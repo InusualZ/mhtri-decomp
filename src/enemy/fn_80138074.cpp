@@ -801,10 +801,10 @@ void fn_8013823C(EnemyWork* self) {
     if ((u32)(self->field_0x1E5 - 8) > 1) {
         if (self->field_0x1E5 == 0xB) {
             if ((self->flags_0x1C8 & 1) == 0) {
-                fn_80131DB4(self);
+                em_motion_timer_arm(self);
             }
             if ((self->flags_0x1C8 & 0x10000) == 0) {
-                fn_80131DF4(self);
+                em_fx_flag_set(self);
             }
         }
     } else {
@@ -991,7 +991,7 @@ void fn_80138B60(EnemyWork* self) {
         }
         fn_8012FC60(self);
         if (self->field_0x1E2 == 4) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
     }
 }
@@ -1059,8 +1059,8 @@ void fn_80138F3C(EnemyWork* self) {
 void fn_80139024(EnemyWork* self) {
     u8 state;
 
-    fn_80131DB4(self);
-    fn_80131DF4(self);
+    em_motion_timer_arm(self);
+    em_fx_flag_set(self);
     state = self->field_0x005;
     switch (state) {
     case 0:

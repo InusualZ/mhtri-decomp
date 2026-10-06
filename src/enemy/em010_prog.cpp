@@ -1,6 +1,6 @@
 /*
  * enemy/em010_prog.cpp - enemy 010's program: the per-area seat and entry selectors (`stage_map_kind_get`,
- *   `area_no` and the entry state pick the `fn_80126324` motion), the per-motion state steps and their
+ *   `area_no` and the entry state pick the `em_move_target_set` motion), the per-motion state steps and their
  *   `state_sub` dispatchers, and the static initializer.
  * RANGE. .text 0x801663E4-0x8016D1C4 (77 functions); extab 0x8000E1D4-0x8000E3DC, extabindex
  *   0x800291A8-0x800294B4, .ctors 0x8056F32C-0x8056F330, .rodata 0x8056FC10-0x8056FCD0, .data 0x805A6D58-0x805A7CE8
@@ -126,78 +126,78 @@ u32 fn_801663E4(_ENEMY_WORK* self) {
     case 1:
         switch (self->area_no) {
         case 1:
-            fn_80126324(self, 2, 5, lbl_807974F0);
+            em_move_target_set(self, 2, 5, lbl_807974F0);
             break;
         case 2:
             switch (self->field_0x9F6) {
             case 1:
-                fn_80126324(self, 2, 9, lbl_807974F0);
+                em_move_target_set(self, 2, 9, lbl_807974F0);
                 break;
             case 3:
-                fn_80126324(self, 0x15, 0xA, lbl_807974F0);
+                em_move_target_set(self, 0x15, 0xA, lbl_807974F0);
                 break;
             case 4:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             }
             break;
         case 3:
             switch (self->field_0x9F6) {
             case 1:
-                fn_80126324(self, 2, 5, lbl_807974F0);
+                em_move_target_set(self, 2, 5, lbl_807974F0);
                 break;
             case 5:
-                fn_80126324(self, 3, 9, lbl_807974F0);
+                em_move_target_set(self, 3, 9, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 5, lbl_807974F0);
+                em_move_target_set(self, 2, 5, lbl_807974F0);
                 break;
             }
             break;
         case 4:
             switch (self->field_0x9F6) {
             case 2:
-                fn_80126324(self, 2, 9, lbl_807974F0);
+                em_move_target_set(self, 2, 9, lbl_807974F0);
                 break;
             case 9:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 9, lbl_807974F0);
+                em_move_target_set(self, 2, 9, lbl_807974F0);
                 break;
             }
             break;
         case 5:
             switch (self->field_0x9F6) {
             case 3:
-                fn_80126324(self, 2, 5, lbl_807974F0);
+                em_move_target_set(self, 2, 5, lbl_807974F0);
                 break;
             case 9:
-                fn_80126324(self, 3, 9, lbl_807974F0);
+                em_move_target_set(self, 3, 9, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 5, lbl_807974F0);
+                em_move_target_set(self, 2, 5, lbl_807974F0);
                 break;
             }
             break;
         case 9:
             switch (self->field_0x9F6) {
             case 4:
-                fn_80126324(self, 2, 0x11, lbl_807974F0);
+                em_move_target_set(self, 2, 0x11, lbl_807974F0);
                 break;
             case 5:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 0x11, lbl_807974F0);
+                em_move_target_set(self, 2, 0x11, lbl_807974F0);
                 break;
             }
             break;
         case 10:
-            fn_80126324(self, 4, 5, lbl_807974F0);
+            em_move_target_set(self, 4, 5, lbl_807974F0);
             return 1;
         default:
             stale = 1;
@@ -209,124 +209,124 @@ u32 fn_801663E4(_ENEMY_WORK* self) {
         case 1:
             switch (self->field_0x9F6) {
             case 2:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             case 4:
-                fn_80126324(self, 3, 7, lbl_807974F0);
+                em_move_target_set(self, 3, 7, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             }
             break;
         case 2:
             switch (self->field_0x9F6) {
             case 1:
-                fn_80126324(self, 2, 5, lbl_807974F0);
+                em_move_target_set(self, 2, 5, lbl_807974F0);
                 break;
             case 3:
-                fn_80126324(self, 0x13, 0x14, lbl_807974F0);
+                em_move_target_set(self, 0x13, 0x14, lbl_807974F0);
                 break;
             case 9:
-                fn_80126324(self, 3, 4, lbl_807974F0);
+                em_move_target_set(self, 3, 4, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 5, lbl_807974F0);
+                em_move_target_set(self, 2, 5, lbl_807974F0);
                 break;
             }
             break;
         case 3:
             switch (self->field_0x9F6) {
             case 2:
-                fn_80126324(self, 2, 0x14, lbl_807974F0);
+                em_move_target_set(self, 2, 0x14, lbl_807974F0);
                 break;
             case 4:
-                fn_80126324(self, 3, 0x13, lbl_807974F0);
+                em_move_target_set(self, 3, 0x13, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 0x14, lbl_807974F0);
+                em_move_target_set(self, 2, 0x14, lbl_807974F0);
                 break;
             }
             break;
         case 4:
             switch (self->field_0x9F6) {
             case 1:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             case 2:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             case 3:
-                fn_80126324(self, 0x24, 0x27, lbl_807974F0);
+                em_move_target_set(self, 0x24, 0x27, lbl_807974F0);
                 break;
             case 5:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             case 6:
-                fn_80126324(self, 0x25, 0x26, lbl_807974F0);
+                em_move_target_set(self, 0x25, 0x26, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             }
             break;
         case 5:
             switch (self->field_0x9F6) {
             case 4:
-                fn_80126324(self, 2, 6, lbl_807974F0);
+                em_move_target_set(self, 2, 6, lbl_807974F0);
                 break;
             case 7:
-                fn_80126324(self, 0x18, 7, lbl_807974F0);
+                em_move_target_set(self, 0x18, 7, lbl_807974F0);
                 break;
             case 9:
-                fn_80126324(self, 3, 7, lbl_807974F0);
+                em_move_target_set(self, 3, 7, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 6, lbl_807974F0);
+                em_move_target_set(self, 2, 6, lbl_807974F0);
                 break;
             }
             break;
         case 6:
             switch (self->field_0x9F6) {
             case 4:
-                fn_80126324(self, 2, 5, lbl_807974F0);
+                em_move_target_set(self, 2, 5, lbl_807974F0);
                 break;
             case 7:
-                fn_80126324(self, 3, 4, lbl_807974F0);
+                em_move_target_set(self, 3, 4, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 5, lbl_807974F0);
+                em_move_target_set(self, 2, 5, lbl_807974F0);
                 break;
             }
             break;
         case 7:
             switch (self->field_0x9F6) {
             case 5:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             case 6:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             }
             break;
         case 9:
             switch (self->field_0x9F6) {
             case 2:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             case 5:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             }
             break;
         case 10:
-            fn_80126324(self, 1, 3, lbl_807974F4);
+            em_move_target_set(self, 1, 3, lbl_807974F4);
             return 1;
         default:
             stale = 1;
@@ -338,79 +338,79 @@ u32 fn_801663E4(_ENEMY_WORK* self) {
         case 1:
             switch (self->field_0x9F6) {
             case 2:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             case 3:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             }
             break;
         case 2:
             switch (self->field_0x9F6) {
             case 1:
-                fn_80126324(self, 3, 6, lbl_807974F0);
+                em_move_target_set(self, 3, 6, lbl_807974F0);
                 break;
             case 3:
-                fn_80126324(self, 4, 6, lbl_807974F0);
+                em_move_target_set(self, 4, 6, lbl_807974F0);
                 break;
             case 6:
-                fn_80126324(self, 5, 7, lbl_807974F0);
+                em_move_target_set(self, 5, 7, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 3, 6, lbl_807974F0);
+                em_move_target_set(self, 3, 6, lbl_807974F0);
                 break;
             }
             break;
         case 3:
             switch (self->field_0x9F6) {
             case 1:
-                fn_80126324(self, 3, 6, lbl_807974F0);
+                em_move_target_set(self, 3, 6, lbl_807974F0);
                 break;
             case 2:
-                fn_80126324(self, 4, 6, lbl_807974F0);
+                em_move_target_set(self, 4, 6, lbl_807974F0);
                 break;
             case 5:
-                fn_80126324(self, 5, 7, lbl_807974F0);
+                em_move_target_set(self, 5, 7, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 3, 6, lbl_807974F0);
+                em_move_target_set(self, 3, 6, lbl_807974F0);
                 break;
             }
             break;
         case 5:
             switch (self->field_0x9F6) {
             case 3:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             case 6:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             }
             break;
         case 6:
             switch (self->field_0x9F6) {
             case 2:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             case 5:
-                fn_80126324(self, 3, 5, lbl_807974F0);
+                em_move_target_set(self, 3, 5, lbl_807974F0);
                 break;
             default:
-                fn_80126324(self, 2, 4, lbl_807974F0);
+                em_move_target_set(self, 2, 4, lbl_807974F0);
                 break;
             }
             break;
         case 7:
-            fn_80126324(self, 0, 2, lbl_807974F4);
+            em_move_target_set(self, 0, 2, lbl_807974F4);
             return 1;
         case 9:
-            fn_80126324(self, 0, 2, lbl_807974F4);
+            em_move_target_set(self, 0, 2, lbl_807974F4);
             return 1;
         default:
             stale = 1;
@@ -419,14 +419,14 @@ u32 fn_801663E4(_ENEMY_WORK* self) {
         break;
     case 8:
         if (self->area_no == 1) {
-            fn_80126324(self, 0, 1, lbl_807974F8);
+            em_move_target_set(self, 0, 1, lbl_807974F8);
             return 1;
         }
         stale = 1;
         break;
     case 9:
         if (self->area_no == 0) {
-            fn_80126324(self, 0, 1, lbl_807974F8);
+            em_move_target_set(self, 0, 1, lbl_807974F8);
             return 1;
         }
         stale = 1;
@@ -477,7 +477,7 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
         break;
     case 2:
         fn_8016C674(self, &a, &b);
-        fn_80128A8C(self, a, b);
+        em_act_arm_unless_down(self, a, b);
         em_state_refresh(self);
         break;
     case 3:
@@ -521,22 +521,22 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
         if (running == 0) {
             if (fn_801663E4(self) == 0) {
                 em_move_mode_set(self, 0);
-                fn_80128A8C(self, 2, 0);
+                em_act_arm_unless_down(self, 2, 0);
             } else {
                 em_move_mode_set(self, 0);
-                fn_80128A8C(self, 0xC, 1);
+                em_act_arm_unless_down(self, 0xC, 1);
             }
         } else if (map == 2 && self->area_no == 4) {
             em_move_mode_set(self, 0);
-            fn_80126324(self, 0x13, 0x14, lbl_80797500);
-            fn_80128A8C(self, 0xC, 1);
+            em_move_target_set(self, 0x13, 0x14, lbl_80797500);
+            em_act_arm_unless_down(self, 0xC, 1);
         } else if (map == 2 && self->area_no == 5) {
             em_move_mode_set(self, 0);
-            fn_80126324(self, 0x13, 0x15, lbl_807974F8);
-            fn_80128A8C(self, 0xC, 1);
+            em_move_target_set(self, 0x13, 0x15, lbl_807974F8);
+            em_act_arm_unless_down(self, 0xC, 1);
         } else {
             fn_8016C674(self, &a, &b);
-            fn_80128A8C(self, a, b);
+            em_act_arm_unless_down(self, a, b);
         }
         em_state_refresh(self);
         break;
@@ -548,8 +548,8 @@ void fn_801671A8(void) {
 
 void fn_801671AC(_ENEMY_WORK* self) {
     if (em_die_ck(self) == 0) {
-        if (self->field_0x834 == 1 || fn_801337FC(self) == 1) {
-            fn_8012E664(self);
+        if (self->field_0x834 == 1 || em_hit_timer_ck(self) == 1) {
+            em_attack_start(self);
             fn_8013072C(self, 1, 0);
         }
         {
@@ -564,7 +564,7 @@ void fn_801671AC(_ENEMY_WORK* self) {
                         && em_act_ck(data->work_0x18, 1, 6) == 1
                         && em_frame_check(data->work_0x18, 0, lbl_80797504, lbl_807974FC) == 1
                         && self->field_0x916 <= 0) {
-                        fn_8012CEB4(self, (s16)(ran_suu(0) & 0x1F), 0);
+                        em_hit_by_set(self, (s16)(ran_suu(0) & 0x1F), 0);
                     }
                 }
                 if (data->field_0x08 == 0xFF) {
@@ -718,7 +718,7 @@ void fn_801676C4(_ENEMY_WORK* self) {
 
     em_frame_flag_set();
     em_busy_timer_reset(self);
-    fn_80131DF4(self);
+    em_fx_flag_set(self);
     state = self->state;
     switch (state) {
     case 0:
@@ -729,7 +729,7 @@ void fn_801676C4(_ENEMY_WORK* self) {
         break;
     case 1:
         if (self->field_0x1D4 <= lbl_807974FC) {
-            fn_8012E694(self);
+            em_attack_done_set(self);
         }
         break;
     }
@@ -740,7 +740,7 @@ void fn_80167770(_ENEMY_WORK* self) {
 
     em_frame_flag_set();
     em_busy_timer_reset(self);
-    fn_80131DF4(self);
+    em_fx_flag_set(self);
     state = self->state;
     switch (state) {
     case 0:
@@ -763,7 +763,7 @@ void fn_80167770(_ENEMY_WORK* self) {
     case 2:
         em_move_offset_step(self, &self->field_0x1BC);
         if (self->field_0x1D4 <= lbl_807974FC || self->pos.y <= self->field_0x20C) {
-            fn_8012E694(self);
+            em_attack_done_set(self);
         }
         break;
     }
@@ -774,7 +774,7 @@ void fn_801678A0(_ENEMY_WORK* self) {
 
     em_frame_flag_set();
     em_busy_timer_reset(self);
-    fn_80131DF4(self);
+    em_fx_flag_set(self);
     state = self->state;
     switch (state) {
     case 0:
@@ -786,7 +786,7 @@ void fn_801678A0(_ENEMY_WORK* self) {
         break;
     case 1:
         if (--self->timer_0x020 <= 0 || self->field_0x1D4 <= lbl_807974FC) {
-            fn_8012E694(self);
+            em_attack_done_set(self);
         }
         break;
     }

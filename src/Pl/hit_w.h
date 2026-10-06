@@ -69,7 +69,7 @@ struct _HIT_W {
     /* +0x54 */ f32 value_0x54;      /* the same for the second owner slot */
     /* +0x58 */ u8 unused_0x58[0x5A - 0x58];
     /* +0x5A */ u8 field_0x05A;
-    /* +0x5B */ u8 field_0x05B;      /* the mask byte `fn_8029F51C` tests */
+    /* +0x5B */ u8 field_0x05B;      /* the mask byte `hit_mask_ck` tests */
     /* +0x5C */ u8 unused_0x5C[0x60 - 0x5C];
 };
 

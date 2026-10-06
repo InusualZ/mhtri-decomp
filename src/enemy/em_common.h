@@ -88,6 +88,8 @@ u8 em_captured_ck(struct _ENEMY_WORK* enemy);
 /* 0x80126AD0 - whether area entry `entry` lies in area `sub` or one area `index` reaches from it (GUESS name). */
 s32 em_area_entry_near_ck(struct EmAreaEntry* entry, u8 index, u8 sub);
 s32 em_mini_kill_kind_get(struct _ENEMY_WORK* enemy);
+/* 0x8013763C - sets the record's +0x43F latch the roar step arms (GUESS name). */
+void em_roar_latch_set(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }

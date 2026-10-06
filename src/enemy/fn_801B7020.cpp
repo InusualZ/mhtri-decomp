@@ -67,7 +67,7 @@ struct EmVecWords {
     /* +0x08 */ u32 z;
 };
 
-/* The 0x20-byte out record `em_ground_rec_clear` prepares and `fn_801421E4` fills: the mode byte at +0x03
+/* The 0x20-byte out record `em_ground_rec_clear` prepares and `em_ground_rec_find` fills: the mode byte at +0x03
  * (`fn_801B7118`), the vector at +0x08 and the u32 at +0x18 `fn_801B71F4` narrows to u16.
  * size: 0x20 */
 struct EmSelRec {
@@ -95,7 +95,7 @@ struct EmProgWork {
     /* +0x00F */ u8 field_0x00F;
     /* +0x010 */ u8 field_0x010;
     /* +0x011 */ u8 unused_0x011[0x01A - 0x011];
-    /* +0x01A */ u16 field_0x01A;        /* the id `fn_801421E4` is handed */
+    /* +0x01A */ u16 field_0x01A;        /* the id `em_ground_rec_find` is handed */
     /* +0x01C */ u8 unused_0x01C[0x020 - 0x01C];
     /* +0x020 */ s32 timer_0x020;        /* the step countdown (`bgt` keeps a positive one running) */
     /* +0x024 */ u8 unused_0x024[0x188 - 0x024];
@@ -202,7 +202,7 @@ extern "C" s32 fn_801B7118(u16 id) {
     if (move_work_state_ck() == 0) {
         return 0;
     }
-    if (fn_801421E4((u16)id, &rec) == 0) {
+    if (em_ground_rec_find((u16)id, &rec) == 0) {
         return 0;
     }
     roll = (u16)ran_suu(0) % 100;
@@ -223,7 +223,7 @@ extern "C" void fn_801B71F4(EmProgWork* self, u8 mode) {
 
     em_ground_rec_clear(&rec);
     self->field_0x32C = 0;
-    if (fn_801421E4(self->field_0x01A, &rec) == 1) {
+    if (em_ground_rec_find(self->field_0x01A, &rec) == 1) {
         self->field_0x32E = (u16)rec.value_0x18;
     } else {
         self->field_0x32E = 0;
@@ -240,9 +240,9 @@ extern "C" void fn_801B71F4(EmProgWork* self, u8 mode) {
         em_fall_height_get((struct _ENEMY_WORK*)self);
         em_fall_start((struct _ENEMY_WORK*)self);
         if (self->field_0x00A & 1) {
-            fn_80128A8C((struct _ENEMY_WORK*)self, 3, 10);
+            em_act_arm_unless_down((struct _ENEMY_WORK*)self, 3, 10);
         } else {
-            fn_80128A8C((struct _ENEMY_WORK*)self, 0, 3);
+            em_act_arm_unless_down((struct _ENEMY_WORK*)self, 0, 3);
         }
         if (self->field_0x00F == 0) {
             pick = (s8)fn_801B7118(self->field_0x01A);

@@ -36,6 +36,10 @@ s32 fillNetUserProfileRange7C(struct NetUserProfile* profile);
 s32 fillNetUserProfileRank(struct NetUserProfile* profile);
 s32 fillNetUserProfileRecord(struct NetUserProfile* profile);
 
+/* 0x8004BA3C - adds `count` of item `id` to an `{id, value}` table of `n` slots, capping each at `max`; returns 3 when
+ * the table could not take all of it (the callers' reading). */
+s16 item_take(u16 id, s16 count, struct IdValue* table, s32 n, s32 flag, s32 max);
+
 #ifdef __cplusplus
 }
 #endif

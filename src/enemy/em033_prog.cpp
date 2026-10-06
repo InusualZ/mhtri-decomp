@@ -12,7 +12,7 @@
  * RESIDUALS. 39 rows unwritten: 0x8035BAB4-0x8035E034 (`fn_8035BAB4` .. `fn_8035DFC0`).
  *  - `fn_8035E580` saves from r20 where retail calls `_restgpr_22`; `fn_8035EF58` saves no registers through
  *    the helpers where retail calls `_savegpr_27`/`_restgpr_27` (register pressure, not a callee choice).
- *  - `fn_8035E1E0`: retail repeats the `fn_80126324` call (with `lbl_8079B70C`) and the `fn_8012B380` tail in every
+ *  - `fn_8035E1E0`: retail repeats the `em_move_target_set` call (with `lbl_8079B70C`) and the `fn_8012B380` tail in every
  *    case body (920 B), ours shares them (756 B);
  *  - `fn_8035E580`: retail reads the `prev` byte before any store (uninitialised), ours starts it at 0, and the
  *    loop colours differently (`_savegpr_22` against our `_savegpr_20`);
@@ -31,7 +31,7 @@
  */
 
 #include "enemy/fn_8012B380.h" /* fn_8012B380 (rule 2: the owner's header) */
-#include "enemy/fn_8012CEB4.h" /* fn_8012CEB4 (rule 2: the owner's header) */
+#include "enemy/em_hit_by_set.h" /* fn_8012CEB4 (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy.h"
@@ -48,7 +48,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "stage/stg_w.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
-#define fn_8012CEB4_c1 ((void (*)(_ENEMY_WORK*, s16, u32))fn_8012CEB4)
+#define fn_8012CEB4_c1 ((void (*)(_ENEMY_WORK*, s16, u32))em_hit_by_set)
 
 /* Callees outside this unit. */
 
@@ -145,7 +145,7 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         case 4:
             *out_a = 0xC;
             *out_b = 0;
-            fn_80126324(self, 0, 2, lbl_8079B70C);
+            em_move_target_set(self, 0, 2, lbl_8079B70C);
             break;
         default:
             *out_a = 0xC;
@@ -160,9 +160,9 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
             *out_a = 0xC;
             *out_b = 0;
             if (fn_802B0998(3) == 1) {
-                fn_80126324(self, 1, 3, lbl_8079B70C);
+                em_move_target_set(self, 1, 3, lbl_8079B70C);
             } else {
-                fn_80126324(self, 0, 2, lbl_8079B70C);
+                em_move_target_set(self, 0, 2, lbl_8079B70C);
             }
             break;
         case 6:
@@ -174,7 +174,7 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         case 9:
             *out_a = 0xC;
             *out_b = 0;
-            fn_80126324(self, 0, 2, lbl_8079B70C);
+            em_move_target_set(self, 0, 2, lbl_8079B70C);
             break;
         default:
             *out_a = 0xC;
@@ -188,17 +188,17 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         case 5:
             *out_a = 0xC;
             *out_b = 0;
-            fn_80126324(self, 0, 2, lbl_8079B70C);
+            em_move_target_set(self, 0, 2, lbl_8079B70C);
             break;
         case 6:
             *out_a = 0xC;
             *out_b = 0;
-            fn_80126324(self, 0, 2, lbl_8079B70C);
+            em_move_target_set(self, 0, 2, lbl_8079B70C);
             break;
         case 9:
             *out_a = 0xC;
             *out_b = 0;
-            fn_80126324(self, 0, 2, lbl_8079B70C);
+            em_move_target_set(self, 0, 2, lbl_8079B70C);
             break;
         default:
             *out_a = 0xC;
@@ -211,7 +211,7 @@ extern "C" void fn_8035E1E0(_ENEMY_WORK* self, u8* out_a, u8* out_b)
         *out_a = 0xC;
         *out_b = 0;
         if (self->act_id == 2) {
-            fn_80126324(self, 0, 2, lbl_8079B70C);
+            em_move_target_set(self, 0, 2, lbl_8079B70C);
         } else {
             fn_8012B380(self, 5, 2, 10);
         }
@@ -562,9 +562,9 @@ extern "C" void fn_8035F060(_ENEMY_WORK* self, u8 a)
         if (self->field_0x00A == 2) {
             em_fall_height_get(self);
             em_fall_start(self);
-            fn_80128A8C(self, 3, 0);
+            em_act_arm_unless_down(self, 3, 0);
         } else {
-            fn_80128A8C(self, 1, 0);
+            em_act_arm_unless_down(self, 1, 0);
         }
         self->field_0x1CC = lbl_8079B718;
         if (self->run_flags_0xB12 & 1) {

@@ -243,7 +243,7 @@ void em_move_offset_step(struct _ENEMY_WORK* self, void* p);
 u32 em_move_offset_step_update(struct _ENEMY_WORK* self, void* p);
 f32 em_key_curve_eval(struct _ENEMY_WORK* self, void* tbl);
 f32 fn_801356A8(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
-void fn_80136D14(struct _ENEMY_WORK* self);
+void em_shake_req_set(struct _ENEMY_WORK* self);
 
 /* `enemy/fn_80138074.c` */
 void fn_8013AAC4(struct _ENEMY_WORK* self);
@@ -568,7 +568,7 @@ void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
     fn_80131D9C(self);
     if ((u8)stage_map_kind_get(self->field_0x1E0) == 4) {
         if ((u32)(self->area_no - 4) <= 2) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
     }
     switch (self->state) {
@@ -2490,7 +2490,7 @@ struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_c
 void fn_8013221C(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
 void fn_80132224(struct _ENEMY_WORK* self);
 void fn_80132264(struct _ENEMY_WORK* self);
-u8* fn_801377D0(u8 index);
+u8* em_move_work_pick(u8 index);
 void em_part_hit_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_801376B4(struct _ENEMY_WORK* self);
@@ -2552,7 +2552,7 @@ struct EmScratchB {
     /* +0x00 */ u8 unused_0x00[0x40];
 };
 
-/* The area-entry record `fn_801377D0` returns, as `fn_801D6758` reads it.
+/* The area-entry record `em_move_work_pick` returns, as `fn_801D6758` reads it.
  * size: 0x5A8 (only the three bytes the caller reads are named) */
 struct EmAreaEntry801CCBC4 {
     /* +0x000 */ u8 active;
@@ -3391,7 +3391,7 @@ s32 fn_801D6758(struct _ENEMY_WORK* self) {
     EmAreaEntry801CCBC4* entry;
 
     if (self->field_0x382 != 0xFF && self->field_0x380 == 1) {
-        entry = (EmAreaEntry801CCBC4*)fn_801377D0(self->state_0x381);
+        entry = (EmAreaEntry801CCBC4*)em_move_work_pick(self->state_0x381);
         if (entry->active != 0 && entry->area_no == self->area_no &&
             (entry->flags_0x5A6 & 0x7F) == 1) {
             return 1;

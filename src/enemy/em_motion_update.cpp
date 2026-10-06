@@ -21,8 +21,8 @@
 #include "enemy/em_status_set.h" /* em_status_set (rule 2: the owner's header) */
 #include "enemy/fn_80130844.h" /* fn_80130844 (rule 2: the owner's header) */
 #include "enemy/fn_80130B28.h" /* fn_80130B28 (rule 2: the owner's header) */
-#include "enemy/fn_80131DB4.h" /* fn_80131DB4 (rule 2: the owner's header) */
-#include "enemy/fn_80131DF4.h" /* fn_80131DF4 (rule 2: the owner's header) */
+#include "enemy/em_motion_timer_arm.h" /* fn_80131DB4 (rule 2: the owner's header) */
+#include "enemy/em_fx_flag_set.h" /* fn_80131DF4 (rule 2: the owner's header) */
 #include "enemy/fn_80132064.h" /* fn_80132064 (rule 2: the owner's header) */
 #include "enemy/fn_801322B4.h" /* fn_801322B4 (rule 2: the owner's header) */
 #include "enemy/em_state_refresh.h" /* em_state_refresh (rule 2: the owner's header) */
@@ -93,8 +93,8 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
     case 0:
         self->field_0x004++;
         fn_80137C94(self);
-        fn_80131DB4(self);
-        fn_80131DF4(self);
+        em_motion_timer_arm(self);
+        em_fx_flag_set(self);
         fn_800E0914((struct MHchar*)&self->char_0x024);
         break;
 
@@ -174,8 +174,8 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
         }
 
         if (refresh == 1) {
-            fn_80131DB4(self);
-            fn_80131DF4(self);
+            em_motion_timer_arm(self);
+            em_fx_flag_set(self);
             fn_800E0914((struct MHchar*)&self->char_0x024);
         }
         if (self->model_flag_0x058 != 0) {

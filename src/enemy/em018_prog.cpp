@@ -1454,7 +1454,7 @@ void fn_80195638(struct _ENEMY_WORK* self, u32 a) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xD0, 0, 0);
         fn_801303EC(self, lbl_80798238);
-        fn_80136D14(self);
+        em_shake_req_set(self);
         self->field_0x359 = 1;
         break;
     case 1:
@@ -1463,7 +1463,7 @@ void fn_80195638(struct _ENEMY_WORK* self, u32 a) {
             self->field_0x359 = 1;
         }
         if (em_frame_check(self, 2, lbl_8079827C, lbl_80798238) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -1530,11 +1530,11 @@ void fn_801986AC(struct _ENEMY_WORK* self) {
         em_mot_set_blend(self, 0xD6, 0x14, 0, 1);
         em_hit_window_set(self, 0, 2, 3);
         fn_801303EC(self, lbl_80798238);
-        fn_80136D14(self);
+        em_shake_req_set(self);
         break;
     case 1:
         if (em_frame_check(self, 2, lbl_80798398, lbl_80798238) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
             self->state++;
@@ -1685,11 +1685,11 @@ void fn_80195ED4(struct _ENEMY_WORK* self) {
         fn_801303EC(self, lbl_80798238);
         fn_80130CDC(self, -0xC);
         self->field_0x359 = 1;
-        fn_80136D14(self);
+        em_shake_req_set(self);
         break;
     case 1:
         if (em_frame_check(self, 2, lbl_80798288, lbl_80798238) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_frame_check(self, 2, lbl_80798308, lbl_80798238) == 1) {
             self->field_0x359 = 1;
@@ -1716,11 +1716,11 @@ void fn_80196004(struct _ENEMY_WORK* self) {
         em_hit_window_set_default(self, 0, 0x10);
         fn_80130CDC(self, -0xC);
         self->field_0x359 = 1;
-        fn_80136D14(self);
+        em_shake_req_set(self);
         break;
     case 1:
         if (em_frame_check(self, 2, lbl_80798310, lbl_80798238) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_frame_check(self, 2, lbl_80798314, lbl_80798238) == 1) {
             self->field_0x359 = 1;

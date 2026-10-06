@@ -75,7 +75,7 @@ struct EmPartRec {
     /* +0x4 */ s16 value_0x04;
 };
 
-/* The 0x20-byte ground/seat record `em_ground_rec_clear` prepares and `fn_801421E4` fills: both take it as
+/* The 0x20-byte ground/seat record `em_ground_rec_clear` prepares and `em_ground_rec_find` fills: both take it as
  * a `void* out` (their declarations are in `enemy/fn_801251D0.h` and
  * `enemy/enemy_control.h`), so it is the CALLERS' record and the two units that own one
  * share this one definition (docs/plan.md 6.5 rule 1): `enemy/em034_prog.cpp` names the seat flags
@@ -545,6 +545,13 @@ struct _ENEMY_WORK {
             /* +0x33B */ u8 kcolor_b_0x33B;
             /* +0x33C */ u8 unused_0x33Ckc[0x354 - 0x33C];
         } em020_kcolor_0x328;
+        /* the em029 program's hit pair (`menu/multi_result.cpp`'s em029 band): the flag the busy action holds this
+         * frame and last frame's copy the per-frame slot shifts into it.  size: 0x2C */
+        struct {
+            /* +0x328 */ u8 hit_0x328;
+            /* +0x329 */ u8 hit_prev_0x329;
+            /* +0x32A */ u8 unused_0x32Aem029[0x354 - 0x32A];
+        } em029_0x328; /* size: 0x2C */
         /* the em024 monster program's own field view `enemy/em024_ai.cpp` reaches: the three state bytes, the four
          * `s16` gauge/timer words and the two position vectors the program latches.  A union member because the views above already own these
          * bytes. */
@@ -619,7 +626,7 @@ struct _ENEMY_WORK {
                                          * against 1 (`enemy/em005_act.cpp`), and the em030
                                          * homing/action state `enemy/em030_prog.cpp` keeps here */
     /* +0x381 */ u8 state_0x381;        /* the picker mode `enemy/em030_prog.cpp`'s em030 hands to
-                                         * `fn_801377D0`, and the record index
+                                         * `em_move_work_pick`, and the record index
                                          * `enemy/em005_act.cpp`'s `fn_801D6758` hands to the same
                                          * function */
     /* +0x382 */ u8 field_0x382;        /* `fn_8013FD1C` writes it from the stream; 0xFF means
@@ -656,7 +663,7 @@ struct _ENEMY_WORK {
                                         * dispatches on (named by `enemy/em030_prog.cpp`) */
     /* +0x43D */ u8 field_0x43D;
     /* +0x43E */ u8 field_0x43E;
-    /* +0x43F */ u8 field_0x43F;        /* `fn_8013763C` sets it, `fn_80137648` reads it back */
+    /* +0x43F */ u8 field_0x43F;        /* `em_roar_latch_set` sets it, `fn_80137648` reads it back */
     /* +0x440 */ s16 field_0x440;    /* the action frame counter `enemy/em034_prog.cpp`'s
                                         * `fn_801B47A4` tests against 0x1C2 and `enemy/em030_prog.cpp`'s
                                         * em030 `fn_801B0A28` against 300/1800 */

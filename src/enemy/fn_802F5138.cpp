@@ -595,7 +595,7 @@ extern "C" void fn_802F51DC(_ENEMY_WORK* work, u32 arg) {
     }
     if ((u8)arg == 0) {
         em_move_mode_set(work, 2);
-        fn_80128A8C(work, 0, 4);
+        em_act_arm_unless_down(work, 0, 4);
         switch (work->field_0x00A) {
         case 0:
         case 5:

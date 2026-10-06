@@ -362,7 +362,7 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
         return;
     case 3:
         if (em_frame_check(self, 1, lbl_8079C05C, lbl_8079BFF8) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
             self->state++;
@@ -389,7 +389,7 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
             em_move_mode_set(self, 0);
             em_mot_set(self, 0x27, 0, 0);
             fn_801303EC(self, lbl_8079BFF8);
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         return;
     case 6:
@@ -398,7 +398,7 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
             em_busy_timer_reset(self);
         }
         if (em_frame_check(self, 3, lbl_8079C064, lbl_8079BFF8) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
             self->state++;
@@ -749,7 +749,7 @@ extern "C" void fn_80388C38(_ENEMY_WORK* self)
         return;
     case 1:
         if (em_frame_check(self, 1, lbl_8079C05C, lbl_8079BFF8) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
             fn_8013032C(self);
@@ -868,11 +868,11 @@ extern "C" void fn_80389038(_ENEMY_WORK* self)
         fn_801303EC(self, lbl_8079BFF8);
         em_hit_window_set_default(self, 0, 0x13);
         em_hit_window_set_default(self, 1, 0x14);
-        fn_80136D14(self);
+        em_shake_req_set(self);
         return;
     case 1:
         if (em_frame_check(self, 3, lbl_8079C064, lbl_8079BFF8) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -896,7 +896,7 @@ extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
         return;
     case 1:
         if (em_frame_check(self, 1, lbl_8079C05C, lbl_8079BFF8) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
             self->state++;
@@ -952,7 +952,7 @@ extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
                 fn_801303EC(self, lbl_8079BFF8);
                 em_hit_window_set_default(self, 0, 0x13);
                 em_hit_window_set_default(self, 1, 0x14);
-                fn_80136D14(self);
+                em_shake_req_set(self);
                 return;
             }
         }
@@ -965,12 +965,12 @@ extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
             fn_801303EC(self, lbl_8079BFF8);
             em_hit_window_set_default(self, 0, 0x13);
             em_hit_window_set_default(self, 1, 0x14);
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         return;
     case 5:
         if (em_frame_check(self, 3, lbl_8079C064, lbl_8079BFF8) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1) {
             switch (a) {

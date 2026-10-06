@@ -457,8 +457,11 @@ typedef struct QuestRecordRow {
     /* +0x04 */ u8 unused_0x04[0x5C];
 } QuestRecordRow;
 /* The record `quest_work.pad_0x03C` points at: one player's quest/arena result row.  Only the
- * offsets this band reads are named, and the whole tail below +0x372 is not evidenced.
- * size: 0x714 (lower bound) */
+ * offsets this band reads are named.  MEASURED size 0x4B8: `lobby/lb_quest_screen.cpp`'s `quest_record_copy`
+ * (0x803A8994) is a plain struct assignment, which MWCC copies member by member - retail copies 0x000..0x4B8 and
+ * its member grouping fixes the layout below (no member at +0x30E, one 4-byte array at +0x32C, words at
+ * +0x35C..+0x368, halfwords at +0x374..+0x378, a word at +0x380 and a 12-byte array at +0x384).
+ * size: 0x4B8 */
 typedef struct QuestRecord {
     /* +0x000 */ char field_0x000[0x02C];  /* the leading text run: the record's own name, which
                                              * `quest_result_field_text_get`'s field kinds 0/22 copy */
@@ -479,37 +482,57 @@ typedef struct QuestRecord {
     /* +0x1C9 */ char field_0x1C9[0x143];  /* field kind 8's text run */
     /* +0x30C */ u8 field_0x30C[2];  /* the two per-slot monster ids (bytes 0/1)
                                       * `quest_monster_text_get` renders through string table 33 */
-    /* +0x30E */ u8 unused_0x30E[0x002];
+    /* +0x30E */                     /* alignment padding: the record copy skips it */
     /* +0x310 */ u32 flags_0x310;    /* the row's flag word the `quest_flag_*_ck` predicates test */
     /* +0x314 */ union {
         QuestRecordSlotByte slot_bytes_0x314[3];   /* slot 0's byte is the arena quest-info row's flag byte */
         Q_SlotPair slot_pairs_0x314[3];            /* the same three slots as the monster keys they hold */
     };
-    /* +0x32C */ u8 field_0x32C;
-    /* +0x32D */ u8 bonus_rank_0x32D;  /* the rank whose weight (`quest_rank_weight_tbl`) the bonus carries */
-    /* +0x32E */ u8 field_0x32E;
-    /* +0x32F */ u8 intruder_set_0x32F;  /* the intruder set the enemy side's check (`nora_set_proc`) takes */
-    /* +0x330 */ QuestRecordSlotWord slot_words_0x330[3];
-    /* +0x348 */ s32 field_0x348;
-    /* +0x34C */ s32 field_0x34C;
-    /* +0x350 */ s32 field_0x350;
-    /* +0x354 */ s32 field_0x354;
-    /* +0x358 */ s32 field_0x358;     /* `quest_id_set` copies it to the item work's +0x34 */
-    /* +0x35C */ u8 unused_0x35C[0x010];
+    /* +0x32C */ union {
+        u8 bytes_0x32C[4];              /* the four bytes as the one array the record copy moves */
+        struct {
+            /* +0x32C */ u8 field_0x32C;
+            /* +0x32D */ u8 bonus_rank_0x32D;  /* the rank whose weight (`quest_rank_weight_tbl`) the bonus carries */
+            /* +0x32E */ u8 field_0x32E;
+            /* +0x32F */ u8 intruder_set_0x32F;  /* the intruder set the enemy side's check (`nora_set_proc`) takes */
+        };
+    };
+    /* +0x330 */ union {
+        u32 words_0x330[15];            /* the run as the one block the record copy moves */
+        struct {
+            /* +0x330 */ QuestRecordSlotWord slot_words_0x330[3];
+            /* +0x348 */ s32 field_0x348;
+            /* +0x34C */ s32 field_0x34C;
+            /* +0x350 */ s32 field_0x350;
+            /* +0x354 */ s32 field_0x354;
+            /* +0x358 */ s32 field_0x358;     /* `quest_id_set` copies it to the item work's +0x34 */
+            /* +0x35C */ s32 unused_0x35C;
+            /* +0x360 */ s32 unused_0x360;
+            /* +0x364 */ s32 unused_0x364;
+            /* +0x368 */ s32 unused_0x368;
+        };
+    };
     /* +0x36C */ u16 field_0x36C;     /* `quest_slot_progress_get` returns its low byte */
     /* +0x36E */ u8 lobby_kind_0x36E;  /* the lobby quest kind (`lb_quest_work_init`) */
     /* +0x36F */ u8 stage_0x36F;       /* the stage whose dcm archive the quest entry loads */
     /* +0x370 */ u8 unused_0x370[0x002];
     /* +0x372 */ u16 field_0x372;
-    /* +0x374 */ u8 unused_0x374[0x006];
+    /* +0x374 */ u16 unused_0x374;
+    /* +0x376 */ u16 unused_0x376;
+    /* +0x378 */ u16 unused_0x378;
     /* +0x37A */ u16 field_0x37A;
-    /* +0x37C */ u32 area_ofs_0x37C;   /* byte offset of the row's area block from the row */
-    /* +0x380 */ u8 unused_0x380[0x010];
+    /* +0x37C */ union {
+        u32 words_0x37C[5];             /* the run as the one block the record copy moves */
+        struct {
+            /* +0x37C */ u32 area_ofs_0x37C;   /* byte offset of the row's area block from the row */
+            /* +0x380 */ u32 em_stat_0x380;    /* the parameter `quest_em_stat_tbl_get` returns for a monster id of 32 or more */
+            /* +0x384 */ Q_ArenaItem items_0x384[2];  /* the two arena items (`Q_ResultRow::items_0x384`) */
+        };
+    };
     /* +0x390 */ u32 em_level_0x390;   /* the enemy level plus one, 0 for the default */
     /* +0x394 */ QuestRecordRow rows_0x394[3];
     /* +0x4B4 */ u32 acdata_ofs_0x4B4;  /* byte offset from the record to its 0xA0-byte-per-player acdata equip records (`dl_acdata_to_ar_eqdata`) */
-    /* +0x4B8 */ u8 unused_0x4B8[0x25C];
-} QuestRecord; /* size: 0x714 (lower bound) */
+} QuestRecord; /* size: 0x4B8 */
 /* One 0x60-byte entry of the quest work block's element array at `quest_work` +0x94: `flags` gates
  * the entry, `id` is the u16 the callers match on and `value` is the count/target they compare.
  * `key_bytes` is the same +0x04..+0x06 pair as three bytes - `quest_players_state_get` reads the

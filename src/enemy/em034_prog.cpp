@@ -36,7 +36,7 @@
 #include "enemy/em_se_tbl_play.h" /* em_se_tbl_play (rule 2: the owner's header) */
 #include "enemy/em_se_tbl_play_alt.h" /* em_se_tbl_play_alt (rule 2: the owner's header) */
 #include "enemy/em_ground_rec_clear.h" /* fn_80125F54 (rule 2: the owner's header) */
-#include "enemy/fn_80126324.h" /* fn_80126324 (rule 2: the owner's header) */
+#include "enemy/em_move_target_set.h" /* fn_80126324 (rule 2: the owner's header) */
 #include "enemy/em_hit_window_set_default.h" /* em_hit_window_set_default (rule 2: the owner's header) */
 #include "enemy/fn_8012D0B4.h" /* fn_8012D0B4 (rule 2: the owner's header) */
 #include "enemy/fn_8012D1A8.h" /* fn_8012D1A8 (rule 2: the owner's header) */
@@ -48,13 +48,13 @@
 #include "enemy/em_turn_seq_start.h" /* em_turn_seq_start (rule 2: the owner's header) */
 #include "enemy/em_turn_seq_step.h" /* em_turn_seq_step (rule 2: the owner's header) */
 #include "enemy/em_move_mode_set.h" /* em_move_mode_set (rule 2: the owner's header) */
-#include "enemy/fn_80131DF4.h" /* fn_80131DF4 (rule 2: the owner's header) */
+#include "enemy/em_fx_flag_set.h" /* fn_80131DF4 (rule 2: the owner's header) */
 #include "enemy/em_mot_set.h" /* em_mot_set (rule 2: the owner's header) */
 #include "enemy/em_mot_set_ck.h" /* em_mot_set_ck (rule 2: the owner's header) */
 #include "enemy/em_mot_speed_set.h" /* em_mot_speed_set (rule 2: the owner's header) */
 #include "enemy/em_mot_end_ck.h" /* em_mot_end_ck (rule 2: the owner's header) */
 #include "enemy/em_action_finish.h" /* em_action_finish (rule 2: the owner's header) */
-#include "enemy/fn_8012CEB4.h" /* fn_8012CEB4 (rule 2: the owner's header) */
+#include "enemy/em_hit_by_set.h" /* fn_8012CEB4 (rule 2: the owner's header) */
 #include "enemy/fn_80132184.h" /* fn_80132184 (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
@@ -70,9 +70,9 @@
 #define em_hit_window_set_default em_hit_window_set_default_hidden_fn_801251D0_h
 #define em_se_tbl_play em_se_tbl_play_hidden_fn_801251D0_h
 #define em_se_tbl_play_alt em_se_tbl_play_alt_hidden_fn_801251D0_h
-#define fn_80126324 fn_80126324_hidden_fn_801251D0_h
+#define em_move_target_set fn_80126324_hidden_fn_801251D0_h
 #include "enemy/fn_801251D0.h" /* EmGroundRec + fn_80125F54 (rule 1/2: their owner) */
-#undef fn_80126324
+#undef em_move_target_set
 #undef em_se_tbl_play_alt
 #undef em_se_tbl_play
 #undef em_hit_window_set_default
@@ -119,7 +119,7 @@
 #define ran_suu_view1 ((u16 (*)(s32))ran_suu)
 #define fn_8012D1A8_view1 ((s32 (*)(u8))fn_8012D1A8)
 #define fn_8012D0B4_view1 ((s32 (*)(struct _ENEMY_WORK*, void*))fn_8012D0B4)
-#define fn_80126324_view1 ((void (*)(struct _ENEMY_WORK*, u32, u32, f32))fn_80126324)
+#define fn_80126324_view1 ((void (*)(struct _ENEMY_WORK*, u32, u32, f32))em_move_target_set)
 #define em_turn_seq_start_view1 ((void (*)(struct _ENEMY_WORK*, void*, s32, s32, s32))em_turn_seq_start)
 #define em_se_tbl_play_alt_view1 ((void (*)(struct _ENEMY_WORK*, void*, u32, u32))em_se_tbl_play_alt)
 #define em_se_tbl_play_view1 ((void (*)(struct _ENEMY_WORK*, void*, u32, u32))em_se_tbl_play)
@@ -142,7 +142,7 @@ extern "C" {
 /* enemy/em_common.cpp (0x8012EC74..0x80137604) - the action/motion arming helpers. */
 
 /* enemy/em_common.cpp (0x801251D0..0x8012BA00) - the program/entry helpers. */
-u32 fn_801421E4(u32 id, void* out);
+u32 em_ground_rec_find(u32 id, void* out);
 u8 stage_map_kind_get(u8 map);
 
 /* enemy/em_common.cpp (the 0x8013xxxx motion setters). */
@@ -248,7 +248,7 @@ extern "C" void fn_801B4348(_ENEMY_WORK* work) {
     EmGroundRec rec;
 
     em_ground_rec_clear(&rec);
-    if (fn_801421E4(work->field_0x01A, &rec) == 1) {
+    if (em_ground_rec_find(work->field_0x01A, &rec) == 1) {
         copyVec3(&work->aim, &rec.pos_0x08);
     }
 }
@@ -279,7 +279,7 @@ extern "C" u32 fn_801B4398(_ENEMY_WORK* work, u32 kind, u32* out) {
     return 0;
 }
 
-/* The 0x20-byte ground record `em_ground_rec_clear` prepares and `fn_801421E4` fills is `EmGroundRec`
+/* The 0x20-byte ground record `em_ground_rec_clear` prepares and `em_ground_rec_find` fills is `EmGroundRec`
  * (`enemy/ENEMY_WORK.h`). */
 
 /* The range's functions, in address order. */
@@ -459,7 +459,7 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
         if (seated || (self->flag_0x329 == 1 && self->field_0x833 != 0)) {
             fn_8013072C(self, 2, 0);
             self->flag_0x329 = 0;
-            fn_8012CEB4(self, (s16)(ran_suu(0) & 0x1F), 0);
+            em_hit_by_set(self, (s16)(ran_suu(0) & 0x1F), 0);
         }
         if (any == 0) {
             fn_8013072C(self, 0, 0);
@@ -524,7 +524,7 @@ extern "C" s32 fn_801B4C54(u16 id) {
     if (move_work_state_ck() == 0) {
         return 0;
     }
-    if (fn_801421E4((u16)id, &rec) == 0) {
+    if (em_ground_rec_find((u16)id, &rec) == 0) {
         return 0;
     }
     pct = (u16)ran_suu(0) % 100;
@@ -1464,7 +1464,7 @@ extern "C" void fn_801B64FC(_ENEMY_WORK* self) {
         break;
     }
     if (em_act_ck(self, 0x0A, 0x7D) != 0) {
-        fn_80131DF4(self);
+        em_fx_flag_set(self);
     }
 }
 
@@ -1618,7 +1618,7 @@ extern "C" s32 fn_801B6C38(_ENEMY_WORK* self, u8 flag) {
     return 0;
 }
 
-/* 0x801B6C84 (0x270): maps the map kind (`stage_map_kind_get`) and area to a motion pair through `fn_80126324`;
+/* 0x801B6C84 (0x270): maps the map kind (`stage_map_kind_get`) and area to a motion pair through `em_move_target_set`;
  * with no match it reports the unmatched state and copies the control record's position/rotation onto the work. */
 extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     EmGroundRec rec;
@@ -1629,16 +1629,16 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     case 1:
         switch (self->area_no) {
         case 1:
-            fn_80126324(self, 3, 4, lbl_80798CD8);
+            em_move_target_set(self, 3, 4, lbl_80798CD8);
             break;
         case 2:
-            fn_80126324(self, 7, 8, lbl_80798CDC);
+            em_move_target_set(self, 7, 8, lbl_80798CDC);
             break;
         case 3:
-            fn_80126324(self, 7, 8, lbl_80798CD8);
+            em_move_target_set(self, 7, 8, lbl_80798CD8);
             break;
         case 4:
-            fn_80126324(self, 4, 5, lbl_80798CD8);
+            em_move_target_set(self, 4, 5, lbl_80798CD8);
             break;
         default:
             unmatched = 1;
@@ -1648,13 +1648,13 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     case 2:
         switch (self->area_no) {
         case 2:
-            fn_80126324(self, 4, 5, lbl_80798CE0);
+            em_move_target_set(self, 4, 5, lbl_80798CE0);
             break;
         case 6:
-            fn_80126324(self, 8, 9, lbl_80798CE0);
+            em_move_target_set(self, 8, 9, lbl_80798CE0);
             break;
         case 9:
-            fn_80126324(self, 4, 5, lbl_80798CE0);
+            em_move_target_set(self, 4, 5, lbl_80798CE0);
             break;
         default:
             unmatched = 1;
@@ -1664,10 +1664,10 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     case 3:
         switch (self->area_no) {
         case 7:
-            fn_80126324(self, 3, 4, lbl_80798CE0);
+            em_move_target_set(self, 3, 4, lbl_80798CE0);
             break;
         case 9:
-            fn_80126324(self, 3, 4, lbl_80798CE4);
+            em_move_target_set(self, 3, 4, lbl_80798CE4);
             break;
         default:
             unmatched = 1;
@@ -1676,7 +1676,7 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
         break;
     case 5:
         if (self->area_no == 1) {
-            fn_80126324(self, 2, 3, lbl_80798CE0);
+            em_move_target_set(self, 2, 3, lbl_80798CE0);
         } else {
             unmatched = 1;
         }
@@ -1689,7 +1689,7 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
         em_move_mode_set(self, 0);
         *out_state = 0;
         *out_flag = 0;
-        if (fn_801421E4(self->field_0x01A, &rec) == 1) {
+        if (em_ground_rec_find(self->field_0x01A, &rec) == 1) {
             copyVec3(&self->pos, &rec.pos_0x08);
             eft_rot_vec_copy_c1(&self->field_0x1BC, &rec.field_0x14);
         }

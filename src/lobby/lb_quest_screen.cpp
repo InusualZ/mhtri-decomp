@@ -25,14 +25,10 @@
  *   GUESS: quest_failed_ck, quest_sub_state_end_ck
  * RESIDUALS. 48 rows unwritten: 0x803A3A50-0x803A4170, 0x803A4214-0x803A4DD4, 0x803A4EC0-0x803A4F7C,
  *   0x803A5100-0x803A7E1C.  The quest tail 0x803A7E1C-0x803AA4A4 is written (38 rows).  Partial: `note_pane_pos_step`,
- *   `note_value_to_slot`, `note_slot_to_value`; in the tail `quest_record_copy` (the struct assignment is right - MWCC
- *   copies member by member - but `quest/quest_types.h`'s `QuestRecord` is 0x714 bytes with four `u8`s at +0x32C, a
- *   `u8[2]` member at +0x30E, a `u8[0x10]` run at +0x35C/+0x380 and a `u8[6]` run at +0x374, while the copy shows a
- *   0x4B8-byte record with one 4-byte array at +0x32C, padding at +0x30E, words at +0x35C..+0x368, halfwords at
- *   +0x374/+0x376, words at +0x37C/+0x380 and a 12-byte array at +0x384), `quest_area_spawn_apply` (the six-kind
+ *   `note_value_to_slot`, `note_slot_to_value`; in the tail `quest_area_spawn_apply` (the six-kind
  *   membership test: retail compares without an index register, every loop shape tried keeps one), the kill
  *   bookkeeping and spawn-list rows (register allocation; `quest_enemy_kill_record` saves one register more,
- *   `_savegpr_20` against retail's `_savegpr_21`), `note_value_to_slot`/`note_slot_to_value` (retail reaches
+ *   `_savegpr_20`/`_restgpr_20` against retail's `_savegpr_21`/`_restgpr_21`), `note_value_to_slot`/`note_slot_to_value` (retail reaches
  *   `note_slot_flat_table` through `r13`, ours through `lis`/`addi`: the table is not yet emitted as small data), `quest_element_finish` (`lb_sub16_send`'s owner spells its
  *   flag `s8`, retail's caller narrows with `clrlwi`; the owner's own row drops to 96.4 with `u8`),
  *   `quest_net_kill_apply` (retail tests the element against 3 with two branches and keeps an empty first arm of the
@@ -47,7 +43,8 @@
  *   callees through the leaf `quest/quest_record_find.h`.  `QuestBossSpawn` (`em_large_spawn`) and `EmAreaEntry`
  *   (`em_area_entry_tbl`) are one 0x44-byte record (`quest_area_spawn_apply` hands the first to
  *   `em_area_entry_release`).  `quest_element_pick_ck`'s `use_alt` test is a conditional expression (an `if` drops a
- *   branch).
+ *   branch).  `quest_record_copy` is a plain struct assignment: MWCC copies `QuestRecord` member by member, which is
+ *   what fixes that record's layout (`quest/quest_types.h`).
  */
 
 #include "types.h"

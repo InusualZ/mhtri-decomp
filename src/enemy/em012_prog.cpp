@@ -22,7 +22,7 @@
  *   claim and differing.
  */
 
-#include "enemy/fn_80128A8C.h" /* fn_80128A8C (rule 2: the owner's header) */
+#include "enemy/em_act_arm_unless_down.h" /* fn_80128A8C (rule 2: the owner's header) */
 #include "types.h"
 #include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
@@ -38,7 +38,7 @@
 #include "ef.h"
 #include "enemy/EnemyData.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
-#define fn_80128A8C_c1 ((void (*)(_ENEMY_WORK *, u8, u8))fn_80128A8C)
+#define fn_80128A8C_c1 ((void (*)(_ENEMY_WORK *, u8, u8))em_act_arm_unless_down)
 
 extern "C" {
 /* The record `enemy_data_find` looks up; only the flag byte at +0x08 is read here.

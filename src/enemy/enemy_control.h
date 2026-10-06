@@ -119,7 +119,7 @@ void em_demo_rot_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
 
 /* 0x801421E4 - r3 is narrowed with `clrlwi r3,r3,16` (a u16 id, 0xFFFF = the "no record" arm) and r4
  * is the out record `em_ground_rec_clear` prepared; returns a word the enemy program functions compare with 1. */
-u32 fn_801421E4(u32 id, void* out);
+u32 em_ground_rec_find(u32 id, void* out);
 /* 0x80146008 - reads the record's motion timer and returns 1 once the elapsed frame count has passed the value in
  * r3 (the call sites pass 0x96/0x12C/...). */
 u32 em_demo_time_ck(u32 frames);
