@@ -7,6 +7,7 @@
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the FPR epilogue as `li r0,<slot>;
  *   psq_lx`) and `#pragma fp_contract off` (retail keeps every `a*b+c` as two instructions).
  * NAMES. The map has only `fn_` stems for the range.
+ *   GUESS: `ef_fabsf` (0x800C9DCC): the out-of-line `fabsf` thunk (`b fabsf`) the emitter shapes call.
  * RESIDUALS. 1 partial row, `fn_800C9540` (the `ef/ef_cube.cpp` and `ef/ef_disc.cpp` shapes share each one):
  *  - the prologue saves `spawn_arg` (`mr r28,r10`) one instruction early;
  *  - the two spawn argument copies take each other's stack slots (0x18/0x24);
@@ -35,7 +36,7 @@ extern "C" {
 /* Helpers declared locally: ef_vec3_normalize_to (`ef/ef_util.cpp`'s vector normalise) and fn_80463F04
  * (the runtime's `fabsf`). */
 extern void ef_vec3_normalize_to(VEC3* out, VEC3* in);
-extern f32 fn_80463F04(f32 x);
+extern f32 fabsf(f32 x);
 
 void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
                  u16 id, s32 spawn_arg, f32 scale) {
@@ -52,12 +53,12 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         return;
     }
 
-    scale_a = fn_800C9DCC(params->scale_x) > 1.1920929e-7f ? params->scale_x : 1.1920929e-7f;
-    scale_b = fn_800C9DCC(params->scale_z) > 1.1920929e-7f ? params->scale_z : 1.1920929e-7f;
+    scale_a = ef_fabsf(params->scale_x) > 1.1920929e-7f ? params->scale_x : 1.1920929e-7f;
+    scale_b = ef_fabsf(params->scale_z) > 1.1920929e-7f ? params->scale_z : 1.1920929e-7f;
     if (flags & 0x02000000) {
         scale_c = scale_a;
     } else {
-        scale_c = fn_800C9DCC(params->scale_c) > 1.1920929e-7f ? params->scale_c : 1.1920929e-7f;
+        scale_c = ef_fabsf(params->scale_c) > 1.1920929e-7f ? params->scale_c : 1.1920929e-7f;
     }
 
     angle = 0.0f;
@@ -133,8 +134,8 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
 }
 
 /* fabsf, reached through a 4-byte tail-call thunk in retail. */
-f32 fn_800C9DCC(f32 x) {
-    return fn_80463F04(x);
+f32 ef_fabsf(f32 x) {
+    return fabsf(x);
 }
 
 } /* extern "C" */

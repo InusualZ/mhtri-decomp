@@ -318,7 +318,7 @@ struct EfAnimRamp {
 extern "C" {
 
 /* 0x80463F04 - the range helper the fractional key lookup measures its distance with. */
-f32 fn_80463F04(f32 x);
+f32 fabsf(f32 x);
 
 /* The unit's functions, in retail order (each is defined below in the same order). */
 void fn_8009CDBC(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
@@ -887,7 +887,7 @@ void fn_8009EF88(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 fra
     NW4R_POINTER_ASSERT(ptrBase, 0x1F1, lbl_80592274, lbl_805922AC);
 
     s32 mid = (lo + hi) / 2;
-    u8 atTarget = fn_80463F04((f32)target - frac) < lbl_80795FEC;
+    u8 atTarget = fabsf((f32)target - frac) < lbl_80795FEC;
 
     u16 keyLo = EF_ANIM_KEY_AT(ptrBase, stride, lo);
     *outLo = keyLo;
