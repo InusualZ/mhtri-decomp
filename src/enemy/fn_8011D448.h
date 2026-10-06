@@ -25,6 +25,8 @@ void em_event_settle(struct _ENEMY_WORK* self, s32 flag);
 void em_event_settle_kind17(struct _ENEMY_WORK* self);
 void em_event_settle_kind20(struct _ENEMY_WORK* self);
 void em_event_settle_kind21(struct _ENEMY_WORK* self);
+/* 0x8011E620 - raises status bits `mask` in the record's +0x824 word (GUESS name). */
+void em_status_bits_set(struct _ENEMY_WORK* self, u32 mask);
 
 #ifdef __cplusplus
 }

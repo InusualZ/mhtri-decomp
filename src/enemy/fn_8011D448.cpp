@@ -9,6 +9,7 @@
  * NAMES. `em_parts_damage_level_get` (0x8011E9DC) is a runtime-dump name; the dump's `JASSeqCtrl::setIntrMask` at
  *   0x8011F230 is a library-signature match on a 16-byte body, not evidence.  `em_parts_damage_add`, the other
  *   `em_parts_*` and the `em_event_settle*` names are GUESSES from their bodies.
+ *   GUESS (from each body and its callers): em_status_bits_set
  * RESIDUALS. 75 rows unwritten: 0x8011DA24-0x8011DE2C, 0x8011DE5C-0x8011E378, 0x8011E3A8-0x8011E51C,
  *   0x8011E7F4-0x8011E9DC, 0x8011E9F0-0x8011F230, 0x8011F240-0x801251D0.
  *  - `fn_8011D690`, `fn_8011D7B0`: ours stores the scale and the id word at +0x8C/+0x90 where retail stores +0xC/
@@ -414,7 +415,7 @@ extern "C" void fn_8011E5EC(_ENEMY_WORK* self)
 }
 
 /* 0x8011E620 - sets status bits. */
-extern "C" void fn_8011E620(_ENEMY_WORK* self, u32 mask)
+extern "C" void em_status_bits_set(_ENEMY_WORK* self, u32 mask)
 {
     self->bits_0x824 |= mask;
 }

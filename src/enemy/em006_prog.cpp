@@ -208,7 +208,7 @@ extern "C" void fn_801BE508(_ENEMY_WORK* self)
         fn_80130CDC(self, -0xA);
         em_busy_set(self);
         em_busy_timer_reset(self);
-        fn_80136D14(self);
+        em_shake_req_set(self);
         fn_80131E00(self);
         break;
     case 1:
@@ -218,7 +218,7 @@ extern "C" void fn_801BE508(_ENEMY_WORK* self)
             fn_80131E00(self);
         }
         if (em_frame_check(self, 2, lbl_80798ED8, lbl_80798E40) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_frame_check(self, 0, lbl_80798E58, lbl_80798E40) == 1) {
             em_move_mode_set(self, 0);

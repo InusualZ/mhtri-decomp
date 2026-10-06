@@ -57,15 +57,15 @@ void fn_80051B7C(void* out, const void* in, f32 scale, s32 a);
 void em_action_finish_fall(struct _ENEMY_WORK* self);
 void fn_8032DD04(struct _EM_CHARA_WORK* self);
 f32 calcVecDistXZ(const void* a, const void* b);
-void fn_8012E694(struct _ENEMY_WORK* self);
+void em_attack_done_set(struct _ENEMY_WORK* self);
 void fn_80136DF4(struct _ENEMY_WORK* self);
 void eft_rot_vec_copy(_CP_VECTOR* dst, const _CP_VECTOR* src);
 u32 quest_sub_state_end_ck(u32 a);
 void fn_80130350(struct _ENEMY_WORK* self, void* vec);
 void fn_8027D3F0(struct _PLW* self, u8 a);
-void fn_8012E664(struct _ENEMY_WORK* self);
+void em_attack_start(struct _ENEMY_WORK* self);
 void* em_res_user_data_ctor(void* self);
-u32 fn_801421E4(u16 id, EmGroundRec* rec);
+u32 em_ground_rec_find(u16 id, EmGroundRec* rec);
 void em_ground_rec_clear(EmGroundRec* rec);
 
 #ifdef __cplusplus
@@ -108,7 +108,7 @@ struct _EM_CHARA_WORK {
     /* +0x006 */ u8 unused_0x006[0x009 - 0x006];
     /* +0x009 */ u8 field_0x009;        /* 2/3 select the joint the effect is placed on */
     /* +0x00A */ u8 unused_0x00A[0x01A - 0x00A];
-    /* +0x01A */ u16 field_0x01A;       /* the ground-record id `fn_801421E4` looks up */
+    /* +0x01A */ u16 field_0x01A;       /* the ground-record id `em_ground_rec_find` looks up */
     /* +0x01C */ u8 unused_0x01C[0x020 - 0x01C];
     /* +0x020 */ s32 field_0x20;       /* the step's own countdown; its low 5 bits gate the scan */
     /* +0x024 */ u8 char_0x024[0x40];   /* the embedded `MHchar` base the `em_` frame checks hand on */
@@ -246,7 +246,7 @@ extern "C" void em_eff_ground_set(_EM_CHARA_WORK* self)
     EmGroundRec rec;
 
     em_ground_rec_clear(&rec);
-    if (fn_801421E4(self->field_0x01A, &rec) != 0) {
+    if (em_ground_rec_find(self->field_0x01A, &rec) != 0) {
         fn_80051B7C(&self->pos, &rec.pos_0x08, lbl_8079B114, 0);
         eft_rot_vec_copy(&self->rot, (_CP_VECTOR*)&rec.field_0x14);
     }
@@ -278,7 +278,7 @@ extern "C" void em_act_die_step(_EM_CHARA_WORK* self)
         return;
     }
     if (self->field_0x834 == 1) {
-        fn_8012E664((_ENEMY_WORK*)self);
+        em_attack_start((_ENEMY_WORK*)self);
     }
     if (self->field_0x338 == 1) {
         f32 speed = self->field_0x1CC;
@@ -405,8 +405,8 @@ extern "C" void em_act_arm_mot_mode(_EM_CHARA_WORK* self, u32 action)
 /* Advances the record's two motion counters, then arms the +0x0B action or ends the step. */
 extern "C" void em_act_arm_mot11(_EM_CHARA_WORK* self)
 {
-    fn_80131DB4((_ENEMY_WORK*)self);
-    fn_80131DF4((_ENEMY_WORK*)self);
+    em_motion_timer_arm((_ENEMY_WORK*)self);
+    em_fx_flag_set((_ENEMY_WORK*)self);
     switch (self->state) {
     case 0:
         self->state += 1;
@@ -415,7 +415,7 @@ extern "C" void em_act_arm_mot11(_EM_CHARA_WORK* self)
         break;
     case 1:
         if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
-            fn_8012E694((_ENEMY_WORK*)self);
+            em_attack_done_set((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -425,9 +425,9 @@ extern "C" void em_act_arm_mot11(_EM_CHARA_WORK* self)
  * band, handing the first such attacker to the damage handler. */
 extern "C" void em_act_arm_mot1_hit1_1(_EM_CHARA_WORK* self)
 {
-    fn_80131DB4((_ENEMY_WORK*)self);
-    fn_80131DF4((_ENEMY_WORK*)self);
-    fn_80136D14((_ENEMY_WORK*)self);
+    em_motion_timer_arm((_ENEMY_WORK*)self);
+    em_fx_flag_set((_ENEMY_WORK*)self);
+    em_shake_req_set((_ENEMY_WORK*)self);
     switch (self->state) {
     case 0:
         self->state += 1;

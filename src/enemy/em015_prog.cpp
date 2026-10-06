@@ -94,7 +94,7 @@
 /* the call sites use the argument-less view: a cast call is the same direct call. */
 #define em_mot_finished_ck_c1 ((u32 (*)(void))em_mot_finished_ck)
 #define fn_801823A0_view1 ((void (*)(_ENEMY_WORK*, s32))fn_801823A0)
-#define fn_80128A8C_view1 ((void (*)(_ENEMY_WORK*, u32, u32))fn_80128A8C)
+#define fn_80128A8C_view1 ((void (*)(_ENEMY_WORK*, u32, u32))em_act_arm_unless_down)
 #define em_turn_to_target_view1 ((void (*)(_ENEMY_WORK*, u32))em_turn_to_target)
 #define em_turn_seq_start_view1 ((void (*)(_ENEMY_WORK*, void*, u32, u32, u32))em_turn_seq_start)
 #define em_target_pos_set_view1 ((void (*)(_ENEMY_WORK*, u32))em_target_pos_set)
@@ -2275,12 +2275,12 @@ void fn_80182768(_ENEMY_WORK* self, u8* out_a, u8* out_b) {
             em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
-            fn_80126324(self, 14, 15, lbl_80797B18);
+            em_move_target_set(self, 14, 15, lbl_80797B18);
         } else if (self->area_no == 12) {
             em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
-            fn_80126324(self, 23, 24, lbl_80797B18);
+            em_move_target_set(self, 23, 24, lbl_80797B18);
         }
         break;
     case 3:
@@ -2288,12 +2288,12 @@ void fn_80182768(_ENEMY_WORK* self, u8* out_a, u8* out_b) {
             em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
-            fn_80126324(self, 6, 7, lbl_80797B18);
+            em_move_target_set(self, 6, 7, lbl_80797B18);
         } else if (self->area_no == 8) {
             em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
-            fn_80126324(self, 6, 0, lbl_80797B18);
+            em_move_target_set(self, 6, 0, lbl_80797B18);
         }
         break;
     case 9:
@@ -2302,7 +2302,7 @@ void fn_80182768(_ENEMY_WORK* self, u8* out_a, u8* out_b) {
             em_move_mode_set(self, 2);
             *out_a = 12;
             *out_b = 0;
-            fn_80126324(self, 0, 1, lbl_80797B18);
+            em_move_target_set(self, 0, 1, lbl_80797B18);
         }
         break;
     default:

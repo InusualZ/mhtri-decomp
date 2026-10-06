@@ -14,6 +14,7 @@
  *   dump's real names: `body_set`, `hit_flag_set`, `hit_result_check`, `get_item_data_ptr`, `ItemName`, `ItemExp`,
  *   `GetItemData`, `get_menu_tbl_ptr`, `get_menu_lsp_tbl`, `put_menu_cursor`; the map's own `get_hit_id__Fv`.  The other
  *   named rows are GUESSes from their bodies (the dump answers `zz_` for them).
+ *   GUESS (from each body and its callers): hit_mask_ck
  * RESIDUALS. 96 rows unwritten (objdiff scores them zero): 0x80297E34-0x80299ED8, 0x80299EF8-0x8029A140,
  *   0x8029A19C-0x8029B8F4, 0x8029B918-0x8029D6FC, 0x8029D744-0x8029EFDC, 0x8029F204-0x8029F3C8 (`hit_data_apply`),
  *   0x8029F834-0x8029FA74, 0x8029FCFC-0x8029FFB8, 0x802A0568-0x802A16F8, 0x802A1714-0x802A2550,
@@ -1077,7 +1078,7 @@ extern "C" void fn_8029F4C4(_HIT_W* hit, u16 a, u16 b, u16 c, u16 d)
 }
 
 /* 0x8029F51C: whether one of the hit entry's +0x05B bits is set. */
-extern "C" u32 fn_8029F51C(_HIT_W* hit, u32 mask)
+extern "C" u32 hit_mask_ck(_HIT_W* hit, u32 mask)
 {
     return (hit->field_0x05B & (u8)mask) != 0;
 }

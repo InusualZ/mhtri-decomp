@@ -43,15 +43,15 @@ void (*fn_801264BC(struct _ENEMY_WORK* work, s32 index))(struct _ENEMY_WORK*);
 u16 em_hit_mask_get(struct _ENEMY_WORK* work);
 void fn_801281EC(struct _ENEMY_WORK* work);
 void fn_801281F8(struct _ENEMY_WORK* work);
-/* 0x80128A8C / 0x8012933C - `fn_80128A8C` takes two u8 arguments (its body narrows both with `clrlwi` before the
+/* 0x80128A8C / 0x8012933C - `em_act_arm_unless_down` takes two u8 arguments (its body narrows both with `clrlwi` before the
  * tail call to `em_act_step_arm`; under the unit's `#pragma peephole off` a u8 parameter keeps that `clrlwi`, so the
  * spelling is load-bearing); `em_hit_window_set` narrows its second argument itself and its owner calls it
  * `(self, (u8)a, b, 0)`.  One declaration for `enemy/em001_prog.cpp`, `enemy/em008_prog.cpp` and
  * `enemy/em015_prog.cpp`. */
-void fn_80128A8C(struct _ENEMY_WORK* self, u8 a, u8 b);
+void em_act_arm_unless_down(struct _ENEMY_WORK* self, u8 a, u8 b);
 /* 0x80126324 - the motion/area setter: r3 `self`, a byte r4 and a scalar r5 (it folds `self->area_no & 0xF` into
  * the id's high byte and passes `clrlwi r6,r31,24` on to 0x8012B380) plus the f32 blend f1 it stores at +0x384. */
-void fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
+void em_move_target_set(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void em_hit_window_set(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 /* 0x8012B380 - r3 `self` and three scalars; the motion/state setter the action band calls after `em_mot_end_ck`
  * reports done. */

@@ -52,9 +52,9 @@ void fn_80167968(struct _ENEMY_WORK* self);
 
 /* ---- enemy-band callees owned by other registered units ---- */
 u32 fn_80127308(struct _ENEMY_WORK* self, const void* src, nw4r::math::VEC3* dst, u32 a);
-void fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
+void em_move_target_set(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void em_action_finish(struct _ENEMY_WORK* self);
-void fn_80128A8C(struct _ENEMY_WORK* self, u8 a, u8 b);
+void em_act_arm_unless_down(struct _ENEMY_WORK* self, u8 a, u8 b);
 u32 fn_80129A1C(struct _ENEMY_WORK* self, u16 a, u32 b, s16* timer);
 u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
 u32 fn_80129D3C(struct _ENEMY_WORK* self);
@@ -62,14 +62,14 @@ u8 fn_80129DB8(struct _ENEMY_WORK* self);
 /* 0x8012A014 - owned by `enemy/fn_801251D0.h`; the spelling here is the owner's (its body
  * forwards r7/r8 to `fn_80129F5C` as the pair of table pointers it walks, `cmpwi r4,0`).  The older
  * `u32 d, const void* e` copy was the second declaration that stopped this header and the owner's
- * being included together (same class as `fn_80128A8C`). */
+ * being included together (same class as `em_act_arm_unless_down`). */
 u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 u32 fn_8012A204(struct _ENEMY_WORK* self);
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
-void fn_8012CEB4(struct _ENEMY_WORK* self, s16 timer, u8 index);
+void em_hit_by_set(struct _ENEMY_WORK* self, s16 timer, u8 index);
 u8 fn_8015D934(struct _ENEMY_WORK* self);
-void fn_8012E664(struct _ENEMY_WORK* self);
-void fn_8012E694(struct _ENEMY_WORK* self);
+void em_attack_start(struct _ENEMY_WORK* self);
+void em_attack_done_set(struct _ENEMY_WORK* self);
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_mot_set_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
@@ -78,9 +78,9 @@ void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
 void fn_8013072C(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_frame_flag_set(void);
-void fn_80131DF4(struct _ENEMY_WORK* self);
+void em_fx_flag_set(struct _ENEMY_WORK* self);
 void em_busy_timer_reset(struct _ENEMY_WORK* self);
-u32 fn_801337FC(struct _ENEMY_WORK* self);
+u32 em_hit_timer_ck(struct _ENEMY_WORK* self);
 void em_state_refresh(struct _ENEMY_WORK* self);
 void em_move_vec2_clr(struct _ENEMY_WORK* self);
 void em_move_offset_step(struct _ENEMY_WORK* self, void* p);

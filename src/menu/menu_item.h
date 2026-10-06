@@ -298,7 +298,7 @@ extern "C" {
 #endif
 
 void fn_8029F4C4(_HIT_W* hit, u16 a, u16 b, u16 c, u16 d);
-u32 fn_8029F51C(_HIT_W* hit, u32 mask);
+u32 hit_mask_ck(_HIT_W* hit, u32 mask);
 void hit_flags_clear(_HIT_W* hit);
 void fn_8029F554(_HIT_W* hit, u32 flags);
 u32 fn_8029F564(_HIT_W* hit, u32 flags);

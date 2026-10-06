@@ -14,6 +14,7 @@
  *   `em_parts_damage_ck`, `em_act_effect_ck`, `em_act_mot_step`, `em_part_reset`, `em_part_colour_lerp` and
  *   `em_part_damage_meter` are GUESSes from their bodies (the dump answers `zz_` or a linker-folded duplicate's
  *   name).  The map has only `fn_` stems for the other rows.
+ *   GUESS (from each body and its callers): em019_action13_active_ck
  * RESIDUALS. 64 rows unwritten: 0x80378F9C-0x80379084, 0x80379090-0x803797F4, 0x8037983C-0x80379DE4,
  *   0x80379E2C-0x8037A7F0, 0x8037A848-0x8037AF08, 0x8037AF88-0x8037E0D0, 0x8037E0E8-0x8037EA64,
  *   0x8037F940-0x8038209C (`em_act_mot_step`: a 216-way switch on `em_get_mot_no` over the jump table at
@@ -28,7 +29,7 @@
  *    on the default's body;
  *  - `fn_80382C00`: retail tests the byte with the unsigned borrow sequence (`li r3,1; subi; orc; srwi; subf`),
  *    ours with `neg; or`;
- *  - `fn_80382F94`: ours adds a `clrlwi r0,r0,24` retail does not have.
+ *  - `em019_action13_active_ck`: ours adds a `clrlwi r0,r0,24` retail does not have.
  *   flipcheck: `.bss`/`.ctors`/`.rodata`/`.sbss`/`.sdata` claimed, not emitted; `.data` 0x9C against 0x13A8,
  *   `.sdata2` 0x10 against 0x2D8; `.text` (0x140C of 0xA1AC), extab (0x80 of 0x248) and extabindex (0xC0 of
  *   0x36C) short of the claim and differing.
@@ -360,7 +361,7 @@ extern "C" void em_act_prog_2(_ENEMY_WORK* self) {
         break;
     case 1:
         if (em_frame_check(self, 1, lbl_8079BCEC, lbl_8079BC88) == 1)
-            fn_80136D14(self);
+            em_shake_req_set(self);
         if (em_frame_check(self, 0, lbl_8079BCF0, lbl_8079BC88) == 1)
             em_hit_window_set(self, 0, 13, 10);
         if (em_frame_check(self, 0, lbl_8079BCF4, lbl_8079BC88) == 1)
@@ -432,14 +433,14 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
         em_mot_set(self, 202, 0, 0);
         fn_801303EC(self, lbl_8079BC88);
         fn_80378F9C(self, 255);
-        fn_80136D14(self);
+        em_shake_req_set(self);
         em_hit_window_set(self, 0, 32, 8);
         em_hit_window_set(self, 1, 31, 24);
         fn_80131E00(self);
         break;
     case 1:
         if (em_frame_check(self, 2, lbl_8079BD04, lbl_8079BC88) == 1)
-            fn_80136D14(self);
+            em_shake_req_set(self);
         if (em_frame_check(self, 2, lbl_8079BCA0, lbl_8079BC88) == 1)
             fn_80131E00(self);
         if (em_frame_check(self, 0, lbl_8079BCB4, lbl_8079BC88) == 1) {
@@ -819,7 +820,7 @@ extern "C" void fn_80382DB8(_ENEMY_WORK* self, u32 flag) {
 }
 
 /* 0x80382F94 */
-extern "C" u32 fn_80382F94(_ENEMY_WORK* self) {
+extern "C" u32 em019_action13_active_ck(_ENEMY_WORK* self) {
     if (self->action == 13) {
         if ((u8)(self->state_sub - 2) <= 6) {
             return 1;

@@ -22,6 +22,9 @@
  *   non-`fn_` name is a GUESS from its body.
  *   GUESS (from each body and its callers): em_record_hit_ck, em_mini_hit_ck, em_captured_ck
  *   GUESS: em_mini_kill_kind_get, em_quest_element_set, em_quest_element_set_large
+ *   GUESS (from each body and its callers): em_shake_req_set, em_move_target_set, em_hit_timer_ck, em_fx_flag_set
+ *   GUESS: em_motion_timer_arm, em_attack_done_set, em_attack_start, pl_torch_ck, em_hit_by_set
+ *   GUESS: em_act_arm_unless_down, em_move_work_pick, em_roar_latch_set, em_area_entry_near_ck
  * RESIDUALS. 379 rows unwritten in 23 runs, the largest 0x8012F3F4-0x80137604 (270 functions);
  *   `sweepcomments.py --unit enemy/em_common` lists them.
  *  - `fn_8012E040`, `fn_8012E5D4`: dense-case dispatch trees; retail shares one tail per constant return and lowers
@@ -44,7 +47,7 @@
  *    `b`); `fn_8012C0EC`: the branch polarity and one reload differ; `fn_8012CF2C`: the +0x796 store is scheduled two
  *    instructions later; `fn_8012D188`: the two bytes load in the other order; `shibire_em_ck_sub`: ours moves r6
  *    earlier;
- *  - `fn_8012B86C`, `fn_8012C220`, `fn_8012E664`, `fn_8012E968`: register allocation only.
+ *  - `fn_8012B86C`, `fn_8012C220`, `em_attack_start`, `fn_8012E968`: register allocation only.
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.rodata`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex
  *   short of the claim.
  * SHAPES. `#pragma peephole off` from the first body to the end (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi`
@@ -82,7 +85,7 @@
 #define fn_8012D1A8 fn_8012D1A8_hidden_fn_8012BDF4_h
 #define fn_8012D23C fn_8012D23C_hidden_fn_8012BDF4_h
 #define fn_8012D3E0 fn_8012D3E0_hidden_fn_8012BDF4_h
-#define fn_8012D7FC fn_8012D7FC_hidden_fn_8012BDF4_h
+#define pl_torch_ck fn_8012D7FC_hidden_fn_8012BDF4_h
 #define fn_8012D8D0 fn_8012D8D0_hidden_fn_8012BDF4_h
 #define fn_8012DB3C fn_8012DB3C_hidden_fn_8012BDF4_h
 #define fn_8012E21C fn_8012E21C_hidden_fn_8012BDF4_h
@@ -92,7 +95,7 @@
 #undef fn_8012E21C
 #undef fn_8012DB3C
 #undef fn_8012D8D0
-#undef fn_8012D7FC
+#undef pl_torch_ck
 #undef fn_8012D3E0
 #undef fn_8012D23C
 #undef fn_8012D1A8
@@ -136,9 +139,9 @@
 #define fn_8012D8D0_view5 ((u32 (*)(struct _ENEMY_WORK*))fn_8012D8D0)
 #define fn_8012D8D0_view3 ((u32 (*)(struct _ENEMY_WORK*))fn_8012D8D0)
 #define fn_8012D8D0_view1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012D8D0)
-#define fn_8012D7FC_view5 ((u32 (*)(struct _ENEMY_WORK*))fn_8012D7FC)
-#define fn_8012D7FC_view3 ((u32 (*)(struct _ENEMY_WORK*))fn_8012D7FC)
-#define fn_8012D7FC_view1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012D7FC)
+#define fn_8012D7FC_view5 ((u32 (*)(struct _ENEMY_WORK*))pl_torch_ck)
+#define fn_8012D7FC_view3 ((u32 (*)(struct _ENEMY_WORK*))pl_torch_ck)
+#define fn_8012D7FC_view1 ((u32 (*)(struct _ENEMY_WORK*))pl_torch_ck)
 #define fn_8012D3E0_view4 ((u8 (*)())fn_8012D3E0)
 #define fn_8012D3E0_view2 ((u8 (*)())fn_8012D3E0)
 #define fn_8012D23C_view4 ((u32 (*)())fn_8012D23C)
@@ -281,7 +284,7 @@ extern "C" s32 quest_time_elapsed_get(void);
 extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind);
 extern "C" u32 fn_8012D23C(_ENEMY_WORK* enemy, u32 kind, u32 slot);
 extern "C" void* fn_8012D498(u32 selector, _PLW* work, s8* out_flag);
-extern "C" s32 fn_8012D7FC(void* arg);
+extern "C" s32 pl_torch_ck(void* arg);
 extern "C" s32 fn_8012D468(u32 selector, _PLW* work, s8* out_flag);
 extern "C" s32 fn_8012D8D0(_ENEMY_WORK* enemy);
 extern "C" u32 ana_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(_ENEMY_WORK* enemy, u32 area, nw4r::math::VEC3* pos, u32 flag, f32 radius);
@@ -306,8 +309,8 @@ extern "C" s32 fn_8012E5A8(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E5D4(u32 actor, u32 flags);
 extern "C" s32 em_record_hit_ck(_ENEMY_WORK* record);
 extern "C" s32 em_mini_hit_ck(_ENEMY_WORK* record);
-extern "C" void fn_8012E664(_ENEMY_WORK* enemy);
-extern "C" void fn_8012E694(_ENEMY_WORK* enemy);
+extern "C" void em_attack_start(_ENEMY_WORK* enemy);
+extern "C" void em_attack_done_set(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E6A0(u32 kind, u16 id);
 extern "C" u8 em_captured_ck(_ENEMY_WORK* enemy);
 extern "C" s32 em_mini_kill_kind_get(_ENEMY_WORK* enemy);
@@ -638,7 +641,7 @@ extern "C" void fn_80128A70(struct _ENEMY_WORK* self, u32 a, u32 b)
     fn_80128A30(self, (u8)a, (u8)b);
 }
 
-extern "C" void fn_80128A8C(struct _ENEMY_WORK* self, u8 a, u8 b)
+extern "C" void em_act_arm_unless_down(struct _ENEMY_WORK* self, u8 a, u8 b)
 {
     if (self->action == 11) {
         return;
@@ -1234,7 +1237,7 @@ extern "C" void fn_8012CE9C(_ENEMY_WORK* enemy, u32 flag)
 }
 
 /* Arms the "hit by" timer and remembers which attack it was, then marks the state word. */
-extern "C" void fn_8012CEB4(_ENEMY_WORK* enemy, s16 timer, u8 index)
+extern "C" void em_hit_by_set(_ENEMY_WORK* enemy, s16 timer, u8 index)
 {
     fn_8012CE8C(enemy, 2);
     enemy->field_0x796 = timer;
@@ -1404,7 +1407,7 @@ extern "C" s32 fn_8012D468(u32 selector, _PLW* work, s8* out_flag)
 
 
 /* Whether the actor has the "charge" skill, or the pair is on its last frame. */
-extern "C" s32 fn_8012D7FC(void* arg)
+extern "C" s32 pl_torch_ck(void* arg)
 {
     if (Pl_Skill_ck((_PLW*)arg, 0xCD) == 1) {
         return 1;
@@ -1826,7 +1829,7 @@ extern "C" s32 em_mini_hit_ck(_ENEMY_WORK* record)
 }
 
 /* Arms the attack timer and, when it was not already armed, tells the attack system about it. */
-extern "C" void fn_8012E664(_ENEMY_WORK* enemy)
+extern "C" void em_attack_start(_ENEMY_WORK* enemy)
 {
     if (enemy->field_0x011 == 0) {
         enemy->field_0x011 = 1;
@@ -1837,7 +1840,7 @@ extern "C" void fn_8012E664(_ENEMY_WORK* enemy)
 }
 
 /* Marks the attack timer as expired. */
-extern "C" void fn_8012E694(_ENEMY_WORK* enemy)
+extern "C" void em_attack_done_set(_ENEMY_WORK* enemy)
 {
     enemy->field_0x011 = 2;
 }
@@ -2151,12 +2154,12 @@ extern "C" u32 fn_80137614(_ENEMY_WORK* self)
 }
 
 /* Sets the field `fn_80137648` reads back. */
-extern "C" void fn_8013763C(_ENEMY_WORK* self)
+extern "C" void em_roar_latch_set(_ENEMY_WORK* self)
 {
     self->field_0x43F = 1;
 }
 
-/* Whether the `fn_8013763C` field is set. */
+/* Whether the `em_roar_latch_set` field is set. */
 extern "C" u32 fn_80137648(_ENEMY_WORK* self)
 {
     return self->field_0x43F == 1;
@@ -2227,7 +2230,7 @@ extern "C" void em_motion_mode_set(_ENEMY_WORK* self, u8 mode)
 
 /* The move-work record `mode` picks: the slot holding the first bit of `mask` when `mode` is 10, the
  * slot `mask` names otherwise. */
-extern "C" u8* fn_801377D0(u8 mode, u8 mask)
+extern "C" u8* em_move_work_pick(u8 mode, u8 mask)
 {
     u8* work = (u8*)get_move_work_adrs_view5(2);
 

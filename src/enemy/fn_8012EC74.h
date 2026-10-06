@@ -43,8 +43,8 @@ f32 fn_8013026C(struct _ENEMY_WORK* self);
 /* r3 (`self`), f1; no return (`enemy/em016_prog.cpp`'s `fn_801850F8` passes the sum it just built). */
 void fn_8012FE3C(struct _ENEMY_WORK* self, f32 a);
 /* r3 (`self`); returns a word compared against 1 (`cmplwi`) - the teardown step of
- * `enemy/em016_prog.cpp` runs `fn_8012E664` only when it answers 1. */
-u32 fn_801337FC(struct _ENEMY_WORK* self);
+ * `enemy/em016_prog.cpp` runs `em_attack_start` only when it answers 1. */
+u32 em_hit_timer_ck(struct _ENEMY_WORK* self);
 /* 0x80133638 - nonzero while the +0x810 mark timer runs (> 0); the cockpit's quest marker asks it. */
 u32 em_mark_timer_ck(struct _ENEMY_WORK* self);
 /* 0x8013364C - 0 for the team-0x28 record and for a kind-4 record that is not grounded; else 1. */

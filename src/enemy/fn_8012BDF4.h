@@ -21,7 +21,7 @@ u32 em_die_ck__FP11_ENEMY_WORK(struct _ENEMY_WORK* work);
 void fn_8012BDF4(struct _ENEMY_WORK* work);
 /* 0x8012CEB4 - r3 the work record, r4 the timer, r5 the slot index; the area-table timer arm the action counters
  * use. */
-void fn_8012CEB4(struct _ENEMY_WORK* self, s16 timer, u8 index);
+void em_hit_by_set(struct _ENEMY_WORK* self, s16 timer, u8 index);
 void fn_8012C600(struct _ENEMY_WORK* work);
 void fn_8012C9AC(struct _ENEMY_WORK* work);
 s32 fn_8012D0B4(struct _ENEMY_WORK* enemy, void* move);
@@ -32,13 +32,13 @@ void em_act_end(struct _ENEMY_WORK* work, s32 mode);
 s32 fn_8012D1A8(u8 arg0);
 u32 fn_8012D23C();
 u8 fn_8012D3E0();
-u32 fn_8012D7FC(struct _ENEMY_WORK* other);
+u32 pl_torch_ck(struct _ENEMY_WORK* other);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 /* 0x8012E664 - one `self` argument, no return (clears the work record; `enemy/em016_prog.cpp`'s teardown step). */
-void fn_8012E664(struct _ENEMY_WORK* self);
+void em_attack_start(struct _ENEMY_WORK* self);
 /* 0x8012E694 - one `self` argument, no return (the finish step `enemy/em016_prog.cpp` runs once
  * `em_mot_end_ck` reports done). */
-void fn_8012E694(struct _ENEMY_WORK* self);
+void em_attack_done_set(struct _ENEMY_WORK* self);
 /* 0x8012D8D0 / 0x8012DB3C / 0x8012E21C - in the signatures their call sites set (r3 the work record / the two
  * byte-derived values). */
 u32 fn_8012D8D0(struct _ENEMY_WORK* work);

@@ -73,7 +73,7 @@
 #include "enemy/em_turn_in_window.h" /* em_turn_in_window (rule 2: the owner's header) */
 #include "enemy/em_flags836_ck.h" /* em_flags836_ck (rule 2: the owner's header) */
 #include "enemy/em_camera_req.h" /* em_camera_req (rule 2: the owner's header) */
-#include "enemy/fn_80136D14.h" /* fn_80136D14 (rule 2: the owner's header) */
+#include "enemy/em_shake_req_set.h" /* fn_80136D14 (rule 2: the owner's header) */
 #include "enemy/fn_80129D3C.h" /* fn_80129D3C (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
@@ -133,7 +133,7 @@
 #define fn_8012A014_view1 ((u32 (*)(EmActWork*, u32, u32, u16, u32, u8*))fn_8012A014)
 #define fn_80129DB8_view1 ((u8 (*)(EmActWork*))fn_80129DB8)
 #define fn_80129A70_view1 ((u32 (*)(EmActWork*, u16))fn_80129A70)
-#define fn_80126324_view1 ((void (*)(EmActWork*, u8, u8, f32))fn_80126324)
+#define fn_80126324_view1 ((void (*)(EmActWork*, u8, u8, f32))em_move_target_set)
 #define em_water_check_view1 ((u32 (*)(struct _ENEMY_WORK*))em_water_check)
 #define em_move_mode_set_view1 ((void (*)(EmActWork*, u32))em_move_mode_set)
 #define em_mot_set_view1 ((void (*)(EmActWork*, s32, s32, s32))em_mot_set)
@@ -629,50 +629,50 @@ extern "C" void fn_80182D5C(_ENEMY_WORK* self) {
     case 1:
         switch (self->area_no) {
         case 5:
-            fn_80126324(self, 6, 7, lbl_80797EA0);
+            em_move_target_set(self, 6, 7, lbl_80797EA0);
             break;
         case 6:
-            fn_80126324(self, 9, 10, lbl_80797EA4);
+            em_move_target_set(self, 9, 10, lbl_80797EA4);
             break;
         case 7:
-            fn_80126324(self, 0xD, 0xE, lbl_80797EA0);
+            em_move_target_set(self, 0xD, 0xE, lbl_80797EA0);
             break;
         case 8:
-            fn_80126324(self, 8, 9, lbl_80797EA0);
+            em_move_target_set(self, 8, 9, lbl_80797EA0);
             break;
         case 0xC:
-            fn_80126324(self, 0x19, 0x1A, lbl_80797EA0);
+            em_move_target_set(self, 0x19, 0x1A, lbl_80797EA0);
             break;
         }
         break;
     case 3:
         switch (self->area_no) {
         case 1:
-            fn_80126324(self, 6, 7, lbl_80797EA8);
+            em_move_target_set(self, 6, 7, lbl_80797EA8);
             break;
         case 2:
-            fn_80126324(self, 7, 8, lbl_80797EA0);
+            em_move_target_set(self, 7, 8, lbl_80797EA0);
             break;
         case 3:
-            fn_80126324(self, 9, 10, lbl_80797EAC);
+            em_move_target_set(self, 9, 10, lbl_80797EAC);
             break;
         case 4:
-            fn_80126324(self, 5, 6, lbl_80797EA0);
+            em_move_target_set(self, 5, 6, lbl_80797EA0);
             break;
         case 5:
-            fn_80126324(self, 7, 8, lbl_80797EA0);
+            em_move_target_set(self, 7, 8, lbl_80797EA0);
             break;
         case 6:
-            fn_80126324(self, 0xD, 0xE, lbl_80797EAC);
+            em_move_target_set(self, 0xD, 0xE, lbl_80797EAC);
             break;
         case 7:
-            fn_80126324(self, 0, 2, lbl_80797EA0);
+            em_move_target_set(self, 0, 2, lbl_80797EA0);
             break;
         case 8:
-            fn_80126324(self, 6, 7, lbl_80797EA0);
+            em_move_target_set(self, 6, 7, lbl_80797EA0);
             break;
         case 10:
-            fn_80126324(self, 0, 1, lbl_80797EAC);
+            em_move_target_set(self, 0, 1, lbl_80797EAC);
             break;
         }
         break;
@@ -714,8 +714,8 @@ extern "C" void* fn_80183440(void* self) {
 /* The map-0x15 (teardown) step: run it once `em_die_ck` and the state check agree. */
 extern "C" void fn_80183A54(_ENEMY_WORK* self) {
     if (em_die_ck(self) == 0) {
-        if (fn_801337FC(self) == 1) {
-            fn_8012E664(self);
+        if (em_hit_timer_ck(self) == 1) {
+            em_attack_start(self);
         }
     }
 }
@@ -1005,14 +1005,14 @@ extern "C" void fn_801841B4(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_frame_check(self, 1, lbl_80797EC4, lbl_80797E88) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
             if (em_frame_check(self, 1, lbl_80797EA4, lbl_80797E88) == 1) {
-                fn_80131DB4(self);
-                fn_80131DF4(self);
+                em_motion_timer_arm(self);
+                em_fx_flag_set(self);
             }
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_8012E694(self);
+            em_attack_done_set(self);
         }
         break;
     }
@@ -1048,14 +1048,14 @@ extern "C" void fn_801842FC(_ENEMY_WORK* self) {
     }
     case 1:
         if (em_frame_check(self, 1, lbl_80797EC8, lbl_80797E88) == 1) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
             if (em_frame_check(self, 1, lbl_80797ECC, lbl_80797E88) == 1) {
-                fn_80131DB4(self);
-                fn_80131DF4(self);
+                em_motion_timer_arm(self);
+                em_fx_flag_set(self);
             }
         }
         if (em_mot_end_ck(self) == 1) {
-            fn_8012E694(self);
+            em_attack_done_set(self);
         }
         break;
     }
@@ -3707,7 +3707,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
             if (em_after_frame_check(self, 0, lbl_80797F40, lbl_80797E88) == 1U) {
                 eft009_spawn_at_joint(self, 0x13U, 0x67U, 0, lbl_80797EB8 * get_em_scale(self));
             }
-            fn_80136D14(self);
+            em_shake_req_set(self);
             break;
         case 0x73:
             if (em_after_frame_check(self, 0, lbl_80797EF8, lbl_80797E88) == 1U) {

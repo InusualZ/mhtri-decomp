@@ -89,19 +89,19 @@ void em_rot_reset(_ENEMY_WORK* self) {
         switch (self->area_no) {
         case 7:
             if (self->field_0x9F6 == 8) {
-                fn_80126324(self, 1, 2, lbl_8079AF50);
+                em_move_target_set(self, 1, 2, lbl_8079AF50);
                 self->field_0x1C0 = 0x8000;
                 return;
             }
-            fn_80126324(self, 1, 2, lbl_8079AF50);
+            em_move_target_set(self, 1, 2, lbl_8079AF50);
             return;
         case 8:
             if (self->field_0x9F6 == 7) {
-                fn_80126324(self, 1, 2, lbl_8079AF50);
+                em_move_target_set(self, 1, 2, lbl_8079AF50);
                 self->field_0x1C0 = 0xF000;
                 return;
             }
-            fn_80126324(self, 1, 2, lbl_8079AF50);
+            em_move_target_set(self, 1, 2, lbl_8079AF50);
             return;
         default:
             self->pos.z = lbl_8079AF54;
@@ -134,12 +134,12 @@ void em_act_entry_start(_ENEMY_WORK* self, u8 mode) {
     switch (mode) {
     case 0:
         em_move_mode_set(self, 4);
-        fn_80128A8C(self, 6, 0x20);
+        em_act_arm_unless_down(self, 6, 0x20);
         em_state_refresh(self);
         break;
     case 3:
         em_move_mode_set(self, 4);
-        fn_80128A8C(self, 6, 0x16);
+        em_act_arm_unless_down(self, 6, 0x16);
         em_rot_reset(self);
         em_state_refresh(self);
         break;

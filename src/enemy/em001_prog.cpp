@@ -623,7 +623,7 @@ extern "C" void fn_80147CE0(_ENEMY_WORK* self, s32 arg) {
         self->pos.y += lbl_80796E18;
         em_fall_height_get(self);
         em_fall_start(self);
-        fn_80128A8C(self, 0, 3);
+        em_act_arm_unless_down(self, 0, 3);
     }
     if ((arg & 0xFF) != 0) {
         em_motion_param_set(self, 0, lbl_80796E1C);

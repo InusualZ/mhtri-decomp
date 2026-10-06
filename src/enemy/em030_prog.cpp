@@ -79,7 +79,7 @@ struct ShellSetBlock {
     /* +0x58 */ ShellSetFn field_0x58;
 };
 
-/* The 0x20-byte ground record `em_ground_rec_clear` prepares and `fn_801421E4` fills is `EmGroundRec`
+/* The 0x20-byte ground record `em_ground_rec_clear` prepares and `em_ground_rec_find` fills is `EmGroundRec`
  * (`enemy/ENEMY_WORK.h`); this unit passes its address and reads its `pos_0x08`. */
 
 /* 0x800CFA90 / 0x800CFAD0: the move-work record base and its count (`ef/system_core.cpp`), declared with the
@@ -186,7 +186,7 @@ extern "C" u32 fn_801B0168(_ENEMY_WORK* work) {
     switch (work->field_0x380) {
     case 1:
         if (work->field_0x382 != 0xFF) {
-            _ENEMY_WORK* target = (_ENEMY_WORK*)fn_801377D0(work->state_0x381, work->field_0x382);
+            _ENEMY_WORK* target = (_ENEMY_WORK*)em_move_work_pick(work->state_0x381, work->field_0x382);
             if (target->active) {
                 if (fn_8012D0B4(work, target) == 1) {
                     return 0;
@@ -383,7 +383,7 @@ extern "C" u32 fn_801B06D4(_ENEMY_WORK* work) {
         if (fn_8012D0B4(work, area) == 0) {
             continue;
         }
-        if (fn_8012D7FC((_ENEMY_WORK*)area) == 0) {
+        if (pl_torch_ck((_ENEMY_WORK*)area) == 0) {
             continue;
         }
         if (fn_80050EAC(&work->pos, &area->vec_0x3C) <= lbl_80798B3C) {
@@ -430,7 +430,7 @@ extern "C" void fn_801B08BC(_ENEMY_WORK* work, u8 kind) {
     if (kind == 2) {
         em_fall_height_get(work);
         em_fall_start(work);
-        fn_80128A8C(work, 0x0C, 0);
+        em_act_arm_unless_down(work, 0x0C, 0);
         em_state_refresh(work);
     }
     work->field_0x328 = 0;
@@ -859,12 +859,12 @@ extern "C" void fn_801B1548(_ENEMY_WORK* work) {
         break;
     case 1:
         if (em_frame_check(work, 1, lbl_80798B44, lbl_80798B48) == 1) {
-            fn_80131DB4(work);
-            fn_80131DF4(work);
+            em_motion_timer_arm(work);
+            em_fx_flag_set(work);
         }
         if (em_mot_end_ck(work) == 1) {
             fn_801B0450(work);
-            fn_8012E694(work);
+            em_attack_done_set(work);
         }
         break;
     }

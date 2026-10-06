@@ -114,7 +114,7 @@ extern u8 lbl_80570150[];
 
 /* `enemy/fn_8011D448.cpp`'s status-bit helpers (`bits_0x824`), declared with these call sites' spelling. */
 void fn_8011E5EC(struct _ENEMY_WORK* self);
-void fn_8011E620(struct _ENEMY_WORK* self, u32 mask);
+void em_status_bits_set(struct _ENEMY_WORK* self, u32 mask);
 void fn_8011E630(struct _ENEMY_WORK* self, u32 mask);
 
 /* `stage/stg_w.cpp`'s blend helper: r3 is the `_ENEMY_WORK` (set by the caller), f1 the scalar. */
@@ -1140,7 +1140,7 @@ void fn_801A3DBC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x801A3DEC - the action-id dispatcher (0x1E5) plus the block's shared tail: the `field_0x1E2 == 4`
- * gate runs `fn_80136D14`. */
+ * gate runs `em_shake_req_set`. */
 void fn_801A3DEC(struct _ENEMY_WORK* self) {
     switch (self->action) {
     case 0:
@@ -1172,7 +1172,7 @@ void fn_801A3DEC(struct _ENEMY_WORK* self) {
         break;
     }
     if (self->field_0x1E2 == 4) {
-        fn_80136D14(self);
+        em_shake_req_set(self);
     }
 }
 
@@ -1357,12 +1357,12 @@ void fn_801A4218(struct _ENEMY_WORK* self) {
         fn_8011E630(self, -1);
         if ((u16)em_get_mot_no(self) == 7) {
             if (em_after_frame_check(self, 2, lbl_807987B4, lbl_80798538) == 1) {
-                fn_8011E620(self, 0x40000);
+                em_status_bits_set(self, 0x40000);
             }
         }
     } else if (em_act_ck(self, 7, 7) == 1) {
         fn_8011E630(self, -1);
-        fn_8011E620(self, 0x80000);
+        em_status_bits_set(self, 0x80000);
     } else {
         fn_8011E5EC(self);
         if (self->area_no == 1) {

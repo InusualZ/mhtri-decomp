@@ -301,7 +301,7 @@ extern "C" void fn_8015D9C8(_ENEMY_WORK* self, u32 arg) {
     switch ((u8)arg) {
       case 2:
         em_move_mode_set(self, 4);
-        fn_80128A8C(self, 6, 5);
+        em_act_arm_unless_down(self, 6, 5);
         em_state_refresh(self);
         break;
     }
@@ -485,7 +485,7 @@ extern "C" void fn_8015DF40(_ENEMY_WORK* self) {
  * height pair on entry, `fn_801280F4` on the wait. */
 extern "C" void fn_8015DFBC(_ENEMY_WORK* self) {
     em_busy_timer_reset(self);
-    fn_80136D14(self);
+    em_shake_req_set(self);
     switch (self->state) {
       case 0:
         self->state++;
@@ -1176,7 +1176,7 @@ extern "C" void fn_8015F2D8(_ENEMY_WORK* self) {
         return;
     case 1:
         if (em_frame_check(self, 1, lbl_807973B4, lbl_80797330) == 1U) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if (em_mot_end_ck(self) == 1U) {
             fn_801280F4(self);
@@ -1191,7 +1191,7 @@ extern "C" void fn_8015F39C(_ENEMY_WORK* self) {
 
     em_busy_timer_reset(self);
     fn_80131E00(self);
-    fn_80136D14(self);
+    em_shake_req_set(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
     case 0:
@@ -1216,7 +1216,7 @@ extern "C" void fn_8015F450(_ENEMY_WORK* self) {
 
     em_busy_timer_reset(self);
     fn_80131E00(self);
-    fn_80136D14(self);
+    em_shake_req_set(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
     case 0:
@@ -1242,7 +1242,7 @@ extern "C" void fn_8015F510(_ENEMY_WORK* self, u8 arg1) {
     em_busy_set(self);
     em_busy_timer_reset(self);
     fn_80131E00(self);
-    fn_80136D14(self);
+    em_shake_req_set(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
     case 0:
@@ -1268,7 +1268,7 @@ extern "C" void fn_8015F60C(_ENEMY_WORK* self) {
 
     em_busy_timer_reset(self);
     fn_80131E00(self);
-    fn_80136D14(self);
+    em_shake_req_set(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {
     case 0:
@@ -1304,11 +1304,11 @@ extern "C" void fn_8015F6C4(_ENEMY_WORK* self, u8 arg1) {
             fn_801303EC(self, lbl_80797330);
             em_hit_window_set_default(self, 0, 0x11);
         }
-        fn_80136D14(self);
+        em_shake_req_set(self);
         return;
     case 1:
         if (em_frame_check(self, 2, lbl_807973C0, lbl_80797330) == 1U) {
-            fn_80136D14(self);
+            em_shake_req_set(self);
         }
         if ((u8) arg1 == 0) {
             if (self->field_0x1AC >= lbl_80797330) {
