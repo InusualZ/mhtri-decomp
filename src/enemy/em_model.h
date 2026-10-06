@@ -1,9 +1,5 @@
-/*
- * Declarations of `src/enemy/em_model.cpp` - the roster spawn and model band of the enemy population manager
- * (`.text` 0x803B936C..0x803BE30C), cut from `enemy/em_pop` at phase 4.  The record types (`EmPopRec`, `EmPopSubRec`,
- * `EmPopWork`, `EmPopWorkSlot`, `EmWeightEntry`) stay in `enemy/em_pop.h`, which this header includes.
- *
- * Names are GUESSes derived from each body (the map and the runtime dump give only placeholders).
+/* The declarations `enemy/em_model.cpp` owns (the roster spawn and model band, 0x803B936C-0x803BE30C); the record
+ * types stay in `enemy/em_pop.h`, which this header includes.  The names are GUESSES from the bodies.
  */
 #ifndef MHTRI_ENEMY_EM_MODEL_H
 #define MHTRI_ENEMY_EM_MODEL_H

@@ -1,100 +1,32 @@
-/* Monster Hunter Tri (RMHE08) - the enemy `0x803253BC-0x8032C920` band (85 functions / 30052 B),
- * reconstructed from the split target object.
- *
- * Registration (brief section 2).  The range is proposal `803253BC_fn_803253BC` from discovery's
- * attribution queue (the map stem the range was claimed under; *Naming* below replaces it).
- * Seam (campaign rule), settled from the data - referrer sets taken
- * from every current target object's relocations, not from `tudiscover`'s hints (it reports only
- * weak signals at every candidate cut here): the range references no string at all, so the
- * `__FILE__` test is inapplicable (the DOL's only `enemy`-band file name is `enemy_control.cpp`, one
- * copy, another TU's), and the pool test is decisive instead.  Of the 188 `lbl_`/`jumptable_` labels
- * this object relocates against, **184 are referenced by no other target object in the tree** - the
- * whole `.sdata2` run 0x8079AF4C..0x8079B100 (107 labels), the whole `.data` run
- * 0x805DDA50..0x805DFC00 (76, jump tables and tables), and `.rodata` `lbl_80570840` - and the
- * remaining four are the shared `.bss` globals `lbl_806BE2C8`..`lbl_806BE310`, which the `.data`
- * initializer band also points at.  The `.sdata2` tiling is disjoint and ordered either side
- * (0x8079AF00..0x8079AF48 -> the 0x80324304-0x80324CC4 run, 0x8079AF4C..0x8079B100 -> this range,
- * 0x8079B108.. -> 0x8032C920+), so the range is **data-complete**: it can own everything it
- * references, and playbook 58's sole-referencer condition holds for all of it.  Residual: the pool
- * boundary bounds the left seam only to (0x80324CC4, 0x803253BC], so `fn_803250B0` (780 B, its own
- * extab record, no pool entry of its own) could in principle still belong to this TU; no datum is
- * cited on both sides of either edge, so no edge is *falsified*.
- *
- * Module `enemy` (evidence class 3): the range drives the shared `_ENEMY_WORK`
- * record (`em_frame_check`, `em_get_mot_no`, `em_die_ck`, `em_after_frame_check`, `get_em_scale`)
- * and calls into the registered enemy units `enemy/enemy_control.cpp`,
- * `enemy/fn_801251D0.cpp` and `enemy/fn_8012EC74.cpp` (em_mot_set x75, em_move_mode_set x62,
- * em_se_tbl_play x60, fn_801303EC x51, em_mot_end_ck x44, fn_801280F4 x42).  Lib `enemy` (cflags_main),
- * the group its link neighbours use.
- *
- * Naming.  The map has no real name for any of the range's 85 addresses: `dumpmap.py join --kind
- * rename` reports **0** candidates over 65679 map symbols, every `lookup` answers `zz_<addr>_`, and
- * no `__FILE__` string covers the band.  The 14 symbols this file defines - 13 bodies plus the still
- * bodyless `em_act_move_step` - and the file name `em_action` are therefore **guesses derived from
- * the bodies** and the module's `em_*` sibling scheme (`em_frame_check`, `em_die_ck`,
- * `em_get_mot_no`, `em_after_frame_check`): `em_act_slots_clr` clears the four action halfwords,
- * `em_act_entry_start` starts the entry action for a mode and installs its state record once,
- * `em_act_frame_ck` is that action's per-step hook, `em_act_dispatch` switches on the action
- * sub-state, `em_act_hold`/`em_act_follow`/`em_act_mot21` are the three motions it dispatches,
- * `em_act_arm_m06s07` arms motion 6 sub-state 7, `em_act_aim` re-latches the aim angle and clamps it
- * into one of the two facing windows, `em_rot_reset` zeroes the three rotation angles,
- * `em_tut_cam_ck` is the tutorial-map/camera-distance gate, and `em_act_rec_init`/`em_act_noop` are
- * the 0xC-byte action record's constructor and its empty step.  Refine them when better evidence
- * turns up; only the bodies support them.
- *
- * Naming note: the file's own 14 symbols are named above; what the escape still covers is
- * precisely the names this file *references* in other units - 25 callee symbols in **42**
- * occurrences (em_move_mode_set x5, fn_80126324 x4, em_mot_end_ck x3, fn_801303EC x2, fn_8012F5C4 x2,
- * fn_8013072C x2, em_state_refresh x2, enemy_data_find x2, enemy_data_grp x2, ...; 21 of the 25 answer `zz_` in
- * the dump too).  Renaming those is a cross-unit rename batch in ~10 owner units, not this lane's
- * change, so the escape stays until that batch runs.
- *
- * Sections this unit owns: .text 0x803253BC-0x8032C920, extab 0x8001622C-0x80016464,
- * extabindex 0x800351A8-0x800354FC (both derived from the range's `@etb_` labels) and the one
- * `.ctors` word 0x8056F39C -> fn_8032C65C.
- *
- * The record is the shared `_ENEMY_WORK` (`enemy/ENEMY_WORK.h`, rule 1).
- *
- * Data state (brief section 2).  `python tools/units/datagap.py --unit em_action` reports **no
- * `ours-extra` row** and no data-section row in either direction: this object emits no
- * `.data`/`.sdata2`/`.sdata`/`.rodata` and neither does the target object, because the entries the
- * range loads live in data bands no `splits.txt` block claims.  They are declared, never defined
- * (`unsplit/enemy.h`, playbook 29) - a definition would emit a second copy.  The ranges
- * *are* claimable, but only once the bodies that use them are written: claiming them now, at 13 of
- * 85 functions, gives the target object bytes this one does not emit (`target-extra`), which playbook
- * 29 calls strictly worse than leaving the claim out.  The one claimed section this object does not
- * emit is the `.ctors` word 0x8056F39C -> fn_8032C65C (`target-extra` 4 B): it needs the static
- * object whose constructor `fn_8032C65C` is, and that body is unwritten.
- *
- * Reconstructed: the head of the band, 0x803253BC-0x80325E34 (13 of the 85 functions, 1744 of the
- * target's 30052 B; our object's `.text` is 1760 B); every other symbol in the range is still a
- * bodyless `fn_` in the map.  Per-symbol
- * numbers come from `python tools/units/recompile.py enemy/em_action.cpp --measure <symbol>`;
- * the drafts the bodies were written from are regenerated with `python tools/units/m2cinput.py
- * build/RMHE08/obj/enemy/em_action.o -o build/tmp/x.s` then `python tools/m2c/m2c.py -t
- * ppc-mwcc-c build/tmp/x.s`.
- *
- * Residuals of what is written:
- *   * em_tut_cam_ck 81.0 - the by-value `get_camera_pos()` result is copied through a temporary where
- *     retail hands the temporary straight to `copyVec3`, i.e. the owner's declaration is a
- *     `const VEC3&` (or the original took a temporary's address); the `const VEC3*` spelling this
- *     unit must use costs the 3-word copy.
- *   * em_act_hold 87.5, em_act_frame_ck 93.7, em_act_aim 93.9 - register colouring plus one duplicated
- *     branch tail (284-304 B against 312/144/144 B).
- *   * em_act_mot21 96.8 - retail keeps an `lfs f1, lbl_8079AF54` before the `em_fall_start` call whose
- *     owner header declares `(self)` only; adding the second parameter there would change that
- *     header's other callers.
- *   * em_act_rec_init 99.3, em_rot_reset 97.6, em_act_entry_start 97.9, em_act_follow 97.3 - one
- *     instruction or one register colour away.
- *     one register colour away.
- *   * em_act_slots_clr, em_act_noop, em_act_arm_m06s07 and em_act_dispatch are byte-identical.
- *
- * Merged with `main`.  The `_ENEMY_WORK` +0x194 field split had landed without its
- * trailing pad, which shrank the struct to 0xB0C and moved every member above +0x194 down by 0x0C -
- * invisible to this unit's own rows but worth 446 lower rows across the tree.  The two views are one
- * `union` now; an MWCC probe (array extents read back from the object's symtab) re-asserts
- * `sizeof(_ENEMY_WORK) == 0xB18`, `field_0x1AC` at 0x1AC and `aim` at 0x1B0.  Four of the thirteen
- * rows above gained from the repair.
+/* enemy/em_action.cpp - the enemy action band: the entry action and its state record, the action-sub-state
+ *   dispatcher and the motions it dispatches, the aim and rotation helpers and the tutorial camera gate.
+ * RANGE. .text 0x803253BC-0x8032C920 (85 functions); .ctors 0x8056F39C-0x8056F3A0 (`fn_8032C65C`),
+ *   .rodata 0x80570840-0x80570880, .data 0x805DD9E0-0x805DFC30, .bss 0x806BE2C8-0x806BE328,
+ *   .sdata 0x80792D08-0x80792D18, .sbss 0x80794B88-0x80794B90, .sdata2 0x8079AF48-0x8079B108, extab, extabindex.
+ * SEAM. Data-complete: of the 188 labels the target object relocates against, 184 (the whole `.sdata2` run
+ *   0x8079AF4C-0x8079B100, the `.data` run 0x805DDA50-0x805DFC00 and `lbl_80570840`) are referenced by no other target
+ *   object, the other four are the `.bss` globals `lbl_806BE2C8`..`lbl_806BE310`, and the `.sdata2` tiling is
+ *   disjoint and ordered on both sides.  The range references no string.
+ * NAMES. The file and the 14 symbols it defines are GUESSES from the bodies on the module's `em_*` scheme (no dump or
+ *   `__FILE__` name covers the band): `em_act_slots_clr` clears the four action halfwords, `em_act_entry_start`
+ *   starts the entry action and installs its state record, `em_act_frame_ck` is its per-step hook, `em_act_dispatch`
+ *   switches on the action sub-state, `em_act_arm_m06s07` arms motion 6 sub-state 7, `em_act_aim` clamps the aim angle
+ *   into a facing window, `em_tut_cam_ck` is the tutorial-map/camera-distance gate, `em_act_rec_init`/`em_act_noop`
+ *   are the 0xC-byte action record's constructor and empty step.
+ * RESIDUALS. 72 rows unwritten: 0x803257C4-0x80325BFC (`em_act_move_step` among them), 0x80325EC4-0x8032C920 (the
+ *   static initializer `fn_8032C65C` among them).
+ *  - `em_tut_cam_ck`: ours copies the by-value `get_camera_pos()` result through a temporary where retail hands it
+ *    straight to `copyVec3` (frame 0x30 against 0x20; the owner's `const VEC3*` spelling forces the copy);
+ *  - `em_act_hold`: ours keeps `state` in a saved register where retail reloads it; `em_act_frame_ck`: an extra `b`
+ *    and retail's `clrlwi` + `cmpwi` mode test; `em_act_entry_start`: retail narrows the mode with `clrlwi`;
+ *  - `em_act_aim`: retail compares against a double (`lfd` + `fcmpo` + `cror`), ours against a float (`lfs` + `fcmpu`);
+ *  - `em_act_mot21`: retail loads `lbl_8079AF54` into f1 before `em_fall_start`, whose owner header declares
+ *    `(self)` only;
+ *  - `em_rot_reset`: retail compares signed (`cmpwi`), ours unsigned; `em_act_rec_init`, `em_act_follow`: register
+ *    allocation only.
+ *   flipcheck: `.bss`/`.ctors`/`.data`/`.rodata`/`.sbss`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/
+ *   extabindex short of the claim; candidate fold with `menu/fn_8031EA8C.cpp` (1 shared pool literal, text
+ *   interleaved, confidence low).
  */
 #include "types.h"
 #include "mh3_pad.h" /* the owner header (rule 2) */

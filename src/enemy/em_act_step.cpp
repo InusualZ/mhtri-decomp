@@ -1,216 +1,36 @@
-/*
- * enemy/em_act_step.cpp - unit, `.text` 0x8032C920..0x80330194 (70 functions, 14452 bytes).
- *
- * 34 of 70 functions have a body here.
- *
- * FLAGS.  `cflags_main`.  The tail (0x80330194..) is `enemy/em_act_step_tail.cpp`.
- *
- * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
- * extabindex).
- */
-/* ---- header inherited from src/enemy/em_act_step.cpp (written against its pre-phase-4 range) ---- */
-/*
- * enemy/em_act_step.cpp - the enemy work record's action-step band: the step function of each of the
- * record's first four action ids, the motion each of their phases arms, and the record's own class (its
- * constructor, vtable and destructor halves) with the effect-offset and seat-aim helpers.  `.text`
- * 0x8032C920..0x8033041C (74 functions, 15100 B).  Registered once, at its final home (docs/plan.md 12) - that proposal's range 0x8032C920..0x80334568
- * was one `--max-bytes` cut over TWO translation units, and the seam re-draw of 2026-09-26 split it
- * here; `enemy/em_pl_frame.cpp` is the other half (0x8033041C..0x80334568, 48 functions / 16716 B).
- *
- * MODULE AND NAME (brief section 2, evidence order).  No `__FILE__` string is reachable from the unit
- * (its whole `.data` run 0x805DFC9C..0x805E0510 is jump tables and the class vtable `lbl_805E04E0` - the
- * only printable bytes in it are two 4-byte coincidences) and `tools/symbols/dumpmap.py lookup` answers
- * `zz_XXXXXXXX_` for every symbol, so class 1 and 2 decide nothing.  Class 3 decides it: the record every
- * function takes in r3 is the enemy work record - the range calls its API with that pointer as the
- * subject (`em_frame_check__FP11_ENEMY_WORKUsff`, `em_act_ck__FP11_ENEMY_WORKUcUc`,
- * `em_die_ck__FP11_ENEMY_WORK`, `em_after_frame_check__FP11_ENEMY_WORKUsff`,
- * `em_get_mot_no__FP11_ENEMY_WORK`, 67 call sites), and every field it reads on that pointer is one
- * `enemy/ENEMY_WORK.h` names for `_ENEMY_WORK`: +0x005 the per-motion state, +0x188 `pos`,
- * +0x1BC/+0x1C0/+0x1C4 the rotation triple, +0x1CC the seat-preference float, +0x328 the per-slot
- * block, +0x338, +0x834 the "already seated" byte, +0xB14 the `_se_w` handle.  The bracketing
- * registered units are `hud/fn_80324F7C.c` (below) and `enemy/em_pl_frame.cpp` (the other half of this
- * proposal's range, above); this unit's own class (the vtable `lbl_805E04E0` its constructor
- * `em_work_ctor` installs) derives from the class whose
- * constructor is `em_res_user_data_ctor` and whose vtable `lbl_805A1368` lives in the enemy band - eleven slots,
- * this range overrides three (the destructor `fn_803300CC`, `fn_8032FFEC`, `fn_8032FFF4`).  Class 4 (a
- * `fn_XXXXXXXX` file stem) was the registration's name for want of anything better; the naming pass
- * below replaced it with what the band *is*.
- *
- * NAMING (2026-09-26: the batch's own symbols, the gate's rule 7 refusal).  Every address
- * of the range is a bare `fn_XXXXXXXX` row in the map and `tools/symbols/dumpmap.py lookup` answers
- * `zz_XXXXXXXX_` for all of them, so no name here comes from evidence class 1 or 2 - each one is
- * **derived from the function's own body** (the fields it reads on the record, the API calls it makes,
- * what it returns) and fits the module's own `em_<noun>_<verb>` scheme (`em_act_ck`, `em_frame_check`,
- * `em_get_mot_no`; the neighbouring band `enemy/em_action.cpp` names its own functions `em_act_hold`,
- * `em_act_mot21`, `em_act_frame_ck`).  All 34 definitions were renamed in
- * `config/RMHE08/symbols.txt` and here in one edit (`symedit.py rename-batch`; playbook 31/48 - objdiff
- * pairs by name, so half a rename measures 0 %).  The scheme, and the datum behind each name:
- *
- *  - `em_act_step_<n>` = the record's step function for action id `n`: the band's own dispatcher
- *    `fn_8032FA88` switches on `+0x1E5 action` (the field `enemy/ENEMY_WORK.h` names as the id
- *    `em_act_ck` matches) and its jump table's cases 0..3 call these four, so each one is the step of
- *    that action state and each switches on `+0x1E6 state_sub` for its phase;
- *  - `em_act_arm_<motion>[...]` = one phase of such a step, which arms a motion through the record's
- *    own setters (`em_mot_set(self, motion, mode, 0)`, `em_mot_set_ck`, `em_mot_set_blend`) and then ends the
- *    step when the motion's frame check (`em_mot_end_ck`, `em_turn_to_target`, `em_approach_step`, `em_frame_check`)
- *    reports done; `_hit<a>_<b>` is the pair handed to the damage handler `em_state_set`, `_f<frames>`
- *    the frame count the arm sets, `_mot_mode` an arm whose motion is the caller's mode argument;
- *  - the rest are named for the record's own state machine and helpers, not for a motion.
- *
- * Each is a **guess** the bodies support and a later pass may refine; the per-function comment above
- * every definition states the same evidence in full.  Old map stem -> name:
- *
- *   fn_8032C920 -> em_eff_offset_set         builds the (0, 0, 10.0f) offset, rotates it by the
- *                                            record's own `rot_y` and hands the vector to `fn_80130350`
- *   fn_8032C994 -> em_eff_offset_clr         zeroes `handle_0x328.vec` and its `field_0x0C` word
- *   fn_8032C9D8 -> em_act_face_away          gates on the player being in play and on <3 set act bits,
- *                                            then points `rot_y` at the reverse bearing (returns 1)
- *   fn_8032CC2C -> em_eff_ground_set         looks the +0x1A id up with `fn_801421E4` and places the
- *                                            effect at the ground record's position and rotation
- *   fn_8032CEA8 -> em_work_ctor              the record's class constructor: base ctor `em_res_user_data_ctor`,
- *                                            then stores this unit's vtable `lbl_805E04E0`
- *   fn_8032CEE4 -> em_work_dtor_del          the vtable's deleting-destructor half (empty in retail)
- *   fn_8032CEE8 -> em_work_noop              the vtable's other empty virtual stub
- *   fn_8032CEEC -> em_act_die_step           while `em_die_ck` refuses it, steps `+0x1CC` up to its
- *                                            ceiling once `+0x338` is 1
- *   fn_8032CF68 -> em_act_arm_mot1           action 0 phases 0-2: `em_mot_set_ck(self, 1, 6, 0)`, ends on
- *                                            `em_mot_end_ck`
- *   fn_8032CFE4 -> em_act_arm_mot201         action 0 phase 3: the two effect resets, then motion 201
- *   fn_8032D074 -> em_act_step_0             the step function of action id 0: `state_sub` 0/1/2 ->
- *                                            `em_act_arm_mot1`, 3 -> `em_act_arm_mot201`
- *   fn_8032D0B0 -> em_act_arm_mot2           action 1 phase 0: `em_mot_set(self, 2, 6, 0)`
- *   fn_8032D12C -> em_act_arm_mot_mode       action 1 phases 1-4: arms the motion the caller's mode
- *                                            selects (0->3, 1->4, 2->6, 3->9)
- *   fn_8032D210 -> em_act_arm_mot11          action 1 phase 5: the two motion counters, then motion 11
- *   fn_8032D2A0 -> em_act_arm_mot1_hit1_1    action 1 phase 6: motion 1, then the scan of the `+0x454`
- *                                            per-attacker values hands `em_state_set(self, 1, 1)`
- *   fn_8032D3F4 -> em_act_arm_mot1_f20       action 1 phase 7: `em_mot_set_blend(self, 1, 20, 0, 1)` - motion 1
- *                                            with a 20-frame check
- *   fn_8032D480 -> em_act_step_1             the step function of action id 1: `state_sub` 0..7 (the
- *                                            eight-arm switch whose table is this unit's `.data`)
- *   fn_8032D4D8 -> em_act_arm_mot5           action 2 phase 0: motion 5 with a `bits_0x1EC`-scaled speed
- *                                            factor and a 150-frame countdown
- *   fn_8032D5C4 -> em_act_arm_mot7           action 2 phase 1: the same step for motion 7, 120 frames
- *   fn_8032D6B0 -> em_act_arm_mot12          action 2 phase 2: motion 12, waits 512 frames
- *   fn_8032D730 -> em_act_arm_mot13          action 2 phase 3: motion 13, waits 1024 frames
- *   fn_8032D7B0 -> em_act_arm_mot10          action 2 phase 4: motion 10, the 2048-frame check first
- *   fn_8032D838 -> em_act_arm_mot114         action 2 phase 5: motion 114 (0x72), 120-frame countdown
- *   fn_8032D8C0 -> em_act_step_2             the step function of action id 2: `state_sub` 0..5
- *   fn_8032D914 -> em_act_arm_mot202         action 3 phase 0: the +0xCA resets, then motion 202
- *   fn_8032D9A4 -> em_act_arm_mot201_hit7_2  action 3 phase 1: motion 201, the attacker scan every 16th
- *                                            step hands `em_state_set(self, 7, 2)`
- *   fn_8032DAE4 -> em_act_arm_mot203_204     action 3 phases 2/3: motion 203, or 204 when the mode is 1
- *   fn_8032DBAC -> em_act_arm_mot205         action 3 phase 4: motion 205, 120-frame countdown and a
- *                                            64-frame `em_approach_step` check
- *   fn_8032DC70 -> em_act_arm_mot207         action 3 phase 5: motion 207, waits 1024 frames
- *   fn_8032DF44 -> em_act_arm_mot210_hit3_10 action 3 phase 11: motion 210, then `em_state_set(self, 3,
- *                                            10)` and `em_eff_offset_set` at the end of every step
- *   fn_8032DFD4 -> em_act_arm_mot201_hit7_6  action 3 phase 18: motion 201, the same scan with
- *                                            `em_state_set(self, 7, 6)`
- *   fn_8032E108 -> em_act_arm_mot203_hit3_20 action 3 phase 19: motion 203 and `em_state_set(self, 3, 20)`
- *   fn_8032E190 -> em_act_step_3             the step function of action id 3: `state_sub` 0..5, 10, 11,
- *                                            18, 19 (the sparse table behind its `cmplwi 21`)
- *   fn_8032E1E8 -> em_seat_aim_ck            1 / -1 / 0 for "the seat has a player and
- *                                            `em_act_face_away` turned the record" / "refused" / "no seat"
- *
- * Naming note: the file names every symbol it *defines* (the table above); the escape that remains
- * covers precisely the names it *references* in other units - `em_mot_set`, `em_move_mode_set`, `em_state_set`
- * and ~50 more callee stems whose owners have not been named yet, plus the rows of this range's own
- * unwritten tail (`fn_8032DD04`, `fn_8032E23C`, `fn_803303E0`, ...), which belong to the pass that
- * writes their bodies.  Renaming the callee stems is a cross-unit batch in ten owner units, not this
- * lane's change (the same escape `enemy/em_action.cpp` records).  Every definition below is `extern
- * "C"` so objdiff pairs it by the map's name (playbook 42); a C++ definition would mangle and measure
- * 0 %.
- *
- * SEAM - SETTLED (seam re-draw): the proposal's range is two translation units and the cut
- * is 0x8033041C.  Three instruments agree, and none of them is the behavioural argument the first note
- * used:
- *  - the extabindex run names its own functions - entry 57 (at 0x800357A8) is `fn_8033041C`, so this
- *    unit takes entries 0..56 and the other half 57..98;
- *  - the `.sdata2` pool run 0x8079B108..0x8079B2AC is two objects' pools, cut at 0x8079B20C |
- *    0x8079B210: this unit's labels are referenced only by functions 0x8032C920..0x80330128, the other
- *    half's only by 0x803305F8..0x80334398, and no label is shared.  MWCC's u32->f32 magic
- *    `0x4330000080000000` is emitted twice inside the run - 0x8079B140 for `em_act_arm_mot5`/`em_act_arm_mot7`
- *    and 0x8079B228 for `fn_803305F8` - and 0.0f / 0.5f / 1.0f / 10.0f / 20.0f / 30.0f / 60.0f / 0.8f /
- *    -30.0f each occur once per half.  A pool emits one copy of a constant per object (this unit's own
- *    object uses the magic in two functions and emits one 8-byte entry) and the linker merges nothing
- *    (that magic occurs >= 40x in the DOL's `.sdata2`), so two copies mean two emitters;
- *  - the `.data` run splits at the same place: this unit's table fragment ends with the class vtable
- *    0x805E04E0 (0x30 B) and the other half's begins at 0x805E0510 with six objects `fn_803305F8`
- *    alone references.
- * `fn_803303E0` (60 B) ends exactly on the cut.  The behavioural argument the first note recorded is
- * still true but it is a hint, not the seam: this unit's own `em_act_arm_mot201_hit7_2`/`em_act_arm_mot201_hit7_6` already scan
- * the player work records, so "the first half drives the enemy work" was already wrong at 0x8032D9A4.
- *
- * SECTIONS.  `.text` 0x8032C920..0x8033041C.  The unit owns the extab run 0x80016464..0x8001662C
- * (57 x 8 B) and the extabindex run 0x800354FC..0x800357A8 (57 x 12 B) - 17 of its 74 functions carry
- * no extab record (`em_work_dtor_del`, `em_act_step_0`, `em_act_step_1`, `em_act_step_2`, `em_act_step_3`,
- * `fn_8032ED78`, `fn_8032F2FC`, `fn_8032FA34`, `fn_8032FCD8`, `fn_8032FEF0`, `fn_8032FFEC`,
- * `fn_803303E0`, ...) - plus the `.ctors` word 0x8056F3A0 -> `fn_80330128`, its static initializer
- * (still unwritten).  `.data` 0x805DFC9C..0x805E0510 **is claimed**: it is this unit's own table run
- * (the jump tables, the per-function tables of `fn_8032EDE0`, `fn_8032F014`, `fn_8032F550`,
- * `fn_8032FA88`, and the class vtable `lbl_805E04E0`), it starts exactly where the previous band's last
- * object (`em026_prog_tbl`, 0x805DFC30..0x805DFC9C) ends and ends exactly where the other half's first
- * table object (0x805E0510) starts, so it is a complete fragment - and the claim was measured before
- * and after (build green, every row of the written functions unchanged).  `.sdata2`
- * 0x8079B108..0x8079B210 (this unit's pool half) is deliberately NOT claimed: a `.sdata2` claim links
- * only while the object emits no pool of its own and ours emits the compiler's 8-byte magic (playbook
- * 23/58), so its labels stay declarations (playbook 29).  The other half's pool half
- * 0x8079B210..0x8079B2AC is not this unit's and is not declared here either - `unsplit/enemy.h`
- * now carries this half's words only.
- *
- * FLAGS.  `cflags_main` (Wii/1.3, `-O3 -inline noauto -Cpp_exceptions on`), the bracketing enemy units'
- * set - the range's callees and its extab presence agree with it, so nothing per-unit is added.
- *
- * THE RECORD.  `_EM_CHARA_WORK` below is this unit's view of the record: the offsets
- * `enemy/ENEMY_WORK.h` does not name yet (+0x354 as an `f32`, +0x565/+0x566/+0x56B, +0x5C6,
- * +0x454) are kept here because that header is shared and a worker may not edit it; the outbox carries
- * the `shared-file` request that folds them in.  The view is a union of the two shared views of the same
- * record (`_ENEMY_WORK` in `enemy/ENEMY_WORK.h`, `_PLW` in `pl.h`), which is why callees
- * that declare `_PLW*` are called through a cast of the same pointer.
- *
- * RESIDUALS.  34 of the unit's 74 functions are written (10732 B of 15100), 24 of them byte-identical;
- * the unit reads 34.69 % fuzzy / 16.93 % matched code, and `build/RMHE08/main.dol` stays OK.  The redraw
- * changed two source spellings and nothing else: `em_act_arm_mot201_hit7_2` and `em_act_arm_mot201_hit7_6` compared against
- * `lbl_8079B2A0`, which is the OTHER half's copy of 0.8 - a reference across the seam, impossible once
- * the range is two TUs - so both now use this unit's own `lbl_8079B178` (0.8).  Both measured identical
- * before and after (98.25 % / 98.18 %), so the score does not say which copy the body wants; the
- * target's `em_act_arm_mot201_hit7_2` loads `lbl_8079B150` (800.0) there and calls `em_state_set` at +0x1170, so the
- * body's constant is a decompilation defect for the next pass - recorded, not guessed at.  The ten
- * written functions that are not byte-identical:
- *
- *  - em_eff_offset_set 92.93 %: the 12-byte copy into the outgoing local is the only difference - retail
- *    pairs two `lwz` before two `stw` (two registers), ours alternates one `lwz`/`stw` per word.  A
- *    `VEC3` copy, a `_CP_VECTOR` copy and the cast form all measure the same.
- *  - em_act_face_away 97.61 %: register colouring only - retail holds the record/player in r29/r30 and the
- *    +0x328 block in r31, ours in r30/r31/r29; the instruction stream and the frame are equal.
- *  - em_act_arm_mot1_hit1_1 98.76 %, em_act_arm_mot201_hit7_2 98.25 %, em_act_arm_mot201_hit7_6 98.18 %: the attacker scan.  Retail
- *    advances the move-work pointer by 0xB20 at the loop tail (`addi r3,r3,0xb20`) and re-forms the
- *    per-attacker float address from the index; ours keeps the base pointer (`work->`) and indexes the
- *    +0x454 array.  Measured: `work[i]` (the stride spelling) costs 92.4 % on `em_act_arm_mot1_hit1_1`, so the
- *    `work->` spelling is kept.
- *  - em_act_arm_mot5 93.22 %, em_act_arm_mot7 93.22 %, em_act_arm_mot205 95.92 %: one argument-materialisation order
- *    - retail loads f1 before `li r4, 0` for the trailing `em_approach_start(self, 0, -200.0f)`, ours after
- *    (the same three instructions, reordered).  The constants of both are the pool labels
- *    `lbl_8079B138` (the `f32` argument) and the record's own `bits_0x1EC * 0.1` factor.
- *  - em_act_arm_mot203_204 99.80 %: one register - retail masks the mode into r0 at the first test
- *    (`clrlwi r0, r4, 24`) where ours masks into the saved copy.
- *  - em_act_step_3 99.95 %: one immediate - retail's jump-table range check is `cmplwi r0, 21` and ours
- *    `cmplwi r0, 19`, i.e. the source switch's largest case was 21 where this one's is 19 (the table's
- *    gap entries are the default label in both); adding an empty `case 21: break;` measured the
- *    same, so the source likely had a case there with a body this reconstruction has not found yet.
- *
- * Unit-level gaps (measured with `tools/units/datagap.py` after the redraw):
- *  - `.sdata2` ours-extra 8 B: the `0x43300000_80000000` u32->f32 magic MWCC pools for
- *    `(f32)(bits_0x1EC & 3)`.  Retail's copy is the pool word at 0x8079B140, inside this unit's
- *    unclaimed pool half; the claim would break the link while our object emits a pool of its own
- *    (playbook 23/58), so it stays unclaimed.  This is the unit's one ours-extra row.
- *  - `.data` 2164 B / `.rela.data` 1056 B target-extra: the claim is active and the run is the unit's -
- *    the object emits only the tables the written functions use (112 B today).
- *  - `.ctors` 4 B / `.rela.ctors` 12 B target-extra: the static initializer `fn_80330128` is unwritten.
- *  - `.text` 15100 vs 5304 B, extab 456 vs 224 B, extabindex 684 vs 336 B target-extra: 40 functions
- *    are unwritten; the next in address order is `fn_8032E23C` (0x1F8, the largest of the remaining
- *    rows), then `fn_8032E434` (0x118) and `fn_8032E54C` (0x2A4).
+/* enemy/em_act_step.cpp - the enemy work record's action-step band: the step function of each of the record's first
+ *   four action ids, the motion each of their phases arms, and the record's own class (constructor, vtable, destructor
+ *   halves) with the effect-offset and seat-aim helpers.
+ * RANGE. .text 0x8032C920-0x80330194 (70 functions); .ctors 0x8056F3A0-0x8056F3A4 (`fn_80330128`),
+ *   .data 0x805DFC30-0x805E0510 (from `em026_prog_tbl`; the jump tables, the per-function tables and the class vtable
+ *   `lbl_805E04E0` last), .bss 0x806BE328-0x806BE340, .sdata 0x80792D18-0x80792D28, .sdata2 0x8079B108-0x8079B210,
+ *   extab, extabindex.  The band's last four functions are `enemy/em_act_step_tail.cpp`.
+ * SEAM. The band's end 0x8033041C (against `hud/pl_frame_sync.cpp`) is settled: extabindex entry 57 (0x800357A8)
+ *   is `fn_8033041C`; the `.sdata2` run cuts at 0x8079B20C | 0x8079B210 with no label shared and MWCC's u32->f32
+ *   magic emitted once per side (0x8079B140 and 0x8079B228); the `.data` run cuts at 0x805E0510.  The cut at
+ *   0x80330194 is the reconciled candidate's and unproven.
+ * NAMES. Every symbol the unit defines is a GUESS from its body on the module's `em_<noun>_<verb>` scheme:
+ *   `em_act_step_<n>` is action id n's step (the dispatcher `fn_8032FA88` switches on `+0x1E5`, cases 0..3);
+ *   `em_act_arm_<motion>` one phase that arms a motion and ends on its frame check, `_hit<a>_<b>` the pair handed to
+ *   `em_state_set`, `_f<frames>` the frame count it sets, `_mot_mode` a motion chosen by the caller's mode.
+ * RESIDUALS. 36 rows unwritten: 0x8032CC90-0x8032CEA8, 0x8032DD04-0x8032DF44, 0x8032E23C-0x80330194 (the static
+ *   initializer `fn_80330128` among them).
+ *  - `em_act_die_step`: `_EM_CHARA_WORK` declares `field_0x834` after `+0xA39`, so ours reads +0x1234 where retail
+ *    reads +0x834;
+ *  - `em_act_arm_mot1_hit1_1`, `em_act_arm_mot201_hit7_2`, `em_act_arm_mot201_hit7_6`: retail advances the move-work
+ *    pointer by 0xB20 at the loop tail, ours indexes from the base (the `work[i]` stride spelling scores lower); the
+ *    two `_hit7_` rows load `lbl_8079B178` (0.8) where retail loads `lbl_8079B150` (800.0);
+ *  - `em_eff_offset_set`: retail copies the 12-byte offset through r3, ours through r0, and loads `lbl_8079B110`
+ *    where retail loads `lbl_8079B10C`;
+ *  - `em_act_arm_mot5`, `em_act_arm_mot7`: retail loads f1 before `li r4,0` for the trailing `em_approach_start`,
+ *    ours after;
+ *  - `em_act_step_3`: retail's jump-table bound is `cmplwi r0,21`, ours 19 (an empty `case 21` measures the same);
+ *  - `em_act_face_away`, `em_act_arm_mot203_204`: register allocation only.
+ *   flipcheck: `.bss`/`.ctors`/`.sdata` claimed, not emitted; `.data`/`.sdata2`/`.text`/extab/extabindex short of
+ *   the claim.
+ * SHAPES. `_EM_CHARA_WORK` is the union of the record's two shared views (`_ENEMY_WORK`, `_PLW`), so callees that
+ *   take `_PLW*` are called through a cast of the same pointer; `#pragma peephole off` and `#pragma fp_contract off`
+ *   over the bodies.
  */
 
 #include "types.h"
@@ -232,8 +52,7 @@
 extern "C" {
 #endif
 
-/* The out-of-range callees whose owner's header does not declare them yet - each spelling is the
- * callee's own body (the same gap `camera/fn_802B5C58.cpp` and `ai/fn_802C5D10.cpp` recorded). */
+/* The out-of-range callees whose owner's header does not declare them; each spelling is the callee's own body. */
 void fn_80051B7C(void* out, const void* in, f32 scale, s32 a);
 void em_action_finish_fall(struct _ENEMY_WORK* self);
 void fn_8032DD04(struct _EM_CHARA_WORK* self);
@@ -268,9 +87,8 @@ struct EmHandleBlock {
     /* +0x0C */ u32 field_0x0C;
 };
 
-/* The record every function in this range takes in r3 (docs/plan.md 6.5 rules 3-5: size from the
- * range's largest access - +0xB14, the `_se_w` handle - and from `enemy/ENEMY_WORK.h`'s 0xB18;
- * every field ascending and named from its use).  Offset +0x000 is the class vtable the constructor
+/* The record every function in this range takes in r3 (size from the largest access, +0xB14, and from
+ * `enemy/ENEMY_WORK.h`'s 0xB18; every field named from its use, ascending except `field_0x834`, see RESIDUALS).  Offset +0x000 is the class vtable the constructor
  * `em_work_ctor` stores, so the class's object *is* this record.
  * size: 0xB18 */
 struct _EM_CHARA_WORK {
@@ -362,9 +180,8 @@ extern "C" void em_eff_offset_clr(_EM_CHARA_WORK* self)
     block->field_0x0C = 0;
 }
 
-/* Faces the work record away from the player: bails unless the player is in play and fewer than three
- * of the player's act bits are set, then turns the record's y angle to the reverse bearing and stores
- * the sub-step. */
+/* Faces the work record away from the player: with the player in play and fewer than three of its act bits set,
+ * turns the record's y angle to the reverse bearing and stores the sub-step. */
 extern "C" u32 em_act_face_away(_EM_CHARA_WORK* self, _PLW* pl)
 {
     nw4r::math::VEC3* offset = &self->handle_0x328.vec;

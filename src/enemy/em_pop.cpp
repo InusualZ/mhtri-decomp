@@ -1,77 +1,25 @@
-/*
- * em_pop.cpp - the enemy population/roster manager (`enemy` module).
- *
- * `.text` 0x803B465C..0x803B936C (82 symbols), extab 0x80018DC4..0x80018FEC, extabindex 0x8003930C..0x80039648,
- * plus the unit's `.ctors`/`.data`/`.bss`/`.sdata`/`.sbss`/`.sdata2` claims.
- *
- * Phase 4 recut: the registered range was 0x803B465C..0x803BE30C (139 symbols / 40112 B); its tail from 0x803B936C
- * moved to `enemy/em_model.cpp` (with `em_pop_w` and `em_handle_tbl`, which that unit now defines).  The notes
- * below describe the whole former range, whose seam analysis the recut applies.
- *
- * What it is.  The range is the field-side manager of the per-map enemy population: it walks the
- * monster roster (the 0x224-byte `EmPopRec` records), releases and recycles them, and its own string
- * pool names the data it consumes - `05/em_set/em_set_m%02da%02d_%03d.esd` (0x805F81F4),
- * `m%03d_%06d_c_pop.dat` (0x805F84E0) and `B-L-p02-ankou` (0x805F84B0).  Nine registered
- * `src/enemy/*` units call into the range (five of them call 0x803B9BA0; `enemy/fn_80138074.c`
- * drives the three roster helpers this file now defines), and `enemy/fn_8035E034.cpp` already
- * documents the roster record this file's accessor hands back.
- *
- * Naming evidence (brief section 2, in order).  1. No `__FILE__` string covers the range: every
- * `lis`+`addi` pair in 0x803B465C..0x803BE30C resolves to a numeric table, never a bare source-file
- * name (checked against the DOL's `.data`/`.rodata`/`.sdata` bytes).  2. `dumpmap.py lookup` answers
- * `zz_` for every symbol in the range - no real runtime-dump name.  3. The bracketing registered
- * units name different modules (`menu/multi_result.cpp` below, `Network/NetworkSessionManager.cpp` above), so
- * no neighbour scheme reaches the range.  4. **GUESS**, recorded here as the brief requires: module
- * `enemy` and file name `em_pop` are derived from what the range does (it builds, indexes and
- * recycles the per-map enemy population the `em_set`/`_pop.dat` files describe), plus the callers -
- * nine `src/enemy/*` units.  Every function name in this file is likewise derived from its own body.
- *
- * Status / residuals (this pass: 69 of 139 bodies, unit 27.16 % fuzzy; 59 rows at 100 %, 68 at or above 80 %,
- * mean 99.1 % over the 69 written; object .text 10996 B of the target's 40112 B).
- *  - Seam UNPROVEN and almost certainly WRONG (docs/plan.md 8.3): the range is several translation units.
- *    Evidence, all from the target object: (a) the `.sdata2` pool repeats values at separate addresses - 0.0f
- *    at 0x8079C530/C5A8/C5E0, 60.0f at C524/C568, 50.0f at C578/C5D8, the two int-to-float magics at
- *    C528/C610 and C570/C600 - and MWCC keeps one pool per TU; (b) the pool entries from 0x8079C568 on are
- *    monotone in first-use address and tile into three bands, 0x803B7CE8..0x803B8A48 (C568..C5B4, the em_set
- *    loader band), 0x803B9588..0x803B9D74 (C5B8..C5D0, the roster spawn band) and 0x803BA6F0..0x803BE1A8
- *    (C5D8..C628, the model band), while 0x8079C524..C560 is read by `fn_803B6998`/`fn_803B6B14`, before the
- *    first of them, and is shared with `quest/quest_entry` (poolseams fold, 6 shared
- *    literals); (c) the one `.ctors` word names `fn_803B92D4` (`lis`+`b fn_803B92E0`, a static-initializer
- *    thunk over the `.bss` object at 0x806CC420 whose constructor `fn_803B92E0`/`fn_803B9338` follows it),
- *    which closes the em_set TU near 0x803B936C, and `.sdata` 0x80793688..0x807936A0 and `.sbss` 0x80794C60/64
- *    are read across those bands; (d) `tudiscover` answers MATCH SET 0x803B7CE8..0x803B91A0 (16 functions) and
- *    0x803BA6F0..0x803BE30C (35 functions).  Proposed tiling (unmeasured): [0x803B465C, ~0x803B7490) joins
- *    quest_entry + arena_result; [~0x803B7490, 0x803B936C) is the em_set TU (owns `.ctors`, the `.bss` object,
- *    `lbl_80793688`); [0x803B936C, 0x803BA6F0) is the roster spawn TU; [0x803BA6F0, 0x803BE30C) is the model
- *    TU.  The `.sdata`/`.sdata2` claims are blocked on that re-cut (datagap deferred: isolated-run).
- *  - Data claims are PROVISIONAL: seam suspected, the claims are the 19 sole-owned pairs only (`.data` 0x805F7C68..0x805F84E0,
- *    `.bss` 0x806CC420..0x806D2AF8 incl. the em_set TU's object, which only this unit's bodies read, `.sbss` 0x80794C48..0x80794C60);
- *    revisit at the seam recut.  This file defines `em_pop_w`, `em_handle_tbl` and, through its switch, a jump table (`@NNNN`
- *    where the target has `jumptable_805F7C68`); the rest stays target-only.  `.sdata`/`.sdata2` pairs are deferred by the gate.
- *    The `.ctors` word needs the em_set TU's static object and is not emitted here.
- *  - Row residuals: `em_roster_record_result_get` 71.11 % (the target folds the {3,4} arms with one
- *    `subi`+`cmplwi` and takes out-of-line returns; the plain switch emits two compares - 188 B vs 184 B,
- *    if-chain and nested-switch variants measured 49-60 %); `em_roster_record_get` 86.56 % (the target keeps
- *    the record in r4 and moves it to r3 only for the return, ours takes `beqlr` - 56 B vs 64 B; four
- *    spellings measured); `em_roster_record_copy` 98.26 % (copy-pointer registers); `em_weight_table_pick`
- *    95.10 % (the target reloads the weight in both loops and tests the first entry before the loop: 196 B vs
- *    188 B); `quest_all_player_item_count_sum` 95.87 % (the `li` of the element index is scheduled before
- *    the pool loads); `stepStagingDownloadForVersion` 96.81 %, `quest_element_progress_step` 98.54 %,
- *    `quest_slot_byte_get` 99.51 %, `quest_arena_need_get` 98.92 %, `em_work_slot_pair_get` 98.89 % (all
- *    register numbering of loop temporaries or one `lha`/`lhz`; same size).
- *  - GUESS names (evidence: the flag masks, offsets and callers named in each comment; none from the dump):
- *    `quest_flag_*_ck` for the unnamed masks, `quest_slot_byte_get`/`quest_slot_word_get`, `quest_field*_get`,
- *    `quest_objective_result_get`, `quest_element_state_find`/`_404_ck`/`_window_check`/`_progress_step`,
- *    `quest_arena_value_clear_ck`/`_key_clear`, `quest_key_row_ck`/`_key20_flag_ck`, `quest_move_*`,
- *    `quest_pouch_items_settle`, `quest_result_field_text_cur_get`, `stepStagingDownloadForVersion`,
- *    `em_weight_table_pick`, `em_roster_kind_*`, `em_team_damage_under_ck`/`_over_ck` (in `enemy/fn_8012EC74`).
- *    `quest_flag_2000000_ck` and `quest_flag_800000_ck` are two-bit predicates (0x2000000 or 0x100;
- *    0x800000 or exactly 0x40 of 0xC0); their names predate this pass.
- *
- * Flags probed: this unit is built with the address neighbour's `cflags_menu`
- * (`cflags_main` + `-opt nopeephole`).  The range's 139 functions carry `-Cpp_exceptions on` extab
- * (116 records in the target's extab run 0x80018DC4..0x80019164), which `cflags_main` supplies;
- * `-opt nopeephole` is inherited from `menu/multi_result.cpp`; no function here needed a per-function pragma.
+/* enemy/em_pop.cpp - the field-side enemy population/roster manager: it walks the 0x224-byte `EmPopRec` roster
+ *   records, releases and recycles them, and carries the quest-progress queries around them; its string pool names the
+ *   data it consumes (`05/em_set/em_set_m%02da%02d_%03d.esd` 0x805F81F4, `m%03d_%06d_c_pop.dat` 0x805F84E0).
+ * RANGE. .text 0x803B465C-0x803B936C (82 functions); .ctors 0x8056F3B4-0x8056F3B8 (`fn_803B92D4`),
+ *   .data 0x805F7C68-0x805F8220, .bss 0x806CC420-0x806D2A68, .sdata 0x80793688-0x80793690, .sbss 0x80794C48-0x80794C50,
+ *   .sdata2 0x8079C560-0x8079C5B8, extab, extabindex.  `enemy/em_model.cpp` continues the band at 0x803B936C.
+ * SEAM. Unproven and probably several TUs (the pool repeats, the `.ctors` thunk and the proposed tiling are in
+ *   docs/enemy.md).
+ * FLAGS. `cflags_menu`, the address neighbour's group (`cflags_main` + `-opt nopeephole`).
+ * NAMES. The module and `em_pop` are a GUESS from what the range does and its callers (nine `src/enemy/*` units);
+ *   every function name is a GUESS from its own body (the flag masks, offsets and callers its comment names), none
+ *   from the dump.  `quest_flag_2000000_ck` and `quest_flag_800000_ck` are two-bit predicates (0x2000000 or 0x100;
+ *   0x800000 or exactly 0x40 of 0xC0).
+ * RESIDUALS. 30 rows unwritten: 0x803B5700-0x803B5B1C, 0x803B6998-0x803B6AC4, 0x803B6B14-0x803B6F2C,
+ *   0x803B700C-0x803B729C, 0x803B744C-0x803B88A8, 0x803B8940-0x803B8E40, 0x803B8F1C-0x803B936C.
+ *  - `em_work_slot_pair_get`: retail reads the +0x98 halfword with `lhz`, ours with `lha`;
+ *  - `quest_all_player_item_count_sum`: the `li` of the element index is scheduled before the pool loads in ours;
+ *  - `quest_slot_byte_get`, `quest_element_progress_step`, `quest_arena_need_get`, `stepStagingDownloadForVersion`:
+ *    register numbering of the loop temporaries (same size).
+ *   flipcheck: `.bss`/`.ctors`/`.sbss`/`.sdata`/`.sdata2` claimed, not emitted (the `.ctors` word needs the static
+ *   object at 0x806CC420); `.data`/`.text`/extab/extabindex short of the claim; candidate fold with
+ *   `quest/quest_entry.cpp` (4 shared pool literals, text adjacent, confidence medium).
  */
 
 #include "types.h"

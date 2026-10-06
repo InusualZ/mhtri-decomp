@@ -1,11 +1,8 @@
-/*
- * enemy/lobby_state_block.h - the leaf header for the lobby state block (`.bss` 0x806BF530, 0x2EB8 B),
- * which `enemy/em020_prog.cpp`'s `.bss` range (0x806BF530..0x806C23E8) owns (docs/plan.md 6.5 rule 2).
- *
- * Name: GUESS `lobby_state_block` - the network pat control counts its timer rows down every frame and its
- * work-record init clears all 0x2EB8 bytes; the lobby/enemy units read its +0x03 quest-active byte.  Only the
- * timer table is viewed here.  A leaf header because the owner and `lobby/lb_npc.cpp` still declare the block
- * as a byte array (their `[3]` / `+ 0x13E6` reads), which must not meet this type in one translation unit.
+/* enemy/lobby_state_block.h - the leaf header for the lobby state block (`.bss` 0x806BF530, 0x2EB8 B), which
+ * `enemy/em020_prog.cpp`'s `.bss` (0x806BF530..0x806C23E8) owns.  The name is a GUESS: the network pat control counts
+ * its timer rows down every frame and its work-record init clears all 0x2EB8 bytes; the lobby/enemy units read its
+ * +0x03 quest-active byte.  Only the timer table is viewed; a leaf header because the owner and `lobby/lb_npc.cpp`
+ * declare the block as a byte array, which must not meet this type in one translation unit.
  */
 #ifndef MHTRI_ENEMY_LOBBY_STATE_BLOCK_H
 #define MHTRI_ENEMY_LOBBY_STATE_BLOCK_H

@@ -1,11 +1,5 @@
-/* The declarations owned by `enemy/fn_80147CE0.cpp` (docs/plan.md 6.5 rule 2): the enemy action band's
- * entry points that other units call.
- *
- * Moved here on that unit's landing from `unsplit/enemy.h`, which carried the consumers'
- * old-style spellings (`void fn_801493A8();`) while the symbols had no registered owner.  The
- * consumers (`enemy/fn_8014A1BC.c`, `enemy/fn_80149D6C.c`, `enemy/fn_80176C58.cpp`) now include this
- * header; their C call sites keep the old-style declarations below, because two of them pass argument
- * counts the real prototypes would reject (C allows it with `()`, C++ does not).
+/* Declarations `enemy/em001_prog.cpp` owns from its action band (0x80147CE0..): the C consumers keep old-style
+ * `()` declarations because two of them pass argument counts the real prototypes would reject.
  */
 #ifndef MHTRI_ENEMY_FN_80147CE0_H
 #define MHTRI_ENEMY_FN_80147CE0_H
@@ -16,8 +10,8 @@
 struct _ENEMY_WORK;
 
 /* The 0x18-byte spawn record the unit's `em_spawn_rec_init`/`fn_801545B8` fill and `fn_801493A8` builds on
- * its stack.  Same layout as `enemy/fn_8014A1BC.c`'s private `ShellParams` (its +0x12/+0x14 u16 pair
- * is the one that unit reads back); the shared home for both is a rule-1 follow-up.
+ * its stack.  Same layout as `enemy/em001_prog.cpp`'s private `ShellParams` (its +0x12/+0x14 u16 pair
+ * is the one that unit reads back): one record, two definitions.
  * size: 0x18 */
 typedef struct EmSpawnRec {
     /* +0x00 */ u32 id;           /* the effect type `fn_801545B8` stores (26) */
@@ -31,7 +25,7 @@ typedef struct EmSpawnRec {
 extern "C" {
 #endif
 
-/* The helper's base constructor (the same 12-byte record `enemy/fn_80176C58.cpp` names
+/* The helper's base constructor (the same 12-byte record `enemy/em015_prog.cpp` names
  * `Helper_80176E50`; the parameter stays `void*` until that type moves to a shared header). */
 void* em_res_user_data_ctor(void* self);
 

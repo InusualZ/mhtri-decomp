@@ -1,94 +1,21 @@
-/* enemy/em035_prog.cpp - the em035 enemy program's tail, `.text` 0x8035F2B4..0x8035FC18 (20
- * functions / 0x964 B), extab 0x800175DC..0x80017634 and extabindex 0x80036F30..0x80036FB4.
- * Naming note: the names this file *references* in other units are still the map's generated
- * `fn_XXXXXXXX` stems (the `fn_8012*`/`fn_8014*` callee band and the lobby `fn_8021*`/`fn_8035FC*`
- * note below) - those are other lanes' to rename.  Every symbol this file DEFINES is named from its
- * own body; the derivation and its evidence are under "NAMING" below.
- *
- * WHAT IT IS.  The em035 program's sub-state handlers, continued from the registered
- * `enemy/fn_8035E034.cpp`: the `.data` table `em035_prog_tbl` (0x805ED838, 0x6C B) lists this range's
- * entry points (`em035_frame_tick` at its +0x8, then `em035_action_dispatch`, `em035_action11_effect`, `em035_kcolor_set`,
- * `em035_timer_done_ck` and `em035_part_node_init` at its last word 0x805ED8A0), and every body drives the shared
- * `_ENEMY_WORK` record (`+0x005` sub-state, `+0x020` timer, `+0x188` position, `+0x1C4` angle,
- * `+0x1E5` action, `+0x1E6` first sub-state, `+0xB14` sound handle) through the same motion arming
- * pair (`em_mot_set`/`em_mot_set_ck`) the neighbour above uses.
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string covers the range: the
- * `.data`/`.sdata` its relocations reach are the unowned program tables (`lbl_805ED8C0`/`lbl_805ED8F8`/
- * `lbl_805ED930`) and the `0x8079B71C..0x8079B738` float pool, never a source-file-name literal.
- * 2. `dumpmap.py lookup` gives only `zz_XXXXXXXX_`.  3. The module is `enemy` from the program table
- * that lists the range's own entry points and from the `_ENEMY_WORK` record every body drives - the
- * same evidence as the registered neighbour `enemy/fn_8035E034.cpp`.
- *
- * NAMING (all 20 names are GUESSES; the map had only `fn_XXXXXXXX`).  The file is `em035_prog` for
- * the range's own evidence: the `.data` program table `em035_prog_tbl` (0x805ED838) lists these very
- * entry points, and the module's scheme is `em*` (`em_action.cpp`'s `em_act_*` band is the sibling
- * precedent).  Each symbol names what its body does, on that scheme:
- *   * `em035_frame_tick` - the per-frame step (clamps the `+0x1CC` approach weight, ticks the
- *     `+0x328`/`+0x32A` counters, tail-calls `fn_80131E00`);
- *   * `em035_arm_mot1s4_wait90` / `em035_arm_mot1s4_angle_wait90` / `em035_arm_mot1s0_wait90` /
- *     `em035_arm_mot1s0_angle_wait90` - the four arming steps, named for the motion the pair arms
- *     (`em_mot_set_ck(self, 1, 4, 0)` / `(self, 1, 0, 0)`), whether they reset `+0x1C4` to 0x8000 first,
- *     and whether the wait is the 90-frame timer or `em_mot_end_ck`-done (`em035_arm_mot2_exit`,
- *     `em035_arm_mot2_angle_exit` - `em_mot_set(self, 2, 0, 0)`);
- *   * `em035_handlers_mot1s4` / `em035_handlers_alt` / `em035_handlers_angle` /
- *     `em035_handlers_blend` - the four second-level sub-state dispatchers, each named for the handler
- *     set it selects;
- *   * `em035_motion_done_step` - picks `em_action_finish_fall`/`em_action_finish` from the `+0x1E2` mode byte;
- *   * `em035_substate_se_start` - starts the action's sound program (`em_se_tbl_play_alt` with the
- *     `0x805ED8C0`/`0x805ED8F8`/`0x805ED930` tables) from the `+0x1E6` sub-state;
- *   * `em035_blend_seq` / `em035_blend_entry` - the three-stage motion-blend sequences
- *     (`em_demo_time_ck`/`em_demo_pos_set`/`em_demo_rot_set`);
- *   * `em035_action_dispatch` - the `+0x1E5` action-id dispatch the shared interpreter calls;
- *   * `em035_action11_effect` - action 11's one-shot `eft019_set`/`se_req_pos_ps` trigger;
- *   * `em035_kcolor_set` - the model's `MHchar` K-colour override, once per record;
- *   * `em035_timer_done_ck` - whether the `+0x328`/`+0x32A` countdown the mode names has run out;
- *   * `em035_part_node_init` - seeds one part node (uniform scale, then the two flag-gated overrides).
- * A later pass with more evidence can refine any of them.
- *
- * SEAM - RE-CUT, AND WHY (the brief's range was two TUs).  `attribute.py` gave
- * 0x8035F2B4..0x80365C84 (79 functions / 27088 B) as one "capped" run, and the evidence splits it at
- * 0x8035FC18:
- *   * `em035_prog_tbl`'s last non-zero entry is `em035_part_node_init` (0x805ED8A0), and that body ends exactly
- *     at 0x8035FC18;
- *   * from 0x8035FC18 the callee mix changes completely: `fn_8035FC80`/`fn_8035FD08` drive the lobby
- *     work block `lobby_w` (`.bss` 0x806AAB44: `memset` of the 0x2000-byte buffer at `lobby_w+0xAC`,
- *     `fn_8021CBB0`, `fn_80217934`, `fn_80377664` on `lobby_world_block`), `fn_8035FC30`/`fn_803602A4` run
- *     the crafting-screen path (`seisan_data`, `fn_80217F4C`, `fn_802190FC`,
- *     `Gunner_opt_ok_ck(_EQUIP*)`, `Get_pl_type` on the two `_EQUIP` records at player+0x1D0/+0x1E8),
- *     and `fn_803602A4` reads back the pointer `fn_8035FC80` stores at buffer+0x204 - a screen record,
- *     a player record and `lobby_w`, none of them `_ENEMY_WORK`;
- *   * the run's 61 extab records split 11 + 50 at exactly the same address, and this unit's own
- *     object emits the first 11 byte-for-byte (`datagap.py --mode both --all-sections` reports no
- *     allocated-section gap), so the first half is a complete TU and the second is a fragment of a
- *     lobby-screen TU that must not be claimed with it.
- * The second half (0x8035FC18..0x80365C84, 59 functions / 24.4 KB, extab 0x80017634..0x800177C4,
- * extabindex 0x80036FB4..0x8003720C) is left unregistered and re-proposed under `lobby` (its screen
- * record and `lobby_w` view are its own); this file claims only the em035 half.
- *
- * LANGUAGE AND SECTIONS.  C++: the range reaches genuinely mangled callees through their real
- * signatures (rule 9).  Every plain `fn_` definition is `extern "C"` so it keeps the map's name
- * (playbook 42).  The lib is `enemy` (`cflags_main`) plus a file-wide `#pragma peephole off`: the
- * target keeps the unfused forms the pass folds (every `--work->timer_0x020 <= 0` is `addi` + `cmpwi`,
- * never `addic.`), and the same pass folds the `u8` increment's mask the other way - which is why the
- * sub-state bumps are compound assignments (`+= 1`) rather than `+ 1`.
- *
- * STATUS / RESIDUALS (measured with the official report metric).  20 of 20 functions written; the
- * unit scores 99.825294 fuzzy / 88.352745 code, and `datagap.py --mode both --all-sections` reports
- * no allocated-section gap (our `.text`, `extab`, `extabindex` and `.sdata2` all pair).  Two
- * residuals, both four bytes:
- *   * `em035_frame_tick` 98.54 - the two float webs are coloured the other way round: retail keeps the
- *     field value in f2 and the pool constant in f1, this build the reverse, so the `fcmpo`/`fadds`
- *     operand registers differ while every instruction and the size are already right.  Eleven source
- *     shapes were measured (`weight`/`limit` in both declaration orders, the constant as a local, the
- *     comparison and compound-assignment spellings, the nested-expression form); the best two are
- *     this one (98.54) and the reversed-declaration form (95.00, which swaps the two loads instead).
- *     `tools/m2c` (run through `tools/units/m2cinput.py`) drafts the same shape with the same f2/f0
- *     split - the allocator's web order is the residual, not the source.
- *   * `em035_part_node_init` 98.48 - retail passes the `setVec3` result straight on (`mr r4,r3`),
- *     which needs the helper's *pointer* return type.  The owner's header carries it now
- *     (`VEC3* setVec3(VEC3*, f32, f32, f32)`, docs/plan.md 6.5 rule 11); the remaining four-byte
- *     residual is the allocator's, not the spelling's.
+/* enemy/em035_prog.cpp - the em035 enemy's program: its per-frame step, the motion-arming sub-state handlers and
+ *   their dispatchers, the action dispatch and the part-node seeding.
+ * RANGE. .text 0x8035F2B4-0x8035FC18 (20 functions); .data 0x805ED838-0x805ED950, .sdata2 0x8079B71C-0x8079B740,
+ *   extab, extabindex.  The program's head (0x8035F060-0x8035F2B4) sits in `enemy/em033_prog.cpp`.
+ * SEAM. The right edge: `em035_prog_tbl`'s last entry is `em035_part_node_init`, whose body ends at 0x8035FC18; from
+ *   there `lobby/lb_screen_step.cpp` drives `lobby_w` and the crafting screen, and the band's extab records split
+ *   11 + 50 at the same address (this object emits the first 11).
+ * NAMES. The file from `em035_prog_tbl` (0x805ED838), which lists this range's entry points; every symbol it defines
+ *   is a GUESS from its body on the module's `em*` scheme: `arm_mot<M>s<S>` arms `em_mot_set_ck(self, M, S, 0)`,
+ *   `_angle` first resets `+0x1C4` to 0x8000, `_wait90` waits the 90-frame timer and `_exit` `em_mot_end_ck`.
+ * RESIDUALS. Every row is written.
+ *  - `em035_frame_tick`: retail keeps the field in f2 and the pool constant in f1, ours the reverse (the eleven
+ *    source orders measured are in docs/enemy.md);
+ *  - `em035_part_node_init`: retail passes the `setVec3` result straight on (`mr r4,r3`), ours reloads the vector
+ *    from r31.
+ *   flipcheck: `.data`/`.sdata2` claimed, not emitted.
+ * SHAPES. File-wide `#pragma peephole off` (retail compares each decremented `+0x020` timer as `addi` + `cmpwi`);
+ *   the sub-state bumps are compound assignments (`+= 1`), which keeps the `u8` mask retail has.
  */
 
 #include "types.h"
@@ -104,9 +31,8 @@
 #include "sound/mhchar.h"
 #include "unsplit/unknown.h"
 
-/* The target keeps the unfused forms the peephole pass folds: every sub-state handler compares its
- * decremented `+0x020` timer as `addi` + `cmpwi` (the pass fuses them into `addic.`), and folds the
- * narrow `u8` increment's mask the other way (which is why the store is a compound assignment). */
+/* Retail compares each decremented `+0x020` timer as `addi` + `cmpwi`, which the peephole pass fuses into
+ * `addic.`. */
 #pragma peephole off
 
 /* Pool literals (declared, never defined - playbook 29). */
@@ -119,14 +45,13 @@ extern "C" f32 lbl_8079B730;
 extern "C" f32 lbl_8079B734;
 extern "C" f32 lbl_8079B738;
 
-/* The `.data` tables the action start hands to `em_se_tbl_play_alt` (declared, never defined - the
- * unowned 0x805ED8C0 band; see `unsplit/enemy.h`). */
+/* The `.data` tables the action start hands to `em_se_tbl_play_alt`: this unit's `.data`, declared and never
+ * defined (playbook 29). */
 extern "C" u8 lbl_805ED8C0[];
 extern "C" u8 lbl_805ED8F8[];
 extern "C" u8 lbl_805ED930[];
 
-/* The record `em035_part_node_init` seeds.  The body reaches the node at +0x34 and the three fields inside it;
- * the 0x34-byte head belongs to the caller and is left unnamed.
+/* The node `em035_part_node_init` seeds at +0x34 of the caller's record (`EmPartNode`).
  * size: 0x44 (the extent this unit's body reaches) */
 struct EmNode {
     /* +0x00 */ nw4r::math::VEC3 vec_0x00;  /* the three copies `copyVec3` writes */
@@ -169,9 +94,7 @@ extern "C" u32 em035_timer_done_ck(_ENEMY_WORK* work, u8 mode);
 extern "C" void em035_part_node_init(struct EmPartNode* part, const nw4r::math::VEC3* vec, struct EmPartSrc* src,
                             u8 flags);
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F2B4 - steps the em035 program's approach weight and ticks the two short counters.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F2B4 (0x60): steps the em035 program's approach weight and ticks the two short counters. */
 extern "C" void em035_frame_tick(_ENEMY_WORK* work)
 {
     f32 weight = work->field_0x1CC;
@@ -192,9 +115,7 @@ extern "C" void em035_frame_tick(_ENEMY_WORK* work)
     fn_80131E00(work);
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F314 - arms sub-state 1's motion pair, then runs the 90-frame wait out.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F314 (0x88): arms sub-state 1's motion pair, then runs the 90-frame wait out. */
 extern "C" void em035_arm_mot1s4_wait90(_ENEMY_WORK* work)
 {
     switch (work->state) {
@@ -211,9 +132,7 @@ extern "C" void em035_arm_mot1s4_wait90(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F39C - the same pair with the third angle reset; the step refreshes every frame.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F39C (0xA8): the same pair with the third angle reset; the step refreshes every frame. */
 extern "C" void em035_arm_mot1s4_angle_wait90(_ENEMY_WORK* work)
 {
     work->field_0x1C4 = 0x8000;
@@ -234,9 +153,7 @@ extern "C" void em035_arm_mot1s4_angle_wait90(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F444 - a three-way sub-state dispatch into the two arming steps above.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F444 (0x3C): a three-way sub-state dispatch into the two arming steps above. */
 extern "C" void em035_handlers_mot1s4(_ENEMY_WORK* work)
 {
     switch (work->state_sub) {
@@ -255,9 +172,7 @@ extern "C" void em035_handlers_mot1s4(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F480 - arms sub-state 1's motion, then leaves once the motion reports done.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F480 (0x7C): arms sub-state 1's motion, then leaves once the motion reports done. */
 extern "C" void em035_arm_mot2_exit(_ENEMY_WORK* work)
 {
     switch (work->state) {
@@ -273,9 +188,7 @@ extern "C" void em035_arm_mot2_exit(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F4FC - the 90-frame variant of 0x8035F314's arming pair.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F4FC (0x88): the 90-frame variant of 0x8035F314's arming pair. */
 extern "C" void em035_arm_mot1s0_wait90(_ENEMY_WORK* work)
 {
     switch (work->state) {
@@ -292,9 +205,7 @@ extern "C" void em035_arm_mot1s0_wait90(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F584 - a two-way sub-state dispatch into the two arming steps above.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F584 (0x24): a two-way sub-state dispatch into the two arming steps above. */
 extern "C" void em035_handlers_alt(_ENEMY_WORK* work)
 {
     switch (work->state_sub) {
@@ -307,9 +218,7 @@ extern "C" void em035_handlers_alt(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F5A8 - the angle-reset arming step whose wait leaves once the motion reports done.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F5A8 (0x9C): the angle-reset arming step whose wait leaves once the motion reports done. */
 extern "C" void em035_arm_mot2_angle_exit(_ENEMY_WORK* work)
 {
     work->field_0x1C4 = 0x8000;
@@ -329,9 +238,7 @@ extern "C" void em035_arm_mot2_angle_exit(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F644 - the angle-reset arming step that waits 90 frames.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F644 (0xA8): the angle-reset arming step that waits 90 frames. */
 extern "C" void em035_arm_mot1s0_angle_wait90(_ENEMY_WORK* work)
 {
     work->field_0x1C4 = 0x8000;
@@ -352,9 +259,7 @@ extern "C" void em035_arm_mot1s0_angle_wait90(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F6EC - a two-way sub-state dispatch into the two angle-reset steps above.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F6EC (0x24): a two-way sub-state dispatch into the two angle-reset steps above. */
 extern "C" void em035_handlers_angle(_ENEMY_WORK* work)
 {
     switch (work->state_sub) {
@@ -367,9 +272,7 @@ extern "C" void em035_handlers_angle(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F710 - picks the sub-state-1 motion step from the record's mode byte.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F710 (0x14): picks the sub-state-1 motion step from the record's mode byte. */
 extern "C" void em035_motion_done_step(_ENEMY_WORK* work)
 {
     if (work->field_0x1E2 == 1)
@@ -378,9 +281,7 @@ extern "C" void em035_motion_done_step(_ENEMY_WORK* work)
         em_action_finish(work);
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F724 - starts the action's sound/effect program from the current sub-state.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F724 (0x8C): starts the action's sound/effect program from the current sub-state. */
 extern "C" void em035_substate_se_start(_ENEMY_WORK* work)
 {
     switch (work->state_sub) {
@@ -402,9 +303,7 @@ extern "C" void em035_substate_se_start(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F7B0 - the three-stage motion arming sequence with its per-stage blend literals.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F7B0 (0x124): the three-stage motion arming sequence with its per-stage blend literals. */
 extern "C" void em035_blend_seq(_ENEMY_WORK* work)
 {
     switch (work->state) {
@@ -433,9 +332,7 @@ extern "C" void em035_blend_seq(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F8D4 - arms the stage-1 motion and its two blend sets, then leaves on motion done.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F8D4 (0xA4): arms the stage-1 motion and its two blend sets, then leaves on motion done. */
 extern "C" void em035_blend_entry(_ENEMY_WORK* work)
 {
     switch (work->state) {
@@ -453,9 +350,7 @@ extern "C" void em035_blend_entry(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F978 - a two-way sub-state dispatch into the two blend sequences above.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F978 (0x24): a two-way sub-state dispatch into the two blend sequences above. */
 extern "C" void em035_handlers_blend(_ENEMY_WORK* work)
 {
     switch (work->state_sub) {
@@ -468,9 +363,7 @@ extern "C" void em035_handlers_blend(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F99C - the action-id dispatch the shared interpreter calls each frame.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F99C (0x54): the action-id dispatch the shared interpreter calls each frame. */
 extern "C" void em035_action_dispatch(_ENEMY_WORK* work)
 {
     switch (work->action) {
@@ -495,9 +388,7 @@ extern "C" void em035_action_dispatch(_ENEMY_WORK* work)
     }
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035F9F0 - the action-11 sub-states' one-shot effect/SE trigger.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035F9F0 (0xA4): the action-11 sub-states' one-shot effect/SE trigger. */
 extern "C" void em035_action11_effect(_ENEMY_WORK* work)
 {
     if (work->action != 11)
@@ -513,9 +404,7 @@ extern "C" void em035_action11_effect(_ENEMY_WORK* work)
     work->effect_latch_0x32C = 1;
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035FA94 - the model's K-colour override, applied once per record.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035FA94 (0x84): the model's K-colour override, applied once per record. */
 extern "C" void em035_kcolor_set(_ENEMY_WORK* work)
 {
     if (work->field_0x00A != 0)
@@ -532,9 +421,7 @@ extern "C" void em035_kcolor_set(_ENEMY_WORK* work)
     work->kcolor_latch_0x32D = 1;
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035FB18 - reports whether the countdown the mode names has run out.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035FB18 (0x48): reports whether the countdown the mode names has run out. */
 extern "C" u32 em035_timer_done_ck(_ENEMY_WORK* work, u8 mode)
 {
     switch (mode) {
@@ -550,9 +437,7 @@ extern "C" u32 em035_timer_done_ck(_ENEMY_WORK* work, u8 mode)
     return 0;
 }
 
-/* ---------------------------------------------------------------------------------------------- *
- * 0x8035FB60 - seeds one part node: its uniform scale, then the two optional overrides.
- * ---------------------------------------------------------------------------------------------- */
+/* 0x8035FB60 (0xB8): seeds one part node: its uniform scale, then the two optional overrides. */
 extern "C" void em035_part_node_init(EmPartNode* part, const nw4r::math::VEC3* vec, EmPartSrc* src, u8 flags)
 {
     EmNode* node = &part->node_0x34;

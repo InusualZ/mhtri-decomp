@@ -1,20 +1,24 @@
-/*
- * enemy/em_model.cpp - the roster spawn and model band of the enemy population manager (`enemy` module):
- * the 0x224-byte `EmPopRec` record accessors, the roster slot effect/position setters, the 32-slot model-handle
- * table and the per-kind roster helpers.
- *
- * `.text` 0x803B936C..0x803BE30C (57 functions), extab 0x80018FEC..0x80019164, extabindex 0x80039648..0x8003987C,
- * `.data` 0x805F8220..0x805F84E0, `.bss` 0x806D2A68..0x806D2AF8, `.sdata` 0x80793690..0x807936A8, `.sbss`
- * 0x80794C50..0x80794C60, `.sdata2` 0x8079C5B8..0x8079C630.
- *
- * Phase 4 recut of `enemy/em_pop`: the tail of the registered unit's range, text from
- * `em_roster_record_result_get` on (the first function of the source that lies at or above 0x803B936C), with the
- * unit's own `.sbss`/`.bss` definitions (`em_pop_w` at 0x80794C58, `em_handle_tbl` at 0x806D2A78).  `enemy/em_pop`
- * keeps the head (0x803B465C..0x803B936C); the file name `em_model` is a GUESS from the band's model-handle
- * table and its `0x803BA6F0..0x803BE30C` model helpers (the candidate's name; the map has no real one).
- *
- * Names and per-row residuals of these functions are in `enemy/em_pop.cpp`'s header (same source, same unit
- * before the recut).  Flags: `cflags_menu` like `enemy/em_pop.cpp` (the recut carries the old row's flags).
+/* enemy/em_model.cpp - the roster spawn and model band of the enemy population manager: the 0x224-byte `EmPopRec`
+ *   record accessors, the roster slot effect/position setters, the 32-slot model-handle table and the per-kind roster
+ *   helpers.
+ * RANGE. .text 0x803B936C-0x803BE30C (57 functions); .data 0x805F8220-0x805F84E0, .bss 0x806D2A68-0x806D2AF8,
+ *   .sdata 0x80793690-0x807936A8, .sbss 0x80794C50-0x80794C60, .sdata2 0x8079C5B8-0x8079C630, extab, extabindex.  It
+ *   defines `em_pop_w` (0x80794C58) and `em_handle_tbl` (0x806D2A78); `enemy/em_pop.cpp` is the band's head.
+ * SEAM. Unproven; probably several TUs with `enemy/em_pop.cpp` (docs/enemy.md, Seams).
+ * FLAGS. `cflags_menu`, like `enemy/em_pop.cpp`.
+ * NAMES. `em_model` is a GUESS from the model-handle table and the 0x803BA6F0-0x803BE30C model helpers; the
+ *   function names are `enemy/em_pop.cpp`'s scheme (its header).
+ * RESIDUALS. 40 rows unwritten: 0x803B936C-0x803B9450, 0x803B9508-0x803B993C, 0x803B99C0-0x803B9A40,
+ *   0x803B9A84-0x803B9E50, 0x803B9E90-0x803BA0A0, 0x803BA1B4-0x803BA69C, 0x803BA6F0-0x803BAE80, 0x803BAF44-0x803BCF70,
+ *   0x803BD058-0x803BD99C, 0x803BD9F8-0x803BDECC, 0x803BE128-0x803BE30C.
+ *  - `em_roster_record_result_get`: retail tests the kinds {3,4} with a range compare and computes the case-6 result
+ *    branch-free (`subfic`/`nor`/`srawi`/`andi.`), ours uses a compare chain and branches;
+ *  - `em_roster_record_get`: retail returns through `bne` + `mr r3,r4` + `blr`, ours through `beqlr` (the spellings
+ *    tried for this row and the one above are in docs/enemy.md);
+ *  - `em_weight_table_pick`: retail reloads the weight halfword (`lhz`); `em_roster_record_copy`: register
+ *    allocation only.
+ *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.bss`/`.sbss`/`.text`/extab/extabindex short of
+ *   the claim.
  */
 
 

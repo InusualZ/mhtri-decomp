@@ -1,9 +1,4 @@
-/* The enemy motion-cost unit `enemy/fn_8012BA00.c` (0x8012BA00..0x8012BDF4).
- *
- * Declarations moved here from the consumer units' `src/` files (docs/plan.md 6.5 rule 2:
- * an extern lives with the TU that owns the symbol).  The signature set is what the
- * consumers used; where only the parameter spelling differed the wider form is kept.
- */
+/* The declaration of `enemy/em_common.cpp`'s motion frame cost `fn_8012BA00`, in the signature its consumers use. */
 #ifndef MHTRI_ENEMY_FN_8012BA00_H
 #define MHTRI_ENEMY_FN_8012BA00_H
 

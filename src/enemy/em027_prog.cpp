@@ -1,92 +1,21 @@
-/* enemy/em027_prog.cpp - enemy 027 program
- *
- * `.text` 0x801AA154..0x801B0010, 47 functions written (the rest of the range is not decompiled yet).
- * Renamed from `fn_801A9540`: the unit's `.data` holds `em027_prog_tbl` (0x805B06D0) and its `.text` starts at 0x801AA154.
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `enemy/fn_801A9540.cpp` (kept for its notes and residuals): */
-/* enemy/fn_801A9540.cpp - the enemy per-action state-machine band between
- * `enemy/fn_8019ED34.cpp` (ends at 0x801AA154) and the unclaimed run at 0x801B0010.
- *
- * .text 0x801AA154..0x801B0010 (0x5EBC); extab 0x8000F374..0x8000F54C; extabindex 0x8002AC18..0x8002AEDC.
- * The first 0x614 bytes of the original range (0x801A9540..0x801AA154, seven written functions) moved to
- * `enemy/fn_8019ED34.cpp` in the 2026-09-30 recut (see its header); the figures below predate it.  The left edge 0x801AA154 is a GUESS
- * inside the pool-dedupe window 0x801AA0F8..0x801AA154 (see `enemy/fn_8019ED34.cpp`).  The extab/extabindex runs are the entries whose
- * `funcStart` falls in this range, read out of the DOL: the entry before the first is
- * `0x8002AB94` (fn_801A94C4, the neighbour unit's last framed function) and the one after the last
- * is `0x8002AEE8` (fn_801B0010, the next proposal's first), so both runs are exactly this unit's.
- *
- * Registration (proposal/801A9540_fn_801A9540.cpp).  The range is registered once, here, at its
- * final home.  Which evidence class decided the name and module:
- *   * class 1 (a `__FILE__` string) fails.  `nm -u` over the range's 82 split objects names no
- *     string symbol at all: the whole undefined set is the `.sdata2` float pool, the `.data`
- *     tables/jumptables and `fn_XXXXXXXX` callees.  Nothing in the range references
- *     `enemy_control.cpp` (the last accepted `__FILE__` name before the run, at
- *     0x801411B8..0x80147CE0) either.
- *   * class 2 (a runtime-dump name) fails: `python tools/symbols/dumpmap.py lookup 0x801A9540`
- *     answers the `zz_01a9540_` placeholder, which the brief states is not evidence.
- *   * class 3 decides the module: `enemy`.  Both bracketing registered units are `enemy/*`
- *     (`enemy/fn_8019ED34.cpp` below, `enemy/fn_801B7020.cpp` above), and every callee out of the
- *     range is enemy-band (`em_act_ck`, `em_frame_check`, `em_get_mot_no`, `get_joint_wmat_em`,
- *     `get_move_work_adrs`, `em_action_finish`, `em_mot_set`, ...); every body drives the
- *     `_ENEMY_WORK` record `enemy/ENEMY_WORK.h` owns.
- *   * class 4 keeps the name: nothing supports a file name, so the map's own `fn_801A9540` stem is
- *     the file name (the sibling units use the same scheme).
- *
- * C++ (`-lang=c++` through the lib's `cflags_main`) because the range reaches genuinely mangled
- * callees (`em_frame_check__FP11_ENEMY_WORKUsff`, `setVector3__FPQ34nw4r4math4VEC3fff`,
- * `get_joint_wmat_em__FP11_ENEMY_WORKUlPQ34nw4r4math5MTX34`, `ran_suu__Fl`) through their real
- * signatures (rule 9); every plain `fn_XXXXXXXX` definition here is `extern "C"` so its map name is
- * emitted.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked over
- * config/RMHE08/symbols.txt - every symbol this unit defines is a bare `.text` entry with no owner
- * name - and `python tools/symbols/dumpmap.py lookup 0x801A9540` answers the `zz_01a9540_`
- * placeholder form, which is not evidence).  The owner names this range *does* reach
- * (`em_parts_damage_level_get`, `em_get_mot_no`) are its callees, not its own functions.
- *
- * What the range is.  It is the enemy side's per-action step band: 20 of its functions are
- * `switch (self->state_sub)` dispatchers that tail-call one handler each, and the handlers
- * themselves are the small `switch (self->state)` step machines the armed action runs
- * (`em_move_mode_set(self, 0)` starts the motion, `em_mot_set`/`em_mot_set_ck` set it, `em_mot_end_ck`/
- * `em_approach_step` report it, `em_action_finish(self)` ends the action).  `fn_801AD1F0`/`fn_801AD3F0` are
- * the two program-table dispatchers (the `.data` tables `lbl_805B07E0`.. and `lbl_805B0C08`..).
- * The bodies read `_ENEMY_WORK` fields through `enemy/ENEMY_WORK.h` and the enemy-band
- * callees through their owner headers.
- *
- * Status (measured with `python tools/units/recompile.py enemy/fn_801A9540.cpp --measure <symbol>`,
- * the official report metric).  54 of the 82 functions are written and EVERY written row is above
- * the 80 % bar: 29 are byte-identical and the mean is 97.81 %.  The 28 unwritten rows are the
- * follow-up queue in the outbox, in address order.
- *
- * Residuals, by measurement (every near-miss is a codegen shape, not comprehension):
- *   * `fn_801A960C` 87.60 (100 B target / 88 B ours).  The target narrows its `u8` parameter
- *     (`clrlwi r4,r4,24`) before the `kind - 2 <= 1` test and truncates the callee's `u8` return to
- *     a byte (`clrlwi r0,r3,24`) before the bit-0 test (`clrlwi r0,r0,31`); ours folds both away
- *     and emits the fused `clrlwi. r0,r3,31`.  `em_parts_damage_level_get` was measured both as
- *     `u8` (the owner's return) and with an explicit `(u8)` cast, and the truncation is dropped
- *     either way; the fused record-form is what costs the 12 B.
- *   * `fn_801AC0E0`/`fn_801AC1A4`/`fn_801ACADC` 92.2-92.7 (4-8 B short).  These are the only rows
- *     whose target uses paired-single register save/restore (`psq_st`/`psq_l` around the `f32`
- *     argument, which GNU objdump 2.42 renders as `xscmpeqdp`/`vmrghb`); the bodies match, the FP
- *     spill shape does not.
- *   * the remaining sub-100 rows differ by one tail branch or a 4 B spill slot
- *     (`fn_801AB9DC` 97.44, `fn_801ABA90` 96.10, `fn_801ABD2C` 97.98, `fn_801ABF84` 96.10,
- *     `fn_801AC268` 95.56, `fn_801AC388` 93.90, `fn_801AC524` 98.14, `fn_801AC6B0` 92.80,
- *     `fn_801AC778` 95.35, `fn_801AC824` 96.19, `fn_801AC8CC` 95.57, `fn_801AC9E4` 95.81,
- *     `fn_801ACB94` 97.24, `fn_801ACD5C` 95.24, `fn_801AD498` 95.56, `fn_801AD528` 95.56,
- *     `fn_801A9540` 98.71, `fn_801A9DF4` 97.78, `fn_801AA0F8` 95.43, `fn_801A9670` 95.11,
- *     `fn_801ABC74` 95.22).
- *   * `fn_801AD1F0` (0x200) and `fn_801AD3F0` (0x90) are NOT written: their bodies are ready (a
- *     `switch (self->state_sub)` over the two `.data` program tables) but `em_se_tbl_play`'s declared
- *     signature has three parameters where the target's call sites pass four - r3 `self`, r4 the
- *     table, r5 0, r6 the id (measured at both this range's call sites and at
- *     `enemy/fn_8014A1BC.c`'s: `lis/addi r4,table; li r5,0; li r6,id; b 0x801251D0`, and the callee
- *     itself is `clrlwi r5,r5,24; b 0x80124C5C`).  Writing them needs `enemy/fn_801251D0.h`
- *     and the `extern "C" void em_se_tbl_play(...)` definition in `src/enemy/fn_801251D0.cpp` moved to
- *     the four-argument form - a shared-file edit outside this unit's registration, so it is left
- *     as a recorded correction for the owner rather than made here.
+/* enemy/em027_prog.cpp - the em027 enemy's program: the per-action step machines and the `state_sub` dispatchers
+ *   that tail-call them.
+ * RANGE. .text 0x801AA154-0x801B0010 (71 functions); .rodata 0x805701A0-0x80570260, .data 0x805B06D0-0x805B0FCC,
+ *   .sdata 0x80791A88-0x80791A90, .sdata2 0x80798910-0x80798B38, extab, extabindex.  The left edge is a GUESS inside
+ *   the pool-dedupe window 0x801AA0F8-0x801AA154 (`enemy/em025_prog.cpp`'s header).
+ * NAMES. `em027_prog` from the map's `em027_prog_tbl` (0x805B06D0), the first object of the unit's `.data`.
+ * RESIDUALS. 24 rows unwritten: 0x801AA154-0x801AB048, 0x801AB054-0x801AB930, 0x801AD1F0-0x801AD498 (the two
+ *   program-table dispatchers `fn_801AD1F0`/`fn_801AD3F0`), 0x801ADC50-0x801AE25C, 0x801AE308-0x801AE670,
+ *   0x801AE71C-0x801AE8EC, 0x801AE998-0x801B0010.
+ *  - `fn_801AB9DC`, `fn_801ABA90`, `fn_801ABC74`, `fn_801ABF84`, `fn_801AC268`, `fn_801AC388`, `fn_801AC9E4`,
+ *    `fn_801ACB94`, `fn_801ACD5C`: ours emits an extra `b` to the shared tail ahead of a case body;
+ *  - `fn_801ABC74`, `fn_801ABD2C`, `fn_801AC268`, `fn_801AC524`, `fn_801AC8CC`: retail narrows the `u8` switch value
+ *    (`clrlwi r0,r31,24`) before the compares, ours compares r31;
+ *  - `fn_801AC6B0`, `fn_801AC824`, `fn_801AC9E4`, `fn_801AD498`, `fn_801AD528`: retail keeps the timer decrement as
+ *    `subi` + `cmpwi`, ours fuses it into `subic.`;
+ *  - `fn_801AC0E0`, `fn_801AC1A4`, `fn_801ACADC`: retail restores f31 with `li r0,0x18` + `psq_lx`, ours with
+ *    `psq_l f31,0x18(r1)`.
+ *   flipcheck: `.rodata`/`.sdata`/`.sdata2` claimed, not emitted; `.data`/`.text`/extab/extabindex short of the claim.
  */
 
 #include "types.h"

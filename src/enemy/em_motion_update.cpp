@@ -1,8 +1,13 @@
-/* enemy/em_motion_update.cpp - an enemy's per-frame motion/action driver
- *
- * `.text` 0x8013791C..0x80138074, 7 functions written (the rest of the range is not decompiled yet).
- * Name is a GUESS: the range is the `fn_8013791C` driver (an outer phase switch around an inner action switch) with its init, action callbacks and angle helpers.
- * Each function keeps the `#pragma` state it had in its retired source.
+/* enemy/em_motion_update.cpp - an enemy's per-frame motion/action driver: `fn_8013791C` (an outer phase switch around
+ *   an inner action switch) with its init, action callbacks and angle helpers.
+ * RANGE. .text 0x8013791C-0x80138074 (7 functions); extab, extabindex.
+ * NAMES. `em_motion_update` is a GUESS from what the driver does; the map has only `fn_` stems for the range.
+ * RESIDUALS. `fn_80137EE0`: retail narrows the mode (`clrlwi r30,r4,24`) after the first call where ours does it
+ *   at entry, and lays out the `-1` return as a branch past a shared block where ours duplicates it.
+ *   flipcheck: `.text` differs from the target (53 of 1880 bytes).
+ * SHAPES. `#pragma peephole off` over the bodies (retail keeps the `clrlwi`/`rlwinm`/`and` + `cmpwi` bit tests
+ *   unfused); `u32 kind_lo = (u8)kind` in `fn_80137EE0` is the only spelling that keeps the mask (`u8 kind_lo = kind`
+ *   drops it).
  */
 
 #include "enemy/em_act_advance.h" /* em_act_advance (rule 2: the owner's header) */
@@ -33,29 +38,20 @@
 #define fn_801260BC_c1 ((u32 (*)(_ENEMY_WORK*))fn_801260BC)
 #define fn_801260E0_c1 ((u32 (*)(_ENEMY_WORK*))fn_801260E0)
 
-/* The scene root `g3d_root_model_bind` looks a model up in. */
+/* The mangled callees, declared at C++ scope with the signature each mangling encodes. */
 
-/* ------------------------------------------------------------------------------------------------ *
- * the callees
- *
- * The three the map carries mangled are declared at C++ scope with the signature the mangling encodes
- * (`tools/units/mangle.py` proves each one), so no call site spells a mangling (rule 9).
- * ------------------------------------------------------------------------------------------------ */
-
-/* `get_enemy_data__FP11_ENEMY_WORK` (owner `enemy/fn_801251D0.cpp`).  Only the record's leading flag
- * word is read here, and `EnemyData`'s definition lives in `enemy.h`, which cannot be included
- * beside `enemy/ENEMY_WORK.h` - both define `_ENEMY_WORK` - so the word is read at the offset the
- * target loads (`lwz r0,0(r3)`). */
+/* `get_enemy_data__FP11_ENEMY_WORK` (`enemy/em_common.cpp`); only the record's leading flag word is read, at the
+ * offset the target loads, because `enemy.h`'s `EnemyData` cannot be included beside `enemy/ENEMY_WORK.h`. */
 struct EnemyData;
 struct EnemyData* get_enemy_data(_ENEMY_WORK* work);
 
-/* `em_act_ck__FP11_ENEMY_WORKUcUc` (owner `enemy/fn_8012BDF4.cpp`). */
+/* `em_act_ck__FP11_ENEMY_WORKUcUc` (`enemy/em_common.cpp`). */
 u32 em_act_ck(_ENEMY_WORK* work, u8 action, u8 arg);
 
 /* `calcVecAngXY__FPQ34nw4r4math4VEC3PUlPUl`. */
 void calcVecAngXY(nw4r::math::VEC3* v, u32* x, u32* y);
 
-/* `ran_suu__Fl` (owner `ef/fn_800CDB2C.cpp`). */
+/* `ran_suu__Fl` (`ef/system_core.cpp`). */
 s32 ran_suu(s32 range);
 
 /* `fn_800E0914`'s parameter is a model base, not a `_ENEMY_WORK`; the record embeds one at +0x24. */
@@ -64,10 +60,6 @@ struct MHchar;
 extern "C" {
 void fn_80137C94(_ENEMY_WORK* self);
 
-/* `enemy/fn_801251D0.cpp` */
-
-
-
 /* `enemy/fn_80138074.c` */
 void fn_8013823C(_ENEMY_WORK* self);
 void fn_80138E18(_ENEMY_WORK* self);
@@ -75,15 +67,13 @@ void fn_80138E28(_ENEMY_WORK* self);
 void fn_80139024(_ENEMY_WORK* self);
 void fn_8013A978(_ENEMY_WORK* self);
 
-/* `mh3_pad.cpp`: rebuilds one 0x0C-byte record from three floats. */
-
 /* `g3d/g3d_scnmdl.cpp`: finds a scene model by id. */
 void g3d_root_model_bind(s32 root, u32 id);
 
-/* `sound/fn_800DD1F0.cpp`: refreshes the model base at `_ENEMY_WORK::char_0x024`. */
+/* `sound/mhchar.cpp`: refreshes the model base at `_ENEMY_WORK::char_0x024`. */
 void fn_800E0914(struct MHchar* model);
 
-/* the enemy band's still-unregistered helpers (the 0x8011xxxx/0x8012xxxx/0x8013xxxx proposals) */
+/* `enemy/fn_8011D448.cpp`'s and `enemy/enemy_control.cpp`'s helpers */
 void fn_8011E5EC(_ENEMY_WORK* self);
 void fn_8011E960(_ENEMY_WORK* self);
 u8 fn_8014278C(u16 a, u16 b);
@@ -93,9 +83,7 @@ void fn_80144584(_ENEMY_WORK* self, s32 mode);
 
 #pragma peephole off
 
-/* ------------------------------------------------------------------------------------------------ *
- * 0x8013791C..0x80138074 - the per-frame driver and its callbacks
- * ------------------------------------------------------------------------------------------------ */
+/* The per-frame driver and its callbacks. */
 
 /* One frame of the record's action state machine. */
 extern "C" void fn_8013791C(_ENEMY_WORK* self)

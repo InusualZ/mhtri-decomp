@@ -1,18 +1,8 @@
-/* enemy/fn_801B4458.h - the enemy seat/effect-action band 0x801B4458..0x801B7020 (48 functions).
+/* enemy/fn_801B4458.h - declarations `enemy/em034_prog.cpp` owns from its seat/effect-action band
+ * (0x801B4458-0x801B7020).
  *
- * The unit owns the `.text` range 0x801B4458..0x801B7020, the extab run 0x8000F6B4..0x8000F7EC
- * (39 records), the extabindex run 0x8002B0F8..0x8002B2CC (39 records) and one `.ctors` word at
- * 0x8056F348 (the static initializer `fn_801B6FB0`).  It is the unclaimed gap between
- * `enemy/fn_801B0010.cpp` (the em030 program unit, ending at 0x801B4458) and
- * `enemy/fn_801B7020.cpp` (starting at 0x801B7020).
- *
- * rule 7 deferred: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup` on every address of the 48-function inventory: every one
- * answers `zz_<addr>_`, so the dump is not evidence; `config/RMHE08/symbols.txt` carries nothing but
- * the bare `fn_XXXXXXXX` entries and the range references no `__FILE__`/class-name string).
- *
- * The 0x20-byte seat record the em030 unit's `fn_801B4398` hands back (through its third argument)
- * and this band walks record by record.  `code` is the seat's kind (1 = a two-point seat whose
+ * The 0x20-byte seat record `fn_801B4398` hands back (through its third argument) and the band walks record by
+ * record.  `code` is the seat's kind (1 = a two-point seat whose
  * second point is `vec_0x10`, anything else a single point), `vec_0x04`/`vec_0x10` are engine
  * vectors (`vec_to_mh_vec3` converts them) and `value_0x1C` is the seat's own float parameter.
  * size: 0x20 */

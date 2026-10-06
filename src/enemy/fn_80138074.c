@@ -1,50 +1,33 @@
-/* enemy/fn_80138074.c - the enemy "user data" driver and its accessors,
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * `.text` 0x80138074..0x8013ACC4.
- *
- * What it is.  Two clusters that share one translation unit:
- *   * 0x80138074..0x801391E8 - the `ENEMY_WORK` per-frame driver: `fn_8013823C` (the per-tick update)
- *     and `fn_80138B60` (the sleep/death half) walk the work block's move table, user-data list and
- *     EmCharBase base, and the small helpers around them (`fn_80138E64` pushes the work's scale/rotation into
- *     the EmCharBase, `fn_80138EC8` advances one of the two 0x5C-byte effect slots, `fn_80138F3C` fills the
- *     per-move `-1` markers, `fn_80139024` is the action-state step, `em_res_user_data_set` installs a callback).
- *   * 0x801394B8..0x8013AC08 - the `g3d_resuser_ac.h` accessor: `ResUserDataAc` (vtable at +0, the
- *     `ENEMY_WORK*` at +4, a 32-bit flag word at +8) reads `ResUserData` values out of the work's
- *     `EnemyData` (`get_enemy_data(work)->0x94` is the 0x18-byte item list) and drives the per-entity
- *     user-data state machine (`fn_8013A900`, `fn_8013A978`, `fn_8013AA1C`, `fn_8013AACC`, `fn_8013AB74`).
- *     The `ResUserData`/`ResUserDataItem` panics name the NW4R accessor header, which is why the unit's
- *     original source file is reported as `g3d_resuser_ac.h`.
- *
- * Residuals (see the outbox report for the numbers):
- *   * `fn_80139B6C` (0x6AC) is not written yet - still the original bytes; its body is the per-item
- *     matrix builder, the largest remaining function.
- *   * `fn_801394C0` keeps the target's `clrlwi r0,r4,16` before the `sth`; the source form that stops
- *     MWCC eliding that mask has not been found, so the function is one instruction short.
- *   * The int-to-float conversions in `fn_801391FC`/`fn_80139620` reference the object's own `.sdata2`
- *     magic (`@867`-style) where the target references the shared `lbl_80796D78`/`lbl_80796D80`; the
- *     unit emits a 0x10-byte `.sdata2` the target does not have (the target's constants are external).
- *     Every other difference in the 80-99 % band is register colouring or an instruction order.
- *
- * Source shapes worth keeping (each measured):
- *   * `fn_8013A770` and `fn_8013A6F4` need the `item != NULL` test hoisted out of the loop; folding it
- *     into the `while` condition costs the loop test's shape.
- *   * `fn_8013A770`'s index and `fn_801391FC`'s `total` are 32-bit accumulators that are narrowed only
- *     at the use site - `u16` locals make MWCC re-mask every iteration.
- *   * `fn_8013A900` is a `switch` inside `for (;;)`, not three `if`s: MWCC emits the compare chain
- *     first and the bodies after it.
- *
- * Language.  The unit's own symbols are plain (`fn_XXXXXXXX`), so the file stays C and the mangled
- * callees are declared with the map's spelling, as `ef/fn_800FD520.c` does.
- *
- * Types.  `EnemyWork` and its sub-records are reconstructed from the field offsets in `.text` (an MWCC
- * object carries no DWARF); fields are named for what the call sites store or compare against, and
- * padding keeps every offset at its measured place.  `Vec3`/`Mtx34` are the nw4r math types the mangled
- * callees take; they live here because `nw4r/math.h` is C++-only and this unit is C.
- *
- * Data.  The unit owns no pool section: the strings, the key tags and the float constants live in a
- * shared pool, so they are `extern`-declared by their map names and never defined (playbook 29).
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit enemy/fn_80138074.c`.
+/* enemy/fn_80138074.c - the enemy "user data" driver and its accessors, two clusters of one TU: the `_ENEMY_WORK`
+ *   per-frame driver (0x80138074-0x801391E8: `fn_8013823C` the per-tick update, `fn_80138B60` the sleep/death half
+ *   and their helpers) and the `ResUserDataAc` accessor with the per-entity user-data state machine
+ *   (0x801394B8-0x8013AC08).
+ * RANGE. .text 0x80138074-0x8013ACC4 (73 functions); .data 0x805A1358-0x805A1530, .sdata 0x807919F0-0x80791A20,
+ *   .sdata2 0x80796D40-0x80796D90, extab, extabindex.
+ * NAMES. The map stem; the `ResUserData`/`ResUserDataItem` panics name the NW4R accessor header `g3d_resuser_ac.h`,
+ *   not this file.  `em_res_user_data_set` is a GUESS (it installs a callback).
+ * RESIDUALS. 1 row unwritten: 0x80139B6C-0x8013A218 (`fn_80139B6C`, the per-item matrix builder).
+ *  - `fn_80138074`, `fn_8013823C`, `fn_80138B60`, `fn_80138EC8`, `fn_801391FC`, `fn_801394D4`, `fn_8013A5E4`,
+ *    `fn_8013AC08`: retail keeps `rlwinm`/`clrlwi`/`extsh` + `cmpwi`, ours emits the record form;
+ *  - `fn_8013823C`, `fn_8013A830`, `fn_8013A884`, `fn_8013A8B4`, `fn_8013A900`, `fn_8013AB74`: retail keeps `clrlwi`
+ *    + `slwi`, ours fuses them into `clrlslwi`;
+ *  - `fn_801394C0` (the `clrlwi r0,r4,16` before the `sth`), `fn_8013918C`, `fn_80139858`, `fn_8013A954`,
+ *    `fn_8013AA1C`, `fn_8013AACC`: retail narrows the value, ours elides the mask;
+ *  - `fn_801391FC`, `fn_80139620`: ours converts int to float through the object's own `.sdata2` magic where retail
+ *    references `lbl_80796D78`/`lbl_80796D80`, and `fn_801391FC` lacks retail's `__cvt_fp2unsigned` call; `fn_801391FC` and `fn_80138F3C` also differ in the `psq_st` f31 spill;
+ *  - `fn_8013A29C`, `fn_8013A338`, `fn_8013A4E8`: ours forms the `lbl_807919F0`/`F4`/`F8` addresses with `lis` +
+ *    `addi`, retail with one instruction;
+ *  - `fn_8013A494`, `fn_8013A560`: ours passes a stack temporary (`addi r3,r1,0x8`); `fn_8013A43C`: ours passes the
+ *    record where retail passes its +0x4;
+ *  - `fn_80139024`, `fn_80139954`, `fn_8013A6F4`, `fn_8013A770`, `em_res_user_data_set`: the branch layout differs
+ *    (an extra or a missing `b`/`beq`);
+ *  - `fn_8013823C`, `fn_801394D4`, `fn_80139620`: the frame differs (0x100/0x40/0xC0 against our 0xE0/0x30/0xD0);
+ *    `fn_8013817C`: ours saves r30.
+ *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex short of the claim.
+ * SHAPES. `fn_8013A770` and `fn_8013A6F4` hoist the `item != NULL` test out of the loop; `fn_8013A770`'s index and
+ *   `fn_801391FC`'s `total` are 32-bit accumulators narrowed at the use (`u16` locals re-mask every iteration);
+ *   `fn_8013A900` is a `switch` inside `for (;;)`, not three `if`s.  The file is C (the unit's own symbols are plain),
+ *   so `Vec3`/`Mtx34` are declared here and the mangled callees with the map's spelling.
  */
 
 struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` parameters name this type (C scopes a struct first named in a prototype) */
@@ -81,7 +64,7 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "unsplit/sound.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
-#include "unsplit/enemy_pool.h" /* the band's unowned .data pools (rule 2) */
+#include "unsplit/enemy_pool.h" /* the enemy band's .data pool labels, declared in the band header */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define fn_80126098_c1 ((s32 (*)(void))fn_80126098)
 #define fn_801281EC_c1 ((void (*)(EnemyWork*))fn_801281EC)

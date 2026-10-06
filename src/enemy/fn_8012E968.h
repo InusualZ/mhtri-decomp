@@ -1,8 +1,5 @@
-/* The enemy control/predicate unit `enemy/fn_8012E968.cpp` (0x8012E968..0x8012EC74): the two one-byte
- * predicates the action band's handlers gate on, owned by that unit.
- *
- * Declarations moved here from `unsplit/enemy.h` (docs/plan.md 6.5 rule 2: an extern lives
- * with the TU that owns the symbol; the band header is a fallback, not the owner).
+/* The two one-byte predicates `enemy/em_common.cpp` owns (0x8012E968-0x8012EC74) that the action band's handlers
+ * gate on.
  */
 #ifndef MHTRI_ENEMY_FN_8012E968_H
 #define MHTRI_ENEMY_FN_8012E968_H

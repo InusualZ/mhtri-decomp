@@ -1,4 +1,4 @@
-/* Declarations owned by `src/enemy/em_common.*` (docs/plan.md 6.5 rule 2): a consumer includes this header instead of declaring the symbols itself. */
+/* Declarations `enemy/em_common.cpp` owns, for the units that call them. */
 #ifndef MHTRI_ENEMY_EM_COMMON_H
 #define MHTRI_ENEMY_EM_COMMON_H
 
@@ -7,7 +7,7 @@
 #include "enemy/fn_8012E968.h"
 #include "enemy/fn_801502C8.h"
 
-/* Declarations moved here from `unsplit/enemy.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* `enemy/em_common.cpp`'s own declarations. */
 struct _ENEMY_WORK;
 
 #ifdef __cplusplus
@@ -18,9 +18,8 @@ void CancelFade(struct _ENEMY_WORK *self);
 
 void em_mot_set(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
 
-/* 0x8012F504 - the five-argument motion setter `em_mot_set` tail-calls; moved here from
- * `enemy/fn_801550FC.cpp` on landing (rule 2).  `em_mot_set` narrows its second argument to u16
- * (`clrlwi r4,r4,16`) before the tail call, so the owner's first argument is u16. */
+/* 0x8012F504 - the five-argument motion setter `em_mot_set` tail-calls; `em_mot_set` narrows its second argument to
+ * u16 (`clrlwi r4,r4,16`) first, so the owner's first argument is u16. */
 void em_mot_set_blend(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 
 void em_mot_set_ck(struct _ENEMY_WORK *self, u32 a, u32 b, u32 c);
@@ -67,7 +66,7 @@ void em_move_offset_apply(struct _ENEMY_WORK *self);
  * before ANDing it against the record's `flags_0x836`; the body's `neg`/`or`/`srwi 31` returns 1
  * when any masked bit is set, so the result is a u32 0/1 and every call site compares it with
  * `cmplwi`.  The old-style `s32 em_flags836_ck()` declaration could not carry the two arguments the
- * landed callers pass (`enemy/fn_8014A1BC.c` and `enemy/fn_801D80EC.cpp` both call it
+ * landed callers pass (`enemy/em001_prog.cpp` and `enemy/em007_act.cpp` both call it
  * `(self, mask)`). */
 u32 em_flags836_ck(struct _ENEMY_WORK* self, u32 a);
 

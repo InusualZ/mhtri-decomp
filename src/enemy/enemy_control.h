@@ -1,11 +1,5 @@
-/* The records `enemy/enemy_control.cpp` reads out of the enemy-control work blob `emc_work`
- * (0x806A4590, size 0xF50).  Kept in a header because more than one of the unit's functions uses
- * them (docs/plan.md 6.5 rule 1).
- *
- * NOTE (rule-1 follow-up): `emc_work`'s per-enemy slot is the same 0x18-byte record
- * `enemy/fn_8013F764.cpp` calls `EmcWork` privately in its `src/` file; the two definitions should
- * be folded into this one when that unit is touched.  This header names the slot `EmcSlot` to keep
- * the two spellings visibly distinct until then.
+/* The records `enemy/enemy_control.cpp` reads out of the enemy-control work blob `emc_work` (0x806A4590, 0xF50);
+ * its 0x18-byte per-enemy slot is `EmcSlot` here and `EmcWork` in `enemy/em_kind.cpp` (one record, two definitions).
  */
 #ifndef MHTRI_ENEMY_ENEMY_CONTROL_H
 #define MHTRI_ENEMY_ENEMY_CONTROL_H
@@ -14,7 +8,7 @@
 #include "nw4r/math.h" /* nw4r::math::VEC3 - the sparkle record's position (rule 11) */
 
 /* one 0x18-byte per-enemy slot of `emc_work` (the array `fn_801413D0` scans and `fn_80141358`
- * clears; `enemy/fn_8013F764.cpp` calls the same record `EmcWork`).
+ * clears; `enemy/em_kind.cpp` calls the same record `EmcWork`).
  * size: 0x18 */
 struct EmcSlot {
     /* +0x00 */ u8 id;         /* the slot index `fn_80141358` stores, returned by `fn_80141470` */
@@ -41,7 +35,7 @@ struct SenkoRec {
 };
 
 /* one 0x24-byte record of the second marker array at `emc_work + 0x1F8` (the ten entries
- * `fn_80141B2C` clears the +0x09 byte of; `hud/net_char_sync.cpp` packs a record into a net message).
+ * `fn_80141B2C` clears the +0x09 byte of; `hud/pl_frame_sync.cpp` packs a record into a net message).
  * size: 0x24 */
 struct Marker2Rec {
     /* +0x00 */ u16 field_0x00;
@@ -87,7 +81,7 @@ struct EmcWork {
     /* +0x36A */ u8 field_0x36A;
     /* +0x36B */ u8 field_0x36B;
     /* +0x36C */ u8 unused_0x36C[0xD9C - 0x36C];
-    /* +0xD9C */ EmcStatus status_0xD9C;   /* the last event `hud/net_char_sync.cpp` replays to its peers */
+    /* +0xD9C */ EmcStatus status_0xD9C;   /* the last event `hud/pl_frame_sync.cpp` replays to its peers */
     /* +0xDA4 */ u8 unused_0xDA4[0xF48 - 0xDA4];
     /* +0xF48 */ u32* field_0xF48;
     /* +0xF4C */ u32 field_0xF4C;
@@ -103,7 +97,7 @@ struct _ENEMY_MINI_WORK;
 extern "C" {
 #endif
 
-/* The mini-enemy event handlers the net sync (`hud/net_char_sync.cpp`) drives; the signatures are the call
+/* The mini-enemy event handlers the net sync (`hud/pl_frame_sync.cpp`) drives; the signatures are the call
  * sites' (GUESS: the roles). */
 void emc_mini_event_b(struct _ENEMY_MINI_WORK* mini, s32 mode);
 void emc_mini_event_a(struct _ENEMY_MINI_WORK* mini, s32 a, s32 b);
@@ -117,38 +111,31 @@ void emc_marker_replay(struct _ENEMY_MINI_WORK* mini, u8 a, u8 b, u16 id, u8 c, 
  * is `src/Pl/pl_act.cpp`'s - it is registered but not yet reconstructed (see the unit source's
  * Status). */
 void* fn_80143174(void* a, void* b, s32 c);
-/* The action band's arming helpers that live inside this unit's range, called by
- * `enemy/fn_80178378.cpp` (docs/plan.md 6.5 rule 2: an extern lives with the TU that owns it).
- * The bodies come with this unit's follow-up queue; the signatures are the call sites'. */
+/* The action band's arming helpers in this unit's range that `enemy/em015_prog.cpp` calls (unwritten; the
+ * signatures are the call sites'). */
 void em_demo_pos_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
 void em_demo_rot_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
 
 
 /* 0x801421E4 - r3 is narrowed with `clrlwi r3,r3,16` (a u16 id, 0xFFFF = the "no record" arm) and r4
- * is the out record `fn_80125F54` prepared; returns a word the enemy program functions compare with 1.
- * Added with `enemy/fn_801B7020.cpp` (rule 2: this unit owns the address). */
+ * is the out record `fn_80125F54` prepared; returns a word the enemy program functions compare with 1. */
 u32 fn_801421E4(u32 id, void* out);
-/* 0x80146008 - r3 the frame count in f1?  It reads the record's motion timer and returns 1 once
- * the elapsed frame count has passed the value in r3 (the call sites pass 0x96/0x12C/...).
- * Declared here with the rest of this unit's record helpers (rule 2). */
+/* 0x80146008 - reads the record's motion timer and returns 1 once the elapsed frame count has passed the value in
+ * r3 (the call sites pass 0x96/0x12C/...). */
 u32 em_demo_time_ck(u32 frames);
 void em_demo_enable(struct _ENEMY_WORK* self);
-/* 0x80145FE4 - the joint-effect slot allocator this unit owns (returns the slot index, -1 when the
- * set is full).  Added with `enemy/em009_act.cpp`'s action band (rule 2). */
+/* 0x80145FE4 - the joint-effect slot allocator (returns the slot index, -1 when the set is full). */
 s16 em_demo_frame_get(void);
-/* 0x8014616C - r3 (`self`) and r4 (the mode); this unit's own definition, added with
- * `enemy/em009_act.cpp` (rule 2). */
+/* 0x8014616C - r3 `self` and r4 the mode. */
 void em_demo_reset(struct _ENEMY_WORK* self, s32 mode);
-/* 0x801461A8 - r3 (`self`), r4 (`s16` slot), r5/r6 two pointers (the caller's vectors).  Added with
- * `enemy/em009_act.cpp` (rule 2). */
+/* 0x801461A8 - r3 `self`, r4 the `s16` slot, r5/r6 the caller's two vectors. */
 void em_demo_key3_apply(struct _ENEMY_WORK* self, s16 slot, void* a, void* b);
-/* 0x801462A4 - r3 (`self`), r4 (`s16` slot), r5/r6 two pointers and r7/r8 two scalars.  Added with
- * `enemy/em009_act.cpp` (rule 2). */
+/* 0x801462A4 - r3 `self`, r4 the `s16` slot, r5/r6 two pointers and r7/r8 two scalars. */
 void em_demo_key_apply(struct _ENEMY_WORK* self, s16 slot, void* a, void* b, s32 c, s32 d);
 
 /* 0x80141B88 - the enemy spawn request (GUESS name).  The tenth argument is a placement `VEC3*` or null: the
  * callee loads the outgoing stack word into r21 and hands it to `copyVec3` as the second argument when it is
- * non-null (`enemy/fn_8015D860.cpp` passes a vector, `enemy/fn_80170600.cpp` null). */
+ * non-null (`enemy/em008_prog.cpp` passes a vector, `enemy/em012_prog.cpp` null). */
 namespace nw4r { namespace math { struct VEC3; } }
 void em_spawn_request(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, nw4r::math::VEC3* j, s32 k);
 
@@ -157,8 +144,7 @@ void em_spawn_request(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 
  * call site. */
 u32 em_area_entry_make(u8* area, u8 kind, u8 index);
 
-/* 0x80143BF8 - no arguments; returns a word the effect band's slot scan compares with 1.  Added with
- * `ef/eft_slot.cpp` (rule 2: this unit owns the address). */
+/* 0x80143BF8 - no arguments; returns a word the effect band's slot scan (`ef/eft_slot.cpp`) compares with 1. */
 u8 fn_80143BF8(void);
 
 #ifdef __cplusplus

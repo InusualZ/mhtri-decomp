@@ -1,8 +1,4 @@
-/* The enemy action unit `enemy/fn_80171194.cpp` (0x80171194..0x80176C58).
- *
- * Declarations moved here from the consumer units' `src/` files (docs/plan.md 6.5 rule 2:
- * an extern lives with the TU that owns the symbol).
- */
+/* Declarations `enemy/em012_prog.cpp` owns from its 0x80171194 action band, for its consumers. */
 #ifndef MHTRI_ENEMY_FN_80171194_H
 #define MHTRI_ENEMY_FN_80171194_H
 

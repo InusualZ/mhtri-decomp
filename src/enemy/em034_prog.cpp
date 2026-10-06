@@ -1,79 +1,34 @@
-/* enemy/em034_prog.cpp - enemy 034 program
- *
- * `.text` 0x801B4348..0x801B7020, 50 functions written (the rest of the range is not decompiled yet).
- * Phase 4: fold of 2 registered units, built from `enemy/fn_801B0010.cpp`, `enemy/fn_801B4458.cpp`.
- * Named after `em034_prog_tbl` (0x805B17A8), the first `.data` symbol of the range (GUESS for the unit as a whole: the range is the seat/effect-action band that follows em030).
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- *
- * Kept views: the retired sources declared 10 callee(s) with different signatures (`assignVec3`, `calcVecDistXZ`, `em_hit_window_set_default`, `em_se_tbl_play`, `em_se_tbl_play_alt`, `em_turn_seq_start`, `fn_80126324`, `fn_8012D0B4`, `fn_8012D1A8`, `ran_suu`); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
- * Hidden declarations: 10 header declaration(s) that disagree with the kept view are renamed away around their `#include` (`#define <name> <name>_hidden_<header>`): `assignVec3`, `calcVecDistXZ`, `em_hit_window_set_default`, `em_se_tbl_play`, `em_se_tbl_play_alt`, `em_turn_seq_start`, `fn_80126324`, `fn_8012D0B4`, `fn_8012D1A8`, `ran_suu`.
- */
-
-/* Retired header of `enemy/fn_801B4458.cpp` (kept for its notes and residuals): */
-/* enemy/fn_801B4458.cpp - the enemy seat/effect-action band, 0x801B4458..0x801B7020 (48 functions).
- *
- * The unit owns `.text` 0x801B4458..0x801B7020, the extab run 0x8000F6B4..0x8000F7EC (39 records),
- * the extabindex run 0x8002B0F8..0x8002B2CC (39 records) and one `.ctors` word at 0x8056F348 (the
- * static initializer `fn_801B6FB0`).
- *
- * MODULE AND NAME (brief section 2, evidence order).
- *   * Option 1 (a `__FILE__` string) fails: the range references no file-name string at all (its
- *     only `.rodata` reference is the numeric table `lbl_80570260`, and the `.sdata2` references are
- *     the float pool in `fn_801B4458.h`'s comment).
- *   * Option 2 (a real runtime-dump name) fails: `python tools/symbols/dumpmap.py lookup` answers
- *     `zz_<addr>_` for every one of the 48 addresses, which is not evidence.
- *   * Option 3 (what the code does plus the neighbours' scheme) fixes the module: the bracketing
- *     registered units are `enemy/fn_801B0010.cpp` below and `enemy/fn_801B7020.cpp` above, and every
- *     callee out of the range is enemy-band (`_ENEMY_WORK`, `em_act_ck`, `em_mot_set`,
- *     `get_move_work_adrs(3)`).
- *   * Option 4 therefore decides the FILE NAME: the neighbours' scheme is `fn_XXXXXXXX.<ext>`
- *     (`src/enemy/` is 27 such files plus `enemy_control.cpp`), and no evidence names the original
- *     source file, so the file keeps the map's own stem.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup` on every address of the 48-function inventory: every one
- * answers `zz_<addr>_`, and `config/RMHE08/symbols.txt` carries nothing but the bare `fn_XXXXXXXX`
- * entries).
- *
- * Language C++.  Every callee the range reaches through a mangling is declared at its real signature
- * (`em_act_ck`, `em_die_ck`, `em_get_mot_no`, `em_frame_check`, `em_after_frame_check`,
- * `get_move_work_adrs`, `get_move_work_max`, `ran_suu`, `get_em_chg_scale`, `get_joint_wpos_em`,
- * `setVector3`, `vec_to_mh_vec3`) - rule 9 never spells the mangling.  The range's own flat symbols
- * stay C-linkage through the `extern "C"` block in `enemy/fn_801B4458.h`.
- *
- * Object: `_ENEMY_WORK`, included from `enemy/ENEMY_WORK.h` (the one shared home; the fields
- * this range names were added there - +0x00F, +0x1CC, the +0x328 seat view, +0x440, +0x833 and
- * +0x888, and `EmAreaWork`'s +0x008/+0x3C for the area records `get_move_work_adrs(2)` hands back).
- *
- * The seam is unproven (docs/plan.md 8.3).  It is exactly the unclaimed gap between the two
- * registered units, so both edges are their `.text` edges.
- *
- * Flags: no deviation - the `enemy` lib's `cflags_main` measured every body below.  No `#pragma`.
- *
- * State of the reconstruction.  All 48 bodies are written and every one clears the 80 % bar.
- *
- * STATUS (measured with `tools/units/recompile.py enemy/fn_801B4458 --measure <symbol>`, the official
- * report metric against MAIN's retired single-symbol split objects `auto_fn_*_text.o`).  Mean
- * 95.0569 %; 19 bodies are byte-identical: fn_801B4E38, fn_801B4E3C, fn_801B4EA8, fn_801B4F08,
- * fn_801B4F84, fn_801B5000, fn_801B5108, fn_801B5184, fn_801B53E8, fn_801B5464, fn_801B54E0,
- * fn_801B555C, fn_801B5AE4, fn_801B5B60, fn_801B5E20, fn_801B60D4, fn_801B64E8, fn_801B64FC,
- * fn_801B701C.  Object sections: `.text` 0x2C28 (target 0x2BC8), extab 0x138 (target 0x138),
- * extabindex 0x1D4 (target 0x1D4).
- *
- * Residuals, by measurement (all near-misses are codegen shapes, not comprehension):
- *   * RECORD-WALKER COLOURING - fn_801B4694 82.43 and fn_801B45B0 82.81: the `list` base reload and
- *     the `index << 5` offset land in different registers from the target's own split.
- *   * `clrlwi`/`rlwinm` + `cmpwi` FUSION - fn_801B4C54 96.56 and fn_801B6C38 94.47: -O3's peephole
- *     folds the byte test into the record form where the target keeps the unfused pair.  A
- *     `#pragma peephole off` was probed and rejected: it fixes those two to 100 but regresses the
- *     bodies that keep the fused/eliminated form (fn_801B4F08 100 -> 96.77, fn_801B5AE4 100 ->
- *     96.77, fn_801B5030 97.87 -> 92.31, fn_801B6010 97.65 -> 93.57).
- *   * `.ctors` REGISTER ORDER - fn_801B6FB0 84.93: the two `setVec3` calls colour their float
- *     registers differently.
- *   * MOTION SELECT - fn_801B63E8 86.33: the `field_0x00A & 1` motion select materialises in a
- *     different register, and fn_801B65B8 87.24 the same in the effect-id select.
- *   * `fn_801B4458` 91.00 / fn_801B47A4 88.79: the seat picker and the per-tick update keep a
- *     close instruction multiset but pair a few blocks differently.
+/* enemy/em034_prog.cpp - the em034 enemy's program: the seat/effect-action band (seat records, the per-tick seat
+ *   update and the seat actions) and its static constructor.
+ * RANGE. .text 0x801B4348-0x801B7020 (50 functions); .ctors 0x8056F348-0x8056F34C, .rodata 0x80570260-0x805702A0,
+ *   .data 0x805B17A8-0x805B2118, .bss 0x806A7AA0-0x806A7AB8, .sdata 0x80791A90-0x80791AB0,
+ *   .sdata2 0x80798C68-0x80798CF8, extab, extabindex.
+ * NAMES. `em034_prog` is a GUESS from `em034_prog_tbl` (0x805B17A8), the first object of the unit's `.data`; the
+ *   `.bss` record name is a GUESS (a pair of model-space points).
+ * RESIDUALS. Every row is written.
+ *  - `fn_801B4458`, `fn_801B47A4`, `fn_801B4C54`, `fn_801B5200`, `fn_801B529C`, `fn_801B5338`, `fn_801B563C`,
+ *    `fn_801B5774`, `fn_801B5D24`, `fn_801B63E8`, `fn_801B65B8`, `fn_801B670C`: retail keeps `clrlwi`/`rlwinm` +
+ *    `cmpwi`, ours emits the record form;
+ *  - `fn_801B4398`, `fn_801B4694`, `fn_801B47A4`, `fn_801B5774`, `fn_801B5D24`: retail keeps `clrlwi` + `slwi`,
+ *    ours fuses them into `clrlslwi`;
+ *  - `fn_801B5200`, `fn_801B529C`, `fn_801B563C`, `fn_801B5774`, `fn_801B5908`, `fn_801B5BEC`, `fn_801B5D24`: ours
+ *    loads `state_sub` (+0x5) at a different point of the body;
+ *  - `fn_801B5030`, `fn_801B5ED4`, `fn_801B6010`, `fn_801B63E8`, `fn_801B563C`, `fn_801B5774`, `fn_801B5D24`: ours
+ *    emits an extra `b` to the shared tail ahead of a case body;
+ *  - `fn_801B4D14`, `fn_801B6EF4`, `fn_801B6C38`, `fn_801B5A08`: retail narrows the `u8` argument with `clrlwi`
+ *    before the compare, ours compares the register;
+ *  - `fn_801B47A4`: retail's frame is 0x50 against our 0x40 and its loops count with `mtctr`/`bdnz`;
+ *    `fn_801B6FB0`: frame 0x30 against 0x20, the two `setVec3` calls colour their float registers differently;
+ *    `fn_801B4458`, `fn_801B563C`, `fn_801B5774`, `fn_801B65B8`: retail spills f31 with `psq_st`;
+ *  - `fn_801B670C`: ours lacks one of retail's `em_after_frame_check` calls (with its `lbl_80798CA0`/`lbl_80798C74`
+ *    window);
+ *  - `fn_801B45B0`: ours materialises the seat-code compare with `cntlzw`/`srwi` where retail branches;
+ *    `fn_801B6B94`: ours loads the +0x1D4 field before retail's `lbl_80798CD0`; `fn_801B6C84`: the stack-vector
+ *    setup is ordered differently; `fn_801B610C`, `fn_801B6308`: register allocation only.
+ *   flipcheck: `.ctors`/`.rodata`/`.sdata`/`.sdata2` claimed, not emitted; `.data`/`.text` short of the claim.
+ * SHAPES. The 10 callees the folded sources declared with different signatures are called through cast macros
+ *   (`<name>_cN`, `<name>_viewN`: the same direct call), and the header declarations that disagree are renamed away
+ *   around their `#include` (`#define <name> <name>_hidden_<header>`).  No peephole pragma (docs/enemy.md).
  */
 
 #include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2: the owner's header) */
@@ -122,7 +77,7 @@
 #undef em_se_tbl_play
 #undef em_hit_window_set_default
 #include "ai/ainpc.h"   /* `_AINPC_W` (rule 1) */
-#include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/fn_802D44F4.cpp (rule 2) */
+#include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/ai_npc.cpp (rule 2) */
 #define em_turn_seq_start em_turn_seq_start_hidden_fn_8012EC74_h
 #include "enemy/fn_8012EC74.h"
 #undef em_turn_seq_start
@@ -159,32 +114,21 @@
 #define fn_8012D1A8_c1 ((u32 (*)(u8))fn_8012D1A8)
 #define em_approach_start_c1 ((void (*)(struct _ENEMY_WORK*, f32, u32))em_approach_start)
 #define em_turn_seq_start_c1 ((u32 (*)(struct _ENEMY_WORK*, void*, s32, s32, s32))em_turn_seq_start)
-/* ran_suu_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
+/* Callees the folded sources declared with different parameters: each call keeps its own view through a cast
+ * (the same direct call). */
 #define ran_suu_view1 ((u16 (*)(s32))ran_suu)
-/* fn_8012D1A8_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_8012D1A8_view1 ((s32 (*)(u8))fn_8012D1A8)
-/* fn_8012D0B4_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_8012D0B4_view1 ((s32 (*)(struct _ENEMY_WORK*, void*))fn_8012D0B4)
-/* fn_80126324_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_80126324_view1 ((void (*)(struct _ENEMY_WORK*, u32, u32, f32))fn_80126324)
-/* em_turn_seq_start_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_turn_seq_start_view1 ((void (*)(struct _ENEMY_WORK*, void*, s32, s32, s32))em_turn_seq_start)
-/* em_se_tbl_play_alt_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_se_tbl_play_alt_view1 ((void (*)(struct _ENEMY_WORK*, void*, u32, u32))em_se_tbl_play_alt)
-/* em_se_tbl_play_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_se_tbl_play_view1 ((void (*)(struct _ENEMY_WORK*, void*, u32, u32))em_se_tbl_play)
-/* em_hit_window_set_default_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_hit_window_set_default_view1 ((void (*)(struct _ENEMY_WORK*, u32, u32))em_hit_window_set_default)
-/* calcVecDistXZ_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define calcVecDistXZ_view1 ((f32 (*)(const void*, const void*))calcVecDistXZ)
-/* assignVec3_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define assignVec3_view1 ((void (*)(Vec*, Vec*))assignVec3)
 
-/* The 8-byte `lbl_805B1B08` lookup entry: a key byte, a value byte and the list pointer (the list
- * holds more records of this same shape, keyed by the kind).  It is NOT `enemy/em004_act.cpp`'s
- * same-named entry, which models the different 0x805B3CD8 table (`{key, count, EmLookupSub*}`); the
- * two records are modelled separately and the names must not collide (docs/plan.md 6.5 rule 1), so
- * this unit's view is named after its own table.
+/* The 8-byte `lbl_805B1B08` lookup entry: a key byte, a value byte and the list pointer (more records of this shape,
+ * keyed by the kind); `enemy/em004_act.cpp`'s `EmLookupEntry` is the different 0x805B3CD8 table.
  * size: 0x8 */
 struct EmCodeListEntry {
     /* +0x0 */ u8 code;
@@ -195,13 +139,13 @@ struct EmCodeListEntry {
 extern "C" EmCodeListEntry lbl_805B1B08[];
 
 extern "C" {
-/* enemy/fn_8012EC74.cpp (0x8012EC74..0x80137604) - the action/motion arming helpers. */
+/* enemy/em_common.cpp (0x8012EC74..0x80137604) - the action/motion arming helpers. */
 
-/* enemy/fn_801251D0.cpp (0x801251D0..0x8012BA00) - the program/entry helpers. */
+/* enemy/em_common.cpp (0x801251D0..0x8012BA00) - the program/entry helpers. */
 u32 fn_801421E4(u32 id, void* out);
 u8 stage_map_kind_get(u8 map);
 
-/* enemy/fn_80137604.cpp (the 0x8013xxxx motion setters). */
+/* enemy/em_common.cpp (the 0x8013xxxx motion setters). */
 
 /* the base vector/effect helpers (owned elsewhere; declared, never defined - playbook 29). */
 void assignVec3(void* out, void* in);
@@ -239,9 +183,7 @@ f32 get_em_chg_scale(struct _ENEMY_WORK* self);
 void get_joint_wpos_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::VEC3* out);
 void setVector3(nw4r::math::VEC3* v, f32 x, f32 y, f32 z);
 
-/* -------------------------------------------------------------------------------------------------
- * the `.sdata2` float pool and the two data tables the band reads.
- * ------------------------------------------------------------------------------------------------- */
+/* The `.sdata2` float pool and the two data tables the band reads. */
 extern f32 lbl_80798C68; /* 1000000.0f */
 extern f32 lbl_80798C6C; /* 2.0f */
 extern f32 lbl_80798C70; /* 1.0f */
@@ -337,14 +279,12 @@ extern "C" u32 fn_801B4398(_ENEMY_WORK* work, u32 kind, u32* out) {
     return 0;
 }
 
-/* The 0x20-byte ground record `fn_80125F54` prepares and `fn_801421E4` fills lives in
- * `enemy/ENEMY_WORK.h` now (rule 1: one definition for both units that own one). */
+/* The 0x20-byte ground record `fn_80125F54` prepares and `fn_801421E4` fills is `EmGroundRec`
+ * (`enemy/ENEMY_WORK.h`). */
 
-/* -------------------------------------------------------------------------------------------------
- * the range's functions, in address order
- * ------------------------------------------------------------------------------------------------- */
+/* The range's functions, in address order. */
 
-/* 0x801B4458 (0x158).  Pick the seat record of the `kind` set `fn_801B4398` hands back whose point
+/* 0x801B4458 (0x158).  Picks the seat record of the `kind` set `fn_801B4398` hands back whose point
  * (or two-point segment midpoint) is nearest the work record's `pos`; 0xFF when the set is empty. */
 extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
     nw4r::math::VEC3 mid;
@@ -387,9 +327,8 @@ extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
     return best;
 }
 
-/* 0x801B45B0 (0xE4).  Whether the seat record is within `radius` of `point`: a two-point seat
- * (code 1) builds the box between its points and tests the point against it, a single-point seat
- * measures straight distance. */
+/* 0x801B45B0 (0xE4): whether the seat record is within `radius` of `point`; a two-point seat (code 1) tests the
+ * box between its points, a single-point seat the straight distance. */
 extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
     EmSeatRec* rec;
     u8 box[0x34];
@@ -417,9 +356,8 @@ extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
     return 0;
 }
 
-/* 0x801B4694 (0x110).  Move the work record's aim to seat `index`: the two-point seats install a
- * segment (through `fn_8013581C`), a single-point seat the point itself (`em_wave_amp`), each with
- * the seat's own float and a random u16 phase. */
+/* 0x801B4694 (0x110): moves the aim to seat `index` - a segment (`fn_8013581C`) for a two-point seat, the point
+ * itself (`em_wave_amp`) otherwise, each with the seat's own float and a random u16 phase. */
 extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
     nw4r::math::VEC3 a;
     nw4r::math::VEC3 b;
@@ -446,10 +384,8 @@ extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
     }
 }
 
-/* 0x801B47A4 (0x4B0).  The per-tick seat update: it walks the (3) work records and the (2) area
- * records for seats near the enemy, marks which of the up-to-10 seat records are occupied, re-picks
- * the current seat (the seat selection itself is `fn_801B4458`), and arms the seat action through
- * `fn_8013072C`. */
+/* 0x801B47A4 (0x4B0): the per-tick seat update; marks which of the up-to-10 seats the kind-3 work and kind-2 area
+ * records occupy, re-picks the current seat (`fn_801B4458`) and arms the seat action (`fn_8013072C`). */
 extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
     u8 flags[0x0A];
     EmSeatRec* list;
@@ -640,7 +576,7 @@ extern "C" void fn_801B4D14(_ENEMY_WORK* self, u8 kind) {
 /* 0x801B4E38 (0x4).  The empty slot the neighbour's function table keeps. */
 extern "C" void fn_801B4E38(void) {}
 
-/* 0x801B4E3C (0x6C).  Release the latched effect handle +0x888 when neither the 0xA/0x7D nor the
+/* 0x801B4E3C (0x6C).  Releases the latched effect handle +0x888 when neither the 0xA/0x7D nor the
  * 0xB/0x25 action is live. */
 extern "C" void fn_801B4E3C(_ENEMY_WORK* self) {
     if (em_act_ck(self, 0x0A, 0x7D) == 0 && em_act_ck(self, 0x0B, 0x25) == 0 &&
@@ -698,7 +634,7 @@ extern "C" void fn_801B4F84(_ENEMY_WORK* self) {
     }
 }
 
-/* 0x801B5000 (0x30).  Dispatch the 0x801B4F08/0x801B4F84 pair on the +0x1E6 sub-state. */
+/* 0x801B5000 (0x30).  Dispatches the 0x801B4F08/0x801B4F84 pair on the +0x1E6 sub-state. */
 extern "C" void fn_801B5000(_ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
@@ -904,7 +840,7 @@ extern "C" void fn_801B54E0(_ENEMY_WORK* self) {
     }
 }
 
-/* 0x801B555C (0x4C).  Dispatch the 0x801B5030..0x801B54E0 set on the +0x1E6 sub-state. */
+/* 0x801B555C (0x4C).  Dispatches the 0x801B5030..0x801B54E0 set on the +0x1E6 sub-state. */
 extern "C" void fn_801B555C(_ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
@@ -1231,7 +1167,7 @@ extern "C" void fn_801B5D24(_ENEMY_WORK* self, u8 flag) {
     }
 }
 
-/* 0x801B5E20 (0xB4).  Dispatch the 0x801B55A8..0x801B5D24 set on the +0x1E6 sub-state. */
+/* 0x801B5E20 (0xB4).  Dispatches the 0x801B55A8..0x801B5D24 set on the +0x1E6 sub-state. */
 extern "C" void fn_801B5E20(_ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
@@ -1355,7 +1291,7 @@ extern "C" void fn_801B6010(_ENEMY_WORK* self) {
     }
 }
 
-/* 0x801B60D4 (0x38).  Dispatch the 0x801B5ED4/0x801B6010 trio on the +0x1E6 sub-state. */
+/* 0x801B60D4 (0x38).  Dispatches the 0x801B5ED4/0x801B6010 trio on the +0x1E6 sub-state. */
 extern "C" void fn_801B60D4(_ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
@@ -1532,7 +1468,7 @@ extern "C" void fn_801B64FC(_ENEMY_WORK* self) {
     }
 }
 
-/* 0x801B65B8 (0x154).  Spawn the seat's effect at the motion's joint (kind 1) or directly (kind 0),
+/* 0x801B65B8 (0x154).  Spawns the seat's effect at the motion's joint (kind 1) or directly (kind 0),
  * with the +0x228 gate selecting the "blocked" id/scale. */
 extern "C" void fn_801B65B8(_ENEMY_WORK* self, u8 kind, u8 id, s32 joint, s32 arg4, f32 scale) {
     nw4r::math::VEC3 pos;
@@ -1659,7 +1595,7 @@ extern "C" void fn_801B670C(_ENEMY_WORK* self) {
     }
 }
 
-/* 0x801B6B94 (0xA4).  Seed the two alpha/colour passes of the embedded MHchar base from the +0x1D4
+/* 0x801B6B94 (0xA4).  Seeds the two alpha/colour passes of the embedded MHchar base from the +0x1D4
  * ratio. */
 extern "C" void fn_801B6B94(_ENEMY_WORK* self) {
     f32 ratio;
@@ -1682,9 +1618,8 @@ extern "C" s32 fn_801B6C38(_ENEMY_WORK* self, u8 flag) {
     return 0;
 }
 
-/* 0x801B6C84 (0x270).  The enemy-control seat picker: map the map id (`stage_map_kind_get`) and area to a
- * motion pair through `fn_80126324`; when no map/area matches, report the unmatched state and copy
- * the control record's position/rotation onto the work. */
+/* 0x801B6C84 (0x270): maps the map kind (`stage_map_kind_get`) and area to a motion pair through `fn_80126324`;
+ * with no match it reports the unmatched state and copies the control record's position/rotation onto the work. */
 extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     EmGroundRec rec;
     u32 unmatched = 0;
@@ -1802,7 +1737,6 @@ extern "C" u32 fn_801B701C(_ENEMY_WORK* self) {
     return fn_80132184();
 }
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7AA0..0x806A7AB8`), in address order: the 1 two-vector record(s)
- * its static constructor `fn_801B6FB0` builds (`.data` tables point at them).  Names are GUESSes: each record is a
- * pair of model-space points. */
+/* The unit's `.bss` (0x806A7AA0-0x806A7AB8): the two-vector record its static constructor `fn_801B6FB0` builds
+ * and the `.data` tables point at. */
 VEC3 vec_pair_801B4458_0[2];  /* +0x806A7AA0 */

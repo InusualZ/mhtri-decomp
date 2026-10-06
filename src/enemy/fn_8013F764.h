@@ -1,5 +1,5 @@
-/* The declarations `src/enemy/fn_8013F764.cpp` owns that other units call (docs/plan.md 6.5 rule 2).
- * The owner's definitions are C linkage (its own `extern "C"` block). */
+/* Declarations `enemy/em_kind.cpp` owns from its run driver and stream helpers (0x8013F764..), C linkage like the
+ * definitions. */
 #ifndef MHTRI_ENEMY_FN_8013F764_H
 #define MHTRI_ENEMY_FN_8013F764_H
 

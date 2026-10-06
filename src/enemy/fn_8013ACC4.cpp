@@ -1,76 +1,25 @@
-/* enemy/fn_8013ACC4.cpp - the enemy user-data command interpreter and its 0x100-entry dispatch table.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup:
- * every `fn_` name this file uses is a bare .text entry in config/RMHE08/symbols.txt, and the dump
- * answers only `zz_` placeholders for all three of this range's symbols)
- * `.text` 0x8013ACC4..0x8013BE60 (3 functions), extab 0x8000D414..0x8000D424,
- * extabindex 0x80027D08..0x80027D20.
- *
- * What it is.  `fn_8013ACC4` is the second half of the enemy user-data state machine the unit above
- * (`enemy/fn_80138074.c`, the `ResUserDataAc` accessor) installs and the unit below
- * (`enemy/fn_8013BE60.c`, the parameter interpreter) feeds: it runs one *program* - a byte stream at
- * `work->stream_0x958` - through a 256-entry `switch`, dispatching each command to the handler
- * `enemy/fn_8013BE60.c` owns.  The loop is:
- *
- *     len = fn_80140768(work->stream_0x958);              // the command's length in bytes
- *     if ((u8)len == 0xFF && work->stream_0x958[0] != 0xFF) { end the run; continue; }
- *     switch (*work->stream_0x958++) { case 0x00: ... case 0xFF: ... }
- *     work->stream_0x958 += (u8)len;                       // the shared tail every `break` reaches
- *
- * The table is `jumptable_805A15D0` (256 entries): cases 0x00..0x6C call one handler each (the handler
- * returning `s16` advances the cursor by that delta, the rest just run), `0x10` and `0xFF` share the
- * range's biggest body - a second `switch` over `work->field_0x95C`, the interpreter's *state*
- * (`jumptable_805A15A0`, 12 entries) - `0x39` is an empty case, and 0x6D..0xFE are the default
- * (`fn_80140AF8(work, 0xD, *work->stream_0x958)`).
- *
- * `fn_8013BDE4` is the stream reader the two neighbouring units call through
- * `fn_8013BDE4(&work->stream_0x958, code, &value)`, and `fn_8013BDC8` is the 8-byte record copier the
- * interpreter uses to save and restore the work's `recs_0x9AC` array across a state switch.
- *
- * Language.  C++: the range's own symbols are plain, but one callee is the mangled `ran_suu__Fl`
- * (`u16 ran_suu(long)`), so the file must be C++ for the front-end to reproduce that mangling; the
- * range's own three functions are `extern "C"` so they pair with the map's plain stems (rule 9).
- *
- * Types.  `_ENEMY_WORK` (= `EmWork` here) is reconstructed from this range's own field offsets.  It is
- * a *view*, like the ones `enemy/fn_80138074.c` and `enemy/fn_8013BE60.c` carry: the shared home
- * `enemy/ENEMY_WORK.h` cannot be used as-is because its view of this range's own fields
- * disagrees with the disassembly - it calls +0x424 a word of `values_0x3A4[]`, +0x958 an `s32` (this
- * range loads it and dereferences it as the stream cursor), +0x95F/+0x999/+0x99B padding or array
- * bytes (this range reads and writes all three as flags/counters), and +0x9A4 an `EmCmdRec*` (this
- * range reads a record-table pointer at +0x4 of the object 0x9A4 points at, with a 0xC stride).  The
- * outbox asks for those fields to be folded into the header (rule 1's follow-up).
- *
- * Measured result.  `fn_8013ACC4` 99.22865 (4356 B / 4356 B, size exact), `fn_8013BDC8` 100.0,
- * `fn_8013BDE4` 100.0; unit fuzzy_match_percent 99.25466 with 2 of 3 functions byte-identical.  All 256
- * dispatch cases, both state-switch bodies, the pre-loop state snapshot/restore and the exit block are
- * written - nothing is stubbed.
- *
- * Residual (every remaining objdiff row of `fn_8013ACC4`, all of them register names or a spelling):
- *   * retail materialises the loop's two constants as 0 in r15 / 1 in r16, ours as 0 in r16 / 1 in r15
- *     (four `stb` sites); the record copiers' index is r14 in retail and r15 here, which is also why
- *     retail hoists `lis r14, jumptable_805A15D0@ha` out of the loop while ours re-materialises it per
- *     dispatch;
- *   * the `continue` edges: retail branches to the loop's own test (`.text+0x10BC`), ours to the loop
- *     head (`+0x258`) - MWCC proved that path cannot set `finished`.  The other source shape (the exit
- *     test written at the TOP of `for (;;)`, which is what retail's rotated layout implies) measures
- *     97.60 and grows `.text` by 8 B here, so the bottom-test form is the better of the two and is
- *     what is applied;
- *   * the `switch (work->field_0x95C)` range probe: retail `subi r0,r3,3 / cmplwi r0,2 / ble`, ours the
- *     two-sided `cmpwi r0,3 / blt / cmpwi r0,5 / ble` chain (same cases 3,4,5);
- *   * the head's schedule: `bl VEC3_ctor` runs one slot earlier in retail than here.
- *
- * Source shapes worth keeping (each measured):
- *   * a `switch` beats `if/else if` for the inner `case 10` sub-command (retail's compare chain is
- *     `cmpwi 0 / beq body0 / cmpwi 1 / beq body1 / b continue`);
- *   * a branch's polarity follows its textual order - retail emits the *then* block first, so inner
- *     `case 0` is `if (stack_0x961[1] == 0) fn_8013AB6C(); else fn_801408B4();`;
- *   * do not cache a field in a local where retail re-reads it per use: `case 2`'s two
- *     `table_0x9A4 != NULL` blocks (and the `else key = 0;` shape) each reload +0x9A4;
- *   * the local *declaration order* drives MWCC's callee-saved assignment: the order below
- *     (finished, aborted, roll, save380..383, save384, save424, seeded, frames, flag, byte, count, len,
- *     i) is retail's r31, r30, r29, r28..r24, r23, r22, r21, r20, r19 and was worth 99.06 -> 99.23 by
- *     itself;
- *   * a counter declared inside its loop (not at function scope) keeps a callee-saved register free;
- *   * the work's saved-command array is 7 records (0x9AC..0x9E4): `case 0x03`'s flag is at +0x9E4.
+/* enemy/fn_8013ACC4.cpp - the enemy user-data command interpreter: `fn_8013ACC4` runs one program (the byte stream
+ *   at `work->stream_0x958`) through the 256-entry `jumptable_805A15D0`, dispatching each command to its handler in
+ *   `enemy/em_kind.cpp`; `fn_8013BDE4` is the stream reader its neighbours call and `fn_8013BDC8` the 8-byte record
+ *   copier that saves and restores `recs_0x9AC` across a state switch.
+ * RANGE. .text 0x8013ACC4-0x8013BE60 (3 functions); .data 0x805A15A0-0x805A19D0, extab, extabindex.  Cases
+ *   0x00-0x6C call one handler each, 0x10 and 0xFF share the second `switch` over the interpreter state
+ *   `field_0x95C` (`jumptable_805A15A0`, 12 entries), 0x39 is empty and 0x6D-0xFE are the default.
+ * NAMES. The map stem; the dump answers only `zz_` placeholders for the three symbols.
+ * RESIDUALS. Every row is written.
+ *  - `fn_8013ACC4`: retail keeps the loop constants 0/1 in r15/r16 (ours r16/r15) and the copiers' index in r14,
+ *    which hoists the jump-table base out of the loop; retail's `continue` edges branch to the loop test, ours to the
+ *    loop head (the exit test at the top of `for (;;)` scores lower and grows `.text` by 8 B); the `field_0x95C` range
+ *    probe is `subi` + `cmplwi` in retail, a two-sided compare chain in ours; `bl VEC3_ctor` runs one slot earlier
+ *    in retail.
+ *   flipcheck: `.text` is laid out in the source's definition order, not the address order (the three functions sit
+ *   at other addresses); extab/extabindex follow from it.
+ * SHAPES. `#pragma peephole off` over the unit; a `switch` for the inner `case 10` sub-command; each branch's then
+ *   block first (`if (stack_0x961[1] == 0) fn_8013AB6C(); else fn_801408B4();`); `case 2` re-reads +0x9A4 in each
+ *   block; the locals' declaration order (finished, aborted, roll, save380..383, save384, save424, seeded, frames,
+ *   flag, byte, count, len, i) is retail's r31..r19; a counter declared inside its loop keeps a saved register
+ *   free; `EmWork` is a view because `enemy/ENEMY_WORK.h` types +0x424, +0x958, +0x95F/+0x999/+0x99B and +0x9A4
+ *   differently from how this range uses them.
  */
 
 #include "types.h"
@@ -79,11 +28,8 @@
 #include "stage/niku_find.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
-/* One scoped pragma, measured on this unit's own command line: with the -O3 peephole MWCC fuses the
- * interpreter's record index into `clrlslwi` (0x8013AE34's `clrlwi`+`slwi` pair) and folds the
- * `switch (work->field_0x95C)` range test into a two-sided compare chain; retail keeps both unfused.
- * with: fn_8013ACC4 99.23 / fn_8013BDE4 100.00 / fn_8013BDC8 100.00;
- * without: fn_8013ACC4 98.69.  No other symbol moves. */
+/* With the peephole pass on, MWCC fuses the record index's `clrlwi` + `slwi` (0x8013AE34) into `clrlslwi`;
+ * retail keeps the pair (measured in docs/enemy.md). */
 #pragma peephole off
 
 /* ----------------------------------------------------------------------------------------------- */
@@ -127,10 +73,8 @@ struct EmRunRec {
     /* +0x07 */ u8 unused_0x07;
 };
 
-/* The interpreter's own record: a lower bound of 0xB18 (the tail is the unit's `open_level_no` band,
- * which this range never touches).  See the unit header for why this is a view rather than
- * `enemy/ENEMY_WORK.h`.
- * size: 0xB18 */
+/* The interpreter's view of the enemy work record (the unit header says why it is not `enemy/ENEMY_WORK.h`).
+ * size: 0xB18 (lower bound: the range reads nothing past +0x9E4) */
 struct EmWork {
     /* +0x0000 */ u8 unused_0x0000[0x036C];
     /* +0x036C */ nw4r::math::VEC3 vec_0x36C;  /* the position `copyVec3` snapshots with the state */
@@ -191,7 +135,7 @@ struct EmUserSave {
 /* Callees.  The map spells every one of them as a C symbol, so the whole set - this unit's own three */
 /* entry points included - sits in one `extern "C"` block: without it this C++ front-end would mangle */
 /* every name and objdiff would pair nothing (playbook 42, and the trap              */
-/* `enemy/fn_8013F764.cpp` documents).  They are plain prototypes rather than `extern` declarations  */
+/* `enemy/em_kind.cpp` documents).  They are plain prototypes rather than `extern` declarations  */
 /* (the band's interim home for another unit's symbol: rule 2 keys on the `extern` keyword, and these */
 /* are views of the arity this range's own call sites prove - a handler this range reads `r3` from    */
 /* is declared to return `s16` even where its owner's reconstruction calls it `void`).               */
@@ -208,13 +152,11 @@ void fn_8013AB6C(EmWork* self);
 void fn_8013AAC4(EmWork* self);
 void fn_8013817C(EmWork* self);
 
-/* This unit's own entry points.  The map spells them as C symbols, so they are `extern "C"` here and at
- * their definitions - without it this C++ front-end would mangle them and objdiff would pair nothing
- * (the same trap `enemy/fn_8013F764.cpp` documents).  `fn_8013BDE4` is declared in the owner's header
- * above (its neighbours call it); `fn_8013BDC8` is internal and stays here. */
+/* This unit's own entry points, `extern "C"` for the map's plain names; `fn_8013BDE4` is declared in this unit's
+ * header (its neighbours call it). */
 extern "C" void fn_8013BDC8(EmSaveRec* dst, EmSaveRec* src);
 
-/* `enemy/fn_8013BE60.c` and `enemy/fn_8013F764.cpp` - the per-command handlers.  The `s16` group
+/* `enemy/em_kind.cpp` and `enemy/em_kind.cpp` - the per-command handlers.  The `s16` group
  * advances the stream cursor by the delta it returns. */
 s16 fn_8013C794(EmWork* self, u8* in, u32 value);
 s16 fn_8013CBE4(EmWork* self, u8* in);
@@ -336,16 +278,14 @@ u32 em_status_set(EmWork* self, u32 kind);
 void em_state_refresh(EmWork* self);
 void fn_80140AF8(EmWork* self, u32 a, u8 b);
 
-/* the stream readers `enemy/fn_8013F764.cpp` owns */
+/* the stream readers `enemy/em_kind.cpp` owns */
 u8 fn_80140768(u8* in);
 s16 fn_80140778(u8* in, u8 code, u8 mode);
 
 
 } /* extern "C" */
 
-/* The one mangled callee.  Declared as the C++ function it is (outside the `extern "C"` block, with no
- * mangled spelling of its own): the front-end emits the map's `ran_suu__Fl` from `u16 ran_suu(long)`
- * (rule 9). */
+/* The one mangled callee, declared at C++ scope so the front-end emits the map's `ran_suu__Fl`. */
 s32 ran_suu(long index);
 
 /* ----------------------------------------------------------------------------------------------- */

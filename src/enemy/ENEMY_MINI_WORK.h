@@ -1,6 +1,5 @@
-/* The small per-enemy work record `em_get_unique_work` hands back through its third parameter (the map
- * spells the type `_ENEMY_MINI_WORK` in that symbol's mangling).  Only the bytes the enemy-control net sync
- * reads are named; its extent is not measured.
+/* The small per-enemy work record `em_get_unique_work` hands back through its third parameter (`_ENEMY_MINI_WORK` in
+ * that symbol's mangling); only the bytes the net sync reads are named.
  * size: 0x1D (measured minimum: the highest byte any reader names is +0x1C; the true extent is unmeasured) */
 #ifndef MHTRI_ENEMY_ENEMY_MINI_WORK_H
 #define MHTRI_ENEMY_ENEMY_MINI_WORK_H
