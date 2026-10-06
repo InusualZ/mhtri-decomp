@@ -17,6 +17,11 @@ u32 fn_800628B4(void *self);               /* 0x800628B4 - `*(u32*)self != 0` */
 void *fn_800628A4(void *self);             /* 0x800628A4 - loads the word at +0x0 of `self` */
 
 
+/* The animation type-name records (`.rodata`: a length word, then the NUL-terminated name) this unit's type-info
+ * members read; they sit in this unit's range (0x8056F500-0x8056F550). */
+extern u8 anm_typename_AnmObjChrNode[];   /* 0x8056F510 - "AnmObjChrNode" */
+extern u8 anm_typename_AnmObjChrBlend[];  /* 0x8056F524 - "AnmObjChrBlend" */
+
 /* The name-record store helper (0x800638B8) `g3d/fn_800680CC.cpp` and `g3d/g3d_scnmdl.cpp` also call. */
 const u8 **type_obj_set_name(const u8 **out, const u8 *v); /* stores `v` through `out` and returns `out` */
 

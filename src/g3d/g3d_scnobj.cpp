@@ -1,10 +1,14 @@
 /*
  * g3d/g3d_scnobj.cpp - nw4r g3d `ScnObj` base object and its `ScnLeaf`/`ScnGroup` subclasses.
- * RANGE. .text 0x800813B8-0x800827E4 (36 functions); extab, extabindex, .data 0x8058F3D8-0x8058F530 (opens on
- *   "g3d_scnobj.cpp"; the `!GetParent()` assert and jumptable_8058F40C/jumptable_8058F434), .sdata2
- *   0x80795E64-0x80795E68.  Both edges are tudiscover's weak cuts and `.data` fragment boundaries; the
- *   0x80082668-0x800827E4 tail is here because the run-time type members read the ScnObj/ScnLeaf/ScnGroup
- *   name records (scn_typename_ScnObj/_ScnLeaf/_ScnGroup).
+ * RANGE. .text 0x80081188-0x800827E4 (39 functions); extab, extabindex, .rodata 0x8056F6A0-0x8056F6D0 (the
+ *   ScnObj/ScnLeaf/ScnGroup type-name records), .data 0x8058F3D8-0x8058F530 (opens on "g3d_scnobj.cpp"; the
+ *   `!GetParent()` assert and jumptable_8058F40C/jumptable_8058F434), .sbss 0x807948E8-0x807948F0
+ *   (scnobj_culling_frustum), .sdata2 0x80795E60-0x80795E68.  The left edge 0x80081188 is ScnObj::CalcWorldMtx,
+ *   the head of the TU (ScnObj::CalcViewMtx and the constructor, which stores this unit's ScnObj vtable and reads the
+ *   `.sdata2` word 0x80795E60, follow it); the right edge and the `.data` edges are tudiscover's weak cuts and
+ *   fragment boundaries; the 0x80082668-0x800827E4 tail is here because the run-time type members read the
+ *   ScnObj/ScnLeaf/ScnGroup name records (scn_typename_ScnObj/_ScnLeaf/_ScnGroup), which `g3d/fn_80075DCC.cpp`'s
+ *   GetTypeObjStatic members read too.
  * NAMES. The members of ScnObj, ScnLeaf, ScnGroup, IScnObjCallback and IScnObjGather are nw4r's: the three vtables
  *   give the slot order, the asserts name the file, and the map rows carry the compiler's manglings.
  *   scn_typename_ScnObj/_ScnLeaf/_ScnGroup are GUESSES (the `.rodata` records by their strings); scnobj_culling_frustum
@@ -13,18 +17,18 @@
  *   type_obj_set_name_scngroup are GUESSES (the type-name store copies of `g3d/fn_80075DCC.cpp` the ScnLeaf and
  *   ScnGroup type members call); G3dProcGatherScnObj, G3dProcCalcWorld, G3dProcCalcMat and G3dProcCalcView are
  *   GUESSES (the per-pass ScnGroup members DefG3dProcScnGroup dispatches to).
- * RESIDUALS. Unwritten: 0x8008147C-0x800814C0 (IScnObjCallback's destructor: defining it would emit the interface's
+ * RESIDUALS. Unwritten: 0x80081260-0x800813B8 (the ScnObj constructor), 0x8008147C-0x800814C0 (IScnObjCallback's destructor: defining it would emit the interface's
  *   vtable here, which the target object does not carry) and 0x80081804-0x80081838 (the AABB copy assignment
  *   retail emits out of line; `nw4r::math::AABB` is a plain struct, so MWCC copies inline).
  *   Partial: SetBoundingVolume and GetBoundingVolume (retail calls the out-of-line AABB copy `fn_80081804`; ours
  *   copies inline), Remove(u32) (retail keeps `idx * 4` in
  *   a saved register across the detach call), Insert (one `subf` scheduled later), DefG3dProcScnGroup (retail keeps
  *   a dead `b` after the CALC_VIEW case), and the rows whose only difference is a string relocation name.
- *   The ScnObj constructor (0x80081260), CalcWorldMtx (0x80081188) and CalcViewMtx (0x80081250) sit in
- *   `g3d/g3d_scnmdlsmpl.cpp`'s range and IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and the
- *   CheckCallback members in `g3d/fn_80075DCC.cpp`'s: the left seam is unmoved (nw4r-l1#110).  The three 0x10-byte
- *   name records at `.rodata` 0x8056F6A0 and scnobj_culling_frustum (`.sbss` 0x807948E8, defined here) are unclaimed
- *   (nw4r-l1#111), so the object's `.sbss` has no claim to land in yet.
+ *   The ScnObj constructor (0x80081260) is unwritten (its MTX34/AABB member arrays are built by out-of-line element
+ *   constructors the math types do not declare); IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and
+ *   the CheckCallback members sit in `g3d/fn_80075DCC.cpp`'s range.
+ *   flipcheck: `.rodata` (the three name records) is claimed and not emitted; `.sdata2` is 0x4 of 0x8 (the other word,
+ *   0x80795E60, is the unwritten constructor's).
  * SHAPES. `(int)mCallbackDeleteOption == 1` and `(u32)type < MTX_TYPE_MAX` reproduce retail's signed and unsigned
  *   compares; the destructors and CalcWorldMtx keep `#pragma peephole off` (retail's `extsh` and `clrlwi` + `cmpwi`).
  */
@@ -48,6 +52,36 @@ const nw4r::math::Frustum* scnobj_culling_frustum;
 /* ------------------------------------------------------------------------------------------------ */
 /* ScnObj                                                                                           */
 /* ------------------------------------------------------------------------------------------------ */
+
+/* 0x80081188 (0xC8): composes the world matrix from the parent's and the local one, and the world box; bit 0 of the
+ * parameter skips one pass. */
+#pragma peephole off
+void nw4r::g3d::ScnObj::CalcWorldMtx(const math::MTX34* pParent, u32* pParam)
+{
+    if (pParam != NULL && (*pParam & 1)) {
+        *pParam &= ~1;
+        return;
+    }
+    if (pParent != NULL) {
+        if (TestScnObjFlag(SCNOBJFLAG_MTX_LOCAL_IDENTITY)) {
+            mtx34_copy_ps(&mMtxArray[MTX_WORLD], pParent);
+        } else {
+            mtx34_concat(&mMtxArray[MTX_WORLD], pParent, &mMtxArray[MTX_LOCAL]);
+        }
+    } else {
+        mtx34_copy_ps(&mMtxArray[MTX_WORLD], &mMtxArray[MTX_LOCAL]);
+    }
+    if (TestScnObjFlag(SCNOBJFLAG_ENABLE_CULLING)) {
+        mAABB[BOUNDINGVOLUME_AABB_WORLD].Set(&mAABB[BOUNDINGVOLUME_AABB_LOCAL], &mMtxArray[MTX_WORLD]);
+    }
+}
+#pragma peephole on
+
+/* 0x80081250 (0x10): composes the view matrix from the camera and the world matrix. */
+void nw4r::g3d::ScnObj::CalcViewMtx(const math::MTX34* pCamera)
+{
+    mtx34_concat(&mMtxArray[MTX_VIEW], pCamera, &mMtxArray[MTX_WORLD]);
+}
 
 /* 0x800813B8 (0xC4): asserts the object is detached and deletes an owned callback. */
 #pragma peephole off

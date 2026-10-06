@@ -23,9 +23,11 @@ symedit.py rename <old> <new> [--dry-run] [--force] [--no-refs]
 symedit.py rename-batch <file> [--dry-run]       # lines: "old new" (# comments allowed)
 symedit.py merge-batch <file> [--dry-run] [--no-refs]   # lines: "merge <phantom> <previous> <size>",
                                                          # "fold <label> <object> <size>", "size <object> <size>"
+symedit.py split <row> <offset> <new-name> [--scope S] [--dry-run]   # the inverse of a merge: shrink <row> to <offset> bytes,
+                                                         # add <new-name> at address+offset with the remainder
 symedit.py --selftest                            # the checks, against temp fixtures only
 ```
-Subcommands: `find`, `show`, `at`, `range`, `refs`, `check`, `rename`, `rename-batch`, `merge-batch`.
+Subcommands: `find`, `show`, `at`, `range`, `refs`, `check`, `rename`, `rename-batch`, `merge-batch`, `split`.
 Flags: `--code-only`, `--count`, `--dry-run`, `--file`, `--force`, `--json`, `--limit`, `--no-refs`, `--roots`, `--section`, `--selftest`, `--type`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
@@ -74,9 +76,9 @@ Today's selftest: in-file `selftest()` (`--selftest`). The name rule: `tools/tes
 `test_template_and_local_names` (seven real names valid and renamed and parsed back, six malformed ones refused,
 `name_pattern` on `@`/template names; the old `[A-Za-z_][\w.$]*` rule fails it, a `\b` pattern fails 1). The data
 merges: `test_data_merges` (patPacketTable's end fold, an inner label, a resize, the no-op, the refusals, the batch-file
-grammar); a resize that plans nothing fails 5.
+grammar); a resize that plans nothing fails 5. The split: `test_split_plans` (the shrunk row and the remainder row in both line endings, scope inherited/replaced, the re-apply, eight refusals).
 Target: `tools/tests/symbols/test_symedit.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps
 
-the proxy cannot resize or delete a symbol except through `merge-batch`
+the proxy cannot resize or delete a symbol except through `merge-batch` (and `split` shrinks the row it cuts)

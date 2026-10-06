@@ -11,12 +11,10 @@
  *   defined where their range is until the seam is re-drawn.
  * FLAGS. `cflags_main`; `#pragma peephole off` before the includes, `#pragma dont_inline on` at the end (the inline
  *   destructor calls its base out of line, see there).
- * NAMES. GUESS: `ef_min_float` (0x800BF5B0) from its body; the assert names (`pm`, `pm->mResource`, `&ed`) are
+ * NAMES. GUESS: `ef_min_float` (0x800BF5B0) from its body; `ef_line_gx_position3f` (the 0x14 FIFO writer at +0x10 of
+ *   `fn_800BF58C`, reached by a tail call); the assert names (`pm`, `pm->mResource`, `&ed`) are
  *   NintendoWare's.
- * RESIDUALS. 1 partial row: `fn_800BF58C` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the
- *   three `lfs` and the three FIFO stores and loads into f1-f3 (ours f0-f2): the row is two functions, a tail call
- *   into a 0x14 static FIFO writer at +0x10 that the map folds into it (reproduced byte for byte with a
- *   `dont_inline` static helper; the map split is request nw4r-l3#21).
+ * RESIDUALS. Every row is written and every function is at 100 %.
  *   flipcheck: `.data` claimed, not emitted; `.sdata` (the width clamp) and `.sdata2` (the literals' pool) are emitted
  *   with their bytes equal, 0x4 short of the claim each (the trailing pad the next object's alignment adds).
  *   `DrawPointStrategy` (constructor): the empty body is the whole source - the compiler
@@ -210,11 +208,18 @@ u32 fn_800BF578(u32 value) {
     return (value & 1) != 0;
 }
 
-/* Writes a position to the GX FIFO. */
+static void ef_line_gx_position3f(f32 x, f32 y, f32 z);
+
+/* Writes a position to the GX FIFO through the FIFO writer that follows it. */
 void fn_800BF58C(const VEC3* v) {
     f32 x = v->x;
     f32 y = v->y;
     f32 z = v->z;
+    ef_line_gx_position3f(x, y, z);
+}
+
+/* Writes three f32 to the GX FIFO. */
+static void ef_line_gx_position3f(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
     GXWGFifo.f32 = z;

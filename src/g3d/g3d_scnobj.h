@@ -19,6 +19,15 @@
 #include "nw4r/math.h"       /* nw4r::math::MTX34 / VEC3 */
 #include "nw4r/fn_805012C4.h" /* nw4r::math::AABB / Frustum, owner nw4r/fn_805012C4.cpp (rule 2) */
 
+/* The "ScnObj", "ScnLeaf" and "ScnGroup" type-name records (`.rodata` 0x8056F6A0/0x8056F6B0/0x8056F6C0, this unit's
+ * claim: a length word, then the NUL-terminated name) the scene objects' run-time type members read, here and in
+ * `g3d/fn_80075DCC.cpp`'s GetTypeObjStatic members. */
+extern "C" {
+extern u8 scn_typename_ScnObj[];
+extern u8 scn_typename_ScnLeaf[];
+extern u8 scn_typename_ScnGroup[];
+}
+
 namespace nw4r {
 namespace g3d {
 
@@ -233,5 +242,9 @@ public:
 
 }  // namespace g3d
 }  // namespace nw4r
+
+/* The frustum the gather pass culls against while it is set; `.sbss` 0x807948E8, this unit's claim, read by
+ * `g3d/g3d_scnroot.cpp`'s gather. */
+extern const nw4r::math::Frustum* scnobj_culling_frustum;
 
 #endif /* MHTRI_G3D_G3D_SCNOBJ_H */

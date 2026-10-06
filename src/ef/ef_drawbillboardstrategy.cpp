@@ -29,7 +29,8 @@
  *   GUESS: `ef_billboard_gx_position`, `ef_billboard_vec2_set`, `ef_directional_gx_end`, `ef_directional_gx_u8`,
  *   GUESS: `ef_directional_tex_flag`, `ef_directional_gx_position`, `ef_billboard_write_quad`,
  *   GUESS: `ef_directional_write_quad_center`, `ef_billboard_ahead_younger`, `ef_billboard_ahead_neighbours`,
- *   GUESS: `ef_billboard_setup_gx`, `ef_directional_setup_gx`, `ef_directional_draw_world`,
+ *   GUESS: `ef_billboard_gx_position3f` and `ef_directional_gx_position3f` (the 0x14 FIFO writers at +0x10 of the
+ *   GUESS: two `_gx_position` rows, reached by a tail call), `ef_billboard_setup_gx`, `ef_directional_setup_gx`, `ef_directional_draw_world`,
  *   GUESS: `ef_directional_local_mtx`, `ef_directional_rotate_mtx`, `ef_directional_draw_view`,
  *   GUESS: `ef_directional_write_quad`, `ef_directional_draw_mode`.
  * SHAPES. The quad writers take the floats first and the pivot and flags last (the caller then sets r6/r7 after the
@@ -41,15 +42,10 @@
  *   expression form `(void)(ok || (Panic(...), 0))`, whose value leaves retail's dead `li r0,0; cmpwi r0,0`
  *   (playbook 103).
  * RESIDUALS. Every row is written.  The source order differs from retail's, so `.text` and the extab and extabindex
- *   records run in another order.  9 partial rows:
+ *   records run in another order.  7 partial rows:
  *  - `ef_billboard_normal_quad` (0x800BA1E0): the `register` parameters the asm block needs keep the roll branch's
  *    temporaries out of f21-f31, so our frame saves f15-f20 too (0x1B0 against 0x150) and the roll branch's
  *    registers differ;
- *  - `ef_billboard_gx_position`, `ef_directional_gx_position` (ours 0x20 of 0x24): retail has a `b` to the next
- *    instruction between the three `lfs` and the FIFO base and loads into f1-f3 (an inline helper does not
- *    reproduce it; `ef/ef_drawlinestrategy.cpp`'s `fn_800BF58C` is the same):
- *    the row is two functions, a tail call into a 0x14 static FIFO writer at +0x10 that the map folds into it
- *    (reproduced byte for byte with a `dont_inline` static helper; the map split is request nw4r-l3#21);
  *  - the two `Draw`s (0x800B9A80, 0x800BC1B4), both `GetCalcAheadFunc`s, `ef_directional_draw_world` and
  *    `ef_directional_draw_view`: the `lwz r6, 0x24(pm)` (0x20 for the manager-EM assert) of a member assert is
  *    scheduled before the `li` flags where retail loads it after (0x800BC1B4 also compares `cmplwi` where retail
@@ -795,11 +791,18 @@ int ef_billboard_tex_flag(u32 value) {
     return (value & 1) != 0;
 }
 
-/* Writes a vector to the pipe. */
+static void ef_billboard_gx_position3f(f32 x, f32 y, f32 z);
+
+/* Writes a vector to the pipe through the FIFO writer that follows it. */
 void ef_billboard_gx_position(Vec* v) {
     f32 x = v->x;
     f32 y = v->y;
     f32 z = v->z;
+    ef_billboard_gx_position3f(x, y, z);
+}
+
+/* Writes three f32 to the pipe. */
+static void ef_billboard_gx_position3f(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
     GXWGFifo.f32 = z;
@@ -824,11 +827,18 @@ int ef_directional_tex_flag(u32 value) {
     return (value & 1) != 0;
 }
 
-/* Writes a vector to the pipe (second copy). */
+static void ef_directional_gx_position3f(f32 x, f32 y, f32 z);
+
+/* Writes a vector to the pipe through the FIFO writer that follows it (second copy). */
 void ef_directional_gx_position(Vec* v) {
     f32 x = v->x;
     f32 y = v->y;
     f32 z = v->z;
+    ef_directional_gx_position3f(x, y, z);
+}
+
+/* Writes three f32 to the pipe (second copy). */
+static void ef_directional_gx_position3f(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
     GXWGFifo.f32 = z;

@@ -2,7 +2,7 @@
  * g3d/g3d_anmchr.cpp - nw4r g3d character animation (`g3d_anmchr.cpp`), led by the g3d work-memory accessors,
  *   with small constant/forwarder helpers.
  * RANGE. .text 0x8005CED0-0x80063E60 (149 functions); extab 0x800073C8-0x8000776C, extabindex
- *   0x8001F71C-0x8001FBFC, .rodata 0x8056F500-0x8056F510 (the "AnmObjChr" name record, read only here), .data 0x8058B410-0x8058C118, .bss 0x8066AE80-0x80682E80, .sdata 0x80791138-0x80791158,
+ *   0x8001F71C-0x8001FBFC, .rodata 0x8056F500-0x8056F550 (the "AnmObjChr", "AnmObjChrNode", "AnmObjChrBlend" and "AnmObjChrRes" name records, read only here), .data 0x8058B410-0x8058C118, .bss 0x8066AE80-0x80682E80, .sdata 0x80791138-0x80791158,
  *   .sdata2 0x80795D48-0x80795D68.  The asserts from 0x8005CF10 on pass "g3d_anmchr.cpp" (.data 0x8058B410).
  * RANGE. Left edge 0x8005CED0: the font/debug-print console before it is `font/flfnt.cpp` (its header has the
  *   seam evidence).  fn_8005CED0-fn_8005CF04 return the 0x18000-byte `.bss` buffer 0x8066AE80-0x80682E80, read
@@ -18,10 +18,13 @@
  *   the slot order, and the map rows carry the compiler's manglings.
  *   GUESS: `type_obj_set_name` (0x800638B8: stores a type-name record pointer through `out`, the weak type-info
  *   helper) and `anm_typename_AnmObj`/`_AnmObjChrNode`/`_AnmObjChrBlend`/`_G3dObj` (the `.rodata` records by their strings).
+ *   GUESS: `Alloc__Q34nw4r3g3d6G3dObjFP12MEMAllocatorUl` (0x800604D4, `b` to the next word: G3dObj's allocation entry the
+ *   callers pass (heap, size) to) and `g3d_obj_alloc_tail` (0x800604D8, the 4-byte local that tail-calls
+ *   MEMAllocFromAllocator); the map row was one 8-byte `fn_800604D4` before.
  * RESIDUALS. 42 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
  *   lists them), the largest fn_80060658 (AnmObjChrBlend::GetResult, 0x8D0), fn_80061424 (0x474), fn_800600C8
  *   (AnmObjChrBlend::Construct, 0x404), fn_80062980 (0x384) and fn_80062E50 (0x320).  AnmObjChrNode::SetFrame and
- *   SetUpdateRate (0x8005F054, 0x8005F380) wait on a name for `MSL_C/alloc.cpp`'s fn_8045B9D8 (__fpclassifyf);
+ *   SetUpdateRate (0x8005F054, 0x8005F380) assert on `MSL_C/alloc.cpp`'s __fpclassifyf;
  *   AnmObj::~AnmObj (dtor_8005D384) is written but keeps its stem while `g3d/fn_800680CC.cpp` calls it as a free
  *   function.  Partial: fn_8005D27C, fn_800604DC, fn_8006244C, fn_80062824, fn_800628AC, and the members whose only
  *   difference is a relocation name (the strings, the AnmObj destructor's stem).
@@ -29,8 +32,9 @@
  *   operator delete is a bare `blr`; the compiler emits the constructors' base calls, vtable stores and member
  *   initialisers and the destructors' base calls).  The G3dObj vtable is emitted here (its first virtual,
  *   IsDerivedFrom, is defined here) while retail keeps it in `g3d/fn_80075DCC.cpp`'s `.data`.
- *   The type-name records the 0x80063888-0x80063E60 functions read (`.rodata` 0x8056F500-0x8056F578) sit in
- *   `g3d/fn_80063888.cpp`'s `.rodata` claim (0x8056F510-0x8056F578): their seam is unmoved.
+ *   The AnmObj type-name record (0x8056F568, read only by AnmObj::GetTypeObj and GetTypeObjStatic here) sits in
+ *   `g3d/fn_80063888.cpp`'s `.rodata` claim (0x8056F550-0x8056F578) beside the AnmObjMatClr record (0x8056F550, read
+ *   only by that unit's fn_80064868): the two owners interleave there, which one seam cannot express.
  *   flipcheck: `.text` 0xB38 of 0x6F90; extab 0x110 of 0x3A4; extabindex 0x198 of 0x4E0; `.rodata`, `.data`, `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_80791148`,
  *     `lbl_807911E8`, `lbl_80791168`, `lbl_80791150`.

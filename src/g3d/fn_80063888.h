@@ -26,10 +26,8 @@ s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */
 nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::PostureInfo *self);
 #endif
 
-/* The animation type-name records (`.rodata`: a length word, then the NUL-terminated name) `g3d/g3d_anmchr.cpp`'s
- * type-info members read. */
-extern u8 anm_typename_AnmObjChrNode[];   /* 0x8056F510 - "AnmObjChrNode" */
-extern u8 anm_typename_AnmObjChrBlend[];  /* 0x8056F524 - "AnmObjChrBlend" */
+/* The animation type-name record (`.rodata`: a length word, then the NUL-terminated name) `g3d/g3d_anmchr.cpp`'s
+ * type-info members read; it sits in this unit's range (the seam is 0x8056F550). */
 extern u8 anm_typename_AnmObj[];          /* 0x8056F568 - "AnmObj" */
 
 /* The 3-float clamp `g3d/g3d_resanmchr.cpp`'s frame walkers call. */
