@@ -1000,7 +1000,7 @@ enemy/em_motion_update.cpp:
 	extabindex  start:0x80027AE0 end:0x80027B28
 	.text       start:0x8013791C end:0x80138074
 
-enemy/fn_80138074.c:
+enemy/fn_80138074.cpp:
 	extab       start:0x8000D2D4 end:0x8000D414
 	extabindex  start:0x80027B28 end:0x80027D08
 	.text       start:0x80138074 end:0x8013ACC4

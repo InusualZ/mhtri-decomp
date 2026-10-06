@@ -1,4 +1,4 @@
-/* enemy/fn_8013ACC4.cpp - the enemy user-data command interpreter: `fn_8013ACC4` runs one program (the byte stream
+/* enemy/fn_8013ACC4.cpp - the enemy user-data command interpreter: `em_userdata_script_run` runs one program (the byte stream
  *   at `work->stream_0x958`) through the 256-entry `jumptable_805A15D0`, dispatching each command to its handler in
  *   `enemy/em_kind.cpp`; `fn_8013BDE4` is the stream reader its neighbours call and `fn_8013BDC8` the 8-byte record
  *   copier that saves and restores `recs_0x9AC` across a state switch.
@@ -6,8 +6,9 @@
  *   0x00-0x6C call one handler each, 0x10 and 0xFF share the second `switch` over the interpreter state
  *   `field_0x95C` (`jumptable_805A15A0`, 12 entries), 0x39 is empty and 0x6D-0xFE are the default.
  * NAMES. The map stem; the dump answers only `zz_` placeholders for the three symbols.
+ *   em_userdata_script_run is a GUESS (0x8013ACC4: it interprets the user-data command stream through fn_8013BDE4).
  * RESIDUALS. Every row is written.
- *  - `fn_8013ACC4`: retail keeps the loop constants 0/1 in r15/r16 (ours r16/r15) and the copiers' index in r14,
+ *  - `em_userdata_script_run`: retail keeps the loop constants 0/1 in r15/r16 (ours r16/r15) and the copiers' index in r14,
  *    which hoists the jump-table base out of the loop; retail's `continue` edges branch to the loop test, ours to the
  *    loop head (the exit test at the top of `for (;;)` scores lower and grows `.text` by 8 B); the `field_0x95C` range
  *    probe is `subi` + `cmplwi` in retail, a two-sided compare chain in ours; `bl VEC3_ctor` runs one slot earlier
@@ -15,7 +16,7 @@
  *   flipcheck: `.text` is laid out in the source's definition order, not the address order (the three functions sit
  *   at other addresses); extab/extabindex follow from it.
  * SHAPES. `#pragma peephole off` over the unit; a `switch` for the inner `case 10` sub-command; each branch's then
- *   block first (`if (stack_0x961[1] == 0) fn_8013AB6C(); else fn_801408B4();`); `case 2` re-reads +0x9A4 in each
+ *   block first (`if (stack_0x961[1] == 0) em_userdata_state_reenter_alt(); else fn_801408B4();`); `case 2` re-reads +0x9A4 in each
  *   block; the locals' declaration order (finished, aborted, roll, save380..383, save384, save424, seeded, frames,
  *   flag, byte, count, len, i) is retail's r31..r19; a counter declared inside its loop keeps a saved register
  *   free; `EmWork` is a view because `enemy/ENEMY_WORK.h` types +0x424, +0x958, +0x95F/+0x999/+0x99B and +0x9A4
@@ -25,6 +26,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/fn_8013ACC4.h"
+#include "enemy/fn_80138074.h" /* the user-data accessors this interpreter drives (rule 2) */
 #include "stage/niku_find.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
@@ -38,13 +40,13 @@
 /* ----------------------------------------------------------------------------------------------- */
 
 /* size: 0x0C
- * One record of the table `fn_8013AC08` walks (`work->table_0x9A4->recs_0x04[index]`, stride 0xC). */
+ * One record of the table `em_userdata_record_find_back` walks (`work->table_0x9A4->recs_0x04[index]`, stride 0xC). */
 struct EmStateRec {
     /* +0x00 */ u8 unused_0x00[0x08];
     /* +0x08 */ u8 field_0x08; /* the sub-command `fn_8013AB74` re-enters the state with */
     /* +0x09 */ u8 pad_0x09;
     /* +0x0A */ u8 pad_0x0A;
-    /* +0x0B */ u8 field_0x0B; /* the match key `fn_8013AC08` compares its second argument against */
+    /* +0x0B */ u8 field_0x0B; /* the match key `em_userdata_record_find_back` compares its second argument against */
 };
 
 /* size: 0x0C - an approximation: only +0x04 (the record array) is read by this range, and +0x00 is
@@ -81,7 +83,7 @@ struct EmWork {
     /* +0x0378 */ u8 unused_0x0378[0x0380 - 0x0378];
     /* +0x0380 */ u8 field_0x380;  /* the state snapshot's first byte (`fn_8013A0xx` writes it) */
     /* +0x0381 */ u8 field_0x381;  /* the state snapshot's second byte */
-    /* +0x0382 */ u8 field_0x382;  /* the state snapshot's third byte; `fn_8013AC08`'s record index */
+    /* +0x0382 */ u8 field_0x382;  /* the state snapshot's third byte; `em_userdata_record_find_back`'s record index */
     /* +0x0383 */ u8 field_0x383;  /* the state snapshot's fourth byte */
     /* +0x0384 */ f32 field_0x384; /* the state snapshot's float */
     /* +0x0388 */ u8 unused_0x0388[0x038E - 0x0388];
@@ -113,7 +115,7 @@ struct EmWork {
     /* +0x099A */ u8 unused_0x099A;
     /* +0x099B */ u8 field_0x99B;    /* set by `case 0x5D` */
     /* +0x099C */ u8 unused_0x099C[0x09A4 - 0x099C];
-    /* +0x09A4 */ EmStateTable* table_0x9A4; /* the record table `fn_8013AC08` walks */
+    /* +0x09A4 */ EmStateTable* table_0x9A4; /* the record table `em_userdata_record_find_back` walks */
     /* +0x09A8 */ u8 count_0x9A8;    /* the count the state switch saves and restores */
     /* +0x09A9 */ u8 unused_0x09A9[0x09AC - 0x09A9];
     /* +0x09AC */ EmSaveRec recs_0x9AC[7]; /* the 8-byte commands the state switch saves (the
@@ -141,16 +143,10 @@ struct EmUserSave {
 /* is declared to return `s16` even where its owner's reconstruction calls it `void`).               */
 /* ----------------------------------------------------------------------------------------------- */
 
-extern "C" {
+/* The owner header spells the work block `struct _ENEMY_WORK`; this unit's `EmWork` is a view of the same block. */
+#define EM_ENEMY_WORK(self) ((struct _ENEMY_WORK*)(self))
 
-/* `enemy/fn_80138074.c` - the user-data accessor this interpreter drives */
-u32 fn_8013A900(EmWork* self);
-u32 fn_8013A884(EmWork* self, s32 value);
-u32 fn_8013AB74(EmWork* self, u32 state, u32 sub);
-void fn_8013AACC(EmWork* self, u8 arg);
-void fn_8013AB6C(EmWork* self);
-void fn_8013AAC4(EmWork* self);
-void fn_8013817C(EmWork* self);
+extern "C" {
 
 /* This unit's own entry points, `extern "C"` for the map's plain names; `fn_8013BDE4` is declared in this unit's
  * header (its neighbours call it). */
@@ -265,8 +261,6 @@ u32 fn_8013C254(EmWork* self);
 
 /* the rest of the enemy band */
 u32 fn_80130134(EmWork* self, u32 value);
-u32 fn_8013AC00(EmWork* self, u16 index); /* `ran_suu(1)`'s tail: the state's next roll */
-u8 fn_8013AC08(EmWork* self, u8 index, u8 key);
 void fn_8012A254(EmWork* self, u32 index);
 void fn_8012B380(EmWork* self, u32 a, u32 b, u8 c);
 void em_target_pos_set(EmWork* self, s32 mode);
@@ -315,7 +309,7 @@ extern "C" void fn_8013BDE4(u8** in, u32 id, s16* out) {
 /* 0x8013ACC4 - the interpreter.                                                                      */
 /* ----------------------------------------------------------------------------------------------- */
 
-extern "C" u32 fn_8013ACC4(EmWork* self) {
+extern "C" u32 em_userdata_script_run(EmWork* self) {
     EmUserSave save;
     u32 finished = 0;
     u32 aborted = 0;
@@ -341,8 +335,8 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
         return 0;
     }
 
-    if ((u8)fn_8013A900(self) != 0xc && fn_8013A884(self, 0xc) == 1 && fn_80130134(self, 0) == 1) {
-        fn_8013AB74(self, 0xc, 0);
+    if ((u8)fn_8013A900(EM_ENEMY_WORK(self)) != 0xc && fn_8013A884(EM_ENEMY_WORK(self), 0xc) == 1 && fn_80130134(self, 0) == 1) {
+        fn_8013AB74(EM_ENEMY_WORK(self), 0xc, 0);
     }
 
     roll = ran_suu(1);
@@ -384,33 +378,33 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
     for (;;) {
         frames++;
         if ((s16)frames > 0x3e8) {
-            fn_8013AAC4(self);
+            fn_8013AAC4(EM_ENEMY_WORK(self));
         }
 
         if (self->stream_0x958 == (u8*)self->field_0x954[0][0]) {
             if (self->field_0x916 > 0) {
-                if (fn_8013A884(self, 8) == 1) {
-                    fn_8013AB74(self, 8, 0);
+                if (fn_8013A884(EM_ENEMY_WORK(self), 8) == 1) {
+                    fn_8013AB74(EM_ENEMY_WORK(self), 8, 0);
                 }
-            } else if (self->field_0x89F == 3 && fn_8013A884(self, 9) == 1) {
-                fn_8013AB74(self, 9, 0);
+            } else if (self->field_0x89F == 3 && fn_8013A884(EM_ENEMY_WORK(self), 9) == 1) {
+                fn_8013AB74(EM_ENEMY_WORK(self), 9, 0);
             } else if (seeded == 0) {
                 fn_8012A254(self, (u16)roll);
-                roll = fn_8013AC00(self, (u16)roll);
+                roll = em_userdata_roll(EM_ENEMY_WORK(self), (u16)roll);
                 seeded = 1;
             }
         }
 
         len = fn_80140768(self->stream_0x958);
         if ((u8)len == 0xff && self->stream_0x958[0] != 0xff) {
-            fn_8013AAC4(self);
+            fn_8013AAC4(EM_ENEMY_WORK(self));
             continue;
         }
 
         switch (*self->stream_0x958++) {
         case 0x00:
             if (self->field_0x79A != 0) {
-                fn_8013AACC(self, 1);
+                em_userdata_state_exit(EM_ENEMY_WORK(self), 1);
             }
             fn_8013C458(self, self->stream_0x958);
             finished = 1;
@@ -421,7 +415,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
             break;
         case 0x02:
             self->stream_0x958 += (s16)fn_8013C794(self, self->stream_0x958, (u16)roll);
-            roll = fn_8013AC00(self, (u16)roll);
+            roll = em_userdata_roll(EM_ENEMY_WORK(self), (u16)roll);
             break;
         case 0x03:
             fn_8013C7E0(self, self->stream_0x958);
@@ -454,7 +448,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
             self->stream_0x958 += (s16)fn_8013CCA8(self, self->stream_0x958);
             break;
         case 0x0D:
-            fn_8013AAC4(self);
+            fn_8013AAC4(EM_ENEMY_WORK(self));
             break;
         case 0x0E:
             self->stream_0x958 += (s16)fn_8013CCD0(self, self->stream_0x958);
@@ -516,7 +510,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
             break;
         case 0x22:
             self->stream_0x958 += (s16)fn_8013D8C8(self, self->stream_0x958, (u16)roll);
-            roll = fn_8013AC00(self, (u16)roll);
+            roll = em_userdata_roll(EM_ENEMY_WORK(self), (u16)roll);
             break;
         case 0x23:
             self->stream_0x958 += (s16)fn_8013D990(self, self->stream_0x958);
@@ -556,7 +550,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
             break;
         case 0x2F:
             if (self->field_0x79A != 0) {
-                fn_8013AACC(self, 1);
+                em_userdata_state_exit(EM_ENEMY_WORK(self), 1);
             }
             fn_8013E05C(self, self->stream_0x958);
             finished = 1;
@@ -567,7 +561,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
             break;
         case 0x31:
             if (self->field_0x79A != 0) {
-                fn_8013AACC(self, 1);
+                em_userdata_state_exit(EM_ENEMY_WORK(self), 1);
             }
             {
                 s16 n = fn_8013E06C(self, self->stream_0x958);
@@ -765,11 +759,11 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
         case 0xFF:
             switch (self->field_0x95C) {
             default:
-                fn_8013AAC4(self);
+                fn_8013AAC4(EM_ENEMY_WORK(self));
                 continue;
             case 0:
                 if (self->stack_0x961[1] == 0) {
-                    fn_8013AB6C(self);
+                    em_userdata_state_reenter_alt(EM_ENEMY_WORK(self));
                 } else {
                     fn_801408B4(self);
                 }
@@ -778,7 +772,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
                 self->field_0x999++;
                 if (self->field_0x999 >= 0xa || fn_8013C254(self) == 1) {
                     if (self->field_0x382 == 0) {
-                        fn_8013817C(self);
+                        em_userdata_motion_head_load(EM_ENEMY_WORK(self));
                     } else {
                         u8 key;
                         u8 v;
@@ -790,14 +784,14 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
                             key = 0;
                         }
                         self->field_0x382--;
-                        self->field_0x382 = fn_8013AC08(self, self->field_0x382, key);
+                        self->field_0x382 = em_userdata_record_find_back(EM_ENEMY_WORK(self), self->field_0x382, key);
                         if (self->table_0x9A4 != NULL) {
                             v = self->table_0x9A4->recs_0x04[self->field_0x382].field_0x08;
                         } else {
                             v = 0;
                         }
                         em_target_pos_set(self, 0);
-                        fn_8013AB74(self, self->field_0x95C, v);
+                        fn_8013AB74(EM_ENEMY_WORK(self), self->field_0x95C, v);
                     }
                 } else {
                     u8 key;
@@ -809,7 +803,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
                     } else {
                         key = 0;
                     }
-                    found = fn_8013AC08(self, self->field_0x382, key);
+                    found = em_userdata_record_find_back(EM_ENEMY_WORK(self), self->field_0x382, key);
                     v = self->field_0x95D;
                     if (found != self->field_0x382) {
                         self->field_0x382 = found;
@@ -817,7 +811,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
                             v = self->table_0x9A4->recs_0x04[found].field_0x08;
                         }
                     }
-                    fn_8013AB74(self, self->field_0x95C, v);
+                    fn_8013AB74(EM_ENEMY_WORK(self), self->field_0x95C, v);
                 }
                 continue;
             case 3:
@@ -844,7 +838,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
                         finished = 1;
                     }
                 } else {
-                    fn_8013AAC4(self);
+                    fn_8013AAC4(EM_ENEMY_WORK(self));
                 }
                 continue;
             case 1:
@@ -853,27 +847,27 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
             case 8:
                 if (self->field_0x95D == 0 && self->field_0x916 <= 0) {
                     self->field_0x95D = 1;
-                    fn_8013AB74(self, self->field_0x95C, 1);
+                    fn_8013AB74(EM_ENEMY_WORK(self), self->field_0x95C, 1);
                 } else {
-                    fn_8013AAC4(self);
+                    fn_8013AAC4(EM_ENEMY_WORK(self));
                 }
                 continue;
             case 9:
                 if (fn_8012EC3C(self) == 1) {
                     fn_801409C8(self);
                 }
-                fn_8013AAC4(self);
+                fn_8013AAC4(EM_ENEMY_WORK(self));
                 continue;
             case 10:
                 switch (self->field_0x95D) {
                 case 0:
                     if (niku_enemy_serial_matches(niku_find(self->field_0x381, self->field_0x382), (struct _ENEMY_WORK*)self) == 1) {
-                        fn_8013AB74(self, self->field_0x95C, 1);
+                        fn_8013AB74(EM_ENEMY_WORK(self), self->field_0x95C, 1);
                     } else {
                         EmRunRec* run = (EmRunRec*)fn_80130DF8(self);
 
                         if (run != NULL) {
-                            fn_8013AB74(self, 0xa, 0);
+                            fn_8013AB74(EM_ENEMY_WORK(self), 0xa, 0);
                             fn_8012B380(self, 7, run->field_0x05, run->field_0x06);
                             em_target_pos_set(self, 0);
                         } else {
