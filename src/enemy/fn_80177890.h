@@ -1,7 +1,5 @@
-/* The `enemy/fn_80177890.cpp` unit's cross-unit declarations (docs/plan.md 6.5 rule 2).
- *
- * `enemy/fn_80178378.cpp`'s master dispatcher tail-calls `fn_80177BA4`, which the owner defines as
- * `void fn_80177BA4(_ENEMY_WORK* self)` (its `state_sub` dispatcher).
+/* `enemy/em015_prog.cpp`'s `fn_80177BA4` (its `state_sub` dispatcher, `void (_ENEMY_WORK*)`), which the master
+ * dispatcher tail-calls.
  */
 #ifndef MHTRI_ENEMY_FN_80177890_H
 #define MHTRI_ENEMY_FN_80177890_H

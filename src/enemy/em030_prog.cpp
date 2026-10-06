@@ -1,104 +1,31 @@
-/* enemy/em030_prog.cpp - enemy 030 program
- *
- * `.text` 0x801B0010..0x801B4348, 48 functions written (the rest of the range is not decompiled yet).
- * Renamed from `fn_801B0010`: the unit's `.data` holds `em030_prog_tbl` (0x805B0FD0).
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `enemy/fn_801B0010.cpp` (kept for its notes and residuals): */
-/* enemy/fn_801B0010.cpp - the em030 (enemy #30) program translation unit.
- *
- * `.text` 0x801B0010..0x801B4458 (60 functions, 17480 B), extab 0x8000F54C..0x8000F6B4 (45 records),
- * extabindex 0x8002AEDC..0x8002B0F8 (45 x 12 B).  Registered once, at its final home.
- *
- * MODULE AND NAME (brief section 2, evidence order).
- *   * Option 1 (a `__FILE__` string) fails: no `.string` in the image names this TU.  The only
- *     `em030` string is `lbl_80791550 = "em030"` (the enemy-id name table at 0x80791540..0x80791560,
- *     one entry per enemy), and the range references no file-name string at all.
- *   * Option 2 (a real runtime-dump name) fails at the unit's own address:
- *     `python tools/symbols/dumpmap.py lookup 0x801B0010` answers `zz_01b0010_`, which is not
- *     evidence.  The range's INTERIOR does carry two real dump names (`em030_condition_ck`,
- *     `em030_homing_range_ck`) and the range's own `.data` carries one real global name
- *     (`em030_prog_tbl` at 0x805B0FD0, a 0x6C-byte table whose slots are this range's functions
- *     0x801B08BC/0x801B0A28/0x801B2D34/0x801B0968/0x801B096C/0x801B2F30/0x801B4240/0x801B4244/
- *     0x801B42A0/0x801B42C4/0x801B42C8), so the module is `enemy` and the TU is the em030 program.
- *     They name the CONTENT, not the source file: the original file could have been `em030.cpp`,
- *     `em030_prog.cpp` or `enemy_em030.cpp`, and the project's rule forbids inventing a file name.
- *   * Option 3 (what the code does plus the neighbours' scheme) fixes the module: every bracketing
- *     registered unit is `enemy/` (`enemy/fn_80191598.cpp` below, the next occupied band above is
- *     `auto_03_801B4E38`), and every callee the range names is enemy-band or the shared enemy work
- *     API (`em_die_ck`, `em_get_mot_no`, `em_frame_check`, `get_move_work_adrs(3)`).
- *   * Option 4 therefore decides the FILE NAME: the neighbours' scheme is `fn_XXXXXXXX.<ext>`
- *     (`src/enemy/` is 27 such files plus the one unit whose `__FILE__` string survived,
- *     `enemy_control.cpp`), and no evidence names the original source file, so the file keeps the
- *     map's own stem.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range except the two `em030_*`
- * runtime-dump names (checked with `python tools/symbols/dumpmap.py lookup` over the range's
- * inventory: 58 of the 60 rows answer `zz_XXXXXXXX_` placeholders, and the two that do not,
- * `em030_condition_ck__FP11_ENEMY_WORK` / `em030_homing_range_ck__FP11_ENEMY_WORK`, are written as
- * the C++ functions their manglings spell).
- *
- * Language C++: every callee out of the range that is not a bare `fn_` placeholder is a mangled
- * symbol (`em_die_ck__FP11_ENEMY_WORK`, `get_move_work_adrs__FUc`, `Pl_Skill_ck__FP4_PLWUs`,
- * `GetItemData__FUs`), and the two dump-named functions are C++ free functions whose manglings the
- * target's `.data` records (`em030_prog_tbl` holds their addresses).
- *
- * STATUS (official `build/RMHE08/report.json`, full `ninja` in this worktree, `main.dol: OK`).
- * 50 of the 60 functions are written and every one of them is above the 80 % bar; 16 are
- * byte-identical.  Unit: 56.920364 % fuzzy, 1432 / 17480 `.text` bytes matched, 16 / 60 functions
- * matched.  Sections: `.text` 0x4448, extab 0x168 (93.82353 %), extabindex 0x21C, `.ctors` 4.
- * The 10 unwritten functions (6616 B, 38 % of the range) are the follow-up queue at the end of this
- * header.
- *
- * TRANSPORT (landed on `main` 2026-09-26 from `worker/801b0010-fn-801b0010-ab10`).  The registration
- * and the bodies came across as a delta; the header set was reconciled with the units that landed
- * while the branch waited, and the two functions whose rows moved moved UP (`fn_801B0230` 95.09 ->
- * 95.64 and `fn_801B03E8` 91.35 -> 93.65: the branch had declared `Pl/pl_skill.h`'s `Pl_item_timer_get`/
- * `pl_item_add` at C++ scope, while their owner defines them `extern "C"`, so their call sites were
- * emitting a mangled reloc the target does not have).  Everything else that changed here:
- *   * `pl_model_state_set` moved from `unsplit/Pl.h` (a fallback band, and a `rule 2` finding once
- *     its owner existed) to the owner's header `Pl/fn_80262940.h`; `fn_801E01BC` likewise to
- *     `enemy/em007_act.h`, and this unit's own three band symbols to
- *     `enemy/fn_801B0010.h` (`fn_801B0010` was parked in `unsplit/enemy.h` with the note
- *     "owned by the still-unregistered enemy/em030_prog.cpp range"; `fn_801B4348`/`fn_801B4398` were
- *     declared in `enemy/fn_801B4458.cpp`).
- *   * `EmGroundRec` is now one definition, in `enemy/ENEMY_WORK.h`: this unit's own copy was
- *     0x18 bytes where the landed view (`enemy/fn_801B4458.cpp`, whose fields +0x18/+0x1C it reads)
- *     is 0x20, i.e. the scratch buffer `fn_801B4348` hands `fn_80125F54`/`fn_801421E4` was 8 bytes
- *     short of what the same record needs elsewhere.
- *   * this unit's 8-byte lookup entry is `EmCodeListEntry` here: `enemy/em004_act.cpp` has an
- *     `EmLookupEntry` of its own for the different 0x805B3CD8 table (rule 1 - two records, two
- *     names).
- *   * `get_move_work_adrs`/`get_move_work_max` stay declared in this file (see the note above their
- *     declarations): MAIN carries four incompatible spellings of the pair, so neither can move into
- *     the owner's header yet.  Unifying them is booked in this unit's outbox (`shared-file`).
- *
- * Residuals, by measurement (all near-misses are codegen shapes, not comprehension):
- *   * RANGE-CASE TREE - `fn_801B0010` 92.94 (the group {1,2} is tested as two compares where the
- *     target uses the `(x-1) <= 1` range idiom; the `(u32)(team - 1) <= 1` spelling reproduces the
- *     exact instruction multiset and size - 252 B both sides - but reorders the blocks and scores
- *     82.22), `fn_801B096C` 88.72 (same shape on the `{10,11}` group of its `state` switch; the
- *     `if`-chain spelling is 4 B short and does not pair).
- *   * BLOCK ORDER AFTER A SHARED TAIL - `fn_801B4244` 91.09 and `fn_801B42DC` 84.93: MWCC places the
- *     `return 0` block inline where the target keeps it last, and the `.ctors` body's two
- *     `setVec3` calls colour their float registers differently.
- *   * `clrlwi` FUSION - the peephole fuses the `clrlwi rX,rY,24` + `cmpwi rX,0` pair of a byte test
- *     into the record form `clrlwi.`; `fn_801B4244` needs it off (`#pragma peephole off` scoped to
- *     that one body: 59.78 -> 91.09).  Every other body in the unit keeps the peephole on.
- *   * ARGUMENT SET ORDER - `fn_801B2514` 91.74: its `fn_80133DB0`-family rows and the `setVec3`
- *     float arguments are materialised in a different order.
- *   * `fn_801B0230` 95.64 and `fn_801B03E8` 93.65 (both improved by the transport): the remaining
- *     rows are the `Pl_Skill_ck`/`Pl_item_timer_get` argument setup and `fn_801B03E8`'s two
- *     `ainpc_w` byte reads.
- *
- * Follow-up queue (the 10 unwritten functions, biggest first; sizes in bytes):
- *   fn_801B2F30 (4880), fn_801B28C0 (600), fn_801B2B6C (436), fn_801B2D94 (412), fn_801B2684 (264),
- *   fn_801B278C (192), fn_801B284C (116), fn_801B2D34 (96), fn_801B2B18 (84), fn_801B2D20 (20).
- *   All ten are the same two shapes the written bodies already establish - a `switch` on
- *   `_ENEMY_WORK::state` (`fn_801B2684`, `fn_801B278C`, `fn_801B284C`, `fn_801B28C0`, `fn_801B2B18`,
- *   `fn_801B2B6C`, `fn_801B2D20`, `fn_801B2D34`) or the third `state_sub` jump-table dispatcher
- *   (`fn_801B2D94`, `fn_801B2F30`, whose `.data` tables sit at 0x805B11C0 and 0x805B14F0).
+/* enemy/em030_prog.cpp - the em030 enemy's program: its condition checks, action steps, `state_sub` dispatchers and
+ *   the static constructor of its two-vector record.
+ * RANGE. .text 0x801B0010-0x801B4348 (58 functions); .ctors 0x8056F344-0x8056F348, .data 0x805B0FD0-0x805B17A8,
+ *   .bss 0x806A7A88-0x806A7AA0, .sdata2 0x80798B38-0x80798C68, extab, extabindex.
+ * NAMES. `em030_prog` from the map's `em030_prog_tbl` (0x805B0FD0, the first object of the unit's `.data`, whose
+ *   slots are this range's entry points); `em030_condition_ck` and `em030_homing_range_ck` are runtime-dump names.
+ *   The `.bss` record name is a GUESS (a pair of model-space points).
+ * RESIDUALS. 10 rows unwritten: 0x801B2684-0x801B4240 (`fn_801B2684` .. `fn_801B2F30`; `fn_801B2D94`/`fn_801B2F30`
+ *   are the third and fourth `state_sub` dispatchers, tables at 0x805B11C0 and 0x805B14F0).
+ *  - `fn_801B0F00`, `fn_801B0FBC`, `fn_801B1078`, `fn_801B1134`, `fn_801B11C4`, `fn_801B1314`, `fn_801B13A4`,
+ *    `fn_801B16A4`, `fn_801B1814`, `fn_801B1958`, `fn_801B1A40`, `fn_801B1CF4`, `fn_801B2298`, `fn_801B2514`: retail
+ *    keeps the timer decrement as `subi` + `cmpwi`, ours fuses it into `subic.`;
+ *  - `fn_801B0230`, `fn_801B0810`, `fn_801B0A28`, `fn_801B13A4`: retail keeps `clrlwi` + `cmpwi`, ours emits
+ *    `clrlwi.`; `fn_801B055C` the same with `rlwinm.`;
+ *  - `fn_801B0010`, `fn_801B096C`: the {1,2} / {10,11} case groups are two compares where retail uses the
+ *    `(x - 1) <= 1` range test (the `(u32)(team - 1) <= 1` spelling has retail's size but reorders the blocks);
+ *  - `fn_801B03E8`, `fn_801B0450`, `fn_801B0230`: retail reads the +0x328 halfword with `lhz`, ours with `lha`;
+ *  - `fn_801B06D4`, `fn_801B42DC`: retail's frame is 0x30 against our 0x20 (retail spills f31 with `psq_st`);
+ *  - `fn_801B0DE4`: retail switches on the byte at +0x1E6, ours on `state_sub` (+0x5);
+ *  - `fn_801B0E14`, `fn_801B203C`: ours emits an extra `b` and orders the case blocks differently; `fn_801B4244`:
+ *    ours places the `return 0` block inline, retail keeps it last;
+ *  - `fn_801B2514`: ours hoists the `shell_set_func_ptr` slot load out of the two branches retail reloads it in;
+ *    `fn_801B1B30`: retail reloads `lbl_80798B48`, ours reuses it;
+ *  - `em030_homing_range_ck`, `fn_801B08BC`: retail narrows the `u8` argument with `clrlwi` before the compare;
+ *    `fn_801B0168`: retail compares unsigned (`cmplwi`), ours signed.
+ *   flipcheck: `.ctors`/`.sdata2` claimed, not emitted; `.data`/`.text`/extab/extabindex short of the claim.
+ * SHAPES. `#pragma peephole off` around `fn_801B4244` only (retail keeps its `clrlwi` + `cmpwi` byte test unfused);
+ *   every other body keeps the peephole on.
  */
 
 #include "types.h"
@@ -110,7 +37,7 @@
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_801251D0.h" /* EmGroundRec + fn_80125F54 (rule 1/2: their owner) */
 #include "ai/ainpc.h"   /* `_AINPC_W` (rule 1) */
-#include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/fn_802D44F4.cpp (rule 2) */
+#include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/ai_npc.cpp (rule 2) */
 #include "enemy/fn_8012EC74.h"
 #include "enemy/enemy_control.h"
 #include "enemy/fn_80137604.h"
@@ -129,12 +56,8 @@
 /* declarations this unit needs whose owner's header does not carry them yet                          */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* 0x8029F6DC - the item-table accessor, owned by the not-yet-registered band between
- * `Pl/pl_act.cpp` and `stage/fn_802B2978.c` (rule 2's named gap: the bracketing registered units
- * name different modules, so there is no sound header to move the declaration to).  Declared at C++
- * scope so the call site spells the owner's real signature (`GetItemData__FUs`), not the mangling
- * (rule 9); the return type is not part of the mangling, so this unit's view of the row is what it
- * declares. */
+/* 0x8029F6DC: the item-table accessor `menu/menu_item.cpp` defines (`GetItemData__FUs`), declared with this
+ * unit's view of the row it returns (the return type is not part of the mangling). */
 /* size: 0x4 */
 struct EmItemRow {
     /* +0x00 */ u8 field_0x00;
@@ -142,8 +65,7 @@ struct EmItemRow {
     /* +0x02 */ u8 unused_0x02[2];
 };
 EmItemRow* GetItemData(u16 id);
-/* 0x802D8414 - `ai_torch_ck(_AINPC_W*)`; the owner band sits between `ai/fn_802D0DCC.c` and
- * `ef/fn_803066F0.c` (named gap).  Declared at C++ scope with its real signature (rule 9). */
+/* 0x802D8414: `ai_torch_ck(_AINPC_W*)`, which `ai/ai_npc.cpp` defines. */
 struct _AINPC_W;
 u32 ai_torch_ck(_AINPC_W* npc);
 
@@ -157,33 +79,17 @@ struct ShellSetBlock {
     /* +0x58 */ ShellSetFn field_0x58;
 };
 
-/* The 0x20-byte ground record `fn_80125F54` prepares and `fn_801421E4` fills is `EmGroundRec`, and
- * it now lives with its producer (`enemy/fn_801251D0.h`, docs/plan.md 6.5 rule 1: one
- * definition; `enemy/fn_801B4458.cpp` includes the same home).  This unit only passes its address
- * and reads its `pos_0x08`. */
+/* The 0x20-byte ground record `fn_80125F54` prepares and `fn_801421E4` fills is `EmGroundRec`
+ * (`enemy/ENEMY_WORK.h`); this unit passes its address and reads its `pos_0x08`. */
 
-/* 0x800CFA90 / 0x800CFAD0 - the move-work record base and its count.  Their owner's header
- * (`ef/fn_800CDB2C.h`) cannot carry either one yet: MAIN spells the pair four incompatible
- * ways - the owner's own bodies return `void*` and `u16`, `unsplit/ef.h` carries
- * `extern "C" void*`/`u32`, `Pl/fn_8025F088.h` and `enemy/fn_80165FC8.h` carry the C++ `void*`/`u32`
- * pair, and `src/ef/eft_res.cpp`/`src/sound/fn_800EF7D8.cpp` re-declare both locally as `u16` -
- * and MWCC rejects any fifth spelling in every TU that includes two of them (`(10505) illegal
- * overloading`).  Measured: `u32` in the owner's header breaks `ef/eft_res.cpp`,
- * `sound/fn_800EF7D8.cpp` and `Pl/fn_80273B14.cpp`; `u16` breaks `Pl/fn_8025F088.cpp`,
- * `Pl/fn_802489D4.cpp`, `Pl/fn_802430E8.cpp` and `Pl/fn_80273B14.cpp`.  Choosing one spelling is a
- * change to four landed units' declarations, so both accessors stay declared HERE, at C++ scope with
- * the owner's own return types (the map names are the manglings `get_move_work_adrs__FUc` and
- * `get_move_work_max__FUc`, rule 9), and the unification is booked in this unit's outbox
- * (`shared-file`).  The owner header is left exactly as MAIN has it. */
+/* 0x800CFA90 / 0x800CFAD0: the move-work record base and its count (`ef/system_core.cpp`), declared with the
+ * owner's own return types: the tree's headers spell the count as `u32` and `u16`, and MWCC refuses two at once. */
 void* get_move_work_adrs(u8 index);
 u16 get_move_work_max(u8 index);
 
-/* The two `fn_8004CAD8.cpp` vector helpers this range calls now come from that unit's owner header
- * (`fn_8004CAD8.h`, rule 2): `calcVecDistXZ` measures the distance between two positions and
- * `subVec3` subtracts them.  Their signatures there were settled from the callees' own bodies. */
+/* `calcVecDistXZ` (the distance between two positions) and `subVec3` come from `fn_8004CAD8.h`. */
 
-/* The shared `.sdata2` pool constants this range loads (never defined here - redefining them would
- * rebuild the pool instead of addressing the target's, playbook 29). */
+/* The `.sdata2` pool constants this range loads, declared and never defined (playbook 29). */
 extern "C" f32 lbl_80798B3C; /* 2250000.0f - the squared 1500-unit radius `fn_80050EAC` is compared to */
 extern "C" f32 lbl_80798B38; /* 40000.0f - the squared 200-unit homing radius */
 extern "C" f32 lbl_80798B44; /* 144.0f - the `em_frame_check` window's first bound */
@@ -208,8 +114,7 @@ extern "C" f32 lbl_80798C5C; /* -100.0f - the second record's y */
 extern "C" f32 lbl_80798C60; /* -50.0f - its z */
 /* The two three-float records the unit's static constructor fills (0x18 bytes of `.bss`). */
 extern "C" VEC3 vec_pair_801B0010_0[2];
-/* 0x803B9BA0 - the not-yet-registered band between `hud/fn_80324F7C.c` and
- * `Network/NetworkWiiMediator.c` (rule 2's named gap): r3 the work record, r4 the position, r5 the id. */
+/* 0x803B9BA0 (`enemy/em_model.cpp`): r3 the work record, r4 the position, r5 the id. */
 extern "C" void fn_803B9BA0(_ENEMY_WORK* work, nw4r::math::VEC3* pos, u32 id);
 extern "C" f32 lbl_80798B40; /* 2000.0f */
 
@@ -217,17 +122,15 @@ extern "C" f32 lbl_80798B40; /* 2000.0f */
 /* the range's own view of the player work it is handed                                              */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* `_PLW` comes from `pl.h` (rule 1); the record is the one `em030_prog_tbl`'s caller passes
- * in, and this range only ever reads the slot table at +0x278 (`_SLOTENT`, 4 bytes each, its
- * `item_id` half read as a 16-bit id) and the liveness byte at +0x000. */
+/* `_PLW` comes from `pl.h`; this range reads only its slot table at +0x278 (`_SLOTENT`, the `item_id` half
+ * read as a 16-bit id) and the liveness byte at +0x000. */
 
 /* ------------------------------------------------------------------------------------------------ */
 /* bodies                                                                                            */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* 0x801B0010 (0xFC).  "Is any live work record of kind 3 in `area` already handling this fight?" -
- * walks the 0xB18-byte records `get_move_work_adrs(3)` hands back and asks the per-team checker
- * (cases 1/2 the shared one, 5 and 7 their own) whether the record is engaged. */
+/* 0x801B0010 (0xFC): whether any live kind-3 work record in `area` is engaged, asking the per-team checker
+ * (cases 1/2 the shared one, 5 and 7 their own) for each 0xB18-byte record. */
 extern "C" u32 fn_801B0010(u32 area) {
     u16 max = get_move_work_max(3);
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
@@ -300,9 +203,8 @@ extern "C" u32 fn_801B0168(_ENEMY_WORK* work) {
     return 0;
 }
 
-/* 0x801B0230 (0x1B8).  Picks the player's counter-move for em030: the two "already fighting" skills
- * first (0x238 then 0xD9), then the highest-value usable slot, and latches it on the work record
- * together with the player work it came from. */
+/* 0x801B0230 (0x1B8): picks the player's counter-move (skills 0x238 then 0xD9, else the highest-value usable
+ * slot) and latches it on the work record with the player work it came from. */
 extern "C" u32 fn_801B0230(_ENEMY_WORK* work, _PLW* plw) {
     if (plw == NULL) {
         return 0;
@@ -522,7 +424,7 @@ extern "C" u32 fn_801B0810(_ENEMY_WORK* work) {
     return 0;
 }
 
-/* 0x801B08BC (0x2C0... 0xAC).  The em030 program's reset/exit hook: the action-2 teardown runs the
+/* 0x801B08BC (0xAC).  The em030 program's reset/exit hook: the action-2 teardown runs the
  * motion helpers, then the record's em030 block is cleared and the "active" bit re-armed. */
 extern "C" void fn_801B08BC(_ENEMY_WORK* work, u8 kind) {
     if (kind == 2) {
@@ -893,9 +795,8 @@ extern "C" void fn_801B1314(_ENEMY_WORK* work) {
     }
 }
 
-/* 0x801B13A4 (0x1A4).  The motion-0x25 approach: the kind picks the countdown (0x96/0x5A/0x32), the
- * countdown expiry picks the follow-up (kind 1 the 0x26 motion plus the position helper, kind 2 and
- * the default the 0x67 one). */
+/* 0x801B13A4 (0x1A4): the motion-0x25 approach; the kind picks the countdown (0x96/0x5A/0x32) and the follow-up
+ * on expiry (kind 1 the 0x26 motion plus the position helper, otherwise the 0x67 one). */
 extern "C" void fn_801B13A4(_ENEMY_WORK* work, u32 kind) {
     switch (work->state) {
     case 0:
@@ -969,9 +870,8 @@ extern "C" void fn_801B1548(_ENEMY_WORK* work) {
     }
 }
 
-/* 0x801B15F8 (0xAC).  The em030 action dispatcher: `state_sub` selects the action function (the
- * `.data` jump table `jumptable_805B103C` holds the 20 entries), and the `fn_801B0E14` entries carry
- * their kind in r4. */
+/* 0x801B15F8 (0xAC): the action dispatcher; `state_sub` selects one of the 20 `jumptable_805B103C` entries, and
+ * the `fn_801B0E14` entries carry their kind in r4. */
 extern "C" void fn_801B15F8(_ENEMY_WORK* work) {
     switch (work->state_sub) {
     case 0:
@@ -1037,9 +937,8 @@ extern "C" void fn_801B15F8(_ENEMY_WORK* work) {
     }
 }
 
-/* 0x801B16A4 (0x170).  The knockback/recovery action: the kind picks the motion and the blend scale,
- * the flag the countdown, and the state-1 half re-runs the 0x800-flag check and clamps the countdown
- * once the action guard says the hit is over. */
+/* 0x801B16A4 (0x170): the knockback/recovery action; the kind picks the motion and blend scale, the flag the
+ * countdown, and state 1 re-runs the 0x800-flag check and clamps the countdown once the hit is over. */
 extern "C" void fn_801B16A4(_ENEMY_WORK* work, u32 kind, u32 flag) {
     switch (work->state) {
     case 0:
@@ -1089,9 +988,8 @@ extern "C" void fn_801B16A4(_ENEMY_WORK* work, u32 kind, u32 flag) {
     }
 }
 
-/* 0x801B1814 (0x144).  The motion-0x18/0x05 recovery: the 0x100-flag check (or the 0x12C-frame
- * countdown) picks the 0x19 tail, and the countdown is clamped to 0x0F once the guard says the hit is
- * over. */
+/* 0x801B1814 (0x144): the motion-0x18/0x05 recovery; the 0x100-flag check (or the 0x12C-frame countdown) picks
+ * the 0x19 tail, and the countdown is clamped to 0x0F once the hit is over. */
 extern "C" void fn_801B1814(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
@@ -1151,9 +1049,8 @@ extern "C" void fn_801B1958(_ENEMY_WORK* work) {
     }
 }
 
-/* 0x801B1A40 (0xF0).  The motion-0x06 turn: the record's own 4-bit `bits_0x1EC` field is latched into
- * `state_0x006` as the turn step, and the second angle is stepped through `fn_80133DB0` while the
- * 0x78-frame countdown runs. */
+/* 0x801B1A40 (0xF0): the motion-0x06 turn; the 4-bit `bits_0x1EC` field is latched into `state_0x006` as the
+ * turn step, and the second angle steps through `fn_80133DB0` while the 0x78-frame countdown runs. */
 extern "C" void fn_801B1A40(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
@@ -1237,9 +1134,8 @@ extern "C" void fn_801B1C60(_ENEMY_WORK* work) {
     }
 }
 
-/* 0x801B1CF4 (0x194).  The motion-0x06 turn-to-target: the angle between the record's +0x36C target
- * point and its position is turned into a per-frame step (clamped at 0), the position is stepped
- * through `fn_80133DB0`, and the 0x78-frame countdown picks the 0x19 tail. */
+/* 0x801B1CF4 (0x194): the motion-0x06 turn-to-target; the angle to the +0x36C target point becomes a per-frame
+ * step (clamped at 0) through `fn_80133DB0`, and the 0x78-frame countdown picks the 0x19 tail. */
 extern "C" void fn_801B1CF4(_ENEMY_WORK* work, u32 kind) {
     VEC3 vec;
     VEC3 diff;
@@ -1305,9 +1201,8 @@ extern "C" void fn_801B1E88(_ENEMY_WORK* work) {
     }
 }
 
-/* 0x801B1F04 (0x90).  The second em030 action dispatcher (`state_sub` 0..13), the `.data` jump table
- * `jumptable_805B108C` holds the 14 entries and the `fn_801B16A4` entries carry their kind/flag in
- * r4/r5. */
+/* 0x801B1F04 (0x90): the second action dispatcher (`state_sub` 0..13 through `jumptable_805B108C`); the
+ * `fn_801B16A4` entries carry their kind/flag in r4/r5. */
 extern "C" void fn_801B1F04(_ENEMY_WORK* work) {
     switch (work->state_sub) {
     case 0:
@@ -1355,9 +1250,8 @@ extern "C" void fn_801B1F04(_ENEMY_WORK* work) {
     }
 }
 
-/* 0x801B1F94 (0xA8).  The "armed" motion: the two teardown helpers, the 0x0E motion, the position
- * helper, and the +0x310 angle triple the kind arms before `rotVecY` turns it by the record's
- * second angle. */
+/* 0x801B1F94 (0xA8): the "armed" motion; the two teardown helpers, the 0x0E motion, the position helper, and the
+ * +0x310 angle triple the kind arms before `rotVecY` turns it by the second angle. */
 extern "C" void fn_801B1F94(_ENEMY_WORK* work, u32 kind) {
     em_fall_height_get(work);
     em_fall_start(work);
@@ -1374,9 +1268,8 @@ extern "C" void fn_801B1F94(_ENEMY_WORK* work, u32 kind) {
     rotVecY(&work->offset_0x30C.vec_0x310, work->field_0x1C0);
 }
 
-/* 0x801B203C (0x25C).  The kinded "recovery/counter" action: state 0 arms the motion the kind picks,
- * state 2 runs the counter-attack latch (`fn_801B0230` on the player work at +0xA34) and the
- * `UpdateValue` wait, state 3 finishes it. */
+/* 0x801B203C (0x25C): the kinded recovery/counter action; state 0 arms the kind's motion, state 2 runs the
+ * counter latch (`fn_801B0230` on the player work at +0xA34) and the `UpdateValue` wait, state 3 finishes it. */
 extern "C" void fn_801B203C(_ENEMY_WORK* work, u32 kind) {
     switch (work->state) {
     case 0:
@@ -1446,9 +1339,8 @@ extern "C" void fn_801B203C(_ENEMY_WORK* work, u32 kind) {
     }
 }
 
-/* 0x801B2298 (0x27C).  The kinded turn action: state 0 latches the target angle with `calcVecAngXY`,
- * state 1 waits (or steps the second angle through `fn_80133DB0`), and the team/kind gates pick the
- * follow-up. */
+/* 0x801B2298 (0x27C): the kinded turn action; state 0 latches the target angle (`calcVecAngXY`), state 1 waits
+ * or steps the second angle through `fn_80133DB0`, and the team/kind gates pick the follow-up. */
 extern "C" void fn_801B2298(_ENEMY_WORK* work, u32 kind) {
     VEC3 vec;
     VEC3 diff;
@@ -1603,7 +1495,6 @@ extern "C" void fn_801B42DC(void) {
     assignVec3((Vec*)&vec_pair_801B0010_0[1], (Vec*)&rec);
 }
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7A88..0x806A7AA0`), in address order: the 1 two-vector record(s)
- * its static constructor `fn_801B42DC` builds (`.data` tables point at them).  Names are GUESSes: each record is a
- * pair of model-space points. */
+/* The unit's `.bss` (0x806A7A88-0x806A7AA0): the two-vector record its static constructor `fn_801B42DC` builds
+ * and the `.data` tables point at. */
 VEC3 vec_pair_801B0010_0[2];  /* +0x806A7A88 */

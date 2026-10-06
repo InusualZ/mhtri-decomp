@@ -3,8 +3,8 @@
 
 #include "types.h"
 
-/* One entry of the area/group table `lbl_806A54E0` (0x806A54E0, .bss, unsplit): four of them per
- * group, 32 groups (the `.bss` run 0x806A54E0..0x806A76E0 the retired object's data run gives).
+/* One entry of the area/group table `lbl_806A54E0` (0x806A54E0..0x806A76E0, `enemy/enemy_control.cpp`'s `.bss`):
+ * four of them per group, 32 groups.
  * Only the four bytes `fn_8012E968` tests are named.
  * size: 0x44 */
 typedef struct EmAreaEntry {

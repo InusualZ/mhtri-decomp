@@ -1,85 +1,34 @@
-/*
- * enemy/em_prog_support.cpp - unit, `.text` 0x80383148..0x80385EE0 (75 functions, 11672 bytes).
- *
- * 47 of 75 functions have a body here.
- *
- * FLAGS.  `cflags_main`.  GUESS (rule 7): the stem names the shared support block of the note-pane band; the four
- * helper names `note_pane_mode_set`, `note_pane_motion_set`, `note_pane_motion_end_ck`, `qn_chr_flag_set` are derived
- * from their bodies (their map rows were `note_pane_mode_set`, `note_pane_motion_set`, `note_pane_motion_end_ck`, `qn_chr_flag_set`).
- *
- * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sbss, .sdata, .sdata2, .text, extab,
- * extabindex).
- */
-/* ---- header inherited from src/enemy/fn_80382310.cpp (written against its pre-phase-4 range) ---- */
-/* enemy/fn_80382310.cpp - the enemy `em009`/`em019` program band's shared support block, `.text`
- * 0x80382310..0x803868DC (the tail 0x803868DC..0x80387844 moved to `enemy/em009_act.cpp` in the
- * 2026-09-30 recut; the range still holds more than one TU, see SEAM).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x80382310` -> `zz_0382310_`; the map's own rows for the
- * range in config/RMHE08/symbols.txt carry no real name either), and no `__FILE__` string is
- * referenced by any body - every `lis`/`addi` and every `@sda21` relocation in the range resolves to
- * the `.sdata2` float pool, a switch/jumptable or one of the band's own record tables, never to a
- * source-file-name literal (checked by reading all `R_PPC_*` relocations of the range's 118 split
- * objects and cstring-ing each referenced `data:string` label in orig/RMHE08/sys/main.dol: of the 302
- * bare `<name>.c/.cpp/.h` string labels in the image, none is referenced from 0x80382310..0x80387844).
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string (above).  2. `dumpmap.py
- * lookup` answers only `zz_XXXXXXXX_` placeholders.  3. The code places the unit in `enemy`: the
- * immediately following registered unit is `enemy/em009_act.cpp` (0x80387844, the monster-AI action
- * band), the immediately preceding `.data` is the enemy program-table block (`em019_prog_tbl`
- * at 0x805EE518, its table run 0x805EE584..0x805EE5B0 that `fn_80382310` indexes, `em009_prog_tbl` at
- * 0x805EF990, and the `jumptable_805EF4F4`/`jumptable_805EF52C` switch tables of the same band), and
- * every body drives the shared `_ENEMY_WORK` record through `em_frame_check__FP11_ENEMY_WORKUsff`,
- * `em_act_ck__FP11_ENEMY_WORKUcUc`, `get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3`,
- * `get_em_chg_scale__FP11_ENEMY_WORK` and `em_magma_check`.  The file therefore keeps the map's
- * `fn_80382310` stem (brief option 4); no name was invented and no module was guessed.
- *
- * LANGUAGE AND SECTIONS.  C++ (langcheck: the range defines one mangled function,
- * `qn_get_motion_no__FP7_QNPC_W`, and reaches genuinely mangled callees - `MHchar::getTevKColor`/
- * `setTevKColor`, `setVector3__FPQ34nw4r4math4VEC3fff`, `get_joint_wpos_em__FP11_ENEMY_WORK...` -
- * through their real signatures, rule 9).  Every plain `fn_` definition is `extern "C"` so it keeps
- * the map's name (playbook 42).  Sections claimed: `.text` 0x80382310..0x803868DC, extab
- * 0x80017E2C..0x8001803C, extabindex 0x80037BA8..0x80037EC0, `.ctors` 0x8056F3A8..0x8056F3B0, `.data`
- * 0x805EF8C0..0x805EF990, `.bss` 0x806C23E8..0x806C5488 and `.sbss` 0x80794C00..0x80794C08.  The band's
- * `.sdata2` tables live in other splits and are referenced here as the map's `lbl_`/`jumptable_`
- * symbols, never re-emitted (rule 10 / rule 2).
- *
- * SEAM.  The right edge 0x803868DC starts the `em009` TU (`enemy/em009_act.cpp`).  The range is still
- * more than one TU, not split yet: the two `.ctors` words (`fn_8038309C`, `fn_80385E7C`) are two TUs'
- * static initializers (the first TU ends at 0x80383148; `fn_80385E7C` constructs the `lbl_806C4A88`
- * array with `fn_80385E9C`, emitted after it), and the pool repeats 41c00000 at `lbl_8079BFAC` (first
- * read by `fn_803865B4`), so a third TU starts in 0x80385E7C..0x80386028 (taken as
- * 0x80385EE0..0x803868DC: GUESS).  The left edge 0x80382310 is discovery's cap, not a proven boundary -
- * `tudiscover.py at 0x80382310` extends the range left to 0x8037F940 on its strong cuts.
- *
- * RECONSTRUCTION STATUS (measured with `tools/units/recompile.py enemy/fn_80382310 --measure <sym>`,
- * the official report metric, against MAIN's retired split objects `auto_fn_*_text.o`).  72 of the
- * range's 118 functions have a body (5068 of 21812 `.text` bytes, 23.23 %); 34 are byte-identical and
- * 61 measure >= 80 %.  The unit is short of the 80 % bar: the 72 bodies written this session are the
- * band's mechanical half - the colour/slot accessors, the note-pane allocator/constructor/destructor
- * set, the eleven sub-state machines and the tail-call dispatchers - and the band's byte mass sits in
- * the large bodies not attempted yet (fn_80384434 0x700, fn_80386C9C 0x600, fn_80382310 0x46C,
- * fn_803865B4 0x328, fn_803828B8 0x2F8, fn_80386A04 0x298, fn_80387620 0x224, ...) - the 46
- * functions without a body cover 16744 bytes.
- *
- * RESIDUALS (what still differs and why):
- *   - **`fn_80384ECC` (14.5 %).**  The retail body dispatches through the 17-entry jump table
- *     `jumptable_805EF94C`; the conformant `switch (a) { case 0..3 }` spells the same predicate but MWCC
- *     emits a compare chain here (104 B vs 124 B).  The jump-table shape needs an explicit case per
- *     index; recorded, not forced.
- *   - **`fn_803851D4` (48.6 %).**  The five-slot allocator is written from the target's unrolled shape
- *     but indexes `lbl_806C4A88[i]` (156 B vs 152 B): the retail body walks a pointer by +0x1F8 instead.
- *   - **`note_pane_motion_end_ck`/`fn_80385C70`/`fn_80385C80` (60/45/45 %).**  The three MHchar tail-call thunks
- *     differ in the argument-narrowing the compiler inserts before the `b` (12 B vs the target's 16 B
- *     for the two 3-argument forms).
- *   - **`note_pane_set_anim_pair` (60 %).**  The body is right but MWCC knows the u8 parameters are already narrow
- *     and drops the two `clrlwi` the retail object carries (12 B vs 20 B).
- *   - **`fn_80384B34` (74.8 %), `fn_803857BC` (76.8 %), `fn_803852B8` (79.3 %), `fn_80382C00` (73.4 %),
- *     `fn_80382F94` (90.9 %).**  Sign/narrowing and load-order residuals inside otherwise-correct bodies.
- *
- * The per-symbol table is in the outbox .pi/outbox/80382310-fn-80382310-2982.json and the batch note
- * .pi/notes/80382310-fn-80382310-2982.md.
+/* enemy/em_prog_support.cpp - the note-pane band's support block between the em019 and em009 programs: the colour/slot
+ *   accessors, the note-pane allocator/constructor/destructor set, the sub-state machines and the MHchar tail-call
+ *   thunks.
+ * RANGE. .text 0x80383148-0x80385EE0 (75 functions); .ctors 0x8056F3AC-0x8056F3B0 (`fn_80385E7C`),
+ *   .data 0x805EF8C0-0x805EF990, .bss 0x806C2418-0x806C5528, .sdata 0x807933C0-0x807933D8, .sbss 0x80794C00-0x80794C08,
+ *   .sdata2 0x8079BF60-0x8079BF90, extab, extabindex.
+ * SEAM. The left edge closes `enemy/em019_ai.cpp`, whose static initializer `fn_8038309C` ends there.  This unit's
+ *   own initializer `fn_80385E7C` constructs the `lbl_806C4A88` array with `fn_80385E9C`, emitted after it; the pool
+ *   repeats 41c00000 at `lbl_8079BFAC` (first read by `fn_803865B4`), so the next TU starts in
+ *   0x80385E7C-0x80386028 and the right edge 0x80385EE0 is a GUESS.
+ * NAMES. `em_prog_support` and the `note_pane_*`/`qn_chr_flag_set` names are GUESSES from the band's role and the
+ *   bodies; `qn_get_motion_no` is the map's mangled name.
+ * RESIDUALS. 28 rows unwritten: 0x80383148-0x803831B0, 0x803831B4-0x803836EC, 0x80383720-0x8038392C,
+ *   0x80383944-0x803839C0, 0x803839EC-0x80384004, 0x80384048-0x80384304, 0x80384434-0x80384B34, 0x80384BA0-0x80384ECC,
+ *   0x803850A4-0x803851D4, 0x8038530C-0x803853C8, 0x803855D4-0x8038575C, 0x80385828-0x80385A54, 0x80385CAC-0x80385E7C.
+ *  - `fn_80384ECC`: retail dispatches through the 17-entry `jumptable_805EF94C`, ours emits a compare chain
+ *    (104 B against 124 B);
+ *  - `fn_803851D4`: ours indexes `lbl_806C4A88[i]`, retail walks a pointer by +0x1F8;
+ *  - `fn_80385A78`: ours copies the position to +0x30/+0x34 and a byte at +0x38, retail stores the three words to
+ *    +0x2C/+0x30/+0x34;
+ *  - `note_pane_motion_end_ck`, `fn_80385C70`, `fn_80385C80`: retail adds 4 to r3 before the argument setup of the
+ *    tail call, ours after;
+ *  - `fn_80384F48`, `fn_80384F80`, `fn_80384FF8`, `fn_803853C8`, `fn_8038541C`, `fn_80385538`, `fn_80385B28`,
+ *    `fn_80385B5C`, `note_pane_anim_pair_ck`, `note_pane_motion_set`: retail narrows the argument with `clrlwi`, ours
+ *    drops it;
+ *  - `fn_80384004`, `fn_80384B34`: retail keeps `extsh`/`extsb` + `cmpwi`, ours the record form; `fn_803843D8`:
+ *    retail sign-extends twice more;
+ *  - `fn_803852B8`, `fn_803854E4`, `fn_8038575C`: the loop's index setup is ordered differently; `fn_803857BC`: ours
+ *    compares the narrowed value unsigned where retail compares signed.
+ *   flipcheck: `.bss`/`.ctors`/`.data`/`.sbss`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex
+ *   short of the claim.
  */
 
 #include "types.h"
@@ -101,11 +50,10 @@
 #include "lobby/lb_server_sel_trans.h" /* fn_803C7EAC / fn_803C7F88 (owner's header, rule 2) */
 #include "Runtime.PPCEABI.H/CPlusLibPPC.h" /* __construct_array (owner's header, rule 2) */
 
-/* --- the declarations this band's bodies need (the owners are not registered yet; the address of
- * each sits inside 0x80380000.., the band this unit opens) ------------------------------- */
+/* The declarations this band's bodies need. */
 
 extern "C" {
-/* The note band's own still-unwritten members (declared here until their bodies land below). */
+/* The lobby helpers the band calls (`lobby/fn_80212810.cpp`, `lobby/lb_npc.cpp`, `lobby/lb_menu_pos_tbl.cpp`). */
 void fn_80217934(void);
 void fn_802125C8(void);
 void fn_8021F248(u8 a);
@@ -126,12 +74,10 @@ struct NotePane {
     /* +0x19E */ u16 field_0x19E;
 };
 
-/* The note record types this band shares with the band above it (0x803A3A50..) live in
- * `enemy/note_work.h` (rule 1: one definition, included).
- */
+/* The note record types this band shares with the band at 0x803A3A50 are `enemy/note_work.h`'s. */
 
-/* The band's own data / unsplit globals (referenced, never defined - rule 2/10). */
-extern u8* lobby_world_block;         /* .sbss 0x80794880 - the 4-byte block pointer `fn_803836EC` reads */
+/* The data the band reads, declared and never defined. */
+extern u8* lobby_world_block;         /* .sbss 0x80794880 (`userdata_item.cpp`), read by `fn_803836EC` */
 extern NoteWork lbl_806C4A88[5]; /* .bss  0x806C4A88 - the retail 5-record note array (0x9D8) */
 extern NoteSlot lbl_806C5460[3]; /* .bss  0x806C5460 - the 3-slot seat set (0x28) */
 extern NoteLayout lbl_806C2418;  /* .bss  0x806C2418 - the note layout state (0x2670) */
@@ -511,7 +457,7 @@ extern "C" u32 fn_80384F80(u8 a, u8 b) {
     return fn_80384F48(a, b) == 1;
 }
 
-/* 0x80384FF8 - seed one seat record. */
+/* 0x80384FF8 - seeds one seat record. */
 extern "C" void fn_80384FF8(u8 idx) {
     u8 local[16];
     NoteSlot* slot = &lbl_806C5460[idx];
@@ -548,7 +494,7 @@ extern "C" NoteWork* fn_803851D4(void) {
     return 0;
 }
 
-/* 0x80385478 - tear one seat record down. */
+/* 0x80385478 - tears one seat record down. */
 extern "C" void fn_80385478(NoteWork* self) {
     if (self->field_0x000 != 0) {
         fn_800E26C4(&self->model);

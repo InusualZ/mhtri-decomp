@@ -1,5 +1,5 @@
-/* Leaf header for the two joint-matrix accessors `enemy/fn_80138074.c` owns (0x80139A64, 0x80139A7C); the
- * owner is a C file whose declarations take `void*`.  They read and write the matrix of one joint of a character's model.
+/* Leaf header for the two joint-matrix accessors `enemy/fn_80138074.c` owns (0x80139A64, 0x80139A7C), which read and
+ * write the matrix of one joint of a character's model; the owner is a C file whose declarations take `void*`.
  */
 struct MtxHolder;
 

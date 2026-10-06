@@ -1,15 +1,8 @@
-/*
- * The enemy population/roster records `src/enemy/em_pop.cpp` owns - the 0x224-byte per-monster
- * roster record the map's `.bss` band names (`em_bui_tbl`, `em_hagi_tbl`, `em_drop_tbl` at
- * 0x80794C28..0x80794C58 from the runtime dump), and the manager work those records live in.
- *
- * Sizes are traced from the object's own arithmetic: `work_mem_alloc(0x34A68)` allocates the work,
- * `0x11200` the record array (`128 x 0x224`) and `0x1600` the sub-record array; the record's
- * stride is the `mulli r0, r3, 0x224` in `em_roster_record_get`.
- *
- * `src/enemy/fn_8035E034.cpp` carries its own two-field view of the same record under the name
- * `EmRosterRec` (its size is 0x1F4, ending at the `+0x1F0` approach radius).  That view is a
- * prefix of this one; folding it into this header is the follow-up recorded in this unit's residual list.
+/* The enemy population/roster records `enemy/em_pop.cpp` owns: the 0x224-byte per-monster roster record (the `.bss`
+ * tables `em_bui_tbl`, `em_hagi_tbl`, `em_drop_tbl` at 0x80794C28..0x80794C58 are runtime-dump names) and the manager
+ * work they live in.  Sizes from the object's arithmetic: `work_mem_alloc(0x34A68)` for the work, `0x11200` for the
+ * record array (`128 x 0x224`), `0x1600` for the sub-records, and `mulli r0, r3, 0x224` in `em_roster_record_get`.
+ * `enemy/em033_prog.cpp`'s `EmRosterRec` (0x1F4, ending at the +0x1F0 approach radius) is a prefix view of it.
  */
 #ifndef MHTRI_ENEMY_EM_POP_H
 #define MHTRI_ENEMY_EM_POP_H
@@ -85,26 +78,17 @@ typedef struct EmPopWorkSlot {
 extern "C" {
 #endif
 
-/* The roster accessors, the work pointer `em_pop_w` and the model-band helpers (0x803B936C..0x803BE30C) are declared in
- * `enemy/em_model.h` since the phase 4 recut moved them to `enemy/em_model.cpp`. */
+/* The roster accessors, the work pointer `em_pop_w` and the model-band helpers (0x803B936C..0x803BE30C) are
+ * `enemy/em_model.cpp`'s, declared in `enemy/em_model.h`. */
 
 /* 0x803B6078 - fills two u16s from the work's per-slot pair when the slot is armed.
- * 0x803B8E1C - the em_set work's own state word.
- * Both moved out of `unsplit/menu.h` when this unit registered their addresses
- * (rule 2: the owner's header carries them). */
+ * 0x803B8E1C - the em_set work's own state word. */
 u16 em_work_slot_pair_get(u16 index, s16* out);
 s32 em_set_work_state_get(void);
 
-/* The quest/arena accessors that share this unit's registered `.text` range.  `em_pop`'s band
- * 0x803B465C..0x803BE30C is the discovery `--max-bytes` cap over several bands (its header says so);
- * the `quest_flag_*_ck` / `quest_arena_*_get` / `quest_element_value_get` accessors at
- * 0x803B4BEC..0x803B68F0 sit inside it and are the quest/arena UI band's own.  Their callers, from
- * the target objects' undefined references (2987 objects scanned), are **20**: enemy/em020_prog,
- * enemy/fn_8011D448, enemy/fn_801251D0, enemy/fn_8012EC74, enemy/fn_8013F764,
- * lobby/lb_quest_screen, menu/fn_8031EA8C, menu/menu_result, quest/quest_entry, quest/quest_entry
- * and nine unclaimed `auto_*` bands - this file defines none of them and is not among them.  The
- * declarations live here because the registered range is this unit's (rule 2); the seam re-draw is
- * filed in both units' residual lists. */
+/* The quest/arena accessors at 0x803B4BEC..0x803B68F0 (`quest_flag_*_ck`, `quest_arena_*_get`,
+ * `quest_element_value_get`): in this unit's range but the quest/arena UI band's own (the unit is probably several
+ * TUs, docs/enemy.md); their callers are the enemy, lobby, menu and quest units. */
 struct QuestRecord;   /* defined in `unsplit/menu.h` (the arena-result band's record) */
 /* The result record's +0x310 flag word, one test per bit; `rec` 0 means the current record (NULL
  * selects the work's own through `quest_record_get`).  The bit names are this header's reading of

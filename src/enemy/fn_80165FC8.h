@@ -1,17 +1,7 @@
-/* The enemy state/action unit `enemy/fn_80165FC8.cpp` (0x80165FC8..0x801679B0, 21 functions).
- *
- * This header holds what the unit needs from outside its own range: the two records its bodies read
- * (the `enemy_data_find` entry and the `ResUserDataAc` accessor the range's three non-state methods
- * belong to), and the declarations of the flat `fn_XXXXXXXX` symbols the range calls.  The flat names
- * are C-linkage and never spelled as a mangling (docs/plan.md 6.5 rule 9); the genuinely mangled
- * callees are declared at C++ scope with their real signatures.
- *
- * The record layouts are the union of the offsets this unit reads and the offsets the records' other
- * readers name (`enemy/fn_8013BE60.c`'s `_ENEMY_DATA`, `enemy/fn_80170600.cpp`'s `ENEMY_ENTRY`; the
- * two are the same record).  `ResUserDataAc` is the `g3d_resuser_ac.h` accessor `enemy/fn_80138074.c`
- * reconstructs (its vtable is `lbl_805A6D28`, stored by that unit's `fn_8015DAA8` constructor); the
- * three methods of this range that belong to it (`fn_801661BC`/`fn_801661FC`/`fn_801662D4`) are
- * emitted here because their addresses fall in this range.
+/* What `enemy/em008_prog.cpp`'s 0x80165FC8 state/action band needs from outside it: the `enemy_data_find` entry
+ * (`enemy/em_kind.cpp`'s `_ENEMY_DATA` and `enemy/em012_prog.cpp`'s `ENEMY_ENTRY` are the same record), the
+ * `ResUserDataAc` accessor (`g3d_resuser_ac.h`, vtable `lbl_805A6D28`) whose methods `fn_801661BC`/`fn_801661FC`/
+ * `fn_801662D4` fall in the band, and the flat `fn_` callees (C linkage; the mangled ones at C++ scope).
  */
 #ifndef MHTRI_ENEMY_FN_80165FC8_H
 #define MHTRI_ENEMY_FN_80165FC8_H

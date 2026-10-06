@@ -1,9 +1,5 @@
-/* The quest-note / note-pane record types of the enemy band at 0x80385A54..0x80385CA0 and of the
- * band that continues it at 0x803A3A50 (docs/plan.md 6.5 rule 1: a type more than one unit uses is
- * defined once and included, never copied).
- *
- * The owner is `src/enemy/fn_80382310.cpp` (`.text` 0x80382310..0x80387844); the second consumer is
- * the band above it (0x803A3A50..), whose head drives the same 0x1F8-byte records.
+/* The quest-note / note-pane record types of `enemy/em_prog_support.cpp` (0x80385A54..0x80385CA0) and of the band at
+ * 0x803A3A50 that drives the same 0x1F8-byte records: one definition, included by both.
  */
 #ifndef MHTRI_ENEMY_NOTE_WORK_H
 #define MHTRI_ENEMY_NOTE_WORK_H
@@ -95,7 +91,7 @@ struct NoteLayout {
 };
 
 /* `Screen_w` (0x8065903C, .bss, unsplit): only the frame scale at +0x14, the field this band's
- * `fn_80384324` multiplies its string width by (the same field `enemy/fn_8012E968.cpp` names).
+ * `fn_80384324` multiplies its string width by (the same field `enemy/em_common.cpp` names).
  * size: 0x54 */
 struct NoteScreenScale {
     /* +0x00 */ u8 pad_0x00[0x14];

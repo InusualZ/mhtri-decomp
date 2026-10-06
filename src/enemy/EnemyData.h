@@ -1,6 +1,5 @@
-/* The per-enemy data record `get_enemy_data` returns, shared by `enemy.h` and the net sync
- * (`hud/net_char_sync.cpp`) that reads its kind byte (docs/plan.md 6.5 rule 1: one definition, included).
- * Moved here from `enemy.h`; the definition is unchanged except that its +0x00F byte is named.
+/* The per-enemy data record `get_enemy_data` returns, shared by `enemy.h` and the net sync (`hud/pl_frame_sync.cpp`)
+ * that reads its kind byte (+0x00F).
  */
 #ifndef MHTRI_ENEMY_ENEMYDATA_H
 #define MHTRI_ENEMY_ENEMYDATA_H
@@ -9,9 +8,9 @@
 
 typedef struct EmDataRecord EmDataRecord;   /* enemy/fn_80138074.c */
 typedef struct UserDataItem UserDataItem;   /* enemy/fn_80138074.c */
-typedef struct EnemyExtraData EnemyExtraData; /* enemy/fn_8012BDF4.cpp */
+typedef struct EnemyExtraData EnemyExtraData; /* enemy/em_common.cpp */
 
-/* The per-enemy data record `get_enemy_data` returns.  Union of `enemy/fn_8012BDF4.cpp` and
+/* The per-enemy data record `get_enemy_data` returns.  Union of `enemy/em_common.cpp` and
  * `enemy/fn_80138074.c`; the two views are compatible (a pointer table at +0x04, the value list at
  * +0x64, the user-data items at +0x94 and the extra block at +0xA0). size: 0xA4 */
 typedef struct EnemyData {

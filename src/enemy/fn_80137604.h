@@ -1,9 +1,5 @@
-/* The enemy unit `enemy/fn_80137604.cpp` (0x80137604..0x80138074): the per-motion action/rotation
- * update set and the move-work slot picker.
- *
- * Declarations for the symbols the unit owns (docs/plan.md 6.5 rule 2: an extern lives with the TU
- * that owns the symbol).  `fn_801377D0` was added by `enemy/fn_801B0010.cpp`, whose em030 program
- * calls it.
+/* Declarations `enemy/em_common.cpp` owns from its per-motion action/rotation set (0x80137604-0x8013791C), the
+ * move-work slot picker `fn_801377D0` among them.
  */
 #ifndef MHTRI_ENEMY_FN_80137604_H
 #define MHTRI_ENEMY_FN_80137604_H

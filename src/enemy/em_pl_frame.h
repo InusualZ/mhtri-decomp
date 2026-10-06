@@ -1,7 +1,5 @@
-/* The declarations `src/enemy/em_pl_frame.cpp` owns that the player-act dispatcher in
- * `hud/net_char_sync.cpp` calls (docs/plan.md 6.5 rule 2: an extern lives with the TU that owns the symbol).
- * The unit's bodies are still to be written; each handler takes the player work and, for all but three, the
- * index of the act variant it serves (the signatures are the dispatcher's call sites').
+/* The player-act handlers `hud/pl_frame_sync.cpp` defines and its dispatcher calls: each takes the player work and,
+ * for all but three, the index of the act variant it serves (the signatures are the call sites').
  */
 #ifndef MHTRI_ENEMY_EM_PL_FRAME_H
 #define MHTRI_ENEMY_EM_PL_FRAME_H

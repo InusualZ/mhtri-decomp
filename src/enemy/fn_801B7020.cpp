@@ -1,90 +1,35 @@
 /* enemy/fn_801B7020.cpp - the em036 enemy's motion/act-instruction group.
- *
- * `.text` 0x801B7020..0x801B98C8 (em036), extab 0x8000F7EC..0x8000F904, extabindex 0x8002B2CC..0x8002B470, one
- * `.ctors` word at 0x8056F34C..0x8056F350 (`fn_801B985C`, the `__sinit`), `.data` 0x805B2188..0x805B2804 (after
- * `em036_prog_tbl`, 0x805B2118) and `.bss` 0x806A7AB8..0x806A7AD0.  Registered; the range was 0x801B7020..0x801BD6C0 until the 2026-09-30 recut.
- *
- * The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
- * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
- * static initializer - the `.ctors` words 0x8056F34C/350/354/358 - and the `.sdata2` pool repeats a value at each
- * change): em036 0x801B7020..0x801B98C8 (`fn_801B7020.cpp`), em040 0x801B98C8..0x801BB758 (`em040_ai.cpp`), em006
- * 0x801BB758..0x801C29F8 (`fn_801BD6C0.cpp`), em004 0x801C29F8..0x801CA8DC (`fn_801CA004.cpp`), em005 0x801CA8DC..
- * 0x801D71C4 (`fn_801CCBC4.cpp`), em007 0x801D71C4..0x801E0ADC (`fn_801D80EC.cpp`).  The files keep their old stems;
- * the `emNNN` names are GUESSes from the prog table that opens each TU's data.
- *
- * Module `enemy`.  Both bracketing registered units are `enemy/*` (`enemy/fn_80191598.cpp` below at
- * 0x80191598..0x801926EC, `lobby/lobby_scene.c` only after the whole 0x801926EC..0x801EC9E0 band), and
- * every callee out of the range is the enemy work API (`em_die_ck__FP11_ENEMY_WORK`,
- * `em_frame_check__FP11_ENEMY_WORKUsff`, `get_em_scale__FP11_ENEMY_WORK`, `get_move_work_adrs`,
- * `em_parts_damage_level_get`).  Language C++: the range reaches mangled symbols whose mangling only a
- * class/namespace declaration reproduces (`setMatColor__6MHcharFUl12_GXChannelID8_GXColorb`,
- * `rotVecY__FPQ34nw4r4math4VEC3Ul`, `shell_se_req__FP5_se_wPQ34nw4r4math4VEC3UcUl`).
- *
- * Seam.  Right edge 0x801B98C8: `fn_801B985C` is this TU's `__sinit` (the `.ctors` word) and `fn_801B98C8` is an
- * ordinary function that opens em040 (the 0.0 pool entry repeats at `lbl_80798DA4` in the window 0x801B98C8..
- * 0x801B9968).  Left edge 0x801B7020: the 4-byte `fn_801B701C` is in the window 0x801B701C..0x801B70A4 the 0.0
- * dedupe gives and stays with the unit below (not proven either way).
- *
- * Name.  The map has only `fn_XXXXXXXX` for this range - the runtime dump answers `zz_01b7020_` for
- * 0x801B7020 and nothing at all for the later rows (`tools/symbols/dumpmap.py lookup`) - and no
- * `__FILE__` string is referenced anywhere in the range, so the file keeps the map's stem.
- *
- * Status (this branch).  The first 24 rows (0x801B7020..0x801B7F74, 0x1A0C B) are written; 21 of them
- * are byte-identical under the official `report generate` metric and 3 carry a residual (below).  The
- * rest of the range is unwritten (the unit's score is in the report).  Every written row was measured one at a time
- * with `python tools/units/recompile.py enemy/fn_801B7020 --measure <symbol>` and re-measured in the
- * tree-wide report.
- *
- * Source shapes worth keeping (each measured):
- *   * `#pragma peephole off` (one scoped pragma, docs/plan.md 8.2): the build's -O3 peephole fuses the
- *     `clrlwi`/`rlwinm` + `cmpwi` pairs the byte gates need into their record forms (`clrlwi.` /
- *     `rlwinm.`).  `fn_801B7048`'s `joint_flags & 6` test and `fn_801B73A0`'s `bits_0x1EC & 7` test
- *     only match with it off; every already-identical row is unchanged by it.
- *   * `self->state++` and not `self->state = self->state + 1`: the u8 store of a plain `+ 1` expression
- *     drags a `clrlwi r0,r0,24` in front of the `stb`, which retail does not have (it costs one
- *     instruction in 17 rows).
- *   * a `switch` is the idiom the sparse dispatches are written in: it makes MWCC emit the `cmpwi`
- *     chain retail has (`fn_801B73A0`'s value chain, `fn_801B7494`'s state dispatch,
- *     `fn_801B7590`/`fn_801B78B0`'s sub-state dispatch - `fn_801B7590` scores 71.53 % as grouped
- *     `case 0: case 1: case 2:` labels, because MWCC then picks a range test instead of the chain).
- *   * the mode gates that retail compares with `cmpwi` (a *signed* int compare) need the operand
- *     spelled `(s32)(u8)mode`: a plain `u8` promotes to unsigned and yields `cmplwi`
- *     (`fn_801B71F4` 98.88 -> 100.00, `fn_801B7A68` 97.20 -> 97.85).
- *   * `fn_801B70A4`'s +0x08..+0x14 copy is word-wise in retail (`lwz`/`stw` pairs, not `lfs`/`stfs`):
- *     a three-u32 struct assignment reproduces the shape, a `memcpy` call does not (84.83 %).
- *
- * Residuals of the three rows that are not byte-identical:
- *   * `fn_801B70A4` 92.93 - everything matches but the register pair of the 12-byte copy: retail
- *     loads two words into r3/r0 and stores them (the inlined-copy shape), this build loads and stores
- *     one word at a time through r0.  Tried: a `memcpy(&out, &rot, 0xC)` call (84.83), a
- *     float-member assignment (the shape the target does *not* use), and a 3x u32 struct assignment
- *     (best).
- *   * `fn_801B7A68` 97.85 - the pool-reference spelling of the five constants and one row of the
- *     `fn_801B7E34`-style vector block; the instruction sequence itself matches.
- *   * `fn_801B7BDC` 99.84 - one `fmuls` operand order (`f1 * f0` in retail, `f0 * f1` here) after the
- *     `-5.0f` local is narrowed.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
- * lookup on the range's inventory: all 123 names are bare `.text` entries in
- * config/RMHE08/symbols.txt, the whole range's data references are pool floats/integers and `.bss`
- * blocks, and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
- *
- * Types.  This unit reads `_ENEMY_WORK` bytes that the shared views name differently: it keeps a f32
- * counter at +0x328 (the shared `enemy/ENEMY_WORK.h` carries a s16 `field_0x328` there for
- * `fn_80170804`) and it drives a +0x328..+0x358 cluster, +0x310/+0x320 vectors and the +0x210/+0x228
- * words that no shared header names yet.  The unit therefore carries its own view (`EmProgWork`),
- * exactly as `enemy/fn_80191598.cpp` (`EmActWork`), `enemy/fn_8013ACC4.cpp` (`EmWork`) and
- * `enemy/fn_8013F764.cpp` (`EmcWork`) do; the outbox asks for the measured fields to be folded into
- * the shared header.
+ * RANGE. .text 0x801B7020-0x801B98C8 (50 functions); .ctors 0x8056F34C-0x8056F350 (`fn_801B985C`, the static
+ *   initializer), .data 0x805B2118-0x805B2804 (from `em036_prog_tbl`), .bss 0x806A7AB8-0x806A7AD0,
+ *   .sdata 0x80791AB0-0x80791AB8, .sdata2 0x80798CF8-0x80798D88, extab, extabindex.
+ * SEAM. The band 0x801B7020-0x801E0ADC is six TUs: each one's `.data` opens with its `emNNN_prog_tbl`, each ends with
+ *   its static initializer (the `.ctors` words 0x8056F34C/350/354/358) and the `.sdata2` pool repeats a value at each
+ *   change - em036 here, em040 `enemy/em040_ai.cpp`, em006 `enemy/em006_prog.cpp`, em004 `enemy/em004_act.cpp`, em005
+ *   `enemy/em005_act.cpp`, em007 `enemy/em007_act.cpp`.  Right edge: `fn_801B985C` is this TU's static initializer and
+ *   the 0.0 pool entry repeats at `lbl_80798DA4` from `fn_801B98C8` on; left edge: the 4-byte `fn_801B701C` sits in the
+ *   0.0 dedupe window 0x801B701C-0x801B70A4 and stays with `enemy/em034_prog.cpp` (unproven either way).
+ * NAMES. The map stem; the dump answers `zz_01b7020_` for 0x801B7020 and nothing for the later rows, and no
+ *   `__FILE__` string is referenced.  em036 is a GUESS from the prog table that opens the TU's data.
+ * RESIDUALS. 26 rows unwritten: 0x801B7F78-0x801B98C8 (the static initializer among them).
+ *  - `fn_801B70A4`: retail copies the 12-byte +0x08..+0x14 block through r3/r0 pairs, ours one word at a time
+ *    through r0 (a `memcpy` call and a float-member assignment score lower; the three-u32 struct assignment is best);
+ *  - `fn_801B7BDC`: one `fmuls` operand order (`f1 * f0` in retail) after the `-5.0f` local is narrowed.
+ *   flipcheck: `.ctors`/`.data`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex short of the
+ *   claim.
+ * SHAPES. `#pragma peephole off` over the bodies (`fn_801B7048`'s `joint_flags & 6` and `fn_801B73A0`'s
+ *   `bits_0x1EC & 7` tests keep `clrlwi`/`rlwinm` + `cmpwi`); `self->state++`, not `self->state = self->state + 1`
+ *   (the `+ 1` store drags a `clrlwi` in front of the `stb`); a `switch` for the sparse dispatches (grouped
+ *   `case 0: case 1: case 2:` labels in `fn_801B7590` turn the chain into a range test); `(s32)(u8)mode` for the
+ *   gates retail compares with `cmpwi`; `EmProgWork` is this unit's view because it keeps an `f32` at +0x328 where
+ *   `enemy/ENEMY_WORK.h` has an `s16`, and names the +0x328..+0x358 cluster, the +0x310/+0x320 vectors and the
+ *   +0x210/+0x228 words.
  */
 #include "types.h"
 
 #include "nw4r/math.h"
 
-/* Retail keeps the unfused `clrlwi`+`cmpwi` and `rlwinm`+`cmpwi` pairs the -O3 peephole pass folds
- * into their record forms (`clrlwi.` / `rlwinm.`): `fn_801B7048`'s `joint_flags` test and
- * `fn_801B73A0`'s `bits_0x1EC` test both need it.  The same per-unit lever `enemy/fn_80191598.cpp`
- * documents (docs/plan.md 8.2; the playbook's row 39). */
+/* Retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` pairs the peephole pass folds into record forms
+ * (`fn_801B7048`'s `joint_flags` test, `fn_801B73A0`'s `bits_0x1EC` test; playbook 39). */
 #pragma peephole off
 
 #include "mh3_pad.h"
@@ -105,11 +50,8 @@
  * boundary (a pointer cast, never arithmetic - docs/plan.md 6.5 rule 6). */
 struct _ENEMY_WORK;
 
-/* The C++-mangled callees, declared at C++ scope so the front-end reproduces the map's mangling
- * (docs/plan.md 6.5 rule 9: a caller never spells it).  `rotVecY` belongs in the header of the unit
- * that owns it (0x80051064, `fn_8004CAD8.cpp`) but cannot go there: `src/enemy/fn_801550FC.cpp`
- * carries a C-linkage declaration of the same name, so a C++-scope declaration in that shared header
- * fails that unit with `(10505) illegal overloading`.  The outbox carries the conflict. */
+/* The C++-mangled callees, declared at C++ scope for the map's manglings; `rotVecY` (0x80051064) is
+ * `fn_8004CAD8.cpp`'s. */
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -125,9 +67,8 @@ struct EmVecWords {
     /* +0x08 */ u32 z;
 };
 
-/* The 0x20-byte out record `fn_80125F54` prepares and `fn_801421E4` fills.  Both of this range's
- * readers measure it the same way: a byte at +0x03 (the mode `fn_801B7118` switches on), the 3-float
- * vector the initialiser zeroes at +0x08, and a u32 at +0x18 that `fn_801B71F4` narrows to u16.
+/* The 0x20-byte out record `fn_80125F54` prepares and `fn_801421E4` fills: the mode byte at +0x03
+ * (`fn_801B7118`), the vector at +0x08 and the u32 at +0x18 `fn_801B71F4` narrows to u16.
  * size: 0x20 */
 struct EmSelRec {
     /* +0x00 */ u8 unused_0x00[0x03];
@@ -203,31 +144,17 @@ struct EmProgWork {
 /* This unit's own rows that an earlier row calls - they are defined further down, in address order. */
 extern "C" void fn_801B78F8(EmProgWork* self);
 
-/* The two foreign callees this unit cannot reach through a header, each for a documented reason:
- *   * `fn_800B0B90` is `Vec* fn_800B0B90(Vec* self, Vec* b)` in the owner's own source
- *     (`src/ef/fn_800AEE48.cpp:330` - it subtracts `b` from `self` in place), but that owner's header
- *     includes `ef.h`, whose `VEC3_ctor`/`setVec3` spellings clash with
- *     `mh3_pad.h`'s on the very same C-linkage symbols (MWCC `(10197) illegal function
- *     overloading`), so the header is not includable here.  The map symbol is the plain
- *     `fn_800B0B90`, hence C linkage.
- *   * `lbl_805B2188` is the 0x60-byte `.data` table `em_key_curve_eval` is handed; no registered unit
- *     claims that `.data` range, so it has no owner header - the same in-file spelling
- *     `src/Pl/pl_act.cpp` uses for its data labels.  Both are `shared-file` requests in the outbox. */
+/* `fn_800B0B90` subtracts `b` from `self` in place (`ef/fn_800AEE48.cpp`, whose header clashes with `mh3_pad.h`'s
+ * `VEC3_ctor`/`setVec3`); `lbl_805B2188` is this unit's 0x60-byte `.data` table `em_key_curve_eval` is handed. */
 extern "C" {
 void fn_800B0B90(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
-/* 0x80050850 has moved to its owner's header, `fn_8004CAD8.h` (included above): the two
- * in-file copies that made that fold unsafe (`src/ef/fn_801173AC.cpp`'s and this one) were settled
- * in the same batch, 2026-09-27.  0x80051EE0 (r3 `out`, r4 `in`, f1 the scale it saves in f31
- * before zeroing `out` through `VEC3_ctor`) is still declared here: its owner is the same unit,
- * but the remaining spellings (`src/g3d/fn_80075DCC.cpp`'s four-argument form) have not been
- * settled, so the fold stays an outbox `shared-file` request. */
+/* 0x80051EE0 (`fn_8004CAD8.cpp`): r3 `out`, r4 `in`, f1 the scale it keeps in f31 while `VEC3_ctor` zeroes `out`;
+ * the tree spells it with three and four arguments, so it is declared here. */
 void fn_80051EE0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 extern u8 lbl_805B2188[];
 }
 
-/* ------------------------------------------------------------------------------------------------ */
-/* the range                                                                                          */
-/* ------------------------------------------------------------------------------------------------ */
+/* The range. */
 
 /* The walk-in altitude clamp: while the work's height (`pos.y`) is more than 1500 above its target
  * height (`target.y`), drop it by 20 per frame. */
@@ -251,7 +178,7 @@ extern "C" void fn_801B7048(EmProgWork* self) {
     }
 }
 
-/* Rotate a 45-degree-up vector by the work's Y rotation and hand it to the aim setter. */
+/* Rotates a 45-degree-up vector by the work's Y rotation and hands it to the aim setter. */
 extern "C" void fn_801B70A4(EmProgWork* self) {
     nw4r::math::VEC3 rot;
     EmVecWords out;
@@ -265,7 +192,7 @@ extern "C" void fn_801B70A4(EmProgWork* self) {
     fn_80130350((struct _ENEMY_WORK*)self, &out);
 }
 
-/* Pick the random-motion kind for the work's `field_0x01A` entry: 0 = no record, 1/2 = the kind the
+/* Picks the random-motion kind for the work's `field_0x01A` entry: 0 = no record, 1/2 = the kind the
  * selection record's mode chooses (0 → the 10 % branch, 2 → the 60 % branch). */
 extern "C" s32 fn_801B7118(u16 id) {
     EmSelRec rec;
@@ -338,9 +265,8 @@ extern "C" void fn_801B71F4(EmProgWork* self, u8 mode) {
     }
 }
 
-/* Retarget the program instruction (r4 points at the `{ code, ... }` record, r5 at the value): only
- * the code 11 row with an empty 3-bit `bits_0x1EC` field runs, and it moves the byte 0 → 29 and
- * 5 → 30. */
+/* Retargets the program instruction (r4 the `{ code, ... }` record, r5 the value): only the code 11 row with an
+ * empty 3-bit `bits_0x1EC` field runs, moving the byte 0 → 29 and 5 → 30. */
 extern "C" void fn_801B73A0(EmProgWork* self, u8* record, u8* value) {
     if (*record != 11) {
         return;
@@ -596,9 +522,8 @@ extern "C" void fn_801B78F8(EmProgWork* self) {
     }
 }
 
-/* The charge run-in: the motion set is restarted, the speed comes from the mode-dependent constant
- * (`em_approach_start`, 8 frames), and the vector to the target is normalised and scaled into the run-in
- * slot. */
+/* The charge run-in: restarts the motion set, takes the speed from the mode's constant (`em_approach_start`,
+ * 8 frames) and scales the normalised vector to the target into the run-in slot. */
 extern "C" void fn_801B7A68(EmProgWork* self, u8 mode) {
     nw4r::math::VEC3 vec;
     nw4r::math::VEC3 out;
@@ -748,7 +673,6 @@ extern "C" void fn_801B7E34(EmProgWork* self, u8 mode) {
     fn_801B7048(self);
 }
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7AB8..0x806A7AD0`), in address order: the 1 two-vector record(s)
- * its static constructor `fn_801B985C` builds (`.data` tables point at them).  Names are GUESSes: each record is a
- * pair of model-space points. */
+/* The unit's `.bss` (0x806A7AB8-0x806A7AD0): the two-vector record (a GUESS: a pair of model-space points) its
+ * static constructor `fn_801B985C` builds and the `.data` tables point at. */
 VEC3 vec_pair_801B7020_0[2];  /* +0x806A7AB8 */

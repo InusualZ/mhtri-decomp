@@ -1,13 +1,5 @@
-/* The enemy program/parts band `enemy/fn_8011D448.cpp` (0x8011D448..0x801251D0): the declarations
- * its consumers need (docs/plan.md 6.5 rule 2 - an extern lives with the TU that owns the symbol).
- * `em_parts_damage_level_get` is that unit's one function the runtime dump already names
- * (`em_parts_damage_level_get__FP11_ENEMY_WORKUc`), so it is declared at C++ scope with its real
- * signature (rule 9); its consumers call it as `em_parts_damage_level_get(self, part)`.
- *
- * Added with `enemy/fn_801A9540.cpp`'s registration: that range's `fn_801A960C`/`fn_801A9670` read
- * the per-part damage level through this function, and `src/ef/eft009.cpp` carried a private copy of
- * the declaration.  `enemy/fn_80181C88.cpp`'s `fn_80182080`/`fn_801825A4`/`fn_80182918` are a
- * second consumer (they declared it locally too), so this header is the one home for it.
+/* The declarations `enemy/fn_8011D448.cpp` owns that other units call; `em_parts_damage_level_get` is declared at
+ * C++ scope for its runtime-dump mangling.
  */
 #ifndef MHTRI_ENEMY_FN_8011D448_H
 #define MHTRI_ENEMY_FN_8011D448_H

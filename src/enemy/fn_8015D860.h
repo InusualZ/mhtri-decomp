@@ -1,14 +1,6 @@
-/* The action/state band `enemy/fn_8015D860.cpp` (0x8015D860..0x8015E854).
- *
- * Declarations published for the consumers (docs/plan.md 6.5 rule 2: an extern lives with the TU
- * that owns the symbol).  Moved out of `unsplit/enemy.h` when the band registered: that
- * header is a fallback for unowned addresses, and once the unit owns them its typed declarations
- * belong here.
- *
- * The signatures are the owners': `fn_8015D8F0`/`fn_8015D934` return the u32 0/1 predicates their
- * call sites compare with `cmplwi`; `fn_8015D908` returns the two-bit gate's answer;
- * `fn_8015D860`/`fn_8015DDB8`/`fn_8015DE00`/`fn_8015E05C`/`fn_8015E804` are the `void` steps and
- * dispatchers.
+/* Declarations `enemy/em008_prog.cpp` owns from its 0x8015D860-0x8015E854 action/state band: `fn_8015D8F0`/
+ * `fn_8015D934` return the u32 0/1 predicates their callers compare with `cmplwi`, `fn_8015D908` the two-bit gate's
+ * answer, and `fn_8015D860`/`fn_8015DDB8`/`fn_8015DE00`/`fn_8015E05C`/`fn_8015E804` are `void` steps and dispatchers.
  */
 #ifndef MHTRI_ENEMY_FN_8015D860_H
 #define MHTRI_ENEMY_FN_8015D860_H
