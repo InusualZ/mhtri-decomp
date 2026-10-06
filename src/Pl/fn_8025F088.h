@@ -71,7 +71,7 @@ u32 fn_80278578(struct _PLW* self, s32 v);
 u32 fn_80278D1C(struct _PLW* self);
 u32 fn_80279C20(struct _PLW* self);
 u32 fn_8027AF34(struct _PLW* self);
-s32 fn_80273228(struct _PLW* self, u16 item_id, s16 value);
+s32 pl_item_room_get(struct _PLW* self, u16 item_id, s16 value);
 u32 pl_act_kind_get(struct _PLW* self);
 
 /* ---- library callees (the owners' headers do not declare these) ---- */

@@ -8,6 +8,7 @@
  *   in `r0`; playbook 39).
  * NAMES. `eft004_set`, `eft004_set_pl` and `eft004_set_pl2` are the runtime dump's own names; `mtx34_trans_get` and
  *   `mtx34_trans_add` are GUESSes from their bodies; the map has only `fn_` stems for the rest.
+ *   GUESS (from its body and the note pane's caller): eft004_scaled_spawn
  * RESIDUALS. 5 rows unwritten: 0x801007BC-0x80100A30 (`fn_801007BC`), 0x80100AA8-0x8010140C (`fn_80100AA8`,
  *   `fn_801011B4`), 0x801017B0-0x80101C60 (`fn_801017B0`, `fn_80101980`).
  *   6 partial rows:
@@ -42,7 +43,7 @@
 
 /* `_PLW`, the player work record, comes from `Pl/plw.h` - one definition, in the owner's header (rule 1). */
 
-/* The pool block `fn_80101670` seeds: the count and a scale. size: 0x0C - lower bound, an approximation */
+/* The pool block `eft004_scaled_spawn` seeds: the count and a scale. size: 0x0C - lower bound, an approximation */
 struct EftScaledPool {
     /* +0x00 */ s32 count;
     /* +0x04 */ u8 unused_0x04[0x08 - 0x04];
@@ -342,7 +343,7 @@ extern "C" void fn_80101594(_PLW* self)
 }
 
 /* Creates a player-owned effect with a 1-effect pool, at a caller-chosen position and scale. */
-extern "C" void fn_80101670(nw4r::math::VEC3* pos, u8 area, f32 scale)
+extern "C" void eft004_scaled_spawn(nw4r::math::VEC3* pos, u8 area, f32 scale)
 {
     Eft004* effect = eft_res_slot_get(12);
 

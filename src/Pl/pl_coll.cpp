@@ -43,7 +43,7 @@
 
 /* One 0x10-byte placed sphere: an `nw4r::math::VEC3` position plus the radius the overlap tests read
  * at +0xC.  Evidence: `fn_8029CD7C`/`fn_8029D110` (the two callers) materialise the arguments as
- * 16-byte locals; every vector helper they are handed to (`PSVECSubtract`, `fn_80050EAC`) reads the
+ * 16-byte locals; every vector helper they are handed to (`PSVECSubtract`, `vec3_dist_sq`) reads the
  * first 12 bytes only, while `fn_8028F66C`/`fn_8028F758` read +0xC as a scalar and compare the
  * squared distance against `(radius_a + radius_b)`. size: 0x10 */
 struct HitSphere {
@@ -93,7 +93,7 @@ s32 fn_8028F66C(HitSphere* a, HitSphere* b, VEC3* out) {
     f32 reach;
 
     VEC3_ctor(&sep);
-    dist = fn_80050EAC(a, b);
+    dist = vec3_dist_sq(a, b);
     reach = a->radius + b->radius;
     if (dist <= reach * reach) {
         if (dist > 0.001f) {
@@ -116,7 +116,7 @@ s32 fn_8028F758(HitSphere* a, HitSphere* b, VEC3* out) {
     f32 reach;
 
     VEC3_ctor(&sep);
-    dist = fn_80050EAC(a, b);
+    dist = vec3_dist_sq(a, b);
     reach = a->radius + b->radius;
     if (dist <= reach * reach) {
         if (dist > 0.001f) {

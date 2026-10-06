@@ -15,6 +15,15 @@ extern "C" {
 /* 0x800D28FC - stores `mode + 1` as `system_w`'s display-state byte (+0xA58); the network transfer-mode switch
  * calls it with the transfer mode.  GUESS name. */
 void setTransferDisplayState(u8 mode);
+/* 0x800CEF18 - one step of the random ring's generator (0 is taken as 1; GUESS name). */
+u16 rand_lcg_step(u16 value);
+
+/* 0x800D2F1C - steps the system's two stream counters (GUESS name). */
+void system_stream_count_step(void);
+/* 0x800CF1B4 / 0x800CF154 - stop the sound, release both stage slots and reset the scene; the second also clears the
+ * system work first (GUESS names). */
+void system_scene_reset(void);
+void system_full_reset(void);
 
 #ifdef __cplusplus
 }
@@ -24,6 +33,13 @@ void setTransferDisplayState(u8 mode);
 /* 0x800CEAB0 - requests a file load (C++ scope: `load_file_req__FPcUllUllPUl`): name, destination, size,
  * callback, mode and the callback's context. */
 void load_file_req(char* name, u32 data, s32 size, u32 callback, s32 mode, u32* ctx);
+#endif
+
+#ifdef __cplusplus
+/* 0x800CF7A8 - takes `size` bytes of work memory (C++ scope: `work_mem_alloc__FUl`). */
+void* work_mem_alloc(u32 size); /* untyped: a byte range the caller types */
+/* 0x800D2138 - turns the HOME button menu off (C++ scope: `hbm_disable__Fv`). */
+void hbm_disable(void);
 #endif
 
 #endif /* MHTRI_EF_SYSTEM_CORE_H */

@@ -11,6 +11,7 @@
  * NAMES. `eft050_set` is the runtime dump's own name; the map has only `fn_` stems for the other 45 rows, so plain
  *   definitions are `extern "C"`.  `Eft050Work`, `Eft051Work` and `Eft050SetWork` type `_EFT::work_0x38` per family
  *   from the offsets each reads; the first family's count byte at +0x04 overlaps its handle list above a count of 1.
+ *   GUESS (from each body and its callers): eft050_interior_fx_spawn
  * RESIDUALS. 17 rows unwritten: 0x8033FAA4-0x8033FD78, 0x80340010-0x803401B8, 0x8034028C-0x80340594,
  *   0x803405C8-0x80342504, 0x803425C8-0x80342AC0, 0x80342B70-0x80342C60, 0x80342CAC-0x80342E80,
  *   0x80343130-0x803432B4.
@@ -72,7 +73,7 @@ typedef struct CockpitItemSlot {
 typedef struct CockpitItemBlock {
     /* +0x00 */ u8 state_0x00;      /* 1/2 draw the selection frame, `fn_8033F788` tests `+0xFF` */
     /* +0x01 */ u8 unused_0x01[0x07];
-    /* +0x08 */ u16 frame_id_0x08;  /* handed to `fn_802E0DA8` as the frame's part */
+    /* +0x08 */ u16 frame_id_0x08;  /* handed to `spr_anim_draw` as the frame's part */
     /* +0x0A */ u16 sel_id_0x0A;    /* the same, for the two cursor sprites */
     /* +0x0C */ u16 sel_flag_0x0C;  /* set while a selection is drawn */
     /* +0x0E */ u16 cursor_0x0E;    /* the slot the cursor sits on */
@@ -196,8 +197,8 @@ const u8* lb_entry_id_get(u8 index);
 s8* get_item_name_str(u8 id);
 s8* get_player_name_str(u8 index);
 s8* get_digit_str(u8 id);
-void fn_80222BC4(void* work, u16 id, u32 arg);
-void fn_8035A7D8(u16 id, const void* tbl, const void* pos, u16 id2, u32 arg);
+void lb_item_box_count_draw(void* work, u16 id, u32 arg);
+void eft052_box_list_draw(u16 id, const void* tbl, const void* pos, u16 id2, u32 arg);
 void fn_8033F788(CockpitItemBlock* self);
 /* this unit's own bodies, forward-declared (address order) */
 void fn_8033F270(CockpitPanel* self, const _mh_ivec2_* pos);
@@ -259,7 +260,7 @@ extern const u16 lbl_80793098[];
 extern const u16 lbl_807930A0[];
 
 /* The hold block at 0x806BF310 (`fn_8033FA2C` hands its address to `fn_8033F788`). */
-extern CockpitItemBlock lbl_806BF310;
+extern CockpitItemBlock eft052_item_box;
 
 #ifdef __cplusplus
 }
@@ -403,7 +404,7 @@ extern "C" void fn_8033F788(CockpitItemBlock* self)
                     sel.pos.x = (s16)(sel.pos.x + digit.x);
                     sel.pos.y = (s16)(sel.pos.y + digit.y);
                     set_blendmode(4, 1, 1);
-                    fn_802E0DA8(&sel, self->frame_id_0x08, &anchor);
+                    spr_anim_draw(&sel, self->frame_id_0x08, &anchor);
                     set_blendmode(4, 5, 1);
                 }
             }
@@ -419,12 +420,12 @@ extern "C" void fn_8033F788(CockpitItemBlock* self)
         spr_data_copy(&sel, get_lsp_data(0x1305, 0));
         sel.pos.x = (s16)(sel.pos.x + cursor.x);
         sel.pos.y = (s16)(sel.pos.y + cursor.y);
-        fn_802E0DA8(&sel, self->sel_id_0x0A, &anchor);
+        spr_anim_draw(&sel, self->sel_id_0x0A, &anchor);
         set_blendmode(4, 5, 1);
         spr_data_copy(&sel, get_lsp_data(0x1306, 0));
         sel.pos.x = (s16)(sel.pos.x + cursor.x);
         sel.pos.y = (s16)(sel.pos.y + cursor.y);
-        fn_802E0DA8(&sel, self->sel_id_0x0A, &anchor);
+        spr_anim_draw(&sel, self->sel_id_0x0A, &anchor);
     }
 }
 
@@ -434,9 +435,9 @@ extern "C" void fn_8033FA2C(void)
     _mh_ivec2_ anchor;
     get_lsp_data(0x2066, &anchor);
     draw_sprite_ary(lbl_805E753C, &anchor);
-    fn_8033F788(&lbl_806BF310);
-    fn_80222BC4(&lbl_806BF310, 0x2090, 0);
-    fn_8035A7D8(0x209F, lbl_805E7528, lbl_807930A0, 0x2065, 0);
+    fn_8033F788(&eft052_item_box);
+    lb_item_box_count_draw(&eft052_item_box, 0x2090, 0);
+    eft052_box_list_draw(0x209F, lbl_805E7528, lbl_807930A0, 0x2065, 0);
 }
 
 /* Reports the hold's state: 0 while the busy flag is set, -1 while the hold flag is clear, 1

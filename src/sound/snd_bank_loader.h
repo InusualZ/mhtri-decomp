@@ -30,6 +30,11 @@ void snd_quest_bgm_load(void);
 void snd_stage_bank_load(u8 map, u8 area, u8 rank);
 void snd_player_banks_load(void);
 
+/* 0x800F22A8 - starts loading the lobby BGM stream (GUESS name). */
+void lobby_bgm_load(void);
+/* 0x800F051C - loads the sound bank pair of map `kind`'s area `index` (GUESS name). */
+void snd_area_bank_load(u8 kind, u8 index);
+
 #ifdef __cplusplus
 }
 #endif
@@ -37,6 +42,11 @@ void snd_player_banks_load(void);
 #ifdef __cplusplus
 /* 0x800EEEFC - resets the quest sound work (C++ scope: the map row is `quest_snd_wk_init__Fv`). */
 void quest_snd_wk_init(void);
+#endif
+
+#ifdef __cplusplus
+/* 0x800F21AC - loads the movie's BGM (C++ scope: `movie_bgm_load__Fv`). */
+void movie_bgm_load(void);
 #endif
 
 #endif

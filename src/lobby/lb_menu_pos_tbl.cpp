@@ -8,7 +8,8 @@
  * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off` (retail keeps the narrowing `clrlwi`s; docs/lobby.md).
  * NAMES. `lb_menu_pos_tbl` is the position table the static constructor `fn_8021FF5C` fills; `lb_page_state_0/1` (the
  *   records `.data` 0x805BA4B0/0x805BA530 point at) and `lb_menu_pos_tbl`/`lb_menu_pos_extra` are GUESSes.
- * RESIDUALS. 12 rows unwritten: `fn_8021F0DC` (0x8021F0DC-0x8021F218), 0x8021F2AC-0x8021FCD0, 0x8021FCE0-0x80220038
+ *   GUESS (from each body and its callers): lb_event_schedule_step
+ * RESIDUALS. 12 rows unwritten: `lb_event_schedule_step` (0x8021F0DC-0x8021F218), 0x8021F2AC-0x8021FCD0, 0x8021FCE0-0x80220038
  *   (the constructor `fn_8021FF5C` among them, which `setVec3`s the five positions and calls `fn_8021FFFC(&lobby_w)`);
  *   only `lb_item_list_state` of the `.bss` claim is defined.
  *  - `syncItemListClock`: retail keeps no third callee-saved register (ours saves r29 for the surviving argument) and

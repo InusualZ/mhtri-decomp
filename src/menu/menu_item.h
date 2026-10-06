@@ -212,7 +212,7 @@ struct MenuSlot {
     /* +0x324 */ MenuPlaceRec* place_entries; /* the 0x24-byte placement list `menu/menu_row.cpp` walks */
     /* +0x328 */ s32 place_count;
     /* +0x32C */ u8 unused_0x32C[0x1];
-    /* +0x32D */ u8 field_0x32D;      /* the flag `fn_802A0188` clears after `fn_8004082C` */
+    /* +0x32D */ u8 field_0x32D;      /* the flag `fn_802A0188` clears after `kbd_close_call` */
     /* +0x32E */ u8 unused_0x32E[0x330 - 0x32E];
 };
 
@@ -260,7 +260,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *
  * The callees split three ways by whose header can supply a declaration (rule 2):
  *   * `Pl/pl_act.cpp` (`fn_8027EB18`, `fn_8027E120`), `pad_connect.cpp` (`screen_split_mode_ck`) and
- *     `fn_80040598.cpp` (`fn_8004082C`) have no header that declares these, so the shapes here are this unit's
+ *     `fn_80040598.cpp` (`kbd_close_call`) have no header that declares these, so the shapes here are this unit's
  *     call sites'; `mh3_pad.h` cannot be included here because it and `ef.h` (which `pl.h` pulls in) collide.
  *   * `GameMode_ck` keeps its owner's (`ef/fn_800CDB2C.h`) `u8` spelling: a `u32` view is `(10505) illegal
  *     overloading` beside the owner's header.
@@ -351,7 +351,7 @@ void fn_802A4D98(MenuSlot* slot);
 /* 0x80047058 is `pad_connect.cpp`'s (no argument, `Screen_w+0x1A != 0`); it keeps the owner's `s32`, since a
  * `u32` view is `(10505) illegal overloading` once both headers are visible in one TU. */
 s32 screen_split_mode_ck(void);
-void fn_8004082C(void);
+void kbd_close_call(void);
 u8 GameMode_ck(void);
 u32 move_work_state_ck(void);
 u32 game_ready_ck(void);

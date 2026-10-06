@@ -88,8 +88,8 @@ void fn_803066B4(_EFT* self);
 /* `stage/fn_802B2AA0.h` cannot be included here: it pulls `sound/mhchar.h`, whose
  * `_GXChannelID` enum clashes with the one `pl.h` (via `hud/layout.h`) defines. */
 u8* fn_802B04A0(u8 kind);
-s32 fn_80222BC4(u8*, s32, u8);
-s32 fn_8035A7D8(s32, const void*, const void*, s32, s32);
+s32 lb_item_box_count_draw(u8*, s32, u8);
+s32 eft052_box_list_draw(s32, const void*, const void*, s32, s32);
 
 /* C-linkage object/data the range reads that no registered unit has claimed (rule 2's unsplit home;
  * these sit in the range's own unclaimed `.data`/`.sbss` runs). */
@@ -107,7 +107,7 @@ extern const u16 lbl_805DAFE8[];          /* .data 0x805DAFE8 */
 extern u16 lbl_80792A68;                 /* .sdata 0x80792A68 */
 extern u16 lbl_80792A70;                 /* .sdata 0x80792A70 */
 extern char lbl_80792A78;                /* .sdata 0x80792A78 - a 7-byte string */
-extern u8 lbl_806BF310[];                 /* .bss 0x806BF310, 0x58 B */
+extern u8 eft052_item_box[];                 /* .bss 0x806BF310, 0x58 B */
 
 /* `src/lobby/fn_802FA9A0.cpp` owns these addresses (the band below); declared in its header once the
  * bodies land, so this file reaches them through that header. */
@@ -186,16 +186,16 @@ void fn_8030326C(s32 index, _mh_ivec2_* out) {
     out->y = pos.y + 2;
 }
 
-/* 0x80303580 - the page's static furniture pass: sprite `0x2469` then the `lbl_806BF310` overlay,
+/* 0x80303580 - the page's static furniture pass: sprite `0x2469` then the `eft052_item_box` overlay,
  * closing with the `0x2497` string banner. */
 void fn_80303580(void) {
     _mh_ivec2_ pos;
 
     get_lsp_data(0x2469, &pos);
     draw_sprite_ary(lbl_805DB1F0, &pos);
-    fn_803032EC(lbl_806BF310);
-    fn_80222BC4(lbl_806BF310, 0x2468, 0);
-    fn_8035A7D8(0x2497, lbl_805DB1D8, &lbl_80792A78, 0x2467, 0);
+    fn_803032EC(eft052_item_box);
+    lb_item_box_count_draw(eft052_item_box, 0x2468, 0);
+    eft052_box_list_draw(0x2497, lbl_805DB1D8, &lbl_80792A78, 0x2467, 0);
 }
 
 /* 0x803035F8 - finds the `_tr_flag` record whose leading id matches `id`, or returns the table base

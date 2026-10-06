@@ -34,4 +34,12 @@ void draw_shape_stage_load(u8 stage);
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x80054E04 / 0x80055054 / 0x80055204 - load the item-icon, frame and menu texture packs (C++ scope: the map rows
+ * are `itemicon_tex_load__Fv`, `gpframe_tex_load__Fv`, `menu_tex_load__Fv`). */
+void itemicon_tex_load(void);
+void gpframe_tex_load(void);
+void menu_tex_load(void);
+#endif
+
 #endif /* MHTRI_DRAW_SHAPE_H */

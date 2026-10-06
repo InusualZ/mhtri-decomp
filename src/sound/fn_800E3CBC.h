@@ -12,4 +12,9 @@
 void prim_init_all(void);
 #endif
 
+#ifdef __cplusplus
+/* 0x800E4574 - sets the 2D blend mode (C++ scope: `set_blendmode__FUcUcUc`). */
+void set_blendmode(u8 src, u8 dst, u8 op);
+#endif
+
 #endif /* MHTRI_SOUND_FN_800E3CBC_H */

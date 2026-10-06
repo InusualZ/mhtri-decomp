@@ -125,6 +125,11 @@ typedef union StageCell {
 void stage_map_res_load(u8 map);
 void stage_map_obj_load(u8 map);
 
+/* 0x802AFBA0 - releases stage area slot `slot` (GUESS name). */
+void stage_area_slot_release(s8 slot);
+/* 0x802AFB10 - the free stage area slot (0 or 1), -1 when both are taken (GUESS name). */
+s8 stage_area_free_slot_get(void);
+
 #ifdef __cplusplus
 }
 #endif

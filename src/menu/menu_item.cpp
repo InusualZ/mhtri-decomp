@@ -1559,7 +1559,7 @@ extern "C" void fn_802A0188(void)
     menu_work.slot[1].active = 0;
     menu_work.slot[0].active = 0;
     if (menu_work.slot[0].field_0x32D != 0) {
-        fn_8004082C();
+        kbd_close_call();
         menu_work.slot[0].field_0x32D = 0;
         menu_work.slot[1].field_0x32D = 0;
     }

@@ -37,7 +37,7 @@
  * callbacks and the Psw pad-record accessors, the KPAD/WPAD setup and the small flag/word helpers.
  *
  * Residuals (measured against the target object, symbol by symbol):
- *   - fn_80040AC4 / fn_80040B98 / fn_80040ED0 (79.2 / 79.4 / 79.1 %): the loader state functions keep
+ *   - rso_overlay_mode2_load / fn_80040B98 / rso_overlay_mode4_load (79.2 / 79.4 / 79.1 %): the loader state functions keep
  *     the pool array and the name table in two registers (r30/r31) across both loads; ours re-materialises
  *     the base each time, so ~10 of the ~47 instructions differ by register only.  Same byte sizes.
  *   - fn_8004192C (79.2 %): the target sign-extends the s16 slot (`extsh r0,r3`) before the `slwi r3,5`;
@@ -61,6 +61,8 @@
  *   flipcheck: `.sdata2` claimed, not emitted.
  *   GUESS (from the body and its callers): `vec3_assign`.
  * NAMES. GUESS (from each body and its callers): stage_map_set
+ *   GUESS (from each body and its callers): rso_overlay_release_all, rso_overlay_mode2_load, rso_overlay_mode4_load
+ *   GUESS: pad_input_clear
  */
 
 #include "types.h"
@@ -209,7 +211,7 @@ extern "C" void fn_80040928(void)
 }
 
 /* Release every loaded sub-overlay and reset the loader state. */
-extern "C" void fn_80040954(void)
+extern "C" void rso_overlay_release_all(void)
 {
     s32 loadedD8;
     s32 loadedDC;
@@ -268,14 +270,14 @@ extern "C" void fn_80040954(void)
 }
 
 /* Load the two-overlay mode (state 2). */
-extern "C" void fn_80040AC4(void)
+extern "C" void rso_overlay_mode2_load(void)
 {
     u32* pools;
     char** names;
     u8* idx;
 
     if ((s8)lbl_807947C8[0] != 2 && (s8)lbl_807947C8[0] != 4) {
-        fn_80040954();
+        rso_overlay_release_all();
         pools = rso_slot_load_base;
         names = lbl_8057C9D8;
         idx = lbl_80790E28;
@@ -295,7 +297,7 @@ extern "C" void fn_80040AC4(void)
 extern "C" void fn_80040B98(void)
 {
     if ((s8)lbl_807947C8[0] != 1) {
-        fn_80040954();
+        rso_overlay_release_all();
         rso_slot_load_base[lbl_80790E28[0]] = lbl_807947C0;
         lbl_807947D8 = (RSOModule*)fn_80040598(lbl_8057C9D8[0], (void*)rso_slot_load_base[lbl_80790E28[0]],
                                                 lbl_80790E28[0]);
@@ -320,7 +322,7 @@ extern "C" void fn_80040B98(void)
 extern "C" void fn_80040CA8(void)
 {
     if ((s8)lbl_807947C8[0] != 3) {
-        fn_80040954();
+        rso_overlay_release_all();
         rso_slot_load_base[lbl_80790E28[0]] = lbl_807947C0;
         lbl_807947D8 = (RSOModule*)fn_80040598(lbl_8057C9D8[0], (void*)rso_slot_load_base[lbl_80790E28[0]],
                                                 lbl_80790E28[0]);
@@ -368,10 +370,10 @@ extern "C" void stage_map_set(u8 which)
 }
 
 /* Load the fifth-overlay mode (state 4). */
-extern "C" void fn_80040ED0(void)
+extern "C" void rso_overlay_mode4_load(void)
 {
     if ((s8)lbl_807947C8[0] != 4) {
-        fn_80040954();
+        rso_overlay_release_all();
         rso_slot_load_base[lbl_80790E28[0]] = lbl_807947C0;
         lbl_807947D8 = (RSOModule*)fn_80040598(lbl_8057C9D8[0], (void*)rso_slot_load_base[lbl_80790E28[0]],
                                                 lbl_80790E28[0]);
@@ -857,7 +859,7 @@ extern "C" f32 clamp_acc(f32 value, f32 limit)
  * foot of the file, after every use: with the definitions above the bodies MWCC folds the addresses
  * into one section base plus displacements, where the target emits a `lis`/`addi` pair per symbol.
  * ------------------------------------------------------------------ */
-u32 rso_slot_load_base[5];             /* +0x806585B8: per-slot RSO load base, cleared by `fn_80040954` */
+u32 rso_slot_load_base[5];             /* +0x806585B8: per-slot RSO load base, cleared by `rso_overlay_release_all` */
 u32 rso_slot_unused_words[5];          /* +0x806585CC: cleared with `rso_slot_load_base`, read nowhere else */
 SystemWork system_w;                   /* +0x806585E0: the game/system state block (`mh3_pad/system_w.h`) */
 ScreenWork Screen_w;                   /* +0x8065903C: the screen geometry block (`mh3_pad/Screen_w.h`) */

@@ -199,7 +199,7 @@ u32 get_move_work_max(u8 kind);
  *   * `hud/cockpit_quest_marker.h` (0x802EC4F0-0x802EF730), `hud/cockpit_quest.h`
  *     (0x802E796C-0x802EA33C) and `hud/layout.h` (0x802E0B54/0x802E270C): all three clash with
  *     `unsplit/lobby.h`, which this unit needs for `drawshape_*`/`draw_sprite_*`, on
- *     `_mh_ivec2_`, `spr_data_copy`, `fn_802E0DA8`, `draw_sprite_anim_ary`, `get_move_work_adrs` and
+ *     `_mh_ivec2_`, `spr_data_copy`, `spr_anim_draw`, `draw_sprite_anim_ary`, `get_move_work_adrs` and
  *     `get_move_work_max`; `hud/cockpit_quest.h` additionally redefines `CockpitWork` and declares
  *     `cockpit_work` with its own record type.
  *   * `ai/fn_802D0F34.h` (0x802D27E0): redefines `_HIT_W` against `menu/menu_item.h`

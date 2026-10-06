@@ -33,6 +33,11 @@ u8 get_cfg(u8 index, u8 value);
 void arena_cfg_apply(u8 player);
 void arena_cfg_set(u8 player, u8 index, u8 value);
 
+/* The note trade's goods table (`.sdata` 0x807936B0): its first word points at the 0-terminated `NoteGoods`
+ * records; the reader takes it as an object of unknown extent (a `lis`/`lwz` load, not a small-data one) (GUESS name). */
+struct NoteGoods;
+extern struct NoteGoods* note_goods_tbl[];
+
 #ifdef __cplusplus
 }
 #endif

@@ -16,6 +16,9 @@ s32 getItemListSelection(void);
  * scroll depth (GUESS name: the network control's schedule sync is the caller). */
 void syncItemListClock(u32 stamp, u32 count, f32 depth);
 
+/* 0x8021F0DC - steps the lobby's event schedule (GUESS name). */
+void lb_event_schedule_step(void);
+
 #ifdef __cplusplus
 }
 #endif

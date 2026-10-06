@@ -49,7 +49,11 @@ u32 fn_8027A198(struct _PLW* self);
 void fn_8027A17C(struct _PLW* self);
 void fn_8027A190(struct _PLW* self, s32 a);
 u32 fn_802790E4(struct _PLW* self, u32 mask);
-u32 fn_8027BCE0(struct _PLW* self);
+u32 pl_carry_item_get(struct _PLW* self);
+/* 0x802731B4 - how many of item `id` the actor carries (pouch and box run). */
+int Pl_item_timer_get(struct _PLW* self, u16 id);
+/* 0x80273228 - how many of item `id` (up to `value`) the actor still has room for (GUESS name). */
+s32 pl_item_room_get(struct _PLW* self, u16 item_id, s16 value);
 /* 0x8027D40C - the number of set bits in the actor's action-lock word (one parameter, like the definition). */
 s32 fn_8027D40C(struct _PLW* self);
 
@@ -136,6 +140,8 @@ void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c);
  * (`pl_act_enter`/`fn_80275ADC` emit `clrlwi r6,r6,16`). */
 void pl_act_enter_raw(struct _PLW* self, u8 kind, u16 no, u16 mask);
 
+/* 0x80274918 - the act-name table row `index` for the player's stance (`force` picks the stance table) (GUESS name). */
+u8* pl_act_name_row_get(struct _PLW* plw, s32 force, s32 index);
 /* 0x8027FAC4 - clears `out` and builds the equipment record item `item_id` stands for (the five equipment-ticket
  * ids 110/111/440/441/442 pick their builders).  GUESS name; added with `menu/menu_result.cpp` (rule 2). */
 struct _EQUIP;

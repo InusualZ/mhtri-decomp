@@ -1,6 +1,6 @@
 /* The types and declarations of `lobby/lb_pane_ui.cpp`'s page/panel band, with the map's own type names its manglings
  * need (`_mh_ivec2_`); `unsplit/lobby.h` cannot be included beside it (a byte-array `lobby_world_block`, a two-argument
- * `fn_8021213C`). */
+ * `lb_cmd_pressed_ck`). */
 #ifndef MHTRI_LOBBY_LB_PANE_UI_H
 #define MHTRI_LOBBY_LB_PANE_UI_H
 

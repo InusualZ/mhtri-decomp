@@ -1,10 +1,11 @@
 /* hud/layout.cpp - the HUD's 2D element library (the 88-function `layout.cpp` translation unit,
  * `.text` 0x802E0740..0x802E4978 / 0x4238 B).
+ * NAMES. GUESS (from each body and its callers): spr_anim_draw, draw_font_anim_idx, draw_window_frame_style
  *
  * Naming note: the symbol map had only fn_XXXXXXXX for most of this range; this run named every row it
  * wrote and the rows they call inside the unit (see "Renames" below).  The rows still carrying a
  * `fn_` stem are the ones with no body yet, plus the pre-existing debt (`fn_802E1978`,
- * `fn_802E198C`, `fn_802E0A24`, `fn_802E0B54`, `sprite_ary_last_frame`, `fn_802E0CE4`, `fn_802E0DA8`,
+ * `fn_802E198C`, `fn_802E0A24`, `fn_802E0B54`, `sprite_ary_last_frame`, `fn_802E0CE4`, `spr_anim_draw`,
  * `fn_802E08E8`, `fn_802E099C`, `sprite_frame_apply`, `fn_802E0F78`, `fn_802E1AEC`, `fn_802E1C74`,
  * `fn_802E1D30`, `fn_802E0714`) - filed as a naming sweep, not fixed here because each needs its
  * own evidence and the two that are called from outside this unit are cross-unit sweeps.
@@ -65,7 +66,7 @@
  * claim, and `objalign.py`/`flipcheck.py` are the two checks to run then.
  *
  * Flags: `cflags_hud` (Wii/1.3, `-O3`, `-inline noauto`, `-Cpp_exceptions on`, `-opt nopeephole`) - the
- * range keeps `bl`s to its own tiny helpers (`fn_802E0DA8` -> `fn_802E0CE4`), which is `-inline noauto`,
+ * range keeps `bl`s to its own tiny helpers (`spr_anim_draw` -> `fn_802E0CE4`), which is `-inline noauto`,
  * and it carries the 74 extab records `-Cpp_exceptions on` emits; the `nopeephole` half is the lib's
  * (this file's own `fmuls`+`fadds` pairs are the `#pragma fp_contract off` below, not a lib flag).
  *
@@ -362,7 +363,7 @@ u32 fn_802E0CE4(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 part, const _mh_ive
 }
 
 /* 0x802E0DA8 (0x14) - the same from the record's own animation table. */
-u32 fn_802E0DA8(_SPR_DATA_* rec, u16 part, const _mh_ivec2_* pos)
+u32 spr_anim_draw(_SPR_DATA_* rec, u16 part, const _mh_ivec2_* pos)
 {
     return fn_802E0CE4(rec, rec->anim, part, pos);
 }

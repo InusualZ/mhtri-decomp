@@ -279,6 +279,24 @@ struct EmSetSave {
     /* +0xD4 */ u16 flag_0xD4;          /* `em_set_userdata_flag_ck` */
 };
 
+/* The note trade's voyage record at `lobby_world_block + 0x5270` (`note_timer_*`, `note_trade_*`): the route sent
+ * and the points it brings back, the bonus route and its points, the visit's random seed, the voyages left, the
+ * reward each route's next 100 points give, the routes' points, and each route's offer seed (stepped 50 times a
+ * tick: the retail source's own leftover nesting, which the target's codegen reproduces exactly).
+ * size: 0x18 */
+typedef struct NoteTimer {
+    /* +0x00 */ s8 slot_0x00;
+    /* +0x01 */ u8 gain_0x01;
+    /* +0x02 */ u8 bonus_slot_0x02;
+    /* +0x03 */ u8 bonus_gain_0x03;
+    /* +0x04 */ u16 seed_0x04;
+    /* +0x06 */ s8 voyage_0x06;
+    /* +0x07 */ u8 pad_0x07;
+    /* +0x08 */ s8 reward_0x08[4];
+    /* +0x0C */ u8 points_0x0C[4];
+    /* +0x10 */ u16 seed_0x10[4];
+} NoteTimer;
+
 /* One arena quest's record holders in the save block: the two hunter names the best time was set with.
  * size: 0x34 */
 struct Q_ArenaRecord {
@@ -308,15 +326,22 @@ struct Q_UserData {
     /* +0x3F04 */ s32 points_0x3F04;          /* the resource points (`userdata_zenny_add` credits them) */
     /* +0x3F08 */ u8 pad_0x3F08[0x3F28 - 0x3F08];
     /* +0x3F28 */ Q_QuestStat quest_stat;  /* the stat `quest_init` copies into the work block's own */
-    /* +0x3F38 */ u8 pad_0x3F38[0x3F98 - 0x3F38];
+    /* +0x3F38 */ u8 pad_0x3F38[0x3F95 - 0x3F38];
+    /* +0x3F95 */ u8 cat_name_0x3F95[3];   /* the name index of each of the three kitchen Felynes (NPC kinds 0x14..0x16) */
     /* +0x3F98 */ EmSetSave em_set_0x3F98;   /* the free hunt's monster records (`em_set_work_init`) */
     /* +0x406E */ u8 pad_0x406E[0x42D0 - 0x406E];
     /* +0x42D0 */ Q_ArenaRecord arena_0x42D0[12];  /* the arena quests' record holders, by arena quest */
-    /* +0x4540 */ u8 pad_0x4540[0x484E - 0x4540];
+    /* +0x4540 */ u8 pad_0x4540[0x483A - 0x4540];
+    /* +0x483A */ u8 pig_name_0x483A;   /* the Poogie's name index (`name_menu_step`) */
+    /* +0x483B */ u8 pig_dress_0x483B;  /* the Poogie's costume (`pig_menu_step`) */
+    /* +0x483C */ u8 pad_0x483C[0x484E - 0x483C];
     /* +0x484E */ u16 kitchen_seed_0x484E;    /* the kitchen's roll seed, re-drawn after every meal */
     /* +0x4850 */ u8 pad_0x4850[0x516C - 0x4850];
     /* +0x516C */ u8 kitchen_pairs_0x516C[0xF0];  /* the ingredient pairs tried offline, one bit per pair */
-    /* +0x525C */ u8 kitchen_pairs_0x525C[0x86];  /* the pairs tried online (approximate: to the next field) */
+    /* +0x525C */ u8 kitchen_pairs_0x525C[0x14];  /* the pairs tried online (approximate: to the note timer) */
+    /* +0x5270 */ NoteTimer note_timer_0x5270;   /* the note trade's voyage record (`note_timer_*`, `note_trade_*`) */
+    /* +0x5288 */ u32 note_rewards_0x5288;   /* one bit per route reward won (route * 6 + reward) */
+    /* +0x528C */ u8 pad_0x528C[0x52E2 - 0x528C];
     /* +0x52E2 */ u16 event_bits_0x52E2;  /* the event flags the result screen reports as new */
     /* +0x52E4 */ u8 pad_0x52E4[0x5334 - 0x52E4];
     /* +0x5334 */ u32 arena_best_0x5334[12];  /* the arena quests' best times in frames, 0 when unset */

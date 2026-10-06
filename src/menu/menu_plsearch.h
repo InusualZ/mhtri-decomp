@@ -53,8 +53,19 @@ s32 suppressPatTermsEcho(struct PatTerms* terms, const u8* in, u8* out, s32 size
 s32 readPatTermsVoice(struct PatTerms* terms, u8* out, s32 size);
 s32 writePatTermsVoice(struct PatTerms* terms, const s16* in, s32 size);
 
+/* 0x80449860 / 0x804498C8 / 0x804498CC - start the data file, start the system file and wait for the system file
+ * (the last stores the save-busy flag) (GUESS names). */
+s32 game_data_file_create_start(void);
+s32 game_system_file_create_start(void);
+s32 game_system_file_create_wait(void);
+
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* 0x80449878 - waits for the game save (C++ scope: `game_save_wait__Fv`). */
+s32 game_save_wait(void);
 #endif
 
 #endif /* MHTRI_MENU_MENU_PLSEARCH_H */

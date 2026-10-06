@@ -15,6 +15,8 @@
  *   is the dump's name.  Every other named row (`em020_*`, `releaseRemotePlayerParts`, `sendMemberJoinNotice`,
  *   `handleLobbyNetMessage`, `dropLobbyMail`, `addFriendNotice`) is a GUESS from its body: the dump answers `zz_`
  *   or a linker-folded duplicate's name.
+ *   GUESS (from each body and its callers): lobby_net_err_draw
+ *   GUESS (from each body and its callers): em020_profile_send
  * RESIDUALS. 108 rows unwritten: 0x8036CF64-0x8036E26C, 0x8036E2BC-0x8036E570, 0x8036E574-0x8036E6B8,
  *   0x8036E8C4-0x8036EA38, 0x8036EBF4-0x8036FA58, 0x8036FB10-0x80370274, 0x80370368-0x803705A8,
  *   0x80370680-0x80370FC8, 0x803710AC-0x80375084, 0x80375628-0x803757E0, 0x8037586C-0x803759BC,

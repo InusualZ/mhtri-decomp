@@ -10,8 +10,8 @@ extern "C" {
 #endif
 
 /* The `lb_*_str` tables: four `.sbss` pointers to arrays of string pointers, indexed by species id -
- * `fn_80211DCC` felyne-chaCha skill, `fn_80211DE0` felyne mask, `fn_80211DF4` felyne name,
- * `fn_80211E08` poogie name. */
+ * `lb_chacha_skill_name_get` felyne-chaCha skill, `lb_chacha_mask_name_get` felyne mask, `lb_cat_name_get` felyne name,
+ * `lb_pig_name_get` poogie name. */
 extern s32* lb_chacha_skill_str;
 extern s32* lb_chacha_mask_str;
 extern s32* lb_cat_name;
@@ -28,16 +28,21 @@ extern s32 lbl_805B9450[6];
 s32 lb_cmd_pressed_ck(u16 mask);
 s32 lb_cmd_held_ck(u16 mask);
 s32 lb_cmd_repeat_ck(u16 mask);
-s32 fn_80212250(u16 mask);
+s32 lobby_cmd_release_ck(u16 mask);
 u16 lb_cmd_repeat_get(void);
-u16 fn_802122E8(void);
-u16 fn_80212334(void);
+u16 lobby_cmd_trig_get(void);
+u16 lobby_cmd_release_get(void);
 
 /* `glplatTextureGetHeight` is the map's own name for the unguarded getter of `cmd_mask_0x084[0][0]`. */
 u16 glplatTextureGetHeight(void);
 
 s32 lb_yes_no_step(void* self);
-void fn_80212584(void* self);
+s32 lobby_cmd_toggle_step_raw(void* self);
+/* 0x80211DCC / 0x80211DE0 / 0x80211DF4 / 0x80211E08 - entry `id` of the four `lb_*_str` tables (GUESS names). */
+s32 lb_chacha_skill_name_get(u32 id);
+s32 lb_chacha_mask_name_get(u32 id);
+s32 lb_cat_name_get(u32 id);
+s32 lb_pig_name_get(u32 id);
 s16 fn_802126E8(s16* table, s16 count, u32 value);
 s16 fn_80212724(u8* table, s16 count, u32 value);
 

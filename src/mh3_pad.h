@@ -52,6 +52,14 @@ void* word_copy_return_dst(void *out /* untyped: a raw word the callee copies by
 s32 screen_split_mode_ck(void);
 
 #ifdef __cplusplus
+/* 0x80040954 - releases every loaded sub-overlay and resets the loader state (GUESS name). */
+void rso_overlay_release_all(void);
+/* 0x80040AC4 / 0x80040ED0 - load the two-overlay (state 2) and the fifth-overlay (state 4) sets (GUESS names). */
+void rso_overlay_mode2_load(void);
+void rso_overlay_mode4_load(void);
+/* 0x8004278C - clears pad `pad`'s button and stick words (GUESS name). */
+void pad_input_clear(s32 pad);
+
 }
 
 /* 0x8004136C - writes into `out` the localised form of the resource file name `name` (the region's
@@ -64,6 +72,11 @@ void cnvt_eur_fname(char* out, char* name);
 void GameModeExec(void);
 void VsGameModeExec(void);
 void setSoftresetFlag(bool flag);
+#endif
+
+#ifdef __cplusplus
+/* 0x80041A34 - hands the game over to the arena-select task (C++ scope: `ArenaSelExec__Fv`). */
+void ArenaSelExec(void);
 #endif
 
 #endif /* MHTRI_MH3_PAD_H */

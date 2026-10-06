@@ -5107,7 +5107,7 @@ s32 fn_802D7804(u8 index, f32 distance)
     if (index == 4 && fn_802D9CE0(&ainpc_w) == 1) {
         return 0;
     }
-    return fn_80050EAC(&ainpc_w.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
+    return vec3_dist_sq(&ainpc_w.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
            distance * distance;
 }
 
@@ -5132,7 +5132,7 @@ s32 fn_802D78FC(void)
     if (ainpc_w.field_0x422 == 0) {
         return 0;
     }
-    return fn_80050EAC(&ainpc_w.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
+    return vec3_dist_sq(&ainpc_w.vec_0x178, (nw4r::math::VEC3*)&plw->motion_pos_0x3C) <
            lbl_8079A870;
 }
 

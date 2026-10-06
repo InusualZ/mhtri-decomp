@@ -2889,7 +2889,7 @@ void fn_802607C4(_PLW* self) {
         for (i = 0; i < count; i++) {
             if (work->field_0x000 != 0 && work->field_0x001 != 0 &&
                 fn_8026077C(self->area_0x16, work->field_0x1E1) != 0) {
-                f32 distance = fn_80050EAC(&self->vec_0x03C, &work->pos_0x188);
+                f32 distance = vec3_dist_sq(&self->vec_0x03C, &work->pos_0x188);
 
                 if (best >= distance) {
                     best = distance;
@@ -3232,7 +3232,7 @@ s32 fn_80262688(_PLW* self) {
             fn_80050EF4(&self->vec_0x03C, &work->vec_0x03C) >= pl_float_300 &&
             ((PlItemData*)GetItemData(work->field_0x650))->field_0x01 < 3) {
             self->field_0x658 = 90;
-            if (fn_80273228(self, work->field_0x650, work->field_0x652) < work->field_0x652) {
+            if (pl_item_room_get(self, work->field_0x650, work->field_0x652) < work->field_0x652) {
                 if ((u16)fn_80273044(self, work->field_0x650) == 0xFFFF) {
                     pl_model_state_set(self, 1, 0, 0);
                 } else {
@@ -3444,7 +3444,7 @@ s32 fn_80264F78(_PLW* self) {
 
 /* 0x80264FF0 - the sleeping/paralysed state predicate. */
 s32 fn_80264FF0(_PLW* self) {
-    if ((Pl_cat_skill_ck(self, 0x17) == 1 || Pl_cat_skill_ck(self, 0x18) == 1) && fn_8027BCE0(self) != 0xFFFF) {
+    if ((Pl_cat_skill_ck(self, 0x17) == 1 || Pl_cat_skill_ck(self, 0x18) == 1) && pl_carry_item_get(self) != 0xFFFF) {
         return 1;
     }
     return 0;

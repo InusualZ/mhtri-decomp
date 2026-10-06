@@ -9,6 +9,13 @@
 
 extern "C" {
 
+/* The NPC sound callback `qnpc_snd_func_get` hands out (the shape `se_entry_request` takes). */
+typedef void (*QnpcSndFunc)(struct _ENEMY_WORK* work, s32 event);
+/* 0x80385414 - the NPC sound callback the quest NPC sets up (GUESS name). */
+QnpcSndFunc qnpc_snd_func_get(void);
+/* 0x80385B5C - starts motion `motion` on the pane's model whatever it is playing (GUESS name). */
+void note_pane_motion_start(NoteWork* self, u16 motion, u32 blend, s32 frame);
+
 /* 0x80384F80 - whether the quest NPC of (`map`, `area`) needs its models loaded (GUESS name). */
 u32 qnpc_load_ck(u8 map, u8 area);
 /* 0x80385118 - the `load_file_req` completion of one quest NPC model file: registers the read file in the resource
@@ -29,6 +36,13 @@ void note_pane_motion_start(NoteWork* self, u16 motion, u32 b, s32 frames);
 
 /* 0x80385C64 - whether the pane model's motion has ended (GUESS name: a tail call into the model's end test). */
 u32 note_pane_motion_end_ck(NoteWork* self);
+
+/* 0x80385B18 - the world matrix of joint `joint` of the pane's model (GUESS name). */
+void note_pane_joint_mtx_get(NoteWork* self, u32 joint, nw4r::math::MTX34* out);
+
+/* 0x80385C70 - whether the pane model's motion `a` is at frame `frame` (within `range`); the frame pair passes
+ * through to the model's test in f1/f2 (GUESS name). */
+u32 note_pane_motion_frame_ck(NoteWork* self, u32 a, f32 frame, f32 range);
 
 /* 0x80385C98 - stores the quest NPC model's flag byte (GUESS name; the tail sets it to 90). */
 void qn_chr_flag_set(_QNPC_W* self, u8 flag);

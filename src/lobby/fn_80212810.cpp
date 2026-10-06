@@ -6,6 +6,10 @@
  * NAMES. The map and the dump give only placeholders (`LbPutAnaPageArrow__FUsUsssUsP10_mh_ivec2_bb` is the range's one
  *   real name), so the file keeps the map's stem.  Module `lobby`: `LbStr`, `draw_sprite_ary`, `get_lsp_data`,
  *   `GetMenuFontColor`, `put_menu_cursor`, and the `.bss` it reads (`lobby_w`, `lb_npc`).
+ *   GUESS (from each body and its callers): lb_list_init, lb_choice_init, lb_choice_step, lb_choice_draw
+ *   GUESS: lb_list_draw_ex, lb_panel_msg_draw, lb_panel_str_print, lb_panel_line_draw, lb_panel_yes_no_draw
+ *   GUESS: lb_page_arrow_draw, lb_list_row_draw, lb_frame_draw_at, lb_panel_close, lb_scene_npc_refresh
+ *   GUESS (from each body and its callers): lb_item_need_list_draw, lb_window_draw
  *   GUESS: `lb_item_cell_draw_wide`, `lb_item_cell_draw`, `lb_panel_close`, `lb_panel_msg_draw`
  * RESIDUALS. 68 rows unwritten: 0x80212B1C-0x80214EF0, 0x80214F30-0x80215A74, 0x80215AE4-0x80215E6C,
  *   0x80215E84-0x802164F0, 0x8021677C-0x80216A08, 0x80216A68-0x80217934, 0x802179D4-0x80217B04, 0x80217C68-0x80217DA0,
@@ -313,7 +317,7 @@ void fn_80216608(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
     fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 5);
 }
 
-void fn_80216640(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
+void lb_window_draw(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
     fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 6);
 }
@@ -351,17 +355,17 @@ void fn_80216A38(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h)
 /* ------------------------------------------------------------------------------------------------ */
 
 /* The page-arrow setter family. */
-s32 fn_802178B8(s32 on);
+s32 lb_scene_npc_refresh(s32 on);
 s32 fn_80217B04(u8 a, u16 b);
 
 s32 lb_panel_close(void)
 {
-    return fn_802178B8(0);
+    return lb_scene_npc_refresh(0);
 }
 
 s32 fn_8021793C(void)
 {
-    return fn_802178B8(1);
+    return lb_scene_npc_refresh(1);
 }
 
 s32 fn_80217DA0(s32 a, s32 b)

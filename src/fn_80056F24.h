@@ -38,6 +38,10 @@ extern "C" {
 #endif
 /* 0x80058008 - turns the filter panel on. */
 void filter_panel_on(void);
+/* 0x800594C8 / 0x8005801C - clear the filter's +0x13C flag and its panel's first word (GUESS names). */
+void filter_flag_clear(void);
+void filter_panel_flag_clear(void);
+
 #ifdef __cplusplus
 }
 #endif
@@ -45,6 +49,11 @@ void filter_panel_on(void);
 #ifdef __cplusplus
 /* 0x800578A0 - turns the glare filter on (C++ scope: the map row is `GlareFilter_on__Fv`). */
 void GlareFilter_on(void);
+#endif
+
+#ifdef __cplusplus
+/* 0x800580EC - resets fade slot `slot` (C++ scope: `fade_reset__Fl`). */
+void fade_reset(long slot);
 #endif
 
 #endif /* MHTRI_FN_80056F24_H */

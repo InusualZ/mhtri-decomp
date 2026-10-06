@@ -24,6 +24,8 @@
  *   two trailing zeros), `Pl_act_set_step_table` 0x802770E8 (installs the per-act `.data` record at +0x318),
  *   `Pl_item_id_usable_ck` 0x802752C8 and its parameter `mode` (dead in retail; the call sites pass 0/1/2 against the
  *   body's 1/2/0x10 masks).
+ *   GUESS (from each body and the NPC swap callers): pl_carry_item_get, pl_item_room_get
+ *   GUESS (from each body and its callers): pl_act_name_row_get
  * RESIDUALS. 122 functions unwritten (objdiff scores them 0) in 18 runs: 0x802695A4-0x80269998, 0x80269AC4-0x8026A00C,
  *   0x8026A0D4-0x8026A224, 0x8026A248-0x8026A2BC, 0x8026A3A8-0x8026A4E4, 0x8026A5A4-0x8026A618, 0x8026A738-0x8026BA04,
  *   0x80274B20-0x80274B5C, 0x8027D7EC-0x8027D874, 0x8027D8A0-0x8027DC64, 0x8027E120-0x8027E1B8, 0x8027E404-0x8027E918,
@@ -50,7 +52,7 @@
  *  - `fn_8027885C`: retail's `mr r0,r3; mr r3,self; extsh r4,r0` says `fn_802753E4` returns `s16`; the declaration
  *    stays wider (`fn_802789EC`/`fn_80278D1C` depend on it) and each of the five `(s16)` call sites costs one row;
  *  - `fn_8027B0BC`: six `clrlwi r0,r0,24` before the `stb`s into `q + 0x5E1` (a peephole-level residual);
- *  - `fn_8027BCE0`: a `v`/`id` callee-saved swap; `fn_8027D0D4`: retail gives the jump table r23 and the loop bound
+ *  - `pl_carry_item_get`: a `v`/`id` callee-saved swap; `fn_8027D0D4`: retail gives the jump table r23 and the loop bound
  *    r30, ours the mirror (playbook 22); `fn_8027C208`: the frame is 0x30 against retail's 0x40 (unused locals);
  *  - `fn_8027A340`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
  *    `Pl_bari_ck`: retail lays the first arm out of line and the second inline, the natural chain is the mirror;
@@ -89,8 +91,8 @@
  *    are load-bearing; `fn_8026CBE4` keeps two unused trailing parameters (its callers pass four);
  *  - `fn_80271BD4`/`fn_80271E0C` dispatch with `switch ((u32)kind)`: cases 1-5, case 6, then 7-15 as `default`, which
  *    lays the bodies out in retail's B, C, A order;
- *  - the record walks index the typed arrays (`rec->skill_id[i]`); `fn_80273044`/`fn_80273228` scan `plw->slot_id`
- *    with a flat `for (i = 0; i < 24; i++)` (unrolled eight-wide under `mtctr 3`), and `fn_80273228`'s spare-slot scan
+ *  - the record walks index the typed arrays (`rec->skill_id[i]`); `fn_80273044`/`pl_item_room_get` scan `plw->slot_id`
+ *    with a flat `for (i = 0; i < 24; i++)` (unrolled eight-wide under `mtctr 3`), and `pl_item_room_get`'s spare-slot scan
  *    is a `u16*` walk (`p[i * 2]`); `Pl_cat_skill_ck` is a two-iteration loop over a `u16*` walk (`p += 2`);
  *  - the valid-bit updates in `fn_80273998`/`fn_8027373C`/`fn_802738E8` are compound (`plw->set_valid &= (u16)~mask`);
  *    the plain assignment adds a `clrlwi` before the `sth`;
@@ -109,7 +111,7 @@
  *    `fn_80278674`, `fn_8027D5A4`; playbook 38); `field = field + value` and a temporary extend at the store, and
  *    `field--` stores raw where `field = field - 1` extends (`fn_8027B0BC`);
  *  - a 32-bit accumulator that retail sign-extends only at each compare is an `s32` with `b = (s16)(b + N)` on the
- *    arms that convert and `a -= b` for the difference (`fn_80279490`, `fn_802791FC`, `fn_8027BCE0`);
+ *    arms that convert and `a -= b` for the difference (`fn_80279490`, `fn_802791FC`, `pl_carry_item_get`);
  *  - equality on a `u16`/`u8` value pairs as `cmpwi` through a signed local or cast (`s32 id = self->act_no`,
  *    `(s32)(u8)x`, `(s32)arg0 == N`) and `(u32)` on an `s32` helper gives `cmplwi` (`fn_8027C8B4`, `fn_802789EC`);
  *  - `x <= N ? 1 : 2` gives retail's `xoris/subfic/addc/subfe/addi` and `x == N ? a : b` its `addi/subfic/nor/srawi`
@@ -556,7 +558,7 @@ void fn_8026AF08(_PLW* self, u32 value);
 void fn_800E09D0(void* dst, void* src);
 u8 GameMode_ck(void);
 s8 my_player_no(void);
-u32 fn_80212060(void);
+u32 lobby_input_locked_ck(void);
 u16 fn_802BE038(void);
 void* memset(void* dst, int value, u32 size);
 }
@@ -2083,7 +2085,7 @@ extern "C" void fn_8026F7B4(_PLW* self)
 /* 0x8026F828 */
 extern "C" void fn_8026F828(_PLW* self)
 {
-    if (Pl_master_ck(self) == 0 || fn_80212060() == 1) {
+    if (Pl_master_ck(self) == 0 || lobby_input_locked_ck() == 1) {
         memset((u8*)self + 184, 0, 132);
     } else {
         fn_8026AF08(self, 0);
@@ -3424,7 +3426,7 @@ extern "C" s16 pl_item_add(_PLW* plw, u16 item, s16 value) {
 }
 
 /* The value one equipment slot contributes to `value`, clamped to the item's own limit. */
-extern "C" s32 fn_80273228(_PLW* plw, u16 item, s16 value) {
+extern "C" s32 pl_item_room_get(_PLW* plw, u16 item, s16 value) {
     u16 slot = fn_80273044(plw, item);
     u8* data = GetItemData__FUs(item);
     s16 ent;
@@ -4518,7 +4520,7 @@ extern "C" s32 fn_80274904(struct _PLW* plw)
 }
 
 /* Picks the act-name table row for the player's current stance. */
-extern "C" u8* fn_80274918(struct _PLW* plw, s32 force, s32 index)
+extern "C" u8* pl_act_name_row_get(struct _PLW* plw, s32 force, s32 index)
 {
     if (force == 0) {
         return (u8*)(lbl_805C5F30 + index * 0xA);
@@ -5662,7 +5664,7 @@ extern "C" void fn_802E5D68(u16);
 extern "C" s32 pl_part_flag_ck(_PLW*, s32);
 extern "C" u8 fn_802748C8(_PLW*);
 
-extern "C" u32 fn_8027BCE0(_PLW*);
+extern "C" u32 pl_carry_item_get(_PLW*);
 extern "C" s32 fn_80272C80(_PLW*, u8);
 extern "C" u8 fn_80274B20(u16);
 extern "C" s16 fn_80272CC8(_PLW*, u8);
@@ -6431,7 +6433,7 @@ extern "C" s32 fn_8027BDD4(_PLW* self)
     if (Pl_Skill_ck(self, 93) == 1) {
         return 1;
     }
-    return (u16)fn_8027BCE0(self) == 395;
+    return (u16)pl_carry_item_get(self) == 395;
 }
 
 /* 0x8027CBC8: the highest carve-slot value the actor has available. */
@@ -6970,7 +6972,7 @@ extern "C" void fn_802789EC(_PLW* self, s32 arg1)
 }
 
 /* 0x8027BCE0: the highest of the actor's 24 stored item ids that is in the carve set. */
-extern "C" u32 fn_8027BCE0(_PLW* self)
+extern "C" u32 pl_carry_item_get(_PLW* self)
 {
     s32 id;
     u16 v = 0xFFFF;
@@ -7468,7 +7470,7 @@ extern "C" void fn_8027B358(_PLW* self)
     }
 }
 
-extern "C" s32 fn_80273228(_PLW*, u16, s32);
+extern "C" s32 pl_item_room_get(_PLW*, u16, s32);
 
 /* 0x8027B0BC: steps the handling-direction state machine - an 8-way direction on a five-row grid of
  * stored action entries - from the pad edge events. */
@@ -7548,7 +7550,7 @@ extern "C" void fn_8027B0BC(_PLW* self)
                 if ((s32)item != 0) {
                     s16 val = *(s16*)(q + 0x5E4 + (s8)*(u8*)(q + 0x5E1) * 4);
                     if (val > 0) {
-                        if (fn_80273228(self, item, val) >= val) {
+                        if (pl_item_room_get(self, item, val) >= val) {
                             sysSE_req(8);
                             fn_8027AF88(self);
                             return;

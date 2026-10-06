@@ -10,6 +10,18 @@ struct LbMenuWork;
 struct LbMenuPanel;
 struct _se_w;
 
+/* One interior-model resource buffer of `LbLobbyWork::res_slots_0x0CC`: in use, the model index (or the lowest
+ * index of a multi-model load), the interior id (`lb_interior_path_table`'s index), how many users it has, the
+ * buffer and its size.  size: 0xC */
+typedef struct LbResSlot {
+    /* +0x0 */ u8 used_0x0;
+    /* +0x1 */ u8 sub_0x1;
+    /* +0x2 */ u8 id_0x2;
+    /* +0x3 */ u8 refs_0x3;
+    /* +0x4 */ u8* buf_0x4;
+    /* +0x8 */ u32 size_0x8;
+} LbResSlot;
+
 typedef struct LbLobbyWork {
     /* +0x000 */ union {
         u8 state_0x000;   /* the lobby scene/mode `fn_80211E68` dispatches on (0..0x25) */
@@ -28,13 +40,18 @@ typedef struct LbLobbyWork {
         u8 field_0x003;   /* the NPC band resets it to 0xFF */
     };
     /* +0x006 */ u8 field_0x006;
-    /* +0x007 */ u8 unused_0x007;
-    /* +0x008 */ u8 active_0x008;   /* 1 while a lobby screen (kitchen, trade, board) is open */
+    /* +0x007 */ u8 field_0x007;   /* cleared with +0x006 when the game-mode flow enters the lobby */
+    /* +0x008 */ u8 active_0x008;   /* 1 while a lobby screen (kitchen, trade, board, Poogie, name, note trade) is open */
     /* +0x009 */ u8 community_flag_0x009;   /* cleared when community command 12 succeeds (GUESS name) */
     /* +0x00A */ u8 unused_0x00A[0x02];
     /* +0x00C */ u32 slots_0x00C[2];
     /* +0x014 */ u8 field_0x014;
-    /* +0x015 */ u8 unused_0x015[0x12];
+    /* +0x015 */ u8 area_next_0x015;   /* the area the area change loads next (`lobby_area_change_step`) */
+    /* +0x016 */ u8 area_prev_0x016;   /* the area it leaves */
+    /* +0x017 */ u8 unused_0x017;
+    /* +0x018 */ u8 spawn_0x018[0xC];  /* the player spawn record `lb_player_spawn_set` reads */
+    /* +0x024 */ u16 spawn_id_0x024;   /* its entry id */
+    /* +0x026 */ u8 area_change_0x026; /* 1 asks the game-mode flow for an area change */
     /* +0x027 */ union {
         u8 flag_0x027;
         u8 field_0x027;
@@ -52,11 +69,11 @@ typedef struct LbLobbyWork {
     /* +0x050 */ u8 unused_0x050[0x2];
     /* +0x052 */ u8 page_0x052;
     /* +0x053 */ u8 unused_0x053;
-    /* +0x054 */ u8 kitchen_busy_0x054;   /* set while the kitchen serves a meal */
+    /* +0x054 */ u8 kitchen_busy_0x054;   /* set while the kitchen serves a meal; cleared by `lobby_flow_init` */
     /* +0x055 */ u8 unused_0x055[0x21];
     /* +0x076 */ u8 field_0x076;
     /* +0x077 */ u8 field_0x077;
-    /* +0x078 */ u8 unused_0x078[0x1];
+    /* +0x078 */ u8 pig_dress_0x078;   /* the Poogie costume the lobby shows (`lobby_pig_dress_view_set`) */
     /* +0x079 */ s8 field_0x079;
     /* +0x07A */ u8 unused_0x07A[0x2];
     /* +0x07C */ union {   /* 0x07C-0x0AB: the slot run and the NPC/page units' views of it (the union is anchored
@@ -80,15 +97,30 @@ typedef struct LbLobbyWork {
     /* +0x0AC */ union {
         struct LbMenuWork* menu_0xAC;
         struct LbMenuPanel* menu_0x0AC;   /* the page unit's view of the same pointer */
+        struct LbPigMenuWork* pig_menu_0x0AC;     /* screen 0x15, the Poogie menu (`menu/multi_result.cpp`) */
+        struct LbNameMenuWork* name_menu_0x0AC;   /* screen 0x16, the name menu (`menu/multi_result.cpp`) */
+        struct LbNoteTradeWork* note_trade_0x0AC; /* screen 0x17, the note trade (`lobby/lb_quest_screen.cpp`) */
     };
     /* +0x0B0 */ u8 field_0x0B0;
     /* +0x0B1 */ u8 sub_0x0B1;
-    /* +0x0B2 */ u8 unused_0x0B2[0x6];
-    /* +0x0B8 */ struct _se_w* field_0x0B8;   /* the sound-request handles `src/sound/fn_800D7F54.cpp` reads */
-    /* +0x0BC */ struct _se_w* field_0x0BC;
+    /* +0x0B2 */ u8 unused_0x0B2[0x2];
+    /* +0x0B4 */ union {   /* the three sound-request handles the game-mode flow opens and releases */
+        struct _se_w* se_0x0B4[3];
+        struct {
+            /* +0x0B4 */ struct _se_w* field_0x0B4;
+            /* +0x0B8 */ struct _se_w* field_0x0B8;   /* the sound-request handles `src/sound/fn_800D7F54.cpp` reads */
+            /* +0x0BC */ struct _se_w* field_0x0BC;
+        };
+    };
     /* +0x0C0 */ union {
         u8 unused_0x0C0[0x6C];
         u8 talk_0x0C0[0x6C];
+        struct {   /* the interior-model resource view (`lobby/lb_quest_screen.cpp`'s `lb_interior_*`) */
+            /* +0x0C0 */ u8 unused_0x0C0r[0x4];
+            /* +0x0C4 */ s32 res_handle_0x0C4;   /* the resource-memory slot `lobby_res_slots_init` reserves */
+            /* +0x0C8 */ u8* res_base_0x0C8;     /* its address, split into the eight 0x14000-byte buffers below */
+            /* +0x0CC */ LbResSlot res_slots_0x0CC[8];
+        };
     };
     /* +0x12C */ u8 field_0x12C;   /* 1 puts the lobby act layer on hold */
     /* +0x12D */ u8 param_0x12D;
@@ -106,21 +138,21 @@ typedef struct LbLobbyWork {
     /* +0x15F */ u8 field_0x15F;
     /* +0x160 */ u8 field_0x160;
     /* +0x161 */ u8 field_0x161;
-    /* +0x162 */ union {
-        u8 unused_0x162[0x14];
-        struct {
-            /* +0x162 */ u8 item_list_selection_0x162;   /* the item list's selected row, stored by the session's case 4 (GUESS) */
-            /* +0x163 */ u8 field_0x163;
-            /* +0x164 */ u8 pad_0x164[0x0B];
-            /* +0x16F */ s8 field_0x16F;
-            /* +0x170 */ u8 pad_0x170[0x2];
-            /* +0x172 */ union {
-                s16 field_0x172;
-                u16 busy_0x172;   /* nonzero while a lobby transition owns the screen */
-            };
-            /* +0x174 */ u8 pad_0x174[0x2];
-        };
+    /* +0x162 */ u8 item_list_selection_0x162;   /* the item list's selected row, stored by the session's case 4 (GUESS) */
+    /* +0x163 */ u8 field_0x163;
+    /* +0x164 */ s16 net_wait_0x164;   /* frames the game-mode flow waits before it offers to leave a dropped session */
+    /* +0x166 */ u8 pad_0x166[0x2];
+    /* +0x168 */ char* net_err_0x168;  /* the network error message `lobby_net_err_draw` shows */
+    /* +0x16C */ u8 pad_0x16C;
+    /* +0x16D */ s8 friend_sync_0x16D; /* the result `requestFriendSync` writes */
+    /* +0x16E */ u8 pad_0x16E;
+    /* +0x16F */ s8 field_0x16F;
+    /* +0x170 */ u8 pad_0x170[0x2];
+    /* +0x172 */ union {
+        s16 field_0x172;
+        u16 busy_0x172;   /* nonzero while a lobby transition owns the screen */
     };
+    /* +0x174 */ s16 leave_wait_0x174;  /* frames the game-mode flow waits before it leaves the lobby */
     /* +0x176 */ u8 field_0x176;
     /* +0x177 */ u8 unused_0x177[0x5];
 } LbLobbyWork; /* size: 0x17C */

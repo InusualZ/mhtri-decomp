@@ -36,7 +36,7 @@
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 #include "quest/quest_entry.h" /* quest_monsters_release (the owner's header, rule 2) */
 
-/* The object `fn_8028BCF4` releases: three `fn_800D8E44` handles, 4 bytes apart.
+/* The object `fn_8028BCF4` releases: three `se_handle_clear` handles, 4 bytes apart.
  * size: 0x144 (lower bound) */
 struct PlHandleSet {
     /* +0x000 */ u8 unused_0x000[0x138];
@@ -69,7 +69,7 @@ extern "C" {
 
 
 void draw_shape_stage_load(u8 idx);
-void fn_800D8E44(void* handle);
+void se_handle_clear(void* handle);
 void eft_common_load(void);
 
 u32 fn_8027CB1C(void* self);
@@ -154,19 +154,19 @@ void fn_80288E60(_PLW* self, f32 dt) {
     fn_80288CEC(self, 1, dt);
 }
 
-/* 0x8028BCF4 - release the three `fn_800D8E44` handles the mode object carries. */
+/* 0x8028BCF4 - release the three `se_handle_clear` handles the mode object carries. */
 void fn_8028BCF4(PlHandleSet* self) {
     if (self == 0) {
         return;
     }
     if (self->handle_0x138 != 0) {
-        fn_800D8E44(self->handle_0x138);
+        se_handle_clear(self->handle_0x138);
     }
     if (self->handle_0x13C != 0) {
-        fn_800D8E44(self->handle_0x13C);
+        se_handle_clear(self->handle_0x13C);
     }
     if (self->handle_0x140 != 0) {
-        fn_800D8E44(self->handle_0x140);
+        se_handle_clear(self->handle_0x140);
     }
 }
 

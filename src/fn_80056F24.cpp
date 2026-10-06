@@ -47,6 +47,7 @@
  * `fn_80058BD0`, `fn_80057DE0`, `fn_80057EF4`, `fn_80058140`, `fn_8005920C`, the `disp_beta` trio) are
  * not written yet.  The per-symbol scores are in the unit notes / outbox.
  * NAMES. GUESS (from each body and its callers): filter_panel_on
+ *   GUESS (from each body and its callers): filter_flag_clear, filter_panel_flag_clear
  */
 
 #include "types.h"
@@ -353,12 +354,12 @@ extern "C" void fn_8005792C(void) {
  * The fade slots.
  * ------------------------------------------------------------------------------------------------- */
 
-/* `fn_80058008`/`fn_8005801C`: the panel enable flag. */
+/* `fn_80058008`/`filter_panel_flag_clear`: the panel enable flag. */
 extern "C" void filter_panel_on(void) {
     lbl_8066ACF8.panel_0x0B0.field_0x00 = 1;
 }
 
-extern "C" void fn_8005801C(void) {
+extern "C" void filter_panel_flag_clear(void) {
     lbl_8066ACF8.panel_0x0B0.field_0x00 = 0;
 }
 
@@ -602,7 +603,7 @@ extern "C" void fn_80059420(void) {
     }
 }
 
-extern "C" void fn_800594C8(void) {
+extern "C" void filter_flag_clear(void) {
     lbl_8066ACF8.field_0x13C = 0;
 }
 

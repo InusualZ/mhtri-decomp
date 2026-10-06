@@ -14,6 +14,7 @@
  *   (`PutPageArrow`, `get_menu_lsp_tbl`, `get_lsp_data`, `draw_sprite_*`, `GetMenuFontColor`, `LbStr`), shared with
  *   `menu/menu_result.cpp`, `menu/menu_item.cpp` and `menu/menu_item_page.cpp`.  The file keeps the first symbol, the
  *   runtime dump's own name.
+ *   GUESS (from each body and its callers): note_goods_tbl
  * RESIDUALS. 72 rows unwritten (objdiff scores them zero): `fn_803BE318`, 0x803BE4D4-0x803BEA28,
  *   0x803BEA94-0x803BEBF0, `fn_803BECC8`, 0x803BED3C-0x803BEE04, 0x803BEEB8-0x803BEFC0, 0x803BEFD4-0x803C0C4C,
  *   0x803C0C58-0x803C0F24, 0x803C0F3C-0x803C3A30, `fn_803C3A40`.  `set_option_cfg`/`set_def_option`/`set_option_mode`

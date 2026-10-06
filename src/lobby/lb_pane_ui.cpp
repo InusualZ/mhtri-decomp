@@ -6,13 +6,14 @@
  *   break, so one TU: the panes 0x801EC9F8-0x801F3294, the page/panel group 0x801F3294-0x801F9CD4, the colour screen
  *   0x801F9CD4-0x801FBF78.  Each band keeps its own declarations in a namespace: they view `lobby_w`,
  *   `lobby_world_block` and the `lbl_805B8xxx` tables differently and call some callees with different argument lists
- *   (`unsplit/lobby.h`'s `fn_8021213C(s32, s16)` takes two where the panes pass one; the colour screen's `lb_chg` scope
+ *   (`unsplit/lobby.h`'s `lb_cmd_pressed_ck(s32, s16)` takes two where the panes pass one; the colour screen's `lb_chg` scope
  *   spells `lobby_world_block` as the pointer it is and `lb_list_row_draw` with the five arguments every call passes).
  *   Uniting the views is open work.
  * FLAGS. `cflags_lobby`; `#pragma peephole off` throughout and `#pragma dont_inline on` over the panes band
  *   (0x801EC9F8-0x801F3294) only (retail keeps `fn_801ED3E8`/`fn_801ED464` out of line); measured in docs/lobby.md.
  * NAMES. `lb_pane_ui` is a GUESS from what the three bands draw; no `__FILE__` string or dump name covers the range,
  *   and the map gives only placeholders for the functions.
+ *   GUESS (from each body and its callers): lobby_scene_setup_step
  * RESIDUALS. 69 rows unwritten: 0x801EE988-0x801EEDC4, 0x801EF3B0-0x801EF73C, 0x801EF760-0x801F3294,
  *   0x801F35B0-0x801F37C8, 0x801F3828-0x801F3998, 0x801F39E8-0x801F3DEC, 0x801F3FDC-0x801F4444, 0x801F44CC-0x801F54C4,
  *   0x801F55B4-0x801F5FB0, 0x801F6168-0x801F6A9C, 0x801F6AEC-0x801F865C, 0x801F87B0-0x801F8ABC, 0x801F8B3C-0x801FA0DC,
@@ -187,7 +188,7 @@ namespace s_801EC9F8 {
 
 /* ------------------------------------------------------------------------------------------------
  * The symbols this range reads, as plain prototypes (their owners' headers do not declare them).  `lobby_w` and
- * `lobby_world_block` carry this range's own view: `unsplit/lobby.h` cannot be included (its `fn_8021213C(s32, s16)`
+ * `lobby_world_block` carry this range's own view: `unsplit/lobby.h` cannot be included (its `lb_cmd_pressed_ck(s32, s16)`
  * and `menu_cursor_step_fixed_tail` do not match the calls here).
  */
 extern "C" {
@@ -277,12 +278,12 @@ s32 fn_801EC9E0(void);
 s32 lb_cmd_pressed_ck(u32 mask);
 s32 lb_cmd_repeat_ck(u32 mask);
 u16 lb_cmd_repeat_get(void);
-u16 fn_802122E8(void);
-u16 fn_80212334(void);
-s32 fn_80212250(u32 mask);
+u16 lobby_cmd_trig_get(void);
+u16 lobby_cmd_release_get(void);
+s32 lobby_cmd_release_ck(u32 mask);
 s32 lb_yes_no_step(void* p);
 s16 fn_80213374(u8 a, s16 b, void* c, u16 d, s32 e, s32 f, u8 g);
-s32 fn_80214654(void* p, s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g);
+s32 lb_list_init(void* p, s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g);
 s32 lb_choice_step(void* p);
 s32 fn_80219080(s32 a, void* p, s32 b, s32 c);
 void fn_802190F4(void* p);
@@ -449,7 +450,7 @@ extern "C" void fn_801ECDD4(LbDigitPane* self)
         }
     } else if (lb_cmd_pressed_ck(0x300) != 0) {
         self->digit_hundreds_0x02 = menu_cursor_step_forward(self->digit_hundreds_0x02, self->digit_hundreds_max_0x03,
-                                                             fn_802122E8(), 0x100, 0x200, 6, &self->flags_0x08);
+                                                             lobby_cmd_trig_get(), 0x100, 0x200, 6, &self->flags_0x08);
         if ((self->flags_0x08 & 0x100) != 0) {
             self->blink_a_0x12 = 0;
         }
@@ -534,7 +535,7 @@ extern "C" s32 fn_801ED048(LbDigitPane* self, LbListPane* list)
         }
         return 0;
     }
-    result = toggle_word_step(&self->stepper_0x04, fn_802122E8(), 4, 8, 0xFFFF);
+    result = toggle_word_step(&self->stepper_0x04, lobby_cmd_trig_get(), 4, 8, 0xFFFF);
     switch (result) {
     case 1:
         count = userdata_box_capacity(lobby_world_block);
@@ -672,7 +673,7 @@ extern "C" s32 fn_801ED56C(LbListPane* self, u8 arg)
         }
         return 0;
     }
-    result = toggle_word_step(&self->stepper_0x02C, fn_802122E8(), 4, 8, 0xFFFF);
+    result = toggle_word_step(&self->stepper_0x02C, lobby_cmd_trig_get(), 4, 8, 0xFFFF);
     switch (result) {
     case 1:
         if (arg == 0) {
@@ -1291,7 +1292,7 @@ extern "C" s32 fn_801EEFA0(LbDigitPane* self, LbListPane* list)
         }
         break;
     case 2:
-        r = toggle_word_step(&self->stepper_0x04, fn_802122E8(), 4, 8, 0xFFFF);
+        r = toggle_word_step(&self->stepper_0x04, lobby_cmd_trig_get(), 4, 8, 0xFFFF);
         switch (r) {
         case 1:
             self->phase_0x00 = 0;
@@ -1921,7 +1922,7 @@ void fn_801FC6A0(u32 unused, s32* value);
 void fn_801FC810(void);
 void fn_801FC874(void);
 void fn_801FC8C8(void);
-void fn_801FC8F0(void);
+void lb_npc_map_setup(void);
 void fn_801FCA80(u32 index);
 void fn_801FCADC(u8* self, u32 index);
 void fn_8021D9F8(void);
@@ -1941,9 +1942,9 @@ void fn_8035A9E4(void);
 void lobby_res_slots_init(void);
 void fn_803C3A70(void);
 void fn_803C3F60(void);
-s32 fn_80449860(void);
-s32 fn_804498C8(void);
-s32 fn_804498CC(void);
+s32 game_data_file_create_start(void);
+s32 game_system_file_create_start(void);
+s32 game_system_file_create_wait(void);
 s32 game_save_wait(void);
 s32 chg_nand_err2msgcode(void);
 }
@@ -2192,12 +2193,12 @@ s32 fn_801FB524(LbChgSeqWork* self)
         q = get_qResult_work();
         if (q != NULL && system_w.field_0x2d == 0 &&
             (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
-            if (fn_80449860() != 0) {
+            if (game_data_file_create_start() != 0) {
                 self->state_0x0B = 1;
                 system_w.field_0x865 = 1;
                 break;
             }
-            if (fn_804498C8() != 0) {
+            if (game_system_file_create_start() != 0) {
                 self->state_0x0B = 2;
                 break;
             }
@@ -2214,7 +2215,7 @@ s32 fn_801FB524(LbChgSeqWork* self)
         if (v != 1) {
             break;
         }
-        if (fn_804498C8() != 0) {
+        if (game_system_file_create_start() != 0) {
             self->state_0x0B = 2;
             break;
         }
@@ -2222,7 +2223,7 @@ s32 fn_801FB524(LbChgSeqWork* self)
         self->state_0x0B = 3;
         break;
     case 2:
-        v = fn_804498CC();
+        v = game_system_file_create_wait();
         if ((u8)(v + 2) <= 1U) {
             self->state_0x0B = 0x64;
             break;
@@ -2230,7 +2231,7 @@ s32 fn_801FB524(LbChgSeqWork* self)
         if (v != 1) {
             break;
         }
-        if (fn_804498C8() != 0) {
+        if (game_system_file_create_start() != 0) {
             self->state_0x0B = 2;
             break;
         }
@@ -2252,7 +2253,7 @@ s32 fn_801FB524(LbChgSeqWork* self)
     case 6:
         stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
         fn_803C3F60();
-        fn_801FC8F0();
+        lb_npc_map_setup();
         fn_802BB0EC();
         self->step_0x0A++;
         self->state_0x0B = 0;

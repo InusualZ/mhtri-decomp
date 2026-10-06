@@ -22,6 +22,7 @@
  * extabindex).
  * NAMES. GUESS (from each body and its callers): stage_entry_angle_get, stage_cell_get, stage_gate_a_ck
  *   GUESS: stage_gate_b_ck
+ *   GUESS (from each body and its callers): stage_area_slot_release, stage_area_free_slot_get
  */
 /* ---- header inherited from src/stage/stg_w.cpp (written against its pre-phase-4 range) ---- */
 /*

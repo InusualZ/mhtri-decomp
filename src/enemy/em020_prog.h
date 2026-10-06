@@ -36,6 +36,17 @@ u32 em020_quest_active_ck(void);
 /* .sbss 0x80794BF0 - the message id of the last failed network layer command (GUESS name). */
 extern s32 net_layer_error_message;
 
+/* 0x80375858 - clears the lobby state block's quest-active byte. */
+void em020_quest_active_clear(void);
+/* 0x803759BC - stores the lobby message band's flag byte. */
+void em020_unknown_flag_set(u8 flag);
+/* 0x80376978 - clears the hunter-card pages. */
+void em020_quest_pages_clear(void);
+/* 0x803759C4 - draws the lobby's network error window from `lobby_w`'s error message (GUESS name). */
+void lobby_net_err_draw(void);
+
+/* 0x803777C8 - sends the user profile's part 2 when online (GUESS name). */
+void em020_profile_send(void);
 /* 0x80377348 - sends the served meal's skills and bonuses to the area `area` (a 0x36-byte packet).  GUESS name. */
 void meal_result_send(u8 area);
 

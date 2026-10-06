@@ -61,7 +61,7 @@ struct EmAreaWork {
                                       * `fn_801B45B0` measures the seat records against
                                       * (`enemy/em034_prog.cpp`) and the one
                                       * `enemy/em030_prog.cpp`'s `fn_801B06D4` passes to
-                                      * `fn_80050EAC` as its `(void*, VEC3*)` second argument */
+                                      * `vec3_dist_sq` as its `(void*, VEC3*)` second argument */
     /* +0x048 */ u8 unused_0x048[0xB20 - 0x048];
 };
 

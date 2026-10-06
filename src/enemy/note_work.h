@@ -43,7 +43,7 @@ struct NoteWork {
     /* +0x188 */ u32 field_0x188;
     /* +0x18C */ u32 field_0x18C;
     /* +0x190 */ u32 field_0x190;
-    /* +0x194 */ u8 pad_0x194[0x195 - 0x194];
+    /* +0x194 */ u8 map_0x194;      /* the map whose home spot `note_pane_init` places the pane on */
     /* +0x195 */ u8 field_0x195;
     /* +0x196 */ u8 pad_0x196[0x198 - 0x196];
     /* +0x198 */ u32 field_0x198;   /* the note id `fn_8038541C` records */
@@ -55,10 +55,11 @@ struct NoteWork {
     /* +0x1A1 */ u8 field_0x1A1;
     /* +0x1A2 */ u8 pad_0x1A2[0x1A8 - 0x1A2];
     /* +0x1A8 */ u32 field_0x1A8;   /* the position `note_pane_pos_step` (this band) eases +0x18C onto */
-    /* +0x1AC */ u8 pad_0x1AC[0x1B0 - 0x1AC];
+    /* +0x1AC */ u8 flag_0x1AC;     /* set by `note_pane_init` */
+    /* +0x1AD */ u8 pad_0x1AD[0x1B0 - 0x1AD];
     /* +0x1B0 */ f32 field_0x1B0;   /* the per-state step `fn_80386028`/`fn_803863C8` set */
-    /* +0x1B4 */ u8 pad_0x1B4[0x1C0 - 0x1B4];
-    /* +0x1C0 */ u8 field_0x1C0;    /* the band above's pane state `fn_803A3A50` switches on */
+    /* +0x1B4 */ nw4r::math::VEC3 vec_0x1B4;   /* the rest position `note_pane_init` copies from +0x170 */
+    /* +0x1C0 */ u8 field_0x1C0;    /* the talk step `npc_talk_step` switches on */
     /* +0x1C1 */ u8 field_0x1C1;
     /* +0x1C2 */ u8 pad_0x1C2[0x1F4 - 0x1C2];
     /* +0x1F4 */ s32 field_0x1F4;  /* the voice handle `fn_8038541C` stores */

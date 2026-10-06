@@ -15,6 +15,7 @@
  *
  * Status: the small table helpers and the FIFO writers have bodies; the rest of the range (87 functions) is not decompiled.
  * NAMES. GUESS: `userdata_pouch_size`, `userdata_pouch_get`, `item_slots_free_count`
+ *   GUESS (from each body and its callers): userdata_opening_seen_set, userdata_item_count_total
  */
 
 #include "types.h"

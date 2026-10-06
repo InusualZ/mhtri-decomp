@@ -121,7 +121,8 @@ typedef struct SystemWork {
     /* +0x869 */ u8 pad_0x869[0x1];
     /* +0x86A */ u8 field_0x86A;
     /* +0x86B */ u8 field_0x86b;      /* hbm_enable: == 1 keeps the menu suppressed */
-    /* +0x86C */ u8 pad_0x86c[0x2];
+    /* +0x86C */ u8 pad_0x86c[0x1];
+    /* +0x86D */ u8 title_req_0x86d;   /* GUESS name: cleared by `game_mode_flow_task` before it runs the +0x8C4 reset hook */
     /* +0x86E */ u8 unk2158;
     /* +0x86F */ u8 unk2159;
     /* +0x870 */ u8 hbm_disabled;     /* hbm_disable sets 1; hbm_enable follows +0x86B */
@@ -151,7 +152,9 @@ typedef struct SystemWork {
     /* +0x8B2 */ u8 field_0x8b2;   /* set by the quest result fill when element 0 is monster 25 and was armed */
     /* +0x8B3 */ u8 pad_0x8b3[0xE];
     /* +0x8C1 */ u8 net_result_wait_0x8c1;   /* GUESS name: `arena_task` step 4 skips its network-result wait unless this is 1 */
-    /* +0x8C2 */ u8 pad_0x8c2[0x12];
+    /* +0x8C2 */ u8 pad_0x8c2[0x2];
+    /* +0x8C4 */ void (*reset_func_0x8c4)(void);   /* GUESS name: the hook `game_mode_flow_task` runs when the lobby is left for the title */
+    /* +0x8C8 */ u8 pad_0x8c8[0xC];
     /* +0x8D4 */ void (*field_0x8d4)(void);
     /* +0x8D8 */ u32 (*unk2264)(void);
     /* +0x8DC */ void (*field_0x8dc)(void);

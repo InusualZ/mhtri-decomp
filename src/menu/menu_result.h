@@ -8,6 +8,7 @@
 #define MHTRI_MENU_MENU_RESULT_H
 
 #include "types.h"
+#include "mh3_pad/system_w.h"           /* system_w: the game/system state block (its +9 language index) */
 #include "id_value.h"                  /* IdValue: the (item id, count) pairs of the result's item grids */
 #include "quest/quest_result_work.h"   /* Q_ResultWork: the one view of the 0x438-byte quest result record (rule 1) */
 #include "Pl/plw.h"                    /* _EQUIP: the 12-byte equipment record */

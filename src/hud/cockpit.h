@@ -37,7 +37,7 @@ void cockpitShowNewMail(void);
 void setCockpitTransferMode(u8 slot, s32 mode);
 
 /* 0x802DE224 - holds the AI NPC page for this frame (its +0x25 byte).  GUESS name. */
-s32 ainpc_page_hold_set(void);
+void ainpc_page_hold_set(void);
 /* 0x802DE360 / 0x802DE3F0 - draw the page's button marks at layout `panel` (moved by `offset` when given) unless the
  * page is hidden.  GUESS names. */
 void ainpc_page_mark_a_draw(u16 panel, const struct _mh_ivec2_* offset);
