@@ -24,6 +24,13 @@
  * `__memReg` and the two `.data` jump tables) belong to those SDK libraries, not to this range, so they are
  * declared `extern` here and never defined; the data pass owns the claims.
  *
+ * NAMES. `GXLoadLightObjImm` (0x804B7C40) is the SDK name, from its callers' shape (a 0x40-byte light object and a
+ *   `1 << n` light mask); its declaration is `EXI/ProbeBarnacle.h`.
+ *
+ * RESIDUALS. flipcheck: `.text` 0x1B20 of 0x6850; `.data` 0x21 of 0x6AC; `.sbss` 0x8 of 0x88; `.sdata` 0x8 of 0x28;
+ *   `.bss` (0x6E0) and `.sdata2` (0x70) are claimed and not emitted.  Relocation names that differ from retail:
+ *   `ISFS_OpenLib` reads the `.sdata`-pooled `lo$688`/`hi$689` where ours emits no symbol.
+ *
  * Measured state (objdiff unit `main/EXI/ProbeBarnacle`, the only row this file moves):
  *   fuzzy_match_percent 25.78 over the band's 25928 B of code; 27 of 118 functions byte-identical
  *   (6396 B / 24.67 %), plus fn_804B2AB0 at 98.97.  Every function of the EXI + FS half is reconstructed:

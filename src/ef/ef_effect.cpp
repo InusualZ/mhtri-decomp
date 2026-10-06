@@ -234,7 +234,7 @@ u32 fn_800A98D4(void* pm, void (*cb)(void*, u32), u32 arg, bool flag, u32 zero);
 void fn_800AE500(void* pm, u32 flag);
 void fn_800AE5B0(void* pm);
 void mtx34_identity(void* mtx);
-void fn_8007100C(MTX34* dst, const MTX34* src);
+void mtx34_copy_ps(MTX34* dst, const MTX34* src);
 u16 fn_8009B374(void* list, void** buf, u16 size);
 void fn_80501A64(void* list, void* node);
 void fn_80501BF4(void* list, void* node);
@@ -795,7 +795,7 @@ extern "C" u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32
 /* 0x800A53BC - concatenates the root matrix and pushes it to the parentless emitters. */
 void nw4r::ef::Effect::SetRootMtx(const nw4r::math::MTX34& mtx) {
     EfEff* self = (EfEff*)this;
-    fn_8007100C(&self->mRootMtx, &mtx);
+    mtx34_copy_ps(&self->mRootMtx, &mtx);
     EfEffEmitter* node = NULL;
     while ((node = (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, node)) != NULL) {
         if (node->mField_0xF4 == NULL) {

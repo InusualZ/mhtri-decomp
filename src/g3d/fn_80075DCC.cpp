@@ -74,7 +74,6 @@ typedef struct {
 
 /* Data objects the range references (unsplit, address-only). */
 extern u32 lbl_8056F658;
-extern u32 lbl_8056F668;
 extern u32 lbl_8056F678;
 extern u32 lbl_8056F688;
 extern u32 lbl_8056F6A0;
@@ -202,7 +201,6 @@ u32 fn_8005DC24(void*);
 void* fn_8005DCD0(void*, void*);
 void* fn_800600C0(void);
 void* fn_80062DEC(s32);
-void* fn_800638B8(void*, void*);
 s32 fn_80063964(s32, void*);
 s32 fn_800639D0(void*, void*);
 s32 fn_8006405C(void*);
@@ -219,7 +217,7 @@ u32 fn_8006F228(void*, void*);
 u32 fn_8006FDCC(void*);
 s32 fn_8006FEC8(void*, s32);
 s32 fn_80070020(s32);
-u32 fn_8007100C(void*, s32);
+u32 mtx34_copy_ps(void*, s32);
 u32 mtx34_concat(void*, void*, void*);
 u32 fn_80071C38(u32);
 s32 fn_80074074(void*);
@@ -1359,7 +1357,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                     spE0 = sp6C;
                     spF0 = sp70;
                 } else {
-                    fn_8007100C((void*)(&spC8), (s32)(g3d_state_get_camera_mtx()));
+                    mtx34_copy_ps((void*)(&spC8), (s32)(g3d_state_get_camera_mtx()));
                 }
             }
             temp_r3_5 = (s32)g3d_state_get_light_obj(g3d_state_get_light_set_entry((s8)*var_r30));

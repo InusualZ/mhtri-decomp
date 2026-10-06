@@ -18,8 +18,8 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle, IS_VALID_PTR (rule 1) */
 #include "nw4r/g3d/scnmdl.h"      /* nw4r::g3d::ScnMdl (rule 1) */
-#include "g3d/fn_80063888.h"      /* fn_800638B8, fn_800639D0, G3dObj (rule 2: owner g3d/fn_80063888.cpp) */
-#include "g3d/g3d_anmchr.h"       /* fn_8005D3E0, fn_8005DC24 (rule 2: owner g3d/g3d_anmchr.cpp) */
+#include "g3d/fn_80063888.h"      /* fn_800649B4 (rule 2: owner g3d/fn_80063888.cpp) */
+#include "g3d/g3d_anmchr.h"       /* fn_8005D3E0, fn_8005DC24, type_obj_set_name, fn_800639D0, G3dObj (rule 2: owner g3d/g3d_anmchr.cpp) */
 #include "g3d/fn_800680CC.h"      /* fn_800696E4, fn_800697A4 (rule 2: owner g3d/fn_800680CC.cpp) */
 #include "g3d/fn_8005AA28.h"      /* fn_8005AB00 (rule 2: owner g3d/fn_8005AA28.cpp) */
 #include "g3d/fn_80075DCC.h"      /* fn_8007B424..fn_800793A4 (rule 2: owner g3d/fn_80075DCC.cpp) */
@@ -63,7 +63,7 @@ extern const char lbl_8058F004[]; /* "NW4R:Failed assertion !GetParent()" */
 extern const char lbl_8058F028[]; /* the ScnMdl vtable (0x48 B) */
 extern const char lbl_8058F070[]; /* "%s::%s: Object not valid." */
 extern const char lbl_8058F090[]; /* "g3d_resmdl_ac.h" */
-extern char lbl_8056F678[];       /* the `.rodata` "ScnMdl" name record */
+extern u8 lbl_8056F678[];         /* the `.rodata` "ScnMdl" name record */
 extern u32 lbl_80791208;          /* the `.sdata` word "ref" */
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -496,9 +496,9 @@ void* fn_8007EE68(ScnMdl* pSelf, s16 flag) {
 
 /* 0x8007EF1C - the ScnMdl name record (`g3d_scnmdl.cpp`'s own type registration). */
 u32 fn_8007EF1C(void) {
-    void* local;
+    const u8* local;
 
-    return (u32)*fn_800638B8(&local, lbl_8056F678);
+    return (u32)*type_obj_set_name(&local, lbl_8056F678);
 }
 
 /* 0x8007EF4C - the vtable-dispatch wrapper: run the object's slot +0x14 and read the word back

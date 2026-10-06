@@ -7,6 +7,8 @@
  * NAMES. Map stems.
  * RESIDUALS. Unwritten (objdiff scores it zero): fn_8007411C.  Partial: fn_800736F8, fn_800737CC, fn_80073CE0,
  *   fn_80073D34, fn_80073F00, addVec3To.
+ *   Relocation names that differ from retail: `fn_800737CC` calls `fn_8050133C` where retail calls
+ *   `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3` (undefined in a flip).
  *   flipcheck: `.text` 0xAD0 of 0xFE4; `.data` is claimed and not emitted; `.sdata` is 0x4 of 0x10, `.sdata2` 0x4
  *   of 0x8.
  * SHAPES. `#pragma peephole off` around fn_8007403C keeps retail's masked compare (playbook 32); file-scope
@@ -19,7 +21,7 @@
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
-#include "g3d/g3d_calcview.h" /* fn_8006FDCC..fn_8007100C (rule 2) */
+#include "g3d/g3d_calcview.h" /* fn_8006FDCC..mtx34_copy_ps (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
@@ -245,7 +247,7 @@ void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, R
         pScale[0] = 1.0f;
         pScale[1] = 1.0f;
         pScale[2] = 1.0f;
-        fn_8007100C(pMtxArray, pMtx);
+        mtx34_copy_ps((Mtx34*)pMtxArray, (const Mtx34*)pMtx);
         u32* pMtxIDList = fn_8005CEDC();
         u32 numMtx = 0;
         *pMtxIDs = (s32)flags;
@@ -331,7 +333,7 @@ void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, R
                 u32 targetID = (pCode[3] << 8) + pCode[4];
                 pMtxIDList[numMtx++] = nodeID;
                 pMtxIDs[nodeID] = pMtxIDs[targetID];
-                fn_8007100C(pMtxArray + nodeID * 0x30, pMtxArray + targetID * 0x30);
+                mtx34_copy_ps((Mtx34*)(pMtxArray + nodeID * 0x30), (const Mtx34*)(pMtxArray + targetID * 0x30));
                 /* `pScale` is the frame's flat float array (`fn_8005CED0`), so the record is
                  * reached by index; the helper's own type is the real one (rule 11). */
                 copyVec3((nw4r::math::VEC3*)(pScale + nodeID * 3),

@@ -19,6 +19,14 @@ void *fn_800628A4(void *self);             /* 0x800628A4 - loads the word at +0x
 
 u32 fn_8005DC24(u32 *p);                   /* 0x8005DC24 - loads the word at +0x0 of `p`, +4 */
 
+/* The name-record store helper (0x800638B8) `g3d/fn_800680CC.cpp` and `g3d/g3d_scnmdl.cpp` also call. */
+const u8 **type_obj_set_name(const u8 **out, const u8 *v); /* stores `v` through `out` and returns `out` */
+
+/* The list-insert chain steps (0x800638F8/0x800639D0/0x80063964) the other g3d units' insert steps call. */
+u32 fn_800638F8(void *self, u32 *other);
+u32 fn_800639D0(u32 **a, u32 **b);
+u32 fn_80063964(void *self, u32 *other);
+
 /* The frame/rate helpers `g3d/g3d_resanmchr.cpp`'s channel evaluators call (types the target bodies imply). */
 f32 math_reciprocal(f32 value);                /* 0x800610AC - the reciprocal helper */
 void *fn_800618BC(void *self);             /* 0x800618BC - the resource-table base */
@@ -32,6 +40,15 @@ u32 fn_800600C0(u32* p);
 }
 #endif
 
+/* The object/vtable pair the dispatch wrappers of this unit, `g3d/fn_80063888.cpp` and `g3d/fn_800680CC.cpp` share (rule 1). */
+typedef u32 (*G3dVtMethod)(void *);
+typedef struct {
+    /* +0x00 */ u8 pad_0x00[0x14];
+    /* +0x14 */ G3dVtMethod method_0x14;
+} G3dVtbl; /* size: 0x18 */
+typedef struct {
+    /* +0x00 */ G3dVtbl *vt;
+} G3dObj; /* size: 0x4 */
 
 #endif /* MHTRI_G3D_G3D_ANMCHR_H */
 

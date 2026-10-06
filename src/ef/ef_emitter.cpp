@@ -158,7 +158,7 @@ void mtx34_identity(void* mtx);
 void vec3_scale_by(void* dst, void* src, f32 scale);
 void assignVec3(void* dst, void* src);
 void mtx34_mult_vec3(void* dst, void* mtx, void* vec);
-void fn_8007100C(void* dst, void* src);
+void mtx34_copy_ps(void* dst, void* src);
 void mtx34_concat(void* dst, void* a, void* b);
 void mtx34_inverse(void* mtx, void* in);
 void ef_mtx34_rotate_xyz(void* mtx, f32 x, f32 y, f32 z);
@@ -1578,7 +1578,7 @@ extern "C" void* ef_emitter_get_mtx(EfEmitterObj* self, void* out) {
         nw4r::math::MTX34 m;
         MTX34_ctor(&m);
         if (self->parent == NULL) {
-            fn_8007100C(&self->matrix, fn_800A60C0(self->managerEF));
+            mtx34_copy_ps(&self->matrix, fn_800A60C0(self->managerEF));
         } else {
             nw4r::math::MTX34 p;
             MTX34_ctor(&p);

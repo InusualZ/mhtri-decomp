@@ -25,7 +25,7 @@ void mtx34_concat(Mtx34* out, const Mtx34* a, const Mtx34* b);
 u32 fn_8006FDCC(const void* p);
 struct G3DWorkObj* fn_8006FF50(void);
 s32* fn_80070054(void* pOut, const void* pKey);
-void fn_8007100C(void* pDst, const void* pSrc);
+void mtx34_copy_ps(Mtx34* pDst, const Mtx34* pSrc);   /* 0x8007100C - paired-single copy of a 3x4 matrix */
 
 #ifdef __cplusplus
 }

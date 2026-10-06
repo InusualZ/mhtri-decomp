@@ -269,8 +269,8 @@ extern "C" void *fn_8006D000(void *self, void *src)
 
 extern "C" u32 fn_800693A0(void)
 {
-    void *local;
-    return (u32)*fn_800638B8(&local, lbl_8056F578);
+    const u8 *local;
+    return (u32)*type_obj_set_name(&local, lbl_8056F578);
 }
 
 extern "C" u32 fn_8006943C(void)

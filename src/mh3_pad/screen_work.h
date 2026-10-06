@@ -1,6 +1,6 @@
 /*
  * `Screen_w` - the screen geometry/calibration block (.bss 0x8065903C, 0x54 B), defined by `src/mh3_pad.cpp`
- * (its `.bss` 0x806585B8-0x806694E8 is that unit's own).  `main.cpp` fills it in `fn_8003F940`'s video setup
+ * (its `.bss` 0x806585B8-0x806694E8 is that unit's own).  `main.cpp` fills it in `render_mode_copy`'s video setup
  * and reads it through its screen accessors; the band units read single fields (`frame_scale`, `aspect`).
  * This is the type's one home (rule 1); the object is declared in `Screen_w.h`.
  *

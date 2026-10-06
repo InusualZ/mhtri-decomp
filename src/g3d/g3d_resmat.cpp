@@ -218,7 +218,7 @@ ResTexSrt ResTexSrt::CopyTo(void* pDst) const {
             pDstEffect->ref_light = pSrcEffect->ref_light;
             pDstEffect->map_mode = pSrcEffect->map_mode;
             pDstEffect->misc_flag = pSrcEffect->misc_flag;
-            fn_8007100C(&pDstEffect->effectMtx, &pSrcEffect->effectMtx);
+            mtx34_copy_ps(&pDstEffect->effectMtx, &pSrcEffect->effectMtx);
         }
     }
     return ResTexSrt(pDst);
@@ -229,7 +229,7 @@ bool ResTexSrt::SetEffectMtx(u32 id, const math::MTX34* pMtx) {
     if (id < 8) {
         TexMtxEffect* pEffect = &ref().effect[id];
         if (pMtx != NULL) {
-            fn_8007100C(&pEffect->effectMtx, pMtx);
+            mtx34_copy_ps(&pEffect->effectMtx, pMtx);
             pEffect->misc_flag &= ~1;
         } else {
             mtx34_identity(&pEffect->effectMtx);
@@ -243,7 +243,7 @@ bool ResTexSrt::SetEffectMtx(u32 id, const math::MTX34* pMtx) {
 /* 0x800953D0 (0x68): copies coordinate `id`'s effect matrix out. */
 bool ResTexSrt::GetEffectMtx(u32 id, math::MTX34* pMtx) const {
     if (pMtx != NULL && id < 8) {
-        fn_8007100C(pMtx, &ref().effect[id].effectMtx);
+        mtx34_copy_ps(pMtx, &ref().effect[id].effectMtx);
         return true;
     }
     return false;

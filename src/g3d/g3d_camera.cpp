@@ -5,9 +5,9 @@
  *   "g3d_camera.cpp", read from fn_800746DC on), .sdata2 0x80795DC8-0x80795DF8.  The six accessors
  *   fn_80074620..fn_800746D4 before it (no data references) sit in `g3d/g3d_calcworld.cpp` by the candidate cut.
  * NAMES. Map stems, plus the three `nw4r::g3d::Camera` members the map carries mangled (`SetPosition`, `SetPosture`,
- *   `SetPerspective`); MTX44_ctor is a GUESS (0x80075390: the empty 4x4 matrix constructor, the MTX34_ctor scheme).
+ *   `SetPerspective`, `GetCameraMtx`); MTX44_ctor is a GUESS (0x80075390: the empty 4x4 matrix constructor, the MTX34_ctor scheme).
  * RESIDUALS. Partial (15): fn_80074758, `Camera::SetPosition`, `Camera::SetPosture`, 0x80074D78-0x80074FEC (three),
- *   fn_8007507C, fn_80075258, 0x80075394-0x80075844 (six), fn_80075940.
+ *   fn_8007507C, fn_80075258, 0x80075394-0x80075844 (six, `Camera::GetCameraMtx` first), fn_80075940.
  *   flipcheck: `.text` 0x16A0 of 0x16F0; `.data` is claimed and not emitted; `.sdata2` is 0x34 of 0x30 - one pooled
  *   literal is shared with `g3d/fn_80075DCC.cpp` (a candidate fold).
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_8050168C`,
@@ -19,7 +19,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-#include "g3d/g3d_calcview.h" /* fn_8007100C (rule 2) */
+#include "g3d/g3d_calcview.h" /* mtx34_copy_ps (rule 2) */
 #include "g3d/g3d_state.h" /* g3d_state_get_render_mode (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_80075DCC/fn_80075DD8, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
@@ -187,7 +187,6 @@ void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d);
 void fn_80075170(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f32* p4, f32* p5, f32* p6);
 void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
 void MTX44_ctor(nw4r::math::MTX44* pMtx);
-void fn_80075394(nw4r::g3d::Camera* pSelf, void* pOut);
 void fn_80075440(nw4r::g3d::Camera* pSelf, void* pOut);
 void fn_800754EC(nw4r::g3d::Camera* pSelf, void* pOut);
 void fn_80075620(nw4r::g3d::Camera* pSelf, void* pOut);
@@ -424,7 +423,7 @@ void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVe
     f32 frustum[6];
     MTX34_ctor((nw4r::math::MTX34*)viewMtx);
     MTX44_ctor((nw4r::math::MTX44*)projMtx);
-    fn_80075394(pSelf, viewMtx);
+    pSelf->GetCameraMtx((nw4r::math::MTX34*)viewMtx);
     fn_80075440(pSelf, projMtx);
     CameraData* pData = fn_80074A54(pSelf);
     f32 projType = (f32)pData->mProjType;
@@ -450,18 +449,18 @@ void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVe
 void MTX44_ctor(nw4r::math::MTX44* pMtx) {
 }
 
-void fn_80075394(nw4r::g3d::Camera* pSelf, void* pOut) {
-    if (!fn_80067EE8(pSelf)) {
+void nw4r::g3d::Camera::GetCameraMtx(math::MTX34* pMtx) const {
+    if (!fn_80067EE8(this)) {
         nw4r::db::Panic(lbl_8058E430, 629, lbl_8058E468);
     }
-    if (pOut == NULL || !fn_80067EE8(pSelf)) {
+    if (pMtx == NULL || !fn_80067EE8(this)) {
         return;
     }
-    CameraData* pData = fn_80074A54(pSelf);
+    CameraData* pData = fn_80074A54((nw4r::g3d::Camera*)this);
     if ((pData->mFlags & 8) == 0) {
-        fn_80075940(pSelf);
+        fn_80075940((nw4r::g3d::Camera*)this);
     }
-    fn_8007100C(pOut, pData);
+    mtx34_copy_ps((Mtx34*)pMtx, (const Mtx34*)pData);
 }
 
 void fn_80075440(nw4r::g3d::Camera* pSelf, void* pOut) {

@@ -65,18 +65,18 @@
  *   are nw4r's members.
  * RESIDUALS. 29 functions unwritten (objdiff scores them zero) in 12 runs:
  *   0x80084630-0x8008503C and 0x8008715C-0x800873E4 (the projection functions and the texture-SRT load: their
- *     matrix copy is `g3d/g3d_calcview.cpp`'s fn_8007100C, 32 call sites in other units; fn_80084B9C also calls
+ *     matrix copy is `g3d/g3d_calcview.cpp`'s mtx34_copy_ps, 32 call sites in other units; fn_80084B9C also calls
  *     `MTX/vec.c`'s fn_804C6C60), 0x8008540C-0x80085478 (the light table constructor: the light objects'
  *     constructor and destructor are `g3d/fn_80075DCC.cpp` stems), 0x800854B8-0x8008569C and 0x800856F4-0x80085ACC
  *     (g3d_light_table_set_setting, g3d_light_table_load_light_set: their light load is `EXI/ProbeBarnacle.c`'s
- *     unnamed fn_804B7C40), 0x80085C70-0x80085D4C (g3d_camera_table_set_camera: its view-matrix getter
- *     fn_80075394 is also declared by `sound/fn_800E3CBC.cpp`), 0x80087AD0-0x80087C80
+ *     GXLoadLightObjImm), 0x80085C70-0x80085D4C (g3d_camera_table_set_camera: its view-matrix getter
+ *     `Camera::GetCameraMtx` is also called by `sound/fn_800E3CBC.cpp`), 0x80087AD0-0x80087C80
  *     (g3d_state_load_shp_prim: its indexed matrix loads are `RVLGX/GXTexture_tail.cpp`'s unnamed fn_804BA560 and
  *     fn_804BA5F0), 0x80087F18-0x80087FA8 (g3d_view_mtx_arrays_nrm_mtx: it
- *     calls `fn_8004CAD8.cpp`'s fn_800516F0 and `hud/pl_frame_sync.cpp`'s fn_80330E14), 0x80088050-0x8008812C and
+ *     calls `fn_8004CAD8.cpp`'s fn_800516F0 and `hud/pl_frame_sync.cpp`'s mtx34_to_mtx33), 0x80088050-0x8008812C and
  *     0x8008819C-0x80088250 (the fog set and g3d_fog_table_load: the Fog members are `g3d/fn_80075DCC.cpp` m2c
  *     stems, and GXSetFog has no declaration in `RVLGX/GXTexture_tail.cpp`), 0x80088574-0x80088584 (its copy is
- *     `main.cpp`'s fn_8003F940), 0x80088AD0-0x80088E24 (the `.ctors` static constructor fn_80088AD0 and the
+ *     `main.cpp`'s render_mode_copy), 0x80088AD0-0x80088E24 (the `.ctors` static constructor fn_80088AD0 and the
  *     globals' constructors: the globals would become definitions).
  *   G3dRandomAccessTag: its inline constructor is empty on purpose (the tag temporary stays uninitialised, and
  *     retail copies an uninitialised byte).
@@ -111,8 +111,8 @@
 #include "nw4r/math.h"
 #include "gx.h"              /* GXWGFifo, the 0xCC008000 write window (rule 1) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResGenMode (rule 2) */
-#include "g3d/g3d_anmchr.h"    /* fn_8005DC24, owned by g3d/g3d_anmchr.cpp (rule 2) */
-#include "g3d/fn_80063888.h"   /* fn_800639D0, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "g3d/g3d_anmchr.h"    /* fn_8005DC24, fn_800639D0, owned by g3d/g3d_anmchr.cpp (rule 2) */
+#include "g3d/fn_80063888.h"   /* the cluster declarations, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_identity/MTX34_ctor, owned by fn_8004CAD8.cpp (rule 2) */
 #include "g3d/g3d_camera.h"    /* fn_80075390..fn_80075620, owned by g3d/g3d_camera.cpp (rule 2) */
 #include "g3d/fn_80075DCC.h"    /* fn_8007B5F4/fn_8007BB8C, GDWriteXFCmd, owned by g3d/fn_80075DCC.cpp (rule 2) */

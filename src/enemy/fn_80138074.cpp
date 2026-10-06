@@ -71,7 +71,7 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "sound/mhchar.h" /* MHchar::move (rule 2) */
 #include "enemy/fn_8013ACC4.h" /* em_userdata_script_run (rule 2) */
-#include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8006FDCC/fn_8007100C (rule 2) */
+#include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8006FDCC/mtx34_copy_ps (rule 2) */
 #include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
 #include "nw4r/db_assert.h" /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
 #include "g3d/g3d_state.h"
@@ -1361,7 +1361,7 @@ void fn_80139954(ResUserDataAc* self, MtxHolder* arg1, s32 arg2, s32 arg3, s32 a
 /* Copies a matrix into the holder, or resets it when no source is given. */
 void joint_mtx_store(MtxHolder* dst, void* src) {
     if (src != NULL) {
-        fn_8007100C(dst->mtx, src);
+        mtx34_copy_ps((Mtx34*)dst->mtx, (const Mtx34*)src);
         return;
     }
     mtx34_identity(dst->mtx);
@@ -1372,12 +1372,12 @@ void joint_mtx_load(MtxHolder* holder, void* mtx) {
     if (mtx == NULL) {
         return;
     }
-    fn_8007100C(mtx, holder->mtx);
+    mtx34_copy_ps((Mtx34*)mtx, (const Mtx34*)holder->mtx);
 }
 
 /* Copies the holder's matrix into the destination, unconditionally. */
 void fn_80139A98(MtxHolder* holder, void* src) {
-    fn_8007100C(holder->mtx, src);
+    mtx34_copy_ps((Mtx34*)holder->mtx, (const Mtx34*)src);
 }
 
 /* Placeholder the retail object keeps as an empty body. */
