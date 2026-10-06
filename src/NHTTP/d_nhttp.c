@@ -110,7 +110,9 @@
  *     `NHTTPi_cancelAllRequests` 92.7 (retail reloads `active->request` for the store), `NHTTP_SendRequestAsync`
  *     95.8 (retail stores the flag after the argument setup), `NHTTPi_GetResponseSize`/`BufferFull`/
  *     `Recv`/`PostSendCallback` (earlier passes): one to a few instructions of scheduling or allocation.
- *   - `NHTTPi_InitConnectionList` 83.3: retail loads the list once and skips the count when empty.
+ *   - Relocation names that differ: `NHTTPi_createRequestObject` +0x21c, retail calls `NHTTPi_SetError` where ours
+ *     inlines it; `NHTTPi_Base64Encode` reaches its table off a base where retail names `NHTTPi_base64Alphabet`;
+ *     `NHTTPi_sendUrlEncodedBody` names `NHTTPi_urlEncodedHeader` where retail names the pool label `lbl_80630BDC`.
  *
  * Shared files touched (each minimal, all listed in the outbox): `NHTTPRequest` completed in
  * `NHTTP/NHTTP_bgnend.h` (+ `quitFlag`/`socket`/`sslHook` renames in `NHTTP_bgnend.c`), the request-info
@@ -497,10 +499,11 @@ s32 NHTTPi_SocRecv(s32 handle, NHTTPConnection* conn, s32 flags, u8* buf, s32 le
     } else {
         NHTTPConnection* connection = NHTTPi_Request2Connection((NHTTPMutexInfo*)handle, (s32)conn);
 
-        if (connection == NULL) {
-            return -1001;
+        if (connection != NULL) {
+            result = NHTTPi_SocRecv_sub(connection, flags, buf, length, arg);
+        } else {
+            result = -1001;
         }
-        result = NHTTPi_SocRecv_sub(connection, flags, buf, length, arg);
     }
     if (result < 0) {
         if (((NHTTPRequest*)conn)->cancelled != 0) {
@@ -680,7 +683,7 @@ asm void* NHTTPi_memclr(void* dst, u32 n) {
 
 /* The case fold `NHTTPi_strnicmp` and `NHTTPi_strToHex` both need.  MWCC inlines it at every call
  * site, so it has no symbol of its own. */
-static inline char NHTTPi_toLower(char c) {
+static inline s32 NHTTPi_toLower(char c) {
     return ((c >= 'A') & (c <= 'Z')) ? c + 32 : c;
 }
 
@@ -692,9 +695,11 @@ s32 NHTTPi_strnicmp(const char* s1, const char* s2, s32 n) {
         char c1 = *s1++;
         char c2 = *s2++;
 
-        if (c1 == 0 && c2 == 0) {
-            n = 0;
-            break;
+        if (c1 == 0 || c2 == 0) {
+            if (c1 == 0 && c2 == 0) {
+                n = 0;
+                break;
+            }
         }
         if (NHTTPi_toLower(c1) != NHTTPi_toLower(c2)) {
             break;
@@ -879,18 +884,20 @@ s32 NHTTPi_compareToken(const char* a, const char* b) {
 /* 0x805172FC (0x90): read at most `n` characters as a decimal number, skipping spaces.  Answers -1
  * when the field held no digit at all, or when the number needs more than nine digits. */
 s32 NHTTPi_strtonum(const char* s, s32 n) {
+    char c;
     s32 value = 0;
     s32 digits = 0;
 
-    for (; n > 0; n--) {
-        char c = *s;
-        u32 isDigit = (c >= '0') & (c <= '9');
+    for (; n != 0; n--) {
+        c = *s;
 
-        if (c != ' ' && isDigit) {
-            value = value * 10 + (c - '0');
-            digits++;
-            if (digits > 9) {
-                return -1;
+        if (c != ' ') {
+            if ((c >= '0') & (c <= '9')) {
+                value = value * 10 + (c - '0');
+                digits++;
+                if (digits > 9) {
+                    return -1;
+                }
             }
         }
         s++;
@@ -913,16 +920,13 @@ s32 NHTTPi_containsString(const char* haystack, s32 haystackLen, const char* nee
     }
     p = haystack;
     for (i = 0; i < haystackLen - needleLen + 1; i++) {
-        if (*p == needle[0]) {
-            s32 matched = 1;
-
+        if (needle[0] == *p) {
             for (k = 1; k < needleLen; k++) {
                 if (haystack[i + k] != needle[k]) {
                     break;
                 }
-                matched++;
             }
-            if (matched == needleLen) {
+            if (k == needleLen) {
                 return 0;
             }
         }
@@ -2485,25 +2489,23 @@ NHTTPRequest* __NHTTPCreateRequestEx(const char* url, s32 method, u32 buffer, u3
     NHTTPMutexInfo* mutex;
     NHTTPRequest* request;
 
-    if (connection == NULL) {
-        return NULL;
+    if (connection != NULL) {
+        info = NHTTPi_GetSystemInfoP();
+        mutex = NHTTPi_GetMutexInfoP(info);
+        connection = NHTTPi_GetConnection(mutex, connection);
+        request = NHTTPi_Connection2Request(mutex, connection);
+        if (request != NULL) {
+            if (request->response != NULL) {
+                connection->completeCallback = completeCallback;
+                request->response->bufferFullCallback = bufferFullCallback;
+                request->response->freeCallback = freeCallback;
+                return request;
+            }
+            NHTTP_DestroyRequest(info, request);
+            NHTTPi_OmitConnectionList(mutex, connection);
+            NHTTPi_free(connection);
+        }
     }
-    info = NHTTPi_GetSystemInfoP();
-    mutex = NHTTPi_GetMutexInfoP(info);
-    connection = NHTTPi_GetConnection(mutex, connection);
-    request = NHTTPi_Connection2Request(mutex, connection);
-    if (request == NULL) {
-        return NULL;
-    }
-    if (request->response != NULL) {
-        connection->completeCallback = completeCallback;
-        request->response->bufferFullCallback = bufferFullCallback;
-        request->response->freeCallback = freeCallback;
-        return request;
-    }
-    NHTTP_DestroyRequest(info, request);
-    NHTTPi_OmitConnectionList(mutex, connection);
-    NHTTPi_free(connection);
     return NULL;
 }
 
@@ -2574,10 +2576,10 @@ s32 NHTTPi_GetResponseSize(NHTTPConnection* connection) {
 
     if (conn != NULL) {
         response = NHTTPi_Connection2Response(mutex, conn);
-
         if (response != NULL) {
             return response->userData;
         }
+        return 0;
     }
     return 0;
 }
@@ -3002,13 +3004,13 @@ NHTTPConnection* NHTTPi_ControlConnectionList(NHTTPMutexInfo* mutex, void* key, 
 /* 0x8051B1E8 (0x30): put the connection at the head of the list, answering 0 when it went in and -1
  * when it did not. */
 s32 NHTTPi_AddConnection(NHTTPMutexInfo* mutex, NHTTPConnection* connection) {
-    return NHTTPi_ControlConnectionList(mutex, connection, NHTTPI_LIST_ADD) == NULL ? -1 : 0;
+    return (NHTTPi_ControlConnectionList(mutex, connection, NHTTPI_LIST_ADD) != NULL) - 1;
 }
 
 /* 0x8051B218 (0x30): take the connection out of the list, answering 0 when it was in it and -1 when
  * it was not. */
 s32 NHTTPi_OmitConnectionList(NHTTPMutexInfo* mutex, NHTTPConnection* connection) {
-    return NHTTPi_ControlConnectionList(mutex, connection, NHTTPI_LIST_OMIT) == NULL ? -1 : 0;
+    return (NHTTPi_ControlConnectionList(mutex, connection, NHTTPI_LIST_OMIT) != NULL) - 1;
 }
 
 /* 0x8051B248 (0x38): the request the connection holds, or null when it is not in the list. */
@@ -3242,14 +3244,17 @@ NHTTPSock* NHTTPi_GetSock(NHTTPConnection* connection) {
 /* Drop the connection list: warn when connections were still in it. */
 void NHTTPi_InitConnectionList(void) {
     NHTTPConnection* node = NHTTPi_connectionListHead;
-    s32 count = 0;
+    s32 count;
 
-    while (node != NULL) {
-        node = node->next;
-        count++;
-    }
-    if (count != 0) {
-        printf("*warning: %d connections rests! Please free connections.\n", count);
+    if (node != NULL) {
+        count = 0;
+        while (node != NULL) {
+            node = node->next;
+            count++;
+        }
+        if (count != 0) {
+            printf("*warning: %d connections rests! Please free connections.\n", count);
+        }
     }
     NHTTPi_connectionListHead = NULL;
 }
