@@ -319,17 +319,16 @@ extern "C" u32 fn_80069334(void *self, u32 *key)
 {
     u32 res = fn_800693A0();
 
-    if (fn_800639D0((u32 **)key, (u32 **)&res))
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
         return 1;
-    u32 local = *key;
-    return fn_80063964(self, &local);
+    return reinterpret_cast<const nw4r::g3d::G3dObj*>(self)->nw4r::g3d::G3dObj::IsDerivedFrom(*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key));
 }
 
 extern "C" u32 fn_800693D0(void *self, u32 *key)
 {
     u32 res = fn_8006943C();
 
-    if (fn_800639D0((u32 **)key, (u32 **)&res))
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
         return 1;
     u32 local = *key;
     return fn_80069334(self, &local);
@@ -339,17 +338,16 @@ extern "C" u32 fn_8006E6C8(void *self, u32 *key)
 {
     u32 res = fn_8006E734();
 
-    if (fn_800639D0((u32 **)key, (u32 **)&res))
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
         return 1;
-    u32 local = *key;
-    return fn_800638F8(self, &local);
+    return reinterpret_cast<const nw4r::g3d::AnmObj*>(self)->nw4r::g3d::AnmObj::IsDerivedFrom(*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key));
 }
 
 extern "C" u32 fn_8006E7CC(void *self, u32 *key)
 {
     u32 res = fn_8006E838();
 
-    if (fn_800639D0((u32 **)key, (u32 **)&res))
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
         return 1;
     u32 local = *key;
     return fn_8006E6C8(self, &local);
@@ -359,7 +357,7 @@ extern "C" u32 fn_8006E92C(void *self, u32 *key)
 {
     u32 res = fn_8006E998();
 
-    if (fn_800639D0((u32 **)key, (u32 **)&res))
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
         return 1;
     u32 local = *key;
     return fn_8006E7CC(self, &local);
@@ -369,7 +367,7 @@ extern "C" u32 fn_8006EA24(void *self, u32 *key)
 {
     u32 res = fn_8006EA90();
 
-    if (fn_800639D0((u32 **)key, (u32 **)&res))
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
         return 1;
     u32 local = *key;
     return fn_8006E6C8(self, &local);
@@ -379,7 +377,7 @@ extern "C" u32 fn_8006EA24(void *self, u32 *key)
  * The teardown destructors and the checked word reader (0x8006AA4C-0x8006E9C8).
  * --------------------------------------------------------------------------------------------- */
 
-/* The g3d/main-band teardown helper this unit declares itself; fn_8005D384/fn_8005D3E0/fn_800628A4/
+/* The g3d/main-band teardown helper this unit declares itself; fn_8005D384/G3dObj::operator delete/fn_800628A4/
  * fn_800628B4/fn_80062914 come from `g3d/g3d_anmchr.h`. */
 extern "C" void dtor_8006AAA8(void *self, s32 flag);
 
@@ -401,7 +399,7 @@ extern "C" void *dtor_8006AA4C(void *self, s32 flag)
     if (self != 0) {
         dtor_8005D384(self, 0);
         if ((s16)flag > 0)
-            fn_8005D3E0(self);
+            nw4r::g3d::G3dObj::operator delete(self);
     }
     return self;
 }
@@ -411,7 +409,7 @@ extern "C" void *fn_8006E868(void *self, s32 flag)
     if (self != 0) {
         dtor_8006AAA8(self, 0);
         if ((s16)flag > 0)
-            fn_8005D3E0(self);
+            nw4r::g3d::G3dObj::operator delete(self);
     }
     return self;
 }
@@ -421,7 +419,7 @@ extern "C" void *fn_8006E9C8(void *self, s32 flag)
     if (self != 0) {
         dtor_8006AA4C(self, 0);
         if ((s16)flag > 0)
-            fn_8005D3E0(self);
+            nw4r::g3d::G3dObj::operator delete(self);
     }
     return self;
 }
@@ -554,7 +552,7 @@ extern "C" u32 fn_8006D9A4(void *self, void *key)
 
 /* --------------------------------------------------------------------------------------------- *
  * The vtable-dispatch wrappers (0x8006A38C/0x8006A3F4/0x8006E794/0x8006E8F4): the body word 0 is its
- * vtable, the entry at +0x14 runs with the object and a word is read back through the `fn_8005DC24`
+ * vtable, the entry at +0x14 runs with the object and a word is read back through the `TypeObj::GetTypeName`
  * helper (the shape `g3d/fn_80063888.cpp` uses for its three wrappers).
  * --------------------------------------------------------------------------------------------- */
 
@@ -563,7 +561,7 @@ extern "C" u32 fn_8006A38C(void *p)
     G3dObj *obj = (G3dObj *)p;
     u32 tmp = obj->vt->method_0x14(p);
 
-    return fn_8005DC24(&tmp);
+    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
 }
 
 extern "C" u32 fn_8006A3F4(void *p)
@@ -571,7 +569,7 @@ extern "C" u32 fn_8006A3F4(void *p)
     G3dObj *obj = (G3dObj *)p;
     u32 tmp = obj->vt->method_0x14(p);
 
-    return fn_8005DC24(&tmp);
+    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
 }
 
 extern "C" u32 fn_8006E794(void *p)
@@ -579,7 +577,7 @@ extern "C" u32 fn_8006E794(void *p)
     G3dObj *obj = (G3dObj *)p;
     u32 tmp = obj->vt->method_0x14(p);
 
-    return fn_8005DC24(&tmp);
+    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
 }
 
 extern "C" u32 fn_8006E8F4(void *p)
@@ -587,7 +585,7 @@ extern "C" u32 fn_8006E8F4(void *p)
     G3dObj *obj = (G3dObj *)p;
     u32 tmp = obj->vt->method_0x14(p);
 
-    return fn_8005DC24(&tmp);
+    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
 }
 
 namespace nw4r {

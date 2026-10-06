@@ -60,6 +60,9 @@ typedef struct {
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "g3d/g3d_xsi.h" /* g3d_calc_tex_mtx_xsi (rule 2) */
+#include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 2) */
+#include "OS/MEMAllocFromAllocator.h" /* MEMFreeToAllocator (rule 2) */
+#include "g3d/g3d_anmchr.h" /* type_obj_set_name (rule 2) */
 #include "g3d/g3d_cpu.h"
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resmat.h"
@@ -131,7 +134,6 @@ extern const char lbl_8058EC30[];
 extern const char lbl_8058EC70[];
 extern const char lbl_8058ECB0[];
 extern const char lbl_8058ECF8[];
-extern const char lbl_8058ED18[];
 extern u32 lbl_8058ED38;
 extern const char lbl_8058ED64[];
 extern const char lbl_8058ED90[];
@@ -178,7 +180,6 @@ u32 GXSetFog(s32, void*, f32, f32, f32, f32);
 u32 GXSetFogRangeAdj(u8, u16, void*);
 u32 GXSetIndTexMtx(s32, void*, s8);
 u32 GXSetTevKColor(u32, void*);
-u32 MEMFreeToAllocator(void);
 u32 OSRegisterVersion(s32);
 u32 PPCSync(void);
 u32 TheBeatMatchOutput(void);
@@ -196,13 +197,7 @@ s32 fn_8005D050(void*);
 u32 fn_8005D0CC(void*, void*);
 s32 fn_8005D218(void*);
 u32 fn_8005D2C0(void*, void*);
-u32 fn_8005D3E0(void*);
-u32 fn_8005DC24(void*);
-void* fn_8005DCD0(void*, void*);
-void* fn_800600C0(void);
 void* fn_80062DEC(s32);
-s32 fn_80063964(s32, void*);
-s32 fn_800639D0(void*, void*);
 s32 fn_8006405C(void*);
 u32 fn_80064BD4(void*);
 s32 fn_8006518C(void);
@@ -342,11 +337,6 @@ u32 math_sincos_idx(f32);
 /* internal */ void* fn_8007B148(u32 *arg0, u32 *arg1);
 /* internal */ s32 fn_8007B160(void *arg0, u32 arg1, s8 arg2);
 /* internal */ s32 fn_8007B224(void *arg0, s8 arg1);
-/* internal */ void* dtor_8007B2D4(void *arg0, s16 arg1);
-/* internal */ u32 fn_8007B340(void* a0, void* a1);
-/* internal */ void fn_8007B348(void **arg0);
-/* internal */ s32 fn_8007B3BC(void* a0);
-/* internal */ void fn_8007B3EC(void **arg0);
 /* internal */ s32 fn_8007B424(void *arg0);
 /* internal */ void fn_8007B42C(u32 *arg0, u32 arg1, u32 *arg2);
 /* internal */ void fn_8007B450(void* a0);
@@ -2665,13 +2655,19 @@ typedef struct {
     /* +0x04 */ u8 pad_0x04[0x4];
     /* +0x08 */ u32 field_0x08;
 } RawView_61; /* size: 0xC */
-void* dtor_8007B2D4(void *arg0, s16 arg1) {
+} /* extern "C" */
+
+/* 0x8007B2D4 (0x6C): returns the object's memory to the heap it came from. */
+nw4r::g3d::G3dObj::~G3dObj() {
+    Dealloc(mpHeap, this);
 }
 
-
-u32 fn_8007B340(void* a0, void* a1) {
-    MEMFreeToAllocator();
+/* 0x8007B340 (0x8): returns a block to the allocator. */
+void nw4r::g3d::G3dObj::Dealloc(MEMAllocator* pHeap, void* pBlock) { /* untyped: byte range */
+    MEMFreeToAllocator(pHeap, pBlock);
 }
+
+extern "C" {
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x10];
@@ -2681,32 +2677,45 @@ typedef struct {
     /* +0x00 */ u8 pad_0x00[0xC];
     /* +0x0C */ u32 (*field_0x0C)(...);
 } RawView_62; /* size: 0x10 */
-void fn_8007B348(void **arg0) {
-    void **temp_r3;
+} /* extern "C" */
 
-    temp_r3 = (void **)(fn_800600C0());
-    if (temp_r3 != NULL) {
-        ((RawView_62*)(*temp_r3))->field_0x0C(0x10001, 0, arg0);
+/* 0x8007B348 (0x74): tells the parent the object is going away, then destroys it. */
+void nw4r::g3d::G3dObj::Destroy() {
+    G3dObj* pParent = GetParent();
+    if (pParent != NULL) {
+        pParent->G3dProc(G3DPROC_CHILD_DETACHED, 0, this);
     }
-    if (arg0 != NULL) {
-        ((RawView_63*)(*arg0))->field_0x10(arg0, 1);
-    }
+    delete this;
 }
 
-s32 fn_8007B3BC(void* a0) {
+extern "C" {
+
+} /* extern "C" */
+
+/* The G3dObj type-name record (this unit's `.rodata`). */
+extern "C" u8 anm_typename_G3dObj[];
+
+/* 0x8007B3BC (0x30): returns the type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::G3dObj::GetTypeObj() const {
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name(&pName, anm_typename_G3dObj));
 }
+
+extern "C" {
 
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x14];
     /* +0x14 */ u32 (*field_0x14)(...);
 } RawView_64; /* size: 0x18 */
-void fn_8007B3EC(void **arg0) {
-    s32 sp8;
+} /* extern "C" */
 
-    sp8 = ((RawView_64*)(*arg0))->field_0x14();
-    fn_8005DC24((void*)(&sp8));
+/* 0x8007B3EC (0x38): returns the type's name. */
+const char* nw4r::g3d::G3dObj::GetTypeName() const {
+    return GetTypeObj().GetTypeName();
 }
+
+extern "C" {
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0xE4];
@@ -2768,7 +2777,7 @@ s32 fn_8007B5F4(s32 arg0, s32 *arg1) {
     s32 sp8;
 
     spC = fn_8007B6FC(0);
-    if (fn_800639D0((void*)(arg1), (void*)(&spC)) != 0) {
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((arg1)) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((&spC))) != 0) {
         return 1;
     }
     sp8 = *arg1;
@@ -2780,11 +2789,10 @@ s32 fn_8007B660(s32 arg0, s32 *arg1) {
     s32 sp8;
 
     spC = fn_8007B6CC(0);
-    if (fn_800639D0((void*)(arg1), (void*)(&spC)) != 0) {
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((arg1)) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((&spC))) != 0) {
         return 1;
     }
-    sp8 = *arg1;
-    return fn_80063964((s32)(arg0), (void*)(&sp8));
+    return reinterpret_cast<const nw4r::g3d::G3dObj*>(arg0)->nw4r::g3d::G3dObj::IsDerivedFrom(*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(arg1));
 }
 
 s32 fn_8007B6CC(void* a0) {
@@ -2905,7 +2913,7 @@ s32 dtor_8007BA44(s32 arg0, s16 arg1) {
     if (arg0 != 0) {
         dtor_800813B8((u32)(0));
         if (arg1 > 0) {
-            fn_8005D3E0((void*)(arg0));
+            nw4r::g3d::G3dObj::operator delete((void*)(arg0));
         }
     }
     return arg0;
@@ -2923,7 +2931,7 @@ s32 fn_8007BAF0(s32 arg0, s32 *arg1) {
     s32 sp8;
 
     spC = fn_8007BB5C(0);
-    if (fn_800639D0((void*)(arg1), (void*)(&spC)) != 0) {
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((arg1)) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((&spC))) != 0) {
         return 1;
     }
     sp8 = *arg1;

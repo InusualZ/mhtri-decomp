@@ -34,7 +34,7 @@ public:
         }; /* size: 0x8 (approximation) */
 
         explicit TypeObj(const TypeName* pName);
-        u32 GetTypeNameLen() const;
+        u32 GetTypeID() const;
         const char* GetTypeName() const;
         bool operator==(const TypeObj& rhs) const;
 
@@ -66,8 +66,12 @@ public:
     virtual const TypeObj GetTypeObj() const;
     virtual const char* GetTypeName() const;
 
+    void Destroy();
     G3dObj* GetParent() const;
+    void SetParent(G3dObj* pParent);
+    static const TypeObj GetTypeObjStatic();
     static void operator delete(void* pBlock); /* untyped: byte range */
+    static void Dealloc(MEMAllocator* pHeap, void* pBlock); /* untyped: byte range */
 
     /* +0x00 vtable */
     /* +0x04 */ G3dObj* mpParent;
@@ -79,8 +83,7 @@ class AnmObj : public G3dObj {
 public:
     /* The flag bits of mFlags. */
     enum AnmFlag {
-        ANMFLAG_ISBOUND = (1 << 0),
-        ANMFLAG_ALLOCATED = (1 << 1)
+        ANMFLAG_ISBOUND = (1 << 2)
     };
 
     AnmObj(MEMAllocator* pHeap, G3dObj* pParent);
@@ -99,7 +102,39 @@ public:
     virtual bool Bind(ResMdl mdl) = 0;
     virtual void Release() = 0;
 
+    void SetAnmFlag(AnmFlag flag, bool on);
+    static const TypeObj GetTypeObjStatic();
+
     /* +0x0C */ u32 mFlags;
+};
+
+/* The scene animation interface (cameras, lights, fog); only its constructor and the head of its vtable are
+ * reconstructed.  size: 0x0C (approximation: the base's size, the derived scene animations add their members) */
+class AnmScn : public G3dObj {
+public:
+    explicit AnmScn(MEMAllocator* pHeap);
+
+    virtual bool IsDerivedFrom(TypeObj type) const;
+    virtual void G3dProc(u32 task, u32 param, void* pInfo) = 0; /* untyped: caller-owned payload */
+    virtual ~AnmScn();
+    virtual const TypeObj GetTypeObj() const;
+    virtual const char* GetTypeName() const;
+};
+
+/* How a frame past the end is folded back (PlayPolicy_Onetime, PlayPolicy_Loop): (start, end, frame) -> frame. */
+typedef f32 (*PlayPolicyFunc)(f32 startFrame, f32 endFrame, f32 frame);
+
+/* An animation's frame counter: the current frame, the rate it advances by, the frame range and the play
+ * policy.  size: 0x14 */
+class FrameCtrl {
+public:
+    FrameCtrl(f32 startFrame, f32 endFrame, PlayPolicyFunc pPolicy);
+
+    /* +0x00 */ f32 mFrame;
+    /* +0x04 */ f32 mUpdateRate;
+    /* +0x08 */ f32 mStartFrame;
+    /* +0x0C */ f32 mEndFrame;
+    /* +0x10 */ PlayPolicyFunc mpPlayPolicy;
 };
 
 }  // namespace g3d
