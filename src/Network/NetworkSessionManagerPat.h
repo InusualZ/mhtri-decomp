@@ -53,6 +53,10 @@ void deleteCircleListLayer(NetworkSessionManagerPat* self, s32 id);
 void changeCircleListLayer(NetworkSessionManagerPat* self, const struct PatCircleInfo* info, struct PatCircleOptionList* options);
 void networkPatAttachBuffer(NetworkSessionManagerPat* self);
 void networkPatReleaseBuffer(NetworkSessionManagerPat* self);
+/* 0x803DEA30 - opens the NetworkSessionStable a layer session needs on the manager (its session pointer, ready flag
+ * and work buffer, viewed as `NetworkSessionStableInit`); the session's index, or -1 when one is already open. */
+struct NetworkSessionStableInit;
+s32 initNetworkSessionStable(struct NetworkSessionStableInit* self);
 
 /* the two reflection adapters the session manager installs as callbacks */
 /* untyped: caller-owned payload - the six arguments are forwarded unchanged */

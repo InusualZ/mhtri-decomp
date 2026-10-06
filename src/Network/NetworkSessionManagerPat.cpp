@@ -3251,12 +3251,6 @@ void networkPatReleaseBuffer(NetworkSessionManagerPat* self)
  * unit at 99.92 %. */
 #pragma peephole off
 
-extern "C" {
-
-s8 initNetworkSessionStable(struct NetworkSessionStableInit* self);
-
-}
-
 /* The owner that opens the session: its session pointer at +0x0C, the ready flag at +0x3C8 and the work
    buffer at +0x3CC; offsets are the ones the body addresses. */
 struct NetworkSessionStableInit {
@@ -3268,7 +3262,7 @@ struct NetworkSessionStableInit {
     /* +0x3CC */ u8  work_3CC[0x0C];
 };   /* size: 0x3D8 */
 
-s8 initNetworkSessionStable(NetworkSessionStableInit* self)
+s32 initNetworkSessionStable(NetworkSessionStableInit* self)
 {
     NetworkSessionStable* session;
 
@@ -3285,7 +3279,7 @@ s8 initNetworkSessionStable(NetworkSessionStableInit* self)
     self->session_0C->setConnectionInterval(networkSessionTimeoutSeconds);
     self->session_0C->setHostTimeout(networkSessionIntervalSeconds);
     self->ready_3C8 = 1;
-    return self->session_0C->getOwnIndex();
+    return (s8)self->session_0C->getOwnIndex();
 }
 
 /* Marks the session joined and sets its subhost and host timeouts (10 s / 20 s); -1 while there is no

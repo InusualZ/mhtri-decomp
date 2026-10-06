@@ -9,26 +9,42 @@
  *   `setSessionLog*` trio before `NetworkLayer`), `NetworkCommunity`'s constructor (it stores 0x805FC440) after.
  * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
  *   (playbook 39: retail keeps `clrlwi`+`cmpwi` unfused).
- * NAMES. The class name is the pool strings' ("NetworkLayerPat::move ...").  GUESSes from the bodies: `stepRequest`
- *   (0x803E44C8, 960 B, slot +0x104: it advances the request state 0 -> 5 -> ... -> 30, or 100/110, issuing
- *   `sendReqLayerUp`, `sendReqLayerChildInfo`, `sendReqLayerUserList`), the 20 request handlers +0xF4..+0x140 (from the
- *   `sendReq*` they issue: `handleChat` sends `sendNtcLayerChat`), the accessors (`getCommunityValueE0_B4` reads +0xE0;
- *   the `_XX` suffix is the slot offset, the consumers' scheme), the voice/NAT fields and helpers (except
- *   `mVoiceMixed.mSize`, the move warning).  Callees named at integration: `sendReqLayerUserInfoSet` (0x80401AF4,
- *   recvAnsLayerUserInfoSet's slot), `sendReqLayerTell` (0x8040211C, the `sendReqCircleTell` shape),
- *   `sendNtcLayerUserTransfer` (0x80403230, GUESS).
- * RESIDUALS. 40 rows unwritten (the rows objdiff scores zero: `reflect`, `handleLayerCreate`, `handleLayerJump`,
- *   `requestLayerCreate`, `getPatTerms` and the helpers).  The handlers and most helpers read `PatLayerData`/
- *   `PatLayerUser` words `Network/PatInterface.h` leaves in padding (+0x58..+0x70; +0x38/+0x3C/+0x13C), the request
- *   timers are `NetworkLayerRequest` members `Network/NetworkLayer.h` does not declare (0x803E55AC/0x803E5630), and
- *   `getPatTerms` loads `menu/menu_plsearch.cpp`'s unnamed `.sbss` 0x80794D58.  The inline copies of `NetworkLayerRequest`'s
- *   ctor/dtor/reset/isOwned/run/begin and `NetworkRequest::getRecord`/`getArgument`/`setRecord` (0x803E12B0..,
- *   0x803E24F8, 0x803E283C, 0x803E2928, 0x803E9B88, 0x803E9C00, 0x803EF460) and the member-array ctors/dtors carry
- *   manglings `Network/NetworkLayer.cpp`/`Network/NetworkSessionManager.cpp` already define, so the map cannot carry
- *   them twice; our calls reach those copies by name.  `.data` cannot match until the unwritten handlers' tables and
- *   strings are emitted (`vtableaudit` keeps the 0x805FC1E8 run); `flipcheck`: the claimed `.sdata` 8 B is not emitted.
+ * NAMES. The class name is the pool strings' ("NetworkLayerPat::move ...").  The runtime dump names none of the
+ *   functions below, so each is derived from its body, one GUESS line per group:
+ *   GUESS (state machine, slot +0x104, issues `sendReqLayerUp`/`ChildInfo`/`UserList`): `stepRequest`.
+ *   GUESS (request handlers, from the `sendReq*` they issue): `handleServerList`, `handleServerSelect`, `handleLayerInfo`.
+ *   GUESS (request handlers, from the `sendReq*` they issue): `handleLayerCreate`, `handleLayerJump`, `handleChat`.
+ *   GUESS (slot-offset accessors, the consumers' `_XX` scheme): `sendUserFields_5C`, `readSelectedServer_88`.
+ *   GUESS (slot-offset accessors, the consumers' `_XX` scheme): `setPresence_A0`, `getCommunityValueE0_B4`.
+ *   GUESS (voice/NAT helpers): `findFriendByPeerId`, `sendPairState`, `sendPeerRecord`, `checkMemberSessions`.
+ *   GUESS (friend and server helpers): `pollFriendSlot`, `exportServerRec`, `getPatTerms` (menu_plsearch's terms).
+ *   GUESS (the leave-and-reread runs the failing handlers finish with): `stepLayerLeave`, `stepChildListRead`.
+ *   GUESS (the own pool): `allocRequest`, `deleteRequest`, `requestLayerCreate`, `handleLayerReserve` (event 36).
+ *   GUESS (own request type; retail carries a second copy of every member): `NetworkLayerPatRequest`.
+ *   GUESS (its members, `NetworkLayerRequest`'s names for the same bodies): `clear`, `reset`, `isOwned`, `run`.
+ *   GUESS (its members, `NetworkLayerRequest`'s names for the same bodies): `begin`, `getRecord`, `getArgument`.
+ *   GUESS (its members, `NetworkLayerRequest`'s names for the same bodies): `setRecord`.
+ *   GUESS (reflect helpers 0x803EA82C..0x803EB678): `importLayerInfo`, `importCommunityRec`, `importFriendRec`.
+ *   GUESS (reflect helpers 0x803EA82C..0x803EB678): `storeFriendDetail`, `findFriendByUserId`, `addFriendSlot`.
+ *   GUESS (reflect helpers 0x803EA82C..0x803EB678): `removeFriendSlot`, `unpackLayerSettings`.
+ *   GUESS (records and fields): `restoreSentProfile` (NetworkCommunityPat), `NetLayerInfoRec`, `jumpTicket_3D8`.
+ *   GUESS (records and fields): `matchKey_0x00F0`; the callee `sendNtcLayerUserTransfer` (0x80403230).
+ *   `strtok` (0x8045F858) is the C library's own name, which the dump does not carry - not a GUESS.
+ *   Callees named at integration: `sendReqLayerUserInfoSet` (0x80401AF4, recvAnsLayerUserInfoSet's slot),
+ *   `sendReqLayerTell` (0x8040211C, the `sendReqCircleTell` shape).
+ * RESIDUALS. 7 rows unwritten: `reflect` (0x803EBB9C, 8976 B) and three inline ctor/dtor pairs (0x803E6D7C/0x803E6DD8 after `handleChat`, 0x803EDEAC..0x803EDF94
+ *   after `reflect`) - copies of `NetworkSessionSlotInfo`'s and two other records' members whose manglings
+ *   `Network/NetworkSessionManager.cpp` already defines, so the map cannot carry them twice; our calls reach those
+ *   copies by name.  `.data` cannot match until `reflect`'s tables and strings are emitted (`vtableaudit` keeps the
+ *   0x805FC1E8 run); `flipcheck`: the claimed `.sdata` 8 B is not emitted.  The inline members of
+ *   `NetworkLayerPatRequest` are defined at the end of the file, callees after callers, so no call is inlined.
+ *   Not unwritten: the empty constructor/destructor bodies of `NetFriendNotice`, `NetFriendStatusNotice` and
+ *   `NetLayerMediationEntry` are complete - MWCC emits the member construction and destruction (all at 100 %).
  *   Partial rows:
- *  - `moveRequests`: the unrolled scan's trip count in r25 (the base's own `move` residual);
+ *  - `moveRequests`: the unrolled scan's trip count in r25 (the base's own `move` residual), so retail saves from r20
+ *    (`_savegpr_20`/`_restgpr_20`) where ours saves from r21;
+ *  - `handleChat`: its message record's constructor and destructor are the inline copies `fn_803E6DD8`/`dtor_803E6D7C` in
+ *    retail; ours calls `NetworkSessionSlotInfo`'s own members (the copies cannot be named, see above);
  *  - `clear`: two instructions scheduled apart at the end;
  *  - `setFriendTransferModeById`: retail indexes the mode array as `lbzx` off `this` (u8/u32 mode, peephole on/off and
  *    an entry pointer tried);
@@ -40,7 +56,14 @@
  *  - `downsampleVoice`: retail tests the count with `cmplwi`+`blelr` (`i != 0` and `i > 0` both give `cmpwi`+`beqlr`);
  *  - `sendUserFields_5C`: two registers swapped;
  *  - `move`: two `pairState_C7F0` reads use `lbzx` off a precomputed row (the voice-ready result is the mediator's
- *    `u32` `isVoiceReady`, kept in a `u32` local: compared and stored without a mask, as retail).
+ *    `u32` `isVoiceReady`, kept in a `u32` local: compared and stored without a mask, as retail);
+ *  - `handleLayerCreate`, `handleLayerJump`: retail loads the friend peer's `port_0C` with `lhz` for the `s16`
+ *    `setBufferSize` argument (ours `lha`), and gives `getFmpSelected`'s result (and in `handleLayerJump` two more
+ *    temporaries) a different callee-saved register; declaration orders tried;
+ *  - `addFriendSlot`: the voice-ready and accepted-peer results are stored to their byte arrays after a `clrlwi` retail
+ *    does not have (a u8 cast, a u8/u32 local tried); `storeFriendDetail`: retail keeps `index * 0x104` for the copy's
+ *    destination, ours multiplies again; `importCommunityRec`: the state byte's `clrlwi` (a file-wide peephole on
+ *    costs more); `removeFriendSlot`: the unrolled clear's remainder `addis`/`mulli` order.
  * SHAPES. The constructor calls `NetworkLayer::NetworkLayer` and stores 0x805FC1E0 (79 slots); the table is emitted here
  *   (key function `stepRequest`, declared first; rule 10) and every override's map row carries the compiler's mangling.
  *  - every handler is the state machine over `NetworkLayerRequest::state_00` (0 start, waits, 100 cancelled, 110
@@ -63,6 +86,7 @@
  */
 #include "Network/NetworkLayerPat.h"
 #include "Network/NetworkPat.h"
+#include "Network/NetworkCommunityPat.h"   /* restoreSentProfile - the community layer's profile */
 #include "Network/network_pat_control.h"
 #include "enemy/em020_ai.h"
 #include "unsplit/Network.h"
@@ -95,6 +119,7 @@ enum {
     SLOT_SERVER_LIST = 3,    /* `requestServers_24` -> `handleServerList` */
     SLOT_SERVER_SELECT = 4,  /* `selectServer_28` -> `handleServerSelect` */
     SLOT_LAYER_UP = 5,       /* `request_38` -> `stepRequest` */
+    SLOT_LAYER_CREATE = 6,   /* `request_40` -> `handleLayerCreate` */
     SLOT_LAYER_INFO = 7,     /* `request_44` -> `handleLayerInfo` */
     SLOT_CHILD_LIST = 8,     /* `requestCities_48` -> `handleChildList` */
     SLOT_SIBLING_LIST = 9,   /* `request_4C` -> `handleSiblingList` */
@@ -103,11 +128,13 @@ enum {
     SLOT_CHAT = 12,              /* `sendMessage_64` -> `handleChat` */
     SLOT_DETAIL_SEARCH = 13,     /* `setPageSize_68` -> `handleDetailSearch` */
     SLOT_USER_SEARCH = 14,       /* `handleUserSearch`'s own search */
+    SLOT_LAYER_JUMP = 15,        /* `request_70` -> `handleLayerJump` */
     SLOT_LAYER_INFO_BY_ID = 16,  /* `request_74` -> `handleLayerInfoById` */
     SLOT_LAYER_INFO_SET = 17,    /* `request_78` -> `handleLayerInfoSet` */
     SLOT_MEDIATION_LOCK = 18,    /* `request_7C` -> `handleMediationLock` */
     SLOT_MEDIATION_UNLOCK = 19,  /* `request_80` -> `handleMediationUnlock` */
-    SLOT_MEDIATION_LIST = 20     /* `requestAccount_84` -> `handleMediationList` */
+    SLOT_MEDIATION_LIST = 20,    /* `requestAccount_84` -> `handleMediationList` */
+    SLOT_LAYER_RESERVE = 21      /* the layer's own request (`ownRequests_1C0`) -> `handleLayerReserve` */
 };
 
 /* The events `notifyLayerEvent` reports. */
@@ -179,7 +206,21 @@ enum {
     FLAG_FMP_INFO_REPLY = 0x20,
     FLAG_LAYER_END_REPLY = 0x80,
     FLAG_LAYER_JUMP_REPLY = 0x8000000,
-    FLAG_LAYER_INFO_SET_REPLY = 0x20000000
+    FLAG_LAYER_INFO_SET_REPLY = 0x20000000,
+    FLAG_DOWN_REPLY = 0x100,            /* the layer-create slot's own bits */
+    FLAG_HOST_REPLY = 0x40000,
+    FLAG_CREATE_HEAD_REPLY = 0x200000,
+    FLAG_CREATE_SET_REPLY = 0x400000,
+    FLAG_CREATE_FOOT_REPLY = 0x800000,
+    FLAG_JUMP_READY_REPLY = 0x400,      /* the layer-jump slot's own bits */
+    FLAG_JUMP_GO_REPLY = 0x800
+};
+
+/* The layer-create request's event. */
+enum {
+    EVENT_LAYER_CREATE = 5,
+    EVENT_LAYER_JUMP = 27,
+    EVENT_LAYER_RESERVE = 36
 };
 
 #pragma peephole off
@@ -943,6 +984,576 @@ void NetworkLayerPat::move()
     }
 }
 
+/* Enters (kind 0) or creates (kind 1, with two member limits) the child layer `layerId`: the down or create
+ * exchange, the parent's child info and user list, then, in a two-member room, the member session and the GameSpy
+ * match; a failure leaves to the parent layer and re-reads the city list. */
+s32 NetworkLayerPat::handleLayerCreate(NetworkLayerRequest* request)
+{
+    s32 kind = request->getArgument(0);
+    s32 layerId = request->getArgument(1);
+    s32 limitA = 0;
+    s32 limitB = 0;
+    NetworkRequestError error;
+    PatTagList tags;
+    PatServerBlock server;
+    PatLayerData down;
+    PatLayerData create;
+    s32 result;
+    s32 index;
+    s8 slot;
+    s32 fmp;
+
+    if (kind == 1) {
+        limitA = request->getArgument(2);
+        limitB = request->getArgument(3);
+    }
+    switch (request->state_00) {
+    case STEP_START:
+        if (this->connected_3D0 == 0) {
+            setCollectionLog(request, LAYER_ERR_NOT_CONNECTED, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+        } else if (layerId < 0) {
+            setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+        } else if (kind == 1 && ((u32)(limitA - 1) > 99 || limitA <= limitB || limitB < 0)) {
+            setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->memberCount_4C8 >= 2) {
+            setCollectionLog(request, LAYER_ERR_CANNOT_START, 0, 3);
+            request->state_00 = STEP_CANCELLED;
+        } else {
+            this->requestFlags_310[SLOT_LAYER_CREATE] = 0;
+            switch (kind) {
+            case 0:
+                if (this->pendingRequestId_F19C >= 0) {
+                    setCollectionLog(request, LAYER_ERR_CANNOT_START, 0, 0);
+                    request->state_00 = STEP_CANCELLED;
+                } else {
+                    this->requestIds_368[SLOT_LAYER_CREATE] = sendReqLayerChildInfo(getInstance_(), layerId, 0);
+                    request->state_00 = 5;
+                }
+                break;
+            case 1:
+                if (this->pendingRequestId_F19C == layerId) {
+                    request->state_00 = 30;
+                } else if (this->pendingRequestId_F19C >= 0) {
+                    setCollectionLog(request, LAYER_ERR_CANNOT_START, 0, 0);
+                    request->state_00 = STEP_CANCELLED;
+                } else {
+                    this->requestIds_368[SLOT_LAYER_CREATE] = sendReqLayerCreateHead(getInstance_(), layerId);
+                    request->state_00 = 25;
+                }
+                break;
+            default:
+                setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+                request->state_00 = STEP_CANCELLED;
+                break;
+            }
+        }
+        break;
+    case 5:
+        if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CHILD_INFO_REPLY) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        memset(&down, 0, sizeof(down));
+        down.matchKey_070 = this->matchKey_3D4;
+        this->requestFlags_310[SLOT_LAYER_CREATE] = 0;
+        this->requestIds_368[SLOT_LAYER_CREATE] = sendReqLayerDown(getInstance_(), layerId, &down);
+        request->state_00 = 15;
+        break;
+    case 15:
+        if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_DOWN_REPLY) {
+            request->state_00 = 50;
+        }
+        break;
+    case 25:
+        if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CREATE_HEAD_REPLY) {
+            request->state_00 = 30;
+        }
+        break;
+    case 30:
+        memset(&create, 0, sizeof(create));
+        if (this->comment_F060[0] != 0) {
+            memcpy(create.name_014, this->comment_F060, sizeof(this->comment_F060) - 1);
+        }
+        create.memberLimitA_064 = limitA;
+        create.memberLimitB_068 = limitB;
+        buildLayerInfoFields(&tags, &this->settings_F0A0);
+        this->pendingRequestId_F19C = -1;
+        this->requestFlags_310[SLOT_LAYER_CREATE] = 0;
+        this->requestIds_368[SLOT_LAYER_CREATE] = sendReqLayerCreateSet(getInstance_(), layerId, &create, &tags);
+        request->state_00 = 35;
+        break;
+    case 35:
+        if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = 40;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CREATE_SET_REPLY) {
+            request->state_00 = 40;
+        }
+        break;
+    case 40:
+        this->requestFlags_310[SLOT_LAYER_CREATE] = 0;
+        this->requestIds_368[SLOT_LAYER_CREATE] = sendReqLayerCreateFoot(getInstance_(), layerId, 0);
+        request->state_00 = 45;
+        break;
+    case 45:
+        if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CREATE_FOOT_REPLY) {
+            memset(&error, 0, sizeof(error));
+            request->getRecord(&error);
+            if (error.code_00 != 0) {
+                request->state_00 = STEP_CANCELLED;
+            } else {
+                this->memberCount_4C8++;
+                this->address_474.path_08[this->memberCount_4C8] = layerId + 1;
+                request->state_00 = 50;
+            }
+        }
+        break;
+    case 50:
+        this->requestFlags_310[SLOT_LAYER_CREATE] = 0;
+        this->requestIds_368[SLOT_LAYER_CREATE] = sendReqLayerChildInfo(getInstance_(), -1, 0);
+        request->state_00 = 55;
+        break;
+    case 55:
+        if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CHILD_INFO_REPLY) {
+            if (this->hostMode_4C4 != 0) {
+                request->state_00 = 60;
+            } else {
+                request->state_00 = 70;
+            }
+        }
+        break;
+    case 60:
+        this->requestFlags_310[SLOT_LAYER_CREATE] = 0;
+        this->requestIds_368[SLOT_LAYER_CREATE] = sendReqLayerUserList(getInstance_());
+        request->state_00 = 65;
+        break;
+    case 65:
+        if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_USER_LIST_REPLY) {
+            if (this->memberCount_4C8 == 2) {
+                if (kind == 0) {
+                    request->state_00 = 67;
+                    break;
+                }
+                this->sessionState_C080 = this->transferSlot_C07C;
+            }
+            request->state_00 = 70;
+        }
+        break;
+    case 67:
+        this->requestFlags_310[SLOT_LAYER_CREATE] = 0;
+        this->requestIds_368[SLOT_LAYER_CREATE] = sendReqLayerHost(getInstance_(), (const u8*)&this->address_474);
+        request->state_00 = 68;
+        break;
+    case 68:
+        if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_CREATE] & FLAG_HOST_REPLY) {
+            request->state_00 = 70;
+        }
+        break;
+    case 70:
+        if (this->memberCount_4C8 == 2) {
+            if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                index = initNetworkSessionStable(
+                    (struct NetworkSessionStableInit*)getNetworkSessionManagerPat(getPatsObject(), 0));
+                if (index < 0) {
+                    setCollectionLog(request, 0x80050037, 0, index);
+                    request->state_00 = 90;
+                    break;
+                }
+                this->friendSession_EF00[this->transferSlot_C07C] = index;
+                this->memberStatus_EF64[this->transferSlot_C07C] = 2;
+                if (this->transferSlot_C07C == this->sessionState_C080 &&
+                    getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                    getNetworkSessionManagerPat(getPatsObject(), 0)->setHostConnectionIndex(index);
+                }
+            }
+            request->state_00 = 71;
+        }
+    case 71:
+        if (this->memberCount_4C8 == 2 && this->memberUsed_F02C > 1) {
+            if (GameSpyInterfaceThread::getInstance() != NULL) {
+                if (GameSpyInterfaceThread::getInstance()->getState() != 1) {
+                    if (GameSpyInterfaceThread::getInstance()->getState() < 0) {
+                        GameSpyInterfaceThread::getInstance()->getErrorStruct((NetworkErrorInfo*)&error);
+                        setCollectionLog(request, error.code_00, error.arg_04, error.arg_08);
+                        request->state_00 = 90;
+                    }
+                    break;
+                }
+                if (GameSpyInterfaceThread::getInstance()->getPhase() <= 0) {
+                    copyServerBlock(getInstance_(), 1, (u8*)&server);
+                    GameSpyInterfaceThread::getInstance()->resetSlots();
+                    GameSpyInterfaceThread::getInstance()->setBufferSize(
+                        this->friendPeers_C1B0[this->transferSlot_C07C].port_0C);
+                    fmp = getFmpSelected(getInstance_());
+                    if (GameSpyInterfaceThread::getInstance()->startMatch(
+                            this->status_F034, this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00,
+                            server.address_100[3] + (server.address_100[2] << 8) +
+                                ((server.address_100[0] << 24) + (server.address_100[1] << 16)),
+                            server.port_104, fmp, (this->address_474.path_08[1] << 16) + this->address_474.path_08[2],
+                            this->matchKey_3D4) < 0) {
+                        GameSpyInterfaceThread::getInstance()->getErrorStruct((NetworkErrorInfo*)&error);
+                        setCollectionLog(request, error.code_00, error.arg_04, error.arg_08);
+                        request->state_00 = 90;
+                        break;
+                    }
+                    request->restartTimer(60.0f);
+                    request->state_00 = 75;
+                } else {
+                    GameSpyInterfaceThread::getInstance()->canClose();
+                    break;
+                }
+            }
+            sendPeerRecord(-1, 1);
+            break;
+        }
+    case 75:
+        if (this->memberCount_4C8 == 2) {
+            if (this->memberUsed_F02C > 1) {
+                if (GameSpyInterfaceThread::getInstance() != NULL) {
+                    if (request->isTimedOut()) {
+                        setCollectionLog(request, 0x8003003A, 0, -1);
+                        request->state_00 = 90;
+                        break;
+                    }
+                    if (GameSpyInterfaceThread::getInstance()->getPhase() != 1) {
+                        if (GameSpyInterfaceThread::getInstance()->getPhase() <= 0) {
+                            GameSpyInterfaceThread::getInstance()->getErrorStruct((NetworkErrorInfo*)&error);
+                            setCollectionLog(request, error.code_00, error.arg_04, error.arg_08);
+                            request->state_00 = 90;
+                        }
+                        break;
+                    }
+                    result = checkMemberSessions();
+                    if (result < 1) {
+                        if (result == -1) {
+                            setCollectionLog(request, this->sessionError_444.code_00, this->sessionError_444.param1_04,
+                                             this->sessionError_444.param2_08);
+                            request->state_00 = 90;
+                        }
+                        break;
+                    }
+                }
+                for (slot = 0; slot < 100; slot++) {
+                    refreshFriendTransfer(slot, 1);
+                }
+            }
+            if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                getNetworkSessionManagerPat(getPatsObject(), 0)->joinSession();
+            }
+        }
+    case 80:
+        this->busy_3D1 = 0;
+        memset(this->comment_F060, 0, sizeof(this->comment_F060));
+        this->settings_F0A0.count_0x00 = 0;
+        notifyLayerEvent(EVENT_LAYER_CREATE, 0, 1, (NetworkRequestError*)&layerId, this->context_08);
+        pollLayerSlots();
+        notifyLayerSlotSummary();
+        return 1;
+    case 90:
+        clearListPending1();
+        request->state_00 = 95;
+        break;
+    case 95:
+        result = stepLayerLeave(request);
+        if (result < 0) {
+            request->state_00 = STEP_FAILED;
+        } else if (result > 0) {
+            request->state_00 = 96;
+        }
+        break;
+    case 96:
+        clearListPending2();
+        request->state_00 = 97;
+        break;
+    case 97:
+        result = stepChildListRead(request);
+        if (result < 0) {
+            request->state_00 = STEP_FAILED;
+        } else if (result > 0) {
+            request->state_00 = STEP_CANCELLED;
+        }
+        break;
+    case STEP_CANCELLED:
+        this->busy_3D1 = 0;
+        memset(this->comment_F060, 0, sizeof(this->comment_F060));
+        this->settings_F0A0.count_0x00 = 0;
+        request->getRecord(&error);
+        notifyLayerEvent(EVENT_LAYER_CREATE, error.code_00, 1, &error, this->context_08);
+        pollLayerSlots();
+        notifyLayerSlotSummary();
+        return 1;
+    case STEP_FAILED:
+        this->busy_3D1 = 0;
+        memset(this->comment_F060, 0, sizeof(this->comment_F060));
+        this->settings_F0A0.count_0x00 = 0;
+        request->getRecord(&error);
+        notifyLayerEvent(EVENT_LAYER_CREATE, error.code_00, 1, &error, this->context_08);
+        notifyLayerEvent(EVENT_ERROR, error.code_00, 1, &error, this->context_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* 0x803EA128 (0x218): leaves to the parent layer, then re-reads its child info and (while hosting) its user list. */
+s32 NetworkLayerPat::stepLayerLeave(NetworkLayerRequest* request)
+{
+    switch (this->listPending_3C0[1]) {
+    case 0:
+        this->requestFlags_310[SLOT_LAYER_UP] = 0;
+        this->requestIds_368[SLOT_LAYER_UP] = sendReqLayerUp(getInstance_());
+        this->listPending_3C0[1] = 5;
+        break;
+    case 5:
+        if (this->requestFlags_310[SLOT_LAYER_UP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            return -1;
+        }
+        if (this->requestFlags_310[SLOT_LAYER_UP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            return -2;
+        }
+        if (this->requestFlags_310[SLOT_LAYER_UP] & FLAG_UP_REPLY) {
+            this->listPending_3C0[1] = 10;
+        }
+        break;
+    case 10:
+        if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+            closeNetworkSessionManagerPat(getNetworkSessionManagerPat(getPatsObject(), 0));
+        }
+        if (GameSpyInterfaceThread::getInstance() != NULL) {
+            GameSpyInterfaceThread::getInstance()->canClose();
+            GameSpyInterfaceThread::getInstance()->initialize();
+        }
+        this->requestFlags_310[SLOT_LAYER_UP] = 0;
+        this->requestIds_368[SLOT_LAYER_UP] = sendReqLayerChildInfo(getInstance_(), -1, 0);
+        this->listPending_3C0[1] = 15;
+        break;
+    case 15:
+        if (this->requestFlags_310[SLOT_LAYER_UP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            return -1;
+        }
+        if (this->requestFlags_310[SLOT_LAYER_UP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            return -2;
+        }
+        if (this->requestFlags_310[SLOT_LAYER_UP] & FLAG_CHILD_INFO_REPLY) {
+            if (this->hostMode_4C4 != 0) {
+                this->listPending_3C0[1] = 20;
+            } else {
+                this->listPending_3C0[1] = 30;
+            }
+        }
+        break;
+    case 20:
+        this->requestFlags_310[SLOT_LAYER_UP] = 0;
+        this->requestIds_368[SLOT_LAYER_UP] = sendReqLayerUserList(getInstance_());
+        this->listPending_3C0[1] = 25;
+        break;
+    case 25:
+        if (this->requestFlags_310[SLOT_LAYER_UP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            return -1;
+        }
+        if (this->requestFlags_310[SLOT_LAYER_UP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            return -2;
+        }
+        if (this->requestFlags_310[SLOT_LAYER_UP] & FLAG_USER_LIST_REPLY) {
+            this->listPending_3C0[1] = 30;
+        }
+        break;
+    case 30:
+        return 1;
+    }
+    return 0;
+}
+
+/* 0x803EA34C (0x2D0): re-reads the child list (the cities) in batches of 10 under the singleton's busy flag. */
+s32 NetworkLayerPat::stepChildListRead(NetworkLayerRequest* request)
+{
+    s32 first;
+    s32 batch;
+
+    switch (this->listPending_3C0[2]) {
+    case 0:
+        if (testAndSet611b(getInstance_()) == 0) {
+            this->requestFlags_310[SLOT_CHILD_LIST] = 0;
+            this->requestIds_368[SLOT_CHILD_LIST] = sendReqLayerChildListHead(getInstance_(), 1, 40);
+            this->listPending_3C0[2] = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_310[SLOT_CHILD_LIST] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            this->listPending_3C0[2] = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_CHILD_LIST] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            this->listPending_3C0[2] = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_CHILD_LIST] & FLAG_LIST_HEAD_REPLY) {
+            this->cities_540.count_0x000 = 0;
+            if (this->listTotal_F1A4 > 0) {
+                this->listCursor_F1A0 = 0;
+                this->listPending_3C0[2] = 10;
+            } else {
+                this->listPending_3C0[2] = 20;
+            }
+        }
+        break;
+    case 10:
+        this->requestFlags_310[SLOT_CHILD_LIST] = 0;
+        first = this->listCursor_F1A0;
+        batch = (this->listTotal_F1A4 - first < 10) ? this->listTotal_F1A4 - first : 10;
+        this->requestIds_368[SLOT_CHILD_LIST] = sendReqLayerChildListData(getInstance_(), first + 1, batch);
+        this->listPending_3C0[2] = 15;
+        break;
+    case 15:
+        if (this->requestFlags_310[SLOT_CHILD_LIST] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            this->listPending_3C0[2] = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_CHILD_LIST] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            this->listPending_3C0[2] = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_CHILD_LIST] & FLAG_LIST_DATA_REPLY) {
+            if (this->cities_540.count_0x000 < 40 && this->listTotal_F1A4 - this->listCursor_F1A0 > 0) {
+                this->listPending_3C0[2] = 10;
+            } else {
+                this->listPending_3C0[2] = 20;
+            }
+        }
+        break;
+    case 20:
+        this->requestFlags_310[SLOT_CHILD_LIST] = 0;
+        this->requestIds_368[SLOT_CHILD_LIST] = sendReqLayerChildListFoot(getInstance_());
+        this->listPending_3C0[2] = 25;
+        break;
+    case 25:
+        if (this->requestFlags_310[SLOT_CHILD_LIST] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            this->listPending_3C0[2] = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_CHILD_LIST] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            this->listPending_3C0[2] = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_CHILD_LIST] & FLAG_LIST_FOOT_REPLY) {
+            this->listPending_3C0[2] = 30;
+        }
+        break;
+    case 30:
+        set611b(getInstance_());
+        return 1;
+    case STEP_CANCELLED:
+        set611b(getInstance_());
+        return -2;
+    case STEP_FAILED:
+        set611b(getInstance_());
+        return -1;
+    }
+    return 0;
+}
+
+/* 0x803EEBA4 (0xFC): sends this console's binary record (its GameSpy peer id) to friend slot `slot`, or to every
+ * member when `broadcast` is set. */
+void NetworkLayerPat::sendPeerRecord(s8 slot, s32 broadcast)
+{
+    u8 userId[8];
+
+    if (this->transferSlot_C07C < 0) {
+        return;
+    }
+    if (broadcast != 0) {
+        sendLayerBinaryRecord(getInstance_(), this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00,
+                              this->friendPeers_C1B0[this->transferSlot_C07C].mode_04,
+                              this->friendPeers_C1B0[this->transferSlot_C07C].session_08,
+                              this->friendPeers_C1B0[this->transferSlot_C07C].port_0C, NULL, broadcast);
+        return;
+    }
+    if ((u8)slot > 99) {
+        return;
+    }
+    if (this->friends_3568.entries_0x004[slot].valid_0x35 == 0) {
+        return;
+    }
+    if (slot == this->transferSlot_C07C) {
+        return;
+    }
+    this->friends_3568.entries_0x004[slot].id_0x00.exportTo(userId, sizeof(userId));
+    sendLayerBinaryRecord(getInstance_(), this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00,
+                          this->friendPeers_C1B0[this->transferSlot_C07C].mode_04,
+                          this->friendPeers_C1B0[this->transferSlot_C07C].session_08,
+                          this->friendPeers_C1B0[this->transferSlot_C07C].port_0C, userId, broadcast);
+}
+
+/* 0x803EECFC (0xD0): 1 when every flagged member's session is connected, 0 while one is pending or connecting,
+ * -1 when one failed. */
+s32 NetworkLayerPat::checkMemberSessions()
+{
+    s32 i;
+
+    for (i = 0; i < 100; i++) {
+        if (this->friends_3568.entries_0x004[i].valid_0x35 != 0 && this->friendFlagEFC8_EFC8[i] != 0) {
+            if (this->memberStatus_EF64[i] == 0) {
+                return 0;
+            }
+            if (this->memberStatus_EF64[i] == 2) {
+                return 0;
+            }
+            if (this->memberStatus_EF64[i] == 1) {
+                return -1;
+            }
+        }
+    }
+    return 1;
+}
+
 /* 0x803E247C (0x8): the live terms object. */
 extern "C" struct PatTerms* getPatTerms(void)
 {
@@ -1525,7 +2136,7 @@ s32 NetworkLayerPat::handleLayerInfo(NetworkLayerRequest* request)
         break;
 
     case 10:
-        notifyLayerEvent(EVENT_LAYER_INFO, 0, 1, (NetworkRequestError*)this->layerInfo_4CC, this->context_08);
+        notifyLayerEvent(EVENT_LAYER_INFO, 0, 1, (NetworkRequestError*)&this->layerInfo_4CC, this->context_08);
         return 1;
 
     case STEP_CANCELLED:
@@ -1545,6 +2156,502 @@ s32 NetworkLayerPat::handleLayerInfo(NetworkLayerRequest* request)
 /* Builds the entry's unique id. */
 NetLayerMediationEntry::NetLayerMediationEntry()
 {
+}
+
+/* Destroys the entry's unique id. */
+NetLayerMediationEntry::~NetLayerMediationEntry()
+{
+}
+
+/* Moves to the layer `id` names (in a community, `inCommunity` set): the jump-ready exchange and the FMP server
+ * switch when the id is on another server, else a plain jump; then the child info, the user list and, in a
+ * two-member room, the member session and the GameSpy match. */
+s32 NetworkLayerPat::handleLayerJump(NetworkLayerRequest* request)
+{
+    const NetworkLayerId* id = (const NetworkLayerId*)request->getArgument(0);
+    s32 inCommunity = request->getArgument(1);
+    s32 kind;
+    s32 index;
+    NetLayerAddress target;
+    NetworkRequestError error;
+    PatTagList tags;
+    PatServerBlock server;
+    NetworkCommunityProfile* profile;
+    u32 size;
+    u32 offset;
+    s32 i;
+    s32 slot;
+    s32 result;
+    s32 depth;
+    s32 fmp;
+    s8 friendSlot;
+
+    switch (request->state_00) {
+    case STEP_START:
+        if (this->connected_3D0 == 0) {
+            setCollectionLog(request, LAYER_ERR_NOT_CONNECTED, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+        } else if (id == NULL) {
+            setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+        } else {
+            NetworkLayerIdExportTo(id, (u8*)&target, sizeof(target));
+            if (target.id_00 != this->address_474.id_00 || target.id_04 == 0 || target.path_08[0] != 1) {
+                setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+                request->state_00 = STEP_CANCELLED;
+                break;
+            }
+            this->matchKey_3D4 = 0;
+            if (inCommunity != 0) {
+                for (i = 0; i < this->communities_F1AC.count_0x00000; i++) {
+                    if (NetworkUniqueIdEquals((const NetworkLayerId*)this->communities_F1AC.entries_0x00004[i].header_0x0000,
+                                              id)) {
+                        break;
+                    }
+                }
+                if (i >= this->communities_F1AC.count_0x00000) {
+                    setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 1);
+                    request->state_00 = STEP_CANCELLED;
+                    break;
+                }
+                this->matchKey_3D4 = this->communities_F1AC.entries_0x00004[i].matchKey_0x00F0;
+            }
+            if (this->pendingRequestId_F19C >= 0) {
+                setCollectionLog(request, LAYER_ERR_CANNOT_START, 0, 0);
+                request->state_00 = STEP_CANCELLED;
+            } else if (target.id_04 != this->address_474.id_04) {
+                request->state_00 = 10;
+            } else if (memcmp(&target, &this->address_474, sizeof(target)) != 0) {
+                request->state_00 = 60;
+            } else {
+                request->state_00 = 70;
+            }
+        }
+        break;
+    case 10:
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        NetworkLayerIdExportTo(id, (u8*)&target, sizeof(target));
+        sendReqLayerJumpReady(getInstance_(), (const u8*)&target, this->matchKey_3D4);
+        request->state_00++;
+        break;
+    case 11:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_JUMP_READY_REPLY) {
+            request->state_00++;
+        }
+        break;
+    case 12:
+        saveFmpSelection(getInstance_());
+        NetworkLayerIdExportTo(id, (u8*)&target, sizeof(target));
+        slot = getFmpSlotIndex(getInstance_(), target.id_04);
+        if (slot >= 0) {
+            chooseServerAddress(getInstance_(), 1, slot);
+        } else {
+            getFmpSelection(getInstance_(), &kind, &index);
+            chooseServerAddress(getInstance_(), 1, index == 0 ? 1 : 0);
+        }
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        sendReqFmpInfo(getInstance_(), target.id_04, slot >= 0);
+        request->state_00 = 15;
+        break;
+    case 15:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_FMP_INFO_REPLY) {
+            request->state_00 = 20;
+        }
+        break;
+    case 20:
+        NetworkLayerIdExportTo(id, (u8*)&target, sizeof(target));
+        if ((s32)getFmpSlotIndex(getInstance_(), target.id_04) < 0) {
+            setCollectionLog(request, LAYER_ERR_SERVER, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+        } else if ((u8)getNetworkBinaryState(getInstance_()) == 0) {
+            request->state_00 = 40;
+        } else if (this->memberCount_4C8 < 0) {
+            request->state_00 = 30;
+        } else {
+            resetLayerState();
+            this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+            sendReqLayerEnd(getInstance_());
+            request->state_00 = 25;
+        }
+        break;
+    case 25:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            request->state_00 = 40;
+        } else if ((this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) ||
+                   (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_LAYER_END_REPLY)) {
+            request->state_00 = 30;
+        }
+        break;
+    case 30:
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        sendReqShut(getInstance_(), 2);
+        request->state_00 = 35;
+        break;
+    case 35:
+        if ((this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) ||
+            (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) ||
+            (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SHUT_REPLY)) {
+            request->state_00 = 40;
+        }
+        break;
+    case 40:
+        if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+            closeNetworkSessionManagerPat(getNetworkSessionManagerPat(getPatsObject(), 0));
+        }
+        if (GameSpyInterfaceThread::getInstance() != NULL) {
+            GameSpyInterfaceThread::getInstance()->canClose();
+            GameSpyInterfaceThread::getInstance()->initialize();
+        }
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        resetNetworkState3(getInstance_());
+        request->state_00 = 45;
+        break;
+    case 45:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_STATE3_REPLY) {
+            NetworkLayerIdExportTo(id, (u8*)&target, sizeof(target));
+            slot = getFmpSlotIndex(getInstance_(), target.id_04);
+            chooseServerAddress(getInstance_(), 1, slot);
+            this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+            setConnectServerType(getInstance_(), 1);
+            resetNetworkState(getInstance_());
+            request->state_00++;
+        }
+        break;
+    case 46:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else {
+            result = handleNetworkState2Binary(getInstance_());
+            if (result < 0) {
+                setCollectionLog(request, LAYER_ERR_SERVER, 110, result);
+                request->state_00 = STEP_FAILED;
+            } else if (result > 0) {
+                NetworkLayerIdExportTo(id, (u8*)&target, sizeof(target));
+                if (target.id_04 != getFmpSelected(getInstance_())) {
+                    if (isFmpServerRejected(getInstance_()) != 0) {
+                        setCollectionLog(request, LAYER_ERR_SERVER_REJECTED, 0, 0);
+                    } else {
+                        setCollectionLog(request, LAYER_ERR_SERVER, 110, 0);
+                    }
+                }
+                request->state_00 = 50;
+            }
+        }
+        break;
+    case 50:
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        sendReqLayerStart(getInstance_());
+        request->state_00 = 55;
+        break;
+    case 55:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_LAYER_START_REPLY) {
+            if (getNetworkCommunityPat(getPatsObject(), 0) != NULL) {
+                profile = getNetworkCommunityPat(getPatsObject(), 0)->restoreSentProfile();
+                size = profile->windowSize_024;
+                if (size != 0) {
+                    offset = profile->windowOffset_020;
+                    sendReqUserBinarySet(getInstance_(), offset, &profile->data_028[offset], (u16)size);
+                }
+            }
+            if (this->presence_450.count_0x00 != 0) {
+                this->timers_3C4[1] = getNetworkLogger()->getTime_60();
+                buildLayerInfoFields(&tags, &this->presence_450);
+                sendReqUserSearchSet(getInstance_(), &tags);
+            }
+            this->flag_3D2 = 0;
+            memset(&error, 0, sizeof(error));
+            request->getRecord(&error);
+            if (error.code_00 != 0) {
+                request->state_00 = 70;
+            } else {
+                request->state_00++;
+            }
+        }
+        break;
+    case 56:
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        NetworkLayerIdExportTo(id, (u8*)&target, sizeof(target));
+        sendReqLayerJumpGo(getInstance_(), (const u8*)&target, this->jumpTicket_3D8);
+        request->state_00++;
+        break;
+    case 57:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = 70;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_JUMP_GO_REPLY) {
+            NetworkLayerIdExportTo(id, (u8*)&this->address_474, sizeof(this->address_474));
+            depth = 1;
+            if (this->address_474.path_08[1] != 0) {
+                depth = 2;
+                if (this->address_474.path_08[2] != 0) {
+                    depth = 3;
+                }
+            }
+            this->memberCount_4C8 = depth - 1;
+            request->state_00 = 70;
+        }
+        break;
+    case 60:
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        NetworkLayerIdExportTo(id, (u8*)&target, sizeof(target));
+        sendReqLayerJump(getInstance_(), (const u8*)&target, this->matchKey_3D4);
+        request->state_00 = 65;
+        break;
+    case 65:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            if (this->memberCount_4C8 != 0) {
+                request->state_00 = STEP_CANCELLED;
+            } else {
+                request->state_00 = 70;
+            }
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_LAYER_JUMP_REPLY) {
+            NetworkLayerIdExportTo(id, (u8*)&this->address_474, sizeof(this->address_474));
+            depth = 1;
+            if (this->address_474.path_08[1] != 0) {
+                depth = 2;
+                if (this->address_474.path_08[2] != 0) {
+                    depth = 3;
+                }
+            }
+            this->memberCount_4C8 = depth - 1;
+            request->state_00 = 70;
+        }
+        break;
+    case 70:
+        if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+            closeNetworkSessionManagerPat(getNetworkSessionManagerPat(getPatsObject(), 0));
+        }
+        if (GameSpyInterfaceThread::getInstance() != NULL) {
+            GameSpyInterfaceThread::getInstance()->canClose();
+            GameSpyInterfaceThread::getInstance()->initialize();
+        }
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        sendReqLayerChildInfo(getInstance_(), -1, 0);
+        request->state_00 = 75;
+        break;
+    case 75:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CHILD_INFO_REPLY) {
+            if (this->hostMode_4C4 != 0) {
+                request->state_00 = 80;
+            } else {
+                request->state_00 = 90;
+            }
+        }
+        break;
+    case 80:
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        sendReqLayerUserList(getInstance_());
+        request->state_00 = 85;
+        break;
+    case 85:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_USER_LIST_REPLY) {
+            if (this->memberCount_4C8 == 2) {
+                request->state_00 = 87;
+            } else {
+                request->state_00 = 90;
+            }
+        }
+        break;
+    case 87:
+        this->requestFlags_310[SLOT_LAYER_JUMP] = 0;
+        this->requestIds_368[SLOT_LAYER_JUMP] = sendReqLayerHost(getInstance_(), (const u8*)&this->address_474);
+        request->state_00 = 88;
+        break;
+    case 88:
+        if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_JUMP] & FLAG_HOST_REPLY) {
+            request->state_00 = 90;
+        }
+        break;
+    case 90:
+        if (this->memberCount_4C8 == 2) {
+            if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                result = initNetworkSessionStable(
+                    (struct NetworkSessionStableInit*)getNetworkSessionManagerPat(getPatsObject(), 0));
+                if (result < 0) {
+                    setCollectionLog(request, 0x80050037, 0, result);
+                    request->state_00 = 94;
+                    break;
+                }
+                this->friendSession_EF00[this->transferSlot_C07C] = result;
+                this->memberStatus_EF64[this->transferSlot_C07C] = 2;
+                if (this->transferSlot_C07C == this->sessionState_C080 &&
+                    getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                    getNetworkSessionManagerPat(getPatsObject(), 0)->setHostConnectionIndex(result);
+                }
+            }
+            request->state_00 = 91;
+        }
+    case 91:
+        if (this->memberCount_4C8 == 2 && this->memberUsed_F02C > 1) {
+            if (GameSpyInterfaceThread::getInstance() != NULL) {
+                if (GameSpyInterfaceThread::getInstance()->getState() != 1) {
+                    if (GameSpyInterfaceThread::getInstance()->getState() < 0) {
+                        GameSpyInterfaceThread::getInstance()->getErrorStruct((NetworkErrorInfo*)&error);
+                        setCollectionLog(request, error.code_00, error.arg_04, error.arg_08);
+                        request->state_00 = 94;
+                    }
+                    break;
+                }
+                if (GameSpyInterfaceThread::getInstance()->getPhase() <= 0) {
+                    copyServerBlock(getInstance_(), 1, (u8*)&server);
+                    GameSpyInterfaceThread::getInstance()->resetSlots();
+                    GameSpyInterfaceThread::getInstance()->setBufferSize(
+                        this->friendPeers_C1B0[this->transferSlot_C07C].port_0C);
+                    fmp = getFmpSelected(getInstance_());
+                    if (GameSpyInterfaceThread::getInstance()->startMatch(
+                            this->status_F034, this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00,
+                            server.address_100[3] + (server.address_100[2] << 8) +
+                                ((server.address_100[0] << 24) + (server.address_100[1] << 16)),
+                            server.port_104, fmp, (this->address_474.path_08[1] << 16) + this->address_474.path_08[2],
+                            this->matchKey_3D4) < 0) {
+                        GameSpyInterfaceThread::getInstance()->getErrorStruct((NetworkErrorInfo*)&error);
+                        setCollectionLog(request, error.code_00, error.arg_04, error.arg_08);
+                        request->state_00 = 94;
+                        break;
+                    }
+                    request->restartTimer(60.0f);
+                    request->state_00 = 92;
+                } else {
+                    GameSpyInterfaceThread::getInstance()->canClose();
+                    break;
+                }
+            }
+            sendPeerRecord(-1, 1);
+            break;
+        }
+    case 92:
+        if (this->memberCount_4C8 == 2) {
+            if (this->memberUsed_F02C > 1) {
+                if (GameSpyInterfaceThread::getInstance() != NULL) {
+                    if (request->isTimedOut()) {
+                        setCollectionLog(request, 0x8003003A, 0, -2);
+                        request->state_00 = 94;
+                        break;
+                    }
+                    if (GameSpyInterfaceThread::getInstance()->getPhase() != 1) {
+                        if (GameSpyInterfaceThread::getInstance()->getPhase() <= 0) {
+                            GameSpyInterfaceThread::getInstance()->getErrorStruct((NetworkErrorInfo*)&error);
+                            setCollectionLog(request, error.code_00, error.arg_04, error.arg_08);
+                            request->state_00 = 94;
+                        }
+                        break;
+                    }
+                    result = checkMemberSessions();
+                    if (result < 1) {
+                        if (result == -1) {
+                            setCollectionLog(request, this->sessionError_444.code_00, this->sessionError_444.param1_04,
+                                             this->sessionError_444.param2_08);
+                            request->state_00 = 94;
+                        }
+                        break;
+                    }
+                }
+                for (friendSlot = 0; friendSlot < 100; friendSlot++) {
+                    refreshFriendTransfer(friendSlot, 1);
+                }
+            }
+            if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                getNetworkSessionManagerPat(getPatsObject(), 0)->joinSession();
+            }
+        }
+    case 93:
+        memset(&error, 0, sizeof(error));
+        request->getRecord(&error);
+        if (error.code_00 != 0) {
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        this->busy_3D1 = 0;
+        notifyLayerEvent(EVENT_LAYER_JUMP, 0, 0, NULL, this->context_08);
+        pollLayerSlots();
+        notifyLayerSlotSummary();
+        return 1;
+    case 94:
+        clearListPending1();
+        request->state_00 = 95;
+        break;
+    case 95:
+        result = stepLayerLeave(request);
+        if (result < 0) {
+            request->state_00 = STEP_FAILED;
+        } else if (result > 0) {
+            request->state_00 = STEP_CANCELLED;
+        }
+        break;
+    case STEP_CANCELLED:
+        request->getRecord(&error);
+        notifyLayerEvent(EVENT_LAYER_JUMP, error.code_00, 1, &error, this->context_08);
+        if (this->busy_3D1 != 0) {
+            pollLayerSlots();
+            notifyLayerSlotSummary();
+        }
+        this->busy_3D1 = 0;
+        return 1;
+    case STEP_FAILED:
+        this->busy_3D1 = 0;
+        request->getRecord(&error);
+        notifyLayerEvent(EVENT_LAYER_JUMP, error.code_00, 1, &error, this->context_08);
+        notifyLayerEvent(EVENT_ERROR, error.code_00, 1, &error, this->context_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Widens the profile's window back to the last sent one (none at 0x100) and returns the profile. */
+inline NetworkCommunityProfile* NetworkCommunityPat::restoreSentProfile()
+{
+    if (this->sentOffset_500 != 0x100) {
+        this->profile_3D8.windowOffset_020 = this->sentOffset_500;
+        this->profile_3D8.windowSize_024 = this->sentSize_504;
+    }
+    return &this->profile_3D8;
 }
 
 /* Locks the mediation of member `lock` with `key`; reports the server id and the two arguments when it is done. */
@@ -2855,6 +3962,76 @@ s32 NetworkLayerPat::handleUserInfo(NetworkLayerRequest* request)
     return 0;
 }
 
+/* Fills the current layer's info record: the name, four words and the settings of a layer answer. */
+void NetworkLayerPat::importLayerInfo(NetLayerInfoRec* out, const PatLayerData* layer, PatTagList* tags)
+{
+    memcpy(out->name_00, layer->name_014, sizeof(out->name_00) - 1);
+    out->name_00[sizeof(out->name_00) - 1] = 0;
+    out->count_40 = layer->counts_058[1];
+    out->count_44 = layer->counts_058[0];
+    out->memberLimit_48 = layer->memberLimitA_064;
+    out->value_4C = layer->value_06C;
+    unpackLayerSettings(&out->settings_50, tags);
+}
+
+/* Fills a community record from a layer answer: its id, the name and leader the comment carries (tab-separated), the
+ * layer's name, words, match key and settings, its state, and an empty member table. */
+void NetworkLayerPat::importCommunityRec(NetCommunityRec* rec, const PatLayerData* layer, PatTagList* tags)
+{
+    s32 field;
+    char* token;
+    u32 nameLength;
+    u32 leaderLength;
+    s32 i;
+
+    if (rec == NULL || layer == NULL) {
+        return;
+    }
+    NetworkLayerIdImportFrom((NetworkLayerId*)rec->header_0x0000, 3, layer->path_004, sizeof(layer->path_004));
+    memset(rec->name_0x0040, 0, sizeof(rec->name_0x0040));
+    memset(rec->leader_0x0060, 0, sizeof(rec->leader_0x0060));
+    field = 0;
+    for (token = strtok((char*)layer->comment_07E, "\t"); token != NULL; token = strtok(NULL, "\t")) {
+        if (field >= 3) {
+            break;
+        }
+        if (field == 0) {
+            if (strlen(token) < sizeof(rec->name_0x0040) - 1) {
+                nameLength = strlen(token);
+            } else {
+                nameLength = sizeof(rec->name_0x0040) - 1;
+            }
+            memcpy(rec->name_0x0040, token, nameLength);
+            rec->name_0x0040[nameLength] = 0;
+        }
+        if (field == layer->isCurrent_07D - 1) {
+            if (strlen(token) < sizeof(rec->leader_0x0060) - 1) {
+                leaderLength = strlen(token);
+            } else {
+                leaderLength = sizeof(rec->leader_0x0060) - 1;
+            }
+            memcpy(rec->leader_0x0060, token, leaderLength);
+            rec->leader_0x0060[leaderLength] = 0;
+            break;
+        }
+        field++;
+    }
+    memcpy(rec->comment_0x00A0, layer->name_014, sizeof(rec->comment_0x00A0) - 1);
+    rec->comment_0x00A0[sizeof(rec->comment_0x00A0) - 1] = 0;
+    rec->value_0x00E0 = layer->counts_058[1];
+    rec->value_0x00E4 = layer->counts_058[0];
+    rec->value_0x00E8 = layer->memberLimitA_064;
+    rec->value_0x00EC = layer->value_06C;
+    rec->matchKey_0x00F0 = layer->matchKey_070;
+    rec->settingsCount_0x00F4 = 0;
+    unpackLayerSettings((NetLayerSettings*)&rec->settingsCount_0x00F4, tags);
+    rec->state_0x0118 = layer->value_076 == 2;
+    rec->members_0x011C.count_0x000 = 0;
+    for (i = 0; i < 100; i++) {
+        rec->members_0x011C.entries_0x004[i].valid_0x35 = 0;
+    }
+}
+
 /* Clears one friend record: its id, its data and its flags. */
 s32 NetworkLayerPat::clearFriendRec(NetFriendRec* rec)
 {
@@ -2874,7 +4051,7 @@ s32 NetworkLayerPat::clearFriendSlot(u32 index)
     if (index > 99) {
         return -1;
     }
-    this->details_595C[index].state_0x000 = 0;
+    this->details_595C[index].size_0x000 = 0;
     this->friendStatus_BEEC[index] = 0;
     this->friendFlagC084_C084[index] = 0;
     this->friendTransfer_C0E8[index] = 0;
@@ -2887,6 +4064,176 @@ s32 NetworkLayerPat::clearFriendSlot(u32 index)
     this->friendSessions_4B4C[index].state_00 = 0;
     getInstance()->closeTransferSlot(index);
     return 1;
+}
+
+/* Fills a friend record from a binary user id and a name (none: an empty name) and marks it valid. */
+s32 NetworkLayerPat::importFriendRec(NetFriendRec* rec, const u8* userId, const char* name)
+{
+    if (rec == NULL || userId == NULL) {
+        return -1;
+    }
+    rec->id_0x00.importFrom(3, userId, 8);
+    if (name != NULL) {
+        memcpy(rec->name_0x20, name, sizeof(rec->name_0x20) - 1);
+        rec->name_0x20[sizeof(rec->name_0x20) - 1] = 0;
+    } else {
+        memset(rec->name_0x20, 0, sizeof(rec->name_0x20));
+    }
+    memset(&rec->flag_0x34, 0, 1);
+    rec->valid_0x35 = 1;
+    return 1;
+}
+
+/* Keeps friend slot `index`'s binary (at most 0x100 bytes) and key word from a user answer. */
+s32 NetworkLayerPat::storeFriendDetail(u32 index, const PatLayerUser* user)
+{
+    if (index > 99) {
+        return -1;
+    }
+    if (user == NULL) {
+        return -2;
+    }
+    this->details_595C[index].size_0x000 = user->binarySize_13C;
+    if (this->details_595C[index].size_0x000 > 0x100) {
+        this->details_595C[index].size_0x000 = 0x100;
+    }
+    memcpy(this->details_595C[index].data_0x004, user->binary_03C, this->details_595C[index].size_0x000);
+    this->friendStatus_BEEC[index] = user->key_038;
+    return 1;
+}
+
+/* The friend slot whose record carries the binary user id `userId`: -1 without an id, -2 when none does. */
+s32 NetworkLayerPat::findFriendByUserId(const u8* userId)
+{
+    NetworkUniqueId id;
+    s32 i;
+
+    if (userId == NULL) {
+        return -1;
+    }
+    id.importFrom(3, userId, 8);
+    for (i = 0; i < 100; i++) {
+        if (this->friends_3568.entries_0x004[i].valid_0x35 != 0 && id.equals(&this->friends_3568.entries_0x004[i].id_0x00)) {
+            return i;
+        }
+    }
+    return -2;
+}
+
+/* Adds a user to the first free friend slot and opens its transfer slot; this console's own slot becomes the transfer
+ * slot with a fresh peer id and port.  The slot, or -1 (no id or user), -2 (already a friend), -3 (no free slot). */
+s32 NetworkLayerPat::addFriendSlot(const u8* userId, const PatLayerUser* user)
+{
+    NetworkUniqueId id;
+    NetFriendRec* rec;
+    s8 slot;
+    u8 active;
+
+    if (userId == NULL || user == NULL) {
+        return -1;
+    }
+    if (findFriendByUserId(userId) >= 0) {
+        return -2;
+    }
+    if (this->friends_3568.count_0x000 < 100) {
+        for (slot = 0; slot < 100; slot++) {
+            if (this->friends_3568.entries_0x004[slot].valid_0x35 == 0) {
+                rec = &this->friends_3568.entries_0x004[slot];
+                importFriendRec(rec, userId, user->name_008);
+                storeFriendDetail(slot, user);
+                getInstance()->openTransferSlot(slot, this->flag_76, 1.0f);
+                id.importFrom(3, userId, 8);
+                if (this->serverId_3DC.equals(&id)) {
+                    this->transferSlot_C07C = slot;
+                    this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00 = this->serverValue_42C;
+                    this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00 ^= rand() << 16;
+                    this->friendPeers_C1B0[this->transferSlot_C07C].mode_04 = getSomething7(getInstance_());
+                    this->friendPeers_C1B0[this->transferSlot_C07C].session_08 = this->serverValue_430;
+                    this->friendPeers_C1B0[this->transferSlot_C07C].port_0C = rand() % 20000 + 10000;
+                    this->friendFlagC084_C084[slot] = getInstance()->isVoiceReady();
+                    active = 0;
+                    if (this->friendTransfer_C0E8 != NULL && isFriendTransferActive_E4(slot)) {
+                        active = 1;
+                    }
+                    this->friendTransfer_C0E8[slot] = active;
+                    this->friendTransferMode_C14C[slot] = 1;
+                } else if (getNetworkCommunityPat(getPatsObject(), 0) != NULL) {
+                    this->friendTransferMode_C14C[slot] =
+                        getNetworkCommunityPat(getPatsObject(), 0)->isAcceptedPeer(&rec->id_0x00);
+                }
+                this->friends_3568.count_0x000++;
+                return slot;
+            }
+        }
+    }
+    return -3;
+}
+
+/* Removes the friend with binary user id `userId` (a copy of its record goes to `out`): ends a NAT pair it is part of,
+ * clears its pair states, session slot, record and slot, and closes its transfer slot.  The slot, or negative. */
+s32 NetworkLayerPat::removeFriendSlot(const u8* userId, NetFriendRec* out)
+{
+    s32 slot;
+    NetFriendRec* rec;
+    s32 i;
+
+    slot = findFriendByUserId(userId);
+    if (slot >= 0) {
+        this->friends_3568.count_0x000--;
+        rec = &this->friends_3568.entries_0x004[slot];
+        if (out != NULL) {
+            copyNetFriendRec(out, rec);
+            out->valid_0x35 = 0;
+        }
+        if (this->negotiateFrom_438 != 0 && this->negotiateFrom_438 == this->friendPeers_C1B0[slot].peerId_00) {
+            if (this->negotiated_440 != 0) {
+                sendPairState(this->negotiateFrom_438, this->negotiateTo_43C, 0);
+                this->negotiated_440 = 0;
+                this->negotiateTo_43C = 0;
+            }
+            this->negotiateFrom_438 = 0;
+        }
+        if (this->negotiateTo_43C != 0 && this->negotiateTo_43C == this->friendPeers_C1B0[slot].peerId_00) {
+            this->negotiateTo_43C = 0;
+        }
+        for (i = 0; i < 100; i++) {
+            this->pairState_C7F0[i][slot] = 0;
+        }
+        if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+            getNetworkSessionManagerPat(getPatsObject(), 0)->resetSessionSlot(this->friendSession_EF00[slot]);
+        }
+        clearFriendRec(rec);
+        clearFriendSlot(slot);
+        getInstance()->closeTransferSlot(slot);
+    }
+    return slot;
+}
+
+/* Takes the numbered fields 1..4 of `tags` (at most 32 read) as the enabled settings pairs; the count is the highest
+ * number seen. */
+void NetworkLayerPat::unpackLayerSettings(NetLayerSettings* out, PatTagList* tags)
+{
+    u8 i;
+    u32 slot;
+
+    if (out == NULL || tags == NULL) {
+        return;
+    }
+    out->count_0x00 = 0;
+    memset(out->pairs_0x04, 0, sizeof(out->pairs_0x04));
+    if (tags->count_000 > 32) {
+        tags->count_000 = 32;
+    }
+    for (i = 0; i < tags->count_000; i++) {
+        slot = tags->values_004[i].tag_0 - 1;
+        if (slot < 4 && (s32)tags->values_004[i].type_1 == 1) {
+            out->pairs_0x04[slot].enabled_0x0 = 1;
+            out->pairs_0x04[slot].value_0x4 = tags->values_004[i].value_4;
+            if ((u32)out->count_0x00 <= slot) {
+                out->count_0x00 = slot + 1;
+            }
+        }
+    }
 }
 
 /* Forgets the layer: this console's address and name, the member count and every friend slot. */
@@ -3119,7 +4466,7 @@ s32 NetworkLayerPat::handleChat(NetworkLayerRequest* request)
 }
 
 /* The first idle request of the layer's own pool, NULL when both are in use. */
-NetworkLayerRequest* NetworkLayerPat::allocRequest()
+NetworkLayerPatRequest* NetworkLayerPat::allocRequest()
 {
     s32 i;
 
@@ -3132,7 +4479,7 @@ NetworkLayerRequest* NetworkLayerPat::allocRequest()
 }
 
 /* Releases the request in `slot` (warning when it is still running) and empties the slot. */
-void NetworkLayerPat::deleteRequest(NetworkLayerRequest** slot)
+void NetworkLayerPat::deleteRequest(NetworkLayerPatRequest** slot)
 {
     if (*slot != 0) {
         if ((*slot)->isOwned() != 0) {
@@ -3270,7 +4617,7 @@ void NetworkLayerPat::clear()
     this->serverPort_434 = 0;
     this->presence_450.count_0x00 = 0;
     resetLayerState();
-    memset(this->layerInfo_4CC, 0, sizeof(this->layerInfo_4CC));
+    memset(&this->layerInfo_4CC, 0, sizeof(this->layerInfo_4CC));
     this->cities_540.count_0x000 = 0;
     this->rooms_18A4.count_0x000 = 0;
     memset(this->comment_F060, 0, sizeof(this->comment_F060));
@@ -3794,6 +5141,272 @@ s32 NetworkLayerPat::handleConnect(NetworkLayerRequest* request)
         return 1;
     }
     return 0;
+}
+
+/* The descriptor `requestLayerCreate` passes by value: `{0, -1, handler}`. */
+NetworkLayerPatHandler networkLayerPatRequestDescReserve = &NetworkLayerPat::handleLayerReserve;
+
+/* Starts the layer's own request on `handleLayerReserve` with `layerId` and the reserve flag, while none is parked. */
+void NetworkLayerPat::requestLayerCreate(u32 layerId, s32 reserve)
+{
+    NetworkLayerPatRequest* request;
+
+    if (this->ownRequests_1C0[0] == 0) {
+        request = allocRequest();
+        if (request != 0) {
+            this->ownRequests_1C0[0] = request;
+            request->begin(this, networkLayerPatRequestDescReserve, 2, layerId, reserve);
+        }
+    }
+}
+
+/* Reserves (create head, kept as the pending id) or releases (create foot) layer `layerId` and reports event 36
+ * with the reserve flag. */
+s32 NetworkLayerPat::handleLayerReserve(NetworkLayerPatRequest* request)
+{
+    s32 layerId = request->getArgument(0);
+    s32 reserve = request->getArgument(1);
+    NetworkRequestError error;
+    u8 reserved;
+
+    if (this->memberCount_4C8 < 0) {
+        setCollectionLog(request, LAYER_ERR_NO_LAYER, 0, 0);
+        request->state_00 = STEP_CANCELLED;
+    }
+    switch (request->state_00) {
+    case STEP_START:
+        if (this->connected_3D0 == 0) {
+            setCollectionLog(request, LAYER_ERR_NOT_CONNECTED, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+        } else if (layerId < 0) {
+            setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, layerId);
+            request->state_00 = STEP_CANCELLED;
+        } else {
+            if (reserve != 0) {
+                if (this->pendingRequestId_F19C >= 0) {
+                    if (this->pendingRequestId_F19C != layerId) {
+                        setCollectionLog(request, LAYER_ERR_CANNOT_START, 0, layerId);
+                        request->state_00 = STEP_CANCELLED;
+                    } else {
+                        request->state_00 = 20;
+                    }
+                    break;
+                }
+            } else if (this->pendingRequestId_F19C != layerId) {
+                setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+                request->state_00 = STEP_CANCELLED;
+            }
+            this->requestFlags_310[SLOT_LAYER_RESERVE] = 0;
+            if (reserve != 0) {
+                this->requestIds_368[SLOT_LAYER_RESERVE] = sendReqLayerCreateHead(getInstance_(), layerId);
+                request->state_00 = 5;
+            } else {
+                this->requestIds_368[SLOT_LAYER_RESERVE] = sendReqLayerCreateFoot(getInstance_(), layerId, 1);
+                request->state_00 = 15;
+            }
+        }
+        break;
+    case 5:
+        if (this->requestFlags_310[SLOT_LAYER_RESERVE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_RESERVE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_LAYER_RESERVE] & FLAG_CREATE_HEAD_REPLY) {
+            request->state_00 = 20;
+        }
+        break;
+    case 15:
+        if (this->requestFlags_310[SLOT_LAYER_RESERVE] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_LAYER_RESERVE] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_LAYER_RESERVE] & FLAG_CREATE_FOOT_REPLY) {
+            request->state_00 = 20;
+        }
+        break;
+    case 20:
+        reserved = reserve != 0;
+        this->pendingRequestId_F19C = reserve != 0 ? layerId : -1;
+        notifyLayerEvent(EVENT_LAYER_RESERVE, 0, 1, (NetworkRequestError*)&reserved, this->context_08);
+        return 1;
+    case STEP_CANCELLED:
+        request->getRecord(&error);
+        notifyLayerEvent(EVENT_LAYER_RESERVE, error.code_00, 1, &error, this->context_08);
+        return 1;
+    case STEP_FAILED:
+        request->getRecord(&error);
+        notifyLayerEvent(EVENT_LAYER_RESERVE, error.code_00, 1, &error, this->context_08);
+        notifyLayerEvent(EVENT_ERROR, error.code_00, 1, &error, this->context_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Records the session-lost error (the singleton's own record, else 0x80060033) as the own request's error. */
+void NetworkLayerPat::setCollectionLogSessionLost(NetworkLayerPatRequest* request)
+{
+    NetworkErrorInfo info;
+
+    getErrorInfoOrCode654c(getInstance_(), 0x80060033, &info);
+    request->setRecord(info.code_00, info.param1_04, info.param2_08);
+}
+
+/* Records the cancelled-request error (0x80060012) as the own request's error. */
+void NetworkLayerPat::setCollectionLogAborted(NetworkLayerPatRequest* request)
+{
+    NetworkErrorInfo info;
+
+    buildErrorInfo613c(getInstance_(), 0x80060012, &info);
+    request->setRecord(info.code_00, info.param1_04, info.param2_08);
+}
+
+/* Reports `code` (+ two arguments) to the server, clears the singleton's record and keeps it as the own request's
+ * error. */
+void NetworkLayerPat::setCollectionLog(NetworkLayerPatRequest* request, u32 code, u32 arg_a, u32 arg_b)
+{
+    u32 values[3];
+
+    values[0] = code;
+    values[1] = arg_a;
+    values[2] = arg_b;
+    sendServerTimeout(getInstance_(), values);
+    clearErrorRecord613c(getInstance_());
+    request->setRecord(code, arg_a, arg_b);
+}
+
+/* Builds the record's mutex, then resets it. */
+inline NetworkLayerPatRequest::NetworkLayerPatRequest()
+{
+    networkInstance_initMutex(this->mutex_78);
+    reset();
+}
+
+/* Whether the request is running (it has an owner). */
+inline s32 NetworkLayerPatRequest::isOwned()
+{
+    return this->owner_94 != 0;
+}
+
+/* Runs the request's handler through its member-function pointer; a handler that reports completion resets the
+ * record. */
+inline void NetworkLayerPatRequest::run()
+{
+    if (this->owner_94 != 0 && (this->owner_94->*this->handler_98)(this) != 0) {
+        clear();
+    }
+}
+
+/* Starts the request for `owner`: resets it, stamps the start time and a fresh id, takes the handler and copies up to
+ * eight word arguments. */
+inline void NetworkLayerPatRequest::begin(NetworkLayerPat* owner, NetworkLayerPatHandler handler, u32 count, ...)
+{
+    NetworkVaState args;
+    u32 i;
+
+    reset();
+    this->timeout_50 = getNetworkLogger()->getTime_60();
+    this->requestId_70 = NetworkRequest_idCounter;
+    NetworkRequest_idCounter = this->requestId_70 + 1;
+    this->owner_94 = owner;
+    this->handler_98 = handler;
+    this->count_28 = count > 8 ? 8 : count;
+    __builtin_va_info(&args);
+    for (i = 0; i < this->count_28; i++) {
+        this->args_2C[i] = *(u32*)__va_arg(&args, 1);
+    }
+}
+
+/* Copies the request's error record out under its mutex; false while none is set. */
+inline s32 NetworkLayerPatRequest::getRecord(NetworkRequestError* out)
+{
+    s32 result;
+
+    result = 0;
+    LockMutex(this->mutex_78);
+    if (this->record_54 != 0) {
+        result = 1;
+        out->code_00 = this->record_54;
+        out->arg_04 = this->record_58;
+        out->arg_08 = this->record_5C;
+    }
+    UnlockMutex(this->mutex_78);
+    return result;
+}
+
+/* The starter's word argument `index`, 0 (and a warning) past the count it was given. */
+inline s32 NetworkLayerPatRequest::getArgument(u32 index)
+{
+    u32 count;
+
+    count = this->count_28;
+    if (count <= index) {
+        getNetworkLogger()->warn_10("NetworkRequest::getArgument: arg no over %d <= %d\n", count, index);
+        return 0;
+    }
+    return (s32)this->args_2C[index];
+}
+
+/* Sets the request's error record under its mutex. */
+inline void NetworkLayerPatRequest::setRecord(u32 code, u32 arg_a, u32 arg_b)
+{
+    LockMutex(this->mutex_78);
+    this->record_58 = arg_a;
+    this->record_5C = arg_b;
+    this->record_54 = code;
+    UnlockMutex(this->mutex_78);
+}
+
+/* Resets the record and releases its mutex. */
+inline NetworkLayerPatRequest::~NetworkLayerPatRequest()
+{
+    clear();
+    networkInstance_destroyMutex(this->mutex_78, -1);
+}
+
+inline void NetworkLayerPatRequest::clear()
+{
+    reset();
+}
+
+/* Returns a request record to its idle state. */
+inline void NetworkLayerPatRequest::reset()
+{
+    this->state_00 = 0;
+    this->interval_4C = 0.0f;
+    this->timeout_50 = 0.0f;
+    this->requestId_70 = 0;
+    this->unused_24 = 0;
+    this->cancelled_74 = 0;
+    this->owner_94 = 0;
+    this->handler_98 = 0;
+    this->count_28 = 0;
+    this->record_54 = 0;
+    this->record_58 = 0;
+    this->record_5C = 0;
+    this->unused_60 = 0;
+    this->unused_64 = 0;
+    this->unused_68 = 0;
+    this->unused_6C = 0;
+    this->unused_04 = 0;
+    this->unused_08 = 0;
+    this->unused_0C = 0;
+    this->unused_10 = 0;
+    this->unused_14 = 0;
+    this->unused_18 = 0;
+    this->unused_1C = 0;
+    this->unused_20 = 0;
+    this->args_2C[0] = 0;
+    this->args_2C[1] = 0;
+    this->args_2C[2] = 0;
+    this->args_2C[3] = 0;
+    this->args_2C[4] = 0;
+    this->args_2C[5] = 0;
+    this->args_2C[6] = 0;
+    this->args_2C[7] = 0;
 }
 
 /* The server's message callback `setCallback(..., 4)` installs: re-orders the six arguments and runs `reflect`. */
