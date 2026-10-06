@@ -1006,7 +1006,7 @@ config.libs = [
             Object(NonMatching, "g3d/g3d_scnobj.cpp"),
             Object(NonMatching, "g3d/g3d_scnroot.cpp"),
             Object(NonMatching, "g3d/g3d_cpu.cpp"),
-            Object(NonMatching, "g3d/g3d_gpu.cpp"),
+            Object(Matching, "g3d/g3d_gpu.cpp"),
         ],
     },
     {
