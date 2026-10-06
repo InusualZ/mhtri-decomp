@@ -17,7 +17,12 @@
  *   `postQuestBoardRecord` (its one caller is the quest board); the `userdata_item` profile fillers
  *   `fillNetUserProfile*` (declared in `userdata_item.h`); `refreshRosterCache`, `copyPeerProfileCard`, `sendPeerMessage`,
  *   `net_peer_address` and the `NetPeerCard` fields from what the bodies copy.
- * RESIDUALS. Unwritten: the static initialiser 0x80437204
+ * RESIDUALS. Partial: the static initialiser 0x80437204 (the map names it after the compiler's `__sinit`)
+ *   - flip blockers: `.bss` is 0x3C0 against the 0x3C8 claim and `.data` 0x118 against 0x120 (the two
+ *     `__register_global_object` chain records the static initialiser's out-of-line `__ct__20NetworkCommunityPeerFv` /
+ *     `__dt__20NetworkCommunityPeerFv` registration needs; the `net_peer_address` record retail registers is
+ *     `lbl_806E1B0C`); `communityReflectCallback` saves from r27 (`_savegpr_27`/`_restgpr_27`) where retail saves from
+ *     r26 (`_savegpr_26`/`_restgpr_26`).
  *   (`net_community_state` is a `NetworkCommunityPeer` built with that record's constructor 0x803F0730 / destructor
  *   0x803F0578, which `Network/NetworkCommunityPat.h` leaves implicit: declaring them moves that unit's implicit member
  *   run and costs its extab order): our `__sinit` constructs `net_peer_address`
@@ -1929,13 +1934,8 @@ void installCommunityCallback(void)
     s32 i;
 
     if (getNetworkCommunityPat(getPatsObject(), 0) != NULL) {
-        for (i = 0; i < 3; i++) {
-            work->community_results_0xA144[i * 6 + 0] = 0;
-            work->community_results_0xA144[i * 6 + 1] = 0;
-            work->community_results_0xA144[i * 6 + 2] = 0;
-            work->community_results_0xA144[i * 6 + 3] = 0;
-            work->community_results_0xA144[i * 6 + 4] = 0;
-            work->community_results_0xA144[i * 6 + 5] = 0;
+        for (i = 0; i < 18; i++) {
+            work->community_results_0xA144[i] = 0;
         }
         getNetworkCommunityPat(getPatsObject(), 0)->setReflectCallback((u32)communityReflectCallback, 0);
         buildNetUserProfile(&net_user_profile);
@@ -2312,11 +2312,11 @@ void sendPeerMessage(const char* id, const char* text, u8 mode, s8* result)
  */
 s32 isRosterMember(const NetworkUniqueId* address)
 {
-    NetRosterList* roster = &net_ctrl_wk->roster_0xA1B8;
+    NetworkCommunityFriendList* roster = &net_ctrl_wk->roster_0xA1B8;
     s32 i;
 
-    for (i = 0; i < roster->count_0x000; i++) {
-        if (address->equals(&roster->entries_0x004[i].address_0x00) == 1U) {
+    for (i = 0; i < roster->count_00; i++) {
+        if (address->equals(&roster->entries_04[i].id_00) == 1U) {
             return 1;
         }
     }
@@ -2328,14 +2328,14 @@ s32 isRosterMember(const NetworkUniqueId* address)
  */
 void appendRosterEntry(const NetRosterRec* src)
 {
-    NetRosterRec* entry;
-    NetRosterList* roster = &net_ctrl_wk->roster_0xA1B8;
+    NetworkCommunityFriend* entry;
+    NetworkCommunityFriendList* roster = &net_ctrl_wk->roster_0xA1B8;
 
-    if (roster->count_0x000 < 50) {
-        entry = &roster->entries_0x004[roster->count_0x000];
-        entry->address_0x00.copyFrom((const u8*)&src->address_0x00);
-        strcpy(entry->name_0x20, src->name_0x20);
-        roster->count_0x000++;
+    if (roster->count_00 < 50) {
+        entry = &roster->entries_04[roster->count_00];
+        entry->id_00.copyFrom((const u8*)&src->address_0x00);
+        strcpy(entry->name_20, src->name_0x20);
+        roster->count_00++;
     }
 }
 
@@ -2344,25 +2344,25 @@ void appendRosterEntry(const NetRosterRec* src)
  */
 void removeRosterEntry(const NetworkUniqueId* address)
 {
-    NetRosterList* roster = &net_ctrl_wk->roster_0xA1B8;
+    NetworkCommunityFriendList* roster = &net_ctrl_wk->roster_0xA1B8;
     s32 i;
 
-    for (i = 0; i < roster->count_0x000; i++) {
-        if (address->equals(&roster->entries_0x004[i].address_0x00) == 1U) {
+    for (i = 0; i < roster->count_00; i++) {
+        if (address->equals(&roster->entries_04[i].id_00) == 1U) {
             break;
         }
     }
-    if (i < roster->count_0x000) {
-        for (; i < roster->count_0x000 - 1; i++) {
-            NetRosterRec* entry = &roster->entries_0x004[i];
-            NetRosterRec* next = &roster->entries_0x004[i + 1];
+    if (i < roster->count_00) {
+        for (; i < roster->count_00 - 1; i++) {
+            NetworkCommunityFriend* entry = &roster->entries_04[i];
+            NetworkCommunityFriend* next = &roster->entries_04[i + 1];
 
-            entry->address_0x00.copyFrom((const u8*)&next->address_0x00);
-            strcpy(entry->name_0x20, next->name_0x20);
+            entry->id_00.copyFrom((const u8*)&next->id_00);
+            strcpy(entry->name_20, next->name_20);
         }
-        roster->count_0x000 = roster->count_0x000 - 1;
-        if (roster->count_0x000 < 0) {
-            roster->count_0x000 = 0;
+        roster->count_00 = roster->count_00 - 1;
+        if (roster->count_00 < 0) {
+            roster->count_00 = 0;
         }
     }
 }
@@ -2373,14 +2373,14 @@ void removeRosterEntry(const NetworkUniqueId* address)
 void appendRecentEntry(const NetworkUniqueId* address)
 {
     NetCtrlWk* work = net_ctrl_wk;
-    NetRecentRec* entry;
-    NetRecentList* recent = &work->recent_0xBB84;
+    NetworkCommunityBlocked* entry;
+    NetworkCommunityBlockList* recent = &work->recent_0xBB84;
 
-    if (recent->count_0x000 < 16) {
-        entry = &recent->entries_0x004[recent->count_0x000];
-        entry->address_0x00.copyFrom((const u8*)address);
-        strcpy(entry->name_0x20, work->message_0xBF08);
-        recent->count_0x000++;
+    if (recent->count_00 < 16) {
+        entry = &recent->entries_04[recent->count_00];
+        entry->id_00.copyFrom((const u8*)address);
+        strcpy(entry->name_20, work->message_0xBF08);
+        recent->count_00++;
     }
 }
 
@@ -2389,25 +2389,25 @@ void appendRecentEntry(const NetworkUniqueId* address)
  */
 void removeRecentEntry(const NetworkUniqueId* address)
 {
-    NetRecentList* recent = &net_ctrl_wk->recent_0xBB84;
+    NetworkCommunityBlockList* recent = &net_ctrl_wk->recent_0xBB84;
     s32 i;
 
-    for (i = 0; i < recent->count_0x000; i++) {
-        if (address->equals(&recent->entries_0x004[i].address_0x00) == 1U) {
+    for (i = 0; i < recent->count_00; i++) {
+        if (address->equals(&recent->entries_04[i].id_00) == 1U) {
             break;
         }
     }
-    if (i < recent->count_0x000) {
-        for (; i < recent->count_0x000 - 1; i++) {
-            NetRecentRec* entry = &recent->entries_0x004[i];
-            NetRecentRec* next = &recent->entries_0x004[i + 1];
+    if (i < recent->count_00) {
+        for (; i < recent->count_00 - 1; i++) {
+            NetworkCommunityBlocked* entry = &recent->entries_04[i];
+            NetworkCommunityBlocked* next = &recent->entries_04[i + 1];
 
-            entry->address_0x00.copyFrom((const u8*)&next->address_0x00);
-            strcpy(entry->name_0x20, next->name_0x20);
+            entry->id_00.copyFrom((const u8*)&next->id_00);
+            strcpy(entry->name_20, next->name_20);
         }
-        recent->count_0x000 = recent->count_0x000 - 1;
-        if (recent->count_0x000 < 0) {
-            recent->count_0x000 = 0;
+        recent->count_00 = recent->count_00 - 1;
+        if (recent->count_00 < 0) {
+            recent->count_00 = 0;
         }
     }
 }
@@ -2471,12 +2471,12 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
                 *work->result_0xC290 = 1;
             }
             work->community_results_0xA144[command] = 1;
-            work->roster_0xA1B8.count_0x000 = ((NetRosterList*)data)->count_0x000;
-            for (i = 0; i < work->roster_0xA1B8.count_0x000; i++) {
-                NetRosterRec* entry = &work->roster_0xA1B8.entries_0x004[i];
+            work->roster_0xA1B8.count_00 = ((NetRosterList*)data)->count_0x000;
+            for (i = 0; i < work->roster_0xA1B8.count_00; i++) {
+                NetworkCommunityFriend* entry = &work->roster_0xA1B8.entries_04[i];
 
-                entry->address_0x00.copyFrom((const u8*)&((NetRosterList*)data)->entries_0x004[i].address_0x00);
-                strcpy(entry->name_0x20, ((NetRosterList*)data)->entries_0x004[i].name_0x20);
+                entry->id_00.copyFrom((const u8*)&((NetRosterList*)data)->entries_0x004[i].address_0x00);
+                strcpy(entry->name_20, ((NetRosterList*)data)->entries_0x004[i].name_0x20);
             }
         }
         break;
@@ -2656,12 +2656,12 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
             if (work->result_0xC290 != NULL) {
                 *work->result_0xC290 = 1;
             }
-            work->recent_0xBB84.count_0x000 = ((NetRecentList*)data)->count_0x000;
-            for (i = 0; i < work->recent_0xBB84.count_0x000; i++) {
-                NetRecentRec* entry = &work->recent_0xBB84.entries_0x004[i];
+            work->recent_0xBB84.count_00 = ((NetRecentList*)data)->count_0x000;
+            for (i = 0; i < work->recent_0xBB84.count_00; i++) {
+                NetworkCommunityBlocked* entry = &work->recent_0xBB84.entries_04[i];
 
-                entry->address_0x00.copyFrom((const u8*)&((NetRecentList*)data)->entries_0x004[i].address_0x00);
-                strcpy(entry->name_0x20, ((NetRecentList*)data)->entries_0x004[i].name_0x20);
+                entry->id_00.copyFrom((const u8*)&((NetRecentList*)data)->entries_0x004[i].address_0x00);
+                strcpy(entry->name_20, ((NetRecentList*)data)->entries_0x004[i].name_0x20);
             }
         }
         break;
