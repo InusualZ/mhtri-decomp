@@ -12,10 +12,9 @@
  *   destructor's `extsh`, the scramblers' `clrlwi` before each `stb`).
  * NAMES. The file name is a GUESS from the class, `NetworkStreamSink`; its log strings call the class `NetworkBuffer`
  *   and the slots `init` (`clear`), `serialize` (`fill`), `deserialize` (`put`), `duplicate` (`copyFrom`) and `equals`
- *   (`slot_2C`).  `networkCrc16Table` (0x80570C20, the CRC-16/CCITT table) is a GUESS from its content.
- * RESIDUALS. `slot_2C` (0x803C9CD8) is not written: retail takes the other buffer and returns the verdict, which
- *   `virtual void slot_2C()` (the declaration `NetworkUniqueId` overrides as declared) cannot carry.  Data: `.rodata`
- *   is byte-identical; `.data` matches up to 0x2D8 (the `equals` strings are not emitted while `slot_2C` has no body).
+ *   (`equals`).  `networkCrc16Table` (0x80570C20, the CRC-16/CCITT table) is a GUESS from its content.
+ * RESIDUALS. none in `.text`; `.rodata` is byte-identical; `.data` is 0x3DC B against the claim's 0x3E0 (alignment
+ *   fill before the next unit's 8-aligned `.data`).
  */
 
 #include "Network/NetworkStreamSink.h"
@@ -196,6 +195,31 @@ s32 NetworkStreamSink::copyFrom(const u8* src)
     memcpy(data_04, other->data_04, other->used_0C);
     used_0C = other->used_0C;
     return used_0C;
+}
+
+/* Whether another buffer stores the same bytes (0 when either side has no block). */
+u32 NetworkStreamSink::equals(const NetworkStreamSink* other) const
+{
+    if (data_04 == NULL) {
+        getNetworkLogger()->warn_10("NetworkBuffer::equals: this->buf is null.\n");
+        return 0;
+    }
+    if (other == NULL) {
+        getNetworkLogger()->warn_10("NetworkBuffer::equals: arg->obj is null.\n");
+        return 0;
+    }
+    if (other->data_04 == NULL) {
+        getNetworkLogger()->warn_10("NetworkBuffer::equals: arg->obj->buf is null.\n");
+        return 0;
+    }
+    if (other->used_0C != used_0C) {
+        return 0;
+    }
+    if (used_0C == 0) {
+        getNetworkLogger()->log_14("NetworkBuffer::equals: this->len and arg->obj->len is zero.\n");
+        return 1;
+    }
+    return memcmp(other->data_04, data_04, used_0C) == 0;
 }
 
 /* Scrambles `size` bytes from `offset`: each byte is XORed with the previous plain byte, the first with `key`. */

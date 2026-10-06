@@ -73,43 +73,125 @@ struct NetworkConnectionOpenInfo {
     /* +0x04 */ u32 size_04;
 };   /* size: 0x08 */
 
-/* The callback a connection reports through: the event, the slot index, an argument, a size, the payload
-   and the session that opened it. */
-typedef void (*NetworkConnectionCallback)(s32 event, s8 index, u32 arg, s32 size, const u8* data, NetworkSessionStable* owner);
+/* The callback a connection reports through (`NetworkConnectionCallback`) is declared with the connection base in
+   `Network/NetworkConnection.h`. */
+
+/* The error a connection keeps for its owner: the first failure's code and its two arguments (`setError` refuses to
+   overwrite a filled record). */
+struct NetworkConnectionError {
+    /* +0x00 */ s32 code_00;
+    /* +0x04 */ s32 param1_04;
+    /* +0x08 */ s32 param2_08;
+};   /* size: 0x0C */
 
 /* The connection object of a slot (the log strings call it `NetworkConnectionStable[%d]`), allocated by
-   `NetworkSessionStable::set`; the class is the connection band's, so it is declared and never defined.
-   Every virtual name is a GUESS read off the call that reaches it. */
-class NetworkConnectionStable {
+   `NetworkSessionStable::set`: a `NetworkConnection` whose peer carries the frames, with the slot's queues, the
+   handshake that trades sequence numbers and addresses, a ping table and round-trip average, the MTU probe and the
+   traffic counters.  Its methods are `Network/NetworkConnectionStable.cpp`'s; the slot names are GUESSes read off the
+   call that reaches each one. */
+class NetworkConnectionStable : public NetworkConnection {
 public:
-    NetworkConnectionStable(s32 isSelf);
+    NetworkConnectionStable(s32 kind);
     /* +0x08 */ virtual ~NetworkConnectionStable();
-    /* +0x0C (GUESS: opens the connection; takes the event callback, its owner, the slot index and the address record) */
-    virtual void open(NetworkConnectionCallback callback, NetworkSessionStable* owner, s32 index, const NetworkConnectionOpenInfo* info);
-    /* +0x10 (GUESS) */ virtual void reset();
-    /* +0x14 */ virtual void slot_14();
-    /* +0x18 (GUESS) */ virtual void update();
-    /* +0x1C (GUESS: starts the connect to the given address) */ virtual void start(u32 a, u32 b);
-    /* +0x20 (GUESS) */ virtual void begin();
-    /* +0x24 (GUESS) */ virtual void end();
-    /* +0x28 (GUESS) */ virtual void stop();
-    /* +0x2C (GUESS) */ virtual void clearPending();
-    /* +0x30 */ virtual void slot_30();
-    /* +0x34 (GUESS) */ virtual void setRelay(s32 enabled);
-    /* +0x38 (GUESS) */ virtual void flush();
-    /* +0x3C (GUESS) */ virtual void setInterval(f32 seconds);
-    /* +0x40 (GUESS) */ virtual void setTimeout(f32 seconds);
-    /* +0x44 (GUESS) */ virtual void setLimit(f32 seconds);
-    /* +0x48 (GUESS) */ virtual void setValue(f32 value);
-    /* +0x4C (GUESS) */ virtual f32 getValue();
+    /* +0x0C (opens the connection: the event callback, its owner, the slot index and the address record) */
+    virtual void open(NetworkConnectionCallback callback, NetworkSessionStable* owner, s8 index, const NetworkConnectionOpenInfo* info);
+    /* +0x10 (closes the peer and returns to the idle state) */ virtual void reset();
+    /* +0x14 (clears every buffer, queue, clock and counter) */ virtual void clear();
+    /* +0x18 (one frame of the connect / link / close machine) */ virtual void update();
+    /* +0x1C (binds the peer to its record; `b` == 0 keeps the MTU probing on) */ virtual void start(u32 a, u32 b);
+    /* +0x20 (starts the connect with the owner's round-trip estimate) */ virtual void begin(f32 roundTrip);
+    /* +0x24 (closes towards a relay) */ virtual void end();
+    /* +0x28 (closes and leaves) */ virtual void stop();
+    /* +0x2C (flushes both channels and shuts down) */ virtual void clearPending();
+    /* +0x30 (the slot index) */ virtual s32 getIndex();
+    /* +0x34 (arms the receive timeout) */ virtual void setRelay(u8 enabled);
+    /* +0x38 (marks a receive in this frame) */ virtual void flush();
+    /* +0x3C */ virtual void setInterval(f32 seconds);
+    /* +0x40 */ virtual void setTimeout(f32 seconds);
+    /* +0x44 */ virtual void setLimit(f32 seconds);
+    /* +0x48 (the queues' expiry) */ virtual void setValue(f32 value);
+    /* +0x4C */ virtual f32 getValue();
 
-    void clearSendPending();       /* 0x803CBA2C (GUESS) */
-    s32 getSendRoom();             /* 0x803CBA38 (GUESS) */
-    s32 getCongestion();           /* 0x803CBEBC (GUESS) */
-    f32 getRoundTripTime();        /* 0x803CBFFC (GUESS) */
-    s32 getMaxPacketSize();        /* 0x803CC014 (GUESS) */
+    void putOnSendPool(NetworkStreamWriter* packet, s32 channel);   /* 0x803CB41C */
+    void sendChannel(s32 channel);       /* 0x803CB4E0 (GUESS) */
+    void clearSendPending();             /* 0x803CBA2C (GUESS) */
+    s32 getSendRoom();                   /* 0x803CBA38 (GUESS) */
+    void receivePackets();               /* 0x803CBC38 (GUESS) */
+    s32 getCongestion();                 /* 0x803CBEBC (GUESS) */
+    f32 getRoundTripTime();              /* 0x803CBFFC (GUESS) */
+    s32 getMaxPacketSize();              /* 0x803CC014 (GUESS) */
+    void setState(s32 state);            /* 0x803CC030 (GUESS) */
+    s32 getState();                      /* 0x803CC038 (GUESS) */
+    void setError(s32 code, s32 param1, s32 param2);   /* 0x803CC040 (GUESS) */
+    s32 checkChannel(s32 channel);       /* 0x803CC05C (GUESS: 1, and an error, for a channel other than 0/1) */
+    void sendHello(s32 reply);           /* 0x803CC0A8 (GUESS: control 0x81, or 0x82 answering one) */
+    void sendHelloDone();                /* 0x803CC1C0 (GUESS: control 0x83) */
+    void sendPing(u8 index);             /* 0x803CC240 (GUESS: control 0x91) */
+    void sendPong(u8 index, u32 time);   /* 0x803CC348 (GUESS: control 0x92) */
+    void sendClose(s32 relay);           /* 0x803CC430 (GUESS: control 0x84 towards a relay, else 0x85) */
+    void sendMtuProbe();                 /* 0x803CC4CC (GUESS) */
+    void stepMtu();                      /* 0x803CC630 (GUESS) */
+    void sendMtuReply(u32 size);         /* 0x803CC720 (GUESS: control 0x95) */
+    void dispatchControl();              /* 0x803CC7CC (GUESS) */
+    void updateRoundTrip(u8 index);      /* 0x803CCCDC (GUESS) */
+    void updateRate();                   /* 0x803CCDA4 (GUESS) */
 
-    /* +0x04 */ u8 pad_04[0x224C];
+    /* +0x0000..+0x000F - `NetworkConnection` */
+    /* +0x0010 */ NetworkConnectionError error_0010;
+    /* +0x001C */ u8 frame_001C[0x400];        /* the frame being built or sent */
+    /* +0x041C */ u8 receive_041C[0x400];      /* the peer's received frames */
+    /* +0x081C */ u8 record_081C[0x400];       /* the peer's received record */
+    /* +0x0C1C */ u8 raw_0C1C[0x400];          /* the frames `networkStreamWriter_attach` collects */
+    /* +0x101C */ s32 rawSize_101C;
+    /* +0x1020 */ u8 sendPending_1020;         /* set when the collected frames were flushed for room */
+    /* +0x1021 */ u8 pad_1021[0x03];
+    /* +0x1024 */ NetworkSlotQueues queues_1024;
+    /* +0x10A4 */ u8 sendBlocks_10A4[2][0x400];
+    /* +0x18A4 */ u8 receiveBlocks_18A4[2][0x400];
+    /* +0x20A4 */ s8 index_20A4;               /* the session slot */
+    /* +0x20A5 */ u8 address_20A5[0x80];       /* this side's address record (`open`) */
+    /* +0x2125 */ u8 pad_2125[0x03];
+    /* +0x2128 */ s32 addressSize_2128;
+    /* +0x212C */ u8 peerAddress_212C[0x80];   /* the other side's (the handshake) */
+    /* +0x21AC */ s32 peerAddressSize_21AC;
+    /* +0x21B0 */ s32 state_21B0;              /* 0 idle, 1 connecting, 2 handshake, 3 established, 4 linked, 5/6 closing */
+    /* +0x21B4 */ f32 now_21B4;                /* the clock this frame */
+    /* +0x21B8 */ f32 openTime_21B8;
+    /* +0x21BC */ f32 lastPoll_21BC;
+    /* +0x21C0 */ f32 pollInterval_21C0;
+    /* +0x21C4 */ f32 connectStart_21C4;
+    /* +0x21C8 */ f32 connectTimeout_21C8;
+    /* +0x21CC */ f32 lastHello_21CC;
+    /* +0x21D0 */ u8 pingIndex_21D0;
+    /* +0x21D1 */ u8 pad_21D1[0x03];
+    /* +0x21D4 */ f32 pingTimes_21D4[8];      /* the open pings' send times, 0 once answered */
+    /* +0x21F4 */ f32 roundTrip_21F4;
+    /* +0x21F8 */ s32 pingsLost_21F8;
+    /* +0x21FC */ s32 pingsAnswered_21FC;
+    /* +0x2200 */ f32 lastPing_2200;
+    /* +0x2204 */ f32 lastStat_2204;
+    /* +0x2208 */ s32 bytesSent_2208;
+    /* +0x220C */ s32 bytesReceived_220C;
+    /* +0x2210 */ s32 lastBytesSent_2210;
+    /* +0x2214 */ s32 lastBytesReceived_2214;
+    /* +0x2218 */ s32 minuteBytesSent_2218;
+    /* +0x221C */ s32 minuteBytesReceived_221C;
+    /* +0x2220 */ s32 packetsSent_2220;
+    /* +0x2224 */ s32 lastPacketsSent_2224;
+    /* +0x2228 */ s32 minutePacketsSent_2228;
+    /* +0x222C */ s32 totalBytesSent_222C;
+    /* +0x2230 */ s32 totalBytesReceived_2230;
+    /* +0x2234 */ f32 lastReceive_2234;
+    /* +0x2238 */ f32 receiveTimeout_2238;
+    /* +0x223C */ u8 receivedThisFrame_223C;
+    /* +0x223D */ u8 receiveTimeoutOn_223D;
+    /* +0x223E */ u8 mtuProbe_223E;
+    /* +0x223F */ u8 mtuReply_223F;
+    /* +0x2240 */ u32 mtuSeen_2240;
+    /* +0x2244 */ u32 mtu_2244;
+    /* +0x2248 */ bool mtuFixed_2248;
+    /* +0x2249 */ u8 pad_2249[0x03];
+    /* +0x224C */ s32 mtuTries_224C;
 };   /* size: 0x2250 (evidence: the `__nw` size `set` passes) */
 
 /* ---------------- the slot ------------------------------------------------------------------------ */
