@@ -684,7 +684,7 @@ config.libs = [
             Object(NonMatching, "enemy/fn_8011D448.cpp"),
             Object(NonMatching, "enemy/em_common.cpp"),
             Object(NonMatching, "enemy/em_motion_update.cpp"),
-            Object(NonMatching, "enemy/fn_80138074.c"),
+            Object(NonMatching, "enemy/fn_80138074.cpp"),
             Object(NonMatching, "enemy/fn_8013ACC4.cpp"),
             Object(NonMatching, "enemy/em_kind.cpp"),
             Object(NonMatching, "enemy/enemy_control.cpp"),

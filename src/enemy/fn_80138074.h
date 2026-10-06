@@ -34,6 +34,13 @@ u8 fn_8013A900(struct _ENEMY_WORK* enemy);
 void fn_8013AAC4(struct _ENEMY_WORK* enemy);
 u32 fn_8013AB74(struct _ENEMY_WORK *self, u32 a, u32 b);
 
+/* The user-data accessors `enemy/fn_8013ACC4.cpp`'s interpreter drives (its call sites' arity). */
+void em_userdata_state_exit(struct _ENEMY_WORK* self, u8 arg);
+void em_userdata_state_reenter_alt(struct _ENEMY_WORK* self);
+void em_userdata_motion_head_load(struct _ENEMY_WORK* self);
+u32 em_userdata_roll(struct _ENEMY_WORK* self, u16 index); /* `ran_suu(1)`'s tail: the state's next roll */
+u8 em_userdata_record_find_back(struct _ENEMY_WORK* self, u8 index, u8 key);
+
 /* The user-data accessors `enemy/em015_prog.cpp` calls. */
 s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
 void em_res_user_data_set(struct _ENEMY_WORK* self, void* arg1);

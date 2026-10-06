@@ -1,4 +1,4 @@
-/* enemy/fn_80138074.c - the enemy "user data" driver and its accessors, two clusters of one TU: the `_ENEMY_WORK`
+/* enemy/fn_80138074.cpp - the enemy "user data" driver and its accessors, two clusters of one TU: the `_ENEMY_WORK`
  *   per-frame driver (0x80138074-0x801391E8: `fn_8013823C` the per-tick update, `fn_80138B60` the sleep/death half
  *   and their helpers) and the `ResUserDataAc` accessor with the per-entity user-data state machine
  *   (0x801394B8-0x8013AC08).
@@ -6,13 +6,17 @@
  *   .sdata2 0x80796D40-0x80796D90, extab, extabindex.
  * NAMES. The map stem; the `ResUserData`/`ResUserDataItem` panics name the NW4R accessor header `g3d_resuser_ac.h`,
  *   not this file.  `em_res_user_data_set` is a GUESS (it installs a callback).
+ *   From their bodies: em_userdata_motion_head_load is a GUESS (0x8013817C); em_userdata_state_exit is a GUESS
+ *   (0x8013AACC); em_userdata_state_reenter_alt is a GUESS (0x8013AB6C); em_userdata_roll is a GUESS (0x8013AC00);
+ *   em_userdata_record_find_back is a GUESS (0x8013AC08); em_res_user_data_ck is a GUESS (0x801391E8);
+ *   joint_mtx_store is a GUESS (0x80139A64); joint_mtx_load is a GUESS (0x80139A7C).
  * RESIDUALS. 1 row unwritten: 0x80139B6C-0x8013A218 (`fn_80139B6C`, the per-item matrix builder).
  *  - `fn_80138074`, `fn_8013823C`, `fn_80138B60`, `fn_80138EC8`, `fn_801391FC`, `fn_801394D4`, `fn_8013A5E4`,
- *    `fn_8013AC08`: retail keeps `rlwinm`/`clrlwi`/`extsh` + `cmpwi`, ours emits the record form;
+ *    `em_userdata_record_find_back`: retail keeps `rlwinm`/`clrlwi`/`extsh` + `cmpwi`, ours emits the record form;
  *  - `fn_8013823C`, `fn_8013A830`, `fn_8013A884`, `fn_8013A8B4`, `fn_8013A900`, `fn_8013AB74`: retail keeps `clrlwi`
  *    + `slwi`, ours fuses them into `clrlslwi`;
  *  - `fn_801394C0` (the `clrlwi r0,r4,16` before the `sth`), `fn_8013918C`, `fn_80139858`, `fn_8013A954`,
- *    `fn_8013AA1C`, `fn_8013AACC`: retail narrows the value, ours elides the mask;
+ *    `fn_8013AA1C`, `em_userdata_state_exit`: retail narrows the value, ours elides the mask;
  *  - `fn_801391FC`, `fn_80139620`: ours converts int to float through the object's own `.sdata2` magic where retail
  *    references `lbl_80796D78`/`lbl_80796D80`, and `fn_801391FC` lacks retail's `__cvt_fp2unsigned` call; `fn_801391FC` and `fn_80138F3C` also differ in the `psq_st` f31 spill;
  *  - `fn_8013A29C`, `fn_8013A338`, `fn_8013A4E8`: ours forms the `lbl_807919F0`/`F4`/`F8` addresses with `lis` +
@@ -22,7 +26,7 @@
  *  - `fn_80139024`, `fn_80139954`, `fn_8013A6F4`, `fn_8013A770`, `em_res_user_data_set`: the branch layout differs
  *    (an extra or a missing `b`/`beq`);
  *  - `fn_8013823C`, `fn_801394D4`, `fn_80139620`: the frame differs (0x100/0x40/0xC0 against our 0xE0/0x30/0xD0);
- *    `fn_8013817C`: ours saves r30.
+ *    `em_userdata_motion_head_load`: ours saves r30.
  *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex short of the claim.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `__cvt_fp2unsigned`,
  *     `fn_805012E8`, `MTX34ToMTX33__Q24nw4r4mathFPQ34nw4r4math5MTX33PCQ34nw4r4math5MTX34`, `lbl_807919F4`,
@@ -30,8 +34,8 @@
  *   flipcheck: referenced but defined by nothing a flip can use: `fn_805012E8`.
  * SHAPES. `fn_8013A770` and `fn_8013A6F4` hoist the `item != NULL` test out of the loop; `fn_8013A770`'s index and
  *   `fn_801391FC`'s `total` are 32-bit accumulators narrowed at the use (`u16` locals re-mask every iteration);
- *   `fn_8013A900` is a `switch` inside `for (;;)`, not three `if`s.  The file is C (the unit's own symbols are plain),
- *   so `Vec3`/`Mtx34` are declared here and the mangled callees with the map's spelling.
+ *   `fn_8013A900` is a `switch` inside `for (;;)`, not three `if`s.  The unit's own symbols are plain C names, so its
+ *   definitions and its callees' map spellings sit in one `extern "C"` block; the nw4r members are called as C++.
  */
 
 struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` parameters name this type (C scopes a struct first named in a prototype) */
@@ -63,7 +67,10 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "sys_mem.h"
 #include "ef/ef_torus.h" /* fn_800C9DCC (rule 2) */
 #include "unsplit/enemy.h"
-#include "g3d/fn_800680CC.h" /* fn_80069664 (rule 2) */
+#include "g3d/g3d_rescommon.h" /* nw4r::g3d::ResDic (rule 2) */
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
+#include "sound/mhchar.h" /* MHchar::move (rule 2) */
+#include "enemy/fn_8013ACC4.h" /* em_userdata_script_run (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8006FDCC/fn_8007100C (rule 2) */
 #include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
 #include "nw4r/db_assert.h" /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
@@ -78,6 +85,9 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #define fn_801281F8_c1 ((void (*)(EnemyWork*))fn_801281F8)
 #define fn_80128204_c1 ((u32 (*)(EnemyWork*))fn_80128204)
 #define em_busy_set_c1 ((void (*)(EnemyWork*))em_busy_set)
+
+/* The unit's own symbols and its callees' map spellings are plain C names. */
+extern "C" {
 
 /* --------------------------------------------------------------------------------------------- */
 /* shared pool symbols (another unit owns the bytes)                                              */
@@ -153,7 +163,7 @@ typedef struct WorkRecord8 WorkRecord8;
 typedef struct MoveWork MoveWork;
 
 void fn_80138074(EnemyWork* self, u8 arg1);
-void fn_8013817C(EnemyWork* self);
+void em_userdata_motion_head_load(EnemyWork* self);
 void fn_801381F4(EnemyWork* self);
 void fn_8013823C(EnemyWork* self);
 void fn_80138B60(EnemyWork* self);
@@ -220,11 +230,11 @@ void fn_8013A9F4(EnemyWork* work);
 void fn_8013AA00(EnemyWork* work);
 void fn_8013AA1C(EnemyWork* work, u8 arg1);
 void fn_8013AAC4(EnemyWork* work);
-void fn_8013AACC(EnemyWork* work, u8 arg1);
-void fn_8013AB6C(EnemyWork* work);
+void em_userdata_state_exit(EnemyWork* work, u8 arg1);
+void em_userdata_state_reenter_alt(EnemyWork* work);
 s32 fn_8013AB74(EnemyWork* work, u8 arg1, u8 arg2);
-void fn_8013AC00(void);
-u8 fn_8013AC08(EnemyWork* work, u8 arg1, u8 arg2);
+void em_userdata_roll(void);
+u8 em_userdata_record_find_back(EnemyWork* work, u8 arg1, u8 arg2);
 
 /* --------------------------------------------------------------------------------------------- */
 /* callees (map spellings)                                                                       */
@@ -245,12 +255,9 @@ extern void fn_800524C0(Vec3* out, const Vec3* a, const Vec3* b, const Vec3* c, 
 extern void mtx34_copy(Mtx34* out, const Mtx34* src);
 extern void fn_8005D0CC(void* out, const void* src);
 extern s32 fn_8005D124(void* arg0);
-extern void fn_8005D1AC(void* out, s32 arg1);
-extern void fn_80062914(void* self, void* p);
 extern void fn_8008DF8C(void* arg0, Mtx34* out);
 extern void fn_8008EE68(void* arg0, Mtx34* mtx);
 extern void fn_8008F148(void* arg0, const Vec3* v);
-extern void fn_80092250(void* self, const char* key);
 extern f32 getKeyData__FPff(s32 key, f32 t);
 extern void cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(CPVector* angles, Mtx34* mtx);
 extern void rotMatrixX__FUlPQ34nw4r4math5MTX34(u16 angle, Mtx34* mtx);
@@ -612,7 +619,7 @@ void fn_80138074(EnemyWork* self, u8 arg1) {
 }
 
 /* Loads the current motion's first frame into the EmCharBase base. */
-void fn_8013817C(EnemyWork* self) {
+void em_userdata_motion_head_load(EnemyWork* self) {
     EnemyData* data = self->field_0x9A4;
 
     if (data->field_0x00 == 0xFE || data->field_0x00 == 0xFC) {
@@ -696,7 +703,7 @@ void fn_8013823C(EnemyWork* self) {
                 if (calcVecDistXZ(&self->field_0x188, &self->field_0x36C) <=
                     self->field_0x9A4->records->field_0x04) {
                     fn_801381F4(self);
-                    fn_8013817C(self);
+                    em_userdata_motion_head_load(self);
                     fn_80133BB4(self);
                 }
             }
@@ -787,7 +794,7 @@ void fn_8013823C(EnemyWork* self) {
     if (flag == 1) {
         em_state_refresh(self);
     } else if (fn_80133BCC(self) == 1 && self->field_0x46A == 0) {
-        fn_8013ACC4(self);
+        em_userdata_script_run((struct EmWork*)self);
     } else if ((self->flags_0x1C8 & 8) == 0) {
         em_target_pos_set(self, 0);
     }
@@ -807,7 +814,7 @@ void fn_8013823C(EnemyWork* self) {
         void (*cb)(EnemyWork*) = fn_801264BC(self, 3);
         if (cb != NULL) {
             if (fn_80137C9C(self, cb) != 0) {
-                if (fn_80133BCC(self) == 1 && self->field_0x46A == 0 && fn_8013ACC4(self) == 1) {
+                if (fn_80133BCC(self) == 1 && self->field_0x46A == 0 && em_userdata_script_run((struct EmWork*)self) == 1) {
                     fn_801281EC_c1(self);
                 }
                 if (fn_80128204_c1(self) == 1) {
@@ -870,7 +877,7 @@ void fn_8013823C(EnemyWork* self) {
             } else {
                 move_arg = 0;
             }
-            move__6MHcharFUs(EM_CHAR(self), move_arg);
+            EM_CHAR(self)->move(move_arg);
         }
         copyVec3(&self->field_0x188, &self->char_0x024.field_0x04);
         switch (self->field_0x1E2) {
@@ -1382,10 +1389,9 @@ void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2) {
     Mtx34 m1;
     Mtx34 m2;
     Mtx34 m3;
-    s32 key;
+    nw4r::g3d::ResNode key((void*)0);
     s32 idx;
 
-    fn_8005D1AC(&key, 0);
     MTX34_ctor(&m1);
     MTX34_ctor(&m2);
     MTX34_ctor(&m3);
@@ -1404,7 +1410,7 @@ void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2) {
 /* Reads the item's S32 value. */
 ResUserDataItemData* fn_8013A218(ResUserData* self) {
     if (fn_8013A314(self) != 0) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_805A14C4, 54, lbl_805A1480);
+        nw4r::db::Panic(lbl_805A14C4, 54, lbl_805A1480);
     }
     return (ResUserDataItemData*)fn_8013A280(self, (s32)fn_8013A29C(self)->field_0x04);
 }
@@ -1421,7 +1427,7 @@ void* fn_8013A280(ResUserData* self, s32 arg1) {
 /* Returns the item's value header, asserting the item is valid. */
 ResUserDataItemData* fn_8013A29C(ResUserData* self) {
     if (fn_8013A428(self) == 0) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_805A143C, 38, lbl_805A1420, fn_8013A308(), lbl_807919F4);
+        nw4r::db::Panic(lbl_805A143C, 38, lbl_805A1420, fn_8013A308(), lbl_807919F4);
     }
     return fn_8013A300(self);
 }
@@ -1444,7 +1450,7 @@ s32 fn_8013A314(ResUserData* self) {
 /* Returns the item's value header, asserting the item is valid. */
 ResUserDataItemData* fn_8013A338(ResUserData* self) {
     if (fn_8013A428(self) == 0) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_805A146C, 38, lbl_805A1450, fn_8013A308(), lbl_807919F0);
+        nw4r::db::Panic(lbl_805A146C, 38, lbl_805A1450, fn_8013A308(), lbl_807919F0);
     }
     return fn_8013A39C(self);
 }
@@ -1457,7 +1463,7 @@ ResUserDataItemData* fn_8013A39C(ResUserData* self) {
 /* Reads the item's string value. */
 ResUserDataItemData* fn_8013A3A4(ResUserData* self) {
     if (fn_8013A314(self) != 2) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_805A151C, 68, lbl_805A14D8);
+        nw4r::db::Panic(lbl_805A151C, 68, lbl_805A14D8);
     }
     return (ResUserDataItemData*)fn_8013A40C(self, (s32)fn_8013A338(self)->field_0x04);
 }
@@ -1497,18 +1503,15 @@ void fn_8013A488(ResUserData* dst, ResUserData* src) {
 /* Looks a key up in the item's name table and returns the matching value header. */
 ResUserDataItemData* fn_8013A494(ResUserData* self, const char* key) {
     ResUserDataItemData* data = fn_8013A4E8(self);
-    u32 table;
     ResUserData found;
 
-    fn_80062914(&table, &data->field_0x04);
-    fn_80092250(&table, key);
-    return fn_8013A5E4(&found, (ResUserDataItemData*)&table)->data;
+    return fn_8013A5E4(&found, (ResUserDataItemData*)nw4r::g3d::ResDic(&data->field_0x04)[key])->data;
 }
 
 /* Returns the item's value header, asserting the item is valid. */
 ResUserDataItemData* fn_8013A4E8(ResUserData* self) {
     if (fn_8013A594(self) == 0) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_805A13C0, 87, lbl_805A13A4, fn_8013A554(), lbl_807919F8);
+        nw4r::db::Panic(lbl_805A13C0, 87, lbl_805A13A4, fn_8013A554(), lbl_807919F8);
     }
     return fn_8013A54C(self);
 }
@@ -1525,10 +1528,7 @@ const char* fn_8013A554(void) {
 
 /* Reports whether the item's name table holds any entries. */
 void fn_8013A560(ResUserData* self) {
-    u32 table;
-
-    fn_80062914(&table, &fn_8013A4E8(self)->field_0x04);
-    fn_80069664(&table);
+    nw4r::g3d::ResDic(&fn_8013A4E8(self)->field_0x04).GetNumData();
 }
 
 /* Reports whether the item holds a value. */
@@ -1551,7 +1551,7 @@ void fn_8013A5D8(ResUserData* dst, ResUserData* src) {
 ResUserData* fn_8013A5E4(ResUserData* self, ResUserDataItemData* data) {
     fn_8013A648(self, data);
     if (((u32)data & 3) != 0) {
-        Panic__Q24nw4r2dbFPCciPCce(lbl_805A13FC, 38, lbl_805A13D4);
+        nw4r::db::Panic(lbl_805A13FC, 38, lbl_805A13D4);
     }
     return self;
 }
@@ -1691,7 +1691,7 @@ void fn_8013A954(EnemyWork* work, u8 arg1) {
     work->field_0x999 = 0;
     work->field_0x99A = 0;
     work->field_0x99B = 0;
-    fn_8013AACC(work, arg1);
+    em_userdata_state_exit(work, arg1);
 }
 
 /* Installs the work's user-data state table and re-enters the default state. */
@@ -1742,7 +1742,7 @@ void fn_8013AAC4(EnemyWork* work) {
 }
 
 /* Tears down the work's user-data state, keeping the key table when it is still in use. */
-void fn_8013AACC(EnemyWork* work, u8 arg1) {
+void em_userdata_state_exit(EnemyWork* work, u8 arg1) {
     if (em_busy_ck(work) == 1) {
         work->field_0x1F9 = 0;
     }
@@ -1758,7 +1758,7 @@ void fn_8013AACC(EnemyWork* work, u8 arg1) {
 }
 
 /* Re-enters the work's user-data state in the non-default mode. */
-void fn_8013AB6C(EnemyWork* work) {
+void em_userdata_state_reenter_alt(EnemyWork* work) {
     fn_8013AA1C(work, 0);
 }
 
@@ -1775,12 +1775,12 @@ s32 fn_8013AB74(EnemyWork* work, u8 arg1, u8 arg2) {
 }
 
 /* Draws one random number for the work's user-data roll. */
-void fn_8013AC00(void) {
+void em_userdata_roll(void) {
     ran_suu__Fl(1);
 }
 
 /* Walks the work's per-motion records backwards to the first one matching the current state. */
-u8 fn_8013AC08(EnemyWork* work, u8 arg1, u8 arg2) {
+u8 em_userdata_record_find_back(EnemyWork* work, u8 arg1, u8 arg2) {
     u8 index = arg1;
     EnemyData* data = work->field_0x9A4;
 
@@ -1801,3 +1801,5 @@ u8 fn_8013AC08(EnemyWork* work, u8 arg1, u8 arg2) {
     }
     return arg1;
 }
+
+}  /* extern "C" */
