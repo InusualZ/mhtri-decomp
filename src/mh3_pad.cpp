@@ -54,6 +54,12 @@
  * config_requests: the `unsplit/unknown.h` field additions (field_0x20/0x21, field_0x33[4]/
  * field_0x37[4], field_0x7dc[4], field_0x868 - all previously `pad_*`), the `RSOModule` hoist out of
  * `src/RSO/runtime.c`, and the unsplit externs this unit needs.  See the outbox.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_807947C8`,
+ *     `lbl_80790E30`, `lbl_80790E28`.
+ *   flipcheck: `.sbss` claimed, not emitted.
+ *   flipcheck: `.sdata` claimed, not emitted.
+ *   flipcheck: `.sdata2` claimed, not emitted.
+ *   GUESS (from the body and its callers): `vec3_assign`.
  */
 
 #include "types.h"
@@ -533,7 +539,7 @@ void TestModeExec(void)
 /* The record these three work on is `nw4r::math::VEC3` (0xC, x/y/z at +0/+4/+8) - see
  * `mh3_pad/vec3.h` for the evidence (`setVec3`'s body is byte-identical to the map's
  * `setVector3__FPQ34nw4r4math4VEC3fff`).  The parameters were `void*` until the type-fix pass. */
-extern "C" void fn_80041E70(VEC3* dst, const VEC3* src)
+extern "C" void vec3_assign(VEC3* dst, const VEC3* src)
 {
     dst->x = src->x;
     dst->y = src->y;
@@ -542,7 +548,7 @@ extern "C" void fn_80041E70(VEC3* dst, const VEC3* src)
 
 extern "C" VEC3* copyVec3(VEC3* dst, const VEC3* src)
 {
-    fn_80041E70(dst, src);
+    vec3_assign(dst, src);
     return dst;
 }
 

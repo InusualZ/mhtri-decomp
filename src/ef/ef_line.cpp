@@ -66,7 +66,7 @@ struct Emitter {
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 /* The nw4r helper callees are C functions: the target object's relocations carry their plain names
  * (`VEC3_ctor`, not `fn_80043EA8__FP...`), so they are declared `extern "C"`. */
-extern "C" void fn_8009C760(f32* sin, f32* cos, f32 rad); /* PSSinCosRad */
+extern "C" void ef_sin_cos(f32* sin, f32* cos, f32 rad); /* PSSinCosRad */
 extern "C" f32 ef_random_float(Random* r);                    /* Random::RandFloat */
 extern "C" void fn_800A99B4(void* self, VEC3* result, Emitter* em, VEC3* position, VEC3* normalDir,
                         VEC3* fromOrigin, VEC3* fromYAxis); /* EmitterForm::CalcVelocity */
@@ -118,9 +118,9 @@ void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 op
                 pos -= lbl_807962EC;
             pos *= params[0];
 
-            fn_8009C760(&sx, &cx, params[1]);
-            fn_8009C760(&sy, &cy, params[2]);
-            fn_8009C760(&sz, &cz, params[3]);
+            ef_sin_cos(&sx, &cx, params[1]);
+            ef_sin_cos(&sy, &cy, params[2]);
+            ef_sin_cos(&sz, &cz, params[3]);
 
             VEC3_ctor(&p);
             p.x = (cx * cz * sy + sx * sz) * pos;

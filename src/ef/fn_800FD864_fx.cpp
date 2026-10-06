@@ -22,6 +22,8 @@
  *   where retail relocates against the `.data` run's `jumptable_` entries.
  *   flipcheck: `.sdata`/`.sdata2` claimed, not emitted; `.text` (0x219C of 0x2BE4), extab (0x50 of 0x68), extabindex
  *   (0x78 of 0x9C) and `.data` (0x274 of 0xB80) short of the claim and differing.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_21`,
+ *     `_savegpr_22`, `_restgpr_21`, `jumptable_8059C3E0`, `jumptable_8059C3C0`, `_restgpr_22`.
  * SHAPES. `fn_800FD864`'s `areano` is `u32` (the small area switches then compare `cmplwi`), assigned through a `(u8)`
  *   cast (retail's `clrlwi r3,24`); each case assigns its three parameters in retail's order (`a`, `b`, `c`; `b`, `a`,
  *   `c` for maps 21/22) and the tail stores them as `+0x00 = b`, `+0x0D0 = a`, `+0x0D4 = c`.
@@ -125,7 +127,7 @@ extern f32 lbl_807966A4;
 /* The nw4r::ef / engine helpers, reached through their real signatures (rule 9). */
 nw4r::ef::Effect* res_eft_create(u16 id, u16 kind, u32 arg);
 extern "C" nw4r::ef::Effect* fn_800F91C4(u16 id, u16 kind, s32 a, s32 b);
-extern "C" void fn_800532DC(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
+extern "C" void mtx34_copy(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 /* C++ callees: the target object references their manglings (cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34,
  * work_mem_alloc__FUl, work_mem_free__FPv, load_file__FPcUll, ran_suu__Fl), so no extern "C"
  * (relocaudit).  fn_802FB8EC is the reverse: its target spelling is plain, so it keeps C linkage. */
@@ -1479,7 +1481,7 @@ extern "C" void fn_800FE978(_EFT* self)
                     work->types_0x8D5[i] = set.slots_0x90[i].field_0x00;
                     cpSetRotMatrix(&set.slots_0x90[i].rot_0x20, &mtx);
                     fn_800FBB90(&mtx, &set.slots_0x90[i].vec_0x14);
-                    fn_800532DC(&work->matrices[i], &mtx);
+                    mtx34_copy(&work->matrices[i], &mtx);
 
                     if (set.slots_0x90[i].flags_0x03 & 2) {
                         work->effects[i] = fn_800F91C4((u16)(work->id_base + work->types_0x8D5[i]),

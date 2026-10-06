@@ -64,7 +64,7 @@ void calcVecAngXY(nw4r::math::VEC3* v, u32* x, u32* y);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
 #endif
 
-/* C linkage: the target symbol is the unmangled `fn_80051570` (.text 0x80051570, a 4-byte `blr`).
+/* C linkage: the target symbol is the unmangled `mtx34_const_ptr` (.text 0x80051570, a 4-byte `blr`).
  * Moved out of `src/g3d/g3d_anmchr.cpp` on landing (docs/plan.md 6.5, rule 2): that range was
  * written before this owner registered, so its local `extern "C"` declaration was a boundary
  * artefact. */
@@ -82,7 +82,7 @@ u16 get_hunter_rank_max(const u8* block);
  * and skill bands credit.  The owner defines it at C linkage, so the declaration sits inside the
  * `extern "C"` region (rule 2: added with `menu/multi_result.cpp`, its second consumer). */
 void score_add_clamped(s32 delta, s32* value);
-u32 fn_80051570(u32);
+u32 mtx34_const_ptr(u32);
 /* 0x8005220C - an 8-byte `fabs f1,f1; blr` helper (caller: `gx/fn_8009ACE4.c`, rule 2: this range
  * owns the address). */
 f32 fn_8005220C(f32 value);
@@ -94,8 +94,8 @@ f32 fn_8005220C(f32 value);
 f32 fn_80050EDC(const f32* v);
 f32 fn_80050F24(const f32* v);
 void fn_80051424(f32* out, const f32* in, f32 s);
-f32* fn_80051820(f32* out, const f32* a, const f32* b);
-f32 fn_80052214(const f32* a, const f32* b);
+f32* vec3_cross(f32* out, const f32* a, const f32* b);
+f32 vec3_dot(const f32* a, const f32* b);
 /* 0x80050BC0 - the square root: `x * FrSqrt(x)` for x > 0, 0 for x == 0, and a `nw4r::db::Warning`
  * for x < 0.  ONE float argument, settled from the callee's own body (it reads only f1 and never
  * touches f2), not from the call sites: the `f2` a retail caller materialises before the call is the
@@ -136,10 +136,10 @@ void draw_shape_tex_slot_set(const u32* tex, const u32* pltt, u16 index, s8 flag
 void draw_shape_tex_slots_clear(u32 first, u32 last);
 /* 0x80050508 - the 4-byte `blr` twin of fn_8005050C.  Its body does not touch r3, and the retail
  * call sites use the pointer it hands back as the following call's first argument
- * (`GXLoadTexMtxImm(fn_80050508(&mtx), id, ...)` in `src/g3d/g3d_gpu.cpp`, `GXLoadPosMtxImm(
- * fn_80050508(&mtx), 0)` in `src/ef/ef_drawlinestrategy.cpp`), so the pointer-returning shape is the
+ * (`GXLoadTexMtxImm(mtx34_get_ptr(&mtx), id, ...)` in `src/g3d/g3d_gpu.cpp`, `GXLoadPosMtxImm(
+ * mtx34_get_ptr(&mtx), 0)` in `src/ef/ef_drawlinestrategy.cpp`), so the pointer-returning shape is the
  * one the target's call sites require (added when `src/g3d/g3d_gpu.cpp` registered as the consumer). */
-void* fn_80050508(void* pOut);
+void* mtx34_get_ptr(void* pOut);
 /* 0x80050EF4 - the two-pointer distance helper: r3 and r4 are the two `VEC3*` (its body moves r3
  * into r5 and calls `subVec3(&out, r4, r3)`, then `fn_80050F24(&out)`), so it takes two
  * pointers and returns the float.  Moved here from `enemy/fn_801550FC.cpp` on landing (rule 2):

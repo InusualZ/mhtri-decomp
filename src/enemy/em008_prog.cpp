@@ -1583,7 +1583,7 @@ void fn_801661FC(ResUserDataAc* self, MTX34* mtx, void* cursor, s32 arg3) {
     fn_8005D0CC(head, &idx);
     {
         _ENEMY_WORK* work = self->work;
-        fn_800532DC(&local, &mtx[fn_8006FDCC(head)]);
+        mtx34_copy(&local, &mtx[fn_8006FDCC(head)]);
         mtx34_identity(&out);
         rotMatrixX_view1(work->field_0x608, &out);
         rotMatrixZ_view1(work->field_0x610, &out);

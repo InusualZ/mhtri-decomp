@@ -29,6 +29,7 @@
 #include "unsplit/ef.h"
 #include "g3d/fn_80063888.h" /* fn_80067E54, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "nw4r/fn_805012C4.h" /* nw4r::ut::List_* (rule 2) */
 
 #ifdef __cplusplus
 namespace nw4r {
@@ -56,8 +57,6 @@ extern char lbl_805936A0[];  /* "NW4R:Pointer Error\nproject(=%p) is not valid..
 extern char lbl_80694598[];  /* the post-field singleton                                   .bss  0x80694598 */
 
 /* Helpers owned by other units. */
-extern void  MEMInitList(void* list, u16 offset);
-extern void* fn_80501C9C(void* list, u16 index);
 extern void  PSVECSubtract(Vec* dst, const Vec* a, const Vec* b);
 
 
@@ -67,11 +66,11 @@ extern void  PSVECSubtract(Vec* dst, const Vec* a, const Vec* b);
 
 /* Two `nw4r::ut::List`s plus their element counters; `fn_800B28B4` is the initialiser. */
 typedef struct EfPostField {
-    u8 pad_0x00[0x08]; /* +0x00  list A (MEMInitList, offset 4) */
+    u8 pad_0x00[0x08]; /* +0x00  list A (List_Init, offset 4) */
     u16 count_a;       /* +0x08 */
     u8 pad_0x0A[0x02]; /* +0x0A */
     u32 field_0x0C;    /* +0x0C  zeroed by the initialiser */
-    u8 list_b[0x08];   /* +0x10  list B (MEMInitList, offset 4) */
+    u8 list_b[0x08];   /* +0x10  list B (List_Init, offset 4) */
     u16 count_b;       /* +0x18 */
     u8 pad_0x1A[0x02]; /* +0x1A */
     u32 field_0x1C;    /* +0x1C  zeroed by the initialiser */
@@ -82,8 +81,8 @@ void* fn_800B2878(void) {
 }
 
 void fn_800B28B4(EfPostField* self) {
-    MEMInitList(self, 4);
-    MEMInitList(&self->list_b, 4);
+    nw4r::ut::List_Init((nw4r::ut::List*)self, 4);
+    nw4r::ut::List_Init((nw4r::ut::List*)&self->list_b, 4);
     self->field_0x0C = 0;
     self->field_0x1C = 0;
 }
@@ -101,14 +100,14 @@ void* fn_800B4A70(EfPostField* self, u16 index) {
     if ((u32)index >= self->count_a) {
         return 0;
     }
-    return fn_80501C9C(self, index);
+    return nw4r::ut::List_GetNth((nw4r::ut::List*)self, index);
 }
 
 void* fn_800B4A98(EfPostField* self, u16 index) {
     if ((u32)index >= self->count_b) {
         return 0;
     }
-    return fn_80501C9C(&self->list_b, index);
+    return nw4r::ut::List_GetNth((nw4r::ut::List*)&self->list_b, index);
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -277,12 +276,11 @@ u32 fn_800B3D84(EfPostField* self, EfResFile* arg) {
  * --------------------------------------------------------------------------------------------- */
 
 extern void* fn_800A5250(void* list);
-extern void  fn_80501BF4(void* list, void* node);
 
 /* Empties the primary list and clears its counter. */
 int fn_800B483C(EfPostField* self) {
     while (fn_800A5250(self) != 0) {
-        fn_80501BF4(self, fn_800A5250(self));
+        nw4r::ut::List_Remove((nw4r::ut::List*)self, fn_800A5250(self));
     }
     self->field_0x0C = 0;
     return 1;
@@ -291,7 +289,7 @@ int fn_800B483C(EfPostField* self) {
 /* Empties the second list and clears its counter. */
 int fn_800B4A14(EfPostField* self) {
     while (fn_800A5250(&self->list_b) != 0) {
-        fn_80501BF4(&self->list_b, fn_800A5250(&self->list_b));
+        nw4r::ut::List_Remove((nw4r::ut::List*)&self->list_b, fn_800A5250(&self->list_b));
     }
     self->field_0x1C = 0;
     return 1;
@@ -304,7 +302,6 @@ int fn_800B4A14(EfPostField* self) {
  * --------------------------------------------------------------------------------------------- */
 
 extern void* fn_800B308C(void* block, u16 index);
-extern void* fn_80501C60(void* list, void* node);
 
 /* Finds the block holding `index`, walking the chain when no block is given. */
 void* fn_800B3DBC(void* self, u32 index, EfResFile* arg) {
@@ -322,7 +319,7 @@ void* fn_800B3DBC(void* self, u32 index, EfResFile* arg) {
             return fn_800B308C(node, (u16)index);
         }
         index -= n;
-        node = fn_80501C60(self, node);
+        node = nw4r::ut::List_GetNext((nw4r::ut::List*)self, node);
     }
     return 0;
 }

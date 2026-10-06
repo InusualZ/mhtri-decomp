@@ -7,7 +7,8 @@
  *   `g3d/g3d_camera.cpp`; the right edge is the discovery's byte cap, not a TU seam (`g3d/g3d_scnmdl.cpp` follows).
  * NAMES. The file keeps the map's stem (no one `__FILE__` names the run).  The bodies are m2c's output, typed
  *   mechanically: each `RawView_N` struct's `field_0xNN` states an offset and a size, not a meaning.
- * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, fn_80077DF0, fn_80079EE4, fn_8007A468.
+ *   GUESS (from the body and its callers): `sin_cos_deg`, `mtx34_set`.
+ * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, mtx34_set, fn_80079EE4, fn_8007A468.
  *   Unwritten (empty stubs, 33 rows, 0x31F0 bytes; objdiff scores them near zero): fn_800769F4, fn_8007868C,
  *   fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8, fn_800793A4, fn_80079604, fn_80079938, fn_800799BC,
  *   fn_80079A48, fn_80079B38, fn_8007A814, fn_8007A8E0, dtor_8007AF28, fn_8007AF6C, fn_8007B074, fn_8007B0A0,
@@ -17,6 +18,18 @@
  *   Partial (101 written bodies): every remaining function except the 77 at 100 %.
  *   flipcheck: `.text` 0x3B28 of 0x6774; `.rodata`, `.data` and `.sdata` are claimed and not emitted; `.sdata2` is
  *   0xC of 0x68, and the `.sdata`/`.sdata2` pools share a literal with `g3d/g3d_camera.cpp` (a candidate fold).
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_8058E570`,
+ *     `lbl_8058E57C`, `lbl_8058E5B0`, `lbl_8058E5D8`, `_savegpr_27`, `_restgpr_27`, `lbl_8058E758`,
+ *     `lbl_8058E730`, `lbl_8058E790`, `lbl_8058E768`, `lbl_8058E870`, `lbl_8058E848`, `lbl_8058E838`,
+ *     `lbl_8058E810`, `lbl_8058E6F0`, `lbl_8058E6D0`, `lbl_8058E6C0`, `lbl_8058E6A4`, `lbl_8058E800`,
+ *     `lbl_8058E7E4`, `lbl_8058E720`, `lbl_8058E700`, `lbl_8058E7C8`, `lbl_8058E7A0`, `_savegpr_22`,
+ *     `_savegpr_19`, `_restgpr_22`, `lbl_8058E880`, `lbl_8058E8B8`, `lbl_8058E890`, `_restgpr_19`,
+ *     `__cvt_fp2unsigned`, `lbl_8058E8E8`, `lbl_8058E91C`, `lbl_8058EA90`, `lbl_8058EA64`, `lbl_8058EA50`,
+ *     `lbl_8058EA30`, `lbl_8058EA20`, `lbl_8058E9F4`, `lbl_8058EAC8`, `lbl_8058EAA0`, `lbl_8058EAD8`,
+ *     `lbl_80795E28`, `lbl_8058EAE8`, `lbl_8058EB08`, `fn_80502678`, `Enable__Q34nw4r2ut2LCFv`, `fn_805026D8`,
+ *     `Disable__Q34nw4r2ut2LCFv`, `lbl_8061A9C0`, `lbl_8061AA74`, `lbl_8058ED90`, `lbl_8058ED64`, `lbl_8058ED38`,
+ *     `lbl_8058F4C8`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_80502678`, `fn_805026D8`.
  */
 
 #include "types.h"
@@ -163,7 +176,7 @@ u32 dtor_800813B8(u32);
 u32 color_rgba_copy(s32, void*);
 u32 mtx34_identity(s32);
 u32 fn_80050850(void*, void*, f32, f32);
-u32 fn_800514FC(void*, s32, void*);
+u32 mtx34_mult_vec3(void*, s32, void*);
 u32 fn_8005A8E0(void*, void*);
 s32 fn_8005A91C(s32);
 s32 fn_8005A950(void*, s32);
@@ -216,7 +229,7 @@ u32 fn_8006FDCC(void*);
 s32 fn_8006FEC8(void*, s32);
 s32 fn_80070020(s32);
 u32 fn_8007100C(void*, s32);
-u32 fn_800710BC(void*, void*, void*);
+u32 mtx34_concat(void*, void*, void*);
 u32 fn_80071C38(u32);
 u32 fn_800731EC(void*, s32);
 u32 fn_80073404(void*, s32);
@@ -293,7 +306,7 @@ u32 math_sincos_idx(f32);
 u32 mtx34_rotate_vec3(void*, s32, void*);
 u32 fn_80502678(void);
 u32 fn_805026D8(void);
-/* internal */ void fn_80075DCC(f32 farg0);
+/* internal */ void sin_cos_deg(f32 farg0);
 /* internal */ void fn_80075DD8(void* a0);
 /* internal */ u32 fn_80075E98(void* a0);
 /* internal */ void fn_80075E9C(s32 arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, u32 arg_sp0);
@@ -358,7 +371,7 @@ u32 fn_805026D8(void);
 /* internal */ s32 fn_80077D64(s32 arg0);
 /* internal */ u32 fn_80077DBC(void *arg1, void* a1);
 /* internal */ s32 fn_80077DD8(s32 *arg0);
-/* internal */ u32 fn_80077DF0(void *arg0, f32 farg0, f32 farg1, f32 farg2, f32 farg3, f32 farg4, f32 farg5, f32 farg6, f32 farg7, f32 arg_sp8, f32 arg_spC, f32 arg_sp10, f32 arg_sp14);
+/* internal */ u32 mtx34_set(void *arg0, f32 farg0, f32 farg1, f32 farg2, f32 farg3, f32 farg4, f32 farg5, f32 farg6, f32 farg7, f32 arg_sp8, f32 arg_spC, f32 arg_sp10, f32 arg_sp14);
 /* internal */ s32 fn_80077E34(s32 arg0, void* a1);
 /* internal */ u32 fn_80077E64(s32 *arg0, s32 *arg1);
 /* internal */ u32 fn_80077E70(s32 arg0, s32 arg1, s32 arg2);
@@ -503,7 +516,7 @@ u32 fn_805026D8(void);
 /* internal */ void* fn_8007C474(void *arg0, void *arg1, s32 arg2);
 
 
-void fn_80075DCC(f32 farg0) {
+void sin_cos_deg(f32 farg0) {
     math_sincos_idx((f32)(lbl_80795DFC * farg0));
 }
 
@@ -1314,14 +1327,14 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                         sp18 = fn_80097EB0((void*)(&sp2C), (s32)(temp_r3_3));
                         fn_8005D2C0((void*)(&sp28), (void*)(&sp18));
                         temp_r20_2 = fn_8005D218((void*)(arg1));
-                        fn_800710BC((void*)(&spC8), (void*)(fn_8005D218((void*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
+                        mtx34_concat((void*)(&spC8), (void*)(fn_8005D218((void*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
                         temp_r3_4 = (void *)(fn_80087F08((s32)(((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08)));
                         sp8 = ((RawView_19*)temp_r3_4)->field_0x18;
                         spC = ((RawView_19*)temp_r3_4)->field_0x1C;
                         sp10 = ((RawView_19*)temp_r3_4)->field_0x20;
                         sp14 = temp_f31;
-                        fn_80077DF0((void *)(&sp98), (*(f32*)&temp_r3_4), (f32)(((RawView_19*)temp_r3_4)->field_0x00), (f32)(((RawView_19*)temp_r3_4)->field_0x04), (f32)(((RawView_19*)temp_r3_4)->field_0x08), (f32)(temp_f31), (f32)(((RawView_19*)temp_r3_4)->field_0x0C), (f32)(((RawView_19*)temp_r3_4)->field_0x10), (f32)(((RawView_19*)temp_r3_4)->field_0x14), (f32)(temp_f31), 0, 0, 0);
-                        fn_800710BC((void*)(&spC8), (void*)(&sp98), (void*)(&spC8));
+                        mtx34_set((void *)(&sp98), (*(f32*)&temp_r3_4), (f32)(((RawView_19*)temp_r3_4)->field_0x00), (f32)(((RawView_19*)temp_r3_4)->field_0x04), (f32)(((RawView_19*)temp_r3_4)->field_0x08), (f32)(temp_f31), (f32)(((RawView_19*)temp_r3_4)->field_0x0C), (f32)(((RawView_19*)temp_r3_4)->field_0x10), (f32)(((RawView_19*)temp_r3_4)->field_0x14), (f32)(temp_f31), 0, 0, 0);
+                        mtx34_concat((void*)(&spC8), (void*)(&sp98), (void*)(&spC8));
                     }
                     spF4 = temp_f31;
                     spE4 = temp_f31;
@@ -1429,7 +1442,7 @@ typedef struct {
     /* +0x28 */ u32 field_0x28;
     /* +0x2C */ u32 field_0x2C;
 } RawView_21; /* size: 0x30 */
-u32 fn_80077DF0(void *arg0, f32 farg0, f32 farg1, f32 farg2, f32 farg3, f32 farg4, f32 farg5, f32 farg6, f32 farg7, f32 arg_sp8, f32 arg_spC, f32 arg_sp10, f32 arg_sp14) {
+u32 mtx34_set(void *arg0, f32 farg0, f32 farg1, f32 farg2, f32 farg3, f32 farg4, f32 farg5, f32 farg6, f32 farg7, f32 arg_sp8, f32 arg_spC, f32 arg_sp10, f32 arg_sp14) {
     ((RawView_21*)arg0)->field_0x00 = farg0;
     ((RawView_21*)arg0)->field_0x04 = farg1;
     ((RawView_21*)arg0)->field_0x08 = farg2;

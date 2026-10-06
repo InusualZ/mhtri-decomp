@@ -38,7 +38,7 @@ extern f32 lbl_80796058; /* 65535.0f                .sdata2 */
  * map names, so they have C linkage. */
 extern "C" {
 void fn_8009CA30(void* mtx, f32 x, f32 y, f32 z);               /* Euler rotation */
-void fn_800514FC(void* out, const void* mtx, const void* in);   /* mulVecMat */
+void mtx34_mult_vec3(void* out, const void* mtx, const void* in);   /* mulVecMat */
 void fn_80051424(void* out, const void* in);                    /* copy */
 void fn_800513CC(void* out, const void* a, const void* b);      /* blend */
 }
@@ -110,9 +110,9 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
         a1 = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
         a2 = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
         a3 = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
-        fn_8009C760(&s1, &c1, a1);
-        fn_8009C760(&s2, &c2, a2);
-        fn_8009C760(&s3, &c3, a3);
+        ef_sin_cos(&s1, &c1, a1);
+        ef_sin_cos(&s2, &c2, a2);
+        ef_sin_cos(&s3, &c3, a3);
 
         out->x += em->spread_scale * (c3 * (c1 * s2) + s1 * s3);
         out->y += em->spread_scale * (s3 * (c1 * s2) - s1 * c3);
@@ -130,7 +130,7 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
             MTX34_ctor(&mtx_a);
             fn_8009CA30(&mtx_a, em->euler_x, em->euler_y, em->euler_z);
             setVec3(&axis_a, lbl_80796030, lbl_8079603C, lbl_80796030);
-            fn_800514FC(&axis_a, &mtx_a, &axis_a);
+            mtx34_mult_vec3(&axis_a, &mtx_a, &axis_a);
             out->x += em->axis_angle_scale * axis_a.x;
             out->y += em->axis_angle_scale * axis_a.y;
             out->z += em->axis_angle_scale * axis_a.z;
@@ -143,7 +143,7 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
             /* `axis_b` is the matrix record; its declaration is short (see the unit header). */
             MTX34_ctor((MTX34*)&axis_b);
             fn_8009CA30(&axis_b, em->euler_x, em->euler_y, em->euler_z);
-            fn_800710BC(&mtx_b, (const Mtx34*)&axis_b, &mtx_b);
+            mtx34_concat(&mtx_b, (const Mtx34*)&axis_b, &mtx_b);
             out->x += em->axis_angle_scale * mtx_b.m[0][1];
             out->y += em->axis_angle_scale * mtx_b.m[1][1];
             out->z += em->axis_angle_scale * mtx_b.m[2][1];

@@ -12,10 +12,12 @@
  * RESIDUALS. Unwritten (objdiff scores them zero): 75 of the 124 functions, every one except the 42 at 100 % and
  *   these partial ones - fn_8005D27C, fn_8005DC30, fn_8005DCA0, fn_800604DC, fn_8006244C, fn_80062824, fn_800628AC.
  *   flipcheck: `.text` 0x3D0 of 0x69B8; `.data`, `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_80791148`,
+ *     `lbl_807911E8`, `lbl_80791168`, `lbl_80791150`.
  */
 
 #include "types.h"
-#include "fn_8004CAD8.h"   /* fn_80051570's owner header (docs/plan.md 6.5, rule 2) */
+#include "fn_8004CAD8.h"   /* mtx34_const_ptr's owner header (docs/plan.md 6.5, rule 2) */
 #include "nw4r/math_arithmetic.h"   /* nw4r::math::detail::FExp, owner nw4r/math_arithmetic.cpp (rule 2) */
 
 /* --- the SDK entry points this unit tail-calls (owners are unsplit; declared, never defined) --------- */
@@ -295,7 +297,7 @@ extern "C" void* fn_80060F70(void* self, u32 a, u32 b)
 
 extern "C" void* fn_80060FAC(void* self, u32 a)
 {
-    fn_804C6D70(self, fn_80051570(a));
+    fn_804C6D70(self, mtx34_const_ptr(a));
     return self;
 }
 

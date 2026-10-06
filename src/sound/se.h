@@ -127,7 +127,7 @@ void CleanUpTracks(void* obj);
 void* fn_80097F18(void* sub, void* arg);
 void fn_8005D0CC(void* obj, void* sub);
 int fn_8006FDCC(void* sub);
-void fn_800532DC(void* dst, void* src);
+void mtx34_copy(void* dst, void* src);
 void fn_80080B10(void* obj, s32 kind);
 void fn_800810DC(void* obj, s32 flag);
 SeSlot* fn_800D8E58(_se_w* work, s32 id);

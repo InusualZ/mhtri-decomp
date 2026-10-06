@@ -42,6 +42,10 @@
  * `fn_800E444C` (-8 B) keeps one `lwz` fewer than retail across the `rec = (PrimRec*)local` reload;
  * `fn_800E3CBC`/`fn_800E3D7C`/`fn_800E4390`/`set_zmode` are size-exact and differ only in register
  * colouring.  `fn_800E4284` (-4 B) is the `(u32)((f32)(n - 1) * t)` conversion sequence.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_20`,
+ *     `_savegpr_19`, `_restgpr_20`, `_restgpr_19`, `vec3_dot`.
+ *   flipcheck: `.bss` claimed, not emitted.
+ *   flipcheck: `.sdata2` size gap.
  */
 
 #include "types.h"
@@ -82,7 +86,7 @@ struct PrimRec {
 typedef struct WorkBuf {
     /* 0x00 */ u8 pad_0x00[0x1C];
     /* 0x1C */ f32 f_0x1C;                     /* fn_80081714 writes it; read back as f1 */
-    /* 0x20 */ VEC3 v_0x20;                    /* the projected point fn_80052214 reads */
+    /* 0x20 */ VEC3 v_0x20;                    /* the projected point vec3_dot reads */
     /* 0x2C */ f32 f_0x2C;
 };
 
@@ -153,7 +157,7 @@ s32 my_player_no(void);
 void fn_8007F77C(void* p);
 void* fn_800A60C0(void* p);
 void fn_80081714(void* a, u32 b, WorkBuf* out);
-f32 fn_80052214(const VEC3* a, const VEC3* b);
+f32 vec3_dot(const VEC3* a, const VEC3* b);
 void* fn_8007B544(void* a, u32 b);
 void fn_80049728(void* p, s32 n);
 void fn_80088590(s32 n);
@@ -327,15 +331,15 @@ extern "C" s32 fn_800E4148(PrimRec* self, const WorkBuf* arg)
 
     VEC3_ctor(&v);
     if (self->flags & 0x1) {
-        fn_80052214(&self->pos, &arg->v_0x20);
-        self->key = -(arg->f_0x2C + fn_80052214(&self->pos, &arg->v_0x20));
+        vec3_dot(&self->pos, &arg->v_0x20);
+        self->key = -(arg->f_0x2C + vec3_dot(&self->pos, &arg->v_0x20));
     } else if (self->kind <= 1) {
         f32* m = (f32*)fn_8007B544(self->handle, 2);
         self->key = -m[0xB];
     } else if (self->kind == 2) {
         f32* m = (f32*)fn_800A60C0(self->handle);
         setVector3(&v, m[3], m[7], m[11]);
-        self->key = -(arg->f_0x2C + fn_80052214(&v, &arg->v_0x20));
+        self->key = -(arg->f_0x2C + vec3_dot(&v, &arg->v_0x20));
     } else {
         return 0;
     }

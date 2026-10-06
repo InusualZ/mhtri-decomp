@@ -20,6 +20,14 @@
  *     `union` pun, a two-step temporary and a plain cast all emit `fctiwz`/`stfd`.
  *   fn_8008F6C4: two loads ordered 0x10-then-0x00 here, 0x00-then-0x10 in retail.
  *   flipcheck: `.text` 0x4590 of 0x5084; `.rodata` and `.data` are claimed and not emitted; `.sdata2` is 0x10 of 0x38.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_80501434`,
+ *     `MTX34RotXYZFIdx__Q24nw4r4mathFPQ34nw4r4math5MTX34fff`, `fn_80500F60`, `Atan2FIdx__Q24nw4r4mathFff`,
+ *     `fn_805012C4`, `MTX33Identity__Q24nw4r4mathFPQ34nw4r4math5MTX33`, `fn_805012E8`,
+ *     `MTX34ToMTX33__Q24nw4r4mathFPQ34nw4r4math5MTX33PCQ34nw4r4math5MTX34`, `fn_8050133C`,
+ *     `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`, `fn_80501594`,
+ *     `MTX33ToMTX34__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX33`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_80500F60`, `fn_805012C4`, `fn_805012E8`,
+ *     `fn_8050133C`, `fn_80501434`, `fn_80501594`.
  * SHAPES. File-scope `#pragma peephole off`: retail keeps the split `clrlwi`+`slwi`/`cmpwi` forms.  `fp_contract`
  *   stays on (fn_8008AED0 uses fused `fmadds`/`fmsubs`).
  */
@@ -919,7 +927,7 @@ f32 fn_8008AA8C(u32 self, f32 frame)
     }
     span = frame - loFrame;
     return fn_8008AED0(curVal, curTan, nextVal, nextTan,
-                       span * fn_800610AC(hiFrame - loFrame), span);
+                       span * math_reciprocal(hiFrame - loFrame), span);
 }
 
 /* The s16 key's value halfword read as a float (target keeps the paired-single load; see residuals). */
@@ -1014,7 +1022,7 @@ f32 fn_8008B200(u32 self, f32 frame)
     }
     span = frame - loFrame;
     return fn_8008AED0(curVal, curTan, nextVal, nextTan,
-                       span * fn_800610AC(hiFrame - loFrame), span);
+                       span * math_reciprocal(hiFrame - loFrame), span);
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -1094,7 +1102,7 @@ f32 fn_8008B95C(u32 self, f32 frame)
     }
     span = frame - loFrame;
     return fn_8008AED0(curVal, curTan, nextVal, nextTan,
-                       span * fn_800610AC(hiFrame - loFrame), span);
+                       span * math_reciprocal(hiFrame - loFrame), span);
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -1551,7 +1559,7 @@ void fn_8008F3DC(ResAnmChrObj* self, const void* src)
     if (self->flags & 8) {
         fn_8007100C(self->mat, src);
     } else {
-        setVec3((nw4r::math::VEC3*)norm, fn_800610AC(rec.x), fn_800610AC(rec.y), fn_800610AC(rec.z));
+        setVec3((nw4r::math::VEC3*)norm, math_reciprocal(rec.x), math_reciprocal(rec.y), math_reciprocal(rec.z));
         fn_8050133C(self->mat, src, norm);
     }
     self->flags &= 0x7FFFFFFF;

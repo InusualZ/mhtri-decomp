@@ -11,6 +11,10 @@
  *
  * Name: `mhchar` is the class the range is about (`MHchar::` methods, the model block `sound/mhchar.h` views); no `__FILE__`
  * string names the TU, so the file name is a GUESS from the class.
+ *   flipcheck: `.rodata` claimed, not emitted.
+ *   flipcheck: `.sbss` claimed, not emitted.
+ *   flipcheck: `.sdata` claimed, not emitted.
+ *   flipcheck: `.sdata2` claimed, not emitted.
  */
 
 #include "types.h"
@@ -94,7 +98,7 @@ extern "C" void fn_800E0A14(MHchar* self, void* arg, void* dst)
     void* entry = fn_80097F18(&self->field_0x114, arg);
     int offset = fn_8006FDCC(&entry) * 48;
     MHchar* handle = (MHchar*)self->field_0x118;
-    fn_800532DC(dst, (void*)(fn_800E0A8C(handle) + offset));
+    mtx34_copy(dst, (void*)(fn_800E0A8C(handle) + offset));
 }
 
 /* Read the model's +0xEC word. */

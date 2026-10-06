@@ -1,33 +1,39 @@
 /*
  * ef/ef_drawpointstrategy.cpp - nw4r::ef DrawPointStrategy: `Draw` (the point particle walker), the single point
- *   emitter (`GXBegin` POINTS, position, optional texcoord), the out-of-line GX FIFO writers, the point GX state,
- *   a deleting destructor and the constructor that installs the DrawSmoothStripeStrategy table `lbl_80594778`.
+ *   emitter (`GXBegin` POINTS, position, optional texcoord), the out-of-line GX FIFO writers, the point GX state, the
+ *   class's destructor and the DrawSmoothStripeStrategy constructor.
  * RANGE. .text 0x800BF818-0x800BFFD4 (9 functions); extab 0x8000A36C-0x8000A394, extabindex 0x800238C8-0x80023904,
  *   .data 0x80594408-0x805944E0 (the `__FILE__` string "ef_drawpointstrategy.cpp" and the three pointer-error
  *   messages first), .sdata 0x80791350-0x80791358, .sdata2 0x807961B8-0x807961C0.
- *   Unproven seam (playbook 80: a TU's tables sit late in its `.data`): this unit's table `lbl_805944C8` is installed
- *   by `fn_800BF7DC` at the tail of `ef/ef_drawlinestrategy.cpp`'s range, and this range ends with
- *   `fn_800BFF3C`/`fn_800BFF98`, the constructor installing `ef/ef_drawsmoothstripestrategy.cpp`'s table, so each
- *   `.text` seam may be off by that constructor.
- * FLAGS. `cflags_main`; `#pragma peephole off` (the FIFO writers keep the unfused narrowing stores, playbook 39).
- * NAMES. The map has only `fn_` stems for the range and the dump only `zz_` names; `fn_800BF818`/`fn_800BFD84` are
- *   a GUESS for NintendoWare's `DrawPointStrategy::Draw`/`SetupState` (their asserts on lines 92/96/98 and 150
- *   name `pm`, `pm->mResource` and `&ed`).
+ *   Seam (playbook 80, measured): every strategy TU runs [constructor, ..., inline destructor], and each constructor
+ *   installs the vtable at the end of its own TU's `.data`; so this class's constructor is the tail of `ef/ef_drawlinestrategy.cpp`'s range
+ *   (0x800BF7DC) and the DrawSmoothStripeStrategy constructor at this range's tail (0x800BFF98) is the next TU's.
+ * FLAGS. `cflags_main`; `#pragma peephole off` before the includes (the FIFO writers keep the unfused narrowing stores,
+ *   playbook 39), `#pragma dont_inline on` at the end (the inline destructor calls its base out of line).
+ * NAMES. The map has only `fn_` stems for the helpers; `fn_800BFD84` is a GUESS for NintendoWare's setup (its assert
+ *   on line 150 names `pm`).
  * RESIDUALS. The source defines the FIFO writers and the emitter before `Draw`, so our `.text` (and the extab and
  *   extabindex records) run in a different order from retail's address order.
  *   2 partial rows:
- *  - `fn_800BF818`: the two table getter calls load the table through r5 where retail uses r3 (the `mr r3,self`
- *    schedule), and one `lwz` and one `lfs` are placed differently;
+ *  - `Draw` (0x800BF818): one `lwz r6, 0x24(pm)` (the asserted resource) is scheduled before the six assert
+ *    temporaries where retail loads it after them, and one `lfs` is placed differently;
  *  - `fn_800BFD60` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the three `lfs` and the
  *    `lis` of the FIFO base (the `ef/ef_drawlinestrategy.cpp` row `fn_800BF58C` is the same).
- *   flipcheck: `.data`, `.sdata` and `.sdata2` claimed, not emitted; `.text` 0x7B8 of 0x7BC.
+ *   flipcheck: `.data` claimed, not emitted; `.sdata` (the size clamp) is emitted with its bytes equal (0x4 short of
+ *   the claim, the trailing pad); `.sdata2` (the literals' pool) holds 0.0f before 6.0f where retail has 6.0f first.
+ *   `DrawSmoothStripeStrategy` (constructor): the empty body is the whole source - the compiler
+ *     emits the base call and the vtable store.
  * SHAPES. The `Panic` line numbers are literals (92/96/98 in `Draw`, 150 in the state setup), so the source's
  *   line count does not move them.
  */
 
+#pragma peephole off
+
 #include "ef.h"
 #include "gx.h"
-#include "ef/ef_drawstrategy.h"
+#include "ef/ef_drawpointstrategy.h"
+#include "ef/ef_drawstripestrategy.h" /* ef_draw_info_view_mtx (rule 2) */
+#include "ef/ef_drawsmoothstripestrategy.h" /* DrawSmoothStripeStrategy, whose constructor closes this range */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
@@ -44,25 +50,18 @@ void Panic(const char* file, int line, const char* fmt, ...);
 extern "C" {
 #endif
 
-#pragma peephole off
 
 /* --------------------------------------------------------------------------------------------------
  * externs owned by neighbouring translation units and the SDK.
  * -------------------------------------------------------------------------------------------------- */
 
-EfEmitterShape* fn_800AB388(void* emitter);
-f32 fn_800AB3AC(void* particle);
-f32 fn_800B5A48(void);
-f32* fn_800BF5B0(f32* limit, f32* value);
-void fn_800AE360(EfDrawArgs* args, Mtx34* mtx);
-void fn_800B7DB0(void* em, Mtx34* mtx);
-void fn_800710BC(Mtx34* out, Mtx34* a, Mtx34* b);
-Mtx34* fn_80050508(Mtx34* mtx);
-void fn_800C6064(EfDrawStrategyObj* self, EfDrawArgs* args, EfEmitterShape* shape, void* em);
-void fn_800C68E8(EfDrawStrategyObj* self, void* particle, EfEmitterShape* shape, void* em, u32 first,
-                 u32 texcoord);
-void fn_800B4B04(void* self, int mode);
-void fn_800C5F74(void* self);
+EfEmitterShape* ef_resource_draw_setting(void* emitter);
+f32 ef_particle_get_scale(void* particle);
+f32 ef_float_epsilon(void);
+f32* ef_min_float(f32* limit, f32* value);
+void ef_pm_get_mtx(EfDrawArgs* args, Mtx34* mtx);
+void mtx34_concat(Mtx34* out, Mtx34* a, Mtx34* b);
+Mtx34* mtx34_get_ptr(Mtx34* mtx);
 
 /* SDK GX entry points, declared locally. */
 extern void GXBegin(u8 prim, u8 vtxfmt, u16 nverts);
@@ -80,10 +79,8 @@ extern char lbl_80594408[]; /* "ef_drawpointstrategy.cpp"                       
 extern char lbl_80594424[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."      .data 0x80594424 */
 extern char lbl_80594458[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..." .data 0x80594458 */
 extern char lbl_80594494[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."     .data 0x80594494 */
-extern char lbl_80594778[]; /* the DrawSmoothStripeStrategy table                       .data 0x80594778 */
-extern f32 lbl_80791350;    /* 42.5f - the point-size clamp                            .sdata  0x80791350 */
-extern f32 lbl_807961B8;    /* 6.0f  - the point-size scale                           .sdata2 0x807961B8 */
-extern f32 lbl_807961BC;    /* 0.0f  - the point texcoord                             .sdata2 0x807961BC */
+/* The largest point the size clamp allows (`.sdata`). */
+static f32 ef_point_max_size = 42.5f;
 
 /* --------------------------------------------------------------------------------------------------
  * The out-of-line GX FIFO writers, in address order.
@@ -123,21 +120,21 @@ void fn_800BFCCC(Vec* pos, u32 flag) {
     GXBegin(0xB8, 0, 1);
     fn_800BFD60(pos);
     if (fn_800BFD4C(flag)) {
-        fn_800BFD3C(lbl_807961BC, lbl_807961BC);
+        fn_800BFD3C(0.0f, 0.0f);
     }
     fn_800BFD38();
 }
 
 /* Sets the point GX state (texcoord offsets, vertex format, current matrix). */
-void fn_800BFD84(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
+void fn_800BFD84(nw4r::ef::DrawPointStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* args) {
     if (!IsValidPointer((u32)args)) {
         nw4r::db::Panic(lbl_80594408, 150, lbl_80594424, args);
     }
-    fn_800C6064(self, args, fn_800AB388(args->emitter), em);
+    self->InitGraphics(args, *(EfEmitterDrawSetting*)ef_resource_draw_setting(args->resource), *info);
     GXEnableTexOffsets(0, 1, 1);
     GXClearVtxDesc();
     GXSetVtxDesc(9, 1);
-    if (self->flag_0xD0 != 0) {
+    if (self->mNumTexmap != 0) {
         GXSetVtxDesc(0xD, 1);
     }
     GXSetVtxAttrFmt(0, 9, 1, 4, 0);
@@ -145,94 +142,83 @@ void fn_800BFD84(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
     GXSetCurrentMtx(0);
 }
 
-/* --------------------------------------------------------------------------------------------------
- * DrawPointStrategy::Draw - the point particle walker.
- * -------------------------------------------------------------------------------------------------- */
+#ifdef __cplusplus
+}
+#endif
 
-void fn_800BF818(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
-    EfEmitterShape* shape;
+namespace nw4r {
+namespace ef {
+
+/* 0x800BF818 (0x4B4): draws each live particle of the manager as a GX point, resizing the point only when the size
+ * changes. */
+void DrawPointStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
+    EfEmitterDrawSetting* ed;
     u32 flag;
-    EfPointWalkerFn first_fn;
-    EfPointWalkerFn next_fn;
+    GetFirstDrawParticleFunc first_fn;
+    GetNextDrawParticleFunc next_fn;
     u32 last_size;
-    u32 first;
-    EfParticleRecord* particle;
+    bool first;
+    EfDrawParticle* particle;
     Mtx34 mtx_view;
     Mtx34 mtx_result;
     f32 progress;
     f32 scale;
     u32 size;
 
-    if (!IsValidPointer((u32)args)) {
-        nw4r::db::Panic(lbl_80594408, 92, lbl_80594424, args);
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(lbl_80594408, 92, lbl_80594424, pm);
     }
-    fn_800BFD84(self, em, args);
-    if (!IsValidPointer((u32)args->emitter)) {
-        nw4r::db::Panic(lbl_80594408, 96, lbl_80594458, args->emitter);
+    fn_800BFD84(this, &info, pm);
+    if (!IsValidPointer((u32)pm->resource)) {
+        nw4r::db::Panic(lbl_80594408, 96, lbl_80594458, pm->resource);
     }
-    shape = fn_800AB388(args->emitter);
-    if (!IsValidPointer((u32)shape)) {
-        nw4r::db::Panic(lbl_80594408, 98, lbl_80594494, shape);
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    if (!IsValidPointer((u32)ed)) {
+        nw4r::db::Panic(lbl_80594408, 98, lbl_80594494, ed);
     }
 
-    flag = (self->flag_0xD0 != 0);
+    flag = (mNumTexmap != 0);
 
     MTX34_ctor(&mtx_view);
-    fn_800AE360(args, &mtx_view);
+    ef_pm_get_mtx(pm, &mtx_view);
     MTX34_ctor(&mtx_result);
-    fn_800B7DB0(em, &mtx_result);
-    fn_800710BC(&mtx_result, &mtx_result, &mtx_view);
-    GXLoadPosMtxImm(fn_80050508(&mtx_result), 0);
+    ef_draw_info_view_mtx(&info, &mtx_result);
+    mtx34_concat(&mtx_result, &mtx_result, &mtx_view);
+    GXLoadPosMtxImm(mtx34_get_ptr(&mtx_result), 0);
 
-    first_fn = self->vtable->get_first(self, shape->flags_0x00 & 0x800);
-    next_fn = self->vtable->get_next(self, shape->flags_0x00 & 0x800);
+    first_fn = GetGetFirstDrawParticleFunc(ed->flags & 0x800);
+    next_fn = GetGetNextDrawParticleFunc(ed->flags & 0x800);
 
     last_size = 0;
-    first = 1;
-    scale = lbl_807961B8;
-    for (particle = (EfParticleRecord*)((void* (*)(void*))first_fn)(args); particle != 0;
-         particle = (EfParticleRecord*)((void* (*)(void*, void*))next_fn)(args, particle)) {
-        progress = fn_800AB3AC(particle);
-        if (progress < fn_800B5A48()) {
+    first = true;
+    scale = 6.0f;
+    for (particle = first_fn(pm); particle != 0; particle = next_fn(pm, particle)) {
+        progress = ef_particle_get_scale(particle);
+        if (progress < ef_float_epsilon()) {
             continue;
         }
-        size = (u32)(s32)(scale * *fn_800BF5B0(&lbl_80791350, &progress));
+        size = (u32)(s32)(scale * *ef_min_float(&ef_point_max_size, &progress));
         if ((u8)size != 0) {
             if ((u8)last_size != (u8)size) {
                 last_size = size;
                 GXSetPointSize((u8)size, 5);
-                fn_800C68E8(self, particle, shape, em, first, 1);
+                SetupGP(particle, *ed, info, first, true);
             } else {
-                fn_800C68E8(self, particle, shape, em, first, 0);
+                SetupGP(particle, *ed, info, first, false);
             }
-            first = 0;
+            first = false;
             fn_800BFCCC(&particle->world_pos, flag);
         }
     }
 }
 
-/* --------------------------------------------------------------------------------------------------
- * The deleting destructor and the constructor.
- * -------------------------------------------------------------------------------------------------- */
+/* 0x800BFF98 (0x3C): the DrawSmoothStripeStrategy constructor (the next unit's class; see the unit header). */
+DrawSmoothStripeStrategy::DrawSmoothStripeStrategy() {}
 
-/* A deleting destructor: tears down the base and, when the flag is positive, frees the storage. */
-void* fn_800BFF3C(void* self, s16 flag) {
-    if (self != 0) {
-        fn_800B4B04(self, 0);
-        if ((s16)flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
+}  // namespace ef
+}  // namespace nw4r
 
-/* Constructs the DrawSmoothStripeStrategy: runs the base constructor and installs lbl_80594778. */
-void** fn_800BFF98(void** self) {
-    fn_800C5F74(self);
-    self[0] = (void*)lbl_80594778;
-    return self;
-}
-
-#ifdef __cplusplus
-}
-#endif
+/* The destructors are the classes' inline ones, emitted at the end of this TU; retail calls each base destructor
+ * out of line from them (`bl` + `extsh` of the delete flag), which a deferred inline body only gets with inlining
+ * off at its point of emission. */
+#pragma dont_inline on

@@ -1,6 +1,6 @@
-/* ef/ef_drawstrategyimpl.h - the records `ef/ef_drawstrategyimpl.cpp` reads: `EfDrawInfo` (nw4r::ef `DrawInfo`),
- * `EfAheadContext` (`DrawStrategyImpl::AheadContext`) and `EfParticleLayers` (the two bit-packed texture-layer
- * fields).  `ef/ef_drawsmoothstripestrategy.cpp` carries private copies of the first and third. */
+/* ef/ef_drawstrategyimpl.h - nw4r::ef `DrawStrategyImpl`, the GX setup every concrete draw strategy derives from, its
+ * per-draw `AheadContext`, and the `DrawStrategyBuilder` that hands out the seven strategy singletons; all of them are
+ * `ef/ef_drawstrategyimpl.cpp`'s.  The records they read are `ef/ef_drawstrategy.h`'s. */
 #ifndef MHTRI_EF_EF_DRAWSTRATEGYIMPL_H
 #define MHTRI_EF_EF_DRAWSTRATEGYIMPL_H
 
@@ -8,93 +8,127 @@
 #include "ef.h"
 #include "gx.h"
 #include "nw4r/math.h"
+#include "ef/ef_drawstrategy.h"
+
+#ifdef __cplusplus
+namespace nw4r {
+namespace ef {
+
+/* The common part of the concrete draw strategies: the texture, TEV and channel setup of a draw and the per-particle
+ * GP state cache that `SetupGP` compares against before it touches GX. */
+class DrawStrategyImpl : public DrawStrategy {
+public:
+    /* The particle-list walkers the two selectors hand out. */
+    typedef EfDrawParticle* (*GetFirstDrawParticleFunc)(EfDrawParticleManager* pm);
+    typedef EfDrawParticle* (*GetNextDrawParticleFunc)(EfDrawParticleManager* pm, EfDrawParticle* p);
+
+    struct AheadContext;
+    /* The per-particle ahead-vector builder a stripe, billboard or directional strategy hands out. */
+    typedef void (*CalcAheadFunc)(VEC3* out, AheadContext* ctx, EfDrawParticle* p);
+
+    /* The texture state last loaded for one texture layer. */
+    struct PrevTexture {
+        PrevTexture();
+
+        /* +0x00 */ EfTextureData* texture;
+        /* +0x04 */ f32 scale_s;           /* the layer's repeat, negative when reversed */
+        /* +0x08 */ f32 scale_t;
+        /* +0x0C */ f32 offset_s;          /* the matching translation (0, 1 or 2) */
+        /* +0x10 */ f32 offset_t;
+        /* +0x14 */ s32 wrap_s;            /* GXTexWrapMode */
+        /* +0x18 */ s32 wrap_t;
+        /* +0x1C */ EfVec2 scale;          /* the particle's texture scale */
+        /* +0x24 */ f32 rotate;            /* the particle's texture rotation */
+        /* +0x28 */ EfVec2 translate;      /* the particle's texture translation */
+    }; /* size: 0x30 */
+
+    /* The per-draw transform state the stripe and billboard walkers advance along. */
+    struct AheadContext {
+        AheadContext(const MTX34* view_mtx, EfDrawParticleManager* pm);
+
+        /* +0x00 */ EfDrawParticleManager* particle_manager;
+        /* +0x04 */ const MTX34* view_mtx;
+        /* +0x08 */ MTX34 emitter_mtx;
+        /* +0x38 */ MTX34 manager_mtx;
+        /* +0x68 */ MTX34 manager_mtx_inv;
+        /* +0x98 */ VEC3 emitter_axis_y;   /* the emitter's Y axis in manager space, normalised */
+        /* +0xA4 */ VEC3 emitter_center;   /* the emitter's origin in manager space */
+        /* +0xB0 */ VEC3 manager_axis_y;   /* the manager's Y axis (draw types 5 and 7 only) */
+    }; /* size: 0xBC */
+
+    DrawStrategyImpl();
+    virtual ~DrawStrategyImpl() {}
+    virtual GetFirstDrawParticleFunc GetGetFirstDrawParticleFunc(int draw_order);
+    virtual GetNextDrawParticleFunc GetGetNextDrawParticleFunc(int draw_order);
+
+    void InitGraphics(EfDrawParticleManager* pm, const EfEmitterDrawSetting& setting, const EfDrawInfo& info);
+    void InitTexture(const EfEmitterDrawSetting& setting);
+    void InitTev(const EfEmitterDrawSetting& setting, const EfDrawInfo& info);
+    void InitColor(EfDrawParticleManager* pm, const EfEmitterDrawSetting& setting, const EfDrawInfo& info);
+    void SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& setting, const EfDrawInfo& info, bool first,
+                 bool xf_dirty);
+    bool SetupGPAlpha(EfDrawParticle* pp, const EfEmitterDrawSetting& setting, bool force);
+    bool SetupGPColor(EfDrawParticle* pp, const EfEmitterDrawSetting& setting, bool force);
+    bool SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSetting& setting, const EfDrawInfo& info,
+                        bool force);
+
+    /* +0x00    the vtable */
+    /* +0x04 */ PrevTexture mPrevTexture[3];
+    /* +0x94 */ GXColor mPrevTevColor[3];  /* GX_TEVREG0..2 as last loaded */
+    /* +0xA0 */ GXColor mPrevTevKColor[4]; /* GX_KCOLOR0..3 as last loaded */
+    /* +0xB0 */ s32 mPrevAlphaRef0;        /* the alpha-compare references as last loaded, -1 when unknown */
+    /* +0xB4 */ s32 mPrevAlphaRef1;
+    /* +0xB8 */ u8 mUseColor[2][2];        /* the particle colours ([layer][index]) some TEV register reads */
+    /* +0xBC */ u8 mUseAlpha[2][2];        /* the same for the alphas */
+    /* +0xC0 */ GXColor mColor[2][2];      /* the particle colours fetched for this particle */
+    /* +0xD0 */ u8 mNumTexmap;             /* the number of texture coordinate generators */
+    /* +0xD1 */ u8 pad_0xD1[0x03];
+    /* +0xD4 */ s32 mTexmapMap[3];         /* the GX texmap of texture layer 0..2, or -1 */
+}; /* size: 0xE0 */
+
+/* Hands out the draw strategy of a draw type, one lazily built singleton per type. */
+class DrawStrategyBuilder {
+public:
+    virtual DrawStrategy* Create(u32 type);
+}; /* size: 0x04 */
+
+}  // namespace ef
+}  // namespace nw4r
+
+typedef nw4r::ef::DrawStrategyImpl::AheadContext EfAheadContext;
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* The draw-time view state `nw4r::ef::DrawInfo`.  The layout is the retail one: the engine's copy has
- * a second light mask at +0x68 and keeps the material/ambient colours behind pointers at +0x98/+0x9C,
- * which the public nw4r release spells as locals inside `DrawStrategyImpl::InitColor`. */
-typedef struct EfDrawInfo {
-    u8 pad_0x00[0x60]; /* +0x00  the view and projection matrices */
-    u8 light_enable;   /* +0x60  `mLightEnable` */
-    u32 light_mask;    /* +0x64  `mLightMask`, the GX_COLOR0 light bitmask */
-    u32 light_mask1;   /* +0x68  the GX_COLOR1A1 light bitmask */
-    u8 is_spot_light;  /* +0x6C  `mIsSpotLight` */
-    u8 pad_0x6D[0x2B]; /* +0x6D  fog state */
-    GXColor mat_color; /* +0x98  the material colour handed to GXSetChanMatColor */
-    GXColor amb_color; /* +0x9C  the ambient colour handed to GXSetChanAmbColor */
-} EfDrawInfo; /* size: 0xA0 (the record continues past what this unit reads) */
+/* The out-of-line copies of the `EfDrawInfo` accessors and of the particle's texture-layer accessors (`particle.h`),
+ * the four particle-list walkers and the ahead-context member constructor. */
+const GXColor* fn_800C68B8(const EfDrawInfo* self);
+const GXColor* fn_800C68C0(const EfDrawInfo* self);
+u32 fn_800C68C8(const EfDrawInfo* self);
+bool fn_800C68D0(const EfDrawInfo* self);
+u32 fn_800C68D8(const EfDrawInfo* self);
+bool fn_800C68E0(const EfDrawInfo* self);
+void fn_800C8674(u32 dst_coord, u32 func, u32 src_param, u32 mtx);
+s32 ef_particle_tex_offset_t(EfDrawParticle* self, int layer);
+s32 ef_particle_tex_offset_s(EfDrawParticle* self, int layer);
+s32 ef_particle_tex_scale_t(EfDrawParticle* self, int layer);
+s32 ef_particle_tex_scale_s(EfDrawParticle* self, int layer);
+s32 ef_particle_wrap_t(EfDrawParticle* self, int layer);
+s32 ef_particle_wrap_s(EfDrawParticle* self, int layer);
+EfDrawParticle* fn_800C8A80(EfDrawParticleManager* pm);
+EfDrawParticle* fn_800C8B9C(EfDrawParticleManager* pm);
+EfDrawParticle* fn_800C8CB8(EfDrawParticleManager* pm, EfDrawParticle* p);
+EfDrawParticle* fn_800C8DE4(EfDrawParticleManager* pm, EfDrawParticle* p);
 
-/* One entry of the three-layer texture set the constructor builds.  The two 8-byte sub-objects
- * (`field_0x1C`/`field_0x28`) are built by `fn_800834F0` and then overwritten with the scale pair. */
-typedef struct EfTextureLayer {
-    u32 field_0x00; /* +0x00  zeroed by the constructor */
-    f32 field_0x04; /* +0x04  1.0f */
-    f32 field_0x08; /* +0x08  1.0f */
-    f32 field_0x0C; /* +0x0C  1.0f */
-    f32 field_0x10; /* +0x10  1.0f */
-    u32 field_0x14; /* +0x14  zeroed */
-    u32 field_0x18; /* +0x18  zeroed */
-    f32 field_0x1C; /* +0x1C  1.0f */
-    f32 field_0x20; /* +0x20  1.0f */
-    f32 field_0x24; /* +0x24  0.0f */
-    f32 field_0x28; /* +0x28  0.0f */
-    f32 field_0x2C; /* +0x2C  0.0f */
-} EfTextureLayer; /* size: 0x30 */
+/* The unit vectors, the zero vector and the identity matrix the unit's static initializer builds. */
+extern VEC3 ef_unit_x_vec;
+extern VEC3 ef_unit_y_vec;
+extern VEC3 ef_unit_z_vec;
+extern VEC3 ef_zero_vec;
+extern MTX34 ef_identity_mtx;
 
-/* The three-layer texture set the constructor builds (vtable + three 0x30-byte layers + the two
- * bit-packed texture-layer fields the accessors read). */
-typedef struct EfParticleLayers {
-    u32 vtable;               /* +0x00 */
-    EfTextureLayer layers[3]; /* +0x04  stride 0x30, ends at +0x94 */
-    u16 texture_wrap_bits;    /* +0x94  wrap mode per texture layer (bits 0-1, 4-5, 8-9) */
-    u8 texture_flag_bits;     /* +0x96  filter/reverse mode per texture layer (bits 0-1, 2-3, 4-5) */
-    u8 alpha_threshold;       /* +0x97  the particle's alpha-compare reference */
-    u8 alpha_threshold2;      /* +0x98  the particle's second alpha-compare reference */
-} EfParticleLayers; /* size: 0x9C (the record continues past what this unit reads) */
-
-/* The draw-strategy object `nw4r::ef::DrawStrategyImpl`.  Only the fields these functions touch are
- * named; the record is much larger than the 0xE0 reached here.  The fog record at +0x70..+0x84 and
- * the material's alpha/tex-coord state at +0xB0/+0xD0 are read by the per-draw setup. */
-typedef struct EfDrawStrategyImpl {
-    u8 pad_0x00[0x70];   /* +0x00 */
-    u32 fog_color;       /* +0x70  fog colour handed to GXSetFog */
-    f32 fog_near;        /* +0x74 */
-    f32 fog_far;         /* +0x78 */
-    f32 fog_density;     /* +0x7C */
-    f32 fog_scale;       /* +0x80 */
-    u8 pad_0x84[0x2C];   /* +0x84 */
-    u32 alpha_ref;       /* +0xB0  the last alpha-compare reference applied */
-    u32 alpha_ref2;      /* +0xB4 */
-    u8 pad_0xB8[0x18];   /* +0xB8 */
-    u8 tex_coord_count;  /* +0xD0  the number of texture coordinate generators */
-    u8 pad_0xD1[0x03];   /* +0xD1 */
-    s32 tex_coord_0;     /* +0xD4  the GX tex-coord id of layer 0, or -1 */
-    s32 tex_coord_1;     /* +0xD8 */
-    s32 tex_coord_2;     /* +0xDC */
-} EfDrawStrategyImpl; /* size: 0xE0 (lower bound, the record continues past +0xDC) */
-
-/* The per-draw ahead state `nw4r::ef::DrawStrategyImpl::AheadContext`: the emitter and manager
- * transforms plus the two axes the stripe/tube walkers advance along. */
-typedef struct EfAheadContext {
-    void* particle_manager; /* +0x00 */
-    const void* view_mtx;   /* +0x04 */
-    Mtx34 emitter_mtx;      /* +0x08 */
-    Mtx34 manager_mtx;      /* +0x38 */
-    Mtx34 manager_mtx_inv;  /* +0x68 */
-    Vec emitter_axis_y;     /* +0x98 */
-    Vec emitter_center;     /* +0xA4 */
-} EfAheadContext; /* size: 0xB0 (the record continues past what this unit reads) */
-
-
-/* The texture-set constructor and the per-draw setup this unit owns; the callers (`ef/fn_800AEE48.cpp`,
- * `ef/ef_drawfreestrategy.cpp`, `ef/ef_drawlinestrategy.cpp`) cast to these types. */
-EfParticleLayers* fn_800C5F74(EfParticleLayers* self);
-void fn_800C6064(EfDrawStrategyImpl* self, u32 a, u16* params, void* state);
-/* 0x800C68E8 - the per-particle draw helper the free/line/point/smooth strategies call. */
-void fn_800C68E8(void* self, void* particle, void* ed, void* em, u32 first, u32 rebindColor);
 #ifdef __cplusplus
 }
 #endif

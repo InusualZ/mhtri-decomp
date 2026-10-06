@@ -13,6 +13,7 @@
  *   for `fn_800A6134` (it keeps its two `.sdata2` constants in f1/f0 across the stores).
  * NAMES. The map has only `fn_` stems for the range except `RetireEffect`, written as an `nw4r::ef::EffectSystem`
  *   member.
+ *   GUESS (from the body and its callers): `ef_draw_info_projection`.
  * RESIDUALS. 5 partial rows (ours 0xBBC of 0xBA8):
  *  - `fn_800A56B0` (ours 0x24C of 0x250): the two allocation sizes share the `maxGroupID * 0x1C` product, which
  *    MWCC computes once into a callee-saved register where retail has one `mulli` per call;
@@ -144,12 +145,12 @@ typedef struct EfSysVtblObj {
     /* +0x00 */ void* vtable;
 } EfSysVtblObj; /* size: 0x04 */
 
-/* The object fn_800A60B8 / fn_800A60C0 are called with: ef/effect.cpp casts fn_800A60C0's result to a
+/* The object ef_draw_info_projection / fn_800A60C0 are called with: ef/effect.cpp casts fn_800A60C0's result to a
  * MTX34 (the effect's root matrix) and the two returned offsets are the only thing this range
  * establishes, so the +0x30 block is a named byte and the matrix is the mapped one. size: 0x88 */
 typedef struct EfSysAccessObj {
     /* +0x00 */ u8 pad_0x00[0x30];
-    /* +0x30 */ u8 block_0x30; /* the sub-object fn_800A60B8 returns (its type is not this range's) */
+    /* +0x30 */ u8 block_0x30; /* the sub-object ef_draw_info_projection returns (its type is not this range's) */
     /* +0x31 */ u8 pad_0x31[0x27];
     /* +0x58 */ nw4r::math::MTX34 mtx_0x58; /* the matrix fn_800A60C0 returns */
 } EfSysAccessObj; /* size: 0x88 (lower bound: +0x58 is the highest field returned) */
@@ -225,7 +226,7 @@ u32 fn_800A5D8C(EfSys* self, u32 groupID);
 u32 fn_800A5E6C(EfSys* self, u32 groupID);
 u32 fn_800A5F4C(EfSys* self, u32 groupID);
 void fn_800A602C(EfSys* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* src, f32 a, f32 b);
-void* fn_800A60B8(EfSysAccessObj* self);
+void* ef_draw_info_projection(EfSysAccessObj* self);
 nw4r::math::MTX34* fn_800A60C0(EfSysAccessObj* self);
 void fn_800A60C8(void);
 void* fn_800A6134(EfSysDefaultRecord* self);
@@ -248,8 +249,8 @@ const char* fn_800A485C(void* p);
 void* fn_800A4864(void* p);
 u16 fn_8009B374(void* list, void** buf, u16 size);
 void* mtx34_identity(void* mtx);
-void* fn_80050508(void* mtx);
-void* fn_80051570(const void* src);
+void* mtx34_get_ptr(void* mtx);
+void* mtx34_const_ptr(const void* src);
 void fn_800A559C(EfSys* self); /* the system's constructor lives in ef/ef_effect.cpp */
 void fn_800A5618(EfSys* self, s16 flag); /* ... and so does its destructor */
 void* __construct_new_array(void* block, void* (*ctor)(void*), void (*dtor)(void*), u32 size,
@@ -478,14 +479,14 @@ extern "C" u32 fn_800A5F4C(EfSys* self, u32 groupID) {
 extern "C" void fn_800A602C(EfSys* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* src,
                             f32 a, f32 b) {
     copyVec3(&self->mRefPos, pos);
-    nw4r::math::MTX34* dst = (nw4r::math::MTX34*)fn_80050508(&self->mRefMtx);
-    PSMTXCopy(fn_80051570(src), dst);
+    nw4r::math::MTX34* dst = (nw4r::math::MTX34*)mtx34_get_ptr(&self->mRefMtx);
+    PSMTXCopy(mtx34_const_ptr(src), dst);
     self->mRangeA = a;
     self->mRangeB = b;
 }
 
 /* 0x800A60B8 - the +0x30 block accessor (ef_drawstrategyimpl.cpp's fn_800C7CE0 calls it). */
-extern "C" void* fn_800A60B8(EfSysAccessObj* self) {
+extern "C" void* ef_draw_info_projection(EfSysAccessObj* self) {
     return &self->block_0x30;
 }
 

@@ -19,7 +19,7 @@ u32 fn_8006FFC8(void* pSelf);       /* 0x8006FFC8 - the `ResMdl` handle validity
 u32 fn_800700C0(void* p); /* 0x800700C0 - the checked resource resolver */
 
 /* 0x800710BC - `out = a * b` for two 3x4 matrices. */
-void fn_800710BC(Mtx34* out, const Mtx34* a, const Mtx34* b);
+void mtx34_concat(Mtx34* out, const Mtx34* a, const Mtx34* b);
 
 /* 0x8006FDCC..0x8007100C - the `g3d_calcworld` node/resource helpers (callers: g3d_calcworld.cpp and the
  * matrix users).  `fn_8006FDCC`'s callers use the word as a matrix id or an array index. */

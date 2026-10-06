@@ -8,6 +8,10 @@
  *   `tmpVec` scoped into their branches; the `handleArg` -> `handle` alias is kept).
  *   flipcheck: the `.text` layout is a permutation of retail's - every function keeps its size but sits at another
  *   address, so the definitions are not in address order; `.data` and `.sdata2` are claimed and not emitted.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_8050133C`,
+ *     `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`, `fn_80501390`,
+ *     `MTX34Trans__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050133C`, `fn_80501390`.
  * SHAPES. File-scope `#pragma peephole off`: fn_800D7F40 keeps the unfolded `(x & 0x40000000) != 0`, and
  *   fn_800D7D24 and fn_800D79B4 lose rows without it.
  */
@@ -33,8 +37,8 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 extern "C" {
 /* The `g3d` node/resource helpers this unit calls (plain map stems). */
-void* fn_80050508(void* pMtx);
-void* fn_80051570(void* pMtx);
+void* mtx34_get_ptr(void* pMtx);
+void* mtx34_const_ptr(void* pMtx);
 u32 fn_800737AC(u32 handle);
 u32 fn_800737B4(u32 handle);
 u32 fn_800737BC(u32 handle);
@@ -107,8 +111,8 @@ u32 fn_800D7F40(u32 handle) {
 
 /* Scale `pSrc` by the VEC3 `pScale` into the resource node's matrix and return `pSrc`. */
 Mtx34* fn_800D7ED0(Mtx34* pSrc, const Vec3* pScale, void* pNodeMtx) {
-    const Mtx34* src = (const Mtx34*)fn_80050508(pSrc);
-    Mtx34* dst = (Mtx34*)fn_80051570(pNodeMtx);
+    const Mtx34* src = (const Mtx34*)mtx34_get_ptr(pSrc);
+    Mtx34* dst = (Mtx34*)mtx34_const_ptr(pNodeMtx);
     PSMTXScaleApply(dst, src, pScale->x, pScale->y, pScale->z);
     return pSrc;
 }
@@ -136,14 +140,14 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
         } else {
             MTX34_ctor(&tmpMtx);
             fn_800D7ED0(&tmpMtx, pScale, &pNode->mtx);
-            fn_800710BC(pMtx, pSrcMtx, &tmpMtx);
+            mtx34_concat(pMtx, pSrcMtx, &tmpMtx);
         }
     } else {
         if (fn_800D7F40(handle)) {
-            fn_800710BC(pMtx, pSrcMtx, &pNode->mtx);
+            mtx34_concat(pMtx, pSrcMtx, &pNode->mtx);
         } else {
             fn_8050133C(pMtx, pSrcMtx, pScale);
-            fn_800710BC(pMtx, pMtx, &pNode->mtx);
+            mtx34_concat(pMtx, pMtx, &pNode->mtx);
         }
     }
 
@@ -180,7 +184,7 @@ int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag) {
         return 0;
     }
 
-    fn_80075DCC(&sin_, &cos_, pSrt->rotate);
+    sin_cos_deg(&sin_, &cos_, pSrt->rotate);
 
     if (direct != 0) {
         pMtx->m[0][0] = pSrt->scaleX * cos_;
@@ -209,7 +213,7 @@ int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag) {
         mtx.m[2][1] = lbl_807963D0;
         mtx.m[2][2] = lbl_807963D4;
         mtx.m[2][3] = lbl_807963D0;
-        fn_800710BC(pMtx, &mtx, pMtx);
+        mtx34_concat(pMtx, &mtx, pMtx);
     }
 
     return 1;

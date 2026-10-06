@@ -49,7 +49,7 @@ typedef struct EfParticle EfParticle;
  * the four floats are the scale factors their product reads; `manager` is the record's owner. */
 typedef struct EfParticleParams EfParticleParams;
 
-/* One 8-byte sub-object the constructor builds with fn_800834F0; three of them form each array. */
+/* One 8-byte sub-object the constructor builds with VEC2_ctor; three of them form each array. */
 typedef struct EfParticleNode {
     /* +0x00 */ u8 data[8];
 } EfParticleNode; /* size: 0x08 */
@@ -69,7 +69,7 @@ struct EfParticleParams {
     /* +0x44 */ u8 pad_0x44[0x0C];
     /* +0x50 */ EfParticleNode field_0x50[3];
     /* +0x68 */ u8 field_0x68[0x11]; /* fn_800AB3D0 returns this address */
-    /* +0x79 */ s8 field_0x79;      /* read as a signed flag by fn_800AB3FC */
+    /* +0x79 */ s8 field_0x79;      /* read as a signed flag by ef_particle_flick_alpha */
     /* +0x7A */ u8 pad_0x7A[0x06];
     /* +0x80 */ VEC3 field_0x80;
     /* +0x8C */ VEC3 field_0x8C;
@@ -94,13 +94,13 @@ struct EfParticleChain {
 typedef struct EfParticleMgr EfParticleMgr;
 struct EfParticleMgr {
     /* +0x00 */ u8 pad_0x00[0x24];
-    /* +0x24 */ void* context;   /* the object fn_800AB388 walks into */
+    /* +0x24 */ void* context;   /* the object ef_resource_draw_setting walks into */
     /* +0x28 */ u8 pad_0x28[0x30];
-    /* +0x58 */ f32 scale_a;     /* read by fn_800AB3AC (inlined) */
+    /* +0x58 */ f32 scale_a;     /* read by ef_particle_get_scale (inlined) */
     /* +0x5C */ f32 scale_b;     /* read by fn_800AB37C */
 
 #ifdef __cplusplus
-    /* The factor fn_800AB3AC multiplies its scale product by.  It is an inline member in the original:
+    /* The factor ef_particle_get_scale multiplies its scale product by.  It is an inline member in the original:
      * retail keeps the argument setup (`mr r4,r3`) and the call's branch (`b +4`) with the body inlined
      * right after it - so it stays a MEMBER and cannot move out of the struct.  Guarded because this
      * header is included by C units (ef/fn_8011722C.c), which must see the data fields only; a member
@@ -249,7 +249,7 @@ extern void VEC3_ctor(VEC3* out);                                   /* 0x80043EA
 extern VEC3* setVec3(VEC3* out, f32 x, f32 y, f32 z);               /* 0x80041E8C - owner mh3_pad.cpp */
 extern void assignVec3(Vec* out, Vec* in);                         /* out = in */
 extern void fn_8009C6F0(Vec* out, f32 angle);                       /* sin/cos of angle */
-extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);         /* sin/cos of angle */
+extern void ef_sin_cos(f32* out_a, f32* out_b, f32 angle);         /* sin/cos of angle */
 extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
 extern u16 fn_800A9FB0(s32 ctx, u16 id, f32 scale, EfWork* em);
 extern f32 ef_random_float(u32* progress);                              /* pseudo-random 0..1 */

@@ -1,548 +1,1652 @@
 /*
- * ef/ef_drawsmoothstripestrategy.cpp - nw4r::ef DrawSmoothStripeStrategy: `Draw`, the walker selectors
- *   (`GetGetFirstDrawParticleFunc`/`Next`/`CalcAhead`), the stripe and tube builders, and the out-of-line copies of
- *   the `Particle`/`ParticleManager` inline helpers and of the small vector records' builders and copies.
+ * ef/ef_drawsmoothstripestrategy.cpp - nw4r::ef DrawSmoothStripeStrategy: `Draw`, `GetCalcAheadFunc`, its ahead
+ *   context, and the TU's own copies of the stripe helpers: the quadratic B-spline ribbon and tube builders (each
+ *   particle samples a ribbon edge pair or a tube ring, and every three neighbouring samples are blended into
+ *   `curve steps` sub-segments), the GX writers and setup, the first-ahead and ahead-vector builders.
  * RANGE. .text 0x800BFFD4-0x800C5DB8 (49 functions); extab 0x8000A394-0x8000A49C, extabindex 0x80023904-0x80023A90,
  *   .data 0x805944E0-0x80594840 (the `__FILE__` string "ef_drawsmoothstripestrategy.cpp" first), .bss
  *   0x806945B8-0x806945E8, .sbss 0x80794928-0x80794930, .sdata2 0x807961C0-0x807961E0.
- *   Unproven seam (playbook 80: a TU's tables sit late in its `.data`): this unit's table `lbl_80594778` is installed
- *   by `fn_800BFF98` at the tail of `ef/ef_drawpointstrategy.cpp`'s range, so the left `.text` seam may be off by
- *   that constructor.
- * FLAGS. `cflags_main`; `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of every
- *   narrowing FIFO store, playbook 39).
- * NAMES. The map has only `fn_` stems for the range; every definition is `extern "C"` to keep them (playbook 42).
- * RESIDUALS. 36 rows unwritten (declared, never defined): 0x800BFFD4-0x800C0770, 0x800C0784-0x800C0E14,
- *   0x800C0E5C-0x800C14F0, 0x800C155C-0x800C16F8, 0x800C1738-0x800C1B7C, 0x800C1BB4-0x800C26A4,
- *   0x800C2738-0x800C3834, 0x800C38A4-0x800C5DB8.
- *   2 rows written and at 0: `fn_800C1508`, `fn_800C26FC` (the three- and two-vector record copies move floats,
- *   `lfs`/`stfs`, where retail copies words, `lwz`/`stw`, then the scalar).
- *   This file also defines 46 functions of `ef/ef_drawstrategyimpl.cpp`'s range (the GX FIFO writers, the
- *   `EfDrawInfo` accessors, the texture-layer accessors, the ahead-context initialiser and walker selectors), which
- *   that unit defines too; with them our `.text` runs in a different order from retail's.
- *   flipcheck: `.bss`, `.data`, `.sbss` and `.sdata2` claimed, not emitted; `.text` 0x6C0 of 0x5DE4; extab 0x38 of
- *   0x108; extabindex 0x54 of 0x18C.
+ *   Seam (playbook 80, measured): every strategy TU runs [constructor, ..., inline destructor]; this class's
+ *   constructor (0x800BFF98) is the tail of `ef/ef_drawpointstrategy.cpp`'s range and is defined there.
+ * FLAGS. `cflags_main`; `#pragma peephole off`, `#pragma fp_contract off` and `#pragma pool_data off` before the
+ *   includes (retail keeps the unfused `fmuls`/`fsubs`, and reaches each `.bss` static by its own `lis`/`addi`
+ *   where the pooled form hoists one base: `Draw` 95.09 -> 97.78), `#pragma dont_inline on` at the end (the inline
+ *   destructor calls its base out of line).
+ * NAMES. GUESS: every `ef_smooth_*` helper, from its body and its callers, in the scheme of the stripe unit's
+ *   `ef_stripe_*` copies; the `.bss` statics `ef_smooth_axis_*` by their values.
+ *   GUESS (from the body and its callers): `ef_smooth_ribbon_sample`, `ef_smooth_scale_mtx`,
+ *   GUESS: `ef_smooth_draw_segment`, `ef_smooth_flag_facing`, `ef_smooth_tube_ring`, `ef_smooth_spline_weight`,
+ *   GUESS: `ef_smooth_ribbon_curve`, `ef_smooth_ribbon_pair`, `ef_smooth_gx_texcoord`, `ef_smooth_flag_tex`,
+ *   GUESS: `ef_smooth_gx_position`, `ef_smooth_gx_position3`, `ef_smooth_ribbon_blend`, `ef_smooth_ribbon_end`,
+ *   GUESS: `ef_smooth_tube_curve`, `ef_smooth_gx_end`, `ef_smooth_flag_reverse`, `ef_smooth_tube_param_copy`,
+ *   GUESS: `ef_smooth_tube_blend`, `ef_smooth_tube_param_ctor`, `ef_smooth_ribbon_open`,
+ *   GUESS: `ef_smooth_ribbon_param_ctor`, `ef_smooth_tex_mode`, `ef_smooth_draw_order`, `ef_smooth_ribbon_loop`,
+ *   GUESS: `ef_smooth_ribbon_to_emitter`, `ef_smooth_ribbon_param_set`, `ef_smooth_ribbon_param_copy`,
+ *   GUESS: `ef_smooth_draw_ribbon`, `ef_smooth_connect_type`, `ef_smooth_tube_open`, `ef_smooth_tube_divide`,
+ *   GUESS: `ef_smooth_tube_loop`, `ef_smooth_tube_to_emitter`, `ef_smooth_tube_param_set`, `ef_smooth_draw_tube`,
+ *   GUESS: `ef_smooth_begin_side`, `ef_smooth_curve_steps`, `ef_smooth_setup_gx`, `ef_smooth_first_ahead`,
+ *   GUESS: `ef_smooth_axis_mode`, `ef_smooth_ahead_type3`, `ef_smooth_ahead_type6`, `ef_smooth_ahead_type6_link1`,
+ *   GUESS: `ef_smooth_ahead_type6_link2`.
+ * SHAPES. The `.bss` edge offsets are function-local statics constructed through `setVec3` behind `.sbss` guards;
+ *   the ribbon pair writer takes the scale before the flags (the caller loads f1 before r5); a spline weight's `t`
+ *   is computed into a local before the call; the connection dispatches list `default` first.
+ * RESIDUALS. Every row is written.  9 partial rows:
+ *  - `Draw` (0x800C3D88): retail's `copyVec3(.., setVec3(&tmp, ..))` temporaries sit below the loop locals (the
+ *    out-of-line VEC3 constructor's temporaries), ours above, and `ed`/`count` take r31/r29 where ours has r30/r31;
+ *    the asserted resource's `lwz r6, 0x24(pm)` is scheduled before the assert's `li` flags;
+ *  - `GetCalcAheadFunc` (0x800C4930): the same asserted-resource load placement;
+ *  - `ef_smooth_ribbon_open`/`_loop`/`_to_emitter`, `ef_smooth_tube_open`/`_loop`/`_to_emitter`: the register
+ *    allocator gives the parameters r20-r25 and the loop state the high registers in retail, the reverse in ours;
+ *  - `ef_smooth_tube_curve`: the second side loop's counter and table pointer swap r20/r21.
+ *   Data: `.bss` (the four statics) is emitted and matches; `.sbss` emits the four guards (0x4 of the claimed
+ *   0x8); `.data` holds only our vtable - the strings stay `extern` because the range is two TUs by its
+ *   emission order (`datagap.py`); the weak `DrawStrategyImpl`/`DrawStrategy` destructors add 0xA0 of `.text`.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `ef_smooth_zero`,
+ *     `ef_smooth_one`, `ef_smooth_half`, `ef_smooth_minus_one`, `ef_smooth_hundredth`, `ef_smooth_full_circle`,
+ *     `ef_smooth_axis_x`, `ef_smooth_axis_neg_x`, `ef_smooth_axis_z`, `ef_smooth_axis_neg_z`.
  */
 
-#include "ef.h"
+#pragma peephole off
+#pragma fp_contract off
+#pragma pool_data off
+
+#include "types.h"
 #include "gx.h"
-#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
+#include "ef.h"
+#include "ef/ef_drawstrategyimpl.h"
+#include "ef/fn_800AEE48.h"            /* ef_vec3_normalize / ef_pm_*_alive (rule 2) */
+#include "ef/ef_drawstripestrategy.h"  /* EfStripeParam, ef_stripe_draw_count, the shared ahead builders (rule 2) */
+#include "ef/ef_drawsmoothstripestrategy.h"
+#include "sys_mem.h"
+#include "mh3_pad.h"                   /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "ef/ef_particle.h"            /* ef_particle_get_scale / ef_particle_get_scale_y (rule 2) */
+#include "RVLGX/GXSetTevOrder.h"       /* GXLoadPosMtxImm (rule 2) */
+#include "EXI/GXBegin.h"               /* the GX vertex-format entry points (rule 2) */
+#include "g3d/g3d_calcview.h"          /* mtx34_concat (rule 2) */
+#include "nw4r/fn_805012C4.h"          /* mtx34_rotate_vec3 (rule 2) */
+#include "fn_8004CAD8.h"               /* MTX34_ctor, vec3_cross, addVec3, subVec3 (rule 2) */
+#include "g3d/fn_80075DCC.h"           /* mtx34_set, sin_cos_deg (rule 2) */
+#include "g3d/g3d_anmchr.h"            /* math_reciprocal (rule 2) */
+#include "nw4r/mtx34_mult_vec3.h"      /* mtx34_mult_vec3 (rule 2) */
+#include "g3d/g3d_calcworld.h"         /* addVec3To (rule 2) */
+#include "g3d/mtx34_inverse.h"         /* mtx34_inverse (rule 2) */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`). */
-#ifdef __cplusplus
 namespace nw4r {
 namespace db {
 void Panic(const char* file, int line, const char* fmt, ...);
 }  // namespace db
 }  // namespace nw4r
-#endif
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
-#pragma peephole off
+/* The `__FILE__`/assert strings of this unit's `.data`, declared, never defined. */
+extern char ef_smooth_file_str[];            /* "ef_drawsmoothstripestrategy.cpp"                 .data 0x805944E0 */
+extern char ef_smooth_dst_assert_str[];      /* "NW4R:Pointer Error\ndst(=%p) ..."                 .data 0x80594500 */
+extern char ef_smooth_context_assert_str[];  /* "NW4R:Pointer Error\ncontext(=%p) ..."             .data 0x80594534 */
+extern char ef_smooth_pp_assert_str[];       /* "NW4R:Pointer Error\npp(=%p) ..."                  .data 0x8059456C */
+extern char ef_smooth_trig_assert_str[];     /* "NW4R:Pointer Error\ntrigonometric(=%p) ..."       .data 0x805945A0 */
+extern char ef_smooth_ahead_assert_str[];    /* "NW4R:Pointer Error\naheadContext(=%p) ..."        .data 0x805945DC */
+extern char ef_smooth_youngest_assert_str[]; /* "NW4R:Failed assertion youngest"                   .data 0x80594618 */
+extern char ef_smooth_tube_divide_assert_str[]; /* "NW4R:Failed assertion 3 <= GetTubeDivide(ed)"  .data 0x80594638 */
+extern char ef_smooth_pm_assert_str[];       /* "NW4R:Pointer Error\npm(=%p) ..."                  .data 0x80594668 */
+extern char ef_smooth_resource_assert_str[]; /* "NW4R:Pointer Error\npm->mResource(=%p) ..."       .data 0x8059469C */
+extern char ef_smooth_ed_assert_str[];       /* "NW4R:Pointer Error\n&ed(=%p) ..."                 .data 0x805946D8 */
+extern char ef_smooth_yaxis_assert_str[];    /* "NW4R:Pointer Error\nyAxis(=%p) ..."               .data 0x8059470C */
+extern char ef_smooth_particle_assert_str[]; /* "NW4R:Pointer Error\nparticle(=%p) ..."            .data 0x80594740 */
+extern char ef_smooth_scale_pp_str[];        /* "NW4R:Pointer Error\npp(=%p) ...", an inline copy  .data 0x80594794 */
+extern char ef_smooth_scale_file_str[];      /* "ef_drawsmoothstripestrategy.cpp", an inline copy .data 0x805947C8 */
+extern char ef_smooth_inline_pp_str[];       /* "NW4R:Pointer Error\npp(=%p) ...", an inline copy  .data 0x805947E8 */
+extern char ef_smooth_inline_file_str[];     /* "ef_drawsmoothstripestrategy.cpp", an inline copy .data 0x80594820 */
 
-/* The `__FILE__`/assert strings and constants of this unit's `.data` (0x805944E0-0x80594840) and of
- * `ef/ef_drawstrategyimpl.cpp`'s (0x80594850-0x80594BA7; no `.data` range covers the gap, `lbl_80594840`) and
- * of both `.sdata2` runs (0x807961C0-0x80796208), declared, never defined. */
-extern char lbl_805944E0[]; /* "ef_drawsmoothstripestrategy.cpp"                          .data 0x805944E0 */
-extern char lbl_80594500[]; /* "NW4R:Pointer Error\ndst(=%p) is not valid pointer."        .data 0x80594500 */
-extern char lbl_80594534[]; /* "NW4R:Pointer Error\ncontext(=%p) is not valid pointer."    .data 0x80594534 */
-extern char lbl_8059456C[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."         .data 0x8059456C */
-extern char lbl_805945A0[]; /* "NW4R:Pointer Error\ntrigonometric(=%p) is not valid..."    .data 0x805945A0 */
-extern char lbl_805945DC[]; /* "NW4R:Pointer Error\naheadContext(=%p) is not valid..."    .data 0x805945DC */
-extern char lbl_80594618[]; /* "NW4R:Failed assertion youngest"                            .data 0x80594618 */
-extern char lbl_80594638[]; /* "NW4R:Failed assertion 3 <= GetTubeDivide(ed)"              .data 0x80594638 */
-extern char lbl_80594668[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."           .data 0x80594668 */
-extern char lbl_8059469C[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."    .data 0x8059469C */
-extern char lbl_805946D8[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."        .data 0x805946D8 */
-extern char lbl_8059470C[]; /* "NW4R:Pointer Error\nyAxis(=%p) is not valid pointer."      .data 0x8059470C */
-extern char lbl_80594740[]; /* "NW4R:Pointer Error\nparticle(=%p) is not valid pointer."   .data 0x80594740 */
-extern char lbl_80594794[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."         .data 0x80594794 */
-extern char lbl_805947C8[]; /* "ef_drawsmoothstripestrategy.cpp"                          .data 0x805947C8 */
-extern char lbl_805947E8[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."         .data 0x805947E8 */
-extern char lbl_80594820[]; /* "ef_drawsmoothstripestrategy.cpp"                          .data 0x80594820 */
-extern char lbl_80594850[]; /* "ef_drawstrategyimpl.cpp"                                  .data 0x80594850 */
-extern char lbl_80594868[]; /* "NW4R:Failed assertion mTexmapMap[0] == 0"                 .data 0x80594868 */
-extern char lbl_80594894[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."         .data 0x80594894 */
-extern char lbl_805948C8[]; /* "...pp->mParameter.mTexture[texIndex](=%p) is not valid..." .data 0x805948C8 */
-extern char lbl_80594918[]; /* "NW4R:Failed assertion false"                              .data 0x80594918 */
-extern char lbl_80594934[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."         .data 0x80594934 */
-extern char lbl_80594968[]; /* "NW4R:Pointer Error\npm->mManagerEM(=%p) is not valid..."  .data 0x80594968 */
-extern char lbl_805949A8[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."    .data 0x805949A8 */
-extern char lbl_805949E4[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."        .data 0x805949E4 */
-extern char lbl_80594A18[]; /* the DrawSmoothStripeStrategy vtable                        .data 0x80594A18 */
-extern char lbl_80594A30[]; /* the base DrawStrategy vtable                               .data 0x80594A30 */
-extern char lbl_80594A40[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594A40 */
-extern char lbl_80594A70[]; /* "particle.h"                                               .data 0x80594A70 */
-extern char lbl_80594A7C[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594A7C */
-extern char lbl_80594AAC[]; /* "particle.h"                                               .data 0x80594AAC */
-extern char lbl_80594AB8[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594AB8 */
-extern char lbl_80594AE8[]; /* "particle.h"                                               .data 0x80594AE8 */
-extern char lbl_80594AF4[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594AF4 */
-extern char lbl_80594B24[]; /* "particle.h"                                               .data 0x80594B24 */
-extern char lbl_80594B30[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594B30 */
-extern char lbl_80594B60[]; /* "particle.h"                                               .data 0x80594B60 */
-extern char lbl_80594B6C[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594B6C */
-extern char lbl_80594B9C[]; /* "particle.h"                                               .data 0x80594B9C */
+/* A ribbon sample: the two edge points and the texture coordinate along the stripe. */
+typedef struct EfRibbonParam {
+    /* +0x00 */ VEC3 a;
+    /* +0x0C */ VEC3 b;
+    /* +0x18 */ f32 tex_t;
+} EfRibbonParam; /* size: 0x1C */
 
-/* The pool constants this unit's code loads (values from the binary dossier). */
-extern f32 lbl_807961C0; /* 0.0f                                                             .sdata2 0x807961C0 */
-extern f32 lbl_807961C4; /* 1.0f                                                             .sdata2 0x807961C4 */
-extern f32 lbl_807961C8; /* 0.5f                                                             .sdata2 0x807961C8 */
-extern f32 lbl_807961CC; /* -1.0f                                                            .sdata2 0x807961CC */
-extern f32 lbl_807961D8; /* 0.01f                                                            .sdata2 0x807961D8 */
-extern f32 lbl_807961DC; /* 360.0f                                                           .sdata2 0x807961DC */
-extern f32 lbl_807961E0; /* 1.0f                                                             .sdata2 0x807961E0 */
-extern f32 lbl_807961E4; /* 0.0f                                                             .sdata2 0x807961E4 */
-extern f32 lbl_807961E8; /* 100.0f                                                           .sdata2 0x807961E8 */
-extern f32 lbl_807961EC; /* -1.0f                                                            .sdata2 0x807961EC */
-extern f32 lbl_807961F0; /* 0.5f                                                             .sdata2 0x807961F0 */
+/* Declarations of this unit's helpers that are used before their definition. */
+void ef_smooth_draw_segment(MTX34* out, nw4r::ef::DrawSmoothStripeStrategy* self,
+                            nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, u32 flags, EfDrawParticle* p,
+                            const VEC3* ahead, const VEC3* pos);
+void ef_smooth_scale_mtx(MTX34* out, nw4r::ef::DrawSmoothStripeStrategy* self, EfDrawParticle* p, f32 width);
+int ef_smooth_flag_facing(u32 value);
+void ef_smooth_ribbon_pair(Vec* a, Vec* b, f32 scale, u32 flags);
+void ef_smooth_gx_texcoord(f32 x, f32 y);
+int ef_smooth_flag_tex(u32 value);
+void ef_smooth_gx_position(Vec* v);
+void ef_smooth_gx_position3(f32 x, f32 y, f32 z);
+EfRibbonParam* ef_smooth_ribbon_blend(EfRibbonParam* out, const EfRibbonParam* a, const EfRibbonParam* b,
+                                      const EfRibbonParam* c, const VEC3* w);
+void ef_smooth_spline_weight(VEC3* out, nw4r::ef::DrawSmoothStripeStrategy* self, f32 t);
+void ef_smooth_gx_end(void);
+int ef_smooth_flag_reverse(u32 value);
+void ef_smooth_tube_param_copy(EfStripeParam* dst, const EfStripeParam* src);
+EfStripeParam* ef_smooth_tube_blend(EfStripeParam* out, const EfStripeParam* a, const EfStripeParam* b,
+                                    const EfStripeParam* c, const VEC3* w);
+EfStripeParam* ef_smooth_tube_param_ctor(EfStripeParam* self);
+EfRibbonParam* ef_smooth_ribbon_param_ctor(EfRibbonParam* self);
+s32 ef_smooth_tex_mode(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed);
+u32 ef_smooth_draw_order(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed);
+EfRibbonParam* ef_smooth_ribbon_param_set(EfRibbonParam* self, const VEC3* a, const VEC3* b, f32 t);
+void ef_smooth_ribbon_param_copy(EfRibbonParam* dst, const EfRibbonParam* src);
+s32 ef_smooth_connect_type(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed);
+s32 ef_smooth_tube_divide(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed);
+EfStripeParam* ef_smooth_tube_param_set(EfStripeParam* self, const VEC3* center, const VEC3* side, const VEC3* up,
+                                        f32 t);
+void ef_smooth_begin_side(u32 cull_mode, u32 enabled, u32 flags);
+s32 ef_smooth_curve_steps(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed);
+void ef_smooth_setup_gx(nw4r::ef::DrawSmoothStripeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm);
+void ef_smooth_first_ahead(VEC3* out, nw4r::ef::DrawSmoothStripeStrategy* self, EfEmitterDrawSetting* ed,
+                           nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx);
+s32 ef_smooth_axis_mode(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed);
+void ef_smooth_ahead_type3(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p);
+void ef_smooth_ahead_type6(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p);
+void ef_smooth_ahead_type6_link1(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p);
+void ef_smooth_ahead_type6_link2(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p);
 
-/* --------------------------------------------------------------------------------------------- *
- * Small predicates and accessors, in address order.
- * --------------------------------------------------------------------------------------------- */
+/* 0x800BFFD4 (0x3BC): one ribbon sample: the particle's frame times its rotation-and-scale matrix applied to the edge
+ * offsets `a`/`b`, with texture coordinate `t`. */
+void ef_smooth_ribbon_sample(nw4r::ef::DrawSmoothStripeStrategy* self, EfRibbonParam* out,
+                             nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, u32 flags, EfDrawParticle* p,
+                             nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead, const VEC3* pos, const VEC3* a,
+                             const VEC3* b, f32 width, f32 t) {
+    VEC3 ahead;
+    MTX34 mtx;
+    MTX34 frame;
+    MTX34 scale;
 
-/* Tests one bit of a draw-order/flag word. */
-int fn_800C0770(u32 value) {
+    if (!IsValidPointer((u32)out)) {
+        nw4r::db::Panic(ef_smooth_file_str, 208, ef_smooth_dst_assert_str, out);
+    }
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 209, ef_smooth_context_assert_str, ctx);
+    }
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic(ef_smooth_file_str, 210, ef_smooth_pp_assert_str, p);
+    }
+    VEC3_ctor(&ahead);
+    MTX34_ctor(&mtx);
+    calc_ahead(&ahead, ctx, p);
+    ef_smooth_draw_segment(&frame, self, ctx, flags, p, &ahead, pos);
+    ef_smooth_scale_mtx(&scale, self, p, width);
+    mtx34_concat(&mtx, &frame, &scale);
+    mtx34_mult_vec3(&out->a, &mtx, a);
+    mtx34_mult_vec3(&out->b, &mtx, b);
+    out->tex_t = t;
+}
+
+/* 0x800C0390 (0x1E4): the rotation (about the stripe axis, by the particle's Y rotation) and scale of one ribbon
+ * segment, recentred on the strip width. */
+void ef_smooth_scale_mtx(MTX34* out, nw4r::ef::DrawSmoothStripeStrategy* self, EfDrawParticle* p, f32 width) {
+    VEC3 rotate;
+    f32 c;
+    f32 s;
+    f32 size;
+
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic(ef_smooth_scale_file_str, 177, ef_smooth_scale_pp_str, p);
+    }
+    VEC3_ctor(&rotate);
+    ef_particle_get_rotate(p, &rotate);
+    size = ef_particle_get_scale((EfParticle*)p);
+    ef_sin_cos(&s, &c, rotate.y);
+    c *= size;
+    s *= size;
+    mtx34_set(out, c, 0.0f, -s, width - c * width, 0.0f, 1.0f, 0.0f, 0.0f, s, 0.0f, c, -s * width);
+}
+
+/* 0x800C0574 (0x1FC): the frame of one stripe particle: the side axis is the ahead vector crossed with the previous
+ * particle's (or, in view-facing mode, the view's Z axis), the up axis completes the frame and becomes the particle's
+ * new ahead vector, and the position is the translation. */
+void ef_smooth_draw_segment(MTX34* out, nw4r::ef::DrawSmoothStripeStrategy* self,
+                            nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, u32 flags, EfDrawParticle* p,
+                            const VEC3* ahead, const VEC3* pos) {
+    VEC3 side;
+    VEC3 up;
+
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic(ef_smooth_inline_file_str, 140, ef_smooth_inline_pp_str, p);
+    }
+    VEC3_ctor(&side);
+    VEC3_ctor(&up);
+    if (ef_smooth_flag_facing(flags) == 0) {
+        vec3_cross((f32*)&side, (const f32*)ahead, (const f32*)&p->ahead);
+    } else {
+        vec3_cross((f32*)&side, (const f32*)ahead, (const f32*)&ctx->view_axis_z);
+    }
+    if (ef_vec3_normalize(&side) == 0) {
+        copyVec3(&side, &ctx->emitter_axis_x);
+    }
+    vec3_cross((f32*)&up, (const f32*)&side, (const f32*)ahead);
+    ef_vec3_normalize(&up);
+    copyVec3(&p->ahead, &up);
+    mtx34_set(out, side.x, ahead->x, up.x, pos->x, side.y, ahead->y, up.y, pos->y, side.z, ahead->z, up.z, pos->z);
+}
+
+/* Tests the view-facing bit of the draw flags. */
+int ef_smooth_flag_facing(u32 value) {
     return (value & 0x8) != 0;
 }
 
-/* Nothing to do (the original's empty body). */
-void fn_800C14F0(void) {}
+/* 0x800C0784 (0x4DC): one tube ring: the particle's frame times its rotation-and-scale matrix, kept as a centre and
+ * the X/Z axes, with texture coordinate `t`. */
+void ef_smooth_tube_ring(nw4r::ef::DrawSmoothStripeStrategy* self, EfStripeParam* out,
+                         nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, u32 flags, EfDrawParticle* p,
+                         nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead, f32 offset_x, f32 offset_y, f32 t) {
+    MTX34 frame;
+    MTX34 local;
+    MTX34 mtx;
+    VEC3 ahead;
+    VEC3 rotate;
+    VEC3 center;
+    f32 s;
+    f32 c;
+    f32 scale_x;
+    f32 scale_y;
 
-/* Tests one bit of a draw-order/flag word. */
-int fn_800C14F4(u32 value) {
-    return (value & 0x10) != 0;
+    if (!IsValidPointer((u32)out)) {
+        nw4r::db::Panic(ef_smooth_file_str, 246, ef_smooth_dst_assert_str, out);
+    }
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 247, ef_smooth_context_assert_str, ctx);
+    }
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic(ef_smooth_file_str, 248, ef_smooth_pp_assert_str, p);
+    }
+    VEC3_ctor(&ahead);
+    calc_ahead(&ahead, ctx, p);
+    ef_smooth_draw_segment(&frame, self, ctx, flags, p, &ahead, (const VEC3*)&p->world_pos);
+    VEC3_ctor(&rotate);
+    ef_particle_get_rotate(p, &rotate);
+    scale_x = ef_particle_get_scale((EfParticle*)p);
+    scale_y = ef_particle_get_scale_y((EfParticle*)p);
+    ef_sin_cos(&s, &c, rotate.y);
+    mtx34_set(&local, c * scale_x, 0.0f, -s * scale_y,
+              (offset_x - offset_x * (c * scale_x)) + offset_y * (s * scale_y), 0.0f, 1.0f,
+              0.0f, 0.0f, s * scale_x, 0.0f, c * scale_y,
+              (offset_y - offset_x * (s * scale_x)) - offset_y * (c * scale_y));
+    MTX34_ctor(&mtx);
+    mtx34_concat(&mtx, &frame, &local);
+    copyVec3(&out->center, setVec3(&center, mtx.m[0][3], mtx.m[1][3], mtx.m[2][3]));
+    mtx34_rotate_vec3(&out->side, &mtx, ef_get_unit_x_vec());
+    mtx34_rotate_vec3(&out->up, &mtx, ef_get_unit_z_vec());
+    out->tex_t = t;
 }
 
-/* The draw-time view state `nw4r::ef::DrawInfo`.  The layout is the retail one: the engine's copy has
- * a second light mask at +0x68 and keeps the material/ambient colours behind pointers at +0x98/+0x9C,
- * which the public nw4r release spells as locals inside `DrawStrategyImpl::InitColor`. */
-typedef struct EfDrawInfo {
-    u8 pad_0x00[0x60];       /* +0x00  the view and projection matrices */
-    u8 light_enable;         /* +0x60  `mLightEnable` */
-    u32 light_mask;          /* +0x64  `mLightMask`, the GX_COLOR0 light bitmask */
-    u32 light_mask1;         /* +0x68  the GX_COLOR1A1 light bitmask */
-    u8 is_spot_light;        /* +0x6C  `mIsSpotLight` */
-    u8 pad_0x6D[0x2B];       /* +0x6D  fog state */
-    GXColor mat_color;       /* +0x98  the material colour handed to GXSetChanMatColor */
-    GXColor amb_color;       /* +0x9C  the ambient colour handed to GXSetChanAmbColor */
-} EfDrawInfo; /* size: 0xA0 (the record continues past what this unit reads) */
+/* 0x800C0C60 (0x2C): the quadratic B-spline weights of the three neighbouring samples at `t` in [0, 1]. */
+void ef_smooth_spline_weight(VEC3* out, nw4r::ef::DrawSmoothStripeStrategy* self, f32 t) {
+    f32 t2 = t * t;
+    f32 half_t2 = 0.5f * t2;
 
-/* The material colour of the draw-time view state. */
-GXColor* fn_800C68B8(EfDrawInfo* self) {
-    return &self->amb_color;
+    setVec3(out, 0.5f + (half_t2 - t), 0.5f + (-1.0f * t2 + t), half_t2);
 }
 
-/* The ambient colour of the draw-time view state. */
-GXColor* fn_800C68C0(EfDrawInfo* self) {
-    return &self->mat_color;
+/* 0x800C0C8C (0xF8): the `steps` ribbon vertex pairs of the curve through three neighbouring samples (the last
+ * one, at t = 1, is the next curve's first). */
+void ef_smooth_ribbon_curve(nw4r::ef::DrawSmoothStripeStrategy* self, s32 steps, const EfRibbonParam* a,
+                            const EfRibbonParam* b, const EfRibbonParam* c, u32 flags) {
+    f32 inv = math_reciprocal(steps);
+    s32 i;
+
+    for (i = 0; i < steps; i++) {
+        EfRibbonParam point;
+        VEC3 w;
+        f32 t = i * inv;
+
+        ef_smooth_spline_weight(&w, self, t);
+        ef_smooth_ribbon_blend(&point, a, b, c, &w);
+        ef_smooth_ribbon_pair((Vec*)&point.a, (Vec*)&point.b, point.tex_t, flags);
+    }
 }
 
-/* The GX_COLOR1A1 light bitmask of the draw-time view state. */
-u32 fn_800C68C8(EfDrawInfo* self) {
-    return self->light_mask1;
+/* 0x800C0D84 (0x90): writes one ribbon vertex pair, each followed by its texture coordinate when the flag asks. */
+void ef_smooth_ribbon_pair(Vec* a, Vec* b, f32 scale, u32 flags) {
+    ef_smooth_gx_position(a);
+    if (ef_smooth_flag_tex(flags)) {
+        ef_smooth_gx_texcoord(1.0f, scale);
+    }
+    ef_smooth_gx_position(b);
+    if (ef_smooth_flag_tex(flags)) {
+        ef_smooth_gx_texcoord(0.0f, scale);
+    }
 }
-
-/* Whether the light is a spot light. */
-u8 fn_800C68D0(EfDrawInfo* self) {
-    return self->is_spot_light;
-}
-
-/* The GX_COLOR0 light bitmask of the draw-time view state. */
-u32 fn_800C68D8(EfDrawInfo* self) {
-    return self->light_mask;
-}
-
-/* Whether lighting is enabled for the draw. */
-u8 fn_800C68E0(EfDrawInfo* self) {
-    return self->light_enable;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * Vector writers, zeroers and copies, in address order.  The `EfVec3x2`/`EfVec3x3` records are the
- * two shapes this part of the effect pipeline passes around: a pair (or triple) of positions with a
- * trailing scalar, which the original copies as an aggregate (word-by-word, then the scalar).
- * --------------------------------------------------------------------------------------------- */
 
 /* Writes a pair of f32 to the pipe. */
-void fn_800C0E14(f32 x, f32 y) {
+void ef_smooth_gx_texcoord(f32 x, f32 y) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
 }
 
-/* Tests the low bit of a status word. */
-int fn_800C0E24(u32 value) {
+/* Tests the texture-coordinate bit of the draw flags. */
+int ef_smooth_flag_tex(u32 value) {
     return (value & 1) != 0;
 }
 
 /* Writes one vector to the pipe. */
-void fn_800C0E48(f32 x, f32 y, f32 z);
-void fn_800C0E38(Vec* v) {
-    fn_800C0E48(v->x, v->y, v->z);
+void ef_smooth_gx_position(Vec* v) {
+    ef_smooth_gx_position3(v->x, v->y, v->z);
 }
+
 /* Writes three f32 to the pipe. */
-void fn_800C0E48(f32 x, f32 y, f32 z) {
+void ef_smooth_gx_position3(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
     GXWGFifo.f32 = z;
 }
 
-/* A pair of vectors plus a trailing scalar. */
-typedef struct EfVec3x2 {
-    Vec a; /* +0x00 */
-    Vec b; /* +0x0C */
-    f32 w; /* +0x18 */
-} EfVec3x2; /* size: 0x1C */
+/* 0x800C0E5C (0x138): the weighted sum of three ribbon samples. */
+EfRibbonParam* ef_smooth_ribbon_blend(EfRibbonParam* out, const EfRibbonParam* a, const EfRibbonParam* b,
+                                      const EfRibbonParam* c, const VEC3* w) {
+    VEC3 a_sum2;
+    VEC3 a_sum1;
+    VEC3 a_wa;
+    VEC3 a_wb;
+    VEC3 a_wc;
+    VEC3 b_sum2;
+    VEC3 b_sum1;
+    VEC3 b_wa;
+    VEC3 b_wb;
+    VEC3 b_wc;
 
-/* Three vectors plus a trailing scalar. */
-typedef struct EfVec3x3 {
-    Vec a; /* +0x00 */
-    Vec b; /* +0x0C */
-    Vec c; /* +0x18 */
-    f32 w; /* +0x24 */
-} EfVec3x3; /* size: 0x28 */
-
-/* Copies a three-vector record. */
-void fn_800C1508(EfVec3x3* dst, EfVec3x3* src) {
-    dst->a = src->a;
-    dst->b = src->b;
-    dst->c = src->c;
-    dst->w = src->w;
+    VEC3_ctor(&out->a);
+    VEC3_ctor(&out->b);
+    vec3_scale(&a_wc, (VEC3*)&c->a, w->z);
+    vec3_scale(&a_wb, (VEC3*)&b->a, w->y);
+    vec3_scale(&a_wa, (VEC3*)&a->a, w->x);
+    addVec3(&a_sum1, &a_wa, &a_wb);
+    addVec3(&a_sum2, &a_sum1, &a_wc);
+    copyVec3(&out->a, &a_sum2);
+    vec3_scale(&b_wc, (VEC3*)&c->b, w->z);
+    vec3_scale(&b_wb, (VEC3*)&b->b, w->y);
+    vec3_scale(&b_wa, (VEC3*)&a->b, w->x);
+    addVec3(&b_sum1, &b_wa, &b_wb);
+    addVec3(&b_sum2, &b_sum1, &b_wc);
+    copyVec3(&out->b, &b_sum2);
+    out->tex_t = c->tex_t * w->z + (a->tex_t * w->x + b->tex_t * w->y);
+    return out;
 }
 
-/* Zeroes a three-vector record and returns it. */
-EfVec3x3* fn_800C16F8(EfVec3x3* self) {
-    VEC3_ctor((VEC3*)&self->a);   /* the declaration takes the nw4r vector; same 3-float layout */
-    VEC3_ctor((VEC3*)&self->b);
-    VEC3_ctor((VEC3*)&self->c);
-    return self;
+/* 0x800C0F94 (0x8C): the ribbon vertex pair at the end (t = 1) of the curve through three samples. */
+void ef_smooth_ribbon_end(nw4r::ef::DrawSmoothStripeStrategy* self, const EfRibbonParam* a, const EfRibbonParam* b,
+                          const EfRibbonParam* c, u32 flags) {
+    EfRibbonParam point;
+    VEC3 w;
+
+    ef_smooth_spline_weight(&w, self, 1.0f);
+    ef_smooth_ribbon_blend(&point, a, b, c, &w);
+    ef_smooth_ribbon_pair((Vec*)&point.a, (Vec*)&point.b, point.tex_t, flags);
 }
 
-/* Zeroes a two-vector record and returns it. */
-EfVec3x2* fn_800C1B7C(EfVec3x2* self) {
-    VEC3_ctor((VEC3*)&self->a);
-    VEC3_ctor((VEC3*)&self->b);
-    return self;
-}
+/* 0x800C1020 (0x4D0): the tube strips of the curve through three neighbouring rings: `steps` blended rings, one strip
+ * of `divide` sides between each pair (from the cos/sin table; the ring order sets the facing). */
+void ef_smooth_tube_curve(nw4r::ef::DrawSmoothStripeStrategy* self, s32 steps, s32 divide, const EfStripeParam* a,
+                          const EfStripeParam* b, const EfStripeParam* c, u32 flags, const f32* trig) {
+    f32 inv_steps;
+    f32 inv_divide;
+    VEC3 w;
+    EfStripeParam prev;
+    EfStripeParam cur;
+    s32 i;
 
-/* Builds a two-vector record from two source vectors and a scalar, and returns it. */
-EfVec3x2* fn_800C26A4(EfVec3x2* self, Vec* a, Vec* b, f32 w) {
-    assignVec3(&self->a, a);
-    assignVec3(&self->b, b);
-    self->w = w;
-    return self;
-}
-
-/* Copies a two-vector record. */
-void fn_800C26FC(EfVec3x2* dst, EfVec3x2* src) {
-    dst->a = src->a;
-    dst->b = src->b;
-    dst->w = src->w;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The ahead-context initialiser, the particle-walker selectors and the tail of the unit.
- * --------------------------------------------------------------------------------------------- */
-
-/* An `nw4r::math::MTX34` (three rows of four floats) comes from `nw4r/math.h`. */
-
-/* The per-draw ahead state `nw4r::ef::DrawStrategyImpl::AheadContext`: the emitter and manager
- * transforms plus the two axes the stripe/tube walkers advance along. */
-typedef struct EfAheadContext {
-    void* particle_manager;    /* +0x00 */
-    const void* view_mtx;      /* +0x04 */
-    Mtx34 emitter_mtx;         /* +0x08 */
-    Mtx34 manager_mtx;         /* +0x38 */
-    Mtx34 manager_mtx_inv;     /* +0x68 */
-    Vec emitter_axis_y;        /* +0x98 */
-    Vec emitter_center;        /* +0xA4 */
-} EfAheadContext; /* size: 0xB0 (the record continues past what this unit reads) */
-
-/* The GX texture-coordinate generator, the matrix initialiser this unit shares with its neighbours, and
- * the four particle walkers this unit defines further down. */
-extern void GXSetTexCoordGen2(u32 dst_coord, u32 func, u32 src_param, u32 mtx, u32 normalize,
-                              u32 pt_texmtx);
-void fn_800C8A80(void);
-void fn_800C8B9C(void);
-void fn_800C8CB8(void);
-void fn_800C8DE4(void);
-
-/* Initialises the ahead context and returns it. */
-EfAheadContext* fn_800C9434(EfAheadContext* self) {
-    MTX34_ctor(&self->emitter_mtx);
-    MTX34_ctor(&self->manager_mtx);
-    MTX34_ctor(&self->manager_mtx_inv);
-    VEC3_ctor((VEC3*)&self->emitter_axis_y);
-    VEC3_ctor((VEC3*)&self->emitter_center);
-    return self;
-}
-
-/* Builds a three-vector record from three source vectors and a scalar, and returns it. */
-EfVec3x3* fn_800C3834(EfVec3x3* self, Vec* a, Vec* b, Vec* c, f32 w) {
-    assignVec3(&self->a, a);
-    assignVec3(&self->b, b);
-    assignVec3(&self->c, c);
-    self->w = w;
-    return self;
-}
-
-/* Picks the walker that visits the younger particles first. */
-void (*fn_800C8A48(void* self, int draw_order))(void);
-void (*fn_800C8A48(void* self, int draw_order))(void) {
-    if (draw_order == 0) {
-        return fn_800C8B9C;
+    if (!IsValidPointer((u32)trig)) {
+        nw4r::db::Panic(ef_smooth_file_str, 334, ef_smooth_trig_assert_str, trig);
     }
-    return fn_800C8A80;
-}
+    inv_steps = math_reciprocal(steps);
+    inv_divide = math_reciprocal(divide);
+    ef_smooth_spline_weight(&w, self, 0.0f);
+    ef_smooth_tube_param_ctor(&prev);
+    ef_smooth_tube_blend(&cur, a, b, c, &w);
+    for (i = 1; i <= steps; i++) {
+        VEC3 next_w;
+        EfStripeParam next;
+        s32 j;
+        const f32* pair;
+        f32 t;
 
-/* Picks the walker that visits the elder particles first. */
-void (*fn_800C8A64(void* self, int draw_order))(void);
-void (*fn_800C8A64(void* self, int draw_order))(void) {
-    if (draw_order == 0) {
-        return fn_800C8DE4;
+        ef_smooth_tube_param_copy(&prev, &cur);
+        t = i * inv_steps;
+        ef_smooth_spline_weight(&next_w, self, t);
+        copyVec3(&w, &next_w);
+        ef_smooth_tube_param_copy(&cur, ef_smooth_tube_blend(&next, a, b, c, &w));
+        GXBegin(0x98, 0, divide * 2 + 2);
+        if (ef_smooth_flag_reverse(flags)) {
+            for (j = 0, pair = trig; j <= divide; pair += 2, j++) {
+                f32 s = pair[1];
+                f32 co = pair[0];
+                VEC3 p_pos;
+                VEC3 p_sum;
+                VEC3 p_side;
+                VEC3 p_up;
+                VEC3 c_pos;
+                VEC3 c_sum;
+                VEC3 c_side;
+                VEC3 c_up;
+
+                vec3_scale(&p_up, &prev.up, s);
+                vec3_scale(&p_side, &prev.side, co);
+                addVec3(&p_sum, &p_side, &p_up);
+                addVec3(&p_pos, &p_sum, &prev.center);
+                ef_smooth_gx_position((Vec*)&p_pos);
+                if (ef_smooth_flag_tex(flags)) {
+                    ef_smooth_gx_texcoord(inv_divide * j, prev.tex_t);
+                }
+                vec3_scale(&c_up, &cur.up, s);
+                vec3_scale(&c_side, &cur.side, co);
+                addVec3(&c_sum, &c_side, &c_up);
+                addVec3(&c_pos, &c_sum, &cur.center);
+                ef_smooth_gx_position((Vec*)&c_pos);
+                if (ef_smooth_flag_tex(flags)) {
+                    ef_smooth_gx_texcoord(inv_divide * j, cur.tex_t);
+                }
+            }
+        } else {
+            for (j = 0, pair = trig; j <= divide; pair += 2, j++) {
+                f32 s = pair[1];
+                f32 co = pair[0];
+                VEC3 c_pos;
+                VEC3 c_sum;
+                VEC3 c_side;
+                VEC3 c_up;
+                VEC3 p_pos;
+                VEC3 p_sum;
+                VEC3 p_side;
+                VEC3 p_up;
+
+                vec3_scale(&c_up, &cur.up, s);
+                vec3_scale(&c_side, &cur.side, co);
+                addVec3(&c_sum, &c_side, &c_up);
+                addVec3(&c_pos, &c_sum, &cur.center);
+                ef_smooth_gx_position((Vec*)&c_pos);
+                if (ef_smooth_flag_tex(flags)) {
+                    ef_smooth_gx_texcoord(inv_divide * j, cur.tex_t);
+                }
+                vec3_scale(&p_up, &prev.up, s);
+                vec3_scale(&p_side, &prev.side, co);
+                addVec3(&p_sum, &p_side, &p_up);
+                addVec3(&p_pos, &p_sum, &prev.center);
+                ef_smooth_gx_position((Vec*)&p_pos);
+                if (ef_smooth_flag_tex(flags)) {
+                    ef_smooth_gx_texcoord(inv_divide * j, prev.tex_t);
+                }
+            }
+        }
+        ef_smooth_gx_end();
     }
-    return fn_800C8CB8;
 }
-
-/* Sets one texture coordinate generator and leaves the projective matrix at identity. */
-void fn_800C8674(u32 dst_coord, u32 func, u32 src_param, u32 mtx) {
-    GXSetTexCoordGen2(dst_coord, func, src_param, mtx, 0, 125);
-}
-
-/* The particle-side record these three accessors read.  Only the two texture-layer bit fields are
- * touched here: +0x94 packs a 2-bit value per texture layer at a stride of 4 bits (the second pair of
- * bits of each layer is read by `fn_800C8954`), +0x96 packs a 2-bit value per layer at a stride of 2. */
-typedef struct EfParticleLayers {
-    u8 pad_0x00[0x94];     /* +0x00 */
-    u16 texture_wrap_bits; /* +0x94  wrap mode per texture layer (bits 0-1, 4-5, 8-9) */
-    u8 texture_flag_bits;  /* +0x96  filter/reverse mode per texture layer (bits 0-1, 2-3, 4-5) */
-    u8 pad_0x97[0x01];     /* +0x97 */
-} EfParticleLayers; /* size: 0x98 */
-
-/* The wrap mode of one texture layer. */
-u32 fn_800C8954(EfParticleLayers* self, u32 layer);
-u32 fn_800C8954(EfParticleLayers* self, u32 layer) {
-    if (!(layer <= 2)) {
-        nw4r::db::Panic(lbl_80594AAC, 414, lbl_80594A7C);
-    }
-    return ((s32)self->texture_wrap_bits >> (layer * 4 + 2)) & 3;
-}
-
-/* The second wrap mode of one texture layer. */
-u32 fn_800C89D0(EfParticleLayers* self, u32 layer) {
-    if (!(layer <= 2)) {
-        nw4r::db::Panic(lbl_80594A70, 375, lbl_80594A40);
-    }
-    return ((s32)self->texture_wrap_bits >> (layer * 4)) & 3;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The out-of-line GX FIFO writers, 0x800C6F90..0x800C7270.  Retail emits one copy per component count
- * and per store width; the empty one is the SDK's no-op `GXEnd`.
- * --------------------------------------------------------------------------------------------- */
 
 /* Ends the current FIFO command (the SDK's `GXEnd`, which writes nothing). */
-void fn_800C6F90(void) {}
+void ef_smooth_gx_end(void) {}
 
-/* Writes one u16 to the pipe. */
-void fn_800C6F94(u16 value) {
-    GXWGFifo.u16 = value;
+/* Tests the reversed-facing bit of the draw flags. */
+int ef_smooth_flag_reverse(u32 value) {
+    return (value & 0x10) != 0;
 }
 
-/* Writes one u8 to the pipe. */
-void fn_800C6FA4(u8 value) {
-    GXWGFifo.u8 = value;
+/* Copies a tube ring. */
+void ef_smooth_tube_param_copy(EfStripeParam* dst, const EfStripeParam* src) {
+    *dst = *src;
 }
 
-/* Writes one f32 to the pipe. */
-void fn_800C6FB4(f32 value) {
-    GXWGFifo.f32 = value;
+/* 0x800C155C (0x19C): the weighted sum of three tube rings. */
+EfStripeParam* ef_smooth_tube_blend(EfStripeParam* out, const EfStripeParam* a, const EfStripeParam* b,
+                                    const EfStripeParam* c, const VEC3* w) {
+    VEC3 c_sum2;
+    VEC3 c_sum1;
+    VEC3 c_wa;
+    VEC3 c_wb;
+    VEC3 c_wc;
+    VEC3 s_sum2;
+    VEC3 s_sum1;
+    VEC3 s_wa;
+    VEC3 s_wb;
+    VEC3 s_wc;
+    VEC3 u_sum2;
+    VEC3 u_sum1;
+    VEC3 u_wa;
+    VEC3 u_wb;
+    VEC3 u_wc;
+
+    VEC3_ctor(&out->center);
+    VEC3_ctor(&out->side);
+    VEC3_ctor(&out->up);
+    vec3_scale(&c_wc, (VEC3*)&c->center, w->z);
+    vec3_scale(&c_wb, (VEC3*)&b->center, w->y);
+    vec3_scale(&c_wa, (VEC3*)&a->center, w->x);
+    addVec3(&c_sum1, &c_wa, &c_wb);
+    addVec3(&c_sum2, &c_sum1, &c_wc);
+    copyVec3(&out->center, &c_sum2);
+    vec3_scale(&s_wc, (VEC3*)&c->side, w->z);
+    vec3_scale(&s_wb, (VEC3*)&b->side, w->y);
+    vec3_scale(&s_wa, (VEC3*)&a->side, w->x);
+    addVec3(&s_sum1, &s_wa, &s_wb);
+    addVec3(&s_sum2, &s_sum1, &s_wc);
+    copyVec3(&out->side, &s_sum2);
+    vec3_scale(&u_wc, (VEC3*)&c->up, w->z);
+    vec3_scale(&u_wb, (VEC3*)&b->up, w->y);
+    vec3_scale(&u_wa, (VEC3*)&a->up, w->x);
+    addVec3(&u_sum1, &u_wa, &u_wb);
+    addVec3(&u_sum2, &u_sum1, &u_wc);
+    copyVec3(&out->up, &u_sum2);
+    out->tex_t = c->tex_t * w->z + (a->tex_t * w->x + b->tex_t * w->y);
+    return out;
 }
 
-/* Writes one s16 to the pipe. */
-void fn_800C6FC0(s16 value) {
-    GXWGFifo.s16 = value;
+/* Zeroes the three vectors of a tube ring and returns it. */
+EfStripeParam* ef_smooth_tube_param_ctor(EfStripeParam* self) {
+    VEC3_ctor(&self->center);
+    VEC3_ctor(&self->side);
+    VEC3_ctor(&self->up);
+    return self;
 }
 
-/* Writes one u16 to the pipe. */
-void fn_800C6FD0(u16 value) {
-    GXWGFifo.u16 = value;
+/* 0x800C1738 (0x444): an open smooth ribbon: one sample per particle, a curve through every three neighbouring
+ * samples and the closing curve and end pair at the last one. */
+void ef_smooth_ribbon_open(nw4r::ef::DrawSmoothStripeStrategy* self,
+                           nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags,
+                           const VEC3* a, const VEC3* b) {
+    EfDrawParticleManager* pm;
+    EfEmitterDrawSetting* ed;
+    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
+    u32 order;
+    nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
+    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
+    s32 count;
+    f32 width;
+    f32 step;
+    s32 index;
+    s32 dir;
+    EfRibbonParam samples[3];
+    s32 prev;
+    s32 cur;
+    EfDrawParticle* p;
+
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 403, ef_smooth_ahead_assert_str, ctx);
+    }
+    pm = ctx->particle_manager;
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    calc_ahead = self->GetCalcAheadFunc(pm);
+    order = ef_smooth_draw_order(self, ed);
+    first = self->GetGetFirstDrawParticleFunc(order);
+    next = self->GetGetNextDrawParticleFunc(order);
+    count = ef_stripe_draw_count(self, pm);
+    width = 0.01f * ed->scale_a;
+    GXBegin(0x98, 0, (count * steps + 1) * 2);
+    if (ef_smooth_tex_mode(self, ed) == 0x40) {
+        step = 1.0f;
+    } else {
+        step = math_reciprocal(count - 1);
+    }
+    index = 0;
+    dir = 1;
+    if (order != 0) {
+        index = count - 1;
+        dir = -1;
+    }
+    ef_smooth_ribbon_param_ctor(&samples[0]);
+    ef_smooth_ribbon_param_ctor(&samples[1]);
+    ef_smooth_ribbon_param_ctor(&samples[2]);
+    prev = 0;
+    cur = 0;
+    p = first(pm);
+    ef_smooth_ribbon_sample(self, &samples[0], ctx, flags, p, calc_ahead, (const VEC3*)&p->world_pos, a, b, width,
+                            step * index);
+    index += dir;
+    for (p = next(pm, p); p != NULL; p = next(pm, p), index += dir) {
+        s32 old = prev;
+        EfRibbonParam* sample;
+
+        prev = cur;
+        cur = (cur + 1) % 3;
+        sample = &samples[cur];
+        ef_smooth_ribbon_sample(self, sample, ctx, flags, p, calc_ahead, (const VEC3*)&p->world_pos, a, b, width,
+                                step * index);
+        ef_smooth_ribbon_curve(self, steps, &samples[old], &samples[prev], sample, flags);
+    }
+    {
+        EfRibbonParam* last = &samples[cur];
+        EfRibbonParam* before = &samples[prev];
+
+        ef_smooth_ribbon_curve(self, steps, before, last, last, flags);
+        ef_smooth_ribbon_end(self, before, last, last, flags);
+    }
+    ef_smooth_gx_end();
 }
 
-/* Writes one s8 to the pipe. */
-void fn_800C6FE0(s8 value) {
-    GXWGFifo.s8 = value;
+/* Zeroes the two vectors of a ribbon sample and returns it. */
+EfRibbonParam* ef_smooth_ribbon_param_ctor(EfRibbonParam* self) {
+    VEC3_ctor(&self->a);
+    VEC3_ctor(&self->b);
+    return self;
 }
 
-/* Writes one u8 to the pipe. */
-void fn_800C6FF0(u8 value) {
-    GXWGFifo.u8 = value;
+/* The texture-mapping bits (6-7) of the draw setting's stripe flags. */
+s32 ef_smooth_tex_mode(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed) {
+    return ed->stripe_connect & 0xC0;
 }
 
-/* Writes a pair of f32 to the pipe. */
-void fn_800C7000(f32 x, f32 y) {
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
+/* The draw-order bit (0x800) of the draw setting's flags. */
+u32 ef_smooth_draw_order(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed) {
+    return ed->flags & 0x800;
 }
 
-/* Writes a pair of s16 to the pipe. */
-void fn_800C7010(s16 x, s16 y) {
-    GXWGFifo.s16 = x;
-    GXWGFifo.s16 = y;
+/* 0x800C1BCC (0x518): a looped smooth ribbon: the open ribbon plus the curves that close it through the first two
+ * samples (sampled first, at half steps). */
+void ef_smooth_ribbon_loop(nw4r::ef::DrawSmoothStripeStrategy* self,
+                           nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags,
+                           const VEC3* a, const VEC3* b) {
+    EfDrawParticleManager* pm;
+    EfEmitterDrawSetting* ed;
+    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
+    u32 order;
+    nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
+    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
+    s32 count;
+    f32 width;
+    f32 step;
+    s32 index;
+    s32 dir;
+    EfRibbonParam samples[5];
+    VEC3 unused_a;
+    VEC3 unused_b;
+    s32 prev;
+    s32 cur;
+    EfDrawParticle* p;
+
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 475, ef_smooth_ahead_assert_str, ctx);
+    }
+    pm = ctx->particle_manager;
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    calc_ahead = self->GetCalcAheadFunc(pm);
+    order = ef_smooth_draw_order(self, ed);
+    first = self->GetGetFirstDrawParticleFunc(order);
+    next = self->GetGetNextDrawParticleFunc(order);
+    count = ef_stripe_draw_count(self, pm);
+    width = 0.01f * ed->scale_a;
+    GXBegin(0x98, 0, (count * steps + 1) * 2);
+    if (ef_smooth_tex_mode(self, ed) == 0x40) {
+        step = 0.5f;
+    } else {
+        step = 0.5f / count;
+    }
+    index = -1;
+    dir = 2;
+    if (order != 0) {
+        index = count * 2 + 1;
+        dir = -2;
+    }
+    ef_smooth_ribbon_param_ctor(&samples[0]);
+    ef_smooth_ribbon_param_ctor(&samples[1]);
+    ef_smooth_ribbon_param_ctor(&samples[2]);
+    ef_smooth_ribbon_param_ctor(&samples[3]);
+    ef_smooth_ribbon_param_ctor(&samples[4]);
+    VEC3_ctor(&unused_a);
+    VEC3_ctor(&unused_b);
+    p = first(pm);
+    ef_smooth_ribbon_sample(self, &samples[3], ctx, flags, p, calc_ahead, (const VEC3*)&p->world_pos, a, b, width,
+                            step * index);
+    p = next(pm, p);
+    index += dir;
+    ef_smooth_ribbon_sample(self, &samples[4], ctx, flags, p, calc_ahead, (const VEC3*)&p->world_pos, a, b, width,
+                            step * index);
+    p = next(pm, p);
+    index += dir;
+    prev = 3;
+    cur = 4;
+    for (; p != NULL; p = next(pm, p), index += dir) {
+        s32 old = prev;
+        EfRibbonParam* sample;
+
+        prev = cur;
+        cur = (cur + 1) % 3;
+        sample = &samples[cur];
+        ef_smooth_ribbon_sample(self, sample, ctx, flags, p, calc_ahead, (const VEC3*)&p->world_pos, a, b, width,
+                                step * index);
+        ef_smooth_ribbon_curve(self, steps, &samples[old], &samples[prev], sample, flags);
+    }
+    samples[3].tex_t = step * index;
+    {
+        EfRibbonParam* last = &samples[cur];
+
+        ef_smooth_ribbon_curve(self, steps, &samples[prev], last, &samples[3], flags);
+        samples[4].tex_t = step * (index + dir);
+        ef_smooth_ribbon_curve(self, steps, last, &samples[3], &samples[4], flags);
+        ef_smooth_ribbon_end(self, last, &samples[3], &samples[4], flags);
+    }
+    ef_smooth_gx_end();
 }
 
-/* Writes a pair of u16 to the pipe. */
-void fn_800C7028(u16 x, u16 y) {
-    GXWGFifo.u16 = x;
-    GXWGFifo.u16 = y;
+/* 0x800C20E4 (0x5C0): a smooth ribbon that also reaches back to the emitter: the eldest (or youngest) end is moved
+ * by the youngest particle's offset from the emitter origin. */
+void ef_smooth_ribbon_to_emitter(nw4r::ef::DrawSmoothStripeStrategy* self,
+                                 nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags,
+                                 const VEC3* a, const VEC3* b) {
+    EfDrawParticleManager* pm;
+    EfEmitterDrawSetting* ed;
+    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
+    u32 order;
+    nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
+    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
+    f32 width;
+    EfDrawParticle* youngest;
+    VEC3 offset;
+    s32 count;
+    f32 step;
+    s32 index;
+    s32 dir;
+    EfRibbonParam samples[3];
+    VEC3 unused_a;
+    VEC3 unused_b;
+    s32 prev;
+    s32 cur;
+    EfDrawParticle* p;
+
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 566, ef_smooth_ahead_assert_str, ctx);
+    }
+    pm = ctx->particle_manager;
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    calc_ahead = self->GetCalcAheadFunc(pm);
+    order = ef_smooth_draw_order(self, ed);
+    first = self->GetGetFirstDrawParticleFunc(order);
+    next = self->GetGetNextDrawParticleFunc(order);
+    width = 0.01f * ed->scale_a;
+    youngest = (EfDrawParticle*)ef_pm_first_alive((EfDrawList*)ctx->particle_manager);
+    if (!youngest) {
+        nw4r::db::Panic(ef_smooth_file_str, 579, ef_smooth_youngest_assert_str);
+    }
+    subVec3(&offset, &ctx->emitter_center, &youngest->world_pos);
+    count = ef_stripe_draw_count(self, pm);
+    GXBegin(0x98, 0, ((count + 1) * steps + 1) * 2);
+    if (ef_smooth_tex_mode(self, ed) == 0x40) {
+        step = 1.0f;
+    } else {
+        step = math_reciprocal(count);
+    }
+    index = 0;
+    dir = 1;
+    if (order != 0) {
+        index = count;
+        dir = -1;
+    }
+    ef_smooth_ribbon_param_ctor(&samples[0]);
+    ef_smooth_ribbon_param_ctor(&samples[1]);
+    ef_smooth_ribbon_param_ctor(&samples[2]);
+    prev = 0;
+    cur = 0;
+    VEC3_ctor(&unused_a);
+    VEC3_ctor(&unused_b);
+    p = first(pm);
+    ef_smooth_ribbon_sample(self, &samples[0], ctx, flags, p, calc_ahead, (const VEC3*)&p->world_pos, a, b, width,
+                            step * index);
+    index += dir;
+    if (order == 0) {
+        cur = 1;
+        ef_smooth_ribbon_param_copy(&samples[1], &samples[0]);
+        samples[1].tex_t = step * index;
+        addVec3To(&samples[0].a, &offset);
+        addVec3To(&samples[0].b, &offset);
+        index += dir;
+        ef_smooth_ribbon_curve(self, steps, &samples[0], &samples[0], &samples[1], flags);
+    }
+    for (p = next(pm, p); p != NULL; p = next(pm, p), index += dir) {
+        s32 old = prev;
+        EfRibbonParam* sample;
+
+        prev = cur;
+        cur = (cur + 1) % 3;
+        sample = &samples[cur];
+        ef_smooth_ribbon_sample(self, sample, ctx, flags, p, calc_ahead, (const VEC3*)&p->world_pos, a, b, width,
+                                step * index);
+        ef_smooth_ribbon_curve(self, steps, &samples[old], &samples[prev], sample, flags);
+    }
+    if (order != 0) {
+        s32 old = prev;
+        EfRibbonParam* last;
+        EfRibbonParam* sample;
+        EfRibbonParam moved;
+        VEC3 moved_a;
+        VEC3 moved_b;
+
+        prev = cur;
+        cur = (cur + 1) % 3;
+        last = &samples[prev];
+        sample = &samples[cur];
+        addVec3(&moved_b, &last->b, &offset);
+        addVec3(&moved_a, &last->a, &offset);
+        ef_smooth_ribbon_param_copy(sample, ef_smooth_ribbon_param_set(&moved, &moved_a, &moved_b, step * index));
+        ef_smooth_ribbon_curve(self, steps, &samples[old], last, sample, flags);
+    }
+    {
+        EfRibbonParam* last = &samples[cur];
+        EfRibbonParam* before = &samples[prev];
+
+        ef_smooth_ribbon_curve(self, steps, before, last, last, flags);
+        ef_smooth_ribbon_end(self, before, last, last, flags);
+    }
+    ef_smooth_gx_end();
 }
 
-/* Writes a pair of s8 to the pipe. */
-void fn_800C7040(s8 x, s8 y) {
-    GXWGFifo.s8 = x;
-    GXWGFifo.s8 = y;
+/* Builds a ribbon sample from two edge points and a texture coordinate, and returns it. */
+EfRibbonParam* ef_smooth_ribbon_param_set(EfRibbonParam* self, const VEC3* a, const VEC3* b, f32 t) {
+    assignVec3((Vec*)&self->a, (Vec*)a);
+    assignVec3((Vec*)&self->b, (Vec*)b);
+    self->tex_t = t;
+    return self;
 }
 
-/* Writes a pair of u8 to the pipe. */
-void fn_800C7058(u8 x, u8 y) {
-    GXWGFifo.u8 = x;
-    GXWGFifo.u8 = y;
+/* Copies a ribbon sample. */
+void ef_smooth_ribbon_param_copy(EfRibbonParam* dst, const EfRibbonParam* src) {
+    *dst = *src;
 }
 
-/* Writes one u16 to the pipe. */
-void fn_800C7070(u16 value) {
-    GXWGFifo.u16 = value;
+/* 0x800C2738 (0x1B4): draws the smooth ribbon through the builder the stripe's connection type selects. */
+void ef_smooth_draw_ribbon(nw4r::ef::DrawSmoothStripeStrategy* self,
+                           nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags,
+                           const VEC3* a, const VEC3* b) {
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 670, ef_smooth_ahead_assert_str, ctx);
+    }
+    switch (ef_smooth_connect_type(
+        self, (EfEmitterDrawSetting*)ef_resource_draw_setting(ctx->particle_manager->resource))) {
+    default:
+        ef_smooth_ribbon_open(self, ctx, steps, flags, a, b);
+        break;
+    case 1:
+        ef_smooth_ribbon_loop(self, ctx, steps, flags, a, b);
+        break;
+    case 2:
+        ef_smooth_ribbon_to_emitter(self, ctx, steps, flags, a, b);
+        break;
+    }
 }
 
-/* Writes one u8 to the pipe. */
-void fn_800C7080(u8 value) {
-    GXWGFifo.u8 = value;
+/* The connection-type bits (0-2) of the draw setting's stripe flags. */
+s32 ef_smooth_connect_type(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed) {
+    return ed->stripe_connect & 0x7;
 }
 
-/* Writes four u8 to the pipe (an RGBA colour). */
-void fn_800C7090(u8 r, u8 g, u8 b, u8 a) {
-    GXWGFifo.u8 = r;
-    GXWGFifo.u8 = g;
-    GXWGFifo.u8 = b;
-    GXWGFifo.u8 = a;
+/* 0x800C28F8 (0x448): an open smooth tube: one ring per particle, the strips of the curve through every three
+ * neighbouring rings and the closing curve at the last one. */
+void ef_smooth_tube_open(nw4r::ef::DrawSmoothStripeStrategy* self,
+                         nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags) {
+    EfDrawParticleManager* pm;
+    EfEmitterDrawSetting* ed;
+    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
+    u32 order;
+    nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
+    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
+    s32 count;
+    f32 offset_x;
+    f32 offset_y;
+    f32 step;
+    s32 index;
+    s32 dir;
+    EfStripeParam rings[3];
+    s32 prev;
+    s32 cur;
+    EfDrawParticle* p;
+
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 698, ef_smooth_ahead_assert_str, ctx);
+    }
+    pm = ctx->particle_manager;
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    calc_ahead = self->GetCalcAheadFunc(pm);
+    order = ef_smooth_draw_order(self, ed);
+    first = self->GetGetFirstDrawParticleFunc(order);
+    next = self->GetGetNextDrawParticleFunc(order);
+    count = ef_stripe_draw_count(self, pm);
+    offset_x = 0.01f * ed->scale_a;
+    offset_y = 0.01f * ed->scale_b;
+    if (ef_smooth_tex_mode(self, ed) == 0x40) {
+        step = 1.0f;
+    } else {
+        step = math_reciprocal(count - 1);
+    }
+    index = 0;
+    dir = 1;
+    if (order != 0) {
+        index = count - 1;
+        dir = -1;
+    }
+    ef_smooth_tube_param_ctor(&rings[0]);
+    ef_smooth_tube_param_ctor(&rings[1]);
+    ef_smooth_tube_param_ctor(&rings[2]);
+    prev = 0;
+    cur = 0;
+    p = first(pm);
+    ef_smooth_tube_ring(self, &rings[0], ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
+    index += dir;
+    for (p = next(pm, p); p != NULL; p = next(pm, p), index += dir) {
+        s32 old = prev;
+        EfStripeParam* ring;
+
+        prev = cur;
+        cur = (cur + 1) % 3;
+        ring = &rings[cur];
+        ef_smooth_tube_ring(self, ring, ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
+        ef_smooth_tube_curve(self, steps, ef_smooth_tube_divide(self, ed), &rings[old], &rings[prev], ring, flags,
+                             ctx->trig_table);
+    }
+    {
+        EfStripeParam* last = &rings[cur];
+
+        ef_smooth_tube_curve(self, steps, ef_smooth_tube_divide(self, ed), &rings[prev], last, last, flags,
+                             ctx->trig_table);
+    }
 }
 
-/* Writes three u8 to the pipe (an RGB colour). */
-void fn_800C70B8(u8 r, u8 g, u8 b) {
-    GXWGFifo.u8 = r;
-    GXWGFifo.u8 = g;
-    GXWGFifo.u8 = b;
+/* The tube side count of the draw setting. */
+s32 ef_smooth_tube_divide(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed) {
+    return ed->type_option2;
 }
 
-/* Writes one u16 to the pipe. */
-void fn_800C70D8(u16 value) {
-    GXWGFifo.u16 = value;
+/* 0x800C2D48 (0x51C): a looped smooth tube: the open tube plus the curves that close it through the first two rings
+ * (sampled first, at half steps). */
+void ef_smooth_tube_loop(nw4r::ef::DrawSmoothStripeStrategy* self,
+                         nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags) {
+    EfDrawParticleManager* pm;
+    EfEmitterDrawSetting* ed;
+    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
+    u32 order;
+    nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
+    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
+    s32 count;
+    f32 offset_x;
+    f32 offset_y;
+    f32 step;
+    s32 index;
+    s32 dir;
+    EfStripeParam rings[5];
+    s32 prev;
+    s32 cur;
+    EfDrawParticle* p;
+
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 764, ef_smooth_ahead_assert_str, ctx);
+    }
+    pm = ctx->particle_manager;
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    calc_ahead = self->GetCalcAheadFunc(pm);
+    order = ef_smooth_draw_order(self, ed);
+    first = self->GetGetFirstDrawParticleFunc(order);
+    next = self->GetGetNextDrawParticleFunc(order);
+    count = ef_stripe_draw_count(self, pm);
+    offset_x = 0.01f * ed->scale_a;
+    offset_y = 0.01f * ed->scale_b;
+    if (ef_smooth_tex_mode(self, ed) == 0x40) {
+        step = 0.5f;
+    } else {
+        step = 0.5f / count;
+    }
+    index = -1;
+    dir = 2;
+    if (order != 0) {
+        index = count * 2 + 1;
+        dir = -2;
+    }
+    ef_smooth_tube_param_ctor(&rings[0]);
+    ef_smooth_tube_param_ctor(&rings[1]);
+    ef_smooth_tube_param_ctor(&rings[2]);
+    ef_smooth_tube_param_ctor(&rings[3]);
+    ef_smooth_tube_param_ctor(&rings[4]);
+    p = first(pm);
+    ef_smooth_tube_ring(self, &rings[3], ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
+    p = next(pm, p);
+    index += dir;
+    ef_smooth_tube_ring(self, &rings[4], ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
+    p = next(pm, p);
+    index += dir;
+    prev = 3;
+    cur = 4;
+    for (; p != NULL; p = next(pm, p), index += dir) {
+        s32 old = prev;
+        EfStripeParam* ring;
+
+        prev = cur;
+        cur = (cur + 1) % 3;
+        ring = &rings[cur];
+        ef_smooth_tube_ring(self, ring, ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
+        ef_smooth_tube_curve(self, steps, ef_smooth_tube_divide(self, ed), &rings[old], &rings[prev], ring, flags,
+                             ctx->trig_table);
+    }
+    rings[3].tex_t = step * index;
+    {
+        EfStripeParam* last = &rings[cur];
+
+        ef_smooth_tube_curve(self, steps, ef_smooth_tube_divide(self, ed), &rings[prev], last, &rings[3], flags,
+                             ctx->trig_table);
+        rings[4].tex_t = step * (index + dir);
+        ef_smooth_tube_curve(self, steps, ef_smooth_tube_divide(self, ed), last, &rings[3], &rings[4], flags,
+                             ctx->trig_table);
+    }
 }
 
-/* Writes one u8 to the pipe. */
-void fn_800C70E8(u8 value) {
-    GXWGFifo.u8 = value;
+/* 0x800C3264 (0x5D0): a smooth tube that also reaches back to the emitter: the eldest (or youngest) end ring is
+ * moved by the youngest particle's offset from the emitter origin. */
+void ef_smooth_tube_to_emitter(nw4r::ef::DrawSmoothStripeStrategy* self,
+                               nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags) {
+    EfDrawParticleManager* pm;
+    EfEmitterDrawSetting* ed;
+    nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead;
+    u32 order;
+    nw4r::ef::DrawStrategyImpl::GetFirstDrawParticleFunc first;
+    nw4r::ef::DrawStrategyImpl::GetNextDrawParticleFunc next;
+    f32 offset_x;
+    f32 offset_y;
+    EfDrawParticle* youngest;
+    VEC3 offset;
+    s32 count;
+    f32 step;
+    s32 index;
+    s32 dir;
+    EfStripeParam rings[3];
+    s32 prev;
+    s32 cur;
+    EfDrawParticle* p;
+
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 845, ef_smooth_ahead_assert_str, ctx);
+    }
+    pm = ctx->particle_manager;
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    calc_ahead = self->GetCalcAheadFunc(pm);
+    order = ef_smooth_draw_order(self, ed);
+    first = self->GetGetFirstDrawParticleFunc(order);
+    next = self->GetGetNextDrawParticleFunc(order);
+    offset_x = 0.01f * ed->scale_a;
+    offset_y = 0.01f * ed->scale_b;
+    youngest = (EfDrawParticle*)ef_pm_first_alive((EfDrawList*)ctx->particle_manager);
+    if (!youngest) {
+        nw4r::db::Panic(ef_smooth_file_str, 859, ef_smooth_youngest_assert_str);
+    }
+    subVec3(&offset, &ctx->emitter_center, &youngest->world_pos);
+    count = ef_stripe_draw_count(self, pm);
+    if (ef_smooth_tex_mode(self, ed) == 0x40) {
+        step = 1.0f;
+    } else {
+        step = math_reciprocal(count);
+    }
+    index = 0;
+    dir = 1;
+    if (order != 0) {
+        index = count;
+        dir = -1;
+    }
+    ef_smooth_tube_param_ctor(&rings[0]);
+    ef_smooth_tube_param_ctor(&rings[1]);
+    ef_smooth_tube_param_ctor(&rings[2]);
+    prev = 0;
+    cur = 0;
+    p = first(pm);
+    ef_smooth_tube_ring(self, &rings[0], ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
+    index += dir;
+    if (order == 0) {
+        EfStripeParam moved;
+
+        cur = 1;
+
+        ef_smooth_tube_param_copy(&rings[1], ef_smooth_tube_param_set(&moved, &rings[0].center, &rings[0].side,
+                                                                      &rings[0].up, step * index));
+        addVec3To(&rings[0].center, &offset);
+        index += dir;
+        ef_smooth_tube_curve(self, steps, ef_smooth_tube_divide(self, ed), &rings[0], &rings[0], &rings[1], flags,
+                             ctx->trig_table);
+    }
+    for (p = next(pm, p); p != NULL; p = next(pm, p), index += dir) {
+        s32 old = prev;
+        EfStripeParam* ring;
+
+        prev = cur;
+        cur = (cur + 1) % 3;
+        ring = &rings[cur];
+        ef_smooth_tube_ring(self, ring, ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
+        ef_smooth_tube_curve(self, steps, ef_smooth_tube_divide(self, ed), &rings[old], &rings[prev], ring, flags,
+                             ctx->trig_table);
+    }
+    if (order != 0) {
+        s32 old = prev;
+        EfStripeParam* last;
+        EfStripeParam* ring;
+        EfStripeParam moved;
+        VEC3 moved_center;
+
+        prev = cur;
+        cur = (cur + 1) % 3;
+        last = &rings[prev];
+        ring = &rings[cur];
+        addVec3(&moved_center, &last->center, &offset);
+        ef_smooth_tube_param_copy(ring, ef_smooth_tube_param_set(&moved, &moved_center, &last->side, &last->up,
+                                                                 step * index));
+        ef_smooth_tube_curve(self, steps, ef_smooth_tube_divide(self, ed), &rings[old], last, ring, flags,
+                             ctx->trig_table);
+    }
+    {
+        EfStripeParam* last = &rings[cur];
+
+        ef_smooth_tube_curve(self, steps, ef_smooth_tube_divide(self, ed), &rings[prev], last, last, flags,
+                             ctx->trig_table);
+    }
 }
 
-/* Writes three f32 to the pipe. */
-void fn_800C70F8(f32 x, f32 y, f32 z) {
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
-    GXWGFifo.f32 = z;
+/* Builds a tube ring from its three vectors and a texture coordinate, and returns it. */
+EfStripeParam* ef_smooth_tube_param_set(EfStripeParam* self, const VEC3* center, const VEC3* side, const VEC3* up,
+                                        f32 t) {
+    assignVec3((Vec*)&self->center, (Vec*)center);
+    assignVec3((Vec*)&self->side, (Vec*)side);
+    assignVec3((Vec*)&self->up, (Vec*)up);
+    self->tex_t = t;
+    return self;
 }
 
-/* Writes three s16 to the pipe. */
-void fn_800C710C(s16 x, s16 y, s16 z) {
-    GXWGFifo.s16 = x;
-    GXWGFifo.s16 = y;
-    GXWGFifo.s16 = z;
+/* 0x800C38A4 (0x454): draws the smooth stripe as a tube: builds the (cos, sin) table of its sides on the stack, then
+ * draws the back faces and the front faces through the connection type's builder. */
+void ef_smooth_draw_tube(nw4r::ef::DrawSmoothStripeStrategy* self,
+                         nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx, s32 steps, u32 flags, u32 flush) {
+    EfEmitterDrawSetting* ed;
+    s32 divide;
+
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 944, ef_smooth_ahead_assert_str, ctx);
+    }
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(ctx->particle_manager->resource);
+    if (!(3 <= ef_smooth_tube_divide(self, ed))) {
+        nw4r::db::Panic(ef_smooth_file_str, 949, ef_smooth_tube_divide_assert_str);
+    }
+    divide = ef_smooth_tube_divide(self, ed);
+    if (divide >= 3) {
+        f32* trig = (f32*)__alloca((divide + 1) * 8);
+
+        if (!IsValidPointer((u32)trig)) {
+            nw4r::db::Panic(ef_smooth_file_str, 959, ef_smooth_trig_assert_str, trig);
+        }
+        if (trig != NULL) {
+            f32 step = 360.0f / divide;
+            f32* pair;
+            s32 i;
+
+            trig[0] = 1.0f;
+            trig[1] = 0.0f;
+            for (i = 1, pair = trig + 2; i < divide; pair += 2, i++) {
+                sin_cos_deg(&pair[1], &pair[0], step * i);
+            }
+            trig[divide * 2] = 1.0f;
+            trig[divide * 2 + 1] = 0.0f;
+            ctx->trig_table = trig;
+            switch (ef_smooth_connect_type(self, ed)) {
+            default:
+                ef_smooth_begin_side(1, flush, flags);
+                ef_smooth_tube_open(self, ctx, steps, flags);
+                ef_smooth_begin_side(2, flush, flags);
+                ef_smooth_tube_open(self, ctx, steps, flags);
+                break;
+            case 1:
+                ef_smooth_begin_side(1, flush, flags);
+                ef_smooth_tube_loop(self, ctx, steps, flags);
+                ef_smooth_begin_side(2, flush, flags);
+                ef_smooth_tube_loop(self, ctx, steps, flags);
+                break;
+            case 2:
+                ef_smooth_begin_side(1, flush, flags);
+                ef_smooth_tube_to_emitter(self, ctx, steps, flags);
+                ef_smooth_begin_side(2, flush, flags);
+                ef_smooth_tube_to_emitter(self, ctx, steps, flags);
+                break;
+            }
+        }
+    }
 }
 
-/* Writes three s8 to the pipe. */
-void fn_800C712C(s8 x, s8 y, s8 z) {
-    GXWGFifo.s8 = x;
-    GXWGFifo.s8 = y;
-    GXWGFifo.s8 = z;
+/* Draws an empty eight-vertex strip (the GP flush) with the cull mode set, when `enabled`. */
+void ef_smooth_begin_side(u32 cull_mode, u32 enabled, u32 flags) {
+    GXSetCullMode(cull_mode);
+    if (enabled != 0) {
+        GXBegin(0x98, 0, 8);
+        for (int i = 0; i < 8; i++) {
+            ef_smooth_gx_position3(0.0f, 0.0f, 0.0f);
+            if (ef_smooth_flag_tex(flags)) {
+                ef_smooth_gx_texcoord(0.0f, 0.0f);
+            }
+        }
+        ef_smooth_gx_end();
+    }
 }
 
-/* Writes one u16 to the pipe. */
-void fn_800C714C(u16 value) {
-    GXWGFifo.u16 = value;
+}  // extern "C"
+
+/* A function-local static edge offset: constructed through `setVec3` on first use. */
+struct EfSmoothAxis : public VEC3 {
+    EfSmoothAxis(f32 x, f32 y, f32 z) { setVec3(this, x, y, z); }
+}; /* size: 0xC */
+
+namespace nw4r {
+namespace ef {
+
+/* 0x800C3D88 (0x7A0): draws the manager's particles as one smooth stripe: each particle's ahead vector first, then
+ * either one strip per particle (the short connection modes) or the whole stripe, as a ribbon, a cross or a tube. */
+void DrawSmoothStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
+    EfEmitterDrawSetting* ed;
+    s32 count;
+
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1003, ef_smooth_pm_assert_str, pm);
+    }
+    if (!IsValidPointer((u32)pm->resource)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1005, ef_smooth_resource_assert_str, pm->resource);
+    }
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    if (!IsValidPointer((u32)ed)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1007, ef_smooth_ed_assert_str, ed);
+    }
+    count = ef_stripe_draw_count(this, pm);
+    if (count != 0) {
+        MTX34 view_mtx;
+        EfDrawParticle* p;
+        u32 flags;
+        u32 order;
+        MTX34 mtx;
+        VEC3 ahead;
+
+        MTX34_ctor(&view_mtx);
+        ef_draw_info_view_mtx(&info, &view_mtx);
+        AheadContext ctx(&view_mtx, pm);
+        ef_smooth_first_ahead(&ahead, this, ed, &ctx);
+        for (p = (EfDrawParticle*)ef_pm_list_head((EfParticleState*)pm); p != NULL;
+             p = (EfDrawParticle*)ef_pm_list_next(pm, p)) {
+            if (p->ahead.x <= 1.0f) {
+                break;
+            }
+            copyVec3(&p->ahead, &ahead);
+        }
+
+        flags = (ef_smooth_draw_order(this, ed) ? 0x10 : 0) | (ed->type_option == 2 ? 8 : 0);
+        order = ef_smooth_draw_order(this, ed);
+        MTX34_ctor(&mtx);
+        ef_draw_info_view_mtx(&info, &mtx);
+        mtx34_concat(&mtx, &mtx, &ctx.manager_mtx);
+        if (ef_smooth_flag_facing(flags)) {
+            MTX34 inv;
+            MTX34_ctor(&inv);
+            if (mtx34_inverse(&inv, &mtx)) {
+                VEC3 z;
+                copyVec3(&ctx.view_axis_z, setVec3(&z, inv.m[0][2], inv.m[1][2], inv.m[2][2]));
+            } else {
+                VEC3 z;
+                copyVec3(&ctx.view_axis_z, setVec3(&z, 0.0f, 0.0f, 1.0f));
+            }
+        }
+
+        {
+            s32 connect = ef_smooth_connect_type(this, ed);
+
+            if ((connect == 1 && count < 3) || (connect == 0 && count < 2)) {
+                CalcAheadFunc calc_ahead = GetCalcAheadFunc(pm);
+                GetFirstDrawParticleFunc first = GetGetFirstDrawParticleFunc(order);
+                GetNextDrawParticleFunc next = GetGetNextDrawParticleFunc(order);
+
+                for (p = first(pm); p != NULL; p = next(pm, p)) {
+                    VEC3 axis;
+                    MTX34 frame;
+
+                    VEC3_ctor(&axis);
+                    calc_ahead(&axis, &ctx, p);
+                    ef_smooth_draw_segment(&frame, this, &ctx, flags, p, &axis, (VEC3*)&p->world_pos);
+                }
+                return;
+            }
+        }
+
+        ef_smooth_setup_gx(this, &info, pm);
+        GXLoadPosMtxImm((const f32(*)[4])mtx34_get_ptr(&mtx), 0);
+        flags |= (mNumTexmap != 0);
+        p = GetGetFirstDrawParticleFunc(ef_smooth_draw_order(this, ed))(pm);
+        SetupGP(p, *ed, info, true, false);
+        {
+            s32 steps = ef_smooth_curve_steps(this, ed);
+            static EfSmoothAxis ef_smooth_axis_x(1.0f, 0.0f, 0.0f);
+            static EfSmoothAxis ef_smooth_axis_neg_x(-1.0f, 0.0f, 0.0f);
+            static EfSmoothAxis ef_smooth_axis_z(0.0f, 0.0f, 1.0f);
+            static EfSmoothAxis ef_smooth_axis_neg_z(0.0f, 0.0f, -1.0f);
+
+            if (steps == 0) {
+                steps = 1;
+            }
+            if (ed->type_option != 3) {
+                ef_smooth_draw_ribbon(this, &ctx, steps, flags, &ef_smooth_axis_x, &ef_smooth_axis_neg_x);
+                if (ed->type_option == 1) {
+                    ef_smooth_draw_ribbon(this, &ctx, steps, flags, &ef_smooth_axis_z, &ef_smooth_axis_neg_z);
+                }
+            } else {
+                u32 flush = 0;
+                if ((ed->flags & 8) != 0 || p->manager->emitter->effect->system->flush_gp == 0) {
+                    flush = 1;
+                }
+                ef_smooth_draw_tube(this, &ctx, steps, flags, flush);
+            }
+        }
+    }
 }
 
-/* Writes one u8 to the pipe. */
-void fn_800C715C(u8 value) {
-    GXWGFifo.u8 = value;
+}  // namespace ef
+}  // namespace nw4r
+
+extern "C" {
+
+/* The curve subdivision count of the draw setting. */
+s32 ef_smooth_curve_steps(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed) {
+    return ed->type_option3;
 }
 
-/* Writes a pair of f32 to the pipe. */
-void fn_800C716C(f32 x, f32 y) {
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
+/* 0x800C4530 (0x1B8): sets the stripe's GX state: the strategy's texture/TEV/channel setup, then a direct position
+ * and texcoord vertex format at the current matrix. */
+void ef_smooth_setup_gx(nw4r::ef::DrawSmoothStripeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm) {
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1126, ef_smooth_pm_assert_str, pm);
+    }
+    self->InitGraphics(pm, *(EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource), *info);
+    GXEnableTexOffsets(0, 1, 1);
+    GXClearVtxDesc();
+    GXSetVtxDesc(9, 1);
+    if (self->mNumTexmap != 0) {
+        GXSetVtxDesc(0xD, 1);
+    }
+    GXSetVtxAttrFmt(0, 9, 1, 4, 0);
+    GXSetVtxAttrFmt(0, 0xD, 1, 4, 0);
+    GXSetCurrentMtx(0);
 }
 
-/* Writes a pair of s16 to the pipe. */
-void fn_800C717C(s16 x, s16 y) {
-    GXWGFifo.s16 = x;
-    GXWGFifo.s16 = y;
+/* 0x800C46E8 (0x23C): the stripe's first ahead vector: for direction type 7 one manager axis (or their sum) by the
+ * stripe's axis bits, otherwise the emitter's X or Z axis (or a small diagonal) taken into manager space;
+ * normalised, falling back to the emitter's Y axis. */
+void ef_smooth_first_ahead(VEC3* out, nw4r::ef::DrawSmoothStripeStrategy* self, EfEmitterDrawSetting* ed,
+                           nw4r::ef::DrawSmoothStripeStrategy::AheadContext* ctx) {
+    VEC3 diagonal;
+    VEC3 axis_x;
+    VEC3 axis_y;
+    VEC3 axis_z;
+    VEC3 sum_xyz;
+    VEC3 sum_xy;
+    VEC3 x;
+    VEC3 y;
+    VEC3 z;
+
+    VEC3_ctor(out);
+    if (ed->type_direction == 7) {
+        switch (ef_smooth_axis_mode(self, ed)) {
+        case 8:
+            copyVec3(out, setVec3(&axis_x, ctx->manager_mtx_inv.m[0][0], ctx->manager_mtx_inv.m[1][0],
+                                  ctx->manager_mtx_inv.m[2][0]));
+            break;
+        default:
+            copyVec3(out, setVec3(&axis_y, ctx->manager_mtx_inv.m[0][1], ctx->manager_mtx_inv.m[1][1],
+                                  ctx->manager_mtx_inv.m[2][1]));
+            break;
+        case 16:
+            copyVec3(out, setVec3(&axis_z, ctx->manager_mtx_inv.m[0][2], ctx->manager_mtx_inv.m[1][2],
+                                  ctx->manager_mtx_inv.m[2][2]));
+            break;
+        case 24: {
+            VEC3* py;
+            VEC3* pz;
+
+            pz = setVec3(&z, ctx->manager_mtx_inv.m[0][2], ctx->manager_mtx_inv.m[1][2],
+                               ctx->manager_mtx_inv.m[2][2]);
+            py = setVec3(&y, ctx->manager_mtx_inv.m[0][1], ctx->manager_mtx_inv.m[1][1],
+                               ctx->manager_mtx_inv.m[2][1]);
+            addVec3(&sum_xy, setVec3(&x, ctx->manager_mtx_inv.m[0][0], ctx->manager_mtx_inv.m[1][0],
+                                     ctx->manager_mtx_inv.m[2][0]), py);
+            addVec3(&sum_xyz, &sum_xy, pz);
+            copyVec3(out, &sum_xyz);
+            break;
+        }
+        }
+    } else {
+        switch (ef_smooth_axis_mode(self, ed)) {
+        case 8:
+            mtx34_rotate_vec3(out, &ctx->emitter_mtx, ef_get_unit_x_vec());
+            mtx34_rotate_vec3(out, &ctx->manager_mtx_inv, out);
+            break;
+        default:
+            copyVec3(out, &ctx->emitter_axis_y);
+            return;
+        case 16:
+            mtx34_rotate_vec3(out, &ctx->emitter_mtx, ef_get_unit_z_vec());
+            mtx34_rotate_vec3(out, &ctx->manager_mtx_inv, out);
+            break;
+        case 24:
+            setVec3(&diagonal, 1.0f, 1.0f, 1.0f);
+            mtx34_rotate_vec3(out, &ctx->emitter_mtx, &diagonal);
+            mtx34_rotate_vec3(out, &ctx->manager_mtx_inv, out);
+            break;
+        }
+    }
+    if (ef_vec3_normalize(out) == 0) {
+        copyVec3(out, &ctx->emitter_axis_y);
+    }
 }
 
-/* Writes a pair of u16 to the pipe. */
-void fn_800C7194(u16 x, u16 y) {
-    GXWGFifo.u16 = x;
-    GXWGFifo.u16 = y;
+/* The first-ahead axis bits (3-5) of the draw setting's stripe flags. */
+s32 ef_smooth_axis_mode(nw4r::ef::DrawSmoothStripeStrategy* self, const EfEmitterDrawSetting* ed) {
+    return ed->stripe_connect & 0x38;
 }
 
-/* Writes a pair of s8 to the pipe. */
-void fn_800C71AC(s8 x, s8 y) {
-    GXWGFifo.s8 = x;
-    GXWGFifo.s8 = y;
+}  // extern "C"
+
+namespace nw4r {
+namespace ef {
+
+/* 0x800C4930 (0x3BC): the ahead-vector builder the draw setting's direction type (and, for type 6, the stripe's
+ * connection mode) selects. */
+DrawStrategyImpl::CalcAheadFunc DrawSmoothStripeStrategy::GetCalcAheadFunc(EfDrawParticleManager* pm) {
+    EfEmitterDrawSetting* ed;
+
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1226, ef_smooth_pm_assert_str, pm);
+    }
+    if (!IsValidPointer((u32)pm->resource)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1227, ef_smooth_resource_assert_str, pm->resource);
+    }
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    if (!IsValidPointer((u32)ed)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1230, ef_smooth_ed_assert_str, ed);
+    }
+    switch (ed->type_direction) {
+    case 0:
+        return (CalcAheadFunc)ef_ahead_move_dir;
+    case 1:
+        return (CalcAheadFunc)ef_ahead_from_emitter;
+    case 2:
+        return (CalcAheadFunc)ef_ahead_emitter_axis_y;
+    case 3:
+        return ef_smooth_ahead_type3;
+    case 5:
+    case 7:
+        return (CalcAheadFunc)ef_ahead_manager_axis_y;
+    case 6:
+        switch (ed->stripe_connect & 7) {
+        case 1:
+            return ef_smooth_ahead_type6_link1;
+        case 2:
+            return ef_smooth_ahead_type6_link2;
+        default:
+            return ef_smooth_ahead_type6;
+        }
+    default:
+        return (CalcAheadFunc)ef_ahead_move_dir;
+    }
 }
 
-/* Writes a pair of u8 to the pipe. */
-void fn_800C71C4(u8 x, u8 y) {
-    GXWGFifo.u8 = x;
-    GXWGFifo.u8 = y;
+/* 0x800C4CEC (0x15C): the base ahead context plus the emitter's X axis in manager space. */
+DrawSmoothStripeStrategy::AheadContext::AheadContext(const MTX34* view, EfDrawParticleManager* pm)
+    : DrawStrategyImpl::AheadContext(view, pm) {
+    VEC3 axis;
+
+    VEC3_ctor(&emitter_axis_x);
+    VEC3_ctor(&view_axis_z);
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1265, ef_smooth_pm_assert_str, pm);
+    }
+    setVec3(&axis, emitter_mtx.m[0][0], emitter_mtx.m[1][0], emitter_mtx.m[2][0]);
+    mtx34_rotate_vec3(&emitter_axis_x, &manager_mtx_inv, &axis);
 }
 
-/* Writes three f32 to the pipe. */
-void fn_800C71DC(f32 x, f32 y, f32 z) {
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
-    GXWGFifo.f32 = z;
+}  // namespace ef
+}  // namespace nw4r
+
+extern "C" {
+
+/* 0x800C4E48 (0x35C): the ahead vector toward the next elder particle (or, for the eldest, from the emitter origin),
+ * normalised, falling back to the emitter's Y axis. */
+void ef_smooth_ahead_type3(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p) {
+    EfDrawParticle* next;
+
+    if (!IsValidPointer((u32)out)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1278, ef_smooth_yaxis_assert_str, out);
+    }
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1279, ef_smooth_context_assert_str, ctx);
+    }
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1280, ef_smooth_particle_assert_str, p);
+    }
+    next = (EfDrawParticle*)ef_pm_prev_alive(ctx->particle_manager, p);
+    if (next != NULL) {
+        PSVECSubtract((f32*)out, (const f32*)&p->world_pos, (const f32*)&next->world_pos);
+    } else {
+        PSVECSubtract((f32*)out, (const f32*)&p->world_pos, (const f32*)&ctx->emitter_center);
+    }
+    if (ef_vec3_normalize(out) == 0) {
+        copyVec3(out, &ctx->emitter_axis_y);
+    }
 }
 
-/* Writes three s16 to the pipe. */
-void fn_800C71F0(s16 x, s16 y, s16 z) {
-    GXWGFifo.s16 = x;
-    GXWGFifo.s16 = y;
-    GXWGFifo.s16 = z;
+/* 0x800C51A4 (0x400): the ahead vector across the particle's two neighbours (each direction normalised), falling
+ * back to the emitter's Y axis. */
+void ef_smooth_ahead_type6(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p) {
+    EfDrawParticle* younger;
+    EfDrawParticle* elder;
+    VEC3 to_younger;
+    VEC3 to_elder;
+    VEC3 zero_a;
+    VEC3 zero_b;
+
+    if (!IsValidPointer((u32)out)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1305, ef_smooth_yaxis_assert_str, out);
+    }
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1306, ef_smooth_context_assert_str, ctx);
+    }
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1307, ef_smooth_particle_assert_str, p);
+    }
+    younger = (EfDrawParticle*)ef_pm_next_alive(ctx->particle_manager, p);
+    elder = (EfDrawParticle*)ef_pm_prev_alive(ctx->particle_manager, p);
+    setVec3(&to_younger, 0.0f, 0.0f, 0.0f);
+    if (younger != NULL) {
+        PSVECSubtract((f32*)&to_younger, (const f32*)&younger->world_pos, (const f32*)&p->world_pos);
+        if (ef_vec3_normalize(&to_younger) == 0) {
+            copyVec3(&to_younger, setVec3(&zero_a, 0.0f, 0.0f, 0.0f));
+        }
+    }
+    setVec3(&to_elder, 0.0f, 0.0f, 0.0f);
+    if (elder != NULL) {
+        PSVECSubtract((f32*)&to_elder, (const f32*)&elder->world_pos, (const f32*)&p->world_pos);
+        if (ef_vec3_normalize(&to_elder) == 0) {
+            copyVec3(&to_elder, setVec3(&zero_b, 0.0f, 0.0f, 0.0f));
+        }
+    }
+    PSVECSubtract((f32*)out, (const f32*)&to_younger, (const f32*)&to_elder);
+    if (ef_vec3_normalize(out) == 0) {
+        copyVec3(out, &ctx->emitter_axis_y);
+    }
 }
 
-/* Writes three u16 to the pipe. */
-void fn_800C7210(u16 x, u16 y, u16 z) {
-    GXWGFifo.u16 = x;
-    GXWGFifo.u16 = y;
-    GXWGFifo.u16 = z;
+/* 0x800C55A4 (0x400): as the two-neighbour ahead vector, with the list wrapping around for a looped stripe. */
+void ef_smooth_ahead_type6_link1(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p) {
+    EfDrawParticle* younger;
+    EfDrawParticle* elder;
+    VEC3 to_younger;
+    VEC3 to_elder;
+    VEC3 zero_a;
+    VEC3 zero_b;
+
+    if (!IsValidPointer((u32)out)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1345, ef_smooth_yaxis_assert_str, out);
+    }
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1346, ef_smooth_context_assert_str, ctx);
+    }
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1347, ef_smooth_particle_assert_str, p);
+    }
+    younger = (EfDrawParticle*)ef_pm_next_alive(ctx->particle_manager, p);
+    if (younger == NULL) {
+        younger = (EfDrawParticle*)ef_pm_first_alive((EfDrawList*)ctx->particle_manager);
+    }
+    elder = (EfDrawParticle*)ef_pm_prev_alive(ctx->particle_manager, p);
+    if (elder == NULL) {
+        elder = (EfDrawParticle*)ef_pm_last_alive((EfParticleState*)ctx->particle_manager);
+    }
+    VEC3_ctor(&to_younger);
+    PSVECSubtract((f32*)&to_younger, (const f32*)&younger->world_pos, (const f32*)&p->world_pos);
+    if (ef_vec3_normalize(&to_younger) == 0) {
+        copyVec3(&to_younger, setVec3(&zero_a, 0.0f, 0.0f, 0.0f));
+    }
+    VEC3_ctor(&to_elder);
+    PSVECSubtract((f32*)&to_elder, (const f32*)&elder->world_pos, (const f32*)&p->world_pos);
+    if (ef_vec3_normalize(&to_elder) == 0) {
+        copyVec3(&to_elder, setVec3(&zero_b, 0.0f, 0.0f, 0.0f));
+    }
+    PSVECSubtract((f32*)out, (const f32*)&to_younger, (const f32*)&to_elder);
+    if (ef_vec3_normalize(out) == 0) {
+        copyVec3(out, &ctx->emitter_axis_y);
+    }
 }
 
-/* Writes three s8 to the pipe. */
-void fn_800C7230(s8 x, s8 y, s8 z) {
-    GXWGFifo.s8 = x;
-    GXWGFifo.s8 = y;
-    GXWGFifo.s8 = z;
+/* 0x800C59A4 (0x3B8): as the two-neighbour ahead vector, with the eldest particle reaching to the emitter origin. */
+void ef_smooth_ahead_type6_link2(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p) {
+    EfDrawParticle* younger;
+    EfDrawParticle* elder;
+    VEC3 to_younger;
+    VEC3 to_elder;
+
+    if (!IsValidPointer((u32)out)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1386, ef_smooth_yaxis_assert_str, out);
+    }
+    if (!IsValidPointer((u32)ctx)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1387, ef_smooth_context_assert_str, ctx);
+    }
+    if (!IsValidPointer((u32)p)) {
+        nw4r::db::Panic(ef_smooth_file_str, 1388, ef_smooth_particle_assert_str, p);
+    }
+    younger = (EfDrawParticle*)ef_pm_next_alive(ctx->particle_manager, p);
+    elder = (EfDrawParticle*)ef_pm_prev_alive(ctx->particle_manager, p);
+    setVec3(&to_younger, 0.0f, 0.0f, 0.0f);
+    if (younger != NULL) {
+        PSVECSubtract((f32*)&to_younger, (const f32*)&younger->world_pos, (const f32*)&p->world_pos);
+        ef_vec3_normalize(&to_younger);
+    }
+    VEC3_ctor(&to_elder);
+    if (elder != NULL) {
+        PSVECSubtract((f32*)&to_elder, (const f32*)&elder->world_pos, (const f32*)&p->world_pos);
+    } else {
+        PSVECSubtract((f32*)&to_elder, (const f32*)&ctx->emitter_center, (const f32*)&p->world_pos);
+    }
+    ef_vec3_normalize(&to_elder);
+    PSVECSubtract((f32*)out, (const f32*)&to_younger, (const f32*)&to_elder);
+    if (ef_vec3_normalize(out) == 0) {
+        copyVec3(out, &ctx->emitter_axis_y);
+    }
 }
 
-/* Writes three u8 to the pipe. */
-void fn_800C7250(u8 x, u8 y, u8 z) {
-    GXWGFifo.u8 = x;
-    GXWGFifo.u8 = y;
-    GXWGFifo.u8 = z;
-}
+}  // extern "C"
 
-#ifdef __cplusplus
-}
-#endif
+/* The destructor is the class's inline one, emitted at the end of this TU; retail calls the base destructor out of
+ * line from it (`bl` + `extsh` of the delete flag), which a deferred inline body only gets with inlining off at its
+ * point of emission. */
+#pragma dont_inline on

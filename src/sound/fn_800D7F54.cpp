@@ -48,6 +48,11 @@
  *
  * Data runs in this range are recorded in `splits.txt` as comments and not claimed (playbook 23,
  * docs/plan.md 8.4); the `extab`/`extabindex` fragments travel with the code unit.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_800E8228`,
+ *     `lbl_807963E0`, `lbl_80794978`, `lbl_807963F8`, `fn_800F2680`.
+ *   flipcheck: `.data` size gap.
+ *   flipcheck: `.sdata` claimed, not emitted.
+ *   flipcheck: force-active in retail .comment, not in ours: `fn_800DB684`.
  */
 #pragma optimization_level 4
 #pragma peephole off
@@ -68,7 +73,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "draw_shape/fn_800532DC.h" /* fn_800532DC, owned by draw_shape.cpp's range (rule 2) */
+#include "draw_shape/mtx34_copy.h" /* mtx34_copy, owned by draw_shape.cpp's range (rule 2) */
 #include "sound/se_req.h" /* fn_800DFDCC / fn_800E0428, owned by se_req.cpp's range (rule 2) */
 #include "Pl/plw.h"
 #include "pl.h"
@@ -2030,13 +2035,13 @@ extern "C" void fn_800D80B8(void) {
             my_player_no_set(0);
             copyVec3(&self->field_0x004, &get_camera_pos());
             copyVec3(&self->field_0x010, &get_camera_direction());
-            fn_800532DC(&self->field_0x29280, &get_current_view_mtx());
+            mtx34_copy(&self->field_0x29280, &get_current_view_mtx());
             fn_800E8498_c1(&self->field_0x29280, 0);
 
             my_player_no_set(1);
             copyVec3(&self->field_0x01C, &get_camera_pos());
             copyVec3(&self->field_0x028, &get_camera_direction());
-            fn_800532DC(&self->field_0x292B0, &get_current_view_mtx());
+            mtx34_copy(&self->field_0x292B0, &get_current_view_mtx());
             fn_800E8498_c1(&self->field_0x292B0, 1);
 
             my_player_no_set((s8)idx);
@@ -2045,7 +2050,7 @@ extern "C" void fn_800D80B8(void) {
             copyVec3(&self->field_0x010, &get_camera_direction());
             copyVec3(&self->field_0x01C, &self->field_0x004);
             copyVec3(&self->field_0x028, &self->field_0x010);
-            fn_800532DC(&self->field_0x29280, &get_current_view_mtx());
+            mtx34_copy(&self->field_0x29280, &get_current_view_mtx());
             fn_800E8498_c1(&self->field_0x29280, 0);
             fn_800E8498_c1(NULL, 1);
             if (work != NULL) {

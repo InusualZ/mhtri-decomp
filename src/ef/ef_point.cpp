@@ -98,8 +98,8 @@ extern u16 fn_800A9FB0(void *self, u16 id, struct EfEmitter *em, f32 f);
 extern void fn_800A99B4(void *self, nw4r::math::VEC3 *out, struct EfEmitter *em, nw4r::math::VEC3 *a,
                         nw4r::math::VEC3 *b, nw4r::math::VEC3 *c, nw4r::math::VEC3 *d);
 extern f32 sqrt_f32(f32 x);
-extern void fn_8009C760(f32 *a, f32 *b, f32 angle);
-extern void fn_8009C484(nw4r::math::VEC3 *a, nw4r::math::VEC3 *b);
+extern void ef_sin_cos(f32 *a, f32 *b, f32 angle);
+extern void ef_vec3_normalize_to(nw4r::math::VEC3 *a, nw4r::math::VEC3 *b);
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -157,12 +157,12 @@ void fn_800CD584(void *self, EfEmitter *em, EfPm *pm, s32 count, void *unused, v
                 s = (lbl_8079630C - lbl_80796310 * t) * t;
             v_38.x = s;
             r = sqrt_f32(lbl_80796308 - v_38.x * v_38.x);
-            fn_8009C760(&v_38.z, &v_38.y,
+            ef_sin_cos(&v_38.z, &v_38.y,
                         lbl_80796304 * (lbl_80796314 * ef_random_float(&em->rate)));
             v_38.y = v_38.y * r;
             v_38.z = v_38.z * r;
             setVec3(&v_2C, v_38.x, lbl_80796300, v_38.z);
-            fn_8009C484(&v_2C, &v_2C);
+            ef_vec3_normalize_to(&v_2C, &v_2C);
             VEC3_ctor(&v_20);
             fn_800A99B4(self, &v_20, em, &v_44, &v_38, &v_38, &v_2C);
             v_b = v_20;

@@ -93,7 +93,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         if (!swept) {
             angle = (params->angle_end - params->angle_base) * ef_random_float(&em->progress);
         }
-        fn_8009C760(&fC, &f8, range + angle);
+        ef_sin_cos(&fC, &f8, range + angle);
         setVec3(&v64, fC, 0.0f, -f8);
         v88.x = scale_a * (v64.x * scale);
         v88.y = 0.0f;

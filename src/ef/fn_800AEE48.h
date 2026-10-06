@@ -1,6 +1,6 @@
 /* ef/fn_800AEE48.h - declarations (C linkage) for `ef/fn_800AEE48.cpp`'s symbols the effect modules call and for the
- * `ef/ef_drawstripestrategy.cpp` symbols its own header does not carry (`fn_800B4B04`..`fn_800B95C0`), with the two
- * records the particle-list walkers take.  `fn_800B7DB0` (unwritten) keeps the consumers' `void*`/`MTX34*` view. */
+ * `ef/ef_drawstripestrategy.cpp` symbols its own header does not carry (`fn_800B4B04`..`ef_pm_last_alive`), with the two
+ * records the particle-list walkers take. */
 #ifndef MHTRI_EF_FN_800AEE48_H
 #define MHTRI_EF_FN_800AEE48_H
 
@@ -12,10 +12,8 @@
 extern "C" {
 #endif
 
-f32 fn_800B5A48(void);
-int fn_800B59E4(void* self);
-void* fn_800B4B04(void* self, s16 flag);
-void fn_800B7DB0(void* em, MTX34* out);
+f32 ef_float_epsilon(void);
+int ef_vec3_normalize(void* self);
 /* 0x800B0B90 - `self -= b` in place, returning `self`. */
 Vec* fn_800B0B90(Vec* self, Vec* b);
 
@@ -41,13 +39,13 @@ typedef struct EfDrawList {
 } EfDrawList; /* size: 0x40 */
 
 /* Walks the particle list at +0x3C until the callback reports 1 (or the end). */
-void* fn_800B5A64(EfDrawList* self);
+void* ef_pm_first_alive(EfDrawList* self);
 /* Walks the particle list at +0x38. */
-void* fn_800B8D48(void* self, void* node);
+void* ef_pm_prev_alive(void* self, void* node);
 /* Walks the auxiliary list through the per-node offset table until the callback reports 1. */
-void* fn_800B5ACC(void* self, void* node);
+void* ef_pm_next_alive(void* self, void* node);
 /* Walks the list starting at the particle record's +0x3C head. */
-void* fn_800B95C0(EfParticleState* self);
+void* ef_pm_last_alive(EfParticleState* self);
 
 
 /* The resource-system entry points `ef/fn_800AEE48.cpp` owns: the walker the manager builds, the

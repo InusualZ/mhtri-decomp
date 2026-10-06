@@ -21,6 +21,9 @@
  *   The other 13 partial rows have no recorded cause (`symdiff.py -u ef/effect --all`).
  *   flipcheck: `.bss`/`.ctors`/`.data` claimed, not emitted; `.text` (0x168C of 0x1708) and `.sdata2` (0x10 of 0x30)
  *   short of the claim; `.text`, extab and extabindex differing.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_800A4420`,
+ *     `lbl_8058A880`, `eft_name_tbl_ptr`, `_savegpr_24`, `_savegpr_27`, `_restgpr_24`, `VEC3_ctor`, `_restgpr_27`,
+ *     `_savegpr_26`, `_restgpr_26`, `fn_800F6B6C`.
  */
 
 #include "ef/eft_scnbox_data_ptr.h" /* eft_scnbox_data_ptr (rule 2: the owner's header) */
@@ -174,12 +177,12 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
 extern "C" {
 /* the engine vector/matrix helpers */
 void color_rgba_copy(void* dst, void* src);
-void fn_800532DC(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
+void mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void fn_802BDE90(f32* out_a, f32* out_b);
-void fn_800834F0(void* out);
-void* fn_800A8944(void* self);
+void VEC2_ctor(void* out);
+void* ef_emitter_tex_flags(void* self);
 void fn_800A898C(void* dst, const void* src);
-void fn_800AEE0C(void* dst, void* src);
+void ef_pm_handle(void* dst, void* src);
 void fn_800B38C0(void* out, void* a, void* b, void* c);
 void fn_800A602C(void* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* mtx, f32 a, f32 b);
 void fn_800AC100(void* mgr, u8 mode, u8* a, u8* b, u8* c, f32 scale);
@@ -286,7 +289,7 @@ extern "C" void fn_800F95A4(void* self) {
     MTX34_ctor(&world);
     VEC3_ctor(&pos);
     copyVec3(&pos, &get_camera_pos());
-    fn_800532DC(&world, &get_current_view_mtx());
+    mtx34_copy(&world, &get_current_view_mtx());
     fn_802BDE90(&fov, &aspect);
     fn_800A602C(self, &pos, &world, fov, aspect);
 }
@@ -320,7 +323,7 @@ void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
     MTX34_ctor(&mtx);
     if (effect != NULL) {
         const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)fn_800A60C0(effect);
-        fn_800532DC(&mtx, src);
+        mtx34_copy(&mtx, src);
         mtx.m[0][3] = pos->x;
         mtx.m[1][3] = pos->y;
         mtx.m[2][3] = pos->z;
@@ -334,7 +337,7 @@ extern "C" void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos) {
     MTX34_ctor(&mtx);
     if (effect != NULL) {
         const nw4r::math::MTX34* src = (const nw4r::math::MTX34*)fn_800A60C0(effect);
-        fn_800532DC(&mtx, src);
+        mtx34_copy(&mtx, src);
         mtx.m[0][3] += pos->x;
         mtx.m[1][3] += pos->y;
         mtx.m[2][3] += pos->z;
@@ -424,7 +427,7 @@ extern "C" EftParticleArgs* fn_800F9A8C(EftParticleArgs* self) {
 void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale) {
     nw4r::math::VEC3 v;
     VEC3_ctor(&v);
-    fn_800834F0(&v);
+    VEC2_ctor(&v);
     if (scale >= lbl_807965DC) {
         if (fn_800A51D0(effect) != 0) {
             void* handle = fn_800A51D8(effect, 0);
@@ -684,9 +687,9 @@ extern "C" void fn_800FA450(void* effect) {
         return;
     }
     u8 flags;
-    fn_800AEE0C(&flags, fn_800A9714(handle, 0));
+    ef_pm_handle(&flags, fn_800A9714(handle, 0));
     fn_800A898C(&mode, &flags);
-    u8 bits = *(u8*)((u8*)fn_800A8944(&mode) + 3);
+    u8 bits = *(u8*)((u8*)ef_emitter_tex_flags(&mode) + 3);
     u8 which;
     if ((bits & 0x80) != 0) {
         which = 0;

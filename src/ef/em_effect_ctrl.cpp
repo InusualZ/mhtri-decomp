@@ -15,6 +15,7 @@
  *    the quad at +0x40; MWCC allocates the five locals in reverse order whatever the declaration order.
  *   flipcheck: `.sdata` claimed, not emitted; `.text` (0x9E8 of 0x9F0) and `.sdata2` (0x10 of 0x50) short of the
  *   claim and differing; extabindex differs in 1 byte.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_80796708`.
  * SHAPES. `EmEffectUnit::handles` is an array member and `fn_80101FA4` writes `unit->handles[i]->field` inline:
  *   retail reloads the handle and `unit->entries[i]` at every access.
  *   The screen-box test and its off-screen accumulator use the negated comparisons (`!(x <= lo)`, `!(x >= hi)`,
@@ -147,7 +148,7 @@ struct EmEffectWork {
 extern "C" f32 fn_80050EDC(const nw4r::math::VEC3* work);
 extern "C" void subVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" f32 fn_80050F24(const nw4r::math::VEC3* in);
-extern "C" f32 fn_80052214(const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
+extern "C" f32 vec3_dot(const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void fn_80050850(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
 extern "C" void vec3_scale(nw4r::math::VEC3* out, const nw4r::math::VEC3* in, f32 scale);
 extern "C" void addVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
@@ -283,7 +284,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     copyVec3(&vF4, &vAC);
     model = fn_80082BCC(pRoot);
     fn_80075258(&model, &v130, &unit->world_pos);
-    f29 = fn_80052214(&v100, &vF4);
+    f29 = vec3_dot(&v100, &vF4);
     fn_80050850(&v100, &v100);
     fn_80050850(&vF4, &vF4);
     get_camera_pos_c1(&v94);
@@ -293,7 +294,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     addVec3To(&v124, &vE8);
     if (!(v130.x <= lbl_807966FC) && !(v130.x >= lbl_80796700) && !(v130.y <= lbl_807966FC)
         && !(v130.y >= lbl_80796704) && !(f29 < lbl_807966F4)) {
-        fn_80052214(&vE8, &v100);
+        vec3_dot(&vE8, &v100);
         vec3_scale(&v64, &v100, lbl_80796708);
         get_camera_pos_c1(&v70);
         addVec3(&v7C, &v70, &v64);

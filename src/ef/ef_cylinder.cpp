@@ -35,7 +35,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The 3-float vector `nw4r/math.h` owns, spelled `VEC3` here: this unit's whole vector
- * API (`fn_8009C484`, `assignVec3`, the spawn slot) works on it. */
+ * API (`ef_vec3_normalize_to`, `assignVec3`, the spawn slot) works on it. */
 typedef nw4r::math::VEC3 VEC3; /* size: 0x0C */
 
 /* The six-float parameter block `params`. */
@@ -83,9 +83,9 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 /* nw4r::math and effect-library helpers; retail's relocations carry their plain map names, so they
  * have C linkage (`VEC3_ctor` comes from `mh3_pad.h`). */
 extern "C" {
-extern void fn_8009C484(VEC3* out, VEC3* in);
+extern void ef_vec3_normalize_to(VEC3* out, VEC3* in);
 extern void assignVec3(VEC3* out, VEC3* in);
-extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);
+extern void ef_sin_cos(f32* out_a, f32* out_b, f32 angle);
 extern void fn_800A99B4(s32 ctx, VEC3* out, EfWork* em, VEC3* pos, VEC3* a, VEC3* b, VEC3* c);
 extern u32  fn_800A9FB0(s32 ctx, u16 id, EfWork* em, f32 scale);
 extern f32  fn_80463F10(f32 a, f32 b);
@@ -145,7 +145,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         if (!(flags & 0x00020000)) {
             angle = (params->range_end - params->range_begin) * ef_random_float(&em->progress);
         }
-        fn_8009C760(&cs, &sn, phase + angle);
+        ef_sin_cos(&cs, &sn, phase + angle);
         setVec3(&v64, cs, 0.0f, -sn);
         v88.x = size_x * (v64.x * factor);
         if (flags & 0x00020000) {
@@ -155,9 +155,9 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         }
         v88.z = size_z * (v64.z * factor);
         setVec3(&v52, v88.x, 0.0f, v88.z);
-        fn_8009C484(&v52, &v52);
+        ef_vec3_normalize_to(&v52, &v52);
         assignVec3(&v40, &v88);
-        fn_8009C484(&v40, &v40);
+        ef_vec3_normalize_to(&v40, &v40);
         fn_800A99B4(ctx, &v76, em, &v88, &v52, &v40, &v64);
         v16 = v76;
         v28 = v88;

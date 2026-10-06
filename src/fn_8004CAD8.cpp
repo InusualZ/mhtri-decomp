@@ -70,6 +70,11 @@
  *     written: those six fields have no context name yet (rule 5).
  *
  * Inventory / addresses / sizes: `python tools/units/ledger.py unit fn_8004CAD8.cpp`.
+ *   flipcheck: `.bss` claimed, not emitted.
+ *   flipcheck: `.rodata` claimed, not emitted.
+ *   flipcheck: `.sbss` claimed, not emitted.
+ *   flipcheck: `.sdata` claimed, not emitted.
+ *   flipcheck: `.sdata2` claimed, not emitted.
  */
 
 #include "types.h"

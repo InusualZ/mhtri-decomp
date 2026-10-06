@@ -26,7 +26,7 @@ u32 fn_80062750(void *out, void *key);     /* 0x80062750 - the resource-table lo
 u32 fn_8005DC24(u32 *p);                   /* 0x8005DC24 - loads the word at +0x0 of `p`, +4 */
 
 /* The frame/rate helpers `g3d/g3d_resanmchr.cpp`'s channel evaluators call (types the target bodies imply). */
-f32 fn_800610AC(f32 value);                /* 0x800610AC - the reciprocal helper */
+f32 math_reciprocal(f32 value);                /* 0x800610AC - the reciprocal helper */
 void *fn_800618BC(void *self);             /* 0x800618BC - the resource-table base */
 s32 fn_800628C8(void *self, s32 key);      /* 0x800628C8 - the table entry lookup */
 
