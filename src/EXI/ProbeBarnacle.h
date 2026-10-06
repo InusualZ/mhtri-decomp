@@ -5,6 +5,7 @@
 #define MHTRI_EXI_PROBEBARNACLE_H
 
 #include "types.h"
+#include "gx.h" /* GXLightObj */
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,6 +24,9 @@ void GXSetVtxAttrFmt(u32 vtxfmt, u32 attr, u32 cnt, u32 type, u8 frac);
 void GXSetNumChans(u8 nChans);
 void GXSetChanCtrl(u32 chan, u8 enable, u32 ambSrc, u32 matSrc, u32 lightMask, u32 diffFn, u32 attnFn);
 void GXSetNumTexGens(u8 nTexGens);
+
+/* 0x804B7C40 - loads the light object `lt_obj` into the hardware light slot selected by the `light` mask bit. */
+void GXLoadLightObjImm(const GXLightObj* lt_obj, u32 light);
 
 #ifdef __cplusplus
 }

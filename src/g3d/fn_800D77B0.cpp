@@ -23,9 +23,9 @@
 
 /* The `g3d_calcworld.cpp` owner's declarations of the matrix-id helpers this unit calls. */
 #include "g3d/g3d_calcworld.h"
-/* The band header's declarations of the matrix copy/concat helpers (fn_8007100C/mtx34_concat, owner
+/* The band header's declarations of the matrix copy/concat helpers (mtx34_copy_ps/mtx34_concat, owner
  * `g3d/g3d_calcview.cpp`). */
-#include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8007100C (rule 2) */
+#include "g3d/g3d_calcview.h" /* fn_800710BC/mtx34_copy_ps (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
@@ -48,7 +48,7 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
     u32 flags = pRec->mFlags;
 
     if ((flags & 2) != 0 || (flags & 4) != 0) {
-        fn_8007100C(pDstMtx, pSrcMtx);
+        mtx34_copy_ps(pDstMtx, pSrcMtx);
     } else if ((flags & 0x20) != 0) {
         if (fn_800D79A0(mtxId) != 0) {
             VEC3 v;
@@ -65,7 +65,7 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
     } else {
         MTX34 mtx;
         MTX34_ctor(&mtx);
-        fn_8007100C(&mtx, &pRec->mMtx);
+        mtx34_copy_ps(&mtx, &pRec->mMtx);
         mtx.m[0][3] *= pSrcScale->x;
         mtx.m[1][3] *= pSrcScale->y;
         mtx.m[2][3] *= pSrcScale->z;

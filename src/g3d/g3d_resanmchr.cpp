@@ -34,7 +34,7 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* IS_VALID_PTR (rule 1) */
-#include "g3d/g3d_calcview.h" /* fn_8007100C (rule 2) */
+#include "g3d/g3d_calcview.h" /* mtx34_copy_ps (rule 2) */
 #include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
 #include "g3d/g3d_anmchr.h"      /* fn_800610AC, fn_800618BC, fn_800628C8 (rule 2) */
 #include "g3d/g3d_rescommon.h"   /* nw4r::g3d::ResDic (rule 2) */
@@ -1405,12 +1405,12 @@ void fn_8008E408(ResAnmChrObj* self, f32* out)
             out[11] = self->mat[11];
         }
     } else if (flags & 0x40) {
-        fn_8007100C(out, self->mat);
+        mtx34_copy_ps((Mtx34*)out, (const Mtx34*)self->mat);
         out[3] = lbl_80795ED0;
         out[7] = lbl_80795ED0;
         out[11] = lbl_80795ED0;
     } else {
-        fn_8007100C(out, self->mat);
+        mtx34_copy_ps((Mtx34*)out, (const Mtx34*)self->mat);
     }
 }
 
@@ -1558,7 +1558,7 @@ void fn_8008F3DC(ResAnmChrObj* self, const void* src)
     setVec3(&rec, fn_8008F6C4((u32)src, 0), fn_8008F6C4((u32)src, 1), fn_8008F6C4((u32)src, 2));
     fn_8008E8D0(self, (const f32*)&rec);
     if (self->flags & 8) {
-        fn_8007100C(self->mat, src);
+        mtx34_copy_ps((Mtx34*)self->mat, (const Mtx34*)src);
     } else {
         setVec3((nw4r::math::VEC3*)norm, math_reciprocal(rec.x), math_reciprocal(rec.y), math_reciprocal(rec.z));
         fn_8050133C(self->mat, src, norm);

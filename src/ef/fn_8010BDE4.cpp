@@ -159,7 +159,7 @@ extern "C" {
 void mtx34_identity(nw4r::math::MTX34* mtx);
 void fn_800513F0(nw4r::math::VEC3* v, f32 s);
 void mtx34_copy(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
-void fn_8007100C(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
+void mtx34_copy_ps(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void mtx34_concat(nw4r::math::MTX34* a, nw4r::math::MTX34* b, nw4r::math::MTX34* m);
 void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
 void g3d_root_model_bind(s32 root, u32 id);
@@ -582,7 +582,7 @@ extern "C" void fn_8010CE80(void* arg)
         base = fn_800E0A8C((MHchar*)((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x118);
         handle = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x114)->GetResNode(i + 1).mpData;
         idx = fn_8006FDCC(&handle);
-        fn_8007100C(&((nw4r::math::MTX34*)base)[idx], &mtxB);
+        mtx34_copy_ps(&((nw4r::math::MTX34*)base)[idx], &mtxB);
     }
 }
 

@@ -17,7 +17,7 @@
  */
 #include "types.h"
 #include "nw4r/math.h"
-#include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8007100C (rule 2) */
+#include "g3d/g3d_calcview.h" /* fn_800710BC/mtx34_copy_ps (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_80075DCC, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
@@ -129,7 +129,7 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
 
     if ((flag & 0x2) || (flag & 0x4)) {
         if (fn_800D7F40(handle)) {
-            fn_8007100C(pMtx, pSrcMtx);
+            mtx34_copy_ps(pMtx, pSrcMtx);
         } else {
             fn_8050133C(pMtx, pSrcMtx, pScale);
         }

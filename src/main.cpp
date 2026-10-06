@@ -12,6 +12,8 @@
  * addresses into one section base, which the target does not do).  `system_w`/`Screen_w` and the pad state that follow
  * belong to `mh3_pad.cpp`.
  *
+ * NAMES. GUESS: `render_mode_copy` (0x8003F940: the aggregate `GXRenderModeObj` copy).
+ *
  * Batch 4 extended the split from the 0x80040360 cut to the real seam 0x80040478 (`tudiscover`'s boundary,
  * commit 845a6d8): the `ck_WideMode`/`Screen_w` group belongs to this file, and 0x80040478 is where
  * sys_mem.cpp's `__nw__FUl` starts.
@@ -22,7 +24,7 @@
  * does; and the `.sdata2` label set 0x80795AA0-0x80795AD8 is shared across `main` <-> `fn_8003F9E4` <->
  * `fn_8004030C`, which a per-TU literal pool cannot be split across. The runtime dump names the untitled
  * ones: `fn_8003F620` = create_memory_heaps, `fn_8003F728` = mem_create_exp_heap, `fn_8003F730` = render
- * init, `fn_8003F940` = GXRenderModeObj copy, `fn_8003F9E4` = TV-mode re-init, `fn_8003FCCC` = GX/VI setup,
+ * init, `render_mode_copy` = GXRenderModeObj copy, `fn_8003F9E4` = TV-mode re-init, `fn_8003FCCC` = GX/VI setup,
  * `fn_804E7110` = AIRegisterDMACallback.
  *
  * Identified but **not claimed** yet: the unit's remaining data fragments (`.sbss`, `.sdata`, `.data`,
@@ -49,12 +51,12 @@
  *     `-inline auto` (cflags_base's) the retail call to `fn_8003F554` inside `fn_8003F52C`/`fn_8003F564` is
  *     inlined (74.00 % on both, 48 B vs 40 B) and `change_widemode_req__FUc` is inlined into
  *     `change_widemode_req_default__Fv` (21.18 %); `-inline off` *and* `-inline noauto` both put them back at
- *     100 %. The two are not equivalent for `fn_8003F940`: its body is the retail aggregate
+ *     100 %. The two are not equivalent for `render_mode_copy`: its body is the retail aggregate
  *     `GXRenderModeObj` copy, which MWCC lowers to a call to the implicitly-*inline* copy-assignment
  *     operator under `-inline off` (4 B `bl`, 0.98 %) and inlines under `-inline noauto` (164 B, 100.00 %).
  *     Measured on the whole unit, `-inline noauto` moves nothing else (main 96.70, fn_8003F58C 90.81,
  *     fn_8003FC64 99.58, every other function unchanged), so `cflags_main` carries `-inline noauto` and
- *     `fn_8003F940` is at 100 %.
+ *     `render_mode_copy` is at 100 %.
  *   * `-use_lmw_stmw` stays **off**: the target's 4728 B `.text` has no `lmw`/`stmw` at all (objdump), and
  *     `-use_lmw_stmw on` measures byte-identical to off.
  *
@@ -272,7 +274,7 @@ extern "C" u32 VIGetTvFormat(void);
 extern "C" void OSPanic(const char* file, int line, const char* msg, ...);
 extern "C" void OSReport(const char* fmt, ...);
 extern "C" void fn_804B6C00(void* src, void* dst, u32 offset, u32 size);
-extern "C" void fn_8003F940(GXRenderModeObj* dst, GXRenderModeObj* src);
+extern "C" void render_mode_copy(GXRenderModeObj* dst, GXRenderModeObj* src);
 extern "C" u32 GXInit(void* base, u32 size);
 extern "C" void fn_804BA7A0(f32, f32, f32, f32, f32, f32);
 extern "C" void GXSetViewport(f32, f32, f32, f32, f32, f32);
@@ -601,7 +603,7 @@ extern "C" void fn_8003F730(s32 arg)
     lbl_80794784 = 0;
 
     if (arg != 0) {
-        fn_8003F940((GXRenderModeObj*)_f_bss, (GXRenderModeObj*)arg);
+        render_mode_copy((GXRenderModeObj*)_f_bss, (GXRenderModeObj*)arg);
         Rmode = (GXRenderModeObj*)_f_bss;
     } else if (lbl_80794780 == 1 && lbl_80794785 == 1) {
         lbl_80794784 = 0;
@@ -646,7 +648,7 @@ extern "C" void fn_8003F730(s32 arg)
 #pragma peephole reset
 
 /* Copies one render-mode object over another. */
-extern "C" void fn_8003F940(GXRenderModeObj* dst, GXRenderModeObj* src)
+extern "C" void render_mode_copy(GXRenderModeObj* dst, GXRenderModeObj* src)
 {
     *dst = *src;
 }

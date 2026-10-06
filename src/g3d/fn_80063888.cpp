@@ -3,10 +3,11 @@
  *   `AnmObjChr`, `AnmObjChrNode`, `AnmObjChrBlend`, `AnmScn`, ...) and their list-insert steps,
  *   the checked `_ac.h` getters, `nw4r::g3d::PlayPolicy_Onetime`/`PlayPolicy_Loop` and the anim-object bodies
  *   of `g3d_anmobj.cpp`, `g3d_anmclr.cpp` and `g3d_anmscn.cpp`.
- * RANGE. .text 0x80063888-0x800680A8 (164 functions); extab, extabindex, .rodata 0x8056F510-0x8056F578, .data
+ * RANGE. .text 0x80063E60-0x800680A8 (139 functions); extab, extabindex, .rodata 0x8056F510-0x8056F578, .data
  *   0x8058C118-0x8058CC40, .sdata 0x80791158-0x80791178, .sdata2 0x80795D68-0x80795D90.  More than one TU:
  *   fn_80063E60 cites "g3d_anmclr.cpp" (0x8058C118) and fn_800649CC onward "g3d_anmscn.cpp" (0x8058C288), a seam
- *   near 0x800649CC.  The left edge is `g3d/g3d_anmchr.cpp`'s end, the right edge `g3d/g3d_anmscn.cpp`.
+ *   near 0x800649CC.  The left edge is `g3d/g3d_anmchr.cpp`'s end (the weak type-info members of its five vtables,
+ *   0x80063888-0x80063E60, belong to that unit), the right edge `g3d/g3d_anmscn.cpp`.
  * NAMES. The file keeps the map's stem (no one `__FILE__` names the run); the stems are defined `extern "C"`
  *   (playbook 48), `fn_80066C8C` keeps C++ linkage (map row `fn_80066C8C__FPv`), and the `PlayPolicy` pair sits in
  *   `nw4r::g3d`, as do ResMatChan's GetClassName and IsValid.  The cross-unit declarations are `g3d/fn_80063888.h`.
@@ -17,10 +18,9 @@
  *   0x80064C24-0x80064CE0, 0x80064CF0-0x8006518C, 0x80065284-0x8006553C, 0x8006560C-0x800657C4,
  *   0x800659D8-0x80065ED8, 0x80065EF0-0x80065FFC, 0x800660DC-0x80066C68, 0x80066EF8-0x80066F2C,
  *   0x800670D4-0x800677D8, 0x80067824-0x80067A54, 0x80067B90-0x80067E54, 0x80067EFC-0x800680A8.
- *   Partial (18): fn_800638C0, fn_800639D0, fn_80063B2C, fn_80063C00, fn_80063C94, fn_80063D68, fn_800646E8,
- *   fn_80064758, fn_8006497C, fn_80064988, fn_8006518C, fn_8006522C, fn_8006553C, fn_800655A4, fn_800657C4,
- *   fn_80065ED8, fn_80066080, fn_80066FA0.
- *   flipcheck: `.text` 0x145C of 0x4820; `.rodata`, `.data` and `.sdata2` are claimed and not emitted; `.sdata` is
+ *   Partial (12): fn_800646E8, fn_80064758, fn_8006497C, fn_80064988, fn_8006518C, fn_8006522C, fn_8006553C,
+ *   fn_800655A4, fn_800657C4, fn_80065ED8, fn_80066080, fn_80066FA0.
+ *   flipcheck: `.text` 0xEF4 of 0x4248; extab 0x170 of 0x3A8; extabindex 0x228 of 0x360; `.rodata`, `.data` and `.sdata2` are claimed and not emitted; `.sdata` is
  *   0x4 of 0x20.
  */
 
@@ -28,25 +28,17 @@
 #include "unsplit/g3d.h"      /* the math types it reads through the band header */
 #include "g3d/fn_80075DCC.h" /* fn_8007A5E4/fn_8007A5A8/fn_8007A724, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/fn_80063888.h"
+#include "g3d/g3d_anmchr.h"   /* the fn_8005Dxx helpers, the type-info members and G3dObj, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
 #include "mh3_pad.h"        /* VEC3_ctor, owned by mh3_pad.cpp (rule 2) */
 
-/* Forward declarations: this unit's own list and copy helpers, and fn_8005DC60/fn_8005DCD0/dtor_8005E5E8/
- * dtor_8005E58C/fn_8005D3E0, owner `g3d/g3d_anmchr.cpp`. */
-extern "C" void **fn_8005DC60(void **out, void *name);
-extern "C" void **fn_8005DCD0(void **out, void *name);
+/* Forward declarations: this unit's own copy helpers. */
 extern "C" void fn_8006411C(u32 *dst, const u32 *src);
 extern "C" void *fn_80064754(void *self);
 extern "C" void fn_8006602C(u32 *dst, const u32 *src);
 extern "C" void fn_80066D48(u32 *dst, const u32 *src);
 extern "C" void fn_80066F94(u32 *dst, const u32 *src);
 extern "C" void fn_800670C8(u32 *dst, const u32 *src);
-extern "C" u32 fn_800638F8(void *self, u32 *other);
-extern "C" u32 fn_80063A58(void *self, u32 *other);
-extern "C" u32 fn_80063B64(void *self, u32 *other);
-extern "C" void dtor_8005E5E8(void *self, s32 flag);
-extern "C" void dtor_8005E58C(void *self, s32 flag);
-extern "C" void fn_8005D3E0(void *self);
 
 /* A three-float vector record (the cluster's `.text` copies it field by field, so the struct is the
  * explicit-float-copy shape, not a word copy). */
@@ -54,15 +46,9 @@ typedef nw4r::math::VEC3 Vec3f; /* size: 0xC */
 
 /* The cluster's `.rodata` animation type-name records (0x8056F500-0x8056F678): a length word followed by
  * the NUL-terminated name.  Referenced by address only. */
-extern u8 lbl_8056F500[];
-extern u8 lbl_8056F510[];
-extern u8 lbl_8056F524[];
-extern u8 lbl_8056F538[];
 extern u8 lbl_8056F550[];
-extern u8 lbl_8056F568[];
 extern u8 lbl_8056F578[];
 extern u8 lbl_8056F588[];
-extern u8 lbl_8056F668[];
 
 /* The type-name strings the plain getters below return by address (`.data`/`.rodata`, read-only). */
 extern u8 lbl_8058C1D0[];
@@ -97,200 +83,6 @@ extern u8 lbl_8058CBA8[];
 extern u8 lbl_8058CBC8[];
 extern u8 lbl_8058CBD8[];
 extern u8 lbl_8058CBF8[];
-
-/* --------------------------------------------------------------------------------------------- *
- * The pointer-holder accessors (0x80063888-0x80063E60): a local pointer is filled in through one of
- * the two store helpers and the destination address is returned.
- * --------------------------------------------------------------------------------------------- */
-
-/* Stores `v` through `out` and hands `out` back so the caller keeps its address in r3. */
-extern "C" void **fn_800638B8(void **out, void *v)
-{
-    *out = v;
-    return out;
-}
-
-extern "C" u32 fn_80063888(void)
-{
-    void *local;
-    return (u32)*fn_800638B8(&local, lbl_8056F568);
-}
-
-extern "C" u32 fn_800639A0(void)
-{
-    void *local;
-    return (u32)*fn_800638B8(&local, lbl_8056F668);
-}
-
-extern "C" u32 fn_80063A20(u32 *p)
-{
-    return *p;
-}
-
-extern "C" u32 fn_80063A28(void)
-{
-    void *local;
-    return (u32)*fn_800638B8(&local, lbl_8056F568);
-}
-
-extern "C" u32 fn_80063AC4(void)
-{
-    void *local;
-    return (u32)*fn_8005DC60(&local, lbl_8056F500);
-}
-
-extern "C" void **fn_80063B24(void **out, void *v)
-{
-    *out = v;
-    return out;
-}
-
-extern "C" u32 fn_80063AF4(void)
-{
-    void *local;
-    return (u32)*fn_80063B24(&local, lbl_8056F510);
-}
-
-extern "C" u32 fn_80063BD0(void)
-{
-    void *local;
-    return (u32)*fn_80063B24(&local, lbl_8056F510);
-}
-
-extern "C" void **fn_80063C8C(void **out, void *v)
-{
-    *out = v;
-    return out;
-}
-
-extern "C" u32 fn_80063C5C(void)
-{
-    void *local;
-    return (u32)*fn_80063C8C(&local, lbl_8056F524);
-}
-
-extern "C" u32 fn_80063D38(void)
-{
-    void *local;
-    return (u32)*fn_80063C8C(&local, lbl_8056F524);
-}
-
-extern "C" u32 fn_80063E30(void)
-{
-    void *local;
-    return (u32)*fn_8005DCD0(&local, lbl_8056F538);
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The vtable-dispatch wrappers (0x800638C0/0x80063B2C/0x80063C94): the object's word 0 is its vtable,
- * the entry at +0x14 runs with the object as its argument and a word is read back through the
- * `fn_8005DC24` helper.
- * --------------------------------------------------------------------------------------------- */
-
-extern "C" u32 fn_8005DC24(u32 *p);
-
-extern "C" u32 fn_800638C0(void *p)
-{
-    G3dObj *obj = (G3dObj *)p;
-    u32 tmp = obj->vt->method_0x14(p);
-    return fn_8005DC24(&tmp);
-}
-
-extern "C" u32 fn_80063B2C(void *p)
-{
-    G3dObj *obj = (G3dObj *)p;
-    u32 tmp = obj->vt->method_0x14(p);
-    return fn_8005DC24(&tmp);
-}
-
-extern "C" u32 fn_80063C94(void *p)
-{
-    G3dObj *obj = (G3dObj *)p;
-    u32 tmp = obj->vt->method_0x14(p);
-    return fn_8005DC24(&tmp);
-}
-
-/* The two equality readers: compare the words reached through each argument. */
-extern "C" u32 fn_800639D0(u32 **a, u32 **b)
-{
-    return fn_80063A20((u32 *)b) == fn_80063A20((u32 *)a);
-}
-
-extern "C" u32 fn_80063964(void *self, u32 *other)
-{
-    u32 local = fn_800639A0();
-    return fn_800639D0((u32 **)other, (u32 **)&local);
-}
-
-/* The five list-insert steps (0x800638F8-0x80063DC4): resolve a type name, compare the caller's key
- * against it through fn_800639D0, and on a miss run the previous step's insertion with a copy of the
- * key word.  They chain in address order. */
-extern "C" u32 fn_800638F8(void *self, u32 *other)
-{
-    u32 res = fn_80063A28();
-    if (fn_800639D0((u32 **)other, (u32 **)&res))
-        return 1;
-    u32 key = *other;
-    return fn_80063964(self, &key);
-}
-
-extern "C" u32 fn_80063A58(void *self, u32 *other)
-{
-    u32 res = fn_80063AC4();
-    if (fn_800639D0((u32 **)other, (u32 **)&res))
-        return 1;
-    u32 key = *other;
-    return fn_800638F8(self, &key);
-}
-
-extern "C" u32 fn_80063B64(void *self, u32 *other)
-{
-    u32 res = fn_80063BD0();
-    if (fn_800639D0((u32 **)other, (u32 **)&res))
-        return 1;
-    u32 key = *other;
-    return fn_80063A58(self, &key);
-}
-
-extern "C" u32 fn_80063CCC(void *self, u32 *other)
-{
-    u32 res = fn_80063D38();
-    if (fn_800639D0((u32 **)other, (u32 **)&res))
-        return 1;
-    u32 key = *other;
-    return fn_80063B64(self, &key);
-}
-
-extern "C" u32 fn_80063DC4(void *self, u32 *other)
-{
-    u32 res = fn_80063E30();
-    if (fn_800639D0((u32 **)other, (u32 **)&res))
-        return 1;
-    u32 key = *other;
-    return fn_80063A58(self, &key);
-}
-
-/* The two deleting destructors (0x80063C00/0x80063D68): clear the base, and free only when the signed
- * flag is positive; the object is handed back either way. */
-extern "C" void *fn_80063C00(void *self, s16 flags)
-{
-    if (self != 0) {
-        dtor_8005E5E8(self, 0);
-        if (flags > 0)
-            fn_8005D3E0(self);
-    }
-    return self;
-}
-
-extern "C" void *fn_80063D68(void *self, s16 flags)
-{
-    if (self != 0) {
-        dtor_8005E58C(self, 0);
-        if (flags > 0)
-            fn_8005D3E0(self);
-    }
-    return self;
-}
 
 /* --------------------------------------------------------------------------------------------- *
  * More vtable-dispatch wrappers and the ownership-copy helpers (0x800640EC-0x800657C4).
@@ -426,8 +218,8 @@ extern "C" u16 fn_800651E0(u16 *p)
 
 extern "C" u32 fn_80065574(void)
 {
-    void *local;
-    return (u32)*fn_800638B8(&local, lbl_8056F578);
+    const u8 *local;
+    return (u32)*type_obj_set_name(&local, lbl_8056F578);
 }
 
 extern "C" u32 fn_800655DC(void)

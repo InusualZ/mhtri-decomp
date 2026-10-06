@@ -67,6 +67,11 @@ typedef struct _GXTexObj {
     u32 dummy[8]; /* +0x0 */
 } GXTexObj;
 
+/* The SDK's opaque 0x40-byte light record (`GXLoadLightObjImm` loads it into the hardware).  size: 0x40 */
+typedef struct _GXLightObj {
+    u32 dummy[16]; /* +0x0 */
+} GXLightObj;
+
 /* size: 0xC */
 typedef struct _GXTlutObj {
     u32 dummy[3]; /* +0x0 */

@@ -21,16 +21,14 @@ s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */
 nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::PostureInfo *self);
 #endif
 
+/* The animation type-name records (`.rodata`: a length word, then the NUL-terminated name) `g3d/g3d_anmchr.cpp`'s
+ * type-info members read. */
+extern u8 anm_typename_AnmObjChrNode[];   /* 0x8056F510 - "AnmObjChrNode" */
+extern u8 anm_typename_AnmObjChrBlend[];  /* 0x8056F524 - "AnmObjChrBlend" */
+extern u8 anm_typename_AnmObj[];          /* 0x8056F568 - "AnmObj" */
+
 /* The 3-float clamp `g3d/g3d_resanmchr.cpp`'s frame walkers call. */
 f32 fn_8006497C(f32 a, f32 b, f32 c);       /* 0x8006497C - the 3-float clamp helper */
-
-/* The name-record store helper (0x800638B8) `g3d/fn_800680CC.cpp` also calls. */
-void **fn_800638B8(void **out, void *v);    /* stores `v` through `out` and returns `out` */
-
-/* The list-insert chain steps (0x800638F8/0x800639D0/0x80063964) `g3d/fn_800680CC.cpp`'s insert steps call. */
-u32 fn_800638F8(void *self, u32 *other);
-u32 fn_800639D0(u32 **a, u32 **b);
-u32 fn_80063964(void *self, u32 *other);
 
 /* 0x800649B4 - the animation-object flag setter `g3d/g3d_scnmdl.cpp`'s fn_8007EA08 calls; the object is opaque
  * here, and the owner reads it through its `G3dFlagWord` view of the +0xC flag word. */
@@ -42,16 +40,6 @@ s32 fn_800649B4(void* pSelf, u32 bits);
 
 /* The one real C++ free function of the cluster: the front-end mangles this to `fn_80066C8C__FPv`. */
 void *fn_80066C8C(void *obj);
-
-/* The object/vtable pair the dispatch wrappers of this unit and `g3d/fn_800680CC.cpp` share (rule 1). */
-typedef u32 (*G3dVtMethod)(void *);
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x14];
-    /* +0x14 */ G3dVtMethod method_0x14;
-} G3dVtbl; /* size: 0x18 */
-typedef struct {
-    /* +0x00 */ G3dVtbl *vt;
-} G3dObj; /* size: 0x4 */
 
 /* The resolved-resource records `fn_8006584C`/`fn_80066E80` return, shared with `g3d/g3d_resanmlight.cpp`: the
  * fields both units read; each record continues past its last field, so the sizes are lower bounds. */

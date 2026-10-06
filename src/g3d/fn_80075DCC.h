@@ -10,6 +10,10 @@
 extern "C" {
 #endif
 
+/* 0x8056F668 - the "G3dObj" type-name record (`.rodata`: a length word, then the NUL-terminated name) `g3d/g3d_anmchr.cpp`
+ * reads. */
+extern u8 anm_typename_G3dObj[];
+
 /* 0x80075DCC - a one-line thunk: `math_sincos_idx(lbl_80795DFC * angle)`.  The callers pass a sin/cos
  * out-pair plus an angle; the shipped body reads only the angle. */
 void sin_cos_deg(f32* pOutSin, f32* pOutCos, f32 angle);

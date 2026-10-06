@@ -55,6 +55,7 @@
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/nw_res_manager.h"
 #include "g3d/g3d_state.h" /* g3d_state_invalidate (rule 2) */
+#include "g3d/g3d_camera_types.h" /* nw4r::g3d::Camera (rule 2) */
 
 #pragma peephole off
 
@@ -146,7 +147,6 @@ extern f32 lbl_80796464;
 extern f32 lbl_80796468;
 extern f64 lbl_80796470;
 void fn_800E3C90(void* p);
-void fn_80075394(void* a, WorkBuf* out);
 void* fn_80047234(void* a);
 s32 stage_water_enabled_ck(void);
 void fn_80074AA8(void* a, u32 b, f32* out, u32 d);
@@ -232,7 +232,7 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
     MTX34_ctor((MTX34*)&b40);
     MTX34_ctor((MTX34*)&b10);
     GXInvalidateVtxCache();
-    fn_80075394(a, &b40);
+    ((nw4r::g3d::Camera*)a)->GetCameraMtx((MTX34*)&b40);
     DrawCtx* ctx = (DrawCtx*)fn_80047234(a);
     s32 sel = stage_water_enabled_ck();
     if (sel == 1) {
