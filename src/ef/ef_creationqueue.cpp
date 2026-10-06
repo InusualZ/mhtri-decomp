@@ -8,6 +8,7 @@
  *   `fn_800A3718` and `addi` + `cmpwi` in `fn_800A3800`).
  * NAMES. The map has only `fn_` stems for the range; the types and fields are GUESSes from the panic messages
  *   (`setting`, `eh`) and from `fn_800A7750` in `ef/ef_emitter.cpp`, which asserts the same handle.
+ *   GUESS: `ef_ref_object_add_ref` (0x800A337C): a referenced object's AddRef (its count at +0x10).
  *   GUESS: `ef_creation_queue_add_type0` (0x800A3044) queues entry type 0 (a particle creation).
  *   GUESS: `ef_creation_queue_add_type1` (0x800A33DC) queues type 1, which `fn_800A3718` dispatches through the
  *   emitter form's create slot. The types they share with `ef/ef_animcurve.cpp` live in
@@ -106,7 +107,7 @@ extern char lbl_80592388[];
 extern "C" void fn_800A3390(Setting* dst, const Setting* src);
 
 /* 0x800A337C - the manager's AddRef (increments the +0x10 count, returns it). */
-extern "C" u32 fn_800A337C(EffectManager* manager);
+extern "C" u32 ef_ref_object_add_ref(EffectManager* manager);
 
 /* 0x800A3044 (0x338): queues a type-0 (particle) creation. */
 extern "C" void ef_creation_queue_add_type0(CreationQueue* self, const Setting* setting, EffectManager* manager,
@@ -124,7 +125,7 @@ extern "C" void ef_creation_queue_add_type0(CreationQueue* self, const Setting* 
     self->mEntry[self->mCount].mLife = life;
     fn_800A3390(&self->mEntry[self->mCount].mSetting, setting);
     self->mEntry[self->mCount].mpManager = manager;
-    fn_800A337C(manager);
+    ef_ref_object_add_ref(manager);
     self->mEntry[self->mCount].mpHandle = eh;
     if (pos != 0) {
         self->mEntry[self->mCount].mFlags |= 1;
@@ -138,7 +139,7 @@ extern "C" void ef_creation_queue_add_type0(CreationQueue* self, const Setting* 
 }
 
 /* 0x800A337C - the manager's AddRef. */
-extern "C" u32 fn_800A337C(EffectManager* manager) {
+extern "C" u32 ef_ref_object_add_ref(EffectManager* manager) {
     return ++manager->mRefCount;
 }
 
@@ -171,7 +172,7 @@ extern "C" void ef_creation_queue_add_type1(CreationQueue* self, const Setting* 
     self->mEntry[self->mCount].mLife = life;
     fn_800A3390(&self->mEntry[self->mCount].mSetting, setting);
     self->mEntry[self->mCount].mpManager = manager;
-    fn_800A337C(manager);
+    ef_ref_object_add_ref(manager);
     self->mEntry[self->mCount].mpHandle = eh;
     if (pos != 0) {
         self->mEntry[self->mCount].mFlags |= 1;

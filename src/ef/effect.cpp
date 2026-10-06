@@ -21,7 +21,7 @@
  *   The other 13 partial rows have no recorded cause (`symdiff.py -u ef/effect --all`).
  *   flipcheck: `.bss`/`.ctors`/`.data` claimed, not emitted; `.text` (0x168C of 0x1708) and `.sdata2` (0x10 of 0x30)
  *   short of the claim; `.text`, extab and extabindex differing.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_800A4420`,
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `ef_system_memory_manager`,
  *     `lbl_8058A880`, `eft_name_tbl_ptr`, `_savegpr_24`, `_savegpr_27`, `_restgpr_24`, `VEC3_ctor`, `_restgpr_27`,
  *     `_savegpr_26`, `_restgpr_26`, `fn_800F6B6C`.
  */
@@ -191,7 +191,7 @@ void fn_800AC100(void* mgr, u8 mode, u8* a, u8* b, u8* c, f32 scale);
 void fn_800A5F4C(void* effect, u32 idx);
 void fn_800A5E6C(void* effect, u32 idx);
 void fn_800A5D8C(void* effect, u32 idx);
-void* fn_800A4420(void* effect);
+void* ef_system_memory_manager(void* effect);
 void* fn_800A60C0(void* effect);
 u16 fn_800A51D0(void* effect);
 void* fn_800A51D8(void* effect, u16 idx);
@@ -305,8 +305,8 @@ extern "C" void fn_800F9628(void) {
         fn_800A5E6C(effect, i);
         fn_800A5D8C(effect, i);
     }
-    void** vt = (void**)fn_800A4420(effect);
-    ((void (*)(void*))vt[3])(fn_800A4420(effect));
+    void** vt = (void**)ef_system_memory_manager(effect);
+    ((void (*)(void*))vt[3])(ef_system_memory_manager(effect));
     s32 handle = ef_resource_instance();
     ef_resource_remove_all_effect_projects();
     ef_resource_remove_all_texture_projects(handle);

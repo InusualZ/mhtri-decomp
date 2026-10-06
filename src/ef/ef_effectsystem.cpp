@@ -66,8 +66,8 @@ typedef struct EfSysList {
 } EfSysList; /* size: 0x0C */
 
 /* One `mActivityList` group record: the group's live list, its retiring list and the live count.  The
- * assert names it (`mActivityList[group].mActiveList`); `fn_800A4428` zeroes exactly these words and
- * `fn_800A43E8` / `fn_800A45DC` / `fn_800A4A1C` keep them. size: 0x1C */
+ * assert names it (`mActivityList[group].mActiveList`); `ef_activity_list_clear` zeroes exactly these words and
+ * `ef_activity_list_add` / `fn_800A45DC` / `fn_800A4A1C` keep them. size: 0x1C */
 typedef struct EfSysActivityList {
     /* +0x00 */ EfSysList mActiveList;
     /* +0x0C */ EfSysList mRetireList;
@@ -237,9 +237,9 @@ EfSysVtblObj* fn_800A6248(EfSysVtblObj* self);
 
 /* the callees */
 void fn_800A4030(void* list, u16 linkOffset);
-void* fn_800A4420(void* p);
-void fn_800A4428(void* list);
-void fn_800A43E8(void* list, void* node);
+void* ef_system_memory_manager(void* p);
+void ef_activity_list_clear(void* list);
+void ef_activity_list_add(void* list, void* node);
 void fn_800A45DC(void* list, void* node);
 void fn_800A49B8(void* effect);
 void fn_800A4A1C(void* list, void* node);
@@ -294,10 +294,10 @@ void PSMTXCopy(const void* src, void* dst);
 
 #define NW4R_EF_MAX_EFFECT 0x200
 
-/* The system's allocator, reached through `fn_800A4420` (the map's `GetMemoryManager__Q34nw4r2ef12EffectSystemCFv`
+/* The system's allocator, reached through `ef_system_memory_manager` (the map's `GetMemoryManager__Q34nw4r2ef12EffectSystemCFv`
  * sits at an .init offset, not here). */
 static inline EfSysMemoryManager* EfGetMemoryManager(EfSys* self) {
-    return (EfSysMemoryManager*)fn_800A4420(self);
+    return (EfSysMemoryManager*)ef_system_memory_manager(self);
 }
 
 #pragma peephole off
@@ -329,7 +329,7 @@ extern "C" u32 fn_800A56B0(EfSys* self, u32 maxGroupID) {
     self->mActivityList = list;
     for (u32 i = 0; i < self->mMaxGroupID; i++) {
         fn_800A4030(&self->mActivityList[i], 0x14);
-        fn_800A4428(&self->mActivityList[i]);
+        ef_activity_list_clear(&self->mActivityList[i]);
     }
     fn_800A5900(&self->mRandom, 0);
     self->mDrawOrder = &lbl_80794910;
@@ -398,7 +398,7 @@ extern "C" EfSysEffect* fn_800A5A90(EfSys* self, void* emitter, u32 groupID, u16
         return NULL;
     }
     effect->mGroupID = groupID;
-    fn_800A43E8(&self->mActivityList[groupID], effect);
+    ef_activity_list_add(&self->mActivityList[groupID], effect);
     effect->state = 1;
     fn_800A4A1C(&self->mActivityList[groupID], effect);
     effect->state = 2;

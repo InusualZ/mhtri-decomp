@@ -25,7 +25,7 @@
  *     `lbl_80796260`, `lbl_8079624C`, `lbl_80796250`, `lbl_80796248`, `lbl_80796264`, `fn_800C9DCC`,
  *     `lbl_80796268`, `lbl_80796258`, `lbl_80796244`, `lbl_8079626C`, `VEC3_ctor`, `ef_random_float`,
  *     `fn_80463F04`, `fn_80463F98`, `math_reciprocal`, `sqrt_f32`, `fn_800C9DD0__FUiP4Vec3P4Vec3P2EmP2PmUsfUi`,
- *     `fn_800A6E70`, `setVec3`, `_restgpr_18`.
+ *     `ef_random_u16`, `setVec3`, `_restgpr_18`.
  * SHAPES. The two definitions spell their integer parameters `unsigned int`: their manglings encode `Ui`, which
  *   `types.h`'s `u32` (`unsigned long`) would not.
  */

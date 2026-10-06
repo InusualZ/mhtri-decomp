@@ -21,6 +21,8 @@
  *   GUESS (the emitter resource's track blocks, from `ef/ef_resource.cpp`'s relocation): `ef_emres_num_emit_track`,
  *   GUESS: `ef_emres_get_ptcl_track`, `ef_emres_get_emit_track_tbl`.
  *   GUESS: `ef_vec3_dist_sq` (0x800A8300): the squared distance of two positions.
+ *   GUESS: `ef_random_u16` (0x800A6E70): steps the random block and returns its high half.
+ *   GUESS: `ef_pm_set_mtx_dirty` (0x800A96C0): marks a particle manager's matrix for rebuilding.
  *   GUESS: `ef_mtx34_copy` (0x800A89A0): copies the twelve words of a 3x4 matrix and returns the destination.
  *   GUESS: `ef_calc_inherit_mtx` (0x800A90AC): builds the transform a child inherits (scale, rotation, a share of
  *   the translation) from its parent's matrix; the parent chain and the particle manager call it.
@@ -29,7 +31,7 @@
  *    `ef_resource_instance` and asserts `mManagerEF` (`lbl_80592A6C`) where ours does not;
  *  - `fn_800A7750`, `fn_800A7378`: retail calls `ef_res_emitter_desc` where ours does not, and `fn_800A7750` has a
  *    `Panic(..., "Failed assertion false")` path ours lacks;
- *  - `fn_800A6A04`: ours calls `ef_res_emitter_desc` and `fn_800A4420` where retail reads `lbl_80796008`;
+ *  - `fn_800A6A04`: ours calls `ef_res_emitter_desc` and `ef_system_memory_manager` where retail reads `lbl_80796008`;
  *  - `fn_800A8A5C`: the `ef_emres_num_emit_track` call sits at another point of the pass;
  *  - `fn_800A8220`, `ef_vec3_dist_sq`: the argument copy `mr r3, r4` is scheduled elsewhere and the float registers
  *    differ;
@@ -39,7 +41,7 @@
  *   The other partial rows are register colours with no recorded cause.
  *   flipcheck: `.data` and `.sbss` claimed, not emitted; `.sdata2` 0x10 of 0x30.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `ef_res_emitter_desc`,
- *     `fn_800A4420`, `fn_80501390`,
+ *     `ef_system_memory_manager`, `fn_80501390`,
  *     `MTX34Trans__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`, `lbl_80796004`,
  *     `lbl_80592850`, `lbl_805929F8`, `Panic__Q24nw4r2dbFPCciPCce`, `fn_80501C60`,
  *     `List_GetNext__Q24nw4r2utFPCQ34nw4r2ut4ListPCv`, `lbl_80592A6C`, `fn_80501C9C`,
@@ -50,7 +52,7 @@
  * SHAPES. The 0x1020/0x820 frames are `NW4R_EF_MAX_PARTICLEMANAGER`/`NW4R_EF_MAX_EMITTER`-wide stack arrays
  *   (`fn_800A6350`, `fn_800A6420`, `fn_800A6938`, `fn_800A8D30`).
  * SHAPES. The manager's hooks call through the delegate at manager+0xA0, and the create path calls through the
- *   table at +0x1C of the object `fn_800A4420` returns; both are spelled as function-pointer tables.
+ *   table at +0x1C of the object `ef_system_memory_manager` returns; both are spelled as function-pointer tables.
  * SHAPES. The object type is `EfEmitterObj`; `ef/ef_point.cpp` carries a partial `EfEmitter` of the same class.
  */
 
@@ -117,19 +119,19 @@ void* fn_80501C60(void* list, void* node);         /* GetNext */
 void* fn_80501C9C(void* list, u16 index);          /* GetNth */
 void* ef_list_get_first(void* list);                     /* GetFirst */
 s32 ef_get_life_status(void* node);
-void fn_800A43E8(void* list, void* node);
+void ef_activity_list_add(void* list, void* node);
 void fn_800A45DC(void* list, void* node);
 void fn_800A4A1C(void* list, void* node);
 void fn_800A49B8(void* node);
-void fn_800A4428(void* list);
-void fn_800A444C(void* self);
+void ef_activity_list_clear(void* list);
+void ef_ref_object_init(void* self);
 void fn_800A4474(void* manager, void* self);
-void* fn_800A4420(void* self);
+void* ef_system_memory_manager(void* self);
 void* ef_res_emitter_desc(void* p); /* walks to an object's chain head */
 void fn_800A486C(void* manager, void* emitter);
 u32 ef_emres_get_name(void* p);
 void* fn_800A4654(void* manager, void* em, u8 flag, s32 mode);
-void fn_800A337C(void* p);
+void ef_ref_object_add_ref(void* p);
 void fn_800A3390(void* dst, const void* src);
 void fn_800A3800(void* p);
 void fn_800A5114(void* manager, s32 flag);
@@ -241,7 +243,7 @@ typedef struct EfVt {
     /* +0x00 */ void* slots[16];
 } EfVt; /* size: 0x40 */
 
-/* The object `fn_800A4420` returns: its table pointer sits at +0x1C. */
+/* The object `ef_system_memory_manager` returns: its table pointer sits at +0x1C. */
 typedef struct EfHost {
     /* +0x00 */ u8 pad_0x00[0x1C];
     /* +0x1C */ EfVt* vtable;
@@ -453,7 +455,7 @@ s32 fn_800A67E8(EfEmitterObj* self, EfParticleRec* target);
 u32 fn_800A6938(EfEmitterObj* self);
 s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef);
 u32 fn_800A6E64(EfEmitterWork* work);
-u16 fn_800A6E70(void* random);
+u16 ef_random_u16(void* random);
 void fn_800A6EA4(void* random);
 s32 fn_800A6EC4(EfEmitterObj* self, EfEmitterManager* aParentEF, void* eh, u8 value);
 void fn_800A723C(EfEmitterManager* self, void* pm);
@@ -487,7 +489,7 @@ void fn_800A8F18(EfEmitterObj* self);
 void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c, bool d);
 void* ef_emitter_get_mtx(EfEmitterObj* self, void* out);
 void fn_800A95D8(EfEmitterObj* self);
-void fn_800A96C0(EfPmView* pm);
+void ef_pm_set_mtx_dirty(EfPmView* pm);
 u16 fn_800A9700(EfPmView* pm);
 u16 fn_800A970C(EfEmitterObj* self);
 void* fn_800A9714(EfEmitterObj* self, u16 index);
@@ -733,7 +735,7 @@ extern "C" s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef) {
     ef_resource_instance();
     self->seed = (u16)work->field_0x088;
     if (self->seed == 0) {
-        self->seed = fn_800A6E70(&ef->effect->random);
+        self->seed = ef_random_u16(&ef->effect->random);
     }
     fn_800A5900(&self->random, self->seed);
     self->animate_0x4C[0] = work->vec_0x1C[0];
@@ -746,7 +748,7 @@ extern "C" s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef) {
     self->orig = NULL;
     {
         u32 id = fn_800A6E64(work);
-        EfHost* host = (EfHost*)fn_800A4420(ef->effect);
+        EfHost* host = (EfHost*)ef_system_memory_manager(ef->effect);
         self->field_0x0F0 =
             ((void* (*)(EfHost*, u32))host->vtable->slots[2])(host, id);
     }
@@ -767,7 +769,7 @@ extern "C" u32 fn_800A6E64(EfEmitterWork* work) {
  * 0x800A6E70 - step a random block and return the high half of its state.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" u16 fn_800A6E70(void* random) {
+extern "C" u16 ef_random_u16(void* random) {
     fn_800A6EA4(random);
     return (u16)(*(u32*)random >> 16);
 }
@@ -791,12 +793,12 @@ extern "C" s32 fn_800A6EC4(EfEmitterObj* self, EfEmitterManager* aParentEF, void
 #line 247
     NW4R_POINTER_ASSERT(lbl_80592850, eh, lbl_80592954);
     ef_res_emitter_desc(eh);
-    fn_800A444C(self);
-    fn_800A4428(&self->particles);
+    ef_ref_object_init(self);
+    ef_activity_list_clear(&self->particles);
     fn_800A6A04(self, eh, aParentEF);
     self->managerEF = aParentEF;
     {
-        EfHost* host = (EfHost*)fn_800A4420(aParentEF->effect);
+        EfHost* host = (EfHost*)ef_system_memory_manager(aParentEF->effect);
         EfPmView* created =
             ((EfPmView* (*)(EfHost*, EfEmitterObj*, void*))host->vtable->slots[4])(host, self, eh);
         if (created == NULL) {
@@ -804,8 +806,8 @@ extern "C" s32 fn_800A6EC4(EfEmitterObj* self, EfEmitterManager* aParentEF, void
             nw4r::db::Panic(lbl_80592850, __LINE__, lbl_805929F8);
             return 0;
         }
-        fn_800A337C(self->managerEF);
-        fn_800A43E8(&self->particles, created);
+        ef_ref_object_add_ref(self->managerEF);
+        ef_activity_list_add(&self->particles, created);
         fn_800A66A4((EfEmitterObj*)created, 1);
         created->flags = 0;
         if ((EfGetWork(aParentEF)->flags & 0x20) != 0) {
@@ -852,7 +854,7 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
     }
     e->field_0x0E8 += (u16)life_bonus;
     e->parent = self;
-    fn_800A337C(e->parent);
+    ef_ref_object_add_ref(e->parent);
     e->flags3 = 0;
     if ((self->flags & 0x80) != 0) {
         e->flags3 |= 1;
@@ -906,7 +908,7 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
     if (params->field_0x00 != 0 || params->field_0x02 != 0 || params->field_0x03 != 0 ||
         params->field_0x04 != 0 || (params->field_0x07 & 2) != 0) {
         e->orig = pm;
-        fn_800A337C(pm);
+        ef_ref_object_add_ref(pm);
         fn_800A3390(&e->param, params);
     }
     return e;
@@ -1037,13 +1039,13 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             created = (EfEmitterObj*)fn_800A8040(self, eh, (u32)use_a, (u32)use_b, scale, (u32)use_c,
                                               params->field_0x05);
             if (created == NULL) {
-                EfHost* ch = (EfHost*)fn_800A4420(self->managerEF->effect);
+                EfHost* ch = (EfHost*)ef_system_memory_manager(self->managerEF->effect);
                 created = ((EfEmitterObj* (*)(EfHost*, EfEmitterObj*, void*))ch->vtable->slots[4])(
                     ch, self, eh);
                 if (created == NULL) {
                     return 0;
                 }
-                fn_800A43E8(&self->particles, created);
+                ef_activity_list_add(&self->particles, created);
                 fn_800A66A4((EfEmitterObj*)created, 1);
                 created->scale_0x028.scale = lbl_80796004;
                 if (use_a != 0) {
@@ -1062,7 +1064,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             if (params->field_0x00 != 0 || params->field_0x02 != 0 || params->field_0x03 != 0 ||
                 params->field_0x04 != 0 || (params->field_0x07 & 2) != 0) {
                 created->orig = pm;
-                fn_800A337C(pm);
+                ef_ref_object_add_ref(pm);
                 fn_800A3390(&created->param, params);
             } else {
                 created->orig = NULL;
@@ -1606,7 +1608,7 @@ extern "C" void fn_800A95D8(EfEmitterObj* self) {
     {
         void* node = NULL;
         while ((node = fn_80501C60(&self->particles, node)) != NULL) {
-            fn_800A96C0((EfPmView*)node);
+            ef_pm_set_mtx_dirty((EfPmView*)node);
         }
     }
     if (self->managerEF != NULL) {
@@ -1622,7 +1624,7 @@ extern "C" void fn_800A95D8(EfEmitterObj* self) {
                     {
                         void* node = NULL;
                         while ((node = fn_80501C60(&e->particles, node)) != NULL) {
-                            fn_800A96C0((EfPmView*)node);
+                            ef_pm_set_mtx_dirty((EfPmView*)node);
                         }
                     }
                 }
@@ -1636,7 +1638,7 @@ extern "C" void fn_800A95D8(EfEmitterObj* self) {
  * 0x800A96C0 - mark a manager's transform dirty.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800A96C0(EfPmView* pm) {
+extern "C" void ef_pm_set_mtx_dirty(EfPmView* pm) {
     pm->dirty = 1;
     if ((s32)fn_800A9700(pm) == lbl_80794920) {
         lbl_80794920 = -1;
