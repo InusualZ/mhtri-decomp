@@ -12,6 +12,10 @@
  *   (playbook 48), `fn_80066C8C` keeps C++ linkage (map row `fn_80066C8C__FPv`), and the `PlayPolicy` pair sits in
  *   `nw4r::g3d`, as do ResMatChan's GetClassName and IsValid.  The cross-unit declarations are `g3d/fn_80063888.h`.
  *   GUESS: `vec3_copy_construct` (0x80067E54): copies three floats into `out` and returns it (a VEC3 copy).
+ *   type_obj_set_name_texsrt_res is a GUESS, type_obj_set_name_texsrt_node is a GUESS,
+ *   type_obj_set_name_texsrt_override is a GUESS (the type-name store copies the texture-SRT GetTypeObj members call;
+ *   the dump's GXInitTexObjUserData at those addresses is an identical-body fold, not evidence).
+ *   AnmScn's constructor and AnmObj::SetAnmFlag are nw4r's members.
  * RESIDUALS. `fn_80066FA0` lacks retail's call to `fn_80066DB4` (+0x9C).  27 functions unwritten (objdiff scores
  *   them zero) in 17 runs: 0x80063E60-0x80063FC8,
  *   0x80064080-0x800640E4, 0x80064128-0x800646E8, 0x800648B0-0x8006497C (`PlayPolicy_Loop`), 0x800649CC-0x80064BD4,
@@ -20,7 +24,7 @@
  *   0x800670D4-0x800677D8, 0x80067824-0x80067A54, 0x80067B90-0x80067E54, 0x80067EFC-0x800680A8.
  *   Partial (12): fn_800646E8, fn_80064758, fn_8006497C, fn_80064988, fn_8006518C, fn_8006522C, fn_8006553C,
  *   fn_800655A4, fn_80065ED8, fn_80066080, fn_80066FA0.  AnmScn's constructor has an empty body by design (the
- *   compiler emits the G3dObj base call and the vtable store); AnmObj::SetAnmFlag is nw4r's member.
+ *   compiler emits the G3dObj base call and the vtable store).
  *   flipcheck: `.text` 0xEF4 of 0x4248; extab 0x170 of 0x3A8; extabindex 0x228 of 0x360; `.rodata`, `.data` and `.sdata2` are claimed and not emitted; `.sdata` is
  *   0x4 of 0x20.
  */
@@ -143,9 +147,10 @@ nw4r::g3d::AnmScn::AnmScn(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
  * The small word accessors (0x80063FC8-0x80064898).
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_80063FC8(void **out, void *v)
+extern "C" const u8 **type_obj_set_name_texsrt_res(const u8 **out, const u8 *v)
 {
     *out = v;
+    return out;
 }
 
 extern "C" u32 fn_80064034(u32 *p)
@@ -182,9 +187,10 @@ extern "C" u32 fn_80064868(void)
     return (u32)*fn_8005DCD0(&local, lbl_8056F550);
 }
 
-extern "C" void fn_80064898(void **out, void *v)
+extern "C" const u8 **type_obj_set_name_texsrt_node(const u8 **out, const u8 *v)
 {
     *out = v;
+    return out;
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -586,9 +592,10 @@ extern "C" s32 fn_80066D04(u32 *p)
     return *p != 0;
 }
 
-extern "C" void fn_800648A0(void **out, void *v)
+extern "C" const u8 **type_obj_set_name_texsrt_override(const u8 **out, const u8 *v)
 {
     *out = v;
+    return out;
 }
 
 extern "C" void fn_80064BE4(u32 *p)

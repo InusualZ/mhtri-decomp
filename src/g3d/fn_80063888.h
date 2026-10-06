@@ -10,6 +10,11 @@
 extern "C" {
 #endif
 
+/* The three type-name store copies the texture-SRT classes GetTypeObj members call (g3d/fn_800680CC.cpp): each stores v through out and returns out. */
+const u8 **type_obj_set_name_texsrt_res(const u8 **out, const u8 *v);
+const u8 **type_obj_set_name_texsrt_node(const u8 **out, const u8 *v);
+const u8 **type_obj_set_name_texsrt_override(const u8 **out, const u8 *v);
+
 /* The cluster's owns with plain `fn_XXXXXXXX` map names, so C linkage. */
 /* 0x80064C14 - releases the object the second argument points at (`light/light.cpp`'s fn_802C1AD8 tail-calls it). */
 void fn_80064C14(void *self, const f32 *v);

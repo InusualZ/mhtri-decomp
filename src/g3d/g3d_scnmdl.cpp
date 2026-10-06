@@ -11,7 +11,8 @@
  * RESIDUALS. Unwritten (objdiff scores them zero): fn_8007C540, fn_8007D59C, fn_8007DDFC, fn_8007E01C,
  *   fn_8007E498, fn_8007E8B4, fn_8007EA8C.  Partial: fn_8007D404, fn_8007D568, fn_8007DBDC, fn_8007DCB8,
  *   fn_8007E7FC, fn_8007EA10, 0x8007ECD8-0x8007EF1C (five functions, the constructor and destructor among them),
- *   fn_8007EF4C, fn_8007F05C.
+ *   fn_8007EF4C, ScnGroup::PopBack.
+ *   ScnGroup::PopBack and ScnGroup::Empty (0x8007F05C, 0x8007F0BC) are nw4r's `g3d/g3d_scnobj.h` members.
  *   flipcheck: `.text` 0xADC of 0x2BA4; `.data` and `.sdata` are claimed and not emitted.
  */
 
@@ -22,7 +23,8 @@
 #include "g3d/g3d_anmchr.h"       /* G3dObj::operator delete, TypeObj::GetTypeName, type_obj_set_name, TypeObj::operator==, G3dObj (rule 2: owner g3d/g3d_anmchr.cpp) */
 #include "g3d/fn_800680CC.h"      /* fn_800696E4, fn_800697A4 (rule 2: owner g3d/fn_800680CC.cpp) */
 #include "g3d/fn_8005AA28.h"      /* fn_8005AB00 (rule 2: owner g3d/fn_8005AA28.cpp) */
-#include "g3d/fn_80075DCC.h"      /* fn_8007B424..fn_800793A4 (rule 2: owner g3d/fn_80075DCC.cpp) */
+#include "g3d/fn_80075DCC.h"      /* fn_8007B734..fn_800793A4 (rule 2: owner g3d/fn_80075DCC.cpp) */
+#include "g3d/g3d_scnobj.h"       /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
 #include "g3d/g3d_anmvis.h"      /* fn_8006ECB4/fn_8006ED84 (rule 2: owner g3d/g3d_anmvis.cpp) */
 #include "g3d/g3d_calcview.h"     /* fn_8006FFBC/fn_8006FFC8 (rule 2: owner g3d/g3d_calcview.cpp) */
 #include "g3d/g3d_calcvtx.h"       /* fn_8007270C (rule 2: g3d_calcvtx.cpp) */
@@ -130,8 +132,6 @@ u32 fn_8007EF1C(void);
 u32 fn_8007EF4C(G3dObj* pSelf);
 u32 fn_8007EF84(void* pSelf, u32* pKey);
 u32 fn_8007EFF0(void* pSelf, u32* pKey);
-u32 fn_8007F05C(ScnMdl* pSelf);
-u32 fn_8007F0BC(ScnMdl* pSelf);
 u32 g3d_root_model_bind(ScnMdl* pSelf, u32 id);
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -199,7 +199,8 @@ void fn_8007D47C(ScnMdl* pSelf, u32* pArg2, u32* pArg3) {
             fn_8006ECB4(&local, (void*)fn_8007D568(pSelf));
         }
     }
-    fn_8007B564(pSelf, 4, pArg2, pArg3);
+    reinterpret_cast<nw4r::g3d::ScnObj*>(pSelf)->CheckCallback_CALC_WORLD(nw4r::g3d::ScnObj::CALLBACK_TIMING_C,
+                                                                    (u32)pArg2, pArg3);
 }
 
 /* 0x8007D568 - the shape-animation object the node passes walk. */
@@ -534,27 +535,38 @@ u32 fn_8007EFF0(void* pSelf, u32* pKey) {
     {
         u32 local = *pKey;
 
-        return fn_8007BAF0(pSelf, &local);
+        return reinterpret_cast<nw4r::g3d::ScnLeaf*>(pSelf)->nw4r::g3d::ScnLeaf::IsDerivedFrom(
+            *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&local));
     }
 }
 
 /* 0x8007F05C - drop the last material of the copied-material list (a no-op when the resource handle is
  * empty). */
-u32 fn_8007F05C(ScnMdl* pSelf) {
-    u32 count;
+}   /* extern "C": the scene object members below have C++ linkage */
 
-    if (fn_8007F0BC(pSelf) != 0) {
-        return 0;
+/* 0x8007F05C (0x60): removes and returns the last child; NULL when the group is empty. */
+nw4r::g3d::ScnObj* nw4r::g3d::ScnGroup::PopBack()
+{
+    if (!Empty()) {
+        return Remove(Size() - 1);
     }
-    count = fn_8007B424(pSelf);
-    pSelf->mpfn_0x38(count - 1);
-    return 0;
+    return NULL;
 }
+
+extern "C" {
+
 
 /* 0x8007F0BC - `mResMdl == 0`: the resource handle is empty. */
-u32 fn_8007F0BC(ScnMdl* pSelf) {
-    return pSelf->mResMdl == 0;
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007F0BC (0x10): whether the group has no child. */
+bool nw4r::g3d::ScnGroup::Empty() const
+{
+    return mNumScnObj == 0;
 }
+
+extern "C" {
+
 
 /* 0x8007F0CC - dispatch the material id through slot +0x34 (the `CopiedMatAccess` constructor's
  * handle hand-over). */

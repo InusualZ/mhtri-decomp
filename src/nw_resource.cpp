@@ -54,6 +54,7 @@
 #include "nw_resource.h" /* `ResEntry` and the C++ entry points (this unit owns them) */
 #include "ef/nw_res_manager.h"
 #include "ef/pRoot.h"
+#include "g3d/g3d_scnobj.h" /* nw4r::g3d::ScnGroup::Clear, owner g3d/g3d_scnobj.cpp (rule 2) */
 
 /* The two `.sbss` words this unit defines (0x80794970-0x80794978): the resource manager every function below walks, and the
  * g3d model root (stored once, by `fn_800D32CC`; read by `nwWorkInitialize`/`nwMoveStart`/`nwMoveEnd`).  Definer of both:
@@ -165,7 +166,6 @@ void fn_800A5D8C(void* p, u32 index);
 void fn_800D31B0(void);
 void fn_800D320C(void);
 void fn_800D3C4C(void);
-void fn_80082668(void* root);
 void fn_80083290(void* root);
 void fn_800832DC(void* root);
 }
@@ -563,7 +563,7 @@ s32 fn_800D5CAC(void* table) {
 /* 0x800D5C74 - bring up the work system. */
 void nwWorkInitialize(void) {
     if (pRoot == 0) {
-        fn_80082668((void*)pRoot);
+        reinterpret_cast<nw4r::g3d::ScnGroup*>(pRoot)->Clear();
     }
     fn_800D58DC();
     fn_800D31B0();
@@ -573,7 +573,7 @@ void nwWorkInitialize(void) {
 /* 0x800D5D18 - start the move phase. */
 void nwMoveStart(void) {
     if (pRoot != 0) {
-        fn_80082668((void*)pRoot);
+        reinterpret_cast<nw4r::g3d::ScnGroup*>(pRoot)->Clear();
     }
 }
 

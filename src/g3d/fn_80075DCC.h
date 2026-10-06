@@ -37,17 +37,14 @@ void fn_8007A5E4(void* self, f32 x, f32 y, f32 z);
 void fn_8007A5A8(void* self, f32 x, f32 y, f32 z);
 void fn_8007A724(void* self, f32 x, f32 y, f32 z);
 
-/* 0x8007B5F4/0x8007BB8C - the ScnRoot state lookups `g3d/g3d_state.cpp` calls: fn_8007BB8C stores what it finds
- * through its out-parameter and returns it; fn_8007B5F4 registers `pKey` under the state object. */
-u32 fn_8007B5F4(void* pSelf, const u32* pKey);
-void** fn_8007BB8C(void** pOut, const char* pName);
+/* 0x8007BB8C/0x8007B72C - the type-name store copies the ScnLeaf and ScnGroup run-time type members call (and
+ * `g3d/g3d_state.cpp`'s ScnRoot ones): each stores `v` through `out` and returns `out`. */
+const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
+const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
 
 /* The ScnMdl/ScnMdlSimple material and draw-buffer helpers `g3d/g3d_scnmdl.cpp` calls. */
-s32 fn_8007B424(void* pSelf);  /* 0x8007B424 - the material count */
 s32 fn_8007B734(void* pSelf);  /* 0x8007B734 - a name-record reader */
 s32 fn_8007B764(void* pSelf);  /* 0x8007B764 - a name-record reader */
-s32 fn_8007BAF0(void* pSelf, u32* pKey); /* 0x8007BAF0 - the chain's insertion step */
-void fn_8007B564(void* pSelf, u32 mask, void* pArg2, void* pArg3);
 void fn_8007B8E4(void* pSelf, u32 mask, void* pArg2, void* pArg3);
 void fn_8007B940(void* pSelf, u32 mask, void* pArg2, void* pArg3);
 u32 fn_8007C464(void* pSelf);

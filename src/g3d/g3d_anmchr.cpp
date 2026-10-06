@@ -474,9 +474,11 @@ extern "C" void **fn_80063C8C(void **out, void *v)
     }
 
 /* 0x8005D384 (0x5C): destroys the animation object. */
+#pragma peephole off
 nw4r::g3d::AnmObj::~AnmObj()
 {
 }
+#pragma peephole on
 
 /* 0x8005D3E4 (0x44): constructs the animation object with no flags set. */
 nw4r::g3d::AnmObj::AnmObj(MEMAllocator* pHeap, G3dObj* pParent) : G3dObj(pHeap, pParent), mFlags(0)
@@ -589,9 +591,11 @@ void nw4r::g3d::AnmObjChr::DetachAll()
 }
 
 /* 0x8005E58C (0x5C): destroys the character animation. */
+#pragma peephole off
 nw4r::g3d::AnmObjChr::~AnmObjChr()
 {
 }
+#pragma peephole on
 
 /* ------------------------------------------------------------------------------------------------ */
 /* The run-time type members of G3dObj, AnmObj and AnmObjChr                                        */
@@ -697,11 +701,13 @@ nw4r::g3d::AnmObjChrNode::AnmObjChrNode(MEMAllocator* pHeap, u16* pBindingBuf, i
 }
 
 /* 0x8005E5E8 (0x16C): detaches every child and destroys the node. */
+#pragma peephole off
 nw4r::g3d::AnmObjChrNode::~AnmObjChrNode()
 {
     ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xE1, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
     DetachAll();
 }
+#pragma peephole on
 
 /* 0x8005E754 (0x314): attaches `pRes` as child `idx`, binding the nodes it defines, and returns the child it
  * replaced. */
@@ -982,9 +988,11 @@ f32 nw4r::g3d::AnmObjChrBlend::GetWeight(int idx) const
 }
 
 /* 0x80063C00 (0x5C): destroys the blend. */
+#pragma peephole off
 nw4r::g3d::AnmObjChrBlend::~AnmObjChrBlend()
 {
 }
+#pragma peephole on
 
 /* 0x80063C5C (0x30): returns the type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrBlend::GetTypeObj() const
@@ -1066,9 +1074,11 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObj() const
 }
 
 /* 0x80063D68 (0x5C): destroys the resource animation. */
+#pragma peephole off
 nw4r::g3d::AnmObjChrRes::~AnmObjChrRes()
 {
 }
+#pragma peephole on
 
 /* 0x80063DC4 (0x6C): whether the object is an AnmObjChrRes or derives from `type`. */
 bool nw4r::g3d::AnmObjChrRes::IsDerivedFrom(TypeObj type) const
