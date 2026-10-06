@@ -1,24 +1,23 @@
 /*
- * ef/ef_disc.cpp - the disc emitter form's emission entry (its class's single virtual, through the table
- *   `lbl_80594DD0`): guards `em`/`pm`/`params`, derives the two radii and the sweep range, then emits `count`
- *   particles in the XZ plane, advancing the angle when the effect is swept.  The flat sibling of
- *   `ef/ef_cylinder.cpp`, with the emission body inlined.
- * RANGE. .text 0x800CC5B0-0x800CCCF8 (1 function); extab 0x8000A57C-0x8000A584, extabindex 0x80023BE0-0x80023BEC,
- *   .data 0x80594DE0-0x80594E8C (the `__FILE__` string first), .sdata2 0x807962B0-0x807962E8 (the literal floats
- *   MWCC pools).
- * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around the function (no `rlwinm.` or
- *   `fmadds` in any target object of the 0x800BFFD4-0x800CCFB0 shapes).
- * NAMES. `em`/`pm`/`params` are the source's names, from the `NW4R:Pointer Error` strings of the three asserts.
- * RESIDUALS. 1 partial row, `fn_800CC5B0__FlP6EfWorkP10EfParticlelUlP8EfParamsUsfl`:
- *  - the `v16`/`v28` copies take each other's stack slots (0x10/0x1C), the spawn call's `fmr f1` is late and the
- *    slot +0x14 dispatch loads through the saved `pm` (`lwz r11, 0x1C(r25)`) where retail goes through r3: retail
- *    calls a virtual `CreateParticle` with the vectors by value (the `ef/ef_torus.cpp` shape), which needs `ef.h`'s
- *    `EfParticle` to become that class (the mangling names it);
- *  - the `.sdata2` constants are our pool's `@N` where retail reads the claimed `lbl_807962B0` run.
- *   flipcheck: `.data` claimed, not emitted.
+ * ef/ef_disc.cpp - the disc emitter form (`EmitterFormDisc::Emission`): guards `em`/`pm`/`params`, derives the
+ *   two radii and the sweep range, then emits `count` particles on the rim, each leaning out of the plane by
+ *   the emitter's spread.
+ * RANGE. .text 0x800CC5B0-0x800CCCF8 (1 function); extab and extabindex its one record each; .data
+ *   0x80594DE0-0x80594E98 (the `__FILE__` string "ef_disc.cpp", the three assert messages, the class's table at
+ *   0x80594E8C - the table ends the unit's `.data`, so `ef/ef_emform.cpp`'s run starts after it), .sdata2 its
+ *   pool.
+ * FLAGS. `cflags_main` plus `-pool off`; file-wide `#pragma peephole off` and `#pragma fp_contract off`.
+ * NAMES. The class and method are nw4r's (the asserts' `em`/`pm`/`params` are its parameter names).
+ *   GUESS: `ef_disc_file_name`, `ef_disc_err_em`, `ef_disc_err_pm`, `ef_disc_err_params` (their text).
+ * RESIDUALS. none known: every section is byte-identical to the target object.
+ * SHAPES. The function is `nw4r::ef::EmitterFormDisc::Emission` (the class is declared in `ef/ef_emform.h`; this unit
+ *   defines its key function, so the compiler emits the class's table here, after the strings).  The
+ *   particle manager's spawn is its virtual `CreateParticle`, taking the position and velocity by value: the call
+ *   copies them (velocity first), evaluates the momentum before the life and dispatches through r3.  The float
+ *   argument precedes the space matrix (nw4r's `Emission(..., u16 life, f32 lifeRnd, const MTX34* space)`).
+ * SHAPES. The strings are global definitions in retail's order; `-pool off` (configure.py) gives each its own
+ *   `lis`/`addi`, where the default pools them off one base register.
  * SHAPES. The `.sdata2` constants are literals, so MWCC pools and hoists them out of the loop.
- * SHAPES. The emission's float argument precedes the last integer one (nw4r's `Emission(..., u16 life, f32 lifeRnd,
- *   const MTX34* space)`), which orders the prologue's moves; the map row carries that mangling.
  * SHAPES. `#line 42` puts the three `EF_ASSERT_PTR` sites on lines 42-44 (`__LINE__`).
  */
 
@@ -30,18 +29,28 @@
 
 
 
-#include "ef.h"
+#include "ef/ef_emform.h" /* nw4r::ef::EmitterFormDisc, EfWork, ParticleManager (rule 1) */
 #include "fn_8004CAD8.h"      /* sqrt_f32 - that unit owns the address and publishes it (rule 2) */
 #pragma peephole off
 #pragma fp_contract off
 
-void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
-                 u16 id, f32 farg0, s32 arg7) {
+/* The unit's `.data` strings, in retail order: the file name and one message per checked pointer (the
+ * class's table follows them). */
+char ef_disc_file_name[] = "ef_disc.cpp";
+char ef_disc_err_em[] = "NW4R:Pointer Error\nem(=%p) is not valid pointer.";
+char ef_disc_err_pm[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
+char ef_disc_err_params[] = "NW4R:Pointer Error\nparams(=%p) is not valid pointer.";
+
+/* 0x800CC5B0 (0x748): emits `count` particles on the disc's rim (scaled inward by the rate), at random or swept
+ * (flag 0x20000), each leaning out of the plane by the emitter's spread. */
+void nw4r::ef::EmitterFormDisc::Emission(EfWork* em, ParticleManager* pm, int count, u32 flags, f32* paramBlock,
+                                         u16 id, f32 farg0, const MTX34* arg7) {
+    EfParams* params = (EfParams*)paramBlock;
     u32 swept; s32 i; f32 scale_a, scale_b, angle, step, range;
 #line 42
-    EF_ASSERT_PTR(lbl_80594DE0, lbl_80594DEC, em);
-    EF_ASSERT_PTR(lbl_80594DE0, lbl_80594E20, pm);
-    EF_ASSERT_PTR(lbl_80594DE0, lbl_80594E54, params);
+    EF_ASSERT_PTR(ef_disc_file_name, ef_disc_err_em, em);
+    EF_ASSERT_PTR(ef_disc_file_name, ef_disc_err_pm, pm);
+    EF_ASSERT_PTR(ef_disc_file_name, ef_disc_err_params, params);
 
     if (count < 1) {
         return;
@@ -110,12 +119,10 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             v40.z = -f8 * v40.x;
             v40.x = v40.x * fC;
         }
-        ef_form_calc_velocity(ctx, (Vec*)&v76, em, (Vec*)&v88, (Vec*)&v40, (Vec*)&v52, (Vec*)&v64);
-        VEC3 v16 = v76;
-        VEC3 v28 = v88;
-        scale = 1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress);
-        pm->slots->spawn(pm, ef_form_calc_life(ctx, id, farg0, em), (Vec*)&v28, (Vec*)&v16, arg7, &em->spawn_data,
-                         em->spawn_extra, em->spawn_flag, scale);
+        CalcVelocity((Vec*)&v76, em, (Vec*)&v88, (Vec*)&v40, (Vec*)&v52, (Vec*)&v64);
+        pm->CreateParticle(CalcLife(id, farg0, em), v88, v76, arg7,
+                           1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), &em->spawn_data,
+                           em->spawn_extra, em->spawn_flag);
         if (swept) {
             angle += step;
         }

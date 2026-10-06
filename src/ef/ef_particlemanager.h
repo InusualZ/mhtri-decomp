@@ -50,7 +50,7 @@ struct ParticleManager : ParticleManagerHead {
     virtual void slot_0x08();
     virtual void slot_0x0C();
     virtual void Initialize();
-    virtual void CreateParticle(u16 life, VEC3 pos, VEC3 vel, s32 space, f32 momentum, u8* inherit, u32 reference,
+    virtual void CreateParticle(u16 life, VEC3 pos, VEC3 vel, const MTX34* space, f32 momentum, u8* inherit, u32 reference,
                                 u16 remain);
 }; /* size: 0x20 */
 #endif

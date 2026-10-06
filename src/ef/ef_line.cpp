@@ -1,73 +1,43 @@
 /*
- * ef/ef_line.cpp - the line emitter form's per-sample generator: validates `em`/`pm`/`params`, walks `count`
- *   samples, builds a scaled direction from three `SinCos` Euler angles, projects it through `CalcVelocity` and
- *   submits it through the particle manager's `CreateParticle` slot.
+ * ef/ef_line.cpp - the line emitter form (`EmitterFormLine::Emission`): validates `em`/`pm`/`params`, walks
+ *   `count` samples along the direction three `SinCos` Euler angles build, projects each through `CalcVelocity`
+ *   and submits it through the particle manager's `CreateParticle`.
  * RANGE. .text 0x800CCFB0-0x800CD584 (1 function); extab 0x8000A5CC-0x8000A5D4, extabindex 0x80023C58-0x80023C64,
- *   .data 0x80594EE0-0x80594F98 (the `__FILE__` string "ef_line.cpp" first), .sdata2 0x807962E8-0x80796300.
- * FLAGS. `cflags_main`; file-wide `#pragma fp_contract off` (retail's FP is unfused `fmuls` + `fadds`) and
- *   `#pragma peephole off` (retail keeps the paired-single epilogue as `li r0,off; psq_lx`).
- * NAMES. The function is a GUESS for NintendoWare's `EmitterFormLine::Emission` (its three pointer asserts on
- *   lines 42-44 and the `em`/`pm`/`params` names the panic strings stringify); the map row keeps its `fn_` stem.
- * RESIDUALS. `.text` is byte-identical.  The `.data` run is the three panic strings, the file name and, at
- *   0x80594F8C, the 12-byte table {0, 0, `fn_800CCFB0`} of the `EmitterFormLine` class whose one virtual this function
- *   is; it is emitted only once the emitter-form classes are reconstructed together with `ef/ef_emform.cpp`'s
- *   constructors (which install the table), so the strings stay declared.
- *  - the `(f32)(s32)` conversion constant is our pool's `@N`, retail's the claimed `lbl_807962F8`.
- *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x8 of the claimed 0x18.
- * SHAPES. The particle manager is a class whose vtable pointer follows a 0x1C-byte non-polymorphic head; the spawn
- *   is its virtual `CreateParticle`, taking the position and velocity by value: the call copies them (velocity
- *   first), evaluates the momentum before the life and dispatches through r3, as in retail.
+ *   .data 0x80594EE0-0x80594F98 (the `__FILE__` string "ef_line.cpp", the three assert messages, the class's
+ *   table at 0x80594F8C), .sdata2 0x807962E8-0x80796300.
+ * FLAGS. `cflags_main` plus `-pool off`; file-wide `#pragma fp_contract off` (retail's FP is unfused `fmuls` +
+ *   `fadds`) and `#pragma peephole off` (retail keeps the paired-single epilogue as `li r0,off; psq_lx`).
+ * NAMES. The class and method are nw4r's (the asserts' `em`/`pm`/`params` are its parameter names).
+ *   GUESS: `ef_line_file_name`, `ef_line_err_em`, `ef_line_err_pm`, `ef_line_err_params` (their text).
+ * RESIDUALS. none known: every section is byte-identical to the target object.
+ * SHAPES. The function is `nw4r::ef::EmitterFormLine::Emission` (the class is declared in `ef/ef_emform.h`; this unit
+ *   defines its key function, so the compiler emits the class's table here, after the strings).  The
+ *   particle manager's spawn is its virtual `CreateParticle`, taking the position and velocity by value: the call
+ *   copies them (velocity first), evaluates the momentum before the life and dispatches through r3.  The float
+ *   argument precedes the space matrix (nw4r's `Emission(..., u16 life, f32 lifeRnd, const MTX34* space)`).
+ * SHAPES. The strings are global definitions in retail's order; `-pool off` (configure.py) gives each its own
+ *   `lis`/`addi`, where the default pools them off one base register.
+ * SHAPES. The `.sdata2` constants are literals: MWCC pools them in retail's order.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "ef/ef_emitter.h" /* ef_random_float (rule 2) */
-#include "ef/ef_particlemanager.h" /* ParticleManager (rule 1) */
+#include "ef/ef_emform.h" /* nw4r::ef::EmitterFormLine, EfWork, ParticleManager (rule 1) */
 
 #pragma fp_contract off
 #pragma peephole off
 
-/* nw4r::ef::Random - `RandFloat()` stays out of line under `-inline noauto`. */
-typedef struct {
-    /* +0x00 */ u32 mSeed;
-} Random; /* size: 0x04 */
-
-typedef struct Emitter Emitter;
-
-
-/* The emitter fields this unit reads; the full Emitter is much larger. */
-struct Emitter {
-    u8 pad_0x00[0x67]; /* +0x00 */
-    /* +0x67 */ s8 mVelMomentumRandom; /* EmitterParameter::mVelMomentumRandom */
-    u8 pad_0x68[0xE8 - 0x68]; /* +0x68 */
-    /* +0xE8 */ u16 mCalcRemain;
-    u8 pad_0xEA[0xEC - 0xEA]; /* +0xEA */
-    /* +0xEC */ Random mRandom;
-    /* +0xF0 */ u32 unused_0xF0;
-    u8 pad_0xF4[0xF8 - 0xF4]; /* +0xF4 */
-    /* +0xF8 */ void* mpReferenceParticle;
-    /* +0xFC */ u32 mInheritSetting;
-}; /* size: 0x100 */
-
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
-/* The nw4r helper callees are C functions: the target object's relocations carry their plain names
- * (`VEC3_ctor`, not `fn_80043EA8__FP...`), so they are declared `extern "C"`. */
-extern "C" void ef_sin_cos(f32* sin, f32* cos, f32 rad); /* PSSinCosRad */
-extern "C" void ef_form_calc_velocity(void* self, VEC3* result, Emitter* em, VEC3* position, VEC3* normalDir,
-                        VEC3* fromOrigin, VEC3* fromYAxis); /* EmitterForm::CalcVelocity */
-extern "C" u16 ef_form_calc_life(void* self, u16 aPtclLife, f32 aPtclLifeRnd, Emitter* em); /* CalcLife */
-
-extern char lbl_80594EE0[];
-extern char lbl_80594EEC[];
-extern char lbl_80594F20[];
-extern char lbl_80594F54[];
-extern const f32 lbl_807962E8;
-extern const f32 lbl_807962EC;
-extern const f32 lbl_807962F0;
-extern const f32 lbl_807962F4;
+/* The unit's `.data` strings, in retail order: the file name and one message per checked pointer (the
+ * class's table follows them). */
+char ef_line_file_name[] = "ef_line.cpp";
+char ef_line_err_em[] = "NW4R:Pointer Error\nem(=%p) is not valid pointer.";
+char ef_line_err_pm[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
+char ef_line_err_params[] = "NW4R:Pointer Error\nparams(=%p) is not valid pointer.";
 
 /* NW4R_POINTER_ASSERT's RVL address-range check (MEM1/MEM2, cached and uncached, plus locked cache). */
 #define NW4R_VALID_PTR(p)                                                                          \
@@ -77,14 +47,15 @@ extern const f32 lbl_807962F4;
      ((u32)(p) & 0xFFFFC000) == 0xE0000000)
 
 #define NW4R_POINTER_ASSERT(p, line, msg)                                                          \
-    (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(lbl_80594EE0, line, msg, (p)))
+    (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(ef_line_file_name, line, msg, (p)))
 
-/* EmitterFormLine::Emission */
-void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 optionFlag, f32* params,
-                 u16 aPtclLife, f32 aPtclLifeRnd, u32 space) {
-    NW4R_POINTER_ASSERT(em, 42, lbl_80594EEC);
-    NW4R_POINTER_ASSERT(pm, 43, lbl_80594F20);
-    NW4R_POINTER_ASSERT(params, 44, lbl_80594F54);
+/* 0x800CCFB0 (0x5D4): emits `count` particles along the line the three rotation angles turn, at random or evenly
+ * spaced (flag 0x20000), centred on the origin with flag 0x04000000. */
+void nw4r::ef::EmitterFormLine::Emission(EfWork* em, ParticleManager* pm, int count, u32 optionFlag, f32* params,
+                                         u16 aPtclLife, f32 aPtclLifeRnd, const MTX34* space) {
+    NW4R_POINTER_ASSERT(em, 42, ef_line_err_em);
+    NW4R_POINTER_ASSERT(pm, 43, ef_line_err_pm);
+    NW4R_POINTER_ASSERT(params, 44, ef_line_err_params);
 
     if (count >= 1) {
         int i;
@@ -94,14 +65,14 @@ void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 op
             VEC3 p, normal, fromYAxis, v;
 
             if ((optionFlag & 0x00020000) == 0) {
-                pos = ef_random_float(&em->mRandom.mSeed);
+                pos = ef_random_float(&em->progress);
             } else if (count > 1) {
                 pos = (f32)i / (f32)(count - 1);
             } else {
-                pos = lbl_807962E8;
+                pos = 0.0f;
             }
             if ((optionFlag & 0x04000000) != 0)
-                pos -= lbl_807962EC;
+                pos -= 0.5f;
             pos *= params[0];
 
             ef_sin_cos(&sx, &cx, params[1]);
@@ -114,20 +85,19 @@ void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 op
             p.z = (cx * cy) * pos;
 
             VEC3_ctor(&normal);
-            normal.x = lbl_807962E8;
-            normal.y = lbl_807962F0;
-            normal.z = lbl_807962E8;
+            normal.x = 0.0f;
+            normal.y = 1.0f;
+            normal.z = 0.0f;
 
-            setVec3(&fromYAxis, p.x, lbl_807962E8, p.z);
+            setVec3(&fromYAxis, p.x, 0.0f, p.z);
 
             VEC3_ctor(&v);
-            ef_form_calc_velocity(self, &v, em, &p, &normal, &p, &fromYAxis);
+            CalcVelocity((Vec*)&v, em, (Vec*)&p, (Vec*)&normal, (Vec*)&p, (Vec*)&fromYAxis);
 
-            pm->CreateParticle(ef_form_calc_life(self, aPtclLife, aPtclLifeRnd, em), p, v, space,
-                               lbl_807962F0 + lbl_807962F4 * (f32)(s32)em->mVelMomentumRandom *
-                                                  ef_random_float(&em->mRandom.mSeed),
-                               (u8*)&em->mInheritSetting, (u32)em->mpReferenceParticle,
-                               em->mCalcRemain);
+            pm->CreateParticle(CalcLife(aPtclLife, aPtclLifeRnd, em), p, v, space,
+                               1.0f + 0.01f * (f32)(s32)em->scale_rate *
+                                                  ef_random_float(&em->progress),
+                               &em->spawn_data, em->spawn_extra, em->spawn_flag);
         }
     }
 }

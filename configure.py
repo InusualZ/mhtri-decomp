@@ -784,17 +784,25 @@ config.libs = [
             # Flags: unit header of src/ef/ef_drawstrategyimpl.cpp (`-pool off`, playbook 43).
             Object(NonMatching, "ef/ef_drawstrategyimpl.cpp", extra_cflags=["-pool off"]),
             Object(NonMatching, "ef/ef_drawfreestrategy.cpp"),
-            Object(NonMatching, "ef/ef_torus.cpp"),
-            Object(NonMatching, "ef/ef_cube.cpp"),
-            Object(NonMatching, "ef/ef_cylinder.cpp"),
-            Object(NonMatching, "ef/ef_disc.cpp"),
+            # Flags: unit header of src/ef/ef_torus.cpp (`-pool off`: one `lis`/`addi` per string).
+            Object(Matching, "ef/ef_torus.cpp", extra_cflags=["-pool off"]),
+            # Flags: unit header of src/ef/ef_cube.cpp (`-pool off`: one `lis`/`addi` per string).
+            Object(NonMatching, "ef/ef_cube.cpp", extra_cflags=["-pool off"]),
+            # Flags: unit header of src/ef/ef_cylinder.cpp (`-pool off`: one `lis`/`addi` per string).
+            Object(NonMatching, "ef/ef_cylinder.cpp", extra_cflags=["-pool off"]),
+            # Flags: unit header of src/ef/ef_disc.cpp (`-pool off`: one `lis`/`addi` per string).
+            Object(Matching, "ef/ef_disc.cpp", extra_cflags=["-pool off"]),
             Object(NonMatching, "ef/ef_emitterform.cpp"),
             Object(NonMatching, "ef/ef_emitter.cpp"),
             Object(NonMatching, "ef/ef_particle.cpp"),
-            Object(NonMatching, "ef/ef_emform.cpp"),
-            Object(NonMatching, "ef/ef_line.cpp"),
-            Object(NonMatching, "ef/ef_point.cpp"),
-            Object(NonMatching, "ef/ef_sphere.cpp"),
+            # Flags: unit header of src/ef/ef_emform.cpp (`-pool off`: one `lis`/`addi` per string).
+            Object(NonMatching, "ef/ef_emform.cpp", extra_cflags=["-pool off"]),
+            # Flags: unit header of src/ef/ef_line.cpp (`-pool off`: one `lis`/`addi` per string).
+            Object(Matching, "ef/ef_line.cpp", extra_cflags=["-pool off"]),
+            # Flags: unit header of src/ef/ef_point.cpp (`-pool off`: one `lis`/`addi` per string).
+            Object(Matching, "ef/ef_point.cpp", extra_cflags=["-pool off"]),
+            # Flags: unit header of src/ef/ef_sphere.cpp (`-pool off`: one `lis`/`addi` per string).
+            Object(NonMatching, "ef/ef_sphere.cpp", extra_cflags=["-pool off"]),
             Object(NonMatching, "ef/system_core.cpp"),
             Object(NonMatching, "ef/eft001.cpp"),
             Object(NonMatching, "ef/eft_res.cpp"),

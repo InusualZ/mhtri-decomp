@@ -1,31 +1,32 @@
 /*
- * ef/ef_sphere.cpp - the sphere emitter form's spawn function `ef_sphere_spawn` and its `cosf` thunk.
+ * ef/ef_sphere.cpp - the sphere emitter form (`EmitterFormSphere::Emission`) and its `cosf` thunk.
  * RANGE. .text 0x800CDB2C-0x800CE5A8 (2 functions); extab 0x8000A5DC-0x8000A5E4, extabindex 0x80023C70-0x80023C7C,
- *   .data 0x80595058-0x80595118 (the `__FILE__` string "ef_sphere.cpp" and the assert strings), .sdata2
- *   0x80796328-0x80796360.  Left edge: `ef/ef_point.cpp` ends there.  Right edge: `ef_cosf` is called only
- *   from `ef_sphere_spawn`, while `fn_800CE5A8` (the 0x84D0 `system_w` side-table size) is called only from
- *   `ef/system_core.cpp`, which starts there.
- * FLAGS. `cflags_main`; file-wide `#pragma peephole off` and `#pragma fp_contract off`, as the sibling shapes.
- * NAMES. The file name is the `__FILE__` string's.  `cosf` (0x80463E50) is MSL's: its body calls `cos`
- *   (0x80467918); the shared dump's `tanf` there is wrong.
- *   GUESS: `ef_sphere_spawn` (0x800CDB2C): the sphere form's emission (nw4r's `EmitterFormSphere::Emission` role).
+ *   .data 0x80595058-0x80595118 (the `__FILE__` string "ef_sphere.cpp", the three assert messages, the class's
+ *   table at 0x80595108), .sdata2 0x80796328-0x80796360.  Left edge: `ef/ef_point.cpp` ends there.  Right edge:
+ *   `ef_cosf` is called only from `Emission`, while `fn_800CE5A8` (the 0x84D0 `system_w` side-table size) is
+ *   called only from `ef/system_core.cpp`, which starts there.
+ * FLAGS. `cflags_main` plus `-pool off`; file-wide `#pragma peephole off` and `#pragma fp_contract off`, as the
+ *   sibling shapes.
+ * NAMES. The class and method are nw4r's.  `cosf` (0x80463E50) is MSL's: its body calls `cos` (0x80467918); the
+ *   shared dump's `tanf` there is wrong.
  *   GUESS: `ef_cosf` (0x800CE5A4): the out-of-line `cosf` thunk (`b cosf`), the sphere's twin of `ef_fabsf`.
  *   GUESS: `ef_sphere_file_name`, `ef_sphere_err_em`, `ef_sphere_err_pm`, `ef_sphere_err_params` (their text).
  * RESIDUALS.
- *  - `ef_sphere_spawn`: the register colouring differs from retail's - `flags` takes r24 where retail's takes r23,
- *    the ring counter r23 where retail's takes r25, and a few loop floats sit one or two FPRs off; the `.sdata2`
+ *  - `Emission`: the register colouring differs from retail's - `flags` takes r24 where retail's takes r23, the
+ *    ring counter r23 where retail's takes r25, and a few loop floats sit one or two FPRs off; the `.sdata2`
  *    literals are our pool's `@N`.
- *   flipcheck: `.data` claimed, not emitted (the strings are declared, never defined).
+ * SHAPES. The function is `nw4r::ef::EmitterFormSphere::Emission` (declared in `ef/ef_emform.h`; this unit defines the key
+ *   function, so the class's table is emitted here, after the strings).  The particle manager's spawn is its
+ *   virtual `CreateParticle`, taking the position and velocity by value (copied velocity first, momentum
+ *   evaluated before the life, dispatch through r3); the float argument precedes the space matrix.
+ * SHAPES. The strings are global definitions in retail's order; `-pool off` (configure.py) gives each its own
+ *   `lis`/`addi`.
  * SHAPES. The `.sdata2` constants are literals, so MWCC pools and hoists them as retail does.
- * SHAPES. The particle manager is a class whose vtable pointer follows a 0x1C-byte non-polymorphic head; the spawn
- *   is its virtual `CreateParticle`, taking the position and velocity by value (copied velocity first, momentum
- *   evaluated before the life, dispatch through r3).  The emission's float argument precedes the last integer one
- *   (nw4r's `Emission(..., u16 life, f32 lifeRnd, const MTX34* space)`), which orders the prologue's moves.
  * SHAPES. `#line 42` puts the three `EF_ASSERT_PTR` sites on lines 42-44.
  */
 
 #include "ef.h"
-#include "ef/ef_particlemanager.h" /* ParticleManager (rule 1) */
+#include "ef/ef_emform.h" /* nw4r::ef::EmitterFormSphere, ParticleManager (rule 1) */
 #include "ef/ef_vec3_normalize_to.h" /* ef_vec3_normalize_to (rule 2) */
 #include "MSL_C/alloc.h"             /* cosf (rule 2) */
 
@@ -33,21 +34,25 @@
 #pragma fp_contract off
 
 
-/* The unit's own strings (its claimed `.data`, declared, never defined). */
-extern char ef_sphere_file_name[];  /* "ef_sphere.cpp"                                        .data */
-extern char ef_sphere_err_em[];     /* "NW4R:Pointer Error\nem(=%p) is not valid pointer."     .data */
-extern char ef_sphere_err_pm[];     /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."     .data */
-extern char ef_sphere_err_params[]; /* "NW4R:Pointer Error\nparams(=%p) is not valid pointer." .data */
+/* The unit's `.data` strings, in retail order: the file name and one message per checked pointer (the
+ * class's table follows them). */
+char ef_sphere_file_name[] = "ef_sphere.cpp";
+char ef_sphere_err_em[] = "NW4R:Pointer Error\nem(=%p) is not valid pointer.";
+char ef_sphere_err_pm[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
+char ef_sphere_err_params[] = "NW4R:Pointer Error\nparams(=%p) is not valid pointer.";
 
 extern "C" {
 
 f32 ef_cosf(f32 x);
 
+} /* extern "C" */
+
 /* 0x800CDB2C (0xA78): emits `count` particles from the sphere: on latitude rings (flag 0x20000; `count * count * 4
  * + 2` of them, the ring sizes growing by four to the equator and shrinking after it) or at random inside the
  * shell the hollow ratio leaves. */
-void ef_sphere_spawn(s32 ctx, EfWork* em, ParticleManager* pm, s32 count, u32 flags, EfParams* params, u16 id,
-                     f32 scale, s32 spawn_arg) {
+void nw4r::ef::EmitterFormSphere::Emission(EfWork* em, ParticleManager* pm, int count, u32 flags, f32* paramBlock,
+                                           u16 id, f32 scale, const MTX34* spawn_arg) {
+    EfParams* params = (EfParams*)paramBlock;
     f32 dist;
     f32 hollow, radius_x, radius_y, radius_z, base;
 
@@ -135,8 +140,8 @@ void ef_sphere_spawn(s32 ctx, EfWork* em, ParticleManager* pm, s32 count, u32 fl
                 side.x = -side.x;
                 side.z = -side.z;
             }
-            ef_form_calc_velocity(ctx, (Vec*)&out, em, (Vec*)&pos, (Vec*)&norm, (Vec*)&norm, (Vec*)&side);
-            pm->CreateParticle(ef_form_calc_life(ctx, id, scale, em), pos, out, spawn_arg,
+            CalcVelocity((Vec*)&out, em, (Vec*)&pos, (Vec*)&norm, (Vec*)&norm, (Vec*)&side);
+            pm->CreateParticle(CalcLife(id, scale, em), pos, out, spawn_arg,
                                1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), &em->spawn_data,
                                em->spawn_extra, em->spawn_flag);
         }
@@ -170,12 +175,14 @@ void ef_sphere_spawn(s32 ctx, EfWork* em, ParticleManager* pm, s32 count, u32 fl
         assignVec3((Vec*)&flat, (Vec*)&pos);
         flat.y = 0.0f;
         ef_vec3_normalize_to(&flat, &flat);
-        ef_form_calc_velocity(ctx, (Vec*)&out, em, (Vec*)&pos, (Vec*)&norm, (Vec*)&norm, (Vec*)&flat);
-        pm->CreateParticle(ef_form_calc_life(ctx, id, scale, em), pos, out, spawn_arg,
+        CalcVelocity((Vec*)&out, em, (Vec*)&pos, (Vec*)&norm, (Vec*)&norm, (Vec*)&flat);
+        pm->CreateParticle(CalcLife(id, scale, em), pos, out, spawn_arg,
                            1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), &em->spawn_data,
                            em->spawn_extra, em->spawn_flag);
     }
 }
+
+extern "C" {
 
 /* 0x800CE5A4 (0x4): cosf, reached through a 4-byte tail-call thunk. */
 f32 ef_cosf(f32 x) {

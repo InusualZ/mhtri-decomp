@@ -1,24 +1,26 @@
 /*
- * ef/ef_emitterform.cpp - the emitter form's spawn transform builder `ef_form_calc_velocity` (asserts `out` and `em`, seeds
- *   from the emitter's direction, then a direction blend, a rotation, a random Euler spread, an axis-angle spread
- *   and a size jitter) and `ef_form_calc_life`, which varies a 16-bit particle life per instance.
+ * ef/ef_emitterform.cpp - the two helpers every emitter form calls: `EmitterForm::CalcVelocity` (asserts `out` and
+ *   `em`, seeds from the emitter's direction, then a direction blend, a rotation, a random Euler spread, an
+ *   axis-angle spread and a size jitter) and `EmitterForm::CalcLife`, which varies a 16-bit particle life per
+ *   instance.
  * RANGE. .text 0x800A99B4-0x800AA18C (2 functions); extab 0x80009DF4-0x80009E04, extabindex 0x80023094-0x800230AC,
  *   .data 0x80592CD0-0x80592D50 (the `__FILE__` string "ef_emitterform.cpp" first), .sdata2 0x80796030-0x80796060.
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail's epilogue is `li r0,N; psq_lx`) and `#pragma
  *   fp_contract off` (retail keeps every `a*b+c` as `fmuls`/`fadds`).
- * NAMES. The map has only `fn_` stems for the range.
- *   GUESS: `ef_form_calc_velocity` (0x800A99B4): nw4r's `EmitterForm::CalcVelocity` role, the spawn velocity.
- *   GUESS: `ef_form_calc_life` (0x800A9FB0): nw4r's `EmitterForm::CalcLife` role, the per-instance life.
- * RESIDUALS. 1 partial row, `ef_form_calc_velocity`: the two `0.0f != weight` tests load the constant into f1
- *   where retail loads it into f0 (the operands of `fcmpu` and the three stores of the zeroing branch follow).
+ * NAMES. The class is nw4r's (`nw4r::ef::EmitterForm`, declared in `ef/ef_emform.h`); the two members are GUESSES.
+ *   GUESS: `CalcVelocity` (0x800A99B4): nw4r's spawn-velocity helper, from what it builds.
+ *   GUESS: `CalcLife` (0x800A9FB0): nw4r's per-instance life helper, from what it returns.
+ * RESIDUALS. 1 partial row, `CalcVelocity`: the two `0.0f != weight` tests load the constant into f1 where retail
+ *   loads it into f0 (the operands of `fcmpu` and the three stores of the zeroing branch follow).
  *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x10 of 0x30.
- * SHAPES. The five stages of `ef_form_calc_velocity` are in retail's evaluation order.  The pool constants are
- *   declared `extern const` (retail reads `0.0f` once per test), the second axis-angle matrix is a full `Mtx34`
- *   (retail's 0x120 frame), and the spread's `z` term and the axis-angle adds keep retail's operand order.
+ * SHAPES. The five stages of `CalcVelocity` are in retail's evaluation order.  The pool constants are declared
+ *   `extern const` (retail reads `0.0f` once per test), the second axis-angle matrix is a full `Mtx34` (retail's
+ *   0x120 frame), and the spread's `z` term and the axis-angle adds keep retail's operand order.
  */
 
 #include "types.h"
 #include "ef.h"
+#include "ef/ef_emform.h" /* nw4r::ef::EmitterForm, the owner of these two members */
 #include "g3d/g3d_calcview.h" /* fn_800710BC (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
@@ -66,7 +68,7 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 
 /* Builds the particle spawn transform `out` from the emitter work record `em`, `dir` (base direction),
  * `offset` and the two rotated axes `rot`/`rot2`; each stage sits behind a non-zero weight in `em`. */
-void ef_form_calc_velocity(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot, Vec* rot2)
+void nw4r::ef::EmitterForm::CalcVelocity(Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot, Vec* rot2)
 {
     Mtx34 mtx_a;
     VEC3 tmp;
@@ -163,7 +165,7 @@ void ef_form_calc_velocity(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset,
 
 /* Maps the emitter's 16-bit instance id `id` into the id the particle is spawned with: a per-instance
  * fractional offset from the emitter's progress, clamped to [1, 65535]. */
-u16 ef_form_calc_life(s32 ctx, u16 id, f32 scale, EfWork* em)
+u16 nw4r::ef::EmitterForm::CalcLife(u16 id, f32 scale, EfWork* em)
 {
     f32 v;
     int ok;
