@@ -837,7 +837,7 @@ def main() -> int:
     n.add_argument("--worker", default=None)
     n.add_argument("--kind", default="unit",
                    help="the lane kind -> agent profile (`unit`->surveyor, `fix`->fixer, `merge`->merger, "
-                        "`tooling`/`docs`->worker, `review`->codereviewer, `scout`/`plan` read-only; default unit)")
+                        "`tooling`/`docs`->worker, `review`->codereviewer, `scout`/`recon`/`plan` read-only; default unit)")
     n.add_argument("--profile", default=None, choices=_profiles(),
                    help="override the agent profile the lane is launched with (default: derived from --kind)")
     n.add_argument("--dry-run", action="store_true")

@@ -44,6 +44,16 @@ def test_cli(c):
         rc, text = _run(["--main", main, "--json"])
         c.check("--json is the lib's summary plus the unreadable lines",
                 (json.loads(text)["outcomes"]["refused"], json.loads(text)["unreadable_lines"]), (3, []))
+        c.check("... with no lane manifest counted before one is named", json.loads(text)["manifests"], 0)
+        lib.append(main, lib.Attempt("tooling/t1", "refused", 5.0, refused_row="the batch touches only the lane's "
+                                     "manifest", manifest="t1-wave"))
+        rc, text = _run(["list", "--main", main, "--last", "1"])
+        c.check("list names the lane manifest an attempt was judged against", "[manifest: t1-wave]" in text, True)
+        rc, text = _run(["summary", "--main", main])
+        c.check("the summary counts the attempts that named a manifest", "lane manifests: 1 attempt(s)" in text, True)
+        rows, _ = lib.read(main)
+        c.check("a line without a manifest carries no `manifest` key (an optional key, schema 2)",
+                ("manifest" in rows[0], rows[-1]["manifest"], rows[-1]["schema"]), (False, "t1-wave", 2))
 
 
 if __name__ == "__main__":

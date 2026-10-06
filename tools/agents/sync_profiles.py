@@ -55,6 +55,10 @@ RULE_RE = re.compile(r"^\|\s*(\d+)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*$")
 # paragraph (the audit counts, the backlog policy) belongs to the plan, not to a profile.
 ENFORCEMENT_ANCHORS = ("land.py verify", "--diff", "exempts nothing", "no exemption and no deferral")
 
+# The self-check list a lane runs on its own branch before it reports (the review defect classes): a paragraph that
+# opens with this anchor, then its bullet list. It rides the block verbatim; a section without it adds nothing.
+SELF_CHECK_ANCHOR = "**Before reporting: the review defect classes.**"
+
 MIN_RULES = 8   # a table that lost half its rows is a parse failure, not a rule change
 # The block's title says `rules 1-N` with N = the table's row count, so a new rule (rule 12, 2026-09-28)
 # reaches every profile without a code change here; there is no rule count to keep in step.
@@ -178,8 +182,36 @@ def enforcement(section):
     return " ".join(kept)
 
 
+def self_check(section):
+    """The self-check paragraph and its bullet list, verbatim lines - `[]` when the section has no such paragraph.
+
+    The paragraph is the line that opens with `SELF_CHECK_ANCHOR` plus its continuation lines; the list is every
+    following `- ` / `* ` item (with its indented continuations) up to the first blank line after the list starts.
+    """
+    lines = section.split("\n")
+    start = next((i for i, line in enumerate(lines) if line.startswith(SELF_CHECK_ANCHOR)), None)
+    if start is None:
+        return []
+    out, seen_item = [], False
+    for line in lines[start:]:
+        if not line.strip():
+            if seen_item:
+                break
+            if out and out[-1]:
+                out.append("")          # the blank line between the paragraph and its list, kept once
+            continue
+        if line.lstrip().startswith(("- ", "* ")):
+            seen_item = True
+        out.append(line)
+    if not seen_item:
+        raise SystemExit("section 6.5's self-check paragraph has no bullet list - the shape changed; fix it rather "
+                         "than write a block without the list")
+    return out
+
+
 def build_block(section):
-    """The generated block: the table's rules, one line each, then the enforcement sentence(s)."""
+    """The generated block: the table's rules, one line each, then the enforcement sentence(s), then the self-check
+    list when the section has one (`self_check`)."""
     rows = parse_rules(section)
     lines = [BEGIN]
     lines.append("The canonical table for rules 1-%d is `docs/plan.md` section 6.5; this block is generated "
@@ -189,6 +221,10 @@ def build_block(section):
         lines.append("%d. %s - %s" % (number, title, meaning))
     lines.append("")
     lines.append(enforcement(section))
+    check = self_check(section)
+    if check:
+        lines.append("")
+        lines.extend(check)
     lines.append(END)
     return "\n".join(lines)
 

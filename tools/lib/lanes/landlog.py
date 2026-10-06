@@ -27,7 +27,8 @@ class Attempt:
     """One landing attempt. `refused_row` is the gate row that refused (None when it landed); `conflicts` the
     paths `apply` could not resolve; `units` the batch's units; `seconds` the wall time; `allow` the allowances
     the command line granted (`ALLOW_CLASSES`; `{}` when none); `warnings` the WARNING rows' findings
-    (`<row>: <finding>`; a warning never refuses)."""
+    (`<row>: <finding>`; a warning never refuses); `manifest` the lane manifest id `land --manifest` named (absent
+    from the line when none - an optional key, so the schema stays 2)."""
     branch: str
     outcome: str
     seconds: float
@@ -40,6 +41,7 @@ class Attempt:
     extra: dict = field(default_factory=dict)
     allow: dict = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
+    manifest: str | None = None
 
     def __post_init__(self) -> None:
         if self.outcome not in OUTCOMES:
@@ -55,6 +57,8 @@ class Attempt:
         data["warnings"] = list(self.warnings)
         if not data["extra"]:
             del data["extra"]
+        if data["manifest"] is None:
+            del data["manifest"]
         return json.dumps(data, sort_keys=True, separators=(",", ":"))
 
 
@@ -117,7 +121,7 @@ def allowance_counts(rows: list[dict]) -> dict:
 
 def summary(rows: list[dict]) -> dict:
     """Counts by outcome, the refusing rows and conflicted paths by frequency, wall-time totals, the allowances
-    (`allowance_counts`) and the schema versions read."""
+    (`allowance_counts`), how many attempts named a lane manifest, and the schema versions read."""
     outcomes = Counter(str(r.get("outcome")) for r in rows)
     refused = Counter(str(r["refused_row"]) for r in rows if r.get("refused_row"))
     conflicts = Counter(p for r in rows for p in (r.get("conflicts") or []))
@@ -131,6 +135,7 @@ def summary(rows: list[dict]) -> dict:
             "seconds_total": round(sum(secs), 1),
             "seconds_median_landed": round(sorted(landed)[len(landed) // 2], 1) if landed else None,
             "allowances": allowance_counts(rows),
+            "manifests": sum(1 for r in rows if r.get("manifest")),
             "warning_rows": Counter(str(w).split(":", 1)[0] for r in rows
                                     for w in (r.get("warnings") or [])).most_common(),
             "schemas": dict(sorted(Counter(int(r.get("schema") or 1) for r in rows).items()))}

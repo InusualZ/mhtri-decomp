@@ -96,7 +96,7 @@ def _log(main: str, branch: str, rec: dict, t0: float) -> None:
                                              units=tuple(rec["units"]), commit=rec["commit"],
                                              allow=rec.get("allow") or {},
                                              warnings=tuple(rec.get("warnings") or ()),
-                                             extra=dict(rec.get("extra") or {})))
+                                             extra=dict(rec.get("extra") or {}), manifest=state.MANIFEST))
     except OSError as exc:                         # the log is evidence; it never changes a landing's answer
         print("WARNING: the landing log was not written (%s)" % exc, file=sys.stderr)
 

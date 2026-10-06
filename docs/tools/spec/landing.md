@@ -20,8 +20,8 @@ prints the `land.band_ownership_warnings` command beside `stylelint.py --diff ma
   compile targets, and `Batch`: one `verify` run (inputs, the `lib.findings.Row`s so far, `warn` - a WARNING row that
   never refuses, its findings kept on `warnings` for the message and the landing log -, the values a later row
   reads). Imports nothing of the package.
-* `state.py` - the invocation's recorded allowances (`--allow-rule10/12`, `--allow-orphan`) and `--unit-rename`
-  pairs, read as `state.<NAME>` (a re-exported copy would not see a setter's rebinding); `allowances` folds them with
+* `state.py` - the invocation's recorded allowances (`--allow-rule10/12`, `--allow-orphan`), `--unit-rename`
+  pairs and the `--manifest` spec (`MANIFEST`: the landing log's `manifest` id and the commit body's `manifest:` line), read as `state.<NAME>` (a re-exported copy would not see a setter's rebinding); `allowances` folds them with
   `--allow-regression`/`--no-outbox`/`--no-selftests` into the landing log's `allow` and `allow_lines` into the commit
   body's `allow:` lines. The CLI is the one path that sets them (`flow.land` takes no `allow_rule10`).
 * `base.py` - `record-base` and the readers it stores (ledger, report snapshot, dirty set); the object and data
@@ -39,7 +39,9 @@ prints the `land.band_ownership_warnings` command beside `stylelint.py --diff ma
   base, the batch-path guard and scratch, conflict markers, the branch guards, the pre-flight), `batch.py` (outbox,
   branch commits), `rules.py` (style lint with rule 12's allowance, rule 2's band boundary, rule 10), `selftests.py` (the suite row), `subject.py` (commitlint), `build.py` (command rows, the compile gate, the
   `ok` stamp), `objects.py` (`verifyunit`, `undefrefs`, `flipcheck`: registration, references, drift, re-measure),
-  `data.py` (`dataclosure`), `regression.py` (`lib.report.regression`); `objects.new_unit_name_row` (pre-build, rule 7: a unit newly registered under a generated name refuses); `knowledge.py` (7.10) was deleted
+  `data.py` (`dataclosure`), `regression.py` (`lib.report.regression`), `manifest.py` (pre-build, after the conflict
+  markers: with `--manifest` every changed path must sit inside the lane's `owns` and outside its `read_only` -
+  `lane-manifest.md`; no row without the flag); `objects.new_unit_name_row` (pre-build, rule 7: a unit newly registered under a generated name refuses); `knowledge.py` (7.10) was deleted
   2026-10-05 with its row.
 * `gate.py` - `verify`: `PRE_BUILD` rows in order, then the build and the rows that read it, the message body.
 * `flow.py` - `land` and `land_branch` (gate -> stage -> commit -> release, one answer line). A stage or commit step
@@ -79,8 +81,8 @@ Tier: fixture. `tools/tests/units/test_land.py` (the re-homed `land.py --selftes
 decisions, `land`/`land --branch` on fixture repos - among them `test_land_branch_config_relocations`: a
 `block_relocations`-only `config.yml` lands with the unit batch in one commit, a frozen key or `build.sha1` refuses at
 pre-flight with main unchanged -, the resolver, the CLI) and
-`tools/tests/units/landing/`: `test_gate_golden.py` (seventeen scenarios, the whole table - the two `new-unit-*` ones pin the new-unit name row's refusal and its rename credit, the two `lint-rule15-*` ones run the real lint: a stale path new to a changed file refuses the style-lint row, advisory markers pass it), `test_landlog_hook.py` (the
-landing log), `test_base_report.py` (the base report rebuild and its row), `test_neighbours.py` (names-only
+`tools/tests/units/landing/`: `test_gate_golden.py` (nineteen scenarios, the whole table - the two `new-unit-*` ones pin the new-unit name row's refusal and its rename credit, the two `lint-rule15-*` ones run the real lint: a stale path new to a changed file refuses the style-lint row, advisory markers pass it, the two `manifest-*` ones pin the lane-manifest row: a batch inside its manifest passes, one touching a read-only hot header refuses; `test_manifest_decision` pins the globs, read-only over owns and the loader), `test_landlog_hook.py` (the
+landing log, the manifest id included), `test_base_report.py` (the base report rebuild and its row), `test_neighbours.py` (names-only
 neighbours), `test_long_paths.py` (the golden fixture's `bulk` kind - 1,500 renames, 3,000 pathspec entries - landed
 through `flow.land` under `testing.argv_limit()`, the simulated 32,767-character limit: it lands; the old command-line
 commit is caught as outcome `error` and its printed recovery commits the batch; a raising commit step's printed abandon

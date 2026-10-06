@@ -576,6 +576,18 @@ rules 3 and 4 exist to record.
  */
 ```
 
+**Before reporting: the review defect classes.** The read-only review found these in every batch of the 2026-10-06 wave; a lane checks its own branch for each before its final message:
+
+- **Owners are mapped by function address**: a callee's owner is the unit whose `splits.txt` range holds that function's address, never the unit a retired range started at (`symedit.py at <addr>`, `callers.py <addr>`).
+- **A 100 % row can still call the wrong thing**: a wrong callee, mangling or linkage hides behind a matching row; read the relocation targets (`python tools/objdiff/relocdiff.py --by-owner`), not the percentage.
+- **An empty stub body is unwritten, not partial**: it never counts toward "bodies written" or a partial score.
+- **The unwritten list is complete**: up to 20 runs as address ranges, otherwise the count, the largest and `sweepcomments.py --unit <unit>`.
+- **Every flipcheck blocker is in RESIDUALS**, one line each.
+- **Every GUESS name is marked** on the unit header's NAMES line.
+- **A dump name is checked by address**: a signature match on a short body, or a linker-folded duplicate, is not evidence.
+- **"Unowned"/"unclaimed" is verified** against `splits.txt` before it is written (`symedit.py at <addr>`, `datagap.py --unit <unit>`).
+- **A function comment is third person, present tense** ("Returns the slot").
+
 **These rules are part of phase C, not a separate chore.** The residual sweep already revisits every unit that
 is not byte-identical; the conformance work (rules 1-15) rides the same pass, unit by unit, in address order.
 

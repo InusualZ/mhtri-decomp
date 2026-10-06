@@ -35,7 +35,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 
 ## Spec index (the kept and new tools)
 
-Core gate: `land`, `verifyunit`, `stylelint`, `vtableaudit`, `undefrefs`, `flipcheck`, `datagap` (+ `dataclosure`), `langcheck`,
+Core gate: `land` (+ `lane-manifest`), `verifyunit`, `stylelint`, `vtableaudit`, `undefrefs`, `flipcheck`, `datagap` (+ `dataclosure`), `langcheck`,
 `ledger`, `recompile`, `handoff`, `playbook`, `commitlint`, `guard`, `prepcommit`, `selftest`, `objalign`, `objextab`,
 `ideas` (+ `ideas_demo`), `sync_playbook_index`, `sync_profiles`.
 
