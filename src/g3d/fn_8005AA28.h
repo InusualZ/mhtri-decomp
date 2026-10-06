@@ -16,7 +16,6 @@ void fn_8005AA44(void* pSelf, u32 enable);
 
 /* 0x8005AB00 - the `ResMat` handle's resource pointer; the ScnMdl unit's replacement passes read it
  * (rule 2: declared here, in its owner's header, not in the consumer). */
-u32 fn_8005AB00(const void* pSelf);
 
 /* 0x8005AB08 (0x70): translates `pSrc` by `pPos` into the node matrix (`PSMTXTransApply`) and returns `pSrc`. */
 /* untyped: opaque handle - the node matrix, read through its accessor */

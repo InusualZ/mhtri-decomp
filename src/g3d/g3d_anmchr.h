@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 void **fn_8005DC60(void **out, void *v);   /* 0x8005DC60 - stores `v` through `out`, returns `out` */
-void **fn_8005DCD0(void **out, void *v);   /* 0x8005DCD0 - stores `v` through `out`, returns `out` */
+void **type_obj_set_name_anmchr(void **out, void *v);   /* 0x8005DCD0 - stores `v` through `out`, returns `out` */
 u32 fn_800628B4(void *self);               /* 0x800628B4 - `*(u32*)self != 0` */
 void *fn_800628A4(void *self);             /* 0x800628A4 - loads the word at +0x0 of `self` */
 

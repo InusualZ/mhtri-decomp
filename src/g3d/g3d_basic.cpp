@@ -39,10 +39,10 @@ extern "C" {
 /* The `g3d` node/resource helpers this unit calls (plain map stems). */
 void* mtx34_get_ptr(void* pMtx);
 void* mtx34_const_ptr(void* pMtx);
-u32 fn_800737AC(u32 handle);
-u32 fn_800737B4(u32 handle);
-u32 fn_800737BC(u32 handle);
-u32 fn_800737C4(u32 handle);
+u32 world_mtx_attr_not_scale_uniform(u32 handle);
+u32 world_mtx_attr_not_scale_one(u32 handle);
+u32 world_mtx_attr_scale_uniform(u32 handle);
+u32 world_mtx_attr_scale_one(u32 handle);
 void fn_8050133C(void* pOut, const void* pA, const void* pB);
 void fn_80501390(void* pOut, const void* pA, const void* pB);
 void PSMTXScaleApply(Mtx34* pDst, const Mtx34* pSrc, f32 xS, f32 yS, f32 zS);
@@ -152,19 +152,19 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
     }
 
     if (flag & 0x8) {
-        handle = fn_800737C4(handle);
+        handle = world_mtx_attr_scale_one(handle);
         pVecOut->z = lbl_807963D4;
         pVecOut->y = lbl_807963D4;
         pVecOut->x = lbl_807963D4;
     } else {
-        handle = fn_800737B4(handle);
+        handle = world_mtx_attr_not_scale_one(handle);
         copyVec3(pVecOut, &pNode->pos);
     }
 
     if (flag & 0x10) {
-        fn_800737BC(handle);
+        world_mtx_attr_scale_uniform(handle);
     } else {
-        fn_800737AC(handle);
+        world_mtx_attr_not_scale_uniform(handle);
     }
 }
 

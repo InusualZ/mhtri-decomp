@@ -4,7 +4,9 @@
  *   0x8058D6C0-0x8058D7E0, .sdata 0x807911A0-0x807911A8.  Both edges are the unclaimed run's, not proven seams.
  * NAMES. Map stems; the dump's three names in this range come from a differently laid-out build and contradict
  *   the `g3d_anmvis.cpp`/`ResAnmVis` strings.
- * RESIDUALS. fn_8006ECB4: retail loads the vtable through r3 (`mr r3,r27; lwz r12,0(r3)`), ours through r27.
+ *   g3d_apply_vis_anm_result is a GUESS (0x8006ECB4: applies the visibility animation to the model's nodes, called
+ *   by ScnMdlSimple's world pass).
+ * RESIDUALS. g3d_apply_vis_anm_result: retail loads the vtable through r3 (`mr r3,r27; lwz r12,0(r3)`), ours through r27.
  *   flipcheck: `.rodata`, `.data` and `.sdata` are claimed and not emitted.
  * SHAPES. `AnmObjVis` is polymorphic with twelve placeholder slots ahead of the called one, so the call is a real
  *   virtual dispatch (`lwz r12,0x38(r12)`); a function-pointer field emits a different temp register.
@@ -18,6 +20,7 @@
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "g3d/fn_8005AA28.h" /* fn_8005AA44 (rule 2: its owner's header) */
+#include "g3d/g3d_obj.h"      /* nw4r::g3d::AnmObjVis (rule 1) */
 
 namespace nw4r {
 namespace db {
@@ -91,9 +94,8 @@ s32 fn_8006EC28(const ResHandle* pSelf);
 u32 fn_8006EC3C(ResHandle* pSelf);
 u32 fn_8006ECA0(const ResHandle* pSelf);
 const char* fn_8006ECA8(void);
-void fn_8006ECB4(void* pModel, AnmObjVis* pSelf);
+void g3d_apply_vis_anm_result(void* pModel, AnmObjVis* pSelf);
 void fn_8006ED84(u8* pByteVec, void* pModel, AnmObjVis* pSelf);
-u32 fn_8006EE48(void);
 
 /* The per-node visibility test: guard `this` with the library pointer check, bound `nodeId` by the entry
  * count, then report the top two bits of the entry halfword. */
@@ -141,7 +143,7 @@ const char* fn_8006ECA8(void)
 
 /* Walk the model's node table and, for every node the object marks visible, query the node handle's ID
  * (asserting it equals the index) and forward the per-node virtual result into the handle. */
-void fn_8006ECB4(void* pModel, AnmObjVis* pSelf)
+void g3d_apply_vis_anm_result(void* pModel, AnmObjVis* pSelf)
 {
     s32 numNodes = reinterpret_cast<const nw4r::g3d::ResMdl*>(pModel)->GetResNodeNumEntries();
 
@@ -180,12 +182,16 @@ void fn_8006ED84(u8* pByteVec, void* pModel, AnmObjVis* pSelf)
 }
 #pragma peephole on
 
-/* The AnmObjVis type-info name, through the one-word association helper the SDK uses for it. */
-u32 fn_8006EE48(void)
+}  // extern "C"
+
+/* 0x8006EE48 (0x30): returns the AnmObjVis type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjVis::GetTypeObjStatic()
 {
     u32 value;
 
-    return *fn_8005DC60(&value, lbl_8056F628);
+    return *reinterpret_cast<const TypeObj*>(fn_8005DC60(&value, lbl_8056F628));
 }
+
+extern "C" {
 
 }  // extern "C"

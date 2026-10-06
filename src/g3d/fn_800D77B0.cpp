@@ -2,7 +2,7 @@
  * g3d/fn_800D77B0.cpp - the single-matrix node transform (by `pRec->flags`) and the matrix slot's sign-bit test.
  * RANGE. .text 0x800D77B0-0x800D79B4 (2 functions); extab, extabindex.  Between `g3d/g3d_xsi.cpp` and
  *   `g3d/g3d_basic.cpp`, with no `__FILE__` string of its own; fn_800D77B0 is the per-node world-matrix builder
- *   `g3d/g3d_calcworld.cpp`'s fn_800737CC calls, and its multi-matrix sibling fn_800D7D24 is in `g3d/g3d_basic.cpp`.
+ *   `g3d/g3d_calcworld.cpp`'s g3d_calc_world calls, and its multi-matrix sibling fn_800D7D24 is in `g3d/g3d_basic.cpp`.
  * NAMES. Map stems (no name evidence); `pRec` is a private view of `g3d/g3d_calcworld.cpp`'s `NodeMtxRec` (the
  *   three members this range reads, the MTX34 at +0x1C).
  * RESIDUALS. fn_800D77B0: two registers swap - retail keeps `pRec->mFlags` in r30 and `mtxId`/the returned id in
@@ -74,19 +74,19 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
 
     u32 id;
     if ((flags & 8) != 0) {
-        id = fn_800737C4(mtxId);
+        id = world_mtx_attr_scale_one(mtxId);
         copyVec3(pDstScale, pSrcScale);
     } else {
-        id = fn_800737B4(mtxId);
+        id = world_mtx_attr_not_scale_one(mtxId);
         pDstScale->x = pSrcScale->x * pRec->mScale.x;
         pDstScale->y = pSrcScale->y * pRec->mScale.y;
         pDstScale->z = pSrcScale->z * pRec->mScale.z;
     }
 
     if ((flags & 0x10) != 0) {
-        return (s32) fn_800737BC(id);
+        return (s32) world_mtx_attr_scale_uniform(id);
     }
-    return (s32) fn_800737AC(id);
+    return (s32) world_mtx_attr_not_scale_uniform(id);
 }
 
 /* `(value & 0x80000000) != 0` - the matrix slot's "no transform" sign bit. */

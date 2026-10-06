@@ -22,4 +22,14 @@ struct RenderModeObj;
 #include "nw4r/fn_805012C4.h" /* nw4r::math::Frustum, owner nw4r/fn_805012C4.cpp (rule 2) */
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x8056F688 - the "ScnMdlSimple" type-name record (`.rodata`: a length word, then the NUL-terminated name)
+ * ScnMdlSimple's run-time type members read; no registered range covers it. */
+extern u8 scn_typename_ScnMdlSimple[];
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_UNSPLIT_G3D_H */

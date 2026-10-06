@@ -8,8 +8,11 @@
  * NAMES. Map stems (the dump answers `zz_` placeholders); `nw4r::g3d::ScnMdl` comes from the name record and the
  *   `mReplacement.*Array` assert texts; `g3d_root_model_bind` (0x8007F0CC) is a GUESS (it dispatches the material
  *   id through slot +0x34).
+ *   res_mdl_info_ref is a GUESS (0x8007D404: the ResMdlInfo handle's block, asserting the handle).  The ScnMdlSimple
+ *   getters, G3dProcUpdateFrame and IsDerivedFrom defined here are its weak copies (members of
+ *   `g3d/g3d_scnmdlsmpl.h`), as is AnmObj::IsBound.
  * RESIDUALS. Unwritten (objdiff scores them zero): fn_8007C540, fn_8007D59C, fn_8007DDFC, fn_8007E01C,
- *   fn_8007E498, fn_8007E8B4, fn_8007EA8C.  Partial: fn_8007D404, fn_8007D568, fn_8007DBDC, fn_8007DCB8,
+ *   fn_8007E498, fn_8007E8B4, fn_8007EA8C.  Partial: res_mdl_info_ref, fn_8007D568, fn_8007DBDC, fn_8007DCB8,
  *   fn_8007E7FC, fn_8007EA10, 0x8007ECD8-0x8007EF1C (five functions, the constructor and destructor among them),
  *   fn_8007EF4C, ScnGroup::PopBack.
  *   ScnGroup::PopBack and ScnGroup::Empty (0x8007F05C, 0x8007F0BC) are nw4r's `g3d/g3d_scnobj.h` members.
@@ -22,17 +25,15 @@
 #include "g3d/fn_80063888.h"      /* fn_800649B4 (rule 2: owner g3d/fn_80063888.cpp) */
 #include "g3d/g3d_anmchr.h"       /* G3dObj::operator delete, TypeObj::GetTypeName, type_obj_set_name, TypeObj::operator==, G3dObj (rule 2: owner g3d/g3d_anmchr.cpp) */
 #include "g3d/fn_800680CC.h"      /* fn_800696E4, fn_800697A4 (rule 2: owner g3d/fn_800680CC.cpp) */
-#include "g3d/fn_8005AA28.h"      /* fn_8005AB00 (rule 2: owner g3d/fn_8005AA28.cpp) */
-#include "g3d/fn_80075DCC.h"      /* fn_8007B734..fn_800793A4 (rule 2: owner g3d/fn_80075DCC.cpp) */
+#include "g3d/fn_80075DCC.h"      /* fn_8007B734..g3d_draw_res_mdl_directly (rule 2: owner g3d/fn_80075DCC.cpp) */
 #include "g3d/g3d_scnobj.h"       /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
-#include "g3d/g3d_anmvis.h"      /* fn_8006ECB4/fn_8006ED84 (rule 2: owner g3d/g3d_anmvis.cpp) */
+#include "g3d/g3d_anmvis.h"      /* g3d_apply_vis_anm_result/fn_8006ED84 (rule 2: owner g3d/g3d_anmvis.cpp) */
 #include "g3d/g3d_calcview.h"     /* fn_8006FFBC/fn_8006FFC8 (rule 2: owner g3d/g3d_calcview.cpp) */
 #include "g3d/g3d_calcvtx.h"       /* fn_8007270C (rule 2: g3d_calcvtx.cpp) */
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_resnode.h"
-#include "g3d/g3d_scnmdlsmpl.h"   /* fn_8007F41C? and the ScnMdlSimple helpers (rule 2) */
-#include "fn_80047398.h"          /* fn_800497AC (rule 2: owner fn_80047398.cpp) */
+#include "g3d/g3d_scnmdlsmpl.h"   /* nw4r::g3d::ScnMdlSimple (rule 2) */
 
 /* `ScnMdl` lives in its real namespace (rule 9's owner spelling); this unit's bodies name it short. */
 using nw4r::g3d::ReplacementBlock;
@@ -90,28 +91,20 @@ u32 fn_8009435C(void* pSelf, u32 flag);  /* 0x8009435C - the tex-color-DL replac
 u32 fn_8009411C(void* pSelf, u32 flag);  /* 0x8009411C - the ind-mtx/scale replacement's teardown */
 
 u32 fn_8007D38C(u32 p);
-u32 fn_8007D404(ResHandle* pSelf);
 u32 fn_8007D468(const ResHandle* pSelf);
 u32 fn_8007D470(u32 p);
 void fn_8007D47C(ScnMdl* pSelf, u32* pArg2, u32* pArg3);
-u32 fn_8007D568(ScnMdl* pSelf);
 u32 fn_8007D570(ScnMdl* pSelf);
 u32 fn_8007D588(ScnMdl* pSelf);
-u32 fn_8007DB2C(ScnMdl* pSelf);
-u32 fn_8007DB34(ScnMdl* pSelf);
 u32* fn_8007DB3C(u32* pDst, const u32* pSrc);
 void fn_8007DB6C(u32* pDst, const u32* pSrc);
 u32* fn_8007DB78(u32* pDst, const u32* pSrc);
 void fn_8007DBA8(u32* pDst, const u32* pSrc);
-u32 fn_8007DBB4(ScnMdl* pSelf);
 u32 fn_8007DBBC(ScnMdl* pSelf, u32 idx, u32 mask);
 void fn_8007DBDC(ScnMdl* pSelf, u32* pArg2, u32* pArg3);
-u32 fn_8007DCB0(ScnMdl* pSelf);
-u32 fn_8007DD8C(ScnMdl* pSelf);
 void fn_8007DCB8(ScnMdl* pSelf, u32* pArg2, u32* pArg3);
 void fn_8007DD94(ScnMdl* pSelf);
 u32 fn_8007DDF4(ScnMdl* pSelf);
-void fn_8007DF98(ScnMdl* pSelf, u32 type, u32 on);
 u32 fn_8007DF9C(ScnMdl* pSelf, u32 type, u32 on);
 u32 fn_8007DFDC(ScnMdl* pSelf, u32 type, u32* pOut);
 u32 fn_8007E478(ScnMdl* pSelf);
@@ -120,7 +113,6 @@ u32 fn_8007E488(ScnMdl* pSelf);
 void fn_8007E490(void);
 void fn_8007E494(void);
 void fn_8007E7FC(ScnMdl* pSelf);
-void fn_8007EA08(ScnMdl* pSelf);
 void* fn_8007EA10(ScnMdl* pSelf);
 u32 fn_8007ECD8(ScnMdl* pSelf, u32 type);
 u32 fn_8007ED28(ScnMdl* pSelf, u32 type);
@@ -131,7 +123,6 @@ void* fn_8007EE68(ScnMdl* pSelf, s16 flag);
 u32 fn_8007EF1C(void);
 u32 fn_8007EF4C(G3dObj* pSelf);
 u32 fn_8007EF84(void* pSelf, u32* pKey);
-u32 fn_8007EFF0(void* pSelf, u32* pKey);
 u32 g3d_root_model_bind(ScnMdl* pSelf, u32 id);
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -163,7 +154,7 @@ u32 nw4r::g3d::ResVtxPos::GetSize() const {
 extern "C" {
 
 /* 0x8007D404 - `ResCommon<ResMdl>::ref()`: the `g3d_resmdl_ac.h` inlined assert, then the handle. */
-u32 fn_8007D404(ResHandle* pSelf) {
+u32 res_mdl_info_ref(ResHandle* pSelf) {
     if (fn_8006FFC8(pSelf) == 0) {
         nw4r::db::Panic(lbl_8058F090, 57, lbl_8058F070, fn_8006FFBC(), lbl_80791208);
     }
@@ -183,30 +174,35 @@ u32 fn_8007D470(u32 p) {
 /* 0x8007D47C - the model's per-node visibility pass: refresh the copied material, then either write the
  * per-node byte vector (the node buffer exists) or hand the node table to the animation object. */
 void fn_8007D47C(ScnMdl* pSelf, u32* pArg2, u32* pArg3) {
-    fn_8007F41C(pSelf, pArg2, pArg3);
+    reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->CalcPosture((u32)pArg2, (const nw4r::math::MTX34*)pArg3);
     if (fn_8007D588(pSelf) != 0 && fn_8007D570(pSelf) != 0) {
         fn_8007E7FC(pSelf);
     }
-    if (fn_8007D568(pSelf) != 0) {
+    if (reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetAnmObjVis() != 0) {
         if (pSelf->mReplacement.mpNodeVisible != 0) {
-            u32 local = fn_8005AB00(pSelf);
+            nw4r::g3d::ResMdl local = reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetResMdl();
 
-            fn_8006ED84(pSelf->mReplacement.mpNodeVisible, &local, (u32*)fn_8007D568(pSelf));
+            fn_8006ED84(pSelf->mReplacement.mpNodeVisible, &local, (u32*)reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetAnmObjVis());
             fn_8007C464(pSelf);
         } else {
-            u32 local = fn_8005AB00(pSelf);
+            nw4r::g3d::ResMdl local = reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetResMdl();
 
-            fn_8006ECB4(&local, (void*)fn_8007D568(pSelf));
+            g3d_apply_vis_anm_result(&local, (void*)reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetAnmObjVis());
         }
     }
     reinterpret_cast<nw4r::g3d::ScnObj*>(pSelf)->CheckCallback_CALC_WORLD(nw4r::g3d::ScnObj::CALLBACK_TIMING_C,
                                                                     (u32)pArg2, pArg3);
 }
 
-/* 0x8007D568 - the shape-animation object the node passes walk. */
-u32 fn_8007D568(ScnMdl* pSelf) {
-    return pSelf->mpAnmObjShp;
+}   /* extern "C" */
+
+/* 0x8007D568 (0x8): the visibility animation. */
+nw4r::g3d::AnmObjVis* nw4r::g3d::ScnMdlSimple::GetAnmObjVis()
+{
+    return mpAnmObjVis;
 }
+
+extern "C" {
 
 /* 0x8007D570 - `(mFlags & 1) != 0`, the visible bit. */
 u32 fn_8007D570(ScnMdl* pSelf) {
@@ -222,15 +218,25 @@ u32 fn_8007D588(ScnMdl* pSelf) {
     return !flag;
 }
 
-/* 0x8007DB2C - the DL-buffer vertex count. */
-u32 fn_8007DB2C(ScnMdl* pSelf) {
-    return pSelf->mNumPixDL;
+}   /* extern "C" */
+
+/* 0x8007DB2C (0x8): the material-colour animation. */
+nw4r::g3d::AnmObjMatClr* nw4r::g3d::ScnMdlSimple::GetAnmObjMatClr()
+{
+    return mpAnmObjMatClr;
 }
 
-/* 0x8007DB34 - the indirect-matrix/scale DL count. */
-u32 fn_8007DB34(ScnMdl* pSelf) {
-    return pSelf->mNumIndMtxAndScaleDL;
+extern "C" {
+
+}   /* extern "C" */
+
+/* 0x8007DB34 (0x8): the texture-SRT animation. */
+nw4r::g3d::AnmObjTexSrt* nw4r::g3d::ScnMdlSimple::GetAnmObjTexSrt()
+{
+    return mpAnmObjTexSrt;
 }
+
+extern "C" {
 
 /* 0x8007DB3C - the word copy that hands the destination back (the `mReplacement` setter's shape). */
 u32* fn_8007DB3C(u32* pDst, const u32* pSrc) {
@@ -254,10 +260,15 @@ void fn_8007DBA8(u32* pDst, const u32* pSrc) {
     *pDst = *pSrc;
 }
 
-/* 0x8007DBB4 - the tex-coord-gen DL count. */
-u32 fn_8007DBB4(ScnMdl* pSelf) {
-    return pSelf->mNumTevColorDL;
+}   /* extern "C" */
+
+/* 0x8007DBB4 (0x8): the texture-pattern animation. */
+nw4r::g3d::AnmObjTexPat* nw4r::g3d::ScnMdlSimple::GetAnmObjTexPat()
+{
+    return mpAnmObjTexPat;
 }
+
+extern "C" {
 
 /* 0x8007DBBC - `(pSelf->mpDLBuffer[idx] & mask) != 0`, the per-entry option query. */
 u32 fn_8007DBBC(ScnMdl* pSelf, u32 idx, u32 mask) {
@@ -270,53 +281,61 @@ u32 fn_8007DBBC(ScnMdl* pSelf, u32 idx, u32 mask) {
  * the draw-buffer builder, then mark it done. */
 void fn_8007DBDC(ScnMdl* pSelf, u32* pArg2, u32* pArg3) {
     u32 key;
-    u32 handle;
 
-    fn_8007B940(pSelf, 1, pArg2, pArg3);
+    reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->CheckCallback_DRAW_OPA(nw4r::g3d::ScnObj::CALLBACK_TIMING_A, (u32)pArg2, pArg3);
     if (pArg3 != 0) {
         key = *pArg3;
     } else {
-        key = fn_800497AC(pSelf);
+        key = reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetDrawMode();
     }
-    handle = fn_8005AB00(pSelf);
-    fn_800793A4((s32*)&handle, fn_80080B5C(pSelf), fn_80080BA8(pSelf), fn_80080C04(pSelf),
-                fn_8007DCB0(pSelf), 0, (s32)&pSelf->mReplacement, key, handle);
-    fn_8007B940(pSelf, 4, pArg2, pArg3);
+    nw4r::g3d::ResMdl handle = reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetResMdl();
+    g3d_draw_res_mdl_directly(&handle, reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetViewPosMtxArray(), reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetViewNrmMtxArray(), reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetViewTexMtxArray(),
+                              reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetByteCodeDrawOpa(), NULL, &pSelf->mReplacement, key);
+    reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->CheckCallback_DRAW_OPA(nw4r::g3d::ScnObj::CALLBACK_TIMING_C, (u32)pArg2, pArg3);
 }
 
-/* 0x8007DCB0 - the tex-matrix count. */
-u32 fn_8007DCB0(ScnMdl* pSelf) {
-    return pSelf->mNumTexMtx;
+}   /* extern "C" */
+
+/* 0x8007DCB0 (0x8): the opaque draw byte code. */
+const u8* nw4r::g3d::ScnMdlSimple::GetByteCodeDrawOpa()
+{
+    return mpByteCodeDrawOpa;
 }
+
+extern "C" {
 
 /* 0x8007DCB8 - the `texCoordGen` replacement pass (the same shape as fn_8007DBDC, with the tex-coord
  * count in the parameter slot the other one gives to the pix-DL count). */
 void fn_8007DCB8(ScnMdl* pSelf, u32* pArg2, u32* pArg3) {
     u32 key;
-    u32 handle;
 
-    fn_8007B8E4(pSelf, 1, pArg2, pArg3);
+    reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->CheckCallback_DRAW_XLU(nw4r::g3d::ScnObj::CALLBACK_TIMING_A, (u32)pArg2, pArg3);
     if (pArg3 != 0) {
         key = *pArg3;
     } else {
-        key = fn_800497AC(pSelf);
+        key = reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetDrawMode();
     }
-    handle = fn_8005AB00(pSelf);
-    fn_800793A4((s32*)&handle, fn_80080B5C(pSelf), fn_80080BA8(pSelf), fn_80080C04(pSelf), 0,
-                fn_8007DD8C(pSelf), (s32)&pSelf->mReplacement, key, handle);
-    fn_8007B8E4(pSelf, 4, pArg2, pArg3);
+    nw4r::g3d::ResMdl handle = reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetResMdl();
+    g3d_draw_res_mdl_directly(&handle, reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetViewPosMtxArray(), reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetViewNrmMtxArray(), reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetViewTexMtxArray(),
+                              NULL, reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetByteCodeDrawXlu(), &pSelf->mReplacement, key);
+    reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->CheckCallback_DRAW_XLU(nw4r::g3d::ScnObj::CALLBACK_TIMING_C, (u32)pArg2, pArg3);
 }
 
-/* 0x8007DD8C - the tex-coord-generation count. */
-u32 fn_8007DD8C(ScnMdl* pSelf) {
-    return pSelf->mNumTexSrt;
+}   /* extern "C" */
+
+/* 0x8007DD8C (0x8): the translucent draw byte code. */
+const u8* nw4r::g3d::ScnMdlSimple::GetByteCodeDrawXlu()
+{
+    return mpByteCodeDrawXlu;
 }
+
+extern "C" {
 
 /* 0x8007DD94 - the shape-blend driver hand-over: the model handle, the shape-animation object and the
  * replacement record's three tables. */
 void fn_8007DD94(ScnMdl* pSelf) {
     if (fn_8007DDF4(pSelf) != 0) {
-        u32 local = fn_8005AB00(pSelf);
+        nw4r::g3d::ResMdl local = reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetResMdl();
 
         fn_8007270C(&local, (void*)fn_8007DDF4(pSelf), (const void**)pSelf->mReplacement.mpVtxPosTable,
                     (const void**)pSelf->mReplacement.mpClrTable,
@@ -329,10 +348,16 @@ u32 fn_8007DDF4(ScnMdl* pSelf) {
     return pSelf->mpAnmObjShp;
 }
 
-/* 0x8007DF98 - a one-line tail thunk: pass every argument on to the shared option setter. */
-void fn_8007DF98(ScnMdl* pSelf, u32 type, u32 on) {
-    fn_80080A5C(pSelf, type, on);
+}   /* extern "C" */
+
+/* 0x8007DF98 (0x4): the frame-update pass: advances the attached animations. */
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::ScnMdlSimple::G3dProcUpdateFrame(u32 param, void* pInfo)
+{
+    UpdateFrame();
 }
+
+extern "C" {
 
 /* 0x8007DF9C - the option setter for the one option this unit owns (bit 1 of mFlags, inverted); every
  * other option tail-calls the shared setter. */
@@ -344,7 +369,7 @@ u32 fn_8007DF9C(ScnMdl* pSelf, u32 type, u32 on) {
             pSelf->mFlags |= 2u;
         }
     } else {
-        return fn_8007FFC4(pSelf, type, on);
+        return reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->nw4r::g3d::ScnMdlSimple::SetScnObjOption(type, on);
     }
     return 1;
 }
@@ -360,7 +385,7 @@ u32 fn_8007DFDC(ScnMdl* pSelf, u32 type, u32* pOut) {
         flag = pSelf->mFlags & 2;
         *pOut = !flag;
     } else {
-        return fn_80080004(pSelf, type, pOut);
+        return reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->nw4r::g3d::ScnMdlSimple::GetScnObjOption(type, pOut);
     }
     return 1;
 }
@@ -389,7 +414,7 @@ void fn_8007E494(void) {}
 /* 0x8007E7FC - write one byte per node into the visible array (1 where the node is visible) and clear
  * the visible bit, which forces the next query to re-read the node table. */
 void fn_8007E7FC(ScnMdl* pSelf) {
-    u32 handle = fn_8005AB00(pSelf);
+    nw4r::g3d::ResMdl handle = reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->GetResMdl();
     u32 view;
     s32 numNodes;
     u32 i;
@@ -410,10 +435,15 @@ void fn_8007E7FC(ScnMdl* pSelf) {
     pSelf->mFlags &= ~1u;
 }
 
-/* 0x8007EA08 - the animation-object setter's zero-filled subclass step. */
-void fn_8007EA08(ScnMdl* pSelf) {
-    fn_800649B4(pSelf, 4);
+}   /* extern "C" */
+
+/* 0x8007EA08 (0x8): whether the animation is bound to a model. */
+bool nw4r::g3d::AnmObj::IsBound() const
+{
+    return TestAnmFlag(ANMFLAG_ISBOUND);
 }
+
+extern "C" {
 
 /* 0x8007EA10 - `DynamicCast`-shaped: resolve the caller's name record and hand the object back only
  * when the object's own type query accepts it. */
@@ -438,7 +468,7 @@ u32 fn_8007ECD8(ScnMdl* pSelf, u32 type) {
         pSelf->mpfn_0x38(value);
         return value;
     }
-    return fn_800808C4(pSelf, type);
+    return (u32)reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->nw4r::g3d::ScnMdlSimple::RemoveAnmObj((nw4r::g3d::ScnMdlSimple::AnmObjType)type);
 }
 
 /* 0x8007ED28 - the `type == 5` fast path of the second option accessor. */
@@ -446,7 +476,7 @@ u32 fn_8007ED28(ScnMdl* pSelf, u32 type) {
     if (type == 5) {
         return pSelf->mpAnmObjShp;
     }
-    return fn_800809A4(pSelf, type);
+    return (u32)reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->nw4r::g3d::ScnMdlSimple::GetAnmObj((nw4r::g3d::ScnMdlSimple::AnmObjType)type);
 }
 
 /* 0x8007ED40 - the same fast path for the setter side. */
@@ -454,7 +484,8 @@ u32 fn_8007ED40(ScnMdl* pSelf, u32 type) {
     if (type == 5) {
         return pSelf->mpAnmObjShp;
     }
-    return fn_80080A00(pSelf, type);
+    return (u32)reinterpret_cast<const nw4r::g3d::ScnMdlSimple*>(pSelf)->nw4r::g3d::ScnMdlSimple::GetAnmObj(
+        (nw4r::g3d::ScnMdlSimple::AnmObjType)type);
 }
 
 /* 0x8007ED58 - the ScnMdl constructor: the base constructor with the caller's two-word record, the vtable, the two
@@ -521,24 +552,23 @@ u32 fn_8007EF84(void* pSelf, u32* pKey) {
     {
         u32 local = *pKey;
 
-        return fn_8007EFF0(pSelf, &local);
-    }
-}
-
-/* 0x8007EFF0 - the chain's insertion step for an object that has no parent yet. */
-u32 fn_8007EFF0(void* pSelf, u32* pKey) {
-    u32 res = fn_8007B734(pSelf);
-
-    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(pKey) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res))) {
-        return 1;
-    }
-    {
-        u32 local = *pKey;
-
-        return reinterpret_cast<nw4r::g3d::ScnLeaf*>(pSelf)->nw4r::g3d::ScnLeaf::IsDerivedFrom(
+        return reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(pSelf)->nw4r::g3d::ScnMdlSimple::IsDerivedFrom(
             *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&local));
     }
 }
+
+}   /* extern "C" */
+
+/* 0x8007EFF0 (0x6C): whether the object is a ScnMdlSimple or derives from `type`. */
+bool nw4r::g3d::ScnMdlSimple::IsDerivedFrom(TypeObj type) const
+{
+    if (type == GetTypeObjStatic()) {
+        return true;
+    }
+    return ScnLeaf::IsDerivedFrom(type);
+}
+
+extern "C" {
 
 /* 0x8007F05C - drop the last material of the copied-material list (a no-op when the resource handle is
  * empty). */

@@ -9,8 +9,8 @@
 extern "C" {
 #endif
 
-/* 0x8006ECB4 - walk the model's node table and forward each visible node's virtual result. */
-void fn_8006ECB4(void* pModel, void* pSelf);
+/* 0x8006ECB4 - applies the visibility animation's result to the model's nodes. */
+void g3d_apply_vis_anm_result(void* pModel, void* pSelf); /* untyped: opaque handles - the model handle and the animation */
 /* 0x8006ED84 - the same walk, writing one byte per node into `pByteVec`. */
 void fn_8006ED84(u8* pByteVec, void* pModel, void* pSelf);
 

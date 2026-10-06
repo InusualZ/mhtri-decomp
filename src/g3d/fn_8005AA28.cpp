@@ -15,6 +15,7 @@
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMat (rule 2) */
+#include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -107,10 +108,15 @@ u32 fn_8005AAEC(const ResMatHandle* pSelf) {
     return pSelf->mpRes != NULL;
 }
 
-/* The mat's draw-order word (`ScnMdl::CopiedMatAccess` feeds it to its material lookup). */
-u32 fn_8005AB00(const ResMatHandle* pSelf) {
-    return pSelf->mDrawOrder;
+}   /* extern "C": the ScnMdlSimple member below has C++ linkage */
+
+/* 0x8005AB00 (0x8): the model resource. */
+nw4r::g3d::ResMdl nw4r::g3d::ScnMdlSimple::GetResMdl()
+{
+    return mResMdl;
 }
+
+extern "C" {
 
 /* The `PSMTXTransApply` twin of g3d_basic.cpp's fn_800D7ED0: translate `pPos` into the node matrix and
  * return `pSrc`. */
