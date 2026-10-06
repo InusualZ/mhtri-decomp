@@ -47,6 +47,7 @@
 #include "ef/fn_800CDB2C.h"
 #include "enemy/ENEMY_WORK.h"
 #include "stage/stg_w.h"
+#include "stage/get_now_mapno.h"
 #include "sound/fn_800DD1F0.h"
 #include "menu/menu_message.h"
 #include "pl.h"
@@ -199,7 +200,6 @@ extern "C" s32  fn_80308F1C(StatusScreenWork* self);
 /* Neighbours of this range the map leaves plain; the ones an owner unit already has a header for are
  * declared there and included above (rule 2), the rest sit here until their owner writes one. */
 extern "C" void eft004_set(u8 id, nw4r::math::VEC3* pos, f32 scale, u32 a, u8 area);
-extern "C" u8 get_now_mapno(void);
 extern "C" void rotLocalMatY(u32 angle, nw4r::math::MTX34* mtx);
 extern "C" void rotLocalMatX(u32 angle, nw4r::math::MTX34* mtx);
 extern "C" void sysSE_req(s32 id);

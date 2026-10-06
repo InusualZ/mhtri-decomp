@@ -6,9 +6,12 @@
 
 #include "types.h"
 
+struct _ENEMY_WORK;
+
 /* size: 0x10 */
 struct LbNpcFunc {
-    /* +0x00 */ u8 pad_0x00[4];
+    /* +0x00 */ void (*se_func_0x00)(struct _ENEMY_WORK* work, s32 event);   /* the NPC sound source the game-mode flow
+                                                                            * hands to `se_entry_request` */
     /* +0x04 */ void (*field_0x04)(void);
     /* +0x08 */ u8 pad_0x08[8];
 };

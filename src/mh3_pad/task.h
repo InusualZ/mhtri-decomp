@@ -17,7 +17,9 @@ typedef struct TaskSlot {
     /* +0x02 */ s16 timer;
     /* +0x04 */ void (*func)(struct TaskSlot*);
     /* +0x08 */ u8 step_0x08;         /* the task body's own step byte */
-    /* +0x09 */ u8 pad_0x09[0x03];
+    /* +0x09 */ u8 sub_0x09;          /* the game-mode flow's sub-state (`game_mode_flow_task`) */
+    /* +0x0A */ u8 step_0x0A;         /* the sub-state's own step */
+    /* +0x0B */ u8 sub_step_0x0B;     /* the step's own sub-step */
     /* +0x0C */ s16 wait_0x0C;        /* the body's frame countdown */
     /* +0x0E */ u8 pad_0x0E[0x06];
     /* +0x14 */ u8 flag_0x14;         /* cleared when the arena task leaves its first step */

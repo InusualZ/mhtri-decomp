@@ -51,6 +51,9 @@ u16 userdata_equip_box_add(struct Q_UserData* user, const struct _EQUIP* equip);
  * the table could not take all of it (the callers' reading). */
 s16 item_take(u16 id, s16 count, struct IdValue* table, s32 n, s32 flag, s32 max);
 
+/* 0x8004AA48 - marks the opening movie seen in the user data (GUESS name). */
+void userdata_opening_seen_set(void);
+
 /* 0x8004B0A4 - how many of item `id` the user holds in the pouch, the box and the stock, capped at 999.  GUESS. */
 s32 userdata_item_count_total(u16 id, u8* userdata);
 

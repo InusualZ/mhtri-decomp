@@ -6,7 +6,7 @@
  *   0x80791D50-0x80791DC0, .sbss 0x80794AB0-0x80794B08, .sdata2 0x80799880-0x80799C18, extab, extabindex.  Four bands
  *   whose `.sdata2` pool and `.bss` tables run on across their edges, so one TU: the NPC tables and motion lookups
  *   0x801FBF78-0x802029B4; the NPC work band 0x802029B4-0x802076D4 (a byte state machine on `_LB_NPC::field_0x006` that
- *   arms motions through `fn_801FDFE4`/`fn_801FDEE4`/`fn_801FDF70`/`fn_801FE13C` and waits on `fn_801FDFD0`); the act
+ *   arms motions through `fn_801FDFE4`/`fn_801FDEE4`/`fn_801FDF70`/`lb_npc_motion_restart` and waits on `fn_801FDFD0`); the act
  *   layer 0x802076D4-0x8020C588 (on `_LB_NPC` or on `_PLW`, for the functions that reach past +0x268); the control band
  *   0x8020C588-0x80212810 (it defines `LbStr__FUcUs` and drives `_PLW` through `Pl_act_ck`/`Pl_master_ck`/
  *   `Pl_frame_check`).  `fn_80207698` is tail-called from `fn_80207A44`'s act dispatch beside the act layer's own
@@ -14,10 +14,17 @@
  *   (different views of `lobby_w` and `lobby_world_block`, different callee signatures); uniting them is open work.
  * FLAGS. `cflags_lobby`; `#pragma peephole off` around `fn_801FC268`, and from `fn_80203114` to the end of the NPC work
  *   band (0x802076D4); the control band is under `#pragma dont_inline on` (retail keeps the accessors'
- *   `bl fn_80212060`) and `#pragma peephole off` (`fn_80211DCC`'s `clrlwi` + `slwi`); measured in docs/lobby.md.
+ *   `bl lobby_input_locked_ck`) and `#pragma peephole off` (`lb_chacha_skill_name_get`'s `clrlwi` + `slwi`); measured in docs/lobby.md.
  * NAMES. `lb_npc` is the NPC work array the range owns, with `npc_data_town`, `npc_data_village`, `npc_lp_tbl`,
  *   `npc_model_*`, `npc_sub_data`, `npc_event_set_data`, `lb_npc_Get_motion_no`, `lb_npc_area_ck` and
  *   `get_talk_npc_data_ptr`; the map and the dump give only placeholders for the rest.
+ *   GUESS (from each body and its callers): lb_npc_model_release_all, lb_npc_map_setup, lobby_frame_update
+ *   GUESS: lb_player_spawn_set
+ *   GUESS (from each body and its callers): lb_cmd_pressed_ck, lb_cmd_held_ck, lb_cmd_repeat_ck
+ *   GUESS: lobby_cmd_release_ck, lb_cmd_repeat_get, lobby_cmd_trig_get, lobby_cmd_release_get
+ *   GUESS: lobby_input_locked_ck, lb_yes_no_step, lobby_cmd_toggle_step_raw, lb_chacha_skill_name_get
+ *   GUESS: lb_chacha_mask_name_get, lb_cat_name_get, lb_pig_name_get, lb_npc_find, lb_npc_event_set
+ *   GUESS: lb_npc_motion_restart, lb_npc_act_set, lb_player_act_latch, lb_player_angle_to
  *   GUESS: `lb_cmd_pressed_ck`, `lb_cmd_held_ck`, `lb_cmd_repeat_ck`, `lb_cmd_repeat_get`, `lb_yes_no_step`
  * RESIDUALS. 238 rows unwritten: 0x801FC318-0x801FC6A0, 0x801FCBC8-0x801FD0F8, 0x801FD338-0x801FDD9C,
  *   0x801FE200-0x802029B4, 0x80204DA8-0x8020505C, 0x8020623C-0x80206824, 0x80206AD0-0x80206CB4, 0x80207284-0x80207698,
@@ -32,9 +39,9 @@
  *    `s32` temporary tried); `fn_801FC810`: retail bumps the pointer before the counter;
  *  - `fn_802050AC`: retail schedules `lwz r4,44(r31)` between the `(s16)(u16)` mask and the signed `/ 5`, ours after
  *    the divide (`+=`, `a = a + b` and a named temporary measure the same);
- *  - `fn_801FC6EC`: ours fuses `extsb.` where retail keeps `extsb` + `cmpwi` (the peephole is on there); `fn_801FC874`:
+ *  - `lobby_frame_update`: ours fuses `extsb.` where retail keeps `extsb` + `cmpwi` (the peephole is on there); `fn_801FC874`:
  *    retail keeps a `clrlwi r0,r0,24` ours drops;
- *  - `fn_801FC8F0`, `fn_801FCA00`, `fn_801FCA80`: the loop counter/base registers are coloured differently;
+ *  - `lb_npc_map_setup`, `lb_npc_model_release_all`, `fn_801FCA80`: the loop counter/base registers are coloured differently;
  *  - `fn_801FCADC`: frame 0x20 against ours 0x30, and retail calls `ckResourceName__FPc` where ours mangles `__FPSc`
  *    (the parameter is `char*`, not `s8*`);
  *  - `fn_801FCB68`: retail loads `npc_lp_tbl` early as an sda21 pointer, ours addresses it with `lis`/`addi`;
@@ -42,7 +49,7 @@
  *  - `fn_801FD174`: retail loads its float constant once into f1, ours reloads it, and keeps one more `clrlwi`;
  *  - `fn_801FDFE4`: ours loads a compiler-pooled double (`@345`) where retail uses `lbl_807998D0`;
  *  - `fn_801FE0AC`: retail narrows the motion id (`clrlwi r4,r29,16`) before the compare;
- *  - `fn_801FE13C`, `fn_802076D4`: the float register of a constant (f1/f0, f31/f30), and `fn_802076D4`'s epilogue
+ *  - `lb_npc_motion_restart`, `fn_802076D4`: the float register of a constant (f1/f0, f31/f30), and `fn_802076D4`'s epilogue
  *    reloads f31 with `psq_lx` where ours uses `psq_l`;
  *  - `fn_80207938`, `fn_8020AD14`, `fn_8020AEF0`, `fn_8020AF90`, `fn_8020B264`: retail increments the state byte
  *    (`addi r0,rX,1`) where ours stores the constant 1; `fn_8020AD14` also reads +0xB6 where ours reads +0x182, and
@@ -86,7 +93,7 @@ extern "C" LbNpcSystemWork system_w;   /* .bss 0x806585E0 */
 extern "C" u8 lobby_state_block[];
 extern "C" u8 lbl_806AA6F0[];
 extern "C" u8 lbl_80794AB0;
-extern "C" u8* lbl_80794B18;
+extern "C" u8* lobby_wp;
 extern "C" void* npc_data_town[];
 extern "C" void* npc_data_village[];
 extern "C" void* npc_lp_tbl[];
@@ -439,7 +446,7 @@ __declspec(noinline) void fn_801FE130(_LB_NPC* self)
 }
 
 /* 0x801FE13C - restart the NPC's motion state machine. */
-void fn_801FE13C(_LB_NPC* self, u16 motion_id)
+void lb_npc_motion_restart(_LB_NPC* self, u16 motion_id)
 {
     self->field_0x006 = 0;
     self->field_0x007 = 0;
@@ -540,7 +547,7 @@ extern "C" {
 
 /* 0x801FC6EC - the lobby's per-frame world update: refresh the systems, then either arm the village
  * transition or run the normal frame's subsystem ticks. */
-void fn_801FC6EC(void)
+void lobby_frame_update(void)
 {
     prim_init_all();
     fn_80212370();
@@ -579,7 +586,7 @@ void fn_801FC6EC(void)
 }
 
 /* 0x801FC8F0 - reset the 0x12 NPC slots and refill them from the current map's NPC table. */
-void fn_801FC8F0(void)
+void lb_npc_map_setup(void)
 {
     s32 i;
     s32 count;
@@ -589,10 +596,10 @@ void fn_801FC8F0(void)
     for (i = 0; i < 0x12; i++) {
         fn_801FD174(&lb_npc[i]);
     }
-    if (lbl_80794B18[1] == 0x15) {
-        data = (u8*)npc_data_town[lbl_80794B18[2]];
+    if (lobby_wp[1] == 0x15) {
+        data = (u8*)npc_data_town[lobby_wp[2]];
     } else {
-        data = (u8*)npc_data_village[lbl_80794B18[2]];
+        data = (u8*)npc_data_village[lobby_wp[2]];
     }
     npc = lb_npc;
     count = 0;
@@ -616,7 +623,7 @@ void fn_801FC8F0(void)
 }
 
 /* 0x801FCA00 - release every live NPC's model slot. */
-void fn_801FCA00(void)
+void lb_npc_model_release_all(void)
 {
     s32 i;
     _LB_NPC* npc = lb_npc;
@@ -808,7 +815,7 @@ void fn_801FDFC8(_LB_NPC* self, u8 value);
 u32 fn_801FDFD0(_LB_NPC* self);
 void fn_801FDFE4(_LB_NPC* self, u16 id, s32 a3, s32 a4);
 void fn_801FE0AC(_LB_NPC* self, u16 id, s32 a3, s32 a4);
-void fn_801FE13C(_LB_NPC* self, u16 id);
+void lb_npc_motion_restart(_LB_NPC* self, u16 id);
 u32 fn_801FE1CC(_LB_NPC* self, u16 id, f32 a, f32 b);
 u32 fn_801FE1DC(_LB_NPC* self, u16 id, f32 a, f32 b);
 u32 fn_801FE1EC(_LB_NPC* self);
@@ -893,7 +900,7 @@ __declspec(noinline) void fn_802029B4(_LB_NPC* self)
     case 2:
         fn_801FDFC0(self, 0);
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -914,7 +921,7 @@ __declspec(noinline) void fn_80202AC4(_LB_NPC* self)
         break;
     case 1:
         if (fn_801FDFD0(self) == 1) {
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -933,7 +940,7 @@ __declspec(noinline) void fn_80202B88(_LB_NPC* self)
     case 1:
         if (fn_801FDFD0(self) == 1) {
             fn_801FDF70(self, 10);
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -960,7 +967,7 @@ __declspec(noinline) void fn_80202C24(_LB_NPC* self)
     case 2:
         if (fn_801FDFD0(self) == 1) {
             fn_801FDF70(self, 10);
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -982,7 +989,7 @@ __declspec(noinline) void fn_80202D24(_LB_NPC* self)
     case 1:
         if (fn_801FDFD0(self) == 1) {
             fn_801FDF70(self, 10);
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -1001,7 +1008,7 @@ __declspec(noinline) void fn_80202DD0(_LB_NPC* self)
     case 1:
         if (fn_801FDFD0(self) == 1) {
             fn_801FDF70(self, 10);
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -1020,7 +1027,7 @@ __declspec(noinline) void fn_80202E6C(_LB_NPC* self)
         break;
     case 1:
         if (fn_801FDFD0(self) == 1) {
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -1069,12 +1076,12 @@ __declspec(noinline) void fn_80202F00(_LB_NPC* self)
             addVec3(&delta, &self->field_0x214->vec_0x3C, &offset);
             copyVec3(&self->target_0x1EC, &delta);
             fn_801FDD9C(self, lbl_807999D0);
-            fn_801FE13C(self, 44);
+            lb_npc_motion_restart(self, 44);
         } else if (fn_801FDFD0(self) == 1) {
             if (lobby_w.field_0x076 == 1) {
-                fn_801FE13C(self, 55);
+                lb_npc_motion_restart(self, 55);
             } else {
-                fn_801FE13C(self, 44);
+                lb_npc_motion_restart(self, 44);
             }
         }
         break;
@@ -1161,7 +1168,7 @@ void fn_80203114(_LB_NPC* self)
             } else if (fn_801FE32C(self, 18) == 1) {
                 fn_801FE0AC(self, 1098, 4, 0);
             } else {
-                fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+                lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
                 break;
             }
             self->field_0x006++;
@@ -1175,7 +1182,7 @@ void fn_80203114(_LB_NPC* self)
             break;
         case 2:
             if (self->field_0x1E4 <= 0) {
-                fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+                lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
             }
             break;
         }
@@ -1287,7 +1294,7 @@ void fn_80203884(_LB_NPC* self)
         fn_801FDFC0(self, 0);
         if (fn_801FE1EC(self) == 1) {
             fn_801FDF70(self, 10);
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -1418,7 +1425,7 @@ void fn_80203D10(_LB_NPC* self)
         break;
     case 2:
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, 0);
+            lb_npc_motion_restart(self, 0);
         } else if (fn_801FE1CC(self, 0, lbl_807999D8, lbl_807999A0) != 0) {
             fn_801FE200(self, 25, 0);
         }
@@ -1481,7 +1488,7 @@ void fn_80203EC4(_LB_NPC* self)
         break;
     case 3:
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -1508,7 +1515,7 @@ void fn_80204070(_LB_NPC* self)
         break;
     case 2:
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, 0);
+            lb_npc_motion_restart(self, 0);
         }
         break;
     }
@@ -1616,7 +1623,7 @@ void fn_80204148(_LB_NPC* self)
     case 3:
         if (fn_801FE1EC(self) == 1) {
             fn_801FDF70(self, 10);
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -1652,7 +1659,7 @@ void fn_802046E4(_LB_NPC* self)
     self->field_0x006++;
     self->field_0x204 = lb_npc_move_data.table_0x0C;
     self->field_0x208 = 0;
-    fn_801FE13C(self, self->field_0x204[0].motion_0x0C);
+    lb_npc_motion_restart(self, self->field_0x204[0].motion_0x0C);
 }
 
 /* 0x8020471C - clear the action byte, flag the NPC's second state byte, arm 1074 over 4 frames and then
@@ -1670,7 +1677,7 @@ void fn_8020471C(_LB_NPC* self)
         break;
     case 1:
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -1707,7 +1714,7 @@ void fn_802047C8(_LB_NPC* self)
             if ((u16)ran_suu(1) % 100 < 50) {
                 self->field_0x204 = lb_npc_move_data.table_0x10;
                 self->field_0x208 = 0;
-                fn_801FE13C(self, self->field_0x204[0].motion_0x0C);
+                lb_npc_motion_restart(self, self->field_0x204[0].motion_0x0C);
             }
         } else if (fn_801FE1CC(self, 5, lbl_807999F8, lbl_8079999C) == 1 ||
                    fn_801FE1CC(self, 5, lbl_807999FC, lbl_80799A00) == 1) {
@@ -1716,7 +1723,7 @@ void fn_802047C8(_LB_NPC* self)
         break;
     case 3:
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -1738,7 +1745,7 @@ void fn_802049C4(_LB_NPC* self, u8 kind)
                 fn_801FFE44(self);
                 break;
             case 1:
-                fn_801FE13C(self, 34);
+                lb_npc_motion_restart(self, 34);
                 break;
             }
         }
@@ -1756,7 +1763,7 @@ void fn_80204A68(_LB_NPC* self)
         break;
     case 1:
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, 36);
+            lb_npc_motion_restart(self, 36);
         }
         break;
     }
@@ -1778,7 +1785,7 @@ void fn_80204ADC(_LB_NPC* self)
         break;
     case 2:
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, 33);
+            lb_npc_motion_restart(self, 33);
         }
         break;
     }
@@ -1915,10 +1922,10 @@ void fn_8020531C(_LB_NPC* self)
             lobby_w.field_0x076 = 0;
             if ((u8)get_now_mapno() == 21) {
                 self->field_0x208 = 0;
-                fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+                lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
             } else {
                 self->field_0x208 = 0;
-                fn_801FE13C(self, 52);
+                lb_npc_motion_restart(self, 52);
             }
         }
         break;
@@ -1950,7 +1957,7 @@ void fn_80205424(_LB_NPC* self)
     case 2:
         if (fn_801FDFD0(self) == 1) {
             self->field_0x208 = 0;
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -1969,7 +1976,7 @@ void fn_80205544(_LB_NPC* self)
         break;
     case 1:
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, 55);
+            lb_npc_motion_restart(self, 55);
             lobby_w.field_0x076 = 1;
         }
         break;
@@ -2034,7 +2041,7 @@ void fn_802055D8(_LB_NPC* self)
     }
     self->field_0x208 = 0;
     self->field_0x204 = selected;
-    fn_801FE13C(self, selected[0].motion_0x0C);
+    lb_npc_motion_restart(self, selected[0].motion_0x0C);
 }
 
 /* 0x80205978 - set the NPC's secondary action byte and clear its two flag bytes, then set the lobby's
@@ -2064,7 +2071,7 @@ void fn_80206044(_LB_NPC* self)
 {
     self->field_0x204 = self->field_0x204[self->field_0x208].field_0x10;
     self->field_0x208 = 0;
-    fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+    lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
 }
 
 /* 0x80207698 - restart motion 67 when the NPC's own flag byte is set, otherwise re-arm motion 1 over
@@ -2076,7 +2083,7 @@ void fn_80207698(_LB_NPC* self)
     }
     self->field_0x006++;
     if (self->field_0x264 != 0) {
-        fn_801FE13C(self, 67);
+        lb_npc_motion_restart(self, 67);
     } else {
         fn_801FE0AC(self, 1, 4, 0);
     }
@@ -2093,7 +2100,7 @@ void fn_80205F5C(_LB_NPC* self)
         break;
     case 1:
         if (fn_801FE1EC(self) == 1) {
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         }
         break;
     }
@@ -2563,7 +2570,7 @@ void fn_80204528(_LB_NPC* self)
     case 4:
         if (fn_801FE1EC(self) == 1) {
             fn_801FDEB4(self, (u16)-909, 10);
-            fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+            lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
         } else if (fn_801FE1CC(self, 0, lbl_807999F4, lbl_807999A0) != 0) {
             fn_801FDEE4(self, 11);
         }
@@ -2690,7 +2697,7 @@ void fn_802050AC(_LB_NPC* self)
     case 1:
         if (fn_801FDFD0(self) == 1) {
             if (lobby_w.field_0x076 == 1) {
-                fn_801FE13C(self, 55);
+                lb_npc_motion_restart(self, 55);
             } else if ((u8)get_now_mapno() == 22) {
                 entry = fn_80207DC4(self, &kind);
                 if ((u8)get_now_mapno() == 22 && self->field_0x004 == 2) {
@@ -2710,15 +2717,15 @@ void fn_802050AC(_LB_NPC* self)
                 if (entry != 0 && skip == 0) {
                     self->field_0x208 = 0;
                     self->field_0x204 = entry;
-                    fn_801FE13C(self, entry[0].motion_0x0C);
+                    lb_npc_motion_restart(self, entry[0].motion_0x0C);
                 } else {
                     self->field_0x208 = 0;
                     self->field_0x204 = &lbl_805B8EC8;
-                    fn_801FE13C(self, 48);
+                    lb_npc_motion_restart(self, 48);
                 }
             } else {
                 self->field_0x208 = 0;
-                fn_801FE13C(self, self->field_0x204[self->field_0x208].motion_0x0C);
+                lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
             }
         } else {
             turn = (s16)(u16)fn_801FDE3C(self, &self->field_0x214->vec_0x3C) / 5;
@@ -2793,7 +2800,7 @@ u32 fn_8021B8F4(u8 a, u8 b);
 void fn_801FDEE4(_LB_NPC* self, u32 motion);
 u32 fn_801FDFD0(_LB_NPC* self);
 void fn_801FE0AC(_LB_NPC* self, u16 motion_id, s32 a, s32 b);
-void fn_801FE13C(_LB_NPC* self, u16 motion_id);
+void lb_npc_motion_restart(_LB_NPC* self, u16 motion_id);
 u32 fn_801FE1EC(_LB_NPC* self);
 u32 fn_801FE32C(_LB_NPC* self, u16 id);
 void fn_801FE200(_LB_NPC* self, u16 a, u16 b);
@@ -2892,7 +2899,7 @@ __declspec(noinline) void fn_80207938(_LB_NPC* self)
     case 2:
         if (fn_801FDFD0(self) == 1) {
             self->field_0x208 = 0;
-            fn_801FE13C(self, 0);
+            lb_npc_motion_restart(self, 0);
         }
         break;
     }
@@ -2959,7 +2966,7 @@ void fn_80207B28(void)
 }
 
 /* 0x80207E9C - raises the +0x234 flag with `state` beside it; the two small id decoders follow. */
-__declspec(noinline) void fn_80207E9C(_LB_NPC* self, u8 state)
+__declspec(noinline) void lb_npc_event_set(_LB_NPC* self, u8 state)
 {
     self->field_0x234[0] = 1;
     self->field_0x234[1] = state;
@@ -3038,7 +3045,7 @@ __declspec(noinline) u16 fn_802089F4(s32 id)
 }
 
 /* 0x80208A00 - latch the act step when the master act is running. */
-__declspec(noinline) void fn_80208A00(_PLW* self)
+__declspec(noinline) void lb_player_act_latch(_PLW* self)
 {
     if (Pl_master_ck(self) == 1) {
         self->field_0xB00 = 2;
@@ -3236,7 +3243,7 @@ s32 get_fade_stat(s32 slot);
 #include "types.h"
 
 
-/* Retail keeps the accessors' `bl fn_80212060` out of line and the species-id index's unfused `clrlwi` + `slwi`. */
+/* Retail keeps the accessors' `bl lobby_input_locked_ck` out of line and the species-id index's unfused `clrlwi` + `slwi`. */
 #pragma dont_inline on
 #pragma peephole off
 namespace s_8020C588 {
@@ -3248,19 +3255,19 @@ namespace s_8020C588 {
 
 
 /* The four species-id string tables, indexed by the id byte (this accessor and the three after it). */
-extern "C" s32 fn_80211DCC(u32 id) {
+extern "C" s32 lb_chacha_skill_name_get(u32 id) {
     return lb_chacha_skill_str[(u8)id];
 }
 
-extern "C" s32 fn_80211DE0(u32 id) {
+extern "C" s32 lb_chacha_mask_name_get(u32 id) {
     return lb_chacha_mask_str[(u8)id];
 }
 
-extern "C" s32 fn_80211DF4(u32 id) {
+extern "C" s32 lb_cat_name_get(u32 id) {
     return lb_cat_name[(u8)id];
 }
 
-extern "C" s32 fn_80211E08(u32 id) {
+extern "C" s32 lb_pig_name_get(u32 id) {
     return lb_pig_name[(u8)id];
 }
 } /* namespace s_8020C588 */
@@ -3278,7 +3285,7 @@ namespace s_8020C588 {
 
 
 /* Nonzero while the lobby screen is owned by a transition or a fade. */
-extern "C" u32 fn_80212060(void) {
+extern "C" u32 lobby_input_locked_ck(void) {
     if (lobby_w.busy_0x172 != 0) {
         return 1;
     }
@@ -3299,28 +3306,28 @@ extern "C" u32 fn_80212060(void) {
 
 /* The four player-0 command-mask testers; all report "clear" while the screen is not owned. */
 extern "C" s32 lb_cmd_pressed_ck(u16 mask) {
-    if (fn_80212060() == 1) {
+    if (lobby_input_locked_ck() == 1) {
         return 0;
     }
     return (lobby_w.cmd_mask_0x084[0][0] & mask) != 0;
 }
 
 extern "C" s32 lb_cmd_held_ck(u16 mask) {
-    if (fn_80212060() == 1) {
+    if (lobby_input_locked_ck() == 1) {
         return 0;
     }
     return (lobby_w.cmd_mask_0x084[0][1] & mask) != 0;
 }
 
 extern "C" s32 lb_cmd_repeat_ck(u16 mask) {
-    if (fn_80212060() == 1) {
+    if (lobby_input_locked_ck() == 1) {
         return 0;
     }
     return (lobby_w.cmd_mask_0x084[0][2] & mask) != 0;
 }
 
-extern "C" s32 fn_80212250(u16 mask) {
-    if (fn_80212060() == 1) {
+extern "C" s32 lobby_cmd_release_ck(u16 mask) {
+    if (lobby_input_locked_ck() == 1) {
         return 0;
     }
     return (lobby_w.cmd_mask_0x084[0][3] & mask) != 0;
@@ -3328,14 +3335,14 @@ extern "C" s32 fn_80212250(u16 mask) {
 
 /* The four player-0 command-mask getters. */
 extern "C" u16 lb_cmd_repeat_get(void) {
-    if (fn_80212060() == 1) {
+    if (lobby_input_locked_ck() == 1) {
         return 0;
     }
     return lobby_w.cmd_mask_0x084[0][2];
 }
 
-extern "C" u16 fn_802122E8(void) {
-    if (fn_80212060() == 1) {
+extern "C" u16 lobby_cmd_trig_get(void) {
+    if (lobby_input_locked_ck() == 1) {
         return 0;
     }
     return lobby_w.cmd_mask_0x084[0][0];
@@ -3345,8 +3352,8 @@ extern "C" u16 glplatTextureGetHeight(void) {
     return lobby_w.cmd_mask_0x084[0][0];
 }
 
-extern "C" u16 fn_80212334(void) {
-    if (fn_80212060() == 1) {
+extern "C" u16 lobby_cmd_release_get(void) {
+    if (lobby_input_locked_ck() == 1) {
         return 0;
     }
     return lobby_w.cmd_mask_0x084[0][3];
@@ -3354,12 +3361,12 @@ extern "C" u16 fn_80212334(void) {
 
 /* Steps the caller's 4/8 sprite stepper over player 0's first mask. */
 extern "C" s32 lb_yes_no_step(void* self) {
-    return toggle_word_step_dpad(self, fn_802122E8(), 4, 8);
+    return toggle_word_step_dpad(self, lobby_cmd_trig_get(), 4, 8);
 }
 
 /* Steps the caller's 4/8 sprite stepper over the same mask, ignoring the screen guard. */
-extern "C" void fn_80212584(void* self) {
-    toggle_word_step_dpad(self, glplatTextureGetHeight(), 4, 8);
+extern "C" s32 lobby_cmd_toggle_step_raw(void* self) {
+    return toggle_word_step_dpad(self, glplatTextureGetHeight(), 4, 8);
 }
 
 /* Toggles the item database's display byte and redraws the lobby when the pad loop is idle. */

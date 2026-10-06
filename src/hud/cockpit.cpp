@@ -8,6 +8,8 @@
  *
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .data, .sbss, .sdata, .sdata2, .text, extab,
  * extabindex).
+ * NAMES. GUESS (from its body and its callers): ainpc_page_hold_set
+ *   GUESS (from each body and its callers): ainpc_page_mode2_set, ainpc_page_mark_b_draw, menu_money_draw
  */
 /* ---- header inherited from src/ai/fn_802D44F4.cpp (written against its pre-phase-4 range) ---- */
 /*

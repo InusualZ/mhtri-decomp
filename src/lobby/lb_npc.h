@@ -35,7 +35,7 @@ typedef struct LbNpcModel {
     /* +0x006 */ u8 flag_0x006;
 } LbNpcModel; /* size: 0x7+ */
 
-/* The system work block's tail byte `fn_801FC6EC` clears (a partial view; the full block belongs to the
+/* The system work block's tail byte `lobby_frame_update` clears (a partial view; the full block belongs to the
  * ef/system units). */
 typedef struct LbNpcSystemWork {
     /* +0x000 */ u8 pad_0x000[0x8C0];
@@ -63,7 +63,7 @@ typedef struct LbResRec {
 
 /* One 0x14-byte entry of the NPC's motion table - the array `_LB_NPC::field_0x204` points at and
  * `field_0x208` indexes (the band 0x802029B4..0x802076D4's state machines read an entry's id and hand
- * it to `fn_801FE13C`, which restarts that motion).  Only the id is read here; size from the two
+ * it to `lb_npc_motion_restart`, which restarts that motion).  Only the id is read here; size from the two
  * `mulli ..., 20` sites. size: 0x14 */
 typedef struct LbNpcMotionEntry {
     /* +0x00 */ u8 pad_0x00[0x0C];
@@ -195,14 +195,32 @@ void mhchar_construct(void* block);
 extern "C" {
 #endif
 
-extern u8 lb_item_get_data[];
+extern u8* lb_item_get_data;
 
 /* 0x802087D4 - resets the lobby party state when the party is dissolved (GUESS name, from the body). */
 void lb_party_state_reset(void);
 
+/* 0x801FCA00 / 0x801FC8F0 - release every NPC's model and refill the NPC slots from the map's table (GUESS names). */
+void lb_npc_model_release_all(void);
+void lb_npc_map_setup(void);
+/* 0x801FC6EC - the lobby's per-frame world update (GUESS name). */
+void lobby_frame_update(void);
+/* 0x80209070 - places the local player at spawn record `spawn` (entry `id`) of map `map`'s area `area` (GUESS name). */
+void lb_player_spawn_set(u8* spawn, u16 id, u8 map, u8 area);
+
+/* 0x801FE5B0 - the live NPC of kind `kind` (GUESS name). */
+struct _LB_NPC* lb_npc_find(u8 kind);
+/* 0x80207E9C - raises the NPC's +0x234 event flag with `state` beside it (GUESS name). */
+void lb_npc_event_set(struct _LB_NPC* self, u8 state);
+/* 0x801FE13C - restarts the NPC's motion state machine on motion `motion_id` (GUESS name). */
+void lb_npc_motion_restart(struct _LB_NPC* self, u16 motion_id);
 /* 0x8020A3E4 - starts act `act`/`sub` on the player work, with the request `flags` (bit 0x20 re-rolls the random
  * pick).  GUESS name; the spelling is the owner's own (`lobby/lb_npc.cpp`). */
 void lb_npc_act_set(_PLW* self, u32 act, s32 sub, s32 flags);
+/* 0x80208A00 - latches the act step when the master act runs (GUESS name). */
+void lb_player_act_latch(struct _PLW* self);
+/* 0x8020E778 - the heading from the player towards `target` (GUESS name). */
+u32 lb_player_angle_to(struct _PLW* self, VEC3* target);
 
 #ifdef __cplusplus
 }

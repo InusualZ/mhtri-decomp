@@ -4069,7 +4069,7 @@ u32 fn_8014E670(_ENEMY_WORK *self, u8 arg1) {
             vec3_scale(&sp8, &sp2C, lbl_80796F64 * get_em_chg_scale(self));
             addVec3(&sp14, &self->pos, &sp8);
             copyVec3(&sp20, &sp14);
-            if (fn_80050EAC(temp_r31_2 + 0x3C, &sp20) <= lbl_80796F94) {
+            if (vec3_dist_sq(temp_r31_2 + 0x3C, &sp20) <= lbl_80796F94) {
                 return 1U;
             }
         }

@@ -250,7 +250,7 @@ u32 fn_801E0058(struct _ENEMY_WORK* self, u8 a);
 void subVec3(void* out, void* a, void* b);
 f32 fn_80050EF4(void* a, void* b);
 f32 calcVecDistXZ(void* a, void* b);
-f32 fn_80050EAC(void* a, void* b);
+f32 vec3_dist_sq(void* a, void* b);
 void addVec3(void* out, void* a, void* b);
 void vec3_scale(void* out, void* a, f32 b);
 void addVec3To(void* a, void* b);
@@ -1276,7 +1276,7 @@ extern "C" s32 fn_801DA410(struct _ENEMY_WORK* self, u8 arg1) {
             vec3_scale(&sp8, &sp2C, lbl_80799618 * get_em_chg_scale(self));
             addVec3(&sp14, &self->pos, &sp8);
             copyVec3(&sp20, &sp14);
-            if (fn_80050EAC(temp_r31_2 + 0x3C, &sp20) == lbl_8079961C) {
+            if (vec3_dist_sq(temp_r31_2 + 0x3C, &sp20) == lbl_8079961C) {
                 return 1;
             }
         }

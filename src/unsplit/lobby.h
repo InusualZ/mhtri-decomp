@@ -303,7 +303,7 @@ extern u16 lbl_805BA660[58];
 extern u16 lbl_805BA6D4[34];
 extern u16 lbl_805BA718[28];
 extern const u16 lbl_805BAA20[10];
-extern u8 lbl_806BF310[88];
+extern u8 eft052_item_box[88];
 extern u16 lbl_80791B70[4];
 extern u16 lbl_80791B78[4];
 extern u16 lbl_80791B80[4];
@@ -414,16 +414,16 @@ u16 fn_802089F4(s32);
 s32 lb_cmd_pressed_ck(s32, s16);
 s32 lb_cmd_repeat_ck(s32);
 u16 lb_cmd_repeat_get(s32);
-u16 fn_802122E8(void);
+u16 lobby_cmd_trig_get(void);
 s32 lb_yes_no_step(void *);
 u8 fn_802126E8(s32, s16, s32);
-s32 fn_80214654(void *, s32, s32, s32, s32, s32, s32, s32);
+s32 lb_list_init(void *, s32, s32, s32, s32, s32, s32, s32);
 s32 lb_choice_init(void *, void*, u16, s32);
 s32 lb_choice_step(void *);
 s32 lb_choice_draw(u8 *, const void*, const void*, void*, s32);
 s32 lb_panel_msg_draw(s32, s16);
 s32 fn_80214FB8(s32, s32, u16);
-s32 fn_8021505C(s32, s16, s32);
+s32 lb_panel_str_print(s32, s16, s32);
 s32 lb_panel_line_draw(s32, s16, s32, s32);
 s32 lb_panel_yes_no_draw(s32, s32);
 s32 fn_8021565C(u8, s16 *);
@@ -438,18 +438,18 @@ s32 lb_talk_page_open(s32);
 s32 lb_talk_page_mode_reset(void);
 s32 getItemListSelection(void);
 s32 fn_80222848(s32, s16 *);
-s32 fn_80222BC4(void*, s32, u8);
+s32 lb_item_box_count_draw(void*, s32, u8);
 /* `menu_hold_row_draw_by_lsp`/`menu_cursor_step_fixed_tail`/`menu_cursor_step_open_last`/`menu_cursor_step`/`toggle_word_step` (0x802A7C04-0x802A8F50) were
  * declared here while the menu band had no registered unit.  `menu/menu_message.cpp` owns that range
  * now, so its header `menu/menu_message.h` declares them and this header includes it (rule 2).
  * They stood here with `s16` returns and `void*`/`s32` tails while the owner defines `s32` - that
  * mismatch is the `(10505) illegal overloading` this move clears. */
-s32 ainpc_page_hold_set(void);
+void ainpc_page_hold_set(void);
 /* `camera_talk_lock_set`/`fn_802BBAC0`/`fn_802BBAC4` (0x802BBA64-0x802BBAF4) were declared here as `s32 (s32)`;
  * `camera/fn_802B5C58.cpp` owns that range and `camera/camera.h` - included by this header -
  * declares them `void (u8)` (rule 2). */
 s32 menu_money_draw(s32);
-s32 fn_802E0DA8(s16 *, u16, s16 *);
+s32 spr_anim_draw(s16 *, u16, s16 *);
 s32 lb_unlock_cond_ck(u16);
 s32 fn_802FB4F4(s32);
 u16 fn_802FB54C(s32);
@@ -458,9 +458,9 @@ s32 fn_8033B990(void);
 s32 fn_8033C1AC(void);
 s32 fn_80359628(void);
 s32 fn_80359B00(s32);
-s32 fn_80359D98(void *, void *);
-s32 fn_8035A034(void);
-s32 fn_8035A7D8(s32, void*, void*, s32, s32);
+s32 eft052_item_get_open(void *, void *);
+s32 eft052_item_get_step(void);
+s32 eft052_box_list_draw(s32, void*, void*, s32, s32);
 /* `fn_803768F8` (0x803768F8) and `fn_80377664` (0x80377664) are owned by
  * `enemy/em020_ai.cpp` now that its range is registered - rule 2: their declarations moved to the
 owner's header and are included here. */

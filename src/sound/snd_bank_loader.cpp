@@ -5,6 +5,7 @@
  * Name is a GUESS: the range holds `snd_bank_layout`, `scene_se_bank_load`, `system_se_load`, `title_se_load` and the `*_bgm_load` family over the `SndWork` record.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  * NAMES. GUESS (from each body and its callers): snd_player_banks_load, snd_em_se_slot_release, snd_npc_voice_bank_load
+ *   GUESS (from each body and its callers): lobby_bgm_load, snd_area_bank_load
  */
 
 /* Retired header of `sound/fn_800EF7D8.cpp` (kept for its notes and residuals): */
@@ -65,7 +66,7 @@
  * Flags: `cflags_main` (`-O3 -inline noauto`) plus a file-scope `#pragma peephole off`, which is
  * required and measured: without it the unit is 59/62, because the peephole pass fuses
  * `clrlwi`+`slwi` into `clrlslwi` and `clrlwi`+`srwi` into `extrwi` where retail carries the pairs
- * unfused (`fn_800EFD88` 26.25 -> 100.00, `fn_800F051C` 71.00 -> 83.86, `set_SE_volume__FUc`
+ * unfused (`fn_800EFD88` 26.25 -> 100.00, `snd_area_bank_load` 71.00 -> 83.86, `set_SE_volume__FUc`
  * 76.53 -> 81.53, `fn_800F298C` 70.00 -> 83.33, `fn_800F0C74` 75.41 -> 100.00,
  * `get_em_se_bank__FUc` 75.63 -> 82.00, `fn_800F2A1C` 93.65 -> 100.00).  Retail is peephole-off in
  * this band, exactly as `sound/fn_800E46E8.cpp` records, so the pragma is a stand-in for the
@@ -355,7 +356,7 @@ extern "C" void fn_800F033C(void* unused_0, void* unused_1, void* unused_2, u32*
 extern "C" void fn_800F0410(s32 idx);
 extern "C" void fn_800F0448(void* ctx, void* unused_1, void* unused_2, u32* args);
 extern "C" s32 fn_800F04FC(s32 idx);
-extern "C" void fn_800F051C(u8 kind, u8 index);
+extern "C" void snd_area_bank_load(u8 kind, u8 index);
 extern "C" void fn_800F0554(void);
 extern "C" void fn_800F0560(u8 a, u8 b);
 extern "C" void fn_800F06AC(u8 kind, u8 arg1);
@@ -378,7 +379,7 @@ extern "C" void fn_800F1700(u8 arg0, u8 arg1, u8 arg2);
 extern "C" s32 fn_800F1DE0(void);
 extern "C" void fn_800F1FCC(void);
 extern "C" void fn_800F2114(void);
-extern "C" void fn_800F22A8(void);
+extern "C" void lobby_bgm_load(void);
 extern "C" void fn_800F2328(u8 arg0, u8 arg1);
 extern "C" void fn_800F2468(u8 arg0);
 extern "C" void fn_800F2540(u32 arg0, s32 arg1, SndVoice* out);
@@ -609,7 +610,7 @@ extern "C" void scene_se_bank_load(u8 a, u8 b)
 {
     char name[0x100];
 
-    fn_800F051C(a, 0);
+    snd_area_bank_load(a, 0);
     fn_800F08E8(a);
     if (GameMode_ck() != 3) {
         fn_800F2328(a, b);
@@ -817,7 +818,7 @@ void title_snd_init(void)
     title_se_load();
 }
 
-extern "C" void fn_800F051C(u8 kind, u8 index)
+extern "C" void snd_area_bank_load(u8 kind, u8 index)
 {
     const u8* p = lbl_805978E8[kind];
 
@@ -1554,7 +1555,7 @@ void title_bgm_load(void)
 }
 
 /* The lobby BGM. */
-extern "C" void fn_800F22A8(void)
+extern "C" void lobby_bgm_load(void)
 {
     u32 args[5];
 

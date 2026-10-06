@@ -16,6 +16,9 @@ extern "C" {
 void* fn_80040598(const char* path, void* buffer, u32 mode);
 void* CntSdRsoTerminate(const char* path, void* buffer);
 
+/* 0x8004080C - runs the system's keyboard reset hook when one is set (GUESS name). */
+void kbd_reset_call(void);
+
 #ifdef __cplusplus
 }
 
@@ -25,6 +28,12 @@ void* CntSdRsoTerminate(const char* path, void* buffer);
 u32 kbd_open(u8 mode);
 s32 kbd_move(void);
 void set_kbd_param(char* buffer, u32 length);
+#endif
+
+#ifdef __cplusplus
+/* 0x8004074C / 0x80040854 - start and stop the USB keyboard layer (C++ scope: `kbd_init__FUc`, `kbd_exit__Fv`). */
+void kbd_init(u8 mode);
+void kbd_exit(void);
 #endif
 
 #endif /* MHTRI_FN_80040598_H */

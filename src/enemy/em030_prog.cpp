@@ -90,7 +90,7 @@ u16 get_move_work_max(u8 index);
 /* `calcVecDistXZ` (the distance between two positions) and `subVec3` come from `fn_8004CAD8.h`. */
 
 /* The `.sdata2` pool constants this range loads, declared and never defined (playbook 29). */
-extern "C" f32 lbl_80798B3C; /* 2250000.0f - the squared 1500-unit radius `fn_80050EAC` is compared to */
+extern "C" f32 lbl_80798B3C; /* 2250000.0f - the squared 1500-unit radius `vec3_dist_sq` is compared to */
 extern "C" f32 lbl_80798B38; /* 40000.0f - the squared 200-unit homing radius */
 extern "C" f32 lbl_80798B44; /* 144.0f - the `em_frame_check` window's first bound */
 extern "C" f32 lbl_80798B48; /* 0.0f - its second bound */
@@ -177,7 +177,7 @@ s32 em030_condition_ck(_ENEMY_WORK* work) {
 /* 0x801B0128 (0x40).  The em030 program's homing-range hook: the work is in homing range while its
  * distance to its own +0x36C target point is inside the squared 200-unit radius. */
 s32 em030_homing_range_ck(_ENEMY_WORK* work) {
-    return fn_80050EAC(&work->pos, &work->vec_0x36C) < lbl_80798B38;
+    return vec3_dist_sq(&work->pos, &work->vec_0x36C) < lbl_80798B38;
 }
 
 /* 0x801B0168 (0xC8).  The em030 program's action guard: state 0 always runs, state 1 runs only while
@@ -370,7 +370,7 @@ extern "C" void fn_801B055C(_ENEMY_WORK* work) {
 }
 
 /* 0x801B06D4 (0x13C).  "Is any live area-work record of kind 2 (or the live game-state block's own
- * record) inside the 1500-unit radius?" - `fn_80050EAC` answers the squared distance. */
+ * record) inside the 1500-unit radius?" - `vec3_dist_sq` answers the squared distance. */
 extern "C" u32 fn_801B06D4(_ENEMY_WORK* work) {
     u16 max = get_move_work_max(2);
     EmAreaWork* area = (EmAreaWork*)get_move_work_adrs(2);
@@ -386,14 +386,14 @@ extern "C" u32 fn_801B06D4(_ENEMY_WORK* work) {
         if (pl_torch_ck((_ENEMY_WORK*)area) == 0) {
             continue;
         }
-        if (fn_80050EAC(&work->pos, &area->vec_0x3C) <= lbl_80798B3C) {
+        if (vec3_dist_sq(&work->pos, &area->vec_0x3C) <= lbl_80798B3C) {
             return 1;
         }
     }
 
     if (ainpc_w.active != 0 && work->area_no == ainpc_w.field_0x1A4) {
         if (ai_torch_ck(&ainpc_w) == 1) {
-            if (fn_80050EAC(&work->pos, &ainpc_w.vec_0x178) <= lbl_80798B3C) {
+            if (vec3_dist_sq(&work->pos, &ainpc_w.vec_0x178) <= lbl_80798B3C) {
                 return 1;
             }
         }

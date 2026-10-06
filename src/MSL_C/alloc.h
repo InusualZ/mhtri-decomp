@@ -14,6 +14,7 @@
 extern "C" {
 #endif
 
+int abs(int value);                            /* 0x8045AB38 */
 int strcmp(const char* a, const char* b);      /* 0x8045F684, consumed by `Network/PatInterface.cpp` */
 int sprintf(char* dst, const char* fmt, ...); /* 0x8045DECC */
 char* strchr(const char* s, int c);           /* 0x8045F7E0 */

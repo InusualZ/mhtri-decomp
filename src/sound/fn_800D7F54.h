@@ -126,4 +126,28 @@ void titleSE_req(s32 id);
  * had not declared it yet). */
 void fn_800DC9A4(struct _se_w* work, VEC3* pos);
 
+/* 0x800D9804 - takes a free SE entry for `kind` on `enemy` with `callback` as its sound source and returns it (GUESS
+ * name). */
+struct SeEntry;
+extern "C" struct SeEntry* se_entry_request(s32 kind, struct _ENEMY_WORK* enemy,
+                                           void (*callback)(struct _ENEMY_WORK*, s32));
+
+#ifdef __cplusplus
+extern "C" {
+/* 0x800D7F54 / 0x800D80B8 - set the SE work up and run its frame (GUESS names). */
+void se_work_init(void);
+void se_frame_step(void);
+/* 0x800D8E44 - clears the byte `handle` points at, when there is one (GUESS name). */
+void se_handle_clear(u8* handle);
+}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+/* 0x800DBCD8 / 0x800DBE0C - request sound `id` on channel 32 / channel 2 when it is free (GUESS names). */
+void sysSE_bank32_req(s32 id);
+void se_ch2_req(s32 id);
+}
+#endif
+
 #endif /* MHTRI_SOUND_FN_800D7F54_H */

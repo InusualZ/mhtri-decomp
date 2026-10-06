@@ -156,7 +156,7 @@ struct _PLW {
             /* +0x030 */ s16 field_0x030;
             /* +0x032 */ u8 pad_0x32[0xA];
         };
-        struct {   /* the act unit's own view: the stagger value `fn_80274918` branches on.  Retail
+        struct {   /* the act unit's own view: the stagger value `pl_act_name_row_get` branches on.  Retail
                     * loads that pair with `lha`, so the field really is a signed 16-bit one */
             /* +0x030 */ u8 pad_0x30_pair[0x6];
             /* +0x036 */ s16 field_0x036;
@@ -1003,7 +1003,7 @@ struct _PLW {
         /* +0x5AD */ u8 pad_merge_0x5AD[0xB];
         };
     };
-    /* +0x5B8 */ s16 field_0x5B8;  /* the guard timer `fn_80274918` gates the table row on (>= 0xA0) */
+    /* +0x5B8 */ s16 field_0x5B8;  /* the guard timer `pl_act_name_row_get` gates the table row on (>= 0xA0) */
     /* +0x5BA */ u8 field_0x5BA;
     /* +0x5BB */ u8 unk5BB;
     /* +0x5BC */ u8 field_0x5BC;   /* `hud/cockpit_quest.cpp`'s `quest_mark_visible_ck` gates the quest
@@ -1136,8 +1136,12 @@ struct _PLW {
     };
     /* +0x666 */ u16 field_0x666;
     /* +0x668 */ u8 talk_wait_0x668;    /* re-armed to 5 each frame a lobby NPC talk runs; 0 ends the talk */
-    /* +0x669 */ u8 talk_left_0x669;    /* the talks the NPC still has (3 once the progress flag is set) */
-    /* +0x66A */ u8 pad_0x66A[0x48A];
+    /* +0x669 */ u8 talk_left_0x669;    /* the talks the NPC still has (3 once the progress flag is set); swaps open at 6 or less */
+    /* +0x66A */ u8 pad_0x66A[0x2];
+    /* +0x66C */ u16 trade_want_0x66C;   /* the item the quest NPC asks for (`npc_trade_pick`) */
+    /* +0x66E */ s16 trade_count_0x66E;  /* -1 once the trade is settled, else the count */
+    /* +0x670 */ u16 trade_give_0x670;   /* the item the NPC gives for it */
+    /* +0x672 */ u8 pad_0x672[0x482];
     /* +0xAF4 */ struct _se_w* field_0xAF4;
     /* +0xAF8 */ struct _se_w* field_0xAF8;
     /* +0xAFC */ struct _se_w* field_0xAFC;

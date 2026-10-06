@@ -34,7 +34,7 @@
  *    ours hoists them;
  *  - `fn_8012BDF4`: retail's frame is 0x70 against our 0x50 (an f31 `psq_st` spill and an `f64` temporary), and ours
  *    forms `ainpc_w`'s address, which retail does not reference;
- *  - `fn_8012C3C8`, `fn_8012C4E8`: the distance test (`fn_80050EAC`, `fmuls`) is laid out with the opposite branch
+ *  - `fn_8012C3C8`, `fn_8012C4E8`: the distance test (`vec3_dist_sq`, `fmuls`) is laid out with the opposite branch
  *    polarity;
  *  - `fn_8012C300`, `fn_8012C600`, `fn_8012C6F4`, `fn_8012C870`, `fn_8012CDF4`, `fn_8012CF04`, `fn_8012D3E0`: the
  *    `clrlwi` narrowing sits at a different point (at entry in one, at the use or store in the other);
@@ -272,7 +272,7 @@ struct EnemyExtraData {
 
 
 /* Callees and pooled data. */
-extern "C" f32 fn_80050EAC(void* ref, nw4r::math::VEC3* pos);
+extern "C" f32 vec3_dist_sq(void* ref, nw4r::math::VEC3* pos);
 extern "C" u8 fn_80133BCC(void);
 extern "C" void* quest_spawn_rec_find(u16 id);
 
@@ -1060,7 +1060,7 @@ extern "C" s32 fn_8012C3C8(u32 team, u32 state_sub, void* ref, f32 radius)
         if (work->active != 0 && work->action != 0x0B && work->action != 0x0C && work->team == (u8)team &&
             work->area_no == (u8)state_sub) {
             if (ref == NULL || radius < zero ||
-                fn_80050EAC(ref, &work->pos) <= radius * radius) {
+                vec3_dist_sq(ref, &work->pos) <= radius * radius) {
                 work->flags_0xA04 |= 4;
                 found = 1;
             }
@@ -1086,7 +1086,7 @@ extern "C" void fn_8012C4E8(u32 team, u32 state_sub, s16 arg3, void* ref, f32 ra
         if (work->active != 0 && work->action != 0x0B && work->action != 0x0C && work->team == (u8)team &&
             work->area_no == (u8)state_sub) {
             if (ref == NULL || radius < zero ||
-                fn_80050EAC(ref, &work->pos) <= radius * radius) {
+                vec3_dist_sq(ref, &work->pos) <= radius * radius) {
                 work->flags_0xA04 |= 4;
                 fn_80130858(work, arg3);
             }

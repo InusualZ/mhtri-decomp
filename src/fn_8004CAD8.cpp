@@ -77,6 +77,8 @@
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: `.sdata2` claimed, not emitted.
  * NAMES. GUESS (from each body and its callers): get_FqResult_work
+ *   GUESS (from each body and its callers): vec3_dist_sq
+ *   GUESS (from each body and its callers): userdata_progress_flag_ck
  */
 
 #include "types.h"

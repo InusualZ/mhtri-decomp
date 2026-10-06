@@ -32,6 +32,10 @@ s32 npc_talk_start(s8 npc, u8 msg, u16 arg, u8 kind);
 u8 npc_talk_active_ck(void);
 void npc_talk_end(void);
 void npc_talk_flag_set(u8 flag);
+/* 0x803C8670 / 0x803C8680 / 0x803C86A4 - the talk window's speaker, choice flag and message index (GUESS names). */
+u8 talk_msg_speaker_get(void);
+u8 talk_msg_choice_ck(void);
+u8 talk_msg_index_get(void);
 
 #ifdef __cplusplus
 }

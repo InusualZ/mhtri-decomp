@@ -48,6 +48,12 @@ void snd_quest_frame_end(void);
 int snd_bgm_hold_ck(void);
 void snd_hunt_stream_start(s32 mode);
 
+/* 0x800F2A94 / 0x800F5290 - set the BGM control work up and run its frame (GUESS names). */
+void bgm_ctrl_init(void);
+void bgm_ctrl_frame(void);
+/* 0x800F590C - clears the BGM control's "behind the scene" flag (GUESS name). */
+void bgm_behind_flag_clear(void);
+
 #ifdef __cplusplus
 }
 #endif

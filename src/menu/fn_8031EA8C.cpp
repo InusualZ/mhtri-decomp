@@ -45,7 +45,7 @@ void  eft_res_slot_release(_EFT* self);
 void  fn_800F8A44(MHchar** models, s32 count);
 f32   fn_800513F0(VEC3* v, f32 s);
 u32   userdata_flag_ck(u32 value);
-s32   fn_800CEF18(u32 value);
+s32   rand_lcg_step(u32 value);
 s32   lb_panel_close(void);
 void  setCockpitTransferMode(u8 index, s32 value);
 void  fn_802DFCD4(void);
@@ -280,7 +280,7 @@ extern "C" s32 fn_8031FB84(s16 n) {
     s16 i = 0;
 
     while (i < n) {
-        value = fn_800CEF18((u16)value);
+        value = rand_lcg_step((u16)value);
         i++;
     }
     return value;

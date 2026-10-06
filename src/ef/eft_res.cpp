@@ -8,6 +8,7 @@
  *   seven functions; `eft_res_slot_get`, `eft_res_slot_release`, `eft_res_model_get`, `eft_res_spawn_gate_ck` and
  *   `eft_res_models_spawn` are GUESSes from their bodies; the map has only `fn_` stems for the rest.
  *   GUESS (from each body and its callers): eft_control_init
+ *   GUESS (from each body and its callers): eft_res_release_all
  * RESIDUALS. `fn_800F8634` saves from r27 where retail calls `_savegpr_26` (and ours restores with `_restgpr_27`
  *   where retail's epilogue differs); `eft_res_models_spawn` calls `_savegpr_23`/`_restgpr_23` where retail calls
  *   `_savegpr_24`/`_restgpr_24`;
@@ -170,7 +171,7 @@ extern "C" {
 
 void fn_800F6520(void);
 void eft_control_init(void);
-void fn_800F6688(void);
+void eft_res_release_all(void);
 void fn_800F6984(u32, u32, void*, void*);
 void fn_800F69A0(u32, void*, void*);
 void fn_800F69B8(void);
@@ -287,7 +288,7 @@ extern "C" void eft_control_init(void) {
 }
 
 /* 0x800F6688 - run the teardown over every live effect slot. */
-extern "C" void fn_800F6688(void) {
+extern "C" void eft_res_release_all(void) {
     EftResSlot* slot = eft_control.slots_0x10;
 
     if (slot == NULL) {

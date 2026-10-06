@@ -176,7 +176,7 @@ void subVec3(void* out, const void* a, const void* b);
 f32 calcVecDistXZ(const void* a, const void* b);
 /* 0x80050EAC - the SQUARED distance between two positions (the callers compare it against a squared
  * radius constant, e.g. `enemy/fn_801B0010.cpp` against `lbl_80798B3C` = 2250000.0f = 1500^2). */
-f32 fn_80050EAC(const void* a, const void* b);
+f32 vec3_dist_sq(const void* a, const void* b);
 /* 0x80051378 - the three-pointer vector helper this range owns (unmangled `addVec3`, so C
  * linkage).  Its body saves r3/r4/r5, zeroes the first through `VEC3_ctor`, then tail-forwards all
  * three to `vec3_add_ps`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added with its first consumer
@@ -263,6 +263,10 @@ void fn_8004EA58(const void* entry);
 void exportItemBoxPage(u8* record, s32 page);
 /* 0x8004FD6C - packs the equipment set (a 0xF0-byte record) out of the lobby world block (GUESS name). */
 void exportEquipRecord(u8* record);
+
+/* 0x800526F8 - copies the 4-byte coordinate pair at the head of `src` into `dst`. */
+/* untyped: a byte range, the coordinate pair at the head of either a position or a sprite record */
+void uv_pair_copy(void* dst, const void* src);
 
 #ifdef __cplusplus
 }

@@ -10,6 +10,7 @@
  *   (docs/lobby.md).
  * NAMES. `lb_equip_page` is a GUESS from the item/equipment page the first half draws; the map and the dump give only
  *   placeholders for the functions.
+ *   GUESS (from each body and its callers): lb_item_box_count_draw
  * RESIDUALS. 85 rows unwritten: 0x80220078-0x80220114, 0x8022015C-0x80220818, 0x8022081C-0x802208A8,
  *   0x80220994-0x80220AF0, 0x80220B84-0x802216B4, 0x802216E8-0x80221864, 0x80221890-0x80221BBC, 0x80221C28-0x80222238,
  *   0x802222C0-0x802227BC, 0x80222848-0x802230C8, 0x802230F8-0x802235A4, 0x802235FC-0x80223A18, 0x80223A70-0x80224AC4,

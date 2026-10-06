@@ -129,6 +129,9 @@ s16 menu_text_block_center_x(char* text, s32 center, s16 size, s16* out_lines);
 void menu_yes_no_draw(u16 id, s32 sel);
 
 #ifdef __cplusplus
+/* 0x802A7978 - draws the item row `item` (item and count) at sprite `id`. */
+void menu_item_row_draw_by_lsp(u16 id, u16* item);
+
 }
 
 /* 0x802AA3EC - the `bool` row's colour, the front-end's spelling of the map's

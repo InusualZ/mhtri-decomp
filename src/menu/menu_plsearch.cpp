@@ -9,6 +9,8 @@
  * FLAGS. `cflags_menu` (configure.py; unmeasured).
  * NAMES. Module and file from the `__FILE__` string "menu_plsearch.cpp".  `sPatTerms` (.sbss 0x80794D58) is a GUESS:
  *   the terms object's constructor publishes itself there.
+ *   GUESS (from each body and its callers): game_data_file_create_start, game_system_file_create_start
+ *   GUESS: game_system_file_create_wait
  * RESIDUALS. every body (118 rows score zero) and the internal seams: at least three TUs (`menu_plsearch.cpp`,
  *   `menu_message.cpp` at 0x8044E340, the save-data code).  The symbols are in the map
  *   (`python tools/units/ledger.py unit menu/menu_plsearch.cpp`).

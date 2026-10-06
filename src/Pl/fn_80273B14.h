@@ -121,7 +121,7 @@ void fn_802761DC(struct _PLW* self, u32 a, u32 b, u32 c);
 void* fn_80274850(struct _PLW* plw);
 
 /* 0x80274918 - the act-name table row picker. */
-u8* fn_80274918(struct _PLW* plw, s32 force, s32 index);
+u8* pl_act_name_row_get(struct _PLW* plw, s32 force, s32 index);
 
 /* 0x80274E6C / 0x80275014 / 0x802751B4 - the three weapon-record bonus sums. */
 u8 fn_80274E6C(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);

@@ -7,6 +7,7 @@
  *   end.
  * FLAGS. `cflags_menu` (configure.py; unmeasured).
  * NAMES. Module and file from the `__FILE__` string "menu_placeinfo.cpp" in the range's data (0x80604780).
+ *   GUESS (from each body and its callers): placeinfo_model_create
  * RESIDUALS. every body (60 rows score zero); the unit may hold more than one TU.  The symbols are in the map
  *   (`python tools/units/ledger.py unit menu/menu_placeinfo.cpp`).
  */

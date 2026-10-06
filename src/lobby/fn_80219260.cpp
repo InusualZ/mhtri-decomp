@@ -9,6 +9,9 @@
  *   it) and the dump answers `zz_` throughout, so the file keeps the map's stem.  Module `lobby`: the lobby/HUD API
  *   (`LbStr`, `get_lsp_data`, `draw_sprite_ary`, `get_menu_lsp_tbl`) and the `_EQUIP` accessors (`Get_equip_rare`,
  *   `Gunner_opt_ok_ck`, `GetEquipName`, `ItemName`, `draw_weaponicon_idx`).
+ *   GUESS (from each body and its callers): lb_menu_scratch_init
+ *   GUESS (from each body and its callers): lb_menu_open, lb_talk_page_open, lb_talk_page_value_get, lb_talk_page_mode_reset
+ *   GUESS: lb_menu_step
  *   GUESS: `userdata_award_bit_set`, `lb_talk_page_value_get`, `lb_talk_page_mode_set`,
  *   GUESS: `lb_talk_page_mode_reset`
  * RESIDUALS. 48 rows unwritten: 0x802196F0-0x8021AC24, 0x8021AD14-0x8021B5AC, 0x8021B690-0x8021B890,
@@ -56,7 +59,7 @@ void fn_800D0754(u8 value);
 void fn_800DCFE4(void);
 const u16* get_menu_lsp_tbl(u16 id);
 void lb_npc_talk_mode_set(void* slot, s32 value);
-s32 fn_8021D21C(u8 a, s32 b, s32 c, s32 d);
+s32 lb_menu_step(u8 a, s32 b, s32 c, s32 d);
 
 void fn_8021B94C(void);
 
@@ -502,12 +505,12 @@ extern "C" s32 fn_8021D1D4(void) {
 
 /* Switches the page to the given menu mode. */
 extern "C" s32 lb_talk_page_mode_set(s32 mode) {
-    return fn_8021D21C((u8)mode, 0, 0, 1);
+    return lb_menu_step((u8)mode, 0, 0, 1);
 }
 
 /* Switches the page back to menu mode 1. */
 extern "C" s32 lb_talk_page_mode_reset(void) {
-    return fn_8021D21C(1, 0, 0, 1);
+    return lb_menu_step(1, 0, 0, 1);
 }
 
 /* Whether the selection record is filled. */

@@ -1099,7 +1099,7 @@ void lb_settings_copy(LbSettings* dst, LbSettings* src) {
     dst->value_0x0C = src->value_0x0C;
 }
 
-/* A tail call of `fn_80217934`, the area-name/quest path helper the tutorial block drives. */
+/* A tail call of `lb_panel_close`, the area-name/quest path helper the tutorial block drives. */
 void lb_area_name_apply(void) {
     lb_panel_close();
 }
@@ -1153,7 +1153,7 @@ void lb_page_refresh(void) {
     lb_entry_model_publish();
 }
 
-/* Republishes the entry byte (`lb_entry_publish`) and then the page's name path (`fn_80217934`). */
+/* Republishes the entry byte (`lb_entry_publish`) and then the page's name path (`lb_panel_close`). */
 void lb_entry_republish(void) {
     lb_entry_publish();
     lb_panel_close();

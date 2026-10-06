@@ -6,6 +6,7 @@
  * `#pragma optimization_level reset`: the old units that held them were measured with the project's default level and `peephole off`
  * only (the `optimization_level 4` pragma below is the old `fn_800D7F54.cpp`'s, which the cflags of the three absorbed rows share).
  *
+ * NAMES. GUESS (from each body and its callers): se_entry_request
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * 141 functions. This is the game's sound-effect request layer: a request names a sound id plus a world
@@ -53,6 +54,8 @@
  *   flipcheck: `.data` size gap.
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: force-active in retail .comment, not in ours: `fn_800DB684`.
+ *   GUESS (from each body and its callers): se_work_init, se_frame_step, se_handle_clear
+ *   GUESS (from each body and its callers): sysSE_bank32_req, se_ch2_req
  * NAMES. GUESS: `sysSE_bank32_req`, `sysSE_bank20_req`, `sysSE_bank24_req`, `se_talk_point_set`
  */
 #pragma optimization_level 4
@@ -169,7 +172,7 @@ extern "C" SeWork* get_move_work_adrs__FUc(u8 kind);
 void sysSE_req(s32 id);
 
 /* --- the fixed-id positional wrappers (16 bytes each) and the id-selecting ones (72 bytes) --------- */
-extern "C" void fn_800D8E44(u8* p) {
+extern "C" void se_handle_clear(u8* p) {
     if (p != NULL) {
         *p = 0;
     }
@@ -433,7 +436,7 @@ extern "C" void sysSE_bank24_req(void) {
     }
 }
 
-extern "C" void fn_800DBE0C(s32 id) {
+extern "C" void se_ch2_req(s32 id) {
     if (fn_800F04FC(2) != 0) {
         fn_800DBB78(2, id);
     }
@@ -2011,7 +2014,7 @@ Mtx34 get_current_view_mtx(void);
  * direction pairs when the play mode asks for it), lets every live enemy-work record push its own
  * position into the pool and dispatch to its kind's slot walker, then runs the pool's trailing slot.
  */
-extern "C" void fn_800D80B8(void) {
+extern "C" void se_frame_step(void) {
     SePool* self = (SePool*)lbl_80794978;
     s32 i;
     SeEntry* entry;
@@ -2122,7 +2125,7 @@ extern "C" void fn_800D80B8(void) {
  * the kind and the kind's own sound code (from the enemy's bank, from a frame/state helper, or from a
  * fixed code), then returns the record.
  */
-extern "C" SeEntry* fn_800D9804(s32 kind, _ENEMY_WORK* enemy,
+extern "C" SeEntry* se_entry_request(s32 kind, _ENEMY_WORK* enemy,
                                 void (*callback)(_ENEMY_WORK*, s32)) {
     SeEntry* entry;
     _se_w* pool = lbl_80794978;
@@ -3165,7 +3168,7 @@ struct SystemWorkView {
 };
 
 /* Clears the work area and lays a 16-step ramp into it. */
-extern "C" void fn_800D7F54(void) {
+extern "C" void se_work_init(void) {
     SystemWorkView* sys = (SystemWorkView*)system_w;
     lbl_80794978 = sys->se_work;
     memset(lbl_80794978, 0, 0x2966C);

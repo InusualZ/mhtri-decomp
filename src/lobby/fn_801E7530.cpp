@@ -52,7 +52,7 @@ void* get_FqResult_work(void);
 s32 userdata_progress_flag_ck(s32 a);
 s32 userdata_zenny_add(s32 a);
 void uv_pair_copy(_mh_ivec2_* dst, const _mh_ivec2_* src);
-u16 fn_800CEF18(u16 id);
+u16 rand_lcg_step(u16 id);
 u32 game_ready_ck(void);
 s32 sysSE_stop(s32 id);
 }
@@ -402,7 +402,7 @@ void fn_801E79E4(void)
         switch (fn_801E7178(self)) {
         case 1:
             self->state_0x00 = 5U;
-            fn_80359D98(lobby_world_block + 0x4860, lb_item_get_data + 0x20);
+            eft052_item_get_open(lobby_world_block + 0x4860, lb_item_get_data + 0x20);
             break;
         case 2:
             self->state_0x00 = 1U;
@@ -417,7 +417,7 @@ void fn_801E79E4(void)
         return;
     case 5:
         ainpc_page_hold_set();
-        if (fn_8035A034() == 1) {
+        if (eft052_item_get_step() == 1) {
             self->state_0x00 = 1U;
         }
         return;
@@ -558,7 +558,7 @@ void fn_801E8348(LbMenuWork* self)
     if (a != 0xFFFFU) {
         lb_panel_msg_draw(0x1877, (s16)a);
         if (b != 0xFFFFU) {
-            fn_8021505C(0x1877, (s16)b, 2);
+            lb_panel_str_print(0x1877, (s16)b, 2);
         }
     }
 }
@@ -718,7 +718,7 @@ void fn_801E89B4(LbMenuWork* self)
             p2.x += m.x;
             p2.y += m.y;
             set_blendmode(4, 1, 1);
-            fn_802E0DA8((s16*)&p2, self->selected_0x08, (s16*)&pos);
+            spr_anim_draw((s16*)&p2, self->selected_0x08, (s16*)&pos);
             set_blendmode(4, 5, 1);
         }
         if (*(s32*)(self->data_0x1C + off) != 0) {
@@ -731,12 +731,12 @@ void fn_801E89B4(LbMenuWork* self)
         spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x1305U, NULL));
         p2.x += p1.x;
         p2.y += p1.y;
-        fn_802E0DA8((s16*)&p2, (u16)self->stage_0x0E, (s16*)&pos);
+        spr_anim_draw((s16*)&p2, (u16)self->stage_0x0E, (s16*)&pos);
         set_blendmode(4, 5, 1);
         spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x1306U, NULL));
         p2.x += p1.x;
         p2.y += p1.y;
-        fn_802E0DA8((s16*)&p2, (u16)self->stage_0x0E, (s16*)&pos);
+        spr_anim_draw((s16*)&p2, (u16)self->stage_0x0E, (s16*)&pos);
     }
 }
 
@@ -746,14 +746,14 @@ void fn_801E8C44(void)
 
     get_lsp_data(0x1DFBU, &pos);
     draw_sprite_ary((const u16*)lbl_805B7E8C, &pos);
-    fn_801E89B4((LbMenuWork*)lbl_806BF310);
-    fn_80222BC4(lbl_806BF310, 0x1E17, 0U);
+    fn_801E89B4((LbMenuWork*)eft052_item_box);
+    lb_item_box_count_draw(eft052_item_box, 0x1E17, 0U);
 }
 
 void fn_801E8CA0(void)
 {
     fn_801E8C44();
-    fn_8035A7D8(0x1E26, lbl_805B7EC8, lbl_80791BAC, 0x1DFA, 0);
+    eft052_box_list_draw(0x1E26, lbl_805B7EC8, lbl_80791BAC, 0x1DFA, 0);
 }
 
 void fn_801E8CDC(u8 id, s8* str)
@@ -907,7 +907,7 @@ void fn_801E9FC8(void)
 void fn_801EB524(void)
 {
     fn_801EB464();
-    fn_8035A7D8(0x1718, lbl_805B83F4, lbl_80791BE8, 0x16D6, 0);
+    eft052_box_list_draw(0x1718, lbl_805B83F4, lbl_80791BE8, 0x16D6, 0);
 }
 
 void fn_801EAC30(LbParam* dst, const LbParam* src)

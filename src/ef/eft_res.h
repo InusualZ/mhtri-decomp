@@ -57,6 +57,9 @@ extern "C" {
  * (GUESS names). */
 void eft_control_init(void);
 void eft_common_load(void);
+/* 0x800F6688 - releases every live effect slot (GUESS name). */
+void eft_res_release_all(void);
+
 #ifdef __cplusplus
 }
 #endif

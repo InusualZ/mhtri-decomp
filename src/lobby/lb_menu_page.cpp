@@ -86,7 +86,7 @@ typedef struct LbMenuPage {
     /* +0x100 */ u8 unused_0x100[0x28];
     /* +0x128 */ s16 index_0x128;       /* the icon/word/u16 index of the three tables below */
     /* +0x12A */ u8 unused_0x12A[0xD6];
-    /* +0x200 */ s32 data_0x200;        /* `fn_80215170`'s second argument for the 6265 panel */
+    /* +0x200 */ s32 data_0x200;        /* `lb_panel_yes_no_draw`'s second argument for the 6265 panel */
     /* +0x204 */ u8 unused_0x204[0x8];
     /* +0x20C */ LbIconRec icons_0x20C[4]; /* 12-byte icon records `equip_record_copy` copies */
     /* +0x23C */ u32 values_0x23C[4];      /* the words `fn_80214FB8` is handed */

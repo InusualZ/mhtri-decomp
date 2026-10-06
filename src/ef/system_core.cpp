@@ -17,12 +17,14 @@
  *   `player_count_set`, `game_ready_ck`, `game_reset_to_title`, `move_work_state_ck`, `ef_move_state_dispatch` and
  *   `setTransferDisplayState` are GUESSes from their bodies and callers (the dump's `SaveLoad::DidGameIDChange` /
  *   `BTM_IsDeviceUp` at four of these addresses contradict the one-byte bodies).
+ *   GUESS (from each body and its callers): rand_lcg_step
+ *   GUESS (from each body and its callers): system_stream_count_step, system_scene_reset, system_full_reset
  *   GUESS: `monster_size_value_get` (0x800CEE74, from its body and its quest-result caller).
  * RESIDUALS. 54 rows unwritten in 23 runs (and `TPLtexLoad`, written, at 0 %: ours emits the plain `TPLtexLoad`
  *   where retail defines `TPLtexLoad__FPvP9_tex_info`); the largest by size is 0x800D0764-0x800D2098 (6 rows, the
  *   texture loader up to `fn_800D104C`); `sweepcomments.py --unit ef/system_core` lists them.
  *   31 partial rows, including:
- *  - `fn_800CEF18`, `ran_suu`: retail reduces the 0xB0/0xAD mix with the magic 0x00AD7539, `srwi 15` and
+ *  - `rand_lcg_step`, `ran_suu`: retail reduces the 0xB0/0xAD mix with the magic 0x00AD7539, `srwi 15` and
  *    `mulli 0xFF53`; the `u32` spelling here emits the 32-bit magic 0x7AD2208F (the original operand width is open);
  *  - `set_move_work_max`, `GameMode_set`, `PlayMode_set`, `get_move_work_adrs`, `get_move_work_max`: retail narrows
  *    the argument (`clrlwi`) at entry, ours folds it into the store or the `clrlslwi`;
@@ -187,7 +189,7 @@ void fn_800CEE9C(u8 value) {
 }
 
 /* 0x800CEF18 - the ring's value transform (0 -> 1, then the 0xB0 over 0xAD mix). */
-u16 fn_800CEF18(u16 value) {
+u16 rand_lcg_step(u16 value) {
     u32 v = value;
 
     if (v == 0) {
@@ -312,7 +314,7 @@ u32 fn_800D2EE0(u32 id) {
 }
 
 /* 0x800D2F1C - step the two stream counters. */
-void fn_800D2F1C(void) {
+void system_stream_count_step(void) {
     u32 n = ++system_w.field_0x894;
 
     if (n % 0x1E != 0) {

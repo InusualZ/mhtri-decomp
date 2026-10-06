@@ -206,7 +206,7 @@ u32 fn_8027D8A0(struct _PLW* self, s32 a);
 
 /* The `.data` tables the same unit reads. */
 extern const u16 lbl_805BF490[];  /* 4-byte {u16 id, u16 value} rows, `fn_80274B20` looks ids up */
-extern u8 lbl_805C5F30[];         /* the melee act-name table rows `fn_80274918` picks */
+extern u8 lbl_805C5F30[];         /* the melee act-name table rows `pl_act_name_row_get` picks */
 extern u8 lbl_805C5F50[];
 extern u8 lbl_805C5F70[];
 

@@ -48,7 +48,7 @@
  *   * Below 100 % but above the bar: `fn_800F2E38` 97.47, `fn_800F3218` 96.79, `fn_800F4644` 95.54,
  *     `fn_800F4350` 90.40 - each otherwise instruction-for-instruction equal to retail, differing in
  *     register colouring only.
- *   * 23 symbols are unwritten (0 %).  Biggest first: `snd_quest_frame_begin` (0x728), `fn_800F5290` (0x67C),
+ *   * 23 symbols are unwritten (0 %).  Biggest first: `snd_quest_frame_begin` (0x728), `bgm_ctrl_frame` (0x67C),
  *     `snd_quest_frame_end` (0x3B8), `fn_800F3C58` (0x340), `fn_800F3604` (0x320), `fn_800F3054` (0x1C4),
  *     `fn_800F2A94` (0x244), `fn_800F2CD8` (0x160), `fn_800F34EC`+`fn_800F3554` (0x118), `snd_quest_scene_set`
  *     (0x138), `fn_800F48F4` (0x174).  The complete per-symbol table is the outbox's `symbols`.
@@ -56,6 +56,7 @@
  *     three parallel 3-entry runs and no source shape tried so far reproduces the sequence.  It is the
  *     largest single body missing here.
  * NAMES. GUESS (from each body and its callers): snd_bgm_hold_ck
+ *   GUESS (from each body and its callers): bgm_ctrl_init, bgm_ctrl_frame, bgm_behind_flag_clear
  */
 #pragma peephole off
 #include "types.h"
@@ -441,7 +442,7 @@ extern "C" void fn_800F51E0() {
 }
 
 /* 0x800F590C - 0x18: clear the "behind the scene" flag. */
-extern "C" void fn_800F590C() {
+extern "C" void bgm_behind_flag_clear() {
     BgmCtrl* work = lbl_80791690;
     if (work == NULL) {
         return;
