@@ -48,4 +48,19 @@ extern const f32 networkSessionNever;               /* 0x8079C71C = -1.0f */
 extern const f32 networkSessionPriorityScale;       /* 0x8079C728 = 256.0f (GUESS) */
 extern const f32 networkSessionPriorityRange;       /* 0x8079C72C = 4096.0f (GUESS) */
 
+/* the connection band's words (`Network/NetworkConnection.cpp`, `Network/NetworkConnectionStable.cpp`; GUESS on every
+   name: each is read off its use) */
+extern f32 networkConnectionDefaultInterval;         /* 0x80793900 = 20.0f - the keep-alive interval a connection opens with */
+extern f32 networkConnectionDefaultTimeout;          /* 0x80793904 = 20.0f - the connect timeout */
+extern f32 networkConnectionDefaultLimit;            /* 0x80793908 = 20.0f - the receive timeout */
+extern const f32 networkConnectionMilliseconds;      /* 0x8079C698 = 1000.0f */
+extern const f32 networkConnectionZero;              /* 0x8079C69C = 0.0f */
+extern const f32 networkConnectionTwo;               /* 0x8079C6A0 = 2.0f */
+extern const f32 networkConnectionPingInterval;      /* 0x8079C6A4 = 1.0f - seconds between two pings, the rate's ceiling */
+extern const f32 networkConnectionStatInterval;      /* 0x8079C6A8 = 60.0f - seconds between two traffic logs */
+extern const f32 networkConnectionNoTimestamp;       /* 0x8079C6AC = -1.0f */
+extern const f32 networkConnectionMinRoundTrip;      /* 0x8079C6B0 = 0.0001f */
+extern const f32 networkConnectionRoundTripKeep;     /* 0x8079C6C0 = 0.9f - the weight the round-trip average keeps */
+extern const f32 networkConnectionRoundTripWeight;   /* 0x8079C6C4 = 0.1f - the weight a new sample gets, the rate's floor */
+
 #endif /* NETWORK_SHARED_DATA_H */

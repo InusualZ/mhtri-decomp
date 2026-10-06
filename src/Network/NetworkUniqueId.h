@@ -25,7 +25,7 @@ public:
     NetworkUniqueId();
     /* +0x1C */ virtual void bind(u8* block, u32 size);
     /* +0x08 */ virtual ~NetworkUniqueId();
-    /* +0x2C */ virtual void slot_2C();
+    /* +0x2C */ virtual u32 equals(const NetworkStreamSink* other) const;
 
     s32 isValid() const;
     void importFrom(u8 kind, const u8* data, u32 size);

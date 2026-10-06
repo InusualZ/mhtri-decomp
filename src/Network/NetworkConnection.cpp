@@ -2,18 +2,61 @@
  * Network/NetworkConnection.cpp - the connection base `NetworkConnectionStable` is built on (constructor 0x803CA1D4,
  *   table 0x805F9190: it creates the slot's peer by kind and owns it at +0x0C), the member mutex class (table
  *   0x805F91E0) and the peer constructors the base calls (the 0x663C-byte peer, `NetworkPeerUdp`).
- * RANGE. .text 0x803CA1D4-0x803CA484 (6 functions), extab 0x80019584-0x80019618, extabindex 0x80039EAC-0x80039EF4
+ * RANGE. .text 0x803CA1D4-0x803CA49C (9 functions), extab 0x80019584-0x80019618, extabindex 0x80039EAC-0x80039EF4
  *   (6 entries), .data 0x805F9190-0x805F91F0 (the two tables).  Left edge: the `.data` zigzag at 0x805F9190 (after
  *   `__vt__17NetworkStreamSink`).  Right edge: the V->S seam at 0x805F91F0 (the `NetworkConnectionStable[%d]` strings
- *   start a new TU); the `.text` edge is a GUESS at 0x803CA484: the three float setters 0x803CA484..0x803CA49C between
- *   the base destructor and `NetworkConnectionStable`'s constructor are called only from that class (0x803CBF48), so
- *   they go with it; they carry no extab record, so the extab/extabindex edges are exact either way.
- * FLAGS. the `NetworkStreamSink` row's flags, unmeasured: there is no body yet.
- * NAMES. The file name is a GUESS: the base class of `NetworkConnectionStable`.
- * RESIDUALS. Every function unwritten: the base class is not declared (`NetworkConnectionStable` is declared without a
- *   base in `Network/NetworkSessionStable.h`), the mutex record is a class (its constructor stores 0x805F91E0) that the
- *   band calls as the C pair `networkInstance_initMutex`/`_destroyMutex`, and neither peer class declares its
- *   constructor.
+ *   start a new TU) and `NetworkConnectionStable`'s constructor 0x803CA49C (its extabindex record opens the next run);
+ *   the three float setters 0x803CA484..0x803CA49C are the base table's slots +0x3C..+0x44, so they are this class's.
+ * FLAGS. the library's flags plus `#pragma peephole off`, measured on the five written rows.
+ * NAMES. The file and class names are GUESSes: the base class of `NetworkConnectionStable`; the slot names are read off
+ *   the derived class's overrides.  GUESS: setInterval, setTimeout, setLimit (the defaults each new connection copies).
+ * RESIDUALS. Unwritten: the constructor (0x803CA1D4, 288 B) - `new` of each peer kind is refused while
+ *   `NetworkPeerBase` carries its pure `slot_2C` table pad (the peers are abstract); the 0x663C-byte peer's
+ *   constructor (0x803CA2F4, 68 B) - `NetworkPeerGameSpy` is not a `NetworkPeerBase` class in
+ *   `Network/GameSpyInterfaceThread.h`; the mutex record's destructor and constructor (0x803CA338, 0x803CA37C, 132 B) -
+ *   a class (its constructor stores 0x805F91E0) that six units call as the C pair
+ *   `networkInstance_destroyMutex`/`_initMutex` on byte blocks.  `.data`: the base table and the mutex table are not
+ *   emitted until the constructors are written.
+ * SHAPES. `NetworkPeerUdp`'s constructor is complete with an empty body (the compiler emits the base call and the
+ *   table store) and matches.
  */
 
 #include "Network/NetworkConnection.h"
+#include "Network/NetworkPeerUdp.h"
+#include "Network/network_shared_data.h"      /* the connection defaults */
+
+#pragma peephole off
+
+/* Chains the peer base; the Udp peer's own fields are bound later (`setContext`). */
+NetworkPeerUdp::NetworkPeerUdp()
+{
+}
+
+/* Destroys the peer. */
+NetworkConnection::~NetworkConnection()
+{
+    if (peer_0C != NULL) {
+        if (peer_0C != NULL) {
+            peer_0C->destroy(1);
+        }
+        peer_0C = NULL;
+    }
+}
+
+/* Sets the keep-alive interval new connections start with. */
+void NetworkConnection::setInterval(f32 seconds)
+{
+    networkConnectionDefaultInterval = seconds;
+}
+
+/* Sets the connect timeout new connections start with. */
+void NetworkConnection::setTimeout(f32 seconds)
+{
+    networkConnectionDefaultTimeout = seconds;
+}
+
+/* Sets the receive timeout new connections start with. */
+void NetworkConnection::setLimit(f32 seconds)
+{
+    networkConnectionDefaultLimit = seconds;
+}

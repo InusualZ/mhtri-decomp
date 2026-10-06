@@ -401,8 +401,7 @@ void NetworkSessionStable::move()
         case 1:
             slot->left_1A = 0;
             slot->authenticated_19 = 0;
-            getRoundTrip(index);
-            connection->begin();
+            connection->begin(getRoundTrip(index));
             slot->linkState_00 = 2;
             break;
         case 2:

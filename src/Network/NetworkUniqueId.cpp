@@ -9,10 +9,10 @@
  *   the members; `-inline auto` folds them).
  * NAMES. From the unit's own log strings: `NetworkUniqueIdIsValid`, `NetworkUniqueIdImportFrom`,
  *   `NetworkUniqueIdExportTo`, `NetworkUniqueIdEquals` (C-style, `this`/`arg` in their messages) and
- *   `NetworkUniqueId::exportTo`/`::equals`; `isValid` and `importFrom` log nothing and are GUESSes; `bind`/`slot_2C`
+ *   `NetworkUniqueId::exportTo`/`::equals`; `isValid` and `importFrom` log nothing and are GUESSes; `bind`/`equals`
  *   (the table's +0x1C/+0x2C) are the sink's.
  * RESIDUALS. none in `.text`; `.data` is 0x2C4 B against the claim's 0x2C8 (the claim ends on the 8-aligned start of the
- *   next unit's `.data`), so `flipcheck` refuses the flip although a trial `Matching` link keeps the DOL SHA-1; the
+ *   next unit's `.data`), alignment fill (`flipcheck`'s pad rule); the
  *   log strings pair by address, not by name (`@NNN` against the map's `lbl_805FC9D0..`).
  * SHAPES. The destructor (the table's +0x08) is compiled in `Network/NetworkPeerBase.cpp`, whose range holds its only
  *   copy.
@@ -170,8 +170,8 @@ void NetworkUniqueId::bind(u8* block, u32 size)
     NetworkStreamSink::bind(block, size);
 }
 
-/* Forwards to the sink's own slot. */
-void NetworkUniqueId::slot_2C()
+/* Forwards to the sink's byte comparison. */
+u32 NetworkUniqueId::equals(const NetworkStreamSink* other) const
 {
-    NetworkStreamSink::slot_2C();
+    return NetworkStreamSink::equals(other);
 }
