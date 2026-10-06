@@ -1052,7 +1052,7 @@ config.libs = [
             Object(NonMatching, "Network/PatInterface.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkPool.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkPool.cpp",
+            Object(Matching, "Network/NetworkPool.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkWiiMediator.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkWiiMediator.cpp",
