@@ -1,12 +1,14 @@
-/* ef/fn_800AEE48.h - declarations (C linkage) for `ef/fn_800AEE48.cpp`'s symbols the effect modules call and for the
- * `ef/ef_drawstripestrategy.cpp` symbols its own header does not carry (`fn_800B4B04`..`ef_pm_last_alive`), with the two
- * records the particle-list walkers take. */
+/* ef/fn_800AEE48.h - the `ef/ef_drawstripestrategy.cpp` symbols its own header does not carry (`fn_800B4B04`..
+ * `ef_pm_last_alive`), with the two records the particle-list walkers take; it includes the post-field and resource
+ * units' own headers. */
 #ifndef MHTRI_EF_FN_800AEE48_H
 #define MHTRI_EF_FN_800AEE48_H
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
+#include "ef/ef_postfield.h" /* fn_800B0B90 (its owner's header) */
+#include "ef/ef_resource.h"  /* the resource singleton's entry points (their owner's header) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,8 +16,6 @@ extern "C" {
 
 f32 ef_float_epsilon(void);
 int ef_vec3_normalize(void* self);
-/* 0x800B0B90 - `self -= b` in place, returning `self`. */
-Vec* fn_800B0B90(Vec* self, Vec* b);
 
 /* The particle record the list walkers yield.  +0x38/+0x3C are the two list heads. size: 0xB3 */
 typedef struct EfParticleState {
@@ -48,17 +48,6 @@ void* ef_pm_next_alive(void* self, void* node);
 void* ef_pm_last_alive(EfParticleState* self);
 
 
-/* The resource-system entry points `ef/fn_800AEE48.cpp` owns: the walker the manager builds, the
- * post-field list accessors (typed `EfPostField*` as the owner defines them) and the per-handle helpers. */
-struct EfPostField;
-void* fn_800B2878(void);
-u16 fn_800B4A90(EfPostField* self);
-void* fn_800B4A98(EfPostField* self, u16 index);
-void  fn_800B44F4(void* work);
-s32 fn_800B3670(void* work, void* data);
-s32 fn_800B3E80(void* work, void* data);
-s32 fn_800B46C0(void* work, void* data);
-s32 fn_800B4898(void* work, void* data);
 
 #ifdef __cplusplus
 }

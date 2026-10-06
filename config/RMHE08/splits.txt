@@ -464,15 +464,21 @@ ef/ef_particlemanager.cpp:
 	.bss        start:0x80694538 end:0x80694598
 	.sdata2     start:0x807960A0 end:0x807960E8
 
-ef/fn_800AEE48.cpp:
-	extab       start:0x80009F74 end:0x8000A10C
-	extabindex  start:0x800232D4 end:0x80023538
-	.text       start:0x800AEE48 end:0x800B4AC8
+ef/ef_postfield.cpp:
+	extab       start:0x80009F74 end:0x8000A044
+	extabindex  start:0x800232D4 end:0x8002340C
+	.text       start:0x800AEE48 end:0x800B2878
+	.data       start:0x80593580 end:0x80593690
+	.sdata2     start:0x807960E8 end:0x80796120
+
+ef/ef_resource.cpp:
+	extab       start:0x8000A044 end:0x8000A10C
+	extabindex  start:0x8002340C end:0x80023538
+	.text       start:0x800B2878 end:0x800B4AC8
 	.ctors      start:0x8056F2E0 end:0x8056F2E4
-	.data       start:0x80593580 end:0x805939E8
+	.data       start:0x80593690 end:0x805939E8
 	.bss        start:0x80694598 end:0x806945B8
 	.sdata      start:0x807912E8 end:0x80791300
-	.sdata2     start:0x807960E8 end:0x80796120
 
 ef/ef_drawstripestrategy.cpp:
 	extab       start:0x8000A10C end:0x8000A23C
