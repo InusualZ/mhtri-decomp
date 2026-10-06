@@ -1,14 +1,15 @@
 /*
  * Network/GameSpyInterfaceThread.h - the classes and data of `Network/GameSpyInterfaceThread.cpp`.
- * SHAPES. The foreign objects the target dispatches through (`GameSpyReceiver`, `NetworkPeerCallback`, `NetworkLogger`
- *   in `unsplit/Network.h`, `PatInterface`) are classes with real virtuals, never constructed here, so no table is
- *   emitted for them; the peer's and the timed handler's tables (0x80603714, 0x80603740) belong to other TUs.
+ * SHAPES. The foreign objects the target dispatches through (`GameSpyReceiver`, `NetworkLogger` in `unsplit/Network.h`,
+ *   `PatInterface`) are classes with real virtuals, never constructed here, so no table is emitted for them.
+ *   `NetworkPeerGameSpy` is a `NetworkPeerBase` peer; its table (0x80603714) is emitted from its destructor.
  */
 
 #ifndef MHTRI_NETWORK_GAMESPYINTERFACETHREAD_H
 #define MHTRI_NETWORK_GAMESPYINTERFACETHREAD_H
 
 #include "types.h"
+#include "Network/NetworkPeerBase.h"            /* NetworkPeerBase - the peer base class */
 #include "unsplit/Network.h"
 #include "Network/PatInterface.h"             /* isCallback / resetCallback / the error accessors - owner Network/PatInterface.cpp */
 #include "Network/NetworkReflectService.h"    /* NetworkReflectService / GameSpyChannel - owner Network/NetworkReflectService.cpp */
@@ -64,10 +65,29 @@ public:
 /* `NetworkPeerGameSpy` - the 0x600-byte send / 0x6000-byte receive buffer pair                   */
 /* --------------------------------------------------------------------------------------------- */
 
-class NetworkPeerGameSpy {
+class NetworkPeerGameSpy : public NetworkPeerBase {
 public:
-    /* +0x0000 */ void* vtable_00;
-    /* +0x0004 */ u8  pad_04[0x0C];
+    /* 0x803CA2F4 (`Network/NetworkConnection.cpp`) */ NetworkPeerGameSpy();
+    /* +0x08 deleting destructor: destroys the queue mutex and the base, then frees on request */
+    virtual NetworkPeerBase* destroy(s16 flags);
+    /* +0x0C binds the peer to the interface and resets both buffers (the context is the interface and peer id pair) */
+    virtual void setContext(const void* context); /* untyped: caller-owned payload - the interface and peer id pair */
+    /* +0x10 builds and sends a framed peer message from the two optional payloads */
+    virtual s32 send(const u8* data, s32 size, const u8* data2, s32 size2, s8 kind);
+    /* +0x14 pulls one framed message out of the peer's receive buffer */
+    virtual s32 receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind);
+    /* +0x18 appends a datagram to the peer's receive queue */
+    virtual s32 put(const u8* packet, s32 length, u32 a, u32 b, u32 c);
+    /* +0x1C reports whether the peer has a message queued */
+    virtual s32 move();
+    /* +0x20 empty, only the Mcs peer implements it */
+    virtual void armDrop();
+    /* +0x24 clears the peer through slot +0x28 and reports it usable */
+    virtual s32 init();
+    /* +0x28 releases the peer's interface slot and drops its receive queue */
+    virtual void reset();
+
+    /* +0x0000..+0x000F - `NetworkPeerBase` */
     /* +0x0010 */ u32 received_10;
     /* +0x0014 */ u8  sendBuffer_14[0x600];
     /* +0x0614 */ u8  recvBuffer_614[0x6000];
@@ -75,28 +95,7 @@ public:
     /* +0x6630 */ s32 field_6630;
     /* +0x6634 */ GameSpyInterfaceThread* interface_6634;
     /* +0x6638 */ u32 peer_6638;
-
-    /* binds the peer to the interface and resets both buffers */
-    void  bind(const u32* id);
-    /* builds and sends a framed peer message from the two optional payloads */
-    s32   send(const u16* a, s32 aLen, const u16* b, s32 bLen, s8 flag);
-    /* pulls one framed message out of the peer's receive buffer */
-    /* untyped: byte range - the two caller buffers the framed payloads are copied into */
-    s32   receive(void* a, s32* aLen, void* b, s32* bLen, u8* flag);
-    /* appends a buffer to the peer's receive queue (the pool's `NetworkPeerGameSpy::put`) */
-    /* untyped: byte range - the datagram appended to the receive queue */
-    s32   put(const void* data, u32 size);
-    /* reports whether the peer has a message queued */
-    s32   isQueued();
-    /* releases the peer's interface slot and drops its receive queue */
-    void  release();
-    /* vtable slot +0x20: empty, only the Mcs peer implements it */
-    void  armDrop();
-    /* vtable slot +0x24: clears the peer through slot +0x28 and reports it usable */
-    s32   init();
-    /* deleting destructor: destroys the queue mutex and the base, then frees on request */
-    NetworkPeerGameSpy* destroy(s16 flags);
-};   /* size: 0x663C (approximation: the range addresses up to +0x6638) */
+};   /* size: 0x663C (the allocation `NetworkConnection`'s constructor makes) */
 
 /* The receiver object `GameSpyInterfaceThread::dispatchReceiver` tail-calls.  Its slot +0x18 takes the five arguments the
  * tail call passes; the class is only ever dispatched through, so no vtable is emitted for it. */
@@ -107,20 +106,6 @@ public:
     /* +0x10 */ virtual void pad_10();
     /* +0x14 */ virtual void pad_14();
     /* +0x18 */ virtual void handle_18(s32 a, s32 b, s32 c, s32 d, s32 e);
-};   /* size: 0x04 (the object's leading vtable word) */
-
-/* The peer object `NetworkPeerGameSpy::init` ticks through slot +0x28. */
-class NetworkPeerCallback {
-public:
-    /* +0x08 */ virtual void pad_08();
-    /* +0x0C */ virtual void pad_0C();
-    /* +0x10 */ virtual void pad_10();
-    /* +0x14 */ virtual void pad_14();
-    /* +0x18 */ virtual void pad_18();
-    /* +0x1C */ virtual void pad_1C();
-    /* +0x20 */ virtual void pad_20();
-    /* +0x24 */ virtual void pad_24();
-    /* +0x28 */ virtual s32  tick_28();
 };   /* size: 0x04 (the object's leading vtable word) */
 
 /* the 8-byte GameSpy header `gt2UnrecognizedMessageCallback` builds on the stack */

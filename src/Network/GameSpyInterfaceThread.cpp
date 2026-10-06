@@ -17,14 +17,17 @@
  *   shape or opcode: the unsplit callees (the `gt2*` API, `DWC_*`, `DWCi_natProbe*`, `sendReq*`, `hasMultipleRefs60d4`,
  *   `errorRecordCode613c`, `getErrorInfo654c`, `getGameInfo2d1c`), `natNegProgressCallback`, `natNegCompletedCallback`,
  *   `copyGameSpyAddress`, `NetworkReflectService::notify` and the peer's `armDrop`/`init` (the base's +0x20/+0x24
- *   slots).
+ *   slots).  The peer's other slot names are `NetworkPeerBase`'s:
+ *   GUESS: setContext, send, receive, put, move, reset, destroy (the base slot each overrides).
  * RESIDUALS. `NetworkPeerGameSpy::receive`: retail materialises the error-source constant as a relocation
  *   (`@eti_80030018+9/+10`) where ours is the immediate, and keeps a `clrlwi` ours drops.  `tGameSpyInterface`: the
  *   hoisted high word of `ticks * 17` is a fresh `li r0, 0` where retail reuses r24.  `publishRequest`, `step`: register
  *   colouring.  `.data`: 1392 of 1396 B until the cut, plus `NetworkTimedHandler`'s table, which this unit emits (its
- *   destructor is defined here) while retail's 0x80603740 lies past the claimed range;
- *   `extab` lacks a 20-byte cleanup record against `networkInstance_destroyMutex` (the peer's member-mutex destructor), which needs a
- *   real `NetworkPeerBase` derivation with a member mutex in the peer TU.
+ *   destructor is defined here) while retail's 0x80603740 lies past the claimed range, and `NetworkPeerGameSpy`'s table
+ *   (0x30 B here: `NetworkPeerBase`'s pure `slot_2C` pad; retail's 0x80603714 is 0x2C B and unclaimed);
+ *   `extab` lacks a 20-byte cleanup record against `networkInstance_destroyMutex` (the peer's member-mutex destructor), which needs
+ *   the mutex as a class member.  `.sdata` (flip blocker): the claimed 0x10 B (`sRejectMessageNG`, `sEmptyString`,
+ *   `sPortFormat`) is not emitted.
  * SHAPES. Every call through a foreign object's vtable goes through a declared `virtual` (the only shape MWCC emits as
  *   `lwz r12,0x0(r3)` / `lwz r12,<slot>(r12)`).  `~GameSpyInterfaceThread` comes first in the class (the vtable pointer
  *   sits where the first virtual is declared, playbook 98); as the key function it makes this unit emit `__vt__` and
@@ -1266,8 +1269,11 @@ u32 GameSpyInterfaceThread::getPeerId()
 }
 
 /* Binds the peer to the interface and resets both buffers. */
-void NetworkPeerGameSpy::bind(const u32* id)
+/* untyped: caller-owned payload - the interface and peer id pair */
+void NetworkPeerGameSpy::setContext(const void* context)
 {
+    const u32* id = (const u32*)context;
+
     interface_6634 = (GameSpyInterfaceThread*)id[0];
     peer_6638 = id[1];
     field_6630 = interface_6634->registerReceiver(this, peer_6638);
@@ -1277,8 +1283,7 @@ void NetworkPeerGameSpy::bind(const u32* id)
 }
 
 /* Builds and sends a framed peer message from the two optional payloads. */
-s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
-                           s8 flag)
+s32 NetworkPeerGameSpy::send(const u8* a, s32 aLen, const u8* b, s32 bLen, s8 flag)
 {
     s8 flagByte;
     u16 aLen16;
@@ -1347,9 +1352,7 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
 }
 
 /* Pulls one framed message out of the peer's receive buffer. */
-/* untyped: byte range - the two caller buffers the framed payloads are copied into */
-s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
-                           u8* flag)
+s32 NetworkPeerGameSpy::receive(u8* a, s32* aLen, u8* b, s32* bLen, u8* flag)
 {
     u16 aLen16;
     u16 bLen16;
@@ -1423,8 +1426,7 @@ s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
 }
 
 /* Appends a buffer to the peer's receive queue. */
-/* untyped: byte range - the datagram appended to the receive queue */
-s32 NetworkPeerGameSpy::put(const void* data, u32 size)
+s32 NetworkPeerGameSpy::put(const u8* data, s32 size, u32 a, u32 b, u32 c)
 {
     LockMutex(mutex_6614);
     if (received_10 + size > 0x6000) {
@@ -1439,7 +1441,7 @@ s32 NetworkPeerGameSpy::put(const void* data, u32 size)
 }
 
 /* Reports whether the peer has a message queued. */
-s32 NetworkPeerGameSpy::isQueued()
+s32 NetworkPeerGameSpy::move()
 {
     s8 state;
 
@@ -1461,12 +1463,12 @@ void NetworkPeerGameSpy::armDrop()
 /* Clears the peer through its own virtual slot +0x28 and reports it usable. */
 s32 NetworkPeerGameSpy::init()
 {
-    ((NetworkPeerCallback*)this)->tick_28();
+    reset();
     return 1;
 }
 
 /* Releases the peer's interface slot and drops its receive queue. */
-void NetworkPeerGameSpy::release()
+void NetworkPeerGameSpy::reset()
 {
     interface_6634->unregisterReceiver(field_6630);
     LockMutex(mutex_6614);
@@ -1476,12 +1478,11 @@ void NetworkPeerGameSpy::release()
 }
 
 /* Deleting destructor: destroys the queue mutex and the base, then frees on request. */
-NetworkPeerGameSpy* NetworkPeerGameSpy::destroy(s16 flags)
+NetworkPeerBase* NetworkPeerGameSpy::destroy(s16 flags)
 {
     if (this != NULL) {
         networkInstance_destroyMutex(mutex_6614, -1);
-        /* C cast: this class still hand-models `void* vtable_00`, unrelated to NetworkPeerBase; the measured alternatives failed. */
-        ((NetworkPeerBase*)this)->NetworkPeerBase::destroy(0);
+        NetworkPeerBase::destroy(0);
         if (flags > 0) {
             operator delete(this);
         }

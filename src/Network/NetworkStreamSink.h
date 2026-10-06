@@ -47,34 +47,31 @@ public:
 
 /* ---------------- the bit-stream writer's frame objects (the writer band's classes) ------------- */
 
-/* Two stream-sink classes of the writer band (this header's unit defines their constructors and
-   destructors).  Each constructor chains `NetworkStreamSink`'s and stores its own table - 0x805FCE10 for
-   `NetworkStreamWriter` (0x803CB9B4), 0x805FCDD4 for `NetworkStreamWriterDefault` (0x803CB9F0) - and each
-   table's +0x08 slot is the matching destructor (0x803CB958, 0x803CB8FC); both destructors chain
-   `~NetworkStreamSink` directly, which is also what an inlined `~NetworkStreamWriter` reduces to, so the bodies
-   allow either hierarchy - `NetworkStreamWriterDefault : NetworkStreamWriter` is the one the call sites need (the
-   writer band's `networkPacket_*` readers take a `NetworkStreamWriter*` and are handed the default writer).
-   Only the sizes are evidenced beyond that:
-   `NetworkStreamWriter` is the 0x18-byte packet every op-code sender in this range reserves
-   (`NetworkSessionStable::send` places it at +0x08 and the 0x1C-byte writer at +0x20), and
-   `NetworkStreamWriterDefault` the one `moveOutOfBand` reserves.  Their remaining members belong to the
-   writer's own band; only the constructor and destructor are declared, so no table is emitted here. */
+/* The two stream sinks of the writer band.  `NetworkStreamWriter` is the 0x18-byte message packet every op-code
+   sender reserves; `NetworkStreamWriterDefault` is the 0x14-byte frame reader/writer (`receivePackets` places its
+   frame record at sp+0x1C right after one at sp+0x08).  Both derive from `NetworkStreamSink` directly: each
+   constructor (0x803CB9B4, 0x803CB9F0) chains `NetworkStreamSink`'s and stores its own table (0x805FCE10,
+   0x805FCDD4), and each destructor (0x803CB958, 0x803CB8FC) chains `~NetworkStreamSink`.  The constructors and
+   destructors are `Network/NetworkConnectionStable.cpp`'s; the tables are `Network/NetworkUnitPacket.cpp`'s, emitted
+   with the flush override each class declares first (its key function, defined in that unit). */
 class NetworkStreamWriter : public NetworkStreamSink {
 public:
     NetworkStreamWriter();
-    virtual ~NetworkStreamWriter();
+    /* +0x0C (0x803FAE70, the packet's flush hook) */ virtual void onFlush(u8* data, u32 size);
+    /* +0x08 */ virtual ~NetworkStreamWriter();
 
-    /* +0x10 */ u8* message_10;   /* the message (or, in the framed writer, the frame) the packet stands at */
+    /* +0x10 */ u8* message_10;   /* the message the packet stands at */
     /* +0x14 */ u8* cursor_14;    /* the read cursor in the current message's payload */
 };   /* size: 0x18 */
 
-class NetworkStreamWriterDefault : public NetworkStreamWriter {
+class NetworkStreamWriterDefault : public NetworkStreamSink {
 public:
     NetworkStreamWriterDefault();
-    virtual ~NetworkStreamWriterDefault();
+    /* +0x0C (0x803FAE78, the frame's flush hook) */ virtual void onFlush(u8* data, u32 size);
+    /* +0x08 */ virtual ~NetworkStreamWriterDefault();
 
-    u8 unused_18[0x04];   /* +0x18..+0x1B */
-};   /* size: 0x1C */
+    /* +0x10 */ u8* message_10;   /* the frame the writer stands at */
+};   /* size: 0x14 */
 
 /* ---------------- the stream buffer (its table 0x805F9150 is this unit's .data) ------------- */
 

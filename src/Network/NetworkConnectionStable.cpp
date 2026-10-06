@@ -17,23 +17,18 @@
  *   The runtime dump's names at 0x803CBA2C, 0x803CBF34, 0x803CBF3C and 0x803CBFFC..
  *   0x803CC00C (`GoalOverlay::SceneCreated`, `J3DColorBlockLightOff::setColorChanNum`, `nw4hbm::ut::TextWriterBase`'s
  *   char-space accessors) are folded one-store bodies, not evidence.
- * RESIDUALS. Unwritten: the four `NetworkStreamWriter`/`NetworkStreamWriterDefault` constructors and destructors
- *   (0x803CB8FC..0x803CBA2C, 304 B) - the default writer's constructor chains `NetworkStreamSink`'s directly, so the
- *   header's `Default : Writer` hierarchy cannot produce it, and their tables (0x805FCDD4, 0x805FCE10) lie in
- *   `Network/NetworkUnitPacket.cpp`'s `.data`.  The constructor calls `NetworkConnection(s32)`, which is unwritten in
- *   `Network/NetworkConnection.cpp`.
+ * RESIDUALS. The constructor calls `NetworkConnection(s32)`, which is unwritten in `Network/NetworkConnection.cpp`.
  *   `sendHello`, `sendMtuProbe`, `sendChannel`: retail copies `networkStreamWriter_size`'s result (`mr r0,r3`) before
  *   the `clrlwi` - a `u16` return; `NetworkUnitPacket.h` declares `u32` (the retype costs `NetworkSessionStable::send`
- *   93.73 -> 93.53, so it is filed, not made).  `receivePackets`/`sendChannel`: retail's frame puts the default writer
- *   in 0x14 bytes (the `NetworkConnectionFrame` at sp+0x1C after the reader at sp+0x08), the header's class is 0x1C;
- *   `receivePackets` also re-extends `networkPacket_getChannel`'s `u8` (a wider return).  `open`: `rand() + base` adds
- *   in the other operand order.  `checkChannel`: MWCC fuses `channel < 0 || channel >= 2` into one `cmplwi`, retail
- *   keeps both compares.  `getIndex`: `lbz r0`+`extsb r3,r0` vs `lbz r3`+`extsb r3,r3`.  `sendClose`: the 0x84/0x85
- *   select computes in r4 directly.
+ *   93.73 -> 93.53, so it is filed, not made).  `open`: `rand() + base` adds in the other operand
+ *   order (`(s32)`/`(u16)` spellings tried).  `getIndex`: `lbz r0`+`extsb r3,r0` vs `lbz r3`+`extsb r3,r3`.  `sendClose`: the 0x84/0x85
+ *   select computes in r4 directly (a `u8` local tried).
  *   `.sdata2` (flip blocker): our object emits the `u32`->`f32` conversion double (8 B) that retail pools at
  *   0x8079C6B8 (`dispatchControl`'s pong time); the range is not this unit's to claim.
- * SHAPES. The destructor and the `NetworkSlotQueues` constructor and destructor are complete with empty bodies (the
- *   compiler emits the member and base calls); all three match.
+ * SHAPES. The destructor, the `NetworkSlotQueues` constructor and destructor and the four writer constructors and
+ *   destructors are complete with empty bodies (the compiler emits the member and base calls and the table stores);
+ *   all of them match.  The writers' tables are `Network/NetworkUnitPacket.cpp`'s: each class declares its flush
+ *   override first, so that override, not the destructor defined here, is the key function.
  */
 
 #include "Network/NetworkConnectionStable.h"
@@ -488,6 +483,30 @@ void NetworkConnectionStable::sendChannel(s32 channel)
     queues->lastSend_6C[channel] = now_21B4;
 }
 
+/* ==== the writer band's stream objects ======================================================================= */
+
+/* Destroys the frame writer's sink. */
+NetworkStreamWriterDefault::~NetworkStreamWriterDefault()
+{
+}
+
+/* Destroys the packet's sink. */
+NetworkStreamWriter::~NetworkStreamWriter()
+{
+}
+
+/* Builds the packet on an empty sink. */
+NetworkStreamWriter::NetworkStreamWriter()
+{
+}
+
+/* Builds the frame writer on an empty sink. */
+NetworkStreamWriterDefault::NetworkStreamWriterDefault()
+{
+}
+
+/* ==== the collected frames =================================================================================== */
+
 /* Clears the flag `networkStreamWriter_attach` raises when it flushed for room. */
 void NetworkConnectionStable::clearSendPending()
 {
@@ -727,7 +746,7 @@ void NetworkConnectionStable::setError(s32 code, s32 param1, s32 param2)
 /* 1, with an error recorded, for a channel other than 0 or 1. */
 s32 NetworkConnectionStable::checkChannel(s32 channel)
 {
-    if (channel < 0 || channel >= 2) {
+    if (channel < 0 || 2 <= channel) {
         setError(0x80030001, channel, 0);
         return 1;
     }
