@@ -151,6 +151,9 @@ struct NetworkCommunityFriend {
 struct NetworkCommunityFriendList {
     /* +0x000 */ s32 count_00;
     /* +0x004 */ NetworkCommunityFriend entries_04[50];
+
+    NetworkCommunityFriendList();    /* 0x803F06AC - inline, emitted by Network/NetworkCommunityPat.cpp */
+    ~NetworkCommunityFriendList();   /* 0x803F045C */
 };   /* size: 0x19CC */
 
 /* One entry of the block list. */
@@ -165,6 +168,9 @@ struct NetworkCommunityBlocked {
 struct NetworkCommunityBlockList {
     /* +0x000 */ s32 count_00;
     /* +0x004 */ NetworkCommunityBlocked entries_04[16];
+
+    NetworkCommunityBlockList();    /* 0x803F0630 - inline, emitted by Network/NetworkCommunityPat.cpp */
+    ~NetworkCommunityBlockList();   /* 0x803F0394 */
 };   /* size: 0x384 */
 
 class NetworkCommunityPat : public NetworkCommunity {   /* size: 0x25EC (the allocation `initNetworkPatControl` makes for it) */
