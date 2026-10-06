@@ -194,6 +194,20 @@ class CharStrmReader {
 public:
     typedef u16 (CharStrmReader::*ReadFunc)();
 
+    CharStrmReader(ReadFunc func) : mCharStrm(NULL), mReadFunc(func) {}
+
+    /* untyped: byte range - the encoded string, read as u8 or u16 by the encoding */
+    void Set(const void* stream) {
+        mCharStrm = stream;
+    }
+    /* untyped: byte range - the encoded string, read as u8 or u16 by the encoding */
+    const void* GetCurrentPos() const {
+        return mCharStrm;
+    }
+    u16 Next() {
+        return (this->*mReadFunc)();
+    }
+
     u16 ReadNextCharUTF8();
     u16 ReadNextCharUTF16();
     u16 ReadNextCharCP1252();
@@ -207,13 +221,20 @@ public:
         reinterpret_cast<const T*&>(mCharStrm) += count;
     }
 
-    /* untyped: the encoded string, read as u8 or u16 by the encoding */
+    /* untyped: byte range - the encoded string, read as u8 or u16 by the encoding */
     /* +0x0 */ const void* mCharStrm;
     /* +0x4 */ ReadFunc mReadFunc;
 };
 
 /* An axis-aligned rectangle. size: 0x10 */
 struct Rect {
+    Rect() : left(0.0f), top(0.0f), right(0.0f), bottom(0.0f) {}
+    Rect(f32 l, f32 t, f32 r, f32 b) : left(l), top(t), right(r), bottom(b) {}
+
+    f32 GetWidth() const {
+        return right - left;
+    }
+
     /* Orders the edges so left <= right and top <= bottom. */
     void Normalize() {
         f32 l = left;

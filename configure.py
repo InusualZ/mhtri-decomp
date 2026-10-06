@@ -1275,8 +1275,6 @@ config.libs = [
             Object(NonMatching, "RVLGX/GXTexture_tail.cpp"),
             Object(NonMatching, "SC/sc.cpp"),
             Object(NonMatching, "WPAD/wpad.cpp"),
-            Object(NonMatching, "nw4r/fn_80504A3C.cpp"),
-            Object(NonMatching, "nw4r/fn_8050661C.cpp"),
             Object(NonMatching, "SSL/ssl.cpp"),
             Object(NonMatching, "NCD/ncdsystem.c"),
             Object(NonMatching, "SO/soi.cpp"),
@@ -1295,6 +1293,8 @@ config.libs = [
             Object(NonMatching, "nw4r/math_triangular.cpp"),
             Object(NonMatching, "nw4r/fn_805012C4.cpp"),
             Object(NonMatching, "nw4r/fn_80502828.cpp"),
+            Object(NonMatching, "nw4r/fn_80504A3C.cpp"),
+            Object(NonMatching, "nw4r/fn_8050661C.cpp"),
         ],
     },
     {

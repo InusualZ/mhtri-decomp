@@ -6,16 +6,16 @@ The NintendoWare for Revolution library units under `src/nw4r/` (`nw4r::math`, `
 ## Compiler and flags
 
 The `nw4r` lib block in `configure.py` compiles `nw4r/db_assert.cpp`, `nw4r/math_arithmetic.cpp`,
-`nw4r/math_triangular.cpp`, `nw4r/fn_805012C4.cpp` and `nw4r/fn_80502828.cpp` with **GC/3.0a5.2** and `cflags_nw4r` (`cflags_os` plus
+`nw4r/math_triangular.cpp`, `nw4r/fn_805012C4.cpp`, `nw4r/fn_80502828.cpp`, `nw4r/fn_80504A3C.cpp` and `nw4r/fn_8050661C.cpp` with **GC/3.0a5.2** and `cflags_nw4r` (`cflags_os` plus
 `-fp_contract off`). The other `nw4r/` stubs stay in the `OS` block until their bodies are measured.
 
 Evidence, from `mt.py matrix` on the written bodies:
 
-| compiler | math_triangular | math_arithmetic | db_assert | fn_805012C4 (37 written rows) | fn_80502828 (Font/ResFontBase, 27 rows) |
-|---|---|---|---|---|---|
-| GC/3.0a3 .. GC/3.0a5.2, `-fp_contract off` | 5/5 at 100 % | 2/3 (FLog 97.6 %) | 5/6 (Warning 99.3 %) | 33/37 | 27/27 |
-| Wii/1.0RC1 .. Wii/1.7, Wii/0x4201_127 | 1/5 | 1/3 | 5/6 | 25/37 | 20/27 |
-| GC/2.6, GC/2.7 | below the GC/3.0a rows | | | | |
+| compiler | math_triangular | math_arithmetic | db_assert | fn_805012C4 (37 written rows) | fn_80502828 (Font/ResFontBase, 27 rows) | fn_80504A3C (11 rows) | fn_8050661C (25 rows) |
+|---|---|---|---|---|---|---|---|
+| GC/3.0a3 .. GC/3.0a5.2, `-fp_contract off` | 5/5 at 100 % | 2/3 (FLog 97.6 %) | 5/6 (Warning 99.3 %) | 33/37 | 27/27 | 9/11 | 19/25 |
+| Wii/1.0RC1 .. Wii/1.7, Wii/0x4201_127 | 1/5 | 1/3 | 5/6 | 25/37 | 20/27 | 3/11 | 17/25 |
+| GC/2.6, GC/2.7 | below the GC/3.0a rows | | | | | | |
 
 What separates them:
 
