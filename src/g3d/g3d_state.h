@@ -1,13 +1,5 @@
-/*
- * The `g3d/g3d_state.cpp` unit's cross-unit declarations (docs/plan.md 6.5 rule 2).
- *
- * `g3d_state.cpp` (`.text` 0x8008452C-0x800898B0) owns the nw4r g3d texture/state helpers that the
- * `g3d/g3d_resmat.cpp` handle accessors resolve their resources through, and the resource-range store
- * helper `g3d/g3d_resfile.cpp`'s accessor cluster calls.  A consumer includes this header instead of
- * declaring them itself.
- *
- * All of them keep C linkage (their map names are plain `fn_XXXXXXXX` stems).
- */
+/* g3d/g3d_state.h - the texture/state helpers of `g3d/g3d_state.cpp` that `g3d/g3d_resmat.cpp` resolves through,
+ *   and the resource-range store `g3d/g3d_resfile.cpp` calls (C linkage). */
 #ifndef MHTRI_G3D_G3D_STATE_H
 #define MHTRI_G3D_G3D_STATE_H
 
@@ -23,9 +15,7 @@ u8* fn_80086390(void* pSelf);
 /* 0x80087870 - the const twin of fn_80086390 (used by `ResTexSrt::GetEffectMtx`). */
 u8* fn_80087870(void* pSelf);
 
-/* 0x80089690 - the resource-range store (caller: g3d/g3d_resfile.cpp's accessor cluster).  Added
- * when `g3d/g3d_resfile.cpp` registered; disjoint from the resolvers below, so both sides' intent
- * survives this add/add conflict. */
+/* 0x80089690 - the resource-range store `g3d/g3d_resfile.cpp`'s accessors call. */
 void fn_80089690(void* pBase, u32 size);
 
 /* 0x80089624..0x80089844 - the `ResTlut`-style slot-array resolvers the g3d_resmat thunks tail-call
@@ -41,7 +31,7 @@ u8* fn_80089844(void* pSelf, u32 index);
 }
 #endif
 
-/* Declarations moved here from `unsplit/g3d.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* More of the unit's cross-unit declarations (rule 2). */
 #ifdef __cplusplus
 extern "C" {
 #endif

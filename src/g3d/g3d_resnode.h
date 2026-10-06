@@ -1,19 +1,6 @@
-/*
- * The nw4r g3d `ResNode` records that **more than one unit** reaches (docs/plan.md 6.5 rule 1).
- *
- * `ResNodeData` is the node's resource block: `g3d/g3d_calcworld.cpp` already reads its +0x18 matrix-id
- * word through `fn_8005D0C4`, and `g3d/g3d_resnode.cpp` (this file's first consumer) reads the +0x14
- * flag word and the +0x20/+0x2C/+0x38 vectors.  The nw4r name is `g3d_resnode.h`'s, so the record lives
- * here once and is included where needed.  `g3d/g3d_calcworld.cpp` still carries its own partial 0x1C
- * view of the same name in its source (it pre-dates this header); folding it onto this definition is a
- * residual for the conformance sweep, exactly as `nw4r/g3d/res_anm.h` records for its two
- * records - the layouts agree at +0x18, so the fold is mechanical.
- *
- * `AnmResult` is the animation-result record the node reads and writes (`g3d_calcworld.cpp` builds the
- * same record under its own `NodeMtxRec` name).  Its layout is the target's: the three scale floats at
- * +0x04, the three Euler angles at +0x10, and the 3x4 matrix at +0x1C whose translation column is
- * `mtx[3]`/`mtx[7]`/`mtx[11]` (+0x28/+0x38/+0x48).
- */
+/* g3d/g3d_resnode.h - the nw4r g3d `ResNode` records more than one unit reads: `ResNodeData` (the +0x14 flag word,
+ *   the +0x18 matrix id, the +0x20/+0x2C/+0x38 vectors) and `AnmResult` (scale at +0x04, Euler angles at +0x10, the
+ *   3x4 matrix at +0x1C).  `g3d/g3d_calcworld.cpp` still defines its own `ResNodeData` view and `NodeMtxRec`. */
 #ifndef MHTRI_G3D_G3D_RESNODE_H
 #define MHTRI_G3D_G3D_RESNODE_H
 

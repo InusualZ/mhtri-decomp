@@ -1,14 +1,4 @@
-/*
- * The `g3d/g3d_cpu.cpp` unit's cross-unit declarations (docs/plan.md 6.5 rule 2).
- *
- * `g3d/g3d_cpu.cpp` (`.text` 0x8009A748-0x8009AA78) owns the two CPU-side display-list block
- * primitives: the 32-byte copy (`fn_8009A748`) and the 32-byte 0.0f fill (`fn_8009A910`).  The copy is
- * called from the g3d render/resource band (fn_80075DCC, g3d_state.cpp, g3d_resfile.cpp and the
- * g3d_resmat accessor cluster), so it is declared once here (the owner's header) and those consumers
- * include it.
- *
- * It keeps C linkage (its map names are plain `fn_XXXXXXXX` stems).
- */
+/* g3d/g3d_cpu.h - the 32-byte block copy fn_8009A748 and 0.0f fill fn_8009A910 `g3d/g3d_cpu.cpp` owns (C linkage). */
 #ifndef MHTRI_G3D_G3D_CPU_H
 #define MHTRI_G3D_G3D_CPU_H
 

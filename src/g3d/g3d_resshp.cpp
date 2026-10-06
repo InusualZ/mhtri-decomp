@@ -1,104 +1,23 @@
 /*
- * nw4r g3d: `g3d_resshp.cpp` - the `ResShp`/`ResShpPrePrim`/`ResTagDL` resource TU (58 functions)
- * and the `ResTev`/`ResTex` cache helpers its tail carries, `.text` 0x80099400-0x8009A748.
- *
- * Naming (brief section 2, evidence class 1 - a `__FILE__` string, with the boundary proven from the
- * classes).  The first body, fn_80099400, calls `fn_80077674` on its own `this`: that is `ResShp::ref`
- * (its failing assert names `.sdata` 0x807911F0 = "ResShp" as the `%s::%s: Object not valid.` class and
- * `.data` 0x8058E720 = "g3d_resshp_ac.h" as its file), while the body before it, fn_800993B4, calls
- * `fn_8005D218` = `ResNode::ref` (class-name string `.sdata` 0x80791148 = "ResNode").  Two different
- * classes cannot be methods of one source file, so 0x80099400 is the TU boundary.  The `g3d_resshp.cpp`
- * `.data` fragment starts at 0x80591618 (the exact end of `g3d_resnode.cpp`'s three-string fragment,
- * 0x805915C0 + 0x58) and runs to 0x80591860 (`lbl_80591860` = "g3d_cpu.cpp", the next TU's first
- * string); every `__FILE__` string this unit's asserts name - `g3d_resshp.cpp` (0x80591618),
- * `g3d_resshp_ac.h` (0x80591708/0x80591748), `g3d_rescommon_ac.h` (0x80591780/0x805917EC),
- * `g3d_restev_ac.h` (0x80591820) and `g3d_restex_ac.h` (0x80591850) - sits inside it, and so do the
- * class-name strings the assert macro passes ("ResShpPrePrim" 0x80591718, "ResTagDL" 0x80591794,
- * "ResTev" 0x8079124C, "ResTex" 0x80790FD0).  `langcheck.py` agrees: `.cpp` name plus the `Panic`
- * C++ mangling.
- *
- * **The tail 0x800997E0-0x8009A748 is the rest of the same TU** (sibling proposal `800997E0`, landed
- * by extending this unit in place - one `Object(...)` line, one splits.txt block, one file).  The tail's
- * own four `__FILE__`-level asserts still pass `lbl_80591618` = "g3d_resshp.cpp" (fn_800997E0,
- * fn_800998CC, fn_80099A58, fn_80099B10), and its bodies keep reaching the head's `ResShp::ref`
- * (fn_8009A0F8) and the head's `ResTagDL`/`ResShpPrePrim` accessors; the right edge is
- * `g3d_cpu.cpp`'s first body at 0x8009A748 (`source` seam), which is also the next registered unit's
- * start, so the widened extent is 0x80099400-0x8009A748 and nothing else is claimed.
- *
- * Sections (widened): `.text` 0x80099400-0x8009A748, `extab` 0x80009880-0x800099E0 (11 + 33 records,
- * 0x160 B), `extabindex` 0x8002289C-0x80022AAC (11 + 33 entries, 0x210 B).  The tail's records are the
- * 0x800098D8-0x800099E0 run (its four leaf bodies fn_80099E5C, fn_8009A000, fn_8009A06C, fn_8009A1D8
- * carry none) and the extabindex entries 0x80022920-0x80022AAC; both runs abut the head's and
- * `g3d_cpu.cpp`'s with no gap.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with `grep` over
- * config/RMHE08/symbols.txt: every 0x80099400..0x8009A748 row is a bare `fn_XXXXXXXX`, and
- * `python tools/symbols/dumpmap.py lookup 0x800997E0` answers the `zz_00997e0_` placeholder).
- *
- * Measurement (this worktree, against the split-of-the-DOL target object, i.e. the official report
- * metric): the unit is 99.26 % fuzzy, 53 of 58 bodies byte-identical.  The head's 21 bodies are
- * unchanged (avg 99.93 %, only its own fn_80099724 residual below 100), the tail's 37 average 99.18 %
- * with 33 of them at 100.00 %.  Full `ninja` in the worktree: `build/RMHE08/main.dol: OK`.
- *
- * What the bodies are.  Head: fn_80099400/fn_8009943C, fn_800995A0/fn_800995D4/fn_80099638 and
- * fn_800996AC/fn_800996E8/fn_80099724/fn_800997AC are three `ResShp` sub-resource lookups built from
- * the `ResShp` data's own offsets; fn_80099488-fn_80099640 and fn_80099580-fn_80099740 are the
- * out-of-line copies of the two classes' `Ptr`/`ref`/`IsValid` accessors, each with the assert the
- * `_ac.h` header it was written in passes (so fn_80099514 and fn_80099740 are two copies of the same
- * `ResTagDL::ref`).
- *
- * Tail: `ResShp`'s per-resource accessors (fn_80099974/fn_800999E8/fn_80099A58/fn_80099B10/fn_80099BB0
- * resolve the shape's vertex-position/normal/colour/tex-coord/texture resources through the owning
- * model, each with its own `id*` field of the `ResShp` data and the `-1` "absent" form), the pre-prim
- * attribute records (fn_800997E0/fn_800998CC/fn_80099E68/fn_80099C20 write and clear the 0xC-byte
- * per-GX-attribute records at the pre-prim block's +0x32, `attr - GX_VA_POS` indexed), the two draw
- * paths (fn_80099F1C and fn_8009A078 call the tag's display list through the SDK or the inline
- * 0x40-opcode pipe write in fn_8009A000), the `ResTagDL` size/offset readers (fn_80099DD4, fn_8009A018)
- * and the two out-of-line handle copy-assignments (fn_80099E2C/fn_80099E5C, fn_8009A03C/fn_8009A06C),
- * the pre-prim cache-range call (fn_8009A12C) - then the `ResTev` half (fn_8009A174/fn_8009A1D8/
- * fn_8009A254/fn_8009A1E0/fn_8009A278/fn_8009A2F4) and the `ResTex` half (fn_8009A360-fn_8009A720: the
- * cache-range calls, the format test, `ref` and the resource-info pair fn_8009A490/fn_8009A5C4, whose
- * inverted flag tests make them the two instantiations of one accessor).
- *
- * Residuals (best-scoring variant kept, per the matching policy; every one is above the 80 % bar except
- * fn_8009A1E0, and all four are the *same object size* as the target unless stated):
- * - head fn_80099724 98.57 % - one register name (the base word loads into r3 where the target uses r0).
- * - fn_800997E0 99.83 % - the pointer `fn_80099640(...) + (attr - 9) * 0xC` accumulates into the local's
- *   register where the target accumulates into r3 and then adds 0x32; the two bodies are otherwise
- *   instruction-identical and the same size.
- * - fn_80099C20 99.81 % - stack-slot order only: the target puts the destination handles of the three
- *   `ResXxx` copies above their value temporaries (0x30/0x20, 0x2c/0x1c, 0x28/0x18) and the tag pair at
- *   0x10/0xc; every instruction and every call matches.
- * - fn_8009A278 99.68 % - the final `subf`'s destination register (r0 in the target, r4 here), same size
- *   and same instructions.
- * - fn_8009A1E0 70.28 % - the only residual below the bar, and it is compiler scheduling, not shape: the
- *   target hoists `lis/addi lbl_8056F730` into a callee-saved register (r31) *before* the
- *   `fn_800866FC` call and keeps `self`/index/table-base live (frame 0x20, r29-r31 saved), where this
- *   build rematerialises the table base after the call into a volatile register (frame 0x10, r30/r31
- *   saved, 8 bytes shorter).  Every spelling tried - `lbl_8056F730[prim]`, a byte-offset
- *   `*(u32*)((u8*)lbl_8056F730 + idx)`, a named `const u32*` table local, the load in its own local -
- *   produces the same 108-byte body; the two streams agree instruction for instruction once the frame
- *   is folded.
- *
- * Two codegen levers, both file-scoped:
- * - `#pragma peephole off` - with it the `rlwinm` flag extracts keep the target's explicit `cmpwi`
- *   instead of the folded record form (the same lever `g3d/g3d_resnode.cpp` records), and it is also
- *   what makes fn_800997E0/fn_800998CC materialise their range check (`li r3, 0` / `li r3, 1` +
- *   `cmpwi`) instead of folding the bool away.
- * - the `.sdata` `"ref"` member-name strings must be declared as *sized* 4-byte arrays
- *   (`extern char lbl_807912B8[4];`) so MWCC's small-data heuristic emits the target's `li r7, @sda21`
- *   form instead of `lis`/`addi` (an unsized `extern const char[]` is assumed large); the same lever as
- *   `g3d/g3d_resfile.cpp`'s `lbl_80791290`.  Each takes fn_80099514/80099640/80099740 from 93.6 % to
- *   100.0 % (and the tail's fn_8009A174/fn_8009A42C likewise).
- *
- * Naming caveats, where an offset had no class-name evidence: the field names of `ResTagDLData`
- * (`mPrePrimOfs` is the +0x08 word of the `ResTagDL` block at `ResShpData::mTag`, resolved from the
- * tag's own address; `mSize`/`mDlSize` are its +0x00/+0x04 words) and of `ResTevData`/`ResTexData` are
- * best-effort; the offsets themselves are the facts.  The `id*` fields of `ResShpData` are the names
- * fn_80099974's own assert string spells (`ref().idVtxPosition >= 0`); the four `ResShpData` fields the
- * head declared (`pad_0x00`, `mToResMdlData`, `pad_0x08`, `mTag`) keep the head's names, offsets and the
- * type's size - the tail only adds the +0x24 tag, the eight `id*` fields and the two `ResTagDLData`
- * words, which is codegen-neutral (the head's 21 bodies still measure exactly what they did before).
+ * g3d/g3d_resshp.cpp - nw4r g3d `ResShp`/`ResShpPrePrim`/`ResTagDL` resources (sub-resource lookups, the
+ *   pre-prim attribute records, the two display-list draw paths) and the `ResTev`/`ResTex` cache helpers.
+ * RANGE. .text 0x80099400-0x8009A748 (58 functions); extab, extabindex, .rodata 0x8056F730-0x8056F770, .data
+ *   0x80591618-0x80591860, .sdata 0x807912B8-0x807912D8.  Left seam: fn_80099400 calls `ResShp::ref`
+ *   (fn_80077674) on its own `this` where fn_800993B4 calls `ResNode::ref` (fn_8005D218), and the `.data`
+ *   fragment opens with "g3d_resshp.cpp"; the right edge is `g3d/g3d_cpu.cpp`.
+ * NAMES. Map stems (the dump answers `zz_` placeholders).  The `ResTagDLData` fields (`mPrePrimOfs` at +0x08,
+ *   `mSize`/`mDlSize`) and the `ResTevData`/`ResTexData` fields are GUESSes; the `ResShpData` `id*` fields are
+ *   spelled by fn_80099974's assert (`ref().idVtxPosition >= 0`).
+ * RESIDUALS. fn_80099724: the base word loads into r3 where retail uses r0.
+ *   fn_800997E0: `fn_80099640(...) + (attr - 9) * 0xC` accumulates in the local's register; retail uses r3, then +0x32.
+ *   fn_80099C20: stack-slot order of the three `ResXxx` copies' destination handles and value temporaries.
+ *   fn_8009A1E0: retail keeps `lbl_8056F730` in r31 across the `fn_800866FC` call (frame 0x20, r29-r31); ours
+ *     rematerialises it after the call (frame 0x10, 8 bytes shorter); every spelling of the table read emits the same.
+ *   fn_8009A278: the final `subf`'s destination register (r0 in retail, r4 here).
+ *   flipcheck: `.text` 0x1340 of 0x1348; `.rodata`, `.data` and `.sdata` are claimed and not emitted.
+ * SHAPES. File-scope `#pragma peephole off`: the `rlwinm` flag extracts keep retail's `cmpwi`, and fn_800997E0/
+ *   fn_800998CC materialise their range check (`li r3, 0` / `li r3, 1` + `cmpwi`).
+ *   The `.sdata` "ref" strings are sized externs (`extern char lbl_807912B8[4];`): MWCC then emits `li r7, @sda21`.
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -107,7 +26,7 @@
 #include "g3d/g3d_cpu.h"        /* fn_8009A748, owner g3d/g3d_cpu.cpp (rule 2)           */
 #include "g3d/g3d_calcvtx.h"    /* fn_800734E4, owner g3d/g3d_calcvtx.cpp (rule 2)       */
 #include "g3d/g3d_state.h"      /* fn_80089690, owner g3d/g3d_state.cpp (rule 2)         */
-#include "unsplit/g3d.h"        /* fn_80088E84/80088FFC/8008918C, no registered owner    */
+#include "unsplit/g3d.h"        /* fn_80088E84/80088FFC/8008918C, owner g3d/g3d_resvtx.cpp */
 
 /* The target's `-O3` schedule is retail only with the peephole pass off: every flag extract keeps an
  * explicit `cmpwi` after the `rlwinm` instead of the folded record form `rlwinm.`. */
@@ -181,8 +100,7 @@ struct ResTexData {
     /* +0x2C */ f32 mLodMax;    /* fn_8009A490's fifth out                             */
 }; /* size: 0x30 (a lower bound: only the words above are reached) */
 
-/* The pooled constants this unit reads (all still unsplit in the map, so they have no registered
- * owner to move to). */
+/* The pooled constants this unit reads (this unit's data, claimed, not emitted). */
 extern "C" {
 extern const char lbl_805916E0[]; /* "NW4R:Failed assertion !((u32)p & 0x3)"   .data */
 extern const char lbl_80591708[]; /* "g3d_resshp_ac.h"                        .data */
@@ -198,7 +116,7 @@ extern const char lbl_805917D0[]; /* "%s::%s: Object not valid."              .d
 extern const char lbl_805917EC[]; /* "g3d_rescommon_ac.h"                     .data */
 }
 
-/* The `"ref"` member-name strings of the accessor asserts (unsplit `.sdata`).  Declared as *sized*
+/* The `"ref"` member-name strings of the accessor asserts (`.sdata`).  Declared as *sized*
  * 4-byte arrays so MWCC's small-data heuristic emits the target's `li rN, @sda21` address form (an
  * unsized `extern const char[]` is assumed large and gets `lis`/`addi` - the same lever as
  * `g3d/g3d_resfile.cpp`'s `lbl_80791290`). */
@@ -206,9 +124,7 @@ extern char lbl_807912B8[4]; /* "ref" */
 extern char lbl_807912BC[4]; /* "ref" */
 extern char lbl_807912C0[4]; /* "ref" */
 
-/* The neighbours this unit calls; the registered owner is named beside each.  The prototypes sit in
- * this `extern "C"` block (the shape g3d/fn_8005AA28.cpp uses) so the rule-2 conformance pass can lift
- * them into the owners' headers. */
+/* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
 ResShpData* fn_80077674(const ResHandle* pSelf);         /* owner: src/g3d/fn_80075DCC.cpp */
 ResShpData* fn_80077398(const ResHandle* pSelf);         /* owner: src/g3d/fn_80075DCC.cpp */
@@ -393,7 +309,7 @@ u32 fn_800997AC(ResHandle* pSelf) {
 /* half plus the `ResTev`/`ResTex` cache helpers.  Same TU, same section claim (widened below).      */
 /* ================================================================================================== */
 
-/* The pooled `__FILE__`/assert strings this half passes (all still unsplit `.data`). */
+/* The pooled `__FILE__`/assert strings this half passes (this unit's `.data`, claimed, not emitted). */
 extern const char lbl_80591618[]; /* "g3d_resshp.cpp"                                              */
 extern const char lbl_80591628[]; /* "attr is out of bounds(%d)\n%d <= attr <= %d not satisfied."    */
 extern const char lbl_80591664[]; /* "NW4R:Failed assertion ref().idVtxPosition >= 0"               */
@@ -413,9 +329,7 @@ extern char lbl_807912D0[4]; /* "ref" */
  * (`lbl_8056F730[0..15]` = 0xA0, 0xA0, 0xC0, 0xC0, 0x100, ..., 0x1E0).  `.data`, so not small data. */
 extern u32 lbl_8056F730[];
 
-/* The neighbours this half calls; the registered owner is named beside each.  The prototypes sit in
- * this `extern "C"` block (the shape `g3d/fn_8005AA28.cpp` uses) so the rule-2 conformance pass can
- * lift them into the owners' headers. */
+/* The neighbours this half calls (plain map stems), each owner named beside it. */
 extern "C" {
 ResShpData* fn_80077398(const ResHandle* pSelf);  /* owner: g3d/fn_80075DCC.cpp            */
 s32 fn_80076814(const ResHandle* pSelf);          /* owner: g3d/fn_80075DCC.cpp            */
@@ -430,7 +344,7 @@ u32 fn_800866FC(ResHandle* pSelf);                /* owner: g3d/g3d_state.cpp   
 u32* fn_80086768(void);                           /* owner: g3d/g3d_state.cpp              */
 s32 fn_8008931C(ResHandle* pSelf);                /* owner: g3d/g3d_state.cpp              */
 void fn_8008939C(ResHandle* pSelf, const void** ppBaseVtx, u8* pStride); /* g3d/g3d_state.cpp */
-void fn_80091F70(void* pDst, u32 arg1, u32 arg2);  /* unsplit 0x80091F70 band (rule 2)      */
+void fn_80091F70(void* pDst, u32 arg1, u32 arg2);  /* owner: g3d/g3d_resanmtexsrt.cpp       */
 u32 fn_80097FC8(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
 u32 fn_800980E0(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
 u32 fn_800981F8(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
@@ -501,11 +415,8 @@ void fn_8009A720(ResHandle* pSelf);
 /* attribute table (the block's own +0x32, indexed by `attr - GX_VA_POS`).                             */
 /* -------------------------------------------------------------------------------------------------- */
 
-/* 0x800997E0 - write the two size/data words of one attribute's record.  `attr` must be a GX vertex
- * attribute (the target asserts 9 <= attr <= 20 = GX_VA_POS..GX_VA_TEX7 and reports
- * `attr is out of bounds(%d)`); `pData` is the base-vertex address (biased by the 0x80000000 the GX
- * display-list offset form wants) and `size` the stride/count byte.  Attribute 25 is special-cased to
- * the single-element form (the target's own `attr == 0x19`, dead under the assert's own range). */
+/* 0x800997E0 - writes one GX vertex attribute's size/data words (asserting GX_VA_POS..GX_VA_TEX7): `pData` is the
+ * base-vertex address biased by 0x80000000, `size` the stride/count byte; attribute 25 takes the single form. */
 extern "C" void fn_800997E0(ResHandle* pSelf, s32 attr, u32 pData, u32 size) {
     bool inRange = false;
     if ((u32)(attr - 9) <= 11) {
@@ -615,9 +526,8 @@ extern "C" u32 fn_80099BB0(ResHandle* pSelf) {
     return (u32)fn_800985B0(&ret, 0)->mpData;
 }
 
-/* 0x80099C20 - rebuild the shape's pre-prim attribute records: one per vertex resource the shape
- * actually has (position, normal, the two colour channels, the eight tex-coords), then invalidate the
- * pre-prim block and the display-list block in the data cache. */
+/* 0x80099C20 - rebuilds the pre-prim attribute records, one per vertex resource the shape has, then invalidates
+ * the pre-prim and display-list blocks in the data cache. */
 extern "C" void fn_80099C20(ResHandle* pSelf) {
     const void* pBaseVtx;
     u8 stride;
@@ -709,9 +619,8 @@ extern "C" void fn_80099E68(ResHandle* pSelf) {
     fn_800998CC(pSelf, 20);
 }
 
-/* 0x80099F1C - draw the shape's pre-prim block: `pSync` picks the SDK's `GXCallDisplayList` over the
- * inline pipe command, and `pSkipPrePrimHeader` skips the block's 0x20-byte header (the two size and
- * address forms the target branches on). */
+/* 0x80099F1C - draws the pre-prim block: `pSync` picks the SDK's `GXCallDisplayList` over the inline pipe
+ * command, `pSkipPrePrimHeader` skips the block's 0x20-byte header. */
 extern "C" void fn_80099F1C(ResHandle* pSelf, s32 pSync, s32 pSkipPrePrimHeader) {
     ResHandle hTag;
     u32 tag = fn_800995A0(pSelf);

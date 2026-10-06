@@ -1,10 +1,5 @@
-/*
- * g3d/g3d_camera_types.h - `nw4r::g3d::Camera`, the class `src/g3d/g3d_camera.cpp` defines the members of
- * (docs/plan.md 6.5 rules 1 and 2: one definition, included by the owner and by its consumers).
- *
- * `Camera` is a `ResCommon<CameraData>` handle, so its one word is the payload pointer.  The three
- * mangled map symbols (`SetPosition`/`SetPosture`/`SetPerspective`) need the real class.
- */
+/* g3d/g3d_camera_types.h - `nw4r::g3d::Camera`, a one-word `ResCommon<CameraData>` handle whose members
+ *   `SetPosition`/`SetPosture`/`SetPerspective` `g3d/g3d_camera.cpp` defines. */
 #ifndef MHTRI_G3D_G3D_CAMERA_TYPES_H
 #define MHTRI_G3D_G3D_CAMERA_TYPES_H
 

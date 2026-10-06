@@ -1,52 +1,35 @@
 /*
- * nw4r g3d animation-object cluster - `.text` 0x80063888-0x800680A8 (164 functions, 18464 B).
- *
- * Registered once, at its final home (docs/plan.md 12), from the pooled proposal `80063888`.
- *
- * Name (evidence class 4, "nothing supports a single name"): the run is a maximal unclaimed run that
- * spans more than one original translation unit, so no one `__FILE__` string names it.  The discovery's
- * own language probe (`tools/units/attribution-queue.json`) reports
- * `sources: [g3d_anmclr.cpp, g3d_anmobj.cpp], conflict: true`; the region's `.rodata` fragment
- * (0x8056F500-0x8056F678) opens on the g3d animation type-name table (`AnmObj`, `AnmObjChr`,
- * `AnmObjChrNode`, `AnmObjChrBlend`, `AnmScn`, ...) and the first function that cites a `__FILE__` string
- * (`fn_80063E60`) cites `g3d_anmclr.cpp` (0x8058C118), while the tail cites `g3d_anmscn.cpp`
- * (0x8058C288, `fn_800649CC` onward) - two source files, with an internal seam near 0x800649CC.  The
- * dominant TU name `g3d_anmscn.cpp` already has a provisional registered home (`g3d/g3d_anmscn.cpp`,
- * 0x800680A8-0x800680CC), so the cluster keeps the map's own stem and the module is `g3d` (every covered
- * TU is nw4r g3d).  Both seams are recorded in the outbox for the batch re-split.
- *
- * Language: C++ (the discovery's `langcheck`: cxx true, confidence high - the run defines the mangled
- * `nw4r::g3d::PlayPolicy::Onetime/Loop` and calls the mangled `nw4r::db::Panic`).  The map's
- * `fn_XXXXXXXX` stems are the map's placeholders, so those bodies are defined `extern "C"` to keep the
- * bare symbol (playbook 48).  The one real C++ free function of the cluster, `fn_80066C8C`, keeps C++
- * linkage (its map name is the mangling `fn_80066C8C__FPv`) and is declared in the owner header.
- *
- * Seam: unproven.  The left edge 0x80063888 is where `g3d_anmchr.cpp`'s last function ends
- * (`fn_800636B0` + 0x1D8); the right edge 0x800680A8 is the start of the registered
- * `g3d/g3d_anmscn.cpp` and of the next proposal (`800680CC`).  This unit was registered with the
- * proposal's exact extent so it can be measured; the re-cut rides the batch.
- *
- * Sections: .text 0x80063888-0x800680A8, extab 0x800076C4-0x80007B14,
- * extabindex 0x8001FB00-0x8001FF5C.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>`: every unnamed entry is a bare `zz_XXXXXXXX_`
- * placeholder in the runtime dump too), so there is no real name to recover for those functions and
- * stylelint's rule 7 refuses the landing without this line.  The two name-map exceptions
- * (`PlayPolicy_Onetime/Loop`) are written through their namespace owner (rule 9) when reconstructed.
- *
- * The cross-unit declarations (rule 2) live in `g3d/fn_80063888.h`; four other units call into
- * this cluster and include that header.
+ * g3d/fn_80063888.cpp - nw4r g3d animation-object cluster: the type-name records (`.rodata`: `AnmObj`,
+ *   `AnmObjChr`, `AnmObjChrNode`, `AnmObjChrBlend`, `AnmScn`, ...) and their list-insert steps,
+ *   the checked `_ac.h` getters, `nw4r::g3d::PlayPolicy_Onetime`/`PlayPolicy_Loop` and the anim-object bodies
+ *   of `g3d_anmobj.cpp`, `g3d_anmclr.cpp` and `g3d_anmscn.cpp`.
+ * RANGE. .text 0x80063888-0x800680A8 (164 functions); extab, extabindex, .rodata 0x8056F510-0x8056F578, .data
+ *   0x8058C118-0x8058CC40, .sdata 0x80791158-0x80791178, .sdata2 0x80795D68-0x80795D90.  More than one TU:
+ *   fn_80063E60 cites "g3d_anmclr.cpp" (0x8058C118) and fn_800649CC onward "g3d_anmscn.cpp" (0x8058C288), a seam
+ *   near 0x800649CC.  The left edge is `g3d/g3d_anmchr.cpp`'s end, the right edge `g3d/g3d_anmscn.cpp`.
+ * NAMES. The file keeps the map's stem (no one `__FILE__` names the run); the stems are defined `extern "C"`
+ *   (playbook 48), `fn_80066C8C` keeps C++ linkage (map row `fn_80066C8C__FPv`), and the `PlayPolicy` pair sits in
+ *   `nw4r::g3d`.  The cross-unit declarations are `g3d/fn_80063888.h`.
+ * RESIDUALS. 27 functions unwritten (objdiff scores them zero) in 17 runs: 0x80063E60-0x80063FC8,
+ *   0x80064080-0x800640E4, 0x80064128-0x800646E8, 0x800648B0-0x8006497C (`PlayPolicy_Loop`), 0x800649CC-0x80064BD4,
+ *   0x80064C24-0x80064CE0, 0x80064CF0-0x8006518C, 0x80065284-0x8006553C, 0x8006560C-0x800657C4,
+ *   0x800659D8-0x80065ED8, 0x80065EF0-0x80065FFC, 0x800660DC-0x80066C68, 0x80066EF8-0x80066F2C,
+ *   0x800670D4-0x800677D8, 0x80067824-0x80067A54, 0x80067B90-0x80067E54, 0x80067EFC-0x800680A8.
+ *   Partial (18): fn_800638C0, fn_800639D0, fn_80063B2C, fn_80063C00, fn_80063C94, fn_80063D68, fn_800646E8,
+ *   fn_80064758, fn_8006497C, fn_80064988, fn_8006518C, fn_8006522C, fn_8006553C, fn_800655A4, fn_800657C4,
+ *   fn_80065ED8, fn_80066080, fn_80066FA0.
+ *   flipcheck: `.text` 0x145C of 0x4820; `.rodata`, `.data` and `.sdata2` are claimed and not emitted; `.sdata` is
+ *   0x4 of 0x20.
  */
 
 #include "types.h"
-#include "unsplit/g3d.h"      /* unsplit g3d neighbours (rule 2) */
+#include "unsplit/g3d.h"      /* the band header's g3d declarations (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_8007A5E4/fn_8007A5A8/fn_8007A724, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/fn_80063888.h"
 #include "mh3_pad.h"        /* VEC3_ctor, owned by mh3_pad.cpp (rule 2) */
 
-/* The `g3d`-band helpers owned by unsplit units (their address band - bracketed by the `main` unit
- * `fn_8004C9A0.cpp` and this one - names no single module, so they stay local declarations). */
+/* Forward declarations: this unit's own list and copy helpers, and fn_8005DC60/fn_8005DCD0/dtor_8005E5E8/
+ * dtor_8005E58C/fn_8005D3E0, owner `g3d/g3d_anmchr.cpp`. */
 extern "C" void **fn_8005DC60(void **out, void *name);
 extern "C" void **fn_8005DCD0(void **out, void *name);
 extern "C" void fn_8006411C(u32 *dst, const u32 *src);
@@ -750,8 +733,7 @@ extern "C" s32 fn_80067EE8(const void *p)
 }
 
 /* --------------------------------------------------------------------------------------------- *
- * The label getters and flag/word accessors recovered from the per-function target objects
- * (0x8006403C-0x80066EEC).
+ * The label getters and flag/word accessors (0x8006403C-0x80066EEC).
  * --------------------------------------------------------------------------------------------- */
 
 extern "C" u32 fn_8006403C(void)
@@ -838,11 +820,8 @@ extern "C" void fn_80064988(G3dFlagWord *self, u32 bits, s32 set)
         self->field_0x0C &= ~bits;
 }
 
-/* `fn_800649B4` is declared in `g3d/fn_80063888.h` with the object as an opaque `void*` (the
- * ScnMdl pointer `g3d/g3d_scnmdl.cpp`'s fn_8007EA08 passes unchanged, per the target object's
- * `li r4,4; b` tail call) and this file's definition has to spell the same C-linkage parameter type
- * or the two declarations collide as illegal overloading.  The body casts to the local
- * `G3dFlagWord` view, which is the record the target's body reads at +0xC. */
+/* Tests `bits` in the object's +0xC flag word; the object is opaque, as `g3d/fn_80063888.h` declares it (the
+ * ScnMdl pointer fn_8007EA08 passes through). */
 extern "C" s32 fn_800649B4(void *pSelf, u32 bits)
 {
     G3dFlagWord *self = (G3dFlagWord *)pSelf;

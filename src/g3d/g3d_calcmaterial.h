@@ -1,12 +1,5 @@
-/*
- * The `g3d/g3d_calcmaterial.cpp` unit's cross-unit declarations (docs/plan.md 6.5 rule 2).
- *
- * `g3d/g3d_calcmaterial.cpp` (`.text` 0x8006EE78-0x8006F738) owns the alignment-asserting resource
- * pointer constructors of the `g3d_resmat_ac.h` inlines.  `g3d/g3d_resfile.cpp`'s accessor cluster calls
- * two of them, so they are declared once here (the owner's header) and that consumer includes it.
- *
- * Both keep C linkage (their map names are plain `fn_XXXXXXXX` stems).
- */
+/* g3d/g3d_calcmaterial.h - the alignment-asserting `g3d_resmat_ac.h` pointer constructors `g3d/g3d_calcmaterial.cpp`
+ *   owns (C linkage). */
 #ifndef MHTRI_G3D_G3D_CALCMATERIAL_H
 #define MHTRI_G3D_G3D_CALCMATERIAL_H
 

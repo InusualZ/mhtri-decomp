@@ -1,21 +1,16 @@
 /*
- * nw4r g3d: g3d_camera.cpp - `Camera`'s posture/projection/viewport/scissor methods and the
- * `ResCommon<CameraData>` accessors, `.text` 0x800746DC-0x80075DCC (27 functions, including the
- * already-demangled `Camera::SetPosition`/`SetPosture`/`SetPerspective`).
- *
- * Re-cut (docs/plan.md 12 item 5).  The `g3d_camera.cpp` string
- * `lbl_8058E430` is referenced from `fn_800746DC` onward and `g3d_rescommon_ac.h` from
- * `fn_800748E4`/`fn_80074A54`; the data fragment is 0x8058E430-0x8058E570.  The six accessors
- * `fn_80074620`..`fn_800746D4` (0x80074620-0x800746DC, zero data references) are assigned to
- * `g3d/g3d_calcworld.cpp` per the report's candidate cut - unpinned, measure to settle.
- *
- * Naming note: the free functions keep the map's `fn_XXXXXXXX` names (docs/plan.md 6.5 rule 7);
- * the three `Camera` members are named because the map already carries their mangling.
- *
- * Shared declarations: `nw4r::g3d::Camera`/`CameraData` and `nw4r::math::VEC3` are local/shared per
- * rule 1 (`VEC3` comes from `nw4r/math.h`).  `#pragma peephole off` is scoped to `fn_80075940`
- * (playbook 32) and `#pragma fp_contract off` is file-scoped.  Registered `Object(NonMatching, ...)`
- * in lib g3d.
+ * g3d/g3d_camera.cpp - nw4r g3d `Camera` posture/projection/viewport/scissor methods and the `ResCommon<CameraData>`
+ *   accessors.
+ * RANGE. .text 0x800746DC-0x80075DCC (27 functions); extab, extabindex, .data 0x8058E430-0x8058E570 (opens on
+ *   "g3d_camera.cpp", read from fn_800746DC on), .sdata2 0x80795DC8-0x80795DF8.  The six accessors
+ *   fn_80074620..fn_800746D4 before it (no data references) sit in `g3d/g3d_calcworld.cpp` by the candidate cut.
+ * NAMES. Map stems, plus the three `nw4r::g3d::Camera` members the map carries mangled (`SetPosition`, `SetPosture`,
+ *   `SetPerspective`).
+ * RESIDUALS. Partial (15): fn_80074758, `Camera::SetPosition`, `Camera::SetPosture`, 0x80074D78-0x80074FEC (three),
+ *   fn_8007507C, fn_80075258, 0x80075394-0x80075844 (six), fn_80075940.
+ *   flipcheck: `.text` 0x16A0 of 0x16F0; `.data` is claimed and not emitted; `.sdata2` is 0x34 of 0x30 - one pooled
+ *   literal is shared with `g3d/fn_80075DCC.cpp` (a candidate fold).
+ * SHAPES. `#pragma peephole off` around fn_80075940 (playbook 32); file-scope `#pragma fp_contract off`.
  */
 
 
@@ -27,7 +22,7 @@
 #include "g3d/g3d_camera_types.h"
 #include "g3d/fn_80063888.h" /* fn_80067EE8, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
  * `-fp_contract on`, so the original file carried the pragma. File-scoped (see header). */

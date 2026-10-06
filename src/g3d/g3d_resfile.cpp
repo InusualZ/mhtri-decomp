@@ -1,59 +1,13 @@
 /*
- * nw4r g3d: g3d_resfile.cpp - the `ResFile` translation unit, `.text` 0x80093990-0x800947A4
- * (53 functions, 0xE14 B).
- *
- * Naming - which evidence class decided it.  Class 1 decides: the range's own `.data` pool holds the
- * bare source-file name `g3d_resfile.cpp` (lbl_80590BA0 at 0x80590BA0), which is the file argument of
- * the `nw4r::db::Panic` assert at the head of fn_80093990 ("NW4R:Failed assertion CheckRevision()",
- * lbl_80590BB0).  The `Panic__Q24nw4r2dbFPCciPCce` relocation is a C++ mangling, so the unit is
- * `src/g3d/g3d_resfile.cpp` in the existing g3d lib (Wii/1.3, cflags_g3d).  Class 2 FAILS:
- * `dumpmap.py lookup 0x80093990` answers a `zz_XXXXXXXX_` placeholder, not a name.
- *
- * What the unit is.  The `ResFile` resource-file container: fn_80093990 / fn_80093AA0 / fn_80093B0C
- * walk the file's ten resource categories (count + item accessors, `fn_80092588`/`fn_80092584` and its
- * nine siblings), checking each entry (`fn_80094044` and the sibling revision checks) or releasing it.
- * The tail of the range (fn_80094164 onward) is the out-of-line copy of the `g3d_resmat_ac.h` inlined
- * accessors the TU instantiates - `ResMatPix` / `ResMatTevColor` / `ResMatIndMtxAndScale` /
- * `ResMatTexCoordGen` `ref()` guards plus their GX-copy wrappers.
- *
- * Section claim: `.text` 0x80093990-0x800947A4, `extab` 0x800093A8-0x800094E0, `extabindex`
- * 0x80022158-0x8002232C.  The boundaries are the functions before (fn_800938EC, `CleanUpTracks`) and
- * after (fn_800947A4, the first body of the next TU, which cites "g3d_resmat.cpp").
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x80093990`, which answers a `zz_` placeholder, and with
- * config/RMHE08/symbols.txt, whose every `.text` entry in 0x80093990..0x800947A4 is a bare
- * `fn_XXXXXXXX`).  The map's stems stand and are used as the identifiers.
- *
- * Measurement path: registered here for the first time, so MAIN has no split object for the range;
- * the source compiles with the g3d lib's real command line and each symbol is scored with objdiff
- * `report generate` against the retired per-range objects under build/RMHE08/obj/.
- *
- * Reconstruction status: all 53 functions reconstructed and measured at 100.00 % (official report
- * metric) against the retired per-range split objects under build/RMHE08/obj/; the object's `.text`
- * (0xE14), `extab` (0x138) and `extabindex` (0x1D4) sizes all equal the target's and `flipcheck.py`
- * reports READY.  The one codegen lever is the `.sdata` `"ref"` member-name string: it must be
- * declared as a *sized* 4-byte array (`extern char lbl_80791294[4];`) so MWCC's small-data heuristic
- * emits the target's `li rN, @sda21` form instead of `lis`/`addi` (the same lever as
- * `g3d/g3d_anmvis.cpp`).
- *
- * Flip status - `Object(Matching, ...)`.  The unit used to be blocked by the
- * extab/extabindex map-name class: `Object(Matching, ...)` failed with `undefined: '@eti_800222FC'`,
- * referenced from `lbl_8057CED0` in `auto_07_8057C820_data.o` - the unclaimed `.data` blob at
- * 0x8057C820, whose word at 0x8057EA88 (0x80022300) is dtk's *guessed* relocation into the extabindex
- * entry at 0x800222FC (packed non-pointer data, so the entry is a coincidence, not a reader of it).
- * That name was defined only by the *target* object `dol split` synthesises, because MWCC emits
- * extab/extabindex entries as anonymous locals with a local binding (`@377`, `@905`) while the target
- * carries the map's `@etb_<addr>`/`@eti_<addr>` names with a global binding for the referenced ones.
- * No source or `cflags_g3d` spelling reaches it: the name and the binding are assembler output, and
- * `mwcceppc.exe -help` has no option that names or exports an extab symbol.  `tools/elf/objextab.py`
- * now does it in the build (chained into every MWCC rule, after `objalign`): it renames this object's
- * extab/extabindex entries to the map's names - extabindex+0x1A4 (`@905`) becomes `@eti_800222FC`,
- * since the claim starts at 0x80022158 - and sets their binding global, so our object defines the name
- * itself.  The flip then links and reproduces sha1 BF4850739478CAAEDFE675949EB7C28595A7FDE9.  The
- * class is wider than this unit - 18 of 254 registered units own an extab/extabindex symbol that
- * another *linked* object references, and each of them would have been unlinkable on flip (playbook
- * 59, `.pi/notes/resfile-flip.md`).
+ * g3d/g3d_resfile.cpp - nw4r g3d `ResFile` container checks/releases and the out-of-line `g3d_resmat_ac.h` accessors.
+ * RANGE. .text 0x80093990-0x800947A4 (53 functions); extab, extabindex.  fn_80093990's `CheckRevision()` assert
+ *   passes "g3d_resfile.cpp" (lbl_80590BA0); the next body, fn_800947A4, cites "g3d_resmat.cpp".
+ * NAMES. Map stems (the dump answers `zz_` placeholders).
+ * RESIDUALS. none.  The flip links because `tools/elf/objextab.py` gives the object's extab/extabindex entries the
+ *   map's `@etb_`/`@eti_` names with global binding (`@eti_800222FC` is referenced from the `.data` blob at
+ *   0x8057C820; playbook 59).
+ * SHAPES. The `.sdata` "ref" strings are sized externs (`extern char lbl_80791294[4];`): MWCC then emits
+ *   `li rN, @sda21`, not `lis`/`addi`.
  */
 
 #include "types.h"
@@ -82,7 +36,8 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 } // namespace db
 } // namespace nw4r
 
-/* The panic file/format strings the target references as map symbols (unsplit `.data`). */
+/* The panic file/format strings the target references as map symbols: lbl_80590BA0/lbl_80590BB0 are in
+ * `g3d/g3d_resanmtexsrt.cpp`'s `.data`, lbl_80591280/lbl_80591294 are unclaimed. */
 extern const char lbl_80590BA0[]; /* "g3d_resfile.cpp" */
 extern const char lbl_80590BB0[]; /* "NW4R:Failed assertion CheckRevision()" */
 extern const char lbl_80591280[]; /* "ResMatTexCoordGen" */
@@ -120,10 +75,8 @@ extern char lbl_807912A8[4];
 extern char lbl_807912AC[4];
 
 /* ------------------------------------------------------------------------------------------------ */
-/* The `ResFile` release helpers and the SDK display-list entry point.  Their addresses sit in the
- * unclaimed run between the registered `g3d_resfile.cpp` and the `gx` unit, so the bracketing bands
- * name different modules and there is no sound header home (rule 2's named gap); they stay declared
- * here.  `GXCallDisplayList` is the SDK's own symbol. */
+/* The `ResFile` release helpers (fn_80098ACC/fn_80098CF0 are `g3d/g3d_resmat.cpp`'s, fn_8009A360
+ * `g3d/g3d_resshp.cpp`'s; declared here) and the SDK's `GXCallDisplayList`. */
 extern "C" void fn_80098ACC(void* p);
 extern "C" void fn_80098CF0(void* p);
 extern "C" u32 fn_8009A360(void* p, u32 value);
@@ -650,7 +603,3 @@ extern "C" u32 fn_80094758(ResHandle* pSelf, u32 pDst) {
     return *fn_800766D0(&handle, pDst);
 }
 
-/*
- * Residuals: none.  Every symbol in the range is byte-identical to the target (100.00 % on the
- * official report metric; .text/extab/extabindex sizes equal the target's).
- */

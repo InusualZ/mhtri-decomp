@@ -1,12 +1,6 @@
-/*
- * Declarations owned by `g3d/g3d_camera.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
- * header instead of declaring the symbol itself.  Keep it minimal.
- *
- * `fn_80075258` projects a world position through the camera into screen space: `pSelf` is the camera
- * handle `fn_80082BCC` returns (only ever a pointer here), `pOut` the three-float result and `pVec`
- * the world position.  The owner's own spelling uses `nw4r::g3d::Camera*`; `extern "C"` keeps the map's
- * plain stem, which is what the call sites pair on.
- */
+/* g3d/g3d_camera.h - the declarations `g3d/g3d_camera.cpp` owns: fn_80075258 projects the world position `pVec`
+ *   through the camera handle `pSelf` (what fn_80082BCC returns) into the screen-space `pOut`; `extern "C"` keeps the
+ *   map's stem. */
 #ifndef MHTRI_G3D_G3D_CAMERA_H
 #define MHTRI_G3D_G3D_CAMERA_H
 
@@ -33,8 +27,7 @@ void fn_80075440(void* pOut, const void* pIn);
 void fn_800754EC(void* pOut, const void* pIn);
 void fn_80075620(void* pOut, const void* pIn);
 
-/* Added when `camera/fn_802B5C58.cpp` registered (rule 2): its `get_camera_pos` reads the camera's
- * position through this one. */
+/* The camera-position copy `camera/fn_802B5C58.cpp`'s `get_camera_pos` reads through. */
 void fn_800749C8(const void* src, void* dst); /* 0x800749C8 - copies the camera's +0x74 vector out */
 
 #ifdef __cplusplus

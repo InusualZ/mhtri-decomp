@@ -1,55 +1,41 @@
 /*
- * nw4r g3d animation-object cluster - `.text` 0x800680CC-0x8006EAC0 (133 functions, 27124 B).
- *
- * Registered once, at its final home (docs/plan.md 12), from the pooled proposal `800680CC`.
- *
- * Name (evidence class 1, but the evidenced name is already taken): this run is a maximal unclaimed run
- * that spans four original nw4r g3d translation units.  The `__FILE__` string each body cites decides the
- * TU: `fn_800680CC` cites `g3d_anmscn.cpp` (lbl_8058C288, the "NW4R:Pointer Error" asserts), `fn_8006946C`
- * cites `g3d_anmshp.cpp` (lbl_8058CC40), `fn_800697D4` cites `g3d_anmtexpat.cpp` (lbl_8058CD40) and
- * `fn_80069CF4` onward cite `g3d_anmtexsrt.cpp` (lbl_8058CE10); the run ends exactly where the next
- * proposal's `g3d_anmvis.cpp` (`fn_8006EAC0`) begins.  The first TU name `g3d_anmscn.cpp` already has a
- * provisional registered home (`g3d/g3d_anmscn.cpp`, 0x800680A8-0x800680CC, one function), so - exactly as
- * its left neighbour `g3d/fn_80063888.cpp` did for the same collision - the cluster keeps the map's own
- * `fn_800680CC` stem and the module is `g3d`.  The three internal TU seams (near 0x8006946C, 0x800697D4 and
- * 0x80069CF4) are recorded in the outbox for the batch re-split.
- *
- * Language: C++ (the bodies call the mangled `nw4r::db::Panic`/`Warning` and are the nw4r animation
- * classes).  The map carries only `fn_XXXXXXXX` stems for this range, so those bodies are defined
- * `extern "C"` to keep the bare symbol (playbook 48); no source-level class is invented for them here.
- *
- * Sections: .text 0x800680CC-0x8006EAC0, extab 0x80007B1C-0x80008060,
- * extabindex 0x8001FF68-0x800206B8.  No `.ctors`/`.dtors` word points into the range.
- *
- * Seam: unproven.  Left edge 0x800680CC is where the provisional `g3d/g3d_anmscn.cpp` ends; right edge
- * 0x8006EAC0 is the start of the next proposal (`g3d_anmvis.cpp`).  Registered at the proposal's exact
- * extent so it can be measured; the re-cut rides the batch.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (plus dtk's `dtor_XXXXXXXX`
- * destructor stems) - checked with `python tools/symbols/dumpmap.py lookup <addr>`: every unnamed entry is
- * a bare `zz_XXXXXXXX_` placeholder in the runtime dump too - so there is no real name to recover and
- * stylelint's rule 7 refuses the landing without this line.  The owner's checked-getter/assert shape is reconstructed, but
- * this pass writes the accessor families first; the large `AnmObj` validity-check and vtable bodies are
- * left unpaired rather than guessed.
- *
- * Status: partial first pass.  The plain accessor families (getters, `!= 0` readers, word copies, the
- * type-name returners, the `Init`/`Set` forwarders and the helper-backed name readers) are reconstructed;
- * the ~45 large `TestScnAnm`/attach/detach bodies are not yet written.  Per-symbol scores live in the unit
- * notes / outbox.
+ * g3d/fn_800680CC.cpp - nw4r g3d animation-object cluster: the `g3d_anmscn.cpp`, `g3d_anmshp.cpp`,
+ *   `g3d_anmtexpat.cpp` and `g3d_anmtexsrt.cpp` bodies - accessor families (getters, `!= 0` readers, word copies,
+ *   type-name returners, `Init`/`Set` forwarders, name readers) and the `TestScnAnm`/attach/detach bodies.
+ * RANGE. .text 0x800680CC-0x8006EAC0 (133 functions); extab, extabindex, .rodata 0x8056F598-0x8056F628, .data
+ *   0x8058CC40-0x8058D6C0, .sdata 0x80791188-0x807911A0, .sdata2 0x80795D90-0x80795DA8.  Four TUs by the `__FILE__`
+ *   each body cites: fn_800680CC "g3d_anmscn.cpp" (lbl_8058C288), fn_8006946C "g3d_anmshp.cpp" (lbl_8058CC40),
+ *   fn_800697D4 "g3d_anmtexpat.cpp" (lbl_8058CD40), fn_80069CF4 onward "g3d_anmtexsrt.cpp" (lbl_8058CE10).  The left
+ *   edge is `g3d/g3d_anmscn.cpp`, the right edge `g3d/g3d_anmvis.cpp`.
+ * NAMES. The file keeps the map's stem (`g3d_anmscn.cpp` already names `g3d/g3d_anmscn.cpp`); the stems are defined
+ *   `extern "C"` (playbook 48).
+ * RESIDUALS. 60 functions unwritten (objdiff scores them zero) in 20 runs: 0x800680CC-0x80068634,
+ *   0x800686FC-0x800689B0, 0x80068A78-0x80069334, 0x8006946C-0x800695D4, 0x800696C0-0x800696E4,
+ *   0x800697D4-0x8006993C, 0x800699C8-0x80069BD8, 0x80069C80-0x8006A38C, 0x8006A42C-0x8006AA4C,
+ *   0x8006AAA8-0x8006C650, 0x8006C668-0x8006CDBC, 0x8006CE48-0x8006D000, 0x8006D084-0x8006D9A0,
+ *   0x8006DA48-0x8006E2A8, 0x8006E338-0x8006E668, 0x8006E764-0x8006E794, 0x8006E838-0x8006E868,
+ *   0x8006E8C4-0x8006E8F4, 0x8006E998-0x8006E9C8, 0x8006EA90-0x8006EAC0.
+ *   Partial (10): fn_8006A38C, fn_8006A3F4, dtor_8006AA4C, fn_8006C650, fn_8006D9FC, fn_8006E668, fn_8006E794,
+ *   fn_8006E868, fn_8006E8F4, fn_8006E9C8.  fn_8006C650: retail materialises `~(b - 1)` with an explicit `not`
+ *   where MWCC folds it into `andc` (one instruction fewer).
+ *   flipcheck: `.text` 0xC8C of 0x69F4; `.rodata`, `.data` and `.sdata2` are claimed and not emitted; `.sdata` is
+ *   0x4 of 0x18.
  */
 
 #include "types.h"
 #include "g3d/fn_80063888.h"
 #include "g3d/g3d_anmchr.h"  /* the fn_8005Dxx / fn_80062xx helpers the g3d_anmchr.cpp range now owns (rule 2) */
 
-/* The `.rodata` animation name records the helper-backed readers pass by address (unsplit `.rodata`). */
+/* The `.rodata` animation name records the helper-backed readers pass by address: lbl_8056F598.. are this unit's
+ * (claimed, not emitted), lbl_8056F578/lbl_8056F588 are unclaimed. */
 extern u8 lbl_8056F578[];
 extern u8 lbl_8056F588[];
 extern u8 lbl_8056F598[];
 extern u8 lbl_8056F5A8[];
 extern u8 lbl_8056F5C0[];
 
-/* The `.data` type-name strings the plain returners hand back by address (unsplit `.data`). */
+/* The `.data` type-name strings the plain returners hand back by address (this unit's `.data`, and
+ * `g3d/fn_80063888.cpp`'s for lbl_8058CAFC/lbl_8058CAB8; claimed, not emitted). */
 extern u8 lbl_8058CAFC[]; /* "ResAnmFog"     */
 extern u8 lbl_8058CAB8[]; /* "ResAnmCamera"  */
 extern u8 lbl_8058CCC8[]; /* "ResAnmShp"     */
@@ -244,10 +230,7 @@ extern "C" f32 fn_8006E6A4(f32 x, f32 y)
     return x;
 }
 
-/* Rounds `a` up to the next multiple of `b` (0x8006C650). */
-/* Rounds `a` up to the next multiple of `b`.  The retail body materialises `~(b - 1)` with an explicit
- * `not` where MWCC folds it to `andc`, so the score stops at 71.67 % (5 instructions against 6); the
- * residual is the compiler shape, recorded rather than chased. */
+/* Rounds `a` up to the next multiple of `b`. */
 extern "C" u32 fn_8006C650(u32 a, u32 b)
 {
     return (a + b - 1) & -b;
@@ -423,9 +406,8 @@ extern "C" u32 fn_8006EA24(void *self, u32 *key)
  * The teardown destructors and the checked word reader (0x8006AA4C-0x8006E9C8).
  * --------------------------------------------------------------------------------------------- */
 
-/* The unsplit g3d/main-band teardown helper with no registered owner (rule 2's named gap); the
- * fn_8005D384/fn_8005D3E0/fn_800628A4/fn_800628B4/fn_80062914 helpers now come from
- * `g3d/g3d_anmchr.h` (their range registered as `g3d/g3d_anmchr.cpp`). */
+/* The g3d/main-band teardown helper this unit declares itself; fn_8005D384/fn_8005D3E0/fn_800628A4/
+ * fn_800628B4/fn_80062914 come from `g3d/g3d_anmchr.h`. */
 extern "C" void dtor_8006AAA8(void *self, s32 flag);
 
 typedef struct {

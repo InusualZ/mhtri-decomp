@@ -1,15 +1,5 @@
-/*
- * The `g3d/g3d_anmvis.cpp` unit's cross-unit declarations (docs/plan.md 6.5 rule 2).
- *
- * `g3d/g3d_anmvis.cpp` (`.text` 0x8006EAC0-0x8006EE78) owns the two node-visibility walkers that apply
- * an `AnmObjVis` over a model's node table.  They were declared in the consumer's own file while the
- * range was unclaimed; a consumer (`g3d/g3d_scnmdl.cpp`, whose fn_8007D47C is the `ScnMdl` twin of
- * fn_8006ED84) now includes this header instead.
- *
- * Both keep C linkage (their map names are plain `fn_XXXXXXXX` stems).  The second parameter of
- * fn_8006ECB4 is the polymorphic animation object the owner declares; it is only ever passed through
- * here, so it arrives as `void*`.
- */
+/* g3d/g3d_anmvis.h - the two node-visibility walkers `g3d/g3d_anmvis.cpp` owns (C linkage); fn_8006ECB4's
+ *   animation object is passed through as `void*`. */
 #ifndef MHTRI_G3D_G3D_ANMVIS_H
 #define MHTRI_G3D_G3D_ANMVIS_H
 
@@ -24,7 +14,7 @@ void fn_8006ECB4(void* pModel, void* pSelf);
 /* 0x8006ED84 - the same walk, writing one byte per node into `pByteVec`. */
 void fn_8006ED84(u8* pByteVec, void* pModel, void* pSelf);
 
-/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the checked `ResAnmVis` resolver. */
+/* The checked `ResAnmVis` resolver `g3d/g3d_resfile.cpp` calls. */
 u32 fn_8006EC3C(void* p); /* 0x8006EC3C - the checked `ResAnmVis` resolver */
 
 #ifdef __cplusplus

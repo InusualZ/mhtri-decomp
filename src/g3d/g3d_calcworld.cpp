@@ -1,21 +1,16 @@
 /*
- * nw4r g3d: g3d_calcworld.cpp - the node/matrix world pass and its node-table accessors, `.text`
- * 0x800736F8-0x800746DC (29 functions).
- *
- * Re-cut (docs/plan.md 12 item 5).  The panic string
- * `lbl_8058E184` = `g3d_calcworld.cpp` is referenced only from `fn_800737CC` (whose `fn_8007411C`
- * sibling is still unwritten - a residual, not part of this file), and `lbl_8058E340`..`lbl_8058E420`
- * from the `fn_80073E80`..`fn_80074114` helpers; the data fragment is 0x8058E184-0x8058E430.  The six
- * tiny accessors `fn_80074620`..`fn_800746D4` carry zero data references - the report's candidate cut
- * 0x800746DC puts them here (alternative 0x80074620), so the group is unpinned and a measurement is
- * what settles it.
- *
- * Naming note: the map carries only `fn_XXXXXXXX` names in this range (docs/plan.md 6.5 rule 7);
- * renaming a symbol needs the map and the source in one edit (playbook 31).
- *
- * Shared declarations: `ResHandle` comes from `nw4r/g3d/res_common.h`, `nw4r::math::VEC3` from
- * `nw4r/math.h` (rule 1).  `#pragma peephole off` is scoped to `fn_8007403C` (playbook 32) and
- * `#pragma fp_contract off` is file-scoped.  Registered `Object(NonMatching, ...)` in lib g3d.
+ * g3d/g3d_calcworld.cpp - nw4r g3d node/matrix world pass (fn_800737CC, fn_8007411C) and its node-table accessors.
+ * RANGE. .text 0x800736F8-0x800746DC (30 functions); extab, extabindex, .data 0x8058E178-0x8058E430 (fn_800737CC
+ *   passes "g3d_calcworld.cpp", lbl_8058E184; the fn_80073E80..fn_80074114 helpers read lbl_8058E340..lbl_8058E420),
+ *   .sdata 0x807911D0-0x807911E0, .sdata2 0x80795DC0-0x80795DC8.  The six accessors fn_80074620..fn_800746D4 carry no
+ *   data reference: the candidate cut 0x800746DC puts them here, 0x80074620 is the alternative.
+ * NAMES. Map stems.
+ * RESIDUALS. Unwritten (objdiff scores it zero): fn_8007411C.  Partial: fn_800736F8, fn_800737CC, fn_80073CE0,
+ *   fn_80073D34, fn_80073F00, addVec3To.
+ *   flipcheck: `.text` 0xAD0 of 0xFE4; `.data` is claimed and not emitted; `.sdata` is 0x4 of 0x10, `.sdata2` 0x4
+ *   of 0x8.
+ * SHAPES. `#pragma peephole off` around fn_8007403C keeps retail's masked compare (playbook 32); file-scope
+ *   `#pragma fp_contract off`.
  */
 
 
@@ -453,9 +448,8 @@ void fn_80073FA0(NodeMtxRec* pDst, const NodeMtxRec* pSrc) {
     *pDst = *pSrc;
 }
 
-/* `#pragma peephole off` is load-bearing here: at `-O3` the peephole folds the masked compare into a
- * single `rlwinm r3,r3,5,31,31`, while the target keeps the generic `!= 0` conversion
- * (`rlwinm r3,r3,0,4,4; neg; or; srwi`). Scoped to this one function (playbook 32). */
+/* `peephole off` keeps retail's generic `!= 0` conversion (`rlwinm r3,r3,0,4,4; neg; or; srwi`), which `-O3`
+ * folds into one `rlwinm r3,r3,5,31,31` (playbook 32). */
 #pragma peephole off
 s32 fn_8007403C(u32 flags) {
     return (flags & 0x08000000) != 0;

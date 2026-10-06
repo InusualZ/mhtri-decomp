@@ -1,30 +1,18 @@
 /*
- * nw4r g3d character-animation unit (`g3d_anmchr.cpp`), registered here as one capped proposal slice.
- *
- * `.text` 0x8005ABD8..0x80063888 (0x8CB0 B, 183 functions), `extab` 0x80007328..0x800076C4,
- * `extabindex` 0x8001F62C..0x8001FB00 (103 framed functions).  The range is one maximal unclaimed run,
- * capped by discovery - the seam is a proposal cap, not a proven TU boundary.
- *
- * Naming - which evidence class decided it.  CLASS 1, a `__FILE__` string: every `nw4r::db::Panic`
- * assert reachable from 0x8005CF10 on passes the bare source name `"g3d_anmchr.cpp"` (.data 0x8058B410,
- * 98 call sites, 0x8005CF50..0x8006385C), and its supporting header strings (`g3d_resnode_ac.h`
- * 0x8058B370, `g3d_obj.h`, `g3d_anmobj.h`, `g3d_resanmchr_ac.h`, `g3d_resdict_ac.h`, `arithmetic.h`) sit
- * in the same `.data` pool.  A header string only proves the caller *includes* that header; the `.cpp`
- * string inside a `Panic(__FILE__, line, ...)` is the unit's own source name.  Module `g3d`, so the file
- * is `src/g3d/g3d_anmchr.cpp` in the `g3d` lib (`cflags_g3d` is token-identical to `cflags_main`).
- * Class 2 fails (`dumpmap.py lookup` answers only `zz_<addr>_` placeholders).  The `flfnt*`/`font_*`
- * accessors in the middle of the range have no assert of their own; their state pointer `lbl_807948D8`
- * is referenced by no unit outside this range, and `fn_8005B7A0`'s 16-entry colour table lives at
- * 0x8058B3D0 - inside the same `.data` pool as the `g3d_anmchr.cpp` assert strings - so the font
- * accessors are this TU's own debug-print state, not a neighbour's.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for most of this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` - every unnamed address in 0x8005ABD8..0x80063888 is a
- * bare `.text` entry and the shared runtime dump has only `zz_<addr>_` placeholders).  Those definitions
- * are `extern "C"` so the object emits the map's own stem.
- *
- * Status: partial (first pass).  Bodies are written in address order; the unwritten ones are 0.  See the
- * "Residual"/"Inventory" notes at the bottom of this header and the report.
+ * g3d/g3d_anmchr.cpp - nw4r g3d character animation (`g3d_anmchr.cpp`) and the game's font/debug-print state
+ *   and accessors (`flfnt*`, `font_*`), with the GX pipe helpers and small constant/forwarder helpers.
+ * RANGE. .text 0x8005ABD8-0x80063888 (183 functions); extab, extabindex, .data 0x8058B388-0x8058C118, .bss
+ *   0x8066AE60-0x80682E80, .sdata 0x80791130-0x80791158, .sbss 0x807948D8-0x807948E8, .sdata2
+ *   0x80795CF8-0x80795D68.  The asserts from 0x8005CF10 on pass "g3d_anmchr.cpp" (.data 0x8058B410); the font
+ *   accessors' state `lbl_807948D8` and fn_8005B7A0's colour table (0x8058B3D0) sit in the same pools, so they are
+ *   this TU's.  The run's edges are a discovery cap, not proven seams.
+ * NAMES. The map's own names (`disp_beta_tex`, `dbg_drawgraph_init`, the `flfnt*`/`font_*` manglings) and stems,
+ *   the stems defined `extern "C"`; `FlFnt` is a GUESS read off the `flfnt*` bodies, its size an approximation;
+ *   `getGlyphWidth` (0x8005BF68) is a GUESS (the glyph-width lookup `Network/network_pat_control.cpp` calls).
+ * RESIDUALS. Unwritten (objdiff scores them zero): 104 functions in 36 runs, every function in the range except the
+ *   69 at 100 % and these partial ones - fn_8005AED4, fn_8005B7D8, fn_8005C7F0, fn_8005D27C, fn_8005DC30,
+ *   fn_8005DCA0, fn_800604DC, fn_8006244C, fn_80062824, fn_800628AC.
+ *   flipcheck: `.text` 0x754 of 0x8CB0; `.data`, `.bss`, `.sdata`, `.sbss` and `.sdata2` are claimed and not emitted.
  */
 
 #include "types.h"
@@ -145,7 +133,7 @@ extern "C" void fn_8005AF10(u32 coord, u32 func, u32 src, u32 mtx)
     GXSetTexCoordGen2(coord, func, src, mtx, 0, 125);
 }
 
-/* Bump/identity helper pair; fn_8005B224 returns its argument (the object pointer). */
+/* The identity helper of the store pair below: returns its argument (the object pointer). */
 extern "C" void* fn_8005B224(void* self)
 {
     return self;

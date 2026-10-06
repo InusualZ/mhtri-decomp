@@ -1,86 +1,19 @@
 /*
- * nw4r g3d: g3d_resanmscn.cpp - the `ResAnmScn` channel getters and the `ResAnmTexPat` accessor/bind
- * cluster, `.text` 0x800908FC-0x800916FC (24 functions, 0xE00 B).
- *
- * Registered once, at its final home (docs/plan.md 12), from the pooled proposal
- * `g3d/g3d_resanmscn.cpp`.  Naming - evidence class 1, a `__FILE__` string: the five channel
- * getters (fn_800908FC..fn_8009107C, lines 122/162/202/241/281 and 132/172/212/251/291) pass
- * `.data` 0x80590700 = "g3d_resanmscn.cpp" to `nw4r::db::Panic`, and the next function outside this
- * range (fn_800916FC, line 0x800916FC) passes 0x80590928 = "g3d_resanmtexsrt.cpp".  So the module is
- * `g3d` (its registered neighbours g3d_resanmfog/g3d_resanmchr are the same nw4r band), the extension
- * is `.cpp` (the `__FILE__` suffix) and the file takes the evidenced TU name; class 2 fails
- * (`dumpmap.py lookup 0x800908FC` answers the `zz_00908fc_` placeholder).
- *
- * The range spans TWO original TUs; the seam is inside it, not at its edge (recorded, not guessed
- * away):
- *
- *  * 0x800908FC-0x8009125C - `ResAnmScn`: five getters (`GetResLightSet`/`GetResAnmAmbLight`/
- *    `GetResAnmLight`/`GetResAnmFog`/`GetResAnmCamera`) plus each one's null-safe offset helper.  Every
- *    getter asserts `IsValid()`, reads one `ResAnmScnInfoData` count at +0x3C/+0x3E/+0x40/+0x42/+0x44,
- *    resolves one of the five `toResAnm*DataArray` offsets at +0x14..+0x24 and returns the element
- *    (stride 0x4C/0x1C/0x5C/0x28/0x5C - the element struct sizes) through that element type's
- *    out-of-line constructor (0x800900A4 = `g3d_reslightset_ac.h`, 0x800901AC =
- *    `g3d_resanmamblight_ac.h`, 0x80090380 = `g3d_resanmlight_ac.h`, 0x80090554 =
- *    `g3d_resanmfog_ac.h`, 0x80090728 = `g3d_resanmcamera_ac.h` - each constructor's own assert names
- *    its class header, which is what identifies the five element types).
- *  * 0x8009125C-0x800916FC - `ResAnmTexPat`: the checked `ref()` (fn_800912F8, whose assert names
- *    `g3d_resanmtexpat_ac.h` and the class string "ResAnmTexPat"), the raw data accessors, `Bind(ResFile)`
- *    (fn_800913A0) and `Release()` (fn_80091628).  Both read `ResAnmTexPatData`'s `toTexNameArray`
- *    (+0x14), `toPlttNameArray` (+0x18), `toResTexArray` (+0x1C), `toResPlttArray` (+0x20) and
- *    `info.numTexture`/`info.numPalette` (+0x34/+0x36) - the nw4r `ResAnmTexPatData` layout, which does
- *    not overlap `ResAnmScnData`'s array offsets.  The seam at 0x8009125C is where the first `ResAnmTexPat`
- *    accessor starts; the orchestrator's re-split may want to cut this unit in two there (the file name
- *    stays the evidence-backed `g3d_resanmscn.cpp` for the lower half).
- *
- * Sections: `.text` 0x800908FC-0x800916FC, `extab` 0x800091A0-0x80009208 (13 unwind-only records - one
- * per function that calls, i.e. every function but the seven leaf helpers) and `extabindex`
- * 0x80021E4C-0x80021EE8 (13 records).  Both are claimed in splits.txt; the `.data`/`.sdata` strings and
- * the one `.sdata` word ("ref") are declared here as externs (they belong to no registered unit).
- *
- * Language: C++ - `langcheck.py` says so (`__FILE__` `g3d_resanmscn.cpp` plus the mangled
- * `Panic__Q24nw4r2dbFPCciPCce` relocation), and every body is the nw4r g3d resource pattern.  The unit
- * builds with the g3d lib's flags (`cflags_g3d`: -O3, `-inline noauto`, `-Cpp_exceptions on`) - the
- * `-inline noauto` is what makes the `*_ac.h` inline constructors call out-of-line copies
- * (fn_800900A4/... and fn_80062D58/...), so those are declared and called by their map stems.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x800908FC` -> `zz_00908fc_`, and with
- * config/RMHE08/symbols.txt, whose every `.text` entry in 0x800908FC..0x800916FC is a bare
- * `fn_XXXXXXXX`), so the map's stems stand and are the identifiers.  The `*_ac.h` file strings prove the
- * *classes*, not a better symbol name.
- *
- * Measurement: this unit is registered here for the first time, so MAIN has no split object for the
- * range; `tools/units/recompile.py g3d/g3d_resanmscn.cpp --measure <symbol>` compiles with the g3d lib's
- * real command line and scores each symbol against the retired per-function objects under
- * build/RMHE08/obj/ (`auto_fn_800908FC_text.o`, `auto_03_80090AC0_text.o`, ...).  Every one of the 24
- * symbols is measured; the per-symbol numbers are in `.pi/outbox/800908fc-fn-800908fc-ab7b.json`.
- *
- * Reconstruction status (official report metric `fuzzy_match_percent`): 23 of the 24
- * symbols are at **100.00 %** - all five getters, all eight null-safe offset helpers, and every
- * `ResAnmTexPat` accessor (fn_8009125C, fn_80091280, fn_800912D4, fn_800912F8, fn_8009135C, fn_80091364,
- * fn_80091394, fn_80091584, fn_80091614, fn_80091628) - and fn_800913A0 is at 99.30 %.  The section sizes
- * land exactly (`.text` 0xE00, extab 0x68, extabindex 0x9C), so the object is size-identical to the
- * retail split; what is left is one function's register colouring, recorded here rather than worked
- * around.  No `#pragma peephole off` / `fp_contract off`: the retail object's split `li`+`blr` tails and
- * its `lwz r0` base words are what the *default* pass produces here, and turning the peephole off moves
- * the eight offset helpers' base from r0 to r3 (98.57 %) without fixing anything else - measured, and
- * the opposite of what `g3d/g3d_resanm.c`/`g3d_resanmchr.cpp` need, so this unit carries no pragma.
- *
- * Residual - fn_800913A0 (99.30 %, 484 B): the instruction sequence is identical, the colouring is not.
- * MWCC's allocator puts the two `ResAnmTexPatInfoData` counts in r31/r30 where the retail keeps them in
- * r30/r29, the texture-name array in r29 where the retail has r31, and it coalesces the palette loop's
- * counter onto the texture loop's r24 where the retail reuses the dead `numTexture` register r31; the
- * loop-local name/handle temporaries follow at 0x0C/0x1C/0x28/0x2C against the retail's
- * 0x0C/0x14/0x1C/0x28.  Declaration and counter-type permutations were swept - counts before pointers
- * and a signed palette counter took it 97.52 % -> 98.43 % -> 99.30 % (with the peephole pragma still in
- * place), and it has held 99.30 % since the pragma came out - but this is the allocator's choice, not a
- * source shape, so it is recorded rather than chased.
- *
- * Residual - nothing else.  Two source facts were needed to reach 100 % and are worth recording: the five
- * getters' two class temporaries must be declared fallback-then-result for MWCC to put them at r1+0xC (the
- * empty path) and r1+0x8 (the element path), and the `%s::%s: Object not valid.` message's `"ref"`
- * argument must stay a *literal* (an extern would be loaded with `lis`/`addi` instead of the retail's
- * `li r7, ...@sda21`).
+ * g3d/g3d_resanmscn.cpp - nw4r g3d `ResAnmScn` channel getters (`GetResLightSet`, `GetResAnmAmbLight`,
+ *   `GetResAnmLight`, `GetResAnmFog`, `GetResAnmCamera`, each with its null-safe offset helper) and the
+ *   `ResAnmTexPat` accessors, `Bind(ResFile)` (fn_800913A0) and `Release()` (fn_80091628).
+ * RANGE. .text 0x800908FC-0x800916FC (24 functions); extab, extabindex, .data 0x805908B0-0x80590928, .sdata
+ *   0x80791268-0x80791270.  The range holds two classes: `ResAnmScn` 0x800908FC-0x8009125C (its getters pass
+ *   "g3d_resanmscn.cpp", .data 0x80590700) and `ResAnmTexPat` 0x8009125C-0x800916FC, a candidate TU seam.
+ * NAMES. Map stems (the dump answers `zz_` placeholders); the element types come from each out-of-line
+ *   constructor's `*_ac.h` assert (fn_800900A4, fn_800901AC, fn_80090380, fn_80090554, fn_80090728).
+ * RESIDUALS. fn_800913A0: register colouring only - the two `ResAnmTexPatInfoData` counts in r31/r30 (retail
+ *   r30/r29), the texture-name array in r29 (retail r31), the palette counter on r24 (retail reuses r31), and the
+ *   loop temporaries at 0x0C/0x1C/0x28/0x2C (retail 0x0C/0x14/0x1C/0x28).
+ *   flipcheck: `.data` is claimed and not emitted; `.sdata` is 0x4 of 0x8.
+ * SHAPES. No peephole pragma: turning it off moves the eight offset helpers' base from r0 to r3.
+ *   The five getters declare the fallback temporary before the result (r1+0xC for the empty path, r1+0x8 for the
+ *   element), and the `"ref"` assert argument stays a literal (an extern loads with `lis`/`addi`, not `@sda21`).
  */
 
 #include "types.h"
@@ -237,11 +170,10 @@ struct ResName {
 
 /*
  * The declarations this unit needs.  The `*_ac.h` inline constructors/resolvers are out-of-line copies
- * owned by other translation units (their map names are plain stems, so they stay C linkage):
- * 0x800658C4/0x800658B0 and the five 0x800900A4..0x80090728 constructors are in the unclaimed
- * 0x8009xxxx/g3d band; 0x80052984..0x80053A90 belong to the texture units in the 0x80052xxx band;
- * 0x8006268C/0x80062D58 are owned by g3d/g3d_anmchr.cpp, 0x800699B4/0x800699A8/0x80069BD8/0x80069C14 by
- * g3d/fn_800680CC.cpp, and 0x800926CC/0x80092990 by the unclaimed ResFile unit.
+ * owned by other units (plain map stems, so C linkage): 0x800658C4/0x800658B0 by `g3d/fn_80063888.cpp`, the
+ * five 0x800900A4..0x80090728 constructors by `g3d/g3d_resanmlight.cpp`, 0x80052984..0x80053A90 by the texture
+ * units of the 0x80052xxx band, 0x8006268C/0x80062D58 by `g3d/g3d_anmchr.cpp`, 0x800699B4/0x800699A8/0x80069BD8/
+ * 0x80069C14 by `g3d/fn_800680CC.cpp`, and 0x800926CC/0x80092990 by `g3d/g3d_resanmtexsrt.cpp`.
  */
 extern "C" {
 
@@ -303,8 +235,7 @@ void *fn_80069C14(void *self, void *src); /* g3d/fn_800680CC.cpp */
 u32 fn_800699B4(void *p);
 u32 fn_800699A8(void);
 
-/* The `ResFile` lookups (unclaimed ResFile unit, 0x80092xxx band): resolve a name to a texture/palette
- * handle. */
+/* The `ResFile` lookups (`g3d/g3d_resanmtexsrt.cpp`): resolve a name to a texture/palette handle. */
 u32 fn_80092990(void *file, ResName name);
 u32 fn_800926CC(void *file, ResName name);
 

@@ -1,13 +1,4 @@
-/*
- * The `g3d/g3d_calcview.cpp` unit's cross-unit declarations (docs/plan.md 6.5 rule 2).
- *
- * `g3d_calcview.cpp` (`.text` 0x8006F738-0x8007270C) owns the view/billboard-matrix calculator and the
- * `ResMdl` handle validity accessors the `g3d_resmdl_ac.h` inlined assert expands to.  A consumer
- * (`g3d/g3d_scnmdl.cpp`, whose fn_8007D404 is that assert's out-of-line copy) includes this header
- * instead of declaring them itself.
- *
- * Both keep C linkage (their map names are plain `fn_XXXXXXXX` stems).
- */
+/* g3d/g3d_calcview.h - the `ResMdl` handle validity accessors `g3d/g3d_calcview.cpp` owns (C linkage). */
 #ifndef MHTRI_G3D_G3D_CALCVIEW_H
 #define MHTRI_G3D_G3D_CALCVIEW_H
 
@@ -20,7 +11,7 @@ extern "C" {
 const char* fn_8006FFBC(void);      /* 0x8006FFBC - the `ResMdl` type name the assert prints */
 u32 fn_8006FFC8(void* pSelf);       /* 0x8006FFC8 - the `ResMdl` handle validity test */
 
-/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the checked resource resolver. */
+/* The checked resource resolver `g3d/g3d_resfile.cpp` calls. */
 u32 fn_800700C0(void* p); /* 0x800700C0 - the checked resource resolver */
 
 #ifdef __cplusplus

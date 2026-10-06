@@ -1,10 +1,5 @@
-/* The g3d camera-animation unit `g3d/g3d_resanmcamera.cpp` (0x8008A220-0x8008A664; the earlier
- * `.c` spelling covered only 0x8008A220-0x8008A28C and was merged into this one TU 2026-09-24).
- *
- * Declarations moved here from the consumer units' `src/` files (docs/plan.md 6.5 rule 2:
- * an extern lives with the TU that owns the symbol).  The signature set is what the
- * consumers used; where only the parameter spelling differed the wider form is kept.
- */
+/* g3d/g3d_resanmcamera.h - the cross-unit declarations of `g3d/g3d_resanmcamera.cpp`, in the consumers'
+ *   spellings (the wider form where only a parameter spelling differed). */
 #ifndef MHTRI_G3D_G3D_RESANMCAMERA_H
 #define MHTRI_G3D_G3D_RESANMCAMERA_H
 

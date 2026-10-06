@@ -1,57 +1,26 @@
 /*
- * nw4r g3d: g3d_state.cpp - the `G3DState` cluster, `.text` 0x8008452C-0x80088E24 (167 functions),
- * plus its `extab` (0x80008ADC-0x80008DE0) and `extabindex` (0x8002148C-0x800218AC) records.  Phase 4 cut the
- * `ResVtx*` accessor tail (0x80088E24-0x800898B0, the second `.data` fragment below) into `g3d_resvtx.cpp`.
- *
- * Registered once, at its final home, from proposal `8008452C` - the 0x8008452C-0x800898B0 maximal
- * unclaimed run.  The evidence:
- *
- *  - **source name**: the run's own `__FILE__` string - `.data` 0x8058F750 holds `"g3d_state.cpp"`
- *    (18 references, the file argument of the `nw4r::db::Panic` asserts from fn_80084630 on, e.g.
- *    fn_80085C70's `mtxID < NUM_CAMERA` at line 0x6C5).  It is the name of the original source file,
- *    so module and name are decided (brief section 2 class 1); `langcheck`'s authority says C++.
- *  - **left seam** 0x8008452C: the enclosing attachment's own anchor `"g3d_anmroot.cpp"`-family ends
- *    there - `tudiscover at 0x80084300` gives the `g3d_scnroot.cpp` TU as 0x800827E4-0x8008452C with
- *    `.data` fragment 0x8058F530-0x8058F74A; this run's fragment starts at 0x8058F750, the next
- *    address.  The seam is a real TU boundary.
- *  - **right seam** 0x800898B0: the registered `g3d/g3d_resanm.c` starts exactly there; `tudiscover
- *    at 0x800894C8` calls it a *strong* cut (`.sdata2` lbl_80795EA0 -> lbl_80795EA8).
- *  - **interior**: a second `.data` fragment opens at 0x8058FCE8 (the `g3d_resvtx_ac.h` /
- *    `ResVtxFurVec` / `ResVtxTexCoord` strings), so the last ~35 functions are a second TU: the reconciled
- *    candidate cuts the run at 0x80088E24 and `g3d_resvtx.cpp` takes the tail.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `tools/symbols/dumpmap.py` over the range and the proposal's 202-entry inventory - every name is a
- * `fn_`/`dtor_` stem, no mangling, so no better name can be derived).
- *
- * **State of the unit.**  Registered and building; 31 of the run's 202 functions are reconstructed
- * here (26 byte-exact, one at 99.93 %, four partial - the table below).  The remaining 171 keep
- * their auto/ units until the next pass; they are not stubbed, because a wrong shape costs the next
- * reader more than a missing body (brief section 5: a function that resists is a residual, and this
- * file's header is where it is recorded).
- *
- * ```text
- * 100.00 %  fn_8008452C fn_80084594 fn_80084600 fn_80085344 fn_80085478 fn_8008569C fn_800856CC
- *           fn_800856D4 fn_80085AF8 fn_80085B00 fn_80085B28 fn_80085B54 fn_80085F3C fn_80086118
- *           fn_80086138 fn_80086154 fn_80086390 fn_80086640 fn_80086760 fn_80086768 fn_80086770
- *           fn_800867A0 fn_800868A0 fn_800868D8 fn_80086AA0 fn_80086FFC
- *  99.93 %  fn_8008455C  (56 B, paired - one relocation/argument differs)
- *  74.17 %  fn_80086610  (48 B target / 36 B ours: the two masked flag tests fuse to the record form
- *                        `rlwinm.`/`clwi.` instead of the target's separate `rlwinm` + `cmpwi`.  Tried:
- *                        early-return chain, one `&&` expression, materialised mask locals - all fuse.)
- *  71.25 %  fn_800868E4  (16 B target / 12 B ours: the target masks the argument with `clrlwi 24`
- *                        before the byte store; `GXWGFifo.u8 = value` stores the low byte directly.
- *                        Tried: `(u8)` cast, a `u8` local, a `u8` parameter - all stay 12 B.)
- *  56.00 %  fn_800856A4  56.00 %  fn_800856B8
- *           (20 B target / 16 B ours: the target materialises `(flags & 0x20) == 0` with `rlwinm` +
- *            `cntlzw` + `srwi 5`; MWCC folds the single-bit test to `extrwi` + `xori` no matter how it
- *            is spelled - bound first, ternary, `if`/`return`, `<= 0`.)
- * ```
- *
- * Not reconstructed yet: the run's larger bodies in address order - fn_80084630 (0x3E4), fn_80084B9C
- * (0x4A0), fn_80084A14 (0x188), fn_80085B6C (0x104), fn_800856F4 (0x3D8), fn_800861E0 (0x13C),
- * fn_8008715C (0x288), fn_80087680 (0x1F0), fn_80088AD0 (the `.ctors` static constructor, 0xD4),
- * fn_80088C28 (0x100) ... plus the tail accessors of the may-be-separate TU documented above.
+ * g3d/g3d_state.cpp - the nw4r g3d `G3DState` cluster: GX state writes and the camera matrix table the
+ *   `mtxID < NUM_CAMERA` asserts guard.
+ * RANGE. .text 0x8008452C-0x80088E24 (167 functions); extab, extabindex, .ctors 0x8056F2D4-0x8056F2D8, .rodata
+ *   0x8056F6D0-0x8056F710, .data 0x8058F750-0x8058FCE8 (opens on "g3d_state.cpp"), .bss 0x80682E80-0x80688420,
+ *   .sdata 0x80791238-0x80791258, .sbss 0x807948F0-0x80794910, .sdata2 0x80795E70-0x80795E98.  Left seam:
+ *   `g3d/g3d_scnroot.cpp`'s `.data` fragment ends at 0x8058F74A; the right edge is `g3d/g3d_resvtx.cpp`, whose
+ *   fragment opens at 0x8058FCE8.
+ * NAMES. Map stems (`fn_`/`dtor_`, no mangling to derive from); `mtx34_inverse` (0x800883C4) is a GUESS (the 3x4
+ *   matrix inverse its body computes).
+ * RESIDUALS. 136 functions unwritten (objdiff scores them zero) in 13 runs: 0x80084630-0x80085344,
+ *   0x80085350-0x80085478, 0x800854B8-0x8008569C, 0x800856F4-0x80085AF8, 0x80085B6C-0x80085F3C,
+ *   0x80085F60-0x80086118, 0x80086194-0x80086390, 0x80086398-0x80086610, 0x80086648-0x80086760,
+ *   0x800867AC-0x800868A0, 0x800868F4-0x80086AA0, 0x80086AA8-0x80086FFC, 0x80087004-0x80088E24 (with the `.ctors`
+ *   static constructor fn_80088AD0).
+ *   fn_8008455C: one relocation argument differs.
+ *   fn_80086610: the two masked flag tests fuse to the record form (`rlwinm.`) where retail keeps `rlwinm` + `cmpwi`
+ *     (tried: an early-return chain, one `&&` expression, mask locals).
+ *   fn_800868E4: retail masks the argument with `clrlwi 24` before the byte store, ours stores the low byte directly
+ *     (tried: a `(u8)` cast, a `u8` local, a `u8` parameter).
+ *   fn_800856A4, fn_800856B8: retail materialises `(flags & 0x20) == 0` with `rlwinm` + `cntlzw` + `srwi 5`; MWCC
+ *     folds it to `extrwi` + `xori` for every spelling tried.
+ *   flipcheck: `.text` 0x394 of 0x48F8; `.ctors`, `.bss`, `.sbss` and every data section are claimed and not emitted.
  */
 
 #include "types.h"
@@ -87,10 +56,8 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 }  // namespace db
 }  // namespace nw4r
 
-/* The SDK entry points the target reaches with their own `lis`/`addi` (their bracketing registered
- * units name different modules, so the unsplit band does not carry them - rule 2's named gap).
- * mtx34_identity/MTX34_ctor (owner fn_8004CAD8.cpp) and fn_80075390..fn_80075620 (owner
- * g3d/g3d_camera.cpp) are now declared in those owners' headers and #included above (rule 2). */
+/* The SDK entry points the target reaches with their own `lis`/`addi`; mtx34_identity/MTX34_ctor and
+ * fn_80075390..fn_80075620 come from their owners' headers above. */
 extern "C" void fn_80501658(void* p);
 
 /* ------------------------------------------------------------------------------------------------ */

@@ -1,17 +1,6 @@
-/*
- * The `g3d/g3d_resanmscn.cpp` unit's cross-unit declarations (docs/plan.md 6.5 rule 2).
- *
- * `g3d/g3d_resanmscn.cpp` (`.text` 0x800908FC-0x800916FC) owns the `ResAnmScn` channel getters and the
- * `ResAnmTexPat` accessor/bind cluster.  The right-hand `g3d/g3d_resanmtexsrt.cpp` unit
- * (0x800916FC-0x80093990) consumes the five `ResAnmTexPat` helpers below through its
- * `ResFile`/`ResDic` chain and used to declare them locally, because the range was registered without a header; registering `g3d_resanmscn.cpp` makes the
- * addresses owned, so the declarations move here (rule 2) and the consumer includes this header.
- *
- * All five keep C linkage (the map carries plain `fn_XXXXXXXX` stems).  The signatures are the owner's
- * own forward declarations in `g3d_resanmscn.cpp`, inside its `extern "C"` block; the owner does not
- * include this header, so no translation unit ever sees two declarations of one C-linkage symbol (the
- * "illegal function overloading" trap).
- */
+/* g3d/g3d_resanmscn.h - the five `ResAnmTexPat` helpers of `g3d/g3d_resanmscn.cpp` that `g3d/g3d_resanmtexsrt.cpp`
+ *   calls through its `ResFile`/`ResDic` chain (C linkage).  The owner does not include this header, so no unit
+ *   sees two declarations of one C symbol. */
 #ifndef MHTRI_G3D_G3D_RESANMSCN_H
 #define MHTRI_G3D_G3D_RESANMSCN_H
 
