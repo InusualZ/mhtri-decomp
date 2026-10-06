@@ -57,9 +57,11 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "g3d/g3d_calcworld.h"
 #include "g3d/g3d_resanmcamera.h"
 #include "sys_mem.h"
-#include "unsplit/ef.h"
+#include "ef/ef_torus.h" /* fn_800C9DCC (rule 2) */
 #include "unsplit/enemy.h"
-#include "unsplit/g3d.h"
+#include "g3d/fn_800680CC.h" /* fn_80069664 (rule 2) */
+#include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8006FDCC/fn_8007100C (rule 2) */
+#include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
 #include "nw4r/db_assert.h" /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
 #include "g3d/g3d_state.h"
 #include "unsplit/sound.h"
@@ -233,7 +235,7 @@ extern f32 calcVecDistXZ(const Vec3* a, const Vec3* b);
 extern void addVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern void fn_800516F0(Mtx34* mtx);
 extern void fn_80051894(Mtx34* out, const Mtx34* a, const Mtx34* b, s32 arg3, f32 t, f32 u);
-extern void fn_80051EE0(Vec3* out, const Vec3* v, f32 scale);
+extern void vec3_scale(Vec3* out, const Vec3* v, f32 scale);
 extern f32 fn_80052214(const Vec3* a, const Vec3* b);
 extern void fn_800524C0(Vec3* out, const Vec3* a, const Vec3* b, const Vec3* c, f32 t);
 extern void fn_800532DC(Mtx34* out, const Mtx34* src);
@@ -712,7 +714,7 @@ void fn_8013823C(EnemyWork* self) {
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v50, &self->field_0x188, self->field_0x1E1);
             copyVec3(&vD4, &v50);
             addVec3(&v74, &vC8, &vBC);
-            fn_80051EE0(&v80, &v74, lbl_80796D50);
+            vec3_scale(&v80, &v74, lbl_80796D50);
             copyVec3(&vB0, &v80);
             subVec3(&v2C, &vBC, &vB0);
             copyVec3(&vA4, &v2C);

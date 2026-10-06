@@ -161,7 +161,7 @@ f32 fn_8028F86C(PlBox* box, const VEC3* point, f32* param) {
         VEC3 scaled;
 
         t = fn_8028F84C(fn_80052214(&sep.x, &box->vec_0x18.x) / axis_len2, 0.0f, 1.0f);
-        fn_80051EE0(&scaled, &box->vec_0x18, t);
+        vec3_scale(&scaled, &box->vec_0x18, t);
         /* `fn_800B0B90` is declared with the `ef` module's `Vec`, a distinct 0xC record with the same
          * layout (`ef.h`); the conversion is a view, not arithmetic. */
         fn_800B0B90((Vec*)&sep, (Vec*)&scaled);
@@ -187,7 +187,7 @@ f32 fn_8028F938(VEC3* start, VEC3* end, VEC3* point, VEC3* out) {
     subVec3(&diff, end, start);
     copyVec3(&box.vec_0x18, &diff);
     dist = fn_8028F86C(&box, point, &param);
-    fn_80051EE0(&scaled, &box.vec_0x18, param);
+    vec3_scale(&scaled, &box.vec_0x18, param);
     addVec3(&pos, &scaled, start);
     copyVec3(out, &pos);
     return dist;

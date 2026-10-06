@@ -26,7 +26,8 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* IS_VALID_PTR (rule 1) */
-#include "unsplit/g3d.h"         /* fn_8007100C, fn_80082F18 (rule 2) */
+#include "g3d/g3d_calcview.h" /* fn_8007100C (rule 2) */
+#include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
 #include "g3d/g3d_anmchr.h"      /* fn_800610AC, fn_800618BC, fn_800628C8 (rule 2) */
 #include "g3d/fn_80063888.h"     /* fn_8006497C (rule 2) */
 #include "fn_8004CAD8.h"         /* anim_tick_angle, mtx34_identity, sqrt_f32 (rule 2) */

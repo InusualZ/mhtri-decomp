@@ -30,7 +30,7 @@
 #include "ef/fn_800AEE48.h"
 #include "gx.h"
 #include "unsplit/ef.h"
-#include "unsplit/g3d.h"
+#include "g3d/g3d_scnroot.h" /* fn_800834F0 (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_80077DF0, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 

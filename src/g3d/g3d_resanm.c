@@ -19,7 +19,7 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
-#include "unsplit/g3d.h" /* fn_80082F18, owner g3d/g3d_scnroot.cpp */
+#include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
 #include "g3d/fn_80063888.h" /* fn_800651BC, owned by g3d/fn_80063888.cpp (rule 2) */
 
 #pragma peephole off

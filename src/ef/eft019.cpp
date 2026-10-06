@@ -39,7 +39,7 @@
 #include "main.h"
 #include "Pl/Pl_master_ck.h"
 #include "unsplit/unknown.h"
-#include "unsplit/g3d.h"
+#include "g3d/g3d_scnroot.h" /* fn_80082BCC (rule 2) */
 #include "sound/fn_800D7F54.h"
 #include "ef/ef_particlemanager.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */

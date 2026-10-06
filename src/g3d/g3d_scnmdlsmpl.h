@@ -26,6 +26,10 @@ void dtor_80080F7C(void* pSelf, s32 flag); /* 0x80080F7C - the base's teardown *
 u32 fn_8007F41C(void* pSelf, u32* pArg2, u32* pArg3); /* 0x8007F41C - the copied-material pass */
 void fn_80080C60(void* pSelf, void* pArg2, u32* pArg3); /* 0x80080C60 - the ScnMdlSimple base constructor */
 
+/* The two option setters the game's model users call. */
+void fn_80080B10(void* arg0, u32 arg1);
+void fn_800810DC(void* arg0, s32 arg1);
+
 #ifdef __cplusplus
 }
 #endif

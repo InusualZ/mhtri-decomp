@@ -17,11 +17,10 @@
  *    `fn_800AC178`: `extsh.` where retail keeps `extsh` + `cmpwi` (both the peephole pass's folds);
  *  - `fn_800AC0E4`, `fn_800AC100`: the argument copies take other registers and are scheduled differently;
  *  - `fn_800ADDCC`: the index scaling folds to `clrlslwi` where retail keeps `clrlwi` + `slwi`.
- *   relocdiff: `fn_800AD9C0` scores 100 but calls `fn_80501EE0`, a name the map does not carry, where retail calls
- *   `fn_80051EE0`; our `.ctors` word carries the symbol `lbl_8056F2DC`, retail's none.
+ *   relocdiff: our `.ctors` word carries the symbol `lbl_8056F2DC`, retail's none.
  *   flipcheck: `.bss`, `.data` and `.sdata2` claimed, not emitted (`.sdata2` is a partial pool: flipcheck names a
  *   fold with `ef/ef_particle.cpp`, one shared literal); `.text` 0x990 of 0x37F0; extab 0x90 of 0x108; extabindex
- *   0xD8 of 0x18C; `fn_80501EE0` is undefined at link.
+ *   0xD8 of 0x18C.
  * SHAPES. The pointer asserts are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
  *   ("ef_particlemanager.cpp", "particle.h" or "res_emitter.h"); `#line` reproduces each assert's line (61, 72, 73,
  *   0x29E, 0x2D5, ...).
@@ -32,8 +31,10 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/ef_particlemanager.h"
+#include "ef/ef_emitter.h" /* ef_store_word (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
+#include "vec3_scale.h" /* vec3_scale (rule 2) */
 
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 namespace nw4r { namespace math { f32 SinFIdx(f32); } }
@@ -71,10 +72,8 @@ void fn_800513F0(void* dst, f32 f);
 void fn_800514FC(void* dst, const void* a, const void* b);
 s32 fn_800A5248(void* self);
 u8* fn_800A8BF8();
-void fn_800A8998(void* a, void* b);
 void fn_80501C80(void* self, s32 v);
 void fn_805013FC(void* a, void* b, f32 f);
-void fn_80501EE0(void* a, f32 f);
 }
 
 void operator delete(void* p) throw();
@@ -369,9 +368,9 @@ extern "C" void fn_800AD514(void* a, void* b, f32 f) {
     fn_805013FC(a, b, lbl_807960C0 * f);
 }
 
-/* The reciprocal-rate wrapper. */
-extern "C" void fn_800AD9C0(void* a, f32 f) {
-    fn_80501EE0(a, lbl_807960A8 / f);
+/* The reciprocal-rate wrapper: `out = in * (1 / f)`. */
+extern "C" void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 f) {
+    vec3_scale(out, in, lbl_807960A8 / f);
 }
 
 /* Scale the parameter's rate by `1.0f - rate` onto the matrix. */
@@ -421,7 +420,7 @@ extern "C" void fn_800AE6A4() {
 }
 
 extern "C" void fn_800AEE0C(void* a, EfPmManager* m) {
-    fn_800A8998(a, m->resource);
+    ef_store_word(a, (s32)m->resource);
 }
 
 /* The .ctors entry: construct the file's two static matrices. */

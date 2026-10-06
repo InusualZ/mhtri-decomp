@@ -26,7 +26,6 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "gx.h"              /* GXWGFifo, the 0xCC008000 write window (rule 1) */
-#include "unsplit/g3d.h"       /* unsplit g3d neighbours (rule 2) */
 #include "g3d/g3d_anmchr.h"    /* fn_8005DC24, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/fn_80063888.h"   /* fn_800639D0, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_identity/MTX34_ctor, owned by fn_8004CAD8.cpp (rule 2) */

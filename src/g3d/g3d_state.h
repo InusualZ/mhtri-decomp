@@ -4,6 +4,10 @@
 #define MHTRI_G3D_G3D_STATE_H
 
 #include "types.h"
+#include "nw4r/math.h"
+
+/* The render-mode record `fn_80088584` returns; only used through a pointer. */
+struct RenderModeObj;
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,6 +30,15 @@ u8* fn_80089700(void* pSelf, u32 index);
 u8* fn_8008976C(void* pSelf, u32 index);
 u8* fn_800897D8(void* pSelf, u32 index);
 u8* fn_80089844(void* pSelf, u32 index);
+
+/* 0x80088584 - the render-mode helper (caller: g3d_camera.cpp). */
+struct RenderModeObj* fn_80088584(void);
+
+/* 0x800868A0 - the pipe-command writer (callers: gx/fn_8009AA78.c, gx/fn_8009ACE4.c). */
+void fn_800868A0(u32 value);
+
+/* 0x8079124C - the `.sdata` word the unit hands back the address of. */
+extern u32 lbl_8079124C;
 
 #ifdef __cplusplus
 }

@@ -17,6 +17,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef/ef_emitter.h" /* ef_store_word (rule 2) */
 #include "pl.h"
 #include "ef/eft007.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -88,7 +89,6 @@ struct EftState {
 /* ------------------------------------------------------------------------------------------------ */
 
 /* Stores its second argument through its first. */
-extern "C" void fn_800A8998(void** dst, void* value);
 /* Returns the shared `lbl_80694598` block. */
 extern "C" void* fn_800B2878(void);
 /* Bounds-checks `index` against `obj`'s +0x08 count, then forwards to `fn_80501C9C`. */
@@ -121,7 +121,7 @@ extern "C" void fn_80101DF4(EftState* self) {
     u32* area_table;
 
     set = self->set;
-    fn_800A8998(&unused_0x08, NULL);
+    ef_store_word(&unused_0x08, NULL);
     fn_800B4A70(fn_800B2878(), 4);
 
     self->state++;

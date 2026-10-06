@@ -9,10 +9,11 @@
  *   fn_800A6414 destroy, fn_800A6420 retire, fn_800A6EC4 create child, fn_800A7378 create, fn_800A8A5C,
  *   fn_800A8D30, fn_800A8DF8, fn_800A8F18), .sbss 0x80794920-0x80794928, .sdata2 0x80796000-0x80796030.
  * FLAGS. `cflags_main`.
- * NAMES. The map has only `fn_` stems for the range.  The object's containers are named by its asserts: its own
- *   particle-manager list at +0xC0 (`NW4R_EF_MAX_PARTICLEMANAGER`, 0x400) and the emitter manager's list at
- *   manager+0x24 (`NW4R_EF_MAX_EMITTER`, 0x200); `mManagerEF` is at +0xBC, the work record at +0xB8, the parent
- *   at +0xF4 and the object's MTX34 at +0x124.
+ * NAMES. The map has only `fn_` stems for the range but four GUESS names from the bodies: `ef_store_word`,
+ *   `ef_truncate_float`, `ef_random_float` and `ef_res_block_body`.  The object's containers are named by its
+ *   asserts: its own particle-manager list at +0xC0 (`NW4R_EF_MAX_PARTICLEMANAGER`, 0x400) and the emitter
+ *   manager's list at manager+0x24 (`NW4R_EF_MAX_EMITTER`, 0x200); `mManagerEF` is at +0xBC, the work record at
+ *   +0xB8, the parent at +0xF4 and the object's MTX34 at +0x124.
  * RESIDUALS. 29 partial rows (ours 0x34E8 of 0x375C), including:
  *  - `fn_800A8D18` (ours 0xC of 0x18), `fn_800A94A4` (ours 0x110 of 0x134): retail masks then booleanises
  *    (`rlwinm; neg; or; srwi`) where MWCC folds the flag test into `extrwi` for every spelling tried;
@@ -23,8 +24,6 @@
  *  - `fn_800A7750` (ours 0x714 of 0x7B0), `fn_800A7378`: retail calls `fn_800A4864` where ours does not, and
  *    `fn_800A7750` has a `Panic(..., "Failed assertion false")` path ours lacks;
  *  - `fn_800A6A04`: ours calls `fn_800A4864` and `fn_800A4420` where retail reads `lbl_80796008`;
- *  - `fn_800A8040`: ours passes the `target` pointer message `lbl_8059291C` where retail passes the `eh` message
- *    `lbl_80592954`;
  *  - `fn_800A8A5C`: the `fn_800A8BC8` call sits at another point of the pass;
  *  - `fn_800A8220`, `fn_800A8300`: the argument copy `mr r3, r4` is scheduled elsewhere and the float registers
  *    differ;
@@ -171,7 +170,7 @@ typedef struct EfList {
     /* +0x14 */ void* field_0x14;
 } EfList; /* size: 0x18 */
 
-/* The random block `fn_800A5900` seeds and `fn_800A8A08` steps. */
+/* The random block `fn_800A5900` seeds and `ef_random_float` steps. */
 typedef struct EfRandom {
     /* +0x00 */ u32 state;
 } EfRandom; /* size: 0x04 */
@@ -339,7 +338,7 @@ typedef struct EfPmView {
     /* +0x8A */ u8 dirty;
 } EfPmView; /* size: 0x8B (lower bound) */
 
-/* The length-prefixed blocks the emitter resource is walked through: `fn_800A8C24` steps 8 bytes in
+/* The length-prefixed blocks the emitter resource is walked through: `ef_res_block_body` steps 8 bytes in
  * from its own `offset`, `fn_800A8BF8` 4. */
 typedef struct EfResHeader {
     /* +0x00 */ u32 field_0x00;
@@ -448,21 +447,21 @@ EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitterParam* pa
 s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* params, EfParticleRec* pm,
                 s32 life_bonus, void* host);
 EfVec* fn_800A7F00(EfParticleRec* self, EfVec* result);
-void* fn_800A8040(EfEmitterObj* self, void* target, u32 a, u32 b, s8 c, u32 d, u8 e);
+void* fn_800A8040(EfEmitterObj* self, void* eh, u32 a, u32 b, s8 c, u32 d, u8 e);
 f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4);
 f32 fn_800A8300(void* a, void* b);
 void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx);
 void* fn_800A8944(void* self);
 void* fn_800A8968(EfEmitterObj* self);
 void* fn_800A898C(void* dst, const void* src);
-void* fn_800A8998(void* dst, s32 v);
+void* ef_store_word(void* dst, s32 v);
 void* fn_800A89A0(void* dst, const void* src);
-f32 fn_800A8A04(f32 x);
-f32 fn_800A8A08(u32* random);
+f32 ef_truncate_float(f32 x);
+f32 ef_random_float(u32* random);
 void fn_800A8A5C(EfEmitterObj* self);
 u16 fn_800A8BC8(void* res);
 void* fn_800A8BF8(void* res);
-void* fn_800A8C24(void* res);
+void* ef_res_block_body(void* res);
 void* fn_800A8C34(void* res, u16 index);
 void* fn_800A8CB8(void* res);
 u16 fn_800A8CE8(void* res);
@@ -1097,13 +1096,13 @@ extern "C" EfVec* fn_800A7F00(EfParticleRec* self, EfVec* result) {
  * 0x800A8040 - sweep this object's managers for the one matching a set of flag bytes.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void* fn_800A8040(EfEmitterObj* self, void* target, u32 a, u32 b, s8 c, u32 d, u8 e) {
+extern "C" void* fn_800A8040(EfEmitterObj* self, void* eh, u32 a, u32 b, s8 c, u32 d, u8 e) {
 #line 700
-    NW4R_POINTER_ASSERT(lbl_80592850, target, lbl_8059291C);
+    NW4R_POINTER_ASSERT(lbl_80592850, eh, lbl_80592954);
     void* node = fn_800A5250(&self->particles);
     while (node != NULL) {
         EfPmView* pm = (EfPmView*)node;
-        if (pm->param == target) {
+        if (pm->param == eh) {
             u32 flags = pm->flags;
             if (a == (flags & 1) && b == (flags & 2) && pm->field_0x88 == c &&
                 d == (flags & 4) && pm->field_0x89 == e) {
@@ -1161,9 +1160,9 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
     }
     self->field_0x0E0 = self->interval;
     if (self->rate != lbl_80796004) {
-        f32 r = fn_800A8A08(&self->random.state);
+        f32 r = ef_random_float(&self->random.state);
         self->field_0x0E0 +=
-            (u16)(s32)(fn_800A8A04(((f32)self->interval * self->rate) - lbl_8079601C) * r);
+            (u16)(s32)(ef_truncate_float(((f32)self->interval * self->rate) - lbl_8079601C) * r);
     }
     if ((self->flags2 & 0x2000) != 0) {
         self->life = (f32)self->life_frames;
@@ -1174,7 +1173,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
         } else {
             step = self->scale_0x028.scale +
                    self->scale_0x028.scale * self->scale_step *
-                       (lbl_80796020 * fn_800A8A08(&self->random.state) - lbl_8079601C);
+                       (lbl_80796020 * ef_random_float(&self->random.state) - lbl_8079601C);
         }
         if ((self->flags2 & 0x100) != 0) {
             EfEffectData* effect = self->managerEF->effect;
@@ -1227,7 +1226,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
             {
                 s32 a = 0;
                 s32 b = 0;
-                fn_800A8998(&a, 0);
+                ef_store_word(&a, 0);
                 fn_800AEE0C(&b, pm);
                 fn_800A898C(&a, &b);
                 if ((*(u8*)((u8*)fn_800A8944(&a) + 3) & 0x20) != 0) {
@@ -1265,7 +1264,7 @@ extern "C" void* fn_800A898C(void* dst, const void* src) {
     return dst;
 }
 
-extern "C" void* fn_800A8998(void* dst, s32 v) {
+extern "C" void* ef_store_word(void* dst, s32 v) {
     *(u32*)dst = (u32)v;
     return dst;
 }
@@ -1292,7 +1291,7 @@ extern "C" void* fn_800A89A0(void* dst, const void* src) {
  * 0x800A8A04 - the spawner's truncation (a one-argument runtime call).
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" f32 fn_800A8A04(f32 x) {
+extern "C" f32 ef_truncate_float(f32 x) {
     return fn_80463E2C(x);
 }
 
@@ -1300,7 +1299,7 @@ extern "C" f32 fn_800A8A04(f32 x) {
  * 0x800A8A08 - the random block stepped and normalised to 0..1.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" f32 fn_800A8A08(u32* random) {
+extern "C" f32 ef_random_float(u32* random) {
     fn_800A6EA4(random);
     return (f32)(*random >> 16) / lbl_80796024;
 }
@@ -1370,11 +1369,11 @@ extern "C" u16 fn_800A8BC8(void* res) {
 }
 
 extern "C" void* fn_800A8BF8(void* res) {
-    EfChainHeader* h = (EfChainHeader*)fn_800A8C24(res);
+    EfChainHeader* h = (EfChainHeader*)ef_res_block_body(res);
     return (u8*)h + h->offset + sizeof(EfChainHeader);
 }
 
-extern "C" void* fn_800A8C24(void* res) {
+extern "C" void* ef_res_block_body(void* res) {
     EfResHeader* h = (EfResHeader*)res;
     return (u8*)h + h->offset + sizeof(EfResHeader);
 }

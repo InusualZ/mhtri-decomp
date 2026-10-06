@@ -31,8 +31,8 @@
 #include "ef/ef_drawstrategyimpl.h"
 #include "ef/ef_particle.h"
 #include "ef/ef_particlemanager.h"
-#include "unsplit/ef.h"
-#include "unsplit/g3d.h"
+#include "ef/ef_drawstripestrategy.h" /* fn_800B7DB0/fn_800B4B04 (rule 2) */
+#include "g3d/g3d_calcview.h" /* fn_800710BC (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling

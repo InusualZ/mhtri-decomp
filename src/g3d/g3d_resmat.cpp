@@ -24,7 +24,7 @@
 #include "g3d/fn_800680CC.h"               /* fn_8006E2AC, owner g3d/fn_800680CC.cpp (rule 2) */
 #include "g3d/g3d_state.h"                 /* fn_80087870, owner g3d/g3d_state.cpp (rule 2) */
 #include "fn_8004CAD8.h"                   /* mtx34_identity, owner fn_8004CAD8.cpp (rule 2) */
-#include "unsplit/g3d.h"                   /* fn_8007100C, owner g3d/g3d_calcview.cpp */
+#include "g3d/g3d_calcview.h" /* fn_8007100C (rule 2) */
 
 /* nw4r::db::Panic - the assert failure handler (variadic).  Called through its namespace
  * owner, never its mangled spelling (rule 9). */

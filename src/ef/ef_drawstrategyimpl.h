@@ -93,6 +93,8 @@ typedef struct EfAheadContext {
  * `ef/ef_drawfreestrategy.cpp`, `ef/ef_drawlinestrategy.cpp`) cast to these types. */
 EfParticleLayers* fn_800C5F74(EfParticleLayers* self);
 void fn_800C6064(EfDrawStrategyImpl* self, u32 a, u16* params, void* state);
+/* 0x800C68E8 - the per-particle draw helper the free/line/point/smooth strategies call. */
+void fn_800C68E8(void* self, void* particle, void* ed, void* em, u32 first, u32 rebindColor);
 #ifdef __cplusplus
 }
 #endif

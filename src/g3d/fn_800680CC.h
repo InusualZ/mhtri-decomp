@@ -18,7 +18,9 @@ const char* fn_80069748(void);
 s32 fn_80069754(const void* p);
 void fn_80069768(void* pDst, const void* pSrc);
 u32 fn_800696C0(const void* p);
-bool fn_8006946C(const void* p, s32 id);
+#ifdef __cplusplus
+bool fn_8006946C(const void* p, s32 id); /* C++ only: `bool` is not a C type */
+#endif
 
 /* 0x80068634 - the checked resource resolver: panics when the handle's reference is invalid, then
  * returns the body word at +0x0 (the resolved data pointer).  Owner: g3d/fn_800680CC.cpp. */
@@ -42,7 +44,7 @@ u8* fn_8006E2AC(void* pSelf);
  * `g3d/g3d_resanmtexsrt.cpp` field readers call. */
 u32 fn_8006CDBC(void* p);
 /* 0x80069664 - the indexed resource reader: the body word at +0x4 of the resolved record, or 0 for an invalid
- * handle.  `s32` to agree with `unsplit/g3d.h`, which several consumers also include. */
+ * handle.  `s32` is the consumers' spelling; the owner defines it `u32` (register-identical). */
 s32 fn_80069664(void* self);
 /* 0x8006D9FC - the indexed handle reader the `g3d_resanmtexsrt.cpp` field readers call (rule 2). */
 u32 fn_8006D9FC(void* self, u32 idx);

@@ -67,7 +67,7 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 /* The nw4r helper callees are C functions: the target object's relocations carry their plain names
  * (`VEC3_ctor`, not `fn_80043EA8__FP...`), so they are declared `extern "C"`. */
 extern "C" void fn_8009C760(f32* sin, f32* cos, f32 rad); /* PSSinCosRad */
-extern "C" f32 fn_800A8A08(Random* r);                    /* Random::RandFloat */
+extern "C" f32 ef_random_float(Random* r);                    /* Random::RandFloat */
 extern "C" void fn_800A99B4(void* self, VEC3* result, Emitter* em, VEC3* position, VEC3* normalDir,
                         VEC3* fromOrigin, VEC3* fromYAxis); /* EmitterForm::CalcVelocity */
 extern "C" u16 fn_800A9FB0(void* self, u16 aPtclLife, f32 aPtclLifeRnd, Emitter* em); /* CalcLife */
@@ -108,7 +108,7 @@ void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 op
             u16 life;
 
             if ((optionFlag & 0x00020000) == 0) {
-                pos = fn_800A8A08(&em->mRandom);
+                pos = ef_random_float(&em->mRandom);
             } else if (count > 1) {
                 pos = (f32)i / (f32)(count - 1);
             } else {
@@ -141,7 +141,7 @@ void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 op
             posArg = p;
 
             momentum = lbl_807962F0 + lbl_807962F4 * (f32)(s32)em->mVelMomentumRandom *
-                                           fn_800A8A08(&em->mRandom);
+                                           ef_random_float(&em->mRandom);
             life = fn_800A9FB0(self, aPtclLife, aPtclLifeRnd, em);
 
             pm->vtable->createParticle(pm, life, &posArg, &velArg, space, momentum, &em->mInheritSetting,

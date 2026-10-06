@@ -69,7 +69,7 @@ extern "C" {
 #include "nw4r/g3d/scnmdl.h"     /* ScnMdl::CopiedMatAccess */
 #include "g3d/g3d_resmat.h" /* ResTexSrt */
 #include "fn_8004CAD8.h"         /* MTX34_ctor, fn_8005024C (their owner's header) */
-#include "unsplit/g3d.h"         /* fn_8006F304 */
+#include "g3d/g3d_calcmaterial.h" /* fn_8006F304 (rule 2) */
 #include "unsplit/sound.h"       /* fn_800E2994 */
 #include "unsplit/unknown.h"     /* SystemWork / system_w */
 #include "enemy/em020_ai.h"      /* em020_aim_target_ck (this unit's) */

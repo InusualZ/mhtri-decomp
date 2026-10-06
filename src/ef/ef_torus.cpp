@@ -65,7 +65,7 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     if (flags & 0x00040000) {
         phase = params->angle_base;
     } else {
-        phase = 2.0f * (3.1415927f * fn_800A8A08(&em->progress));
+        phase = 2.0f * (3.1415927f * ef_random_float(&em->progress));
     }
 
     swept = flags & 0x00020000;
@@ -88,8 +88,8 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         VEC3_ctor(&v_out);
         ratio = (100.0f - params->rate) / (100.0f + params->rate);
         if (!swept) {
-            angle = (params->angle_end - params->angle_base) * fn_800A8A08(&em->progress);
-            tube = 2.0f * (3.1415927f * fn_800A8A08(&em->progress));
+            angle = (params->angle_end - params->angle_base) * ef_random_float(&em->progress);
+            tube = 2.0f * (3.1415927f * ef_random_float(&em->progress));
         }
         fn_8009C760(&c1, &s1, phase + angle);
         fn_8009C760(&c2, &s2, tube);
@@ -117,7 +117,7 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         fn_800A99B4(ctx, (Vec*)&v_out, em, (Vec*)&v_pt, (Vec*)&v_dir, (Vec*)&v_norm, (Vec*)&v_flat);
         VEC3 v_out_copy = v_out;
         VEC3 v_pt_copy = v_pt;
-        ratio = 1.0f + 0.01f * (f32)em->scale_rate * fn_800A8A08(&em->progress);
+        ratio = 1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress);
         pm->slots->spawn(pm, fn_800A9FB0(ctx, id, scale, em), (Vec*)&v_pt_copy, (Vec*)&v_out_copy, spawn_arg,
                          &em->spawn_data, em->spawn_extra, em->spawn_flag, ratio);
 

@@ -41,7 +41,7 @@ typedef struct {
 #include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
-#include "g3d/fn_800D74E8.h"
+#include "g3d/g3d_xsi.h" /* fn_800D74E8 (rule 2) */
 
 #define M2C_ERROR(x) /* unknown instruction */
 

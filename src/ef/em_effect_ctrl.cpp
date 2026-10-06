@@ -32,7 +32,7 @@
 #include "ef/eft004.h"
 #include "ef/eft009.h"
 #include "unsplit/ef.h"
-#include "unsplit/g3d.h"
+#include "g3d/g3d_scnroot.h" /* fn_80082BCC (rule 2) */
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -149,7 +149,7 @@ extern "C" void subVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const 
 extern "C" f32 fn_80050F24(const nw4r::math::VEC3* in);
 extern "C" f32 fn_80052214(const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void fn_80050850(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
-extern "C" void fn_80051EE0(nw4r::math::VEC3* out, const nw4r::math::VEC3* in, f32 scale);
+extern "C" void vec3_scale(nw4r::math::VEC3* out, const nw4r::math::VEC3* in, f32 scale);
 extern "C" void addVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 extern "C" void addVec3To(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
@@ -288,13 +288,13 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     fn_80050850(&vF4, &vF4);
     get_camera_pos_c1(&v94);
     copyVec3(&v124, &v94);
-    fn_80051EE0(&v88, &vF4, lbl_807966F8);
+    vec3_scale(&v88, &vF4, lbl_807966F8);
     copyVec3(&vE8, &v88);
     addVec3To(&v124, &vE8);
     if (!(v130.x <= lbl_807966FC) && !(v130.x >= lbl_80796700) && !(v130.y <= lbl_807966FC)
         && !(v130.y >= lbl_80796704) && !(f29 < lbl_807966F4)) {
         fn_80052214(&vE8, &v100);
-        fn_80051EE0(&v64, &v100, lbl_80796708);
+        vec3_scale(&v64, &v100, lbl_80796708);
         get_camera_pos_c1(&v70);
         addVec3(&v7C, &v70, &v64);
         copyVec3(&v10C, &v7C);
@@ -327,15 +327,15 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
             for (i = 0; i < unit->emitter_count; i++) {
                 unit->handles[i]->offset_x = unit->entries[i].offset_x;
                 unit->handles[i]->offset_y = unit->entries[i].offset_y;
-                fn_80051EE0(&v28, &vE8, (f32)(u8)intensity);
-                fn_80051EE0(&v34, &v28, spread);
+                vec3_scale(&v28, &vE8, (f32)(u8)intensity);
+                vec3_scale(&v34, &v28, spread);
                 addVec3(&v40, &v124, &v34);
                 copyVec3(&unit->handles[i]->pos, &v40);
                 if (unit->entries[i].follow != 0) {
                     copyVec3(&unit->handles[i]->pos, &unit->handles[0]->pos);
                 }
-                fn_80051EE0(&v10, &vDC, unit->entries[i].scale);
-                fn_80051EE0(&v1C, &v10, f31 / unit->scale);
+                vec3_scale(&v10, &vDC, unit->entries[i].scale);
+                vec3_scale(&v1C, &v10, f31 / unit->scale);
                 addVec3To(&unit->handles[i]->pos, &v1C);
                 color.r = 0xFF - unit->entries[i].color_r;
                 color.g = 0xFF - unit->entries[i].color_g;

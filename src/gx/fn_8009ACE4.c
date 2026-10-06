@@ -6,7 +6,7 @@
  * Registration (brief section 2).  Module, evidence class 3 (what the code does plus the naming scheme
  * of its neighbours): the range is the immediate continuation of `gx/fn_8009AA78.c`, reads the same
  * `.sdata2` prompt constants and emits through the same write-gather-pipe writers (`fn_8009AC98`/
- * `AC44`/`AB1C` owned by that unit, `fn_800868A0` from `unsplit/g3d.h`), so it is registered in
+ * `AC44`/`AB1C` owned by that unit, `fn_800868A0` from `g3d/g3d_state.h`), so it is registered in
  * the same `gx` lib block and directory.  Name, evidence class 4: the map has only the `fn_XXXXXXXX`
  * stem for both symbols and the runtime dump resolves only `zz_`, so the stem is kept and no name is
  * invented.
@@ -40,7 +40,7 @@
 #include "types.h"
 #include "fn_8004CAD8.h"    /* fn_8005220C - the `fabs` helper this range's owner declares (rule 2) */
 #include "gx/fn_8009AA78.h" /* fn_8009AB1C/AC44/AC98, owned by gx/fn_8009AA78.c (rule 2) */
-#include "unsplit/g3d.h"    /* fn_800868A0, the 0x61 BP word writer (rule 2, unsplit) */
+#include "g3d/g3d_state.h" /* fn_800868A0 (rule 2) */
 
 /* The `.sdata2` floats this function reads.  The band has no registered owner (only `main.cpp` owns a
  * `.sdata2` range, 0x80795AA0-0x80795AD8), so rule 2 leaves them in the unsplit gap and they are

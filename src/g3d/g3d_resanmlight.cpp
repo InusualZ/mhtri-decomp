@@ -22,7 +22,10 @@
 #include "g3d/g3d_anmchr.h"             /* fn_8006268C/fn_80062914/fn_80062750 (rule 2) */
 #include "font/flfnt.h"                 /* fn_8005B1E4 (rule 2) */
 #include "g3d/g3d_resanmamblight.h"     /* fn_8008A188/fn_8008A1A8, owner g3d/g3d_resanmamblight.c */
-#include "unsplit/g3d.h"                /* fn_8008A644/fn_80069664/fn_80092330/fn_80463E74 (rule 2) */
+#include "g3d/fn_800680CC.h" /* fn_80069664 (rule 2) */
+#include "g3d/g3d_resanmtexsrt.h" /* fn_80092330 (rule 2) */
+#include "MSL_C/alloc.h" /* fn_80463E74 (rule 2) */
+#include "g3d/g3d_resanmcamera.h" /* fn_8008A644 (rule 2) */
 
 #pragma peephole off
 #pragma fp_contract off

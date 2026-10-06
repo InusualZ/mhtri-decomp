@@ -71,7 +71,7 @@
 #include "mh3_pad/task.h"    /* `TaskSlot` (rule 1) */
 #include "quest/arenatask.h" /* arena_task: the arena-select task ArenaSelExec installs (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
-#include "unsplit/g3d.h"     /* fn_8007A510 (rule 2) */
+#include "g3d/fn_80075DCC.h" /* fn_8007A510 (rule 2) */
 
 /* ------------------------------------------------------------------ *
  * Local types

@@ -4,6 +4,7 @@
  * unnamed function here, so there is no better name to take).  The mangled names the range does carry
  * (`drawshape_exec__Fv`, `set_mydata2vs__FUcUc`, `write_wpad_memory__FUcUc`, `rotMatrixX__FUlP...`,
  * `atan2ang__Fff`, ...) are spelled by their real declarations, never as callable identifiers (rule 9).
+ * `vec3_scale` (0x80051EE0, `out = in * s`) is a GUESS name from its body and its callers.
  *
  * The game-root draw/gallery band.  `.text` 0x8004CAD8..0x8005270C (phase 4 cut: the old range ran to 0x80054C64, 277 functions).
  * The `draw_shape` 2D pipeline's `drawshape_*` half from 0x8005270C on is `draw_shape.cpp`'s now.

@@ -41,7 +41,7 @@
 #include "types.h"
 #include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
-#include "unsplit/ef.h"
+#include "ef/ef_torus.h" /* fn_800C9DCC (rule 2) */
 #include "ef/ef_particlemanager.h"
 
 #pragma peephole off
@@ -148,8 +148,8 @@ struct EfAnimSlotQueue {
     /* +0x04 */ EfAnimSlot mSlot[0x400];
 }; /* size: 0xC004 */
 
-/* VEC3_ctor (zero a VEC3) and fn_800C9DCC (fabsf) are declared by the `ef` band header, where their
- * owner-less declarations live (rule 2), so this unit includes it rather than re-declaring them. */
+/* fn_800C9DCC (fabsf) is declared by its owner's header `ef/ef_torus.h` (rule 2), so this unit includes it rather
+ * than re-declaring it. */
 extern "C" {
 
 /* 0x8009EEDC - one step of the curve random generator's LCG. */

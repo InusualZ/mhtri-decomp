@@ -326,6 +326,7 @@ void fn_802235A4(u32* base)
 #include "Pl/fn_80258FCC.h"
 #include "lobby/fn_8021E1EC.h"
 #include "unsplit/g3d.h"
+#include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
 #include "unsplit/unknown.h"
 #include "sys_mem.h"
 #include "Pl/fn_80224AC4.h"

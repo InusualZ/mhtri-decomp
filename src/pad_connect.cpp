@@ -17,7 +17,7 @@
 #include "types.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w (rule 1/2) */
 #include "mh3_pad/Screen_w.h"   /* ScreenWork / Screen_w (rule 1/2) */
-#include "unsplit/g3d.h"     /* fn_8007A510 (rule 2) */
+#include "g3d/fn_80075DCC.h" /* fn_8007A510 (rule 2) */
 
 /* ------------------------------------------------------------------ *
  * 0x80046EE4 - 0x800470B4  (system flags)

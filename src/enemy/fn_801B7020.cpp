@@ -150,7 +150,7 @@ extern "C" {
 void fn_800B0B90(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 /* 0x80051EE0 (`fn_8004CAD8.cpp`): r3 `out`, r4 `in`, f1 the scale it keeps in f31 while `VEC3_ctor` zeroes `out`;
  * the tree spells it with three and four arguments, so it is declared here. */
-void fn_80051EE0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
+void vec3_scale(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 extern u8 lbl_805B2188[];
 }
 
@@ -542,7 +542,7 @@ extern "C" void fn_801B7A68(EmProgWork* self, u8 mode) {
         fn_800B0B90(&vec, &self->pos);
         if (fn_80050EDC((const f32*)&vec) > 0.001f) {
             fn_80050850(&vec, &vec);
-            fn_80051EE0(&out, &vec, 8.0f);
+            vec3_scale(&out, &vec, 8.0f);
             copyVec3(&self->vec_0x310, &out);
         }
         self->timer_0x020 = 240;
@@ -653,7 +653,7 @@ extern "C" void fn_801B7E34(EmProgWork* self, u8 mode) {
         fn_800B0B90(&vec, &self->pos);
         if (fn_80050EDC((const f32*)&vec) > 0.001f) {
             fn_80050850(&vec, &vec);
-            fn_80051EE0(&out, &vec, 10.0f);
+            vec3_scale(&out, &vec, 10.0f);
             copyVec3(&self->vec_0x310, &out);
         }
         self->timer_0x020 = 150;

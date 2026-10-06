@@ -179,25 +179,25 @@ extern "C" u32 fn_800932D8(void* self, u32 arg);
 extern "C" u32 fn_8009348C(void* self, u32 arg);
 extern "C" u32 fn_800935D4(void* self, u32 arg);
 
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092584(void* self, u32 arg) { return (void*)fn_800924CC(self, arg); }
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092848(void* self, u32 arg) { return (void*)fn_80092790(self, arg); }
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092B0C(void* self, u32 arg) { return (void*)fn_80092A54(self, arg); }
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092CC0(void* self, u32 arg) { return (void*)fn_80092C08(self, arg); }
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092E74(void* self, u32 arg) { return (void*)fn_80092DBC(self, arg); }
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80093028(void* self, u32 arg) { return (void*)fn_80092F70(self, arg); }
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_800931DC(void* self, u32 arg) { return (void*)fn_80093124(self, arg); }
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80093390(void* self, u32 arg) { return (void*)fn_800932D8(self, arg); }
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80093544(void* self, u32 arg) { return (void*)fn_8009348C(self, arg); }
-/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
+/* Forwards to the category lookup, typed `void*` as `g3d/g3d_resanmtexsrt.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_8009368C(void* self, u32 arg) { return (void*)fn_800935D4(self, arg); }
 
 /* ====================== 0x80092B9C-0x80093484: the six value-type constructors ================= */
@@ -286,8 +286,8 @@ extern "C" u32 fn_80091D20(void* self, void* key) {
 /* ==================== the `ResFile` dictionary chain (rule 2 declarations) ==================== */
 
 extern "C" u32 fn_80092444(void* self);             /* this unit (0x80092444) */
-extern "C" s32 fn_80092330(void* dict, void* arg); /* this unit (0x80092330); `s32` as unsplit/g3d.h
-                                                    * declares it */
+extern "C" s32 fn_80092330(void* dict, void* arg); /* this unit (0x80092330); `s32` as this unit's
+                                                    * header declares it */
 
 /* The ten "no-key" accessors: build the dictionary name from the category label, resolve the
  * `ResFile` root dictionary at +0x18, look the entry up, then read the body word through the

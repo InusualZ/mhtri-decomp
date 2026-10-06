@@ -29,6 +29,11 @@ void fn_800B87D0(Vec* a, struct EfParticleState* particle, EfAheadItem* item);
 /* untyped: opaque handle passed through to fn_800A7F00 */
 void fn_800B882C(Vec* a, struct EfParticleState* particle, void* arg);
 
+/* The helpers the free and line strategies' draws call. */
+void fn_800B7DB0(void* a, MTX34* out);
+void* fn_800B4B04(void* self, s16 flag);
+void fn_800B54B4(const void* src, Vec3* out);
+
 #ifdef __cplusplus
 }
 #endif

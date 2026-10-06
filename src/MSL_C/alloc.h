@@ -64,6 +64,9 @@ char* strtok(char* string, const char* delimiters);
  * arith.c defines `abs` before `labs`, so this second one is taken as `labs` (a GUESS by that order). */
 long labs(long n);
 
+/* 0x80463E74 - the global frame thunk `g3d/g3d_resanmlight.cpp`'s `fn_8008FFFC` tail-calls. */
+f32 fn_80463E74(void);
+
 #ifdef __cplusplus
 }
 #endif

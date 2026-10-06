@@ -29,7 +29,7 @@
  */
 
 #include "gx.h"
-#include "unsplit/g3d.h" /* fn_800868A0 (unsplit g3d neighbour, rule 2) */
+#include "g3d/g3d_state.h" /* fn_800868A0 (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_80077420, owned by g3d/fn_80075DCC.cpp (rule 2) */
 
 /* The write-gather-pipe window at 0xCC008000 and its `GXWGFifo` macro live in `gx.h` now that
@@ -38,7 +38,7 @@
 
 /* Pipe writers and the byte table, all defined by other translation units of the same library; the
  * addresses are the map's and the local extab names above are the only object-level difference.
- * `fn_800868A0`/`fn_80077420` come from unsplit/g3d.h (rule 2). */
+ * `fn_800868A0` comes from `g3d/g3d_state.h`, `fn_80077420` from `g3d/fn_80075DCC.h` (rule 2). */
 extern const u8 lbl_80795F58[4];
 
 #pragma peephole off

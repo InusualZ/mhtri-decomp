@@ -22,7 +22,7 @@
 #include "nw4r/math.h"
 #include "mh3_pad.h"
 
-#include "unsplit/ef.h"
+#include "ef/ef_emitter.h" /* fn_800A7750 (rule 2) */
 
 #pragma peephole off
 

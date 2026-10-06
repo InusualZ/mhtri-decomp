@@ -22,7 +22,7 @@
 #include "g3d/g3d_calcworld.h"
 /* The band header's declarations of the matrix copy/concat helpers (fn_8007100C/fn_800710BC, owner
  * `g3d/g3d_calcview.cpp`). */
-#include "unsplit/g3d.h"
+#include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8007100C (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
