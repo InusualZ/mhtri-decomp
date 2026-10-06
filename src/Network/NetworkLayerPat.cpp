@@ -29,17 +29,20 @@
  *   GUESS (reflect helpers 0x803EA82C..0x803EB678): `removeFriendSlot`, `unpackLayerSettings`.
  *   GUESS (records and fields): `restoreSentProfile` (NetworkCommunityPat), `NetLayerInfoRec`, `jumpTicket_3D8`.
  *   GUESS (records and fields): `matchKey_0x00F0`; the callee `sendNtcLayerUserTransfer` (0x80403230).
+ *   GUESS (reflect's notice records, 0x803EDEAC..0x803EDF94 their members): `NetUserFieldsNotice`, `NetUserPositionNotice`.
+ *   GUESS (reflect's answer views and events): `NetLayerUserRow`, `NetLayerCommunityRow`, `LAYER_ERR_BAD_ANSWER`.
  *   `strtok` (0x8045F858) is the C library's own name, which the dump does not carry - not a GUESS.
  *   Callees named at integration: `sendReqLayerUserInfoSet` (0x80401AF4, recvAnsLayerUserInfoSet's slot),
  *   `sendReqLayerTell` (0x8040211C, the `sendReqCircleTell` shape).
- * RESIDUALS. 7 rows unwritten: `reflect` (0x803EBB9C, 8976 B) and three inline ctor/dtor pairs (0x803E6D7C/0x803E6DD8 after `handleChat`, 0x803EDEAC..0x803EDF94
- *   after `reflect`) - copies of `NetworkSessionSlotInfo`'s and two other records' members whose manglings
+ * RESIDUALS. 2 rows unwritten: the inline ctor/dtor pair `fn_803E6DD8`/`dtor_803E6D7C` (after `handleChat`, used by
+ *   `handleChat` and `reflect`'s chat notice) - a copy of `NetworkSessionSlotInfo`'s members, whose manglings
  *   `Network/NetworkSessionManager.cpp` already defines, so the map cannot carry them twice; our calls reach those
- *   copies by name.  `.data` cannot match until `reflect`'s tables and strings are emitted (`vtableaudit` keeps the
- *   0x805FC1E8 run); `flipcheck`: the claimed `.sdata` 8 B is not emitted.  The inline members of
+ *   members by name.  `.data`: the jump tables and the two `getArgument` strings are emitted but objdiff pairs the
+ *   map's `jumptable_`/`lbl_` names with nothing (the compiler names them `@NNNN`).  The inline members of
  *   `NetworkLayerPatRequest` are defined at the end of the file, callees after callers, so no call is inlined.
- *   Not unwritten: the empty constructor/destructor bodies of `NetFriendNotice`, `NetFriendStatusNotice` and
- *   `NetLayerMediationEntry` are complete - MWCC emits the member construction and destruction (all at 100 %).
+ *   Not unwritten: the empty constructor/destructor bodies of `NetFriendNotice`, `NetFriendStatusNotice`,
+ *   `NetLayerMediationEntry`, `NetUserFieldsNotice` and `NetUserPositionNotice` are complete - MWCC emits the member
+ *   construction and destruction (all at 100 %).
  *   Partial rows:
  *  - `moveRequests`: the unrolled scan's trip count in r25 (the base's own `move` residual), so retail saves from r20
  *    (`_savegpr_20`/`_restgpr_20`) where ours saves from r21;
@@ -60,6 +63,9 @@
  *  - `handleLayerCreate`, `handleLayerJump`: retail loads the friend peer's `port_0C` with `lhz` for the `s16`
  *    `setBufferSize` argument (ours `lha`), and gives `getFmpSelected`'s result (and in `handleLayerJump` two more
  *    temporaries) a different callee-saved register; declaration orders tried;
+ *  - `reflect`: the callee-saved registers are coloured differently in places (the answer pointer r25 vs retail r26);
+ *    the city-list rows reload `layerId`/`value_076` after each store in retail; `connectPeer`'s result is handled as
+ *    an `s32` in retail (the class declares `s8`, so ours sign-extends first); the port's `lhz` as above;
  *  - `addFriendSlot`: the voice-ready and accepted-peer results are stored to their byte arrays after a `clrlwi` retail
  *    does not have (a u8 cast, a u8/u32 local tried); `storeFriendDetail`: retail keeps `index * 0x104` for the copy's
  *    destination, ours multiplies again; `importCommunityRec`: the state byte's `clrlwi` (a file-wide peephole on
@@ -1577,31 +1583,32 @@ void NetworkLayerPat::sendUserFields_5C(NetUserFields* fields)
         for (i = 0; i < fields->count_000; i++) {
             switch (fields->fields_008[i].kind_00) {
             case 1:
-                appendItemList(getInstance_(), &list, i, 1, (const u8*)&fields->fields_008[i].data_08, 0);
+                appendItemList(getInstance_(), &list, i, 1, (const u8*)&fields->fields_008[i].value_08, 0);
                 break;
             case 2:
-                appendItemList(getInstance_(), &list, i, 2, (const u8*)&fields->fields_008[i].data_08, 0);
+                appendItemList(getInstance_(), &list, i, 2, (const u8*)&fields->fields_008[i].value_08, 0);
                 break;
             case 3:
-                appendItemList(getInstance_(), &list, i, 3, (const u8*)&fields->fields_008[i].data_08, 0);
+                appendItemList(getInstance_(), &list, i, 3, (const u8*)&fields->fields_008[i].value_08, 0);
                 break;
             case 4:
-                appendItemList(getInstance_(), &list, i, 4, (const u8*)&fields->fields_008[i].data_08, 0);
+                appendItemList(getInstance_(), &list, i, 4, (const u8*)&fields->fields_008[i].value_08, 0);
                 break;
             case 5:
-                appendItemList(getInstance_(), &list, i, 5, (const u8*)&fields->fields_008[i].data_08, 0);
+                appendItemList(getInstance_(), &list, i, 5, (const u8*)&fields->fields_008[i].value_08, 0);
                 break;
             case 6:
-                appendItemList(getInstance_(), &list, i, 6, (const u8*)&fields->fields_008[i].data_08, 0);
+                appendItemList(getInstance_(), &list, i, 6, (const u8*)&fields->fields_008[i].value_08, 0);
                 break;
             case 7:
-                appendItemList(getInstance_(), &list, i, 7, (const u8*)&fields->fields_008[i].data_08, 0);
+                appendItemList(getInstance_(), &list, i, 7, (const u8*)&fields->fields_008[i].value_08, 0);
                 break;
             case 8:
-                appendItemList(getInstance_(), &list, i, 8, fields->fields_008[i].data_08, 0);
+                appendItemList(getInstance_(), &list, i, 8, fields->fields_008[i].value_08.blob.data_0, 0);
                 break;
             case 9:
-                appendItemList(getInstance_(), &list, i, 9, fields->fields_008[i].data_08, fields->fields_008[i].size_0C);
+                appendItemList(getInstance_(), &list, i, 9, fields->fields_008[i].value_08.blob.data_0,
+                               fields->fields_008[i].value_08.blob.size_4);
                 break;
             default:
                 appendItemList(getInstance_(), &list, i, 0, NULL, 0);
@@ -2038,6 +2045,1167 @@ s32 NetworkLayerPat::handleServerList(NetworkLayerRequest* request)
         return 1;
     }
     return 0;
+}
+
+/* The answers `reflect` reads, in the layout the Pat interface delivers them (GUESS on the names: what each field is
+ * copied into). */
+
+/* A list head answer: the rows the server will send. */
+typedef struct NetLayerListHead {
+    /* +0x0 */ u32 unused_0;
+    /* +0x4 */ s32 total_4;
+} NetLayerListHead;   /* size: 0x8 */
+
+/* One row of a user list answer: the binary user id, its name and its tag list. */
+typedef struct NetLayerUserRow {
+    /* +0x000 */ u8 userId_000[0x8];
+    /* +0x008 */ char name_008[0x138];
+    /* +0x140 */ PatTagList tags_140;
+} NetLayerUserRow;   /* size: 0x244 */
+
+/* One row of a user search answer: the binary user id, its name and its tag list. */
+typedef struct NetLayerSearchRow {
+    /* +0x000 */ u8 userId_000[0x8];
+    /* +0x008 */ char name_008[0x228];
+    /* +0x230 */ PatTagList tags_230;
+} NetLayerSearchRow;   /* size: 0x334 */
+
+/* One row of a community list answer: its members, the layer and its tag list. */
+typedef struct NetLayerCommunityRow {
+    /* +0x000 */ s32 memberCount_000;
+    /* +0x004 */ const NetLayerUserRow* members_004;
+    /* +0x008 */ u8 pad_008[0x4];
+    /* +0x00C */ PatLayerData layer_00C;
+    /* +0x24C */ PatTagList tags_24C;
+} NetLayerCommunityRow;   /* size: 0x350 */
+
+/* A user status notice: the binary user id and the status word. */
+typedef struct NetLayerUserStatusMsg {
+    /* +0x00 */ u8 userId_00[0x8];
+    /* +0x08 */ u8 pad_08[0x30];
+    /* +0x38 */ u32 status_38;
+} NetLayerUserStatusMsg;   /* size: 0x3C */
+
+/* One field of a user-field notice: its number, its kind and its value. */
+typedef struct NetLayerUserFieldIn {
+    /* +0x0 */ u8 index_0;
+    /* +0x1 */ u8 kind_1;
+    /* +0x2 */ u8 pad_2[0x6];
+    /* +0x8 */ NetUserFieldValue value_8;
+} NetLayerUserFieldIn;   /* size: 0x10 */
+
+/* A user-field notice: the binary user id and its fields (the first is the notice's own kind). */
+typedef struct NetLayerUserFieldsMsg {
+    /* +0x0 */ u8 userId_0[0x8];
+    /* +0x8 */ u8 pad_8[0x2];
+    /* +0xA */ u8 count_A;
+    /* +0xB */ u8 pad_B;
+    /* +0xC */ NetLayerUserFieldIn* fields_C;
+} NetLayerUserFieldsMsg;   /* size: 0x10 */
+
+/* A user-position notice: the binary user id and the position. */
+typedef struct NetLayerUserPositionMsg {
+    /* +0x00 */ u8 userId_00[0x8];
+    /* +0x08 */ NetUserPosition position_08;
+} NetLayerUserPositionMsg;   /* size: 0x20 */
+
+/* A chat notice: the text, its tag and time, and the sender's binary id and name. */
+typedef struct NetLayerChatMsg {
+    /* +0x000 */ char text_000[0x100];
+    /* +0x100 */ u32 tag_100;
+    /* +0x104 */ s32 time_104;
+    /* +0x108 */ u8 userId_108[0x8];
+    /* +0x110 */ char name_110[0x14];
+} NetLayerChatMsg;   /* size: 0x124 */
+
+/* A mediation notice row: the binary user id, the lock and the key. */
+typedef struct NetLayerMediationMsg {
+    /* +0x0 */ u8 userId_0[0x8];
+    /* +0x8 */ u8 lock_8;
+    /* +0x9 */ u8 key_9;
+} NetLayerMediationMsg;   /* size: 0xA */
+
+/* A user binary notice: the binary user id, a window of its binary, the window's size and offset. */
+typedef struct NetLayerUserBinaryMsg {
+    /* +0x000 */ u8 userId_000[0x8];
+    /* +0x008 */ u8 pad_008;
+    /* +0x009 */ u8 data_009[0x103];
+    /* +0x10C */ u32 size_10C;
+    /* +0x110 */ u32 offset_110;
+} NetLayerUserBinaryMsg;   /* size: 0x114 */
+
+/* The child-state event (37): the child's index and its closed/hidden flags. */
+typedef struct NetLayerChildStateEvent {
+    /* +0x0 */ u32 index_0;
+    /* +0x4 */ bool closed_4;
+    /* +0x5 */ bool hidden_5;
+    /* +0x6 */ u8 pad_6[0x2];
+} NetLayerChildStateEvent;   /* size: 0x8 */
+
+/* The child-name event (38): the child's index, its name and settings. */
+typedef struct NetLayerChildNameEvent {
+    /* +0x00 */ u32 index_00;
+    /* +0x04 */ char name_04[0x40];
+    /* +0x44 */ NetLayerSettings settings_44;
+} NetLayerChildNameEvent;   /* size: 0x68 */
+
+/* The layer-binary event (30): the size and the bytes of this layer's binary. */
+typedef struct NetLayerBinaryEvent {
+    /* +0x000 */ u32 size_000;
+    /* +0x004 */ u8 data_004[0x100];
+} NetLayerBinaryEvent;   /* size: 0x104 */
+
+/* The error code `reflect` posts for a malformed answer (GUESS). */
+enum {
+    LAYER_ERR_BAD_ANSWER = 0x80000000
+};
+
+/* The server message callback's body: each message sets the reply bits the handlers poll, updates the layer's
+ * records (lists, friends, address) or reports a notice. */
+void NetworkLayerPat::reflect(s32 code, s32 requestId, s32 flag, s32 count, const u8* data)
+{
+    s32 i;
+    s32 j;
+    s32 n;
+    NetCityRec* city;
+    NetRoomRec* room;
+
+    switch (code) {
+    case 0x8000:
+    case 0x8007:
+        for (i = 0; i < 21; i++) {
+            if (this->requests_0C[i] != 0) {
+                break;
+            }
+        }
+        if (i == 21) {
+            for (j = 0; j < 1; j++) {
+                if (this->ownRequests_1C0[j] != 0) {
+                    break;
+                }
+            }
+            if (j == 1) {
+                NetworkErrorInfo info;
+
+                getErrorInfoOrCode654c(getInstance_(), 0x80060033, &info);
+                notifyLayerEvent(EVENT_ERROR, info.code_00, 1, (NetworkRequestError*)&info, this->context_08);
+            }
+        }
+        for (i = 0; i < 22; i++) {
+            this->requestFlags_310[i] |= FLAG_SESSION_LOST;
+        }
+        return;
+    case 0x8006:
+        this->requestFlags_310[SLOT_CONNECT] |= FLAG_SHUT_REPLY;
+        this->requestFlags_310[SLOT_DISCONNECT] |= FLAG_SHUT_REPLY;
+        this->requestFlags_310[SLOT_SERVER_SELECT] |= FLAG_SHUT_REPLY;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_SHUT_REPLY;
+        return;
+    case 0x8002:
+        this->requestFlags_310[SLOT_CONNECT] |= FLAG_CANCELLED;
+        this->requestFlags_310[SLOT_DISCONNECT] |= FLAG_CANCELLED;
+        this->requestFlags_310[SLOT_SERVER_LIST] |= FLAG_CANCELLED;
+        this->requestFlags_310[SLOT_SERVER_SELECT] |= FLAG_CANCELLED;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_CANCELLED;
+        for (i = 0; i < 22; i++) {
+            if (requestId == (s32)this->requestIds_368[i]) {
+                this->requestFlags_310[i] |= FLAG_CANCELLED;
+            }
+        }
+        return;
+    case 0x8004:
+        if (flag != 0) {
+            for (i = 0; i < 22; i++) {
+                this->requestFlags_310[i] |= FLAG_SESSION_LOST;
+            }
+            return;
+        }
+        break;
+    case 0x8005:
+        this->requestFlags_310[SLOT_CONNECT] |= FLAG_STATE3_REPLY;
+        this->requestFlags_310[SLOT_DISCONNECT] |= FLAG_STATE3_REPLY;
+        this->requestFlags_310[SLOT_SERVER_SELECT] |= FLAG_STATE3_REPLY;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_STATE3_REPLY;
+        return;
+    case 0x8008:
+        this->requestFlags_310[SLOT_SERVER_SELECT] |= FLAG_FMP_INFO_REPLY;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_FMP_INFO_REPLY;
+        return;
+    case 0x800D: {
+        const PatLayerData* layer = (const PatLayerData*)data;
+
+        this->busy_3D1 = 1;
+        this->memberCount_4C8 = 0;
+        this->address_474.id_00 = getSomething3(getInstance_());
+        this->address_474.id_04 = getFmpSelected(getInstance_());
+        memset(this->address_474.path_08, 0, sizeof(u16) * 3);
+        this->address_474.path_08[this->memberCount_4C8] = layer->layerId_054 + 1;
+        applyLoginRecord((const NetLayerLoginRecord*)layer);
+        this->requestFlags_310[SLOT_CONNECT] |= FLAG_LAYER_START_REPLY;
+        this->requestFlags_310[SLOT_SERVER_SELECT] |= FLAG_LAYER_START_REPLY;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_LAYER_START_REPLY;
+        return;
+    }
+    case 0x800E:
+        this->requestFlags_310[SLOT_DISCONNECT] |= FLAG_LAYER_END_REPLY;
+        this->requestFlags_310[SLOT_SERVER_SELECT] |= FLAG_LAYER_END_REPLY;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_LAYER_END_REPLY;
+        return;
+    case 0x800F: {
+        const PatLayerInfo* info = (const PatLayerInfo*)data;
+        const PatLayerData* layer = &info->layer_004;
+        NetLayerSlotSummary counts;
+        u32 index;
+
+        counts.code_00 = -1;
+        counts.used_04 = layer->counts_058[1];
+        counts.peak_08 = layer->counts_058[0];
+        counts.status_0C = layer->memberLimitA_064;
+        counts.status_10 = layer->value_06C;
+        if ((u32)this->memberCount_4C8 > 2) {
+            return;
+        }
+        if (info->kind_000 == 1) {
+            notifyLayerEvent(21, 0, 1, (NetworkRequestError*)&counts, this->context_08);
+        }
+        if (info->kind_000 == 2 || (info->kind_000 == 1 && this->memberCount_4C8 == 0)) {
+            this->memberUsed_F02C = layer->counts_058[1];
+            this->status_F030 = layer->counts_058[0];
+            this->status_F034 = layer->memberLimitA_064;
+            this->status_F038 = layer->value_06C;
+            if (this->busy_3D1 == 0) {
+                notifyLayerEvent(20, 0, 1, (NetworkRequestError*)&counts, this->context_08);
+            }
+        }
+        if (info->kind_000 == 4) {
+            if (this->memberCount_4C8 + 1 >= 3) {
+                return;
+            }
+            counts.code_00 = index = ((const NetLayerAddress*)layer->path_004)->path_08[this->memberCount_4C8 + 1] - 1;
+            if (index > 39) {
+                return;
+            }
+            city = &this->cities_540.entries_0x004[index];
+            city->count_0x44 = counts.used_04;
+            city->population_0x48 = counts.peak_08;
+            city->capacity_0x4C = counts.status_0C;
+            city->order_0x50 = counts.status_10;
+            if (this->busy_3D1 == 0) {
+                notifyLayerEvent(23, 0, 1, (NetworkRequestError*)&counts, this->context_08);
+            }
+        }
+        if (info->kind_000 == 5) {
+            if (this->memberCount_4C8 - 1 < 0) {
+                return;
+            }
+            if (this->parentInfo_F1A8 != 0) {
+                this->layerInfo_4CC.count_40 = counts.used_04;
+                this->layerInfo_4CC.count_44 = counts.peak_08;
+                this->layerInfo_4CC.memberLimit_48 = counts.status_0C;
+                this->layerInfo_4CC.value_4C = counts.status_10;
+            }
+            if (this->busy_3D1 == 0) {
+                notifyLayerEvent(22, 0, 1, (NetworkRequestError*)&counts, this->context_08);
+            }
+        }
+        if (info->kind_000 == 3) {
+            counts.code_00 = index = ((const NetLayerAddress*)layer->path_004)->path_08[this->memberCount_4C8] - 1;
+            if (index > 39) {
+                return;
+            }
+            room = &this->rooms_18A4.entries_0x004[index];
+            room->count_0x84 = counts.used_04;
+            room->population_0x88 = counts.peak_08;
+            room->capacity_0x8C = counts.status_0C;
+            room->order_0x90 = counts.status_10;
+            if (this->busy_3D1 == 0) {
+                notifyLayerEvent(24, 0, 1, (NetworkRequestError*)&counts, this->context_08);
+            }
+        }
+        return;
+    }
+    case 0x8010:
+        this->busy_3D1 = 1;
+        this->transferSlot_C07C = -1;
+        this->sessionState_C080 = -2;
+        this->negotiateFrom_438 = 0;
+        this->negotiateTo_43C = 0;
+        this->negotiated_440 = 0;
+        this->requestFlags_310[SLOT_SERVER_SELECT] |= FLAG_LAYER_JUMP_REPLY;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_LAYER_JUMP_REPLY;
+        return;
+    case 0x8011:
+        this->requestFlags_310[SLOT_LAYER_CREATE] |= FLAG_CREATE_HEAD_REPLY;
+        this->requestFlags_310[SLOT_LAYER_RESERVE] |= FLAG_CREATE_HEAD_REPLY;
+        return;
+    case 0x8012:
+        this->requestFlags_310[SLOT_LAYER_CREATE] |= FLAG_CREATE_SET_REPLY;
+        return;
+    case 0x8013:
+        if (requestId == (s32)this->requestIds_368[SLOT_LAYER_CREATE]) {
+            this->busy_3D1 = 1;
+            this->transferSlot_C07C = -1;
+            this->sessionState_C080 = -2;
+            this->negotiateFrom_438 = 0;
+            this->negotiateTo_43C = 0;
+            this->negotiated_440 = 0;
+        }
+        this->requestFlags_310[SLOT_LAYER_CREATE] |= FLAG_CREATE_FOOT_REPLY;
+        this->requestFlags_310[SLOT_LAYER_RESERVE] |= FLAG_CREATE_FOOT_REPLY;
+        return;
+    case 0x8014: {
+        s16 layerId = *(const s16*)data;
+
+        this->busy_3D1 = 1;
+        this->transferSlot_C07C = -1;
+        this->sessionState_C080 = -2;
+        this->negotiateFrom_438 = 0;
+        this->negotiateTo_43C = 0;
+        this->negotiated_440 = 0;
+        if (layerId < 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        this->memberCount_4C8++;
+        this->address_474.path_08[this->memberCount_4C8] = layerId + 1;
+        this->requestFlags_310[SLOT_LAYER_CREATE] |= FLAG_DOWN_REPLY;
+        return;
+    }
+    case 0x8016:
+        this->busy_3D1 = 1;
+        if (this->memberCount_4C8 < 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        this->address_474.path_08[this->memberCount_4C8] = 0;
+        this->memberCount_4C8--;
+        this->requestFlags_310[SLOT_LAYER_UP] |= FLAG_UP_REPLY;
+        return;
+    case 0x8015: {
+        PatServerBlock server;
+        s32 slot;
+        s32 fmp;
+
+        slot = addFriendSlot(data, (const PatLayerUser*)data);
+        this->memberUsed_F02C = this->friends_3568.count_0x000;
+        if (this->busy_3D1 == 0) {
+            if (slot >= 0) {
+                pollFriendSlot(slot);
+            }
+            if (this->memberCount_4C8 == 2 && (s32)this->status_F034 > 1 && GameSpyInterfaceThread::getInstance() != NULL &&
+                GameSpyInterfaceThread::getInstance()->getState() == 1 &&
+                GameSpyInterfaceThread::getInstance()->getPhase() <= 0) {
+                copyServerBlock(getInstance_(), 1, (u8*)&server);
+                GameSpyInterfaceThread::getInstance()->resetSlots();
+                GameSpyInterfaceThread::getInstance()->setBufferSize(
+                    this->friendPeers_C1B0[this->transferSlot_C07C].port_0C);
+                fmp = getFmpSelected(getInstance_());
+                GameSpyInterfaceThread::getInstance()->startMatch(
+                    this->status_F034, this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00,
+                    server.address_100[3] + (server.address_100[2] << 8) +
+                        ((server.address_100[0] << 24) + (server.address_100[1] << 16)),
+                    server.port_104, fmp, (this->address_474.path_08[1] << 16) + this->address_474.path_08[2],
+                    this->matchKey_3D4);
+            }
+        }
+        return;
+    }
+    case 0x8017: {
+        NetFriendRec removed;
+        s32 slot;
+
+        slot = removeFriendSlot(data, &removed);
+        this->memberUsed_F02C = this->friends_3568.count_0x000;
+        if (this->memberCount_4C8 == 2 && this->memberUsed_F02C <= 1 &&
+            GameSpyInterfaceThread::getInstance() != NULL) {
+            GameSpyInterfaceThread::getInstance()->canClose();
+            GameSpyInterfaceThread::getInstance()->initialize();
+        }
+        if (this->busy_3D1 != 0) {
+            return;
+        }
+        if (slot >= 0) {
+            notifyLayerEvent(7, 0, 1, (NetworkRequestError*)&removed, this->context_08);
+        }
+        return;
+    }
+    case 0x8018:
+        this->jumpTicket_3D8 = *(const u32*)data;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_JUMP_READY_REPLY;
+        return;
+    case 0x8019:
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_JUMP_GO_REPLY;
+        return;
+    case 0x801A:
+        this->requestFlags_310[SLOT_LAYER_INFO_SET] |= FLAG_LAYER_INFO_SET_REPLY;
+        return;
+    case 0x801B: {
+        const PatLayerInfo* info = (const PatLayerInfo*)data;
+        const PatLayerData* layer = &info->layer_004;
+        PatTagList* tags = (PatTagList*)&info->tags_244;
+        NetLayerChildStateEvent state;
+        NetLayerChildNameEvent named;
+        NetLayerBinaryEvent binary;
+        u32 size;
+        u32 index;
+        s32 depth;
+        const u16* path;
+
+        if (memcmp(layer->path_004, &this->address_474, sizeof(this->address_474)) == 0) {
+            size = 0x100;
+            if (layer->value_23E < 0x100) {
+                size = layer->value_23E;
+            }
+            memcpy(binary.data_004, layer->binary_13E, size);
+            binary.size_000 = size;
+            unpackLayerSettings(&this->layerSettings_F03C, tags);
+            notifyLayerEvent(30, 0, 1, (NetworkRequestError*)&binary, this->context_08);
+            return;
+        }
+        depth = this->memberCount_4C8;
+        if (depth < 0 || depth + 1 >= 3) {
+            break;
+        }
+        path = &((const NetLayerAddress*)layer->path_004)->path_08[depth];
+        if (path[1] == 0 || (depth + 2 < 3 && path[2] != 0)) {
+            break;
+        }
+        index = path[1] - 1;
+        if (index > 39) {
+            break;
+        }
+        if (layer->value_076 != 0) {
+            state.index_0 = index;
+            state.closed_4 = layer->value_076 == 2;
+            state.hidden_5 = layer->value_076 == 1;
+            this->cities_540.entries_0x004[index].id_0x00 = index;
+            this->cities_540.entries_0x004[index].closed_0x78 = state.closed_4;
+            this->cities_540.entries_0x004[index].hidden_0x79 = state.hidden_5;
+            if (state.closed_4 == 0 && state.hidden_5 == 1 && this->pendingRequestId_F19C == (s32)state.index_0) {
+                this->pendingRequestId_F19C = -1;
+            }
+            if (this->busy_3D1 == 0) {
+                notifyLayerEvent(37, 0, 1, (NetworkRequestError*)&state, this->context_08);
+            }
+        }
+        if (layer->name_014[0] != 0) {
+            named.index_00 = index;
+            memcpy(named.name_04, layer->name_014, sizeof(named.name_04) - 1);
+            named.name_04[sizeof(named.name_04) - 1] = 0;
+            unpackLayerSettings(&named.settings_44, tags);
+            memcpy(this->cities_540.entries_0x004[index].name_0x04, named.name_04, sizeof(named.name_04));
+            if (this->busy_3D1 == 0) {
+                notifyLayerEvent(38, 0, 1, (NetworkRequestError*)&named, this->context_08);
+            }
+        }
+        unpackLayerSettings((NetLayerSettings*)&this->cities_540.entries_0x004[index].kind_0x54, tags);
+        break;
+    }
+    case 0x801C: {
+        const PatLayerInfo* info = (const PatLayerInfo*)data;
+        char* token;
+        u32 length;
+
+        NetworkLayerIdImportFrom((NetworkLayerId*)this->layerRecord_6E024.header_000, 3, info->layer_004.path_004,
+                                 sizeof(info->layer_004.path_004));
+        this->layerRecord_6E024.textCount_40 = 0;
+        this->layerRecord_6E024.texts_044[0][0] = 0;
+        this->layerRecord_6E024.texts_044[1][0] = 0;
+        this->layerRecord_6E024.texts_044[2][0] = 0;
+        for (token = strtok((char*)info->layer_004.comment_07E, "\t"); token != NULL; token = strtok(NULL, "\t")) {
+            n = this->layerRecord_6E024.textCount_40;
+            if (n >= 3) {
+                break;
+            }
+            if (strlen(token) < 0x3F) {
+                length = strlen(token);
+            } else {
+                length = 0x3F;
+            }
+            memcpy(this->layerRecord_6E024.texts_044[n], token, length);
+            this->layerRecord_6E024.texts_044[this->layerRecord_6E024.textCount_40][length] = 0;
+            this->layerRecord_6E024.textCount_40++;
+        }
+        this->requestFlags_310[SLOT_LAYER_INFO_BY_ID] |= FLAG_LAYER_INFO_BY_ID_REPLY;
+        return;
+    }
+    case 0x801D: {
+        const PatLayerInfo* info = (const PatLayerInfo*)data;
+
+        importLayerInfo(&this->layerInfo_4CC, &info->layer_004, (PatTagList*)&info->tags_244);
+        this->requestFlags_310[SLOT_LAYER_INFO] |= FLAG_LAYER_INFO_REPLY;
+        return;
+    }
+    case 0x801E: {
+        const PatLayerInfo* info = (const PatLayerInfo*)data;
+        const PatLayerData* layer = &info->layer_004;
+        PatTagList* tags = (PatTagList*)&info->tags_244;
+
+        if (layer->layerId_054 == -1) {
+            applyLoginRecord((const NetLayerLoginRecord*)layer);
+            unpackLayerSettings(&this->layerSettings_F03C, tags);
+        }
+        this->matchKey_3D4 = layer->matchKey_070;
+        this->requestFlags_310[SLOT_SERVER_SELECT] |= FLAG_CHILD_INFO_REPLY;
+        this->requestFlags_310[SLOT_LAYER_UP] |= FLAG_CHILD_INFO_REPLY;
+        this->requestFlags_310[SLOT_LAYER_CREATE] |= FLAG_CHILD_INFO_REPLY;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_CHILD_INFO_REPLY;
+        return;
+    }
+    case 0x801F:
+        this->listTotal_F1A4 = ((const NetLayerListHead*)data)->total_4;
+        this->cities_540.count_0x000 = 0;
+        for (i = 0, city = this->cities_540.entries_0x004; i < 40; i++, city++) {
+            city->id_0x00 = -1;
+            city->name_0x04[0] = 0;
+            city->capacity_0x4C = -1;
+            city->kind_0x54 = -1;
+        }
+        this->requestFlags_310[SLOT_CHILD_LIST] |= FLAG_LIST_HEAD_REPLY;
+        return;
+    case 0x8020: {
+        const PatLayerInfo* row = (const PatLayerInfo*)data;
+        PatTagList* tags;
+
+        if (count <= 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        n = 40 - this->cities_540.count_0x000;
+        if (count > n) {
+            count = n;
+        }
+        for (i = 0; i < count; i++, row++) {
+            tags = (PatTagList*)&row->tags_244;
+            if (row->layer_004.layerId_054 < 0) {
+                NetworkPostedError error;
+
+                error.code_00 = LAYER_ERR_BAD_ANSWER;
+                error.param1_04 = 0;
+                error.param2_08 = 0;
+                getInstance_()->postError(error);
+                break;
+            }
+            city = &this->cities_540.entries_0x004[this->cities_540.count_0x000++];
+            if (city->id_0x00 < 0) {
+                city->id_0x00 = row->layer_004.layerId_054;
+                city->closed_0x78 = row->layer_004.value_076 == 2;
+                city->hidden_0x79 = row->layer_004.value_076 == 1;
+            }
+            if (city->name_0x04[0] == 0) {
+                memcpy(city->name_0x04, row->layer_004.name_014, sizeof(city->name_0x04) - 1);
+                city->name_0x04[sizeof(city->name_0x04) - 1] = 0;
+            }
+            if (city->kind_0x54 == (u32)-1) {
+                unpackLayerSettings((NetLayerSettings*)&city->kind_0x54, tags);
+            }
+            if (city->capacity_0x4C < 0) {
+                city->count_0x44 = row->layer_004.counts_058[1];
+                city->population_0x48 = row->layer_004.counts_058[0];
+                city->capacity_0x4C = row->layer_004.memberLimitA_064;
+                city->order_0x50 = row->layer_004.value_06C;
+            }
+        }
+        this->listCursor_F1A0 += count;
+        this->requestFlags_310[SLOT_CHILD_LIST] |= FLAG_LIST_DATA_REPLY;
+        return;
+    }
+    case 0x8021:
+        this->requestFlags_310[SLOT_CHILD_LIST] |= FLAG_LIST_FOOT_REPLY;
+        return;
+    case 0x8022:
+        this->listTotal_F1A4 = ((const NetLayerListHead*)data)->total_4;
+        for (i = 0; i < 40; i++) {
+            this->rooms_18A4.entries_0x004[i].capacity_0x8C = -1;
+        }
+        this->requestFlags_310[SLOT_SIBLING_LIST] |= FLAG_LIST_HEAD_REPLY;
+        return;
+    case 0x8023: {
+        const PatLayerInfo* row = (const PatLayerInfo*)data;
+        PatTagList* tags;
+
+        if (count <= 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        n = 40 - this->rooms_18A4.count_0x000;
+        if (count > n) {
+            count = n;
+        }
+        for (i = 0; i < count; i++, row++) {
+            tags = (PatTagList*)&row->tags_244;
+            if (row->layer_004.layerId_054 < 0) {
+                NetworkPostedError error;
+
+                error.code_00 = LAYER_ERR_BAD_ANSWER;
+                error.param1_04 = 0;
+                error.param2_08 = 0;
+                getInstance_()->postError(error);
+                break;
+            }
+            room = &this->rooms_18A4.entries_0x004[this->rooms_18A4.count_0x000];
+            room->id_0x40 = row->layer_004.layerId_054;
+            memcpy(room->name_0x44, row->layer_004.name_014, sizeof(room->name_0x44) - 1);
+            room->name_0x44[sizeof(room->name_0x44) - 1] = 0;
+            if (room->capacity_0x8C < 0) {
+                room->count_0x84 = row->layer_004.counts_058[1];
+                room->population_0x88 = row->layer_004.counts_058[0];
+                room->capacity_0x8C = row->layer_004.memberLimitA_064;
+                room->order_0x90 = row->layer_004.value_06C;
+            }
+            unpackLayerSettings(&room->settings_0x94, tags);
+            NetworkLayerIdImportFrom((NetworkLayerId*)room->header_0x00, 3, row->layer_004.path_004,
+                                     sizeof(row->layer_004.path_004));
+            this->rooms_18A4.count_0x000++;
+        }
+        this->listCursor_F1A0 += count;
+        this->requestFlags_310[SLOT_SIBLING_LIST] |= FLAG_LIST_DATA_REPLY;
+        return;
+    }
+    case 0x8024:
+        this->requestFlags_310[SLOT_SIBLING_LIST] |= FLAG_LIST_FOOT_REPLY;
+        return;
+    case 0x8025: {
+        s32 slot = findFriendByUserId(data);
+
+        if (slot < 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        this->sessionState_C080 = slot;
+        this->requestFlags_310[SLOT_LAYER_CREATE] |= FLAG_HOST_REPLY;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_HOST_REPLY;
+        return;
+    }
+    case 0x8026: {
+        s32 slot = findFriendByUserId(data);
+
+        if (slot >= 0) {
+            this->sessionState_C080 = slot;
+            if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                getNetworkSessionManagerPat(getPatsObject(), 0)->setHostConnectionIndex(
+                    this->friendSession_EF00[this->sessionState_C080]);
+            }
+        }
+        return;
+    }
+    case 0x8029: {
+        const PatLayerUser* row = (const PatLayerUser*)data;
+        s32 slot;
+
+        if (count <= 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        this->friends_3568.count_0x000 = 0;
+        for (i = 0; i < 100; i++) {
+            clearFriendRec(&this->friends_3568.entries_0x004[i]);
+            clearFriendSlot(i);
+        }
+        if (count > 100) {
+            count = 100;
+        }
+        for (i = 0; i < count; i++, row++) {
+            slot = addFriendSlot((const u8*)row->userId_000, row);
+            if (slot >= 0) {
+                this->friendFlagEFC8_EFC8[slot] = 1;
+            }
+        }
+        this->memberUsed_F02C = this->friends_3568.count_0x000;
+        this->requestFlags_310[SLOT_SERVER_SELECT] |= FLAG_USER_LIST_REPLY;
+        this->requestFlags_310[SLOT_LAYER_UP] |= FLAG_USER_LIST_REPLY;
+        this->requestFlags_310[SLOT_LAYER_CREATE] |= FLAG_USER_LIST_REPLY;
+        this->requestFlags_310[SLOT_LAYER_JUMP] |= FLAG_USER_LIST_REPLY;
+        return;
+    }
+    case 0x802A:
+    case 0x802D:
+        this->listTotal_F1A4 = ((const NetLayerListHead*)data)->total_4;
+        this->requestFlags_310[SLOT_USER_LIST] |= FLAG_USER_HEAD_REPLY;
+        return;
+    case 0x802B:
+    case 0x802E: {
+        const NetLayerUserRow* row = (const NetLayerUserRow*)data;
+
+        if (count <= 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        n = 100 - this->friendList_6BC30.count_0x00;
+        if (count > n) {
+            count = n;
+        }
+        for (i = 0; i < count; i++, row++) {
+            importFriendRec(&this->friendList_6BC30.entries_0x04[this->friendList_6BC30.count_0x00].rec_00,
+                            row->userId_000, row->name_008);
+            unpackLayerSettings(
+                (NetLayerSettings*)&this->friendList_6BC30.entries_0x04[this->friendList_6BC30.count_0x00].session_38,
+                (PatTagList*)&row->tags_140);
+            this->friendList_6BC30.count_0x00++;
+        }
+        this->listCursor_F1A0 += count;
+        this->requestFlags_310[SLOT_USER_LIST] |= FLAG_USER_DATA_REPLY;
+        return;
+    }
+    case 0x802C:
+    case 0x802F:
+        this->requestFlags_310[SLOT_USER_LIST] |= FLAG_USER_FOOT_REPLY;
+        return;
+    case 0x803E:
+        this->listTotal_F1A4 = ((const NetLayerListHead*)data)->total_4;
+        this->requestFlags_310[SLOT_DETAIL_SEARCH] |= FLAG_SEARCH_HEAD_REPLY;
+        return;
+    case 0x803F: {
+        NetLayerCommunityRow* row = (NetLayerCommunityRow*)data;
+        NetCommunityRec* community;
+        const NetLayerUserRow* member;
+
+        if (count <= 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        n = 40 - this->communities_F1AC.count_0x00000;
+        if (count > n) {
+            count = n;
+        }
+        for (i = 0; i < count; i++, row++) {
+            importCommunityRec(&this->communities_F1AC.entries_0x00004[this->communities_F1AC.count_0x00000],
+                               &row->layer_00C, &row->tags_24C);
+            member = row->members_004;
+            community = &this->communities_F1AC.entries_0x00004[this->communities_F1AC.count_0x00000];
+            if (row->memberCount_000 > 100) {
+                row->memberCount_000 = 100;
+            }
+            for (j = 0; j < row->memberCount_000; j++, member++) {
+                importFriendRec(&community->members_0x011C.entries_0x004[j], member->userId_000, member->name_008);
+                unpackLayerSettings((NetLayerSettings*)&community->memberSessions_0x1700[j],
+                                    (PatTagList*)&member->tags_140);
+            }
+            for (; j < 100; j++) {
+                community->members_0x011C.entries_0x004[j].valid_0x35 = 0;
+            }
+            community->members_0x011C.count_0x000 = row->memberCount_000;
+            this->communities_F1AC.count_0x00000++;
+        }
+        this->listCursor_F1A0 += count;
+        this->requestFlags_310[SLOT_DETAIL_SEARCH] |= FLAG_SEARCH_DATA_REPLY;
+        return;
+    }
+    case 0x8040:
+        this->requestFlags_310[SLOT_DETAIL_SEARCH] |= FLAG_SEARCH_FOOT_REPLY;
+        return;
+    case 0x8033: {
+        NetLayerUserFieldsMsg* msg = (NetLayerUserFieldsMsg*)data;
+        NetLayerUserFieldIn* first = msg->fields_C;
+
+        if (msg->count_A != 0) {
+            if (first->index_0 == 0x40) {
+                NetUserFieldsNotice notice;
+                NetUserFields* fields = &notice.fields_020;
+                NetLayerUserFieldIn* in;
+                NetUserField* out;
+                u8 index;
+
+                notice.id_000.importFrom(3, msg->userId_0, 8);
+                memset(fields, 0, sizeof(*fields));
+                if (msg->count_A > 65) {
+                    msg->count_A = 65;
+                }
+                for (i = 1; i < msg->count_A; i++) {
+                    in = &msg->fields_C[i];
+                    index = in->index_0;
+                    if (index >= 64) {
+                        continue;
+                    }
+                    out = &fields->fields_008[index];
+                    switch (in->kind_1) {
+                    case 1:
+                        out->value_08.byte = in->value_8.byte;
+                        break;
+                    case 2:
+                        out->value_08.half = in->value_8.half;
+                        break;
+                    case 3:
+                        out->value_08.word = in->value_8.word;
+                        break;
+                    case 4:
+                        out->value_08.wide = in->value_8.wide;
+                        break;
+                    case 5:
+                        out->value_08.single = in->value_8.single;
+                        break;
+                    case 6:
+                        out->value_08.real = in->value_8.real;
+                        break;
+                    case 7:
+                        out->value_08.word = in->value_8.word;
+                        break;
+                    case 8:
+                        out->value_08.blob.data_0 = in->value_8.blob.data_0;
+                        break;
+                    case 9:
+                        out->value_08.blob.data_0 = in->value_8.blob.data_0;
+                        out->value_08.blob.size_4 = in->value_8.blob.size_4;
+                        break;
+                    default:
+                        continue;
+                    }
+                    out->kind_00 = in->kind_1;
+                    if (fields->count_000 <= index) {
+                        fields->count_000 = index + 1;
+                    }
+                }
+                notifyLayerEvent(17, 0, 1, (NetworkRequestError*)&notice, this->context_08);
+            } else if (first->index_0 == 0x01) {
+                u8 kind = first->value_8.byte;
+                s8 slot = findFriendByUserId(msg->userId_0);
+
+                if (this->transferSlot_C07C >= 0 && slot >= 0) {
+                    if (msg->count_A == 2) {
+                        if (msg->fields_C[1].index_0 == 2) {
+                            u32 flags = msg->fields_C[1].value_8.word;
+
+                            switch (kind) {
+                            case 5:
+                                refreshFriendTransfer(slot, 0);
+                            case 4:
+                                setFriendFlags(slot, flags);
+                                break;
+                            }
+                        }
+                    } else if (msg->count_A == 5) {
+                        if (msg->fields_C[1].index_0 == 3 && msg->fields_C[2].index_0 == 4 &&
+                            msg->fields_C[3].index_0 == 5 && msg->fields_C[4].index_0 == 6) {
+                            u32 peerId = msg->fields_C[1].value_8.word;
+                            u32 mode = msg->fields_C[2].value_8.word;
+                            u32 session = msg->fields_C[3].value_8.word;
+                            u16 port = msg->fields_C[4].value_8.half;
+                            s32 index;
+
+                            switch (kind) {
+                            case 6:
+                                sendPeerRecord(slot, 0);
+                            case 7:
+                                this->friendPeers_C1B0[slot].peerId_00 = peerId;
+                                this->friendPeers_C1B0[slot].mode_04 = mode;
+                                this->friendPeers_C1B0[slot].session_08 = session;
+                                this->friendPeers_C1B0[slot].port_0C = port;
+                                if (this->friendSession_EF00[slot] < 0 &&
+                                    getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                                    index = getNetworkSessionManagerPat(getPatsObject(), 0)->connectPeer(
+                                        &this->friends_3568.entries_0x004[slot].id_0x00, peerId);
+                                    if (index >= 0) {
+                                        this->friendSession_EF00[slot] = index;
+                                        this->memberStatus_EF64[slot] = 2;
+                                        if (slot == this->sessionState_C080 &&
+                                            getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                                            getNetworkSessionManagerPat(getPatsObject(), 0)->setHostConnectionIndex(index);
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    } else if (msg->count_A == 4) {
+                        if (msg->fields_C[1].index_0 == 7 && msg->fields_C[2].index_0 == 8 &&
+                            msg->fields_C[3].index_0 == 9) {
+                            u32 from = msg->fields_C[1].value_8.word;
+                            u32 to = msg->fields_C[2].value_8.word;
+                            u8 pairState = msg->fields_C[3].value_8.byte;
+                            s8 a = findFriendByPeerId(from);
+                            s8 b = findFriendByPeerId(to);
+
+                            if (kind == 8) {
+                                if (pairState == 2) {
+                                    this->negotiateFrom_438 = from;
+                                    this->negotiateTo_43C = to;
+                                    this->negotiated_440 = 0;
+                                    if (from == this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00) {
+                                        if (a >= 0 && b >= 0) {
+                                            if (this->pairState_C7F0[this->transferSlot_C07C][b] != 1 &&
+                                                GameSpyInterfaceThread::getInstance() != NULL) {
+                                                GameSpyInterfaceThread::getInstance()->startNegotiation(
+                                                    &this->friendPeers_C1B0[a], &this->friendPeers_C1B0[b]);
+                                            }
+                                        } else {
+                                            sendPairState(this->negotiateFrom_438, this->negotiateTo_43C, 3);
+                                            this->negotiateFrom_438 = 0;
+                                            this->negotiateTo_43C = 0;
+                                        }
+                                    } else if (to == this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00) {
+                                        if (a >= 0 && b >= 0) {
+                                            if (this->pairState_C7F0[this->transferSlot_C07C][a] != 1) {
+                                                if (GameSpyInterfaceThread::getInstance() != NULL) {
+                                                    GameSpyInterfaceThread::getInstance()->startNegotiation(
+                                                        &this->friendPeers_C1B0[a], &this->friendPeers_C1B0[b]);
+                                                }
+                                            } else {
+                                                sendPairState(from, to, this->pairState_C7F0[this->transferSlot_C07C][a]);
+                                                this->negotiated_440 = 1;
+                                            }
+                                        } else {
+                                            sendPairState(this->negotiateFrom_438, this->negotiateTo_43C, 3);
+                                            this->negotiateFrom_438 = 0;
+                                            this->negotiateTo_43C = 0;
+                                        }
+                                    } else {
+                                        if (a < 0) {
+                                            this->negotiateFrom_438 = 0;
+                                        }
+                                        if (b < 0) {
+                                            this->negotiateTo_43C = 0;
+                                        }
+                                    }
+                                } else {
+                                    if (a >= 0 && b >= 0) {
+                                        if (pairState != 3) {
+                                            this->pairState_C7F0[a][b] = pairState;
+                                            this->pairState_C7F0[b][a] = pairState;
+                                        }
+                                        if (pairState == 4) {
+                                            if (from == this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00) {
+                                                if (GameSpyInterfaceThread::getInstance() != NULL) {
+                                                    GameSpyInterfaceThread::getInstance()->replyRequest(to);
+                                                }
+                                            } else if (to == this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00) {
+                                                if (GameSpyInterfaceThread::getInstance() != NULL) {
+                                                    GameSpyInterfaceThread::getInstance()->replyRequest(from);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (pairState != 0 && pairState != 4) {
+                                        this->negotiateFrom_438 = 0;
+                                        this->negotiateTo_43C = 0;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        break;
+    }
+    case 0x8034: {
+        const NetLayerUserPositionMsg* msg = (const NetLayerUserPositionMsg*)data;
+        NetUserPositionNotice notice;
+
+        notice.id_00.importFrom(3, msg->userId_00, 8);
+        notice.position_20.position_00[0] = msg->position_08.position_00[0];
+        notice.position_20.position_00[1] = msg->position_08.position_00[1];
+        notice.position_20.position_00[2] = msg->position_08.position_00[2];
+        notice.position_20.value_0C[0] = msg->position_08.value_0C[0];
+        notice.position_20.value_0C[1] = msg->position_08.value_0C[1];
+        notice.position_20.value_0C[2] = msg->position_08.value_0C[2];
+        notifyLayerEvent(14, 0, 1, (NetworkRequestError*)&notice, this->context_08);
+        return;
+    }
+    case 0x8027:
+        this->requestFlags_310[SLOT_USER_INFO] |= FLAG_USER_INFO_REPLY;
+        return;
+    case 0x8028: {
+        const NetLayerUserStatusMsg* msg = (const NetLayerUserStatusMsg*)data;
+        NetFriendStatusNotice notice;
+
+        notice.id_00.importFrom(3, msg->userId_00, 8);
+        notice.status_20 = msg->status_38;
+        notifyLayerEvent(EVENT_FRIEND_STATUS, 0, 1, (NetworkRequestError*)&notice, this->context_08);
+        return;
+    }
+    case 0x8036:
+        this->requestFlags_310[SLOT_CHAT] |= FLAG_TELL_REPLY;
+        return;
+    case 0x8035:
+    case 0x8037: {
+        const NetLayerChatMsg* msg = (const NetLayerChatMsg*)data;
+
+        if ((s8)msg->text_000[0] != 0 && (s8)msg->userId_108[0] != 0) {
+            NetworkSessionSlotInfo message;
+
+            message.smallObject_00.importFrom(3, msg->userId_108, 8);
+            memcpy(message.name_20, msg->name_110, sizeof(message.name_20));
+            message.nameEnd_33 = 0;
+            memset(&message.flag_34, 0, 1);
+            memcpy(message.text_35, msg->text_000, sizeof(msg->text_000) - 1);
+            message.text_35[sizeof(msg->text_000) - 1] = 0;
+            message.textEnd_235 = 0;
+            message.tag_238 = msg->tag_100;
+            message.time_23C = msg->time_104;
+            notifyLayerEvent(16, 0, 1, (NetworkRequestError*)&message, this->context_08);
+        }
+        break;
+    }
+    case 0x8030:
+        this->listTotal_F1A4 = ((const NetLayerListHead*)data)->total_4;
+        this->requestFlags_310[SLOT_USER_SEARCH] |= FLAG_USER_HEAD_REPLY;
+        return;
+    case 0x8031: {
+        const NetLayerSearchRow* row = (const NetLayerSearchRow*)data;
+
+        if (count <= 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        n = 100 - this->friendList_6BC30.count_0x00;
+        if (count > n) {
+            count = n;
+        }
+        for (i = 0; i < count; i++, row++) {
+            importFriendRec(&this->friendList_6BC30.entries_0x04[this->friendList_6BC30.count_0x00].rec_00,
+                            row->userId_000, row->name_008);
+            unpackLayerSettings(
+                (NetLayerSettings*)&this->friendList_6BC30.entries_0x04[this->friendList_6BC30.count_0x00].session_38,
+                (PatTagList*)&row->tags_230);
+            this->friendList_6BC30.count_0x00++;
+        }
+        this->listCursor_F1A0 += count;
+        this->requestFlags_310[SLOT_USER_SEARCH] |= FLAG_USER_DATA_REPLY;
+        return;
+    }
+    case 0x8032:
+        this->requestFlags_310[SLOT_USER_SEARCH] |= FLAG_USER_FOOT_REPLY;
+        return;
+    case 0x8071: {
+        const NetLayerUserBinaryMsg* msg = (const NetLayerUserBinaryMsg*)data;
+        s32 slot = findFriendByUserId(msg->userId_000);
+        u32 size;
+
+        if (slot >= 0 && msg->offset_110 < 0x100) {
+            size = 0x100 - msg->offset_110;
+            if (msg->size_10C < size) {
+                size = msg->size_10C;
+            }
+            if (this->details_595C[slot].size_0x000 < msg->offset_110 + size) {
+                this->details_595C[slot].size_0x000 = msg->offset_110 + size;
+            }
+            memcpy(&this->details_595C[slot].data_0x004[msg->offset_110], msg->data_009, size);
+        }
+        break;
+    }
+    case 0x8039:
+        this->requestFlags_310[SLOT_MEDIATION_LOCK] = FLAG_MEDIATION_LOCK_REPLY;
+        return;
+    case 0x803A: {
+        const NetLayerMediationMsg* msg = (const NetLayerMediationMsg*)data;
+
+        if ((s8)msg->userId_0[0] != 0) {
+            NetLayerMediationEntry entry;
+
+            entry.id_00.importFrom(3, msg->userId_0, 8);
+            entry.lock_20 = msg->lock_8;
+            entry.key_21 = msg->key_9;
+            notifyLayerEvent(32, 0, 1, (NetworkRequestError*)&entry, this->context_08);
+        }
+        break;
+    }
+    case 0x803B:
+        this->requestFlags_310[SLOT_MEDIATION_UNLOCK] |= FLAG_MEDIATION_UNLOCK_REPLY;
+        return;
+    case 0x803C: {
+        const NetLayerMediationMsg* msg = (const NetLayerMediationMsg*)data;
+
+        if ((s8)msg->userId_0[0] != 0) {
+            NetLayerMediationEntry entry;
+
+            entry.id_00.importFrom(3, msg->userId_0, 8);
+            entry.lock_20 = msg->lock_8;
+            entry.key_21 = msg->key_9;
+            notifyLayerEvent(34, 0, 1, (NetworkRequestError*)&entry, this->context_08);
+        }
+        break;
+    }
+    case 0x803D: {
+        const NetLayerMediationMsg* row = (const NetLayerMediationMsg*)data;
+
+        if (count < 0) {
+            NetworkPostedError error;
+
+            error.code_00 = LAYER_ERR_BAD_ANSWER;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            getInstance_()->postError(error);
+            return;
+        }
+        if (count > 32) {
+            count = 32;
+        }
+        this->mediationList_6E128.count_000 = 0;
+        for (i = 0; i < count; i++, row++) {
+            this->mediationList_6E128.entries_004[this->mediationList_6E128.count_000].id_00.importFrom(3, row->userId_0, 8);
+            this->mediationList_6E128.entries_004[this->mediationList_6E128.count_000].lock_20 = row->lock_8;
+            this->mediationList_6E128.entries_004[this->mediationList_6E128.count_000].key_21 = row->key_9;
+            this->mediationList_6E128.count_000++;
+        }
+        this->requestFlags_310[SLOT_MEDIATION_LIST] |= FLAG_MEDIATION_LIST_REPLY;
+        break;
+    }
+    }
+}
+
+/* Builds the notice's unique id. */
+inline NetUserPositionNotice::NetUserPositionNotice()
+{
+}
+
+/* Destroys the notice's unique id. */
+inline NetUserPositionNotice::~NetUserPositionNotice()
+{
+}
+
+/* Builds the notice's unique id. */
+inline NetUserFieldsNotice::NetUserFieldsNotice()
+{
+}
+
+/* Destroys the notice's unique id. */
+inline NetUserFieldsNotice::~NetUserFieldsNotice()
+{
 }
 
 /* Copies the selected server (an FMP slot) into `out` when one is selected. */
@@ -4256,7 +5424,7 @@ void NetworkLayerPat::resetLayerState()
     this->status_F030 = 0;
     this->status_F034 = 0;
     this->status_F038 = 0;
-    this->status_F03C = 0;
+    this->layerSettings_F03C.count_0x00 = 0;
 }
 
 /* Leaves the layer and shuts the connection down (event 2), skipping the steps that no longer apply. */
@@ -4630,7 +5798,7 @@ void NetworkLayerPat::clear()
     for (i = 0; i < 100; i++) {
         this->friendList_6BC30.entries_0x04[i].rec_00.valid_0x35 = 0;
     }
-    this->layerRecord_6E024.id_40 = 0;
+    this->layerRecord_6E024.textCount_40 = 0;
     this->mediationList_6E128.count_000 = 0;
 }
 
