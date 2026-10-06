@@ -8,6 +8,11 @@ measurements behind the lib's flags, which `configure.py` points at.
 `cflags_g3d` is `cflags_base` without `-O4,p` and `-inline auto`, plus `-O3`, `-inline noauto` and
 `-Cpp_exceptions on`.
 
+* **Compiler: Wii/1.3.** A `mt.py matrix` over 7 units (g3d_calcvtx, g3d_resanmchr, g3d_resanm, g3d_resanmamblight,
+  g3d_resanmcamera, g3d_resmat, g3d_cpu) against GC/3.0a3, 3.0a5, 3.0a5.2, Wii/1.0 and Wii/1.3, with and without
+  `-fp_contract off`: Wii/1.3 is best or tied on every unit (g3d_resmat 92.91 vs 91.16 on GC/3.0a5.2), unlike the
+  nw4r math/ut/db stubs, which match under GC/3.0a5.2.
+
 * **`-O3`** (playbook 27). `g3d/g3d_anmscn.cpp`'s `fn_800680A8__FPv` (0x24 B, 9 instructions) loads the field at
   +0xC before the epilogue's LR reload. Under `-O4,p` the same nine instructions come in the other order
   (`lwz r0, 0x14(r1)` before `lwz r3, 0xc(r3)`); under `-O3` the object is byte-identical. Every `-O3` variant

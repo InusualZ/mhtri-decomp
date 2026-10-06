@@ -6,6 +6,7 @@
 #define RVLGX_GXTEXTURE_TAIL_H
 
 #include "types.h"
+#include "gx.h"
 
 /* One entry of an `IOS_Ioctlv` vector list. size: 0x8 */
 typedef struct IPCIOVector {
@@ -43,6 +44,16 @@ void* IPCGetBufferLo(void);
 void* IPCGetBufferHi(void);
 void IPCSetBufferLo(void* lo);
 u32 strnlen(const char* str, u32 maxlen);
+
+/* 0x804B8020..0x804BA1B0 - the texture-object initialisers and the display-list call (callers: g3d/g3d_resmat.cpp). */
+void GXInitTexObj(GXTexObj* obj, void* image, u16 width, u16 height, u32 format, u32 wrapS, u32 wrapT,
+                  u8 mipmap); /* untyped: byte range */
+void GXInitTexObjCI(GXTexObj* obj, void* image, u16 width, u16 height, u32 format, u32 wrapS, u32 wrapT,
+                    u8 mipmap, u32 tlutName); /* untyped: byte range */
+void GXInitTexObjLOD(GXTexObj* obj, u32 minFilt, u32 magFilt, f32 minLod, f32 maxLod, f32 lodBias, u8 biasClamp,
+                     u8 doEdgeLod, u32 maxAniso);
+void GXInitTlutObj(GXTlutObj* obj, void* lut, u32 format, u16 numEntries); /* untyped: byte range */
+void GXCallDisplayList(const void* list, u32 size); /* untyped: byte range */
 
 #ifdef __cplusplus
 }

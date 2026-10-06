@@ -1,10 +1,13 @@
-/*
- * g3d/g3d_gpu.cpp - two nw4r g3d GPU-path texgen helpers `fn_80087CCC` calls: XF 0x1018 packing, a texture matrix.
- * RANGE. .text 0x8009B140-0x8009B374 (2 functions); extab, extabindex, .data 0x80591900-0x80591948, .sdata2
- *   0x80795F6C-0x80795F70.  The right edge is the discovery byte cap, not a proven TU end.
- * NAMES. Map stems (the dump answers `zz_` placeholders); `Array8` is the assert message's name, `Mat33` a GUESS.
- * RESIDUALS. none in `.text`; flipcheck: `.data` and `.sdata2` are claimed and not emitted.
- * SHAPES. `GXLoadTexMtxImm` is declared `extern "C"` (the map's plain name); C++ linkage mangles the relocation.
+/* g3d/g3d_gpu - the nw4r g3d fifo current-matrix-index and 3x3 texture-matrix display-list writers.
+ * RANGE. .text 0x8009B140-0x8009B374 (2 functions); extab, extabindex, .data 0x80591900-0x80591948 (the file name
+ *   and the assert message), .sdata2 0x80795F6C-0x80795F70 (0.0f).
+ * FLAGS. cflags_g3d (docs/g3d.md).
+ * NAMES. GDSetCurrentMtx and GDLoadTexMtxImm3x3 are GUESSES from the nw4r g3d fifo API (XF 0x1018 matrix-index
+ *   packing; a 3x3 expanded to 3x4 and loaded with GXLoadTexMtxImm); `Array8` is the assert message's name, `Mat33`
+ *   a GUESS.
+ * RESIDUALS. none.
+ * SHAPES. `GXLoadTexMtxImm` is declared `extern "C"` (the map's plain name); the assert message is retail's bytes,
+ *   `\n` then a plain `t`; the strings are literals so the object emits `.data` in retail's order.
  */
 
 #include "types.h"
@@ -27,12 +30,6 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
  * the third argument is a `GXTexMtxType` (`GX_MTX3x4 == 0`). */
 extern "C" void GXLoadTexMtxImm(const void* pMtx, u32 id, u32 type);
 
-/* The file's own pooled strings and the pooled 0.0f, declared, not defined: the claimed `.data`/`.sdata2` are
- * not emitted yet. */
-extern char lbl_80591900[]; /* "g3d_gpu.cpp"                                                       .data 0x80591900 */
-extern char lbl_8059190C[]; /* "NW4R:Pointer Error\n\tArray8(=%p) is not valid pointer."          .data 0x8059190C */
-extern const f32 lbl_80795F6C; /* 0.0f - the texture matrix's translation column                 .sdata2 0x80795F6C */
-
 /* The nw4r resource pointer assert: `ptr` must fall in one of the seven mapped Wii memory ranges.  The six
  * materialised BOOLs and the two-test first `if` (`top_` caches the 0xFF000000 test the 0xC0000000 test reuses)
  * are retail's shape; `line` is the original file's line (`li r4, 0xff`). */
@@ -53,10 +50,10 @@ extern const f32 lbl_80795F6C; /* 0.0f - the texture matrix's translation column
         if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))                              \
             ok1_ = FALSE;                                                                        \
         if (!ok1_)                                                                              \
-            nw4r::db::Panic(lbl_80591900, line, msg, (ptr));                                    \
+            nw4r::db::Panic("g3d_gpu.cpp", line, msg, (ptr));                                    \
     }
 
-/* The eight-setting record fn_8009B140 packs.  Its own assert message names it ("Array8(=%p) is not
+/* The eight-setting record GDSetCurrentMtx packs.  Its own assert message names it ("Array8(=%p) is not
  * valid pointer."); the caller `fn_80087CCC` fills the eight words from a per-texgen table (the values
  * it writes - 0, 30, 60 - all fit the six bits the packing leaves each field).  The name of each field
  * is its slot in the two emitted command words: `lo_*` goes to the word at bits 0/6/12/18, `hi_*` to
@@ -73,7 +70,7 @@ struct Array8 {
     /* +0x1C */ u32 lo_bits_18;  /* -> first command word bits 18-23  */
 };
 
-/* The stored 3x3 rotation fn_8009B2CC expands.  The caller `fn_80087CCC` passes fn_80087F08's result
+/* The stored 3x3 rotation GDLoadTexMtxImm3x3 expands.  The caller `fn_80087CCC` passes fn_80087F08's result
  * (the resource's matrix block) and the body reads all nine floats as one contiguous 0x24 block, so it
  * is a 3x3 and not the 3x4 `MTX34` the expanded form uses.
  * size: 0x24 */
@@ -85,8 +82,8 @@ extern "C" {
 
 /* Emits the texgen record's eight settings as the two packed command words of the XF `0x1018` state,
  * plus their fixed header.  Caller: fn_80087CCC (0x80087D78), which packs the record it just built. */
-void fn_8009B140(Array8* self) {
-    G3D_GPU_POINTER_ASSERT(self, 255, lbl_8059190C);
+void GDSetCurrentMtx(Array8* self) {
+    G3D_GPU_POINTER_ASSERT(self, 255, "NW4R:Pointer Error\ntArray8(=%p) is not valid pointer.");
 
     u32 hi = (self->hi_bits_6 << 6) | (self->hi_bits_12 << 12) | (self->hi_bits_18 << 18)
            | (self->hi_bits_24 << 24);
@@ -100,22 +97,22 @@ void fn_8009B140(Array8* self) {
 
 /* Expands the stored 3x3 rotation `pSrc` into a 3x4 texture matrix (fourth column the pooled 0.0f) and loads it
  * as texgen matrix `id`; fn_80087CCC (0x80087D24) calls it once per setting that wants a matrix. */
-void fn_8009B2CC(const Mat33* pSrc, u32 id) {
+void GDLoadTexMtxImm3x3(const Mat33* pSrc, u32 id) {
     nw4r::math::MTX34 mtx;
 
     MTX34_ctor(&mtx);
     mtx.m[0][0] = pSrc->m[0][0];
     mtx.m[0][1] = pSrc->m[0][1];
     mtx.m[0][2] = pSrc->m[0][2];
-    mtx.m[0][3] = lbl_80795F6C;
+    mtx.m[0][3] = 0.0f;
     mtx.m[1][0] = pSrc->m[1][0];
     mtx.m[1][1] = pSrc->m[1][1];
     mtx.m[1][2] = pSrc->m[1][2];
-    mtx.m[1][3] = lbl_80795F6C;
+    mtx.m[1][3] = 0.0f;
     mtx.m[2][0] = pSrc->m[2][0];
     mtx.m[2][1] = pSrc->m[2][1];
     mtx.m[2][2] = pSrc->m[2][2];
-    mtx.m[2][3] = lbl_80795F6C;
+    mtx.m[2][3] = 0.0f;
 
     GXLoadTexMtxImm(fn_80050508(&mtx), id, 0 /* GX_MTX3x4 */);
 }
