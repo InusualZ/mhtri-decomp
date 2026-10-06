@@ -1,58 +1,33 @@
-/* ef/ef_creationqueue.cpp - the NW4R effect library's creation queue.
- *
- * .text 0x800A3044..0x800A388C, seven functions.  The unit's own `__FILE__` string decides the
- * registration (docs/plan.md 12, evidence class 1): every Panic/Warning in the range passes
- * `lbl_805922C0`, which reads `ef_creationqueue.cpp` at 0x805922C0 - a bare source-file name, so the
- * original TU is `ef_creationqueue.cpp`.  The `.cpp` suffix and the Panic formatter
- * (`Panic__Q24nw4r2dbFPCciPCce`) make it C++ (langcheck: a `.cpp` panic string is conclusive).
- *
- * What it is: the queue the effect library fills when it wants an effect created later.  An entry is
- * 0x30 bytes and carries the effect manager, the effect handle, a 0xA-byte setting record, a life and
- * two optional VEC3 (position/velocity); `mCount` at +0 of the queue holds the live-entry count and the
- * entry array starts at +4.  The two `Add` bodies (fn_800A3044 type 0, fn_800A33DC type 1) differ only
- * in the entry's `mType` byte and in the assert/warning line numbers; `Execute` (fn_800A3718) walks the
- * queue, dispatches on `mType` (a plain call for type 0, the form's virtual slot +0x14 for type 1),
- * releases the manager and resets the count.  fn_800A337C/fn_800A3800 are the manager's inlined
- * reference-count pair emitted out of line here (the `mRefCount > 0` assert and `referencedobject.h`
- * string are theirs); fn_800A3390 is the setting record's 0xA-byte copy; fn_800A3888 is empty.
- *
- * Names: the map has only `fn_XXXXXXXX` for this range, so the functions keep the map's stems (rule 7
- * deferred).  The types and fields are named from the evidence (the panic messages name `setting` and
- * `eh`; the callee fn_800A7750 in `ef_emitter.cpp` asserts the same handle).
- *
- * Flags: the lib's `cflags_main` (`-O3 -inline noauto -Cpp_exceptions on`) is the registered home, but
- * the target's two loose ends are the *unfused* select forms - `clrlwi` + `cmpwi` for the flag test in
- * fn_800A3718 and `addi` + `cmpwi` for the ref-count decrement in fn_800A3800 - where the peephole pass
- * emits `clrlwi.`/`addic.`.  A file-scoped `#pragma peephole off` reproduces both (and leaves the other
- * five bodies byte-identical).  Its extab 0x20 + extabindex 0x30 are exact: `-Cpp_exceptions on` emits
- * the four 8-byte unwind-only records (fn_800A3044/33DC/3718/3800).
- *
- * Result: .text 0x848/0x848 (fn_800A3044, fn_800A337C, fn_800A3390, fn_800A33DC and fn_800A3888 are
- * byte-identical).  The residuals are register allocation, not source shape:
- *   - fn_800A3718 98.10 %: MWCC keeps the loop's entry pointer in r31 and the index in r30 from the
- *     `i = 0` init (the target's are r31/r30 too when the init reads the other way), and loads the
- *     form's vtable through r9 before the slot (`lwz r9, 0x1C(r3); lwz r12, 0x14(r9)`) where the target
- *     reuses r12 (`lwz r12, ...; lwz r12, ...`).
- *   - fn_800A3800 99.56 %: the disposal call loads the vtable into r4 (`lwz r4, 0x1C(r31)`) instead of
- *     through the `this` register (`lwz r12, 0x1C(r3)`); every instruction and the section size match.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/symbols/dumpmap.py lookup over all seven addresses, and config/RMHE08/symbols.txt).
+/*
+ * ef/ef_creationqueue.cpp - the NW4R effect library's creation queue: two `Add` paths (entry type 0 and 1),
+ *   `Execute` (dispatch each entry, release its manager, reset the count) and the manager's inlined
+ *   reference-count pair emitted out of line.
+ * RANGE. .text 0x800A3044-0x800A388C (7 functions); extab 0x80009B40-0x80009B60, extabindex 0x80022CBC-0x80022CEC,
+ *   .data 0x805922C0-0x805923A0 (the `__FILE__` string `ef_creationqueue.cpp` first).
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the unfused `clrlwi` + `cmpwi` in
+ *   `fn_800A3718` and `addi` + `cmpwi` in `fn_800A3800`).
+ * NAMES. The map has only `fn_` stems for the range; the types and fields are GUESSes from the panic messages
+ *   (`setting`, `eh`) and from `fn_800A7750` in `ef/ef_emitter.cpp`, which asserts the same handle.
+ * RESIDUALS. 2 partial rows:
+ *  - `fn_800A3718`: retail reuses r12 for the form's table and slot (`lwz r12, ...; lwz r12, ...`), ours loads the
+ *    table through r9;
+ *  - `fn_800A3800`: the disposal call loads the table into r4 (`lwz r4, 0x1C(r31)`) where retail goes through the
+ *    `this` register (`lwz r12, 0x1C(r3)`).
+ *   flipcheck: `.data` claimed, not emitted.
+ * SHAPES. A table member declared as a pointer to a struct of function pointers makes the virtual calls load the
+ *   slot straight through the table register, as retail does.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h"
 
-/* The `VEC3_ctor` macro that used to guard this include is gone: `unsplit/ef.h` no longer declares
- * the symbol (its owner `mh3_pad.h` does), so the two headers no longer clash. */
 #include "unsplit/ef.h"
 
 #pragma peephole off
 
-/* `nw4r::db::Panic`/`Warning`: declaring the owner's real spelling makes the C++ front-end reproduce
- * the map's mangling (`Panic__Q24nw4r2dbFPCciPCce`) exactly; spelling the mangling itself would
- * re-mangle it (docs/plan.md 6.5 rule 9). */
+/* `nw4r::db::Panic`/`Warning`, declared in their namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r {
 namespace db {
 void Panic(const char* file, int line, const char* fmt, ...);

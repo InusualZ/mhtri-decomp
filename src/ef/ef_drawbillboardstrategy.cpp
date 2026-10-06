@@ -1,76 +1,48 @@
-/* ef/ef_drawbillboardstrategy.cpp - nw4r::ef draw-strategy family, `.text` 0x800B9A44..0x800BE154.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
- * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * 36 functions / 0x4710 bytes of the NintendoWare-for-Revolution effect library (`nw4r::ef`).  Phase 4 renamed the unit: the old
- * `ef/ef_drawstripestrategy.cpp` registration (0x800B99E8..0x800BE154) was cut at 0x800B9A44, because the `ef_drawstripestrategy.cpp`
- * `__FILE__` strings (0x805939E8, 0x80593D0C, 0x80593D5C, 0x80593DAC) all belong to the code before it - the DrawStripeStrategy
- * deleting destructor `fn_800B99E8` and the walkers up to it are `ef/ef_drawstripestrategy.cpp` now, and this range opens on the
- * DrawBillboardStrategy constructor.  The name is the first `__FILE__` string the range owns: `ef_drawbillboardstrategy.cpp`
- * (0x80593E88).  The range still holds a second TU, `ef_drawdirectionalstrategy.cpp` (0x80594070), which owns 0x800BBDEC/0x800BC1B4/
- * 0x800BE0BC; the reconciled candidate keeps the two in one unit (the seam between them stays open, as `phase3-notes.md` records).
- *
- * The `.cpp` spelling makes the original language C++ (docs/plan.md, "The language comes from the
- * symbol"); the `Panic__Q24nw4r2dbFPCciPCce` callee and the `__dl__FPv` deleting destructors say the
- * same.  This file is registered as `.cpp` and every definition sits inside an `extern "C"` guard so
- * the front-end keeps the map's `fn_XXXXXXXX` spelling (playbook 42) instead of mangling
- * it.
- *
- * Layout in address order (36 symbols):
- *   0x800B9A44  the DrawBillboardStrategy constructor
- *   0x800B9A80  the per-particle draw-strategy dispatch (three `nw4r::ef::Emitter*` shape branches)
- *   0x800B9DF8/0x800BA854/0x800BAFBC  the point/stripe/tube particle walkers
- *   0x800BA1E0  the four-vertex stripe writer
- *   0x800BA6E8..0x800BA710  the out-of-line GX FIFO writers (empty/u8/bit/vec3)
- *   0x800BA734  the indexed four-vertex stripe writer
- *   0x800BAC30  the tube writer
- *   0x800BAFB0  the two-f32 accessor
- *   0x800BB488  the four-vertex tube writer
- *   0x800BB748  the stripe GX state setup
- *   0x800BB93C  the DrawBillboardStrategy emitter-shape dispatch
- *   0x800BBBBC/0x800BBCF8  the two ahead-context position resolvers
- *   0x800BBD90  the DrawBillboardStrategy deleting destructor
- *   0x800BBDEC  the DrawDirectionalStrategy constructor
- *   0x800BBE28  the four-vertex matrix writer
- *   0x800BC048..0x800BC070  the out-of-line GX FIFO writers (second copy)
- *   0x800BC094  the indexed four-vertex writer (second copy)
- *   0x800BC1B4  the DrawDirectionalStrategy emitters
- *   0x800BC41C  the particle flag accessor
- *   0x800BC428/0x800BD234  the large per-particle emitters
- *   0x800BCD14/0x800BCE98/0x800BDB60/0x800BDD34  the layer/tube emitters
- *   0x800BE0BC  the DrawDirectionalStrategy deleting destructor
- *   0x800BE118  the next constructor
- *
- * Codegen lever: this unit needs the peephole pass off - the GX FIFO writers keep the unfused
- * `clrlwi`/`extsh`/`extsb` in front of every narrowing store, exactly as the sibling
- * `ef/ef_drawsmoothstripestrategy.cpp` and `gx/fn_8009AA78.c` did.
- *
- * Status (measured against the retired auto_fn_<addr> target objects with the official report metric):
- * 27 of the 37 symbols are written, every one of them at or above 80 % - 18 byte-identical (the
- * constructors/destructors, the GX FIFO writers, the indexed four-vertex writers, the matrix writer
- * and the ahead resolver fn_800BBCF8).  Residual: fn_800BA710/fn_800BC070 (85.6 %) miss only the
- * 4-byte `b` retail materialises between the three vector loads and the FIFO base load;
- * fn_800BB748/fn_800BDB60 (94.9/95.9 %) differ in the GXSetArray sda21 access; fn_800BBBBC (94.9 %)
- * in the setVec3/copyVec3 pairing; fn_800B9A80/fn_800BB93C/fn_800BC1B4/fn_800BDD34 (98-99 %)
- * in the inlined IsValidPointer short-circuit on one guard.  The eleven unwritten emitters
- * (fn_800B9DF8, fn_800BA1E0, fn_800BA854, fn_800BAC30, fn_800BAFBC, fn_800BB488, fn_800BC428,
- * fn_800BCD14, fn_800BCE98, fn_800BD234) are large nw4r paired-single (AltiVec) particle walkers that
- * m2c cannot recover - they are the recorded residual, not a finished translation.
+/*
+ * ef/ef_drawbillboardstrategy.cpp - nw4r::ef DrawBillboardStrategy and DrawDirectionalStrategy: their
+ *   constructors and deleting destructors, the per-particle draw dispatch and emitter-shape dispatch, the point,
+ *   stripe and tube particle walkers and writers, two copies of the out-of-line GX FIFO writers and the indexed
+ *   four-vertex writers, the stripe GX state, the ahead-context position resolvers and the directional emitters.
+ * RANGE. .text 0x800B9A44-0x800BE154 (36 functions); extab 0x8000A23C-0x8000A30C, extabindex 0x80023700-0x80023838,
+ *   .rodata 0x8056F770-0x8056F7D0, .data 0x80593E88-0x805941F8, .sdata 0x80791300-0x80791340, .sdata2
+ *   0x80796150-0x80796190.  The range holds two TUs by their `__FILE__` strings: "ef_drawbillboardstrategy.cpp"
+ *   (0x80593E88) and "ef_drawdirectionalstrategy.cpp" (0x80594070, its bodies from 0x800BBDEC); the seam between
+ *   them is open.  Left edge: the "ef_drawstripestrategy.cpp" strings belong to the code before 0x800B9A44.
+ *   Unproven seam (playbook 80: a TU's tables sit late in its `.data`): the range ends with a deleting destructor and
+ *   the constructor `fn_800BE118`, which installs `ef/ef_drawfreestrategy.cpp`'s table `lbl_80594318`, so that
+ *   constructor may belong to the next unit.
+ * FLAGS. `cflags_main`; `#pragma peephole off` (the GX FIFO writers keep the unfused `clrlwi`/`extsh`/`extsb` in
+ *   front of every narrowing store).
+ * NAMES. The map has only `fn_` stems for the range; every definition is `extern "C"` to keep them (playbook 42).
+ * RESIDUALS. 10 rows unwritten (declared, never defined): 0x800B9DF8-0x800BA6E8, 0x800BA854-0x800BAFB0,
+ *   0x800BAFBC-0x800BB748, 0x800BC428-0x800BDB60 (`fn_800BA1E0` carries paired-single ops, playbook 85).  The
+ *   source order differs from retail's, so `.text` and the extab and extabindex records run in another order.
+ *   9 partial rows:
+ *  - `fn_800BA710`, `fn_800BC070` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the three
+ *    `lfs` and the FIFO base and loads into f1-f3 (`ef/ef_drawlinestrategy.cpp`'s `fn_800BF58C` is the same);
+ *  - `fn_800BB748`, `fn_800BDB60`: the two pointer masks share one `clrrwi`, retail's dead `li r0,0; cmpwi r0,0` is
+ *    missing, and `lbl_80791300`/`lbl_80791320` are reached with `lis`/`addi` where retail uses `@sda21`;
+ *  - `fn_800B9A80`, `fn_800BC1B4`, `fn_800BDD34`: one `lwz r6, 0x24(pm)` is scheduled earlier (`fn_800BC1B4` also
+ *    compares `cmplwi` where retail has `cmpwi`);
+ *  - `fn_800BB93C`: the `lwz r6, 0x24(r4)` comes first, so the argument registers shift down one;
+ *  - `fn_800BBBBC`: the two vector helper calls pass a stack address (`addi r4, r1, ...`) where retail passes the
+ *    returned pointer (`mr r4, r3`).
+ *   flipcheck: `.data`, `.rodata`, `.sdata` and `.sdata2` claimed, not emitted; `.text` 0x17EC of 0x4710; extab
+ *   0x80 of 0xD0; extabindex 0xC0 of 0x138.
  */
 
 #include "ef.h"
 #include "gx.h"
 #include "sys_mem.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "fn_8004CAD8/PSVECSubtract.h" /* PSVECSubtract, owned by fn_8004CAD8.cpp's range (rule 2) */
 #include "ef/fn_800AEE48.h" /* fn_800B4B04 / fn_800B59E4 / fn_800B5ACC / fn_800B8D48, owned by ef_drawstripestrategy.cpp's range (rule 2) */
 #include "ef/ef_drawstripestrategy.h" /* the walker family fn_800B8788..fn_800B882C (rule 2) */
-#include "ef/ef_drawfreestrategy.h" /* lbl_80594318, the next strategy's table (rule 2) */
+#include "ef/ef_drawfreestrategy.h" /* lbl_80594318, the DrawFreeStrategy table (rule 2) */
 
-/* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
- * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it).  Declaring the mangled
- * spelling instead would re-mangle it and break the link (playbook 50); rule 9. */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 #ifdef __cplusplus
 namespace nw4r {
 namespace db {
@@ -86,8 +58,7 @@ extern "C" {
 #pragma peephole off
 
 /* --------------------------------------------------------------------------------------------------
- * externs owned by the neighbouring ef translation units (declared here, never defined: rule 2 keeps
- * the definition in the TU that owns the symbol).
+ * Declarations: a neighbouring unit's base constructor and this unit's unwritten walkers.
  * -------------------------------------------------------------------------------------------------- */
 
 void fn_800C5F74(void* self);
@@ -149,7 +120,7 @@ void fn_800BD234(void* self, void* em, EfDrawArgs* args);
 void fn_800BDB60(EfDrawStrategyObj* self, void* em, EfDrawArgs* args);
 u32 fn_800BC41C(void* unused, EfParticleFlags* self);
 
-/* SDK GX state setters and the mtx helpers (unsplit / SDK: rule 2's named gap). */
+/* SDK GX state setters and the matrix helpers, declared locally. */
 extern void mtx34_identity(Mtx34* mtx);
 extern void fn_80050508(Mtx34* mtx);
 void fn_800C6064(void* self, EfDrawArgs* args, EfEmitterShape* shape, void* em);
@@ -167,9 +138,8 @@ extern char lbl_80791320[]; /* the GX texcoord array descriptor (.sdata) */
  * use (all still `fn_*`/SDK, defined outside this range). */
 extern f32 lbl_80796154; /* the zero/one constant the walkers initialise with (.sdata2) */
 
-/* This unit's pooled `__FILE__`/assert strings and the vtables the constructors write.  They are
- * declared, never defined here: the data pass claims the ranges once the source emits them
- * (docs/plan.md 8.4), so a definition would move the pool. */
+/* This unit's `__FILE__`/assert strings and the tables the constructors write (its claimed `.data`),
+ * declared, never defined. */
 extern char lbl_80593E88[]; /* "ef_drawbillboardstrategy.cpp"                                 .data 0x80593E88 */
 extern char lbl_80593EA8[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."           .data 0x80593EA8 */
 extern char lbl_80593EDC[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."     .data 0x80593EDC */
@@ -183,7 +153,7 @@ extern char lbl_805940F4[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not va
 extern char lbl_80594130[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."         .data 0x80594130 */
 
 /* --------------------------------------------------------------------------------------------------
- * The DrawStripeStrategy constructors and deleting destructors.
+ * The constructors and deleting destructors of this range.
  * -------------------------------------------------------------------------------------------------- */
 
 
@@ -222,7 +192,7 @@ void fn_800B9A80(void* self, void* em, EfDrawArgs* args) {
     }
 }
 
-/* The base deleting destructor (DrawStrategyImpl). */
+/* The deleting destructor ahead of the DrawDirectionalStrategy constructor: chains the base destructor. */
 void* fn_800BBD90(void* self, s16 flag) {
     if (self != 0) {
         fn_800B4B04(self, 0);
@@ -233,14 +203,14 @@ void* fn_800BBD90(void* self, s16 flag) {
     return self;
 }
 
-/* The base constructor (DrawStrategyImpl). */
+/* Constructs the DrawDirectionalStrategy: runs the base constructor and installs lbl_805941D8. */
 void** fn_800BBDEC(void** self) {
     fn_800C5F74(self);
     self[0] = (void*)lbl_805941D8;
     return self;
 }
 
-/* The second deleting destructor. */
+/* The deleting destructor ahead of the DrawFreeStrategy constructor: chains the base destructor. */
 void* fn_800BE0BC(void* self, s16 flag) {
     if (self != 0) {
         fn_800B4B04(self, 0);
@@ -251,7 +221,7 @@ void* fn_800BE0BC(void* self, s16 flag) {
     return self;
 }
 
-/* The second constructor. */
+/* Constructs the DrawFreeStrategy (table lbl_80594318). */
 void** fn_800BE118(void** self) {
     fn_800C5F74(self);
     self[0] = (void*)lbl_80594318;
@@ -259,8 +229,7 @@ void** fn_800BE118(void** self) {
 }
 
 /* --------------------------------------------------------------------------------------------------
- * The out-of-line GX FIFO writers, in address order (the same family the sibling
- * ef_drawsmoothstripestrategy.cpp carries at 0x800C6F90.. and ef_drawstrategyimpl.cpp at 0x800BC...).
+ * The out-of-line GX FIFO writers, in address order.
  * -------------------------------------------------------------------------------------------------- */
 
 /* Ends the current FIFO command (the SDK's `GXEnd`, which writes nothing). */
@@ -321,7 +290,7 @@ void fn_800BC070(Vec* v) {
  * with its index when the draw record asks for it.
  * -------------------------------------------------------------------------------------------------- */
 
-/* GX is an unsplit SDK band (rule 2's named gap): declared here. */
+/* SDK GX entry points, declared locally. */
 extern void GXBegin(u8 prim, u8 vtxfmt, u16 nverts);
 extern void subVec3(Vec* out, void* mtx, Vec* in);
 extern void addVec3(Vec* out, void* mtx, Vec* in);

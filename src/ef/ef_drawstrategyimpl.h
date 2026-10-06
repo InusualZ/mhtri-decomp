@@ -1,12 +1,6 @@
-/* The records `ef/ef_drawstrategyimpl.cpp` reads, defined once here (docs/plan.md 6.5 rule 1: a type
- * more than one unit uses lives in one header).
- *
- * `EfDrawInfo` is the nw4r::ef draw-time view state (`DrawInfo`) and `EfAheadContext` the
- * `DrawStrategyImpl::AheadContext`; `EfParticleLayers` is the particle-side record whose two bit-packed
- * texture-layer fields the accessors read.  The sibling `ef/ef_drawsmoothstripestrategy.cpp` still
- * carries private copies of the first and third (and of the `EfVec3x2`/`EfVec3x3` records) from when
- * the two translation units shared one source file; they move here when that unit is next touched.
- */
+/* ef/ef_drawstrategyimpl.h - the records `ef/ef_drawstrategyimpl.cpp` reads: `EfDrawInfo` (nw4r::ef `DrawInfo`),
+ * `EfAheadContext` (`DrawStrategyImpl::AheadContext`) and `EfParticleLayers` (the two bit-packed texture-layer
+ * fields).  `ef/ef_drawsmoothstripestrategy.cpp` carries private copies of the first and third. */
 #ifndef MHTRI_EF_EF_DRAWSTRATEGYIMPL_H
 #define MHTRI_EF_EF_DRAWSTRATEGYIMPL_H
 
@@ -95,10 +89,8 @@ typedef struct EfAheadContext {
 } EfAheadContext; /* size: 0xB0 (the record continues past what this unit reads) */
 
 
-/* The texture-set constructor and the per-draw setup this unit owns.  Rule 2: an owned symbol is
- * declared once, in its owner's header; the callers (`fn_800AEE48`, `ef_drawfreestrategy`,
- * `ef_drawlinestrategy`) include this header and cast to these types (pointer<->u32 is the same
- * register, so the call is codegen-neutral). */
+/* The texture-set constructor and the per-draw setup this unit owns; the callers (`ef/fn_800AEE48.cpp`,
+ * `ef/ef_drawfreestrategy.cpp`, `ef/ef_drawlinestrategy.cpp`) cast to these types. */
 EfParticleLayers* fn_800C5F74(EfParticleLayers* self);
 void fn_800C6064(EfDrawStrategyImpl* self, u32 a, u16* params, void* state);
 #ifdef __cplusplus

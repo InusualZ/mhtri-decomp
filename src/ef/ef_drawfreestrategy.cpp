@@ -1,40 +1,28 @@
 /*
- * ef/ef_drawfreestrategy.cpp - nw4r::ef `DrawFreeStrategy`, 0x800BE154..0x800BEF98 (11 functions).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name
- * this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * The unit's `.data` pool names the original source file: the assert at 0x805941F8 is the bare string
- * "ef_drawfreestrategy.cpp", read from the DOL's `.data` (0x805941F8, size 0x18) and handed to
- * `nw4r::db::Panic` as the `pFile` argument by fn_800BE154 (line 88), fn_800BE3C0 (200/204/206),
- * fn_800BEA00 (136) and fn_800BED2C (278).  A `.cpp` `__FILE__` string is conclusive evidence for the
- * language (docs/plan.md, "The language comes from the symbol") and the mangled
- * `Panic__Q24nw4r2dbFPCciPCce` callee says the same, so the unit is C++ and lives at
- * `src/ef/ef_drawfreestrategy.cpp` in the `ef` lib.  The seam against the neighbours (0x800B99E8's
- * ef_drawbillboard/directional run below, 0x800BEF98's ef_drawlinestrategy run above) is the proposal's
- * own boundary; it is unproven (docs/plan.md 8.3) and this header says so.
- *
- * The functions, in address order:
- *   0x800BE154  the four-vertex emitter: transform four Vec3 through the draw matrix, `GXBegin` a quad,
- *               `GXPosition3f32` each corner and, when the flag is set, the 1-byte per-vertex index.
- *   0x800BE374  GXEnd (empty).
- *   0x800BE378  `GXWGFifo.u8 = value` (out-of-line narrowing FIFO store).
- *   0x800BE388  the low-bit test of a status word.
- *   0x800BE39C  `GXPosition3f32(v->x, v->y, v->z)` (out-of-line writer).
- *   0x800BE3C0  DrawFreeStrategy::Draw: set up the GX vertex/tex array state, then walk the particle
- *               list and emit the camera-facing quad (and the second, YZ quad) per particle.
- *   0x800BE938  build a rotation/billboard matrix into an `MTX34` from a source matrix and four scalars.
- *   0x800BEA00  build an axis (or full Euler) rotation `MTX34` from a particle's angle vector.
- *   0x800BED2C  set up the GX vertex descriptors / attribute formats for the direct position draw.
- *   0x800BEF00  scalar deleting destructor.
- *   0x800BEF5C  constructor (base ctor + install the vtable).
- *
- * Codegen lever: `#pragma peephole off`.  Retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of
- * every narrowing FIFO store and byte load (matching the sibling `ef_drawsmoothstripestrategy.cpp` and
- * the `auto` GX-writer units); `-O3`'s peephole folds them away without the pragma.
- *
- * Residuals are recorded per function in the comments below and in
- * `.pi/notes/800be154-fn-800be154-b8b2.md`.
+ * ef/ef_drawfreestrategy.cpp - nw4r::ef DrawFreeStrategy: the four-vertex quad emitter, the out-of-line GX FIFO
+ *   writers, `Draw` (GX array state, then a camera-facing quad and an optional YZ quad per particle), the
+ *   billboard and Euler/axis `MTX34` builders, the vertex-descriptor setup, a deleting destructor and the constructor
+ *   that installs the DrawLineStrategy table `lbl_805943F0`.
+ * RANGE. .text 0x800BE154-0x800BEF98 (11 functions); extab 0x8000A30C-0x8000A344, extabindex 0x80023838-0x8002388C,
+ *   .rodata 0x8056F7D0-0x8056F830 (the XY and YZ quad corners), .data 0x805941F8-0x80594330 (the `__FILE__` string
+ *   "ef_drawfreestrategy.cpp" first), .sdata 0x80791340-0x80791348, .sdata2 0x80796190-0x807961A8.
+ *   Unproven seam (playbook 80: a TU's tables sit late in its `.data`): this unit's table `lbl_80594318` is installed
+ *   by `fn_800BE118` at the tail of `ef/ef_drawbillboardstrategy.cpp`'s range, and this range ends with
+ *   `fn_800BEF00`/`fn_800BEF5C`, the constructor installing `ef/ef_drawlinestrategy.cpp`'s table, so each `.text`
+ *   seam may be off by that constructor.
+ * FLAGS. `cflags_main`; `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of every
+ *   narrowing FIFO store and byte load).
+ * NAMES. The map has only `fn_` stems for the range.
+ * RESIDUALS. 4 partial rows:
+ *  - `fn_800BE39C` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the three loads and the
+ *    `lis` of the FIFO base (`ef/ef_drawlinestrategy.cpp`'s `fn_800BF58C` is the same);
+ *  - `fn_800BE3C0`: the three arguments are saved one register lower (r27-r29 against r28-r30) and one
+ *    `lwz r6, 0x24(pm)` is scheduled earlier;
+ *  - `fn_800BEA00`: the two products of the 0x24 component (`fmuls f6`, `fmuls f11`) are computed later and the
+ *    float registers around them differ;
+ *  - `fn_800BED2C`: the two pointer masks share one `clrrwi` (retail recomputes it), retail's dead `li r0,0;
+ *    cmpwi r0,0` is missing, and `lbl_80791340` is reached with `lis`/`addi` where retail uses `li ...@sda21`.
+ *   flipcheck: `.data`, `.rodata` and `.sdata` claimed, not emitted; `.text` 0xE34 of 0xE44.
  */
 
 #include "types.h"
@@ -49,9 +37,8 @@
 #include "g3d/fn_80075DCC.h" /* fn_80077DF0, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
-/* nw4r::db::Panic.  The map already carries its real C++ mangling (Panic__Q24nw4r2dbFPCciPCce); declaring
- * that spelling as a C++ identifier re-mangles it, so the owner is declared instead and the front-end
- * reproduces the map's name (playbook 50, docs/plan.md 6.5 rule 9). */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r {
 namespace db {
 void Panic(const char* file, int line, const char* fmt, ...);
@@ -69,16 +56,15 @@ extern "C" {
 #pragma peephole off
 #pragma fp_contract off
 
-/* This unit's pooled `.data`/`.rodata`/`.sdata`/`.sdata2` symbols.  They are declared, never defined here:
- * the data pass claims the ranges once the source emits them (docs/plan.md 8.4), so a definition would
- * move the pool.  A `range` request for them rides the outbox. */
+/* This unit's `.data`/`.rodata`/`.sdata`/`.sdata2` symbols (its claimed ranges), declared, never
+ * defined. */
 extern char lbl_805941F8[]; /* "ef_drawfreestrategy.cpp"                                 .data 0x805941F8 */
 extern char lbl_80594210[]; /* "NW4R:Pointer Error\np(=%p) is not valid pointer."        .data 0x80594210 */
 extern char lbl_80594240[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."       .data 0x80594240 */
 extern char lbl_80594274[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."  .data 0x80594274 */
 extern char lbl_805942B0[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."      .data 0x805942B0 */
 extern char lbl_805942E4[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."       .data 0x805942E4 */
-extern char lbl_805943F0[]; /* the DrawStrategy vtable incl. its offset-to-top words    .data 0x805943F0 */
+extern char lbl_805943F0[]; /* the DrawLineStrategy table (end of ef_drawlinestrategy's .data) .data 0x805943F0 */
 extern Vec3 lbl_8056F7D0[]; /* quad corners in the XY plane (-1,-1,0)..(1,-1,0)         .rodata 0x8056F7D0 */
 extern Vec3 lbl_8056F800[]; /* quad corners in the YZ plane (0,-1,1)..(0,-1,-1)         .rodata 0x8056F800 */
 extern u8 lbl_80791340[];   /* the GXSetArray coordinate table                          .sdata 0x80791340 */
@@ -98,9 +84,7 @@ extern void GXSetVtxDesc(u32 attr, u32 type);
 extern void GXSetVtxAttrFmt(u32 vtxfmt, u32 attr, u32 cnt, u32 type, u32 frac);
 extern void GXSetCurrentMtx(u32 id);
 
-/* nw4r::math / effect-library helpers, still `fn_*` in the symbol map.  The ones with a registered
- * owner (fn_800AB388/AB3AC/AB2DC -> ef/ef_particle.h, fn_800AE360 -> ef/ef_particlemanager.h) and the
- * unowned ef-band helpers (fn_800B7DB0/B4B04/B54B4 -> unsplit/ef.h) are declared in those headers. */
+/* nw4r::math / effect-library helpers; the ef callees come from the headers included above. */
 extern void fn_800514FC(Vec3* out, const MTX34* mtx, const Vec3* in); /* out = mtx * in */
 extern MTX34* fn_80050508(MTX34* mtx);                               /* returns its argument (size 0x4) */
 
@@ -242,9 +226,7 @@ int fn_800BE388(u32 value) {
     return (value & 1) != 0;
 }
 
-/* Writes one vector's three components to the pipe.  Residual: retail keeps a `b` (branch to the next
- * instruction) between the three loads and the `lis` FIFO base - a scheduler artefact the simple body
- * cannot reproduce (same residual as the sibling's fn_800BA710/fn_800BC070, 85.6 %). */
+/* Writes one vector's three components to the pipe. */
 void fn_800BE39C(const Vec3* v) {
     f32 x = v->x;
     f32 y = v->y;
@@ -330,9 +312,8 @@ void fn_800BE3C0(EfDrawStrategy* self, void* a2, EfParticleManager* pm) {
  * 0x800BE938 - the rotation/billboard matrix builder.
  * --------------------------------------------------------------------------------------------- */
 
-/* Builds a `MTX34` from a source matrix and four scalars: rows 0/1 are the source rows scaled by
- * (u,v,u) with the trailing column a `s`/`t` correction, row 2 is the source row scaled by (u,v,u).
- * Every value lands through `fn_80077DF0`, the 12-float `MTX34` assembler. */
+/* Builds an `MTX34` through `fn_80077DF0` from the source rows scaled by (u,v,u), with an `s`/`t`
+ * correction in the trailing column of rows 0 and 1. */
 void fn_800BE938(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v) {
     f32 us = u * s;
     f32 vt = v * t;
@@ -403,9 +384,8 @@ void fn_800BEA00(MTX34* dst, const Vec3* pp, u8 mode) {
  * 0x800BED2C - the GX vertex-descriptor setup.
  * --------------------------------------------------------------------------------------------- */
 
-/* Sets the direct-position vertex format for the free draw: clears the descriptor, enables the position
- * array and, when the state's +0xD0 byte is set, the indexed texcoord array, then fixes the two attribute
- * formats and the current matrix. */
+/* Sets the free draw's vertex format: the position array, the indexed texcoord array when the state's
+ * +0xD0 byte is set, the two attribute formats and the current matrix. */
 void fn_800BED2C(EfDrawStrategy* self, void* a2, EfParticleManager* pm) {
     void* ed;
 
@@ -428,7 +408,7 @@ void fn_800BED2C(EfDrawStrategy* self, void* a2, EfParticleManager* pm) {
 }
 
 /* --------------------------------------------------------------------------------------------- *
- * 0x800BEF00 - scalar deleting destructor, and 0x800BEF5C - constructor.
+ * 0x800BEF00 - a scalar deleting destructor, and 0x800BEF5C - the DrawLineStrategy constructor.
  * --------------------------------------------------------------------------------------------- */
 
 void* fn_800BEF00(void* self, s16 flag) {

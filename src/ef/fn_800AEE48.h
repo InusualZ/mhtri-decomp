@@ -1,3 +1,6 @@
+/* ef/fn_800AEE48.h - declarations (C linkage) for `ef/fn_800AEE48.cpp`'s symbols the effect modules call and for the
+ * `ef/ef_drawstripestrategy.cpp` symbols its own header does not carry (`fn_800B4B04`..`fn_800B95C0`), with the two
+ * records the particle-list walkers take.  `fn_800B7DB0` (unwritten) keeps the consumers' `void*`/`MTX34*` view. */
 #ifndef MHTRI_EF_FN_800AEE48_H
 #define MHTRI_EF_FN_800AEE48_H
 
@@ -5,18 +8,6 @@
 #include "nw4r/math.h"
 #include "ef.h"
 
-/* Declarations for the symbols `src/ef/fn_800AEE48.cpp` owns (docs/plan.md 6.5, rule 2).  C-visible;
- * kept minimal - only the declarations a consumer needs.
- *
- * The signatures are the owner's own definitions - `f32 fn_800B5A48(void)`,
- * `int fn_800B59E4(void* self)`, `void* fn_800B4B04(void* self, s16 flag)` - so including this header
- * from the owner cannot conflict.  `fn_800B7DB0` is not reconstructed in the owner unit yet, so it
- * keeps the `void*`/`MTX34*` view the consumers (and `unsplit/ef.h`) already share.
- *
- * The two records the particle-list walkers take are defined here (moved out of the owner's source)
- * so the walkers can be declared with the owner's own types: a generic `void(void*)` copy in
- * `unsplit/ef.h` would be an illegal overload of the typed definition in C++.
- */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -25,8 +16,7 @@ f32 fn_800B5A48(void);
 int fn_800B59E4(void* self);
 void* fn_800B4B04(void* self, s16 flag);
 void fn_800B7DB0(void* em, MTX34* out);
-/* 0x800B0B90 - `self -= b` in place, returning `self` (the owner's own definition).  Added with
- * `Pl/fn_8028F66C.cpp`, the third consumer (rule 2). */
+/* 0x800B0B90 - `self -= b` in place, returning `self`. */
 Vec* fn_800B0B90(Vec* self, Vec* b);
 
 /* The particle record the list walkers yield.  +0x38/+0x3C are the two list heads. size: 0xB3 */
@@ -60,11 +50,8 @@ void* fn_800B5ACC(void* self, void* node);
 void* fn_800B95C0(EfParticleState* self);
 
 
-/* The resource-system entry points this unit owns (the effect modules call them): the walker the
- * manager builds (+ the per-index registration and the release), and the per-handle helpers the
- * load callbacks file their results through.  `fn_800B4A90`/`fn_800B4A98` read the post-field list
- * this unit owns, so they carry its type: the owner's declaration governs (rule 3), and a generic
- * `void*` copy beside the owner's `EfPostField*` definition is an illegal overload in C++. */
+/* The resource-system entry points `ef/fn_800AEE48.cpp` owns: the walker the manager builds, the
+ * post-field list accessors (typed `EfPostField*` as the owner defines them) and the per-handle helpers. */
 struct EfPostField;
 void* fn_800B2878(void);
 u16 fn_800B4A90(EfPostField* self);

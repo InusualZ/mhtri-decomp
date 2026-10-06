@@ -1,20 +1,25 @@
-/* ef/ef_drawstripestrategy.cpp - nw4r::ef DrawStripeStrategy and its particle / list helpers, `.text` 0x800B4AC8..0x800B9A44.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * Name: the `__FILE__` string `ef_drawstripestrategy.cpp` (`.data` 0x805939E8, with copies at 0x80593D0C/0x80593D5C/0x80593DAC) is cited by the
- * walkers in this range (`fn_800B4BA4` .. `fn_800B9630`) and its deleting destructor `fn_800B99E8` closes it; `ef_resource.cpp` is the TU before
- * (`ef/fn_800AEE48.cpp`, which ends at 0x800B4AC8) and `ef_drawbillboardstrategy.cpp` the TU after (`ef/ef_drawbillboardstrategy.cpp`).
- * Phase 4 made this unit out of the tail of the old `ef/fn_800AEE48.cpp` (0x800B4AC8..0x800B99E8, 36 functions) and the first function of the old
- * `ef/ef_drawstripestrategy.cpp` (`fn_800B99E8`, now in this file; the rest of that registration is `ef/ef_drawbillboardstrategy.cpp`).
- *
- * Data.  The unit owns no pool section here: its `.data`/`.sdata2` labels are `extern` by their map names and never defined (playbook 29).
- * `.data` 0x805939E8..0x80593E88 (the strip assert strings), `.sdata2` 0x80796120..0x80796150.
- *
- * Status.  37 of the unit's 60 symbols are written (measured when they sat in `ef/fn_800AEE48.cpp`: 100 % except `fn_800B6900` 80.5 %,
- * `fn_800B51F8` 94.4 %, `fn_800B7F58` 99.0 %); the DrawStripeStrategy `Particle`/`ParticleManager` walkers `fn_800B4BA4`.. `fn_800B9630` are not
- * reconstructed yet.  The layer's own `EfStripeParam` (nine words + a scalar, 0x28) and `EfStripeSample` (three `Vec`s) are distinct even though
- * `ef_drawsmoothstripestrategy.cpp` spells a 0x28 sampler record `EfVec3x3`, because the target copies the first nine words as words and only +0x24
- * as a float.  The file-scoped `#pragma peephole off` is the old unit's.
+/*
+ * ef/ef_drawstripestrategy.cpp - nw4r::ef DrawStripeStrategy and its particle/list helpers: the
+ *   `Particle`/`ParticleManager` walkers, the draw-time particle copies and ahead-vector builders the billboard
+ *   dispatch hands out, and the class's deleting destructor `fn_800B99E8`, which closes the range.
+ * RANGE. .text 0x800B4AC8-0x800B9A44 (60 functions); extab 0x8000A10C-0x8000A23C, extabindex 0x80023538-0x80023700,
+ *   .data 0x805939E8-0x80593E88 (the `__FILE__` string "ef_drawstripestrategy.cpp" first, copies at 0x80593D0C,
+ *   0x80593D5C and 0x80593DAC), .sdata2 0x80796120-0x80796150.  Left edge: `ef/fn_800AEE48.cpp` (`ef_resource.cpp`)
+ *   ends there; right edge: `ef/ef_drawbillboardstrategy.cpp` starts there.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off`.
+ * NAMES. The map has only `fn_` stems for the range.
+ * RESIDUALS. 23 rows unwritten (declared, never defined): 0x800B4BA4-0x800B4FE0, 0x800B4FE4-0x800B51F8,
+ *   0x800B52D0-0x800B59E4, 0x800B5B54-0x800B612C, 0x800B6144-0x800B6534, 0x800B6548-0x800B68F8,
+ *   0x800B69A0-0x800B7628, 0x800B76C4-0x800B7F58, 0x800B7FCC-0x800B83C0, 0x800B83CC-0x800B8788,
+ *   0x800B8888-0x800B8D48, 0x800B8DC0-0x800B95C0, 0x800B9630-0x800B99E8.
+ *   3 partial rows:
+ *  - `fn_800B51F8`: the prologue saves r5 (`mr r31, r5`) two slots early;
+ *  - `fn_800B6900`: the record copy interleaves its word loads and stores differently;
+ *  - `fn_800B7F58`: two saved values swap r30/r31.
+ *   flipcheck: `.data` and `.sdata2` claimed, not emitted (declared by their map names, playbook 29); `.text` 0x75C
+ *   of 0x4F7C; extab 0x80 of 0x130; extabindex 0xC0 of 0x1C8.
+ * SHAPES. `EfStripeParam` (nine words and a scalar, 0x28) stays apart from the smooth-stripe unit's `EfVec3x3`:
+ *   retail copies its first nine words as words and only +0x24 as a float.
  */
 
 #include "types.h"

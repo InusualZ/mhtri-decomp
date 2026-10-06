@@ -1,92 +1,33 @@
-#include "mh3_pad/vec3.h" /* the owner header (rule 2) */
-/* ef/ef_cube.cpp - the ef_cube.cpp translation unit, .text 0x800C9DD0..0x800CB948.
- *
- * fn_800C9DD0 (0x800C9DD0, 1072 B) is complete and matches except for one register choice (99.94 %).
- * fn_800CA200 (0x800CA200, 5960 B) has only its three pointer asserts so far (12.27 %) - the body is
- * still open, and what is known about it is below and in the outbox.
- *
- * fn_800CA200 - what is established (measurement: `recompile.py --measure fn_800CA200`):
- *   * signature, from the prologue and its seven fn_800C9DD0 call sites:
- *     `(u32 a [r3], Em* em [r4], Pm* pm [r5], u32 n [r6], u32 flags [r7],
- *      Params* params [r8], u16 d [r9], u32 e [r10], f32 f [f1])`
- *     The three asserts are lines 94/95/96 with the "em"/"pm"/"params" messages.
- *   * a `Vec3` array of 14 elements at r1+8 (offsets 8,20,...,164, stride 0xC); every block below
- *     works on one *pair* of it, in descending order: (152,164), (128,140), (104,116), (80,92).
- *   * six near-identical blocks, each: `VEC3_ctor(&pair[0])`, `VEC3_ctor(&pair[1])`, fill both,
- *     scale one component by `fn_800A8A08(&em->field_0xEC)`, take `fn_80463F04` (fabsf) of a component
- *     and compare it against `lbl_80796268`, then `fn_80463F98` + `fn_800610AC` + `sqrt_f32`
- *     (nw4r::math::FrSqrt) and finish with `fn_800C9DD0(a, &pair[1], &pair[0], em, pm, d, f, e)`.
- *   * `fn_800C9DCC` is a 4-byte `b fn_80463F04` thunk and `fn_80463F04` is `fabsf`; the body calls it
- *     69 times, so the source's absolute-value calls are what the 69 `bl`s are.
- *   * the two big loops are over `n*n` (r23 vs r24 = n*n) and over `n` (r19), and the inner one
- *     carries a 4-state `switch` (r20) that walks a ring (r21/r22 = the two half-extents).
- *   * `nw4r::db::Panic` line numbers 94/95/96 here; `#pragma peephole off
-#pragma fp_contract off` is required (see below).
- *   A structural draft from `tools/m2c` (with `goto` and `M2C_ERROR` placeholders, so it needs a
- *   rewrite into real loops and named locals before it is usable) is the fastest way back in:
- *     `python tools/units/m2cinput.py build/RMHE08/obj/auto/800C9DD0_fn_800C9DD0.o -o build/tmp/t.o`
- *     `python tools/m2c/m2c.py -t ppc-mwcc-c --no-cache -f fn_800CA200 build/tmp/t.o`
- *   The remaining work is source shape, not flags: the peephole pragma below and the lib's cflags
- *   already reproduce the retail idioms this function uses (`psq_lx` FPR restore, `clrlwi` on the u16
- *   argument, `fn_80463F04`/`fn_80463F98`/`fn_800610AC` calls).
- *
- * The original source file is named: the unit's own `.data` pool starts with the `__FILE__` string
- * "ef_cube.cpp" (`lbl_80594C68`, confirmed by the shared dump's symbol map as `s_ef_cube.cpp_80594c68`),
- * which is the file argument of every `nw4r::db::Panic` call below. The unit name is still the
- * provisional `auto/` one; renaming it is a configure.py + splits.txt batch, requested in the outbox.
- *
- * Flag evidence - `#pragma peephole off
-#pragma fp_contract off` below is load-bearing, not cosmetic:
- *   * the FPR epilogue is `li r0,136; psq_lx f31,r1,r0,0,0` in retail. With the peephole on MWCC
- *     rewrites that pair to the displacement form `psq_l f31,136(r1),0,0` (verified on Wii/1.0, 1.0a,
- *     1.1 and 1.3 - all four emit `psq_l`), and the peephole also deletes the `clrlwi r4,r30,16` the
- *     retail call site keeps. Off, fn_800C9DD0 scores 99.94 %; on, 94.24 %.
- *   * `-opt nopeephole` on the command line reproduces the same object, so this is a peephole
- *     difference and not a compiler version or a `-O` level one.
- *
- * Flag evidence - `#pragma fp_contract off` below, same shape:
- *   * retail keeps every `a*b+c` as two instructions here (`fmuls f1,f0,f1; fsubs f0,f1,f0` and
- *     `fmuls f0,f0,f2; fmuls f1,f0,f1; fadds f30,f0,f1`), which `-fp_contract on` fuses into
- *     `fmsubs`/`fmadds`. Writing each site through a temporary reproduces retail's pairs too, so the
- *     pragma is not strictly required for this unit - it is the honest form of the same finding, and
- *     the neighbouring ef unit (ef/ef_cylinder.cpp, ef_cylinder.cpp) measured the identical
- *     thing on four sites there. With the pragma fn_800C9DD0 measures 99.94 %, exactly as with the
- *     temporaries; without either, 94.24 %.
- *
- * Residual (fn_800C9DD0, 99.94 %): the last `lwz` pair is `lwz r12,28(r3); lwz r12,20(r12)` in retail
- * and `lwz r11,28(r29); lwz r12,20(r11)` here - the allocator keeps `pm` in its incoming r29 where
- * retail colours it into r3 (the copy it just made for the call's `this`). Declaration order, a named
- * `Pm*`/`PmVtbl*` local, a cast and `-lang=c++` were all tried and none moves it.
- *
- * The float pool (`lbl_80796240..lbl_80796260`) and the three message strings are referenced as
- * externals because the split does not own them yet: the target object has no `.sdata2`/`.data`, so
- * emitting them here would add sections the target does not have. Claiming them is the measured data
- * pass (`tools/units/dataclaim.py`), which is why the magic-double reloc here reads `@118` where the
- * target reads `lbl_80796258`.
- *
- * What the seam rests on (see the `tu-boundary-discovery` skill for the method):
- *   pinned seam (source): source file change ef_cube.cpp -> ef_cylinder.cpp
- *   pinned seam (pool): .sdata2 run jump lbl_8079626C -> lbl_80796270
- *
- * Data runs in this range. They are recorded in `splits.txt` as comments and **not** claimed: a stub
- * object emits nothing, and a range our object does not emit must not be claimed (playbook 23,
- * docs/plan.md 8.4). The claim belongs to the measured data pass - `tools/units/dataclaim.py`,
- * docs/plan.md 7.8 / 12 item 7 - once the source emits the bytes:
- *   extabindex   0x80023BB0..0x80023BC8   2 labels  proposed    (dataclaim: no queue run)
- *   .data        0x80594C68..0x80594D11   4 labels  proposed    (dataclaim: unowned)
- *   .sdata2      0x80796240..0x80796270  10 labels  proposed    (dataclaim: unowned)
- *
- *   The `extab`/`extabindex` fragment sections are the exception: they travel with the code unit
- *   (`dataqueue.py`'s `FRAGMENT_SECTIONS`) and are claimed in `splits.txt` with its `.text`;
- *   `.ctors`/`.dtors` are added after the split. Everything else above waits for the measured pass.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/ef_cube.cpp`.
+/*
+ * ef/ef_cube.cpp - the cube emitter form: `fn_800C9DD0` normalises the two direction vectors, derives the spawn
+ *   position and calls the particle manager's slot +0x14; `fn_800CA200` builds the cube's vertex grid and emits it
+ *   through `fn_800C9DD0`.
+ * RANGE. .text 0x800C9DD0-0x800CB948 (2 functions); extab 0x8000A55C-0x8000A56C, extabindex 0x80023BB0-0x80023BC8,
+ *   .data 0x80594C68-0x80594D20 (the `__FILE__` string "ef_cube.cpp" first), .sdata2 0x80796240-0x80796270.
+ *   Right edge: the source file changes to "ef_cylinder.cpp" and the `.sdata2` run jumps from `lbl_8079626C` to
+ *   `lbl_80796270`.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the `li r0,136; psq_lx` FPR epilogue and
+ *   the `clrlwi r4,r30,16` at the call site; `-opt nopeephole` gives the same object) and `#pragma fp_contract off`
+ *   (retail keeps every `a*b+c` as two instructions; a temporary per site does the same).
+ * NAMES. The map has only `fn_` stems for the range; the `Em` fields keep `field_0xNN` names.
+ * RESIDUALS. `fn_800CA200__FUiP2EmP2PmUiUiPvUsUif` (0x800CA200-0x800CB948) is unwritten past its three pointer
+ *   asserts (lines 94-96). Its known structure: a 14-element `Vec3` array at r1+8 worked on in pairs from the top;
+ *   six blocks of `VEC3_ctor` x2, a fill, a scale by `fn_800A8A08(&em->field_0xEC)`, a `fabsf` compare against
+ *   `lbl_80796268`, `fn_80463F98` + `fn_800610AC` + `sqrt_f32`, then `fn_800C9DD0(a, &pair[1], &pair[0], em, pm, d,
+ *   f, e)`; 69 `fn_800C9DCC` (`fabsf` thunk) calls; loops over `n*n` and over `n`, the inner one a 4-state
+ *   `switch` walking a ring.
+ *  - `fn_800C9DD0__FUiP4Vec3P4Vec3P2EmP2PmUsfUi`: the `v3_copy`/`b_copy` copies move floats (`lfs`/`stfs`) where
+ *    retail moves words (`lwz`/`stw`), and the slot +0x14 dispatch keeps `pm` in r29 (`lwz r11,28(r29)`) where
+ *    retail goes through r3; declaration order, a named `Pm*` local, a cast and `-lang=c++` do not move it.
+ *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x8 of 0x30 (the pool is declared, so the conversion
+ *   constant reads our `@N`); `.text` 0x728 of 0x1B78; extab and extabindex differ in the unwritten row's record.
+ * SHAPES. The unit keeps its own scalar typedefs (below): its manglings encode `unsigned int`.
  */
 
-/* The unit keeps its own scalar typedefs: `types.h` spells `u32` `unsigned long` while this unit's
- * manglings encode `unsigned int` (`fn_800C9DD0__FUiP4Vec3...` in the target object), so including
- * `types.h` here re-mangles both functions and unpairs them.  `mh3_pad/vec3.h` is the owner's header
- * for the three vector helpers and deliberately pulls in no typedefs. */
+#include "mh3_pad/vec3.h" /* the owner header (rule 2) */
+
+/* The unit's own scalar typedefs: `types.h` spells `u32` `unsigned long`, while this unit's manglings
+ * encode `unsigned int` (`fn_800C9DD0__FUiP4Vec3...`).  `mh3_pad/vec3.h` pulls in no typedefs. */
 
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -102,14 +43,14 @@ typedef struct {
     f32 z; /* +0x8 */
 } Vec3; /* size: 0xC */
 
-/* The unit's own .data pool (unclaimed - see the header): the source file name and one message per
- * checked pointer. `Panic` is `nw4r::db::Panic(const char*, int, const char*, ...)`. */
+/* The unit's own `.data` strings (claimed, declared, never defined): the source file name and one
+ * message per checked pointer. */
 extern char lbl_80594C68[]; /* "ef_cube.cpp" */
 extern char lbl_80594C74[]; /* "NW4R:Pointer Error\nem(=%p) is not valid pointer." */
 extern char lbl_80594CA8[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer." */
 extern char lbl_80594CDC[]; /* "NW4R:Pointer Error\nparams(=%p) is not valid pointer." */
 
-/* The unit's own .sdata2 pool (unclaimed - see the header). */
+/* The unit's own `.sdata2` pool (claimed, declared, never defined). */
 extern f32 lbl_80796240; /* 0x00800000, FLT_MIN */
 extern f32 lbl_80796244; /* 2.0f */
 extern f32 lbl_80796248; /* 1.0f */
@@ -117,16 +58,12 @@ extern f32 lbl_8079624C; /* 0.0f */
 extern f32 lbl_80796250; /* 0.01f */
 extern f64 lbl_80796258; /* 0x4330000080000000, the u32 -> f64 magic */
 
-/* nw4r::db::Panic. The map already carries its real C++ mangling
- * (Panic__Q24nw4r2dbFPCciPCce), and declaring that spelling as a C++ identifier re-mangles it
- * (Panic__Q24nw4r2dbFPCciPCce__FPCciPCce) - which only shows up at LINK time, so a NonMatching
- * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
- * map's spelling exactly: tools/units/mangle.py confirms it. */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 
-/* nw4r::math and effect-library helpers, still `fn_*` in the symbol map.  The target object
- * references each by its plain map name, so they carry C linkage; a C++ spelling mangles the reloc
- * (fn_8009C484__FP4Vec3P4Vec3) and it no longer pairs (relocaudit). */
+/* nw4r::math and effect-library helpers; retail's relocations carry their plain map names, so they
+ * have C linkage. */
 extern "C" {
 extern void fn_8009C484(Vec3* dst, Vec3* src);
 extern void assignVec3(Vec3* dst, const Vec3* src);
@@ -216,8 +153,8 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
         v2.z = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
     }
     fn_8009C484(&v2, &v2);
-    /* This unit's own record type (`Vec3`, the map's `P4Vec3`) is a different type from the
-     * helper's `nw4r::math::VEC3`; both are the same 0xC-byte layout (see the header). */
+    /* This unit's `Vec3` (the map's `P4Vec3`) and the helper's `nw4r::math::VEC3` share one 0xC-byte
+     * layout. */
     VEC3_ctor((nw4r::math::VEC3*)&v3);
     fn_800A99B4(a, &v3, em, b, c, &v1, &v2);
     v3_copy = v3;
@@ -228,11 +165,8 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
                          em->field_0xE8);
 }
 
-/* Builds the effect cube's vertex grid and emits it through fn_800C9DD0 once per face.
- *
- * Only the three pointer asserts are recovered: they are the same `||` chain fn_800C9DD0 uses, at
- * lines 94/95/96, and they alone measure 12.27 %. The rest of the body is not written yet - see the
- * header for the structure that is established and for the m2c draft to start from. */
+/* Builds the effect cube's vertex grid and emits it through fn_800C9DD0 once per face; only the three
+ * pointer asserts are written. */
 void fn_800CA200(u32 a, Em* em, Pm* pm, u32 n, u32 flags, void* params, u16 d, u32 e, f32 f)
 {
     int ok;

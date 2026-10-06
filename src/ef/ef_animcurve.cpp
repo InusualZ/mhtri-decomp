@@ -1,83 +1,41 @@
 /*
- * ef/ef_animcurve.cpp - the key-frame animation curve the effect library interpolates with.
- *
- * .text 0x8009CDBC..0x800A3044, 26 functions.  Final home and name from the range's own `__FILE__`
- * string (evidence class 1): every `Panic` in the range passes `lbl_80591E68`, which reads
- * "ef_animcurve.cpp" at 0x80591E68 in the DOL's `.data` (three pooled copies of it exist -
- * 0x80591E68, 0x80592260, 0x805922AC - and the `.data` pool order puts all of them between the
- * previous TU's literals and `ef_creationqueue.cpp`'s at 0x805922C0).  A bare source-file name is
- * the original TU, so the module is `ef` (the bracketing units are ef/ef_util.cpp below and
- * ef/ef_creationqueue.cpp above) and the extension is the name's suffix.  C++ is conclusive:
- * the `.cpp` name plus the `Panic__Q24nw4r2dbFPCciPCce` callee in 20 of the 26 bodies.
- *
- * The seam is proven on both sides.  Below, the run starts at the first function after
- * ef/ef_util.cpp's run (the 0x8009B374 proposal) and the address is a boundary in the extabindex
- * table (0x80022BC0).  Above, 0x800A3044 is where ef/ef_creationqueue.cpp starts and where the
- * extabindex table breaks (0x80022CBC).  Sections: extab 0x8009A98..0x8009B40 (21 unwind records -
- * exactly the 21 non-leaf bodies that carry a frame), extabindex 0x80022BC0..0x80022CBC (21
- * records), .text 0x8009CDBC..0x800A3044.  The five leaf bodies (fn_8009EEDC, fn_8009F834,
- * fn_8009F848, fn_800A1290, fn_800A14A4) get no record, which is why the extab run is 21 entries
- * and not 26.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` over all 26 addresses - every one answers the
- * map's own `fn_` stem and the runtime dump only `zz_XXXXXXXX_`; config/RMHE08/symbols.txt agrees).
- *
- * What it is.  A key-frame animation curve: a heading record (`header`) holding a curve type and a
- * key count, and interpolators that resolve a curve of `u8` keys (or their `f32` form) at a
- * tick.  The pointer-assert messages the Panic calls carry (`header`, `tick`, `tickF32`, `resDiv`,
- * `final`, `mCmdList`, `target`, `key`, `divL`, `divH`, `pHead`, `random`, `randomTable`,
- * `nameTable`, `pp`, `ptrFixed`, `ptrBase`) are the original source's own parameter names, and the
- * two `Panic` format strings that are not pointer errors ("NW4R:Failed assertion 0",
- * "NW4R:Failed assertion div < nextDiv") are `NW4R_ASSERT(...)` stringifications of the source's
- * own conditions.
- *
- *   fn_8009E854 / fn_800A01C4  the interpolation kernels: a u16.16 fixed-point `u8` version and
- *                its `f32` twin.  Curve type 0 is linear, 1 is a cubic whose two inner control
- *                terms are switched by bits 2 and 3 of the type byte (0.0f or 1.5f), 2 is "hold",
- *                and anything else is the `NW4R_ASSERT(0)` default.
- *   fn_8009EEDC / fn_8009EEF4  the random generator: a linear congruential step
- *                (`seed * 0x343FD + 0x269EC3`) and the four-word hash the name table is keyed by.
- *   fn_8009F834 / fn_8009F848  the two 0x100-byte lookup tables (`lbl_80591C68`, `lbl_80591D68`)
- *                the divisor tables are indexed through.
- *   fn_800A1290  the 4-byte key record copy (u8, u8, u16).
- *   fn_800A14A4  the one-shot flag latch that folds a bit pair into the `+0x96` byte.
- *   fn_800A2FA4 / fn_800A3008  the 0x400-entry creation queue's reset and its entry initialiser
- *                (the same 0x30-byte stride and the same two VEC3 at +0x18/+0x24 that
- *                ef/ef_creationqueue.cpp pushes).
- *
- * Flags: this lib's `cflags_main` (`-O3 -inline noauto -Cpp_exceptions on`) is the registered home
- * and every body below was measured under it.  Two file-scoped pragmas are load-bearing and neither
- * is a flag change: `#pragma peephole off` (retail keeps `clrlwi`/`extrwi` + `cmpwi` unfused where
- * the pass emits `clrlwi.`/`rlwinm.`) and `#pragma fp_contract off` (retail keeps `fmuls` + `fadds`
- * separate where `-fp_contract on` fuses `fmadds`/`fmsubs`).  Measured: without them fn_8009E854 is
- * 63.30 %, fn_800A01C4 73.77 %; with them 97.74 % / 97.47 %.
- *
- * Result: 18 of the 26 bodies are at or above the 80 % bar - fn_8009EEDC, fn_8009F834, fn_8009F848,
- * fn_800A1290 and fn_800A3008 are byte-identical; fn_8009EA4C 99.98 %, fn_800A2CF0 98.29 %,
- * fn_800A2504 98.23 %, fn_8009E854 97.74 %, fn_800A01C4 97.47 %, fn_800A2FA4 96.00 %,
- * fn_800A12AC 95.12 %, fn_800A1504 94.78 %, fn_8009EF88 93.79 %, fn_8009CDBC 91.45 %,
- * fn_800A27B4 89.35 %, fn_8009EEF4 88.65 %, fn_800A14A4 81.25 %.  The residuals are register
- * allocation and scheduling, not source shape: fn_8009EA4C differs in one instruction's operand
- * order; fn_8009EEF4's five products are all present but MWCC schedules the `a`/`b` share before
- * the `d`/`c` share (the target keeps the adds in the written order); fn_800A14A4 stores the `&`
- * result only once where retail stores it twice (the second statement's read of the field is what
- * retail's dead-store pass kept, ours forward-substitutes) and reuses the shift count where retail
- * recomputes it; fn_8009CDBC is 104 bytes short on the `flags & 0x80` divisor path (the target's
- * nested three-way `if` materialises a longer chain than the same logic written flat).
- *
- * The eight functions below are NOT reconstructed - they are listed as residual bodies at the end
- * of this file and their measured scores are 0.16-1.68 %: fn_8009D5C0 (0x8F0), fn_8009DEB0 (0x9A4),
- * fn_8009F22C (0x608), fn_8009F85C (0x968), fn_800A02F8 (0xA0C), fn_800A0D04 (0x58C),
- * fn_800A16C4 (0x5E4), fn_800A1CA8 (0x85C).  They are 20 932 of the range's 25 224 bytes and are
- * the obvious next queue for this unit; each is the same assert-then-compute family as the 18 that
- * did land, and fn_8009F85C already has its signature fixed by `ef/ef_emitter.cpp`'s declaration
- * (`void fn_8009F85C(void* rec, void* target, u32 life, u16 seed, s32 range)`).
- *
- * One `.sdata2` note: the two int->float conversion doubles the original TU emitted (0x80795FC0 and
- * 0x80795FC8) live in the shipped pool, but MWCC re-emits them per TU, so this object carries 16
- * bytes of `.sdata2` of its own (no named float literal is spelled anywhere in this file - the
- * `.sdata2` labels are referenced by name, which is why the section is 16 and not 44 bytes).
+ * ef/ef_animcurve.cpp - the effect library's key-frame animation curve: the tick resolver, the `u8` (u16.16
+ *   fixed-point) and `f32` interpolation kernels (type 0 linear, 1 cubic with bits 2/3 picking 0.0f or 1.5f inner
+ *   terms, 2 hold, else `NW4R_ASSERT(0)`), the divider walk, the key searches, the random generator (`seed *
+ *   0x343FD + 0x269EC3`) and name hash, the two 0x100-byte divisor tables' getters, the key record copy, the flag
+ *   latch, and the curve commands that feed `ef/ef_creationqueue.cpp`'s 0x400-entry queue.
+ * RANGE. .text 0x8009CDBC-0x800A3044 (26 functions); extab 0x80009A98-0x80009B40, extabindex 0x80022BC0-0x80022CBC
+ *   (21 records: the five leaf bodies have none), .data 0x80591C68-0x805922C0 (the divisor tables, then three
+ *   copies of the `__FILE__` string "ef_animcurve.cpp" at 0x80591E68, 0x80592260 and 0x805922AC), .sdata2
+ *   0x80795FB8-0x80795FF0.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps `clrlwi`/`extrwi` + `cmpwi` unfused) and
+ *   `#pragma fp_contract off` (retail keeps `fmuls` + `fadds`/`fsubs` apart).
+ * NAMES. The map has only `fn_` stems for the range; the parameter names are the source's own, from the pointer
+ *   messages (`header`, `tick`, `tickF32`, `resDiv`, `final`, `mCmdList`, `target`, `key`, `divL`, `divH`, `pHead`,
+ *   `random`, `randomTable`, `nameTable`, `pp`, `ptrFixed`, `ptrBase`).
+ * RESIDUALS. 8 rows unwritten (minimal bodies): 0x8009D5C0-0x8009E854, 0x8009F22C-0x8009F834,
+ *   0x8009F85C-0x800A01C4, 0x800A02F8-0x800A1290, 0x800A16C4-0x800A2504.  The source order differs from retail's
+ *   (these eight are defined last), so our `.text`, extab and extabindex run in another order.
+ *   13 partial rows:
+ *  - `fn_8009CDBC` (ours 0x79C of 0x804): the `flags & 0x80` divisor path is short; retail's nested three-way `if`
+ *    materialises a longer chain than the flat logic;
+ *  - `fn_8009EA4C`: one instruction's operand order;
+ *  - `fn_8009EEF4`: the five products are scheduled `a`/`b` before `d`/`c` (retail keeps the written order);
+ *  - `fn_800A14A4` (ours 0x58 of 0x60): the `&` result is stored once where retail stores it twice, and the shift
+ *    count is reused where retail recomputes it;
+ *  - `fn_8009E854`: float register colours and two branch senses;
+ *  - `fn_8009EF88` (ours 0x2C4 of 0x2A4), `fn_800A12AC` (ours 0x210 of 0x1F8): extra `slwi r0,r0,1` index scaling
+ *    and `clrlwi` narrowings around the u16 key table;
+ *  - `fn_800A01C4`: the type-bit tests are `rlwinm` + `beq` where retail has `extrwi` + `bne`, and two pool loads
+ *    swap order;
+ *  - `fn_800A1504`: a `clrlwi` + `cmplw` compare where retail compares signed (`cmpw`);
+ *  - `fn_800A2504`, `fn_800A2CF0`: the u8 argument is narrowed straight into r25 where retail first saves it (`mr
+ *    r27,r3`);
+ *  - `fn_800A27B4` (ours 0x4E4 of 0x53C): 27 retail instructions are missing and one load is hoisted;
+ *  - `fn_800A2FA4` (ours 0x68 of 0x64): our loop adds a pre-test `b`.
+ *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x10 of 0x38 (only the two conversion doubles MWCC
+ *   re-emits); `.text` 0x2260 of 0x6288; extab 0x68 of 0xA8; extabindex 0x9C of 0xFC.
+ * SHAPES. The `.sdata2` constants are referenced by name, never spelled as literals (a literal re-pools them).
  */
 
 #include "types.h"
@@ -86,17 +44,11 @@
 #include "unsplit/ef.h"
 #include "ef/ef_particlemanager.h"
 
-/* Two file-scoped pragmas, both load-bearing (the same pair ef/ef_cube.cpp and ef/eft007.cpp carry):
- *   - `peephole off`: retail keeps the compare-against-a-select chain unfused (`clrlwi` + `cmpwi`,
- *     `extrwi` + `cmpwi`) where the peephole pass emits `clrlwi.`/`rlwinm.`;
- *   - `fp_contract off`: retail keeps `fmuls` + `fadds` / `fmuls` + `fsubs` separate, which
- *     `-fp_contract on` (this lib's cflags) fuses into `fmadds`/`fmsubs`. */
 #pragma peephole off
 #pragma fp_contract off
 
-/* `nw4r::db::Panic`: declaring the owner's real spelling makes the C++ front-end reproduce the map's
- * mangling (`Panic__Q24nw4r2dbFPCciPCce`) exactly; spelling the mangling itself would re-mangle it
- * (docs/plan.md 6.5 rule 9). */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r {
 namespace db {
 void Panic(const char* file, int line, const char* fmt, ...);
@@ -108,8 +60,8 @@ extern char lbl_80591E68[];
 extern char lbl_80592260[];
 extern char lbl_805922AC[];
 
-/* The two 0x100-byte tables the curve's divisor lookups index (they live in the ef library's pooled
- * `.data`, so they are declared, never defined here). */
+/* The two 0x100-byte tables the curve's divisor lookups index (this unit's claimed `.data`, declared,
+ * never defined). */
 extern u8 lbl_80591C68[];
 extern u8 lbl_80591D68[];
 
@@ -136,9 +88,7 @@ extern char lbl_80592204[]; /* "NW4R:Failed assertion div < nextDiv" */
 extern char lbl_80592228[]; /* ptrBase                            */
 extern char lbl_80592274[]; /* ptrBase                            */
 
-/* The .sdata2 pool this unit reaches into.  They are referenced by name, never spelled as float
- * literals: MWCC would then emit its own copy into this unit's `.sdata2` and the shipped pool at
- * 0x80795FB8.. would gain a second entry (main.cpp is the one unit that owns a `.sdata2` range). */
+/* The `.sdata2` constants, referenced by name (a float literal would re-pool them in this object). */
 extern f32 lbl_80795FB8; /* 0.0f        */
 extern f32 lbl_80795FD0; /* 1.0f        */
 extern f32 lbl_80795FD4; /* 65536.0f    */
@@ -233,7 +183,7 @@ u8 fn_8009F848(u32 index) {
     return lbl_80591D68[index & 0xFF];
 }
 
-/* 0x800A1290 - copy a 4-byte key record (u8, u8, u16). */
+/* 0x800A1290 - copies a 4-byte key record (u8, u8, u16). */
 struct EfAnimKey {
     /* +0x00 */ u8 mValue;
     /* +0x01 */ u8 mType;
@@ -318,14 +268,14 @@ u32 fn_8009E854(u32 tick, u8 start, u8 end, u8 type) {
     }
 }
 
-/* 0x800A3008 - initialise a queue slot's two VEC3 tails. */
+/* 0x800A3008 - initialises a queue slot's two VEC3 tails. */
 EfAnimSlot* fn_800A3008(EfAnimSlot* slot) {
     VEC3_ctor(&slot->mPos);
     VEC3_ctor(&slot->mVel);
     return slot;
 }
 
-/* 0x800A2FA4 - reset the whole creation queue: clear every slot's VEC3 tails and the count. */
+/* 0x800A2FA4 - resets the whole creation queue: clear every slot's VEC3 tails and the count. */
 EfAnimSlotQueue* fn_800A2FA4(EfAnimSlotQueue* queue) {
     EfAnimSlot* slot = &queue->mSlot[0];
     while (slot < &queue->mSlot[0x400]) {
@@ -336,7 +286,7 @@ EfAnimSlotQueue* fn_800A2FA4(EfAnimSlotQueue* queue) {
     return queue;
 }
 
-/* 0x800A14A4 - latch the one-shot flag and, the first time, fold a bit pair taken from `arg` into
+/* 0x800A14A4 - latches the one-shot flag and, the first time, fold a bit pair taken from `arg` into
  * the `+0x96` byte. */
 struct EfAnimBitArg {
     /* +0x00 */ u8 pad_0x00[0x4];
@@ -366,7 +316,7 @@ void fn_800A14A4(EfAnimLatch* self, const EfAnimBitArg* arg) {
 extern "C" void fn_8009F22C(const void* self, u32* outA, u32* outB, u32* outC, u32* outD, u32* outE);
 extern "C" void fn_800A27B4(const EfAnimHeader* header, u32 step, u16* tick, u32 mode);
 
-/* 0x800A12AC - binary-search a table of u16 keys (stride `stride` u16s) for `target` and return the
+/* 0x800A12AC - binary-searches a table of u16 keys (stride `stride` u16s) for `target` and return the
  * lower bracketing index in `*out`.  `flag` decides which side an exact hit narrows. */
 void fn_800A12AC(u32* out, s32 target, const u16* ptrBase, u32 stride, s32 lo, s32 hi, int flag) {
     NW4R_POINTER_ASSERT(ptrBase, 0x24C, lbl_80592228, lbl_80592260);
@@ -420,9 +370,8 @@ struct EfAnimState {
     /* +0xE5 */ u8 mPhase;
 }; /* size: 0xE6 */
 
-/* 0x800A1504 - resolve a key's slot and hand the table's u32 word at that slot + 1 back through
- * `target`.  `self->mPhase` is folded into the divider's own range, and bit 2 of the ramp's flags
- * picks between the "call the ramp helper at the last key" and the "wrap to the first key" rule. */
+/* 0x800A1504 - resolves a key's slot (`mPhase` folded into the divider's range) and returns the table word
+ * at slot + 1 through `target`; ramp flag bit 2 picks calling the ramp helper or wrapping at the last key. */
 void fn_800A1504(EfAnimState* self, const EfAnimDivider* divider, const EfAnimRamp* ramp, void* arg3,
                  const u8* table, u32* target) {
     s32 span = ramp->mEnd - ramp->mStart;
@@ -441,7 +390,7 @@ void fn_800A1504(EfAnimState* self, const EfAnimDivider* divider, const EfAnimRa
     NW4R_POINTER_ASSERT(target, 0x70D, lbl_80591FC4, lbl_80591E68);
 }
 
-/* 0x800A2504 - copy the `u8` channels the key's mask selects out of one key record. */
+/* 0x800A2504 - copies the `u8` channels the key's mask selects out of one key record. */
 void fn_800A2504(const u8* mCmdList, u8* target, u32 arg2, u32 arg3) {
     NW4R_POINTER_ASSERT(mCmdList, 0x92C, lbl_80591F8C, lbl_80591E68);
     NW4R_POINTER_ASSERT(target, 0x92D, lbl_80591FC4, lbl_80591E68);
@@ -498,10 +447,8 @@ void fn_800A2CF0(const u8* mCmdList, f32* target, u32 arg2, u32 arg3) {
 /* 0x80463F04 - the range helper the fractional key lookup measures its distance with. */
 extern "C" f32 fn_80463F04(f32 x);
 
-/* 0x8009EA4C - advance the two divider counters for one key step.  `divH` starts at `divL`; bit 6 of
- * the header's flags is what enables the walk, and the second counter only moves at the curve's
- * last key (or immediately when bit 5 is set).  The third block advances the first counter when the
- * step starts at division 0. */
+/* 0x8009EA4C - advances the two divider counters one key step (header flag bit 6 enables it; `divH` moves
+ * only at the last key or with bit 5, `divL` also when the step starts at division 0). */
 void fn_8009EA4C(const EfAnimHeader* header, const EfAnimKeyRange* key, u32 lo, u32* divL,
                  u32* divH) {
     NW4R_POINTER_ASSERT(header, 0x301, lbl_80591E7C, lbl_80591E68);
@@ -531,9 +478,8 @@ void fn_8009EA4C(const EfAnimHeader* header, const EfAnimKeyRange* key, u32 lo, 
     }
 }
 
-/* 0x8009EF88 - the fractional sibling of fn_800A12AC: binary-search the same u16 key table, but
- * return both bracketing keys (`outLo`/`outHi`) and, in `*flag`, whether `frac` lands exactly on the
- * key that was found. */
+/* 0x8009EF88 - binary-searches fn_800A12AC's u16 key table for both bracketing keys (`outLo`/`outHi`);
+ * `*flag` says whether `frac` lands exactly on the found key. */
 void fn_8009EF88(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
                  const u16* ptrBase, u32 stride, s32 lo, s32 hi) {
     NW4R_POINTER_ASSERT(ptrBase, 0x1F1, lbl_80592274, lbl_805922AC);
@@ -594,10 +540,8 @@ void fn_8009EF88(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 fra
     *flag = 0;
 }
 
-/* 0x8009CDBC - resolve a curve's tick from a division step.  `mode` (the first argument) is the
- * curve's length in steps; `header` carries the tick count, the flags and the divisor count; `step`
- * is the position inside the curve.  The three output parameters are the key tick, the fractional
- * tick and the resolved divisor.  Completely flat curves (tick count <= 1) short-circuit to tick 0. */
+/* 0x8009CDBC - resolves the key tick, fractional tick and divisor of position `step` in a curve `mode`
+ * steps long (`header` holds the tick count, flags and divisor count); a tick count <= 1 gives tick 0. */
 void fn_8009CDBC(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
                  u32* resDiv) {
     NW4R_POINTER_ASSERT(header, 0x87, lbl_80591E7C, lbl_80591E68);
@@ -775,67 +719,54 @@ void fn_800A27B4(const EfAnimHeader* header, u32 step, u16* tick, u32 mode) {
 }
 
 /* -------------------------------------------------------------------------------------------------
- * Residual bodies.  The eight functions below are inside this unit's range but were NOT reconstructed
- * in this pass (each is 0x1F8..0xA0C bytes of the same assert-then-compute family).  They are defined
- * here, minimally, for one reason only: a registered unit whose symbols are missing would leave the
- * range half-registered and break the next measurement pass (docs/plan.md 8.6).  Their signatures are
- * the ones the range's own call sites use (fn_8009F85C's is fixed by ef/ef_emitter.cpp's declaration).
- * Each is a residual with the measurement recorded in the unit's header; none of them is claimed to
- * match, and none of them is called by any other registered unit except fn_8009F85C.
+ * The eight unwritten bodies, defined minimally with the signatures the range's call sites use
+ * (fn_8009F85C's is `ef/ef_emitter.cpp`'s declaration).
  * ------------------------------------------------------------------------------------------------- */
 void fn_8009D5C0(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
                  u32* resDiv, u32* final) {
-    /* NOT RECONSTRUCTED.  0x8009D5C0, 0x8F0 bytes, seven parameters and five pointer guards
-     * (header/tick/tickF32/resDiv/final at lines 0x12A-0x12E).  Residual. */
+    /* Unwritten: five pointer guards (header/tick/tickF32/resDiv/final, lines 0x12A-0x12E). */
     (void)mode; (void)header; (void)step; (void)tickF32; (void)resDiv;
     *tick = 0;
     *final = 0;
 }
 
 void fn_8009DEB0(const void* mCmdList, void* target) {
-    /* NOT RECONSTRUCTED.  0x8009DEB0, 0x9A4 bytes; calls fn_8009CDBC, fn_8009E854, fn_8009EA4C,
-     * fn_8009EEDC, fn_8009EEF4, fn_8009EF88, fn_8009F22C, fn_8009F834, fn_8009F848, fn_800A2504,
-     * i.e. the whole unit's readers.  Residual. */
+    /* Unwritten: calls the unit's readers (the tick resolver, the kernels, the divider walk, the key
+     * searches, the random generator, the table getters, fn_800A2504). */
     (void)mCmdList; (void)target;
 }
 
 void fn_8009F22C(const void* self, u32* outA, u32* outB, u32* outC, u32* outD, u32* outE) {
-    /* NOT RECONSTRUCTED.  0x8009F22C, 0x608 bytes, six parameters and six pointer guards
-     * (lines 0x70-0x75).  Residual. */
+    /* Unwritten: six pointer guards (lines 0x70-0x75). */
     (void)self;
     *outA = 0; *outB = 0; *outC = 0; *outD = 0; *outE = 0;
 }
 
 void fn_8009F85C(void* rec, void* target, u32 life, u16 seed, s32 range) {
-    /* NOT RECONSTRUCTED.  0x8009F85C, 0x968 bytes; the one function of this range another registered
-     * unit calls (ef/ef_emitter.cpp's signature above).  It calls fn_8009CDBC, fn_8009EA4C,
-     * fn_8009EEDC, fn_8009EEF4, fn_8009EF88, fn_8009F22C, fn_8009F834, fn_8009F848, fn_800A01C4 and
-     * fn_800A2CF0, i.e. the curve evaluator itself.  Residual. */
+    /* Unwritten: the curve evaluator `ef/ef_emitter.cpp` calls (the tick resolver, the divider walk,
+     * the random generator, the key searches, the f32 kernel, fn_800A2CF0). */
     (void)rec; (void)target; (void)life; (void)seed; (void)range;
 }
 
 void fn_800A02F8(const void* mCmdList, void* target) {
-    /* NOT RECONSTRUCTED.  0x800A02F8, 0xA0C bytes; calls fn_8009CDBC, fn_8009EA4C, fn_8009EEDC,
-     * fn_8009EEF4, fn_8009EF88, fn_8009F22C, fn_8009F834, fn_8009F848, fn_800A01C4.  Residual. */
+    /* Unwritten: calls the tick resolver, the divider walk, the random generator, the key searches,
+     * the table getters and the f32 kernel. */
     (void)mCmdList; (void)target;
 }
 
 void fn_800A0D04(const void* mCmdList, void* target) {
-    /* NOT RECONSTRUCTED.  0x800A0D04, 0x58C bytes; calls fn_8009D5C0, fn_8009EEF4, fn_8009F22C,
-     * fn_800A1290, fn_800A12AC.  Residual. */
+    /* Unwritten: calls fn_8009D5C0, fn_8009EEF4, fn_8009F22C, fn_800A1290 and fn_800A12AC. */
     (void)mCmdList; (void)target;
 }
 
 void fn_800A16C4(const void* mCmdList, void* target) {
-    /* NOT RECONSTRUCTED.  0x800A16C4, 0x5E4 bytes; calls fn_8009EEF4, fn_800A3044 and fn_800A33DC
-     * (the creation queue's two Add entries).  Residual. */
+    /* Unwritten: calls fn_8009EEF4 and the creation queue's two `Add` entries. */
     (void)mCmdList; (void)target;
 }
 
 void fn_800A1CA8(const void* mCmdList, void* target) {
-    /* NOT RECONSTRUCTED.  0x800A1CA8, 0x85C bytes; the range's other card carries the
-     * `NW4R:Failed assertion div < nextDiv` guard (lbl_80592204) and calls fn_8009D5C0,
-     * fn_8009F22C and fn_800A12AC.  Residual. */
+    /* Unwritten: carries the `div < nextDiv` assert (lbl_80592204) and calls fn_8009D5C0, fn_8009F22C
+     * and fn_800A12AC. */
     (void)mCmdList; (void)target;
 }
 

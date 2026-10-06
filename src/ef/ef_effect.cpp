@@ -1,108 +1,43 @@
 /*
- * ef/ef_effect.cpp - the nw4r::ef::Effect object and the EffectSystem ctor/dtor.
- *
- * .text 0x800A40F4..0x800A56B0, thirty-nine functions.  Final home and name, evidence class 1 (a
- * `__FILE__` string): every `Panic`/`Warning` in the range passes `lbl_80592430`, which reads
- * "ef_effect.cpp" at 0x80592430 (read from the DOL's .data - it heads the range's own pool).  A bare
- * source-file name is the original TU, so the module is `ef` and the extension is the name's suffix.
- * `langcheck.py` is conclusive for C++: the `.cpp` name, the `Panic__Q24nw4r2dbFPCciPCce` /
- * `Warning__Q24nw4r2dbFPCciPCce` callees, and the range's own class table `lbl_80592588`.  The seam is
- * proven on both sides: the run starts where ef/ef_draworder.cpp ends (0x800A40F4, whose own `__FILE__`
- * string is "ef_effect.cpp" at 0x80592430) and stops at ef/ef_effectsystem.cpp's first instruction
- * (0x800A56B0, whose pool heads with "ef_effectsystem.cpp" at 0x80592698).  The extab and extabindex
- * runs break at exactly those two addresses (extab 0x80009BA0..0x80009C38 / extabindex
- * 0x80022D4C..0x80022E30).  Sections: extab 0x80009BA0..0x80009C38 (19 unwind records),
- * extabindex 0x80022D4C..0x80022E30, .text 0x800A40F4..0x800A56B0.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` over all 39 addresses and against
- * config/RMHE08/symbols.txt, where every one is a bare `.text` fn_ entry) - except the three methods the
- * map names (`RetireEmitterAll__Q34nw4r2ef6EffectFv`,
- * `ForeachParticleManager__Q34nw4r2ef6EffectFPFPvUl_vUlb`,
- * `SetRootMtx__Q34nw4r2ef6EffectFRCQ34nw4r4math5MTX34`), which are written through their owner
- * `nw4r::ef::Effect` (rule 9).
- *
- * What it is.  The `nw4r::ef::Effect` object - the thing the memory manager's pool hands out (the
- * EffectSystem's `RetireEffect` walks the same record).  Its class table is `lbl_80592588`
- * = [0, 0, fn_800A4464, fn_800A4470, fn_800A40F4, fn_800A5428, fn_800A4BBC, fn_800A5154] (six virtuals
- * behind a 2-word head; the table is pooled data this unit references but does not own - the data pass
- * holds .data).  The range reconstructs:
- *
- *   fn_800A40F4  the effect's initialiser + first-emitter spawn: zero the state, build the emitter
- *                list, take the back-pointer, reset the root matrix/floats, then create the emitter
- *                through the memory manager's table.
- *   fn_800A4654  `CreateEmitter(mgr, emitter, flag8, flag16)`: the flags' 0x40000000 bit must be set
- *                (else `Warning("incomplete relocation")`), then the same table-driven spawn and the
- *                +0xE8 count bump; returns the emitter or NULL.
- *   fn_800A5428  the table's spawn slot: `fn_800A4654(this, fn_800A5484(pp), flag8, flag16)`.
- *   fn_800A4474  retire+free one emitter (its +0xF4/+0xF8/+0xBC blocks), then unlink it.
- *   fn_800A486C  retire one emitter (state 1 only): drop it from the list, run its table's teardown.
- *   RetireEmitterAll / fn_800A4AF8  the two whole-list sweeps (retire the emitter / the particles).
- *   fn_800A4BBC  the per-frame update: the retired-state dispatch, the detached re-parenting, the five
- *                ordered passes over the live emitters, the +0xE8 lifetime count and the transform
- *                finalisation.
- *   fn_800A50EC/5104/5114/513C/5154/51B0  the +0x54 flag accessors (bits 0, 1, 15) and the +0xA0
- *                object's one call.
- *   fn_800A51C8/51D0/51D8/5248/5250  the emitter-list accessors (head, size, indexed get, state).
- *   ForeachParticleManager  walk the particle managers calling `fn_800A98D4`.
- *   fn_800A52E4  walk + filter (the +0xF4 chain must hold a given node) calling a raw callback.
- *   SetRootMtx   concat the system matrix and push it to every emitter with no +0xF4 parent.
- *   fn_800A559C/5618/56A4  the EffectSystem's constructor, deleting destructor and singleton accessor
- *                (ef/ef_effectsystem.cpp calls the ctor and registers the dtor, and its file header
- *                says so - the two bodies live in this TU).
- *
- * Load-bearing source shapes:
- *   - the pointer guards are the `NW4R_POINTER_ASSERT` RVL address-range chain the ef units share
- *     (six materialised BOOLs, the first `if` carrying two tests); the file argument is the call site's
- *     own pooled name ("ef_effect.cpp" here, "activitylist.h"/"res_emitter_ac.h" for the two header
- *     asserts) and the message comes from the call site.  The `__LINE__` immediates are reproduced with
- *     `#line`.
- *   - a file-scoped `#pragma peephole off` reproduces the deleting destructor's `extsh` + `cmpwi` flag
- *     test (the same shape ef/ef_draworder.cpp and ef/ef_effectsystem.cpp needed it for).
- *   - the effect record is a *local* view (`EfEff`, `EfEffEmitter`, `EfEffManager`): `ef.h`
- *     declares `struct Effect` as the union of the sibling units' private copies and models the memory
- *     manager at its first word, so it cannot carry this unit's own layout.  Rule 1 debt, booked in the
- *     outbox: the union and this layout have to become one `ef.h` definition.
- *   - the three map-named methods are declared in `ef.h`; their definitions here cast `this` to
- *     the local record.  `ForeachParticleManager` is corrected to `u32` (the target returns the count
- *     the walk accumulates and the sweep units add it).
- *
- * Status: official report 99.252335 % fuzzy (5564 B .text), 33 of the 39 bodies byte-identical; extab
- * 0x98/0x98 and extabindex 0xE4/0xE4 byte-identical and .text exactly 0x15BC.  Full `ninja` in the
- * worktree: `build/RMHE08/main.dol: OK`.  Six residuals, each >= 92.59 %; every one is a compiler
- * register/scheduling shape, not a source one:
- *
- *   fn_800A40F4  99.84127  the table dispatches load the vtable/table pointer into a scratch GPR
- *   fn_800A4654  99.76923  where retail reuses r12 for both loads (`lwz r12,0(r3); lwz r12,36(r12)`)
- *   fn_800A49B8  98.95834  - the identical residual ef/ef_effectsystem.cpp recorded for its
- *   fn_800A5154  99.56522  fn_800A5A90 (a named virtual would emit retail's pair).
- *   fn_800A4BBC  98.35844  1328/1328 B: the loop temporaries land in a different callee-saved
- *                          rotation (r25/r26/r29/r31) and the two +0xB4 load/compare pairs are
- *                          scheduled differently; every instruction and the size match.
- *   fn_800A52E4  92.59259  216/216 B: the +0xF4 parent-chain walk; retail's found-flag loop is
- *                          rotated (the `cmpwi r0,0` guard appears twice, the match test is scheduled
- *                          before it) and skips `pm` itself (checks pm->0xF4 first).  Measured: the
- *                          check-self-first `while (p) { if (p==match) {found; break;} p=p->0xF4; }`
- *                          scores 93.15 % at 212 B; the size-exact form scores 92.59 % at 216 B
- *                          (adopted - it makes the unit's .text exactly the split's 0x15BC).
- *
- * Measured source shapes: `#line` placed so the `Panic`/`Warning` line equals the target immediate
- * (fn_800A45DC 134, fn_800A51D8 423, RetireEmitterAll 160, fn_800A4AF8 180, fn_800A4BBC
- * 267/292/312/323); fn_800A40F4's fourth argument is `u16` (retail adds it to a u16 with no mask);
- * EfEffEmitter::mField_0xB4 is `s32` (retail uses `cmpwi`); fn_800A5114's bit is 0x10000
- * (`oris r0,r0,1` / `rlwinm r0,r0,0,16,14`); fn_800A559C/5618 return the object.
- *
- * `ef.h` was edited for the owner's real `ForeachParticleManager` return type (`u32`); the
- * four direct consumers and six more ef.h users recompile to byte-identical `.text` in this worktree
- * (see the unit's .pi/notes).  rule 1 debt booked in the outbox: ef.h's union `struct Effect` and
- * this unit's local record must become one definition.
+ * ef/ef_effect.cpp - the nw4r::ef::Effect object (the record the memory manager's pool hands out): its
+ *   initialiser and first-emitter spawn, `CreateEmitter` (warns "incomplete relocation" unless the flags' 0x40000000
+ *   bit is set), the emitter retire/free paths and whole-list sweeps, the per-frame update, the flag and emitter-list
+ *   accessors, `ForeachParticleManager`, the filtered walk, `SetRootMtx`, and the EffectSystem constructor, deleting
+ *   destructor and singleton accessor that `ef/ef_effectsystem.cpp` calls.
+ * RANGE. .text 0x800A40F4-0x800A56B0 (39 functions); extab 0x80009BA0-0x80009C38, extabindex 0x80022D4C-0x80022E30,
+ *   .data 0x80592430-0x80592698 (the `__FILE__` string "ef_effect.cpp" first; the class table `lbl_80592588` = [0,
+ *   0, fn_800A4464, fn_800A4470, fn_800A40F4, fn_800A5428, fn_800A4BBC, fn_800A5154]), .sdata 0x807912E0-0x807912E8,
+ *   .sdata2 0x80795FF0-0x80795FF8.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (the deleting destructor's `extsh` + `cmpwi` flag test).
+ * NAMES. The map has only `fn_` stems for the range except `RetireEmitterAll`, `ForeachParticleManager` and
+ *   `SetRootMtx`, written as `nw4r::ef::Effect` members.
+ * RESIDUALS. The source defines `fn_800A4AF0` (8 bytes) before `RetireEmitterAll`, so the two swap places in our
+ *   `.text`.
+ *   6 partial rows:
+ *  - `fn_800A40F4`, `fn_800A4654`, `fn_800A49B8`, `fn_800A5154`: the table dispatches load the table pointer into a
+ *    scratch GPR where retail reuses r12 for both loads (`lwz r12,0(r3); lwz r12,36(r12)`), as in
+ *    `ef/ef_effectsystem.cpp`;
+ *  - `fn_800A4BBC`: the loop temporaries take another callee-saved rotation (r25/r26/r29/r31) and the two +0xB4
+ *    load/compare pairs are scheduled differently;
+ *  - `fn_800A52E4`: retail's found-flag loop is rotated (the `cmpwi r0,0` guard twice, the match test before it,
+ *    `pm` itself skipped); the check-self-first loop scores higher but is 4 bytes short, so the size-exact form
+ *    stays.
+ *   flipcheck: `.data`, `.sdata` and `.sdata2` claimed, not emitted.
+ * SHAPES. The pointer guards are the `NW4R_POINTER_ASSERT` six-BOOL chain; the file argument is the call site's
+ *   own string ("ef_effect.cpp", or "activitylist.h"/"res_emitter_ac.h" for the two header asserts).
+ * SHAPES. `#line` puts each `Panic`/`Warning` on retail's line (`fn_800A45DC` 134, `fn_800A51D8` 423,
+ *   `RetireEmitterAll` 160, `fn_800A4AF8` 180, `fn_800A4BBC` 267/292/312/323).
+ * SHAPES. `fn_800A40F4`'s fourth argument is `u16` (retail adds it with no mask), `EfEffEmitter::mField_0xB4` is
+ *   `s32` (`cmpwi`), `fn_800A5114`'s bit is 0x10000, and `fn_800A559C`/`fn_800A5618` return the object.
+ * SHAPES. The effect record is a local view (`EfEff`, `EfEffEmitter`, `EfEffManager`): `ef.h`'s `struct Effect` is
+ *   a union of the sibling units' copies; the map-named methods cast `this` to it.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h" /* nw4r::ef::Effect (rule 9's owner) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -111,8 +46,7 @@ void Warning(const char* file, int line, const char* fmt, ...);
 } // namespace db
 } // namespace nw4r
 
-/* The global `operator delete` (its compiler mangling is `__dl__FPv`; declaring that spelling would be
- * rule 9's violation - the sibling ef units spell it the same way). */
+/* The global `operator delete` (the map's `__dl__FPv`). */
 void operator delete(void* ptr) throw();
 
 extern "C" void OSRegisterVersion(const char* version);
@@ -250,8 +184,8 @@ typedef struct EfEffSys {
 } EfEffSys; /* size: 0xC068 (the symbol map's size for lbl_806884D0) */
 
 /* ===================================================================================================
- * The pooled data this range references but does not own (`.data` 0x80592430..0x805925C8).  Declared,
- * never defined; the data pass owns the section.
+ * The strings and constants of this unit's claimed data, `ef/ef_effectsystem.cpp`'s once-flag and singleton
+ * (all declared, never defined) and the declarations of the callees.
  * =================================================================================================== */
 
 extern "C" {
@@ -272,8 +206,7 @@ extern void* lbl_807912E0;        /* the version string registered once         
 extern u32 lbl_8079491C;          /* the once-only init flag fn_800A559C sets                */
 extern u8 lbl_806884D0[];         /* the EffectSystem singleton (0xC068 B)                   */
 
-/* Callees outside this unit.  All are still `fn_*` in the symbol map (the unsplit rule-2 gap) and are
- * declared with C linkage: the target's relocations are plain names, not C++ spellings (rule 9). */
+/* Callees outside this unit, with C linkage: retail's relocations carry their plain map names. */
 void fn_800A2FA4(void* p);
 void fn_800A3718(void* p);
 void fn_800A3800(void* p);
@@ -361,8 +294,6 @@ void* fn_800A56A4(void);
             nw4r::db::Panic(file, __LINE__, msg, (ptr));                                           \
     }
 
-/* The file-scoped pragma: the deleting destructor keeps its `extsh` + `cmpwi` flag test - the peephole
- * pass folds it (the same shape ef/ef_draworder.cpp and ef/ef_effectsystem.cpp needed it for). */
 #pragma peephole off
 
 /* ===================================================================================================
@@ -408,7 +339,7 @@ extern "C" u32 fn_800A40F4(EfEff* self, EfEffManager* mgr, void* eh, u16 n) {
     return 1;
 }
 
-/* 0x800A43E8 - append an emitter to the group and bump the live count. */
+/* 0x800A43E8 - appends an emitter to the group and bump the live count. */
 extern "C" void fn_800A43E8(EfEffActivityList* list, void* node) {
     fn_80501A64(&list->mActiveList, node);
     list->mNumActive++;
@@ -419,7 +350,7 @@ extern "C" void* fn_800A4420(void* p) {
     return *(void**)p;
 }
 
-/* 0x800A4428 - clear an activity group (both lists and the count). */
+/* 0x800A4428 - clears an activity group (both lists and the count). */
 extern "C" void fn_800A4428(EfEffActivityList* list) {
     list->mActiveList.head = NULL;
     list->mActiveList.numObjects = 0;
@@ -430,7 +361,7 @@ extern "C" void fn_800A4428(EfEffActivityList* list) {
     list->mNumActive = 0;
 }
 
-/* 0x800A444C - reset the effect's state to active. */
+/* 0x800A444C - resets the effect's state to active. */
 extern "C" u32 fn_800A444C(EfEff* self) {
     self->mField_0x10 = NULL;
     self->mState = 1;
@@ -447,7 +378,7 @@ extern "C" u32 fn_800A4470(EfEff* self) {
     return ((nw4r::ef::Effect*)self)->RetireEmitterAll();
 }
 
-/* 0x800A4474 - retire one emitter and free its blocks. */
+/* 0x800A4474 - retires one emitter and free its blocks. */
 extern "C" u32 fn_800A4474(EfEff* self, EfEffEmitter* em) {
 #line 93
     NW4R_POINTER_ASSERT(em, lbl_80592430, lbl_805924AC);
@@ -465,7 +396,7 @@ extern "C" u32 fn_800A4474(EfEff* self, EfEffEmitter* em) {
     return 1;
 }
 
-/* 0x800A45DC - move an emitter from the live list to the retired list. */
+/* 0x800A45DC - moves an emitter from the live list to the retired list. */
 extern "C" void fn_800A45DC(EfEffActivityList* list, void* node) {
 #line 133
     if (list->mActiveList.numObjects < list->mNumActive) {
@@ -475,7 +406,7 @@ extern "C" void fn_800A45DC(EfEffActivityList* list, void* node) {
     fn_80501A64(&list->mRetireList, node);
 }
 
-/* 0x800A4654 - create an emitter on the effect's list. */
+/* 0x800A4654 - creates an emitter on the effect's list. */
 extern "C" u32 fn_800A4654(EfEff* self, EfEffEmitter* emitter, u8 a, u16 b) {
     EfEffMemMgr* mm;
     EfEffEmitter* em;
@@ -514,7 +445,7 @@ extern "C" void* fn_800A4864(void* p) {
     return (u8*)p + 8;
 }
 
-/* 0x800A486C - retire one live emitter. */
+/* 0x800A486C - retires one live emitter. */
 extern "C" u32 fn_800A486C(EfEff* self, EfEffEmitter* em) {
 #line 144
     NW4R_POINTER_ASSERT(em, lbl_80592430, lbl_805924AC);
@@ -527,7 +458,7 @@ extern "C" u32 fn_800A486C(EfEff* self, EfEffEmitter* em) {
     return 1;
 }
 
-/* 0x800A49B8 - run an emitter's teardown: table slot 0x0C, state 2, then slot 0x08 when detached. */
+/* 0x800A49B8 - runs an emitter's teardown: table slot 0x0C, state 2, then slot 0x08 when detached. */
 extern "C" void fn_800A49B8(EfEffEmitter* em) {
     em->mTable->method_0x0C(em);
     em->mState = 2;
@@ -541,7 +472,7 @@ extern "C" void fn_800A4A18(void* p) {
     (void)p;
 }
 
-/* 0x800A4A1C - drop one from the group's live count. */
+/* 0x800A4A1C - drops one from the group's live count. */
 extern "C" void fn_800A4A1C(EfEffActivityList* list, void* node) {
     (void)node;
     list->mNumActive--;
@@ -575,7 +506,7 @@ u32 nw4r::ef::Effect::RetireEmitterAll() {
     return count;
 }
 
-/* 0x800A4AF8 - retire every particle on every live emitter. */
+/* 0x800A4AF8 - retires every particle on every live emitter. */
 extern "C" u32 fn_800A4AF8(EfEff* self) {
     u32 count = 0;
     EfEffEmitter* list[NW4R_EF_MAX_EMITTER];
@@ -749,7 +680,7 @@ extern "C" u32 fn_800A5104(void* p) {
     return *(u32*)p == 0;
 }
 
-/* 0x800A5114 - set/clear the +0x54 bit 0. */
+/* 0x800A5114 - sets/clears the +0x54 bit 0. */
 extern "C" void fn_800A5114(EfEff* self, u32 on) {
     if (on) {
         self->mFlags_0x54 |= 0x10000u;
@@ -805,7 +736,7 @@ extern "C" void* fn_800A5250(EfEffList* list) {
     return fn_80501C60(list, NULL);
 }
 
-/* 0x800A5258 - `Effect::ForeachParticleManager`: walk the particle managers with `cb`. */
+/* 0x800A5258 - walks the particle managers with `cb` and returns the count the walk accumulates. */
 u32 nw4r::ef::Effect::ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bool flag) {
     EfEff* self = (EfEff*)this;
     u32 count = 0;
@@ -819,7 +750,7 @@ u32 nw4r::ef::Effect::ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bo
     return count;
 }
 
-/* 0x800A52E4 - walk the particle managers, keeping those whose +0xF4 chain holds `match`. */
+/* 0x800A52E4 - walks the particle managers, keeping those whose +0xF4 chain holds `match`. */
 extern "C" u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32 flag,
                            EfEffEmitter* match) {
     u32 count = 0;
@@ -846,7 +777,7 @@ extern "C" u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32
     return count;
 }
 
-/* 0x800A53BC - `Effect::SetRootMtx`: concat the root matrix and push it to the parentless emitters. */
+/* 0x800A53BC - concatenates the root matrix and pushes it to the parentless emitters. */
 void nw4r::ef::Effect::SetRootMtx(const nw4r::math::MTX34& mtx) {
     EfEff* self = (EfEff*)this;
     fn_8007100C(&self->mRootMtx, &mtx);

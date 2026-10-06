@@ -1,77 +1,50 @@
 /*
- * ef/ef_emitter.cpp - the nw4r::ef emitter / particle-manager object layer, `.text`
- * 0x800A6258..0x800A99B4 (phase 4: the emitter-side resource object's constructor, its sub-object constructor and its deleting
- * destructor, 0x800A6258..0x800A6350, came over from the old `ef_effectsystem.cpp`, which ends at 0x800A6258).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` for every one of the proposal's 49 symbols - each
- * resolves to `map=fn_XXXXXXXX`, and the shared dump names none of those addresses either).
- *
- * The name is evidence class 1: the range's own assert sites pass the bare `__FILE__` string
- * "ef_emitter.cpp" (`lbl_80592850`, read from the DOL at that address), so the module is `ef` and the
- * extension is that name's suffix.  `langcheck.py`'s evidence for C++: the `.cpp` name, the
- * `Panic__Q24nw4r2dbFPCciPCce` / `Warning__Q24nw4r2dbFPCciPCce` callees, and the range's own vtable
- * (`lbl_80592BB0`, eight words pointing at this file's functions).  The siblings' scheme
- * (`ef_particlemanager.cpp`, `ef_emitterform.cpp`, `ef_resource.cpp`) gives the file its final
- * spelling.
- *
- * The seam is proven on both sides: the run starts where the previous unit ends and stops exactly at
- * `ef/ef_emitterform.cpp`'s first instruction (0x800A99B4, in splits.txt).  `.data`, `.sdata2` and
- * `.sbss` stay unclaimed (the data pass owns them); the source declares them `extern`.
- *
- * What it is.  The emitter-side objects of the NintendoWare effect library.  The range's own vtable
- * at `.data 0x80592BB0` is this file's functions in order - fn_800A6414 (destroy), fn_800A6420
- * (retire), fn_800A6EC4 (create child), fn_800A7378 (create), fn_800A8A5C, fn_800A8D30, fn_800A8DF8,
- * fn_800A8F18 - and the three asserts the range carries name its two containers:
- *   - `UtlistSize(&mActivityList.mActiveList) < NW4R_EF_MAX_PARTICLEMANAGER` (0x400) - the object's
- *     own particle-manager list at +0xC0 (fn_800A6350, fn_800A6938, fn_800A8D30);
- *   - `UtlistSize(&mManagerEF->mActivityList.mActiveList) < NW4R_EF_MAX_EMITTER` (0x200) - the
- *     emitter manager's list, reached through +0xBC and living at manager+0x24 (fn_800A6420).
- * `mManagerEF` is at +0xBC, the work record (`em`) at +0xB8, the parent at +0xF4, and the object's
- * own MTX34 at +0x124.
- *
- * Load-bearing source shapes:
- *   - the pointer guards are the `NW4R_POINTER_ASSERT` shape the ef shape units share (six
- *     materialised BOOLs); the range uses three file strings ("ef_emitter.cpp", "particle.h",
- *     "effect.h"), so the macro takes file and message, and the `__LINE__` immediates are
- *     reproduced with `#line`.
- *   - the 0x1020 / 0x820 frames are `NW4R_EF_MAX_PARTICLEMANAGER` / `NW4R_EF_MAX_EMITTER`-wide stack
- *     arrays (fn_800A6350, fn_800A6420, fn_800A6938, fn_800A8D30).
- *   - the manager's out-of-line hooks (fn_800A66AC, fn_800A723C) call through the delegate at
- *     manager+0xA0; the create path (fn_800A6EC4) calls through the object `fn_800A4420` returns,
- *     whose function table sits at +0x1C.  Both are spelled as function-pointer tables.
- *
- * Status: all 49 symbols reconstructed, none left as a stub.  46 of them are at or above the 80 %
- * bar and 20 are byte-identical; the unit is 91.29 % (weighted over the range's 13924 bytes).  The
- * three below the bar are
- *   fn_800A834C  71.66 %  the per-frame spawner: `#pragma fp_contract off` is needed for most of the
- *                         expression chain but the target fuses one `f2*f1 - f0` into `fmsubs`, and
- *                         the 0x48-hook/delegate path and the tail's field order still differ;
- *   fn_800A89A0  49.84 %  the 0x30-byte block copy: the target pairs its loads/stores through a
- *                         second temporary (`lwz r5; lwz r0; stw r5; stw r0`) where MWCC here emits
- *                         one `lwz/stw` per word, so the register colours differ through all 24
- *                         instructions;
- *   fn_800A8D18  40.00 %  the flag getter: the target masks then booleanises (`rlwinm; neg; or;
- *                         srwi`), MWCC here folds `(flags & 0x200) != 0` into `extrwi` for every
- *                         spelling tried (`bool` return, `== 0x200`, `(x >> 9) & 1`, `!= 0`).
- * The per-symbol numbers and the residuals are in `.pi/notes/800a6350-fn-800a6350-7a8c.md`.
- *
- * Rules 1/2/3/6/9: this file is clean (`stylelint.py --diff main` reports no new violation).  Two
- * cross-unit findings belong to the next sweep and are booked in the unit's outbox:
- *   - `src/ef/ef_point.cpp:73` defines its own partial `EfEmitter` (same nw4r class, 0x100-byte
- *     lower bound).  This file's type is `EfEmitterObj` so the batch adds no second definition, but
- *     the two must become one `ef/ef_emitter.h` definition (rule 1) once this unit has a
- *     header;
- *   - nine units declare this unit's symbols `extern` (`fn_800A8A08`, `fn_800A7F00`, `fn_800A8A04`,
- *     `fn_800A8C24`, `fn_800A8998`); those declarations now resolve to an owner and belong in that
- *     header (rule 2).
+ * ef/ef_emitter.cpp - the nw4r::ef emitter-side object layer: the resource object's constructor, sub-object
+ *   constructor and deleting destructor, the particle-manager sweeps and retire paths, the emitter manager's
+ *   destroy and set-params hooks (delegate slots at manager+0xA0), the initialiser, the random generator (`state *
+ *   0x343FD + 0x269EC3`), the create-child/create-emitter slots, the frame's create and relocation passes, the
+ *   distance fade and per-frame spawner, the track walkers, the transform chain and the accessors.
+ * RANGE. .text 0x800A6258-0x800A99B4 (52 functions); extab 0x80009CBC-0x80009DF4, extabindex 0x80022EC0-0x80023094,
+ *   .data 0x80592850-0x80592CD0 (the `__FILE__` string "ef_emitter.cpp" first; the class table at 0x80592BB0 =
+ *   fn_800A6414 destroy, fn_800A6420 retire, fn_800A6EC4 create child, fn_800A7378 create, fn_800A8A5C,
+ *   fn_800A8D30, fn_800A8DF8, fn_800A8F18), .sbss 0x80794920-0x80794928, .sdata2 0x80796000-0x80796030.
+ * FLAGS. `cflags_main`.
+ * NAMES. The map has only `fn_` stems for the range.  The object's containers are named by its asserts: its own
+ *   particle-manager list at +0xC0 (`NW4R_EF_MAX_PARTICLEMANAGER`, 0x400) and the emitter manager's list at
+ *   manager+0x24 (`NW4R_EF_MAX_EMITTER`, 0x200); `mManagerEF` is at +0xBC, the work record at +0xB8, the parent
+ *   at +0xF4 and the object's MTX34 at +0x124.
+ * RESIDUALS. 29 partial rows (ours 0x34E8 of 0x375C), including:
+ *  - `fn_800A8D18` (ours 0xC of 0x18), `fn_800A94A4` (ours 0x110 of 0x134): retail masks then booleanises
+ *    (`rlwinm; neg; or; srwi`) where MWCC folds the flag test into `extrwi` for every spelling tried;
+ *  - `fn_800A89A0`: retail pairs the block copy's loads/stores through a second temporary (`lwz r5; lwz r0; stw
+ *    r5; stw r0`), ours moves one word at a time;
+ *  - `fn_800A834C` (ours 0x4EC of 0x5F8): retail fuses one `f2*f1 - f0` into `fmsubs` under the rest's unfused
+ *    chain, and it calls `fn_800B2878` and asserts `mManagerEF` (`lbl_80592A6C`) where ours does not;
+ *  - `fn_800A7750` (ours 0x714 of 0x7B0), `fn_800A7378`: retail calls `fn_800A4864` where ours does not, and
+ *    `fn_800A7750` has a `Panic(..., "Failed assertion false")` path ours lacks;
+ *  - `fn_800A6A04`: ours calls `fn_800A4864` and `fn_800A4420` where retail reads `lbl_80796008`;
+ *  - `fn_800A8040`: ours passes the `target` pointer message `lbl_8059291C` where retail passes the `eh` message
+ *    `lbl_80592954`;
+ *  - `fn_800A8A5C`: the `fn_800A8BC8` call sits at another point of the pass;
+ *  - `fn_800A8220`, `fn_800A8300`: the argument copy `mr r3, r4` is scheduled elsewhere and the float registers
+ *    differ;
+ *  - `fn_800A8C34`: the index scaling folds to `clrlslwi` where retail keeps `clrlwi` + `slwi`.
+ *   The other 17 partial rows have no recorded cause.
+ *   flipcheck: `.data` and `.sbss` claimed, not emitted; `.sdata2` 0x10 of 0x30; `.text` 0x34E8 of 0x375C.
+ * SHAPES. The pointer guards are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
+ *   ("ef_emitter.cpp", "particle.h" or "effect.h"); `#line` reproduces each assert's line.
+ * SHAPES. The 0x1020/0x820 frames are `NW4R_EF_MAX_PARTICLEMANAGER`/`NW4R_EF_MAX_EMITTER`-wide stack arrays
+ *   (`fn_800A6350`, `fn_800A6420`, `fn_800A6938`, `fn_800A8D30`).
+ * SHAPES. The manager's hooks call through the delegate at manager+0xA0, and the create path calls through the
+ *   table at +0x1C of the object `fn_800A4420` returns; both are spelled as function-pointer tables.
+ * SHAPES. The object type is `EfEmitterObj`; `ef/ef_point.cpp` carries a partial `EfEmitter` of the same class.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/ef_particlemanager.h" /* fn_800AB9F4 / fn_800AE360 are that unit's (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "ef/ef_util.h" /* fn_8009CD64, owned by ef_util.cpp's range (rule 2) */
 #include "draw_shape/fn_800532DC.h" /* fn_800532DC, owned by draw_shape.cpp's range (rule 2) */
 
@@ -84,8 +57,8 @@ void Warning(const char* file, int line, const char* fmt, ...);
 
 extern "C" {
 
-/* The pooled data this range references but does not own (`.data 0x80592850..0x80592CC0`,
- * `.sdata2 0x80796000..0x80796030`, `.sbss 0x80794920`).  Declared, never defined. */
+/* The strings and constants of this unit's claimed `.data`, `.sdata2` and `.sbss`, declared, never
+ * defined. */
 extern const char lbl_80592850[]; /* "ef_emitter.cpp"                                        */
 extern const char lbl_80592860[]; /* "NW4R:Failed assertion UtlistSize(&mActivityList..."
                                      " < NW4R_EF_MAX_PARTICLEMANAGER"                        */
@@ -123,8 +96,7 @@ extern const f32 lbl_80796024;    /* 65536.0f                                   
 extern const f32 lbl_80796028;    /* pi/2                                                    */
 extern s32 lbl_80794920;          /* the "current manager" cache slot                        */
 
-/* Callees outside this unit.  All are still `fn_*` in the symbol map and unsplit (no owner file to
- * move the declaration to - the rule-2 gap the campaign records for an unsplit address). */
+/* Callees outside this unit, declared locally with C linkage. */
 u16 fn_800A4AF0(void* list);                       /* UtlistSize */
 u16 fn_8009B374(void* list, void** buf, u16 size); /* UtlistGetArray */
 void* fn_80501C60(void* list, void* node);         /* GetNext */
@@ -431,9 +403,8 @@ typedef struct EfSysResourceSub {
     /* +0x88 */ nw4r::math::VEC3 vec_0xA8;
 } EfSysResourceSub; /* size: 0x94 */
 
-/* The emitter-side object `fn_800A6258` builds: the constructor's view of `EfEmitterObj` (the same object; the table sits at +0x1C
- * here).  Moved with the constructor from the old `ef_effectsystem.cpp` in phase 4. size: 0x154 (lower bound: +0x124 is the highest
- * field the constructor touches) */
+/* The emitter-side object `fn_800A6258` builds: the constructor's view of `EfEmitterObj` (the same object; the
+ * table sits at +0x1C here). size: 0x154 (lower bound: +0x124 is the highest field the constructor touches) */
 typedef struct EfSysResourceObj {
     /* +0x000 */ u8 pad_0x000[0x01C];
     /* +0x01C */ void* vtable; /* the root base's table fn_800A4080 sets, then this class's */

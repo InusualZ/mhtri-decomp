@@ -1,34 +1,22 @@
-/* ef/ef_line.cpp - one function, .text 0x800CCFB0..0x800CD584.
- *
- * The unit is the NW4R effect library's `nw4r::ef` module.  The assert strings it references name the
- * file `ef_line.cpp` (0x80594EE0), the panic formatter is `nw4r::db::Panic`, and the sibling units pin
- * the seams `ef_line.cpp -> ef_point.cpp -> ef_sphere.cpp` - so the TU is `ef_line.cpp`, and the
- * function is `EmitterFormLine::Emission` (the NintendoWare 2009-04-03 source, whose three
- * `NW4R_POINTER_ASSERT` calls sit on lines 42/43/44 and whose `em`/`pm`/`params` names are exactly the
- * ones the panic format strings stringify).  It is the line emitter's per-sample generator: validate the
- * three pointers, walk `count` samples, build a scaled direction vector from three `SinCos` Euler angles,
- * project it through `CalcVelocity` and submit it through `ParticleManager::CreateParticle`.
- *
- * Flags: the auto lib (cflags_main, Wii/1.3, `-lang=c`) is the registered home.  Two file-local pragmas
- * are load-bearing: `#pragma fp_contract off` (the target's FP is unfused - `fmuls`+`fadds`, never
- * `fmadds` - while cflags_base passes `-fp_contract on`) and `#pragma peephole off` (the target keeps the
- * paired-single epilogue in its indexed `li r0,off; psq_lx` form, which the peephole pass folds into
- * `psq_l off(r1)`; the same stand-in the other auto unit uses, docs/plan.md 6.5).
- *
- * Result: 99.96 % (`.text` 0x5D4/0x5D4, `extab` and `extabindex` equal).  The residual is two
- * instructions, both C-vs-C++ front-end rather than source shape:
- *   - the `(f32)(s32)` conversions load MWCC's 2^52+2^31 magic double; the target references the shared
- *     pool label `lbl_807962F8`, ours emits the same constant under a private pool label (`@153`).
- *   - the `CreateParticle` dispatch: the target loads the slot through the first-argument register
- *     (`lwz r12, 0x1C(r3); lwz r12, 0x14(r12)`), ours through the saved parameter
- *     (`lwz r11, 0x1C(r23); lwz r12, 0x14(r11)`); the original's C++ front end ties the object and
- *     `this`, which a C indirect call does not.  Tried and rejected: a by-value `VEC3` parameter
- *     (93.5 %), a `static inline` forwarding helper, a local copy of `pm`, a duplicate-expression macro,
- *     and compiling the file as C++ (`-lang=c++`, 97.8 %).
- *
- * The callees are still `fn_*` in the map; the field names are the original source's.  The two explicit
- * `VEC3` copies (`velArg`/`posArg`) stand in for the by-value `p`/`v` arguments of `CreateParticle`; the
- * target copies `v` first, and the declaration order below puts their stack slots where the target has them.
+/*
+ * ef/ef_line.cpp - the line emitter form's per-sample generator: validates `em`/`pm`/`params`, walks `count`
+ *   samples, builds a scaled direction from three `SinCos` Euler angles, projects it through `CalcVelocity` and
+ *   submits it through the particle manager's `CreateParticle` slot.
+ * RANGE. .text 0x800CCFB0-0x800CD584 (1 function); extab 0x8000A5CC-0x8000A5D4, extabindex 0x80023C58-0x80023C64,
+ *   .data 0x80594EE0-0x80594F98 (the `__FILE__` string "ef_line.cpp" first), .sdata2 0x807962E8-0x80796300.
+ * FLAGS. `cflags_main`; file-wide `#pragma fp_contract off` (retail's FP is unfused `fmuls` + `fadds`) and
+ *   `#pragma peephole off` (retail keeps the paired-single epilogue as `li r0,off; psq_lx`).
+ * NAMES. The function is a GUESS for NintendoWare's `EmitterFormLine::Emission` (its three pointer asserts on
+ *   lines 42-44 and the `em`/`pm`/`params` names the panic strings stringify); the map row keeps its `fn_` stem.
+ * RESIDUALS. 1 partial row, `fn_800CCFB0__FPvP7EmitterP15ParticleManageriUlPfUsfUl`:
+ *  - the `velArg`/`posArg` copies move floats (`lfs`/`stfs`) where retail moves words (`lwz`/`stw`);
+ *  - the `CreateParticle` dispatch loads the slot through the saved parameter (`lwz r11, 0x1C(r23)`) where retail
+ *    goes through r3 (`lwz r12, 0x1C(r3)`); a by-value `VEC3` parameter, a forwarding helper, a local copy of
+ *    `pm` and `-lang=c++` all score lower;
+ *  - the `(f32)(s32)` conversion constant is our pool's `@N`, retail's the claimed `lbl_807962F8`.
+ *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x8 of the claimed 0x18.
+ * SHAPES. The explicit `velArg`/`posArg` copies stand in for `CreateParticle`'s by-value arguments; their
+ *   declaration order puts the stack slots where retail has them (`v` is copied first).
  */
 
 #include "types.h"
@@ -37,8 +25,6 @@
 
 #pragma fp_contract off
 #pragma peephole off
-
-/* `VEC3` comes from `nw4r/math.h` - one definition, in the owner's header (rule 1). */
 
 /* nw4r::ef::Random - `RandFloat()` stays out of line under `-inline noauto`. */
 typedef struct {
@@ -75,17 +61,12 @@ struct Emitter {
     /* +0xFC */ u32 mInheritSetting;
 }; /* size: 0x100 */
 
-/* nw4r::db::Panic. The map already carries its real C++ mangling
- * (Panic__Q24nw4r2dbFPCciPCce), and declaring that spelling as a C++ identifier re-mangles it
- * (Panic__Q24nw4r2dbFPCciPCce__FPCciPCce) - which only shows up at LINK time, so a NonMatching
- * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
- * map's spelling exactly: tools/units/mangle.py confirms it. */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 /* The nw4r helper callees are C functions: the target object's relocations carry their plain names
  * (`VEC3_ctor`, not `fn_80043EA8__FP...`), so they are declared `extern "C"`. */
 extern "C" void fn_8009C760(f32* sin, f32* cos, f32 rad); /* PSSinCosRad */
-                     /* VEC3::VEC3() */
- /* VEC3::VEC3(f32, f32, f32) */
 extern "C" f32 fn_800A8A08(Random* r);                    /* Random::RandFloat */
 extern "C" void fn_800A99B4(void* self, VEC3* result, Emitter* em, VEC3* position, VEC3* normalDir,
                         VEC3* fromOrigin, VEC3* fromYAxis); /* EmitterForm::CalcVelocity */

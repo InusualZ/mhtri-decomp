@@ -1,127 +1,46 @@
 /*
- * ef/ef_effectsystem.cpp - the nw4r::ef effect system: its group table, its pools and its walkers.
- *
- * .text 0x800A56B0..0x800A6258, twenty functions (phase 4 moved the emitter-side resource object's constructor, sub-object constructor
- * and deleting destructor, 0x800A6258..0x800A6350, to `ef_emitter.cpp`).  Sections: .text 0x800A56B0..0x800A6258, and the `.ctors` word at 0x8056F2D8,
- * which points at the file's static initializer fn_800A60C8.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` over every one of the 23 addresses - each answers
- * `dump=zz_00a5xxx_` - and against config/RMHE08/symbols.txt, where every one is a bare `.text` fn_
- * entry; only `RetireEffect__Q34nw4r2ef12EffectSystemFPQ34nw4r2ef6Effect` carries a real name), so the
- * definitions keep the map's spelling.  The one name the map carries is written through its owner
- * (`nw4r::ef::EffectSystem::RetireEffect`, rule 9).
- *
- * Final home and name, evidence class 1 (a `__FILE__` string): every assert in the range passes
- * `lbl_80592698`, which reads "ef_effectsystem.cpp" at 0x80592698 (read from the DOL's .data - it is the
- * first item of the range's own pool, and no function below the range references it).  A bare
- * source-file name is the original TU, so the module is `ef` (both bracketing units are ef's) and the
- * extension is that name's suffix.  `langcheck.py` is conclusive for C++: the `.cpp` name, the
- * `Panic__Q24nw4r2dbFPCciPCce` / `Warning__Q24nw4r2dbFPCciPCce` callees and the range's own `.data` item
- * `lbl_8059283C` (the table the last constructor stores).  The seam is proven on both sides: the range
- * starts where `ef/ef_effect.cpp` ends (its own `__FILE__` string - "ef_effect.cpp" at 0x80592430 - heads
- * the *previous* pool, and discovery records this boundary as ef/ef_effect.cpp's seam
- * `"ef_effectsystem.cpp" starts here`), and it stops at ef/ef_emitter.cpp's first instruction
- * (0x800A6350, whose pool starts with "ef_emitter.cpp" at 0x80592850).  The extab and extabindex runs
- * break at exactly those two addresses.
- *
- * What it is.  The NintendoWare effect library's system object - `nw4r::ef::EffectSystem`, the
- * 0xC068-byte record the symbol map carries as `lbl_806884D0` (0xC068 is the map's own size for it) and
- * that the game's effect manager holds (`fn_800D3C0C` reads the pointer out of its own +0x29074).  The
- * range reconstructs:
- *
- *   fn_800A56B0  `Initialize(maxGroupID)`: build the group table (`mActivityList`, `maxGroupID` records
- *                of 0x1C B) out of the allocator the system was handed, then bind the three borrowed
- *                engine objects and the random block.
- *   fn_800A5900/5908/590C/5940  the small helpers the group table is built with: the seed setter, the
- *                array element constructor and the two allocation shims the compiler's array form calls.
- *   fn_800A5948  retire one effect on the spot: move it to its group's retiring list, state 3.
- *   fn_800A5A90  `CreateEffect(emitter, groupID, flag)`: take an effect off the memory manager's pool,
- *                run it through the effect object's own create slot, then put it on the group's list.
- *   RetireEffect `RetireEffect(target)`: the mapped member - release the effect from its group's list
- *                and tear it down; state 1 only.
- *   fn_800A5D8C/5E6C/5F4C  the three per-group sweeps over `mActivityList[group].mActiveList` (retire
- *                the effect, retire its emitters, retire its particles), each with the 0x200-entry stack
- *                buffer `NW4R_EF_MAX_EFFECT` guards.
- *   fn_800A602C  set the system's reference transform: the reference position, the matrix and the two
- *                range floats the effect code reads at +0xC020/+0xC02C/+0xC05C/+0xC060.
- *   fn_800A60B8/60C0  the two sub-object accessors other units call (the +0x30 and +0x58 blocks; the
- *                second is the matrix ef/effect.cpp casts its result to).
- *   fn_800A60C8  the file's static initializer: the three borrowed engine objects, the 0xA0-byte record,
- *                then the system singleton and its `__register_global_object` link.
- *   fn_800A6134  the 0xA0-byte record's constructor (the game allocates 0xA0 bytes at 0x800D3D0C and
- *                calls it; the map's size for lbl_80688420 is 0xA0).
- *   fn_800A61EC/61FC/620C/6248  out-of-line copies of four other units' constructors, emitted here
- *                because this file instantiates their classes (the three borrowed objects and the
- *                `ef_draworder.cpp` list class - `lbl_8059241C` is that class's table).
- *
- * Load-bearing source shapes:
- *   - the pointer guard is the `NW4R_POINTER_ASSERT` RVL address-range chain the ef units share (six
- *     materialised BOOLs); the file argument is this unit's own "ef_effectsystem.cpp" and the message
- *     comes from the call site.  The `__LINE__` immediates (0x4F, 0x50, 0x67, 0x7B, 0x83, 0x9F, 0xA0,
- *     0xB2, 0xC9, 0xDD) are reproduced with `#line`.
- *   - a file-scoped `#pragma peephole off` reproduces the five table stores (`lis` + `addi r0` + `stw r0`)
- *     and the deleting destructor's `extsh` + `cmpwi` flag test - with the pass on MWCC folds them (the
- *     same two shapes ef/ef_draworder.cpp and ef/ef_particle.cpp needed it for).
- *   - the group table is built with the compiler's array form: the allocator call, the shim and
- *     `__construct_new_array(block, fn_800A590C, NULL, 0x1C, maxGroupID)` sit inside one try/catch whose
- *     handler calls the empty `fn_800A5908` and rethrows.
- *   - the effect object's +0x1C is a *table*, not a sub-object: every entry is called with the effect
- *     itself as the first argument (`RetireEffect`, `fn_800A49B8` and `CreateEffect` all do).
- *   - `ef.h` declares `class EffectSystem` (rule 9 needs `RetireEffect` to be its member).  That
- *     declaration carries the two `virtual_0xN` placeholders ef/eft004.cpp reaches through
- *     `fn_800A4420`, i.e. it models the *memory manager* (`mMemoryManager`, this object's first word) as
- *     if it were the system, so it cannot also be the system's real layout.  The layout this file works
- *     with is therefore stated once here, as `EfSys` (rule 1 debt: the two must become one `ef.h`
- *     definition - booked in this unit's outbox, it would touch ef/eft004.cpp's one indirect call).
- *   - `RetireEffect` returns a value (`li r3, 1` / `li r3, 0` in the target, and the sweep adds it), so
- *     `ef.h`'s `void RetireEffect(Effect*)` is corrected to the mapped owner's real one; the one
- *     consumer, ef/eft004.cpp, ignores the value and its `.text` is unchanged.  The same holds for
- *     `Effect::RetireEmitterAll` (the sweep adds its result too).
- *
- * Status: all 23 symbols reconstructed, none left as a stub.  The unit is 98.678 % (official report
- * metric, .text 3232 B) and 18 of the 23 bodies are byte-identical; every symbol is at or above the
- * bar.  The residual is five functions, and each difference is a compiler shape, not a source one:
- *
- *   fn_800A56B0  97.53 %  588/592 B: the group table is built from two sizes that share the
- *                         `maxGroupID * 0x1C` sub-tree (`+ 0x20` for the allocator call, `+ 0x10` for the
- *                         placement shim), so MWCC folds that product once and hoists it into a
- *                         callee-saved register where retail materialises it twice (one `mulli` per
- *                         call, 4 B).  Every other instruction matches, including the handler.
- *   fn_800A5A90  99.68 %  376/376 B: the three indirect calls load the table and the slot through the
- *                         same register in retail (`lwz r12, 0(r3)` then `lwz r12, 0x10(r12)`) and
- *                         through an intermediate in ours.  Same instructions, register-only;
- *                         a virtual (rather than table-indexed) member call on the memory manager would
- *                         emit retail's pair, but the memory manager's own API is not named anywhere in
- *                         the map, so the table spelling the sibling units use is kept.
- *   fn_800A5D8C/ 95.96-  232/224 B each: retail keeps the scaled group index (`groupID * 0x1C`) in a
- *    5E6C/5F4C   96.05 %  callee-saved register across the `Panic` call and reuses it for all three
- *                         `&mActivityList[groupID]` uses; MWCC keeps `groupID` and re-materialises the
- *                         `mulli` per use (2 extra instructions).  Measured alternatives: a local
- *                         `EfSysActivityList* group = &self->mActivityList[groupID]` (the base is
- *                         materialised once - 212 B, 80.1 %), the `.mActiveList` member spelling
- *                         (unchanged) and an explicit scaled index local (256 B, 85.2 %).
- *
- * Everything else, including the extab of every body and the two ambiguous-source shapes (the array
- * form's `__construct_new_array` block and the EABI rethrow the handler ends with), matches byte for
- * byte.  The two load-bearing source shapes that were measured rather than guessed:
- *   - the array form's handler must end in a call the compiler knows not to return, so the rethrow is
- *     spelled `__throw(0, 0, 0)` with `__attribute__((noreturn))` (the map's own name for the EABI
- *     rethrow at 0x80458A60).  A source-level `throw;` compiles to the same call *plus* the
- *     six-instruction `__end__catch` bookkeeping and one extra extab action word (93.48 % measured).
- *   - fn_800A6134 needs its two sda2 constants in named locals, the second one declared where the
- *     first is already stored (`f32 one = ...; use; f32 zero; zero = ...; use;`): declared together they
- *     are both loaded up front (8 loads instead of 2, 86.11 %), and the store order of the two colour
- *     words is retail's own (`0x9A/0x99/0x98/0x9B`, then `0x9E/0x9D/0x9C`).
- *
- * Status detail per symbol and the probes are in .pi/notes/800a56b0-fn-800a56b0-ba01.md.
+ * ef/ef_effectsystem.cpp - the nw4r::ef::EffectSystem (the 0xC068-byte singleton `lbl_806884D0` the game's effect
+ *   manager holds, read by `fn_800D3C0C` at +0x29074): `Initialize` (the group table of 0x1C-byte `mActivityList`
+ *   records out of the system's allocator), its array helpers, the immediate retire, `CreateEffect`, `RetireEffect`,
+ *   the three per-group sweeps (0x200-entry stack buffers), the reference-transform setter and two sub-object
+ *   accessors, the static initializer `fn_800A60C8`, the 0xA0-byte record's constructor, and out-of-line copies of
+ *   four other units' constructors (the three borrowed engine objects and the `ef/ef_draworder.cpp` list class).
+ * RANGE. .text 0x800A56B0-0x800A6258 (20 functions); extab 0x80009C38-0x80009CBC, extabindex 0x80022E30-0x80022EC0,
+ *   .ctors 0x8056F2D8-0x8056F2DC, .data 0x80592698-0x80592850 (the `__FILE__` string "ef_effectsystem.cpp" first),
+ *   .bss 0x80688420-0x80694538, .sbss 0x80794910-0x80794920, .sdata2 0x80795FF8-0x80796000.
+ * FLAGS. `cflags_main`; `#pragma peephole off` through the static initializer (the five table stores as `lis` +
+ *   `addi r0` + `stw r0`, the deleting destructor's `extsh` + `cmpwi`, the sweeps' unfused `clrlwi` + `slwi`), on
+ *   for `fn_800A6134` (it keeps its two `.sdata2` constants in f1/f0 across the stores).
+ * NAMES. The map has only `fn_` stems for the range except `RetireEffect`, written as an `nw4r::ef::EffectSystem`
+ *   member.
+ * RESIDUALS. 5 partial rows (ours 0xBBC of 0xBA8):
+ *  - `fn_800A56B0` (ours 0x24C of 0x250): the two allocation sizes share the `maxGroupID * 0x1C` product, which
+ *    MWCC computes once into a callee-saved register where retail has one `mulli` per call;
+ *  - `fn_800A5A90`: the three table calls load the table and the slot through an intermediate where retail reuses
+ *    r12 (`lwz r12, 0(r3); lwz r12, 0x10(r12)`);
+ *  - `fn_800A5D8C`, `fn_800A5E6C`, `fn_800A5F4C` (ours 0xE8 of 0xE0 each): retail keeps `groupID * 0x1C` in a
+ *    callee-saved register across the `Panic` and reuses it, ours re-materialises the `mulli` per use; a group
+ *    pointer local and a scaled index local both score lower.
+ *   flipcheck: `.bss`, `.data`, `.sbss` and `.sdata2` claimed, not emitted; `.text` 0xBBC of 0xBA8.
+ *   relocdiff: our `.ctors` word carries the symbol `lbl_8056F2D8`, retail's none; both relocate to `fn_800A60C8`.
+ * SHAPES. `#line` puts each assert on retail's line (0x4F, 0x50, 0x67, 0x7B, 0x83, 0x9F, 0xA0, 0xB2, 0xC9, 0xDD).
+ * SHAPES. The group table uses the compiler's array form: the allocator call, the shim and
+ *   `__construct_new_array(block, fn_800A590C, NULL, 0x1C, maxGroupID)` inside one try/catch whose handler calls
+ *   the empty `fn_800A5908` and rethrows with `__throw(0, 0, 0)` declared `noreturn` (a source `throw;` adds the
+ *   `__end__catch` bookkeeping and an extab action word).
+ * SHAPES. The effect object's +0x1C is a table whose every entry takes the effect as its first argument.
+ * SHAPES. `fn_800A6134` declares its second constant after the first is stored (`f32 one = ...; use; f32 zero;
+ *   zero = ...; use;`; declared together both load up front), and its colour bytes are stored in retail's order
+ *   (0x9A/0x99/0x98/0x9B, then 0x9E/0x9D/0x9C).
+ * SHAPES. The system layout is this file's `EfSys`: `ef.h`'s `class EffectSystem` models the memory manager (its
+ *   first word) for `ef/fn_800FD864_fx.cpp`.  `RetireEffect` and `Effect::RetireEmitterAll` return the sweeps' count.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h" /* nw4r::ef::EffectSystem / nw4r::ef::Effect (rule 9's owner) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "ef/ef_draworder.h" /* lbl_8059241C (rule 2) */
 #include "ef/ef_emform.h" /* lbl_80594EC4 (rule 2) */
 #include "unsplit/ef_tables.h" /* lbl_80594840: no registered owner yet (rule 2) */
@@ -134,9 +53,7 @@ void Warning(const char* file, int line, const char* fmt, ...);
 } // namespace nw4r
 
 /* ===================================================================================================
- * Types.  Every record states its size; the offsets are the ones the bodies load or store.  The `EfSys`
- * prefix keeps this unit's views distinct from the sibling units' (`EfList`, `EfEmitterObj`, ...) - a
- * type more than one unit uses has to become one header definition (the rule 1 debt above).
+ * Types.  The `EfSys` prefix keeps this unit's views apart from the sibling units' (`EfList`, ...).
  * =================================================================================================== */
 
 /* The library's list record: head, tail, live count and the link offset `fn_800A4030` sets. */
@@ -267,10 +184,8 @@ typedef struct EfSysDefaultRecord {
     /* +0x9F */ u8 color_0x9F;
 } EfSysDefaultRecord; /* size: 0xA0 */
 
-/* This file's own pooled data.  `lbl_80592698` is the `__FILE__` string (the evidence for the name), the
- * next eight are the assert messages, and `lbl_8059283C` is the zero-filled item the last constructor
- * stores (the class table at the end of this unit's .data pool).  Declared, never defined: the data pass
- * owns .data (the rule ef/ef_draworder.cpp follows). */
+/* This unit's `.data`: the `__FILE__` string, the assert messages and the class table the last
+ * constructor stores (`lbl_8059283C`), declared, never defined. */
 extern const char lbl_80592698[];
 extern const char lbl_805926AC[];
 extern const char lbl_805926EC[];
@@ -281,9 +196,8 @@ extern const char lbl_805927AC[];
 extern const char lbl_805927E0[];
 extern void* lbl_8059283C[];
 
-/* The tables and objects of the modules this unit borrows: the three engine objects the system holds,
- * the system singleton itself (0xC068 B, the map's size), its link record, the borrowed classes' tables
- * and the two float constants the 0xA0-byte record keeps. */
+/* This unit's `.sbss`/`.bss`/`.sdata2` objects: the three engine objects the system holds, the 0xA0-byte
+ * record, the system singleton and its link record, and the record's two float constants. */
 extern void* lbl_80794910; /* the three borrowed engine objects (their constructors are below) */
 extern void* lbl_80794914;
 extern void* lbl_80794918;
@@ -294,10 +208,8 @@ extern f32 lbl_80795FF8;
 extern f32 lbl_80795FFC;
 
 /* ===================================================================================================
- * Declarations.  Every callee outside this unit is still a `fn_*` in the symbol map and unsplit, so it
- * has no owner file to move to - the rule-2 gap the campaign records for an unsplit address.  They are
- * declared with C linkage: the target's relocations are plain names, not C++ spellings (docs/plan.md 6.5
- * rule 9), and this unit's own symbols come first, in address order.
+ * Declarations, with C linkage (retail's relocations carry plain map names): this unit's own symbols in
+ * address order, then the callees.
  * =================================================================================================== */
 
 extern "C" {
@@ -381,17 +293,12 @@ void PSMTXCopy(const void* src, void* dst);
 
 #define NW4R_EF_MAX_EFFECT 0x200
 
-/* The system's allocator.  The target reaches it through `fn_800A4420` (the map also carries a
- * `GetMemoryManager__Q34nw4r2ef12EffectSystemCFv` name for the class, but at an .init offset, so the
- * call keeps the map's own spelling for 0x800A4420). */
+/* The system's allocator, reached through `fn_800A4420` (the map's `GetMemoryManager__Q34nw4r2ef12EffectSystemCFv`
+ * sits at an .init offset, not here). */
 static inline EfSysMemoryManager* EfGetMemoryManager(EfSys* self) {
     return (EfSysMemoryManager*)fn_800A4420(self);
 }
 
-/* The file-scoped pragma: the five table stores materialise their address as `lis` + `addi r0` and the
- * deleting destructor keeps its `extsh` + `cmpwi` pair - the peephole pass folds both shapes (the same
- * two shapes ef/ef_draworder.cpp and ef/ef_particle.cpp needed it for).  It also keeps the index
- * expression in the three sweeps unfused (`clrlwi` + `slwi`, not `clrlslwi`). */
 #pragma peephole off
 
 /* ===================================================================================================
@@ -453,7 +360,7 @@ extern "C" void* fn_800A5940(u32 size, void* block) {
     return block;
 }
 
-/* 0x800A5948 - retire one effect on the spot: move it to its group's retiring list and mark it done. */
+/* 0x800A5948 - retires one effect on the spot: move it to its group's retiring list and mark it done. */
 extern "C" u32 fn_800A5948(EfSys* self, EfSysEffect* target) {
 #line 103
     NW4R_POINTER_ASSERT(target, lbl_80592714);
@@ -517,7 +424,7 @@ u32 nw4r::ef::EffectSystem::RetireEffect(Effect* target_) {
     return 1;
 }
 
-/* 0x800A5D8C - retire every effect on one group's active list. */
+/* 0x800A5D8C - retires every effect on one group's active list. */
 extern "C" u32 fn_800A5D8C(EfSys* self, u32 groupID) {
     u32 count = 0;
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
@@ -535,7 +442,7 @@ extern "C" u32 fn_800A5D8C(EfSys* self, u32 groupID) {
     return count;
 }
 
-/* 0x800A5E6C - retire the emitters of every effect on one group's active list. */
+/* 0x800A5E6C - retires the emitters of every effect on one group's active list. */
 extern "C" u32 fn_800A5E6C(EfSys* self, u32 groupID) {
     u32 count = 0;
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
@@ -551,7 +458,7 @@ extern "C" u32 fn_800A5E6C(EfSys* self, u32 groupID) {
     return count;
 }
 
-/* 0x800A5F4C - retire the particles of every effect on one group's active list. */
+/* 0x800A5F4C - retires the particles of every effect on one group's active list. */
 extern "C" u32 fn_800A5F4C(EfSys* self, u32 groupID) {
     u32 count = 0;
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
@@ -567,7 +474,7 @@ extern "C" u32 fn_800A5F4C(EfSys* self, u32 groupID) {
     return count;
 }
 
-/* 0x800A602C - set the system's reference transform and its two range floats. */
+/* 0x800A602C - sets the system's reference transform and its two range floats. */
 extern "C" void fn_800A602C(EfSys* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* src,
                             f32 a, f32 b) {
     copyVec3(&self->mRefPos, pos);
@@ -582,7 +489,7 @@ extern "C" void* fn_800A60B8(EfSysAccessObj* self) {
     return &self->block_0x30;
 }
 
-/* 0x800A60C0 - the +0x58 matrix accessor the effect code (ef/effect.cpp, ef/eft004.cpp) calls. */
+/* 0x800A60C0 - the +0x58 matrix accessor (callers include ef/effect.cpp, ef/fn_800FD864_fx.cpp, ef/ef_emitter.cpp). */
 extern "C" nw4r::math::MTX34* fn_800A60C0(EfSysAccessObj* self) {
     return &self->mtx_0x58;
 }
@@ -601,9 +508,7 @@ extern "C" void fn_800A60C8(void) {
 /* The `.ctors` word (0x8056F2D8) the split assigns to this unit - it points at the initializer. */
 __declspec(section ".ctors") void* const lbl_8056F2D8 = (void*)fn_800A60C8;
 
-/* The .data pool's own functions want the pass on: fn_800A6134 keeps its two sda2 constants in f1/f0
- * across the stores and schedules the byte stores 0x9A/0x99/0x98/0x9B (measured: with the pass off it
- * reloads both constants for every store, 8 loads against the target's 2). */
+/* The pass is on from here: fn_800A6134 keeps its two constants in f1/f0 across the stores. */
 #pragma peephole on
 
 /* 0x800A6134 - the constructor of the 0xA0-byte record the game allocates at 0x800D3D0C. */

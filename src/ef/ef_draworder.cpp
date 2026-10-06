@@ -1,77 +1,31 @@
 /*
- * ef/ef_draworder.cpp - the nw4r::ef draw-order list helpers.
- *
- * .text 0x800A388C..0x800A40F4, nine functions.  Final home and name, evidence class 1 (a `__FILE__`
- * string): every `Panic` in the range passes `lbl_805923A0`, which reads "ef_draworder.cpp" at
- * 0x805923A0 (read from the DOL's .data).  A bare source-file name is the original TU, so the module
- * is `ef` and the extension is the name's suffix.  `langcheck.py`'s evidence is conclusive for C++:
- * the `.cpp` name and the `Panic__Q24nw4r2dbFPCciPCce` callees (3 of them).  The seam is proven on
- * both sides: the run starts where ef/ef_creationqueue.cpp ends and stops at the next original TU
- * (0x800A40F4, whose own `__FILE__` string is "ef_effect.cpp" at 0x80592430), and the extabindex table
- * breaks at exactly those two addresses (0x80022CEC / 0x80022D4C).  Sections: extab
- * 0x80009B60..0x80009BA0 (8 unwind records, one per non-leaf body), extabindex
- * 0x80022CEC..0x80022D4C, .text 0x800A388C..0x800A40F4.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` over all nine addresses and with
- * config/RMHE08/symbols.txt - every one is a bare `.text` fn_ name; only the two vtables carry labels).
- *
- * What it is.  The draw-order side of the effect library.  Three of the nine functions are the whole
- * vtable of a class - `lbl_8059241C` is [0, 0, fn_800A3B20, fn_800A3D7C, fn_800A39A4], a 2-word
- * head plus three virtuals: ordered insert, removal and a walk - and they are emitted here because
- * their first non-inline virtual lives here (a vtable lands in its key function's TU).  The rest is
- * the small object layer beside them:
- *
- *   fn_800A388C  `ef->mDrawList` - the draw-order list head the effect keeps at +0x94 - with the
- *                `NW4R_POINTER_ASSERT(ef, ...)` guard every ef entry point carries.
- *   fn_800A39A4  walk the list head->tail, calling `fn_800AE628` (the particle manager's world-matrix
- *                rebuild), the node's own vtable slot +0x1C and `fn_800AE6A4` per element.
- *   fn_800A3B20  ordered insert: walk tail->head while the node's draw order (+0x89) is greater than
- *                the new one and link the new node in behind the first that is not.
- *   fn_800A3D7C  unlink one node from the list.
- *   fn_800A3F98  the object constructor: the root base's vtable setter (fn_800A4080), the object's
- *                own vtable, the pooled-list head at +0x24, the matrix at +0x58, the vector at +0x88
- *                and the draw list at +0x94 (link offset 0x30).
- *   fn_800A3FFC/ fn_800A4030  the `{two ut::Lists + counter}` sub-object constructor (the effect
- *                classes each embed one; its link offset is the 0x14 argument).
- *   fn_800A4090  the deleting destructor: reset the vtable, `Effect::RetireEmitterAll()` and, for a
- *                positive flag, `operator delete`.
- *
- * Load-bearing source shapes:
- *   - the pointer guards are the `NW4R_POINTER_ASSERT` RVL address-range chain the ef units share
- *     (seven ranges, six materialised BOOLs, the first `if` carrying two tests); the file argument is
- *     this unit's own "ef_draworder.cpp" and the message comes from the call site.
- *   - `lbl_8059241C`'s slots are virtuals of a class whose definition is here and whose constructor is
- *     in `ef/ef_effectsystem.cpp` (fn_800A620C stores `lbl_8059241C` into +0x00), so each of the three
- *     takes the class's `this` in r3 - which the bodies never touch - and its real arguments in r4/r5.
- *     The reconstruction spells that first parameter out rather than defining C++ virtuals (a real
- *     vtable would re-emit `.data`, which this unit does not claim).
- *   - `lbl_805925A8` is the root base's vtable and `lbl_80592588` this class's; both are referenced,
- *     never defined (the data pass owns `.data`).
- *   - a file-scoped `#pragma peephole off` reproduces the three vtable stores (`lis` + `addi r0` +
- *     `stw r0`) and the deleting destructor's `extsh` + `cmpwi` flag test - with the pass on, MWCC
- *     folds the `addi` destination into the base register and drops the `extsh` (the same two shapes
- *     ef/ef_particle.cpp needed it for).
- *
- * Status: .text 0x868/0x868, extab 0x40/0x40, extabindex 0x60/0x60.  Eight of the nine bodies are
- * byte-identical; the ninth is
- *   fn_800A39A4  99.84 %: the virtual dispatch loads the node's table through the node's home
- *                register (`lwz r5, 28(r29); lwz r12, 28(r5)`) where retail reuses r3 for both
- *                (`lwz r12, 28(r3); lwz r12, 28(r12)`).  Every instruction and the section size match;
- *                a virtual member call on the node is what produces retail's shape, and a real
- *                virtual cannot be declared without re-emitting the class's `.data` vtable.
- * The per-symbol numbers and the pragma/flag probes are in
- * `.pi/notes/800a388c-fn-800a388c-e2cb.md`.
+ * ef/ef_draworder.cpp - the nw4r::ef draw-order list: the effect's list head accessor, the list class's three
+ *   virtual slots (ordered insert by the node's draw order at +0x89, removal, a walk), the object constructor,
+ *   the `{two ut::Lists + counter}` sub-object constructors and the deleting destructor.
+ * RANGE. .text 0x800A388C-0x800A40F4 (9 functions); extab 0x80009B60-0x80009BA0, extabindex 0x80022CEC-0x80022D4C,
+ *   .data 0x805923A0-0x80592430 (the `__FILE__` string "ef_draworder.cpp" first, then the list class's table
+ *   `lbl_8059241C` = [0, 0, fn_800A3B20, fn_800A3D7C, fn_800A39A4]).
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps `lis` + `addi r0` + `stw r0` for the three
+ *   table stores and `extsh` + `cmpwi` for the deleting destructor's flag test).
+ * NAMES. The map has only `fn_` stems for the range; the types and fields are GUESSes from the bodies.
+ * RESIDUALS. 1 partial row:
+ *  - `fn_800A39A4`: the virtual dispatch loads the node's table through the node's home register (`lwz r5,
+ *    28(r29); lwz r12, 28(r5)`) where retail reuses r3 (`lwz r12, 28(r3); lwz r12, 28(r12)`); retail's shape is a
+ *    virtual member call on the node.
+ *   flipcheck: `.data` claimed, not emitted.
+ * SHAPES. The list class's slots take the class's `this` in r3 (unused) and the real arguments in r4/r5; the
+ *   class's constructor is in `ef/ef_effectsystem.cpp` (`fn_800A620C` stores `lbl_8059241C`).
+ * SHAPES. The pointer guards are the `NW4R_POINTER_ASSERT` RVL address-range chain the ef units share (seven
+ *   ranges, the first `if` carrying two tests), with this unit's own file string.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h" /* the canonical nw4r::ef::Effect declaration (RetireEmitterAll, rule 1) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
-/* `nw4r::db::Panic`: declaring the owner's real spelling makes the C++ front-end reproduce the map's
- * mangling (`Panic__Q24nw4r2dbFPCciPCce`) exactly; spelling the mangling itself would re-mangle it
- * (docs/plan.md 6.5 rule 9). */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r {
 namespace db {
 void Panic(const char* file, int line, const char* fmt, ...);
@@ -83,12 +37,12 @@ void operator delete(void* ptr) throw();
 
 extern "C" {
 
-/* The pooled data this range references but does not own (`.data` 0x805923A0..0x805925C8).  Declared,
- * never defined; the data pass owns the section. */
+/* The strings of this unit's `.data` (claimed, not emitted) and the two class tables of
+ * `ef/ef_effect.cpp`'s `.data`. */
 extern const char lbl_805923A0[]; /* "ef_draworder.cpp"                                      */
 extern const char lbl_805923B4[]; /* "NW4R:Pointer Error\nef(=%p) is not valid pointer."     */
 extern const char lbl_805923E8[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."     */
-extern void* lbl_80592588[];      /* this class's vtable: 0, 0, then six method words        */
+extern void* lbl_80592588[];      /* ef_effect's Effect table: 0, 0, then six method words   */
 extern void* lbl_805925A8[];      /* the root base's vtable: 0, 0, then two method words     */
 
 } /* extern "C" */
@@ -159,12 +113,9 @@ typedef struct EfDrawOrderObject {
 
 extern "C" {
 
-/* Callees outside this unit.  The first three belong to other registered units (rule 2 would want
- * their owner's headers; ef_emitter.cpp and fn_800AEE48.cpp declare them the same way) and the
- * MEMInitList family is unsplit, so the prototypes stay here. */
+/* Callees outside this unit: two particle-manager functions and the `ut::List` family. */
 void fn_800AE628(void* pm);                                    /* particle manager: world matrix */
 void fn_800AE6A4(void* pm);                                    /* particle manager: tail (a `blr`) */
-                                   /* matrix helper (fn_8004CAD8.cpp) */
 void fn_80501AD4(void* list, void* before, void* elem);        /* ut::List insert-before/append */
 void* fn_80501C60(void* list, void* node);                     /* ut::List GetNext (head when 0) */
 void* fn_80501C80(void* list, void* node);                     /* ut::List GetPrev (tail when 0) */
@@ -182,9 +133,6 @@ void fn_800A4080(EfDrawOrderObject* self);
  * the functions, in address order
  * ------------------------------------------------------------------------------------------------- */
 
-/* The file-scoped pragma: the three vtable stores materialise the address as `lis` + `addi r0` and
- * the deleting destructor's flag test keeps its `extsh` + `cmpwi` pair (the same two shapes
- * ef/ef_particle.cpp needed it for).  With the peephole pass on, MWCC folds them. */
 #pragma peephole off
 
 extern "C" {
@@ -195,9 +143,8 @@ void* fn_800A388C(EfDrawOrderObject* ef) {
     return &ef->mDrawList;
 }
 
-/* 0x800A39A4 - the vtable's walk slot: head->tail, rebuilding each node's world matrix before its
- * own slot +0x1C runs.  `self` is the vtable owner the compiler passes in r3; the body works from the
- * `ef` argument the slot takes in r4. */
+/* 0x800A39A4 - the walk slot: head to tail, rebuilding each node's world matrix before the node's
+ * own slot +0x1C runs. */
 void fn_800A39A4(EfDrawOrderObject* self, EfDrawOrderObject* ef, void* arg) {
     NW4R_POINTER_ASSERT(ef, 35, lbl_805923B4);
 
@@ -211,9 +158,8 @@ void fn_800A39A4(EfDrawOrderObject* self, EfDrawOrderObject* ef, void* arg) {
     }
 }
 
-/* 0x800A3B20 - the vtable's insert slot: keep the list ordered by the node's draw order (+0x89).
- * Walk tail->head while the element's order is greater than the new node's, then link in behind the
- * first one that is not (the head when the walk runs off the end). */
+/* 0x800A3B20 - the insert slot: links the node in behind the last element whose draw order (+0x89)
+ * is not greater than its own (the head when there is none). */
 void fn_800A3B20(EfDrawOrderObject* self, EfDrawOrderObject* ef, EfDrawOrderNode* node) {
     NW4R_POINTER_ASSERT(ef, 49, lbl_805923B4);
     NW4R_POINTER_ASSERT(node, 50, lbl_805923E8);
@@ -255,7 +201,7 @@ EfDrawOrderGroup* fn_800A3FFC(EfDrawOrderGroup* group, u32 offset) {
     return group;
 }
 
-/* 0x800A4030 - initialise both of the group's lists and clear its counter. */
+/* 0x800A4030 - initialises both of the group's lists and clear its counter. */
 void fn_800A4030(EfDrawOrderGroup* group, u32 offset) {
     MEMInitList(&group->mListA, (u16)offset);
     MEMInitList(&group->mListB, (u16)offset);

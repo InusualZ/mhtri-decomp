@@ -1,7 +1,5 @@
-/*
- * Declarations for the symbols `src/ef/ef_draworder.cpp` owns (docs/plan.md 6.5 rule 2).  The class table is read by the effect system's
- * constructor of the list class (`ef/ef_effectsystem.cpp`'s out-of-line copy of that constructor).
- */
+/* ef/ef_draworder.h - the symbols `ef/ef_draworder.cpp` owns: the list class's table, which the class's constructor in
+ * `ef/ef_effectsystem.cpp` stores. */
 #ifndef MHTRI_EF_EF_DRAWORDER_H
 #define MHTRI_EF_EF_DRAWORDER_H
 

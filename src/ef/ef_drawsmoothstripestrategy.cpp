@@ -1,62 +1,34 @@
-/* ef/ef_drawsmoothstripestrategy.cpp - nw4r::ef DrawSmoothStripeStrategy + DrawStrategyImpl, 0x800BFFD4..0x800C9540.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * 118 functions / 0x956C bytes of the NintendoWare-for-Revolution effect library (`nw4r::ef`).  The
- * split object's own traces name the original source files - the `__FILE__` strings in the unit's
- * `.data` are `ef_drawsmoothstripestrategy.cpp` (0x805944E0, 0x805947C8, 0x80594820),
- * `ef_drawstrategyimpl.cpp` (0x80594850) and `particle.h` (0x80594A70..0x80594B9C) - so the range is
- * two original translation units kept whole by the attribution pass (`over --max-bytes with no legal
- * cut`, docs/plan.md 12 item 5).  The `.cpp` names make the original language **C++** (docs/plan.md,
- * "The language comes from the symbol"); the `Panic__Q24nw4r2dbFPCciPCce` callee says the same.
- *
- * This file is registered as `.c` (the attribution pass chose the extension without that evidence), so
- * it is written C-compatible and every definition sits inside an `extern "C"` guard: compiled as C the
- * guards vanish, compiled as C++ (the promotion the outbox requests) the names stay unmangled and
- * objdiff still pairs them by the map's `fn_XXXXXXXX` (playbook 42).
- *
- * Layout in address order:
- *   0x800BFFD4..0x800C6158  ef_drawsmoothstripestrategy.cpp - DrawSmoothStripeStrategy (Draw,
- *                           GetGetFirstDrawParticleFunc/Next/CalcAhead, the stripe/tube builders) plus
- *                           the out-of-line copies of the `Particle`/`ParticleManager` inline helpers.
- *   0x800C6158..0x800C9540  ef_drawstrategyimpl.cpp - DrawStrategyImpl (InitTexture, the per-draw-order
- *                           particle walkers, the stripe/tube/point/line emitters) and the out-of-line
- *                           copies of the GX FIFO writers it uses.  The two files are why one object
- *                           references two `__FILE__` names: the range is two original translation units
- *                           kept whole by the attribution pass (the seam needs a re-check before the
- *                           extension is trusted - `langcheck.py` says the same).
- *
- * Codegen lever: this unit needs the **peephole pass off** (playbook 39).  Retail keeps the
- * unfused `clrlwi`/`extsh`/`extsb` in front of every narrowing FIFO store, which `-O3`'s peephole folds
- * away; `#pragma peephole off` is what the `auto` library's other GX-writer unit (8009AA78) needed too,
- * and with it the whole out-of-line writer family matches.
- *
- * Status (measured with `tools/units/recompile.py`, one pass): 57 of the 118 symbols are byte-identical
- * (the 34 out-of-line GX FIFO writers at 0x800C6F90..0x800C7270, the six `EfDrawInfo` accessors, the
- * small predicates, the `EfVec3x2`/`EfVec3x3` builders and copies, the two walker selectors and
- * `AheadContext`'s initialiser); `fn_800C8954`/`fn_800C89D0` sit at 86.8 %/86.3 % and the rest are still
- * the original bytes.  Residual of the two near-misses: retail materialises the layer-range guard into a
- * register (`li r0,0` / `cmplwi` / `bgt` / `li r0,1` / `cmpwi r0,0` / `bne`) where our `if (!(layer <= 2))`
- * branches on the compare directly; the panic call itself, the `lbl_*` arguments and the bit extraction
- * are identical.  Both are above the 80 % bar.
- *
- * Language: the object is C++ (two `.cpp` `__FILE__` strings, `Panic__Q24nw4r2dbFPCciPCce`,
- * `operator_delete`), but the attribution pass registered it as `.c`, so this file is written
- * C-compatible with `extern "C"` guards and the promotion (extension, `-lang`, module name) is in the
- * outbox.  Until that lands the compile is C and the object cannot emit the target's `extab`/`extabindex`
- * group, which is why the unit can never be `Matching` in this shape.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/ef_drawsmoothstripestrategy.cpp`; the
- * binary dossier (source names, panic line map, pool literals): `python tools/units/dossier.py
- * ef/ef_drawsmoothstripestrategy.cpp`.
+/*
+ * ef/ef_drawsmoothstripestrategy.cpp - nw4r::ef DrawSmoothStripeStrategy: `Draw`, the walker selectors
+ *   (`GetGetFirstDrawParticleFunc`/`Next`/`CalcAhead`), the stripe and tube builders, and the out-of-line copies of
+ *   the `Particle`/`ParticleManager` inline helpers and of the small vector records' builders and copies.
+ * RANGE. .text 0x800BFFD4-0x800C5DB8 (49 functions); extab 0x8000A394-0x8000A49C, extabindex 0x80023904-0x80023A90,
+ *   .data 0x805944E0-0x80594840 (the `__FILE__` string "ef_drawsmoothstripestrategy.cpp" first), .bss
+ *   0x806945B8-0x806945E8, .sbss 0x80794928-0x80794930, .sdata2 0x807961C0-0x807961E0.
+ *   Unproven seam (playbook 80: a TU's tables sit late in its `.data`): this unit's table `lbl_80594778` is installed
+ *   by `fn_800BFF98` at the tail of `ef/ef_drawpointstrategy.cpp`'s range, so the left `.text` seam may be off by
+ *   that constructor.
+ * FLAGS. `cflags_main`; `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of every
+ *   narrowing FIFO store, playbook 39).
+ * NAMES. The map has only `fn_` stems for the range; every definition is `extern "C"` to keep them (playbook 42).
+ * RESIDUALS. 36 rows unwritten (declared, never defined): 0x800BFFD4-0x800C0770, 0x800C0784-0x800C0E14,
+ *   0x800C0E5C-0x800C14F0, 0x800C155C-0x800C16F8, 0x800C1738-0x800C1B7C, 0x800C1BB4-0x800C26A4,
+ *   0x800C2738-0x800C3834, 0x800C38A4-0x800C5DB8.
+ *   2 rows written and at 0: `fn_800C1508`, `fn_800C26FC` (the three- and two-vector record copies move floats,
+ *   `lfs`/`stfs`, where retail copies words, `lwz`/`stw`, then the scalar).
+ *   This file also defines 46 functions of `ef/ef_drawstrategyimpl.cpp`'s range (the GX FIFO writers, the
+ *   `EfDrawInfo` accessors, the texture-layer accessors, the ahead-context initialiser and walker selectors), which
+ *   that unit defines too; with them our `.text` runs in a different order from retail's.
+ *   flipcheck: `.bss`, `.data`, `.sbss` and `.sdata2` claimed, not emitted; `.text` 0x6C0 of 0x5DE4; extab 0x38 of
+ *   0x108; extabindex 0x54 of 0x18C.
  */
 
 #include "ef.h"
 #include "gx.h"
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
-/* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
- * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it). Declaring the mangled
- * spelling instead would re-mangle it and break the link (playbook 50); rule 9. */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 #ifdef __cplusplus
 namespace nw4r {
 namespace db {
@@ -71,9 +43,9 @@ extern "C" {
 
 #pragma peephole off
 
-/* This unit's pooled `__FILE__`/assert strings and constants (the `.data` range 0x805944E0..0x80594BA7 and
- * the `.sdata2` range 0x807961C0..0x80796208).  They are declared, never defined here: the data pass
- * claims the ranges once the source emits them (docs/plan.md 8.4), so a definition would move the pool. */
+/* The `__FILE__`/assert strings and constants of this unit's `.data` (0x805944E0-0x80594840) and of
+ * `ef/ef_drawstrategyimpl.cpp`'s (0x80594850-0x80594BA7; no `.data` range covers the gap, `lbl_80594840`) and
+ * of both `.sdata2` runs (0x807961C0-0x80796208), declared, never defined. */
 extern char lbl_805944E0[]; /* "ef_drawsmoothstripestrategy.cpp"                          .data 0x805944E0 */
 extern char lbl_80594500[]; /* "NW4R:Pointer Error\ndst(=%p) is not valid pointer."        .data 0x80594500 */
 extern char lbl_80594534[]; /* "NW4R:Pointer Error\ncontext(=%p) is not valid pointer."    .data 0x80594534 */

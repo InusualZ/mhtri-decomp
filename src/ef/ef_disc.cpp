@@ -1,35 +1,35 @@
 /*
- * ef/ef_disc.cpp - the retail `ef_disc.cpp` unit, 0x800CC5B0..0x800CCCF8.
- *
- * One function: the `Disc` effect shape's emitter entry (the shape's single virtual method, dispatched
- * through the `ef_disc.cpp` vtable `lbl_80594DD0`).  It guards its `em`/`pm`/`params` pointers, derives
- * the two emission radii, the sweep angle range and the per-step angle from the parameter block and the
- * effect's progress, then runs the emission loop: for each of `count` steps it rebuilds the particle
- * position and direction from a sin/cos pair (`fn_8009C760`), orients the particle (`fn_8009C6F0` when
- * the emitter has a spread), converts the frame with `fn_800A99B4`, hands the result to the particle
- * manager's spawn slot and advances the emission angle when the effect is a swept one.
- *
- * The shape is the flat-disc sibling of `ef_cylinder.cpp` (0x800CB948..0x800CC5B0): both derive the same
- * scales and sweep range from `em`/`pm`/`params`, but the cylinder factors the emission body into a
- * separate function while the disc inlines it, and the disc keeps the particle in the XZ plane.
- *
- * `em`/`pm`/`params` are the source's own parameter names - recovered from the `NW4R:Pointer Error`
- * format strings, which the three asserts on lines 42-44 pass to `nw4r::db::Panic`.  The unit's own
- * `.sdata2` pool (0x807962B0..0x807962E8) is **compiler-generated**: the source writes the constants as
- * literals, so MWCC pools them (and can hoist them out of the loop) instead of treating them as the
- * reloadable `extern` variables a named-constant source would produce - that shape alone was worth
- * 89.2 % -> 96.9 %.  The pool range is not claimed in `splits.txt` yet, so a `range` request rides the
- * outbox; the `extab`/`extabindex` fragments travel with the code unit.
- *
- * The shape objects were built with the peephole pass and floating-point contraction off (there is no
- * `rlwinm.` or `fmadds` in any target object of the 0x800BFFD4..0x800CCFB0 region); the two pragmas
- * below scope that to this unit instead of changing the whole catch-all `auto` lib.
- *
- * Residual: the function is the target's size (1864 B) and scores 99.1 %.  The six open rows are the
- * prologue's `arg7` save slot (`mr r28,r10` one step early), the spawn call's `fmr f1`/`lwz r11`
- * placements, and the three `Panic` line numbers; every one was probed against several source shapes
- * and left as the allocator/scheduler residual it is.  Measurements: `.pi/notes/800cc5b0-fn-800cc5b0-39c9.md`.
+ * ef/ef_disc.cpp - the disc emitter form's emission entry (its class's single virtual, through the table
+ *   `lbl_80594DD0`): guards `em`/`pm`/`params`, derives the two radii and the sweep range, then emits `count`
+ *   particles in the XZ plane, advancing the angle when the effect is swept.  The flat sibling of
+ *   `ef/ef_cylinder.cpp`, with the emission body inlined.
+ * RANGE. .text 0x800CC5B0-0x800CCCF8 (1 function); extab 0x8000A57C-0x8000A584, extabindex 0x80023BE0-0x80023BEC,
+ *   .data 0x80594DE0-0x80594E8C (the `__FILE__` string first), .sdata2 0x807962B0-0x807962E8 (the literal floats
+ *   MWCC pools).
+ * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around the function (no `rlwinm.` or
+ *   `fmadds` in any target object of the 0x800BFFD4-0x800CCFB0 shapes).
+ * NAMES. `em`/`pm`/`params` are the source's names, from the `NW4R:Pointer Error` strings of the three asserts.
+ * RESIDUALS. 1 partial row, `fn_800CC5B0__FlP6EfWorkP10EfParticlelUlP8EfParamsUslf`:
+ *  - the prologue saves `arg7` (`mr r30,r10`) one step early, and the saved arguments take r23-r30 where
+ *    retail takes r22-r28 and r31;
+ *  - the `v16`/`v28` copies move floats (`lfs`/`stfs`) where retail moves words (`lwz`/`stw`); `ef/ef_torus.cpp`
+ *    gets retail's form by initialising its copies;
+ *  - the spawn call's `fmr f1` is late and the slot +0x14 dispatch loads through the saved `pm` (`lwz r11,
+ *    0x1C(r25)`) where retail goes through r3;
+ *  - the `.sdata2` constants are our pool's `@N` where retail reads the claimed `lbl_807962B0` run.
+ *   flipcheck: `.data` claimed, not emitted.
+ * SHAPES. The `.sdata2` constants are literals, so MWCC pools and hoists them out of the loop.
+ * SHAPES. This header's line count is load-bearing: with no `#line`, the three `EF_ASSERT_PTR` sites must stay
+ *   on lines 42-44 (`__LINE__`).
  */
+
+
+
+
+
+
+
+
 
 #include "ef.h"
 #include "fn_8004CAD8.h"      /* sqrt_f32 - that unit owns the address and publishes it (rule 2) */
@@ -84,10 +84,8 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         t = fn_800A8A08(&em->progress);
         rate = params->rate / 100.0f;
         if (flags & 0x01000000) {
-            /* One argument, not two: the callee (0x80050BC0) reads only f1 and returns `x * FrSqrt(x)`.
-             * Retail's `f2` at 0x800CCA7C is the hoisted `1.0f - t`, which the else branch below reuses
-             * (0x800CCA98) - so the shared subexpression stays in the expression and MWCC still
-             * materialises it before the call. */
+            /* One argument: the callee reads only f1; retail's `f2` is the hoisted `1.0f - t` the else
+             * branch reuses, so the shared subexpression stays in the expression. */
             scale = sqrt_f32(t + (1.0f - t) * (rate * rate));
         } else {
             scale = t + rate * (1.0f - t);
