@@ -1,75 +1,35 @@
-/* ef/eft002.cpp - the tail of effect 001 and effect 002 (`eft001_set_pos`, `eft002_set`, `eft002_set_shell`)
- *
- * `.text` 0x800FBE64..0x800FD520, 24 functions written (the rest of the range is not decompiled yet).
- * Phase 4: fold of 2 registered units, built from `ef/eft001.cpp`, `ef/eft002.cpp`.
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- *
- * Kept views: the retired sources declared 6 callee(s) with different signatures (`eft_res_slot_get`, `eft_res_models_spawn`, `eft_state_flags_set`, `fn_800FCED4`, `fn_800FD29C`, `fn_800FD2AC`); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
- * Hidden declarations: 3 header declaration(s) that disagree with the kept view are renamed away around their `#include` (`#define <name> <name>_hidden_<header>`): `fn_800FCED4`, `fn_800FD29C`, `fn_800FD2AC`.
- */
-
-/* Retired header of `ef/eft002.cpp` (kept for its notes and residuals): */
-/* auto/800FCED4_fn_800FCED4.cpp - the `eft002` effect cluster, 0x800FCED4..0x800FD520 (8 functions).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * Two effect families share the range. `eft002_set` / `eft002_set_shell` (0x800FD2FC, 0x800FD3D8) build
- * the 72-byte effect object `eft_res_slot_release` destroys and install the two handlers that travel with it
- * (`fn_800FD4E4` = the `byte_5` dispatcher, `fn_800FD4A8` = the pool release). `fn_800FCED4` /
- * `fn_800FD29C` / `fn_800FD2AC` / `fn_800FD2B0` are the other family: the per-frame body, its `byte_5`
- * bump, the destructor thunk (`fn_800FD2AC` -> `eft_res_slot_release`, called from four sites in the unit before
- * this one) and the "is this effect still legal for the player" gate.
- *
- * The seam is the `.sdata2` pool jump `lbl_80796684 -> lbl_80796688`; the reasoning is in configure.py
- * beside the `auto` lib entry. Every `fn_XXXXXXXX` callee and the SDK entry points are `extern "C"` so
- * the compiler emits the map's spelling; the mangled map names (`eft002_set__FP4_PLWUcUcf`,
- * `getKeyData__FPff`, `setMatColor__6MHcharFUl12_GXChannelID8_GXColorb`, ...) come from C++ declarations
- * with the signatures the map encodes.
- *
- * Result: all 8 symbols 100 %, unit 100 % fuzzy, `.text` (0x64C), `extab` (0x20) and `extabindex` (0x30)
- * byte-identical to the target. The one flag-shaped lever is the peephole pass - see the scoped
- * `#pragma peephole off`/`reset` pair below the `extern` block. The only remaining object-level difference
- * is two relocation *names*: our object
- * emits the `fn_800FD2B0` jump table and MWCC's int->float magic as local pool entries where the target
- * (whose splits.txt does not claim them) references `jumptable_8059B930` and `lbl_80796650`.
- *
- * Load-bearing source shapes (each one measured, the wrong form costs real points):
- *   * the two returned values that are consumed by pointer (`fn_8006F304(&srt, access.GetResTexSrt(false))`,
- *     `fn_800532DC(&mtx_a, get_current_view_mtx())`) are passed through a **reference** parameter, so MWCC
- *     materialises the return as a compiler temporary below the named locals. With a named `u32 res` local
- *     the two swap slots (res 0x18 / srt 0x14 against retail's srt 0x1c / res 0x14); with a named
- *     `MTX34 view_mtx = get_current_view_mtx()` MWCC emits a 48-byte copy and the frame grows
- *     0x140 -> 0x170 (86.11 % -> 99.48 %).
- *   * `fn_800FD2B0`'s switch must cover case 0, so MWCC's table is 0-based (`cmplwi r0,29`, no subtract) and
- *     the `flag != 1` return lands *after* the switch; `_PLW::flag_0x30` is `s8` (retail `cmpwi`, not
- *     `cmplwi`).
- *   * `fn_800FCED4`'s state machine is a `switch (state_0x06)` whose inner type switch uses `break` plus a
- *     trailing `return` - with `return` in each case MWCC adds a dead `b`. `state_0x06++` (not `= 1`) so
- *     the increment reuses the switch operand. `frame_0x10` is `s32`: retail's float conversion is
- *     `xoris` + `2^52+2^31`, which MWCC only picks for a signed source.
- *
- * Data: the unit's `.data` run (0x8059B6F8..0x8059B9A8: the RGB key tables, the two `getKeyData` float
- * tables, the `_GXColor` alpha tables, `jumptable_8059B930`) and its `.sdata`/`.sdata2` pool
- * (`lbl_807916D0`/`D8`, `lbl_80796650`) are `extern` here and referenced by name (playbook 23/29) - the
- * target object carries no such sections, and a range our object does not emit must not be claimed. Two of
- * them the object *does* emit and they are the `config_requests`: the `fn_800FD2B0` jump table
- * (`.data 0x78`) and the int->float magic (`.sdata2 0x8`). Making the unit linkable needs the rest of the
- * run defined in the source and claimed in one measured data pass; the bytes are in
- * `.pi/notes/800fced4-fn-800fced4-063a.md`.
- *
- * The pool block at +0x38 is typed per effect family: the setters seed a `f32` scale and a `u32` id
- * (`_EFT_WORK`), `fn_800FCED4` reads an `MHchar*` model and an `f32` paramscale out of the same words
- * (`_EFT_MODEL_WORK`) - a float and a pointer in one slot cannot be the same object, so the two 72-byte
- * effect objects are two types here rather than one with a punning field.
- *
- * `_PLW`, `_SHELL_W`, `MHchar`, `_GXChannelID`/`_GXColor` and the `nw4r` types are reconstructed minimally
- * (only the offsets/sizes this unit needs) and are shared with other units - they belong in one header,
- * which does not exist yet.
- *
- * Evidence for this batch: `python tools/units/attribute.py plan 0x800f0000 0x801e0000
- * --max-total-bytes 0x80000` (this unit's plan line), `.pi/attribution-batch-4.patch.md` (the exact
- * splits/configure edits) and `.pi/notes/attribution-batch-4.md` (the chosen/dropped table).
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/800FCED4_fn_800FCED4.cpp`.
- * The name is provisional - `auto/` plus the first symbol's address.
+/* ef/eft002.cpp - the tail of the eft001 effect family (`eft001_set_pos` and its pooled-effect builders) and the
+ *   eft002 family (`eft002_set`, `eft002_set_shell`, the model effect's per-frame body and its player gate).
+ * RANGE. .text 0x800FBE64-0x800FD520 (24 functions); extab 0x8000BD8C-0x8000BDFC, extabindex 0x80025B3C-0x80025BE4,
+ *   .data 0x8059B638-0x8059B9A8, .sdata 0x807916C8-0x807916E0, .sdata2 0x80796640-0x80796658.
+ * FLAGS. `cflags_main`; `#pragma peephole off` from `fn_800FCED4` to the end of the file.
+ * NAMES. `eft001_set_pos`, `eft002_set` and `eft002_set_shell` are the runtime dump's own names; `eft_rot_vec_copy`
+ *   is a GUESS from its body; the map has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
+ * RESIDUALS. 2 rows unwritten (empty stubs): 0x800FBE64-0x800FC0D4 (`fn_800FBE64`) and 0x800FC484-0x800FC7EC
+ *   (`fn_800FC484`).
+ *   10 partial rows, all above the `#pragma peephole off` line:
+ *  - `fn_800FC0F0`, `fn_800FC27C`, `eft001_set_pos`, `fn_800FC384`, `fn_800FCA34`, `fn_800FC428`: ours drop the
+ *    `clrlwi` narrowing of the `u8` arguments (or sign-extend the `s8` test with an extra `extsb`) and keep the
+ *    handler address in the stored register;
+ *  - `fn_800FC428`: ours compares the states 1, 2, 3, 0 where retail compares 0, 1, 2, 3 (docs/ef.md, "The case-0
+ *    nested dispatch");
+ *  - `fn_800FC1DC`: ours turns the `== 1` store into `cntlzw`/`srwi` where retail branches;
+ *  - `fn_800FC7EC`: retail reloads `work_0x38` (`lwz r3,8(r31)`) at each use, ours keeps it in a register;
+ *  - `fn_800FCA54`: ours fuses `subic.` and compares the 0x16/0x19/0x1A cases unsigned in another order;
+ *  - `fn_800FCEC8`: retail tail-branches (`b`), ours falls through.
+ *   flipcheck: `.sdata` claimed, not emitted; `.text` (0x1178 of 0x16BC), extab (0x60 of 0x70), extabindex (0x90 of
+ *   0xA8), `.data` (0x120 of 0x370) and `.sdata2` (0x8 of 0x18) short of the claim and differing.
+ * SHAPES. The two returned values consumed by pointer (`fn_8006F304(&srt, access.GetResTexSrt(false))`,
+ *   `fn_800532DC(&mtx_a, get_current_view_mtx())`) go through a reference parameter, so MWCC places the temporary
+ *   below the named locals; a named local swaps the slots or copies the 48-byte matrix.
+ *   `fn_800FD2B0`'s switch covers case 0 (a 0-based table, `cmplwi r0,29`) and the `flag != 1` return follows it;
+ *   `_PLW::flag_0x30` is `s8` (retail `cmpwi`).
+ *   `fn_800FCED4`'s inner type switch uses `break` plus one trailing `return` (a `return` per case adds a dead `b`);
+ *   `state_0x06++` reuses the switch operand; `frame_0x10` is `s32` (retail's `xoris` int-to-float form).
+ *   `_EFT_WORK` (the setters' `f32` scale and `u32` id) and `_EFT_MODEL_WORK` (`fn_800FCED4`'s `MHchar*` and
+ *   `f32`) are two views of the 72-byte effect object's +0x38 block.
+ *   The `<name>_viewN`/`<name>_cN` cast macros keep each folded source's view of a callee; a cast call is the same
+ *   direct call.
  */
 
 #include "ef/eft_res_spawn_gate_ck.h" /* eft_res_spawn_gate_ck (rule 2: the owner's header) */
@@ -90,7 +50,7 @@
 #undef fn_800FD29C
 #undef fn_800FCED4
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_800FD520.h"
 #include "ef/fn_800FD718.h"
 #include "unsplit/g3d.h"
@@ -100,17 +60,17 @@
 #define eft_state_flags_set_c1 ((void (*)(void*, u8, u8))eft_state_flags_set)
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define fn_800F8914_c1 ((void* (*)())eft_res_model_get)
-/* fn_800FD2AC_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
+/* fn_800FD2AC_view1: the folded sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_800FD2AC_view1 ((void (*)(struct _EFT*))fn_800FD2AC)
-/* fn_800FD29C_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
+/* fn_800FD29C_view1: the folded sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_800FD29C_view1 ((void (*)(struct _EFT*))fn_800FD29C)
-/* fn_800FCED4_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
+/* fn_800FCED4_view1: the folded sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_800FCED4_view1 ((void (*)(struct _EFT*))fn_800FCED4)
-/* fn_800F9DF4_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
+/* fn_800F9DF4_view1: the folded sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_800F9DF4_view1 ((void (*)(_EFT*, u8, u8))eft_state_flags_set)
-/* fn_800F93D8_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
+/* fn_800F93D8_view1: the folded sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_800F93D8_view1 ((void (*)(void*, void*, u32, s32, u32))eft_res_models_spawn)
-/* fn_800F8788_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
+/* fn_800F8788_view1: the folded sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_800F8788_view1 ((_EFT* (*)(u32))eft_res_slot_get)
 
 /* The `fn_800FBE64` / `fn_800FC484` family block: two pooled effects and the model they share. */
@@ -490,9 +450,8 @@ extern "C" void fn_800FCEB0(nw4r::ef::Effect* self, u32 arg, bool flag)
     self->ForeachParticleManager(fn_800FCEC8, arg, flag);
 }
 
-/* Builds the pooled effect + model pair for a per-frame effect: allocates both from the type's id
- * tables, poses the model at the effect's position, offsets its animation clock by a random amount,
- * and seeds the two K-colours the effect family uses. */
+/* Builds the pooled effect and model pair from the type's id tables, poses the model, offsets its animation clock at
+ * random and seeds the two K-colours. */
 extern "C" void fn_800FC7EC(_EFT* self)
 {
     _EFT001_EFFECT_WORK* work = (_EFT001_EFFECT_WORK*)self->work_0x38;

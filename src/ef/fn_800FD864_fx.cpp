@@ -1,170 +1,31 @@
-/* ef/fn_800FD864_fx.cpp - the effects at 0x800FD864 and 0x800FE978 and the head of effect 004
- *
- * `.text` 0x800FD864..0x80100448, 14 functions written (the rest of the range is not decompiled yet).
- * Phase 4: fold of 3 registered units, built from `ef/fn_800FD864.cpp`, `ef/fn_800FE978.cpp`, `ef/eft004.cpp`.
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `ef/fn_800FD864.cpp` (kept for its notes and residuals): */
-/* ef/fn_800FD864.cpp - the map/area spawn table of the `eft004` effect family and its two hooks,
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * `.text` 0x800FD864..0x800FE978 (3 functions: fn_800FD864, fn_800FE8E8, fn_800FE93C).
- *
- * What it is.  `fn_800FD864` is the effect spawner the map/area code calls once per map area: it takes
- * the 0x48-byte effect slot `eft_res_slot_get(0x8F4)` hands out (the `0x8F4` is the family work-block size the
- * slot's `+0x38` pointer receives), clears the work flag, reads the current map number and area, and a
- * 23-entry map switch then an area switch select the three spawn parameters (effect id, count, parameter)
- * the family's per-frame handlers read out of the work block.  The common tail writes them, sets the
- * phase to 3, stores the area, seeds the slot with `eft_state_flags_set` and installs `fn_800FE93C` as the
- * `+0x34` state dispatcher and `fn_800FE8E8` as the `+0x40` release hook.
- *
- * `fn_800FE8E8` is the release hook: it hands both of the work block's effect-heap runs back to
- * `push_eft_effect_heap_num` and zeroes their counts.  `fn_800FE93C` is the four-state dispatcher: it
- * tail-calls the state-0 handler `fn_800FE978` and the three `eft004` per-frame handlers
- * (`fn_800FF8D4`, `fn_800FFC98`, `fn_800FFCA8`).
- *
- * Language.  The unit's own symbols (`fn_800FD864`, `fn_800FE8E8`, `fn_800FE93C`) and the plain helpers
- * (`eft_res_slot_get`, `eft_res_slot_release`, `eft_state_flags_set`, `quest_id_head_ck`) are plain, unmangled names, so those carry
- * C linkage.  The mangled callees (`get_now_mapno__Fv` / `get_now_areano__Fv` / the
- * `push_eft_effect_heap_num(nw4r::ef::Effect**, long)` the map spells with an argument list) are declared
- * with their real C++ signatures and called through them (rule 9); the file is a `.cpp` for that reason,
- * and `fn_800FD864` is still a plain symbol because every definition is `extern "C"`.  `langcheck` reads
- * the mangled callees as *suggested* C++ and suggests keeping `.c` only by spelling the mangled names,
- * which rule 9 forbids; the C++ route reproduces all 61 `.rela.text` relocation names exactly (the 24
- * non-jump-table ones - `get_now_mapno__Fv`, `get_now_areano__Fv`,
- * `push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl`, the six helpers and `fn_800FE978`/`fn_800FF8D4`/
- * `fn_800FFC98`/`fn_800FFCA8` - are name-identical to the target's), so C++ is the evidence.
- *
- * Result: fn_800FD864 (0x1084), fn_800FE8E8 (0x54) and fn_800FE93C (0x3C) all 100 %; `.text` (0x1114),
- * `extab` (0x10) and `extabindex` (0x18) byte-identical to the target.  The only object-level differences
- * are the eight switch jump tables, which our object emits locally in `.data` (0x224) while the target's
- * code relocates against the shared `.data` run (`jumptable_8059C19C..0x8059C368`), plus the local
- * extab/symbol-table names and the `.comment` version byte (ours 0x0f, retail 0x0e) - none of which
- * reaches the linked DOL or the per-symbol score.
- *
- * Load-bearing source shapes (each measured; the wrong form costs real points):
- *   * `areano` is `u32`, not `u8`.  As a `u8` the small area switches lower to signed compares
- *     (`cmpwi r28,1`); retail uses the unsigned `cmplwi` for the non-zero cases, which a `u32` operand
- *     produces (98.79 -> 99.98 %).  The `(u8)` cast on the assignment keeps retail's `clrlwi r3,24`.
- *   * `#pragma peephole off` is required for the two function-pointer stores at the tail: with the pass
- *     on MWCC folds `addi r0,r3,fn_800FE8E8@l; stw r0,0x40(r30)` into `addi r3,...; stw r3,...`, where
- *     retail keeps the scratch in `r0` (99.98 -> 100 %).
- *   * each case body assigns its three parameters in the retail instruction order (`a`,`b`,`c` for most
- *     maps, `b`,`a`,`c` for the two maps 21/22); the common tail after the outer switch stores them as
- *     `work->+0x00 = b`, `+0x0D0 = a`, `+0x0D4 = c`.
- *
- * Naming.  Evidence class 4: nothing supports a name.  The unit has no `.data` pool and no `__FILE__`
- * string (the target object carries only `.text`/`extab`/`extabindex`, and none of the three functions
- * references a string), the runtime dump gives `zz_00fd864_` only (not evidence), and the two range
- * neighbours (`ef/fn_800FD520.c`, `ef/fn_800FD718.c`) keep the map's `fn_XXXXXXXX` stem.  The file is
- * therefore `ef/fn_800FD864.cpp`, the first symbol's stem, and the rule-7 deferral above is the reason.
- *
- * Data.  The unit owns no pool section: its eight jump tables live in the shared `.data` run
- * (0x8059C19C..0x8059C368) and are referenced by their map names only.  The `extab`/`extabindex`
- * fragments travel with the code and are claimed in `splits.txt`.
- *
- * Types.  `_EFT` and `_EFT_WORK` come from the shared `ef.h` (rule 1); the family work block the slot
- * carries at `+0x38` is this unit's own `_EFT_MAP_WORK` (a 0x8F4-byte block, the size `eft_res_slot_get` was
- * asked for), defined here because no other unit reads it.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_800FD864.cpp`.
- */
-
-/* Retired header of `ef/fn_800FE978.cpp` (kept for its notes and residuals): */
-/* ef/fn_800FE978.cpp - the effect-family spawn/init handler at `.text` 0x800FE978-0x800FF8D4
- * (3 functions, 0xF5C bytes).  Registered once, at its final home (docs/plan.md 12).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
- * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt; dumpmap returns only
- * the placeholder `zz_00fe978_`, and the object carries no `__FILE__` string).
- *
- * Naming evidence (brief 2): class 4.  No `__FILE__` string is referenced by the object (checked:
- * every relocation in `.text` is a callee or a pool literal, no `.data` filename pool), the runtime
- * dump names all three symbols `zz_*` (not evidence), and the map carries only `fn_XXXXXXXX`.  The
- * module is `ef` (every neighbour in the band is `ef`; the code drives `nw4r::ef::Effect` through
- * `res_eft_create` and the `_EFT` records of `ef.h`).  The map stem is kept as the file name.
- *
- * Language: C++ (langcheck: 10 mangled callees, e.g. `res_eft_create__FUsUsUl`,
- * `SetRootMtx__Q34nw4r2ef6EffectFRCQ34nw4r4math5MTX34`); the object carries `extab`/`extabindex`
- * (confounded by the `ef` lib's `-Cpp_exceptions on`, but the mangled callees decide it).
- *
- * What it is: the family's per-spawn state machine.  It builds the resource path from the
- * per-map/per-area table (`lbl_8059BA18`..`lbl_8059BF84`), loads the family's effect file into the
- * work block (`_EFT::work_0x38`), and either seeds the work from the file (type 0/1) or drives the
- * display-list of pre-placed slots (`res_eft_create` / `fn_800F91C4`, `SetRootMtx`), then advances
- * the state (`fn_800FF8D4`) or bails through the library's error path (`fn_800FF886C`/`fn_800FFCA8`).
- *
- * Status: the two small helpers (`fn_800FF8A0`, `fn_800FF840`) are reconstructed byte-identical
- * (100 %).  `fn_800FE978` (0xEC8 = 3784 B) is the spawn state machine; it reaches **73.47 %** and is
- * the recorded residual.
- *
- * Residual (`fn_800FE978`, 73.47 %, target 3784 B / ours 3352 B): the control flow, all 11 per-map
- * name tables, the file load and the two/three-case dispatch blocks are reconstructed; what still
- * differs is codegen, not shape:
- *   * prologue: the original frame is 0x840 and MWCC emits the dynamic `stwux` prologue
- *     (`clrlwi`/`subfic`/`mr r12`/`stwux`) saving r22-r31; ours is a static 0x8F0 frame saving
- *     r21-r31 (one extra live web), so `self` lands in r31 where retail has r30 and every
- *     r30/r31 operand row differs.  Neither reversing the local declarations nor forcing `size`
- *     onto the stack (an array, a `volatile`) moved MWCC's slot assignment - the layout is the
- *     allocator's, given the same local types.
- *   * stack slots: retail's locals are info(0x20) mtx(0x60) header(0x90) size(0x128) name(0x12C)
- *     set(0x240); ours are mtx(0x08) info(0x38) header(0x70) name(0x108) set(0x308), so every
- *     `r1`-relative immediate differs.
- *   * 108 target-only instructions (432 B): the two `mapno`-22/21 area switches and the
- *     `fn_802FB8EC` sub-switches compile to compare chains in retail but to local jump tables
- *     (`.data` 0x50 B) here; the report metric ignores the relocation name, not the shape.
- * The shapes that reproduce the machine are all present and measured; what is left is the
- * register/stack colouring the retail build chose, which is not reachable by a source rewrite of
- * this function alone.
- */
-
-/* Retired header of `ef/eft004.cpp` (kept for its notes and residuals): */
-/* auto/800FF8D4_fn_800FF8D4.cpp - the `eft004` effect cluster, 0x800FF8D4..0x80101DF4 (37 functions).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * The game's `eft004` effect module: the per-frame handlers (`fn_800FF8D4`, `fn_800FFCAC`,
- * `fn_80100088`, ...), the effect-record state-machine dispatchers (`fn_80100A6C`, `fn_80101774`,
- * `fn_80101DB8`), the pool release helpers (`fn_80100A30`, `fn_80101D70`), the spawn helper
- * `fn_801007BC` and the three public setters `eft004_set` / `eft004_set_pl` / `eft004_set_pl2`.
- * 29 of the 37 symbols are recovered; the eight not yet written are the large handlers
- * (`fn_800FF8D4` 964 B, `fn_800FFCAC` 604 B, `fn_80100088` 632 B, `fn_801007BC` 628 B,
- * `fn_80100AA8` 1804 B, `fn_801011B4` 600 B, `fn_801017B0` 464 B, `fn_80101980` 736 B).
- *
- * Flags: the whole file is compiled with the peephole pass off (`#pragma peephole off`, playbook 39) -
- * the retail object keeps the unfused `rlwinm` + `cmpwi` where the pass emits a record-form `rlwinm.`,
- * and the function pointer through `r0`. It took `fn_80101594` 97.73 -> 100, `fn_80101670` 95.6 -> 100,
- * `eft004_set` 75.5 -> 92.86, `fn_801006A0` 80.1 -> 94.29 and `fn_8010072C` 86.1 -> 94.44.
- *
- * Residuals (measured with `python tools/units/recompile.py auto/800FF8D4_fn_800FF8D4 --measure <sym>`):
- *   * the eight unwritten handlers above are 0 %.
- *   * `fn_80101470` 81.84 % - the two nested type switches reproduce the target's jump tables and case
- *     bodies, but MWCC lays the state-0 block and the state-2/3 block out in the other order and folds
- *     the `state == 1` return into a `bnelr` (target: `cmpwi r5,1; beqlr; blr`).
- *   * `eft004_set` / `fn_801006A0` / `fn_8010072C` / `eft004_set_pl2` 92.86-96.97 % - the spawn
- *     parameter block's address (`addi r7,r1,8`) is scheduled three instructions before the call where
- *     retail has it after the `lfs`/`fmr` constant setup; the code is otherwise identical.
- *   * `fn_800FFF08` 93.75 % - `self->work_0x38` and `&eft_control` swap `r3`/`r5`.
- *   * `fn_80100330` 96.29 % - the `IsValidPointer` inline colours the tested value in `r4` where retail
- *     uses `r6`.
- *   * `fn_80101C74` 96.51 % - the loop keeps `pool->entries[i]` in a register where retail reloads it.
- *
- * Load-bearing source shapes:
- *   * `fn_80100A6C` / `fn_80101774` / `fn_80101DB8` are four-case dispatchers whose cases `return` (not
- *     `break`): a `break` emits a shared trailing branch retail does not have.
- *   * `fn_80100A30` / `fn_80101738` and `fn_80101D70` read the same `self->work_0x38` pool through two
- *     layouts (`EftEffectPool`, `EftHeapPool`); the pool is `void*` on `Eft004` and cast per family.
- *   * `fn_80101470`'s outer `switch (state)` lists `case 2` and `case 3` together and has no `case 1`.
- *   * the setter family passes the spawning owner (`_PLW*`) as `fn_801007BC`'s first argument in
- *     `eft004_set_pl`/`eft004_set_pl2` and `NULL` in `eft004_set`/`fn_801006A0`/`fn_8010072C`.
- *
- * Types: `Eft004`, `_PLW`, the three pool views, `EftEmitter`, `Eft004Owner` and `EftControl` are
- * reconstructed minimally (only the offsets this unit reads); `nw4r::math::MTX34` moved to
- * `nw4r/math.h`. `EftControl` is sized 0xC44 (from symbols.txt) so MWCC emits the far
- * `lis`/`addi` address retail has instead of an `@sda21` load.
- *
- * The unit owns no data section: its literals and jump tables live in the shared `.data`/`.sdata2` run
- * (`0x8059BF90..`, `0x807966A8..`), referenced by name only. Evidence for the attribution:
- * `.pi/attribution-batch-4.patch.md` and `.pi/notes/attribution-batch-4.md`; inventory:
- * `python tools/units/ledger.py unit auto/800FF8D4_fn_800FF8D4.cpp`.
+/* ef/fn_800FD864_fx.cpp - the eft004 family's map/area spawner and its hooks, the per-spawn state machine and the
+ *   head of the family's per-frame handlers.
+ * RANGE. .text 0x800FD864-0x80100448 (17 functions); extab 0x8000BE0C-0x8000BE74, extabindex 0x80025BFC-0x80025C98,
+ *   .data 0x8059B9A8-0x8059C528, .sdata 0x807916E8-0x80791788, .sdata2 0x80796690-0x807966B8.  `fn_800FD864` takes the
+ *   0x48-byte slot `eft_res_slot_get(0x8F4)` hands out, picks the spawn parameters by map and area and installs
+ *   `fn_800FE93C` (the four-state dispatcher: `fn_800FE978`, `fn_800FF8D4`, `fn_800FFC98`, `fn_800FFCA8`) and
+ *   `fn_800FE8E8` (the release hook); `fn_800FE978` loads the family's effect file per map and area and seeds or
+ *   drives the pre-placed slots.  The setters from 0x80100448 are `ef/eft004_fx.cpp`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` for `fn_800FD864`, `fn_800FE8E8`, `fn_800FE93C` and from `fn_800FFC98`
+ *   to the end (retail keeps the hook address in `r0` and the unfused `rlwinm` + `cmpwi`; playbook 39).
+ * NAMES. The map has only `fn_` stems here (the dump has placeholders), so the definitions are `extern "C"`; the
+ *   unit is C++ because the mangled callees are called through their real signatures.
+ * RESIDUALS. 3 rows unwritten: 0x800FF8D4-0x800FFC98 (`fn_800FF8D4`), 0x800FFCAC-0x800FFF08 (`fn_800FFCAC`),
+ *   0x80100088-0x80100300 (`fn_80100088`).
+ *   3 partial rows:
+ *  - `fn_800FE978`: retail's frame is 0x840 with the dynamic `stwux` prologue saving r22-r31, ours a static 0x8F0
+ *    frame saving r21-r31, so `self` and every stack slot move; the `mapno` 21/22 area switches and the
+ *    `fn_802FB8EC` sub-switches are compare chains in retail and local jump tables in ours;
+ *  - `fn_800FFF08`: `self->work_0x38` and `&eft_control` swap `r3`/`r5`;
+ *  - `fn_80100330`: the `IsValidPointer` inline tests the value in `r4` where retail uses `r6`.
+ *   Ours emits the eight `fn_800FD864` switch tables and three `fn_800FE978` tables locally (`@523`-`@533`, `@837`)
+ *   where retail relocates against the `.data` run's `jumptable_` entries.
+ *   flipcheck: `.sdata`/`.sdata2` claimed, not emitted; `.text` (0x219C of 0x2BE4), extab (0x50 of 0x68), extabindex
+ *   (0x78 of 0x9C) and `.data` (0x274 of 0xB80) short of the claim and differing.
+ * SHAPES. `fn_800FD864`'s `areano` is `u32` (the small area switches then compare `cmplwi`), assigned through a `(u8)`
+ *   cast (retail's `clrlwi r3,24`); each case assigns its three parameters in retail's order (`a`, `b`, `c`; `b`, `a`,
+ *   `c` for maps 21/22) and the tail stores them as `+0x00 = b`, `+0x0D0 = a`, `+0x0D4 = c`.
+ *   `_EFT_MAP_WORK` is the 0x8F4-byte family block at `+0x38`.
  */
 
 #include "types.h"
@@ -178,7 +39,7 @@
 #include "ef/eft001.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_80101DF4.h"
 #include "ef/eft007.h"
 #include "sound/fn_800D7F54.h"
@@ -223,9 +84,8 @@ u8 get_now_mapno();
 u8 get_now_areano();
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
 
-/* The state-0 handler of this family and the three `eft004` handlers states 1-3 tail-call.  The state-0
- * handler is unsplit (it heads the next unclaimed range) and comes from the band header; the three
- * come from eft004's own header (rule 2). */
+/* The state-0 handler (this unit's own `fn_800FE978`, declared in `ef/fn_800FE978.h`) and the three handlers of
+ * states 1-3 (declared in `ef/eft004.h`) the dispatcher tail-calls. */
 
 /* This file's own two hooks, used by the spawner before their definitions. */
 extern "C" void fn_800FE8E8(_EFT* self);
@@ -286,9 +146,8 @@ u32 LbCheckKujiraEvent();
 /* types                                                                                              */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* The 0x3C-byte file stat `fn_800CEE2C` fills; only the byte count at +0x34 is read here.  Its own
- * name because `src/fn_80040598.cpp` carries the SDK spelling of the same record (rule 1: a name
- * moves to `include/` the second *unit* needs it; this unit only reads one field). */
+/* The 0x3C-byte file stat `fn_800CEE2C` fills; only the byte count at +0x34 is read here.  It keeps its own name
+ * because `src/fn_80040598.cpp` carries the SDK spelling of the same record and this unit reads one field. */
 struct EftFileStat {
     /* +0x00 */ u8 pad_0x00[0x34];
     /* +0x34 */ u32 length;

@@ -1,61 +1,20 @@
-/* ef/fn_80114E34.cpp - the effect band at 0x80114E34
- *
- * `.text` 0x80114E34..0x801153D0, 8 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `ef/fn_80114E34.cpp` (kept for its notes and residuals): */
-/* ef/fn_80114E34.cpp - the eft020/021/022 effect cluster and the eft023/024 job machine,
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * `.text` 0x80114E34..0x8011722C (45 functions, in address order).
- *
- * What it is.  `eft_res_slot_get(size)` allocates the 0x48-byte `_EFT` record with a `size`-byte work block
- * attached at +0x38; each family stamps +0x03 with its effect id and installs the two hooks that travel
- * with the record (`+0x40` pool release, `+0x34` per-frame dispatch):
- *
- *   | family | creator | work | +0x03 | +0x40 release | +0x34 dispatch |
- *   | 20 | fn_80114E34 | 0x20 `_EFT_WORK_A` | 20 | fn_80114F34 | fn_80114F70 |
- *   | 21 | fn_80115460 | 0x25C `_EFT_WORK_B` | 21 | fn_80115554 | fn_80115664 |
- *   | 22 | eft022_set | 0x8 `_EFT_WORK_C` | 22 | fn_801164F0 | fn_8011652C |
- *   | 23 | fn_80116770 | 0x4C `_EFT_JOB_WORK` | 23 | fn_8011688C | fn_8011689C |
- *   | 24 | fn_80116DA4 | 0x84 `_EFT_JOB2_WORK` | 24 | fn_80116FCC | fn_80116FDC |
- *
- * Language.  The object's symbol table defines the mangled free function
- * `eft022_set__FPQ34nw4r4math4VEC3Uc`, so the unit is C++ and the file is `.cpp`; every other definition
- * is `extern "C"` so its emitted name stays the map's plain `fn_XXXXXXXX` (playbook row 42).
- *
- * Flags.  The `auto` lib builds `-O3 -inline noauto -Cpp_exceptions on`, peephole and fp_contract on.
- * The unit needs `#pragma peephole off` (playbook row 39): retail keeps the `li r0` + `psq_l` epilogue
- * and the raw `clrlwi` chains.  No `configure.py` change is needed.
- *
- * Data.  The unit owns no pool section (the target object carries none): the shared `.data` tables and
- * the `.sdata`/`.sdata2` scalars are `extern`-declared by their map names and never defined
- * (playbook 29).  The `extab`/`extabindex`/`.ctors` fragments travel with the code unit and are claimed
- * in `splits.txt` with its `.text`.
- *
- * Load-bearing source shapes (each measured; the wrong form costs real points):
- *   * fn_80114E34: `u8` parameters with explicit `(u8)` casts, and the float guard is `scale <= 0.0f`
- *     (`fcmpo`+`cror eq,lt,eq`), not `==` (`fcmpu`).
- *   * fn_80114FAC: declaration order `MTX34 mtx; s32 i; u16 id; s32 n; _EFT_WORK_A* work;`.
- *   * fn_80115100: the key-table select is a ternary on the loaded value (`(i == 0) ? lbl_805A01B8[type]
- *     : lbl_805A01E0[type]`); selecting the table pointer first merges the two load arms.
- *   * fn_80116EEC: a nested `for (j = 0; j < 4; j++) for (k = 0; k < 8; k++)` gives the target's
- *     `mtctr`/`bdnz` and the `mr r3,r4` early returns; a flat `do/while` emits a decrement+cmp instead.
- *   * fn_80117120: the reap loop must be `for (i = 0; i < 0x20; i++)` with one slot per iteration so
- *     MWCC unrolls it to the target's two slots; two slots in source unrolls to four.
- *   * fn_80116FDC: the target's case bodies sit after the switch exit, so the source needs the
- *     `case 0: break; case 1: break;` + after-switch switch form (playbook 33/80119C44); writing the
- *     bodies inside the cases leaves them inline (75.26 %).
- *   * fn_80116B00: the seven float constants are named locals loaded before the loop; inlining the
- *     globals reloads them per use and loses the register set.
- *
- * Residuals.  The unit's per-symbol objdiff score is 100 % on 20 of 45 functions; the rest are between
- * 81.9 % and 98.7 %.  The largest gaps are fn_80116080 (81.9 %, the pose-blend loop's float scheduling),
- * fn_80116FDC (83.68 %, block layout), fn_80116B00 (84.23 %, the unsigned int->float `xoris` conversion)
- * and fn_80115100 (88.53 %, 28 B long - the `_GXColor` by-value temp grows the frame).  The exact
- * per-function numbers live in `build/RMHE08/report.json`, never here.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_80114E34.cpp`.
+/* ef/fn_80114E34.cpp - the eft020 effect family: the creator `fn_80114E34` (a 0x20-byte `_EFT_WORK_A` block from
+ *   `eft_res_slot_get`, `+0x03 = 20`, release `fn_80114F34` at +0x40, dispatch `fn_80114F70` at +0x34) and its
+ *   per-frame bodies.
+ * RANGE. .text 0x80114E34-0x801153D0 (8 functions); extab 0x8000C3D4-0x8000C3F4, extabindex 0x800264A8-0x800264D8,
+ *   .ctors 0x8056F310-0x8056F314, .data 0x805A00B8-0x805A0208, .bss 0x806A4538-0x806A4548, .sdata2
+ *   0x80796A28-0x80796A30.  Families 21-24 from 0x801153D0 are `ef/eft022_fx.cpp`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` over every body (retail keeps the `li r0` + `psq_l` epilogue and the
+ *   raw `clrlwi` chains; playbook 39).
+ * NAMES. The map has only `fn_` stems here, so the definitions are `extern "C"` in a C++ unit.
+ * RESIDUALS. 1 partial row: `fn_80115100` is 28 bytes long, the `_GXColor` by-value temporary growing the frame.
+ *   flipcheck: `.bss`/`.ctors`/`.data`/`.sdata2` claimed, not emitted; `.text` 0x5B8 against the claimed 0x59C and
+ *   differing; extabindex differs in 1 byte.
+ * SHAPES. `fn_80114E34` takes `u8` parameters with explicit `(u8)` casts, and its float guard is `scale <= 0.0f`
+ *   (`fcmpo` + `cror`), not `==` (`fcmpu`).
+ *   `fn_80114FAC` declares `MTX34 mtx; s32 i; u16 id; s32 n; _EFT_WORK_A* work;` in that order.
+ *   `fn_80115100` selects the key with a ternary on the loaded value (`(i == 0) ? lbl_805A01B8[type] :
+ *   lbl_805A01E0[type]`); selecting the table pointer first merges the two load arms.
  */
 
 #include "types.h"
@@ -74,7 +33,7 @@
 #include "unsplit/ef.h"
 #include "sound/fn_800D7F54.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_80114E34_types.h"
 
 struct _EFT_CHARA_SRC;
@@ -128,11 +87,8 @@ extern "C" void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 
 /* fn_8011722C comes from its owner's header (rule 2). */
 
-/* The library entry points are reached through their real declarations (rule 9): the free functions
- * come from `unsplit/unknown.h`, `unsplit/enemy.h`, `enemy/fn_8012BDF4.h`, `sys_mem.h` and
- * `Pl/pl_master.h`; the nw4r math ones from `nw4r/math.h`.  Only the `MHchar` members are left as the
- * map spelling - their owner (the canonical `pl.h` struct) carries no methods, so no real name can be
- * expressed and they are reported (rule 9). */
+/* The `MHchar` members keep the map spelling: their owner (`pl.h`'s struct) carries no methods (rule 9); the other
+ * library entry points come from their owners' headers. */
 extern "C" void get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3(void* chr, u32 joint,
                                                              nw4r::math::VEC3* out);
 

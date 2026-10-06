@@ -1,6 +1,4 @@
-/*
- * Declarations for the symbols `src/ef/system_core.cpp` owns that other units call (docs/plan.md 6.5, rule 2).
- */
+/* ef/system_core.h - the declarations of `ef/system_core.cpp`'s symbols other units call (docs/plan.md 6.5 rule 2). */
 #ifndef MHTRI_EF_SYSTEM_CORE_H
 #define MHTRI_EF_SYSTEM_CORE_H
 

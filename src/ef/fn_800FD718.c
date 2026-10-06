@@ -1,59 +1,18 @@
-/* ef/fn_800FD718.c - the state-1/2/3 handlers of the `eft002` effect machine,
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * `.text` 0x800FD718..0x800FD864 (3 functions: fn_800FD718, fn_800FD850, fn_800FD860).
- *
- * What it is.  `fn_800FD4E4` is the four-state update hook the `eft002` setters install on the 0x48-byte
- * effect record (`_EFT_S8::dispatch_0x34`); it dispatches on `state_0x05` to `fn_800FD520` (0),
- * `fn_800FD718` (1), `fn_800FD850` (2) and `fn_800FD860` (3).  This unit owns the last three.
- *
- * `fn_800FD718` is the shell family's per-frame body (`type_0x02 == 1`): it counts the frame budget down,
- * and once the shell's byte at +0x00 has cleared it drops the effect; otherwise, while the shell is in
- * the area the effect was spawned for, it re-seats the effect on the shell's position - the shell's own
- * position, offset 20 units up, rotated by the shell's X and Z angles and added back - and then asks the
- * nw4r effect whether it is still alive, either dropping the effect or handing the pool block to
- * `eft_res_models_spawn`.  `fn_800FD850` is the state-2 "advance one state" step and `fn_800FD860` the state-3
- * release, a one-line forward to `eft_res_slot_release`.
- *
- * Language.  `langcheck` reads the object as *suggested* C++ - the only evidence is six mangled callees -
- * and a mangled callee does not decide the caller's language, so the unit stays `.c` and the callees are
- * declared with the map's spelling, exactly as `ef/fn_800FD520.c` does for the same six
- * (docs/plan.md, "The language comes from the symbol").
- *
- * Result: fn_800FD718 (0x138), fn_800FD850 (0x10) and fn_800FD860 (0x4) 100 %; `.text` (0x14C),
- * `extab` (0x8) and `extabindex` (0xC) byte-identical to the target, and so is every `.rela.text`
- * relocation (offset, type and symbol name).  The only object-level differences are the `.comment`
- * version byte (ours 0x0f, retail 0x0e) and our local extab/symbol-table names, neither of which reaches
- * the linked DOL.
- *
- * Load-bearing source shapes (each measured; the wrong form costs real points):
- *   * `type_0x02` is `s8`, not `u8`.  Retail compares it with `cmpwi`; a `u8` makes MWCC emit `cmplwi`
- *     (99.94 %).  The neighbours agree: `_PLW::flag_0x30` needed `s8` for the same reason, and the
- *     `switch` chains that read a `u8` got `cmpwi` only because a switch chain is lowered signed.
- *   * the area test is an **early return** (`if (area != get_now_areano()) return;`), not an
- *     `if (area == ...) { ... }` block.  Written as a block, MWCC branches to the `effect_move` block
- *     where retail branches straight to the epilogue (99.94 %) - the shell leaving the area skips the
- *     rest of the frame.
- *   * `work` is declared **before** `source`: with `source` first the allocator colours the two
- *     callee-saved webs the other way round (`source` r31 / `work` r30 where retail has r31 / r30).
- *   * `work = self->work_0x38;` is a statement *before* the `VEC3` construction - retail does not hoist
- *     the constructor call above it.
- *   * `fn_800FD850`/`fn_800FD860` are *not* called from `fn_800FD718`: the state bump is written out
- *     twice, and the state-2/3 bodies exist only because `fn_800FD4E4` dispatches to them.
- *
- * Data.  The unit owns no pool section: its two `.sdata2` floats (0.0f and 20.0f, the effect's offset
- * from the shell) live in a shared pool, so they are `extern`-declared by their map names and never
- * defined (playbook 29); the target object carries no such section either.  The `extab`/`extabindex`
- * fragments travel with the code and are already claimed in `splits.txt`.
- *
- * Types.  `_EFT_S8`, `_EFT_WORK` and `_SHELL_W` are reconstructed minimally (only the offsets this unit
- * reads) and are copies of `auto/800FCED4_fn_800FCED4.cpp`'s definitions, which the same `_SHELL_W`
- * extension belongs to; all three belong in one shared header, which does not exist yet (the request is
- * in that unit's outbox).  `VEC3` is `nw4r/math.h`'s type, which is C++ and so cannot be
- * included here - the same private copy `ef/fn_80104BD0.c` keeps.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_800FD718.c`.
- * The name is provisional - `auto/` plus the first symbol's address - because nothing in the object
- * names the original source file.
+/* ef/fn_800FD718.c - the state-1/2/3 handlers of the eft002 effect machine (`ef/eft002.cpp`'s `fn_800FD4E4`
+ *   dispatches on `state_0x05` to `fn_800FD520` (0), `fn_800FD718` (1), `fn_800FD850` (2) and `fn_800FD860` (3)).
+ * RANGE. .text 0x800FD718-0x800FD864 (3 functions); extab 0x8000BE04-0x8000BE0C, extabindex 0x80025BF0-0x80025BFC,
+ *   .sdata2 0x80796688-0x80796690 (0.0f and 20.0f, the effect's offset above the shell).
+ * NAMES. The map has only `fn_` stems for this range.  The file is C: the only C++ evidence is six mangled callees,
+ *   which do not decide the caller's language (as in `ef/fn_800FD520.c`).
+ * RESIDUALS. none in code: all three rows match.
+ *   flipcheck: `.sdata2` claimed, not emitted.
+ * SHAPES. `type_0x02` is `s8` (retail `cmpwi`; a `u8` emits `cmplwi`).
+ *   The area test is an early return (`if (area != get_now_areano()) return;`); as a block MWCC branches to the
+ *   `effect_move` block where retail branches to the epilogue.
+ *   `work` is declared before `source` (the callee-saved registers colour the other way otherwise), and
+ *   `work = self->work_0x38;` stays a statement before the `VEC3` construction.
+ *   The state bump is written out in `fn_800FD718` rather than calling `fn_800FD850`.
+ *   `VEC3` is a private C copy here (`nw4r/math.h` is C++), as in `ef/fn_80104BD0.c`.
  */
 
 #include "types.h"

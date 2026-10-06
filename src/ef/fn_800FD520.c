@@ -1,46 +1,18 @@
-/* ef/fn_800FD520.c - the state-0 handler of the eft002 effect machine,
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * `.text` 0x800FD520..0x800FD718 (one function, `fn_800FD520`).
- *
- * What it is.  `fn_800FD4E4` (the last function of the previous unit, 0x800FCED4..0x800FD520) is the
- * four-state update hook `eft002_set` installs on the 0x48-byte effect record; it dispatches on
- * `state_0x05` to `fn_800FD520` (0), `fn_800FD718` (1), `fn_800FD850` (2) and `fn_800FD860` (3).  This
- * function creates the real nw4r effect for the actor's weapon class and, for the classes whose model
- * exists, places it at the weapon joint: it queries the joint's world matrix through the player's
- * `MHchar` (`_PLW::physics_0x13C + 4`), transforms a per-class local muzzle offset by it and adds the
- * matrix translation, then hands the result to `SetRootMtxTrans`.  The sibling `fn_8027C064`
- * (`Pl/pl_act.cpp`) is the same shape and was the template for the tail.
- *
- * The two "empty" callees are real: `VEC3_ctor` and `MTX34_ctor` are one-instruction `blr` stubs in
- * the DOL, so their calls must still be written out to reproduce the target's bytes.
- *
- * Result: 100 %; `.text` (0x1F8), `extab` (0x8), `extabindex` (0xC) and all 26 `.rela.text` relocation
- * names byte-identical to the target.  The only object-level differences are the `.comment` version
- * byte (ours 0x0f, retail 0x0e) and our local extab/symbol-table names, neither of which reaches the DOL.
- *
- * Load-bearing source shapes (each measured; the wrong form costs real points):
- *   * `#pragma peephole off` is required for the pool-block store.  With the pass on MWCC forwards
- *     `work->effect = res_eft_create(...)` into the test, dropping the target's `lwz r0,4(work)` - 4 B
- *     short, 99.68 %; the pragma keeps the reload (100 %).  The assignment has to be its own statement
- *     too: `if ((work->effect = ...) == 0)` does not reload even with the pragma (99.68 %).
- *   * `source` is declared **before** `work`.  With `work` first the allocator colours the two webs the
- *     other way round (`work` r31 / `source` r30 where retail has r30 / r31); the declaration order
- *     flips the pair and is the whole 99.68 -> 100 % step.
- *
- * Data.  The unit owns no pool section: its 12 `.sdata2` floats (the per-class offsets) and the two
- * `.sdata` u16 tables (effect id and parameter id per class) live in a shared pool, so they are
- * `extern`-declared by their map names and never defined (playbook 29); the target object carries no
- * such section either.  The map names are the target's - the same trick
- * `auto/800FCED4_fn_800FCED4.cpp` uses for its own pool.
- *
- * Types.  `_EFT`/`_EFT_WORK`/`_PLW` are reconstructed minimally (only the offsets this function reads)
- * and are copies of the neighbours' definitions (`auto/800FCED4_fn_800FCED4.cpp`'s `_EFT`,
- * `Pl/pl_act.cpp`'s `_PLW`); all three belong in one shared header, which does not exist yet.
- *
- * Language.  The unit's own symbol is plain (`fn_800FD520`), so the file stays C and the mangled
- * callees are declared by their map spelling, as `ef/fn_803066F0.c` does.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_800FD520.c`.
+/* ef/fn_800FD520.c - the state-0 handler of the eft002 effect machine: it creates the nw4r effect for the actor's
+ *   weapon class and places it at the weapon joint (the joint's world matrix through `_PLW::physics_0x13C + 4`, a
+ *   per-class muzzle offset, then `SetRootMtxTrans`), the shape of `Pl/pl_act.cpp`'s `fn_8027C064`.
+ * RANGE. .text 0x800FD520-0x800FD718 (1 function); extab 0x8000BDFC-0x8000BE04, extabindex 0x80025BE4-0x80025BF0,
+ *   .sdata 0x807916E0-0x807916E8 (the per-class effect and parameter ids), .sdata2 0x80796658-0x80796688 (the 12
+ *   per-class offsets).
+ * FLAGS. `cflags_main`; `#pragma peephole off` around the function: with the pass on, MWCC forwards
+ *   `work->effect = res_eft_create(...)` into the test and drops retail's `lwz r0,4(work)` reload.
+ * NAMES. The map has only the `fn_` stem.  The file is C: its own symbol is plain, the mangled callees are declared
+ *   by their map spelling.
+ * RESIDUALS. none in code: the row matches.
+ *   flipcheck: `.sdata`/`.sdata2` claimed, not emitted.
+ * SHAPES. The pool-block store is its own statement (`if ((work->effect = ...) == 0)` does not reload even with the
+ *   pragma).  `source` is declared before `work` (the other order swaps their callee-saved registers).
+ *   `VEC3_ctor` and `MTX34_ctor` are one-instruction `blr` stubs in the DOL, so their calls stay written out.
  */
 
 #include "types.h"
@@ -49,7 +21,7 @@
 #include "ef/fn_800FD718.h"
 #include "unsplit/sound.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "Pl/plw.h"
 
 /* ---------------------------------------------------------------------------------------------------

@@ -1,82 +1,39 @@
 /*
- * ef/system_core.cpp - the game-system core TU: `.text` 0x800CE5A8..0x800D2FEC (the `system_w` interface, the file loader, the
- * work heap, the texture/hbm block), extab 0x8000A5E4..0x8000A77C, extabindex 0x80023C7C..0x80023EE0, `.ctors` 0x8056F2EC.
- * The file was registered under the stem of the proposal it came from (`fn_800CDB2C`, a --max-bytes cut) and the range was recut on
- * 2026-09-30 - see "Seams" below; phase 4 renamed the unit `system_core` (GUESS: the `system_w` interface, the file loader, the work heap and
- * the texture/hbm block make the game-system core; no `__FILE__` string names the range).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
- * `fn_` name this file uses is a bare `.text` entry in config/RMHE08/symbols.txt; only the 24 named
- * symbols - file_loading_ck, load_file_req, load_file, ran_suu, system_w_clr, all_reset, PlayMode_ck,
- * GameMode_set, PlayMode_set, work_mem_alloc, work_mem_free, get_move_work_adrs, get_move_work_max,
- * set_move_work_max, create_move_work, TPLtexLoad, loading_disp_set, hbm_disable, hbm_enable,
- * pmic_disp_off, get_str_tbl_ptr, get_str_tbl, push_g3d_wk - carry a name)
- *
- * What it is.  The brief's `ef/ef_sphere.cpp` range is one of discovery's `--max-bytes`
- * cuts and its seam is a guess: the range is **several original translation units**, not one.  The
- * evidence is the split objects' own `__FILE__` strings (from MAIN's `build/RMHE08/asm/auto_*.s`,
- * which carries the pooled `.data` labels), in address order:
- *   - `ef_sphere.cpp` (0x80595058, the `em`/`pm`/`params` pointer asserts at 0x800CDCA4..0x800CDEC4)
- *     names the first function only, `ef_sphere_spawn` (0xA78).  `src/ef/ef_point.cpp`'s own header
- *     records the seam `ef_point.cpp -> ef_sphere.cpp`, so the range starts inside the ef band.
- *   - `00/saveicon.tpl` (0x80595198), `00/capcom.tpl` (0x805951A8) then `m.m.tpl` are the texture
- *     names of the loading/UI tail (TPLtexLoad et al.), which is not ef code.
- *   - `memorymanagertmp.h` (0x80595520/0x80595584) and `g3d_anmobj.h` (0x8059577C, beside
- *     `g3d_xsi.cpp`) name the TUs that end the range.
- * Seams (recut 2026-09-30; the proposal range 0x800CDB2C..0x800D45AC held four original TUs):
- *   - 0x800CDB2C..0x800CE5A8 is `ef/ef_sphere.cpp` (one function; its strings `.data` 0x80595058 name `ef_sphere.cpp`).  The
- *     tail thunk `fn_800CE5A4` is its own call target; `fn_800CE5A8` returns the `system_w` side-table size 0x84D0 and is
- *     called only from this unit's `fn_800CF3E4`, so it opens this TU.
- *   - 0x800D2FEC is the right edge: `fn_800D2F88` is the TU's `__sinit` (the `.ctors` word 0x8056F2EC) and `fn_800D2F94` its
- *     element constructor; every function from `fn_800D2FEC` reads `.sbss` 0x80794970 (the resource manager), and the `.sbss`
- *     words 0x80794958..0x80794970 are read only below it.
- *   - 0x800D2FEC..0x800D6C00 is `nw_resource.cpp` (one vtable group 0x80595378..0x80595428 whose readers straddle the old
- *     0x800D45AC edge, plus the inline-assert tail 0x80595490..0x80595790), 0x800D6C00..0x800D77B0 is `g3d/g3d_xsi.cpp`.
- *     Evidence for each cut: `.pi/notes/ef-nwres-seam.md`.
- * More than one original file was evidenced in the old range; after the recut no `__FILE__` string names this unit, so its name is a
- * GUESS (see above).  The module is `ef` (the `__FILE__` string and the band below are ef) and
- * the language is C++ (the `.cpp`/`.h` names and the `nw4r::db::Panic` callee).
- *
- * The game-system core - `system_w` and its mode/loading accessors, the file loader and the work
- * heap - is the middle of the range and the reason it is not one ef file.  This unit owns the
- * `system_w` interface, so `SystemWork`'s newly-evidenced fields were added in
- * `unsplit/unknown.h` (the symbol is unsplit - no `.bss` range is registered - so that is its
- * named home; docs/plan.md 6.5 rule 2's gap).
- *
- * Status.  70 of the 165 symbols are reconstructed (0x9EC = 2540 B of 0x6A80), 63 of them at the
- * 80 % bar or above and 41 byte-identical (100 %); the unit as a whole is 7.86 % of code bytes.  The
- * reconstructed set is the `system_w` interface and the loader/stream accessors at the head of the
- * range (0x800CE5A8..0x800D2FEC, minus the ones this round did not reach).  `fn_800D20F0` (a
- * `fn_800E4E3C` thunk) is left out on purpose: declaring that sound unit's symbol here would be a
- * rule-2 addition, and the owner's header does not exist yet.  The 95 missing symbols are
- * the large players in the middle and tail: the ef_sphere emitter `ef_sphere_spawn` (0xA78), the loader
- * state machine `fn_800CE6A0`/`fn_800CE884`/`fn_800CE920` (the 0x154-entry record copier), the file
- * loader `file_loading_ck`/`load_file_req`/`load_file`, the mode reset block `fn_800CF154`..`fn_800CF3E4`,
- * `fn_800CF948` (the 0x800D streams), the texture loader `fn_800D0764`..`fn_800D104C`, the hbm/PMIC
- * block, and the whole 0x800D3000..0x800D45AC group (g3d/memory-manager TUs).
- *
- * Residuals of the below-80 % reconstructions (all still applied, per CLAUDE.md's best-variant rule):
- *   - `fn_800CEF18` 77.4 % and `ran_suu__Fl` 68.2 %: the 0xB0/0xAD 16-bit mix.  The target materialises
- *     the divisor magic as `0x00AD7539` + `srwi ...,15` + `mulli ...,0xFF53`; writing `(v * 0xB0) %
- *     0xAD` on `u32` (best, 77.4 %) emits the 32-bit magic `0x7AD2208F`, and the `u16` spelling (60.2 %)
- *     a third shape.  The target's magic is not the `x / 173` constant for a 32-bit dividend, so the
- *     original operand width is still unidentified - a residual to re-derive from the caller.
- *   - `set_move_work_max` 63.1 %: the target masks `value` with an explicit `clrlwi r5,r4,16` before the
- *     `sthx`; every spelling here (long, u16 local, u16 cast) lets the store width do the truncation.
- *   - `fn_800D20B4` 62.5 %: the target `extsh`s both GX-FIFO halfwords; the `s16` local/cast still emits
- *     a bare `sth` because the union member's store already truncates.
- *   - `fn_800D0568`/`fn_800D05A4`/`fn_800D05DC` 32-59.6 %: the target hoists `lis/addi system_w` above
- *     the `index < 0x20` bound check and keeps the index in r3, base in r4; every source order tried
- *     materialises the base after the branch.  The bodies' behaviour is right (the accessors agree with
- *     `get_move_work_*`), only the schedule differs.
- *   - `GameMode_set`/`PlayMode_set` (85 %), `fn_800CF638`/`fn_800CF650` (98.3 %), `setTransferDisplayState` (83.3 %),
- *     `fn_800D2954` (87.2 %), `get_move_work_adrs`/`get_move_work_max` (89.7/89.0 %), `fn_800CF8EC`
- *     (90.7 %), `fn_800CFD00` (93.1 %), `fn_800D2928` (95.9 %), `fn_800CE610` (99.6 %) and
- *     `system_w_clr` (99.9 %) are above the bar; their sub-instruction deltas are not chased.
- *
- * Flags.  The range is measured under the ef lib's real command line (`-O3 -inline noauto
- * -Cpp_exceptions on`, `Wii/1.3`).  No flag was probed or changed: the below-80 % residuals are
- * source/schedule shapes, not instruction-set fingerprints (no `lmw`/`stmw`, no fused float op seen).
- * A `-O4,p` / `-inline` sweep over the range is the next probe if a later round needs it.
+ * ef/system_core.cpp - the game-system core: the `system_w` interface and its mode/loading accessors, the file
+ *   loader, the work heap, the texture loader and the hbm/PMIC block.
+ * RANGE. .text 0x800CE5A8-0x800D2FEC (127 functions); extab 0x8000A5E4-0x8000A77C, extabindex 0x80023C7C-0x80023EE0,
+ *   .ctors 0x8056F2EC-0x8056F2F0, .data 0x80595118-0x80595378, .bss 0x80694C68-0x80695610, .sdata
+ *   0x80791358-0x80791370, .sbss 0x80794958-0x80794970, .sdata2 0x80796360-0x807963C0.  Left edge: `ef/ef_sphere.cpp` ends at 0x800CE5A8 and
+ *   `fn_800CE5A8` (the `system_w` side-table size 0x84D0) is called only from this unit's `fn_800CF3E4`.  Right edge:
+ *   `fn_800D2F88` is the TU's `__sinit` (the `.ctors` word) and `fn_800D2F94` its element constructor; every function
+ *   from 0x800D2FEC reads `.sbss` 0x80794970 (the `nw_resource.cpp` resource manager).
+ * FLAGS. `cflags_main`.
+ * NAMES. The unit name is a GUESS (no `__FILE__` string names the range; it is the game-system core).  The runtime
+ *   dump names the loader, mode, work-heap, texture and string-table accessors (`file_loading_ck`, `load_file_req`,
+ *   `load_file`, `ran_suu`, `system_w_clr`, `all_reset`, `PlayMode_ck`, `GameMode_set`, `PlayMode_set`,
+ *   `work_mem_alloc`, `work_mem_free`, `get_move_work_adrs`, `get_move_work_max`, `set_move_work_max`,
+ *   `create_move_work`, `TPLtexLoad`, `loading_disp_set`, `hbm_disable`, `hbm_enable`, `pmic_disp_off`,
+ *   `get_str_tbl_ptr`, `get_str_tbl`); `GameMode_ck`, `my_player_no`, `my_player_no_set`, `player_count_get`,
+ *   `player_count_set`, `game_ready_ck`, `game_reset_to_title`, `move_work_state_ck`, `ef_move_state_dispatch` and
+ *   `setTransferDisplayState` are GUESSes from their bodies and callers (the dump's `SaveLoad::DidGameIDChange` /
+ *   `BTM_IsDeviceUp` at four of these addresses contradict the one-byte bodies).
+ * RESIDUALS. 54 rows unwritten in 23 runs (and `TPLtexLoad`, written, at 0 %: ours emits the plain `TPLtexLoad`
+ *   where retail defines `TPLtexLoad__FPvP9_tex_info`); the largest by size is 0x800D0764-0x800D2098 (6 rows, the
+ *   texture loader up to `fn_800D104C`); `sweepcomments.py --unit ef/system_core` lists them.
+ *   31 partial rows, including:
+ *  - `fn_800CEF18`, `ran_suu`: retail reduces the 0xB0/0xAD mix with the magic 0x00AD7539, `srwi 15` and
+ *    `mulli 0xFF53`; the `u32` spelling here emits the 32-bit magic 0x7AD2208F (the original operand width is open);
+ *  - `set_move_work_max`, `GameMode_set`, `PlayMode_set`, `get_move_work_adrs`, `get_move_work_max`: retail narrows
+ *    the argument (`clrlwi`) at entry, ours folds it into the store or the `clrlslwi`;
+ *  - `fn_800D20B4`: retail `extsh`s both GX-FIFO halfwords before the `sth`;
+ *  - `fn_800D0568`, `fn_800D05A4`, `fn_800D05DC`: retail hoists `lis`/`addi system_w` above the `index < 0x20`
+ *    check, ours materialises the base after the branch;
+ *  - `fn_800CFD20`: the branch sense around the `fn_800CFC64` call is inverted.
+ *   The other 19 partial rows have no recorded cause (`symdiff.py -u ef/system_core --all`).
+ *   flipcheck: `.bss`/`.ctors`/`.data`/`.sbss`/`.sdata`/`.sdata2` claimed, not emitted; `.text` (0xA6C of 0x4A44),
+ *   extab (0x58 of 0x198) and extabindex (0x84 of 0x264) short of the claim and differing; row 36: 8 retail
+ *   force-active functions (`fn_800CF228`, `fn_800CF270`, `fn_800CF3A4`, `fn_800CF3B4`, `fn_800CF668`,
+ *   `fn_800CFBE0`, `fn_800D20D8`, `fn_800D2108`) are not exported in ours.
  */
 
 #include "types.h"
@@ -93,8 +50,8 @@
  * rows reproduced. */
 
 /* --------------------------------------------------------------------------------------------- */
-/* Data owned by no registered unit (its range sits outside every splits.txt block); declared,
- * never defined - the auto split's own bss/data object still provides it (playbook 29). */
+/* The unit's own claimed data (.bss 0x80694C68-0x80695610 and the rest of its splits block); declared, never
+ * defined (playbook 29). */
 /* --------------------------------------------------------------------------------------------- */
 
 /* The system side table at .bss:0x80694C68: a 0x4C-byte record whose +0x48 word is the 0x84D0-byte

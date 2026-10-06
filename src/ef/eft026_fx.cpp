@@ -1,7 +1,27 @@
-/* ef/eft026_fx.cpp - effect 026 fx band
- *
- * `.text` 0x80117DA8..0x80119C44, 20 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source.
+/* ef/eft026_fx.cpp - the eft026 enemy-fold family (`eft026_set` and two sibling setters, the allocator `fn_80117FF8`
+ *   stamping tag 26, the release `fn_80118154` and its state machine) and the eft028 break/crumble family's setters
+ *   (`fn_80119970`, `eft028_set_koware`, `fn_80119AA8`, `fn_80119BB0`), which build their records through
+ *   `ef/fn_80119C44.c`.
+ * RANGE. .text 0x80117DA8-0x80119C44 (20 functions); extab 0x8000C4D4-0x8000C554, extabindex 0x80026628-0x800266E8,
+ *   .data 0x805A0488-0x805A06F0, .sdata 0x80791940-0x80791970, .sdata2 0x80796AC0-0x80796B2C.
+ * FLAGS. `cflags_main`; `#pragma peephole off` over every body (with the pass on MWCC fuses the nested slot loop's
+ *   `subi`/`cmpwi` into `subic.` and compresses the frame; playbook 39).
+ * NAMES. `eft026_set` and `eft028_set_koware` are the runtime dump's own names; the map has only `fn_` stems for the
+ *   rest, so plain definitions are `extern "C"`.
+ * RESIDUALS. 10 partial rows, including:
+ *  - `fn_80118154`: retail's base+offset induction (`addi r30,r31,4; addi r31,r31,8`) for the four `slots[]` pushes;
+ *    the pointer walk `p[0]`/`p--` here is the closest spelling;
+ *  - `fn_80118214`: the placement tail's register pressure after the 12-way switch;
+ *  - `fn_80118FF0`: ours addresses `lbl_80791940`/`lbl_80791948` with `lis`/`addi` where retail uses `@sda21`.
+ *   The other 7 partial rows are scheduling or frame layout with no recorded cause (`symdiff.py -u ef/eft026_fx
+ *   --all`).
+ *   flipcheck: `.sdata` claimed, not emitted; `.text` (0x1E78 of 0x1E9C), `.data` (0x30 of 0x268) and `.sdata2` (0x8 of
+ *   0x6C) short of the claim; `.text`, `.data`, `.sdata2`, extab and extabindex differing.
+ * SHAPES. `_EFT26_PHASE`'s colour is four plain `u8` fields, not a union (a union aligns to 4 and moves
+ *   `_EFT26_WORK::slots` from +0x7C to +0x90); the two `fn_800964E4` sites read it as a word through
+ *   `(u32*)&phase[i].color_r`.
+ *   `lbl_805A04B0` is `s32[]`: the eft026 timer tests compile to retail's signed `cmpw` only with the signed view.
+ *   `fn_80118B2C` calls `get_camera_direction()` mid-case, after the position accumulation.
  */
 
 #include "ef/eft_res_spawn_gate_ck.h" /* eft_res_spawn_gate_ck (rule 2: the owner's header) */
@@ -389,9 +409,8 @@ extern "C" void fn_801181D8(_EFT* self)
     }
 }
 
-/* State 0: pool one model per live char, then seed the five colour phases and place the model by
- * kind.  Kinds 1/2/8/9 are the folded-body kinds (they hang off the enemy joint and ramp a colour),
- * 3 is the two-model break, 7/10 are the plain ramps, and 0/4/5/6/11 only seed the phases. */
+/* Pools one model per live char, seeds the five colour phases and places the model by kind (1/2/8/9 hang off the
+ * enemy joint, 3 is the two-model break, 7/10 are plain ramps). */
 extern "C" void fn_80118214(_EFT* self)
 {
     _EFT26_WORK* work = (_EFT26_WORK*)self->work_0x38;

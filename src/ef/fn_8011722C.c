@@ -1,47 +1,18 @@
-/* ef/fn_8011722C.c - the kind-1 start stage of the effect job machine,
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * `.text` 0x8011722C..0x801173AC (one function, `fn_8011722C`).
- *
- * What it is.  The previous unit (ef/fn_80114E34.cpp, 0x80114E34..0x8011722C) holds the
- * job's update hook `fn_80116FDC`, a four-state switch on `job->state_0x05` that dispatches into
- * `fn_80117018`/`fn_80117050`/`fn_80117074`/`fn_80117084`; inside state 0 and state 1 a second byte,
- * `job->kind_0x02`, selects a variant (`fn_80117088`/`fn_8011722C` for kind 0/1 in state 0,
- * `fn_80117120`/`fn_801173AC` for kind 0/1 in state 1).  This function is the kind-1 state-0 entry: it
- * takes one effect character out of the shared `eft_control` pool (`eft_res_model_get`), creates the model
- * for it, drops it at one of three fixed offsets picked at random (`lbl_805A0460`), zeroes its scale
- * and its position, randomises the three rotation angles and clears the three spin deltas.  The
- * kind-1 state-1 handler `fn_801173AC` is the one that then integrates those spin deltas into the
- * angles and pushes the result to the character, so the field names below are its names.
- *
- * Result: 100 %; `.text` (0x180), `extab` (0x8) and `extabindex` (0xC) byte-identical to the target.
- *
- * Data.  The unit owns no pool section (the target object carries none): the three spawn offsets in
- * `.data` and the two floats in `.sdata2` are declared `extern` by their map names and never defined
- * (playbook 29).  `lbl_80796A80` is 0.4f (the scale `setVector3` is given), `lbl_80796A84` is 0.0f
- * (position and spin), and `lbl_805A0460` is three `Vec`s of world offsets (36 B, followed by a
- * stray 0.0f word the range 0x805A0460..0x805A0488 covers).
- *
- * Load-bearing source shapes (each measured; the wrong form costs real points):
- *   * `#pragma peephole off` is required for the pool-handle loop.  With the pass on MWCC forwards
- *     `work->chara[i] = eft_res_model_get()` into the test, dropping the target's `lwz r0, 4(r30)` - 4 B
- *     short, 96.41 %; the pragma keeps the reload (100 %).
- *   * the model id has to be the **ternary** `get_now_mapno() == 12 ? 24 : 23`, not the equivalent
- *     `(get_now_mapno() == 12) + 23`: both emit the same `cntlzw`/`srwi`/`addi`, but the addition
- *     narrows the value to the `u16` parameter *before* the first argument is loaded, where retail
- *     loads `work->chara[0]` first (97.92 % vs 100 %).
- *
- * Types.  `EftJob` and `EftCharaWork` are reconstructed minimally (only the offsets this function
- * reads) and are this unit's own copies: the sibling kind-0 functions (`fn_80116EEC`, `fn_80117120`,
- * `fn_80117088`) view the very same `job->work_0x38` block as 32 `MHchar*` slots plus two `s16`
- * counters, so the block is really one allocation with two views.  `MHchar` is `eft_res_model_get`'s
- * 0x168-byte `eft_control` slot (the pointer it returns is slot+4), and only the three fields this
- * function touches are named.  The 3-float vector is `Vec` from the shared `ef.h`, not a
- * fourth local `Vec3`.
- *
- * Language.  The unit's own symbol is plain (`fn_8011722C`, `-lang=c`), so the file is C and the
- * mangled nw4r callees are declared by their map spelling, as ef/fn_800FD520.c does.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_8011722C.c`.
+/* ef/fn_8011722C.c - the kind-1 state-0 entry of the effect job machine (`ef/eft022_fx.cpp`'s `fn_80116FDC`
+ *   dispatches on `state_0x05` and `kind_0x02`): it takes one effect character from the `eft_control` pool, creates
+ *   its model, drops it at one of three random offsets (`lbl_805A0460`) and randomises its rotation; the kind-1
+ *   state-1 handler `fn_801173AC` then integrates the spin.
+ * RANGE. .text 0x8011722C-0x801173AC (1 function); extab 0x8000C494-0x8000C49C, extabindex 0x800265C8-0x800265D4,
+ *   .data 0x805A0460-0x805A0488 (three `Vec` offsets and a 0.0f word), .sdata2 0x80796A80-0x80796A88 (0.4f, 0.0f).
+ * FLAGS. `cflags_main`; `#pragma peephole off` around the function: with the pass on, MWCC forwards
+ *   `work->chara[i] = eft_res_model_get()` into the loop test and drops retail's `lwz r0,4(r30)` reload.
+ * NAMES. The map has only the `fn_` stem.  The file is C; the mangled nw4r callees are declared by their map spelling.
+ * RESIDUALS. none in code: the row matches.
+ *   flipcheck: `.data`/`.sdata2` claimed, not emitted.
+ * SHAPES. The model id is the ternary `get_now_mapno() == 12 ? 24 : 23`: `(get_now_mapno() == 12) + 23` narrows to
+ *   the `u16` parameter before `work->chara[0]` is loaded.
+ *   `EftJob`/`EftCharaWork` are this unit's view of `job->work_0x38`; the kind-0 functions view the same block as 32
+ *   `MHchar*` slots and two `s16` counters.
  */
 
 #include "ef/fn_80116FCC.h" /* fn_80116FCC (rule 2: the owner's header) */
@@ -90,9 +61,7 @@ typedef struct EftJob {
 #define fn_80116FCC_c1 ((void (*)(EftJob*))fn_80116FCC)
 #define fn_80117074_c1 ((void (*)(EftJob*))fn_80117074)
 
-/* ---------------------------------------------------------------------------------------------------
- * externs - the callees and the shared pool
- * ------------------------------------------------------------------------------------------------- */
+/* The callees and the shared pool. */
 
 extern MHchar* eft_res_model_get(void);                 /* takes a free eft_control slot, returns its chara */
 /* fn_80116FCC / fn_80117074 come from their owner's leaf headers (`_EFT*` parameter); the consumer stores them in a typed

@@ -1,4 +1,4 @@
-/* Types and macros the units cut from `ef/eft007.cpp` share (hoisted at phase 4 so each is defined once). */
+/* ef/eft007_types.h - the types and macros `ef/eft007.cpp` and `ef/em_effect_ctrl.cpp` share (one definition each). */
 #ifndef MHTRI_EF_EFT007_TYPES_H
 #define MHTRI_EF_EFT007_TYPES_H
 
@@ -12,7 +12,7 @@
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 
 /* The engine's own 3-float vector.  It is NOT `nw4r::math::VEC3`: `vec_to_mh_vec3` exists to convert

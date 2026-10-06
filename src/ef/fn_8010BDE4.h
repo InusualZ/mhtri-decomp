@@ -1,8 +1,5 @@
-/*
- * Declarations for the symbols `src/ef/fn_8010BDE4.cpp` owns (docs/plan.md 6.5, rule 2).  The signatures
- * are the owner's own `extern "C"` definitions, so a consumer that includes this header cannot disagree
- * with the owner.  The only consumer today is `ef/fn_80105314.cpp`'s `fn_8010BDA8` dispatcher.
- */
+/* ef/fn_8010BDE4.h - the declarations of `ef/fn_8010BDE4.cpp`'s symbols, in the owner's own `extern "C"` signatures
+ * (docs/plan.md 6.5 rule 2); `ef/fn_80105314.cpp`'s `fn_8010BDA8` dispatcher calls them. */
 #ifndef MHTRI_EF_FN_8010BDE4_H
 #define MHTRI_EF_FN_8010BDE4_H
 

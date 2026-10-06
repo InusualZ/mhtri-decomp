@@ -1,8 +1,9 @@
-/* ef/eft_model_slot.cpp - the effect model-slot handlers
- *
- * `.text` 0x800FACAC..0x800FAE08, 5 functions written (the rest of the range is not decompiled yet).
- * Name is a GUESS: the five functions release or update an effect's model slot (`EftModelOwner`, handler at slot +0x34).
- * Each function keeps the `#pragma` state it had in its retired source.
+/* ef/eft_model_slot.cpp - the effect model-slot handlers: the five functions release or update an effect's model slot
+ *   (`EftModelOwner`, its handler at slot +0x34).
+ * RANGE. .text 0x800FACAC-0x800FAE08 (5 functions); extab 0x8000BD4C-0x8000BD6C, extabindex 0x80025ADC-0x80025B0C.
+ * FLAGS. `cflags_main`; `#pragma fp_contract off` and `#pragma peephole off` over every body.
+ * NAMES. The unit name is a GUESS from what the five functions do; the map has only `fn_` stems for them.
+ * RESIDUALS. none: all five rows match and flipcheck reports the unit READY.
  */
 
 #include "types.h"
@@ -13,7 +14,7 @@
 #include "pl.h"
 #include "g3d/fn_80063888.h" /* fn_80064820, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/effect_types.h"
 
 /* One pool slot `fn_800FBD68` returns. */

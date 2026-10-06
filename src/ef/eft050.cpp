@@ -1,88 +1,29 @@
-/* ef/eft050.cpp - the `eft050` effect family and the cockpit item-hold band it spawns from,
- * `.text` 0x8033F270..0x803432B4 (46 functions, 16452 B).
- *
- * Home and name, evidence class 2 (a real runtime-dump name).  The map already carries the dump's own
- * definition `eft050_set__FP4_PLWPQ34nw4r4math4VEC3Uc` at 0x80342F34 (`python tools/symbols/dumpmap.py
- * lookup 0x80342F34` answers it, and it is the range's only name the dump knows - every other address
- * answers the dump's `zz_XXXXXXXX_` placeholder).  So the module is `ef` and the file follows the
- * `eft00X.cpp` scheme of the registered neighbours - `ef/eft035.cpp` is the same shape: the dump's
- * `eft035_set`/`eft035_set2` named that TU and its band likewise mixes cockpit-HUD functions with the
- * effect family.  Language: the range defines a mangled name and its callees are mangled names, so
- * the file is `.cpp`; every definition whose map name is plain (`fn_XXXXXXXX`) is `extern "C"` so its
- * emitted name stays the map's stem and objdiff can pair it by name (playbook row 42).
- *
- * Sections.  `.text` 0x8033F270..0x803432B4, extab 0x80016CA4..0x80016DB4 and extabindex
- * 0x8003615C..0x800362F4 (34 eight- and twelve-byte records - exactly the bytes the bracketing units
- * leave unclaimed: `auto_fn_8033F13C_text` ends extab at 0x80016CA4 / extabindex at 0x8003615C and
- * `auto_fn_803432B4_text` starts at 0x80016DB4 / 0x800362F4).  No `.ctors`/`.dtors` word belongs to
- * the range.  The range's own `.data` run 0x805E7400..0x805E7A70 (28 labels, `leak: 0`), its `.sdata`
- * 0x8079308C..0x807930F0 and its `.sdata2` 0x8079B2C0..0x8079B320 are `extern`-declared by their map
- * names and never defined (playbook 29); the jump table at 0x805E918C is this range's
- * (`_8034239cswitchdataD_805e918c` in the dump, i.e. `fn_8034235C`'s switch).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/symedit.py range 0x8033F270 0x803432B4`: 45 of the 46 rows are bare `fn_`
- * stems, and `python tools/symbols/dumpmap.py lookup <addr>` answers `zz_XXXXXXXX_` for every address
- * but 0x80342F34).
- *
- * What it is.  The cockpit item-hold band (0x8033F270..0x8033FDA8) draws the player's item hold: its
- * 2D elements come from the `hud` library (`draw_sprite_ary`, `draw_sprite_idx`, `draw_sprite_anim_ary`,
- * `draw_itemicon_item_id`, `fn_802E0DA8`, `get_lsp_data`, `set_blendmode`, `get_now_areano`), it reads
- * the shared block `lobby_world_block` and the `_PLW` weapon state through `Pl_act_ck`/`Pl_Skill_ck`/
- * `Pl_master_ck`.  The rest is the `eft050` family: `eft050_set` pools the effect record, installs its
- * `release_0x40`/`dispatch_0x34` hooks (`fn_8034305C`, `fn_803430F4`) and its 100-byte work block, and
- * `fn_8033FDA8` is the second spawn entry the hold band calls.  Each spawner stamps `_EFT::type_0x02`,
- * the hooks and `_EFT::area_0x44`, seeds the pooled model handle (`eft_res_model_get`) and installs the
- * `state_0x05` machine, whose arms are the model-create pass (`res_eft_model_create`), the alive body,
- * the state advance and the pool release (`eft_res_slot_release`).
- *
- * Seam (unproven, as the brief says).  This is one maximal unclaimed run.  `python
- * tools/splits/tudiscover.py at 0x8033F270` must-links only `fn_8033F270` and offers weak left
- * (`0x8033C384`/`0x8033C3AC`/`0x8033C448`) and weak right (`0x8033F40C`/`0x8033F560`/`0x8033F638`)
- * boundaries with no anchor, so no seam was cut and the extent settles as the functions match.  The
- * band may hold more than one original TU; the registration records that rather than guessing it.
- *
- * Residuals.  29 of the range's 46 functions are reconstructed (4132 B of the target's 16452 B;
- * `python tools/units/measure.py ef/eft050 --main .` reads 24.48 fuzzy, 14 of them byte-identical and
- * 29 at or above the 80 % bar, mean 97.98 % over the 29 scored).  All but one of the rest is
- * 92-99 % - the residual is register colouring, the owner header's relocation name and the two data
- * passes below, not a code shape:
- *
- *   byte-identical  fn_8033F638, fn_8033FEE8, fn_8033FF24, fn_803401B8, fn_803401C8, fn_803401E4,
- *                   fn_80340594, fn_80342504, fn_8034257C, fn_80342C60, fn_80342C70, fn_80342F20,
- *                   fn_80342F30, fn_803430F4
- *   92.93-99.42     the other 15 (fn_8033FD78 99.42, fn_80342AC0 99.20, fn_8033FF60 99.09,
- *                   fn_8033F270 99.03, fn_8033F6C4 97.96, fn_803401CC 96.67, fn_8033F40C 95.52,
- *                   fn_8033FDA8 95.31, fn_8033F788 95.27, fn_8033FA2C 94.67, `eft050_set` 94.51,
- *                   fn_8034305C 94.18, fn_8033F560 93.98, fn_80342E80 93.63, fn_80340218 92.93)
- *   unwritten       fn_8033FAA4 (0x2D4), fn_80340010 (0x1A8), fn_8034028C (0x19C),
- *                   fn_80340428 (0x16C), fn_803405C8 (0x288), fn_80340850 (0x460),
- *                   fn_80340CB0 (0xCE0), fn_80341990 (0x1DC), fn_80341B6C (0x1DC),
- *                   fn_80341D48 (0x24C), fn_80341F94 (0x3C8), fn_8034235C (0x1A8),
- *                   fn_803425C8 (0x2E0), fn_803428A8 (0x218), fn_80342B70 (0xF0),
- *                   fn_80342CAC (0x1D4), fn_80343130 (0x184)
- *
- * Two residuals are worth a follow-up rather than a per-function note:
- *
- *   * the range's own `.sdata` tables are `extern` here, so MWCC addresses them with `lis`/`addi`;
- *     the target object addresses them with `@sda21` (`li r26, lbl_8079308C@sda21` in fn_8033F40C,
- *     `li r31, lbl_80793098@sda21` in fn_8033F560, `li r5, lbl_807930A0@sda21` in fn_8033FA2C),
- *     which is what a TU that *defined* those small-data objects emits.  Matching it is the data
- *     pass: define the tables and claim `.sdata` 0x8079308C..0x807930F0 (and the `.sdata2` pool
- *     0x8079B2C0..0x8079B320 the two floats in fn_80342B70 read) - one relocation each.
- *   * `hud/layout.h` declares `get_lsp_data` inside its `extern "C"` block, so our calls
- *     relocate to the plain name `get_lsp_data` where the target holds the mangling
- *     `get_lsp_data__FUsP10_mh_ivec2_` (rule 9: the map name is a mangling, the declaration belongs
- *     at C++ scope).  That is the owner header's edit, recorded as a `shared-file` request in this
- *     unit's outbox; it costs a relocation-name diff on fn_8033F270/fn_8033F788/fn_8033FA2C.
- *
- * Unit-level residuals, measured: fn_8033F270 misses retail's `extsh` before the narrow `anchor.x`
- * store (one instruction in a 412-byte body); fn_80342E80 keeps `extsh`+`sth` where retail stores
- * the widened sum and narrows only for the compare; fn_80340218's `abs`/`min`/apply chain and
- * fn_8033F560's `extsb`-per-use loop colouring differ by register; `EFT::work_0x38`'s block is
- * typed per family (`Eft050Work`, `Eft051Work`, `Eft050SetWork`) from the offsets each family
- * reads, and the first family's count byte at +0x04 overlaps its handle list above a count of 1
- * (its spawner seeds 1).
+/* ef/eft050.cpp - the eft050 effect family and the cockpit item-hold band it spawns from.
+ * RANGE. .text 0x8033F270-0x803432B4 (46 functions); extab 0x80016CA4-0x80016DB4, extabindex 0x8003615C-0x800362F4,
+ *   .data 0x805E7410-0x805E7B50, .sdata 0x8079308C-0x807930F0, .sdata2 0x8079B2C0-0x8079B320.  One maximal run:
+ *   `tudiscover.py at 0x8033F270` must-links only `fn_8033F270` and offers no anchored seam, so the band may hold
+ *   more than one original TU.  The item-hold band (0x8033F270-0x8033FDA8) draws the hold through the `hud`
+ *   sprite calls and reads `lobby_world_block` and the `_PLW` weapon state; the rest is the family's spawners
+ *   (`eft050_set`, `fn_8033FDA8`), its `release_0x40`/`dispatch_0x34` hooks (`fn_8034305C`, `fn_803430F4`) and its
+ *   `state_0x05` machine.
+ * FLAGS. `cflags_main`; `#pragma peephole off` around `fn_80342AC0` (retail keeps the unfused countdown, `subi` +
+ *   `cmpwi`, not the peephole's `subic.`).
+ * NAMES. `eft050_set` is the runtime dump's own name; the map has only `fn_` stems for the other 45 rows, so plain
+ *   definitions are `extern "C"`.  `Eft050Work`, `Eft051Work` and `Eft050SetWork` type `_EFT::work_0x38` per family
+ *   from the offsets each reads; the first family's count byte at +0x04 overlaps its handle list above a count of 1.
+ * RESIDUALS. 17 rows unwritten: 0x8033FAA4-0x8033FD78, 0x80340010-0x803401B8, 0x8034028C-0x80340594,
+ *   0x803405C8-0x80342504, 0x803425C8-0x80342AC0, 0x80342B70-0x80342C60, 0x80342CAC-0x80342E80,
+ *   0x80343130-0x803432B4.
+ *   15 partial rows, including:
+ *  - `fn_8033F40C`, `fn_8033F560`, `fn_8033FA2C`: retail addresses the `.sdata` tables `@sda21`
+ *    (`lbl_8079308C`, `lbl_80793098`, `lbl_807930A0`), ours with `lis`/`addi` because the tables are `extern` here;
+ *    `fn_8033F40C` also has a 0x20 frame against retail's 0x30;
+ *  - `fn_8033F270`: retail narrows `anchor.x` with an `extsh` before the store; ours omits it;
+ *  - `fn_80342E80`: ours narrows the sum (`extsh`) before the `sth`, retail only for the compare;
+ *  - `fn_80340218`: ours sign-extends before the `neg` where retail masks after it (`clrlwi`).
+ *   The other 9 partial rows have no recorded cause (`symdiff.py -u ef/eft050 --all`).
+ *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text` (0x1024 of 0x4044), extab (0x88 of 0x110) and
+ *   extabindex (0xCC of 0x198) short of the claim and differing.
  */
 
 #include "types.h"
@@ -96,7 +37,7 @@
 #include "ef/fn_800CDB2C.h" /* push_g3d_wk */
 #include "Runtime.PPCEABI.H/memset.h" /* memset - owner Runtime.PPCEABI.H/memset.c */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 
 /* ---------------------------------------------------------------------------------------------------
  * the records this unit reads
@@ -520,9 +461,8 @@ extern "C" void fn_8033FEE8(_EFT* self)
     work->count_0x04 = 0;
 }
 
-/* Spawns the family's effect for one area: rejects a foreign area, pools the record and its work
- * block, seeds the model handle, stamps the type/area and the two hooks, then installs the state
- * machine through `eft_state_flags_set`. */
+/* Spawns the family's effect in its area: pools the record and work block, seeds the model handle, stamps the
+ * type, area and hooks, and installs the state machine through `eft_state_flags_set`. */
 extern "C" void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param, u8 area)
 {
     if ((u8)get_now_areano() != (u8)area) {
@@ -665,8 +605,7 @@ extern "C" s32 fn_8034257C(HoldOwner* state, HoldOwner* owner)
     return (state->mode_0x08 == 2) ? (Pl_Skill_ck(owner->plw_0x30, 0x95) == 1) + 2 : 1;
 }
 
-/* Spawns five of the family's effects around one position, one per rotation step.  Retail keeps the
- * unfused countdown (`subi` + `cmpwi`, not the peephole's `subic.`), so the pass is scoped off here. */
+/* Spawns five of the family's effects around one position, one per rotation step. */
 #pragma peephole off
 extern "C" void fn_80342AC0(u32 kind, VEC3* pos, f32 scale)
 {

@@ -1,8 +1,22 @@
-/* ef/eft007.cpp - effect 007 (the player-weapon controller and the enemy emitter)
- *
- * `.text` 0x80102994..0x80103D28, 16 functions written (the rest of the range is not decompiled yet).
- * Phase 4: recut registered unit; the tail of the retired `ef/eft007.cpp` (the `em` head went to `ef/em_effect_ctrl.cpp`).
- * Each function keeps the `#pragma` state it had in its retired source.
+/* ef/eft007.cpp - the eft007 effect family: the player-weapon controller (`eft007_set`, `eft007_set_vec`, its states;
+ *   `_EFT007`/`_EFT007_WORK`/`_PLW`) and the enemy emitter (`eft007_part_set`, `eft007_part_spawn`, its states;
+ *   `_EFT_EMITTER`/`_ENEMY_WORK`).
+ * RANGE. .text 0x80102994-0x80103D28 (16 functions); extab 0x8000BF1C-0x8000BF7C, extabindex 0x80025D94-0x80025E24,
+ *   .data 0x8059DAA0-0x8059DBEC, .sdata2 0x80796740-0x80796750.  The `em` controller below 0x80102994 is
+ *   `ef/em_effect_ctrl.cpp`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` from `eft007_set` to `fn_8010383C` and around `eft007_part_spawn`/
+ *   `fn_80103B60` (retail keeps the unfused compare forms; playbook 39).
+ * NAMES. `eft007_set` and `eft007_set_vec` are the runtime dump's own names; `eft007_part_set` and
+ *   `eft007_part_spawn` are GUESSes from their bodies; the map has only `fn_` stems for the rest.
+ * RESIDUALS. 1 partial row: `fn_80103518` is instruction-identical; only the callee-saved registers are coloured
+ *   differently (playbook 22).  Ours names the three switch tables `@933`/`@1050`/`@1166` where retail names the
+ *   `jumptable_8059DB00`/`DB50`/`DBA0` entries.
+ *   flipcheck: `.sdata2` claimed, not emitted; `.data` (0xEC of 0x14C) short of the claim and differing; `.text`
+ *   differs in 34 bytes.
+ * SHAPES. The `eft007` setters take the part index as `u8` and the enemy wrappers as `u32`: the narrowing at the call
+ *   is retail's `clrlwi`.
+ *   `get_camera_pos`/`get_camera_direction` are called through the out-pointer view (`void (VEC3*)`): the owner's
+ *   by-value `VEC3 get_camera_pos()` grows the frame from 0x1C0 to 0x1F0.
  */
 
 #include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2: the owner's header) */
@@ -18,7 +32,7 @@
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 #include "ef/eft007_types.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
@@ -243,14 +257,13 @@ extern "C" _EFT_EMITTER* fn_80103B60(_ENEMY_WORK* enemy, u8 part);
 void vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src);
 void get_joint_wmat_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::MTX34* mtx);
 
-/* The block's pooled data - declared, never defined here (the pools belong to the data pass). */
+/* The unit's own pool, declared, never defined (playbook 29). */
 #include "unsplit/ef_tables.h" /* lbl_8059DCF8 / lbl_8059DE00 / lbl_8059DE48 (rule 2: the band) */
 
 #pragma peephole off
 
-/* Spawns the `eft007` effect for the player's weapon: builds the object, seeds its pool block with the
- * id, the scale and the placement vector, maps the weapon type onto the effect's type/colour pair and
- * installs the two handlers. */
+/* Spawns the eft007 effect for the player's weapon: seeds the pool block, maps the weapon type onto the effect's
+ * type and colour, and installs the two handlers. */
 void eft007_set(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math::VEC3* vec, f32 scale)
 {
     if (self->area_0x16 != (u8)get_now_areano()) {
@@ -389,9 +402,8 @@ extern "C" void fn_80102D0C(_EFT007* self)
     }
 }
 
-/* Places and advances the first step of the animation family: builds the two pooled emitters from the
- * weapon type's resource pair and runs the per-type placement. Every arm shares one tail (the model's
- * joint position then the second step), so the arms only `break`. */
+/* Builds the two pooled emitters from the weapon type's resource pair and runs the per-type placement; every arm
+ * shares one tail, so the arms only `break`. */
 extern "C" void fn_80102D48(_EFT007* self)
 {
     nw4r::math::MTX34 mtx;
@@ -515,9 +527,8 @@ extern "C" void fn_80102D48(_EFT007* self)
     fn_80103130(self);
 }
 
-/* Per-frame body of the second step of the animation family: re-places and drives every pooled emitter,
- * recolours them from the weapon type's key table (or the stage's colour), then either hands them back to
- * the pool or, for three of the types, waits for the camera to move past the model. */
+/* Re-places, drives and recolours every pooled emitter, then hands them back or waits for the camera to pass the
+ * model. */
 extern "C" void fn_80103130(_EFT007* self)
 {
     nw4r::math::MTX34 mtx;
@@ -707,9 +718,8 @@ extern "C" void fn_801036BC(_EFT007* self)
     eft_res_slot_release(self);
 }
 
-/* Answers whether the model is in one of the motion states that park or retire the effect: 1 when the
- * motion is one of the `Pl_frame_check` families, otherwise the step machine is walked to its end state
- * (which retires the pooled emitters once) and 0 comes back. */
+/* Returns 1 while the model is in a `Pl_frame_check` motion family; otherwise walks the step machine to its end
+ * state and returns 0. */
 extern "C" s32 fn_801036C0(_EFT007* self)
 {
     _PLW* model = self->model_0x30;

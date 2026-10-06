@@ -1,7 +1,26 @@
-/* ef/eft013_fx.cpp - effect 013 fx band
- *
- * `.text` 0x80107250..0x8010BDE4, 32 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source.
+/* ef/eft013_fx.cpp - the eft013, eft014 and eft015 effect families: their setters, state dispatchers, hooks and
+ *   per-frame handlers.
+ * RANGE. .text 0x80107250-0x8010BDE4 (58 functions); extab 0x8000C074-0x8000C1F4, extabindex 0x80025F98-0x800261D8,
+ *   .data 0x8059EB50-0x8059F518, .sdata 0x807917A0-0x80791820, .sdata2 0x807967A8-0x807967E8.
+ * FLAGS. `cflags_main`; `#pragma peephole off` for `fn_8010A318`, `fn_8010BBCC`, `fn_8010BBDC` and `fn_8010BDA8`.
+ * NAMES. `eft013_set`, `eft013_set_dmeft_pl`, `eft014_set_daihouden` and `eft015_set` are the runtime dump's own
+ *   names; the map has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
+ * RESIDUALS. 26 rows unwritten: 0x80107250-0x80107314 (`eft013_set`), 0x801073B8-0x80107518 (`fn_801073B8`),
+ *   0x80107784-0x801077C4 (`eft013_set_dmeft_pl`), 0x80107A18-0x80107CA0 (`fn_80107A18`, 2 rows), 0x80107DDC-0x801089C0
+ *   (`fn_80107DDC`, 3 rows), 0x80108A74-0x8010A318 (`fn_80108A74`, 5 rows), 0x8010A49C-0x8010A6A0 (`fn_8010A49C`),
+ *   0x8010A988-0x8010AAD0 (`eft014_set_daihouden`, 2 rows), 0x8010ABF4-0x8010AD00 (`fn_8010ABF4`, 2 rows),
+ *   0x8010AE0C-0x8010B154 (`fn_8010AE0C`, 3 rows), 0x8010B198-0x8010BBCC (`fn_8010B198`, 4 rows), 0x8010BBE0-0x8010BD3C
+ *   (`eft015_set`).
+ *   14 partial rows, including:
+ *  - `fn_8010AAD0`, `fn_8010AD00`, `fn_8010B154`: retail addresses `lbl_80791808` `@sda21`, ours with `lis`/`addi`;
+ *  - `fn_8010AD00`: ours compares the states 1, 2, 3, 0 where retail compares 0, 1, 2, 3 (docs/ef.md, "The case-0
+ *    nested dispatch");
+ *  - `fn_80107640`: ours compares the type signed with a compare chain where retail uses `subi` + `cmplwi` range
+ *    tests, narrows the type with `clrlwi`, and keeps the hook addresses in the stored register (the body sits
+ *    outside the `#pragma peephole off` scope).
+ *   The other 9 partial rows have no recorded cause (`symdiff.py -u ef/eft013_fx --all`).
+ *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text` (0xEDC of 0x4B94), extab (0xB8 of 0x180), extabindex
+ *   (0x114 of 0x240) and `.sdata2` (0x8 of 0x40) short of the claim and differing.
  */
 
 #include "types.h"
@@ -20,7 +39,7 @@
 #include "unsplit/unknown.h"
 #include "unsplit/ef.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_80105314_types.h"
 
 /* size: 0x34 - lower bound, an approximation. */

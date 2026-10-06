@@ -1,4 +1,4 @@
-/* Types and macros the units cut from `ef/fn_801173AC.cpp` share (hoisted at phase 4 so each is defined once). */
+/* ef/fn_801173AC_types.h - the types and macros `ef/fn_801173AC.cpp` and `ef/eft026_fx.cpp` share. */
 #ifndef MHTRI_EF_FN_801173AC_TYPES_H
 #define MHTRI_EF_FN_801173AC_TYPES_H
 

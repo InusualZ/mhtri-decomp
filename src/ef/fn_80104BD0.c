@@ -1,65 +1,30 @@
-/* ef/fn_80104BD0.c - one function, .text 0x80104BD0..0x80105314.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * Per-frame handler of the enemy hit-effect controller.  It reads the enemy work object and the
- * effect work block off the effect object, spawns the two `nw4r::ef` effects the type selects, keeps
- * the second one alive only for the four "paired" types, drives each effect's root matrix from the
- * enemy joint (or from the enemy's own position), colours them from the stage effect-colour table and
- * scales them per frame.
- *
- * The object is the generic 72-byte effect object the `eft002` cluster also uses (`_EFT` in
- * `800FCED4_fn_800FCED4.cpp`): flag at +0x01, type at +0x02, state at +0x05, position at +0x18, the
- * enemy work at +0x30, the per-family work block at +0x38 and the area byte at +0x44.  Only this
- * family reads +0x24 (a `_CP_VECTOR` rotation source for `cpSetRotMatrix`) and its work block is the
- * larger `_EM_EFT_WORK` (count, joint, two effects, an RGBA and a scale).
- *
- * The two big `switch`es are the type dispatch: the first (joint bound) picks one of three
- * colour/height pairs, the second (no joint) picks one of two colours.  Their case sets are read off
- * the target's comparison trees and each is enumerated in full because MWCC groups consecutive cases
- * into the same run (a value that is not a case would fall to `default`, so every value in a
- * non-default run must be written out).
- *
- * Callees with a C++-mangled map name are declared with that spelling, as `800D7F54`/`803066F0` do:
- * the file is compiled `-lang=c` (see the brief), so the identifier is emitted verbatim and the
- * relocation pairs with the map's symbol.
- *
- * Result: `fn_80104BD0` 100 %, `.text` (0x744), `extab` (0x8) and `extabindex` (0xC) byte-identical to
- * the target.
- *
- * Load-bearing source shapes (each one measured; the wrong form costs real points):
- *   * the two big `switch`es enumerate **every** value of each non-default run.  MWCC merges
- *     consecutive same-body cases into a run, so a value left out falls to `default` and the
- *     comparison tree changes.  The target's tree gives the runs: the joint-bound switch has
- *     `[0x1E,0x20] += 3`, `0x37 += 1`, `[0x39,0x3C] += 0xC/+8`, `[0x4E,0x50] += 0x34`,
- *     `[0x70,0x73] += 4`, and the colour switches are `[0x00,0x02]`/`[0x04,0x0B]`/`[0x55,0x73]`/...
- *     vs the default colour (the full lists are in the bodies).
- *   * the file needs the peephole pass off: retail keeps `rlwinm r,r,0,29,30` + `cmpwi` unfused where
- *     the pass fuses `rlwinm.` + `bne` (playbook 39).
- *   * the colour byte extraction is the **masked** form, `(color & 0xFF000000) >> 24`; with the
- *     peephole off that emits the raw `clrrwi`+`srwi` (and `rlwinm`+`srwi`+`clrlwi`) chain retail has,
- *     while `(u8)(color >> 24)` is three instructions short.
- *   * `s32 i;` must be declared **before** `u32 color;`: the declaration order decides which of the two
- *     gets r27 and which reuses the dead `enemy`'s r30.
- *   * `s32 mapno = get_now_mapno__Fv();` (not `u8`) is what narrows with `clrlwi` and then compares
- *     `cmpwi`; `(s32)self->type_0x02 == 0x2E` is the same for the `0x2E` test.
- *   * the effect object needs its `+0x34` slot (the sibling `_EFT`'s `dispatch_0x34`) or the work
- *     pointer lands at +0x34 and every later offset shifts.
- *   * the secondary `switch` reads the type into a **local** used as the table index: the type then
- *     lives in a non-r0 register and MWCC emits the `subi`+`cmplwi` range test retail has (with a
- *     direct field read it lands in r0 and becomes two compares).
- *
- * `VEC3`, `MTX34`, `_CP_VECTOR`, `_ENEMY_WORK` and the two effect types are reconstructed minimally
- * (only the offsets this unit reads); the sibling units still carry private copies, so the shared ones
- * belong in `include/` the next time one of them is touched.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_80104BD0.c`.
+/* ef/fn_80104BD0.c - the per-frame handler of the enemy hit-effect controller: it spawns the one or two `nw4r::ef`
+ *   effects the type selects, drives their root matrices from the enemy joint (or the enemy's position), colours
+ *   them from the stage effect-colour table and scales them per frame.
+ * RANGE. .text 0x80104BD0-0x80105314 (1 function); extab 0x8000BFB4-0x8000BFBC, extabindex 0x80025E78-0x80025E84,
+ *   .data 0x8059E430-0x8059E688, .sdata2 0x80796778-0x80796784.
+ * FLAGS. `cflags_main`; `#pragma peephole off` from the first statement on (retail keeps `rlwinm` + `cmpwi` unfused,
+ *   playbook 39).
+ * NAMES. The map has only the `fn_` stem.  The file is C; mangled callees are declared by their map spelling.
+ * RESIDUALS. none in code: the row matches.
+ *   flipcheck: `.data`/`.sdata2` claimed, not emitted.
+ * SHAPES. The two type switches enumerate every value of each non-default run (MWCC merges consecutive same-body
+ *   cases into a run, so a missing value falls to `default` and changes the comparison tree).
+ *   The colour bytes are extracted masked (`(color & 0xFF000000) >> 24`): `(u8)(color >> 24)` is three instructions
+ *   short.
+ *   `s32 i;` is declared before `u32 color;` (the order decides which reuses the dead `enemy` register).
+ *   `s32 mapno = get_now_mapno__Fv();` (not `u8`) narrows with `clrlwi` and compares `cmpwi`, as
+ *   `(s32)self->type_0x02 == 0x2E` does.
+ *   The effect object keeps its `+0x34` slot (`dispatch_0x34`) so the work pointer stays at +0x38.
+ *   The secondary switch reads the type into a local used as the table index (MWCC then emits retail's
+ *   `subi` + `cmplwi` range test).
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/cp_vector.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 
 /* ---------------------------------------------------------------------------------------------------
  * types

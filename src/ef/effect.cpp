@@ -1,38 +1,26 @@
-/* ef/effect.cpp - the effect handle helpers (root matrix, colour and scale changes, key lookups)
- *
- * `.text` 0x800F95A4..0x800FACAC, 36 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `ef/effect.cpp` (kept for its notes and residuals): */
-/* effect.cpp - the game's effect manager, `.text` 0x800F95A4..0x800FAE08 (41 functions).
- *
- * Naming note: the symbol map spells 34 of this range's 41 functions as bare `fn_XXXXXXXX`
- * (checked with symedit: each is a bare .text entry in config/RMHE08/symbols.txt), so those
- * definitions have to keep the map's own spelling; the other seven arrive mangled and are written
- * through their owners.
- *
- * Final home, evidence class 1 (a `__FILE__` string).  fn_800F9884's `nw4r::db::Panic` assert passes
- * the bare string `effect.cpp` (0x8059B5D0, 0x0B bytes) as its file argument - the retired gap object
- * `build/RMHE08/obj/auto_fn_800F9884_text.o` relocates `lbl_8059B5D0` into `Panic`'s r3 (line 2854)
- * and `lbl_8059B5E0` (`NW4R:Failed assertion 0`) into its r5.  The `.cpp` suffix decides the language
- * and `tools/units/langcheck.py` agrees (seven definitions arrive mangled:
- * `SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3`, `effect_move__FPQ34nw4r2ef6Effect`,
- * `change_color_eff__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC38_GXColor`,
- * `change_paramscale_eff__FPQ34nw4r2ef6Effectf`,
- * `change_paramscale_eff_vec3__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3`,
- * `eftGetKeyRGB__FPUclPUcPUcPUc`, `eftGetKeyAlpha__FPUcl`).  The module is `ef`: every sibling in the
- * band is `ef/*` and the range's callees are `nw4r::ef::Effect` members.  The seam is unproven (the
- * proposal boundary, 0x800F95A4 / 0x800FAE08, cuts at function boundaries).
- *
- * Evidence: the retired per-function targets `build/RMHE08/obj/auto_fn_800F*_text.o` (MAIN),
- * `python tools/flags/infer.py build/RMHE08/obj/auto_fn_800F9E04_text.o` (peephole off) and the
- * DOL's extabindex table (extab 0x8000BC5C..0x8000BD6C, extabindex 0x80025974..0x80025B0C).
- *
- * The `nw4r::db::Panic` file/message pool, the `lbl_807965xx` float constants, the two name tables
- * (`lbl_8058A880`, `lbl_8058A924`), the `.bss` `eft_control`/`lbl_806A1400`/`lbl_806A2080` runs are
- * declared, never defined here - the data pass claims them once a definition would make the object
- * emit them (docs/plan.md 8.4).
+/* ef/effect.cpp - the game's effect manager: the effect handle helpers (root matrix, colour and scale changes,
+ *   key-frame colour lookups) over `nw4r::ef::Effect`.
+ * RANGE. .text 0x800F95A4-0x800FACAC (36 functions); extab 0x8000BC5C-0x8000BD4C, extabindex 0x80025974-0x80025ADC,
+ *   .ctors 0x8056F30C-0x8056F310, .data 0x8059B5D0-0x8059B5F8, .bss 0x806A1400-0x806A20F0, .sdata2
+ *   0x807965D8-0x80796608.  The name is the range's own `__FILE__` string `effect.cpp` (0x8059B5D0, passed to
+ *   `nw4r::db::Panic` by `fn_800F9884`).
+ * FLAGS. `cflags_main`; `#pragma fp_contract off` and `#pragma peephole off` for the whole file.
+ * NAMES. `SetRootMtxTrans`, `effect_move`, `change_color_eff`, `change_paramscale_eff`, `change_paramscale_eff_vec3`,
+ *   `eftGetKeyRGB` and `eftGetKeyAlpha` are the runtime dump's own names; the map has only `fn_` stems for the rest.
+ * RESIDUALS. 21 partial rows, including:
+ *  - `fn_800FA9B8`: ours inverts the name-table walk's test and drops the second record check (`lwz`/`cmpwi`);
+ *  - `fn_800FA208`: ours keeps an extra saved register and lays the state compares out 1, 2, 3 where retail
+ *    branches on 2, 0, 4;
+ *  - `fn_800F99D4`: ours turns the `u8` flag test into `neg`/`or`/`srwi` where retail passes it through;
+ *  - `fn_800FA5D4`: the stack slots and the loop's exit branch differ;
+ *  - `eftGetKeyRGB`: ours re-masks each channel with an extra `clrlwi`;
+ *  - `fn_800F9CDC`: ours drops the `xoris` of the signed int-to-float conversion;
+ *  - `fn_800F9A70`: ours advances the key pointer before the load;
+ *  - `fn_800F97F0`: retail reads the table through `eft_name_tbl_ptr` (`@sda21`, `.sbss` 0x80794A70); ours indexes
+ *    `lbl_8058A880` directly.
+ *   The other 13 partial rows have no recorded cause (`symdiff.py -u ef/effect --all`).
+ *   flipcheck: `.bss`/`.ctors`/`.data` claimed, not emitted; `.text` (0x168C of 0x1708) and `.sdata2` (0x10 of 0x30)
+ *   short of the claim; `.text`, extab and extabindex differing.
  */
 
 #include "ef/eft_scnbox_data_ptr.h" /* eft_scnbox_data_ptr (rule 2: the owner's header) */
@@ -44,7 +32,7 @@
 #include "pl.h"
 #include "g3d/fn_80063888.h" /* fn_80064820, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/effect_types.h"
 
 /* ---------------------------------------------------------------------------------------------------
@@ -169,7 +157,7 @@ u8 get_now_areano();
 u32 get_stg_eft_col(u8 area, u8 index);
 u32 hit_point_sphr(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 r);
 
-/* the unit's own owned symbols other units call (declared in the owners' headers in wave 2) */
+/* The unit's own symbols other units call. */
 extern "C" void eft_state_flags_set(EftFrameState* self, u8 a, u8 b);
 extern "C" EftVectors* fn_800FA3E8(EftVectors* self);
 extern "C" nw4r::math::VEC3* fn_800FA420(nw4r::math::VEC3* self);

@@ -1,61 +1,20 @@
-/* ef/eft009.cpp - the `eft009` enemy-effect cluster, 0x80103D28..0x80104BD0 (10 functions).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * The unit is the enemy-side effect family: `fn_80104A68` is the allocator every setter funnels through
- * (it pools a 72-byte effect object, installs `fn_80104B94` as the `state_0x05` dispatcher and
- * `fn_80104B54` as the pool release), `fn_80103D28` / `fn_801041BC` are the two per-frame handlers that
- * place the pooled effects on an enemy joint (`get_joint_wmat_em` / `get_joint_wpos_em`) and recolour
- * them, and `eft009_set_pos` is the one function the map already names. The neighbour unit
- * `auto/800FCED4_fn_800FCED4.cpp` is the `eft002` sibling and shares this shape (allocator + `byte_5`
- * dispatcher + pool release), which is where the `_EFT` layout below was cross-checked.
- *
- * `splits.txt` `.text` 0x80103D28..0x80104BD0, 10 symbols in address order:
- *   fn_80103D28 (0x494)  per-frame handler, shared joint matrix, type switch on `type_0x02`
- *   fn_801041BC (0x6E4)  per-frame handler, joint matrix/pos, colour switch, `effect_move` liveness
- *   fn_801048A0 (0x10)   `state_0x05++`
- *   fn_801048B0 (0x04)   destroys the effect object (`eft_res_slot_release`)
- *   eft009_spawn_at_joint (0x98)   setter: single effect, re-scaled by `get_em_chg_scale`
- *   eft009_set_pos (0x84) setter: position + rotation vector, no scale
- *   fn_801049D0 (0x98)   setter: as eft009_spawn_at_joint plus `copyVec3`
- *   fn_80104A68 (0xEC)   the allocator every setter funnels through
- *   fn_80104B54 (0x40)   pool release handler (`release_0x40`)
- *   fn_80104B94 (0x3C)   `state_0x05` dispatcher (`dispatch_0x34`)
- *
- * Language: C++. The object's own definition `eft009_set_pos__FUcPQ34nw4r4math4VEC3P10_CP_VECTORfUl` is
- * mangled, so the file is `.cpp` and every definition whose map name is plain (`fn_80103D28`, ...) is
- * `extern "C"` - MWCC would otherwise mangle it and objdiff, which pairs by name, would report 0 %
- * (playbook 42). The mangled callees are declared with the signatures their map names encode.
- *
- * Two pool-block views share `_EFT::work_0x38` (the `eft002` unit's pattern): the move family
- * (`fn_80103D28` / `fn_801041BC`) drives a shared joint matrix at +0x0C and a placement offset at +0x3C,
- * the create/set family drives a single pooled effect at +0x08 and an `f32` paramscale at +0x14. The two
- * overlap (the matrix covers +0x0C..0x3C), so the field is a union of the two typed pointers.
- *
- * Flag lever: the whole unit needs the peephole pass off (the `#pragma peephole off` / `reset` pair
- * around the bodies). With it on, `eft009_set_pos` measures 92.12, `eft009_spawn_at_joint` 95.26, `fn_801049D0`
- * 95.00 and `fn_80104A68` 91.61; with it off all four are 100. The pass was fusing the u8 argument
- * truncations and the byte masks retail keeps unfused (playbook 39). `fn_80103D28` 96.06 -> 99.32 and
- * `fn_801041BC` 94.76 -> 99.55.
- *
- * Result: 8 of 10 symbols byte-identical (100 %); `fn_80103D28` 99.32 and `fn_801041BC` 99.55. All ten
- * sizes match, and `.text` (0xEA8), `extab` (0x38) and `extabindex` (0x54) are byte-identical to the
- * target.
- *
- * Residuals (both in the two big handlers, both scheduling rather than source-shaped):
- *   * the loop-invariant `lbl_80796750` (`f32 neg`) load is one slot early - retail emits
- *     `li r26,0; mr r27,r31; lfs f31` where we emit `lfs f31; li r26,0; mr r27,r31`. Declaring `neg`
- *     inside the loop body, in the `for`-init and via a `while` preheader all schedule it to the same
- *     place, so the source form is not the lever.
- *   * our object emits its own three switch tables in `.data` (0x2D0) where retail references
- *     `jumptable_8059E160` / `E268` / `E328` from the shared pool. That is a relocation *name*
- *     difference only (the report metric does not count it), but a `Matching` flip would add the 0x2D0
- *     bytes unless the tables are claimed in the measured data pass (playbook 23/29).
- *
- * Data: the `.data` run 0x8059DBF0..0x8059E430 (the two `u16` id tables and the `u32` joint table) and
- * the `.sdata2` run 0x80796750..0x80796778 (the scale constants) are the shared pool, `extern`-declared
- * here and never defined (playbook 23/29).
- *
- * `MTX34` comes from `nw4r/math.h` (landed with the `auto/800FF8D4` batch).
+/* ef/eft009.cpp - the eft009 enemy-effect family: two per-frame handlers that place pooled effects on an enemy joint
+ *   and recolour them, three setters, the allocator they funnel through and the record's hooks.
+ * RANGE. .text 0x80103D28-0x80104BD0 (10 functions); extab 0x8000BF7C-0x8000BFB4, extabindex 0x80025E24-0x80025E78,
+ *   .data 0x8059E160-0x8059E430 (the three switch tables), .sdata2 0x80796750-0x80796778.  `fn_80104A68` is the
+ *   allocator (it installs `fn_80104B94` as the `state_0x05` dispatcher and `fn_80104B54` as the pool release).
+ * FLAGS. `cflags_main`; `#pragma peephole off` around every body (playbook 39: with the pass on, the `u8` argument
+ *   truncations and byte masks retail keeps are fused away).
+ * NAMES. `eft009_set_pos` is the runtime dump's own name; `eft009_spawn_at_joint` is a GUESS from its body; the map
+ *   has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
+ * RESIDUALS. 2 partial rows: `fn_80103D28`, `fn_801041BC`: the loop-invariant `lbl_80796750` load (`lfs f31`) sits
+ *   one slot early in ours (retail `li r26,0; mr r27,r31; lfs f31`); declaring `neg` in the loop, the `for`-init or a
+ *   `while` preheader schedules it the same.  Ours names the three switch tables `@374`/`@550`/`@551` where retail
+ *   names `jumptable_8059E160`/`jumptable_8059E268`/`jumptable_8059E328`.
+ *   flipcheck: `.sdata2` claimed, not emitted; `.text` differs in 20 bytes.
+ * SHAPES. `_EFT::work_0x38` is a union of two typed pointers: the move family (`fn_80103D28`/`fn_801041BC`) drives a
+ *   joint matrix at +0x0C and an offset at +0x3C, the set family one pooled effect at +0x08 and an `f32` paramscale
+ *   at +0x14.
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
@@ -68,7 +27,7 @@
 #include "ef/fn_80105314.h"
 #include "unsplit/ef.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_state_flags_set_c1 ((void (*)(_EFT*, u8, u8))eft_state_flags_set)
 

@@ -1,74 +1,32 @@
-/* ef/eft_res.cpp - the game's effect-resource manager, `.text` 0x800F6520..0x800F95A4 (43 functions).
- *
- * Naming note: the symbol map spells 36 of this range's 43 functions as bare `fn_XXXXXXXX`
- * (checked with `tools/symbols/dumpmap.py lookup`: each answers `dump=zz_...` and is a bare `.text`
- * entry in config/RMHE08/symbols.txt), so those definitions keep the map's own spelling; the other
- * seven arrive mangled (`res_eft_create__FUsUsUl`, `res_eft_model_create__FP6MHcharUsUl`,
- * `res_eft_model_create_light__FP6MHcharUsUll`, `res_eft_UV_model_create__FP6MHcharUsUllPP9_g3d_worklUc`,
- * `res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc`, `get_eft_res_name__FUs`,
- * `push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl`) and are written through real C++ signatures.
- *
- * Final home, evidence class 3 (what the code does plus the neighbours' naming scheme), with class 2 as
- * support.  Class 1 first: no `__FILE__` string is reachable from this range - not one of the 43
- * functions touches a .data/.rodata string (every `lis` in the range's disassembly names `eft_control`,
- * `lbl_806A2D34`, the `*_proID_tbl_ptr` run or a `jumptable_`, and the retired gap objects carry no
- * string object at all).  Class 2: the runtime dump names seven of the range's functions and all seven
- * carry the same stem - `res_eft_*`, `get_eft_res_name`, `push_eft_effect_heap_num` - i.e. the game's
- * `eft` effect-resource layer; that names the functions, not the TU.  So the file name follows class 3:
- * this is the resource half of the `ef` module (`eft_control` init and slot table, the proID tables,
- * the load/create path, the effect-heap push), whose siblings are `effect.cpp` (the manager) and
- * `eft001.cpp`..`eft009.cpp` (the per-effect clusters); `eft_res` names it in the siblings' snake_case
- * scheme.
- *
- * Module `ef`: both bracketing units (`sound/fn_800F2A94.cpp` below, `ef/effect.cpp` above) and every
- * callee in the range are the ef module's; `langcheck.py` is conclusive for C++ (the seven mangled
- * definitions above plus `RetireEffect__Q34nw4r2ef12EffectSystemFPQ34nw4r2ef6Effect` and
- * `RetireEmitterAll__Q34nw4r2ef6EffectFv` as mangled undefined callees).  The seam is unproven (the
- * proposal boundary cuts at function boundaries; the range's last function drives the same `_EFT` state
- * machine as `ef/effect.cpp`'s first).
- *
- * Sections: `.text` 0x800F6520..0x800F95A4 plus the extab/extabindex runs dtk assigns at the first split
- * (extab 0x8000BB6C..0x8000BC5C, extabindex 0x8002580C..0x80025974).  No `.ctors`/`.dtors` word.
- *
- * What the unit is.  `eft_control` (0xC44 B of .bss) is the effect manager's control block: three
- * `get_move_work_*` pools (0x48-byte per-effect slots, 0x168-byte per-model records, a 0x40-byte block
- * heap with a trailing flag run), three parallel 0x100-entry resource-id arrays and the byte at +0xC40
- * that gates the per-frame walk.  A 256-entry slot table follows it at `lbl_806A2D34` (a 4-byte header
- * then 0x18-byte records); the records' proID is resolved through the `*_proID_tbl_ptr` tables, the
- * file is loaded through `load_file_req`/`pull_res_mem` and its callback feeds `fn_800F7D44`, and the
- * pooled `nw4r::ef::Effect`s are retired through `push_eft_effect_heap_num`.
- *
- * State (this round): 34 of the 43 functions are reconstructed, 27 of them at >= 80 %, and the unit's
- * `.text` is 35.71 % (4434 / 12420 B) by the official report metric.  Measured with
- * `build/tmp/measure.py` against this worktree's own split object (MAIN has no registration yet):
- *
- *   >= 80 %: fn_800F6520 94.0, fn_800F65B4 89.1, fn_800F6688 94.5, fn_800F69A0 96.7, fn_800F69B8 94.1,
- *   fn_800F6A24 92.4, fn_800F6A78 80.0, fn_800F7AA4 81.6, fn_800F7BF0 88.5, fn_800F7C74 83.1,
- *   fn_800F7D44 87.1, fn_800F8634 85.7, eft_res_slot_get 82.7, eft_res_slot_release 96.4, eft_res_model_get 96.4,
- *   fn_800F89A4 98.2, fn_800F8A44 92.8, push_eft_effect_heap_num 86.6, fn_800F8C78 80.2,
- *   fn_800F8D80 87.2, fn_800F8DA4 90.8, fn_800F91C4 98.6, fn_800F9278 98.7, fn_800F92D4 100,
- *   fn_800F92E0 100, fn_800F9380 100, eft_res_models_spawn 86.7.
- *   below the bar (residuals, each with what still differs in the unit note): fn_800F6984 77.1,
- *   eft_res_spawn_gate_ck 78.9, get_eft_res_name 68.0, res_eft_model_create 66.7, fn_800F6AC8 59.9,
- *   res_eft_create 50.0, fn_800F8B44 39.0.
- *   not reconstructed (9): fn_800F6710, fn_800F6B6C, fn_800F6DB4, fn_800F7778, fn_800F7F18,
- *   fn_800F8358, res_eft_model_create_light, res_eft_UV_model_create,
- *   res_eft_UV_model_create_name.  The four `fn_` stubs are the range's four largest bodies
- *   (0x9C4/0x440/0x2DC/0x32C B, 5.3 KB of the 12.4 KB); the three `res_eft_*` stubs need the
- *   EftModel/g3d mesh chain (`fn_8007B878`/`fn_8007BA08`/`fn_8005AB00`/`fn_800D3874`/`fn_800D38F8`).
- *
- * Load-bearing shapes (each measured):
- *   * `eft_control`'s address is materialised into one callee-saved register at the top of almost every
- *     function that touches it (`EftControl* ctrl = &eft_control;` as the first statement): the
- *     unhoisted form measured 74.7 on eft_res_slot_release and 76.6 on fn_800F89A4, hoisting them is 96.4 / 98.3.
- *   * The 256-record table is addressed two ways and both are needed verbatim: `lbl_806A2D34 + i*0x18`
- *     with the record's fields at +0x04.. (fn_800F6A78, whose `EftProHdrSlot` carries the 4-byte header
- *     as a pad) and `(lbl_806A2D34 + 4) + i*0x18` with the fields at +0x00.. (the searchers
- *     fn_800F6AC8/fn_800F7AA4 and the loaders fn_800F8358/fn_800F7D44).
- *   * `load_file_req`'s argument order is (name, data, size, callback, 4, ctx) - the callback is the
- *     4th argument, not the 5th; getting it wrong cost 7 points on fn_800F8634 (79.3 -> 85.9).
- *   * The unsigned difference in fn_800F8C78 (`(u32)(ptr - heap) >> 6`) is load-bearing: the signed
- *     form emits `srawi` and fuses the `<< 6` into `clrrwi` (79.4 -> 80.2).
+/* ef/eft_res.cpp - the game's effect-resource manager: `eft_control` and its slot pools, the 256-entry proID slot
+ *   table, the resource load/create path and the effect-heap push.
+ * RANGE. .text 0x800F6520-0x800F95A4 (43 functions); extab 0x8000BB6C-0x8000BC5C, extabindex 0x8002580C-0x80025974,
+ *   .data 0x8059B3B0-0x8059B5D0, .sbss 0x80794A40-0x80794A88, .sdata2 0x807965D0-0x807965D8.  The seam is unproven:
+ *   the range's last function drives the same `_EFT` state machine as `ef/effect.cpp`'s first.
+ * NAMES. The unit name is a GUESS in the siblings' scheme (no `__FILE__` string is reachable; the runtime dump's
+ *   `res_eft_*`, `get_eft_res_name` and `push_eft_effect_heap_num` name the `eft` resource layer).  The dump names
+ *   seven functions; `eft_res_slot_get`, `eft_res_slot_release`, `eft_res_model_get`, `eft_res_spawn_gate_ck` and
+ *   `eft_res_models_spawn` are GUESSes from their bodies; the map has only `fn_` stems for the rest.
+ * RESIDUALS. 9 rows unwritten: 0x800F6710-0x800F6984 (`fn_800F6710`), 0x800F6B6C-0x800F7AA4 (`fn_800F6B6C`,
+ *   `fn_800F6DB4`, `fn_800F7778`), 0x800F7F18-0x800F8634 (`fn_800F7F18`, `fn_800F8358`), 0x800F8E68-0x800F91A0
+ *   (`res_eft_model_create_light`, `res_eft_UV_model_create`, `res_eft_UV_model_create_name`: they need the
+ *   EftModel/g3d mesh chain `fn_8007B878`/`fn_8007BA08`/`fn_8005AB00`/`fn_800D3874`/`fn_800D38F8`).
+ *   31 partial rows, including:
+ *  - `res_eft_create`, `res_eft_model_create`, `get_eft_res_name`, `fn_800F6AC8`: retail narrows the `u16`/`u8`
+ *    arguments (`clrlwi`) at entry, ours does not (or folds it into a `clrlslwi`);
+ *  - `fn_800F6AC8`: retail unrolls the 0x18-byte record search three-wide (`li r0,0x33`), ours one-wide with `lbzu`;
+ *  - `fn_800F8B44`: retail loads `eft_control`'s pool fields before the loop and walks the flag bytes with a
+ *    pointer, ours re-indexes (`lbzx`) and runs a different loop shape.
+ *   The other 26 partial rows have no recorded cause (`symdiff.py -u ef/eft_res --all`).
+ *   flipcheck: `.data`/`.sbss`/`.sdata2` claimed, not emitted; `.text` (0x13E8 of 0x3084), extab (0xA8 of 0xF0) and
+ *   extabindex (0xFC of 0x168) short of the claim and differing.
+ * SHAPES. `EftControl* ctrl = &eft_control;` opens every function that touches it, so the address lives in one
+ *   callee-saved register (the unhoisted form loses the register on `eft_res_slot_release` and `fn_800F89A4`).
+ *   The slot table is addressed two ways, both needed: `lbl_806A2D34 + i*0x18` with the fields at +0x04 (`fn_800F6A78`,
+ *   whose `EftProHdrSlot` pads the 4-byte header) and `(lbl_806A2D34 + 4) + i*0x18` with the fields at +0x00 (the
+ *   searchers `fn_800F6AC8`/`fn_800F7AA4` and the loaders `fn_800F8358`/`fn_800F7D44`).
+ *   `load_file_req`'s arguments are (name, data, size, callback, 4, ctx): the callback is the fourth.
+ *   `fn_800F8C78`'s difference is unsigned (`(u32)(ptr - heap) >> 6`): the signed form emits `srawi` and a `clrrwi`.
  */
 
 #include "types.h"
@@ -198,8 +156,7 @@ inline EftProSlot* eft_pro_slots(void) {
 }
 
 /* ---------------------------------------------------------------------------------------------------
- * this unit's own entry points (the callers' declarations belong in the owner's header; the extern
- * sweep at the end of the round moves them to ef/eft_res.h)
+ * this unit's own entry points (`ef/eft_res.h` declares the ones other units call)
  * ------------------------------------------------------------------------------------------------- */
 
 #ifdef __cplusplus

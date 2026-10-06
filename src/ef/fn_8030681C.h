@@ -1,4 +1,4 @@
-/* Declarations owned by `src/ef/fn_8030681C.*` (docs/plan.md 6.5 rule 2): a consumer includes this header instead of declaring the symbols itself. */
+/* ef/fn_8030681C.h - the declarations of `ef/fn_8030681C.cpp`'s symbols its consumers call (docs/plan.md 6.5 rule 2). */
 #ifndef MHTRI_EF_FN_8030681C_H
 #define MHTRI_EF_FN_8030681C_H
 
@@ -7,7 +7,6 @@
 #include "gx.h"
 #include "camera/camera.h"
 
-/* Declarations moved here from `unsplit/unknown.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct _ENEMY_WORK;
 
 #ifdef __cplusplus

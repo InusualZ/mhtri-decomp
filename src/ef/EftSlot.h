@@ -1,7 +1,5 @@
-/* The 0x3C-byte effect slot record `ef/eft_slot.cpp` keeps in its ten-entry pool, shared with the net sync
- * (`hud/net_char_sync.cpp`) that packs and applies it (docs/plan.md 6.5 rule 1: one definition, included).
- * The definition was moved here from `src/ef/eft_slot.cpp`.
- */
+/* ef/EftSlot.h - the 0x3C-byte effect slot record `ef/eft_slot.cpp` keeps in its ten-entry pool, shared with
+ * `hud/pl_frame_sync.cpp` (through `hud/net_char_sync.h`), which packs and applies it (docs/plan.md 6.5 rule 1). */
 #ifndef MHTRI_EF_EFTSLOT_H
 #define MHTRI_EF_EFTSLOT_H
 

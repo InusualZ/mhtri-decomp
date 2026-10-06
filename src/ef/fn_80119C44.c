@@ -1,61 +1,17 @@
-/* ef/fn_80119C44.c - the effect-record constructor and its three hooks,
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * `.text` 0x80119C44..0x80119DEC (5 functions, in address order).
- *
- * What it is.  `fn_80119C44` is the constructor of a 0x48-byte effect record (`_EFT_HEAP`, the same object
- * `auto/800FCED4_fn_800FCED4.cpp` and `ef/fn_800FD520.c` drive): it gates on the current
- * area, takes a record from the `eft_res_slot_get` pool with a 0x18-byte work block attached, seeds the work
- * block's effect count and scale, stamps the type/area, and installs the two handlers that travel with
- * the record - `fn_80119D10` as the pool-release hook at +0x40 and `fn_80119D9C` as the per-frame
- * dispatch at +0x34.  `fn_80119D10` picks between the two identical pool-release bodies
- * (`fn_80119D24`/`fn_80119D60`), and `fn_80119D9C` is the four-state machine that runs the type-2
- * start (`fn_80119DEC`) or the type handler (`fn_8011A2A0`/`fn_8011A34C`/`fn_8011ACF0`/`fn_8011AD00`).
- *
- * Language.  The unit's own symbols are plain (`fn_80119C44`, `fn_80119D10`, ...), so the file is C and
- * the mangled callee is declared by its map spelling - the same finding as `ef/fn_800FD520.c`
- * (a mangled *callee* is not evidence of a C++ unit; only a mangled definition or a `.cpp` `__FILE__`
- * string would be).  The `extab`/`extabindex` fragment the object carries comes from `cflags_main`'s
- * `-Cpp_exceptions on`, not from a C++ source.
- *
- * Result.  `fn_80119D10`, `fn_80119D24` and `fn_80119D60` are byte-identical; `.text` (0x1A8), `extab`
- * (0x18) and `extabindex` (0x24) are the target's sizes and all six fragment records pair.  Two
- * residuals remain, both measured (objdiff per-symbol `match_percent`):
- *
- *   * `fn_80119C44` (99.61 %).  The two handler stores materialise the address as
- *     `lis r3, sym@ha; addi r3, r3, sym@l; stw r3, off(r31)` where the target uses **r0** for the `addi`
- *     (`addi r0, r3, sym@l; stw r0, off(r31)`) - the instructions, sizes and relocations are otherwise
- *     identical.  It is not a source shape: the same two assignments in `eft002_set` (C++,
- *     `auto/800FCED4_fn_800FCED4.cpp`) *do* compile to `addi r0` with this flag set, and no spelling of
- *     the assignment here moves it (tried: a typed local, an explicit cast, `void*` fields, a comma
- *     expression, the two stores swapped, the stores moved before the `eft_state_flags_set` call, a nested
- *     block-scoped declaration, `#pragma peephole off`) - so it is the allocator's preference for this
- *     function's IR and belongs to the residual, not to the source.
- *   * `fn_80119D9C` (89.00 %).  The instructions are the target's, in the target's order, and the
- *     function is the target's 0x50 bytes - the difference is **block layout**.  Retail is
- *     `[chain][default blr][case0: b N][case1][case2][case3][exit blr][N: nested dispatch]`, i.e. case
- *     0's block is a bare jump and the nested switch's blocks sit after the function's exit block (its
- *     `break` shares that exit, which is what makes the nested switch a case-0 body).  Every shape that
- *     MWCC will emit for that source puts the nested blocks in case 0's slot instead
- *     (`[chain][default blr][N: nested dispatch][case1][case2][case3][exit blr]`, 54.25 %), so the
- *     landed source is the equivalent **`case 0: break;` + after-switch switch** form, which at least
- *     reproduces the target's size and instruction order and scores 89.00 %; its own residual is a
- *     trailing dead `blr` (the nested switch's private exit) and case 0's merged slot.  The shapes tried
- *     for the retail layout, all measured, are in `.pi/notes/80119c44-fn-80119c44-b297.md` - the nested
- *     switch as a case-0 body with `break`/`return`/neither, with the cases in either source order, with
- *     an explicit `default` before/after, with braces, with an explicit trailing `return`, with a
- *     table-lookup or a `s8` operand, and with `#pragma peephole off`; MWCC never emits the retail
- *     layout for any of them, and the sibling dispatchers of the same family (`fn_800FC428`,
- *     `fn_8011B180`, `fn_80107DDC`) all carry it in retail.
- *
- * Data.  The unit owns no pool section: its one float (`lbl_80796B2C`, 1.0f) lives in a shared
- * `.sdata2` pool, so it is `extern`-declared by its map name and never defined (playbook 29).  The
- * `extab`/`extabindex` fragments travel with the code and are claimed in `splits.txt` with its `.text`.
- *
- * Types.  `_EFT_HEAP` and `_EFT_HEAP_WORK` are reconstructed minimally (only the offsets this unit touches)
- * and are copies of the neighbours' definitions (`auto/800FCED4_fn_800FCED4.cpp`'s `_EFT_HEAP`/`_EFT_WORK`);
- * all of them belong in one shared header, which does not exist yet.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_80119C44.c`.
+/* ef/fn_80119C44.c - an effect record's constructor and its three hooks, dispatching into `ef/eft029.cpp`'s handlers.
+ * RANGE. .text 0x80119C44-0x80119DEC (5 functions); extab 0x8000C554-0x8000C56C, extabindex 0x800266E8-0x8002670C,
+ *   .sdata2 0x80796B2C-0x80796B30.  `fn_80119C44` takes a 0x48-byte `_EFT_HEAP` record with a 0x18-byte work block
+ *   from `eft_res_slot_get`, installs `fn_80119D10` (pool release, +0x40) and `fn_80119D9C` (the four-state dispatch,
+ *   +0x34); `fn_80119D9C` runs the type-2 start `fn_80119DEC` or the type handlers in `ef/eft029.cpp`.
+ * NAMES. The map has only `fn_` stems for this range.  The file is C: the unit's own symbols are plain (a mangled
+ *   callee is not evidence of a C++ unit); its extab/extabindex come from `cflags_main`'s `-Cpp_exceptions on`.
+ * RESIDUALS. 2 partial rows:
+ *  - `fn_80119C44`: the two handler stores use `r3` for the `addi` where retail uses `r0` (sizes and relocations
+ *    agree); no spelling of the assignments moves it (docs/ef.md, "Handler stores through r0");
+ *  - `fn_80119D9C`: retail places case 0's nested type switch after the function's exit block; MWCC puts it in
+ *    case 0's slot for every spelling, so the source is the `case 0: break;` plus after-switch form, which keeps
+ *    the target's size and order but leaves a dead `blr` (docs/ef.md, "The case-0 nested dispatch").
+ *   flipcheck: `.sdata2` claimed, not emitted; `.text` differs in 26 bytes.
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */

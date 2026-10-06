@@ -1,7 +1,28 @@
-/* ef/eft022_fx.cpp - effect 022 fx band
- *
- * `.text` 0x801153D0..0x8011722C, 37 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source.
+/* ef/eft022_fx.cpp - the eft021 and eft022 effect families and the eft023/eft024 job machines.  Each creator takes the
+ *   0x48-byte `_EFT` record with a work block from `eft_res_slot_get`, stamps `+0x03` and installs its hooks:
+ *   21 `fn_80115460` (0x25C `_EFT_WORK_B`, release `fn_80115554`, dispatch `fn_80115664`), 22 `eft022_set` (0x8
+ *   `_EFT_WORK_C`, `fn_801164F0`, `fn_8011652C`), 23 `fn_80116770` (0x4C `_EFT_JOB_WORK`, `fn_8011688C`,
+ *   `fn_8011689C`), 24 `fn_80116DA4` (0x84 `_EFT_JOB2_WORK`, `fn_80116FCC`, `fn_80116FDC`).
+ * RANGE. .text 0x801153D0-0x8011722C (37 functions); extab 0x8000C3F4-0x8000C494, extabindex 0x800264D8-0x800265C8,
+ *   .data 0x805A0208-0x805A0460, .sdata 0x80791930-0x80791938, .sdata2 0x80796A30-0x80796A80.  Family 20 below
+ *   0x801153D0 is `ef/fn_80114E34.cpp`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` over every body (playbook 39) and `#pragma unroll off` around
+ *   `fn_80117120`.
+ * NAMES. `eft022_set` is the runtime dump's own name; the map has only `fn_` stems for the rest, so plain definitions
+ *   are `extern "C"`.
+ * RESIDUALS. 17 partial rows, including:
+ *  - `fn_80116080`: the pose-blend loop's float scheduling;
+ *  - `fn_80116FDC`: block layout (the case bodies sit after the switch exit in retail);
+ *  - `fn_80116B00`: the unsigned int-to-float conversion (`xoris`).
+ *   The other 14 partial rows have no recorded cause (`symdiff.py -u ef/eft022_fx --all`).
+ *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text` (0x1E2C of 0x1E5C) and `.sdata2` (0x10 of 0x50) short of
+ *   the claim; `.text`, `.sdata2`, extab and extabindex differing.
+ * SHAPES. `fn_80116EEC` nests `for (j = 0; j < 4; j++) for (k = 0; k < 8; k++)` (retail's `mtctr`/`bdnz` and the
+ *   `mr r3,r4` early returns; a flat `do`/`while` emits a decrement and compare).
+ *   `fn_80117120` reaps one slot per iteration.
+ *   `fn_80116FDC` uses the `case 0: break; case 1: break;` plus after-switch form (docs/ef.md, "The case-0 nested
+ *   dispatch"); bodies inside the cases stay inline.
+ *   `fn_80116B00` loads its seven float constants into named locals before the loop (inline globals reload per use).
  */
 
 #include "ef/eft_res_model_get.h" /* eft_res_model_get (rule 2: the owner's header) */
@@ -27,7 +48,7 @@
 #include "unsplit/ef.h"
 #include "sound/fn_800D7F54.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_80114E34_types.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_res_model_get_c1 ((void* (*)(void))eft_res_model_get)

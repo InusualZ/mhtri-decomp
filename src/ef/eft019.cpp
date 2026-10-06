@@ -1,72 +1,30 @@
-/* ef/eft019.cpp - the `eft019` effect family, `.text` 0x801121DC..0x80114E34 (24 functions).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump resolves only the nine `eft019_*`
- * names - `eft019_set`, `eft019_set_core`, `_vec`, `_brethend`, `_tyakudan`, `_mazule`, `_subtype`,
- * `_ring`, `_smoke` - and every other address in the range is the dump's placeholder `zz_XXXXXXXX_`).
- *
- * Registration (docs/plan.md 12).  Class 2 evidence named it: the runtime dump's own name at
- * 0x801121DC is `eft019_set`, so the module is `ef` and the file is `eft019.cpp` - the scheme of its
- * neighbours `ef/eft001.cpp` ... `ef/eft009.cpp`.  Language: the object's own definition
- * `eft019_set__FPQ34nw4r4math4VEC3UcUc` is a C++ mangling (a `nw4r::math::VEC3*` plus `u8/u8`), so the
- * file is `.cpp` and every definition whose map name is plain (`fn_XXXXXXXX`) is `extern "C"` so its
- * emitted name stays the map's stem and objdiff can pair it (playbook row 42).  `extab` (0xA8 = 21
- * records) and `extabindex` (0xFC = 21 x 12 B) are the ranges the two neighbouring blocks leave
- * unclaimed; no `.ctors` word belongs to the range (no auto-split object of it carries one).
- *
- * What it is.  `fn_80114A1C` is the family allocator: it rejects a foreign area, runs
- * `eft_res_slot_get(0x58)` for the 0x48-byte `_EFT` record plus its 0x58-byte work block at +0x38, stamps
- * `field_0x03 = 19` (the eft019 family tag) and `type_0x02` with the caller's id, seeds the work
- * pool's capacity from the per-id count table `lbl_8059F670`, and installs the two hooks that travel
- * with the record - `fn_80112D1C` (the per-frame dispatcher, `dispatch_0x34`) and `fn_80112CE0` (the
- * pool release, `release_0x40`).  The `eft019_set_*` functions are the spawn entry points: each picks
- * an id, calls the allocator, fills `pos_0x18`/`rot_0x24`/`timer_0x0C`, and stores its variant id and
- * two scale factors into the work block.
- *
- * The state machine is `fn_80112D1C`: `state_0x05` 0 -> `fn_80112D58` (create the pooled effect
- * objects and place them), 1 -> `fn_8011392C` (the per-frame update), 2 -> `fn_8011484C` (advance the
- * state), 3 -> `fn_8011485C` (destroy the record through `eft_res_slot_release`).
- *
- * Work block.  The effects go through one `res_eft_create(u16 id, u16 param, u32 mode)` pool whose
- * capacity is the id's `lbl_8059F670` entry (maximum 7) and whose used length is `live_0x3C` while
- * `fn_80112D58` builds it, then `count`; `fn_80112CE0` hands the whole array back with
- * `push_eft_effect_heap_num` and `fn_8011392C` reaps the dead entries with `fn_800F9884` /
- * `RetireEffect`.
- *
- * Types.  `nw4r::math::VEC3`/`MTX34` come from `nw4r/math.h`; `_EFT`, `_CP_VECTOR` and the
- * `nw4r::ef::Effect` class from `ef.h`; `_PLW` and `MHchar` from `pl.h`.  The work block is typed per
- * family, so it is a unit-local `_EFT019_WORK` cast from `_EFT::work_0x38` (the pattern
- * `ef/eft001.cpp` uses for its `_EFT001_EFFECT_WORK`), and the actor record the setters hang effects
- * off is viewed through a unit-local `_EFT019_ACTOR`: the canonical `enemy.h` names the +0x1E1 byte
- * `act_id` while every ef consumer reads it as the area number (`ef/eft007.cpp` `area_no`,
- * `ef/eft009.cpp` `effect_type_0x1E1`, `enemy/fn_8012BA00.c` `area_no`, "the same value on both
- * records means 'same area'"), and pads +0x016/+0x1A4/+0x110 which this unit reads.
- *
- * Data.  The unit owns no pool section (the target object carries none): the `.data` tables, the
- * `.sdata` pointer and the `.sdata2` constants are `extern`-declared by their map names and never
- * defined (playbook 29).
- *
- * Result.  23 of the 24 functions are reconstructed; 16 are byte-identical and every one measures at
- * or above 80 % (size-weighted 95.01 % over the 7480 reconstructed bytes, 62.60 % of the range's
- * 11352).  Retail's frame/register layout pins three source shapes that are not the obvious ones:
- * the `_CP_VECTOR*` setters copy the rotation triple with word reads (`effect->rot_0x24 = *rot;`,
- * never through `nw4r::math::VEC3*` - that emits an `fctiwz` per component), `eft019_set` needs one
- * `VEC3` per camera case (nine of them; a case-local reuses one slot) and `fn_80114A1C` writes its two
- * seeds with a chained assignment so the constant is loaded once and 0x48 is stored first.
- *
- * Residuals.  `fn_8011392C` (0x8011392C, 3872 B) is not written - the family's per-frame update, the
- * one function of the range still missing; `m2c` decompiles it (`build/tmp/eft019/all.m2c.c`
- * lines 1019-1700) and the work-block field table above comes from it.  Of the 23 written:
- * `eft019_set` 98.14 (one case's branch layout), `eft019_set_brethend` 97.73 and `eft019_set_mazule`
- * 97.96 (the two bodies of their chains sit in the other order), `eft019_set_subtype` 98.14 (switch
- * tail layout), `fn_80112D58` 91.84 (`eft_control`, a `.bss` global, is addressed sda21 here where
- * retail emits `lis`/`addi`), `fn_80112B7C` 85.59 (retail puts the `type_0x02 = 103` body out of line
- * and neither the `else-if` nor the empty-`then` spelling reproduces it - rule 8 forbids forcing it
- * with a `goto`) and `fn_801148E4` 82.42 (its local frame is 0x10 larger than retail's: retail keeps
- * the projected vector at +0x20, the clip pair at +0x18, the colour word at +0x08 and the camera
- * handle at +0x0C).
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/eft019.cpp`.
+/* ef/eft019.cpp - the eft019 effect family: its spawn entry points, the family allocator and the record's state
+ *   machine.
+ * RANGE. .text 0x801121DC-0x80114E34 (24 functions); extab 0x8000C32C-0x8000C3D4, extabindex 0x800263AC-0x800264A8,
+ *   .data 0x8059F670-0x805A00B8, .sdata 0x80791840-0x80791930, .sdata2 0x807969D8-0x80796A28.  `fn_80114A1C` is the
+ *   allocator (`eft_res_slot_get(0x58)`, family tag `field_0x03 = 19`, capacity from `lbl_8059F670`, hooks
+ *   `fn_80112D1C` as `dispatch_0x34` and `fn_80112CE0` as `release_0x40`); `fn_80112D1C` dispatches `state_0x05` to
+ *   `fn_80112D58` (create), `fn_8011392C` (per-frame update), `fn_8011484C` (advance) and `fn_8011485C` (release).
+ * FLAGS. `cflags_main`; `#pragma peephole off` from `eft019_set` to the end of the file (playbook 39: with the pass on,
+ *   the `u8` argument `clrlwi`s fold away).
+ * NAMES. The nine `eft019_set*` entries are the runtime dump's own names; the map has only `fn_` stems for the rest,
+ *   so plain definitions are `extern "C"`.  `_EFT019_ACTOR` reads the actor's +0x1E1 byte as the area number (the
+ *   canonical `enemy.h` calls it `act_id`; every ef consumer compares it as an area).
+ * RESIDUALS. 1 row unwritten: 0x8011392C-0x8011484C (`fn_8011392C`, the per-frame update).
+ *   7 partial rows:
+ *  - `eft019_set`: frame 0x100 against retail's 0x90; ours copies each case's `VEC3` through a second stack slot;
+ *  - `fn_80112D58`: frame 0x80 against 0x70, and ours places the `lbl_8059FB40` colour block inline;
+ *  - `eft019_set_brethend`, `fn_80112B7C`: ours inverts the last test of the chain, so the two bodies sit in the other
+ *    order;
+ *  - `fn_80112B7C`: retail puts the `type_0x02 = 103` body out of line (the `else-if` and empty-`then` spellings
+ *    do not reproduce it);
+ *  - `eft019_set_mazule`, `eft019_set_subtype`, `fn_801148E4` have no recorded cause (`symdiff.py -u ef/eft019`).
+ *   flipcheck: `.sdata`/`.sdata2` claimed, not emitted; `.text` (0x1E60 of 0x2C58), extab (0xA0 of 0xA8), extabindex
+ *   (0xF0 of 0xFC) and `.data` (0x254 of 0xA48) short of the claim and differing.
+ * SHAPES. The `_CP_VECTOR*` setters copy the rotation triple with word reads (`effect->rot_0x24 = *rot;`): through a
+ *   `nw4r::math::VEC3*` it emits an `fctiwz` per component.
+ *   `eft019_set` keeps one `VEC3` per camera case (nine).
+ *   `fn_80114A1C` writes its two seeds with a chained assignment, so the constant is loaded once and 0x48 stored first.
  */
 
 #include "types.h"
@@ -85,7 +43,7 @@
 #include "sound/fn_800D7F54.h"
 #include "ef/ef_particlemanager.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 
 /* ---------------------------------------------------------------------------------------------------
@@ -113,7 +71,10 @@ void fn_80114C6C(void* actor, u8 key, s32 joint);
 void fn_80114CC8(void* actor, u8 key);
 void fn_80114D28(void* actor, u8 kind, u8 type, f32 scale);
 
-/* unsplit ef-band helpers (the band's bracketing units disagree, so they have no owner header) */
+/* Callees other units own, declared locally (a rule-2 residual): `fn_80050850`/`fn_800513F0` are
+ * `fn_8004CAD8.cpp`'s, `fn_8005696C`/`fn_80056A20` `draw_shape_arm.cpp`'s, `eft_res_slot_get`/`eft_res_slot_release`
+ * `ef/eft_res.cpp`'s, `fn_80306D6C` `ef/fn_8030681C.cpp`'s, `fn_80331210` `hud/pl_frame_sync.cpp`'s and
+ * `fn_800E0A14` `sound/mhchar.cpp`'s. */
 void fn_80050850(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 void fn_8005696C(s32 id, s32 kind, s32 mode, s32* color, s32 timer, f32 x, f32 y);
@@ -143,9 +104,9 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
 void eft019_set_ring(nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot);
 void eft019_set_smoke(nw4r::math::VEC3* pos, u8 area, u8 type, s32 timer);
 
-/* The effect-manager id table and the sound-object hooks `fn_80112D58` case 0x88 drives: all
- * unsplit ef-band symbols the target references by their plain map names, so they carry C
- * linkage (relocaudit). */
+/* The effect-manager id table and the sound-object hooks `fn_80112D58` case 0x88 drives, declared locally with C
+ * linkage (the target references their plain names): `fn_800A4420`/`fn_800A51D8` are `ef/ef_effect.cpp`'s,
+ * `fn_800A970C`/`fn_800A9714`/`fn_800A67E8` `ef/ef_emitter.cpp`'s (a rule-2 residual). */
 extern "C" {
 void** fn_800A4420(s32 id);
 void* fn_800A51D8(nw4r::ef::Effect* effect, u32 arg);
@@ -174,10 +135,8 @@ struct _EFT019_SND_VTABLE {
 void calcVecAngXY(nw4r::math::VEC3* v, u32* x, u32* y);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
 
-/* The camera entries.  The map spells both `__Fv`, but every call site in this unit (and in
- * `ef/eft007.cpp`, which records the same finding) passes an out pointer, so the declaration carries
- * the pointer; the relocation name that emits differs from the map's `__Fv` spelling, which the
- * report's metric ignores (playbook 23). */
+/* The camera entries: the map spells both `__Fv`, but every call site passes an out pointer, so the declaration
+ * carries it (the relocation name differs from the map's; playbook 23). */
 nw4r::math::VEC3 get_camera_direction(void); /* target references get_camera_direction__Fv (relocaudit) */
 void get_camera_pos(nw4r::math::VEC3* out);
 
@@ -257,7 +216,7 @@ struct _EFT019_EMY_DATA {
     /* +0x9C */ _EFT019_EMY_SCALE* field_0x9C;
 }; /* size: 0xA0 */
 
-/* --- pooled data (declared, never defined: the pool belongs to the data pass) -------------------- */
+/* --- the unit's own pool, declared, never defined (playbook 29) ---------------------------------- */
 
 extern u8 lbl_8059F670[];  /* per-id effect count, indexed by `type_0x02` (.data 0x8059F670, 0x8C) */
 extern u16 lbl_8059F6FC[]; /* the effect id table `res_eft_create` is fed (.data 0x8059F6FC, 0x114) */
@@ -294,16 +253,10 @@ extern f32 lbl_80796A18;
 extern f32 lbl_80796A20;
 extern f32 lbl_80796A24;
 
-/* Playbook row 39: the peephole pass folds the u8 argument truncations and the byte masks that retail
- * keeps (`clrlwi r4,r5,24` before every `fn_80114A1C` call, `clrlwi r0,r6,24` before the `type - 3`
- * compares), and it fuses the record-form compares.  With the pass on, `eft019_set_core` loses both
- * `clrlwi`s (80 B vs the target's 84) and `eft019_set_vec` / `eft019_set_tyakudan` / `eft019_set_smoke`
- * lose the same pair; off, every one of them is byte-identical.  Measurement: see the unit report. */
+/* The bodies keep retail's `u8` argument masks and unfused record-form compares (playbook 39). */
 #pragma peephole off
 
-/* ===================================================================================================
- * 0x801121DC  eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
- * =================================================================================================== */
+/* 0x801121DC (0x434): Spawns an eft019 record and orients it per camera case. */
 
 void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
 {
@@ -426,9 +379,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
     }
 }
 
-/* ===================================================================================================
- * 0x80112610  eft019_set_core(nw4r::math::VEC3* pos, u8 area, u8 type, f32 scale_a, f32 scale_b)
- * =================================================================================================== */
+/* 0x80112610 (0x54): Spawns an eft019 record with its two scale factors. */
 
 void eft019_set_core(nw4r::math::VEC3* pos, u8 area, u8 type, f32 scale_a, f32 scale_b)
 {
@@ -443,9 +394,7 @@ void eft019_set_core(nw4r::math::VEC3* pos, u8 area, u8 type, f32 scale_a, f32 s
     }
 }
 
-/* ===================================================================================================
- * 0x80112664  eft019_set_vec(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 type, f32 scale)
- * =================================================================================================== */
+/* 0x80112664 (0x60): Spawns an eft019 record with one scale and a copied rotation. */
 
 void eft019_set_vec(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 type, f32 scale)
 {
@@ -461,9 +410,7 @@ void eft019_set_vec(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 type, f3
     }
 }
 
-/* ===================================================================================================
- * 0x801126C4  eft019_set_brethend(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 type, f32 s)
- * =================================================================================================== */
+/* 0x801126C4 (0xE0): Spawns the breath-end record: variant 11 for ids 3-5, variant 17 for ids 18, 21, 22 and 83. */
 
 void eft019_set_brethend(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 type, f32 scale)
 {
@@ -495,9 +442,7 @@ void eft019_set_brethend(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 typ
     }
 }
 
-/* ===================================================================================================
- * 0x801127A4  eft019_set_tyakudan(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 type, f32 s)
- * =================================================================================================== */
+/* 0x801127A4 (0x68): Spawns a landing record that keeps only the rotation's yaw, with a scale. */
 
 void eft019_set_tyakudan(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 type, f32 scale)
 {
@@ -515,9 +460,7 @@ void eft019_set_tyakudan(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 typ
     }
 }
 
-/* ===================================================================================================
- * 0x8011280C  eft019_set_mazule(u8 id, nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot, _PLW* plw)
- * =================================================================================================== */
+/* 0x8011280C (0x188): Spawns the muzzle record for a weapon id, the variant picked by the player's kind. */
 
 void eft019_set_mazule(u8 id, nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot, _PLW* plw)
 {
@@ -566,10 +509,7 @@ void eft019_set_mazule(u8 id, nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot, _
     }
 }
 
-/* ===================================================================================================
- * 0x80112994  eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area,
- *                                _CP_VECTOR* rot, s32 timer, f32 scale)
- * =================================================================================================== */
+/* 0x80112994 (0x1E8): Spawns an eft019 record of a subtype with its rotation, timer and scale. */
 
 void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot,
                         s32 timer, f32 scale)
@@ -629,9 +569,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
     }
 }
 
-/* ===================================================================================================
- * 0x80112B7C  fn_80112B7C(void* source, u8 key, u8 subtype, VEC3* pos, VEC3* rot, f32 scale)
- * =================================================================================================== */
+/* 0x80112B7C (0xCC): Spawns an eft019 record in a source actor's area with its rotation, source and variant. */
 
 void fn_80112B7C(void* source, u8 key, u8 subtype, nw4r::math::VEC3* pos, _CP_VECTOR* rot,
                  f32 scale)
@@ -664,9 +602,7 @@ void fn_80112B7C(void* source, u8 key, u8 subtype, nw4r::math::VEC3* pos, _CP_VE
     }
 }
 
-/* ===================================================================================================
- * 0x80112C48  eft019_set_ring(nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot)
- * =================================================================================================== */
+/* 0x80112C48 (0x54): Spawns the ring record (type 10) with the rotation's pitch and yaw. */
 
 void eft019_set_ring(nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot)
 {
@@ -680,9 +616,7 @@ void eft019_set_ring(nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot)
     }
 }
 
-/* ===================================================================================================
- * 0x80112C9C  eft019_set_smoke(nw4r::math::VEC3* pos, u8 area, u8 type, s32 timer)
- * =================================================================================================== */
+/* 0x80112C9C (0x44): Spawns a smoke record with a timer. */
 
 void eft019_set_smoke(nw4r::math::VEC3* pos, u8 area, u8 type, s32 timer)
 {
@@ -694,9 +628,7 @@ void eft019_set_smoke(nw4r::math::VEC3* pos, u8 area, u8 type, s32 timer)
     }
 }
 
-/* ===================================================================================================
- * 0x80112CE0  fn_80112CE0(_EFT* self) - the pool release hook (`release_0x40`)
- * =================================================================================================== */
+/* 0x80112CE0 (0x3C): Hands the record's effect pool back to the heap (the `release_0x40` hook). */
 
 void fn_80112CE0(_EFT* self)
 {
@@ -707,9 +639,7 @@ void fn_80112CE0(_EFT* self)
     work->count = 0;
 }
 
-/* ===================================================================================================
- * 0x80112D1C  fn_80112D1C(_EFT* self) - the per-frame dispatcher (`dispatch_0x34`)
- * =================================================================================================== */
+/* 0x80112D1C (0x3C): Dispatches `state_0x05` to the four state bodies (the `dispatch_0x34` hook). */
 
 void fn_80112D1C(_EFT* self)
 {
@@ -729,16 +659,8 @@ void fn_80112D1C(_EFT* self)
     }
 }
 
-/* ===================================================================================================
- * 0x80112D58  fn_80112D58(_EFT* self) - state 0: create the pool and place it
- *
- * `res_eft_create(lbl_8059F6FC[type], lbl_8059F810[type], 0)` makes slot 0 for every id; the switch on
- * `type_0x02` then adds the per-id extra objects (all of them checked, each failure destroying the
- * record through `fn_8011485C`) and, for some ids, the tint `color_0x4C`.  Every arm converges on the
- * shared tail, which places the pool on the record's position, runs the `type_0x02 - 0x66` camera
- * re-aim, flags the record live, dispatches the per-material impact sound and immediately advances the
- * state machine into `fn_8011392C`.
- * =================================================================================================== */
+/* 0x80112D58 (0xBD4): Creates the record's effect pool for its type, places and re-aims it, plays the impact
+ * sound and advances into `fn_8011392C`. */
 
 void fn_80112D58(_EFT* self)
 {
@@ -1205,27 +1127,21 @@ void fn_80112D58(_EFT* self)
     fn_8011392C(self);
 }
 
-/* ===================================================================================================
- * 0x8011484C  fn_8011484C(_EFT* self) - state 2
- * =================================================================================================== */
+/* 0x8011484C (0x10): Advances the record's state. */
 
 void fn_8011484C(_EFT* self)
 {
     self->state_0x05++;
 }
 
-/* ===================================================================================================
- * 0x8011485C  fn_8011485C(_EFT* self) - state 3
- * =================================================================================================== */
+/* 0x8011485C (0x4): Releases the record to the slot pool. */
 
 void fn_8011485C(_EFT* self)
 {
     eft_res_slot_release(self);
 }
 
-/* ===================================================================================================
- * 0x80114860  fn_80114860(nw4r::math::VEC3* pos, u8 area) - the weapon-side `tyakudan` record
- * =================================================================================================== */
+/* 0x80114860 (0x84): Spawns the weapon-side landing record (type 6) without a work block. */
 
 void fn_80114860(nw4r::math::VEC3* pos, u8 area)
 {
@@ -1242,9 +1158,7 @@ void fn_80114860(nw4r::math::VEC3* pos, u8 area)
     }
 }
 
-/* ===================================================================================================
- * 0x801148E4  fn_801148E4(_EFT* self) - the on-screen impact sound and its normalisation
- * =================================================================================================== */
+/* 0x801148E4 (0x138): Plays the on-screen impact sound and normalises its screen position. */
 
 void fn_801148E4(_EFT* self)
 {
@@ -1276,9 +1190,7 @@ void fn_801148E4(_EFT* self)
     self->state_0x05++;
 }
 
-/* ===================================================================================================
- * 0x80114A1C  fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type) - the family allocator
- * =================================================================================================== */
+/* 0x80114A1C (0x104): Allocates an eft019 record in the current area, tags it 19 and installs its hooks. */
 
 _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type)
 {
@@ -1312,9 +1224,7 @@ _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type)
     return effect;
 }
 
-/* ===================================================================================================
- * 0x80114B20  fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx) - place the record on its actor
- * =================================================================================================== */
+/* 0x80114B20 (0x100): Places the record on its actor's joint 7 and spins it. */
 
 void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
 {
@@ -1342,9 +1252,7 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
     fn_800FBB90(mtx, &pos);
 }
 
-/* ===================================================================================================
- * 0x80114C20  ef_inst_spawn(void* actor, u8 key) - spawn an eft020 record for a per-key effect
- * =================================================================================================== */
+/* 0x80114C20 (0x4C): Spawns an eft020 record for a per-key effect on an actor. */
 
 void ef_inst_spawn(void* actor, u8 key)
 {
@@ -1357,9 +1265,7 @@ void ef_inst_spawn(void* actor, u8 key)
     }
 }
 
-/* ===================================================================================================
- * 0x80114C6C  fn_80114C6C(void* actor, u8 key, s32 joint)
- * =================================================================================================== */
+/* 0x80114C6C (0x5C): Spawns an eft020 record on an actor's joint in the actor's area. */
 
 void fn_80114C6C(void* actor, u8 key, s32 joint)
 {
@@ -1377,9 +1283,7 @@ void fn_80114C6C(void* actor, u8 key, s32 joint)
     }
 }
 
-/* ===================================================================================================
- * 0x80114CC8  fn_80114CC8(void* actor, u8 key)
- * =================================================================================================== */
+/* 0x80114CC8 (0x60): Spawns an eft020 record on an actor's joint 3 under its effect key. */
 
 void fn_80114CC8(void* actor, u8 key)
 {
@@ -1394,9 +1298,7 @@ void fn_80114CC8(void* actor, u8 key)
     }
 }
 
-/* ===================================================================================================
- * 0x80114D28  fn_80114D28(void* actor, u8 kind, u8 type, f32 scale)
- * =================================================================================================== */
+/* 0x80114D28 (0x10C): Spawns an eft020 record on an actor, its area, scale and joint picked by the actor kind. */
 
 void fn_80114D28(void* actor, u8 kind, u8 type, f32 scale)
 {

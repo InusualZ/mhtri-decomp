@@ -762,24 +762,6 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
-            # Registered once, at its final home (docs/plan.md 12): the `eft052` effect family (its `_EFT` tag is 52)
-            # and the cockpit item-page band it draws from (`.text` 0x80358624..0x8035E034, 92
-            # functions / 23056 B).  Module `ef` (brief class 3): the range is an `eft` family plus
-            # the cockpit hold/item layer in exactly the shape the registered `ef/eft050.cpp`
-            # documents, and its callers are the `ef` and `lobby` bands (`ef/ef_emitter.cpp`,
-            # `ef/eft050.cpp`, `lobby/fn_801E7530.cpp`, `lobby/fn_801EC9F8.cpp`).  No `__FILE__`
-            # string is reachable (every `lbl_` reference resolves to the float pool, the `.data`
-            # run or a call) and the runtime dump answers only `zz_` placeholders, so the name is
-            # DERIVED from the tag `eft052_set` seeds `_EFT::field_0x03` with - the file name of
-            # every registered sibling the dump knows (`eft001`, `eft002`, `eft009`, `eft019`,
-            # `eft035`, `eft050`) - and stays a guess the unit header records.  Every symbol this
-            # file defines is named from its own body; the `rule 7 deferred` line in its header
-            # covers only references to OTHER units' unrenamed symbols.  C++ (`GetItemData__FUs`,
-            # `LbStr__FUcUs`, `calcDistanceSqXZ__FP...`, plus the class whose constructor
-            # `fn_8035BBE8` installs the vtable `lbl_805ED808`); every plain `fn_` definition is
-            # `extern "C"`.  Only `.text` is claimed - the `.data` run 0x805ED0C0..0x805ED938, the
-            # `.sdata2` pool 0x8079B640..0x8079B704 and the extab/extabindex records stay
-            # unclaimed (the pooled constants and tables are declared, never defined).
             Object(NonMatching, "ef/eft052.cpp"),
             Object(NonMatching, "ef/ef_util.cpp"),
             Object(NonMatching, "ef/ef_animcurve.cpp"),
@@ -807,19 +789,9 @@ config.libs = [
             Object(NonMatching, "ef/ef_line.cpp"),
             Object(NonMatching, "ef/ef_point.cpp"),
             Object(NonMatching, "ef/ef_sphere.cpp"),
-            # Registered (a 0x800CDB2C run discovery proposed at a --max-bytes cap, recut
-            # 2026-09-30 and renamed in phase 4) - the game-system core; see the unit's file header.
             Object(NonMatching, "ef/system_core.cpp"),
             Object(NonMatching, "ef/eft001.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/eft_res.cpp` range (0x800F6520..0x800F95A4, 43 functions): the game's
-            # eft resource manager (eft_control, the 256-slot proID table, the load/create path and the
-            # effect-heap push).  Module `ef` from both bracketing units; the name follows the siblings'
-            # scheme - see the unit's file header for the evidence.
             Object(NonMatching, "ef/eft_res.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/effect.cpp` range: the game's `effect.cpp` manager, named from the
-            # range's own `__FILE__` string (0x8059B5D0, cited by fn_800F9884's Panic).
             Object(NonMatching, "ef/effect.cpp"),
             Object(NonMatching, "ef/eft_model_slot.cpp"),
             Object(NonMatching, "ef/eft002.cpp"),
@@ -832,96 +804,24 @@ config.libs = [
             Object(NonMatching, "ef/eft007.cpp"),
             Object(NonMatching, "ef/eft009.cpp"),
             Object(NonMatching, "ef/fn_80104BD0.c"),
-            # Registered once, at its final home (docs/plan.md 12).  ef/fn_80105314.cpp:
-            # a maximal unclaimed run, seam unproven; class 4 decided the name (the map's
-            # fn_80105314 stem, the scheme the bracketing fn_80104BD0/fn_8010D1A8 units use) and
-            # the range holds several original effect families - see the unit's file header.
             Object(NonMatching, "ef/fn_80105314.cpp"),
             Object(NonMatching, "ef/eft013_fx.cpp"),
-            # Registered (a 0x8010BDE4 run discovery proposed).
-            # The range's own symbols are plain fn_XXXXXXXX (rule 7 deferred); it is built as C++
-            # because every callee it reaches is a C++ mangling (rule 9) - see the unit's header.
             Object(NonMatching, "ef/fn_8010BDE4.cpp"),
             Object(NonMatching, "ef/fn_8010D1A8.c"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/eft019.cpp` range: named from the runtime
-            # dump's own `eft019_set` (dumpmap.py), C++ from its mangled definition.
             Object(NonMatching, "ef/eft019.cpp"),
             Object(NonMatching, "ef/fn_80114E34.cpp"),
             Object(NonMatching, "ef/eft022_fx.cpp"),
             Object(NonMatching, "ef/fn_8011722C.c"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/fn_801173AC.cpp` range (`.text` 0x801173AC..0x80119C44, 30 functions
-            # / 10392 B): the tail of the eft024 job machine, the whole eft025 player family, the whole
-            # eft026 enemy family and the head of eft028.  Two of the range's own definitions are
-            # manglings (`eft026_set__FP4_PLWUcUlUl`, `eft028_set_koware__FUcPQ34nw4r4math4VEC3Ucl`), so
-            # it is built as C++ and every plain `fn_XXXXXXXX` definition is `extern "C"`.  Sections:
-            # extab 0x8000C49C..0x8000C554, extabindex 0x800265D4..0x800266E8,
-            # .text 0x801173AC..0x80119C44.
             Object(NonMatching, "ef/fn_801173AC.cpp"),
             Object(NonMatching, "ef/eft026_fx.cpp"),
             Object(NonMatching, "ef/fn_80119C44.c"),
-            # Registered once, at its final home (docs/plan.md 12).  The `ef/eft029.cpp`
-            # range, at the TU-bounded 0x80119DEC..0x8011D448 the attribution queue carries: the runtime
-            # dump's own `eft029_set_scale` / `eft029_set_kaihou` name the TU (dumpmap.py); C++ from
-            # their mangled definitions.  See the unit's file header for the stale-brief record.
             Object(NonMatching, "ef/eft029.cpp"),
             Object(NonMatching, "ef/eft029_fx.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/802F140C_fn_802F140C` range (`.text` 0x802F140C..0x802F5138, 39 functions /
-            # 15660 B): the runtime dump's own `eft035_set`/`eft035_set2` name the TU (dumpmap.py;
-            # every other address is the dump's `zz_XXXXXXXX_` placeholder), so the module is `ef`
-            # and the file follows the `eft00X.cpp` scheme of the neighbours.  Sections: extab
-            # 0x80015424..0x80015514, extabindex 0x80033C9C..0x80033E04, .text
-            # 0x802F140C..0x802F5138 - exactly the bytes the bracketing units leave unclaimed.  The
-            # seam is unproven (one maximal unclaimed run); see the unit's file header for the
-            # two-cluster evidence.
             Object(NonMatching, "ef/eft035.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/eft050.cpp` range (`.text` 0x8033F270..0x803432B4, 46 functions /
-            # 16452 B): the runtime dump's own `eft050_set` at 0x80342F34 names the TU (dumpmap.py;
-            # every other address is the dump's `zz_XXXXXXXX_` placeholder), so the module is `ef`
-            # and the file follows the `eft00X.cpp` scheme of the neighbours.  Sections: extab
-            # 0x80016CA4..0x80016DB4, extabindex 0x8003615C..0x800362F4, .text
-            # 0x8033F270..0x803432B4 - exactly the bytes the bracketing units leave unclaimed.  The
-            # seam is unproven (one maximal unclaimed run); see the unit's file header.
             Object(NonMatching, "ef/eft050.cpp"),
             Object(NonMatching, "ef/fn_803066F0.c"),
-            # Registered once, at its final home (docs/plan.md 12), and re-drawn by the seam round (`.text`
-            # 0x8030681C..0x80308FB4, 32 functions / 10136 B): the eft041/042 effect machine, whose
-            # first body drives fn_803066F0's `_EFT` record and which defines `eft042_set2`.  The
-            # `menu_infomation.cpp` `__FILE__` string's referrer set puts the seam at 0x80308FB4 (the
-            # screen bodies above it belong to `menu/menu_infomation.cpp`), so this range keeps only
-            # the two screen entry points below it (`fn_80308EC0`/`fn_80308F1C`).  Class 4 decided
-            # the name (the map's own fn_8030681C stem) and class 2 the module (`ef`, the left
-            # bracket).  C++; every plain `fn_` definition is `extern "C"`.  Sections: extab
-            # 0x80015AB4..0x80015B54 (20 records), extabindex 0x80034674..0x80034764 (20 x 12 B).
             Object(NonMatching, "ef/fn_8030681C.cpp"),
-            # ef/eft_slot.cpp: the `_EFT` family at `.text` 0x803432B4..0x80349DD8
-            # (92 functions / 0x6B24 bytes).  Module `ef` from the code: the range's `self` is the
-            # 0x48-byte `_EFT` field for field (`flag_0x01`, `state_0x05`, `field_0x06`,
-            # `timer_0x0C`, `pos_0x18`, `work_0x38`, `area_0x44` - the `src/ef.h` layout), it
-            # spawns models through `ef/eft_res.cpp`'s `res_eft_model_create` and gates on
-            # `eft_control`; the sibling units are `ef/eft035.cpp`/`ef/fn_803066F0.c`.  The file is
-            # `ef/eft_slot.cpp`: the range is the family's 10-entry slot pool and the enemy-record
-            # scan that drives it (`eft_slot_spawn`, `eft_slot_work_update`), and every one of the 34
-            # symbols it defines is named from its own body, the unit header's NAMES section carrying
-            # the evidence - no `__FILE__` string is reachable from the range and `dumpmap.py lookup`
-            # answers only `zz_` placeholders, so the names are guesses a later pass may refine.
-            # Sections: `.text` 0x803432B4..0x80349DD8, extab 0x80016DB4..0x80016FE4, extabindex
-            # 0x800362F4..0x8003663C, `.ctors` 0x8056F3A4, `.data` 0x805E9168..0x805E91E8.  C++;
-            # every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "ef/eft_slot.cpp"),
-            # Registered, whose 0x80366618..0x8036CF64 range is a
-            # discovery `--max-bytes` cut.  `tudiscover.py at 0x80366618` returns a 15-function MATCH SET,
-            # 0x80366618..0x8036A690, from two must-link `lbl_8079B744` anchors; the range's private
-            # `.sdata2` run (0x8079B740..0x8079B820, no leak) ends at its last referrer `fn_80369D50`,
-            # and the next run's first referrer is `fn_8036E320`, so the TU stops at 0x8036A690 and the
-            # 0x8036A690..0x8036CF64 tail stays unclaimed (seam re-draw, see the unit's file header).
-            # Sections: extab 0x800177D4..0x80017844, extabindex 0x80037224..0x800372CC,
-            # .text 0x80366618..0x8036A690.  The runtime dump's own `eft053_get_shell_data` /
-            # `eft053_get_model_ang` name the TU (dumpmap.py), so the module is `ef`; same
-            # `cflags_main` as the two sibling units in this block.
             Object(NonMatching, "ef/eft053.cpp"),
         ],
     },
