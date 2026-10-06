@@ -9,7 +9,7 @@ Usage:
     python scripts/mt.py units                       # which units can be worked on
     python scripts/mt.py info   [-u <unit>]          # resolved paths + the real ninja command line
     python scripts/mt.py frames [-u <unit>] [--flags-extra "..."] [--versions ...]
-    python scripts/mt.py matrix [-u <unit>] [--flags-extra "..."] [versions...]
+    python scripts/mt.py matrix [-u <unit>] [--flags-extra "..."] [--only-open] [--one] [--json] [versions...]
     python scripts/mt.py sweep  [-u <unit>] [subs...]
     python scripts/mt.py variants [-u <unit>] [--variants f.py] [names...]
     python scripts/mt.py shapes [-u <unit>] [-f <function>] [--scan N] [--gens ...] [--depth N]

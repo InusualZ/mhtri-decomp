@@ -893,6 +893,22 @@ def test_rule_rows(c):
     two_new = dict(moved, **{"run:.data:80598050": run_row(0x80598050, 2)})
     check("rule10 pairing: one removed run pairs with ONE added run - the second overlapping addition still refuses",
           L.rule10_growth(base_runs, two_new, [])[0], ["run:.data:80598050"])
+    # a recut's re-owned run: credited by `diff_rows` (the base side's `owners` row) and PRINTED by the row
+    import tools.units.landing.rows.rules as _rules
+    import types as _types
+    owners = {"owners:base": {"kind": "owners", "unit": "", "where": "",
+                              "owners": [(0x80598000, 0x80599000, "lobby/lb_server_sel_trans.cpp")], "matching": []}}
+    after_run = {"run:.data:80598038": run_row(0x80598038, 6, unit="Network/NetworkStreamSink")}
+    checks_seen = []
+    fake = _types.SimpleNamespace(extra={"rule10_before": owners}, main=".", unit_units=["Network/NetworkStreamSink"],
+                                  check=lambda name, ok, **kw: checks_seen.append(ok))
+    out = io.StringIO()
+    with mock.patch.object(_rules, "rule10_violations", lambda main, text_ref=None: after_run), \
+            contextlib.redirect_stdout(out):
+        _rules.rule10_row(fake)
+    check("rule10: a re-owned run passes the row and the credit is printed with its old owner",
+          (checks_seen, "1 re-owned" in out.getvalue(),
+           "run:.data:80598038 <- lobby/lb_server_sel_trans.cpp" in out.getvalue()), ([True], True, True))
 
     # --- the data-closure row: ADD-only over (unit, orphan address) pairs; datagap's own selftest has the
     # end-to-end fixtures (real objects), this pins the allowance plumbing and the row's decision shape.

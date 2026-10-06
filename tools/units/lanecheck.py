@@ -21,6 +21,7 @@ from tools.lib import names as _names
 from tools.lib import objcompare
 from tools.lib import proc as _proc
 from tools.lib import repo as _repo
+from tools.lib import report as _report
 from tools.lib.git import Git
 from tools.lib.project import configure as _configure
 from tools.lib.project.ownership import SPLITS_REL, SYMBOLS_REL, Ownership
@@ -452,6 +453,36 @@ def flip_problems(root: str, stems: list[str]) -> dict[str, list[str]] | None:
     return {u: v.get("problems", []) for u, v in (data.get("units") or {}).items()}
 
 
+
+def object_reasons(ctx: "Context", stem: str, src: str) -> list[str]:
+    """Why this tree's compiled object cannot stand for the judged source (empty when it can): older than the unit's
+    include closure on disk (`lib.report.unit_reasons`), or - for `--branch` - the branch's source is not the file on
+    disk, so the object was built from other text. Builds nothing."""
+    ours, _target = ctx.object_paths(stem)
+    disk = os.path.join(ctx.root, *src.split("/"))
+    out = []
+    if not os.path.exists(ours):
+        return out                                              # absent: reported as `no compiled object`
+    if ctx.branch is not None:
+        try:
+            with open(disk, "rb") as fh:
+                on_disk = fh.read().decode("utf-8", "replace")
+        except OSError:
+            on_disk = None
+        if on_disk != (ctx.text(src) or None):
+            out.append("%s differs from %s's copy, so build/RMHE08/src/%s.o is not that branch's object"
+                       % (src, ctx.branch, stem))
+    out += _report.unit_reasons(disk, ours, ctx.root, rel=lambda p: _report.rel_path(p, ctx.root))[0]
+    return out
+
+
+def build_summary(ctx: "Context", units: dict) -> dict:
+    """`{tree, built, oldest, newest}`: whose objects the object-reading checks use, and how old they are."""
+    times = [t for t in (_report.mtime(ctx.object_paths(stem)[0]) for stem in units) if t is not None]
+    return {"tree": ctx.root.replace("\\", "/"), "built": len(times),
+            "oldest": _report.stamp(min(times)) if times else None,
+            "newest": _report.stamp(max(times)) if times else None}
+
 # --- the run ----------------------------------------------------------------------------------------------------------
 
 def run(root: str, base: str = "main", branch: str | None = None, flipcheck: bool = True,
@@ -475,7 +506,9 @@ def run(root: str, base: str = "main", branch: str | None = None, flipcheck: boo
         items += check_citations(rel, lines, ctx.own, ctx.tree.exists, ctx.units)
         items += check_unowned_claims(rel, lines, ctx.own)
     units = ctx.touched_units()
-    problems = flip_problems(root, list(units)) if flipcheck else None
+    fresh = {stem: object_reasons(ctx, stem, src) for stem, src in units.items()}
+    build = build_summary(ctx, units)
+    problems = flip_problems(root, [u for u in units if not fresh[u]]) if flipcheck else None
     if not flipcheck:
         skipped.append("flip-blocker: --no-flipcheck")
     elif problems is None:
@@ -485,7 +518,9 @@ def run(root: str, base: str = "main", branch: str | None = None, flipcheck: boo
         header, hline = header_of(text)
         hline = hline or 1
         ours, target = ctx.object_paths(stem)
-        if os.path.exists(ours) and os.path.exists(target):
+        if fresh[stem]:
+            skipped.append("wrong-callee/flip-blocker %s: refused - %s" % (stem, "; ".join(fresh[stem])))
+        elif os.path.exists(ours) and os.path.exists(target):
             try:
                 items += check_callees(src, header, hline, objcompare.callee_diffs(target, ours))
             except (OSError, ValueError) as exc:
@@ -495,12 +530,12 @@ def run(root: str, base: str = "main", branch: str | None = None, flipcheck: boo
         new = {n for n, _t in ctx.added.get(src, [])}
         items += check_stubs(src, text, header, ctx.own, new)
         items += check_guesses(src, text, header, ctx.own, dump, new)
-        if problems:
+        if problems and not fresh[stem]:
             items += check_blockers(src, header, hline, problems.get(stem, []))
     order = {c: i for i, c in enumerate(CLASSES)}
     items.sort(key=lambda i: (order.get(i.cls, 99), i.file, i.line))
     return {"base": ctx.base, "head": branch or "(working tree)", "units": list(units), "items": items,
-            "skipped": skipped, "seconds": round(time.time() - t0, 1)}
+            "skipped": skipped, "build": build, "seconds": round(time.time() - t0, 1)}
 
 
 def main(args) -> object:
@@ -515,11 +550,16 @@ def main(args) -> object:
     failed = bool(findings) or (args.strict and bool(res["skipped"]))
     if args.json:
         payload = {"tool": TOOL.name, "ok": not failed, "base": res["base"], "head": res["head"],
-                   "units": res["units"], "skipped": res["skipped"], "seconds": res["seconds"],
+                   "units": res["units"], "skipped": res["skipped"], "build": res["build"], "seconds": res["seconds"],
                    "rows": [dict(f.to_dict(), hint=i.hint) for f, i in zip(findings, res["items"])],
                    "summary": "%d finding(s) over %d unit(s)" % (len(findings), len(res["units"]))}
         print(json.dumps(payload, indent=1))
         return 1 if failed else 0
+    b = res["build"]
+    print("objects: %s/build/RMHE08 (%d of %d touched unit(s) built here; oldest object %s, newest %s) - the "
+          "wrong-callee and flip-blocker checks judge THIS tree's build%s"
+          % (b["tree"], b["built"], len(res["units"]), b["oldest"] or "-", b["newest"] or "-",
+             ", not the branch's: run from its worktree for its own objects" if res["head"] != "(working tree)" else ""))
     for i in res["items"]:
         print(i.render())
     for s in res["skipped"]:

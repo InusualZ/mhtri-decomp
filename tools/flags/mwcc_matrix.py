@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Compile a unit with several MWCC versions and/or flag overrides and summarize the official score per function.
 Spec: docs/tools/spec/mwcc_matrix.md. CLI: python tools/flags/mwcc_matrix.py [-u <unit>] [<version>...]
-[--flags-extra "<flags>"] [--list-versions]."""
+[--flags-extra "<flags>"] [--only-open] [--one] [--json] [--list-versions]."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
+import contextlib
 import json
 import os
+import shutil
 
 from tools.lib import repo, report, units
 
@@ -76,70 +78,149 @@ def summarize(path, official=None):
     return rows
 
 
-def main():
+def open_rows(rows, only_open=False):
+    """`(rows to print, how many were hidden)`: with `only_open` the rows below 100 % (by the official metric's
+    number, never by matching the printed text), else every row."""
+    if not only_open:
+        return list(rows), 0
+    kept = [r for r in rows if r[3] < 100.0]
+    return kept, len(rows) - len(kept)
+
+
+def render_block(label, rows, only_open=False):
+    """The printed table of one variant (`summarize` rows), the `--only-open` filter applied."""
+    shown, hidden = open_rows(rows, only_open)
+    block = ["== %s   (match = official report metric)" % label]
+    for name, tsz, osz, pct, first, approx in shown:
+        fd = ("first-diff@%d %s" % first) if first else "IDENTICAL"
+        block.append("   %-28s target %6d  ours %6d  %6.2f%%%s  %s"
+                     % (name, tsz, osz, pct, "~" if approx else " ", fd))
+    if hidden:
+        block.append("   (%d function(s) at 100%% not shown: --only-open)" % hidden)
+    block.append("")
+    return block
+
+
+class ScratchObject:
+    """`--one`: keep the unit's real object as it was. On entry the object (if any) is copied aside with its
+    mtime; on `keep(dest)` the variant's object is copied to `dest` (the scratch result); on exit the real object
+    is put back byte- and mtime-exact (or removed if there was none), so ninja sees nothing to rebuild and no foreign
+    object is left in the build."""
+
+    def __init__(self, path):
+        self.path = path
+        self.backup = path + ".matrix-backup"
+
+    def __enter__(self):
+        if os.path.exists(self.path):
+            shutil.copy2(self.path, self.backup)
+        return self
+
+    def keep(self, dest):
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(self.path, dest)
+        return dest
+
+    def __exit__(self, *exc):
+        if os.path.exists(self.backup):
+            os.replace(self.backup, self.path)
+        elif os.path.exists(self.path):
+            os.unlink(self.path)
+
+
+def scratch_path(unit, label):
+    """Where `--one` leaves the variant's object: `build/tmp/matrix/one/<label>/<unit stem>.o`."""
+    return os.path.join(outdir(unit), "one", label.replace("/", "_"), *(unit.key + ".o").split("/"))
+
+
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("versions", nargs="*", help="compiler versions (default: the unit's own)")
     ap.add_argument("--unit", "-u", help="unit spec (default: the only unit with source)")
     ap.add_argument("--flags-extra", default="", help="flags to add, replacing same-family ones")
     ap.add_argument("--list-versions", action="store_true", help="print installed compiler versions")
-    args = ap.parse_args()
+    ap.add_argument("--only-open", action="store_true",
+                    help="print only the functions below 100%% (the official metric, filtered on the number)")
+    ap.add_argument("--one", action="store_true",
+                    help="one variant (at most one version): compile, score, leave the object in "
+                         "build/tmp/matrix/one/<label>/ and put the unit's real object back untouched")
+    ap.add_argument("--json", action="store_true", help="print the rows as JSON instead of the table")
+    args = ap.parse_args(argv)
 
     unit = units.Unit.resolve(args.unit, repo.repo_root())
     root = unit.root
     head, flags, tail = units.split_command(unit)
     if args.list_versions:
         print("\n".join(units.available_versions(head)))
-        return
+        return 0
+    if args.one and len(args.versions) > 1:
+        print("mwcc_matrix: --one takes at most one compiler version", file=sys.stderr)
+        return 2
     flags = units.override_flags(flags, args.flags_extra)
     symbol = units.function_names(unit.obj_target)[0] if os.path.exists(unit.obj_target) else None
     if symbol is None:
         raise SystemExit("no target object at %s - split the unit first" % unit.obj_target)
 
     os.makedirs(outdir(unit), exist_ok=True)
-    lines = []
-    for version in (args.versions or [None]):
-        label = (version or "default") + ("__" + "_".join(args.flags_extra.split())
-                                          if args.flags_extra else "")
-        head_v = units.with_compiler_version(head, version) if version else head
-        flags_v = list(flags)
-        rc, log, obj = units.run_tokens(head_v + flags_v + tail, root, expect=unit.obj_ours)
-        while rc != 0 and len(flags_v) > 1:
-            trimmed = units.drop_unknown_option(flags_v, log)
-            if trimmed is None:
-                break
-            flags_v = trimmed
+    lines, payload = [], []
+    guard = ScratchObject(unit.obj_ours) if args.one else contextlib.nullcontext()
+    with guard:
+        for version in (args.versions or [None]):
+            label = (version or "default") + ("__" + "_".join(args.flags_extra.split())
+                                              if args.flags_extra else "")
+            head_v = units.with_compiler_version(head, version) if version else head
+            flags_v = list(flags)
             rc, log, obj = units.run_tokens(head_v + flags_v + tail, root, expect=unit.obj_ours)
-        if rc != 0:
-            msg = "%s: COMPILE FAILED rc=%d\n%s" % (label, rc, units.quiet(log)[:800])
-            print(msg)
-            lines.append(msg)
-            continue
-        path, err = diff_unit(unit, label, symbol)
-        if not path:
-            msg = "%s: objdiff FAILED\n%s" % (label, err[:400])
-            print(msg)
-            lines.append(msg)
-            continue
-        official = report.score_entries(unit.obj_target, unit.obj_ours, unit.report_name, outdir(unit),
-                                        objdiff=report.objdiff_cli(root), cwd=root)
-        if "_error" in official:
-            print("%s: WARNING the report metric is unavailable, positional values below are marked ~:\n  %s"
-                  % (label, official["_error"][:200]))
-            official = {}
-        rows = summarize(path, official)
-        block = ["== %s   (match = official report metric)" % label]
-        for name, tsz, osz, pct, first, approx in rows:
-            fd = ("first-diff@%d %s" % first) if first else "IDENTICAL"
-            block.append("   %-28s target %6d  ours %6d  %6.2f%%%s  %s"
-                         % (name, tsz, osz, pct, "~" if approx else " ", fd))
-        block.append("")
-        lines += block
-        print("\n".join(block))
+            while rc != 0 and len(flags_v) > 1:
+                trimmed = units.drop_unknown_option(flags_v, log)
+                if trimmed is None:
+                    break
+                flags_v = trimmed
+                rc, log, obj = units.run_tokens(head_v + flags_v + tail, root, expect=unit.obj_ours)
+            if rc != 0:
+                msg = "%s: COMPILE FAILED rc=%d\n%s" % (label, rc, units.quiet(log)[:800])
+                print(msg)
+                lines.append(msg)
+                payload.append({"label": label, "error": "compile failed (rc=%d)" % rc})
+                continue
+            path, err = diff_unit(unit, label, symbol)
+            if not path:
+                msg = "%s: objdiff FAILED\n%s" % (label, err[:400])
+                print(msg)
+                lines.append(msg)
+                payload.append({"label": label, "error": "objdiff failed"})
+                continue
+            official = report.score_entries(unit.obj_target, unit.obj_ours, unit.report_name, outdir(unit),
+                                            objdiff=report.objdiff_cli(root), cwd=root)
+            if "_error" in official:
+                print("%s: WARNING the report metric is unavailable, positional values below are marked ~:\n  %s"
+                      % (label, official["_error"][:200]))
+                official = {}
+            rows = summarize(path, official)
+            kept = guard.keep(scratch_path(unit, label)) if args.one else None
+            shown, hidden = open_rows(rows, args.only_open)
+            payload.append({"label": label, "flags": flags_v, "object": kept,
+                            "rows": [{"name": n, "target": t, "ours": o, "match": p, "approx": a,
+                                      "first_diff": f[0] if f else None} for n, t, o, p, f, a in shown],
+                            "hidden_full": hidden})
+            block = render_block(label, rows, args.only_open)
+            if kept:
+                block.insert(1, "   object kept at %s" % os.path.relpath(kept, root))
+            lines += block
+            if not args.json:
+                print("\n".join(block))
     open(os.path.join(outdir(unit), "summary.txt"), "w").write("\n".join(lines))
+    if args.json:
+        print(json.dumps({"unit": unit.report_name, "variants": payload}, indent=1))
+        return 0
     print("wrote", os.path.relpath(os.path.join(outdir(unit), "summary.txt"), root))
-    print("restore the unit object with: rm -f %s && ninja %s"
-          % (os.path.relpath(unit.obj_ours, root), os.path.relpath(unit.obj_ours, root)))
+    if args.one:
+        print("the unit's own object %s is as it was (--one)" % os.path.relpath(unit.obj_ours, root))
+    else:
+        print("restore the unit object with: rm -f %s && ninja %s"
+              % (os.path.relpath(unit.obj_ours, root), os.path.relpath(unit.obj_ours, root)))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

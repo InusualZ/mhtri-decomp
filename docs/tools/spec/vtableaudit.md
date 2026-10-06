@@ -64,7 +64,7 @@ Inputs -> outputs: splits, map, DOL, objects, src -> rows.
   owner. Replay of `9db8fbe62` (the lobby-tail recut, which needed six `--allow-rule10` keys) against its parent with
   that commit's own objects: 6 added -> 0 added, 6 re-owned (3 from `lobby/lb_server_sel_trans.cpp` to
   `Network/NetworkStreamSink.cpp`, 3 from `SO/soi.cpp` to `VF/vf.cpp`). The gate row gets the credit through
-  `diff_rows` unchanged; it does not print the re-owned list yet.
+  `diff_rows` and prints each credited key with its old owner (`rule 10: N re-owned ...`).
 * **A unit with two ranges of one section (2026-10-05).** dtk writes one object section per split range, so a
   unit with two `.data` ranges has two sections named `.data` in its target object, each with its own `.rela.data`.
   The reader keys sections and relocations by `object_key` (`.data`, `.data#2`, in address order), reads the k-th
@@ -108,8 +108,6 @@ Target: `tools/tests/units/test_vtableaudit.py` on `lib.testing` (`FixtureTree`/
 * A re-owned run's verdict at the base is not computed (that needs the base's objects): the credit assumes a
   non-`Matching` owner did not emit it. A non-`Matching` unit whose source did emit the table, recut to one that
   does not, would be credited.
-* The land gate's rule-10 row (`landing/rows/rules.py`) takes the credit but prints only shifted/removed, not
-  `reowned`.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 
