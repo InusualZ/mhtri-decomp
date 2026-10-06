@@ -27,12 +27,12 @@ void GDSetIndTexMtx(int base, const f32* v) {
     f32 m10 = v[4];
     f32 m11 = v[5];
     f32 m12 = v[6];
-    f32 a00 = fn_8005220C(m00);
-    f32 a01 = fn_8005220C(m01);
-    f32 a02 = fn_8005220C(m02);
-    f32 a10 = fn_8005220C(m10);
-    f32 a11 = fn_8005220C(m11);
-    f32 a12 = fn_8005220C(m12);
+    f32 a00 = abs_f32(m00);
+    f32 a01 = abs_f32(m01);
+    f32 a02 = abs_f32(m02);
+    f32 a10 = abs_f32(m10);
+    f32 a11 = abs_f32(m11);
+    f32 a12 = abs_f32(m12);
 
     if (a00 >= 1.0f || a01 >= 1.0f || a02 >= 1.0f || a10 >= 1.0f
         || a11 >= 1.0f || a12 >= 1.0f) {

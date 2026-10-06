@@ -56,7 +56,7 @@ extern "C" void GXSetScissorBoxOffset(s32 x, s32 y);
 extern "C" void GXSetViewport(f32 x, f32 y, f32 width, f32 height, f32 near, f32 far);
 extern "C" void mtx34_identity(void* pOut);
 extern "C" void* mtx34_get_ptr(void* pMtx);
-extern "C" void fn_80050850(void* pOut, const void* pIn);
+extern "C" void vec3_normalize_into(void* pOut, const void* pIn);
 extern "C" s32 fn_800508A8(const void* pIn);
 extern "C" void vec3_cross(void* pOut, const void* pA, const void* pB);
 extern "C" f32 vec3_dot(const void* pA, const void* pB);
@@ -631,8 +631,8 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
         } else {
             setVec3(&axisA, diff.z, 0.0f, -diff.x);
             VEC3_ctor(&axisB);
-            fn_80050850(&diff, &diff);
-            fn_80050850(&axisA, &axisA);
+            vec3_normalize_into(&diff, &diff);
+            vec3_normalize_into(&axisA, &axisA);
             vec3_cross(&axisB, &diff, &axisA);
             sin_cos_deg(&rotSin, &rotCos, pData->mUnkA4);
             VEC3_ctor(&rowA);

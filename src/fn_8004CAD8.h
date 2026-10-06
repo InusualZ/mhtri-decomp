@@ -85,15 +85,15 @@ void score_add_clamped(s32 delta, s32* value);
 u32 mtx34_const_ptr(u32);
 /* 0x8005220C - an 8-byte `fabs f1,f1; blr` helper (caller: `gx/fn_8009ACE4.c`, rule 2: this range
  * owns the address). */
-f32 fn_8005220C(f32 value);
+f32 abs_f32(f32 value);
 /* The VEC3 helpers this range owns, added when `src/ef/ef_util.cpp` registered as a consumer (rule 2).
  * Signatures are the owners' own bodies, not the call sites' guesses: 0x80050EDC is the squared length
  * (`ps_mul`/`ps_madd`/`ps_sum0` of the vector with itself), 0x80050F24 the length (`PSVECMag`),
  * 0x80051424 the scale-by-scalar (`out = in * s`), 0x80051820 the cross product (returns `out`),
  * 0x80052214 the dot product, 0x80050BC0 the square root (`x * FrSqrt(x)`). */
-f32 fn_80050EDC(const f32* v);
+f32 vec3_length_sq(const f32* v);
 f32 fn_80050F24(const f32* v);
-void fn_80051424(f32* out, const f32* in, f32 s);
+void vec3_scale_by(f32* out, const f32* in, f32 s);
 f32* vec3_cross(f32* out, const f32* a, const f32* b);
 f32 vec3_dot(const f32* a, const f32* b);
 /* 0x80050BC0 - the square root: `x * FrSqrt(x)` for x > 0, 0 for x == 0, and a `nw4r::db::Warning`
@@ -161,10 +161,10 @@ f32 calcVecDistXZ(const void* a, const void* b);
 f32 fn_80050EAC(const void* a, const void* b);
 /* 0x80051378 - the three-pointer vector helper this range owns (unmangled `addVec3`, so C
  * linkage).  Its body saves r3/r4/r5, zeroes the first through `VEC3_ctor`, then tail-forwards all
- * three to `fn_800513CC`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added when `ai/fn_802CC794.cpp`
- * registered as the first consumer (rule 2) - the owner header did not declare it yet. */
+ * three to `vec3_add_ps`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added with its first consumer
+ * (rule 2) - the owner header did not declare it yet. */
 void addVec3(VEC3* out, VEC3* a, VEC3* b);
-/* 0x80050850 - the in-place normaliser this range owns (unmangled `fn_80050850`, so C
+/* 0x80050850 - the in-place normaliser this range owns (unmangled `vec3_normalize_into`, so C
  * linkage).  Its body saves r3/r4 in r29/r30, hands r3 to `PSVECNormalize`'s `src` (r3) and
  * r4 to its `dst` (the target body reads 0(r3)/8(r3) and stores 0(r4)/8(r4)), then restores
  * `mr r3,r29`, so the shape is `dst = normalize(src); return dst;`: two pointers, the source
@@ -172,20 +172,20 @@ void addVec3(VEC3* out, VEC3* a, VEC3* b);
  * (rule 2).  `void*`/`const void*` is the spelling every call site reaches without a cast
  * (`ef`, `g3d` and `enemy` callers mix `VEC3*` and `void*` pointers) - the body moves
  * pointers and cannot distinguish them. */
-void* fn_80050850(void* dst, const void* src);
+void* vec3_normalize_into(void* dst, const void* src);
 /* 0x80052370 - the animation key-frame reader the C++ pair below sits beside (plain `fn_` map name,
  * so it stays at C linkage).  Added with `Pl/fn_80224AC4.cpp`. */
 f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
 /* 0x800513CC / 0x80050028 / 0x80051EE0 / 0x800513F0 - the four vector helpers the `Pl` hit tests and
- * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `fn_800513CC(out, a, b)`
+ * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `vec3_add_ps(out, a, b)`
  * is the paired-single add `out = a + b`, `fn_80050028(out, src)` the field-by-field three-float copy,
- * `vec3_scale(out, in, s)` the scale (`VEC3_ctor` then `fn_80051424`; in its leaf header), and `fn_800513F0` the
+ * `vec3_scale(out, in, s)` the scale (`VEC3_ctor` then `vec3_scale_by`; in its leaf header), and `fn_800513F0` the
  * in-place scale.  Added with `Pl/fn_8028F66C.cpp`, the first consumer to need them here.  The
  * parameter spellings are the ones the consumers that already include this header declare
  * (`ef/fn_801173AC.cpp`, `enemy/fn_801B7020.cpp`, `enemy/fn_8035E034.cpp`): `fn_800513F0`'s return
  * value is ignored at every call site in the tree, so it is declared `void` - a `VEC3*` return here
  * would be a second overload and `(10505) illegal overloading`. */
-void fn_800513CC(VEC3* out, VEC3* a, VEC3* b);
+void vec3_add_ps(VEC3* out, VEC3* a, VEC3* b);
 void fn_80050028(VEC3* out, const VEC3* src);
 void fn_800513F0(VEC3* v, f32 scale);
 /* 0x80053960 / 0x80054178 - the two draw-shape helpers the cockpit band (`menu/fn_802E4978.cpp`,

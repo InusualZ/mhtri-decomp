@@ -13,10 +13,12 @@
  *   costs `fn_8009C6F0`/`ef_sin_cos`).
  * NAMES. The map has only `fn_` stems for the range.
  *   GUESS (from the body and its callers): `ef_sin_cos`, `ef_vec3_normalize_to`.
+ *   GUESS: `ef_mtx34_rotate_xyz` (the Euler rotation its callers build), `ef_mtx34_scale_columns` (the
+ *   column scale).
  * RESIDUALS. 3 rows unwritten: 0x8009C7D4-0x8009CBA0 (two empty bodies whose whole retail body is the
  *   paired-single sequence, playbook 85) and 0x8009CD64-0x8009CDBC (`ef_mtx34_column_length`, declared, never defined).  The
  *   source order differs from retail's, so `.text`, extab and extabindex run in another order.
- *   2 rows written and at 0: `fn_8009CBA0`, `fn_8009CC20` (paired-single bodies, playbook 85).
+ *   2 rows written and at 0: `fn_8009CBA0`, `ef_mtx34_scale_columns` (paired-single bodies, playbook 85).
  *   7 partial rows:
  *  - `ef_vec3_normalize_to`, `fn_8009C6F0`, `ef_sin_cos`: paired-single bodies (playbook 85); our C versions also read
  *    `lbl_80795FA8`/`lbl_80795F7C` where retail does not;
@@ -35,6 +37,7 @@
  *     `lbl_80591C58`, `lbl_80591C18`, `lbl_80795F7C`, `lbl_80795F84`, `fn_8050133C`,
  *     `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`.
  *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050133C`, `fn_80501C60`.
+ *   `ef_mtx34_rotate_xyz` (0x8009CA30) is unwritten (an empty body; 60 paired-single instructions).
  * SHAPES. The pointer assert is the six-BOOL chain with a two-test first `if` (`ef/ef_point.cpp`'s shape); its
  *   trailing `(ptr)` is retail's fourth `Panic` argument (`mr r6, <ptr>`).
  */
@@ -83,7 +86,7 @@ void fn_8009BCB4(const f32* vec, f32* mtx);
 void fn_8009BF08(const f32* mtx, f32* vec);
 s32 ef_vec3_normalize_to(f32* dst, const f32* src);
 void fn_8009C7D4(f32* mtx, const f32* a, const f32* b);
-void fn_8009CA30(f32* mtx, f32 x, f32 y, f32 z);
+void ef_mtx34_rotate_xyz(f32* mtx, f32 x, f32 y, f32 z);
 void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale);
 void fn_8050133C(f32* dst, const f32* mtx, const f32* scale);
 }
@@ -192,10 +195,10 @@ extern "C" void fn_8009B448(f32* mtx, const f32* vec) {
     f32 z;
 
     NW4R_POINTER_ASSERT(mtx, 0x1AE, lbl_8059199C);
-    NW4R_ASSERT(fn_8005220C(fn_80050F24(vec) - lbl_80795F80) < lbl_80795F84, 0x1AF, lbl_805919D0);
+    NW4R_ASSERT(abs_f32(fn_80050F24(vec) - lbl_80795F80) < lbl_80795F84, 0x1AF, lbl_805919D0);
 
     z = vec[2];
-    s = fn_8005220C(z);
+    s = abs_f32(z);
     if (lbl_80795F80 - s < lbl_80795F8C) {
         a = lbl_80795F7C;
         b = lbl_80795F7C;
@@ -381,7 +384,7 @@ extern "C" void fn_8009C7D4(f32* mtx, const f32* a, const f32* b) {
 
 /* Builds a rotation matrix from three Euler angles: 60 paired-single instructions and nothing else
  * (unwritten). */
-extern "C" void fn_8009CA30(f32* mtx, f32 x, f32 y, f32 z) {
+extern "C" void ef_mtx34_rotate_xyz(f32* mtx, f32 x, f32 y, f32 z) {
 }
 
 /* Computes the 3x4 matrix's three column scales into `scale` (Gram-Schmidt lengths, negated for a
@@ -405,33 +408,33 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
     VEC3_ctor((nw4r::math::VEC3*)v2c);
 
     fn_8009BA78(mtx, 0, v2c);
-    len = fn_80050EDC(v2c);
+    len = vec3_length_sq(v2c);
     if (len > lbl_80795F8C) {
         r = nw4r::math::FrSqrt(len);
         scale[0] = math_reciprocal(r);
-        fn_80051424(v2c, v2c, r);
+        vec3_scale_by(v2c, v2c, r);
 
         fn_8009BA78(mtx, 1, v20);
         d0 = vec3_dot(v2c, v20);
-        fn_80051424(v8, v2c, d0);
+        vec3_scale_by(v8, v2c, d0);
         PSVECSubtract(v20, v20, v8);
 
-        len = fn_80050EDC(v20);
+        len = vec3_length_sq(v20);
         if (len > lbl_80795F8C) {
             r = nw4r::math::FrSqrt(len);
             scale[1] = math_reciprocal(r);
             d0 = d0 * r;
-            fn_80051424(v20, v20, r);
+            vec3_scale_by(v20, v20, r);
 
             fn_8009BA78(mtx, 2, v14);
             d1 = vec3_dot(v20, v14);
-            fn_80051424(v8, v20, d1);
+            vec3_scale_by(v8, v20, d1);
             PSVECSubtract(v14, v14, v8);
             d2 = vec3_dot(v2c, v14);
-            fn_80051424(v8, v2c, d2);
+            vec3_scale_by(v8, v2c, d2);
             PSVECSubtract(v14, v14, v8);
 
-            len = fn_80050EDC(v14);
+            len = vec3_length_sq(v14);
             if (len > lbl_80795F8C) {
                 scale[2] = sqrt_f32(len);
                 vec3_cross(v8, v20, v14);
@@ -447,9 +450,9 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
             scale[1] = lbl_80795F7C;
             fn_8009BA78(mtx, 2, v14);
             d2 = vec3_dot(v2c, v14);
-            fn_80051424(v8, v2c, d2);
+            vec3_scale_by(v8, v2c, d2);
             PSVECSubtract(v14, v14, v8);
-            len = fn_80050EDC(v14);
+            len = vec3_length_sq(v14);
             if (len > lbl_80795F8C)
                 scale[2] = sqrt_f32(len);
             else
@@ -458,15 +461,15 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
     } else {
         scale[0] = lbl_80795F7C;
         fn_8009BA78(mtx, 1, v20);
-        len = fn_80050EDC(v20);
+        len = vec3_length_sq(v20);
         if (len > lbl_80795F8C) {
             r = nw4r::math::FrSqrt(len);
             scale[1] = math_reciprocal(r);
-            fn_80051424(v20, v20, r);
+            vec3_scale_by(v20, v20, r);
 
             fn_8009BA78(mtx, 2, v14);
             d1 = vec3_dot(v20, v14);
-            fn_80051424(v8, v20, d1);
+            vec3_scale_by(v8, v20, d1);
             PSVECSubtract(v14, v14, v8);
             scale[2] = fn_80050F24(v14);
         } else {
@@ -538,7 +541,7 @@ extern "C" void fn_8009CBA0(f32* dst, const f32* mtx, const f32* scale) {
 
 /* Scales every column of the 3x4 matrix `mtx` by the matching component of `scale`, into `dst`; a zero
  * component is replaced by the pooled ramp value at lbl_80795FB0. */
-extern "C" void fn_8009CC20(f32* dst, const f32* scale, const f32* mtx) {
+extern "C" void ef_mtx34_scale_columns(f32* dst, const f32* scale, const f32* mtx) {
     f32 sx = scale[0];
     f32 sy = scale[1];
     f32 sz = scale[2];

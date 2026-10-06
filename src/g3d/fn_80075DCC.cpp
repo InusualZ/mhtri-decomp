@@ -178,7 +178,7 @@ u32 VIGetTvFormat(void);
 u32 dtor_800813B8(u32);
 u32 color_rgba_copy(s32, void*);
 u32 mtx34_identity(s32);
-u32 fn_80050850(void*, void*, f32, f32);
+u32 vec3_normalize_into(void*, void*, f32, f32);
 u32 mtx34_mult_vec3(void*, s32, void*);
 u32 fn_8005A8E0(void*, void*);
 s32 fn_8005A91C(s32);
@@ -1340,17 +1340,17 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                     spE4 = temp_f31;
                     spD4 = temp_f31;
                     setVec3((nw4r::math::VEC3*)&sp80, (f32)(spC8), (f32)(spD8), (f32)(spE8));
-                    fn_80050850((void*)(&sp80), (void*)(&sp80), 0, 0);
+                    vec3_normalize_into((void*)(&sp80), (void*)(&sp80), 0, 0);
                     spC8 = sp80;
                     spD8 = sp84;
                     spE8 = sp88;
                     setVec3((nw4r::math::VEC3*)&sp74, (f32)(spCC), (f32)(spDC), (f32)(spEC));
-                    fn_80050850((void*)(&sp74), (void*)(&sp74), 0, 0);
+                    vec3_normalize_into((void*)(&sp74), (void*)(&sp74), 0, 0);
                     spCC = sp74;
                     spDC = sp78;
                     spEC = sp7C;
                     setVec3((nw4r::math::VEC3*)&sp68, (f32)(spD0), (f32)(spE0), (f32)(spF0));
-                    fn_80050850((void*)(&sp68), (void*)(&sp68), 0, 0);
+                    vec3_normalize_into((void*)(&sp68), (void*)(&sp68), 0, 0);
                     spD0 = sp68;
                     spE0 = sp6C;
                     spF0 = sp70;
@@ -1367,13 +1367,13 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                         fn_8007A7C8((s32)(temp_r3_5), (s32)(&sp5C));
                         fn_80077DBC((void *)(&sp44), (void*)(&sp5C));
                         copyVec3((nw4r::math::VEC3*)&sp5C, (const nw4r::math::VEC3*)&sp44);
-                        fn_80050850((void*)(&sp5C), (void*)(&sp5C), 0, 0);
+                        vec3_normalize_into((void*)(&sp5C), (void*)(&sp5C), 0, 0);
                     }
                 } else if (fn_80077D64((s32)(temp_r3_5)) != 0) {
                     fn_8007A7C8((s32)(temp_r3_5), (s32)(&sp5C));
                     fn_80077DBC((void *)(&sp38), (void*)(&sp5C));
                     copyVec3((nw4r::math::VEC3*)&sp5C, (const nw4r::math::VEC3*)&sp38);
-                    fn_80050850((void*)(&sp5C), (void*)(&sp5C), 0, 0);
+                    vec3_normalize_into((void*)(&sp5C), (void*)(&sp5C), 0, 0);
                 } else {
                     VEC3_ctor((nw4r::math::VEC3*)&sp50);
                     if (fn_80077D4C((s32 *)(temp_r3_5)) == 0) {
@@ -1384,7 +1384,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                     sp5C = temp_f1 * sp50;
                     sp60 = temp_f1 * sp54;
                     sp64 = temp_f30 + (temp_f1 * sp58);
-                    fn_80050850((void*)(&sp5C), (void*)(&sp5C), (f32)(temp_f1), (f32)(sp58));
+                    vec3_normalize_into((void*)(&sp5C), (void*)(&sp5C), (f32)(temp_f1), (f32)(sp58));
                 }
                 ((RawView_16*)(*temp_r3))->field_0x14(temp_r3, temp_r26, &sp5C, &spC8, *var_r31);
             } else {

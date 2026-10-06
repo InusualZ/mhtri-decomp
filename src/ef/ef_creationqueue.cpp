@@ -8,6 +8,7 @@
  *   `fn_800A3718` and `addi` + `cmpwi` in `fn_800A3800`).
  * NAMES. The map has only `fn_` stems for the range; the types and fields are GUESSes from the panic messages
  *   (`setting`, `eh`) and from `fn_800A7750` in `ef/ef_emitter.cpp`, which asserts the same handle.
+ *   GUESS: `ef_creation_queue_add_type0`, `ef_creation_queue_add_type1` (the two Add paths, by entry type).
  * RESIDUALS. 2 partial rows:
  *  - `fn_800A3718`: retail reuses r12 for the form's table and slot (`lwz r12, ...; lwz r12, ...`), ours loads the
  *    table through r9;
@@ -139,7 +140,7 @@ extern "C" void fn_800A3390(Setting* dst, const Setting* src);
 extern "C" u32 fn_800A337C(EffectManager* manager);
 
 /* 0x800A3044 - queues a type-0 creation. */
-extern "C" void fn_800A3044(CreationQueue* self, const Setting* setting, EffectManager* manager,
+extern "C" void ef_creation_queue_add_type0(CreationQueue* self, const Setting* setting, EffectManager* manager,
                             EffectHandle* eh, u16 life, const Vec3* pos, const Vec3* vel) {
     NW4R_POINTER_ASSERT(setting, 0x20, lbl_805922D8);
     NW4R_POINTER_ASSERT(eh, 0x21, lbl_80592310);
@@ -185,8 +186,8 @@ extern "C" void fn_800A3390(Setting* dst, const Setting* src) {
     dst->mArg7 = src->mArg7;
 }
 
-/* 0x800A33DC - queues a type-1 creation (same shape as fn_800A3044). */
-extern "C" void fn_800A33DC(CreationQueue* self, const Setting* setting, EffectManager* manager,
+/* 0x800A33DC - queues a type-1 creation (same shape as ef_creation_queue_add_type0). */
+extern "C" void ef_creation_queue_add_type1(CreationQueue* self, const Setting* setting, EffectManager* manager,
                             EffectHandle* eh, u16 life, const Vec3* pos, const Vec3* vel) {
     NW4R_POINTER_ASSERT(setting, 0x41, lbl_805922D8);
     NW4R_POINTER_ASSERT(eh, 0x42, lbl_80592310);

@@ -97,8 +97,8 @@ s32 fn_8028F66C(HitSphere* a, HitSphere* b, VEC3* out) {
     if (dist <= reach * reach) {
         if (dist > 0.001f) {
             PSVECSubtract(&sep.x, &a->pos.x, &b->pos.x);
-            fn_80051424(&sep.x, &sep.x, b->radius / sqrt_f32(dist));
-            fn_800513CC(out, &sep, &b->pos);
+            vec3_scale_by(&sep.x, &sep.x, b->radius / sqrt_f32(dist));
+            vec3_add_ps(out, &sep, &b->pos);
         } else {
             fn_80050028(out, &b->pos);
         }
@@ -125,7 +125,7 @@ s32 fn_8028F758(HitSphere* a, HitSphere* b, VEC3* out) {
             PSVECSubtract(&sep.x, &a->pos.x, &b->pos.x);
             mag = sqrt_f32(dist);
             ratio = (reach - mag) / mag;
-            fn_80051424(&out->x, &sep.x, ratio);
+            vec3_scale_by(&out->x, &sep.x, ratio);
         } else {
             out->x = 0.0f;
             out->y = 0.0f;
@@ -155,7 +155,7 @@ f32 fn_8028F86C(PlBox* box, const VEC3* point, f32* param) {
     f32 t;
 
     subVec3(&sep, point, &box->vec_0x00);
-    axis_len2 = fn_80050EDC(&box->vec_0x18.x);
+    axis_len2 = vec3_length_sq(&box->vec_0x18.x);
     t = 0.0f;
     if (axis_len2 >= 0.001f) {
         VEC3 scaled;
@@ -167,7 +167,7 @@ f32 fn_8028F86C(PlBox* box, const VEC3* point, f32* param) {
         fn_800B0B90((Vec*)&sep, (Vec*)&scaled);
     }
     *param = t;
-    return fn_80050EDC(&sep.x);
+    return vec3_length_sq(&sep.x);
 }
 
 /* 0x8028F938 - build the box `start` -> `end`, then hand `out` the point on it closest to `point`;
@@ -197,7 +197,7 @@ f32 fn_8028F938(VEC3* start, VEC3* end, VEC3* point, VEC3* out) {
  * does). */
 void fn_802910C0(VEC3* out, const VEC3* in, f32 scale) {
     VEC3_ctor(out);
-    fn_80051424(&out->x, &in->x, scale);
+    vec3_scale_by(&out->x, &in->x, scale);
 }
 
 /* 0x802919FC - the 2-layer ground query: resets the caller's `LandData` and asks for the region

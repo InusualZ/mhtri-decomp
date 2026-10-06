@@ -540,8 +540,8 @@ extern "C" void fn_801B7A68(EmProgWork* self, u8 mode) {
         copyVec3(&vec, &self->target);
         vec.y += 60.0f;
         fn_800B0B90(&vec, &self->pos);
-        if (fn_80050EDC((const f32*)&vec) > 0.001f) {
-            fn_80050850(&vec, &vec);
+        if (vec3_length_sq((const f32*)&vec) > 0.001f) {
+            vec3_normalize_into(&vec, &vec);
             vec3_scale(&out, &vec, 8.0f);
             copyVec3(&self->vec_0x310, &out);
         }
@@ -651,8 +651,8 @@ extern "C" void fn_801B7E34(EmProgWork* self, u8 mode) {
         copyVec3(&vec, &self->target);
         vec.y += 60.0f;
         fn_800B0B90(&vec, &self->pos);
-        if (fn_80050EDC((const f32*)&vec) > 0.001f) {
-            fn_80050850(&vec, &vec);
+        if (vec3_length_sq((const f32*)&vec) > 0.001f) {
+            vec3_normalize_into(&vec, &vec);
             vec3_scale(&out, &vec, 10.0f);
             copyVec3(&self->vec_0x310, &out);
         }

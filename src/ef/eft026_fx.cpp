@@ -205,7 +205,7 @@ void fn_80119D10(_EFT* self);
 void fn_80119D9C(_EFT* self);
 /* 0x80041E40 is owned by `src/mh3_pad.cpp`; its header cannot be included here (`ef.h`
  * spells `VEC3_ctor`/`setVec3` differently from `mh3_pad.h`, MWCC (10197)), so this
- * copy stays - normalised to the owner's body (`void*` return).  `fn_80050850`/`addVec3` now
+ * copy stays - normalised to the owner's body (`void*` return).  `vec3_normalize_into`/`addVec3` now
  * come from their owner's header, `fn_8004CAD8.h` (included above, rule 2). */
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 void mtx34_copy(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
@@ -742,7 +742,7 @@ extern "C" void fn_80118B2C(_EFT* self)
             nw4r::math::VEC3 camDir = get_camera_direction();
             copyVec3(&v3, &camDir);
         }
-        fn_80050850(&v3, &v3);
+        vec3_normalize_into(&v3, &v3);
         fn_800513F0(&v3, lbl_80796B04);
         addVec3(&v0, &self->pos_0x18, &v3);
         copyVec3(&v2, &v0);
