@@ -33,7 +33,9 @@ Ownership, Owner, AutoObjects, Refused, ShapeError`.
   write=None)`; `write_text(path, text, rename=None)` (the verified `lib.text.Transaction` write); `rewrite_name`, `resize`,
   `infer_section(rows, address, section)`; `rename_pairs(removed_lines, added_lines) -> {old: new}` (a map diff's rows
   renamed at an unchanged `section:address`, one row each side) and `stem_renames(rows) -> {fn_/lbl_<ADDR>: name}` (every
-  row not named by dtk's generated stem) - `objsame --renames-from-git` reads both.
+  row not named by dtk's generated stem) - `objsame --renames-from-git` reads both; `VALID_NAME_RE` (what `plan_rename`
+  accepts: template `<>,-`, `@LOCAL@`/`@GUARD@`, the `\` of `__sinit_\x_cpp`) and `name_pattern(name)` (a reference
+  to the name in source, `\b`-free so `@...` and `...>` names are found).
 * `configure.py`: `Configure.load(path)` / `Configure.parse(text, args=None)`: `objects()` (`ObjectRow(path, flag, linked, lib,
   mw_version, lib_cflags, cflags_name, cflags, options, line)`), `object(path)` (exact, else stem), `libs()` (`Lib(name,
   mw_version, cflags_name, cflags, progress_category, objects, line)`), `lib(name)`, `groups()`, `cflags(group or lib)`,
