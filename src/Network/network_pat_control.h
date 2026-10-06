@@ -13,6 +13,7 @@
 #include "Network/NetworkPat.h"
 #include "Network/NetworkSessionManagerPat.h"   /* getPatsObject, isNetworkSessionManagerPatReady (owner's header, rule 2) */
 #include "Network/NetworkLayerPat.h"   /* NetId and the layer records the work record embeds */
+#include "Network/NetworkCommunityPat.h"   /* NetworkCommunityFriendList / NetworkCommunityBlockList - the two lists */
 #include "Network/NetworkUniqueId.h"       /* NetworkUniqueId - the roster entries' address objects */
 #include "Network/NetworkFileFetcher.h"     /* NetworkFileFetcher - the fetch state machines' client */
 #include "menu/PatTerms.h"                  /* PatTerms - the terms object (owner menu/menu_plsearch.cpp) */
@@ -32,14 +33,14 @@ typedef struct NetCtrlEntry {
     /* +0x50 */ char text_0x50[0xC];
 } NetCtrlEntry; /* size: 0x5C */
 
-/* One slot of the 100-record `slots_0x3ED4` table (the `.sbss` 0x80794CF8 band).  The first byte is the
- * slot's state (0 = free), +0x04 is the owner pointer the state machine hands out, +0x3C/+0x40 the two
- * float members and +0x54 the slot's mode word. */
+/* One slot of the 100-record `slots_0x3ED4` table.  The first byte is the slot's state (0 = free), +0x04 the
+ * member's friend record (the record's address is the handle `findSlotByOwner` matches), +0x3C/+0x40 the two
+ * float members and +0x54 the slot's mode word.  The record makes the slot a class the compiler builds and
+ * destroys (inline constructor 0x804320D0, destructor 0x80431FCC). */
 typedef struct NetSlot {
     /* +0x00 */ u8 state_0x00;
     /* +0x01 */ u8 pad_0x01[0x3];
-    /* +0x04 */ void* owner_0x04;   /* untyped: opaque handle - the slot hands its owner back to the caller */
-    /* +0x08 */ u8 pad_0x08[0x34];
+    /* +0x04 */ NetFriendRec rec_0x04;
     /* +0x3C */ f32 valueA_0x3C;
     /* +0x40 */ f32 valueB_0x40;
     /* +0x44 */ u8 pad_0x44[0x10];
@@ -158,12 +159,6 @@ typedef struct NetPeerRec {
 
     void assign(const NetPeerRec* src);
 } NetPeerRec; /* size: 0x120 */
-
-/* One 0x20-byte peer address object (`NetCtrlWk::peer_addresses_0x7908`): a `NetworkUniqueId` the work
- * record's constructor builds; compared with `NetworkUniqueId::equals`.  size: 0x20 */
-typedef struct NetPeerAddress {
-    /* +0x00 */ NetworkUniqueId object_0x00;
-} NetPeerAddress; /* size: 0x20 */
 
 /* The peer list `NetCtrlWk::copyPeerList` copies out for the caller: the count, then the four records. */
 typedef struct NetPeerList {
@@ -717,10 +712,8 @@ typedef struct NetCtrlWk {
     /* +0x460 */ u8 page_records_0x460[8][0x40];
     /* +0x660 */ NetSrvList server_list_0x660;   /* layer command 18 copies it whole */
     /* +0x1A68 */ u8 layer_block_0x1A68[0x74];   /* the 0x74-byte block layer command 8 delivers */
-    /* +0x1ADC */ s32 layer_value_0x1ADC;        /* the word layer command 11 delivers */
-    /* +0x1AE0 */ NetRecentRec layer_peers_0x1AE0[20];   /* the layer's peer list (address object and name) resetMessagePool rebuilds from */
-    /* +0x1F40 */ u8 pad_0x1F40[0x28];
-    /* +0x1F68 */ u8 pad_0x1F68[0x1F68];
+    /* +0x1ADC */ NetFriendTable friends_0x1ADC;   /* the layer's members (layer command 11 sets the count; resetMessagePool rebuilds from it) */
+    /* +0x30C0 */ NetFriendSession friend_sessions_0x30C0[100];   /* each member's session record (the peer import copies them) */
     /* +0x3ED0 */ NetSlot* slot_list_0x3ED0;
     /* +0x3ED4 */ NetSlot slots_0x3ED4[100];
     /* +0x6134 */ NetUserPosition position_0x6134;   /* the position `sendUserPosition` publishes */
@@ -747,7 +740,7 @@ typedef struct NetCtrlWk {
         u8 msgTable_0x7488[0x480];   /* the byte view `Network/network_pat_control.cpp` indexes */
         NetPeerRec peers_0x7488[4];
     };
-    /* +0x7908 */ NetPeerAddress peer_addresses_0x7908[4];   /* the peers' address objects (the record's ctor builds them) */
+    /* +0x7908 */ NetworkUniqueId peer_addresses_0x7908[4];   /* the peers' address objects (the record's ctor builds them) */
     /* +0x7988 */ u8 used_0x7988[4];
     /* +0x798C */ u8 pad_0x798C[0x4];
     /* +0x7990 */ u8 transfer_flag_0x7990;   /* handed to the mediator (0x804172DC) */
@@ -794,8 +787,8 @@ typedef struct NetCtrlWk {
     /* +0xA144 */ s32 community_results_0xA144[27];   /* one result word per community command (communityReflectCallback) */
     /* +0xA1B0 */ s32 cmd4_value_0xA1B0;   /* the word community command 4 reports */
     /* +0xA1B4 */ s32 cmd5_value_0xA1B4;   /* the word community command 5 reports */
-    /* +0xA1B8 */ NetRosterList roster_0xA1B8;
-    /* +0xBB84 */ NetRecentList recent_0xBB84;
+    /* +0xA1B8 */ NetworkCommunityFriendList roster_0xA1B8;   /* the friend roster (built and destroyed out of line) */
+    /* +0xBB84 */ NetworkCommunityBlockList recent_0xBB84;    /* the recent-player list (likewise) */
     /* +0xBF08 */ char message_0xBF08[0x24];
     /* +0xBF2C */ u8 flag_0xBF2C;
     /* +0xBF2D */ u8 flag_0xBF2D;
@@ -995,6 +988,10 @@ typedef struct NetCtrlWk {
     static void copyStaging(u8* dst);
     s32 stepStagingDownload(s32 file, u16 version);
     static s32 stepStagingDownloadIfUp(s32 file, u32 version);
+
+    /* 0x8043202C / 0x80431EFC - build and destroy the member objects (inline: emitted after the static init). */
+    NetCtrlWk();
+    ~NetCtrlWk();
 /*@NetCtrlWk end@*/
 } NetCtrlWk; /* size: 0xC4A8 (the .bss instance net_ctrl_work) */
 #pragma pack(pop)
@@ -1095,6 +1092,8 @@ NetSlot* findSlotByOwner(void* owner /* untyped: opaque handle - the owner point
 /* 0x80427024 / 0x80427240 / 0x80428628 - reset the peer table, find a free peer-event word, copy the layer's
  * friend list into the work record (GUESS names from the bodies). */
 void resetPeerTable(void);
+/* 0x80427C00 (GUESS) - rebuilds the peer table and `list` from the layer's members; the member total. */
+u8 importLayerPeers(NetPeerList* list);
 u32* findFreePeerEvent(void);
 void refreshFriendList(void);
 /* 0x80427284 - queues a network command (1 = accepted): the command id, the caller's result byte, an

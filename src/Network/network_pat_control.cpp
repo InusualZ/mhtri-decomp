@@ -26,14 +26,24 @@
  *   `readCommunityMemberCards`, `checkLayerEntry`, `NetFriendCard`, `NetServerConfig`, `NetSrvList`.
  *   GUESS: `updateMessagePool` (0x80425790, the per-frame message and command pump).
  *   GUESS: `updatePeerCardBlock` (0x80427868, a peer's card update).
+ *   GUESS: `importLayerPeers` (0x80427C00, the peer table rebuilt from the layer's members).
  *   GUESS: `getCommunityRecord` (0x804281C4), `NetCommandPool`, `NetServerRows`, the helpers `stepLayerEntryCheck`/
  *   `finishLayerEntry` (inline pieces of `updateMessagePool`), `NetPeerCardMessage`.
  *   `isReadyCountOne` and `resetFailureState` (a `blr` stub) keep names that say only what the body does.
- * RESIDUALS. 11 rows unwritten (objdiff scores them zero):
- *   - the peer import 0x80427C00 (740 B, it copies the layer's friend roster into +0x1ADC: a `NetFriendRoster` the
- *     record still spells as `layer_value_0x1ADC`/`layer_peers_0x1AE0` and padding);
- *   - the static-init/ctor/dtor group 0x80431CD8..0x80432104 (10 rows; it needs `NetCtrlWk`'s member classes - that
- *     roster, the peer address objects, the requests - as C++ members).
+ * RESIDUALS. 1 row unwritten: `fn_80431D80`, the compiler's array destructor for `net_profile_table` (its name is the
+ *   compiler's `__arraydtor$NNNN`, which changes with every edit, so the map keeps the address name).
+ *   `NetCtrlWk`'s constructor/destructor: retail calls `__ct__26NetworkCommunityFriendListFv`,
+ *   `__ct__25NetworkCommunityBlockListFv`, `__dt__26NetworkCommunityFriendListFv` and `__dt__25NetworkCommunityBlockListFv`
+ *   out of line (they live in `Network/NetworkCommunityPat.cpp`); the classes declare none, so ours builds and
+ *   destroys their elements (`__ct__22NetworkCommunityFriendFv`, `__dt__23NetworkCommunityBlockedFv`, ...) inline -
+ *   declaring them in `Network/NetworkCommunityPat.h` drops that unit (99.94 -> 97.00) until it defines them.
+ *   Ours therefore adds `__construct_array`/`__destroy_arr` calls over `__ct__23NetworkCommunityBlockedFv`/
+ *   `__dt__22NetworkCommunityFriendFv` where retail calls the list members.
+ *   Not unwritten: `NetCtrlWk`'s empty constructor and destructor bodies are complete (MWCC emits the member work).
+ *   `__sinit_
+etwork_pat_control_cpp`: retail builds `net_pats_object` with `constructNetworkPat` and registers
+ *   `destroyNetworkPat` (`__register_global_object`); `NetworkPat` (a Matching unit) declares no constructor, so ours
+ *   leaves the object unbuilt there.
  *   Partial rows written here: `updateMessagePool` (retail's control flow is irreducible: steps 3 and 4 of a layer
  *   entry jump back into step 1's `checkLayerEntry` dispatch and step 6 into step 2's success block; without `goto`
  *   (rule 8) those two blocks are inline helpers, so the dispatch is emitted three times and the success block twice -
@@ -56,10 +66,12 @@
  *  - `queueNetCommand`: one store scheduled before the loop's pointer bump; `resetMessagePool`, `initWorkRecord`,
  *    `initNetworkPatControl`: scheduling, one folded store each;
  *  - `get_server_type_name` and the rest: register and unroll differences (the objdiff rows);
- *  - `__dt__9NetCtrlWkFv`: retail destroys `NetworkCommunityFriendList`/`NetworkCommunityBlockList`, `NetworkUniqueId`
- *    arrays, `NetSlot`'s `NetFriendRec` and a `NetFriendTable` at +0x1ADC; ours the record's own views (`NetRosterList`,
- *    `NetRecentList`, `NetPeerAddress`) - the member restructure that fixes it is pending a ruling;
- *  - callee-saved range: `PatCryptEncrypt`, `layerReflectCallback`, `updateNetworkPatControl` save from r24 in retail
+ *  - `importLayerPeers`: the callee-saved registers are coloured differently (declaration orders tried);
+ *  - callee-saved range: `updatePeerCardBlock` (ours `_savegpr_14`/`_restgpr_14`, retail `_savegpr_15`/`_restgpr_15`),
+ *    `importLayerPeers` (ours `_savegpr_20`/`_restgpr_20`, retail `_savegpr_19`/`_restgpr_19`);
+ *  - `updateMessagePool`'s duplicated blocks add calls: `checkLayerEntry`, `clearRefreshTimeoutOnChange`, `freePoolEntry`,
+ *    `getCommunityMemberRecord`, `getNetworkLayerPat`, `getPatsObject`, `memset`, `readLayerIdChange`, `refreshRosterCache`,
+ *    `releaseRemotePlayerParts`, `resetPeerTable`, `saveLayerId`, `sendCheckRequest`, `setErrorCode`, `strcpy`; `PatCryptEncrypt`, `layerReflectCallback`, `updateNetworkPatControl` save from r24 in retail
  *    (`_savegpr_24`/`_restgpr_24`), ours from r25/r26; `copyRosterLists` the other way (retail r25, ours r24);
  *    `resetSlotTable` names the `.sdata2` constant `lbl_8079C888` where retail's load carries no symbol, and
  *    `initWorkRecord`/`copyFriendList` reach `net_ctrl_work`/`net_ctrl_wk` with an extra relocation (an address CSE'd
@@ -446,7 +458,7 @@ NetSlot* findSlotByOwner(void* owner)
     u32 i;
 
     for (i = 0; i < 100; i++) {
-        if (slot->state_0x00 != 0 && slot->owner_0x04 == owner) {
+        if (slot->state_0x00 != 0 && (void*)&slot->rec_0x04 == owner) {
             return slot;
         }
         slot++;
@@ -557,7 +569,7 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
 
                 formatNetId(work->peers_0x7488[slot].id_0x00.text_0x00, (const NetworkUniqueId*)data);
                 strcpy(work->peers_0x7488[slot].name_0x0A.text_0x00, ((NetLayerPeerJoin*)data)->name_0x20);
-                importNetId(&work->peer_addresses_0x7908[slot].object_0x00, &work->peers_0x7488[slot].id_0x00);
+                importNetId(&work->peer_addresses_0x7908[slot], &work->peers_0x7488[slot].id_0x00);
                 memcpy(&work->peers_0x7488[slot].blob_0x20, ((NetLayerPeerJoin*)data)->profile_0x3C, 0x100);
                 applyNetUserProfile((const u8*)&work->peers_0x7488[slot].blob_0x20);
                 postMediatorRecord(getInstance(), work->peers_0x7488[slot].blob_0x20.record_0x9C);
@@ -648,7 +660,7 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
             work->layer_results_0x6244[command] = result;
         } else {
             work->layer_results_0x6244[command] = 1;
-            work->layer_value_0x1ADC = *(s32*)data;
+            work->friends_0x1ADC.count_0x000 = *(s32*)data;
         }
         break;
     case 13:
@@ -1581,15 +1593,15 @@ void updateMessagePool(void)
 
                     resetMessagePool();
                     *entry->result_0x04 = 1;
-                    work->layer_value_0x1ADC = getNetworkLayerPat(getPatsObject(), 0)->friends_3568.count_0x000;
+                    work->friends_0x1ADC.count_0x000 = getNetworkLayerPat(getPatsObject(), 0)->friends_3568.count_0x000;
                     if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
-                        for (friend_index = 0; friend_index < work->layer_value_0x1ADC; friend_index++) {
+                        for (friend_index = 0; friend_index < (s32)work->friends_0x1ADC.count_0x000; friend_index++) {
                             getNetworkLayerPat(getPatsObject(), 0);
-                            copyNetFriendRec((NetFriendRec*)&work->layer_peers_0x1AE0[friend_index],
+                            copyNetFriendRec(&work->friends_0x1ADC.entries_0x004[friend_index],
                                              &getNetworkLayerPat(getPatsObject(), 0)->friends_3568.entries_0x004[friend_index]);
                             if (friend_index == 0) {
                                 getNetworkLayerPat(getPatsObject(), 0);
-                                copyNetFriendRec((NetFriendRec*)&work->slots_0x3ED4[0].owner_0x04,
+                                copyNetFriendRec(&work->slots_0x3ED4[0].rec_0x04,
                                                  &getNetworkLayerPat(getPatsObject(), 0)->friends_3568.entries_0x004[friend_index]);
                             }
                         }
@@ -1837,16 +1849,16 @@ void resetMessagePool(void)
             work->peer_total_0x7994 = n;
             slot = 1;
             for (; n > 0; n--) {
-                NetRecentRec* listed = &work->layer_peers_0x1AE0[n - 1];
+                NetFriendRec* listed = &work->friends_0x1ADC.entries_0x004[n - 1];
 
-                listed->address_0x00.exportTo((u8*)id_text, 8);
+                listed->id_0x00.exportTo((u8*)id_text, 8);
                 if (strcmp(id_text, work->name_0x7368) == 0) {
-                    work->peer_addresses_0x7908[0].object_0x00.copyFrom((const u8*)&listed->address_0x00);
+                    work->peer_addresses_0x7908[0].copyFrom((const u8*)&listed->id_0x00);
                 } else {
                     strcpy(work->peers_0x7488[slot].id_0x00.text_0x00, id_text);
                     strcpy(work->peers_0x7488[slot].name_0x0A.text_0x00, listed->name_0x20);
                     work->used_0x7988[slot] = 1;
-                    work->peer_addresses_0x7908[slot].object_0x00.copyFrom((const u8*)&listed->address_0x00);
+                    work->peer_addresses_0x7908[slot].copyFrom((const u8*)&listed->id_0x00);
                     slot++;
                 }
             }
@@ -1894,7 +1906,7 @@ s32 findFreePeerSlot(const NetworkUniqueId* address)
     formatNetId(text, address);
     for (i = 1; i < 4; i++) {
         if (work->used_0x7988[i] != 0 &&
-            work->peer_addresses_0x7908[i].object_0x00.equals(address) != 0) {
+            work->peer_addresses_0x7908[i].equals(address) != 0) {
             return -1;
         }
     }
@@ -1918,7 +1930,7 @@ s32 findPeerSlot(const NetworkUniqueId* address)
     formatNetId(text, address);
     for (i = 1; i < 4; i++) {
         if (work->used_0x7988[i] != 0 &&
-            work->peer_addresses_0x7908[i].object_0x00.equals(address) != 0) {
+            work->peer_addresses_0x7908[i].equals(address) != 0) {
             return i;
         }
     }
@@ -2208,6 +2220,84 @@ s32 updatePeerCardBlock(const NetworkUniqueId* id, const u8* src, u32 size, s32 
         }
     }
     return 0;
+}
+
+/* 0x80427C00 (0x2E4): rebuilds the peer table from the layer's members after a layer change: clears both peer tables
+ * and the event slots, copies the layer's friend table and session records, then takes every other valid member into
+ * a free peer slot (id, name, address, card) and lists it in `list` after this console; the member total. */
+u8 importLayerPeers(NetPeerList* list)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    NetPeerRec* listed;
+    NetworkLayerPat* layer;
+    NetFriendTable* table;
+    s32 slot;
+    s32 taken;
+    s32 i;
+
+    if (work == NULL) {
+        return 0;
+    }
+    for (i = 0; i < 4; i++) {
+        memset(&list->peers_0x004[i], 0, sizeof(NetPeerRec));
+        memset(&work->peers_0x7488[i], 0, sizeof(NetPeerRec));
+        work->used_0x7988[i] = 0;
+    }
+    for (i = 0; i < 0x40; i++) {
+        memset(&work->slots_0x7996[i], 0, sizeof(work->slots_0x7996[i]));
+    }
+    work->peer_count_0x62E8 = getNetworkLayerPat(getPatsObject(), 0)->friends_3568.count_0x000;
+    if (work->peer_count_0x62E8 == 0) {
+        return 0;
+    }
+    work->peer_total_0x7994 = work->peer_count_0x62E8;
+    resetPeerTable();
+    listed = list->peers_0x004;
+    strcpy(listed->id_0x00.text_0x00, work->peers_0x7488[0].id_0x00.text_0x00);
+    strcpy(listed->name_0x0A.text_0x00, work->peers_0x7488[0].name_0x0A.text_0x00);
+    listed++;
+    layer = getNetworkLayerPat(getPatsObject(), 0);
+    table = &layer->friends_3568;
+    work->friends_0x1ADC.count_0x000 = table->count_0x000;
+    for (i = 0; i < 100; i++) {
+        if (table->entries_0x004[i].valid_0x35 != 0) {
+            work->friends_0x1ADC.entries_0x004[i].id_0x00.copyFrom((const u8*)&table->entries_0x004[i].id_0x00);
+            memcpy(work->friends_0x1ADC.entries_0x004[i].name_0x20, table->entries_0x004[i].name_0x20,
+                   sizeof(work->friends_0x1ADC.entries_0x004[i].name_0x20));
+            memcpy(&work->friend_sessions_0x30C0[i], &layer->friendSessions_4B4C[i],
+                   sizeof(work->friend_sessions_0x30C0[i]));
+        }
+    }
+    taken = 0;
+    for (i = 0; i < 100; i++) {
+        if (isSameNetId(&table->entries_0x004[i].id_0x00, &work->peers_0x7488[0].id_0x00) == 1) {
+            continue;
+        }
+        if (table->entries_0x004[i].valid_0x35 == 0) {
+            continue;
+        }
+        slot = findFreePeerSlot(&table->entries_0x004[i].id_0x00);
+        if (slot <= 0) {
+            continue;
+        }
+        formatNetId(work->peers_0x7488[slot].id_0x00.text_0x00, &table->entries_0x004[i].id_0x00);
+        strcpy(work->peers_0x7488[slot].name_0x0A.text_0x00, table->entries_0x004[i].name_0x20);
+        importNetId(&work->peer_addresses_0x7908[slot], &work->peers_0x7488[slot].id_0x00);
+        memcpy(&work->peers_0x7488[slot].blob_0x20, getNetworkLayerPat(getPatsObject(), 0)->details_595C[i].data_0x004,
+               sizeof(work->peers_0x7488[slot].blob_0x20));
+        applyNetUserProfile((const u8*)&work->peers_0x7488[slot].blob_0x20);
+        postMediatorRecord(getInstance(), work->peers_0x7488[slot].blob_0x20.record_0x9C);
+        work->used_0x7988[slot] = 1;
+        strcpy(listed->id_0x00.text_0x00, work->peers_0x7488[slot].id_0x00.text_0x00);
+        strcpy(listed->name_0x0A.text_0x00, work->peers_0x7488[slot].name_0x0A.text_0x00);
+        memcpy(&listed->blob_0x20, &work->peers_0x7488[slot].blob_0x20, sizeof(listed->blob_0x20));
+        listed++;
+        taken++;
+        if (taken >= work->peer_count_0x62E8) {
+            break;
+        }
+    }
+    return work->peer_total_0x7994;
 }
 
 /* 0x80427EE4 (0x150): clears `count` cards, then fills them from the layer's friend list from friend `first` on;
@@ -2852,7 +2942,7 @@ void initWorkRecord(void)
     work->fetch_sums_0xA0E4[2] = 0;
     work->fetch_sums_0xA0E4[3] = 0;
     memset(work->community_results_0xA144, 0, 0x6C);
-    work->roster_0xA1B8.count_0x000 = 0;
+    work->roster_0xA1B8.count_00 = 0;
     work->field_0xC154 = 0;
     memset(&work->screen_0xC158, 0, 4);
     memset(work->flags_0xC1C0, 0, sizeof(work->flags_0xC1C0));
@@ -6705,15 +6795,15 @@ void NetCtrlWk::copyRosterLists(NetRosterListView* roster, NetRecentListView* re
     }
     memset(roster, 0, sizeof(*roster));
     memset(recent, 0, sizeof(*recent));
-    roster->count_0x000 = work->roster_0xA1B8.count_0x000;
+    roster->count_0x000 = work->roster_0xA1B8.count_00;
     for (i = 0; i < roster->count_0x000; i++) {
-        memcpy(roster->rows_0x004[i].name_0x00, work->roster_0xA1B8.entries_0x004[i].name_0x20, 0x14);
-        formatNetId(roster->rows_0x004[i].id_text_0x14, &work->roster_0xA1B8.entries_0x004[i].address_0x00);
+        memcpy(roster->rows_0x004[i].name_0x00, work->roster_0xA1B8.entries_04[i].name_20, 0x14);
+        formatNetId(roster->rows_0x004[i].id_text_0x14, &work->roster_0xA1B8.entries_04[i].id_00);
     }
-    recent->count_0x000 = work->recent_0xBB84.count_0x000;
+    recent->count_0x000 = work->recent_0xBB84.count_00;
     for (i = 0; i < recent->count_0x000; i++) {
-        memcpy(recent->rows_0x004[i].name_0x00, work->recent_0xBB84.entries_0x004[i].name_0x20, 0x14);
-        formatNetId(recent->rows_0x004[i].id_text_0x14, &work->recent_0xBB84.entries_0x004[i].address_0x00);
+        memcpy(recent->rows_0x004[i].name_0x00, work->recent_0xBB84.entries_04[i].name_20, 0x14);
+        formatNetId(recent->rows_0x004[i].id_text_0x14, &work->recent_0xBB84.entries_04[i].id_00);
     }
 }
 
@@ -8100,3 +8190,12 @@ void updateFriendTransferModes(void)
 }
 #endif
 
+/* Builds the work record's member objects. */
+NetCtrlWk::NetCtrlWk()
+{
+}
+
+/* Destroys the work record's member objects. */
+NetCtrlWk::~NetCtrlWk()
+{
+}
