@@ -12,12 +12,15 @@
  *   writes one XF register: opcode 0x10, a zero count, the address, the value); `CopiedMatResources` is a GUESS (the 0x38-byte
  *   set of material handles fn_80077E70 refills and 0x80078DC0 constructs).  The material resource classes'
  *   constructors, assignments, ResMatTexCoordGen::IsValid, ResMatTevColor::IsValid, ResShp's ref/ptr/GetClassName/IsValid and `ResMat` getters are nw4r's `g3d_resmat_ac.h` members.
+ *   The ScnObj, ScnLeaf and ScnGroup members (0x8007B424-0x8007BB8C: IsDerivedFrom, GetTypeObjStatic, the flag and
+ *   callback helpers, ScnLeaf's constructor and destructor) are nw4r's `g3d_scnobj.h` members (`g3d/g3d_scnobj.h`);
+ *   type_obj_set_name_scnleaf and type_obj_set_name_scngroup are GUESSES (the type-name store copies they call).
  * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, mtx34_set, fn_80079EE4, fn_8007A468.
  *   Unwritten (empty stubs, 33 rows, 0x31F0 bytes; objdiff scores them near zero): fn_800769F4, fn_8007868C,
  *   fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8, fn_800793A4, fn_80079604, fn_80079938, fn_800799BC,
  *   fn_80079A48, fn_80079B38, fn_8007A814, fn_8007A8E0, dtor_8007AF28, fn_8007AF6C, fn_8007B074, fn_8007B0A0,
- *   fn_8007B160, fn_8007B224, dtor_8007B2D4, fn_8007B3BC, fn_8007B42C, fn_8007B6CC, fn_8007B6FC, fn_8007B734,
- *   fn_8007B764, fn_8007B794, dtor_8007B7F0, fn_8007BB5C, the `ScnMdl::CopiedMatAccess` constructor (0x8007BEAC),
+ *   fn_8007B160, fn_8007B224, dtor_8007B2D4, fn_8007B3BC, fn_8007B734,
+ *   fn_8007B764, fn_8007B794, dtor_8007B7F0, the `ScnMdl::CopiedMatAccess` constructor (0x8007BEAC),
  *   fn_8007C3CC, fn_8007C474.
  *   Partial (101 written bodies): every remaining function except the 77 at 100 %.
  *   flipcheck: `.text` 0x3B28 of 0x6774; `.rodata`, `.data` and `.sdata` are claimed and not emitted; `.sdata2` is
@@ -31,8 +34,8 @@
  *     `__cvt_fp2unsigned`, `lbl_8058E8E8`, `lbl_8058E91C`, `lbl_8058EA90`, `lbl_8058EA64`, `lbl_8058EA50`,
  *     `lbl_8058EA30`, `lbl_8058EA20`, `lbl_8058E9F4`, `lbl_8058EAC8`, `lbl_8058EAA0`, `lbl_8058EAD8`,
  *     `lbl_80795E28`, `lbl_8058EAE8`, `lbl_8058EB08`, `fn_80502678`, `Enable__Q34nw4r2ut2LCFv`, `fn_805026D8`,
- *     `Disable__Q34nw4r2ut2LCFv`, `lbl_8061A9C0`, `lbl_8061AA74`, `lbl_8058ED90`, `lbl_8058ED64`, `lbl_8058ED38`,
- *     `lbl_8058F4C8`.
+ *     `Disable__Q34nw4r2ut2LCFv`, `lbl_8061A9C0`, `lbl_8061AA74`, `lbl_8058ED90`, `lbl_8058ED64`, `lbl_8058ED38`.
+ *   ScnLeaf's destructor is complete with an empty body (the compiler emits the base call and the deleting tail).
  * SHAPES. The CopiedMatResources constructor is complete: its work is the member initialisers.  The material
  *   resource constructors keep `#pragma peephole off` (retail keeps `clrlwi` + `cmpwi` for the alignment test).
  */
@@ -70,6 +73,9 @@ typedef struct {
 #include "g3d/g3d_resshp.h"
 #include "g3d/g3d_state.h"     /* the material loaders (rule 2) */
 #include "nw4r/fn_805012C4.h"
+#include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
+#include "MSL/algorithm.h"     /* std::find / std::distance */
+#include "unsplit/g3d.h"      /* the scene objects' type-name records no unit owns (rule 2) */
 
 #define M2C_ERROR(x) /* unknown instruction */
 
@@ -79,9 +85,6 @@ typedef struct {
 extern u32 lbl_8056F658;
 extern u32 lbl_8056F678;
 extern u32 lbl_8056F688;
-extern u32 lbl_8056F6A0;
-extern u32 lbl_8056F6B0;
-extern u32 lbl_8056F6C0;
 extern const char lbl_8058E570[];
 extern const char lbl_8058E57C[];
 extern const char lbl_8058E5B0[];
@@ -137,7 +140,6 @@ extern const char lbl_8058ECF8[];
 extern u32 lbl_8058ED38;
 extern const char lbl_8058ED64[];
 extern const char lbl_8058ED90[];
-extern u32 lbl_8058F4C8;
 extern u32 lbl_8061A9C0;
 extern u32 lbl_8061AA74;
 extern u32 lbl_807911E0;
@@ -182,9 +184,7 @@ u32 GXSetIndTexMtx(s32, void*, s8);
 u32 GXSetTevKColor(u32, void*);
 u32 OSRegisterVersion(s32);
 u32 PPCSync(void);
-u32 TheBeatMatchOutput(void);
 u32 VIGetTvFormat(void);
-u32 dtor_800813B8(u32);
 u32 color_rgba_copy(s32, void*);
 u32 mtx34_identity(s32);
 u32 vec3_normalize_into(void*, void*, f32, f32);
@@ -337,20 +337,10 @@ u32 math_sincos_idx(f32);
 /* internal */ void* fn_8007B148(u32 *arg0, u32 *arg1);
 /* internal */ s32 fn_8007B160(void *arg0, u32 arg1, s8 arg2);
 /* internal */ s32 fn_8007B224(void *arg0, s8 arg1);
-/* internal */ s32 fn_8007B424(void *arg0);
-/* internal */ void fn_8007B42C(u32 *arg0, u32 arg1, u32 *arg2);
-/* internal */ void fn_8007B450(void* a0);
-/* internal */ s32 fn_8007B47C(s32 arg0, s32 arg1);
 /* internal */ void fn_8007B4E4(void* a0);
 /* internal */ void fn_8007B540(void* a0);
-/* internal */ s32 fn_8007B544(s32 arg0, u32 arg1);
 /* internal */ void fn_8007B5BC(void* a0);
-/* internal */ s32 fn_8007B5C0(void *arg0, u32 arg1);
-/* internal */ s32 fn_8007B5F4(s32 arg0, s32 *arg1);
-/* internal */ s32 fn_8007B660(s32 arg0, s32 *arg1);
-/* internal */ s32 fn_8007B6CC(void* a0);
-/* internal */ s32 fn_8007B6FC(void* a0);
-/* internal */ void* fn_8007B72C(s32 *arg0, s32 arg1);
+/* internal */ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
 /* internal */ s32 fn_8007B734(void* a0);
 /* internal */ s32 fn_8007B764(void* a0);
 /* internal */ s32 fn_8007B794(s32 arg0, s16 arg1);
@@ -363,16 +353,10 @@ u32 math_sincos_idx(f32);
 /* internal */ void fn_8007B998(void* a0);
 /* internal */ void fn_8007B99C(u32 **arg0);
 /* internal */ void fn_8007B9AC(void *arg0);
-/* internal */ s32 fn_8007B9BC(void *arg0, s32 arg1);
-/* internal */ void fn_8007B9D4(void *arg0, s32 arg1, s32 arg2);
 /* internal */ s32 fn_8007BA00(void* a0);
 /* internal */ s32 fn_8007BA08(s32 arg0);
 /* internal */ u32 fn_8007BA38(s32 *arg0, s32 *arg1);
-/* internal */ s32 dtor_8007BA44(s32 arg0, s16 arg1);
-/* internal */ void* fn_8007BAA0(u32 **arg0);
-/* internal */ s32 fn_8007BAF0(s32 arg0, s32 *arg1);
-/* internal */ s32 fn_8007BB5C(void* a0);
-/* internal */ void* fn_8007BB8C(s32 *arg0, s32 arg1);
+/* internal */ const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
 /* internal */ u32 fn_8007BB94(void *arg0, s32 arg1, s32 arg2);
 /* internal */ s32 fn_8007BC2C(void *arg0, s32 arg1);
 /* internal */ s32 fn_8007BCAC(void *arg0, s32 arg1);
@@ -2721,26 +2705,22 @@ typedef struct {
     /* +0x00 */ u8 pad_0x00[0xE4];
     /* +0xE4 */ u32 field_0xE4;
 } RawView_65; /* size: 0xE8 */
-s32 fn_8007B424(void *arg0) {
-    return ((RawView_65*)arg0)->field_0xE4;
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B424 (0x8): the child count. */
+u32 nw4r::g3d::ScnGroup::Size() const
+{
+    return mNumScnObj;
 }
 
-void fn_8007B42C(u32 *arg0, u32 arg1, u32 *arg2) {
-}
+/* 0x8007B42C/0x8007B450/0x8007B47C: the std::find and std::distance instances ScnGroup::Remove(ScnObj*) calls. */
+template nw4r::g3d::ScnObj** std::find(nw4r::g3d::ScnObj** first, nw4r::g3d::ScnObj** last,
+                                       nw4r::g3d::ScnObj* const& value);
+template long std::distance(nw4r::g3d::ScnObj** first, nw4r::g3d::ScnObj** last);
+template long std::__distance(nw4r::g3d::ScnObj** first, nw4r::g3d::ScnObj** last, std::random_access_iterator_tag);
 
+extern "C" {
 
-void fn_8007B450(void* a0) {
-    u32 sp8;
-
-    u8 spC;
-
-    spC = sp8;
-    fn_8007B47C((s32)(&spC), 0);
-}
-
-s32 fn_8007B47C(s32 arg0, s32 arg1) {
-    return (s32) (arg1 - arg0) / 4;
-}
 
 void fn_8007B4E4(void* a0) {
 
@@ -2750,12 +2730,18 @@ void fn_8007B540(void* a0) {
 
 }
 
-s32 fn_8007B544(s32 arg0, u32 arg1) {
-    if (arg1 < 3U) {
-        return arg0 + (arg1 * 0x30) + 0xC;
+}   /* extern "C": the scene object member below has C++ linkage */
+
+/* 0x8007B544 (0x20): the matrix of `type`, or NULL for an unknown type. */
+nw4r::math::MTX34* nw4r::g3d::ScnObj::GetMtxPtr(ScnObjMtxType type)
+{
+    if ((u32)type < MTX_TYPE_MAX) {
+        return &mMtxArray[type];
     }
-    return 0;
+    return NULL;
 }
+
+extern "C" {
 
 void fn_8007B5BC(void* a0) {
 
@@ -2765,46 +2751,81 @@ typedef struct {
     /* +0x00 */ u8 pad_0x00[0xCC];
     /* +0xCC */ u32 field_0xCC;
 } RawView_66; /* size: 0xD0 */
-s32 fn_8007B5C0(void *arg0, u32 arg1) {
-    if ((arg1 < 9U) && ((s32) ((1 << (arg1 - 1)) & ((RawView_66*)arg0)->field_0xCC) != 0)) {
-        return 1;
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B5C0 (0x34): whether the object's flags disable G3dProc pass `task`. */
+#pragma peephole off
+bool nw4r::g3d::ScnObj::IsG3dProcDisabled(u32 task) const
+{
+    if (task < 9 && ((1 << (task - 1)) & mScnObjFlags)) {
+        return true;
     }
-    return 0;
+    return false;
 }
+#pragma peephole on
 
-s32 fn_8007B5F4(s32 arg0, s32 *arg1) {
-    s32 spC;
-    s32 sp8;
+extern "C" {
 
-    spC = fn_8007B6FC(0);
-    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((arg1)) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((&spC))) != 0) {
-        return 1;
+
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B5F4 (0x6C): whether the object is a ScnGroup or derives from `type`. */
+bool nw4r::g3d::ScnGroup::IsDerivedFrom(TypeObj type) const
+{
+    if (type == GetTypeObjStatic()) {
+        return true;
     }
-    sp8 = *arg1;
-    return fn_8007B660((s32)(arg0), (s32 *)(&sp8));
+    return ScnObj::IsDerivedFrom(type);
 }
 
-s32 fn_8007B660(s32 arg0, s32 *arg1) {
-    s32 spC;
-    s32 sp8;
+extern "C" {
 
-    spC = fn_8007B6CC(0);
-    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((arg1)) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((&spC))) != 0) {
-        return 1;
+
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B660 (0x6C): whether the object is a ScnObj or derives from `type`. */
+bool nw4r::g3d::ScnObj::IsDerivedFrom(TypeObj type) const
+{
+    if (type == GetTypeObjStatic()) {
+        return true;
     }
-    return reinterpret_cast<const nw4r::g3d::G3dObj*>(arg0)->nw4r::g3d::G3dObj::IsDerivedFrom(*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(arg1));
+    return G3dObj::IsDerivedFrom(type);
 }
 
-s32 fn_8007B6CC(void* a0) {
+extern "C" {
+
+
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B6CC (0x30): returns the ScnObj type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnObj::GetTypeObjStatic()
+{
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name(&pName, scn_typename_ScnObj));
 }
 
+extern "C" {
 
-s32 fn_8007B6FC(void* a0) {
+
+
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B6FC (0x30): returns the ScnGroup type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnGroup::GetTypeObjStatic()
+{
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_scngroup(&pName, scn_typename_ScnGroup));
 }
 
+extern "C" {
 
-void* fn_8007B72C(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
+
+
+/* 0x8007B72C (0x8): stores `v` through `out` and returns `out`. */
+const u8** type_obj_set_name_scngroup(const u8** out, const u8* v)
+{
+    *out = v;
+    return out;
 }
 
 s32 fn_8007B734(void* a0) {
@@ -2880,21 +2901,37 @@ typedef struct {
     /* +0x00 */ u8 pad_0x00[0xCC];
     /* +0xCC */ u32 field_0xCC;
 } RawView_68; /* size: 0xD0 */
-s32 fn_8007B9BC(void *arg0, s32 arg1) {
-    return (((RawView_68*)arg0)->field_0xCC & arg1) != 0;
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B9BC (0x18): whether any of `flag`'s bits is set. */
+u32 nw4r::g3d::ScnObj::TestScnObjFlag(ScnObjFlag flag) const
+{
+    return (mScnObjFlags & flag) != 0;
 }
+
+extern "C" {
+
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0xCC];
     /* +0xCC */ u32 field_0xCC;
 } RawView_69; /* size: 0xD0 */
-void fn_8007B9D4(void *arg0, s32 arg1, s32 arg2) {
-    if (arg2 != 0) {
-        ((RawView_69*)arg0)->field_0xCC = (s32) (((RawView_69*)arg0)->field_0xCC | arg1);
-        return;
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B9D4 (0x2C): sets or clears `flag`'s bits. */
+#pragma peephole off
+void nw4r::g3d::ScnObj::SetScnObjFlag(ScnObjFlag flag, u32 on)
+{
+    if (on) {
+        mScnObjFlags |= flag;
+    } else {
+        mScnObjFlags &= ~flag;
     }
-    ((RawView_69*)arg0)->field_0xCC = (s32) (((RawView_69*)arg0)->field_0xCC & ~arg1);
 }
+#pragma peephole on
+
+extern "C" {
+
 
 s32 fn_8007BA00(void* a0) {
     return 0;
@@ -2909,41 +2946,61 @@ u32 fn_8007BA38(s32 *arg0, s32 *arg1) {
     *arg0 = *arg1;
 }
 
-s32 dtor_8007BA44(s32 arg0, s16 arg1) {
-    if (arg0 != 0) {
-        dtor_800813B8((u32)(0));
-        if (arg1 > 0) {
-            nw4r::g3d::G3dObj::operator delete((void*)(arg0));
-        }
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007BA44 (0x5C): destroys the leaf. */
+#pragma peephole off
+nw4r::g3d::ScnLeaf::~ScnLeaf()
+{
+}
+#pragma peephole on
+
+extern "C" {
+
+
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007BAA0 (0x50): constructs the leaf with a unit scale. */
+nw4r::g3d::ScnLeaf::ScnLeaf(MEMAllocator* pHeap) : ScnObj(pHeap)
+{
+    setVec3(&mScale, lbl_80795E58, lbl_80795E58, lbl_80795E58);
+}
+
+extern "C" {
+
+
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007BAF0 (0x6C): whether the object is a ScnLeaf or derives from `type`. */
+bool nw4r::g3d::ScnLeaf::IsDerivedFrom(TypeObj type) const
+{
+    if (type == GetTypeObjStatic()) {
+        return true;
     }
-    return arg0;
+    return ScnObj::IsDerivedFrom(type);
 }
 
-void* fn_8007BAA0(u32 **arg0) {
-    TheBeatMatchOutput();
-    *arg0 = &lbl_8058F4C8;
-    setVec3((nw4r::math::VEC3*)(arg0 + 0xDC), (f32)(lbl_80795E58), (f32)(lbl_80795E58), (f32)(lbl_80795E58));
-    return arg0;
+extern "C" {
+
+
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007BB5C (0x30): returns the ScnLeaf type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnLeaf::GetTypeObjStatic()
+{
+    const u8* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_scnleaf(&pName, scn_typename_ScnLeaf));
 }
 
-s32 fn_8007BAF0(s32 arg0, s32 *arg1) {
-    s32 spC;
-    s32 sp8;
-
-    spC = fn_8007BB5C(0);
-    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((arg1)) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>((&spC))) != 0) {
-        return 1;
-    }
-    sp8 = *arg1;
-    return fn_8007B660((s32)(arg0), (s32 *)(&sp8));
-}
-
-s32 fn_8007BB5C(void* a0) {
-}
+extern "C" {
 
 
-void* fn_8007BB8C(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
+
+/* 0x8007BB8C (0x8): stores `v` through `out` and returns `out`. */
+const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v)
+{
+    *out = v;
+    return out;
 }
 
 typedef struct {
@@ -3115,37 +3172,51 @@ extern "C" {
  * disassembly; they are recorded as residuals.
  * -------------------------------------------------------------------------------------------------- */
 
-/* 0x8007B48C / 0x8007B4E8 / 0x8007B564: vtable slot +0x14, guarded by the +0xDA bit 2 and the +0xD8 mask. */
-void fn_8007B48C(void* self, u32 mask, void* a5, void* a6)
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B48C (0x58): runs the callback's CALC_VIEW hook at `timing` when it is enabled for the pass and the timing. */
+#pragma peephole off
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::ScnObj::CheckCallback_CALC_VIEW(Timing timing, u32 param, void* pInfo)
 {
-    DispatchObj* o = (DispatchObj*)self;
-    void* p = o->field_0xD4;
-    if (p == 0 || (o->field_0xDA & 4) == 0)
-        return;
-    if ((o->field_0xD8 & mask) == 0)
-        return;
-    ((DispatchVtbl*)*(void**)p)->method_0x14(p, mask, self, a5, a6);
+    if (mpFnCallback != NULL && (mCallbackExecOpMask & EXECOP_CALC_VIEW) && (mCallbackTiming & timing)) {
+        mpFnCallback->ExecCallback_CALC_VIEW(timing, this, param, pInfo);
+    }
 }
-void fn_8007B4E8(void* self, u32 mask, void* a5, void* a6)
+#pragma peephole on
+
+extern "C" {
+
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B4E8 (0x58): runs the callback's CALC_MAT hook at `timing` when it is enabled for the pass and the timing. */
+#pragma peephole off
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::ScnObj::CheckCallback_CALC_MAT(Timing timing, u32 param, void* pInfo)
 {
-    DispatchObj* o = (DispatchObj*)self;
-    void* p = o->field_0xD4;
-    if (p == 0 || (o->field_0xDA & 4) == 0)
-        return;
-    if ((o->field_0xD8 & mask) == 0)
-        return;
-    ((DispatchVtbl*)*(void**)p)->method_0x14(p, mask, self, a5, a6);
+    if (mpFnCallback != NULL && (mCallbackExecOpMask & EXECOP_CALC_MAT) && (mCallbackTiming & timing)) {
+        mpFnCallback->ExecCallback_CALC_MAT(timing, this, param, pInfo);
+    }
 }
-void fn_8007B564(void* self, u32 mask, void* a5, void* a6)
+#pragma peephole on
+
+extern "C" {
+
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B564 (0x58): runs the callback's CALC_WORLD hook at `timing` when it is enabled for the pass and the timing. */
+#pragma peephole off
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::ScnObj::CheckCallback_CALC_WORLD(Timing timing, u32 param, void* pInfo)
 {
-    DispatchObj* o = (DispatchObj*)self;
-    void* p = o->field_0xD4;
-    if (p == 0 || (o->field_0xDA & 4) == 0)
-        return;
-    if ((o->field_0xD8 & mask) == 0)
-        return;
-    ((DispatchVtbl*)*(void**)p)->method_0x14(p, mask, self, a5, a6);
+    if (mpFnCallback != NULL && (mCallbackExecOpMask & EXECOP_CALC_WORLD) && (mCallbackTiming & timing)) {
+        mpFnCallback->ExecCallback_CALC_WORLD(timing, this, param, pInfo);
+    }
 }
+#pragma peephole on
+
+extern "C" {
+
 /* 0x8007B8E4 / 0x8007B940: vtable slot +0x1C, guarded by the +0xDA bit 5 / bit 4 and the +0xD8 mask. */
 void fn_8007B8E4(void* self, u32 mask, void* a5, void* a6)
 {

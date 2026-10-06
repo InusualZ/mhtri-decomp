@@ -56,6 +56,7 @@
 #include "ef/nw_res_manager.h"
 #include "g3d/g3d_state.h" /* g3d_state_invalidate (rule 2) */
 #include "g3d/g3d_camera_types.h" /* nw4r::g3d::Camera (rule 2) */
+#include "g3d/g3d_scnobj.h"       /* nw4r::g3d::ScnObj::GetMtx / GetMtxPtr (rule 2) */
 
 #pragma peephole off
 
@@ -87,7 +88,7 @@ struct PrimRec {
  * Only the read fields are named; the rest is untouched padding.  size: 0x30 (approximate) */
 typedef struct WorkBuf {
     /* 0x00 */ u8 pad_0x00[0x1C];
-    /* 0x1C */ f32 f_0x1C;                     /* fn_80081714 writes it; read back as f1 */
+    /* 0x1C */ f32 f_0x1C;                     /* ScnObj::GetMtx writes it; read back as f1 */
     /* 0x20 */ VEC3 v_0x20;                    /* the projected point vec3_dot reads */
     /* 0x2C */ f32 f_0x2C;
 };
@@ -157,9 +158,7 @@ s32 camera_work_ck(void);
 s32 my_player_no(void);
 void fn_8007F77C(void* p);
 void* fn_800A60C0(void* p);
-void fn_80081714(void* a, u32 b, WorkBuf* out);
 f32 vec3_dot(const VEC3* a, const VEC3* b);
-void* fn_8007B544(void* a, u32 b);
 void fn_80049728(void* p, s32 n);
 void GXInvalidateVtxCache(void);
 void GXSetBlendMode(u32 a, u32 b, u32 c, u32 d);
@@ -299,7 +298,8 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
                         f1 = lbl_80796458;
                     }
                 } else {
-                    fn_80081714((Obj*)p->handle, 0, &b10);
+                    reinterpret_cast<nw4r::g3d::ScnObj*>(p->handle)->GetMtx(
+                        nw4r::g3d::ScnObj::MTX_LOCAL, reinterpret_cast<nw4r::math::MTX34*>(&b10));
                     f1 = b10.f_0x1C;
                 }
                 if (sel == 1) {
@@ -334,7 +334,7 @@ extern "C" s32 fn_800E4148(PrimRec* self, const WorkBuf* arg)
         vec3_dot(&self->pos, &arg->v_0x20);
         self->key = -(arg->f_0x2C + vec3_dot(&self->pos, &arg->v_0x20));
     } else if (self->kind <= 1) {
-        f32* m = (f32*)fn_8007B544(self->handle, 2);
+        f32* m = (f32*)reinterpret_cast<nw4r::g3d::ScnObj*>(self->handle)->GetMtxPtr(nw4r::g3d::ScnObj::MTX_VIEW);
         self->key = -m[0xB];
     } else if (self->kind == 2) {
         f32* m = (f32*)fn_800A60C0(self->handle);

@@ -115,7 +115,8 @@
 #include "g3d/fn_80063888.h"   /* the cluster declarations, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_identity/MTX34_ctor, owned by fn_8004CAD8.cpp (rule 2) */
 #include "g3d/g3d_camera.h"    /* fn_80075390..fn_80075620, owned by g3d/g3d_camera.cpp (rule 2) */
-#include "g3d/fn_80075DCC.h"    /* fn_8007B5F4/fn_8007BB8C, GDWriteXFCmd, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "g3d/fn_80075DCC.h"    /* type_obj_set_name_scnleaf, GDWriteXFCmd, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "g3d/g3d_scnobj.h"     /* nw4r::g3d::ScnGroup, owned by g3d/g3d_scnobj.cpp (rule 2) */
 #include "g3d/g3d_resshp.h"     /* nw4r::g3d::ResTev (rule 2) */
 #include "g3d/g3d_state.h"
 #include "gx/fn_8009AA78.h"     /* GDSetTexCoordScale2, GDSetGenMode2 (rule 2) */
@@ -371,17 +372,17 @@ void fn_800868A0(u32 value);
 /* g3d_state.cpp                                                                                     */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* The `ScnRoot` singleton lookup: `fn_8007BB8C` stores the found object through its out-parameter and
- * returns that parameter, so the result is the word it stored. */
+/* The `ScnRoot` singleton lookup: `type_obj_set_name_scnleaf` stores the found object through its out-parameter
+ * and returns that parameter, so the result is the word it stored. */
 void* fn_8008452C(void) {
-    void* pScnRoot;
-    return *fn_8007BB8C(&pScnRoot, lbl_8056F6D0);
+    const u8* pScnRoot;
+    return (void*)*type_obj_set_name_scnleaf(&pScnRoot, (const u8*)lbl_8056F6D0);
 }
 
 /* The same lookup, emitted a second time for the state object's own caller. */
 void* fn_80084600(void) {
-    void* pScnRoot;
-    return *fn_8007BB8C(&pScnRoot, lbl_8056F6D0);
+    const u8* pScnRoot;
+    return (void*)*type_obj_set_name_scnleaf(&pScnRoot, (const u8*)lbl_8056F6D0);
 }
 
 /* A virtual dispatch on slot +0x14 whose result is handed to the `TypeObj::GetTypeName` unwrapper. */
@@ -398,7 +399,8 @@ u32 fn_80084594(void* pSelf, u32* pArg) {
         return 1;
     }
     u32 key = *pArg;
-    return fn_8007B5F4(pSelf, &key);
+    return reinterpret_cast<nw4r::g3d::ScnGroup*>(pSelf)->nw4r::g3d::ScnGroup::IsDerivedFrom(
+        *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&key));
 }
 
 void fn_80085344(StateValidFlag* pSelf) {
