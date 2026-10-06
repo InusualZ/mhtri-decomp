@@ -31,7 +31,7 @@
 #include "enemy/em_model.h"
 #include "quest/quest_entry.h"
 #include "ef/get_move_work_adrs.h"
-#include "g3d/g3d_anmchr.h"
+#include "font/flfnt.h"
 #include "quest/quest_types.h"
 #include "enemy/enemy_control.h"
 #include "enemy/em020_ai.h"

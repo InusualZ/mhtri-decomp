@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "nw4r/db_assert.h"   /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -238,9 +239,6 @@ struct _se_w;
 typedef struct _se_w _se_w;
 #endif
 
-/* nw4r::db::Panic - the assert failure handler (variadic). */
-extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* fmt, ...);
-
 /* nw4r::math and effect-library helpers, all still `fn_*` in the symbol map.
  * The two `src/mh3_pad.cpp` helpers declared here (`VEC3_ctor`, `setVec3`) are spelled EXACTLY as
  * `mh3_pad/vec3.h` spells them - that header is their owner's.  The two used to disagree
@@ -305,7 +303,7 @@ inline int IsValidPointer(u32 ptr) {
 /* The file's pointer guard: the message comes from the call site, the line from `__LINE__`. */
 #define EF_ASSERT_PTR(file, msg, ptr) \
     if (!IsValidPointer((u32)(ptr))) \
-        Panic__Q24nw4r2dbFPCciPCce(file, __LINE__, msg, (ptr))
+        nw4r::db::Panic(file, __LINE__, msg, (ptr))
 
 #ifdef __cplusplus
 }

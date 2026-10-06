@@ -19,7 +19,8 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h"        /* IS_VALID_PTR (rule 1) */
 #include "g3d/fn_80063888.h"            /* fn_8006584C/fn_80066E80, owner g3d/fn_80063888.cpp (rule 2) */
-#include "g3d/g3d_anmchr.h"             /* fn_8006268C/fn_80062914/fn_80062750/fn_8005B1E4 (rule 2) */
+#include "g3d/g3d_anmchr.h"             /* fn_8006268C/fn_80062914/fn_80062750 (rule 2) */
+#include "font/flfnt.h"                 /* fn_8005B1E4 (rule 2) */
 #include "g3d/g3d_resanmamblight.h"     /* fn_8008A188/fn_8008A1A8, owner g3d/g3d_resanmamblight.c */
 #include "unsplit/g3d.h"                /* fn_8008A644/fn_80069664/fn_80092330/fn_80463E74 (rule 2) */
 

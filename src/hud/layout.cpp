@@ -98,7 +98,7 @@
  * `fn_802E26EC` -> `anim_frame_wrap`, `fn_802E270C` -> `color_lerp` (9 referrer lines across
  * `hud/cockpit_quest.cpp`, `menu/fn_802E4978.cpp`, `menu/menu_item_page.cpp` and their three
  * headers), `fn_802E28B0` -> `color_scale`, `fn_802E2C08`/`fn_802E2F54`/`fn_802E326C` -> the
- * `anim_step_*` family, and the six note-box rows.  `g3d/g3d_anmchr.h` gained the two
+ * `anim_step_*` family, and the six note-box rows.  `font/flfnt.h` declares the two
  * string helpers this range owns (`flfntStrLen`, `utf82unicode2`) - the owner's header is their
  * home - and `strcpy` comes from `unsplit/Runtime.PPCEABI.H.h` (0x8045F554 is owned by no
  * registered range, so the band header is its home).
@@ -109,7 +109,7 @@
  * `fn_802E2D84` calls `fn_802A2550` (`menu/menu_item.cpp`, 3 referrer lines); the two font-order
  * entries call `menu_text_center_x`/`menu_text_center_x_by_gaps`/`menu_text_block_center_x`
  * (`menu/menu_message.cpp`, already renamed there; 11 call sites) and
- * `fn_802E21C0` also `fn_8005C8F0` (`g3d/g3d_anmchr.cpp`, 4 call sites); `fn_802E23D0` calls
+ * `fn_802E21C0` also `fn_8005C8F0` (`font/flfnt.cpp`, 4 call sites); `fn_802E23D0` calls
  * `sprite_frame_apply` (this unit's own row, but 44 referrer lines across 8 files).  `fn_802E2440`,
  * `fn_802E2524`, `fn_802E4798`/`fn_802E4828`, the four 0x802E33B4-family layout entries and
  * `fn_802E4850` are blocked on **data** (the `lbl_805D58xx`/`lbl_805D5Axx` tables and the `__FILE__`
@@ -133,7 +133,7 @@
 #include "types.h"
 #include "hud/layout.h"
 #include "menu/menu_item.h"
-#include "g3d/g3d_anmchr.h"
+#include "font/flfnt.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 
 /* Retail keeps every `a*b + c` as its own `fmuls` + `fadds`: the animation-step interpolation and

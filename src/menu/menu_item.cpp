@@ -220,7 +220,7 @@ extern "C" u32 fn_8029A140(_HIT_W* self)
 #include "unsplit/ef.h"
 #include "Pl/fn_80273B14.h"               /* `Pl_item_id_usable_ck`, the id-usable predicate (rule 2) */
 #include "Pl/fn_8027D684.h"
-#include "g3d/g3d_anmchr.h"
+#include "font/flfnt.h"
 #include "sound/fn_800D7F54.h"
 /* nw4r's debug panic: the map name `Panic__Q24nw4r2dbFPCciPCce` is the front-end's spelling of this
  * declaration, so it sits at C++ scope (rule 9). */

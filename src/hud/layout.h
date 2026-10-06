@@ -14,7 +14,7 @@
  * Rule-2 debt, recorded rather than guessed: the callees below whose map names carry an argument
  * list are declared at global C++ scope with the signature the target's call site shows (rule 9),
  * and the ones with a `fn_`/`lbl_` stem keep C linkage; the owner headers that exist today are
- * `fn_8004CAD8.h` (some of the `fn_8005xxxx` helpers), `g3d/g3d_anmchr.h` (the
+ * `fn_8004CAD8.h` (some of the `fn_8005xxxx` helpers), `font/flfnt.h` (the
  * font helpers) and `menu/menu_item.h` (the item table), and each owner's header should
  * carry its own declaration - these are this unit's own view until that pass happens.
  */

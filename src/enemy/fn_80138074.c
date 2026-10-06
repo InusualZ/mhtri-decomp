@@ -60,6 +60,7 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "unsplit/ef.h"
 #include "unsplit/enemy.h"
 #include "unsplit/g3d.h"
+#include "nw4r/db_assert.h" /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
 #include "g3d/g3d_state.h"
 #include "unsplit/sound.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -223,7 +224,6 @@ u8 fn_8013AC08(EnemyWork* work, u8 arg1, u8 arg2);
 /* callees (map spellings)                                                                       */
 /* --------------------------------------------------------------------------------------------- */
 
-extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, s32 line, const char* msg, ...);
 extern s32 strcmp(const char* a, const char* b);
 
 extern void mtx34_identity(void* mtx);

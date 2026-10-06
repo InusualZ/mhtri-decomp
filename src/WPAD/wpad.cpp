@@ -1,10 +1,11 @@
 /*
  * WPAD/wpad.cpp - STUB (no bodies yet).
  *
- * `.text` 0x804E45B0..0x80500E10.  Sections of the candidate unit: .text 0x804E45B0..0x80500E10; .rodata 0x80573C40..0x80573CD8; .data 0x8062AB68..0x8062F9C0; .bss 0x8075B110..0x80760C78; .sdata 0x80794148..0x807941E8; .sbss 0x807955C8..0x80795768; .sdata2 0x8079D3C0..0x8079D494.
+ * `.text` 0x804E45B0..0x80500868.  Sections of the candidate unit: .text 0x804E45B0..0x80500868; .rodata 0x80573C40..0x80573CD8; .data 0x8062AB68..0x8062F030; .bss 0x8075B110..0x80760C48; .sdata 0x80794148..0x807941E0; .sbss 0x807955C8..0x80795758; .sdata2 0x8079D3C0..0x8079D480.
  *
- * WHAT IT IS. a merged block of TPL, USB (`IUSB_*`), VI, i2c, WENC, WPAD, WUD and `nw4r::db` (`Panic`/`Warning`) up to 0x80500E10; 309 functions.
- *   merged candidate pieces (guess cuts the renderer does not emit): TPL, usb, fn_804E5600, vi, i2c, vi3in1, WENC, wbc_dummy, wpad, wud, WUDHidHost, db_assert, fn_80500CE0.
+ * WHAT IT IS. a merged block of TPL, USB (`IUSB_*`), VI, i2c, WENC, WPAD and WUD, ending in three nw4r::db console / ut
+ *   functions (0x80500770-0x80500868) that only `nw4r/db_assert.cpp` and other units call; 301 functions.
+ *   merged candidate pieces (guess cuts the renderer does not emit): TPL, usb, fn_804E5600, vi, i2c, vi3in1, WENC, wbc_dummy, wpad, wud, WUDHidHost.
  *
  * WHY IT SITS HERE. phase 1 grade strong, class anchor: TPLBind (the `TPL.c` __FILE__ anchor)/TPLGet.
  *
