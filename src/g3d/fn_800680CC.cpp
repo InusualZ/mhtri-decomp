@@ -24,6 +24,7 @@
 
 #include "types.h"
 #include "g3d/fn_80063888.h"
+#include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_anmchr.h"  /* the fn_8005Dxx / fn_80062xx helpers the g3d_anmchr.cpp range now owns (rule 2) */
 
 /* The `.rodata` animation name records the helper-backed readers pass by address: lbl_8056F598.. are this unit's
@@ -54,21 +55,6 @@ extern "C" u32 fn_80068698(void *p)
 }
 
 extern "C" u32 fn_80068A14(void *p)
-{
-    return *(u32 *)p;
-}
-
-extern "C" u32 fn_800695D4(void *p)
-{
-    return *(u32 *)p;
-}
-
-extern "C" u32 fn_800695DC(void *p)
-{
-    return *(u32 *)p;
-}
-
-extern "C" u32 fn_800695E4(void *p)
 {
     return *(u32 *)p;
 }
@@ -106,11 +92,6 @@ extern "C" u32 fn_80068A28(void *p)
 extern "C" u32 fn_800696AC(void *p)
 {
     return *(u32 *)p != 0;
-}
-
-extern "C" s32 fn_80069754(const void *p)
-{
-    return *(const u32 *)p != 0;
 }
 
 extern "C" u32 fn_800699B4(void *p)
@@ -182,11 +163,6 @@ extern "C" u32 fn_80069658(void)
     return (u32)lbl_8058CCC8;
 }
 
-extern "C" const char *fn_80069748(void)
-{
-    return (const char *)lbl_8058CD04;
-}
-
 extern "C" u32 fn_800699A8(void)
 {
     return (u32)lbl_8058CDC8;
@@ -254,14 +230,6 @@ extern "C" void fn_80068A6C(u32 *dst, const u32 *src);
 extern "C" void *fn_80068A3C(void *self, void *src)
 {
     fn_80068A6C((u32 *)self, (const u32 *)src);
-    return self;
-}
-
-extern "C" void fn_80069798(u32 *dst, const u32 *src);
-
-extern "C" void *fn_80069768(void *self, void *src)
-{
-    fn_80069798((u32 *)self, (const u32 *)src);
     return self;
 }
 
@@ -525,14 +493,6 @@ extern "C" u32 fn_800695EC(void *p)
     return fn_80069650(p);
 }
 
-extern "C" u32 fn_800696E4(void *p)
-{
-    if (fn_80069754((const void *)p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CD30, 39, (const char *)lbl_8058CD10,
-                        (const char *)fn_80069748(), "ref");
-    return fn_800695E4(p);
-}
-
 extern "C" u32 fn_8006993C(void *p)
 {
     if (fn_800699B4(p) == 0)
@@ -624,3 +584,52 @@ extern "C" u32 fn_8006E8F4(void *p)
 
     return fn_8005DC24(&tmp);
 }
+
+namespace nw4r {
+namespace g3d {
+
+/* 0x800695D4 (0x8): returns the colour block. */
+const ResVtxClrData* ResVtxClr::ptr() const {
+    return mpData;
+}
+
+/* 0x800695DC (0x8): returns the normal block. */
+const ResVtxNrmData* ResVtxNrm::ptr() const {
+    return mpData;
+}
+
+/* 0x800695E4 (0x8): returns the position block. */
+const ResVtxPosData* ResVtxPos::ptr() const {
+    return mpData;
+}
+
+/* 0x800696C0 (0x24): returns the array's ID. */
+u32 ResVtxPos::GetID() const {
+    return ref().id;
+}
+
+/* 0x800696E4 (0x64): returns the position block, panicking on a NULL handle. */
+const ResVtxPosData& ResVtxPos::ref() const {
+    if (!IsValid()) {
+        nw4r::db::Panic((const char*)lbl_8058CD30, 39, (const char*)lbl_8058CD10, GetClassName(), "ref");
+    }
+    return *ptr();
+}
+
+/* 0x80069748 (0xC): returns the class name. */
+const char* ResVtxPos::GetClassName() {
+    return (const char*)lbl_8058CD04;
+}
+
+/* 0x80069754 (0x14): tells whether the handle is set. */
+bool ResVtxPos::IsValid() const {
+    return mpData != NULL;
+}
+
+/* 0x80069768 (0x30): copies the handle `pRhs` holds. */
+ResVtxPos::ResVtxPos(const ResVtxPos* pRhs) {
+    fn_80069798((u32*)this, (const u32*)pRhs);
+}
+
+}  // namespace g3d
+}  // namespace nw4r

@@ -21,8 +21,9 @@
 #include "g3d/g3d_anmvis.h"      /* fn_8006EC3C (rule 2) */
 #include "g3d/g3d_anmchr.h"      /* fn_800618BC (rule 2) */
 #include "g3d/g3d_calcview.h"    /* fn_800700C0 (rule 2) */
-#include "g3d/g3d_calcvtx.h"     /* fn_800734E4 (rule 2) */
-#include "g3d/g3d_state.h"       /* fn_80089690 (rule 2) */
+#include "g3d/g3d_state.h"
+#include "g3d/g3d_resvtx.h"
+#include "g3d/g3d_cpu.h"
 #include "fn_80059550.h"         /* fn_8005A9BC (rule 2) */
 
 namespace nw4r {
@@ -83,7 +84,6 @@ extern "C" u32 fn_8009A360(void* p, u32 value);
 extern "C" u32 fn_8009A3CC(void* p);
 extern "C" u32 fn_8009A6C0(void* p);
 extern "C" void fn_8009A720(void* p);
-extern "C" void fn_8009A748(void* pDst, void* pSrc, u32 size);
 extern "C" void GXCallDisplayList(void* pList, u32 size);
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -378,9 +378,9 @@ extern "C" void fn_8009411C(ResHandle* pSelf, s32 flag) {
     u32 data = fn_80094164(pSelf);
 
     if (flag != 0) {
-        fn_800734E4((void*)data, 0x20);
+        nw4r::g3d::DC::StoreRange((void*)data, 0x20);
     } else {
-        fn_80089690((void*)data, 0x20);
+        nw4r::g3d::DC::StoreRangeNoSync((void*)data, 0x20);
     }
 }
 
@@ -407,9 +407,9 @@ extern "C" void fn_800941DC(ResHandle* pSelf, s32 flag) {
     u32 data = fn_80094224(pSelf);
 
     if (flag != 0) {
-        fn_800734E4((void*)data, 0x80);
+        nw4r::g3d::DC::StoreRange((void*)data, 0x80);
     } else {
-        fn_80089690((void*)data, 0x80);
+        nw4r::g3d::DC::StoreRangeNoSync((void*)data, 0x80);
     }
 }
 
@@ -436,9 +436,9 @@ extern "C" void fn_8009429C(ResHandle* pSelf, s32 flag) {
     u32 data = fn_800942E4(pSelf);
 
     if (flag != 0) {
-        fn_800734E4((void*)data, 0x40);
+        nw4r::g3d::DC::StoreRange((void*)data, 0x40);
     } else {
-        fn_80089690((void*)data, 0x40);
+        nw4r::g3d::DC::StoreRangeNoSync((void*)data, 0x40);
     }
 }
 
@@ -465,9 +465,9 @@ extern "C" void fn_8009435C(ResHandle* pSelf, s32 flag) {
     u32 data = fn_800943A4(pSelf);
 
     if (flag != 0) {
-        fn_800734E4((void*)data, 0xA0);
+        nw4r::g3d::DC::StoreRange((void*)data, 0xA0);
     } else {
-        fn_80089690((void*)data, 0xA0);
+        nw4r::g3d::DC::StoreRangeNoSync((void*)data, 0xA0);
     }
 }
 
@@ -572,7 +572,7 @@ extern "C" u32 fn_8009466C(ResHandle* pSelf) {
 
 /* 0x80094674 - copy 0x20 bytes of the `ResMatPix` block and return the 0x20-aligned handle. */
 extern "C" u32 fn_80094674(ResHandle* pSelf, u32 pDst) {
-    fn_8009A748((void*)pDst, (void*)fn_800944E0(pSelf), 0x20);
+    nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_800944E0(pSelf), 0x20);
 
     u32 handle;
     return *fn_80076794(&handle, pDst);
@@ -580,7 +580,7 @@ extern "C" u32 fn_80094674(ResHandle* pSelf, u32 pDst) {
 
 /* 0x800946C0 - copy 0x80 bytes of the `ResMatTevColor` block and return the 0x20-aligned handle. */
 extern "C" u32 fn_800946C0(ResHandle* pSelf, u32 pDst) {
-    fn_8009A748((void*)pDst, (void*)fn_80094594(pSelf), 0x80);
+    nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_80094594(pSelf), 0x80);
 
     u32 handle;
     return *fn_8006F158(&handle, pDst);
@@ -589,7 +589,7 @@ extern "C" u32 fn_800946C0(ResHandle* pSelf, u32 pDst) {
 /* 0x8009470C - copy 0x40 bytes of the `ResMatIndMtxAndScale` block and return the 0x20-aligned
  * handle. */
 extern "C" u32 fn_8009470C(ResHandle* pSelf, u32 pDst) {
-    fn_8009A748((void*)pDst, (void*)fn_80094600(pSelf), 0x40);
+    nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_80094600(pSelf), 0x40);
 
     u32 handle;
     return *fn_8006F298(&handle, pDst);
@@ -597,7 +597,7 @@ extern "C" u32 fn_8009470C(ResHandle* pSelf, u32 pDst) {
 
 /* 0x80094758 - copy 0xA0 bytes of the `ResMatTexCoordGen` block and return the 0x20-aligned handle. */
 extern "C" u32 fn_80094758(ResHandle* pSelf, u32 pDst) {
-    fn_8009A748((void*)pDst, (void*)fn_8009466C(pSelf), 0xA0);
+    nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_8009466C(pSelf), 0xA0);
 
     u32 handle;
     return *fn_800766D0(&handle, pDst);

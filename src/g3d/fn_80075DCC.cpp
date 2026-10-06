@@ -55,6 +55,9 @@ typedef struct {
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "g3d/g3d_xsi.h" /* fn_800D74E8 (rule 2) */
+#include "g3d/g3d_cpu.h"
+#include "g3d/g3d_resvtx.h"
+#include "nw4r/fn_805012C4.h"
 
 #define M2C_ERROR(x) /* unknown instruction */
 
@@ -208,7 +211,6 @@ s32 fn_800651E0(s32);
 s32 fn_80065204(void*);
 s32 fn_800659C4(s32);
 void* fn_80067A54(s32);
-u32 fn_800696C0(void*);
 u32 fn_8006E2A8(s32, s32);
 s32 fn_8006E324(void*);
 s32 fn_8006E6B4(void*);
@@ -231,9 +233,6 @@ s32 fn_80070020(s32);
 u32 fn_8007100C(void*, s32);
 u32 mtx34_concat(void*, void*, void*);
 u32 fn_80071C38(u32);
-u32 fn_800731EC(void*, s32);
-u32 fn_80073404(void*, s32);
-u32 fn_800735A8(void*, s32);
 s32 fn_80074074(void*);
 u32 fn_80074620(void*);
 void* fn_80074A54(void);
@@ -284,8 +283,6 @@ s32 fn_80098798(s32, s32);
 s32 fn_800988B0(s32, s32);
 s32 fn_80099974(void*);
 s32 fn_80099BB0(void*);
-u32 fn_8009A748(void*, void*, u32);
-u32 fn_8009A910(void*, u32);
 u32 fn_8009AB48(u32);
 s32 fn_800D79B4(s32, s32, s32, s32);
 u32 fn_80463EBC(void);
@@ -303,9 +300,6 @@ u32 fn_804B9C60(void*, u16, s32);
 u32 fn_804C6900(f32, f32, f32, f32, f32, f32);
 u32 fn_804C69A0(f32, f32, f32, f32);
 u32 math_sincos_idx(f32);
-u32 mtx34_rotate_vec3(void*, s32, void*);
-u32 fn_80502678(void);
-u32 fn_805026D8(void);
 /* internal */ void sin_cos_deg(f32 farg0);
 /* internal */ void fn_80075DD8(void* a0);
 /* internal */ u32 fn_80075E98(void* a0);
@@ -346,10 +340,6 @@ u32 fn_805026D8(void);
 /* internal */ u32 fn_80077490(u8 arg0);
 /* internal */ f32 fn_800774A0(void* a0, void* a1);
 /* internal */ s32 fn_800774A4(void* a0);
-/* internal */ void* fn_800774C8(s32 arg0);
-/* internal */ s32 fn_8007752C(s32 *arg0);
-/* internal */ void* fn_80077534(void* a0);
-/* internal */ s32 fn_80077540(s32 *arg0);
 /* internal */ s32 fn_80077554(s32 arg0, void* a1);
 /* internal */ u32 fn_80077584(s32 *arg0, s32 *arg1);
 /* internal */ s32 fn_80077590(s32 arg0, void* a1);
@@ -1068,28 +1058,38 @@ typedef struct {
     /* +0x00 */ u8 pad_0x00[0x20];
     /* +0x20 */ u32 field_0x20;
 } RawView_14; /* size: 0x24 */
+/* untyped: opaque handle */
 s32 fn_800774A4(void* a0) {
-    return ((RawView_14*)fn_800774C8(0))->field_0x20;
+    return ((const RawView_14*)&reinterpret_cast<const nw4r::g3d::ResVtxFurPos*>(a0)->ref())->field_0x20;
 }
 
-void* fn_800774C8(s32 arg0) {
-    if (fn_80077540(0) == 0) {
-        nw4r::db::Panic((const char*)&lbl_8058E6C0, 0x13E, (const char*)&lbl_8058E6A4, fn_80077534(0), &lbl_807911EC);
+} /* extern "C" */
+
+/* 0x800774C8 (0x64): returns the fur-position block, panicking on a NULL handle. */
+const nw4r::g3d::ResVtxFurPosData& nw4r::g3d::ResVtxFurPos::ref() const {
+    if (!IsValid()) {
+        nw4r::db::Panic((const char*)&lbl_8058E6C0, 0x13E, (const char*)&lbl_8058E6A4, GetClassName(),
+                        (const char*)&lbl_807911EC);
     }
-    fn_8007752C((s32 *)(arg0));
+    return *ptr();
 }
 
-s32 fn_8007752C(s32 *arg0) {
-    return *arg0;
+/* 0x8007752C (0x8): returns the fur-position block. */
+const nw4r::g3d::ResVtxFurPosData* nw4r::g3d::ResVtxFurPos::ptr() const {
+    return mpData;
 }
 
-void* fn_80077534(void* a0) {
-    return &lbl_8058E694;
+/* 0x80077534 (0xC): returns the class name. */
+const char* nw4r::g3d::ResVtxFurPos::GetClassName() {
+    return (const char*)&lbl_8058E694;
 }
 
-s32 fn_80077540(s32 *arg0) {
-    return *arg0 != 0;
+/* 0x80077540 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResVtxFurPos::IsValid() const {
+    return mpData != NULL;
 }
+
+extern "C" {
 
 s32 fn_80077554(s32 arg0, void* a1) {
     fn_80077584(0, 0);
@@ -2335,9 +2335,9 @@ void fn_8007A400(s32 arg0) {
 
     OSRegisterVersion((s32)(lbl_80791200));
     if (arg0 != 0) {
-        fn_80502678();
+        nw4r::ut::LC::Enable();
     } else {
-        fn_805026D8();
+        nw4r::ut::LC::Disable();
     }
     fn_8007A468(0);
     var_r3 = (u32 *)(&lbl_8061A9C0);
@@ -2380,14 +2380,14 @@ void fn_8007A510(void* a0) {
 void* fn_8007A518(s32 *arg0, s32 *arg1) {
     if (arg0 != arg1) {
         *arg0 = *arg1;
-        fn_8009A748((arg0 + 4), (arg1 + 4), (u32)(0x40));
+        nw4r::g3d::detail::Copy32ByteBlocks((arg0 + 4), (arg1 + 4), (u32)(0x40));
     }
     return arg0;
 }
 
 u32 fn_8007A564(s32 *arg0) {
     *arg0 = 0;
-    fn_8009A910((arg0 + 4), (u32)(0x40));
+    nw4r::g3d::detail::ZeroMemory32ByteBlocks((arg0 + 4), (u32)(0x40));
 }
 
 u32 fn_8007A578(s32 arg0, s32 *arg1) {

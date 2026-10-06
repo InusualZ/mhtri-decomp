@@ -19,18 +19,6 @@ u8* fn_80086390(void* pSelf);
 /* 0x80087870 - the const twin of fn_80086390 (used by `ResTexSrt::GetEffectMtx`). */
 u8* fn_80087870(void* pSelf);
 
-/* 0x80089690 - the resource-range store `g3d/g3d_resfile.cpp`'s accessors call. */
-void fn_80089690(void* pBase, u32 size);
-
-/* 0x80089624..0x80089844 - the `ResTlut`-style slot-array resolvers the g3d_resmat thunks tail-call
- * with a zero index. */
-u8* fn_80089624(void* pSelf, u32 index);
-u8* fn_80089694(void* pSelf, u32 index);
-u8* fn_80089700(void* pSelf, u32 index);
-u8* fn_8008976C(void* pSelf, u32 index);
-u8* fn_800897D8(void* pSelf, u32 index);
-u8* fn_80089844(void* pSelf, u32 index);
-
 /* 0x80088584 - the render-mode helper (caller: g3d_camera.cpp). */
 struct RenderModeObj* fn_80088584(void);
 
