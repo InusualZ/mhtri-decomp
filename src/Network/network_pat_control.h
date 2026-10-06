@@ -151,13 +151,16 @@ typedef struct NetPeerList {
     /* +0x004 */ NetPeerRec peers_0x004[4];
 } NetPeerList; /* size: 0x484 */
 
-/* The decoded player card `decodePlayerCard` fills; only the two strings this unit writes are named.
- * size: 0x5E5 (approximate: the highest byte written here) */
+/* A player's move-work record (`get_move_work_adrs(2)` hands out four), which `decodePlayerCard` fills from a peer's
+ * card; only the active byte and the two strings this unit reads or writes are named.  size: 0xB20 (the array
+ * stride) */
 typedef struct NetPlayerCard {
-    /* +0x000 */ u8 pad_0x000[0x5CA];
+    /* +0x000 */ u8 active_0x000;
+    /* +0x001 */ u8 pad_0x001[0x5C9];
     /* +0x5CA */ char name_0x5CA[0x11];
     /* +0x5DB */ char id_0x5DB[0xA];
-} NetPlayerCard; /* size: 0x5E5 (approximate) */
+    /* +0x5E5 */ u8 pad_0x5E5[0x53B];
+} NetPlayerCard; /* size: 0xB20 */
 
 /* One 0x24-byte entry of the two filter tables at `NetCtrlWk::filters_0x8C64` (8 entries) and
  * `filters_0x8D84` (64 entries): an enabled flag, a kind (0 = always, 1 = id range, 2 = bit lookup)
@@ -176,7 +179,7 @@ typedef struct NetRange {
     /* +0x02 */ u16 high_0x02;
 } NetRange; /* size: 0x4 */
 
-/* One 0x40-byte entry of the server table (`NetCtrlWk::servers_0x668`, `server_count_0x660` valid). */
+/* One 0x40-byte entry of the server table (`NetSrvList`). */
 typedef struct NetSrvRec {
     /* +0x00 */ s32 id_0x00;
     /* +0x04 */ char name_0x04[0x24];
@@ -186,6 +189,13 @@ typedef struct NetSrvRec {
     /* +0x38 */ u32 flags_0x38;
     /* +0x3C */ u32 type_0x3C;          /* 1-based server type, matched against `NetServerType` */
 } NetSrvRec; /* size: 0x40 */
+
+/* The server table layer command 18 delivers: the count and up to 80 servers.  size: 0x1408 */
+typedef struct NetSrvList {
+    /* +0x000 */ u32 count_0x000;
+    /* +0x004 */ u8 pad_0x004[0x4];
+    /* +0x008 */ NetSrvRec entries_0x008[80];
+} NetSrvList; /* size: 0x1408 */
 
 /* One 0xC0-byte server type (`NetCtrlWk::server_types_0x82D8`): a 0x18-byte name and a description. */
 typedef struct NetServerType {
@@ -600,8 +610,24 @@ typedef struct NetCircleRecords {
 typedef struct NetUserData {
     /* +0x00 */ u8 pad_0x00[0x3];
     /* +0x03 */ char name_0x03[0x20];
-} NetUserData; /* size: 0x23 (approximate) */
+    /* +0x23 */ u8 pad_0x23[0x3DC1];
+    /* +0x3DE4 */ u16 hunter_rank_0x3DE4;   /* compared with the servers' and filters' rank ranges */
+} NetUserData; /* size: 0x3DE6 (approximate: the last field read) */
 /*@TYPES end@*/
+
+/* The server configuration the fetch steps fill (`initWorkRecord` clears the whole 0x140C bytes at once): the four
+ * server types, the schedule, the event table, the two filter tables, the per-type rank ranges and the timeouts.
+ * size: 0x140C */
+typedef struct NetServerConfig {
+    /* +0x0000 */ NetServerType server_types_0x000[4];
+    /* +0x0300 */ u8 pad_0x300[0x4];
+    /* +0x0304 */ NetSchedule schedule_0x304;
+    /* +0x030C */ NetEventRec events_0x30C[32];
+    /* +0x098C */ NetFilterRec filters_0x98C[8];
+    /* +0x0AAC */ NetFilterRec filters_0xAAC[64];
+    /* +0x13AC */ NetRange ranges_0x13AC[4];
+    /* +0x13BC */ u16 timeouts_0x13BC[40];
+} NetServerConfig; /* size: 0x140C */
 
 /* The network-control work record reached through `net_ctrl_wk`.  `entries_0x7CD8` is 16 records
  * of 0x5C; the tail offsets (+0x82C4, +0xBF2C, +0xC3F2, ...) are separate flags/counters. */
@@ -668,9 +694,7 @@ typedef struct NetCtrlWk {
     /* +0x17C */ NetRowRec rows_0x17C[8];
     /* +0x45C */ u32 page_count_0x45C;
     /* +0x460 */ u8 page_records_0x460[8][0x40];
-    /* +0x660 */ u32 server_count_0x660;
-    /* +0x664 */ u8 pad_0x664[0x4];
-    /* +0x668 */ NetSrvRec servers_0x668[80];   /* layer command 18 copies the count and the list as 0x1408 bytes */
+    /* +0x660 */ NetSrvList server_list_0x660;   /* layer command 18 copies it whole */
     /* +0x1A68 */ u8 layer_block_0x1A68[0x74];   /* the 0x74-byte block layer command 8 delivers */
     /* +0x1ADC */ s32 layer_value_0x1ADC;        /* the word layer command 11 delivers */
     /* +0x1AE0 */ NetRecentRec layer_peers_0x1AE0[20];   /* the layer's peer list (address object and name) resetMessagePool rebuilds from */
@@ -678,7 +702,8 @@ typedef struct NetCtrlWk {
     /* +0x1F68 */ u8 pad_0x1F68[0x1F68];
     /* +0x3ED0 */ NetSlot* slot_list_0x3ED0;
     /* +0x3ED4 */ NetSlot slots_0x3ED4[100];
-    /* +0x6134 */ u8 pad_0x6134[0x58];
+    /* +0x6134 */ NetUserPosition position_0x6134;   /* the position `sendUserPosition` publishes */
+    /* +0x614C */ u8 pad_0x614C[0x40];
     /* +0x618C */ NetworkLayerId layer_id_0x618C;   /* the layer id `saveLayerId` keeps for the change checks */
     /* +0x61CC */ NetRosterSync roster_sync_0x61CC;
     /* +0x6210 */ u32 settings_0x6210[4];
@@ -725,14 +750,7 @@ typedef struct NetCtrlWk {
     /* +0x82CC */ NetworkFileFetcher* fetcher_0x82CC;
     /* +0x82D0 */ u32 fetch_step_0x82D0;
     /* +0x82D4 */ s32 fetch_index_0x82D4;
-    /* +0x82D8 */ NetServerType server_types_0x82D8[4];
-    /* +0x85D8 */ u8 pad_0x85D8[0x4];
-    /* +0x85DC */ NetSchedule schedule_0x85DC;
-    /* +0x85E4 */ NetEventRec events_0x85E4[32];
-    /* +0x8C64 */ NetFilterRec filters_0x8C64[8];
-    /* +0x8D84 */ NetFilterRec filters_0x8D84[64];
-    /* +0x9684 */ NetRange ranges_0x9684[4];
-    /* +0x9694 */ u16 timeouts_0x9694[40];
+    /* +0x82D8 */ NetServerConfig config_0x82D8;
     /* +0x96E4 */ NetRaidTimes times_0x96E4;
     /* +0x96F0 */ NetBigData bigdata_0x96F0;
     /* +0x9FF4 */ NetServerNotice notice_0x9FF4;
@@ -1076,6 +1094,32 @@ void* memset(void* dst, int value, u32 size);
 struct PatTerms;
 struct SystemWork;
 /* The terms object `getPatTerms` hands out is `menu/menu_plsearch.cpp`'s class `PatTerms` (`menu/PatTerms.h`). */
+/* One friend card the place-info menu shows (`readFriendCards` fills them): the friend's slot, its id text and name,
+ * its area and status bytes and its packed settings.  Field names GUESSED from the session words they come from.
+ * size: 0x130 (the stride the readers clear and fill) */
+typedef struct NetFriendCard {
+    /* +0x000 */ u8 valid_0x000;
+    /* +0x001 */ u8 index_0x001;
+    /* +0x002 */ u8 pad_0x002;
+    /* +0x003 */ char id_0x003[0xA];        /* `formatNetId` text */
+    /* +0x00D */ char name_0x00D[0x17];
+    /* +0x024 */ u16 area_0x024;            /* the session's area half */
+    /* +0x026 */ u8 pad_0x026[0x3];
+    /* +0x029 */ u8 status_0x029;           /* the session status's top byte */
+    /* +0x02A */ u8 pad_0x02A[0xF3];
+    /* +0x11D */ u8 status_low_0x11D;       /* the session status's low byte */
+    /* +0x11E */ u8 pad_0x11E[0xA];
+    /* +0x128 */ u8 settings_0x128[4];
+    /* +0x12C */ u32 members_0x12C;
+} NetFriendCard; /* size: 0x130 */
+
+/* The selection `readCommunityMemberCards` reads the community index from (the place-info menu's record; only that
+ * field is named).  size: 0x62 (approximation: the last field read) */
+typedef struct NetCommunitySelection {
+    /* +0x00 */ u8 pad_0x00[0x60];
+    /* +0x60 */ s16 community_0x60;
+} NetCommunitySelection; /* size: 0x62 */
+
 /* The socket allocator pair `initNetworkPatControl` copies out of `.sdata` 0x807939A8 (`pat_so_allocator`:
  * `soAlloc`, `soFree`).  size: 0x8 */
 typedef struct PatSoAllocator {
@@ -1091,11 +1135,24 @@ s32 findFriendIndex(const NetId* id);
 s32 findFreePeerSlot(const NetworkUniqueId* address);
 s32 findPeerSlot(const NetworkUniqueId* address);
 BOOL isLayerReady(void);
+/* 0x804273EC / 0x80427530 - publish part of this player's profile, or his position (GUESS names from the bodies; the
+ * item menu and the lobby's per-frame update call them). */
+s32 sendUserProfilePart(u8 kind, const u8* data, u32 size);
+/* 0x80427EE4 / 0x80428034 - fill `count` friend cards from friend `first` on: of the layer's friend list, or of the
+ * member table of the community `selection` names; each returns how many cards it filled (GUESS names). */
+s32 readFriendCards(struct NetFriendCard* out, s32 first, s32 count);
+s32 readCommunityMemberCards(const struct NetCommunitySelection* selection, struct NetFriendCard* out, s32 first,
+                             s32 count);
+s32 sendUserPosition(u8 action, const f32* position, const u32* values, u8 mode, u8 low, u8 high, u8 mid);
 /* 0x8042822C / 0x8042826C / 0x80428538 - keep the layer's id, read how it changed since, and classify the change
  * (GUESS names from the bodies). */
 void saveLayerId(void);
 void readLayerIdChange(s32* changed, u32* server, s32* city, s32* room);
 s32 classifyLayerIdChange(void);
+/* 0x8042835C - whether this player may enter the layer `target`: 2 not (no known server, or no city), 4 already
+ * there, 3 the hunter rank is outside the server's range or the profile's city filter, else whether it is another
+ * server (1) or this one (0) (GUESS name from the body). */
+s32 checkLayerEntry(const NetworkLayerId* target, const struct NetUserProfile* profile);
 /* 0x80427714 / 0x804247D0 - installs the layer's reflect callback (and clears the layer status words);
  * the callback itself. */
 void installLayerCallback(void);
@@ -1224,6 +1281,23 @@ extern u16 net_err_msg_num;
 char* getDefaultErrorMessage(void);
 
 char* getDefaultSubErrorMessage(void);
+
+/* 0x804312FC / 0x80431368 - the singleton's negative-reply and shutdown-notice records (GUESS names, after the
+ * fields). */
+struct PatErrorRecord* getErrorRecord613c(class PatInterface* self);
+struct PatErrorRecord* getShutdownRecord6344(class PatInterface* self);
+
+/* 0x80431370 / 0x80431374 / 0x80431378 - tail calls into the ENC converters (GUESS names; the third is the one the
+ * system-message menu converts its texts with). */
+s32 netUtf8ToUtf16(u16* dst, s32* dstLength, const u8* src, s32* srcLength);
+s32 netUtf16ToUtf8(u8* dst, s32* dstLength, const u16* src, s32* srcLength);
+s32 netMessageUtf8ToUtf16(u16* dst, s32* dstLength, const u8* src, s32* srcLength);
+
+/* 0x80431548 / 0x80431578 / 0x80431638 - force the mediator's link error, the graded terms progress, and hand the
+ * layer the system's transfer flag (GUESS names from the bodies). */
+void forceNetLinkError(void);
+s32 getNetTermsProgressLevel(void);
+void syncNetTransferFlag(void);
 
 /* 0x8043172C - switches the transfer mode (1 on / 0 off). */
 void setTransferMode(u32 mode);

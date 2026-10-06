@@ -153,7 +153,10 @@ typedef struct NetFriendSession {
     /* +0x08 */ u32 status_08;   /* the top byte is the status the view shows */
     /* +0x0C */ u8 pad_0C[0x4];
     /* +0x10 */ u32 area_10;     /* the top half is the area the view shows */
-    /* +0x14 */ u8 pad_14[0x10];
+    /* +0x14 */ u8 pad_14[0x4];
+    /* +0x18 */ u32 settings_18; /* four packed setting bytes (a friend card's +0x128..+0x12B) */
+    /* +0x1C */ u8 pad_1C[0x4];
+    /* +0x20 */ u32 members_20;  /* the top half is the member count (a friend card's +0x12C) */
 } NetFriendSession;   /* size: 0x24 (the 36 bytes `handleUserList` copies per entry) */
 
 /* A friend roster: the friend table and the session record of each friend (GUESS on the name) - the payload

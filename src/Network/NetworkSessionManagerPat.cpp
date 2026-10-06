@@ -7,14 +7,14 @@
  *   0x8079C758-0x8079C778, extab, extabindex.  The right edge is the `.data` V->S seam at 0x805FB2B8.
  * FLAGS. The game-root `cflags_main` (configure.py; docs/network.md); file-scope `#pragma peephole off`
  *   from `move` on (retail keeps `lwz r12,0(r3)` after the `mr r3,r31` copy; it also closes `slot_1B8`), on again only
- *   around `getTimeSincePublish`.
+ *   around `getTimeSincePublish` and `updatePlayerRecord`.
  * NAMES. `moveStartSession` and `matchPhase_66C` are its log string's ("moveStartSession::mMatchPhase(0) NG").  GUESSes
  *   from the bodies: `handleCircleLeave`, the chat/leave/log helpers, every message record view, `setCircleComment`
  *   (0x803DF0C8, copies <= 144 chars to +0xA54), `setCircleMode` (0x803DF144), `post` (0x803DF180), the limit/used
  *   counters, `setCircleInfo`/`addCircleInfo`/`removeCircleInfo`, the `*PlayerRecord` family, `packCircleOptions`.
  *   Where a body identifies nothing, an override is named for the vtable offset it fills (`slot_068`, as `slot_13C` in
  *   the base).
- * RESIDUALS. `networkPatReleaseBuffer`: unwritten (232 B; deletes the Tcp/Udp objects through the virtual destructor).
+ * RESIDUALS. Every row has a body.
  *  - `isNetworkSessionManagerPatReady`, `slot_19C`, `getTimeSincePublish`: `NetworkSessionBase::getUserFlagB` (+0x84,
  *    `Network/NetworkSessionBase.h`) returns `u8`, so our callers re-extend it (`clrlwi.`) where retail uses the
  *    full word (`cmpwi r3,0`, a plain `bctr` tail call);
@@ -23,7 +23,9 @@
  *  - `setCircleInfo`: the option's enable byte compares with `cmplwi` where retail has `cmpwi` (u8, s8, bool tried);
  *  - `packCircleOptions`: the name entries are addressed from the list base where retail strength-reduces a pointer at
  *    +0x08 (the explicit pointer spelling swaps two registers);
- *  - `updatePlayerRecord`: not characterised (the objdiff row);
+ *  - `updatePlayerRecord`: under its `#pragma peephole on` island (retail stores the u32 state into the byte field
+ *    unmasked) MWCC folds the second dispatch's `lwz r12,0(r3)` into `lwz r12,0x540(r31)`;
+ *  - `isNetworkSessionManagerPatReady` also costs one extabindex row (ours has a frame, retail's tail call none);
  *  - `.sdata2`: the pool entries pair by address, not by name (anonymous `@NNN` against the map's `lbl_8079C758`;
  *    naming one would claim a symbol the original did not have, playbook 58);
  *  - `.sdata` 0xC against 0x10; `flipcheck` reads both small-data pools as a partial pool of a TU spanning several
@@ -3002,6 +3004,8 @@ void NetworkSessionManagerPat::removePlayerRecord(s8 index, s32 counted)
     player->active_00 = 0;
 }
 
+#pragma peephole on
+
 /* Refreshes an active player record: its address (from 8 raw bytes), its name (19 characters) and its state
  * byte, posting event 27 when the state of an announced player changes. */
 void NetworkSessionManagerPat::updatePlayerRecord(s8 index, const u8* address, const char* name, u32 state)
@@ -3031,6 +3035,7 @@ void NetworkSessionManagerPat::updatePlayerRecord(s8 index, const u8* address, c
         }
     }
 }
+#pragma peephole off
 
 /* Packs the enabled entries of a name list (at most eight, the list's count clamped in place) into `dst`,
  * numbering each by its position; returns how many were packed (at most `max`). */
@@ -3213,6 +3218,36 @@ void NetworkSessionManagerPat::announcePlayers()
             }
         }
     }
+}
+
+extern "C" {
+
+/* 0x803DE948 (0xE8): resets and deletes the session, then disconnects and deletes the Tcp and Udp objects. */
+void networkPatReleaseBuffer(NetworkSessionManagerPat* self)
+{
+    if (self->buffer != NULL) {
+        ((NetworkSessionBase*)self->buffer)->resetAllSlots();
+        if (self->buffer != NULL) {
+            delete (NetworkSessionBase*)self->buffer;
+            self->buffer = NULL;
+        }
+    }
+    if (self->tcp_658 != NULL) {
+        self->tcp_658->disconnect();
+        if (self->tcp_658 != NULL) {
+            delete self->tcp_658;
+            self->tcp_658 = NULL;
+        }
+    }
+    if (self->udp_65C != NULL) {
+        self->udp_65C->disconnect();
+        if (self->udp_65C != NULL) {
+            delete self->udp_65C;
+            self->udp_65C = NULL;
+        }
+    }
+}
+
 }
 
 /* Retail keeps the unfused `lwz r12,0(r3)` in the first dispatch: with the peephole pass on MWCC folds

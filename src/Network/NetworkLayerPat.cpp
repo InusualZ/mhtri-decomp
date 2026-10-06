@@ -18,7 +18,10 @@
  *   recvAnsLayerUserInfoSet's slot), `sendReqLayerTell` (0x8040211C, the `sendReqCircleTell` shape),
  *   `sendNtcLayerUserTransfer` (0x80403230, GUESS).
  * RESIDUALS. 40 rows unwritten (the rows objdiff scores zero: `reflect`, `handleLayerCreate`, `handleLayerJump`,
- *   `requestLayerCreate`, `getPatTerms` and the helpers).  The inline copies of `NetworkLayerRequest`'s
+ *   `requestLayerCreate`, `getPatTerms` and the helpers).  The handlers and most helpers read `PatLayerData`/
+ *   `PatLayerUser` words `Network/PatInterface.h` leaves in padding (+0x58..+0x70; +0x38/+0x3C/+0x13C), the request
+ *   timers are `NetworkLayerRequest` members `Network/NetworkLayer.h` does not declare (0x803E55AC/0x803E5630), and
+ *   `getPatTerms` loads `menu/menu_plsearch.cpp`'s unnamed `.sbss` 0x80794D58.  The inline copies of `NetworkLayerRequest`'s
  *   ctor/dtor/reset/isOwned/run/begin and `NetworkRequest::getRecord`/`getArgument`/`setRecord` (0x803E12B0..,
  *   0x803E24F8, 0x803E283C, 0x803E2928, 0x803E9B88, 0x803E9C00, 0x803EF460) and the member-array ctors/dtors carry
  *   manglings `Network/NetworkLayer.cpp`/`Network/NetworkSessionManager.cpp` already define, so the map cannot carry
@@ -36,8 +39,8 @@
  *    parameter there lowers the mediator's own row, so the u8 stays;
  *  - `downsampleVoice`: retail tests the count with `cmplwi`+`blelr` (`i != 0` and `i > 0` both give `cmpwi`+`beqlr`);
  *  - `sendUserFields_5C`: two registers swapped;
- *  - `move`: the voice-ready byte is compared unextended and stored without `clrlwi` (u8 and u32 each cost one
- *    instruction), and two `pairState_C7F0` reads use `lbzx` off a precomputed row.
+ *  - `move`: two `pairState_C7F0` reads use `lbzx` off a precomputed row (the voice-ready result is the mediator's
+ *    `u32` `isVoiceReady`, kept in a `u32` local: compared and stored without a mask, as retail).
  * SHAPES. The constructor calls `NetworkLayer::NetworkLayer` and stores 0x805FC1E0 (79 slots); the table is emitted here
  *   (key function `stepRequest`, declared first; rule 10) and every override's map row carries the compiler's mangling.
  *  - every handler is the state machine over `NetworkLayerRequest::state_00` (0 start, waits, 100 cancelled, 110
@@ -768,7 +771,7 @@ void NetworkLayerPat::move()
         return;
     }
     if (this->busy_3D1 == 0) {
-        u8 ready = getInstance()->isVoiceReady();
+        u32 ready = getInstance()->isVoiceReady();
 
         if (ready != this->friendFlagC084_C084[this->transferSlot_C07C]) {
             this->friendFlagC084_C084[this->transferSlot_C07C] = ready;

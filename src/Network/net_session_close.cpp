@@ -15,13 +15,14 @@
  *   each issues), the roster/recent helpers, `net_community_state` (the block community command 17 delivers),
  *   `isSessionMember`/ `isSessionMemberId`/`findSessionMemberSlot` (they walk the four session players),
  *   `postQuestBoardRecord` (its one caller is the quest board); the `userdata_item` profile fillers
- *   `fillNetUserProfile*` (declared in `userdata_item.h`).
- * RESIDUALS. Unwritten: `refreshRosterCache` (it reads NetworkLayerPat's u16 at +0xF02C, which the class does not
- *   declare); `requestPeerProfileById`/`fn_80435F48` (the 0x20-byte address object at 0x806E1B18 and
- *   NetworkCommunityPat's 0x803F0F20); `fn_80436220` (NetworkCommunityPat's slot +0x48 and its 0x803F116C, not
- *   declared); the static initialiser 0x80437204 (`net_community_state` is built with the NetworkCommunityPat band's
- *   constructor 0x803F0730 / destructor 0x803F0578, so it stays a plain object), so the claimed `.ctors` word is not
- *   emitted.  `flipcheck`: `sendBoxPageCheckRequest` is force-active in retail's `.comment` and not in ours (row 36).
+ *   `fillNetUserProfile*` (declared in `userdata_item.h`); `refreshRosterCache`, `copyPeerProfileCard`, `sendPeerMessage`,
+ *   `net_peer_address` and the `NetPeerCard` fields from what the bodies copy.
+ * RESIDUALS. Unwritten: `requestPeerProfileById` (it reads the lobby state block's per-row state byte two bytes before
+ *   each timer word, which `enemy/lobby_state_block.h`'s row view does not name); the static initialiser 0x80437204
+ *   (`net_community_state` is a `NetworkCommunityPeer` built with that record's constructor 0x803F0730 / destructor
+ *   0x803F0578, which `Network/NetworkCommunityPat.h` does not declare): our `__sinit` constructs `net_peer_address`
+ *   only, so its row and the first destructor-chain record stay unpaired (the `.ctors` word matches).
+ *   `flipcheck`: `sendBoxPageCheckRequest` is force-active in retail's `.comment` and not in ours (row 36).
  *   Partial rows:
  *  - `sessionReflectCallback`: the case-29 message switch lowers to a binary compare tree where retail tests
  *    `(u32)(kind - 1) <= 3` linearly; the chat-record text address (+0x35) is CSE'd into r27; the peer offset (index *
@@ -35,7 +36,9 @@
  *    them;
  *  - `onSessionCloseDone`: the member loop's registers; `buildRosterSync`: one register swap; `getProfileMemberCounts`,
  *    `getProfileQuestRecord`: not characterised (the objdiff rows).
- * SHAPES. Each session-request completion uses a block-local `req` pointer (an inline helper, or the field spelled
+ * SHAPES. `refreshRosterCache` decrements the server type as `- 1LL` (retail's `li r0,-1` + `addc`, no mask before the
+ *   byte store); `copyPeerProfileCard` tests the card's own settings byte after storing it.
+ *  - Each session-request completion uses a block-local `req` pointer (an inline helper, or the field spelled
  *   directly, rematerialises the `addis` base after the call); `copyCircleToProfile`'s range test is two early returns
  *   (an `||` folds into one unsigned compare); `NetworkUniqueId` is its retail 0x20 B (the member lookups depend on it);
  *   the address object's +0x28 copy is the sink's real virtual `copyFrom`; the member's +0x20 id goes to
@@ -111,8 +114,9 @@ typedef struct NetMailBox {
 /* This player's community profile and the presence record the layer is sent (`.bss` 0x806E1770 / 0x806E1870). */
 NetUserProfile net_user_profile;
 NetStatusRecord net_presence_record;
-/* The community layer's state block (`.bss` 0x806E18A0). */
+/* The community layer's state block (`.bss` 0x806E18A0) and the peer id object (`.bss` 0x806E1B18). */
 NetCommunityState net_community_state;
+NetworkUniqueId net_peer_address;
 
 #ifdef __cplusplus
 extern "C" {
@@ -2091,6 +2095,41 @@ void resendProfileRecord(s8* result)
     *work->result_0xC290 = 0;
 }
 
+/* 0x80435BAC (0x170): refreshes the profile's server byte and four settings bytes (the selected server's type and the
+ * work record's settings while the layer is up), writes them out and publishes them with the layer's member count as
+ * the last two presence pairs. */
+void refreshRosterCache(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    u32 settings;
+    u32 members;
+
+    if (getNetworkCommunityPat(getPatsObject(), 0) == NULL) {
+        return;
+    }
+    net_user_profile.server_0xF8 = work->server_list_0x660.entries_0x008[work->selected_server_index_0xA114].type_0x3C - 1LL;
+    if (work->layer_state_0x064 == 2) {
+        net_user_profile.settings_0xF4[0] = work->settings_0x6210[0];
+        net_user_profile.settings_0xF4[1] = work->settings_0x6210[1];
+        net_user_profile.settings_0xF4[2] = work->settings_0x6210[2];
+        net_user_profile.settings_0xF4[3] = work->settings_0x6210[3];
+    } else {
+        net_user_profile.settings_0xF4[0] = 0xFF;
+        net_user_profile.settings_0xF4[1] = 0xFF;
+        net_user_profile.settings_0xF4[2] = 0xFF;
+        net_user_profile.settings_0xF4[3] = 0xFF;
+    }
+    getNetworkCommunityPat(getPatsObject(), 0)->writeProfileRange_50((const u8*)&net_user_profile, 7, 0xF4);
+    settings = net_user_profile.settings_0xF4[3] | (net_user_profile.settings_0xF4[2] << 8) |
+               ((net_user_profile.settings_0xF4[0] << 24) | (net_user_profile.settings_0xF4[1] << 16));
+    members = (u16)getNetworkLayerPat(getPatsObject(), 0)->memberUsed_F02C << 16;
+    net_presence_record.pairs_0x04[2].kind_0x00 = 1;
+    net_presence_record.pairs_0x04[2].value_0x04 = settings;
+    net_presence_record.pairs_0x04[3].kind_0x00 = 1;
+    net_presence_record.pairs_0x04[3].value_0x04 = members;
+    getNetworkLayerPat(getPatsObject(), 0)->setPresence_A0((const NetLayerSettings*)&net_presence_record);
+}
+
 /*
  * Publishes whether this player is in a party: the profile's party byte (community command 12) and the first
  * presence pair; `result` takes the outcome.
@@ -2122,6 +2161,46 @@ void startRosterFetch(s8* result)
 NetUserProfile* getCommunityUserProfile(void)
 {
     return &net_community_state.profile_0x028;
+}
+
+/* 0x80435F48 (0x168): fills the peer card `out` from the community state: the name, the id text, the profile's id,
+ * rank and level, its nine equipment records in card order, its comment, the three names, the server and settings
+ * bytes and, while the last setting is set, the two words. */
+void copyPeerProfileCard(NetPeerCard* out)
+{
+    NetCommunityState* state = &net_community_state;
+
+    formatNetId(out->id_0x014, &net_peer_address);
+    strcpy(out->name_0x000, state->name_0x24D);
+    out->id_0x01E = state->profile_0x028.id_0x00;
+    out->level_0x020 = state->profile_0x028.level_0xF3;
+    out->rank_0x021 = state->profile_0x028.rank_0xF2;
+    equip_record_copy((struct _EQUIP*)out->equip_0x022[6], (const struct _EQUIP*)state->profile_0x028.equip_0x10[0]);
+    equip_record_copy((struct _EQUIP*)out->equip_0x022[7], (const struct _EQUIP*)state->profile_0x028.equip_0x10[1]);
+    equip_record_copy((struct _EQUIP*)out->equip_0x022[8], (const struct _EQUIP*)state->profile_0x028.equip_0x10[2]);
+    equip_record_copy((struct _EQUIP*)out->equip_0x022[4], (const struct _EQUIP*)state->profile_0x028.equip_0x10[3]);
+    equip_record_copy((struct _EQUIP*)out->equip_0x022[0], (const struct _EQUIP*)state->profile_0x028.equip_0x10[4]);
+    equip_record_copy((struct _EQUIP*)out->equip_0x022[2], (const struct _EQUIP*)state->profile_0x028.equip_0x10[5]);
+    equip_record_copy((struct _EQUIP*)out->equip_0x022[1], (const struct _EQUIP*)state->profile_0x028.equip_0x10[6]);
+    equip_record_copy((struct _EQUIP*)out->equip_0x022[3], (const struct _EQUIP*)state->profile_0x028.equip_0x10[7]);
+    equip_record_copy((struct _EQUIP*)out->equip_0x022[5], (const struct _EQUIP*)state->profile_0x028.equip_0x10[8]);
+    strcpy(out->comment_0x09E, (const char*)state->profile_0x028.record_0x9C);
+    strcpy(out->names_0x14A[0], (const char*)state->members_0x16C[0]);
+    strcpy(out->names_0x14A[1], (const char*)state->members_0x16C[1]);
+    strcpy(out->names_0x14A[2], (const char*)state->members_0x16C[2]);
+    out->server_0x20A = state->profile_0x028.server_0xF8;
+    out->settings_0x20B[0] = state->profile_0x028.settings_0xF4[0];
+    out->settings_0x20B[1] = state->profile_0x028.settings_0xF4[1];
+    out->settings_0x20B[2] = state->profile_0x028.settings_0xF4[2];
+    out->settings_0x20B[3] = state->profile_0x028.settings_0xF4[3];
+    if (out->settings_0x20B[3] == 0xFF) {
+        out->value_0x20F = 0;
+        out->value_0x210 = 0;
+    } else {
+        out->value_0x20F = state->value_0x264;
+        out->value_0x210 = state->value_0x268;
+    }
+    out->status_0x211 = state->profile_0x028.status_0x04;
 }
 
 /*
@@ -2177,6 +2256,20 @@ void requestFriendSync(s8* result)
     buildRosterSync(&work->roster_sync_0x61CC);
     getNetworkCommunityPat(getPatsObject(), 0)->syncFriends(&work->roster_sync_0x61CC);
     work->result_0xC290 = result;
+    *result = 0;
+}
+
+/* 0x80436220 (0xC0): sends `text` to the peer whose id text is `id` (mode 1 a friend message, else the community
+ * request +0x48) and parks `result` for the callback. */
+void sendPeerMessage(const char* id, const char* text, u8 mode, s8* result)
+{
+    importNetId(&net_peer_address, (const NetId*)id);
+    if (mode == 1) {
+        getNetworkCommunityPat(getPatsObject(), 0)->sendFriendMessage(&net_peer_address, text);
+    } else {
+        getNetworkCommunityPat(getPatsObject(), 0)->request_48((u32)text, 0, (u32)&net_peer_address);
+    }
+    net_ctrl_wk->result_0xC290 = result;
     *result = 0;
 }
 

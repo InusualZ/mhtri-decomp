@@ -21,17 +21,21 @@
  *   `findSlotByOwner`, `resetPeerTable`, `findFreePeerEvent`, `refreshFriendList`, `updatePeerCardBlock`,
  *   `updateFriendTransferModes`, `saveLayerId`/`readLayerIdChange`/`classifyLayerIdChange`, `net_peer_join_stamp`,
  *   `net_arena_base`, the idle-check fields (`refreshServerScreen` raises error 23 after 36000 unchanged frames) and
- *   the layer stack `layer_stack_0x6220`/`layer_depth_0x6240`.  `isReadyCountOne` and `resetFailureState` (a `blr`
- *   stub) keep names that say only what the body does.
- * RESIDUALS. 30 rows unwritten (objdiff scores them zero):
- *   - `updateMessagePool` (0x80425790, 5504 B) and the message-pool helpers 0x804273EC..0x80427630 and
- *     0x80427868..0x804286F0, including `updatePeerCardBlock`, `fn_8042835C` and `refreshFriendList` (they call
- *     NetworkLayerPat/NetworkCommunityPat slots +0x4C/+0x50/+0x60/+0xA0);
- *   - the NetworkInstance error accessors and messages 0x804312B8..0x8043137C (their +0x613C/+0x6344 records), the
- *     helpers 0x80431548..0x8043159C and 0x80431638, and `updateTransferMode` (0x804317E8);
- *   - the static-init/ctor/dtor group 0x80431CD8..0x80432104 (10 rows; it needs `NetCtrlWk`'s member classes as C++
- *     classes).
- *   48 partial rows (re-measure with `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`),
+ *   the layer stack `layer_stack_0x6220`/`layer_depth_0x6240`, the error-record accessors and the ENC wrappers
+ *   (`getErrorRecord613c`, `netUtf8ToUtf16` ...), `sendUserProfilePart`, `sendUserPosition`, `readFriendCards`,
+ *   `readCommunityMemberCards`, `checkLayerEntry`, `NetFriendCard`, `NetServerConfig`, `NetSrvList`.
+ *   `isReadyCountOne` and `resetFailureState` (a `blr` stub) keep names that say only what the body does.
+ * RESIDUALS. 13 rows unwritten (objdiff scores them zero):
+ *   - `updateMessagePool` (0x80425790, 5504 B), `updatePeerCardBlock` (0x80427868, 920 B) and the peer import
+ *     0x80427C00 (740 B, it copies the layer's friend roster into +0x1ADC: a `NetFriendRoster` the record still spells
+ *     as `layer_value_0x1ADC`/`layer_peers_0x1AE0` and padding);
+ *   - the static-init/ctor/dtor group 0x80431CD8..0x80432104 (10 rows; it needs `NetCtrlWk`'s member classes - that
+ *     roster, the peer address objects, the requests - as C++ members).
+ *   Partial rows written here: `readFriendCards`/`readCommunityMemberCards` (the callee-saved registers; the community
+ *   one adds the member table's base in two steps), `checkLayerEntry` (one load order and one scheduled `add`),
+ *   `updateTransferMode` (`NetworkLayer::getFriendFlagC084_EC` is declared `u8`, so ours masks the result retail compares
+ *   whole; the loop counter and peer pointer swap r28/r29).
+ *   The older partial rows (re-measure with `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`),
  *   the characterised ones:
  *  - `updateNetworkPatControl`, `layerReflectCallback`: retail saves r24..r31 (a 0x50 frame) and keeps the joining
  *    peer's id/name/profile addresses in their own saved registers, ours CSEs them; the chat-record text address is
@@ -58,6 +62,10 @@
  *    `layoutTextRuns` keeps retail's `extsb` through a `(s32)` cast; `exportNetworkSave` copies the save byte with one;
  *  - `NetworkLayerIdExportTo` is called after an unused `getNetworkLayerPat` (retail evaluates the layer object first);
  *  - the placement `new` of the friend list in `initWorkRecord` (its EH frame);
+ *  - a server type's index is `type - 1LL` (retail's `li r0,-1` + `addc`); the friend-card readers keep the status
+ *    and settings words in locals (retail reads each once) and walk the record and its session with their own
+ *    pointers; `checkLayerEntry` reaches the rank ranges and filters through a `NetServerConfig` pointer and the
+ *    servers through a `NetSrvList` pointer, as retail forms both bases up front;
  *  - `initNetworkLibrary` is handed `PatLibraryParams` cast to the owner's `sNetworkLibraryInitParam` (one 0x2C block
  *    read two ways: this unit names the allocator/game words, the owner keeps `gameInfo[8]`; folding them is a rule-1
  *    item).
@@ -68,6 +76,8 @@
 #include "Runtime.PPCEABI.H/memset.h"            /* memset, owner Runtime.PPCEABI.H/memset.c (rule 2) */
 #include "unsplit/Runtime.PPCEABI.H.h"           /* strcpy - unowned MSL helper (rule 2's unsplit gap) */
 #include "font/flfnt.h"                           /* flfntStrLen, owner font/flfnt.cpp (rule 2) */
+#include "hud/cockpit.h"                          /* setCockpitTransferMode - owner hud/cockpit.cpp */
+#include "BTE/gki_buffer.h"                       /* ENCConvertStringUtf8ToUtf16 / Utf16ToUtf8 */
 #include "enemy/em020_ai.h"
 #include "enemy/em_pop.h"                          /* matchesFileVersion, owner enemy/em_pop.cpp (rule 2) */
 #include "fn_80047398.h"                          /* decodePlayerCard, owner fn_80047398.cpp (rule 2) */
@@ -740,7 +750,7 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
             work->layer_results_0x6244[command] = result;
         } else {
             work->layer_results_0x6244[command] = 1;
-            memcpy(&work->server_count_0x660, data, 0x1408);
+            memcpy(&work->server_list_0x660, data, sizeof(NetSrvList));
         }
         break;
     case 19:
@@ -1171,6 +1181,67 @@ s32 queueNetCommand(u32 command, s8* result, s32 unused, s32 arg_count, const s3
     return 1;
 }
 
+/* 0x804273EC (0x144): publishes part of this player's profile: kinds 1..4 write the profile head, the 0x7C range, the
+ * rank or the record through the community layer (the lobby work's result byte takes the outcome), any other kind
+ * sends `data` (`size` bytes) as one binary user field. */
+s32 sendUserProfilePart(u8 kind, const u8* data, u32 size)
+{
+    NetUserFields fields;
+
+    if (getNetworkLayerPat(getPatsObject(), 0) == NULL) {
+        return 0;
+    }
+    switch (kind) {
+    case 1:
+        sendProfileHead((s8*)&lobby_w.field_0x176);
+        lobby_w.community_flag_0x009 = 1;
+        return 1;
+    case 2:
+        sendProfileRange7C((s8*)&lobby_w.field_0x176);
+        lobby_w.community_flag_0x009 = 1;
+        return 1;
+    case 3:
+        sendProfileRank((s8*)&lobby_w.field_0x176);
+        lobby_w.community_flag_0x009 = 1;
+        return 1;
+    case 4:
+        sendProfileRecord((s8*)&lobby_w.field_0x176);
+        lobby_w.community_flag_0x009 = 1;
+        return 1;
+    }
+    fields.count_000 = 1;
+    fields.fields_008[0].kind_00 = 9;
+    fields.fields_008[0].data_08 = data;
+    fields.fields_008[0].size_0C = size;
+    getNetworkLayerPat(getPatsObject(), 0)->sendUserFields_5C(&fields);
+    return 1;
+}
+
+/* 0x80427530 (0x100): publishes this player's position (three floats) with the action, the second value word and
+ * the packed mode bytes, unless the mode is 0 or 4. */
+s32 sendUserPosition(u8 action, const f32* position, const u32* values, u8 mode, u8 low, u8 high, u8 mid)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (getNetworkLayerPat(getPatsObject(), 0) == NULL) {
+        return 0;
+    }
+    if (mode == 0) {
+        return 1;
+    }
+    if (mode == 4) {
+        return 1;
+    }
+    work->position_0x6134.position_00[0] = position[0];
+    work->position_0x6134.position_00[1] = position[1];
+    work->position_0x6134.position_00[2] = position[2];
+    work->position_0x6134.value_0C[0] = action;
+    work->position_0x6134.value_0C[1] = values[1];
+    work->position_0x6134.value_0C[2] = low | (mode << 8) | ((high << 24) | (mid << 16));
+    getNetworkLayerPat(getPatsObject(), 0)->sendUserPosition_60(&work->position_0x6134);
+    return 1;
+}
+
 /*
  * Empty body: the retail symbol is a bare `blr`.
  */
@@ -1246,6 +1317,124 @@ BOOL isLayerReady(void)
     return work->layer_state_0x064 == 2;
 }
 
+/* 0x80427EE4 (0x150): clears `count` cards, then fills them from the layer's friend list from friend `first` on;
+ * returns how many it filled. */
+s32 readFriendCards(NetFriendCard* out, s32 first, s32 count)
+{
+    NetFriendCard* card;
+    NetFriendList* list;
+    NetFriendRec* rec;
+    NetFriendSession* session;
+    u32 status;
+    u32 settings;
+    s32 total;
+    s32 filled;
+    s32 end;
+    s32 i;
+
+    if (net_ctrl_wk == NULL) {
+        return 0;
+    }
+    card = out;
+    for (i = 0; i < count; i++) {
+        memset(card, 0, sizeof(NetFriendCard));
+        card++;
+    }
+    list = &getNetworkLayerPat(getPatsObject(), 0)->friendList_6BC30;
+    total = list->count_0x00;
+    filled = 0;
+    rec = &list->entries_0x04[first].rec_00;
+    session = &list->entries_0x04[first].session_38;
+    end = first + count;
+    for (i = first; i < end; i++) {
+        if (i >= total) {
+            break;
+        }
+        out->valid_0x000 = 1;
+        out->index_0x001 = i;
+        formatNetId(out->id_0x003, &rec->id_0x00);
+        strcpy(out->name_0x00D, rec->name_0x20);
+        status = session->status_08;
+        out->status_0x029 = status >> 24;
+        out->status_low_0x11D = status & 0xFF;
+        out->area_0x024 = (session->area_10 & 0xFFFF0000) >> 16;
+        settings = session->settings_18;
+        out->settings_0x128[0] = settings >> 24;
+        out->settings_0x128[1] = (settings >> 16) & 0xFF;
+        out->settings_0x128[2] = (settings >> 8) & 0xFF;
+        out->settings_0x128[3] = settings & 0xFF;
+        out->members_0x12C = session->members_20 >> 16;
+        out++;
+        filled++;
+        /* both step one 0x5C-byte entry */
+        rec = (NetFriendRec*)((NetFriendEntry*)rec + 1);
+        session = (NetFriendSession*)((NetFriendEntry*)session + 1);
+    }
+    return filled;
+}
+
+/* 0x80428034 (0x190): clears `count` cards, then fills them from the member table of the community `selection` names
+ * (none past the community count); returns how many it filled. */
+s32 readCommunityMemberCards(const NetCommunitySelection* selection, NetFriendCard* out, s32 first, s32 count)
+{
+    NetFriendCard* card;
+    NetFriendRoster* roster;
+    NetFriendRec* rec;
+    NetFriendSession* session;
+    u32 status;
+    u32 settings;
+    s32 total;
+    s32 filled;
+    s32 end;
+    s32 i;
+
+    total = getNetworkLayerPat(getPatsObject(), 0)->communities_F1AC.count_0x00000;
+    if (total == 0) {
+        return 0;
+    }
+    if (total <= selection->community_0x60) {
+        return 0;
+    }
+    /* the record's member table and sessions are one roster's two runs */
+    roster = (NetFriendRoster*)&getNetworkLayerPat(getPatsObject(), 0)
+                 ->communities_F1AC.entries_0x00004[selection->community_0x60]
+                 .members_0x011C;
+    card = out;
+    for (i = 0; i < count; i++) {
+        memset(card, 0, sizeof(NetFriendCard));
+        card++;
+    }
+    total = roster->table_0000.count_0x000;
+    filled = 0;
+    rec = &roster->table_0000.entries_0x004[first];
+    session = &roster->sessions_15E4[first];
+    end = first + count;
+    for (i = first; i < end; i++) {
+        if (i >= total) {
+            break;
+        }
+        out->valid_0x000 = 1;
+        out->index_0x001 = i;
+        formatNetId(out->id_0x003, &rec->id_0x00);
+        strcpy(out->name_0x00D, rec->name_0x20);
+        status = session->status_08;
+        out->status_0x029 = status >> 24;
+        out->status_low_0x11D = status & 0xFF;
+        out->area_0x024 = (session->area_10 & 0xFFFF0000) >> 16;
+        settings = session->settings_18;
+        out->settings_0x128[0] = settings >> 24;
+        out->settings_0x128[1] = (settings >> 16) & 0xFF;
+        out->settings_0x128[2] = (settings >> 8) & 0xFF;
+        out->settings_0x128[3] = settings & 0xFF;
+        out->members_0x12C = session->members_20 >> 16;
+        out++;
+        filled++;
+        rec++;
+        session++;
+    }
+    return filled;
+}
+
 /*
  * The `index`-th 0x2510-byte sub-record of the layer's 0xF1B0 table, as an address.
  */
@@ -1307,6 +1496,57 @@ void readLayerIdChange(s32* changed, u32* server, s32* city, s32* room)
     work->seen_key_0xC318 = kept.room_0x0C;
 }
 
+/* 0x8042835C (0x1DC): whether this player may enter the layer `target` (see the declaration for the codes). */
+s32 checkLayerEntry(const NetworkLayerId* target, const NetUserProfile* profile)
+{
+    NetSrvRec* server = NULL;
+    NetCtrlWk* work = net_ctrl_wk;
+    NetServerConfig* config = &work->config_0x82D8;
+    NetUserData* user;
+    NetLayerIdText now;
+    NetLayerIdText wanted;
+    NetworkLayerId id;
+    NetFilterRec* filter;
+    NetRange* range;
+    NetSrvList* list;
+    u32 i;
+
+    user = (NetUserData*)get_userdata();
+    getNetworkLayerPat(getPatsObject(), 0);
+    NetworkLayerIdExportTo(target, (u8*)&wanted, 16);
+    list = &work->server_list_0x660;
+    for (i = 0; i < list->count_0x000; i++) {
+        if (wanted.server_0x04 == list->entries_0x008[i].id_0x00) {
+            server = &list->entries_0x008[i];
+            break;
+        }
+    }
+    if (server == NULL) {
+        return 2;
+    }
+    getNetworkLayerPat(getPatsObject(), 0)->exportLayerId_8C(&id);
+    getNetworkLayerPat(getPatsObject(), 0);
+    NetworkLayerIdExportTo(&id, (u8*)&now, 16);
+    if (now.server_0x04 == wanted.server_0x04 && now.city_0x0A == wanted.city_0x0A && now.room_0x0C == wanted.room_0x0C) {
+        return 4;
+    }
+    range = &config->ranges_0x13AC[server->type_0x3C - 1LL];
+    if (user->hunter_rank_0x3DE4 < (s16)range->low_0x00 || user->hunter_rank_0x3DE4 > (s16)range->high_0x02) {
+        return 3;
+    }
+    if (profile != NULL && wanted.room_0x0C != 0) {
+        filter = &config->filters_0x98C[profile->settings_0xF4[1]];
+        if (filter->kind_0x1F == 1 &&
+            (user->hunter_rank_0x3DE4 < filter->low_0x20 || user->hunter_rank_0x3DE4 > filter->high_0x22)) {
+            return 3;
+        }
+    }
+    if (wanted.city_0x0A == 0) {
+        return 2;
+    }
+    return now.server_0x04 != wanted.server_0x04;
+}
+
 /*
  * How the current layer id differs from the kept one: 1 unchanged, 2/3 at server level (3 when the server
  * changed), 4 at city level, -1 otherwise.
@@ -1333,6 +1573,32 @@ s32 classifyLayerIdChange(void)
         return 4;
     }
     return -1;
+}
+
+/* 0x80428628 (0xC8): copies the layer's friend list into the work record's list (each friend's id, name, valid byte
+ * and session record). */
+void refreshFriendList(void)
+{
+    NetFriendEntry* dst;
+    const NetFriendEntry* src;
+    u32 i;
+    NetFriendList* list;
+    NetworkLayerPat* layer;
+
+    list = net_ctrl_wk->friend_list_0xC47C;
+    layer = getNetworkLayerPat(getPatsObject(), 0);
+    list->count_0x00 = layer->friendList_6BC30.count_0x00;
+    i = 0;
+    dst = list->entries_0x04;
+    src = layer->friendList_6BC30.entries_0x04;
+    for (; i < list->count_0x00; i++) {
+        dst->rec_00.id_0x00.copyFrom((const u8*)&src->rec_00.id_0x00);
+        memcpy(dst->rec_00.name_0x20, src->rec_00.name_0x20, sizeof(dst->rec_00.name_0x20));
+        dst->rec_00.valid_0x35 = src->rec_00.valid_0x35;
+        memcpy(&dst->session_38, &src->session_38, sizeof(dst->session_38));
+        dst++;
+        src++;
+    }
 }
 
 /*
@@ -1686,7 +1952,7 @@ void initWorkRecord(void)
     work->flag_0x82C8 = 0;
     work->flag_0xC3F0 = 0;
     work->flag_0xC3F2 = 0;
-    memset(work->server_types_0x82D8, 0, 0x140C);
+    memset(&work->config_0x82D8, 0, sizeof(NetServerConfig));
     memset(&work->times_0x96E4, 0, sizeof(NetRaidTimes));
     memset(&work->bigdata_0x96F0, 0, sizeof(NetBigData));
     memset(&work->notice_0x9FF4, 0, sizeof(NetServerNotice));
@@ -1998,7 +2264,7 @@ void syncScheduleClock(NetCtrlWk* work)
     u32 time = NetCtrlWk::getNetworkTime();
     f32 phase = NetCtrlWk::getSchedulePhase();
 
-    syncItemListClock(time, work->schedule_0x85DC.period_0x04, phase);
+    syncItemListClock(time, work->config_0x82D8.schedule_0x304.period_0x04, phase);
 }
 
 /*
@@ -2945,8 +3211,8 @@ void updateNetworkPatControl(void)
             work->selected_server_index_0xA114 = 0;
             work->field_0xA118 = 0;
             work->chosen_type_0xA11C = 0;
-            server = work->servers_0x668;
-            for (i = 0; i < work->server_count_0x660; i++, server++) {
+            server = work->server_list_0x660.entries_0x008;
+            for (i = 0; i < work->server_list_0x660.count_0x000; i++, server++) {
                 s32 type = server->type_0x3C - 1;
 
                 if (type >= 0) {
@@ -3084,8 +3350,8 @@ void updateNetworkPatControl(void)
 
                 sysSE_req(0);
                 seen = 0;
-                server = work->servers_0x668;
-                for (index = 0; index < work->server_count_0x660; index++, server++) {
+                server = work->server_list_0x660.entries_0x008;
+                for (index = 0; index < work->server_list_0x660.count_0x000; index++, server++) {
                     s32 type = server->type_0x3C - 1;
 
                     if (type >= 0 && type == work->chosen_type_0xA11C) {
@@ -4346,7 +4612,7 @@ BOOL NetCtrlWk::passesFirstFilter(s32 index, u16 value)
     if (net_ctrl_wk == NULL) {
         return FALSE;
     }
-    filter = &net_ctrl_wk->filters_0x8C64[index];
+    filter = &net_ctrl_wk->config_0x82D8.filters_0x98C[index];
     if (filter->kind_0x1F != 1) {
         return TRUE;
     }
@@ -4369,7 +4635,7 @@ BOOL can_enter_server(s32 index, u32 value)
     if (work == NULL) {
         return FALSE;
     }
-    range = &work->ranges_0x9684[index];
+    range = &work->config_0x82D8.ranges_0x13AC[index];
     high = range->high_0x02;
     low = range->low_0x00;
     if (low <= (u16)value && high >= (u16)value) {
@@ -4394,7 +4660,7 @@ s32 NetCtrlWk::stepFetch(s32 kind)
 
     switch (kind) {
     case 1:
-        buffer = server_types_0x82D8;
+        buffer = config_0x82D8.server_types_0x000;
         checksum = &fetch_sums_0xA0E4[0];
         size = 5132;
         break;
@@ -4604,8 +4870,8 @@ s32 NetCtrlWk::listServers(s32 type, NetServerView* views, s32 skip, s32 max)
     }
     skipped = 0;
     count = 0;
-    server = work->servers_0x668;
-    for (i = 0; i < work->server_count_0x660; i++, server++) {
+    server = work->server_list_0x660.entries_0x008;
+    for (i = 0; i < work->server_list_0x660.count_0x000; i++, server++) {
         if (server->type_0x3C != type) {
             continue;
         }
@@ -4986,7 +5252,7 @@ void NetPeerRec::assign(const NetPeerRec* src)
  */
 char* get_server_type_name(s32 index)
 {
-    NetServerType* types = net_ctrl_wk->server_types_0x82D8;
+    NetServerType* types = net_ctrl_wk->config_0x82D8.server_types_0x000;
 
     if (index >= 0 && index < 4) {
         return types[index].name_0x00;
@@ -4999,7 +5265,7 @@ char* get_server_type_name(s32 index)
  */
 char* get_server_type_desc(s32 index)
 {
-    return net_ctrl_wk->server_types_0x82D8[index].description_0x18;
+    return net_ctrl_wk->config_0x82D8.server_types_0x000[index].description_0x18;
 }
 
 /*
@@ -5017,7 +5283,7 @@ s32 NetCtrlWk::collectEvents(s8* out, u8 category, s32 max)
     if (work == NULL) {
         return 0;
     }
-    event = work->events_0x85E4;
+    event = work->config_0x82D8.events_0x30C;
     count = 0;
     index = 0;
     bit = 1 << category;
@@ -5047,7 +5313,7 @@ s32 NetCtrlWk::collectSecondFilters(s8* out, u16 value, const u16* table_a, cons
     if (work == NULL) {
         return 0;
     }
-    filter = work->filters_0x8D84;
+    filter = work->config_0x82D8.filters_0xAAC;
     count = 0;
     index = 0;
     for (i = 0; i < 64; i++, index++, filter++) {
@@ -5102,7 +5368,7 @@ s32 NetCtrlWk::collectFirstFilters(s8* out, u16 value, s32 max)
     if (work == NULL) {
         return 0;
     }
-    filter = work->filters_0x8C64;
+    filter = work->config_0x82D8.filters_0x98C;
     count = 0;
     index = 0;
     for (i = 0; i < 8; i++, index++, filter++) {
@@ -5122,7 +5388,7 @@ s32 NetCtrlWk::collectFirstFilters(s8* out, u16 value, s32 max)
  */
 NetEventRec* NetCtrlWk::getEvent(s32 index)
 {
-    return &net_ctrl_wk->events_0x85E4[index];
+    return &net_ctrl_wk->config_0x82D8.events_0x30C[index];
 }
 
 /*
@@ -5130,7 +5396,7 @@ NetEventRec* NetCtrlWk::getEvent(s32 index)
  */
 NetFilterRec* NetCtrlWk::getFirstFilter(s32 index)
 {
-    return &net_ctrl_wk->filters_0x8C64[index];
+    return &net_ctrl_wk->config_0x82D8.filters_0x98C[index];
 }
 
 /*
@@ -5138,7 +5404,7 @@ NetFilterRec* NetCtrlWk::getFirstFilter(s32 index)
  */
 NetFilterRec* NetCtrlWk::getSecondFilter(s32 index)
 {
-    return &net_ctrl_wk->filters_0x8D84[index];
+    return &net_ctrl_wk->config_0x82D8.filters_0xAAC[index];
 }
 
 /*
@@ -5221,13 +5487,13 @@ BOOL NetCtrlWk::isAccountLinked(void)
 char* NetCtrlWk::getSelectedServerTypeName(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
-    NetServerType* types = work->server_types_0x82D8;
+    NetServerType* types = work->config_0x82D8.server_types_0x000;
     NetSrvRec* server;
 
     if (work == NULL) {
         return " ";
     }
-    server = &work->servers_0x668[work->selected_server_index_0xA114];
+    server = &work->server_list_0x660.entries_0x008[work->selected_server_index_0xA114];
     if ((server->flags_0x38 | server->type_0x3C) == 0) {
         return " ";
     }
@@ -5244,7 +5510,7 @@ char* NetCtrlWk::getSelectedServerName(void)
     if (work == NULL) {
         return " ";
     }
-    return work->servers_0x668[work->selected_server_index_0xA114].name_0x04;
+    return work->server_list_0x660.entries_0x008[work->selected_server_index_0xA114].name_0x04;
 }
 
 /*
@@ -5341,7 +5607,7 @@ NetServerNotice* NetCtrlWk::getServerNotice(void)
  */
 u16 get_server_big_data_timeout_element(s32 index)
 {
-    return net_ctrl_wk->timeouts_0x9694[index];
+    return net_ctrl_wk->config_0x82D8.timeouts_0x13BC[index];
 }
 
 /*
@@ -5354,7 +5620,7 @@ s32 NetCtrlWk::getSelectedServerTypeIndex(void)
     if (work == NULL) {
         return 0;
     }
-    return (s32)((s64)work->servers_0x668[work->selected_server_index_0xA114].type_0x3C - 1);
+    return (s32)((s64)work->server_list_0x660.entries_0x008[work->selected_server_index_0xA114].type_0x3C - 1);
 }
 
 /*
@@ -5508,7 +5774,7 @@ f32 NetCtrlWk::getSchedulePhase(void)
     if (net_ctrl_wk == NULL) {
         return 0.0f;
     }
-    return net_ctrl_wk->schedule_0x85DC.getPhase();
+    return net_ctrl_wk->config_0x82D8.schedule_0x304.getPhase();
 }
 
 /*
@@ -6604,6 +6870,31 @@ s16 MH3DispErrorString(s16 x, s16 y, s8* text)
     return state->pen_y_0x306;
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x804312B8 (0x44): the server's negative-reply message, or the binary's first token when there is none. */
+char* getDefaultSubErrorMessage(void)
+{
+    PatErrorRecord* record = getErrorRecord613c(getInstance_());
+
+    if (record->code_000 != 0) {
+        return record->message_008;
+    }
+    return getBinaryToken(getInstance_(), 0);
+}
+
+/* 0x804312FC (0x8): the singleton's negative-reply record. */
+PatErrorRecord* getErrorRecord613c(NetworkInstance* self)
+{
+    return &self->errorRecord_613C;
+}
+
+#ifdef __cplusplus
+}
+#endif
+
 /*
  * The localized message for network error `code` (code 0's message when it is out of range).
  */
@@ -6620,6 +6911,41 @@ char* MH3GetErrorString2(s32 code)
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 0x80431324 (0x44): the server's shutdown message, or the binary's first token when there is none. */
+char* getDefaultErrorMessage(void)
+{
+    PatErrorRecord* record = getShutdownRecord6344(getInstance_());
+
+    if (record->code_000 != 0) {
+        return record->message_008;
+    }
+    return getBinaryToken(getInstance_(), 0);
+}
+
+/* 0x80431368 (0x8): the singleton's shutdown-notice record. */
+PatErrorRecord* getShutdownRecord6344(NetworkInstance* self)
+{
+    return &self->shutdownRecord_6344;
+}
+
+/* 0x80431370 (0x4): converts UTF-8 text to UTF-16. */
+s32 netUtf8ToUtf16(u16* dst, s32* dstLength, const u8* src, s32* srcLength)
+{
+    return ENCConvertStringUtf8ToUtf16(dst, dstLength, src, srcLength);
+}
+
+/* 0x80431374 (0x4): converts UTF-16 text to UTF-8. */
+s32 netUtf16ToUtf8(u8* dst, s32* dstLength, const u16* src, s32* srcLength)
+{
+    return ENCConvertStringUtf16ToUtf8(dst, dstLength, src, srcLength);
+}
+
+/* 0x80431378 (0x4): converts a UTF-8 message to UTF-16. */
+s32 netMessageUtf8ToUtf16(u16* dst, s32* dstLength, const u8* src, s32* srcLength)
+{
+    return ENCConvertStringUtf8ToUtf16(dst, dstLength, src, srcLength);
+}
 
 /*
  * Copies the work record's network settings (name, support code, Pat settings, terms version and the save
@@ -6666,6 +6992,20 @@ void importNetworkSave(const NetSaveRecord* save)
     work->save_words_0xC248[3] = save->words_0x78[3];
 }
 
+/* 0x80431548 (0x30): makes the mediator's link check report the link as down. */
+void forceNetLinkError(void)
+{
+    if (getInstance() != NULL) {
+        enableMediatorLinkError(getInstance());
+    }
+}
+
+/* 0x80431578 (0x24): the mediator's graded terms progress. */
+s32 getNetTermsProgressLevel(void)
+{
+    return getTermsProgressLevel(getInstance());
+}
+
 /*
  * Derives the two transfer flags from the system's transfer mode bytes, hands them to the mediator and
  * applies the transfer mode.
@@ -6688,6 +7028,15 @@ void applyTransferSettings(void)
     setMediatorTransferFlag6DD2(getInstance(), work->transfer_flag_0x7990);
     setMediatorTransferFlag6DD1(getInstance(), work->transfer_flag_0x7991);
     setTransferMode(system_w.transfer_mode_0xa50);
+}
+
+/* 0x80431638 (0x58): takes the system's transfer flag byte and hands it to the layer (slot +0xD8). */
+void syncNetTransferFlag(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    work->transfer_flag_0x7992 = system_w.transfer_flag_0xa51;
+    getNetworkLayerPat(getPatsObject(), 0)->setMediatorValue_D8(work->transfer_flag_0x7992);
 }
 
 /*
@@ -6729,6 +7078,79 @@ void setTransferMode(u32 mode)
             work->flag_0xC49D = 0;
             setStreamTransferMode(0);
             setTransferDisplayState(0);
+        }
+    }
+}
+
+/* 0x804317E8 (0x2B4): shows each of the four players' transfer state on the cockpit: 3 when the friend's transfer
+ * is active, flagged and ready (and the system's transfer mode is on), 1 active but not ready, 2 otherwise; all 0
+ * while the layer is down, the option is off or the transfer flag is clear. */
+void updateTransferMode(void)
+{
+    s32 friendIndex;
+    NetPeerRec* peer;
+    s32 i;
+    NetCtrlWk* work = net_ctrl_wk;
+    NetPlayerCard* player;
+
+    for (i = 0; i < 4; i++) {
+        setCockpitTransferMode(i, 0);
+    }
+    if (work->layer_state_0x064 <= 1) {
+        return;
+    }
+    if (get_option_cfg(28) == 0) {
+        return;
+    }
+    if (work->flag_0xC499 == 0) {
+        return;
+    }
+    if (GameMode_ck() == 1) {
+        player = (NetPlayerCard*)get_move_work_adrs(2);
+        if (player == NULL) {
+            return;
+        }
+        for (i = 0; i < 4; i++, player++) {
+            if (player->active_0x000 == 0) {
+                setCockpitTransferMode(i, 0);
+                continue;
+            }
+            friendIndex = findFriendIndex((const NetId*)player->id_0x5DB);
+            if (friendIndex < 0) {
+                continue;
+            }
+            if ((u32)getNetworkLayerPat(getPatsObject(), 0)->isFriendTransferActive_E4(friendIndex) == 1 &&
+                (u32)getNetworkLayerPat(getPatsObject(), 0)->getFriendTransferFlag_F0(friendIndex) == 1 &&
+                system_w.transfer_mode_0xa50 == 1 &&
+                (u32)getNetworkLayerPat(getPatsObject(), 0)->isFriendTransferReady_E8(friendIndex) == 1) {
+                setCockpitTransferMode(i, 3);
+            }
+        }
+    } else {
+        peer = work->peers_0x7488;
+        for (i = 0; i < 4; i++, peer++) {
+            if (work->used_0x7988[i] == 0) {
+                setCockpitTransferMode(i, 0);
+                continue;
+            }
+            friendIndex = findFriendIndex(&peer->id_0x00);
+            if (getNetworkLayerPat(getPatsObject(), 0)->getFriendFlagC084_EC(friendIndex) != 1) {
+                continue;
+            }
+            if ((u32)getNetworkLayerPat(getPatsObject(), 0)->isFriendTransferActive_E4(friendIndex) == 1 &&
+                (u32)getNetworkLayerPat(getPatsObject(), 0)->getFriendTransferFlag_F0(friendIndex) == 1) {
+                if (system_w.transfer_mode_0xa50 == 1) {
+                    if ((u32)getNetworkLayerPat(getPatsObject(), 0)->isFriendTransferReady_E8(friendIndex) == 1) {
+                        setCockpitTransferMode(i, 3);
+                    } else {
+                        setCockpitTransferMode(i, 1);
+                    }
+                } else {
+                    setCockpitTransferMode(i, 2);
+                }
+            } else {
+                setCockpitTransferMode(i, 2);
+            }
         }
     }
 }

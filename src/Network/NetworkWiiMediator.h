@@ -11,6 +11,7 @@
 #include "Network/NetworkReflectService.h"   /* NetworkWiiMediatorReflectFn - the reflect service's callback type */
 #include "Network/gamespy_interface_types.h"
 #include "DWCi/dwc_nasfunc.h"               /* DWCSvlResult - owner DWCi/dwc_nasfunc.cpp */
+#include "Network/NetworkPool.h"              /* NetworkPoolCallback / NetworkPoolConfig - the pool forwarders' parameters */
 #include "menu/PatTerms.h"                  /* PatTerms - the member at +0x6DD8 (owner menu/menu_plsearch.cpp) */
 
 /* The mediator's field layout, traced from the disassembly: every offset below is one an instruction
@@ -82,8 +83,14 @@ public:
      * of samples average below the silence floor, and whether the terms object's update has finished. */
     s32  readVoice(u8* out, s32 size);
     s32  isVoiceSilent(const s16* samples, s32 size);
-    u8   isVoiceReady();
-    u8   getTransferFlag6DD1();
+    u32  isVoiceReady();
+    /* 0x80417080 / 0x804170D8 / 0x80417180 / 0x8041722C - the voice output side (GUESS names): write samples to the
+     * terms object, DSP-ADPCM encode them, the encoded size of a sample block and the echo suppressor. */
+    s32  writeVoice(const s16* samples, s32 size);
+    s32  encodeVoice(u8* out, const s16* samples, s32 size);
+    s32  getEncodedVoiceSize(s32 size);
+    s32  suppressVoiceEcho(const u8* in, u8* out, s32 size);
+    BOOL getTransferFlag6DD1();
     u8   getTransferFlag6DD2();
     f32  getTransferLevel();
     void setTransferSlotMode(s8 slot, u8 mode);
@@ -95,11 +102,11 @@ public:
     void openingStop();
     void applyEvent(s32 code, s32 a, s32 b, s32 c, const GameSpyEventMsg* msg);
 
-    /* +0x004 */ u8  cleared_004[4];          /* +0x04..+0x17: five words only the constructor touches (GUESS names) */
-    /* +0x008 */ u8  cleared_008[4];
-    /* +0x00C */ u8  cleared_00C[4];
-    /* +0x010 */ u8  cleared_010[4];
-    /* +0x014 */ u8  cleared_014[4];
+    /* +0x004 */ u8  param_04[4];          /* +0x04..+0x17: five words `setMediatorParams` / `getMediatorParams` copy (GUESS names) */
+    /* +0x008 */ u8  param_08[4];
+    /* +0x00C */ u8  param_0C[4];
+    /* +0x010 */ u8  param_10[4];
+    /* +0x014 */ u8  param_14[4];
     /* +0x018 */ u32 event_flags;             /* `applyEvent` ORs the Pat events in: 1 error, 2 refused, 8 shut, 0x10 done */
     /* +0x01C */ u8  flag_1C;
     /* +0x01D */ u8  flag_1D;
@@ -237,6 +244,9 @@ s32 isMessageRestricted(NetworkWiiMediator* self);
  * 0x1005) and fills `error` when that read fails; 1 when the link is up.  NAME (a GUESS from the body; the Pat
  * interface's step calls it before each send). */
 s32 checkMediatorLink(NetworkWiiMediator* self, struct NetworkErrorInfo* error);
+/* 0x80413BE0 / 0x80413BEC - make the link check report the link as down / ask SO again (the `flag_21` setters). */
+void enableMediatorLinkError(NetworkWiiMediator* self);
+void disableMediatorLinkError(NetworkWiiMediator* self);
 /* 0x80413BF8 - the console's country code (`SCGetCountryCode`, IPL.SADR's first byte), 0 without one; renamed from
  * `getReflectEventId` (GUESS) - `dispatchReflectEvent` maps the codes it returns (18 Canada, 65.. Europe) to a
  * region index. */
@@ -245,7 +255,7 @@ s32 getLanguage(void);
 /* 0x80414C54 - copies the Pat interface's media version string (up to `size` bytes) into `out`. */
 void getMediaVersionString(NetworkWiiMediator* self, char* out, u32 size);
 
-u32 isTermsUpdateFinished(struct PatTerms* terms);
+bool isTermsUpdateFinished(struct PatTerms* terms);
 
 /* 0x804166E0 / 0x80416620 - copy the mediator's nine DWC game-info words out / in (strings are copied
  * into the mediator's own buffers on the way in). */
@@ -293,6 +303,41 @@ void setMediatorTransferFlag6DD1(NetworkWiiMediator* self, u8 flag);
 void setMediatorTransferFlag6DD2(NetworkWiiMediator* self, u8 flag);
 void setMediatorTransferLevel(NetworkWiiMediator* self, f32 level);
 s32 postMediatorRecord(NetworkWiiMediator* self, u8* record);
+
+/* 0x80413980 / 0x80413A34 - copy the five parameter words (+0x04..+0x17) in from / out to the given pointers, each
+ * skipped when null (GUESS names). */
+void setMediatorParams(NetworkWiiMediator* self, const u32* a, const u32* b, const u32* c, const u32* d,
+                       const u32* e);
+void getMediatorParams(NetworkWiiMediator* self, u32* a, u32* b, u32* c, u32* d, u32* e);
+
+/* 0x804155D4 - masks every word of `text` that one of the filter tables lists (`table` 0: the 1024-entry table A,
+ * 1: the single line, 2: table B), returning nonzero when one matched; 0x80416020 runs table 1 (GUESS names). */
+s32 filterReflectText(NetworkWiiMediator* self, char* text, s32 table);
+s32 filterReflectTextSingle(NetworkWiiMediator* self, char* text);
+
+/* The `NetworkPool` forwarders 0x80416028..0x804165A8: create and initialise the pool, then one per pool entry point,
+ * each a no-op (returning 0) without a pool (GUESS names, after the pool method each one calls). */
+/* untyped: caller-owned payload - the sink's argument */
+void initNetworkPool(NetworkWiiMediator* self, NetworkPoolCallback callback, void* arg,
+                     const NetworkPoolConfig* config);
+/* untyped: caller-owned payload - the sink's argument */
+void initNetworkPoolTimed(NetworkWiiMediator* self, NetworkPoolCallback callback, void* arg,
+                          const NetworkPoolConfig* config, s32 timed);
+void stopNetworkPool(NetworkWiiMediator* self);
+void syncNetworkPoolTickets(NetworkWiiMediator* self);
+void deleteNetworkPoolTicket(NetworkWiiMediator* self, s32 itemId);
+void purchaseNetworkPoolItem(NetworkWiiMediator* self, s32 itemId);
+u8   isNetworkPoolConfigRead(NetworkWiiMediator* self);
+s32  isNetworkPoolShopAvailable(NetworkWiiMediator* self);
+s32  getNetworkPoolPointBalance(NetworkWiiMediator* self, struct NetworkErrorInfo* error);
+s32  isNetworkPoolPurchaseRestricted(NetworkWiiMediator* self);
+u8   isNetworkPoolRestrictionBypassed(NetworkWiiMediator* self, s32 kind);
+void launchNetworkPoolShopHelp(NetworkWiiMediator* self);
+void setNetworkPoolTransferTotal(NetworkWiiMediator* self, u64 total);
+void finishNetworkPoolTransfer(NetworkWiiMediator* self);
+void setNetworkPoolTransferOption(NetworkWiiMediator* self, s32 option, s32 value);
+void setNetworkPoolTransferMode(NetworkWiiMediator* self, s32 mode);
+void startNetworkPoolDownload(NetworkWiiMediator* self);
 
 /* The NAS login token and the user id/password paths the session state machine hands the opening
  * (`Network/network_state.cpp` passes the mediator singleton). */

@@ -21,10 +21,13 @@ extern "C" {
  * and sent to the community layer: only the bytes this unit reads or writes are named.  size: 0x100 */
 typedef struct NetUserProfile {
     /* +0x00 */ u16 id_0x00;
-    /* +0x02 */ u8 pad_0x02[0x3];
+    /* +0x02 */ u8 pad_0x02[0x2];
+    /* +0x04 */ u8 status_0x04;         /* copied into a peer card's last byte (GUESS name) */
     /* +0x05 */ u8 region_0x05;
-    /* +0x06 */ u8 pad_0x06[0x96];
-    /* +0x9C */ u8 record_0x9C[0x56];   /* the record handed to the mediator (0x80415FAC) */
+    /* +0x06 */ u8 pad_0x06[0xA];
+    /* +0x10 */ u8 equip_0x10[9][0xC];  /* nine `_EQUIP` records (`Pl/plw.h`) the peer card copies */
+    /* +0x7C */ u8 pad_0x7C[0x20];
+    /* +0x9C */ u8 record_0x9C[0x56];   /* the comment text handed to the mediator's filter (0x80415FAC) */
     /* +0xF2 */ u8 rank_0xF2;
     /* +0xF3 */ u8 level_0xF3;
     /* +0xF4 */ u8 settings_0xF4[4];
@@ -45,20 +48,50 @@ typedef struct NetStatusRecord {
     /* +0x04 */ NetStatusPair pairs_0x04[4];
 } NetStatusRecord; /* size: 0x24 */
 
-/* The community layer's state block (`.bss` 0x806E18A0, 0x26C B): community command 17 delivers it whole.  This
- * player's community profile sits at +0x28, a 0x44-byte block at +0x128 and four 0x40-byte member records at
- * +0x16C.  The static initialiser builds it with the NetworkCommunityPat band's constructor (0x803F0730).
- * size: 0x26C */
+/* The peer card `copyPeerProfileCard` fills from the community peer record (the menu units' hunter card): the name,
+ * the id text, the profile's id, rank and level bytes, its nine equipment records in card order, its comment, the
+ * three names, the server and settings bytes and two words.  Field names GUESSED from the source fields.
+ * size: 0x212 (approximation: the last byte written is +0x211) */
+typedef struct NetPeerCard {
+    /* +0x000 */ char name_0x000[0x14];
+    /* +0x014 */ char id_0x014[0xA];       /* `formatNetId` text */
+    /* +0x01E */ u16 id_0x01E;
+    /* +0x020 */ u8 level_0x020;
+    /* +0x021 */ u8 rank_0x021;
+    /* +0x022 */ u8 equip_0x022[9][0xC];  /* `_EQUIP` records */
+    /* +0x08E */ u8 pad_0x08E[0x10];
+    /* +0x09E */ char comment_0x09E[0xAC];
+    /* +0x14A */ char names_0x14A[3][0x40];
+    /* +0x20A */ u8 server_0x20A;
+    /* +0x20B */ u8 settings_0x20B[4];
+    /* +0x20F */ s8 value_0x20F;
+    /* +0x210 */ s8 value_0x210;
+    /* +0x211 */ u8 status_0x211;
+} NetPeerCard; /* size: 0x212 */
+
+/* The community layer's state block (`.bss` 0x806E18A0, 0x26C B): community command 17 delivers it whole.  It is
+ * the `NetworkCommunityPeer` record (`Network/NetworkCommunityPat.h`) viewed with this player's profile bytes typed
+ * (+0x28); the static initialiser 0x80437204 builds it with that record's constructor.  size: 0x26C */
 typedef struct NetCommunityState {
     /* +0x000 */ u8 pad_0x000[0x28];
     /* +0x028 */ NetUserProfile profile_0x028;
     /* +0x128 */ u8 block_0x128[0x44];
-    /* +0x16C */ u8 members_0x16C[4][0x40];
+    /* +0x16C */ u8 members_0x16C[3][0x40];   /* three names of at most 63 characters */
+    /* +0x22C */ u8 is_remote_0x22C;
+    /* +0x22D */ char title_0x22D[0x20];
+    /* +0x24D */ char name_0x24D[0x14];
+    /* +0x261 */ char tag_0x261[1];
+    /* +0x262 */ u8 pad_0x262[0x2];
+    /* +0x264 */ u32 value_0x264;
+    /* +0x268 */ u32 value_0x268;
 } NetCommunityState; /* size: 0x26C */
 
 extern NetUserProfile net_user_profile;
 extern NetStatusRecord net_presence_record;
 extern NetCommunityState net_community_state;
+/* 0x806E1B18 - the unique id the peer-profile and peer-message requests import their id text into (the static
+ * initialiser constructs it). */
+extern NetworkUniqueId net_peer_address;
 
 /* 0x80435F38 / 0x804360B0 / 0x804360C0 - the community state's profile, its +0x128 block and member record
  * `index`. */
@@ -76,6 +109,11 @@ void requestFriendSync(s8* result);
  * that already holds a server timeout it answers from the lobby state block instead.  NAME (a GUESS from the
  * body; the message pool's command 24 calls it). */
 void requestPeerProfileById(const char* id, s8* result, s8 mode, u8 index);
+/* 0x80435F48 - fills `out` from the community peer record (GUESS name). */
+void copyPeerProfileCard(NetPeerCard* out);
+/* 0x80436220 - sends `text` to the peer whose id text is `id` (mode 1 a friend message, else the community request
+ * +0x48) and parks `result` for the callback (GUESS name). */
+void sendPeerMessage(const char* id, const char* text, u8 mode, s8* result);
 
 /* 0x804362E0..0x8043656C - the friend roster and the recent-player list: membership, append and remove. */
 s32 isRosterMember(const NetworkUniqueId* address);
