@@ -26,7 +26,7 @@
  * `DWCi_NatNegStartSession` takes SIX arguments - the game socket is `r3` and the Network caller reaches it
  * through `gt2GetSocketSOCKET`'s result - which the old 5-argument declaration hid.  The shared
  * `.bss`/`.sbss`/`.sdata` objects were renamed from what the code stores there
- * (`DWCi_natNegNatType`/`MappingScheme` are the words the report carries, `DWCi_natNegGameName` the
+ * (`DWCi_natNegNatType`/`MappingScheme` are the words the report carries, `DWCi_availableNames.gameName` the
  * `%s.%s` prefix and the report's game name).
  *
  * FLAGS.  `cflags_base` without the lib's `-func_align 4` (see `configure.py`): the 16-byte function
@@ -125,7 +125,7 @@ typedef struct DWCiNatNegSocket {
     /* +0x14 */ u32 initAck[4];     /* set when the server answered the probe of that port class */
     /* +0x24 */ s32 retryCount;
     /* +0x28 */ s32 retryLimit;
-    /* +0x2C */ u32 deadline;       /* DWCi_getTick() value the current step times out at */
+    /* +0x2C */ u32 deadline;       /* current_time() value the current step times out at */
     /* +0x30 */ u32 peerAddr;
     /* +0x34 */ u16 peerPort;
     /* +0x36 */ u8 gotYourData;     /* the peer's ping reached us */
@@ -376,7 +376,7 @@ u32 DWCi_natNegPollReplies(s32 sock, struct DWCiNatNegSession* session) {
                         ip = entry->addr;
                         if (ip != (u32)loopback) {
                             addr = ip;
-                            if (DWCi_hostAddressIsUsable(entry) != 0) {
+                            if (DWCi_hostAddressIsPrivate(entry) != 0) {
                                 break;
                             }
                         }
@@ -470,7 +470,7 @@ u32 DWCi_natNegDetermineNatType(struct DWCiNatNegSession* session) {
 /* 0x80512C50 (0x34): destroy the negotiator's socket list and clear its head. */
 void DWCi_NatNegCleanup(void) {
     if (DWCi_natNegSocketList != 0) {
-        DWCi_listDestroy(DWCi_natNegSocketList);
+        ArrayFree(DWCi_natNegSocketList);
         DWCi_natNegSocketList = 0;
     }
 }
@@ -482,8 +482,8 @@ static inline DWCiNatNegSocket* DWCi_natNegFindByToken(s32 token) {
     if (DWCi_natNegSocketList == 0) {
         return 0;
     }
-    for (i = 0; i < (s32)DWCi_listCount(DWCi_natNegSocketList); i++) {
-        DWCiNatNegSocket* it = (DWCiNatNegSocket*)DWCi_listItem(DWCi_natNegSocketList, i);
+    for (i = 0; i < (s32)ArrayLength(DWCi_natNegSocketList); i++) {
+        DWCiNatNegSocket* it = (DWCiNatNegSocket*)ArrayNth(DWCi_natNegSocketList, i);
         if (it->token == token) {
             return it;
         }
@@ -528,8 +528,8 @@ static inline void DWCi_natNegSendReport(DWCiNatNegSocket* node) {
     pkt.body.report.negResult = (node->result == 0);
     pkt.body.report.natType = DWCi_natNegNatType;
     pkt.body.report.mappingScheme = DWCi_natNegMappingScheme;
-    if (strlen(DWCi_natNegGameName) != 0) {
-        memcpy(pkt.body.report.gameName, DWCi_natNegGameName, 50);
+    if (strlen(DWCi_availableNames.gameName) != 0) {
+        memcpy(pkt.body.report.gameName, DWCi_availableNames.gameName, 50);
     }
     addr = DWCi_natNegServerAddr0;
     SOAddressToString(&addr);
@@ -552,7 +552,7 @@ void DWCi_natNegSetSocket(DWCiNatNegSocket* rec, u32 result, u32 resultArg, DWCi
     } else {
         DWCi_natNegSendReport(rec);
         rec->state = 5;
-        rec->deadline = DWCi_getTick() + 1000;
+        rec->deadline = current_time() + 1000;
         rec->retryCount = 0;
         rec->retryLimit = 5;
     }
@@ -596,7 +596,7 @@ void DWCi_natNegSendInit(DWCiNatNegSocket* node) {
                 a = entry->addr;
                 if (a != (u32)DWCi_peerTokenFromSocket(0x7F000001)) {
                     ip = a;
-                    if (DWCi_hostAddressIsUsable(entry) != 0) {
+                    if (DWCi_hostAddressIsPrivate(entry) != 0) {
                         break;
                     }
                 }
@@ -614,8 +614,8 @@ void DWCi_natNegSendInit(DWCiNatNegSocket* node) {
     pkt.body.wireInit.localAddr[3] = wire;
     pkt.body.wireInit.localPort[0] = 0;
     pkt.body.wireInit.localPort[1] = 0;
-    strcpy(pkt.body.wireInit.gameName, DWCi_natNegGameName);
-    len = strlen(DWCi_natNegGameName) + 22;
+    strcpy(pkt.body.wireInit.gameName, DWCi_availableNames.gameName);
+    len = strlen(DWCi_availableNames.gameName) + 22;
     if (pkt.body.wireInit.useGamePort != 0 && node->initAck[0] == 0) {
         DWCiSockAddrIn sa;
         s32 dstSock;
@@ -690,7 +690,7 @@ void DWCi_natNegSendInit(DWCiNatNegSocket* node) {
         sa.addr = dst;
         DWCi_socketSendTo(dstSock, p, len, 0, &sa, 8);
     }
-    node->deadline = DWCi_getTick() + 500;
+    node->deadline = current_time() + 500;
     node->retryLimit = 10;
 }
 
@@ -706,7 +706,7 @@ u32 DWCi_natNegTickIdleSockets(s32 sock) {
 
     ok = 1;
     if (sock != -1) {
-        ok = ((u32)(DWCi_getTick() - DWCi_natNegLastPollTick) < 10000)
+        ok = ((u32)(current_time() - DWCi_natNegLastPollTick) < 10000)
                  ? DWCi_natNegPollRepliesOnce(sock, (struct DWCiNatNegSession*)DWCi_natNegSession)
                  : 0;
         if (ok == 0) {
@@ -758,7 +758,7 @@ s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallbac
         name = DWCi_natNegServerName0;
         fallback = hostNames[0];
         if (name == 0) {
-            snprintf(hostBuf0, 64, DWCi_natNegHostFormat, DWCi_natNegGameName, fallback);
+            snprintf(hostBuf0, 64, DWCi_natNegHostFormat, DWCi_availableNames.gameName, fallback);
             name = hostBuf0;
         }
         addr = DWCi_socketResolveAddress(name);
@@ -776,7 +776,7 @@ s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallbac
         name = DWCi_natNegServerName1;
         fallback = hostNames[1];
         if (name == 0) {
-            snprintf(hostBuf1, 64, DWCi_natNegHostFormat, DWCi_natNegGameName, fallback);
+            snprintf(hostBuf1, 64, DWCi_natNegHostFormat, DWCi_availableNames.gameName, fallback);
             name = hostBuf1;
         }
         addr = DWCi_socketResolveAddress(name);
@@ -794,7 +794,7 @@ s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallbac
         name = DWCi_natNegServerName2;
         fallback = hostNames[2];
         if (name == 0) {
-            snprintf(hostBuf2, 64, DWCi_natNegHostFormat, DWCi_natNegGameName, fallback);
+            snprintf(hostBuf2, 64, DWCi_natNegHostFormat, DWCi_availableNames.gameName, fallback);
             name = hostBuf2;
         }
         addr = DWCi_socketResolveAddress(name);
@@ -814,10 +814,10 @@ s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallbac
     }
     memset(&rec, 0, 84);
     if (DWCi_natNegSocketList == 0) {
-        DWCi_natNegSocketList = DWCi_listCreate(84, 4, 0);
+        DWCi_natNegSocketList = ArrayNew(84, 4, 0);
     }
-    DWCi_listAppend(DWCi_natNegSocketList, &rec);
-    node = (DWCiNatNegSocket*)DWCi_listItem(DWCi_natNegSocketList, DWCi_listCount(DWCi_natNegSocketList) - 1);
+    ArrayAppend(DWCi_natNegSocketList, &rec);
+    node = (DWCiNatNegSocket*)ArrayNth(DWCi_natNegSocketList, ArrayLength(DWCi_natNegSocketList) - 1);
     if (node == 0) {
         return 1;
     }
@@ -836,9 +836,9 @@ s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallbac
     node->retryLimit = 0;
     node->result = 5;
     if (node->fd == -1) {
-        for (i = 0; i < (s32)DWCi_listCount(DWCi_natNegSocketList); i++) {
-            if (node == (DWCiNatNegSocket*)DWCi_listItem(DWCi_natNegSocketList, i)) {
-                DWCi_listDeleteAt(DWCi_natNegSocketList, i);
+        for (i = 0; i < (s32)ArrayLength(DWCi_natNegSocketList); i++) {
+            if (node == (DWCiNatNegSocket*)ArrayNth(DWCi_natNegSocketList, i)) {
+                ArrayRemoveAt(DWCi_natNegSocketList, i);
                 break;
             }
         }
@@ -870,7 +870,7 @@ static inline void DWCi_natNegSendPing(DWCiNatNegSocket* node) {
     addr = node->peerAddr;
     SOAddressToString(&addr);
     DWCi_natNegSendTo((node->gameFd != -1) ? node->gameFd : node->fd, &pkt, 20, node->peerAddr, node->peerPort);
-    node->deadline = DWCi_getTick() + 700;
+    node->deadline = current_time() + 700;
     node->retryLimit = 7;
     if (node->gotYourData != 0) {
         node->finished = 1;
@@ -896,9 +896,9 @@ void DWCi_natNegTickSocket(DWCiNatNegSocket* node) {
         return;
     }
     if (node->state == 4) {
-        for (i = 0; i < (s32)DWCi_listCount(DWCi_natNegSocketList); i++) {
-            if (node == (DWCiNatNegSocket*)DWCi_listItem(DWCi_natNegSocketList, i)) {
-                DWCi_listDeleteAt(DWCi_natNegSocketList, i);
+        for (i = 0; i < (s32)ArrayLength(DWCi_natNegSocketList); i++) {
+            if (node == (DWCiNatNegSocket*)ArrayNth(DWCi_natNegSocketList, i)) {
+                ArrayRemoveAt(DWCi_natNegSocketList, i);
                 return;
             }
         }
@@ -915,7 +915,7 @@ void DWCi_natNegTickSocket(DWCiNatNegSocket* node) {
         }
     }
     if (node->state == 0 || node->state == 2) {
-        if (DWCi_getTick() > node->deadline) {
+        if (current_time() > node->deadline) {
             if (node->retryCount > node->retryLimit) {
                 if (node->state == 0) {
                     DWCi_natNegSetSocket(node, 2, -1, 0);
@@ -933,7 +933,7 @@ void DWCi_natNegTickSocket(DWCiNatNegSocket* node) {
         }
     }
     if (node->state == 3) {
-        if (DWCi_getTick() > node->deadline) {
+        if (current_time() > node->deadline) {
             DWCiSockAddrIn sa;
 
             sa.family = 2;
@@ -947,12 +947,12 @@ void DWCi_natNegTickSocket(DWCiNatNegSocket* node) {
         }
     }
     if (node->state == 1) {
-        if (DWCi_getTick() > node->deadline) {
+        if (current_time() > node->deadline) {
             DWCi_natNegSetSocket(node, 1, -1, 0);
         }
     }
     if (node->state == 5) {
-        if (DWCi_getTick() > node->deadline) {
+        if (current_time() > node->deadline) {
             if (node->retryCount > node->retryLimit) {
                 node->completeCb(node->result, node->resultArg, &node->resultAddr, node->userData);
                 if (node->gameFd == -1) {
@@ -962,7 +962,7 @@ void DWCi_natNegTickSocket(DWCiNatNegSocket* node) {
             } else {
                 DWCi_natNegSendReport(node);
                 node->retryCount++;
-                node->deadline = DWCi_getTick() + 1000;
+                node->deadline = current_time() + 1000;
             }
         }
     }
@@ -972,11 +972,11 @@ void DWCi_natNegTickSocket(DWCiNatNegSocket* node) {
 void DWCi_NatNegProcess(void) {
     s32 i;
 
-    if (DWCi_natNegSocketList == 0 || DWCi_listCount(DWCi_natNegSocketList) == 0) {
+    if (DWCi_natNegSocketList == 0 || ArrayLength(DWCi_natNegSocketList) == 0) {
         DWCi_natNegTickSocket(0);
     } else {
-        for (i = (s32)DWCi_listCount(DWCi_natNegSocketList) - 1; i >= 0; i--) {
-            DWCi_natNegTickSocket((DWCiNatNegSocket*)DWCi_listItem(DWCi_natNegSocketList, i));
+        for (i = (s32)ArrayLength(DWCi_natNegSocketList) - 1; i >= 0; i--) {
+            DWCi_natNegTickSocket((DWCiNatNegSocket*)ArrayNth(DWCi_natNegSocketList, i));
         }
     }
 }
@@ -1040,7 +1040,7 @@ void DWCi_natNegOnConnectPing(DWCiNatNegSocket* node, DWCiNatNegPacket* msg, DWC
                 DWCi_natNegSendPing(node);
             }
             node->state = 3;
-            node->deadline = DWCi_getTick() + 5000;
+            node->deadline = current_time() + 5000;
         } else if (msg->body.connect.finished == 0) {
             DWCi_natNegSendPing(node);
         }
@@ -1058,7 +1058,7 @@ void DWCi_natNegOnReply(DWCiNatNegSocket* node, DWCiNatNegPacket* msg, DWCiNatNe
             if (node->state == 0 && node->initAck[1] != 0 && node->initAck[2] != 0 && node->initAck[3] != 0
                 && (node->gameFd == -1 || node->initAck[0] != 0)) {
                 node->state = 1;
-                node->deadline = DWCi_getTick() + 60000;
+                node->deadline = current_time() + 60000;
                 node->progressCb(node->state, node->userData);
             }
         }

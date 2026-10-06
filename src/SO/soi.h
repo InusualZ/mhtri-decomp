@@ -78,6 +78,24 @@ typedef struct SOSockAddrIn {
     /* +0x4 */ u32 addr;
 } SOSockAddrIn;
 
+/* One IPv4 address word of a resolver answer. size: 0x4 */
+typedef struct SOInAddr {
+    /* +0x0 */ u32 addr;
+} SOInAddr;
+
+/* The resolver answer `SOGetHostByName` returns (a `hostent`): name, aliases, address type, address length
+ * and the NULL-terminated address list. size: 0x10 */
+typedef struct SOHostEnt {
+    /* +0x00 */ char* name;
+    /* +0x04 */ char** aliases;
+    /* +0x08 */ s16 addrType;
+    /* +0x0A */ s16 length;
+    /* +0x0C */ SOInAddr** hosts;
+} SOHostEnt;
+
+/* 0x80520BCC - resolves a host name (NULL when it cannot be resolved). */
+SOHostEnt* SOGetHostByName(const char* name);
+
 /* The poll record `SOPoll` takes (`NetworkSocketWii::pollConnect` stores fd/events/revents with `stw` at
  * +0/+4/+8 and reads revents back). size: 0xC */
 typedef struct SOPollFD {

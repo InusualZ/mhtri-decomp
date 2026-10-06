@@ -17,6 +17,9 @@ extern "C" {
  * message and the range's own "NCDGetCurrentIfConfig" string. */
 s32 NCDGetCurrentIfConfig(u8* config);
 
+/* 0x8051D248 - copies the wireless MAC address (6 bytes) into `address`. GUESS on the name. */
+void NCDGetWirelessMacAddress(u8* address);
+
 /* 0x8051C64C - fill the caller's NCD IP configuration block; negative on failure (`NHTTPi_Startup`
  * passes its own system-info block and panics on a negative answer). */
 /* untyped: caller-owned payload */

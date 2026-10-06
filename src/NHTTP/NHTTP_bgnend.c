@@ -25,7 +25,7 @@
  * the one `.rodata` code table the bodies address belong to dtk's auto data runs, so they are
  * declared `extern` in `unsplit/NHTTP.h` and never defined here; playbook 29/58).
  *
- * FLAGS.  `cflags_nhttp` (`Wii/1.3`, `-func_align 4`, copied from `cflags_dwc`/`cflags_os`) - the
+ * FLAGS.  `cflags_nhttp` (GC/3.0a5.2, `-func_align 4`, copied from `cflags_dwc`/`cflags_os`) - the
  * 4-byte packing above is the evidence for the alignment; nothing else is tuned.
  *
  * NAMING (rule 7).  Six names were derived from their bodies (each a GUESS - the runtime dump answers

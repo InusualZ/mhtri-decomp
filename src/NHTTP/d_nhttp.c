@@ -10,7 +10,7 @@
  * `d_nhttp.c` (`NHTTPSetSystemProxy` panics with it, `.data:0x80630F04`).  One TU: the `.data` literals
  * appear in address order of their first use, from `createRequestObject` to `InitConnectionList`.
  *
- * FLAGS.  `cflags_nhttp` plus the unit's own `#pragma inline_max_size(8)` (below).
+ * FLAGS.  GC/3.0a5.2 with `cflags_nhttp` plus the unit's own `#pragma inline_max_size(8)` (below).
  *
  * BODY (sixth pass).  All 108 functions are written: 48 are byte-identical, 102 are >= 80 %,
  * the unit is 93.56 % fuzzy (13.84 % before this pass).  This pass wrote the request/response object
@@ -86,12 +86,13 @@
  * so those bytes exist only in the target.  `-str reuse` also gives one symbol per literal where retail pools
  * several behind one base.
  *
- * Residuals (fuzzy, per function; the unit is 93.56 %):
+ * Residuals (fuzzy, per function; built with GC/3.0a5.2, the lib's compiler since docs/network.md "SDK library
+ * compilers"; some of the numbers below were taken under Wii/1.3):
  *   - `NHTTPi_Base64Encode` 48.8: retail divides by 3 with `li r0,3`/`divwu` and `groups * 3` with `mulli`
  *     (no reciprocal multiply, no shift-subtract) and schedules the two unrolled loops differently; no
  *     spelling of the division (`u32`, `3U`, a local, `opt size`, levels 2/3, peephole off) reproduces it.
  *   - `NHTTPi_urlEncodedLength` 59.64 / `NHTTPi_strtonum` 72.78 / `NHTTPi_containsString` 73.49 /
- *     `NHTTPi_strToHex` 81.16 / `NHTTPi_strnicmp` 86.37 / `NHTTPi_compareToken` 94.22 /
+ *     `NHTTPi_strnicmp` 86.37 / `NHTTPi_compareToken` 94.22 /
  *     `NHTTPi_encodeUrlChar` 93.38: as recorded by the earlier passes - retail keeps a value in a
  *     callee-saved register (a frame ours does not need), a redundant terminator re-test in `strnicmp`,
  *     and merges two ranges in `urlEncodedLength` that the constant-left spelling would fuse.
@@ -314,12 +315,14 @@ void NHTTP_DestroyResponse(NHTTPMutexInfo* mutex, NHTTPResponse* response) {
 /* Find header field `name` in the response head: answers the length of its value (-1 when there is
  * no such field, 0 for an empty one) and puts the value's start offset in `*offset`. */
 s32 NHTTPi_findHeaderField(NHTTPRecvBuf* ring, const char* name, s32* offset) {
-    s32 flag = 0;
     s32 colon;
+    s32 flag = 0;
     s32 valueEnd;
     s32 valueStart;
+    s32 line;
     s32 next;
-    s32 line = NHTTPi_RecvBufFindLine(ring, 12, ring->capacity, &colon, &flag);
+
+    line = NHTTPi_RecvBufFindLine(ring, 12, ring->capacity, &colon, &flag);
 
     while (line > 0) {
         next = NHTTPi_RecvBufFindLine(ring, line, ring->capacity, &colon, &flag);
@@ -765,15 +768,17 @@ s32 NHTTPi_encodeUrlChar(u8* dst, char c) {
  * no hex digit, when a character is neither a hex digit, a space nor the end, and when eight
  * characters would carry the value into the sign bit. */
 s32 NHTTPi_strToHex(const char* s, s32 n) {
-    s32 value = 0;
-    BOOL seen = FALSE;
+    s32 value;
+    BOOL seen;
 
     if (n > 8) {
         return -1;
     }
-    if ((n == 8) & (*s >= '8')) {
+    if ((n == 8) & (*s > '7')) {
         return -1;
     }
+    value = 0;
+    seen = FALSE;
     for (; n > 0; n--) {
         char c = NHTTPi_toLower(*s);
 

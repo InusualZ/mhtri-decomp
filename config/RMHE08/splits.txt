@@ -2544,6 +2544,7 @@ DWCi/dwc_nasfunc.cpp:
 
 DWCi/fn_805113B0.c:
 	.text       start:0x805113B0 end:0x80512490
+	.data       start:0x806308A8 end:0x806308E8
 	.sdata      start:0x80794358 end:0x80794368
 	.sbss       start:0x80795820 end:0x80795828
 

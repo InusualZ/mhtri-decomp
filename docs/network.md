@@ -190,6 +190,30 @@ bullet per row (function `match_percent` over the same source, flag against flag
 * **`network_shared_data`**: data only (`.sdata2` 0x8079C690-0x8079C758, `.sdata` 0x80793900-0x80793930), no code
   and no flag; the model is `Pl/pl_frame_data.cpp` (playbook 23/53 route 2, playbook 54).
 
+## SDK library compilers
+
+The NWC24, NHTTP, SSL, NCD and SO libraries carry the RVL SDK build string `0x4199_60831`, the build of
+`GC/3.0a5.2` (the compiler survey over 96 units / 13 compilers ranked it first for these libraries); DWCi carries the
+DWC build `0x4302_145` and stays on `Wii/1.3`. The libraries keep their flags (`-O4,p -inline auto`, `-func_align 4`).
+Measured with each lib's own cflags, same sources, whole report compared row by row:
+
+| lib | units | Wii/1.3 | GC/3.0a5.2 | rows better / worse |
+| --- | --- | --- | --- | --- |
+| NWC24 | `nwc24_io`, `nwc24_msg` | 80.69 % / 89.96 %, 18 rows at 100 | 81.54 % / 91.28 %, 21 rows at 100 | 5 / 0 |
+| NHTTP | `NHTTP_bgnend`, `NHTTP_os_RVL`, `d_nhttp` | 97.62 % / 63.09 % / 93.56 % | 98.27 % / 63.09 % / 97.00 % | 42 / 0 |
+
+Under GC/3.0a5.2 two `d_nhttp` rows first came out lower (`NHTTPi_findHeaderField` 95.08 -> 94.81,
+`NHTTPi_strToHex` 81.16 -> 79.71); the source shapes the GC compiler wants fix both: `strToHex` tests the first digit
+as `*s > '7'` and initialises its accumulator after the range checks (100.00), `findHeaderField` declares `colon`
+before `flag` and `line` before `next` (95.39).
+
+DWCi function packing: the retail `dwc_error`, `DWCi_Np_CPUCopyFast` and `dwc_nasfunc` objects start every function on
+16 bytes (`gap_*` words between them). Measured `cflags_base` (`-func_align 16`) against the lib's `cflags_dwc`
+(`-func_align 4`): `dwc_error` and `DWCi_Np_CPUCopyFast` move no row (0 better / 0 worse; `dwc_error`'s `.text` is
+then 2168 of 2176 B, the rest the object's tail pad), so both take `cflags_base`; `dwc_nasfunc` scores 2 rows
+better (`gti2CheckResponse` 98.00 -> 100, `DWCi_socketLookupHost` 83.74 -> 84.54) and 1 worse (`DWC_SVLProcess`
+78.69 -> 77.28, its member-wise copy loop gains an alignment `nop`), so it stays on `cflags_dwc`.
+
 ## Folds and recuts
 
 Earlier unit names cited by the playbook and the notes, and where their ranges live now.
