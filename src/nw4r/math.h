@@ -22,6 +22,12 @@
 namespace nw4r {
 namespace math {
 
+/* size: 0x8 */
+struct VEC2 {
+    /* +0x0 */ f32 x;
+    /* +0x4 */ f32 y;
+};
+
 /* size: 0xC */
 struct VEC3 {
     /* +0x0 */ f32 x;

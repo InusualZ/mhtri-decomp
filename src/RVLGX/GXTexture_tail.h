@@ -54,6 +54,24 @@ void GXInitTexObjLOD(GXTexObj* obj, u32 minFilt, u32 magFilt, f32 minLod, f32 ma
                      u8 doEdgeLod, u32 maxAniso);
 void GXInitTlutObj(GXTlutObj* obj, void* lut, u32 format, u16 numEntries); /* untyped: byte range */
 void GXCallDisplayList(const void* list, u32 size); /* untyped: byte range */
+/* 0x804B8720 - loads a texture object into texture slot `id`. */
+void GXLoadTexObj(GXTexObj* obj, u32 id);
+/* The fog, blend and TEV setters the nw4r character writer drives. */
+void GXSetFog(u32 type, f32 startz, f32 endz, f32 nearz, f32 farz, GXColor color);
+void GXSetTevSwapModeTable(u32 table, u32 red, u32 green, u32 blue, u32 alpha);
+void GXSetZTexture(u32 op, u32 fmt, u32 bias);
+void GXSetNumIndStages(u8 nIndStages);
+void GXSetBlendMode(u32 type, u32 srcFactor, u32 dstFactor, u32 op);
+void GXSetNumTevStages(u8 nStages);
+void GXSetTevDirect(u32 stage);
+void GXSetTevSwapMode(u32 stage, u32 rasSel, u32 texSel);
+void GXSetTevOrder(u32 stage, u32 coord, u32 map, u32 color);
+void GXSetTevColorIn(u32 stage, u32 a, u32 b, u32 c, u32 d);
+void GXSetTevAlphaIn(u32 stage, u32 a, u32 b, u32 c, u32 d);
+void GXSetTevColorOp(u32 stage, u32 op, u32 bias, u32 scale, u8 clamp, u32 outReg);
+void GXSetTevAlphaOp(u32 stage, u32 op, u32 bias, u32 scale, u8 clamp, u32 outReg);
+void GXSetTevOp(u32 stage, u32 mode);
+void GXSetTevColor(u32 reg, GXColor color);
 
 #ifdef __cplusplus
 }

@@ -14,13 +14,15 @@
  *   (MEMInitList) .. List_GetNth (fn_80501C9C), detail::LinkListImpl (fn_80501CE8..fn_80501DF8),
  *   IsValidBinaryFile (fn_80501E24), CharStrmReader::ReadNextChar* (fn_80501E98..fn_80501F48), LC::Enable ..
  *   LC::StoreData (fn_80502678..fn_8050280C, the tail calls in the SDK's LCLoadBlocks/LCLoadData/LCStoreBlocks/
- *   LCStoreData order).  `mtx34_rotate_vec3` keeps the map's C name for nw4r's VEC3TransformNormal.
- * RESIDUALS. Unwritten: ut_TagProcessorBase (0x80501FA8-0x80502678, 8 functions: they need TextWriterBase from
- *   nw4r/fn_80502828.cpp) and the static initialiser 0x80502810 (written as sLCImpl's constructor; the compiler names
- *   it `__sinit_\fn_805012C4_cpp`, which the map cannot carry).
+ *   LCStoreData order), TagProcessorBase<char>/<wchar_t>'s constructor, destructor, Process and CalcRect
+ *   (fn_80501FA8..fn_80502490, the map carrying the template manglings).  `mtx34_rotate_vec3` keeps the map's C name
+ *   for nw4r's VEC3TransformNormal.
+ * RESIDUALS. The static initialiser 0x80502810 is written as sLCImpl's constructor; the compiler names it
+ *   `__sinit_\fn_805012C4_cpp`, which the map cannot carry.
  * RESIDUALS. MTX34RotXYZFIdx 90.9 % (retail keeps the circle pair's address in r0 and schedules the
  *   table `lis` first); AABB::Set 89.4 % (row maxima colour f1/f3 where retail has f2/f3); Frustum::IntersectAABB_Ex
- *   98.7 % (VEC3Dot's register colouring); List_Remove 97.2 % (r5/r6 swap).
+ *   98.7 % (VEC3Dot's register colouring); List_Remove 97.2 % (r5/r6 swap); TagProcessorBase::CalcRect 98.3 % (the
+ *   inlined Rect::Normalize colours f2-f7 where retail has f1/f3/f4; 100 % under `-ipa file`, docs/nw4r.md).
  * SHAPES. The paired-single bodies are C with one inline-asm block over `register` locals; GetChar/StepStrm pun
  *   mCharStrm through a reference so each access reloads it; LinkListImpl's destructor calls Erase(begin, end) (nw4r
  *   calls Clear, which this compiler cannot inline from below); Lock tests `isEnabled` true-first.
@@ -28,6 +30,7 @@
 
 #include "nw4r/math.h"
 #include "nw4r/fn_805012C4.h"
+#include "nw4r/TextWriterBase.h"
 #include "NAND/nand.h"
 #include "NAND/LCEnable.h"
 #include "NAND/OSVReport.h"
@@ -866,6 +869,66 @@ u16 CharStrmReader::ReadNextCharSJIS() {
     }
     return code;
 }
+
+/* ---------------------------------------------------------------------------------------------------------------
+ * ut_TagProcessorBase
+ * ------------------------------------------------------------------------------------------------------------ */
+
+
+#pragma defer_codegen on
+
+/* Makes a tag processor. */
+template <typename T> TagProcessorBase<T>::TagProcessorBase() {}
+
+/* Destroys a tag processor. */
+template <typename T> TagProcessorBase<T>::~TagProcessorBase() {}
+
+/* Acts on a line feed or a tab like Process and returns the rectangle the cursor moved through. */
+template <typename T> Operation TagProcessorBase<T>::CalcRect(Rect* rect, u16 code, PrintContext<T>* context) {
+    switch (code) {
+    case '\n': {
+        TextWriterBase<T>& writer = *context->writer;
+
+        rect->right = writer.GetCursorX();
+        rect->top = writer.GetCursorY();
+        ProcessLinefeed(context);
+        rect->left = writer.GetCursorX();
+        rect->bottom = writer.GetCursorY() + context->writer->GetFontHeight();
+        rect->Normalize();
+        return OPERATION_NEXT_LINE;
+    }
+    case '\t': {
+        TextWriterBase<T>& writer = *context->writer;
+
+        rect->left = writer.GetCursorX();
+        ProcessTab(context);
+        rect->right = writer.GetCursorX();
+        rect->top = writer.GetCursorY();
+        rect->bottom = rect->top + writer.GetFontHeight();
+        rect->Normalize();
+        return OPERATION_NO_CHAR_SPACE;
+    }
+    default:
+        return OPERATION_DEFAULT;
+    }
+}
+
+/* Acts on a line feed or a tab; anything else is left to the writer. */
+template <typename T> Operation TagProcessorBase<T>::Process(u16 code, PrintContext<T>* context) {
+    switch (code) {
+    case '\n':
+        ProcessLinefeed(context);
+        return OPERATION_NEXT_LINE;
+    case '\t':
+        ProcessTab(context);
+        return OPERATION_NO_CHAR_SPACE;
+    default:
+        return OPERATION_DEFAULT;
+    }
+}
+
+template class TagProcessorBase<char>;
+template class TagProcessorBase<wchar_t>;
 
 /* ---------------------------------------------------------------------------------------------------------------
  * ut_LockedCache
