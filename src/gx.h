@@ -62,4 +62,43 @@ typedef enum _GXTevKColorID {
     GX_KCOLOR0, GX_KCOLOR1, GX_KCOLOR2, GX_KCOLOR3
 } _GXTevKColorID;
 
+/* The SDK's opaque texture and TLUT objects (the nw4r material blocks embed them). size: 0x20 */
+typedef struct _GXTexObj {
+    u32 dummy[8]; /* +0x0 */
+} GXTexObj;
+
+/* size: 0xC */
+typedef struct _GXTlutObj {
+    u32 dummy[3]; /* +0x0 */
+} GXTlutObj;
+
+/* The selectors the nw4r g3d material accessors take (their manglings encode the names). */
+typedef enum _GXTexMapID {
+    GX_TEXMAP0, GX_TEXMAP1, GX_TEXMAP2, GX_TEXMAP3, GX_TEXMAP4, GX_TEXMAP5, GX_TEXMAP6, GX_TEXMAP7
+} _GXTexMapID;
+
+typedef enum _GXTlut {
+    GX_TLUT0, GX_TLUT1, GX_TLUT2, GX_TLUT3, GX_TLUT4, GX_TLUT5, GX_TLUT6, GX_TLUT7
+} _GXTlut;
+
+typedef enum _GXIndTexMtxID {
+    GX_ITM_OFF, GX_ITM_0, GX_ITM_1, GX_ITM_2
+} _GXIndTexMtxID;
+
+typedef enum _GXTevRegID {
+    GX_TEVPREV, GX_TEVREG0, GX_TEVREG1, GX_TEVREG2
+} _GXTevRegID;
+
+typedef enum _GXCompare {
+    GX_NEVER, GX_LESS, GX_EQUAL, GX_LEQUAL, GX_GREATER, GX_NEQUAL, GX_GEQUAL, GX_ALWAYS
+} _GXCompare;
+
+typedef enum _GXAlphaOp {
+    GX_AOP_AND, GX_AOP_OR, GX_AOP_XOR, GX_AOP_XNOR
+} _GXAlphaOp;
+
+typedef enum _GXCullMode {
+    GX_CULL_NONE, GX_CULL_FRONT, GX_CULL_BACK, GX_CULL_ALL
+} _GXCullMode;
+
 #endif /* MHTRI_GX_H */

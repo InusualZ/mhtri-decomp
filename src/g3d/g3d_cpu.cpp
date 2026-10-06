@@ -1,21 +1,20 @@
-/*
- * g3d/g3d_cpu.cpp - nw4r g3d CPU-side display-list primitives: a 32-byte block copy and a 0.0f block fill.
- * RANGE. .text 0x8009A748-0x8009AA78 (2 functions); extab, extabindex, .data 0x80591860-0x80591900 (opens on
- *   "g3d_cpu.cpp"), .sdata2 0x80795F50-0x80795F58.  The right edge is `gx/fn_8009AA78.c`.
+/* g3d/g3d_cpu - nw4r g3d CPU-side display-list primitives: a 32-byte block copy and a 0.0f block fill.
+ * RANGE. .text 0x8009A748-0x8009AA78 (2 functions); extab, extabindex, .data 0x80591860-0x80591900 (the file name and
+ *   three assert messages), .sdata2 0x80795F50-0x80795F58 (0.0f).
+ * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` keeps the unfused `clrlwi`+`cmpwi` alignment tests,
+ *   `#pragma pool_data off` gives every string its own `lis`/`addi` as retail does.
  * NAMES. Map stems (the dump answers `zz_` placeholders).
  * RESIDUALS. fn_8009A910: the 36 stores of both loops differ in opcode alone - retail stores the f32 fill as a
- *   paired single (`psq_st f0,off,0,qr0`), while every compiler under `build/compilers`, with either fill type and
- *   every flag tried, emits `stfd` (or two `stfs`); the body kept is the f64 block copy filled from the pooled 0.0f.
- *   flipcheck: `.data` and `.sdata2` are claimed and not emitted.
+ *   paired single (`psq_st f0,off,0,qr0`, no `ps_merge`), while every compiler under `build/compilers` emits `stfd`
+ *   (and `__vec2x32float__` emits `ps_merge00` plus indexed `psq_stx`); the body kept is the f64 block fill.
+ * SHAPES. the strings are literals in first-use order; the three asserts pass retail's line numbers explicitly.
  */
 
 #include "types.h"
 #include "g3d/g3d_cpu.h"
 
-/* The target was built with the peephole pass **off**: it keeps the unfused `clrlwi`+`cmpwi` pair for
- * every alignment test where the lib's `-O3` folds them into one record form (`clrlwi.`).  Same lever
- * as the neighbouring gx/fn_8009AA78.c (its own header records it); the pragma scopes it to this unit. */
 #pragma peephole off
+#pragma pool_data off
 
 /* `Panic(const char* pFile, int line, const char* pFmt, ...)` - the trailing `e` in the map's mangling
  * is MWCC's vararg marker.  Declared in the namespace (C++ linkage), never as the mangled spelling
@@ -28,27 +27,18 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 } // namespace db
 } // namespace nw4r
 
-/* The panic file/format strings the target references as map symbols (this unit's `.data`, claimed, not emitted). */
-extern char lbl_80591860[]; /* "g3d_cpu.cpp"                                        .data 0x80591860 */
-extern char lbl_8059186C[]; /* "NW4R:Failed assertion pDst && !((u32)pDst & 0x3)"  .data 0x8059186C */
-extern char lbl_805918A0[]; /* "NW4R:Failed assertion pSrc && !((u32)pSrc & 0x3)"  .data 0x805918A0 */
-extern char lbl_805918D4[]; /* "NW4R:Failed assertion size % 32 == 0"              .data 0x805918D4 */
-
-/* The pooled fill value the fill body loads with `lfs lbl_80795F50@sda21`. */
-extern f32 lbl_80795F50; /* 0.0f  .sdata2 0x80795F50 */
-
 /* `NW4R_ASSERT(expr)`: the file is the TU's own name, the message is the literalised expression and the
  * line is baked into the `Panic(file, line, msg)` call - the target passes the original file's line
  * numbers (28/29/30 and 94/95), not this reconstruction's, so they are explicit. */
 #define G3D_CPU_ASSERT(expr, line, msg) \
-    ((expr) ? (void)0 : nw4r::db::Panic(lbl_80591860, line, msg))
+    ((expr) ? (void)0 : nw4r::db::Panic("g3d_cpu.cpp", line, msg))
 
 /* Copies `size` bytes from `pSrc` to `pDst` as 32-byte blocks (four 8-byte doubles each - the shape
  * MWCC lowers the block move to: `lfd`/`stfd` pairs, four blocks per unrolled iteration). */
 extern "C" void fn_8009A748(void* pDst, const void* pSrc, u32 size) {
-    G3D_CPU_ASSERT(pDst && !((u32)pDst & 0x3), 28, lbl_8059186C);
-    G3D_CPU_ASSERT(pSrc && !((u32)pSrc & 0x3), 29, lbl_805918A0);
-    G3D_CPU_ASSERT(size % 32 == 0, 30, lbl_805918D4);
+    G3D_CPU_ASSERT(pDst && !((u32)pDst & 0x3), 28, "NW4R:Failed assertion pDst && !((u32)pDst & 0x3)");
+    G3D_CPU_ASSERT(pSrc && !((u32)pSrc & 0x3), 29, "NW4R:Failed assertion pSrc && !((u32)pSrc & 0x3)");
+    G3D_CPU_ASSERT(size % 32 == 0, 30, "NW4R:Failed assertion size % 32 == 0");
 
     f64* dst = (f64*)pDst;
     const f64* src = (const f64*)pSrc;
@@ -66,10 +56,10 @@ extern "C" void fn_8009A748(void* pDst, const void* pSrc, u32 size) {
 
 /* Fills `size` bytes at `pDst` with 0.0f, one 32-byte block (four 8-byte slots) at a time. */
 extern "C" void fn_8009A910(void* pDst, u32 size) {
-    G3D_CPU_ASSERT(pDst && !((u32)pDst & 0x3), 94, lbl_8059186C);
-    G3D_CPU_ASSERT(size % 32 == 0, 95, lbl_805918D4);
+    G3D_CPU_ASSERT(pDst && !((u32)pDst & 0x3), 94, "NW4R:Failed assertion pDst && !((u32)pDst & 0x3)");
+    G3D_CPU_ASSERT(size % 32 == 0, 95, "NW4R:Failed assertion size % 32 == 0");
 
-    f32 value = lbl_80795F50;
+    f32 value = 0.0f;
     f64* dst = (f64*)pDst;
     size /= 32;
     while (size != 0) {

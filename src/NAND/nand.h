@@ -108,6 +108,9 @@ s32 NANDCheckAsync(u32 fsBlock, u32 inode, u32* answer, NANDAsyncCallback callba
  * `OSLaunchPDChannel` log text beside it); it does not return. */
 void OSLaunchShopChannelHelp(void);
 
+/* 0x804CC6D0 - stores a range out of the data cache without waiting. */
+void DCStoreRangeNoSync(void* start, u32 size); /* untyped: byte range */
+
 #ifdef __cplusplus
 }
 #endif
