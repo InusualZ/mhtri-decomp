@@ -1,39 +1,37 @@
 /*
- * ef/ef_cube.cpp - the cube emitter form: `fn_800C9DD0` normalises the two direction vectors, derives the spawn
- *   position and calls the particle manager's slot +0x14; `fn_800CA200` builds the cube's vertex grid and emits it
- *   through `fn_800C9DD0`.
+ * ef/ef_cube.cpp - the cube emitter form: `EmitterFormCube::Emission` builds the cube's even grid or random shell
+ *   points and emits each through `ef_cube_emit`, which normalises the two direction vectors, derives the spawn
+ *   velocity and calls the particle manager's `CreateParticle`.
  * RANGE. .text 0x800C9DD0-0x800CB948 (2 functions); extab 0x8000A55C-0x8000A56C, extabindex 0x80023BB0-0x80023BC8,
- *   .data 0x80594C68-0x80594D20 (the `__FILE__` string "ef_cube.cpp" first), .sdata2 0x80796240-0x80796270.
- *   Right edge: the source file changes to "ef_cylinder.cpp" and the `.sdata2` run jumps from `ef_cube_f32_minus_one` to
- *   `lbl_80796270`.
- * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the `li r0,136; psq_lx` FPR epilogue and
- *   the `clrlwi r4,r30,16` at the call site; `-opt nopeephole` gives the same object) and `#pragma fp_contract off`
- *   (retail keeps every `a*b+c` as two instructions; a temporary per site does the same).
- * NAMES. The map has only `fn_` stems for the two functions; the `Em` fields keep `field_0xNN` names where nothing
- *   names them.  `fabsf` (0x80463F04, `fabs` + `frsp`) and `tanf` (0x80463F98, the dump's name) are MSL's.
+ *   .data 0x80594C68-0x80594D20 (the `__FILE__` string "ef_cube.cpp", the three assert messages, the class's
+ *   table at 0x80594D14), .sdata2 0x80796240-0x80796270.
+ * FLAGS. `cflags_main` plus `-pool off`; file-wide `#pragma peephole off` (retail keeps the `li r0,136; psq_lx` FPR
+ *   epilogue and the `clrlwi r4,r30,16` at the call site) and `#pragma fp_contract off` (retail keeps every
+ *   `a*b+c` as two instructions).
+ * NAMES. The class and method are nw4r's.  `fabsf` (0x80463F04, `fabs` + `frsp`) and `tanf` (0x80463F98, the dump's
+ *   name) are MSL's.
+ *   GUESS: `ef_cube_emit` (0x800C9DD0): emits one cube point (the shared tail of the grid and random paths).
  *   GUESS (from their text, value and use): `ef_cube_file_name`, `ef_cube_err_em`, `ef_cube_err_pm`,
  *   `ef_cube_err_params`, `ef_cube_f32_flt_min`, `ef_cube_f32_two`, `ef_cube_f32_one`, `ef_cube_f32_zero`,
  *   `ef_cube_f32_percent`, `ef_cube_f64_int_bias`, `ef_cube_f32_min_size`, `ef_cube_f32_pi`, `ef_cube_f32_pi_epsilon`,
- *   `ef_cube_f32_minus_one`; the fields `Em::diffusionAngle` (+0x78) and `Em::random` (+0xEC).
+ *   `ef_cube_f32_minus_one`.
  * RESIDUALS.
- *  - `fn_800CA200__FUiP2EmP2PmUiUiPvUsfUi`: the
- *    spiral's `dir = 0` is scheduled before the `n % 2` test where retail sets it after; the side faces' row counter
- *    takes r18 where retail's takes r23; and the `ef_random_u16(...) % 6` keeps a `clrlwi r4,r3,16` of the u16
- *    return that retail does not (4 bytes longer).
+ *  - `Emission`: the spiral's `dir = 0` is scheduled before the `n % 2` test where retail sets it after; the side
+ *    faces' row counter takes r18 where retail's takes r23; and the `ef_random_u16(...) % 6` keeps a
+ *    `clrlwi r4,r3,16` of the u16 return that retail does not (4 bytes longer).
  *   Relocation names that differ from retail (pool constants): `ef_cube_f64_int_bias` (the int-to-float bias reads
  *     our `@N` pool copy).
- *  - flipcheck: `.data` claimed, not emitted; `.sdata2` 0x8 of 0x30 (the pool is declared, so the conversion
- *    constant reads our `@N`); `.text` 0x1B7C of 0x1B78; extabindex differs in the cube row's size word.
- * SHAPES. The emission's float argument precedes the last integer one (nw4r's `Emission(..., u16 life, f32 lifeRnd,
- *   const MTX34* space)`), which orders the prologue's moves; the map row carries that mangling.
- * SHAPES. `Pm` is a class whose vtable pointer follows a 0x1C-byte non-polymorphic head; the spawn is the virtual
- *   `CreateParticle`, taking the position and velocity by value: the call copies them (velocity first) and evaluates
- *   the momentum before the life, and the dispatch goes through r3, as in retail.
+ *  - flipcheck: `.sdata2` 0x8 of 0x30 (the pool is declared, so the conversion constant reads our `@N`); `.text`
+ *    0x1B7C of 0x1B78; extabindex differs in the cube row's size word.
+ * SHAPES. The function is `nw4r::ef::EmitterFormCube::Emission` (declared in `ef/ef_emform.h`; this unit defines the key
+ *   function, so the class's table is emitted here, after the strings).  The particle manager's spawn is its
+ *   virtual `CreateParticle`, taking the position and velocity by value (copied velocity first, momentum
+ *   evaluated before the life, dispatch through r3); the float argument precedes the space matrix.
+ * SHAPES. The strings are global definitions in retail's order; `-pool off` (configure.py) gives each its own
+ *   `lis`/`addi`.
  * SHAPES. The pool constants are declared `extern const`: retail hoists their loads out of every loop, which a
- *   non-`const` declaration (the calls might write it) prevents.  The three spiral/ring blocks declare their own
- *   counters in the order that reproduces retail's register assignment.
- * SHAPES. The two definitions spell their integer parameters `unsigned int`: their manglings encode `Ui`, which
- *   `types.h`'s `u32` (`unsigned long`) would not.
+ *   non-`const` declaration prevents.  The three spiral/ring blocks declare their own counters in the order
+ *   that reproduces retail's register assignment.
  */
 
 #include "types.h"
@@ -43,20 +41,14 @@
 #include "MSL_C/alloc.h" /* fabsf / tanf (rule 2) */
 #include "g3d/math_reciprocal.h" /* math_reciprocal (rule 2) */
 #include "sqrt_f32.h" /* sqrt_f32 (rule 2) */
+#include "ef/ef_emform.h" /* nw4r::ef::EmitterFormCube, EfWork, ParticleManager (rule 1) */
 
-/* nw4r::math::VEC3, the type assignVec3/vec3_length_sq and this unit's three vector locals use. */
-typedef struct {
-    f32 x; /* +0x0 */
-    f32 y; /* +0x4 */
-    f32 z; /* +0x8 */
-} Vec3; /* size: 0xC */
-
-/* The unit's own `.data` strings (claimed, declared, never defined): the source file name and one
- * message per checked pointer. */
-extern char ef_cube_file_name[]; /* "ef_cube.cpp" */
-extern char ef_cube_err_em[]; /* "NW4R:Pointer Error\nem(=%p) is not valid pointer." */
-extern char ef_cube_err_pm[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer." */
-extern char ef_cube_err_params[]; /* "NW4R:Pointer Error\nparams(=%p) is not valid pointer." */
+/* The unit's `.data` strings, in retail order: the file name and one message per checked pointer (the
+ * class's table follows them). */
+char ef_cube_file_name[] = "ef_cube.cpp";
+char ef_cube_err_em[] = "NW4R:Pointer Error\nem(=%p) is not valid pointer.";
+char ef_cube_err_pm[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
+char ef_cube_err_params[] = "NW4R:Pointer Error\nparams(=%p) is not valid pointer.";
 
 /* The unit's own `.sdata2` pool (claimed, declared, never defined). */
 extern const f32 ef_cube_f32_flt_min; /* 0x00800000, FLT_MIN */
@@ -77,45 +69,9 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 /* nw4r::math and effect-library helpers; retail's relocations carry their plain map names, so they
  * have C linkage. */
 extern "C" {
-extern void ef_vec3_normalize_to(Vec3* dst, Vec3* src);
-extern void assignVec3(Vec3* dst, const Vec3* src);
-extern f32 vec3_length_sq(const Vec3* v);
-extern u16 ef_form_calc_life(u32 a, u16 b, f32 f, void* em);
-extern void ef_form_calc_velocity(u32 a, Vec3* b, void* em, Vec3* c, Vec3* d, Vec3* e, Vec3* f);
+extern void ef_vec3_normalize_to(VEC3* dst, VEC3* src);
+extern f32 vec3_length_sq(const VEC3* v);
 }
-
-/* The "em" object this unit is handed: an effect manager. Only the fields the two functions touch are
- * named, and they are named by offset because nothing in the dump names them. */
-typedef struct Em Em;
-struct Em {
-    u8 pad_0x00[0x67]; /* +0x00 */
-    s8 field_0x67;     /* +0x67 */
-    u8 pad_0x68[0x10]; /* +0x68 */
-    f32 diffusionAngle; /* +0x78: how far a direction leans out of its face */
-    u8 pad_0x7C[0x6C]; /* +0x7C */
-    u16 field_0xE8;    /* +0xE8 */
-    u8 pad_0xEA[0x02]; /* +0xEA */
-    u32 random;        /* +0xEC: the emitter's random state */
-    u8 pad_0xF0[0x08]; /* +0xF0 */
-    u32 field_0xF8;    /* +0xF8 */
-    u8 field_0xFC[4];  /* +0xFC */
-}; /* size: 0x100 (approx: only the accessed offsets are evidenced) */
-
-/* The non-polymorphic head of the particle manager: MWCC places the vtable pointer after it, at +0x1C. */
-struct PmHead {
-    u8 pad_0x00[0x1C]; /* +0x00 */
-}; /* size: 0x1C */
-
-/* The "pm" object, a particle manager: its vtable pointer sits at +0x1C and the table's +0x14 slot is the spawn
- * call this unit makes (declared only, so this unit emits no table). */
-struct Pm : PmHead {
-    /* +0x1C: the vtable pointer */
-    virtual void slot_0x08();
-    virtual void slot_0x0C();
-    virtual void slot_0x10();
-    virtual void CreateParticle(u16 life, Vec3 pos, Vec3 vel, u32 space, f32 momentum, u8* inherit, u32 ref,
-                                u16 remain);
-}; /* size: 0x20 */
 
 /* The cube form's parameter block: the half sizes and the hollow ratio in percent. */
 typedef struct EfCubeParams {
@@ -142,11 +98,12 @@ typedef struct EfCubeParams {
 
 /* Normalises the effect's two direction vectors, derives a spawn position from them, and hands the
  * result to the effect parameter object's spawn method. */
-void fn_800C9DD0(unsigned int a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, unsigned int e)
+void ef_cube_emit(nw4r::ef::EmitterFormCube* form, VEC3* b, VEC3* c, EfWork* em, ParticleManager* pm, u16 d, f32 f,
+                  const MTX34* e)
 {
-    Vec3 v1;
-    Vec3 v2;
-    Vec3 v3;
+    VEC3 v1;
+    VEC3 v2;
+    VEC3 v3;
     f32 s;
     u16 r;
     int ok;
@@ -161,39 +118,39 @@ void fn_800C9DD0(unsigned int a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f,
     }
 
     ef_vec3_normalize_to(c, c);
-    assignVec3(&v1, b);
+    assignVec3((Vec*)&v1, (Vec*)b);
     if (vec3_length_sq(&v1) <= ef_cube_f32_flt_min) {
-        v1.x = ef_random_float(&em->random) * ef_cube_f32_two - ef_cube_f32_one;
-        v1.y = ef_random_float(&em->random) * ef_cube_f32_two - ef_cube_f32_one;
-        v1.z = ef_random_float(&em->random) * ef_cube_f32_two - ef_cube_f32_one;
+        v1.x = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
+        v1.y = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
+        v1.z = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
     }
     ef_vec3_normalize_to(&v1, &v1);
-    assignVec3(&v2, b);
+    assignVec3((Vec*)&v2, (Vec*)b);
     v2.y = ef_cube_f32_zero;
     if (vec3_length_sq(&v2) <= ef_cube_f32_flt_min) {
-        v2.x = ef_random_float(&em->random) * ef_cube_f32_two - ef_cube_f32_one;
-        v2.z = ef_random_float(&em->random) * ef_cube_f32_two - ef_cube_f32_one;
+        v2.x = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
+        v2.z = ef_random_float(&em->progress) * ef_cube_f32_two - ef_cube_f32_one;
     }
     ef_vec3_normalize_to(&v2, &v2);
-    /* This unit's `Vec3` (the map's `P4Vec3`) and the helper's `nw4r::math::VEC3` share one 0xC-byte
+    /* This unit's `VEC3` (the map's `P4Vec3`) and the helper's `nw4r::math::VEC3` share one 0xC-byte
      * layout. */
     VEC3_ctor((nw4r::math::VEC3*)&v3);
-    ef_form_calc_velocity(a, &v3, em, b, c, &v1, &v2);
-    pm->CreateParticle(ef_form_calc_life(a, d, f, em), *b, v3, e,
-                       ef_cube_f32_one + ef_cube_f32_percent * (f32)em->field_0x67 * ef_random_float(&em->random),
-                       em->field_0xFC, em->field_0xF8, em->field_0xE8);
+    form->CalcVelocity((Vec*)&v3, em, (Vec*)b, (Vec*)c, (Vec*)&v1, (Vec*)&v2);
+    pm->CreateParticle(form->CalcLife(d, f, em), *b, v3, e,
+                       ef_cube_f32_one + ef_cube_f32_percent * (f32)em->scale_rate * ef_random_float(&em->progress),
+                       &em->spawn_data, em->spawn_extra, em->spawn_flag);
 }
 
 /* The larger of two magnitudes through the shapes' `fabsf` thunk; retail evaluates each side twice. */
 #define EF_CUBE_MAX_ABS(a, b) (ef_fabsf(a) > ef_fabsf(b) ? ef_fabsf(a) : ef_fabsf(b))
 
 /* A uniform random value in [-1, 1). */
-#define EF_CUBE_RAND_SIGNED(em) (ef_cube_f32_two * ef_random_float(&(em)->random) - ef_cube_f32_one)
+#define EF_CUBE_RAND_SIGNED(em) (ef_cube_f32_two * ef_random_float(&(em)->progress) - ef_cube_f32_one)
 
 /* Emits `n` particles from the cube: on an even grid over the six faces (flag 0x20000), or at random inside the
  * shell the hollow ratio leaves; each direction leans out of its face by the emitter's diffusion angle. */
-void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int flags, void* params, u16 d,
-                 f32 f, unsigned int e)
+void nw4r::ef::EmitterFormCube::Emission(EfWork* em, ParticleManager* pm, int n, u32 flags, f32* params, u16 d,
+                                         f32 f, const MTX34* e)
 {
     int ok;
     const EfCubeParams* cube;
@@ -244,7 +201,7 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
         hollow = ef_cube_f32_percent * cube->hollow;
     }
     shell = ef_cube_f32_one - hollow;
-    angle = em->diffusionAngle;
+    angle = em->spread;
     if (ef_fabsf(angle - ef_cube_f32_pi) < ef_cube_f32_pi_epsilon) {
         angle -= ef_cube_f32_pi_epsilon;
     }
@@ -276,8 +233,8 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                 f32 pz;
                 f32 spread;
                 f32 lean;
-                Vec3 pos;
-                Vec3 vel;
+                VEC3 pos;
+                VEC3 vel;
 
                 if (i != 0) {
                     switch (dir) {
@@ -320,11 +277,11 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                 if (ef_cube_f32_zero != shell) {
                     f32 depth;
                     if (flags & 0x01000000) {
-                        f32 r = ef_random_float(&em->random);
+                        f32 r = ef_random_float(&em->progress);
                         r *= r;
                         depth = ef_cube_f32_one - spread * (r * shell);
                     } else {
-                        depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->random));
+                        depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
                     }
                     pos.y *= depth;
                 }
@@ -339,7 +296,7 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                     vel.y = inv * -sqrt_f32(pos.x * pos.x + pos.z * pos.z);
                     vel.z = pos.z;
                 }
-                fn_800C9DD0(a, &pos, &vel, em, pm, d, f, e);
+                ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
             }
         }
 
@@ -357,8 +314,8 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                     f32 pu = u * sizeX;
                     f32 spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
-                    Vec3 pos;
-                    Vec3 vel;
+                    VEC3 pos;
+                    VEC3 vel;
 
                     VEC3_ctor((nw4r::math::VEC3*)&pos);
                     VEC3_ctor((nw4r::math::VEC3*)&vel);
@@ -368,11 +325,11 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                     if (ef_cube_f32_zero != shell) {
                         f32 depth;
                         if (flags & 0x01000000) {
-                            f32 r = ef_random_float(&em->random);
+                            f32 r = ef_random_float(&em->progress);
                             r *= r;
                             depth = ef_cube_f32_one - spread * (r * shell);
                         } else {
-                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->random));
+                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
                         }
                         pos.z *= depth;
                     }
@@ -387,15 +344,15 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                         vel.y = pos.y;
                         vel.z = inv * -sqrt_f32(pos.x * pos.x + pos.y * pos.y);
                     }
-                    fn_800C9DD0(a, &pos, &vel, em, pm, d, f, e);
+                    ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
                 }
                 for (k = 1; k <= (int)n; k++) {
                     f32 u = (f32)k * step - ef_cube_f32_one;
                     f32 pu = u * sizeZ;
                     f32 spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
-                    Vec3 pos;
-                    Vec3 vel;
+                    VEC3 pos;
+                    VEC3 vel;
 
                     VEC3_ctor((nw4r::math::VEC3*)&pos);
                     VEC3_ctor((nw4r::math::VEC3*)&vel);
@@ -405,11 +362,11 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                     if (ef_cube_f32_zero != shell) {
                         f32 depth;
                         if (flags & 0x01000000) {
-                            f32 r = ef_random_float(&em->random);
+                            f32 r = ef_random_float(&em->progress);
                             r *= r;
                             depth = ef_cube_f32_one - spread * (r * shell);
                         } else {
-                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->random));
+                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
                         }
                         pos.x *= depth;
                     }
@@ -424,15 +381,15 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                         vel.y = pos.y;
                         vel.z = pos.z;
                     }
-                    fn_800C9DD0(a, &pos, &vel, em, pm, d, f, e);
+                    ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
                 }
                 for (k = n; k >= 1; k--) {
                     f32 u = (f32)k * step - ef_cube_f32_one;
                     f32 pu = u * sizeX;
                     f32 spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
-                    Vec3 pos;
-                    Vec3 vel;
+                    VEC3 pos;
+                    VEC3 vel;
 
                     VEC3_ctor((nw4r::math::VEC3*)&pos);
                     VEC3_ctor((nw4r::math::VEC3*)&vel);
@@ -442,11 +399,11 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                     if (ef_cube_f32_zero != shell) {
                         f32 depth;
                         if (flags & 0x01000000) {
-                            f32 r = ef_random_float(&em->random);
+                            f32 r = ef_random_float(&em->progress);
                             r *= r;
                             depth = ef_cube_f32_one - spread * (r * shell);
                         } else {
-                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->random));
+                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
                         }
                         pos.z *= depth;
                     }
@@ -461,15 +418,15 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                         vel.y = pos.y;
                         vel.z = inv * sqrt_f32(pos.x * pos.x + pos.y * pos.y);
                     }
-                    fn_800C9DD0(a, &pos, &vel, em, pm, d, f, e);
+                    ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
                 }
                 for (k = n; k >= 1; k--) {
                     f32 u = (f32)k * step - ef_cube_f32_one;
                     f32 pu = u * sizeZ;
                     f32 spread = ef_cube_f32_one - EF_CUBE_MAX_ABS(u, v);
                     f32 lean = EF_CUBE_MAX_ABS(u, v);
-                    Vec3 pos;
-                    Vec3 vel;
+                    VEC3 pos;
+                    VEC3 vel;
 
                     VEC3_ctor((nw4r::math::VEC3*)&pos);
                     VEC3_ctor((nw4r::math::VEC3*)&vel);
@@ -479,11 +436,11 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                     if (ef_cube_f32_zero != shell) {
                         f32 depth;
                         if (flags & 0x01000000) {
-                            f32 r = ef_random_float(&em->random);
+                            f32 r = ef_random_float(&em->progress);
                             r *= r;
                             depth = ef_cube_f32_one - spread * (r * shell);
                         } else {
-                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->random));
+                            depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
                         }
                         pos.x *= depth;
                     }
@@ -498,7 +455,7 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                         vel.y = pos.y;
                         vel.z = pos.z;
                     }
-                    fn_800C9DD0(a, &pos, &vel, em, pm, d, f, e);
+                    ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
                 }
             }
         }
@@ -524,8 +481,8 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                 f32 pz;
                 f32 spread;
                 f32 lean;
-                Vec3 pos;
-                Vec3 vel;
+                VEC3 pos;
+                VEC3 vel;
 
                 if (i != 0) {
                     switch (dir) {
@@ -565,11 +522,11 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                 if (ef_cube_f32_zero != shell) {
                     f32 depth;
                     if (flags & 0x01000000) {
-                        f32 r = ef_random_float(&em->random);
+                        f32 r = ef_random_float(&em->progress);
                         r *= r;
                         depth = ef_cube_f32_one - spread * (r * shell);
                     } else {
-                        depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->random));
+                        depth = ef_cube_f32_one - spread * (shell * ef_random_float(&em->progress));
                     }
                     pos.y *= depth;
                 }
@@ -584,7 +541,7 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                     vel.y = inv * sqrt_f32(pos.x * pos.x + pos.z * pos.z);
                     vel.z = pos.z;
                 }
-                fn_800C9DD0(a, &pos, &vel, em, pm, d, f, e);
+                ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
             }
         }
     } else {
@@ -594,8 +551,8 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
             f32 x;
             f32 y;
             f32 z;
-            Vec3 pos;
-            Vec3 vel;
+            VEC3 pos;
+            VEC3 vel;
 
             if (ef_cube_f32_zero == hollow) {
                 /* A solid cube: anywhere inside. */
@@ -604,7 +561,7 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                 z = EF_CUBE_RAND_SIGNED(em);
             } else if (ef_cube_f32_one == hollow) {
                 /* A hollow cube: on one of the six faces. */
-                switch (ef_random_u16(&em->random) % 6) {
+                switch (ef_random_u16(&em->progress) % 6) {
                 case 0:
                     x = EF_CUBE_RAND_SIGNED(em);
                     y = EF_CUBE_RAND_SIGNED(em);
@@ -641,7 +598,7 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                 f32 slabY = sizeZ * (shell * (sizeX * sizeY));
                 f32 slabZ = shell * (sizeZ * (hollow * (sizeX * sizeY)));
                 f32 slabX = hollow * (sizeZ * (hollow * (sizeY * (sizeX * shell))));
-                f32 pick = (slabY + slabZ + slabX) * ef_random_float(&em->random);
+                f32 pick = (slabY + slabZ + slabX) * ef_random_float(&em->progress);
 
                 if (pick < slabY) {
                     x = EF_CUBE_RAND_SIGNED(em);
@@ -712,7 +669,7 @@ void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int fl
                     vel.z *= inv * sqrt_f32(pos.x * pos.x + pos.y * pos.y);
                 }
             }
-            fn_800C9DD0(a, &pos, &vel, em, pm, d, f, e);
+            ef_cube_emit(this, &pos, &vel, em, pm, d, f, e);
         }
     }
 }

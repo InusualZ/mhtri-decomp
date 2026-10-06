@@ -134,7 +134,7 @@ typedef struct EfWork {
     s8 size_jitter;     /* +0x66  per-frame size jitter, in hundredths (read as signed) */
     s8 scale_rate;      /* +0x67  per-frame scale step, in hundredths */
     /* The five transform stages of the emitter form, each "off" at 0.0f.  The names come from what
-     * the stage does in `ef/ef_emitterform.cpp` (ef_form_calc_velocity), the only reader. */
+     * the stage does in `ef/ef_emitterform.cpp` (`nw4r::ef::EmitterForm::CalcVelocity`), the only reader. */
     f32 dir_weight;       /* +0x68  blend the emitter direction into the result */
     f32 rot_weight;       /* +0x6C  blend the emitter's rotated axis into the result */
     f32 spread_scale;     /* +0x70  scale of the random Euler spread */
@@ -251,8 +251,6 @@ extern void assignVec3(Vec* out, Vec* in);                         /* out = in *
 extern void fn_8009C6F0(Vec* out, f32 angle);                       /* sin/cos of angle */
 extern void ef_vec_sin_cos(Vec* out, f32 angle);                    /* the same, under the owner's name */
 extern void ef_sin_cos(f32* out_a, f32* out_b, f32 angle);         /* sin/cos of angle */
-extern void ef_form_calc_velocity(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
-extern u16 ef_form_calc_life(s32 ctx, u16 id, f32 scale, EfWork* em);
 extern f32 ef_random_float(u32* progress);                              /* pseudo-random 0..1 */
 /* 0x80050BC0 is `src/fn_8004CAD8.cpp`'s, declared in `fn_8004CAD8.h`: it takes one float (its body reads only f1
  * and returns `x * FrSqrt(x)`); the second float the callers materialise is the hoisted `1.0f - t` their `else`
@@ -260,23 +258,6 @@ extern f32 ef_random_float(u32* progress);                              /* pseud
 extern f32 ef_fabsf(f32 a);                                         /* fabsf */
 extern f32 fn_80463F10(f32 a, f32 b);                               /* fmodf */
 extern f32 fmodf(f32 a, f32 b);                                     /* the same, under the map's name */
-
-/* This file's own pooled data (`ef_disc.cpp`), declared but never defined here. */
-extern char lbl_80594DE0[]; /* "ef_disc.cpp"                                  .data 0x80594DE0 */
-extern char lbl_80594DEC[]; /* "NW4R:Pointer Error\nem(=%p) is not valid..." .data 0x80594DEC */
-extern char lbl_80594E20[]; /* "NW4R:Pointer Error\npm(=%p) is not valid..." .data 0x80594E20 */
-extern char lbl_80594E54[]; /* "NW4R:Pointer Error\nparams(=%p) is not valid." .data 0x80594E54 */
-
-extern f32 lbl_807962B0; /* FLT_EPSILON     .sdata2 0x807962B0 */
-extern f32 lbl_807962B4; /* 0.0f            .sdata2 0x807962B4 */
-extern f32 lbl_807962B8; /* 2.0f            .sdata2 0x807962B8 */
-extern f32 lbl_807962BC; /* pi              .sdata2 0x807962BC */
-extern f32 lbl_807962C0; /* 2pi             .sdata2 0x807962C0 */
-extern f32 lbl_807962C4; /* 2pi * 2^-15     .sdata2 0x807962C4 */
-extern f32 lbl_807962C8; /* 2pi - 2^-14     .sdata2 0x807962C8 */
-extern f32 lbl_807962CC; /* 100.0f          .sdata2 0x807962CC */
-extern f32 lbl_807962D0; /* 1.0f            .sdata2 0x807962D0 */
-extern f32 lbl_807962D4; /* 0.01f           .sdata2 0x807962D4 */
 
 /* The console's cached/uncached MEM1 and MEM2 windows plus the 0xE0000000 register page.  Inlined
  * into every caller (`-inline noauto` still inlines an `inline` function). */

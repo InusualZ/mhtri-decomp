@@ -1,35 +1,38 @@
 /*
- * ef/ef_torus.cpp - the torus emitter form's emission entry (its class's single virtual, through the table
- *   `lbl_80594C58`) and a `b fn_80463F04` (`fabsf`) thunk the sibling shapes also call for the `|radius|` clamps.
+ * ef/ef_torus.cpp - the torus emitter form (`EmitterFormTorus::Emission`) and a `b fabsf` thunk the sibling shapes
+ *   also call for the `|radius|` clamps.
  * RANGE. .text 0x800C9540-0x800C9DD0 (2 functions); extab 0x8000A554-0x8000A55C, extabindex 0x80023BA4-0x80023BB0,
- *   .data 0x80594BA8-0x80594C68 (the `__FILE__` string "ef_torus.cpp", the three assert formats, the table at
- *   0x80594C58), .sdata2 0x80796208-0x80796240 (the literal floats MWCC pools).
- * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the FPR epilogue as `li r0,<slot>;
- *   psq_lx`) and `#pragma fp_contract off` (retail keeps every `a*b+c` as two instructions).
- * NAMES. The map has only `fn_` stems for the range.
+ *   .data 0x80594BA8-0x80594C68 (the `__FILE__` string "ef_torus.cpp", the three assert messages, the class's
+ *   table at 0x80594C58), .sdata2 0x80796208-0x80796240 (the literal floats MWCC pools).
+ * FLAGS. `cflags_main` plus `-pool off`; file-wide `#pragma peephole off` (retail keeps the FPR epilogue as
+ *   `li r0,<slot>; psq_lx`) and `#pragma fp_contract off` (retail keeps every `a*b+c` as two instructions).
+ * NAMES. The class and method are nw4r's.
  *   GUESS: `ef_fabsf` (0x800C9DCC): the out-of-line `fabsf` thunk (`b fabsf`) the emitter shapes call.
- * RESIDUALS. `fn_800C9540` is byte-identical; the `.sdata2` literals are our pool's `@N`.
- *   flipcheck: `.data` claimed, not emitted (the strings are declared, never defined).
- * SHAPES. The `.sdata2` constants are literals, not `extern` floats, so MWCC pools and hoists them as retail does.
- * SHAPES. The particle manager is a class whose vtable pointer follows a 0x1C-byte non-polymorphic head; the spawn
- *   is its virtual `CreateParticle`, taking the position and velocity by value (copied velocity first, momentum
- *   evaluated before the life, dispatch through r3).  The emission's float argument precedes the last integer one
- *   (nw4r's `Emission(..., u16 life, f32 lifeRnd, const MTX34* space)`), which orders the prologue's moves.
+ *   GUESS: `ef_torus_file_name`, `ef_torus_err_em`, `ef_torus_err_pm`, `ef_torus_err_params` (their text).
+ * RESIDUALS. none known: every section is byte-identical to the target object.
+ * SHAPES. The function is `nw4r::ef::EmitterFormTorus::Emission` (the class is declared in `ef/ef_emform.h`; this unit
+ *   defines its key function, so the compiler emits the class's table here, after the strings).  The
+ *   particle manager's spawn is its virtual `CreateParticle`, taking the position and velocity by value: the call
+ *   copies them (velocity first), evaluates the momentum before the life and dispatches through r3.  The float
+ *   argument precedes the space matrix (nw4r's `Emission(..., u16 life, f32 lifeRnd, const MTX34* space)`).
+ * SHAPES. The strings are global definitions in retail's order; `-pool off` (configure.py) gives each its own
+ *   `lis`/`addi`, where the default pools them off one base register.
  * SHAPES. `#line 42` puts the three `EF_ASSERT_PTR` sites on lines 42-44.
  */
 
 #include "ef.h"
-#include "ef/ef_particlemanager.h" /* ParticleManager (rule 1) */
+#include "ef/ef_emform.h" /* nw4r::ef::EmitterFormTorus, ParticleManager (rule 1) */
 
 #pragma peephole off
 #pragma fp_contract off
 
 
-/* The unit's own strings (its claimed `.data`, declared, never defined). */
-extern char lbl_80594BA8[]; /* "ef_torus.cpp"                                        .data 0x80594BA8 */
-extern char lbl_80594BB8[]; /* "NW4R:Pointer Error\nem(=%p) is not valid pointer."    .data 0x80594BB8 */
-extern char lbl_80594BEC[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."    .data 0x80594BEC */
-extern char lbl_80594C20[]; /* "NW4R:Pointer Error\nparams(=%p) is not valid pointer." .data 0x80594C20 */
+/* The unit's `.data` strings, in retail order: the file name and one message per checked pointer (the
+ * class's table follows them). */
+char ef_torus_file_name[] = "ef_torus.cpp";
+char ef_torus_err_em[] = "NW4R:Pointer Error\nem(=%p) is not valid pointer.";
+char ef_torus_err_pm[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
+char ef_torus_err_params[] = "NW4R:Pointer Error\nparams(=%p) is not valid pointer.";
 
 extern "C" {
 
@@ -38,16 +41,20 @@ extern "C" {
 extern void ef_vec3_normalize_to(VEC3* out, VEC3* in);
 extern f32 fabsf(f32 x);
 
-void fn_800C9540(s32 ctx, EfWork* em, ParticleManager* pm, s32 count, u32 flags, EfParams* params,
-                 u16 id, f32 scale, s32 spawn_arg) {
+} /* extern "C" */
+
+/* 0x800C9540 (0x88C): emits `count` particles from the torus, at random or swept on rings (flag 0x20000). */
+void nw4r::ef::EmitterFormTorus::Emission(EfWork* em, ParticleManager* pm, int count, u32 flags, f32* paramBlock,
+                                          u16 id, f32 scale, const MTX34* spawn_arg) {
+    EfParams* params = (EfParams*)paramBlock;
     f32 scale_a, scale_b, scale_c, phase, angle, step, tube, ratio;
     u32 swept;
     s32 i, total;
 
 #line 42
-    EF_ASSERT_PTR(lbl_80594BA8, lbl_80594BB8, em);
-    EF_ASSERT_PTR(lbl_80594BA8, lbl_80594BEC, pm);
-    EF_ASSERT_PTR(lbl_80594BA8, lbl_80594C20, params);
+    EF_ASSERT_PTR(ef_torus_file_name, ef_torus_err_em, em);
+    EF_ASSERT_PTR(ef_torus_file_name, ef_torus_err_pm, pm);
+    EF_ASSERT_PTR(ef_torus_file_name, ef_torus_err_params, params);
 
     if (count < 1) {
         return;
@@ -115,8 +122,8 @@ void fn_800C9540(s32 ctx, EfWork* em, ParticleManager* pm, s32 count, u32 flags,
         }
         ef_vec3_normalize_to(&v_dir, &v_dir);
 
-        ef_form_calc_velocity(ctx, (Vec*)&v_out, em, (Vec*)&v_pt, (Vec*)&v_dir, (Vec*)&v_norm, (Vec*)&v_flat);
-        pm->CreateParticle(ef_form_calc_life(ctx, id, scale, em), v_pt, v_out, spawn_arg,
+        CalcVelocity((Vec*)&v_out, em, (Vec*)&v_pt, (Vec*)&v_dir, (Vec*)&v_norm, (Vec*)&v_flat);
+        pm->CreateParticle(CalcLife(id, scale, em), v_pt, v_out, spawn_arg,
                            1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), &em->spawn_data,
                            em->spawn_extra, em->spawn_flag);
 
@@ -130,6 +137,8 @@ void fn_800C9540(s32 ctx, EfWork* em, ParticleManager* pm, s32 count, u32 flags,
         }
     }
 }
+
+extern "C" {
 
 /* fabsf, reached through a 4-byte tail-call thunk in retail. */
 f32 ef_fabsf(f32 x) {
