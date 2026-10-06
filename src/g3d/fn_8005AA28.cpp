@@ -54,8 +54,8 @@ extern f32 lbl_80795CF4;          /* 100.0f                                     
 
 /* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
-void* fn_80050508(void* pMtx);                     /* owner: src/fn_8004CAD8.cpp        */
-void* fn_80051570(void* pMtx);                     /* owner: src/fn_8004CAD8.cpp        */
+void* mtx34_get_ptr(void* pMtx);                     /* owner: src/fn_8004CAD8.cpp        */
+void* mtx34_const_ptr(void* pMtx);                     /* owner: src/fn_8004CAD8.cpp        */
 /* `PSMTXTransApply(const Mtx src, Mtx dst, f32 x, f32 y, f32 z)` - the SDK math helper (the declaration
  * g3d_basic.cpp carries for its PSMTXScaleApply twin). */
 void PSMTXTransApply(Mtx34* pDst, const Mtx34* pSrc, f32 x, f32 y, f32 z);
@@ -109,8 +109,8 @@ u32 fn_8005AB00(const ResMatHandle* pSelf) {
 /* The `PSMTXTransApply` twin of g3d_basic.cpp's fn_800D7ED0: translate `pPos` into the node matrix and
  * return `pSrc`. */
 Mtx34* fn_8005AB08(Mtx34* pSrc, const Vec3* pPos, void* pNodeMtx) {
-    const Mtx34* src = (const Mtx34*)fn_80050508(pSrc);
-    Mtx34* dst = (Mtx34*)fn_80051570(pNodeMtx);
+    const Mtx34* src = (const Mtx34*)mtx34_get_ptr(pSrc);
+    Mtx34* dst = (Mtx34*)mtx34_const_ptr(pNodeMtx);
     PSMTXTransApply(dst, src, pPos->x, pPos->y, pPos->z);
     return pSrc;
 }

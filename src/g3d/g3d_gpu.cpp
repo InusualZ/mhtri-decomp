@@ -114,7 +114,7 @@ void GDLoadTexMtxImm3x3(const Mat33* pSrc, u32 id) {
     mtx.m[2][2] = pSrc->m[2][2];
     mtx.m[2][3] = 0.0f;
 
-    GXLoadTexMtxImm(fn_80050508(&mtx), id, 0 /* GX_MTX3x4 */);
+    GXLoadTexMtxImm(mtx34_get_ptr(&mtx), id, 0 /* GX_MTX3x4 */);
 }
 
 } /* extern "C" */

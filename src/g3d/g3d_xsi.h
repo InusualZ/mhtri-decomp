@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-/* 0x800D74E8 - the XSI pointer-checked builder `fn_80075DCC` calls (four word arguments). */
+/* 0x800D74E8 - the XSI pointer-checked builder `sin_cos_deg` calls (four word arguments). */
 s32 fn_800D74E8(s32, s32, s32, s32);
 
 #ifdef __cplusplus

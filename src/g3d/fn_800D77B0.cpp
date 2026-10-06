@@ -8,6 +8,9 @@
  * RESIDUALS. fn_800D77B0: two registers swap - retail keeps `pRec->mFlags` in r30 and `mtxId`/the returned id in
  *   r31, ours the reverse (tried: declaration order, `void*` vs typed `pRec`, a `prev` local, `u32` vs `s32`
  *   parameters, an early `id`, reusing `mtxId` for the return id).
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_80501390`,
+ *     `MTX34Trans__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_80501390`.
  * SHAPES. File-scope `#pragma peephole off`: the five flag tests keep retail's `rlwinm` + `cmpwi`.
  */
 
@@ -20,7 +23,7 @@
 
 /* The `g3d_calcworld.cpp` owner's declarations of the matrix-id helpers this unit calls. */
 #include "g3d/g3d_calcworld.h"
-/* The band header's declarations of the matrix copy/concat helpers (fn_8007100C/fn_800710BC, owner
+/* The band header's declarations of the matrix copy/concat helpers (fn_8007100C/mtx34_concat, owner
  * `g3d/g3d_calcview.cpp`). */
 #include "g3d/g3d_calcview.h" /* fn_800710BC/fn_8007100C (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -58,7 +61,7 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
             fn_80501390(pDstMtx, pSrcMtx, &v);
         }
     } else if (fn_800D79A0(mtxId) != 0) {
-        fn_800710BC(pDstMtx, pSrcMtx, &pRec->mMtx);
+        mtx34_concat(pDstMtx, pSrcMtx, &pRec->mMtx);
     } else {
         MTX34 mtx;
         MTX34_ctor(&mtx);
@@ -66,7 +69,7 @@ extern "C" s32 fn_800D77B0(MTX34* pDstMtx, VEC3* pDstScale, const MTX34* pSrcMtx
         mtx.m[0][3] *= pSrcScale->x;
         mtx.m[1][3] *= pSrcScale->y;
         mtx.m[2][3] *= pSrcScale->z;
-        fn_800710BC(pDstMtx, pSrcMtx, &mtx);
+        mtx34_concat(pDstMtx, pSrcMtx, &mtx);
     }
 
     u32 id;

@@ -7,24 +7,30 @@
  *   `particle.h` pass that header's name), .sdata2 0x80796060-0x807960A0.
  * FLAGS. `cflags_main`; file-wide `#pragma fp_contract off` (retail keeps `0.01f * v * x` as `fmuls`/`fsubs` in
  *   `fn_800AA700`); `#pragma peephole off` through `fn_800AA27C` (the table store and the `extsh` + `cmpwi` pair),
- *   on for the colour getters (their assert materialisation), off again for `fn_800AB3FC` (no fused `clrlslwi`).
+ *   on for the colour getters (their assert materialisation), off again for `ef_particle_flick_alpha` (no fused `clrlslwi`).
  * NAMES. The map has only `fn_` stems for the range.
+ *   GUESS (from the body and its callers): `ef_particle_get_color`, `ef_particle_get_alpha`,
+ *   GUESS: `ef_particle_get_scale_y`, `ef_resource_draw_setting`, `ef_particle_get_scale`,
+ *   GUESS: `ef_particle_flick_alpha`.
  * RESIDUALS. 2 rows unwritten (empty bodies): 0x800AA2D0-0x800AA700, 0x800AA7A0-0x800AB058.  They are defined
  *   last, so our `.text` (and the extab and extabindex records) run in a different order from retail's.
  *   5 partial rows:
  *  - `fn_800AA1D8`: retail's two 3-element loops are `body; test; branch back`, ours add a pre-test `b`, and the
  *    two element pointers swap r30/r31;
- *  - `fn_800AB058`, `fn_800AB220`: the two phase tests compile branchless (`xori`/`cntlzw`/`slw`) where retail
- *    compares `cmplwi ...,1; bgt`, and the address computation is scheduled differently; `fn_800AB220` also passes
- *    `fn_800AB058`'s copies of the `particle.h` assert strings (`lbl_80592E84`/`EB4`/`EC0`/`EF0`) where retail
+ *  - `ef_particle_get_color`, `ef_particle_get_alpha`: the two phase tests compile branchless (`xori`/`cntlzw`/`slw`) where retail
+ *    compares `cmplwi ...,1; bgt`, and the address computation is scheduled differently; `ef_particle_get_alpha` also passes
+ *    `ef_particle_get_color`'s copies of the `particle.h` assert strings (`lbl_80592E84`/`EB4`/`EC0`/`EF0`) where retail
  *    passes its own (`lbl_80592EFC`/`F2C`/`F38`/`F68`);
- *  - `fn_800AB3AC` (ours 0x1C of 0x24): retail keeps an inlined call's `mr r4,r3` and its vestigial `b` to the
+ *  - `ef_particle_get_scale` (ours 0x1C of 0x24): retail keeps an inlined call's `mr r4,r3` and its vestigial `b` to the
  *    next instruction; the arithmetic is retail's;
- *  - `fn_800AB3FC` (ours 0x240 of 0x25C): the parameter record and `mode` live in r5/r31 where retail uses
+ *  - `ef_particle_flick_alpha` (ours 0x240 of 0x25C): the parameter record and `mode` live in r5/r31 where retail uses
  *    r31/r6, and the `+0x108` product is computed later.
  *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x10 of 0x40 (a partial pool: flipcheck names a fold with
  *   `ef/ef_particlemanager.cpp`, one shared literal); `.text` 0x7D0 of 0x14CC; extab 0x58 of 0x68; extabindex
  *   0x84 of 0x9C.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_80592EF0`,
+ *     `lbl_80592F68`, `lbl_80592EC0`, `lbl_80592F38`, `lbl_80592EB4`, `lbl_80592F2C`, `lbl_80592E84`,
+ *     `lbl_80592EFC`.
  */
 
 #include "types.h"
@@ -32,7 +38,7 @@
 #include "sys_mem.h"
 #include "unsplit/ef.h"
 #include "ef/ef_emitter.h" /* ef_truncate_float/ef_res_block_body (rule 2) */
-#include "g3d/g3d_scnroot.h" /* fn_800834F0 (rule 2) */
+#include "g3d/g3d_scnroot.h" /* VEC2_ctor (rule 2) */
 
 #pragma fp_contract off
 #pragma peephole off
@@ -69,7 +75,7 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
  * earlier one (the object lays them out the same way). */
 extern "C" EfParticleParams* fn_800AA1D8(EfParticleParams* self);
 extern "C" f32 fn_800AB37C(EfParticleMgr* mgr, EfParticle* self, f32 v);
-extern "C" u8* fn_800AB388(void* p);
+extern "C" u8* ef_resource_draw_setting(void* p);
 
 /* Constructor.  Installs the dispatch table, builds the parameter sub-record and clears the position. */
 extern "C" EfParticle* fn_800AA18C(EfParticle* self)
@@ -88,17 +94,17 @@ extern "C" EfParticleParams* fn_800AA1D8(EfParticleParams* self)
     EfParticleNode* p;
     EfParticleNode* end;
 
-    fn_800834F0(&self->scale_0x10);
-    fn_800834F0(&self->scale_0x18);
+    VEC2_ctor(&self->scale_0x10);
+    VEC2_ctor(&self->scale_0x18);
     VEC3_ctor(&self->field_0x20);
 
     end = &self->field_0x2C[3];
     for (p = &self->field_0x2C[0]; p < end; p++) {
-        fn_800834F0(p);
+        VEC2_ctor(p);
     }
     end = &self->field_0x50[3];
     for (p = &self->field_0x50[0]; p < end; p++) {
-        fn_800834F0(p);
+        VEC2_ctor(p);
     }
 
     VEC3_ctor(&self->field_0x80);
@@ -132,7 +138,7 @@ extern "C" void fn_800AA2CC(EfParticle* self)
 
 /* Copies one colour entry out of the 2x2 table.  `layer` and `index` are both asserted into [0, 2). */
 #pragma peephole on
-extern "C" void fn_800AB058(EfParticle* self, u32 layer, u32 index, u8* color)
+extern "C" void ef_particle_get_color(EfParticle* self, u32 layer, u32 index, u8* color)
 {
     u8* entry;
     int ok;
@@ -157,7 +163,7 @@ extern "C" void fn_800AB058(EfParticle* self, u32 layer, u32 index, u8* color)
 }
 
 /* Returns one colour entry's alpha byte. */
-extern "C" u8 fn_800AB220(EfParticle* self, u32 layer, u32 index)
+extern "C" u8 ef_particle_get_alpha(EfParticle* self, u32 layer, u32 index)
 {
     int ok;
 
@@ -174,12 +180,12 @@ extern "C" u8 fn_800AB220(EfParticle* self, u32 layer, u32 index)
 
 /* The record's scale for the current emitter phase: the phase bits select which pair of the four
  * scale factors is multiplied, and the owner's own factor scales the result again. */
-extern "C" f32 fn_800AB2DC(EfParticle* self)
+extern "C" f32 ef_particle_get_scale_y(EfParticle* self)
 {
     f32 v;
     s32 bits;
 
-    bits = *(u16*)fn_800AB388(self->params.manager->context);
+    bits = *(u16*)ef_resource_draw_setting(self->params.manager->context);
     bits &= 0x6000;
 
     switch (bits) {
@@ -206,13 +212,13 @@ extern "C" f32 fn_800AB37C(EfParticleMgr* mgr, EfParticle* self, f32 v)
 }
 
 /* The owner's colour block: the chain head plus its colour-table offset. */
-extern "C" u8* fn_800AB388(void* p)
+extern "C" u8* ef_resource_draw_setting(void* p)
 {
     return (u8*)fn_800A4864(p) + 148;
 }
 
 /* The record's scale product for the current phase, with the owner's factor folded in. */
-extern "C" f32 fn_800AB3AC(EfParticle* self)
+extern "C" f32 ef_particle_get_scale(EfParticle* self)
 {
     f32 v;
 
@@ -266,7 +272,7 @@ extern "C" void fn_800AA7A0(EfParticle* self, u32 a, u32 b, void* c)
 #pragma peephole off
 /* Maps the record's phase into one of five byte colour ramps (mode 0: white), period +0xDC, amplitude and
  * step from the parameter chain, clamped to a byte. */
-extern "C" u8 fn_800AB3FC(EfParticle* self)
+extern "C" u8 ef_particle_flick_alpha(EfParticle* self)
 {
     EfParticleChain* p;
     u32 n;

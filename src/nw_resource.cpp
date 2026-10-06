@@ -42,6 +42,10 @@
  *     target object, and `fn_800D476C` encodes `~(a-1) & (s+a-1)` as `not`+`and` rather than the
  *     peephole pass's fused `andc` (with `align` a *signed* type).  If the sibling `800CDB2C` range needs
  *     the same, this belongs in that lib's cflags instead.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_27`, `_restgpr_27`.
+ *   flipcheck: `.sdata` claimed, not emitted.
+ *   flipcheck: force-active in retail .comment, not in ours: `fn_800D4C14`, `fn_800D4CA4`, `fn_800D516C`,
+ *     `fn_800D5250`, `fn_800D5360`.
  */
 
 #include "types.h"
@@ -125,7 +129,7 @@ extern u8 lbl_80595428[];
 /* The C-linkage helpers: their map names are plain `fn_XXXXXXXX`, so an `extern "C"` declaration keeps
  * the symbol; the definition below then inherits that linkage. */
 extern "C" {
-void fn_800532DC(void* a, void* b);
+void mtx34_copy(void* a, void* b);
 u32 fn_800D312C(void* heap);
 u32 fn_800D476C(u32 size, s32 align);
 void fn_800D4784(void* self);
@@ -196,7 +200,7 @@ u32 fn_800D4794(u16 a, u16 b, u16 c, u16 d, u32 e) {
 
 /* 0x800D4908 - hand a matrix to the view-matrix update (a tail call). */
 void fn_800D4908(void* dst, void* src) {
-    fn_800532DC(dst, src);
+    mtx34_copy(dst, src);
 }
 
 /* 0x800D4A74 - create an expansion heap with the default flags. */

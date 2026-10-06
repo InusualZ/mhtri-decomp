@@ -160,7 +160,7 @@ f32 fn_8028F86C(PlBox* box, const VEC3* point, f32* param) {
     if (axis_len2 >= 0.001f) {
         VEC3 scaled;
 
-        t = fn_8028F84C(fn_80052214(&sep.x, &box->vec_0x18.x) / axis_len2, 0.0f, 1.0f);
+        t = fn_8028F84C(vec3_dot(&sep.x, &box->vec_0x18.x) / axis_len2, 0.0f, 1.0f);
         vec3_scale(&scaled, &box->vec_0x18, t);
         /* `fn_800B0B90` is declared with the `ef` module's `Vec`, a distinct 0xC record with the same
          * layout (`ef.h`); the conversion is a view, not arithmetic. */

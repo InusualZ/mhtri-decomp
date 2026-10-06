@@ -95,7 +95,7 @@ u32 fn_80176AA8(void* p);
  * signature; the shapes here are the call sites' - each is a leaf this unit never re-enters) ---- */
 void fn_8005D1AC(void* out, s32 a);
 void mtx34_identity(void* out);
-void fn_800532DC(void* dst, const void* src);
+void mtx34_copy(void* dst, const void* src);
 int fn_8006FDCC(const void* p);
 void fn_8005D0CC(void* obj, const void* sub);
 void assignVec3(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);

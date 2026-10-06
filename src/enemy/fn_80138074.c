@@ -24,6 +24,10 @@
  *  - `fn_8013823C`, `fn_801394D4`, `fn_80139620`: the frame differs (0x100/0x40/0xC0 against our 0xE0/0x30/0xD0);
  *    `fn_8013817C`: ours saves r30.
  *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.sdata2`/`.text`/extab/extabindex short of the claim.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `__cvt_fp2unsigned`,
+ *     `fn_805012E8`, `MTX34ToMTX33__Q24nw4r4mathFPQ34nw4r4math5MTX33PCQ34nw4r4math5MTX34`, `lbl_807919F4`,
+ *     `lbl_807919F0`, `lbl_807919F8`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_805012E8`.
  * SHAPES. `fn_8013A770` and `fn_8013A6F4` hoist the `item != NULL` test out of the loop; `fn_8013A770`'s index and
  *   `fn_801391FC`'s `total` are 32-bit accumulators narrowed at the use (`u16` locals re-mask every iteration);
  *   `fn_8013A900` is a `switch` inside `for (;;)`, not three `if`s.  The file is C (the unit's own symbols are plain),
@@ -236,9 +240,9 @@ extern void addVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern void fn_800516F0(Mtx34* mtx);
 extern void fn_80051894(Mtx34* out, const Mtx34* a, const Mtx34* b, s32 arg3, f32 t, f32 u);
 extern void vec3_scale(Vec3* out, const Vec3* v, f32 scale);
-extern f32 fn_80052214(const Vec3* a, const Vec3* b);
+extern f32 vec3_dot(const Vec3* a, const Vec3* b);
 extern void fn_800524C0(Vec3* out, const Vec3* a, const Vec3* b, const Vec3* c, f32 t);
-extern void fn_800532DC(Mtx34* out, const Mtx34* src);
+extern void mtx34_copy(Mtx34* out, const Mtx34* src);
 extern void fn_8005D0CC(void* out, const void* src);
 extern s32 fn_8005D124(void* arg0);
 extern void fn_8005D1AC(void* out, s32 arg1);
@@ -720,7 +724,7 @@ void fn_8013823C(EnemyWork* self) {
             copyVec3(&vA4, &v2C);
             subVec3(&v20, &vD4, &vB0);
             copyVec3(&v98, &v20);
-            if (fn_80052214(&vA4, &v98) >= lbl_80796D40) {
+            if (vec3_dot(&vA4, &v98) >= lbl_80796D40) {
                 fn_802B01AC(&v14, &vD4, self->field_0x9F7);
                 copyVec3(&self->field_0x188, &v14);
                 self->field_0x188.y = fn_802B0430(self->field_0x9F7);
@@ -1385,12 +1389,12 @@ void fn_80139AA4(Mtx34* out, void* arg1, Mtx34* arg2) {
     MTX34_ctor(&m1);
     MTX34_ctor(&m2);
     MTX34_ctor(&m3);
-    fn_800532DC(&m1, &arg2[fn_8006FDCC(arg1)]);
+    mtx34_copy(&m1, &arg2[fn_8006FDCC(arg1)]);
     idx = fn_8005D124(arg1);
     fn_8005D0CC(&key, &idx);
-    fn_800532DC(&m2, &arg2[fn_8006FDCC(&key)]);
+    mtx34_copy(&m2, &arg2[fn_8006FDCC(&key)]);
     mtx34_inverse(&m3, &m2);
-    fn_800710BC(out, &m3, &m1);
+    mtx34_concat(out, &m3, &m1);
 }
 
 /* --------------------------------------------------------------------------------------------- */

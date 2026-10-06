@@ -11,6 +11,7 @@
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (the deleting destructor's `extsh` + `cmpwi` flag test).
  * NAMES. The map has only `fn_` stems for the range except `RetireEmitterAll`, `ForeachParticleManager` and
  *   `SetRootMtx`, written as `nw4r::ef::Effect` members.
+ *   GUESS (from the body and its callers): `ef_get_life_status`.
  * RESIDUALS. The source defines `fn_800A4AF0` (8 bytes) before `RetireEmitterAll`, so the two swap places in our
  *   `.text`.
  *   6 partial rows:
@@ -23,6 +24,12 @@
  *    `pm` itself skipped); the check-self-first loop scores higher but is 4 bytes short, so the size-exact form
  *    stays.
  *   flipcheck: `.data`, `.sdata` and `.sdata2` claimed, not emitted.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_80501A64`,
+ *     `List_Append__Q24nw4r2utFPQ34nw4r2ut4ListPv`, `fn_80501BF4`, `List_Remove__Q24nw4r2utFPQ34nw4r2ut4ListPv`,
+ *     `fn_80501C60`, `List_GetNext__Q24nw4r2utFPCQ34nw4r2ut4ListPCv`, `fn_80501C9C`,
+ *     `List_GetNth__Q24nw4r2utFPCQ34nw4r2ut4ListUs`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_80501A64`, `fn_80501BF4`, `fn_80501C60`,
+ *     `fn_80501C9C`.
  * SHAPES. The pointer guards are the `NW4R_POINTER_ASSERT` six-BOOL chain; the file argument is the call site's
  *   own string ("ef_effect.cpp", or "activitylist.h"/"res_emitter_ac.h" for the two header asserts).
  * SHAPES. `#line` puts each `Panic`/`Warning` on retail's line (`fn_800A45DC` 134, `fn_800A51D8` 423,
@@ -213,7 +220,7 @@ void fn_800A3800(void* p);
 u32 fn_800A5948(EfEffSys* self, EfEff* target);
 void fn_800A5D8C(EfEffSys* self, u32 groupID);
 u32 fn_800A6350(void* p);
-void fn_800A94A4(void* node, MTX34* mtx);
+void ef_emitter_get_mtx(void* node, MTX34* mtx);
 void fn_800A95D8(void* node);
 u32 fn_800A98D4(void* pm, void (*cb)(void*, u32), u32 arg, bool flag, u32 zero);
 void fn_800AE500(void* pm, u32 flag);
@@ -255,7 +262,7 @@ u32 fn_800A51B0(EfEff* self);
 void* fn_800A51C8(EfEff* self);
 u16 fn_800A51D0(EfEff* self);
 void* fn_800A51D8(EfEff* self, u16 idx);
-s32 fn_800A5248(void* p);
+s32 ef_get_life_status(void* p);
 void* fn_800A5250(EfEffList* list);
 u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32 flag, EfEffEmitter* match);
 u32 fn_800A5428(EfEff* self, void** pp, u8 a, u16 b);
@@ -663,7 +670,7 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
         }
         MTX34 mtx;
         MTX34_ctor(&mtx);
-        fn_800A94A4(node, &mtx);
+        ef_emitter_get_mtx(node, &mtx);
         node->mField_0x108.x = mtx.m[0][3];
         node->mField_0x108.y = mtx.m[1][3];
         node->mField_0x108.z = mtx.m[2][3];
@@ -727,7 +734,7 @@ extern "C" void* fn_800A51D8(EfEff* self, u16 idx) {
 }
 
 /* 0x800A5248 - the record's state getter. */
-extern "C" s32 fn_800A5248(void* p) {
+extern "C" s32 ef_get_life_status(void* p) {
     return *(s32*)((u8*)p + 0x0C);
 }
 
@@ -758,7 +765,7 @@ extern "C" u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32
     while (pm != NULL) {
         EfEffEmitter* next =
             (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, pm);
-        if (flag != 0u || fn_800A5248(pm) == 1) {
+        if (flag != 0u || ef_get_life_status(pm) == 1) {
             BOOL found = FALSE;
             EfEffEmitter* p = pm;
             while (!found && p != NULL) {

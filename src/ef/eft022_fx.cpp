@@ -17,6 +17,10 @@
  *   The other 14 partial rows have no recorded cause (`symdiff.py -u ef/eft022_fx --all`).
  *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text` (0x1E2C of 0x1E5C) and `.sdata2` (0x10 of 0x50) short of
  *   the claim; `.text`, `.sdata2`, extab and extabindex differing.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_8050131C`,
+ *     `MTX34Zero__Q24nw4r4mathFPQ34nw4r4math5MTX34`, `fn_80115FB0`, `_savegpr_15`, `_savegpr_16`, `_restgpr_15`,
+ *     `_restgpr_16`, `_savegpr_21`, `_savegpr_22`, `_restgpr_21`, `_restgpr_22`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050131C`.
  * SHAPES. `fn_80116EEC` nests `for (j = 0; j < 4; j++) for (k = 0; k < 8; k++)` (retail's `mtctr`/`bdnz` and the
  *   `mr r3,r4` early returns; a flat `do`/`while` emits a decrement and compare).
  *   `fn_80117120` reaps one slot per iteration.
@@ -183,7 +187,7 @@ extern "C" void fn_80117120(_EFT*);
 extern "C" void fn_800F8A44(void** effects, s32 count);
 
 
-extern "C" void fn_800532DC(void* dst, void* src);
+extern "C" void mtx34_copy(void* dst, void* src);
 
 extern "C" void fn_80059374(s32 a);
 extern "C" void fn_80059420(void);
@@ -937,7 +941,7 @@ extern "C" void fn_801156A0(_EFT* self)
             break;
         }
         for (j = 0; j < 5; j++) {
-            fn_800532DC(&work->mtx[i][j + 1], &work->mtx[i][j]);
+            mtx34_copy(&work->mtx[i][j + 1], &work->mtx[i][j]);
         }
     }
 }
@@ -1090,13 +1094,13 @@ extern "C" void fn_80115A80(_EFT* self)
             moved = 0;
             fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[i][0]);
             for (j = 0; j < 5; j++) {
-                fn_800532DC(&work->mtx[i][j + 1], &work->mtx[i][j]);
+                mtx34_copy(&work->mtx[i][j + 1], &work->mtx[i][j]);
             }
         } else {
             moved = 1;
         }
         for (j = 5; j > 0; j--) {
-            fn_800532DC(&work->mtx[i][j], &work->mtx[i][j - 1]);
+            mtx34_copy(&work->mtx[i][j], &work->mtx[i][j - 1]);
         }
         fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[i][0]);
         self->flag_0x01 = plw->field_0x001;
@@ -1166,9 +1170,9 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
     copyMat33(&mtx_arr[fn_8006FDCC(&h0)], src);
     k = 4;
     for (group = 0; group < 4; group++) {
-        fn_800532DC(&ma, &src[group]);
-        fn_800532DC(&mb, &src[group + 1]);
-        fn_800532DC(&mc, &src[group + 2]);
+        mtx34_copy(&ma, &src[group]);
+        mtx34_copy(&mb, &src[group + 1]);
+        mtx34_copy(&mc, &src[group + 2]);
         for (inner = 0; inner < 6; inner++) {
             a = lbl_805A0330[inner];
             b = lbl_805A0300[inner];
@@ -1188,7 +1192,7 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
             out.m[0][3] = f5;
             out.m[1][3] = f4;
             out.m[2][3] = f0;
-            fn_800532DC(dst, &out);
+            mtx34_copy(dst, &out);
             k++;
             if (k >= 0x1B) {
                 return;

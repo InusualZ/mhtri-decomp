@@ -32,9 +32,9 @@ extern char lbl_80594C20[]; /* "NW4R:Pointer Error\nparams(=%p) is not valid poi
 
 extern "C" {
 
-/* Helpers declared locally: fn_8009C484 (`ef/ef_util.cpp`'s vector normalise) and fn_80463F04
+/* Helpers declared locally: ef_vec3_normalize_to (`ef/ef_util.cpp`'s vector normalise) and fn_80463F04
  * (the runtime's `fabsf`). */
-extern void fn_8009C484(VEC3* out, VEC3* in);
+extern void ef_vec3_normalize_to(VEC3* out, VEC3* in);
 extern f32 fn_80463F04(f32 x);
 
 void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
@@ -91,17 +91,17 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             angle = (params->angle_end - params->angle_base) * ef_random_float(&em->progress);
             tube = 2.0f * (3.1415927f * ef_random_float(&em->progress));
         }
-        fn_8009C760(&c1, &s1, phase + angle);
-        fn_8009C760(&c2, &s2, tube);
+        ef_sin_cos(&c1, &s1, phase + angle);
+        ef_sin_cos(&c2, &s2, tube);
 
         v_pt.x = scale_a * (c1 + c1 * (ratio * s2)) / (1.0f + ratio);
         v_pt.y = scale_b * c2;
         v_pt.z = scale_c * (s1 * (-ratio * s2) - s1) / (1.0f + ratio);
 
         assignVec3((Vec*)&v_norm, (Vec*)&v_pt);
-        fn_8009C484(&v_norm, &v_norm);
+        ef_vec3_normalize_to(&v_norm, &v_norm);
         setVec3(&v_flat, v_pt.x, 0.0f, v_pt.z);
-        fn_8009C484(&v_flat, &v_flat);
+        ef_vec3_normalize_to(&v_flat, &v_flat);
         VEC3_ctor(&v_dir);
         if (ratio == 0.0f) {
             v_dir.x = c1 * (scale_a * s2);
@@ -112,7 +112,7 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             v_dir.y = scale_b * c2;
             v_dir.z = scale_c * (s1 * (-ratio * s2)) / (1.0f + ratio);
         }
-        fn_8009C484(&v_dir, &v_dir);
+        ef_vec3_normalize_to(&v_dir, &v_dir);
 
         fn_800A99B4(ctx, (Vec*)&v_out, em, (Vec*)&v_pt, (Vec*)&v_dir, (Vec*)&v_norm, (Vec*)&v_flat);
         VEC3 v_out_copy = v_out;

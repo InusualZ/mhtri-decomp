@@ -17,6 +17,9 @@
  *   --all`).
  *   flipcheck: `.sdata` claimed, not emitted; `.text` (0x1E78 of 0x1E9C), `.data` (0x30 of 0x268) and `.sdata2` (0x8 of
  *   0x6C) short of the claim; `.text`, `.data`, `.sdata2`, extab and extabindex differing.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_26`,
+ *     `_savegpr_27`, `_restgpr_26`, `_restgpr_27`, `lbl_80796AF0`, `lbl_80796AF4`, `lbl_80796AFC`, `lbl_80796B00`,
+ *     `lbl_80796AF8`, `lbl_80791948`, `lbl_80791940`, `_savegpr_25`, `_savegpr_24`, `_restgpr_25`, `_restgpr_24`.
  * SHAPES. `_EFT26_PHASE`'s colour is four plain `u8` fields, not a union (a union aligns to 4 and moves
  *   `_EFT26_WORK::slots` from +0x7C to +0x90); the two `fn_800964E4` sites read it as a word through
  *   `(u32*)&phase[i].color_r`.
@@ -205,7 +208,7 @@ void fn_80119D9C(_EFT* self);
  * copy stays - normalised to the owner's body (`void*` return).  `fn_80050850`/`addVec3` now
  * come from their owner's header, `fn_8004CAD8.h` (included above, rule 2). */
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
-void fn_800532DC(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
+void mtx34_copy(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
 /* eft_res_model_get comes from the owner's header `ef/eft_res.h` (rule 2): this unit's local
  * `void*` copy collided with the owner's `u8*` definition once the header declared it. */
 
@@ -879,7 +882,7 @@ extern "C" void fn_80118FF0(_EFT* self)
     rotLocalMatX(0xe39, &mtxA);
 
     for (i = 0; i < work->count; i++) {
-        fn_800532DC(&mtxB, &mtxA);
+        mtx34_copy(&mtxB, &mtxA);
         rotLocalMatZ(work->rot_a[i], &mtxB);
         copyVec3(&work->chara[i]->scale_0x1C, &v3);
         work->chara[i]->move2(&mtxB, 0);

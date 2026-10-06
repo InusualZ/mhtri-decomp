@@ -6,18 +6,19 @@
  *   .data 0x80591948-0x80591C68 (the `__FILE__` string "ef_util.cpp" first), .sdata 0x807912D8-0x807912E0,
  *   .sdata2 0x80795F70-0x80795FB8.  Left edge: `g3d/g3d_gpu.cpp`'s bodies cite "g3d_gpu.cpp" (0x80591900) and pool
  *   their own 0.0f (0x80795F6C) apart from this TU's (0x80795F7C).  Right edge: `fn_8009CDBC` cites
- *   "ef_animcurve.cpp"; the tail `fn_8009CD64` cites none of this TU's strings or pool, only the `.sdata` pair
+ *   "ef_animcurve.cpp"; the tail `ef_mtx34_column_length` cites none of this TU's strings or pool, only the `.sdata` pair
  *   {3.0f, 0.5f} at 0x807912D8.
  * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around `fn_8009B374`/`fn_8009B448` only
  *   (retail's unfused `clrlwi` + `slwi`, `li r0,<slot>; psq_lx` and `fmuls` + `fsubs` there; file-wide, the pass
- *   costs `fn_8009C6F0`/`fn_8009C760`).
+ *   costs `fn_8009C6F0`/`ef_sin_cos`).
  * NAMES. The map has only `fn_` stems for the range.
+ *   GUESS (from the body and its callers): `ef_sin_cos`, `ef_vec3_normalize_to`.
  * RESIDUALS. 3 rows unwritten: 0x8009C7D4-0x8009CBA0 (two empty bodies whose whole retail body is the
- *   paired-single sequence, playbook 85) and 0x8009CD64-0x8009CDBC (`fn_8009CD64`, declared, never defined).  The
+ *   paired-single sequence, playbook 85) and 0x8009CD64-0x8009CDBC (`ef_mtx34_column_length`, declared, never defined).  The
  *   source order differs from retail's, so `.text`, extab and extabindex run in another order.
  *   2 rows written and at 0: `fn_8009CBA0`, `fn_8009CC20` (paired-single bodies, playbook 85).
  *   7 partial rows:
- *  - `fn_8009C484`, `fn_8009C6F0`, `fn_8009C760`: paired-single bodies (playbook 85); our C versions also read
+ *  - `ef_vec3_normalize_to`, `fn_8009C6F0`, `ef_sin_cos`: paired-single bodies (playbook 85); our C versions also read
  *    `lbl_80795FA8`/`lbl_80795F7C` where retail does not;
  *  - `fn_8009B448`: the float registers of the assert's distance test differ;
  *  - `fn_8009BCB4`: the FPR restores are `psq_l <off>(r1)` where retail has `li r0,<off>; psq_lx` (the
@@ -29,6 +30,11 @@
  *   `lbl_80591948`.
  *   flipcheck: `.data` and `.sdata` claimed, not emitted; `.sdata2` 0x8 of 0x48; `.text` 0x16B8 of 0x1A48;
  *   extab 0x50 of 0x60; extabindex 0x78 of 0x90.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_80501C60`,
+ *     `List_GetNext__Q24nw4r2utFPCQ34nw4r2ut4ListPCv`, `lbl_80591948`, `lbl_80591BD8`, `lbl_80591B98`,
+ *     `lbl_80591C58`, `lbl_80591C18`, `lbl_80795F7C`, `lbl_80795F84`, `fn_8050133C`,
+ *     `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050133C`, `fn_80501C60`.
  * SHAPES. The pointer assert is the six-BOOL chain with a two-test first `if` (`ef/ef_point.cpp`'s shape); its
  *   trailing `(ptr)` is retail's fourth `Panic` argument (`mr r6, <ptr>`).
  */
@@ -61,7 +67,7 @@ f32 FrSqrt(f32 x);
 extern "C" {
 void* fn_80501C60(void* list, void* node);
 /* 0x8009CD64 - the matrix-axis scale helper fn_8009BCB4 reaches (unwritten). */
-f32 fn_8009CD64(const f32* mtx, s32 index);
+f32 ef_mtx34_column_length(const f32* mtx, s32 index);
 f32 fn_80463DE4(f32 x);
 f32 atan2f(f32 y, f32 x);
 f32 fn_8005A63C(f32 x);
@@ -75,7 +81,7 @@ void fn_8009B840(f32* mtx, s32 index, const f32* vec);
 f32* fn_8009BA78(const f32* mtx, s32 index, f32* vec);
 void fn_8009BCB4(const f32* vec, f32* mtx);
 void fn_8009BF08(const f32* mtx, f32* vec);
-s32 fn_8009C484(f32* dst, const f32* src);
+s32 ef_vec3_normalize_to(f32* dst, const f32* src);
 void fn_8009C7D4(f32* mtx, const f32* a, const f32* b);
 void fn_8009CA30(f32* mtx, f32 x, f32 y, f32 z);
 void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale);
@@ -229,15 +235,15 @@ extern "C" void fn_8009B650(const f32* src, f32* mtx) {
     VEC3_ctor((nw4r::math::VEC3*)v8);
 
     fn_8009BA78(src, 0, v20);
-    if (fn_8009C484(v20, v20) == 0)
+    if (ef_vec3_normalize_to(v20, v20) == 0)
         v20[0] = lbl_80795F80;
 
     fn_8009BA78(src, 1, v14);
-    if (fn_8009C484(v14, v14) == 0)
+    if (ef_vec3_normalize_to(v14, v14) == 0)
         v14[1] = lbl_80795F80;
 
-    fn_80051820(v8, v20, v14);
-    fn_80051820(v14, v8, v20);
+    vec3_cross(v8, v20, v14);
+    vec3_cross(v14, v8, v20);
 
     fn_8009B840(mtx, 0, v20);
     fn_8009B840(mtx, 1, v14);
@@ -279,13 +285,13 @@ extern "C" void fn_8009BCB4(const f32* mtx, f32* rot) {
     NW4R_POINTER_ASSERT(rot, 0x21B, lbl_80591A58);
 
     for (;;) {
-        sx = fn_8009CD64(mtx, 0);
+        sx = ef_mtx34_column_length(mtx, 0);
         if (sx < lbl_80795F90)
             break;
-        sy = fn_8009CD64(mtx, 1);
+        sy = ef_mtx34_column_length(mtx, 1);
         if (sy < lbl_80795F90)
             break;
-        sz = fn_8009CD64(mtx, 2);
+        sz = ef_mtx34_column_length(mtx, 2);
         if (sz < lbl_80795F90)
             break;
 
@@ -344,7 +350,7 @@ extern "C" void fn_8009C6F0(f32* pOut, f32 angle) {
 }
 
 /* Writes the sine of `angle` to `pSin` and its cosine to `pCos`. */
-extern "C" void fn_8009C760(f32* pSin, f32* pCos, f32 angle) {
+extern "C" void ef_sin_cos(f32* pSin, f32* pCos, f32 angle) {
     f32 y = angle * lbl_80795F78;
     f32 a = __fabs(y);
     f32 s;
@@ -402,34 +408,34 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
     len = fn_80050EDC(v2c);
     if (len > lbl_80795F8C) {
         r = nw4r::math::FrSqrt(len);
-        scale[0] = fn_800610AC(r);
+        scale[0] = math_reciprocal(r);
         fn_80051424(v2c, v2c, r);
 
         fn_8009BA78(mtx, 1, v20);
-        d0 = fn_80052214(v2c, v20);
+        d0 = vec3_dot(v2c, v20);
         fn_80051424(v8, v2c, d0);
         PSVECSubtract(v20, v20, v8);
 
         len = fn_80050EDC(v20);
         if (len > lbl_80795F8C) {
             r = nw4r::math::FrSqrt(len);
-            scale[1] = fn_800610AC(r);
+            scale[1] = math_reciprocal(r);
             d0 = d0 * r;
             fn_80051424(v20, v20, r);
 
             fn_8009BA78(mtx, 2, v14);
-            d1 = fn_80052214(v20, v14);
+            d1 = vec3_dot(v20, v14);
             fn_80051424(v8, v20, d1);
             PSVECSubtract(v14, v14, v8);
-            d2 = fn_80052214(v2c, v14);
+            d2 = vec3_dot(v2c, v14);
             fn_80051424(v8, v2c, d2);
             PSVECSubtract(v14, v14, v8);
 
             len = fn_80050EDC(v14);
             if (len > lbl_80795F8C) {
                 scale[2] = sqrt_f32(len);
-                fn_80051820(v8, v20, v14);
-                if (fn_80052214(v2c, v8) < lbl_80795F7C) {
+                vec3_cross(v8, v20, v14);
+                if (vec3_dot(v2c, v8) < lbl_80795F7C) {
                     scale[0] = scale[0] * -1.0;
                     scale[1] = scale[1] * -1.0;
                     scale[2] = scale[2] * -1.0;
@@ -440,7 +446,7 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
         } else {
             scale[1] = lbl_80795F7C;
             fn_8009BA78(mtx, 2, v14);
-            d2 = fn_80052214(v2c, v14);
+            d2 = vec3_dot(v2c, v14);
             fn_80051424(v8, v2c, d2);
             PSVECSubtract(v14, v14, v8);
             len = fn_80050EDC(v14);
@@ -455,11 +461,11 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
         len = fn_80050EDC(v20);
         if (len > lbl_80795F8C) {
             r = nw4r::math::FrSqrt(len);
-            scale[1] = fn_800610AC(r);
+            scale[1] = math_reciprocal(r);
             fn_80051424(v20, v20, r);
 
             fn_8009BA78(mtx, 2, v14);
-            d1 = fn_80052214(v20, v14);
+            d1 = vec3_dot(v20, v14);
             fn_80051424(v8, v20, d1);
             PSVECSubtract(v14, v14, v8);
             scale[2] = fn_80050F24(v14);
@@ -473,7 +479,7 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
 
 /* Normalises `vec` into `dst` and returns 1, or copies `vec` unchanged and returns 0 when it is the zero
  * vector. */
-extern "C" s32 fn_8009C484(f32* dst, const f32* vec) {
+extern "C" s32 ef_vec3_normalize_to(f32* dst, const f32* vec) {
     f32 x;
     f32 y;
     f32 z;
@@ -566,15 +572,15 @@ extern "C" void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale) {
 
     VEC3_ctor((nw4r::math::VEC3*)inv);
     if (lbl_80795F7C != scale[0])
-        inv[0] = fn_800610AC(scale[0]);
+        inv[0] = math_reciprocal(scale[0]);
     else
         inv[0] = lbl_80795FAC;
     if (lbl_80795F7C != scale[1])
-        inv[1] = fn_800610AC(scale[1]);
+        inv[1] = math_reciprocal(scale[1]);
     else
         inv[1] = lbl_80795FAC;
     if (lbl_80795F7C != scale[2])
-        inv[2] = fn_800610AC(scale[2]);
+        inv[2] = math_reciprocal(scale[2]);
     else
         inv[2] = lbl_80795FAC;
     fn_8050133C(dst, mtx, inv);

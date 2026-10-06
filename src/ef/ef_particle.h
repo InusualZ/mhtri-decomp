@@ -10,9 +10,9 @@
 extern "C" {
 #endif
 
-u8* fn_800AB388(void* p);          /* the particle's colour block (chain head + 0x94) */
-f32 fn_800AB3AC(EfParticle* self); /* the record's scale product for the current phase */
-f32 fn_800AB2DC(EfParticle* self); /* the record's scale for the current emitter phase */
+u8* ef_resource_draw_setting(void* p);          /* the particle's colour block (chain head + 0x94) */
+f32 ef_particle_get_scale(EfParticle* self); /* the record's scale product for the current phase */
+f32 ef_particle_get_scale_y(EfParticle* self); /* the record's scale for the current emitter phase */
 
 #ifdef __cplusplus
 }

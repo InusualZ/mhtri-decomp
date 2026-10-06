@@ -150,6 +150,7 @@
 
 #include "types.h"
 #include "gx.h"                  /* the SDK colour record `GXColor` (rule 1) */
+#include "RVLGX/GXSetZCompLoc.h"  /* owned by RVLGX/GXTexture_tail.cpp (rule 2) */
 #include "OS/mem.h"               /* `MEMAllocator` (rule 1) */
 #include "mh3_pad/Screen_w.h"      /* `ScreenWork`/`Screen_w`, owned by mh3_pad.cpp (rule 1/2) */
 #include "unsplit/unknown.h"     /* `system_w`/`SystemWork` (undecided module, rule 1/2) */
@@ -289,7 +290,6 @@ extern "C" void fn_804B6F70(u32, u32);
 extern "C" void GXSetDispCopyYScale(void);
 extern "C" void GXSetCopyFilter(u8 aa, u8* pattern, u32 enable, u8* filter);
 extern "C" void GXSetDispCopyGamma(u32);
-extern "C" void fn_804B9FC0(u32);
 extern "C" void GXSetPixelFmt(u32, u32);
 extern "C" void fn_804B7500(void* fb, u32);
 extern "C" void GXDrawDone(void);
@@ -820,7 +820,7 @@ extern "C" void fn_8003FCCC(void)
     GXSetDispCopyDst(Rmode->fbWidth, Rmode->xfbHeight);
     GXSetCopyFilter(Rmode->aa, Rmode->sample_pattern[0], 1, Rmode->vfilter);
     GXSetDispCopyGamma(0);
-    fn_804B9FC0(0);
+    GXSetZCompLoc(0);
     if (Rmode->aa != 0) {
         GXSetPixelFmt(2, 0);
     } else {

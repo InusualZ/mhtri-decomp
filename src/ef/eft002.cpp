@@ -19,8 +19,10 @@
  *  - `fn_800FCEC8`: retail tail-branches (`b`), ours falls through.
  *   flipcheck: `.sdata` claimed, not emitted; `.text` (0x1178 of 0x16BC), extab (0x60 of 0x70), extabindex (0x90 of
  *   0xA8), `.data` (0x120 of 0x370) and `.sdata2` (0x8 of 0x18) short of the claim and differing.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics):
+ *     `eftGetKeyRGB__FPUclPUcPUcPUc`.
  * SHAPES. The two returned values consumed by pointer (`fn_8006F304(&srt, access.GetResTexSrt(false))`,
- *   `fn_800532DC(&mtx_a, get_current_view_mtx())`) go through a reference parameter, so MWCC places the temporary
+ *   `mtx34_copy(&mtx_a, get_current_view_mtx())`) go through a reference parameter, so MWCC places the temporary
  *   below the named locals; a named local swaps the slots or copies the 48-byte matrix.
  *   `fn_800FD2B0`'s switch covers case 0 (a 0-based table, `cmplwi r0,29`) and the `flag != 1` return follows it;
  *   `_PLW::flag_0x30` is `s8` (retail `cmpwi`).
@@ -53,7 +55,7 @@
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_800FD520.h"
 #include "ef/fn_800FD718.h"
-#include "g3d/g3d_scnroot.h" /* fn_800834F0 (rule 2) */
+#include "g3d/g3d_scnroot.h" /* VEC2_ctor (rule 2) */
 #include "g3d/g3d_calcmaterial.h" /* fn_8006F304 (rule 2) */
 #include "g3d/g3d_state.h"
 #include "unsplit/sound.h"
@@ -129,7 +131,7 @@ void eftGetKeyRGB(u8* keys, long frame, u8* r, u8* g, u8* b);
 void setVector3(nw4r::math::VEC3* v, f32 x, f32 y, f32 z);
 
 extern "C" {
-void fn_800834F0(void* p);
+void VEC2_ctor(void* p);
 
 void fn_800DB6CC(nw4r::math::VEC3* pos);
 void fn_800DB714(nw4r::math::VEC3* pos);
@@ -256,7 +258,7 @@ struct _EFT_MODEL {
  * externs
  * ------------------------------------------------------------------------------------------------- */
 extern "C" void mtx34_identity(void* mtx);
-extern "C" void fn_800532DC(void* dst, const nw4r::math::MTX34& src);
+extern "C" void mtx34_copy(void* dst, const nw4r::math::MTX34& src);
 extern "C" void mtx34_concat_assign(void* dst, void* src);
 extern "C" void fn_800FBB90(void* mtx, nw4r::math::VEC3* pos);
 extern "C" void eft_res_slot_release(void* self);
@@ -537,7 +539,7 @@ extern "C" void fn_800FCA54(_EFT* self)
     s32 i;
     _EFT001_EFFECT_WORK* work;
 
-    fn_800834F0(buf);
+    VEC2_ctor(buf);
     VEC3_ctor(&vec);
     work = (_EFT001_EFFECT_WORK*)self->work_0x38;
 
@@ -837,7 +839,7 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self)
         }
     }
 
-    fn_800532DC(&mtx_a, get_current_view_mtx());
+    mtx34_copy(&mtx_a, get_current_view_mtx());
     mtx34_inverse(&mtx_a, &mtx_a);
     mtx34_identity(&mtx_b);
     fn_800FBB90(&mtx_b, &self->pos_0x18);

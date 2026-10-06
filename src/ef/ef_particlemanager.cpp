@@ -8,6 +8,7 @@
  *   first), .bss 0x80694538-0x80694598, .sdata2 0x807960A0-0x807960E8.
  * FLAGS. `cflags_main`; `#pragma fp_contract off` around one body.
  * NAMES. The map has only `fn_` stems for the range.
+ *   GUESS (from the body and its callers): `ef_pm_handle`, `ef_pm_get_mtx`, `ef_pm_modulate_color`.
  * RESIDUALS. 15 rows unwritten (empty bodies): 0x800ABA6C-0x800AC0E4, 0x800AC1BC-0x800AD0C4,
  *   0x800AD254-0x800AD514, 0x800AD520-0x800AD9C0, 0x800AD9CC-0x800ADA24, 0x800ADA5C-0x800ADDCC,
  *   0x800ADED8-0x800AE298, 0x800AE2A4-0x800AE500, 0x800AE628-0x800AE698, 0x800AE6A8-0x800AEE0C.  The source order
@@ -21,6 +22,11 @@
  *   flipcheck: `.bss`, `.data` and `.sdata2` claimed, not emitted (`.sdata2` is a partial pool: flipcheck names a
  *   fold with `ef/ef_particle.cpp`, one shared literal); `.text` 0x990 of 0x37F0; extab 0x90 of 0x108; extabindex
  *   0xD8 of 0x18C.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_805013FC`,
+ *     `MTX34RotAxisFIdx__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3f`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_805013FC`, `fn_80501C80`.
+ *   `ef_pm_get_mtx` is unwritten (an empty body).
+ *   `ef_pm_modulate_color` is unwritten (an empty body).
  * SHAPES. The pointer asserts are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
  *   ("ef_particlemanager.cpp", "particle.h" or "res_emitter.h"); `#line` reproduces each assert's line (61, 72, 73,
  *   0x29E, 0x2D5, ...).
@@ -65,12 +71,12 @@ void fn_800A45DC(void* list, void* node);
 void fn_800A4A1C(void* list, void* node);
 void fn_800A49B8(void* node);
 void fn_800A6554(void* em, void* self);
-void fn_800834F0(void* self);
+void VEC2_ctor(void* self);
 void color_rgba_copy(void* dst, const void* src);
 void fn_80051424(void* dst, const void* src, f32 f);
 void fn_800513F0(void* dst, f32 f);
-void fn_800514FC(void* dst, const void* a, const void* b);
-s32 fn_800A5248(void* self);
+void mtx34_mult_vec3(void* dst, const void* a, const void* b);
+s32 ef_get_life_status(void* self);
 u8* fn_800A8BF8();
 void fn_80501C80(void* self, s32 v);
 void fn_805013FC(void* a, void* b, f32 f);
@@ -233,7 +239,7 @@ extern "C" EfPmManager* fn_800AB664(EfPmManager* self) {
 
 /* Construct the scalar/vec block at manager +0x58. */
 extern "C" EfPmStateA* fn_800AB6BC(EfPmStateA* self) {
-    fn_800834F0(self);
+    VEC2_ctor(self);
     VEC3_ctor(&self->aa.vec);
     fn_800AB6FC(&self->b);
     return self;
@@ -394,7 +400,7 @@ extern "C" void fn_800AE500(EfPmManager* self, s32 arg1) {
             u16 life = node->life;
             if (life != 0)
                 node->life = (u16)(life - 1);
-            if (fn_800A5248(node) == 1 && node->retireFlag == 1)
+            if (ef_get_life_status(node) == 1 && node->retireFlag == 1)
                 node->retireFlag = 0;
         }
         node = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
@@ -405,7 +411,7 @@ extern "C" void fn_800AE500(EfPmManager* self, s32 arg1) {
 extern "C" void fn_800AE5B0(EfPmManager* self) {
     EfPmParticle* node = self->list.head;
     while (node != NULL) {
-        if (fn_800A5248(node) == 1 && node->retireFlag == 3)
+        if (ef_get_life_status(node) == 1 && node->retireFlag == 3)
             node->retireFlag = 1;
         node = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
     }
@@ -419,7 +425,7 @@ extern "C" nw4r::math::MTX34* fn_800AE698() {
 extern "C" void fn_800AE6A4() {
 }
 
-extern "C" void fn_800AEE0C(void* a, EfPmManager* m) {
+extern "C" void ef_pm_handle(void* a, EfPmManager* m) {
     ef_store_word(a, (s32)m->resource);
 }
 
@@ -447,6 +453,6 @@ extern "C" void fn_800AD9CC() {}
 extern "C" void fn_800ADA5C() {}
 extern "C" void fn_800ADED8() {}
 extern "C" void fn_800AE2A4() {}
-extern "C" void fn_800AE360(void* target, MTX34* out) { (void)target; (void)out; }
+extern "C" void ef_pm_get_mtx(void* target, MTX34* out) { (void)target; (void)out; }
 extern "C" void fn_800AE628() {}
-extern "C" void fn_800AE6A8() {}
+extern "C" void ef_pm_modulate_color() {}

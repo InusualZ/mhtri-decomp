@@ -13,7 +13,7 @@
  * RESIDUALS. `fn_800CA200__FUiP2EmP2PmUiUiPvUsUif` (0x800CA200-0x800CB948) is unwritten past its three pointer
  *   asserts (lines 94-96). Its known structure: a 14-element `Vec3` array at r1+8 worked on in pairs from the top;
  *   six blocks of `VEC3_ctor` x2, a fill, a scale by `ef_random_float(&em->field_0xEC)`, a `fabsf` compare against
- *   `lbl_80796268`, `fn_80463F98` + `fn_800610AC` + `sqrt_f32`, then `fn_800C9DD0(a, &pair[1], &pair[0], em, pm, d,
+ *   `lbl_80796268`, `fn_80463F98` + `math_reciprocal` + `sqrt_f32`, then `fn_800C9DD0(a, &pair[1], &pair[0], em, pm, d,
  *   f, e)`; 69 `fn_800C9DCC` (`fabsf` thunk) calls; loops over `n*n` and over `n`, the inner one a 4-state
  *   `switch` walking a ring.
  *  - `fn_800C9DD0__FUiP4Vec3P4Vec3P2EmP2PmUsfUi`: the `v3_copy`/`b_copy` copies move floats (`lfs`/`stfs`) where
@@ -21,6 +21,11 @@
  *    retail goes through r3; declaration order, a named `Pm*` local, a cast and `-lang=c++` do not move it.
  *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x8 of 0x30 (the pool is declared, so the conversion
  *   constant reads our `@N`); `.text` 0x728 of 0x1B78; extab and extabindex differ in the unwritten row's record.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_18`,
+ *     `lbl_80796260`, `lbl_8079624C`, `lbl_80796250`, `lbl_80796248`, `lbl_80796264`, `fn_800C9DCC`,
+ *     `lbl_80796268`, `lbl_80796258`, `lbl_80796244`, `lbl_8079626C`, `VEC3_ctor`, `ef_random_float`,
+ *     `fn_80463F04`, `fn_80463F98`, `math_reciprocal`, `sqrt_f32`, `fn_800C9DD0__FUiP4Vec3P4Vec3P2EmP2PmUsfUi`,
+ *     `fn_800A6E70`, `setVec3`, `_restgpr_18`.
  * SHAPES. The unit keeps its own scalar typedefs (below): its manglings encode `unsigned int`.
  */
 
@@ -65,7 +70,7 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 /* nw4r::math and effect-library helpers; retail's relocations carry their plain map names, so they
  * have C linkage. */
 extern "C" {
-extern void fn_8009C484(Vec3* dst, Vec3* src);
+extern void ef_vec3_normalize_to(Vec3* dst, Vec3* src);
 extern void assignVec3(Vec3* dst, const Vec3* src);
 extern f32 fn_80050EDC(const Vec3* v);
 extern f32 ef_random_float(const void* p);
@@ -138,21 +143,21 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
         nw4r::db::Panic(lbl_80594C68, 44, lbl_80594CA8, pm);
     }
 
-    fn_8009C484(c, c);
+    ef_vec3_normalize_to(c, c);
     assignVec3(&v1, b);
     if (fn_80050EDC(&v1) <= lbl_80796240) {
         v1.x = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
         v1.y = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
         v1.z = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
     }
-    fn_8009C484(&v1, &v1);
+    ef_vec3_normalize_to(&v1, &v1);
     assignVec3(&v2, b);
     v2.y = lbl_8079624C;
     if (fn_80050EDC(&v2) <= lbl_80796240) {
         v2.x = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
         v2.z = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
     }
-    fn_8009C484(&v2, &v2);
+    ef_vec3_normalize_to(&v2, &v2);
     /* This unit's `Vec3` (the map's `P4Vec3`) and the helper's `nw4r::math::VEC3` share one 0xC-byte
      * layout. */
     VEC3_ctor((nw4r::math::VEC3*)&v3);

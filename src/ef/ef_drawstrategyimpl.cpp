@@ -1,54 +1,82 @@
 /*
- * ef/ef_drawstrategyimpl.cpp - nw4r::ef DrawStrategyImpl: the lazy singletons, the three-layer texture-set
- *   constructor and its layers, `InitTexture` and the per-draw material and walker setup, the draw-time view state
- *   and texture-layer accessors, the ahead-context initialiser and walker selectors, the out-of-line GX FIFO
- *   writers, and the static initializer `fn_800C9488`.
+ * ef/ef_drawstrategyimpl.cpp - nw4r::ef DrawStrategyImpl: the strategy builder's lazy singletons, the constructors,
+ *   the per-draw texture/TEV/channel setup, the per-particle GP setup (alpha compare, TEV colours, texture objects and
+ *   matrices, and a dummy primitive that flushes the GP), the out-of-line GX FIFO writers and `EfDrawInfo`/particle
+ *   accessors, the particle-list walkers and their selectors, the ahead context, and the static initializer.
  * RANGE. .text 0x800C5DB8-0x800C9540 (69 functions); extab 0x8000A49C-0x8000A554, extabindex 0x80023A90-0x80023BA4,
  *   .ctors 0x8056F2E4-0x8056F2E8, .data 0x80594850-0x80594BA8 (the `__FILE__` string "ef_drawstrategyimpl.cpp"
  *   first), .bss 0x806945E8-0x80694C68, .sbss 0x80794930-0x80794938, .sdata2 0x807961E0-0x80796208.
- * FLAGS. `cflags_main`; `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of every
- *   narrowing GX FIFO store, playbook 39).
- * NAMES. The map has only `fn_` stems for the range.
- * RESIDUALS. 7 rows unwritten (declared, never defined): 0x800C5DB8-0x800C5F74, 0x800C6158-0x800C64AC,
- *   0x800C64E4-0x800C68B8, 0x800C68E8-0x800C6F90, 0x800C73F8-0x800C8674, 0x800C8F10-0x800C9434.  The source order
- *   differs from retail's, so `.text`, extab and extabindex run in another order.
- *   10 partial rows:
- *  - `fn_800C8680`, `fn_800C8734`, `fn_800C87E8`, `fn_800C889C`, `fn_800C8954`, `fn_800C89D0` (each 0x10 short):
- *    retail materialises the `layer >= 0 && layer < 3` assert into a register (`li r0,0; cmplwi ...,2; bgt; li
- *    r0,1; cmpwi r0,0; bne`) where every shape tried here branches on the compare;
- *  - `fn_800C5F74`: the layer pointer and the end pointer swap r30/r31;
- *  - `fn_800C60DC` (ours 0x84 of 0x7C): two extra `clrlwi r0,r0,24` narrowings;
- *  - `fn_800C7270`: the alpha-threshold compare is `cmplw` where retail has `cmpw`, and the branch layout differs;
- *  - `fn_800C9488` (ours 0xC0 of 0xB8): the two pool constants load in another order and twice more.
- *   `ef/ef_drawsmoothstripestrategy.cpp` defines 46 of this range's functions too.
- *   flipcheck: `.bss`, `.ctors`, `.data`, `.sbss` and `.sdata2` claimed, not emitted; `.text` 0x1008 of 0x3788;
- *   extab 0x80 of 0xB8; extabindex 0xC0 of 0x114.
+ *   Seam: `DrawStrategyBuilder::Create` (0x800C5DB8), its seven statics (.bss 0x806945E8-0x80694C08), their guards
+ *   (.sbss 0x80794930-0x80794937) and its vtable (.data 0x80594840, between this unit's and
+ *   `ef/ef_drawsmoothstripestrategy.cpp`'s claims) are one TU of their own in nw4r (`ef_drawstrategybuilder.cpp`): no
+ *   assert of this file's is cited before 0x800C5F74.
+ * FLAGS. `cflags_main` plus `-pool off` (configure.py: each `.bss` object of `Create` and the static initializer gets
+ *   its own `lis`/`addi`, playbook 43); `#pragma peephole off` before the includes (the unfused `clrlwi`/`extsh`/
+ *   `extsb` of the GX FIFO writers and guard tests, playbook 39) and `#pragma fp_contract off` (the texture matrix
+ *   keeps `fmuls` + `fadds`).
+ * NAMES. GUESS: the members are named after NintendoWare's `DrawStrategyImpl` (`InitTexture`/`InitTev`/`InitColor`,
+ *   `SetupGP`, `GetGetFirstDrawParticleFunc`) from what they do and the assert text (`mTexmapMap[0] == 0`,
+ *   `pp->mParameter.mTexture[texIndex]`, `pm->mManagerEM`); `InitGraphics`, `SetupGPAlpha`/`Color`/`Texture`,
+ *   `PrevTexture`, `AheadContext`'s parameters, the `ef_particle_*` texture-layer accessors and the `ef_unit_*_vec`/
+ *   `ef_zero_vec`/`ef_identity_mtx` globals are descriptive.  The GX FIFO writers and the walkers keep their map stems.
+ *   GUESS (from the body and its callers): `ef_particle_tex_offset_t`, `ef_particle_tex_offset_s`,
+ *   GUESS: `ef_particle_tex_scale_t`, `ef_particle_tex_scale_s`, `ef_particle_wrap_t`, `ef_particle_wrap_s`.
+ * RESIDUALS. 4 partial rows:
+ *  - `SetupGP` (0x800C68E8): retail keeps an explicit `cmpwi 0` for the GX_NONE case of the position, normal and
+ *    texcoord switches (ours folds it into the default), and tests the effect system's flush flag `bne; b` where ours
+ *    `beq`s;
+ *  - `SetupGPAlpha` (0x800C7270): retail follows the reference compare with a redundant `bne`/`beq` pair;
+ *  - `SetupGPTexture` (0x800C7CE0): the texture pointer lives in r30 (ours r23), the asserted texture pointer is loaded
+ *    after the six temporaries are seeded (ours before), and the LOD's 0.0f comes from a hoisted register;
+ *  - `AheadContext::AheadContext` (0x800C8F10): the same field-assert load placement, and the two `(0, 1, 0)`
+ *    temporaries sit in swapped stack slots.
+ *   flipcheck: `.ctors` and `.data` claimed, not emitted (the strings are declared by their map names).
+ *   `DrawStrategyImpl` (constructor): the empty body is the whole source - the compiler
+ *     emits the base call and the vtable store.
+ *   `DrawStrategy` (constructor): the empty body is the whole source - the compiler
+ *     emits the base call and the vtable store.
+ * SHAPES. `IsValidPointer` field asserts pass the pointer as the fourth `Panic` argument (retail loads it into r6);
+ *   `InitTev`'s `GXSetZMode` arguments are ternaries (ours evaluates them in retail's order only that way); the
+ *   attenuation selector is an enum; the accessors take `int layer` (the `layer >= 0 && layer < 3` assert folds into
+ *   one unsigned compare) and the reverse flags are `u8` (the `case 2/3` range check wraps through `addi 254`).
  */
 
-#include "ef.h"
-#include "ef/ef_drawstrategyimpl.h"
-#include "ef/fn_800AEE48.h"
-#include "gx.h"
-#include "unsplit/ef.h"
-#include "g3d/g3d_scnroot.h" /* fn_800834F0 (rule 2) */
-#include "g3d/fn_80075DCC.h" /* fn_80077DF0, owned by g3d/fn_80075DCC.cpp (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
-
-/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
- * (`Panic__Q24nw4r2dbFPCciPCce`). */
-#ifdef __cplusplus
-namespace nw4r {
-namespace db {
-void Panic(const char* file, int line, const char* fmt, ...);
-}  // namespace db
-}  // namespace nw4r
-#endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #pragma peephole off
+
+#include "ef.h"
+#include "gx.h"
+#include "ef/ef_drawstrategyimpl.h"
+#include "ef/ef_drawbillboardstrategy.h" /* DrawBillboardStrategy/DrawDirectionalStrategy (rule 2) */
+#include "ef/ef_drawfreestrategy.h"      /* DrawFreeStrategy (rule 2) */
+#include "ef/ef_drawlinestrategy.h"      /* DrawLineStrategy (rule 2) */
+#include "ef/ef_drawpointstrategy.h"     /* DrawPointStrategy (rule 2) */
+#include "ef/ef_drawsmoothstripestrategy.h" /* DrawSmoothStripeStrategy (rule 2) */
+#include "ef/ef_drawstripestrategy.h"    /* DrawStripeStrategy, fn_800B7F58 (rule 2) */
+#include "ef/fn_800AEE48.h"              /* the stripe unit's walkers and ef_vec3_normalize (rule 2) */
+#include "ef/ef_particle.h"              /* fn_800AB388 (rule 2) */
+#include "ef/ef_particlemanager.h"       /* fn_800AE360 (rule 2) */
+#include "EXI/GXBegin.h"                 /* the GX entry points EXI/ProbeBarnacle.c owns (rule 2) */
+#include "RVLGX/GXSetTevOrder.h"         /* the GX entry points RVLGX/GXTexture_tail.cpp owns (rule 2) */
+#include "EXI/GXSetTexCoordGen2.h"       /* GXSetTexCoordGen2 (rule 2) */
+#include "g3d/g3d_scnroot.h"             /* VEC2_ctor (rule 2) */
+#include "g3d/fn_80075DCC.h"             /* fn_80077DF0 (rule 2) */
+#include "g3d/g3d_calcview.h"            /* fn_800710BC (rule 2) */
+#include "g3d/g3d_state.h"               /* mtx34_inverse (rule 2) */
+#include "nw4r/fn_805012C4.h"            /* mtx34_rotate_vec3 (rule 2) */
+#include "fn_8004CAD8.h"                 /* MTX34_ctor, mtx34_identity, fn_80050508 (rule 2) */
+#include "fn_80047398.h"                 /* color_rgba_copy (rule 2) */
+#include "mh3_pad/vec3.h"                /* copyVec3 (rule 2) */
+#include "ef/ef_particle_get_color.h"   /* the particle colour getters (rule 2) */
+#include "ef/ef_pm_modulate_color.h"    /* the manager colour helpers (rule 2) */
+#include "ef/ef_emitter_tex_flags.h"    /* the emitter accessors (rule 2) */
+#include "ef/ef_draw_info_projection.h" /* ef_draw_info_projection (rule 2) */
+#include "mh3_pad/vec3_assign.h"        /* vec3_assign (rule 2) */
+
+
+
+extern "C" {
+
+#pragma fp_contract off
 
 /* This unit's `__FILE__`/assert strings and the `particle.h` assert pairs (its claimed `.data`),
  * declared, never defined. */
@@ -61,8 +89,6 @@ extern char lbl_80594934[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer
 extern char lbl_80594968[]; /* "NW4R:Pointer Error\npm->mManagerEM(=%p) is not valid..."  .data 0x80594968 */
 extern char lbl_805949A8[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."    .data 0x805949A8 */
 extern char lbl_805949E4[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."        .data 0x805949E4 */
-extern char lbl_80594A18[]; /* the three-layer texture set's vtable (fn_800C8A48/8A64)     .data 0x80594A18 */
-extern char lbl_80594A30[]; /* the base texture-set vtable                                 .data 0x80594A30 */
 extern char lbl_80594A40[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594A40 */
 extern char lbl_80594A70[]; /* "particle.h"                                               .data 0x80594A70 */
 extern char lbl_80594A7C[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594A7C */
@@ -76,351 +102,584 @@ extern char lbl_80594B60[]; /* "particle.h"                                     
 extern char lbl_80594B6C[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594B6C */
 extern char lbl_80594B9C[]; /* "particle.h"                                               .data 0x80594B9C */
 
-/* The pool constants this unit's code loads (values from the binary dossier). */
-extern f32 lbl_807961E0; /* 1.0f                                                             .sdata2 0x807961E0 */
-extern f32 lbl_807961E4; /* 0.0f                                                             .sdata2 0x807961E4 */
-extern f32 lbl_807961E8; /* 100.0f                                                           .sdata2 0x807961E8 */
-extern f32 lbl_807961EC; /* -1.0f                                                            .sdata2 0x807961EC */
-extern f32 lbl_807961F0; /* 0.5f                                                             .sdata2 0x807961F0 */
-extern f32 lbl_807961F8; /* 4.5036e+15 (0x4330000000000000)                                  .sdata2 0x807961F8 */
-extern f32 lbl_80796200; /* 4.5036e+15 (0x4330000080000000)                                  .sdata2 0x80796200 */
+EfAheadContext* fn_800C9434(EfAheadContext* self);
 
-/* The GX texture-coordinate generator (an SDK symbol) and the shared matrix initialiser. */
-extern void GXSetTexCoordGen2(u32 dst_coord, u32 func, u32 src_param, u32 mtx, u32 normalize,
-                              u32 pt_texmtx);
+}  // extern "C"
 
-/* --------------------------------------------------------------------------------------------- *
- * The three-layer texture set's constructor, 0x800C5F74..0x800C6054.
- * --------------------------------------------------------------------------------------------- */
+namespace nw4r {
+namespace ef {
 
-EfParticleLayers* fn_800C5F74(EfParticleLayers* self);
-EfTextureLayer* fn_800C5FDC(EfTextureLayer* self);
-void fn_800C6054(EfParticleLayers* self);
+/* 0x800C5DB8 (0x1BC): returns the strategy singleton of a draw type, building it on first use. */
+DrawStrategy* DrawStrategyBuilder::Create(u32 type) {
+    static DrawBillboardStrategy billboard;
+    static DrawDirectionalStrategy directional;
+    static DrawFreeStrategy free;
+    static DrawLineStrategy line;
+    static DrawPointStrategy point;
+    static DrawStripeStrategy stripe;
+    static DrawSmoothStripeStrategy smooth_stripe;
 
-/* Builds the three-layer texture set, installs its vtable and returns it. */
-EfParticleLayers* fn_800C5F74(EfParticleLayers* self) {
-    EfTextureLayer* p;
-    EfTextureLayer* end;
-
-    fn_800C6054(self);
-    self->vtable = (u32)lbl_80594A18;
-    p = &self->layers[0];
-    end = &self->layers[3];
-    do {
-        fn_800C5FDC(p);
-        p++;
-    } while (p < end);
-    return self;
+    switch (type) {
+    case 3:
+        return &billboard;
+    case 4:
+        return &directional;
+    case 2:
+        return &free;
+    case 1:
+        return &line;
+    case 0:
+        return &point;
+    case 5:
+        return &stripe;
+    case 6:
+        return &smooth_stripe;
+    }
+    return &billboard;
 }
 
-/* Builds one texture layer. */
-EfTextureLayer* fn_800C5FDC(EfTextureLayer* self) {
+}  // namespace ef
+}  // namespace nw4r
+
+/* The unit vectors, the zero vector and the identity matrix the static initializer builds. */
+VEC3 ef_unit_x_vec;
+VEC3 ef_unit_y_vec;
+VEC3 ef_unit_z_vec;
+VEC3 ef_zero_vec;
+MTX34 ef_identity_mtx;
+
+namespace nw4r {
+namespace ef {
+
+/* 0x800C5F74 (0x68): builds the strategy and its three texture-state caches. */
+DrawStrategyImpl::DrawStrategyImpl() {}
+
+/* 0x800C5FDC (0x78): one texture layer's cache, at the identity transform with no texture. */
+DrawStrategyImpl::PrevTexture::PrevTexture() {
     f32 one;
     f32 zero;
 
-    fn_800834F0(&self->field_0x1C);
-    fn_800834F0(&self->field_0x28);
-    self->field_0x00 = 0;
-    one = lbl_807961E0;
-    self->field_0x04 = one;
-    self->field_0x08 = one;
-    self->field_0x0C = one;
-    self->field_0x10 = one;
-    self->field_0x14 = 0;
-    self->field_0x18 = 0;
-    self->field_0x1C = one;
-    self->field_0x20 = one;
-    zero = lbl_807961E4;
-    self->field_0x24 = zero;
-    self->field_0x28 = zero;
-    self->field_0x2C = zero;
-    return self;
+    VEC2_ctor(&scale);
+    VEC2_ctor(&translate);
+    texture = NULL;
+    one = 1.0f;
+    scale_s = one;
+    scale_t = one;
+    offset_s = one;
+    offset_t = one;
+    wrap_s = 0;
+    wrap_t = 0;
+    scale.x = one;
+    scale.y = one;
+    zero = 0.0f;
+    rotate = zero;
+    translate.x = zero;
+    translate.y = zero;
 }
 
-/* Installs the base vtable (the derived constructor overwrites it). */
-void fn_800C6054(EfParticleLayers* self) {
-    self->vtable = (u32)lbl_80594A30;
+/* 0x800C6054 (0x10): the interface's constructor. */
+DrawStrategy::DrawStrategy() {}
+
+/* 0x800C6064 (0x78): sets the GX texture coordinates, TEV and colour channels up for one particle manager. */
+void DrawStrategyImpl::InitGraphics(EfDrawParticleManager* pm, const EfEmitterDrawSetting& setting,
+                                    const EfDrawInfo& info) {
+    InitTexture(setting);
+    InitTev(setting, info);
+    InitColor(pm, setting, info);
 }
 
-/* The GX calls and the shared fog helper the per-draw setup below uses. */
-extern void GXSetNumTexGens(u8 count);
-extern void GXSetAlphaCompare(u32 ref0, u32 func, u32 ref1, u32 op, u32 ref2);
-extern void color_rgba_copy(void* dst, const void* src);
-
-void fn_800C6064(EfDrawStrategyImpl* self, u32 a, u16* params, void* state);
-void fn_800C60DC(EfDrawStrategyImpl* self, u16* params);
-void fn_800C6158(EfDrawStrategyImpl* self, void* params, void* state);
-void fn_800C64E4(EfDrawStrategyImpl* self, u32 a, void* params, void* state);
-
-/* Per-draw texture-coordinate setup: picks the GX tex-coord generators from the material flags. */
-void fn_800C60DC(EfDrawStrategyImpl* self, u16* params) {
-    self->tex_coord_count = 0;
-    self->tex_coord_0 = -1;
-    self->tex_coord_1 = -1;
-    self->tex_coord_2 = -1;
-    if ((*params & 0x10) != 0) {
-        self->tex_coord_0 = 0;
-        self->tex_coord_count = 1;
+/* 0x800C60DC (0x7C): gives each enabled texture layer the next texture coordinate generator. */
+void DrawStrategyImpl::InitTexture(const EfEmitterDrawSetting& setting) {
+    mNumTexmap = 0;
+    mTexmapMap[0] = -1;
+    mTexmapMap[1] = -1;
+    mTexmapMap[2] = -1;
+    if ((setting.flags & 0x10) != 0) {
+        mTexmapMap[0] = 0;
+        mNumTexmap = 1;
     }
-    if ((*params & 0x20) != 0) {
-        self->tex_coord_1 = self->tex_coord_count;
-        self->tex_coord_count = self->tex_coord_count + 1;
+    if ((setting.flags & 0x20) != 0) {
+        mTexmapMap[1] = mNumTexmap;
+        mNumTexmap++;
     }
-    if ((*params & 0x40) != 0) {
-        self->tex_coord_2 = self->tex_coord_count;
-        self->tex_coord_count = self->tex_coord_count + 1;
+    if ((setting.flags & 0x40) != 0) {
+        mTexmapMap[2] = mNumTexmap;
+        mNumTexmap++;
     }
-    GXSetNumTexGens(self->tex_coord_count);
+    GXSetNumTexGens(mNumTexmap);
 }
 
-/* Sets one draw strategy up from a material: texture coords, then the layer state and figures. */
-void fn_800C6064(EfDrawStrategyImpl* self, u32 a, u16* params, void* state) {
-    fn_800C60DC(self, params);
-    fn_800C6158(self, params, state);
-    fn_800C64E4(self, a, params, state);
+}  // namespace ef
+}  // namespace nw4r
+
+extern "C" {
+
+/* 0x800C64AC (0x38): reads the fog record out of the view state. */
+void fn_800C64AC(const EfDrawInfo* self, s32* type, f32* start_z, f32* end_z, f32* near_z, f32* far_z,
+                 GXColor* color) {
+    *type = self->fog_type;
+    *start_z = self->fog_start_z;
+    *end_z = self->fog_end_z;
+    *near_z = self->fog_near_z;
+    *far_z = self->fog_far_z;
+    color_rgba_copy((u8*)color, (const u8*)&self->fog_color);
 }
 
-/* Reads the fog record out of the material for GXSetFog. */
-void fn_800C64AC(EfDrawStrategyImpl* self, s32* color, f32* near, f32* far, f32* density, f32* out_scale,
-                 void* fog_out) {
-    *color = self->fog_color;
-    *near = self->fog_near;
-    *far = self->fog_far;
-    *density = self->fog_density;
-    *out_scale = self->fog_scale;
-    color_rgba_copy(fog_out, &self->pad_0x84);
+}  // extern "C"
+
+namespace nw4r {
+namespace ef {
+
+/* 0x800C6158 (0x354): sets the TEV stages, the indirect stage, the pixel pipeline and the fog of the draw. */
+void DrawStrategyImpl::InitTev(const EfEmitterDrawSetting& setting, const EfDrawInfo& info) {
+    int i;
+
+    GXSetClipMode((setting.flags & 8) != 0);
+    GXSetNumTevStages(setting.num_tev_stages);
+    GXSetTevSwapModeTable(0, 0, 1, 2, 3);
+    for (i = 0; i < setting.num_tev_stages; i++) {
+        GXSetTevDirect(i);
+        GXSetTevColorIn(i, setting.tev_color_in[i][0], setting.tev_color_in[i][1], setting.tev_color_in[i][2],
+                        setting.tev_color_in[i][3]);
+        GXSetTevAlphaIn(i, setting.tev_alpha_in[i][0], setting.tev_alpha_in[i][1], setting.tev_alpha_in[i][2],
+                        setting.tev_alpha_in[i][3]);
+        GXSetTevColorOp(i, setting.tev_color_op[i][0], setting.tev_color_op[i][1], setting.tev_color_op[i][2],
+                        setting.tev_color_op[i][3], setting.tev_color_op[i][4]);
+        GXSetTevAlphaOp(i, setting.tev_alpha_op[i][0], setting.tev_alpha_op[i][1], setting.tev_alpha_op[i][2],
+                        setting.tev_alpha_op[i][3], setting.tev_alpha_op[i][4]);
+        GXSetTevKColorSel(i, setting.tev_kcolor_sel[i]);
+        GXSetTevKAlphaSel(i, setting.tev_kalpha_sel[i]);
+        GXSetTevSwapMode(i, 0, 0);
+        if (setting.tev_texture[i] == 0) {
+            if (!(mTexmapMap[0] == 0)) {
+                nw4r::db::Panic(lbl_80594850, 134, lbl_80594868);
+            }
+            GXSetTevOrder(i, 0, 0, 4);
+        } else if (setting.tev_texture[i] == 1) {
+            GXSetTevOrder(i, mTexmapMap[1], mTexmapMap[1], 4);
+        } else {
+            GXSetTevOrder(i, 0xFF, 0xFF, 4);
+        }
+    }
+
+    if ((setting.flags & 0x40) != 0) {
+        u8 stage_bit;
+        int stage;
+
+        GXSetNumIndStages(1);
+        GXSetIndTexOrder(0, mTexmapMap[2], mTexmapMap[2]);
+        GXSetIndTexCoordScale(0, 0, 0);
+        GXSetIndTexMtx(1, setting.ind_tex_mtx, setting.ind_tex_scale_exp);
+        stage_bit = 1;
+        for (stage = 0; stage < setting.num_tev_stages; stage++, stage_bit <<= 1) {
+            if ((setting.ind_target_stages & stage_bit) != 0) {
+                GXSetTevIndirect(stage, 0, 0, 7, 1, 0, 0, 0, 0, 0);
+            }
+        }
+    } else {
+        GXSetNumIndStages(0);
+    }
+
+    GXSetZCompLoc((setting.flags & 4) != 0);
+    GXSetCullMode(0);
+    GXSetCoPlanar(0);
+    GXSetBlendMode(setting.blend_type, setting.blend_src, setting.blend_dst, setting.blend_op);
+    GXSetZMode((setting.flags & 1) ? 1 : 0, setting.z_compare_func, (setting.flags & 2) ? 1 : 0);
+
+    if ((setting.flags & 0x1000) != 0) {
+        s32 type;
+        f32 start_z;
+        f32 end_z;
+        f32 near_z;
+        f32 far_z;
+        GXColor color;
+
+        fn_800C64AC(&info, &type, &start_z, &end_z, &near_z, &far_z, &color);
+        GXSetFog(type, start_z, end_z, near_z, far_z, color);
+    } else {
+        GXColor color = {0, 0, 0, 0};
+        GXSetFog(0, 0.0f, 100.0f, 0.0f, 100.0f, color);
+    }
 }
 
-/* --------------------------------------------------------------------------------------------- *
- * The draw-time view state's six accessors, 0x800C68B8..0x800C68E0 (`EfDrawInfo` is defined once in
- * ef/ef_drawstrategyimpl.h).
- * --------------------------------------------------------------------------------------------- */
+/* The SDK's light attenuation selector. */
+enum GXAttnFn { GX_AF_SPEC, GX_AF_SPOT, GX_AF_NONE };
 
-/* The material colour of the draw-time view state. */
-GXColor* fn_800C68B8(EfDrawInfo* self) {
+/* Marks the particle colour a TEV register reads as used. */
+inline void MarkColorUse(u8 source, u8* use) {
+    switch (source) {
+    case 1:
+        use[0] = true;
+        break;
+    case 2:
+        use[1] = true;
+        break;
+    case 5:
+        use[0] = true;
+        use[1] = true;
+        break;
+    case 3:
+        use[2] = true;
+        break;
+    case 4:
+        use[3] = true;
+        break;
+    case 6:
+        use[2] = true;
+        use[3] = true;
+        break;
+    }
+}
+
+/* 0x800C64E4 (0x3D4): sets the colour channels from the light state and records which particle colours and alphas
+ * the TEV registers read. */
+void DrawStrategyImpl::InitColor(EfDrawParticleManager* pm, const EfEmitterDrawSetting& setting,
+                                 const EfDrawInfo& info) {
+    int i;
+
+    mPrevAlphaRef0 = -1;
+    mPrevAlphaRef1 = -1;
+    GXSetNumChans(1);
+    if (!fn_800C68E0(&info)) {
+        GXSetChanCtrl(4, 0, 0, 0, 0, 0, 2);
+    } else {
+        if (setting.color_ras == 1) {
+            GXAttnFn attn = fn_800C68D0(&info) ? GX_AF_SPOT : GX_AF_NONE;
+            GXSetChanCtrl(0, 1, 0, 0, fn_800C68D8(&info), 0, attn);
+        } else {
+            GXSetChanCtrl(0, 0, 0, 0, 0, 0, 2);
+        }
+        if (setting.alpha_ras == 1) {
+            GXAttnFn attn = fn_800C68D0(&info) ? GX_AF_SPOT : GX_AF_NONE;
+            GXSetChanCtrl(2, 1, 0, 0, fn_800C68C8(&info), 0, attn);
+        } else {
+            GXSetChanCtrl(2, 0, 0, 0, 0, 0, 2);
+        }
+    }
+    GXSetChanCtrl(5, 0, 0, 0, 0, 0, 2);
+    GXSetChanMatColor(4, *fn_800C68C0(&info));
+    GXSetChanAmbColor(4, *fn_800C68B8(&info));
+
+    mUseColor[0][0] = false;
+    mUseColor[0][1] = false;
+    mUseColor[1][0] = false;
+    mUseColor[1][1] = false;
+    mUseAlpha[0][0] = false;
+    mUseAlpha[0][1] = false;
+    mUseAlpha[1][0] = false;
+    mUseAlpha[1][1] = false;
+    for (i = 0; i < 3; i++) {
+        MarkColorUse(setting.color_tev[i], mUseColor[0]);
+        MarkColorUse(setting.alpha_tev[i], mUseAlpha[0]);
+    }
+    for (i = 0; i < 4; i++) {
+        MarkColorUse(setting.color_tev_k[i], mUseColor[0]);
+        MarkColorUse(setting.alpha_tev_k[i], mUseAlpha[0]);
+    }
+}
+
+}  // namespace ef
+}  // namespace nw4r
+
+extern "C" {
+
+/* 0x800C68B8 (0x8): the material colour of the view state. */
+const GXColor* fn_800C68B8(const EfDrawInfo* self) {
     return &self->amb_color;
 }
 
-/* The ambient colour of the draw-time view state. */
-GXColor* fn_800C68C0(EfDrawInfo* self) {
+/* 0x800C68C0 (0x8): the ambient colour of the view state. */
+const GXColor* fn_800C68C0(const EfDrawInfo* self) {
     return &self->mat_color;
 }
 
-/* The GX_COLOR1A1 light bitmask of the draw-time view state. */
-u32 fn_800C68C8(EfDrawInfo* self) {
+/* 0x800C68C8 (0x8): the GX_COLOR1A1 light bitmask of the view state. */
+u32 fn_800C68C8(const EfDrawInfo* self) {
     return self->light_mask1;
 }
 
-/* Whether the light is a spot light. */
-u8 fn_800C68D0(EfDrawInfo* self) {
+/* 0x800C68D0 (0x8): whether the light is a spot light. */
+bool fn_800C68D0(const EfDrawInfo* self) {
     return self->is_spot_light;
 }
 
-/* The GX_COLOR0 light bitmask of the draw-time view state. */
-u32 fn_800C68D8(EfDrawInfo* self) {
+/* 0x800C68D8 (0x8): the GX_COLOR0 light bitmask of the view state. */
+u32 fn_800C68D8(const EfDrawInfo* self) {
     return self->light_mask;
 }
 
-/* Whether lighting is enabled for the draw. */
-u8 fn_800C68E0(EfDrawInfo* self) {
+/* 0x800C68E0 (0x8): whether lighting is on for the draw. */
+bool fn_800C68E0(const EfDrawInfo* self) {
     return self->light_enable;
 }
 
-/* --------------------------------------------------------------------------------------------- *
- * The ahead-context initialiser, the particle-walker selectors and the texture-coord wrapper,
- * in address order.
- * --------------------------------------------------------------------------------------------- */
+}  // extern "C"
 
-/* Writes one texture-coordinate generator and leaves the projective matrix at identity. */
-void fn_800C8674(u32 dst_coord, u32 func, u32 src_param, u32 mtx) {
-    GXSetTexCoordGen2(dst_coord, func, src_param, mtx, 0, 125);
+/* The out-of-line GX FIFO writers, 0x800C6F90..0x800C7250: one copy per component count and store width.  The
+ * dummy primitive below calls them. */
+extern "C" {
+void fn_800C6F90(void);
+void fn_800C6F94(u16 value);
+void fn_800C6FA4(u8 value);
+void fn_800C6FB4(f32 value);
+void fn_800C6FC0(s16 value);
+void fn_800C6FD0(u16 value);
+void fn_800C6FE0(s8 value);
+void fn_800C6FF0(u8 value);
+void fn_800C7000(f32 x, f32 y);
+void fn_800C7010(s16 x, s16 y);
+void fn_800C7028(u16 x, u16 y);
+void fn_800C7040(s8 x, s8 y);
+void fn_800C7058(u8 x, u8 y);
+void fn_800C7070(u16 value);
+void fn_800C7080(u8 value);
+void fn_800C7090(u8 r, u8 g, u8 b, u8 a);
+void fn_800C70B8(u8 r, u8 g, u8 b);
+void fn_800C70D8(u16 value);
+void fn_800C70E8(u8 value);
+void fn_800C70F8(f32 x, f32 y, f32 z);
+void fn_800C710C(s16 x, s16 y, s16 z);
+void fn_800C712C(s8 x, s8 y, s8 z);
+void fn_800C714C(u16 value);
+void fn_800C715C(u8 value);
+void fn_800C716C(f32 x, f32 y);
+void fn_800C717C(s16 x, s16 y);
+void fn_800C7194(u16 x, u16 y);
+void fn_800C71AC(s8 x, s8 y);
+void fn_800C71C4(u8 x, u8 y);
+void fn_800C71DC(f32 x, f32 y, f32 z);
+void fn_800C71F0(s16 x, s16 y, s16 z);
+void fn_800C7210(u16 x, u16 y, u16 z);
+void fn_800C7230(s8 x, s8 y, s8 z);
+void fn_800C7250(u8 x, u8 y, u8 z);
 }
 
-/* The texture-layer accessors, in address order (`EfParticleLayers` is defined once in
- * ef/ef_drawstrategyimpl.h). */
-u32 fn_800C8954(EfParticleLayers* self, u32 layer);
-u32 fn_800C89D0(EfParticleLayers* self, u32 layer);
+namespace nw4r {
+namespace ef {
 
-/* Whether the texture wraps for a layer, combined with the filter mode of that layer. */
-u32 fn_800C8680(EfParticleLayers* self, u32 layer) {
-    int ok;
-    u32 flags;
-    u32 value;
+/* The vertex description `GXGetVtxDesc`/`GXGetVtxAttrFmt` report for one attribute. */
+struct VtxAttrState {
+    /* +0x00 */ s32 type;  /* GXAttrType: none, direct, 8- or 16-bit index */
+    /* +0x04 */ s32 cnt;   /* GXCompCnt */
+    /* +0x08 */ s32 comp;  /* GXCompType */
+}; /* size: 0x0C */
 
-    ok = (layer < 3);
-    if (!ok) {
-        nw4r::db::Panic(lbl_80594B9C, 541, lbl_80594B6C);
+/* 0x800C68E8 (0x6A8): loads the particle's alpha compare, TEV colours and textures; when GX state changed but no
+ * texture was reloaded and the effect system asks for it, draws an eight-vertex dummy strip in the current vertex
+ * format so the GP takes the new state. */
+void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& setting, const EfDrawInfo& info,
+                               bool first, bool xf_dirty) {
+    bool alpha_dirty;
+    bool color_dirty;
+    bool texture_loaded;
+    bool flush;
+
+    if (!IsValidPointer((u32)pp)) {
+        nw4r::db::Panic(lbl_80594850, 368, lbl_80594894, pp);
     }
-    value = 0;
-    flags = ((s32)self->texture_flag_bits >> (layer * 2)) & 3;
-    if ((u8)(flags - 2) <= 1) {
-        value = 1;
+
+    alpha_dirty = SetupGPAlpha(pp, setting, first);
+    alpha_dirty = xf_dirty || alpha_dirty;
+    color_dirty = SetupGPColor(pp, setting, first);
+    color_dirty = alpha_dirty || color_dirty;
+    texture_loaded = SetupGPTexture(pp, setting, info, first);
+    flush = color_dirty && !texture_loaded;
+
+    if ((setting.flags & 8) != 0) {
+        return;
     }
-    if (fn_800C8954(self, layer) == 2) {
-        value <<= 1;
+    if (pp->manager->emitter->effect->system->flush_gp == 0) {
+        return;
     }
-    return value;
+    if (flush) {
+        u8 frac;
+        VtxAttrState pos;
+        VtxAttrState nrm;
+        VtxAttrState tex0;
+        VtxAttrState clr[2];
+        int i;
+        int c;
+
+        GXGetVtxDesc(9, &pos.type);
+        GXGetVtxDesc(10, &nrm.type);
+        GXGetVtxDesc(11, &clr[0].type);
+        GXGetVtxDesc(12, &clr[1].type);
+        GXGetVtxDesc(13, &tex0.type);
+        GXGetVtxAttrFmt(0, 9, &pos.cnt, &pos.comp, &frac);
+        GXGetVtxAttrFmt(0, 10, &nrm.cnt, &nrm.comp, &frac);
+        GXGetVtxAttrFmt(0, 11, &clr[0].cnt, &clr[0].comp, &frac);
+        GXGetVtxAttrFmt(0, 12, &clr[1].cnt, &clr[1].comp, &frac);
+        GXGetVtxAttrFmt(0, 13, &tex0.cnt, &tex0.comp, &frac);
+        GXBegin(0x98, 0, 8);
+        for (i = 0; i < 8; i++) {
+            switch (pos.type) {
+            case 0:
+                break;
+            case 1:
+                switch (pos.cnt) {
+                case 1:
+                    switch (pos.comp) {
+                    case 0:
+                        fn_800C7250(0, 0, 0);
+                        break;
+                    case 1:
+                        fn_800C7230(0, 0, 0);
+                        break;
+                    case 2:
+                        fn_800C7210(0, 0, 0);
+                        break;
+                    case 3:
+                        fn_800C71F0(0, 0, 0);
+                        break;
+                    case 4:
+                        fn_800C71DC(0.0f, 0.0f, 0.0f);
+                        break;
+                    }
+                    break;
+                case 0:
+                    switch (pos.comp) {
+                    case 0:
+                        fn_800C71C4(0, 0);
+                        break;
+                    case 1:
+                        fn_800C71AC(0, 0);
+                        break;
+                    case 2:
+                        fn_800C7194(0, 0);
+                        break;
+                    case 3:
+                        fn_800C717C(0, 0);
+                        break;
+                    case 4:
+                        fn_800C716C(0.0f, 0.0f);
+                        break;
+                    }
+                    break;
+                }
+                break;
+            case 2:
+                fn_800C715C(0);
+                break;
+            case 3:
+                fn_800C714C(0);
+                break;
+            }
+
+            switch (nrm.type) {
+            case 0:
+                break;
+            case 1:
+                switch (nrm.cnt) {
+                case 0:
+                    switch (nrm.comp) {
+                    case 1:
+                        fn_800C712C(0, 0, 0);
+                        break;
+                    case 3:
+                        fn_800C710C(0, 0, 0);
+                        break;
+                    case 4:
+                        fn_800C70F8(0.0f, 0.0f, 0.0f);
+                        break;
+                    }
+                    break;
+                }
+                break;
+            case 2:
+                fn_800C70E8(0);
+                break;
+            case 3:
+                fn_800C70D8(0);
+                break;
+            }
+
+            for (c = 0; c < 2; c++) {
+                switch (clr[c].type) {
+                case 1:
+                    switch (clr[c].cnt) {
+                    case 0:
+                        fn_800C70B8(0, 0, 0);
+                        break;
+                    case 1:
+                        fn_800C7090(0, 0, 0, 0);
+                        break;
+                    }
+                    break;
+                case 2:
+                    fn_800C7080(0);
+                    break;
+                case 3:
+                    fn_800C7070(0);
+                    break;
+                }
+            }
+
+            switch (tex0.type) {
+            case 0:
+                break;
+            case 1:
+                switch (tex0.cnt) {
+                case 1:
+                    switch (tex0.comp) {
+                    case 0:
+                        fn_800C7058(0, 0);
+                        break;
+                    case 1:
+                        fn_800C7040(0, 0);
+                        break;
+                    case 2:
+                        fn_800C7028(0, 0);
+                        break;
+                    case 3:
+                        fn_800C7010(0, 0);
+                        break;
+                    case 4:
+                        fn_800C7000(0.0f, 0.0f);
+                        break;
+                    }
+                    break;
+                case 0:
+                    switch (tex0.comp) {
+                    case 0:
+                        fn_800C6FF0(0);
+                        break;
+                    case 1:
+                        fn_800C6FE0(0);
+                        break;
+                    case 2:
+                        fn_800C6FD0(0);
+                        break;
+                    case 3:
+                        fn_800C6FC0(0);
+                        break;
+                    case 4:
+                        fn_800C6FB4(0.0f);
+                        break;
+                    }
+                    break;
+                }
+                break;
+            case 2:
+                fn_800C6FA4(0);
+                break;
+            case 3:
+                fn_800C6F94(0);
+                break;
+            }
+        }
+        fn_800C6F90();
+    }
 }
 
-/* Whether the texture filter is 1 or 3 for a layer, combined with the wrap mode of that layer. */
-u32 fn_800C8734(EfParticleLayers* self, u32 layer) {
-    int ok;
-    u32 flags;
-    u32 value;
-
-    ok = (layer < 3);
-    if (!ok) {
-        nw4r::db::Panic(lbl_80594B60, 512, lbl_80594B30);
-    }
-    value = 0;
-    flags = ((s32)self->texture_flag_bits >> (layer * 2)) & 3;
-    if (flags == 1 || flags == 3) {
-        value = 1;
-    }
-    if (fn_800C89D0(self, layer) == 2) {
-        value <<= 1;
-    }
-    return value;
-}
-
-/* The signed layer scale (wrap mode first) used by the stripe walker. */
-s32 fn_800C87E8(EfParticleLayers* self, u32 layer) {
-    int ok;
-    u32 flags;
-    s32 value;
-
-    ok = (layer < 3);
-    if (!ok) {
-        nw4r::db::Panic(lbl_80594B24, 483, lbl_80594AF4);
-    }
-    value = 1;
-    if (fn_800C8954(self, layer) == 2) {
-        value = 2;
-    }
-    flags = ((s32)self->texture_flag_bits >> (layer * 2)) & 3;
-    if ((u8)(flags - 2) <= 1) {
-        value = -value;
-    }
-    return value;
-}
-
-/* The signed layer scale (filter mode first) used by the stripe walker. */
-s32 fn_800C889C(EfParticleLayers* self, u32 layer) {
-    int ok;
-    u32 flags;
-    s32 value;
-
-    ok = (layer < 3);
-    if (!ok) {
-        nw4r::db::Panic(lbl_80594AE8, 454, lbl_80594AB8);
-    }
-    value = 1;
-    if (fn_800C89D0(self, layer) == 2) {
-        value = 2;
-    }
-    flags = ((s32)self->texture_flag_bits >> (layer * 2)) & 3;
-    if (flags == 1 || flags == 3) {
-        value -= value << 1;
-    }
-    return value;
-}
-
-/* The wrap mode of one texture layer. */
-u32 fn_800C8954(EfParticleLayers* self, u32 layer) {
-    int ok;
-
-    ok = (layer < 3);
-    if (!ok) {
-        nw4r::db::Panic(lbl_80594AAC, 414, lbl_80594A7C);
-    }
-    return ((s32)self->texture_wrap_bits >> (layer * 4 + 2)) & 3;
-}
-
-/* The second wrap mode of one texture layer. */
-u32 fn_800C89D0(EfParticleLayers* self, u32 layer) {
-    int ok;
-
-    ok = (layer < 3);
-    if (!ok) {
-        nw4r::db::Panic(lbl_80594A70, 375, lbl_80594A40);
-    }
-    return ((s32)self->texture_wrap_bits >> (layer * 4)) & 3;
-}
-
-/* The four particle walkers this unit defines further down, and the single-particle walkers they
- * hand the manager to (owned by the sibling ef unit; the map leaves them `fn_*`). */
-void fn_800C8A80(void* pm);
-void fn_800C8B9C(void* pm);
-void fn_800C8CB8(void* pm, void* em);
-void fn_800C8DE4(void* pm, void* em);
-
-/* Picks the walker that visits the younger particles first. */
-void (*fn_800C8A48(void* self, int draw_order))(void*);
-void (*fn_800C8A48(void* self, int draw_order))(void*) {
-    if (draw_order == 0) {
-        return fn_800C8B9C;
-    }
-    return fn_800C8A80;
-}
-
-/* Picks the walker that visits the elder particles first. */
-void (*fn_800C8A64(void* self, int draw_order))(void*, void*);
-void (*fn_800C8A64(void* self, int draw_order))(void*, void*) {
-    if (draw_order == 0) {
-        return fn_800C8DE4;
-    }
-    return fn_800C8CB8;
-}
-
-/* Walks the particle manager's youngest-first list and hands each particle to the emitter. */
-void fn_800C8A80(void* pm) {
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594850, 1190, lbl_80594934, pm);
-    }
-    fn_800B95C0((EfParticleState*)pm);
-}
-
-/* Walks the particle manager's youngest-first list the other way. */
-void fn_800C8B9C(void* pm) {
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594850, 1197, lbl_80594934, pm);
-    }
-    fn_800B5A64((EfDrawList*)pm);
-}
-
-/* Walks the particle manager's eldest-first list and hands each particle to the emitter. */
-void fn_800C8CB8(void* pm, void* em) {
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594850, 1204, lbl_80594934, pm);
-    }
-    fn_800B8D48(pm, em);
-}
-
-/* Walks the particle manager's eldest-first list the other way. */
-void fn_800C8DE4(void* pm, void* em) {
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594850, 1211, lbl_80594934, pm);
-    }
-    fn_800B5ACC(pm, em);
-}
-
-/* The per-draw ahead-context initialiser (`EfAheadContext` is defined once in
- * ef/ef_drawstrategyimpl.h). */
-
-/* Initialises the ahead context and returns it. */
-EfAheadContext* fn_800C9434(EfAheadContext* self) {
-    MTX34_ctor(&self->emitter_mtx);
-    MTX34_ctor(&self->manager_mtx);
-    MTX34_ctor(&self->manager_mtx_inv);
-    VEC3_ctor((VEC3*)&self->emitter_axis_y);
-    VEC3_ctor((VEC3*)&self->emitter_center);
-    return self;
-}
+}  // namespace ef
+}  // namespace nw4r
 
 /* --------------------------------------------------------------------------------------------- *
  * The out-of-line GX FIFO writers, 0x800C6F90..0x800C7250.  Retail emits one copy per component count
  * and per store width; the empty one is the SDK's no-op `GXEnd`.
  * --------------------------------------------------------------------------------------------- */
+
+extern "C" {
 
 /* Ends the current FIFO command (the SDK's `GXEnd`, which writes nothing). */
 void fn_800C6F90(void) {}
@@ -621,48 +880,670 @@ void fn_800C7250(u8 x, u8 y, u8 z) {
     GXWGFifo.u8 = z;
 }
 
-/* The shared draw-strategy singletons this unit's setup writes (owned by the effect state; the map
- * leaves them `lbl_`).  Declared, never defined here. */
-extern VEC3 lbl_80694C08;  /* .bss 0x80694C08 - the four basis vectors */
-extern VEC3 lbl_80694C14;  /* .bss 0x80694C14 */
-extern VEC3 lbl_80694C20;  /* .bss 0x80694C20 */
-extern VEC3 lbl_80694C2C;  /* .bss 0x80694C2C */
-extern Mtx34 lbl_80694C38; /* .bss 0x80694C38 - the identity matrix */
+}  // extern "C"
 
-/* Sets the alpha compare from a particle's alpha thresholds, skipping the GX call when nothing moved. */
-u32 fn_800C7270(EfDrawStrategyImpl* self, EfParticleLayers* particle, u8* params, u32 force) {
-    if (!IsValidPointer((u32)particle)) {
-        nw4r::db::Panic(lbl_80594850, 591, lbl_80594894, particle);
+namespace nw4r {
+namespace ef {
+
+/* 0x800C7270 (0x188): loads the particle's alpha-compare references unless they are already current. */
+bool DrawStrategyImpl::SetupGPAlpha(EfDrawParticle* pp, const EfEmitterDrawSetting& setting, bool force) {
+    if (!IsValidPointer((u32)pp)) {
+        nw4r::db::Panic(lbl_80594850, 591, lbl_80594894, pp);
     }
-    if (force == 0 && self->alpha_ref == particle->alpha_threshold) {
-        return 0;
+    if (force || pp->alpha_ref0 != mPrevAlphaRef0) {
+        mPrevAlphaRef0 = pp->alpha_ref0;
+        mPrevAlphaRef1 = pp->alpha_ref0;
+        GXSetAlphaCompare(setting.alpha_comp0, pp->alpha_ref0, setting.alpha_op, setting.alpha_comp1,
+                          pp->alpha_ref1);
+        return true;
     }
-    self->alpha_ref = particle->alpha_threshold;
-    self->alpha_ref2 = particle->alpha_threshold;
-    GXSetAlphaCompare(params[2], particle->alpha_threshold, params[4], params[3],
-                      particle->alpha_threshold2);
-    return 1;
+    return false;
 }
 
-/* Initialises the four basis vectors and the identity matrix the draw strategy starts from. */
+/* Multiplies two 8-bit colour components, rounding. */
+inline u8 MulColorComponent(u8 a, u8 b) {
+    return (u8)((a * b + 0x80) >> 8);
+}
+
+/* Multiplies the RGB of two colours into `dst`, leaving its alpha. */
+inline void MulColorRGB(GXColor* dst, const GXColor* a, const GXColor* b) {
+    u8 g = MulColorComponent(a->g, b->g);
+    u8 blue = MulColorComponent(a->b, b->b);
+    dst->r = MulColorComponent(a->r, b->r);
+    dst->g = g;
+    dst->b = blue;
+}
+
+/* 0x800C73F8 (0x8E8): fetches the particle colours the TEV registers read, scales their alphas by the flicker and
+ * the emitter colour, and loads every TEV colour and konstant colour that changed. */
+bool DrawStrategyImpl::SetupGPColor(EfDrawParticle* pp, const EfEmitterDrawSetting& setting, bool force) {
+    bool dirty;
+    u8 alpha_scale;
+    int i;
+
+    if (!IsValidPointer((u32)pp)) {
+        nw4r::db::Panic(lbl_80594850, 610, lbl_80594894, pp);
+    }
+    dirty = false;
+
+    if (mUseColor[0][0]) {
+        ef_particle_get_color((EfParticle*)pp, 0, 0, (u8*)&mColor[0][0]);
+    }
+    if (mUseColor[0][1]) {
+        ef_particle_get_color((EfParticle*)pp, 0, 1, (u8*)&mColor[0][1]);
+    }
+    if (mUseColor[1][0]) {
+        ef_particle_get_color((EfParticle*)pp, 1, 0, (u8*)&mColor[1][0]);
+    }
+    if (mUseColor[1][1]) {
+        ef_particle_get_color((EfParticle*)pp, 1, 1, (u8*)&mColor[1][1]);
+    }
+
+    alpha_scale = 0xFF;
+    if ((mUseAlpha[0][0] || mUseAlpha[0][1] || mUseAlpha[1][0] || mUseAlpha[1][1]) &&
+        setting.alpha_flick_type != 0) {
+        alpha_scale = ef_particle_flick_alpha((EfParticle*)pp);
+    }
+    if (mUseAlpha[0][0]) {
+        mColor[0][0].a = ef_particle_get_alpha((EfParticle*)pp, 0, 0);
+        if (alpha_scale != 0xFF) {
+            mColor[0][0].a = MulColorComponent(mColor[0][0].a, alpha_scale);
+        }
+    }
+    if (mUseAlpha[0][1]) {
+        mColor[0][1].a = ef_particle_get_alpha((EfParticle*)pp, 0, 1);
+        if (alpha_scale != 0xFF) {
+            mColor[0][1].a = MulColorComponent(mColor[0][1].a, alpha_scale);
+        }
+    }
+    if (mUseAlpha[1][0]) {
+        mColor[1][0].a = ef_particle_get_alpha((EfParticle*)pp, 1, 0);
+        if (alpha_scale != 0xFF) {
+            mColor[1][0].a = MulColorComponent(mColor[1][0].a, alpha_scale);
+        }
+    }
+    if (mUseAlpha[1][1]) {
+        mColor[1][1].a = ef_particle_get_alpha((EfParticle*)pp, 1, 1);
+        if (alpha_scale != 0xFF) {
+            mColor[1][1].a = MulColorComponent(mColor[1][1].a, alpha_scale);
+        }
+    }
+
+    if (pp->manager->inherit_emitter_color != 0) {
+        if (mUseColor[0][0] || mUseColor[0][1] || mUseAlpha[0][0] || mUseAlpha[0][1]) {
+            ef_pm_modulate_color(pp->manager, pp, &mColor[0][0], &mColor[0][1]);
+        }
+        if (mUseColor[1][0] || mUseColor[1][1] || mUseAlpha[1][0] || mUseAlpha[1][1]) {
+            ef_pm_modulate_color(pp->manager, pp, &mColor[1][0], &mColor[1][1]);
+        }
+    }
+
+    for (i = 0; i < 3; i++) {
+        GXColor color = {0, 0, 0, 0};
+
+        if (setting.color_tev[i] != 0 || setting.alpha_tev[i] != 0) {
+            switch (setting.color_tev[i]) {
+            case 1:
+                color.r = mColor[0][0].r;
+                color.g = mColor[0][0].g;
+                color.b = mColor[0][0].b;
+                break;
+            case 2:
+                color.r = mColor[0][1].r;
+                color.g = mColor[0][1].g;
+                color.b = mColor[0][1].b;
+                break;
+            case 5:
+                MulColorRGB(&color, &mColor[0][0], &mColor[0][1]);
+                break;
+            case 3:
+                color.r = mColor[1][0].r;
+                color.g = mColor[1][0].g;
+                color.b = mColor[1][0].b;
+                break;
+            case 4:
+                color.r = mColor[1][1].r;
+                color.g = mColor[1][1].g;
+                color.b = mColor[1][1].b;
+                break;
+            case 6:
+                MulColorRGB(&color, &mColor[1][0], &mColor[1][1]);
+                break;
+            }
+            switch (setting.alpha_tev[i]) {
+            case 1:
+                color.a = mColor[0][0].a;
+                break;
+            case 2:
+                color.a = mColor[0][1].a;
+                break;
+            case 5:
+                color.a = MulColorComponent(mColor[0][0].a, mColor[0][1].a);
+                break;
+            case 3:
+                color.a = mColor[1][0].a;
+                break;
+            case 4:
+                color.a = mColor[1][1].a;
+                break;
+            case 6:
+                color.a = MulColorComponent(mColor[1][0].a, mColor[1][1].a);
+                break;
+            }
+            if (force || color.r != mPrevTevColor[i].r || color.g != mPrevTevColor[i].g ||
+                color.b != mPrevTevColor[i].b || color.a != mPrevTevColor[i].a) {
+                GXSetTevColor(i + 1, color);
+                color_rgba_copy((u8*)&mPrevTevColor[i], (const u8*)&color);
+                dirty = true;
+            }
+        }
+    }
+
+    for (i = 0; i < 4; i++) {
+        GXColor color = {0, 0, 0, 0};
+
+        if (setting.color_tev_k[i] != 0 || setting.alpha_tev_k[i] != 0) {
+            switch (setting.color_tev_k[i]) {
+            case 1:
+                color.r = mColor[0][0].r;
+                color.g = mColor[0][0].g;
+                color.b = mColor[0][0].b;
+                break;
+            case 2:
+                color.r = mColor[0][1].r;
+                color.g = mColor[0][1].g;
+                color.b = mColor[0][1].b;
+                break;
+            case 5:
+                MulColorRGB(&color, &mColor[0][0], &mColor[0][1]);
+                break;
+            case 3:
+                color.r = mColor[1][0].r;
+                color.g = mColor[1][0].g;
+                color.b = mColor[1][0].b;
+                break;
+            case 4:
+                color.r = mColor[1][1].r;
+                color.g = mColor[1][1].g;
+                color.b = mColor[1][1].b;
+                break;
+            case 6:
+                MulColorRGB(&color, &mColor[1][0], &mColor[1][1]);
+                break;
+            }
+            switch (setting.alpha_tev_k[i]) {
+            case 1:
+                color.a = mColor[0][0].a;
+                break;
+            case 2:
+                color.a = mColor[0][1].a;
+                break;
+            case 5:
+                color.a = MulColorComponent(mColor[0][0].a, mColor[0][1].a);
+                break;
+            case 3:
+                color.a = mColor[1][0].a;
+                break;
+            case 4:
+                color.a = mColor[1][1].a;
+                break;
+            case 6:
+                color.a = MulColorComponent(mColor[1][0].a, mColor[1][1].a);
+                break;
+            }
+            if (force || color.r != mPrevTevKColor[i].r || color.g != mPrevTevKColor[i].g ||
+                color.b != mPrevTevKColor[i].b || color.a != mPrevTevKColor[i].a) {
+                GXSetTevKColor(i, color);
+                color_rgba_copy((u8*)&mPrevTevKColor[i], (const u8*)&color);
+                dirty = true;
+            }
+        }
+    }
+    return dirty;
+}
+
+/* 0x800C7CE0 (0x994): loads each enabled layer's texture object when the texture or its wrap changed, and its
+ * texture matrix (scale, rotation, translation, mirroring, and the projection for a projected layer) when the
+ * transform changed. */
+bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSetting& setting,
+                                      const EfDrawInfo& info, bool force) {
+    bool loaded;
+    int layer;
+
+    if (!IsValidPointer((u32)pp)) {
+        nw4r::db::Panic(lbl_80594850, 881, lbl_80594894, pp);
+    }
+    loaded = false;
+    for (layer = 0; layer < 3; layer++) {
+        if (mTexmapMap[layer] >= 0) {
+            EfTextureData* tex;
+
+            if (!IsValidPointer((u32)pp->texture[layer])) {
+                nw4r::db::Panic(lbl_80594850, 890, lbl_805948C8, pp->texture[layer]);
+            }
+            tex = pp->texture[layer];
+            if (tex != NULL) {
+                s32 wrap_s = ef_particle_wrap_s(pp, layer);
+                s32 wrap_t = ef_particle_wrap_t(pp, layer);
+                f32 scale_s;
+                f32 scale_t;
+                f32 offset_s;
+                f32 offset_t;
+
+                if (force || tex != mPrevTexture[layer].texture || wrap_s != mPrevTexture[layer].wrap_s || wrap_t != mPrevTexture[layer].wrap_t) {
+                    GXTexObj tex_obj;
+                    u8 format;
+
+                    loaded = true;
+                    mPrevTexture[layer].texture = tex;
+                    mPrevTexture[layer].wrap_s = wrap_s;
+                    mPrevTexture[layer].wrap_t = wrap_t;
+                    format = tex->format;
+                    switch (format) {
+                    case 8:
+                    case 9:
+                    case 10: {
+                        GXTlutObj tlut_obj;
+
+                        GXInitTlutObj(&tlut_obj, tex->tlut, tex->tlut_format, tex->tlut_entries);
+                        GXLoadTlut(&tlut_obj, mTexmapMap[layer]);
+                        GXInitTexObjCI(&tex_obj, tex->image, tex->width, tex->height, format, wrap_s, wrap_t,
+                                       tex->mipmap_count > 1, mTexmapMap[layer]);
+                        break;
+                    }
+                    case 0:
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                    case 6:
+                    case 14:
+                        GXInitTexObj(&tex_obj, tex->image, tex->width, tex->height, format, wrap_s, wrap_t,
+                                     tex->mipmap_count > 1);
+                        break;
+                    default:
+                        nw4r::db::Panic(lbl_80594850, 954, lbl_80594918);
+                        break;
+                    }
+                    GXInitTexObjLOD(&tex_obj, tex->min_filter, tex->mag_filter, 0.0f,
+                                    -1.0f + tex->mipmap_count, tex->lod_bias, 0, 0, 0);
+                    GXLoadTexObj(&tex_obj, mTexmapMap[layer]);
+                }
+
+                scale_s = ef_particle_tex_scale_s(pp, layer);
+                scale_t = ef_particle_tex_scale_t(pp, layer);
+                offset_s = ef_particle_tex_offset_s(pp, layer);
+                offset_t = ef_particle_tex_offset_t(pp, layer);
+                if (force || scale_s != mPrevTexture[layer].scale_s || scale_t != mPrevTexture[layer].scale_t || offset_s != mPrevTexture[layer].offset_s ||
+                    offset_t != mPrevTexture[layer].offset_t || pp->tex_scale[layer].x != mPrevTexture[layer].scale.x ||
+                    pp->tex_scale[layer].y != mPrevTexture[layer].scale.y || pp->tex_rotate[layer] != mPrevTexture[layer].rotate ||
+                    pp->tex_translate[layer].x != mPrevTexture[layer].translate.x ||
+                    pp->tex_translate[layer].y != mPrevTexture[layer].translate.y) {
+                    MTX34 mtx;
+                    u8* flags;
+
+                    loaded = true;
+                    mPrevTexture[layer].scale_s = scale_s;
+                    mPrevTexture[layer].scale_t = scale_t;
+                    mPrevTexture[layer].offset_s = offset_s;
+                    mPrevTexture[layer].offset_t = offset_t;
+                    mPrevTexture[layer].scale.x = pp->tex_scale[layer].x;
+                    mPrevTexture[layer].scale.y = pp->tex_scale[layer].y;
+                    mPrevTexture[layer].rotate = pp->tex_rotate[layer];
+                    mPrevTexture[layer].translate.x = pp->tex_translate[layer].x;
+                    mPrevTexture[layer].translate.y = pp->tex_translate[layer].y;
+
+                    MTX34_ctor(&mtx);
+                    mtx34_identity(&mtx);
+                    mtx.m[0][3] = pp->tex_translate[layer].x;
+                    mtx.m[1][3] = pp->tex_translate[layer].y;
+                    if (0.0f != pp->tex_rotate[layer]) {
+                        f32 sin;
+                        f32 cos;
+                        f32 du = mtx.m[0][3] - 0.5f;
+                        f32 dv = mtx.m[1][3] - 0.5f;
+
+                        ef_sin_cos(&sin, &cos, pp->tex_rotate[layer]);
+                        mtx.m[1][1] = cos;
+                        mtx.m[0][0] = cos;
+                        mtx.m[0][1] = -sin;
+                        mtx.m[1][0] = sin;
+                        mtx.m[0][3] = 0.5f + cos * du - sin * dv;
+                        mtx.m[1][3] = 0.5f + sin * du + cos * dv;
+                    }
+                    if (1.0f != scale_s || 1.0f != scale_t ||
+                        1.0f != pp->tex_scale[layer].x || 1.0f != pp->tex_scale[layer].y ||
+                        0.0f != offset_s || 0.0f != offset_t) {
+                        f32 sx = pp->tex_scale[layer].x;
+                        f32 ss = scale_s * sx;
+                        f32 sy = pp->tex_scale[layer].y;
+                        f32 st = scale_t * sy;
+
+                        mtx.m[0][0] *= ss;
+                        mtx.m[0][1] *= ss;
+                        mtx.m[0][3] = offset_s + scale_s * (0.5f + (mtx.m[0][3] - 0.5f) * sx);
+                        mtx.m[1][0] *= st;
+                        mtx.m[1][1] *= st;
+                        mtx.m[1][3] = offset_t + scale_t * (0.5f + (mtx.m[1][3] - 0.5f) * sy);
+                    }
+
+                    {
+                        EfDrawParticleManager* handle;
+
+                        ef_pm_handle(&handle, pp->manager);
+                        flags = ef_emitter_tex_flags(&handle);
+                    }
+                    if (layer == 0) {
+                        if ((flags[2] & 4) != 0 && (pp->tex_flags & 1) != 0) {
+                            mtx.m[0][0] *= -1.0f;
+                            mtx.m[0][3] += pp->tex_scale[layer].x;
+                            mtx.m[1][1] *= -1.0f;
+                            mtx.m[1][3] += pp->tex_scale[layer].y;
+                        } else {
+                            if ((flags[2] & 8) != 0) {
+                                mtx.m[0][0] *= -1.0f;
+                                mtx.m[0][3] += pp->tex_scale[layer].x;
+                            }
+                            if ((flags[2] & 0x10) != 0) {
+                                mtx.m[1][1] *= -1.0f;
+                                mtx.m[1][3] += pp->tex_scale[layer].y;
+                            }
+                        }
+                    }
+                    if (layer == 1) {
+                        if ((flags[2] & 0x20) != 0 && (pp->tex_flags & 1) != 0) {
+                            mtx.m[0][0] *= -1.0f;
+                            mtx.m[0][3] += pp->tex_scale[layer].x;
+                            mtx.m[1][1] *= -1.0f;
+                            mtx.m[1][3] += pp->tex_scale[layer].y;
+                        } else {
+                            if ((flags[1] & 0x40) != 0) {
+                                mtx.m[0][0] *= -1.0f;
+                                mtx.m[0][3] += pp->tex_scale[layer].x;
+                            }
+                            if ((flags[1] & 0x80) != 0) {
+                                mtx.m[1][1] *= -1.0f;
+                                mtx.m[1][3] += pp->tex_scale[layer].y;
+                            }
+                        }
+                    }
+
+                    if (((setting.flags >> (layer + 7)) & 1) == 0) {
+                        GXLoadTexMtxImm((const f32(*)[4])mtx34_get_ptr(&mtx), mTexmapMap[layer] * 3 + 30, 1);
+                        if (force) {
+                            fn_800C8674(mTexmapMap[layer], 1, 4, mTexmapMap[layer] * 3 + 30);
+                        }
+                    } else {
+                        mtx34_concat(&mtx, ef_draw_info_projection(&info), &mtx);
+                        GXLoadTexMtxImm((const f32(*)[4])mtx34_get_ptr(&mtx), mTexmapMap[layer] * 3 + 64, 0);
+                        if (force) {
+                            GXSetTexCoordGen2(mTexmapMap[layer], 0, 0, 0, 0, mTexmapMap[layer] * 3 + 64);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return loaded;
+}
+
+}  // namespace ef
+}  // namespace nw4r
+
+/* --------------------------------------------------------------------------------------------- *
+ * The texture-coordinate wrapper and the particle's texture-layer accessors (`particle.h`), in address order.
+ * --------------------------------------------------------------------------------------------- */
+
+extern "C" {
+
+/* 0x800C8674 (0xC): writes one texture-coordinate generator and leaves the projective matrix at identity. */
+void fn_800C8674(u32 dst_coord, u32 func, u32 src_param, u32 mtx) {
+    GXSetTexCoordGen2(dst_coord, func, src_param, mtx, 0, 125);
+}
+
+/* 0x800C8680 (0xB4): the T translation of a layer: 1 when reversed, doubled for a mirrored repeat. */
+s32 ef_particle_tex_offset_t(EfDrawParticle* self, int layer) {
+    int ok;
+    u8 flags;
+    u32 value;
+
+    ok = (layer >= 0 && layer < 3);
+    if (!ok) {
+        nw4r::db::Panic(lbl_80594B9C, 541, lbl_80594B6C);
+    }
+    value = 0;
+    flags = ((s32)self->texture_reverse >> (layer * 2)) & 3;
+    if (flags == 2 || flags == 3) {
+        value = 1;
+    }
+    if (ef_particle_wrap_t(self, layer) == 2) {
+        value <<= 1;
+    }
+    return value;
+}
+
+/* 0x800C8734 (0xB4): the S translation of a layer: 1 when reversed, doubled for a mirrored repeat. */
+s32 ef_particle_tex_offset_s(EfDrawParticle* self, int layer) {
+    int ok;
+    u32 flags;
+    u32 value;
+
+    ok = (layer >= 0 && layer < 3);
+    if (!ok) {
+        nw4r::db::Panic(lbl_80594B60, 512, lbl_80594B30);
+    }
+    value = 0;
+    flags = ((s32)self->texture_reverse >> (layer * 2)) & 3;
+    if (flags == 1 || flags == 3) {
+        value = 1;
+    }
+    if (ef_particle_wrap_s(self, layer) == 2) {
+        value <<= 1;
+    }
+    return value;
+}
+
+/* 0x800C87E8 (0xB4): the signed T repeat of a layer: 2 for a mirrored repeat, negative when reversed. */
+s32 ef_particle_tex_scale_t(EfDrawParticle* self, int layer) {
+    int ok;
+    u8 flags;
+    s32 value;
+
+    ok = (layer >= 0 && layer < 3);
+    if (!ok) {
+        nw4r::db::Panic(lbl_80594B24, 483, lbl_80594AF4);
+    }
+    value = 1;
+    if (ef_particle_wrap_t(self, layer) == 2) {
+        value = 2;
+    }
+    flags = ((s32)self->texture_reverse >> (layer * 2)) & 3;
+    if (flags == 2 || flags == 3) {
+        value = -value;
+    }
+    return value;
+}
+
+/* 0x800C889C (0xB8): the signed S repeat of a layer: 2 for a mirrored repeat, negative when reversed. */
+s32 ef_particle_tex_scale_s(EfDrawParticle* self, int layer) {
+    int ok;
+    u32 flags;
+    s32 value;
+
+    ok = (layer >= 0 && layer < 3);
+    if (!ok) {
+        nw4r::db::Panic(lbl_80594AE8, 454, lbl_80594AB8);
+    }
+    value = 1;
+    if (ef_particle_wrap_s(self, layer) == 2) {
+        value = 2;
+    }
+    flags = ((s32)self->texture_reverse >> (layer * 2)) & 3;
+    if (flags == 1 || flags == 3) {
+        value -= value << 1;
+    }
+    return value;
+}
+
+/* 0x800C8954 (0x7C): the T wrap mode of one texture layer. */
+s32 ef_particle_wrap_t(EfDrawParticle* self, int layer) {
+    int ok;
+
+    ok = (layer >= 0 && layer < 3);
+    if (!ok) {
+        nw4r::db::Panic(lbl_80594AAC, 414, lbl_80594A7C);
+    }
+    return ((s32)self->texture_wrap >> (layer * 4 + 2)) & 3;
+}
+
+/* 0x800C89D0 (0x78): the S wrap mode of one texture layer. */
+s32 ef_particle_wrap_s(EfDrawParticle* self, int layer) {
+    int ok;
+
+    ok = (layer >= 0 && layer < 3);
+    if (!ok) {
+        nw4r::db::Panic(lbl_80594A70, 375, lbl_80594A40);
+    }
+    return ((s32)self->texture_wrap >> (layer * 4)) & 3;
+}
+
+}  // extern "C"
+
+namespace nw4r {
+namespace ef {
+
+/* 0x800C8A48 (0x1C): the walker that starts a draw: the younger particles first for draw order 0. */
+DrawStrategyImpl::GetFirstDrawParticleFunc DrawStrategyImpl::GetGetFirstDrawParticleFunc(int draw_order) {
+    if (draw_order == 0) {
+        return fn_800C8B9C;
+    }
+    return fn_800C8A80;
+}
+
+/* 0x800C8A64 (0x1C): the walker that continues a draw in the same order. */
+DrawStrategyImpl::GetNextDrawParticleFunc DrawStrategyImpl::GetGetNextDrawParticleFunc(int draw_order) {
+    if (draw_order == 0) {
+        return fn_800C8DE4;
+    }
+    return fn_800C8CB8;
+}
+
+}  // namespace ef
+}  // namespace nw4r
+
+extern "C" {
+
+/* 0x800C8A80 (0x11C): the first particle of the manager's list, eldest first. */
+EfDrawParticle* fn_800C8A80(EfDrawParticleManager* pm) {
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(lbl_80594850, 1190, lbl_80594934, pm);
+    }
+    return (EfDrawParticle*)ef_pm_last_alive((EfParticleState*)pm);
+}
+
+/* 0x800C8B9C (0x11C): the first particle of the manager's list, youngest first. */
+EfDrawParticle* fn_800C8B9C(EfDrawParticleManager* pm) {
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(lbl_80594850, 1197, lbl_80594934, pm);
+    }
+    return (EfDrawParticle*)ef_pm_first_alive((EfDrawList*)pm);
+}
+
+/* 0x800C8CB8 (0x12C): the particle after `p`, eldest first. */
+EfDrawParticle* fn_800C8CB8(EfDrawParticleManager* pm, EfDrawParticle* p) {
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(lbl_80594850, 1204, lbl_80594934, pm);
+    }
+    return (EfDrawParticle*)ef_pm_prev_alive(pm, p);
+}
+
+/* 0x800C8DE4 (0x12C): the particle after `p`, youngest first. */
+EfDrawParticle* fn_800C8DE4(EfDrawParticleManager* pm, EfDrawParticle* p) {
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(lbl_80594850, 1211, lbl_80594934, pm);
+    }
+    return (EfDrawParticle*)ef_pm_next_alive(pm, p);
+}
+
+}  // extern "C"
+
+namespace nw4r {
+namespace ef {
+
+/* 0x800C8F10 (0x524): takes the emitter and manager transforms of a draw and the emitter's Y axis and origin in
+ * manager space (and, for draw types 5 and 7, the manager's own Y axis). */
+DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleManager* pm) {
+    EfEmitterDrawSetting* ed;
+    VEC3 axis_y;
+    VEC3 center;
+
+    fn_800C9434(this);
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(lbl_80594850, 1219, lbl_80594934, pm);
+    }
+    view_mtx = view;
+    particle_manager = pm;
+    if (!IsValidPointer((u32)pm->emitter)) {
+        nw4r::db::Panic(lbl_80594850, 1224, lbl_80594968, pm->emitter);
+    }
+    ef_emitter_get_mtx(pm->emitter, &emitter_mtx);
+    ef_pm_get_mtx(pm, &manager_mtx);
+    mtx34_inverse(&manager_mtx_inv, &manager_mtx);
+
+    setVec3(&axis_y, emitter_mtx.m[0][1], emitter_mtx.m[1][1], emitter_mtx.m[2][1]);
+    mtx34_rotate_vec3(&axis_y, &manager_mtx_inv, &axis_y);
+    if (ef_vec3_normalize(&axis_y) == 0) {
+        VEC3 up;
+        copyVec3(&axis_y, setVec3(&up, 0.0f, 1.0f, 0.0f));
+    }
+    copyVec3(&emitter_axis_y, &axis_y);
+
+    setVec3(&center, emitter_mtx.m[0][3], emitter_mtx.m[1][3], emitter_mtx.m[2][3]);
+    ef_vec3_transform(&center, &manager_mtx_inv, &center);
+    copyVec3(&emitter_center, &center);
+
+    if (!IsValidPointer((u32)pm->resource)) {
+        nw4r::db::Panic(lbl_80594850, 1250, lbl_805949A8, pm->resource);
+    }
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    if (!IsValidPointer((u32)ed)) {
+        nw4r::db::Panic(lbl_80594850, 1253, lbl_805949E4, ed);
+    }
+    if ((s32)ed->type_direction == 5 || (s32)ed->type_direction == 7) {
+        VEC3 manager_y;
+
+        setVec3(&manager_y, manager_mtx_inv.m[0][1], manager_mtx_inv.m[1][1], manager_mtx_inv.m[2][1]);
+        if (ef_vec3_normalize(&manager_y) == 0) {
+            VEC3 up;
+            copyVec3(&manager_y, setVec3(&up, 0.0f, 1.0f, 0.0f));
+        }
+        vec3_assign(&manager_axis_y, &manager_y);
+    }
+}
+
+}  // namespace ef
+}  // namespace nw4r
+
+extern "C" {
+
+/* 0x800C9434 (0x54): the ahead context's member constructors (three matrices, two vectors). */
+EfAheadContext* fn_800C9434(EfAheadContext* self) {
+    MTX34_ctor(&self->emitter_mtx);
+    MTX34_ctor(&self->manager_mtx);
+    MTX34_ctor(&self->manager_mtx_inv);
+    VEC3_ctor(&self->emitter_axis_y);
+    VEC3_ctor(&self->emitter_center);
+    return self;
+}
+
+/* 0x800C9488 (0xB8): builds the four basis vectors and the identity matrix the strategies start from. */
 void fn_800C9488(void) {
-    f32 m20;
-    f32 m21;
-    f32 m22;
-    f32 m23;
-
-    setVec3(&lbl_80694C08, lbl_807961E0, lbl_807961E4, lbl_807961E4);
-    setVec3(&lbl_80694C14, lbl_807961E4, lbl_807961E0, lbl_807961E4);
-    setVec3(&lbl_80694C20, lbl_807961E4, lbl_807961E4, lbl_807961E0);
-    setVec3(&lbl_80694C2C, lbl_807961E4, lbl_807961E4, lbl_807961E4);
-    m20 = lbl_807961E4;
-    m21 = lbl_807961E4;
-    m22 = lbl_807961E0;
-    m23 = lbl_807961E4;
-    fn_80077DF0(&lbl_80694C38, lbl_807961E0, lbl_807961E4, lbl_807961E4, lbl_807961E4, lbl_807961E4,
-                lbl_807961E0, lbl_807961E4, lbl_807961E4, m20, m21, m22, m23);
+    setVec3(&ef_unit_x_vec, 1.0f, 0.0f, 0.0f);
+    setVec3(&ef_unit_y_vec, 0.0f, 1.0f, 0.0f);
+    setVec3(&ef_unit_z_vec, 0.0f, 0.0f, 1.0f);
+    setVec3(&ef_zero_vec, 0.0f, 0.0f, 0.0f);
+    mtx34_set(&ef_identity_mtx, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 }
 
-#ifdef __cplusplus
-}
-#endif
+}  // extern "C"

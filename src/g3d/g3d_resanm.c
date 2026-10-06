@@ -12,6 +12,8 @@
  *   fn_80089F78: retail truncates float to short with `psq_st f1,0(r3),1,qr5` + `lha`; no source shape or flag
  *   reproduces it.
  *   flipcheck: `.text` 0x6C4 of 0x6E4; `.data` 0xC4 of 0xC8; `.sdata2` 0x24 of 0x28.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_8058FDD8`,
+ *     `lbl_8058FDC8`, `lbl_8058FE0C`, `lbl_8058FE50`, `dtor_8005B228`.
  * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`: retail has no record-form instruction and
  *   no fused multiply-add.
  */
@@ -30,7 +32,7 @@ extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *m
 
 /* The math/resource helpers this unit calls. */
 extern f32 anim_tick_angle(u16 value);
-extern f32 fn_800610AC(f32 value);
+extern f32 math_reciprocal(f32 value);
 extern void fn_8005B1B4(u32 *self, u32 value);
 extern f32 fn_80463F34(f32 *out, f32 frame);
 
@@ -128,7 +130,7 @@ f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)
 /* Hermite-interpolates between two keys over a span. */
 f32 fn_80089B88(f32 v0, f32 t0, f32 v1, f32 t1, f32 delta, f32 span)
 {
-    f32 h = delta * fn_800610AC(span);
+    f32 h = delta * math_reciprocal(span);
     f32 hm1 = h - 1.0f;
 
     return v0 + (h * (h * (((2.0f * h) - 3.0f) * (v0 - v1)))) +

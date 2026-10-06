@@ -14,8 +14,10 @@
  *   asserts: its own particle-manager list at +0xC0 (`NW4R_EF_MAX_PARTICLEMANAGER`, 0x400) and the emitter
  *   manager's list at manager+0x24 (`NW4R_EF_MAX_EMITTER`, 0x200); `mManagerEF` is at +0xBC, the work record at
  *   +0xB8, the parent at +0xF4 and the object's MTX34 at +0x124.
+ *   GUESS (from the body and its callers): `ef_particle_get_move_dir`, `ef_emitter_tex_flags`,
+ *   GUESS: `ef_emitter_get_mtx`.
  * RESIDUALS. 29 partial rows (ours 0x34E8 of 0x375C), including:
- *  - `fn_800A8D18` (ours 0xC of 0x18), `fn_800A94A4` (ours 0x110 of 0x134): retail masks then booleanises
+ *  - `fn_800A8D18` (ours 0xC of 0x18), `ef_emitter_get_mtx` (ours 0x110 of 0x134): retail masks then booleanises
  *    (`rlwinm; neg; or; srwi`) where MWCC folds the flag test into `extrwi` for every spelling tried;
  *  - `fn_800A89A0`: retail pairs the block copy's loads/stores through a second temporary (`lwz r5; lwz r0; stw
  *    r5; stw r0`), ours moves one word at a time;
@@ -30,6 +32,13 @@
  *  - `fn_800A8C34`: the index scaling folds to `clrlslwi` where retail keeps `clrlwi` + `slwi`.
  *   The other 17 partial rows have no recorded cause.
  *   flipcheck: `.data` and `.sbss` claimed, not emitted; `.sdata2` 0x10 of 0x30; `.text` 0x34E8 of 0x375C.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_800A4864`,
+ *     `fn_800A4420`, `fn_80501390`,
+ *     `MTX34Trans__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`, `lbl_80796004`,
+ *     `lbl_80592850`, `lbl_805929F8`, `Panic__Q24nw4r2dbFPCciPCce`, `fn_80501C60`,
+ *     `List_GetNext__Q24nw4r2utFPCQ34nw4r2ut4ListPCv`, `lbl_80592A6C`, `fn_80501C9C`,
+ *     `List_GetNth__Q24nw4r2utFPCQ34nw4r2ut4ListUs`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_80501390`, `fn_80501C60`, `fn_80501C9C`.
  * SHAPES. The pointer guards are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
  *   ("ef_emitter.cpp", "particle.h" or "effect.h"); `#line` reproduces each assert's line.
  * SHAPES. The 0x1020/0x820 frames are `NW4R_EF_MAX_PARTICLEMANAGER`/`NW4R_EF_MAX_EMITTER`-wide stack arrays
@@ -44,8 +53,8 @@
 #include "ef/ef_particlemanager.h" /* fn_800AB9F4 / fn_800AE360 are that unit's (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
-#include "ef/ef_util.h" /* fn_8009CD64, owned by ef_util.cpp's range (rule 2) */
-#include "draw_shape/fn_800532DC.h" /* fn_800532DC, owned by draw_shape.cpp's range (rule 2) */
+#include "ef/ef_util.h" /* ef_mtx34_column_length, owned by ef_util.cpp's range (rule 2) */
+#include "draw_shape/mtx34_copy.h" /* mtx34_copy, owned by draw_shape.cpp's range (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -101,7 +110,7 @@ u16 fn_8009B374(void* list, void** buf, u16 size); /* UtlistGetArray */
 void* fn_80501C60(void* list, void* node);         /* GetNext */
 void* fn_80501C9C(void* list, u16 index);          /* GetNth */
 void* fn_800A5250(void* list);                     /* GetFirst */
-s32 fn_800A5248(void* node);
+s32 ef_get_life_status(void* node);
 void fn_800A43E8(void* list, void* node);
 void fn_800A45DC(void* list, void* node);
 void fn_800A4A1C(void* list, void* node);
@@ -122,7 +131,7 @@ void fn_800A5900(void* random, u32 seed);
 void* fn_800A5484(void* p);
 void* fn_800A60C0(void* manager);
 void fn_800A52E4(void* manager, void* cb, void* arg, s32 flag, void* self);
-void fn_800AEE0C(void* dst, const void* src);
+void ef_pm_handle(void* dst, const void* src);
 void fn_8035B998(void* p);
 void fn_8009F85C(void* rec, void* target, u32 life, u16 seed, s32 range);
 void* fn_800B2878(void);
@@ -140,15 +149,15 @@ f32 PSVECSquareDistance(void* a, void* b);
 void mtx34_identity(void* mtx);
 void fn_80051424(void* dst, void* src, f32 scale);
 void assignVec3(void* dst, void* src);
-void fn_800514FC(void* dst, void* mtx, void* vec);
+void mtx34_mult_vec3(void* dst, void* mtx, void* vec);
 void fn_8007100C(void* dst, void* src);
-void fn_800710BC(void* dst, void* a, void* b);
+void mtx34_concat(void* dst, void* a, void* b);
 void mtx34_inverse(void* mtx, void* in);
 void fn_8009CA30(void* mtx, f32 x, f32 y, f32 z);
 void fn_8009CBA0(void* dst, void* mtx, void* vec);
 void fn_80501390(void* dst, void* mtx, void* vec);
 f32 fn_80463E2C(f32 x);
-s32 fn_8009C484(void* a, void* b);
+s32 ef_vec3_normalize_to(void* a, void* b);
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -446,12 +455,12 @@ EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitterParam* pa
                        s32 life_bonus, void* host);
 s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* params, EfParticleRec* pm,
                 s32 life_bonus, void* host);
-EfVec* fn_800A7F00(EfParticleRec* self, EfVec* result);
+EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result);
 void* fn_800A8040(EfEmitterObj* self, void* eh, u32 a, u32 b, s8 c, u32 d, u8 e);
 f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4);
 f32 fn_800A8300(void* a, void* b);
 void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx);
-void* fn_800A8944(void* self);
+void* ef_emitter_tex_flags(void* self);
 void* fn_800A8968(EfEmitterObj* self);
 void* fn_800A898C(void* dst, const void* src);
 void* ef_store_word(void* dst, s32 v);
@@ -470,7 +479,7 @@ void fn_800A8D30(EfEmitterObj* self);
 void fn_800A8DF8(EfEmitterObj* self);
 void fn_800A8F18(EfEmitterObj* self);
 void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d);
-void* fn_800A94A4(EfEmitterObj* self, void* out);
+void* ef_emitter_get_mtx(EfEmitterObj* self, void* out);
 void fn_800A95D8(EfEmitterObj* self);
 void fn_800A96C0(EfPmView* pm);
 u16 fn_800A9700(EfPmView* pm);
@@ -646,7 +655,7 @@ extern "C" void fn_800A66AC(EfEmitterManager* self, void* eh) {
 extern "C" s32 fn_800A67E8(EfEmitterObj* self, EfParticleRec* target) {
 #line 130
     NW4R_POINTER_ASSERT(lbl_80592850, target, lbl_8059291C);
-    if (fn_800A5248(target) != 1) {
+    if (ef_get_life_status(target) != 1) {
         return 0;
     }
     fn_800A4A1C(&self->particles, target);
@@ -667,7 +676,7 @@ extern "C" u32 fn_800A6938(EfEmitterObj* self) {
     u16 num = fn_8009B374(&self->particles, list, size);
     for (u16 i = 0; i < num; i++) {
         void* target = list[i];
-        if (fn_800A5248(target) == 1) {
+        if (ef_get_life_status(target) == 1) {
             total += fn_800A67E8(self, (EfParticleRec*)target);
         }
     }
@@ -866,12 +875,12 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
         mtx34_identity(&m1);
         fn_8009CA30(&m1, e->rotation.x, e->rotation.y, e->rotation.z);
         fn_8009CBA0(&m1, &m1, &e->vec_0x9C);
-        fn_800A94A4(e, &m2);
+        ef_emitter_get_mtx(e, &m2);
         mtx34_inverse(&m2, &m2);
-        fn_800710BC(&m1, &m1, &m2);
+        mtx34_concat(&m1, &m1, &m2);
         if (pm != NULL) {
-            fn_800AE360((void*)pm->manager, &m2);
-            fn_800710BC(&m1, &m1, &m2);
+            ef_pm_get_mtx((void*)pm->manager, &m2);
+            mtx34_concat(&m1, &m1, &m2);
         }
         if (host == NULL) {
             if (pm != NULL) {
@@ -883,7 +892,7 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
         fn_8009CA30(&m2, e->rotation.x, e->rotation.y, e->rotation.z);
         fn_8009CBA0(&m2, &m2, &e->vec_0x9C);
         mtx34_inverse(&m2, &m2);
-        fn_800710BC(&m1, &m1, &m2);
+        mtx34_concat(&m1, &m1, &m2);
         e->position.x = v.x + m1.m[0][3];
         e->position.y = v.y + m1.m[1][3];
         e->position.z = v.z + m1.m[2][3];
@@ -939,19 +948,19 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             VEC3_ctor(&v);
             MTX34_ctor(&m1);
             MTX34_ctor(&m2);
-            fn_800AE360((void*)pm->manager, &m2);
+            ef_pm_get_mtx((void*)pm->manager, &m2);
             m2.m[0][3] = lbl_80796004;
             m2.m[1][3] = lbl_80796004;
             m2.m[2][3] = lbl_80796004;
-            fn_800A7F00(pm, &v);
-            fn_800514FC(&v, &m2, &v);
-            if (fn_8009C484(&v, &v) != 0) {
+            ef_particle_get_move_dir(pm, &v);
+            mtx34_mult_vec3(&v, &m2, &v);
+            if (ef_vec3_normalize_to(&v, &v) != 0) {
                 if (params->field_0x00 < 0) {
                     fn_80051424(&v, &v, lbl_80796018);
                 }
                 fn_8009B448(&m1, &v);
                 fn_8009CA30(&m2, e.rotation.x, e.rotation.y, e.rotation.z);
-                fn_800710BC(&m1, &m1, &m2);
+                mtx34_concat(&m1, &m1, &m2);
                 fn_8009BCB4(&m1, &e.rotation);
             }
         }
@@ -967,12 +976,12 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             mtx34_identity(&m1);
             fn_8009CA30(&m1, e.rotation.x, e.rotation.y, e.rotation.z);
             fn_8009CBA0(&m1, &m1, &e.vec_0x9C);
-            fn_800A94A4(&e, &m2);
+            ef_emitter_get_mtx(&e, &m2);
             mtx34_inverse(&m2, &m2);
-            fn_800710BC(&m1, &m1, &m2);
+            mtx34_concat(&m1, &m1, &m2);
             if (pm != NULL) {
-                fn_800AE360((void*)pm->manager, &m2);
-                fn_800710BC(&m1, &m1, &m2);
+                ef_pm_get_mtx((void*)pm->manager, &m2);
+                mtx34_concat(&m1, &m1, &m2);
             }
             if (host == NULL) {
                 if (pm != NULL) {
@@ -984,7 +993,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             fn_8009CA30(&m2, e.rotation.x, e.rotation.y, e.rotation.z);
             fn_8009CBA0(&m2, &m2, &e.vec_0x9C);
             mtx34_inverse(&m2, &m2);
-            fn_800710BC(&m1, &m1, &m2);
+            mtx34_concat(&m1, &m1, &m2);
             e.position.x = pos.x + m1.m[0][3];
             e.position.y = pos.y + m1.m[1][3];
             e.position.z = pos.z + m1.m[2][3];
@@ -1057,10 +1066,10 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
                 nw4r::math::MTX34 m3, m4;
                 MTX34_ctor(&m3);
                 MTX34_ctor(&m4);
-                fn_800AE360((void*)created, &m4);
+                ef_pm_get_mtx((void*)created, &m4);
                 mtx34_inverse(&m4, &m4);
-                fn_800A94A4(&e, &m3);
-                fn_800710BC(&m3, &m4, &m3);
+                ef_emitter_get_mtx(&e, &m3);
+                mtx34_concat(&m3, &m4, &m3);
                 fn_800A834C(&e, (EfParticleRec*)created, &m3);
             }
             e.parent = NULL;
@@ -1069,7 +1078,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
                 fn_800A3800(pm);
                 created->orig = NULL;
             }
-            if (self->state != 1 && fn_800A5248(created) == 1) {
+            if (self->state != 1 && ef_get_life_status(created) == 1) {
                 fn_800A67E8(self, (EfParticleRec*)created);
             }
         }
@@ -1081,7 +1090,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
  * 0x800A7F00 - a particle's global position.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" EfVec* fn_800A7F00(EfParticleRec* self, EfVec* result) {
+extern "C" EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result) {
 #line 300
     NW4R_POINTER_ASSERT(lbl_80592C08, result, lbl_80592BD0);
     {
@@ -1179,7 +1188,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
             EfEffectData* effect = self->managerEF->effect;
             EfVec v;
             VEC3_ctor(&v);
-            fn_800514FC(&v, fn_800A94A4(self, NULL), &self->position);
+            mtx34_mult_vec3(&v, ef_emitter_get_mtx(self, NULL), &self->position);
             step *= self->color_b +
                     (lbl_8079601C - self->color_b) *
                         fn_800A8220(&v, &effect->ref_pos, effect->range_a, effect->range_b,
@@ -1227,9 +1236,9 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
                 s32 a = 0;
                 s32 b = 0;
                 ef_store_word(&a, 0);
-                fn_800AEE0C(&b, pm);
+                ef_pm_handle(&b, pm);
                 fn_800A898C(&a, &b);
-                if ((*(u8*)((u8*)fn_800A8944(&a) + 3) & 0x20) != 0) {
+                if ((*(u8*)((u8*)ef_emitter_tex_flags(&a) + 3) & 0x20) != 0) {
                     fn_8035B998(self->managerEF->field_0x44);
                 }
             }
@@ -1247,7 +1256,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
  * 0x800A8944 / 0x800A8968 - the pooled-effect accessors.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void* fn_800A8944(void* self) {
+extern "C" void* ef_emitter_tex_flags(void* self) {
     return fn_800A8968((EfEmitterObj*)fn_800A5484(self));
 }
 
@@ -1444,10 +1453,10 @@ extern "C" void fn_800A8DF8(EfEmitterObj* self) {
         nw4r::math::MTX34 m1, m2;
         MTX34_ctor(&m1);
         MTX34_ctor(&m2);
-        fn_800AE360((void*)pm->manager, &m2);
+        ef_pm_get_mtx((void*)pm->manager, &m2);
         mtx34_inverse(&m2, &m2);
-        fn_800A94A4(self, &m1);
-        fn_800710BC(&m1, &m2, &m1);
+        ef_emitter_get_mtx(self, &m1);
+        mtx34_concat(&m1, &m2, &m1);
         if (self->field_0x0DE != 0) {
             self->field_0x0DE--;
             return;
@@ -1481,26 +1490,26 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
         self->rotation.y = lbl_80796004;
         self->rotation.z = lbl_80796004;
         self->transform_dirty = 1;
-        fn_800A94A4(self, &m1);
+        ef_emitter_get_mtx(self, &m1);
         MTX34_ctor(&m2);
-        fn_800710BC(&m2, &self->managerEF->effect->ref_mtx, &m1);
+        mtx34_concat(&m2, &self->managerEF->effect->ref_mtx, &m1);
         fn_800A89A0(&m3, &m2);
-        m3.m[0][0] = fn_8009CD64((const f32*)&m3, 0);
+        m3.m[0][0] = ef_mtx34_column_length((const f32*)&m3, 0);
         m3.m[2][0] = lbl_80796004;
         m3.m[1][0] = lbl_80796004;
-        m3.m[1][1] = fn_8009CD64((const f32*)&m3, 1);
+        m3.m[1][1] = ef_mtx34_column_length((const f32*)&m3, 1);
         m3.m[2][1] = lbl_80796004;
         m3.m[0][1] = lbl_80796004;
-        m3.m[2][2] = fn_8009CD64((const f32*)&m3, 2);
+        m3.m[2][2] = ef_mtx34_column_length((const f32*)&m3, 2);
         m3.m[1][2] = lbl_80796004;
         m3.m[0][2] = lbl_80796004;
         if ((self->flags2 & 0x10000) != 0) {
             MTX34_ctor(&m4);
             fn_8009CA30(&m4, lbl_80796028, lbl_80796004, lbl_80796004);
-            fn_800710BC(&m3, &m3, &m4);
+            mtx34_concat(&m3, &m3, &m4);
         }
         mtx34_inverse(&m2, &m2);
-        fn_800710BC(&m2, &m2, &m3);
+        mtx34_concat(&m2, &m2, &m3);
         fn_8009CCAC(&m2, &m2, &self->rotation);
         fn_8009CC20(&m2, &self->vec_0x9C, &m2);
         fn_8009BCB4(&m2, &self->rotation);
@@ -1521,7 +1530,7 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
         nw4r::db::Panic(lbl_80592850, 0x466, lbl_80592B14);
     }
     if (a != 0 && b != 0 && c == 100) {
-        fn_800532DC((Mtx34*)dst, (Mtx34*)orig);
+        mtx34_copy((Mtx34*)dst, (Mtx34*)orig);
         return dst;
     }
     if (a == 0 && b == 0 && c == 0) {
@@ -1549,7 +1558,7 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
             if (b != 0) {
                 MTX34_ctor(&m);
                 fn_8009B650(orig, &m);
-                fn_800710BC(dst, dst, &m);
+                mtx34_concat(dst, dst, &m);
             }
             if (a != 0) {
                 VEC3_ctor(&pt);
@@ -1570,7 +1579,7 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
  * 0x800A94A4 - this object's transform, built on demand.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void* fn_800A94A4(EfEmitterObj* self, void* out) {
+extern "C" void* ef_emitter_get_mtx(EfEmitterObj* self, void* out) {
     if (self->transform_dirty != 0) {
         nw4r::math::MTX34 m;
         MTX34_ctor(&m);
@@ -1579,18 +1588,18 @@ extern "C" void* fn_800A94A4(EfEmitterObj* self, void* out) {
         } else {
             nw4r::math::MTX34 p;
             MTX34_ctor(&p);
-            fn_800A94A4(self->parent, &p);
+            ef_emitter_get_mtx(self->parent, &p);
             fn_800A90AC(&self->matrix, &p, self->flags3 & 1, self->flags3 & 2, (s8)self->alpha,
                         self->flags3 & 4);
         }
         fn_80501390(&self->matrix, &self->matrix, &self->position);
         fn_8009CA30(&m, self->rotation.x, self->rotation.y, self->rotation.z);
-        fn_800710BC(&self->matrix, &self->matrix, &m);
+        mtx34_concat(&self->matrix, &self->matrix, &m);
         fn_8009CBA0(&self->matrix, &self->matrix, &self->vec_0x9C);
         self->transform_dirty = 0;
     }
     if (out != NULL) {
-        fn_800532DC((Mtx34*)out, &self->matrix);
+        mtx34_copy((Mtx34*)out, &self->matrix);
         return out;
     }
     return &self->matrix;
@@ -1677,7 +1686,7 @@ extern "C" s32 fn_800A98D4(EfEmitterObj* self, void* cb, void* arg, s32 flag, s3
     void* node = fn_800A5250(&self->particles);
     while (node != NULL) {
         void* next = fn_80501C60(&self->particles, node);
-        if (flag != 0 || fn_800A5248(node) == 1) {
+        if (flag != 0 || ef_get_life_status(node) == 1) {
             ((void (*)(void*, void*))cb)(node, arg);
             count++;
         }

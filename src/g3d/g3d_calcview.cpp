@@ -6,14 +6,16 @@
  *   0x8058D938-0x8058DD68 (opens on "g3d_calcview.cpp", then the billboard warning strings), .sdata
  *   0x807911A8-0x807911B8, .sdata2 0x80795DA8-0x80795DB0.  Both neighbours cite their own `__FILE__` strings.
  * NAMES. Map stems.
+ *   GUESS (from the body and its callers): `mtx34_concat`.
  * RESIDUALS. Unwritten (empty stubs, 27 rows, 0x2C74 bytes; objdiff scores them near zero): fn_8006F738,
  *   fn_8006F898, fn_8006F8D4, fn_8006F934, fn_8006FB60, fn_8006FBBC, fn_8006FE40, fn_80070134, fn_80070410,
- *   fn_80070600, fn_80070820, fn_80071008, fn_8007100C, fn_80071064, fn_800710A0, fn_800710B4, fn_800710BC,
+ *   fn_80070600, fn_80070820, fn_80071008, fn_8007100C, fn_80071064, fn_800710A0, fn_800710B4, mtx34_concat,
  *   fn_80071130, fn_8007118C, fn_80071198, fn_80071B70, fn_80071BD4, fn_80071C38, fn_80071C3C, fn_80071C40,
  *   fn_80071C48, fn_800726D0.
  *   Partial (7 written bodies): fn_8006F908, fn_8006FDCC, fn_8006FE7C, fn_8006FEC8, fn_8006FF50, fn_8006FFDC,
  *   fn_800700C0.
  *   flipcheck: `.text` 0x258 of 0x2FD4; `.rodata`, `.data`, `.sdata` and `.sdata2` are claimed and not emitted.
+ *   `mtx34_concat` is unwritten (an empty body).
  */
 #include "types.h"
 
@@ -94,7 +96,7 @@ void fn_8007100C(void* pDst, const void* pSrc);
 void fn_80071064(void* p);
 void fn_800710A0(void* p);
 void fn_800710B4(void* p);
-void fn_800710BC(void* pDst, void* pA, void* pB);
+void mtx34_concat(void* pDst, void* pA, void* pB);
 void fn_80071130(void* p);
 void fn_8007118C(void* p);
 void fn_80071198(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
@@ -221,7 +223,7 @@ void fn_8007100C(void* pDst, const void* pSrc) {}
 void fn_80071064(void* p) {}
 void fn_800710A0(void* p) {}
 void fn_800710B4(void* p) {}
-void fn_800710BC(void* pDst, void* pA, void* pB) {}
+void mtx34_concat(void* pDst, void* pA, void* pB) {}
 void fn_80071130(void* p) {}
 void fn_8007118C(void* p) {}
 void fn_80071198(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}

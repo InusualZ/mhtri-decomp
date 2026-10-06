@@ -11,7 +11,7 @@ extern "C" {
 
 /* 0x80075DCC - a one-line thunk: `math_sincos_idx(lbl_80795DFC * angle)`.  The callers pass a sin/cos
  * out-pair plus an angle; the shipped body reads only the angle. */
-void fn_80075DCC(f32* pOutSin, f32* pOutCos, f32 angle);
+void sin_cos_deg(f32* pOutSin, f32* pOutCos, f32 angle);
 /* 0x80075DD8 - sets up the camera projection for `p`. */
 void fn_80075DD8(void* p);
 
@@ -20,7 +20,7 @@ void fn_80077420(u16 command, u8 value);
 
 /* 0x80077DF0 - assembles an MTX34 from twelve floats (the first eight in FPRs, the last four on the
  * stack).  Callers: ef/ef_drawfreestrategy.cpp, ef/ef_drawstrategyimpl.cpp. */
-void fn_80077DF0(Mtx34* dst, f32 m00, f32 m01, f32 m02, f32 m03,
+void mtx34_set(Mtx34* dst, f32 m00, f32 m01, f32 m02, f32 m03,
                  f32 m10, f32 m11, f32 m12, f32 m13,
                  f32 m20, f32 m21, f32 m22, f32 m23);
 

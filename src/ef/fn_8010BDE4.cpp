@@ -15,6 +15,10 @@
  *   The other 7 partial rows have no recorded cause (`symdiff.py -u ef/fn_8010BDE4 --all`).
  *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text` (0x13A0 of 0x13C4) and `.sdata2` (0x10 of 0x50) short of
  *   the claim; `.text`, `.sdata2`, extab and extabindex differing.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_24`,
+ *     `_savegpr_21`, `_restgpr_24`, `_restgpr_21`, `_savegpr_19`, `_savegpr_20`, `_restgpr_19`, `_restgpr_20`,
+ *     `lbl_80796810`, `_savegpr_25`, `_savegpr_26`, `lbl_80791820`, `_restgpr_26`, `_restgpr_25`, `_savegpr_27`,
+ *     `_restgpr_27`.
  * SHAPES. The two families' work blocks are two views of `_EFT::work_0x38`.
  */
 
@@ -152,9 +156,9 @@ void scaleMat34W(nw4r::math::MTX34* mtx, nw4r::math::VEC3* v);
 extern "C" {
 void mtx34_identity(nw4r::math::MTX34* mtx);
 void fn_800513F0(nw4r::math::VEC3* v, f32 s);
-void fn_800532DC(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
+void mtx34_copy(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void fn_8007100C(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
-void fn_800710BC(nw4r::math::MTX34* a, nw4r::math::MTX34* b, nw4r::math::MTX34* m);
+void mtx34_concat(nw4r::math::MTX34* a, nw4r::math::MTX34* b, nw4r::math::MTX34* m);
 void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
 void g3d_root_model_bind(s32 root, u32 id);
 void mtx34_inverse(nw4r::math::MTX34* out, nw4r::math::MTX34* src);
@@ -616,12 +620,12 @@ extern "C" void fn_8010D12C(nw4r::math::MTX34* a, nw4r::math::MTX34* b)
     nw4r::math::MTX34 m;
 
     MTX34_ctor(&m);
-    fn_800532DC(&m, &get_current_view_mtx());
+    mtx34_copy(&m, &get_current_view_mtx());
     m.m[0][3] = lbl_80796810;
     m.m[1][3] = lbl_80796810;
     m.m[2][3] = lbl_80796810;
     mtx34_inverse(&m, &m);
-    fn_800710BC(a, b, &m);
+    mtx34_concat(a, b, &m);
 }
 
 /* Places each pooled model: either the two-model enemy case or the per-model light case. */

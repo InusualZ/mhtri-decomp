@@ -10,6 +10,9 @@
  *   fn_8007507C, fn_80075258, 0x80075394-0x80075844 (six), fn_80075940.
  *   flipcheck: `.text` 0x16A0 of 0x16F0; `.data` is claimed and not emitted; `.sdata2` is 0x34 of 0x30 - one pooled
  *   literal is shared with `g3d/fn_80075DCC.cpp` (a candidate fold).
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_8050168C`,
+ *     `MTX44Copy__Q24nw4r4mathFPQ34nw4r4math5MTX44PCQ34nw4r4math5MTX44`.
+ *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050168C`.
  * SHAPES. `#pragma peephole off` around fn_80075940 (playbook 32); file-scope `#pragma fp_contract off`.
  */
 
@@ -52,11 +55,11 @@ extern "C" void GXSetScissor(u32 left, u32 top, u32 width, u32 height);
 extern "C" void GXSetScissorBoxOffset(s32 x, s32 y);
 extern "C" void GXSetViewport(f32 x, f32 y, f32 width, f32 height, f32 near, f32 far);
 extern "C" void mtx34_identity(void* pOut);
-extern "C" void* fn_80050508(void* pMtx);
+extern "C" void* mtx34_get_ptr(void* pMtx);
 extern "C" void fn_80050850(void* pOut, const void* pIn);
 extern "C" s32 fn_800508A8(const void* pIn);
-extern "C" void fn_80051820(void* pOut, const void* pA, const void* pB);
-extern "C" f32 fn_80052214(const void* pA, const void* pB);
+extern "C" void vec3_cross(void* pOut, const void* pA, const void* pB);
+extern "C" f32 vec3_dot(const void* pA, const void* pB);
 extern "C" void fn_804BA230(const f32* pViewMtx, const f32* pParams, const f32* pFrustum, void* pA,
                             void* pB, void* pC, f32 x, f32 y, f32 z);
 extern "C" void fn_804BA7A0(s32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g);
@@ -438,7 +441,7 @@ void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVe
         params.mUnk10 = projMtx[6];
     }
     fn_80075170(pSelf, &frustum[0], &frustum[1], &frustum[2], &frustum[3], &frustum[4], &frustum[5]);
-    fn_80050508(viewMtx);
+    mtx34_get_ptr(viewMtx);
     fn_804BA230(viewMtx, &params.mProjType, frustum, pOut, pOut + 4, pOut + 8, pVec->x, pVec->y,
                 pVec->z);
 }
@@ -484,18 +487,18 @@ void fn_800754EC(nw4r::g3d::Camera* pSelf, void* pOut) {
     CameraData* pData = fn_80074A54(pSelf);
     u32 flags = pData->mFlags;
     if ((flags & 0x40) != 0) {
-        fn_80050508(pOut);
+        mtx34_get_ptr(pOut);
         fn_804C6810(pData->mUnkBC, pData->mUnkC0, pData->mUnkC4, pData->mUnkC8, pData->mUnkCC,
                     -pData->mUnkD0, pData->mUnkD4, pData->mUnkD8);
         return;
     }
     if ((flags & 0x10) != 0) {
-        fn_80050508(pOut);
+        mtx34_get_ptr(pOut);
         fn_804C6660(pData->mUnkBC, pData->mUnkC0, pData->mUnkC4, pData->mUnkC8, pData->mProjC,
                     pData->mUnkCC, -pData->mUnkD0, pData->mUnkD4, pData->mUnkD8);
         return;
     }
-    fn_80050508(pOut);
+    mtx34_get_ptr(pOut);
     fn_804C6710(pData->mProjA, pData->mProjB, pData->mUnkCC, -pData->mUnkD0, pData->mUnkD4,
                 pData->mUnkD8);
 }
@@ -600,7 +603,7 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
         s32 up = fn_800508A8(&pData->mUpX);
         s32 target = fn_800508A8(&pData->mTargetX);
         s32 pos = fn_800508A8(&pData->mPosX);
-        fn_80050508(pData);
+        mtx34_get_ptr(pData);
         fn_804C64E0(pos, target, up);
     } else if ((flags & 4) != 0) {
         setVec3(&diff, pData->mPosX - pData->mUpX, pData->mPosY - pData->mUpY,
@@ -630,8 +633,8 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
             VEC3_ctor(&axisB);
             fn_80050850(&diff, &diff);
             fn_80050850(&axisA, &axisA);
-            fn_80051820(&axisB, &diff, &axisA);
-            fn_80075DCC(&rotSin, &rotCos, pData->mUnkA4);
+            vec3_cross(&axisB, &diff, &axisA);
+            sin_cos_deg(&rotSin, &rotCos, pData->mUnkA4);
             VEC3_ctor(&rowA);
             VEC3_ctor(&rowB);
             rowA.x = rotSin * axisB.x + rotCos * axisA.x;
@@ -643,23 +646,23 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
             pData->mViewMtx[0][0] = rowA.x;
             pData->mViewMtx[0][1] = rowA.y;
             pData->mViewMtx[0][2] = rowA.z;
-            pData->mViewMtx[0][3] = -fn_80052214(&pData->mPosX, &rowA);
+            pData->mViewMtx[0][3] = -vec3_dot(&pData->mPosX, &rowA);
             pData->mViewMtx[1][0] = rowB.x;
             pData->mViewMtx[1][1] = rowB.y;
             pData->mViewMtx[1][2] = rowB.z;
-            pData->mViewMtx[1][3] = -fn_80052214(&pData->mPosX, &rowB);
+            pData->mViewMtx[1][3] = -vec3_dot(&pData->mPosX, &rowB);
             pData->mViewMtx[2][0] = diff.x;
             pData->mViewMtx[2][1] = diff.y;
             pData->mViewMtx[2][2] = diff.z;
-            pData->mViewMtx[2][3] = -fn_80052214(&pData->mPosX, &diff);
+            pData->mViewMtx[2][3] = -vec3_dot(&pData->mPosX, &diff);
         }
     } else {
         if ((flags & 2) == 0) {
             nw4r::db::Panic(lbl_8058E430, 926, lbl_8058E4E0);
         }
-        fn_80075DCC(&sinX, &cosX, pData->mUnk98);
-        fn_80075DCC(&sinY, &cosY, pData->mUnk9C);
-        fn_80075DCC(&sinZ, &cosZ, pData->mUnkA0);
+        sin_cos_deg(&sinX, &cosX, pData->mUnk98);
+        sin_cos_deg(&sinY, &cosY, pData->mUnk9C);
+        sin_cos_deg(&sinZ, &cosZ, pData->mUnkA0);
         VEC3_ctor(&row0);
         VEC3_ctor(&row1);
         VEC3_ctor(&row2);
@@ -675,15 +678,15 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
         pData->mViewMtx[0][0] = row0.x;
         pData->mViewMtx[0][1] = row0.y;
         pData->mViewMtx[0][2] = row0.z;
-        pData->mViewMtx[0][3] = -fn_80052214(&pData->mPosX, &row0);
+        pData->mViewMtx[0][3] = -vec3_dot(&pData->mPosX, &row0);
         pData->mViewMtx[1][0] = row1.x;
         pData->mViewMtx[1][1] = row1.y;
         pData->mViewMtx[1][2] = row1.z;
-        pData->mViewMtx[1][3] = -fn_80052214(&pData->mPosX, &row1);
+        pData->mViewMtx[1][3] = -vec3_dot(&pData->mPosX, &row1);
         pData->mViewMtx[2][0] = row2.x;
         pData->mViewMtx[2][1] = row2.y;
         pData->mViewMtx[2][2] = row2.z;
-        pData->mViewMtx[2][3] = -fn_80052214(&pData->mPosX, &row2);
+        pData->mViewMtx[2][3] = -vec3_dot(&pData->mPosX, &row2);
     }
     pData->mFlags |= 8;
 }
