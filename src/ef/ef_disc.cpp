@@ -106,7 +106,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             v40.z = 0.0f;
         } else {
             f32 s = scale * em->spread;
-            fn_8009C6F0((Vec*)&v40, s);
+            ef_vec_sin_cos((Vec*)&v40, s);
             v40.z = -f8 * v40.x;
             v40.x = v40.x * fC;
         }

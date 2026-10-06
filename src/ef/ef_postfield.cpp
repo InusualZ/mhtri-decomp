@@ -1434,7 +1434,7 @@ EfResState* ef_res_drawparam_data(const EfResAccessor* self) {
     return (EfResState*)self->data;
 }
 extern EfResDrawParam* fn_800A5484(void* arg);
-extern EfResDrawParam* fn_800A4864(EfResDrawParam* arg);
+extern EfResDrawParam* ef_res_emitter_desc(EfResDrawParam* arg);
 
 /* Sets or clears the 0x400 flag on the accessor's state word. */
 void fn_800B24BC(void* self, int enable) {
@@ -1457,12 +1457,12 @@ void fn_800B2590(EfResSlot* self, void* value) {
 
 /* Resolves the parameter through the two accessors and stores it. */
 void fn_800B2504(EfResSlot* self, void* arg) {
-    fn_800B2544(self, fn_800A4864(fn_800A5484(arg)));
+    fn_800B2544(self, ef_res_emitter_desc(fn_800A5484(arg)));
 }
 
 /* Resolves the parameter and stores the second block's +0x94 field. */
 void fn_800B254C(EfResSlot* self, void* arg) {
-    fn_800B2590(self, &fn_800A4864(fn_800A5484(arg))->field_0x94);
+    fn_800B2590(self, &ef_res_emitter_desc(fn_800A5484(arg))->field_0x94);
 }
 
 /* The resolved parameter block the +0x4C/+0x54 accessors read. */

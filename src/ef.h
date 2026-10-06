@@ -249,6 +249,7 @@ extern void VEC3_ctor(VEC3* out);                                   /* 0x80043EA
 extern VEC3* setVec3(VEC3* out, f32 x, f32 y, f32 z);               /* 0x80041E8C - owner mh3_pad.cpp */
 extern void assignVec3(Vec* out, Vec* in);                         /* out = in */
 extern void fn_8009C6F0(Vec* out, f32 angle);                       /* sin/cos of angle */
+extern void ef_vec_sin_cos(Vec* out, f32 angle);                    /* the same, under the owner's name */
 extern void ef_sin_cos(f32* out_a, f32* out_b, f32 angle);         /* sin/cos of angle */
 extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
 extern u16 fn_800A9FB0(s32 ctx, u16 id, f32 scale, EfWork* em);

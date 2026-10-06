@@ -15,7 +15,7 @@ s32 fn_80064820(void *out);                 /* 0x80064820 - the caller keeps its
 /* 0x80064C14 - releases the object the second argument points at (`light/light.cpp`'s fn_802C1AD8 tail-calls it). */
 void fn_80064C14(void *self, const f32 *v);
 u32 fn_800651BC(void *self);                /* 0x800651BC - reads the word at +0x0 of `self` */
-void *fn_80067E54(void *out, void *in);     /* 0x80067E54 - copies 0x10 B, returns `out` */
+void *vec3_copy_construct(void *out, void *in);     /* 0x80067E54 - copies a VEC3 (three floats), returns `out` */
 s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */
 #ifdef __cplusplus
 /* 0x80067E70 - the posture record's constructor: default-constructs its position, target and up vectors. */

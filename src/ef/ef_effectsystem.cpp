@@ -132,7 +132,7 @@ typedef struct EfSys {
     /* +0xC065 */ u8 pad_0xC065[0x03];
 } EfSys; /* size: 0xC068 (the symbol map's size for lbl_806884D0) */
 
-/* The record `fn_800A4864` hands back for an emitter: the relocation flag `CreateEffect` tests at +0x00
+/* The record `ef_res_emitter_desc` hands back for an emitter: the relocation flag `CreateEffect` tests at +0x00
  * (the name the Warning prints comes from `fn_800A485C`, the emitter's own +0x00). size: 0x04 (lower
  * bound: only this word is read) */
 typedef struct EfSysEmitterWork {
@@ -246,7 +246,7 @@ void fn_800A4A1C(void* list, void* node);
 u16 fn_800A4AF0(void* list);
 u32 fn_800A4AF8(void* effect);
 const char* fn_800A485C(void* p);
-void* fn_800A4864(void* p);
+void* ef_res_emitter_desc(void* p);
 u16 fn_8009B374(void* list, void** buf, u16 size);
 void* mtx34_identity(void* mtx);
 void* mtx34_get_ptr(void* mtx);
@@ -379,7 +379,7 @@ extern "C" EfSysEffect* fn_800A5A90(EfSys* self, void* emitter, u32 groupID, u16
     if (emitter == NULL) {
         return NULL;
     }
-    if ((((EfSysEmitterWork*)fn_800A4864(emitter))->flags & 0x40000000u) == 0) {
+    if ((((EfSysEmitterWork*)ef_res_emitter_desc(emitter))->flags & 0x40000000u) == 0) {
 #line 131
         nw4r::db::Warning(lbl_80592698, __LINE__, lbl_80592788, fn_800A485C(emitter));
         return NULL;

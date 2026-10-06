@@ -1,6 +1,5 @@
 /* unsplit/ef.h - the ef band header: the declarations the ef consumers still read from the band (rule 2's residual):
- * `fn_801173AC`, whose owner has no header yet (one would carry a generated file name), two particle-manager entries
- * whose owner spells them differently, the move-work accessors and
+ * `fn_801173AC`, whose owner has no header yet (one would carry a generated file name), the move-work accessors and
  * `vec_to_mh_vec3`.  The other ef symbols are declared in their owners' headers (`ef/ef_emitter.h`, `ef/ef_torus.h`,
  * `ef/ef_particlemanager.h`, `ef/ef_drawstrategyimpl.h`, `ef/ef_drawstripestrategy.h`). */
 #ifndef MHTRI_UNSPLIT_EF_H
@@ -12,12 +11,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* 0x800AB740 / 0x800AB658 - `ef/ef_particlemanager.cpp`'s teardown entry and ramp helper, in the spelling of their
- * caller `ef/ef_particle.cpp`; the owner defines them `s32 (EfPmManager*, EfPmParticle*)` and `f32 (f32)`, and its
- * header cannot carry this spelling until the two agree. */
-void* fn_800AB740(void* table, void* self);
-f32 fn_800AB658(void* self, f32 v);
 
 /* `ef/fn_801173AC.cpp`'s eft024 kind-1 state-1 handler. */
 void fn_801173AC(void* self);

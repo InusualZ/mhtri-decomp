@@ -8,7 +8,9 @@
  *   .data 0x80592850-0x80592CD0 (the `__FILE__` string "ef_emitter.cpp" first; the class table at 0x80592BB0 =
  *   fn_800A6414 destroy, fn_800A6420 retire, fn_800A6EC4 create child, fn_800A7378 create, fn_800A8A5C,
  *   fn_800A8D30, fn_800A8DF8, fn_800A8F18), .sbss 0x80794920-0x80794928, .sdata2 0x80796000-0x80796030.
- * FLAGS. `cflags_main`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` from the first definition (retail keeps the flag booleanisations
+ *   `rlwinm; neg; or; srwi`, `clrlwi` + `slwi` index scaling and the `li r0,N; psq_lx` epilogues), back on for the
+ *   last definition `fn_800A98D4` (retail folds its byte store's `clrlwi`).
  * NAMES. The map has only `fn_` stems for the range but four GUESS names from the bodies: `ef_store_word`,
  *   `ef_truncate_float`, `ef_random_float` and `ef_res_block_body`.  The object's containers are named by its
  *   asserts: its own particle-manager list at +0xC0 (`NW4R_EF_MAX_PARTICLEMANAGER`, 0x400) and the emitter
@@ -16,24 +18,25 @@
  *   +0xB8, the parent at +0xF4 and the object's MTX34 at +0x124.
  *   GUESS (from the body and its callers): `ef_particle_get_move_dir`, `ef_emitter_tex_flags`,
  *   GUESS: `ef_emitter_get_mtx`.
- *   GUESS: `ef_vec3_dist_sq` (the squared position distance), `ef_mtx34_copy` (the twelve-word copy).
- * RESIDUALS. 29 partial rows (ours 0x34E8 of 0x375C), including:
- *  - `fn_800A8D18` (ours 0xC of 0x18), `ef_emitter_get_mtx` (ours 0x110 of 0x134): retail masks then booleanises
- *    (`rlwinm; neg; or; srwi`) where MWCC folds the flag test into `extrwi` for every spelling tried;
- *  - `ef_mtx34_copy`: retail pairs the block copy's loads/stores through a second temporary (`lwz r5; lwz r0; stw
- *    r5; stw r0`), ours moves one word at a time;
- *  - `fn_800A834C` (ours 0x4EC of 0x5F8): retail fuses one `f2*f1 - f0` into `fmsubs` under the rest's unfused
- *    chain, and it calls `fn_800B2878` and asserts `mManagerEF` (`lbl_80592A6C`) where ours does not;
- *  - `fn_800A7750` (ours 0x714 of 0x7B0), `fn_800A7378`: retail calls `fn_800A4864` where ours does not, and
- *    `fn_800A7750` has a `Panic(..., "Failed assertion false")` path ours lacks;
- *  - `fn_800A6A04`: ours calls `fn_800A4864` and `fn_800A4420` where retail reads `lbl_80796008`;
+ *   GUESS: `ef_vec3_dist_sq` (0x800A8300): the squared distance of two positions.
+ *   GUESS: `ef_mtx34_copy` (0x800A89A0): copies the twelve words of a 3x4 matrix and returns the destination.
+ *   GUESS: `ef_calc_inherit_mtx` (0x800A90AC): builds the transform a child inherits (scale, rotation, a share of
+ *   the translation) from its parent's matrix; the parent chain and the particle manager call it.
+ * RESIDUALS. 25 partial rows, including:
+ *  - `fn_800A834C`: retail fuses one `f2*f1 - f0` into `fmsubs` under the rest's unfused chain, and it calls
+ *    `fn_800B2878` and asserts `mManagerEF` (`lbl_80592A6C`) where ours does not;
+ *  - `fn_800A7750`, `fn_800A7378`: retail calls `ef_res_emitter_desc` where ours does not, and `fn_800A7750` has a
+ *    `Panic(..., "Failed assertion false")` path ours lacks;
+ *  - `fn_800A6A04`: ours calls `ef_res_emitter_desc` and `fn_800A4420` where retail reads `lbl_80796008`;
  *  - `fn_800A8A5C`: the `fn_800A8BC8` call sits at another point of the pass;
  *  - `fn_800A8220`, `ef_vec3_dist_sq`: the argument copy `mr r3, r4` is scheduled elsewhere and the float registers
  *    differ;
- *  - `fn_800A8C34`: the index scaling folds to `clrlslwi` where retail keeps `clrlwi` + `slwi`.
- *   The other 17 partial rows have no recorded cause.
- *   flipcheck: `.data` and `.sbss` claimed, not emitted; `.sdata2` 0x10 of 0x30; `.text` 0x34E8 of 0x375C.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_800A4864`,
+ *  - `ef_res_block_body`, `fn_800A8BF8`, `fn_800A8BC8`, `fn_800A8CB8`, `fn_800A8CE8`: retail adds the offset as the
+ *    first `add` operand (`add r3, r0, r3`), every spelling tried gives `add r3, r3, r0`;
+ *  - `fn_800A8DF8`: ours reloads `+0xC8` where retail reuses the pointer.
+ *   The other partial rows are register colours with no recorded cause.
+ *   flipcheck: `.data` and `.sbss` claimed, not emitted; `.sdata2` 0x10 of 0x30.
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `ef_res_emitter_desc`,
  *     `fn_800A4420`, `fn_80501390`,
  *     `MTX34Trans__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`, `lbl_80796004`,
  *     `lbl_80592850`, `lbl_805929F8`, `Panic__Q24nw4r2dbFPCciPCce`, `fn_80501C60`,
@@ -120,7 +123,7 @@ void fn_800A4428(void* list);
 void fn_800A444C(void* self);
 void fn_800A4474(void* manager, void* self);
 void* fn_800A4420(void* self);
-void* fn_800A4864(void* p); /* walks to an object's chain head */
+void* ef_res_emitter_desc(void* p); /* walks to an object's chain head */
 void fn_800A486C(void* manager, void* emitter);
 u32 fn_800A485C(void* p);
 void* fn_800A4654(void* manager, void* em, u8 flag, s32 mode);
@@ -136,7 +139,7 @@ void ef_pm_handle(void* dst, const void* src);
 void fn_8035B998(void* p);
 void fn_8009F85C(void* rec, void* target, u32 life, u16 seed, s32 range);
 void* fn_800B2878(void);
-void fn_8009B448(void* mtx, void* vec);
+
 void fn_8009BF08(void* vec, void* out);
 void fn_8009C040(void* vec, void* out);
 void fn_8009B650(void* vec, void* mtx);
@@ -390,9 +393,9 @@ typedef struct EfParticleRec {
     /* +0x0C8 */ void* manager;
 } EfParticleRec; /* size: 0xCC (lower bound) */
 
-/* The work record a resource-backed object is initialised from (`fn_800A4864` is its chain head). */
+/* The work record a resource-backed object is initialised from (`ef_res_emitter_desc` is its chain head). */
 static inline EfEmitterWork* EfGetWork(void* p) {
-    return (EfEmitterWork*)fn_800A4864(p);
+    return (EfEmitterWork*)ef_res_emitter_desc(p);
 }
 
 #define NW4R_EF_MAX_PARTICLEMANAGER 0x400
@@ -460,12 +463,12 @@ EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result);
 void* fn_800A8040(EfEmitterObj* self, void* eh, u32 a, u32 b, s8 c, u32 d, u8 e);
 f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4);
 f32 ef_vec3_dist_sq(void* a, void* b);
-void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx);
+void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::math::MTX34* mtx);
 void* ef_emitter_tex_flags(void* self);
 void* fn_800A8968(EfEmitterObj* self);
 void* fn_800A898C(void* dst, const void* src);
 void* ef_store_word(void* dst, s32 v);
-void* ef_mtx34_copy(void* dst, const void* src);
+nw4r::math::MTX34* ef_mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 f32 ef_truncate_float(f32 x);
 f32 ef_random_float(u32* random);
 void fn_800A8A5C(EfEmitterObj* self);
@@ -479,7 +482,7 @@ u32 fn_800A8D18(EfEmitterObj* self);
 void fn_800A8D30(EfEmitterObj* self);
 void fn_800A8DF8(EfEmitterObj* self);
 void fn_800A8F18(EfEmitterObj* self);
-void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d);
+void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c, bool d);
 void* ef_emitter_get_mtx(EfEmitterObj* self, void* out);
 void fn_800A95D8(EfEmitterObj* self);
 void fn_800A96C0(EfPmView* pm);
@@ -558,7 +561,6 @@ extern "C" void* fn_800A630C(void* self, s16 flag) {
     return self;
 }
 
-#pragma peephole on
 
 extern "C" u32 fn_800A6350(EfEmitterObj* self) {
     u32 total = 0;
@@ -786,7 +788,7 @@ extern "C" s32 fn_800A6EC4(EfEmitterObj* self, EfEmitterManager* aParentEF, void
     NW4R_POINTER_ASSERT(lbl_80592850, aParentEF, lbl_805929C0);
 #line 247
     NW4R_POINTER_ASSERT(lbl_80592850, eh, lbl_80592954);
-    fn_800A4864(eh);
+    ef_res_emitter_desc(eh);
     fn_800A444C(self);
     fn_800A4428(&self->particles);
     fn_800A6A04(self, eh, aParentEF);
@@ -926,7 +928,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
         nw4r::math::MTX34 m1, m2;
 
         fn_800A6258((EfSysResourceObj*)&e);
-        fn_800A4864(eh);
+        ef_res_emitter_desc(eh);
         fn_800A6A04(&e, eh, self->managerEF);
         e.field_0x0E8 += (u16)life_bonus;
         e.managerEF = self->managerEF;
@@ -959,7 +961,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
                 if (params->field_0x00 < 0) {
                     vec3_scale_by(&v, &v, lbl_80796018);
                 }
-                fn_8009B448(&m1, &v);
+                ef_mtx34_from_y_axis(m1.m[0], &v.x);
                 ef_mtx34_rotate_xyz(&m2, e.rotation.x, e.rotation.y, e.rotation.z);
                 mtx34_concat(&m1, &m1, &m2);
                 fn_8009BCB4(&m1, &e.rotation);
@@ -1161,7 +1163,7 @@ extern "C" f32 ef_vec3_dist_sq(void* a, void* b) {
  * ------------------------------------------------------------------------------------------------- */
 
 #pragma fp_contract off
-extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
+extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::math::MTX34* mtx) {
 #line 768
     NW4R_POINTER_ASSERT(lbl_80592850, pm, lbl_80592A38);
     if (self->field_0x0E0 != 0) {
@@ -1226,7 +1228,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
                            nw4r::math::MTX34*))((void**)self->field_0x0F0)[2])(
                     self->field_0x0F0, self, pm, life_i, f2, anim, frames, scale, &mc);
             } else {
-                ((void (*)(void*, EfEmitterObj*, EfParticleRec*, s32, u32, f32*, u16, f32, void*))(
+                ((void (*)(void*, EfEmitterObj*, EfParticleRec*, s32, u32, f32*, u16, f32, const nw4r::math::MTX34*))(
                     (void**)self->field_0x0F0)[2])(self->field_0x0F0, self, pm, (s32)self->life,
                                                    self->flags2, self->animate_0x4C,
                                                    work->field_0x0A,
@@ -1262,7 +1264,7 @@ extern "C" void* ef_emitter_tex_flags(void* self) {
 }
 
 extern "C" void* fn_800A8968(EfEmitterObj* self) {
-    return (u8*)fn_800A4864(self) + 0x8C;
+    return (u8*)ef_res_emitter_desc(self) + 0x8C;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -1279,21 +1281,8 @@ extern "C" void* ef_store_word(void* dst, s32 v) {
     return dst;
 }
 
-extern "C" void* ef_mtx34_copy(void* dst, const void* src) {
-    u32* d = (u32*)dst;
-    const u32* s = (const u32*)src;
-    d[0] = s[0];
-    d[1] = s[1];
-    d[2] = s[2];
-    d[3] = s[3];
-    d[4] = s[4];
-    d[5] = s[5];
-    d[6] = s[6];
-    d[7] = s[7];
-    d[8] = s[8];
-    d[9] = s[9];
-    d[10] = s[10];
-    d[11] = s[11];
+extern "C" nw4r::math::MTX34* ef_mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src) {
+    *dst = *src;
     return dst;
 }
 
@@ -1522,7 +1511,7 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
  * 0x800A90AC - the transform combine the parent chain uses.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
+extern "C" void* ef_calc_inherit_mtx(void* dst, void* orig, bool a, bool b, s8 c, bool d) {
 #line 1124
     NW4R_POINTER_ASSERT(lbl_80592850, dst, lbl_80592AA8);
 #line 1125
@@ -1590,7 +1579,7 @@ extern "C" void* ef_emitter_get_mtx(EfEmitterObj* self, void* out) {
             nw4r::math::MTX34 p;
             MTX34_ctor(&p);
             ef_emitter_get_mtx(self->parent, &p);
-            fn_800A90AC(&self->matrix, &p, self->flags3 & 1, self->flags3 & 2, (s8)self->alpha,
+            ef_calc_inherit_mtx(&self->matrix, &p, self->flags3 & 1, self->flags3 & 2, (s8)self->alpha,
                         self->flags3 & 4);
         }
         fn_80501390(&self->matrix, &self->matrix, &self->position);
@@ -1682,6 +1671,7 @@ extern "C" void fn_800A9790(EfEmitterObj* self, EfWalkCtx* arg) {
     arg->count += fn_800A98D4(self, arg->cb, arg->arg, arg->flag, 0);
 }
 
+#pragma peephole on
 extern "C" s32 fn_800A98D4(EfEmitterObj* self, void* cb, void* arg, s32 flag, s32 recurse) {
     s32 count = 0;
     void* node = fn_800A5250(&self->particles);

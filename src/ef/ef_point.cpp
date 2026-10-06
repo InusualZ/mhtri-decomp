@@ -28,6 +28,7 @@
 #include "types.h"
 #include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "ef/ef_emitter.h" /* ef_random_float (rule 2) */
 
 /* --------------------------------------------------------------------------------------------- */
 /* Types                                                                                          */
@@ -93,7 +94,6 @@ extern const f32 lbl_80796318; /* 0.01f */
 
 /* ef/nw4r math helpers; retail's relocations carry their plain map names, so they have C linkage. */
 extern "C" {
-extern f32 ef_random_float(struct EfRate *rate);
 extern u16 fn_800A9FB0(void *self, u16 id, struct EfEmitter *em, f32 f);
 extern void fn_800A99B4(void *self, nw4r::math::VEC3 *out, struct EfEmitter *em, nw4r::math::VEC3 *a,
                         nw4r::math::VEC3 *b, nw4r::math::VEC3 *c, nw4r::math::VEC3 *d);
@@ -149,7 +149,7 @@ void fn_800CD584(void *self, EfEmitter *em, EfPm *pm, s32 count, void *unused, v
 
             setVec3(&v_44, lbl_80796300, lbl_80796300, lbl_80796300);
             VEC3_ctor(&v_38);
-            rate = ef_random_float(&em->rate);
+            rate = ef_random_float(&em->rate.counter);
             t = lbl_80796304 * rate - lbl_80796308;
             if (t >= lbl_80796300)
                 s = (lbl_8079630C + lbl_80796310 * t) * t;
@@ -158,7 +158,7 @@ void fn_800CD584(void *self, EfEmitter *em, EfPm *pm, s32 count, void *unused, v
             v_38.x = s;
             r = sqrt_f32(lbl_80796308 - v_38.x * v_38.x);
             ef_sin_cos(&v_38.z, &v_38.y,
-                        lbl_80796304 * (lbl_80796314 * ef_random_float(&em->rate)));
+                        lbl_80796304 * (lbl_80796314 * ef_random_float(&em->rate.counter)));
             v_38.y = v_38.y * r;
             v_38.z = v_38.z * r;
             setVec3(&v_2C, v_38.x, lbl_80796300, v_38.z);
@@ -168,7 +168,7 @@ void fn_800CD584(void *self, EfEmitter *em, EfPm *pm, s32 count, void *unused, v
             v_b = v_20;
             v_a = v_44;
             scale = lbl_80796308 +
-                    (lbl_80796318 * (f32)em->field_0x67) * ef_random_float(&em->rate);
+                    (lbl_80796318 * (f32)em->field_0x67) * ef_random_float(&em->rate.counter);
             pm->iface->fn_0x14(pm, fn_800A9FB0(self, (u16)id, em, f), &v_a, &v_b, arg7,
                                &em->field_0xFC, em->field_0xF8, em->field_0xE8, scale);
         }

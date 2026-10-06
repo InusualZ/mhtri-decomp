@@ -147,7 +147,7 @@ struct EmEffectWork {
 /* --- callees ------------------------------------------------------------------------------------ */
 extern "C" f32 vec3_length_sq(const nw4r::math::VEC3* work);
 extern "C" void subVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
-extern "C" f32 fn_80050F24(const nw4r::math::VEC3* in);
+extern "C" f32 vec3_len(const nw4r::math::VEC3* in);
 extern "C" f32 vec3_dot(const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void vec3_normalize_into(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
 extern "C" void vec3_scale(nw4r::math::VEC3* out, const nw4r::math::VEC3* in, f32 scale);
@@ -304,7 +304,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
         fn_800513F0(&vE8, lbl_80796708);
         addVec3(&v4C, &v124, &vE8);
         copyVec3(&v118, &v4C);
-        f31 = (f32)(s32)fn_80050F24(&vE8);
+        f31 = (f32)(s32)vec3_len(&vE8);
         off_screen = lbl_807966F4;
         if (v130.x >= lbl_8079670C) {
             off_screen = v130.x - lbl_8079670C;

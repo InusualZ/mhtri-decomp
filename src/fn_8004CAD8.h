@@ -92,7 +92,7 @@ f32 abs_f32(f32 value);
  * 0x80051424 the scale-by-scalar (`out = in * s`), 0x80051820 the cross product (returns `out`),
  * 0x80052214 the dot product, 0x80050BC0 the square root (`x * FrSqrt(x)`). */
 f32 vec3_length_sq(const f32* v);
-f32 fn_80050F24(const f32* v);
+f32 vec3_len(const f32* v);
 void vec3_scale_by(f32* out, const f32* in, f32 s);
 f32* vec3_cross(f32* out, const f32* a, const f32* b);
 f32 vec3_dot(const f32* a, const f32* b);
@@ -141,7 +141,7 @@ void draw_shape_tex_slots_clear(u32 first, u32 last);
  * one the target's call sites require (added when `src/g3d/g3d_gpu.cpp` registered as the consumer). */
 void* mtx34_get_ptr(void* pOut);
 /* 0x80050EF4 - the two-pointer distance helper: r3 and r4 are the two `VEC3*` (its body moves r3
- * into r5 and calls `subVec3(&out, r4, r3)`, then `fn_80050F24(&out)`), so it takes two
+ * into r5 and calls `subVec3(&out, r4, r3)`, then `vec3_len(&out)`), so it takes two
  * pointers and returns the float.  Moved here from `enemy/fn_801550FC.cpp` on landing (rule 2):
  * this unit owns the address, and the three-argument form the consumer used was wrong
  * (`enemy/fn_8015941C` sets only r3/r4). */
@@ -149,7 +149,7 @@ f32 fn_80050EF4(void* a, void* b);
 /* 0x80050CA0 / 0x80050F80 - the vector difference and the distance between two positions, both owned here.
  * Signatures are the CALLEES' OWN BODIES, not the callers' guesses: `subVec3(out, a, b)` is
  * `VEC3_ctor(out); PSVECSubtract(out, a, b)`, and `calcVecDistXZ(a, b)` calls `subVec3(&local, b, a)`
- * then the length helper `fn_80050F24(&local)`, i.e. `|a - b|`.  Ten consumer files used to declare these
+ * then the length helper `vec3_len(&local)`, i.e. `|a - b|`.  Ten consumer files used to declare these
  * locally (four spellings, one of them a `MTX34*` misnomer); they now include this header, so the home is
  * here.  All parameters are pointers - a declaration cannot change a call site's codegen. */
 void subVec3(void* out, const void* a, const void* b);

@@ -15,7 +15,7 @@
  * material and ambient colours. */
 typedef struct EfDrawInfo {
     /* +0x00 */ MTX34 view_mtx;      /* the camera's view matrix */
-    /* +0x30 */ u8 pad_0x30[0x30];
+    /* +0x30 */ MTX34 mtx_0x30;      /* a second matrix the draw info carries (copied with the view matrix) */
     /* +0x60 */ bool light_enable;   /* lighting on for the draw */
     /* +0x61 */ u8 pad_0x61[0x03];
     /* +0x64 */ u32 light_mask;      /* the GX_COLOR0 light bitmask */

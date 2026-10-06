@@ -8,7 +8,10 @@
  *   `fn_800A3718` and `addi` + `cmpwi` in `fn_800A3800`).
  * NAMES. The map has only `fn_` stems for the range; the types and fields are GUESSes from the panic messages
  *   (`setting`, `eh`) and from `fn_800A7750` in `ef/ef_emitter.cpp`, which asserts the same handle.
- *   GUESS: `ef_creation_queue_add_type0`, `ef_creation_queue_add_type1` (the two Add paths, by entry type).
+ *   GUESS: `ef_creation_queue_add_type0` (0x800A3044) queues entry type 0 (a particle creation).
+ *   GUESS: `ef_creation_queue_add_type1` (0x800A33DC) queues type 1, which `fn_800A3718` dispatches through the
+ *   emitter form's create slot. The types they share with `ef/ef_animcurve.cpp` live in
+ *   `ef/ef_creationqueue.h`.
  * RESIDUALS. 2 partial rows:
  *  - `fn_800A3718`: retail reuses r12 for the form's table and slot (`lwz r12, ...; lwz r12, ...`), ours loads the
  *    table through r9;
@@ -23,6 +26,7 @@
 #include "nw4r/math.h"
 #include "mh3_pad.h"
 
+#include "ef/ef_creationqueue.h" /* the unit's own header */
 #include "ef/ef_emitter.h" /* fn_800A7750 (rule 2) */
 
 #pragma peephole off
@@ -36,23 +40,7 @@ void Warning(const char* file, int line, const char* fmt, ...);
 }  // namespace db
 }  // namespace nw4r
 
-/* The 0xA-byte effect setting record copied into a queue entry (fn_800A3390 copies it field by field:
- * a `lha` for the first halfword, then eight byte moves at +0x2..+0x9). */
-struct Setting {
-    /* +0x00 */ s16 mId;
-    /* +0x02 */ u8 mArg0;
-    /* +0x03 */ u8 mArg1;
-    /* +0x04 */ u8 mArg2;
-    /* +0x05 */ u8 mArg3;
-    /* +0x06 */ u8 mArg4;
-    /* +0x07 */ u8 mArg5;
-    /* +0x08 */ u8 mArg6;
-    /* +0x09 */ u8 mArg7;
-}; /* size: 0xA */
-
-struct EffectHandle;
 struct EmitterForm;
-struct EffectManager;
 
 /* The emitter form's virtual slot +0x14 (the type-1 creation entry) and the manager's virtual slot
  * +0x2 (its disposal).  Declaring the vtable member as a pointer to the function-pointer table makes
@@ -95,25 +83,6 @@ struct EmitterForm {
     /* +0x1C */ EmitterFormVtbl* mpVtbl;
 }; /* size: 0x20 */
 
-/* A pending effect-creation record (stride 0x30). */
-struct CreationQueueEntry {
-    /* +0x00 */ u8 mType;
-    /* +0x01 */ u8 mFlags;
-    /* +0x02 */ u16 mLife;
-    /* +0x04 */ Setting mSetting;
-    /* +0x0E */ u8 pad_0x0E[0x2];
-    /* +0x10 */ EffectManager* mpManager;
-    /* +0x14 */ EffectHandle* mpHandle;
-    /* +0x18 */ Vec3 mPos;
-    /* +0x24 */ Vec3 mVel;
-}; /* size: 0x30 */
-
-/* The queue: a live-entry count and the 0x400-entry array right behind it. */
-struct CreationQueue {
-    /* +0x00 */ s32 mCount;
-    /* +0x04 */ CreationQueueEntry mEntry[0x400];
-}; /* size: 0xC004 */
-
 /* NW4R_POINTER_ASSERT's RVL address-range check (MEM1/MEM2, cached and uncached, plus locked cache). */
 #define NW4R_VALID_PTR(p)                                                                          \
     (((u32)(p) & 0xFF000000) == 0x80000000 || ((u32)(p) & 0xFF800000) == 0x81000000 ||             \
@@ -139,9 +108,9 @@ extern "C" void fn_800A3390(Setting* dst, const Setting* src);
 /* 0x800A337C - the manager's AddRef (increments the +0x10 count, returns it). */
 extern "C" u32 fn_800A337C(EffectManager* manager);
 
-/* 0x800A3044 - queues a type-0 creation. */
+/* 0x800A3044 (0x338): queues a type-0 (particle) creation. */
 extern "C" void ef_creation_queue_add_type0(CreationQueue* self, const Setting* setting, EffectManager* manager,
-                            EffectHandle* eh, u16 life, const Vec3* pos, const Vec3* vel) {
+                                            EffectHandle* eh, u16 life, const Vec3* pos, const Vec3* vel) {
     NW4R_POINTER_ASSERT(setting, 0x20, lbl_805922D8);
     NW4R_POINTER_ASSERT(eh, 0x21, lbl_80592310);
 
@@ -186,9 +155,9 @@ extern "C" void fn_800A3390(Setting* dst, const Setting* src) {
     dst->mArg7 = src->mArg7;
 }
 
-/* 0x800A33DC - queues a type-1 creation (same shape as ef_creation_queue_add_type0). */
+/* 0x800A33DC (0x33C): queues a type-1 (emitter) creation, the same shape as the type-0 path. */
 extern "C" void ef_creation_queue_add_type1(CreationQueue* self, const Setting* setting, EffectManager* manager,
-                            EffectHandle* eh, u16 life, const Vec3* pos, const Vec3* vel) {
+                                            EffectHandle* eh, u16 life, const Vec3* pos, const Vec3* vel) {
     NW4R_POINTER_ASSERT(setting, 0x41, lbl_805922D8);
     NW4R_POINTER_ASSERT(eh, 0x42, lbl_80592310);
 
