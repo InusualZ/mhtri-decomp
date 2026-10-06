@@ -201,6 +201,9 @@ Measured with each lib's own cflags, same sources, whole report compared row by 
 | --- | --- | --- | --- | --- |
 | NWC24 | `nwc24_io`, `nwc24_msg` | 80.69 % / 89.96 %, 18 rows at 100 | 81.54 % / 91.28 %, 21 rows at 100 | 5 / 0 |
 | NHTTP | `NHTTP_bgnend`, `NHTTP_os_RVL`, `d_nhttp` | 97.62 % / 63.09 % / 93.56 % | 98.27 % / 63.09 % / 97.00 % | 42 / 0 |
+| SO (in the NWC24 block) | `soi` | 86.47 %, 14 rows at 100 | 90.11 %, 16 rows at 100 | 19 / 0 |
+| SSL (in the NWC24 block) | `ssl` | 98.27 %, 7 rows at 100 | 98.35 %, 9 rows at 100 | 5 / 0 |
+| NCD (in the NWC24 block) | `ncdsystem` | 95.43 %, 5 rows at 100 | 98.38 %, 6 rows at 100 | 5 / 0 |
 
 Under GC/3.0a5.2 two `d_nhttp` rows first came out lower (`NHTTPi_findHeaderField` 95.08 -> 94.81,
 `NHTTPi_strToHex` 81.16 -> 79.71); the source shapes the GC compiler wants fix both: `strToHex` tests the first digit
@@ -212,7 +215,9 @@ DWCi function packing: the retail `dwc_error`, `DWCi_Np_CPUCopyFast` and `dwc_na
 (`-func_align 4`): `dwc_error` and `DWCi_Np_CPUCopyFast` move no row (0 better / 0 worse; `dwc_error`'s `.text` is
 then 2168 of 2176 B, the rest the object's tail pad), so both take `cflags_base`; `dwc_nasfunc` scores 2 rows
 better (`gti2CheckResponse` 98.00 -> 100, `DWCi_socketLookupHost` 83.74 -> 84.54) and 1 worse (`DWC_SVLProcess`
-78.69 -> 77.28, its member-wise copy loop gains an alignment `nop`), so it stays on `cflags_dwc`.
+78.69 -> 77.28, its member-wise copy loop gains an alignment `nop`), so it stayed on `cflags_dwc` until the unit
+was re-registered as C (`dwc_nasfunc.c`: the copy is a block copy, `DWC_SVLProcess` 100); measured again then, 2 better /
+0 worse, so it takes `cflags_base` too.
 
 ## Folds and recuts
 

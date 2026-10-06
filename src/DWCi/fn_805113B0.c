@@ -15,7 +15,11 @@
  * RESIDUALS. `DWCi_createRequest`/`DWCi_findRequest` keep smaller frames than retail (0x30/0x20 against 0x170/0xB0);
  *   the other open rows differ in register colouring and block order; `DWCi_appendTransfer` writes the header bytes
  *   with `srawi`+`stb` where retail uses `extrwi`+`stbx`. The first three rows are the tail of the GT2 message file
- *   that `DWCi/dwc_nasfunc.cpp` ends with (request net-c#13).
+ *   that `DWCi/dwc_nasfunc.c` ends with (request net-c#13).
+ *   `DWCi_createRequest` keeps no saved-register frame (retail `_savegpr_27`); `DWCi_parseAddress` saves from r27
+ *   (retail r26). Flip blockers: `splits.txt` claims `.sbss` (0x8) and `.sdata` (0x10) the object does not emit.
+ *   `DWCi_createRequest`: retail `_savegpr_27`/`_restgpr_27`, ours no frame; `DWCi_parseAddress`: ours
+ *   `_savegpr_27`/`_restgpr_27`, retail `_savegpr_26`/`_restgpr_26`.
  */
 
 #include "types.h"

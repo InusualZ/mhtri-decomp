@@ -1,16 +1,43 @@
 /*
- * DWCi/dwc_nasfunc.cpp - the DWC NAS login / service locator front end and the GameSpy common code the DWC library
+ * DWCi/dwc_nasfunc.c - the DWC NAS login / service locator front end and the GameSpy common code the DWC library
  * links behind it: the auth request callback, the dynamic array and hash table, the socket and platform wrappers,
  * the memory hooks, the availability probe, the GT2 transport (API, connection, callbacks, buffer, messages).
  *
  * RANGE. `.text` 0x80509DB0..0x805113B0 (117 functions); `.data` 0x806307F0..0x806308A8; `.bss`
  *   0x807613B8..0x807614D8; `.sdata` 0x807942FC..0x80794358; `.sbss` 0x807957F8..0x80795820.
- * FLAGS. the `DWCi` lib's `cflags_dwc`. The retail functions start 16-byte aligned (`gap_*` words between them, and
- *   `gti2CheckResponse`'s loop-alignment `nop`), which `-func_align 4` does not reproduce.
+ * FLAGS. `cflags_base`: the retail functions start 16-byte aligned (`gap_*` words between them, and
+ *   `gti2CheckResponse`'s loop-alignment `nop`); measurement in docs/network.md.
  * NAMES. GameSpy SDK names where the body is the SDK's (darray `Array*`, hashtable `Table*`, gsMemory `gsi*`,
  *   gsPlatform `current_time`/`msleep`/`SocketStartUp`/`SocketShutDown`, GT2 `gt2*`/`gti2*`); `DWCi_Auth_EndProcess`
  *   is the function's own report string; the remaining `DWCi_*` names (socket wrappers, request/buffer rows named
  *   before the GT2 identification, the auth callback, `DWCi_Auth_CheckNandResult`) are GUESSes from their bodies.
+ *   GUESS (map name; the runtime dump has only a placeholder or another name at the address):
+ *   GUESS: `DWCi_Auth_RequestCallback`, `strtok`, `gt2CreateSocket`, `gt2CloseSocket`, `gt2Think`, `gt2Listen`
+ *   GUESS: `gt2Accept`, `gt2Reject`, `gt2Connect`, `gt2Send`, `gt2CloseConnection`, `gti2CloseAllConnectionsHardMap`
+ *   GUESS: `DWCi_socketShutdown`, `gt2GetSocketSOCKET`, `gt2SetUnrecognizedMessageCallback`
+ *   GUESS: `gti2NewOutgoingConnection`, `gti2StartConnectionAttempt`, `gti2AcceptConnection`, `gti2RejectConnection`
+ *   GUESS: `gti2CheckTimeout`, `DWCi_requestIsTimedOut`, `gti2CloseConnection`, `DWCi_requestFree`
+ *   GUESS: `gti2RemoveAckedMessages`, `gti2IncomingBufferMessageCompare`, `gti2HandleReliableMessage`
+ *   GUESS: `gti2HandleServerChallenge`, `gti2HandleClientResponse`, `gti2BufferIncomingMessage`
+ *   GUESS: `gti2HandleReliablePacket`, `gti2HandleNack`, `gti2HandleUnreliableMessage`, `gti2HandleMessage`
+ *   GUESS: `DWCi_requestReconnect`, `DWCi_requestRetry`, `gti2ReceiveMessages`, `DWCi_requestBlockState`
+ *   GUESS: `gti2SendClientChallenge`, `gti2SendAccept`, `gti2SendReject`, `gti2SendClose`, `gti2SendKeepAlive`
+ *   GUESS: `DWCi_requestFlush`, `gti2SendAck`, `gti2SendNack`, `gti2NewIncomingConnection`, `DWCi_requestFrame`
+ *   GUESS: `gti2ConnectionClosed`, `DWCi_socketConnect`, `gti2ConnectAttemptCallback`, `gti2ConnectedCallback`
+ *   GUESS: `gti2ReceivedCallback`, `gti2ClosedCallback`, `gti2PingCallback`, `gti2SendFilterCallback`
+ *   GUESS: `gti2ReceiveFilterCallback`, `DWCi_requestSend`, `gti2UnrecognizedMessageCallback`, `DWCi_bufferAlloc`
+ *   GUESS: `gti2GetBufferFreeSpace`, `gti2BufferWriteByte`, `gti2BufferWriteUShort`, `DWCi_bufferFrame`
+ *   GUESS: `gti2BufferShorten`, `DWCi_Auth_EndProcess`, `DWC_NASLoginAsync`, `DWC_NASLoginProcess`, `DWC_SVLBegin`
+ *   GUESS: `DWC_SVLEnd`, `DWC_SVLGetTokenAsync`, `DWC_SVLProcess`, `ArrayNew`, `ArrayFree`, `ArrayLength`
+ *   GUESS: `ArrayNth`, `ArrayAppend`, `ArrayInsertSorted`, `ArrayRemoveAt`, `ArrayDeleteAt`, `ArrayReplaceAt`
+ *   GUESS: `ArraySearch`, `ArrayMapBackwards`, `ArrayMapBackwards2`, `TableNew2`, `TableFree`, `TableEnter`
+ *   GUESS: `TableRemove`, `TableLookup`, `TableMapSafe`, `TableMapSafe2`, `DWCi_natProbeStart`, `DWCi_natProbePoll`
+ *   GUESS: `gti2GetChallenge`, `gti2GetResponse`, `gti2CheckResponse`, `DWCi_socketCreate`, `DWCi_socketClose`
+ *   GUESS: `DWCi_socketBind`, `DWCi_socketRecvFrom`, `DWCi_socketSendTo`, `DWCi_socketGetLocalName`
+ *   GUESS: `DWCi_socketResolveAddress`, `DWCi_socketGetLastError`, `DWCi_socketSelect`, `DWCi_socketLookupHost`
+ *   GUESS: `DWCi_socketHasData`, `DWCi_socketIsUsable`, `DWCi_socketGetLocalHostEntry`, `DWCi_hostAddressIsPrivate`
+ *   GUESS: `SocketStartUp`, `SocketShutDown`, `current_time`, `msleep`, `gsiMemoryCallbacksSet`, `gsimalloc`
+ *   GUESS: `gsirealloc`, `gsifree`
  * SHAPES. The retail object is twelve SDK files (auth callback | nas | svl | darray | hashtable | socket | platform
  *   | memory | available | gt2 auth | gt2 callback/connection/main/message | buffer). MWCC inlines any function
  *   defined earlier in one TU, so the source is ordered callers-first across those file boundaries (the auth
@@ -21,10 +48,23 @@
  *   `DWCi_socketResult`; POST/answer fields through `DWCI_AUTH_DECODE`.
  * RESIDUALS. `DWCi_Auth_RequestCallback` addresses `DWCi/DWCi_Np_CPUCopyFast.c`'s string pool: the retail auth TU
  *   extends to 0x8050A710, so this unit's first row belongs to it (not re-cut) and its strings land in this object's
- *   `.data`. `DWC_SVLProcess` copies the 0x174-byte
- *   result member-wise because the unit compiles as C++ (request net-c#10). The availability probe's three objects
+ *   `.data`. The availability probe's three objects
  *   live in `DWCi/DWCi_NatNeg.c`'s `.bss`, so `DWCi_natProbeStart` cannot share one base register for them.
  *   Register colouring and block order remain in the larger GT2 message handlers and the socket resolver.
+ *   Relocation names that differ (relocdiff --callees): `DWCi_Auth_RequestCallback` saves from r23 (retail r19) and
+ *   bases its strings on `DWCi_reportHttpDestroy` (retail `DWCi_authDataPath`, the Np pool - request net-c#6);
+ *   `ArraySearch`, `DWCi_socketLookupHost`, `gti2GetResponse`, `gti2HandleReliablePacket`, `DWCi_requestFlush` save
+ *   one register more or fewer than retail; `DWCi_socketLookupHost`, `DWCi_socketGetLocalHostEntry` and
+ *   `DWCi_natProbeStart` address their statics from other bases (`DWCi_hostCache` / `DWCi_localAddresses` /
+ *   `DWCi_availableCheck`) than retail. Flip blockers: `.sbss` 0x14 of 0x28 and `.sdata` 0x4A of 0x5C claimed.
+ *   Saved-register helpers that differ (register pressure, not wrong callees): `DWCi_Auth_RequestCallback`
+ *   `_savegpr_23`/`_restgpr_23` (retail `_savegpr_19`/`_restgpr_19`); `ArraySearch` and `DWCi_socketLookupHost`
+ *   `_savegpr_22`/`_restgpr_22` (retail `_savegpr_23`/`_restgpr_23`); `gti2GetResponse` `_savegpr_24`/`_restgpr_24`
+ *   (retail `_savegpr_23`/`_restgpr_23`); `gti2HandleReliablePacket` `_savegpr_25`/`_restgpr_25` (retail
+ *   `_savegpr_26`/`_restgpr_26`); `DWCi_requestFlush` has no frame where retail calls `_savegpr_27`/`_restgpr_27`.
+ *   Static bases that differ: `DWCi_socketGetLocalHostEntry` reaches `DWCi_localHostEntry` and `DWCi_localAddressList`
+ *   from another static's base; `DWCi_natProbeStart` names `DWCi_availableNames` where retail addresses it from the
+ *   `DWCi_availableCheck` base.
  */
 #include "DWCi/dwc_nasfunc.h"
 #include "DWCi/dwc_error.h"
@@ -38,8 +78,6 @@
 #include "MSL_C/strstr.h"
 #include "nw4r/DWCi_Base64Encode.h"
 #include "DWCi/fn_805113B0.h"
-
-extern "C" {
 
 
 
@@ -2740,6 +2778,4 @@ void gsifree(void* block) {
         return;
     }
     gsiMemoryCallbacks.freeFn(block);
-}
-
 }

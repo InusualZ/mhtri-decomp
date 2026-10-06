@@ -70,8 +70,8 @@ s32 NHTTPi_RecvBufFindSpace(NHTTPRecvBuf* ring, s32 start, s32 end);
 /* 0x805153BC (0x1F0): the case-insensitive search `NHTTPi_findHeaderField` names a header with: 0 when
  * the ring's stream between `start` and `end` holds `name` (each character compared upper-cased, the
  * `terminator` character also ending it), -1 when it does not.  Declared from its callers in
- * `d_nhttp.c`; the body is still unwritten. */
-s32 NHTTPi_RecvBufFindUpper(NHTTPRecvBuf* ring, s32 start, s32 end, const char* name, s32 terminator);
+ * `d_nhttp.c`. */
+s32 NHTTPi_RecvBufFindUpper(NHTTPRecvBuf* ring, s32 start, s32 end, const char* name, char terminator);
 
 /* 0x805156F0 (0x1C): true when the ring holds at least `size` bytes. */
 BOOL NHTTPi_isRecvBufFull(NHTTPRecvBuf* info, u32 size);
@@ -87,21 +87,5 @@ void* NHTTPi_commThreadMain(void* arg);
 #endif
 
 /* Declarations moved here from `unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* 0x80630AE8 (0x30+ B, `.data`) - the `NHTTP_os_RVL.c` assert group: +0x00 the function name
- * "NHTTPi_CheckCurrentThread", +0x1C "%s:illegal thread
-", +0x30 "NHTTP_os_RVL.c". */
-extern const char NHTTPi_threadCheckMessages[];
-
-/* 0x807943A0 (`.sdata`) - the message that assert panics with ("halt
-"). */
-extern const char NHTTPi_haltMessage[];
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* MHTRI_NHTTP_NHTTP_OS_RVL_H */

@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-/* The GT2 socket / connection core the `DWCi/dwc_nasfunc.cpp` GT2 entry points call (types in
+/* The GT2 socket / connection core the `DWCi/dwc_nasfunc.c` GT2 entry points call (types in
  * `DWCi/dwc_nasfunc.h`). */
 u32 DWCi_sendControlFrame(DWCiReq* req);
 u32 DWCi_appendTransfer(DWCiReq* req, DWCiXfer* xfer);
