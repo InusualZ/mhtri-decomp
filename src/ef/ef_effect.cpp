@@ -12,6 +12,8 @@
  * NAMES. The map has only `fn_` stems for the range except `RetireEmitterAll`, `ForeachParticleManager` and
  *   `SetRootMtx`, written as `nw4r::ef::Effect` members.
  *   GUESS (from the body and its callers): `ef_get_life_status`.
+ *   GUESS (from `ef/ef_resource.cpp`'s use - the emitter resource's name word and the out-of-line
+ *   GUESS: `ut::List_GetFirst`): `ef_emres_get_name`, `ef_list_get_first`.
  *   GUESS: `ef_res_emitter_desc` (0x800A4864): returns the record 8 bytes into an emitter resource, the emitter
  *   description its callers read flags and draw settings from.
  * RESIDUALS. The source defines `fn_800A4AF0` (8 bytes) before `RetireEmitterAll`, so the two swap places in our
@@ -153,7 +155,7 @@ typedef struct EfEffEmitterWork {
 
 /* An emitter/particle-manager record: the objects the effect's +0x24 list holds. */
 typedef struct EfEffEmitter {
-    /* +0x000 */ const char* mName; /* fn_800A485C hands it back for the Warning */
+    /* +0x000 */ const char* mName; /* ef_emres_get_name hands it back for the Warning */
     /* +0x004 */ u8 pad_0x004[0x04];
     /* +0x008 */ u32 mFlags_0x08; /* ef_res_emitter_desc hands the record at +0x08 back */
     /* +0x00C */ s32 mState;
@@ -246,7 +248,7 @@ u32 fn_800A4470(EfEff* self);
 u32 fn_800A4474(EfEff* self, EfEffEmitter* em);
 void fn_800A45DC(EfEffActivityList* list, void* node);
 u32 fn_800A4654(EfEff* self, EfEffEmitter* emitter, u8 a, u16 b);
-void* fn_800A485C(void* p);
+void* ef_emres_get_name(void* p);
 void* ef_res_emitter_desc(void* p);
 u32 fn_800A486C(EfEff* self, EfEffEmitter* em);
 void fn_800A49B8(EfEffEmitter* em);
@@ -265,7 +267,7 @@ void* fn_800A51C8(EfEff* self);
 u16 fn_800A51D0(EfEff* self);
 void* fn_800A51D8(EfEff* self, u16 idx);
 s32 ef_get_life_status(void* p);
-void* fn_800A5250(EfEffList* list);
+void* ef_list_get_first(EfEffList* list);
 u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32 flag, EfEffEmitter* match);
 u32 fn_800A5428(EfEff* self, void** pp, u8 a, u16 b);
 void* fn_800A5484(void** pp);
@@ -425,7 +427,7 @@ extern "C" u32 fn_800A4654(EfEff* self, EfEffEmitter* emitter, u8 a, u16 b) {
 
     if ((((EfEffEmitterWork*)ef_res_emitter_desc(emitter))->flags & 0x40000000u) == 0) {
 #line 118
-        nw4r::db::Warning(lbl_80592430, __LINE__, lbl_805924E4, fn_800A485C(emitter));
+        nw4r::db::Warning(lbl_80592430, __LINE__, lbl_805924E4, ef_emres_get_name(emitter));
         return 0;
     }
     mm = (EfEffMemMgr*)fn_800A4420(self->mManagerES);
@@ -445,7 +447,7 @@ extern "C" u32 fn_800A4654(EfEff* self, EfEffEmitter* emitter, u8 a, u16 b) {
 }
 
 /* 0x800A485C - the record's name getter (its first word). */
-extern "C" void* fn_800A485C(void* p) {
+extern "C" void* ef_emres_get_name(void* p) {
     return *(void**)p;
 }
 
@@ -741,7 +743,7 @@ extern "C" s32 ef_get_life_status(void* p) {
 }
 
 /* 0x800A5250 - the emitter list's first live element. */
-extern "C" void* fn_800A5250(EfEffList* list) {
+extern "C" void* ef_list_get_first(EfEffList* list) {
     return fn_80501C60(list, NULL);
 }
 
@@ -749,7 +751,7 @@ extern "C" void* fn_800A5250(EfEffList* list) {
 u32 nw4r::ef::Effect::ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bool flag) {
     EfEff* self = (EfEff*)this;
     u32 count = 0;
-    EfEffEmitter* pm = (EfEffEmitter*)fn_800A5250(&self->mEmitters.mActiveList);
+    EfEffEmitter* pm = (EfEffEmitter*)ef_list_get_first(&self->mEmitters.mActiveList);
     while (pm != NULL) {
         EfEffEmitter* next =
             (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, pm);
@@ -763,7 +765,7 @@ u32 nw4r::ef::Effect::ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bo
 extern "C" u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32 flag,
                            EfEffEmitter* match) {
     u32 count = 0;
-    EfEffEmitter* pm = (EfEffEmitter*)fn_800A5250(&self->mEmitters.mActiveList);
+    EfEffEmitter* pm = (EfEffEmitter*)ef_list_get_first(&self->mEmitters.mActiveList);
     while (pm != NULL) {
         EfEffEmitter* next =
             (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, pm);

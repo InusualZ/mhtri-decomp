@@ -12,6 +12,7 @@
  *   GUESS (from the body and its callers): `ef_particle_get_color`, `ef_particle_get_alpha`,
  *   GUESS: `ef_particle_get_scale_y`, `ef_resource_draw_setting`, `ef_particle_get_scale`,
  *   GUESS: `ef_particle_flick_alpha`.
+ *   GUESS (the particle parameters `ef/ef_resource.cpp` binds textures into): `ef_emres_get_ptcl_param`.
  * RESIDUALS. 2 rows unwritten (empty bodies): 0x800AA2D0-0x800AA700, 0x800AA7A0-0x800AB058.  They are defined
  *   last, so our `.text` (and the extab and extabindex records) run in a different order from retail's.
  *   5 partial rows:
@@ -234,7 +235,7 @@ extern "C" u8* fn_800AB3D0(EfParticle* self)
 }
 
 /* The owner's colour block, relocated to its table. */
-extern "C" u8* fn_800AB3D8(void* p)
+extern "C" u8* ef_emres_get_ptcl_param(void* p)
 {
     return (u8*)ef_res_block_body(p) + 4;
 }

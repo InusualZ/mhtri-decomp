@@ -10,6 +10,8 @@
  *   flag booleanisations and the `li r0,N; psq_lx` epilogues); `#pragma fp_contract off` around one body.
  * NAMES. The map has only `fn_` stems for the range.
  *   GUESS (from the body and its callers): `ef_pm_handle`, `ef_pm_get_mtx`, `ef_pm_modulate_color`.
+ *   GUESS (the out-of-line `ut::List_GetLast` and the emitter resource's particle tracks, from `ef/ef_resource.cpp`):
+ *   GUESS: `ef_list_get_last`, `ef_emres_num_ptcl_track`, `ef_emres_get_ptcl_track_tbl`, `ef_emres_get_ptcl_track_at`.
  *   GUESS: `ef_field_vortex` (0x800AD254): turns about an axis with a power blended across a distance.
  *   GUESS: `ef_field_random` (0x800AD520): a random push every interval, free or in a cone about the velocity.
  *   GUESS: `ef_field_newton` (0x800AD384): pulls toward a point, fading as 1/d^2 beyond a distance.
@@ -102,7 +104,7 @@ void VEC2_ctor(void* self);
 void color_rgba_copy(void* dst, const void* src);
 void mtx34_mult_vec3(void* dst, const void* a, const void* b);
 s32 ef_get_life_status(void* self);
-u8* fn_800A8BF8();
+u8* ef_emres_get_ptcl_track();
 void fn_80501C80(void* self, s32 v);
 void fn_805013FC(void* a, void* b, f32 f);
 }
@@ -316,8 +318,8 @@ struct EfPmVecBlock {
 /* Forward declarations of this unit's own constructors and accessors. */
 extern "C" EfPmStateA* fn_800AB6BC(EfPmStateA* self);
 extern "C" EfPmStateB* fn_800AB6FC(EfPmStateB* self);
-extern "C" u8* fn_800ADE50(void* self);
-extern "C" u16 fn_800AD230(void* self);
+extern "C" u8* ef_emres_get_ptcl_track_tbl(void* self);
+extern "C" u16 ef_emres_num_ptcl_track(void* self);
 extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, const nw4r::math::VEC3* d);
 extern "C" void fn_800AEE14();
 extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src);
@@ -421,24 +423,24 @@ extern "C" void* fn_800AC178(void* p, s32 n) {
 }
 
 /* Slot-6 helper: forward to the SDK's matrix function. */
-extern "C" void fn_800AD0C4(void* self) {
+extern "C" void ef_list_get_last(void* self) {
     fn_80501C80(self, 0);
 }
 
 /* The resource-table accessors: the table's count, its first array base and its third u16. */
-extern "C" u16 fn_800AD230(void* self) {
+extern "C" u16 ef_emres_num_ptcl_track(void* self) {
     (void)self;
-    return *(u16*)fn_800A8BF8();
+    return *(u16*)ef_emres_get_ptcl_track();
 }
 
 extern "C" u16 fn_800ADE74(void* self) {
     (void)self;
-    return *(u16*)(fn_800A8BF8() + 2);
+    return *(u16*)(ef_emres_get_ptcl_track() + 2);
 }
 
-extern "C" u8* fn_800ADE50(void* self) {
+extern "C" u8* ef_emres_get_ptcl_track_tbl(void* self) {
     (void)self;
-    return fn_800A8BF8() + 4;
+    return ef_emres_get_ptcl_track() + 4;
 }
 
 /* 0x800ADA5C (0x370): the position `pos` relative to the emitter: through the local-to-emitter matrix, or through
@@ -491,9 +493,9 @@ extern "C" void ef_pm_draw(EfPmManager* self, const EfDrawInfo* info) {
 }
 
 /* Bounds-checked resource lookup (index into the emitter resource table). */
-extern "C" u8* fn_800ADDCC(void* self, u32 index) {
-    u8* base = fn_800ADE50(self);
-    if (!((u16)index < fn_800AD230(self)))
+extern "C" u8* ef_emres_get_ptcl_track_at(void* self, u32 index) {
+    u8* base = ef_emres_get_ptcl_track_tbl(self);
+    if (!((u16)index < ef_emres_num_ptcl_track(self)))
         nw4r::db::Panic(lbl_8059356C, 0x29E, lbl_80593540);
     return ((u8**)base)[(u16)index];
 }

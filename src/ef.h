@@ -78,7 +78,7 @@ struct EfParticleParams {
     /* +0xA8 */ struct EfParticleMgr* manager;
 }; /* size: 0xAC (bounded by the particle's field_0xCC) */
 
-/* The parameter record `fn_800A4864` walks to (reached through the owner's +0x24 pointer).  Only the
+/* The parameter record `ef_res_emitter_desc` walks to (reached through the owner's +0x24 pointer).  Only the
  * offsets this unit's functions read are named. */
 typedef struct EfParticleChain EfParticleChain;
 struct EfParticleChain {

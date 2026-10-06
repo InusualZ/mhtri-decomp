@@ -33,7 +33,7 @@ struct EftControl {
         /* +0x004 */ nw4r::ef::EffectSystem* effect_system_0x04;     /* the effect system it retires through (fn_800FD864_fx.cpp's view) */
         /* +0x004 */ s32 field_0x04;                                 /* eft019.cpp's view */
     };
-    /* +0x008 */ void* resource_0x08;      /* the resource walker fn_800B2878 builds */
+    /* +0x008 */ void* resource_0x08;      /* the resource walker ef_resource_instance builds */
     /* +0x00C */ u32 slot_count_0x0C;      /* get_move_work_max(4) */
     /* +0x010 */ EftResSlot* slots_0x10;   /* get_move_work_adrs(4) */
     /* +0x014 */ u32 slot_used_0x14;

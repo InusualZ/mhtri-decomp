@@ -89,10 +89,10 @@ struct EftState {
 /* ------------------------------------------------------------------------------------------------ */
 
 /* Stores its second argument through its first. */
-/* Returns the shared `lbl_80694598` block. */
-extern "C" void* fn_800B2878(void);
+/* Returns the shared `ef_resource_singleton` block. */
+extern "C" void* ef_resource_instance(void);
 /* Bounds-checks `index` against `obj`'s +0x08 count, then forwards to `fn_80501C9C`. */
-extern "C" void fn_800B4A70(void* obj, u16 index);
+extern "C" void ef_resource_effect_project_at(void* obj, u16 index);
 /* The `nw4r::math::VEC3` copy the map still spells `copyVec3`. */
 /* The library's error path (`eft_res_slot_release`). */
 /* fn_801025F8 comes from its owner's header (rule 2). */
@@ -122,7 +122,7 @@ extern "C" void fn_80101DF4(EftState* self) {
 
     set = self->set;
     ef_store_word(&unused_0x08, NULL);
-    fn_800B4A70(fn_800B2878(), 4);
+    ef_resource_effect_project_at(ef_resource_instance(), 4);
 
     self->state++;
 

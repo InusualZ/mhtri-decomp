@@ -27,7 +27,8 @@
  *   extab and extabindex records run in another order.
  *  - `ef_res_drawparam_data`, `ef_res_emitterparam_cdata`, `ef_res_emitterparam_data` (0x800B23A4, 0x800B2598,
  *    0x800B26F8): the asserted `lwz r6, 0(r3)` is scheduled before the assert's `li` flags (retail after them; a
- *    `const void*` inline, a `||` expression and a macro were measured, none moves it);
+ *    `const void*` inline, a `||` expression and a macro were measured, none moves it; nor do `-inline auto`,
+ *    `-O2` or `-schedule off` (unchanged) or `-O4,p` (worse));
  *  - `ef_pf_hit_sphere`, `ef_pf_hit_cylinder`: two commutative operand pairs (`4 * b * b`, `-2b + root`) come out
  *    swapped.
  *   Relocation names that differ from retail (pool constants): the literals' pool where retail names `ef_pf_two`,
