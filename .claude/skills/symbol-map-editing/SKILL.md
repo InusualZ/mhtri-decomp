@@ -28,6 +28,7 @@ name token you asked it to change.
 | rename one symbol | `python tools/symbols/symedit.py rename <old> <new> [--dry-run] [--force] [--no-refs]` |
 | rename many | `python tools/symbols/symedit.py rename-batch map.txt [--dry-run]` (lines of `old new`) |
 | merge phantoms (7.9) | `python tools/symbols/symedit.py merge-batch batch.txt [--dry-run]` (lines of `merge <phantom> <previous> <size_hex>`) |
+| split a row that is really two functions | `python tools/symbols/symedit.py split <row> <offset> <new-name> [--scope local] [--dry-run]` (shrinks `<row>` to `<offset>` bytes, adds `<new-name>` at address+offset with the remainder) |
 | a per-module RSO map | add `--file config/RMHE08/<module>/symbols.txt` |
 
 `--json` gives machine-readable output, and every option works both before and after the subcommand.

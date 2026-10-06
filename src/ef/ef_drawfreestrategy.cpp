@@ -12,12 +12,9 @@
  * FLAGS. `cflags_main`; `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of every
  *   narrowing FIFO store and byte load), now before the includes; `#pragma dont_inline on` at the end (the inline
  *   destructor calls its base out of line).
- * NAMES. The map has only `fn_` stems for the range.
- * RESIDUALS. 3 partial rows:
- *  - `fn_800BE39C` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the three loads and the
- *    `lis` of the FIFO base (`ef/ef_drawlinestrategy.cpp`'s `fn_800BF58C` is the same):
- *    the row is two functions, a tail call into a 0x14 static FIFO writer at +0x10 that the map folds into it
- *    (reproduced byte for byte with a `dont_inline` static helper; the map split is request nw4r-l3#21);
+ * NAMES. The map has only `fn_` stems for the range.  GUESS: `ef_free_gx_position3f` (the 0x14 FIFO writer at +0x10 of
+ *   `fn_800BE39C`, reached by a tail call).
+ * RESIDUALS. 2 partial rows:
  *  - `Draw` (0x800BE3C0): the three arguments are saved one register lower (r27-r29 against r28-r30) and one
  *    `lwz r6, 0x24(pm)` is scheduled earlier;
  *  - `fn_800BEA00`: the two products of the 0x24 component (`fmuls f6`, `fmuls f11`) are computed later and the
@@ -200,11 +197,18 @@ int fn_800BE388(u32 value) {
     return (value & 1) != 0;
 }
 
-/* Writes one vector's three components to the pipe. */
+static void ef_free_gx_position3f(f32 x, f32 y, f32 z);
+
+/* Writes one vector's three components to the pipe through the FIFO writer that follows it. */
 void fn_800BE39C(const Vec3* v) {
     f32 x = v->x;
     f32 y = v->y;
     f32 z = v->z;
+    ef_free_gx_position3f(x, y, z);
+}
+
+/* Writes three f32 to the pipe. */
+static void ef_free_gx_position3f(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
     GXWGFifo.f32 = z;

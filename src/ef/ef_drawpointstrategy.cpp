@@ -11,16 +11,12 @@
  * FLAGS. `cflags_main`; `#pragma peephole off` before the includes (the FIFO writers keep the unfused narrowing stores,
  *   playbook 39), `#pragma dont_inline on` at the end (the inline destructor calls its base out of line).
  * NAMES. The map has only `fn_` stems for the helpers; `fn_800BFD84` is a GUESS for NintendoWare's setup (its assert
- *   on line 150 names `pm`).
+ *   on line 150 names `pm`); `ef_point_gx_position3f` is a GUESS (the 0x14 FIFO writer at +0x10 of `fn_800BFD60`,
+ *   reached by a tail call).
  * RESIDUALS. The source defines the FIFO writers and the emitter before `Draw`, so our `.text` (and the extab and
  *   extabindex records) run in a different order from retail's address order.
- *   2 partial rows:
- *  - `Draw` (0x800BF818): one `lwz r6, 0x24(pm)` (the asserted resource) is scheduled before the six assert
- *    temporaries where retail loads it after them, and one `lfs` is placed differently;
- *  - `fn_800BFD60` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the three `lfs` and the
- *    `lis` of the FIFO base (the `ef/ef_drawlinestrategy.cpp` row `fn_800BF58C` is the same):
- *    the row is two functions, a tail call into a 0x14 static FIFO writer at +0x10 that the map folds into it
- *    (reproduced byte for byte with a `dont_inline` static helper; the map split is request nw4r-l3#21).
+ *   1 partial row: `Draw` (0x800BF818): one `lwz r6, 0x24(pm)` (the asserted resource) is scheduled before the six assert
+ *    temporaries where retail loads it after them, and one `lfs` is placed differently.
  *   flipcheck: `.data` claimed, not emitted; `.sdata` (the size clamp) is emitted with its bytes equal (0x4 short of
  *   the claim, the trailing pad); `.sdata2` (the literals' pool) holds 0.0f before 6.0f where retail has 6.0f first.
  *   `DrawSmoothStripeStrategy` (constructor): the empty body is the whole source - the compiler
@@ -102,11 +98,18 @@ int fn_800BFD4C(u32 value) {
     return (value & 1) != 0;
 }
 
-/* Writes a vector to the pipe. */
+static void ef_point_gx_position3f(f32 x, f32 y, f32 z);
+
+/* Writes a vector to the pipe through the FIFO writer that follows it. */
 void fn_800BFD60(Vec* v) {
     f32 x = v->x;
     f32 y = v->y;
     f32 z = v->z;
+    ef_point_gx_position3f(x, y, z);
+}
+
+/* Writes three f32 to the pipe. */
+static void ef_point_gx_position3f(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
     GXWGFifo.f32 = z;

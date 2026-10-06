@@ -68,6 +68,10 @@ char* strtok(char* string, const char* delimiters);
 int abs(int n);
 long labs(long n);
 
+/* 0x8045B9D8 - classifies a float (the `__fpclassifyd` twin: FP_NAN / FP_INFINITE / FP_NORMAL / ...);
+ * `g3d/g3d_anmchr.cpp`'s frame and rate setters assert on it. */
+int __fpclassifyf(float x);
+
 /* 0x80463E74 - the global frame thunk `g3d/g3d_resanmlight.cpp`'s `fn_8008FFFC` tail-calls. */
 f32 fn_80463E74(void);
 

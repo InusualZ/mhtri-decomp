@@ -71,8 +71,8 @@
  *     (g3d_light_table_set_setting, g3d_light_table_load_light_set: their light load is `EXI/ProbeBarnacle.c`'s
  *     GXLoadLightObjImm), 0x80085C70-0x80085D4C (g3d_camera_table_set_camera: its view-matrix getter
  *     `Camera::GetCameraMtx` is also called by `sound/fn_800E3CBC.cpp`), 0x80087AD0-0x80087C80
- *     (g3d_state_load_shp_prim: its indexed matrix loads are `RVLGX/GXTexture_tail.cpp`'s unnamed fn_804BA560 and
- *     fn_804BA5F0), 0x80087F18-0x80087FA8 (g3d_view_mtx_arrays_nrm_mtx: it
+ *     (g3d_state_load_shp_prim: its indexed matrix loads are `RVLGX/GXTexture_tail.cpp`'s GXLoadPosMtxIndx and
+ *     GXLoadNrmMtxIndx3x3), 0x80087F18-0x80087FA8 (g3d_view_mtx_arrays_nrm_mtx: it
  *     calls `fn_8004CAD8.cpp`'s fn_800516F0 and `hud/pl_frame_sync.cpp`'s mtx34_to_mtx33), 0x80088050-0x8008812C and
  *     0x8008819C-0x80088250 (the fog set and g3d_fog_table_load: the Fog members are `g3d/fn_80075DCC.cpp` m2c
  *     stems, and GXSetFog has no declaration in `RVLGX/GXTexture_tail.cpp`), 0x80088574-0x80088584 (its copy is

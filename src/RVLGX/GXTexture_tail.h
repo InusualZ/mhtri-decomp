@@ -56,6 +56,11 @@ void GXInitTlutObj(GXTlutObj* obj, void* lut, u32 format, u16 numEntries); /* un
 void GXCallDisplayList(const void* list, u32 size); /* untyped: byte range */
 /* 0x804B8720 - loads a texture object into texture slot `id`. */
 void GXLoadTexObj(GXTexObj* obj, u32 id);
+/* 0x804BA560 / 0x804BA5F0 - the indexed matrix loads of the GX transform block (the SDK order: GXLoadPosMtxImm
+ * 0x804BA510, GXLoadPosMtxIndx, GXLoadNrmMtxImm 0x804BA590, GXLoadNrmMtxIndx3x3); `g3d/g3d_state.cpp`'s shape load
+ * calls both with (matrix index, 0). */
+void GXLoadPosMtxIndx(u16 mtxIndx, u32 id);
+void GXLoadNrmMtxIndx3x3(u16 mtxIndx, u32 id);
 /* The fog, blend and TEV setters the nw4r character writer drives. */
 void GXSetFog(u32 type, f32 startz, f32 endz, f32 nearz, f32 farz, GXColor color);
 void GXSetTevSwapModeTable(u32 table, u32 red, u32 green, u32 blue, u32 alpha);

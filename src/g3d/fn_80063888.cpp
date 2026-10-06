@@ -3,7 +3,7 @@
  *   `AnmObjChr`, `AnmObjChrNode`, `AnmObjChrBlend`, `AnmScn`, ...) and their list-insert steps,
  *   the checked `_ac.h` getters, `nw4r::g3d::PlayPolicy_Onetime`/`PlayPolicy_Loop` and the anim-object bodies
  *   of `g3d_anmobj.cpp`, `g3d_anmclr.cpp` and `g3d_anmscn.cpp`.
- * RANGE. .text 0x80063E60-0x800680A8 (139 functions); extab, extabindex, .rodata 0x8056F510-0x8056F578, .data
+ * RANGE. .text 0x80063E60-0x800680A8 (139 functions); extab, extabindex, .rodata 0x8056F550-0x8056F578, .data
  *   0x8058C118-0x8058CC40, .sdata 0x80791158-0x80791178, .sdata2 0x80795D68-0x80795D90.  More than one TU:
  *   fn_80063E60 cites "g3d_anmclr.cpp" (0x8058C118) and fn_800649CC onward "g3d_anmscn.cpp" (0x8058C288), a seam
  *   near 0x800649CC.  The left edge is `g3d/g3d_anmchr.cpp`'s end (the weak type-info members of its five vtables,

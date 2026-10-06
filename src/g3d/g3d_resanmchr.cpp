@@ -215,8 +215,7 @@ f32 fn_8008CD00(u32 self, u16 index, f32 frame);
 u32* fn_8008A664(f32* out, u32* self, f32* keys, f32 frame);
 
 /* The unsplit `.text` this unit calls whose address band names no module (rule 2's documented gap:
- * 0x8045B9D8 and the 0x8050xxxx math block). */
-s32 fn_8045B9D8(f32 value);
+ * the 0x8050xxxx math block). */
 f32 fn_80500F60(void);
 void fn_805012C4(f32* out);
 void fn_805012E8(f32* out, const void* src);

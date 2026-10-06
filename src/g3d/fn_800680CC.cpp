@@ -15,7 +15,7 @@
  * RESIDUALS. 35 functions unwritten (objdiff scores them zero) in 17 runs: 0x800680CC-0x800686FC (the anmscn
  *   head), 0x800686FC-0x800689B0, 0x80068A78-0x80069334, 0x8006946C-0x800695D4, 0x800697D4-0x8006993C,
  *   0x800699C8-0x80069BD8, 0x8006B514-0x8006B6D8 and 0x8006B840-0x8006BA04 (AnmObjTexSrtNode::SetFrame and
- *   SetUpdateRate: `MSL_C/alloc.cpp`'s fn_8045B9D8 has no name yet), 0x8006C138-0x8006C650, 0x8006C668-0x8006CDBC,
+ *   SetUpdateRate: they assert on `MSL_C/alloc.cpp`'s __fpclassifyf), 0x8006C138-0x8006C650, 0x8006C668-0x8006CDBC,
  *   0x8006CD98-0x8006CDBC, 0x8006CE48-0x8006D000, 0x8006D084-0x8006D9A0 (the AnmObjTexSrtRes members),
  *   0x8006DA48-0x8006E2A8, 0x8006E338-0x8006E668.
  *   AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride, AnmObjTexSrtRes: the destructors' empty bodies are complete
