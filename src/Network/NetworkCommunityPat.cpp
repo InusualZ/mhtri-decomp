@@ -16,7 +16,9 @@
  *   `sendReqBlackAdd` 283, `sendReqBlackDelete` 285, `sendReqBlackList` 287; hence `blockPlayer`/`unblockPlayer`
  *   (BlackAdd/BlackDelete); `inviteFriend` (sends FriendAccept) and `sendFriendMessage` (FriendAdd with a text) keep the
  *   consumer's names.  `NetworkFriendInfo` is `menu/movie.cpp`'s (`menu/movie.h`), `strtok` MSL's.
- * RESIDUALS. `__dt__17NetworkFriendInfoFv`: retail re-extends the flag (`extsh r0,r4`), the empty inline destructor
+ * RESIDUALS. Not unwritten: the empty inline constructor/destructor bodies of `NetworkCommunityFriendList` and
+ *   `NetworkCommunityBlockList` are complete (MWCC emits the element construction; declared so other units call them).
+ *   `__dt__17NetworkFriendInfoFv`: retail re-extends the flag (`extsh r0,r4`), the empty inline destructor
  *   here compares r4 directly - 4 bytes short (`.text` 0x61C0 against 0x61C4); a virtual and a non-virtual destructor
  *   score the same.  `writeProfileRange_50`: one `add` keeps its operands swapped.  `onPatEvent`: the strtok loop's
  *   token/index registers swap (r26/r27) and the two by-value error copies sit in named locals (retail inlines
@@ -102,6 +104,26 @@ NetworkCommunityPat::NetworkCommunityPat()
         new PatInterface();
     }
     clear();
+}
+
+/* Destroys the block list's entries. */
+inline NetworkCommunityBlockList::~NetworkCommunityBlockList()
+{
+}
+
+/* Destroys the friend list's entries. */
+inline NetworkCommunityFriendList::~NetworkCommunityFriendList()
+{
+}
+
+/* Builds the block list's entries. */
+inline NetworkCommunityBlockList::NetworkCommunityBlockList()
+{
+}
+
+/* Builds the friend list's entries. */
+inline NetworkCommunityFriendList::NetworkCommunityFriendList()
+{
 }
 
 inline NetworkCommunityPatRequest::~NetworkCommunityPatRequest()

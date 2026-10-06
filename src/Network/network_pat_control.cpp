@@ -32,13 +32,8 @@
  *   `isReadyCountOne` and `resetFailureState` (a `blr` stub) keep names that say only what the body does.
  * RESIDUALS. 1 row unwritten: `fn_80431D80`, the compiler's array destructor for `net_profile_table` (its name is the
  *   compiler's `__arraydtor$NNNN`, which changes with every edit, so the map keeps the address name).
- *   `NetCtrlWk`'s constructor/destructor: retail calls `__ct__26NetworkCommunityFriendListFv`,
- *   `__ct__25NetworkCommunityBlockListFv`, `__dt__26NetworkCommunityFriendListFv` and `__dt__25NetworkCommunityBlockListFv`
- *   out of line (they live in `Network/NetworkCommunityPat.cpp`); the classes declare none, so ours builds and
- *   destroys their elements (`__ct__22NetworkCommunityFriendFv`, `__dt__23NetworkCommunityBlockedFv`, ...) inline -
- *   declaring them in `Network/NetworkCommunityPat.h` drops that unit (99.94 -> 97.00) until it defines them.
- *   Ours therefore adds `__construct_array`/`__destroy_arr` calls over `__ct__23NetworkCommunityBlockedFv`/
- *   `__dt__22NetworkCommunityFriendFv` where retail calls the list members.
+ *   `NetCtrlWk`'s constructor/destructor call the community lists' members out of line (declared in
+ *   `Network/NetworkCommunityPat.h`, defined inline by `Network/NetworkCommunityPat.cpp`).
  *   Not unwritten: `NetCtrlWk`'s empty constructor and destructor bodies are complete (MWCC emits the member work).
  *   `__sinit_
 etwork_pat_control_cpp`: retail builds `net_pats_object` with `constructNetworkPat` and registers

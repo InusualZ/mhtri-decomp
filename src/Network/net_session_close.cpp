@@ -18,6 +18,10 @@
  *   `fillNetUserProfile*` (declared in `userdata_item.h`); `refreshRosterCache`, `copyPeerProfileCard`, `sendPeerMessage`,
  *   `net_peer_address` and the `NetPeerCard` fields from what the bodies copy.
  * RESIDUALS. Partial: the static initialiser 0x80437204 (the map names it after the compiler's `__sinit`)
+ *   - typing `net_community_state` as `NetworkCommunityPeer` (with its constructor/destructor declared in
+ *     `Network/NetworkCommunityPat.h` and defined there) makes the static initialiser call them as retail does, but
+ *     MWCC then reaches all of this unit's `.bss` objects from one base register (`...bss.0`) where retail loads each
+ *     symbol: the row measured 83 -> 67 %, so the record keeps its `NetCommunityState` type;
  *   - flip blockers: `.bss` is 0x3C0 against the 0x3C8 claim and `.data` 0x118 against 0x120 (the two
  *     `__register_global_object` chain records the static initialiser's out-of-line `__ct__20NetworkCommunityPeerFv` /
  *     `__dt__20NetworkCommunityPeerFv` registration needs; the `net_peer_address` record retail registers is
