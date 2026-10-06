@@ -11,7 +11,7 @@ from tools.units.landing.common import (SELF_REPO, ALLOWED_PREFIXES, ALLOWED_FIL
     _OBJECT_TARGET, _FAILED_LINE, compile_targets, failed_compile_outputs, worktree_root, main_root, Batch,
     unit_owned_paths, outside_batch, is_scratch, scratch_paths)  # noqa: F401
 from tools.units.landing.state import (set_allow_rule10, set_allow_orphan, set_unit_renames, rename_snapshot_keys,
-    set_allow_rule12)  # noqa: F401
+    set_allow_rule12, set_manifest)  # noqa: F401
 from tools.units.landing.message import (land_message_path, write_land_message, message_body_with_subject,
     clear_land_message, message_error, answer_line)  # noqa: F401
 from tools.units.landing.base import (record_base, base_dirty_paths, report_snapshot, ledger_numbers, summary,
@@ -57,7 +57,7 @@ __all__ = ["SELF_REPO", "ALLOWED_PREFIXES", "ALLOWED_FILES", "BASE_FILE", "SCRAT
            "changed_status", "changed_paths", "_OBJECT_TARGET", "_FAILED_LINE", "compile_targets",
            "failed_compile_outputs", "worktree_root", "main_root", "Batch", "unit_owned_paths", "outside_batch",
            "is_scratch", "scratch_paths", "set_allow_rule10", "set_allow_orphan", "set_unit_renames",
-           "rename_snapshot_keys", "set_allow_rule12", "land_message_path", "write_land_message",
+           "rename_snapshot_keys", "set_allow_rule12", "set_manifest", "land_message_path", "write_land_message",
            "message_body_with_subject", "clear_land_message", "message_error", "answer_line", "record_base",
            "base_dirty_paths", "report_snapshot", "ledger_numbers", "summary", "ledger_line", "land_decision",
            "land_stageable", "looks_already_applied", "staged_elsewhere", "foreign_warning", "commit_pathspec",

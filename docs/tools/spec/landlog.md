@@ -5,7 +5,9 @@
 `MAIN/.pi/land-log.jsonl` holds one JSON line per `land.py land` attempt (`lib.lanes.landlog.Attempt`: branch,
 outcome, seconds, the refused row, the conflicted paths, the units, the commit and - schema 2, 2026-10-05 - `allow`,
 every allowance the command line granted: `--allow-regression`, `--allow-rule10`, `--allow-rule12`, `--allow-orphan`,
-`--no-outbox`, `--no-selftests`, `--unit-rename` - and `warnings`, the WARNING rows' findings, `<row>: <finding>`). This CLI reads it: which rows refuse
+`--no-outbox`, `--no-selftests`, `--unit-rename` - and `warnings`, the WARNING rows' findings, `<row>: <finding>`;
+since 2026-10-06 an optional `manifest`, the lane manifest id `land --manifest` named - absent when none, so the schema
+stays 2). This CLI reads it: which rows refuse
 most, which paths conflict most, how long a landing takes - the evidence the gate's cost discussions have lacked.
 
 ## Users
@@ -21,9 +23,11 @@ python tools/units/landlog.py list [--last N] [--json] [--main PATH]
 ```
 `summary` (default): attempts, outcomes, the landed ratio, total and median wall time, the refusing rows, the
 allowances (per class: the attempts that used it and the entries they named; "none recorded" when none, and a note
-counting the schema-1 lines that predate the record), the warnings by row and conflicted paths by frequency; `--json` is
+counting the schema-1 lines that predate the record), the attempts judged against a lane manifest, the warnings by
+row and conflicted paths by frequency; `--json` is
 `lib.lanes.landlog.summary` plus `unreadable_lines`. `list`: one line per attempt (time, outcome, seconds, branch,
-the refusing row or conflicts or commit, then `[allow: <classes>]` when it carried any). Exit 0.
+the refusing row or conflicts or commit, then `[allow: <classes>]` when it carried any and `[manifest: <id>]` when
+it named one). Exit 0.
 
 ## Inputs and outputs
 
@@ -43,7 +47,7 @@ lanes (landlog, registry), cli.
 
 ## Test contract
 
-Tier: fixture. `tools/tests/units/test_landlog.py` (the CLI, the allowance counts); the format is
+Tier: fixture. `tools/tests/units/test_landlog.py` (the CLI, the allowance counts, the manifest id); the format is
 `tools/tests/lib/test_lanes.py`; `tools/tests/units/landing/test_landlog_hook.py` lands a fixture batch with every
 allowance class and checks the log line and the commit body.
 

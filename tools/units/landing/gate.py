@@ -11,6 +11,7 @@ from tools.units.landing import state
 from tools.units.landing.rows import batch
 from tools.units.landing.rows import build
 from tools.units.landing.rows import data
+from tools.units.landing.rows import manifest
 from tools.units.landing.rows import objects
 from tools.units.landing.rows import regression
 from tools.units.landing.rows import rules
@@ -27,7 +28,7 @@ from tools.units.landing.rows.tree import unit_rows
 #: The rows that need no build, in their run order (`docs/tools/spec/land.md`, "The rows of verify" 1-9).
 PRE_BUILD = (
     tree.ground_truth_row, tree.base_row, tree.report_base_row, tree.paths_row, tree.conflict_marker_row,
-    batch.outbox_rows, rules.style_lint_row, selftests.selftests_row, rules.band_row, objects.new_unit_name_row,
+    manifest.manifest_row, batch.outbox_rows, rules.style_lint_row, selftests.selftests_row, rules.band_row, objects.new_unit_name_row,
     subject.subject_row,
 )
 
@@ -146,6 +147,8 @@ def message_body(b: Batch, before: dict, after: dict, fresh: bool) -> str:
             "gates: ground truth ok, base %s, %d check(s), ok recreated=%s%s"
             % ((b.base or "?")[:8], len(b.checks), fresh, ", main.elf relinked" if b.extra.get("flip") else "")]
     body += state.allow_lines(allow)
+    if state.MANIFEST:
+        body.append("manifest: %s" % state.MANIFEST)
     body += ["warning: %s" % w for w in b.warnings]
     body.append("")
     if b.scratch:

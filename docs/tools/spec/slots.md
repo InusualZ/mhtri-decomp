@@ -16,6 +16,7 @@ profiles (`.claude/agents`) (4); CLAUDE.md (4); docs (16); imports `lib.lanes.po
 python tools/units/slots.py init [--count 6] [--force]
 python tools/units/slots.py acquire <unit> [--slot N] [--worker NAME] [--force] [--dry-run]
 python tools/units/slots.py spawn --kind KIND [--slot N] [--unit U] [--task-file PATH] [--units A,B] [--json]
+python tools/units/slots.py spawn --kind recon --group NAME [--units A,B] [--slot N]   # the standard recon brief
 python tools/units/slots.py release [--slot N | --unit U | --branch B] [--keep-branch] [--force] [--dry-run]
 python tools/units/slots.py reclaim [--slot N | --unit U | --branch B] [--json]
 python tools/units/slots.py status [--json]
@@ -25,7 +26,7 @@ python tools/units/slots.py shadow <slot> <dir> [--seed-build] [--force]
 python tools/units/slots.py --selftest
 ```
 Subcommands: `init`, `acquire`, `release`, `reclaim`, `spawn`, `collect`, `status`, `refresh`, `verify`, `shadow`.
-Flags: `--branch`, `--count`, `--dry-run`, `--force`, `--json`, `--keep-branch`, `--kind`, `--main`, `--path`, `--release`, `--seed-build`, `--selftest`, `--slot`, `--task-file`, `--unit`, `--units`, `--worker`.
+Flags: `--branch`, `--count`, `--dry-run`, `--force`, `--group`, `--json`, `--keep-branch`, `--kind`, `--main`, `--path`, `--release`, `--seed-build`, `--selftest`, `--slot`, `--task-file`, `--unit`, `--units`, `--worker`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -55,6 +56,11 @@ git submodule update --init tools/m2c
   only when exactly one registered unit has it - the rest are printed as NOT recorded) and written to the lock as
   `units`; `claims.py list --json` reads it back, so `integrate.py` defers a request whose owner a live lane holds. The
   slot's `release` clears it with the lock.
+* **`--kind recon` writes its own brief.** `recon` is the read-only survey a wave starts with (`docs/pipeline.md`
+  section 14), launched as the read-only global `scout`. With no `--task-file`, `spawn --kind recon --group NAME
+  [--units A,B]` generates the task from `lib.lanes.recon.recon_brief` - the six recon questions with the group filled
+  in, the units on a `Units:` line (recorded on the lock like any unit set) and the no-write rule; a recon with no
+  group is refused, and `--group` on any other kind is refused before a slot is taken.
 * **`collect`** copies a finished lane's `.pi/outbox/*.json` and `.pi/notes/*.md` into `MAIN/.pi/` (MAIN's copy kept
   when at least as new), merges its data requests and reports its branch, the commits main lacks and the dirt
   (`lib.lanes.pool.unlanded_reason_at`). `--slot N` or `--path` naming a slot as before; `--path` may also name a
@@ -80,7 +86,7 @@ lanes, git, repo, text, proc.
 
 Tier: fixture (GitFixture).
 Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_slots.py` on `lib.testing`; the pool's unit checks are in `tools/tests/lib/test_lanes.py`. The in-file selftest drives the lib through this module's re-exported names (357 checks; the ninja seam is `lib.lanes.pool.NINJA_RUNNER`).
+Target: `tools/tests/units/test_slots.py` on `lib.testing`; the pool's unit checks are in `tools/tests/lib/test_lanes.py`. The in-file selftest drives the lib through this module's re-exported names (378 checks, the recon spawn included; the ninja seam is `lib.lanes.pool.NINJA_RUNNER`).
 
 ## Known gaps
 

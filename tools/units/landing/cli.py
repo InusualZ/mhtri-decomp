@@ -15,7 +15,8 @@ from tools.units.landing.branch import resolve_conflicts, scratch_resolve
 from tools.units.landing.common import SELF_REPO, git
 from tools.units.landing.flow import land, land_branch
 from tools.units.landing.rows.tree import caller_branch_error
-from tools.units.landing.state import set_allow_orphan, set_allow_rule10, set_allow_rule12, set_unit_renames
+from tools.units.landing.state import (set_allow_orphan, set_allow_rule10, set_allow_rule12, set_manifest,
+    set_unit_renames)
 
 
 INTEGRATE = os.path.join(SELF_REPO, "tools", "units", "integrate.py")
@@ -61,6 +62,10 @@ def main() -> int:
     v.add_argument("--no-selftests", action="store_true", dest="no_selftests",
                    help="skip the all-tool-selftests row (the fast path; `python tools/selftest.py "
                         "--changed` is the narrower lane loop)")
+    v.add_argument("--manifest", default=None, metavar="PATH|SLUG",
+                   help="the lane manifest the batch is judged against: a path, or a slug whose outbox "
+                        "`.pi/outbox/<slug>.json` carries a `manifest` key; adds the row 'the batch touches only "
+                        "the lane's manifest' (docs/tools/spec/lane-manifest.md)")
     v.add_argument("--json", action="store_true")
     ld = sub.add_parser("land", help="gate + stage + commit + release; one answer line, exit status is the answer")
     ld.add_argument("--base", default=None, help="expected main HEAD (default: the recorded base)")
@@ -95,6 +100,10 @@ def main() -> int:
     ld.add_argument("--no-selftests", action="store_true", dest="no_selftests",
                     help="skip the all-tool-selftests row (the fast path; `python tools/selftest.py "
                          "--changed` is the narrower lane loop)")
+    ld.add_argument("--manifest", default=None, metavar="PATH|SLUG",
+                    help="the lane manifest the batch is judged against: a path, or a slug whose outbox "
+                         "`.pi/outbox/<slug>.json` carries a `manifest` key; adds the row 'the batch touches only "
+                         "the lane's manifest' (docs/tools/spec/lane-manifest.md)")
     ld.add_argument("--message", default=None, help="override the gate message's subject line")
     ld.add_argument("--already-applied", action="store_true", dest="already_applied",
                     help="the batch was applied before `record-base` ran, so its paths are in the base's "
@@ -135,6 +144,7 @@ def main() -> int:
         units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
         set_allow_rule12(args.allow_rule12)
         set_allow_orphan(args.allow_orphan)
+        set_manifest(args.manifest)
         return gate.verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression,
                       check_outbox=not args.no_outbox, release_claims=not args.no_release,
                       no_selftests=args.no_selftests)
@@ -145,6 +155,7 @@ def main() -> int:
             set_allow_rule12(args.allow_rule12)
             set_unit_renames(args.unit_rename, units)
             set_allow_orphan(args.allow_orphan)
+            set_manifest(args.manifest)
             return land_branch(main, args.branch, units=units, base=args.base, no_build=args.no_build,
                                allow_regression=args.allow_regression,
                                check_outbox=not args.no_outbox, release_claims=not args.no_release,
@@ -157,6 +168,7 @@ def main() -> int:
         set_allow_rule12(args.allow_rule12)
         set_unit_renames(args.unit_rename, units)
         set_allow_orphan(args.allow_orphan)
+        set_manifest(args.manifest)
         return land(main, units, args.base, args.no_build, args.allow_regression,
                     check_outbox=not args.no_outbox, release_claims=not args.no_release,
                     subject=args.message, already_applied=args.already_applied,

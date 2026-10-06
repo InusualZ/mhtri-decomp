@@ -86,11 +86,14 @@ The full policy, with its dated reasons, is `docs/pipeline.md` 13.1 and the ruli
   gate or measured regression), `merger` (a refused apply / a fold), `codereviewer` (read-only review), `worker` (tooling and
   docs; the fallback), `surveyor` (the first leg of a unit claim), plus the read-only globals `scout`/`planner`/`reviewer`.
   `python tools/units/slots.py spawn --kind KIND [--slot N]` decides and prints the launch line (`unit`->`surveyor`, `fix`,
-  `merge`, `tooling`/`docs`, `review`, `scout`/`plan`; an unknown kind is refused). No kind maps to `decompiler`: its legs
+  `merge`, `tooling`/`docs`, `review`, `scout`/`recon`/`plan`; an unknown kind is refused). No kind maps to `decompiler`: its legs
   take `queue.py next --profile decompiler`, or the in-session route on the claim's slot (`worktreehook.py arm --slot N`). When a prompt and the profile disagree, **the profile wins**. A profile edit is not live until
   `tools/agents/install.sh` has copied it to `~/.claude/agents/` (it refuses when the section 6.5 block is stale).
 * A lane is a headless `claude --agent <profile> -p <task>` at a slot (`tools/units/lanecmd.py`); it cannot block on a question -
   it ends its turn with the request and is resumed. Harness details: `docs/pipeline.md` 13.2.
+* **A wave** (several multi-unit lanes at once) runs recon (`spawn --kind recon --group G`) -> pre-pass batches landed alone ->
+  lanes with disjoint ownership, each without a claim carrying a manifest (`land.py land --manifest`) -> review -> land ->
+  retro in `docs/waves.md` (`docs/pipeline.md` 14).
 * Keep `ninja build/RMHE08/ok` green and `orig/RMHE08/**` untouched as the invariant of every step.
 
 The steady loop, per unit:

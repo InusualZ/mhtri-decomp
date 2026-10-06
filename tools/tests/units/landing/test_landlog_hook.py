@@ -131,6 +131,28 @@ def test_every_allowance_is_recorded(c):
     c.check("a refused landing records its allowance too (here only `--no-outbox`)", (code, rows[-1]["allow"]), (1, {"no_outbox": True}))
 
 
+def test_manifest_reaches_the_log_and_the_body(c):
+    """`--manifest` (2026-10-06): the landing log line carries the manifest id and the commit body a `manifest:` line;
+    a landing without one carries neither."""
+    fx = fixture()
+    L.set_manifest("lane-net")
+    try:
+        with mock.patch.object(L.gate, "verify", body_gate()), contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            code = L.land(str(fx.root), ["Pl/pl_act"], None, no_build=True, check_outbox=False, release_claims=False,
+                          subject="x")
+    finally:
+        L.set_manifest(None)
+    rows, _ = landlog.read(str(fx.root))
+    body = fx.git("log", "-1", "--format=%B")
+    c.check("a landing judged against a manifest logs its id and writes it in the body",
+            (code, rows[-1].get("manifest"), "manifest: lane-net" in body.splitlines()), (0, "lane-net", True))
+    (fx.root / "src" / "batch.c").write_text("the second batch\n", encoding="utf-8")
+    run_land(fx, body_gate())
+    rows, _ = landlog.read(str(fx.root))
+    c.check("... and a landing without one carries no `manifest` key", "manifest" in rows[-1], False)
+
+
 def test_warnings_reach_the_log_and_the_body(c):
     fx = fixture()
 

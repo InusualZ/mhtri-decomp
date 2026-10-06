@@ -30,6 +30,8 @@ def render_summary(s: dict, bad: list[int], path: str) -> str:
     lines.append("  allowances: %s" % ("; ".join("%s %d attempt(s), %d entr%s" % (cls, v["attempts"], v["entries"],
                                                                               "y" if v["entries"] == 1 else "ies")
                                                 for cls, v in allowances.items()) or "none recorded"))
+    if s.get("manifests"):
+        lines.append("  lane manifests: %d attempt(s) were judged against one (`land --manifest`)" % s["manifests"])
     if s.get("warning_rows"):
         lines.append("  warnings (never a refusal): %s" % "; ".join("%d %s" % (n, row) for row, n in s["warning_rows"]))
     schemas = s.get("schemas") or {}
@@ -48,6 +50,8 @@ def render_list(rows: list[dict]) -> str:
         allow = r.get("allow") if isinstance(r.get("allow"), dict) else {}
         if allow:
             why += "  [allow: %s]" % ", ".join(sorted(allow))
+        if r.get("manifest"):
+            why += "  [manifest: %s]" % r["manifest"]
         out.append("%s  %-8s %6.1fs  %-40s %s" % (r.get("at", "?"), r.get("outcome"), float(r.get("seconds") or 0),
                                                  (r.get("branch") or "")[:40], why))
     return "\n".join(out) or "no landing attempts recorded"

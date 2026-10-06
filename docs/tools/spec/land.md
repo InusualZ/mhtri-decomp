@@ -16,16 +16,16 @@ the selftest runner (1); profiles (`.claude/agents`) (22); CLAUDE.md (5); docs (
 ```
 python tools/units/land.py record-base [--json]
 python tools/units/land.py land --units a,b [--base SHA] [--no-build] [--no-outbox] [--no-release]
-[--no-selftests] [--already-applied]
+[--no-selftests] [--already-applied] [--manifest PATH|SLUG]
 python tools/units/land.py land --branch worker/<slug> [--units a,b] [--base SHA] [--no-build]
-[--no-outbox] [--no-release] [--message SUBJECT] [--no-selftests]
+[--no-outbox] [--no-release] [--message SUBJECT] [--no-selftests] [--manifest PATH|SLUG]
 python tools/units/land.py verify [--base SHA] [--units a,b] [--dry-run] [--no-build] [--no-outbox]
-[--no-release] [--allow-regression UNIT] [--no-selftests]
+[--no-release] [--allow-regression UNIT] [--no-selftests] [--manifest PATH|SLUG]
 python tools/units/land.py resolve --branch worker/<slug> [--worktree PATH] [--main PATH] [--base SHA]
 [--no-commit] [--json]
 ```
 Subcommands: `record-base`, `verify`, `land`, `resolve`.
-Flags: `--allow-orphan`, `--allow-regression`, `--allow-rule10`, `--allow-rule12`, `--already-applied`, `--base`, `--branch`, `--dry-run`, `--json`, `--main`, `--message`, `--no-build`, `--no-commit`, `--no-outbox`, `--no-release`, `--no-selftests`, `--selftest`, `--unit-rename`, `--units`, `--worktree`.
+Flags: `--allow-orphan`, `--allow-regression`, `--allow-rule10`, `--allow-rule12`, `--already-applied`, `--base`, `--branch`, `--dry-run`, `--json`, `--main`, `--manifest`, `--message`, `--no-build`, `--no-commit`, `--no-outbox`, `--no-release`, `--no-selftests`, `--selftest`, `--unit-rename`, `--units`, `--worktree`.
 Exit codes: `verify` 0 when every row passed, 1 otherwise; `land` prints one `LANDED ...` / `REFUSED ...` line on stdout (the gate log goes to stderr) and its exit status is that answer; a refusal never reaches `git commit`. Every refusal line carries the row's KIND: `GATE` (the batch is bad) or `BOOKKEEPING` (the landing's own state is stale; the remedy is printed).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 * `land.py integrate ARGS...` forwards to `tools/units/integrate.py ARGS` unchanged (by subprocess); applying requests
@@ -45,6 +45,9 @@ Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
    (BOOKKEEPING; no row otherwise, and none for a base recorded before WP4).
 3. every changed path belongs to the batch (tool scratch `d<digits>.json`/`t<digits>.json` is tolerated and named), and none
    is added or changed under the retired `include/` root (a deletion or a rename out of it is fine: `common.retired_paths`); no batch file carries a conflict marker (GATE).
+   With `--manifest PATH|SLUG` only: the batch touches only the lane's manifest - every changed path is inside its
+   `owns` globs and outside its `read_only` ones (GATE); an unreadable or malformed manifest is BOOKKEEPING; no row
+   without the flag (`rows/manifest.py`, `lane-manifest.md`).
 4. every unit's branch carries its work as commits (BOOKKEEPING refusal - the gate's only "the work exists" test); batch units named (or `--no-outbox` for an orchestrator-only batch) (BOOKKEEPING); every unit's outbox validates (`handoff.validate`) - a **WARNING** since 2026-10-05 (`every unit's outbox validates (warning)`, always PASS: each problem is printed as `WARNING: ...`, written as a `warning:` line in the commit body and into the landing log's `warnings`); it is skipped with a printed note for `--branch` naming a branch that is not `worker/<slug>` (only a claim's lane writes an outbox).
 5. style lint (section 6.5) adds no violation (`stylelint --diff <base>`, add-only, with rename/move credits; rule 15's advisory classes never count) (GATE).
 6. all tool selftests pass except the parked list (`tools/selftest.py`, ~30 s); `--no-selftests` skips (GATE).

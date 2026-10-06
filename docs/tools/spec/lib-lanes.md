@@ -1,4 +1,4 @@
-# `lib/lanes` - The lane model: naming, the claim registry, live sessions, the slot pool, seeding, rescue refs, one teardown, the launch line, the landing log
+# `lib/lanes` - The lane model: naming, the claim registry, live sessions, the slot pool, seeding, rescue refs, one teardown, the launch line, the recon brief, the landing log
 
 ## Purpose
 
@@ -55,7 +55,9 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   `resume_call`, `task_units(task)` (the names a task's first `Units:` line lists, asides dropped) and
   `resolve_units(names, registered) -> (units, unresolved)` (a path as given, a bare stem only when one registered unit
   has it - `slots.py spawn`'s unit set), `your_tree_lines`/`teardown_lines`/`tree_block` (the block every lane gets, one copy for the brief and
-  `slots.py spawn`).
+  `slots.py spawn`). `KIND_PROFILE["recon"]` is `scout` (read-only).
+* `recon`: `QUESTIONS` (the six recon questions, `{group}` filled in) and `recon_brief(group, units=None)` - the
+  paste-ready task of a recon lane (`slots.py spawn --kind recon --group NAME`); an empty group is refused.
 * `landlog`: `Attempt` (branch, outcome in `landed`/`refused`/`conflict`/`error`, seconds, refused row, conflicted
   paths, units, commit, `allow`, `warnings`), `append(main, attempt)` (one line to `.pi/land-log.jsonl`), `read` (records plus the
   numbers of unreadable lines), `allowance_counts`, `summary` (adds `allowances`, `warning_rows` and `schemas`). **Schema 2**
@@ -63,7 +65,9 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   `regression` (units), `rule10` (keys), `rule12` (tokens), `orphan` (addresses), `unit_renames` (`OLD=NEW`) as
   lists, `no_outbox`/`no_selftests` as `true`; an unused class is absent and an unknown one is refused. Readers accept
   `SCHEMAS` = 1 and 2 (a schema-1 line carries no allowance). Schema 2 also carries `warnings` (the gate's WARNING
-  rows' findings, `<row>: <finding>`).
+  rows' findings, `<row>: <finding>`). An optional `manifest` (2026-10-06) is the lane manifest id `land --manifest`
+  named; the key is absent when none, so the schema stays 2 and `summary` counts the attempts that named one
+  (`manifests`).
 
 ## Invariants and rules
 
@@ -75,7 +79,7 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   probing this replaces is deleted (`retired.md`).
 * The landing log hook (WP4, `tools/units/landing/flow.py`): `t0 = time.time()` before the landing, then in a
   `finally` `landlog.append(main, landlog.Attempt(branch, outcome, time.time() - t0, refused_row=row,
-  conflicts=tuple(paths), units=tuple(units), commit=sha, allow=allowances))` - `allowances` is
+  conflicts=tuple(paths), units=tuple(units), commit=sha, allow=allowances, manifest=state.MANIFEST))` - `allowances` is
   `landing.state.allowances(...)`, taken when the attempt opens, so a refusal records its allowances too; a failure
   to write the log is a warning, never a different answer.
 
@@ -83,7 +87,7 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
 
 Tier: fixture. `tools/tests/lib/test_lanes.py` (naming, registry incl. cluster rows, the git lock, sessions with a
 live and a dead pid, launch, the step list, junction-safe removal, rescue verdicts, the deps-log rewrite and the
-staleness guard, the sentinel, the landing log). The tools' own tests cover the flows: `claims.py --selftest`,
+staleness guard, the sentinel, the landing log, the recon brief). The tools' own tests cover the flows: `claims.py --selftest`,
 `slots.py --selftest` (the pool on a real repository), `worktreehook.py --selftest`, `tools/tests/units/test_lane.py`,
 `test_rescue.py`, `test_wtsafe.py` (smoke: MAIN's `orig/`), `test_lanecmd.py`, `test_landlog.py`.
 

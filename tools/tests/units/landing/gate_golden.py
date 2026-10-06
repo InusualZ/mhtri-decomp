@@ -2,8 +2,9 @@
 before the WP4 split: `{scenario: {"exit": code, "rows": [[name, status, kind], ...]}}`. Data, not a test. The two
 `new-unit-*` scenarios were recorded 2026-10-05 with the new-unit name row, and the two `layout-*` scenarios (the
 header move: renames out of the retired `include/` root land, a new path there refuses) the same day, and the two `lint-rule15-*`
-scenarios (the style-lint row run by the real lint on a stale path and on advisory markers) the same day; every older
-scenario is unchanged."""
+scenarios (the style-lint row run by the real lint on a stale path and on advisory markers) the same day, and the two
+`manifest-*` scenarios (the lane-manifest row: a batch inside its manifest passes, one touching a read-only hot header
+refuses) on 2026-10-06; every older scenario is unchanged."""
 GOLDEN = {
  "noop-dry-run": {"exit": 0, "rows": [
    ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
@@ -316,6 +317,30 @@ GOLDEN = {
    ["main has not moved since the batch base", "PASS", "bookkeeping"],
    ["every changed path belongs to a batch", "PASS", "gate"],
    ["no batch file carries a git conflict marker", "PASS", "gate"],
+   ["every unit's outbox validates (warning)", "PASS", "bookkeeping"],
+   ["every unit's branch carries its work as commits", "PASS", "bookkeeping"],
+   ["style lint (§6.5) adds no violation", "PASS", "gate"],
+   ["all tool selftests pass (except the parked list)", "PASS", "gate"],
+   ["rule 2 registration boundary (warning)", "PASS", "gate"],
+   ["the gate's own subject follows the convention", "PASS", "gate"]]},
+ "manifest-inside-pass": {"exit": 0, "rows": [
+   ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
+   ["main has not moved since the batch base", "PASS", "bookkeeping"],
+   ["every changed path belongs to a batch", "PASS", "gate"],
+   ["no batch file carries a git conflict marker", "PASS", "gate"],
+   ["the batch touches only the lane's manifest", "PASS", "gate"],
+   ["every unit's outbox validates (warning)", "PASS", "bookkeeping"],
+   ["every unit's branch carries its work as commits", "PASS", "bookkeeping"],
+   ["style lint (§6.5) adds no violation", "PASS", "gate"],
+   ["all tool selftests pass (except the parked list)", "PASS", "gate"],
+   ["rule 2 registration boundary (warning)", "PASS", "gate"],
+   ["the gate's own subject follows the convention", "PASS", "gate"]]},
+ "manifest-read-only-hot-header-refusal": {"exit": 1, "rows": [
+   ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
+   ["main has not moved since the batch base", "PASS", "bookkeeping"],
+   ["every changed path belongs to a batch", "PASS", "gate"],
+   ["no batch file carries a git conflict marker", "PASS", "gate"],
+   ["the batch touches only the lane's manifest", "FAIL", "gate"],
    ["every unit's outbox validates (warning)", "PASS", "bookkeeping"],
    ["every unit's branch carries its work as commits", "PASS", "bookkeeping"],
    ["style lint (§6.5) adds no violation", "PASS", "gate"],

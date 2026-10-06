@@ -18,7 +18,7 @@ import time
 from tools.lib import proc as _proc
 from tools.lib import testing
 from tools.lib.git import Git
-from tools.lib.lanes import launch, naming, pool, seed, sessions
+from tools.lib.lanes import launch, naming, pool, recon, seed, sessions
 from tools.lib.lanes.registry import main_of as lane_registry_main_of
 from tools.lib.lanes.launch import KIND_PROFILE, PROFILES, profile_for_kind, tree_block as _tree_block  # noqa: F401
 from tools.lib.lanes.pool import (DEFAULT_COUNT, LOCK_SUBDIR, SLOT_KEEP, SLOT_MARKER, SLOT_SUFFIX,  # noqa: F401
@@ -317,18 +317,23 @@ def spawn_units(main: str, task: str | None, units: list[str] | None) -> tuple[l
 
 def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None,
           task: str | None = None, task_file: str | None = None, worker: str | None = None,
-          force: bool = False, units: list[str] | None = None) -> dict:
+          force: bool = False, units: list[str] | None = None, group: str | None = None) -> dict:
     """Take a slot (by number, or the first free one - named) for a lane of `kind` and return the paste-ready
     launch: the headless `claude --agent <profile>` line run in the slot, then the "your tree" block and the
     claim-time currency proof. The kind, profile and the lane's unit set (`units`, else the task's `Units:`
-    line - `claims.py list --json` reads it back as `units`) are recorded on the slot's lock."""
+    line - `claims.py list --json` reads it back as `units`) are recorded on the slot's lock. A `recon` lane with
+    no task text gets the standard brief for `group` (`recon.recon_brief`); `group` is refused for any other kind."""
     profile = profile_for_kind(kind)
+    if group and kind != "recon":
+        raise SystemExit("REFUSED spawn: --group names a recon lane's group; kind %r takes a task instead" % kind)
     if task is None and task_file:
         try:
             with open(task_file, encoding="utf-8") as fh:
                 task = fh.read().strip()
         except OSError as exc:
             raise SystemExit("REFUSED spawn: cannot read --task-file %s: %s" % (task_file, exc))
+    if task is None and kind == "recon":
+        task = recon.recon_brief(group or "", units)
     held, unresolved = spawn_units(main, task, units)
     unit = unit or "lane/%s-%s" % (kind, time.strftime("%Y%m%d-%H%M%S"))
     info = acquire(main, unit, worker=worker or os.environ.get("USERNAME") or os.environ.get("USER") or "unknown",
@@ -1074,7 +1079,7 @@ def selftest() -> int:
         # `decompiler` - unit policy they could never satisfy. `spawn` makes both explicit.)
         check("the kind mapping is the whole table", KIND_PROFILE,
               {"unit": "surveyor", "fix": "fixer", "merge": "merger", "tooling": "worker",
-               "docs": "worker", "review": "codereviewer", "scout": "scout", "plan": "planner"})
+               "docs": "worker", "review": "codereviewer", "scout": "scout", "recon": "scout", "plan": "planner"})
         check("PROFILES is the table's values, not a second copy", PROFILES,
               tuple(sorted(set(KIND_PROFILE.values()))))
         for _kind, _profile in sorted(KIND_PROFILE.items()):
@@ -1159,6 +1164,19 @@ def selftest() -> int:
         except SystemExit as exc:
             check("spawn refuses an unknown kind", "unknown kind" in str(exc), True)
         check("... without taking a slot", free_count(repo), 2)
+        # (c2) kind recon: the read-only `scout` profile with the standard brief for --group; --group elsewhere refuses
+        try:
+            spawn(repo, "tooling", unit="lane/spawn-group-elsewhere", task="x", group="the network stack")
+            check("--group on a non-recon kind is refused", "no error", "SystemExit")
+        except SystemExit as exc:
+            check("--group on a non-recon kind is refused", "names a recon lane's group" in str(exc), True)
+        check("... without taking a slot", free_count(repo), 2)
+        rc_sp = spawn(repo, "recon", slot=1, unit="lane/spawn-recon", group="the network stack")
+        check("recon maps to the read-only scout profile", rc_sp["agent"], "scout")
+        check("... and its task is the standard brief for the group",
+              ("conflict surface of the network stack" in rc_sp["spawnLine"], "LANE PARTITION" in rc_sp["spawnLine"],
+               "Do not edit any file" in rc_sp["spawnLine"]), (True, True, True))
+        release(repo, slot=1, unit="lane/spawn-recon", rescue=False)
 
         # (d) NO --slot: skips the occupied slot and takes the FIRST genuinely free one, naming it
         hold = spawn(repo, "tooling", slot=1, unit="lane/spawn-hold", task="hold")
@@ -1616,6 +1634,9 @@ def main() -> int:
     sp.add_argument("--units", default=None,
                     help="the units the lane holds, comma-separated (default: the task's `Units:` line); "
                          "recorded on the slot lock, read back by `claims.py list --json` as `units`")
+    sp.add_argument("--group", default=None,
+                    help="kind recon only: the lane group the read-only survey is about; with no --task-file the "
+                         "standard recon brief is generated for it (docs/pipeline.md section 14)")
     sp.add_argument("--worker", default=None)
     sp.add_argument("--force", action="store_true",
                     help="take a slot whose `.used` sentinel names a claim whose owner is gone")
@@ -1726,7 +1747,8 @@ def main() -> int:
     if args.cmd == "spawn":
         out = spawn(main_wt, args.kind, slot=args.slot, unit=args.unit, task_file=args.task_file,
                     worker=args.worker, force=args.force,
-                    units=[u.strip() for u in (args.units or "").split(",") if u.strip()] or None)
+                    units=[u.strip() for u in (args.units or "").split(",") if u.strip()] or None,
+                    group=args.group)
         if args.json:
             # exactly the fields a caller needs; `spawnLine` is the whole paste-ready text (line + block)
             print(json.dumps({k: out[k] for k in ("slot", "path", "agent", "kind", "units", "spawnLine")},

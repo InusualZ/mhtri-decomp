@@ -109,6 +109,24 @@ def test_launch(c):
              "**Do not land.**" in block), (True, True, True, True))
 
 
+def test_recon_brief(c):
+    """The recon lane's standard brief: the group filled into every question, the units on a `Units:` line the spawn
+    reads back, the read-only rule, and `recon` launched as the read-only `scout`."""
+    from tools.lib.lanes import recon
+    brief = recon.recon_brief("the quest system", ["Quest/quest_entry", "Quest/quest_board"])
+    c.check("recon maps to the read-only scout profile", launch.profile_for_kind("recon"), "scout")
+    c.check("the brief numbers every question, in order",
+            [line.split(":", 1)[0] for line in brief.splitlines() if line[:1].isdigit()],
+            ["%d. %s" % (n, t) for n, (t, _q) in enumerate(recon.QUESTIONS, 1)])
+    c.check("... fills the group in and leaves no placeholder", ("{group}" in brief, brief.count("the quest system") >= 5),
+            (False, True))
+    c.check("... names its units on the line `slots.py spawn` reads", launch.task_units(brief),
+            ["Quest/quest_entry", "Quest/quest_board"])
+    c.check("... and forbids every write", "Do not edit any file, commit, or write to the repository" in brief, True)
+    c.check("a brief with no units carries no Units: line", launch.task_units(recon.recon_brief("nw4r")), [])
+    c.raises("a brief with no group is refused", SystemExit, recon.recon_brief, "  ")
+
+
 def test_task_units(c):
     task = ("Lane L2 SESSION CORE (round 2).\nUnits: NetworkSessionManager, NetworkSessionManagerPat (100 of 203 rows "
             "at 100%; 103 left: updateSession 2436 B, handleCircleCreate 1868), NetworkPat (Matching).\n"

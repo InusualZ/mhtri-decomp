@@ -1,4 +1,4 @@
-"""The invocation's recorded allowances (`--allow-rule10/12`, `--allow-orphan`), `--unit-rename` pairs, and their record.
+"""The invocation's allowances (`--allow-rule10/12`, `--allow-orphan`), `--unit-rename` pairs, `--manifest`, their record.
 Spec: docs/tools/spec/landing.md. CLI: none (a module of the `land.py` gate)."""
 from __future__ import annotations
 
@@ -94,6 +94,18 @@ def rename_snapshot_keys(snapshot: dict) -> dict:
             elif isinstance(out[nk], dict) and isinstance(v, dict):
                 out[nk] = dict(out[nk], refs=sorted(set(out[nk].get("refs") or []) | set(v.get("refs") or [])))
     return out
+
+
+MANIFEST: str | None = None
+
+
+def set_manifest(spec: str | None) -> None:
+    """Record the lane manifest *this invocation* judges the batch against (`--manifest <path|slug>`).
+
+    Travels on the module like the allowances: the row (`rows/manifest.py`) lives in `verify`, and the landing log
+    records the id. Set only from a command line; `None` (the default) keeps the gate without the row."""
+    global MANIFEST                                                       # noqa: PLW0603 - one invocation
+    MANIFEST = spec.strip() if spec and spec.strip() else None
 
 
 ALLOW_RULE12: list[str] = []

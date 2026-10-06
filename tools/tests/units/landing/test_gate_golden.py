@@ -64,7 +64,7 @@ SPLITS_GEN = SPLITS_NEW.replace("Net/net_new.cpp", "Net/fn_80001100.cpp")
 class Scenario:
     def __init__(self, name, kind, units, dry_run=False, check_outbox=True, record_base=True, lint=(0, ""),
                  after=None, drift=False, allow_regression=(), no_selftests=False, post_fail=False, variant=None,
-                 unit_renames=()):
+                 unit_renames=(), manifest=None):
         self.name, self.kind, self.units, self.dry_run = name, kind, list(units), dry_run
         # `gen`: the batch registers GEN_UNIT; `rename`: the base registers GEN_UNIT and the batch renames it to UNIT
         self.variant, self.unit_renames = variant, list(unit_renames)
@@ -73,6 +73,8 @@ class Scenario:
         self.allow_regression, self.no_selftests = list(allow_regression), no_selftests
         # every object row's reader refuses: registration, references, rule 10, data closure, the re-measure
         self.post_fail = post_fail
+        # the lane manifest written under the `manifest` key of `.pi/outbox/<MANIFEST_SLUG>.json` and named by slug
+        self.manifest = manifest
 
 
 #: The style-lint row run for real (rule 15, 2026-10-05): the stylelint subprocess is not stubbed but run from this
@@ -86,6 +88,12 @@ R15_UNIT_TEXT = {
     "r15-advisory": "/* 2026-10-05: the network lane's wave 2 (50 % fuzzy match) */\n"
                     "int net_new_step(void) { return 1; }\n",
 }
+#: The lane-manifest scenarios (2026-10-06): the unit batch changes configure.py, splits.txt, symbols.txt, its own
+#: source and the hot header `src/Net/net.h`. Inside its manifest it passes; with that header read-only it refuses.
+MANIFEST_SLUG = "lane-net"
+MANIFEST_OWNS = {"lane": "lane-net", "base": "HEAD", "owns": ["src/Net/", "configure.py", "config/RMHE08/*.txt"],
+                 "read_only": [], "units": [UNIT]}
+MANIFEST_HOT = dict(MANIFEST_OWNS, read_only=["src/Net/net.h"])
 LINT_REFUSAL = (1, json.dumps({"added": [{"rule": 2, "file": "src/Net/net_new.cpp", "added": 1, "before": 0,
                                           "after": 1}],
                                "detail": [{"rule": 2, "file": "src/Net/net_new.cpp", "line": 3, "token": "x"}]}))
@@ -112,6 +120,9 @@ SCENARIOS = [
     # rule 15 through the real lint: a stale path new to a changed file refuses the row; advisory markers pass it
     Scenario("lint-rule15-stale-path-refusal", "unit", [UNIT], dry_run=True, lint=REAL_LINT, variant="r15-stale"),
     Scenario("lint-rule15-advisory-pass", "unit", [UNIT], dry_run=True, lint=REAL_LINT, variant="r15-advisory"),
+    # the lane manifest: a batch inside its `owns` passes the row; one touching a `read_only` hot header refuses it
+    Scenario("manifest-inside-pass", "unit", [UNIT], dry_run=True, manifest=MANIFEST_OWNS),
+    Scenario("manifest-read-only-hot-header-refusal", "unit", [UNIT], dry_run=True, manifest=MANIFEST_HOT),
 ]
 
 
@@ -173,6 +184,9 @@ def build_fixture(root: str, sc: Scenario) -> None:
         os.makedirs(os.path.join(root, ".pi", "outbox"), exist_ok=True)
         with open(claims.outbox_path(root, UNIT), "w", encoding="utf-8") as fh:
             json.dump(OUTBOX, fh)
+        if sc.manifest is not None:
+            with open(os.path.join(root, ".pi", "outbox", MANIFEST_SLUG + ".json"), "w", encoding="utf-8") as fh:
+                json.dump({"manifest": sc.manifest}, fh)
     elif sc.kind == "layout":
         if sc.variant == "add":
             with open(os.path.join(root, "include", "Net", "new.h"), "w", encoding="utf-8") as fh:
@@ -277,12 +291,14 @@ def capture(verify, sc: Scenario, mods: dict | None = None, root: str | None = N
         stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
         stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
         _state.set_unit_renames(sc.unit_renames)
+        _state.set_manifest(MANIFEST_SLUG if sc.manifest is not None else None)
         try:
             code = verify(root, sc.units, None, dry_run=sc.dry_run, no_build=False,
                           allow_regression=sc.allow_regression, check_outbox=sc.check_outbox, release_claims=True,
                           no_selftests=sc.no_selftests)
         finally:
             _state.set_unit_renames([])
+            _state.set_manifest(None)
     return {"exit": code, "rows": seen["rows"]}
 
 
@@ -398,6 +414,54 @@ def test_rule15_style_lint_row(c):
     c.check("... and the refusal is rule 15's, on the unit's file",
             any("rule 15" in p and "src/Net/net_new.cpp" in p for p in problems), True)
     c.check("advisory markers alone pass the row", got["lint-rule15-advisory-pass"][:2], (0, ["PASS"]))
+
+
+def test_manifest_row(c):
+    """The lane-manifest row (2026-10-06): inside its manifest the batch passes; a read-only hot header refuses it with
+    the header named and the remedy; no `--manifest` means no row (every older scenario)."""
+    from tools.units.landing import api
+    from tools.units.landing.rows.manifest import ROW
+    got = {}
+    for name in ("manifest-inside-pass", "manifest-read-only-hot-header-refusal", "unit-dry-run"):
+        problems: list = []
+        res = capture(lambda *a, **k: api.verify(*a, problems=problems, **k), next(s for s in SCENARIOS if s.name == name))
+        got[name] = (res["exit"], [r[1] for r in res["rows"] if r[0] == ROW], problems)
+    c.check("a batch inside its manifest passes the row", got["manifest-inside-pass"][:2], (0, ["PASS"]))
+    exit_code, status, problems = got["manifest-read-only-hot-header-refusal"]
+    c.check("a batch touching a read-only hot header refuses (exit 1, FAIL)", (exit_code, status), (1, ["FAIL"]))
+    c.check("... and the refusal names the header, why, and the request remedy",
+            [("src/Net/net.h (read-only `src/Net/net.h`)" in p, "integrator request" in p) for p in problems],
+            [(True, True)])
+    c.check("no --manifest, no row", got["unit-dry-run"][1], [])
+
+
+def test_manifest_decision(c):
+    """The row's pure decision and loader: globs, directories, read-only over owns, the outbox key, malformed input."""
+    import tempfile as _tf
+    from tools.units.landing.rows import manifest as m
+    c.check("a directory entry covers everything below it, with or without the slash",
+            [m.matches("src/Net/a/b.cpp", "src/Net/"), m.matches("src/Net/a.cpp", "src/Net"),
+             m.matches("src/Network/a.cpp", "src/Net")], [True, True, False])
+    c.check("a glob is fnmatch (`*` crosses `/`); an exact path is itself",
+            [m.matches("config/RMHE08/splits.txt", "config/RMHE08/*.txt"), m.matches("configure.py", "configure.py"),
+             m.matches("configure.pyc", "configure.py")], [True, True, False])
+    man = {"lane": "l", "owns": ["src/Net/", "configure.py"], "read_only": ["src/Net/net.h"]}
+    c.check("outside_manifest: read-only wins over owns, an unowned path is named, an owned one passes",
+            m.outside_manifest(["src/Net/net.h", "src/pl/pl.h", "src/Net/x.cpp", "configure.py"], man),
+            [("src/Net/net.h", "read-only `src/Net/net.h`"), ("src/pl/pl.h", "not in `owns`")])
+    c.check("a well-formed manifest has no shape problem", m.shape_problems(man), [])
+    c.check("an empty owns, a missing lane and a non-list read_only are each named",
+            len(m.shape_problems({"owns": [], "read_only": "src/"})), 3)
+    root = _tf.mkdtemp(prefix="manifest-load-")
+    os.makedirs(os.path.join(root, ".pi", "outbox"))
+    with open(os.path.join(root, ".pi", "outbox", "lane-a.json"), "w", encoding="utf-8") as fh:
+        json.dump({"unit": "x", "manifest": man}, fh)
+    with open(os.path.join(root, "bare.json"), "w", encoding="utf-8") as fh:
+        json.dump(man, fh)
+    c.check("a slug resolves to its outbox's `manifest` key; `worker/<slug>` too; a bare file is the manifest",
+            [m.load(root, "lane-a")[0], m.load(root, "worker/lane-a")[0], m.load(root, "bare.json")[0]], [man] * 3)
+    c.check("a missing manifest is reported, never a crash", (m.load(root, "nope")[0], "no manifest" in m.load(root, "nope")[1]),
+            (None, True))
 
 
 def test_golden_is_not_vacuous(c):

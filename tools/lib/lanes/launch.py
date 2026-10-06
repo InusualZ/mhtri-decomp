@@ -24,6 +24,7 @@ KIND_PROFILE = {
     "docs": "worker",
     "review": "codereviewer",  # the tracked project review profile
     "scout": "scout",          # read-only
+    "recon": "scout",          # read-only: a wave's conflict-surface survey of one lane group (`recon.recon_brief`)
     "plan": "planner",         # read-only
 }
 #: Every profile a lane can be launched with (an override is validated against this).

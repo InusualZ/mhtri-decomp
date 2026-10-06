@@ -60,6 +60,14 @@ Twelve rules.
 | auto-generated names in `src/` | 376 | 7 |
 """
 
+SELF_CHECK = """**Before reporting: the review defect classes.** A lane checks its own branch for each
+before its final message:
+
+- **Owners by function address**: never a retired unit's start.
+- **An empty stub body is unwritten**, not partial;
+  a continuation line stays with its item.
+"""
+
 STALE_BLOCK = """%s
 1. **A shared type lives in one header** - old text
 %s""" % (sp.BEGIN, sp.END)
@@ -111,6 +119,19 @@ def selftest() -> int:
           "apply to new work immediately" in enf, False)
     check("enforcement never carries the audit table", "| measure |" in block or "376" in block, False)
     check("the enforcement paragraph is in the block", enf in block, True)
+
+    # --- the self-check list rides the block verbatim, and only it ----------------------------------------
+    check("a section without the self-check paragraph adds nothing", sp.self_check(FIXTURE), [])
+    with_check = FIXTURE.replace("| measure | count | rule |", SELF_CHECK + "\n| measure | count | rule |")
+    check_block = sp.build_block(with_check)
+    check("the self-check paragraph and every item reach the block",
+          all(line in check_block.split("\n") for line in SELF_CHECK.strip().split("\n")), True)
+    check("... after the enforcement sentences, before the END marker",
+          0 <= check_block.find(enf) < check_block.find(sp.SELF_CHECK_ANCHOR) < check_block.find(sp.END), True)
+    check("... and the list stops at its blank line (the audit table never leaks)",
+          "| measure |" in check_block, False)
+    raises("a self-check paragraph with no list is refused",
+           lambda: sp.self_check("%s lanes check these.\n\nprose\n" % sp.SELF_CHECK_ANCHOR))
 
     # --- a table that changed shape is refused, not summarised ------------------------------------------
     raises("a too-short table is refused", lambda: sp.parse_rules("| 1 | **a** | b |\n"))
@@ -215,6 +236,8 @@ def selftest() -> int:
           "12. **Data a unit uses and nobody owns is the unit's to claim and match**" in real_block, True)
     check("the real plan's rule 12 keeps the already-yours carve-out",
           "ALREADY the unit's own" in real_block, True)
+    check("the real plan's self-check list (the review defect classes) is in the block",
+          (sp.SELF_CHECK_ANCHOR in real_block, len(sp.self_check(real)) >= 8), (True, True))
 
     # --- the brief and the profiles read the same bytes -------------------------------------------------
     try:
