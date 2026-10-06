@@ -147,19 +147,11 @@ extern "C" {
 /* 0x803C9974 - the game's debug/log manager (the network library singleton, read through `mpInstance`). */
 NetworkLogger* getNetworkLogger(void);
 
-/* 0x803CA338 / 0x803CA37C - destroy (flags -1 at every call site) and construct the member mutex the network
- * records embed (the constructor references the 0x10-byte .data 0x805F91E0).  The callers hand a byte block
- * whose layout only this unit's class owns. */
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void networkInstance_destroyMutex(void* self, s32 flags);
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void networkInstance_initMutex(void* self);
-
-/* 0x803CBA9C / 0x803CBB98 - the frame writer's entry points on a connection that `NetworkSessionStable` drives
- * (attach a default writer; hand it `length` bytes of channel `kind`, or none). */
-void networkStreamWriter_attach(NetworkConnectionStable* connection, NetworkStreamWriterDefault* stream);
-void networkStreamWriter_reserve(NetworkConnectionStable* connection, const u8* bytes, u32 length, s8 kind);
-
 }
+
+/* The mutex pair (`Network/NetworkConnection.cpp`) and the frame writer's entry points
+ * (`Network/NetworkConnectionStable.cpp`) the includers of this header call. */
+#include "Network/NetworkConnection.h"
+#include "Network/NetworkConnectionStable.h"
 
 #endif /* MHTRI_NETWORK_NETWORKSTREAMSINK_H */

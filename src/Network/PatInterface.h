@@ -532,7 +532,7 @@ void getSelectedHunterName(NetworkInstance* self, char* out);
 /* 0x803FE4A0 */
 void setSomething(NetworkInstance* self, s32 value);
 /* 0x803FE4A8 */
-s8 getSomething4(NetworkInstance* self);
+u8 getSomething4(NetworkInstance* self);
 
 #ifdef __cplusplus
 }
@@ -576,10 +576,10 @@ typedef struct PatLayerData {
     /* +0x054 */ s16 layerId_054;      /* the id `recvAnsLayerChildInfo` read first (item 5, sent 1-based) */
     /* +0x056 */ u8  pad_056[0x02];
     /* +0x058 */ s32 counts_058[3];    /* items 6..8 (the counting form's items 2..4) */
-    /* +0x064 */ s32 userMax_064;      /* item 9 (GUESS name: the layer's user limit) */
-    /* +0x068 */ s32 userCount_068;    /* item 10 (GUESS name: the users in it) */
+    /* +0x064 */ s32 memberLimitA_064;  /* item 9: the create request's first member limit */
+    /* +0x068 */ s32 memberLimitB_068;  /* item 10: its second member limit */
     /* +0x06C */ s32 value_06C;        /* item 11 */
-    /* +0x070 */ u32 flags_070;        /* item 12 */
+    /* +0x070 */ u32 matchKey_070;      /* item 12: the layer's match key (NetworkLayerPat keeps it at +0x3D4) */
     /* +0x074 */ u16 value_074;        /* item 13 */
     /* +0x076 */ s8  value_076;        /* item 16 */
     /* +0x077 */ u8  pad_077;
@@ -874,7 +874,7 @@ extern "C" {
 #endif
 
 /* the channel requests the GameSpy band sends */
-void sendReqChannelInfo(NetworkInstance* self, u32 handle);
+u32 sendReqChannelInfo(NetworkInstance* self, u32 handle);
 u32 sendReqChannelData(NetworkInstance* self, u32 handle, u32 offset, u32 size);
 u32 sendReqConnect(NetworkInstance* self);
 
@@ -929,8 +929,8 @@ u32 sendReqLayerUserSearchFoot(NetworkInstance* self);
 s32 sendReqBinaryHead(NetworkInstance* self, u8 fileId, s8 mode);
 s32 sendReqBinaryData(NetworkInstance* self, u8 fileId, u32 handle, u32 offset, u32 size);
 s32 sendReqBinaryFoot(NetworkInstance* self, u8 fileId);
-void sendReqCircleInfoNoticeSet(NetworkInstance* self);
-void reqUserSearchInfoMine(NetworkInstance* self, s32 mode);
+u32 sendReqCircleInfoNoticeSet(NetworkInstance* self);
+u32 reqUserSearchInfoMine(NetworkInstance* self, s32 mode);
 
 /* The item writers and the hand-off dispatch the state machine calls with its own view of the session. */
 void writeUInt8Array2(NetworkStateMachine* self, u8 count, const u8* data);
@@ -1071,7 +1071,7 @@ u32 sendReqCircleListFoot(NetworkInstance* self);                               
 u32 sendReqCircleKick(NetworkInstance* self, const char* userId);                         /* 0x80402BCC (GUESS) */
 u32 sendReqCircleHost(NetworkInstance* self, s32 circleId);                                          /* 0x80402C64 */
 u32 sendReqCircleUserList(NetworkInstance* self);                                                    /* 0x80402CC8 */
-void sendNtcCircleChat(NetworkInstance* self, PatMatchOptions* options, const char* text);  /* 0x80402E5C (GUESS) */
+u32 sendNtcCircleChat(NetworkInstance* self, PatMatchOptions* options, const char* text);  /* 0x80402E5C (GUESS) */
 u32 sendReqCircleTell(NetworkInstance* self, const char* userId, PatMatchOptions* options,
                       const char* text);                                                  /* 0x80402EE8 (GUESS) */
 void sendNtcCircleUserValue(NetworkInstance* self, s32 circleId, s32 value, u8 notify);     /* 0x80402FD0 (GUESS) */
@@ -1096,7 +1096,7 @@ s32 sendReqBinaryChecksum(NetworkInstance* self, u8 fileId);
 /* 0x80401AF4 - request op 136, between sendReqLayerHost and sendReqLayerUserList (recvAnsLayerUserInfoSet's slot) */
 u32 sendReqLayerUserInfoSet(NetworkInstance* self, const NetLayerUserRecord* record);
 /* 0x80401F50 */
-void sendNtcLayerUserPosition(NetworkInstance* self, const NetUserPosition* position);
+u32 sendNtcLayerUserPosition(NetworkInstance* self, const NetUserPosition* position);
 /* 0x80402090 */
 u32 sendNtcLayerChat(NetworkInstance* self, u8 channel, const PatMatchOptions* options, const char* text);
 /* 0x8040211C - request op 159 after sendNtcLayerChat, as sendReqCircleTell follows sendNtcCircleChat (recvAnsLayerTell) */
@@ -1121,7 +1121,7 @@ s32 sendReqTell(NetworkInstance* self, const u8* id, const u32* options, const c
 /* 0x804035D8 */
 s32 sendReqBinaryUser(NetworkInstance* self, const u8* id, const u8* data, u16 size);
 /* 0x80403978 */
-s32 sendReqUserSearchInfo(NetworkInstance* self, const u8* query, s32 mode);
+s32 sendReqUserSearchInfo(NetworkInstance* self, const u8* query, s8 mode);
 /* 0x80403A88 */
 s32 sendReqUserStatusSet(NetworkInstance* self, const u8* settings);
 /* 0x80403BF4 */
@@ -1221,7 +1221,7 @@ u32 sendNtcCircleBinaryTo(NetworkInstance* self, s32 circleId, PatItemList list,
  * layer's per-slot record at +0xC1B0. */
 void sendLayerBinaryRecord(NetworkInstance* self, u32 a, u32 b, u32 c, u16 d, const u8* userId, s32 broadcast);
 /* 0x804037EC */
-u32 sendReqUserSearchHead(NetworkInstance* self, u32 kind, u32 count, const char* userId, const char* name, const NetLayerFilter* filters, s32 filterCount, u8 flag);
+u32 sendReqUserSearchHead(NetworkInstance* self, u32 kind, u32 count, const char* userId, const char* name, const NetLayerFilter* filters, s32 filterCount, s8 flag);
 
 #ifdef __cplusplus
 }

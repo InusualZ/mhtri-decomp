@@ -555,10 +555,10 @@ s32 NetworkCommunityPat::handle_68(NetworkCommunityRequest* request)
         if (this->replyFlags_2F0[1] & REPLY_SESSION_LOST) {
             setCollectionLogSessionLost(request);
             request->state_00 = STEP_FAILED;
-        } else if (getSomething4(getInstance_()) < 0) {
+        } else if ((s8)getSomething4(getInstance_()) < 0) {
             request->setRecord(COMMUNITY_ERR_NOT_LOGGED_IN, 0, 0);
             request->state_00 = STEP_CANCELLED;
-        } else if (getSomething4(getInstance_()) > 0) {
+        } else if ((s8)getSomething4(getInstance_()) > 0) {
             this->replyFlags_2F0[1] = 0;
             resetNetworkState(getInstance_());
             request->state_00 = 35;
@@ -624,10 +624,10 @@ s32 NetworkCommunityPat::handle_68(NetworkCommunityRequest* request)
         if (this->replyFlags_2F0[1] & REPLY_SESSION_LOST) {
             setCollectionLogSessionLost(request);
             request->state_00 = STEP_FAILED;
-        } else if (getSomething4(getInstance_()) < 0) {
+        } else if ((s8)getSomething4(getInstance_()) < 0) {
             setCollectionLog(request, COMMUNITY_ERR_NOT_LOGGED_IN, 0, 0);
             request->state_00 = STEP_CANCELLED;
-        } else if (getSomething4(getInstance_()) > 0) {
+        } else if ((s8)getSomething4(getInstance_()) > 0) {
             getFmpSelection(getInstance_(), &kind, &index);
             if (kind != 1 || index < 0) {
                 setCollectionLog(request, COMMUNITY_ERR_BAD_ARGUMENT, 0, 0);

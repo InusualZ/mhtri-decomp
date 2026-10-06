@@ -1924,11 +1924,23 @@ Network/network_shared_data.cpp:
 	.sdata2     start:0x8079C690 end:0x8079C758
 
 Network/NetworkStreamSink.cpp:
-	extab       start:0x80019554 end:0x800198C8
-	extabindex  start:0x80039E64 end:0x8003A0BC
-	.text       start:0x803C987C end:0x803CCDF8
+	extab       start:0x80019554 end:0x80019584
+	extabindex  start:0x80039E64 end:0x80039EAC
+	.text       start:0x803C987C end:0x803CA1D4
 	.rodata     start:0x80570C20 end:0x80570E20
-	.data       start:0x805F8DB0 end:0x805F94E0
+	.data       start:0x805F8DB0 end:0x805F9190
+
+Network/NetworkConnection.cpp:
+	extab       start:0x80019584 end:0x80019618
+	extabindex  start:0x80039EAC end:0x80039EF4
+	.text       start:0x803CA1D4 end:0x803CA484
+	.data       start:0x805F9190 end:0x805F91F0
+
+Network/NetworkConnectionStable.cpp:
+	extab       start:0x80019618 end:0x800198C8
+	extabindex  start:0x80039EF4 end:0x8003A0BC
+	.text       start:0x803CA484 end:0x803CCDF8
+	.data       start:0x805F91F0 end:0x805F94E0
 
 Network/NetworkPeerBase.cpp:
 	extab       start:0x800198C8 end:0x800198E0
