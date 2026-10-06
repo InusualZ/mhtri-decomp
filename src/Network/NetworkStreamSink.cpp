@@ -1,47 +1,24 @@
 /*
- * Network/NetworkStreamSink.cpp - the stream sink with its frame scrambler and CRC (`NetworkStreamSink`), the
- *   manager logger accessor, the Udp peer's constructor, `NetworkConnectionStable`, `NetworkSlotQueues`, the send
- *   pool and the `NetworkStreamWriter` frame writers.
- * RANGE. .text 0x803C987C-0x803CCDF8 (74 functions); extab 0x80019554-0x800198C8, extabindex 0x80039E64-0x8003A0BC
- *   (50 entries), .rodata 0x80570C20-0x80570E20 (the CRC-16 table `checksum` reads), .data 0x805F8DB0-0x805F94E0.
- *   No .bss, .sdata, .sbss or .sdata2 of its own: its pool reads go to `Network/network_shared_data.cpp`.
- * RANGE. Left edge 0x803C987C: cut from `lobby/lb_server_sel_trans.cpp`.  No `.text` reference crosses it in either
- *   direction, every `.data` label below 0x805F8DB0 is read only from below the edge and every label from it only
- *   from above, the `.rodata` table is read only by `checksum`, and the extab/extabindex records split at the same
- *   function (`~NetworkStreamSink`, the first framed one).  Right edge: `Network/NetworkPeerBase.cpp` at 0x803CCDF8.
- * RANGE. More than one TU, not split: `tudiscover` reads a `.data` zigzag at 0x805F9190 (the buffer's table
- *   0x805F9150 is followed by a rising table) and a V->S seam at 0x805F91F0.  The first TU is the buffer class: `.text`
- *   0x803C987C-0x803CA1D4 (its last function `checksum`; the next, 0x803CA1D4, is the first reader of 0x805F9190),
- *   extabindex 0x80039E64-0x80039EAC (6 entries) and extab 0x80019554-0x80019584, `.rodata` 0x80570C20-0x80570E20 and
- *   `.data` 0x805F8DB0-0x805F9190 (its log strings and `__vt__17NetworkStreamSink`); filed as a seam request.
+ * Network/NetworkStreamSink.cpp - the stream buffer (`NetworkStreamSink`; "NetworkBuffer::" in its log strings) with its
+ *   frame scrambler and CRC, and the library accessor `getNetworkLogger`.
+ * RANGE. .text 0x803C987C-0x803CA1D4 (15 functions), extab 0x80019554-0x80019584, extabindex 0x80039E64-0x80039EAC
+ *   (6 entries), .rodata 0x80570C20-0x80570E20 (the CRC-16 table `checksum` reads), .data 0x805F8DB0-0x805F9190 (the
+ *   log strings and `__vt__17NetworkStreamSink`).  No .bss, .sdata, .sbss or .sdata2 of its own.
+ * RANGE. Left edge 0x803C987C: cut from `lobby/lb_server_sel_trans.cpp` (no `.text` reference crosses it, the `.data`
+ *   labels and the extab/extabindex records split at the same function).  Right edge: the `.data` zigzag at 0x805F9190
+ *   (this table is followed by a rising one, the connection base's, first read by 0x803CA1D4); `checksum` is the last
+ *   function reading this unit's data and the extabindex records split there (`Network/NetworkConnection.cpp`).
  * FLAGS. `-O3 -inline noauto -pool off` (configure.py; docs/network.md), file-scope `#pragma peephole off` (the
  *   destructor's `extsh`, the scramblers' `clrlwi` before each `stb`).
- * NAMES. The file name is a GUESS from the range's first class, `NetworkStreamSink`; its log strings call the class
- *   `NetworkBuffer` and the slots `init` (`clear`), `serialize` (`fill`), `deserialize` (`put`), `duplicate`
- *   (`copyFrom`) and `equals` (`slot_2C`).  `networkCrc16Table` (0x80570C20, the CRC-16/CCITT table) is a GUESS from
- *   its content.  `networkInstance_destroyMutex` (0x803CA338, dtk's `dtor_`) is a GUESS in the scheme of its
- *   constructor `networkInstance_initMutex`: every caller destroys a record's member mutex with it (flags -1), and the
- *   extab cleanup records name it for that member.
- * RESIDUALS. Written: the buffer class (every row but `slot_2C` at 100), `getNetworkLogger` and `NetworkSlotQueues`'s
- *   constructor and destructor.  Not attempted, with the reason:
- *  - `slot_2C` (0x803C9CD8): retail takes the other buffer and returns the verdict, which `virtual void slot_2C()` (the
- *    declaration `NetworkUniqueId` overrides as declared) cannot carry; filed as a field request;
- *  - the connection base 0x803CA1D4/0x803CA3F8 (table 0x805F9190) and everything of `NetworkConnectionStable`
- *    (0x803CA49C..0x803CCDF8): the class is declared in `Network/NetworkSessionStable.h` with an opaque
- *    `pad_04[0x224C]` and no base, which this unit may not edit; filed as a decl-move/field request;
- *  - `networkInstance_initMutex`/`_destroyMutex` (0x803CA37C/0x803CA338): the constructor stores the table
- *    0x805F91E0, so the record is a class (rule 10) while the band calls the pair as C functions on a byte block;
- *  - 0x803CA2F4 and 0x803CA3BC (the 0x663C-byte peer and `NetworkPeerUdp` constructors): their classes declare no
- *    constructor in headers this unit may edit;
- *  - 0x803CA484/0x803CA48C/0x803CA494: they store the defaults `network_shared_data.cpp` owns (no declaration yet);
- *  - the `NetworkStreamWriter` constructors and destructors (0x803CB8FC..0x803CBA2C): their tables (0x805FCDD4,
- *    0x805FCE10) lie in another unit's `.data`, so defining the key functions here would emit them in the wrong TU.
- *  Data: `.rodata` is byte-identical; `.data` matches up to 0x2D8 (the `equals` strings are not emitted while
- *  `slot_2C` has no body).
+ * NAMES. The file name is a GUESS from the class, `NetworkStreamSink`; its log strings call the class `NetworkBuffer`
+ *   and the slots `init` (`clear`), `serialize` (`fill`), `deserialize` (`put`), `duplicate` (`copyFrom`) and `equals`
+ *   (`slot_2C`).  `networkCrc16Table` (0x80570C20, the CRC-16/CCITT table) is a GUESS from its content.
+ * RESIDUALS. `slot_2C` (0x803C9CD8) is not written: retail takes the other buffer and returns the verdict, which
+ *   `virtual void slot_2C()` (the declaration `NetworkUniqueId` overrides as declared) cannot carry.  Data: `.rodata`
+ *   is byte-identical; `.data` matches up to 0x2D8 (the `equals` strings are not emitted while `slot_2C` has no body).
  */
 
 #include "Network/NetworkStreamSink.h"
-#include "Network/NetworkSessionStable.h"   /* NetworkSlotQueues */
 #include "Network/sNetworkLibrary.h"        /* sNetworkLibrary::mpInstance */
 #include "unsplit/Network.h"                /* NetworkLogger */
 #include "Runtime.PPCEABI.H/memcpy.h"
@@ -258,16 +235,4 @@ u16 NetworkStreamSink::checksum(u16 size)
         crc = (crc << 8) ^ networkCrc16Table[(u8)((crc >> 8) ^ *p)];
     }
     return crc;
-}
-
-/* ==== the slot queues ========================================================================================= */
-
-/* Destroys the two receive queues and the two send queues. */
-NetworkSlotQueues::~NetworkSlotQueues()
-{
-}
-
-/* Builds the two send queues and the two receive queues. */
-NetworkSlotQueues::NetworkSlotQueues()
-{
 }

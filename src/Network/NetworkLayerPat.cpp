@@ -3650,10 +3650,10 @@ s32 NetworkLayerPat::handleConnect(NetworkLayerRequest* request)
         if (this->requestFlags_310[SLOT_CONNECT] & FLAG_SESSION_LOST) {
             setCollectionLogSessionLost(request);
             request->state_00 = STEP_FAILED;
-        } else if (getSomething4(getInstance_()) < 0 || this->requests_0C[SLOT_DISCONNECT] != 0) {
+        } else if ((s8)getSomething4(getInstance_()) < 0 || this->requests_0C[SLOT_DISCONNECT] != 0) {
             request->setRecord(LAYER_ERR_NO_LAYER, 0, 0);
             request->state_00 = STEP_CANCELLED;
-        } else if (getSomething4(getInstance_()) > 0) {
+        } else if ((s8)getSomething4(getInstance_()) > 0) {
             this->requestFlags_310[SLOT_CONNECT] = 0;
             resetNetworkState(getInstance_());
             request->state_00 = 35;

@@ -336,10 +336,10 @@ s32 NetworkSessionManagerPat::updateSession(NetworkRequest* request)
         if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
             setSessionLogSessionLost(request);
             request->state_00 = REQUEST_FAILED;
-        } else if (getSomething4(getInstance_()) < 0) {
+        } else if ((s8)getSomething4(getInstance_()) < 0) {
             request->setRecord(0x80050033, 0, 0);
             request->state_00 = REQUEST_CANCELLED;
-        } else if (getSomething4(getInstance_()) > 0) {
+        } else if ((s8)getSomething4(getInstance_()) > 0) {
             this->requestFlags_30C[1] = 0;
             resetNetworkState(getInstance_());
             request->state_00 = 35;
@@ -405,10 +405,10 @@ s32 NetworkSessionManagerPat::updateSession(NetworkRequest* request)
         if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
             setSessionLogSessionLost(request);
             request->state_00 = REQUEST_FAILED;
-        } else if (getSomething4(getInstance_()) < 0) {
+        } else if ((s8)getSomething4(getInstance_()) < 0) {
             setSessionLog(request, 0x80050033, 0, 0);
             request->state_00 = REQUEST_CANCELLED;
-        } else if (getSomething4(getInstance_()) > 0) {
+        } else if ((s8)getSomething4(getInstance_()) > 0) {
             getFmpSelection(getInstance_(), &kind, &index);
             if (kind != 1 || index < 0) {
                 setSessionLog(request, 0x80050002, 0, 0);

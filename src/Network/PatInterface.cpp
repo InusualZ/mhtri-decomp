@@ -1004,7 +1004,7 @@ void setSomething(NetworkInstance* self, s32 value)
 #pragma peephole off
 
 /* The +0x6138 flag `setPatByte6138On` sets. */
-s8 getSomething4(NetworkInstance* self)
+u8 getSomething4(NetworkInstance* self)
 {
     return self->flag_6138;
 }
@@ -2838,12 +2838,12 @@ u32 sendNtcLayerBinary(NetworkInstance* self, PatItemList list)
 }
 
 /* Sends this console's position to the layer as six items (three floats, three words). */
-void sendNtcLayerUserPosition(NetworkInstance* self, const NetUserPosition* position)
+u32 sendNtcLayerUserPosition(NetworkInstance* self, const NetUserPosition* position)
 {
     PatItem items[6];
     PatItemList list;
 
-    flushBuffer(self, 156, 0);
+    u32 id = flushBuffer(self, 156, 0);
     memset(items, 0, sizeof(items));
     initItemList(self, &list, items, 6);
     appendItemList(self, &list, 1, 5, (const u8*)&position->position_00[0], 4);
@@ -2854,6 +2854,7 @@ void sendNtcLayerUserPosition(NetworkInstance* self, const NetUserPosition* posi
     appendItemList(self, &list, 6, 3, (const u8*)&position->value_0C[2], 4);
     putItemList(self, list);
     encryptBuffer(self);
+    return (u16)id;
 }
 
 /* Sends a chat line to the layer channel `channel`. */
@@ -3187,14 +3188,15 @@ u32 sendNtcCircleBinaryTo(NetworkInstance* self, s32 circleId, PatItemList list,
 }
 
 /* Sends a chat line to the circle. */
-void sendNtcCircleChat(NetworkInstance* self, PatMatchOptions* options, const char* text)
+u32 sendNtcCircleChat(NetworkInstance* self, PatMatchOptions* options, const char* text)
 {
     u8 items[4] = { 1, 2, 3, 4 };
 
-    flushBuffer(self, 232, 0);
+    u32 id = flushBuffer(self, 232, 0);
     writeChatOptionItems(self, options, 4, items);
     writeString(self, text);
     encryptBuffer(self);
+    return (u16)id;
 }
 
 /* Sends a tell to the circle member `userId`. */
@@ -3211,12 +3213,13 @@ u32 sendReqCircleTell(NetworkInstance* self, const char* userId, PatMatchOptions
 }
 
 /* Asks for the circle info notices with the circle items (twice: the changed and the new circles). */
-void sendReqCircleInfoNoticeSet(NetworkInstance* self)
+u32 sendReqCircleInfoNoticeSet(NetworkInstance* self)
 {
-    flushBuffer(self, 236, 0);
+    u32 id = flushBuffer(self, 236, 0);
     writeCircleItemRequest(self);
     writeCircleItemRequest(self);
     encryptBuffer(self);
+    return (u16)id;
 }
 
 /* Sends a member value to circle `circleId` (kind 2 when `notify` is set, else 1). */
@@ -3393,7 +3396,7 @@ u32 sendReqUserBinaryNotice(NetworkInstance* self, u8 kind, const char* text, u3
 }
 
 /* Requests the user search head: the user id, the name, the filters, the range and the four user items. */
-u32 sendReqUserSearchHead(NetworkInstance* self, u32 kind, u32 count, const char* userId, const char* name, const NetLayerFilter* filters, s32 filterCount, u8 flag)
+u32 sendReqUserSearchHead(NetworkInstance* self, u32 kind, u32 count, const char* userId, const char* name, const NetLayerFilter* filters, s32 filterCount, s8 flag)
 {
     u8 items[4] = { 1, 2, 3, 4 };
     u32 id;
@@ -3429,7 +3432,7 @@ u32 sendReqUserSearchFoot(NetworkInstance* self)
 }
 
 /* Requests the search info of the user `query` names (ten items); `mode` selects the answer's event. */
-s32 sendReqUserSearchInfo(NetworkInstance* self, const u8* query, s32 mode)
+s32 sendReqUserSearchInfo(NetworkInstance* self, const u8* query, s8 mode)
 {
     u8 items[10] = { 1, 2, 3, 4, 7, 8, 11, 12, 13, 14 };
     u32 id;
@@ -3443,13 +3446,14 @@ s32 sendReqUserSearchInfo(NetworkInstance* self, const u8* query, s32 mode)
 }
 
 /* Requests this console's own search info (items 15 and 16). */
-void reqUserSearchInfoMine(NetworkInstance* self, s32 mode)
+u32 reqUserSearchInfoMine(NetworkInstance* self, s32 mode)
 {
     u8 items[2] = { 15, 16 };
 
-    flushBuffer(self, 267, 0);
+    u32 id = flushBuffer(self, 267, 0);
     writeUserSearchItems(self, (const u8*)mode, sizeof(items), items);
     encryptBuffer(self);
+    return (u16)id;
 }
 
 /* Sends this console's status: each of the seven bytes that is not 0xFF (unset). */
@@ -3564,14 +3568,15 @@ s32 sendReqBlackList(NetworkInstance* self, s32 mode, s32 max)
 }
 
 /* Requests channel `handle`'s info (the warning kind first) with the two channel item lists. */
-void sendReqChannelInfo(NetworkInstance* self, u32 handle)
+u32 sendReqChannelInfo(NetworkInstance* self, u32 handle)
 {
-    flushBuffer(self, 291, 0);
+    u32 id = flushBuffer(self, 291, 0);
     writeUInt8(self, self->warningKind_8BBC);
     writeUInt8(self, handle);
     writeChannelItemRequest(self);
     writeChannelDataItemRequest(self);
     encryptBuffer(self);
+    return (u16)id;
 }
 
 /* Requests a range of a reflect channel. */
@@ -6386,13 +6391,13 @@ void writeLayerDownData(NetworkStateMachine* self, PatLayerData* layer, u8 count
             writeShortPlusOne(self, layer->layerId_054);
             break;
         case 9:
-            putItemLong2(self, layer->userMax_064);
+            putItemLong2(self, layer->memberLimitA_064);
             break;
         case 10:
-            putItemLong2(self, layer->userCount_068);
+            putItemLong2(self, layer->memberLimitB_068);
             break;
         case 12:
-            putItemLong(self, layer->flags_070);
+            putItemLong(self, layer->matchKey_070);
             break;
         case 23:
             putItemBinary(self, layer->binary_13E, layer->value_23E);
@@ -7372,16 +7377,16 @@ void readLayerData(NetworkStateMachine* self, PatLayerData* layers, s32 count)
                 getItemLong_(self, &entry->counts_058[2]);
                 break;
             case 9:
-                getItemLong_(self, &entry->userMax_064);
+                getItemLong_(self, &entry->memberLimitA_064);
                 break;
             case 10:
-                getItemLong_(self, &entry->userCount_068);
+                getItemLong_(self, &entry->memberLimitB_068);
                 break;
             case 11:
                 getItemLong_(self, &entry->value_06C);
                 break;
             case 12:
-                getItemLong(self, &entry->flags_070);
+                getItemLong(self, &entry->matchKey_070);
                 break;
             case 13:
                 getItemWord(self, &entry->value_074);
@@ -7444,10 +7449,10 @@ void readLayerCountData(NetworkStateMachine* self, PatLayerData* layers, s32 cou
                 getItemLong_(self, &entry->counts_058[2]);
                 break;
             case 5:
-                getItemLong_(self, &entry->userMax_064);
+                getItemLong_(self, &entry->memberLimitA_064);
                 break;
             case 6:
-                getItemLong_(self, &entry->userCount_068);
+                getItemLong_(self, &entry->memberLimitB_068);
                 break;
             case 7:
                 getItemLong_(self, &entry->value_06C);
