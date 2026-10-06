@@ -1,29 +1,20 @@
-/* enemy/em006_prog.cpp - enemy 006 program
- *
- * `.text` 0x801BB758..0x801C29F8, 11 functions written (the rest of the range is not decompiled yet).
- * Renamed from `fn_801BD6C0`: the unit's `.data` holds `em006_prog_tbl` (0x805B28D0) and its `.text` starts at 0x801BB758.
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `enemy/fn_801BD6C0.cpp` (kept for its notes and residuals): */
-/* enemy/fn_801BD6C0.cpp - the em006 enemy's action band, `.text` 0x801BB758..0x801C29F8.
- *
- * Recut 2026-09-30.  The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
- * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
- * static initializer - the `.ctors` words 0x8056F34C/350/354/358 - and the `.sdata2` pool repeats a value at each
- * change): em036 0x801B7020..0x801B98C8 (`fn_801B7020.cpp`), em040 0x801B98C8..0x801BB758 (`em040_ai.cpp`), em006
- * 0x801BB758..0x801C29F8 (`fn_801BD6C0.cpp`), em004 0x801C29F8..0x801CA8DC (`fn_801CA004.cpp`), em005 0x801CA8DC..
- * 0x801D71C4 (`fn_801CCBC4.cpp`), em007 0x801D71C4..0x801E0ADC (`fn_801D80EC.cpp`).  The files keep their old stems;
- * the `emNNN` names are GUESSes from the prog table that opens each TU's data.
- *
- * This unit's sections: extab 0x8000F9A4..0x8000FB84, extabindex 0x8002B560..0x8002B830, `.ctors`
- * 0x8056F350..0x8056F354 (`fn_801C28FC`, the six-vector `__sinit`: the last function before em004's first,
- * `fn_801C29F8`), `.rodata` 0x805702A0..0x80570320, `.data` 0x805B28D0..0x805B3B7C (from `em006_prog_tbl`) and `.bss`
- * 0x806A7AD0..0x806A7B18.  Left edge 0x801BB758: the 0.0 pool entry repeats at `lbl_80798E40`, first read by
- * `fn_801BB758` (a one-function window).
- *
- * The written functions are the former `enemy/fn_801BD6C0.cpp`'s; `fn_801C2A58` (0x801C2A58, em004's) moved to
- * `enemy/fn_801CA004.cpp`.  Their bodies, residuals and measurements are unchanged (per-function rows in the report).
+/*
+ * enemy/em006_prog.cpp - enemy 006's program: the `_ENEMY_WORK` action steps and the static initializer that
+ *   seeds the six vector records.
+ * RANGE. .text 0x801BB758-0x801C29F8 (74 functions); extab 0x8000F9A4-0x8000FB84, extabindex
+ *   0x8002B560-0x8002B830, .ctors 0x8056F350-0x8056F354 (`fn_801C28FC`), .rodata 0x805702A0-0x80570320, .data
+ *   0x805B28D0-0x805B3B7C (`em006_prog_tbl` first), .bss 0x806A7AD0-0x806A7B18, .sdata 0x80791AB8-0x80791AD8,
+ *   .sdata2 0x80798E40-0x80798FE8.  Left edge: the 0.0 pool entry repeats at `lbl_80798E40`, first read by
+ *   `fn_801BB758`; right edge: `fn_801C28FC` is this TU's static initializer.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off`.
+ * NAMES. The file name follows the runtime dump's `em006_prog_tbl`, which opens the TU's `.data`; the map has only
+ *   `fn_` stems for the functions.
+ *   The `.bss` record names (`vec_pair_801BD6C0_*`) are GUESSes.
+ * RESIDUALS. 63 rows unwritten: 0x801BB758-0x801BD6C0, 0x801BD990-0x801BDA28, 0x801BDAC4-0x801BDEF8,
+ *   0x801BE020-0x801BE198, 0x801BE348-0x801BE508, 0x801BE65C-0x801BEFD4, 0x801BEFEC-0x801C2508,
+ *   0x801C2534-0x801C29F8.  No partial row: the 11 written rows match.
+ *   flipcheck: `.ctors`/`.data`/`.rodata`/`.sdata`/`.sdata2` claimed, not emitted; `.text` (0x7DC of 0x72A0),
+ *   extab (0x38 of 0x1E0) and extabindex (0x54 of 0x2D0) short of the claim and differing.
  */
 
 #include "types.h"
@@ -42,8 +33,8 @@
 #include "draw_shape.h"
 #include "fn_8004CAD8.h"
 
-/* The `.sdata2` pool floats the range's state steps compare and arm with (the same local-declaration
- * convention `src/draw_shape.cpp`/`src/ef/effect.cpp` use). */
+/* The unit's `.sdata2` pool floats the state steps compare and arm with, declared: the source does not
+ * emit the pool yet. */
 extern f32 lbl_80798E40;
 extern f32 lbl_80798E54;
 extern f32 lbl_80798E58;
@@ -314,9 +305,8 @@ extern "C" s32 fn_801C250C(_ENEMY_WORK* self, u8 arg1)
     return 0;
 }
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7AD0..0x806A7B18`), in address order: the 3 two-vector record(s)
- * its static constructor `fn_801C28FC` builds (`.data` tables point at them).  Names are GUESSes: each record is a
- * pair of model-space points. */
+/* The unit's `.bss`: the three two-vector records `fn_801C28FC` seeds.  Names are GUESSes (each record is a
+ * pair of model-space points). */
 VEC3 vec_pair_801BD6C0_0[2];  /* +0x806A7AD0 */
 VEC3 vec_pair_801BD6C0_1[2];  /* +0x806A7AE8 */
 VEC3 vec_pair_801BD6C0_2[2];  /* +0x806A7B00 */

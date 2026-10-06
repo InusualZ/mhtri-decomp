@@ -1,7 +1,23 @@
-/* enemy/em011_prog.cpp - enemy 011 program
- *
- * `.text` 0x8016D1C4..0x80170600, 28 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source.
+/*
+ * enemy/em011_prog.cpp - enemy 011's program: the per-action `_ENEMY_WORK` state steps, their dispatchers and
+ *   the static initializer.
+ * RANGE. .text 0x8016D1C4-0x80170600 (56 functions); extab 0x8000E3DC-0x8000E52C, extabindex
+ *   0x800294B4-0x800296AC, .ctors 0x8056F330-0x8056F334, .rodata 0x8056FCD0-0x8056FD10, .data 0x805A7CE8-0x805A8370
+ *   (`em011_prog_tbl` first), .bss 0x806A7970-0x806A79A0, .sdata2 0x807977D8-0x80797910.
+ * FLAGS. `cflags_main`, no `#pragma`.
+ * NAMES. The file name follows the runtime dump's `em011_prog_tbl`, which opens the TU's `.data`; the map has only
+ *   `fn_` stems for the functions.
+ *   The `.bss` record names (`vec_pair_801679B0_9`/`_10`) are GUESSes.
+ * RESIDUALS. 28 rows unwritten: 0x8016D1C4-0x8016D22C, 0x8016D234-0x8016D384, 0x8016D9EC-0x8016DBE8,
+ *   0x8016DC3C-0x8016E3A0, 0x8016E444-0x8016E544, 0x8016E6EC-0x8016E7D4, 0x8016E824-0x8016EE00,
+ *   0x8016EEE8-0x8016F044, 0x8016F0A0-0x8016F9AC, 0x8016FA48-0x801704AC, 0x801704B0-0x801704CC,
+ *   0x8017054C-0x80170600.
+ *   3 partial rows:
+ *  - `fn_8016E610`, `fn_8016EE00`: retail re-masks the `u8` argument (`clrlwi r0,r4,24`) before the compares, ours
+ *    compares r4, and ours emits one more `b`;
+ *  - `fn_8016E544`: ours branches to a shared `em_mot_end_ck` call where retail calls it in place.
+ *   flipcheck: `.ctors`/`.rodata`/`.sdata2` claimed, not emitted; `.data` 0x9C against 0x688; `.text` (0xBC8 of
+ *   0x343C), extab (0x88 of 0x150) and extabindex (0xCC of 0x1F8) short of the claim and differing.
  */
 
 #include "enemy/fn_80128AAC.h" /* fn_80128AAC (rule 2: the owner's header) */
@@ -17,12 +33,8 @@
 #define fn_80128AAC_c1 ((void (*)(_ENEMY_WORK *, s32, s32))fn_80128AAC)
 #define em_hit_window_set_default_c1 ((void (*)(_ENEMY_WORK *, s32, s32))em_hit_window_set_default)
 
-/* ---------------------------------------------------------------------------------------------------
- * callees and pool literals owned by other units (declared by their map spelling; playbook 29)
- * ------------------------------------------------------------------------------------------------- */
-
-/* The real signature of the one mangled callee: the C++ front-end emits the map's
- * `em_frame_check__FP11_ENEMY_WORKUsff` from it (rule 9 never spells the mangling). */
+/* The one mangled callee, declared by its real signature so the front-end emits the map's
+ * `em_frame_check__FP11_ENEMY_WORKUsff` (rule 9). */
 u32 em_frame_check(_ENEMY_WORK* self, u16 a, f32 b, f32 c);
 
 extern "C" {
@@ -547,5 +559,6 @@ extern "C" void fn_8016EE00(_ENEMY_WORK *self, u8 a) {
     }
 }
 
+/* The unit's `.bss`: the two two-vector records `fn_8017054C` seeds.  Names are GUESSes. */
 VEC3 vec_pair_801679B0_9[2];  /* +0x806A7970 */
 VEC3 vec_pair_801679B0_10[2];  /* +0x806A7988 */

@@ -1,22 +1,28 @@
-/* enemy/em004_act.cpp - the em004 enemy's action band, `.text` 0x801C29F8..0x801CA8DC.
- *
- * Recut 2026-09-30.  The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
- * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
- * static initializer - the `.ctors` words 0x8056F34C/350/354/358 - and the `.sdata2` pool repeats a value at each
- * change): em036 0x801B7020..0x801B98C8 (`fn_801B7020.cpp`), em040 0x801B98C8..0x801BB758 (`em040_ai.cpp`), em006
- * 0x801BB758..0x801C29F8 (`fn_801BD6C0.cpp`), em004 0x801C29F8..0x801CA8DC (`fn_801CA004.cpp`), em005 0x801CA8DC..
- * 0x801D71C4 (`fn_801CCBC4.cpp`), em007 0x801D71C4..0x801E0ADC (`fn_801D80EC.cpp`).  The files keep their old stems;
- * the `emNNN` names are GUESSes from the prog table that opens each TU's data.
- *
- * This unit's sections: extab 0x8000FB84..0x8000FE4C, extabindex 0x8002B830..0x8002BC5C, `.ctors`
- * 0x8056F354..0x8056F358 (`fn_801CA870`, the `__sinit`), `.rodata` 0x80570320..0x80570410, `.data`
- * 0x805B3BF0..0x805B4F8C (after `em004_prog_tbl`, 0x805B3B80) and `.bss` 0x806A7B18..0x806A7B30.  Left edge
- * 0x801C29F8: `fn_801C28FC` (em006's `__sinit`) ends there and `fn_801C29F8` is an ordinary function (an
- * `fn_80137EE0` lookup); right edge 0x801CA8DC: `fn_801CA870` is this TU's `__sinit`, and the 0.0 entry repeats at
- * `lbl_80799220` from `fn_801CA8DC`/`fn_801CAA8C` on (window 0x801CA8DC..0x801CAA8C).
- *
- * Written functions: the former `enemy/fn_801CA004.cpp`'s up to 0x801CA8DC, plus `fn_801C2A58` from the former
- * `enemy/fn_801BD6C0.cpp`.
+/*
+ * enemy/em004_act.cpp - enemy 004's action band: the per-area lookups, the aim-height fade that drives the
+ *   MHchar TEV colours, the spawn-record fill and the static initializer.
+ * RANGE. .text 0x801C29F8-0x801CA8DC (107 functions); extab 0x8000FB84-0x8000FE4C, extabindex
+ *   0x8002B830-0x8002BC5C, .ctors 0x8056F354-0x8056F358 (`fn_801CA870`), .rodata 0x80570320-0x80570410, .data
+ *   0x805B3B80-0x805B4F8C (`em004_prog_tbl` first), .bss 0x806A7B18-0x806A7B30, .sdata 0x80791AD8-0x80791B20,
+ *   .sdata2 0x80798FE8-0x80799220.  Left edge: `fn_801C28FC`, `enemy/em006_prog.cpp`'s static initializer, ends
+ *   there; right edge: `fn_801CA870` is this TU's static initializer and the 0.0 entry repeats at `lbl_80799220`
+ *   from `fn_801CA8DC` on.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi`
+ *   pairs).
+ * NAMES. `em004` is the runtime dump's `em004_prog_tbl`, which opens the TU's `.data`; the `_act` suffix is a
+ *   GUESS.  The map has only `fn_` stems for the functions.
+ *   The `.bss` record names (`vec_pair_801CA004_0`) are GUESSes.
+ * RESIDUALS. 101 rows unwritten: 0x801C29F8-0x801C2A58, 0x801C2A78-0x801CA004, 0x801CA258-0x801CA4CC,
+ *   0x801CA5D8-0x801CA7F0, 0x801CA870-0x801CA8DC.
+ *   2 partial rows:
+ *  - `fn_801CA004`: retail calls `setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor` (a `_GXColor*`) where ours
+ *    calls `...ID8_GXColor` (by value, 3 relocations), hence ours' extra stack copy and `clrlwi` per call; retail
+ *    also loads the step constant before `timer_0x328` and compares `area_no` signed (`cmpwi`, ours `cmplwi`);
+ *  - `fn_801CA170`: retail runs the inner search as a compare loop (`cmplw`/`blt`), ours as a guarded `bdnz` count
+ *    loop, and retail re-materialises `lbl_805B3CD8` where ours hoists it.
+ *   flipcheck: `.ctors`/`.data`/`.rodata`/`.sdata`/`.sdata2` claimed, not emitted; `.text` (0x424 of 0x7EE4),
+ *   extab (0x20 of 0x2C8) and extabindex (0x30 of 0x42C) short of the claim and differing;
+ *   our `setTevKColor__6MHcharFUl14_GXTevKColorID8_GXColor` has no map row (retail's spelling is `...IDP8_GXColor`).
  */
 
 #include "types.h"
@@ -44,16 +50,10 @@
 #include "unsplit/ef.h"
 #include "ef/eft009.h"
 
-/* ===================================================================================================
- * former fn_801CA004.cpp, up to 0x801CA8DC (+ fn_801C2A58)
- * =================================================================================================== */
-
-/* retail keeps the unfused clrlwi/rlwinm + cmpwi pairs this band's -O3 peephole folds, so the whole
- * unit is built with the peephole off (the same finding as `enemy/fn_801B7020.cpp`,
- * `enemy/fn_80147CE0.cpp` and `enemy/fn_801CCBC4.cpp`). */
+/* Retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` pairs the peephole folds. */
 #pragma peephole off
 
-/* the `.rodata`/`.data` tables this range references (shared pools, not this unit's data). */
+/* The unit's `.data` lookup table, declared: the source does not emit it yet. */
 extern u8 lbl_805B3CD8[];
 
 /* the 8-byte `{key, count, subs}` lookup records `fn_801CA170` walks (the pool at 0x805B3CD8). */
@@ -79,9 +79,8 @@ extern "C" {
 /* 0x801CA5D4 - a 4-byte `blr` (the map's own empty body). */
 void fn_801CA5D4(_ENEMY_WORK* self) {}
 
-/* 0x801CA170 - the area's sub-record lookup: the `self->area_no` entry of the 0x805B3CD8 pool,
- * then the record whose key is `a`; the value goes out through `out` and the record's second byte
- * is the answer. */
+/* 0x801CA170 - finds the `self->area_no` entry of the 0x805B3CD8 table, then its record keyed `a`: returns
+ * the record's second byte and stores its value through `out`. */
 u32 fn_801CA170(_ENEMY_WORK* self, u8 a, u32* out) {
     if (stage_map_kind_get(self->field_0x1E0) != 4)
         return 0;
@@ -105,7 +104,7 @@ u32 fn_801CA170(_ENEMY_WORK* self, u8 a, u32* out) {
     return 0;
 }
 
-/* 0x801CA4CC - pick the motion by the map id, feed the aim slot and advance the aim height. */
+/* 0x801CA4CC - picks the motion by the map id, feeds the aim slot and advances the aim height. */
 void fn_801CA4CC(_ENEMY_WORK* self, u8* out_mode, u8* out_flag) {
     em_fall_height_get(self);
     em_fall_start(self);
@@ -128,7 +127,7 @@ void fn_801CA4CC(_ENEMY_WORK* self, u8* out_mode, u8* out_flag) {
     self->pos.y = self->pos.y + lbl_8079900C;
 }
 
-/* 0x801CA7F0 - fill a spawn record: kind 0x1C, the fixed vector and the three scalar fields. */
+/* 0x801CA7F0 - fills a spawn record: kind 0x1C, the fixed vector and the three scalar fields. */
 void fn_801CA7F0(EmSpawnRec* rec, u8 a, u16 b, u16 c) {
     VEC3 v;
     setVec3(&v, lbl_80798FF8, lbl_80798FF8, lbl_80799014);
@@ -178,7 +177,6 @@ extern "C" void fn_801C2A58(_ENEMY_WORK* self)
 
 } /* extern "C" */
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7B18..0x806A7B30`), in address order: the 1 two-vector record(s)
- * its static constructor `fn_801CA870` builds (`.data` tables point at them).  Names are GUESSes: each record is a
- * pair of model-space points. */
+/* The unit's `.bss`: the two-vector record `fn_801CA870` seeds.  The name is a GUESS (a pair of model-space
+ * points). */
 VEC3 vec_pair_801CA004_0[2];  /* +0x806A7B18 */

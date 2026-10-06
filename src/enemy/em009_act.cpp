@@ -1,46 +1,25 @@
-/* enemy/em009_act.cpp - the enemy monster-AI action band (the `em009` TU), `.text` 0x803868DC..0x8038EC44.
- * Naming note: the unit was `enemy/fn_80387844`, a stem that is not its `.text` start; it is
- * named for the `em009_act_*` slot functions the range holds (`em009_act_noop` 0x8038E8E8, ...) and the
- * `em009_prog_tbl` table beside it (GUESS: the `_act` suffix is the map's own, the file stem is derived).
- *
- * WHAT IT IS.  The per-action state machines of an enemy monster's AI: every body takes the shared
- * `_ENEMY_WORK` record and drives its `state` (+0x005) through a small machine whose steps call the
- * motion API (`em_mot_set`, `em_move_mode_set`, `em_mot_end_ck`), test frames (`em_frame_check`), spawn
- * effects (`eft009_set_pos`, `eft009_spawn_at_joint`, `eft_em_spawn`, `eft_spawn_type10`) and rotate the work
- * (`rotVecY`).  Four dispatch tables pick the machine by the work's `action` (+0x1E5) or
- * `state_sub` (+0x1E6): `fn_80388144`/`fn_80388B98`/`fn_80389634`/`fn_8038BA34` (state_sub),
- * `fn_8038CBD4` (action).  The band is the enemy module's action-program block; its `.data` holds
- * the compiler-emitted switch tables and the `lbl_805EFCE4`/`lbl_805F05xx` record tables the
- * machines index.
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string is reachable: every
- * `lis`/`addi` pair in the range resolves to the `.sdata2` float pool, a switch table or one of the
- * band's own record tables, never to a source-file-name literal.  2. `dumpmap.py lookup` answers only
- * `zz_XXXXXXXX_` placeholders.  3. The code places the unit in `enemy`: every body drives
- * `_ENEMY_WORK` and calls `em_frame_check__FP11_ENEMY_WORKUsff`, `em_magma_check`,
- * `get_joint_wpos_em`, and the `.data` switch tables sit in the band the enemy `em0XX_prog_tbl`
- * program tables bracket.  The file stem is derived from the map's `em009_act_*`
- * functions (see the naming note).
- *
- * LANGUAGE AND SECTIONS.  C++: the range reaches genuinely mangled callees (`setVector3`,
- * `mulVecMatAddTrans`, `rotVecY`, `calcVecAng2`, `eft009_set_pos`) through their real signatures
- * (rule 9).  Every plain `fn_` definition is `extern "C"` so it keeps the map's name (playbook 42).
- * Sections: `.text` 0x803868DC..0x8038EC44, extab 0x8001803C..0x800181C4, extabindex
- * 0x80037EC0..0x8003810C, `.rodata` 0x80570B20..0x80570BA0, `.data` 0x805EFA00..0x805F0CB8.
- *
- * SEAM (recut 2026-09-30).  The unit took the tail of `enemy/fn_80382310.cpp` (0x803868DC..0x80387844,
- * eight functions) and the `em009` action slots that headed `lobby/lb_quest_ui.cpp`
- * (0x8038E8E8..0x8038EC44).  Right edge: `fn_8038EBE8` is the deleting destructor that closes the TU (same
- * shape as `fn_8019E5A8`/`fn_801AA0F8`).  Left edge: the 0.0 pool entry is repeated at `lbl_8079BFF8`, first
- * read by `fn_803868F0`, and `fn_80385A54` tail-calls `fn_803865B4` (0x328, the last reader of the note
- * pane's pool run 0x8079BFA0..0x8079BFF0), so 0x803868DC (the window 0x803868DC..0x803868F0 the dedupe
- * gives) starts this TU.  The data tile: `lbl_805EFAB8` (read by `fn_8038E9F0`), `jumptable_805EFAC4`
- * (`fn_80386A04`) and `lbl_805F0C88` (`fn_803869C8`) sit among this unit's tables.  The range
- * 0x80385EE0..0x803868DC that stays in `enemy/fn_80382310.cpp` is a third note-pane TU: its pool
- * repeats the 41c00000 entry of the TU below (`lbl_8079BF88` -> `lbl_8079BFAC`).
- *
- * STATUS / RESIDUALS.  See the outbox `config_requests` and the batch note; the band was written
- * from the target object's own disassembly and the m2c shape oracle.
+/*
+ * enemy/em009_act.cpp - enemy 009's action band: the per-action `_ENEMY_WORK` state machines (motion, frame
+ *   tests, effect spawns, rotation), the four `state_sub` dispatchers `fn_80388144`/`fn_80388B98`/`fn_80389634`/
+ *   `fn_8038BA34` and the `action` dispatcher `fn_8038CBD4`, the action slots and the closing deleting destructor.
+ * RANGE. .text 0x803868DC-0x8038EC44 (64 functions); extab 0x8001803C-0x800181C4, extabindex
+ *   0x80037EC0-0x8003810C, .rodata 0x80570B20-0x80570BA0, .data 0x805EF990-0x805F0CB8 (`em009_prog_tbl` first),
+ *   .sdata2 0x8079BFF8-0x8079C298.  Left edge: the 0.0 pool entry repeats at `lbl_8079BFF8`, first read by
+ *   `fn_803868F0`, after `enemy/em_prog_tail.cpp`'s pool run; right edge: `fn_8038EBE8` is the deleting
+ *   destructor that closes the TU.
+ * FLAGS. `cflags_main`, no `#pragma`.
+ * NAMES. The `em009` stem follows the runtime dump's `em009_prog_tbl`, which opens the TU's `.data`; the `_act`
+ *   suffix and `em009_act_noop`, `em009_act_slot_init`, `em009_act_clear_param`, `em009_act_part_broken_ck` are
+ *   GUESSes from the bodies (the dump answers `zz_` or a linker-folded duplicate's name).
+ * RESIDUALS. 11 rows unwritten: 0x803868F0-0x803869C8, 0x80386A04-0x8038729C, 0x80387528-0x80387844,
+ *   0x8038A7B8-0x8038B888, 0x8038D0A4-0x8038E8E8, 0x8038E8EC-0x8038E958, 0x8038E9F0-0x8038EC44.
+ *   `fn_803874C8` (the compare-chain dispatcher) is written but scores 0: 92 B against retail's 96 B.
+ *   31 partial rows; none has a recorded cause beyond the relocations (`relocdiff --by-owner`): `fn_80387CA4`
+ *   lacks retail's five `em_busy_set`/`em_busy_timer_reset` call pairs, `fn_8038CCA4` lacks three
+ *   `eft009_set_pos__FUcPQ34nw4r4math4VEC3P10_CP_VECTORfUl` and three `eft009_spawn_at_joint` calls, and
+ *   `fn_8038855C` calls `calcVecAng2` once where retail does not.
+ *   flipcheck: `.rodata` claimed, not emitted; `.data` 0x294 against 0x1328, `.sdata2` 0x8 against 0x2A0; `.text`
+ *   (0x4918 of 0x8368), extab (0x130 of 0x188) and extabindex (0x1C8 of 0x24C) short of the claim and differing.
  */
 
 #include "types.h"
@@ -63,8 +42,7 @@
 #include "enemy/fn_80147CE0.h" /* em_res_user_data_ctor (rule 2: the owner's header) */
 #include "enemy/fn_8011D448.h" /* em_parts_damage_level_get */
 
-/* The band's pooled `.sdata2` constants (declared, never defined: the pool belongs to the data pass,
- * playbook 29). */
+/* The unit's `.sdata2` pool, declared, not defined: the source does not emit it yet. */
 extern f32 lbl_8079BFF8; extern f32 lbl_8079BFFC;
 extern f32 lbl_8079C000; extern f32 lbl_8079C004; extern f32 lbl_8079C008; extern f32 lbl_8079C00C;
 extern f32 lbl_8079C010; extern f32 lbl_8079C014; extern f32 lbl_8079C01C; extern f32 lbl_8079C020;
@@ -108,7 +86,7 @@ extern f32 lbl_8079C26C; extern f32 lbl_8079C270; extern f32 lbl_8079C274; exter
 extern f32 lbl_8079C27C; extern f32 lbl_8079C280; extern f32 lbl_8079C284; extern f32 lbl_8079C288;
 extern f32 lbl_8079C28C; extern f32 lbl_8079C290;
 
-/* The band's own `.data`/`.rodata` tables (declared, never defined). */
+/* The unit's `.data`/`.rodata` tables, declared: the source does not emit them yet. */
 extern u8 lbl_80570B20[]; extern u8 lbl_80570B60[];
 extern u8 lbl_805EFA00[]; extern u8 lbl_805EFCE4[];
 extern u8 lbl_805EFF68[]; extern u8 lbl_805EFF90[]; extern u8 lbl_805EFFB8[];
@@ -123,7 +101,7 @@ extern u8 lbl_805F04C0[]; extern u8 lbl_805F04F0[]; extern u8 lbl_805F0518[];
 extern u8 lbl_805F0558[]; extern u8 lbl_805F0570[]; extern u8 lbl_805F0620[];
 extern u8 lbl_805F0790[]; extern u8 lbl_805F07B8[];
 
-/* forward declarations of the larger state machines, defined further down in address order. */
+/* The larger state machines, defined further down. */
 extern "C" void fn_8038A198(_ENEMY_WORK* self, u8 a);
 extern "C" void fn_8038A7B8(_ENEMY_WORK* self, u8 a, u8 b);
 extern "C" void fn_8038C124(_ENEMY_WORK* self);
@@ -134,9 +112,7 @@ extern u8 lbl_805F0C88[]; /* .data 0x805F0C88 - the record table `fn_803869C8` i
 
 static _ENEMY_WORK* w(void* p) { return (_ENEMY_WORK*)p; }
 
-/* =================================================================================================
- * 0x803868DC..0x80387844 - the tail of the former `enemy/fn_80382310.cpp`
- * ================================================================================================= */
+/* ---- 0x803868DC..0x80387844 ---- */
 
 /* 0x803868DC */
 extern "C" void fn_803868DC(_ENEMY_WORK* self) {
@@ -252,9 +228,7 @@ extern "C" void fn_803874C8(_ENEMY_WORK* self) {
     }
 }
 
-/* =================================================================================================
- * 0x80387844
- * ================================================================================================= */
+/* 0x80387844 */
 extern "C" void fn_80387844(_ENEMY_WORK* self)
 {
     u32 found;
@@ -301,9 +275,7 @@ extern "C" void fn_80387844(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x803879EC
- * ================================================================================================= */
+/* 0x803879EC */
 extern "C" void fn_803879EC(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
@@ -344,9 +316,7 @@ extern "C" void fn_803879EC(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80387C28
- * ================================================================================================= */
+/* 0x80387C28 */
 extern "C" void fn_80387C28(_ENEMY_WORK* self)
 {
     switch (self->state) {
@@ -363,9 +333,7 @@ extern "C" void fn_80387C28(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80387CA4
- * ================================================================================================= */
+/* 0x80387CA4 */
 extern "C" void fn_80387CA4(_ENEMY_WORK* self)
 {
     em_busy_set(self);
@@ -446,9 +414,7 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80387FF4
- * ================================================================================================= */
+/* 0x80387FF4 */
 extern "C" void fn_80387FF4(_ENEMY_WORK* self)
 {
     switch (self->state) {
@@ -472,9 +438,7 @@ extern "C" void fn_80387FF4(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x803880C8
- * ================================================================================================= */
+/* 0x803880C8 */
 extern "C" void fn_803880C8(_ENEMY_WORK* self)
 {
     switch (self->state) {
@@ -491,9 +455,7 @@ extern "C" void fn_803880C8(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80388144 - dispatch by `state_sub`
- * ================================================================================================= */
+/* 0x80388144 - dispatches by `state_sub` */
 extern "C" void fn_80388144(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
@@ -509,9 +471,7 @@ extern "C" void fn_80388144(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80388190
- * ================================================================================================= */
+/* 0x80388190 */
 extern "C" void fn_80388190(_ENEMY_WORK* self, u8 a, u8 b)
 {
     switch (self->state) {
@@ -549,9 +509,7 @@ extern "C" void fn_80388190(_ENEMY_WORK* self, u8 a, u8 b)
     }
 }
 
-/* =================================================================================================
- * 0x8038833C
- * ================================================================================================= */
+/* 0x8038833C */
 extern "C" void fn_8038833C(_ENEMY_WORK* self, u8 a)
 {
     switch (self->state) {
@@ -572,9 +530,7 @@ extern "C" void fn_8038833C(_ENEMY_WORK* self, u8 a)
     }
 }
 
-/* =================================================================================================
- * 0x803883F0
- * ================================================================================================= */
+/* 0x803883F0 */
 extern "C" void fn_803883F0(_ENEMY_WORK* self)
 {
     f32 ratio;
@@ -597,9 +553,7 @@ extern "C" void fn_803883F0(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x803884C8
- * ================================================================================================= */
+/* 0x803884C8 */
 extern "C" void fn_803884C8(_ENEMY_WORK* self)
 {
     switch (self->state) {
@@ -617,9 +571,7 @@ extern "C" void fn_803884C8(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038855C
- * ================================================================================================= */
+/* 0x8038855C */
 extern "C" void fn_8038855C(_ENEMY_WORK* self)
 {
     f32 scale;
@@ -647,9 +599,7 @@ extern "C" void fn_8038855C(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80388684
- * ================================================================================================= */
+/* 0x80388684 */
 extern "C" void fn_80388684(_ENEMY_WORK* self, u8 a)
 {
     switch (self->state) {
@@ -669,9 +619,7 @@ extern "C" void fn_80388684(_ENEMY_WORK* self, u8 a)
     }
 }
 
-/* =================================================================================================
- * 0x8038874C
- * ================================================================================================= */
+/* 0x8038874C */
 extern "C" void fn_8038874C(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
@@ -765,9 +713,7 @@ extern "C" void fn_8038874C(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80388B98 - dispatch by `state_sub`
- * ================================================================================================= */
+/* 0x80388B98 - dispatches by `state_sub` */
 extern "C" void fn_80388B98(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
@@ -788,9 +734,7 @@ extern "C" void fn_80388B98(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80388C38
- * ================================================================================================= */
+/* 0x80388C38 */
 extern "C" void fn_80388C38(_ENEMY_WORK* self)
 {
     em_busy_set(self);
@@ -816,9 +760,7 @@ extern "C" void fn_80388C38(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80388D1C
- * ================================================================================================= */
+/* 0x80388D1C */
 extern "C" void fn_80388D1C(_ENEMY_WORK* self)
 {
     em_busy_set(self);
@@ -840,9 +782,7 @@ extern "C" void fn_80388D1C(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80388DC8
- * ================================================================================================= */
+/* 0x80388DC8 */
 extern "C" void fn_80388DC8(_ENEMY_WORK* self)
 {
     em_busy_set(self);
@@ -865,9 +805,7 @@ extern "C" void fn_80388DC8(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80388E88
- * ================================================================================================= */
+/* 0x80388E88 */
 extern "C" void fn_80388E88(_ENEMY_WORK* self, u8 a)
 {
     f32 end = lbl_8079BFF8;
@@ -896,9 +834,7 @@ extern "C" void fn_80388E88(_ENEMY_WORK* self, u8 a)
     }
 }
 
-/* =================================================================================================
- * 0x80388F88
- * ================================================================================================= */
+/* 0x80388F88 */
 extern "C" void fn_80388F88(_ENEMY_WORK* self)
 {
     em_busy_set(self);
@@ -919,9 +855,7 @@ extern "C" void fn_80388F88(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80389038
- * ================================================================================================= */
+/* 0x80389038 */
 extern "C" void fn_80389038(_ENEMY_WORK* self)
 {
     em_busy_set(self);
@@ -947,9 +881,7 @@ extern "C" void fn_80389038(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80389120
- * ================================================================================================= */
+/* 0x80389120 */
 extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
 {
     em_busy_set(self);
@@ -1061,9 +993,7 @@ extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
     }
 }
 
-/* =================================================================================================
- * 0x80389634 - dispatch by `state_sub`
- * ================================================================================================= */
+/* 0x80389634 - dispatches by `state_sub` */
 extern "C" void fn_80389634(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
@@ -1090,9 +1020,7 @@ extern "C" void fn_80389634(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x803896E8
- * ================================================================================================= */
+/* 0x803896E8 */
 extern "C" void fn_803896E8(_ENEMY_WORK* self)
 {
     nw4r::math::MTX34 mtx;
@@ -1144,9 +1072,7 @@ extern "C" void fn_803896E8(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038995C
- * ================================================================================================= */
+/* 0x8038995C */
 extern "C" void fn_8038995C(_ENEMY_WORK* self, u8 a)
 {
     nw4r::math::VEC3 v;
@@ -1209,9 +1135,7 @@ extern "C" void fn_8038995C(_ENEMY_WORK* self, u8 a)
     }
 }
 
-/* =================================================================================================
- * 0x80389C50
- * ================================================================================================= */
+/* 0x80389C50 */
 extern "C" void fn_80389C50(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
@@ -1257,9 +1181,7 @@ extern "C" void fn_80389C50(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x80389E1C
- * ================================================================================================= */
+/* 0x80389E1C */
 extern "C" void fn_80389E1C(_ENEMY_WORK* self, u8 a)
 {
     nw4r::math::VEC3 v;
@@ -1343,9 +1265,7 @@ extern "C" void fn_80389E1C(_ENEMY_WORK* self, u8 a)
     }
 }
 
-/* =================================================================================================
- * 0x8038B888
- * ================================================================================================= */
+/* 0x8038B888 */
 extern "C" void fn_8038B888(_ENEMY_WORK* self)
 {
     switch (self->state) {
@@ -1363,9 +1283,7 @@ extern "C" void fn_8038B888(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038B914
- * ================================================================================================= */
+/* 0x8038B914 */
 extern "C" void fn_8038B914(_ENEMY_WORK* self, u8 a)
 {
     switch (self->state) {
@@ -1395,9 +1313,7 @@ extern "C" void fn_8038B914(_ENEMY_WORK* self, u8 a)
     }
 }
 
-/* =================================================================================================
- * 0x8038BD28
- * ================================================================================================= */
+/* 0x8038BD28 */
 extern "C" void fn_8038BD28(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
@@ -1433,9 +1349,7 @@ extern "C" void fn_8038BD28(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038C080
- * ================================================================================================= */
+/* 0x8038C080 */
 extern "C" void fn_8038C080(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
@@ -1447,17 +1361,13 @@ extern "C" void fn_8038C080(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038C10C
- * ================================================================================================= */
+/* 0x8038C10C */
 extern "C" void fn_8038C10C(_ENEMY_WORK* self)
 {
     fn_80389038(self);
 }
 
-/* =================================================================================================
- * 0x8038C110
- * ================================================================================================= */
+/* 0x8038C110 */
 extern "C" void fn_8038C110(_ENEMY_WORK* self)
 {
     if (self->state_sub == 0) {
@@ -1465,9 +1375,7 @@ extern "C" void fn_8038C110(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038BA34 - dispatch by `state_sub`
- * ================================================================================================= */
+/* 0x8038BA34 - dispatches by `state_sub` */
 extern "C" void fn_8038BA34(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
@@ -1544,9 +1452,7 @@ extern "C" void fn_8038BA34(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038CB0C
- * ================================================================================================= */
+/* 0x8038CB0C */
 extern "C" void fn_8038CB0C(_ENEMY_WORK* self)
 {
     switch (self->state) {
@@ -1565,9 +1471,7 @@ extern "C" void fn_8038CB0C(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038CBB0
- * ================================================================================================= */
+/* 0x8038CBB0 */
 extern "C" void fn_8038CBB0(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
@@ -1576,9 +1480,7 @@ extern "C" void fn_8038CBB0(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038CBD4 - dispatch by `action`
- * ================================================================================================= */
+/* 0x8038CBD4 - dispatches by `action` */
 extern "C" void fn_8038CBD4(_ENEMY_WORK* self)
 {
     switch (self->action) {
@@ -1594,9 +1496,7 @@ extern "C" void fn_8038CBD4(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038CC20
- * ================================================================================================= */
+/* 0x8038CC20 */
 extern "C" void fn_8038CC20(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
@@ -1608,9 +1508,7 @@ extern "C" void fn_8038CC20(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038A198
- * ================================================================================================= */
+/* 0x8038A198 */
 extern "C" void fn_8038A198(_ENEMY_WORK* self, u8 a)
 {
     nw4r::math::MTX34 mtx;
@@ -1727,9 +1625,7 @@ extern "C" void fn_8038A198(_ENEMY_WORK* self, u8 a)
     }
 }
 
-/* =================================================================================================
- * 0x8038C124
- * ================================================================================================= */
+/* 0x8038C124 */
 extern "C" void fn_8038C124(_ENEMY_WORK* self)
 {
     nw4r::math::VEC3 v;
@@ -1901,9 +1797,7 @@ extern "C" void fn_8038C124(_ENEMY_WORK* self)
     }
 }
 
-/* =================================================================================================
- * 0x8038CCA4
- * ================================================================================================= */
+/* 0x8038CCA4 */
 extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 scale)
 {
     nw4r::math::VEC3 v;
@@ -1989,9 +1883,7 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
     }
 }
 
-/* =================================================================================================
- * 0x8038E8E8..0x8038EC44 - the em009 action slots of the former `lobby/lb_quest_ui.cpp` head
- * ================================================================================================= */
+/* ---- 0x8038E8E8..0x8038EC44: the em009 action slots ---- */
 extern "C" {
 
 /* An unused `em009` slot handler. */

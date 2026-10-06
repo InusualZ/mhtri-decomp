@@ -685,158 +685,30 @@ config.libs = [
             Object(NonMatching, "enemy/em_kind.cpp"),
             Object(NonMatching, "enemy/enemy_control.cpp"),
             Object(NonMatching, "enemy/em001_prog.cpp"),
-            # proposal/801550FC_fn_801550FC.cpp: the em003 action unit (0x801550FC..0x8015D860,
-            # 104 functions).  C++ (the range defines three em003_* manglings).  The boundary is
-            # provisional - see the unit header.
             Object(NonMatching, "enemy/em003_prog.cpp"),
-            # enemy/em008_prog.cpp: the em008 per-action state-step band
-            # (0x8015D860..0x8015E854, 28 functions), the run between the two units above and
-            # below.  C++ (the range's callees are manglings and it allocates with `operator
-            # new`); registered once, at its final home - the file keeps the map's `fn_XXXXXXXX`
-            # stem because no `__FILE__` string names it (rule 7 deferred, see the unit header).
             Object(NonMatching, "enemy/em008_prog.cpp"),
-            # Registered: the enemy per-area seat/action unit
-            # (0x80165FC8..0x801679B0, 21 functions / 0x19E8 bytes), the exact unclaimed gap between
-            # the two registered units above and below (each ends where this range begins/ends), plus
-            # the extab/extabindex runs its 18 framed functions carry and the one .ctors word for its
-            # static initializer `fn_80166330`.  Module `enemy` from the link band (both bracketing
-            # units are `enemy`) and from the code (`_ENEMY_WORK`, `fn_802B0668`, `em_frame_check`);
-            # C++ because the range reaches mangled callees through their real signatures (rule 9).
-            # No `__FILE__` string survives in the range and the dump answers only `zz_` placeholders,
-            # so the file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/em010_prog.cpp"),
             Object(NonMatching, "enemy/em011_prog.cpp"),
             Object(NonMatching, "enemy/em015_prog.cpp"),
-            # Registered (the 0x80181C88 run discovery
-            # proposed): the enemy MHchar material/step band 0x80181C88..0x80182D5C, 21 functions /
-            # 0x10D4 bytes, plus the 16 extab/extabindex entries its functions carry.  Module
-            # `enemy` from the link band (fn_80178378.cpp ends at this range's start, fn_80182D5C.cpp
-            # starts at its end) and from the code (`_ENEMY_WORK`, `em_parts_damage_level_get`,
-            # `get_em_chg_scale`, the MHchar TEV setters).  C++ because the range reaches MHchar
-            # members through their real signatures.  No `__FILE__` string survives in the range
-            # (the only `enemy_control.cpp` literal is referenced from the already-registered
-            # enemy_control band, not here) and the dump answers only `zz_` placeholders, so the
-            # file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/em016_prog.cpp"),
             Object(NonMatching, "enemy/em012_prog.cpp"),
-            # Registered (a 0x80191598 run discovery
-            # proposed): the enemy aim/action group the per-enemy class tables at 0x805AA960..
-            # 0x805AAA60 hold, 26 functions / 0x1154 bytes plus its extab/extabindex run.
-            # Module `enemy` from the link band and the code (`em_act_ck(_ENEMY_WORK*)`,
-            # `get_move_work_adrs(3)`, the enemy work's aim record); C++ because every callee out
-            # of the range is a mangled symbol.  No `__FILE__` string survives in the range and
-            # the dump answers only `zz_` placeholders, so the file keeps the map's own stem (see
-            # the unit's header).
             Object(NonMatching, "enemy/em018_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) (the 0x801CCBC4 run discovery proposed; 58
-            # functions / 0x76C8 bytes): the enemy action/step band 0x801CCBC4..0x801D428C, plus the
-            # extab run 0x8000FF4C..0x800100D4 and the extabindex run 0x8002BDDC..0x8002C028 its 49
-            # framed functions carry.  Module `enemy` from the link band (the unit below is
-            # `enemy/fn_801B7020.cpp`, the unit above `enemy/fn_801D428C.cpp`, and every callee out
-            # of the range is an `_ENEMY_WORK`-based enemy-band body); C++ because the range reaches
-            # mangled callees (`em_frame_check__FP11_ENEMY_WORKUsff`,
-            # `calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`, `get_em_scale__FP11_ENEMY_WORK`).
-            # No `__FILE__` string is reachable from the range and the runtime dump answers only
-            # `zz_` placeholders, so the file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/em005_act.cpp"),
             Object(NonMatching, "enemy/em030_prog.cpp"),
             Object(NonMatching, "enemy/em034_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): the enemy action band 0x801D80EC..0x801DB8E0, 49
-            # functions / 0x37F4 bytes, plus the extab run 0x800101E4..0x8001031C (39 records) and
-            # the extabindex run 0x8002C1C0..0x8002C394 (39 records) its framed functions carry.
-            # Module `enemy` from the link band (the unit below is `enemy/fn_801D428C.cpp` and the
-            # unit above `enemy/fn_801DB8E0.cpp`) and from the code (every function takes the shared
-            # `_ENEMY_WORK`).  C++ because the range reaches mangled callees
-            # (`em_frame_check__FP...`, `calcVecAng2__FP...`, `rotVecY__FP...`).  No `__FILE__`
-            # string is reachable and the runtime dump answers only `zz_` placeholders, so the file
-            # keeps the map's own stem (see the unit header).
             Object(NonMatching, "enemy/em007_act.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) (the 0x8019ED34 gap between this unit and
-            # `enemy/fn_801A4504.cpp`; 2026-09-30 recut: left edge 0x8019E670 (the end of the preceding TU's
-            # static initializer), the former enemy/fn_801A4504.cpp folded in and the head of
-            # enemy/fn_801A9540.cpp taken up to 0x801AA154, one TU): the enemy motion/action band 0x8019ED34..0x801A4504, 65
-            # functions / 0x57D0 bytes, plus the extab run 0x8000F14C..0x8000F304 (55 records) and
-            # the extabindex run 0x8002A8DC..0x8002AB70 (55 records).  Module `enemy` from the link
-            # band (both bracketing units are `enemy`) and the code (every callee out of the range
-            # is enemy-band, every state machine switches on `_ENEMY_WORK::state`); the name keeps
-            # the map's `fn_` stem (no `__FILE__` string, the dump answers only `zz_`/`FUN_`).  C++,
-            # every plain `fn_XXXXXXXX` definition `extern "C"` (see the unit's header).
             Object(NonMatching, "enemy/em025_prog.cpp"),
             Object(NonMatching, "enemy/fn_801B7020.cpp"),
             Object(NonMatching, "enemy/em040_ai.cpp"),
-            # Registered: the enemy motion/act-instruction
-            # band's continuation, 128 functions / 0xC944 bytes (0x801BD6C0..0x801CA004) plus the
-            # extab run 0x8000FACC..0x8000FDFC (102 records) and the extabindex run
-            # 0x8002B71C..0x8002BBE4 (102 x 12 B) its framed functions carry.  Module `enemy` from
-            # the link band (the unit below ends exactly at this range's start; the unit above starts
-            # later at 0x801D428C after the still-unclaimed 0x801CA004..0x801D428C run) and from the
-            # code (every callee is the enemy work API).  C++ because the range reaches mangled
-            # callees.  No `__FILE__` string survives and the dump answers only `zz_` placeholders,
-            # so the file keeps the map's own stem (see the unit header).
             Object(NonMatching, "enemy/em006_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): the enemy action/state band, 47 functions /
-            # 0x2BC0 bytes (0x801CA004..0x801CCBC4), plus the extab run 0x8000FDFC..0x8000FF4C and
-            # the extabindex run 0x8002BBE4..0x8002BDDC its 42 framed functions carry.  Module
-            # `enemy` from the link band (both bracketing registered units are `enemy/*`) and from
-            # the code (every function takes the shared `_ENEMY_WORK`); C++ because the range's
-            # callees are mangled (`getTevKColor__6MHchar...`, `__nw__FUl`).  No `__FILE__` string
-            # is reachable and the dump answers only `zz_` placeholders, so the file keeps the
-            # map's own stem (see the unit header).
             Object(NonMatching, "enemy/em004_act.cpp"),
             Object(NonMatching, "enemy/em027_prog.cpp"),
             Object(NonMatching, "enemy/em033_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) and re-cut
-            # 2026-09-29 to the em024 monster's own AI: `.text` 0x8034F138..0x80358624 (69 functions /
-            # 38124 B), extab 0x800171A4..0x8001736C (57 records), extabindex 0x800368DC..0x80036B88
-            # (57 x 12 B), `.data` 0x805EBBE0..0x805ED0C0 (`em024_prog_tbl`, the switch jump tables and
-            # per-motion tables), `.sdata` 0x80793330..0x80793338 and `.sdata2` 0x8079B3C8..0x8079B640.
-            # The original range 0x8034C1D0..0x80358624 was three TUs: `menu/menu_row.cpp` and
-            # `Pl/pl_act_class3.cpp` took the head and the player band.  One TU from here: the pool
-            # float `lbl_8079B3CC` is loaded by 28 functions across the range and by nothing outside.
-            # File name a GUESS from `em024_prog_tbl` and the enemy id 0x18 tested by the caller of
-            # `em024_action11_state5_ck`.  C++; every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "enemy/em024_ai.cpp"),
             Object(NonMatching, "enemy/em035_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): the em020 enemy program
-            # (`.text` 0x8036CF64..0x80375084, 57 functions / 0x8120 B, plus its extab run
-            # 0x800178E4..0x80017A5C - 47 records - and extabindex run 0x800373BC..0x800375F0 -
-            # 47 x 12 B; each is exactly the gap the bracketing split objects leave).  Module
-            # `enemy` and the file name `em020_prog` (brief class 3): the map's own global
-            # `em020_prog_tbl` (`.data` 0x805EE098, 0x70 B) lists seven of this range's handlers by
-            # address (0x8036E2BC/E320/E6B8/72D58/E570/E574/733BC) exactly as `em035_prog_tbl`
-            # lists `enemy/em035_prog.cpp`'s, and the range's callee profile is the enemy band's
-            # (`em_frame_check`, `em_get_mot_no`, `em_act_ck`, `get_joint_wmat_em`, `fn_8013*`).
-            # No `__FILE__` string covers the range and the dump answers only `zz_` placeholders.
-            # C++; every plain `fn_` definition is `extern "C"`.  Same `cflags_main` as its enemy
-            # neighbours.  SEAM UNPROVEN (the `.sdata2` run 0x8079B820..0x8079BC64 is an ordered
-            # disjoint partition between the two neighbours' pools, which is the reliable class -
-            # but an ordered partition cannot separate one object from two adjacent ones); the range
-            # also holds a head group (0x8036CF64..0x8036E26C) that owns no pool and no `.data`, and
-            # `em020_prog_tbl`'s first entry (0x8036E2BC) is the apparent cut - a re-cut is requested
-            # in this batch's `config_requests`.  See the unit header for the full evidence.
             Object(NonMatching, "enemy/em020_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): the em019 monster-AI file's body
-            # (`.text` 0x80378F9C..0x8037EA64, 61 functions / 0x5AC8 bytes) with its extab
-            # 0x80017C44..0x80017DBC (47 records) and extabindex 0x800378CC..0x80037B00
-            # (47 x 12 B).  Module `enemy` and the name `em019` from `em019_prog_tbl`
-            # (0x805EE518, `scope:global`), which starts the `.data` block right after the em020
-            # one and lists this band's entry points (fn_80379090, fn_80379124, fn_8037946C,
-            # fn_8037924C, fn_8037939C, fn_8037F524); the file's real extent is
-            # 0x80378F9C..0x8037F940 (the strong right seam `tudiscover.py at 0x8037E0E8`
-            # reports), and the brief's 0x8037EA64 cut is a `range` config_request.  C++;
-            # every plain `fn_` definition is `extern "C"`.  See the unit's file header.
             Object(NonMatching, "enemy/em019_ai.cpp"),
             Object(NonMatching, "enemy/em_action.cpp"),
-            # Phase 4: folded into enemy/em020_prog.cpp (was Matching, demoted).
-            # Registered once, at its final home (docs/plan.md 12), renamed in phase 4 from `enemy/fn_80387844`:
-            # the em009 enemy's monster-AI action band, `.text` 0x803868DC..0x8038EC44 (2026-09-30 recut of the
-            # range first registered as 0x80387844..0x8038E8E8; see the unit's header).  Module `enemy` from the code (every body drives the shared `_ENEMY_WORK` record
-            # through `em_frame_check__FP11_ENEMY_WORKUsff`, `em_after_frame_check`, `get_joint_wpos_em`,
-            # `em_magma_check`, `get_em_chg_scale`) and from the `.data` `em0XX_prog_tbl` program tables
-            # of the bracketing enemy bands; C++ because the range reaches genuinely mangled callees
-            # (`setVector3__FPQ34nw4r4math4VEC3fff`, `mulVecMatAddTrans`, `rotVecY`) through their real
-            # signatures (rule 9).  No `__FILE__` string is reachable from the range and the runtime dump
-            # answers only `zz_` placeholders, so the file stem is derived from the map's `em009_act_*` names.
             Object(NonMatching, "enemy/em009_act.cpp"),
             Object(NonMatching, "enemy/em_prog_support.cpp"),
             Object(NonMatching, "enemy/em_prog_tail.cpp"),

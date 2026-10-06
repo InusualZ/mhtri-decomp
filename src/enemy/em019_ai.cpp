@@ -1,134 +1,39 @@
 /*
- * enemy/em019_ai.cpp - unit, `.text` 0x80378F9C..0x80383148 (92 functions, 41388 bytes).
- *
- * Fold of 4 registered units: em019_ai.cpp, em019_prog.cpp, em_act_mot.cpp,
- * fn_80382310.cpp.  The functions below are the ones those sources define, in address order; every other function of
- * the range keeps its original bytes.  28 of 92 functions have a body here.
- *
- * FLAGS.  `cflags_main` (all four absorbed sources).  The rest of the old fn_802823xx band is
- * `enemy/em_prog_support.cpp` and `enemy/em_prog_tail.cpp`.
- *
- * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .rodata, .sbss, .sdata, .sdata2, .text,
- * extab, extabindex).
- */
-/* ---- header inherited from src/enemy/em019_ai.cpp (written against its pre-phase-4 range) ---- */
-/*
- * enemy/em019_ai.cpp - the em019 monster-AI file's body, `.text` 0x80378F9C..0x8037EA64
- * (61 functions / 0x5AC8 B) with extab 0x80017C44..0x80017DBC (47 records) and extabindex
- * 0x800378CC..0x80037B00 (47 x 12 B).
- *
- * WHAT IT IS.  Monster-AI code of the em019 program, continued from `enemy/em020_ai.cpp`: every body
- * takes the shared `_ENEMY_WORK` record (`enemy/ENEMY_WORK.h`) and drives it through the
- * enemy core API (`em_frame_check`, `get_joint_wpos_em`, `get_em_chg_scale`, `em_mot_set` /
- * `em_mot_set_ck` / `em_mot_end_ck`) and the game's work blocks (`system_w`, `lobby_w`,
- * `get_move_work_adrs`, `my_player_no`, `Psw`).
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string is reachable from the
- * range (same check as `enemy/em020_ai.cpp`: every relocation target resolves to a program table, a
- * work block, the shared `.sdata2` float pool or a call).  2. `dumpmap.py lookup` answers
- * `zz_<addr>_` everywhere except `em019_prog_tbl`.  3. The module is `enemy` and the file `em019` from
- * the `.data` program table `em019_prog_tbl` (0x805EE518, `scope:global`, size 0x6C), whose
- * entry-point list is this band's own functions (`fn_80379090` +0x00, `fn_80379124` +0x04,
- * `fn_8037946C` +0x08, `fn_8037924C` +0x10, `fn_8037939C` +0x14, `fn_8037F524` +0x24) plus the next
- * file's head (`fn_8037F940`, `fn_80382310`, ... - the same cross-file pattern `em024_prog_tbl`
- * shows for `eft052`), and from the code (`_ENEMY_WORK` field for field, `em_*` callees only).  The
- * name follows the module's `em*` scheme (`em024_ai.cpp`, `em035_prog.cpp`).
- *
- * SEAM (unproven - the range is an `attribute.py` `--max-bytes` run, not a TU boundary).  Left edge:
- * `fn_80378F7C` (the last function of `enemy/em020_ai.cpp`) is called only from 0x8036C284/0x8036C6E8
- * (em020 side) while `fn_80378F9C` (the first function here) is called only from 0x8037939C upward,
- * and the `.data` block boundary is 0x805EE518 - `em019_prog_tbl`, the first `.data` of this file's
- * block.  Right edge: `tudiscover.py at 0x8037E0E8` reports the 48-function match set
- * 0x80379694..0x8037EA64 with a strong seam at 0x8037F940 (`.data` jumptable_805EF4F4 ->
- * jumptable_805EF52C; `.sdata2` lbl_8079BE88 -> lbl_8079BE8C), so this file's real extent is
- * 0x80378F9C..0x8037F940; the brief's 0x8037EA64 cut is filed as a `range` config_request and the
- * tail (0x8037EA64..0x8037F940, 12 functions) is left to its own lane.
- *
- * Naming note: the names this file *references* in other units are still the map's generated
- * `fn_XXXXXXXX` stems (the enemy core band 0x8012xxxx/0x8013xxxx, the lobby 0x802xxxxx band and the
- * game-root 0x8042xxxx band, checked with `tools/symbols/symedit.py range`), and so are the
- * addresses of its own range that are not reconstructed yet - they are *declared*, never defined, so
- * the map row still names the target.  Every symbol this file DEFINES is named from its own body and
- * renamed in the map with `symedit.py rename`.
- *
- * Sections this unit claims: `.text` 0x80378F9C..0x8037EA64, extab 0x80017C44..0x80017DBC,
- * extabindex 0x800378CC..0x80037B00.
- *
- * Residuals: the range is registered as `NonMatching`; the bodies still unwritten keep the map's
- * `fn_XXXXXXXX` names, and the ones written but not yet byte-identical are listed in the outbox with
- * their first divergence.  Re-measure with `ninja build/RMHE08/report.json` +
- * `python tools/objdiff/symdiff.py -u enemy/em019_ai.cpp <symbol>`.
- */
-/* ---- header inherited from src/enemy/fn_80382310.cpp (written against its pre-phase-4 range) ---- */
-/* enemy/fn_80382310.cpp - the enemy `em009`/`em019` program band's shared support block, `.text`
- * 0x80382310..0x803868DC (the tail 0x803868DC..0x80387844 moved to `enemy/em009_act.cpp` in the
- * 2026-09-30 recut; the range still holds more than one TU, see SEAM).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x80382310` -> `zz_0382310_`; the map's own rows for the
- * range in config/RMHE08/symbols.txt carry no real name either), and no `__FILE__` string is
- * referenced by any body - every `lis`/`addi` and every `@sda21` relocation in the range resolves to
- * the `.sdata2` float pool, a switch/jumptable or one of the band's own record tables, never to a
- * source-file-name literal (checked by reading all `R_PPC_*` relocations of the range's 118 split
- * objects and cstring-ing each referenced `data:string` label in orig/RMHE08/sys/main.dol: of the 302
- * bare `<name>.c/.cpp/.h` string labels in the image, none is referenced from 0x80382310..0x80387844).
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string (above).  2. `dumpmap.py
- * lookup` answers only `zz_XXXXXXXX_` placeholders.  3. The code places the unit in `enemy`: the
- * immediately following registered unit is `enemy/em009_act.cpp` (0x80387844, the monster-AI action
- * band), the immediately preceding `.data` is the enemy program-table block (`em019_prog_tbl`
- * at 0x805EE518, its table run 0x805EE584..0x805EE5B0 that `fn_80382310` indexes, `em009_prog_tbl` at
- * 0x805EF990, and the `jumptable_805EF4F4`/`jumptable_805EF52C` switch tables of the same band), and
- * every body drives the shared `_ENEMY_WORK` record through `em_frame_check__FP11_ENEMY_WORKUsff`,
- * `em_act_ck__FP11_ENEMY_WORKUcUc`, `get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3`,
- * `get_em_chg_scale__FP11_ENEMY_WORK` and `em_magma_check`.  The file therefore keeps the map's
- * `fn_80382310` stem (brief option 4); no name was invented and no module was guessed.
- *
- * LANGUAGE AND SECTIONS.  C++ (langcheck: the range defines one mangled function,
- * `qn_get_motion_no__FP7_QNPC_W`, and reaches genuinely mangled callees - `MHchar::getTevKColor`/
- * `setTevKColor`, `setVector3__FPQ34nw4r4math4VEC3fff`, `get_joint_wpos_em__FP11_ENEMY_WORK...` -
- * through their real signatures, rule 9).  Every plain `fn_` definition is `extern "C"` so it keeps
- * the map's name (playbook 42).  Sections claimed: `.text` 0x80382310..0x803868DC, extab
- * 0x80017E2C..0x8001803C, extabindex 0x80037BA8..0x80037EC0, `.ctors` 0x8056F3A8..0x8056F3B0, `.data`
- * 0x805EF8C0..0x805EF990, `.bss` 0x806C23E8..0x806C5488 and `.sbss` 0x80794C00..0x80794C08.  The band's
- * `.sdata2` tables live in other splits and are referenced here as the map's `lbl_`/`jumptable_`
- * symbols, never re-emitted (rule 10 / rule 2).
- *
- * SEAM.  The right edge 0x803868DC starts the `em009` TU (`enemy/em009_act.cpp`).  The range is still
- * more than one TU, not split yet: the two `.ctors` words (`fn_8038309C`, `fn_80385E7C`) are two TUs'
- * static initializers (the first TU ends at 0x80383148; `fn_80385E7C` constructs the `lbl_806C4A88`
- * array with `fn_80385E9C`, emitted after it), and the pool repeats 41c00000 at `lbl_8079BFAC` (first
- * read by `fn_803865B4`), so a third TU starts in 0x80385E7C..0x80386028 (taken as
- * 0x80385EE0..0x803868DC: GUESS).  The left edge 0x80382310 is discovery's cap, not a proven boundary -
- * `tudiscover.py at 0x80382310` extends the range left to 0x8037F940 on its strong cuts.
- *
- * RECONSTRUCTION STATUS (measured with `tools/units/recompile.py enemy/fn_80382310 --measure <sym>`,
- * the official report metric, against MAIN's retired split objects `auto_fn_*_text.o`).  72 of the
- * range's 118 functions have a body (5068 of 21812 `.text` bytes, 23.23 %); 34 are byte-identical and
- * 61 measure >= 80 %.  The unit is short of the 80 % bar: the 72 bodies written this session are the
- * band's mechanical half - the colour/slot accessors, the note-pane allocator/constructor/destructor
- * set, the eleven sub-state machines and the tail-call dispatchers - and the band's byte mass sits in
- * the large bodies not attempted yet (fn_80384434 0x700, fn_80386C9C 0x600, fn_80382310 0x46C,
- * fn_803865B4 0x328, fn_803828B8 0x2F8, fn_80386A04 0x298, fn_80387620 0x224, ...) - the 46
- * functions without a body cover 16744 bytes.
- *
- * RESIDUALS (what still differs and why):
- *   - **`fn_80384ECC` (14.5 %).**  The retail body dispatches through the 17-entry jump table
- *     `jumptable_805EF94C`; the conformant `switch (a) { case 0..3 }` spells the same predicate but MWCC
- *     emits a compare chain here (104 B vs 124 B).  The jump-table shape needs an explicit case per
- *     index; recorded, not forced.
- *   - **`fn_803851D4` (48.6 %).**  The five-slot allocator is written from the target's unrolled shape
- *     but indexes `lbl_806C4A88[i]` (156 B vs 152 B): the retail body walks a pointer by +0x1F8 instead.
- *   - **`note_pane_motion_end_ck`/`fn_80385C70`/`fn_80385C80` (60/45/45 %).**  The three MHchar tail-call thunks
- *     differ in the argument-narrowing the compiler inserts before the `b` (12 B vs the target's 16 B
- *     for the two 3-argument forms).
- *   - **`note_pane_set_anim_pair` (60 %).**  The body is right but MWCC knows the u8 parameters are already narrow
- *     and drops the two `clrlwi` the retail object carries (12 B vs 20 B).
- *   - **`fn_80384B34` (74.8 %), `fn_803857BC` (76.8 %), `fn_803852B8` (79.3 %), `fn_80382C00` (73.4 %),
- *     `fn_80382F94` (90.9 %).**  Sign/narrowing and load-order residuals inside otherwise-correct bodies.
- *
- * The per-symbol table is in the outbox .pi/outbox/80382310-fn-80382310-2982.json and the batch note
- * .pi/notes/80382310-fn-80382310-2982.md.
+ * enemy/em019_ai.cpp - enemy 019's AI: the `_ENEMY_WORK` action, motion, state, approach and battle steps and
+ *   their dispatchers, the `em_act_prog_*` program steps with `em_act_run`, the parts-damage, effect and colour
+ *   helpers, the motion step `em_act_mot_step`, and the static initializer `fn_8038309C`.
+ * RANGE. .text 0x80378F9C-0x80383148 (92 functions); extab 0x80017C44-0x80017E8C, extabindex
+ *   0x800378CC-0x80037C38, .ctors 0x8056F3A8-0x8056F3AC, .rodata 0x80570AE0-0x80570B20, .data 0x805EE518-0x805EF8C0
+ *   (`em019_prog_tbl` first), .bss 0x806C23E8-0x806C2418, .sdata 0x807933B8-0x807933C0, .sbss
+ *   0x80794BF8-0x80794C00, .sdata2 0x8079BC88-0x8079BF60.
+ * FLAGS. `cflags_main`; `#pragma peephole off` from `em_act_prog_1` to `em_part_damage_meter`, on elsewhere.
+ * NAMES. The file name follows the runtime dump's `em019_prog_tbl`, which opens the TU's `.data` and lists this
+ *   range's entry points; the `_ai` suffix is a GUESS.  `em019_action_run_flag_set`, `em019_motion_dispatch`,
+ *   `em019_state_dispatch`, `em019_approach_dispatch`, `em019_battle_dispatch`, `em019_action_start`,
+ *   `em019_action_start_if_idle`, `em_act_prog_1`..`em_act_prog_8`, `em_act_prog_dispatch`, `em_act_run`,
+ *   `em_parts_damage_ck`, `em_act_effect_ck`, `em_act_mot_step`, `em_part_reset`, `em_part_colour_lerp` and
+ *   `em_part_damage_meter` are GUESSes from their bodies (the dump answers `zz_` or a linker-folded duplicate's
+ *   name).  The map has only `fn_` stems for the other rows.
+ * RESIDUALS. 64 rows unwritten: 0x80378F9C-0x80379084, 0x80379090-0x803797F4, 0x8037983C-0x80379DE4,
+ *   0x80379E2C-0x8037A7F0, 0x8037A848-0x8037AF08, 0x8037AF88-0x8037E0D0, 0x8037E0E8-0x8037EA64,
+ *   0x8037F940-0x8038209C (`em_act_mot_step`: a 216-way switch on `em_get_mot_no` over the jump table at
+ *   0x805EF52C), 0x80382310-0x80382BB0, 0x80382C80-0x80382DB8, 0x80382DD8-0x80382F94, 0x80382FC0-0x80383148.
+ *   6 partial rows:
+ *  - `em_act_prog_6`: retail builds the angle constants with `li r30,-0x6000`/`-0x2000` where ours uses
+ *    `lis r3,1; subi`, ours narrows with `clrlwi ...,16` at each use, and its state compare chain is laid out
+ *    differently;
+ *  - `em_act_prog_1`: ours reloads `lbl_8079BC88` three times where retail keeps it in a register;
+ *  - `em_part_damage_meter`: retail keeps the clamp constants in f2, ours reloads them into f0;
+ *  - `em_act_run`: retail bounds the table with `cmplwi r0,13`; ours bounds at 9 even with cases 10..13 written
+ *    on the default's body;
+ *  - `fn_80382C00`: retail tests the byte with the unsigned borrow sequence (`li r3,1; subi; orc; srwi; subf`),
+ *    ours with `neg; or`;
+ *  - `fn_80382F94`: ours adds a `clrlwi r0,r0,24` retail does not have.
+ *   flipcheck: `.bss`/`.ctors`/`.rodata`/`.sbss`/`.sdata` claimed, not emitted; `.data` 0x9C against 0x13A8,
+ *   `.sdata2` 0x10 against 0x2D8; `.text` (0x140C of 0xA1AC), extab (0x80 of 0x248) and extabindex (0xC0 of
+ *   0x36C) short of the claim and differing.
+ * SHAPES. The `ShellSetFuncs` +0x2C call goes through a 6-argument spelling: the shared 7-argument slot type
+ *   hoists the table load in `em_act_prog_5`.
  */
 
 #include "types.h"
@@ -139,8 +44,7 @@
 extern "C" {
 #endif
 
-/* The addresses of this unit's range that are not reconstructed yet (Naming note above).  They
- * are declared, never defined: the map row still names the target object's symbol. */
+/* This unit's unwritten functions the written ones call: declared, never defined. */
 void fn_8037983C(struct _ENEMY_WORK* self);
 void fn_803799A8(struct _ENEMY_WORK* self);
 void fn_80379AC4(struct _ENEMY_WORK* self);
@@ -163,61 +67,6 @@ void fn_80379614(struct _ENEMY_WORK* self);
 void fn_80379694(struct _ENEMY_WORK* self);
 void fn_8037975C(struct _ENEMY_WORK* self);
 }
-/* Monster Hunter Tri (RMHE08) - the enemy program band 0x8037EA64-0x8037F940 (`.text`, 12 functions,
- * 3804 B), reconstructed from the split target object.
- *
- * WHAT IT IS.  The enemy work record's action-program tail: `em_act_run` (0x8037F524) is the
- * per-frame action runner - it clears the +0x358 run flag, dispatches on the action id
- * `self->action` (+0x1E5) through the 14-entry table its own `.data` carries, ticks the +0x35A
- * counter while +0x358 is 1 and calls the +0x1E2 hook pair; action 9 of that table is
- * `em_act_prog_dispatch` (0x8037F4D8), the *program* dispatcher, which tail-calls through the
- * 9-entry jump table on `self->state_sub` (+0x1E6).  Its cases 1..8 are this band's
- * `em_act_prog_1`..`em_act_prog_8` (case 0, `fn_8037E0E8`, belongs to the em019 band below); each is
- * a phase machine on `self->state` (+0x005) whose phase 0 arms a motion and whose phase 1 waits on it
- * (`em_mot_end_ck`, `em_frame_check`).  `em_parts_damage_ck` (0x8037F624) steps the seven part damage
- * meters and `em_act_effect_ck` (0x8037F8A8) drops the record's own ground-stamp vector.
- *
- * MODULE AND NAME (brief section 2, evidence order).  Class 1, a `__FILE__` string: none - the DOL
- * carries one copy of each band file name it has and none is reachable from this range, whose
- * `.data`/`.rodata`/`.sdata2` runs hold no printable byte.  Class 2, the runtime dump: `dumpmap.py
- * lookup` answers `zz_XXXXXXXX_` for all 12 addresses.  Class 3 decides the module: every body takes
- * the shared `_ENEMY_WORK` in r3 and drives it through the enemy API
- * (`em_frame_check__FP11_ENEMY_WORKUsff` x8, `em_parts_damage_level_get__FP11_ENEMY_WORKUc`,
- * `get_em_chg_scale__FP11_ENEMY_WORK`), its link neighbours are `enemy/*`, and the sibling `em_*`
- * bands are the naming scheme.  The file name `em019_prog` follows the *program table* evidence: the
- * `.data` table `em019_prog_tbl` (0x805EE518, `scope:global`) is the em019 program's entry list and
- * its +0x0C entry is this band's own `em_act_run` - the band is the em019 file's program half.  Every
- * symbol here is a **derived name (GUESS)** from its own body; each function's comment carries the
- * datum behind it.
- *
- * SEAM (re-drawn, not the brief's `--max-bytes` cut).  The brief's range was 0x8037EA64..0x80382310,
- * one `attribute.py` byte-budget run over TWO translation units, and it is registered here as the two
- * the evidence names.  The cut is 0x8037F940, and three instruments agree: `tools/splits/tudiscover.py
- * at 0x8037E0E8` reports it as the strong seam (`.data` run jump `jumptable_805EF4F4` ->
- * `jumptable_805EF52C`, each referenced by exactly one side, plus the `.sdata2` run jump
- * `lbl_8079BE88` -> `lbl_8079BE8C`); the already-registered `enemy/em019_ai.cpp` (whose file this band
- * is the tail of) records the same extent, 0x80378F9C..0x8037F940; and the bracketing extab runs tile
- * - this unit takes 0x80017DBC..0x80017E14 (11 records - every function here but
- * `em_act_prog_dispatch` carries one) and the other half 0x80017E1C..0x80017E2C, which ends exactly where
- * `enemy/fn_80382310.cpp` starts its own run.  The left edge is the same `--max-bytes` artifact seen
- * from this side: `enemy/em019_ai.cpp` ends at 0x8037EA64, and this band's first function is the next
- * one in address order, so this registration is a *fragment* of that file - the `range` config_request
- * in the outbox asks for the two to be folded once the em019 file's bodies are written.
- *
- * Naming note: references only to other units' unrenamed `fn_XXXXXXXX` symbols - this file names
- * every symbol it *defines* (the 12 definitions below); what remains are callees whose owning band is
- * still a `fn_` row in the map (`em_move_mode_set`, `em_mot_set`, `em_action_finish` and ~40 more, plus the
- * em019 band's `fn_8037E0E8`..`em019_motion_dispatch`), which the pass that writes those bands owns
- * (`grep -n "fn_" src/enemy/em019_prog.cpp`: every `fn_` left is a call or an `extern` declaration).
- * Every definition is `extern "C"` so objdiff pairs it by the map's name (playbook 42).  The
- * genuinely mangled callees (`em_frame_check`, `em_parts_damage_level_get`, `get_em_chg_scale`,
- * `calcVecAng2`, `rotVecY`) are called through their C++ declarations at global scope (rule 9).
- *
- * SECTIONS.  `.text` 0x8037EA64..0x8037F940, `extab` 0x80017DBC..0x80017E14 (11 x 8 B), `extabindex`
- * 0x80037B00..0x80037B84 (11 x 12 B).  The `.data` run 0x805EF4D0..0x805EF52C (two jump tables) and
- * the `.rodata` table 0x80570AE0 are **not claimed**: a claim without the emitting source is a
- * `target-extra` row, so this object declares them and emits none of them (playbook 23).
- */
 #include "types.h"
 #include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
@@ -233,18 +82,14 @@ void fn_8037975C(struct _ENEMY_WORK* self);
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
 
-/* This band's call of the +0x2C job-injection slot of `ShellSetFuncs` (`stage/shell_set_func_ptr.h`): the
- * target passes the work record, two ids, a VEC3, a scale and the +0xAEA flag word and no table argument,
- * which the shared 7-argument slot type cannot express (passing the table hoists its load, em_act_prog_5
- * 100 -> 97.83), so the call goes through this 6-argument spelling of the same slot. */
+/* A 6-argument spelling of `ShellSetFuncs`' +0x2C slot: retail passes no table argument, and the shared
+ * 7-argument type hoists the table load (`em_act_prog_5` scores lower). */
 typedef void (*ShellJobInjectFn)(struct _ENEMY_WORK* self, s32 a, s32 b, nw4r::math::VEC3* pos, f32 scale,
                                  u16 flags);
-/* The `.rodata` motion table `em_turn_seq_start`/`em_turn_seq_step` walk (0x80570AE0..0x80570B20, 64 B). */
+/* The unit's `.rodata` motion table `em_turn_seq_start`/`em_turn_seq_step` walk (64 bytes). */
 extern "C" u8 lbl_80570AE0[];
 
-/* The band's pooled floats (`.sdata2` 0x8079BC88..0x8079BE88), declared never defined: none is this
- * object's private pool entry (they are shared with the neighbouring bands' pools), so none is
- * claimable (playbook 58) and a definition would emit a second copy the linker does not merge. */
+/* The unit's `.sdata2` pool, declared, not defined: the source does not emit it yet. */
 extern "C" f32 lbl_8079BC88;   /* 0.0 */
 extern "C" f32 lbl_8079BC94;   /* 1.5 */
 extern "C" f32 lbl_8079BCA0;   /* 200.0 */
@@ -266,16 +111,11 @@ extern "C" f32 lbl_8079BD08;   /* 110.0 */
 extern "C" f32 lbl_8079BD24;   /* 100.0 */
 extern "C" f32 lbl_8079BE88;   /* -20.0 */
 
-/* `stage/fn_802B2AA0.h` (this unit's `shell_set_func_ptr` owner) declares `setVec3` with
- * a `void` result, while the target's call site consumes the returned pointer; the band reaches it
- * through the signature its own body has.  `em035_prog.cpp` records the same gap, and the outbox
- * carries the shared-file request. */
+/* `setVec3` through the pointer-returning signature its body has (the shared declaration returns `void`,
+ * the call site consumes the result). */
 typedef nw4r::math::VEC3* (*Fn80041E8C)(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 
-/* The out-of-range callees whose owning band is still a `fn_` row in the map - each spelling is the
- * callee's own body (the same gap the sibling bands `enemy/em_act_step.cpp` and
- * `enemy/em_action.cpp` record).  The `fn_8037...`/`fn_80378...` group is the em019 band's own
- * functions, which `enemy/em019_ai.cpp` (the rest of this file) owns. */
+/* This unit's own functions the program steps call, and `enemy/em_model.cpp`'s `fn_803B9BA0`. */
 
 extern "C" {
 u8 fn_80378F9C(struct _ENEMY_WORK* self, u32 a);
@@ -293,70 +133,17 @@ void fn_8037E0E8(struct _ENEMY_WORK* self);
 u32 fn_80382E48(struct _ENEMY_WORK* self, u32 a);
 void fn_803B9BA0(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a);
 }
-/* Monster Hunter Tri (RMHE08) - the enemy per-motion stepper band 0x8037F940-0x80382310 (`.text`,
- * 4 functions, 10704 B), reconstructed from the split target object.
- *
- * WHAT IT IS.  `em_act_mot_step` (0x8037F940, 10076 B) is the per-motion-number stepper: it calls
- * the em019 band's `em_parts_damage_ck` and `em_act_effect_ck`, reads `em_get_mot_no(self)` and
- * switches 216 ways (`cmplwi r0, 215` over the 216-entry jump table `.data` 0x805EF52C) - one arm
- * per motion the enemy can play, each arming the motion's own state and handing its damage windows
- * on.  The other three are the part-material steppers the neighbouring band calls: `em_part_reset`
- * resets one part slot's colour/meter and takes its RGB from the shared id table, `em_part_colour_lerp`
- * lerps a slot's RGB toward a target by its alpha, and `em_part_damage_meter` steps a slot's 0..1
- * damage meter by 1/damage and arms/disarms the slot.
- *
- * MODULE AND NAME (brief section 2, evidence order).  Class 1, a `__FILE__` string: none reachable
- * (this band's `.data`/`.sdata2` runs carry no printable byte).  Class 2, the runtime dump:
- * `dumpmap.py lookup` answers `zz_XXXXXXXX_` for all four addresses.  Class 3 decides the module: the
- * band drives the shared `_ENEMY_WORK` record, its link neighbours are `enemy/*`, and its three
- * steppers are called from the registered `enemy/fn_80382310.cpp`; the file name `em_act_mot` and
- * every symbol here are **derived names (GUESS)** from the bodies, on the module's `em_<noun>_<verb>`
- * scheme (`em_action.cpp`, `em_act_step.cpp`).
- *
- * SEAM (re-drawn, not the brief's `--max-bytes` cut).  This unit is the half of
- * `proposal/8037EA64_fn_8037EA64.cpp` that the brief's byte budget had merged with the em019
- * program band below; the cut is 0x8037F940 and the evidence is in the sibling half's header
- * (`src/enemy/em019_prog.cpp`): `tudiscover.py at 0x8037E0E8` reports it as the strong seam (the
- * `.data` run jump `jumptable_805EF4F4` -> `jumptable_805EF52C` and the `.sdata2` run jump
- * `lbl_8079BE88` -> `lbl_8079BE8C`, each side's labels referenced only by its own functions), the
- * registered `enemy/em019_ai.cpp` records 0x8037F940 as its file's right edge, and the bracketing
- * extab runs tile - this unit takes 0x80017E14..0x80017E2C and the next registered unit
- * (`enemy/fn_80382310.cpp`) starts its own record run at 0x80017E2C.
- *
- * Naming note: references only to other units' unrenamed `fn_XXXXXXXX` symbols; every symbol this
- * file *defines* is named (the three definitions below).  `em_act_mot_step`'s own row is **not yet
- * defined** - the 216 arm bodies are a unit of their own - so its map name stays a target-only name
- * and its row measures 0 % (see RESIDUALS).  Every definition is `extern "C"` so objdiff pairs it by
- * the map's name (playbook 42).
- *
- * SECTIONS.  `.text` 0x8037F940..0x80382310, `extab` 0x80017E14..0x80017E2C (3 x 8 B: one
- * record per function that carries one, `em_act_mot_step` included), `extabindex`
- * 0x80037B84..0x80037BA8 (3 x 12 B).  The `.data` jump table run 0x805EF4D0..0x805EF52C and the
- * shared part-colour id table 0x805EE5A0 are **not claimed**: the id table is referenced from
- * `enemy/fn_80382310.cpp` too (playbook 58's sole-referencer condition fails) and a jump table claim
- * without its emitting switch is a `target-extra` row.
- *
- * RESIDUALS.  `em_act_mot_step` (10076 B, 94 % of this unit's `.text`) is unwritten: a 216-case
- * switch whose arms must be read out of the target one at a time, which is a lane of its own.  It is
- * the unit's one 0 % row.
- */
 #include "types.h"
 #include "gx.h"
 #include "sound/mhchar.h"
 
-/* The shared part-colour id table the steppers index by slot (`lwzx r4, r4, r0` over 0x805EE5A0,
- * `{3, 0, 1, 4}`).  Referenced from `enemy/fn_80382310.cpp` too, so it is declared, never defined
- * (playbook 29/58). */
+/* The part-colour id table the steppers index by slot (`{3, 0, 1, 4}`), in the unit's `.data`: declared,
+ * not defined. */
 extern "C" u32 lbl_805EE5A0[];
 
-/* The band's pooled floats, declared never defined: they are shared with the neighbouring bands'
- * pools, so none is claimable (playbook 58). */
 extern "C" f32 lbl_8079BC88;   /* 0.0 */
 
 extern "C" {
-
-/* The per-motion stepper of the enemy work record - 0x8037F940, 10076 B, NOT reconstructed: its 216
- * arms would have to be read out of the target one at a time.  See the file header's RESIDUALS. */
 }
 #include "enemy/fn_8012E968.h"
 #include "enemy/fn_80138074.h"
@@ -397,8 +184,7 @@ void em019_action_run_flag_set(struct _ENEMY_WORK* self)
     self->field_0x358 = 1;
 }
 
-/* The em019 per-motion step dispatcher: `+0x1E6` selects one of the eight step bodies, each of which
- * is tail-called.
+/* The em019 per-motion step dispatcher: `+0x1E6` tail-calls one of the eight step bodies.
  * 0x80379DE4 */
 void em019_state_dispatch(struct _ENEMY_WORK* self)
 {
@@ -524,13 +310,10 @@ void em019_motion_dispatch(struct _ENEMY_WORK* self)
 }
 #endif
 
-
 #pragma peephole off
 
-/* The enemy work's action-program channel 1: phase 0 clears the +0x1E4 byte, the whole per-part
- * block (+0x328..+0x357, four slots) and the +0x358/+0x35A pair, then arms motion 20 with the two
- * effect-position resets; phase 1 ends the program through `em_action_finish` once `em_mot_end_ck` reports
- * the motion done. */
+/* Program channel 1: phase 0 clears +0x1E4, the four part slots and +0x358/+0x35A and arms motion 20,
+ * phase 1 ends the program when the motion is done. */
 extern "C" void em_act_prog_1(_ENEMY_WORK* self) {
     switch (self->state) {
     case 0: {
@@ -565,9 +348,8 @@ extern "C" void em_act_prog_1(_ENEMY_WORK* self) {
     }
 }
 
-/* The enemy work's action-program channel 2: phase 0 arms motion 201 sub-motion 4 and zeroes the
- * +0x1CC sequence; phase 1 runs the four `em_frame_check` windows that latch the record's part
- * helpers and then ends on the motion's own frame check, handing the +0x1E4 value to part 13/3. */
+/* Program channel 2: phase 0 arms motion 201/4, phase 1 runs four frame windows that latch the part
+ * helpers, then hands +0x1E4 to part 13/3. */
 extern "C" void em_act_prog_2(_ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -594,9 +376,8 @@ extern "C" void em_act_prog_2(_ENEMY_WORK* self) {
     }
 }
 
-/* The enemy work's action-program channel 3: the `fn_80131E00` hook runs every frame; phase 0 arms
- * motion 4 and starts the `lbl_80570AE0` motion-table sequence with the +0x1CC sequence at 5.0;
- * phase 1 polls that sequence and lands the +0x1E4 value on part 13/4 when it reports done. */
+/* Program channel 3: phase 0 arms motion 4 and the `lbl_80570AE0` sequence, phase 1 polls it and lands
+ * +0x1E4 on part 13/4 (`fn_80131E00` runs every frame). */
 extern "C" void em_act_prog_3(_ENEMY_WORK* self) {
     fn_80131E00(self);
     switch (self->state) {
@@ -615,9 +396,8 @@ extern "C" void em_act_prog_3(_ENEMY_WORK* self) {
     }
 }
 
-/* The enemy work's action-program channel 4: the same `fn_80131E00` hook, then phase 0 arms motion
- * 89 and starts the `lbl_80570AE0` table with a zero +0x1CC sequence; phase 1 waits out its
- * 256-frame window and lands the +0x1E4 value on part 13/5. */
+/* Program channel 4: phase 0 arms motion 89 and the `lbl_80570AE0` table, phase 1 waits 256 frames and
+ * lands +0x1E4 on part 13/5. */
 extern "C" void em_act_prog_4(_ENEMY_WORK* self) {
     fn_80131E00(self);
     switch (self->state) {
@@ -637,10 +417,8 @@ extern "C" void em_act_prog_4(_ENEMY_WORK* self) {
     }
 }
 
-/* The enemy work's action-program channel 5: the two per-frame hooks run unconditionally, then
- * phase 0 arms motion 202, resets the +0x1CC sequence and the part 255 scale and opens two
- * `em_hit_window_set` hit windows; phase 1 sequences three `em_frame_check` windows, and once the motion
- * and `em_busy_ck` both report done it either lands the part 13/6 hit or ends the program. */
+/* Program channel 5: phase 0 arms motion 202 and two hit windows, phase 1 runs three frame windows, then
+ * lands the part 13/6 hit or ends the program. */
 extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
@@ -682,10 +460,8 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
     }
 }
 
-/* The enemy work's action-program channel 6: the four phases drive the +0x36C target vector - phase
- * 0 measures the bearing to it, picks the +0x006 turn direction off the +0x1C0 heading, arms motion
- * 31 or 32 and builds the +0x310 offset vector and the +0x318 radius; phases 1 and 2 run the turn
- * and the `lbl_80570AE0` sequence, phase 3 hands the result on once `em_busy_ck` reports done. */
+/* Program channel 6: phase 0 measures the bearing to +0x36C and arms motion 31 or 32, phases 1 and 2 run the
+ * turn and the `lbl_80570AE0` sequence, phase 3 hands on. */
 extern "C" void em_act_prog_6(_ENEMY_WORK* self) {
     switch (self->state) {
     case 0: {
@@ -771,9 +547,8 @@ extern "C" void em_act_prog_6(_ENEMY_WORK* self) {
     }
 }
 
-/* The enemy work's action-program channel 7: phase 0 arms motion 6 sub-motion 10, stores the
- * 300-frame countdown at +0x020 and starts the `fn_803B9BA0` job over the +0x188 position; phase 1
- * ticks that countdown and lands the +0x1E4 value on part 13/8 when it reaches zero. */
+/* Program channel 7: phase 0 arms motion 6/10, a 300-frame countdown and the `fn_803B9BA0` job, phase 1
+ * lands +0x1E4 on part 13/8 when the countdown ends. */
 extern "C" void em_act_prog_7(_ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -807,8 +582,8 @@ extern "C" void em_act_prog_8(_ENEMY_WORK* self) {
     }
 }
 
-/* The program dispatcher: tail-calls the step of the program id at +0x1E6 through the unit's own
- * 9-entry jump table (the table's case 0 is the em019 band's `fn_8037E0E8`). */
+/* The program dispatcher: tail-calls the step of the program id at +0x1E6 through the 9-entry jump table
+ * (case 0 is `fn_8037E0E8`). */
 extern "C" void em_act_prog_dispatch(_ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
@@ -841,8 +616,7 @@ extern "C" void em_act_prog_dispatch(_ENEMY_WORK* self) {
     }
 }
 
-/* The per-frame action runner: clears the +0x358 run flag, dispatches on the action id at +0x1E5
- * through the unit's own 14-entry table, ticks the +0x35A counter while +0x358 is 1 (clamped at 450)
+/* The per-frame action runner: dispatches on the action id, ticks +0x35A while +0x358 is 1 (clamped at 450)
  * and runs the +0x1E2 hook pair. */
 extern "C" void em_act_run(_ENEMY_WORK* self) {
     self->field_0x358 = 0;
@@ -877,9 +651,6 @@ extern "C" void em_act_run(_ENEMY_WORK* self) {
     case 9:
         em_act_prog_dispatch(self);
         break;
-    /* Retail's range check is `cmplwi r0, 13` over a 14-entry table, so the source's switch carried
-     * cases 10..13 as well - they share the default's body (rule 8's "cases share a break"), which is
-     * what makes the table 14 entries wide instead of 10. */
     case 10:
     case 11:
     case 12:
@@ -900,9 +671,8 @@ extern "C" void em_act_run(_ENEMY_WORK* self) {
     }
 }
 
-/* The per-part damage check: for each of the seven slots, either raises the slot's damage meter
- * (`em_part_rec_reset`) while its `fn_8037900C` arm byte is clear and its damage level is still below the
- * slot's threshold, or ticks it down (`em_part_rec_alt_set`) through the pair of ids. */
+/* The per-part damage check: per slot, raise the meter (`em_part_rec_reset`) while unarmed and below the
+ * threshold, else tick it down (`em_part_rec_alt_set`). */
 extern "C" void em_parts_damage_ck(_ENEMY_WORK* self) {
     if (fn_8037900C(self, 2) == 0 && em_parts_damage_level_get(self, 0) < 2)
         em_part_rec_reset(self, 0);
@@ -949,7 +719,6 @@ extern "C" void em_act_effect_ck(_ENEMY_WORK* self) {
         }
     }
 }
-
 
 extern "C" {
 
@@ -1011,7 +780,6 @@ extern "C" void em_part_damage_meter(_ENEMY_WORK* self, u8 idx, f32 damage) {
     }
 }
 }
-
 
 #pragma peephole on
 

@@ -1,12 +1,5 @@
-/* The enemy unit `enemy/em005_act.cpp` (the em005 TU, 0x801CA8DC..0x801D71C4; the header was
- * `enemy/fn_801D428C.h` until that unit folded in): the enemy action band's
- * per-motion dispatchers and helpers.
- *
- * `fn_801D6694` moved here from `enemy/fn_801B0010.cpp` when this unit landed (docs/plan.md 6.5
- * rule 2: an extern lives with the TU that owns the symbol).  Its previous home was the band header
- * `unsplit/enemy.h`, whose comment said the bracketing registered units named different
- * modules - true until this unit was registered.
- */
+/* enemy/em005_act.h - the declarations `enemy/em005_act.cpp` owns that other units call: the per-motion
+ * dispatchers and helpers, its shared tables and pool entries. */
 #ifndef MHTRI_ENEMY_FN_801CCBC4_H
 #define MHTRI_ENEMY_FN_801CCBC4_H
 
@@ -118,8 +111,7 @@ extern f32 lbl_807994E8;
 extern f32 lbl_807994EC;
 extern f32 lbl_807994F0;
 
-/* The `.sdata2` float pool this unit and `enemy/em007_act.cpp` (one TU's code split across the units) both read.
- * Declared, never defined: the pool belongs to the data pass. */
+/* The unit's `.sdata2` pool entries `enemy/em007_act.cpp` also reads; declared, not defined. */
 extern f32 lbl_80799220;
 extern f32 lbl_80799224;
 extern f32 lbl_80799228;

@@ -1,25 +1,29 @@
-/* enemy/em007_act.cpp - the em007 enemy's action band, `.text` 0x801D71C4..0x801E0ADC.
- *
- * Recut 2026-09-30.  The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
- * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
- * static initializer - the `.ctors` words 0x8056F34C/350/354/358 - and the `.sdata2` pool repeats a value at each
- * change): em036 0x801B7020..0x801B98C8 (`fn_801B7020.cpp`), em040 0x801B98C8..0x801BB758 (`em040_ai.cpp`), em006
- * 0x801BB758..0x801C29F8 (`fn_801BD6C0.cpp`), em004 0x801C29F8..0x801CA8DC (`fn_801CA004.cpp`), em005 0x801CA8DC..
- * 0x801D71C4 (`fn_801CCBC4.cpp`), em007 0x801D71C4..0x801E0ADC (`fn_801D80EC.cpp`).  The files keep their old stems;
- * the `emNNN` names are GUESSes from the prog table that opens each TU's data.
- *
- * This unit's sections: extab 0x80010164..0x800103D4, extabindex 0x8002C100..0x8002C4A8, `.rodata`
- * 0x80570500..0x805706C0 and `.data` 0x805B6A44..0x805B75E8 (after `em007_prog_tbl`, 0x805B69D8).  Left edge
- * 0x801D71C4: em005's `__sinit` ends there (a one-function pool window).  The right edge is the old unit edge
- * 0x801E0ADC and is NOT proven: the 0.0 entry repeats at `lbl_8079978C` in 0x801DFEAC..0x801E0ADC, and
- * `lobby/fn_801E0ADC.cpp` reads `lbl_805B75E8` inside this unit's data (blocked pairs 0x805B7608/0x805B76B8), so
- * the next TU may start later than 0x801E0ADC; the candidate evidence is in `.pi/notes/enemy-recut-edge5.md`.
- *
- * The file is three former sections: `enemy/fn_801D80EC.cpp` (0x801D80EC..0x801DB8E0), the former
- * `enemy/fn_801D428C.cpp` from 0x801D71C4, and the former `enemy/fn_801DB8E0.cpp` (the last has the peephole
- * off).  Declarations that two sections spelled differently were unified to the first (`fn_8013032C` is
- * `f32` and `fn_801303EC` takes it; the one argument-less call is a cast call); every row was re-measured,
- * none is lower.
+/*
+ * enemy/em007_act.cpp - enemy 007's action band: the `_ENEMY_WORK` action and step functions and their
+ *   dispatchers.
+ * RANGE. .text 0x801D71C4-0x801E0ADC (97 functions); extab 0x80010164-0x800103D4, extabindex
+ *   0x8002C100-0x8002C4A8, .rodata 0x80570500-0x805706C0, .data 0x805B69D8-0x805B75E8 (`em007_prog_tbl` first),
+ *   .sdata2 0x807994F8-0x80799788.  Left edge: `enemy/em005_act.cpp`'s static initializer ends there.  The right
+ *   edge is unproven: the unwritten `fn_801E0574` reads `lbl_80799788` (three times), which sits in
+ *   `lobby/fn_801E0ADC.cpp`'s `.sdata2`, and flipcheck names that unit as the fold candidate.  The source is three
+ *   blocks, 0x801D80EC-0x801DB8E0, 0x801D71C4-0x801D80EC and 0x801DB8E0-0x801E0ADC; the functions are not in
+ *   address order.
+ * FLAGS. `cflags_main`; `#pragma peephole off` over the third block.
+ * NAMES. `em007` is the runtime dump's `em007_prog_tbl`, which opens the TU's `.data`; the `_act` suffix is a
+ *   GUESS.  The map has only `fn_` stems for the functions.  `fn_8013032C` returns `f32` and `fn_801303EC` takes
+ *   it; the one argument-less call is a cast call.
+ * RESIDUALS. 11 rows unwritten: 0x801DBE0C-0x801DF2F8, 0x801DFEEC-0x801E0058, 0x801E0240-0x801E04DC,
+ *   0x801E0574-0x801E0AC0.
+ *   41 partial rows; none has a recorded cause beyond the relocations below.
+ *   Relocations (`relocdiff --by-owner`): `fn_801D83C0` and `fn_801D8E9C` call `CancelFade__FP11_ENEMY_WORK` where
+ *   retail calls the C-linkage `CancelFade`; `fn_801D944C` and `fn_801D9584` call
+ *   `calcVecAngXY__FPQ34nw4r4math4VEC3PUlPl` where retail's last parameter is `u32*` (`...PUlPUl`); `fn_801D7890`
+ *   calls `fn_8013032C` once where retail does not.
+ *   flipcheck: `.rodata` claimed, not emitted; `.data` 0x1F4 against 0xC10, `.sdata2` 0x10 against 0x290 (a
+ *   partial pool: candidate fold with `lobby/fn_801E0ADC.cpp`); `.text` (0x59BC of 0x9918), extab (0x218 of 0x270)
+ *   and extabindex (0x324 of 0x3A8) short of the claim and differing; the two spellings above have no map row
+ *   (retail's are `CancelFade` and `calcVecAngXY__FPQ34nw4r4math4VEC3PUlPUl`); the function order differs from
+ *   the target's.
  */
 
 #include "types.h"
@@ -30,19 +34,17 @@
 #include "Pl/pl_hit_sphere.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
 #include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
 #include "ef/eft009.h" /* eft009_set_pos, eft009_spawn_at_joint (rule 2: the owner's header) */
 #include "sound/mhchar.h"
 #include "stage/stg_w.h"
 
 /* ===================================================================================================
- * former fn_801D80EC.cpp
+ * 0x801D80EC-0x801DB8E0
  * =================================================================================================== */
 
-/* ----------------------------------------------------------------------------------------------------
- * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
- * -------------------------------------------------------------------------------------------------- */
+/* The unit's `.sdata2` pool, declared, not defined: the source does not emit it yet. */
 
 extern f32 lbl_80799520;
 extern f32 lbl_80799524;
@@ -114,8 +116,7 @@ extern f32 lbl_80799634;
 extern f32 lbl_80799638;
 extern f32 lbl_80799648;
 
-/* the range's own `.data` tables (no `.data` range is registered for this unit, so they stay the
- * shared pool's bytes; only the ones the code loads explicitly are declared). */
+/* The unit's `.data` tables the code loads, declared: the source does not emit them yet. */
 extern u8 lbl_80570500[];
 extern u8 lbl_80570540[];
 extern u8 lbl_80570580[];
@@ -157,9 +158,7 @@ extern u8 lbl_805B7128[];
 extern u8 lbl_805B7150[];
 extern u8 lbl_805B7190[];
 
-/* ----------------------------------------------------------------------------------------------------
- * the C++-mangled callees (rule 9: declared with the signature the mangling encodes, called through it)
- * -------------------------------------------------------------------------------------------------- */
+/* The C++-mangled callees, declared with the signature each mangling encodes (rule 9). */
 
 s32 calcVecAng2(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
                                                 /* calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3 */
@@ -186,11 +185,7 @@ void CancelFade(struct _ENEMY_WORK* self);      /* CancelFade */
 extern "C" {
 #endif
 
-/* ----------------------------------------------------------------------------------------------------
- * the enemy-band callees (the signatures are the call sites')
- * -------------------------------------------------------------------------------------------------- */
-
-/* enemy/fn_801251D0.cpp (0x801251D0..0x8012BA00) */
+/* The enemy-band callees, declared with the call sites' signatures: `enemy/em_common.cpp`'s first. */
 void em_se_tbl_play(void* tbl, u32 a, u32 b);
 void em_se_tbl_play_alt(void* tbl, u32 a, u32 b);
 void em_part_rec_reset(struct _ENEMY_WORK* self, u32 a);
@@ -203,18 +198,15 @@ void em_target_pos_set(struct _ENEMY_WORK* self, void* p);
 void em_hit_window_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 
-/* enemy/fn_8012BDF4.cpp (0x8012BDF4..0x8012E968) */
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_busy_set(struct _ENEMY_WORK* self);
 u32 em_busy_ck(struct _ENEMY_WORK* self);
 u32 fn_8012D23C(struct _ENEMY_WORK* self, u32 a, u8 b);
 u8 fn_8012D3E0(struct _ENEMY_WORK* self, u32 a);
 
-/* enemy/fn_8012E968.cpp (0x8012E968..0x8012EC74) */
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 
-/* enemy/fn_8012EC74.cpp (0x8012EC74..0x80137604) */
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_mot_set_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 f32 get_em_base_scale(struct _ENEMY_WORK* self);
@@ -242,16 +234,18 @@ void em_move_offset_rot_apply(struct _ENEMY_WORK* self, void* p);
 void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_80136D14(struct _ENEMY_WORK* self);
 
-/* enemy/fn_8011D448.cpp (0x8011D448..) - the damage/knockback helper */
+/* `enemy/fn_8011D448.cpp`'s damage/knockback helper */
 void fn_8011E6EC(struct _ENEMY_WORK* self, s32 a, u32 b, f32 c, f32 d);
 
-/* the neighbouring registered units' dispatchers */
+/* This unit's own functions, declared before use. */
 void fn_801D791C(struct _ENEMY_WORK* self);
 void fn_801D8078(struct _ENEMY_WORK* self);
 void fn_801DFD3C(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut, f32 scale);
 u32 fn_801E0058(struct _ENEMY_WORK* self, u8 a);                     
 
-/* ef / ai / stage module helpers */
+/* Helpers of other units: `fn_8004CAD8.cpp`'s vector math, `g3d/g3d_calcworld.cpp`, `ef/eft007.cpp`,
+ * `enemy/em001_prog.cpp`, `stage/stg_w.cpp`, `camera/camera_main.cpp`, `lobby/fn_8030121C.cpp` and
+ * `enemy/em_model.cpp`. */
 void subVec3(void* out, void* a, void* b);
 f32 fn_80050EF4(void* a, void* b);
 f32 calcVecDistXZ(void* a, void* b);
@@ -1793,21 +1787,12 @@ extern "C" void fn_801DB7D8(struct _ENEMY_WORK* self) {
 }
 
 /* ===================================================================================================
- * former fn_801D428C.cpp, from 0x801D71C4
+ * 0x801D71C4-0x801D80EC
  * =================================================================================================== */
-
-/* ----------------------------------------------------------------------------------------------------
- * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
- * -------------------------------------------------------------------------------------------------- */
-
-
-/* the range's own `.data` tables (no `.data` range is registered for this unit yet, so they stay the
- * shared pool's bytes; only the ones the code loads explicitly are declared). */
+/* The unit's `.data` tables the code loads, declared: the source does not emit them yet. */
 extern u8 lbl_805B75B8[];
 
-/* ----------------------------------------------------------------------------------------------------
- * the C++-mangled callees (rule 9: declared with the signature the mangling encodes, called through it)
- * -------------------------------------------------------------------------------------------------- */
+/* The C++-mangled callees, declared with the signature each mangling encodes (rule 9). */
 
 u16 calcVecAngX(nw4r::math::VEC3* v);                       /* calcVecAngX__FPQ34nw4r4math4VEC3 */
 f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
@@ -1827,8 +1812,7 @@ void get_joint_wpos_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::VEC3* ou
 void* get_move_work_adrs(u8 index);                         /* get_move_work_adrs__FUc */
 u16 get_move_work_max(u8 index);                            /* get_move_work_max__FUc */
 
-/* the runtime's allocator pair; spelling the manglings `__nw__FUl`/`__dl__FPv` as identifiers would be
- * rule 9's violation, so the C++ definitions the compiler mangles to them are declared and called. */
+/* The runtime's allocator pair (`__nw__FUl`/`__dl__FPv`), declared as the C++ functions (rule 9). */
 void* operator new(unsigned long size);
 void operator delete(void* ptr) throw();
 
@@ -1836,15 +1820,7 @@ void operator delete(void* ptr) throw();
 extern "C" {
 #endif
 
-/* ----------------------------------------------------------------------------------------------------
- * the enemy-band callees
- *
- * The signatures are the call sites' (the argument counts are the ones the callers set in r4..r6 and
- * f1..f3); where a callee's body disagrees with its owner header, the body won and the correction is
- * recorded in the outbox.
- * -------------------------------------------------------------------------------------------------- */
-
-/* enemy/enemy_control.cpp (0x801411B8..0x80147CE0) */
+/* The enemy-band callees, declared with the call sites' signatures: `enemy/enemy_control.cpp`'s first. */
 s16 em_demo_frame_get();
 u32 em_demo_time_ck(u32 id);
 void em_demo_pos_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
@@ -1854,9 +1830,7 @@ void em_demo_key3_apply(struct _ENEMY_WORK* self, s16 a, void* b, u32 c);
 void em_demo_key_apply(struct _ENEMY_WORK* self, s16 a, void* b, void* c, u32 d, u32 e);
 void em_demo_enable(struct _ENEMY_WORK* self);
 
-/* enemy/fn_801251D0.cpp (0x801251D0..0x8012BA00).  `fn_80126278` takes the work record in r3 (the
- * callee's body does `mr r30,r4` / `mr r31,r5` before `fn_801261D8`), which the owner header
- * (`void fn_80126278(u16 id, VEC3* out)`) does not carry - corrected here. */
+/* `enemy/em_common.cpp` */
 void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 void em_action_finish(struct _ENEMY_WORK* self);
 void fn_801280F4(struct _ENEMY_WORK* self);
@@ -1869,16 +1843,13 @@ u8 fn_80129DB8(struct _ENEMY_WORK* self);
 u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 s32 fn_8012A204(struct _ENEMY_WORK* self);
 
-/* enemy/fn_8012BDF4.cpp (0x8012BDF4..0x8012E968) */
 void em_busy_set(struct _ENEMY_WORK* self);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 
-/* enemy/fn_8012E968.cpp (0x8012E968..0x8012EC74) - both bodies read the work record (settled from the
- * callees: `fn_8012EC3C` loads +0x89F, `em_alt_mode_ck` loads +0x8AA). */
+/* `fn_8012EC3C` and `em_alt_mode_ck` read the work record (+0x89F, +0x8AA). */
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 
-/* enemy/fn_8012EC74.cpp (0x8012EC74..0x80137604) */
 void em_mot_set_blend(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_mot_set_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
@@ -1905,16 +1876,13 @@ void em_part_hit_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_801376B4(struct _ENEMY_WORK* self);
 
-/* enemy/fn_80138074.c (0x80138074..0x8013ACC4) */
+/* `enemy/fn_80138074.c` */
 void em_res_user_data_set(struct _ENEMY_WORK* self, void* helper);
 void fn_8013918C(void* helper, s16 flag);
 s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
 
-/* enemy/fn_80147CE0.cpp (0x80147CE0..0x80149D6C) */
+/* `enemy/em001_prog.cpp` */
 void* em_res_user_data_ctor(void* self);
-
-/* this range's own not-yet-written bodies (`fn_801D4C3C` dispatches into `fn_801D428C`);
- * declared so the dispatchers compile, written in the next pass (see the residual note above). */
 
 /* ef module */
 void fn_801049D0(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, nw4r::math::VEC3* pos,
@@ -1928,9 +1896,7 @@ void fn_800FA3B8(void* out);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
 void draw_shape_arm(struct _ENEMY_WORK* self, u32 a, u32 b);
 
-/* the unclaimed enemy action band below this range (0x801CB308..0x801D3CF8) - the dispatchers'
- * tail-call targets.  Their band header is `unsplit/enemy.h` and the move is recorded as a
- * `shared-file` request in the outbox; until it lands this file carries its own copy. */
+/* `enemy/em005_act.cpp`'s dispatch targets this block tail-calls. */
 void fn_801CCCE8(struct _ENEMY_WORK* self);
 void fn_801CE898(struct _ENEMY_WORK* self);
 void fn_801CF648(struct _ENEMY_WORK* self);
@@ -1945,12 +1911,8 @@ void fn_801D38A0(struct _ENEMY_WORK* self);
 void fn_801D3C38(struct _ENEMY_WORK* self);
 void fn_801D3CF8(struct _ENEMY_WORK* self, u32 a);
 
-/* the unclaimed band above this range (0x801D80EC..0x801EC9E0), bracketed by `enemy` below and
- * `lobby` above - rule 2's documented gap, so the declaration stays here. */
 void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, u32 d);
 
-/* the same gap in the other modules: 0x802Bxxxx sits between `Pl/pl_act.cpp` and
- * `stage/fn_802B2978.c`, 0x8030xxxx between `ai/fn_802D0DCC.c` and `ef/fn_803066F0.c`. */
 s32 fn_802907BC(s32 a, void* b);
 void fn_802B43A8(void* pos, u8 a, u16 b);
 
@@ -1958,9 +1920,8 @@ void fn_802B43A8(void* pos, u8 a, u16 b);
  * the records this unit needs locally
  * -------------------------------------------------------------------------------------------------- */
 
-/* The 12-byte helper `fn_801D71C4` allocates and hands `em_res_user_data_set`; `fn_801D752C` is its
- * constructor (it chains `em_res_user_data_ctor` and stores the class descriptor `lbl_805B75B8` at +0x00).
- * size: 0x0C (traced from the `operator new(0xC)` in `fn_801D71C4`). */
+/* The 12-byte helper `fn_801D71C4` allocates; its constructor `fn_801D752C` chains `em_res_user_data_ctor`
+ * and stores `lbl_805B75B8` at +0x00.  size: 0x0C (`operator new(0xC)`) */
 struct EmHelper801D428C {
     /* +0x00 */ void* vtbl;
     /* +0x04 */ u32 field_0x04;
@@ -2459,18 +2420,12 @@ void fn_801D8078(struct _ENEMY_WORK* self) {
 }
 #endif
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7B30..0x806A7B90`), in address order: the 4 two-vector record(s)
- * its static constructor `fn_801D6FB8` builds (`.data` tables point at them).  Names are GUESSes: each record is a
- * pair of model-space points. */
-
 /* ===================================================================================================
- * former fn_801DB8E0.cpp
+ * 0x801DB8E0-0x801E0ADC
  * =================================================================================================== */
 #pragma peephole off
 
-/* ----------------------------------------------------------------------------------------------------
- * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
- * -------------------------------------------------------------------------------------------------- */
+/* The unit's `.sdata2` pool, declared, not defined: the source does not emit it yet. */
 
 extern f64 lbl_807995A0;
 extern f32 lbl_80799614;
@@ -2489,14 +2444,11 @@ extern f32 lbl_80799778;
 extern f32 lbl_8079977C;
 extern f32 lbl_80799780;
 
-/* this range's own `.data` tables (no `.data` range is registered for this unit yet, so they stay the
- * shared pool's bytes; only the ones the code loads explicitly are declared). */
+/* The unit's `.data` tables the code loads, declared: the source does not emit them yet. */
 extern u8 lbl_805B6A44[];
 extern u8 lbl_805B6A50[];
 
-/* ----------------------------------------------------------------------------------------------------
- * the C++-mangled callees (rule 9: declared with the signature the mangling encodes, called through it)
- * -------------------------------------------------------------------------------------------------- */
+/* The C++-mangled callees, declared with the signature each mangling encodes (rule 9). */
 
 void rotVecY(nw4r::math::VEC3* v, u32 angle);                    /* rotVecY__FPQ34nw4r4math4VEC3Ul */
                                                 /* calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3 */
@@ -2513,8 +2465,7 @@ f32 get_em_chg_scale(struct _ENEMY_WORK* self);                  /* get_em_chg_s
 void get_joint_wpos_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::VEC3* out);
                                         /* get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3 */
 
-/* the runtime's allocator pair; spelling the manglings `__nw__FUl`/`__dl__FPv` as identifiers would be
- * rule 9's violation, so the C++ definitions the compiler mangles to them are declared and called. */
+/* The runtime's allocator pair (`__nw__FUl`/`__dl__FPv`), declared as the C++ functions (rule 9). */
 void* operator new(unsigned long size);
 void operator delete(void* ptr) throw();
 
@@ -2522,18 +2473,10 @@ void operator delete(void* ptr) throw();
 extern "C" {
 #endif
 
-/* ----------------------------------------------------------------------------------------------------
- * the enemy-band callees
- *
- * The signatures are the call sites' (the argument counts are the ones the callers set in r4..r8 and
- * f1..f3); where a callee's body disagrees with its owner header, the body won.
- * -------------------------------------------------------------------------------------------------- */
-
-/* enemy/fn_8012E968.cpp (0x8012E968..0x8012EC74) - both bodies read the work record. */
+/* The enemy-band callees, declared with the call sites' signatures (`enemy/em_common.cpp`'s first). */
 u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 
-/* enemy/fn_801251D0.cpp (0x801251D0..0x8012BA00). */
 void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 u32 fn_80129D3C(struct _ENEMY_WORK* self);
 u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
@@ -2541,10 +2484,8 @@ u8 fn_80129DB8(struct _ENEMY_WORK* self);
 u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
 s32 fn_8012A204(struct _ENEMY_WORK* self);
 
-/* enemy/fn_8012BDF4.cpp (0x8012BDF4..0x8012E968). */
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 
-/* enemy/fn_8012EC74.cpp (0x8012EC74..0x80137604). */
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 u32 fn_8013023C(struct _ENEMY_WORK* self);
@@ -2553,43 +2494,41 @@ void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 em_flags836_ck(struct _ENEMY_WORK* self, u32 a);
 void fn_8013A654(struct _ENEMY_WORK* self, u32 a);
 
-/* enemy/fn_80138074.c (0x80138074..0x8013ACC4). */
+/* `enemy/fn_80138074.c` */
 void fn_8013918C(void* helper, s16 flag);
 
-/* the object `fn_801E0538` dispatches on (the part-manager record; this unit names only the step byte
- * it reads).
- * size: 0x6 */
+/* The part-manager record `fn_801E0538` dispatches on (only the step byte is named).  size: 0x6 */
 struct EmEftPartsMan {
     /* +0x00 */ u8 unused_0x00[0x05];
     /* +0x05 */ u8 state; /* the step index `fn_801E0538` switches on */
 };
 
-/* this range's own part-manager step functions (declared so the dispatcher compiles; the bodies are
- * the band's residuals, see the file header). */
+/* The part-manager step functions: `fn_801E0574` (unwritten) and three of `lobby/fn_801E0ADC.cpp`. */
 void fn_801E0574(struct EmEftPartsMan* self);
 void fn_801E0D38(struct EmEftPartsMan* self);
 void fn_801E1A2C(struct EmEftPartsMan* self);
 void fn_801E1A3C(struct EmEftPartsMan* self);
 
-/* ef module - the effect clusters. */
+/* The effect clusters. */
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
 void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 
-/* the base runtime helpers the range reaches. */
+/* Runtime helpers. */
 f32 fn_80050EF4(void* a, void* b);
 void fn_8005D0CC(void* out, void* src);
 void fn_8005D1AC(void* out, u32 a);
 void fn_8006FDCC(void* a);
 void fn_800810DC(void* self, u32 a);
 
-/* `stage_map_kind_get`, `get_now_mapno` and `get_now_areano` come from `unsplit/unknown.h`. */
+/* `stage_map_kind_get` and `get_now_areano` come from `stage/stg_w.h`, `get_now_mapno` from
+ * `unsplit/unknown.h`. */
 
 /* ----------------------------------------------------------------------------------------------------
  * the definitions (C linkage: they keep the map's own `fn_XXXXXXXX` names)
  * -------------------------------------------------------------------------------------------------- */
 
-/* 0x801DB8E0 (0x98) - arm the +0x1BC/-0x20C effect spawn once the work record answers the map query
+/* 0x801DB8E0 (0x98) - arms the +0x1BC/-0x20C effect spawn once the work record answers the map query
  * and `system_w`'s counter has run a multiple of 24 frames. */
 void fn_801DB8E0(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
@@ -2602,9 +2541,8 @@ void fn_801DB8E0(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801DB978 (0x494) - the effect-spawn dispatcher: one case per effect id, each either calling the
- * owner's `eft009_set_pos` directly (when the joint is 0xFF) or handing the joint to
- * `eft009_spawn_at_joint`/`eft_spawn_pos_in_area`/`eft_spawn_type11`. */
+/* 0x801DB978 (0x494) - the effect-spawn dispatcher: per effect id, `eft009_set_pos` when the joint is 0xFF,
+ * else the joint goes to `eft009_spawn_at_joint`/`eft_spawn_pos_in_area`/`eft_spawn_type11`. */
 void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, f32 scale) {
     nw4r::math::VEC3 pos;
     VEC3_ctor(&pos);
@@ -2740,9 +2678,8 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
     }
 }
 
-/* 0x801DF2F8 (0x248) - fade the four K-colour alphas of the embedded `MHchar`: the value follows
- * `field_0x340` (stepped by `lbl_8079975C` toward `lbl_80799760`/0), or its scaled and clamped form
- * when the work record answers part kind 4 with area 4/6. */
+/* 0x801DF2F8 (0x248) - fades the four K-colour alphas of the `MHchar` with `field_0x340` (stepped toward
+ * `lbl_80799760`/0), scaled and clamped for part kind 4 in area 4/6. */
 void fn_801DF2F8(struct _ENEMY_WORK* self) {
     _GXColor color;
     u32 strength;
@@ -2811,7 +2748,7 @@ u32 fn_801DF540(struct _ENEMY_WORK* self, u8 a) {
     return 0;
 }
 
-/* 0x801DF568 (0x2A4) - arm the part's motion (`em_move_mode_set`) and pick the `fn_80126278` effect id
+/* 0x801DF568 (0x2A4) - arms the part's motion (`em_move_mode_set`) and picks the `fn_80126278` effect id
  * from the work record's map kind (`stage_map_kind_get`) and `area_no`. */
 void fn_801DF568(struct _ENEMY_WORK* self, u8* outA, u8* outB) {
     u32 kind;
@@ -2922,9 +2859,8 @@ u32 fn_801DF810(struct _ENEMY_WORK* self, u8 part) {
     return 0;
 }
 
-/* 0x801DF8EC (0x31C) - the part-state step: gate on the map kind 1..5, then a `fn_80129DB8` state
- * test, a special-part request through `fn_8012A014` and the "new special part" arming of
- * +0x1FC/+0x1FE/+0x1FF. */
+/* 0x801DF8EC (0x31C) - the part-state step: gate on map kind 1..5, test the state (`fn_80129DB8`), request
+ * a special part (`fn_8012A014`) and arm +0x1FC/+0x1FE/+0x1FF. */
 u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
     u32 kind;
     u32 found;
@@ -3038,7 +2974,7 @@ u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
     return fn_8012A204(self) == 1;
 }
 
-/* 0x801DFC08 (0x134) - step the four action-block floats toward their clamps (up when `em_alt_mode_ck`
+/* 0x801DFC08 (0x134) - steps the four action-block floats toward their clamps (up when `em_alt_mode_ck`
  * answers 1, down otherwise). */
 void fn_801DFC08(struct _ENEMY_WORK* self) {
     EmActionBlock* blk = &self->action_0x328;
@@ -3079,8 +3015,8 @@ void fn_801DFC08(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801DFD3C (0x170) - aim at `self->vec_0x36C`: turn the angle from `pos` into a rotation about y
- * and write the resulting point into `out`. */
+/* 0x801DFD3C (0x170) - aims at `self->vec_0x36C`: turns the angle from `pos` into a rotation about y
+ * and writes the resulting point into `out`. */
 void fn_801DFD3C(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut, f32 scale) {
     nw4r::math::VEC3 dir;
     nw4r::math::VEC3 rot;
@@ -3111,7 +3047,7 @@ void fn_801DFD3C(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
     }
 }
 
-/* 0x801DFEAC (0x40) - clear the helper and set part 7. */
+/* 0x801DFEAC (0x40) - clears the helper and sets part 7. */
 void fn_801DFEAC(struct _ENEMY_WORK* self) {
     u8 tmp[0x0C];
     fn_8005D1AC(&tmp, 0);

@@ -1,338 +1,56 @@
-/* enemy/em001_prog.cpp - enemy 001 program
- *
- * `.text` 0x80147C94..0x80154E40, 121 functions written (the rest of the range is not decompiled yet).
- * Phase 4: fold of 5 registered units, built from `enemy/fn_80147CE0.cpp`, `enemy/fn_80149D6C.c`, `enemy/fn_8014A1BC.c`, `enemy/fn_801502C8.cpp`.
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- *
- * Kept views: the retired sources declared 42 callee(s) with different signatures (`addVec3`, `assignVec3`, `calcVecAngXY`, `draw_shape_arm`, `eft009_set_pos`, `eft009_spawn_at_joint`, `eft_em_spawn`, `eft_spawn_type10`, `eft_spawn_type11`, `em_approach_start`, `em_busy_set`, `em_fall_height_get`, ...); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
- * Hidden declarations: 3 header declaration(s) that disagree with the kept view are renamed away around their `#include` (`#define <name> <name>_hidden_<header>`): `draw_shape_arm`, `em_hit_window_set`, `fn_80149D6C`.
- * Demoted: it absorbed the Matching unit `enemy/fn_80149D6C` (it matched as C; it is NonMatching here: the merged object is not byte-identical until the unit's other bodies are written).
- */
-
-/* Retired header of `enemy/fn_80147CE0.cpp` (kept for its notes and residuals): */
-/* enemy/fn_80147CE0.cpp - the enemy action-handler band, `.text` 0x80147CE0..0x80149D6C (36 functions).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup`: every address resolves to a `zz_XXXXXXXX_` dump name and a
- * bare `.text` entry in config/RMHE08/symbols.txt, so no real name exists to use).
- *
- * What it is.  `_ENEMY_WORK` action handlers of the enemy band, the same family as the neighbouring
- * units `enemy/fn_8014A1BC.c` (0x8014A1BC above) and the action band below 0x80147CE0:
- *
- *   * `fn_80147CE0(self, arg)` is the per-tick entry of one action (the same opening as
- *     `enemy/fn_80176C58.cpp`'s `fn_80176C58`): it attaches the 12-byte vtable helper through
- *     `em_res_user_data_set` when `em_res_user_data_ck` reports none, advances the effect timer for the `2` step and
- *     spawns the 0x1C72 effect (`fn_801057A4`).
- *   * the long state-machine family - `fn_80148248`, `fn_801482D0`, `fn_8014834C`, `fn_801483C8`,
- *     `fn_80148448`, `fn_80148528`, `fn_801486A4`, `fn_80148720`, `fn_8014879C`, `fn_80148828`,
- *     `fn_80148BD0`, `fn_80148E6C`, `fn_80148F88`, `fn_801492B8`, `fn_801498C8`, `fn_80149A08`,
- *     `fn_80149AFC`, `fn_80149C58` - each opens with `switch (self->state)` (+0x05), state 0 arming the
- *     action (`em_move_mode_set` + a motion setter + `field_0x020` timer) and state 1 waiting for the motion
- *     to end (`em_mot_end_ck`) before closing it (`em_action_finish`/`em_action_finish_fall`/`em_action_finish_walk`).
- *   * three sub-state dispatchers keyed on `_ENEMY_WORK::state_sub` (+0x1E6) - `fn_801484D4`,
- *     `fn_80149004`, `fn_80149814` (11- and 14-entry jump tables) - and `fn_80147F48`, the 14-way
- *     dispatch on the action argument with its own `jumptable_805A20E0`.
- *   * the frame helpers `fn_80147E68` (the action-cancel/transition step), `fn_801481D8` (the 50-frame
- *     counter), `fn_801481FC` and `fn_80147F00` (the motion-selection tail).
- *   * the second action's own step family - `fn_80149068`, `fn_80149170`, `fn_80149214`, `fn_801492B8`,
- *     `fn_801493A8` (the six-state spawn body with the shell callback), `em_spawn_rec_init` (the spawn
- *     record's position reset), `fn_801497BC` and the joint/effect helpers `fn_801498C8`,
- *     `fn_80149A08`, `fn_80149AFC`, `fn_80149C54`, `fn_80149C58`.
- *
- * Module and name (brief section 2, in evidence order).
- *   1. No `__FILE__` string is reachable from this range: the only data its code builds are the
- *      `.sdata2` pool, the three `jumptable_*`, the two `.rodata` tables `lbl_8056F8E0`/`lbl_8056F920`
- *      and the `.data` labels - no source-file name.
- *   2. `python tools/symbols/dumpmap.py lookup` answers `zz_0147ce0_` for the range's addresses (a
- *      `zz_` placeholder is not evidence).
- *   3. The code is enemy-band: every function takes a `_ENEMY_WORK*` (pinned by the callee
- *      `em_frame_check__FP11_ENEMY_WORKUsff`) and calls the `em_*`/`fn_8012xxxx` enemy helpers; both
- *      bracketing registered units are `enemy` (`enemy/fn_8013F764.cpp` below, `enemy/fn_80149D6C.c`
- *      above) and the band's naming scheme is the map's own `fn_XXXXXXXX` stem.
- *   The file therefore keeps the map stem (brief option 4); no name was invented.
- *
- * Seam (the left edge is unproven, and said so).  The right edge at 0x80149D6C is evidence: the
- * registered `enemy/fn_80149D6C.c` starts exactly there and this unit's `extabindex` run ends exactly
- * at 0x8002871C, where that unit's begins.  The LEFT edge at 0x80147CE0 is NOT evidence - it is the
- * `--max-bytes` cut of the discovery queue (`MAX_BYTES_DEFAULT` = 27436): the maximal unclaimed run is
- * 0x801411B8..0x80149D6C (35764 B), so `tools/units/attribute.py` cut it at the last function boundary
- * under the cap, and the piece below is `enemy/enemy_control.cpp` (27432 B, its `tu` verdict `merged`).  The
- * two pieces very probably belong to one TU:
- *   * `enemy/enemy_control.cpp` carries the only `__FILE__` evidence in the run - `enemy_control.cpp`,
- *     referenced from 0x801411DC/0x80141258 - and this piece's code references no source name at all,
- *     which is what a continuation of that file looks like;
- *   * the two `.data` tables this range's constructors install (`lbl_805A1368` for `em_res_user_data_ctor`,
- *     `lbl_805A4478` for `fn_80147DF0`, both 0x30 B) are vtables whose entries point at
- *     0x8013918C/0x801394D4/0x80139858/... - virtual functions of the range BELOW - so the classes
- *     this unit constructs are declared there;
- *   * the `.sdata2` pool runs continuously across the cut (0x80796DC8..0x80796EE0), and
- *     `enemy/fn_80176C58.cpp` (a landed unit 0x2A000 B above) calls this unit's `em_res_user_data_ctor` as the
- *     base constructor of its own 12-byte helper.
- * The registration stays separate because that is what this worker was briefed to register; the merge
- * into one `enemy/enemy_control.cpp` is the orchestrator's re-split decision and is requested in the
- * outbox (`config_requests[0]`).
- *
- * Language.  Four of the unit's callees are mangled (`em_frame_check__FP11_ENEMY_WORKUsff`,
- * `setVector3__FPQ34nw4r4math4VEC3fff`, `calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`,
- * `__nw__FUl`) and rule 9 forbids spelling a mangling at the call site, so each is declared at C++
- * scope with the signature its mangling encodes and the file is C++ - the same evidence
- * `langcheck`'s region verdict (C++, medium) rests on.  Every definition keeps the map's plain
- * `fn_XXXXXXXX` name, i.e. the `extern "C"` block below.
- *
- * Types.  `_ENEMY_WORK` is the shared record `enemy/ENEMY_WORK.h` owns (rule 1); this unit
- * added the fields it measured to that header (+0x1FB, +0x314/+0x318/+0x324, +0x354..+0x358, +0x38B,
- * +0x464).  Two records this unit uses are private copies of records another unit also carries and are
- * a rule-1 follow-up (outbox `config_requests[1]`): the 12-byte vtable helper
- * (`Helper_80147CE0` here, `Helper_80176E50` in `enemy/fn_80176C58.cpp`) and the 0x18-byte spawn
- * record (`EmSpawnRec` here, `ShellParams` in `enemy/fn_8014A1BC.c`); the shell callback table is the
- * shared `ShellSetFuncs` of `stage/shell_set_func_ptr.h` (`enemy/fn_8014A1BC.c` keeps a private `ShellSetFunc`).
- *
- * Sections.  Besides `.text` the unit owns `extab` 0x8000D9DC..0x8000DACC and `extabindex`
- * 0x800285B4..0x8002871C, both taken from the target's OWN per-function entry boundaries (30 of the 36
- * functions carry an entry): the piece below ends its `extabindex` exactly at 0x800285B4 and
- * `enemy/fn_80149D6C.c` begins its own exactly at 0x8002871C.  Measured: the object's `extab` is
- * 0xF0 and its `extabindex` 0x168, byte-for-byte the totals of the 36 target objects.  No `.ctors`
- * word, and no data - the `.sdata2`/`.data`/`.rodata` runs the range references are shared pools and
- * are NOT claimed (docs/plan.md 8.4).
- *
- * Status (measured in this worktree with `python tools/units/recompile.py enemy/fn_80147CE0.cpp
- * --measure <symbol>`, against the split's own single-symbol objects).  28 of the 36 bodies are
- * byte-identical (100.00 %); every function is above the 80 % bar; our `.text` is 0x2064 B against the
- * target's 0x208C B.  By size:
- *   * 100.00: fn_80147DF0, em_res_user_data_ctor, fn_80147F00, fn_801481D8, fn_801481FC, fn_80148248,
- *     fn_801482D0, fn_8014834C, fn_801483C8, fn_80148448, fn_801484D4, fn_80148528, fn_801486A4,
- *     fn_80148720, fn_8014879C, fn_80148BD0, fn_80148E6C, fn_80148F88, fn_80149004, fn_80149170,
- *     fn_80149214, em_spawn_rec_init, fn_801497BC, fn_80149814, fn_801498C8, fn_80149A08, fn_80149AFC,
- *     fn_80149C54.
- *   * fn_80149C58 99.86, fn_80147E68 98.42, fn_80148828 96.40, fn_801493A8 93.99, fn_80147CE0 92.43,
- *     fn_80149068 90.91, fn_801492B8 90.00, fn_80147F48 89.34.
- *
- * Residuals, by measurement (each is a codegen shape, not comprehension):
- *   * ARGUMENT EVALUATION ORDER (fn_80147CE0 92.43, fn_80149068 90.91, fn_801492B8 90.00).  The
- *     target evaluates the FLOAT argument of `em_motion_param_set(self, 0, 0.0f)` / `em_approach_start(self, 0, x)`
- *     BEFORE the integer one (`lfs f1,pool` then `li r4,imm`); MWCC evaluates arguments in
- *     declaration order, so that order is what a declaration of `(self, f32, s32)` produces.
- *     Measured directly: with the band header's `(self, s32, f32)` the same call site emits
- *     `li r4,imm` then `lfs f1,pool` (both orders reproduce the same ABI - one FPR and one GPR slot -
- *     so this is a declaration-order artefact of the original TU, not a wrong call).  Fixing it means
- *     flipping the parameter order in `unsplit/enemy.h`'s C++ view of `em_motion_param_set`/
- *     `em_approach_start` AND the call sites in `src/enemy/fn_801550FC.cpp` (another unit's file), so it is
- *     recorded rather than done here.
- *   * MASKED-VALUE CSE (fn_80147CE0 92.43).  `(arg & 0xFF)` used twice CSEs into one register
- *     (`clrlwi r31,r31,24` reused) where the target re-masks into a fresh scratch each time
- *     (`clrlwi r0,r31,24` twice).  `(u8)arg` per use reproduces the fresh masks but flips the
- *     comparisons to `cmplwi`; the target needs `cmpwi` for `== 2` and `cmpwi` for `!= 0`, which only
- *     the signed masked expression produces.  Both spellings measured; the signed one is kept.
- *   * RANGE-TEST LOWERING (fn_80147F48 89.34, target 0x290 B / ours 0x278 B).  Case 3's adjacent
- *     values 22/23 are a register range test in the target (`subi r0,r4,0x16; cmplwi r0,1; ble`) and
- *     this compiler lowers the same `switch` case pair as two compares.  An explicit
- *     `if ((u8)sub == 22 || (u8)sub == 23)` if-chain was measured too (86.60 - the four re-maskings
- *     cost more than the range test gains), so the switch is kept.  The same function's case 10 is a
- *     7-value binary-search tree in the target and comes out equivalent here; the remaining rows are
- *     the `li r6,0`/`r0` zero-source colouring.
- *   * SHELL CALLBACK SETUP ORDER (fn_801493A8 93.99, target 0x3E0 B / ours 0x3D8 B).  The target
- *     materialises the 4th argument (`shell_set_func_ptr`) after r3/r4/r5 and only then loads the
- *     callee from its +0x3C slot; ours loads the table first.  Also measured: `u32 v` (kept - it is
- *     what makes the two range tests `cmplwi`, as the target has them) vs `s32 v` (93.75) vs `u8 v`
- *     (93.31, and it re-masks at each use), and `s32 arg2` + `(arg2 & 0xFF)` for the `== 2`/`== 4`
- *     compares (kept - the target's `cmpwi`).
- *   * UNINITIALISED LOCAL, REPRODUCED (fn_801493A8).  The target reads the case-2 local
- *     (`r30 = (u8)arg2 - 1`) from case 3's dispatch (`clrlwi r0,r30,24`), i.e. the original code reads
- *     an uninitialised automatic in case 3; the compiler says so (`variable 'v' is not initialized
- *     before being used`) and the source keeps the shape because it is what the target's instructions
- *     are.  Declaring `v` at function scope is required for that (`u8 v = 0;` would add an
- *     instruction the target does not have).
- *   * fn_80148828 96.40 (target 0x3A8 B / ours 0x3A0 B) and fn_80147E68 98.42: a handful of rows each,
- *     no shape named - both are above the bar and their bodies are complete.
- *
- * Source shapes worth keeping (each measured):
- *   * `(u8)arg` / `(u8)sub` PER USE, not `(arg & 0xFF)`: `fn_80147F48`'s three `clrlwi r0,r4,24`
- *     masks and the `li r6,0` zero source only appear with the per-use casts; the masked-expression
- *     spelling CSEs into one register and moves the zero to r0 (88.7 -> 89.3 on the same body).
- *   * `(s32)` parameters for `(arg & 0xFF)`: a signed parameter makes `arg & 0xFF` an `int`, which is
- *     what turns `cmplwi` into the target's `cmpwi` (`fn_80149068` 89.09 -> 90.91, `fn_801492B8`
- *     88.00 -> 90.00).
- *   * `switch` cases that share a body are written ONCE and listed (`case 8: case 9:`), and the
- *     sub-state dispatchers list the arguments in the target's order (`fn_801497BC(self, 0, 1)` for
- *     sub-state 6, not `(self, 1, 0)`).
- *   * `#pragma peephole off` is load-bearing for the whole unit: retail keeps the unfused
- *     `clrlwi`/`rlwinm` + `cmpwi` pairs the `-O3` peephole folds into `clrlwi.` (the same finding as
- *     `enemy/fn_8012BA00.c`, `enemy/fn_8012BDF4.cpp` and `enemy/fn_80176C58.cpp`).
- *
- * Declarations.  Rule 2 sent every callee to the header that owns it: this unit's own entry points are
- * published in `enemy/fn_80147CE0.h` (moved out of `unsplit/enemy.h`, whose old-style
- * spellings the C consumers keep), and `fn_80154CA4`/`fn_801545B8` (enemy band, unowned) went the
- * other way into `unsplit/enemy.h`.  The band header's `fn_80128A8C`, `em_hit_window_set`,
- * `em_action_finish_fall`, `em_action_finish_walk` and `em_target_pos_set` moved to their owner's header
- * (`enemy/fn_801251D0.h`), and `draw_shape_arm`'s owner (`src/draw_shape.cpp`) got its first
- * header (`draw_shape.h`).  `fn_8004CAD8.h` gained `calcVecAng2` (C++ linkage, the
- * mangling the map names) and `ef/eft007.h`/`eft009.h` gained the C++ views of
- * `eft007_part_spawn`/`fn_801049D0` (one view per TU - declaring both spellings is `(10197) illegal
- * function overloading`, measured).
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit enemy/fn_80147CE0.cpp`.
- */
-
-/* Retired header of `enemy/fn_80149D6C.c` (kept for its notes and residuals): */
-/* auto/80149D6C_fn_80149D6C.c - one enemy action step, `.text` 0x80149D6C..0x8014A1BC.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * What it is.  The unit is one `_ENEMY_WORK` action.  A two-state machine on `state_0x05` (state 0
- * initialises through `fn_80134F70`/`em_approach_start`/`em_fall_height_get`/`fn_80135584`, state 1 runs the action)
- * plus a `phase_0x06`/`step_0x07` pair picks the body; the shared tail first asks `em_approach_step`
- * whether the enemy is in the released group and then either sets an act id
- * (`em_state_set`/`fn_80128A70`) or hands the parameter table `lbl_8056F9E0` to `fn_80135000`.  The
- * `u8` argument is the action index the dispatcher in this region tail-calls the function with (0/1/2).
- *
- * Flags.  The unit needs a scoped `#pragma peephole off` (playbook 39): retail keeps the `clrlwi`
- * zero-extensions of the argument at every use, and the `-O3` peephole folds them away.  With the
- * peephole off the one comparison that must stay *signed* is `if ((arg & 0xFF) == 1)` (`cmpwi`);
- * `(u8)arg == 1` folds to `cmplwi` and costs a point.
- *
- * Source shapes worth keeping (each measured against the target):
- *   * `state_0x05`/`phase_0x06` are incremented, not assigned a literal, so retail reuses the value
- *     the `switch` already loaded (`addi r0,r3,1`).
- *   * the shared tail is written *inside* `case 1`, so the outer switch's default returns (a branch
- *     to the epilogue) instead of falling into the tail (`b` to the tail body).
- *   * the two nested switches write `default:` first (playbook 37), and the released-tail switch
- *     lists `case 2: case 3: case 4:` before `case 0:` - that is the order whose fall-through body
- *     is the one retail lays out last.
- *
- * Types.  `_ENEMY_WORK` is the enemy work record; its size 0xB18 is the kind-3 stride in
- * `create_move_work` (`mulli r30,r3,2840` at 0x800CFA0C) and `fn_80131034` walks the same array
- * with it.  `field_0x188`/`pos_0x1BC`/`area_no` follow the sibling units that already reconstruct
- * this record; the remaining fields are named by offset where the byte's role is not settled.
- *
- * Data.  The unit owns no pool: `lbl_8056F9E0` (`.rodata`, the action parameter table),
- * `lbl_80796E1C` (0.0f) and `lbl_80796EE8` (16000000.0f) are shared and stay `extern`-declared
- * (playbook 29).
- *
- * Language.  The unit's own symbol is plain and nothing names its original source file, so the file
- * stays C and the one mangled callee is declared by its map spelling.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/80149D6C_fn_80149D6C.c`.
- */
-
-/* Retired header of `enemy/fn_8014A1BC.c` (kept for its notes and residuals): */
-/* auto/8014A1BC_fn_8014A1BC.c - the enemy-work state unit, 0x8014A1BC..0x801502C8 (60 functions).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * Provisional attribution: the range came from the DOL's own layout (docs/plan.md 12 item 5).  Seams
- * (see the `tu-boundary-discovery` skill): .data run jump jumptable_805A30B0 -> jumptable_805A4020,
- * .sdata2 run jump lbl_80796FD4 -> lbl_80796FD8.
- *
- * What it is: the state machines of one enemy action - two jump-table dispatchers (`fn_8014AA4C`,
- * `fn_8014B5C0`, `fn_8014E3AC`) tail-call a handler per action code, and each handler walks the
- * object's two-level `state`/`sub_state` machine, driving the frame checks, motions, scales and the
- * shell effect callbacks.
- *
- * Result: 59 of 60 functions at or above 80 % (14 at 100 %, mean 96.18 %, size-weighted 95.42 %).
- * `Object(NonMatching, ...)`: the object does not link.  The residual is in fn_8014BDAC (70.26 %):
- * retail keeps `clrlwi r0,r5,24; cmpwi r0,0` separate where every source form tried fuses the mask
- * and the zero-compare into `clrlwi.`; see `.pi/notes/8014a1bc-fn-8014a1bc-03ce.md`.  fn_8014CEF8
- * (81.36 %) and fn_8014F078 (85.42 %) are closed but low because their stack locals were typed VEC3
- * from their use sites.
- *
- * Object: `_ENEMY_WORK` (name evidence: the mangled callee `em_frame_check`
- * carries the 11-character type name `_ENEMY_WORK`).  Field offsets and widths are read from the
- * target's load/store instructions, and the `VEC3`s at +0x188 / +0x1B0 / +0x310 / +0x36C from the
- * `PQ34nw4r4math4VEC3` arguments they are passed as.  Size annotations are lower bounds.
- *
- * Load-bearing source shapes (each measured; see the notes file for the full list):
- *   * a `switch` whose `default:` is written first where retail puts the default body after the
- *     compare chain (`fn_8014B6CC`, `fn_8014C16C`);
- *   * `(x & 0xFF)`, not `(u8)x`, when retail uses the signed `cmpwi`;
- *   * `>=`, not `==`, for the `fcmpo` + `cror eq,gt,eq` float tests.
- *
- * Language: C (the unit's own symbols are plain, no `__FILE__` string, no mangled definition).
- *
- * Data runs in this range are recorded in `splits.txt` as comments and NOT claimed: a stub object
- * emits nothing, and a range our object does not emit must not be claimed (playbook 23, docs/plan.md
- * 8.4).  The extab/extabindex fragments already travel with the code unit.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/8014A1BC_fn_8014A1BC.c`.
- */
-
-/* Retired header of `enemy/fn_801502C8.cpp` (kept for its notes and residuals): */
-/* enemy/fn_801502C8.cpp - the enemy em00x action band, `.text` 0x801502C8..0x80154E40 (26 functions).
- *
- * what it is.  One band of an enemy's action/state family, the same kind as the registered
- * `enemy/fn_80147CE0.cpp` below (0x80147CE0..0x80149D6C) and `enemy/fn_801550FC.cpp` above: every
- * function takes the shared `_ENEMY_WORK`, switches on its `state` (+0x05) / `action` (+0x1E5) /
- * `state_sub` (+0x1E6), and drives the motion/effect helpers (`em_frame_check`, `em_after_frame_check`,
- * `em_get_mot_no`, `get_joint_wpos_em`, `get_em_chg_scale`).  The two dispatchers `fn_80151074` /
- * `fn_801510C4` are the band's tail-call tables; `fn_801514BC` is its 0x2CC8-byte case table (a
- * residual, see below).
- *
- * module and name (brief section 2, evidence order).
- *   1. No `__FILE__` string covers the range.  The only `.data`/`.rodata` the range builds are the
- *      `.sdata2` pool, the three `jumptable_*` (`805A30B0`/`805A4064`/`805A408C`), the `.rodata`
- *      parameter tables `lbl_805A2BD8`/`2D68`/`2F28`/`30DC`/`3280`/`3860`/`3AE0`/`3C10`/`3DD0`/`3E90`/
- *      `3FC0`, and the `.bss` vector records - none is a source-file name.  (Discovery notes a
- *      candidate seam inside `enemy_control.cpp`, whose `__FILE__` string at 0x805A1BB8 is referenced
- *      only by the range below; the `tu` verdict is `unproven`, so this unit registers separately.)
- *   2. `python tools/symbols/dumpmap.py lookup` answers `zz_01502c8_` for the range's addresses (a
- *      `zz_` placeholder is not evidence).
- *   3. The code is enemy-band: every function takes the `_ENEMY_WORK` (pinned by the callee
- *      `em_after_frame_check__FP11_ENEMY_WORKUsff`); both bracketing registered units are `enemy`
- *      (`enemy/fn_8014A1BC.c` below, `enemy/fn_801550FC.cpp` above) and the module's naming scheme is
- *      the map's own `fn_XXXXXXXX` stem.
- * The file therefore keeps the map stem (brief option 4); no name was invented.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup`: every address of the range answers `zz_XXXXXXXX_` and
- * carries a bare `fn_XXXXXXXX = .text:0x...` entry in config/RMHE08/symbols.txt; no `__FILE__` string
- * is reachable from the range).
- *
- * language.  C++: the range's callees are C++ manglings (`em_after_frame_check__FP11_ENEMY_WORKUsff`,
- * `em_get_mot_no__FP11_ENEMY_WORK`, `get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3`,
- * `calcVecAngX__FPQ34nw4r4math4VEC3`, `setVector3__FPQ34nw4r4math4VEC3fff`, `__nw__FUl`/`__dl__FPv`).
- * Rule 9: those are declared at C++ scope with the signature their mangling encodes and called through
- * it; every `fn_*` definition stays `extern "C"`.
- *
- * seam.  The left edge at 0x801502C8 is where the registered `enemy/fn_8014A1BC.c` ends and its
- * extab/extabindex runs end exactly where this unit's begin (extab 0x8000DAD4..0x8000DC54,
- * extabindex 0x80028728..0x80028968).  The right edge at 0x80154E40 is proven three ways: `fn_80154D44`
- * is this unit's static-initializer (the `.ctors` word below points at it, and MWCC places a TU's
- * `__sinit` last in its `.text`); the value 0.0 is pooled at `lbl_80796E1C` (read up to `fn_80154D44`) and
- * again at `lbl_807970C0` (first read by `fn_80154E90`), and one TU pools a value once; the next `.data`
- * claim, `lbl_805A5D18` (the vtable `fn_80154F70` installs) and the `jumptable_805A4848` of `fn_80154FAC`
- * tile `enemy/fn_801550FC.cpp`'s `.data`.  The four functions 0x80154E40..0x801550FC moved there (the old
- * edge 0x801550FC was the start of the next registered unit, not a seam).
- *
- * sections.  `.text` 0x801502C8..0x80154E40, `extab` 0x8000DC54..0x8000DCFC, `extabindex`
- * 0x80028968..0x80028A64, `.ctors` 0x8056F320..0x8056F324 (its entry is `fn_80154D44`, the six-vector
- * seeder), `.data` 0x805A2BD8..0x805A4478 (the parameter tables and `jumptable_*` this range reads) and `.bss` 0x806A77D8..0x806A7820 (the
- * three 0x18-byte vector records `fn_80154D44` fills).  The `.data` and `.bss` claims are not emitted by
- * the source yet.
- *
- * residuals (not written this pass):
- *   fn_801514BC (0x2CC8, 11464 B) - the band's giant case table over `jumptable_805A4104` (0xDC+1
- *     cases, each a short `em_after_frame_check`/`fn_801512E8` sequence); reconstructing it needs the
- *     whole table read out of the DOL case by case.
- *   fn_801544F0 (0xC8) - reads a 32-bit pointer at `_ENEMY_WORK` +0x04, which the shared header types
- *     as the byte `field_0x004` (`em_work_die_ck`'s aliveness byte); the two views of +0x04 are a
- *     rule-1 header follow-up, not this unit's to force.
- * The measurement for each is in the worker's outbox.
- *
- * shape and residuals, measured (`recompile.py --measure`, the official report metric).  22 of the 24
- * written functions are at or above the 80 % bar, 12 of them byte-identical (`fn_801502C8`,
- * `fn_80150728`, `fn_80150FCC`, `fn_80151074`, `fn_801510C4`, `fn_801545B8`, `fn_80154784`,
- * `fn_80154928`, `fn_8015497C`, `fn_80154988`, `fn_80154CA4`, `fn_80154D44`).  The file default is
- * `#pragma peephole off` - like `enemy/fn_801D80EC.cpp`, most of the band keeps the unfused
- * `clrlwi`+`cmpwi`/`extsh` forms the peephole pass folds - with a scoped `#pragma peephole on`
- * around the five functions that are the other way (`fn_801502C8` 96.43->100, `fn_80150728`
- * 97.56->100, `fn_801507CC` 96.88->99.79, `fn_80150FCC` 97.62->100, `fn_801545B8` 93.44->100).
- * Two partials sit below the bar and keep their best-scoring shape:
- *   fn_80154184 66.02 % (332 B vs 332 B): the instruction multiset is identical (both the rgb and the
- *     alpha `u32 -> f32 -> int` conversions are there); only the `-O3` scheduling of the call's
- *     argument setup differs (we hoist `lfs f1, 0x1d4(self)` and the `addi r3/li r4/li r5` triple
- *     above the conversion, retail keeps them after it).  Tried: two named vars (same), a `u32 rgba[2]`
- *     array (same codegen), the value-in-both-branches shape (same).
- *   fn_801542D0 76.92 % (544 B vs 524 B): the flow is the surviving shape - `fn_80129DB8`'s
- *     case 1 arms and case 2 returns, then the `armed == 0` `fn_80129E48` test, then the arg3 pick
- *     and `fn_8012A014`.  Retail's `range`-switch keeps four separate `cmpwi`s where MWCC here folds
- *     `case 1/2/3` into a `(kind-1) <= 2` range test (the exact cause of the 20 B gap); the
- *     if-chain that would keep them separate scores 72.79 %, so the folded switch is kept.
+/*
+ * enemy/em001_prog.cpp - enemy 001's program: the `_ENEMY_WORK` action steps (two-level `state`/`state_sub`
+ *   machines), their jump-table dispatchers, the shell spawn path, the part-colour and attack tests, and the
+ *   static initializer that seeds the three vector records.
+ * RANGE. .text 0x80147C94-0x80154E40 (124 functions); extab 0x8000D9DC-0x8000DCFC, extabindex
+ *   0x800285B4-0x80028A64, .ctors 0x8056F320-0x8056F324 (`fn_80154D44`), .rodata 0x8056F8E0-0x8056FA38, .data
+ *   0x805A1C58-0x805A44A8, .bss 0x806A77D8-0x806A7820 (three 0x18-byte vector records), .sdata 0x80791A20-0x80791A38,
+ *   .sdata2 0x80796E08-0x807970C0.  The left edge 0x80147C94 is where `enemy/enemy_control.cpp`'s `.text` and
+ *   extabindex runs end; nothing else proves it (the base helper table `lbl_805A1368` is `enemy/fn_80138074.c`'s
+ *   data, not a link to `enemy_control`).  The right edge is the TU end: `fn_80154D44` is the `.ctors` entry and
+ *   MWCC places a TU's static initializer last.
+ * FLAGS. `cflags_main`; `#pragma peephole off` from `fn_80147CE0` to `fn_80149D6C` and from `fn_80151074` to the
+ *   end except `fn_801545B8` (retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` pairs, playbook 39); the band
+ *   `fn_8014A1BC`..`fn_80150FCC` and `fn_801545B8` compile with it on.
+ * NAMES. The file name follows the runtime dump's `em001_prog_tbl`, which opens `.data`.  `em_res_user_data_ctor`
+ *   (the resource user-data helper's base constructor) and `em_spawn_rec_init` (the spawn record's position
+ *   reset) are GUESSes from their bodies; the dump answers `zz_` for both.  The map has only `fn_` stems for the
+ *   other rows.  Callees whose call sites disagree with the owner's header are called
+ *   through `<name>_viewN`/`<name>_cN` cast macros (the same direct call), and `#define <name>
+ *   <name>_hidden_<header>` hides the disagreeing declaration around its `#include`.  The `.bss` record names
+ *   (`vec_pair_801502C8_*`) are GUESSes.  `_ENEMY_WORK` is 0xB18 bytes: `create_move_work` (`ef/system_core.cpp`)
+ *   strides kind 3 with `mulli r30,r3,2840` at 0x800CFA0C.
+ * RESIDUALS. 3 rows unwritten: 0x80147C94-0x80147CE0; 0x801514BC-0x80154184 (`fn_801514BC`, the case table over
+ *   `jumptable_805A4104`); 0x801544F0-0x801545B8 (`fn_801544F0` reads a 32-bit pointer at `_ENEMY_WORK` +0x04,
+ *   which `enemy/ENEMY_WORK.h` types as the byte `field_0x004`).
+ *   61 partial rows, including:
+ *  - `fn_80147CE0`: retail re-masks the argument at each use (`clrlwi r0,r31,24`) where ours keeps it in r31
+ *    (`(u8)arg` per use flips the compares to `cmplwi`), and loads the 0.0f argument before `li r4,0xa`;
+ *  - `fn_80147F48`: retail lowers case 3's 22/23 pair to a range test (`subi r0,r4,0x16; cmplwi r0,1`), ours to
+ *    two compares (an if-chain scores lower); the rest is the `li r6,0`/r0 zero-source colouring;
+ *  - `fn_801493A8`: retail materialises `shell_set_func_ptr` (the 4th argument) before it loads the callee from
+ *    the table's +0x3C slot, ours loads the table first;
+ *  - `fn_8014BDAC`: retail keeps `clrlwi r0,r5,24; cmpwi r0,0` where every source form tried fuses `clrlwi.`;
+ *  - `fn_8014CEF8`: its stack locals are typed `VEC3` from their use sites and the frame does not line up;
+ *  - `fn_80154184`: the same instructions, but MWCC hoists the call's argument setup (`lfs f1,0x1d4(self)`,
+ *    `addi r3`/`li r4`/`li r5`) above the two `u32 -> f32 -> int` conversions, retail keeps it after them;
+ *  - `fn_801542D0`: retail keeps four `cmpwi`s where MWCC folds `case 1/2/3` into a `(kind-1) <= 2` range test
+ *    (the 20-byte gap; the if-chain scores lower).
+ *   The other 54 partial rows have no recorded cause.  A fully scored row can still call the wrong
+ *   symbol: `fn_801502C8` (fully scored) and `fn_801507CC` call `em_after_frame_check` where retail calls
+ *   `em_frame_check` (3 relocations: `fn_801502C8`+0x158, `fn_801507CC`+0x19c, +0x334; `relocdiff --by-owner`).
+ *   flipcheck: `.ctors`/`.rodata`/`.sdata` claimed, not emitted; `.data` 0x30C against 0x2850, `.sdata2` 0x10
+ *   against 0x2B8; `.text` (0xA304 of 0xD1AC), extab (0x310 of 0x320) and extabindex (0x498 of 0x4B0) short of
+ *   the claim and differing.
+ * SHAPES. `(u8)arg`/`(u8)sub` per use in `fn_80147F48` (its three `clrlwi r0,r4,24` and the `li r6,0` zero
+ *   source); `(s32)` parameters so `arg & 0xFF` is an `int` and compares with `cmpwi` (`fn_80149068`,
+ *   `fn_801492B8`).  `fn_801493A8` reads its case-2 local `v` uninitialised in case 3, as retail does: `v` is
+ *   declared at function scope with no initialiser.  `fn_80149D6C` increments `state_0x05`/`phase_0x06` (retail
+ *   reuses the loaded value, `addi r0,r3,1`), writes the shared tail inside `case 1`, writes `default:` first in
+ *   both nested switches (playbook 37) and lists `case 2: case 3: case 4:` before `case 0:`.  `fn_8014B6CC` and
+ *   `fn_8014C16C` write `default:` first; `>=`, not `==`, gives the `fcmpo` + `cror eq,gt,eq` float tests.
+ *   `fn_801512E8`'s `buf_0x18` is a 0x18-byte buffer whose first 0xC bytes are the helper record: its size sets
+ *   the frame.
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
@@ -393,11 +111,11 @@
 #undef fn_80149D6C
 #include "enemy/fn_8012EC74.h" /* fn_80136D4C (its owner) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "unsplit/enemy_pool.h" /* the band's unowned .data pools (rule 2) */
+#include "unsplit/enemy_pool.h" /* this unit's own `.data` symbols, declared in the band header (rule 2 inverted) */
 #include "enemy/fn_80147CE0.h" /* EmSpawnRec + em_res_user_data_ctor (the owner's header) */
 #include "enemy/fn_801502C8.h" /* this unit's own declarations (rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
 /* the call sites use the argument-less view: a cast call is the same direct call. */
 #define em_mot_finished_ck_c1 ((u32 (*)(void))em_mot_finished_ck)
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
@@ -407,9 +125,8 @@
 #define fn_80128A70_c1 ((void (*)(_ENEMY_WORK *, u32, u32))fn_80128A70)
 #define fn_8012E5A8_c1 ((u32 (*)(struct _ENEMY_WORK*))fn_8012E5A8)
 #define em_alt_mode_ck_c1 ((u32 (*)(struct _ENEMY_WORK*))em_alt_mode_ck)
-/* em_fall_height_get_f32: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_fall_height_get_f32 ((f32 (*)(struct _ENEMY_WORK*))em_fall_height_get)
-/* the retired C source called these unprototyped; each call keeps the shape it was written with through a cast (same direct call). */
+/* Unprototyped call shapes: each call keeps its argument shape through a cast (the same direct call). */
 #define em_busy_set_c1 ((void (*)(_ENEMY_WORK*))em_busy_set)
 #define em_busy_set_c2 ((void (*)(void))em_busy_set)
 #define em_move_offset_step_update_c1 ((s32 (*)(_ENEMY_WORK*, void*))em_move_offset_step_update)
@@ -439,93 +156,49 @@
 #define fn_801545B8_c2 ((void (*)(void*, u32, u16, u32))fn_801545B8)
 #define fn_800AD9C0_c1 ((void (*)(void*, void*, f32))fn_800AD9C0)
 #define fn_80131EC0_c2 ((void (*)(_ENEMY_WORK*))fn_80131EC0)
-/* mhchar_mat_tev_set_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define mhchar_mat_tev_set_view1 ((void (*)(void*, s32, s32, u8, s32, s32, u8, f32))mhchar_mat_tev_set)
-/* fn_8013918C_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_8013918C_view1 ((void (*)(void*, s32))fn_8013918C)
-/* fn_80131034_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_80131034_view1 ((struct _ENEMY_WORK* (*)(struct _ENEMY_WORK*, s32, s32))fn_80131034)
-/* fn_80130CDC_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_80130CDC_view1 ((void (*)(s32))fn_80130CDC)
-/* fn_801303FC_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_801303FC_view1 ((void (*)(f32))fn_801303FC)
-/* fn_8012B380_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_8012B380_view1 ((void (*)(_ENEMY_WORK*, u8, u8, u8))fn_8012B380)
-/* fn_8012A204_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_8012A204_view1 ((s32 (*)(struct _ENEMY_WORK*))fn_8012A204)
-/* fn_8012A014_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_8012A014_view1 ((u32 (*)(struct _ENEMY_WORK*, s32, s32, u16, void*, void*))fn_8012A014)
-/* fn_80128A70_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_80128A70_view1 ((void (*)(_ENEMY_WORK*, u8, u8))fn_80128A70)
-/* fn_80050EF4_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define fn_80050EF4_view1 ((f32 (*)(const void*, const void*))fn_80050EF4)
-/* em_mot_set_blend_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_mot_set_blend_view1 ((void (*)(struct _ENEMY_WORK*, s32, s32, s32, s32))em_mot_set_blend)
-/* em_magma_check_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_magma_check_view1 ((u8 (*)(struct _ENEMY_WORK*))em_magma_check)
-/* em_hit_window_set_default_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_hit_window_set_default_view1 ((void (*)(struct _ENEMY_WORK*, s32, s32))em_hit_window_set_default)
-/* em_hit_window_set_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_hit_window_set_view1 ((void (*)(struct _ENEMY_WORK*, u8, u32, u32))em_hit_window_set)
-/* em_fall_height_get_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_fall_height_get_view1 ((void (*)(struct _ENEMY_WORK*))em_fall_height_get)
-/* em_approach_start_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_approach_start_view1 ((void (*)(_ENEMY_WORK*, f32, u16))em_approach_start)
-/* eft_spawn_type11_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define eft_spawn_type11_view1 ((void (*)(struct _ENEMY_WORK*, void*, u8, f32))eft_spawn_type11)
-/* eft_spawn_type10_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define eft_spawn_type10_view1 ((void (*)(struct _ENEMY_WORK*, u32, u32, void*, f32))eft_spawn_type10)
-/* eft_em_spawn_view3: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define eft_em_spawn_view3 ((void (*)(struct _ENEMY_WORK*, s32, s32, void*, f32))eft_em_spawn)
-/* eft_em_spawn_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define eft_em_spawn_view1 ((void (*)(_ENEMY_WORK*, u32, u32, void*, f32))eft_em_spawn)
-/* eft009_spawn_at_joint_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define eft009_spawn_at_joint_view1 ((void (*)(struct _ENEMY_WORK*, s32, u8, s32, f32))eft009_spawn_at_joint)
-/* draw_shape_arm_view3: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define draw_shape_arm_view3 ((void (*)(struct _ENEMY_WORK*, s32, s32))draw_shape_arm)
-/* draw_shape_arm_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define draw_shape_arm_view1 ((void (*)(u32, u32, u32))draw_shape_arm)
-/* assignVec3_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define assignVec3_view1 ((void (*)(void*, s32))assignVec3)
-/* addVec3_view2: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define addVec3_view2 ((void (*)(void*, const void*, const void*))addVec3)
 
-/* ------------------------------------------------------------------------------------------------ *
- * the 12-byte vtable helper the action allocates
- * ------------------------------------------------------------------------------------------------ */
-
-/* The helper `fn_80147CE0` allocates and `fn_80147DF0` constructs: a 12-byte record whose +0x00 word
- * is the address of a `.data` function/parameter table.  Same record as `enemy/fn_80176C58.cpp`'s
- * private `Helper_80176E50` (that unit's constructor `fn_80176E50` calls this unit's `em_res_user_data_ctor`,
- * and the allocation is the same `operator new(0xC)`); the shared home for both is a rule-1 follow-up.
- * size: 0xC (traced from the `operator new(0xC)` call in `fn_80147CE0`). */
+/* The 12-byte helper `fn_80147CE0` allocates and `fn_80147DF0` constructs; +0x00 holds a `.data` table
+ * address.  `enemy/em015_prog.cpp`'s `Helper_80176E50` is the same record.  size: 0xC (`operator new(0xC)`) */
 typedef struct Helper_80147CE0 {
     /* +0x0 */ void* tbl;
     /* +0x4 */ u32 unused_0x4;
     /* +0x8 */ u32 unused_0x8;
 } Helper_80147CE0;
 
-/* The two `.data` tables the constructors install (`lbl_805A1368` is the base `em_res_user_data_ctor` sets,
- * `lbl_805A4478` the derived one `fn_80147DF0` overrides it with; both are 0x30 B). */
+/* The derived table `fn_80147DF0` installs over the base `lbl_805A1368` (both 0x30 bytes). */
 extern "C" u8 lbl_805A4478[];
 
-/* ------------------------------------------------------------------------------------------------ *
- * callees whose owning unit is not registered and whose address band names different modules (rule 2's
- * documented gap: the declaration has no sound header to move to), declared here as the landed
- * `enemy/fn_8014A1BC.c` and `enemy/fn_80177608.cpp` do
- * ------------------------------------------------------------------------------------------------ */
-
-/* 0x80304508 - between `ai/fn_802D0DCC.c` and `ef/fn_803066F0.c`: `(self, u32, u32, void*, f32)`. */
-/* 0x802B9574 - between `stage/fn_802B2978.c` and `ai/fn_802D0DCC.c`: one byte argument. */
+/* Callees whose owners' headers do not declare them: `camera/camera_main.cpp`'s `fn_802B9574` and
+ * `enemy/em_model.cpp`'s `fn_803B9BA0`. */
 extern "C" void fn_802B9574(u32 a);
-/* 0x803B9BA0 - between `hud/fn_80324F7C.c` and `Network/NetworkWiiMediator.c`: `(self, void*, s32)`. */
 extern "C" void fn_803B9BA0(_ENEMY_WORK* self, void* pos, s32 value);
 
-/* ------------------------------------------------------------------------------------------------ *
- * pooled data owned by other units: declared, never defined (playbook 29)
- * ------------------------------------------------------------------------------------------------ */
-
-/* the `.sdata2` pool this band's float work reads (values measured from the DOL) */
+/* The unit's `.sdata2` pool, declared, not defined: the source does not emit it yet (values from the DOL). */
 extern f32 lbl_80796E18; /* 5000.0 */
 extern f32 lbl_80796E1C; /* 0.0 */
 extern f32 lbl_80796E20; /* 1.0 */
@@ -589,14 +262,10 @@ extern "C" u8 lbl_805A1F70[];
 extern "C" Helper_80147CE0* fn_80147DF0(Helper_80147CE0* self);
 extern "C" void fn_80147F00(_ENEMY_WORK* self, u32 arg);
 
-extern "C" {
-/* ---- callees ---- */
-}
-
 f32 calcDistanceSqXZ(nw4r::math::VEC3*, nw4r::math::VEC3*);
 
 extern "C" {
-/* Shared pool literals: declared, never defined here (the pool belongs to the data pass). */
+/* The unit's pool literals, declared, not defined. */
 extern u8 lbl_8056F9E0[];
 extern f32 lbl_80796E1C; /* 0.0f */
 extern f32 lbl_80796EE8; /* 16000000.0f */
@@ -610,29 +279,19 @@ typedef struct ShellParams {
     /* +0x16 */ u8 pad_0x16[0x02];
 } ShellParams;
 
-
-
 extern "C" {
 
 }
 
-
-
 extern "C" {
 
-
-/* ---------------------------------------------------------------------------------------------------
- * callees and pool literals owned by other units (declared by their map spelling; playbook 29)
- * ------------------------------------------------------------------------------------------------- */
+/* Pool literals and callees the `fn_8014A1BC` block reads (declared by their map spelling). */
 extern f32 lbl_80796EEC;
 extern f32 lbl_80796EF0;
 extern f32 lbl_80796EF4;
 
 extern f32 fn_802B0430(u8 id);
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014A1BC - advance the object's two-level state machine and gate one timer-driven action
- * ------------------------------------------------------------------------------------------------- */
 extern f32 lbl_80796E1C;
 extern f32 lbl_80796E58;
 extern f32 lbl_80796EF8;
@@ -681,7 +340,6 @@ extern f32 lbl_80796F60;
 extern f32 lbl_80796F74;
 extern f32 lbl_80796F78;
 extern f32 lbl_80796F7C;
-
 
 extern f32 lbl_805A2AA0[];
 extern f32 lbl_805A2B00[];
@@ -837,13 +495,9 @@ extern f32 lbl_80796F64;
 extern f32 lbl_80796F68;
 extern f32 fn_80050EF4(void *a, void *b);
 
-/* ----------------------------------------------------------------------------------------------------
- * the band's callees, declared with the signatures their call sites set (rule 2: the plain prototypes
- * are not `extern` declarations of another unit's symbol; the owners' headers carry the canonical
- * spellings and are a follow-up).
- * -------------------------------------------------------------------------------------------------- */
+/* Callees declared with the signatures their call sites use. */
 
-/* enemy/fn_8012EC74.cpp (0x8012EC74..0x80137604) - the action/motion arming helpers. */
+/* `enemy/enemy_control.cpp`'s demo helpers and `stage/stg_w.cpp`'s `stage_map_kind_get`. */
 s16 em_demo_frame_get(void);
 u32 em_demo_time_ck(s32 label);
 void em_demo_pos_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
@@ -854,7 +508,7 @@ void em_demo_key3_apply(struct _ENEMY_WORK* self, s16 a, void* b, void* c);
 void em_demo_key_apply(struct _ENEMY_WORK* self, s16 a, void* b, void* c, s32 d, s32 e);
 u8 stage_map_kind_get(u8 a);
 
-/* enemy/fn_80147CE0.cpp (0x80147CE0..0x80149D6C) - the band below. */
+/* This unit's own dispatch targets, declared before use. */
 void fn_801484D4(struct _ENEMY_WORK* self);
 void fn_80149004(struct _ENEMY_WORK* self);
 void fn_80149814(struct _ENEMY_WORK* self);
@@ -873,10 +527,8 @@ void fn_8014FC24(struct _ENEMY_WORK* self);
 void fn_8014FE00(struct _ENEMY_WORK* self);
 void fn_8014FF10(struct _ENEMY_WORK* self);
 
-/* the ef/effect helpers the range drives. */
+/* The effect helper the range drives. */
 void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
-
-/* the runtime helpers the range reaches. */
 
 }
 
@@ -892,9 +544,7 @@ s32 calcVecAng2(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
 
-/* ----------------------------------------------------------------------------------------------------
- * the pool the range reads (owned elsewhere; declared, never defined)
- * -------------------------------------------------------------------------------------------------- */
+/* More of the unit's `.sdata2` pool, declared, not defined. */
 extern f32 lbl_80796E08;
 
 extern f32 lbl_80796E14;
@@ -932,8 +582,7 @@ extern f32 lbl_807970B0;
 extern f32 lbl_807970B4;
 extern f32 lbl_807970B8;
 
-/* this range's own `.data` parameter tables (claimed in splits.txt, not emitted by the source yet, so
- * they stay the original bytes; only the ones the code loads are declared). */
+/* The unit's `.data` parameter tables the code loads; the source does not emit them yet. */
 extern u8 lbl_805A2BD8[];
 extern u8 lbl_805A20C8[];
 extern u8 lbl_805A20D4[];
@@ -1000,9 +649,8 @@ extern "C" Helper_80147CE0* fn_80147DF0(Helper_80147CE0* self) {
     return self;
 }
 
-/* The helper's base constructor (the engine's own joint-table install, then the base table).  The
- * signature is the one `unsplit/enemy.h` publishes for the consumer
- * `enemy/fn_80176C58.cpp`; the body's trailing `mr r3,r31` is the target's `return self`. */
+/* The helper's base constructor: install the engine's joint table, then the base table, and return
+ * `self`. */
 extern "C" void* em_res_user_data_ctor(void* self) {
     Helper_80147CE0* helper = (Helper_80147CE0*)self;
 
@@ -1179,7 +827,7 @@ extern "C" void fn_80148248(_ENEMY_WORK* self) {
     }
 }
 
-/* Arm the motion `em_mot_set_ck(self, 2, 10, 0)` and close the action when `em_mot_end_ck` reports it
+/* Arms the motion `em_mot_set_ck(self, 2, 10, 0)` and closes the action when `em_mot_end_ck` reports it
  * finished. */
 extern "C" void fn_801482D0(_ENEMY_WORK* self) {
     switch (self->state) {
@@ -1273,9 +921,8 @@ extern "C" void fn_801484D4(_ENEMY_WORK* self) {
     }
 }
 
-/* The action's two-step body: arm `em_mot_set(self, 5, 10, 0)` and the 19-frame sub-timer, then run
- * the three `em_frame_check` windows (the 110/0 pair spawning the effect, the 112/214 pair with the
- * 8-frame modulo on `timer_0x020`) before the action-end test. */
+/* The action's two-step body: arm `em_mot_set(self, 5, 10, 0)` and a 19-frame sub-timer, then run three
+ * `em_frame_check` windows (one spawns the effect) before the action-end test. */
 extern "C" void fn_80148528(_ENEMY_WORK* self) {
     VEC3 v;
 
@@ -1358,10 +1005,8 @@ extern "C" void fn_8014879C(_ENEMY_WORK* self) {
     }
 }
 
-/* The action's long body: `em_busy_set` on the opening call, a 300-frame timer armed with
- * `em_mot_set(self, 19, 6, 0)`, then (on `arg == 1`) six `em_frame_check` windows whose hits spawn the
- * two effects through `eft_em_spawn`/`fn_801049D0`; when the timer runs out the action is released
- * through `em_state_set(self, 1, 8)` (or 5 on the other argument). */
+/* The action's long body: a 300-frame timer with `em_mot_set(self, 19, 6, 0)`, six effect windows on
+ * `arg == 1`, then release through `em_state_set(self, 1, 8)` (5 on the other argument). */
 extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
     VEC3 v;
 
@@ -1427,9 +1072,8 @@ extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
     }
 }
 
-/* The second action's long body: `em_mot_set(self, 20, 6, 0)` on the opening step and six
- * `em_frame_check` windows whose hits spawn the effect - the 12/16 and 50/66 and 72/80 pairs gated by
- * the low two bits of `system_w`'s +0x0C word, the odd ones ungated. */
+/* The second action's long body: `em_mot_set(self, 20, 6, 0)`, then six effect windows, three of them
+ * gated by the low two bits of `system_w`'s +0x0C word. */
 extern "C" void fn_80148BD0(_ENEMY_WORK* self, u32 arg) {
     VEC3 v;
 
@@ -1566,9 +1210,8 @@ extern "C" void fn_80149004(_ENEMY_WORK* self) {
     }
 }
 
-/* The third action's body: `em_busy_set` on the opening call, `em_approach_start`'s rotation seed picked by
- * the argument (the `-500` default, `0` for 1, and `0` clamped to 700 for 2), the motion
- * `em_mot_set(self, 6, 6, 0)`, then the 64-frame release test. */
+/* The third action's body: the argument picks `em_approach_start`'s seed (-500, 0, or 0 clamped to 700),
+ * then `em_mot_set(self, 6, 6, 0)` and the 64-frame release test. */
 extern "C" void fn_80149068(_ENEMY_WORK* self, s32 arg1, u32 arg2) {
     if ((arg2 & 0xFF) == 1) {
         em_busy_set_c3(self);
@@ -1686,9 +1329,8 @@ extern "C" void fn_801492B8(_ENEMY_WORK* self, s32 arg) {
     }
 }
 
-/* The fourth action's four-step body: motion 41, then 67 with `em_move_vec_clr`'s joint setup, then the
- * `lbl_805A1DA0` scale through `em_key_curve_eval`/`fn_80135584`, then motion 26 and `em_turn_to_target`'s
- * 0x100-keyed release. */
+/* The fourth action's four-step body: motions 41 and 67, the `lbl_805A1DA0` scale curve, then motion 26
+ * and `em_turn_to_target`'s release. */
 extern "C" void fn_801498C8(_ENEMY_WORK* self) {
     switch (self->state) {
       case 0:
@@ -1845,10 +1487,8 @@ extern "C" void fn_80149AFC(_ENEMY_WORK* self) {
     }
 }
 
-/* The seventh action's body: motion 31, then `em_target_pos_set`'s release with the target-angle rate
- * (`calcVecAng2` against `vec_0x36C` minus the object's own angle, normalised to turns per frame at
- * 60 fps) fed to `fn_8012F860`, and the frame count from `fn_8012F8EC` handed to `fn_8012F7D4`
- * with the motion parameter at +0x464. */
+/* The seventh action's body: motion 31, then release toward the target with the angle rate (per frame at
+ * 60 fps) fed to `fn_8012F860` and `fn_8012F8EC`'s frame count to `fn_8012F7D4`. */
 extern "C" void fn_80149C58(_ENEMY_WORK* self) {
     u16 angle;
     u16 diff;
@@ -1877,10 +1517,8 @@ extern "C" void fn_80149C58(_ENEMY_WORK* self) {
     }
 }
 
-/* The sixth action's six-state spawn body: motion 214, the `em_turn_to_target` gate on arguments 2/4, then
- * motion 215 with the `lbl_805A1F70` scale, `fn_801303EC`'s angle and the `fn_803B9BA0` shell call,
- * then the two `fn_801545B8`/shell-callback spawn paths keyed on the argument pair, and finally
- * motion 27/216/217 with `em_action_finish_walk`'s release. */
+/* The sixth action's six-state spawn body: motions 214 and 215, the shell call and the two spawn paths the
+ * arguments pick, then motion 27/216/217 and `em_action_finish_walk`. */
 extern "C" void fn_801493A8(_ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3) {
     EmSpawnRec rec;
     u32 v;
@@ -2192,9 +1830,7 @@ void fn_8014A1BC(_ENEMY_WORK *self, s32 arg1, s32 arg2) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014A334 - second-level state machine: advance to the arrival substate on a frame check
- * ------------------------------------------------------------------------------------------------- */
+/* Second-level state machine: advance to the arrival substate on a frame check. */
 void fn_8014A334(_ENEMY_WORK *self, s32 arg1) {
     u8 temp_r3;
 
@@ -2225,9 +1861,7 @@ void fn_8014A334(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014A418 - the charge/scale walk: step through the approach substates and scale the offset
- * ------------------------------------------------------------------------------------------------- */
+/* The charge/scale walk: step through the approach substates and scale the offset. */
 void fn_8014A418(_ENEMY_WORK *self) {
     u32 var_r30;
     u8 temp_r0;
@@ -2341,9 +1975,7 @@ void fn_8014A418(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014A7B0 - the short two-state variant: arm a hit check, then run the frame check
- * ------------------------------------------------------------------------------------------------- */
+/* The short two-state variant: arm a hit check, then run the frame check. */
 void fn_8014A7B0(_ENEMY_WORK *self, s32 arg1) {
     u8 temp_r3;
 
@@ -2367,9 +1999,7 @@ void fn_8014A7B0(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014A860 - a plain countdown state: arm a 60-frame timer, then fire when it runs out
- * ------------------------------------------------------------------------------------------------- */
+/* A plain countdown state: arm a 60-frame timer, then fire when it runs out. */
 void fn_8014A860(_ENEMY_WORK *self) {
     s32 temp_r0;
     u8 temp_r4;
@@ -2393,9 +2023,7 @@ void fn_8014A860(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014A8EC - the arrival substate machine: wait for the frame check, then hand off to the caller
- * ------------------------------------------------------------------------------------------------- */
+/* The arrival substate machine: wait for the frame check, then hand off to the caller. */
 void fn_8014A8EC(_ENEMY_WORK *self, s32 arg1) {
     u8 temp_r0;
     u8 temp_r3;
@@ -2445,9 +2073,7 @@ void fn_8014A8EC(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014AA4C - the state-0x1E6 dispatcher: tail-call the handler for the current action code
- * ------------------------------------------------------------------------------------------------- */
+/* The state-0x1E6 dispatcher: tail-call the handler for the current action code. */
 void fn_8014AA4C(_ENEMY_WORK *self) {
     switch (self->state_sub) {
     case 0: fn_801498C8(self); break;
@@ -2477,9 +2103,7 @@ void fn_8014AA4C(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014AB24 - a three-state handoff: mark the action, wait for the frame check, then relink
- * ------------------------------------------------------------------------------------------------- */
+/* A three-state handoff: mark the action, wait for the frame check, then relink. */
 void fn_8014AB24(_ENEMY_WORK *self) {
     u8 temp_r4;
 
@@ -2507,9 +2131,7 @@ void fn_8014AB24(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014ABEC - the same three-state shape as fn_8014AB24, ending in the shared post-action handler
- * ------------------------------------------------------------------------------------------------- */
+/* The same three-state shape as `fn_8014AB24`, ending in the shared post-action handler. */
 void fn_8014ABEC(_ENEMY_WORK *self) {
     u8 temp_r4;
 
@@ -2536,9 +2158,7 @@ void fn_8014ABEC(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014ACAC - hold the current pose until the frame check, then fade out or return to the base pose
- * ------------------------------------------------------------------------------------------------- */
+/* Holds the current pose until the frame check, then fades out or returns to the base pose. */
 void fn_8014ACAC(_ENEMY_WORK *self) {
     u8 temp_r4;
 
@@ -2573,9 +2193,7 @@ void fn_8014ACAC(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014ADC8 - run a one-shot transition, then hand the finished state to the shared post-action
- * ------------------------------------------------------------------------------------------------- */
+/* Runs a one-shot transition, then hands the finished state to the shared post-action. */
 void fn_8014ADC8(_ENEMY_WORK *self) {
     u8 temp_r4;
 
@@ -2607,9 +2225,7 @@ void fn_8014ADC8(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014AEAC - play the shared animation table, then hand the finished state to the post-action
- * ------------------------------------------------------------------------------------------------- */
+/* Plays the shared animation table, then hands the finished state to the post-action. */
 void fn_8014AEAC(_ENEMY_WORK *self) {
     u8 temp_r3;
 
@@ -2629,9 +2245,7 @@ void fn_8014AEAC(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014AF44 - arm the approach scale and push the offset to its limit while the frame check runs
- * ------------------------------------------------------------------------------------------------- */
+/* Arms the approach scale and pushes the offset to its limit while the frame check runs. */
 void fn_8014AF44(_ENEMY_WORK *self) {
     u8 temp_r3;
 
@@ -2660,9 +2274,7 @@ void fn_8014AF44(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014B020 - play the stance table until the frame check, then hand off to the post-action
- * ------------------------------------------------------------------------------------------------- */
+/* Plays the stance table until the frame check, then hands off to the post-action. */
 void fn_8014B020(_ENEMY_WORK *self) {
     u8 temp_r3;
 
@@ -2687,9 +2299,7 @@ void fn_8014B020(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014B0E8 - arm the pivot action, then hold the offset and let the frame check finish it
- * ------------------------------------------------------------------------------------------------- */
+/* Arms the pivot action, then holds the offset and lets the frame check finish it. */
 void fn_8014B0E8(_ENEMY_WORK *self) {
     u8 temp_r4;
 
@@ -2722,9 +2332,7 @@ void fn_8014B0E8(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014B1F8 - the mirrored strafe: pick the turn direction from the argument and scale the offset
- * ------------------------------------------------------------------------------------------------- */
+/* The mirrored strafe: pick the turn direction from the argument and scale the offset. */
 void fn_8014B1F8(_ENEMY_WORK *self, s32 arg1) {
     s32 sp10;
     s32 spC;
@@ -2766,9 +2374,7 @@ void fn_8014B1F8(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014B378 - spark the two-stage hit effect while the action runs, at most once every eight frames
- * ------------------------------------------------------------------------------------------------- */
+/* Sparks the two-stage hit effect while the action runs, at most once every eight frames. */
 void fn_8014B378(_ENEMY_WORK *self) {
     VEC3 sp8;
     u8 temp_r3;
@@ -2805,9 +2411,7 @@ void fn_8014B378(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014B4EC - count a fixed number of substeps (three or six, by the argument) before finishing
- * ------------------------------------------------------------------------------------------------- */
+/* Counts a fixed number of substeps (three or six, by the argument) before finishing. */
 void fn_8014B4EC(_ENEMY_WORK *self, s32 arg1) {
     VEC3 sp8;
     u32 var_r31;
@@ -2840,9 +2444,7 @@ void fn_8014B4EC(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014B5C0 - the state-0x1E6 dispatcher for the second action group: tail-call the handler
- * ------------------------------------------------------------------------------------------------- */
+/* The state-0x1E6 dispatcher for the second action group: tail-call the handler. */
 void fn_8014B5C0(_ENEMY_WORK *self) {
     switch (self->state_sub) {
     case 0: fn_8014AB24(self); break;
@@ -2862,9 +2464,7 @@ void fn_8014B5C0(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014B630 - arm the two sub-part motions and run the shared post-action on the frame check
- * ------------------------------------------------------------------------------------------------- */
+/* Arms the two sub-part motions and runs the shared post-action on the frame check. */
 void fn_8014B630(_ENEMY_WORK *self) {
     u8 temp_r4;
 
@@ -2885,9 +2485,7 @@ void fn_8014B630(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014B6CC - the long action: approach, hold and release the scale over four outer states
- * ------------------------------------------------------------------------------------------------- */
+/* The long action: approach, hold and release the scale over four outer states. */
 void fn_8014B6CC(_ENEMY_WORK *self, s32 arg1) {
     s32 temp_r0_2;
     s32 temp_r0_4;
@@ -3037,9 +2635,7 @@ void fn_8014B6CC(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014BDAC - pick one of four action ids from two flags and hand it to the action starter
- * ------------------------------------------------------------------------------------------------- */
+/* Picks one of four action ids from two flags and hands it to the action starter. */
 void fn_8014BDAC(_ENEMY_WORK *a0, s32 arg1, s32 arg2, s32 arg3) {
     u8 var_r0;
 
@@ -3062,9 +2658,7 @@ void fn_8014BDAC(_ENEMY_WORK *a0, s32 arg1, s32 arg2, s32 arg3) {
     fn_801493A8_c1(a0, arg1, var_r0, 0);
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014BDF8 - the two-motion grab: pick the motion ids from the argument and run both sub-motions
- * ------------------------------------------------------------------------------------------------- */
+/* The two-motion grab: pick the motion ids from the argument and run both sub-motions. */
 void fn_8014BDF8(_ENEMY_WORK *self, s32 arg1) {
     u32 var_r27;
     u32 var_r28;
@@ -3125,9 +2719,7 @@ void fn_8014BDF8(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014BFE4 - the approach-and-turn action: drive the two scale motions and hand off when done
- * ------------------------------------------------------------------------------------------------- */
+/* The approach-and-turn action: drive the two scale motions and hand off when done. */
 void fn_8014BFE4(_ENEMY_WORK *self, s32 arg1) {
     f32 temp_f31;
     u8 temp_r4;
@@ -3169,9 +2761,7 @@ void fn_8014BFE4(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014C16C - the entry action: pick a scale profile from the argument, then run the frame checks
- * ------------------------------------------------------------------------------------------------- */
+/* The entry action: pick a scale profile from the argument, then run the frame checks. */
 void fn_8014C16C(_ENEMY_WORK *self, s32 arg1) {
     s32 temp_r0;
     u16 var_r5;
@@ -3263,9 +2853,7 @@ void fn_8014C16C(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014CBA0 - arm the short stance and finish it on the frame check
- * ------------------------------------------------------------------------------------------------- */
+/* Arms the short stance and finishes it on the frame check. */
 void fn_8014CBA0(_ENEMY_WORK *self) {
     u8 temp_r4;
 
@@ -3295,9 +2883,7 @@ void fn_8014CBA0(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014CC98 - scale the offset from the distance to the target and hold it while the frame runs
- * ------------------------------------------------------------------------------------------------- */
+/* Scales the offset from the distance to the target and holds it while the frame runs. */
 void fn_8014CC98(_ENEMY_WORK *self) {
     f32 temp_f1;
     u8 temp_r3;
@@ -3336,9 +2922,7 @@ void fn_8014CC98(_ENEMY_WORK *self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_8014CDD0 - the turn-and-hold action: hold the offset while the frame check runs, then finish
- * ------------------------------------------------------------------------------------------------- */
+/* The turn-and-hold action: hold the offset while the frame check runs, then finish. */
 void fn_8014CDD0(_ENEMY_WORK *self, s32 arg1) {
     u8 temp_r3;
 
@@ -3374,7 +2958,6 @@ void fn_8014CDD0(_ENEMY_WORK *self, s32 arg1) {
     }
 }
 
-/* fn_8014C6DC */
 void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
     f32 temp_f31;
     f32 temp_f31_2;
@@ -3383,14 +2966,14 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
     u8 temp_r5;
 
     temp_r5 = self->state;
-    switch ((s32) temp_r5) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r5) {
+    case 0:
         self->state = (u8) (temp_r5 + 1);
         em_move_mode_set(self, 0);
         fn_80154C74(self);
         em_mot_set(self, 0xCD, 6, 0);
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             self->state_0x006 = 0U;
@@ -3404,77 +2987,73 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
             return;
         }
         return;
-    case 2:                                         /* switch 1 */
+    case 2:
         self->offset_0x30C.vec_0x310.y = em_key_curve_eval(self, &lbl_805A1E50);
         temp_f31 = em_fall_height_get(self);
         temp_r0 = self->state_0x006;
-        switch ((s32) temp_r0) {                    /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) temp_r0) {
+        case 0:
             em_move_offset_step_update_c1(self, &self->field_0x1BC);
             if ((em_frame_check(self, 1, lbl_80796EA4, lbl_80796E1C) == 1U) || (self->offset_0x30C.vec_0x310.z < lbl_80796E1C)) {
                 self->state_0x006 = (u8) (self->state_0x006 + 1);
                 self->offset_0x30C.vec_0x310.z = (f32) lbl_80796E1C;
             }
             break;
-        case 1:                                     /* switch 2 */
+        case 1:
             fn_80135584(self, &self->field_0x1BC);
             break;
         }
         if ((em_ground_ck_c2(self, temp_f31) == 1U) && (em_mot_end_ck(self) == 1U)) {
             self->state = (u8) (self->state + 1);
-            switch ((arg1 & 0xFF)) {                   /* switch 3; irregular */
-            case 0:                                 /* switch 3 */
+            switch ((arg1 & 0xFF)) {
+            case 0:
                 em_move_mode_set(self, 0);
                 em_mot_set(self, 0xCF, 0, 0);
                 em_hit_window_set_default_c1(self, 0, 0x16);
                 return;
-            case 1:                                 /* switch 3 */
+            case 1:
                 em_move_mode_set(self, 3);
                 em_mot_set(self, 0x1B, 6, 0);
                 return;
-            case 2:                                 /* switch 3 */
+            case 2:
                 em_move_mode_set(self, 0);
                 em_mot_set(self, 0xD2, 0, 0);
                 em_hit_window_set_default_c1(self, 0, 0x16);
                 return;
-            default:                                /* switch 3 */
+            default:
                 return;
             }
         } else {
-            /* Duplicate return node #51. Try simplifying control flow for better match */
             return;
         }
         break;
-    case 3:                                         /* switch 1 */
-        switch ((arg1 & 0xFF)) {                       /* switch 4; irregular */
-        case 0:                                     /* switch 4 */
+    case 3:
+        switch ((arg1 & 0xFF)) {
+        case 0:
             if (em_mot_end_ck(self) == 1U) {
                 em_action_finish(self);
                 return;
             }
-            /* Duplicate return node #51. Try simplifying control flow for better match */
             return;
-        case 1:                                     /* switch 4 */
+        case 1:
             fn_80154CA4(self);
             if (em_mot_end_ck(self) == 1U) {
                 em_action_finish_walk(self);
                 return;
             }
-            /* Duplicate return node #51. Try simplifying control flow for better match */
             return;
-        case 2:                                     /* switch 4 */
+        case 2:
             if (em_mot_end_ck(self) == 1U) {
                 self->state = (u8) (self->state + 1);
                 em_mot_set(self, 0xCD, 0, 0x46);
                 return;
             }
-            /* Duplicate return node #51. Try simplifying control flow for better match */
             return;
-        default:                                    /* switch 4 */
+        default:
             return;
         }
         break;
-    case 4:                                         /* switch 1 */
+    case 4:
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             self->state_0x006 = 0U;
@@ -3487,21 +3066,20 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
             self->field_0x324 = (f32) (lbl_80796F38 * get_em_base_scale(self));
             return;
         }
-        /* Duplicate return node #51. Try simplifying control flow for better match */
         return;
-    case 5:                                         /* switch 1 */
+    case 5:
         self->offset_0x30C.vec_0x310.y = em_key_curve_eval(self, &lbl_805A1E50);
         temp_f31_2 = em_fall_height_get(self);
         temp_r0_2 = self->state_0x006;
-        switch ((s32) temp_r0_2) {                  /* switch 5; irregular */
-        case 0:                                     /* switch 5 */
+        switch ((s32) temp_r0_2) {
+        case 0:
             em_move_offset_step_update_c1(self, &self->field_0x1BC);
             if ((em_frame_check(self, 1, lbl_80796EA4, lbl_80796E1C) == 1U) || (self->offset_0x30C.vec_0x310.z < lbl_80796E1C)) {
                 self->state_0x006 = (u8) (self->state_0x006 + 1);
                 self->offset_0x30C.vec_0x310.z = (f32) lbl_80796E1C;
             }
             break;
-        case 1:                                     /* switch 5 */
+        case 1:
             fn_80135584(self, &self->field_0x1BC);
             break;
         }
@@ -3512,28 +3090,25 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
             em_hit_window_set_default_c1(self, 0, 0x16);
             return;
         }
-        /* Duplicate return node #51. Try simplifying control flow for better match */
         return;
-    case 6:                                         /* switch 1 */
+    case 6:
         if (em_mot_end_ck(self) == 1U) {
             em_action_finish(self);
         }
-        /* Duplicate return node #51. Try simplifying control flow for better match */
         return;
-    default:                                        /* switch 1 */
+    default:
         return;
     }
 }
 
-/* fn_8014D504 */
 void fn_8014D504(_ENEMY_WORK *self) {
     u8 temp_r0;
     u8 temp_r3;
 
     em_busy_set_c1(self);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r3) {
+    case 0:
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 3);
         fn_80154C74(self);
@@ -3542,7 +3117,7 @@ void fn_8014D504(_ENEMY_WORK *self) {
         em_move_vec2_clr(self);
         self->float_0x328 = fn_801356A8(self, lbl_80796F74, lbl_80796E20, lbl_80796F78);
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         em_key_curve_eval(self, &lbl_805A1DD8);
         fn_801303FC_c2(self);
         if (self->field_0x1AC < lbl_80796E24) {
@@ -3561,13 +3136,13 @@ void fn_8014D504(_ENEMY_WORK *self) {
             return;
         }
         return;
-    case 2:                                         /* switch 1 */
+    case 2:
         temp_r0 = self->state_0x006;
-        switch ((s32) temp_r0) {                    /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) temp_r0) {
+        case 0:
             if (em_frame_check(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
                 self->state_0x006 = (u8) (self->state_0x006 + 1);
-            case 1:                                 /* switch 2 */
+            case 1:
                 if (em_busy_ck(self) == 1U) {
                     if (fn_8012D3E0_c1(self, 0) != 0xFF) {
                         fn_8012B380_c1(self, 1, 2);
@@ -3583,13 +3158,12 @@ void fn_8014D504(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014D714 */
 void fn_8014D714(_ENEMY_WORK *self) {
     u8 temp_r3;
 
     em_busy_set_c1(self);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* irregular */
+    switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 3);
@@ -3635,13 +3209,12 @@ void fn_8014D714(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014E160 */
 void fn_8014E160(_ENEMY_WORK *self) {
     f32 temp_f1;
     u8 temp_r4;
 
     temp_r4 = self->state;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -3672,7 +3245,6 @@ void fn_8014E160(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014E3AC */
 void fn_8014E3AC(_ENEMY_WORK *self) {
     switch (self->state_sub) {
     case 0x0: fn_8014B630(self); break;
@@ -3744,14 +3316,12 @@ void fn_8014E3AC(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014EA70 */
 void fn_8014EA70(_ENEMY_WORK *self) {
     if ((s32) self->state_sub == 0) {
         fn_8014E774(self);
     }
 }
 
-/* fn_8014EA84 */
 void fn_8014EA84(_ENEMY_WORK *self) {
     f32 temp_f2;
     u8 temp_r0;
@@ -3760,20 +3330,20 @@ void fn_8014EA84(_ENEMY_WORK *self) {
 
     fn_80131EC0_c1();
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r3) {
+    case 0:
         self->state = (u8) (temp_r3 + 1);
         self->state_0x006 = 0U;
         em_move_mode_set(self, 0);
         em_mot_set_ck(self, 0xCA, 4, 0);
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         temp_r0 = self->state_0x006;
-        switch ((s32) temp_r0) {                    /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) temp_r0) {
+        case 0:
             if (em_mot_end_ck(self) == 1U) {
                 self->state_0x006 = (u8) (self->state_0x006 + 1);
-            case 1:                                 /* switch 2 */
+            case 1:
                 if (em_busy_ck(self) == 1U) {
                     if ((fn_8012D23C_c1(self, 1, self->field_0x382) == 1U) && (fn_8014E670(self, self->field_0x382) == 1U)) {
                         temp_r0_2 = self->field_0x1E7 - 1;
@@ -3807,7 +3377,6 @@ void fn_8014EA84(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014EC50 */
 void fn_8014EC50(_ENEMY_WORK *self) {
     u8 temp_r0;
     u8 temp_r0_2;
@@ -3815,33 +3384,33 @@ void fn_8014EC50(_ENEMY_WORK *self) {
 
     fn_80131EC0_c1();
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r3) {
+    case 0:
         self->state = (u8) (temp_r3 + 1);
         self->state_0x006 = 0U;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xCB, 4, 0);
         temp_r0 = self->field_0x1E7;
-        switch ((s32) temp_r0) {                    /* switch 2; irregular */
-        case 3:                                     /* switch 2 */
+        switch ((s32) temp_r0) {
+        case 3:
             em_hit_window_set_default_c1(self, 0, 0x18);
             return;
-        case 2:                                     /* switch 2 */
+        case 2:
             em_hit_window_set_default_c1(self, 0, 0x19);
             return;
-        case 1:                                     /* switch 2 */
+        case 1:
             em_hit_window_set_default_c1(self, 0, 0x1A);
             return;
         }
         break;
-    case 1:                                         /* switch 1 */
+    case 1:
         temp_r0_2 = self->state_0x006;
-        switch ((s32) temp_r0_2) {                  /* switch 3; irregular */
-        case 0:                                     /* switch 3 */
+        switch ((s32) temp_r0_2) {
+        case 0:
             if (em_mot_end_ck(self) == 1U) {
                 self->state_0x006 = (u8) (self->state_0x006 + 1);
                 em_mot_set(self, 0xCA, 4, 0);
-            case 1:                                 /* switch 3 */
+            case 1:
                 if (em_busy_ck(self) == 1U) {
                     if ((fn_8012D23C_c1(self, 1, self->field_0x382) == 1U) && (fn_8014E670(self, self->field_0x382) == 1U)) {
                         em_state_set(self, 9, 0);
@@ -3858,20 +3427,19 @@ void fn_8014EC50(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014EDC8 */
 void fn_8014EDC8(_ENEMY_WORK *self) {
     f32 temp_f31;
     u8 temp_r0;
     u8 temp_r4;
 
     temp_r4 = self->state;
-    switch ((s32) temp_r4) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r4) {
+    case 0:
         self->state = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xCD, 6, 0);
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             self->state_0x006 = 0U;
@@ -3887,19 +3455,19 @@ void fn_8014EDC8(_ENEMY_WORK *self) {
             return;
         }
         return;
-    case 2:                                         /* switch 1 */
+    case 2:
         self->offset_0x30C.vec_0x310.y = em_key_curve_eval(self, &lbl_805A1E50);
         temp_f31 = em_fall_height_get(self);
         temp_r0 = self->state_0x006;
-        switch ((s32) temp_r0) {                    /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) temp_r0) {
+        case 0:
             em_move_offset_step_update_c1(self, &self->field_0x1BC);
             if ((em_frame_check(self, 1, lbl_80796EA4, lbl_80796E1C) == 1U) || (self->offset_0x30C.vec_0x310.z < lbl_80796E1C)) {
                 self->state_0x006 = (u8) (self->state_0x006 + 1);
                 self->offset_0x30C.vec_0x310.z = (f32) lbl_80796E1C;
             }
             break;
-        case 1:                                     /* switch 2 */
+        case 1:
             fn_80135584(self, &self->field_0x1BC);
             break;
         }
@@ -3912,35 +3480,30 @@ void fn_8014EDC8(_ENEMY_WORK *self) {
                 return;
             }
         }
-        /* Duplicate return node #21. Try simplifying control flow for better match */
         return;
-    case 3:                                         /* switch 1 */
+    case 3:
         if (em_mot_end_ck(self) == 1U) {
             em_action_finish(self);
         }
-        /* Duplicate return node #21. Try simplifying control flow for better match */
         return;
-    default:                                        /* switch 1 */
+    default:
         return;
     }
 }
 
-/* fn_8014F010 */
 void fn_8014F010(void) {
     fn_801493A8_c2(0U, 1U, 1);
 }
 
-/* fn_8014F020 */
 void fn_8014F020(void) {
     fn_801493A8_c2(0U, 3U, 1);
 }
 
-/* fn_8014F030 */
 void fn_8014F030(_ENEMY_WORK *self) {
     u8 temp_r0;
 
     temp_r0 = self->state_sub;
-    switch ((s32) temp_r0) {                        /* irregular */
+    switch ((s32) temp_r0) {
     case 0:
         fn_8014EA84(self);
         return;
@@ -3959,12 +3522,11 @@ void fn_8014F030(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014F530 */
 void fn_8014F530(_ENEMY_WORK *self) {
     u8 temp_r0;
 
     temp_r0 = self->state_sub;
-    switch ((s32) temp_r0) {                        /* irregular */
+    switch ((s32) temp_r0) {
     case 0:
         em_se_tbl_play_alt_c1(&lbl_805A2AA0, 0, 0);
         return;
@@ -3986,19 +3548,16 @@ void fn_8014F530(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014F5D8 */
 void fn_8014F5D8(void) {
     fn_80149AFC_c2();
 }
 
-/* fn_8014F5DC */
 void fn_8014F5DC(_ENEMY_WORK *self) {
     if ((s32) self->state_sub == 0) {
         fn_8014F5D8();
     }
 }
 
-/* fn_8014F5F0 */
 void fn_8014F5F0(_ENEMY_WORK *self) {
     f32 temp_f1;
     f32 temp_f2;
@@ -4007,7 +3566,7 @@ void fn_8014F5F0(_ENEMY_WORK *self) {
     u8 temp_r4;
 
     temp_r4 = self->state;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -4036,14 +3595,13 @@ void fn_8014F5F0(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014FA34 */
 void fn_8014FA34(_ENEMY_WORK *self) {
     u8 temp_r0;
     u8 temp_r4;
 
     temp_r4 = self->state;
-    switch ((s32) temp_r4) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r4) {
+    case 0:
         self->state = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
         em_mot_set(self, 0xC8, 0x14, 0);
@@ -4052,7 +3610,7 @@ void fn_8014FA34(_ENEMY_WORK *self) {
         fn_801303EC(self, lbl_80796E1C);
         self->float_0x328 = fn_801356A8(self, lbl_80796F74, lbl_80796E20, lbl_80796F78);
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         em_key_curve_eval(self, &lbl_805A1DD8);
         fn_801303FC_c2(self);
         if (self->field_0x1AC < lbl_80796E24) {
@@ -4071,13 +3629,13 @@ void fn_8014FA34(_ENEMY_WORK *self) {
             return;
         }
         return;
-    case 2:                                         /* switch 1 */
+    case 2:
         temp_r0 = self->state_0x006;
-        switch ((s32) temp_r0) {                    /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) temp_r0) {
+        case 0:
             if (em_frame_check(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
                 self->state_0x006 = (u8) (self->state_0x006 + 1);
-            case 1:                                 /* switch 2 */
+            case 1:
                 if (em_busy_ck(self) == 1U) {
                     if (fn_80154638(self, 0) == 1U) {
                         em_state_set(self, 0xD, 3);
@@ -4092,12 +3650,11 @@ void fn_8014FA34(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014FE00 */
 void fn_8014FE00(_ENEMY_WORK *self) {
     u8 temp_r4;
 
     temp_r4 = self->state;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -4127,12 +3684,11 @@ void fn_8014FE00(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014F138 */
 void fn_8014F138(_ENEMY_WORK *self) {
     u8 temp_r0;
 
     temp_r0 = self->state_sub;
-    switch ((s32) temp_r0) {                        /* irregular */
+    switch ((s32) temp_r0) {
     case 0x17:
         em_se_tbl_play_c1(&lbl_805A2338, 0, 0x17);
         return;
@@ -4238,7 +3794,6 @@ void fn_8014F138(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014F078 */
 void fn_8014F078(_ENEMY_WORK *self) {
     f32 spC;
     VEC3 sp8;
@@ -4256,14 +3811,13 @@ void fn_8014F078(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014FF10 */
 void fn_8014FF10(_ENEMY_WORK *self) {
     VEC3 sp8;
     u8 temp_r3;
 
     VEC3_ctor(&sp8);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* irregular */
+    switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 0);
@@ -4310,7 +3864,6 @@ void fn_8014FF10(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014CEF8 */
 void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     VEC3 sp1C;
     VEC3 sp10;
@@ -4328,8 +3881,8 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     VEC3_ctor(&sp1C);
     em_busy_set_c1(self);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r3) {
+    case 0:
         self->state = (u8) (temp_r3 + 1);
         em_fall_height_get_f32(self);
         em_fall_start(self);
@@ -4340,20 +3893,20 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
         self->offset_0x30C.vec_0x310.y = (f32) lbl_80796F6C;
         self->offset_0x30C.vec_0x310.z = (f32) lbl_80796E60;
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         fn_80133C3C(self);
         fn_80136D4C(self, lbl_80796F00);
-        switch ((s32) arg2) {                       /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) arg2) {
+        case 0:
             spC = 0x2800;
             break;
-        case 1:                                     /* switch 2 */
+        case 1:
             spC = 0x2000;
             break;
-        case 2:                                     /* switch 2 */
+        case 2:
             spC = 0x1800;
             break;
-        default:                                    /* switch 2 */
+        default:
             subVec3(&sp10, &self->vec_0x36C, &self->pos);
             copyVec3(&sp1C, &sp10);
             calcVecAngXY_c1(&sp1C, &spC, &sp8);
@@ -4377,7 +3930,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             return;
         }
         return;
-    case 2:                                         /* switch 1 */
+    case 2:
         fn_80133C3C(self);
         self->timer_0x020 = (s32) (self->timer_0x020 + 1);
         if (em_move_offset_step_update_c2(self, &self->field_0x1BC, em_fall_height_get_f32(self) - lbl_80796F4C) == 1U) {
@@ -4393,7 +3946,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             return;
         }
         break;
-    case 3:                                         /* switch 1 */
+    case 3:
         fn_801303EC(self, lbl_80796F34);
         em_move_offset_rot_apply(self, &self->field_0x1BC);
         if (em_mot_end_ck(self) == 1U) {
@@ -4403,7 +3956,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             return;
         }
         break;
-    case 4:                                         /* switch 1 */
+    case 4:
         fn_801303EC(self, lbl_80796F34);
         em_move_offset_rot_apply(self, &self->field_0x1BC);
         temp_r0 = self->timer_0x020 + 1;
@@ -4427,7 +3980,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             return;
         }
         break;
-    case 5:                                         /* switch 1 */
+    case 5:
         if ((arg1 & 0xFF) != 1) {
             if ((arg1 & 0xFF) != 2) {
                 temp_r3_2 = self->timer_0x020;
@@ -4449,8 +4002,8 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
                 }
             } else {
                 temp_r0_3 = self->state_0x006;
-                switch ((s32) temp_r0_3) {          /* switch 4; irregular */
-                case 0:                             /* switch 4 */
+                switch ((s32) temp_r0_3) {
+                case 0:
                     temp_r3_3 = self->timer_0x020;
                     if (temp_r3_3 < 0xA) {
                         temp_r0_4 = temp_r3_3 + 1;
@@ -4465,7 +4018,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
                         return;
                     }
                     break;
-                case 1:                             /* switch 4 */
+                case 1:
                     if (em_mot_end_ck(self) == 1U) {
                         em_action_finish(self);
                     }
@@ -4474,15 +4027,15 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             }
         } else {
             temp_r0_5 = self->state_0x006;
-            switch ((s32) temp_r0_5) {              /* switch 3; irregular */
-            case 0:                                 /* switch 3 */
+            switch ((s32) temp_r0_5) {
+            case 0:
                 if (em_mot_end_ck(self) == 1U) {
                     self->state_0x006 = (u8) (self->state_0x006 + 1);
                     em_mot_set(self, 0xDA, 0, 0);
                     return;
                 }
                 break;
-            case 1:                                 /* switch 3 */
+            case 1:
                 if (em_frame_check(self, 0, lbl_80796EFC, lbl_80796E1C) == 1U) {
                     em_hit_window_clear(self, 0);
                 }
@@ -4497,7 +4050,6 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     }
 }
 
-/* fn_8014E670 */
 u32 fn_8014E670(_ENEMY_WORK *self, u8 arg1) {
     VEC3 sp2C;
     VEC3 sp20;
@@ -4525,7 +4077,6 @@ u32 fn_8014E670(_ENEMY_WORK *self, u8 arg1) {
     return 0U;
 }
 
-/* fn_8014FC24 */
 void fn_8014FC24(_ENEMY_WORK *self) {
     VEC3 sp3C;
     VEC3 sp30;
@@ -4539,7 +4090,7 @@ void fn_8014FC24(_ENEMY_WORK *self) {
     VEC3_ctor(&sp3C);
     VEC3_ctor(&sp30);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* irregular */
+    switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         self->state_0x006 = 0;
@@ -4574,24 +4125,21 @@ void fn_8014FC24(_ENEMY_WORK *self) {
                 return;
             }
             em_state_set(self, 2, 6);
-            /* Duplicate return node #13. Try simplifying control flow for better match */
             return;
         }
-        /* Duplicate return node #13. Try simplifying control flow for better match */
         return;
     default:
         return;
     }
 }
 
-/* fn_8014E290 */
 void fn_8014E290(_ENEMY_WORK *self) {
     ShellParams sp8;
     u8 temp_r3;
 
     em_spawn_rec_init_c1(&sp8);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* irregular */
+    switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 0);
@@ -4614,7 +4162,6 @@ void fn_8014E290(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014BB40 */
 void fn_8014BB40(_ENEMY_WORK *self, u8 arg1) {
     ShellParams sp8;
     u16 var_r31;
@@ -4622,7 +4169,7 @@ void fn_8014BB40(_ENEMY_WORK *self, u8 arg1) {
 
     em_spawn_rec_init_c1(&sp8);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* irregular */
+    switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 0);
@@ -4677,7 +4224,6 @@ void fn_8014BB40(_ENEMY_WORK *self, u8 arg1) {
     }
 }
 
-/* fn_8014C464 */
 void fn_8014C464(_ENEMY_WORK *self, u8 arg1) {
     ShellParams sp8;
     s32 var_r31;
@@ -4685,7 +4231,7 @@ void fn_8014C464(_ENEMY_WORK *self, u8 arg1) {
 
     em_spawn_rec_init_c1(&sp8);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* irregular */
+    switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 0);
@@ -4739,7 +4285,6 @@ void fn_8014C464(_ENEMY_WORK *self, u8 arg1) {
     }
 }
 
-/* fn_8014D8F0 */
 void fn_8014D8F0(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     ShellParams sp8;
     u16 var_r5;
@@ -4748,7 +4293,7 @@ void fn_8014D8F0(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     em_spawn_rec_init_c1(&sp8);
     fn_80154CA4(self);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* irregular */
+    switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 3);
@@ -4795,7 +4340,6 @@ void fn_8014D8F0(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     }
 }
 
-/* fn_8014DAF4 */
 void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     ShellParams sp8;
     u16 var_r5;
@@ -4804,8 +4348,8 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
 
     em_spawn_rec_init_c1(&sp8);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r3) {
+    case 0:
         self->state = (u8) (temp_r3 + 1);
         em_fall_height_get(self);
         em_fall_start(self);
@@ -4823,7 +4367,7 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
         em_move_vec_clr(self);
         self->offset_0x30C.vec_0x310.z = (f32) lbl_80796F84;
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         em_turn_to_target(self, 0x40);
         if ((u32) (arg1 - 2) <= 2U) {
             em_move_offset_rot_apply(self, &self->field_0x1BC);
@@ -4835,7 +4379,7 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             return;
         }
         return;
-    case 2:                                         /* switch 1 */
+    case 2:
         if ((u32) (arg1 - 2) > 2U) {
             if ((arg1 & 0xFF) == 1) {
                 em_turn_to_target(self, 0x40);
@@ -4848,14 +4392,14 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
                 var_r5 = 0x238E;
             } else {
                 temp_r0 = self->state_0x006;
-                switch ((s32) temp_r0) {            /* switch 2; irregular */
-                case 0:                             /* switch 2 */
+                switch ((s32) temp_r0) {
+                case 0:
                     var_r5 = 0x238E;
                     break;
-                default:                            /* switch 2 */
+                default:
                     var_r5 = 0x1E94;
                     break;
-                case 2:                             /* switch 2 */
+                case 2:
                     var_r5 = 0x199A;
                     break;
                 }
@@ -4877,7 +4421,7 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             return;
         }
         break;
-    case 3:                                         /* switch 1 */
+    case 3:
         if (em_mot_end_ck(self) == 1U) {
             em_action_finish_fall(self);
         }
@@ -4885,7 +4429,6 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     }
 }
 
-/* fn_8014DDEC */
 void fn_8014DDEC(_ENEMY_WORK *self) {
     VEC3 sp14;
     VEC3 sp8;
@@ -4898,7 +4441,7 @@ void fn_8014DDEC(_ENEMY_WORK *self) {
     u8 temp_r4;
 
     temp_r4 = self->state;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state = (u8) (temp_r4 + 1);
         self->state_0x006 = 0;
@@ -4969,7 +4512,6 @@ void fn_8014DDEC(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014E774 */
 void fn_8014E774(_ENEMY_WORK *self) {
     VEC3 sp48;
     VEC3 sp3C;
@@ -4987,7 +4529,7 @@ void fn_8014E774(_ENEMY_WORK *self) {
     VEC3_ctor(&sp3C);
     VEC3_ctor(&sp30);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* irregular */
+    switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         self->state_0x006 = 0;
@@ -5055,7 +4597,6 @@ void fn_8014E774(_ENEMY_WORK *self) {
     }
 }
 
-/* fn_8014F71C */
 void fn_8014F71C(_ENEMY_WORK *self) {
     VEC3 sp1C;
     VEC3 sp10;
@@ -5068,8 +4609,8 @@ void fn_8014F71C(_ENEMY_WORK *self) {
 
     VEC3_ctor(&sp1C);
     temp_r3 = self->state;
-    switch ((s32) temp_r3) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r3) {
+    case 0:
         self->state = (u8) (temp_r3 + 1);
         em_fall_height_get(self);
         em_fall_start(self);
@@ -5078,7 +4619,7 @@ void fn_8014F71C(_ENEMY_WORK *self) {
         self->offset_0x30C.vec_0x310.z = (f32) lbl_80796E38;
         self->field_0x324 = (f32) lbl_80796ECC;
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         fn_80133C3C(self);
         em_fall_height_get(self);
         em_move_offset_step_update_c1(self, &self->field_0x1BC);
@@ -5104,7 +4645,7 @@ void fn_8014F71C(_ENEMY_WORK *self) {
             return;
         }
         return;
-    case 2:                                         /* switch 1 */
+    case 2:
         fn_80133C3C(self);
         if (em_approach_step(self, 0, 0x80U) == 1) {
             self->state = (u8) (self->state + 1);
@@ -5123,10 +4664,10 @@ void fn_8014F71C(_ENEMY_WORK *self) {
             return;
         }
         break;
-    case 3:                                         /* switch 1 */
+    case 3:
         temp_r0 = self->state_0x006;
-        switch ((s32) temp_r0) {                    /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) temp_r0) {
+        case 0:
             em_fall_height_get(self);
             var_r30 = em_move_offset_step_update_c1(self, &self->field_0x1BC);
             if (em_frame_check(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
@@ -5134,7 +4675,7 @@ void fn_8014F71C(_ENEMY_WORK *self) {
                 self->field_0x324 = (f32) lbl_80796F14;
             }
             break;
-        case 1:                                     /* switch 2 */
+        case 1:
             em_fall_height_get(self);
             var_r30 = em_move_offset_step_update_c1(self, &self->field_0x1BC);
             if (self->offset_0x30C.vec_0x310.z < lbl_80796E1C) {
@@ -5154,9 +4695,8 @@ void fn_8014F71C(_ENEMY_WORK *self) {
     }
 }
 
-/* 0x801502C8 (0x460) - the 11-state action step (state at +0x05): arm the motion, wait out each
- * effect window through `em_demo_time_ck`/`em_frame_check`, and re-arm the next motion at each
- * transition. */
+/* 0x801502C8 (0x460) - the 11-state action step: arm the motion, wait out each effect window, and re-arm
+ * the next motion at each transition. */
 void fn_801502C8(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -5545,7 +5085,7 @@ void fn_8015111C(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80151274 (0x74) - arm the one-shot effect when the action timer (+0x354) is idle. */
+/* 0x80151274 (0x74) - arms the one-shot effect when the action timer (+0x354) is idle. */
 void fn_80151274(struct _ENEMY_WORK* self, u8 arg1) {
     nw4r::math::VEC3 pos;
 
@@ -5562,8 +5102,7 @@ void fn_801512E8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, s32 arg3, s32 arg4,
     char buf_0x18[0x18];
     nw4r::math::VEC3 pos;
 
-    /* `buf_0x18` is the unit's own 0x18-byte scratch buffer, whose first 0xC bytes are the record
-     * the helper constructs; the buffer's size is part of the matched frame (see the unit header). */
+    /* `buf_0x18`'s size sets the frame. */
     MTX34_ctor((MTX34*)buf_0x18);
     VEC3_ctor(&pos);
     switch (arg1) {
@@ -5708,7 +5247,7 @@ s32 fn_801542D0(struct _ENEMY_WORK* self, u16 arg1) {
 #pragma peephole on
 
 extern "C" {
-/* 0x801545B8 (0x80) - fill the 0x18-byte spawn record and hand it to the effect queue. */
+/* 0x801545B8 (0x80) - fills the 0x18-byte spawn record and hands it to the effect queue. */
 void fn_801545B8(EmSpawnRec* rec, u8 arg1, s16 arg2, s16 arg3) {
     nw4r::math::VEC3 pos;
 
@@ -5759,8 +5298,8 @@ s32 fn_80154638(struct _ENEMY_WORK* self, u8 arg1) {
     return 0;
 }
 
-/* 0x80154784 (0x28) - is the action one of the glide steps?  `u32`: its call site compares the
- * answer against 1 unsigned (`enemy/fn_801B0010.cpp`). */
+/* 0x80154784 (0x28) - is the action one of the glide steps?  `u32`: `enemy/em030_prog.cpp`'s call
+ * site compares it against 1 unsigned. */
 u32 fn_80154784(struct _ENEMY_WORK* self) {
     if (self->action == 0xD && self->state_sub <= 4) {
         return 1;
@@ -5820,7 +5359,7 @@ u8 fn_801547AC(struct _ENEMY_WORK* self, u8 arg1) {
     }
 }
 
-/* 0x80154928 (0x54) - step the work position's y and re-sync the model. */
+/* 0x80154928 (0x54) - steps the work position's y and re-syncs the model. */
 void fn_80154928(struct _ENEMY_WORK* self, u8* arg1, u8* arg2) {
     *arg1 = 0xC;
     *arg2 = 0;
@@ -5829,7 +5368,7 @@ void fn_80154928(struct _ENEMY_WORK* self, u8* arg1, u8* arg2) {
     em_fall_start(self);
 }
 
-/* 0x8015497C (0xC) - clear the action's case-6 flag. */
+/* 0x8015497C (0xC) - clears the action's case-6 flag. */
 void fn_8015497C(struct _ENEMY_WORK* self) {
     self->field_0x357 = 0;
 }
@@ -5942,7 +5481,7 @@ void fn_80154C74(struct _ENEMY_WORK* self) {
     fn_80130CDC_view1(-0xE);
 }
 
-/* 0x80154CA4 (0x44) - clamp the work position's height. */
+/* 0x80154CA4 (0x44) - clamps the work position's height. */
 void fn_80154CA4(struct _ENEMY_WORK* self) {
     fn_801303FC_view1(lbl_807970AC);
     if (self->field_0x1AC < lbl_807970B0) {
@@ -5950,7 +5489,7 @@ void fn_80154CA4(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80154CE8 (0x5C) - release the 0x0C-byte helper when the action closes. */
+/* 0x80154CE8 (0x5C) - releases the 0x0C-byte helper when the action closes. */
 s32 fn_80154CE8(s32 self, s16 flag) {
     if (self != 0) {
         fn_8013918C_view1(0, 0);
@@ -5961,7 +5500,7 @@ s32 fn_80154CE8(s32 self, s16 flag) {
     return self;
 }
 
-/* 0x80154D44 (0xFC) - seed the six 0xC-byte animation vectors of the three global records. */
+/* 0x80154D44 (0xFC) - seeds the six 0xC-byte animation vectors of the three global records. */
 void fn_80154D44(void) {
     nw4r::math::VEC3 a;
     nw4r::math::VEC3 b;
@@ -5979,9 +5518,8 @@ void fn_80154D44(void) {
 }
 }
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A77D8..0x806A7820`), in address order: the 3 two-vector record(s)
- * its static constructor `fn_80154D44` builds (`.data` tables point at them).  Names are GUESSes: each record is a
- * pair of model-space points. */
+/* The unit's `.bss`: the three two-vector records `fn_80154D44` seeds.  Names are GUESSes (each record
+ * is a pair of model-space points). */
 VEC3 vec_pair_801502C8_0[2];  /* +0x806A77D8 */
 VEC3 vec_pair_801502C8_1[2];  /* +0x806A77F0 */
 VEC3 vec_pair_801502C8_2[2];  /* +0x806A7808 */
