@@ -26,6 +26,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "gx.h"              /* GXWGFifo, the 0xCC008000 write window (rule 1) */
+#include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResGenMode (rule 2) */
 #include "g3d/g3d_anmchr.h"    /* fn_8005DC24, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/fn_80063888.h"   /* fn_800639D0, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_identity/MTX34_ctor, owned by fn_8004CAD8.cpp (rule 2) */
@@ -195,7 +196,6 @@ void fn_80085F3C(StatePairTable* pSelf, u32 idx, u16 a, u16 b);
 void fn_80086118(StateBitMask* pSelf, u32 bit);
 void fn_80086138(StateWord3* pDst, const StateWord3* pSrc);
 BOOL fn_80086154(const StateWord3* pA, const StateWord3* pB);
-u32 fn_80086390(StateWord* pSelf);
 void fn_80086610(StateFlags* pSelf, u8 arg);
 u8 fn_80086640(StateByte* pSelf);
 u32 fn_80086760(StateWord* pSelf);
@@ -344,9 +344,14 @@ BOOL fn_80086154(const StateWord3* pA, const StateWord3* pB) {
     return equal;
 }
 
-u32 fn_80086390(StateWord* pSelf) {
-    return pSelf->mWord;
+} /* extern "C" */
+
+/* 0x80086390 (0x8): returns the generation-mode block. */
+const nw4r::g3d::ResGenModeData* nw4r::g3d::ResGenMode::ptr() const {
+    return mpData;
 }
+
+extern "C" {
 
 /* The state's dirty-flush hook: only flush when the pending flags say so and the new value differs. */
 void fn_80086610(StateFlags* pSelf, u8 arg) {

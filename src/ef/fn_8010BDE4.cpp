@@ -22,6 +22,8 @@
  * SHAPES. The two families' work blocks are two views of `_EFT::work_0x38`.
  */
 
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
 #include "enemy/fn_8012E2D4.h" /* fn_8012E2D4 (rule 2: the owner's header) */
 #include "enemy/em_status_ck.h" /* em_status_ck (rule 2: the owner's header) */
@@ -162,7 +164,6 @@ void mtx34_concat(nw4r::math::MTX34* a, nw4r::math::MTX34* b, nw4r::math::MTX34*
 void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
 void g3d_root_model_bind(s32 root, u32 id);
 void mtx34_inverse(nw4r::math::MTX34* out, nw4r::math::MTX34* src);
-s32 fn_80097EB0(void* handle, s32 index);
 s32 fn_8006FDCC(void* handle);
 void fn_800DAA4C(nw4r::math::VEC3* pos);
 s32 fn_800E0A8C(MHchar* model);
@@ -579,7 +580,7 @@ extern "C" void fn_8010CE80(void* arg)
         setVec3(&scale, s, s, s);
         scaleMat34W(&mtxB, &scale);
         base = fn_800E0A8C((MHchar*)((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x118);
-        handle = fn_80097EB0(&((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x114, i + 1);
+        handle = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&((_EFT_MODEL_VIEW*)work->models_0x1c[i])->field_0x114)->GetResNode(i + 1).mpData;
         idx = fn_8006FDCC(&handle);
         fn_8007100C(&((nw4r::math::MTX34*)base)[idx], &mtxB);
     }

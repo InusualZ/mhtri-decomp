@@ -12,11 +12,10 @@ struct G3DWorkObj;
 extern "C" {
 #endif
 
-const char* fn_8006FFBC(void);      /* 0x8006FFBC - the `ResMdl` type name the assert prints */
-u32 fn_8006FFC8(void* pSelf);       /* 0x8006FFC8 - the `ResMdl` handle validity test */
+const char* fn_8006FFBC(void);      /* 0x8006FFBC - the `ResMdlInfo` type name the assert prints */
+u32 fn_8006FFC8(void* pSelf);       /* 0x8006FFC8 - the `ResMdlInfo` handle validity test */
 
 /* The checked resource resolver `g3d/g3d_resfile.cpp` calls. */
-u32 fn_800700C0(void* p); /* 0x800700C0 - the checked resource resolver */
 
 /* 0x800710BC - `out = a * b` for two 3x4 matrices. */
 void mtx34_concat(Mtx34* out, const Mtx34* a, const Mtx34* b);
@@ -26,7 +25,6 @@ void mtx34_concat(Mtx34* out, const Mtx34* a, const Mtx34* b);
 u32 fn_8006FDCC(const void* p);
 struct G3DWorkObj* fn_8006FF50(void);
 s32* fn_80070054(void* pOut, const void* pKey);
-void* fn_8007012C(void);
 void fn_8007100C(void* pDst, const void* pSrc);
 
 #ifdef __cplusplus

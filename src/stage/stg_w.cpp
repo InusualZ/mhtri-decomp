@@ -198,6 +198,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "gx.h"
+#include "g3d/g3d_resmat.h"             /* nw4r::g3d::ResMdl (rule 2) */
 #include "quest/quest_item_slot.h"   /* quest_id_head_ck, quest_id_tail_ck (rule 2) */
 #include "lobby/lb_quest_screen.h"   /* the quest-work time and clock accessors (rule 2) */
 
@@ -456,7 +457,7 @@ extern "C" void* fn_802B057C(void* base, s32 off)
 /* Returns the record at `self` plus the resource size from fn_800700C0(). */
 extern "C" void* fn_802B0540(void* self)
 {
-    return fn_802B057C(self, ((ResolverView*)fn_800700C0(0))->size);
+    return fn_802B057C(self, ((const ResolverView*)&reinterpret_cast<const nw4r::g3d::ResMdl*>(self)->ref())->size);
 }
 
 /* Returns the entry `index` points at, biased by its 0x114-byte header, or NULL. */

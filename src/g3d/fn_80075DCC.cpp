@@ -7,7 +7,9 @@
  *   `g3d/g3d_camera.cpp`; the right edge is the discovery's byte cap, not a TU seam (`g3d/g3d_scnmdl.cpp` follows).
  * NAMES. The file keeps the map's stem (no one `__FILE__` names the run).  The bodies are m2c's output, typed
  *   mechanically: each `RawView_N` struct's `field_0xNN` states an offset and a size, not a meaning.
- *   GUESS (from the body and its callers): `sin_cos_deg`, `mtx34_set`.
+ *   GUESS (from the body and its callers): `sin_cos_deg`, `mtx34_set`; `CopiedMatResources` is a GUESS (the 0x38-byte
+ *   set of material handles fn_80077E70 refills and 0x80078DC0 constructs).  The material resource classes'
+ *   constructors, assignments and `ResMat` getters are nw4r's `g3d_resmat_ac.h` members.
  * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, mtx34_set, fn_80079EE4, fn_8007A468.
  *   Unwritten (empty stubs, 33 rows, 0x31F0 bytes; objdiff scores them near zero): fn_800769F4, fn_8007868C,
  *   fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8, fn_800793A4, fn_80079604, fn_80079938, fn_800799BC,
@@ -29,7 +31,8 @@
  *     `lbl_80795E28`, `lbl_8058EAE8`, `lbl_8058EB08`, `fn_80502678`, `Enable__Q34nw4r2ut2LCFv`, `fn_805026D8`,
  *     `Disable__Q34nw4r2ut2LCFv`, `lbl_8061A9C0`, `lbl_8061AA74`, `lbl_8058ED90`, `lbl_8058ED64`, `lbl_8058ED38`,
  *     `lbl_8058F4C8`.
- *   flipcheck: referenced but defined by nothing a flip can use: `fn_80502678`, `fn_805026D8`.
+ * SHAPES. The CopiedMatResources constructor is complete: its work is the member initialisers.  The material
+ *   resource constructors keep `#pragma peephole off` (retail keeps `clrlwi` + `cmpwi` for the alignment test).
  */
 
 #include "types.h"
@@ -57,6 +60,9 @@ typedef struct {
 #include "g3d/g3d_xsi.h" /* fn_800D74E8 (rule 2) */
 #include "g3d/g3d_cpu.h"
 #include "g3d/g3d_resvtx.h"
+#include "g3d/g3d_resmat.h"
+#include "g3d/g3d_resnode.h"
+#include "g3d/g3d_resshp.h"
 #include "nw4r/fn_805012C4.h"
 
 #define M2C_ERROR(x) /* unknown instruction */
@@ -71,62 +77,62 @@ extern u32 lbl_8056F688;
 extern u32 lbl_8056F6A0;
 extern u32 lbl_8056F6B0;
 extern u32 lbl_8056F6C0;
-extern u32 lbl_8058E570;
-extern u32 lbl_8058E57C;
-extern u32 lbl_8058E5B0;
-extern u32 lbl_8058E5D8;
-extern u32 lbl_8058E608;
-extern u32 lbl_8058E620;
-extern u32 lbl_8058E694;
-extern u32 lbl_8058E6A4;
-extern u32 lbl_8058E6C0;
-extern u32 lbl_8058E6D0;
-extern u32 lbl_8058E6F0;
-extern u32 lbl_8058E700;
-extern u32 lbl_8058E720;
-extern u32 lbl_8058E730;
-extern u32 lbl_8058E758;
-extern u32 lbl_8058E768;
-extern u32 lbl_8058E790;
-extern u32 lbl_8058E7A0;
-extern u32 lbl_8058E7C8;
-extern u32 lbl_8058E7D8;
-extern u32 lbl_8058E7E4;
-extern u32 lbl_8058E800;
-extern u32 lbl_8058E810;
-extern u32 lbl_8058E838;
-extern u32 lbl_8058E848;
-extern u32 lbl_8058E870;
-extern u32 lbl_8058E880;
+extern const char lbl_8058E570[];
+extern const char lbl_8058E57C[];
+extern const char lbl_8058E5B0[];
+extern const char lbl_8058E5D8[];
+extern const char lbl_8058E608[];
+extern const char lbl_8058E620[];
+extern const char lbl_8058E694[];
+extern const char lbl_8058E6A4[];
+extern const char lbl_8058E6C0[];
+extern const char lbl_8058E6D0[];
+extern const char lbl_8058E6F0[];
+extern const char lbl_8058E700[];
+extern const char lbl_8058E720[];
+extern const char lbl_8058E730[];
+extern const char lbl_8058E758[];
+extern const char lbl_8058E768[];
+extern const char lbl_8058E790[];
+extern const char lbl_8058E7A0[];
+extern const char lbl_8058E7C8[];
+extern const char lbl_8058E7D8[];
+extern const char lbl_8058E7E4[];
+extern const char lbl_8058E800[];
+extern const char lbl_8058E810[];
+extern const char lbl_8058E838[];
+extern const char lbl_8058E848[];
+extern const char lbl_8058E870[];
+extern const char lbl_8058E880[];
 extern u32 lbl_8058E890;
 extern u32 lbl_8058E8B8;
-extern u32 lbl_8058E8E8;
-extern u32 lbl_8058E91C;
-extern u32 lbl_8058E950;
-extern u32 lbl_8058E984;
-extern u32 lbl_8058E9C8;
-extern u32 lbl_8058E9F4;
-extern u32 lbl_8058EA20;
-extern u32 lbl_8058EA30;
-extern u32 lbl_8058EA50;
-extern u32 lbl_8058EA64;
-extern u32 lbl_8058EA90;
-extern u32 lbl_8058EAA0;
-extern u32 lbl_8058EAC8;
-extern u32 lbl_8058EAD8;
-extern u32 lbl_8058EAE8;
-extern u32 lbl_8058EB08;
-extern u32 lbl_8058EB80;
-extern u32 lbl_8058EB90;
-extern u32 lbl_8058EBF8;
-extern u32 lbl_8058EC30;
-extern u32 lbl_8058EC70;
-extern u32 lbl_8058ECB0;
-extern u32 lbl_8058ECF8;
-extern u32 lbl_8058ED18;
+extern const char lbl_8058E8E8[];
+extern const char lbl_8058E91C[];
+extern const char lbl_8058E950[];
+extern const char lbl_8058E984[];
+extern const char lbl_8058E9C8[];
+extern const char lbl_8058E9F4[];
+extern const char lbl_8058EA20[];
+extern const char lbl_8058EA30[];
+extern const char lbl_8058EA50[];
+extern const char lbl_8058EA64[];
+extern const char lbl_8058EA90[];
+extern const char lbl_8058EAA0[];
+extern const char lbl_8058EAC8[];
+extern const char lbl_8058EAD8[];
+extern const char lbl_8058EAE8[];
+extern const char lbl_8058EB08[];
+extern const char lbl_8058EB80[];
+extern const char lbl_8058EB90[];
+extern const char lbl_8058EBF8[];
+extern const char lbl_8058EC30[];
+extern const char lbl_8058EC70[];
+extern const char lbl_8058ECB0[];
+extern const char lbl_8058ECF8[];
+extern const char lbl_8058ED18[];
 extern u32 lbl_8058ED38;
-extern u32 lbl_8058ED64;
-extern u32 lbl_8058ED90;
+extern const char lbl_8058ED64[];
+extern const char lbl_8058ED90[];
 extern u32 lbl_8058F4C8;
 extern u32 lbl_8061A9C0;
 extern u32 lbl_8061AA74;
@@ -181,16 +187,11 @@ u32 mtx34_identity(s32);
 u32 vec3_normalize_into(void*, void*, f32, f32);
 u32 mtx34_mult_vec3(void*, s32, void*);
 u32 fn_8005A8E0(void*, void*);
-s32 fn_8005A91C(s32);
-s32 fn_8005A950(void*, s32);
-s32 fn_8005A9BC(void);
-s32 fn_8005AA30(void*);
 s32 fn_8005AAEC(s32);
 s32 fn_8005AB00(void*);
 void* fn_8005CEEC(void);
 s32 fn_8005D050(void*);
 u32 fn_8005D0CC(void*, void*);
-u32 fn_8005D1AC(void*, u32);
 s32 fn_8005D218(void*);
 u32 fn_8005D2C0(void*, void*);
 u32 fn_8005D3E0(void*);
@@ -202,7 +203,6 @@ void* fn_800638B8(void*, void*);
 s32 fn_80063964(s32, void*);
 s32 fn_800639D0(void*, void*);
 s32 fn_8006405C(void*);
-s32 fn_800640E4(s32);
 s32 fn_80064820(void*);
 u32 fn_80064BD4(void*);
 s32 fn_8006518C(void);
@@ -212,21 +212,9 @@ s32 fn_80065204(void*);
 s32 fn_800659C4(s32);
 void* fn_80067A54(s32);
 u32 fn_8006E2A8(s32, s32);
-s32 fn_8006E324(void*);
 s32 fn_8006E6B4(void*);
 u32 fn_8006F0E8(void*, void*);
-s32 fn_8006F124(s32);
-s32 fn_8006F158(void*, s32);
-s32 fn_8006F1C4(void);
 u32 fn_8006F228(void*, void*);
-s32 fn_8006F264(s32);
-s32 fn_8006F298(void*, s32);
-s32 fn_8006F340(s32);
-s32 fn_8006F374(void*, s32);
-s32 fn_8006F3E8(s32);
-s32 fn_8006F41C(void*, s32);
-s32 fn_8006F488(s32);
-s32 fn_8006F4BC(void*, s32);
 u32 fn_8006FDCC(void*);
 s32 fn_8006FEC8(void*, s32);
 s32 fn_80070020(s32);
@@ -262,30 +250,12 @@ u32 fn_800882A0(void*, void*, void*, void*, void*);
 s32 fn_8008831C(void);
 u32 fn_80088574(void*);
 u32 fn_80088590(u32);
-u32 fn_80088E24(void);
-u32 fn_80088F9C(void);
-u32 fn_80089114(u32);
-u32 fn_800895B8(void*, u16);
 s32 fn_80094094(s32);
-u32 fn_800958C8(void*);
-u32 fn_80095940(void*);
-u32 fn_80095ADC(void*, s32, void*, void*);
-f32 fn_80095D54(void*, u16);
-u32 fn_800963C0(void*, u32, void*);
-u32 fn_80096968(void*, s32, void*, void*);
-u32 fn_80096E8C(void*, u32, void*);
-u32 fn_80096F9C(void*, s32, u32, u32, void*, u32, u32, void*);
-s32 fn_8009754C(s32);
-s32 fn_800975D4(void*);
-s32 fn_80097EB0(void*, s32);
-s32 fn_80097F18(void*, s32);
-s32 fn_80098798(s32, s32);
-s32 fn_800988B0(s32, s32);
 s32 fn_80099974(void*);
 s32 fn_80099BB0(void*);
 u32 fn_8009AB48(u32);
 s32 fn_800D79B4(s32, s32, s32, s32);
-u32 fn_80463EBC(void);
+f32 fn_80463EBC(f32 x, f32 y);
 u32 fn_804B7800(s32);
 u32 fn_804B7810(s32);
 u32 fn_804B7820(s32);
@@ -307,28 +277,10 @@ u32 math_sincos_idx(f32);
 /* internal */ void fn_80076050(s32 arg0, s32 arg1, s32 arg2, s32 arg3);
 /* internal */ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4);
 /* internal */ void* fn_8007663C(s32 *arg0);
-/* internal */ s32 fn_8007669C(void* a0);
-/* internal */ s32 fn_800766D0(s32 arg0, s32 arg1);
-/* internal */ u32 fn_80076734(s32 *arg0, s32 arg1);
 /* internal */ s32 fn_8007673C(s32 *arg0);
 /* internal */ s32 fn_80076750(s32 *arg0);
-/* internal */ s32 fn_80076764(void* a0);
-/* internal */ s32 fn_80076794(s32 arg0, s32 arg1);
-/* internal */ u32 fn_800767F8(s32 *arg0, s32 arg1);
 /* internal */ s32 fn_80076800(s32 *arg0);
 /* internal */ s32 fn_80076814(s32 *arg0);
-/* internal */ s32 fn_80076828(void* a0);
-/* internal */ s32 fn_8007685C(s32 arg0, s32 arg1);
-/* internal */ u32 fn_800768C0(s32 *arg0, s32 arg1);
-/* internal */ s32 fn_800768C8(s32 *arg0);
-/* internal */ s32 fn_800768DC(s32 *arg0);
-/* internal */ s32 fn_800768F0(s32 *arg0);
-/* internal */ s32 fn_80076904(s32 arg0, void* a1);
-/* internal */ u32 fn_80076934(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_80076940(void* a0);
-/* internal */ s32 fn_80076974(s32 *arg0);
-/* internal */ s32 fn_80076988(s32 arg0, s32 arg1);
-/* internal */ u32 fn_800769EC(s32 *arg0, s32 arg1);
 /* internal */ u32 fn_800769F4(s32 *arg0, s32 *arg1, s32 arg2, s32 arg3, s32 arg4, void *arg5, s32 arg6);
 /* internal */ void* fn_80077398(s32 arg0);
 /* internal */ s32 fn_800773FC(s32 *arg0);
@@ -338,7 +290,6 @@ u32 math_sincos_idx(f32);
 /* internal */ u32 fn_80077474(s32 arg0);
 /* internal */ u32 fn_80077480(u16 arg0);
 /* internal */ u32 fn_80077490(u8 arg0);
-/* internal */ f32 fn_800774A0(void* a0, void* a1);
 /* internal */ s32 fn_800774A4(void* a0);
 /* internal */ s32 fn_80077554(s32 arg0, void* a1);
 /* internal */ u32 fn_80077584(s32 *arg0, s32 *arg1);
@@ -346,16 +297,12 @@ u32 math_sincos_idx(f32);
 /* internal */ u32 fn_800775C0(s32 *arg0, s32 *arg1);
 /* internal */ void* fn_800775CC(s32 arg0);
 /* internal */ s32 fn_80077630(s32 *arg0);
-/* internal */ void* fn_80077638(void* a0);
 /* internal */ s32 fn_80077644(void* a0);
 /* internal */ void* fn_80077674(s32 arg0);
 /* internal */ s32 fn_800776D8(s32 *arg0);
 /* internal */ s32 fn_800776E0(s32 *arg0);
-/* internal */ s32 fn_800776F4(s32 *arg0);
 /* internal */ s32 fn_80077708(s32 arg0, void* a1);
 /* internal */ u32 fn_80077738(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_80077744(s32 arg0, s32 arg1);
-/* internal */ u32 fn_800777A8(s32 *arg0, s32 arg1);
 /* internal */ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2);
 /* internal */ s32 fn_80077D4C(s32 *arg0);
 /* internal */ s32 fn_80077D64(s32 arg0);
@@ -365,28 +312,7 @@ u32 math_sincos_idx(f32);
 /* internal */ s32 fn_80077E34(s32 arg0, void* a1);
 /* internal */ u32 fn_80077E64(s32 *arg0, s32 *arg1);
 /* internal */ u32 fn_80077E70(s32 arg0, s32 arg1, s32 arg2);
-/* internal */ s32 fn_800783B0(s32 arg0, void* a1);
-/* internal */ u32 fn_800783E0(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_800783EC(s32 arg0, s32 arg1);
-/* internal */ u32 fn_80078450(s32 *arg0, s32 arg1);
-/* internal */ s32 fn_80078458(s32 arg0, void* a1);
-/* internal */ u32 fn_80078488(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_80078494(s32 arg0, void* a1);
-/* internal */ u32 fn_800784C4(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_800784D0(s32 arg0, void* a1);
-/* internal */ u32 fn_80078500(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_8007850C(s32 arg0, void* a1);
-/* internal */ u32 fn_8007853C(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_80078548(s32 arg0, void* a1);
-/* internal */ u32 fn_80078578(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_80078584(s32 arg0, void* a1);
-/* internal */ u32 fn_800785B4(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_800785C0(s32 arg0, s32 arg1);
 /* internal */ u32 fn_80078608(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_80078614(s32 arg0, void* a1);
-/* internal */ u32 fn_80078644(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_80078650(s32 arg0, void* a1);
-/* internal */ u32 fn_80078680(s32 *arg0, s32 *arg1);
 /* internal */ u32 fn_8007868C(s32 arg0, void *arg1, s32 arg2, u32 arg_sp0);
 /* internal */ s32 fn_80078878(s32 arg0, s32 arg1);
 /* internal */ s32 fn_800788C8(s32 arg0, void* a1);
@@ -394,12 +320,7 @@ u32 math_sincos_idx(f32);
 /* internal */ s32 fn_80078904(s32 arg0);
 /* internal */ s32 fn_80078988(s32 arg0, void* a1);
 /* internal */ u32 fn_800789B8(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_800789C4(s32 arg0, s32 arg1);
-/* internal */ u32 fn_80078A28(s32 *arg0, s32 arg1);
-/* internal */ s32 fn_80078A30(s32 arg0, s32 arg1);
-/* internal */ u32 fn_80078A94(s32 *arg0, s32 arg1);
 /* internal */ u32 fn_80078A9C(s32 arg0, void *arg1, s32 arg2, s32 arg3, u32 arg_sp0);
-/* internal */ void* fn_80078DC0(void *arg0);
 /* internal */ u32 fn_80078E7C(s32 arg0, void *arg1, u32 arg2, s32 arg3, u32 arg_sp0);
 /* internal */ u32 fn_80079018(s32 arg0, void *arg1, u32 arg2, s32 arg3, s32 arg4, u32 arg_sp0);
 /* internal */ void* fn_800791D8(u32 *arg0, s32 arg1, s32 arg2, void *arg3, void *arg4);
@@ -664,7 +585,6 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
     u32 sp77;
 
     u32 sp90;
-    s32 sp8C;
     s32 sp88;
     s32 sp84;
     s32 sp80;
@@ -703,54 +623,54 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
     s32 sp8;
 
     if (arg4 == 0) {
-        fn_80076988((s32)(&sp8C), (s32)(0));
-        if ((arg2 == NULL) || (fn_80076974((s32 *)(&((RawView_2*)arg2)->field_0x24)) == 0)) {
-            sp70 = fn_80076940((void*)(arg0));
-            fn_80076904((s32)(&sp8C), (void*)(&sp70));
+        nw4r::g3d::ResMatMisc misc((void*)NULL);
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatMisc*>((s32 *)(&((RawView_2*)arg2)->field_0x24))->IsValid() == 0)) {
+            sp70 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatMisc().mpData;
+            misc = *reinterpret_cast<const nw4r::g3d::ResMatMisc*>(&sp70);
         } else {
-            fn_80076904((s32)(&sp8C), (void*)(&((RawView_2*)arg2)->field_0x24));
+            misc = *reinterpret_cast<const nw4r::g3d::ResMatMisc*>(&((RawView_2*)arg2)->field_0x24);
         }
-        fn_80095940((void*)(&sp8C));
+        misc.GetFogIdx();
         fn_8008818C();
-        sp6C = sp8C;
+        sp6C = (s32)misc.mpData;
         fn_80085D4C((void*)(&sp6C));
-        if ((arg2 == NULL) || (fn_800768F0((s32 *)(&((RawView_2*)arg2)->field_0x04)) == 0)) {
-            sp68 = fn_8006F3E8((s32)(arg0));
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTlutObj*>((s32 *)(&((RawView_2*)arg2)->field_0x04))->IsValid() == 0)) {
+            sp68 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTlutObj().mpData;
             fn_80085FF0((void*)(&sp68));
         } else {
             sp64 = ((RawView_2*)arg2)->field_0x04;
             fn_80085FF0((void*)(&sp64));
         }
-        if ((arg2 == NULL) || (fn_800768DC((s32 *)(arg2)) == 0)) {
-            sp60 = fn_8006F488((s32)(arg0));
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTexObj*>((s32 *)(arg2))->IsValid() == 0)) {
+            sp60 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTexObj().mpData;
             fn_80085DF4((void*)(&sp60));
         } else {
             sp5C = ((RawView_2*)arg2)->field_0x00;
             fn_80085DF4((void*)(&sp5C));
         }
-        if ((arg2 == NULL) || (fn_800768C8((s32 *)(&((RawView_2*)arg2)->field_0x08)) == 0)) {
-            sp58 = fn_80076828((void*)(arg0));
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResGenMode*>((s32 *)(&((RawView_2*)arg2)->field_0x08))->IsValid() == 0)) {
+            sp58 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResGenMode().mpData;
             fn_80086194((void*)(&sp58));
         } else {
             sp54 = ((RawView_2*)arg2)->field_0x08;
             fn_80086194((void*)(&sp54));
         }
         if ((arg2 == NULL) || (fn_80076814((s32 *)(&((RawView_2*)arg2)->field_0x0C)) == 0)) {
-            sp50 = fn_8009754C((s32)(arg0));
+            sp50 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>(arg0)->GetResTev().mpData;
             fn_80086568((void*)(&sp50));
         } else {
             sp4C = ((RawView_2*)arg2)->field_0x0C;
             fn_80086568((void*)(&sp4C));
         }
         if ((arg2 == NULL) || (fn_80076800((s32 *)(&((RawView_2*)arg2)->field_0x10)) == 0)) {
-            sp48 = fn_80076764((void*)(arg0));
+            sp48 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatPix().mpData;
             fn_80086980((void*)(&sp48));
         } else {
             sp44 = ((RawView_2*)arg2)->field_0x10;
             fn_80086980((void*)(&sp44));
         }
         if ((arg2 == NULL) || (fn_80076750((s32 *)(&((RawView_2*)arg2)->field_0x14)) == 0)) {
-            sp40 = fn_8006F124((s32)(arg0));
+            sp40 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatTevColor().mpData;
             fn_800869D4((void*)(&sp40));
         } else {
             sp3C = ((RawView_2*)arg2)->field_0x14;
@@ -758,10 +678,10 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
         }
         if ((arg2 == NULL) || (fn_8006E6B4((void*)(&((RawView_2*)arg2)->field_0x18)) == 0)) {
             if (arg3 != NULL) {
-                sp38 = fn_8006F264((s32)(arg0));
+                sp38 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatIndMtxAndScale().mpData;
                 fn_80086AA8((void*)(&sp38), (void*)(arg3));
             } else {
-                sp34 = fn_8006F264((s32)(arg0));
+                sp34 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatIndMtxAndScale().mpData;
                 fn_80086A28((void*)(&sp34));
             }
         } else if (arg3 != NULL) {
@@ -771,7 +691,7 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
             sp2C = ((RawView_2*)arg2)->field_0x18;
             fn_80086A28((void*)(&sp2C));
         }
-        fn_800958C8((void*)(&sp8C));
+        misc.GetLightSetIdx();
         fn_800882A0((void*)(&sp88), (void*)(&sp84), (void*)(&sp80), (void*)(&sp7C), (void*)(&sp74));
         sp78 = sp74;
         sp79 = sp75;
@@ -779,7 +699,7 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
         sp7B = sp77;
         if ((arg2 == NULL) || (fn_80064820((void*)(&((RawView_2*)arg2)->field_0x1C)) == 0)) {
             sp24 = (s32) sp78;
-            sp28 = fn_8005A91C((s32)(arg0));
+            sp28 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatChan().mpData;
             fn_80086B2C((void*)(&sp28), (s32)(sp88), (s32)(sp84), (s32)(sp80), (s32)(sp7C), (void*)(&sp24), (s32)((arg1 & 8) != 0));
         } else {
             sp1C = (s32) sp78;
@@ -787,14 +707,14 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
             fn_80086B2C((void*)(&sp20), (s32)(sp88), (s32)(sp84), (s32)(sp80), (s32)(sp7C), (void*)(&sp1C), (s32)((arg1 & 8) != 0));
         }
         if ((arg2 == NULL) || (fn_8007673C((s32 *)(&((RawView_2*)arg2)->field_0x20)) == 0)) {
-            sp18 = fn_8007669C((void*)(arg0));
+            sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatTexCoordGen().mpData;
             fn_800870E4((void*)(&sp18));
         } else {
             sp14 = ((RawView_2*)arg2)->field_0x20;
             fn_800870E4((void*)(&sp14));
         }
-        if ((arg2 == NULL) || (fn_8006E324((void*)(&((RawView_2*)arg2)->field_0x28)) == 0)) {
-            sp10 = fn_8006F340((s32)(arg0));
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTexSrt*>((void*)(&((RawView_2*)arg2)->field_0x28))->IsValid() == 0)) {
+            sp10 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTexSrt().mpData;
             fn_8008715C((void*)(&sp10));
             return;
         }
@@ -830,23 +750,35 @@ void* fn_8007663C(s32 *arg0) {
     return arg0;
 }
 
-s32 fn_8007669C(void* a0) {
-    u32 sp8;
+} /* extern "C" */
 
-    return *((s32*)fn_800766D0((s32)(&sp8), (s32)(fn_8006F1C4() + 0xE0)));
+/* 0x8007669C (0x34): returns the material's MatTexCoordGen block. */
+nw4r::g3d::ResMatTexCoordGen nw4r::g3d::ResMat::GetResMatTexCoordGen() {
+    return ResMatTexCoordGen((u8*)GetResMatDLData() + 0xE0);
 }
 
-s32 fn_800766D0(s32 arg0, s32 arg1) {
-    fn_80076734(0, 0);
-    if ((s32) (arg1 & 0x1F) != 0) {
+extern "C" {
+
+} /* extern "C" */
+
+#pragma peephole off
+/* 0x800766D0 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResMatTexCoordGen::ResMatTexCoordGen(void* pData) : ResCommon<ResMatTexCoordGenData>(pData) {
+    if ((u32)pData & 0x1F) {
         nw4r::db::Panic((const char*)&lbl_8058E758, 0x201, (const char*)&lbl_8058E730);
     }
-    return arg0;
 }
+#pragma peephole on
 
-u32 fn_80076734(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
-}
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x80076734 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatTexCoordGenData)
+
+extern "C" {
 
 s32 fn_8007673C(s32 *arg0) {
     return *arg0 != 0;
@@ -856,23 +788,35 @@ s32 fn_80076750(s32 *arg0) {
     return *arg0 != 0;
 }
 
-s32 fn_80076764(void* a0) {
-    u32 sp8;
+} /* extern "C" */
 
-    return *((s32*)fn_80076794((s32)(&sp8), (s32)(fn_8006F1C4())));
+/* 0x80076764 (0x30): returns the material's MatPix block. */
+nw4r::g3d::ResMatPix nw4r::g3d::ResMat::GetResMatPix() {
+    return ResMatPix(GetResMatDLData());
 }
 
-s32 fn_80076794(s32 arg0, s32 arg1) {
-    fn_800767F8(0, 0);
-    if ((s32) (arg1 & 0x1F) != 0) {
+extern "C" {
+
+} /* extern "C" */
+
+#pragma peephole off
+/* 0x80076794 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResMatPix::ResMatPix(void* pData) : ResCommon<ResMatPixData>(pData) {
+    if ((u32)pData & 0x1F) {
         nw4r::db::Panic((const char*)&lbl_8058E790, 0x154, (const char*)&lbl_8058E768);
     }
-    return arg0;
 }
+#pragma peephole on
 
-u32 fn_800767F8(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
-}
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x800767F8 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatPixData)
+
+extern "C" {
 
 s32 fn_80076800(s32 *arg0) {
     return *arg0 != 0;
@@ -882,66 +826,116 @@ s32 fn_80076814(s32 *arg0) {
     return *arg0 != 0;
 }
 
-s32 fn_80076828(void* a0) {
-    u32 sp8;
+} /* extern "C" */
 
-    return *((s32*)fn_8007685C((s32)(&sp8), (s32)(fn_8005A9BC() + 0x14)));
+/* 0x80076828 (0x34): returns the material's GenMode block. */
+nw4r::g3d::ResGenMode nw4r::g3d::ResMat::GetResGenMode() {
+    return ResGenMode((u8*)&ref() + 0x14);
 }
 
-s32 fn_8007685C(s32 arg0, s32 arg1) {
-    fn_800768C0(0, 0);
-    if ((s32) (arg1 & 3) != 0) {
+extern "C" {
+
+} /* extern "C" */
+
+#pragma peephole off
+/* 0x8007685C (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResGenMode::ResGenMode(void* pData) : ResCommon<ResGenModeData>(pData) {
+    if ((u32)pData & 3) {
         nw4r::db::Panic((const char*)&lbl_8058E870, 0xAF, (const char*)&lbl_8058E848);
     }
-    return arg0;
+}
+#pragma peephole on
+
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x800768C0 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResGenModeData)
+
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x800768C8 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResGenMode::IsValid() const {
+    return mpData != NULL;
 }
 
-u32 fn_800768C0(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x800768DC (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResTexObj::IsValid() const {
+    return mpData != NULL;
 }
 
-s32 fn_800768C8(s32 *arg0) {
-    return *arg0 != 0;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x800768F0 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResTlutObj::IsValid() const {
+    return mpData != NULL;
 }
 
-s32 fn_800768DC(s32 *arg0) {
-    return *arg0 != 0;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x80076904 (0x30): copies the handle. */
+nw4r::g3d::ResMatMisc& nw4r::g3d::ResMatMisc::operator=(const ResMatMisc& rhs) {
+    ResCommon<ResMatMiscData>::operator=(rhs);
+    return *this;
 }
 
-s32 fn_800768F0(s32 *arg0) {
-    return *arg0 != 0;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x80076940 (0x34): returns the material's MatMisc block. */
+nw4r::g3d::ResMatMisc nw4r::g3d::ResMat::GetResMatMisc() {
+    return ResMatMisc((u8*)&ref() + 0x1C);
 }
 
-s32 fn_80076904(s32 arg0, void* a1) {
-    fn_80076934(0, 0);
-    return arg0;
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x80076974 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResMatMisc::IsValid() const {
+    return mpData != NULL;
 }
 
-u32 fn_80076934(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
+extern "C" {
 
-s32 fn_80076940(void* a0) {
-    u32 sp8;
 
-    return *((s32*)fn_80076988((s32)(&sp8), (s32)(fn_8005A9BC() + 0x1C)));
-}
+} /* extern "C" */
 
-s32 fn_80076974(s32 *arg0) {
-    return *arg0 != 0;
-}
-
-s32 fn_80076988(s32 arg0, s32 arg1) {
-    fn_800769EC(0, 0);
-    if ((s32) (arg1 & 3) != 0) {
+#pragma peephole off
+/* 0x80076988 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResMatMisc::ResMatMisc(void* pData) : ResCommon<ResMatMiscData>(pData) {
+    if ((u32)pData & 3) {
         nw4r::db::Panic((const char*)&lbl_8058E838, 0xF3, (const char*)&lbl_8058E810);
     }
-    return arg0;
 }
+#pragma peephole on
 
-u32 fn_800769EC(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
-}
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x800769EC (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatMiscData)
+
+extern "C" {
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x3];
@@ -1050,9 +1044,19 @@ u32 fn_80077490(u8 arg0) {
     *(u8 *)0xCC008000 = arg0;
 }
 
-f32 fn_800774A0(void* a0, void* a1) {
-    fn_80463EBC();
+} /* extern "C" */
+
+/* 0x800774A0 (0x4): raises `x` to the power `y` through the C library. */
+namespace nw4r {
+namespace math {
+f32 FPow(f32 x, f32 y) {
+    return fn_80463EBC(x, y);
 }
+}  // namespace math
+}  // namespace nw4r
+
+extern "C" {
+
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x20];
@@ -1110,8 +1114,8 @@ u32 fn_800775C0(s32 *arg0, s32 *arg1) {
 }
 
 void* fn_800775CC(s32 arg0) {
-    if (fn_800776F4(0) == 0) {
-        nw4r::db::Panic((const char*)&lbl_8058E800, 0x11F, (const char*)&lbl_8058E7E4, fn_80077638(0), &lbl_807911E0);
+    if (reinterpret_cast<const nw4r::g3d::ResMatFur*>(0)->IsValid() == 0) {
+        nw4r::db::Panic((const char*)&lbl_8058E800, 0x11F, (const char*)&lbl_8058E7E4, nw4r::g3d::ResMatFur::GetClassName(), &lbl_807911E0);
     }
     fn_80077630((s32 *)(arg0));
 }
@@ -1120,9 +1124,15 @@ s32 fn_80077630(s32 *arg0) {
     return *arg0;
 }
 
-void* fn_80077638(void* a0) {
-    return &lbl_8058E7D8;
+} /* extern "C" */
+
+/* 0x80077638 (0xC): returns the class name. */
+const char* nw4r::g3d::ResMatFur::GetClassName() {
+    return (const char*)&lbl_8058E7D8;
 }
+
+extern "C" {
+
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x34];
@@ -1147,9 +1157,15 @@ s32 fn_800776E0(s32 *arg0) {
     return *arg0 != 0;
 }
 
-s32 fn_800776F4(s32 *arg0) {
-    return *arg0 != 0;
+} /* extern "C" */
+
+/* 0x800776F4 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResMatFur::IsValid() const {
+    return mpData != NULL;
 }
+
+extern "C" {
+
 
 s32 fn_80077708(s32 arg0, void* a1) {
     fn_80077738(0, 0);
@@ -1160,17 +1176,26 @@ u32 fn_80077738(s32 *arg0, s32 *arg1) {
     *arg0 = *arg1;
 }
 
-s32 fn_80077744(s32 arg0, s32 arg1) {
-    fn_800777A8(0, 0);
-    if ((s32) (arg1 & 3) != 0) {
+} /* extern "C" */
+
+#pragma peephole off
+/* 0x80077744 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResMatFur::ResMatFur(void* pData) : ResCommon<ResMatFurData>(pData) {
+    if ((u32)pData & 3) {
         nw4r::db::Panic((const char*)&lbl_8058E7C8, 0x11F, (const char*)&lbl_8058E7A0);
     }
-    return arg0;
 }
+#pragma peephole on
 
-u32 fn_800777A8(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
-}
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x800777A8 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatFurData)
+
+extern "C" {
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x10];
@@ -1271,17 +1296,17 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
 
     M2C_ERROR(/* unknown instruction: xsmaddmdp vs30, vs1, vs0 */);
     M2C_ERROR(/* unknown instruction: xxsel vs29, vs1, vs0, vs36 */);
-    if ((fn_8005AA30(0) == 0) || (fn_800776E0((s32 *)(arg2)) == 0)) {
+    if ((reinterpret_cast<const nw4r::g3d::ResMat*>(0)->IsValid() == 0) || (fn_800776E0((s32 *)(arg2)) == 0)) {
         M2C_ERROR(/* unknown instruction: vmrghb v31, v1, v0 */);
         M2C_ERROR(/* unknown instruction: vmrghb v30, v1, v0 */);
         M2C_ERROR(/* unknown instruction: vmrghb v29, v1, v0 */);
         return NULL;
     }
-    sp24 = fn_80076940((void*)(arg0));
+    sp24 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatMisc().mpData;
     fn_80077590((s32)(&sp34), (void*)(&sp24));
-    fn_80095ADC((void*)(&sp34), (s32)(1), (void*)(&sp8C), (void*)(&sp30));
-    fn_80095ADC((void*)(&sp34), (s32)(2), (void*)(&sp90), (void*)(&sp31));
-    fn_80095ADC((void*)(&sp34), (s32)(3), (void*)(&sp94), (void*)(&sp32));
+    reinterpret_cast<nw4r::g3d::ResMatMisc*>(&sp34)->GetIndirectMethod(GX_ITM_0, (nw4r::g3d::ResMatMiscData::IndirectMethod*)&sp8C, (s8*)&sp30);
+    reinterpret_cast<nw4r::g3d::ResMatMisc*>(&sp34)->GetIndirectMethod(GX_ITM_1, (nw4r::g3d::ResMatMiscData::IndirectMethod*)&sp90, (s8*)&sp31);
+    reinterpret_cast<nw4r::g3d::ResMatMisc*>(&sp34)->GetIndirectMethod(GX_ITM_2, (nw4r::g3d::ResMatMiscData::IndirectMethod*)&sp94, (s8*)&sp32);
     if ((sp8C == 0) && (sp90 == 0) && (sp94 == 0)) {
         M2C_ERROR(/* unknown instruction: vmrghb v31, v1, v0 */);
         M2C_ERROR(/* unknown instruction: vmrghb v30, v1, v0 */);
@@ -1324,7 +1349,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                         if (temp_r3_3 < 0) {
                             nw4r::db::Panic((const char*)&lbl_8058E880, 0x64, (const char*)&lbl_8058E890);
                         }
-                        sp18 = fn_80097EB0((void*)(&sp2C), (s32)(temp_r3_3));
+                        sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMdl*>(&sp2C)->GetResNode((int)temp_r3_3).mpData;
                         fn_8005D2C0((void*)(&sp28), (void*)(&sp18));
                         temp_r20_2 = fn_8005D218((void*)(arg1));
                         mtx34_concat((void*)(&spC8), (void*)(fn_8005D218((void*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
@@ -1466,12 +1491,31 @@ u32 fn_80077E64(s32 *arg0, s32 *arg1) {
     *arg0 = *arg1;
 }
 
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x2C];
-    /* +0x2C */ u32 field_0x2C;
-    /* +0x30 */ u32 field_0x30;
-    /* +0x34 */ u32 field_0x34;
-} RawView_23; /* size: 0x38 */
+} /* extern "C" */
+
+/* The material resource set fn_80077E70 refills from a ScnMdl's copied-material buffers: one handle per
+ * resource kind and three trailing words.  size: 0x38 */
+struct CopiedMatResources {
+    /* +0x00 */ nw4r::g3d::ResTexObj texObj;
+    /* +0x04 */ nw4r::g3d::ResTlutObj tlutObj;
+    /* +0x08 */ nw4r::g3d::ResGenMode genMode;
+    /* +0x0C */ nw4r::g3d::ResTev tev;
+    /* +0x10 */ nw4r::g3d::ResMatPix pix;
+    /* +0x14 */ nw4r::g3d::ResMatTevColor tevColor;
+    /* +0x18 */ nw4r::g3d::ResMatIndMtxAndScale indMtxAndScale;
+    /* +0x1C */ nw4r::g3d::ResMatChan chan;
+    /* +0x20 */ nw4r::g3d::ResMatTexCoordGen texCoordGen;
+    /* +0x24 */ nw4r::g3d::ResMatMisc misc;
+    /* +0x28 */ nw4r::g3d::ResTexSrt texSrt;
+    /* +0x2C */ u32 word_0x2C;
+    /* +0x30 */ u32 word_0x30;
+    /* +0x34 */ u32 word_0x34;
+
+    CopiedMatResources();
+};
+
+extern "C" {
+
 typedef struct {
     /* +0x00 */ u32 field_0x00;
     /* +0x04 */ u8 pad_0x04[0x4];
@@ -1597,183 +1641,215 @@ u32 fn_80077E70(s32 arg0, s32 arg1, s32 arg2) {
     }
     temp_r4 = ((RawView_22*)arg1)->field_0x08;
     if (temp_r4 != 0) {
-        fn_80078650((s32)(arg0), (void*)(fn_8006F4BC((void*)(&sp5C), (s32)(temp_r4 + (arg2 * 0x104)))));
+        ((CopiedMatResources*)arg0)->texObj = nw4r::g3d::ResTexObj((void*)(temp_r4 + (arg2 * 0x104)));
     } else {
-        fn_80078650((s32)(arg0), (void*)(fn_8006F4BC((void*)(&sp58), (s32)(0))));
+        ((CopiedMatResources*)arg0)->texObj = nw4r::g3d::ResTexObj((void*)(0));
     }
     temp_r4_2 = ((RawView_22*)arg1)->field_0x0C;
     if (temp_r4_2 != 0) {
-        fn_80078614((s32)(arg0 + 4), (void*)(fn_8006F41C((void*)(&sp54), (s32)(temp_r4_2 + (arg2 * 0x64)))));
+        ((CopiedMatResources*)arg0)->tlutObj = nw4r::g3d::ResTlutObj((void*)(temp_r4_2 + (arg2 * 0x64)));
     } else {
-        fn_80078614((s32)(arg0 + 4), (void*)(fn_8006F41C((void*)(&sp50), (s32)(0))));
+        ((CopiedMatResources*)arg0)->tlutObj = nw4r::g3d::ResTlutObj((void*)(0));
     }
     temp_r4_3 = ((RawView_22*)arg1)->field_0x10;
     if (temp_r4_3 != 0) {
-        fn_800785C0((s32)(arg0 + 0x28), (s32)(fn_8006F374((void*)(&sp4C), (s32)(temp_r4_3 + (arg2 * 0x248)))));
+        ((CopiedMatResources*)arg0)->texSrt = nw4r::g3d::ResTexSrt((void*)(temp_r4_3 + (arg2 * 0x248)));
     } else {
-        fn_800785C0((s32)(arg0 + 0x28), (s32)(fn_8006F374((void*)(&sp48), (s32)(0))));
+        ((CopiedMatResources*)arg0)->texSrt = nw4r::g3d::ResTexSrt((void*)NULL);
     }
     temp_r4_4 = ((RawView_22*)arg1)->field_0x14;
     if (temp_r4_4 != 0) {
-        fn_80078584((s32)(arg0 + 0x1C), (void*)(fn_8005A950((void*)(&sp44), (s32)(temp_r4_4 + (arg2 * 0x28)))));
+        ((CopiedMatResources*)arg0)->chan = nw4r::g3d::ResMatChan((void*)(temp_r4_4 + (arg2 * 0x28)));
     } else {
-        fn_80078584((s32)(arg0 + 0x1C), (void*)(fn_8005A950((void*)(&sp40), (s32)(0))));
+        ((CopiedMatResources*)arg0)->chan = nw4r::g3d::ResMatChan((void*)(0));
     }
     temp_r4_5 = ((RawView_22*)arg1)->field_0x18;
     if (temp_r4_5 != 0) {
-        fn_80078548((s32)(arg0 + 8), (void*)(fn_8007685C((s32)(&sp3C), (s32)(temp_r4_5 + (arg2 * 8)))));
+        ((CopiedMatResources*)arg0)->genMode = nw4r::g3d::ResGenMode((void*)(temp_r4_5 + (arg2 * 8)));
     } else {
-        fn_80078548((s32)(arg0 + 8), (void*)(fn_8007685C((s32)(&sp38), (s32)(0))));
+        ((CopiedMatResources*)arg0)->genMode = nw4r::g3d::ResGenMode((void*)(0));
     }
     temp_r4_6 = ((RawView_22*)arg1)->field_0x1C;
     if (temp_r4_6 != 0) {
-        fn_80076904((s32)(arg0 + 0x24), (void*)(fn_80076988((s32)(&sp34), (s32)(temp_r4_6 + (arg2 * 0xC)))));
+        ((CopiedMatResources*)arg0)->misc = nw4r::g3d::ResMatMisc((void*)(temp_r4_6 + (arg2 * 0xC)));
     } else {
-        fn_80076904((s32)(arg0 + 0x24), (void*)(fn_80076988((s32)(&sp30), (s32)(0))));
+        ((CopiedMatResources*)arg0)->misc = nw4r::g3d::ResMatMisc((void*)(0));
     }
     temp_r4_7 = ((RawView_22*)arg1)->field_0x20;
     if (temp_r4_7 != 0) {
-        fn_8007850C((s32)(arg0 + 0x10), (void*)(fn_80076794((s32)(&sp2C), (s32)(temp_r4_7 + (arg2 << 5)))));
+        ((CopiedMatResources*)arg0)->pix = nw4r::g3d::ResMatPix((void*)(temp_r4_7 + (arg2 << 5)));
     } else {
-        fn_8007850C((s32)(arg0 + 0x10), (void*)(fn_80076794((s32)(&sp28), (s32)(0))));
+        ((CopiedMatResources*)arg0)->pix = nw4r::g3d::ResMatPix((void*)(0));
     }
     temp_r4_8 = ((RawView_22*)arg1)->field_0x24;
     if (temp_r4_8 != 0) {
-        fn_800784D0((s32)(arg0 + 0x14), (void*)(fn_8006F158((void*)(&sp24), (s32)(temp_r4_8 + (arg2 << 7)))));
+        ((CopiedMatResources*)arg0)->tevColor = nw4r::g3d::ResMatTevColor((void*)(temp_r4_8 + (arg2 << 7)));
     } else {
-        fn_800784D0((s32)(arg0 + 0x14), (void*)(fn_8006F158((void*)(&sp20), (s32)(0))));
+        ((CopiedMatResources*)arg0)->tevColor = nw4r::g3d::ResMatTevColor((void*)(0));
     }
     temp_r4_9 = ((RawView_22*)arg1)->field_0x28;
     if (temp_r4_9 != 0) {
-        fn_80078494((s32)(arg0 + 0x18), (void*)(fn_8006F298((void*)(&sp1C), (s32)(temp_r4_9 + (arg2 << 6)))));
+        ((CopiedMatResources*)arg0)->indMtxAndScale = nw4r::g3d::ResMatIndMtxAndScale((void*)(temp_r4_9 + (arg2 << 6)));
     } else {
-        fn_80078494((s32)(arg0 + 0x18), (void*)(fn_8006F298((void*)(&sp18), (s32)(0))));
+        ((CopiedMatResources*)arg0)->indMtxAndScale = nw4r::g3d::ResMatIndMtxAndScale((void*)(0));
     }
     temp_r4_10 = ((RawView_22*)arg1)->field_0x2C;
     if (temp_r4_10 != 0) {
-        fn_80078458((s32)(arg0 + 0x20), (void*)(fn_800766D0((s32)(&sp14), (s32)(temp_r4_10 + (arg2 * 0xA0)))));
+        ((CopiedMatResources*)arg0)->texCoordGen = nw4r::g3d::ResMatTexCoordGen((void*)(temp_r4_10 + (arg2 * 0xA0)));
     } else {
-        fn_80078458((s32)(arg0 + 0x20), (void*)(fn_800766D0((s32)(&sp10), (s32)(0))));
+        ((CopiedMatResources*)arg0)->texCoordGen = nw4r::g3d::ResMatTexCoordGen((void*)(0));
     }
     temp_r4_11 = ((RawView_22*)arg1)->field_0x30;
     if (temp_r4_11 != 0) {
-        fn_800783B0((s32)(arg0 + 0xC), (void*)(fn_800783EC((s32)(&spC), (s32)(temp_r4_11 + (arg2 << 9)))));
+        ((CopiedMatResources*)arg0)->tev = nw4r::g3d::ResTev((void*)(temp_r4_11 + (arg2 << 9)));
     } else {
-        fn_800783B0((s32)(arg0 + 0xC), (void*)(fn_800783EC((s32)(&sp8), (s32)(0))));
+        ((CopiedMatResources*)arg0)->tev = nw4r::g3d::ResTev((void*)(0));
     }
     if ((s32) (((RawView_22*)arg1)->field_0x00 & 1) != 0) {
-        ((RawView_23*)arg0)->field_0x2C = 0;
-        ((RawView_23*)arg0)->field_0x30 = 0;
-        ((RawView_23*)arg0)->field_0x34 = 0;
+        ((CopiedMatResources*)arg0)->word_0x2C = 0;
+        ((CopiedMatResources*)arg0)->word_0x30 = 0;
+        ((CopiedMatResources*)arg0)->word_0x34 = 0;
         return;
     }
-    ((RawView_23*)arg0)->field_0x2C = (s32) ((RawView_22*)arg1)->field_0x34;
-    ((RawView_23*)arg0)->field_0x30 = (s32) ((RawView_22*)arg1)->field_0x38;
-    ((RawView_23*)arg0)->field_0x34 = (s32) ((RawView_22*)arg1)->field_0x3C;
+    ((CopiedMatResources*)arg0)->word_0x2C = (s32) ((RawView_22*)arg1)->field_0x34;
+    ((CopiedMatResources*)arg0)->word_0x30 = (s32) ((RawView_22*)arg1)->field_0x38;
+    ((CopiedMatResources*)arg0)->word_0x34 = (s32) ((RawView_22*)arg1)->field_0x3C;
 }
 
-s32 fn_800783B0(s32 arg0, void* a1) {
-    fn_800783E0(0, 0);
-    return arg0;
+} /* extern "C" */
+
+/* 0x800783B0 (0x30): copies the handle. */
+nw4r::g3d::ResTev& nw4r::g3d::ResTev::operator=(const ResTev& rhs) {
+    ResCommon<ResTevData>::operator=(rhs);
+    return *this;
 }
 
-u32 fn_800783E0(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
+extern "C" {
 
-s32 fn_800783EC(s32 arg0, s32 arg1) {
-    fn_80078450(0, 0);
-    if ((s32) (arg1 & 0x1F) != 0) {
+
+} /* extern "C" */
+
+#pragma peephole off
+/* 0x800783EC (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResTev::ResTev(void* pData) : ResCommon<ResTevData>(pData) {
+    if ((u32)pData & 0x1F) {
         nw4r::db::Panic((const char*)&lbl_8058EA90, 0x25, (const char*)&lbl_8058EA64);
     }
-    return arg0;
+}
+#pragma peephole on
+
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x80078450 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResTevData)
+
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x80078458 (0x30): copies the handle. */
+nw4r::g3d::ResMatTexCoordGen& nw4r::g3d::ResMatTexCoordGen::operator=(const ResMatTexCoordGen& rhs) {
+    ResCommon<ResMatTexCoordGenData>::operator=(rhs);
+    return *this;
 }
 
-u32 fn_80078450(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x80078494 (0x30): copies the handle. */
+nw4r::g3d::ResMatIndMtxAndScale& nw4r::g3d::ResMatIndMtxAndScale::operator=(const ResMatIndMtxAndScale& rhs) {
+    ResCommon<ResMatIndMtxAndScaleData>::operator=(rhs);
+    return *this;
 }
 
-s32 fn_80078458(s32 arg0, void* a1) {
-    fn_80078488(0, 0);
-    return arg0;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x800784D0 (0x30): copies the handle. */
+nw4r::g3d::ResMatTevColor& nw4r::g3d::ResMatTevColor::operator=(const ResMatTevColor& rhs) {
+    ResCommon<ResMatTevColorData>::operator=(rhs);
+    return *this;
 }
 
-u32 fn_80078488(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x8007850C (0x30): copies the handle. */
+nw4r::g3d::ResMatPix& nw4r::g3d::ResMatPix::operator=(const ResMatPix& rhs) {
+    ResCommon<ResMatPixData>::operator=(rhs);
+    return *this;
 }
 
-s32 fn_80078494(s32 arg0, void* a1) {
-    fn_800784C4(0, 0);
-    return arg0;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x80078548 (0x30): copies the handle. */
+nw4r::g3d::ResGenMode& nw4r::g3d::ResGenMode::operator=(const ResGenMode& rhs) {
+    ResCommon<ResGenModeData>::operator=(rhs);
+    return *this;
 }
 
-u32 fn_800784C4(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x80078584 (0x30): copies the handle. */
+nw4r::g3d::ResMatChan& nw4r::g3d::ResMatChan::operator=(const ResMatChan& rhs) {
+    ResCommon<ResMatChanData>::operator=(rhs);
+    return *this;
 }
 
-s32 fn_800784D0(s32 arg0, void* a1) {
-    fn_80078500(0, 0);
-    return arg0;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x800785C0 (0x48): copies the handle word and the word after it. */
+nw4r::g3d::ResTexSrt& nw4r::g3d::ResTexSrt::operator=(const ResTexSrt& rhs) {
+    fn_80078608((s32*)this, (s32*)&rhs);
+    fn_8006E2A8((s32)this + 4, (s32)&rhs + 4);
+    return *this;
 }
 
-u32 fn_80078500(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
-
-s32 fn_8007850C(s32 arg0, void* a1) {
-    fn_8007853C(0, 0);
-    return arg0;
-}
-
-u32 fn_8007853C(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
-
-s32 fn_80078548(s32 arg0, void* a1) {
-    fn_80078578(0, 0);
-    return arg0;
-}
-
-u32 fn_80078578(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
-
-s32 fn_80078584(s32 arg0, void* a1) {
-    fn_800785B4(0, 0);
-    return arg0;
-}
-
-u32 fn_800785B4(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
-
-s32 fn_800785C0(s32 arg0, s32 arg1) {
-    fn_80078608(0, 0);
-    fn_8006E2A8((s32)(arg0 + 4), (s32)(arg1 + 4));
-    return arg0;
-}
+extern "C" {
 
 u32 fn_80078608(s32 *arg0, s32 *arg1) {
     *arg0 = *arg1;
 }
 
-s32 fn_80078614(s32 arg0, void* a1) {
-    fn_80078644(0, 0);
-    return arg0;
+} /* extern "C" */
+
+/* 0x80078614 (0x30): copies the handle. */
+nw4r::g3d::ResTlutObj& nw4r::g3d::ResTlutObj::operator=(const ResTlutObj& rhs) {
+    ResCommon<ResTlutObjData>::operator=(rhs);
+    return *this;
 }
 
-u32 fn_80078644(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
+extern "C" {
+
+
+} /* extern "C" */
+
+/* 0x80078650 (0x30): copies the handle. */
+nw4r::g3d::ResTexObj& nw4r::g3d::ResTexObj::operator=(const ResTexObj& rhs) {
+    ResCommon<ResTexObjData>::operator=(rhs);
+    return *this;
 }
 
-s32 fn_80078650(s32 arg0, void* a1) {
-    fn_80078680(0, 0);
-    return arg0;
-}
+extern "C" {
 
-u32 fn_80078680(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
 
 typedef struct {
     /* +0x00 */ u8 field_0x00;
@@ -1794,8 +1870,8 @@ u32 fn_8007868C(s32 arg0, void *arg1, s32 arg2, u32 arg_sp0) {
 s32 fn_80078878(s32 arg0, s32 arg1) {
     s32 temp_r31;
 
-    temp_r31 = fn_800640E4((s32)(arg1));
-    return fn_800640E4((s32)(arg0)) == temp_r31;
+    temp_r31 = (s32)reinterpret_cast<const nw4r::g3d::ResMat*>((s32)(arg1))->ptr();
+    return (s32)reinterpret_cast<const nw4r::g3d::ResMat*>((s32)(arg0))->ptr() == temp_r31;
 }
 
 s32 fn_800788C8(s32 arg0, void* a1) {
@@ -1830,29 +1906,47 @@ u32 fn_800789B8(s32 *arg0, s32 *arg1) {
     *arg0 = *arg1;
 }
 
-s32 fn_800789C4(s32 arg0, s32 arg1) {
-    fn_80078A28(0, 0);
-    if ((s32) (arg1 & 3) != 0) {
+} /* extern "C" */
+
+#pragma peephole off
+/* 0x800789C4 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResShp::ResShp(void* pData) : ResCommon<ResShpData>(pData) {
+    if ((u32)pData & 3) {
         nw4r::db::Panic((const char*)&lbl_8058EA20, 0x3A, (const char*)&lbl_8058E9F4);
     }
-    return arg0;
 }
+#pragma peephole on
 
-u32 fn_80078A28(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
-}
+extern "C" {
 
-s32 fn_80078A30(s32 arg0, s32 arg1) {
-    fn_80078A94(0, 0);
-    if ((s32) (arg1 & 3) != 0) {
+} /* extern "C" */
+
+/* 0x80078A28 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResShpData)
+
+extern "C" {
+
+} /* extern "C" */
+
+#pragma peephole off
+/* 0x80078A30 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResMat::ResMat(void* pData) : ResCommon<ResMatData>(pData) {
+    if ((u32)pData & 3) {
         nw4r::db::Panic((const char*)&lbl_8058EAC8, 0x26D, (const char*)&lbl_8058EAA0);
     }
-    return arg0;
 }
+#pragma peephole on
 
-u32 fn_80078A94(s32 *arg0, s32 arg1) {
-    *arg0 = arg1;
-}
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x80078A94 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatData)
+
+extern "C" {
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x4];
@@ -1890,23 +1984,15 @@ typedef struct {
     /* +0x30 */ u32 field_0x30;
     /* +0x34 */ u32 field_0x34;
 } RawView_28; /* size: 0x38 */
-void* fn_80078DC0(void *arg0) {
-    fn_8006F4BC((void*)(0), 0);
-    fn_8006F41C((void*)(&((RawView_28*)arg0)->field_0x04), (s32)(0));
-    fn_8007685C((s32)(&((RawView_28*)arg0)->field_0x08), (s32)(0));
-    fn_800783EC((s32)(&((RawView_28*)arg0)->field_0x0C), (s32)(0));
-    fn_80076794((s32)(&((RawView_28*)arg0)->field_0x10), (s32)(0));
-    fn_8006F158((void*)(&((RawView_28*)arg0)->field_0x14), (s32)(0));
-    fn_8006F298((void*)(&((RawView_28*)arg0)->field_0x18), (s32)(0));
-    fn_8005A950((void*)(&((RawView_28*)arg0)->field_0x1C), (s32)(0));
-    fn_800766D0((s32)(&((RawView_28*)arg0)->field_0x20), (s32)(0));
-    fn_80076988((s32)(&((RawView_28*)arg0)->field_0x24), (s32)(0));
-    fn_8006F374((void*)(&((RawView_28*)arg0)->field_0x28), (s32)(0));
-    ((RawView_28*)arg0)->field_0x2C = 0;
-    ((RawView_28*)arg0)->field_0x30 = 0;
-    ((RawView_28*)arg0)->field_0x34 = 0;
-    return arg0;
-}
+} /* extern "C" */
+
+
+/* 0x80078DC0 (0xBC): constructs every handle empty and clears the trailing words. */
+CopiedMatResources::CopiedMatResources()
+    : texObj(NULL), tlutObj(NULL), genMode(NULL), tev(NULL), pix(NULL), tevColor(NULL), indMtxAndScale(NULL),
+      chan(NULL), texCoordGen(NULL), misc(NULL), texSrt(NULL), word_0x2C(0), word_0x30(0), word_0x34(0) {}
+
+extern "C" {
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x6];
@@ -2898,13 +2984,13 @@ u32 nw4r::g3d::ScnMdl::CopiedMatAccess::GetResTexSrt(bool arg1) {
     u32 sp8;
     void* arg0 = this;
 
-    if (((s32) ((RawView_71*)arg0)->field_0x00 != 0) && (fn_8006E324((void*)(&((RawView_71*)arg0)->field_0x10)) != 0)) {
+    if (((s32) ((RawView_71*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResTexSrt*>((void*)(&((RawView_71*)arg0)->field_0x10))->IsValid() != 0)) {
         if (arg1 != 0) {
             fn_8007BB94((void *)(((RawView_71*)arg0)->field_0x00), (s32)(((RawView_71*)arg0)->field_0x04), (s32)(4));
         }
         return ((RawView_71*)arg0)->field_0x10;
     }
-    return *((s32*)fn_8006F374((void*)(&sp8), (s32)(0)));
+    return (s32)nw4r::g3d::ResTexSrt((void*)NULL).mpData;
 }
 
 /* 0x8007BEAC - the ScnMdl::CopiedMatAccess constructor. */
@@ -2930,7 +3016,7 @@ s32 fn_8007BC2C(void *arg0, s32 arg1) {
         }
         return ((RawView_72*)arg0)->field_0x14;
     }
-    return *((s32*)fn_8005A950((void*)(&sp8), (s32)(0)));
+    return (s32)nw4r::g3d::ResMatChan((void*)NULL).mpData;
 }
 
 typedef struct {
@@ -2942,13 +3028,13 @@ typedef struct {
 s32 fn_8007BCAC(void *arg0, s32 arg1) {
     u32 sp8;
 
-    if (((s32) ((RawView_73*)arg0)->field_0x00 != 0) && (fn_800768C8((s32 *)(&((RawView_73*)arg0)->field_0x18)) != 0)) {
+    if (((s32) ((RawView_73*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResGenMode*>((s32 *)(&((RawView_73*)arg0)->field_0x18))->IsValid() != 0)) {
         if (arg1 != 0) {
             fn_8007BB94((void *)(((RawView_73*)arg0)->field_0x00), (s32)(((RawView_73*)arg0)->field_0x04), (s32)(0x10));
         }
         return ((RawView_73*)arg0)->field_0x18;
     }
-    return *((s32*)fn_8007685C((s32)(&sp8), (s32)(0)));
+    return (s32)nw4r::g3d::ResGenMode((void*)NULL).mpData;
 }
 
 typedef struct {
@@ -2960,13 +3046,13 @@ typedef struct {
 s32 fn_8007BD2C(void *arg0, s32 arg1) {
     u32 sp8;
 
-    if (((s32) ((RawView_74*)arg0)->field_0x00 != 0) && (fn_80076974((s32 *)(&((RawView_74*)arg0)->field_0x1C)) != 0)) {
+    if (((s32) ((RawView_74*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatMisc*>((s32 *)(&((RawView_74*)arg0)->field_0x1C))->IsValid() != 0)) {
         if (arg1 != 0) {
             fn_8007BB94((void *)(((RawView_74*)arg0)->field_0x00), (s32)(((RawView_74*)arg0)->field_0x04), (s32)(0x20));
         }
         return ((RawView_74*)arg0)->field_0x1C;
     }
-    return *((s32*)fn_80076988((s32)(&sp8), (s32)(0)));
+    return (s32)nw4r::g3d::ResMatMisc((void*)NULL).mpData;
 }
 
 typedef struct {
@@ -2984,7 +3070,7 @@ s32 fn_8007BDAC(void *arg0, s32 arg1) {
         }
         return ((RawView_75*)arg0)->field_0x20;
     }
-    return *((s32*)fn_80076794((s32)(&sp8), (s32)(0)));
+    return (s32)nw4r::g3d::ResMatPix((void*)NULL).mpData;
 }
 
 typedef struct {
@@ -3002,7 +3088,7 @@ s32 fn_8007BE2C(void *arg0, s32 arg1) {
         }
         return ((RawView_76*)arg0)->field_0x24;
     }
-    return *((s32*)fn_8006F158((void*)(&sp8), (s32)(0)));
+    return (s32)nw4r::g3d::ResMatTevColor((void*)NULL).mpData;
 }
 
 typedef struct {

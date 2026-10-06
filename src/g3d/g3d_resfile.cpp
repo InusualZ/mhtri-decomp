@@ -2,7 +2,8 @@
  * g3d/g3d_resfile.cpp - nw4r g3d `ResFile` container checks/releases and the out-of-line `g3d_resmat_ac.h` accessors.
  * RANGE. .text 0x80093990-0x800947A4 (53 functions); extab, extabindex.  fn_80093990's `CheckRevision()` assert
  *   passes "g3d_resfile.cpp" (lbl_80590BA0); the next body, fn_800947A4, cites "g3d_resmat.cpp".
- * NAMES. Map stems (the dump answers `zz_` placeholders).
+ * NAMES. Map stems (the dump answers `zz_` placeholders); GXFastCallDisplayList is a GUESS (the inline that
+ *   writes the call-display-list command straight into the GX FIFO).
  * RESIDUALS. none.  The flip links because `tools/elf/objextab.py` gives the object's extab/extabindex entries the
  *   map's `@etb_`/`@eti_` names with global binding (`@eti_800222FC` is referenced from the `.data` blob at
  *   0x8057C820; playbook 59).
@@ -24,7 +25,8 @@
 #include "g3d/g3d_state.h"
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_cpu.h"
-#include "fn_80059550.h"         /* fn_8005A9BC (rule 2) */
+#include "g3d/g3d_resfile.h"
+#include "g3d/g3d_resmat.h"
 
 namespace nw4r {
 namespace db {
@@ -76,10 +78,8 @@ extern char lbl_807912A8[4];
 extern char lbl_807912AC[4];
 
 /* ------------------------------------------------------------------------------------------------ */
-/* The `ResFile` release helpers (fn_80098ACC/fn_80098CF0 are `g3d/g3d_resmat.cpp`'s, fn_8009A360
- * `g3d/g3d_resshp.cpp`'s; declared here) and the SDK's `GXCallDisplayList`. */
-extern "C" void fn_80098ACC(void* p);
-extern "C" void fn_80098CF0(void* p);
+/* The `ResFile` release helpers (fn_8009A360 is `g3d/g3d_resshp.cpp`'s; declared here) and the SDK's
+ * `GXCallDisplayList`. */
 extern "C" u32 fn_8009A360(void* p, u32 value);
 extern "C" u32 fn_8009A3CC(void* p);
 extern "C" u32 fn_8009A6C0(void* p);
@@ -127,26 +127,18 @@ extern "C" u32 fn_80094020(ResHandle* p);
 extern "C" u32 fn_80094044(ResHandle* p);
 extern "C" u32 fn_80094070(ResHandle* p);
 extern "C" u32 fn_800940D0(ResHandle* pSelf, u32 offset);
-extern "C" u32 fn_80094164(ResHandle* p);
 extern "C" u32 fn_800941C8(ResHandle* p);
 extern "C" const char* fn_800941D0(void);
-extern "C" u32 fn_80094224(ResHandle* p);
 extern "C" u32 fn_80094288(ResHandle* p);
 extern "C" const char* fn_80094290(void);
-extern "C" u32 fn_800942E4(ResHandle* p);
 extern "C" u32 fn_80094348(ResHandle* p);
 extern "C" const char* fn_80094350(void);
 extern "C" u32 fn_800943A4(ResHandle* p);
 extern "C" u32 fn_80094408(ResHandle* p);
 extern "C" const char* fn_80094410(void);
-extern "C" void fn_80094464(u32 addr, u32 size);
-extern "C" u32 fn_8009447C(ResHandle* p);
 extern "C" u32 fn_800944E0(ResHandle* p);
-extern "C" u32 fn_80094530(ResHandle* p);
 extern "C" u32 fn_80094594(ResHandle* p);
-extern "C" u32 fn_8009459C(ResHandle* p);
 extern "C" u32 fn_80094600(ResHandle* p);
-extern "C" u32 fn_80094608(ResHandle* p);
 extern "C" u32 fn_8009466C(ResHandle* p);
 
 /* 0x80093990 - the file-checked destructor walk: assert `CheckRevision()`, then release each of the
@@ -160,7 +152,7 @@ extern "C" void fn_80093990(ResHandle* pSelf) {
     for (u32 i = 0; i < count; i++) {
         ResHandle item;
         item.mpData = fn_80092584(pSelf, i);
-        fn_80098ACC(&item);
+        reinterpret_cast<nw4r::g3d::ResMdl*>(&item)->Init();
     }
 
     count = fn_80092B10(pSelf);
@@ -183,13 +175,13 @@ extern "C" u32 fn_80093A98(void* p) {
     return fn_8009A360(p, 0);
 }
 
-/* 0x80093AA0 - release every entry of the first category through `fn_80098CF0`. */
+/* 0x80093AA0 - release every entry of the first category through `ResMdl::Terminate`. */
 extern "C" void fn_80093AA0(ResHandle* pSelf) {
     u32 count = fn_80092588(pSelf);
     for (u32 i = 0; i < count; i++) {
         ResHandle item;
         item.mpData = fn_80092584(pSelf, i);
-        fn_80098CF0(&item);
+        reinterpret_cast<nw4r::g3d::ResMdl*>(&item)->Terminate();
     }
 }
 
@@ -352,12 +344,12 @@ extern "C" u32 fn_80094044(ResHandle* p) {
 }
 
 extern "C" u32 fn_80094070(ResHandle* p) {
-    return ((ResRevisionWord*)(u32)fn_800700C0(p))->revision;
+    return ((ResRevisionWord*)(u32)(u32)&reinterpret_cast<const nw4r::g3d::ResMdl*>(p)->ref())->revision;
 }
 
 /* 0x80094094 - resolve the global material table and read the resource at its +0x4 offset. */
 extern "C" u32 fn_80094094(ResHandle* pSelf) {
-    return fn_800940D0(pSelf, ((ResMaterialTable*)(u32)fn_8005A9BC(pSelf))->field_0x4);
+    return fn_800940D0(pSelf, ((ResMaterialTable*)(u32)(u32)&reinterpret_cast<nw4r::g3d::ResMat*>(pSelf)->ref())->field_0x4);
 }
 
 /* 0x800940D0 - return the handle stored at `self->mpData + offset` (or the null handle at offset 0). */
@@ -375,7 +367,7 @@ extern "C" u32 fn_800940D0(ResHandle* pSelf, u32 offset) {
 
 /* 0x8009411C - `ResMatPix` `ref()` plus the 0x20-byte range store. */
 extern "C" void fn_8009411C(ResHandle* pSelf, s32 flag) {
-    u32 data = fn_80094164(pSelf);
+    u32 data = (u32)&reinterpret_cast<nw4r::g3d::ResMatPix*>(pSelf)->ref();
 
     if (flag != 0) {
         nw4r::g3d::DC::StoreRange((void*)data, 0x20);
@@ -385,11 +377,11 @@ extern "C" void fn_8009411C(ResHandle* pSelf, s32 flag) {
 }
 
 /* 0x80094164 - the checked `ResMatPix::ref()` accessor. */
-extern "C" u32 fn_80094164(ResHandle* pSelf) {
-    if (fn_80076800(pSelf) == 0) {
+nw4r::g3d::ResMatPixData& nw4r::g3d::ResMatPix::ref() {
+    if (fn_80076800((ResHandle*)this) == 0) {
         nw4r::db::Panic(lbl_80591400, 0x154, lbl_805913E4, fn_800941D0(), lbl_80791294);
     }
-    return fn_800941C8(pSelf);
+    return *(nw4r::g3d::ResMatPixData*)fn_800941C8((ResHandle*)this);
 }
 
 /* 0x800941C8 - the `ref()` word. */
@@ -404,7 +396,7 @@ extern "C" const char* fn_800941D0(void) {
 
 /* 0x800941DC - `ResMatTevColor` `ref()` plus the 0x80-byte range store. */
 extern "C" void fn_800941DC(ResHandle* pSelf, s32 flag) {
-    u32 data = fn_80094224(pSelf);
+    u32 data = (u32)&reinterpret_cast<nw4r::g3d::ResMatTevColor*>(pSelf)->ref();
 
     if (flag != 0) {
         nw4r::g3d::DC::StoreRange((void*)data, 0x80);
@@ -414,11 +406,11 @@ extern "C" void fn_800941DC(ResHandle* pSelf, s32 flag) {
 }
 
 /* 0x80094224 - the checked `ResMatTevColor::ref()` accessor. */
-extern "C" u32 fn_80094224(ResHandle* pSelf) {
-    if (fn_80076750(pSelf) == 0) {
+nw4r::g3d::ResMatTevColorData& nw4r::g3d::ResMatTevColor::ref() {
+    if (fn_80076750((ResHandle*)this) == 0) {
         nw4r::db::Panic(lbl_80591398, 0x17A, lbl_80591378, fn_80094290(), lbl_8079129C);
     }
-    return fn_80094288(pSelf);
+    return *(nw4r::g3d::ResMatTevColorData*)fn_80094288((ResHandle*)this);
 }
 
 /* 0x80094288 - the `ref()` word. */
@@ -433,7 +425,7 @@ extern "C" const char* fn_80094290(void) {
 
 /* 0x8009429C - `ResMatIndMtxAndScale` `ref()` plus the 0x40-byte range store. */
 extern "C" void fn_8009429C(ResHandle* pSelf, s32 flag) {
-    u32 data = fn_800942E4(pSelf);
+    u32 data = (u32)&reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>(pSelf)->ref();
 
     if (flag != 0) {
         nw4r::g3d::DC::StoreRange((void*)data, 0x40);
@@ -443,11 +435,11 @@ extern "C" void fn_8009429C(ResHandle* pSelf, s32 flag) {
 }
 
 /* 0x800942E4 - the checked `ResMatIndMtxAndScale::ref()` accessor. */
-extern "C" u32 fn_800942E4(ResHandle* pSelf) {
-    if (fn_8006E6B4(pSelf) == 0) {
+nw4r::g3d::ResMatIndMtxAndScaleData& nw4r::g3d::ResMatIndMtxAndScale::ref() {
+    if (fn_8006E6B4((ResHandle*)this) == 0) {
         nw4r::db::Panic(lbl_80591328, 0x19D, lbl_80591308, fn_80094350(), lbl_807912A4);
     }
-    return fn_80094348(pSelf);
+    return *(nw4r::g3d::ResMatIndMtxAndScaleData*)fn_80094348((ResHandle*)this);
 }
 
 /* 0x80094348 - the `ref()` word. */
@@ -491,28 +483,29 @@ extern "C" const char* fn_80094410(void) {
 
 /* 0x8009441C - `ResMatPix` `ref()` plus a display-list call or the inline pipe writer. */
 extern "C" void fn_8009441C(ResHandle* pSelf, s32 flag) {
-    u32 data = fn_8009447C(pSelf);
+    u32 data = (u32)&reinterpret_cast<const nw4r::g3d::ResMatPix*>(pSelf)->ref();
 
     if (flag != 0) {
         GXCallDisplayList((void*)data, 0x20);
     } else {
-        fn_80094464(data, 0x20);
+        GXFastCallDisplayList((const void*)data, 0x20);
     }
 }
 
 /* 0x80094464 - the inline `GXCallDisplayList` pipe command (opcode 0x40, then address and size). */
-extern "C" void fn_80094464(u32 addr, u32 size) {
+/* untyped: byte range */
+extern "C" void GXFastCallDisplayList(const void* pList, u32 size) {
     GXWGFifo.u8 = 0x40;
-    GXWGFifo.u32 = addr;
+    GXWGFifo.u32 = (u32)pList;
     GXWGFifo.u32 = size;
 }
 
 /* 0x8009447C - the checked `ResMatPix::ref()` accessor (second `_ac.h` instantiation). */
-extern "C" u32 fn_8009447C(ResHandle* pSelf) {
-    if (fn_80076800(pSelf) == 0) {
+const nw4r::g3d::ResMatPixData& nw4r::g3d::ResMatPix::ref() const {
+    if (fn_80076800((ResHandle*)this) == 0) {
         nw4r::db::Panic(lbl_80591430, 0x154, lbl_80591410, fn_800941D0(), lbl_80791290);
     }
-    return fn_800944E0(pSelf);
+    return *(const nw4r::g3d::ResMatPixData*)fn_800944E0((ResHandle*)this);
 }
 
 /* 0x800944E0 - the `ref()` word. */
@@ -522,21 +515,21 @@ extern "C" u32 fn_800944E0(ResHandle* pSelf) {
 
 /* 0x800944E8 - `ResMatTevColor` `ref()` plus a display-list call or the inline pipe writer. */
 extern "C" void fn_800944E8(ResHandle* pSelf, s32 flag) {
-    u32 data = fn_80094530(pSelf);
+    u32 data = (u32)&reinterpret_cast<const nw4r::g3d::ResMatTevColor*>(pSelf)->ref();
 
     if (flag != 0) {
         GXCallDisplayList((void*)data, 0x80);
     } else {
-        fn_80094464(data, 0x80);
+        GXFastCallDisplayList((const void*)data, 0x80);
     }
 }
 
 /* 0x80094530 - the checked `ResMatTevColor::ref()` accessor (second instantiation). */
-extern "C" u32 fn_80094530(ResHandle* pSelf) {
-    if (fn_80076750(pSelf) == 0) {
+const nw4r::g3d::ResMatTevColorData& nw4r::g3d::ResMatTevColor::ref() const {
+    if (fn_80076750((ResHandle*)this) == 0) {
         nw4r::db::Panic(lbl_805913C8, 0x17A, lbl_805913A8, fn_80094290(), lbl_80791298);
     }
-    return fn_80094594(pSelf);
+    return *(const nw4r::g3d::ResMatTevColorData*)fn_80094594((ResHandle*)this);
 }
 
 /* 0x80094594 - the `ref()` word. */
@@ -545,11 +538,11 @@ extern "C" u32 fn_80094594(ResHandle* pSelf) {
 }
 
 /* 0x8009459C - the checked `ResMatIndMtxAndScale::ref()` accessor (second instantiation). */
-extern "C" u32 fn_8009459C(ResHandle* pSelf) {
-    if (fn_8006E6B4(pSelf) == 0) {
+const nw4r::g3d::ResMatIndMtxAndScaleData& nw4r::g3d::ResMatIndMtxAndScale::ref() const {
+    if (fn_8006E6B4((ResHandle*)this) == 0) {
         nw4r::db::Panic(lbl_80591358, 0x19D, lbl_80591338, fn_80094350(), lbl_807912A0);
     }
-    return fn_80094600(pSelf);
+    return *(const nw4r::g3d::ResMatIndMtxAndScaleData*)fn_80094600((ResHandle*)this);
 }
 
 /* 0x80094600 - the `ref()` word. */
@@ -558,11 +551,11 @@ extern "C" u32 fn_80094600(ResHandle* pSelf) {
 }
 
 /* 0x80094608 - the checked `ResMatTexCoordGen::ref()` accessor (second instantiation). */
-extern "C" u32 fn_80094608(ResHandle* pSelf) {
-    if (fn_8007673C(pSelf) == 0) {
+const nw4r::g3d::ResMatTexCoordGenData& nw4r::g3d::ResMatTexCoordGen::ref() const {
+    if (fn_8007673C((ResHandle*)this) == 0) {
         nw4r::db::Panic(lbl_805912E0, 0x201, lbl_805912C0, fn_80094410(), lbl_807912A8);
     }
-    return fn_8009466C(pSelf);
+    return *(const nw4r::g3d::ResMatTexCoordGenData*)fn_8009466C((ResHandle*)this);
 }
 
 /* 0x8009466C - the `ref()` word. */
@@ -574,16 +567,14 @@ extern "C" u32 fn_8009466C(ResHandle* pSelf) {
 extern "C" u32 fn_80094674(ResHandle* pSelf, u32 pDst) {
     nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_800944E0(pSelf), 0x20);
 
-    u32 handle;
-    return *fn_80076794(&handle, pDst);
+    return (u32)nw4r::g3d::ResMatPix((void*)pDst).mpData;
 }
 
 /* 0x800946C0 - copy 0x80 bytes of the `ResMatTevColor` block and return the 0x20-aligned handle. */
 extern "C" u32 fn_800946C0(ResHandle* pSelf, u32 pDst) {
     nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_80094594(pSelf), 0x80);
 
-    u32 handle;
-    return *fn_8006F158(&handle, pDst);
+    return (u32)nw4r::g3d::ResMatTevColor((void*)pDst).mpData;
 }
 
 /* 0x8009470C - copy 0x40 bytes of the `ResMatIndMtxAndScale` block and return the 0x20-aligned
@@ -591,15 +582,13 @@ extern "C" u32 fn_800946C0(ResHandle* pSelf, u32 pDst) {
 extern "C" u32 fn_8009470C(ResHandle* pSelf, u32 pDst) {
     nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_80094600(pSelf), 0x40);
 
-    u32 handle;
-    return *fn_8006F298(&handle, pDst);
+    return (u32)nw4r::g3d::ResMatIndMtxAndScale((void*)pDst).mpData;
 }
 
 /* 0x80094758 - copy 0xA0 bytes of the `ResMatTexCoordGen` block and return the 0x20-aligned handle. */
 extern "C" u32 fn_80094758(ResHandle* pSelf, u32 pDst) {
     nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_8009466C(pSelf), 0xA0);
 
-    u32 handle;
-    return *fn_800766D0(&handle, pDst);
+    return (u32)nw4r::g3d::ResMatTexCoordGen((void*)pDst).mpData;
 }
 

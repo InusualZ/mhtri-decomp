@@ -15,6 +15,8 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* IS_VALID_PTR, ResHandle (rule 1) */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "g3d/fn_8005AA28.h" /* fn_8005AA44 (rule 2: its owner's header) */
 
 namespace nw4r {
@@ -79,8 +81,6 @@ extern "C" {
 u32 fn_8005D050(const void* pSelf);
 void fn_8005D2C0(void* pOut, const void* pIn);
 u32* fn_8005DC60(u32* pOut, const void* value);
-s32 fn_80097F18(void* pA, u32 idx);
-s32 fn_80097F80(void* pA);
 
 /* ------------------------------------------------------------------------------------------------ */
 /* the unit's own functions (forward declarations; keeps the source order free)                       */
@@ -143,14 +143,14 @@ const char* fn_8006ECA8(void)
  * (asserting it equals the index) and forward the per-node virtual result into the handle. */
 void fn_8006ECB4(void* pModel, AnmObjVis* pSelf)
 {
-    s32 numNodes = fn_80097F80(pModel);
+    s32 numNodes = reinterpret_cast<const nw4r::g3d::ResMdl*>(pModel)->GetResNodeNumEntries();
 
     for (u32 i = 0; i < (u32)numNodes; i++) {
         if (fn_8006EAC0(pSelf, (s32)i)) {
             s32 handle;
             s32 node;
 
-            node = fn_80097F18(pModel, i);
+            node = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(pModel)->GetResNode(i).mpData;
             fn_8005D2C0(&handle, &node);
             if ((u32)fn_8005D050(&handle) != i) {
                 nw4r::db::Panic(lbl_8058D6C0, 733, lbl_8058D748);
@@ -169,7 +169,7 @@ void fn_8006ED84(u8* pByteVec, void* pModel, AnmObjVis* pSelf)
     if (pByteVec == NULL) {
         nw4r::db::Panic(lbl_8058D6C0, 743, lbl_8058D778);
     }
-    numNodes = fn_80097F80(pModel);
+    numNodes = reinterpret_cast<const nw4r::g3d::ResMdl*>(pModel)->GetResNodeNumEntries();
     for (u32 i = 0; i < (u32)numNodes; i++) {
         if (fn_8006EAC0(pSelf, (s32)i)) {
             u8 value = (u8)pSelf->GetNodeFlag(i);

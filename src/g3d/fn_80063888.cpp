@@ -28,6 +28,7 @@
 #include "unsplit/g3d.h"      /* the math types it reads through the band header */
 #include "g3d/fn_80075DCC.h" /* fn_8007A5E4/fn_8007A5A8/fn_8007A724, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/fn_80063888.h"
+#include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
 #include "mh3_pad.h"        /* VEC3_ctor, owned by mh3_pad.cpp (rule 2) */
 
 /* Forward declarations: this unit's own list and copy helpers, and fn_8005DC60/fn_8005DCD0/dtor_8005E5E8/
@@ -364,9 +365,10 @@ extern "C" u32 fn_80064034(u32 *p)
     return *p;
 }
 
-extern "C" u32 fn_800640E4(u32 *p)
+/* 0x800640E4 (0x8): returns the material block. */
+const nw4r::g3d::ResMatData* nw4r::g3d::ResMat::ptr() const
 {
-    return *p;
+    return mpData;
 }
 
 extern "C" void fn_8006411C(u32 *dst, const u32 *src)
@@ -587,11 +589,17 @@ typedef struct {
     /* +0x0C */ u32 field_0x0C;
 } ResAnmChrData; /* size: 0x10 (approximate - only the field this accessor reads is evidenced) */
 
-extern "C" ResAnmChrData *fn_80064080(void *p);
+/* 0x80064080 (0x64): returns the material block, panicking on a NULL handle. */
+const nw4r::g3d::ResMatData& nw4r::g3d::ResMat::ref() const
+{
+    if (!IsValid())
+        nw4r::db::Panic((const char *)lbl_8058C1C0, 621, (const char *)lbl_8058C1A0, GetClassName(), "ref");
+    return *ptr();
+}
 
 extern "C" u32 fn_8006405C(void *p)
 {
-    return fn_80064080(p)->field_0x0C;
+    return ((const ResAnmChrData *)&reinterpret_cast<const nw4r::g3d::ResMat *>(p)->ref())->field_0x0C;
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -968,12 +976,13 @@ extern "C" u32 fn_80063FD0(void *p)
     return fn_80064034((u32 *)p);
 }
 
-extern "C" u32 fn_800647A8(void *p)
+/* 0x800647A8 (0x64): returns the channel block, panicking on a NULL handle. */
+nw4r::g3d::ResMatChanData& nw4r::g3d::ResMatChan::ref()
 {
-    if (fn_80064820(p) == 0)
+    if (fn_80064820(this) == 0)
         nw4r::db::Panic((const char *)lbl_8058C1F8, 0x1d1, (const char *)lbl_8058C1DC,
                         (const char *)fn_80064814(), "ref");
-    return fn_8006480C((u32 *)p);
+    return *(ResMatChanData *)fn_8006480C((u32 *)this);
 }
 
 extern "C" ResAnmScnConfig *fn_8006584C(void *p)

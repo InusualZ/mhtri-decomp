@@ -131,7 +131,6 @@ void* res_pltt_ctor(void* out, u32 v);
  * with `quest/arenatask.cpp`'s `arena_resource_load` (rule 2: this range owns the addresses). */
 u32* res_tex_assign(u32* dst, const u32* src);
 u32* res_pltt_assign(u32* dst, const u32* src);
-s32 res_tex_has_pltt(const u32* tex);
 void draw_shape_tex_slot_set(const u32* tex, const u32* pltt, u16 index, s8 flag);
 void draw_shape_tex_slots_clear(u32 first, u32 last);
 /* 0x80050508 - the 4-byte `blr` twin of fn_8005050C.  Its body does not touch r3, and the retail

@@ -27,9 +27,18 @@ struct ResCommon {
     template <typename U>
     U* ofs_to_ptr(s32 ofs);
 
+    /* Copies the handle word (the library's assignment, emitted out of line). */
+    ResCommon& operator=(const ResCommon& rhs);
+
     /* Leaves the handle unset, for the copy constructors that copy it through an out-of-line copy. */
     ResCommon() {}
 };
+
+template <typename T>
+ResCommon<T>& ResCommon<T>::operator=(const ResCommon<T>& rhs) {
+    mpData = rhs.mpData;
+    return *this;
+}
 
 template <typename T>
 template <typename U>
@@ -64,10 +73,22 @@ public:
     bool IsValid() const;
 };
 
-/* A resource dictionary (the patricia tree of named sub-resources).  size: 0x8 (a lower bound) */
+/* One node of a resource dictionary's patricia tree.  size: 0x10 */
+struct ResDicEntry {
+    /* +0x0 */ u16 ref;
+    /* +0x2 */ u16 flag;
+    /* +0x4 */ u16 idxLeft;
+    /* +0x6 */ u16 idxRight;
+    /* +0x8 */ s32 ofsString;
+    /* +0xC */ s32 ofsData;
+};
+
+/* A resource dictionary (the patricia tree of named sub-resources): entry 0 is the root, entries 1..numData the
+ * named sub-resources.  size: 0x18 (a lower bound: the entry array runs on) */
 struct ResDicData {
     /* +0x0 */ u32 size;
     /* +0x4 */ u32 numData;
+    /* +0x8 */ ResDicEntry entry[1];
 };
 
 /* A one-word handle on a resource dictionary.  size: 0x4 */
@@ -79,6 +100,7 @@ public:
     void* operator[](const ResName name) const; /* untyped: opaque handle */
     void* operator[](int idx) const; /* untyped: opaque handle */
     u32 GetNumData() const;
+    const ResDicData& ref() const;
 };
 
 }  // namespace g3d

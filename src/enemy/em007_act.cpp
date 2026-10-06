@@ -27,6 +27,7 @@
  */
 
 #include "types.h"
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/em005_act.h"
@@ -2517,7 +2518,6 @@ void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 /* Runtime helpers. */
 f32 fn_80050EF4(void* a, void* b);
 void fn_8005D0CC(void* out, void* src);
-void fn_8005D1AC(void* out, u32 a);
 void fn_8006FDCC(void* a);
 void fn_800810DC(void* self, u32 a);
 
@@ -3049,8 +3049,7 @@ void fn_801DFD3C(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
 
 /* 0x801DFEAC (0x40) - clears the helper and sets part 7. */
 void fn_801DFEAC(struct _ENEMY_WORK* self) {
-    u8 tmp[0x0C];
-    fn_8005D1AC(&tmp, 0);
+    nw4r::g3d::ResNode tmp((void*)0);
     fn_8013A654(self, 7);
 }
 

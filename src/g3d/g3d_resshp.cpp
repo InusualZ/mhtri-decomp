@@ -5,8 +5,9 @@
  *   0x80591618-0x80591860, .sdata 0x807912B8-0x807912D8.  Left seam: fn_80099400 calls `ResShp::ref`
  *   (fn_80077674) on its own `this` where fn_800993B4 calls `ResNode::ref` (fn_8005D218), and the `.data`
  *   fragment opens with "g3d_resshp.cpp"; the right edge is `g3d/g3d_cpu.cpp`.
- * NAMES. Map stems (the dump answers `zz_` placeholders).  The `ResTagDLData` fields (`mPrePrimOfs` at +0x08,
- *   `mSize`/`mDlSize`) and the `ResTevData`/`ResTexData` fields are GUESSes; the `ResShpData` `id*` fields are
+ * NAMES. Map stems (the dump answers `zz_` placeholders) except the nw4r members ResShp::Init/Terminate and
+ *   ResTex::ref/GetTexObjParam/GetTexObjCIParam/GetTexData (named by the retail `_ac.h` accessor set).  The `ResTagDLData` fields (`mPrePrimOfs` at +0x08,
+ *   `mSize`/`mDlSize`) and the `ResTevData`/`ResTexBlock` fields are GUESSes; the `ResShpData` `id*` fields are
  *   spelled by fn_80099974's assert (`ref().idVtxPosition >= 0`).
  * RESIDUALS. fn_80099724: the base word loads into r3 where retail uses r0.
  *   fn_800997E0: `fn_80099640(...) + (attr - 9) * 0xC` accumulates in the local's register; retail uses r3, then +0x32.
@@ -24,8 +25,10 @@
 #include "nw4r/g3d/res_common.h"
 #include "gx.h"                 /* GXWGFifo, the 0xCC008000 write window (rule 1)        */
 #include "g3d/g3d_cpu.h"
+#include "g3d/g3d_resmat.h"
 #include "g3d/g3d_state.h"
 #include "g3d/g3d_resvtx.h"
+#include "g3d/g3d_resshp.h"
 
 /* The target's `-O3` schedule is retail only with the peephole pass off: every flag extract keeps an
  * explicit `cmpwi` after the `rlwinm` instead of the folded record form `rlwinm.`. */
@@ -83,7 +86,7 @@ struct ResTevData {
     /* +0x20 */ u8 mDl[];      /* the embedded display list (fn_8009A1E0 calls it at +0x20) */
 }; /* size: 0x20+ (a lower bound: only the words above are reached) */
 
-struct ResTexData {
+struct ResTexBlock {
     /* +0x00 */ u8 pad_0x00[0x4];
     /* +0x04 */ u32 mSize;      /* the block's size: the DCFlushRangeNoSync range        */
     /* +0x08 */ u32 mFmt;       /* compared against 1 and 3 (fn_8009A3CC)                */
@@ -332,26 +335,10 @@ extern u32 lbl_8056F730[];
 extern "C" {
 ResShpData* fn_80077398(const ResHandle* pSelf);  /* owner: g3d/fn_80075DCC.cpp            */
 s32 fn_80076814(const ResHandle* pSelf);          /* owner: g3d/fn_80075DCC.cpp            */
-void fn_800783EC(ResHandle* pSelf, u32 pData);    /* owner: g3d/fn_80075DCC.cpp            */
 u32 fn_800866FC(ResHandle* pSelf);                /* owner: g3d/g3d_state.cpp              */
 u32* fn_80086768(void);                           /* owner: g3d/g3d_state.cpp              */
 void fn_80091F70(void* pDst, u32 arg1, u32 arg2);  /* owner: g3d/g3d_resanmtexsrt.cpp       */
-u32 fn_80097FC8(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
-u32 fn_800980E0(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
-u32 fn_800981F8(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
-ResHandle* fn_80098310(ResHandle* pSelf, u32 value); /* owner: g3d/g3d_resmat.cpp (Ptr setter) */
-ResHandle* fn_800985B0(ResHandle* pSelf, u32 value); /* owner: g3d/g3d_resmat.cpp (Ptr setter) */
-u32 fn_8009837C(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
-u32 fn_8009861C(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
 void fn_80071008(void* pBase, u32 size);          /* owner: g3d/g3d_calcview.cpp           */
-u32 fn_80052910(ResHandle* pSelf);                /* owner: fn_8004CAD8.cpp                */
-u32 fn_8005297C(void);                            /* owner: fn_8004CAD8.cpp                */
-s32 fn_80052984(ResHandle* pSelf);                /* owner: fn_8004CAD8.cpp                */
-u32 fn_80052998(ResHandle* pSelf);                /* owner: fn_8004CAD8.cpp                */
-u32 fn_80052DBC(ResHandle* pSelf);                /* owner: fn_8004CAD8.cpp                */
-u32 fn_80052E8C(ResHandle* pSelf);                /* owner: fn_8004CAD8.cpp                */
-u16 fn_80053468(ResHandle* pSelf);                /* owner: fn_8004CAD8.cpp                */
-u16 fn_8005348C(ResHandle* pSelf);                /* owner: fn_8004CAD8.cpp                */
 void GXCallDisplayList(void* pList, u32 size);    /* the SDK's own symbol                  */
 void PPCSync(void);                               /* the SDK's own symbol                  */
 void* memset(void* pDst, int value, u32 size);    /* the runtime's own symbol              */
@@ -367,12 +354,10 @@ u32 fn_800999E8(ResHandle* pSelf);
 u32 fn_80099A58(ResHandle* pSelf, u32 idx);
 u32 fn_80099B10(ResHandle* pSelf, u32 idx);
 u32 fn_80099BB0(ResHandle* pSelf);
-void fn_80099C20(ResHandle* pSelf);
 u32 fn_80099DD4(ResHandle* pSelf);
 u32 fn_80099DF8(ResHandle* pSelf);
 ResHandle* fn_80099E2C(ResHandle* pSelf, const ResHandle* pRhs);
 void fn_80099E5C(ResHandle* pSelf, const ResHandle* pRhs);
-void fn_80099E68(ResHandle* pSelf);
 void fn_80099F1C(ResHandle* pSelf, s32 pSync, s32 pSkipPrePrimHeader);
 void fn_8009A000(u32 addr, u32 size);
 u32 fn_8009A018(ResHandle* pSelf);
@@ -390,12 +375,6 @@ void fn_8009A2F4(ResHandle* pSelf, s32 flag);
 void fn_8009A360(ResHandle* pSelf, s32 flag);
 u32 fn_8009A3CC(ResHandle* pSelf);
 u32 fn_8009A408(ResHandle* pSelf);
-u32 fn_8009A42C(ResHandle* pSelf);
-u32 fn_8009A490(ResHandle* pSelf, u32* pOutVtxData, u16* pOutWidth, u16* pOutHeight, u32* pOutImageSize,
-                 f32* pOutLodMin, f32* pOutLodMax, u8* pOutFlag);
-u32 fn_8009A58C(ResHandle* pSelf);
-u32 fn_8009A5C4(ResHandle* pSelf, u32* pOutVtxData, u16* pOutWidth, u16* pOutHeight, u32* pOutImageSize,
-                 f32* pOutLodMin, f32* pOutLodMax, u8* pOutFlag);
 u32 fn_8009A6C0(ResHandle* pSelf);
 u32 fn_8009A6FC(ResHandle* pSelf);
 void fn_8009A720(ResHandle* pSelf);
@@ -451,7 +430,7 @@ extern "C" u32 fn_80099974(ResHandle* pSelf) {
     }
 
     u32 mdl = fn_80099400(pSelf);
-    return fn_80097FC8((ResHandle*)&mdl, fn_80077674(pSelf)->idVtxPosition);
+    return (u32)reinterpret_cast<nw4r::g3d::ResMdl*>(&mdl)->GetResVtxPos((int)fn_80077674(pSelf)->idVtxPosition).mpData;
 }
 
 /* 0x800999E8 - the vertex-normal resource, or a null handle when the shape has none (`idVtxNrm == -1`). */
@@ -460,7 +439,7 @@ extern "C" u32 fn_800999E8(ResHandle* pSelf) {
 
     if (pData->idVtxNrm != -1) {
         u32 mdl = fn_80099400(pSelf);
-        return fn_800980E0((ResHandle*)&mdl, pData->idVtxNrm);
+        return (u32)reinterpret_cast<nw4r::g3d::ResMdl*>(&mdl)->GetResVtxNrm((int)pData->idVtxNrm).mpData;
     }
 
     return (u32)nw4r::g3d::ResVtxNrm((void*)NULL).mpData;
@@ -479,7 +458,7 @@ extern "C" u32 fn_80099A58(ResHandle* pSelf, u32 idx) {
 
     if (*pId != -1) {
         u32 mdl = fn_80099400(pSelf);
-        return fn_800981F8((ResHandle*)&mdl, *pId);
+        return (u32)reinterpret_cast<nw4r::g3d::ResMdl*>(&mdl)->GetResVtxClr((int)*pId).mpData;
     }
 
     return (u32)nw4r::g3d::ResVtxClr((void*)NULL).mpData;
@@ -495,11 +474,10 @@ extern "C" u32 fn_80099B10(ResHandle* pSelf, u32 idx) {
 
     if (*pId != -1) {
         u32 mdl = fn_80099400(pSelf);
-        return fn_8009837C((ResHandle*)&mdl, *pId);
+        return (u32)reinterpret_cast<nw4r::g3d::ResMdl*>(&mdl)->GetResVtxTexCoord((int)*pId).mpData;
     }
 
-    ResHandle ret;
-    return (u32)fn_80098310(&ret, 0)->mpData;
+    return (u32)nw4r::g3d::ResVtxTexCoord((void*)NULL).mpData;
 }
 
 /* 0x80099BB0 - the shape's texture, or a null handle when it has none (`idTex == -1`). */
@@ -508,59 +486,58 @@ extern "C" u32 fn_80099BB0(ResHandle* pSelf) {
 
     if (pData->idTex != -1) {
         u32 mdl = fn_80099400(pSelf);
-        return fn_8009861C((ResHandle*)&mdl, pData->idTex);
+        return (u32)reinterpret_cast<nw4r::g3d::ResMdl*>(&mdl)->GetResVtxFurPos((int)pData->idTex).mpData;
     }
 
-    ResHandle ret;
-    return (u32)fn_800985B0(&ret, 0)->mpData;
+    return (u32)nw4r::g3d::ResVtxFurPos((void*)NULL).mpData;
 }
 
 /* 0x80099C20 - rebuilds the pre-prim attribute records, one per vertex resource the shape has, then invalidates
  * the pre-prim and display-list blocks in the data cache. */
-extern "C" void fn_80099C20(ResHandle* pSelf) {
+void nw4r::g3d::ResShp::Init() {
     const void* pBaseVtx;
     u8 stride;
 
-    u32 vtxPos = fn_80099974(pSelf);
+    u32 vtxPos = fn_80099974(reinterpret_cast<ResHandle*>(this));
     reinterpret_cast<nw4r::g3d::ResVtxPos*>(&vtxPos)->GetArray(&pBaseVtx, &stride);
-    fn_800997E0(pSelf, 9, (u32)pBaseVtx, stride);
+    fn_800997E0(reinterpret_cast<ResHandle*>(this), 9, (u32)pBaseVtx, stride);
 
-    u32 vtxNrm = fn_800999E8(pSelf);
+    u32 vtxNrm = fn_800999E8(reinterpret_cast<ResHandle*>(this));
     nw4r::g3d::ResVtxNrm nrm(reinterpret_cast<const nw4r::g3d::ResVtxNrm*>(&vtxNrm));
 
     if (nrm.IsValid()) {
         nrm.GetArray(&pBaseVtx, &stride);
-        fn_800997E0(pSelf, 10, (u32)pBaseVtx, stride);
+        fn_800997E0(reinterpret_cast<ResHandle*>(this), 10, (u32)pBaseVtx, stride);
     }
 
     for (u32 i = 0; i < 2; i++) {
-        u32 vtxClr = fn_80099A58(pSelf, i);
+        u32 vtxClr = fn_80099A58(reinterpret_cast<ResHandle*>(this), i);
         nw4r::g3d::ResVtxClr clr(reinterpret_cast<const nw4r::g3d::ResVtxClr*>(&vtxClr));
 
         if (clr.IsValid()) {
             clr.GetArray(&pBaseVtx, &stride);
-            fn_800997E0(pSelf, i + 11, (u32)pBaseVtx, stride);
+            fn_800997E0(reinterpret_cast<ResHandle*>(this), i + 11, (u32)pBaseVtx, stride);
         }
     }
 
     for (u32 i = 0; i < 8; i++) {
-        u32 vtxTex = fn_80099B10(pSelf, i);
+        u32 vtxTex = fn_80099B10(reinterpret_cast<ResHandle*>(this), i);
         ResHandle tex;
         fn_80099E2C(&tex, (const ResHandle*)&vtxTex);
 
         if (reinterpret_cast<nw4r::g3d::ResVtxTexCoord*>(&tex)->IsValid()) {
             reinterpret_cast<nw4r::g3d::ResVtxTexCoord*>(&tex)->GetArray(&pBaseVtx, &stride);
-            fn_800997E0(pSelf, i + 13, (u32)pBaseVtx, stride);
+            fn_800997E0(reinterpret_cast<ResHandle*>(this), i + 13, (u32)pBaseVtx, stride);
         }
     }
 
-    u32 prePrim = fn_800996AC(pSelf);
+    u32 prePrim = fn_800996AC(reinterpret_cast<ResHandle*>(this));
     fn_8009A12C((ResHandle*)&prePrim, 0);
 
     /* Two copies of the shape's own display-list tag (the inlined accessor reached twice): the first
      * supplies the size, the second the address the tag resolves to. */
-    u32 tagSize = fn_80099DF8(pSelf);
-    u32 tagAddr = fn_80099DF8(pSelf);
+    u32 tagSize = fn_80099DF8(reinterpret_cast<ResHandle*>(this));
+    u32 tagAddr = fn_80099DF8(reinterpret_cast<ResHandle*>(this));
     u32 size = fn_80099DD4((ResHandle*)&tagSize);
     nw4r::g3d::DC::StoreRangeNoSync((void*)fn_800996E8((ResHandle*)&tagAddr), size);
 }
@@ -591,19 +568,19 @@ extern "C" void fn_80099E5C(ResHandle* pSelf, const ResHandle* pRhs) {
 
 /* 0x80099E68 - clear every GX attribute record of the pre-prim block.  The target's 12 calls are the
  * unrolled `attr = GX_VA_POS..GX_VA_TEX7` walk, so the walk is written out. */
-extern "C" void fn_80099E68(ResHandle* pSelf) {
-    fn_800998CC(pSelf, 9);
-    fn_800998CC(pSelf, 10);
-    fn_800998CC(pSelf, 11);
-    fn_800998CC(pSelf, 12);
-    fn_800998CC(pSelf, 13);
-    fn_800998CC(pSelf, 14);
-    fn_800998CC(pSelf, 15);
-    fn_800998CC(pSelf, 16);
-    fn_800998CC(pSelf, 17);
-    fn_800998CC(pSelf, 18);
-    fn_800998CC(pSelf, 19);
-    fn_800998CC(pSelf, 20);
+void nw4r::g3d::ResShp::Terminate() {
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 9);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 10);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 11);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 12);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 13);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 14);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 15);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 16);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 17);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 18);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 19);
+    fn_800998CC(reinterpret_cast<ResHandle*>(this), 20);
 }
 
 /* 0x80099F1C - draws the pre-prim block: `pSync` picks the SDK's `GXCallDisplayList` over the inline pipe
@@ -730,15 +707,14 @@ extern "C" u32 fn_8009A278(ResHandle* pSelf, void* pDst) {
     u32 src = fn_8009A174(pSelf);
     nw4r::g3d::detail::Copy32ByteBlocks(pDst, (const void*)src, 0x200);
 
-    ResHandle copy;
-    fn_800783EC(&copy, (u32)pDst);
+    nw4r::g3d::ResTev copy(pDst);
 
-    ResTevData* pData = (ResTevData*)fn_8009A174(&copy);
+    ResTevData* pData = (ResTevData*)fn_8009A174((ResHandle*)&copy);
     u32 size = pData->mDlSize;
     size -= (u32)pDst - src;
     pData->mDlSize = size;
 
-    fn_8009A2F4(&copy, 0);
+    fn_8009A2F4((ResHandle*)&copy, 0);
     return (u32)copy.mpData;
 }
 
@@ -761,8 +737,8 @@ extern "C" void fn_8009A2F4(ResHandle* pSelf, s32 flag) {
 /* 0x8009A360 - store or invalidate the block's `mSize` bytes (the second `ref` copy's twin of
  * fn_8009A2F4). */
 extern "C" void fn_8009A360(ResHandle* pSelf, s32 flag) {
-    u32 base = fn_80052E8C(pSelf);
-    u32 size = *(u32*)(fn_80052E8C(pSelf) + 0x4);
+    u32 base = (u32)&reinterpret_cast<nw4r::g3d::ResPltt*>(pSelf)->ref();
+    u32 size = *(u32*)((u32)&reinterpret_cast<nw4r::g3d::ResPltt*>(pSelf)->ref() + 0x4);
 
     if (flag != 0) {
         nw4r::g3d::DC::StoreRange((void*)base, size);
@@ -780,35 +756,36 @@ extern "C" u32 fn_8009A3CC(ResHandle* pSelf) {
 
 /* 0x8009A408 - the block's format word (its +0x08). */
 extern "C" u32 fn_8009A408(ResHandle* pSelf) {
-    return *(u32*)(fn_80052DBC(pSelf) + 0x8);
+    return *(u32*)((u32)&reinterpret_cast<const nw4r::g3d::ResPltt*>(pSelf)->ref() + 0x8);
 }
 
 /* 0x8009A42C - `ResTex::ref` with the `g3d_restex_ac.h` validity assert. */
-extern "C" u32 fn_8009A42C(ResHandle* pSelf) {
-    if (fn_80052984(pSelf) == 0) {
-        nw4r::db::Panic(lbl_80591850, 0x26, lbl_80591830, (const char*)fn_8005297C(), lbl_807912D0);
+nw4r::g3d::ResTexData& nw4r::g3d::ResTex::ref() {
+    if (!IsValid()) {
+        nw4r::db::Panic(lbl_80591850, 0x26, lbl_80591830, GetClassName(), lbl_807912D0);
     }
-    return fn_80052998(pSelf);
+    return *ptr();
 }
 
 /* 0x8009A490 - the block's resource description: its flags must say the description is readable, and
  * each non-null out-parameter takes one field.  `0` is the refusal, `1` the success. */
-extern "C" u32 fn_8009A490(ResHandle* pSelf, u32* pOutVtxData, u16* pOutWidth, u16* pOutHeight,
-                            u32* pOutImageSize, f32* pOutLodMin, f32* pOutLodMax, u8* pOutFlag) {
-    ResTexData* pData = (ResTexData*)fn_80052910(pSelf);
+/* untyped: byte range - the image the texture block points at */
+bool nw4r::g3d::ResTex::GetTexObjParam(void** pOutVtxData, u16* pOutWidth, u16* pOutHeight, u32* pOutImageSize,
+                                       f32* pOutLodMin, f32* pOutLodMax, u8* pOutFlag) const {
+    const ResTexBlock* pData = reinterpret_cast<const ResTexBlock*>(&ref());
 
     if ((pData->mFlags & 1) != 0) {
         return 0;
     }
 
     if (pOutVtxData != NULL) {
-        *pOutVtxData = fn_8009A58C(pSelf);
+        *pOutVtxData = const_cast<void*>(GetTexData());
     }
     if (pOutWidth != NULL) {
-        *pOutWidth = fn_8005348C(pSelf);
+        *pOutWidth = GetWidth();
     }
     if (pOutHeight != NULL) {
-        *pOutHeight = fn_80053468(pSelf);
+        *pOutHeight = GetHeight();
     }
     if (pOutImageSize != NULL) {
         *pOutImageSize = pData->mImageSize;
@@ -827,36 +804,38 @@ extern "C" u32 fn_8009A490(ResHandle* pSelf, u32* pOutVtxData, u16* pOutWidth, u
 }
 
 /* 0x8009A58C - the block's image address: its own base plus the +0x10 offset, or 0 when it has none. */
-extern "C" u32 fn_8009A58C(ResHandle* pSelf) {
-    ResTexData* pData = (ResTexData*)fn_80052910(pSelf);
+/* untyped: byte range - the image the texture block points at */
+const void* nw4r::g3d::ResTex::GetTexData() const {
+    const ResTexBlock* pData = reinterpret_cast<const ResTexBlock*>(&ref());
     s32 ofs = pData->mToImage;
 
     if (ofs != 0) {
-        pData = (ResTexData*)((u8*)pData + ofs);
+        pData = (const ResTexBlock*)((const u8*)pData + ofs);
     } else {
         pData = NULL;
     }
-    return (u32)pData;
+    return pData;
 }
 
 /* 0x8009A5C4 - fn_8009A490's twin with the flag test inverted (the second `_ac.h` copy: same body,
  * `ref` reached through the other instantiation). */
-extern "C" u32 fn_8009A5C4(ResHandle* pSelf, u32* pOutVtxData, u16* pOutWidth, u16* pOutHeight,
-                            u32* pOutImageSize, f32* pOutLodMin, f32* pOutLodMax, u8* pOutFlag) {
-    ResTexData* pData = (ResTexData*)fn_80052910(pSelf);
+/* untyped: byte range - the image the texture block points at */
+bool nw4r::g3d::ResTex::GetTexObjCIParam(void** pOutVtxData, u16* pOutWidth, u16* pOutHeight, u32* pOutImageSize,
+                                       f32* pOutLodMin, f32* pOutLodMax, u8* pOutFlag) const {
+    const ResTexBlock* pData = reinterpret_cast<const ResTexBlock*>(&ref());
 
     if ((pData->mFlags & 1) == 0) {
         return 0;
     }
 
     if (pOutVtxData != NULL) {
-        *pOutVtxData = fn_8009A58C(pSelf);
+        *pOutVtxData = const_cast<void*>(GetTexData());
     }
     if (pOutWidth != NULL) {
-        *pOutWidth = fn_8005348C(pSelf);
+        *pOutWidth = GetWidth();
     }
     if (pOutHeight != NULL) {
-        *pOutHeight = fn_80053468(pSelf);
+        *pOutHeight = GetHeight();
     }
     if (pOutImageSize != NULL) {
         *pOutImageSize = pData->mImageSize;
@@ -883,12 +862,12 @@ extern "C" u32 fn_8009A6C0(ResHandle* pSelf) {
 
 /* 0x8009A6FC - the block's format word through the `fn_80052910` instantiation. */
 extern "C" u32 fn_8009A6FC(ResHandle* pSelf) {
-    return *(u32*)(fn_80052910(pSelf) + 0x8);
+    return *(u32*)((u32)&reinterpret_cast<const nw4r::g3d::ResTex*>(pSelf)->ref() + 0x8);
 }
 
 /* 0x8009A720 - write the block's `mSize` bytes at its own address out to main memory (the `ResTex`
  * store the loader ends with; fn_80071008 is the SDK's `DCFlushRangeNoSync`). */
 extern "C" void fn_8009A720(ResHandle* pSelf) {
-    ResTexData* pData = (ResTexData*)fn_8009A42C(pSelf);
+    ResTexBlock* pData = reinterpret_cast<ResTexBlock*>(&reinterpret_cast<nw4r::g3d::ResTex*>(pSelf)->ref());
     fn_80071008(pData, pData->mSize);
 }

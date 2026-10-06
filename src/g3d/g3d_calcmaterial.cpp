@@ -11,6 +11,7 @@
  *   flipcheck: `.text` 0x4D4 of 0x8C0; `.data` is claimed and not emitted.
  */
 #include "types.h"
+#include "g3d/g3d_resmat.h"
 
 /* The five assert wrappers below need the *un-fused* compare (retail keeps `clrlwi` + `cmpwi` and a
  * separate `add`/`blr`, where the peephole pass folds them into `clrlwi.`/`bnelr`), exactly as
@@ -34,7 +35,6 @@ u32 fn_8009429C(void* p, u32 flag);
 void res_tex_ctor(void* p, u32 flag);
 void res_pltt_ctor(void* p, u32 flag);
 /* The global material-table accessor the accessor chain reads at +0x3C. */
-void* fn_8005A9BC(void* self);
 
 /* This unit's own bodies, in address order. */
 void* fn_8006EE78(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray);
@@ -42,31 +42,16 @@ u32 fn_8006F0DC(void* p);
 void fn_8006F0E4(void* p);
 void* fn_8006F0E8(void* pDst, const void* pSrc);
 void fn_8006F118(void* pDst, const void* pSrc);
-u32 fn_8006F124(void* self);
-u32* fn_8006F158(u32* pDst, u32 ptr);
-void fn_8006F1BC(u32* pDst, u32 value);
-void* fn_8006F1C4(void* self);
 void* fn_8006F200(void* pHandle, u32 offset);
 void fn_8006F21C(void* p);
 u32 fn_8006F220(void* p);
 void* fn_8006F228(void* pDst, const void* pSrc);
 void fn_8006F258(void* pDst, const void* pSrc);
-u32 fn_8006F264(void* self);
-u32* fn_8006F298(u32* pDst, u32 ptr);
-void fn_8006F2FC(u32* pDst, u32 value);
 void* fn_8006F304(void* pDst, const void* pSrc);
 void fn_8006F334(void* pDst, const void* pSrc);
-u32 fn_8006F340(void* self);
-u32* fn_8006F374(u32* pDst, u32 ptr);
 void fn_8006F3D8(u32* pDst, u32 value);
 void fn_8006F3E0(void* p);
 void fn_8006F3E4(void* p);
-u32 fn_8006F3E8(void* self);
-u32* fn_8006F41C(u32* pDst, u32 ptr);
-void fn_8006F480(u32* pDst, u32 value);
-u32 fn_8006F488(void* self);
-u32* fn_8006F4BC(u32* pDst, u32 ptr);
-void fn_8006F520(u32* pDst, u32 value);
 u32* fn_8006F528(u32* self);
 void fn_8006F5A0(f32* pDst, const f32* pMtx, const f32* pVec);
 void fn_8006F660(f32* pDst, const f32* pMtx, const f32* pVec);
@@ -98,24 +83,36 @@ void fn_8006F118(void* pDst, const void* pSrc) {
 }
 
 /* The handle stores and copies. */
-void fn_8006F1BC(u32* pDst, u32 value) {
-    *pDst = value;
-}
-void fn_8006F2FC(u32* pDst, u32 value) {
-    *pDst = value;
-}
+} /* extern "C" */
+
+/* 0x8006F1BC (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatTevColorData)
+
+extern "C" {
+} /* extern "C" */
+
+/* 0x8006F2FC (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatIndMtxAndScaleData)
+
+extern "C" {
 void fn_8006F334(void* pDst, const void* pSrc) {
     *(u32*)pDst = *(u32*)pSrc;
 }
 void fn_8006F3D8(u32* pDst, u32 value) {
     *pDst = value;
 }
-void fn_8006F480(u32* pDst, u32 value) {
-    *pDst = value;
-}
-void fn_8006F520(u32* pDst, u32 value) {
-    *pDst = value;
-}
+} /* extern "C" */
+
+/* 0x8006F480 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResTlutObjData)
+
+extern "C" {
+} /* extern "C" */
+
+/* 0x8006F520 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResTexObjData)
+
+extern "C" {
 void fn_8006F258(void* pDst, const void* pSrc) {
     *(u32*)pDst = *(u32*)pSrc;
 }
@@ -168,41 +165,62 @@ void* fn_8006F304(void* pDst, const void* pSrc) {
 /* The alignment-asserting resource pointer constructors (g3d_resmat_ac.h inlines).
  * `lbl_8058D848`/`lbl_8058D880`/`...` are the header file strings, `lbl_8058D81C`/`lbl_8058D858`/...
  * the "!((u32)p & mask)" messages. */
-u32* fn_8006F158(u32* pDst, u32 ptr) {
-    fn_8006F1BC(pDst, ptr);
-    if (ptr & 0x1F) {
-        nw4r::db::Panic(lbl_8058D880, 378, lbl_8058D858);
+} /* extern "C" */
+
+/* 0x8006F158 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResMatTevColor::ResMatTevColor(void* pData) : ResCommon<ResMatTevColorData>(pData) {
+    if ((u32)pData & 0x1F) {
+        nw4r::db::Panic((const char*)lbl_8058D880, 378, (const char*)lbl_8058D858);
     }
-    return pDst;
 }
-u32* fn_8006F298(u32* pDst, u32 ptr) {
-    fn_8006F2FC(pDst, ptr);
-    if (ptr & 0x1F) {
-        nw4r::db::Panic(lbl_8058D848, 413, lbl_8058D81C);
+
+extern "C" {
+} /* extern "C" */
+
+/* 0x8006F298 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResMatIndMtxAndScale::ResMatIndMtxAndScale(void* pData) : ResCommon<ResMatIndMtxAndScaleData>(pData) {
+    if ((u32)pData & 0x1F) {
+        nw4r::db::Panic((const char*)lbl_8058D848, 413, (const char*)lbl_8058D81C);
     }
-    return pDst;
 }
-u32* fn_8006F374(u32* pDst, u32 ptr) {
-    fn_8006F3D8(pDst, ptr);
-    if (ptr & 0x3) {
+
+extern "C" {
+} /* extern "C" */
+
+/* 0x8006F374 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResTexSrt::ResTexSrt(void* pData) {
+    fn_8006F3D8((u32*)this, (u32)pData);
+    if ((u32)pData & 0x3) {
         nw4r::db::Panic(lbl_8058D8B8, 107, lbl_8058D890);
     }
-    return pDst;
 }
-u32* fn_8006F41C(u32* pDst, u32 ptr) {
-    fn_8006F480(pDst, ptr);
-    if (ptr & 0x3) {
-        nw4r::db::Panic(lbl_8058D8F0, 74, lbl_8058D8C8);
+
+extern "C" {
+} /* extern "C" */
+
+/* 0x8006F41C (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResTlutObj::ResTlutObj(void* pData) : ResCommon<ResTlutObjData>(pData) {
+    if ((u32)pData & 0x3) {
+        nw4r::db::Panic((const char*)lbl_8058D8F0, 74, (const char*)lbl_8058D8C8);
     }
-    return pDst;
 }
-u32* fn_8006F4BC(u32* pDst, u32 ptr) {
-    fn_8006F520(pDst, ptr);
-    if (ptr & 0x3) {
-        nw4r::db::Panic(lbl_8058D928, 40, lbl_8058D900);
+
+extern "C" {
+} /* extern "C" */
+
+/* 0x8006F4BC (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResTexObj::ResTexObj(void* pData) : ResCommon<ResTexObjData>(pData) {
+    if ((u32)pData & 0x3) {
+        nw4r::db::Panic((const char*)lbl_8058D928, 40, (const char*)lbl_8058D900);
     }
-    return pDst;
 }
+
+extern "C" {
 
 /* The global material table `fn_8005A9BC` returns; only its per-frame offset at +0x3C is read here,
  * so the size is the minimum that covers it. */
@@ -212,37 +230,56 @@ typedef struct {
 } G3dMaterialTable; /* size: 0x40 */
 
 /* Returns the material table base plus the per-frame offset at +0x3C of the global fn_8005A9BC returns. */
-void* fn_8006F1C4(void* self) {
-    G3dMaterialTable* pGlobal = (G3dMaterialTable*)fn_8005A9BC(self);
-    return fn_8006F200(self, pGlobal->offset_0x3C);
+} /* extern "C" */
+
+/* 0x8006F1C4 (0x3C): returns the material's display-list block. */
+/* untyped: byte range - the display-list block */
+void* nw4r::g3d::ResMat::GetResMatDLData() {
+    G3dMaterialTable* pGlobal = (G3dMaterialTable*)&ref();
+    return fn_8006F200(this, pGlobal->offset_0x3C);
 }
 
+extern "C" {
+
 /* The typed sub-resource accessors: build the assert-checked pointer and read its handle. */
-u32 fn_8006F124(void* self) {
-    u8* pBase = (u8*)fn_8006F1C4(self);
-    u32 handle;
-    return *fn_8006F158(&handle, (u32)(pBase + 32));
+} /* extern "C" */
+
+/* 0x8006F124 (0x34): returns the material's MatTevColor block. */
+nw4r::g3d::ResMatTevColor nw4r::g3d::ResMat::GetResMatTevColor() {
+    return ResMatTevColor((u8*)GetResMatDLData() + 32);
 }
-u32 fn_8006F264(void* self) {
-    u8* pBase = (u8*)fn_8006F1C4(self);
-    u32 handle;
-    return *fn_8006F298(&handle, (u32)(pBase + 160));
+
+extern "C" {
+} /* extern "C" */
+
+/* 0x8006F264 (0x34): returns the material's MatIndMtxAndScale block. */
+nw4r::g3d::ResMatIndMtxAndScale nw4r::g3d::ResMat::GetResMatIndMtxAndScale() {
+    return ResMatIndMtxAndScale((u8*)GetResMatDLData() + 160);
 }
-u32 fn_8006F340(void* self) {
-    u8* pGlobal = (u8*)fn_8005A9BC(self);
-    u32 handle;
-    return *fn_8006F374(&handle, (u32)(pGlobal + 424));
+
+extern "C" {
+} /* extern "C" */
+
+/* 0x8006F340 (0x34): returns the material's TexSrt block. */
+nw4r::g3d::ResTexSrt nw4r::g3d::ResMat::GetResTexSrt() {
+    return ResTexSrt((u8*)&ref() + 424);
 }
-u32 fn_8006F3E8(void* self) {
-    u8* pGlobal = (u8*)fn_8005A9BC(self);
-    u32 handle;
-    return *fn_8006F41C(&handle, (u32)(pGlobal + 324));
+
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x8006F3E8 (0x34): returns the material's palette-object block. */
+nw4r::g3d::ResTlutObj nw4r::g3d::ResMat::GetResTlutObj() {
+    return ResTlutObj((u8*)&ref() + 324);
 }
-u32 fn_8006F488(void* self) {
-    u8* pGlobal = (u8*)fn_8005A9BC(self);
-    u32 handle;
-    return *fn_8006F4BC(&handle, (u32)(pGlobal + 64));
+
+/* 0x8006F488 (0x34): returns the material's texture-object block. */
+nw4r::g3d::ResTexObj nw4r::g3d::ResMat::GetResTexObj() {
+    return ResTexObj((u8*)&ref() + 64);
 }
+
+extern "C" {
 
 /* Constructs the 8+8 entry handle arrays at +0x4 and +0x24 of the record. */
 u32* fn_8006F528(u32* self) {

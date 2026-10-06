@@ -13,11 +13,6 @@ struct RenderModeObj;
 extern "C" {
 #endif
 
-/* 0x80086390 - the `ResTexSrt` handle's non-const resource resolver (returns the slot array). */
-u8* fn_80086390(void* pSelf);
-
-/* 0x80087870 - the const twin of fn_80086390 (used by `ResTexSrt::GetEffectMtx`). */
-u8* fn_80087870(void* pSelf);
 
 /* 0x80088584 - the render-mode helper (caller: g3d_camera.cpp). */
 struct RenderModeObj* fn_80088584(void);

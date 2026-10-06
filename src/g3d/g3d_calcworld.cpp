@@ -17,6 +17,8 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h"
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_8006FDCC..fn_8007100C (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
@@ -49,12 +51,9 @@ extern "C" u32* fn_8005CEDC(void);
 extern "C" void* fn_8005D050(const void* p);
 extern "C" ResNodeData* fn_8005D0C4(const void* p);
 extern "C" void fn_8005D2C0(void* pOut, const void* pIn);
-extern "C" s32 fn_8005D2FC(const void* p);
 extern "C" void fn_80061068(void* pOut);
 extern "C" void* fn_8008E1C0(void* pOut, const void* pIn);
 extern "C" void fn_8008F148(void* pOut, const void* pIn);
-extern "C" void* fn_80097D40(void* pA, const void* pB);
-extern "C" s32 fn_80097F18(void* pA, u32 idx);
 extern "C" void fn_80098D5C(void* pA, const void* pB);
 extern "C" void fn_80098F6C(void* pA, void* pOut);
 extern "C" s32 fn_800D77B0(void* pA, void* pB, void* pC, void* pD, s32 e, void* pF);
@@ -119,17 +118,6 @@ struct NodeMtxRec {
     /* +0x18 */ u32 mUnk18;
     /* +0x1C */ f32 mMtx[12];
 }; /* size: 0x4C */
-
-/* The scene/`ResMdl` root `fn_8005D0C4` hands back; only the +0x18 matrix id is read here. */
-struct ResNodeData {
-    /* +0x00 */ u32 mUnk00;
-    /* +0x04 */ u32 mUnk04;
-    /* +0x08 */ u32 mUnk08;
-    /* +0x0C */ u32 mUnk0C;
-    /* +0x10 */ u32 mUnk10;
-    /* +0x14 */ u32 mUnk14;
-    /* +0x18 */ u32 mMtxID;
-}; /* size: 0x1C */
 
 /* The model's resource data (`fn_800740A8` hands it back); +0x4C is the node table's owning object. */
 struct ResMdlData {
@@ -246,7 +234,7 @@ void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, R
     u8* pCode = pByteCode;
     fn_80061068(&rec);
     if (pCode == NULL) {
-        pCode = (u8*)fn_80097D40(pMdl, lbl_8058E178);
+        pCode = (u8*)(void*)reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->GetResByteCode(lbl_8058E178);
     }
     if (pCode != NULL) {
         NodeMtxRec* pRec = NULL;
@@ -269,7 +257,7 @@ void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, R
             case 2: {
                 u32 nodeID = (pCode[1] << 8) + pCode[2];
                 u32 targetID = (pCode[3] << 8) + pCode[4];
-                s14 = fn_80097F18(pMdl, nodeID);
+                s14 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->GetResNode(nodeID).mpData;
                 fn_8005D2C0(&s1C, &s14);
                 u32 mtxID = fn_8006FDCC(&s1C);
                 if (numMtx >= 0x800) {
@@ -470,8 +458,8 @@ s32 fn_80074074(ResHandle* pMdl) {
 
 /* The `ResMdl` root, with the `g3d_resmdl_ac.h` validity assert. */
 ResMdlData* fn_800740A8(ResHandle* pMdl) {
-    if (!fn_8005D2FC(pMdl)) {
-        nw4r::db::Panic(lbl_8058E420, 120, lbl_8058E400, fn_8007012C(), "ref");
+    if (!reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->IsValid()) {
+        nw4r::db::Panic(lbl_8058E420, 120, lbl_8058E400, nw4r::g3d::ResMdl::GetClassName(), "ref");
     }
     return (ResMdlData*)fn_8007410C(pMdl);
 }

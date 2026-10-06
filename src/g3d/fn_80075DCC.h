@@ -46,28 +46,11 @@ void fn_8007B940(void* pSelf, u32 mask, void* pArg2, void* pArg3);
 u32 fn_8007C464(void* pSelf);
 s32 fn_80077E34(s32 pOut, void* pIn);  /* 0x80077E34 - builds the model view the node walks read */
 
-/* 0x800768C8/0x800768DC/0x800768F0 - the `ResMat`/`ResTex` handle validity tests `g3d/g3d_resmat.cpp` asserts
- * through: each returns whether the handle's word is non-null. */
-u32 fn_800768C8(void* pSelf);
-u32 fn_800768DC(void* pSelf);
-u32 fn_800768F0(void* pSelf);
-/* 0x80076974/0x80076988 - the `ResTex`-style handle validators the `g3d_resmat` texture helpers use. */
-u32 fn_80076974(void* pSelf);
-u32 fn_80076988(void* pSelf);
-/* 0x80077638/0x800776F4 - the `ResTlut`-style validators. */
-u32 fn_80077638(void* pSelf);
-u32 fn_800776F4(void* pSelf);
-/* 0x800774A0/0x80077744/0x800783EC - the resolved-resource readers of the same family. */
-u8* fn_800774A0(void* pSelf);
-u8* fn_80077744(void* pSelf);
-u8* fn_800783EC(void* pSelf);
 s32 fn_80078904(s32 pNode);            /* 0x80078904 - the node's visibility test */
 void fn_800793A4(s32* pArg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7,
                  u32 argSp0);          /* 0x800793A4 - the draw-buffer builder */
 
-/* The `g3d_resmat_ac.h` handle constructors and validity predicates `g3d/g3d_resfile.cpp`'s accessors call. */
-u32* fn_800766D0(u32* pDst, u32 value); /* 0x800766D0 - the 0x20-aligned handle constructor */
-u32* fn_80076794(u32* pDst, u32 value); /* 0x80076794 - the 0x20-aligned handle constructor */
+/* The `g3d_resmat_ac.h` validity predicates `g3d/g3d_resfile.cpp`'s accessors call. */
 s32 fn_8007673C(void* p);              /* 0x8007673C - `*(u32*)p != 0` */
 s32 fn_80076750(void* p);              /* 0x80076750 - `*(u32*)p != 0` */
 s32 fn_80076800(void* p);              /* 0x80076800 - `*(u32*)p != 0` */
@@ -85,6 +68,17 @@ void fn_8007A510(void);
  * work record builds its friend list in place with it. */
 /* untyped: opaque handle passed through - the placement address the caller hands in */
 void* operator new(unsigned long size, void* place);
+#endif
+
+#ifdef __cplusplus
+namespace nw4r {
+namespace math {
+
+/* 0x800774A0 - `x` raised to the power `y` (a tail call into the C library). */
+f32 FPow(f32 x, f32 y);
+
+}  // namespace math
+}  // namespace nw4r
 #endif
 
 #endif /* MHTRI_G3D_FN_80075DCC_H */

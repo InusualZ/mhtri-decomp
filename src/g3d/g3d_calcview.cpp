@@ -18,6 +18,8 @@
  *   `mtx34_concat` is unwritten (an empty body).
  */
 #include "types.h"
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 
 /* The alignment-assert wrappers need the un-fused compare (retail keeps `clrlwi` + `cmpwi`), exactly
  * as g3d/g3d_basic.cpp and g3d/g3d_calcmaterial.cpp found. */
@@ -59,7 +61,6 @@ extern "C" {
 
 /* -------- the helpers this unit calls (still unsplit `fn_XXXXXXXX`, C linkage) -------- */
 f32 sqrt_f32(f32 value);                      /* reciprocal-square-root / length helper */
-u32* fn_8005D1AC(void* pDst, u32 value);         /* checked pointer wrapper */
 u32 fn_8005AAEC(void* self);
 u32* fn_8005D0C4(void* self);
 void fn_80069CF4(void* p0, void* p1);
@@ -84,9 +85,6 @@ u32 fn_8006FFDC(void* self);
 u32 fn_80070020(void* self);
 u32* fn_80070054(u32* pDst, u32 ptr);
 void fn_800700B8(u32* pDst, u32 value);
-u32 fn_800700C0(void* self);
-u32 fn_80070124(void* self);
-void* fn_8007012C(void);
 void fn_80070134(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void fn_80070410(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void fn_80070600(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
@@ -127,11 +125,9 @@ u32 fn_8006FDCC(void* self) {
 u32 fn_8006FE7C(void* self, u32 off) {
     u32 base = *(u32*)self;
     if (off == 0) {
-        u32 tmp;
-        return *fn_8005D1AC(&tmp, 0);
+        return (u32)nw4r::g3d::ResNode((void*)0).mpData;
     }
-    u32 tmp;
-    return *fn_8005D1AC(&tmp, base + off);
+    return (u32)nw4r::g3d::ResNode((void*)(base + off)).mpData;
 }
 
 /* 0x8006F908 - the length of column `idx` of a 48-byte (12-float) matrix. */
@@ -174,26 +170,34 @@ u32* fn_80070054(u32* pDst, u32 ptr) {
 
 /* 0x80070020 - the checked pointer the model info lives at. */
 u32 fn_80070020(void* self) {
-    u8* p = (u8*)fn_800700C0(self);
+    u8* p = (u8*)&reinterpret_cast<const nw4r::g3d::ResMdl*>(self)->ref();
     u32 handle;
     return *fn_80070054((u32*)&handle, (u32)(p + 76));
 }
 
-/* 0x80070124 - dereference the handle. */
-u32 fn_80070124(void* self) {
-    return *(u32*)self;
+} /* extern "C" */
+
+/* 0x800700C0 (0x64): returns the model block, panicking on a NULL handle. */
+const nw4r::g3d::ResMdlData& nw4r::g3d::ResMdl::ref() const {
+    if (!IsValid()) {
+        nw4r::db::Panic(lbl_8058DCA8, 120, lbl_8058DC8C, GetClassName(), "ref");
+    }
+    return *ptr();
 }
 
-/* 0x8007012C - the shared null resource record. */
-void* fn_8007012C(void) {
-    return &lbl_807911B0;
+/* 0x80070124 (0x8): returns the model block. */
+const nw4r::g3d::ResMdlData* nw4r::g3d::ResMdl::ptr() const {
+    return mpData;
 }
+
+/* 0x8007012C (0x8): returns the class name. */
+const char* nw4r::g3d::ResMdl::GetClassName() {
+    return (const char*)&lbl_807911B0;
+}
+
+extern "C" {
 
 /* -------- registration stubs (reconstruction pending) -------- */
-u32 fn_800700C0(void* self) {
-    (void)self;
-    return 0;
-}
 void fn_8006F738(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_8006F898(void* p0, void* p1, void* p2, void* p3, void* p4) {}
 void fn_8006F8D4(void* p0, void* p1, void* p2, void* p3) {}

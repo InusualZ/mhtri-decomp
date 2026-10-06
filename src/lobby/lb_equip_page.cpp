@@ -35,6 +35,7 @@
  */
 #include "types.h"
 #include "nw4r/math.h"
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMat (rule 2) */
 
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -73,7 +74,6 @@ s32 game_ready_ck(void);
 
 s32 fn_80217934(void);
 u8* fn_80223A18(u8 table, s32 index);
-LbGlobalBlock* fn_80064080(void);
 u8* fn_80223A44(u8 table, s32 index);
 void fn_802FAFC8(s32 id);
 void fn_80221C28(LbMenuItem* item, s32 open);
@@ -300,7 +300,7 @@ s16 fn_80220AF0(u8* state, u16* id)
 /* The base-relative accessor `fn_80064080`'s block wants. */
 void fn_802235A4(u32* base)
 {
-    fn_802235E0(base, fn_80064080()->field_0x08);
+    fn_802235E0(base, ((const LbGlobalBlock*)&reinterpret_cast<const nw4r::g3d::ResMat*>(base)->ref())->field_0x08);
 }
 
 }  /* extern "C" */

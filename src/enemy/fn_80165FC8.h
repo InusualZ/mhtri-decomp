@@ -93,14 +93,12 @@ u32 fn_80176AA8(void* p);
 
 /* ---- library callees (their owners' headers do not declare these, or declare a different
  * signature; the shapes here are the call sites' - each is a leaf this unit never re-enters) ---- */
-void fn_8005D1AC(void* out, s32 a);
 void mtx34_identity(void* out);
 void mtx34_copy(void* dst, const void* src);
 int fn_8006FDCC(const void* p);
 void fn_8005D0CC(void* obj, const void* sub);
 void assignVec3(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 void mtx34_concat_assign(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
-void* fn_80097EB0(void* sub, s32 a);
 u32 fn_802B0998(u32 kind);
 /* `enemy_data_find`/`enemy_data_grp` (0x803438E4 / 0x803439D4): declared in their owner's header,
  * `ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them (rule 2). */

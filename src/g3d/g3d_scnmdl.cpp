@@ -27,6 +27,8 @@
 #include "g3d/g3d_calcview.h"     /* fn_8006FFBC/fn_8006FFC8 (rule 2: owner g3d/g3d_calcview.cpp) */
 #include "g3d/g3d_calcvtx.h"       /* fn_8007270C (rule 2: g3d_calcvtx.cpp) */
 #include "g3d/g3d_resvtx.h"
+#include "g3d/g3d_resmat.h"
+#include "g3d/g3d_resnode.h"
 #include "g3d/g3d_scnmdlsmpl.h"   /* fn_8007F41C? and the ScnMdlSimple helpers (rule 2) */
 #include "fn_80047398.h"          /* fn_800497AC (rule 2: owner fn_80047398.cpp) */
 
@@ -81,8 +83,6 @@ struct ResVtxBlockHead {
 extern "C" {
 
 /* -------- the two node-table helpers of `g3d/g3d_resmat.cpp`, declared here -------- */
-s32 fn_80097F80(void* pView);            /* 0x80097F80 - the model's node count */
-s32 fn_80097F18(void* pView, u32 idx);   /* 0x80097F18 - one node handle of the table */
 u32 fn_8009A2F4(void* pSelf, u32 flag);  /* 0x8009A2F4 - the pix-DL replacement's teardown */
 u32 fn_8009435C(void* pSelf, u32 flag);  /* 0x8009435C - the tex-color-DL replacement's teardown */
 u32 fn_8009411C(void* pSelf, u32 flag);  /* 0x8009411C - the ind-mtx/scale replacement's teardown */
@@ -394,10 +394,10 @@ void fn_8007E7FC(ScnMdl* pSelf) {
     u32 i;
 
     fn_80077E34((s32)&view, &handle);
-    numNodes = fn_80097F80(&view);
+    numNodes = reinterpret_cast<nw4r::g3d::ResMdl*>(&view)->GetResNodeNumEntries();
     if (pSelf->mReplacement.mpNodeVisible != 0) {
         for (i = 0; i < (u32)numNodes; i++) {
-            s32 node = fn_80097F18(&view, i);
+            nw4r::g3d::ResNode node = reinterpret_cast<nw4r::g3d::ResMdl*>(&view)->GetResNode(i);
 
             if (fn_80078904((s32)&node) != 0) {
                 pSelf->mReplacement.mpNodeVisible[i] = 1;
