@@ -40,7 +40,7 @@
  *   defined here; `enemy_data_grp`'s switch table is emitted beside the table (one `.data` chunk, playbook 58).
  */
 
-#include "enemy/lbl_806A54E0.h" /* lbl_806A54E0 (rule 2: the owner's header) */
+#include "enemy/em_area_entry_tbl.h" /* em_area_entry_tbl (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
@@ -79,7 +79,7 @@ struct EftEntry {
     /* +0x04 */ EftEntry* sub_0x04;
 };
 
-/* One 0x44-byte record of the 128-entry array `lbl_806A54E0` the live-slot scan walks: the same
+/* One 0x44-byte record of the 128-entry array `em_area_entry_tbl` the live-slot scan walks: the same
  * (team, area, action) key an enemy work record carries, plus the key bytes the slot pool matches
  * against.  size: 0x44 */
 struct EftTargetRecord {
@@ -352,7 +352,7 @@ extern "C" EftSlot* eft_slot_spawn(u8 key1, u8 key0, u8 index) {
 /* Spawns the live slots of every enemy work record, then of the 128-entry record array. */
 extern "C" void eft_slot_spawn_targets(void) {
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
-    EftTargetRecord* record = (EftTargetRecord*)lbl_806A54E0;
+    EftTargetRecord* record = (EftTargetRecord*)em_area_entry_tbl;
     u16 count = get_move_work_max(3);
     s32 i;
 
@@ -518,7 +518,7 @@ extern "C" u32 eft_target_match_ck(EftSlot* slot, EftTargetRecord* record) {
 extern "C" void eft_slot_match_count(EftSlot* slot) {
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
     u16 count = get_move_work_max(3);
-    EftTargetRecord* record = (EftTargetRecord*)lbl_806A54E0;
+    EftTargetRecord* record = (EftTargetRecord*)em_area_entry_tbl;
     u8 i;
 
     slot->field_0x0D = 0;
@@ -613,7 +613,7 @@ extern "C" u32 eft_slot_area_ck(EftSlot* slot) {
         }
     }
     {
-        EftTargetRecord* record = (EftTargetRecord*)lbl_806A54E0;
+        EftTargetRecord* record = (EftTargetRecord*)em_area_entry_tbl;
         s32 j;
 
         for (j = 0; j < 128; j++, record++) {

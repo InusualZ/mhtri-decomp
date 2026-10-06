@@ -15,7 +15,7 @@ struct EmcSlot {
     /* +0x01 */ u8 state;      /* 0 idle, 1 claimed, 2 released */
     /* +0x02 */ u8 kind;       /* the file kind `fn_80141470` claims the slot for */
     /* +0x03 */ u8 flags;
-    /* +0x04 */ u8 field_0x04; /* cleared by `fn_801415A8` on release */
+    /* +0x04 */ u8 field_0x04; /* cleared by `em_kind_slot_release` on release */
     /* +0x05 */ u8 unused_0x05[3];
     /* +0x08 */ s32 handle_0x08;
     /* +0x0C */ s32 handle_0x0C;
@@ -172,6 +172,16 @@ struct QuestBossSpawn* em_large_spawn(u8 monster, struct EmGroundRec* rec, u16 o
 void em_intruder_spawn(u8 monster, struct EmGroundRec* rec, u16 row);
 s32 em_kind_release_ck(u8 monster);
 void em_area_spawn_clear(void);
+/* 0x80143A54 - releases every live area entry of the current area (GUESS name). */
+void em_area_entries_release(void);
+/* 0x801477C0 - the first free enemy resource buffer of the control work's six, NULL when all are taken (GUESS name). */
+u8* em_res_buffer_get(void);
+/* 0x801414D4 - the control work's slot holding monster kind `kind` (0..5), 0xFF when none does (GUESS name). */
+u8 em_kind_slot_find(u32 kind);
+/* 0x801415A8 - releases control slot `index`: its sound bank, its resources and its kind (GUESS name). */
+void em_kind_slot_release(u8 index);
+/* 0x80143A40 - releases one live area entry (GUESS name). */
+void em_area_entry_release(struct EmAreaEntry* entry);
 /* 0x801465A0 - the enemy level the quest sets (GUESS name). */
 void em_level_set(s8 level);
 /* 0x801422FC - resets every enemy work and the effect slot pool (GUESS name). */

@@ -158,7 +158,7 @@
  *     `act`, `count`, `bind`, `release`); `emc_*` and `eft_*` as above.
  *   - callees renamed with their owners' sources and headers swept: `pl_pos_blend_start` and `pl_act_add_charge`
  *     (their owner's own doc comments), `pl_act_enter_raw`, `pl_hit_effect_spawn`, `pl_act_net_hook_*`,
- *     `eft_rot_vec_copy`, `item_se_ck`, `se_slot_req`, `quest_enemy_spawn_req`, `eft_slot_marks_set`,
+ *     `eft_rot_vec_copy`, `item_se_ck`, `se_slot_req`, `quest_net_kill_apply`, `eft_slot_marks_set`,
  *     `em_parts_*`, `em_event_settle*`, `em_get_part_limit`, `em_special_part_apply`, `em_act_*`, `em_area_change`,
  *     `em_status_*` (`em_status_set` is the function the map stores +0x43D through), `em_alt_mode_set` (the latch
  *     `em_alt_mode_ck` tests), `em_level_raise`, `em_net_flag_apply_0..7` (one per bit of the action-flag byte),
@@ -1851,7 +1851,7 @@ void emc_net_recv_status(NetEmcStatusMsg* msg) {
         switch (msg->status.kind) {
         case 1:
         case 5:
-            quest_enemy_spawn_req(msg->status.value_0x06, msg->status.enemy_id, msg->status.value_0x07, 0,
+            quest_net_kill_apply(msg->status.value_0x06, msg->status.enemy_id, msg->status.value_0x07, 0,
                         msg->status.value_0x05);
             break;
         }

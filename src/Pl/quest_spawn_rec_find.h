@@ -13,6 +13,8 @@ extern "C" {
  * record `PlRootEntry`.  GUESS name. */
 struct QuestSpawnRec;
 struct QuestSpawnRec* quest_spawn_rec_find(u32 order);
+/* 0x8028F0B4 - the same search inside area list `index` only.  GUESS name. */
+struct QuestSpawnRec* quest_spawn_rec_find_in(u32 order, u32 index);
 
 #ifdef __cplusplus
 }

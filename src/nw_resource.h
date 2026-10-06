@@ -27,6 +27,8 @@ s32 fn_800D4CE4_none(void);
 char* fn_800D4D9C(s32 index);
 u32 fn_800D5138(s32 index);
 s32 fn_800D56F4(void* arg, void* name);
+/* 0x800D58B0 - clears one resource-table entry outright. */
+void nw_res_entry_clear(s32 index);
 
 #ifdef __cplusplus
 }

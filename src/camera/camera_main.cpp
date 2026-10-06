@@ -20,7 +20,8 @@
  *
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
  * extabindex).
- * NAMES. GUESS (from each body and its callers): camera_work_init, camera_area_reset, stage_dcm_path_get
+ * NAMES. GUESS (from each body and its callers): camera_work_init, camera_area_reset, stage_dcm_path_get,
+ *   GUESS: camera_kill_cut_start, camera_kill_cut_start_split
  */
 /* ---- header inherited from src/stage/fn_802B2AA0.cpp (written against its pre-phase-4 range) ---- */
 /*
@@ -1446,7 +1447,7 @@ extern "C" void* fn_802BEDE8(s8 bank)
 
 /* Queries the light resource for the given id with the bank reset and then with it raised, letting
  * each failed query fall through to the id's own record handler. */
-extern "C" void fn_802BEE3C(u8 id, void* arg)
+extern "C" void camera_kill_cut_start_split(u8 id, struct _ENEMY_WORK* arg)
 {
     s32 previous;
 
@@ -1454,12 +1455,12 @@ extern "C" void fn_802BEE3C(u8 id, void* arg)
 
     my_player_no_set(0);
     if (!fn_802B0688(&fn_802BECD0()->resource->entry)) {
-        fn_802BC564(id, arg);
+        camera_kill_cut_start(id, arg);
     }
 
     my_player_no_set(1);
     if (!fn_802B0688(&fn_802BECD0()->resource->entry)) {
-        fn_802BC564(id, arg);
+        camera_kill_cut_start(id, arg);
     }
 
     my_player_no_set(previous);

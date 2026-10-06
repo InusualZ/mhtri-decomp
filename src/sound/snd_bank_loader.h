@@ -9,6 +9,10 @@
 extern "C" {
 #endif
 void fn_800F0F9C(u8 id);
+/* 0x800F0F38 - drops one reference of monster `id`'s SE slot, freeing it at zero. */
+void snd_em_se_slot_release(u8 id);
+/* 0x800F13D8 - loads the quest NPC's voice banks (`c_npc_nekotaku` when the call is demoted, `c_npc_sansai` otherwise). */
+void snd_npc_voice_bank_load(u8 arg0, u8 arg1);
 #ifdef __cplusplus
 }
 #endif

@@ -58,7 +58,7 @@
  *   their `#include`.
  */
 
-#include "enemy/lbl_806A54E0.h" /* lbl_806A54E0 (rule 2: the owner's header) */
+#include "enemy/em_area_entry_tbl.h" /* em_area_entry_tbl (rule 2: the owner's header) */
 #include "types.h"
 #include "hud/em_net_send.h" /* the owner's leaf header (rule 2) */
 #include "nw4r/math.h"
@@ -1919,7 +1919,7 @@ extern "C" s32 fn_8012E968(_ENEMY_WORK* self, u8 mode)
         }
         /* The table walk: 0x60 / 3 = the 32 groups the table holds, four records per group.  `mode`
          * is the target's own counter (see the file header, residual). */
-        for (entry = &lbl_806A54E0[0][0], mode = 0; mode < 0x60; mode += 3, entry += 4) {
+        for (entry = &em_area_entry_tbl[0][0], mode = 0; mode < 0x60; mode += 3, entry += 4) {
             if (entry[0].active != 0 && entry[0].area_no == self->field_0x00A &&
                 entry[0].group == self->group && entry[0].field_0x0C == 1) {
                 return 0;

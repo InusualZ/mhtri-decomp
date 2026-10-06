@@ -9,11 +9,11 @@
  *   `pl_motion_set` loads the motion resources); `pl_motion_set` and `get_gm_daynight` are the map's names.  The root
  *   work `get_move_work_adrs(0)` hands back is `_PL_ROOT` (`Pl/fn_80288CEC.h`), the record `enemy/em_common.cpp`
  *   defines again as `_PLAYER_ROOT` (rule 1).
- *   GUESS (from each body and its callers): quest_spawn_rec_find
+ *   GUESS (from each body and its callers): quest_spawn_rec_find, quest_spawn_rec_find_in
  * RESIDUALS. 53 functions unwritten (objdiff scores them 0) in 6 runs: 0x80288E68-0x8028BCF4, 0x8028BD98-0x8028C570,
  *   0x8028C5B4-0x8028D574, 0x8028D5F4-0x8028DF24, 0x8028DF58-0x8028E4F0, 0x8028E528-0x8028EF30; most are jump-table
  *   state machines of 100-450 instructions, and `pl_motion_set` needs the local string-object shape.  4 partial,
- *   none with a recorded cause: `fn_80288CEC`, `fn_8028DF24`, `fn_8028EF7C`..`fn_8028F0B4`.
+ *   none with a recorded cause: `fn_80288CEC`, `fn_8028DF24`, `fn_8028EF7C`..`quest_spawn_rec_find_in`.
  *  - flipcheck: the object emits no `.bss` (0x18 claimed), `.ctors` (0x4), `.sbss` (0x20) or `.sdata` (0xC0); `.text`
  *    0x868, `.data` 0xAC, `.sdata2` 0x1C, extab 0x88 and extabindex 0xCC against the claims 0x6760, 0x1C84, 0xA0,
  *    0x228 and 0x33C; every compared section differs.
@@ -75,7 +75,6 @@ void eft_common_load(void);
 u32 fn_8027CB1C(void* self);
 u32 stage_map_kind_get(u8 idx);
 void fn_802BE568(void* self, u32 sub);
-u32 quest_arena_item_count_get(void);
 void em_pop_res_load(u8 idx);
 
 }
@@ -294,7 +293,7 @@ PlRootEntry* quest_spawn_rec_find(u32 key) {
 }
 
 /* 0x8028F0B4 - the same search, but the caller names the area index itself. */
-PlRootEntry* fn_8028F0B4(u32 key, u32 index) {
+PlRootEntry* quest_spawn_rec_find_in(u32 key, u32 index) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     PlRootEntry* entry;
     u32 count;

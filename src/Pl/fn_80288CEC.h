@@ -26,7 +26,7 @@ struct PlBox {
  *
  * Only the fields these functions read are named (rule 5); untouched bytes keep their offset as an
  * `unused_0xNN` run (rules 4/5).  `recs_0x154` is the four 0x800-byte area records `fn_8028EF7C` /
- * `fn_8028F0B4` walk when the key is >= 0x20, each an array of 0x10-byte `{key, ...}` entries whose
+ * `quest_spawn_rec_find_in` walk when the key is >= 0x20, each an array of 0x10-byte `{key, ...}` entries whose
  * count lives in `rec_counts_0x2154`; `sparse_0x2274` is the six-entry table they walk for a
  * key < 0x20.
  * size: 0x2300 (lower bound - the highest field read is 0x22DB)

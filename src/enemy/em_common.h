@@ -85,6 +85,8 @@ void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
 s32 em_record_hit_ck(struct _ENEMY_WORK* record);
 s32 em_mini_hit_ck(struct _ENEMY_WORK* record);
 u8 em_captured_ck(struct _ENEMY_WORK* enemy);
+/* 0x80126AD0 - whether area entry `entry` lies in area `sub` or one area `index` reaches from it (GUESS name). */
+s32 em_area_entry_near_ck(struct EmAreaEntry* entry, u8 index, u8 sub);
 s32 em_mini_kill_kind_get(struct _ENEMY_WORK* enemy);
 
 #ifdef __cplusplus

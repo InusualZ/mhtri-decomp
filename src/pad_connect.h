@@ -14,6 +14,9 @@ extern "C" {
  * allocators lock it around every MEM call. */
 extern u8 game_mutex[0x18];
 
+/* 0x80047058 - non-zero while the screen is split between two players. */
+s32 screen_split_mode_ck(void);
+
 #ifdef __cplusplus
 }
 #endif

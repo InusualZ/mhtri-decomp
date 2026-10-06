@@ -11,13 +11,15 @@
  *   `kemuri_set`, `em_get_unique_work` and `em_ride_hit_check` are runtime-dump names; `em_spawn_request`,
  *   `emc_marker_replay`, `emc_mini_event_a`/`_b`, `emc_mini_step`, the `em_demo_*` set and `em_area_entry_make` are
  *   GUESSES from their bodies or call sites (the dump answers only `zz_` for each).
+ *   GUESS (from each body and its callers): em_kind_slot_find, em_kind_slot_release, em_area_entries_release,
+ *   GUESS: em_res_buffer_get, em_area_entry_release
  * RESIDUALS. 126 rows unwritten: 0x80141B88-0x80143174, 0x80143190-0x80143BF8, 0x80143C14-0x80144240,
  *   0x80144244-0x801444FC, 0x8014450C-0x80144FB4, 0x80144FE0-0x80147ABC, 0x80147AC8-0x80147C94.
  *  - `fn_8014128C`: ours re-materialises r3 before the `fn_80144FE0` call (148 B against 144 B);
  *  - `fn_801413D0`: ours loads the +0x1 byte ahead of the first check;
  *  - `fn_801417FC`, `fn_80141A4C`: retail sign-extends the halfword with `extsh` after the load, ours loads it with
  *    `lha` (and `fn_801417FC` sets up its arguments in a different order);
- *  - `fn_80143BF8`: ours narrows the `(b - 1) == 0` result with an extra `clrlwi`; `fn_801414D4`: register allocation.
+ *  - `fn_80143BF8`: ours narrows the `(b - 1) == 0` result with an extra `clrlwi`; `em_kind_slot_find`: register allocation.
  *   flipcheck: `.bss`/`.ctors`/`.data`/`.sbss`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the
  *   claim; `ckResourceName` is referenced unmangled where the map spells `ckResourceName__FPc`.
  * SHAPES. `#pragma peephole off` over the bodies (retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` pairs).
@@ -55,14 +57,14 @@ u32  fn_800E264C(void* self);
 void* ckResourceName(char* name);
 s32* res_file_ctor(s32* dst, s32 value);
 u32  fn_8009380C(void* self, s32* value);
-void fn_800F0F38(u8 kind);
-void fn_800D58B0(s32 handle);
+void snd_em_se_slot_release(u8 kind);
+void nw_res_entry_clear(s32 handle);
 
 /* this unit's own functions, forward-declared so they may be called before their definitions */
 EmcSlot* fn_801413D0(u32 index);
 void fn_80141358(u8 index);
 void fn_8014131C(void);
-void fn_801415A8(u8 index);
+void em_kind_slot_release(u8 index);
 void fn_80141690(u8 index);
 void fn_801416B0(void);
 SenkoRec* fn_801416EC(void);
@@ -75,7 +77,6 @@ void fn_80145C84(void);
 void fn_80146E54(u8 kind);
 void fn_801472D8(u8 kind);
 void* fn_80147AC8(EmcWork* work);
-void fn_80143A40(void* self);
 u32  isServerSelectState(void);
 u8   isReadyCountOne(void);
 
@@ -205,7 +206,7 @@ void fn_801414C8(EmcSlot* slot) {
 }
 
 /* the index of the first slot whose kind matches, among the claimed ones. */
-u8 fn_801414D4(u32 kind0) {
+u8 em_kind_slot_find(u32 kind0) {
     EmcSlot* slots = &emc_work.slot_0x000[0];
     u8 kind = (u8)kind0;
     if (slots[0].state != 0 && slots[0].kind == kind) {
@@ -230,18 +231,18 @@ u8 fn_801414D4(u32 kind0) {
 }
 
 /* Releases one per-enemy slot and drops its two file handles. */
-void fn_801415A8(u8 index) {
+void em_kind_slot_release(u8 index) {
     EmcSlot* slot = &emc_work.slot_0x000[index];
     if (slot->state != 0) {
         u8 kind = slot->kind;
-        fn_800F0F38(kind);
+        snd_em_se_slot_release(kind);
         fn_801472D8(kind);
         slot->id = index;
         slot->state = 0;
         slot->kind = 0;
         slot->field_0x04 = 0;
-        fn_800D58B0(slot->handle_0x08);
-        fn_800D58B0(slot->handle_0x10);
+        nw_res_entry_clear(slot->handle_0x08);
+        nw_res_entry_clear(slot->handle_0x10);
         slot->handle_0x08 = -1;
         slot->handle_0x0C = -1;
         slot->handle_0x10 = -1;
@@ -255,7 +256,7 @@ void fn_80141654(void) {
     u32 i;
     i = 0;
     do {
-        fn_801415A8(i);
+        em_kind_slot_release(i);
         i++;
     } while (i < 6);
 }
@@ -463,7 +464,7 @@ u32 fn_80144FB4(u8 index) {
 
 /* Tail-calls the marker reset. */
 void fn_80144240(void* self) {
-    fn_80143A40(self);
+    em_area_entry_release((struct EmAreaEntry*)self);
 }
 }
 
