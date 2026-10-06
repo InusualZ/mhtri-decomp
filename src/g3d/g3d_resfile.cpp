@@ -407,7 +407,7 @@ extern "C" void fn_800941DC(ResHandle* pSelf, s32 flag) {
 
 /* 0x80094224 - the checked `ResMatTevColor::ref()` accessor. */
 nw4r::g3d::ResMatTevColorData& nw4r::g3d::ResMatTevColor::ref() {
-    if (fn_80076750((ResHandle*)this) == 0) {
+    if (!IsValid()) {
         nw4r::db::Panic(lbl_80591398, 0x17A, lbl_80591378, fn_80094290(), lbl_8079129C);
     }
     return *(nw4r::g3d::ResMatTevColorData*)fn_80094288((ResHandle*)this);
@@ -465,7 +465,7 @@ extern "C" void fn_8009435C(ResHandle* pSelf, s32 flag) {
 
 /* 0x800943A4 - the checked `ResMatTexCoordGen::ref()` accessor. */
 extern "C" u32 fn_800943A4(ResHandle* pSelf) {
-    if (fn_8007673C(pSelf) == 0) {
+    if (reinterpret_cast<const nw4r::g3d::ResMatTexCoordGen*>(pSelf)->IsValid() == 0) {
         nw4r::db::Panic(lbl_805912B0, 0x201, lbl_80591294, fn_80094410(), lbl_807912AC);
     }
     return fn_80094408(pSelf);
@@ -513,11 +513,11 @@ extern "C" u32 fn_800944E0(ResHandle* pSelf) {
     return (u32)pSelf->mpData;
 }
 
-/* 0x800944E8 - `ResMatTevColor` `ref()` plus a display-list call or the inline pipe writer. */
-extern "C" void fn_800944E8(ResHandle* pSelf, s32 flag) {
-    u32 data = (u32)&reinterpret_cast<const nw4r::g3d::ResMatTevColor*>(pSelf)->ref();
+/* 0x800944E8 - calls the TEV colour display list, through the FIFO or the fast path. */
+void nw4r::g3d::ResMatTevColor::CallDisplayList(bool bSync) const {
+    u32 data = (u32)&ref();
 
-    if (flag != 0) {
+    if (bSync) {
         GXCallDisplayList((void*)data, 0x80);
     } else {
         GXFastCallDisplayList((const void*)data, 0x80);
@@ -526,7 +526,7 @@ extern "C" void fn_800944E8(ResHandle* pSelf, s32 flag) {
 
 /* 0x80094530 - the checked `ResMatTevColor::ref()` accessor (second instantiation). */
 const nw4r::g3d::ResMatTevColorData& nw4r::g3d::ResMatTevColor::ref() const {
-    if (fn_80076750((ResHandle*)this) == 0) {
+    if (!IsValid()) {
         nw4r::db::Panic(lbl_805913C8, 0x17A, lbl_805913A8, fn_80094290(), lbl_80791298);
     }
     return *(const nw4r::g3d::ResMatTevColorData*)fn_80094594((ResHandle*)this);
@@ -552,7 +552,7 @@ extern "C" u32 fn_80094600(ResHandle* pSelf) {
 
 /* 0x80094608 - the checked `ResMatTexCoordGen::ref()` accessor (second instantiation). */
 const nw4r::g3d::ResMatTexCoordGenData& nw4r::g3d::ResMatTexCoordGen::ref() const {
-    if (fn_8007673C((ResHandle*)this) == 0) {
+    if (!IsValid()) {
         nw4r::db::Panic(lbl_805912E0, 0x201, lbl_805912C0, fn_80094410(), lbl_807912A8);
     }
     return *(const nw4r::g3d::ResMatTexCoordGenData*)fn_8009466C((ResHandle*)this);

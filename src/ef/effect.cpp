@@ -35,6 +35,7 @@
 #include "ef/ef_emitter.h" /* ef_store_word (rule 2) */
 #include "pl.h"
 #include "g3d/fn_80063888.h" /* fn_80064820, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMatTevColor (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/effect_types.h"
@@ -210,7 +211,6 @@ void* fn_8007BE2C(void* access, u32 idx);
 void* fn_8007BC2C(void* access, u32 idx);
 void fn_8006F0E8(void* out, void* handle);
 void fn_8005A8E0(void* out, void* handle);
-s32 fn_80076750(void* out);
 
 /* the emitter data helpers */
 s32 fn_800F6984(u32 a, u32 b, void* table, void* names);
@@ -734,7 +734,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
             u32 handle = (u32)fn_8007BE2C(&access, 0);
             void* tex;
             fn_8006F0E8(&tex, &handle);
-            if (fn_80076750(&tex) == 0) {
+            if (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>(&tex)->IsValid() == 0) {
                 return;
             }
         }
@@ -747,7 +747,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
             u32 handle = (u32)fn_8007BC2C(&access, 0);
             void* tex;
             fn_8005A8E0(&tex, &handle);
-            if (fn_80064820(&tex) == 0) {
+            if (reinterpret_cast<const nw4r::g3d::ResMatChan*>(&tex)->IsValid() == 0) {
                 return;
             }
         }

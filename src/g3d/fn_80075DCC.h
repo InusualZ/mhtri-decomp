@@ -15,8 +15,8 @@ void sin_cos_deg(f32* pOutSin, f32* pOutCos, f32 angle);
 /* 0x80075DD8 - sets up the camera projection for `p`. */
 void fn_80075DD8(void* p);
 
-/* 0x80077420 - the GX pipe-command writer (caller: gx/fn_8009AA78.c). */
-void fn_80077420(u16 command, u8 value);
+/* 0x80077420 - writes one XF register through the pipe (callers: gx/fn_8009AA78.c, g3d/g3d_state.cpp). */
+void GDWriteXFCmd(u16 addr, u32 value);
 
 /* 0x80077DF0 - assembles an MTX34 from twelve floats (the first eight in FPRs, the last four on the
  * stack).  Callers: ef/ef_drawfreestrategy.cpp, ef/ef_drawstrategyimpl.cpp. */
@@ -51,8 +51,6 @@ void fn_800793A4(s32* pArg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s
                  u32 argSp0);          /* 0x800793A4 - the draw-buffer builder */
 
 /* The `g3d_resmat_ac.h` validity predicates `g3d/g3d_resfile.cpp`'s accessors call. */
-s32 fn_8007673C(void* p);              /* 0x8007673C - `*(u32*)p != 0` */
-s32 fn_80076750(void* p);              /* 0x80076750 - `*(u32*)p != 0` */
 /* 0x8007B878 - the alignment-asserting offset helper, declared as the owner defines it; `g3d/g3d_resanmtexsrt.cpp`
  * casts at its two call sites. */
 u32 fn_8007B878(s32 pDst, s32 offset);
