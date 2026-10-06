@@ -465,11 +465,6 @@ void fn_80142C58(u8 value, void* text, u16 id, u8 flag, f32 scale);
 void fn_80146C00(s8 value, u8 index);
 void fn_802B09B8(u8 a, u8 b);
 void fn_802B45F4(u8 index);
-void fn_803B3074(u8 value, u16 a, s16 b);
-void fn_803B6998(u16 a, u16 b);
-s32 quest_sub_state_end_ck(s32 a);
-u32 quest_element_pick_ck(struct QuestWork* work, u8 index, s32 use_alt);
-void fn_803A9F28(LbCompanionWork* work, LbCompanionSlot* slot, u16 index, u32 a);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */

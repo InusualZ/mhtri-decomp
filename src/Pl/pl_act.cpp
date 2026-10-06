@@ -32,10 +32,8 @@
  *   its 0x90/0x110-byte element types (vtables 0x805BAB58/0x805BAB74); `Pl_chr_set_attr`/0x8026A178/`Pl_chr_setX`
  *   funnel into `fn_800E12CC`, whose argument order is open; `fn_8027D8A0`, `fn_8027D968`, `fn_8027E5E4` and
  *   `fn_8027F3CC` carry paired-single / `cror` instructions the front end cannot emit.
- *  - flipcheck's undefined references: `fn_803B521C` (the map's `quest_flag_80_ck`, declared by `enemy/em_pop.h`;
- *    call sites in the action section), `fn_803B6078` (the map's `em_work_slot_pair_get`) and `get_ControlType`
- *    (the map's `get_ControlType__Fl` needs C++ scope).  A rename sweep missed these call sites; the code fix is a
- *    naming/linkage item for a fixer.
+ *  - flipcheck's undefined reference `get_ControlType` (the map's `get_ControlType__Fl` needs C++ scope): a linkage
+ *    item for a fixer.
  *  - 90 functions partial in 51 runs (`sweepcomments.py --unit Pl/pl_act` lists them), including:
  *  - `fn_80270F50`: the implicit int->float conversion constant rows (compiler-synthesised, playbook 29);
  *  - `fn_80271BD4`/`fn_80271E0C`: MWCC's `switch` decision tree against retail's three linear `subi`/`cmplwi` range
@@ -3911,6 +3909,8 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
 #include "ef/eft001.h"
 #include "stage/stg_w.h"
 #include "Runtime.PPCEABI.H/memset.h"
+#include "enemy/em_pop.h"   /* quest_flag_80_ck, em_work_slot_pair_get, quest_element_remaining_get (rule 2) */
+#include "quest/quest_entry.h"   /* quest_element_supply_state_get, quest_element_item_use (rule 2) */
 
 /* 0x8045F554 - the runtime string copy `fn_8027552C` uses to arm a hunter name (owner: `MSL_C/alloc.cpp`, rule 2). */
 #include "MSL_C/alloc.h"
@@ -5587,10 +5587,10 @@ extern "C" void fn_80276A3C(struct _PLW* plw)
 
 #include "types.h"
 #include "enemy/enemy_control.h"
-#include "ef/fn_800CDB2C.h"   /* my_player_no (rule 2: the owner is `ef/fn_800CDB2C.cpp`) */
+#include "ef/fn_800CDB2C.h"   /* my_player_no (rule 2: the owner is `ef/system_core.cpp`) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "Pl/pl_coll.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "quest/quest_item_slot.h" /* quest_item_work_notify (rule 2: its owner) */
 
 /* The actors this unit calls into; the mangling of the source names reproduces the map's spellings. */
@@ -7156,8 +7156,6 @@ extern "C" s32 fn_8026A6F4(_PLW*, s32);
 void sysSE_req(s32);
 namespace s_80276B58 {
 
-extern "C" u32 fn_803B521C(s32);
-
 /* 0x8027B918: steps the actor's clutch state machine from the pad edge events the move work reports. */
 extern "C" void fn_8027B918(_PLW* self)
 {
@@ -7203,7 +7201,7 @@ extern "C" void fn_8027B918(_PLW* self)
                 return;
             case 1:
                 if ((u32)Pl_motion_input_ck(0) != 1) {
-                    if ((u32)fn_803B521C(0) == 1) {
+                    if ((u32)quest_flag_80_ck(NULL) == 1) {
                         if (quest_item_work_notify(1) == 1 || quest_item_work_notify(2) == 1) {
                             (*(u8*)((u8*)self + 0x5C0))++;
                             *(u8*)(q + 0x68D) = 1;
@@ -7274,10 +7272,6 @@ extern "C" void fn_8027B918(_PLW* self)
 }
 
 extern "C" s32 Pl_item_timer_get(_PLW*, u16);
-extern "C" s32 fn_803B31E0(s8);
-extern "C" void fn_803B6078(u16, u16*);
-extern "C" s32 quest_element_remaining_get(u16);
-extern "C" void fn_803B2C60(_PLW*, u16, s8);
 
 /* 0x8027B358: steps the shell-selection state machine - the clutch index the move work stores plus the
  * three charge levels - from the pad edge events. */
@@ -7303,7 +7297,7 @@ extern "C" void fn_8027B358(_PLW* self)
         *(u8*)((u8*)self + 0x5BE) = 0;
         return;
     }
-    fn_803B6078((u16)*(s8*)(q + 0x68C), &sp8);
+    em_work_slot_pair_get((u16)*(s8*)(q + 0x68C), (s16*)&sp8);
     s32 r28 = quest_element_remaining_get((u16)*(s8*)(q + 0x68C));
     *(u16*)(q + 0x696) = 0;
     switch (*(u8*)((u8*)self + 0x5C0)) {
@@ -7331,7 +7325,7 @@ extern "C" void fn_8027B358(_PLW* self)
             return;
         }
         if ((u32)fn_8026A6F4(self, 0x16) == 1) {
-            switch (fn_803B31E0(*(s8*)(q + 0x68C))) {
+            switch (quest_element_supply_state_get(*(s8*)(q + 0x68C))) {
             case 0:
                 sysSE_req(2);
                 return;
@@ -7356,7 +7350,7 @@ extern "C" void fn_8027B358(_PLW* self)
         }
         break;
     case 2:
-        if (fn_803B31E0(*(s8*)(q + 0x68C)) != 2) {
+        if (quest_element_supply_state_get(*(s8*)(q + 0x68C)) != 2) {
             sysSE_req(1);
             *(u8*)((u8*)self + 0x5C0) = 1;
             return;
@@ -7423,7 +7417,7 @@ extern "C" void fn_8027B358(_PLW* self)
         }
         break;
     case 3:
-        if (fn_803B31E0(*(s8*)(q + 0x68C)) != 2) {
+        if (quest_element_supply_state_get(*(s8*)(q + 0x68C)) != 2) {
             sysSE_req(1);
             *(u8*)((u8*)self + 0x5C0) = 1;
             return;
@@ -7459,7 +7453,7 @@ extern "C" void fn_8027B358(_PLW* self)
             }
             sysSE_req(8);
             *(u8*)((u8*)self + 0x5C0) = 1;
-            fn_803B2C60(self, sp8, *(s8*)(q + 0x68E));
+            quest_element_item_use(self, sp8, *(s8*)(q + 0x68E));
             return;
         }
         if ((u32)fn_8026A6F4(self, 0x17) == 1) {

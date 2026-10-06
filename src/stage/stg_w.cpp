@@ -196,6 +196,8 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "gx.h"
+#include "quest/quest_item_slot.h"   /* quest_id_head_ck, quest_id_tail_ck (rule 2) */
+#include "lobby/lb_quest_screen.h"   /* the quest-work time and clock accessors (rule 2) */
 
 #include "ef.h"
 #include "g3d/g3d_calcview.h"
@@ -1845,7 +1847,7 @@ extern "C" void fn_802B4ABC(StageRuntime* st)
     now = quest_time_limit_get();
     base = quest_time_elapsed_get();
     secs = (u16)((now - base) / 300);
-    secs += fn_803A8F60(0);
+    secs += quest_clock_byte_get(0);
     if (--st->field_0x2FDC > 0) {
         return;
     }

@@ -12,15 +12,17 @@
  *   0x803948C8-0x803949F0, 0x80394A64-0x803956A0, 0x803957EC-0x803959B0, 0x803959C8-0x80395F80, 0x80396070-0x803963D0,
  *   0x803963F4-0x803967F0 (they need `LbQuestBoardWork`'s payload and the `lobby_w` screen block).  flipcheck:
  *   `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim; the
- *   `.sdata`/`.sdata2` pool is shared with `lobby/lb_quest_ui.cpp` and `menu/menu_result.cpp` (fold candidate); the
- *   source still spells `menu/menu_result.cpp`'s `q_result_anim_counter_inc`/`q_result_release_effect` by their old
- *   stems `fn_80396934`/`fn_80396944`, which the map no longer has.
+ *   `.sdata`/`.sdata2` pool is shared with `lobby/lb_quest_ui.cpp` and `menu/menu_result.cpp` (fold candidate).
+ *   `lb_quest_board_step` hands its work to `menu/menu_result.cpp`'s `q_result_anim_counter_inc`/
+ *   `q_result_release_effect` as a `QResultScreen` (one block, two views: a cast until the views are merged).
  */
 
 #include "types.h"
 #include "lobby/lb_quest_board.h"
 #include "quest/quest_entry.h"   /* `quest_record_find` (the owner's header, rule 2) */
 #include "Network/net_session_close.h"   /* `getProfileQuestRecord` (the owner's header, rule 2) */
+#include "menu/menu_result.h"   /* `q_result_*` (the owner's header, rule 2) */
+#include "enemy/em_pop.h"   /* `quest_ex_condition_ck` (the owner's header, rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
 
 /* Declarations of this range's own symbols that are still unwritten (`fn_` in the map), so the
@@ -36,9 +38,6 @@ void lb_quest_board_effect_update(LbQuestBoardWork* work);
 void lb_quest_board_step_kind(LbQuestBoardWork* work);
 void fn_803963F4(LbQuestBoardWork* work);
 void fn_80396654(LbQuestBoardWork* work);
-void fn_803967F0(LbQuestBoardWork* work);
-void fn_80396934(LbQuestBoardWork* work);
-void fn_80396944(LbQuestBoardWork* work);
 }
 
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
@@ -51,7 +50,7 @@ extern "C" void lb_quest_board_state_next(LbQuestBoardWork* work) {
 
 /* Retires one pooled effect runtime record.  GUESS: a forwarding thunk to the effect resource
  * helper of the same name, mirroring the band's other one-line forwards. */
-extern "C" void lb_quest_board_effect_retire(void* work) {
+extern "C" void lb_quest_board_effect_retire(LbQuestBoardWork* work) {
     eft_res_slot_release(work);
 }
 
@@ -116,7 +115,7 @@ extern "C" bool lb_quest_board_accept_input(void) {
     if (row == NULL) {
         return true;
     }
-    current = fn_803B7154(row, work->value_0x38C, work->data_0x264->field_0x014, work->data_0x264);
+    current = quest_ex_condition_ck(row, work->value_0x38C, work->data_0x264->field_0x014, work->data_0x264);
     return current != 1;
 }
 
@@ -197,10 +196,10 @@ extern "C" void lb_quest_board_step(LbQuestBoardWork* work) {
         lb_quest_board_effect_update(work);
         return;
     case 2:
-        fn_80396934(work);
+        q_result_anim_counter_inc((QResultScreen*)work);
         return;
     case 3:
-        fn_80396944(work);
+        q_result_release_effect((QResultScreen*)work);
         return;
     }
 }
@@ -228,7 +227,7 @@ extern "C" void lb_quest_board_effect_update(LbQuestBoardWork* work) {
         fn_80396654(work);
         return;
     case 9:
-        fn_803967F0(work);
+        q_result_effect_follow_npc((QResultScreen*)work);
         return;
     default:
         fn_803963F4(work);

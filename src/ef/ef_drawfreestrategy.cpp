@@ -35,7 +35,7 @@
 #include "ef/ef_drawstripestrategy.h" /* fn_800B7DB0/fn_800B4B04/fn_800B54B4 (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_800710BC (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_80077DF0, owned by g3d/fn_80075DCC.cpp (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`). */

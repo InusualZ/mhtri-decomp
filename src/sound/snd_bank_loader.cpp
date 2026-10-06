@@ -238,7 +238,7 @@ u8  Get_pl_type(_EQUIP* a, _EQUIP* b);
 void cnvt_eur_fname(char* dst, char* src);
 extern "C" u8 fn_8028F288(void);
 extern "C" u8  stage_map_kind_get(u8 a);
-extern "C" u8  fn_803B3420(u8 a, u8 b);
+extern "C" u8  quest_pair_table_get(u8 a, u8 b);
 extern "C" u32 fn_8044FB98(void);
 u8  get_now_mapno(void);
 void get_gm_daynight(void);
@@ -1261,7 +1261,7 @@ extern "C" void fn_800F1700(u8 arg0, u8 arg1, u8 arg2)
         if (move_work_state_ck() == 1) {
             id = arg0;
         } else {
-            id = fn_803B3420(arg0, arg2);
+            id = quest_pair_table_get(arg0, arg2);
         }
         tbl = lbl_80597990[id];
         if (tbl == NULL) {
@@ -1449,7 +1449,7 @@ void quest_bgm_load(u8 arg0, u8 arg1)
     lbl_80794A2C->bgm_loading_2 = 0;
     lbl_80794A2C->bgm_loading_1 = 0;
     if (move_work_state_ck() != 1) {
-        index = fn_803B3420(index, arg1);
+        index = quest_pair_table_get(index, arg1);
     }
     fn_800E4D60(0);
     fn_800E4D60(1);

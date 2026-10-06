@@ -11,15 +11,14 @@
  *   `.data`, and every callee is the menu library's.  No `__FILE__` string reaches the range and the dump answers `zz_`,
  *   so the file name and every function name (the `q_result_*` scheme) are GUESSes from the bodies; `q_result_msg_adrs`
  *   is the runtime dump's own name.
- * RESIDUALS. 57 rows unwritten (objdiff scores them zero): `fn_803967F0`, 0x80396A90-0x80396C18, `fn_80396CAC`,
+ * RESIDUALS. 57 rows unwritten (objdiff scores them zero): `q_result_effect_follow_npc`, 0x80396A90-0x80396C18, `fn_80396CAC`,
  *   0x803970FC-0x80397320, 0x80397344-0x803988B4, 0x80398938-0x80398C14, 0x80398C88-0x80398F24,
  *   0x80398F7C-0x80399D44, 0x80399D4C-0x80399EE4, 0x80399F18-0x8039B9B0, 0x8039B9C0-0x8039CD18,
  *   0x8039CD1C-0x8039D278.  The one partial row, `q_result_sub_screen_ready`: MWCC if-converts the second
  *   `return (B == 1)` (a `beq` to the true return) where the target keeps the branch.
  *   flipcheck: `.bss` (0x30), `.sdata` (0x98) and `.sdata2` (0x48) claimed but not emitted; short `.text` 0x5DC of
  *   0x6A88, extab 0x58 of 0x200, extabindex 0x84 of 0x300, `.data` 0x24 of 0x204; the bytes of all four differ; the
- *   pools are partial (a candidate fold with `lobby/lb_quest_ui` and `lobby/lb_quest_board`); `fn_803B4C64` and
- *   `fn_803B4CE8` are defined by no link input.
+ *   pools are partial (a candidate fold with `lobby/lb_quest_ui` and `lobby/lb_quest_board`).
  */
 
 #include "types.h"
@@ -262,8 +261,8 @@ BOOL q_result_phase_ck(QResultScreen* self, u8 mode)
 /* Whether either of the two sub-screen resource sets has finished loading. */
 BOOL q_result_sub_screen_ready(void)
 {
-    if (fn_803B4C64(NULL) != 1) {
-        if (fn_803B4CE8(NULL) != 1) {
+    if (quest_flag_2000000_ck(NULL) != 1) {
+        if (quest_flag_80000000_ck(NULL) != 1) {
             return FALSE;
         }
     }

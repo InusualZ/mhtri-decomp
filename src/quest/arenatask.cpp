@@ -152,6 +152,7 @@
 #include "unsplit/stage.h"      /* `stage_w` (unowned: band header) */
 #include "stage/stg_w.h"
 #include "mh3_pad/Psw.h"        /* `Psw` (the owner's header, rule 2) */
+#include "mh3_pad/Screen_w.h"   /* `Screen_w` (the owner's header, rule 2) */
 
 
 

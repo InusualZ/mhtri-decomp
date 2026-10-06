@@ -308,7 +308,7 @@ extern "C" void VIWaitForRetrace(void);
 extern "C" void VISetTrapFilter(u8);
 extern "C" void PPCSync(void);
 extern "C" void OSSleepTicks(u32, u32);
-/* Owned by `ef/fn_800CDB2C.cpp` (rule 2).  The declaration stays here, in the block form that unit's
+/* Owned by `ef/system_core.cpp` (rule 2).  The declaration stays here, in the block form that unit's
  * consumers use, because this unit reads the byte as `s8` - its one call site indexes
  * `Screen_w.player_aspect` with `(s8)my_player_no()` - and the owner's `u32` view would put an `extsb` back. */
 extern "C" {

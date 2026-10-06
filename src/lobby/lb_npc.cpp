@@ -842,7 +842,7 @@ s32 fn_80207EAC(_LB_NPC* self);
 LbNpcMotionEntry* fn_80207DC4(_LB_NPC* self, u8* kind);
 void fn_80207FD0(_LB_NPC* self, u8 kind, s32 flag);
 s32 fn_802080C0(_LB_NPC* self);
-void fn_80395D04(_LB_NPC* self, s32 a, s32 b, VEC3* v, f32 f);
+void lb_quest_board_effect_spawn(_LB_NPC* self, s32 a, s32 b, VEC3* v, f32 f);
 }
 } /* namespace s_802029B4 */
 
@@ -1943,7 +1943,7 @@ void fn_80205424(_LB_NPC* self)
             self->field_0x006++;
         } else if (fn_801FE1DC(self, 0, lbl_807999D0, lbl_807999A0) == 1) {
             setVector3(&offset, lbl_807999A0, lbl_8079999C, lbl_807999A0);
-            fn_80395D04(self, 3, 10, &offset, lbl_80799A14);
+            lb_quest_board_effect_spawn(self, 3, 10, &offset, lbl_80799A14);
         }
         break;
     case 2:

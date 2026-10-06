@@ -56,8 +56,9 @@ u32 quest_move_state_get(void);
 u32 quest_play_state_ck(void);
 /* The three quest-id range probes the bands below gate on (0x803AAF3C, 0x803AAF88, 0x803AAFE0). */
 u32 quest_id_low_get(void);
-u32 quest_id_head_ck(void);
-u32 quest_id_tail_ck(void);
+/* `u8`: every caller masks the result to a byte (`clrlwi r0,r3,24` after each `bl`). */
+u8 quest_id_head_ck(void);
+u8 quest_id_tail_ck(void);
 
 /* The band's static initialiser (0x803AB1F0, the `.ctors` word's target): fills the quest zone tables. */
 void quest_zone_tbl_init(void);

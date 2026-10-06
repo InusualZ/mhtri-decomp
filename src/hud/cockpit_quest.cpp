@@ -1,12 +1,12 @@
 /*
  * hud/cockpit_quest.cpp - unit, `.text` 0x802E4978..0x802F2238 (158 functions, 55488 bytes).
  *
- * Fold of 4 registered units: fn_802E4978.cpp, cockpit_quest.cpp,
- * fn_802EBED8.cpp, eft035.cpp.  The functions below are the ones those sources define, in address order; every other
+ * Four bands: the cockpit band (0x802E4978), the cockpit quest band (0x802E7408), the quest-window band (0x802EBED8)
+ * and the cockpit head of the eft035 range (0x802F140C).  The functions below are in address order; every other
  * function of the range keeps its original bytes.  107 of 158 functions have a body here.
  *
- * FLAGS.  `cflags_hud` + `-pool off` (this unit's own row).  The absorbed menu/fn_802E4978.cpp used `cflags_menu`
- * (equal to `cflags_hud`) and hud/fn_802EBED8.cpp the hud lib's group without `-pool off`; no function of either
+ * FLAGS.  `cflags_hud` + `-pool off` (this unit's own row).  The cockpit band was measured under `cflags_menu`
+ * (equal to `cflags_hud`) and the quest-window band under the hud group without `-pool off`; no function of either
  * scored lower under the merged flags (measured).
  *
  * RESIDUAL (record views).  The absorbed sources were written as separate units and each carries its own header view
@@ -88,7 +88,7 @@
  * the object's `.data` starts 4 bytes late (the first 8-aligned table lands 4 B after the target's) - the claimed run
  * itself matches the target byte for byte - and why the pooled literals below are compiler-made (`.sdata2`, unclaimed).
  * The same sharing makes the owner of the icon tables (`hud/cockpit_icon_data.cpp`) an open question, together with
- * `hud/fn_802EBED8.cpp` and `ef/eft035.cpp`: whether one TU spans all four (and so owns the pools) is not decided here.
+ * the quest-window band and `ef/eft035.cpp`: whether one TU spans all four (and so owns the pools) is not decided here.
  *
  * Flags: `cflags_hud` plus a per-object `-pool off` (configure.py, with the four-row evidence table): with the unit's
  * own tables defined, MWCC shares one base register across 3+ `.data` objects per function where retail loads each with
@@ -131,78 +131,18 @@
  * `quest_gauge_shake_scale`/`quest_view_hold_ids*` (isolated-run, defined here, unclaimed) and `.sdata2` 0x8079A928..0x8079A984
  * (pool-synth: the compiler emits the literals).
  */
-/* ---- header inherited from src/hud/fn_802EBED8.cpp (written against its pre-phase-4 range) ---- */
-/* hud/fn_802EBED8.cpp - the cockpit HUD's quest-window band (`.text` 0x802EBED8..0x802F140C, 54
- * functions / 21812 B).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `tools/symbols/symedit.py --section .text range 0x802EBED8 0x802F140C`: every row in the range is
- * a bare `fn_` stem, and `tools/symbols/dumpmap.py lookup 0x802EBED8` answers `zz_02ebed8_`), so
- * every body below keeps the map's stem.
- *
- * Home, name and seam, from evidence (brief section 2):
- *   - class 4 (nothing supports a name).  No `.data`/`.sdata` string of the range is a source-file
- *     name: the range's only `.data` references (0x805D6310..0x805D6940) are the mask/table blobs
- *     `fn_802ED588` and friends walk, and `grep -nE '5d08|805d'` over the range's disassembly finds
- *     no `__FILE__` load.  The dump answers `zz_` for every address, so there is no class-2 name
- *     either.  The file therefore keeps its map stem (`hud/fn_802EBED8.cpp`).
- *   - module `hud`: the band is the cockpit HUD's continuation above `hud/cockpit_quest.cpp` - it
- *     reads the same `_PLW` act fields (`field_0x3D8`/`field_0x3DC`, `field_0x309`, `slot_id[26]`)
- *     and the quest-window record (`cockpit_work`, `get_lsp_data`, `draw_sprite_*`), and its
- *     neighbours `layout.cpp` (0x802E0740..0x802E4978) and `cockpit_quest.cpp`
- *     (0x802E7408..0x802EBED8) are both registered in the `hud` lib.
- *   - the seam is unproven.  `tudiscover.py at 0x802EBED8` must-links `quest_marker_draw`/`fn_802EC200`
- *     and offers strong left cuts at 0x802EBBD0, 0x802EBE2C and 0x802EBED8 (all on the `.sdata2`
- *     run jump `lbl_8079A980 -> lbl_8079A988`); this unit claims the brief's cut 0x802EBED8, which
- *     is a clean function boundary (the band below ends at 0x802EBE2C's tail).  The sibling
- *     `cockpit_quest.cpp` header records the same pool break as a candidate seam it did not take.
- *
- * Sections this unit owns: .text 0x802EBED8..0x802F140C, extab 0x8001529C..0x80015424 and
- * extabindex 0x80033A50..0x80033C9C - both runs are 49 records (8 and 12 bytes), one per framed
- * function of the range, and both start exactly where `hud/cockpit_quest.cpp`'s runs end.  The five
- * unframed functions (fn_802ED588, fn_802ED6F4, fn_802EDAF0, fn_802EDB0C, fn_802EF400) carry no
- * record, which is why the runs tile 49 and not 54.  No `.data`/`.sdata`/`.sdata2` range is claimed
- * (a partial pool claim is not linkable - `hud/layout.cpp`'s header records the mwld error); the
- * tables the range reads are declared and never defined (playbook 29).
- *
- * Flags: `cflags_hud` (= `cflags_main` + `-opt nopeephole`, the lib flag the band's siblings settled -
- * see the group's evidence in `configure.py`): this band keeps the unfused `clrlwi` + `cmpwi` pairs
- * (`fn_802ED588` ... `clrlwi r0,r4,24` + `cmpwi r0,0x0` is the smallest witness), and carries the 49
- * extab records `-Cpp_exceptions on` emits.
- *
- * Score at this commit (the official report metric, one `recompile.py --measure` per symbol against
- * this worktree's own split of the same range): 5.96 % fuzzy (504 of 21812 `.text` bytes), **6 of the
- * 54 bodies byte-identical**, 11 of them at or above the 80 % bar:
- *   100.00  fn_802EDAF0 (28 B), fn_802ED7E4 (80 B), fn_802EECA0 (108 B), fn_802EE330 (124 B),
- *           fn_802EF400 (36 B), fn_802EF6B0 (128 B)
- *    98.18  fn_802EF62C (132 B)
- *    96.67  fn_802ED6F4 (240 B)
- *    94.03  fn_802EEC24 (124 B)
- *    91.09  fn_802EF0A0 (92 B)
- *    90.91  fn_802ED834 (88 B)
- * The 41 functions without a body score 0 and dominate the unit percentage.  The whole-object build
- * links: `ninja` ends `build/RMHE08/main.dol: OK`.
- *
- * Residuals of the written bodies:
- *  - `fn_802EC6C4` 72.33 % (60 B target, 60 B ours).  Every instruction is present in the target's
- *    order except that retail folds `1 | ~v` into one `orc` (`li r3,1; orc r3,r3,r4`) where ours
- *    emits `not r0,r4; ori r0,r0,1`.  Tried `(1 | ~v)`, `(~v | 1)`, a `u32` vs `u8` local, and
- *    `#pragma peephole on` around the body: all 72.33.  The fold is an emitter choice this MWCC
- *    revision does not make under the unit's flags (playbook 22).
- *  - `fn_802ED588` 73.47 % (152 B target, 152 B ours).  Structurally complete - one `kind == 0`
- *    test selecting both 4-byte-word mask tables, two bottom-tested loops, the same 38
- *    instructions - but MWCC puts `result`/`bit`/the second table pointer in different registers
- *    than retail (`r5`/`r6`/`r8` vs `r6`/`r5`/`r4`); declaring `bit` before `result` lifted it
- *    72.08 -> 73.47.  Playbook 22 (register allocation, not shape).
- *  - `fn_802ED834` 90.91 %, `fn_802EF0A0` 91.09 %, `fn_802EEC24` 94.03 %, `fn_802ED6F4` 96.67 %:
- *    one or two register/instruction choices off (the `fn_802ED6F4` countdown keeps an `extsb`
- *    retail does not).
- *
- * Not written (41, in address order): the rest of the band.  The largest are `fn_802F09C4` (0x8E0),
- * `fn_802EDCE4` (0x5A4), `fn_802F02EC` (0x4F8), `fn_802ECE28` (0x3E4), `quest_marker_draw` (0x328),
- * `fn_802EC200` (0x2F0), `fn_802EE3AC` (0x2B0), `fn_802EE97C` (0x2A8), `fn_802ED20C` (0x274); all of
- * them drive the same `cockpit_work` / `_PLW` records this unit's written bodies view.  Their m2c
- * shape oracle is kept for the next lane in `build/tmp/m2c/` (throwaway, gitignored).
+/* The quest-window band, `.text` 0x802EBED8..0x802F140C (54 functions):
+ *  - names: the map has `fn_` stems for the range except `quest_marker_draw`, the dump answers `zz_`, and no
+ *    `__FILE__` load reaches it; module `hud` from its `_PLW` act fields and the quest-window record it shares with
+ *    the cockpit bands.
+ *  - sections: its extab 0x8001529C..0x80015424 and extabindex 0x80033A50..0x80033C9C hold 49 records, one per framed
+ *    function (`fn_802ED588`, `fn_802ED6F4`, `fn_802EDAF0`, `fn_802EDB0C` and `fn_802EF400` are unframed); the tables
+ *    it reads are declared, never defined (playbook 29).
+ *  - seam: unproven; `tudiscover.py` offers left cuts at 0x802EBBD0, 0x802EBE2C and 0x802EBED8 on the `.sdata2` jump
+ *    `lbl_8079A980 -> lbl_8079A988`.
+ *  - residuals: `fn_802EC6C4` (retail folds `1 | ~v` into `orc`, ours emits `not` + `ori`; playbook 22),
+ *    `fn_802ED588` (register allocation, playbook 22), and `fn_802ED834`, `fn_802EF0A0`, `fn_802EEC24`, `fn_802ED6F4`
+ *    one or two register or instruction choices off.
  */
 /* ---- header inherited from src/ef/eft035.cpp (written against its pre-phase-4 range) ---- */
 /* ef/eft035.cpp - the `eft035` effect family, `.text` 0x802F140C..0x802F5138 (39 functions).
@@ -219,7 +159,7 @@
  * every definition whose map name is plain (`fn_XXXXXXXX`) is `extern "C"` so its emitted name stays
  * the map's stem and objdiff can pair it (playbook row 42).  Sections: `extab`
  * 0x80015424..0x80015514 and `extabindex` 0x80033C9C..0x80033E04 (30 records each - exactly the
- * bytes the bracketing units leave unclaimed: `hud/fn_802EBED8.cpp` ends at 0x80015424/0x80033C9C
+ * bytes the bracketing units leave unclaimed: the quest-window band ends at 0x80015424/0x80033C9C
  * and the next unclaimed run starts at 0x80015514/0x80033E04).  No data section belongs to the unit
  * (the target object carries none); its `.data`/`.sdata`/`.sdata2` pool is `extern` here and never
  * defined (playbook 29).  One `.ctors` word belongs to the range, at 0x8056F38C - the address of the
@@ -309,6 +249,7 @@
 #include "main.h"
 #include "Network/network_pat_control.h"
 #include "menu/menu_item.h"
+#include "quest/quest_item_slot.h"   /* quest_select_ready_ck (rule 2) */
 #include "menu/get_pop_dat_ptr.h"
 #include "unsplit/unknown.h"
 #include "ai/fn_802D44F4.h"
@@ -529,7 +470,7 @@ void fn_802E4AD4(void) {
     } else {
         st->field_0x05C = 0;
         st->field_0x05A = 0;
-        st->field_0x070 = fn_803A9690();
+        st->field_0x070 = quest_work_state_get();
     }
     st->field_0x074 = 0;
     idx = (s8)my_player_no();
@@ -989,7 +930,7 @@ void fn_802E71C4(void) {
         if (quest_sub_state_end_ck(1) == 0) {
             total = quest_time_elapsed_get();
         } else {
-            total = fn_803A881C();
+            total = quest_time_base_get();
         }
         if (total <= limit * 5) {
             if (total > limit) {

@@ -82,7 +82,6 @@ void fn_80214EF0(u32 panel, u32 value);
 void fn_80215170(u32 panel, u32 value);
 void fn_803772A8(u8 a, u8 b);
 void* fn_80395DF4(LbQuestBoardWork* work, u32 kind);
-u32 fn_803B7154(struct QuestRecord* value, u16 param, u8 arg, LbQuestBoardData* data);
 }
 
 /* Mangled callees, declared through their owner (rule 9); each spelling was confirmed with

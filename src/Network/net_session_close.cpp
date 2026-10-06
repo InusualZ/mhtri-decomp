@@ -59,7 +59,7 @@
 #include "MSL/strlen.h"                        /* strlen - owner MSL/strlen.cpp */
 #include "enemy/em020_ai.h"                     /* getInstance_ - owner enemy/em020_ai.cpp */
 #include "Network/NetworkUniqueId.h"            /* NetworkUniqueId - owner Network/NetworkUniqueId.cpp */
-#include "ef/get_move_work_adrs.h"              /* get_move_work_adrs - owner ef/fn_800CDB2C.cpp */
+#include "ef/get_move_work_adrs.h"              /* get_move_work_adrs - owner ef/system_core.cpp */
 #include "lobby/lb_menu_pos_tbl.h"              /* getItemListSelection - owner lobby/lb_menu_pos_tbl.cpp */
 #include "hud/net_char_sync.h"                  /* Pl_net_recv, em_net_recv, emc_net_recv - owner hud/pl_frame_sync.cpp */
 #include "sound/fn_800D7F54.h"                  /* sysSE_stop - owner sound/fn_800D7F54.cpp (needs nw4r/math.h first) */

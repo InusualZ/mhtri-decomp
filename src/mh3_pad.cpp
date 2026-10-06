@@ -170,7 +170,7 @@ extern s32 task_func;
 extern void fn_8028DDCC(void);
 extern void fn_8028E528(void);
 extern void fn_8028BF1C(void);
-extern void fn_803A13B4(void);
+extern void game_mode_flow_task(void);
 extern void fn_8021F3A8(void);
 extern PadChanState pad_chan_state[4];
 }
@@ -764,7 +764,7 @@ void GameModeExec(void)
         return;
     case 2:
         if (system_w.field_0x7d3 == 1) {
-            Tsk_Change((void*)&fn_803A13B4, 4);
+            Tsk_Change((void*)&game_mode_flow_task, 4);
             return;
         }
         Tsk_Change((void*)&fn_8021F3A8, 4);

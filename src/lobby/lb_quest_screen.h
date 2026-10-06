@@ -9,7 +9,10 @@
  * included from `unsplit/menu.h`, which the whole menu band takes. */
 struct NoteWork;
 struct QuestWork;
+struct QuestElement;
 struct Q_MoveWork;
+struct Q_ItemWork;
+struct LbCompanionSlot;
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,12 +26,23 @@ void note_pane_get_motion(struct NoteWork* self);
  * enemy id and a fixed 0 (GUESS: the role; the signature is the call site's). */
 void quest_enemy_spawn_req(u8 a, u16 id, u16 b, s32 c, u8 d);
 
-/* The quest-work accessors (unwritten; two still carry the map's stems). */
+/* 0x803A87A8 - the item work of the local slot, or NULL when the slot has none. */
+struct Q_ItemWork* move_work_item_work_get(void);
+
+/* The quest-work accessors (unwritten): the elapsed time (+0x24) and the base time (+0x20), both clamped up to 0,
+ * the limit (+0x1C), the work's +0x6AA0 state word, and the low byte of clock word `index` (+0x6C, 0 without an
+ * item work). */
 s32 quest_time_elapsed_get(void);
-s32 fn_803A881C(void);
+s32 quest_time_base_get(void);
 s32 quest_time_limit_get(void);
-s32 fn_803A9690(void);
+s32 quest_work_state_get(void);
 s32 quest_sub_state_end_ck(s32 flag);
+u8 quest_clock_byte_get(u8 index);
+
+/* 0x803A9F28 - files `index` in the first free one of the item work's three result bytes (+0x309) and, unless the
+ * current record's flags or objective result rule it out, announces the element and copies its reward pair.  `slot`
+ * and `flag` are the caller's, never read.  GUESS name. */
+void quest_element_done_mark(struct QuestWork* work, struct QuestElement* slot, u16 index, u32 flag);
 
 /* 0x803A8DA4 - seeds the quest random source (the item work's 0x5A halfword) with the sum of the seven (low, high << 8)
  * pairs of the clock snapshot at +0x6C, or 451 when that is 0.  GUESS name. */

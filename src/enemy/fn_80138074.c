@@ -66,7 +66,7 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "g3d/g3d_state.h"
 #include "unsplit/sound.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "unsplit/enemy_pool.h" /* the enemy band's .data pool labels, declared in the band header */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define fn_80126098_c1 ((s32 (*)(void))fn_80126098)

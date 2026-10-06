@@ -5,6 +5,8 @@
 lane can check it in one read. The evidence-classed source - 688 lines, every claim tagged with its class - is
 **`.pi/notes/quest-inventory.md`**; this file is its conclusions, and where the two disagree the note wins.
 
+**Stale (2026-10-06).** Unit names here are the live owners, mapped by address from the retired `ef/fn_800CDB2C`, `lobby/fn_801F9CD4`, `lobby/fn_8021E1EC`, `Pl/fn_80288CEC`, `Pl/fn_80295EF4`, `fn_80429B94` and `menu/arena_result` (folded into `quest/quest_entry`); the `fn_` symbol names, the branch and slot facts of section 5.1 and the counts are the recon's and are not refreshed.
+
 **Evidence classes, as the note defines them.** `[bytes]` = the split disassembly (`build/RMHE08/asm/**`) and/or
 the target object; `[xref]` = the whole-DOL caller index; `[tool]` = `tudiscover.py` / `dumpmap.py` /
 `symedit.py`; `[map]` = `config/RMHE08/symbols.txt`; `[splits]` = `config/RMHE08/splits.txt`; `[dump-map]` = the
@@ -70,11 +72,11 @@ does not resolve the difference - it quotes the table:
 | 0x803A140C | `fn_803A13B4` (`menu/multi_result.cpp`) | 0 | none - the result->next-quest machine's first state |
 | 0x803A1528 | `fn_803A13B4` | 0 | `lobby_w->0xB0 == 3` |
 | 0x80447300 | `fn_80446EE8` (unregistered band) | 0 | `fn_803BE8B8(0)` before it |
-| 0x8021F6F4 | `fn_8021F5C8` (`lobby/fn_8021E1EC.cpp`) | 0 | `GameMode_set(2)`, `all_reset()` |
-| 0x8028B994 | `fn_8028B524` (`Pl/fn_80288CEC.cpp`) | 0 | `PlayMode_ck() == 3 \|\| == 6 \|\| == 2` |
-| 0x8028BC68 | `fn_8028BAA8` (`Pl/fn_80288CEC.cpp`) | 1 | `PlayMode_ck() == 3 \|\| == 6 \|\| == 2` |
+| 0x8021F6F4 | `fn_8021F5C8` (`lobby/lb_menu_pos_tbl.cpp`) | 0 | `GameMode_set(2)`, `all_reset()` |
+| 0x8028B994 | `fn_8028B524` (`Pl/pl_motion.cpp`) | 0 | `PlayMode_ck() == 3 \|\| == 6 \|\| == 2` |
+| 0x8028BC68 | `fn_8028BAA8` (`Pl/pl_motion.cpp`) | 1 | `PlayMode_ck() == 3 \|\| == 6 \|\| == 2` |
 
-Only the two `Pl/fn_80288CEC.cpp` sites take the result (`stw r3, 0xDC(r31)` - the `QuestWork *` into the
+Only the two `Pl/pl_motion.cpp` sites take the result (`stw r3, 0xDC(r31)` - the `QuestWork *` into the
 move-work root at `+0xDC`), and only they gate on `PlayMode` (§3.1).
 
 ### 1.3 The two loaders
@@ -179,12 +181,12 @@ Three independent filters sit on this path, in execution order:
 
 `PlayMode_ck()` is 0x800CF218 (`lbz r3, 0x25(system_w)`); `PlayMode_set()` is 0x800CF254 and rejects `>= 7`.
 `system_w` is `.bss` 0x806585E0, 0xA5C B `[map]`. The readers and their constants `[bytes]`: `==2` 39 sites
-(mostly `sound/fn_800F2A94.cpp`, the whole `Pl/fn_80288CEC.cpp` scene half, `stage/stg_w.s`); `==3` 21 sites
+(mostly `sound/fn_800F2A94.cpp`, the whole `Pl/pl_motion.cpp` scene half, `stage/stg_w.s`); `==3` 21 sites
 (the same two files plus `lobby`, `menu/menu_result.cpp`); `==4` three sites, one of them the **file-selection
-gate** in `fn_803AD200` (0x803AD278); `==6` 11 sites, all `Pl/fn_80288CEC.cpp` and `fn_8044FF18`; `==1` one site
-in `ef/fn_800CDB2C.cpp`.
+gate** in `fn_803AD200` (0x803AD278); `==6` 11 sites, all `Pl/pl_motion.cpp` and `fn_8044FF18`; `==1` one site
+in `ef/system_core.cpp`.
 
-The decisive reader is `fn_8028B524` (0x8028B524, 0x584 B, `Pl/fn_80288CEC.cpp`), with `fn_8028BAA8`
+The decisive reader is `fn_8028B524` (0x8028B524, 0x584 B, `Pl/pl_motion.cpp`), with `fn_8028BAA8`
 (0x8028BAA8, 0x24C B) the same shape ending in `quest_init(1)`:
 
 ```
@@ -210,7 +212,7 @@ else {                                             // 0x8028B9A0..0x8028B9B8
 ```
 
 **So the rule is: `PlayMode ∈ {2,3,6}` -> one shared, globally visible `QuestWork` (the single-instance case);
-any other `PlayMode` -> a per-player 0x6AB8 block.** `fn_8042CB9C()` is 0x18 B inside `fn_80429B94.cpp` and
+any other `PlayMode` -> a per-player 0x6AB8 block.** `fn_8042CB9C()` is 0x18 B inside `Network/network_pat_control.cpp` and
 reads a `.sdata` global (`net_ctrl_wk`); `fn_8028BAA8` additionally does `create_move_work(0)` (0x8028BADC) and
 `set_move_work_max(2, system_w->0x8AF == 0 ? 1 : 2)` / `set_max_player__(that)`.
 
@@ -218,8 +220,8 @@ reads a `.sdata` global (`net_ctrl_wk`); `fn_8028BAA8` additionally does `create
 the `lbl_80595118` table are the strongest available triangulation, and "single vs multi" is the reading they
 support, not a name from a string or a dump.
 
-Writers of `PlayMode`, `[xref]`, in full: `lobby/fn_801F9CD4.cpp` `fn_801FB80C` 0x801FB8D4 = **4** (right after
-`create_move_work(1)`); `lobby/fn_8021E1EC.cpp` 0x8021F504 = **3**, 0x8021F5A0 = **6**; `menu/multi_result.cpp`
+Writers of `PlayMode`, `[xref]`, in full: `lobby/lb_pane_ui.cpp` `fn_801FB80C` 0x801FB8D4 = **4** (right after
+`create_move_work(1)`); `lobby/lb_menu_pos_tbl.cpp` 0x8021F504 = **3**, 0x8021F5A0 = **6**; `menu/multi_result.cpp`
 `fn_803A13B4` 0x803A162C = **6** (arena) and 0x803A1648 = **6** (hunt); `quest/quest_entry.cpp` `fn_803ADA70`
 0x803ADC20 = **3** (only when `PlayMode_ck() == 6`); the arena task `fn_804463C4` 0x80446680 = **6**,
 0x8044677C = **2**, 0x8044696C = **4**.
@@ -244,7 +246,7 @@ if ((u16)(q + 0x15A0) <= 0xB) {                    /* 0x803A1618 : q in [0xEA60,
 The twelve IDs **0xEA60..0xEA6B (60000..60011) are the arena quests**, cross-confirmed by `menu.h`'s own
 `arena_time_table[]` (`.data` 0x805F7AF8, twelve pointers to `u16` time tables).
 
-### 3.3 Layer 3 - `create_move_work(long)`, 0x800CFB2C, 0x74 B (`ef/fn_800CDB2C.cpp`)
+### 3.3 Layer 3 - `create_move_work(long)`, 0x800CFB2C, 0x74 B (`ef/system_core.cpp`)
 
 `[bytes]`: for `kind < 9`, `fn_800CF8EC()` allocates/resets a 0x2C-byte block at `system_w+0xA4`; then for kind
 `k`, every non-zero `u16 tbl[k*7 + i]` read from `.data` **0x80595118** becomes
@@ -260,8 +262,8 @@ The 9x7 table `lbl_80595118` (`.data` 0x80595118..0x80595198, 0x80 B reserved) a
 | kind | slot0 | slot1 | slot2 | slot3 | slot4 | slot5 | slot6 | caller |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 | 1 | 18 | 4 | 32 | 128 | 256 | 512 | `fn_8028B524` (offline/net) |
-| 1 | 0 | 18 | 4 | 0 | 128 | 256 | 512 | `lobby/fn_801F9CD4.cpp` 0x801FB8DC |
-| 2 | 0 | 18 | 1 | 0 | 96 | 60 | 512 | `lobby/fn_801F9CD4.cpp` 0x801FB5CC |
+| 1 | 0 | 18 | 4 | 0 | 128 | 256 | 512 | `lobby/lb_pane_ui.cpp` 0x801FB8DC |
+| 2 | 0 | 18 | 1 | 0 | 96 | 60 | 512 | `lobby/lb_pane_ui.cpp` 0x801FB5CC |
 | 3 | 0 | 18 | 4 | 32 | 32 | 60 | 512 | (not called in this build) |
 | 4 | 1 | 18 | 1 | 32 | 128 | 256 | 512 | `fn_8028B524` (PlayMode 3/6) |
 | 5 | 0 | 18 | 8 | 0 | 128 | 256 | 512 | arena task `fn_804463C4` 0x80446518 |
@@ -281,7 +283,7 @@ confirms it. The six call sites above are the whole `create_move_work` `[xref]` 
   `[bytes]` (MSB-numbered): `0x80000`, `0x100`, `0x10`, `0x800000`, `0x4000000`, `0x2000000`, `0x80000000`,
   `0x100000`. `quest_record_get()` (0x803B3394, 0x1C B) is `quest_work_ptr->0x03C`. These are the "is condition
   X of the accepted quest satisfied" gates; biggest consumers are the quest board
-  (`lobby/lb_quest_screen.cpp`), the results (`menu/menu_result.cpp`, `menu/arena_result.cpp`) and enemy logic.
+  (`lobby/lb_quest_screen.cpp`), the results (`menu/menu_result.cpp`, `quest/quest_entry.cpp`'s arena-result accessors) and enemy logic.
 * **The arena element gates** - `quest_arena_need_get` (0x803B6800, 0xF0 B) and `quest_arena_count_get`
   (0x803B68F0, 0xA8 B), both map-named though the stale dump still labels them `fn_*`. They read
   `quest_work + index*0x60` (`QuestElement`): `+0x94` flags, `+0x98`/`+0x9A` a `u16` pair, and a byte at
@@ -416,8 +418,8 @@ per that lane's note) before either range can be called "the" arena id set.
 **MWLD merges identical `.sdata2` constants across objects in this build.** Measured over the whole DOL: of
 **7245** `.sdata2` labels, **640 are cited by more than one registered unit** - e.g. 0x8079C520 (`50.0f`),
 0x8079C524 (`60.0f`) and 0x8079C528 (the int->double magic `0x4330000080000000`) are each cited by
-`menu/arena_result` **and** `quest/quest_entry` **and** `enemy/em_pop`; 0x8079A3B8 (the same magic) by
-`Pl/fn_80295EF4` and `menu/menu_item`. **Consequence: a `.sdata2` label pair is not evidence of a common TU**,
+`quest/quest_entry` (twice: its own band and the arena-result band folded into it) **and** `enemy/em_pop`; 0x8079A3B8 (the same magic) by
+`Pl/pl_coll` and `menu/menu_item`. **Consequence: a `.sdata2` label pair is not evidence of a common TU**,
 so `tudiscover.py`'s `.sdata2` "strong x1" kind is invalid here - it is exactly the evidence its only "strong"
 cuts in the arena band rest on (`lbl_8079C930 -> lbl_8079C934`, `lbl_8079C96C -> lbl_8079C970`, and its
 `extended` range 0x804437FC..0x80446AE8). The playbook's "referrer-run" test for `.sdata2` therefore needs the
@@ -444,8 +446,8 @@ function addresses strictly rising), so it yields the exact per-function invento
    `lb_param_w+0x00` being the quest ID is provable (§1.3); if that field is something else, this flips.
 4. **`quest_init`'s threshold scan at 0x803AD594 is dead code in the shipped build** (its row counter is
    overwritten before use) - either genuine dead code or a misread register lifetime. Flagged, not glossed.
-5. **Both candidate quest-band seams (S1 at 0x803AFF34 in `quest/quest_entry.cpp`, S2 at 0x803B177C in
-   `menu/arena_result.cpp`) are single-signal candidates**; the note did not register either, and the
+5. **Both candidate quest-band seams (S1 at 0x803AFF34 in `quest/quest_entry.cpp`, S2 at 0x803B177C, also in
+   `quest/quest_entry.cpp`) are single-signal candidates**; the note did not register either, and the
    data-claim list it left (`.data` 0x8058AFC8, 0x805F2A98, 0x805F7AB0..0x805F7B78, `.sdata2`
    0x8079C510..0x8079C520 and 0x8079C4C0..0x8079C508, `.sbss` 0x80794C1C/0x80794C20) is unclaimed.
 6. **Two `QuestWork` offsets are unreconciled** (`+0x03F4` vs `+0x03FC`; `+0x6A88` vs `+0x6A8C`) - noted there

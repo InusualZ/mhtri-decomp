@@ -264,7 +264,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *     call sites'; `mh3_pad.h` cannot be included here because it and `ef.h` (which `pl.h` pulls in) collide.
  *   * `GameMode_ck` keeps its owner's (`ef/fn_800CDB2C.h`) `u8` spelling: a `u32` view is `(10505) illegal
  *     overloading` beside the owner's header.
- *   * the rest (`quest_select_ready_ck`, `fn_802FBA60`, `fn_8031A638`, `fn_802DA2D4`, `fn_802DB26C`,
+ *   * the rest (`fn_802FBA60`, `fn_8031A638`, `fn_802DA2D4`, `fn_802DB26C`,
  *     `fn_802DE238`, `fn_802DE670`, `fn_80384380`, `game_ready_ck`, `fn_804273EC`) are declared in their call
  *     sites' shapes; their owners' headers do not declare them yet.
  *
@@ -355,7 +355,6 @@ void fn_8004082C(void);
 u8 GameMode_ck(void);
 u32 move_work_state_ck(void);
 u32 game_ready_ck(void);
-u32 quest_select_ready_ck(void);
 u32 fn_802FBA60(void);
 void fn_8031A638(MenuSlot* slot);
 void fn_802DA2D4(s32 flag);

@@ -32,10 +32,9 @@
 
 #include "quest/quest_item_slot.h"
 #include "quest/quest_entry.h"
-#include "ef/fn_800CDB2C.h"    /* `move_work_state_ck` - owned by ef/fn_800CDB2C.cpp (rule 2) */
-#include "unsplit/menu.h"       /* `quest_work_ptr` - the band data no registered unit claims */
-#include "unsplit/lobby.h"      /* `lb_param_w` - the option block no registered unit claims */
+#include "ef/fn_800CDB2C.h"    /* `move_work_state_ck` - owned by ef/system_core.cpp (rule 2) */
 #include "unsplit/unknown.h"    /* `system_w` - the system block no registered unit claims */
+#include "mh3_pad/lb_param_w.h"  /* `lb_param_w` - owned by src/mh3_pad.cpp (rule 2) */
 #include "Network/network_pat_control.h"   /* isServerSelectState (owner header, rule 2) */
 #include "enemy/em_pop.h"       /* `quest_flag_*_ck` - owned by enemy/em_pop.cpp (rule 2) */
 #include "enemy/fn_801251D0.h"  /* `enemy_kind_same_ck` - owned by enemy/fn_801251D0.cpp (rule 2) */
@@ -483,7 +482,7 @@ u32 quest_id_low_get(void) {
 
 /* Whether the current quest id is one of the three at the head of the low list, and the local slot has
  * a quest selected at all (`(u16)(id + 0xFFFF) <= 2`, i.e. id is 1, 2 or 3). */
-u32 quest_id_head_ck(void) {
+u8 quest_id_head_ck(void) {
     if (quest_select_ready_ck() == 0) {
         return 0;
     }
@@ -492,7 +491,7 @@ u32 quest_id_head_ck(void) {
 
 /* The complementary probe for a slot whose move work is not yet in its quest state: the current quest
  * id is past the head of the low list (`(u16)(id + 0xFFFF) > 3`, i.e. id is 5 or above). */
-u32 quest_id_tail_ck(void) {
+u8 quest_id_tail_ck(void) {
     if (move_work_state_ck() == 1) {
         return 0;
     }

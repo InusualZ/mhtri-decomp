@@ -92,6 +92,9 @@ void q_result_page_set(QResultScreen* self, s32 mode);
 
 /* This unit's own entry points (named for what they do; see the unit header - every name is a
  * GUESS recorded there). */
+/* 0x803967F0 - poses the screen's effect on its NPC's joint 11 while the NPC plays motion 51..54, then spawns the
+ * effect models.  GUESS name. */
+void q_result_effect_follow_npc(QResultScreen* self);
 void q_result_anim_counter_inc(QResultScreen* self);
 void q_result_release_effect(QResultScreen* self);
 char** q_result_msg_table(u8 id);
@@ -102,8 +105,6 @@ char* q_result_msg_string_alt(u8 id);
 BOOL q_result_work_clear(QResultScreen* self);
 u32 q_result_file_ready(QResultScreen* self);
 BOOL q_result_sub_screen_ready(void);
-u32 fn_803B4C64(void* ptr);
-u32 fn_803B4CE8(void* ptr);
 u32* q_result_grid_entry(QResultScreen* self, u8 which);
 u32* q_result_list_entry(QResultScreen* self);
 void q_result_row_init(QResultScreen* self, void* src, u8 a, u8 b);

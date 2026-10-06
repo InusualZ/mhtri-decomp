@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): `eft_net_send` (0x803386C4), defined by `src/hud/net_char_sync.cpp`.  Separate so a consumer
+/* Leaf header (docs/plan.md 6.5 rule 2): `eft_net_send` (0x803386C4), defined by `src/hud/pl_frame_sync.cpp`.  Separate so a consumer
  * does not take the whole net message family (`hud/net_char_sync.h`, which includes `enemy/ENEMY_WORK.h`).
  */
 #ifndef MHTRI_HUD_EFT_NET_SEND_H

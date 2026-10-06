@@ -66,7 +66,7 @@ typedef struct MultiResultRecordArray {
  * `menu/menu_result.cpp`: the map rows these replace are plain names, so the front-end must not
  * mangle them (the two `multi_box_*` whose map names are real manglings stay C++). */
 /* The game-mode/quest flow object the tail of the range drives: its +0x08/+0x09 state bytes are
- * written by `fn_803A13B4`, `fn_803A168C`, `fn_803A1B04` and `fn_803A2248`, and `fn_803A13B4` reads
+ * written by `game_mode_flow_task`, `fn_803A168C`, `fn_803A1B04` and `fn_803A2248`, and `game_mode_flow_task` reads
  * +0x09 back.  Only +0x09 is reachable from this unit's own body.  size: 0xA (approximate) */
 typedef struct GameModeTask {
     /* +0x00 */ u8 pad_0x00[0x9];
@@ -142,7 +142,7 @@ s32 em_action_ret0(void);
 /* `fn_803A11D4`'s own helper view: 1 when part 0 is undamaged. */
 u32 em_parts_damage0_ck(struct _ENEMY_WORK* self, u8 part);
 
-/* Sets the flow object's sub-state to 1 (called from `fn_803A13B4`'s state machine). */
+/* Sets the flow object's sub-state to 1 (called from `game_mode_flow_task`'s state machine). */
 void game_mode_sub_state_set1(GameModeTask* self);
 
 #ifdef __cplusplus
