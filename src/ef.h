@@ -134,7 +134,7 @@ typedef struct EfWork {
     s8 size_jitter;     /* +0x66  per-frame size jitter, in hundredths (read as signed) */
     s8 scale_rate;      /* +0x67  per-frame scale step, in hundredths */
     /* The five transform stages of the emitter form, each "off" at 0.0f.  The names come from what
-     * the stage does in `ef/ef_emitterform.cpp` (fn_800A99B4), the only reader. */
+     * the stage does in `ef/ef_emitterform.cpp` (ef_form_calc_velocity), the only reader. */
     f32 dir_weight;       /* +0x68  blend the emitter direction into the result */
     f32 rot_weight;       /* +0x6C  blend the emitter's rotated axis into the result */
     f32 spread_scale;     /* +0x70  scale of the random Euler spread */
@@ -251,8 +251,8 @@ extern void assignVec3(Vec* out, Vec* in);                         /* out = in *
 extern void fn_8009C6F0(Vec* out, f32 angle);                       /* sin/cos of angle */
 extern void ef_vec_sin_cos(Vec* out, f32 angle);                    /* the same, under the owner's name */
 extern void ef_sin_cos(f32* out_a, f32* out_b, f32 angle);         /* sin/cos of angle */
-extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
-extern u16 fn_800A9FB0(s32 ctx, u16 id, f32 scale, EfWork* em);
+extern void ef_form_calc_velocity(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
+extern u16 ef_form_calc_life(s32 ctx, u16 id, f32 scale, EfWork* em);
 extern f32 ef_random_float(u32* progress);                              /* pseudo-random 0..1 */
 /* 0x80050BC0 is `src/fn_8004CAD8.cpp`'s, declared in `fn_8004CAD8.h`: it takes one float (its body reads only f1
  * and returns `x * FrSqrt(x)`); the second float the callers materialise is the hoisted `1.0f - t` their `else`

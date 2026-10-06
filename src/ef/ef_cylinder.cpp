@@ -6,21 +6,20 @@
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the `li r0,<slot>; psq_lx` epilogue) and
  *   `#pragma fp_contract off` (retail has no fused `a*b+c`).
  * NAMES. The map has only `fn_` stems for the range.
- * RESIDUALS. 2 partial rows:
- *  - `fn_800CB948__FlP6EfWorkP10EfParticlelUlP8EfParamsUslffffffff` (ours 0x664 of 0x668): the prologue saves
- *    `spawn_arg` (`mr r31,r10`) early and the saved arguments take r24-r31 where retail takes r22-r28 and r30;
- *    retail holds the `(f32)(s8)` conversion constant in f31 and 0.01f in f18, ours the constant in f18, so the
- *    other float registers sit one higher; the spawn argument copies move floats (`lfs`/`stfs`) where retail
- *    moves words; the u16 narrowing of `fn_800A9FB0`'s result and the slot +0x14 loads pick other scratch
- *    registers;
- *  - `fn_800CBFB0__FlP6EfWorkP10EfParticlelUlP8EfParamsUslf`: the three `|scale|` clamps load their 1.19e-7
- *    floor before the `fn_800C9DCC` call where retail loads it after, and `mr r10,r31` (the 8th argument) is
- *    one slot early at both spawn calls.
+ * RESIDUALS. `.text` is byte-identical.
  *   `.sdata2` is retail's run except that the 2^52 `(f32)(u16)` constant pools last (retail's
  *   `lbl_80796288`/`lbl_80796290` are adjacent), so the pool references read our `@N` labels.
  *   flipcheck: `.data` claimed, not emitted (`-pool off`, which has no pragma, is what reaches retail's per-string
- *   `lis`/`addi`); `.text` 0xC64 of 0xC68.
- * SHAPES. The float constants are literals, so MWCC hoists them into registers.
+ *   `lis`/`addi`).
+ * SHAPES. The float constants are literals, so MWCC hoists them into registers; the `|scale|` clamps are
+ *   `fabsf(x) > eps ? x : eps`, which loads the floor after the call as retail does.
+ * SHAPES. The particle manager is a class whose vtable pointer follows a 0x1C-byte non-polymorphic head; the spawn
+ *   is its virtual `CreateParticle`, taking the position and velocity by value: the call copies them (velocity
+ *   first), evaluates the momentum before the life and dispatches through r3, as in retail.  `ef_form_calc_life`
+ *   is declared with its owner's argument order and u16 result.
+ * SHAPES. The emission's float argument precedes the last integer one (nw4r's `Emission(..., u16 life, f32 lifeRnd,
+ *   const MTX34* space)`), which orders the prologue's moves; the map rows carry that mangling
+ *   (the helper `fn_800CB948` takes the same order).
  * SHAPES. `#line 49` and `#line 140` put the two functions' `CHECK_PTR` sites on retail's lines 49-51 and 140-142.
  */
 
@@ -62,18 +61,20 @@ typedef struct EfWork {
     u8  spawn_extra;      /* +0xFC  address forwarded to the particle's spawn slot */
 } EfWork;                 /* size: 0xFD (at least - the record continues past what this unit reads) */
 
-/* The particle manager `pm`: a pointer at +0x1C to its slot table. */
-typedef struct EfParticle EfParticle;
-
-typedef struct EfParticleSlots {
-    u8  pad_0x00[0x14];   /* +0x00 */
-    void (*spawn)(EfParticle* self, u16 id, VEC3* pos, VEC3* dir, s32 param, u8* extra, /* +0x14 */
-                  u32 work_param, u16 work_id, f32 scale);
-} EfParticleSlots;        /* size: 0x18 */
-
-struct EfParticle {
+/* The non-polymorphic head of the particle manager: MWCC places the vtable pointer after it, at +0x1C. */
+struct EfParticleHead {
     u8  pad_0x00[0x1C];   /* +0x00 */
-    EfParticleSlots* slots; /* +0x1C */
+};                        /* size: 0x1C */
+
+/* The particle manager `pm`: its vtable pointer sits at +0x1C and the table's +0x14 slot is the spawn call this
+ * unit makes (declared only, so this unit emits no table). */
+struct EfParticle : EfParticleHead {
+    /* +0x1C: the vtable pointer */
+    virtual void slot_0x08();
+    virtual void slot_0x0C();
+    virtual void slot_0x10();
+    virtual void CreateParticle(u16 life, VEC3 pos, VEC3 vel, s32 space, f32 momentum, u8* inherit,
+                                u32 reference, u16 remain);
 };                        /* size: 0x20 */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
@@ -86,8 +87,8 @@ extern "C" {
 extern void ef_vec3_normalize_to(VEC3* out, VEC3* in);
 extern void assignVec3(VEC3* out, VEC3* in);
 extern void ef_sin_cos(f32* out_a, f32* out_b, f32 angle);
-extern void fn_800A99B4(s32 ctx, VEC3* out, EfWork* em, VEC3* pos, VEC3* a, VEC3* b, VEC3* c);
-extern u32  fn_800A9FB0(s32 ctx, u16 id, EfWork* em, f32 scale);
+extern void ef_form_calc_velocity(s32 ctx, VEC3* out, EfWork* em, VEC3* pos, VEC3* a, VEC3* b, VEC3* c);
+extern u16  ef_form_calc_life(s32 ctx, u16 id, f32 scale, EfWork* em);
 extern f32  fmodf(f32 a, f32 b);
 }
 
@@ -117,7 +118,7 @@ inline int IsValidPointer(u32 ptr) {
 /* Emits `count` particles, rebuilding the emission transform each step and advancing the angle when the
  * effect is swept. */
 void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
-                 u16 id, s32 spawn_arg, f32 scale, f32 size_x, f32 size_y, f32 size_z, f32 angle,
+                 u16 id, f32 scale, s32 spawn_arg, f32 size_x, f32 size_y, f32 size_z, f32 angle,
                  f32 angle_step, f32 phase, f32 offset_y) {
     s32 i;
 
@@ -127,7 +128,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     CHECK_PTR(lbl_80594D98, params);
 
     for (i = 0; i < count; i++) {
-        VEC3 v88, v76, v64, v52, v40, v28, v16;
+        VEC3 v88, v76, v64, v52, v40;
         f32 cs, sn;
         f32 factor, rate, t;
 
@@ -158,12 +159,10 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         ef_vec3_normalize_to(&v52, &v52);
         assignVec3(&v40, &v88);
         ef_vec3_normalize_to(&v40, &v40);
-        fn_800A99B4(ctx, &v76, em, &v88, &v52, &v40, &v64);
-        v16 = v76;
-        v28 = v88;
-        factor = 1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress);
-        pm->slots->spawn(pm, (u16)fn_800A9FB0(ctx, (u16)id, em, scale), &v28, &v16, spawn_arg,
-                         &em->spawn_extra, em->spawn_param, em->spawn_id, factor);
+        ef_form_calc_velocity(ctx, &v76, em, &v88, &v52, &v40, &v64);
+        pm->CreateParticle(ef_form_calc_life(ctx, (u16)id, scale, em), v88, v76, spawn_arg,
+                           1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress),
+                           &em->spawn_extra, em->spawn_param, em->spawn_id);
         if (flags & 0x00020000) {
             angle += angle_step;
         }
@@ -173,7 +172,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
 /* Guards its pointers, derives the scale triplet, the parameter range and the per-step scale, then
  * sweeps the whole count or emits a single particle. */
 void fn_800CBFB0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
-                 u16 id, s32 spawn_arg, f32 scale) {
+                 u16 id, f32 scale, s32 spawn_arg) {
     f32 scaleA, scaleB, scaleC, angle, range_phase, phase, angle_step, offset;
     s32 i;
 
@@ -185,21 +184,12 @@ void fn_800CBFB0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     if (count < 1) {
         return;
     }
-    scaleA = 1.1920929e-07f;
-    if (ef_fabsf(params->scale_a) > scaleA) {
-        scaleA = params->scale_a;
-    }
-    scaleB = 1.1920929e-07f;
-    if (ef_fabsf(params->scale_b) > scaleB) {
-        scaleB = params->scale_b;
-    }
+    scaleA = ef_fabsf(params->scale_a) > 1.1920929e-07f ? params->scale_a : 1.1920929e-07f;
+    scaleB = ef_fabsf(params->scale_b) > 1.1920929e-07f ? params->scale_b : 1.1920929e-07f;
     if (flags & 0x02000000) {
         scaleC = scaleA;
     } else {
-        scaleC = 1.1920929e-07f;
-        if (ef_fabsf(params->scale_c) > scaleC) {
-            scaleC = params->scale_c;
-        }
+        scaleC = ef_fabsf(params->scale_c) > 1.1920929e-07f ? params->scale_c : 1.1920929e-07f;
     }
     angle = 0.0f;
     if (flags & 0x00040000) {
@@ -220,11 +210,11 @@ void fn_800CBFB0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             } else {
                 offset = 2.0f * (scaleB * ((f32)i / (f32)(count - 1) - 0.5f));
             }
-            fn_800CB948(ctx, em, pm, count, flags, params, id, spawn_arg, scale, scaleA, scaleB,
+            fn_800CB948(ctx, em, pm, count, flags, params, id, scale, spawn_arg, scaleA, scaleB,
                         scaleC, angle, angle_step, phase, offset);
         }
     } else {
-        fn_800CB948(ctx, em, pm, count, flags, params, id, spawn_arg, scale, scaleA, scaleB, scaleC,
+        fn_800CB948(ctx, em, pm, count, flags, params, id, scale, spawn_arg, scaleA, scaleB, scaleC,
                     angle, angle, phase, 0.0f);
     }
 }

@@ -36,4 +36,23 @@ s32 fn_800AB9F4(struct EfPmManager* self);
 }
 #endif
 
+#ifdef __cplusplus
+/* The particle manager as the emitter forms call it: a class whose vtable pointer follows a 0x1C-byte
+ * non-polymorphic head (MWCC places it after the base's members), with `CreateParticle` in the table's +0x14 slot
+ * (`ef_pm_create_particle`).  Declared only: the table is `ef/ef_particlemanager.cpp`'s, and nothing here makes a
+ * unit emit one. */
+struct ParticleManagerHead {
+    /* +0x00 */ u8 pad_0x00[0x1C];
+}; /* size: 0x1C */
+
+struct ParticleManager : ParticleManagerHead {
+    /* +0x1C: the vtable pointer */
+    virtual void slot_0x08();
+    virtual void slot_0x0C();
+    virtual void Initialize();
+    virtual void CreateParticle(u16 life, VEC3 pos, VEC3 vel, s32 space, f32 momentum, u8* inherit, u32 reference,
+                                u16 remain);
+}; /* size: 0x20 */
+#endif
+
 #endif /* MHTRI_EF_EF_PARTICLEMANAGER_H */

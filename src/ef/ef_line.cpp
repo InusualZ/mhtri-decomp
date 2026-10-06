@@ -8,21 +8,22 @@
  *   `#pragma peephole off` (retail keeps the paired-single epilogue as `li r0,off; psq_lx`).
  * NAMES. The function is a GUESS for NintendoWare's `EmitterFormLine::Emission` (its three pointer asserts on
  *   lines 42-44 and the `em`/`pm`/`params` names the panic strings stringify); the map row keeps its `fn_` stem.
- * RESIDUALS. 1 partial row, `fn_800CCFB0__FPvP7EmitterP15ParticleManageriUlPfUsfUl`:
- *  - the `velArg`/`posArg` copies move floats (`lfs`/`stfs`) where retail moves words (`lwz`/`stw`);
- *  - the `CreateParticle` dispatch loads the slot through the saved parameter (`lwz r11, 0x1C(r23)`) where retail
- *    goes through r3 (`lwz r12, 0x1C(r3)`); a by-value `VEC3` parameter, a forwarding helper, a local copy of
- *    `pm` and `-lang=c++` all score lower;
+ * RESIDUALS. `.text` is byte-identical.  The `.data` run is the three panic strings, the file name and, at
+ *   0x80594F8C, the 12-byte table {0, 0, `fn_800CCFB0`} of the `EmitterFormLine` class whose one virtual this function
+ *   is; it is emitted only once the emitter-form classes are reconstructed together with `ef/ef_emform.cpp`'s
+ *   constructors (which install the table), so the strings stay declared.
  *  - the `(f32)(s32)` conversion constant is our pool's `@N`, retail's the claimed `lbl_807962F8`.
  *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x8 of the claimed 0x18.
- * SHAPES. The explicit `velArg`/`posArg` copies stand in for `CreateParticle`'s by-value arguments; their
- *   declaration order puts the stack slots where retail has them (`v` is copied first).
+ * SHAPES. The particle manager is a class whose vtable pointer follows a 0x1C-byte non-polymorphic head; the spawn
+ *   is its virtual `CreateParticle`, taking the position and velocity by value: the call copies them (velocity
+ *   first), evaluates the momentum before the life and dispatches through r3, as in retail.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "ef/ef_emitter.h" /* ef_random_float (rule 2) */
+#include "ef/ef_particlemanager.h" /* ParticleManager (rule 1) */
 
 #pragma fp_contract off
 #pragma peephole off
@@ -33,20 +34,7 @@ typedef struct {
 } Random; /* size: 0x04 */
 
 typedef struct Emitter Emitter;
-typedef struct ParticleManager ParticleManager;
 
-/* ParticleManager's vtable; slot +0x14 is `CreateParticle`. */
-typedef struct {
-    u8 pad_0x00[0x14]; /* +0x00 */
-    /* +0x14 */ void (*createParticle)(ParticleManager* self, u16 life, VEC3* position, VEC3* velocity,
-                                       u32 space, f32 momentum, void* setting, void* reference,
-                                       u16 calcRemain);
-} ParticleManagerVtbl; /* size: 0x18 */
-
-struct ParticleManager {
-    u8 pad_0x00[0x1C]; /* +0x00 */
-    /* +0x1C */ ParticleManagerVtbl* vtable;
-}; /* size: 0x20 */
 
 /* The emitter fields this unit reads; the full Emitter is much larger. */
 struct Emitter {
@@ -68,9 +56,9 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
 /* The nw4r helper callees are C functions: the target object's relocations carry their plain names
  * (`VEC3_ctor`, not `fn_80043EA8__FP...`), so they are declared `extern "C"`. */
 extern "C" void ef_sin_cos(f32* sin, f32* cos, f32 rad); /* PSSinCosRad */
-extern "C" void fn_800A99B4(void* self, VEC3* result, Emitter* em, VEC3* position, VEC3* normalDir,
+extern "C" void ef_form_calc_velocity(void* self, VEC3* result, Emitter* em, VEC3* position, VEC3* normalDir,
                         VEC3* fromOrigin, VEC3* fromYAxis); /* EmitterForm::CalcVelocity */
-extern "C" u16 fn_800A9FB0(void* self, u16 aPtclLife, f32 aPtclLifeRnd, Emitter* em); /* CalcLife */
+extern "C" u16 ef_form_calc_life(void* self, u16 aPtclLife, f32 aPtclLifeRnd, Emitter* em); /* CalcLife */
 
 extern char lbl_80594EE0[];
 extern char lbl_80594EEC[];
@@ -103,9 +91,7 @@ void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 op
         for (i = 0; i < count; i++) {
             f32 pos;
             f32 sx, cx, sy, cy, sz, cz;
-            VEC3 p, normal, fromYAxis, v, posArg, velArg;
-            f32 momentum;
-            u16 life;
+            VEC3 p, normal, fromYAxis, v;
 
             if ((optionFlag & 0x00020000) == 0) {
                 pos = ef_random_float(&em->mRandom.mSeed);
@@ -135,17 +121,13 @@ void fn_800CCFB0(void* self, Emitter* em, ParticleManager* pm, int count, u32 op
             setVec3(&fromYAxis, p.x, lbl_807962E8, p.z);
 
             VEC3_ctor(&v);
-            fn_800A99B4(self, &v, em, &p, &normal, &p, &fromYAxis);
+            ef_form_calc_velocity(self, &v, em, &p, &normal, &p, &fromYAxis);
 
-            velArg = v;
-            posArg = p;
-
-            momentum = lbl_807962F0 + lbl_807962F4 * (f32)(s32)em->mVelMomentumRandom *
-                                           ef_random_float(&em->mRandom.mSeed);
-            life = fn_800A9FB0(self, aPtclLife, aPtclLifeRnd, em);
-
-            pm->vtable->createParticle(pm, life, &posArg, &velArg, space, momentum, &em->mInheritSetting,
-                                       em->mpReferenceParticle, em->mCalcRemain);
+            pm->CreateParticle(ef_form_calc_life(self, aPtclLife, aPtclLifeRnd, em), p, v, space,
+                               lbl_807962F0 + lbl_807962F4 * (f32)(s32)em->mVelMomentumRandom *
+                                                  ef_random_float(&em->mRandom.mSeed),
+                               (u8*)&em->mInheritSetting, (u32)em->mpReferenceParticle,
+                               em->mCalcRemain);
         }
     }
 }

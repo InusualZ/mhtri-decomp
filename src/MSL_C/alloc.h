@@ -30,6 +30,7 @@ int snprintf(char* dst, u32 size, const char* fmt, ...); /* 0x8045DDD8 - bounded
 u16* wcsncpy(u16* dst, const u16* src, u32 n);
 f32 fabsf(f32 x);                             /* 0x80463F04 */
 f32 tanf(f32 x);                              /* 0x80463F98 */
+f32 cosf(f32 x);                              /* 0x80463E50 */
 
 #ifdef __cplusplus
 }
