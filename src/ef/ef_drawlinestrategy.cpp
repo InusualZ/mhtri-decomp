@@ -9,19 +9,28 @@
  *   installs the vtable at the end of its own TU's `.data`; so this class's constructor is the tail of `ef/ef_drawfreestrategy.cpp`'s range
  *   (0x800BEF5C) and the DrawPointStrategy constructor at this range's tail (0x800BF7DC) is the next TU's; both are
  *   defined where their range is until the seam is re-drawn.
- * FLAGS. `cflags_main`; `#pragma peephole off` before the includes, `#pragma dont_inline on` at the end (the inline
+ * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma pool_data off` (each string address its own `lis`/`addi`)
+ *   before the includes, `#pragma dont_inline on` at the end (the inline
  *   destructor calls its base out of line, see there).
  * NAMES. GUESS: `ef_min_float` (0x800BF5B0) from its body; `ef_line_gx_position3f` (the 0x14 FIFO writer at +0x10 of
- *   `fn_800BF58C`, reached by a tail call); the assert names (`pm`, `pm->mResource`, `&ed`) are
+ *   `ef_line_gx_position`, reached by a tail call); the assert names (`pm`, `pm->mResource`, `&ed`) are
  *   NintendoWare's.
+ *   GUESS: `ef_line_gx_position` (hands a vector to the FIFO writer, the billboard unit's scheme).
+ *   GUESS (from the bodies): `ef_line_write_line`, `ef_line_gx_end`, `ef_line_gx_texcoord`, `ef_line_tex_flag`,
+ *   GUESS: `ef_line_setup_gx`.
  * RESIDUALS. Every row is written and every function is at 100 %.
- *   flipcheck: `.data` claimed, not emitted; `.sdata` (the width clamp) and `.sdata2` (the literals' pool) are emitted
+ *   flipcheck: `.data` is emitted byte for byte (the four strings defined, then the vtable); `.text` carries the
+ *   weak copies of the two base destructors (0x88) and emits the line destructor last, after the `DrawPointStrategy`
+ *   constructor, where retail has it before; a trial flip ends in mwld's internal error (ELF_linker.c line 7133,
+ *   phase Optimizing), and an out-of-line line destructor costs `DrawStrategyBuilder::Create` (100 -> 92.1);
+ *   `.sdata` (the width clamp) and `.sdata2` (the literals' pool) are emitted
  *   with their bytes equal, 0x4 short of the claim each (the trailing pad the next object's alignment adds).
  *   `DrawPointStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
  */
 
 #pragma peephole off
+#pragma pool_data off
 
 #include "types.h"
 #include "nw4r/math.h"
@@ -48,12 +57,11 @@ extern "C" {
 #endif
 
 
-/* This unit's `__FILE__`/assert strings (its claimed `.data`), declared,
- * never defined. */
-extern char lbl_80594330[];  /* "ef_drawlinestrategy.cpp"                                 .data */
-extern char lbl_80594348[];  /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."        .data */
-extern char lbl_8059437C[];  /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."  .data */
-extern char lbl_805943B8[];  /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."      .data */
+/* This unit's `__FILE__`/assert strings (its claimed `.data`, ahead of the vtable). */
+char ef_line_file_str[] = "ef_drawlinestrategy.cpp";
+char ef_line_pm_assert_str[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
+char ef_line_resource_assert_str[] = "NW4R:Pointer Error\npm->mResource(=%p) is not valid pointer.";
+char ef_line_ed_assert_str[] = "NW4R:Pointer Error\n&ed(=%p) is not valid pointer.";
 /* The widest line the width clamp allows (`.sdata`). */
 static f32 ef_line_max_width = 42.5f;
 
@@ -77,12 +85,12 @@ extern void ef_particle_get_move_dir(void* particle, VEC3* out);         /* part
 extern void PSVECSubtract(const VEC3* a, const VEC3* b, VEC3* out);
 
 /* forward declarations of this unit's own functions (the draw path calls the helpers below it) */
-void fn_800BF4C8(const VEC3* a, const VEC3* b, u32 flag);
-void fn_800BF564(void);
-void fn_800BF568(f32 x, f32 y);
-u32 fn_800BF578(u32 value);
-void fn_800BF58C(const VEC3* v);
-void fn_800BF5C8(nw4r::ef::DrawLineStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm);
+void ef_line_write_line(const VEC3* a, const VEC3* b, u32 flag);
+void ef_line_gx_end(void);
+void ef_line_gx_texcoord(f32 x, f32 y);
+u32 ef_line_tex_flag(u32 value);
+void ef_line_gx_position(const VEC3* v);
+void ef_line_setup_gx(nw4r::ef::DrawLineStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm);
 
 /* `NW4R_POINTER_ASSERT`'s RVL address-range check (MEM1/MEM2, cached and uncached, plus locked
  * cache), shared verbatim with ef/ef_line.cpp. */
@@ -93,7 +101,7 @@ void fn_800BF5C8(nw4r::ef::DrawLineStrategy* self, const EfDrawInfo* info, EfDra
      ((u32)(p) & 0xFFFFC000) == 0xE0000000)
 
 #define NW4R_POINTER_ASSERT(p, line, msg)                                                          \
-    (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(lbl_80594330, line, msg, (p)))
+    (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(ef_line_file_str, line, msg, (p)))
 
 /* -------------------------------------------------------------------------------------------------
  * the functions, in address order
@@ -108,11 +116,11 @@ namespace ef {
 
 /* 0x800BEF98 (0x530): walks the draw-order particle list and emits one line per eligible particle. */
 void DrawLineStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
-    NW4R_POINTER_ASSERT(pm, 100, lbl_80594348);
-    fn_800BF5C8(this, &info, pm);
-    NW4R_POINTER_ASSERT(pm->resource, 104, lbl_8059437C);
+    NW4R_POINTER_ASSERT(pm, 100, ef_line_pm_assert_str);
+    ef_line_setup_gx(this, &info, pm);
+    NW4R_POINTER_ASSERT(pm->resource, 104, ef_line_resource_assert_str);
     EfEmitterDrawSetting* ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
-    NW4R_POINTER_ASSERT(ed, 106, lbl_805943B8);
+    NW4R_POINTER_ASSERT(ed, 106, ef_line_ed_assert_str);
 
     MTX34 mtxPm;
     MTX34 mtxEm;
@@ -169,7 +177,7 @@ void DrawLineStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
             }
         }
         first = false;
-        fn_800BF4C8(&pos, &dir, screenSpace);
+        ef_line_write_line(&pos, &dir, screenSpace);
     }
 }
 
@@ -181,37 +189,37 @@ extern "C" {
 #endif
 
 /* Draws one GX line between two positions, with the texture coords the target uses. */
-void fn_800BF4C8(const VEC3* a, const VEC3* b, u32 flag) {
+void ef_line_write_line(const VEC3* a, const VEC3* b, u32 flag) {
     GXBegin(0xA8, 0, 2);
-    fn_800BF58C(a);
-    if (fn_800BF578(flag)) {
-        fn_800BF568(0.0f, 0.0f);
+    ef_line_gx_position(a);
+    if (ef_line_tex_flag(flag)) {
+        ef_line_gx_texcoord(0.0f, 0.0f);
     }
-    fn_800BF58C(b);
-    if (fn_800BF578(flag)) {
-        fn_800BF568(0.0f, 1.0f);
+    ef_line_gx_position(b);
+    if (ef_line_tex_flag(flag)) {
+        ef_line_gx_texcoord(0.0f, 1.0f);
     }
-    fn_800BF564();
+    ef_line_gx_end();
 }
 
 /* The SDK's no-op `GXEnd`. */
-void fn_800BF564(void) {}
+void ef_line_gx_end(void) {}
 
 /* Writes a pair of f32 to the GX FIFO (a texture coordinate). */
-void fn_800BF568(f32 x, f32 y) {
+void ef_line_gx_texcoord(f32 x, f32 y) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
 }
 
 /* Tests the low bit of a flag word. */
-u32 fn_800BF578(u32 value) {
+u32 ef_line_tex_flag(u32 value) {
     return (value & 1) != 0;
 }
 
 static void ef_line_gx_position3f(f32 x, f32 y, f32 z);
 
 /* Writes a position to the GX FIFO through the FIFO writer that follows it. */
-void fn_800BF58C(const VEC3* v) {
+void ef_line_gx_position(const VEC3* v) {
     f32 x = v->x;
     f32 y = v->y;
     f32 z = v->z;
@@ -231,8 +239,8 @@ f32* ef_min_float(f32* a, f32* b) {
 }
 
 /* DrawLineStrategy per-draw setup: binds the resource and the line vertex format. */
-void fn_800BF5C8(nw4r::ef::DrawLineStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm) {
-    NW4R_POINTER_ASSERT(pm, 174, lbl_80594348);
+void ef_line_setup_gx(nw4r::ef::DrawLineStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm) {
+    NW4R_POINTER_ASSERT(pm, 174, ef_line_pm_assert_str);
     self->InitGraphics(pm, *(EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource), *info);
 
     GXEnableTexOffsets(0, 1, 1);
