@@ -13,19 +13,21 @@
  *   narrowing FIFO store and byte load), now before the includes; `#pragma dont_inline on` at the end (the inline
  *   destructor calls its base out of line).
  * NAMES. The map has only `fn_` stems for the range.
- * RESIDUALS. 4 partial rows:
+ * RESIDUALS. 3 partial rows:
  *  - `fn_800BE39C` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the three loads and the
- *    `lis` of the FIFO base (`ef/ef_drawlinestrategy.cpp`'s `fn_800BF58C` is the same);
+ *    `lis` of the FIFO base (`ef/ef_drawlinestrategy.cpp`'s `fn_800BF58C` is the same):
+ *    the row is two functions, a tail call into a 0x14 static FIFO writer at +0x10 that the map folds into it
+ *    (reproduced byte for byte with a `dont_inline` static helper; the map split is request nw4r-l3#21);
  *  - `Draw` (0x800BE3C0): the three arguments are saved one register lower (r27-r29 against r28-r30) and one
  *    `lwz r6, 0x24(pm)` is scheduled earlier;
  *  - `fn_800BEA00`: the two products of the 0x24 component (`fmuls f6`, `fmuls f11`) are computed later and the
- *    float registers around them differ;
- *  - `fn_800BED2C`: the two pointer masks share one `clrrwi` (retail recomputes it) and retail's dead `li r0,0;
- *    cmpwi r0,0` is missing.
+ *    float registers around them differ.
  *   flipcheck: `.data` claimed, not emitted; `.rodata` (the quad tables) and `.sdata` (the texcoord table) are
  *   emitted.
  *   `DrawLineStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
+ * SHAPES. The GX setup's pointer assert is the NW4R expression form `(void)(ok || (Panic(...), 0))`: its value
+ *   leaves retail's dead `li r0,0; cmpwi r0,0` after the call (playbook 103).
  */
 
 #pragma peephole off
@@ -373,8 +375,7 @@ void fn_800BEA00(MTX34* dst, const Vec3* pp, u8 mode) {
 void fn_800BED2C(nw4r::ef::DrawFreeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm) {
     EfEmitterDrawSetting* ed;
 
-    if (!IsValidPointer((u32)pm))
-        nw4r::db::Panic(lbl_805941F8, 278, lbl_80594240, pm);
+    (void)(IsValidPointer((u32)pm) || (nw4r::db::Panic(lbl_805941F8, 278, lbl_80594240, pm), 0));
 
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     self->InitGraphics(pm, *ed, *info);
