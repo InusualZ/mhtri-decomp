@@ -2703,6 +2703,7 @@ DWCiHostEntry* DWCi_socketLookupHost(char* host) {
     int count;
     int length;
     DWCiHostCacheEntry* entry;
+    DWCiHostCacheEntry** cache;
     DWCiHostEntry* result;
 
     if (strncmp("clear", host, strlen("clear")) == 0) {
@@ -2730,19 +2731,20 @@ DWCiHostEntry* DWCi_socketLookupHost(char* host) {
     length = strlen(host);
     hash = 0;
     for (i = 0; i < (u32)length; i++) {
-        hash += host[i] << ((i * 4) & 0x1C);
+        hash += host[i] << ((i % 8) * 4);
     }
     hash = (u32)hash % DWCI_HOST_CACHE_SIZE;
+    cache = DWCi_hostCache;
     for (probe = 0; probe < 15; probe++) {
-        entry = DWCi_hostCache[(u32)(hash + probe * probe) % DWCI_HOST_CACHE_SIZE];
+        entry = cache[(u32)(hash + probe * probe) % DWCI_HOST_CACHE_SIZE];
         if (entry != NULL && strcmp(entry->hostName, host) == 0) {
             return (DWCiHostEntry*)entry;
         }
     }
-    if (DWCi_hostCache[hash] != NULL) {
+    if (cache[hash] != NULL) {
         for (probe = 1; probe < 15; probe++) {
             slot = (u32)(hash + probe * probe) % DWCI_HOST_CACHE_SIZE;
-            if (DWCi_hostCache[slot] == NULL) {
+            if (cache[slot] == NULL) {
                 hash = slot;
                 break;
             }
@@ -2755,11 +2757,11 @@ DWCiHostEntry* DWCi_socketLookupHost(char* host) {
     if (result == NULL) {
         return NULL;
     }
+    DWCi_hostCache[hash] = (DWCiHostCacheEntry*)gsiMallocInline(sizeof(DWCiHostCacheEntry));
     count = 0;
     while (result->hosts[count] != NULL) {
         count++;
     }
-    DWCi_hostCache[hash] = (DWCiHostCacheEntry*)gsiMallocInline(sizeof(DWCiHostCacheEntry));
     DWCi_hostCache[hash]->addrType = 2;
     DWCi_hostCache[hash]->length = result->length;
     DWCi_hostCache[hash]->name = NULL;

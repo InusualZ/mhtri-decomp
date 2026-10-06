@@ -33,7 +33,7 @@
  *    100.00  NHTTPi_InitRequestInfo     (12/12)
  *     96.60  NHTTPi_RecvBufFindSpace   (248)
  *     90.35  NHTTPi_RecvBufFindUpper   (496)
- *     80.59  NHTTPi_RecvBufFindLine    (504)
+ *     97.16  NHTTPi_RecvBufFindLine    (504)
  *     79.67  NHTTPi_SocRecvOffsetRange (60/56)
  *
  * NAMING (rule 7).  The six `fn_` rows this pass renamed in the map, and what each name rests on:
@@ -81,22 +81,11 @@
  *   - `NHTTPi_RecvBufFindUpper` (90.35): retail sign-extends the byte as it reads it and reloads the
  *     index into the shared block arm (`li r9,0`, then the shared `data[index++]`), ours folds the
  *     first block read to `li r9,1`; the remaining rows are register numbering.
- *   - `NHTTPi_RecvBufFindLine` (80.59) and `NHTTPi_RecvBufFindSpace` (96.60) share the byte reader:
- *     retail *specialises* its first arm (its own `addi <index>,<index>,1` plus an `extsb`, then a
- *     branch to the shared `extsb`) where ours shares one tail; four spellings of the reader (`u8`
- *     value, `char` value and return, the `(char)` cast on the ring arm, post-increment in the
- *     subscript) were measured and all keep our shared tail, so ours stops 4 B short of retail's
- *     (244 B against 248).  Their *first* difference was the guard's polarity, which the positive
- *     form above closes.
- *   - `NHTTPi_RecvBufFindLine` alone carries a register residual: retail keeps two callee-saved
- *     registers (`r31` for the ring offset, `r30` for the seen-CR flag) with the `stw`/`lwz`
- *     prologue that implies, where ours allocates the same webs to caller-saved registers - there is
- *     no call anywhere in the function, so our allocator never needs to spill.  `FindSpace` has no
- *     such difference (its register file is r4/r5/r6/r7 with no prologue in either object).
- *     FindLine's own 76 B shortfall is separate: our build proves the LF arm's `result` assignment
- *     dead and answers with `beqlr` (two against retail's none), where retail materialises the
- *     result in a register and merges the exits; six declaration orders of the locals were measured
- *     (77.94 is the best, 75.28 the original).
+ *   - `NHTTPi_RecvBufFindLine` (97.16) and `NHTTPi_RecvBufFindSpace` (96.60) share the byte reader:
+ *     retail *specialises* its first arm (its own `addi <index>,<index>,1` plus an `extsb`) where ours
+ *     shares one tail. FindLine answers on the byte after a CR whatever it is (2 in `*flag` when it is
+ *     the LF), and compares the raw byte through `(char)` casts, which is what keeps retail's two saved
+ *     registers and its per-test `extsb`.
  *   - NHTTPi_SocRecvOffsetRange (79.67): retail re-loads `sock->length` after the range check
  *     (`lwz r0,0x1c(r10)` at the test, `lwz r9,0x1c(r10)` again in the body) where ours reuses the
  *     first load.  The check, the clamp and the `sock->base + offset` computation all pair.
@@ -226,34 +215,33 @@ s32 NHTTPi_RecvBufFindLine(NHTTPRecvBuf* ring, s32 start, s32 end, s32* offset, 
             index = (start - 1024) & 511;
         }
         for (i = start; i < end; i++) {
-            char c = (char)NHTTPi_RecvBufNextByte(ring, &block, &index);
+            u8 c = NHTTPi_RecvBufNextByte(ring, &block, &index);
 
-            if (c == ':' && offset != 0 && *offset < 0) {
+            if ((char)c == ':' && offset != 0 && *offset < 0) {
                 *offset = i;
             }
             if (seenCr != 0) {
-                if (c == '\n') {
+                if ((char)c == '\n') {
                     result = (i == end - 1) ? 0 : i + 1;
                     if (flag != 0) {
                         *flag = 2;
                     }
-                    return result;
                 }
-            } else {
-                if (c == '\r') {
-                    seenCr = 1;
-                    result = (i == end - 1) ? 0 : i + 1;
-                    if (flag != 0) {
-                        *flag = 1;
-                    }
+                return result;
+            }
+            if ((char)c == '\r') {
+                seenCr = 1;
+                result = (i == end - 1) ? 0 : i + 1;
+                if (flag != 0) {
+                    *flag = 1;
                 }
-                if (c == '\n') {
-                    result = (i == end - 1) ? 0 : i + 1;
-                    if (flag != 0) {
-                        *flag = 1;
-                    }
-                    return result;
+            }
+            if ((char)c == '\n') {
+                s32 lf = (i == end - 1) ? 0 : i + 1;
+                if (flag != 0) {
+                    *flag = 1;
                 }
+                return lf;
             }
         }
     }
