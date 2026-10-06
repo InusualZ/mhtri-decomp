@@ -5,8 +5,9 @@
  *   0x80795CF0-0x80795CF8.
  * NAMES. The file keeps the map's stem: the range's only `__FILE__` string is the accessor header
  *   "g3d_resnode_ac.h" (lbl_8058B370, fn_8005AA44's assert).  Module `g3d` from the callers
- *   (`nw4r::g3d::ScnMdl::CopiedMatAccess`, `g3d/g3d_calcworld.cpp`'s fn_80073E8C; fn_8005AB08's twin is
+ *   (`nw4r::g3d::ScnMdl::CopiedMatAccess`, `g3d/g3d_calcworld.cpp`'s fn_80073E8C; mtx34_trans_apply's twin is
  *   `g3d/g3d_basic.cpp`'s fn_800D7ED0).
+ *   GUESS: `mtx34_trans_apply` (the `PSMTXTransApply` wrapper at 0x8005AB08).
  * RESIDUALS. none in `.text`.  flipcheck: `.ctors` (fn_8005AB78 compiles as a plain function), `.data`, `.bss` and
  *   `.sdata2` are claimed and not emitted; `.sdata` is 0x7 of 0xC.
  */
@@ -108,7 +109,7 @@ u32 fn_8005AB00(const ResMatHandle* pSelf) {
 
 /* The `PSMTXTransApply` twin of g3d_basic.cpp's fn_800D7ED0: translate `pPos` into the node matrix and
  * return `pSrc`. */
-Mtx34* fn_8005AB08(Mtx34* pSrc, const Vec3* pPos, void* pNodeMtx) {
+Mtx34* mtx34_trans_apply(Mtx34* pSrc, const Vec3* pPos, void* pNodeMtx) {
     const Mtx34* src = (const Mtx34*)mtx34_get_ptr(pSrc);
     Mtx34* dst = (Mtx34*)mtx34_const_ptr(pNodeMtx);
     PSMTXTransApply(dst, src, pPos->x, pPos->y, pPos->z);

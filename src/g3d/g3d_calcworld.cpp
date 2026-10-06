@@ -42,7 +42,7 @@ struct G3DWorkObj;
 /* externs: the SDK and the neighbouring units this one calls (the map owns their names)            */
 /* ------------------------------------------------------------------------------------------------ */
 
-extern "C" void fn_800513CC(void* pOut, const void* pIn);
+extern "C" void vec3_add_ps(void* pOut, const void* pIn);
 extern "C" s32 fn_8005AAEC(const void* p);
 extern "C" f32* fn_8005CED0(void);
 extern "C" u32* fn_8005CEDC(void);
@@ -439,7 +439,7 @@ void fn_80073F64(void) {
 }
 
 nw4r::math::VEC3* addVec3To(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn) {
-    fn_800513CC(pOut, pIn);
+    vec3_add_ps(pOut, pIn);
     return pOut;
 }
 

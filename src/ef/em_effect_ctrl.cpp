@@ -145,11 +145,11 @@ struct EmEffectWork {
 };
 
 /* --- callees ------------------------------------------------------------------------------------ */
-extern "C" f32 fn_80050EDC(const nw4r::math::VEC3* work);
+extern "C" f32 vec3_length_sq(const nw4r::math::VEC3* work);
 extern "C" void subVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" f32 fn_80050F24(const nw4r::math::VEC3* in);
 extern "C" f32 vec3_dot(const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
-extern "C" void fn_80050850(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
+extern "C" void vec3_normalize_into(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
 extern "C" void vec3_scale(nw4r::math::VEC3* out, const nw4r::math::VEC3* in, f32 scale);
 extern "C" void addVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
@@ -264,7 +264,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
         work->frame++;
         return;
     }
-    if (fn_80050EDC(&unit->world_pos) < lbl_807966F0) {
+    if (vec3_length_sq(&unit->world_pos) < lbl_807966F0) {
         return;
     }
     if (fn_802B45D4() == 1) {
@@ -285,8 +285,8 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     model = fn_80082BCC(pRoot);
     fn_80075258(&model, &v130, &unit->world_pos);
     f29 = vec3_dot(&v100, &vF4);
-    fn_80050850(&v100, &v100);
-    fn_80050850(&vF4, &vF4);
+    vec3_normalize_into(&v100, &v100);
+    vec3_normalize_into(&vF4, &vF4);
     get_camera_pos_c1(&v94);
     copyVec3(&v124, &v94);
     vec3_scale(&v88, &vF4, lbl_807966F8);
@@ -322,7 +322,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
         }
         intensity = (s32)(lbl_8079671C * ease);
         spread = lbl_80796720;
-        fn_80050850(&vDC, &vE8);
+        vec3_normalize_into(&vDC, &vE8);
         fn_801027D0(work);
         if (unit->scale_rate > lbl_80796718) {
             for (i = 0; i < unit->emitter_count; i++) {

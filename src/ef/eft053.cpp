@@ -748,7 +748,7 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
             rotVecZ(c, list[i].rot_z);
             rotVecX(c, list[i].rot_x);
             rotVecY(c, list[i].rot_y);
-            fn_80050850(c, c);
+            vec3_normalize_into(c, c);
             vec_to_mh_vec3(b, &list[i].pos_0x04);
             vec3_scale(&tmp_a, c, scale_off);
             addVec3To(b, &tmp_a);

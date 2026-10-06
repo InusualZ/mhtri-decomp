@@ -16,10 +16,11 @@
  *   +0xB8, the parent at +0xF4 and the object's MTX34 at +0x124.
  *   GUESS (from the body and its callers): `ef_particle_get_move_dir`, `ef_emitter_tex_flags`,
  *   GUESS: `ef_emitter_get_mtx`.
+ *   GUESS: `ef_vec3_dist_sq` (the squared position distance), `ef_mtx34_copy` (the twelve-word copy).
  * RESIDUALS. 29 partial rows (ours 0x34E8 of 0x375C), including:
  *  - `fn_800A8D18` (ours 0xC of 0x18), `ef_emitter_get_mtx` (ours 0x110 of 0x134): retail masks then booleanises
  *    (`rlwinm; neg; or; srwi`) where MWCC folds the flag test into `extrwi` for every spelling tried;
- *  - `fn_800A89A0`: retail pairs the block copy's loads/stores through a second temporary (`lwz r5; lwz r0; stw
+ *  - `ef_mtx34_copy`: retail pairs the block copy's loads/stores through a second temporary (`lwz r5; lwz r0; stw
  *    r5; stw r0`), ours moves one word at a time;
  *  - `fn_800A834C` (ours 0x4EC of 0x5F8): retail fuses one `f2*f1 - f0` into `fmsubs` under the rest's unfused
  *    chain, and it calls `fn_800B2878` and asserts `mManagerEF` (`lbl_80592A6C`) where ours does not;
@@ -27,7 +28,7 @@
  *    `fn_800A7750` has a `Panic(..., "Failed assertion false")` path ours lacks;
  *  - `fn_800A6A04`: ours calls `fn_800A4864` and `fn_800A4420` where retail reads `lbl_80796008`;
  *  - `fn_800A8A5C`: the `fn_800A8BC8` call sits at another point of the pass;
- *  - `fn_800A8220`, `fn_800A8300`: the argument copy `mr r3, r4` is scheduled elsewhere and the float registers
+ *  - `fn_800A8220`, `ef_vec3_dist_sq`: the argument copy `mr r3, r4` is scheduled elsewhere and the float registers
  *    differ;
  *  - `fn_800A8C34`: the index scaling folds to `clrlslwi` where retail keeps `clrlwi` + `slwi`.
  *   The other 17 partial rows have no recorded cause.
@@ -140,20 +141,20 @@ void fn_8009BF08(void* vec, void* out);
 void fn_8009C040(void* vec, void* out);
 void fn_8009B650(void* vec, void* mtx);
 void fn_8009BCB4(void* mtx, void* vec);
-void fn_8009CC20(void* out, void* mtx, void* in);
+void ef_mtx34_scale_columns(void* out, void* mtx, void* in);
 void fn_8009CCAC(void* out, void* mtx, void* in);
 f32 sqrt_f32(f32 x);
 void subVec3(void* dst, void* a, void* b);
 void* fn_800508AC(void* vec);
 f32 PSVECSquareDistance(void* a, void* b);
 void mtx34_identity(void* mtx);
-void fn_80051424(void* dst, void* src, f32 scale);
+void vec3_scale_by(void* dst, void* src, f32 scale);
 void assignVec3(void* dst, void* src);
 void mtx34_mult_vec3(void* dst, void* mtx, void* vec);
 void fn_8007100C(void* dst, void* src);
 void mtx34_concat(void* dst, void* a, void* b);
 void mtx34_inverse(void* mtx, void* in);
-void fn_8009CA30(void* mtx, f32 x, f32 y, f32 z);
+void ef_mtx34_rotate_xyz(void* mtx, f32 x, f32 y, f32 z);
 void fn_8009CBA0(void* dst, void* mtx, void* vec);
 void fn_80501390(void* dst, void* mtx, void* vec);
 f32 fn_80463E2C(f32 x);
@@ -458,13 +459,13 @@ s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* params, EfPa
 EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result);
 void* fn_800A8040(EfEmitterObj* self, void* eh, u32 a, u32 b, s8 c, u32 d, u8 e);
 f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4);
-f32 fn_800A8300(void* a, void* b);
+f32 ef_vec3_dist_sq(void* a, void* b);
 void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx);
 void* ef_emitter_tex_flags(void* self);
 void* fn_800A8968(EfEmitterObj* self);
 void* fn_800A898C(void* dst, const void* src);
 void* ef_store_word(void* dst, s32 v);
-void* fn_800A89A0(void* dst, const void* src);
+void* ef_mtx34_copy(void* dst, const void* src);
 f32 ef_truncate_float(f32 x);
 f32 ef_random_float(u32* random);
 void fn_800A8A5C(EfEmitterObj* self);
@@ -873,7 +874,7 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
         MTX34_ctor(&m1);
         MTX34_ctor(&m2);
         mtx34_identity(&m1);
-        fn_8009CA30(&m1, e->rotation.x, e->rotation.y, e->rotation.z);
+        ef_mtx34_rotate_xyz(&m1, e->rotation.x, e->rotation.y, e->rotation.z);
         fn_8009CBA0(&m1, &m1, &e->vec_0x9C);
         ef_emitter_get_mtx(e, &m2);
         mtx34_inverse(&m2, &m2);
@@ -889,7 +890,7 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
         } else {
             fn_80501390(&m1, &m1, host);
         }
-        fn_8009CA30(&m2, e->rotation.x, e->rotation.y, e->rotation.z);
+        ef_mtx34_rotate_xyz(&m2, e->rotation.x, e->rotation.y, e->rotation.z);
         fn_8009CBA0(&m2, &m2, &e->vec_0x9C);
         mtx34_inverse(&m2, &m2);
         mtx34_concat(&m1, &m1, &m2);
@@ -956,10 +957,10 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             mtx34_mult_vec3(&v, &m2, &v);
             if (ef_vec3_normalize_to(&v, &v) != 0) {
                 if (params->field_0x00 < 0) {
-                    fn_80051424(&v, &v, lbl_80796018);
+                    vec3_scale_by(&v, &v, lbl_80796018);
                 }
                 fn_8009B448(&m1, &v);
-                fn_8009CA30(&m2, e.rotation.x, e.rotation.y, e.rotation.z);
+                ef_mtx34_rotate_xyz(&m2, e.rotation.x, e.rotation.y, e.rotation.z);
                 mtx34_concat(&m1, &m1, &m2);
                 fn_8009BCB4(&m1, &e.rotation);
             }
@@ -974,7 +975,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             MTX34_ctor(&m1);
             MTX34_ctor(&m2);
             mtx34_identity(&m1);
-            fn_8009CA30(&m1, e.rotation.x, e.rotation.y, e.rotation.z);
+            ef_mtx34_rotate_xyz(&m1, e.rotation.x, e.rotation.y, e.rotation.z);
             fn_8009CBA0(&m1, &m1, &e.vec_0x9C);
             ef_emitter_get_mtx(&e, &m2);
             mtx34_inverse(&m2, &m2);
@@ -990,7 +991,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
             } else {
                 fn_80501390(&m1, &m1, host);
             }
-            fn_8009CA30(&m2, e.rotation.x, e.rotation.y, e.rotation.z);
+            ef_mtx34_rotate_xyz(&m2, e.rotation.x, e.rotation.y, e.rotation.z);
             fn_8009CBA0(&m2, &m2, &e.vec_0x9C);
             mtx34_inverse(&m2, &m2);
             mtx34_concat(&m1, &m1, &m2);
@@ -1129,7 +1130,7 @@ extern "C" void* fn_800A8040(EfEmitterObj* self, void* eh, u32 a, u32 b, s8 c, u
 
 extern "C" f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4) {
     f32 range = p1 - p2;
-    f32 d = sqrt_f32(fn_800A8300(b, a));
+    f32 d = sqrt_f32(ef_vec3_dist_sq(b, a));
     f32 x = d - p2;
     f32 lo = range * p4;
     f32 hi = range * p3;
@@ -1149,7 +1150,7 @@ extern "C" f32 fn_800A8220(void* a, void* b, f32 p1, f32 p2, f32 p3, f32 p4) {
  * 0x800A8300 - squared distance between two packed position records.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" f32 fn_800A8300(void* a, void* b) {
+extern "C" f32 ef_vec3_dist_sq(void* a, void* b) {
     void* va = fn_800508AC(a);
     void* vb = fn_800508AC(b);
     return PSVECSquareDistance(va, vb);
@@ -1217,7 +1218,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, void* mtx) {
                 anim[3] = self->animate_0x58[0];
                 anim[4] = self->animate_0x58[1];
                 anim[5] = self->animate_0x58[2];
-                fn_800A89A0(&mc, mtx);
+                ef_mtx34_copy(&mc, mtx);
                 ((void (*)(EfEmitterObj*, EfParticleRec*, s32*, u32*, f32*, u16*, f32*,
                            nw4r::math::MTX34*))self->managerEF->field_0x48)(self, pm, &life_i, &f2,
                                                                         anim, &frames, &scale, &mc);
@@ -1278,7 +1279,7 @@ extern "C" void* ef_store_word(void* dst, s32 v) {
     return dst;
 }
 
-extern "C" void* fn_800A89A0(void* dst, const void* src) {
+extern "C" void* ef_mtx34_copy(void* dst, const void* src) {
     u32* d = (u32*)dst;
     const u32* s = (const u32*)src;
     d[0] = s[0];
@@ -1493,7 +1494,7 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
         ef_emitter_get_mtx(self, &m1);
         MTX34_ctor(&m2);
         mtx34_concat(&m2, &self->managerEF->effect->ref_mtx, &m1);
-        fn_800A89A0(&m3, &m2);
+        ef_mtx34_copy(&m3, &m2);
         m3.m[0][0] = ef_mtx34_column_length((const f32*)&m3, 0);
         m3.m[2][0] = lbl_80796004;
         m3.m[1][0] = lbl_80796004;
@@ -1505,13 +1506,13 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
         m3.m[0][2] = lbl_80796004;
         if ((self->flags2 & 0x10000) != 0) {
             MTX34_ctor(&m4);
-            fn_8009CA30(&m4, lbl_80796028, lbl_80796004, lbl_80796004);
+            ef_mtx34_rotate_xyz(&m4, lbl_80796028, lbl_80796004, lbl_80796004);
             mtx34_concat(&m3, &m3, &m4);
         }
         mtx34_inverse(&m2, &m2);
         mtx34_concat(&m2, &m2, &m3);
         fn_8009CCAC(&m2, &m2, &self->rotation);
-        fn_8009CC20(&m2, &self->vec_0x9C, &m2);
+        ef_mtx34_scale_columns(&m2, &self->vec_0x9C, &m2);
         fn_8009BCB4(&m2, &self->rotation);
         fn_800A95D8(self);
     }
@@ -1548,7 +1549,7 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
             fn_80501390(dst, dst, &offset);
         } else if (c != 0) {
             VEC3_ctor(&pt);
-            fn_80051424(&pt, &offset, (f32)c / lbl_80796000);
+            vec3_scale_by(&pt, &offset, (f32)c / lbl_80796000);
             fn_80501390(dst, dst, &pt);
         }
         if (b != 0 || a != 0) {
@@ -1567,7 +1568,7 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
             }
             if (d != 0 && c != 100) {
                 VEC3_ctor(&pt);
-                fn_80051424(&pt, &offset, lbl_80796018);
+                vec3_scale_by(&pt, &offset, lbl_80796018);
                 fn_80501390(dst, dst, &pt);
             }
         }
@@ -1593,7 +1594,7 @@ extern "C" void* ef_emitter_get_mtx(EfEmitterObj* self, void* out) {
                         self->flags3 & 4);
         }
         fn_80501390(&self->matrix, &self->matrix, &self->position);
-        fn_8009CA30(&m, self->rotation.x, self->rotation.y, self->rotation.z);
+        ef_mtx34_rotate_xyz(&m, self->rotation.x, self->rotation.y, self->rotation.z);
         mtx34_concat(&self->matrix, &self->matrix, &m);
         fn_8009CBA0(&self->matrix, &self->matrix, &self->vec_0x9C);
         self->transform_dirty = 0;

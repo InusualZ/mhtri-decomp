@@ -116,18 +116,26 @@ typedef struct EfDrawParticle {
     /* +0x98 */ u8 alpha_ref1;
     /* +0x99 */ u8 pad_0x99;
     /* +0x9A */ u8 rotate_offset[3];       /* added to the rotation in 2pi/256 steps */
-    /* +0x9D */ u8 pad_0x9D[0x0F];
+    /* +0x9D */ u8 collision_state;        /* the post-field shape test's last answer; bit 7 set on a bounce */
+    /* +0x9E */ u8 pad_0x9E[0x02];
+    /* +0xA0 */ VEC3 velocity;
     /* +0xAC */ Vec world_pos;
-    /* +0xB8 */ u8 pad_0xB8[0x10];
+    /* +0xB8 */ u8 pad_0xB8[0x0C];
+    /* +0xC4 */ f32 step;                  /* the frame's time step the post field advances by */
     /* +0xC8 */ struct EfDrawParticleManager* manager;
     /* +0xCC */ VEC3 ahead;             /* the stripe's ahead vector at this particle */
-    /* +0xD8 */ u8 pad_0xD8[0x0D];
+    /* +0xD8 */ u8 pad_0xD8[0x04];
+    /* +0xDC */ u16 age;                   /* the frames the particle has lived */
+    /* +0xDE */ u8 pad_0xDE[0x04];
+    /* +0xE2 */ u16 life;                  /* the particle's lifetime, handed to the creation queue */
+    /* +0xE4 */ u8 pad_0xE4;
     /* +0xE5 */ u8 tex_flags;              /* bit 0: mirror the layers' transform */
 } EfDrawParticle; /* size: 0xE6 (lower bound) */
 
 /* The effect system the emitter's effect belongs to: +0xC064 is the "flush the GP state" flag. */
 typedef struct EfDrawEffectSystem {
-    /* +0x0000 */ u8 pad_0x0000[0xC064];
+    /* +0x0000 */ u8 pad_0x0000[0x10];
+    /* +0x0010 */ u8 creation_queue[0xC054]; /* `ef/ef_creationqueue.cpp`'s queue (its record type is the owner's) */
     /* +0xC064 */ u8 flush_gp;
 } EfDrawEffectSystem; /* size: 0xC065 (lower bound) */
 

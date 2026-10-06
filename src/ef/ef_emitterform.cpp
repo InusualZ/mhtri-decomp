@@ -37,10 +37,10 @@ extern f32 lbl_80796058; /* 65535.0f                .sdata2 */
 /* nw4r::math helpers of `ef/ef_util.cpp` and `fn_8004CAD8.cpp`; retail's relocations carry their plain
  * map names, so they have C linkage. */
 extern "C" {
-void fn_8009CA30(void* mtx, f32 x, f32 y, f32 z);               /* Euler rotation */
+void ef_mtx34_rotate_xyz(void* mtx, f32 x, f32 y, f32 z);               /* Euler rotation */
 void mtx34_mult_vec3(void* out, const void* mtx, const void* in);   /* mulVecMat */
-void fn_80051424(void* out, const void* in);                    /* copy */
-void fn_800513CC(void* out, const void* a, const void* b);      /* blend */
+void vec3_scale_by(void* out, const void* in);                    /* copy */
+void vec3_add_ps(void* out, const void* a, const void* b);      /* blend */
 }
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
@@ -94,7 +94,7 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
     VEC3_ctor(&tmp);
 
     if (lbl_80796030 != em->dir_weight) {
-        fn_80051424(out, rot);
+        vec3_scale_by(out, rot);
     } else {
         out->x = lbl_80796030;
         out->y = lbl_80796030;
@@ -102,8 +102,8 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
     }
 
     if (lbl_80796030 != em->rot_weight) {
-        fn_80051424(&tmp, rot2);
-        fn_800513CC(out, out, &tmp);
+        vec3_scale_by(&tmp, rot2);
+        vec3_add_ps(out, out, &tmp);
     }
 
     if (lbl_80796030 != em->spread_scale) {
@@ -128,7 +128,7 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
     if (lbl_80796030 != em->axis_angle_scale) {
         if (lbl_80796030 == em->axis_angle_y) {
             MTX34_ctor(&mtx_a);
-            fn_8009CA30(&mtx_a, em->euler_x, em->euler_y, em->euler_z);
+            ef_mtx34_rotate_xyz(&mtx_a, em->euler_x, em->euler_y, em->euler_z);
             setVec3(&axis_a, lbl_80796030, lbl_8079603C, lbl_80796030);
             mtx34_mult_vec3(&axis_a, &mtx_a, &axis_a);
             out->x += em->axis_angle_scale * axis_a.x;
@@ -139,10 +139,10 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
 
             MTX34_ctor(&mtx_b);
             ang = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
-            fn_8009CA30(&mtx_b, em->axis_angle_y * ef_random_float(&em->progress), ang, lbl_80796030);
+            ef_mtx34_rotate_xyz(&mtx_b, em->axis_angle_y * ef_random_float(&em->progress), ang, lbl_80796030);
             /* `axis_b` is the matrix record; its declaration is short (see the unit header). */
             MTX34_ctor((MTX34*)&axis_b);
-            fn_8009CA30(&axis_b, em->euler_x, em->euler_y, em->euler_z);
+            ef_mtx34_rotate_xyz(&axis_b, em->euler_x, em->euler_y, em->euler_z);
             mtx34_concat(&mtx_b, (const Mtx34*)&axis_b, &mtx_b);
             out->x += em->axis_angle_scale * mtx_b.m[0][1];
             out->y += em->axis_angle_scale * mtx_b.m[1][1];

@@ -73,7 +73,7 @@ void fn_800A49B8(void* node);
 void fn_800A6554(void* em, void* self);
 void VEC2_ctor(void* self);
 void color_rgba_copy(void* dst, const void* src);
-void fn_80051424(void* dst, const void* src, f32 f);
+void vec3_scale_by(void* dst, const void* src, f32 f);
 void fn_800513F0(void* dst, f32 f);
 void mtx34_mult_vec3(void* dst, const void* a, const void* b);
 s32 ef_get_life_status(void* self);
@@ -381,7 +381,7 @@ extern "C" void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 f) 
 
 /* Scale the parameter's rate by `1.0f - rate` onto the matrix. */
 extern "C" s32 fn_800ADA24(void* out, EfPmDirParam* p, void* v) {
-    fn_80051424(out, v, p->rate - lbl_807960A8);
+    vec3_scale_by(out, v, p->rate - lbl_807960A8);
     return 1;
 }
 

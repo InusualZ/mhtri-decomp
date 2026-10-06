@@ -221,7 +221,7 @@ u32 stage_water_area_ck(void);
 u32 stage_water_enabled_ck(void);
 void fn_8028F558(void* a, void* b);
 u32 fn_802907BC(void* a, void* b);
-f32 fn_80050EDC(void* v);
+f32 vec3_length_sq(void* v);
 
 /* the file/alloc helpers */
 void __construct_array(void* base, void* ctor, u32 a, u32 elemsize, u32 count);
@@ -449,7 +449,7 @@ extern "C" void fn_800F9B68(EftHandle* handle, nw4r::math::VEC3* v) {
 void change_paramscale_eff_vec3(nw4r::ef::Effect* effect, nw4r::math::VEC3* v) {
     nw4r::math::VEC3 tmp;
     VEC3_ctor(&tmp);
-    if (fn_80050EDC(v) >= lbl_807965DC) {
+    if (vec3_length_sq(v) >= lbl_807965DC) {
         if (fn_800A51D0(effect) != 0) {
             void* handle = fn_800A51D8(effect, 0);
             if (handle != NULL) {
