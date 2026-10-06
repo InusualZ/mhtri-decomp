@@ -31,6 +31,31 @@ public:
     ~TextWriterBase();
 
     f32 GetLineHeight() const;
+    f32 PrintMutable(const T* str, int length);
+    bool CalcLineRectImpl(Rect* rect, const T** str, int length);
+    void CalcStringRectImpl(Rect* rect, const T* str, int length);
+    f32 PrintImpl(const T* str, int length, bool moveCursor);
+    f32 AdjustCursor(f32* xOrigin, f32* yOrigin, const T* str, int length);
+
+    f32 CalcLineWidth(const T* str, int length) {
+        Rect rect;
+        TextWriterBase<T> myCopy(*this);
+
+        myCopy.SetCursor(0.0f, 0.0f);
+        myCopy.CalcLineRectImpl(&rect, &str, length);
+        return rect.GetWidth();
+    }
+    void CalcStringRect(Rect* rect, const T* str, int length) const {
+        TextWriterBase<T> myCopy(*this);
+
+        myCopy.CalcStringRectImpl(rect, str, length);
+    }
+    f32 GetCharSpace() const {
+        return mCharSpace;
+    }
+    bool IsDrawFlagSet(u32 mask, u32 flag) const {
+        return (mDrawFlag & mask) == flag;
+    }
 
     int GetTabWidth() const {
         return mTabWidth;

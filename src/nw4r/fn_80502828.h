@@ -122,7 +122,7 @@ struct FontInformation {
 class Font {
 public:
     Font() : mReaderFunc(&CharStrmReader::ReadNextCharCP1252) {}
-    virtual ~Font();
+    virtual ~Font() {}
 
     virtual int GetWidth() const = 0;
     virtual int GetHeight() const = 0;
@@ -146,6 +146,8 @@ public:
     virtual FontEncoding GetEncoding() const = 0;
 
     void InitReaderFunc(FontEncoding encoding);
+
+    CharStrmReader GetCharStrmReader() const;
 
     /* +0x00 */ /* the vtable */
     /* +0x04 */ CharStrmReader::ReadFunc mReaderFunc;
@@ -301,6 +303,26 @@ public:
 
     void SetupGX();
     void SetFontSize(f32 width, f32 height);
+    const Font* GetFont() const {
+        return mFont;
+    }
+    f32 GetScaleH() const {
+        return mScale.x;
+    }
+    f32 GetScaleV() const {
+        return mScale.y;
+    }
+    void SetCursor(f32 x, f32 y) {
+        mCursorPos.x = x;
+        mCursorPos.y = y;
+    }
+    void MoveCursorX(f32 dx) {
+        mCursorPos.x += dx;
+    }
+    void MoveCursorY(f32 dy) {
+        mCursorPos.y += dy;
+    }
+
     f32 GetFontWidth() const;
     f32 GetFontHeight() const;
     f32 GetFontAscent() const;
