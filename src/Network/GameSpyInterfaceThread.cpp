@@ -25,8 +25,8 @@
  *   colouring.  `.data`: 1392 of 1396 B until the cut, plus `NetworkTimedHandler`'s table, which this unit emits (its
  *   destructor is defined here) while retail's 0x80603740 lies past the claimed range, and `NetworkPeerGameSpy`'s table
  *   (0x30 B here: `NetworkPeerBase`'s pure `slot_2C` pad; retail's 0x80603714 is 0x2C B and unclaimed);
- *   `extab` lacks a 20-byte cleanup record against `networkInstance_destroyMutex` (the peer's member-mutex destructor), which needs
- *   the mutex as a class member.  `.sdata` (flip blocker): the claimed 0x10 B (`sRejectMessageNG`, `sEmptyString`,
+ *   `extab` lacks a 20-byte record: retail's peer constructor (in `Network/NetworkConnection.cpp`) and destructor clean
+ *   up through `NetworkPeerBase`'s destructor, which this project models as the plain virtual `destroy`.  `.sdata` (flip blocker): the claimed 0x10 B (`sRejectMessageNG`, `sEmptyString`,
  *   `sPortFormat`) is not emitted.
  * SHAPES. Every call through a foreign object's vtable goes through a declared `virtual` (the only shape MWCC emits as
  *   `lwz r12,0x0(r3)` / `lwz r12,<slot>(r12)`).  `~GameSpyInterfaceThread` comes first in the class (the vtable pointer
@@ -1376,7 +1376,7 @@ s32 NetworkPeerGameSpy::receive(u8* a, s32* aLen, u8* b, s32* bLen, u8* flag)
     if (received_10 < 4) {
         return 0;
     }
-    LockMutex(mutex_6614);
+    LockMutex(&mutex_6614);
     cursor = recvBuffer_614;
     memcpy(&aLen16, cursor, 2);
     {
@@ -1396,7 +1396,7 @@ s32 NetworkPeerGameSpy::receive(u8* a, s32* aLen, u8* b, s32* bLen, u8* flag)
         cursor = recvBuffer_614;
     }
     if (received_10 < (u32)(aLen16 + payload + 4)) {
-        UnlockMutex(mutex_6614);
+        UnlockMutex(&mutex_6614);
         return 0;
     }
     cursor += 2;
@@ -1421,22 +1421,22 @@ s32 NetworkPeerGameSpy::receive(u8* a, s32* aLen, u8* b, s32* bLen, u8* flag)
     if (received_10 != 0) {
         memmove(recvBuffer_614, cursor, received_10);
     }
-    UnlockMutex(mutex_6614);
+    UnlockMutex(&mutex_6614);
     return consumed;
 }
 
 /* Appends a buffer to the peer's receive queue. */
 s32 NetworkPeerGameSpy::put(const u8* data, s32 size, u32 a, u32 b, u32 c)
 {
-    LockMutex(mutex_6614);
+    LockMutex(&mutex_6614);
     if (received_10 + size > 0x6000) {
         INFO_LOG("NetworkPeerGameSpy::put: buf_recv_peer over. please check NetworkPeerGameSpy::MAX_SIZE_BUF_PEER\n");
-        UnlockMutex(mutex_6614);
+        UnlockMutex(&mutex_6614);
         return -1;
     }
     memcpy(recvBuffer_614 + received_10, data, size);
     received_10 = received_10 + size;
-    UnlockMutex(mutex_6614);
+    UnlockMutex(&mutex_6614);
     return 0;
 }
 
@@ -1471,17 +1471,17 @@ s32 NetworkPeerGameSpy::init()
 void NetworkPeerGameSpy::reset()
 {
     interface_6634->unregisterReceiver(field_6630);
-    LockMutex(mutex_6614);
+    LockMutex(&mutex_6614);
     memset(recvBuffer_614, 0, 0x6000);
     received_10 = 0;
-    UnlockMutex(mutex_6614);
+    UnlockMutex(&mutex_6614);
 }
 
 /* Deleting destructor: destroys the queue mutex and the base, then frees on request. */
 NetworkPeerBase* NetworkPeerGameSpy::destroy(s16 flags)
 {
     if (this != NULL) {
-        networkInstance_destroyMutex(mutex_6614, -1);
+        mutex_6614.NetworkMutex::~NetworkMutex();
         NetworkPeerBase::destroy(0);
         if (flags > 0) {
             operator delete(this);

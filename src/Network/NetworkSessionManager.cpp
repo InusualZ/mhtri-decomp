@@ -18,7 +18,13 @@
  *   `NetworkSessionCircleInfo`/`List`, `NetworkSessionPlayerRecord`, `NetworkRequestPat` (container offsets,
  *   `net_va_arg`/`memset` use), `networkSessionReflectCallbackEx` and the `network<span>*` accessors (the callee each
  *   forwards to), the `slot_14C`..`slot_168` wrappers (their vtable slot).
- * RESIDUALS. `.text` 0x2714 against 0x27B4; `extab` 0x3DC against 0x40C; `.data` 0x3B8 against 0x3C0 (-8; 225 of 960
+ *   GUESS: NetworkRequestHead (the request fields ahead of the mutex both request records share).
+ *   GUESS: clear, reset (`NetworkRequestPat`'s own record reset and its forwarder).
+ * RESIDUALS. `move`: one callee-saved register fewer (`_savegpr_23`/`_restgpr_23` against retail's `_savegpr_22`/`_restgpr_22`); the log strings
+ *   retail names (`NetworkSessionManager_deleteRequestMessage`, `NetworkRequest_getArgumentMessage`,
+ *   `NetworkSessionManager_moveStandByMessage`,
+ *   `NetworkSessionManagerPat_finalMessage`) are this object's anonymous literals.
+ *   `.text` 0x2714 against 0x27B4; `extab` 0x428 against 0x40C; `.data` (flip blocker) 0x3B8 against 0x3C0 (-8; 225 of 960
  *   bytes differ), written but out of order (the base table last, see RANGE); `.sbss` emits the 4 B word of the 8 B
  *   claim.
  *  - `NetworkRequest_copyRecord`: retail copies the 96-byte record as two words then eleven word pairs, `*dst = *src`
@@ -28,7 +34,7 @@
  *    retail gives the `u8` flags argument at the call (no spelling tried reaches the `mr`/`clrlwi` pair);
  *  - `networkSessionReflectCallback`: retail saves all six incoming argument registers before building the callee's,
  *    ours does the minimal four-move rotation;
- *  - `NetworkRequest_deleteElement`: retail's unfused `extsh` of the deleting flag needs `NetworkRequest` to be a class;
+ *  - `~NetworkRequest`: retail's unfused `extsh` of the deleting flag;
  *  - the constructor, destructor, `clear`, `release`, `move`, `putTerminatorA`/`C`,
  *    `NetworkSessionManager_allocRequest`: not characterised one by one (the objdiff rows).
  * SHAPES. Both tables are compiler output (rule 10): the base table 0x805FA908..0x805FAAD0 (456 B) is emitted here;
@@ -81,9 +87,7 @@
 extern "C" {
 
 void NetworkRequest_reset(NetworkRequest*);
-void* NetworkRequest_deleteElement(NetworkRequest*, s16);
 void NetworkRequest_clear(NetworkRequest*);
-NetworkRequest* NetworkRequest_construct(NetworkRequest*);
 s32 NetworkRequest_isOwned(NetworkRequest*);
 void NetworkRequest_begin(NetworkRequest*, NetworkSessionManager*, NetworkRequestDesc, u32, ...);
 void NetworkRequest_cancel(NetworkRequest*);
@@ -99,11 +103,12 @@ void NetworkSessionManager_deleteRequest(NetworkSessionManager*, NetworkRequest*
 /* NetworkSessionManager - construction / pool                                                */
 /* ----------------------------------------------------------------------------------------- */
 
+#pragma peephole off
 NetworkSessionManager::NetworkSessionManager()
 {
     s32 i;
+    NetworkRequest* request;
 
-    __construct_array(&this->pool_7C[0], (void*)NetworkRequest_construct, (void*)NetworkRequest_deleteElement, 0xA4, 2);
     this->unused_04 = 0;
     this->unused_08 = 0;
     this->buffer = 0;
@@ -113,8 +118,8 @@ NetworkSessionManager::NetworkSessionManager()
     }
     this->unused_79 = 1;
     this->unused_7A = 1;
-    for (i = 0; i < 2; i++) {
-        NetworkRequest_reset(&this->pool_7C[i]);
+    for (i = 0, request = this->pool_7C; i < 2; i++, request++) {
+        NetworkRequest_reset(request);
     }
 }
 
@@ -154,36 +159,30 @@ extern "C" void NetworkRequest_reset(NetworkRequest* self)
     self->args_2C[6] = 0;
     self->args_2C[7] = 0;
 }
+
+/* Empties the pooled request; its mutex goes with the member. */
+NetworkRequest::~NetworkRequest()
+{
+    NetworkRequest_clear(this);
+}
 #pragma peephole on
 
-extern "C" void* NetworkRequest_deleteElement(NetworkRequest* self, s16 flags)
-{
-    if (self != 0) {
-        NetworkRequest_reset(self);
-        networkInstance_destroyMutex(self->mutex_78, -1);
-        if (flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
-
+#pragma dont_inline on
 extern "C" void NetworkRequest_clear(NetworkRequest* self)
 {
     NetworkRequest_reset(self);
 }
+#pragma dont_inline off
 
-extern "C" NetworkRequest* NetworkRequest_construct(NetworkRequest* self)
+/* Builds the pooled request: its mutex (the member), then an empty record. */
+NetworkRequest::NetworkRequest()
 {
-    networkInstance_initMutex(self->mutex_78);
-    NetworkRequest_reset(self);
-    return self;
+    NetworkRequest_reset(this);
 }
 
 NetworkSessionManager::~NetworkSessionManager()
 {
     NetworkSessionManager::release();
-    __destroy_arr(&this->pool_7C[0], (void*)NetworkRequest_deleteElement, 0xA4, 2);
 }
 
 
@@ -936,25 +935,25 @@ s32 NetworkRequest::getRecord(NetworkErrorInfo* out)
     s32 result;
 
     result = 0;
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     if (this->record_54 != 0) {
         result = 1;
         out->code_00 = this->record_54;
         out->param1_04 = this->record_58;
         out->param2_08 = this->record_5C;
     }
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
     return result;
 }
 
 /* Stores the request's error record under its mutex. */
 void NetworkRequest::setRecord(u32 a, u32 b, u32 c)
 {
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     this->record_58 = b;
     this->record_5C = c;
     this->record_54 = a;
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
 }
 
 /* The starter's word argument `idx`, 0 (and a warning) past the count it was given. */
@@ -983,14 +982,14 @@ s32 NetworkRequest::isTimedOut()
     s32 result;
 
     result = 0;
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     if (networkRequestTimerIdle != this->interval_4C) {
         log = getNetworkLogger();
         if (log->getTime_60() - this->timeout_50 > this->interval_4C) {
             result = 1;
         }
     }
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
     return result;
 }
 
@@ -999,11 +998,11 @@ void NetworkRequest::restartTimer(f32 interval)
 {
     NetworkLogger* log;
 
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     log = getNetworkLogger();
     this->timeout_50 = log->getTime_60();
     this->interval_4C = interval;
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
 }
 
 /* Moves the 0x60-byte record block an out-of-band request carries. */
@@ -1086,17 +1085,20 @@ NetworkSessionPlayerRecord::NetworkSessionPlayerRecord()
 /* Empties the request record and destroys its mutex. */
 NetworkRequestPat::~NetworkRequestPat()
 {
-    NetworkRequestPat_clear(&request_00);
-    networkInstance_destroyMutex(request_00.mutex_78, -1);
+    clear();
 }
 
-extern "C" void NetworkRequestPat_clear(NetworkRequest* self)
+/* Empties the record. */
+void NetworkRequestPat::clear()
 {
-    NetworkRequestPat_reset(self);
+    reset();
 }
 
-extern "C" void NetworkRequestPat_reset(NetworkRequest* self)
+/* Clears every field of the record. */
+void NetworkRequestPat::reset()
 {
+    NetworkRequestPat* self = this;
+
     self->state_00 = 0;
     self->interval_4C = networkRequestTimerReset;
     self->timeout_50 = networkRequestTimerReset;
@@ -1134,8 +1136,7 @@ extern "C" void NetworkRequestPat_reset(NetworkRequest* self)
 /* Builds the request record: its mutex, then an empty record. */
 NetworkRequestPat::NetworkRequestPat()
 {
-    networkInstance_initMutex(request_00.mutex_78);
-    NetworkRequestPat_reset(&request_00);
+    reset();
 }
 #pragma peephole on
 

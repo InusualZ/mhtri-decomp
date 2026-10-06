@@ -9,6 +9,7 @@
 #define MHTRI_NETWORK_GAMESPYINTERFACETHREAD_H
 
 #include "types.h"
+#include "Network/NetworkConnection.h"      /* NetworkMutex - the member mutex */
 #include "Network/NetworkPeerBase.h"            /* NetworkPeerBase - the peer base class */
 #include "unsplit/Network.h"
 #include "Network/PatInterface.h"             /* isCallback / resetCallback / the error accessors - owner Network/PatInterface.cpp */
@@ -91,7 +92,7 @@ public:
     /* +0x0010 */ u32 received_10;
     /* +0x0014 */ u8  sendBuffer_14[0x600];
     /* +0x0614 */ u8  recvBuffer_614[0x6000];
-    /* +0x6614 */ u8  mutex_6614[0x1C];
+    /* +0x6614 */ NetworkMutex mutex_6614;
     /* +0x6630 */ s32 field_6630;
     /* +0x6634 */ GameSpyInterfaceThread* interface_6634;
     /* +0x6638 */ u32 peer_6638;

@@ -6,6 +6,7 @@
 #define MHTRI_NETWORK_NETWORKCONNECTION_H
 
 #include "types.h"
+#include "unsplit/OS.h"                  /* OSMutex */
 
 class NetworkSessionStable;               /* Network/NetworkSessionStable.h */
 class NetworkPeerBase;                    /* Network/NetworkPeerBase.h */
@@ -14,6 +15,17 @@ struct NetworkConnectionOpenInfo;         /* Network/NetworkSessionStable.h */
 /* The callback a connection reports through: the event, the slot index, an argument, a size, the payload
    and the session that opened it. */
 typedef void (*NetworkConnectionCallback)(s32 event, s8 index, u32 arg, s32 size, const u8* data, NetworkSessionStable* owner);
+
+/* The mutex the network records embed as a member (GUESS on the name): the constructor stores the table 0x805F91E0
+   and initialises the OS mutex after it; the destructor only frees on request.  The records' `LockMutex`/`UnlockMutex`
+   (`Network/NetworkSessionBase.cpp`) take its address. */
+class NetworkMutex {
+public:
+    NetworkMutex();
+    /* +0x08 */ virtual ~NetworkMutex();
+
+    /* +0x04 */ OSMutex mutex_04;
+};   /* size: 0x1C (the records' 0x1C-byte block at +0x78) */
 
 /* The connection base (table 0x805F9190): the constructor creates the slot's peer by kind and the destructor
    destroys it; the three timing setters keep the defaults every new connection starts from.  The other slots are
@@ -45,17 +57,5 @@ public:
     /* +0x08 */ NetworkSessionStable* owner_08;
     /* +0x0C */ NetworkPeerBase* peer_0C;               /* the peer the constructor created */
 };   /* size: 0x10 */
-
-extern "C" {
-
-/* 0x803CA338 / 0x803CA37C - destroy (flags -1 at every call site) and construct the member mutex the network
- * records embed (the constructor references the 0x10-byte .data 0x805F91E0).  The callers hand a byte block
- * whose layout only this unit's class owns. */
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void networkInstance_destroyMutex(void* self, s32 flags);
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void networkInstance_initMutex(void* self);
-
-}
 
 #endif /* MHTRI_NETWORK_NETWORKCONNECTION_H */

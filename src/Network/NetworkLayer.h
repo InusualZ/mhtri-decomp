@@ -6,6 +6,7 @@
 #define MHTRI_NETWORK_NETWORKLAYER_H
 
 #include "types.h"
+#include "Network/NetworkConnection.h"      /* NetworkMutex - the member mutex */
 
 /* The 0x40-byte layer user id `NetworkLayerIdImportFrom`/`NetworkLayerIdExportTo` fill and read (their own log
  * strings name them): an id kind (1..5) and up to 0x3C id bytes. */
@@ -61,7 +62,7 @@ typedef struct NetworkLayerRequest {
     /* +0x70 */ u32 requestId_70;
     /* +0x74 */ u8 cancelled_74;
     /* +0x75 */ u8 pad_75[0x03];
-    /* +0x78 */ u8 mutex_78[0x1C];
+    /* +0x78 */ NetworkMutex mutex_78;
     /* +0x94 */ NetworkLayer* owner_94;     /* set while the request runs */
     /* +0x98 */ NetworkLayerHandler handler_98;
 

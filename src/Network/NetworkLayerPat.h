@@ -7,6 +7,7 @@
 #define MHTRI_NETWORK_NETWORKLAYERPAT_H
 
 #include "types.h"
+#include "Network/NetworkConnection.h"      /* NetworkMutex - the member mutex */
 #include "Network/NetworkSessionManager.h"   /* NetworkRequest - the record the state machine advances */
 #include "Network/NetworkLayer.h"            /* NetworkLayer, NetworkLayerRequest, NetworkLayerId - the base this class builds on */
 #include "Network/NetworkUniqueId.h"         /* NetworkUniqueId - the server id member */
@@ -456,7 +457,7 @@ struct NetworkLayerPatRequest {
     /* +0x70 */ u32 requestId_70;
     /* +0x74 */ u8 cancelled_74;
     /* +0x75 */ u8 pad_75[0x03];
-    /* +0x78 */ u8 mutex_78[0x1C];
+    /* +0x78 */ NetworkMutex mutex_78;
     /* +0x94 */ NetworkLayerPat* owner_94;     /* set while the request runs */
     /* +0x98 */ NetworkLayerPatHandler handler_98;
 

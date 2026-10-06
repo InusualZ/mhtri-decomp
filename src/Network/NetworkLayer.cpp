@@ -11,6 +11,7 @@
  * NAMES. Every name except the class's own is a GUESS from the slot offset or the field it touches; the 22 descriptors
  *   are the `NetworkLayerHandler` globals `networkLayerRequestDescNN`; the request starters the game calls carry the
  *   consumers' spellings (`closeSession_1C`, `requestServers_24`, ... - `Network/network_pat_control.cpp`).
+ * RESIDUALS. `move`: one callee-saved register fewer (`_savegpr_23`/`_restgpr_23` against retail's `_22`).
  * RESIDUALS. `NetworkLayer::move`: the unrolled inner scan's trip count 3 sits in r0 where retail holds it in r29 - one
  *   saved register more shifts every allocation.  The constructor: the second pool loop (an explicit pointer,
  *   the closer of the two spellings measured) swaps the counter/pointer registers.  `.data` is 0x45C of the claimed
@@ -23,8 +24,8 @@
  */
 #include "Network/NetworkLayer.h"                /* the unit's own header: the layer base class and its free functions */
 #include "Network/NetworkLayerPat.h"             /* NetLayerRequest, NetFriendRec - the records the free functions copy */
-#include "Network/NetworkSessionManager.h"       /* networkInstance_initMutex - the record's mutex */
-#include "unsplit/Network.h"                     /* getNetworkLogger, networkInstance_destroyMutex (owner Network/NetworkStreamSink.cpp) */
+#include "Network/NetworkSessionManager.h"       /* the request record shapes */
+#include "unsplit/Network.h"                     /* getNetworkLogger */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL_C/alloc.h"                         /* memcmp - owner MSL_C/alloc.cpp */
@@ -93,7 +94,6 @@ void NetworkLayerRequest::reset()
 NetworkLayerRequest::~NetworkLayerRequest()
 {
     clear();
-    networkInstance_destroyMutex(this->mutex_78, -1);
 }
 
 void NetworkLayerRequest::clear()
@@ -103,7 +103,6 @@ void NetworkLayerRequest::clear()
 
 NetworkLayerRequest::NetworkLayerRequest()
 {
-    networkInstance_initMutex(this->mutex_78);
     reset();
 }
 
