@@ -6,6 +6,7 @@
 #define MHTRI_NETWORK_SNETWORKLIBRARY_H
 
 #include "types.h"
+#include "Network/NetworkConnection.h"      /* NetworkMutex - the member mutex */
 #include "Network/NetworkPeerBase.h"
 #include "Network/network_socket_streams.h"
 #include "Network/NetworkSessionBase.h"
@@ -119,7 +120,8 @@ public:
     /* +0x4C */ u8 flag_0x4C;
     /* +0x4D */ u8 flag_0x4D;
     /* +0x4E */ u8 pad_0x4E[0x02];
-    /* +0x50 */ u8 mutex[0x3C];
+    /* +0x50 */ NetworkMutex mutex_50;
+    /* +0x6C */ u8 unused_6C[0x20];
     /* +0x8C */ s32 timeZoneMinutes;
     /* +0x90 */ u32 field_0x90;
     /* +0x94 */ u16 ports[3];

@@ -14,13 +14,13 @@
  * RESIDUALS. `__ct__16NetworkCommunityFv`: the pool loop keeps its counter and pointer registers swapped (r31/r30
  *   against retail r30/r31; the comma-form loop is the closest spelling of those measured).  `extab`: retail records
  *   the record's mutex as a member object (`~NetworkCommunityRequest` names 0x803CA338), while here it is a byte block
- *   with explicit `networkInstance_initMutex`/`networkInstance_destroyMutex` calls - the mutex class is
+ *   with explicit constructor and destructor calls - the mutex class is
  *   `Network/NetworkStreamSink.cpp`'s and shared with `NetworkLayer`, `NetworkSessionManager` and five other units.  `.sdata2`: the object carries 4 B of the claimed 8.
  * SHAPES. `__vt__16NetworkCommunity` is emitted here from the class (key function the destructor, rule 10).
  */
 #include "Network/NetworkCommunity.h"            /* the unit's own header */
-#include "Network/NetworkSessionManager.h"       /* networkInstance_initMutex, NetworkRequest_idCounter, NetworkVaState */
-#include "unsplit/Network.h"                     /* getNetworkLogger, networkInstance_destroyMutex (owner Network/NetworkStreamSink.cpp) */
+#include "Network/NetworkSessionManager.h"       /* NetworkRequest_idCounter, NetworkVaState */
+#include "unsplit/Network.h"                     /* getNetworkLogger */
 #include "types.h"
 
 /* Retail keeps the unfused lis/addi/lwz forms of the null member pointer copy (see the file header). */
@@ -81,7 +81,6 @@ void NetworkCommunityRequest::reset()
 NetworkCommunityRequest::~NetworkCommunityRequest()
 {
     clear();
-    networkInstance_destroyMutex(this->mutex_78, -1);
 }
 
 void NetworkCommunityRequest::clear()
@@ -91,7 +90,6 @@ void NetworkCommunityRequest::clear()
 
 NetworkCommunityRequest::NetworkCommunityRequest()
 {
-    networkInstance_initMutex(this->mutex_78);
     reset();
 }
 

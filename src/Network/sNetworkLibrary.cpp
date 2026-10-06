@@ -23,7 +23,7 @@
 #include "Network/sNetworkLibrary.h"
 #include "Network/sNetworkLibraryWii.h"   /* sNetworkLibraryWii - the worker-thread bodies */
 #include "Network/NetworkPool.h"               /* NetworkRandom */
-#include "Network/NetworkSessionManager.h"     /* networkInstance_initMutex / networkInstance_destroyMutex - the member mutex */
+#include "Network/NetworkSessionManager.h"     /* the network records */
 #include "unsplit/Network.h"                   /* getNetworkLogger */
 #include "Runtime.PPCEABI.H/memset.h"
 #include "sys_mem.h"
@@ -71,7 +71,6 @@ NetworkRandom* sNetworkLibrary::mpRandom;
 /* Sets up the member mutex and warns when a second instance is built. */
 sNetworkLibrary::sNetworkLibrary()
 {
-    networkInstance_initMutex(mutex);
     registerNetworkObject(this, 1);
     if (mpInstance != NULL) {
         ((sNetworkLibrary*)getNetworkLogger())->logError("Already instance constructed.\n");
@@ -89,7 +88,6 @@ sNetworkLibrary::~sNetworkLibrary()
 {
     sNetworkLibrary::final();
     mpInstance = NULL;
-    networkInstance_destroyMutex(mutex, -1);
 }
 
 void sNetworkLibrary::setLogLevel(s32 level)

@@ -34,6 +34,11 @@
  *   `strtok` (0x8045F858) is the C library's own name, which the dump does not carry - not a GUESS.
  *   Callees named at integration: `sendReqLayerUserInfoSet` (0x80401AF4, recvAnsLayerUserInfoSet's slot),
  *   `sendReqLayerTell` (0x8040211C, the `sendReqCircleTell` shape).
+ * RESIDUALS. `moveRequests`: one callee-saved register fewer (`_savegpr_21`/`_restgpr_21` against retail's `_20`);
+ *   `handleChat`, `reflect`: the slot-info constructor/destructor pair is named `__ct__/__dt__22NetworkSessionSlotInfo`
+ *   here and `fn_803E6DD8`/`dtor_803E6D7C` in the map (the unwritten inline pair).
+ * RESIDUALS. `extab`: the request record's constructor and destructor record cleanups for its `NetworkMutex` member
+ *   that retail's (identical code) do not carry (+0x28 B).
  * RESIDUALS. 2 rows unwritten: the inline ctor/dtor pair `fn_803E6DD8`/`dtor_803E6D7C` (after `handleChat`, used by
  *   `handleChat` and `reflect`'s chat notice) - a copy of `NetworkSessionSlotInfo`'s members, whose manglings
  *   `Network/NetworkSessionManager.cpp` already defines, so the map cannot carry them twice; our calls reach those
@@ -237,14 +242,14 @@ s32 NetworkLayerRequest::getRecord(NetworkRequestError* out)
     s32 result;
 
     result = 0;
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     if (this->record_54 != 0) {
         result = 1;
         out->code_00 = this->record_54;
         out->arg_04 = this->record_58;
         out->arg_08 = this->record_5C;
     }
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
     return result;
 }
 
@@ -620,11 +625,11 @@ BOOL NetworkLayerPat::isFriendTransferActive_E4(s8 slot)
 /* Stores the request's error record under its mutex. */
 void NetworkLayerRequest::setRecord(u32 code, u32 arg_a, u32 arg_b)
 {
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     this->record_58 = arg_a;
     this->record_5C = arg_b;
     this->record_54 = code;
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
 }
 
 /* The starter's word argument `index`, 0 (and a warning) past the count it was given. */
@@ -649,14 +654,14 @@ s32 NetworkLayerRequest::isTimedOut()
     s32 result;
 
     result = 0;
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     if (0.0f != this->interval_4C) {
         log = getNetworkLogger();
         if (log->getTime_60() - this->timeout_50 > this->interval_4C) {
             result = 1;
         }
     }
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
     return result;
 }
 
@@ -665,11 +670,11 @@ void NetworkLayerRequest::restartTimer(f32 interval)
 {
     NetworkLogger* log;
 
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     log = getNetworkLogger();
     this->timeout_50 = log->getTime_60();
     this->interval_4C = interval;
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
 }
 
 /* The layer event callback `setReflectCallback` installs (its first word). */
@@ -6449,7 +6454,6 @@ void NetworkLayerPat::setCollectionLog(NetworkLayerPatRequest* request, u32 code
 /* Builds the record's mutex, then resets it. */
 inline NetworkLayerPatRequest::NetworkLayerPatRequest()
 {
-    networkInstance_initMutex(this->mutex_78);
     reset();
 }
 
@@ -6494,14 +6498,14 @@ inline s32 NetworkLayerPatRequest::getRecord(NetworkRequestError* out)
     s32 result;
 
     result = 0;
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     if (this->record_54 != 0) {
         result = 1;
         out->code_00 = this->record_54;
         out->arg_04 = this->record_58;
         out->arg_08 = this->record_5C;
     }
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
     return result;
 }
 
@@ -6521,18 +6525,17 @@ inline s32 NetworkLayerPatRequest::getArgument(u32 index)
 /* Sets the request's error record under its mutex. */
 inline void NetworkLayerPatRequest::setRecord(u32 code, u32 arg_a, u32 arg_b)
 {
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     this->record_58 = arg_a;
     this->record_5C = arg_b;
     this->record_54 = code;
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
 }
 
 /* Resets the record and releases its mutex. */
 inline NetworkLayerPatRequest::~NetworkLayerPatRequest()
 {
     clear();
-    networkInstance_destroyMutex(this->mutex_78, -1);
 }
 
 inline void NetworkLayerPatRequest::clear()

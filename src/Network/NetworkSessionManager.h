@@ -9,6 +9,7 @@
 #define NETWORK_NetworkSessionManager_H
 
 #include "types.h"
+#include "Network/NetworkConnection.h"      /* NetworkMutex - the member mutex */
 #include "Network/NetworkPeerBase.h"
 #include "Network/network_socket_streams.h"
 #include "Network/NetworkSessionBase.h"
@@ -145,7 +146,8 @@ struct NetworkErrorInfo;   /* the 12-byte error record - Network/gamespy_interfa
    null member pointer (a 12-byte copy of `__ptmf_null`). */
 typedef s32 (NetworkSessionManager::*NetworkRequestDesc)(NetworkRequest* request);   /* size: 0xC */
 
-typedef struct NetworkRequest {
+/* The request fields every request record carries ahead of its mutex (the records differ in who builds them). */
+struct NetworkRequestHead {
     s32 state_00;               /* +0x00 - the request's state-machine step */
     u32 unused_04;              /* +0x04 */
     u32 unused_08;              /* +0x08 */
@@ -170,9 +172,17 @@ typedef struct NetworkRequest {
     u32 requestId_70;              /* +0x70 */
     u8 cancelled_74;               /* +0x74 */
     u8 pad75[0x03];
-    u8 mutex_78[0x1C];      /* +0x78..+0x93 */
-    NetworkSessionManager* owner_94;   /* +0x94 - set while the request runs */
-    NetworkRequestDesc handler_98;     /* +0x98..+0xA3 - the member function the request runs */
+};   /* size: 0x78 */
+
+/* The manager's pooled request: the record, its mutex and the running handler.  Its constructor and destructor are
+   the pair the manager's member array construction hands `__construct_array`. */
+struct NetworkRequest : public NetworkRequestHead {
+    NetworkRequest();    /* builds the mutex (the member), then empties the record */
+    ~NetworkRequest();   /* empties the record; the mutex goes with the member */
+
+    /* +0x78 */ NetworkMutex mutex_78;
+    /* +0x94 */ NetworkSessionManager* owner_94;   /* set while the request runs */
+    /* +0x98 */ NetworkRequestDesc handler_98;     /* the member function the request runs */
 
     void run();   /* runs the handler; a handler that reports completion clears the record */
     s32 getRecord(NetworkErrorInfo* out);    /* the error record, under the mutex; false while none is set */
@@ -180,17 +190,21 @@ typedef struct NetworkRequest {
     s32 getArgument(u32 idx);                /* the starter's word argument `idx` (0 past the count) */
     s32 isTimedOut();                        /* waiting longer than `interval_4C` (never while idle) */
     void restartTimer(f32 interval);         /* the clock becomes the baseline, the interval is replaced */
-} NetworkRequest;           /* size: 0xA4 */
+};   /* size: 0xA4 */
 
-/* The Pat layer's own request record: the same 0xA4-byte record with a constructor and a destructor of its own
-   (the pair the Pat constructor's `__construct_array` passes, distinct from the base pool's), so the Pat manager's
-   member construction runs it in member order (GUESS on the name: derived from its owner). */
-class NetworkRequestPat {
+/* The Pat layer's own request record: the same 0xA4-byte layout with a constructor, a destructor and a reset of its
+   own (the pair the Pat manager's member construction runs), so it owns its mutex directly (GUESS on the name:
+   derived from its owner). */
+class NetworkRequestPat : public NetworkRequestHead {
 public:
     NetworkRequestPat();
     ~NetworkRequestPat();
+    void clear();   /* empties the record */
+    void reset();   /* clears every field */
 
-    /* +0x00 */ NetworkRequest request_00;
+    /* +0x78 */ NetworkMutex mutex_78;
+    /* +0x94 */ NetworkSessionManager* owner_94;
+    /* +0x98 */ NetworkRequestDesc handler_98;
 };   /* size: 0xA4 */
 
 /* One entry of the name list: `copyNameList` copies an entry only when its first word is set. */
@@ -689,8 +703,7 @@ extern NetworkRequestDesc networkRequestDesc428;
 /* 0x80794CA0 (.sbss) - the request-id source: `requestId_70 = counter; counter = requestId_70 + 1`. */
 extern u32 NetworkRequest_idCounter;
 
-/* neighbouring helpers.  The member mutex's constructor and destructor (`networkInstance_initMutex`,
-   `networkInstance_destroyMutex`) are `Network/NetworkStreamSink.cpp`'s, declared in its header (included at
+/* neighbouring helpers.  The member mutex class (`NetworkMutex`) is `Network/NetworkConnection.cpp`'s, declared in its header (included at
    the top of this file).  Each `untyped:` marker below is the honest case for that declaration: a
    record whose layout this range never reads.  The reflection adapters `networkSessionReflect0`/`1`
    are declared in `Network/NetworkSessionManagerPat.h` and `NetworkUniqueId` in
@@ -705,8 +718,6 @@ void networkSessionReflectCallbackEx(void* a0, void* a1, void* a2, void* a3, voi
 
 /* this unit's own record/stream helpers, defined in the tail of the range */
 void NetworkRequest_copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src);
-void NetworkRequestPat_reset(NetworkRequest* self);
-void NetworkRequestPat_clear(NetworkRequest* self);
 /* untyped: caller-owned payload - the array constructors take raw element pointers */
 void __construct_array(void* ptr, void* ctor, void* dtor, u32 size, u32 count);
 /* untyped: caller-owned payload - the array destructors take raw element pointers */

@@ -16,6 +16,8 @@
  *   `sendReqBlackAdd` 283, `sendReqBlackDelete` 285, `sendReqBlackList` 287; hence `blockPlayer`/`unblockPlayer`
  *   (BlackAdd/BlackDelete); `inviteFriend` (sends FriendAccept) and `sendFriendMessage` (FriendAdd with a text) keep the
  *   consumer's names.  `NetworkFriendInfo` is `menu/movie.cpp`'s (`menu/movie.h`), `strtok` MSL's.
+ * RESIDUALS. `extab`: `~NetworkCommunityPatRequest` records a cleanup for its `NetworkMutex` member that retail's
+ *   (byte-identical code) does not carry (+0x14 B).
  * RESIDUALS. Not unwritten: the empty inline constructor/destructor bodies of `NetworkCommunityFriendList` and
  *   `NetworkCommunityBlockList` are complete (MWCC emits the element construction; declared so other units call them).
  *   `__dt__17NetworkFriendInfoFv`: retail re-extends the flag (`extsh r0,r4`), the empty inline destructor
@@ -35,7 +37,7 @@
  *   first function that calls it.
  */
 #include "Network/NetworkCommunityPat.h"         /* the unit's own header */
-#include "Network/NetworkSessionManager.h"       /* networkInstance_initMutex, NetworkRequest_idCounter, NetworkVaState */
+#include "Network/NetworkSessionManager.h"       /* NetworkRequest_idCounter, NetworkVaState */
 #include "Network/NetworkSessionBase.h"          /* LockMutex/UnlockMutex, getNetworkBinaryState */
 #include "Network/PatInterface.h"                /* PatInterface and its C surface */
 #include "Network/network_pat_control.h"         /* NetRosterSync */
@@ -43,7 +45,7 @@
 #include "Network/NetworkSessionManagerPat.h"    /* getPatsObject */
 #include "Network/NetworkLayer.h"                /* NetworkLayerIdImportFrom */
 #include "enemy/em020_ai.h"                      /* getInstance_ */
-#include "unsplit/Network.h"                     /* getNetworkLogger, networkInstance_destroyMutex (owner Network/NetworkStreamSink.cpp) */
+#include "unsplit/Network.h"                     /* getNetworkLogger */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL/strlen.h"
@@ -129,7 +131,6 @@ inline NetworkCommunityFriendList::NetworkCommunityFriendList()
 inline NetworkCommunityPatRequest::~NetworkCommunityPatRequest()
 {
     clear();
-    networkInstance_destroyMutex(this->mutex_78, -1);
 }
 
 inline void NetworkCommunityPatRequest::clear()
@@ -176,7 +177,6 @@ inline void NetworkCommunityPatRequest::reset()
 
 inline NetworkCommunityPatRequest::NetworkCommunityPatRequest()
 {
-    networkInstance_initMutex(this->mutex_78);
     reset();
 }
 
@@ -739,25 +739,25 @@ inline s32 NetworkCommunityRequest::getRecord(NetworkErrorInfo* out)
     s32 result;
 
     result = 0;
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     if (this->record_54 != 0) {
         result = 1;
         out->code_00 = this->record_54;
         out->param1_04 = this->record_58;
         out->param2_08 = this->record_5C;
     }
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
     return result;
 }
 
 /* Sets the request's error record under its mutex. */
 inline void NetworkCommunityRequest::setRecord(u32 code, u32 arg0, u32 arg1)
 {
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     this->record_58 = arg0;
     this->record_5C = arg1;
     this->record_54 = code;
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
 }
 
 /* Closes the community session (command 2): shuts the server side down when this layer holds the last reference. */
@@ -1373,14 +1373,14 @@ inline s32 NetworkCommunityPatRequest::getRecord(NetworkErrorInfo* out)
     s32 result;
 
     result = 0;
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     if (this->record_54 != 0) {
         result = 1;
         out->code_00 = this->record_54;
         out->param1_04 = this->record_58;
         out->param2_08 = this->record_5C;
     }
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
     return result;
 }
 
@@ -2466,11 +2466,11 @@ void NetworkCommunityPat::setCollectionLogSessionLost(NetworkCommunityPatRequest
 /* Sets the request's error record under its mutex. */
 inline void NetworkCommunityPatRequest::setRecord(u32 code, u32 arg0, u32 arg1)
 {
-    LockMutex(this->mutex_78);
+    LockMutex(&this->mutex_78);
     this->record_58 = arg0;
     this->record_5C = arg1;
     this->record_54 = code;
-    UnlockMutex(this->mutex_78);
+    UnlockMutex(&this->mutex_78);
 }
 
 /* Records the aborted-request error on `request`. */

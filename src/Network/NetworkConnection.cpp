@@ -10,10 +10,11 @@
  * FLAGS. the library's flags plus `#pragma peephole off`, measured on the six written rows.
  * NAMES. The file and class names are GUESSes: the base class of `NetworkConnectionStable`; the slot names are read off
  *   the derived class's overrides.  GUESS: setInterval, setTimeout, setLimit (the defaults each new connection copies).
- * RESIDUALS. Unwritten: the mutex record's destructor and
- *   constructor (0x803CA338, 0x803CA37C, 132 B) - a class (its constructor stores 0x805F91E0) that seven units call as
- *   the C pair `networkInstance_destroyMutex`/`_initMutex` on byte blocks (`NetworkRequest` among them is built through
- *   a hand-written `__construct_array`).  `.data`: the mutex table (0x805F91E0) is not emitted until its class is.
+ * NAMES. GUESS: NetworkMutex (the member mutex the network records embed).
+ * RESIDUALS. `extab` (flip blocker): 0x80 of 0x94 B - retail's `NetworkPeerGameSpy` constructor carries a cleanup
+ *   record against `NetworkPeerBase`'s destructor (`destroy__15NetworkPeerBaseFs`), which this project models as the
+ *   plain virtual `destroy` the Matching peers are built on.
+ * SHAPES. `NetworkMutex`'s destructor is complete with an empty body (it only frees on request) and matches.
  * SHAPES. `NetworkPeerUdp`'s constructor is complete with an empty body (the compiler emits the base call and the
  *   table store) and matches.
  */
@@ -56,7 +57,17 @@ NetworkConnection::NetworkConnection(s32 kind)
 /* Chains the peer base and builds the receive queue's mutex; the interface is bound later (`setContext`). */
 NetworkPeerGameSpy::NetworkPeerGameSpy()
 {
-    networkInstance_initMutex(mutex_6614);
+}
+
+/* Frees the mutex on request (the OS mutex needs no teardown). */
+NetworkMutex::~NetworkMutex()
+{
+}
+
+/* Initialises the OS mutex. */
+NetworkMutex::NetworkMutex()
+{
+    OSInitMutex(&mutex_04);
 }
 
 /* Chains the peer base; the Udp peer's own fields are bound later (`setContext`). */
