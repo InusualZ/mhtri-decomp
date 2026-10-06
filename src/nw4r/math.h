@@ -35,6 +35,16 @@ struct MTX34 {
     /* +0x00 */ f32 m[3][4];
 };
 
+/* A 3x3 row-major float matrix. size: 0x24 */
+struct MTX33 {
+    /* +0x00 */ f32 m[3][3];
+};
+
+/* A 4x4 row-major float matrix. size: 0x40 */
+struct MTX44 {
+    /* +0x00 */ f32 m[4][4];
+};
+
 }  // namespace math
 }  // namespace nw4r
 

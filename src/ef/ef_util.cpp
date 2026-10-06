@@ -37,6 +37,7 @@
 #include "fn_8004CAD8.h"    /* the VEC3 helpers this range owns (rule 2) */
 #include "mh3_pad.h"        /* VEC3_ctor - owner src/mh3_pad.cpp (rule 2) */
 #include "g3d/g3d_anmchr.h" /* fn_800610AC - owner src/g3d/g3d_anmchr.cpp (rule 2) */
+#include "nw4r/math_triangular.h" /* nw4r::math::sSinCosTbl - owner src/nw4r/math_triangular.cpp (rule 2) */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`). */
@@ -117,7 +118,6 @@ extern const f32 lbl_80795FA4;   /* 3.0f                                        
 extern const f32 lbl_80795FA8;   /* 65536.0f - the quantized angle's ceiling                  .sdata2 */
 extern const f32 lbl_80795FAC;   /* 100000.0f                                                .sdata2 */
 extern const f32 lbl_80795FB0[]; /* {1.0e-05f, ...} - address taken                           .sdata2 */
-extern const f32 lbl_80573CD8[]; /* the 256-entry x 4-float sin/cos interpolation table      .rodata */
 
 /* The library's pointer assert: `ptr` must fall in one of the seven mapped memory ranges (six
  * materialised BOOLs, the first `if` carrying two tests). */
@@ -333,7 +333,7 @@ extern "C" void fn_8009C6F0(f32* pOut, f32 angle) {
         } while (a >= lbl_80795FA8);
         pOut[0] = a;
     }
-    tbl = lbl_80573CD8 + (*(u16*)pOut & 0xFF) * 4;
+    tbl = &nw4r::math::sSinCosTbl[0].sin_val + (*(u16*)pOut & 0xFF) * 4;
     a = a - pOut[0];
     s = tbl[0] + tbl[2] * a;
     c = tbl[1] + tbl[3] * a;
@@ -358,7 +358,7 @@ extern "C" void fn_8009C760(f32* pSin, f32* pCos, f32 angle) {
         } while (a >= lbl_80795FA8);
         pSin[0] = a;
     }
-    tbl = lbl_80573CD8 + (*(u16*)pSin & 0xFF) * 4;
+    tbl = &nw4r::math::sSinCosTbl[0].sin_val + (*(u16*)pSin & 0xFF) * 4;
     a = a - pSin[0];
     s = tbl[0] + tbl[2] * a;
     c = tbl[1] + tbl[3] * a;
