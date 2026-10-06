@@ -66,14 +66,15 @@ typedef struct NetCityValue {
  * population against capacity, and the closed/hidden flags the list view maps to a state). */
 typedef struct NetCityRec {
     /* +0x00 */ s32 id_0x00;
-    /* +0x04 */ char name_0x04[0x44];
+    /* +0x04 */ char name_0x04[0x40];
+    /* +0x44 */ s32 count_0x44;          /* `PatLayerData::counts_058[1]` */
     /* +0x48 */ s32 population_0x48;
     /* +0x4C */ s32 capacity_0x4C;
     /* +0x50 */ s32 order_0x50;
     /* +0x54 */ u32 kind_0x54;         /* 4 = the record carries the four settings below */
     /* +0x58 */ NetCityValue values_0x58[4];
-    /* +0x78 */ u8 closed_0x78;
-    /* +0x79 */ u8 hidden_0x79;
+    /* +0x78 */ bool closed_0x78;
+    /* +0x79 */ bool hidden_0x79;
     /* +0x7A */ u8 pad_0x7A[0x2];
 } NetCityRec; /* size: 0x7C */
 
@@ -108,10 +109,12 @@ typedef struct NetCityList {
 typedef struct NetRoomRec {
     /* +0x00 */ u8 header_0x00[0x40];   /* the 64 bytes `readRoomHeader_C8` copies out */
     /* +0x40 */ s32 id_0x40;
-    /* +0x44 */ char name_0x44[0x44];
+    /* +0x44 */ char name_0x44[0x40];
+    /* +0x84 */ s32 count_0x84;          /* `PatLayerData::counts_058[1]` */
     /* +0x88 */ s32 population_0x88;
     /* +0x8C */ s32 capacity_0x8C;
-    /* +0x90 */ u8 pad_0x90[0x28];
+    /* +0x90 */ s32 order_0x90;
+    /* +0x94 */ NetLayerSettings settings_0x94;
 } NetRoomRec; /* size: 0xB8 */
 
 /* The room list: a count and the 40 entries (`NetworkLayerPat::rooms_18A4`).  size: 0x1CC4 */
@@ -227,7 +230,7 @@ typedef struct NetCommunityRec {
     /* +0x010C */ s32 slot_0x010C;
     /* +0x0110 */ s32 enabled_0x0110;
     /* +0x0114 */ s32 slot_0x0114;
-    /* +0x0118 */ u8 state_0x0118;   /* `getCommunityState_AC` */
+    /* +0x0118 */ bool state_0x0118;   /* `getCommunityState_AC` */
     /* +0x0119 */ u8 pad_0x0119[0x3];
     /* +0x011C */ NetFriendTable members_0x011C;                /* the record's implicit constructor 0x803E11FC builds it */
     /* +0x1700 */ NetFriendSession memberSessions_0x1700[100];
@@ -263,12 +266,27 @@ typedef struct NetFriendList {
 
 /* One field of the user-field block `NetworkLayerPat::sendUserFields_5C` sends: its kind (1..7 a value held inline
  * at +0x08, 8 a pointer at +0x08, 9 a pointer and a 16-bit size, anything else an empty field). */
+typedef struct NetUserFieldBlob {
+    /* +0x0 */ const u8* data_0;
+    /* +0x4 */ u16 size_4;
+    /* +0x6 */ u8 pad_6[0x2];
+} NetUserFieldBlob;   /* size: 0x8 */
+
+/* A user field's value: kinds 1..7 inline (u8, u16, u32, s64, f32, f64, u32), 8 and 9 a pointer (9 with a size). */
+typedef union NetUserFieldValue {
+    /* +0x0 */ u8 byte;
+    /* +0x0 */ u16 half;
+    /* +0x0 */ u32 word;
+    /* +0x0 */ s64 wide;
+    /* +0x0 */ f32 single;
+    /* +0x0 */ f64 real;
+    /* +0x0 */ NetUserFieldBlob blob;
+} NetUserFieldValue;   /* size: 0x8 */
+
 typedef struct NetUserField {
     /* +0x00 */ u8 kind_00;
     /* +0x01 */ u8 pad_01[0x07];
-    /* +0x08 */ const u8* data_08;   /* kinds 1..7: the value itself, inline */
-    /* +0x0C */ u16 size_0C;         /* kind 9 */
-    /* +0x0E */ u8 pad_0E[0x02];
+    /* +0x08 */ NetUserFieldValue value_08;
 } NetUserField;   /* size: 0x10 */
 
 /* The user-field block: how many fields are set (at most 64) and the fields. */
@@ -284,6 +302,24 @@ typedef struct NetUserPosition {
     /* +0x00 */ f32 position_00[3];
     /* +0x0C */ s32 value_0C[3];
 } NetUserPosition;   /* size: 0x18 */
+
+/* The user-field event `reflect` reports (event 17): the user and the fields the server sent (GUESS on the name). */
+struct NetUserFieldsNotice {
+    /* +0x000 */ NetworkUniqueId id_000;
+    /* +0x020 */ NetUserFields fields_020;
+
+    NetUserFieldsNotice();    /* 0x803EDF94 - inline, emitted after `reflect` */
+    ~NetUserFieldsNotice();   /* 0x803EDF38 */
+};   /* size: 0x428 */
+
+/* The user-position event `reflect` reports (event 14): the user and the position it published (GUESS on the name). */
+struct NetUserPositionNotice {
+    /* +0x000 */ NetworkUniqueId id_00;
+    /* +0x020 */ NetUserPosition position_20;
+
+    NetUserPositionNotice();    /* 0x803EDF08 - inline, emitted after `reflect` */
+    ~NetUserPositionNotice();   /* 0x803EDEAC */
+};   /* size: 0x38 */
 
 /* The login record the server sends this console when it enters a layer (only the fields `applyLoginRecord` takes
  * are named; GUESS on their meaning from where they go). */
@@ -311,11 +347,12 @@ typedef struct NetLayerAddress {
     /* +0x08 */ u16 path_08[4];
 } NetLayerAddress;   /* size: 0x10 */
 
-/* The layer record a layer-info-by-id request fills (only the word `clear` resets is named). */
+/* The layer record a layer-info-by-id request fills: the layer's id and up to three tab-separated texts of its
+ * comment. */
 typedef struct NetLayerRecord {
-    /* +0x000 */ u8 pad_000[0x40];
-    /* +0x040 */ u32 id_40;
-    /* +0x044 */ u8 pad_044[0xC0];
+    /* +0x000 */ u8 header_000[0x40];     /* a `NetworkLayerId` (`NetworkLayerIdImportFrom` fills it) */
+    /* +0x040 */ s32 textCount_40;
+    /* +0x044 */ char texts_044[3][0x40];
 } NetLayerRecord;   /* size: 0x104 */
 
 /* The user record a user-info request sends (only the key it fills is named). */
@@ -677,8 +714,7 @@ public:
     /* +0xF030 */ u32 status_F030;
     /* +0xF034 */ u32 status_F034;
     /* +0xF038 */ u32 status_F038;
-    /* +0xF03C */ u32 status_F03C;
-    /* +0xF040 */ u8 pad_F040[0x20];
+    /* +0xF03C */ NetLayerSettings layerSettings_F03C;   /* the current layer's settings (its info answers) */
     /* +0xF060 */ char comment_F060[0x40];   /* `setComment_94` copies at most 63 characters */
     /* +0xF0A0 */ NetLayerSettings settings_F0A0;
     /* +0xF0C4 */ NetLayerRequest request_F0C4;   /* `submitRequest_9C`'s record */

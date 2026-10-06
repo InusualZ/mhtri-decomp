@@ -26,9 +26,10 @@
  *   `readCommunityMemberCards`, `checkLayerEntry`, `NetFriendCard`, `NetServerConfig`, `NetSrvList`.
  *   `isReadyCountOne` and `resetFailureState` (a `blr` stub) keep names that say only what the body does.
  * RESIDUALS. 13 rows unwritten (objdiff scores them zero):
- *   - `updateMessagePool` (0x80425790, 5504 B), `updatePeerCardBlock` (0x80427868, 920 B) and the peer import
- *     0x80427C00 (740 B, it copies the layer's friend roster into +0x1ADC: a `NetFriendRoster` the record still spells
- *     as `layer_value_0x1ADC`/`layer_peers_0x1AE0` and padding);
+ *   - `updateMessagePool` (0x80425790, 5504 B), `updatePeerCardBlock` (0x80427868, 920 B; it writes a peer's card into
+ *     `lobby/lb_companion_ui.cpp`'s `lbl_806BE340` records and `lobby_state_block`+8, blocked on requests net-b#9/#10)
+ *     and the peer import 0x80427C00 (740 B, it copies the layer's friend roster into +0x1ADC: a `NetFriendRoster` the
+ *     record still spells as `layer_value_0x1ADC`/`layer_peers_0x1AE0` and padding);
  *   - the static-init/ctor/dtor group 0x80431CD8..0x80432104 (10 rows; it needs `NetCtrlWk`'s member classes - that
  *     roster, the peer address objects, the requests - as C++ members).
  *   Partial rows written here: `readFriendCards`/`readCommunityMemberCards` (the callee-saved registers; the community
@@ -46,7 +47,15 @@
  *    redundant `== '\\'` test;
  *  - `queueNetCommand`: one store scheduled before the loop's pointer bump; `resetMessagePool`, `initWorkRecord`,
  *    `initNetworkPatControl`: scheduling, one folded store each;
- *  - `get_server_type_name` and the rest: register and unroll differences (the objdiff rows).
+ *  - `get_server_type_name` and the rest: register and unroll differences (the objdiff rows);
+ *  - callee-saved range: `PatCryptEncrypt`, `layerReflectCallback`, `updateNetworkPatControl` save from r24 in retail
+ *    (`_savegpr_24`/`_restgpr_24`), ours from r25/r26; `copyRosterLists` the other way (retail r25, ours r24);
+ *    `resetSlotTable` names the `.sdata2` constant `lbl_8079C888` where retail's load carries no symbol, and
+ *    `initWorkRecord`/`copyFriendList` reach `net_ctrl_work`/`net_ctrl_wk` with an extra relocation (an address CSE'd
+ *    differently).
+ *  - flip blockers: `.bss` is 0xDFE4 against the 0xE100 claim and `.data` 0x580 against 0x620 (the unwritten rows'
+ *    statics and tables); retail keeps `netNullQuery`, `netNullHook`, `netUtf8ToUtf16` force-active (`.comment`), ours
+ *    lets the linker strip them (they need `__declspec(export)` before a flip);
  *  - data: the `.rodata` certificate is byte-identical after linking (the split object holds a relocation at +0x244, the
  *    DER bytes 8014CB40 read as a pointer); our object also emits 0x10 of each of `.sdata`/`.sdata2` from its own pools
  *    (`@NNNN` where the target names `lbl_8079C898`/`lbl_8079C890`/`lbl_807939C4`/`SPACE_STR`).
@@ -1211,8 +1220,8 @@ s32 sendUserProfilePart(u8 kind, const u8* data, u32 size)
     }
     fields.count_000 = 1;
     fields.fields_008[0].kind_00 = 9;
-    fields.fields_008[0].data_08 = data;
-    fields.fields_008[0].size_0C = size;
+    fields.fields_008[0].value_08.blob.data_0 = data;
+    fields.fields_008[0].value_08.blob.size_4 = size;
     getNetworkLayerPat(getPatsObject(), 0)->sendUserFields_5C(&fields);
     return 1;
 }
