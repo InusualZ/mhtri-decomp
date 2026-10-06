@@ -5,7 +5,7 @@
  *   dispatch hands out, and the class's destructor, which closes the range.
  * RANGE. .text 0x800B4AC8-0x800B9A44 (60 functions); extab 0x8000A10C-0x8000A23C, extabindex 0x80023538-0x80023700,
  *   .data 0x805939E8-0x80593E88 (the `__FILE__` string "ef_drawstripestrategy.cpp" first, copies at 0x80593D0C,
- *   0x80593D5C and 0x80593DAC), .sdata2 0x80796120-0x80796150.  Left edge: `ef/fn_800AEE48.cpp` (`ef_resource.cpp`)
+ *   0x80593D5C and 0x80593DAC), .sdata2 0x80796120-0x80796150.  Left edge: `ef/ef_resource.cpp`
  *   ends there; right edge: `ef/ef_drawbillboardstrategy.cpp` starts there.
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off`, `#pragma fp_contract off` and `#pragma dont_inline on`
  *   before the includes (the base destructors the constructor's unwind entry emits call their bases out of line,

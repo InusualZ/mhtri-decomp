@@ -144,7 +144,7 @@ struct EmProgWork {
 /* This unit's own rows that an earlier row calls - they are defined further down, in address order. */
 extern "C" void fn_801B78F8(EmProgWork* self);
 
-/* `fn_800B0B90` subtracts `b` from `self` in place (`ef/fn_800AEE48.cpp`, whose header clashes with `mh3_pad.h`'s
+/* `fn_800B0B90` subtracts `b` from `self` in place (`ef/ef_postfield.cpp`, whose header clashes with `mh3_pad.h`'s
  * `VEC3_ctor`/`setVec3`); `lbl_805B2188` is this unit's 0x60-byte `.data` table `em_key_curve_eval` is handed. */
 extern "C" {
 void fn_800B0B90(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
