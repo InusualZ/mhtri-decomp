@@ -12,13 +12,20 @@
  * FLAGS. `cflags_main`; `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of every
  *   narrowing FIFO store and byte load), now before the includes; `#pragma dont_inline on` at the end (the inline
  *   destructor calls its base out of line).
- * NAMES. The map has only `fn_` stems for the range.  GUESS: `ef_free_gx_position3f` (the 0x14 FIFO writer at +0x10 of
- *   `fn_800BE39C`, reached by a tail call).
+ * NAMES. GUESS: `ef_free_gx_position3f` (the 0x14 FIFO writer at +0x10 of
+ *   `ef_free_gx_position`, reached by a tail call).
+ *   GUESS (from the bodies, the billboard unit's scheme): `ef_free_gx_position` (hands a vector to the FIFO writer),
+ *   GUESS: `ef_free_rotate_mtx` (the axis/Euler rotation from the particle's angles), `ef_free_setup_gx` (the GX setup).
+ *   GUESS (the billboard unit's scheme): `ef_free_write_quad`, `ef_free_gx_end`, `ef_free_gx_u8`, `ef_free_tex_flag`,
+ *   GUESS: `ef_free_scale_mtx` (the source rows scaled by (u,v,u) with the s/t correction).
+ *   The data names spell their strings (`ef_free_file_str`, `ef_free_*_assert_str` after the asserted expression).
  * RESIDUALS. 2 partial rows:
  *  - `Draw` (0x800BE3C0): the three arguments are saved one register lower (r27-r29 against r28-r30) and one
  *    `lwz r6, 0x24(pm)` is scheduled earlier;
- *  - `fn_800BEA00`: the two products of the 0x24 component (`fmuls f6`, `fmuls f11`) are computed later and the
+ *  - `ef_free_rotate_mtx`: the two products of the 0x24 component (`fmuls f6`, `fmuls f11`) are computed later and the
  *    float registers around them differ.
+ *   Relocation names that differ from retail (pool constants - the literals' own pool): `ef_free_hundred`,
+ *     `ef_free_epsilon`, `ef_free_int_to_double`, `ef_free_one`, `ef_free_zero`.
  *   flipcheck: `.data` claimed, not emitted; `.rodata` (the quad tables) and `.sdata` (the texcoord table) are
  *   emitted.
  *   `DrawLineStrategy` (constructor): the empty body is the whole source - the compiler
@@ -59,12 +66,12 @@ extern "C" {
 
 /* This unit's `.data`/`.rodata`/`.sdata`/`.sdata2` symbols (its claimed ranges), declared, never
  * defined. */
-extern char lbl_805941F8[]; /* "ef_drawfreestrategy.cpp"                                 .data 0x805941F8 */
-extern char lbl_80594210[]; /* "NW4R:Pointer Error\np(=%p) is not valid pointer."        .data 0x80594210 */
-extern char lbl_80594240[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."       .data 0x80594240 */
-extern char lbl_80594274[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."  .data 0x80594274 */
-extern char lbl_805942B0[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."      .data 0x805942B0 */
-extern char lbl_805942E4[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."       .data 0x805942E4 */
+extern char ef_free_file_str[]; /* "ef_drawfreestrategy.cpp"                                 .data 0x805941F8 */
+extern char ef_free_p_assert_str[]; /* "NW4R:Pointer Error\np(=%p) is not valid pointer."        .data 0x80594210 */
+extern char ef_free_pm_assert_str[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."       .data 0x80594240 */
+extern char ef_free_resource_assert_str[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."  .data 0x80594274 */
+extern char ef_free_ed_assert_str[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."      .data 0x805942B0 */
+extern char ef_free_pp_assert_str[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."       .data 0x805942E4 */
 /* The unit quad in the XY plane and its crossing quad in the YZ plane (`.rodata`). */
 static const Vec3 ef_free_quad_vtx[4] = {
     {-1.0f, -1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}};
@@ -72,11 +79,11 @@ static const Vec3 ef_free_cross_vtx[4] = {
     {0.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, -1.0f}, {0.0f, -1.0f, -1.0f}};
 /* The quads' texture coordinates, (s, t) byte pairs the GX_VA_TEX0 array reads (`.sdata`). */
 static u8 ef_free_texcoords[8] __attribute__((aligned(32))) = {0, 1, 0, 0, 1, 0, 1, 1};
-extern f32 lbl_80796190;    /* 100.0f                                                   .sdata2 0x80796190 */
-extern f32 lbl_80796194;    /* FLT_EPSILON                                              .sdata2 0x80796194 */
-extern f64 lbl_80796198;    /* the int->double conversion magic (2^52 + 2^31)           .sdata2 0x80796198 */
-extern f32 lbl_807961A0;    /* 1.0f                                                     .sdata2 0x807961A0 */
-extern f32 lbl_807961A4;    /* 0.0f                                                     .sdata2 0x807961A4 */
+extern f32 ef_free_hundred;    /* 100.0f                                                   .sdata2 0x80796190 */
+extern f32 ef_free_epsilon;    /* FLT_EPSILON                                              .sdata2 0x80796194 */
+extern f64 ef_free_int_to_double;    /* the int->double conversion magic (2^52 + 2^31)           .sdata2 0x80796198 */
+extern f32 ef_free_one;    /* 1.0f                                                     .sdata2 0x807961A0 */
+extern f32 ef_free_zero;    /* 0.0f                                                     .sdata2 0x807961A4 */
 
 /* The GX entry points this unit calls (the SDK spells them, so they are `extern "C"`). */
 extern void GXBegin(u32 prim, u32 vtxfmt, u32 nverts);
@@ -124,20 +131,20 @@ typedef struct EfDrawState {
     /* +0xAB */ u8 pad_0xAB[0x02];
     /* +0xAD */ u8 draw_yz_quad;    /* == 1: also emit the YZ-plane quad */
     /* +0xAE */ u8 pad_0xAE;
-    /* +0xAF */ u8 drawer_mode;     /* the rotation-axis selector fn_800BEA00 switches on */
+    /* +0xAF */ u8 drawer_mode;     /* the rotation-axis selector ef_free_rotate_mtx switches on */
 } EfDrawState; /* size: 0xB0 - a lower bound (the record continues past what this unit reads) */
 
 /* --------------------------------------------------------------------------------------------- *
  * Forward declarations, so the definitions can sit in address order.
  * --------------------------------------------------------------------------------------------- */
-void fn_800BE154(const MTX34* mtx, const Vec3* verts, u32 flag);
-void fn_800BE374(void);
-void fn_800BE378(u8 value);
-int fn_800BE388(u32 value);
-void fn_800BE39C(const Vec3* v);
-void fn_800BE938(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v);
-void fn_800BEA00(MTX34* dst, const Vec3* pp, u8 mode);
-void fn_800BED2C(nw4r::ef::DrawFreeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm);
+void ef_free_write_quad(const MTX34* mtx, const Vec3* verts, u32 flag);
+void ef_free_gx_end(void);
+void ef_free_gx_u8(u8 value);
+int ef_free_tex_flag(u32 value);
+void ef_free_gx_position(const Vec3* v);
+void ef_free_scale_mtx(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v);
+void ef_free_rotate_mtx(MTX34* dst, const Vec3* pp, u8 mode);
+void ef_free_setup_gx(nw4r::ef::DrawFreeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm);
 
 /* --------------------------------------------------------------------------------------------- *
  * 0x800BE154 - the four-vertex emitter.
@@ -145,11 +152,11 @@ void fn_800BED2C(nw4r::ef::DrawFreeStrategy* self, const EfDrawInfo* info, EfDra
 
 /* Transforms four input vectors through `mtx` and writes them as a GX_QUADS primitive; when `flag` is
  * set each corner is preceded by its 1-byte index.  The guard is the file's `__FILE__` assert. */
-void fn_800BE154(const MTX34* mtx, const Vec3* verts, u32 flag) {
+void ef_free_write_quad(const MTX34* mtx, const Vec3* verts, u32 flag) {
     Vec3 v0, v1, v2, v3;
 
     if (!IsValidPointer((u32)verts))
-        nw4r::db::Panic(lbl_805941F8, 88, lbl_80594210, verts);
+        nw4r::db::Panic(ef_free_file_str, 88, ef_free_p_assert_str, verts);
 
     VEC3_ctor(&v0);
     VEC3_ctor(&v1);
@@ -161,23 +168,23 @@ void fn_800BE154(const MTX34* mtx, const Vec3* verts, u32 flag) {
     mtx34_mult_vec3(&v3, mtx, &verts[3]);
 
     GXBegin(0x80, 0, 4);
-    fn_800BE39C(&v0);
-    if (fn_800BE388(flag)) {
-        fn_800BE378(0);
+    ef_free_gx_position(&v0);
+    if (ef_free_tex_flag(flag)) {
+        ef_free_gx_u8(0);
     }
-    fn_800BE39C(&v1);
-    if (fn_800BE388(flag)) {
-        fn_800BE378(1);
+    ef_free_gx_position(&v1);
+    if (ef_free_tex_flag(flag)) {
+        ef_free_gx_u8(1);
     }
-    fn_800BE39C(&v2);
-    if (fn_800BE388(flag)) {
-        fn_800BE378(2);
+    ef_free_gx_position(&v2);
+    if (ef_free_tex_flag(flag)) {
+        ef_free_gx_u8(2);
     }
-    fn_800BE39C(&v3);
-    if (fn_800BE388(flag)) {
-        fn_800BE378(3);
+    ef_free_gx_position(&v3);
+    if (ef_free_tex_flag(flag)) {
+        ef_free_gx_u8(3);
     }
-    fn_800BE374();
+    ef_free_gx_end();
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -185,22 +192,22 @@ void fn_800BE154(const MTX34* mtx, const Vec3* verts, u32 flag) {
  * --------------------------------------------------------------------------------------------- */
 
 /* Ends the current FIFO command (the SDK's `GXEnd`, which writes nothing). */
-void fn_800BE374(void) {}
+void ef_free_gx_end(void) {}
 
 /* Writes one u8 to the pipe. */
-void fn_800BE378(u8 value) {
+void ef_free_gx_u8(u8 value) {
     GXWGFifo.u8 = value;
 }
 
 /* Tests the low bit of a status word. */
-int fn_800BE388(u32 value) {
+int ef_free_tex_flag(u32 value) {
     return (value & 1) != 0;
 }
 
 static void ef_free_gx_position3f(f32 x, f32 y, f32 z);
 
 /* Writes one vector's three components to the pipe through the FIFO writer that follows it. */
-void fn_800BE39C(const Vec3* v) {
+void ef_free_gx_position(const Vec3* v) {
     f32 x = v->x;
     f32 y = v->y;
     f32 z = v->z;
@@ -234,17 +241,17 @@ void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
     f32 scale_a, scale_b, scale_x, scale_z;
 
     if (!IsValidPointer((u32)pm))
-        nw4r::db::Panic(lbl_805941F8, 200, lbl_80594240, pm);
+        nw4r::db::Panic(ef_free_file_str, 200, ef_free_pm_assert_str, pm);
 
-    fn_800BED2C(this, &info, pm);
+    ef_free_setup_gx(this, &info, pm);
 
     if (!IsValidPointer((u32)pm->resource))
-        nw4r::db::Panic(lbl_805941F8, 204, lbl_80594274, pm->resource);
+        nw4r::db::Panic(ef_free_file_str, 204, ef_free_resource_assert_str, pm->resource);
 
     ed = (EfDrawState*)ef_resource_draw_setting(pm->resource);
 
     if (!IsValidPointer((u32)ed))
-        nw4r::db::Panic(lbl_805941F8, 206, lbl_805942B0, ed);
+        nw4r::db::Panic(ef_free_file_str, 206, ef_free_ed_assert_str, ed);
 
     flag = (mNumTexmap != 0);
 
@@ -277,16 +284,16 @@ void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
         SetupGP(p, *(EfEmitterDrawSetting*)ed, info, first_pass, false);
         first_pass = false;
 
-        fn_800BEA00(&mtx_rot, (const Vec3*)&((EfDrawFreeParticle*)p)->pos, ed->drawer_mode);
-        fn_800BE938(&mtx_final, &mtx_rot, scale_a, scale_b, scale_x, scale_z);
+        ef_free_rotate_mtx(&mtx_rot, (const Vec3*)&((EfDrawFreeParticle*)p)->pos, ed->drawer_mode);
+        ef_free_scale_mtx(&mtx_final, &mtx_rot, scale_a, scale_b, scale_x, scale_z);
 
         mtx_final.m[0][3] += ((EfDrawFreeParticle*)p)->offset_x;
         mtx_final.m[1][3] += ((EfDrawFreeParticle*)p)->offset_y;
         mtx_final.m[2][3] += ((EfDrawFreeParticle*)p)->offset_z;
 
-        fn_800BE154(&mtx_final, (Vec3*)ef_free_quad_vtx, flag);
+        ef_free_write_quad(&mtx_final, (Vec3*)ef_free_quad_vtx, flag);
         if (ed->draw_yz_quad == 1) {
-            fn_800BE154(&mtx_final, (Vec3*)ef_free_cross_vtx, flag);
+            ef_free_write_quad(&mtx_final, (Vec3*)ef_free_cross_vtx, flag);
         }
     }
 }
@@ -304,7 +311,7 @@ extern "C" {
 
 /* Builds an `MTX34` through `mtx34_set` from the source rows scaled by (u,v,u), with an `s`/`t`
  * correction in the trailing column of rows 0 and 1. */
-void fn_800BE938(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v) {
+void ef_free_scale_mtx(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v) {
     f32 us = u * s;
     f32 vt = v * t;
 
@@ -329,12 +336,12 @@ void fn_800BE938(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v) {
 
 /* Builds an `MTX34` rotation from the particle's angle vector `pp`: mode 0 rotates about X, 1 about Y,
  * 2 about Z and any other value composes the full Euler rotation.  `ef_sin_cos` is the sin/cos pair. */
-void fn_800BEA00(MTX34* dst, const Vec3* pp, u8 mode) {
+void ef_free_rotate_mtx(MTX34* dst, const Vec3* pp, u8 mode) {
     Vec3 v;
     f32 sx, cx, sy, cy, sz, cz;
 
     if (!IsValidPointer((u32)pp))
-        nw4r::db::Panic(lbl_805941F8, 136, lbl_805942E4, pp);
+        nw4r::db::Panic(ef_free_file_str, 136, ef_free_pp_assert_str, pp);
 
     VEC3_ctor(&v);
     ef_particle_get_rotate((const void*)pp, &v);
@@ -376,10 +383,10 @@ void fn_800BEA00(MTX34* dst, const Vec3* pp, u8 mode) {
 
 /* Sets the free draw's vertex format: the position array, the indexed texcoord array when the state's
  * +0xD0 byte is set, the two attribute formats and the current matrix. */
-void fn_800BED2C(nw4r::ef::DrawFreeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm) {
+void ef_free_setup_gx(nw4r::ef::DrawFreeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm) {
     EfEmitterDrawSetting* ed;
 
-    (void)(IsValidPointer((u32)pm) || (nw4r::db::Panic(lbl_805941F8, 278, lbl_80594240, pm), 0));
+    (void)(IsValidPointer((u32)pm) || (nw4r::db::Panic(ef_free_file_str, 278, ef_free_pm_assert_str, pm), 0));
 
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     self->InitGraphics(pm, *ed, *info);

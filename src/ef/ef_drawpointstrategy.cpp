@@ -10,9 +10,11 @@
  *   (0x800BF7DC) and the DrawSmoothStripeStrategy constructor at this range's tail (0x800BFF98) is the next TU's.
  * FLAGS. `cflags_main`; `#pragma peephole off` before the includes (the FIFO writers keep the unfused narrowing stores,
  *   playbook 39), `#pragma dont_inline on` at the end (the inline destructor calls its base out of line).
- * NAMES. The map has only `fn_` stems for the helpers; `fn_800BFD84` is a GUESS for NintendoWare's setup (its assert
- *   on line 150 names `pm`); `ef_point_gx_position3f` is a GUESS (the 0x14 FIFO writer at +0x10 of `fn_800BFD60`,
+ * NAMES. `ef_point_setup_gx` is a GUESS for NintendoWare's setup (its assert
+ *   on line 150 names `pm`); `ef_point_gx_position3f` is a GUESS (the 0x14 FIFO writer at +0x10 of `ef_point_gx_position`,
  *   reached by a tail call).
+ *   GUESS: `ef_point_gx_position` (hands a vector to the FIFO writer, the billboard unit's scheme).
+ *   GUESS (from the bodies): `ef_point_write_point`, `ef_point_gx_end`, `ef_point_gx_texcoord`, `ef_point_tex_flag`.
  * RESIDUALS. The source defines the FIFO writers and the emitter before `Draw`, so our `.text` (and the extab and
  *   extabindex records) run in a different order from retail's address order.
  *   1 partial row: `Draw` (0x800BF818): one `lwz r6, 0x24(pm)` (the asserted resource) is scheduled before the six assert
@@ -73,10 +75,10 @@ extern void GXSetCurrentMtx(u32 id);
 
 /* This unit's `__FILE__`/assert strings, the draw-order table and the constants, declared, never
  * defined. */
-extern char lbl_80594408[]; /* "ef_drawpointstrategy.cpp"                                .data 0x80594408 */
-extern char lbl_80594424[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."      .data 0x80594424 */
-extern char lbl_80594458[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..." .data 0x80594458 */
-extern char lbl_80594494[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."     .data 0x80594494 */
+extern char ef_point_file_str[]; /* "ef_drawpointstrategy.cpp"                                .data 0x80594408 */
+extern char ef_point_pm_assert_str[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."      .data 0x80594424 */
+extern char ef_point_resource_assert_str[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..." .data 0x80594458 */
+extern char ef_point_ed_assert_str[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."     .data 0x80594494 */
 /* The largest point the size clamp allows (`.sdata`). */
 static f32 ef_point_max_size = 42.5f;
 
@@ -85,23 +87,23 @@ static f32 ef_point_max_size = 42.5f;
  * -------------------------------------------------------------------------------------------------- */
 
 /* Ends the current FIFO command (the SDK's no-op `GXEnd`). */
-void fn_800BFD38(void) {}
+void ef_point_gx_end(void) {}
 
 /* Writes one f32 pair to the pipe (the point's texture coordinate). */
-void fn_800BFD3C(f32 x, f32 y) {
+void ef_point_gx_texcoord(f32 x, f32 y) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
 }
 
 /* Tests the low bit of a status word. */
-int fn_800BFD4C(u32 value) {
+int ef_point_tex_flag(u32 value) {
     return (value & 1) != 0;
 }
 
 static void ef_point_gx_position3f(f32 x, f32 y, f32 z);
 
 /* Writes a vector to the pipe through the FIFO writer that follows it. */
-void fn_800BFD60(Vec* v) {
+void ef_point_gx_position(Vec* v) {
     f32 x = v->x;
     f32 y = v->y;
     f32 z = v->z;
@@ -121,19 +123,19 @@ static void ef_point_gx_position3f(f32 x, f32 y, f32 z) {
 
 /* Emits one point at `pos`: GXBegin(POINTS, 0, 1), the position, and the (0, 0) texcoord when `flag`'s
  * low bit asks for one. */
-void fn_800BFCCC(Vec* pos, u32 flag) {
+void ef_point_write_point(Vec* pos, u32 flag) {
     GXBegin(0xB8, 0, 1);
-    fn_800BFD60(pos);
-    if (fn_800BFD4C(flag)) {
-        fn_800BFD3C(0.0f, 0.0f);
+    ef_point_gx_position(pos);
+    if (ef_point_tex_flag(flag)) {
+        ef_point_gx_texcoord(0.0f, 0.0f);
     }
-    fn_800BFD38();
+    ef_point_gx_end();
 }
 
 /* Sets the point GX state (texcoord offsets, vertex format, current matrix). */
-void fn_800BFD84(nw4r::ef::DrawPointStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* args) {
+void ef_point_setup_gx(nw4r::ef::DrawPointStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* args) {
     if (!IsValidPointer((u32)args)) {
-        nw4r::db::Panic(lbl_80594408, 150, lbl_80594424, args);
+        nw4r::db::Panic(ef_point_file_str, 150, ef_point_pm_assert_str, args);
     }
     self->InitGraphics(args, *(EfEmitterDrawSetting*)ef_resource_draw_setting(args->resource), *info);
     GXEnableTexOffsets(0, 1, 1);
@@ -171,15 +173,15 @@ void DrawPointStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) 
     u32 size;
 
     if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594408, 92, lbl_80594424, pm);
+        nw4r::db::Panic(ef_point_file_str, 92, ef_point_pm_assert_str, pm);
     }
-    fn_800BFD84(this, &info, pm);
+    ef_point_setup_gx(this, &info, pm);
     if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(lbl_80594408, 96, lbl_80594458, pm->resource);
+        nw4r::db::Panic(ef_point_file_str, 96, ef_point_resource_assert_str, pm->resource);
     }
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
-        nw4r::db::Panic(lbl_80594408, 98, lbl_80594494, ed);
+        nw4r::db::Panic(ef_point_file_str, 98, ef_point_ed_assert_str, ed);
     }
 
     flag = (mNumTexmap != 0);
@@ -212,7 +214,7 @@ void DrawPointStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) 
                 SetupGP(particle, *ed, info, first, false);
             }
             first = false;
-            fn_800BFCCC(&particle->world_pos, flag);
+            ef_point_write_point(&particle->world_pos, flag);
         }
     }
 }
