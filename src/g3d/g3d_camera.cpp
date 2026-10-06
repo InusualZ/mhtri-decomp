@@ -5,7 +5,7 @@
  *   "g3d_camera.cpp", read from fn_800746DC on), .sdata2 0x80795DC8-0x80795DF8.  The six accessors
  *   fn_80074620..fn_800746D4 before it (no data references) sit in `g3d/g3d_calcworld.cpp` by the candidate cut.
  * NAMES. Map stems, plus the three `nw4r::g3d::Camera` members the map carries mangled (`SetPosition`, `SetPosture`,
- *   `SetPerspective`).
+ *   `SetPerspective`); MTX44_ctor is a GUESS (0x80075390: the empty 4x4 matrix constructor, the MTX34_ctor scheme).
  * RESIDUALS. Partial (15): fn_80074758, `Camera::SetPosition`, `Camera::SetPosture`, 0x80074D78-0x80074FEC (three),
  *   fn_8007507C, fn_80075258, 0x80075394-0x80075844 (six), fn_80075940.
  *   flipcheck: `.text` 0x16A0 of 0x16F0; `.data` is claimed and not emitted; `.sdata2` is 0x34 of 0x30 - one pooled
@@ -186,7 +186,7 @@ void fn_80074FEC(nw4r::g3d::Camera* pSelf, u32 x, u32 y, u32 w, u32 h);
 void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d);
 void fn_80075170(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f32* p4, f32* p5, f32* p6);
 void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
-void fn_80075390(void* pOut);
+void MTX44_ctor(nw4r::math::MTX44* pMtx);
 void fn_80075394(nw4r::g3d::Camera* pSelf, void* pOut);
 void fn_80075440(nw4r::g3d::Camera* pSelf, void* pOut);
 void fn_800754EC(nw4r::g3d::Camera* pSelf, void* pOut);
@@ -423,7 +423,7 @@ void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVe
     ProjParams params;
     f32 frustum[6];
     MTX34_ctor((nw4r::math::MTX34*)viewMtx);
-    fn_80075390(projMtx);
+    MTX44_ctor((nw4r::math::MTX44*)projMtx);
     fn_80075394(pSelf, viewMtx);
     fn_80075440(pSelf, projMtx);
     CameraData* pData = fn_80074A54(pSelf);
@@ -446,7 +446,8 @@ void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVe
                 pVec->z);
 }
 
-void fn_80075390(void* pOut) {
+/* 0x80075390 (0x4): constructs a 4x4 matrix (nothing to initialise). */
+void MTX44_ctor(nw4r::math::MTX44* pMtx) {
 }
 
 void fn_80075394(nw4r::g3d::Camera* pSelf, void* pOut) {

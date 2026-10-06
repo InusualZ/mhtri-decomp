@@ -49,22 +49,38 @@
  *   g3d_camera_table_proj_tex_mtx is a GUESS, g3d_camera_table_env_tex_mtx is a GUESS,
  *   g3d_zcomp_cache_clear is a GUESS (nw4r's G3DState camera table, Invalidate and its resetters;
  *   g3d_state_invalidate's 0x7FF argument is INVALIDATE_ALL).
- *   g3d_state_load_mat_tev_color is a GUESS (the TEV colour display-list load).
+ *   g3d_state_load_mat_tev_color is a GUESS (the TEV colour display-list load); g3d_tex_proj_identity is a GUESS,
+ *   g3d_distance is a GUESS, g3d_distance_random_access is a GUESS, g3d_find_s32 is a GUESS, g3d_find_s8 is a
+ *   GUESS (std::distance/std::find shapes), g3d_state_load_mat_chan is a GUESS, g3d_fog_ref is a GUESS,
+ *   g3d_state_load_fog is a GUESS, g3d_fog_table_load is a GUESS, g3d_state_set_light_setting is a GUESS,
+ *   g3d_state_get_light_obj is a GUESS, g3d_state_get_light_set_entry is a GUESS, g3d_state_load_light_set is a
+ *   GUESS, g3d_light_table_set_setting is a GUESS, g3d_light_table_load_light_set is a GUESS,
+ *   g3d_state_set_camera is a GUESS, g3d_camera_table_set_camera is a GUESS (nw4r's G3DState light, fog and
+ *   camera entry points, by their bodies and callers); G3dLightTable is a GUESS, G3dCameraTable is a GUESS.
  *   G3dIndMtxCallback is a GUESS, G3dIndMtxCallbackStd is a GUESS (nw4r's G3DState IndMtxOp and its standard
  *   implementation: the two vtables' slots, the ITM asserts and the normal-map matrices); its members
  *   Exec is a GUESS, Reset is a GUESS, SetNrmMapMtx is a GUESS (nw4r's IndMtxOp slot names, by their bodies).
  *   ResGenMode's GXGet*, ResTev's ref/ptr/GetClassName, ResMatChan::ptr and ResTexSrt's
  *   ref/ptr/GetTexMtxMode/GetTexSrtFlag/IsIdentityTexMtx/IsExist
  *   are nw4r's members.
- * RESIDUALS. 42 functions unwritten (objdiff scores them zero) in 15 runs: 0x80084630-0x80085160,
- *   0x8008540C-0x80085478, 0x800854B8-0x8008569C, 0x800856F4-0x80085AF8, 0x80085B6C-0x80085D4C,
- *   0x80086B2C-0x80086F94,
- *   0x8008715C-0x800873E4 (its matrix copy is `g3d/g3d_calcview.cpp`'s fn_8007100C, 32 call sites in other
- *   units), 0x80087978-0x80087A14 and 0x80087AD0-0x80087C80 and 0x80087DB0-0x80087DF8 (the ResShp
- *   accessors they call are `g3d/fn_80075DCC.cpp`'s free stems), 0x80087F18-0x80087FA8,
- *   0x80088050-0x8008812C and 0x80088138-0x8008831C (the fog and light tables), 0x80088574-0x80088584
- *   (its copy is `main.cpp`'s fn_8003F940), 0x80088AD0-0x80088E24 (the `.ctors` static constructor fn_80088AD0
- *   and the globals' constructors).
+ * RESIDUALS. 31 functions unwritten (objdiff scores them zero) in 14 runs:
+ *   0x80084630-0x8008503C and 0x8008715C-0x800873E4 (the projection functions and the texture-SRT load: their
+ *     matrix copy is `g3d/g3d_calcview.cpp`'s fn_8007100C, 32 call sites in other units; fn_80084B9C also calls
+ *     `MTX/vec.c`'s fn_804C6C60), 0x8008540C-0x80085478 (the light table constructor: the light objects'
+ *     constructor and destructor are `g3d/fn_80075DCC.cpp` stems), 0x800854B8-0x8008569C and 0x800856F4-0x80085ACC
+ *     (g3d_light_table_set_setting, g3d_light_table_load_light_set: their light load is `EXI/ProbeBarnacle.c`'s
+ *     unnamed fn_804B7C40), 0x80085C70-0x80085D4C (g3d_camera_table_set_camera: its view-matrix getter
+ *     fn_80075394 is also declared by `sound/fn_800E3CBC.cpp`), 0x80087978-0x80087A14 and 0x80087AD0-0x80087C80
+ *     and 0x80087DB0-0x80087DF8 (the ResShp accessors are `g3d/fn_80075DCC.cpp` free stems and
+ *     `g3d/g3d_resshp.cpp` keeps a private `ResShpData`), 0x80087F18-0x80087FA8 (g3d_view_mtx_arrays_nrm_mtx: it
+ *     calls `fn_8004CAD8.cpp`'s fn_800516F0 and `hud/pl_frame_sync.cpp`'s fn_80330E14), 0x80088050-0x8008812C and
+ *     0x8008819C-0x80088250 (the fog set and g3d_fog_table_load: the Fog members are `g3d/fn_80075DCC.cpp` m2c
+ *     stems, and GXSetFog has no declaration in `RVLGX/GXTexture_tail.cpp`), 0x80088574-0x80088584 (its copy is
+ *     `main.cpp`'s fn_8003F940), 0x80088AD0-0x80088E24 (the `.ctors` static constructor fn_80088AD0 and the
+ *     globals' constructors: the globals would become definitions).
+ *   G3dRandomAccessTag: its inline constructor is empty on purpose (the tag temporary stays uninitialised, and
+ *     retail copies an uninitialised byte).
+ *   __ct__14G3dCameraTableFv: register choice only (retail alternates r30/r31 through the member array loops).
  *   fn_8008455C: one relocation argument differs.
  *   G3dIndMtxCallback, G3dIndMtxCallbackStd: the constructors' and destructors' empty bodies are complete (the
  *     compiler emits the vtable stores, the base constructor call and the deleting tail).
@@ -83,7 +99,8 @@
  *   flipcheck: `.text` short of the claim; `.ctors`, `.bss`, `.sbss`, `.rodata` and `.sdata2` are claimed and not
  *     emitted, `.data` is 0xAC of 0x598 and `.sdata` 0x4 of 0x20 (the globals and the asserts' strings are declared,
  *     not defined).
- * SHAPES. File-scope `#pragma pool_data off`: retail gives each assert string its own `lis`/`addi` (it took
+ * SHAPES. `#pragma fp_contract off` around g3d_state_load_mat_chan: retail keeps `fmuls` + `fadds` for the scaled
+ *   ambient (it took the function from 97.7 to 100).  File-scope `#pragma pool_data off`: retail gives each assert string its own `lis`/`addi` (it took
  *   g3d_tex_proj_build to 100).  File-scope `#pragma peephole off`: retail keeps every `rlwinm`/`clrlwi` + `cmpwi` and unfused
  *   `clrlwi` + `slwi` pairs (it took fn_800856A4/fn_800856B8/fn_80086610/fn_800868E4 to 100 with no row lost).
  *   The generation-mode word is `(ind << 16 | cull << 14) | ((tev - 1) << 10 | (gens | chans << 4))`, that
@@ -144,6 +161,28 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
  * fn_80075390..fn_80075620 come from their owners' headers above. */
 extern "C" void fn_80501658(void* p);
 
+/* The nw4r resource pointer assert: `ptr` must fall in one of the seven mapped Wii memory ranges (the six
+ * materialised BOOLs are retail's shape). */
+#define G3D_STATE_POINTER_ASSERT(ptr, line, msg)                                               \
+    {                                                                                          \
+        BOOL ok1_ = TRUE, ok2_ = TRUE, ok3_ = TRUE, ok4_ = TRUE, ok5_ = TRUE, ok6_ = TRUE;      \
+        u32 top_ = (u32)(ptr) & 0xFF000000u;                                                    \
+        if (!(top_ == 0x80000000u) && !(((u32)(ptr) & 0xFF800000u) == 0x81000000u))             \
+            ok6_ = FALSE;                                                                        \
+        if (!ok6_ && !(((u32)(ptr) & 0xF8000000u) == 0x90000000u))                              \
+            ok5_ = FALSE;                                                                        \
+        if (!ok5_ && !(top_ == 0xC0000000u))                                                    \
+            ok4_ = FALSE;                                                                        \
+        if (!ok4_ && !(((u32)(ptr) & 0xFF800000u) == 0xC1000000u))                              \
+            ok3_ = FALSE;                                                                        \
+        if (!ok3_ && !(((u32)(ptr) & 0xF8000000u) == 0xD0000000u))                              \
+            ok2_ = FALSE;                                                                        \
+        if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))                              \
+            ok1_ = FALSE;                                                                        \
+        if (!ok1_)                                                                              \
+            nw4r::db::Panic(lbl_8058F750, line, msg, (ptr));                                     \
+    }
+
 /* ------------------------------------------------------------------------------------------------ */
 /* types                                                                                             */
 /* ------------------------------------------------------------------------------------------------ */
@@ -159,6 +198,11 @@ struct G3DResRef {
 struct StateWord {
     /* +0x00 */ u32 mWord;
 }; /* size: 0x4 (approximation) */
+
+/* The iterator category the distance helper dispatches on (an empty tag passed by value).  size: 0x1 */
+struct G3dRandomAccessTag {
+    G3dRandomAccessTag() {}
+};
 
 /* The display-list dirty flag (`g3d_state_dl_dirty`): set when a cached state changed, read-and-cleared by the next
  * display-list call.  size: 0x4 */
@@ -245,41 +289,31 @@ struct StateFlags {
     /* +0x00 */ u32 mFlags;
 }; /* size: 0x4 (approximation) */
 
-/* One 0x44-byte entry of the texture-matrix table at +0x2C (`fn_8008540C` constructs 0x80 of them,
- * `fn_800856D4` indexes them). */
-struct StateTexMtxEntry {
+/* One light object of the light table (`fn_8008540C` constructs 0x80 of them, `fn_800856D4` indexes them).
+ * size: 0x44 */
+struct G3dLightObj {
     /* +0x00 */ u8 mData[0x44];
-}; /* size: 0x44 */
+};
 
-/* The texture-matrix table `fn_800856D4` indexes: 0x80 entries from +0x2C. */
-struct StateTexMtxTable {
-    /* +0x00 */ u8 pad_00[0x2C];
-    /* +0x2C */ StateTexMtxEntry mEntries[0x80];
-}; /* size: 0x222C */
-
-/* One 0xC-byte row of the byte table at +0x242C (`fn_80085B54`). */
-struct StateByteRow {
+/* One light set of the light table: the light indices it selects (`fn_80085B54` reads one).  size: 0xC */
+struct G3dLightSet {
     /* +0x00 */ u8 mBytes[0xC];
-}; /* size: 0xC */
+};
 
-/* The two 0xC-byte-row tables and the index that selects one, as `fn_80085B54` walks them. */
-struct StateByteTable {
-    /* +0x00 */ u8 pad_00[0x10];
-    /* +0x10 */ u32 mIndex;
-    /* +0x14 */ u8 pad_14[0x2418];
-    /* +0x242C */ StateByteRow mRows[0x80];
-}; /* size: 0x2A2C */
-
-/* The 0x2C-byte header `fn_80085478` re-initialises (the `-1`/`0` fill of one camera-state entry). */
-struct StateEntryHead {
-    /* +0x00 */ u8 pad_00[0x10];
-    /* +0x10 */ s32 mUnk10;
-    /* +0x14 */ s32 mUnk14;
-    /* +0x18 */ s32 mUnk18;
-    /* +0x1C */ s32 mUnk1C;
-    /* +0x20 */ s32 mUnk20;
-    /* +0x24 */ s8 mUnk24[8];
-}; /* size: 0x2C (approximation - the caller's object continues past it) */
+/* The light table (`g3d_state_light_table`): the light setting's header, the loaded light set and the masks and
+ * light indices it produced, the 128 light objects and the 128 light sets.  size: 0x2A2C */
+struct G3dLightTable {
+    /* +0x0000 */ u8 pad_0x0000[0x10];
+    /* +0x0010 */ s32 loadedLightSet;      /* -1: none (`fn_80085478`); selects the row `fn_80085B54` reads */
+    /* +0x0014 */ u32 maskDiffColor;
+    /* +0x0018 */ u32 maskDiffAlpha;
+    /* +0x001C */ u32 maskSpecColor;
+    /* +0x0020 */ u32 maskSpecAlpha;
+    /* +0x0024 */ s8 loadedLightIdx[8];    /* -1: none */
+    /* +0x002C */ G3dLightObj lightObj[0x80];
+    /* +0x222C */ u8 pad_0x222C[0x200];
+    /* +0x242C */ G3dLightSet lightSet[0x80];
+};
 
 /* The object `fn_80085344` sets the validity byte of. */
 struct StateValidFlag {
@@ -308,16 +342,17 @@ u32 fn_8008455C(G3dVtObject* pSelf);
 u32 fn_80084594(void* pSelf, u32* pArg);
 void* fn_80084600(void);
 void fn_80085344(StateValidFlag* pSelf);
-void fn_80085478(StateEntryHead* pSelf);
+void fn_80085478(G3dLightTable* pSelf);
 u32* fn_8008569C(G3DResRef* pSelf);
 BOOL fn_800856A4(StateFlags* pSelf);
 BOOL fn_800856B8(StateFlags* pSelf);
 u32* fn_800856CC(G3DResRef* pSelf);
-StateTexMtxEntry* fn_800856D4(StateTexMtxTable* pSelf, u32 idx);
-u8* fn_80085B00(u8* p, u8* pEnd, const s32* pValue);
-s8* fn_80085B28(s8* p, s8* pEnd, const s8* pDelim);
-s32 fn_80085AF8(u32 a, u32 b);
-u8 fn_80085B54(StateByteTable* pSelf, u32 byteIdx);
+G3dLightObj* fn_800856D4(G3dLightTable* pSelf, u32 idx);
+u8* g3d_find_s32(u8* p, u8* pEnd, const s32* pValue);
+s32 g3d_distance(const s8* first, const s8* last);
+s32 g3d_distance_random_access(const s8* first, const s8* last, G3dRandomAccessTag);
+s8* g3d_find_s8(s8* p, s8* pEnd, const s8* pDelim);
+u8 fn_80085B54(G3dLightTable* pSelf, u32 byteIdx);
 void fn_80085F3C(StatePairTable* pSelf, u32 idx, u16 a, u16 b);
 void fn_80086118(G3dTexObjCache* pSelf, u32 bit);
 void fn_80086138(StateWord3* pDst, const StateWord3* pSrc);
@@ -371,20 +406,20 @@ void fn_80085344(StateValidFlag* pSelf) {
 }
 
 /* Re-initialise one camera-state entry: the -1 markers and the cleared words. */
-void fn_80085478(StateEntryHead* pSelf) {
-    pSelf->mUnk10 = -1;
-    pSelf->mUnk14 = 0;
-    pSelf->mUnk18 = 0;
-    pSelf->mUnk1C = 0;
-    pSelf->mUnk20 = 0;
-    pSelf->mUnk24[7] = -1;
-    pSelf->mUnk24[6] = -1;
-    pSelf->mUnk24[5] = -1;
-    pSelf->mUnk24[4] = -1;
-    pSelf->mUnk24[3] = -1;
-    pSelf->mUnk24[2] = -1;
-    pSelf->mUnk24[1] = -1;
-    pSelf->mUnk24[0] = -1;
+void fn_80085478(G3dLightTable* pSelf) {
+    pSelf->loadedLightSet = -1;
+    pSelf->maskDiffColor = 0;
+    pSelf->maskDiffAlpha = 0;
+    pSelf->maskSpecColor = 0;
+    pSelf->maskSpecAlpha = 0;
+    pSelf->loadedLightIdx[7] = -1;
+    pSelf->loadedLightIdx[6] = -1;
+    pSelf->loadedLightIdx[5] = -1;
+    pSelf->loadedLightIdx[4] = -1;
+    pSelf->loadedLightIdx[3] = -1;
+    pSelf->loadedLightIdx[2] = -1;
+    pSelf->loadedLightIdx[1] = -1;
+    pSelf->loadedLightIdx[0] = -1;
 }
 
 u32* fn_8008569C(G3DResRef* pSelf) {
@@ -413,31 +448,37 @@ BOOL fn_800856B8(StateFlags* pSelf) {
 
 /* The bounds-tested table accessor.  The target puts the NULL path last, so the guard is spelled
  * `if (idx <= 0x7F) { return ...; } return NULL;`. */
-StateTexMtxEntry* fn_800856D4(StateTexMtxTable* pSelf, u32 idx) {
+G3dLightObj* fn_800856D4(G3dLightTable* pSelf, u32 idx) {
     if (idx <= 0x7F) {
-        return &pSelf->mEntries[idx];
+        return &pSelf->lightObj[idx];
     }
     return NULL;
 }
 
-s32 fn_80085AF8(u32 a, u32 b) {
-    return b - a;
+/* 0x80085ACC (0x2C): returns the number of bytes from `first` to `last`. */
+s32 g3d_distance(const s8* first, const s8* last) {
+    return g3d_distance_random_access(first, last, G3dRandomAccessTag());
 }
 
-u8 fn_80085B54(StateByteTable* pSelf, u32 byteIdx) {
-    return pSelf->mRows[pSelf->mIndex].mBytes[byteIdx];
+/* 0x80085AF8 (0x8): returns the number of bytes from `first` to `last` (the random-access form). */
+s32 g3d_distance_random_access(const s8* first, const s8* last, G3dRandomAccessTag) {
+    return last - first;
+}
+
+u8 fn_80085B54(G3dLightTable* pSelf, u32 byteIdx) {
+    return pSelf->lightSet[pSelf->loadedLightSet].mBytes[byteIdx];
 }
 
 /* The two byte-scan loops of the state's key tables: walk `p` up to `pEnd` while the byte does not
  * match, and return where it stopped. */
-u8* fn_80085B00(u8* p, u8* pEnd, const s32* pValue) {
+u8* g3d_find_s32(u8* p, u8* pEnd, const s32* pValue) {
     while (p != pEnd && *(s8*)p != *pValue) {
         p++;
     }
     return p;
 }
 
-s8* fn_80085B28(s8* p, s8* pEnd, const s8* pDelim) {
+s8* g3d_find_s8(s8* p, s8* pEnd, const s8* pDelim) {
     while (p != pEnd && *p != *pDelim) {
         p++;
     }
@@ -923,28 +964,6 @@ void g3d_state_load_mat_ind_mtx(nw4r::g3d::ResMatIndMtxAndScale ind, G3dIndMtxCa
 
 } /* extern "C" */
 
-/* The nw4r resource pointer assert: `ptr` must fall in one of the seven mapped Wii memory ranges (the six
- * materialised BOOLs are retail's shape). */
-#define G3D_STATE_POINTER_ASSERT(ptr, line, msg)                                               \
-    {                                                                                          \
-        BOOL ok1_ = TRUE, ok2_ = TRUE, ok3_ = TRUE, ok4_ = TRUE, ok5_ = TRUE, ok6_ = TRUE;      \
-        u32 top_ = (u32)(ptr) & 0xFF000000u;                                                    \
-        if (!(top_ == 0x80000000u) && !(((u32)(ptr) & 0xFF800000u) == 0x81000000u))             \
-            ok6_ = FALSE;                                                                        \
-        if (!ok6_ && !(((u32)(ptr) & 0xF8000000u) == 0x90000000u))                              \
-            ok5_ = FALSE;                                                                        \
-        if (!ok5_ && !(top_ == 0xC0000000u))                                                    \
-            ok4_ = FALSE;                                                                        \
-        if (!ok4_ && !(((u32)(ptr) & 0xFF800000u) == 0xC1000000u))                              \
-            ok3_ = FALSE;                                                                        \
-        if (!ok3_ && !(((u32)(ptr) & 0xF8000000u) == 0xD0000000u))                              \
-            ok2_ = FALSE;                                                                        \
-        if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))                              \
-            ok1_ = FALSE;                                                                        \
-        if (!ok1_)                                                                              \
-            nw4r::db::Panic(lbl_8058F750, line, msg, (ptr));                                     \
-    }
-
 /* A scene-dependent texture projection: builds `pMtx` from camera `refCamera` and light `refLight`. */
 typedef void (*G3dTexProjFunc)(nw4r::math::MTX34* pMtx, s8 refCamera, s8 refLight);
 
@@ -1018,8 +1037,8 @@ void g3d_gd_set_chan_ctrl_unlit(u32 chan, u32 ctrl, u32 lightMask) {
 }
 
 /* 0x80087064 (0x14): writes a colour channel's ambient colour (XF 0x100A + chan). */
-void g3d_gd_set_chan_amb_color(u32 chan, const u32* pColor) {
-    GDWriteXFCmd((chan & 1) + 0x100A, *pColor);
+void g3d_gd_set_chan_amb_color(u32 chan, GXColor color) {
+    GDWriteXFCmd((chan & 1) + 0x100A, *(const u32*)&color);
 }
 
 } /* extern "C" */
@@ -1307,11 +1326,13 @@ G3dIndMtxCallback* g3d_state_get_ind_mtx_hook(void) {
 /* The camera matrix table (`g3d_state_camera_table`): a cached inverse of the current camera matrix and, per camera,
  * its view matrix, its projection and the two texture projection matrices built from it.  size: 0x1A34 */
 struct G3dCameraTable {
+    G3dCameraTable();
+
     /* +0x0000 */ u16 flags;            /* bit 0: invCameraMtx is the current camera's inverse */
     /* +0x0002 */ u16 currentCamera;
     /* +0x0004 */ nw4r::math::MTX34 invCameraMtx;
     /* +0x0034 */ nw4r::math::MTX34 cameraMtx[32];
-    /* +0x0634 */ u8 pad_0x0634[0x800];   /* the 32 0x40-byte projections */
+    /* +0x0634 */ nw4r::math::MTX44 projMtx[32];
     /* +0x0E34 */ nw4r::math::MTX34 projTexMtx[32];
     /* +0x1434 */ nw4r::math::MTX34 envTexMtx[32];
 };
@@ -1327,7 +1348,7 @@ extern "C" {
 
 extern G3dCameraTable g3d_state_camera_table;
 extern G3dFogTable g3d_state_fog_table;
-extern StateEntryHead g3d_state_light_table;
+extern G3dLightTable g3d_state_light_table;
 extern struct RenderModeObj g3d_state_render_mode;
 extern G3dVtxDescCache g3d_state_vtx_desc_cache;
 extern s32 g3d_state_tex_mtx_func_types[8];
@@ -1695,3 +1716,217 @@ void G3dIndMtxCallbackStd::Exec(G3dIndMtxOp* pOp) {
         g3d_ind_mtx_op_set(pOp, 3, &mtx[2]);
     }
 }
+
+/* ------------------------------------------------------------------------------------------------ */
+/* The identity projection, the channel load and the fog accessors                                   */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* The fog data a `G3dFog` handle points at (`g3d_fog_ref`); only used through the pointer. */
+struct G3dFogData;
+
+/* A fog handle: the fog data's address.  size: 0x4 */
+struct G3dFog {
+    /* +0x00 */ G3dFogData* mpData;
+};
+
+extern "C" {
+
+void g3d_fog_table_load(G3dFogTable* pSelf, s32 idx);
+
+/* 0x8008503C (0x124): the projection of a map mode with no scene dependency: the identity. */
+void g3d_tex_proj_identity(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
+    G3D_STATE_POINTER_ASSERT(pM, 0x140, "NW4R:Pointer Error\npM(=%p) is not valid pointer.");
+    if (pM != NULL) {
+        mtx34_identity(pM);
+    }
+}
+
+#pragma fp_contract off
+/* 0x80086B2C (0x468): loads the material's channel colours and controls: the material colours, the ambient colours
+ * scaled by `amb`, and the light masks (unlit when `bLightOff`); the second channel only when two are in use. */
+void g3d_state_load_mat_chan(const nw4r::g3d::ResMatChan chan, u32 maskColor0, u32 maskAlpha0, u32 maskColor1,
+                             u32 maskAlpha1, GXColor amb, BOOL bLightOff) {
+    if (chan.IsValid()) {
+        const nw4r::g3d::ResMatChanData& data = chan.ref();
+        u32 flag = data.chan[0].flag;
+        if (flag & 1) {
+            if (flag & 2) {
+                g3d_gd_set_chan_mat_color(4, data.chan[0].matColor);
+            } else {
+                g3d_gd_set_chan_mat_color(0, data.chan[0].matColor);
+            }
+        } else if (flag & 2) {
+            g3d_gd_set_chan_mat_color(2, data.chan[0].matColor);
+        }
+        GXColor ambColor;
+        ambColor.r = amb.r * data.chan[0].ambColor.r * (1.0f / 255.0f) + 0.5f;
+        ambColor.g = amb.g * data.chan[0].ambColor.g * (1.0f / 255.0f) + 0.5f;
+        ambColor.b = amb.b * data.chan[0].ambColor.b * (1.0f / 255.0f) + 0.5f;
+        ambColor.a = amb.a * data.chan[0].ambColor.a * (1.0f / 255.0f) + 0.5f;
+        flag = data.chan[0].flag;
+        if (flag & 4) {
+            if (flag & 8) {
+                g3d_gd_set_chan_amb_color(4, ambColor);
+            } else {
+                g3d_gd_set_chan_amb_color(0, ambColor);
+            }
+        } else if (flag & 8) {
+            g3d_gd_set_chan_amb_color(2, ambColor);
+        }
+        if (bLightOff) {
+            if (data.chan[0].flag & 0x10) {
+                g3d_gd_set_chan_ctrl_unlit(0, data.chan[0].paramChanCtrlC, maskColor0);
+            }
+            if (data.chan[0].flag & 0x20) {
+                g3d_gd_set_chan_ctrl_unlit(2, data.chan[0].paramChanCtrlA, maskAlpha0);
+            }
+        } else {
+            if (data.chan[0].flag & 0x10) {
+                g3d_gd_set_chan_ctrl_lights(0, data.chan[0].paramChanCtrlC, maskColor0);
+            }
+            if (data.chan[0].flag & 0x20) {
+                g3d_gd_set_chan_ctrl_lights(2, data.chan[0].paramChanCtrlA, maskAlpha0);
+            }
+        }
+        if (fn_80086FFC((StateByte1*)&g3d_state_gen_mode_cache) == 2) {
+            const nw4r::g3d::ResMatChanData& data1 = chan.ref();
+            flag = data1.chan[1].flag;
+            if (flag & 1) {
+                if (flag & 2) {
+                    g3d_gd_set_chan_mat_color(5, data1.chan[1].matColor);
+                } else {
+                    g3d_gd_set_chan_mat_color(1, data1.chan[1].matColor);
+                }
+            } else if (flag & 2) {
+                g3d_gd_set_chan_mat_color(3, data1.chan[1].matColor);
+            }
+            flag = data1.chan[1].flag;
+            if (flag & 4) {
+                if (flag & 8) {
+                    g3d_gd_set_chan_amb_color(5, data1.chan[1].ambColor);
+                } else {
+                    g3d_gd_set_chan_amb_color(1, data1.chan[1].ambColor);
+                }
+            } else if (flag & 8) {
+                g3d_gd_set_chan_amb_color(3, data1.chan[1].ambColor);
+            }
+            if (bLightOff) {
+                if (data1.chan[1].flag & 0x10) {
+                    g3d_gd_set_chan_ctrl_unlit(1, data1.chan[1].paramChanCtrlC, maskColor1);
+                }
+                if (data1.chan[1].flag & 0x20) {
+                    g3d_gd_set_chan_ctrl_unlit(3, data1.chan[1].paramChanCtrlA, maskAlpha1);
+                }
+            } else {
+                if (data1.chan[1].flag & 0x10) {
+                    g3d_gd_set_chan_ctrl_lights(1, data1.chan[1].paramChanCtrlC, maskColor1);
+                }
+                if (data1.chan[1].flag & 0x20) {
+                    g3d_gd_set_chan_ctrl_lights(3, data1.chan[1].paramChanCtrlA, maskAlpha1);
+                }
+            }
+        } else {
+            g3d_gd_set_chan_ctrl_lights(1, 0, 0);
+            g3d_gd_set_chan_ctrl_lights(3, 0, 0);
+        }
+        g3d_gen_mode_cache_load_full(&g3d_state_gen_mode_cache);
+    }
+}
+#pragma fp_contract on
+
+/* 0x80088138 (0x54): returns the fog's data, asserting the handle is set. */
+G3dFogData* g3d_fog_ref(const G3dFog* pFog) {
+    if (pFog->mpData == NULL) {
+        nw4r::db::Panic("g3d_rescommon_ac.h", 0x8F, "NW4R:Pointer must not be NULL (mpData)");
+    }
+    return pFog->mpData;
+}
+
+/* 0x8008818C (0x10): loads fog `idx` of the fog table. */
+void g3d_state_load_fog(s32 idx) {
+    g3d_fog_table_load(&g3d_state_fog_table, idx);
+}
+
+} /* extern "C" */
+
+/* 0x80085B6C (0x104): constructs the camera table: every matrix the identity, camera 0 current. */
+G3dCameraTable::G3dCameraTable() {
+    MTX34_ctor(&invCameraMtx);
+    nw4r::math::MTX34* pMtx = cameraMtx;
+    do {
+        MTX34_ctor(pMtx);
+        pMtx++;
+    } while (pMtx < &cameraMtx[32]);
+    nw4r::math::MTX44* pProj = projMtx;
+    do {
+        MTX44_ctor(pProj);
+        pProj++;
+    } while (pProj < &projMtx[32]);
+    pMtx = projTexMtx;
+    do {
+        MTX34_ctor(pMtx);
+        pMtx++;
+    } while (pMtx < &projTexMtx[32]);
+    pMtx = envTexMtx;
+    do {
+        MTX34_ctor(pMtx);
+        pMtx++;
+    } while (pMtx < &envTexMtx[32]);
+    flags = 0;
+    currentCamera = 0;
+    mtx34_identity(&invCameraMtx);
+    for (u32 i = 0; i < 32; i++) {
+        mtx34_identity(&cameraMtx[i]);
+        nw4r::math::MTX44Identity(&projMtx[i]);
+        mtx34_identity(&projTexMtx[i]);
+        mtx34_identity(&envTexMtx[i]);
+    }
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* The light table's state entry points                                                              */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* The light setting `g3d_state_set_light_setting` copies in; only used through the pointer. */
+struct G3dLightSetting;
+
+extern "C" {
+
+void g3d_light_table_set_setting(G3dLightTable* pSelf, const G3dLightSetting* pSetting);
+void g3d_light_table_load_light_set(G3dLightTable* pSelf, s32 idx, u32* pMaskDiffColor, u32* pMaskDiffAlpha,
+                                    u32* pMaskSpecColor, u32* pMaskSpecAlpha, GXColor* pAmb);
+
+/* 0x80088250 (0x10): copies the light setting into the state and loads its lights. */
+void g3d_state_set_light_setting(const G3dLightSetting* pSetting) {
+    g3d_light_table_set_setting(&g3d_state_light_table, pSetting);
+}
+
+/* 0x80088260 (0x10): returns light object `idx`, NULL past the table. */
+G3dLightObj* g3d_state_get_light_obj(u32 idx) {
+    return fn_800856D4(&g3d_state_light_table, idx);
+}
+
+/* 0x80088270 (0x30): returns byte `idx` of the loaded light set (a light index, -1 for none). */
+s8 g3d_state_get_light_set_entry(u32 idx) {
+    return fn_80085B54(&g3d_state_light_table, idx);
+}
+
+/* 0x800882A0 (0x5C): loads light set `idx` and returns its four light masks and its ambient colour. */
+void g3d_state_load_light_set(s32 idx, u32* pMaskDiffColor, u32* pMaskDiffAlpha, u32* pMaskSpecColor,
+                              u32* pMaskSpecAlpha, GXColor* pAmb) {
+    g3d_light_table_load_light_set(&g3d_state_light_table, idx, pMaskDiffColor, pMaskDiffAlpha, pMaskSpecColor,
+                                   pMaskSpecAlpha, pAmb);
+}
+
+} /* extern "C" */
+
+extern "C" {
+
+void g3d_camera_table_set_camera(G3dCameraTable* pSelf, const nw4r::g3d::Camera& camera, u32 id, bool bUpdate);
+
+/* 0x800882FC (0x20): records camera `id`'s matrices from `camera`, making it current when `bUpdate`. */
+void g3d_state_set_camera(const nw4r::g3d::Camera& camera, u32 id, bool bUpdate) {
+    g3d_camera_table_set_camera(&g3d_state_camera_table, camera, id, bUpdate);
+}
+
+} /* extern "C" */

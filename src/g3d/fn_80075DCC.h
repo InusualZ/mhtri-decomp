@@ -4,6 +4,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "gx.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +18,8 @@ void fn_80075DD8(void* p);
 
 /* 0x80077420 - writes one XF register through the pipe (callers: gx/fn_8009AA78.c, g3d/g3d_state.cpp). */
 void GDWriteXFCmd(u16 addr, u32 value);
+/* 0x8007740C - writes a colour channel's material colour (caller: g3d/g3d_state.cpp). */
+void g3d_gd_set_chan_mat_color(u32 chan, GXColor color);
 
 /* 0x80077DF0 - assembles an MTX34 from twelve floats (the first eight in FPRs, the last four on the
  * stack).  Callers: ef/ef_drawfreestrategy.cpp, ef/ef_drawstrategyimpl.cpp. */

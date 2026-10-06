@@ -45,6 +45,7 @@ class ResMatPix;
 class ResMatIndMtxAndScale;
 class ResMatTexCoordGen;
 class ResMatTevColor;
+class ResMatChan;
 }  // namespace g3d
 }  // namespace nw4r
 
@@ -61,6 +62,13 @@ void g3d_state_set_gen_mode(nw4r::g3d::ResGenMode genMode);
 void g3d_state_load_tev(nw4r::g3d::ResTev tev);
 void g3d_state_load_mat_pix(nw4r::g3d::ResMatPix pix);
 void g3d_state_load_mat_tev_color(nw4r::g3d::ResMatTevColor tevColor);
+void g3d_state_load_mat_chan(nw4r::g3d::ResMatChan chan, u32 maskColor0, u32 maskAlpha0, u32 maskColor1,
+                             u32 maskAlpha1, struct _GXColor amb, BOOL bLightOff);
+void g3d_state_load_fog(s32 idx);
+void g3d_state_load_light_set(s32 idx, u32* pMaskDiffColor, u32* pMaskDiffAlpha, u32* pMaskSpecColor,
+                              u32* pMaskSpecAlpha, struct _GXColor* pAmb);
+struct G3dLightObj* g3d_state_get_light_obj(u32 idx);
+s8 g3d_state_get_light_set_entry(u32 idx);
 void g3d_state_load_mat_ind_mtx_dl(nw4r::g3d::ResMatIndMtxAndScale ind);
 void g3d_state_load_mat_ind_mtx(nw4r::g3d::ResMatIndMtxAndScale ind, G3dIndMtxCallback* pCallback);
 void g3d_ind_mtx_op_load(G3dIndMtxOp* pSelf);
