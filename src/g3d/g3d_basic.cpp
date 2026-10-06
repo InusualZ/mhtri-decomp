@@ -1,41 +1,22 @@
-/* g3d/g3d_basic.cpp - the `g3d_basic.cpp` basic-matrix cluster, .text 0x800D79B4..0x800D7F54.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every name
- * this file uses is a bare `fn_XXXXXXXX` entry in config/RMHE08/symbols.txt).
- *
- * The file name is class-1 evidence: the `.data` string `lbl_80595840` is `"g3d_basic.cpp"`, the `pFile`
- * argument of every `nw4r::db::Panic` call in fn_800D79B4 (read out of orig/RMHE08/sys/main.dol). The
- * `.cpp` suffix and the `Panic__Q24nw4r2dbFPCciPCce` callee make it C++. Module `g3d`, so
- * `src/g3d/g3d_basic.cpp`.
- *
- * The four functions build 2-D scale/rotate/translate matrices from an SRT record and multiply them into
- * a model matrix:
- *   - fn_800D7F40 is the `0x40000000` handle-bit test.
- *   - fn_800D7ED0 scales a matrix by a VEC3 (into a resource node's matrix).
- *   - fn_800D7D24 is the SRT dispatch: it picks a direct copy / concat / vector-transform path from the
- *     node's flag word (bits 0x2, 0x4, 0x8, 0x10, 0x20).
- *   - fn_800D79B4 builds the SRT matrix itself (scale/rotate/translation in the XY plane) with the
- *     `nw4r::db::Panic` pointer asserts at lines 36-38.
- *
- * Residuals and the measured per-symbol table are in the outbox.
- *
- * Measured per symbol against the split target `build/RMHE08/obj/g3d/g3d_basic.o` (official
- * `fuzzy_match_percent`): fn_800D79B4 100.0, fn_800D7ED0 100.0, fn_800D7F40 100.0, fn_800D7D24 97.336.
- *   - fn_800D7F40 needs the un-folded `(x & 0x40000000) != 0` shape, so the file carries
- *     `#pragma peephole off`; the same pragma is what the other three want (without it fn_800D7D24 is
- *     92.15 and fn_800D79B4 99.52).
- *   - fn_800D7D24 (97.336 %) is instruction-for-instruction equal to retail: 128 instructions, the same
- *     opcode sequence except one prologue pair reordered (retail copies `pNode` to r29 and loads the flag
- *     word to r30 before copying `handle`/arg5 to r31; ours copies arg5 to r30 first). Its 428 bytes are
- *     identical; only the callee-saved colouring differs. Shapes tried: arg5 aliased through a local
- *     (`handleArg` -> `handle`, the form kept - 97.336), the local inlined or reordered (97.056), and
- *     `tmpMtx`/`tmpVec` scoped into their branches (97.056).
+/*
+ * g3d/g3d_basic.cpp - nw4r g3d basic-matrix cluster: SRT matrix build and dispatch, a node-matrix scale, a handle bit.
+ * RANGE. .text 0x800D79B4-0x800D7F54 (4 functions); extab, extabindex, .data 0x80595840-0x805958F8 (opens on
+ *   "g3d_basic.cpp", fn_800D79B4's assert file), .sdata2 0x807963D0-0x807963D8.
+ * NAMES. Map stems.
+ * RESIDUALS. fn_800D7D24: one prologue pair reordered - retail copies `pNode` to r29 and loads the flag word to r30
+ *   before copying `handle` to r31, ours copies it to r30 first (tried: the local inlined or reordered, `tmpMtx`/
+ *   `tmpVec` scoped into their branches; the `handleArg` -> `handle` alias is kept).
+ *   flipcheck: the `.text` layout is a permutation of retail's - every function keeps its size but sits at another
+ *   address, so the definitions are not in address order; `.data` and `.sdata2` are claimed and not emitted.
+ * SHAPES. File-scope `#pragma peephole off`: fn_800D7F40 keeps the unfolded `(x & 0x40000000) != 0`, and
+ *   fn_800D7D24 and fn_800D79B4 lose rows without it.
  */
 #include "types.h"
 #include "nw4r/math.h"
-#include "unsplit/g3d.h" /* fn_8007100C / fn_800710BC (rule 2) */
+#include "unsplit/g3d.h" /* fn_8007100C / fn_800710BC, owner g3d/g3d_calcview.cpp */
 #include "g3d/fn_80075DCC.h" /* fn_80075DCC, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
 /* The retail object keeps the un-folded `(x & mask) != 0` form in fn_800D7F40 (`rlwinm` + the
  * neg/or/srwi tests) and the un-fused compares elsewhere; the file-scope peephole pass folds both.
@@ -51,8 +32,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 }  // namespace nw4r
 
 extern "C" {
-/* The `g3d` node/resource helpers this unit calls; all still `fn_XXXXXXXX` in the map.  Declared here
- * because their addresses have no registered owner yet or are declared in the unsplit band. */
+/* The `g3d` node/resource helpers this unit calls (plain map stems). */
 void* fn_80050508(void* pMtx);
 void* fn_80051570(void* pMtx);
 u32 fn_800737AC(u32 handle);
@@ -66,8 +46,8 @@ void PSMTXCopy(const Mtx34* pSrc, Mtx34* pDst);
 void PSMTXConcat(const Mtx34* pA, const Mtx34* pB, Mtx34* pDst);
 }
 
-/* The pooled constants and the file-name/assert strings (declared, never defined - they live in the
- * original `.data`/`.sdata2`, which this unit does not claim). */
+/* The pooled constants and the file-name/assert strings, declared, not defined: the claimed `.data`/`.sdata2`
+ * are not emitted yet. */
 extern const char lbl_80595840[]; /* "g3d_basic.cpp"                                       .data */
 extern const char lbl_80595850[]; /* "NW4R:Pointer Error\npMtx(=%p) is not valid pointer." */
 extern const char lbl_80595884[]; /* "NW4R:Pointer Error\n& srt(=%p) is not valid pointer." */

@@ -1,47 +1,20 @@
 /*
- * nw4r g3d: g3d_resanmtexsrt.cpp - the `ResAnmTexSrt` SRT-animation evaluator and the inline
- * resource-accessor cluster emitted beside it, `.text` 0x800916FC-0x80093990 (75 functions,
- * 8852 B).
- *
- * Registered once, at its final home (docs/plan.md 12), from the pooled proposal
- * `g3d/g3d_resanmtexsrt.cpp`.
- *
- * Naming - which evidence class decided it.  Class 1 decides: the range's own `.data` pool holds
- * the bare source-file name `g3d_resanmtexsrt.cpp` (lbl_80590928 at 0x80590928), the file argument
- * of the four `nw4r::db::Panic` asserts inside fn_800916FC (lines 118/119/120/123), read out of the
- * original `orig/RMHE08/sys/main.dol` (the retail main.elf dump's `.data`).  `langcheck` says C++
- * (the `.cpp` name and the `Panic__Q24nw4r2dbFPCciPCce` relocation), so the unit is
- * `src/g3d/g3d_resanmtexsrt.cpp` in the existing g3d lib (cflags_g3d), exactly where its link
- * neighbours (`g3d_resanmchr.cpp`, `g3d_resanmfog.cpp`) sit.  Class 2 FAILS: every `fn_XXXXXXXX`
- * stem in the range answers `zz_XXXXXXXX_` in the runtime dump (`dumpmap.py lookup 0x800916FC`),
- * a placeholder, not a name; only `GetResPltt`/`GetResTex` carry real mangled names and those are
- * `nw4r::g3d::ResFile` members.
- *
- * Interior seam note (brief 8.3, left to settle).  The run also cites the inlined-assert headers
- * `g3d_rescommon_ac.h`, `g3d_resfile_ac.h`, `g3d_resanmchr_ac.h`, `g3d_resanmvis_ac.h`,
- * `g3d_resanmclr_ac.h`, `g3d_resanmtexpat_ac.h`, `g3d_resanmtexsrt_ac.h`, `g3d_resanmshp_ac.h` -
- * the `ResFile::GetResXxx` accessor bodies that nw4r defines in the `_ac.h` headers.  Their `__FILE__`
- * strings sit in the same contiguous `.data` fragment as `g3d_resanmtexsrt.cpp`'s (the attribution
- * queue's run 0x80590928-0x80590D64, density 0.94, one fragment), so they are the inlined accessor
- * bodies of this TU, not a second object.  The right edge 0x80093990 is the next TU's first body
- * (`g3d_resfile.cpp`'s `ResFile::CheckRevision`, `.data` 0x80590BA0), a proven seam.
- *
- * Section claim: `.text` 0x800916FC-0x80093990, `extab` 0x80009208-0x800093A8 (52 8-byte
- * unwind-only records, one per thrown body), `extabindex` 0x80021EE8-0x80022158 (52 12-byte
- * records).  The boundaries are the functions before (fn_80091628, the resanmscn tail) and after
- * (fn_80093990 = `ResFile::CheckRevision`).  No `.ctors`/`.dtors` word points into the range.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x800916FC`, which answers the `zz_00916fc_` placeholder,
- * and with config/RMHE08/symbols.txt, whose every `.text` entry in 0x800916FC..0x80093990 is a bare
- * `fn_XXXXXXXX` except the two `ResFile::GetRes*` accessors), so there is no real name to recover
- * and stylelint's rule 7 refuses the landing without this line.
- *
- * Reconstruction status.  See `.pi/outbox/800916fc-fn-800916fc-78c0.json` for the measured
- * per-symbol scores and the residual list.  The bodies written so far are the self-contained
- * helpers, the byte-IO (de)serialisers, the six value-type constructors and the forwarder thunks;
- * the dictionary lookups and the large `ResAnmTexSrt::GetAnmResult` dispatcher are recorded as
- * residuals in the outbox.
+ * g3d/g3d_resanmtexsrt.cpp - nw4r g3d `ResAnmTexSrt` SRT-animation evaluator and the `ResFile::GetResXxx`
+ *   accessor bodies the `g3d_res*_ac.h` headers inline beside it: byte-IO (de)serialisers, the six value-type
+ *   constructors, the ten category lookups and their forwarders.
+ * RANGE. .text 0x800916FC-0x80093990 (75 functions); extab, extabindex, .data 0x80590928-0x80590D78 (opens on
+ *   "g3d_resanmtexsrt.cpp"; the `_ac.h` assert strings share the fragment), .sdata 0x80791270-0x80791280, .sdata2
+ *   0x80795F08-0x80795F10.  The right edge is `g3d/g3d_resfile.cpp`'s first body, a proven seam.
+ * NAMES. Map stems (the dump answers `zz_` placeholders) except the two `nw4r::g3d::ResFile` members
+ *   `GetResPltt`/`GetResTex`.
+ * RESIDUALS. Unwritten (objdiff scores them zero): 0x800916FC-0x80091CEC (fn_800916FC, the `GetAnmResult`
+ *   dispatcher, and fn_80091B50), 0x80092020-0x80092234 (fn_80092020, fn_8009213C).
+ *   Partial (32): fn_80091D78, fn_80091E44, fn_80091EE8, fn_80091FD0, fn_80092234, fn_800924CC,
+ *   0x80092588-0x80092848 and 0x8009284C-0x80092B0C (four each), fn_80092B10, fn_80092C08, fn_80092CC4,
+ *   fn_80092DBC, fn_80092E78, fn_80092F70, fn_8009302C, fn_80093124, fn_800931E0, fn_800932D8, fn_80093394,
+ *   fn_8009348C, 0x80093548-0x8009368C (two), 0x80093690-0x800938EC (four).
+ *   flipcheck: `.text` 0x19A0 of 0x2294; `.data`, `.sdata` and `.sdata2` are claimed and not emitted.
+ * SHAPES. File-scope `#pragma peephole off`: the constructor guards keep retail's split `clrlwi` + `cmpwi`.
  */
 
 #include "types.h"
@@ -69,8 +42,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 extern "C" {
 
-/* The `nw4r::g3d::ResFile` accessor owner header.  There is no `_ac.h` mirror under include/, so the
- * assert strings are declared here; they are this unit's own `.data` fragment. */
+/* The `ResFile` accessors' assert strings, this unit's own `.data` fragment. */
 extern const char lbl_80590928[]; /* "g3d_resanmtexsrt.cpp" */
 extern const char lbl_80590940[]; /* "this(=%p) is not valid pointer." */
 extern const char lbl_80590974[]; /* "pResult(=%p) is not valid pointer." */
@@ -207,35 +179,25 @@ extern "C" u32 fn_800932D8(void* self, u32 arg);
 extern "C" u32 fn_8009348C(void* self, u32 arg);
 extern "C" u32 fn_800935D4(void* self, u32 arg);
 
-/* main's band declaration is `void* fn_80092584(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092584(void* self, u32 arg) { return (void*)fn_800924CC(self, arg); }
-/* main's band declaration is `void* fn_80092848(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092848(void* self, u32 arg) { return (void*)fn_80092790(self, arg); }
-/* main's band declaration is `void* fn_80092B0C(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092B0C(void* self, u32 arg) { return (void*)fn_80092A54(self, arg); }
-/* main's band declaration is `void* fn_80092CC0(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092CC0(void* self, u32 arg) { return (void*)fn_80092C08(self, arg); }
-/* main's band declaration is `void* fn_80092E74(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80092E74(void* self, u32 arg) { return (void*)fn_80092DBC(self, arg); }
-/* main's band declaration is `void* fn_80093028(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80093028(void* self, u32 arg) { return (void*)fn_80092F70(self, arg); }
-/* main's band declaration is `void* fn_800931DC(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_800931DC(void* self, u32 arg) { return (void*)fn_80093124(self, arg); }
-/* main's band declaration is `void* fn_80093390(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80093390(void* self, u32 arg) { return (void*)fn_800932D8(self, arg); }
-/* main's band declaration is `void* fn_80093544(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_80093544(void* self, u32 arg) { return (void*)fn_8009348C(self, arg); }
-/* main's band declaration is `void* fn_8009368C(void*, u32)` (it feeds a ResHandle), so the
- * definition matches it - one symbol, one type per translation unit. */
+/* Forwards to the category lookup, typed `void*` as `unsplit/g3d.h` declares it (it feeds a ResHandle). */
 extern "C" void* fn_8009368C(void* self, u32 arg) { return (void*)fn_800935D4(self, arg); }
 
 /* ====================== 0x80092B9C-0x80093484: the six value-type constructors ================= */
@@ -324,9 +286,8 @@ extern "C" u32 fn_80091D20(void* self, void* key) {
 /* ==================== the `ResFile` dictionary chain (rule 2 declarations) ==================== */
 
 extern "C" u32 fn_80092444(void* self);             /* this unit (0x80092444) */
-extern "C" s32 fn_80092330(void* dict, void* arg); /* this unit (0x80092330); `s32` is
-                                                    * main's band declaration (see
-                                                    * unsplit/g3d.h) */
+extern "C" s32 fn_80092330(void* dict, void* arg); /* this unit (0x80092330); `s32` as unsplit/g3d.h
+                                                    * declares it */
 
 /* The ten "no-key" accessors: build the dictionary name from the category label, resolve the
  * `ResFile` root dictionary at +0x18, look the entry up, then read the body word through the

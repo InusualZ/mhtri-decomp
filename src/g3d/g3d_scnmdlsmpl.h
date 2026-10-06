@@ -1,14 +1,6 @@
-/*
- * The `g3d/g3d_scnmdlsmpl.cpp` unit's cross-unit declarations (docs/plan.md 6.5 rule 2).
- *
- * `g3d_scnmdlsmpl.cpp` (`.text` 0x8007F0E4-0x800813B8) is the `ScnMdlSimple` scene-model object - the
- * base class `g3d/g3d_scnmdl.cpp`'s ScnMdl builds on.  Its option accessors, its node-visibility walk
- * and its replacement-buffer helper are the ones the ScnMdl bodies call.
- *
- * All keep C linkage (their map names are plain `fn_XXXXXXXX`/`dtor_XXXXXXXX` stems).  The signatures
- * are the ones the target bodies imply: the setters take (self, type) and the `type == 5` fast paths
- * are out of line here.
- */
+/* g3d/g3d_scnmdlsmpl.h - the `ScnMdlSimple` option accessors, node-visibility walk and replacement-buffer helper
+ *   `g3d/g3d_scnmdl.cpp` calls (C linkage); the setters take (self, type), and the `type == 5` fast paths are out of
+ *   line. */
 #ifndef MHTRI_G3D_G3D_SCNMDLSMPL_H
 #define MHTRI_G3D_G3D_SCNMDLSMPL_H
 

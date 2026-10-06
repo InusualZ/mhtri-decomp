@@ -1,21 +1,15 @@
 /*
- * nw4r g3d: g3d_resanmamblight.cpp - the ambient-light channel evaluator, `.text`
- * 0x80089F94-0x8008A220 (6 functions).
- *
- * Re-cut (docs/plan.md 12 item 5).  `fn_8008A000` panics with
- * `__FILE__` = `g3d_resanmamblight.cpp` (line 44) and the retail data fragment is
- * 0x8058FE90-0x8058FF20, so the range is the real `g3d_resanmamblight.cpp`.  `fn_80089F94` cites the
- * `g3d_resanmscn_ac.h` header string (lbl_8058FF08); `fn_8008A204` carries no data reference (the
- * report's alternative cut is 0x8008A204) - unpinned, measure to settle.
- *
- * Naming note: the map carries only `fn_XXXXXXXX` names here (docs/plan.md 6.5 rule 7); renaming a
- * symbol needs the map and the source in one edit (playbook 31).
- *
- * Language: langcheck says the retail TU is C++, but the source is C-idiom (`fn_80089F94` passes a
- * `void*` to a `u32*` parameter, which C++ rejects) and this re-cut must not rewrite bodies, so the
- * extension stays `.c`; the C++ conversion rides the language lane.
- * `#pragma peephole off` / `#pragma fp_contract off` are file-scoped.  Registered `Object(NonMatching,
- * ...)` in lib g3d.
+ * g3d/g3d_resanmamblight.c - nw4r g3d ambient-light channel evaluator fn_8008A000 and its pointer, frame-clamp and
+ *   offset helpers.
+ * RANGE. .text 0x80089F94-0x8008A220 (6 functions); extab, extabindex, .data 0x8058FE90-0x8058FF20 (fn_8008A000
+ *   passes "g3d_resanmamblight.cpp"), .sdata2 0x80795EC0-0x80795ED0.  fn_80089F94 cites "g3d_resanmscn_ac.h"
+ *   (lbl_8058FF08); fn_8008A204 carries no data reference, so 0x8008A204 is an alternative right edge.
+ * NAMES. Map stems.  The retail TU is C++; the source stays `.c` because it is C-idiom (fn_80089F94 passes a
+ *   `void*` to a `u32*` parameter), so `fn_80066C8C__FPv` and the `Panic` mangling are spelled verbatim.
+ * RESIDUALS. fn_8008A000: two string addresses differ with the `.data` layout, and one instruction more.
+ *   fn_8008A204: retail keeps the base word in r0 (`lwz r0,0(r3); add r3,r0,r4`), ours in r3.
+ *   flipcheck: `.text` 0x290 of 0x28C; `.data` is 0x8A of 0x90 and its bytes differ.
+ * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`.
  */
 
 
@@ -28,10 +22,7 @@
 /* nw4r::db::Panic(const char*, int, const char*, ...) */
 extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *msg, ...);
 
-/* nw4r math / resource helpers owned by unsplit units.  Their map names are the C++ manglings, so a C
- * declaration spells the mangled name verbatim - exactly what a C unit calling a C++ function looks
- * like (`fn_80066C8C` is `fn_80066C8C__FPv`, renamed in the map with the unit that calls it,
- * `g3d/g3d_anmscn.cpp`). */
+/* The C++ helper `fn_80066C8C` (owner `g3d/fn_80063888.cpp`), spelled with its mangling because this unit is C. */
 extern u32 *fn_80066C8C__FPv(void *obj);
 
 /* The resolved animation object `fn_80066C8C__FPv` returns: a type word, a frame count and the
@@ -58,11 +49,6 @@ s32 fn_8008A188(u32 *self, s32 flag, f32 frame);
 f32 fn_8008A1A8(u16 *count, f32 frame);
 s32 fn_8008A204(u32 *self, s32 offset);
 
-/*
- * The pointer-range check nw4r's resource macros expand to: a pointer is valid when it lies in
- * one of the Wii memory regions.  Shared by g3d_resanm.c and g3d_resanmamblight.c, so it lives
- * in nw4r/g3d/res_common.h (rule 1).
- */
 
 /* Stores a pointer and asserts its 4-byte alignment. */
 void *fn_80089F94(void *self, u32 value)

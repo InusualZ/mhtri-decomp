@@ -1,34 +1,22 @@
 /*
- * nw4r g3d render/dispatch cluster - `.text` 0x80075DCC-0x8007C540 (216 functions, 26484 B).
- *
- * Registered once, at its final home (docs/plan.md 12), from the pooled proposal `80075DCC`.
- *
- * Name (evidence class 4, "nothing supports a single name"): the run is a maximal unclaimed run that
- * spans more than one original translation unit, so no one `__FILE__` string names it.  The discovery's
- * own attribution probe (`tools/units/attribution-queue.json`) reports
- * `sources: [g3d_dcc.cpp, g3d_draw.cpp, g3d_draw1mat1shp.cpp, g3d_fog.cpp, g3d_light.cpp], conflict: true`
- * - five C++ source files in one linker run.  The first function that cites a `__FILE__` string
- * (`fn_80075E9C`) cites `g3d_dcc.cpp`, the tail (`fn_8007A8E0` onward) cites `g3d_light.cpp`.  The
- * dominant TU names already have homes elsewhere, so the cluster keeps the map's own `fn_80075DCC` stem
- * and the module is `g3d` (every covered TU is nw4r g3d).
- *
- * Seam: unproven.  The left edge 0x80075DCC is where `g3d/g3d_camera.cpp`'s last function ends and is a
- * `tudiscover` strong cut (a `.sdata2` pool run jump); the right edge 0x8007C540 is the proposal
- * boundary the discovery capped at `--max-bytes`, NOT a TU seam - the next proposal (`8007C540`) owns
- * the rest of this linker run.  This unit was registered with the proposal's exact extent so it can be
- * measured; the re-cut rides the batch.
- *
- * Sections: .text 0x80075DCC-0x8007C540, extab 0x800081F8-0x80008588,
- * extabindex 0x8002091C-0x80020E74.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>`: every unnamed entry is a bare `zz_XXXXXXXX_`
- * placeholder in the runtime dump too), so there is no real name to recover for those functions and
- * stylelint's rule 7 refuses the landing without this line.
- *
- * Reconstruction status: the bodies are m2c's decompilation of the target object, mechanically typed
- * (each `->unkNN` becomes a `RawView_N` struct field `field_0xNN` with its offset and size stated).
- * Per-function scores are in the outbox and the notes file.
+ * g3d/fn_80075DCC.cpp - nw4r g3d render/dispatch cluster: the `g3d_dcc.cpp`, `g3d_draw1mat1shp.cpp`,
+ *   `g3d_draw.cpp`, `g3d_fog.cpp` and `g3d_light.cpp` bodies of one linker run.
+ * RANGE. .text 0x80075DCC-0x8007C540 (216 functions); extab, extabindex, .rodata 0x8056F658-0x8056F678, .data
+ *   0x8058E570-0x8058EDA0, .sdata 0x807911E0-0x80791208, .sdata2 0x80795DF8-0x80795E60.  fn_80075E9C cites
+ *   "g3d_dcc.cpp" and fn_8007A8E0 onward "g3d_light.cpp".  The left edge is a tudiscover strong cut after
+ *   `g3d/g3d_camera.cpp`; the right edge is the discovery's byte cap, not a TU seam (`g3d/g3d_scnmdl.cpp` follows).
+ * NAMES. The file keeps the map's stem (no one `__FILE__` names the run).  The bodies are m2c's output, typed
+ *   mechanically: each `RawView_N` struct's `field_0xNN` states an offset and a size, not a meaning.
+ * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, fn_80077DF0, fn_80079EE4, fn_8007A468.
+ *   Unwritten (empty stubs, 33 rows, 0x31F0 bytes; objdiff scores them near zero): fn_800769F4, fn_8007868C,
+ *   fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8, fn_800793A4, fn_80079604, fn_80079938, fn_800799BC,
+ *   fn_80079A48, fn_80079B38, fn_8007A814, fn_8007A8E0, dtor_8007AF28, fn_8007AF6C, fn_8007B074, fn_8007B0A0,
+ *   fn_8007B160, fn_8007B224, dtor_8007B2D4, fn_8007B3BC, fn_8007B42C, fn_8007B6CC, fn_8007B6FC, fn_8007B734,
+ *   fn_8007B764, fn_8007B794, dtor_8007B7F0, fn_8007BB5C, the `ScnMdl::CopiedMatAccess` constructor (0x8007BEAC),
+ *   fn_8007C3CC, fn_8007C474.
+ *   Partial (101 written bodies): every remaining function except the 77 at 100 %.
+ *   flipcheck: `.text` 0x3B28 of 0x6774; `.rodata`, `.data` and `.sdata` are claimed and not emitted; `.sdata2` is
+ *   0xC of 0x68, and the `.sdata`/`.sdata2` pools share a literal with `g3d/g3d_camera.cpp` (a candidate fold).
  */
 
 #include "types.h"
@@ -52,7 +40,7 @@ typedef struct {
 #include "sys_mem.h" /* operator delete (rule 9: call through the owner) */
 #include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "g3d/fn_800D74E8.h"
 
 #define M2C_ERROR(x) /* unknown instruction */
@@ -2906,8 +2894,7 @@ u32 nw4r::g3d::ScnMdl::CopiedMatAccess::GetResTexSrt(bool arg1) {
     return *((s32*)fn_8006F374((void*)(&sp8), (s32)(0)));
 }
 
-/* 0x8007BEAC - the ScnMdl::CopiedMatAccess constructor.  m2c could not decompile it (a `bctr` through
- * an unresolved jump table), so it is a compiling stub and a recorded residual. */
+/* 0x8007BEAC - the ScnMdl::CopiedMatAccess constructor. */
 nw4r::g3d::ScnMdl::CopiedMatAccess::CopiedMatAccess(ScnMdl* pMdl, u32 idx)
 {
     (void)pMdl;

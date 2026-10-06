@@ -1,9 +1,5 @@
-/*
- * g3d/g3d_resanmtexsrt.h - `nw4r::g3d::ResFile`, the resource-file handle whose two lookups
- * `src/g3d/g3d_resanmtexsrt.cpp` defines (docs/plan.md 6.5 rules 1 and 2: one definition, included by the
- * owner and its consumers).  A `ResCommon<ResFileData>` handle: its one word is the file-data pointer,
- * and the lookups return the found `ResTex`/`ResPltt` handle as a word.
- */
+/* g3d/g3d_resanmtexsrt.h - `nw4r::g3d::ResFile`, a one-word `ResCommon<ResFileData>` handle whose lookups
+ *   `GetResTex`/`GetResPltt` (the found `ResTex`/`ResPltt` handle as a word) `g3d/g3d_resanmtexsrt.cpp` defines. */
 #ifndef MHTRI_G3D_G3D_RESANMTEXSRT_H
 #define MHTRI_G3D_G3D_RESANMTEXSRT_H
 

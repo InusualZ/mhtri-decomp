@@ -1,18 +1,6 @@
-/* The g3d ambient-light animation unit `g3d/g3d_resanmamblight.c`.
- *
- * Declarations moved here from the consumer units' `src/` files (docs/plan.md 6.5 rule 2:
- * an extern lives with the TU that owns the symbol).  `fn_8008F6E8` (`g3d/g3d_resanmfog.cpp`)
- * is the second consumer, so the shared channel evaluators are declared once here.
- *
- * The functions keep C linkage (the map carries plain `fn_XXXXXXXX` stems).
- *
- * Parameter order: the retail fog call site (`g3d/g3d_resanmfog.cpp`) schedules the float `frame`
- * argument before the integer flag (MWCC evaluates arguments left to right), so the evidenced
- * signature is `(self, f32 frame, s32 flag)`.  The owner's reconstructed definition in
- * `g3d_resanmamblight.c` spells it `(self, s32 flag, f32 frame)`; the two are ABI-identical (the
- * PPC EABI assigns integer and float arguments to separate register files), so the declaration is
- * interchangeable and only the scheduling differs.  The evidenced order is kept here.
- */
+/* g3d/g3d_resanmamblight.h - the channel evaluators of `g3d/g3d_resanmamblight.c` that `g3d/g3d_resanmfog.cpp`
+ *   also calls (C linkage), declared `(self, f32 frame, s32 flag)` - the order the retail fog call site schedules;
+ *   the owner's `(self, s32 flag, f32 frame)` definition is ABI-identical. */
 #ifndef MHTRI_G3D_G3D_RESANMAMBLIGHT_H
 #define MHTRI_G3D_G3D_RESANMAMBLIGHT_H
 

@@ -1,27 +1,25 @@
 /*
- * nw4r g3d: g3d_resanm.cpp - the float and color animation-channel evaluators, `.text`
- * 0x800898B0-0x80089F94 (10 functions).
- *
- * Re-cut (docs/plan.md 12 item 5, a bulk attribution spanning three
- * original TUs).  `fn_800898B0`/`fn_80089C6C` panic with `__FILE__` = `g3d_resanm.cpp` (lines 105/135/
- * 176/206) and the retail data fragment is 0x8058FDC8-0x8058FE90, so the range is `g3d_resanm.cpp`.
- * The byte-lerp helpers `fn_80089E9C`..`fn_80089F90` carry no data reference of their own; the report's
- * candidate cut 0x80089F94 puts them here (alternative 0x80089E9C) - unpinned, measure to settle.
- *
- * Naming note: the map carries only `fn_XXXXXXXX` names here (docs/plan.md 6.5 rule 7); renaming a
- * symbol needs the map and the source in one edit (playbook 31).
- *
- * Language: langcheck says the retail TU is C++ (`__FILE__` `g3d_resanm.cpp`), but the reconstructed
- * source is C-idiom and does not compile as C++ without casts, so this re-cut keeps the `.c` extension
- * and the C++ conversion rides the language lane (see `.pi/notes/800898b0-fn-800898b0-acfb.md`).
- * `#pragma peephole off` / `#pragma fp_contract off` are file-scoped (the retail object has no
- * record-form instruction and no fused multiply-add).  Registered `Object(NonMatching, ...)` in lib g3d.
+ * g3d/g3d_resanm.c - nw4r g3d float and colour animation-channel evaluators (fn_800898B0, fn_80089C6C), the Hermite
+ *   step, the colour constructors and the byte-lerp and float-to-short helpers.
+ * RANGE. .text 0x800898B0-0x80089F94 (10 functions); extab, extabindex, .data 0x8058FDC8-0x8058FE90 (the evaluators
+ *   pass "g3d_resanm.cpp"), .sdata2 0x80795E98-0x80795EC0.  The byte-lerp helpers fn_80089E9C..fn_80089F90 carry no
+ *   data reference, so 0x80089E9C is an alternative right edge.
+ * NAMES. Map stems.  The retail TU is C++; the source stays `.c` because it is C-idiom and does not compile as C++
+ *   without casts, so the `Panic` mangling is spelled verbatim.
+ * RESIDUALS. fn_800898B0: the panic strings share a pooled base (`lis r4,...data.0@ha; addi r31`), so ours saves r29
+ *   too and takes a 0x50 frame where retail's is 0x40 (0x2D0 of retail's 0x2D8 bytes).
+ *   fn_80089C6C: the key-index addressing (`slwi`/`lwzx`) is scheduled and allocated differently.
+ *   fn_80089F78: retail truncates float to short with `psq_st f1,0(r3),1,qr5` + `lha`; no source shape or flag
+ *   reproduces it.
+ *   flipcheck: `.text` 0x6C4 of 0x6E4; `.data` 0xC4 of 0xC8; `.sdata2` 0x24 of 0x28.
+ * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`: retail has no record-form instruction and
+ *   no fused multiply-add.
  */
 
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
-#include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
+#include "unsplit/g3d.h" /* fn_80082F18, owner g3d/g3d_scnroot.cpp */
 #include "g3d/fn_80063888.h" /* fn_800651BC, owned by g3d/fn_80063888.cpp (rule 2) */
 
 #pragma peephole off
@@ -30,8 +28,7 @@
 /* nw4r::db::Panic(const char*, int, const char*, ...) */
 extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *msg, ...);
 
-/* nw4r math / resource helpers owned by unsplit units.  `fn_80082F18` comes from
- * `unsplit/g3d.h` (rule 2). */
+/* The math/resource helpers this unit calls. */
 extern f32 anim_tick_angle(u16 value);
 extern f32 fn_800610AC(f32 value);
 extern void fn_8005B1B4(u32 *self, u32 value);
@@ -72,11 +69,6 @@ void fn_80089F44(f32 *value, s16 *out);
 s16 fn_80089F78(f32 value);
 f32 fn_80089F90(f32 *out, f32 frame);
 
-/*
- * The pointer-range check nw4r's resource macros expand to: a pointer is valid when it lies in
- * one of the Wii memory regions.  Shared by g3d_resanm.c and g3d_resanmamblight.c, so it lives
- * in nw4r/g3d/res_common.h (rule 1).
- */
 
 /* Evaluates one float channel at a frame and returns the interpolated value. */
 f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)

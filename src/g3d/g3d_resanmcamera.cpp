@@ -1,29 +1,13 @@
 /*
- * nw4r g3d: g3d_resanmcamera.cpp - the camera-animation channel evaluator, `.text`
- * 0x8008A220-0x8008A664 (4 functions).
- *
- * Re-cut (docs/plan.md 12 item 5).  `fn_8008A28C` panics with
- * `__FILE__` = `g3d_resanmcamera.cpp` (lines 46/99/121) and the retail data fragment is
- * 0x8058FF20-0x80590010, so the range is `g3d_resanmcamera.cpp`.  The earlier partial cut
- * (`g3d_resanmcamera.c`, 0x8008A220-0x8008A28C) is the SAME TU: `fn_8008A220`'s own strings
- * (lbl_8058FFD4/FFFC) sit inside that fragment too, and extab/extabindex/.text are contiguous
- * across 0x8008A28C, so the two ranges are one source file and were merged here.
- *
- * Language: the `__FILE__` is a `.cpp`, the object carries extab/extabindex, and the bodies call the
- * C++ `nw4r::db::Panic`, so this is a C++ translation unit - the `.c` spelling of the earlier cut is
- * why it carried the mangled `Panic__Q24nw4r2dbFPCciPCce` declaration (docs/plan.md 6.5 rule 9).
- *
- * Naming note: the map carries only `fn_XXXXXXXX` names here (docs/plan.md 6.5 rule 7); renaming a
- * symbol needs the map and the source in one edit (playbook 31).
- *
- * `#pragma peephole off` / `#pragma fp_contract off` are file-scoped.  Registered `Object(NonMatching,
- * ...)` in lib g3d.
- *
- * Residual: `fn_8008A28C` is 92.77 % under the lib's current flags because four `Panic` string literals are
- * addressed through one pooled base register (`...data.0`) where retail materialises each one with its own
- * `lis`/`addi` (the call is 0x20 B short).  `-pool off` reproduces retail exactly (100.00 %, `.text` 0x444)
- * and is requested for lib g3d in the outbox (`fn_8008A28C` 92.77 -> 100.00; `g3d_resanm.c`'s
- * `fn_800898B0` 90.02 -> 96.84; `g3d_resanmamblight.c` unchanged).
+ * g3d/g3d_resanmcamera.cpp - nw4r g3d camera-animation channel evaluator (fn_8008A28C) and its accessors.
+ * RANGE. .text 0x8008A220-0x8008A664 (4 functions); extab, extabindex, .data 0x8058FF20-0x80590010.  fn_8008A28C
+ *   passes "g3d_resanmcamera.cpp", and fn_8008A220's strings (lbl_8058FFD4, lbl_8058FFFC) sit in the same fragment.
+ * NAMES. Map stems.
+ * RESIDUALS. fn_8008A28C: the four `Panic` string literals share one pooled base register where retail materialises
+ *   each with its own `lis`/`addi` (0x20 bytes short, and a larger frame: 0x30 with `_savegpr_27` for the pool
+ *   base, retail 0x20); `-pool off` reproduces retail, and `cflags_g3d` does not carry it.
+ *   flipcheck: `.text` 0x424 of 0x444; `.data` is 0xEE of 0xF0 and its bytes differ.
+ * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`.
  */
 
 #include "types.h"

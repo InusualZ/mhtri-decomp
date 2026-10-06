@@ -1,72 +1,16 @@
 /*
- * nw4r g3d: g3d_anmvis.cpp - the ResAnmVis handle accessors and the AnmObjVis node-visibility walkers,
- * `.text` 0x8006EAC0-0x8006EE78 (8 functions, 0x3B8 bytes).
- *
- * Naming - which evidence class decided it.  Class 1 decides: the region's own `.data` pool holds the
- * bare source-file name `g3d_anmvis.cpp` (lbl_8058D6C0 at 0x8058D6C0, referenced by fn_8006EAC0 at
- * lines 54/55, by fn_8006ECB4 at line 733 and by fn_8006ED84 at line 743), the inlined-assert header
- * `g3d_resanmvis_ac.h` (lbl_8058D7CC) and the RTTI/type name `ResAnmVis` (lbl_8058D7A4).  `langcheck`
- * says C++ (the file name is a `.cpp` and the `Panic__Q24nw4r2dbFPCciPCce` relocation is a C++ mangling),
- * so the unit is `src/g3d/g3d_anmvis.cpp` in the existing g3d lib (Wii/1.3, cflags_g3d) - exactly where
- * its link neighbours sit.  Class 2 FAILS: `dumpmap.py lookup` answers `zz_006eac0_`/`zz_006ec3c_`/
- * `zz_006ecb4_`/`zz_006ed84_`/`zz_006ee48_` for five of the eight, and the three it does name
- * (`LexicalCast<b,i>(int`, `CBGetBytesAvailableForRead`, `GetOneTimerLeadGroundContactAnims(void)`) are
- * the Loading85 dump's names for a differently-laid-out build - they contradict the file's own
- * `g3d_anmvis.cpp`/`ResAnmVis` evidence, so they are not usable.
- *
- * What the unit is.  `fn_8006EC28`/`fn_8006ECA0`/`fn_8006EC3C`/`fn_8006ECA8` are the out-of-line
- * `ResCommon<ResAnmVis>` handle accessors (the `g3d_resanmvis_ac.h` inlined-assert trio: `IsValid`,
- * `ref`, and the `%s::%s: Object not valid.` guard that names the type `ResAnmVis` and the `ref`
- * accessor).  `fn_8006EAC0` is the per-node visibility/flag query and `fn_8006ECB4`/`fn_8006ED84` are the
- * two walkers that apply it over a model's node table (`fn_80097F80` = the entry count, `fn_80097F18` =
- * one node handle), one writing a byte vector and one gating a virtual per-node call; `fn_8006EE48`
- * returns the AnmObjVis type-info name.
- *
- * Language: C++ (`__FILE__` `g3d_anmvis.cpp`, C++ `Panic` mangling).  The range is one maximal
- * unclaimed run (attribute.py); its seam is unproven - it is a proposal cap, not a proven TU boundary.
- *
- * Section claim: `.text` 0x8006EAC0-0x8006EE78, `extab` 0x80007E98-0x80007EC0 (5 unwind records, one per
- * extabindex entry), `extabindex` 0x8002040C-0x80020448 (5 entries: fn_8006EAC0/EC3C/ECB4/ED84/EE48).
- *
- * Measurement path: the unit is registered here for the first time, so MAIN has no split object for the
- * range; the source is compiled with the g3d lib's real command line (cflags_g3d) and each symbol is
- * scored with objdiff `report generate` against the retired per-range object that contains it
- * (`auto_fn_8006EAC0_text.o`, `auto_03_8006EC28_text.o`, `auto_fn_8006EC3C_text.o`,
- * `auto_03_8006ECA0_text.o`, `auto_fn_8006ECB4_text.o`, `auto_fn_8006ED84_text.o`,
- * `auto_fn_8006EE48_text.o` under build/RMHE08/obj/).
- *
- * Results (objdiff `report generate`, the official metric; target bytes / our bytes):
- *   100.00: fn_8006EAC0 (360/360), fn_8006EC28 (20/20), fn_8006EC3C (100/100),
- *           fn_8006ECA0 (8/8), fn_8006ECA8 (12/12), fn_8006EE48 (48/48)
- *    99.90: fn_8006ECB4 (208/208)
- *   100.00: fn_8006ED84 (196/196)
- * 7 of 8 symbols byte-identical; the eighth is one register.
- *
- * Residuals (recorded, not worked around):
- *   * fn_8006ECB4 (99.90 %) is instruction-for-instruction except one base register: retail loads the
- *     vtable pointer through the argument register (`lwz r12,0(r3)`, after `mr r3,r27`), MWCC loads it
- *     through the parameter's home register (`lwz r12,0(r27)`).  Every other instruction, including the
- *     `lwz r12,0x38(r12); mtctr r12; bctrl` dispatch, matches byte for byte.  Register choice is the
- *     allocator's, not the source's: the identical virtual call in fn_8006ED84 does use r3, and
- *     declaration/argument permutations only move other registers.
- *
- * Two source shapes carry the range and are load-bearing:
- *   * `AnmObjVis` is declared polymorphic with twelve un-evidenced slots ahead of the called one, so the
- *     call is a real C++ virtual dispatch and emits retail's `lwz r12,0(r3); lwz r12,0x38(r12)` (a
- *     function-pointer field load emits a different temp register - 99.69 % for fn_8006ED84).
- *   * `#pragma peephole off` is scoped to fn_8006ED84: at `-O3` the peephole folds the `(u8)` truncation
- *     into the `stb`, while retail keeps the `clrlwi r0,r3,24` (97.55 % with the fold).
- * Also: `lbl_807911A0` is declared `char[4]` (its exact size) rather than an unsized array, because
- * MWCC's small-data heuristic then emits retail's `li r7, lbl_807911A0@sda21` instead of `lis`/`addi`
- * (fn_8006EC3C 93.60 % -> 100 %); and the file/format strings are `extern` map labels, not literals,
- * because `-str reuse` would pool the twice-used `lbl_8058D6C0` and share one base register.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x8006EAC0`, which answers the `zz_006eac0_` placeholder, and
- * with `python tools/units/stylelint.py`'s own map index; every `.text` entry in 0x8006EAC0..0x8006EE78
- * in config/RMHE08/symbols.txt is a bare `fn_XXXXXXXX`).  The dump's three real names are for a
- * differently-laid-out dump build and contradict the range's own `__FILE__` evidence, so the map's stems
- * stand and are used as the identifiers.
+ * g3d/g3d_anmvis.cpp - nw4r g3d `ResAnmVis` handle accessors and the `AnmObjVis` node-visibility query and walkers.
+ * RANGE. .text 0x8006EAC0-0x8006EE78 (8 functions); extab, extabindex, .rodata 0x8056F628-0x8056F638, .data
+ *   0x8058D6C0-0x8058D7E0, .sdata 0x807911A0-0x807911A8.  Both edges are the unclaimed run's, not proven seams.
+ * NAMES. Map stems; the dump's three names in this range come from a differently laid-out build and contradict
+ *   the `g3d_anmvis.cpp`/`ResAnmVis` strings.
+ * RESIDUALS. fn_8006ECB4: retail loads the vtable through r3 (`mr r3,r27; lwz r12,0(r3)`), ours through r27.
+ *   flipcheck: `.rodata`, `.data` and `.sdata` are claimed and not emitted.
+ * SHAPES. `AnmObjVis` is polymorphic with twelve placeholder slots ahead of the called one, so the call is a real
+ *   virtual dispatch (`lwz r12,0x38(r12)`); a function-pointer field emits a different temp register.
+ *   `#pragma peephole off` around fn_8006ED84 keeps retail's `clrlwi r0,r3,24` ahead of the `stb`.
+ *   `lbl_807911A0` is a sized `char[4]` (`li r7, @sda21`); the file/format strings are extern labels, because
+ *   `-str reuse` would pool the twice-used `lbl_8058D6C0` into one base register.
  */
 
 #include "types.h"

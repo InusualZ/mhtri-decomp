@@ -1,62 +1,19 @@
 /*
- * nw4r g3d: g3d_resanmlight.cpp - the light-animation channel evaluator and the `ResAnmScn` light
- * channel accessors, `.text` 0x8008F8E4-0x800908FC (31 functions, 0x1018 B).
- *
- * Registered once, at its final home (docs/plan.md 12), from the pooled proposal
- * `g3d/g3d_resanmlight.cpp`.  Naming - evidence class 1, a `__FILE__` string: the range's first
- * body `fn_8008F8E4` passes `.data` 0x80590440 = "g3d_resanmlight.cpp" as its `nw4r::db::Panic` file
- * argument (`python tools/symbols/dumpmap.py lookup 0x80590440`).  The preceding registered unit
- * `g3d/g3d_resanmfog.cpp` ends exactly at 0x8008F8E4 and its header names that string as this unit's
- * first body, so the left seam is proven.
- *
- * The right seam 0x800908FC is the pinned first body of the next TU (`g3d/g3d_resanmscn.cpp`: its
- * `fn_800908FC` cites `g3d_resanmscn.cpp`) and is registered separately by its own worker; the sibling
- * proposals `800916FC`/`80093990`/`800947A4` carve the rest of the discovery cap.  The proposal brief's
- * stated 0x8008F8E4-0x80097D40 cap therefore overlaps those four siblings, so this unit is registered
- * at its own evidenced extent only, 0x8008F8E4-0x800908FC.  (The `.data` pool proves the cap is not one
- * TU: this range cites `g3d_resanmlight.cpp` and the `g3d_reslightset_ac.h`/`g3d_resanmamblight_ac.h`/
- * `g3d_resanmlight_ac.h`/`g3d_resanmfog_ac.h`/`g3d_resanmcamera_ac.h` inlined-assert headers, while
- * 0x800908FC on cites `g3d_resanmscn.cpp`, 0x800916FC cites `g3d_resanmtexsrt.cpp`, 0x80093990 cites
- * `g3d_resfile.cpp` and 0x800947A4 cites `g3d_resmat.cpp`.)
- *
- * Language: C++ - `langcheck.py` says the retail TU is C++ and the bodies carry the mangled
- * `nw4r::db::Panic` assert.  The map symbols carry plain `fn_XXXXXXXX` stems, so they are defined
- * `extern "C"` to keep the bare symbol (playbook 48).
- *
- * Sections: `.text` 0x8008F8E4-0x800908FC, `extab` 0x80009108-0x800091A0 (the unwind records for the
- * frame-using bodies, produced by the lib's `-Cpp_exceptions on`) and `extabindex`
- * 0x80021D68-0x80021E4C.  Both are claimed in splits.txt.  No `.ctors`/`.dtors` word points into the
- * range.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x8008F8E4` / `0x8008FD04` / `0x800900A4`: all bare
- * `zz_XXXXXXXX_` placeholders in the runtime dump too), so there is no real name to recover and
- * stylelint's rule 7 refuses the landing without this line.
- *
- * Measured (official report metric, `tools/units/recompile.py g3d/g3d_resanmlight.cpp --measure <sym>`),
- * 31/31 bodies over the 80 % bar, unit byte-weighted ~94.3 %:
- *   100.00 % (20): fn_8008FD04, fn_8008FFFC, fn_8009001C, fn_8009004C, fn_800900A4, fn_80090108,
- *                  fn_800901AC, fn_80090210, fn_800902E0, fn_80090380, fn_800903E4, fn_800904B4,
- *                  fn_80090554, fn_800905B8, fn_80090688, fn_80090728, fn_8009078C, fn_8009085C
- *   99.07 % fn_8008F8E4, 99.95 % fn_80090058, 98.92 % fn_8008FE88, 98.57 % fn_80090000
- *   87.24 % fn_80090218/fn_800903EC/fn_800905C0/fn_80090794
- *   84.56 % fn_80090110/fn_800902E4/fn_800904B8/fn_8009068C/fn_80090860
- *
- * Residuals (what still differs; the shape was measured, not guessed):
- *  - The five 0x9C `...GetAnm`-style channel resolvers (fn_80090110/2E4/4B8/68C/860) and the four
- *    0xC8 ones (fn_80090218/3EC/5C0/794) are each one instruction short (152 vs 156 / 196 vs 200 B).
- *    The target keeps `&key` in a second callee-saved register (r31, saving r30 too) and lays the
- *    stack temporaries in ascending order (key 0x10, resolved 0x14, obj 0x18); MWCC here re-materialises
- *    `&key` from the frame and lays them descending.  Every source reshape tried (a named key pointer,
- *    a `key = *(u32*)fn_8006268C(...)` initialiser, reordered locals) keeps the same 84-87 %.
- *  - fn_8008F8E4 (99.07 %) and fn_8008FE88 (98.92 %, 368 vs 372 B) are each a single instruction off:
- *    fn_8008FE88's tail MMCC schedules the bit mask before the array load where the target loads first;
- *    fn_8008F8E4 differs in one register choice in the channel-evaluation block.
- *  - fn_80090000 (98.57 %): the body is instruction-identical but the target keeps `base` in r0
- *    (`lwz r0,0(r3); add r3,r0,r4`), ours in r3; the `base += offset` shape is what forces the branch
- *    (a plain `if/return` is if-converted to a branchless `(base+offset) & -(offset!=0)`).
- *  - fn_80090058 (99.95 %): the two branch arms use different stack slots in the target (0xC and 0x8);
- *    ours share one.  Instruction-identical modulo that.
+ * g3d/g3d_resanmlight.cpp - nw4r g3d light-animation channel evaluator (fn_8008F8E4) and the `ResAnmScn` light
+ *   channel accessors and resolvers.
+ * RANGE. .text 0x8008F8E4-0x800908FC (31 functions); extab, extabindex.  Both seams are proven: fn_8008F8E4
+ *   passes "g3d_resanmlight.cpp" (.data 0x80590440) and fn_800908FC opens `g3d/g3d_resanmscn.cpp`.
+ * NAMES. Map stems, defined `extern "C"` (the dump answers `zz_` placeholders).
+ * RESIDUALS. The nine channel resolvers fn_80090110/2E4/4B8/68C/860 (0x9C) and fn_80090218/3EC/5C0/794 (0xC8) are
+ *   each one instruction short: retail keeps `&key` in r31 (saving r30 too) and lays key/resolved/obj ascending at
+ *   0x10/0x14/0x18; ours rematerialises `&key` and lays them descending (tried: a named key pointer, a
+ *   `key = *(u32*)fn_8006268C(...)` initialiser, reordered locals).
+ *   fn_8008F8E4: one register choice in the channel-evaluation block.
+ *   fn_8008FE88: one instruction short - retail's `li r7,0x0` is missing.
+ *   fn_80090000: retail keeps `base` in r0 (`lwz r0,0(r3); add r3,r0,r4`), ours in r3.
+ *   fn_80090058: retail's two branch arms use the stack slots 0xC and 0x8, ours share one.
+ *   flipcheck: `.text` 0xFF0 of 0x1018 (the ten short functions).
+ * SHAPES. `base += offset` in fn_80090000 keeps the branch (a plain `if`/`return` if-converts to branchless code).
  */
 
 #include "types.h"

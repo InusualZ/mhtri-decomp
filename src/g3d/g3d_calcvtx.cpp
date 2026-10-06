@@ -1,39 +1,21 @@
 /*
- * nw4r g3d: g3d_calcvtx.cpp - `.text` 0x8007270C-0x800736F8 (one original TU).
- *
- * Widened 2026-09-24 from the tail-only 0x80073398-0x800736F8 cut: `fn_8007270C`'s in-function
- * `nw4r::db::Panic` cites `__FILE__` = "g3d_calcvtx.cpp" (`lbl_8058DD68`) at line 36, and
- * `.pi/notes/tuboundary-defects-2026-09-23.md` finding 2 independently puts the TU's start at exactly
- * 0x8007270C and its end at 0x800736F8.  The panic strings the whole unit references sit in the same
- * data fragment (0x8058DD68-0x8058E184), which starts with that `__FILE__` string.
- *
- * Residuals (recorded, not blockers):
- *   - `fn_8007270C` (0x8007270C, 0x9A8 B) is the `CalcVtx`-style shape-blend driver: three inlined
- *     ResVtxPos/ResVtxNrm/ResVtxClr passes, each resolving an animated-shape key list and blending it
- *     over the vertex array.  Reconstructed to **66.49 %** (target 2472 B, ours 2340 B; the prologue
- *     and 0x5e0 frame match).  The residual is register colouring: retail spills `mdl` to 0x8(r1) and
- *     reloads it, while this source keeps it live in r14, so the whole live range shifts a register and
- *     the pass setup's stack slots move by 8.  The pass 1/2/3 blends match once the accumulator is a
- *     `f32 v[3]` with an inner `for (j < 3)` (pass 3 reads a rolling 3-float window advancing 4 B);
- *     scores went 30.79 -> 42.54 -> 57.73 -> 66.49 as each pass took that shape.
- *   - the 0x80073180-0x80073398 gap is the same `g3d_resvtx_ac.h` accessor family; its 12 bodies were
- *     absorbed 2026-09-24 from the `proposal/80073180` handover (`.pi/notes/80073180-gap-for-g3d_calcvtx.md`)
- *     and all 12 measure 100 %.  `fn_800731EC` needs a scoped `#pragma peephole off` (playbook 32).
- *   - the 0x80073398-0x800736F8 tail below is the earlier cut's work.
- *
- * Re-cut (docs/plan.md 12 item 5, bulk attribution spanning three
- * original TUs).  The retail `.extabindex` run 0x80020634-0x8002073C (11 EH functions) ends with
- * `fn_800736A4`.  The seam at 0x800736F8 puts the `g3d_resvtx_ac.h` scale setter `fn_800736F8` and the
- * flag helpers `fn_800737AC`..`fn_800737C4` in `g3d/g3d_calcworld.cpp`; the extabindex table pins the
- * seam to the whole-function start, but the flag-helper group carries no data reference of its own
- * (`.pi/notes/tuboundary-defects-2026-09-23.md` - measure to settle).
- *
- * Naming note: the map carries only `fn_XXXXXXXX` names in this range (docs/plan.md 6.5 rule 7);
- * renaming a symbol needs the map and the source in one edit (playbook 31).
- *
- * `#pragma fp_contract off` is file-scoped: the retail object contains no `fmadds`/`fmsubs` while
- * `cflags_g3d` passes `-fp_contract on`.  Registered `Object(NonMatching, ...)` in lib g3d; the
- * per-function residual is in the objdiff report.
+ * g3d/g3d_calcvtx.cpp - nw4r g3d vertex calculation: the shape-blend driver fn_8007270C (three inlined
+ *   ResVtxPos/ResVtxNrm/ResVtxClr passes, each blending an animated-shape key list over the vertex array) and the
+ *   `g3d_resvtx_ac.h` accessor family.
+ * RANGE. .text 0x8007270C-0x800736F8 (35 functions); extab, extabindex, .data 0x8058DD68-0x8058E178 (opens on
+ *   "g3d_calcvtx.cpp", fn_8007270C's assert), .sdata 0x807911B8-0x807911D0, .sdata2 0x80795DB8-0x80795DC0.  The
+ *   `.extabindex` run ends with fn_800736A4; the seam at 0x800736F8 gives the scale setter fn_800736F8 and the flag
+ *   helpers fn_800737AC..fn_800737C4 to `g3d/g3d_calcworld.cpp` (the helpers carry no data reference to confirm it).
+ * NAMES. Map stems.
+ * RESIDUALS. fn_8007270C: 132 bytes short (2340 of 2472); the first divergence is the `mdl` spill (retail stores
+ *   it at 0x8(r1) and reloads it, ours keeps it in r14), then `lwz` against `lwzx` addressing; the rest unmeasured.
+ *   fn_80073404, fn_800735A8: the masked test folds to the record form where retail keeps `clrlwi` + `cmpwi`.
+ *   fn_80073614: one instruction more than retail.
+ *   flipcheck: `.text` 0xF64 of 0xFEC; `.data` is claimed and not emitted; `.sdata` is 0x4 of 0x18, `.sdata2` 0x4
+ *   of 0x8.
+ * SHAPES. Each blend pass accumulates into a `f32 v[3]` with an inner `for (j < 3)` (pass 3 reads a rolling
+ *   three-float window advancing 4 bytes).  File-scope `#pragma fp_contract off` (retail has no `fmadds`/`fmsubs`);
+ *   `#pragma peephole off` around fn_800731EC keeps retail's `clrlwi` + `cmpwi` (playbook 32).
  */
 
 
@@ -62,10 +44,8 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 /* ------------------------------------------------------------------------------------------------ */
 
 extern "C" void DCStoreRange(void* pBase, u32 size);
-/* fn_800696E4/fn_80069748/fn_80069754/fn_800695D4/fn_800695DC/fn_80069768/fn_800696C0/fn_8006946C come
- * from g3d/fn_800680CC.h (owned by `g3d/fn_800680CC.cpp`, rule 2).
- * fn_800731EC/fn_800732F0/fn_80073354 used to come from unsplit/g3d.h too; this registration now
- * defines them, so their declarations moved to this unit's forward-declaration block (rule 2). */
+/* fn_800696E4/fn_80069748/fn_80069754/fn_800695D4/fn_800695DC/fn_80069768/fn_800696C0/fn_8006946C come from
+ * `g3d/fn_800680CC.h`; fn_800731EC/fn_800732F0/fn_80073354 are this unit's, in its forward-declaration block. */
 
 /* The panic file/format strings the target references as map symbols. They are extern here rather
  * than literals: MWCC's `-str reuse` would pool a literal into one blob and address it through a
@@ -387,9 +367,8 @@ void* fn_800731E4(ResHandle* pSelf) {
     return pSelf->mpData;
 }
 
-/* The line-154 alignment-checked setter. `#pragma peephole off` is load-bearing here: at `-O3` the
- * peephole folds the masked compare into the record form `clrlwi.`+`beq`, while the target keeps the
- * generic `clrlwi`+`cmpwi`+`beq`. Scoped to this one function (playbook 32). */
+/* The line-154 alignment-checked setter; `peephole off` keeps retail's `clrlwi`+`cmpwi`+`beq` where `-O3` folds
+ * the masked compare into `clrlwi.` (playbook 32). */
 #pragma peephole off
 ResHandle* fn_800731EC(ResHandle* pSelf, u32 pData) {
     fn_80073250(pSelf, pData);
@@ -450,10 +429,8 @@ void* fn_80073360(ResHandle* pSelf) {
 /* 0x8007270C: the animated-shape vertex driver (the largest function of the TU)                     */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* For every vertex position the model animates: resolve the animated-shape node, then blend that
- * node's base key and key list over the position / normal / colour vertex arrays.  The three
- * resource passes (flags bits 1/2/3) are near-identical, differing only in the accessor pair and the
- * per-vertex width. */
+/* Blends each animated shape's base key and key list over the position, normal and colour vertex arrays (three
+ * passes, flag bits 1/2/3, differing only in the accessor pair and the per-vertex width). */
 void fn_8007270C(void* mdl, void* pAnmObjShp, const void** vtxPosTable, const void** pClrTable,
                  const void** pTexTable) {
     if (pAnmObjShp == NULL) {

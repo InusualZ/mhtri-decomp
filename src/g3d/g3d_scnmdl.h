@@ -1,4 +1,4 @@
-/* Declarations owned by `src/g3d/g3d_scnmdl.*` (docs/plan.md 6.5 rule 2): a consumer includes this header instead of declaring the symbols itself. */
+/* g3d/g3d_scnmdl.h - the cross-unit declarations of `g3d/g3d_scnmdl.cpp`. */
 #ifndef MHTRI_G3D_G3D_SCNMDL_H
 #define MHTRI_G3D_G3D_SCNMDL_H
 
@@ -6,7 +6,7 @@
 #include "nw4r/math.h"
 #include "ef/pRoot.h"
 
-/* Declarations moved here from `unsplit/g3d.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* The unit's cross-unit declarations (rule 2). */
 #ifdef __cplusplus
 extern "C" {
 #endif

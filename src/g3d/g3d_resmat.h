@@ -1,15 +1,6 @@
-/*
- * The `nw4r::g3d::ResTexSrt` handle owned by `g3d/g3d_resmat.cpp` (docs/plan.md 6.5 rules 1 and 2).
- *
- * `g3d/g3d_resmat.cpp` is the TU that defines `ResTexSrt`'s out-of-line members
- * (`SetEffectMtx__Q34nw4r3g3d9ResTexSrtFUlPCQ34nw4r4math5MTX34` and its const `GetEffectMtx` twin), so
- * the declaration belongs here, once, and every consumer includes it (`ef/eft002.cpp` still carries a
- * local handle of the same name/4-byte shape; that duplicate is on the rule-1 backlog and is not this
- * batch's to move).
- *
- * A `ResCommon<ResTexSrtData>`-style one-word handle: `mpData` is the resource pointer, the member
- * functions resolve it through the nw4r accessors. `size: 0x4`.
- */
+/* g3d/g3d_resmat.h - `nw4r::g3d::ResTexSrt`, a one-word `ResCommon`-style handle (`mpData`, `size: 0x4`) whose
+ *   `SetEffectMtx` and const `GetEffectMtx` members `g3d/g3d_resmat.cpp` defines; `ef/eft002.cpp` still carries a
+ *   local copy. */
 #ifndef MHTRI_NW4R_G3D_G3D_RESMAT_H
 #define MHTRI_NW4R_G3D_G3D_RESMAT_H
 

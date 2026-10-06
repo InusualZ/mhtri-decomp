@@ -1,41 +1,27 @@
 /*
- * nw4r g3d: g3d_resanmchr.cpp - the `ResAnmChr` character-animation channel evaluators, `.text`
- * 0x8008A664-0x8008F6E8 (101 functions, 0x5084 B).
- *
- * Naming - which evidence class decided it.  Class 1 decides: the region's own `.data` pool holds the
- * bare source-file name `g3d_resanmchr.cpp` (lbl_80590010 at 0x80590010, the file argument of every
- * `nw4r::db::Panic` assert in the range, first at fn_8008A664 line 0x298) with the value-type format
- * strings and the `g3d_resanmchr_ac.h` inlined-assert header beside it.  `langcheck` says C++ (the
- * `.cpp` name and the `Panic__Q24nw4r2dbFPCciPCce` relocation), so the unit is
- * `src/g3d/g3d_resanmchr.cpp` in the existing g3d lib (Wii/1.3, cflags_g3d), exactly where its link
- * neighbours sit.  Class 2 FAILS: `dumpmap.py lookup 0x8008A664` answers `zz_008a664_`, a placeholder,
- * not a name.
- *
- * What the unit is.  Four animation channels share the shape - a channel record (+0x00 frame count,
- * +0x04 frame rate) with a key array whose stride is 0xC (float), 0x6 (s16) or 0x4 (u8) - and each has
- * a cubic-Hermite evaluator behind an offset/validity guard.  `fn_8008A664`/`fn_8008C038`/`fn_8008CF2C`
- * read one node's 3-component value (scale/rotation/translation) through the channel table selected by
- * the node-data flags.
- *
- * Section claim: `.text` 0x8008A664-0x8008F6E8, `extab` 0x80008F10-0x80009100 (62 records),
- * `extabindex` 0x80021A74-0x80021D5C (62 entries).  The boundaries are the functions before
- * (fn_8008A644) and after (fn_8008F6E8).
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x8008A664`, which answers the `zz_008a664_` placeholder,
- * and with config/RMHE08/symbols.txt, whose every `.text` entry in 0x8008A664..0x8008F6E8 is a bare
- * `fn_XXXXXXXX`).  The map's stems stand and are used as the identifiers.
- *
- * Measurement path: the unit is registered here for the first time, so MAIN has no split object for
- * the range; the source compiles with the g3d lib's real command line and each symbol is scored with
- * objdiff `report generate` against the retired per-range objects under build/RMHE08/obj/
- * (`auto_fn_8008A664_text.o`, `auto_03_8008A938_text.o`, ...).
- *
- * Reconstruction status: 98 of the 101 functions are reconstructed (estimated unit match ~85 %;
- * 75 byte-identical).  The measured per-symbol scores are recorded in
- * `.pi/outbox/8008a664-fn-8008a664-7a76.json`.  Still missing: `fn_8008C038` (0x8008C038, 0x44C B),
- * `fn_8008CF2C` (0x8008CF2C, 0x280 B) and `fn_8008D5FC` (0x8008D5FC, 0x3BC B) - the three per-node
- * dispatchers.  Residuals (recorded, not worked around) are listed at the bottom of this file.
+ * g3d/g3d_resanmchr.cpp - nw4r g3d `ResAnmChr` character-animation channel evaluators: four channel kinds (a
+ *   record of frame count +0x00 and frame rate +0x04, keys of stride 0xC float, 0x6 s16 or 0x4 u8), each a
+ *   cubic-Hermite evaluator behind an offset/validity guard, and the per-node scale/rotation/translation readers.
+ * RANGE. .text 0x8008A664-0x8008F6E8 (101 functions); extab, extabindex, .rodata 0x8056F710-0x8056F730, .data
+ *   0x80590010-0x805903F0 (opens on "g3d_resanmchr.cpp"), .sdata2 0x80795ED0-0x80795F08.
+ * NAMES. Map stems (the dump answers `zz_` placeholders).
+ * RESIDUALS. Unwritten (objdiff scores them zero): the per-node dispatchers fn_8008C038, fn_8008CF2C, fn_8008D5FC.
+ *   fn_8008A664: the `ScaleType` compare chain holds the masked word in r7 in retail, r3 here.
+ *   fn_8008AA8C, fn_8008B200, fn_8008B95C: swapped `fcmpo` operand order, `fmr`/`fmuls` scheduling, 12 bytes short.
+ *   fn_8008C600, fn_8008C968, fn_8008CD00: retail's ordered compare (`fcmpo` + `cror`) is `fcmpu` here, and the float
+ *     registers colour differently.
+ *   fn_8008D30C, fn_8008D3DC, fn_8008D47C, fn_8008D528: the argument shaping for the missing fn_8008C038/fn_8008CF2C
+ *     (their declared parameters are approximations) and register colouring.
+ *   fn_8008E8D0, fn_8008EB68, fn_8008EE68, fn_8008F148: register colouring and load order of the compare operands.
+ *   fn_8008DC4C: one `fcmpu` operand.
+ *   fn_8008B650, fn_8008AFE4, fn_8008B78C, fn_8008BFBC: retail loads a scalar float with `psq_l fN,0(rN),1,qrN`
+ *     where our compiler emits `lfs`; no source shape or flag reproduces it.
+ *   fn_8008B704, fn_8008BEF0: retail truncates float to short/byte with `psq_st ...,1,qrN` + `lha`/`lbz`; a
+ *     `union` pun, a two-step temporary and a plain cast all emit `fctiwz`/`stfd`.
+ *   fn_8008F6C4: two loads ordered 0x10-then-0x00 here, 0x00-then-0x10 in retail.
+ *   flipcheck: `.text` 0x4590 of 0x5084; `.rodata` and `.data` are claimed and not emitted; `.sdata2` is 0x10 of 0x38.
+ * SHAPES. File-scope `#pragma peephole off`: retail keeps the split `clrlwi`+`slwi`/`cmpwi` forms.  `fp_contract`
+ *   stays on (fn_8008AED0 uses fused `fmadds`/`fmsubs`).
  */
 
 #include "types.h"
@@ -46,10 +32,8 @@
 #include "fn_8004CAD8.h"         /* anim_tick_angle, mtx34_identity, sqrt_f32 (rule 2) */
 #include "mh3_pad.h"             /* copyVec3, setVec3, VEC3_ctor (rule 2) */
 
-/* fp_contract stays ON (cflags_g3d): the target's `fn_8008AED0` uses fused fmadds/fmsubs, so this unit
- * does not carry the `#pragma fp_contract off` its `g3d/g3d_resanm.c` sibling does.  `peephole off` is
- * file-scoped: the target keeps the split `clrlwi`+`slwi`/`cmpwi` forms (no record-form instruction),
- * which the peephole would fuse (the same finding as g3d_resanm's `fn_8008C7F0`). */
+/* Retail keeps the split `clrlwi`+`slwi`/`cmpwi` forms the peephole would fuse; `fp_contract` stays on (the
+ * target's fn_8008AED0 uses fused `fmadds`/`fmsubs`). */
 #pragma peephole off
 
 namespace nw4r {
@@ -65,8 +49,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 /* The panic file/format strings the target references as map symbols.  They are declared here as
  * externs rather than literals: MWCC's `-str reuse` pools repeated literals, while the target loads
- * each assert string with its own `lis`/`addi`.  They are unsplit `.data` owned by no registered unit,
- * so this is their declaration site. */
+ * each assert string with its own `lis`/`addi`; the claimed `.data` is not emitted yet. */
 extern const char lbl_80590010[]; /* "g3d_resanmchr.cpp" */
 extern const char lbl_80590028[]; /* the ScaleType format string */
 extern const char lbl_80590088[]; /* the "not valid pointer" format string */
@@ -170,7 +153,7 @@ typedef struct {
     /* +0x04 */ f32 scale[3];
     /* +0x10 */ f32 pos[3];
     /* +0x1C */ f32 mat[12];
-} ResAnmChrObj; /* size: 0x4C - lower bound, an approximation
+} ResAnmChrObj; /* size: 0x4C - lower bound, an approximation */
 
 /* The 3-component record the walkers copy is `Vec3f` as `g3d/fn_80063888.cpp` already defines it
  * (rule 1: a shared type is defined once, in the lexicographically first owner); this unit reads the
@@ -1117,10 +1100,8 @@ f32 fn_8008B95C(u32 self, f32 frame)
 /* The per-node 3-component value reader.                                                              */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* Reads one node's three components (a scale, a rotation or a translation) from the key cells `keys`,
- * selecting the key layout from the node-data `ScaleType` (flags bits 25-26).  `keys` is a list of
- * value cells: a constant float, or - for ScaleType != 0 - a pointer the channel evaluators resolve.
- * The uniform-flag (bit 27) reuses the first component for all three.  Returns the advanced cursor. */
+/* Reads one node's three components from the value cells `keys` (constants, or channel pointers when the
+ * `ScaleType`, flag bits 25-26, is non-zero; bit 27 reuses the first for all three); returns the advanced cursor. */
 u32* fn_8008A664(f32* out, u32* self, f32* keys, f32 frame)
 {
     u32 flags = self[1];
@@ -1612,31 +1593,3 @@ s32 fn_8008DC4C(ResAnmChrObj* self, f32* out)
 }
 
 } /* extern "C" */
-
-/*
- * Residuals - what still differs, measured with `recompile.py g3d/g3d_resanmchr.cpp --measure <sym>`:
- *
- *   fn_8008A664   81.04 %  the `ScaleType` compare chain holds the masked word in r7 in the target and
- *                          r3 here (the only differing instructions are the `rlwinm`/`subis` register);
- *                          the `switch` case order and the values themselves match.
- *   fn_8008C600 / C968 / CD00   97.62 %  the instruction stream is identical; the gap is the
- *                          relocation-normalised branch target encoding (the target is a standalone
- *                          per-symbol object, ours is one function of a 101-function unit).
- *   fn_8008AA8C / B200 / B95C   98.19-98.21 %  same class (1080/1092 target bytes; no instruction differs
- *                          under objdiff's pairing).
- *   fn_8008D30C 91.42 / D528 91.68 / D47C 92.56 / D3DC 94.45 %  the `fn_8008C038`/`fn_8008CF2C` argument
- *                          shaping (both callees are still missing, so their declared parameters are an
- *                          approximation) and register colouring.
- *   fn_8008EE68 97.96 / EB68 98.98 / F148 99.06 / E8D0 99.10 %  register colouring only.
- *   fn_8008B650 48.00 / AFE4 70.00 / B78C 70.00 / BFBC 70.00 %  the target loads a scalar float with
- *                          `psq_l fN,0(rN),1,qrN` where MWCC 0x0f emits `lfs`.  Same compiler-build
- *                          difference (retail `.comment` version 0x0e vs 0x0f) the sibling
- *                          `g3d/g3d_resanm.c` recorded for `fn_80089F78`; no source shape or flag
- *                          reproduces it.
- *   fn_8008B704 73.33 / BEF0 73.33 %  the target's float->short/byte truncation is `psq_st ...,1,qrN` +
- *                          `lha`/`lbz`; `union` bit-punning, a two-step temp and a plain cast all emit
- *                          `fctiwz`/`stfd`.  The same unreachable residual `g3d/g3d_resanm.c` documented
- *                          for `fn_80089F78`.
- *   fn_8008F6C4 99.78 %  two internal loads are ordered 0x10-then-0x00 here and 0x00-then-0x10 in the
- *                          target (one instruction pair).
- */

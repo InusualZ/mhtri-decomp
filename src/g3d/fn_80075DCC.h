@@ -1,19 +1,4 @@
-/*
- * The `g3d/fn_80075DCC.cpp` cluster's cross-unit declarations (docs/plan.md 6.5 rule 2).  A symbol a
- * registered unit owns is declared once, in that owner's header, and every consumer includes it; this
- * is that header for the nw4r g3d render/dispatch cluster registered from proposal `80075DCC`
- * (`.text` 0x80075DCC-0x8007C540).
- *
- * The seven plain-`fn_XXXXXXXX` symbols below used to sit in `unsplit/g3d.h`, the fallback
- * band for a g3d-module symbol with no registered owner.  Registering the cluster makes them owned, so
- * the declarations move here and the consumers (`g3d/g3d_basic.cpp`, `g3d/g3d_camera.cpp`,
- * `gx/fn_8009AA78.c`, `ef/ef_drawfreestrategy.cpp`, `ef/ef_drawstrategyimpl.cpp`,
- * `g3d/fn_80063888.cpp`) include this header instead.  The transfer itself is recorded in the outbox
- * as a `shared-file` request, because it edits files (`unsplit/g3d.h` and the consumers) that
- * the batch applies together.
- *
- * All of them carry the map's own `fn_XXXXXXXX` stem, so they keep C linkage.
- */
+/* g3d/fn_80075DCC.h - the cross-unit declarations of `g3d/fn_80075DCC.cpp` (C linkage, plain map stems). */
 #ifndef MHTRI_G3D_FN_80075DCC_H
 #define MHTRI_G3D_FN_80075DCC_H
 
@@ -45,17 +30,12 @@ void fn_8007A5E4(void* self, f32 x, f32 y, f32 z);
 void fn_8007A5A8(void* self, f32 x, f32 y, f32 z);
 void fn_8007A724(void* self, f32 x, f32 y, f32 z);
 
-/* 0x8007B5F4/0x8007BB8C - the ScnRoot state lookups `g3d/g3d_state.cpp` calls (rule 2, moved out of
- * unsplit/g3d.h when this unit registered).  `fn_8007BB8C` stores what it finds
- * through its out-parameter and returns that parameter; `fn_8007B5F4` registers `pKey` under the
- * state object. */
+/* 0x8007B5F4/0x8007BB8C - the ScnRoot state lookups `g3d/g3d_state.cpp` calls: fn_8007BB8C stores what it finds
+ * through its out-parameter and returns it; fn_8007B5F4 registers `pKey` under the state object. */
 u32 fn_8007B5F4(void* pSelf, const u32* pKey);
 void** fn_8007BB8C(void** pOut, const char* pName);
 
-/* The ScnMdl/ScnMdlSimple material and draw-buffer helpers the ScnMdl unit
- * (g3d/g3d_scnmdl.cpp) calls.  Declared here, in the owner's header, once this unit is the owner
- * (rule 2); the consumer includes this header instead of re-declaring them.  The target object
- * references the plain `fn_XXXXXXXX` names, so they sit inside this `extern "C"` block. */
+/* The ScnMdl/ScnMdlSimple material and draw-buffer helpers `g3d/g3d_scnmdl.cpp` calls. */
 s32 fn_8007B424(void* pSelf);  /* 0x8007B424 - the material count */
 s32 fn_8007B734(void* pSelf);  /* 0x8007B734 - a name-record reader */
 s32 fn_8007B764(void* pSelf);  /* 0x8007B764 - a name-record reader */
@@ -66,9 +46,8 @@ void fn_8007B940(void* pSelf, u32 mask, void* pArg2, void* pArg3);
 u32 fn_8007C464(void* pSelf);
 s32 fn_80077E34(s32 pOut, void* pIn);  /* 0x80077E34 - builds the model view the node walks read */
 
-/* 0x800768C8/0x800768DC/0x800768F0 - the three `ResMat`/`ResTex`-style handle validity tests the
- * `g3d/g3d_resmat.cpp` accessors assert through (callers: g3d_resmat.cpp).  Each reads the handle's
- * word and returns whether it is non-null; the three differ only by the type of handle they name. */
+/* 0x800768C8/0x800768DC/0x800768F0 - the `ResMat`/`ResTex` handle validity tests `g3d/g3d_resmat.cpp` asserts
+ * through: each returns whether the handle's word is non-null. */
 u32 fn_800768C8(void* pSelf);
 u32 fn_800768DC(void* pSelf);
 u32 fn_800768F0(void* pSelf);
@@ -86,21 +65,14 @@ s32 fn_80078904(s32 pNode);            /* 0x80078904 - the node's visibility tes
 void fn_800793A4(s32* pArg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7,
                  u32 argSp0);          /* 0x800793A4 - the draw-buffer builder */
 
-/* Added when `g3d/g3d_resfile.cpp` registered (rule 2): the `g3d_resmat_ac.h` handle constructors and
- * validity predicates the accessor cluster calls.  Inside this `extern "C"` block with the rest of the
- * owner's declarations (the target object references the plain `fn_XXXXXXXX` names). */
+/* The `g3d_resmat_ac.h` handle constructors and validity predicates `g3d/g3d_resfile.cpp`'s accessors call. */
 u32* fn_800766D0(u32* pDst, u32 value); /* 0x800766D0 - the 0x20-aligned handle constructor */
 u32* fn_80076794(u32* pDst, u32 value); /* 0x80076794 - the 0x20-aligned handle constructor */
 s32 fn_8007673C(void* p);              /* 0x8007673C - `*(u32*)p != 0` */
 s32 fn_80076750(void* p);              /* 0x80076750 - `*(u32*)p != 0` */
 s32 fn_80076800(void* p);              /* 0x80076800 - `*(u32*)p != 0` */
-/* 0x8007B878 - the alignment-asserting offset helper (the owner defines it
- * `s32 fn_8007B878(s32, s32)` in `g3d/fn_80075DCC.cpp`).  ONE declaration: main's landed form is
- * kept and this branch's `void* fn_8007B878(void* out, u32 v)` spelling is dropped - two differing
- * declarations of one C-linkage symbol in one translation unit is the "illegal function
- * overloading" trap, and `g3d/g3d_resanmtexsrt.cpp` includes this header.  The argument and return
- * types are register-identical, so that unit's two call sites take plain casts and its object is
- * unchanged. */
+/* 0x8007B878 - the alignment-asserting offset helper, declared as the owner defines it; `g3d/g3d_resanmtexsrt.cpp`
+ * casts at its two call sites. */
 u32 fn_8007B878(s32 pDst, s32 offset);
 
 #ifdef __cplusplus

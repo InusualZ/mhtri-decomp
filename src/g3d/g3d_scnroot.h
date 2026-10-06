@@ -1,10 +1,5 @@
-/*
- * g3d/g3d_scnroot.h - `nw4r::g3d::ScnRoot`, the scene-graph root `src/g3d/g3d_scnroot.cpp` owns.  Only the
- * two camera methods its consumers call are declared, and the class carries no virtuals, so MWCC emits
- * nothing for it (docs/plan.md 6.5 rule 9: the map names are manglings of these members, never spelled
- * as callables).  Moved here from `stage/fn_802B2AA0.h` (rules 1 and 2) when
- * `quest/arenatask.cpp` became the second consumer.
- */
+/* g3d/g3d_scnroot.h - `nw4r::g3d::ScnRoot`, declaring only the two camera methods its consumers call; with no
+ *   virtuals MWCC emits nothing for the class. */
 #ifndef MHTRI_G3D_G3D_SCNROOT_H
 #define MHTRI_G3D_G3D_SCNROOT_H
 

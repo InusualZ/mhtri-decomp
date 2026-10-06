@@ -1,65 +1,13 @@
 /*
- * nw4r g3d: `g3d_resnode.cpp` - the `ResNode` animation-result translation unit, `.text`
- * 0x80098D5C-0x80099400 (7 functions).
- *
- * Naming (brief section 2, evidence class 1 - a `__FILE__` string).  Every `nw4r::db::Panic` in the unit
- * passes `.data` 0x805915C0 = "g3d_resnode.cpp" as its file argument (read out of
- * orig/RMHE08/sys/main.dol's `.data`): fn_80098D5C (lines 0x20/0x21), fn_80098F6C (0x7E/0x7F),
- * fn_80099178 (0xEF) and fn_80099278 (0x103).  The preceding registered unit `g3d/g3d_resmat.cpp`
- * (0x800947A4-0x80098D5C) already names that string as its right seam, so the module is `g3d`, the file
- * takes its evidenced TU name, and `langcheck.py` agrees (the name is a `.cpp` and the `Panic`
- * relocation is a C++ mangling).  The whole `g3d_resnode.cpp` `.data` fragment is exactly these three
- * strings - "g3d_resnode.cpp" (0x10) + "NW4R:Pointer must not be NULL (pResult)" (0x28) +
- * "NW4R:Failed assertion IsValid()" (0x20) = 0x58 bytes, ending at 0x80591618 - where the next TU's
- * fragment starts (`lbl_80591618` = "g3d_resshp.cpp").
- *
- * The right seam 0x80099400 is `g3d_resshp.cpp`'s first body, and it is proven from the classes, not
- * from the queue: fn_80099378/fn_800993B4 call `fn_8005D218` (`ResNode::ref` - its failing assert names
- * `.sdata` 0x80791148 = "ResNode" and `.data` 0x8058BE98 = "g3d_resnode_ac.h") on their own `this`,
- * while the next body, fn_80099400, calls `fn_80077674` (`ResShp::ref` - its assert names `.sdata`
- * 0x807911F0 = "ResShp" and `.data` 0x8058E720 = "g3d_resshp_ac.h") on its own `this`.  Two different
- * classes cannot be methods of one source file, so the boundary sits between them.
- *
- * **The brief's cap 0x80098D5C-0x800997E0 spans two translation units.**  proposal/800997E0 claims
- * 0x800997E0-0x8009A748 as `g3d_resshp.cpp` and both caps are contiguous, so this unit registers only
- * its own non-overlapping part, 0x80098D5C-0x80099400 (the sibling's left seam must move to 0x80099400;
- * see the unit report and the outbox config_requests).
- *
- * Sections: `.text` 0x80098D5C-0x80099400, `extab` 0x80009850-0x80009880 (6 records), `extabindex`
- * 0x80022854-0x8002289C (6 records) - contiguous with `g3d/g3d_resmat.cpp`'s end (0x80009850) and with
- * `g3d_resshp.cpp`'s start (0x80009880 / 0x8002289C).
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with `grep` over
- * config/RMHE08/symbols.txt: every 0x80098D5C..0x80099400 row is a bare `fn_XXXXXXXX`).
- *
- * What the bodies are: fn_80098F6C fills an `AnmResult` from the node's own animation state and
- * fn_80098D5C applies an `AnmResult` back to the node, so the pair is nw4r's `GetAnmResult`/
- * `SetAnmResult`; fn_80099178/fn_80099278 store the translate/rotate triple and keep `ResNodeData`'s
- * "all three channels animated" bit coherent through fn_80099134.
- *
- * Measurement.  `python tools/units/recompile.py g3d/g3d_resnode.cpp --measure <symbol>` against MAIN's
- * retired per-symbol `auto_*_text.o` targets (MAIN has no split object for this unit until the
- * registration lands).  6 of 7 bodies are byte-identical (100.0 %); fn_80098D5C is 96.10 % (528 B both;
- * instruction-identical modulo register naming - the target keeps the flag word in r31 and the
- * `flags & ~0x10` temp in r29 where MWCC here picks r29/r28).  The object's sections equal the claim
- * exactly: `.text` 0x6A4, `extab` 0x30 (6 records), `extabindex` 0x48 (6 entries).
- *
- * The one codegen lever is the file-scoped `#pragma peephole off` below: with it every `rlwinm` flag
- * extract keeps the target's explicit compare (`rlwinm r0,rA,0,mb,me` + `cmpwi r0,0` + `beq`) instead of
- * the folded record form (`rlwinm.` + `beq`), which takes fn_80099134 from 81.47 % to 100.0 %.
- * `#pragma fp_contract off` rides along with `g3d/g3d_resanmcamera.cpp`'s precedent (these bodies use no
- * fused ops either way).
- *
- * What the bodies are: fn_80098F6C fills an `AnmResult` from the node's own animation state and
- * fn_80098D5C applies an `AnmResult` back to the node, so the pair is nw4r's `GetAnmResult`/
- * `SetAnmResult`; fn_80099178/fn_80099278 store the translate/rotate triple and keep `ResNodeData`'s
- * "all three channels animated" bit coherent through fn_80099134.
- *
- * Residual (best-scoring variant kept, per the matching policy): fn_80098D5C's register assignment
- * (see above); everything else is byte-identical.  The one naming caveat: the `fn_80099378`/
- * `fn_800993B4` pair is a `ResNode` sub-resource lookup whose target class is only evidenced by
- * fn_8008A220's header (`g3d_resuser_ac.h`), so the field is named `mSubResOfs` best-effort - the offset
- * is the fact.
+ * g3d/g3d_resnode.cpp - nw4r g3d `ResNode` animation results (`SetAnmResult`/`GetAnmResult` by body) and setters.
+ * RANGE. .text 0x80098D5C-0x80099400 (7 functions); extab, extabindex, .data 0x805915C0-0x80591618 (the three
+ *   assert strings), .sdata2 0x80795F48-0x80795F50.  Right seam by class: fn_800993B4 calls `ResNode::ref`
+ *   (fn_8005D218), fn_80099400 calls `ResShp::ref` (fn_80077674).
+ * NAMES. Map stems; `mSubResOfs` is a GUESS (its target class is evidenced only by fn_8008A220's
+ *   `g3d_resuser_ac.h`).
+ * RESIDUALS. fn_80098D5C: register naming only (retail keeps the flag word in r31 and `flags & ~0x10` in r29,
+ *   ours in r29/r28).  flipcheck: `.data` and `.sdata2` are claimed and not emitted.
+ * SHAPES. File-scope `#pragma peephole off`: every `rlwinm` flag extract keeps retail's `cmpwi` (fn_80099134).
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -82,9 +30,8 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 }  // namespace db
 }  // namespace nw4r
 
-/* The pooled constants this unit reads.  They live in the original `.data`/`.sdata2`, which the unit
- * does not claim, so they are declarations; each is still unsplit in the map (its address band
- * interleaves modules), so the declaration has no registered owner to move to. */
+/* The pooled constants this unit reads, declared, not defined: the claimed `.data`/`.sdata2` are not emitted
+ * yet. */
 extern "C" {
 extern const char lbl_805915C0[]; /* "g3d_resnode.cpp"                            .data */
 extern const char lbl_805915D0[]; /* "NW4R:Pointer must not be NULL (pResult)"    .data */
@@ -93,13 +40,8 @@ extern const f32 lbl_80795F48;          /* 1.0f                                 
 extern const f32 lbl_80795F4C;          /* 0.0f                                         .sdata2 */
 }
 
-/* The neighbours this unit calls; the registered owner is named beside each.  The prototypes sit in
- * this `extern "C"` block (the shape `g3d/fn_8005AA28.cpp` uses) so the rule-2 conformance pass can
- * lift them into the owners' headers.  These are `fn_XXXXXXXX` stems, not manglings, so rule 9 does
- * not reach them. */
+/* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
-              /* owner: src/mh3_pad.cpp */
-           /* owner: src/mh3_pad.cpp */
 void mtx34_identity(MTX34* pMtx);                               /* owner: src/fn_8004CAD8.cpp */
 s32 fn_8005AAEC(const ResHandle* pSelf);                     /* owner: src/g3d/fn_8005AA28.cpp */
 void* fn_8005AAE4(const ResHandle* pSelf);                   /* owner: src/g3d/fn_8005AA28.cpp */

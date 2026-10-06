@@ -261,27 +261,11 @@ cflags_rel = [
     "-sdata2 0",
 ]
 
-# g3d flags (src/g3d/g3d_resanmamblight.c). Evidence: the retail fn_800680A8 (0x24 B / 9 instructions)
-# loads the field at +0xC *before* the epilogue's LR reload. Under -O4,p the nine instructions are the same
-# multiset in the other order; under -O3 the object is byte-identical. The -O3 variants tried (-inline auto /
-# -inline noauto / -opt nopeephole) all reproduce the retail order, so the level is the lever. Camellia and
-# RSO settled on -O3 as well; -O4,p is cflags_base's default, not this build's.
+# cflags_g3d: -O3, -inline noauto and -Cpp_exceptions on over cflags_base; measurements in docs/g3d.md.
 cflags_g3d = [
     *[f for f in cflags_base if f not in ("-O4,p", "-inline auto")],
     "-O3",
-    # `-inline noauto`, not cflags_base's `-inline auto`: the lib is taking in units whose reconstruction was
-    # measured under `-inline noauto` (the same inlining as cflags_main), and under `-inline auto` they lose
-    # 13.03 and 1.27 points. Measured 2026-09-24 with a scratch compile of the exact proposed command line,
-    # official report metric plus a raw per-section byte compare, over the whole lib: `-inline noauto`
-    # reproduces both units' baselines byte-for-byte (83.20733 / 94.86212) where `-inline auto` gives 70.17290
-    # / 93.59429, and it makes this group token-identical to cflags_main. The lib's existing unit is
-    # unaffected: g3d/g3d_resanmamblight.c's object is sha-identical under both flags, so the DOL hash cannot
-    # move. Evidence: .pi/notes/g3d-flags.report.md.
     "-inline noauto",
-    # Evidence: the retail object carries extab 0x8 + extabindex 0xC, and its single function fn_800680A8 is
-    # byte-identical to ours (9 instructions, 0x24 B) - the records are unwind-only (a 4-byte flag word plus a
-    # zero terminator, no PC-action ranges, no exception actions), so the flag alone reproduces them. Same
-    # finding as cflags_pl and Gecko_ExceptionPPC.cp; analysis in .pi/notes/extab-gap.md.
     "-Cpp_exceptions on",
 ]
 
@@ -1537,236 +1521,41 @@ config.libs = [
         "cflags": cflags_g3d,
         "host": False,
         "objects": [
-            # 36-byte `ResAnmAmbLight`-cluster accessor.  Re-homed from the mis-named
-            # `g3d/g3d_resanmamblight.c` when the wQ-recut carved the real `g3d_resanmamblight.cpp`
-            # (0x80089F94) out of g3d/g3d_resanm.c: its neighbours cite `g3d_anmscn.cpp` and the region's
-            # data fragment is g3d_anmscn.cpp's, so the file took its own TU's name.  Real C++ since the
-            # wR-mangling pass: the map's `fn_800680A8`/`fn_80066C8C` were placeholders, so the source mangles
-            # and the MAP was renamed to `fn_800680A8__FPv`/`fn_80066C8C__FPv` (playbook 48); the object is
-            # byte-identical, so the DOL hash holds.
             Object(Matching, "g3d/g3d_anmscn.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `8005ABD8_disp_beta_tex__FP3VecP4Vec28_GXColorP9_GXTexObj` - the nw4r g3d character-
-            # animation TU plus the game's font/debug-print accessors (183 functions / 0x8CB0 B,
-            # 0x8005ABD8..0x80063888).  Its own `nw4r::db::Panic` asserts pass the bare source name
-            # `"g3d_anmchr.cpp"` (`.data` 0x8058B410, 98 sites, 0x8005CF50..0x8006385C) with the
-            # `g3d_resnode_ac.h`/`g3d_anmobj.h`/`g3d_resanmchr_ac.h` cluster beside it, so the lib is
-            # `g3d` and the file takes its evidenced TU name (class 1 in the brief) rather than the map's
-            # `disp_beta_tex` stem.  The range is a capped slice: its first ~0x2338 B (0x8005ABD8..
-            # 0x8005CF10) carry no g3d assert and read a different `.data` pool, so the seam is a proposal
-            # cap, not a proven TU boundary - the header records it.
-            Object(NonMatching, "g3d/g3d_anmchr.cpp"),     # 0x8005ABD8-0x80063888
-            # Registered once, at its final home (docs/plan.md 12): proposal `800680CC` - the nw4r g3d
-            # animation-object cluster that spans `g3d_anmscn.cpp` -> `g3d_anmshp.cpp` ->
-            # `g3d_anmtexpat.cpp` -> `g3d_anmtexsrt.cpp` (each body's cited `__FILE__` string settles
-            # the TU).  The first TU name already has the provisional `g3d/g3d_anmscn.cpp` home, so the
-            # cluster keeps the map's own stem, as `g3d/fn_80063888.cpp` did beside it; internal seam
-            # near 0x8006946C/0x800697D4/0x80069CF4 (see the file header).
-            Object(NonMatching, "g3d/fn_800680CC.cpp"),   # 0x800680CC-0x8006EAC0
-            # Registered (the 0x8006EE78 range).  The range spans
-            # two original TUs, proven by their own `__FILE__` strings read out of orig/RMHE08/sys/main.dol:
-            # fn_8006EE78's Panic cites `lbl_8058D7E0` = "g3d_calcmaterial.cpp", and fn_8006F738 - the
-            # file's first body - cites `lbl_8058D938` = "g3d_calcview.cpp".  Each is registered once at
-            # its final home; the seam is 0x8006F738 and is also the extab/extabindex boundary.
-            Object(NonMatching, "g3d/g3d_calcmaterial.cpp"), # 0x8006EE78-0x8006F738
-            Object(NonMatching, "g3d/g3d_calcview.cpp"),     # 0x8006F738-0x8007270C
-            # Registered (the 0x8006EAC0-0x8006EE78 maximal
-            # unclaimed run).  `g3d` from the region's own `__FILE__` string (`lbl_8058D6C0` =
-            # "g3d_anmvis.cpp", reached by fn_8006EAC0/ECB4/ED84's nw4r::db::Panic asserts).
-            Object(NonMatching, "g3d/g3d_anmvis.cpp"),     # 0x8006EAC0-0x8006EE78
-            # The two boundary-defective auto/ units re-cut at their real TU seams - each was a bulk
-            # attribution spanning three original TUs.  The lib's cflags are cflags_g3d; the source was
-            # authored under cflags_main's `-inline noauto`, which cflags_g3d lacks, so the per-function
-            # scores here are measured with the flag lane's fix still outstanding (see the cflags_g3d
-            # note above and .pi/notes/g3d-flags.probe.py).
-            Object(NonMatching, "g3d/g3d_calcvtx.cpp"),      # 0x8007270C-0x800736F8 (widened 2026-09-24 from 0x80073398; 0x8007270C-0x80073398 reconstructed, incl. the 80073180 handover, 0x80073398-0x800736F8 earlier cut)
-            Object(NonMatching, "g3d/g3d_calcworld.cpp"),    # 0x800736F8-0x800746DC
-            Object(NonMatching, "g3d/g3d_camera.cpp"),       # 0x800746DC-0x80075DCC
-            # Registered once, at its final home (docs/plan.md 12): proposal `8008452C` - the maximal
-            # unclaimed run 0x8008452C-0x800898B0 (202 functions).  Module `g3d` and source name
-            # `g3d_state.cpp` come from the run's own `__FILE__` string (`.data` 0x8058F750 =
-            # "g3d_state.cpp", 18 references - the file argument of the `nw4r::db::Panic` asserts from
-            # fn_80084630 on).  The run's data fragment starts at 0x8058F750, exactly where
-            # `g3d_scnroot.cpp`'s ends (0x8058F530-0x8058F74A), so the left seam 0x8008452C is the
-            # scnroot|state TU boundary; the right seam is the registered `g3d/g3d_resanm.c` at
-            # 0x800898B0 (tudiscover: strong).  Interior: a second `.data` fragment starts at
-            # 0x8058FCE8 (`g3d_resvtx_ac.h`/`ResVtxFurVec`/`ResVtxTexCoord` strings plus the static
-            # constructor fn_80088AD0 at .ctors 0x8056F2D4), so the last ~52 functions may be a second
-            # TU; both interior cut candidates (0x80088AD0 / 0x80089330) are tudiscover "weak" only, so
-            # the run is registered whole and the seam is left to settle (brief 8.3).
-            Object(NonMatching, "g3d/g3d_state.cpp"),        # 0x8008452C-0x80088E24
-            Object(NonMatching, "g3d/g3d_resvtx.cpp"),       # 0x80088E24-0x800898B0
-            Object(NonMatching, "g3d/g3d_resanm.c"),         # 0x800898B0-0x80089F94
-            Object(NonMatching, "g3d/g3d_resanmamblight.c"), # 0x80089F94-0x8008A220
-            Object(NonMatching, "g3d/g3d_resanmcamera.cpp"),   # 0x8008A220-0x8008A664 (merged 2026-09-24 from the 0x8008A220-0x8008A28C `.c` cut: same `__FILE__` fragment and contiguous sections, one TU)
-            # Registered once, at its final home (docs/plan.md 12): proposal `8008F6E8` - the nw4r
-            # g3d fog animation-channel evaluator (2 functions, 0x1FC B, 0x8008F6E8-0x8008F8E4).
-            # `g3d`/`.cpp` from the body's own `__FILE__` string (`.data` 0x805903F0 =
-            # "g3d_resanmfog.cpp"); the right edge 0x8008F8E4 is the next TU's first body, which
-            # cites "g3d_resanmlight.cpp" (.data 0x80590440), so the seam is proven.  See the file
-            # header for the sections and the rule-7 deferral.
-            Object(NonMatching, "g3d/g3d_resanmfog.cpp"),    # 0x8008F6E8-0x8008F8E4
-            # Registered once, at its final home (docs/plan.md 12): proposal `8008F8E4` - the nw4r g3d
-            # light-animation channel evaluator and the `ResAnmScn` light channel accessors
-            # (31 functions / 0x1018 B, 0x8008F8E4-0x800908FC).  `g3d`/`.cpp` from the body's own
-            # `__FILE__` string (`.data` 0x80590440 = "g3d_resanmlight.cpp", fn_8008F8E4's Panic file
-            # argument).  The discovery cap 0x8008F8E4-0x80097D40 spans several original TUs (whose own
-            # `__FILE__` strings - g3d_resanmscn.cpp at 0x800908FC, g3d_resanmtexsrt.cpp at 0x800916FC,
-            # g3d_resfile.cpp at 0x80093990, g3d_resmat.cpp at 0x800947A4 - are the pinned seams of the
-            # sibling proposals 800908FC/800916FC/80093990/800947A4), so this unit is registered at its
-            # own evidenced extent only.  See the file header for the sections and the rule-7 deferral.
-            Object(NonMatching, "g3d/g3d_resanmlight.cpp"),   # 0x8008F8E4-0x800908FC
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `800908FC_fn_800908FC` - the nw4r `ResAnmScn` channel getters followed by the
-            # `ResAnmTexPat` accessor/bind cluster (24 functions / 0xE00 B, 0x800908FC-0x800916FC).
-            # The range's own `__FILE__` string is `g3d_resanmscn.cpp` (`.data` 0x80590700, the file
-            # argument of every getter's Panic) and the next TU's is `g3d_resanmtexsrt.cpp`, so the
-            # module is `g3d` and the name is the evidenced TU name; the seam between the two TUs sits
-            # inside the range (see the unit's file header).  Flags are this lib's `cflags_g3d`.
-            Object(NonMatching, "g3d/g3d_resanmscn.cpp"),  # 0x800908FC-0x800916FC
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80093990_fn_80093990` - the nw4r g3d `ResFile` translation unit (53 functions /
-            # 0xE14 B, 0x80093990..0x800947A4).  Its own `nw4r::db::Panic` assert passes the bare
-            # source name "g3d_resfile.cpp" (`.data` 0x80590BA0, the file argument of the
-            # CheckRevision assert at the head of fn_80093990), so the lib is `g3d` and the file
-            # takes its evidenced TU name (class 1 in the brief).  `langcheck` agrees: the name is a
-            # `.cpp` and the `Panic__Q24nw4r2dbFPCciPCce` relocation is a C++ mangling, so the unit
-            # is `src/g3d/g3d_resfile.cpp` in this lib.  Sections: `.text` 0x80093990-0x800947A4,
-            # `extab` 0x800093A8-0x800094E0, `extabindex` 0x80022158-0x8002232C; the boundaries are
-            # fn_800938EC before and fn_800947A4 after (the first body of the next TU, which cites
-            # "g3d_resmat.cpp").
-            Object(Matching, "g3d/g3d_resfile.cpp"),      # 0x80093990-0x800947A4
-            # Registered once, at its final home (docs/plan.md 12): proposal `800947A4` - the nw4r g3d
-            # `ResMat`/`ResTexSrt` resource TU (140 functions / 0x45B8 B, 0x800947A4-0x80098D5C).  `g3d`/
-            # `.cpp` from the range's own `__FILE__` string (`.data` 0x80590D78 = "g3d_resmat.cpp", the
-            # file argument of every `nw4r::db::Panic` assert in the range); the right edge 0x80098D5C is
-            # `g3d_resnode.cpp`'s first body (tudiscover seam, class `source`), so the seam is proven.
-            # Sections: `.text` 0x800947A4-0x80098D5C, `extab` 0x800094E0-0x80009850 (110 8-byte
-            # unwind-only records) and `extabindex` 0x8002232C-0x80022854 (110 12-byte records).
-            # See the file header for the sections, the rebuilt bodies and the rule-7 deferral.
-            Object(NonMatching, "g3d/g3d_resmat.cpp"),      # 0x800947A4-0x80098D5C
-
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80098D5C_fn_80098D5C` - the nw4r g3d `ResNode` animation-result TU
-            # (7 functions / 0x6A4 B, 0x80098D5C-0x80099400).  `g3d`/`.cpp` from the range's own
-            # `__FILE__` string (`.data` 0x805915C0 = "g3d_resnode.cpp", the file argument of
-            # fn_80098D5C/F6C/9178/9278's `nw4r::db::Panic` asserts; `langcheck` returns C++
-            # conclusive).  The discovery cap 0x80098D5C-0x800997E0 is NOT one TU: it spans this file
-            # and `g3d_resshp.cpp` (see below), so the unit is registered at its own evidenced extent
-            # only.  Sections: `.text` 0x80098D5C-0x80099400, `extab` 0x80009850-0x80009880
-            # (6 records), `extabindex` 0x80022854-0x8002289C (6 entries).
-            Object(NonMatching, "g3d/g3d_resnode.cpp"),      # 0x80098D5C-0x80099400
-            # Registered once, at its final home (docs/plan.md 12): the nw4r g3d `ResShp` TU -
-            # proposal `80098D5C_fn_80098D5C`'s head plus proposal `800997E0_fn_800997E0`'s tail,
-            # which are one file.  fn_80099400 - the range's first body - calls `fn_80077674` =
-            # `ResShp::ref` on its own `this` (its assert names `.sdata` 0x807911F0 = "ResShp"), while
-            # fn_800993B4 calls `fn_8005D218` = `ResNode::ref` (0x80791148 = "ResNode"), so 0x80099400
-            # is the resnode|resshp boundary; the `g3d_resshp.cpp` `.data` fragment starts at
-            # 0x80591618 and every assert string the two halves pass ("g3d_resshp.cpp" 0x80591618,
-            # "g3d_resshp_ac.h" 0x80591708/748, "g3d_rescommon_ac.h" 0x80591780/7EC,
-            # "g3d_restev_ac.h" 0x80591820, "g3d_restex_ac.h" 0x80591850) sits inside it, so both
-            # proposals are registered here as ONE unit (one Object line, one splits.txt block).  The
-            # tail's own four `__FILE__`-level asserts pass "g3d_resshp.cpp" (0x80591618) and its
-            # bodies keep calling the head's `ResShp`/`ResTagDL` accessors.  The right edge 0x8009A748
-            # is `g3d_cpu.cpp`'s first body (the next registered unit).  Sections: `.text`
-            # 0x80099400-0x8009A748 (58 functions / 0x1348 B), `extab` 0x80009880-0x800099E0
-            # (44 records, 0x160 B), `extabindex` 0x8002289C-0x80022AAC (44 entries, 0x210 B).
-            Object(NonMatching, "g3d/g3d_resshp.cpp"),       # 0x80099400-0x8009A748
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `8008A664_fn_8008A664` - the nw4r g3d `ResAnmChr` character-animation TU
-            # (101 functions / 0x5084 B, 0x8008A664..0x8008F6E8).  Its own `nw4r::db::Panic` asserts pass
-            # the bare source name "g3d_resanmchr.cpp" (`.data` 0x80590010, the file argument of every
-            # assert in the range) with the value-type format strings and the `g3d_resanmchr_ac.h`
-            # inlined-assert header beside it, so the lib is `g3d` and the file takes its evidenced TU
-            # name (class 1 in the brief).  `langcheck` agrees: the name is a `.cpp` and the `Panic`
-            # relocation is a C++ mangling, so the unit is `src/g3d/g3d_resanmchr.cpp` in this lib.
-            # Sections: `.text` 0x8008A664-0x8008F6E8, `extab` 0x80008F10-0x80009100 (62 records),
-            # `extabindex` 0x80021A74-0x80021D5C (62 entries); the boundaries are the functions before
-            # (fn_8008A644) and after (fn_8008F6E8).
-            Object(NonMatching, "g3d/g3d_resanmchr.cpp"),   # 0x8008A664-0x8008F6E8
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `800916FC_fn_800916FC` - the nw4r g3d `ResAnmTexSrt` SRT-animation TU and the inline
-            # resource-accessor bodies emitted beside it (75 functions / 0x2294 B,
-            # 0x800916FC-0x80093990).  Its own `nw4r::db::Panic` asserts pass the bare source name
-            # "g3d_resanmtexsrt.cpp" (`.data` 0x80590928, the file argument of all four asserts in
-            # fn_800916FC), so the lib is `g3d` and the file takes its evidenced TU name (class 1 in
-            # the brief).  `langcheck` agrees: the name is a `.cpp` and the `Panic` relocation is a
-            # C++ mangling, so the unit is `src/g3d/g3d_resanmtexsrt.cpp` in this lib.  The run also
-            # cites the `g3d_res*_ac.h` inlined-assert headers, which share the same `.data`
-            # fragment, so they are this TU's inlined accessor bodies, not a second object.  Sections:
-            # `.text` 0x800916FC-0x80093990, `extab` 0x80009208-0x800093A8 (52 records),
-            # `extabindex` 0x80021EE8-0x80022158 (52 entries).  See the file header.
-            Object(NonMatching, "g3d/g3d_resanmtexsrt.cpp"), # 0x800916FC-0x80093990
-            # Registered (the 0x800D77B0 two-function run).  `g3d`
-            # from `g3d/g3d_calcworld.cpp`, which calls fn_800D77B0 (`fn_800737CC`'s per-node matrix
-            # builder) and names it; the range's own data has no `__FILE__` string, so the name stays
-            # the map's `fn_` stem (docs/plan.md 12, the register-once rule).
-            # The `g3d_xsi.cpp` TU (0x800D6C00-0x800D77B0), carved out of `nw_resource.cpp`'s tail on 2026-09-30 (its own `__FILE__` string).
-            Object(NonMatching, "g3d/g3d_xsi.cpp"),         # 0x800D6C00-0x800D77B0
-            Object(NonMatching, "g3d/fn_800D77B0.cpp"),     # 0x800D77B0-0x800D79B4
-            # The `g3d_basic.cpp` SRT/matrix cluster, named by its own `__FILE__` string
-            # (`lbl_80595840` = "g3d_basic.cpp", reached by fn_800D79B4's `nw4r::db::Panic` asserts).
-            Object(NonMatching, "g3d/g3d_basic.cpp"),        # 0x800D79B4-0x800D7F54
-            # Registered once, at its final home (docs/plan.md 12): proposal `80063888` - the nw4r g3d
-            # animation-object cluster (164 functions / 0x4820 B, 0x80063888..0x800680A8).  The run spans
-            # more than one original TU (`g3d_anmobj.cpp`/`g3d_anmclr.cpp` in its head, `g3d_anmscn.cpp`
-            # from 0x800649CC), so it keeps the map's `fn_80063888` stem (brief evidence class 4); the
-            # module is `g3d` and the lib's flags are cflags_g3d.  See the file header for the seam and
-            # the rule-2 owner header `src/g3d/fn_80063888.h`.
-            Object(NonMatching, "g3d/fn_80063888.cpp"),       # 0x80063888-0x800680A8
-            # Registered once, at its final home (docs/plan.md 12): proposal `8005AA28` - the nw4r g3d
-            # `ResMat` accessor cluster (0x8005AA28..0x8005ABD8, 8 functions).  Its own `__FILE__`
-            # string is the accessor header `g3d_resnode_ac.h` (lbl_8058B370, the Panic file argument of
-            # fn_8005AA44), which names the header an inline assert was written in, not the unit - no
-            # `.cpp` string exists for the range, so the file keeps the map's `fn_` stem (class 4).  The
-            # module is `g3d`: every caller is nw4r g3d (`ScnMdl::CopiedMatAccess`, g3d_calcworld.cpp's
-            # fn_80073E8C, g3d_basic.cpp's fn_800D7ED0 twin).  See the file header.
-            Object(NonMatching, "g3d/fn_8005AA28.cpp"),       # 0x8005AA28-0x8005ABD8
-            # Registered once, at its final home (docs/plan.md 12): proposal `80075DCC` - the nw4r g3d
-            # render/dispatch cluster (216 functions / 0x6774 B, 0x80075DCC..0x8007C540).  The run spans
-            # five original TUs (g3d_dcc.cpp, g3d_draw1mat1shp.cpp, g3d_draw.cpp, g3d_fog.cpp,
-            # g3d_light.cpp - `tools/units/attribution-queue.json`), so it keeps the map's `fn_80075DCC`
-            # stem (brief evidence class 4); the module is `g3d` and the lib's flags are cflags_g3d.  The
-            # left edge 0x80075DCC is a tudiscover strong cut, the right edge 0x8007C540 is the proposal
-            # cap, not a seam.  See the file header and `src/g3d/fn_80075DCC.h` (rule 2).
-            Object(NonMatching, "g3d/fn_80075DCC.cpp"),      # 0x80075DCC-0x8007C540
-            # Registered once, at each real TU's own home (docs/plan.md 12), from the pooled proposal
-            # `8007C540` (185 functions / 0x7FEC B, 0x8007C540-0x8008452C).  The proposal is NOT one TU:
-            # its own `.data` pool pins four different `__FILE__` strings to four disjoint function runs
-            # (`g3d_scnmdl.cpp` at 0x8058EDA0, `g3d_scnmdlsmpl.cpp` at 0x8058F0A0, `g3d_scnobj.cpp` at
-            # 0x8058F3D8, `g3d_scnroot.cpp` at 0x8058F530 - four consecutive per-TU `.data` fragments),
-            # so each is registered at its own home with its own section ranges.  The three small runs
-            # between the anchors (0x8007EF1C, 0x800810DC, 0x80082668) each hold the *name-record reader*
-            # of the class the neighbouring file defines (ScnMdl / ScnMdlSimple / ScnObj+ScnLeaf+ScnGroup),
-            # so each is allocated to that class's file; the extab, extabindex and `.text` ranges are then
-            # contiguous and gapless across the four units.  See each file's header for the seams.
-            Object(NonMatching, "g3d/g3d_scnmdl.cpp"),       # 0x8007C540-0x8007F0E4
-            Object(NonMatching, "g3d/g3d_scnmdlsmpl.cpp"),   # 0x8007F0E4-0x800813B8
-            Object(NonMatching, "g3d/g3d_scnobj.cpp"),       # 0x800813B8-0x800827E4
-            Object(NonMatching, "g3d/g3d_scnroot.cpp"),      # 0x800827E4-0x8008452C
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `8009A748_fn_8009A748` - the nw4r g3d CPU-side display-list copy/fill helpers
-            # (2 functions / 0x330 B, 0x8009A748..0x8009AA78).  `g3d`/`.cpp` from the range's own
-            # `__FILE__` string (`.data` 0x80591860 = "g3d_cpu.cpp", the file argument of every
-            # `nw4r::db::Panic` assert in both bodies), so the lib is `g3d` and the file takes its
-            # evidenced TU name (class 1 in the brief).  `langcheck` agrees: the name is a `.cpp` and
-            # the `Panic__Q24nw4r2dbFPCciPCce` relocation is a C++ mangling, so the unit is
-            # `src/g3d/g3d_cpu.cpp` in this lib.  Every caller of the range is nw4r g3d
-            # (fn_80075DCC, g3d_state.cpp, g3d_resfile.cpp and the g3d_resmat band).  Sections:
-            # `.text` 0x8009A748-0x8009AA78, `extab` 0x800099E0-0x800099F0, `extabindex`
-            # 0x80022AAC-0x80022AC4; the boundaries are fn_8009A720 before (a different TU) and
-            # gx/fn_8009AA78.c at 0x8009AA78 after.
-            Object(NonMatching, "g3d/g3d_cpu.cpp"),           # 0x8009A748-0x8009AA78
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `8009B140_fn_8009B140` - the nw4r g3d GPU-path texgen helpers (2 functions / 0x234 B,
-            # 0x8009B140..0x8009B374).  `g3d`/`.cpp` from the range's own `__FILE__` string
-            # (`.data` 0x80591900 = "g3d_gpu.cpp", the `pFile` argument of fn_8009B140's
-            # `nw4r::db::Panic` assert), the same class-1 evidence its sibling `g3d_cpu.cpp` used, so
-            # the lib is `g3d` and the file takes its evidenced TU name.  Section claim:
-            # `.text` 0x8009B140..0x8009B374, `extab` 0x80009A28..0x80009A38, `extabindex`
-            # 0x80022B18..0x80022B30 (gapless against gx/fn_8009ACE4.c below them).  The right edge
-            # 0x8009B374 is the discovery byte cap, not a proven TU end - the file's header records it.
-            Object(NonMatching, "g3d/g3d_gpu.cpp"),           # 0x8009B140-0x8009B374
+            Object(NonMatching, "g3d/g3d_anmchr.cpp"),
+            Object(NonMatching, "g3d/fn_800680CC.cpp"),
+            Object(NonMatching, "g3d/g3d_calcmaterial.cpp"),
+            Object(NonMatching, "g3d/g3d_calcview.cpp"),
+            Object(NonMatching, "g3d/g3d_anmvis.cpp"),
+            Object(NonMatching, "g3d/g3d_calcvtx.cpp"),
+            Object(NonMatching, "g3d/g3d_calcworld.cpp"),
+            Object(NonMatching, "g3d/g3d_camera.cpp"),
+            Object(NonMatching, "g3d/g3d_state.cpp"),
+            Object(NonMatching, "g3d/g3d_resvtx.cpp"),
+            Object(NonMatching, "g3d/g3d_resanm.c"),
+            Object(NonMatching, "g3d/g3d_resanmamblight.c"),
+            Object(NonMatching, "g3d/g3d_resanmcamera.cpp"),
+            Object(NonMatching, "g3d/g3d_resanmfog.cpp"),
+            Object(NonMatching, "g3d/g3d_resanmlight.cpp"),
+            Object(NonMatching, "g3d/g3d_resanmscn.cpp"),
+            Object(Matching, "g3d/g3d_resfile.cpp"),
+            Object(NonMatching, "g3d/g3d_resmat.cpp"),
+            Object(NonMatching, "g3d/g3d_resnode.cpp"),
+            Object(NonMatching, "g3d/g3d_resshp.cpp"),
+            Object(NonMatching, "g3d/g3d_resanmchr.cpp"),
+            Object(NonMatching, "g3d/g3d_resanmtexsrt.cpp"),
+            Object(NonMatching, "g3d/g3d_xsi.cpp"),
+            Object(NonMatching, "g3d/fn_800D77B0.cpp"),
+            Object(NonMatching, "g3d/g3d_basic.cpp"),
+            Object(NonMatching, "g3d/fn_80063888.cpp"),
+            Object(NonMatching, "g3d/fn_8005AA28.cpp"),
+            Object(NonMatching, "g3d/fn_80075DCC.cpp"),
+            Object(NonMatching, "g3d/g3d_scnmdl.cpp"),
+            Object(NonMatching, "g3d/g3d_scnmdlsmpl.cpp"),
+            Object(NonMatching, "g3d/g3d_scnobj.cpp"),
+            Object(NonMatching, "g3d/g3d_scnroot.cpp"),
+            Object(NonMatching, "g3d/g3d_cpu.cpp"),
+            Object(NonMatching, "g3d/g3d_gpu.cpp"),
         ],
     },
     {

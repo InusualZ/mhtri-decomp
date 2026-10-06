@@ -1,8 +1,4 @@
-/*
- * The `g3d/g3d_resanm.c` unit's cross-unit declarations (docs/plan.md 6.5 rule 2).  The unit itself is
- * C (`fn_800898B0` keeps its map name), so the declarations carry C linkage.  Consumers used to
- * re-declare these in their own source; they belong with the TU that defines them.
- */
+/* g3d/g3d_resanm.h - the cross-unit declarations of the C unit `g3d/g3d_resanm.c` (C linkage). */
 #ifndef MHTRI_G3D_G3D_RESANM_H
 #define MHTRI_G3D_G3D_RESANM_H
 

@@ -1,6 +1,4 @@
-/* The owner header of `g3d/g3d_resanmchr.cpp` (rule 2): the cross-unit declarations its symbols
- * need.  Written by `enemy/em_action.cpp`'s lane with the one declaration it needed.
- */
+/* g3d/g3d_resanmchr.h - the cross-unit declarations of `g3d/g3d_resanmchr.cpp`. */
 #ifndef MHTRI_G3D_G3D_RESANMCHR_H
 #define MHTRI_G3D_G3D_RESANMCHR_H
 

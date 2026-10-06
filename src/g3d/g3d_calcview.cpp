@@ -1,22 +1,19 @@
-/* g3d/g3d_calcview.cpp - the `g3d_calcview.cpp` TU's `.text` 0x8006F738..0x8007270C.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with a grep of
- * config/RMHE08/symbols.txt: every .text entry in 0x8006EE78..0x8007270C is a bare `fn_XXXXXXXX`).
- *
- * The file name is class-1 evidence: the `.data` string `lbl_8058D938` read out of
- * orig/RMHE08/sys/main.dol is exactly "g3d_calcview.cpp", the `pFile` argument of the
- * `nw4r::db::Warning`/`Panic` calls in fn_8006F738, fn_8006F934, fn_8006FBBC, fn_80070134,
- * fn_80070410, fn_80070600, fn_80070820, fn_80071198 and fn_80071C48.  Module `g3d`; the `.cpp`
- * suffix plus the C++ call sites make it C++.
- *
- * Seams: 0x8006F738 (left, from `g3d_calcmaterial.cpp`) and 0x8007270C (right, where the range's
- * first `g3d_calcvtx.cpp` function fn_8007270C starts).  The billboard warning strings
- * (`lbl_8058D94C` .. `lbl_8058DA70`) in the same pool belong to this file.
- *
- * This file owns the view/billboard-matrix calculator: the per-billboard matrix builders
- * (fn_8006F738 / fn_8006F934 / fn_8006FBBC) and the material/model accessor chain they drive
- * (fn_8006FDCC .. fn_80070134).  The reconstruction is in progress: the small accessor wrappers
- * are matched below, the large paired-single bodies are still registration stubs and their
- * per-symbol scores are in the outbox.
+/*
+ * g3d/g3d_calcview.cpp - nw4r g3d view/billboard-matrix calculator: the per-billboard matrix builders
+ *   (fn_8006F738, fn_8006F934, fn_8006FBBC) and the material/model accessor chain they drive (fn_8006FDCC ..
+ *   fn_80070134).
+ * RANGE. .text 0x8006F738-0x8007270C (44 functions); extab, extabindex, .rodata 0x8056F638-0x8056F658, .data
+ *   0x8058D938-0x8058DD68 (opens on "g3d_calcview.cpp", then the billboard warning strings), .sdata
+ *   0x807911A8-0x807911B8, .sdata2 0x80795DA8-0x80795DB0.  Both neighbours cite their own `__FILE__` strings.
+ * NAMES. Map stems.
+ * RESIDUALS. Unwritten (empty stubs, 27 rows, 0x2C74 bytes; objdiff scores them near zero): fn_8006F738,
+ *   fn_8006F898, fn_8006F8D4, fn_8006F934, fn_8006FB60, fn_8006FBBC, fn_8006FE40, fn_80070134, fn_80070410,
+ *   fn_80070600, fn_80070820, fn_80071008, fn_8007100C, fn_80071064, fn_800710A0, fn_800710B4, fn_800710BC,
+ *   fn_80071130, fn_8007118C, fn_80071198, fn_80071B70, fn_80071BD4, fn_80071C38, fn_80071C3C, fn_80071C40,
+ *   fn_80071C48, fn_800726D0.
+ *   Partial (7 written bodies): fn_8006F908, fn_8006FDCC, fn_8006FE7C, fn_8006FEC8, fn_8006FF50, fn_8006FFDC,
+ *   fn_800700C0.
+ *   flipcheck: `.text` 0x258 of 0x2FD4; `.rodata`, `.data`, `.sdata` and `.sdata2` are claimed and not emitted.
  */
 #include "types.h"
 
@@ -32,8 +29,8 @@ void Warning(const char* pFile, int line, const char* pFmt, ...);
 }  // namespace db
 }  // namespace nw4r
 
-/* The pooled file-name/assert strings and the two `.sdata` globals this unit reads (declared, never
- * defined - they live in the original `.data`/`.sdata`, which this unit does not claim). */
+/* The pooled file-name/assert strings and the two `.sdata` globals this unit reads, declared, not defined: the
+ * claimed `.data`/`.sdata` are not emitted yet. */
 extern const char lbl_8058D938[];
 extern const char lbl_8058D94C[];
 extern const char lbl_8058D984[];

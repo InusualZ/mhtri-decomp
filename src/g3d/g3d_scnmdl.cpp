@@ -1,65 +1,23 @@
 /*
- * nw4r g3d: g3d_scnmdl.cpp - the ScnMdl scene-model object, its replaced-material (`mReplacement`)
- * buffers and the ScnMdl name-record cluster.
- * `.text` 0x8007C540-0x8007F0E4 (55 functions, 11172 B).
- *
- * Registered once, at its final home (docs/plan.md 12), from the pooled proposal `8007C540`.
- *
- * Name - which evidence class decided it.  Class 1, a `__FILE__` string: the unit's own `.data`
- * fragment (0x8058EDA0-0x8058F0A0) opens on the bare source-file name `g3d_scnmdl.cpp`
- * (lbl_8058EDA0, 0x8058EDA0, referenced by fn_8007C540, by fn_8007E01C, by fn_8007E8B4 and by
- * fn_8007EE68), and the same fragment carries the inlined-assert header `g3d_resmdl_ac.h`
- * (lbl_8058F090, the `%s::%s: Object not valid.` guard's file argument in fn_8007D404) and the
- * `mReplacement.*Array` assert texts that name the class's own buffers
- * (`mReplacement.pixDLArray`, `.tevColorDLArray`, `.indMtxAndScaleDLArray`, `.texCoordGenDLArray`,
- * `.tevDataArray`).  The module is `g3d` (its link neighbours in config/RMHE08/splits.txt are all
- * nw4r g3d) and the `.cpp` suffix plus the C++ call sites make it C++ - `langcheck.py` agrees.
- *
- * Class 2 fails: `python tools/symbols/dumpmap.py lookup 0x8007C540` answers the placeholder
- * `zz_007c540_`, which is not evidence.
- *
- * Seams.  Left: 0x8007C540, where g3d/fn_80075DCC.cpp ends; it is that unit's proposal cap, not a
- * proven TU seam (its header says so).  Right: 0x8007F0E4, where g3d/g3d_scnmdlsmpl.cpp begins; it is
- * tudiscover's weak `codegen fingerprint change` cut AND the extent of this unit's proven match set
- * (`tudiscover.py at 0x8007C540`: "MATCH SET 48 functions, certainly one TU: 0x8007C540..0x8007EF1C").
- *
- * The 0x8007EF1C-0x8007F0E4 tail (7 functions) is allocated to this unit, not to a TU of its own:
- * its head function fn_8007EF1C is the ScnMdl *name-record reader* (the `*fn_800638B8(&local,
- * lbl_8056F678)` shape with lbl_8056F678 = "ScnMdl", the same shape g3d/g3d_anmvis.cpp's
- * fn_8006EE48 uses for "AnmObjVis"), and only the TU that defines ScnMdl can register that record.
- * The same argument assigns 0x800810DC-0x800813B8 to g3d_scnmdlsmpl.cpp ("ScnMdlSimple") and
- * 0x80082668-0x800827E4 to g3d_scnobj.cpp ("ScnObj"/"ScnLeaf"/"ScnGroup"); with that partition
- * `extab` (0x80008588-0x80008674), `extabindex` (0x80020E74-0x80020FB8) and `.text` are each
- * contiguous per unit and across the four units, which is the residual's own cross-check.
- *
- * Sections claimed: `.text` 0x8007C540-0x8007F0E4, `extab` 0x80008588-0x80008674 (236 B, 27 records:
- * 26 x 8 + 28 for fn_8007EE68), `extabindex` 0x80020E74-0x80020FB8 (324 B, 27 entries x 12).
- * The unit's `.data` fragment 0x8058EDA0-0x8058F0A0 (its `__FILE__` name, the assert texts, the
- * `%s::%s: Object not valid.` format, the ScnMdl vtable lbl_8058F028 and the `.rodata` name record
- * lbl_8056F678) and the `.sdata` word lbl_80791208 (`"ref"`) are NOT claimed here: a range may only
- * be claimed once the object emits it (docs/plan.md 8.4) and this pass reconstructs bodies only.
- * They are recorded in the outbox for the data pass.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x8007C540`, which answers the `zz_007c540_` placeholder,
- * and by reading every `.text` entry in 0x8007C540..0x8007F0E4 out of config/RMHE08/symbols.txt:
- * they are all bare `fn_XXXXXXXX`).  The one real name the range implies - `nw4r::g3d::ScnMdl` - is
- * a class name recovered from the `.rodata` name record and the assert texts; it is used as this
- * file's object type, never as a callable identifier.
- *
- * Measurement path: `python tools/units/recompile.py g3d/g3d_scnmdl.cpp --measure <symbol>` scores
- * each symbol against MAIN's retired per-function object that contains it (auto_fn_<ADDR>_text.o or
- * the auto_<nn>_<ADDR>_text.o run), compiled with the g3d lib's real command line (cflags_g3d).
- *
- * Reconstruction status: the small/medium bodies of the 0x8007D38C-0x8007F0CC span are written; the
- * seven large bodies (fn_8007C540, fn_8007D59C, fn_8007DDFC, fn_8007E01C, fn_8007E498, fn_8007E8B4,
- * fn_8007EA8C, fn_8007ED58) are registration stubs still to do.  Per-function scores: see the outbox
- * and .pi/notes/8007c540-fn-8007c540-567b.md.
+ * g3d/g3d_scnmdl.cpp - nw4r g3d `ScnMdl` scene model: its replaced-material (`mReplacement`) buffers, the node
+ *   visibility and option accessors, the constructor and destructor, and the `ScnMdl` name-record cluster.
+ * RANGE. .text 0x8007C540-0x8007F0E4 (55 functions); extab, extabindex, .data 0x8058EDA0-0x8058F0A0 (opens on
+ *   "g3d_scnmdl.cpp"), .sdata 0x80791208-0x80791210.  The left edge is `g3d/fn_80075DCC.cpp`'s cap, not a proven
+ *   seam; tudiscover proves one TU through 0x8007EF1C, and the 0x8007EF1C-0x8007F0E4 tail is here because its head
+ *   fn_8007EF1C reads the "ScnMdl" name record (lbl_8056F678), which only the class's own TU registers.
+ * NAMES. Map stems (the dump answers `zz_` placeholders); `nw4r::g3d::ScnMdl` comes from the name record and the
+ *   `mReplacement.*Array` assert texts; `g3d_root_model_bind` (0x8007F0CC) is a GUESS (it dispatches the material
+ *   id through slot +0x34).
+ * RESIDUALS. Unwritten (objdiff scores them zero): fn_8007C540, fn_8007D59C, fn_8007DDFC, fn_8007E01C,
+ *   fn_8007E498, fn_8007E8B4, fn_8007EA8C.  Partial: fn_8007D404, fn_8007D568, fn_8007DBDC, fn_8007DCB8,
+ *   fn_8007E7FC, fn_8007EA10, 0x8007ECD8-0x8007EF1C (five functions, the constructor and destructor among them),
+ *   fn_8007EF4C, fn_8007F05C.
+ *   flipcheck: `.text` 0xADC of 0x2BA4; `.data` and `.sdata` are claimed and not emitted.
  */
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle, IS_VALID_PTR (rule 1) */
-#include "nw4r/g3d/scnmdl.h"      /* nw4r::g3d::ScnMdl (rule 1: one definition, in include/) */
+#include "nw4r/g3d/scnmdl.h"      /* nw4r::g3d::ScnMdl (rule 1) */
 #include "g3d/fn_80063888.h"      /* fn_800638B8, fn_800639D0, G3dObj (rule 2: owner g3d/fn_80063888.cpp) */
 #include "g3d/g3d_anmchr.h"       /* fn_8005D3E0, fn_8005DC24 (rule 2: owner g3d/g3d_anmchr.cpp) */
 #include "g3d/fn_800680CC.h"      /* fn_800696E4, fn_800697A4 (rule 2: owner g3d/fn_800680CC.cpp) */
@@ -121,8 +79,7 @@ struct ResVtxBlockHead {
 
 extern "C" {
 
-/* -------- the two g3d-band helpers with no registered owner (rule 2's documented gap: the band is
- * bracketed by a `g3d` unit and a `gx` unit, so it names no single module's header) -------- */
+/* -------- the two node-table helpers of `g3d/g3d_resmat.cpp`, declared here -------- */
 s32 fn_80097F80(void* pView);            /* 0x80097F80 - the model's node count */
 s32 fn_80097F18(void* pView, u32 idx);   /* 0x80097F18 - one node handle of the table */
 u32 fn_8009A2F4(void* pSelf, u32 flag);  /* 0x8009A2F4 - the pix-DL replacement's teardown */
@@ -497,9 +454,8 @@ u32 fn_8007ED40(ScnMdl* pSelf, u32 type) {
     return fn_80080A00(pSelf, type);
 }
 
-/* 0x8007ED58 - the ScnMdl constructor: run the base constructor with the caller's two-word record, install
- * the vtable, clear the two empty-by-default members, take the DL buffer pointer, copy the 0x40-byte
- * replacement record in and store the trailing argument. */
+/* 0x8007ED58 - the ScnMdl constructor: the base constructor with the caller's two-word record, the vtable, the two
+ * cleared members, the DL buffer pointer, the copied 0x40-byte replacement record and the trailing argument. */
 u32 fn_8007ED58(ScnMdl* pSelf, void* pArg2, u32* pArg3, u32 a4, u32 a5, u32 a6, u32 a7, u32 a8,
                 u32 a9, u32 a10, const ReplacementBlock* pReplacement, u32* pDLBuffer, u32 a13) {
     u32 args[3];

@@ -1,25 +1,14 @@
-/* g3d/g3d_calcmaterial.cpp - the `g3d_calcmaterial.cpp` TU's `.text` 0x8006EE78..0x8006F738.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with a symbol greps of
- * config/RMHE08/symbols.txt: every .text entry in 0x8006EE78..0x8007270C is a bare `fn_XXXXXXXX`).
- *
- * The file name is class-1 evidence: the `.data` string `lbl_8058D7E0` read out of
- * orig/RMHE08/sys/main.dol is exactly "g3d_calcmaterial.cpp", the `pFile` argument of the
- * `nw4r::db::Panic` assertion inside fn_8006EE78.  Module `g3d` (its registered neighbours are all
- * `g3d/*`); the `.cpp` suffix plus the `Panic__Q24nw4r2dbFPCciPCce`/C++ front-end make it C++.
- *
- * The seam at 0x8006F738 is proven the same way: 0x8006F738's first assertion cites
- * `lbl_8058D938` = "g3d_calcview.cpp" and the range after it is a different TU (registered
- * separately as `g3d/g3d_calcview.cpp`).  The TU before (0x8006EAC0..0x8006EE78) cites
- * "g3d_anmvis.cpp" and the next (0x8007270C..) cites "g3d_calcvtx.cpp".
- *
- * This file reconstructs the material-controller helpers: a chain of small pointer wrappers over the
- * global material table returned by fn_8005A9BC, whose inlined constructors (fn_8006F158 / fn_8006F298
- * assert 32-byte alignment, fn_8006F374 / fn_8006F41C / fn_8006F4BC assert 4-byte alignment) carry the
- * `g3d_resmat_ac.h` file string.  fn_8006EE78 walks the material list and drives per-material matrix
- * updates.
- *
- * Residuals (all still stubs in this commit): fn_8006EE78, fn_8006F5A0 and fn_8006F660 are the large
- * vector/matrix bodies; their per-symbol scores are in the outbox.
+/*
+ * g3d/g3d_calcmaterial.cpp - nw4r g3d material-controller helpers: pointer wrappers over the global material table
+ *   fn_8005A9BC returns (their inlined `g3d_resmat_ac.h` constructors assert 32-byte alignment in fn_8006F158/
+ *   fn_8006F298 and 4-byte in fn_8006F374/fn_8006F41C/fn_8006F4BC), and fn_8006EE78, which walks the material
+ *   list and drives the per-material matrix updates.
+ * RANGE. .text 0x8006EE78-0x8006F738 (33 functions); extab, extabindex, .data 0x8058D7E0-0x8058D938 (opens on
+ *   "g3d_calcmaterial.cpp", fn_8006EE78's assert).  The right seam is proven: fn_8006F738 cites "g3d_calcview.cpp".
+ * NAMES. Map stems.
+ * RESIDUALS. The large vector/matrix bodies fn_8006EE78, fn_8006F5A0 and fn_8006F660 are stubs; fn_8006F200 and
+ *   fn_8006F528 are partial.
+ *   flipcheck: `.text` 0x4D4 of 0x8C0; `.data` is claimed and not emitted.
  */
 #include "types.h"
 
@@ -37,10 +26,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 }  // namespace nw4r
 
 extern "C" {
-/* The helpers this unit calls.  Every one is still a bare `fn_XXXXXXXX` in the map (C linkage) and
- * its address has no registered owner, so - as g3d_basic.cpp does for the same band - they are
- * declared here rather than in a header nobody owns yet (docs/plan.md 6.5 rule 2's named gap for an
- * unsplit address). */
+/* The helpers this unit calls (C linkage, plain map stems). */
 /* Allocator/registry pair behind fn_8006F0DC / fn_8006F220. */
 u32 fn_800941DC(void* p, u32 flag);
 u32 fn_8009429C(void* p, u32 flag);
@@ -86,8 +72,8 @@ void fn_8006F5A0(f32* pDst, const f32* pMtx, const f32* pVec);
 void fn_8006F660(f32* pDst, const f32* pMtx, const f32* pVec);
 }
 
-/* The pooled file-name/assert strings this unit reads (declared, never defined - they live in the
- * original `.data`, which this unit does not claim). */
+/* The pooled file-name/assert strings this unit reads, declared, not defined: the claimed `.data` is not
+ * emitted yet. */
 extern const char lbl_8058D7E0[]; /* "g3d_calcmaterial.cpp"                            .data */
 extern const char lbl_8058D7F8[]; /* "NW4R:Failed assertion mdl.IsValid()"            .data */
 extern const char lbl_8058D81C[]; /* "NW4R:Failed assertion !((u32)p & 0x1f)"         .data */
@@ -106,12 +92,12 @@ extern const char lbl_8058D928[]; /* "g3d_resmat_ac.h"                          
 
 extern "C" {
 
-/* fn_8006F118: copy a 4-byte resource handle. */
+/* Copies a 4-byte resource handle. */
 void fn_8006F118(void* pDst, const void* pSrc) {
     *(u32*)pDst = *(u32*)pSrc;
 }
 
-/* fn_8006F1BC / fn_8006F2FC / fn_8006F334 / fn_8006F3D8 / fn_8006F480 / fn_8006F520: store a handle. */
+/* The handle stores and copies. */
 void fn_8006F1BC(u32* pDst, u32 value) {
     *pDst = value;
 }
@@ -148,7 +134,7 @@ void fn_8006F3E4(void* p) {
     (void)p;
 }
 
-/* fn_8006F200: base handle + offset, with offset 0 meaning the null resource. */
+/* Base handle + offset, with offset 0 meaning the null resource. */
 void* fn_8006F200(void* pHandle, u32 offset) {
     u32 base = *(u32*)pHandle;
     if (offset == 0) {
@@ -157,7 +143,7 @@ void* fn_8006F200(void* pHandle, u32 offset) {
     return (void*)(base + offset);
 }
 
-/* fn_8006F0DC / fn_8006F220: tail calls into the pool allocator/registry with a null flag. */
+/* Tail calls into the pool allocator/registry with a null flag. */
 u32 fn_8006F0DC(void* p) {
     return fn_800941DC(p, 0);
 }
@@ -165,7 +151,7 @@ u32 fn_8006F220(void* p) {
     return fn_8009429C(p, 0);
 }
 
-/* fn_8006F0E8 / fn_8006F228 / fn_8006F304: copy-construct and return the destination. */
+/* Copy-construct and return the destination. */
 void* fn_8006F0E8(void* pDst, const void* pSrc) {
     fn_8006F118(pDst, pSrc);
     return pDst;
@@ -218,8 +204,6 @@ u32* fn_8006F4BC(u32* pDst, u32 ptr) {
     return pDst;
 }
 
-/* fn_8006F1C4: the material table base plus the per-frame offset at +0x3C of the global from
- * fn_8005A9BC. */
 /* The global material table `fn_8005A9BC` returns; only its per-frame offset at +0x3C is read here,
  * so the size is the minimum that covers it. */
 typedef struct {
@@ -227,6 +211,7 @@ typedef struct {
     /* +0x3C */ u32 offset_0x3C;
 } G3dMaterialTable; /* size: 0x40 */
 
+/* Returns the material table base plus the per-frame offset at +0x3C of the global fn_8005A9BC returns. */
 void* fn_8006F1C4(void* self) {
     G3dMaterialTable* pGlobal = (G3dMaterialTable*)fn_8005A9BC(self);
     return fn_8006F200(self, pGlobal->offset_0x3C);
@@ -259,7 +244,7 @@ u32 fn_8006F488(void* self) {
     return *fn_8006F4BC(&handle, (u32)(pGlobal + 64));
 }
 
-/* fn_8006F528: construct the 8+8 entry handle arrays at +0x4 and +0x24 of the record. */
+/* Constructs the 8+8 entry handle arrays at +0x4 and +0x24 of the record. */
 u32* fn_8006F528(u32* self) {
     u32* p = self + 1;
     u32* mid = self + 9;
@@ -272,7 +257,7 @@ u32* fn_8006F528(u32* self) {
     return self;
 }
 
-/* fn_8006EE78: walk the model's material list and drive the per-material matrix update.  Stub. */
+/* Walks the model's material list and drives the per-material matrix update (a stub). */
 void* fn_8006EE78(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray) {
     (void)pMdl;
     (void)pMatArray;
@@ -281,7 +266,7 @@ void* fn_8006EE78(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray)
     return pMdl;
 }
 
-/* fn_8006F5A0 / fn_8006F660: paired-single matrix/vector builders (a compiler-cloned pair).  Stubs. */
+/* The paired-single matrix/vector builders, a compiler-cloned pair (stubs). */
 void fn_8006F5A0(f32* pDst, const f32* pMtx, const f32* pVec) {
     (void)pDst;
     (void)pMtx;

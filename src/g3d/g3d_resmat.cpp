@@ -1,35 +1,19 @@
 /*
- * nw4r g3d: g3d_resmat.cpp - the `ResMat`/`ResTexSrt` resource TU, `.text`
- * 0x800947A4-0x80098D5C (140 functions, 0x45B8 B).
- *
- * Registered once, at its final home (docs/plan.md 12), from the pooled proposal
- * `g3d/g3d_resmat.cpp`.  Naming - evidence class 1, a `__FILE__` string:
- * the first body's `nw4r::db::Panic` assert passes `.data` 0x80590D78 = "g3d_resmat.cpp"
- * (`python tools/symbols/dumpmap.py lookup 0x80590D78`), and the next function outside this
- * range - 0x80098D5C - starts `g3d_resnode.cpp` (tudiscover seam, class `source`).  So the
- * range is exactly the `g3d_resmat.cpp` TU and both edges are proven seams.  The module is
- * `g3d` (the registered `g3d_res*` neighbours) and the extension `.cpp` is the `__FILE__`
- * suffix.  `tools/units/langcheck.py` agrees: C++, conclusive.
- *
- * The map owns two mangled symbols in this range - `ResTexSrt::SetEffectMtx` and its const
- * `GetEffectMtx` twin (`Q34nw4r3g3d9ResTexSrt`) - and 138 bare `fn_XXXXXXXX` stems.  The
- * mangled pair is written through its owner class (`g3d/g3d_resmat.h`, rule 9);
- * the rest keep the map's stems (Naming note below).
- *
- * Sections: `.text` 0x800947A4-0x80098D5C, `extab` 0x800094E0-0x80009850 (110 8-byte
- * unwind-only records) and `extabindex` 0x8002232C-0x80022854 (110 12-byte records).  The
- * extab extent is the contiguous run that starts at the previous TU's end (0x80009108) and
- * ends exactly where `gx/fn_8009AA78.c`'s extab begins (0x800099F0); our 110 records sit in
- * its middle, in `.text` order.  No `.ctors`/`.dtors` word points into the range.
- *
- * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` on the range's addresses: only the two
- * `ResTexSrt` manglings resolve to a real name, every other entry is an `fn_` placeholder),
- * so there is no real name to recover and stylelint's rule 7 refuses the landing without
- * this line.
- *
- * Residuals are recorded per function as the reconstruction proceeds (see the unit notes);
- * the measured percentages are in the outbox.
+ * g3d/g3d_resmat.cpp - nw4r g3d `ResMat`/`ResTexSrt` material resources.
+ * RANGE. .text 0x800947A4-0x80098D5C (140 functions); extab, extabindex, .data 0x80590D78-0x80591280 (opens on
+ *   "g3d_resmat.cpp", the first body's assert), .sdata2 0x80795F10-0x80795F48.  The right edge is
+ *   `g3d/g3d_resnode.cpp`'s first body (tudiscover's `source` seam).
+ * NAMES. Map stems, except `ResTexSrt::SetEffectMtx` and its const `GetEffectMtx` twin, written through their class
+ *   (`g3d/g3d_resmat.h`).
+ * RESIDUALS. 88 functions unwritten (objdiff scores them zero) in 18 runs: 0x80094B9C-0x80094CB8,
+ *   0x800950B0-0x8009521C, 0x80095228-0x80095344, 0x80095698-0x80095718, 0x80095744-0x800957A8,
+ *   0x80095BC4-0x80095C44, 0x80095C78-0x80095CDC, 0x80095CE8-0x80095D4C, 0x80095D54-0x8009639C,
+ *   0x800963C0-0x80097158, 0x800971AC-0x80097450, 0x80097474-0x80097898, 0x800978C0-0x80097924,
+ *   0x8009792C-0x80098374, 0x8009837C-0x800984F8, 0x80098500-0x80098614, 0x8009861C-0x80098CC0,
+ *   0x80098CF0-0x80098D5C.
+ *   Partial (15): fn_800947A4, fn_80094870, 0x8009493C-0x80094B9C (three), fn_80094CB8, fn_80094D84,
+ *   0x80094E50-0x800950B0 (three), fn_80095438, fn_800955A8, fn_80095838, 0x800959B8-0x80095BC4 (two).
+ *   flipcheck: `.text` 0x100C of 0x45B8; `.data` and `.sdata2` are claimed and not emitted.
  */
 
 #include "types.h"
@@ -40,7 +24,7 @@
 #include "g3d/fn_800680CC.h"               /* fn_8006E2AC, owner g3d/fn_800680CC.cpp (rule 2) */
 #include "g3d/g3d_state.h"                 /* fn_80087870, owner g3d/g3d_state.cpp (rule 2) */
 #include "fn_8004CAD8.h"                   /* mtx34_identity, owner fn_8004CAD8.cpp (rule 2) */
-#include "unsplit/g3d.h"                   /* fn_8007100C, no registered owner (rule 2) */
+#include "unsplit/g3d.h"                   /* fn_8007100C, owner g3d/g3d_calcview.cpp */
 
 /* nw4r::db::Panic - the assert failure handler (variadic).  Called through its namespace
  * owner, never its mangled spelling (rule 9). */
@@ -52,7 +36,7 @@ void Panic(const char* pFile, int line, const char* pMsg, ...);
 } /* namespace db */
 } /* namespace nw4r */
 
-/* The `.data` strings the retail asserts pass by address (unsplit `.data`). */
+/* The `.data` strings the retail asserts pass by address (this unit's `.data`, claimed, not emitted). */
 extern u8 lbl_80590D78[]; /* "g3d_resmat.cpp"                                                      */
 extern u8 lbl_80590D88[]; /* "NW4R:Failed assertion IsValid()"                                    */
 extern u8 lbl_80590DA8[]; /* "NW4R:Failed assertion id >= GX_TEXMAP0 && id <= GX_TEXMAP7"         */
