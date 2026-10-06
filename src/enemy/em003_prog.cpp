@@ -1,67 +1,31 @@
-/* enemy/em003_prog.cpp - enemy 003 program
- *
- * `.text` 0x80154E40..0x8015D860, 68 functions written (the rest of the range is not decompiled yet).
- * Renamed from `fn_801550FC`: the unit's `.data` holds `em003_prog_tbl` (0x805A44A8) and its `.text` starts at 0x80154E40.
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `enemy/fn_801550FC.cpp` (kept for its notes and residuals): */
-/* enemy/fn_801550FC.cpp - the em003 enemy's action/state unit, 0x80154E40..0x8015D860 (108 functions).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `dumpmap.py
- * lookup`: every function of the range reports `zz_<addr>_` in the shared runtime dump and no
- * `__FILE__`/class string names it, and `config/RMHE08/symbols.txt` carries only the bare
- * `fn_XXXXXXXX` entries for the range - the three exceptions are the C++ mangled definitions listed
- * below, which are declared and defined through their real signatures).
- *
- * What it is.  The per-action work functions of one `enemy`-module actor, the `em003` enemy: three of
- * the range's own definitions are C++ manglings (`em003_call_act_type_ck__FP11_ENEMY_WORK`,
- * `em003_atama_koware_act_ck__FP11_ENEMY_WORK`, `em003_yobi_boss_em_ck__FUc`), and the range drives
- * the shared enemy work record (`_ENEMY_WORK`) through the enemy-band helpers
- * (`em_frame_check`, `em_act_ck`, `get_joint_wpos_em`, `get_em_chg_scale`, ...).  The bodies are
- * per-action state steps: frame/timer gates on the work record, distance and angle tests against the
- * player, `em_act_ck`/`em_frame_check` gates, motion requests and effect/part requests.
- *
- * The range's left edge is settled from evidence (2026-09-30 recut): `fn_80154D44` is the static-initializer
- * of the unit below (its `.ctors` word points at it), the 0.0 pool entry is duplicated at
- * `lbl_807970C0` from `fn_80154E90` on (one TU pools a value once), and the em003 data chunk
- * (`lbl_805A4518` .. the `jumptable_805A4848` of `fn_80154FAC` and the `lbl_805A5D18` vtable `fn_80154F70`
- * installs) is read from 0x80154E90 upwards - so the unit starts at 0x80154E40, the four functions
- * 0x80154E40..0x801550FC came from `enemy/fn_801502C8.cpp`.  The upper end is bounded by the em008 chunk
- * taking over (the next queue entry starts 0x8015E854).
- *
- * Language: C++ (the range defines three C++-mangled symbols; `langcheck.py` agrees).  The flat
- * `fn_*` symbols are `extern "C"` so objdiff pairs them by name, and the mangled callees are declared
- * and called through their real signatures (rule 9).
- *
- * Object: `_ENEMY_WORK`, included from `enemy.h` (the union of every consumer's copy).  Name
- * evidence: the mangled callee `em_frame_check__FP11_ENEMY_WORKUsff` carries the type name.  The
- * fields this unit walks were added to that header with their offsets (+0x331, the +0x332 union, the
- * +0x334..+0x336 bytes, +0x338, +0x33C, +0xA0D); the +0x332 union keeps the signed-short reading
- * `enemy/fn_80176C58.cpp` uses, because `fn_8015D194` clears the byte at +0x333 on its own.
- *
- * Flags: this unit needs no deviation - the `enemy` lib's `cflags_main` (see the block's comment in
- * `configure.py`) measured every body below.  No `#pragma` is used.
- *
- * State of the reconstruction.  The 62 functions the bodies below cover are the range's state steps and
- * their dispatchers, in address order; the large per-action functions (`fn_801550FC`,
- * `fn_80155BA8`, `fn_8015B0CC` and the rest of the range's biggest bodies) are NOT written yet - they
- * are recorded as the residual, with the two functions that the m2c draft could not round-trip
- * (`fn_8015C890`, `fn_8015D140`) and the four the compiler rejected outright.
- *
- * Residuals, per shape (the measurement lives in the outbox, not here; playbook rows in
- * `docs/matching.md`):
- *   * `fn_80156920`/`fn_80156B28` are the two-step motion start-up of the range: retail places the
- *     `(a1 & 0xFF) == 1` and `== 2` bodies out of line and the `else` inline, this source emits the
- *     inverted nesting MWCC orders inline-first.  A plain `switch` measures worse, not better; the
- *     difference is instruction order inside the same 240-byte body.
- *   * the biggest bodies (`fn_801550FC` and up) need the per-action record fields this unit reaches
- *     through the helpers (motion ids, effect/part requests) and are the next pass's work.
- *   * `fn_80154E90` (90.98 %, recut 2026-09-30): retail keeps `clrlwi r0,r31,24`+`cmpwi` for the `arg1 != 0` test
- *     (this unit's peephole folds it) and loads the two `em_motion_param_set` float arguments one call later; the
- *     instruction multiset is otherwise the same.  `fn_80154F70` (99.33 %) picks `r3` where retail picks `r0`
- *     for the table address.
- *   * nothing here is a paired-single (`psq_l`/`psq_st`) residual: the range has no such instruction
- *     (checked with the disassembly), so the stopping rule of `docs/matching.md` does not apply.
+/*
+ * enemy/em003_prog.cpp - enemy 003's program: the per-action `_ENEMY_WORK` state steps (frame and timer gates,
+ *   distance and angle tests against the player, motion, effect and part requests) and their dispatchers.
+ * RANGE. .text 0x80154E40-0x8015D860 (108 functions); extab 0x8000DCFC-0x8000DFA4, extabindex
+ *   0x80028A64-0x80028E60, .ctors 0x8056F324-0x8056F328, .rodata 0x8056FA38-0x8056FB50, .data 0x805A44A8-0x805A5D48
+ *   (`em003_prog_tbl` first), .bss 0x806A7820-0x806A7868, .sdata 0x80791A38-0x80791A58, .sdata2
+ *   0x807970C0-0x80797330.  The left edge follows `enemy/em001_prog.cpp`'s static initializer `fn_80154D44`; the
+ *   0.0 pool entry recurs at `lbl_807970C0` from `fn_80154E90` on, and the em003 data (`lbl_805A4518` to the
+ *   `lbl_805A5D18` table `fn_80154F70` installs) is read from 0x80154E90 up.
+ * FLAGS. `cflags_main`, no `#pragma`.
+ * NAMES. `em003_call_act_type_ck`, `em003_atama_koware_act_ck`, `em003_yobi_boss_em_ck` and `em003_prog_tbl` are
+ *   the runtime dump's names; the map has only `fn_` stems for the other rows.
+ *   The `.bss` record names (`vec_pair_801550FC_*`) are GUESSes.
+ * RESIDUALS. 40 rows unwritten: 0x801550FC-0x80155664, 0x80155BA8-0x80155DD8, 0x801560B8-0x801564DC,
+ *   0x80156C18-0x80156E9C, 0x80157764-0x80157ABC, 0x80157B40-0x80157EC4, 0x801580E8-0x801581F0,
+ *   0x80158820-0x80158928, 0x80158A50-0x80158B4C, 0x80158C48-0x801592CC, 0x80159540-0x80159984,
+ *   0x80159AB8-0x80159DD8, 0x80159E54-0x8015A1BC, 0x8015A344-0x8015A604, 0x8015A6C4-0x8015AB08,
+ *   0x8015AC20-0x8015D194, 0x8015D208-0x8015D860.
+ *   25 partial rows, including:
+ *  - `fn_80156920`, `fn_80156B28`: retail lays the `(a1 & 0xFF) == 1` and `== 2` bodies out of line and the `else`
+ *    inline, ours nests them the other way (a plain `switch` scores lower);
+ *  - `fn_80154E90`: retail keeps `clrlwi r0,r31,24` + `cmpwi` for `arg1 != 0` (the peephole folds it here) and
+ *    loads the two `em_motion_param_set` float arguments one call later;
+ *  - `fn_80154F70`: retail picks r0 for the table address where ours picks r3.
+ *   The other 21 partial rows have no recorded cause.
+ *   flipcheck: `.ctors`/`.rodata`/`.sdata` claimed, not emitted; `.data` 0x264 against 0x18A0, `.sdata2` 0x10
+ *   against 0x270; `.text` (0x2DE4 of 0x8A20), extab (0x190 of 0x2A8) and extabindex (0x258 of 0x3FC) short of the
+ *   claim and differing.
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
@@ -386,7 +350,7 @@ extern "C" void fn_801556E8(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -407,7 +371,7 @@ extern "C" void fn_80155770(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -425,7 +389,7 @@ extern "C" void fn_801557EC(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -443,7 +407,7 @@ extern "C" void fn_80155868(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -462,7 +426,7 @@ extern "C" void fn_801558E8(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -480,7 +444,7 @@ extern "C" void fn_80155964(_ENEMY_WORK* self) {
     u8 temp_r0;
 
     temp_r0 = self->state_sub;
-    switch ((s32) temp_r0) {                        /* irregular */
+    switch ((s32) temp_r0) {
     case 0:
         fn_801556E8(self);
         return;
@@ -506,7 +470,7 @@ extern "C" void fn_801559B8(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -524,7 +488,7 @@ extern "C" void fn_80155A34(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -542,7 +506,7 @@ extern "C" void fn_80155AB0(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -560,7 +524,7 @@ extern "C" void fn_80155B2C(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -578,7 +542,7 @@ extern "C" void fn_80155DD8(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -597,7 +561,7 @@ extern "C" void fn_80155E58(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -636,7 +600,7 @@ extern "C" void fn_80155F74(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         self->phase_0x06 = 0;
@@ -668,23 +632,23 @@ extern "C" void fn_801564DC(_ENEMY_WORK* self, u8 a1) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r4) {
+    case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
-        switch ((s32) a1) {                       /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) a1) {
+        case 0:
             em_mot_set(self, 0xE6, 4, 0);
             return;
-        case 1:                                     /* switch 2 */
+        case 1:
             em_mot_set(self, 0xE7, 6, 0);
             return;
-        case 2:                                     /* switch 2 */
+        case 2:
             em_mot_set(self, 0xE8, 6, 0);
             return;
         }
         break;
-    case 1:                                         /* switch 1 */
+    case 1:
         if (em_mot_end_ck(self) == 1U) {
             em_action_finish(self);
         }
@@ -697,7 +661,7 @@ extern "C" void fn_801565B4(_ENEMY_WORK* self) {
 
     em_busy_set(self);
     temp_r3 = self->state_0x05;
-    switch ((s32) temp_r3) {                        /* irregular */
+    switch ((s32) temp_r3) {
     case 0:
         self->state_0x05 = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 0);
@@ -719,7 +683,7 @@ extern "C" void fn_8015668C(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -737,7 +701,7 @@ extern "C" void fn_80156708(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -755,7 +719,7 @@ extern "C" void fn_80156784(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -897,7 +861,7 @@ extern "C" void fn_80156920(_ENEMY_WORK* self, s32 a1) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -927,7 +891,7 @@ extern "C" void fn_80156A10(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -945,7 +909,7 @@ extern "C" void fn_80156A9C(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -963,7 +927,7 @@ extern "C" void fn_80156B28(_ENEMY_WORK* self, s32 a1) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -998,7 +962,7 @@ extern "C" void fn_80156EA4(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -1027,7 +991,7 @@ extern "C" void fn_80156FEC(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -1116,7 +1080,7 @@ extern "C" void fn_801571F0(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -1155,7 +1119,7 @@ extern "C" void fn_80157330(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -1186,7 +1150,7 @@ extern "C" void fn_80157424(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -1231,7 +1195,7 @@ extern "C" void fn_8015757C(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -1261,7 +1225,7 @@ extern "C" void fn_80157650(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -1290,7 +1254,7 @@ extern "C" void fn_80157ABC(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -1309,7 +1273,7 @@ extern "C" void fn_80157EC4(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -1329,7 +1293,7 @@ extern "C" void fn_80157F44(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -1353,18 +1317,18 @@ extern "C" void fn_80157FD0(_ENEMY_WORK* self) {
 
     em_busy_set(self);
     temp_r3 = self->state_0x05;
-    switch ((s32) temp_r3) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r3) {
+    case 0:
         self->state_0x05 = (u8) (temp_r3 + 1);
         self->phase_0x06 = 0U;
         em_fall_height_get(self);
         em_fall_start(self);
         em_mot_set(self, 0x3D, 6, 0);
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         temp_r0 = self->phase_0x06;
-        switch ((s32) temp_r0) {                    /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) temp_r0) {
+        case 0:
             if (em_frame_check(self, 1, lbl_8079718C, lbl_807970C0) == 1U) {
                 self->phase_0x06 = (u8) (self->phase_0x06 + 1);
                 em_move_vec2_clr(self);
@@ -1372,7 +1336,7 @@ extern "C" void fn_80157FD0(_ENEMY_WORK* self) {
                 self->v_0x320.y = (f32) lbl_80797184;
             }
             break;
-        case 1:                                     /* switch 2 */
+        case 1:
             em_fall_height_get(self);
             em_move_offset_step_update(self, &self->pos_0x1BC);
             if (self->v_0x310.z > lbl_80797198) {
@@ -1446,7 +1410,7 @@ extern "C" void fn_80158264(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, NULL);
@@ -1472,7 +1436,7 @@ extern "C" void fn_80158324(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -1498,7 +1462,7 @@ extern "C" void fn_801583E4(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -1532,7 +1496,7 @@ extern "C" void fn_80158500(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -1562,7 +1526,7 @@ extern "C" void fn_801585DC(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -1580,7 +1544,7 @@ extern "C" void fn_80158668(_ENEMY_WORK* self, u8 a1) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -1611,7 +1575,7 @@ extern "C" void fn_80158764(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -1635,7 +1599,7 @@ extern "C" void fn_80158928(_ENEMY_WORK* self, u8 a1) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -1725,7 +1689,7 @@ extern "C" void fn_80158BBC(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -1745,33 +1709,33 @@ extern "C" void fn_801592CC(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* switch 1; irregular */
-    case 0:                                         /* switch 1 */
+    switch ((s32) temp_r4) {
+    case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         self->phase_0x06 = 0U;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xDE, 4, 0);
         em_hit_window_set_default(self, 0, 6);
         return;
-    case 1:                                         /* switch 1 */
+    case 1:
         if (em_frame_check(self, 1, lbl_807971F0, lbl_807970C0) == 0) {
             em_turn_to_target(self, 0x60);
         }
         temp_r3 = self->phase_0x06;
-        switch ((s32) temp_r3) {                    /* switch 2; irregular */
-        case 0:                                     /* switch 2 */
+        switch ((s32) temp_r3) {
+        case 0:
             if ((s32) self->field_0xA0D == 0) {
                 self->phase_0x06 = (u8) (temp_r3 + 1);
                 em_hit_window_set_default(self, 0, 7);
             }
             break;
-        case 1:                                     /* switch 2 */
+        case 1:
             if ((s32) self->field_0xA0D == 0) {
                 self->phase_0x06 = (u8) (temp_r3 + 1);
                 em_hit_window_set_default(self, 0, 8);
             }
             break;
-        case 2:                                     /* switch 2 */
+        case 2:
             if ((s32) self->field_0xA0D == 0) {
                 self->phase_0x06 = (u8) (temp_r3 + 1);
                 em_hit_window_set_default(self, 0, 9);
@@ -1790,7 +1754,7 @@ extern "C" void fn_8015941C(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -1826,7 +1790,7 @@ extern "C" void fn_80159984(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
@@ -1860,7 +1824,7 @@ extern "C" void fn_80159DD8(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
@@ -1990,7 +1954,7 @@ extern "C" void fn_8015A604(_ENEMY_WORK* self) {
     u8 temp_r0;
 
     temp_r0 = self->state_sub;
-    switch ((s32) temp_r0) {                        /* irregular */
+    switch ((s32) temp_r0) {
     case 0:
         em_se_tbl_play_alt(self, &lbl_805A55D8, 0, 0);
         return;
@@ -2026,7 +1990,7 @@ extern "C" void fn_8015AB08(_ENEMY_WORK* self) {
     u8 temp_r4;
 
     temp_r4 = self->state_0x05;
-    switch ((s32) temp_r4) {                        /* irregular */
+    switch ((s32) temp_r4) {
     case 0:
         self->state_0x05 = (u8) (temp_r4 + 1);
         em_fall_height_get(self);
@@ -2048,7 +2012,7 @@ extern "C" void fn_8015ABAC(_ENEMY_WORK* self) {
     u8 temp_r0;
 
     temp_r0 = self->state_sub;
-    switch ((s32) temp_r0) {                        /* irregular */
+    switch ((s32) temp_r0) {
     case 0:
         fn_8015A6C4(self);
         return;
@@ -2124,9 +2088,8 @@ extern "C" void fn_8015D200(_ENEMY_WORK* self) {
     fn_8013A654(self, 3);
 }
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7820..0x806A7868`), in address order: the three two-vector
- * records its static constructor `fn_8015D764` builds (`.data` tables point at them).  Names are GUESSes:
- * each record is a (0, y0, 0) / (0, y1, 0) pair of model-space points. */
+/* The unit's `.bss`: the three two-vector records `fn_8015D764` seeds.  Names are GUESSes (each record is a
+ * (0, y0, 0) / (0, y1, 0) pair of model-space points). */
 VEC3 vec_pair_801550FC_0[2];  /* +0x806A7820 */
 VEC3 vec_pair_801550FC_1[2];  /* +0x806A7838 */
 VEC3 vec_pair_801550FC_2[2];  /* +0x806A7850 */

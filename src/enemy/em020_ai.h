@@ -1,11 +1,6 @@
 /*
- * enemy/em020_ai.h - the declarations `enemy/em020_ai.cpp` owns for the symbols of its `.text` range
- * that its consumers still reach through a declaration (docs/plan.md 6.5 rule 2: an `extern` lives
- * with the TU that owns the symbol).
- *
- * `getInstance_` (0x803768F0), `fn_803768F8` (0x803768F8) and `fn_80377664` (0x80377664) all sit
- * inside the unit's claimed range, so the consumers that used to read them out of
- * `unsplit/Network.h` / `unsplit/lobby.h` include this header instead.
+ * enemy/em020_ai.h - declarations `enemy/em020_prog.cpp` owns that other units call: `getInstance_`,
+ * `fn_803768F8`, `fn_80377664`, `em020_aim_target_ck` and `em020_hit_info_get`.
  */
 #ifndef MHTRI_ENEMY_EM020_AI_H
 #define MHTRI_ENEMY_EM020_AI_H
@@ -30,9 +25,7 @@ u32 fn_803768F8(void);
 s32 fn_80377664(void* unused);
 /* 0x803754F4 - the "aim target found" predicate (`+0x836` bit 15). */
 u32 em020_aim_target_ck(struct _ENEMY_WORK* self);
-/* The out record `em020_hit_info_get` fills for its caller: the hit flag, the per-part damage-level
- * bits, the facing angle and the damage numerator (the first 8 bytes of a `Q_QuestStat`).
- * size: 0x08 */
+/* The out record `em020_hit_info_get` fills (the first 8 bytes of a `Q_QuestStat`).  size: 0x08 */
 struct Em020HitInfo {
     /* +0x0 */ u8 hit_0x00;
     /* +0x1 */ u8 levels_0x01;

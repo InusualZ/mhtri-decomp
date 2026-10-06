@@ -1,88 +1,34 @@
-/* enemy/em025_prog.cpp - enemy 025 program
- *
- * `.text` 0x8019E670..0x801AA154, 57 functions written (the rest of the range is not decompiled yet).
- * Renamed from `fn_8019ED34`: the unit's `.data` holds `em025_prog_tbl` (0x805AE750) and its `.text` starts at 0x8019E670.
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `enemy/fn_8019ED34.cpp` (kept for its notes and residuals): */
-/* enemy/fn_8019ED34.cpp - the enemy motion/action band between `enemy/fn_801926EC.cpp` and
- * `enemy/fn_801A9540.cpp`.
- * .text 0x8019E670..0x801AA154 (0xBAE4); extab 0x8000F124..0x8000F374; extabindex 0x8002A8A0..0x8002AC18;
- * `.rodata` 0x80570150..0x805701A0; `.data` 0x805AE7C0..0x805B06D0.
- *
- * Recut 2026-09-30.  This unit is one translation unit assembled from four registered ranges:
- *   * 0x8019E670..0x8019ED34 came from the former `enemy/fn_801993E0.cpp`;
- *   * 0x8019ED34..0x801A4504 is the original range of this file;
- *   * 0x801A4504..0x801A9540 is the former `enemy/fn_801A4504.cpp` (folded in);
- *   * 0x801A9540..0x801AA154 is the head of `enemy/fn_801A9540.cpp` (seven functions, `fn_801A9540` ..
- *     `fn_801AA0F8`).
- * Evidence.  Left edge 0x8019E670: `fn_8019E604`, the preceding TU's `__sinit`, ends there and the 0.0 pool
- * entry is repeated at `lbl_80798538` from here on.  The three old units shared one `.sdata2` pool (the
- * pool entries 0x80798518..0x807988E4 are read by all of them, interleaved: a pool is one TU's), and
- * `fn_801A4504` calls `fn_801A9748`/`fn_801A98F8`.  The data tile: `lbl_805B0188` (read by `fn_801A9748`)
- * sits between this unit's own tables, `lbl_805B06A0` (read by `fn_8019EF04`) after `fn_801A4504`'s
- * `jumptable_805B04D0`.  Right edge 0x801AA154 (GUESS within the window 0x801AA0F8..0x801AA154 the pool
- * dedupe gives: the 0.0 entry is repeated at `lbl_8079893C`, first read by `fn_801AA154`): `fn_801AA0F8` is
- * the same deleting destructor as `fn_8019E5A8` (which closes its TU just before the `__sinit`), so it is
- * taken as this TU's last function.
- *
- * Header-signature decisions the merge forced (every function re-measured, none lower): `stage_map_kind_get`
- * is the owner's `u8` form (`stage/stg_w.h`; the retail `clrlwi r0,r3,24` after the call now appears),
- * `quest_flag_200000_ck` (was `em_work_state_bit21_ck`) takes a `QuestRecord*` (`enemy/em_pop.h`) and every
- * retail call site, `fn_801A9384`'s included, passes `li r3,0`, and `em_roster_record_release` is `em_pop.h`'s `u32`.
- *
- * Registration (proposal/8019ED34_fn_8019ED34.cpp).  The range is registered once, here, at its
- * final home.  Which class decided the name and module:
- *   * class 1 (a `__FILE__` string) fails.  No object in the range has an undefined reference to a
- *     `__FILE__` literal: its undefined set is the `.sdata2` float pool, the `.data` jumptables and
- *     `.bss` globals only.  `python tools/symbols/dumpmap.py lookup 0x8019ED34` answers
- *     `FUN_8019ed34`/`zz_019ed34_`, which the brief states is not evidence (class 2 fails too).
- *   * class 3 decides the module: `enemy`.  The bracketing registered units are `enemy` (below:
- *     `enemy/fn_801926EC.cpp` ends at 0x8019E670; above: `enemy/fn_801A9540.cpp` starts at
- *     0x801AA154), and every callee out of the range is an enemy-band function
- *     (`em_frame_check__FP11_ENEMY_WORKUsff`, `em_se_tbl_play`, `em_mot_end_ck`, `em_move_mode_set`,
- *     `em_get_mot_no__FP11_ENEMY_WORK`, `get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3`,
- *     `em_act_ck__FP11_ENEMY_WORKUcUc`) and every state machine switches on `_ENEMY_WORK::state`.
- *   * class 4 keeps the name: nothing supports a file name, so the map's own `fn_8019ED34` stem is
- *     the file name (the sibling units use the same scheme).
- * Seam: the left edge 0x8019E670 is proven by the preceding TU's `__sinit` (see above); the right edge
- * 0x801AA154 is a GUESS inside the pool-dedupe window 0x801AA0F8..0x801AA154 (the dtor heuristic above).
- *
- * C++ (`-lang=c++` through the lib's `cflags_main`) because the range reaches mangled callees -
- * `em_frame_check__FP11_ENEMY_WORKUsff`, `setVector3__FPQ34nw4r4math4VEC3fff` - through their real
- * signatures (rule 9).  Every plain `fn_XXXXXXXX` definition here is `extern "C"` so its map name is
- * emitted.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup` - every address answers the `zz_XXXXXXXX_`/`FUN_XXXXXXXX`
- * placeholder, and no `__FILE__` string is referenced anywhere in the range).
- *
- * Status.  Per-function scores are in the objdiff report (`python tools/units/unitscore.py enemy/fn_8019ED34`);
- * the unwritten functions are the rows the report lists at 0 %, and the residual shapes are below.
- *
- * Residuals, by measurement (all the near-misses are codegen shapes, not comprehension):
- *   * TIMER DECREMENT (`fn_8019F56C` 95.29, `fn_801A1454` 96.19, `fn_801A16D4` 94.30,
- *     `fn_801A1384` 94.90) - the target stores the decremented `timer_0x020` and then tests it with
- *     a separate `cmpwi`; MWCC folds `--x; if (x <= 0)` into the record-form `addic.` and drops the
- *     `cmpwi` (4 bytes shorter).  Three spellings were measured (`--x`, a named local, and
- *     `x = x - 1` separately); all emit `addic.`, and the exact `addi`+`cmpwi` shape needs a
- *     source-level idiom MWCC did not accept here.  Recorded rather than restructured.
- *   * REGISTER CHOICE (`fn_8019F07C` 99.09) - the `lbl_805AF9CC`/`lbl_805AFC08` stores materialise
- *     the address into r4 and store r4; the target uses r0 (`addi r0,r4,off; stw r0,...`).  One
- *     instruction over the whole function; the pool/register allocation is otherwise identical.
- *   * SINGLE WORD (`fn_801A05E0` 95.12, `fn_801A4218` 97.82, `fn_801A3DEC` 100, `fn_8019F768`/
- *     `fn_8019F9BC` 98.66, `fn_8019FC10`/`fn_8019FE80` 98.72) - one register or a `cror` pair
- *     differs in the ten-window `em_frame_check` pass and the status-bit branch; the control flow
- *     and every call are the same.  Nothing to change without moving the landed owners' headers.
- *   * `fn_801A2E30` (the 22-case motion table) is deliberately NOT written yet: its call sites pass
- *     a fourth argument (r6) to `em_se_tbl_play`, whose owner header declares three; matching it needs
- *     a 4-argument spelling of an owned symbol (rule 2/9), which is a residual for the owner's
- *     header, not this unit's source.
- *
- * Sections claimed: `.text` 0x8019E670..0x801AA154, extab 0x8000F124..0x8000F374, extabindex
- * 0x8002A8A0..0x8002AC18, `.rodata` 0x80570150..0x805701A0, `.data` 0x805AE7C0..0x805B06D0.  No `.ctors` word belongs to the range: the one at 0x8056F340 is
- * `enemy/fn_801926EC.cpp`'s (its `__sinit` is `fn_8019E604`).
+/*
+ * enemy/em025_prog.cpp - enemy 025's program: the `_ENEMY_WORK` motion and action state machines, the frame-window
+ *   effect passes, the per-area and quest tests, and the closing deleting destructor `fn_801AA0F8`.
+ * RANGE. .text 0x8019E670-0x801AA154 (93 functions); extab 0x8000F124-0x8000F374, extabindex
+ *   0x8002A8A0-0x8002AC18, .rodata 0x80570150-0x805701A0, .data 0x805AE750-0x805B06D0 (`em025_prog_tbl` first),
+ *   .sdata 0x80791A80-0x80791A88, .sdata2 0x80798518-0x80798910.  Left edge: `fn_8019E604`,
+ *   `enemy/em018_prog.cpp`'s static initializer, ends there and the 0.0 pool entry repeats at `lbl_80798538` from
+ *   here.  The right edge is a GUESS inside the pool window 0x801AA0F8-0x801AA154 (the 0.0 entry repeats at
+ *   `lbl_8079893C`, first read by `fn_801AA154`): `fn_801AA0F8` is a deleting destructor like `fn_8019E5A8`, which
+ *   closes its own TU.
+ * FLAGS. `cflags_main`, no `#pragma`.
+ * NAMES. The file name follows the runtime dump's `em025_prog_tbl`, which opens the TU's `.data`; the map has only
+ *   `fn_` stems for the functions.  `stage_map_kind_get` is the owner's `u8` form (`stage/stg_w.h`),
+ *   `quest_flag_200000_ck` takes a `QuestRecord*` (`enemy/em_pop.h`) and `em_roster_record_release` is
+ *   `em_pop.h`'s `u32`.
+ * RESIDUALS. 36 rows unwritten: 0x8019EC38-0x8019ECD4, 0x8019ED34-0x8019EF40, 0x8019EF44-0x8019F07C,
+ *   0x8019F378-0x8019F56C, 0x801A0210-0x801A05B4, 0x801A0684-0x801A0FEC, 0x801A10AC-0x801A12C8,
+ *   0x801A1894-0x801A2DAC, 0x801A2E30-0x801A30D4, 0x801A30E8-0x801A3DBC, 0x801A3E90-0x801A4218,
+ *   0x801A437C-0x801A4504, 0x801A9748-0x801A9C6C, 0x801A9CAC-0x801A9DF4, 0x801A9E60-0x801AA0F8.
+ *   22 partial rows, including:
+ *  - `fn_8019F56C`, `fn_801A1384`, `fn_801A1454`, `fn_801A16D4`: retail stores the decremented `timer_0x020` and
+ *    tests it with a separate `cmpwi`, MWCC folds every spelling tried into `addic.` (4 bytes shorter);
+ *  - `fn_8019F07C`: the `lbl_805AF9CC`/`lbl_805AFC08` stores materialise the address in r4 where retail uses r0;
+ *  - `fn_801A4218`: one register or `cror` pair in the `em_frame_check` window pass;
+ *  - `fn_801A9384`: retail keeps the bool conversions (`neg; or; srwi`, the `>= 1` borrow sequence, the
+ *    trailing `clrlwi`s) and tests the float with `fcmpo` + `cror`; ours folds them and uses `fcmpu`.
+ *   The other 15 partial rows have no recorded cause.  Relocations (`relocdiff --by-owner`): `fn_8019EA04` and
+ *   `fn_801A4504` save from r27 (`_savegpr_27`/`_restgpr_27`) where retail saves from r26, and `fn_801A16D4`
+ *   calls `fn_8013032C` once where retail does not.
+ *   flipcheck: `.rodata`/`.sdata`/`.sdata2` claimed, not emitted; `.data` 0x2AC against 0x1F80; `.text` (0x71F0
+ *   of 0xBAE4), extab (0x138 of 0x250) and extabindex (0x1D4 of 0x378) short of the claim and differing.
  */
 
 #include "types.h"
@@ -115,12 +61,7 @@
 #include "enemy/fn_80138074.h"
 
 extern "C" {
-/* ------------------------------------------------------------------------------------------------
- * The `.sdata2` float pool this range loads.  Its labels are unsplit (no registered unit claims a
- * `.sdata2` range) and `stylelint`'s rule-2 `module()` answers `None` for the section, so these stay
- * declared here as the counted "address band interleaves modules" gap - the same shape
- * `enemy/fn_801926EC.cpp` uses for its own pool run.  Never defined: the target addresses the pool.
- * ------------------------------------------------------------------------------------------------ */
+/* The unit's `.sdata2` pool, declared, not defined: the source does not emit it yet. */
 extern f32 lbl_80798518;
 extern f32 lbl_8079851C;
 extern f32 lbl_80798520;
@@ -161,10 +102,8 @@ extern f32 lbl_807985EC;
 extern f32 lbl_807985F0;
 extern f32 lbl_807987B4;
 
-/* ------------------------------------------------------------------------------------------------
- * `.data` tables with no registered owner (the same counted rule-2 gap).  `fn_8019F07C` stores two
- * of them into the record's dispatch words; the rest are the tail-call dispatcher's motion tables.
- * ------------------------------------------------------------------------------------------------ */
+/* The unit's `.data` tables, declared: `fn_8019F07C` stores two into the record's dispatch words, the rest
+ * are the dispatcher's motion tables. */
 extern u8 lbl_805AE7C0[];
 extern u8 lbl_805AF268[];
 extern u8 lbl_805AF9CC[];
@@ -172,18 +111,12 @@ extern u8 lbl_805AFC08[];
 extern u8 lbl_805B0478[];
 extern u8 lbl_80570150[];
 
-/* The status-bit helpers `enemy/fn_8011D448.cpp` defines (`bits_0x824`) - declared locally, the same
- * counted gap its other consumers (`enemy/fn_80137604.cpp`) use: the owner registered no header. */
+/* `enemy/fn_8011D448.cpp`'s status-bit helpers (`bits_0x824`), declared with these call sites' spelling. */
 void fn_8011E5EC(struct _ENEMY_WORK* self);
 void fn_8011E620(struct _ENEMY_WORK* self, u32 mask);
 void fn_8011E630(struct _ENEMY_WORK* self, u32 mask);
 
-/* ------------------------------------------------------------------------------------------------
- * Symbols with no registered owner whose address band names no module (the lint's counted
- * "address band interleaves modules" gap): the model/effect helpers this band calls.
- * ------------------------------------------------------------------------------------------------ */
-
-/* 0x802B08DC - r3 is the `_ENEMY_WORK` (set by the caller), f1 the alpha/blend scalar; no return. */
+/* `stage/stg_w.cpp`'s blend helper: r3 is the `_ENEMY_WORK` (set by the caller), f1 the scalar. */
 void fn_802B08DC(f32 a);
 
 void fn_8019F2C0(struct _ENEMY_WORK* self);
@@ -236,13 +169,9 @@ void fn_801A3C54(struct _ENEMY_WORK* self);
 void fn_801A3DBC(struct _ENEMY_WORK* self);
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * 0x801A4504..0x801A9540 - the range of the former `enemy/fn_801A4504.cpp`
- * ------------------------------------------------------------------------------------------------- */
+/* ---- 0x801A4504..0x801A9540 ---- */
 
-/* The pooled `.sdata2` floats this range reads (each is a bare marker symbol in the map; the values
- * drive the comparisons/floats below).  Declared, never defined here: the pool belongs to the data
- * pass. */
+/* More of the unit's `.sdata2` floats, declared, not defined. */
 extern const f32 lbl_807985BC;
 extern const f32 lbl_80798600;
 extern const f32 lbl_80798610;
@@ -365,23 +294,19 @@ extern const f32 lbl_807988E8;
 extern const f32 lbl_807988EC;
 extern const f32 lbl_807988F0;
 
-/* 0x80304508 - unowned (the bracketing registered units name different modules, `ai`/`ef`) and its
- * two existing consumers disagree on the parameter spellings (`s32`/`nw4r::math::VEC3*` in
- * `ef/fn_801173AC.cpp`, `u32`/`void*` in `enemy/fn_80147CE0.cpp`), so it cannot share one band
- * header declaration (docs/plan.md 6.5 rule 2's named gap).  This unit keeps the `void*` form. */
+/* `lobby/fn_8030121C.cpp`'s `eft_em_spawn`, in the `void*` spelling these call sites use (its callers
+ * disagree on the parameter types). */
 extern "C" void eft_em_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s);
 
-/* One 0x10-byte record of the per-enemy effect table `get_enemy_data(self)+0x2C` points at: a joint
- * id and the joint-local offset the effect is placed at (the target reads +0x00 as `lwz` and copies
- * a `VEC3` from +0x04).  size: 0x10 */
+/* One record of the effect table at `get_enemy_data(self)+0x2C`: a joint id and the joint-local offset.
+ * size: 0x10 */
 struct EmDataEntry {
     /* +0x00 */ s32 joint;
     /* +0x04 */ nw4r::math::VEC3 vec;
 };
 
-/* The `get_enemy_data` record's unnamed +0x2C field (the effect-table pointer); the canonical
- * `EnemyData` leaves +0x28..+0x30 as padding, so this unit carries the one offset it walks, exactly
- * as `ef/eft019.cpp`/`ef/fn_80105314.cpp` do for the offsets they reach.  size: 0x30 */
+/* This unit's view of the `get_enemy_data` record's +0x2C effect-table pointer (`EnemyData` pads it).
+ * size: 0x30 */
 struct _ENEMY_DATA_VIEW {
     /* +0x00 */ u8 pad_0x00[0x2C];
     /* +0x2C */ EmDataEntry* table_0x2C;
@@ -470,7 +395,7 @@ u32 fn_8019E840(struct _ENEMY_WORK* self) {
     return 0;
 }
 
-/* 0x8019E908 - arm/step the +0x1E4 countdown: mode 0 steps it while bit 0 is set, mode 1 sets bit 0. */
+/* 0x8019E908 - arms/steps the +0x1E4 countdown: mode 0 steps it while bit 0 is set, mode 1 sets bit 0. */
 void fn_8019E908(struct _ENEMY_WORK* self, u8 mode) {
     if (mode == 0) {
         if ((self->field_0x1E4 & 1) == 0) {
@@ -482,7 +407,7 @@ void fn_8019E908(struct _ENEMY_WORK* self, u8 mode) {
     }
 }
 
-/* 0x8019E948 - clear the four-byte action bit set at +0x354 (the target's four `stb`s are the
+/* 0x8019E948 - clears the four-byte action bit set at +0x354 (the target's four `stb`s are the
  * compiler's inlined `memset`). */
 void fn_8019E948(struct _ENEMY_WORK* self) {
     self->mask_0x354[0] = 0;
@@ -491,7 +416,7 @@ void fn_8019E948(struct _ENEMY_WORK* self) {
     self->mask_0x354[3] = 0;
 }
 
-/* 0x8019E960 - set bit `id` of that set: slot `id / 8` clamped to the last of the four bytes. */
+/* 0x8019E960 - sets bit `id` of that set: slot `id / 8` clamped to the last of the four bytes. */
 void fn_8019E960(struct _ENEMY_WORK* self, s32 id) {
     s32 slot = id / 8;
     if (slot >= 4) {
@@ -512,7 +437,7 @@ s32 fn_8019E9AC(struct _ENEMY_WORK* self, s32 id) {
     return 0;
 }
 
-/* 0x8019EA04 - release every live enemy-control handle and re-arm the slot states. */
+/* 0x8019EA04 - releases every live enemy-control handle and re-arms the slot states. */
 void fn_8019EA04(struct _ENEMY_WORK* self) {
     for (u16 i = 0; i < 4; i++) {
         if (self->handles_0x328[i] != -1) {
@@ -524,7 +449,7 @@ void fn_8019EA04(struct _ENEMY_WORK* self) {
     self->field_0x761 = 0;
 }
 
-/* 0x8019EA80 - pick one of the free slot indices at random: the low 8 bits of +0x761 mark the used
+/* 0x8019EA80 - picks one of the free slot indices at random: the low 8 bits of +0x761 mark the used
  * slots, the RSO random source is folded down to the free count. */
 u32 fn_8019EA80(struct _ENEMY_WORK* self, u16 idx) {
     u8 avail[8];
@@ -545,7 +470,7 @@ u32 fn_8019EA80(struct _ENEMY_WORK* self, u16 idx) {
     return avail[value % (s32)n];
 }
 
-/* 0x8019EBAC - step the rotation word at +0x1C0 by 4 (clamped to the 0x4000..0x4004 band) and keep
+/* 0x8019EBAC - steps the rotation word at +0x1C0 by 4 (clamped to the 0x4000..0x4004 band) and keeps
  * the height at +0x190 inside its two pool bounds, snapping to the middle value otherwise. */
 void fn_8019EBAC(struct _ENEMY_WORK* self) {
     u32 angle = self->field_0x1C0 & 0xFFFF;
@@ -568,8 +493,8 @@ void fn_8019EBAC(struct _ENEMY_WORK* self) {
     self->pos.z = lbl_80798524;
 }
 
-/* 0x8019ECD4 - arm the four enemy-control slots at +0x328 and seed the record's remaining state,
- * then clear the bit set. */
+/* 0x8019ECD4 - arms the four enemy-control slots at +0x328 and seeds the record's remaining state,
+ * then clears the bit set. */
 void fn_8019ECD4(struct _ENEMY_WORK* self) {
     self->handles_0x328[0] = -1;
     self->states_0x338[0] = 255;
@@ -761,9 +686,8 @@ void fn_8019F70C(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x8019F768 - the first of the four `fn_801A01C8` motion steps: state 0 arms
- * `em_mot_set(self, 20, 100, 0)` and the alpha store, state 1 is a ten-window joint pass
- * (`em_frame_check` -> `em_hit_window_set`/`em_hit_window_clear`) ending in the `em_approach_step` completion. */
+/* 0x8019F768 - the first `fn_801A01C8` motion step: arm `em_mot_set(self, 20, 100, 0)`, then a ten-window
+ * hit-window pass ending in the `em_approach_step` completion. */
 void fn_8019F768(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -957,9 +881,8 @@ void fn_8019FE80(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801A00F0 - the fourth of the `fn_801A01C8` band's motion steps: state 0 arms the
- * `em_mot_set(self, 26, 20, 0)` pair with the two `em_hit_window_set_default` windows, state 1 arms
- * `em_mot_set_blend(self, 27, 20, 0, 1)` and advances, state 2 completes through `em_action_finish`. */
+/* 0x801A00F0 - the fourth `fn_801A01C8` motion step: motion 26 with two hit windows, then motion 27 blended,
+ * then `em_action_finish`. */
 void fn_801A00F0(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1016,9 +939,8 @@ void fn_801A05B4(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801A05E0 - action 6's first motion: state 0 arms `fn_8012F5C4(self, 1, 30, 0, 1)` plus the two
- * alpha/timer stores, state 1 waits on `em_approach_step(self, 0, 0)` and completes through
- * `fn_801280F4`. */
+/* 0x801A05E0 - action 6's first motion: arm `fn_8012F5C4(self, 1, 30, 0, 1)`, then wait on
+ * `em_approach_step(self, 0, 0)` and complete through `fn_801280F4`. */
 void fn_801A05E0(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1055,9 +977,6 @@ void fn_8019F07C(struct _ENEMY_WORK* self) {
         fn_802B08DC(lbl_80798528);
     }
 }
-
-/* 0x8019F70C's motion table above is documented here because the two cover one 0x254-byte band each
- * in the same order; `fn_8019F70C` holds the dispatcher that reaches both. */
 
 /* 0x801A2DAC - the state_sub dispatcher of the `state`-band's second half: 0..14, with the double
  * entries 2/12, 8/11, 9/13, 10/14 passing the 0/1 selector to the four two-argument motion steps. */
@@ -1277,9 +1196,8 @@ void fn_801A0FEC(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801A12C8 - action 6's sub-state 14: state 0 arms mode 8, the `em_mot_speed_set` blend and
- * `field_0x318 = lbl_807985D8 * get_em_base_scale(self)`; state 1 runs `em_move_offset_step(self, &field_0x1BC)`
- * and completes through `fn_801280F4`. */
+/* 0x801A12C8 - action 6's sub-state 14: arm mode 8 and the scaled `field_0x318`, then step the move offset
+ * and complete through `fn_801280F4`. */
 void fn_801A12C8(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1351,9 +1269,8 @@ void fn_801A1454(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801A14FC - action 6's sub-state 18: the shared `em_busy_set`/`em_busy_timer_reset` gate, then state 0
- * arms mode 9 and the `field_0x318` scale, state 1 drives the two `em_frame_check` windows and
- * completes through `fn_8019F12C`. */
+/* 0x801A14FC - action 6's sub-state 18: the busy gate, mode 9 and the `field_0x318` scale, two frame
+ * windows, then `fn_8019F12C`. */
 void fn_801A14FC(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     em_busy_timer_reset(self);
@@ -1404,9 +1321,8 @@ void fn_801A1624(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801A16D4 - action 6's sub-state 20/21: state 0 arms mode 1, state 1 drives the `field_0x1AC`
- * height against the (mode)-selected blend window and completes either through `fn_8019F12C` (mode
- * 0) or `fn_801280F4`. */
+/* 0x801A16D4 - action 6's sub-state 20/21: drive the `field_0x1AC` height against the mode's blend window,
+ * then `fn_8019F12C` (mode 0) or `fn_801280F4`. */
 void fn_801A16D4(struct _ENEMY_WORK* self, u32 mode) {
     switch (self->state) {
     case 0:
@@ -1433,10 +1349,8 @@ void fn_801A16D4(struct _ENEMY_WORK* self, u32 mode) {
     }
 }
 
-/* 0x801A4218 - action 7's status-bit pass: the (7,6) window clears the bits and re-arms through
- * `fn_8011E620(0x40000)` when `em_get_mot_no` reports 7 and the frame window matches; the (7,7)
- * window re-arms through `0x80000`; otherwise `fn_8011E5EC` seeds and area 1 gets the `0x40000`
- * clear. */
+/* 0x801A4218 - action 7's status-bit pass: the (7,6) and (7,7) windows re-arm bits 0x40000/0x80000,
+ * otherwise `fn_8011E5EC` seeds and area 1 clears 0x40000. */
 void fn_801A4218(struct _ENEMY_WORK* self) {
     if (em_act_ck(self, 7, 6) == 1) {
         fn_8011E630(self, -1);
@@ -2665,9 +2579,8 @@ void fn_801A4504(_ENEMY_WORK* self) {
     }
 }
 
-/* The model-effect refresh: when the map lookup says 6 and the enemy is in area 1, copy the scene
- * model's effect matrix (wrapped into [0,1) on the Y row), then push the enemy's material colour
- * (alpha scaled by `field_0x1D4`). */
+/* The model-effect refresh: on map 6 in area 1 copy the scene model's effect matrix (Y row wrapped into
+ * [0,1)), then push the material colour (alpha scaled by `field_0x1D4`). */
 void fn_801A9210(_ENEMY_WORK* self) {
     nw4r::math::MTX34 mtx;
     _GXColor color;
@@ -2698,11 +2611,8 @@ void fn_801A9210(_ENEMY_WORK* self) {
     }
 }
 
-/* The per-kind predicate the action code polls.  `kind` selects the byte/float test; the return is
- * 0/1 for kinds 0/1/4/5 and a 0..3 band for kinds 2/3, so the return is `int` (the target's arms
- * have no trailing `clrlwi`), and the switch narrows the wider argument once (`clrlwi r4,24`).
- * Residual 83.3 %: the target's kinds 0/1/5 keep the redundant bool conversion and kind 3 keeps the
- * `extrwi`+`clrlwi` the value forms below let MWCC fold away. */
+/* The per-kind predicate the action code polls: 0/1 for kinds 0/1/4/5, a 0..3 band for kinds 2/3 (an `int`
+ * return; the switch narrows the argument once). */
 int fn_801A9384(_ENEMY_WORK* self, u32 kind) {
     u8 narrowed = (u8) kind;
     switch (narrowed) {
@@ -2740,7 +2650,7 @@ void fn_801A94C0(_ENEMY_WORK* self) {
     fn_8019EA04(self);
 }
 
-/* Clear the two bytes and reset the position and the three rotation words. */
+/* Clears the two bytes and resets the position and the three rotation words. */
 void fn_801A94C4(_ENEMY_WORK* self, u8* a, u8* b) {
     em_move_mode_set(self, 0);
     *a = 0;

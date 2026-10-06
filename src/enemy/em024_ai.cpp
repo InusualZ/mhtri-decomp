@@ -1,39 +1,31 @@
-/* enemy/em024_ai.cpp - the em024 monster's AI: 69 functions, `.text` 0x8034F138..0x80358624, with the unit's
- * extab/extabindex, `.data` 0x805EBBE0..0x805ED0C0, `.sdata` 0x80793330..0x80793338 and `.sdata2`
- * 0x8079B3C8..0x8079B640.  Left seam: `Pl/pl_act_class3.cpp`; right seam: `ef/eft052.cpp`.
- *
- * WHAT IT IS.  A program table (`Em024ProgTbl`, 0x70 B) of seven entry points: the init, an empty slot, the
- * event notifier, the frame update, the action dispatcher, the motion-event switch and the TEV color update.
- * Actions 0..4, 7, 10, 11 and 13 have a dispatcher over the sub-state; the sub-state steps are named
- * `em024_act<N>_sub<M>` after the first sub-state they handle.
- *
- * DATA.  `.data`, `.sdata` and `.rodata` (0x80570880..0x805709D0: the six turn tables, defined here as `const`
- * data) are byte-identical to the target.  `.sdata2` differs only by its 4-byte trailing pad: `splits.txt` ends
- * it at 0x8079B640 because `lbl_8079B638` is an 8-byte symbol, and an end of 0x8079B63C makes `dtk dol split`
- * fail ("ends within symbol 'lbl_8079B638'"), so the claim stays 0x278 B against the object's 0x274 B.
- *
- * GUESSES.  The `em024` file name (enemy id 0x18 == 24 agrees), every function name and description, the
- * `Em024ProgTbl`/`EmSeRecord`/`EmSePos`/`EmSeEntry` field names (`EmSePos::channel_0x08`/`angle_0x0A` and
- * `EmSeRecord::length_0x08` are thin), the `em024_0x328` view's `tev_color_*` roles and the sub-state numbers'
- * meaning.
- *
- * SHAPES.  `enemy/ENEMY_WORK.h` carries an `em024_0x328` union view of the shared record for this
- * monster's fields.  `em_turn_seq_*` take `void*`, so the const turn tables are passed through a `(void*)` cast.
- * `#pragma peephole off`, `pool_data off` and `fp_contract off` are file-scope because each one changes rows all
- * over the unit: measured on the whole unit, dropping peephole lowers 30 rows (58 -> 38 matched functions),
- * dropping pool_data lowers 2 (`act10_dispatch` 100 -> 84.7) and dropping fp_contract lowers 4 (`front_ray_hit_ck`,
- * `act7_sub1`, `act7_sub5`, `act7_scatter_pos`).
- *
- * HEADERS.  The declarations this unit added (`camera_event_set`/`camera_shake_req`, `eft_em_spawn_joint`,
- * `eft_em_spawn`, `em_status_bit_set`, `em_wave_amp`) raise 112 rows in 24 other enemy units, and 69 rows here.
- * `ef/fn_801173AC.cpp` still carries its own C++-scope `eft_em_spawn` prototype.
- *
- * RESIDUALS.
- *   - The shell-slot call `shell_set_func_ptr->slot(...)` hoists the `lwz r7` in our compile (10 functions:
- *     `act4_sub0`, `act7_sub1`, `sub2`, `sub5`, `sub13`, `sub16`, `sub25`, `sub26`, `act7_field_burst`, `act13_sub0`).
- *   - Register allocation and ordering in the same ten and in `em024_tev_color_update` (99.9 % and up for most).
- *   - `shell_set_func_ptr` is owned by `stage/fn_802B2AA0.cpp`; this unit added the `ShellSetFuncs` slots
- *     `method_0x74`, `method_0x84` and `method_0x8C` (signatures are the call sites' shapes, a GUESS).
+/*
+ * enemy/em024_ai.cpp - enemy 024's AI: the program table `Em024ProgTbl` (init, an empty slot, the event
+ *   notifier, the frame update, the action dispatcher, the motion-event switch and the TEV colour update), the
+ *   sub-state dispatchers of actions 0..4, 7, 10, 11 and 13 and their `em024_act<N>_sub<M>` steps.
+ * RANGE. .text 0x8034F138-0x80358624 (69 functions); extab 0x800171A4-0x8001736C, extabindex
+ *   0x800368DC-0x80036B88, .rodata 0x80570880-0x805709D0 (the six turn tables, `const` data here), .data
+ *   0x805EBBE0-0x805ED0C0 (`em024_prog_tbl` first), .sdata 0x80793330-0x80793338, .sdata2 0x8079B3C8-0x8079B640.
+ *   Left seam `Pl/pl_act_class3.cpp`, right seam `ef/eft052.cpp`; one TU: the pool float `lbl_8079B3CC` is loaded
+ *   by 28 functions across the range and by nothing outside it.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off`, `#pragma pool_data off` and `#pragma fp_contract off`,
+ *   each measured on the whole unit: without peephole off 30 rows drop (58 to 38 matched functions), without
+ *   pool_data off 2 (`em024_act10_dispatch`), without fp_contract off 4 (`em024_front_ray_hit_ck`,
+ *   `em024_act7_sub1`, `em024_act7_sub5`, `em024_act7_scatter_pos`).
+ * NAMES. `em024` follows the runtime dump's `em024_prog_tbl` (the caller of `em024_action11_state5_ck` tests enemy
+ *   id 0x18); the `_ai` suffix, every function name, the `Em024ProgTbl`/`EmSeRecord`/`EmSePos`/`EmSeEntry` field
+ *   names (`EmSePos::channel_0x08`/`angle_0x0A` and `EmSeRecord::length_0x08` are thin), the `em024_0x328` view's
+ *   `tev_color_*` roles and the sub-state numbers' meaning are GUESSes.  `ShellSetFuncs::method_0x74`,
+ *   `method_0x84` and `method_0x8C` (the table behind `stage/stg_w.cpp`'s `shell_set_func_ptr`) take the call
+ *   sites' shapes, a GUESS.
+ * RESIDUALS. No row unwritten.  11 partial rows:
+ *  - `em024_act4_sub0`, `em024_act7_sub1`, `em024_act7_sub2`, `em024_act7_sub5`, `em024_act7_sub13`,
+ *    `em024_act7_sub16`, `em024_act7_sub25`, `em024_act7_sub26`, `em024_act7_field_burst`, `em024_act13_sub0`:
+ *    ours hoists the `lwz r7` of the `shell_set_func_ptr->slot(...)` call, and register allocation and order differ;
+ *  - `em024_tev_color_update`: register allocation and order.
+ *   flipcheck: `.sdata2` is 0x274 against the claimed 0x278 (the claim ends at 0x8079B640 because `lbl_8079B638`
+ *   is an 8-byte symbol; an end of 0x8079B63C makes `dtk dol split` fail); `.text` differs in 417 of 38124 bytes.
+ * SHAPES. `enemy/ENEMY_WORK.h` carries the `em024_0x328` union view of the shared record for this monster's
+ *   fields.  `em_turn_seq_*` take `void*`, so the `const` turn tables pass through a `(void*)` cast.
  */
 
 #include "types.h"
@@ -107,7 +99,7 @@ extern "C" const u32 em024_turn_tbl_e[16] = {
     0x003D0000, 0x00000002, 0x00000000, 0x00000000,
     0x003D0000, 0x00000002, 0x00000000, 0x00000000,
 };
-/* Wave amplitude per motion group (0x441D8000 == 630.0f). */
+/* The `em_wave_amp` amplitude per motion group (0x441D8000 == 630.0f). */
 extern "C" const f32 em024_turn_ratio_tbl[4] = {630.0f, 630.0f, 630.0f, 630.0f};
 
 /* One keyframe of a motion curve: the frame number, then one to three channel values.  A row whose frame is
@@ -241,7 +233,6 @@ EmKey1 em024_curve_mot42[] = {
 };
 
 EmSeOffset em024_se_shift = {-50.0f, -10.0f};
-
 
 /* Answers -1 unless the action is 11, otherwise whether its sub-state is 5. */
 extern "C" s8 em024_action11_state5_ck(_ENEMY_WORK* self)
@@ -2993,7 +2984,6 @@ EmSeEntry em024_se_tbl_mot5[11] = {
     {0x00, {0, 0, 0}, &em024_se_rec_mot5_f},
     {0xFF, {0, 0, 0}, 0},
 };
-
 
 /* Starts the per-motion sound table that the motion selects (the default finishes the action). */
 extern "C" void em024_act10_dispatch(_ENEMY_WORK* self)

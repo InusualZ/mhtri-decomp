@@ -1,81 +1,40 @@
-/* enemy/em018_prog.cpp - enemy 018 program
- *
- * `.text` 0x80192348..0x8019E670, 82 functions written (the rest of the range is not decompiled yet).
- * Phase 4: fold of 2 registered units, built from `enemy/fn_80191598.cpp`, `enemy/fn_801926EC.cpp`.
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `enemy/fn_801926EC.cpp` (kept for its notes and residuals): */
-/* enemy/fn_801926EC.cpp - the enemy "em" action band's per-motion step group.
- *
- * `.text` 0x801926EC..0x8019E670 (0xBF84 B); extab 0x8000EDF4..0x8000F124; extabindex
- * 0x8002A3D8..0x8002A8A0; `.ctors` 0x8056F340..0x8056F344; `.data` 0x805AD3DC..0x805AE750; `.bss`
- * 0x806A7A70..0x806A7A88.  Registered; the unit absorbed the
- * former `enemy/fn_801993E0.cpp` (0x801993E0..0x8019E670) in the 2026-09-30 recut.
- *
- * Seam.  The right edge 0x8019E670 is where the TU's own static-initializer ends: the `.ctors` word
- * points at `fn_8019E604`, which seeds the two vectors at `lbl_806A7A70`, and MWCC emits a TU's
- * `__sinit` last.  The next function, `fn_8019E670`, is the first reader of the second 0.0 pool entry
- * (`lbl_80798538`; the first, `lbl_80798238`, is read here), and one TU pools a value once.  The data
- * proves the 0x801993E0 edge false: the jump tables and tables at 0x805AE118..0x805AE6FC are read only by
- * 0x801994F4..0x8019D8B8 and the table at 0x805AE720 by `fn_8019287C`, so one `.data` run spans both
- * old units.  The left edge 0x801926EC is NOT proven: the same two pieces of evidence put this TU's
- * start at 0x80192348 (the function after `fn_80192204`, the preceding TU's `__sinit`), i.e. the
- * tail of `enemy/fn_80191598.cpp` (0x80192348..0x801926EC, written over its own `EmActWork` model)
- * belongs here.
- *
- * Module `enemy`: every callee out of the range is an enemy-band function.  Language C++ (the range
- * reaches the mangled `em_frame_check`).
- *
- * Name.  No `__FILE__` string survives in the range and the runtime dump answers only `zz_`
- * placeholders (`dumpmap.py lookup 0x801926EC` -> `zz_01926ec_`), so the map's own stem keeps the
- * file name (brief section 2, class 4).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
- * lookup on the range's inventory: every name is a bare `.text` entry in
- * config/RMHE08/symbols.txt and the runtime dump answers only `zz_XXXXXXXX_` placeholders)
- *
- * Structure.  `fn_80199B24` dispatches `self->action` (0x1E5) into this range's
- * six dispatchers `fn_80192F24`/`fn_80193394`/`fn_801938D8`/`fn_801953BC`/`fn_80196618`/`fn_801987E4`,
- * each of which switches on `self->state_sub` (0x1E6) and tail-calls one per-motion step.  Every
- * state machine reads `self->state` (0x005) and, at state 0, runs `em_move_mode_set` + a motion setter
- * (`em_mot_set_ck`/`fn_8012F5C4`/`em_mot_set`); at state 1 it waits on `em_mot_end_ck(self) == 1` and
- * runs a completion hook.
- *
- * Status of the original 0x801926EC..0x801993E0 range (official `report.json`; the absorbed range is below).
- * 56 of the 93 functions are written and every written one is above the 80 % bar: 44 are byte-identical
- * and 12 are codegen near-misses (fn_801933DC 89.71, fn_801934EC 95.56, fn_80193964 97.98,
- * fn_8019485C 98.09, fn_80194CC8 96.10, fn_80195BCC 98.06, fn_8019610C 97.77, fn_801961C8 97.61,
- * fn_80196768 97.10, fn_80196A50 97.94, fn_80197C84 96.08, fn_80198FE8 96.77).  Unit: 33.057507 %
- * fuzzy, 6756 / 27892 `.text` bytes matched, 44 / 93 functions matched.
- *
- * The 37 unwritten functions are the residual (address order): fn_801926EC (400 B), fn_8019287C (60 B),
- * fn_801928BC (664 B), fn_80192B54 (188 B), fn_801936A8 (560 B), fn_80193AEC (476 B), fn_80193CC8 (288 B),
- * fn_80193DE8 (264 B), fn_80194078 (672 B), fn_801943A0 (484 B), fn_80194584 (356 B), fn_801946E8 (372 B),
- * fn_80194AE4 (484 B), fn_80194D6C (564 B), fn_80194FA0 (248 B), fn_80195214 (296 B), fn_80195504 (308 B),
- * fn_80195720 (320 B), fn_80195860 (876 B), fn_80195CA4 (220 B), fn_80195D80 (340 B), fn_801963A8 (624 B),
- * fn_8019687C (468 B), fn_80196BF4 (540 B), fn_80196E10 (1156 B), fn_80197294 (368 B), fn_80197404 (364 B),
- * fn_80197570 (328 B), fn_801976B8 (1288 B), fn_80197D50 (436 B), fn_80197F04 (588 B), fn_80198150 (1372 B),
- * fn_80198910 (1264 B), fn_80198E00 (272 B), fn_801990E0 (260 B), fn_801991E4 (508 B).  Each is a
- * `switch (self->state)` state machine of the same family as the ones above; they were not reached in
- * this round.
- *
- * Absorbed range 0x801993E0..0x8019E670: 14 functions written, nine unwritten - `fn_801994F4` (1336 B),
- * `fn_80199BE0` (980 B), `fn_80199FB4` (544 B), `fn_8019A1D4` (12336 B), `fn_8019D204` (1716 B),
- * `fn_8019DBDC` (692 B), `fn_8019DE98` (556 B), `fn_8019E0C4` (724 B), `fn_8019E604` (108 B, the `__sinit`).
- * Residuals: `stage_map_kind_get`'s `clrlwi r0,r3,24` after the call
- * is folded away (`fn_8019D8B8` 90.52, `fn_8019D9BC` 82.62, `fn_8019DAC0` 96.00: the owner's `u32`
- * declaration would need a `u8` view, which re-measures every landed consumer); `fn_8019E398` 89.85 and
- * `fn_8019E49C` 92.11 are register allocation on the `||` blocks and the f30 save of the radius test.
- *
- * Residual shapes on the 12 near-misses (all are register/evaluation ordering, not comprehension):
- *   * fn_801933DC - the target keeps a `clrlwi r4,r4,16` before `em_mot_set` that MWCC folds away for
- *     the constant ternary; the motion value needs a u16 spelling the header's `s32` prototype cannot ask
- *     for.  4 B short.
- *   * fn_801934EC - `mr r3,self` is hoisted before the height ternary in the target, after it here; one row.
- *   * fn_80193964/fn_8019485C/fn_8019610C/fn_801961C8/fn_80195BCC/fn_80196768/fn_80196A50/fn_80197C84/
- *     fn_80198FE8 - single-row register colouring / `mr r3` placement around the `fn_8012F9*` wait.
- *   * fn_80194CC8 - the +0x020 timer loop's `lfs`/`fcmpo` ordering.
+/*
+ * enemy/em018_prog.cpp - enemy 018's program: the aim-record flag accessors and setup over the `EmActWork` view,
+ *   the `action` dispatcher `fn_80199B24` and its six `state_sub` dispatchers (`fn_80192F24`, `fn_80193394`,
+ *   `fn_801938D8`, `fn_801953BC`, `fn_80196618`, `fn_801987E4`), the per-motion state machines, and the static
+ *   initializer.
+ * RANGE. .text 0x80192348-0x8019E670 (128 functions); extab 0x8000EDC4-0x8000F124, extabindex
+ *   0x8002A390-0x8002A8A0, .ctors 0x8056F340-0x8056F344 (`fn_8019E604`), .rodata 0x80570050-0x80570150, .data
+ *   0x805AD370-0x805AE750 (`em018_prog_tbl` first), .bss 0x806A7A70-0x806A7A88, .sdata 0x80791A78-0x80791A80,
+ *   .sdata2 0x80798238-0x80798518.  Left edge: the function after `fn_80192204`, `enemy/em016_prog.cpp`'s static
+ *   initializer; right edge: `fn_8019E604` (the two vectors at `lbl_806A7A70`) is this TU's static initializer,
+ *   and `fn_8019E670` is the first reader of the next 0.0 pool entry `lbl_80798538`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` from `fn_80192348` to `fn_80192630`, on from `fn_80192C10`.
+ * NAMES. The file name follows the runtime dump's `em018_prog_tbl`, which opens the TU's `.data`; the map has only
+ *   `fn_` stems for the functions.
+ *   The `.bss` record names (`vec_pair_801926EC_0`) are GUESSes.
+ * RESIDUALS. 46 rows unwritten: 0x801926EC-0x801928B8, 0x801928BC-0x80192C10, 0x801936A8-0x801938D8,
+ *   0x80193AEC-0x80193EF0, 0x80194078-0x80194318, 0x801943A0-0x8019485C, 0x80194AE4-0x80194CC8,
+ *   0x80194D6C-0x80195098, 0x80195214-0x8019533C, 0x80195504-0x80195638, 0x80195720-0x80195BCC,
+ *   0x80195CA4-0x80195ED4, 0x80196278-0x80196618, 0x8019687C-0x80196A50, 0x80196BF4-0x80197BC0,
+ *   0x80197D50-0x801986AC, 0x80198910-0x80198F10, 0x801990E0-0x801993E0, 0x801994F4-0x80199A2C,
+ *   0x80199BE0-0x8019D8B8, 0x8019DBDC-0x8019DE90, 0x8019DE98-0x8019E398, 0x8019E604-0x8019E670.
+ *   16 partial rows, including:
+ *  - `fn_8019D8B8`, `fn_8019D9BC`, `fn_8019DAC0`: retail keeps `clrlwi r0,r3,24` after `stage_map_kind_get`,
+ *    which ours folds away (the owner declares a `u32` return);
+ *  - `fn_8019E398`, `fn_8019E49C`: register allocation on the `||` blocks and the f30 save of the radius test;
+ *  - `fn_801934EC`: retail hoists `mr r3,self` before the height ternary;
+ *  - `fn_80194CC8`: the `+0x020` timer loop's `lfs`/`fcmpo` order;
+ *  - `fn_80192448`: one callee-saved register coloured differently (the `work`/`i` pair);
+ *  - `fn_80193964`, `fn_8019485C`, `fn_8019610C`, `fn_801961C8`, `fn_80195BCC`, `fn_80196A50`: single-row register
+ *    colouring or `mr r3` placement around the `fn_8012F9*` wait.
+ *   The other 2 partial rows have no recorded cause.
+ *   flipcheck: `.ctors`/`.rodata`/`.sdata` claimed, not emitted; `.data` 0x248 against 0x13E0, `.sdata2` 0x4
+ *   against 0x2E0; `.text` (0x2FF8 of 0xC328), extab (0x200 of 0x360) and extabindex (0x300 of 0x510) short of the
+ *   claim and differing.
+ * SHAPES. `u8 >= 2` in `fn_8019238C` compiles to the borrow sequence (`li r3,2; orc; addi; srwi; subf; srwi`):
+ *   the source keeps the comparison.  `fn_80192448` declares its locals `max`, `i`, `work`, which gives retail's
+ *   r31/r30/r29.
  */
 
 #include "enemy/lbl_80797E88.h" /* lbl_80797E88 (rule 2: the owner's header) */
@@ -85,7 +44,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
 #include "enemy/em016_prog_types.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/enemy_control.h"
@@ -101,10 +60,8 @@
 #define mtx34_trans_get_c1 ((void (*)(MTX34*, VEC3*))mtx34_trans_get)
 
 /* ------------------------------------------------------------------------------------------------ */
-/* the shared pool this range reads                                                                  */
+/* the unit's pool, declared, not defined                                                            */
 /* ------------------------------------------------------------------------------------------------ */
-
-
 
 extern const f32 lbl_80798238;
 
@@ -129,7 +86,6 @@ void senko_set(VEC3* pos, f32 value, u8 a, s16 b);
 
 extern "C" {
 
-
 void fn_80192348(EmActWork* self, u8 mask);
 void fn_80192358(EmActWork* self, u8 mask);
 u32 fn_8019238C(EmActWork* self);
@@ -142,10 +98,7 @@ void fn_8019255C(EmActWork* self);
 void fn_80192630(EmActWork* self);
 }
 
-/* The `.sdata2` and `.data` pool labels this range loads.  They are unsplit (no registered unit
- * claims a range covering them) and `stylelint`'s rule-2 `module()` answers `None`, so they stay
- * declared here as the counted "address band interleaves modules" gap - the same shape the landed
- * `enemy/fn_8019ED34.cpp` uses for its own pool runs.  Never defined: the target addresses them. */
+/* The unit's `.sdata2` and `.data` labels, declared, not defined: the source does not emit them yet. */
 extern f32 lbl_80798264;
 extern f32 lbl_80798268;
 extern f32 lbl_8079826C;
@@ -183,8 +136,7 @@ extern "C" {
 /* 0x802B0668 - the map-id lookup: a byte table, `0xFF` meaning "no entry" (the argument comes back). */
 u32 stage_map_kind_get(u32 kind);
 
-/* This range's own functions, declared so the dispatchers can tail-call them (they are defined
- * below, in address order). */
+/* This unit's own functions, declared so the dispatchers can tail-call them. */
 void fn_801993E0(struct _ENEMY_WORK* self);
 void fn_80199468(struct _ENEMY_WORK* self);
 void fn_801994F4(struct _ENEMY_WORK* self);
@@ -291,9 +243,8 @@ void fn_80192358(EmActWork* self, u8 mask) {
     self->aim_0x328.flags_0x35 &= ~mask;
 }
 
-/* Reports whether every aim bit of the caller's mask is set.  The mask is narrowed in the source:
- * the target masks the incoming register (`clrlwi r0,r4,24`), which is what a `u8` parameter never
- * needs. */
+/* Reports whether every aim bit of the caller's mask is set (narrowed in the source: retail masks the
+ * incoming register, `clrlwi r0,r4,24`). */
 u32 fn_80192370(struct _ENEMY_WORK* self_, u32 mask) {
     EmActWork* self = (EmActWork*)self_;
     return (self->aim_0x328.flags_0x35 & (u8)mask) != 0;
@@ -387,8 +338,7 @@ void fn_80192630(EmActWork* self) {
     VEC3 v1;
     VEC3 v2;
 
-    /* The aim record's +0x00 is a scalar the rest of the unit reads as one, but the retail call
-     * copies a whole 3-float record over it (see the unit header). */
+    /* The aim record's +0x00 is read as a scalar, but retail copies a whole 3-float record over it. */
     copyVec3((nw4r::math::VEC3*)&rec->angle_0x00,
              setVec3(&v1, lbl_8079824C, lbl_8079824C, lbl_8079824C));
     copyVec3((nw4r::math::VEC3*)&rec->rot_0x10,
@@ -418,7 +368,7 @@ extern "C" {
 /* the per-motion step group dispatched by fn_80192F24 (states 0,1,2,4,5,7)                         */
 /* ---------------------------------------------------------------------------------------------- */
 
-/* 0x80192C10 - arm motion 1 for 4 frames; state 1 waits and re-enters the motion. */
+/* 0x80192C10 - arms motion 1 for 4 frames; state 1 waits and re-enters the motion. */
 void fn_80192C10(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -466,7 +416,7 @@ void fn_80192D08(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80192D84 - arm motion mode 2 with the four-argument setter (40/20/0/3) and the
+/* 0x80192D84 - arms motion mode 2 with the four-argument setter (40/20/0/3) and the
  * `fn_80128030` completion. */
 void fn_80192D84(struct _ENEMY_WORK* self) {
     switch (self->state) {
@@ -548,7 +498,7 @@ void fn_80192F24(struct _ENEMY_WORK* self) {
 /* the step group dispatched by fn_80193394 (states 0..7)                                           */
 /* ---------------------------------------------------------------------------------------------- */
 
-/* 0x80192F78 - arm motion 6 for 10 frames; state 1 runs `em_state_set(self, 1, 5)`. */
+/* 0x80192F78 - arms motion 6 for 10 frames; state 1 runs `em_state_set(self, 1, 5)`. */
 void fn_80192F78(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -564,7 +514,7 @@ void fn_80192F78(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80192FFC - arm motion 7 for 4 frames. */
+/* 0x80192FFC - arms motion 7 for 4 frames. */
 void fn_80192FFC(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -580,7 +530,7 @@ void fn_80192FFC(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80193078 - arm motion 0x1A for 4 frames. */
+/* 0x80193078 - arms motion 0x1A for 4 frames. */
 void fn_80193078(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -596,7 +546,7 @@ void fn_80193078(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801930F4 - arm motion 0x1E for 4 frames; state 1 fires the joint effect when `em_frame_check`
+/* 0x801930F4 - arms motion 0x1E for 4 frames; state 1 fires the joint effect when `em_frame_check`
  * reports the frame and then waits on `em_mot_end_ck`. */
 void fn_801930F4(struct _ENEMY_WORK* self) {
     switch (self->state) {
@@ -617,7 +567,7 @@ void fn_801930F4(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801931A4 - arm motion 0x72 for 10 frames. */
+/* 0x801931A4 - arms motion 0x72 for 10 frames. */
 void fn_801931A4(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -633,7 +583,7 @@ void fn_801931A4(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80193220 - arm motion 8 for 4 frames. */
+/* 0x80193220 - arms motion 8 for 4 frames. */
 void fn_80193220(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -649,7 +599,7 @@ void fn_80193220(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x8019329C - arm motion 20 for 4 frames. */
+/* 0x8019329C - arms motion 20 for 4 frames. */
 void fn_8019329C(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -665,7 +615,7 @@ void fn_8019329C(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80193318 - arm motion 0x1D for 4 frames. */
+/* 0x80193318 - arms motion 0x1D for 4 frames. */
 void fn_80193318(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -715,10 +665,8 @@ void fn_80193394(struct _ENEMY_WORK* self) {
 /* the step group dispatched by fn_801938D8 (states 0..10)                                          */
 /* ---------------------------------------------------------------------------------------------- */
 
-/* 0x801933DC - arm motion `a == 1 ? 9 : 2` and pick the height by `b`.  The `default` arm is
- * written first: MWCC emits its body right after the compare chain (playbook row 37).  Both
- * selectors are narrowed at use (`(u8)a`/`switch ((u8)b)`) and the motion to `u16`, which is the
- * `clrlwi` pair the target keeps. */
+/* 0x801933DC - arms motion `a == 1 ? 9 : 2` and picks the height by `b`; `default:` first (playbook 37),
+ * selectors narrowed at use and the motion to `u16` (retail's `clrlwi` pair). */
 void fn_801933DC(struct _ENEMY_WORK* self, u32 a, u32 b) {
     switch (self->state) {
     case 0:
@@ -751,7 +699,7 @@ void fn_801933DC(struct _ENEMY_WORK* self, u32 a, u32 b) {
     }
 }
 
-/* 0x801934EC - arm motion 21 and pick the height by `a`. */
+/* 0x801934EC - arms motion 21 and picks the height by `a`. */
 void fn_801934EC(struct _ENEMY_WORK* self, u32 a) {
     switch (self->state) {
     case 0:
@@ -771,7 +719,7 @@ void fn_801934EC(struct _ENEMY_WORK* self, u32 a) {
     }
 }
 
-/* 0x801935A0 - arm the `lbl_80570050` descriptor and wait on `em_turn_seq_step`. */
+/* 0x801935A0 - arms the `lbl_80570050` descriptor and waits on `em_turn_seq_step`. */
 void fn_801935A0(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -787,7 +735,7 @@ void fn_801935A0(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x8019362C - arm motion 0x1B for 4 frames. */
+/* 0x8019362C - arms motion 0x1B for 4 frames. */
 void fn_8019362C(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1163,7 +1111,7 @@ void fn_801928B8(void) {
 /* the per-action steps the 0x801953BC/0x80196618/0x801987E4 dispatchers select                 */
 /* ---------------------------------------------------------------------------------------------- */
 
-/* 0x80193EF0 - arm mode 2 with (0x32/0x14/0/3) and the `fn_80128030` completion. */
+/* 0x80193EF0 - arms mode 2 with (0x32/0x14/0/3) and the `fn_80128030` completion. */
 void fn_80193EF0(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1179,7 +1127,7 @@ void fn_80193EF0(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80193F70 - arm mode 2 with (0x31/0x14/0/1) and the `em_state_set(self, 5, 0x1D)` completion. */
+/* 0x80193F70 - arms mode 2 with (0x31/0x14/0/1) and the `em_state_set(self, 5, 0x1D)` completion. */
 void fn_80193F70(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1195,7 +1143,7 @@ void fn_80193F70(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80193FF8 - arm mode 2 with (0x3A/0x0A/0/1) and the `fn_80128030` completion. */
+/* 0x80193FF8 - arms mode 2 with (0x3A/0x0A/0/1) and the `fn_80128030` completion. */
 void fn_80193FF8(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1211,7 +1159,7 @@ void fn_80193FF8(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80194938 - arm mode 2 with motion 0x68 for 10 frames; completion `fn_80128030`. */
+/* 0x80194938 - arms mode 2 with motion 0x68 for 10 frames; completion `fn_80128030`. */
 void fn_80194938(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1227,7 +1175,7 @@ void fn_80194938(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80194A64 - arm mode 2 with (0x2E/6/0/1); completion `fn_80128030`. */
+/* 0x80194A64 - arms mode 2 with (0x2E/6/0/1); completion `fn_80128030`. */
 void fn_80194A64(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1243,7 +1191,7 @@ void fn_80194A64(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x8019533C - arm mode 2 with (0x36/0x14/0/3); completion `fn_80128030`. */
+/* 0x8019533C - arms mode 2 with (0x36/0x14/0/3); completion `fn_80128030`. */
 void fn_8019533C(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1259,7 +1207,7 @@ void fn_8019533C(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801966DC - arm motion 0x54 for 10 frames with the `em_hit_window_set_default(self, 0, 1)` pair. */
+/* 0x801966DC - arms motion 0x54 for 10 frames with the `em_hit_window_set_default(self, 0, 1)` pair. */
 void fn_801966DC(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1276,7 +1224,7 @@ void fn_801966DC(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80196A50 - arm motion 0x57 for 10 frames and the two joint slots whose ids depend on `a`. */
+/* 0x80196A50 - arms motion 0x57 for 10 frames and the two joint slots whose ids depend on `a`. */
 void fn_80196A50(struct _ENEMY_WORK* self, u8 a) {
     switch (self->state) {
     case 0:
@@ -1351,7 +1299,7 @@ void fn_80195BCC(struct _ENEMY_WORK* self, u8 a) {
     }
 }
 
-/* 0x80194318 - arm motion 0x3D with the common `em_action_finish` completion. */
+/* 0x80194318 - arms motion 0x3D with the common `em_action_finish` completion. */
 void fn_80194318(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     switch (self->state) {
@@ -1453,7 +1401,7 @@ void fn_8019515C(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801949B4 - arm motion 0x1F for 4 frames, fire the joint effect on the frame and complete with
+/* 0x801949B4 - arms motion 0x1F for 4 frames, fires the joint effect on the frame and completes with
  * `fn_80128030`. */
 void fn_801949B4(struct _ENEMY_WORK* self) {
     switch (self->state) {
@@ -1474,7 +1422,7 @@ void fn_801949B4(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80196B1C - arm motion 0x4E with the two joint slots 8/9; while the frame effect has not
+/* 0x80196B1C - arms motion 0x4E with the two joint slots 8/9; while the frame effect has not
  * expired it keeps the two-state release armed. */
 void fn_80196B1C(struct _ENEMY_WORK* self) {
     switch (self->state) {
@@ -1553,7 +1501,7 @@ void fn_80196768(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80197C84 - arm motion 0xA for 8 frames and the `lbl_80798270` blend; completes with
+/* 0x80197C84 - arms motion 0xA for 8 frames and the `lbl_80798270` blend; completes with
  * `fn_80128A70(self, 7, 0)`. */
 void fn_80197C84(struct _ENEMY_WORK* self) {
     switch (self->state) {
@@ -1675,7 +1623,7 @@ void fn_8019610C(struct _ENEMY_WORK* self, u8 a) {
     }
 }
 
-/* 0x8019485C - arm motion 0xCA for 10 frames, advance to 0xDE on completion, then `fn_80128030`. */
+/* 0x8019485C - arms motion 0xCA for 10 frames, advances to 0xDE on completion, then `fn_80128030`. */
 void fn_8019485C(struct _ENEMY_WORK* self, u8 a) {
     if (a == 1) {
         em_busy_set(self);
@@ -1701,7 +1649,7 @@ void fn_8019485C(struct _ENEMY_WORK* self, u8 a) {
     }
 }
 
-/* 0x80195098 - arm motion 0x7F, advance to 0x82 on completion, then `em_action_finish`. */
+/* 0x80195098 - arms motion 0x7F, advances to 0x82 on completion, then `em_action_finish`. */
 void fn_80195098(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     switch (self->state) {
@@ -1724,7 +1672,7 @@ void fn_80195098(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80195ED4 - arm motion 0xDA with the joint slot 0xF; the frame effects re-arm the flag and
+/* 0x80195ED4 - arms motion 0xDA with the joint slot 0xF; the frame effects re-arm the flag and
  * fire the joint effect, and `em_action_finish` completes the step. */
 void fn_80195ED4(struct _ENEMY_WORK* self) {
     em_busy_set(self);
@@ -1756,7 +1704,7 @@ void fn_80195ED4(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80196004 - arm motion 0xDB with the joint slot 0x10 and the two frame-effect hooks. */
+/* 0x80196004 - arms motion 0xDB with the joint slot 0x10 and the two frame-effect hooks. */
 void fn_80196004(struct _ENEMY_WORK* self) {
     em_busy_set(self);
     switch (self->state) {
@@ -1784,7 +1732,7 @@ void fn_80196004(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80198FE8 - arm mode 2 with (0x37/0x14/0/1) and the `lbl_807983A0` blend; state 1 waits on the
+/* 0x80198FE8 - arms mode 2 with (0x37/0x14/0/1) and the `lbl_807983A0` blend; state 1 waits on the
  * descriptor and advances to (0x2F/0x28/0/1), completing with `em_state_set(self, 0xD, 2)`. */
 void fn_80198FE8(struct _ENEMY_WORK* self) {
     switch (self->state) {
@@ -1809,9 +1757,8 @@ void fn_80198FE8(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x801993E0 - the state-advance entry of the enemy's "em" action: state 0 arms the motion, state 1
- * waits for `em_mot_end_ck` to report the current action finished and then runs the band's
- * `em_state_set(self, 13, 5)` completion. */
+/* 0x801993E0 - the state-advance entry: state 0 arms the motion, state 1 waits for `em_mot_end_ck` and runs
+ * `em_state_set(self, 13, 5)`. */
 void fn_801993E0(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1845,9 +1792,8 @@ void fn_80199468(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80199A2C - the motion step of the action `fn_80199ADC` dispatches case 7 to: state 0 arms mode
- * 31 with the band's `em_demo_pos_set`/`em_demo_rot_set` pair and zeroes the stored height, state 1 waits for
- * `em_mot_end_ck` and then runs `fn_80128030`. */
+/* 0x80199A2C - `fn_80199ADC`'s case 7: arm mode 31 with the `em_demo_pos_set`/`em_demo_rot_set` pair and zero
+ * the stored height, then wait for `em_mot_end_ck` and run `fn_80128030`. */
 void fn_80199A2C(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
@@ -1866,8 +1812,8 @@ void fn_80199A2C(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80199ADC - the action-id dispatcher: `self->state_sub` (0x1E6) selects this range's own
- * per-action update, whose first two entries the registered `enemy/fn_80191598.cpp` owns. */
+/* 0x80199ADC - the action-id dispatcher: `self->state_sub` (0x1E6) selects this unit's per-action
+ * update. */
 void fn_80199ADC(struct _ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0:
@@ -1897,9 +1843,8 @@ void fn_80199ADC(struct _ENEMY_WORK* self) {
     }
 }
 
-/* 0x80199B24 - the per-action `action` (0x1E5) dispatcher of the run above, plus the common tail
- * every action shares: the +0x1E2 gate that runs the pair `em_busy_set`/`em_busy_timer_reset`, then this
- * unit's own `fn_8019E398`. */
+/* 0x80199B24 - the `action` (0x1E5) dispatcher, plus the shared tail: the +0x1E2 gate that runs
+ * `em_busy_set`/`em_busy_timer_reset`, then `fn_8019E398`. */
 void fn_80199B24(struct _ENEMY_WORK* self) {
     switch (self->action) {
     case 0:
@@ -2100,9 +2045,8 @@ u32 fn_8019E580(struct _ENEMY_WORK* self) {
     return 0;
 }
 
-/* 0x8019E5A8 - the deleting destructor of that record: reset through the owner's `fn_8013918C`,
- * then `operator delete` when the caller passed a positive flag.  Returns its argument, exactly as
- * the target's `mr r3,r30` epilogue does. */
+/* 0x8019E5A8 - the record's deleting destructor: reset through `fn_8013918C`, `operator delete` on a
+ * positive flag, and return the argument. */
 void* fn_8019E5A8(void* p, s16 flags) {
     if (p != 0) {
         fn_8013918C((struct _ENEMY_WORK*)p, 0);
@@ -2114,7 +2058,6 @@ void* fn_8019E5A8(void* p, s16 flags) {
 }
 }
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7A70..0x806A7A88`): the two-vector record its static
- * constructor `fn_8019E604` builds (`.data` tables point at it).  The name is a GUESS: a pair of model-space
- * points. */
+/* The unit's `.bss`: the two-vector record `fn_8019E604` seeds.  The name is a GUESS (a pair of model-space
+ * points). */
 VEC3 vec_pair_801926EC_0[2];  /* +0x806A7A70 */

@@ -1,15 +1,15 @@
-/* Types and macros the units cut from `enemy/fn_80191598.cpp` share (hoisted at phase 4 so each is defined once). */
+/* enemy/em016_prog_types.h - the `EmActWork` view of the enemy work record and its records, shared by
+ * `enemy/em016_prog.cpp` and `enemy/em018_prog.cpp`. */
 #ifndef MHTRI_ENEMY_EM016_PROG_TYPES_H
 #define MHTRI_ENEMY_EM016_PROG_TYPES_H
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
-/* The map's mangled callees take a `_ENEMY_WORK*`/`_CP_VECTOR*`; the front-end has to spell those
- * names to reproduce their symbols (rule 9), so both tags are forward-declared and the calls below
- * cast this range's view onto them (a pointer cast, never arithmetic). */
+/* The mangled callees take `_ENEMY_WORK*`/`_CP_VECTOR*`, so the tags are forward-declared and the calls cast
+ * this view onto them (rule 9). */
 struct _ENEMY_WORK;
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -44,11 +44,8 @@ struct EmAimRec {
     /* +0x3A */ s16 value_0x3A;
 };
 
-/* One 0x90-byte per-area cluster at `EmActWork::clusters_0x590` (three of them, ending at +0x740;
- * `enemy/fn_80138074.c` carries the same array as an unnamed byte blob, and `fn_80139954` reaches it
- * with the same `i * 0x90 + 0x590` addressing).  The two fields this range reads are the liveness
- * byte and the position `fn_800FBB90` copies.
- * size: 0x90 */
+/* One of the three per-area clusters at `EmActWork::clusters_0x590` (`enemy/fn_80138074.c` addresses the same
+ * array as `i * 0x90 + 0x590`); only the liveness byte and the position are read.  size: 0x90 */
 struct EmCluster {
     /* +0x00 */ u8 unused_0x00[0x03];
     /* +0x03 */ u8 live_0x03;     /* `fn_80191E30` needs >= 1 */

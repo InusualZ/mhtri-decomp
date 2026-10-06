@@ -1,7 +1,5 @@
-/* The enemy unit `enemy/em004_act.cpp` (the em004 TU, 0x801B-0x801CA8DC): the `.sdata2` float pool entries it owns
- * that `enemy/em005_act.cpp` reads as well (one TU's code split across the units).  Declared, never defined: the
- * pool belongs to the data pass.
- */
+/* enemy/em004_act.h - the `.sdata2` pool entries `enemy/em004_act.cpp` owns that `enemy/em005_act.cpp` also
+ * reads; declared, not defined (the source does not emit the pool yet). */
 #ifndef MHTRI_ENEMY_EM004_ACT_H
 #define MHTRI_ENEMY_EM004_ACT_H
 

@@ -1,54 +1,32 @@
-/* enemy/em010_prog.cpp - enemy 010 program
- *
- * `.text` 0x801663E4..0x8016D1C4, 30 functions written (the rest of the range is not decompiled yet).
- * Phase 4: fold of 2 registered units, built from `enemy/fn_80165FC8.cpp`, `enemy/fn_801679B0.cpp`.
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- *
- * Kept views: the retired sources declared 7 callee(s) with different signatures (`assignVec3`, `em_act_ck`, `em_fall_height_get`, `em_frame_flag_set`, `em_mot_set`, `em_mot_finished_ck`, `em_motion_param_set`); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
- * Hidden declarations: 7 header declaration(s) that disagree with the kept view are renamed away around their `#include` (`#define <name> <name>_hidden_<header>`): `assignVec3`, `em_act_ck`, `em_fall_height_get`, `em_frame_flag_set`, `em_mot_set`, `em_mot_finished_ck`, `em_motion_param_set`.
- */
-
-/* Retired header of `enemy/fn_801679B0.cpp` (kept for its notes and residuals): */
-/* enemy/fn_801679B0.cpp - the enemy state-machine unit, 0x801679B0..0x80170600 (117 functions).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap lookup:
- * every function of the range reports only `zz_<addr>_` in the shared runtime dump, and
- * `config/RMHE08/symbols.txt` carries only the bare `fn_XXXXXXXX` entries).
- *
- * Registration: the range is unclaimed in `splits.txt`; it sits in the `enemy` link band directly above
- * `enemy/fn_8014A1BC.c` (ends 0x801502C8) and every callee it names is an enemy symbol
- * (`em_act_ck__FP11_ENEMY_WORKUcUc`, `get_enemy_data__FP11_ENEMY_WORK`, `get_joint_wpos_em__FP...`), so it
- * registers as `enemy/` (brief section 2, class 3: what the code does plus the naming scheme of its
- * neighbours).
- *
- * Language: C++.  The unit calls `em_frame_check(_ENEMY_WORK*, u16, f32, f32)`, whose map spelling
- * `em_frame_check__FP11_ENEMY_WORKUsff` is a C++ mangling: rule 9 forbids writing the mangled spelling as
- * the callee, and a real signature only produces that symbol from the C++ front-end, so the unit is `.cpp`.
- * The unit's own `fn_*` functions stay flat symbols through `extern "C"`.  The one foreign callee it
- * needs a declaration for (`em_busy_set`, owned by `enemy/fn_8012BDF4.cpp`) and the unsplit enemy-band
- * helpers it calls live in their owner headers (`enemy/fn_8012BDF4.h`, `unsplit/enemy.h`),
- * not in this file (rule 2).
- *
- * Inventory and per-symbol measurement: `python tools/units/recompile.py enemy/fn_801679B0 --measure <symbol>`.
- *
- * Status.  42 of the 117 symbols are written and every one of them measures at or above the 80 % bar
- * (38 byte-identical at 100 %, `fn_801679B0` 83.13 and `fn_80167BA8` 83.12, `fn_8016E544` 97.75,
- * `fn_8016E610` 96.18, `fn_8016EE00`/`fn_80169360` 93.02).  The shape that closed the bulk is the
- * decompiler's own: each function is one of three families -
- *   * a `switch (self->state)` start-up advance that seeds `em_mot_set`/`em_mot_set_ck` and waits on
- *     `em_mot_end_ck`,
- *   * a dispatcher `switch (self->state_sub)` / `switch (self->action)` over the per-action handlers,
- *   * a tiny predicate.
- * `m2c` (tools/m2c, fed by `tools/units/m2cinput.py`) recovered all three, so the residual work is the
- * remaining 75 symbols, not a shape still to find.  The largest unwritten ones (each needs a struct this
- * unit reads that `enemy.h` does not yet name - 0x1BC/0x1C4, 0x314-0x324, 0x46C, 0x834/0x835, and a
- * u8 at 0x1E4 - plus a `cror eq,lt,eq` float compare m2c reports as `M2C_ERROR`) are listed in the outbox;
- * the four written functions still below 100 % are each one extra `clrlwi` byte-mask or one shared
- * `return` branch (see `fn_8016EE00` below).
- *
- * `fn_8016EE00` 93.02: retail masks the `u8` parameter (`clrlwi r0,r4,24; cmplwi r0,0x1`) where this build
- * folds the compare onto `r4` directly, and its case-1 false path shares the dispatch's exit branch while
- * this source emits a second `b`; the two fixes are a wider parameter with an explicit `(u8)` cast and a
- * fall-through instead of the trailing `return`, both left as recorded residuals rather than guessed.
+/*
+ * enemy/em010_prog.cpp - enemy 010's program: the per-area seat and entry selectors (`stage_map_kind_get`,
+ *   `area_no` and the entry state pick the `fn_80126324` motion), the per-motion state steps and their
+ *   `state_sub` dispatchers, and the static initializer.
+ * RANGE. .text 0x801663E4-0x8016D1C4 (77 functions); extab 0x8000E1D4-0x8000E3DC, extabindex
+ *   0x800291A8-0x800294B4, .ctors 0x8056F32C-0x8056F330, .rodata 0x8056FC10-0x8056FCD0, .data 0x805A6D58-0x805A7CE8
+ *   (`em010_prog_tbl` first), .bss 0x806A7898-0x806A7970, .sdata2 0x807974F0-0x807977D8.
+ * FLAGS. `cflags_main`, no `#pragma`.
+ * NAMES. The file name follows the runtime dump's `em010_prog_tbl`, which opens the TU's `.data`; the map has only
+ *   `fn_` stems for the functions.  Callees whose call sites disagree with the owner's header are called through
+ *   `<name>_viewN`/`<name>_cN` cast macros (the same direct call), and `#define <name> <name>_hidden_<header>`
+ *   hides the disagreeing declaration around its `#include`.
+ *   The `.bss` record names (`vec_pair_801679B0_0`..`_8`) are GUESSes.
+ * RESIDUALS. 47 rows unwritten: 0x80167DB4-0x80168010, 0x8016808C-0x80168828, 0x801688B4-0x80168C8C,
+ *   0x80168CDC-0x80169360, 0x801694C4-0x80169750, 0x801697BC-0x8016BFC4, 0x8016C09C-0x8016CB78,
+ *   0x8016CB88-0x8016CD50, 0x8016CD54-0x8016D1C4.
+ *   9 partial rows:
+ *  - `fn_80167BA8`: the body lacks retail's opening `a == 2` pair `em_busy_set`/`em_busy_timer_reset`, and
+ *    retail re-masks `a` (`clrlwi r0,r31,24`) before each compare;
+ *  - `fn_801679B0`, `fn_80169360`: retail re-masks the `u8` argument before each compare, ours compares the
+ *    register (`fn_80169360` also emits one more `b`);
+ *  - `fn_80166DF8`: ours fuses `clrlwi.` where retail keeps `clrlwi` + `cmpwi`, narrows with `clrlwi r6,r3,16`
+ *    before the copy, and gives each test of the chain its own `li r29,0` exit where retail shares one;
+ *  - `fn_801678A0`: ours fuses `subic.` where retail keeps `subi` + `cmpwi`, and schedules `li r4,0x1e` early;
+ *  - `fn_801676C4`, `fn_80167770`: retail schedules the `li r4,imm` argument two instructions later;
+ *  - `fn_801671AC`: retail sign-extends the masked value (`extsh r4,r0`) that ours uses unextended;
+ *  - `fn_801663E4`: one compare is `cmplwi` where retail has `cmpwi`, and ours reloads `lbl_807974FC` twice.
+ *   flipcheck: `.ctors`/`.rodata`/`.sdata2` claimed, not emitted; `.data` 0x138 against 0xF90; `.text` (0x1DC8 of
+ *   0x6DE0), extab (0xA8 of 0x208) and extabindex (0xFC of 0x30C) short of the claim and differing.
  */
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
@@ -77,20 +55,14 @@
 #include "enemy/fn_8012BDF4.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define em_hit_window_set_default_c1 ((void (*)(_ENEMY_WORK *, s32, s32))em_hit_window_set_default)
-/* em_motion_param_set_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_motion_param_set_view1 ((void (*)(struct _ENEMY_WORK*, s32, f32))em_motion_param_set)
-/* em_mot_finished_ck_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_mot_finished_ck_view1 ((u32 (*)(void))em_mot_finished_ck)
-/* em_mot_set_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_mot_set_view1 ((void (*)(struct _ENEMY_WORK*, s32, s32, s32))em_mot_set)
-/* em_frame_flag_set_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_frame_flag_set_view1 ((void (*)(struct _ENEMY_WORK*))em_frame_flag_set)
-/* em_fall_height_get_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_fall_height_get_view1 ((f32 (*)(struct _ENEMY_WORK*))em_fall_height_get)
-/* em_act_ck_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
 #define em_act_ck_view1 ((s32 (*)(struct _ENEMY_WORK*, u8, u8))em_act_ck)
 #undef em_act_ck
-/* assignVec3_view1: the retired sources disagreed on this callee's parameters; calls keep their own view through a cast (same direct call). */
+/* Call-site views: each macro casts a callee to the signature its call sites use (the same direct call). */
 #define assignVec3_view1 ((void (*)(Vec*, Vec*))assignVec3)
 
 extern "C" {
@@ -841,9 +813,7 @@ void fn_80167968(_ENEMY_WORK* self) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_801679B0 - advance the action's start-up state and seed the motion from the action code
- * ------------------------------------------------------------------------------------------------- */
+/* Advances the action's start-up state and seeds the motion from the action code. */
 extern "C" void fn_801679B0(_ENEMY_WORK *self, u8 a, u8 b) {
     if (a == 7) {
         em_busy_set(self);
@@ -907,9 +877,8 @@ extern "C" void fn_801679B0(_ENEMY_WORK *self, u8 a, u8 b) {
     }
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * small dispatchers and predicates
- * ------------------------------------------------------------------------------------------------- */
+/* ---- small dispatchers and predicates ---- */
+
 extern "C" void fn_80167BA8(_ENEMY_WORK *self, u8 a) {
     switch (self->state) {
     case 0:
@@ -991,7 +960,7 @@ extern "C" void fn_80168C8C(_ENEMY_WORK *self) {
     }
 }
 
-/* Pattern B: advance the start-up byte (state_0x05) and seed the motion */
+/* The start-up steps: advance `state_0x05` and seed the motion. */
 extern "C" void fn_80167CBC(_ENEMY_WORK *self) {
     switch (self->state) {
     case 0:
@@ -1052,7 +1021,7 @@ extern "C" void fn_80169448(_ENEMY_WORK *self) {
     }
 }
 
-/* Pattern A: dispatch on the action code (action_0x1E5) or the sub-state (state_sub) */
+/* The dispatchers on `action_0x1E5` or `state_sub`. */
 extern "C" void fn_80169750(_ENEMY_WORK *self) {
     switch (self->state_sub) {
     case 0:
@@ -1210,9 +1179,8 @@ extern "C" void fn_80169360(_ENEMY_WORK *self, u8 a) {
     }
 }
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7898..0x806A79A0`), in address order: the 11 two-vector record(s)
- * its static constructor `fn_8016CF18 and fn_8017054C` builds (`.data` tables point at them).  Names are GUESSes: each record is a
- * pair of model-space points. */
+/* The unit's `.bss` (0x806A7898..0x806A7970): the nine two-vector records `fn_8016CF18` seeds.  Names are
+ * GUESSes (each record is a pair of model-space points). */
 VEC3 vec_pair_801679B0_0[2];  /* +0x806A7898 */
 VEC3 vec_pair_801679B0_1[2];  /* +0x806A78B0 */
 VEC3 vec_pair_801679B0_2[2];  /* +0x806A78C8 */
