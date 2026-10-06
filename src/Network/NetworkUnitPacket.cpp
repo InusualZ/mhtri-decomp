@@ -1,7 +1,7 @@
 /*
  * Network/NetworkUnitPacket.cpp - the unit packet band: the message packet (`networkPacket_*`, the 0x18-byte
  *   `NetworkStreamWriter`), the 22-byte framed writer/reader (`networkStreamWriter_*`/`networkStreamReader_*`, the
- *   0x1C-byte `NetworkStreamWriterDefault`) and the queue of framed messages (`networkStreamQueue_*`).
+ *   0x14-byte `NetworkStreamWriterDefault`) and the queue of framed messages (`networkStreamQueue_*`).
  * RANGE. .text 0x803F89CC-0x803FAE9C (98 functions); .data 0x805FCC98-0x805FCE50, .sdata 0x80793958-0x80793960, .sdata2
  *   0x8079C7C0-0x8079C7D0, extab, extabindex.
  * FLAGS. `-O3` (configure.py) like the transport siblings; file-scope `#pragma peephole off` and `#pragma dont_inline
@@ -11,13 +11,18 @@
  *   (`NetworkStreamWriter`/`NetworkStreamWriterDefault`/`NetworkStreamQueue`).  GUESSes: the sink's +0x30/+0x34/+0x38
  *   slots `encrypt`/`decrypt`/`checksum` (u16 offset and size, from the forwarding overrides),
  *   `networkStreamReader_decryptFrame`, `networkStreamReader_test`, `networkStreamWriter_encrypt`/`_decrypt`.
+ *   GUESS (the frame-header field each reads): networkPacket_getSequenceA, networkPacket_getSequenceB,
+ *   GUESS: networkPacket_getSourceNonce, networkPacket_getSessionNonce, networkPacket_getFlag10, networkPacket_getChannel,
+ *   GUESS: networkPacket_getFlag04, networkPacket_isHandshake, networkStreamQueue_putNextPacket,
+ *   GUESS: networkStreamQueue_acknowledge.
  * RESIDUALS. `networkPacket_getMessageSize`: retail returns a u16, but `Network/NetworkSessionStable.cpp`'s `send` is
  *   worse with a u16 declaration, so the header keeps u32 and the callers here cast.  `networkPacket_copyMessage`: the
  *   same u16 return and operand order in two address sums.  The `networkPacket_*` rows `beginMessage`, `getHeaderSize`,
  *   `takeByte`, `putTopPacket` and `networkStreamQueue_acknowledge`: operand order / one register. `.data`: the two
- *   writer tables 0x805FCDD4/0x805FCE10 stay unemitted while their `attach`/`bind`/`fill`/`flush` overrides are the
- *   free functions other units call (`networkPacket_attach`, `networkStreamReader_attach`, ...; their destructors live
- *   in `Network/NetworkStreamSink.cpp`, whence `dataorder`'s zigzag seam at 0x805FCE10).  `extab`:
+ *   writer tables `__vt__26NetworkStreamWriterDefault`/`__vt__19NetworkStreamWriter` (0x805FCDD4/0x805FCE10) stay
+ *   unemitted while their flush overrides (the key functions the classes declare first) are the free functions
+ *   `networkStreamWriter_onFlush`/`networkPacket_onFlush`; their constructors and destructors are
+ *   `Network/NetworkConnectionStable.cpp`'s.  `extab`:
  *   `networkStreamQueue_discard`'s cleanup range ends at the `hasMessage` call in retail (0x11 words) and at `memmove`
  *   in ours (0x1B) - a `throw()` on the declaration does not move it.  `.sdata`: 2 of 8 B (the frame version).
  * SHAPES. A message is a big-endian u16 payload size, a flag byte (0x80 user data, 0x40 a timestamp follows, 0x3F the
@@ -713,7 +718,7 @@ u32 networkPacket_getFrameOverhead(void)
 }
 
 /* The frame's first sequence number (+0x04). */
-u16 networkPacket_getSequenceA(NetworkStreamWriter* self)
+u16 networkPacket_getSequenceA(NetworkStreamWriterDefault* self)
 {
     u16 raw;
 
@@ -722,7 +727,7 @@ u16 networkPacket_getSequenceA(NetworkStreamWriter* self)
 }
 
 /* The frame's second sequence number (+0x06). */
-u16 networkPacket_getSequenceB(NetworkStreamWriter* self)
+u16 networkPacket_getSequenceB(NetworkStreamWriterDefault* self)
 {
     u16 raw;
 
@@ -731,7 +736,7 @@ u16 networkPacket_getSequenceB(NetworkStreamWriter* self)
 }
 
 /* The frame's source nonce (+0x08). */
-u32 networkPacket_getSourceNonce(NetworkStreamWriter* self)
+u32 networkPacket_getSourceNonce(NetworkStreamWriterDefault* self)
 {
     u32 raw;
 
@@ -740,7 +745,7 @@ u32 networkPacket_getSourceNonce(NetworkStreamWriter* self)
 }
 
 /* The frame's session nonce (+0x0C). */
-u32 networkPacket_getSessionNonce(NetworkStreamWriter* self)
+u32 networkPacket_getSessionNonce(NetworkStreamWriterDefault* self)
 {
     u32 raw;
 
@@ -749,7 +754,7 @@ u32 networkPacket_getSessionNonce(NetworkStreamWriter* self)
 }
 
 /* The frame flag `networkStreamWriter_enable1` sets: 0 for 0x10, 1 for 0x20. */
-s32 networkPacket_getFlag10(NetworkStreamWriter* self)
+s32 networkPacket_getFlag10(NetworkStreamWriterDefault* self)
 {
     u8 flags = self->message_10[0x11];
 
@@ -760,7 +765,7 @@ s32 networkPacket_getFlag10(NetworkStreamWriter* self)
 }
 
 /* The frame's channel: 0 for flag 1, 1 for flag 2. */
-u8 networkPacket_getChannel(NetworkStreamWriter* self)
+s32 networkPacket_getChannel(NetworkStreamWriterDefault* self)
 {
     u8 flags = self->message_10[0x11];
 
@@ -771,13 +776,13 @@ u8 networkPacket_getChannel(NetworkStreamWriter* self)
 }
 
 /* True when the frame flag 0x04 is set. */
-s32 networkPacket_getFlag04(NetworkStreamWriter* self)
+s32 networkPacket_getFlag04(NetworkStreamWriterDefault* self)
 {
     return (self->message_10[0x11] & 4) != 0;
 }
 
 /* True for a handshake frame (flag 0x08). */
-s32 networkPacket_isHandshake(NetworkStreamWriter* self)
+s32 networkPacket_isHandshake(NetworkStreamWriterDefault* self)
 {
     return (self->message_10[0x11] & 8) != 0;
 }
@@ -956,10 +961,9 @@ u32 networkStreamWriter_size(const void* sub)
 
 /* Files the received frame's payload by its first sequence number: 0 when old, 2 when it starts beyond the expected one,
    3 when the new part was appended, or an error source when the queue is full. */
-u32 putTopPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet)
+u32 putTopPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame)
 {
     NetworkStreamWriter messages;
-    NetworkStreamWriterDefault* frame = (NetworkStreamWriterDefault*)packet;
     s32 first;
     s32 expected;
     s32 size;
@@ -967,7 +971,7 @@ u32 putTopPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet)
     u32 result;
 
     size = networkStreamReader_getPayloadSize(frame);
-    networkStreamQueue_unwrapSequence(self, self->sequence_10, networkPacket_getSequenceA(packet), &expected, &first);
+    networkStreamQueue_unwrapSequence(self, self->sequence_10, networkPacket_getSequenceA(frame), &expected, &first);
     if (first + size <= expected) {
         result = 0;
     } else if (expected < first) {
@@ -987,10 +991,9 @@ u32 putTopPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet)
 
 /* Files the payload of the received frame when its first sequence number is not beyond the expected one:
    0 when it is old or beyond, 1 when it was appended, or an error source when the queue is full. */
-u32 networkStreamQueue_putNextPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet)
+u32 networkStreamQueue_putNextPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame)
 {
     NetworkStreamWriter messages;
-    NetworkStreamWriterDefault* frame = (NetworkStreamWriterDefault*)packet;
     s32 first;
     s32 expected;
     s32 size;
@@ -998,7 +1001,7 @@ u32 networkStreamQueue_putNextPacket(NetworkStreamQueue* self, NetworkStreamWrit
 
     size = networkStreamReader_getPayloadSize(frame);
     result = 0;
-    networkStreamQueue_unwrapSequence(self, self->sequence_10, networkPacket_getSequenceA(packet), &expected, &first);
+    networkStreamQueue_unwrapSequence(self, self->sequence_10, networkPacket_getSequenceA(frame), &expected, &first);
     if (first + size <= expected) {
         result = 0;
     } else if (expected <= first) {
@@ -1014,10 +1017,9 @@ u32 networkStreamQueue_putNextPacket(NetworkStreamQueue* self, NetworkStreamWrit
 }
 
 /* Appends the whole payload of the received frame: 1, or an error source when the queue is full. */
-u32 putAllPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet)
+u32 putAllPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame)
 {
     NetworkStreamWriter messages;
-    NetworkStreamWriterDefault* frame = (NetworkStreamWriterDefault*)packet;
     u32 size;
 
     size = networkStreamReader_getPayloadSize(frame);
@@ -1030,12 +1032,12 @@ u32 putAllPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet)
 }
 
 /* Drops what the frame's second sequence number acknowledges and moves the expected number up to it. */
-void networkStreamQueue_acknowledge(NetworkStreamQueue* self, NetworkStreamWriter* packet)
+void networkStreamQueue_acknowledge(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame)
 {
     s32 acknowledged;
     s32 expected;
 
-    networkStreamQueue_unwrapSequence(self, self->sequence_10, networkPacket_getSequenceB(packet), &expected,
+    networkStreamQueue_unwrapSequence(self, self->sequence_10, networkPacket_getSequenceB(frame), &expected,
                                       &acknowledged);
     if (expected < acknowledged) {
         networkStreamQueue_discard(self, acknowledged - expected, 0xBF);

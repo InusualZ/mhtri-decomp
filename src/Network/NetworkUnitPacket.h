@@ -183,21 +183,21 @@ u32 networkPacket_getMessageOverhead(void);
 u32 networkPacket_getFrameOverhead(void);
 
 /* 0x803FA164 / 0x803FA1B0 - the frame's two sequence numbers; 0x803FA1FC / 0x803FA248 - its two nonces. */
-u16 networkPacket_getSequenceA(NetworkStreamWriter* self);
+u16 networkPacket_getSequenceA(NetworkStreamWriterDefault* self);
 
-u16 networkPacket_getSequenceB(NetworkStreamWriter* self);
+u16 networkPacket_getSequenceB(NetworkStreamWriterDefault* self);
 
-u32 networkPacket_getSourceNonce(NetworkStreamWriter* self);
+u32 networkPacket_getSourceNonce(NetworkStreamWriterDefault* self);
 
-u32 networkPacket_getSessionNonce(NetworkStreamWriter* self);
+u32 networkPacket_getSessionNonce(NetworkStreamWriterDefault* self);
 
 /* 0x803FA2C4 - the frame's channel (0 or 1); 0x803FA310 - true for a handshake frame. */
-u8 networkPacket_getChannel(NetworkStreamWriter* self);
+s32 networkPacket_getChannel(NetworkStreamWriterDefault* self);
 /* 0x803FA294 / 0x803FA2F4 - the frame flags `networkStreamWriter_enable1` and `_setFlag04` set (GUESS names). */
-s32 networkPacket_getFlag10(NetworkStreamWriter* self);
-s32 networkPacket_getFlag04(NetworkStreamWriter* self);
+s32 networkPacket_getFlag10(NetworkStreamWriterDefault* self);
+s32 networkPacket_getFlag04(NetworkStreamWriterDefault* self);
 
-s32 networkPacket_isHandshake(NetworkStreamWriter* self);
+s32 networkPacket_isHandshake(NetworkStreamWriterDefault* self);
 
 /* 0x803F9970 - appends the front message under `mask` to the writer; returns the bytes or -1. */
 s32 networkStreamWriter_putPacket(NetworkStreamWriterDefault* self, NetworkStreamWriter* packet, u32 mask);
@@ -209,7 +209,7 @@ s32 networkStreamQueue_append(NetworkStreamQueue* self, NetworkStreamWriter* pac
 s32 networkStreamQueue_appendAll(NetworkStreamQueue* self, NetworkStreamWriter* packet);
 
 /* 0x803FAAFC - appends the frame's whole payload; 1, or an error source. */
-u32 putAllPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet);
+u32 putAllPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame);
 
 /* 0x803FAC38 - lifts whichever of two 16-bit sequence numbers wrapped so they compare the short way round. */
 void networkStreamQueue_unwrapSequence(NetworkStreamQueue* self, u16 own, u16 other, s32* ownOut, s32* otherOut);
@@ -232,12 +232,12 @@ void networkStreamQueue_setSequence(NetworkStreamQueue* self, u16 sequence);
 
 /* 0x803FA898 / 0x803FA9D0 - files `packet` by its first / next sequence number; 0..3 is the outcome,
  * else an error source. */
-u32 putTopPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet);
+u32 putTopPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame);
 
-u32 networkStreamQueue_putNextPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet);
+u32 networkStreamQueue_putNextPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame);
 
 /* 0x803FABC0 - drops what the packet's second sequence number acknowledges. */
-void networkStreamQueue_acknowledge(NetworkStreamQueue* self, NetworkStreamWriter* packet);
+void networkStreamQueue_acknowledge(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame);
 
 /* 0x803FAC80 - moves the read cursor to the front; 0x803FAC8C - true when a whole message is under it;
  * 0x803FACF4 - steps over it; 0x803FAD88 - binds `packet` to the bytes from the cursor; 0x803FADB8 - removes it. */
