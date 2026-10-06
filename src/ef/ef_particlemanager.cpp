@@ -1,6 +1,6 @@
 /*
  * ef/ef_particlemanager.cpp - the nw4r::ef::ParticleManager bookkeeping object: its constructor `fn_800AB664`
- *   (installs the table `lbl_805934E0`, slots 2-7 = fn_800AB730, fn_800AB73C, fn_800ABA6C, fn_800AC1BC,
+ *   (installs the table `lbl_805934E0`, slots 2-7 = fn_800AB730, fn_800AB73C, ef_pm_initialize, ef_pm_create_particle,
  *   fn_800AC2F8, fn_800ADED8), the object's lifecycle, and the static initializer `fn_800AEE14`, which constructs
  *   the file's two static matrices.
  * RANGE. .text 0x800AB658-0x800AEE48 (44 functions); extab 0x80009E6C-0x80009F74, extabindex 0x80023148-0x800232D4,
@@ -20,12 +20,16 @@
  *   GUESS: `ef_field_gravity` (0x800AD9CC): a constant direction given as rotation angles, scaled by the power.
  *   GUESS: `ef_draw_info_copy` (0x800AE2A4): the draw info's (`EfDrawInfo`, 0xA0 bytes) field-by-field copy.
  *   GUESS: `ef_draw_info_set_depth_offset` (0x800AE298): sets the draw info's depth offset and origin.
+ *   GUESS: `ef_pm_initialize` (0x800ABA6C): table slot 4, binds the manager to its emitter and resource.
+ *   GUESS: `ef_pm_create_particle` (0x800AC1BC): table slot 5, allocates, initialises and lists a particle.
  *   GUESS: `ef_pm_draw` (0x800ADED8): table slot 7, draws the particles through the manager's draw strategy.
  *   GUESS: `ef_pm_calc_emitter_pos` (0x800ADA5C): a position relative to the emitter, from the three matrices.
- * RESIDUALS. 4 rows unwritten (empty bodies): 0x800ABA6C-0x800AC0E4, 0x800AC1BC-0x800AC2F8,
- *   0x800AC2F8-0x800AD0C4, 0x800AE6A8-0x800AEE0C.  The source order differs from retail's, so `.text`, extab and
+ * RESIDUALS. 2 rows unwritten (empty bodies): 0x800AC2F8-0x800AD0C4, 0x800AE6A8-0x800AEE0C.  The source order differs from retail's, so `.text`, extab and
  *   extabindex run in another order.
  *  - `ef_field_random`: three products keep their operands in the other order (`fmuls f1, f1, f0`).
+ *  - `ef_pm_create_particle`: the arguments take r23-r29 with `self` in r30 where retail keeps `self` in r31, and
+ *    the memory manager's slot +0x4C is called through a function-pointer table (`lwz r4`) where retail's is a
+ *    virtual (`lwz r12`).
  *  - `ef_pm_draw`: retail tests the emitter's hidden bit as `beq` + `b` where ours branches once.
  *   relocdiff: our `.ctors` word carries the symbol `lbl_8056F2DC`, retail's none.
  *   flipcheck: `.bss`, `.data` and `.sdata2` claimed, not emitted (`.sdata2` is a partial pool: flipcheck names a
@@ -51,6 +55,7 @@
 #include "ef/ef_emitter_tex_flags.h" /* ef_emitter_get_mtx (rule 2) */
 #include "ef/ef_util.h" /* ef_vec3_from_rotation (rule 2) */
 #include "ef/ef_effect.h" /* ef_res_emitter_desc (rule 2) */
+#include "ef/ef_creationqueue.h" /* ef_ref_object_add_ref (rule 2) */
 #include "ef/ef_particle.h" /* ef_resource_draw_setting (rule 2) */
 #include "ef/ef_animcurve.h" /* ef_anim_rand_next / ef_anim_name_hash (rule 2) */
 #include "g3d/mtx34_inverse.h" /* mtx34_inverse (rule 2) */
@@ -76,6 +81,12 @@ extern const char lbl_80592F78[]; /* "ef_particlemanager.cpp" */
 extern const char lbl_80592F90[]; /* "NW4R:Pointer Error\ntarget(=%p) is not valid pointer." */
 extern const char lbl_80592FC8[]; /* "NW4R:Failed assertion target->mParticleManager == this" */
 extern const char ef_pm_result_pointer_error[];
+extern const char ef_pm_err_parent[]; /* "NW4R:Pointer Error\nparent(=%p) is not valid pointer." */
+extern const char ef_pm_err_resource_arg[]; /* "NW4R:Pointer Error\nresource(=%p) is not valid pointer." */
+extern const char ef_pm_err_manager_em[]; /* "...\nmManagerEM(=%p) ..." */
+extern const char ef_pm_err_manager_ef[]; /* "...\nmManagerEM->mManagerEF(=%p) ..." */
+extern const char ef_pm_err_manager_es[]; /* "...\nmManagerEM->mManagerEF->mManagerES(=%p) ..." */
+extern const char ef_pm_err_draw_strategy_builder[]; /* "...\n...->mDrawStrategyBuilder(=%p) ..." */
 extern const char ef_pm_err_resource[]; /* "NW4R:Pointer Error\nmResource(=%p) is not valid pointer." */
 extern const char ef_pm_err_emitter_desc[]; /* "NW4R:Pointer Error\ned(=%p) is not valid pointer." */
 extern const char ef_pm_err_draw_strategy[]; /* "NW4R:Pointer Error\nmDrawStrategy(=%p) is not valid pointer." */
@@ -124,7 +135,9 @@ struct EfPmManager;
 struct EfPmParticle {
     /* +0x00 */ u8 pad_0x00[0x0C];
     /* +0x0C */ s32 state;            /* 1 = created (ad/retire), 3 = retired */
-    /* +0x10 */ u8 pad_0x10[0x9C];
+    /* +0x10 */ u8 pad_0x10[0x0C];
+    /* +0x1C */ struct EfPmParticleSlots* slots; /* the particle class's table */
+    /* +0x20 */ u8 pad_0x20[0x8C];
     /* +0xAC */ nw4r::math::VEC3 accel; /* the velocity the fields add into */
     /* +0xB8 */ u8 pad_0xB8[0x0C];
     /* +0xC4 */ f32 accelScale;       /* the factor every added acceleration is scaled by */
@@ -201,7 +214,8 @@ struct EfPmDirParam {
 
 /* The parameter block fn_800AC0E4 forwards. */
 struct EfPmSetterParams {
-    /* +0x00 */ u8 pad_0x00[0x77];
+    /* +0x00 */ u16 flags;     /* bit 10: the manager is not drawn */
+    /* +0x02 */ u8 pad_0x02[0x75];
     /* +0x77 */ u8 mode;
     /* +0x78 */ u32 colorPri;
     /* +0x7C */ u32 colorSec;
@@ -238,11 +252,14 @@ struct EfPmFieldVortexParam {
     /* +0x10 */ EfRotation rotation; /* the vortex axis, as rotation angles */
 }; /* size: 0x1C */
 
-/* The emitter descriptor ef_res_emitter_desc resolves a manager's resource to: +0x94 holds its flags (bit 10: not drawn). */
+/* The emitter descriptor ef_res_emitter_desc resolves a manager's resource to: +0x94 holds its flags (bit 10: not
+ * drawn) and the start of the setter block fn_800AC0E4 forwards, +0x140 the draw type. */
 struct EfPmEmitterDesc {
-    /* +0x00 */ u8 pad_0x00[0x94];
-    /* +0x94 */ u16 flags;
-}; /* size: 0x96 */
+    /* +0x000 */ u8 pad_0x000[0x94];
+    /* +0x094 */ EfPmSetterParams setter;
+    /* +0x124 */ u8 pad_0x124[0x1C];
+    /* +0x140 */ u8 drawType;
+}; /* size: 0x141 */
 
 /* The emitter's draw setting as the particle manager reads it: the depth offset at +0xB4. */
 struct EfPmDrawSetting {
@@ -250,11 +267,53 @@ struct EfPmDrawSetting {
     /* +0xB4 */ f32 depthOffset;
 }; /* size: 0xB8 */
 
-/* The emitter flags the draw pass reads (+0x20, bit 1: hidden). */
+/* The particle class's table: slot +0x10 initialises a freshly allocated particle (by-value position and
+ * velocity), nonzero on success. */
+struct EfPmParticleSlots {
+    /* +0x00 */ u8 pad_0x00[0x10];
+    /* +0x10 */ s32 (*initialize)(EfPmParticle* self, u16 life, nw4r::math::VEC3 pos, nw4r::math::VEC3 vel,
+                                  EfPmManager* manager, s32 param0, f32 scale, s32 param1, s32 param2);
+}; /* size: 0x14 */
+
+/* The effect system's memory manager: its table's slot +0x4C allocates a particle. */
+struct EfPmMemoryManagerSlots {
+    /* +0x00 */ u8 pad_0x00[0x4C];
+    /* +0x4C */ EfPmParticle* (*allocParticle)(EfMemoryManager* self);
+}; /* size: 0x50 */
+
+struct EfMemoryManager {
+    /* +0x00 */ EfPmMemoryManagerSlots* slots;
+}; /* size: 0x04 */
+
+/* The draw-strategy builder (`nw4r::ef::DrawStrategyBuilder`, defined elsewhere): its first virtual hands out the
+ * strategy for a draw type. */
+class EfPmDrawStrategyBuilder {
+public:
+    virtual nw4r::ef::DrawStrategy* GetDrawStrategy(u32 drawType) = 0;
+}; /* size: 0x04 */
+
+/* The effect system as the particle manager reads it: its draw-strategy builder at +0x08. */
+struct EfPmEffectSystem {
+    /* +0x00 */ u8 pad_0x00[0x08];
+    /* +0x08 */ EfPmDrawStrategyBuilder* drawStrategyBuilder;
+}; /* size: 0x0C */
+
+/* The effect an emitter belongs to: its effect system at +0x20. */
+struct EfPmEffect {
+    /* +0x00 */ u8 pad_0x00[0x20];
+    /* +0x20 */ EfPmEffectSystem* system;
+}; /* size: 0x24 */
+
+/* The emitter fields the particle manager reads: its flags (+0x20, bit 1: hidden), its effect and its
+ * random block. */
 struct EfPmEmitterView {
     /* +0x00 */ u8 pad_0x00[0x20];
     /* +0x20 */ u32 flags;
-}; /* size: 0x24 */
+    /* +0x24 */ u8 pad_0x24[0x98];
+    /* +0xBC */ EfPmEffect* effect;
+    /* +0xC0 */ u8 pad_0xC0[0x2C];
+    /* +0xEC */ u32 random;
+}; /* size: 0xF0 */
 
 /* The random field's parameter record. */
 struct EfPmFieldRandomParam {
@@ -322,6 +381,7 @@ extern "C" u8* ef_emres_get_ptcl_track_tbl(void* self);
 extern "C" u16 ef_emres_num_ptcl_track(void* self);
 extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, const nw4r::math::VEC3* d);
 extern "C" void fn_800AEE14();
+extern "C" void fn_800AC0E4(EfPmManager* self, EfPmSetterParams* p);
 extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src);
 extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, const nw4r::math::VEC3* origin);
 
@@ -399,12 +459,65 @@ extern "C" s32 fn_800AB9F4(EfPmManager* self) {
     return total;
 }
 
+/* 0x800ABA6C (0x678): table slot 4: binds the manager to its emitter and resource, resets its state and picks
+ * the draw strategy the resource's draw type asks for. */
+extern "C" s32 ef_pm_initialize(EfPmManager* self, EfEmitterManager* parent, EfResource* resource) {
+#line 109
+    NW4R_POINTER_ASSERT(lbl_80592F78, parent, ef_pm_err_parent);
+    NW4R_POINTER_ASSERT(lbl_80592F78, resource, ef_pm_err_resource_arg);
+    ef_ref_object_init(self);
+    ef_activity_list_clear(&self->list);
+    self->stateA.aa.a = lbl_807960A8;
+    self->stateA.aa.b = lbl_807960A8;
+    self->stateA.aa.vec.x = ef_pm_f32_zero;
+    self->stateA.aa.vec.y = ef_pm_f32_zero;
+    self->stateA.aa.vec.z = ef_pm_f32_zero;
+    self->managerEM = parent;
+    ef_ref_object_add_ref((EffectManager*)parent);
+    self->resource = resource;
+    self->flags = 0;
+    ef_pm_set_mtx_dirty(self);
+    EfPmEmitterDesc* desc = (EfPmEmitterDesc*)ef_res_emitter_desc(self->resource);
+#line 132
+    NW4R_POINTER_ASSERT(lbl_80592F78, self->managerEM, ef_pm_err_manager_em);
+    NW4R_POINTER_ASSERT(lbl_80592F78, ((EfPmEmitterView*)self->managerEM)->effect, ef_pm_err_manager_ef);
+    NW4R_POINTER_ASSERT(lbl_80592F78, ((EfPmEmitterView*)self->managerEM)->effect->system, ef_pm_err_manager_es);
+#line 135
+    NW4R_POINTER_ASSERT(lbl_80592F78, ((EfPmEmitterView*)self->managerEM)->effect->system->drawStrategyBuilder, ef_pm_err_draw_strategy_builder);
+    EfPmDrawStrategyBuilder* builder = ((EfPmEmitterView*)self->managerEM)->effect->system->drawStrategyBuilder;
+    self->drawStrategy = builder->GetDrawStrategy(desc->drawType);
+    self->list.activeCount = 0;
+    fn_800AC0E4(self, &desc->setter);
+    return 1;
+}
+
 /* Forward a parameter block to the manager's own setter. */
 extern "C" void fn_800AC0E4(EfPmManager* self, EfPmSetterParams* p) {
     fn_800AC100(self, p->mode, &p->colorPri, &p->colorSec, p->scale, &p->vec);
 }
 
 extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, const nw4r::math::VEC3* d);
+
+/* 0x800AC1BC (0x13C): allocates a particle from the effect system's memory manager, initialises it with
+ * copies of `pos` and `vel`, extends its life and puts it on the manager's list. */
+extern "C" EfPmParticle* ef_pm_create_particle(EfPmManager* self, u16 life, const nw4r::math::VEC3* pos,
+                                     const nw4r::math::VEC3* vel, s32 param0, f32 scale, s32 param1, s32 param2,
+                                     u16 lifeAdd) {
+    EfMemoryManager* mm = ef_system_memory_manager(((EfPmEmitterView*)self->managerEM)->effect->system);
+    EfPmParticle* p = mm->slots->allocParticle(mm);
+    if (p == NULL) {
+        return NULL;
+    }
+    if (p->slots->initialize(p, life, *pos, *vel, self, param0, scale, param1, param2) == 0) {
+        return NULL;
+    }
+    p->life += lifeAdd;
+    ef_activity_list_add(&self->list, p);
+    p->state = 1;
+    p->field_0xE4 = 0;
+    p->field_0xE5 = ef_random_u16(&((EfPmEmitterView*)self->managerEM)->random);
+    return p;
+}
 
 /* The setter fn_800AC0E4 forwards to. */
 extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, const nw4r::math::VEC3* d) {
@@ -472,7 +585,7 @@ extern "C" void ef_pm_draw(EfPmManager* self, const EfDrawInfo* info) {
     EfPmEmitterDesc* ed = (EfPmEmitterDesc*)ef_res_emitter_desc(self->resource);
 #line 701
     NW4R_POINTER_ASSERT(lbl_80592F78, ed, ef_pm_err_emitter_desc);
-    if ((ed->flags & 0x400) == 0) {
+    if ((ed->setter.flags & 0x400) == 0) {
         if ((((EfPmEmitterView*)self->managerEM)->flags & 2) == 0) {
             EfDrawInfo local;
             ef_draw_info_copy(&local, info);
@@ -824,7 +937,5 @@ extern "C" MTX34* ef_pm_get_mtx(void* target, MTX34* out) {
 /* Not yet reconstructed                                                                          */
 /* --------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800ABA6C() {}
-extern "C" void fn_800AC1BC() {}
 extern "C" void fn_800AC2F8() {}
 extern "C" void ef_pm_modulate_color() {}

@@ -46,6 +46,9 @@ struct CreationQueue {
 extern "C" {
 #endif
 
+/* 0x800A337C - a referenced object's AddRef: increments its count and returns it. */
+u32 ef_ref_object_add_ref(EffectManager* object);
+
 /* 0x800A3044 (0x338): queues a type-0 (particle) creation. */
 void ef_creation_queue_add_type0(CreationQueue* self, const Setting* setting, EffectManager* manager,
                                  EffectHandle* eh, u16 life, const Vec3* pos, const Vec3* vel);

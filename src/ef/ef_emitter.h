@@ -26,6 +26,11 @@ nw4r::math::MTX34* ef_mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34
 nw4r::math::MTX34* ef_calc_inherit_mtx(nw4r::math::MTX34* dst, const nw4r::math::MTX34* orig, bool inheritScale,
                                        bool inheritRotate, s8 inheritTranslate, bool aroundOrigin);
 #endif
+/* 0x800A6E70 - steps the random block and returns the high half of its state. */
+u16 ef_random_u16(u32* random);
+/* 0x800A96C0 - marks a particle manager's matrix for rebuilding. */
+struct EfPmManager;
+void ef_pm_set_mtx_dirty(struct EfPmManager* pm);
 /* 0x800A8A04 - the spawner's truncation (the angle -> byte rounding helper). */
 f32 ef_truncate_float(f32 x);
 /* 0x800A8A08 - steps the random block and returns it normalised to 0..1. */

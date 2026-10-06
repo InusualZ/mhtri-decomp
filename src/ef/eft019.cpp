@@ -11,6 +11,8 @@
  *   so plain definitions are `extern "C"`.  `_EFT019_ACTOR` reads the actor's +0x1E1 byte as the area number (the
  *   canonical `enemy.h` calls it `act_id`; every ef consumer compares it as an area).
  * RESIDUALS. 1 row unwritten: 0x8011392C-0x8011484C (`fn_8011392C`, the per-frame update).
+ *  - `eft019_set` and `eft019_set_subtype` load the pooled constants `lbl_807969DC`, `lbl_807969E8` and
+ *    `lbl_807969F4` by name where retail's loads carry no symbol (retail folds them into its own pool).
  *   7 partial rows:
  *  - `eft019_set`: frame 0x100 against retail's 0x90; ours copies each case's `VEC3` through a second stack slot;
  *  - `fn_80112D58`: frame 0x80 against 0x70, and ours places the `lbl_8059FB40` colour block inline;
@@ -105,17 +107,17 @@ void eft019_set_ring(nw4r::math::VEC3* pos, u8 area, _CP_VECTOR* rot);
 void eft019_set_smoke(nw4r::math::VEC3* pos, u8 area, u8 type, s32 timer);
 
 /* The effect-manager id table and the sound-object hooks `fn_80112D58` case 0x88 drives, declared locally with C
- * linkage (the target references their plain names): `fn_800A4420`/`fn_800A51D8` are `ef/ef_effect.cpp`'s,
+ * linkage (the target references their plain names): `ef_system_memory_manager`/`fn_800A51D8` are `ef/ef_effect.cpp`'s,
  * `fn_800A970C`/`fn_800A9714`/`fn_800A67E8` `ef/ef_emitter.cpp`'s (a rule-2 residual). */
 extern "C" {
-void** fn_800A4420(s32 id);
+void** ef_system_memory_manager(s32 id);
 void* fn_800A51D8(nw4r::ef::Effect* effect, u32 arg);
 u16 fn_800A970C(void);
 void* fn_800A9714(void* obj, u16 index);
 void fn_800A67E8(void* obj, void* value);
 }
 
-/* The object `fn_800A4420` returns: a vtable word at +0 and the 4th virtual slot at +0x0C, which
+/* The object `ef_system_memory_manager` returns: a vtable word at +0 and the 4th virtual slot at +0x0C, which
  * retail calls with the object itself as `this`. size: 0x04 */
 struct _EFT019_SND_OBJ {
     /* +0x00 */ void** vtable;
@@ -127,7 +129,7 @@ struct _EFT019_SND_VTABLE {
     /* +0x0C */ void (*slot_0x0C)(_EFT019_SND_OBJ* self);
 }; /* size: 0x10 */
 
-/* The effect manager's control block `eft_control` is the band's one record (`unsplit/ef_control.h`); this unit only hands its +0x04 word to `fn_800A4420`. */
+/* The effect manager's control block `eft_control` is the band's one record (`unsplit/ef_control.h`); this unit only hands its +0x04 word to `ef_system_memory_manager`. */
 #include "unsplit/ef_control.h"
 
 /* `calcVecAngXY(VEC3*, u32*, u32*)` and `rotVecY(VEC3*, u32)` are map-mangled free functions with no
@@ -1060,7 +1062,7 @@ void fn_80112D58(_EFT* self)
         i = (s32)fn_800A9714(obj, (u16)(fn_800A970C() - 1));
         fn_800AB9F4((struct EfPmManager*)i);
         fn_800A67E8(obj, (void*)i);
-        obj = (_EFT019_SND_OBJ*)fn_800A4420(snd);
+        obj = (_EFT019_SND_OBJ*)ef_system_memory_manager(snd);
         ((_EFT019_SND_VTABLE*)obj->vtable)->slot_0x0C(obj);
         break;
     }

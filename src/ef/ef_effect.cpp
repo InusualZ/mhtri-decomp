@@ -12,6 +12,10 @@
  * NAMES. The map has only `fn_` stems for the range except `RetireEmitterAll`, `ForeachParticleManager` and
  *   `SetRootMtx`, written as `nw4r::ef::Effect` members.
  *   GUESS (from the body and its callers): `ef_get_life_status`.
+ *   GUESS: `ef_activity_list_add` (0x800A43E8), `ef_activity_list_clear` (0x800A4428): an activity list's append
+ *   and reset.
+ *   GUESS: `ef_system_memory_manager` (0x800A4420): the effect system's memory manager (its first word).
+ *   GUESS: `ef_ref_object_init` (0x800A444C): a referenced object's initialisation (no link, state 1).
  *   GUESS (from `ef/ef_resource.cpp`'s use - the emitter resource's name word and the out-of-line
  *   GUESS: `ut::List_GetFirst`): `ef_emres_get_name`, `ef_list_get_first`.
  *   GUESS: `ef_res_emitter_desc` (0x800A4864): returns the record 8 bytes into an emitter resource, the emitter
@@ -95,7 +99,7 @@ typedef struct EfEffTable {
     /* +0x24 */ void (*method_0x24)(void* self);
 } EfEffTable; /* size: 0x28 */
 
-/* The memory manager fn_800A4420 hands back: a table with the effect-pool getter/releaser. */
+/* The memory manager ef_system_memory_manager hands back: a table with the effect-pool getter/releaser. */
 typedef struct EfEffMemMgrVtbl {
     /* +0x00 */ u8 pad_0x00[0x24];
     /* +0x24 */ void* (*getEmitter)(void* self);
@@ -106,7 +110,7 @@ typedef struct EfEffMemMgr {
     /* +0x00 */ EfEffMemMgrVtbl* vtable;
 } EfEffMemMgr; /* size: 0x04 (lower bound: the manager's own state is not this unit's) */
 
-/* The object the effect keeps at +0x20 (`mManagerES`): its first word is the record `fn_800A4420`
+/* The object the effect keeps at +0x20 (`mManagerES`): its first word is the record `ef_system_memory_manager`
  * dereferences and its +0x04 word is the effect's +0xA0 back-pointer. */
 typedef struct EfEffManager {
     /* +0x00 */ void* field_0x00;
@@ -122,12 +126,12 @@ typedef struct EfEffA0Obj {
 
 /* The effect object this unit works on (`nw4r::ef::Effect`).  A local view (rule 1 debt above). */
 typedef struct EfEff {
-    /* +0x00 */ void* mMemoryManager; /* fn_800A4420 dereferences it */
+    /* +0x00 */ void* mMemoryManager; /* ef_system_memory_manager dereferences it */
     /* +0x04 */ u8 pad_0x04[0x04];
     /* +0x08 */ u16 mNumEmitter; /* the head word fn_800A4AF0 reads through +0x24 */
     /* +0x0A */ u16 pad_0x0A;
     /* +0x0C */ s32 mState; /* 1 = active, 2 = created, 3 = retired */
-    /* +0x10 */ void* mField_0x10; /* cleared by fn_800A444C, tested by fn_800A49B8 */
+    /* +0x10 */ void* mField_0x10; /* cleared by ef_ref_object_init, tested by fn_800A49B8 */
     /* +0x14 */ u8 pad_0x14[0x04];
     /* +0x18 */ u16 mField_0x18;
     /* +0x1A */ u16 pad_0x1A;
@@ -239,10 +243,10 @@ void* fn_80501C9C(void* list, u16 idx);
 
 /* This unit's own symbols (address order). */
 u32 fn_800A40F4(EfEff* self, EfEffManager* mgr, void* eh, u16 n);
-void fn_800A43E8(EfEffActivityList* list, void* node);
-void* fn_800A4420(void* p);
-void fn_800A4428(EfEffActivityList* list);
-u32 fn_800A444C(EfEff* self);
+void ef_activity_list_add(EfEffActivityList* list, void* node);
+void* ef_system_memory_manager(void* p);
+void ef_activity_list_clear(EfEffActivityList* list);
+u32 ef_ref_object_init(EfEff* self);
 u32 fn_800A4464(EfEff* self);
 u32 fn_800A4470(EfEff* self);
 u32 fn_800A4474(EfEff* self, EfEffEmitter* em);
@@ -320,8 +324,8 @@ extern "C" u32 fn_800A40F4(EfEff* self, EfEffManager* mgr, void* eh, u16 n) {
 #line 42
     NW4R_POINTER_ASSERT(eh, lbl_80592430, lbl_80592478);
 
-    fn_800A444C(self);
-    fn_800A4428(&self->mEmitters);
+    ef_ref_object_init(self);
+    ef_activity_list_clear(&self->mEmitters);
     self->mField_0xA0 = mgr->field_0x04;
     mtx34_identity(&self->mRootMtx);
     self->mManagerES = mgr;
@@ -334,35 +338,35 @@ extern "C" u32 fn_800A40F4(EfEff* self, EfEffManager* mgr, void* eh, u16 n) {
     self->mField_0x8C = zero;
     self->mField_0x90 = zero;
 
-    mm = (EfEffMemMgr*)fn_800A4420(mgr);
+    mm = (EfEffMemMgr*)ef_system_memory_manager(mgr);
     em = (EfEffEmitter*)mm->vtable->getEmitter(mm);
     if (em == NULL) {
         return 0;
     }
     if (em->mTable->method_0x10(em, self, eh, 128) == 0) {
-        mm = (EfEffMemMgr*)fn_800A4420(mgr);
+        mm = (EfEffMemMgr*)ef_system_memory_manager(mgr);
         mm->vtable->releaseEmitter(mm, em);
         return 0;
     }
-    fn_800A43E8(&self->mEmitters, em);
+    ef_activity_list_add(&self->mEmitters, em);
     em->mState = 1;
     em->mField_0xE8 += n;
     return 1;
 }
 
 /* 0x800A43E8 - appends an emitter to the group and bump the live count. */
-extern "C" void fn_800A43E8(EfEffActivityList* list, void* node) {
+extern "C" void ef_activity_list_add(EfEffActivityList* list, void* node) {
     fn_80501A64(&list->mActiveList, node);
     list->mNumActive++;
 }
 
 /* 0x800A4420 - the manager getter: the record's first word. */
-extern "C" void* fn_800A4420(void* p) {
+extern "C" void* ef_system_memory_manager(void* p) {
     return *(void**)p;
 }
 
 /* 0x800A4428 - clears an activity group (both lists and the count). */
-extern "C" void fn_800A4428(EfEffActivityList* list) {
+extern "C" void ef_activity_list_clear(EfEffActivityList* list) {
     list->mActiveList.head = NULL;
     list->mActiveList.numObjects = 0;
     list->mActiveList.tail = NULL;
@@ -373,7 +377,7 @@ extern "C" void fn_800A4428(EfEffActivityList* list) {
 }
 
 /* 0x800A444C - resets the effect's state to active. */
-extern "C" u32 fn_800A444C(EfEff* self) {
+extern "C" u32 ef_ref_object_init(EfEff* self) {
     self->mField_0x10 = NULL;
     self->mState = 1;
     return 1;
@@ -430,17 +434,17 @@ extern "C" u32 fn_800A4654(EfEff* self, EfEffEmitter* emitter, u8 a, u16 b) {
         nw4r::db::Warning(lbl_80592430, __LINE__, lbl_805924E4, ef_emres_get_name(emitter));
         return 0;
     }
-    mm = (EfEffMemMgr*)fn_800A4420(self->mManagerES);
+    mm = (EfEffMemMgr*)ef_system_memory_manager(self->mManagerES);
     em = (EfEffEmitter*)mm->vtable->getEmitter(mm);
     if (em == NULL) {
         return 0;
     }
     if (em->mTable->method_0x10(em, self, emitter, a) == 0) {
-        mm = (EfEffMemMgr*)fn_800A4420(self->mManagerES);
+        mm = (EfEffMemMgr*)ef_system_memory_manager(self->mManagerES);
         mm->vtable->releaseEmitter(mm, em);
         return 0;
     }
-    fn_800A43E8(&self->mEmitters, em);
+    ef_activity_list_add(&self->mEmitters, em);
     em->mState = 1;
     em->mField_0xE8 += b;
     return (u32)em;
