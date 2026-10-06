@@ -4,6 +4,7 @@
 #define MHTRI_G3D_FN_80063888_H
 
 #include "types.h"
+#include "g3d/anm_typename_AnmObj.h" /* anm_typename_AnmObj, this unit's record (leaf header) */
 #include "g3d/g3d_camera_types.h" /* `nw4r::g3d::Camera::PostureInfo`, the object `camera_posture_info_ctor` initialises */
 
 #ifdef __cplusplus
@@ -26,9 +27,6 @@ s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */
 nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::PostureInfo *self);
 #endif
 
-/* The animation type-name record (`.rodata`: a length word, then the NUL-terminated name) `g3d/g3d_anmchr.cpp`'s
- * type-info members read; it sits in this unit's range (the seam is 0x8056F550). */
-extern u8 anm_typename_AnmObj[];          /* 0x8056F568 - "AnmObj" */
 
 /* The 3-float clamp `g3d/g3d_resanmchr.cpp`'s frame walkers call. */
 f32 fn_8006497C(f32 a, f32 b, f32 c);       /* 0x8006497C - the 3-float clamp helper */
