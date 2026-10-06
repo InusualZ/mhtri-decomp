@@ -5,7 +5,8 @@
  *   0x80591618-0x80591860, .sdata 0x807912B8-0x807912D8.  Left seam: fn_80099400 calls `ResShp::ref`
  *   (fn_80077674) on its own `this` where fn_800993B4 calls `ResNode::ref` (fn_8005D218), and the `.data`
  *   fragment opens with "g3d_resshp.cpp"; the right edge is `g3d/g3d_cpu.cpp`.
- * NAMES. Map stems (the dump answers `zz_` placeholders) except the nw4r members ResShp::Init/Terminate and
+ * NAMES. Map stems (the dump answers `zz_` placeholders) except the nw4r members ResShp::Init/Terminate,
+ *   ResShp::CallPrePrimitiveDisplayList/CallPrimitiveDisplayList and
  *   ResTex::ref/GetTexObjParam/GetTexObjCIParam/GetTexData (named by the retail `_ac.h` accessor set).  The `ResTagDLData` fields (`mPrePrimOfs` at +0x08,
  *   `mSize`/`mDlSize`) and the `ResTevData`/`ResTexBlock` fields are GUESSes; the `ResShpData` `id*` fields are
  *   spelled by fn_80099974's assert (`ref().idVtxPosition >= 0`).
@@ -45,34 +46,8 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 }  // namespace db
 }  // namespace nw4r
 
-/* The `ResTagDL` block embedded in the `ResShp` data at +0x18 (fn_80099740's assert names the class
- * through `.sdata` 0x80591794).  +0x08 is the offset fn_800996E8 resolves from the tag's own address;
- * the tail half also reads +0x00 (fn_80099DD4) and +0x04 (fn_8009A018), so all three words are named. */
-struct ResTagDLData {
-    /* +0x00 */ u32 mSize;       /* the marked block's total size (fn_80099DD4)                  */
-    /* +0x04 */ u32 mDlSize;     /* the display-list size (fn_8009A018, fn_8009A018's callers)    */
-    /* +0x08 */ u32 mPrePrimOfs; /* the offset from this tag to the block it marks               */
-}; /* size: 0xC */
-
-/* The `ResShp` resource block `ResShp::ref` hands back.  +0x04 is the offset fn_80099400 turns into a
- * `ResMdl` handle (fn_8007B878's assert header is `g3d_resmdl_ac.h`); +0x18 is the embedded pre-prim
- * tag and +0x24 the shape's own display-list tag.  The `id*` half are the shape's per-vertex-resource
- * ids: the first is named by fn_80099974's own assert string (`ref().idVtxPosition >= 0`), the rest
- * follow it and are `-1` when the shape has no resource of that kind. */
-struct ResShpData {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ u32 mToResMdlData;
-    /* +0x08 */ u8 pad_0x08[0x18 - 0x8];
-    /* +0x18 */ ResTagDLData mTag;            /* the pre-prim tag (fn_800995A0, fn_800996AC) */
-    /* +0x24 */ ResTagDLData mDlTag;          /* the shape's display-list tag (fn_80099DF8) */
-    /* +0x30 */ u8 pad_0x30[0x18];
-    /* +0x48 */ s16 idVtxPosition;            /* vertex-position id (asserted `>= 0`)        */
-    /* +0x4A */ s16 idVtxNrm;                 /* vertex-normal id, -1 = none                 */
-    /* +0x4C */ s16 idVtxClr[2];              /* the colour-channel ids, -1 = none           */
-    /* +0x50 */ s16 idVtxTexCoord[8];         /* the tex-coord ids, -1 = none                */
-    /* +0x60 */ u8 pad_0x60[0x2];
-    /* +0x62 */ s16 idTex;                    /* texture id, -1 = none                       */
-}; /* size: 0x64 (a lower bound: only the fields above are reached) */
+using nw4r::g3d::ResShpData;
+using nw4r::g3d::ResTagDLData;
 
 /* The `ResTev`/`ResTex` resource blocks the tail half caches (`g3d_restev_ac.h` /
  * `g3d_restex_ac.h`, the file names of their asserts).  Only the words the tail's bodies reach are
@@ -128,8 +103,6 @@ extern char lbl_807912C0[4]; /* "ref" */
 
 /* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
-ResShpData* fn_80077674(const ResHandle* pSelf);         /* owner: src/g3d/fn_80075DCC.cpp */
-ResShpData* fn_80077398(const ResHandle* pSelf);         /* owner: src/g3d/fn_80075DCC.cpp */
 void* fn_8007B878(void* pOut, u32 value);                /* owner: src/g3d/fn_80075DCC.cpp */
 }
 
@@ -164,7 +137,7 @@ u32 fn_800997AC(ResHandle* pSelf);
 /* The `ResShp` body before the range's ResShpPrePrim cluster: build the model handle from the shape's
  * +0x04 offset. */
 u32 fn_80099400(ResHandle* pSelf) {
-    ResShpData* pData = fn_80077674(pSelf);
+    const ResShpData* pData = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref();
     return fn_8009943C(pSelf, pData->mToResMdlData);
 }
 
@@ -228,7 +201,7 @@ s32 fn_8009958C(const ResHandle* pSelf) {
 
 /* Box the ResShp data's embedded tag (its +0x18 block). */
 u32 fn_800995A0(ResHandle* pSelf) {
-    ResShpData* pData = fn_80077674(pSelf);
+    const ResShpData* pData = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref();
     ResHandle tag;
     return (u32)fn_800995D4(&tag, (u32)&pData->mTag)->mpData;
 }
@@ -299,7 +272,7 @@ ResTagDLData* fn_800997A4(const ResHandle* pSelf) {
 
 /* Box the ResShp data's embedded tag through the other `ResShp::ref` copy. */
 u32 fn_800997AC(ResHandle* pSelf) {
-    ResShpData* pData = fn_80077398(pSelf);
+    ResShpData* pData = &reinterpret_cast<nw4r::g3d::ResShp*>(pSelf)->ref();
     ResHandle tag;
     return (u32)fn_800995D4(&tag, (u32)&pData->mTag)->mpData;
 }
@@ -333,7 +306,6 @@ extern u32 lbl_8056F730[];
 
 /* The neighbours this half calls (plain map stems), each owner named beside it. */
 extern "C" {
-ResShpData* fn_80077398(const ResHandle* pSelf);  /* owner: g3d/fn_80075DCC.cpp            */
 void fn_80091F70(void* pDst, u32 arg1, u32 arg2);  /* owner: g3d/g3d_resanmtexsrt.cpp       */
 void fn_80071008(void* pBase, u32 size);          /* owner: g3d/g3d_calcview.cpp           */
 void GXCallDisplayList(void* pList, u32 size);    /* the SDK's own symbol                  */
@@ -355,12 +327,10 @@ u32 fn_80099DD4(ResHandle* pSelf);
 u32 fn_80099DF8(ResHandle* pSelf);
 ResHandle* fn_80099E2C(ResHandle* pSelf, const ResHandle* pRhs);
 void fn_80099E5C(ResHandle* pSelf, const ResHandle* pRhs);
-void fn_80099F1C(ResHandle* pSelf, s32 pSync, s32 pSkipPrePrimHeader);
 void fn_8009A000(u32 addr, u32 size);
 u32 fn_8009A018(ResHandle* pSelf);
 ResHandle* fn_8009A03C(ResHandle* pSelf, const ResHandle* pRhs);
 void fn_8009A06C(ResHandle* pSelf, const ResHandle* pRhs);
-void fn_8009A078(ResHandle* pSelf, s32 flag);
 u32 fn_8009A0F8(ResHandle* pSelf);
 void fn_8009A12C(ResHandle* pSelf, s32 flag);
 u32 fn_8009A174(ResHandle* pSelf);
@@ -421,17 +391,17 @@ extern "C" void fn_800998CC(ResHandle* pSelf, u32 attr) {
 /* 0x80099974 - the shape's vertex-position resource: resolve the owning model's position array at the
  * shape's own `idVtxPosition` (the assert the target bakes into `ref().idVtxPosition >= 0`). */
 extern "C" u32 fn_80099974(ResHandle* pSelf) {
-    if (fn_80077674(pSelf)->idVtxPosition < 0) {
+    if (reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref().idVtxPosition < 0) {
         nw4r::db::Panic(lbl_80591618, 0x31E, lbl_80591664);
     }
 
     u32 mdl = fn_80099400(pSelf);
-    return (u32)reinterpret_cast<nw4r::g3d::ResMdl*>(&mdl)->GetResVtxPos((int)fn_80077674(pSelf)->idVtxPosition).mpData;
+    return (u32)reinterpret_cast<nw4r::g3d::ResMdl*>(&mdl)->GetResVtxPos((int)reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref().idVtxPosition).mpData;
 }
 
 /* 0x800999E8 - the vertex-normal resource, or a null handle when the shape has none (`idVtxNrm == -1`). */
 extern "C" u32 fn_800999E8(ResHandle* pSelf) {
-    ResShpData* pData = fn_80077674(pSelf);
+    const ResShpData* pData = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref();
 
     if (pData->idVtxNrm != -1) {
         u32 mdl = fn_80099400(pSelf);
@@ -443,14 +413,14 @@ extern "C" u32 fn_800999E8(ResHandle* pSelf) {
 
 /* 0x80099A58 - one colour-channel resource (two per shape, hence the `idx == 0 || idx == 1` assert). */
 extern "C" u32 fn_80099A58(ResHandle* pSelf, u32 idx) {
-    ResShpData* pData = fn_80077674(pSelf);
+    const ResShpData* pData = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref();
     bool inRange = (idx == 0 || idx == 1);
 
     if (!inRange) {
         nw4r::db::Panic(lbl_80591618, 0x330, lbl_80591694);
     }
 
-    s16* pId = &pData->idVtxClr[idx];
+    const s16* pId = &pData->idVtxClr[idx];
 
     if (*pId != -1) {
         u32 mdl = fn_80099400(pSelf);
@@ -466,7 +436,7 @@ extern "C" u32 fn_80099B10(ResHandle* pSelf, u32 idx) {
         nw4r::db::Panic(lbl_80591618, 0x33B, lbl_805916C0);
     }
 
-    s16* pId = &fn_80077674(pSelf)->idVtxTexCoord[idx];
+    const s16* pId = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref().idVtxTexCoord[idx];
 
     if (*pId != -1) {
         u32 mdl = fn_80099400(pSelf);
@@ -478,7 +448,7 @@ extern "C" u32 fn_80099B10(ResHandle* pSelf, u32 idx) {
 
 /* 0x80099BB0 - the shape's texture, or a null handle when it has none (`idTex == -1`). */
 extern "C" u32 fn_80099BB0(ResHandle* pSelf) {
-    ResShpData* pData = fn_80077674(pSelf);
+    const ResShpData* pData = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref();
 
     if (pData->idTex != -1) {
         u32 mdl = fn_80099400(pSelf);
@@ -545,7 +515,7 @@ extern "C" u32 fn_80099DD4(ResHandle* pSelf) {
 
 /* 0x80099DF8 - box the shape's own display-list tag (the ResShp data's +0x24 block). */
 extern "C" u32 fn_80099DF8(ResHandle* pSelf) {
-    ResShpData* pData = fn_80077398(pSelf);
+    ResShpData* pData = &reinterpret_cast<nw4r::g3d::ResShp*>(pSelf)->ref();
     ResHandle tag;
     return (u32)fn_800995D4(&tag, (u32)&pData->mDlTag)->mpData;
 }
@@ -581,13 +551,13 @@ void nw4r::g3d::ResShp::Terminate() {
 
 /* 0x80099F1C - draws the pre-prim block: `pSync` picks the SDK's `GXCallDisplayList` over the inline pipe
  * command, `pSkipPrePrimHeader` skips the block's 0x20-byte header. */
-extern "C" void fn_80099F1C(ResHandle* pSelf, s32 pSync, s32 pSkipPrePrimHeader) {
+void nw4r::g3d::ResShp::CallPrePrimitiveDisplayList(bool bSync, bool bSkipHeader) const {
     ResHandle hTag;
-    u32 tag = fn_800995A0(pSelf);
+    u32 tag = fn_800995A0(reinterpret_cast<ResHandle*>(const_cast<ResShp*>(this)));
     fn_8009A03C(&hTag, (const ResHandle*)&tag);
 
-    if (pSkipPrePrimHeader != 0) {
-        if (pSync != 0) {
+    if (bSkipHeader) {
+        if (bSync) {
             u32 size = fn_8009A018(&hTag);
             GXCallDisplayList((void*)(fn_800996E8(&hTag) + 0x20), size - 0x20);
         } else {
@@ -595,7 +565,7 @@ extern "C" void fn_80099F1C(ResHandle* pSelf, s32 pSync, s32 pSkipPrePrimHeader)
             fn_8009A000(fn_800996E8(&hTag) + 0x20, size - 0x20);
         }
     } else {
-        if (pSync != 0) {
+        if (bSync) {
             u32 size = fn_8009A018(&hTag);
             GXCallDisplayList((void*)fn_800996E8(&hTag), size);
         } else {
@@ -630,12 +600,12 @@ extern "C" void fn_8009A06C(ResHandle* pSelf, const ResHandle* pRhs) {
 
 /* 0x8009A078 - draw the shape's own display list (the +0x24 tag), `flag` picking the SDK call over
  * the inline pipe command. */
-extern "C" void fn_8009A078(ResHandle* pSelf, s32 flag) {
+void nw4r::g3d::ResShp::CallPrimitiveDisplayList(bool bSync) const {
     ResHandle hTag;
-    u32 tag = fn_8009A0F8(pSelf);
+    u32 tag = fn_8009A0F8(reinterpret_cast<ResHandle*>(const_cast<ResShp*>(this)));
     fn_8009A03C(&hTag, (const ResHandle*)&tag);
 
-    if (flag != 0) {
+    if (bSync) {
         u32 size = fn_8009A018(&hTag);
         GXCallDisplayList((void*)fn_800996E8(&hTag), size);
     } else {
@@ -647,7 +617,7 @@ extern "C" void fn_8009A078(ResHandle* pSelf, s32 flag) {
 /* 0x8009A0F8 - the same +0x24 tag through the first `ResShp::ref` copy (the head's fn_800997AC is
  * the +0x18 one through the second). */
 extern "C" u32 fn_8009A0F8(ResHandle* pSelf) {
-    ResShpData* pData = fn_80077674(pSelf);
+    const ResShpData* pData = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref();
     ResHandle tag;
     return (u32)fn_800995D4(&tag, (u32)&pData->mDlTag)->mpData;
 }

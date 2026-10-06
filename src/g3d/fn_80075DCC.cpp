@@ -11,7 +11,7 @@
  *   plus the channel); GDWriteXFCmd is a GUESS (the SDK's GD inline that
  *   writes one XF register: opcode 0x10, a zero count, the address, the value); `CopiedMatResources` is a GUESS (the 0x38-byte
  *   set of material handles fn_80077E70 refills and 0x80078DC0 constructs).  The material resource classes'
- *   constructors, assignments, ResMatTexCoordGen::IsValid, ResMatTevColor::IsValid and `ResMat` getters are nw4r's `g3d_resmat_ac.h` members.
+ *   constructors, assignments, ResMatTexCoordGen::IsValid, ResMatTevColor::IsValid, ResShp's ref/ptr/GetClassName/IsValid and `ResMat` getters are nw4r's `g3d_resmat_ac.h` members.
  * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, mtx34_set, fn_80079EE4, fn_8007A468.
  *   Unwritten (empty stubs, 33 rows, 0x31F0 bytes; objdiff scores them near zero): fn_800769F4, fn_8007868C,
  *   fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8, fn_800793A4, fn_80079604, fn_80079938, fn_800799BC,
@@ -59,7 +59,7 @@ typedef struct {
 #include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
-#include "g3d/g3d_xsi.h" /* fn_800D74E8 (rule 2) */
+#include "g3d/g3d_xsi.h" /* g3d_calc_tex_mtx_xsi (rule 2) */
 #include "g3d/g3d_cpu.h"
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resmat.h"
@@ -258,9 +258,6 @@ u32 math_sincos_idx(f32);
 /* internal */ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4);
 /* internal */ void* fn_8007663C(s32 *arg0);
 /* internal */ u32 fn_800769F4(s32 *arg0, s32 *arg1, s32 arg2, s32 arg3, s32 arg4, void *arg5, s32 arg6);
-/* internal */ void* fn_80077398(s32 arg0);
-/* internal */ s32 fn_800773FC(s32 *arg0);
-/* internal */ void* fn_80077404(void* a0);
 /* internal */ u32 GDWriteXFCmd(u16 arg0, s32 arg1);
 /* internal */ u32 fn_80077474(s32 arg0);
 /* internal */ u32 fn_80077480(u16 arg0);
@@ -273,9 +270,6 @@ u32 math_sincos_idx(f32);
 /* internal */ void* fn_800775CC(s32 arg0);
 /* internal */ s32 fn_80077630(s32 *arg0);
 /* internal */ s32 fn_80077644(void* a0);
-/* internal */ void* fn_80077674(s32 arg0);
-/* internal */ s32 fn_800776D8(s32 *arg0);
-/* internal */ s32 fn_800776E0(s32 *arg0);
 /* internal */ s32 fn_80077708(s32 arg0, void* a1);
 /* internal */ u32 fn_80077738(s32 *arg0, s32 *arg1);
 /* internal */ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2);
@@ -486,7 +480,7 @@ void fn_80075E9C(s32 arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, u32 arg_sp0) 
     if (arg4 == 0) {
         nw4r::db::Panic((const char*)&lbl_8058E570, 0x2C, (const char*)&lbl_8058E5B0);
     } else if (arg4 == 1) {
-        var_r26 = fn_800D74E8((s32)(arg0), (s32)(arg1), (s32)(arg2), (s32)(arg3)) == 0;
+        var_r26 = g3d_calc_tex_mtx_xsi((nw4r::math::MTX34*)(arg0), (BOOL)(arg1), (const nw4r::g3d::TexSrt*)(arg2), (u32)(arg3)) == 0;
     } else {
         nw4r::db::Panic((const char*)&lbl_8058E570, 0x3C, (const char*)&lbl_8058E5D8);
     }
@@ -974,20 +968,28 @@ u32 fn_800769F4(s32 *arg0, s32 *arg1, s32 arg2, s32 arg3, s32 arg4, void *arg5, 
 }
 
 
-void* fn_80077398(s32 arg0) {
-    if (fn_800776E0(0) == 0) {
-        nw4r::db::Panic((const char*)&lbl_8058E6F0, 0x3A, (const char*)&lbl_8058E6D0, fn_80077404(0), &lbl_807911E8);
+} /* extern "C" */
+
+/* 0x80077398 (0x64): returns the shape block, panicking on a NULL handle. */
+nw4r::g3d::ResShpData& nw4r::g3d::ResShp::ref() {
+    if (!IsValid()) {
+        nw4r::db::Panic((const char*)&lbl_8058E6F0, 0x3A, (const char*)&lbl_8058E6D0, GetClassName(),
+                        (const char*)&lbl_807911E8);
     }
-    fn_800773FC((s32 *)(arg0));
+    return *ptr();
 }
 
-s32 fn_800773FC(s32 *arg0) {
-    return *arg0;
+/* 0x800773FC (0x8): returns the shape block. */
+nw4r::g3d::ResShpData* nw4r::g3d::ResShp::ptr() {
+    return mpData;
 }
 
-void* fn_80077404(void* a0) {
-    return &lbl_807911F0;
+/* 0x80077404 (0x8): returns the class name. */
+const char* nw4r::g3d::ResShp::GetClassName() {
+    return (const char*)&lbl_807911F0;
 }
+
+extern "C" {
 
 /* 0x8007740C (0x14): writes a colour channel's material colour (XF 0x100C + chan). */
 void g3d_gd_set_chan_mat_color(u32 chan, GXColor color) {
@@ -1108,23 +1110,31 @@ typedef struct {
     /* +0x34 */ u32 field_0x34;
 } RawView_15; /* size: 0x38 */
 s32 fn_80077644(void* a0) {
-    return (((RawView_15*)fn_80077674(0))->field_0x34 & 2) == 0;
+    return (reinterpret_cast<const nw4r::g3d::ResShp*>(a0)->ref().flag & 2) == 0;
 }
 
-void* fn_80077674(s32 arg0) {
-    if (fn_800776E0(0) == 0) {
-        nw4r::db::Panic((const char*)&lbl_8058E720, 0x3A, (const char*)&lbl_8058E700, fn_80077404(0), &lbl_807911E4);
+} /* extern "C" */
+
+/* 0x80077674 (0x64): returns the shape block, panicking on a NULL handle. */
+const nw4r::g3d::ResShpData& nw4r::g3d::ResShp::ref() const {
+    if (!IsValid()) {
+        nw4r::db::Panic((const char*)&lbl_8058E720, 0x3A, (const char*)&lbl_8058E700, GetClassName(),
+                        (const char*)&lbl_807911E4);
     }
-    fn_800776D8((s32 *)(arg0));
+    return *ptr();
 }
 
-s32 fn_800776D8(s32 *arg0) {
-    return *arg0;
+/* 0x800776D8 (0x8): returns the shape block. */
+const nw4r::g3d::ResShpData* nw4r::g3d::ResShp::ptr() const {
+    return mpData;
 }
 
-s32 fn_800776E0(s32 *arg0) {
-    return *arg0 != 0;
+/* 0x800776E0 (0x14): whether the handle is set. */
+bool nw4r::g3d::ResShp::IsValid() const {
+    return mpData != NULL;
 }
+
+extern "C" {
 
 } /* extern "C" */
 
@@ -1265,7 +1275,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
 
     M2C_ERROR(/* unknown instruction: xsmaddmdp vs30, vs1, vs0 */);
     M2C_ERROR(/* unknown instruction: xxsel vs29, vs1, vs0, vs36 */);
-    if ((reinterpret_cast<const nw4r::g3d::ResMat*>(0)->IsValid() == 0) || (fn_800776E0((s32 *)(arg2)) == 0)) {
+    if ((reinterpret_cast<const nw4r::g3d::ResMat*>(0)->IsValid() == 0) || (reinterpret_cast<const nw4r::g3d::ResShp*>(arg2)->IsValid() == 0)) {
         M2C_ERROR(/* unknown instruction: vmrghb v31, v1, v0 */);
         M2C_ERROR(/* unknown instruction: vmrghb v30, v1, v0 */);
         M2C_ERROR(/* unknown instruction: vmrghb v29, v1, v0 */);
@@ -1297,10 +1307,10 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
         if ((s32) *var_r31 != 0) {
             if (var_r29 == 0) {
                 var_r29 = 1;
-                if ((s32) ((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08 >= 0) {
+                if ((s32) reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx >= 0) {
                     temp_r20 = fn_8006FDCC((void*)(arg1));
-                    if ((u32) ((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08 == temp_r20) {
-                        temp_r3_2 = (void *)(g3d_state_get_nrm_mtx((u32)(((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08)));
+                    if ((u32) reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx == temp_r20) {
+                        temp_r3_2 = (void *)(g3d_state_get_nrm_mtx((u32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx)));
                         spC8 = ((RawView_18*)temp_r3_2)->field_0x00;
                         spCC = ((RawView_18*)temp_r3_2)->field_0x04;
                         spD0 = ((RawView_18*)temp_r3_2)->field_0x08;
@@ -1314,7 +1324,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                         sp20 = fn_80094094((s32)(arg0));
                         fn_80077E34((s32)(&sp2C), (void*)(&sp20));
                         sp1C = fn_80074074((void*)(&sp2C));
-                        temp_r3_3 = fn_8006FEC8((void*)(&sp1C), (s32)(((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08));
+                        temp_r3_3 = fn_8006FEC8((void*)(&sp1C), (s32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx));
                         if (temp_r3_3 < 0) {
                             nw4r::db::Panic((const char*)&lbl_8058E880, 0x64, (const char*)&lbl_8058E890);
                         }
@@ -1322,7 +1332,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                         fn_8005D2C0((void*)(&sp28), (void*)(&sp18));
                         temp_r20_2 = fn_8005D218((void*)(arg1));
                         mtx34_concat((void*)(&spC8), (void*)(fn_8005D218((void*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
-                        temp_r3_4 = (void *)(g3d_state_get_nrm_mtx((u32)(((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08)));
+                        temp_r3_4 = (void *)(g3d_state_get_nrm_mtx((u32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx)));
                         sp8 = ((RawView_19*)temp_r3_4)->field_0x18;
                         spC = ((RawView_19*)temp_r3_4)->field_0x1C;
                         sp10 = ((RawView_19*)temp_r3_4)->field_0x20;
