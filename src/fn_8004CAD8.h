@@ -10,6 +10,7 @@
 #include "nw4r/math.h"
 #include "fn_8004CAD8/mtx.h" /* MTX34_ctor / set_slot_none - the two this unit's consumers share */
 #include "fn_8004CAD8/get_qResult_work.h" /* get_qResult_work (leaf header) */
+#include "vec3_scale.h" /* vec3_scale (leaf header) */
 
 #ifdef __cplusplus
 void wii_sysmsg_gen(long id, char* buf, long a);
@@ -178,7 +179,7 @@ f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
 /* 0x800513CC / 0x80050028 / 0x80051EE0 / 0x800513F0 - the four vector helpers the `Pl` hit tests and
  * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `fn_800513CC(out, a, b)`
  * is the paired-single add `out = a + b`, `fn_80050028(out, src)` the field-by-field three-float copy,
- * `fn_80051EE0(out, in, s)` the scale (`VEC3_ctor` then `fn_80051424`), and `fn_800513F0` the
+ * `vec3_scale(out, in, s)` the scale (`VEC3_ctor` then `fn_80051424`; in its leaf header), and `fn_800513F0` the
  * in-place scale.  Added with `Pl/fn_8028F66C.cpp`, the first consumer to need them here.  The
  * parameter spellings are the ones the consumers that already include this header declare
  * (`ef/fn_801173AC.cpp`, `enemy/fn_801B7020.cpp`, `enemy/fn_8035E034.cpp`): `fn_800513F0`'s return
@@ -186,7 +187,6 @@ f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
  * would be a second overload and `(10505) illegal overloading`. */
 void fn_800513CC(VEC3* out, VEC3* a, VEC3* b);
 void fn_80050028(VEC3* out, const VEC3* src);
-void fn_80051EE0(VEC3* out, VEC3* in, f32 scale);
 void fn_800513F0(VEC3* v, f32 scale);
 /* 0x80053960 / 0x80054178 - the two draw-shape helpers the cockpit band (`menu/fn_802E4978.cpp`,
  * 0x802E4978-0x802E7408) calls (rule 2: this range owns the addresses; the signatures are that

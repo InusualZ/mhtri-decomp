@@ -29,7 +29,8 @@
 
 #include "types.h"
 #include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
-#include "unsplit/ef.h"
+#include "ef/ef_torus.h" /* fn_800C9DCC (rule 2) */
+#include "ef/ef_emitter.h" /* ef_random_float (rule 2) */
 #include "fn_8004CAD8.h"       /* sqrt_f32 - that unit owns the address and publishes it (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
@@ -55,7 +56,7 @@ typedef struct EfWork {
     s8  scale_rate;       /* +0x67  per-frame scale step, in hundredths */
     u8  pad_0x68[0x80];   /* +0x68 */
     u16 spawn_id;         /* +0xE8  forwarded to the particle's spawn slot */
-    u32 progress;         /* +0xEC  fixed-point progress read by fn_800A8A08 */
+    u32 progress;         /* +0xEC  fixed-point progress read by ef_random_float */
     u8  pad_0xF0[0x08];   /* +0xF0 */
     u32 spawn_param;      /* +0xF8  forwarded to the particle's spawn slot */
     u8  spawn_extra;      /* +0xFC  address forwarded to the particle's spawn slot */
@@ -87,7 +88,6 @@ extern void assignVec3(VEC3* out, VEC3* in);
 extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);
 extern void fn_800A99B4(s32 ctx, VEC3* out, EfWork* em, VEC3* pos, VEC3* a, VEC3* b, VEC3* c);
 extern u32  fn_800A9FB0(s32 ctx, u16 id, EfWork* em, f32 scale);
-extern f32  fn_800A8A08(void* progress);
 extern f32  fn_80463F10(f32 a, f32 b);
 }
 
@@ -133,7 +133,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
 
         VEC3_ctor(&v88); /* `mh3_pad.h`'s C-linkage declaration takes nw4r::math::VEC3* */
         VEC3_ctor(&v76);
-        t = fn_800A8A08(&em->progress);
+        t = ef_random_float(&em->progress);
         rate = params->rate_pct / 100.0f;
         if (flags & 0x01000000) {
             /* One argument, not two: the callee (0x80050BC0) reads only f1.  Retail's f2 at
@@ -143,7 +143,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             factor = t + rate * (1.0f - t);
         }
         if (!(flags & 0x00020000)) {
-            angle = (params->range_end - params->range_begin) * fn_800A8A08(&em->progress);
+            angle = (params->range_end - params->range_begin) * ef_random_float(&em->progress);
         }
         fn_8009C760(&cs, &sn, phase + angle);
         setVec3(&v64, cs, 0.0f, -sn);
@@ -151,7 +151,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         if (flags & 0x00020000) {
             v88.y = offset_y;
         } else {
-            v88.y = size_y * ((2.0f * fn_800A8A08(&em->progress)) - 1.0f);
+            v88.y = size_y * ((2.0f * ef_random_float(&em->progress)) - 1.0f);
         }
         v88.z = size_z * (v64.z * factor);
         setVec3(&v52, v88.x, 0.0f, v88.z);
@@ -161,7 +161,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         fn_800A99B4(ctx, &v76, em, &v88, &v52, &v40, &v64);
         v16 = v76;
         v28 = v88;
-        factor = 1.0f + 0.01f * (f32)em->scale_rate * fn_800A8A08(&em->progress);
+        factor = 1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress);
         pm->slots->spawn(pm, (u16)fn_800A9FB0(ctx, (u16)id, em, scale), &v28, &v16, spawn_arg,
                          &em->spawn_extra, em->spawn_param, em->spawn_id, factor);
         if (flags & 0x00020000) {
@@ -205,7 +205,7 @@ void fn_800CBFB0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     if (flags & 0x00040000) {
         phase = params->range_begin;
     } else {
-        phase = 2.0f * (3.14159265f * fn_800A8A08(&em->progress));
+        phase = 2.0f * (3.14159265f * ef_random_float(&em->progress));
     }
     if (flags & 0x00020000) {
         range_phase = fn_80463F10(params->range_end - params->range_begin, 6.2831855f);

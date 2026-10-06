@@ -42,7 +42,8 @@
 #include "Pl/Pl_master_ck.h"
 #include "Pl/fn_802693C4.h"
 #include "ef/fn_8011722C.h"
-#include "unsplit/g3d.h"
+#include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
+#include "g3d/g3d_calcview.h" /* fn_8006FDCC (rule 2) */
 #include "unsplit/sound.h"
 #include "unsplit/Pl.h"
 #include "unsplit/ef.h"

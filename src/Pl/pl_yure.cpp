@@ -29,7 +29,7 @@
 #include "ef/get_move_work_adrs.h"
 #include "enemy/joint_mtx_store.h"
 #include "fn_8004CAD8.h"
-#include "g3d/mtx34_inverse.h"
+#include "g3d/g3d_state.h"
 #include "mh3_pad/vec3.h"
 #include "unsplit/unknown.h"
 #include "nw4r/fn_805012C4.h"

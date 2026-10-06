@@ -31,7 +31,8 @@
 #include "ef.h"
 #include "sys_mem.h"
 #include "unsplit/ef.h"
-#include "unsplit/g3d.h"
+#include "ef/ef_emitter.h" /* ef_truncate_float/ef_res_block_body (rule 2) */
+#include "g3d/g3d_scnroot.h" /* fn_800834F0 (rule 2) */
 
 #pragma fp_contract off
 #pragma peephole off
@@ -57,9 +58,7 @@ extern f32 lbl_80796080; /* 0.5f    .sdata2 */
 
 /* nw4r helpers, declared locally with C linkage. */
 extern "C" void fn_800A4080(void* self); /* the particle's base constructor */
-extern "C" f32 fn_800A8A04(f32 v);       /* the angle -> byte rounding helper */
 extern "C" void* fn_800A4864(void* p);   /* walks to an object's chain head */
-extern "C" void* fn_800A8C24(void* p);
 extern f32 lbl_807960A0; /* 2pi  .sdata2 */
 
 /* nw4r::db::Panic.  The map already carries its real C++ mangling, and declaring the C++ spelling is
@@ -230,13 +229,13 @@ extern "C" u8* fn_800AB3D0(EfParticle* self)
 /* The owner's colour block, relocated to its table. */
 extern "C" u8* fn_800AB3D8(void* p)
 {
-    return (u8*)fn_800A8C24(p) + 4;
+    return (u8*)ef_res_block_body(p) + 4;
 }
 
 /* Maps a radian angle into the particle's byte angle: radians -> half-turns -> [-0.5, 127.5] -> u8. */
 extern "C" u8 fn_800AA700(f32 angle)
 {
-    return (u8)((s32)fn_800A8A04(angle / lbl_8079607C * lbl_80796078 - lbl_80796080) % 256);
+    return (u8)((s32)ef_truncate_float(angle / lbl_8079607C * lbl_80796078 - lbl_80796080) % 256);
 }
 
 /* Two-float copy used by the vector helpers below. */

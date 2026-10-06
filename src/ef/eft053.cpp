@@ -750,9 +750,9 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
             rotVecY(c, list[i].rot_y);
             fn_80050850(c, c);
             vec_to_mh_vec3(b, &list[i].pos_0x04);
-            fn_80051EE0(&tmp_a, c, scale_off);
+            vec3_scale(&tmp_a, c, scale_off);
             addVec3To(b, &tmp_a);
-            fn_80051EE0(&tmp_b, c, off_a);
+            vec3_scale(&tmp_b, c, off_a);
             addVec3(&tmp_c, b, &tmp_b);
             copyVec3(a, &tmp_c);
             fn_800513F0(c, e * lbl_8079B7AC);

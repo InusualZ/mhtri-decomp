@@ -148,7 +148,7 @@ typedef struct EfWork {
     u8 pad_0x90[0x58];    /* +0x90 */
     u16 spawn_flag;     /* +0xE8  passed through to the particle's spawn slot */
     u8 pad_0xEA[0x02];  /* +0xEA */
-    u32 progress;       /* +0xEC  fixed-point progress read by fn_800A8A08 */
+    u32 progress;       /* +0xEC  fixed-point progress read by ef_random_float */
     u8 pad_0xF0[0x08];  /* +0xF0 */
     u32 spawn_extra;    /* +0xF8  passed through to the particle's spawn slot */
     u8 spawn_data;      /* +0xFC  address passed through to the particle's spawn slot */
@@ -252,7 +252,7 @@ extern void fn_8009C6F0(Vec* out, f32 angle);                       /* sin/cos o
 extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);         /* sin/cos of angle */
 extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
 extern u16 fn_800A9FB0(s32 ctx, u16 id, f32 scale, EfWork* em);
-extern f32 fn_800A8A08(u32* progress);                              /* pseudo-random 0..1 */
+extern f32 ef_random_float(u32* progress);                              /* pseudo-random 0..1 */
 /* 0x80050BC0 is `src/fn_8004CAD8.cpp`'s, declared in `fn_8004CAD8.h`: it takes one float (its body reads only f1
  * and returns `x * FrSqrt(x)`); the second float the callers materialise is the hoisted `1.0f - t` their `else`
  * branch reuses (`ef_disc.cpp` 0x800CCA7C `fsubs f2, f30, f1`, 0x800CCA98 `fsubs f0, f30, f1`). */

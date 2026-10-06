@@ -251,7 +251,7 @@ f32 fn_80050EF4(void* a, void* b);
 f32 calcVecDistXZ(void* a, void* b);
 f32 fn_80050EAC(void* a, void* b);
 void addVec3(void* out, void* a, void* b);
-void fn_80051EE0(void* out, void* a, f32 b);
+void vec3_scale(void* out, void* a, f32 b);
 void addVec3To(void* a, void* b);
 void eft007_part_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_spawn_rec_init(void* out);
@@ -1272,7 +1272,7 @@ extern "C" s32 fn_801DA410(struct _ENEMY_WORK* self, u8 arg1) {
         if (*temp_r31_2 != 0) {
             setVector3(&sp2C, lbl_807994FC, lbl_807994FC, lbl_807994F8);
             rotVecY(&sp2C, self->field_0x1C0);
-            fn_80051EE0(&sp8, &sp2C, lbl_80799618 * get_em_chg_scale(self));
+            vec3_scale(&sp8, &sp2C, lbl_80799618 * get_em_chg_scale(self));
             addVec3(&sp14, &self->pos, &sp8);
             copyVec3(&sp20, &sp14);
             if (fn_80050EAC(temp_r31_2 + 0x3C, &sp20) == lbl_8079961C) {
@@ -1309,8 +1309,8 @@ extern "C" void fn_801DA514(struct _ENEMY_WORK* self) {
         em_turn_seq_start(self, lbl_80570680, 2, 1, sp8);
         em_move_vec_clr(self);
         temp_f31 = get_em_base_scale(self);
-        fn_80051EE0(&spC, &sp30, lbl_80799624);
-        fn_80051EE0(&sp18, &spC, temp_f31);
+        vec3_scale(&spC, &sp30, lbl_80799624);
+        vec3_scale(&sp18, &spC, temp_f31);
         copyVec3(&self->offset_0x30C.vec_0x310, &sp18);
         self->field_0x314 = lbl_807994FC;
         return;
@@ -1665,7 +1665,7 @@ extern "C" void fn_801DB3F8(struct _ENEMY_WORK* self) {
         em_target_pos_set(self, &sp30);
         em_turn_seq_start(self, lbl_80570680, 2, 1, sp8);
         em_move_vec_clr(self);
-        fn_80051EE0(&spC, &sp24, lbl_807994F8 / fn_8012F8F4(self));
+        vec3_scale(&spC, &sp24, lbl_807994F8 / fn_8012F8F4(self));
         copyVec3(&self->offset_0x30C.vec_0x310, &spC);
         self->field_0x314 = lbl_807994FC;
         return;

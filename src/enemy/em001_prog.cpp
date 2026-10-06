@@ -4066,7 +4066,7 @@ u32 fn_8014E670(_ENEMY_WORK *self, u8 arg1) {
         if ((s32) *temp_r31_2 != 0) {
             setVector3(&sp2C, lbl_80796E1C, lbl_80796E1C, lbl_80796E20);
             rotVecY(&sp2C, self->field_0x1C0);
-            fn_80051EE0(&sp8, &sp2C, lbl_80796F64 * get_em_chg_scale(self));
+            vec3_scale(&sp8, &sp2C, lbl_80796F64 * get_em_chg_scale(self));
             addVec3(&sp14, &self->pos, &sp8);
             copyVec3(&sp20, &sp14);
             if (fn_80050EAC(temp_r31_2 + 0x3C, &sp20) <= lbl_80796F94) {
@@ -4102,8 +4102,8 @@ void fn_8014FC24(_ENEMY_WORK *self) {
         em_turn_seq_start(self, &lbl_8056F960, 2, 1, sp8);
         em_move_vec_clr(self);
         temp_f31 = get_em_base_scale(self);
-        fn_80051EE0(&spC, &sp30, lbl_80796F98);
-        fn_80051EE0(&sp18, &spC, temp_f31);
+        vec3_scale(&spC, &sp30, lbl_80796F98);
+        vec3_scale(&sp18, &spC, temp_f31);
         copyVec3(&self->offset_0x30C.vec_0x310, &sp18);
         self->offset_0x30C.vec_0x310.y = (f32) lbl_80796E1C;
         return;
@@ -4541,8 +4541,8 @@ void fn_8014E774(_ENEMY_WORK *self) {
         em_turn_seq_start(self, &lbl_8056F960, 2, 1, sp8);
         em_move_vec_clr(self);
         temp_f31 = get_em_base_scale(self);
-        fn_80051EE0(&spC, &sp3C, lbl_80796F98);
-        fn_80051EE0(&sp18, &spC, temp_f31);
+        vec3_scale(&spC, &sp3C, lbl_80796F98);
+        vec3_scale(&sp18, &spC, temp_f31);
         copyVec3(&self->offset_0x30C.vec_0x310, &sp18);
         self->offset_0x30C.vec_0x310.y = (f32) lbl_80796E1C;
         return;

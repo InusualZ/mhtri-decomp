@@ -75,6 +75,9 @@ s32 fn_80076800(void* p);              /* 0x80076800 - `*(u32*)p != 0` */
  * casts at its two call sites. */
 u32 fn_8007B878(s32 pDst, s32 offset);
 
+/* 0x8007A510 - the softreset/return-to-title request (callers: src/mh3_pad.cpp, src/pad_connect.cpp). */
+void fn_8007A510(void);
+
 #ifdef __cplusplus
 }
 

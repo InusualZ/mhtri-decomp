@@ -26,7 +26,7 @@
 #include "g3d/g3d_cpu.h"        /* fn_8009A748, owner g3d/g3d_cpu.cpp (rule 2)           */
 #include "g3d/g3d_calcvtx.h"    /* fn_800734E4, owner g3d/g3d_calcvtx.cpp (rule 2)       */
 #include "g3d/g3d_state.h"      /* fn_80089690, owner g3d/g3d_state.cpp (rule 2)         */
-#include "unsplit/g3d.h"        /* fn_80088E84/80088FFC/8008918C, owner g3d/g3d_resvtx.cpp */
+#include "g3d/g3d_resvtx.h" /* fn_80088E84/fn_80088FFC/fn_8008918C (rule 2) */
 
 /* The target's `-O3` schedule is retail only with the peephole pass off: every flag extract keeps an
  * explicit `cmpwi` after the `rlwinm` instead of the folded record form `rlwinm.`. */

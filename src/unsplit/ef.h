@@ -1,6 +1,8 @@
-/* unsplit/ef.h - the ef band header: declarations the ef consumers use for symbols the band's units define.  Every
- * address declared here now has a registered owner (the rule-2 residual of this file); the signatures are what the
- * consumers used, the wider form kept where only parameter spellings differed. */
+/* unsplit/ef.h - the ef band header: the declarations the ef consumers still read from the band (rule 2's residual):
+ * `fn_801173AC`, whose owner has no header yet (one would carry a generated file name), two particle-manager entries
+ * whose owner spells them differently, the move-work accessors and
+ * `vec_to_mh_vec3`.  The other ef symbols are declared in their owners' headers (`ef/ef_emitter.h`, `ef/ef_torus.h`,
+ * `ef/ef_particlemanager.h`, `ef/ef_drawstrategyimpl.h`, `ef/ef_drawstripestrategy.h`). */
 #ifndef MHTRI_UNSPLIT_EF_H
 #define MHTRI_UNSPLIT_EF_H
 
@@ -11,15 +13,11 @@
 extern "C" {
 #endif
 
-f32 fn_800C9DCC(f32 arg0);
-/* 0x800A7750 - `ef/ef_emitter.cpp`'s per-emitter creation entry, called by the creation queue: the emitter form,
- * the effect handle, the setting record, the manager, a life and an optional VEC3 position. */
-void fn_800A7750(void* form, void* eh, const void* setting, void* manager, u16 life, const void* pos);
-/* 0x800AB740 / 0x800AB658 - `ef/ef_particlemanager.cpp`'s teardown entry and ramp helper (caller:
- * `ef/ef_particle.cpp`). */
+/* 0x800AB740 / 0x800AB658 - `ef/ef_particlemanager.cpp`'s teardown entry and ramp helper, in the spelling of their
+ * caller `ef/ef_particle.cpp`; the owner defines them `s32 (EfPmManager*, EfPmParticle*)` and `f32 (f32)`, and its
+ * header cannot carry this spelling until the two agree. */
 void* fn_800AB740(void* table, void* self);
 f32 fn_800AB658(void* self, f32 v);
-
 
 /* `ef/fn_801173AC.cpp`'s eft024 kind-1 state-1 handler. */
 void fn_801173AC(void* self);
@@ -37,15 +35,6 @@ u32 get_move_work_max(u8 kind);
 }
 #endif
 struct Vec;
-
-/* 0x800C68E8 - `ef/ef_drawstrategyimpl.cpp`'s per-particle draw helper the free/line/point/smooth strategies call;
- * `fn_800C5F74` and `fn_800C6064` are declared in `ef/ef_drawstrategyimpl.h`. */
-void fn_800C68E8(void* self, void* particle, void* ed, void* em, u32 first, u32 rebindColor);
-
-/* `ef/ef_drawstripestrategy.cpp`'s helpers the free-strategy draw calls (caller: `ef/ef_drawfreestrategy.cpp`). */
-void fn_800B7DB0(void* a, MTX34* out);
-void* fn_800B4B04(void* self, s16 flag);   /* the owner defines it; this is the ABI */
-void fn_800B54B4(const void* src, Vec3* out);
 
 /* The effect record the band's callers pass. */
 struct _EFT;

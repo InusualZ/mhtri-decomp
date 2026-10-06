@@ -32,6 +32,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
+#include "ef/ef_emitter.h" /* ef_store_word (rule 2) */
 #include "pl.h"
 #include "gx.h"
 #include "unsplit/g3d.h"
@@ -211,7 +212,6 @@ void fn_8007B878(void*, s32);
 void fn_8007BA08(void*, void*);
 extern s32 nwDelResource(s32);
 extern s32 fn_800A4420(void*);
-extern void fn_800A8998(void*, u32);
 extern void* fn_800A5484(void*);
 extern void* fn_800A5A90(void*, void*, void*, u32);
 extern void* res_model_name_ptr;
@@ -748,7 +748,7 @@ extern "C" void* fn_800F91C4(u16 id, u16 kind, u32 arg, u32 count) {
     u8 copy[4];
     void* system;
 
-    fn_800A8998(rec, 0);
+    ef_store_word(rec, 0);
     system = eft_control.system_0x04;
     if (fn_800F97F0(id, fn_800F7AA4((u8)kind), rec) == 0) {
         return NULL;

@@ -17,7 +17,7 @@
 
 #include "types.h"
 #include "ef.h"
-#include "unsplit/g3d.h"
+#include "g3d/g3d_calcview.h" /* fn_800710BC (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
 /* This unit's own pooled data (still another unit's range in splits.txt - declared, never defined). */
@@ -107,9 +107,9 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
     }
 
     if (lbl_80796030 != em->spread_scale) {
-        a1 = lbl_80796034 * (lbl_80796038 * fn_800A8A08(&em->progress));
-        a2 = lbl_80796034 * (lbl_80796038 * fn_800A8A08(&em->progress));
-        a3 = lbl_80796034 * (lbl_80796038 * fn_800A8A08(&em->progress));
+        a1 = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
+        a2 = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
+        a3 = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
         fn_8009C760(&s1, &c1, a1);
         fn_8009C760(&s2, &c2, a2);
         fn_8009C760(&s3, &c3, a3);
@@ -138,8 +138,8 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
             f32 ang;
 
             MTX34_ctor(&mtx_b);
-            ang = lbl_80796034 * (lbl_80796038 * fn_800A8A08(&em->progress));
-            fn_8009CA30(&mtx_b, em->axis_angle_y * fn_800A8A08(&em->progress), ang, lbl_80796030);
+            ang = lbl_80796034 * (lbl_80796038 * ef_random_float(&em->progress));
+            fn_8009CA30(&mtx_b, em->axis_angle_y * ef_random_float(&em->progress), ang, lbl_80796030);
             /* `axis_b` is the matrix record; its declaration is short (see the unit header). */
             MTX34_ctor((MTX34*)&axis_b);
             fn_8009CA30(&axis_b, em->euler_x, em->euler_y, em->euler_z);
@@ -153,7 +153,7 @@ void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* dir, Vec* offset, Vec* rot,
     if (em->size_jitter != 0) {
         jitter = lbl_8079603C -
                   (lbl_80796040 * (f32)em->size_jitter) *
-                      (lbl_80796034 * fn_800A8A08(&em->progress) - lbl_8079603C);
+                      (lbl_80796034 * ef_random_float(&em->progress) - lbl_8079603C);
         out->x *= jitter;
         out->y *= jitter;
         out->z *= jitter;
@@ -173,7 +173,7 @@ u16 fn_800A9FB0(s32 ctx, u16 id, f32 scale, EfWork* em)
     }
 
     if (lbl_80796030 != scale) {
-        v = scale * ((f32)(u16)id * fn_800A8A08(&em->progress));
+        v = scale * ((f32)(u16)id * ef_random_float(&em->progress));
         if ((f32)(u16)id - v < lbl_8079603C) {
             id = 1;
         } else if ((f32)(u16)id - v > lbl_80796058) {

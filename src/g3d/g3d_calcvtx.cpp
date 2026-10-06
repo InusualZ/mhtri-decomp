@@ -21,7 +21,7 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
-#include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
+#include "g3d/g3d_resvtx.h" /* fn_80088E84/fn_80088FFC/fn_8008918C (rule 2) */
 #include "g3d/fn_800680CC.h" /* fn_8006946C..fn_80069768, owned by fn_800680CC.cpp (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes

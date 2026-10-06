@@ -12,7 +12,7 @@
  * NAMES. The map has only `fn_` stems for the range; the `Em` fields keep `field_0xNN` names.
  * RESIDUALS. `fn_800CA200__FUiP2EmP2PmUiUiPvUsUif` (0x800CA200-0x800CB948) is unwritten past its three pointer
  *   asserts (lines 94-96). Its known structure: a 14-element `Vec3` array at r1+8 worked on in pairs from the top;
- *   six blocks of `VEC3_ctor` x2, a fill, a scale by `fn_800A8A08(&em->field_0xEC)`, a `fabsf` compare against
+ *   six blocks of `VEC3_ctor` x2, a fill, a scale by `ef_random_float(&em->field_0xEC)`, a `fabsf` compare against
  *   `lbl_80796268`, `fn_80463F98` + `fn_800610AC` + `sqrt_f32`, then `fn_800C9DD0(a, &pair[1], &pair[0], em, pm, d,
  *   f, e)`; 69 `fn_800C9DCC` (`fabsf` thunk) calls; loops over `n*n` and over `n`, the inner one a 4-state
  *   `switch` walking a ring.
@@ -68,7 +68,7 @@ extern "C" {
 extern void fn_8009C484(Vec3* dst, Vec3* src);
 extern void assignVec3(Vec3* dst, const Vec3* src);
 extern f32 fn_80050EDC(const Vec3* v);
-extern f32 fn_800A8A08(const void* p);
+extern f32 ef_random_float(const void* p);
 extern u16 fn_800A9FB0(u32 a, u16 b, f32 f, void* em);
 extern void fn_800A99B4(u32 a, Vec3* b, void* em, Vec3* c, Vec3* d, Vec3* e, Vec3* f);
 }
@@ -141,16 +141,16 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
     fn_8009C484(c, c);
     assignVec3(&v1, b);
     if (fn_80050EDC(&v1) <= lbl_80796240) {
-        v1.x = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
-        v1.y = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
-        v1.z = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
+        v1.x = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
+        v1.y = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
+        v1.z = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
     }
     fn_8009C484(&v1, &v1);
     assignVec3(&v2, b);
     v2.y = lbl_8079624C;
     if (fn_80050EDC(&v2) <= lbl_80796240) {
-        v2.x = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
-        v2.z = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
+        v2.x = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
+        v2.z = ef_random_float(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
     }
     fn_8009C484(&v2, &v2);
     /* This unit's `Vec3` (the map's `P4Vec3`) and the helper's `nw4r::math::VEC3` share one 0xC-byte
@@ -159,7 +159,7 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
     fn_800A99B4(a, &v3, em, b, c, &v1, &v2);
     v3_copy = v3;
     b_copy = *b;
-    s = lbl_80796248 + lbl_80796250 * (f32)em->field_0x67 * fn_800A8A08(&em->field_0xEC);
+    s = lbl_80796248 + lbl_80796250 * (f32)em->field_0x67 * ef_random_float(&em->field_0xEC);
     r = fn_800A9FB0(a, d, f, em);
     pm->vtbl->spawn_0x14(pm, r, &b_copy, &v3_copy, e, s, em->field_0xFC, em->field_0xF8,
                          em->field_0xE8);

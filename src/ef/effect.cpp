@@ -29,6 +29,7 @@
 #include "nw4r/g3d/scnmdl.h"
 #include "gx.h"
 #include "ef.h"
+#include "ef/ef_emitter.h" /* ef_store_word (rule 2) */
 #include "pl.h"
 #include "g3d/fn_80063888.h" /* fn_80064820, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -176,7 +177,6 @@ void color_rgba_copy(void* dst, void* src);
 void fn_800532DC(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void fn_802BDE90(f32* out_a, f32* out_b);
 void fn_800834F0(void* out);
-void fn_800A8998(void* out, u32 mode);
 void* fn_800A8944(void* self);
 void fn_800A898C(void* dst, const void* src);
 void fn_800AEE0C(void* dst, void* src);
@@ -663,7 +663,7 @@ extern "C" void fn_800FA450(void* effect) {
     fn_800FA3B8((EftVectors*)&box);
     VEC3_ctor(&pos);
     fn_800FA378(&box2);
-    fn_800A8998(&mode, 0);
+    ef_store_word(&mode, 0);
     u16 count = fn_800A51D0(effect);
     if (count == 0) {
         return;

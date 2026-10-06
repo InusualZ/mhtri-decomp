@@ -17,7 +17,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h"
-#include "unsplit/g3d.h" /* unsplit g3d neighbours (rule 2) */
+#include "g3d/g3d_calcview.h" /* fn_8006FDCC..fn_8007100C (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes

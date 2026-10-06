@@ -61,7 +61,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     if (flags & 0x00040000) {
         range = params->angle_base;
     } else {
-        range = 2.0f * (3.1415927f * fn_800A8A08(&em->progress));
+        range = 2.0f * (3.1415927f * ef_random_float(&em->progress));
     }
 
     swept = flags & 0x00020000;
@@ -81,7 +81,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
 
         VEC3_ctor(&v88);   /* the declaration takes the nw4r vector; same 3-float layout */
         VEC3_ctor(&v76);
-        t = fn_800A8A08(&em->progress);
+        t = ef_random_float(&em->progress);
         rate = params->rate / 100.0f;
         if (flags & 0x01000000) {
             /* One argument: the callee reads only f1; retail's `f2` is the hoisted `1.0f - t` the else
@@ -91,7 +91,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             scale = t + rate * (1.0f - t);
         }
         if (!swept) {
-            angle = (params->angle_end - params->angle_base) * fn_800A8A08(&em->progress);
+            angle = (params->angle_end - params->angle_base) * ef_random_float(&em->progress);
         }
         fn_8009C760(&fC, &f8, range + angle);
         setVec3(&v64, fC, 0.0f, -f8);
@@ -113,7 +113,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         fn_800A99B4(ctx, (Vec*)&v76, em, (Vec*)&v88, (Vec*)&v40, (Vec*)&v52, (Vec*)&v64);
         v16 = v76;
         v28 = v88;
-        scale = 1.0f + 0.01f * (f32)em->scale_rate * fn_800A8A08(&em->progress);
+        scale = 1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress);
         pm->slots->spawn(pm, fn_800A9FB0(ctx, id, farg0, em), (Vec*)&v28, (Vec*)&v16, arg7, &em->spawn_data,
                          em->spawn_extra, em->spawn_flag, scale);
         if (swept) {

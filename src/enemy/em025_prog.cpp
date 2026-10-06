@@ -45,7 +45,7 @@
 #include "sound/mhchar.h"
 #include "nw4r/g3d/scnmdl.h"
 #include "g3d/g3d_resmat.h"
-#include "unsplit/g3d.h"
+#include "g3d/g3d_calcmaterial.h" /* fn_8006F304 (rule 2) */
 #include "enemy/enemy_control.h"
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"

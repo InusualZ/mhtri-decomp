@@ -13,7 +13,7 @@
 #include "types.h"
 #include "gx.h"                  /* GXWGFifo (rule 1) */
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
-#include "unsplit/g3d.h"         /* the ten category accessors (rule 2) */
+#include "g3d/g3d_resanmtexsrt.h" /* the ten category accessors (rule 2) */
 #include "g3d/fn_80075DCC.h"     /* fn_80076xxx/0x8007B878 (rule 2) */
 #include "g3d/fn_800680CC.h"     /* fn_800695EC/0x8006CDBC/0x8006993C/0x8006E6B4 (rule 2) */
 #include "g3d/fn_80063888.h"     /* fn_8006584C/0x80063FD0 (rule 2) */
