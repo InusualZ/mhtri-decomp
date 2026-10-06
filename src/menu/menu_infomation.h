@@ -1,14 +1,7 @@
 /*
- * menu/menu_infomation.h - the records and entry points the `menu_infomation.cpp` unit owns
- * (`src/menu/menu_infomation.cpp`, `.text` 0x80308FB4..0x8031A6C0, docs/plan.md 6.5 rule 2).
- *
- * `StatusScreenWork` is the screen's own work record.  Two units read it: the owner
- * (`menu/menu_infomation.cpp`, whose head bodies `fn_8030BACC`/`equip_list_page_count`/`fn_8030A1D0` drive it)
- * and `ef/fn_8030681C.cpp`, whose tail (`fn_80308EC0`/`fn_80308F1C`, the two screen bodies *below*
- * the seam at 0x80308FB4) reads the same record, so the type lives here rather than in either source
- * (`.pi/notes/seam-round.md`: the seam is the one-copy `menu_infomation.cpp` `__FILE__` string's
- * referrer set, not a TU boundary).  The type is the partial view those four bodies prove, not the
- * record's complete layout.
+ * menu/menu_infomation.h - the records and entry points `menu/menu_infomation.cpp` owns.  `StatusScreenWork` is the
+ *   status screen's work record as `fn_8030BACC`/`equip_list_page_count`/`fn_8030A1D0` and `ef/fn_8030681C.cpp`'s
+ *   `fn_80308EC0`/`fn_80308F1C` (below the 0x80308FB4 edge) read it: a partial view, not the complete layout.
  */
 #ifndef MHTRI_MENU_MENU_INFOMATION_H
 #define MHTRI_MENU_MENU_INFOMATION_H

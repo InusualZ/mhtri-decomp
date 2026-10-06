@@ -1,81 +1,37 @@
-/* menu/multi_result.cpp - the multiplayer-result screen's box cursor band, plus the enemy
- * action/substate dispatchers that share its address range.
- *
- * `.text` 0x8039D278..0x803A3A50 (80 functions, 0x67D8 B), registered whole as the proposal
- * `8039D278` asked.  The seam is UNPROVEN and the range is *not* one translation unit: it is a
- * sequence of objects the linker placed next to each other, so this file reconstructs the functions
- * whose own evidence is complete and leaves the rest to the seam re-draw.
- *
- * SEAM EVIDENCE (measured):
- *   - the left edge 0x8039D278 is the cap `menu/menu_result.cpp` was registered at, and the two
- *     bands share a record layout: that unit's `q_result_phase_enter`/`fn_8039D0C8` iterate the same
- *     +0x33DC array of 0x18-byte records that `multi_box_records_step` walks, so the real boundary
- *     may sit further down.  Nothing in the range carries a `__FILE__` string (the only menu source
- *     names in the DOL - `menu_item.cpp`, `menu_note.cpp`, `menu_placeinfo.cpp`, `arenatask.cpp`,
- *     `Hmenu_message.cpp`, ... - are all referenced from other bands).
- *   - three pool/call clusters are visible inside the range: the box band 0x8039D278..0x8039E5CC
- *     (this file's `multi_box_*`), an `_ENEMY_WORK` action band 0x8039E5CC..0x803A11D4 (40
- *     functions sharing the `.sdata2` run 0x8079C330..0x8079C438 - `tudiscover at 0x8039FD4C`), and
- *     a quest/game-mode band above it.
- *   - SDK objects are interleaved with them: the runtime dump names `DBClose` (0x8039E714, 4 B) and
- *     `gdev_cc_shutdown` (0x803A1108, 8 B) inside the enemy band and `GoalOverlay::SceneCreated`
- *     (0x803A1680) / `homebutton::MotorCallback` (0x803A26A8) in the quest band, i.e. objects from
- *     other libraries sit between the game ones - no single seam can cover them.
- *
- * NAME: module `menu` (evidence class 3) - the range's head is the multiplayer result screen and its
- * neighbours are `menu/menu_result.cpp` below and the `menu/*` band above; the two symbols the
- * original compiler mangled are the box helpers on `_multi_result_work`, and every callee of the
- * head band is the menu library's (`get_qResult_work`, `q_result_phase_is_2/3`, `GetItemData`).
- * The file name is a GUESS for the same reason the seam is unproven: the band's own `__FILE__`
- * string does not exist.  Every function name in this file is a GUESS derived from its body - the
- * runtime dump answers `zz_` for all of them: its only in-range names are the two `multi_box_*`
- * manglings plus a handful of *junk* duplicates (`DBClose` at 295 addresses, `gdev_cc_shutdown` at
- * 133, `GoalOverlay::SceneCreated` at 72), which are not evidence.
- *
- * FLAGS: `menu`'s `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`,
- * Wii/1.3) - the band is C++ (its two defining symbols carry real manglings) and its box bodies
- * keep unfused narrow loads.
- *
- * RESIDUAL: 24 of the 80 functions are written - 21 of them at 100.0 %, `multi_box_phase_ck` at
- * 99.59 %, `multi_box_grid_clear` at 97.40 % and `multi_box_rem_exist_ck` at 96.27 % (2
- * instructions short: the target keeps a *dead* loop counter, see that body's note).  `.text`
- * 2840 B of 26584 B.  The two colouring residuals are the allocator's, not the source's:
- *   - `multi_box_phase_ck` is 440/440 B and differs only in which callee-saved register holds the
- *     ready mask (`r30` retail, `r31` ours) over the loop index.  Declaring the mask/index/n at
- *     function scope is what closed the 4-byte gap (a `break` - not a second constant return -
- *     stops MWCC if-converting the mask test into a branchless `srwi`); the register pair itself
- *     did not move for a swapped declaration order, so it is a ceiling (playbook 22).
- *   - `multi_box_grid_clear` is 180/180 B and differs the same way (`items`/`i` mirrored) plus a
- *     commutative `mullw` operand order; both spellings of the product measure 97.40 %.
- * The functions still unwritten are blocked by evidence, not by effort:
- *   - the enemy band's shared `.sdata2` run 0x8079C330..0x8079C438: 65 four-byte floats whose only
- *     dump name is `FLOAT_<addr>`.  ~15 in-range bodies (`em_action1_sub0/1/2/7`, `em_action2_sub0..5`,
- *     `em_action3_sub0/2`, `em_action6_sub0/1`, `fn_8039E5CC`, `fn_803A1110`, ...) take them as motion
- *     parameters; naming them from the value alone would invent semantics the binary does not carry,
- *     so they stay unclaimed until the enemy band's own unit registers and claims the run.
- *   - the `+0x328` union in `enemy/ENEMY_WORK.h` has no byte view: `fn_8039E68C`, `fn_8039E718`
- *     and `em_action1_sub5` all write +0x328/+0x329 as *separate bytes* (the target emits two `stb`
- *     where the existing `s16 field_0x328` view would emit one `sth`), so they need a named byte-pair
- *     union member added by whoever owns that header next.
- *   - `multi_box_cursor_clamp` (0x8C) and `multi_box_grid_step` (0x308) read the pad key words at
- *     `+0x2C4`/`+0x2D4` of `Psw[player_no]`; `PlayerPad` is a *local* type in `src/mh3_pad.cpp`, and
- *     reaching it from here is the rule-1 move (two users) that must be measured against `mh3_pad`.
- *   - `multi_box_result_step` (0x284) takes an object whose `+0x150` is the screen - the caller that
- *     names that type is not in a registered unit, so its parameter has no evidence yet.
- *   - `fn_8039DBC8` (0x780) is the save/VS-wpad band: it needs `fn_8004F3B4`, `ai_npc_reaction_forward` and
- *     `ai_torch_ck`'-style names whose bodies are outside this range.
- * The 24 renames this band needed are in the map (see the previous commit's message); the sweep is
- * complete, so a later pass can write the rest in place.
- *
- * Data (measured, `datagap.py --unit menu/multi_result`): `ours-extra .data 128B, .rela.data 384B,
- * .sdata2 8B`.  The 128 B are the three switch tables the dispatchers own - `.data` 0x805F1774
- * (0x28, `em_action1_dispatch`), 0x805F179C (0x20, `em_action2_dispatch`) and 0x805F1DE0 (0x38,
- * `em_action_dispatch`) - and the 8 B are the two float literals of `em_action2_dispatch`.  They are
- * deliberately NOT claimed in `splits.txt`: the first two tables are one contiguous 0x48 B run, but
- * the third is 0x624 B further on with the enemy band's own `.data` labels in between, so claiming
- * the unit's `.data` means claiming a run it does not own (and a partial `.sdata2` claim is not
- * linkable at all - playbook 23).  The claim belongs to the seam re-draw, once the objects between
- * the two runs are attributed.
+/*
+ * menu/multi_result.cpp - the multiplayer-result screen's box cursor band (`multi_box_*` on `_multi_result_work`), then
+ *   the enemy action/substate dispatchers and a quest/game-mode band that share its address range.  C++ (the two box
+ *   helpers carry the original manglings).
+ * RANGE. .text 0x8039D278-0x803A3A50 (80 functions); extab, extabindex, .rodata 0x80570BA0-0x80570C20, .data
+ *   0x805F1708-0x805F2038, .sdata 0x80793520-0x80793530, .sbss 0x80794C08-0x80794C18, .sdata2 0x8079C330-0x8079C448.
+ *   The range is a sequence of objects, not one TU: the box band 0x8039D278-0x8039E5CC, an `_ENEMY_WORK` action band
+ *   0x8039E5CC-0x803A11D4 (40 functions sharing the `.sdata2` run 0x8079C330-0x8079C438) and a quest band.  The dump's
+ *   SDK names inside the range are linker-folded duplicates of tiny bodies, not evidence.  The left edge is `menu/menu_result.cpp`'s cap, and that unit's
+ *   `q_result_phase_enter`/`fn_8039D0C8` walk the same +0x33DC array of 0x18-byte records as `multi_box_records_step`.
+ * FLAGS. `cflags_menu` (configure.py).
+ * NAMES. Module `menu`: the head is the multiplayer result screen, between `menu/menu_result.cpp` and the `menu/*` band,
+ *   and its callees are the menu library's (`get_qResult_work`, `q_result_phase_is_2/3`, `GetItemData`).  No `__FILE__`
+ *   string reaches the range, so the file name and every function name but the two `multi_box_*` manglings are GUESSes
+ *   from the bodies.
+ * RESIDUALS. 56 rows unwritten (objdiff scores them zero): 0x8039D5B0-0x8039D944, 0x8039DBC8-0x8039E714,
+ *   0x8039E718-0x8039E7CC, 0x8039E878-0x8039EAA0, 0x8039EBD0-0x8039ECA8, 0x8039ED24-0x8039EDF0,
+ *   0x8039EED0-0x8039F380, 0x8039F3E4-0x8039F758, 0x8039F79C-0x8039FB5C, 0x8039FC7C-0x803A1108,
+ *   0x803A1110-0x803A11D4, 0x803A1220-0x803A1680, 0x803A168C-0x803A3A50.  Known needs:
+ *  - the enemy band's `.sdata2` floats (0x8079C330-0x8079C438, dump names `FLOAT_<addr>` only) are motion parameters of
+ *    `em_action1_sub0/1/2/7`, `em_action2_sub0..5`, `em_action3_sub0/2`, `em_action6_sub0/1`, `fn_8039E5CC`, `fn_803A1110`;
+ *  - `fn_8039E68C`, `fn_8039E718` and `em_action1_sub5` write `_ENEMY_WORK` +0x328/+0x329 as two bytes (two `stb`);
+ *  - `multi_box_result_step`'s object (+0x150 is the screen) is typed by no registered caller;
+ *  - `fn_8039DBC8` (the save/VS-wpad step) needs `fn_8004F3B4` and callees outside the range.
+ *   The 3 partial rows:
+ *  - `multi_box_rem_exist_ck`: 2 instructions short, the target keeps a dead loop counter;
+ *  - `multi_box_phase_ck`: the ready mask in r31 against retail's r30 (playbook 22);
+ *  - `multi_box_grid_clear`: `items`/`i` mirrored and a `mullw` operand order (both spellings measured).
+ *   flipcheck: `.rodata` (0x80), `.sdata` (0x10) and `.sbss` (0x10) claimed but not emitted; short `.text` 0xB18 of
+ *   0x67D8, extab 0x60 of 0x1F0, extabindex 0x90 of 0x2E8, `.data` 0x80 of 0x930 (the three switch tables of
+ *   `em_action1_dispatch`, `em_action2_dispatch`, `em_action_dispatch`), `.sdata2` 0x8 of 0x118; the bytes of all five
+ *   differ; the `.sdata`/`.sdata2` pools are partial (a candidate fold with `lobby/lb_quest_screen`).
+ * SHAPES. `multi_box_phase_ck` declares the mask, index and count at function scope and leaves its loop with a `break`
+ *   (a second constant return makes MWCC if-convert the mask test into a branchless `srwi`).
  */
 
 #include "types.h"

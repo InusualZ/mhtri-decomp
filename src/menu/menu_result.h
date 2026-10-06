@@ -1,21 +1,8 @@
 /*
- * `menu/menu_result.cpp`'s records and outbound declarations.
- *
- * The unit is the quest-result screen band: its `.text` 0x803967F0..0x8039D278 (85 functions,
- * 0x6A88 B) drives the result record `get_qResult_work()` hands back, reads the message table
- * `q_result_msg_adrs` by message id and language, and draws the reward rows (item/monster icons,
- * `PutPageArrow`, `put_menu_cursor`, `font_print_ex`).
- *
- * `QResultScreen` is the record the band's functions take as their first argument; only the fields
- * this unit touches are named (a *view*, folded by the next pass that owns the record - rule 1).
- * The owners of the symbols this unit only *references* are: `fn_8004CAD8.cpp` (`get_qResult_work`,
- * `get_userdata`), `sound/fn_800D7F54.cpp` (`sysSE_req`, `fn_800DBDD4`), `ef/fn_800CDB2C.cpp`
- * (`my_player_no`, `get_move_work_adrs`, `file_loading_ck`), `ef/eft_res.h` (`eft_res_slot_release`),
- * `menu/menu_item.cpp` (`GetItemData`, `ItemName`, `get_menu_lsp_tbl`, `put_menu_cursor`),
- * `menu/menu_message.cpp`, `hud/layout.cpp`, `fn_80047398.cpp` - all included, never re-declared
- * (rule 2). `system_w`, `q_result_msg_adrs`, `Psw` and the `sprintf`/`strcpy`/`strcat` family sit in
- * address bands whose bracketing registered units name different modules, so they are rule 2's
- * documented `unsplit` gap and are declared here.
+ * menu/menu_result.h - `menu/menu_result.cpp`'s records and outbound declarations.  `QResultScreen` is the record the
+ *   band's functions take first (a view: only the fields the unit touches are named).  `system_w`, `Psw` and the
+ *   `sprintf`/`strcpy`/`strcat` family are declared here (their owners' headers do not declare them yet);
+ *   `q_result_msg_adrs` is the unit's own `.bss`; every other callee comes from its owner's header.
  */
 #ifndef MHTRI_MENU_MENU_RESULT_H
 #define MHTRI_MENU_MENU_RESULT_H
@@ -94,7 +81,7 @@ extern "C" {
  * `q_result_msg_adrs[message id][language]` is the pointer array the screen indexes by string id. */
 extern char*** q_result_msg_adrs[12];
 
-/* The game/system state block at 0x806685E0; only its +9 byte (the language index) is read here. */
+/* The game/system state block at 0x806585E0; only its +9 byte (the language index) is read here. */
 extern u8 system_w[];
 
 /* `get_qResult_work()` comes from its owner's header, `fn_8004CAD8.h`, which this unit includes. */

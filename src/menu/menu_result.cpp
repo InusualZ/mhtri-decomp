@@ -1,53 +1,25 @@
-/* menu/menu_result.cpp - the quest-result screen band.
- *
- * `.text` 0x803967F0..0x8039D278 (85 functions, 0x6A88 B) plus the data it owns: `.data`
- * 0x805F1500..0x805F1704 (the icon/message-id tables and three switch tables), `.sdata`
- * 0x80793488..0x8079351C (the same kind of id arrays) and `.sdata2` 0x8079C2EC..0x8079C330 (the
- * band's own literal pool).  All three runs are *private*: every label inside them is referenced
- * from this range only, and the `.data` referrer runs break exactly at 0x803967F0 - the run below
- * ends at 0x803960BC (fn_803960BC's object) and this unit's first referrer is 0x80396BBC, so the
- * left edge is a real translation-unit seam, unlike the brief's `--max-bytes` cap.  The right edge
- * is bounded the same way: the next `.data` label is `em029_prog_tbl` (0x805F1708), an enemy
- * program table, whose own band's jumptables resume at 0x805F1774.
- *
- * NAME: module `menu` (evidence class 3) - the `.data` band this unit's tables sit in carries
- * `menu_note.cpp` (0x805E91F8) below and `menu_placeinfo.cpp` (0x80604780) above, and every callee
- * of the range is the menu library's (`get_menu_lsp_tbl`, `put_menu_cursor`, `GetMenuFontColor`,
- * `ItemName`, `GetItemData`, `PutPageArrow`, `font_print_ex`).  The file name `menu_result.cpp` is a
- * GUESS (no `__FILE__` string reaches the range and `dumpmap.py` answers `zz_` for every address):
- * the band's state machine drives `get_qResult_work()`'s record, reads the `q_result_msg_adrs`
- * message table by id and language (0x806C5528, the runtime dump's own name) and gates on
- * `field_0x1E2` (2 while loading, 3 when loaded), i.e. it is the screen drawn while the quest result
- * is loaded and shown.  A later pass with the screen's own symbols can sharpen it.
- *
- * NAMING: every symbol this unit defines is named for what its body does (or for the record field
- * it touches) plus the `q_result_*` prefix of the band; there is no `__FILE__` string and the
- * runtime dump answers `zz_` for all 85 addresses, so *every name here is a GUESS* - the evidence
- * behind each one is the body comment in the unit's own header and this file's functions.
- *
- * FLAGS: `menu`'s `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, mw version
- * Wii/1.3) - the band is C++ (its bodies call genuinely mangled callees such as
- * `get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3`) and it keeps unfused narrow-load pairs the
- * peephole would fuse.
- *
- * RESIDUAL: 28 of the 85 functions are written in this pass and 27 of them are at 100.0;
- * `q_result_sub_screen_ready` is at 99.33 - its second `!= 1` test is emitted with the opposite
- * branch polarity (`beq` to the TRUE return) however the two calls are nested, i.e. MWCC
- * if-converts the `return (B == 1)` here where the target kept the branch; the body is otherwise
- * instruction-identical.  The remaining 57 (largest first:
- * `fn_80398F7C` 0xC80, `fn_8039756C` 0xB00, `fn_8039AFBC` 0x774, `fn_8039BFF8` 0x734,
- * `fn_8039B9C0` 0x638, ...) are still map stems and measure 0 %, so their names and bodies are the
- * next pass's work.  Their data tables (.data/.sdata/.sdata2 above) are not emitted by this object
- * yet, so the two id-table runs stay unclaimed in `splits.txt` until the bodies that own them
- * land.  The one data range that IS claimed is the switch jump table this object emits
- * (`.data` 0x805F1698..0x805F16BC, the target's `jumptable_805F1698`, 36 B, referenced by this
- * unit only) - without it `datagap.py` reports an `ours-extra .data 36B` row.
- *
- * Naming note: references only to other units' unrenamed fn_XXXXXXXX symbols (each checked
- * against the map's owner: `eft_res_slot_release` -> `ef/eft_res.cpp`, `fn_800DBDD4` ->
- * `sound/fn_800D7F54.cpp`, `item_pair_copy` -> `fn_80047398.cpp`, and `fn_803B5030`, `fn_802DF6E4`,
- * `fn_803B4C64`/`fn_803B4CE8` -> unregistered bands).  No `fn_` name
- * this unit *defines* is left unrenamed: every body above carries the name `symbols.txt` now has.
+/*
+ * menu/menu_result.cpp - the quest-result screen: the state machine over `get_qResult_work()`'s record, the message
+ *   table `q_result_msg_adrs` (by id and language) and the sub-screens gated on `field_0x1E2` (2 loading, 3 loaded).
+ *   C++ (the bodies call mangled callees such as `get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3`).
+ * RANGE. .text 0x803967F0-0x8039D278 (85 functions); extab, extabindex, .data 0x805F1500-0x805F1704 (the icon and
+ *   message-id tables and three switch tables, `jumptable_805F1698` among them), .bss 0x806C5528-0x806C5558
+ *   (`q_result_msg_adrs`), .sdata 0x80793488-0x80793520, .sdata2 0x8079C2E8-0x8079C330.  The left edge is a TU seam: the
+ *   `.data` referrer runs break there (the run below ends at 0x803960BC, this unit's starts at 0x80396BBC).
+ * FLAGS. `cflags_menu` (configure.py).
+ * NAMES. Module `menu`: its tables sit between `menu_note.cpp` (0x805E91F8) and `menu_placeinfo.cpp` (0x80604780) in
+ *   `.data`, and every callee is the menu library's.  No `__FILE__` string reaches the range and the dump answers `zz_`,
+ *   so the file name and every function name (the `q_result_*` scheme) are GUESSes from the bodies; `q_result_msg_adrs`
+ *   is the runtime dump's own name.
+ * RESIDUALS. 57 rows unwritten (objdiff scores them zero): `fn_803967F0`, 0x80396A90-0x80396C18, `fn_80396CAC`,
+ *   0x803970FC-0x80397320, 0x80397344-0x803988B4, 0x80398938-0x80398C14, 0x80398C88-0x80398F24,
+ *   0x80398F7C-0x80399D44, 0x80399D4C-0x80399EE4, 0x80399F18-0x8039B9B0, 0x8039B9C0-0x8039CD18,
+ *   0x8039CD1C-0x8039D278.  The one partial row, `q_result_sub_screen_ready`: MWCC if-converts the second
+ *   `return (B == 1)` (a `beq` to the true return) where the target keeps the branch.
+ *   flipcheck: `.bss` (0x30), `.sdata` (0x98) and `.sdata2` (0x48) claimed but not emitted; short `.text` 0x5DC of
+ *   0x6A88, extab 0x58 of 0x200, extabindex 0x84 of 0x300, `.data` 0x24 of 0x204; the bytes of all four differ; the
+ *   pools are partial (a candidate fold with `lobby/lb_quest_ui` and `lobby/lb_quest_board`); `fn_803B4C64` and
+ *   `fn_803B4CE8` are defined by no link input.
  */
 
 #include "types.h"
@@ -60,9 +32,8 @@
 #include "fn_80047398.h"
 #include "enemy/em_pop.h"   /* quest_flag_10_ck (rule 2: its owner) */
 
-/* The `sprintf`/`strcpy`/`strcat` family sits in an address band whose bracketing registered units
- * name different modules, so rule 2's home for them is `unsplit/*.h`'s documented gap and
- * they are declared here (the same spelling `menu/fn_802E4978.cpp` uses). */
+/* The `sprintf`/`strcpy`/`strcat` family: their owners' headers do not declare them yet, so they are declared
+ * here. */
 extern "C" {
 int sprintf(char*, const char*, ...);
 char* strcpy(char*, const char*);
@@ -89,7 +60,7 @@ char** q_result_msg_table(u8 id)
     return q_result_msg_adrs[id][system_w[9]];
 }
 
-/* One string of the message table `q_result_msg_entry`'s owner selected. */
+/* One string of the language-selected message table for message `id`. */
 char* q_result_msg_entry(u8 id, u8 index)
 {
     return q_result_msg_adrs[id][system_w[9]][index];

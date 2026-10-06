@@ -1,17 +1,7 @@
 /*
- * `menu/menu_item.cpp`'s outbound declarations and the records its bodies read.
- *
- * The unit is the item menu's data/hit layer: the item-record accessors (`ItemName`, `ItemExp`,
- * `GetItemData`), the menu-table accessors (`get_menu_tbl_ptr`, `get_menu_lsp_tbl`) and the hit
- * helpers the menu's attack preview uses (`body_set`, `hit_flag_set`, `hit_result_check`).
- *
- * Two of the records here are this unit's view of a record another unit also views: `_HIT_W` is
- * also defined by `Pl/pl_act.cpp` (its own offsets for the same attack entry).  Folding the two
- * views into one shared definition is a union-aware merge (the fields this unit names sit inside
- * `pl_act.cpp`'s `unk00[0x31]` run), so it is recorded as a rule-1 residual for the unit header.
- *
- * `extern` declarations for symbols no registered unit owns live in `unsplit/`; the ones
- * this unit needs are included from there where a band header already carries them.
+ * menu/menu_item.h - `menu/menu_item.cpp`'s outbound declarations and the records its bodies read: the item-record
+ *   accessors (`ItemName`, `ItemExp`, `GetItemData`), the menu tables (`get_menu_tbl_ptr`, `get_menu_lsp_tbl`), the hit
+ *   helpers (`body_set`, `hit_flag_set`, `hit_result_check`; `_HIT_W` is `Pl/hit_w.h`'s) and the menu slot `MenuSlot`.
  */
 #ifndef MHTRI_MENU_MENU_ITEM_H
 #define MHTRI_MENU_MENU_ITEM_H
@@ -257,8 +247,8 @@ struct MenuFrameWork {
     /* +0x5BE */ u8 field_0x5BE;
 };
 
-/* The three `.bss`/`.data` blocks the accessors read.  They are other units' data (no registered
- * unit emits them), so the accessors take their addresses instead of defining them. */
+/* The `.bss`/`.data` blocks the accessors read: this unit's own sections, declared never defined (playbook 29),
+ * so the accessors take their addresses instead of defining them. */
 extern HitRegistry lbl_806AC8A8;
 extern ItemDataHead lbl_806AC8B8;
 extern MenuWork lbl_806AC8C8;
@@ -266,35 +256,17 @@ extern MenuTables lbl_806ACF28;
 extern u32 lbl_805CDE78[];              /* .data:0x805CDE78 - 0x30 B, indexed by `ItemDataRecord::kind` */
 extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
 
-/* This unit's own entry points and the callees its written bodies call.
- *
- * The callees split three ways by whose header can supply a declaration (rule 2):
- *   * `Pl/fn_8027D684.cpp` (`fn_8027EB18`, `fn_8027E120`, `fn_8027D738`), `mh3_pad.cpp`
- *     (`screen_split_mode_ck` - including `mh3_pad.h` here is impossible: it and `ef.h`, which `pl.h` pulls
- *     in for `_HIT_W`'s sibling records, collide in one TU) and `fn_80040598.cpp` (`fn_8004082C`)
- *     have no header that declares these, so the shapes here are this unit's call sites' - the
- *     practice `Pl/fn_8028F66C.h` documents for the same situation.
- *   * `ef/fn_800CDB2C.cpp`'s header declares `GameMode_ck` as `u8`, while the retail caller keeps a
- *     `clrlwi` on the widened form (the same per-consumer-view split `Pl/pl_act.h`'s
- *     `fn_8027D050` note records), so the declaration here is the call site's 32-bit view.
- *   * the rest (`game_ready_ck`, `fn_8004082C`'s neighbours, `fn_804273EC`, ...) sit in no registered
- *     range, so they are rule 2's unsplit case.
- */
 /* This unit's own entry points, in address order, and the callees its written bodies call.
  *
  * The callees split three ways by whose header can supply a declaration (rule 2):
- *   * `Pl/fn_8027D684.cpp` (`fn_8027EB18`, `fn_8027E120`, `fn_8027D738`), `mh3_pad.cpp`
- *     (`screen_split_mode_ck`) and `fn_80040598.cpp` (`fn_8004082C`) have no header that declares these, so
- *     the shapes here are this unit's call sites' - the practice `Pl/fn_8028F66C.h`
- *     documents for the same situation, with one hard constraint: including `mh3_pad.h` here is
- *     impossible because it and `ef.h` (which `pl.h` pulls in for the records above) collide in one
- *     translation unit.
- *   * `ef/fn_800CDB2C.cpp`'s header declares `GameMode_ck` as `u8`, while the retail caller keeps a
- *     `clrlwi` on the widened form (the per-consumer-view split `Pl/pl_act.h`'s
- *     `fn_8027D050` note records), so the declaration here is the call site's 32-bit view.
+ *   * `Pl/pl_act.cpp` (`fn_8027EB18`, `fn_8027E120`), `pad_connect.cpp` (`screen_split_mode_ck`) and
+ *     `fn_80040598.cpp` (`fn_8004082C`) have no header that declares these, so the shapes here are this unit's
+ *     call sites'; `mh3_pad.h` cannot be included here because it and `ef.h` (which `pl.h` pulls in) collide.
+ *   * `GameMode_ck` keeps its owner's (`ef/fn_800CDB2C.h`) `u8` spelling: a `u32` view is `(10505) illegal
+ *     overloading` beside the owner's header.
  *   * the rest (`quest_select_ready_ck`, `fn_802FBA60`, `fn_8031A638`, `fn_802DA2D4`, `fn_802DB26C`,
- *     `fn_802DE238`, `fn_802DE670`, `fn_80384380`, `game_ready_ck`, `fn_804273EC`) sit in no
- *     registered range - rule 2's unsplit case.
+ *     `fn_802DE238`, `fn_802DE670`, `fn_80384380`, `game_ready_ck`, `fn_804273EC`) are declared in their call
+ *     sites' shapes; their owners' headers do not declare them yet.
  *
  * The `fn_*` declarations keep C linkage: the map's names for them are placeholders, not manglings.
  */
@@ -302,10 +274,9 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
 #define MHTRI_MENU_MENU_ITEM_DECLARED
 
 /* This unit's own C++-mangled entry points (the map names are these manglings, rule 9).
- * `put_menu_cursor` (0x802A2564) is one of them but has no body yet - it was declared in
- * `unsplit/lobby.h` until this range was registered, and its consumer (`lobby/fn_801E7530.cpp`)
- * includes this header for it now (rule 2).  Its third parameter is the lobby band's 2D vector, whose
- * tag is declared here rather than including a band header for it. */
+ * `put_menu_cursor` (0x802A2564) is one of them but has no body yet; its consumer
+ * (`lobby/fn_801E7530.cpp`) includes this header for it (rule 2).  Its third parameter is the lobby band's
+ * 2D vector, whose tag is declared here rather than including a band header for it. */
 struct _mh_ivec2_;
 /* The 0x24-byte placement record `MenuSlot::place_entries` points at: `menu/menu_row.cpp` is its
  * only consumer, so its definition lives in that unit and this header only names the pointer's type. */
@@ -374,12 +345,11 @@ void fn_802A47F4(MenuSlot* self);
 void fn_802A4D98(MenuSlot* slot);
 
 /* The callees above this unit. */
-/* `fn_8027D738` is `Pl/fn_8027D684.cpp`'s (its address is inside that unit's range) and it is written
+/* `fn_8027D738` is `Pl/pl_act.cpp`'s (its address is inside that unit's range) and it is written
  * there, so its declaration is the owner's header `Pl/fn_8027D684.h` (rule 2).  The two
  * unwritten siblings above have no owner header entry yet and keep this unit's call-site shape. */
-/* 0x80047058 is `mh3_pad.cpp`'s (no argument, `Screen_w+0x1A != 0`).  It was `u32` here, which
- * MWCC reports as `(10505) illegal overloading` against the owner's `s32` as soon as both headers
- * are visible in one TU. */
+/* 0x80047058 is `pad_connect.cpp`'s (no argument, `Screen_w+0x1A != 0`); it keeps the owner's `s32`, since a
+ * `u32` view is `(10505) illegal overloading` once both headers are visible in one TU. */
 s32 screen_split_mode_ck(void);
 void fn_8004082C(void);
 u8 GameMode_ck(void);
@@ -395,8 +365,8 @@ u32 fn_802DE670(u8 idx);
 void fn_80384380(void);
 void fn_804273EC(s32 a, s32 b, s32 c);
 
-/* 0x802A2620 / 0x802A26F4 - the two menu-band entries the cockpit band above this range
- * (`menu/fn_802E4978.cpp`, 0x802E4978-0x802E7408) calls (rule 2: this range owns the addresses).
+/* 0x802A2620 / 0x802A26F4 - the two menu-band entries `hud/cockpit_quest.cpp`'s cockpit band
+ * (0x802E4978-0x802E7408) calls (rule 2: this range owns the addresses).
  * `fn_802A2620(0)` redraws the menu frame; `menu_slot_panel_draw` is registered with `subTransSetPrio` by
  * address, so it is declared as the function it is.  Both signatures are that consumer's call sites
  * (neither body is written yet). */

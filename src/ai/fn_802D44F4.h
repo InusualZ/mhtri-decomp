@@ -1,13 +1,8 @@
-/* The declarations `src/ai/fn_802D44F4.cpp` owns (docs/plan.md 6.5 rule 2: a consumer includes the
- * owner's header, it never declares the symbol itself).
- *
- * The unit is the cockpit-side AI band 0x802D44F4-0x802DDC04.  The `fn_802DAxxx` entries below are the
- * ones the cockpit band above it (`menu/fn_802E4978.cpp`, 0x802E4978-0x802E7408) calls; they had been
- * declared in `unsplit/menu.h` while the address had no registered owner, and their signatures
- * are that consumer's call sites (no body of them is written yet).
- *
- * `fn_802DA3CC` is a body of this range (0x88 B) whose *address* the consumer registers with
- * `subTransSetPrio`, so it is declared as the function it is rather than as a data object.
+/*
+ * ai/fn_802D44F4.h - declarations of the 0x802D44F4-0x802DDC04 band, now `ai/ai_npc.cpp` (to 0x802D9EA4) and
+ *   `hud/cockpit.cpp` (from there): the notice-pool and slot helpers the cockpit calls, `ai_slots_clear`, `PutPageArrow`
+ *   and the `ai_npc` entries other units call.  `fn_802DA3CC` is declared as the function whose address
+ *   `subTransSetPrio` registers.
  */
 #ifndef MHTRI_AI_FN_802D44F4_H
 #define MHTRI_AI_FN_802D44F4_H
@@ -50,7 +45,7 @@ void ai_npc_hold_item_arm(void);                  /* 0x802D6534, called by hud/c
 
 void fn_802DA3CC(void);                  /* 0x802DA3CC, registered by address */
 
-/* 0x802D94C4 - the area-mode setter `enemy/em020_handlers.cpp`'s `em020_area_model_set` calls for
+/* 0x802D94C4 - the area-mode setter `enemy/em020_prog.cpp`'s `em020_area_model_set` calls for
  * the em020 area models: once the screen-state query `quest_move_state_valid_ck` is true it arms
  * `ainpc_w`'s +0x484 mode byte and its 90-frame +0x486 timer (1 for 0, 2 otherwise) and clears
  * +0x485.  Added with that registration (rule 2: this range owns the address; the signature is the

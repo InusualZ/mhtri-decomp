@@ -1,9 +1,7 @@
 /*
- * menu/PatTerms.h - leaf header (docs/plan.md 6.5 rule 2) for the terms object `menu/menu_plsearch.cpp`
- * defines: its constructor 0x804504F4 (stores the table 0x80607E40, publishes the object in `.sbss` 0x80794D58 and
- * clears its state), its destructor 0x80450534 (unpublishes it) and its table.  Moved here from
- * `Network/network_pat_control.h` when `NetworkWiiMediator` embedded it as a member (+0x6DD8), so the
- * mediator's header can see the complete type without the pat-control band's.
+ * menu/PatTerms.h - leaf header (rule 2) for the terms object `menu/menu_plsearch.cpp` defines: its constructor
+ *   0x804504F4 (stores the table 0x80607E40, publishes the object in `.sbss` 0x80794D58, clears its state), its
+ *   destructor 0x80450534 (unpublishes it) and its table.  `NetworkWiiMediator` embeds it at +0x6DD8.
  */
 #ifndef MHTRI_MENU_PATTERMS_H
 #define MHTRI_MENU_PATTERMS_H

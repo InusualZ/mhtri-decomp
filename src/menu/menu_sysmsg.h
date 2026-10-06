@@ -1,6 +1,6 @@
 /*
- * Declarations of `src/menu/menu_sysmsg.cpp` (the stub unit `.text` 0x804513FC..0x804565C0, `.data` 0x80607E50..0x8060E7FC).
- * The unit has no bodies yet; this header carries the data symbol other units read from its `.data` run.
+ * menu/menu_sysmsg.h - the `.data` symbol other units read from `menu/menu_sysmsg.cpp`'s system-message run
+ *   (0x80607E50-0x8060E7FC); the unit has no bodies yet.
  */
 #ifndef MHTRI_MENU_MENU_SYSMSG_H
 #define MHTRI_MENU_MENU_SYSMSG_H

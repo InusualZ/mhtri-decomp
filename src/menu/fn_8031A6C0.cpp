@@ -1,51 +1,36 @@
 /*
- * menu/fn_8031A6C0.cpp - unit, `.text` 0x8031A6C0..0x8031DAA8 (45 functions, 13288 bytes).
- *
- * 23 of 45 functions have a body here.
- *
- * FLAGS.  `cflags_menu`.  The effect tail of the old range (0x8031DAA8..) is `menu/menu_item_effect.cpp`.
- *
- * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
- * extabindex).
- */
-/* ---- header inherited from src/menu/fn_8031A6C0.cpp (written against its pre-phase-4 range) ---- */
-/*
- * src/menu/fn_8031A6C0.cpp - the menu selection-screen band, `.text` 0x8031A6C0..0x8031EA8C.
- *
- * WHAT IT IS.  The item/equipment selection screen.  `MenuSel` (this band's view of the 0x330-byte
- * menu working record `menu_item.h` names `MenuSlot`) is the screen state: the input bits at +0x4/
- * +0x8, the selection cursor at +0x1EC, the 3+8 0x18-byte entry arrays at +0x24/+0x6C, the resolved
- * slot pairs at +0x210 and the item data at +0x1F0.  `self[1]` is the work area's second slot (the
- * +0x330 accesses).  `fn_8031A6C0` is the per-frame state step and `fn_8031B774` the state dispatch
- * (both switch on `state_0x001`); `fn_8031AE38`/`fn_8031B080`/`fn_8031BD7C` are the three draw
- * passes and the tail (0x8031D294..) drives the selected item's 3D effect model.
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string covers the range: the
- * only source-file string in the band's whole `.data` run is `menu_infomation.cpp` (0x805DCCDC), and
- * it is loaded only by functions of the *previous* proposal range (0x80312F84..0x80316DDC), never by
- * this one - the flanking TU's string, not this range's (the convention `menu/fn_802E4978.cpp`'s
- * registration records).  2. `dumpmap.py lookup` answers only `zz_031a6c0_` for the code.  3. The
- * `menu` module is certain: the band calls the menu library's `get_menu_lsp_tbl`/`GetMenuFontColor`/
- * `GetItemData`/`ItemName`/`draw_font`, drives the `_PLW`/`_EQUIP` selection, and both bracketing
- * registrations are `menu`.  The file therefore keeps the map's stem (brief option 4).
- *
- * LANGUAGE.  C++: every callee is a mangled free function (`GetItemData__FUs`,
- * `get_lsp_data__FUsP10_mh_ivec2_`, ...), so the band's bodies are `extern "C"` and call the real
- * signature (rule 9).  The extab/extabindex runs the registered unit owns are
- * 0x80015F3C..0x80016074 / 0x80034D40..0x80034F14 (contiguous with the previous proposal's run,
- * which is why the seam at 0x8031A6C0 is a discovery size cap, not a TU edge).
- *
- * RESIDUALS (this pass).  The band is 59 functions / 17356 B; this pass reconstructs the 28 whose
- * bodies need no in-band helper that is not itself written here.  The remaining 31 - the two big
- * state machines (`fn_8031A6C0`, `fn_8031B774`), the three draw passes (`fn_8031AE38`,
- * `fn_8031B080`, `fn_8031BD7C`), the cursor's record machine (`fn_8031C0B8`, `fn_8031C5FC`,
- * `fn_8031CE08`, `fn_8031CAC4`) and the whole 0x8031D294.. effect tail - are transcribed from the
- * target's m2c skeletons in `.pi/notes` and are the follow-up round's work.  Every function's
- * `.text` is unaffected by the helpers, so the landed subset measures as its own functions.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked every `.text` row of
- * config/RMHE08/symbols.txt from 0x8031A6C0 to 0x8031EA8C - 59 functions, all `fn_` stems, and the
- * runtime dump answers `zz_031a6c0_`).
+ * menu/fn_8031A6C0.cpp - the item/equipment selection screen.  `MenuSel` (this unit's view of the 0x330-byte working
+ *   record `menu/menu_item.h` names `MenuSlot`) is the screen state: the input bits at +0x4/+0x8, the cursor at +0x1EC,
+ *   the 3+8 0x18-byte entry arrays at +0x24/+0x6C, the resolved slot pairs at +0x210, the item data at +0x1F0;
+ *   `self[1]` is the work area's second slot.  `fn_8031A6C0` is the per-frame state step and `fn_8031B774` the state
+ *   dispatch (both switch on `state_0x001`); `fn_8031AE38`/`fn_8031B080`/`fn_8031BD7C` are the three draw passes.
+ *   C++: the callees are mangled free functions (`GetItemData__FUs`, `get_lsp_data__FUsP10_mh_ivec2_`), the bodies
+ *   `extern "C"`.
+ * RANGE. .text 0x8031A6C0-0x8031DAA8 (45 functions); extab, extabindex, .ctors 0x8056F398, .data 0x805DCE98-0x805DCF38,
+ *   .bss 0x806BE108-0x806BE120, .sdata 0x80792C20-0x80792C48, .sdata2 0x8079AE50-0x8079AE70.  The extab/extabindex runs
+ *   continue `menu/menu_infomation.cpp`'s, so the left edge is a discovery size cap, not a measured TU edge; the effect
+ *   tail from 0x8031DAA8 is `menu/menu_item_effect.cpp`.
+ * FLAGS. `cflags_menu` (configure.py).
+ * NAMES. Module `menu` from the callees (`get_menu_lsp_tbl`, `GetMenuFontColor`, `GetItemData`, `ItemName`, `draw_font`)
+ *   and the bracketing menu units; no `__FILE__` string covers the range (`menu_infomation.cpp`'s is the neighbour's) and
+ *   the dump answers `zz_`, so the file keeps the map's stem.
+ * RESIDUALS. 23 rows unwritten (objdiff scores them zero): `fn_8031A6C0`, 0x8031AE38-0x8031B2D0, `fn_8031B39C`,
+ *   `fn_8031B4C4`, 0x8031B624-0x8031BD50, `fn_8031BD7C`, `fn_8031C0B8`, `fn_8031C5FC`, `fn_8031C934`,
+ *   0x8031CAC4-0x8031DA50, `fn_8031DA54` (the state machines, the draw passes, the cursor's record machine and the
+ *   effect-model tail).  The 15 partial rows (0x8031AD30-0x8031AE38, 0x8031B2D0-0x8031B39C, 0x8031BFEC-0x8031C0B8,
+ *   0x8031C338-0x8031C5FC, `fn_8031C8EC`, `fn_8031CA3C`), by cause:
+ *  - indexed-access fold: retail `add r3,r3,r0` + `lhz`/`sth 0x39a2(r3)`, ours `lhzx`/`sthx` (`fn_8031B2D0`,
+ *    `fn_8031B2FC`, `fn_8031B31C`);
+ *  - an extra narrowing (`clrlwi`/`extsh`) ours applies to a value retail stores or compares raw (`fn_8031AD30`,
+ *    `fn_8031AD9C`, `fn_8031B2FC`, `fn_8031BFEC`, `fn_8031C01C`, `fn_8031C028`, `fn_8031C390`, `fn_8031CA3C`);
+ *  - 0xFFFF built as `lis r6,1; subi r0,r6,1` in retail, `li r0,-1` in ours (`fn_8031BFEC`, `fn_8031C028`);
+ *  - a signed byte test (`extsb` + `cmpwi`) where ours emits `cmplwi` (`fn_8031C338`, `fn_8031C8EC`), and `lhz`
+ *    where ours loads `lha` (`fn_8031C514`);
+ *  - ours repeats a `li r3,0; blr` tail where retail branches to a shared one (`fn_8031C338`, `fn_8031C390`,
+ *    `fn_8031C408`), and an inverted branch with a dropped `b` (`fn_8031AD9C`, `fn_8031C514`);
+ *  - register allocation only (`fn_8031B344`; `fn_8031C408` with r30/r31 swapped).
+ *   flipcheck: `.bss` (0x18), `.ctors` (0x4), `.data` (0xA0), `.sdata` (0x28) and `.sdata2` (0x20) claimed but not
+ *   emitted; short `.text` 0x868 of 0x33E8, extab 0x48 of 0xF8, extabindex 0x6C of 0x174; the bytes of all three differ.
  */
 
 #include "types.h"
@@ -56,7 +41,8 @@
 #include "menu/menu_message.h"
 #include "sound/fn_800D7F54.h"
 
-/* The band's unowned callees (no registered unit owns these addresses; rule 2's unsplit case). */
+/* Callees other units own (`menu_slot_get` `menu/menu_message.cpp`, `fn_80274570` `Pl/pl_act.cpp`, `fn_8033AAFC`
+ * `lobby/lb_companion_ui.cpp`, ...); their owners' headers do not declare them yet. */
 
 extern "C" {
 

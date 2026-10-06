@@ -1,21 +1,9 @@
 /*
- * `menu/multi_result.cpp`'s records and outbound declarations.
- *
- * The unit is the multiplayer-result screen's box cursor band plus the enemy action/substate
- * dispatchers that share its address range (see the unit header for the seam evidence).  Its two
- * defining symbols are the box helpers on `_multi_result_work`, the 0x18-byte record the screen
- * keeps four of at +0x33DC of its work buffer - the mangled map name `...__FP18_multi_result_work`
- * is the original struct's own spelling (`18` is the name's length, and the record's stride in
- * `multi_box_records_step` is 0x18), so the type keeps that name: a rename would ask the front-end
- * for a different symbol.
- *
- * The record's `work` pointer points back at the screen object that owns the record, whose box grids
- * sit at +0x3070 / +0x3130 (`MultiResultBoxGrids` is this unit's view of that part; the owner's
- * `QResultScreen` in `menu/menu_result.h` names the same two runs as `grid_entries`/`list_entries`).
- *
- * The owners of the symbols this unit only *references* are: `menu/menu_result.cpp`
- * (`q_result_phase_is_2`, `q_result_phase_is_3`), `enemy/fn_8011D448.cpp`
- * (`em_parts_damage_level_get`) - both included, never re-declared (rule 2).
+ * menu/multi_result.h - `menu/multi_result.cpp`'s records and outbound declarations.  `_multi_result_work` keeps the
+ *   original struct name the map's `...__FP18_multi_result_work` spells (`18` is its length; the screen keeps four of
+ *   these 0x18-byte records at +0x33DC), and its `work` pointer leads back to the screen object whose box grids sit at
+ *   +0x3070/+0x3130 (`MultiResultBoxGrids`; `menu/menu_result.h`'s `QResultScreen` names them `grid_entries`/
+ *   `list_entries`).
  */
 #ifndef MHTRI_MENU_MULTI_RESULT_H
 #define MHTRI_MENU_MULTI_RESULT_H
@@ -114,8 +102,7 @@ void em_action5_dispatch(struct _ENEMY_WORK* self);
 void em_action6_dispatch(struct _ENEMY_WORK* self);
 void em_action7_dispatch(struct _ENEMY_WORK* self);
 
-/* The handlers the dispatchers above tail-call; their bodies are the next pass's work, so only the
- * dispatchers themselves are defined here (the map rows are renamed in the same change). */
+/* The handlers the dispatchers above tail-call; their bodies are not written yet. */
 void em_action0_step(struct _ENEMY_WORK* self);
 void em_action1_sub0(struct _ENEMY_WORK* self);
 void em_action1_sub1(struct _ENEMY_WORK* self);
@@ -139,8 +126,7 @@ void em_action6_sub0(struct _ENEMY_WORK* self);
 void em_action6_sub1(struct _ENEMY_WORK* self);
 void em_action7_step(struct _ENEMY_WORK* self);
 
-/* `multi_box_phase_step` asks this one whether the screen is ready for the phase it names; the body
- * is the next pass's work (it needs `get_vsUser_work` declared by its owner, `fn_8004CAD8.cpp`). */
+/* `multi_box_phase_step` asks this one whether the screen is ready for the phase it names. */
 u32 multi_box_phase_ck(QResultScreen* self, u8 mode);
 
 /* Whether the area already holds an active team-19 enemy, the action band's hand-over test. */

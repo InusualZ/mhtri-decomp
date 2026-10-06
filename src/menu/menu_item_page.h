@@ -1,12 +1,7 @@
 /*
- * `menu/menu_item_page.cpp`'s own view: the item page draw layer's entry points and the callees it
- * calls.  See the unit's source header for the module/name evidence and the residuals.
- *
- * Rule 2 note (the practice `menu/fn_802E4978.h` documents): the callees below are declared here
- * or come from `unsplit/<band>.h`, because the owner headers collide in one translation unit -
- * `hud/layout.h` and `lobby/lb_pane_ui.h` define `_mh_ivec2_`/`_SPR_DATA_` differently
- * from `unsplit/lobby.h` (`get_lsp_data` is `void*` there and `_SPR_DATA_*` in the owner's), and
- * `menu/menu_item.h` already pulls `pl.h`.
+ * menu/menu_item_page.h - `menu/menu_item_page.cpp`'s entry points, records and callees.  The callees are declared
+ *   here or come from `unsplit/` because the owner headers collide in one TU: `hud/layout.h` and `lobby/lb_pane_ui.h`
+ *   define `_mh_ivec2_`/`_SPR_DATA_` differently from `unsplit/lobby.h`, and `menu/menu_item.h` pulls `pl.h`.
  */
 #ifndef MHTRI_MENU_MENU_ITEM_PAGE_H
 #define MHTRI_MENU_MENU_ITEM_PAGE_H
@@ -162,7 +157,7 @@ s32 chk_pointer(void);
 s32 spr_data_copy(s16* dst, void* src);
 u8 get_option_cfg(u8 index);
 
-/* `lobby/fn_801F3294.cpp`'s page arrow and the menu band's own text helpers. */
+/* `lobby/lb_pane_ui.cpp`'s page arrow and the menu band's own text helpers. */
 void PutPageArrow(u16* table, s16 a, s16 b, u16 c, const _mh_ivec2_* pos, u8 flags);
 u8** get_str_tbl(s32 idx);
 void set_blendmode(u8 a, u8 b, u8 c);

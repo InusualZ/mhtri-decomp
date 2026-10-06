@@ -1,76 +1,36 @@
 /*
- * The pop-data / option system file, `.text` 0x803BE30C-0x803C3A5C (87 functions).
- *
- * Phase 4 recut: the registered range was 0x803BE30C-0x803C4BA0 (110 functions, 26772 B); the demo-work accessors
- * from 0x803C3A5C moved to `lobby/lb_server_sel_trans.cpp`.  The notes below describe the former range.
- *
- * What it is.  The head of the range loads the per-map/area monster-population files
- * (`m%03d_%06d_c_pop.dat`, `06/..._f_pop.dat`, `06/..._r_pop.dat`) into the move-work buffer
- * `get_move_work_adrs(0)`; the middle is the option table `option_w` (.bss 0x80659090) and its
- * arena-config twin; the tail is the demo/event work `demo_work` (.bss 0x806D2B20) with its
- * accessors.  Its callers are spread across `Pl`, `menu`, `hud`, `lobby`, `ef`, `enemy` and
- * `stage`, and every one of the range's own `__F` manglings is C++ (the discovery probe's
- * `mangled-defined` set: `ck_option_cfg__FUc`, `get_option_cfg__FUc`, `get_arena_cfg__FUcUc`,
- * `set_option_cfg__FUcUc`, `set_def_option__Fv`, `set_option_mode__Fv`, `get_demo_no__Fv`,
- * `event_demo_ck__Fv`, `get_pop_dat_ptr__Fv`), so the unit is C++.  The range's other symbols keep
- * the map's plain (C-linkage) spelling - `fn_803BECA0`, `fn_803BEE04`, `fn_803C482C`, ... - and are
- * defined inside `extern "C"` so the front-end reproduces the name.
- *
- * Module and name (evidence classes 3 and 4).  No `__FILE__` string reaches the range - its only
- * `.data`/`.sdata` references are its own tables (the pop file-name strings at 0x805F84E0/0x805F84F8/
- * 0x805F8510, the option maximum table at 0x805F8528, the kana/keyboard tables at 0x805F87B0.. and
- * 0x807936A8..), and the shared runtime dump answers `zz_` for 101 of the range's 110 addresses (the
- * nine real names it does carry are the ones the map already has).  Module `menu` is class 3: the
- * range's callee surface is the menu 2D library's (`PutPageArrow`, `get_menu_lsp_tbl`, `get_lsp_data`,
- * `draw_sprite_*`, `GetMenuFontColor`, `LbStr`, `chk_pointer`, `PlayMode_ck`), it shares 48-66 of those
- * callees with `menu/menu_result.cpp` / `menu/menu_item.cpp` / `menu/menu_item_page.cpp`, and the
- * immediately preceding registered band is `menu/multi_result.cpp` (0x8039D278..0x803A3A50).  The file
- * name keeps the range's first symbol, which is the runtime dump's own real name (`get_pop_dat_ptr`).
- *
- * Seam.  UNPROVEN, and the brief's range is kept: this is the discovery `--max-bytes` cap, not a
- * boundary.  `tudiscover at 0x803BE30C` reports only weak cuts - the best right-hand cut is 0x803BF294
- * (share 0.107-0.116, "fn_803BF0E0/fn_803BF198 called only from this range"), the best left-hand one
- * is this range's own start (share 0.037), and `tudiscover at 0x803BE318` ranks a cut at 0x803BE318
- * above it - so nothing here is decisive.  The data does agree with the range: the `.bss` pair
- * 0x806D2AF8/0x806D2B20, the `.data` runs 0x805F84E0..0x805F8510 and 0x805F87B0..0x805F8948, the
- * `.sdata` run 0x807936A8..0x807938B0 and the whole `.sdata2` run 0x8079C630..0x8079C688 are
- * referenced only from inside it (the two exceptions are the single `.sbss` words 0x80794C60/0x80794C64,
- * which two earlier functions at 0x803BD3C0/0x803BA1B4 also read - the one hint that the TU may start
- * earlier than 0x803BE30C).  A seam re-draw is the follow-up if the bodies say so.
- *
- * Flags.  `cflags_menu` (its siblings' group): the target objects keep the unfused narrow-load pairs
- * (`infer.py` on `auto_fn_803BE318_text.o`: "0 record forms, 1 kept `clrlwi` before a narrowing
- * store" -> peephole off) and carry `extab`/`extabindex` (78 framed functions, 0x80019164..0x800193D4
- * and 0x8003987C..0x80039C24), which `-Cpp_exceptions on` supplies.
- *
- * Sections.  Only `.text` is claimed.  The unit's own extab 0x80019164..0x800193D4, extabindex
- * 0x8003987C..0x80039C24, `.data` 0x805F84E0..0x805F8510 + 0x805F87B0..0x805F8948, `.sdata`
- * 0x807936A8..0x807938B0, `.sdata2` 0x8079C630..0x8079C688, `.bss` 0x806D2AF8..0x806D2B48 and `.sbss`
- * 0x80794C60..0x80794C88 are NOT claimed yet - the pass that writes the bodies that emit them claims
- * them with them (docs/plan.md 8.4; the `menu/menu_result.cpp` precedent).  The pooled constants the
- * written bodies load are therefore spelled as literals, not as the map's pool symbols.
- *
- * Residuals (this pass).
- *   * 83 of the 110 functions are unwritten and measure 0 %.  The ones that need a heavily shared
- *     `lbl_` global (`lobby_state_block` - 26 referrers outside the range - `lobby_world_block` - 90 - and the
- *     `stage_map_kind_get` / `fn_80217934` / `eft_res_slot_release` / `fn_800F8A44` callee set, each declared across
- *     30+ files) are deliberately left out: rule 7 makes naming them this batch's job, and that is a
- *     cross-unit rename batch, not this unit's registration.  They are the first follow-up.
- *   * `set_option_mode` / `set_option_cfg` / `set_def_option` / `set_option_from` (488 B) are not
- *     written: their bodies apply the result through `set_SE_volume`/`set_BGM_volume`
- *     (0x800F29BC/0x800F2A08, owned by `sound/fn_800EF7D8.cpp`, which has no owner header yet - the
- *     declarations sit in its own source at 397-398) and `set_now_brightness` (0x8003FC50, owned by
- *     `main/main.cpp`, declared nowhere).  Giving those two owners their headers is a cross-unit
- *     change with a re-measure of both units; it is the second follow-up.
- *   * `not_in_demo` (0x803C482C, `fn_803C482C`) is not written: `lobby/lb_companion_ui.h`
- *     declares the same symbol as `s32 fn_803C482C(void* psw)`, so naming it here needs that header's
- *     call-site signature settled first.
- *   * The pop-file-name strings (0x805F84E0/0x805F84F8/0x805F8510) and the option default table
- *     (0x805F8548) are declared in `unsplit/menu.h` and never defined, the same shape
- *     `menu/menu_note.cpp` records for its own `.data` literals.
- *   * `option_w`'s element type is unsigned here (`lbzx`, no `extsb`, in `ck_option_cfg`) while the
- *     target's `set_option_cfg` converts its value to a signed byte before the store; one of the two
- *     views is wrong and the first divergence in those rows says which.
+ * menu/get_pop_dat_ptr.cpp - the pop-data / option system file: the per-map monster-population file loads
+ *   (`m%03d_%06d_c_pop.dat`, `06/..._f_pop.dat`, `06/..._r_pop.dat`) into `get_move_work_adrs(0)`, the option table
+ *   `option_w` and its arena-config twin, and the demo state words.  C++ (the range defines `get_pop_dat_ptr__Fv`,
+ *   `ck_option_cfg__FUc`, `get_option_cfg__FUc`, `get_arena_cfg__FUcUc`, `set_option_cfg__FUcUc`, `set_def_option__Fv`,
+ *   ...); the plain-spelled rows are defined inside `extern "C"`.
+ * RANGE. .text 0x803BE30C-0x803C3A5C (87 functions); extab, extabindex, .ctors 0x8056F3B8, .data 0x805F84E0-0x805F8920,
+ *   .bss 0x806D2AF8-0x806D2B20 (`pop_dat_ptrs`), .sdata 0x807936A8-0x80793738, .sbss 0x80794C60-0x80794C90, .sdata2
+ *   0x8079C630-0x8079C680.  The edges are unproven: `tudiscover` gives only weak cuts (0x803BE318, 0x803BF294), and the
+ *   `.sbss` words 0x80794C60/0x80794C64 are also read at 0x803BD3C0/0x803BA1B4, a hint that the TU starts earlier.
+ * FLAGS. `cflags_menu` (configure.py); `infer.py` on the target: 0 record forms and a `clrlwi` kept before a narrowing
+ *   store (the peephole off), and extab records (`-Cpp_exceptions on`).
+ * NAMES. Module `menu`: no `__FILE__` string reaches the range, and its callee surface is the menu 2D library's
+ *   (`PutPageArrow`, `get_menu_lsp_tbl`, `get_lsp_data`, `draw_sprite_*`, `GetMenuFontColor`, `LbStr`), shared with
+ *   `menu/menu_result.cpp`, `menu/menu_item.cpp` and `menu/menu_item_page.cpp`.  The file keeps the first symbol, the
+ *   runtime dump's own name.
+ * RESIDUALS. 72 rows unwritten (objdiff scores them zero): `fn_803BE318`, 0x803BE4D4-0x803BEA28,
+ *   0x803BEA94-0x803BEBF0, `fn_803BECC8`, 0x803BED3C-0x803BEE04, 0x803BEEB8-0x803BEFC0, 0x803BEFD4-0x803C0C4C,
+ *   0x803C0C58-0x803C0F24, 0x803C0F3C-0x803C3A30, `fn_803C3A40`.  `set_option_cfg`/`set_def_option`/`set_option_mode`
+ *   apply their result through `set_SE_volume__FUc`/`set_BGM_volume__FUc` (`sound/snd_bank_loader.cpp`) and
+ *   `set_now_brightness__Ff` (`main.cpp`), which no header declares.  The 4 partial rows:
+ *  - `get_arena_cfg`: indexed-access fold, retail `add r3,r3,r0; lbz r0,0xd0(r3)` twice where ours emits `lbzx`
+ *    (120 B against 128);
+ *  - `get_option_pair`: retail reads the value table through `@sda21` (`lbl_807936B8`), ours through `lis`/`addi`
+ *    (`option_value_tbl` is not declared small);
+ *  - `demo_state_set`: our store lands at +0x4 where retail stores at +0x8;
+ *  - `demo_save_words`: our second load is scheduled before the `li`, retail's after it.
+ *  - `option_w`'s element type is unsigned here (`lbzx`, no `extsb`, in `ck_option_cfg`) while the target's
+ *    `set_option_cfg` converts its value to a signed byte before the store: one of the two views is wrong.
+ *   flipcheck: `.ctors` (0x4), `.data` (0x440), `.sdata` (0x90), `.sbss` (0x30) and `.sdata2` (0x50) claimed but not
+ *   emitted; short `.text` 0x294 of 0x5750, extab 0x10 of 0x208, extabindex 0x18 of 0x30C; the bytes of all three
+ *   differ; `demo_init_word_0`/`demo_init_word_1`, `demo_saved_words`, `option_value_max` and `option_value_tbl` are
+ *   defined by no link input.
  */
 
 #include "types.h"
@@ -79,14 +39,14 @@
 #include "fn_8004CAD8.h"     /* get_vsUser_work / _vs_user_data (owner src/fn_8004CAD8.cpp) */
 #include "hud/layout.h"     /* _mh_ivec2_, which the band header's prototypes name */
 #include "Runtime.PPCEABI.H/memset.h" /* memset (owner: the Runtime.PPCEABI.H lib) */
-#include "unsplit/menu.h"    /* option_w, this band's own tables, its unowned callees */
+#include "unsplit/menu.h"    /* option_w, this band's own tables, its callees */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "lobby/lb_server_sel_trans.h" /* demo_work_process (owner's header, rule 2) */
 
 /* The ten pop-data pointers (.bss 0x806D2AF8) the accessor below hands out; this unit's whole `.bss` claim. */
 PopData* pop_dat_ptrs[10];
 
-/* The pop-data pointer accessor (map name `get_pop_dat_ptr__Fv`). */
+/* Hands out the ten pop-data pointers. */
 PopData** get_pop_dat_ptr(void)
 {
     return pop_dat_ptrs;

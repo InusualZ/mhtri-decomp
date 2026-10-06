@@ -1,92 +1,56 @@
 /*
- * menu/menu_item.cpp - the menu item band: the hit/land query tail of the Pl band, the item name and item-data helpers and the item
- * menu's own pages.
- *
- * `.text` 0x80297E34..0x802A6624 (about 170 functions), `.bss` 0xDF0 B, `.data` 0x384 B, `.sdata` 0x28 B and `.sdata2` 0x78 B (the unit's
- * `__FILE__` string is this file's name).  Phase 4 fold/recut: the tail of `Pl/fn_80295EF4` (0x80297E34..0x8029F3C8)
- * and the registered `menu/menu_item` are one TU of the candidate; the head of `Pl/fn_80295EF4` goes to `Pl/pl_coll`.  The
- * unit crosses the window edge 0x802A0000 (its text ends at 0x802A6624).
- *
- * Flags: `cflags_menu` as the survivor.  The `Pl/fn_80295EF4` tail was `cflags_pl` (Wii/1.0); the flag set is the same
- * (-O3, -inline noauto, -opt nopeephole, -Cpp_exceptions on) and only the compiler version differs (Wii/1.3 here).  Measured: the 12
- * functions of that tail this object defines are instruction-identical (objdump, relocations kept) when the file is compiled
- * under Wii/1.0 and under Wii/1.3, and the 71 functions of the old unit that live here score the same before and after the fold
- * (71 of 71); the menu half's own functions do differ between the two versions, which is why the survivor's version is kept.
- */
-
-/* ==== recut from Pl/fn_80295EF4.cpp (0x80297E34..0x8029F3C8) ==== */
-/*
- * Naming note: the symbol map spells 97 of this range's 99 functions as bare `fn_XXXXXXXX` and
- * names the other two with a mangling (`get_hit_id__Fv`) or a plain name; the map is the only
- * evidence for a name here - no `__FILE__` string covers the band (the DOL's string pool jumps from
- * `enemy_control.cpp` at 0x805A1BB8 straight to `menu_item.cpp` at 0x805CDFC8) and
- * `tools/symbols/dumpmap.py lookup` answers a `zz_XXXXXXXX_` placeholder for every in-range address
- * (checked for 0x80295EF4, 0x8029B918, 0x8029F204 and the range's other endpoints).
- *
- * Pl/fn_80295EF4.cpp - the hit/land query band of the `Pl` module.  `.text` 0x80295EF4-0x8029F3C8
- * (99 functions, 0x94D4 B).  Nothing else is claimed: the band's `.data` tables and both pools
- * (`.sdata2` 0x8079A330-0x8079A3C8, `.sdata` 0x80794B58) stay with the `auto_*` objects, and so does
- * the `.ctors` word for the static initializer `fn_80297C30` (invariant 8.4 - never claim a range the
- * object does not emit).
- *
- * The seam is unproven, and it is a `--max-bytes` cut, not a TU boundary (the brief says so and the
- * evidence agrees): the band's `.sdata2` run 0x8079A330-0x8079A3C8 is referenced from 0x80291664
- * through 0x8029F204 without a single run break, and the static initializer at 0x80297C30 (inside
- * this range) constructs arrays whose element constructors are the *previous* proposal's functions
- * (`fn_80295544` at 0x80295544) - i.e. 0x8028F66C-0x8029F3C8 and their neighbours are very likely one
- * original object.  Both halves are registered separately only because discovery cut the run; the
- * merge is requested in the outbox (`shared-file`).
- *
- * Module `Pl` - class 3 of the brief's evidence order.  Class 1 (a `__FILE__` string) and class 2 (a
- * real runtime-dump name) both fail (above).  Class 3 is conclusive: the band's callees are the Pl
- * family (`get_move_work_adrs`, `_PLW` fields, `Pl_frame_check`) and its record vocabulary is the one
- * the map already names inside the Pl band (`_HIT_W`, `LandData`, `hit_ground_comon`, `get_hit_id`,
- * `body_set`), with the registered sibling `Pl/fn_80288CEC.cpp` ending at 0x8028F66C straight before
- * it.  File name - class 4: nothing names a file, so the stem stays the map's `fn_80295EF4`, the
- * sibling class-4 pattern of `Pl/fn_80229ECC.cpp` / `Pl/fn_8024158.cpp` / `Pl/fn_80288CEC.cpp`.
- *
- * Language: C++ (mangled `get_hit_id__Fv` is defined here, and the range reaches mangled callees).
- * Flags: `cflags_pl` (the lib's, settled by `Pl/pl_act.cpp`/`pl_master.cpp`/`pl_skill.cpp`).
- *
- * RESIDUAL (this pass).  24 of the range's 99 functions are written and measured; the row is at
- * ~4 % of the range's bytes, with 16 functions byte-identical and the rest of this pass's set between
- * 92 and 99 %.  Per-symbol numbers are in `build/RMHE08/report.json` and the outbox; what is
- * deliberately NOT written, and why:
- *   * `hit_data_apply` (452 B, the hit-record initializer) reads the owner's area byte for all four
- *     owner kinds; kinds 1 and 2 land on offsets `pl.h` does not name (+0x1E1 inside an `_EQUIP`
- *     sub-record, +0x08 inside a run another lane owns), and this pass did not invent names for them.
- *   * The owner work records (`_HIT_W`'s owner, written at +0x470/+0x574/+0x8B4 by the
- *     `fn_802996B4`..`fn_802997E4` family) are not pinned: `pl.h`'s `+0x470` is an `s16` while those
- *     functions store a float triple there, so the field's owner is unresolved (the same blocker the
- *     sibling band records from the other side).
- *   * The band's switches (`fn_80299EF8`, `fn_8029A358`, `fn_8029B918`, `fn_8029E35C`, ...) are the
- *     ceiling the sibling band already recorded: every jump table in the range is zero-filled in the
- *     original DOL, so a sparse switch's case-to-body mapping is not recoverable from the image.
- *   * `.text` only is claimed.  The split does hand the unit's target object the `.ctors` word
- *     (4 B), `extab` (0x240 B) and `extabindex` (0x360 B) that bracket the range, and our object does
- *     emit the extab of the functions it defines - but the ranges are not registered here because the
- *     `.text` cut is not a TU boundary (see above) and this source states the static initializer
- *     `fn_80297C30` as an explicit function rather than a file-scope object (invariant 8.4).
- *
- * Measured residuals in the written set (best variant landed for each):
- *   * `fn_802961F8` / `fn_80296228` (95.0 / 95.71): retail's loop guard is `cmplwi r5,0` + `ble`
- *     where MWCC emits `cmpwi` + `beq` from every shape tried (`while`, `for`, `for (;;)`+break,
- *     `u32` and `s32` counts, an explicit pre-loop guard - the last one costs 12 bytes).
- *   * `fn_8029F084` (92.41): retail carries an unused accumulator (`li r5,0` then `+9` per outer
- *     iteration) that MWCC's dead-code pass removes from every source spelling tried; ours is 4 B
- *     short.  The loop shape itself (two unrolled ten-entry rows) is the one that reproduces.
- *   * `fn_802963B0` / `fn_802963FC` / `fn_802969A8` / `fn_802969D0` (98.32 / 98.32 / 99.0 / 99.0):
- *     instruction-for-instruction equal but for the operand order of one `add` in the index
- *     arithmetic, and the branch form of the range checks (`||`-chain vs `&&`-chain inversion).
- *   * `fn_80296368` (98.78), `fn_8029A140` (68.61): the same class - only the branch sense of one
- *     `fcmpo` differs.  `fn_8029A140`'s tail block is laid out in the other order (4 B).
+ * menu/menu_item.cpp - the item menu: the hit/land query tail of the Pl band (the hit registry, the id lists, the tile
+ *   lookups), the item-name and item-data helpers, and the action and option lists' per-frame state machines and draw
+ *   walk.  C++; every `fn_` stem is `extern "C"` so objdiff pairs it by the map's name.
+ * RANGE. .text 0x80297E34-0x802A6624 (170 functions); extab, extabindex, .data 0x805CDC88-0x805CE00C, .bss
+ *   0x806AC8A8-0x806AD698, .sdata 0x80792278-0x807922A0, .sdata2 0x8079A380-0x8079A3F8.  The left half
+ *   (0x80297E34-0x8029F3C8) is the tail of the old Pl hit/land band, whose head is `Pl/pl_coll.cpp`.
+ * FLAGS. `cflags_menu` (configure.py: the lib's `-opt nopeephole`, which makes the old `#pragma peephole off`
+ *   redundant).  The Pl tail's functions compile instruction-identical under Wii/1.0 and Wii/1.3; the menu half needs 1.3.
+ *   The range keeps `bl`s to its tiny same-file helpers (`GetItemData` from `fn_8029F704`/`item_category_ck`,
+ *   `hit_flag_set` from `fn_8029F4C4`): `cflags_main`'s `-inline noauto`.
+ * NAMES. Module and file from the `__FILE__` string `lbl_805CDFC8` = "menu_item.cpp", passed by every
+ *   `nw4r::db::Panic` of the range (the dump's `_802a22a4s_menu_item.cpp_805cdfc8`, emitted by 0x802A22A4).  The runtime
+ *   dump's real names: `body_set`, `hit_flag_set`, `hit_result_check`, `get_item_data_ptr`, `ItemName`, `ItemExp`,
+ *   `GetItemData`, `get_menu_tbl_ptr`, `get_menu_lsp_tbl`, `put_menu_cursor`; the map's own `get_hit_id__Fv`.  The other
+ *   named rows are GUESSes from their bodies (the dump answers `zz_` for them).
+ * RESIDUALS. 96 rows unwritten (objdiff scores them zero): 0x80297E34-0x80299ED8, 0x80299EF8-0x8029A140,
+ *   0x8029A19C-0x8029B8F4, 0x8029B918-0x8029D6FC, 0x8029D744-0x8029EFDC, 0x8029F204-0x8029F3C8 (`hit_data_apply`),
+ *   0x8029F834-0x8029FA74, 0x8029FCFC-0x8029FFB8, 0x802A0568-0x802A16F8, 0x802A1714-0x802A2550,
+ *   0x802A2564-0x802A2C98 (`put_menu_cursor` and five more), 0x802A2CB8-0x802A3190, 0x802A31D4-0x802A441C,
+ *   0x802A4430-0x802A47F4, 0x802A4810-0x802A5444.  Blocked so far: `hit_data_apply`'s owner kinds 1 and 2 land on
+ *   offsets `pl.h` does not name (+0x1E1 inside an `_EQUIP`, +0x08); the `fn_802996B4`..`fn_802997E4` family stores a
+ *   float triple at the owner's +0x470, an `s16` in `pl.h`; every jump table of the Pl tail is zero-filled in the DOL,
+ *   so a sparse switch's case mapping (`fn_80299EF8`, `fn_8029A358`, `fn_8029B918`, `fn_8029E35C`) is not recoverable.
+ *   The 11 partial rows:
+ *  - `fn_8029A140`: the branch sense of one `fcmpo`, and its tail block laid out in the other order;
+ *  - `fn_8029F084`: retail keeps an unused accumulator (`li r5,0`, `+9` per outer iteration) MWCC deletes;
+ *  - `item_category_ck`: the `and` operands in the other order (both spellings tried);
+ *  - `fn_8029FA74`, `fn_8029FB00`: retail loads the byte straight into the argument register (`lbz r4` + `extsb r4,r4`),
+ *    ours through r0;
+ *  - `menu_item_frame_update`: retail masks `GameMode_ck`'s result (`clrlwi r3,r30,24`), ours moves it (`mr r3,r30`);
+ *  - `fn_802A5444`, `fn_802A579C`, `fn_802A64B0`: one `mullw` with its operands in the other order; `fn_802A598C`
+ *    the same plus two r0-vs-r4 argument loads;
+ *  - `fn_802A5E64`: the same instructions, a different permutation of r24-r31.
+ *  - source order is not address order (the 0x802A5444-0x802A6624 block precedes the 0x8029F3C8 bodies, `fn_8029F084`
+ *    precedes the 0x8029A140 rows), so the emitted order differs from retail's (`relocdiff.py menu/menu_item --by-owner`:
+ *    the extabindex symbols mismatch); a flip blocker whose fix is a source reorder, a decompilation task.
+ *   flipcheck: `.data` (0x384), `.bss` (0xDF0) and `.sdata` (0x28) claimed but not emitted; short `.text` 0x2258 of
+ *   0xE7F0, extab 0xB0 of 0x380, extabindex 0x108 of 0x540, `.sdata2` 0x10 of 0x78; the bytes of all four differ.
+ * SHAPES. Two views of the menu slot at `.bss` 0x806AC8C8 meet here: `MenuSlot` (`menu/menu_item.h`) and `MENU_ITEM_W`
+ *   (below, the option/action lists' view); where one symbol has one declaration the `MenuSlot` one wins and the list
+ *   call site carries the difference:
+ *  - `fn_8029FFFC(MenuSlot*, s32)` is called with `(s8)self->grid_row`: retail sign-extends there (`extsb r4,r4`);
+ *  - `fn_802A4D98(MenuSlot*)` takes a pointer cast; `fn_8029F7C4`/`fn_8029F7E0`/`get_menu_lsp_tbl` return `u32`/`u32*` and
+ *    the call sites cast to the pointer they hand on;
+ *  - `ItemDataRecord`'s +0x000 is a union of both views (`kind_0x00`/`level_0x01` beside one `u16`).
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "pl.h"
 #include "Runtime.PPCEABI.H/memset.h"
-#include "ef/fn_800CDB2C.h"   /* PlayMode_ck (rule 2: the owner is `ef/fn_800CDB2C.cpp`) */
+#include "ef/fn_800CDB2C.h"   /* PlayMode_ck (rule 2: the owner is `ef/system_core.cpp`) */
 #include "menu/hit_attack_list_push.h"
 #include "Pl/pl_coll.h"   /* the owner of the `.bss` arrays `pl_land_data` / `pl_hit_id_list` (rule 2) */
 
@@ -241,167 +205,7 @@ extern "C" u32 fn_8029A140(_HIT_W* self)
     return 2;
 }
 
-/* ==== survivor: menu/menu_item.cpp (0x8029F3C8..0x802A64B0) ==== */
-/* menu/menu_item.cpp - the item menu: the item-record / hit helpers the menu's attack preview and
- * option list read back (the landed half, 0x8029F3C8..0x802A5444), followed by the action and
- * option lists' own per-frame state machines and their draw walk (the folded half,
- * 0x802A5444..0x802A6624).
- *
- * `.text` 0x8029F3C8..0x802A6624 (0x725C B), extab 0x8001360C..0x800137D4 and extabindex
- * 0x80030F90..0x8003123C (57 framed functions, one 8-byte extab record and one 12-byte extabindex
- * record each - the two runs are exactly the gap between the bracketing auto objects, and the
- * 0x8029F3C8 registration proved this file's extab bytes equal to the target's).  No
- * `.ctors`/`.dtors` word is this unit's, and the `.data` run 0x805CDE78..0x805CE00C (this file's
- * colour table, three switch tables and two strings) is left unclaimed because the bodies declare
- * those objects instead of defining them (row 29).
- *
- * FOLD.  `attribute.py`'s `--max-bytes` cap split one real translation unit into two
- * proposals, and two lanes registered the same file name independently: the `__FILE__` static
- * `lbl_805CDFC8` (".data 0x805CDFC8", 0xE B = `menu_item.cpp`) is passed by every `nw4r::db::Panic`
- * assert of *both* ranges (the folded half's line numbers 396/579/1175, and the landed half's own
- * dump label `_802a22a4s_menu_item.cpp_805cdfc8`), and no other range references that string.
- * This file is the fold: one registration (the landed `menu` lib and its one `splits.txt` block,
- * whose `.text`/extab/extabindex now end where the folded half's did), one file, 61 functions
- * measured together.  The folded bodies are the branch's, unchanged except at the call sites under
- * VIEWS; the branch's duplicate `menu` lib block and `Object(NonMatching, "menu/menu_item.cpp")`
- * line are *not* taken (the landed ones stay single).
- *
- * The left edge is deliberately **not** moved to 0x8029E4E0.  `python tools/splits/tudiscover.py at
- * 0x8029F3C8` answers `MATCH SET 1 functions` and only weak left-boundary signals (the best is
- * `_8029e4e0switchdataD_805cdea8`, a switch table of the *previous* run), so 0x8029E4E0 is a bound,
- * not a measured edge, and re-splitting to it would move addresses inside the already registered
- * `Pl/fn_80295EF4.cpp` for no measured gain.  The seam and the `.data` run stay the landed header's
- * SEAM note (a follow-up).
- *
- * VIEWS (two reconstructions of one record, meeting in this one TU).  `MenuSlot` (this unit's
- * header - the landed half's view) and `MENU_ITEM_W` (below - the folded half's) are two views of
- * the same `.bss:0x806AC8C8` slot: `fn_802A04EC` (landed) indexes `lbl_806AC8C8.slot[idx]` with the
- * index the folded half reads from `self->slot_id` (+0x011), both halves name +0x18C and the `_PLW*`
- * at +0x190, and the folded half's 12 x 0x18 cell run at +0x06C is the landed half's
- * `entries_b`+`entries_c` (also 12 x 0x18 `MenuEntry`s).  Each view is the one its own half was
- * measured with, so the fold keeps both and reconciles only where a *symbol* has one declaration:
- * the landed definition wins and the folded call site carries the difference -
- *   * `fn_8029FFFC` takes `(MenuSlot*, s32)`: the folded call passes `(s8)self->grid_row` because
- *     retail sign-extends there (`lbz r4,0x1a2(r29)` + `extsb r4,r4` before the `bl`), which an
- *     `s32` parameter over a `u8` field would not emit.
- *   * `fn_802A4D98` takes `(MenuSlot*)`: pointer cast only, the folded call ignores the result.
- *   * `fn_8029F7C4`/`fn_8029F7E0`/`get_menu_lsp_tbl` return the landed half's `u32`/`u32*` and the
- *     folded call sites cast to the pointer they hand on - the landed half's own
- *     `(u32*)fn_8029F7C4(7)` call sites are that same practice, and the casts are no-ops.
- *   * `ItemDataRecord`'s +0x000 pair is a union of both views (see the header): the folded half
- *     reads `kind_0x00`/`level_0x01` where the landed view had one `u16 unused_0x000`.
- * `MENU_ITEM_DATA` (the folded half's truncated view of that record) is dropped - it is the union's
- * second arm now.  The two halves' peephole settings are reconciled too: the `menu` lib carries
- * `-opt nopeephole` for the whole file, so the folded half's file-scope `#pragma peephole off` is
- * gone - measured identical per symbol with and without it (the command-line flag, not the pragma,
- * is the lever).
- *
- * MODULE AND NAME (brief section 2, evidence order).
- *   * class 1 (a `__FILE__` string) decides both.  `.data` carries `lbl_805CDFC8`, 0xE bytes =
- *     `"menu_item.cpp"`, and the dump's own local symbol for it is
- *     `_802a22a4s_menu_item.cpp_805cdfc8` - i.e. the `__FILE__` static emitted by the function at
- *     0x802A22A4, which this range owns (`fn_802A1714`, 0x802A1714-0x802A23F4).  The module is
- *     `menu`, the file name `menu_item.cpp`, the extension `.cpp` (the range's mangled callees).
- *   * class 2 confirms the range's own symbols: `python tools/symbols/dumpmap.py lookup` answers the
- *     real names `body_set(_BODY_W`, `hit_flag_set(_HIT_W`, `hit_result_check(_HIT_W`,
- *     `get_item_data_ptr`, `ItemName(unsigned`, `ItemExp(unsigned`, `GetItemData(unsigned`,
- *     `get_menu_tbl_ptr`, `get_menu_lsp_tbl(unsigned`, `put_menu_cursor(unsigned` for the 10 rows of
- *     the landed half the map already names, and the folded half's rows are the same band's API
- *     (`put_menu_cursor`, `GetItemData`, `get_menu_lsp_tbl` call sites); every other row answers the
- *     `zz_<addr>_` placeholder.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `symedit.py range 0x8029F3C8 0x802A6624` - 81 of the landed half's 91 rows are `fn_XXXXXXXX` with
- * `dumpmap.py lookup` answering `zz_<addr>_` for all 81 and no dump name for the folded half's 8,
- * all of which are bare `fn_XXXXXXXX` stems too - and the 10 real rows are written as the C++
- * functions their manglings spell below).  No `unkNN` identifier survives in either half.
- *
- * STATUS (official `build/RMHE08/report.json`, full `ninja` in this worktree, `main.dol: OK`).
- * 62 of the extended range's 99 functions are written and every written one is above the 80 % bar
- * (the lowest is `fn_802A5E64` at 97.13); 53 are byte-identical.  Unit: 27.160952 % fuzzy,
- * 2724 / 29276 `.text` bytes matched - 13.872065 % / 2568 / 24700 before the fold.
- *
- * The fold moved **no row**: all 91 rows of the landed half measure exactly what `main`'s
- * `build/RMHE08/report.json` measures for them (50 at 100.0, `item_category_ck` 99.29, `fn_8029FA74`
- * 99.43, `fn_8029FB00` 99.61, `menu_item_frame_update` 98.50), and the 8 folded rows are the branch's own
- * values (3 byte-identical).  Two whole-project notes from the same comparison: the folded unit's
- * own `menu` lib flag `-opt nopeephole` reproduces every folded row with the `#pragma peephole off`
- * removed (measured: the probe re-adds it and the unit's 99 rows are bit-identical), and
- * `menu_item_frame_update` 98.50 is unchanged by the `GameMode_ck` declaration this fold aligned with its
- * owner (`u8`, the owner's own spelling - the `u32` call-site view main carried is the
- * `(10505) illegal overloading` that `Pl/fn_80273B14.cpp` trips once it includes this header).
- *
- * The 37 unwritten functions (the landed half's follow-up queue, in address order):
- *   fn_8029F834 (576 B);
- *   fn_8029FCFC (700 B);
- *   fn_802A0568 (232 B);
- *   fn_802A0650 (336 B);
- *   fn_802A07A0 (3360 B);
- *   fn_802A14C0 (312 B);
- *   fn_802A15F8 (92 B);
- *   fn_802A1654 (164 B);
- *   fn_802A1714 (3296 B);
- *   fn_802A23F4 (348 B);
- *   put_menu_cursor__FPUsUsPC10_mh_ivec2_ (188 B);
- *   fn_802A2620 (212 B);
- *   menu_slot_panel_draw (600 B);
- *   fn_802A294C (476 B);
- *   fn_802A2B28 (72 B);
- *   fn_802A2B70 (296 B);
- *   fn_802A2CB8 (176 B);
- *   fn_802A2D68 (80 B);
- *   fn_802A2DB8 (940 B);
- *   fn_802A3164 (44 B);
- *   fn_802A31D4 (164 B);
- *   fn_802A3278 (1060 B);
- *   fn_802A369C (164 B);
- *   fn_802A3740 (180 B);
- *   fn_802A37F4 (988 B);
- *   fn_802A3BD0 (1248 B);
- *   fn_802A40B0 (472 B);
- *   fn_802A4288 (404 B);
- *   fn_802A4430 (272 B);
- *   fn_802A4540 (692 B);
- *   fn_802A4810 (660 B);
- *   fn_802A4AA4 (596 B);
- *   fn_802A4CF8 (160 B);
- *   fn_802A4D98 (352 B);
- *   fn_802A4EF8 (244 B);
- *   fn_802A4FEC (820 B);
- *   fn_802A5320 (292 B);
- *
- * Residuals, by measurement.
- *   * `item_category_ck` 99.29 - the `and` of the item record's +0x02 byte with the caller's mask; retail
- *     orders the operands `and r3,r<byte>,r<mask>`, ours `and r3,r<mask>,r<byte>` (both source
- *     spellings tried).
- *   * `fn_8029FA74` 99.43 - the two selection calls: retail loads the byte straight into the argument
- *     register (`lbz r4,0x19(r31); extsb r4,r4`), ours loads into r0 and sign-extends into r4.
- *   * `fn_8029FB00` 99.61 - the same r0-vs-argument-register shape on the trailing `fn_802A0040`
- *     call; passing the field through an `s8` local (which fixes nothing else here) is what closed
- *     the rest of that function.
- *   * `menu_item_frame_update` 98.50 - the `GameMode_ck` arm.  Its declaration in this unit's header is the
- *     owner's own `u8 GameMode_ck(void)` (the landed registration's `u32` call-site view is the
- *     `(10505) illegal overloading` this fold's rule-2 move tripped in `Pl/fn_80273B14.cpp`, which
- *     now includes this header), and the residual rows are that widening, not an instruction count.
- *   * the folded half (its four own residuals, retained): `get_move_work_adrs`/`get_move_work_max`
- *     are owned by `ef/fn_800CDB2C.cpp` but declared at C scope in `unsplit/ef.h` (the
- *     owner's header does not declare them), so this unit references the plain name where the target
- *     reloc is the mangling `get_move_work_adrs__FUc` - a reloc-name-only difference (the sibling
- *     `Pl/fn_80273B14.cpp` carries the same one); `fn_802A5444` is 4 B too large (its
- *     `menu_cursor_step(self->item_cursor, self->item_count, keys, 1, 2)` call narrows `item_count`, a
- *     `u8`, to the `s16` second parameter `unsplit/lobby.h` declares, while retail's call site
- *     has no `extsh` - a `u32`/`s32` second parameter satisfies both of the range's call sites, a
- *     shared-file request rather than an edit to a band header another unit measures against);
- *     `fn_802A5E64` 97.13 (the instruction stream matches; the remaining rows are register numbers -
- *     retail colours `flags`/`draw_panel`/... r30/28/31/27/26/25/24 where this build picks a
- *     different permutation of the same set, and the `two_page` flag lands on r24 instead of r29;
- *     recorded, not chased - playbook 22); and every other folded function is at 99.5+ with one to
- *     three rows left (a `mullw` whose operands retail emits in the other order - `r4,r0` vs `r0,r4`;
- *     the surrounding loads and registers are equal and swapping the source's operand order moved
- *     the *loads* instead, both spellings measured).
- *
- * Inventory and evidence: `python tools/units/ledger.py unit menu/menu_item.cpp`.
- */
+/* ---- the item menu: the item-record helpers, the option and action lists and their draw walk (0x8029F3C8-0x802A6624) ---- */
 
 #include "types.h"
 #include "id_value.h"
@@ -475,12 +279,10 @@ typedef struct MENU_ITEM_SLOT {
     /* +0x03 */ u8 unused_0x03[0x15];
 } MENU_ITEM_SLOT;
 
-/* The item record `GetItemData` hands back.  Only the two bytes this range tests are named.
-
 /* The sprite-data block the `draw_font`/`draw_sprite` family takes by reference: only the colour word
  * `_SPR_DATA_` +0x1C is named here (it is what the highlighted row overwrites).  `unsplit/lobby.h`
  * forward-declares the tag; this is its definition. size: 0x20 (the frame
- * `lobby/fn_801F3294.cpp` reserves for it) */
+ * `lobby/lb_pane_ui.cpp` reserves for it) */
 typedef struct _SPR_DATA_ {
     /* +0x00 */ u8 unused_0x00[0x1C];
     /* +0x1C */ u32 color_0x1C;
@@ -1221,9 +1023,8 @@ extern "C" s32 fn_802A64B0(MENU_ITEM_W* self) {
 #include "unsplit/unknown.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
-/* 0x8029F3C8: fills a body slot in from a body record - the appearance/hit state the item menu shows.
- * `kind` selects which byte of the work record it copies and with which sub-code; the second
- * argument is stored, not read. */
+/* 0x8029F3C8: fills a body slot from a body record (the appearance/hit state the item menu shows); `kind` picks the
+ * work byte copied and its sub-code, the second argument is stored, not read. */
 void body_set(_BODY_W* body, _BODY_DATA* data, u8 kind, u32 work, u8 mode)
 {
     _BODY_DATA* work_rec = (_BODY_DATA*)work;

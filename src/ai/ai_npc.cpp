@@ -1,416 +1,68 @@
 /*
- * ai/ai_npc.cpp - unit, `.text` 0x802C2700..0x802D9EA4 (357 functions, 96164 bytes).
- *
- * Fold of 7 registered units: light.cpp, fn_802C474C.cpp, fn_802C5D10.cpp,
- * fn_802CC794.cpp, fn_802D0DCC.c, fn_802D0F34.cpp, fn_802D44F4.cpp.  The functions below are the ones those sources
- * define, in address order; every other function of the range keeps its original bytes.  204 of 357 functions have a
- * body here.
- *
- * FLAGS.  `cflags_main` for every absorbed source; `#pragma peephole off` is carried per piece (474C, 5C10 and 44F4
- * are peephole-off, CC794, D0DCC and D0F34 are not), restored at each boundary.
- *
- * RESIDUAL (record views).  The absorbed sources were written as separate units and each carries its own header view
- * of the records they share; where two views disagree on a record layout or a prototype of one extern "C" symbol they
- * are kept apart in a namespace (extern "C" names stay unmangled, so the symbols are unchanged) instead of being
- * unified by guess.  Unifying them (one record header, one prototype per symbol) is the open work and removes the
- * namespace.  Here: `view_fn_802D0F34` holds the old ai/fn_802D0F34.cpp with `ai/ai_npc.h` and `ai/fn_802D0F34.h`,
- * whose `_AINPC_W` is a second partial view of the record `ai/ainpc.h` defines for the other pieces (the former local
- * copy in fn_802CC794 was a subset of `ainpc.h` and is dropped).  The three C++-mangled ai_* functions of that source
- * stay at global scope and reach the record through a cast to the view.
- *
- * Signature views: the pieces declare eight shared functions with different parameter types; the prototype kept for
- * each is the one measured to score best (fn_802D30F8 takes the 5C10 view, the others the first-seen view), and the
- * call of `fn_802D66B8` from the 5C10 band keeps its `(s16)` narrowing as a cast.
- *
- * `ai/fn_802D0DCC.c` (was `Object(Matching)`) is folded in as extern "C" and demoted with the unit.
- *
- * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sbss, .sdata, .sdata2, .text, extab,
- * extabindex).
- */
-/* ---- header inherited from src/light/light.cpp (written against its pre-phase-4 range) ---- */
-/*
- * light/light.cpp - the map light work: its record, its constructors, its per-frame channels and its
- * accessors.
- *
- * `.text` 0x802BEAAC-0x802C474C (103 functions, 23712 B).
- *
- * Module `light` and file name `light.cpp` come from evidence class 2 (brief section 2): the range's
- * own symbols the retail symbol table knows are `light_init__Fv` (0x802BF284), `light_move__Fv`
- * (0x802C1D30), `set_amblight__FUc8_GXColor` (0x802C1DA8) and
- * `make_dir_light2__FlPQ34nw4r4math4VEC38_GXColorl` (0x802C1F74) - four real manglings naming one
- * light subsystem, all confirmed by `tools/symbols/dumpmap.py lookup`; `light_init`/`light_move` are
- * the module's own entry points, which is what this file holds.  No `__FILE__` string covers the
- * range (the `menu_item.cpp` string the discovery note mentions sits at 0x805CDFC8 and the dump
- * attributes its emitter to 0x802A22A4, i.e. the registered `menu_item` proposal, not this band).
- *
- * Language C++: four defined manglings (`light_init__Fv`...), `cflags_main` (`Wii/1.3`, `-O3
- * -inline noauto -Cpp_exceptions on`), the same group as the neighbour `stage/stg_w.cpp`.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for 99 of this range's 103 symbols (checked
- * with `python tools/symbols/symedit.py range 0x802BEAAC 0x802C474C` and
- * `python tools/symbols/dumpmap.py lookup` over the inventory: every unnamed entry is a bare
- * `fn_XXXXXXXX` in config/RMHE08/symbols.txt, and the runtime dump answers either `zz_XXXXXXXX_` or
- * an unrelated engine symbol for it).
- *
- * Seam - unproven.  The range is one maximal unclaimed run (`attribute.py` cut it at its byte cap),
- * and two observations say a real TU boundary sits at, not inside, its end: the `.ctors` word at
- * 0x8056F380 points at fn_802BEEE0 and the one at 0x8056F384 at fn_802C2530, and the `.sdata2`
- * ordering seam `lbl_8079A698 -> lbl_8079A69C` falls between fn_802C4630 and fn_802C474C (the last
- * function of the range), so the extent stays as proposed until the functions match.
- *
- * The light work record.  `LightWork`'s size is 0x4F8 and it is traced, not guessed: lbl_806BB7E0 is
- * a 0x9F0-byte `.bss` object holding exactly two records (fn_802BECD0 returns one of the two, 0x4F8
- * apart, and fn_802BEEE0 constructs both with `__construct_array(0x806BB7E0, fn_802BEF00, 0, 0x4F8,
- * 2)`), and fn_802BEF00's initialization loop runs its `LightChannel` array from +0x4A8 to +0x4E4 in
- * 0x14 steps.  The sub-records the constructors build carry their own traced extents.
- *
- * Flags: the unit is peephole-off - retail keeps the unfused `extsh` + `cmpwi` pair (playbook 39)
- * where `-O3`'s peephole folds them into one `extsh.`, and the two sibling units of the band
- * (`stage/stg_w.cpp`, `stage/fn_802B2978.c`) carry the same pragma for the same reason.
- *
- * Residuals (31 of the range's 103 functions written, 1960 B of 23712; 28 of the 31 byte-identical):
- *
- *  - fn_802BEAAC (86.81 %, 152 B against the target's 144 B).  Retail materialises the zero once at
- *    the top (`li r0, 0x0`) and keeps the decremented timer in r5; ours rematerialises `li r0, 0x0`
- *    inside each of the three arms and takes r0 for the timer, so the object is two instructions
- *    long.  Every other instruction is identical, and `--timer` (the shape landed) beats both the
- *    `s16 t = timer - 1` local (70.69 %) and the field-assignment form (70.69 %).
- *  - fn_802BF7E8 (85.45 %, 40 B against 44 B).  Retail materialises the counter's address into r4
- *    once at the top and stores the wrap with `sth r3, 0x0(r4)`, where ours keeps the `@sda21`
- *    addressing for both stores, which is one instruction short.
- *  - fn_802BF0AC (99.00 %, 140 B each).  The first run walk has its pointer/bound register pair the
- *    other way round (`addi r31, r31, 0xc` / `cmplw r31, r30` against ours on r30/r31); the second
- *    walk, the four leading vectors and the whole rest of the function are identical.
- *
- * Not yet written: the remaining 72 functions of the range, all still `fn_XXXXXXXX` in the map.
- *
- * Inventory and evidence: `python tools/units/ledger.py unit proposal/802BEAAC_fn_802BEAAC.cpp`.
- */
-/* ---- header inherited from src/ai/fn_802C474C.cpp (written against its pre-phase-4 range) ---- */
-/* ai/fn_802C474C.cpp - the AI-NPC band's "aimed action" ladder: eleven per-motion dispatchers of the
- * AI work record (`_AINPC_W`), each a small state machine that arms a motion through the band's shared
- * helpers, walks the motion's 10- or 14-byte table row, and drives the effect/SE pass.
- *
- * `.text` 0x802C474C..0x802C5D10 (0x15C4 B, 11 functions), the run between the landed `light/light.cpp`
- * and `ai/fn_802CC794.cpp`.  The registration's right edge is the attribution plan's `--max-bytes` cap,
- * not a measured seam (`attribute.py`: "capped at --max-bytes, seam is a guess"), so the extab run
- * 0x8001442C..0x80014484 and the `.data` run 0x805D4784..0x805D4964 are this unit's but the extent past
- * 0x802C5D10 settles as the band's functions match (brief section 2).
- *
- * MODULE AND NAME.  Class 3 of the brief's evidence order: no `__FILE__` string is referenced by any of
- * the eleven (the nearest, `.data` 0x805CDFC8 = "menu_item.cpp", belongs to the landed
- * `menu/menu_item.cpp` and is emitted by 0x802A22A4, 0x59000 B below this range), and Dolphin's map has
- * only `zz_02c474c_`-style placeholders for all eleven.  What decides it is the record: every function
- * takes `_AINPC_W*`, the type the neighbouring `ai/fn_802CC794.cpp` reconstructs from `ai_skill_ck__FP8_AINPC_WUc`,
- * so the module is `ai` and the file keeps the map's stem.  The `.cpp` extension is the band's: the same
- * run is C++ (mangled callees `rotVecY__FPQ34nw4r4math4VEC3Ul`).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked: `symedit.py range`
- * over 0x802C4700..0x802C5E00 lists eleven `fn_` stems and nothing else, and `dumpmap.py lookup` on all
- * eleven returns `zz_<address>_` placeholders, i.e. unnamed rather than absent).
- *
- * LOAD-BEARING SOURCE SHAPES (each measured; the band's flags are the `ai` lib's `cflags_main` plus the
- * file-scope `#pragma peephole off` below):
- *   * the four motion tables are `u16` word arrays, not row structs.  `arg * 5` / `arg * 7`
- *     strength-reduce to `slwi`+`add` and then take the u16 scale, which is retail's index math; a
- *     10/14-byte struct index folds into one `mulli`, measured (playbook 39's unfused-form rule).
- *   * `self->state++` / `self->sub_step--`, never `x = x + 1` - the assignment form emits a `clrlwi`
- *     retail does not have.
- *   * the two `arg == 0 || arg == 2` class tests are `switch (arg)` with shared case labels, not
- *     `if`/`else if`: an if-chain gets a nested test/body layout, the switch the flat compare chain
- *     retail has (playbook 34/37).
- *   * `fn_802C4EA8` declares one output vector *per case* (three slots, MWCC hands the first-declared
- *     the highest offset) and `fn_802C58DC` writes the ground result with one chained assignment, which
- *     is what keeps retail's single `lfs` for its two stores.
- *
- * RESIDUAL.
- *   * the four tables are declared, never defined (playbook 29): `.data` 0x805D4784..0x805D4964 is this
- *     band's own run (`leak 0`, four labels) and belongs to the measured data pass, so they are
- *     `extern`-declared here and used as load operands.  The `.sdata2`
- *     constants are the same case (`shell_set_func_ptr` comes from `stage/shell_set_func_ptr.h`).
- *   * the record's tail fields (+0x3C2..+0x498) are new in `ai/ainpc.h`; its owner
- *     `src/ai/fn_802CC794.cpp` still carries its own inline copy of the union and has to include the
- *     header instead (rule 1).
- *   * five rows are not byte-identical; what still differs, first divergence first:
- *     `fn_802C5428` (90.4) and `fn_802C5624` (90.9) - the scheduler hoists the SE word's base+offset
- *     ahead of the `arg` compares in retail and leaves it inside the arm here (same bytes, different
- *     order, 508/508 and 700/696 B).  `fn_802C4EA8` (94.0) - retail's `arg == 5` test is a signed
- *     `cmpwi` where a `u8` parameter gives `cmplwi` (one instruction), and its `case 1` state increment
- *     schedules three slots later.  `fn_802C5ACC` (94.5) and `fn_802C4CD4` (98.3) - the
- *     `shell_set_func_ptr` load is scheduled three instructions early in ours (4 x 1 instruction).
- *     `fn_802C4908` (99.4) - one `lhz`-vs-`lha` load of `_PLW` +0x650 and the r29/r30 pairing of `self`
- *     and the argument.
- */
-/* ---- header inherited from src/ai/fn_802C5D10.cpp (written against its pre-phase-4 range) ---- */
-/*
- * ai/fn_802C5D10.cpp - the AI-NPC sub-state machines' first block: the per-motion step dispatchers
- * that drive an `_AINPC_W`'s scripted motion.
- *
- * `.text` 0x802C5D10-0x802CC794 (76 functions, 27268 B).
- *
- * Module `ai`, and the file keeps the map's stem (brief section 2, class 4): the record every
- * function takes in r3 is the `_AINPC_W` the neighbouring `ai/fn_802CC794.cpp` band reconstructs -
- * this band calls `ai_skill_ck__FP8_AINPC_WUc` and stores through the same `+0x170`/`+0x442`/`+0x444`
- * offsets that band's own writers use - but neither a `__FILE__` string nor a runtime-dump name covers
- * the range (`tools/symbols/dumpmap.py lookup` answers `zz_XXXXXXXX_` for all 76 symbols and
- * `tools/symbols/symedit.py range 0x802C5D10 0x802CC794` returns 76 bare `fn_XXXXXXXX` entries), so
- * every symbol in the inventory is still a map placeholder.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/symedit.py range 0x802C5D10 0x802CC794` - 76 entries, all bare `.text`
- * `fn_XXXXXXXX` - and `python tools/symbols/dumpmap.py lookup` over that inventory, which answers only
- * `zz_XXXXXXXX_` placeholders).  Every definition below is `extern "C"` so objdiff pairs it by the
- * map's name (playbook 42); a C++ definition would mangle and measure 0 %.
- *
- * Seam - unproven.  The range is one maximal unclaimed run of `attribute.py`, and the discovery note's
- * `menu_item.cpp` seam is not this band's: that `__FILE__` string sits at `.data` 0x805CDFC8 and the
- * dump's own local symbol attributes it to the function at 0x802A22A4, in the registered `menu`
- * proposal - the same finding `light/light.cpp` recorded.  `.sdata2` is no help either way: the pool
- * run 0x8079A670-0x8079A778 is shared with the neighbouring bands (0.0, 50.0 and 30.0 are loaded by
- * both this range and 0x802C474C-0x802C5D10), so it constrains nothing.
- *
- * Sections: `.text` 0x802C5D10-0x802CC794, extab 0x80014484-0x8001467C (63 x 8-byte records, exactly
- * the run the extabindex entries for 0x802C5D10-0x802CC57C point at) and extabindex
- * 0x8003252C-0x80032820 (63 x 12 B).  No `.data` is claimed: the range's switch tables live at
- * 0x805D4964-0x805D4D38, but the run's ends are the neighbouring unclaimed bands' (the previous
- * proposal's data ends at 0x805D4964, `ai/fn_802CC794.cpp`'s begins at 0x805D4D38) and a data claim
- * has to be measured before and after; `.sdata2` is left to the pool (playbook 29: the constants are
- * `extern`, never defined).
- *
- * Flags: nothing per-unit - `cflags_main` (`Wii/1.3`, `-O3 -inline noauto -Cpp_exceptions on`), the
- * bracketing units' set - except that the file needs the peephole pass off (`#pragma peephole off`
- * below).  Evidence: retail keeps `clrlwi rN, rN, 24` + a separate compare in every narrowed-flag
- * test (fn_802C5D10's three, fn_802C6578's one) where `-O3`'s peephole emits one `clrlwi.` record
- * form; turning it off took fn_802C5D10 94.23 -> 95.99 and fn_802C6578 93.86 -> 97.71, the same
- * finding the sibling bands `light/light.cpp`, `camera/fn_802B5C58.cpp` and `stage/fn_802B2978.c`
- * record.  Under it the state increments must be written `field += 1` (not `field = field + 1`):
- * the latter leaves a `clrlwi r0, r0, 24` before the byte store that retail does not have (playbook
- * 38's narrow-store rule), worth exactly one instruction in five of the seven functions written.
- *
- * The flag parameters are spelled `u32` and tested `(flag & 0xFF)`: retail materialises the byte
- * with `clrlwi rN, rN, 24` at every test, which a `u8` parameter does not produce (`cmpwi r31, 0`).
- *
- * Residuals (12 of the range's 76 functions written, 6152 B of 27268; 3 byte-identical, 9 of the 12
- * at or above 97 %):
- *
- *  - fn_802C5ECC 91.41 %, fn_802C6110 96.92 %, fn_802C6318 93.55 %: retail's `setVec3` call
- *    reuses the callee's return pointer (`mr r4, r3`) where ours rematerialises the local's address
- *    (`addi r4, r1, N`) - the declaration `pl.h` reaches (`ef.h`, through which `_PLW`
- *    arrives) spells that helper `void`, while the target's own code proves it returns its `out`
- *    pointer (`enemy/fn_80165FC8.h` has the `VEC3*` spelling, but it clashes with `ef.h`'s
- *    `Vec*` one so the two cannot both be included).  fn_802C6318 also keeps a signed compare chain
- *    where retail tests three unsigned ranges, and its flag masks are CSE'd into each other.
- *  - fn_802C5D10 99.05 %: retail has one extra `clrlwi r0, r31, 24` at its third flag test, which
- *    MWCC CSEs into the second test's r0 (the branch reaches it directly, so the value is live);
- *    `(u8)flag`, a `u8` parameter and two separate `if`s were all measured and all keep the CSE.
- *  - fn_802C6BE0 98.15 %, fn_802C703C 98.71 %, fn_802C722C 99.09 %: each has one instruction the
- *    target carries and ours folds - the `clrlwi r5, r5, 16` retail masks a `u16` argument with from
- *    a constant ternary (measured: a `u16` parameter, a `u16` local and an explicit cast all fold
- *    it) - or one case-test opcode (`cmpwi` where ours picks `cmplwi`).  fn_802C6578 99.14 % is the
- *    same opcode residual.
- *  - fn_802C6E3C 97.30 %: the `clrlwi r5, r5, 16` residual plus a register-colouring swap (retail
- *    puts the flag parameter in r30 and `armed` in r31, ours the other way), which is its whole
- *    instruction diff - the operands and the frame are equal.
- *
- * Not yet written: the remaining 64 functions of the range, all still `fn_XXXXXXXX` in the map.  The
- * next one in address order is `fn_802C6908` (0x2D8, a 94-way jump-table dispatcher whose table is
- * `.data` 0x805D4964 and whose arms tail-call into the neighbouring bands - mechanical but long),
- * then `fn_802C75F4` (0x290) and `fn_802C7884` (0x240).
- *
- * The `_AINPC_W` layout is the union of both bands' offsets, traced: every offset this file reads was
- * checked against the target's own load/store displacement, and the `+0x1D8` gap that separated them
- * by 4 bytes was found that way (the record's `+0x1DC`/`+0x482`/`+0x492` fields sit at their
- * annotated offsets now, confirmed with a compile probe).  `ai/ainpc.h` is the one definition;
- * `src/ai/fn_802CC794.cpp` still carries its own copy of the first 0x492 bytes and should include
- * this header instead (see the outbox's shared-file request).
- *
- * Inventory and evidence: the unit's symbols are in `config/RMHE08/symbols.txt`, its target object at
- * `build/RMHE08/obj/ai/fn_802C5D10.o`, and its per-symbol scores in `build/RMHE08/report.json`.
- */
-/* ---- header inherited from src/ai/fn_802CC794.cpp (written against its pre-phase-4 range) ---- */
-/*
- * ai/fn_802CC794.cpp - the 0x802CC794-0x802D0DCC AI-NPC work band (63 functions, 17976 B).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/symbols/dumpmap.py lookup + `grep -n "fn_802CC" config/RMHE08/symbols.txt`: every defined
- * name lands as a bare `.text` entry, and no `__FILE__` string or runtime-dump name covers it).
- *
- * Evidence for the home and the type:
- *   - the pointer at r3 is passed straight to `get_enemy_data` / `get_em_chg_scale` (whose parameter
- *     the map spells `_ENEMY_WORK*`) and to `ai_skill_ck` / `ai_torch_ck` (parameter `_AINPC_W*`),
- *     while the prologue of `fn_802CC794` computes `get_move_work_adrs(3) + self->enemy_index*0xB18`
- *     to reach the `_ENEMY_WORK` records.  So the `self` this band owns is the AI-NPC work record,
- *     and its name must be `_AINPC_W` or the callees mangle to the wrong map name (rule 9);
- *   - the registered unit that brackets the band above is `ai/fn_802D0DCC.c` (0x802D0DCC), and
- *     `ai_skill_ck`/`ai_torch_ck` sit in the same band, so the module is `ai`.
- *
- * Registered NonMatching; the body below is the part reconstructed so far, in address order.
- *
- * Score at this commit: 42 of 63 functions, 40/63 at >=80 % (27 at 100 %, 13 in 91-99 %), 46.57 %
- * of the unit's bytes (measured with `tools/units/recompile.py ai/fn_802CC794 --measure <sym>`
- * against `build/RMHE08/obj/ai/fn_802CC794.o`).
- *
- * Residuals: (1) `fn_802CDAB8` 62.9 % - the target's `field_0x1F0 <= (s32)((f32)field_0x1F4 *
- * formation->budget)` uses a mixed-sign 64-bit idiom (srawi/srwi/subfc/adde) that no C spelling
- * tried reproduces (direct 62.9, s64 cast 53.1, reversed >= 41.3).  (2) `fn_802CD588` 78.5 % - the
- * `switch` on `field_0x420` emits a 4-instruction signed range test where the target emits the
- * 3-instruction `subi`/`cmplwi` unsigned one (a `u32` switch local made it worse at 74.3 %).
- * (3) 21 functions are not attempted: they read `_PLW` fields at +0x3C, and `pl.h` cannot be
- * included beside `mh3_pad.h` because `ef.h` re-declares `VEC3_ctor`/`setVec3` with
- * signatures that clash with their owners' headers ((10197) illegal function overloading).
- */
-/* ---- header inherited from src/ai/fn_802D0DCC.c (written against its pre-phase-4 range) ---- */
-/*
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * auto/802D0DCC_fn_802D0DCC.c - one state dispatch over a shared .data table, .text 0x802D0DCC-0x802D0F34.
- *
- * One function, `fn_802D0DCC`, the only symbol in the range.  It switches on the state byte at +0x420 of
- * its argument and tail-calls `fn_802D3398(self, entry)` with one of two adjacent entries of the
- * 16-pointer table `lbl_805D4150` (`.data` 0x805D4150, 0x40 B), chosen by the byte at +0x170.  States 1-6
- * use table slots 2-13, the default uses 14/15.  It calls nothing else and touches no other field of
- * `self`.
- *
- * Flags: `cflags_main` (`auto`, `Wii/1.3`, `-O3 -inline noauto`) reproduces the object exactly - 360 B,
- * 90/90 rows, every relocation equal - so no flag or pragma deviation is needed.
- *
- * The `default` arm is written **first** because that is the layout MWCC emits: the default body sits
- * directly after the `cmpwi`/`beq` chain, while a `default` written last is placed after the case bodies
- * and needs an extra branch to reach it (364 B, 93.73 %).
- *
- * The name is provisional - `auto/` plus the first symbol's address - because nothing in the object, the
- * symbol map or the runtime dump (`zz_02d0dcc_`, `zz_02d3398_`) names the original file or function, and
- * the neighbours carry no naming scheme.  Same for the callee and the table.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/802D0DCC_fn_802D0DCC.c`.
- */
-/* ---- header inherited from src/ai/fn_802D0F34.cpp (written against its pre-phase-4 range) ---- */
-/*
- * ai/fn_802D0F34.cpp - the 0x802D0F34-0x802D44F4 AI-NPC motion band (90 functions, 13760 B).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/symbols/symedit.py: every name this file defines is a bare `.text` row in
- * config/RMHE08/symbols.txt, no `__FILE__` string covers the range - the nearest one,
- * `lbl_805CDFC8` ("menu_item.cpp"), is referenced only by 0x802A5444/0x802A579C/0x802A64B0, eight
- * bands below - and the runtime dump answers `zz_` for every row).
- *
- * Home and type, from evidence: the range sits directly above `ai/fn_802D0DCC.c` and its `self` is
- * the AI-NPC work record - the three names the map does spell out are `ai_area_ck__FP8_AINPC_W`,
- * `ai_get_motion_no__FP8_AINPC_W` and
- * `get_joint_wpos_ai__FP8_AINPC_WUlPQ34nw4r4math4VEC3`, and the band forwards `self` to the `ai`
- * band below (`fn_802CD770`, `fn_802D0C9C`, `ai_skill_ck`, `fn_802D0DCC`) and to
- * `get_move_work_adrs(3)`.  So the module is `ai`; the file keeps the map's stem (brief section 2,
- * class 4 - nothing in the object names the original source file).  The record and the attack entry
- * embedded in it live in `ai/ai_npc.h`; the cross-unit declarations are in
- * `ai/fn_802D0F34.h`.
- *
- * Sections this unit owns: .text 0x802D0F34..0x802D44F4, extab 0x80014844..0x8001496C (37 8-byte
- * records), extabindex 0x80032ACC..0x80032C88, .data 0x805D4E80..0x805D5000 (the four
- * `scope:local` jump tables `fn_802D0F34`, `fn_802D2264`, `fn_802D4248` and the one at 0x805D5000
- * that belongs to 0x802D44F4).
- *
- * Flags: `cflags_main` (`Wii/1.3`, `-O3 -inline noauto`, `-Cpp_exceptions on`) - the neighbour `ai`
- * lib's setting, and `-Cpp_exceptions on` is what emits the target's extab.
- *
- * Rule-1 debt: `_HIT_W` is defined here (through `ai/ai_npc.h`) as well as in
- * `menu/menu_item.h` and `menu/hit_attack_list_push.h`, which carry their own partial views of
- * the same record; none of them names the offsets this band reads.  `_AINPC_W` likewise also lives in
- * `ai/ainpc.h` (the `fn_802CC794.cpp`/`fn_802C474C.cpp` view) - `ai/ai_npc.h` carries
- * the note and the two must be folded by the next `ai` worker.
- *
- * Score at this commit: 90.96 % fuzzy (13760/13760 B of `.text`, 52 of 90 functions byte-identical,
- * 85 of 90 at or above the 80 % bar) - `ninja build/RMHE08/report.json`, unit `main/ai/fn_802D0F34`.
- *
- * Residuals (measured, `tools/objdiff/symdiff.py -u main/ai/fn_802D0F34 <symbol>`):
- *   * `fn_802D2984` 60.0 %, `fn_802D2990` 50.0 %, `fn_802D29A0` 50.0 % - the address of the model
- *     (`addi r3,r3,8`) is scheduled *before* the constant argument (`li r4/r5`) in retail; every
- *     source spelling tried (a `MHchar*` local, the member form) keeps MWCC's constant-first order.
- *     Same instruction set, so this is an emission-order residual, not a source shape.
- *   * `fn_802D3F1C` 73.3 % - retail keeps `li r0,0xFF; cmplwi r0,0xFF; beq` where the first
- *     `highest == 0xFF` test is provably true; our build folds it away (the operand-order spelling
- *     `highest < value` was chosen to keep the second compare's shape).
- *   * `fn_802D3984` 76.1 % - retail widens `reverse` with `clrlwi r0,r6,24` and sign-extends both
- *     bounds; ours narrows only inside the arithmetic (a `u8`/`s16` local spelling costs the
- *     `clrlwi`), best variant kept.
- *   * `fn_802D2264` 81.7 % - the counter-attack gate; the control flow is reproduced with the
- *     rule-8 shapes (`for (;;) { ... break; }` where retail branches to a shared tail), so the
- *     residual is register numbering and the `(s16)`-narrowed `-window` argument.
- *   * `fn_802D282C` 82.3 %, `fn_802D30F8` 84.7 %, `fn_802D15DC` 84.8 %, `fn_802D3184` 86.0 %,
- *     `fn_802D2F7C` 83.5 % - register-allocation/argument-width residuals (first divergence is an
- *     `ARG` row, the instruction set is equal).
- *   * our object carries an 8-byte `.sdata2` section the target object does not: the double
- *     constant MWCC materialises for the `(f32)` conversion in `fn_802D287C`.  Harmless while the
- *     unit is `NonMatching` (the linker pools `.sdata2` per program), but it is the first thing to
- *     look at if this unit is ever flipped.
- *   * the three `scope:local` jump tables (`jumptable_805D4E80` 0x28, `jumptable_805D4EA8` 0x94,
- *     `jumptable_805D4F3C` 0xC4) *are* emitted - byte-identical bytes and identical
- *     `R_PPC_ADDR32 fn_802D0F34+0x...` relocations against the target's - but objdiff pairs `.data`
- *     by symbol name and MWCC emits them anonymously, so the rows read 0 %; the target names come from
- *     `dol split`, not from the object (playbook 23).
- */
-/* ---- header inherited from src/ai/fn_802D44F4.cpp (written against its pre-phase-4 range) ---- */
-/*
- * ai/fn_802D44F4.cpp - the 0x802D44F4-0x802DDC04 band (165 functions, 38672 B).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/symbols/dumpmap.py lookup + the Dolphin dump map at
- * D:/WiiExperiment/DumpSymbols.zip: every defined symbol in the range is a bare `fn_`/`zz_`
- * entry, and no `__FILE__` string covers it), so the file keeps the map's stem.
- *
- * Seam, module and language:
- *   - the range is where a discovery run was cut by `--max-bytes`, so its edge is a size cap and
- *     not a translation-unit boundary (brief section 1).  `tudiscover at 0x802D44F4` finds no
- *     closure edge, no must-link anchor and no labelled data the range references, so the
- *     boundary is unconstrained and the range is worked as one unit; the registered neighbour
- *     below is `ai/fn_802D0DCC.c` and the next proposal starts at 0x802DDC04.
- *   - the range defines `ai_skill_ck__FP8_AINPC_WUc`, `ai_torch_ck__FP8_AINPC_W`,
- *     `ai_taru_move_ck__FP8_AINPC_W`, `ai_taru_range_ck__FP8_AINPC_W` and `ai_demo_stop_ck__Fv`,
- *     i.e. the AI-NPC state checks of the `ai` module the neighbouring unit also builds, so the
- *     module is `ai`.  Its tail also defines the UI helpers `PutPageArrow__F...` and
- *     `get_rare_color__FUc`, which look like a second original file; that seam could not be
- *     proven from any evidence kind (docs/plan.md 8.3) and is recorded here as a hint instead.
- *   - the language is C++ (every defined name in the range is mangled).  The `fn_XXXXXXXX`
- *     definitions are `extern "C"` (the map name is a placeholder stem, not a mangling); the
- *     `ai_*`/`get_rare_color`/`PutPageArrow` ones are C++ free functions at global scope so the
- *     front-end reproduces the map's own mangling (rule 9).
- *
- * Types: the record the whole AI band drives is `_AINPC_W`, whose shared home is
- * `ai/ainpc.h` (main already created it as the union of the `ai` band's accessors); this
- * unit added the offsets its own bodies name to that file - +0x000, +0x172, +0x20C..+0x23E,
- * +0x33A, +0x374, +0x3B0..+0x3BC, +0x3D4..+0x3DC, +0x3F4..+0x414, +0x424, +0x431..+0x438,
- * +0x450, +0x46C, +0x47C, +0x483 - rather than carrying a second copy (rule 1).  The four tuning
- * tables it indexes are declared in `unsplit/ai.h` (no registered unit owns them, rule 2).
- *
- * Flags: `cflags_main`, plus `#pragma peephole off` for the whole file - retail keeps the unfused
- * `clrlwi`+`slwi` / `clrlwi`+`cmpwi` forms that the peephole pass folds into `clrlslwi` and a
- * masked compare (playbook 39); turning it back on costs `fn_802D773C` 73.3 -> 100 and
- * `fn_802D7754` 85.3 -> 75.5 (measured).
- *
- * Sections: .text 0x802D44F4..0x802DDC04, extab 0x8001496C..0x80014C64 (95 unwind-only records),
- * extabindex 0x80032C88..0x800330FC, .ctors 0x8056F388 (the static constructor in the range), and
- * .data 0x805D5428..0x805D5460 - `jumptable_805D5428`, the 14-entry switch table MWCC emits for
- * `fn_802D77A0` (playbook 53/56: claim exactly the table's own range, never the band around it).
- * The table was recovered by reading the 14 slot values out of `main.elf` (0 -> 0x802D77C4 etc.),
- * which is what turned the switch's arm mapping into source.
- *
- * Registered NonMatching; the bodies below are the part reconstructed so far, in address order:
- * 48 of 165 functions, 23 byte-identical and 40 at or above the 80 % bar (2.62 % of the unit's
- * bytes; the extab/`.data` sections are still unmatched, so the unit's own percent is 9.91).
- *
- * Residuals:
- *   - `fn_802D7B5C`/`fn_802D7C04`/`fn_802D7C6C` (61.7 / 0 / 19.9): the target's search loop stays a
- *     loop, MWCC unrolls ours - the `for (i = 0; i < N; i++) if (x < table[i+1]) break;` shape is
- *     right (conditions and body match) but the constant trip count is unrolled in our build.
- *   - `fn_802D7B24` (11.4): the two range tests want the raw `subi` result in a 32-bit `cmplwi`;
- *     written that way the compiler still inserts the sign-splitting sequence (`subfic`/`orc`).
- *   - `fn_802D6690` (59.0): the `field_0x33A * 4` index is computed before the table base in retail,
- *     after it in ours.
- *   - `fn_802D6B2C` (74.1) / `fn_802D77DC` (71.7) / `fn_802D7A50` (76.7) / `fn_802D7CE4` (75.7):
- *     register-allocation and scheduling differences only - the instruction stream agrees, the
- *     web order does not.
- *   - `fn_802D7688` (89.3), `fn_802D6A00` (89.0), `fn_802D7464` (99.98): same, instruction counts
- *     equal.
- *   - the remaining 117 functions have no body yet; `fn_802D44F4` alone is 8256 B (21 % of the
- *     range) and is a 2064-instruction compare tree on `ai_get_motion_no()`.
+ * ai/ai_npc.cpp - the AI companion (`_AINPC_W`, `ai/ainpc.h`): the light band's arm dispatcher, the aimed-action
+ *   ladder, the per-motion sub-state machines, the work band, the state dispatch over `lbl_805D4150`, the
+ *   motion/attack band and the state checks (`ai_skill_ck`, `ai_torch_ck`, `ai_taru_*_ck`, `ai_demo_stop_ck`).  C++;
+ *   every `fn_` stem is `extern "C"` so objdiff pairs it by the map's name (playbook 42).
+ * RANGE. .text 0x802C2700-0x802D9EA4 (357 functions); extab, extabindex, .ctors 0x8056F388 (`fn_802D9E14`, the
+ *   `ainpc_w` constructor), .data 0x805D3A88-0x805D54A0, .bss 0x806BD360-0x806BD808 (`ainpc_w`), .sdata, .sbss,
+ *   .sdata2.  `jumptable_805D5428` is the 14-entry table MWCC emits for `fn_802D77A0` (slots read out of `main.elf`).
+ * FLAGS. `cflags_main` (configure.py).  `#pragma peephole off` over 0x802C2F08-0x802CC794 and from 0x802D6534 on, on
+ *   for 0x802CCD90-0x802D44F4: retail keeps the unfused `clrlwi`+`cmpwi`, `clrlwi`+`slwi` and `extsh`+`cmpwi` pairs
+ *   there (playbook 39; peephole on costs `fn_802D773C` 100 -> 73.3, `fn_802C5D10` and `fn_802C6578` 1.8 and 3.9 points).
+ * NAMES. Module `ai` from the record every function takes (`ai_skill_ck__FP8_AINPC_WUc`, `ai_area_ck__FP8_AINPC_W`,
+ *   `get_joint_wpos_ai__FP8_AINPC_WUlPQ34nw4r4math4VEC3`); no `__FILE__` string covers the range and the runtime dump
+ *   answers `zz_` for the `fn_` rows.  `ainpc_entry_tbl`/`ainpc_page_state` (`hud/cockpit.cpp`'s `.bss`, typed here
+ *   as `AinpcEntry`/`AinpcPageState`) are GUESSes from their users; `ai_npc_hold_item_arm`, `ai_npc_hold_ck` and
+ *   `ai_npc_arrived_ck` are GUESSes from their bodies (the dump has only `zz_` names).
+ * RESIDUALS. 153 rows unwritten (objdiff scores them zero): 0x802C2700-0x802C2F08, 0x802C2F2C-0x802C474C,
+ *   0x802C6908-0x802C6BE0, 0x802C75F4-0x802CCD90, 0x802CCE18-0x802CD20C, 0x802CD348-0x802CD588,
+ *   0x802CD770-0x802CDAB8, 0x802CDB10-0x802CDDC4, 0x802CE698-0x802CF390, 0x802CF588-0x802CF704,
+ *   0x802CF808-0x802CF8E4, 0x802CF9E8-0x802CFABC, 0x802CFAF0-0x802CFBC8, 0x802D0C9C-0x802D0DCC,
+ *   0x802D44F4-0x802D6534 (`fn_802D44F4`, a 2064-instruction compare tree on `ai_get_motion_no()`),
+ *   0x802D6BB0-0x802D7464, 0x802D79A4-0x802D7A50, 0x802D7EB0-0x802D7F10, 0x802D7F58-0x802D84D0,
+ *   0x802D84D8-0x802D948C, 0x802D94C4-0x802D9A40, 0x802D9A78-0x802D9EA4.  93 rows partial, including:
+ *  - `fn_802D7B5C`, `fn_802D7C04` (zero), `fn_802D7C6C`: the search loop stays a loop in retail, MWCC unrolls the
+ *    constant trip count of `for (i = 0; i < N; i++) if (x < table[i+1]) break;`;
+ *  - `fn_802D7B24`: the range tests want the raw `subi` result in a 32-bit `cmplwi`; MWCC inserts `subfic`/`orc`;
+ *  - `fn_802CDAB8`: retail's mixed-sign 64-bit compare idiom (`srawi`/`srwi`/`subfc`/`adde`) for
+ *    `field_0x1F0 <= (s32)((f32)field_0x1F4 * formation->budget)`; no spelling tried reproduces it;
+ *  - `fn_802CD588`: the `switch` on +0x420 emits a signed 4-instruction range test, retail a `subi`/`cmplwi`;
+ *  - `fn_802D2984`/`fn_802D2990`/`fn_802D29A0`: retail schedules the model address (`addi r3,r3,8`) before the
+ *    constant argument; every spelling keeps MWCC's constant-first order;
+ *  - `fn_802D3F1C`: retail keeps a provably-true `li r0,0xFF; cmplwi r0,0xFF; beq` our build folds away;
+ *  - `fn_802D3984`: retail widens `reverse` with `clrlwi r0,r6,24` and sign-extends both bounds;
+ *  - `fn_802D6690`: retail computes the `field_0x33A * 4` index before the table base;
+ *  - `fn_802C5428`/`fn_802C5624`: retail hoists the SE word's base+offset ahead of the `arg` compares;
+ *    `fn_802C5ACC`/`fn_802C4CD4`: the `shell_set_func_ptr` load schedules three instructions early in ours;
+ *  - `fn_802C4EA8`: retail's `arg == 5` is a signed `cmpwi` where the `u8` parameter gives `cmplwi`;
+ *    `fn_802C4908`: one `lhz`-vs-`lha` load of `_PLW` +0x650 and the r29/r30 pairing;
+ *  - `fn_802C5ECC`/`fn_802C6110`/`fn_802C6318`: retail reuses `setVec3`'s returned pointer (`mr r4,r3`); the
+ *    declaration `pl.h` reaches through `ef.h` returns `void` (`enemy/fn_80165FC8.h`'s `VEC3*` spelling clashes);
+ *  - `fn_802C5D10`: one extra `clrlwi r0,r31,24` at the third flag test that MWCC CSEs into the second's;
+ *  - `fn_802C6BE0`/`fn_802C6E3C`/`fn_802C703C`/`fn_802C722C`: the `clrlwi r5,r5,16` retail masks a constant ternary's
+ *    `u16` with, or one `cmpwi`/`cmplwi` case test (`fn_802C6578` too); `fn_802C6E3C` also swaps r30/r31;
+ *  - `fn_802D2264`, `fn_802D282C`, `fn_802D30F8`, `fn_802D15DC`, `fn_802D3184`, `fn_802D2F7C`,
+ *    `fn_802D6B2C`, `fn_802D77DC`, `fn_802D7A50`, `fn_802D7CE4`, `fn_802D7688`, `fn_802D6A00`: register allocation and
+ *    argument width; the instruction streams agree;
+ *  - `.data`: the jump tables are emitted byte-identical but anonymous, so objdiff leaves the map's
+ *    `jumptable_805D4E80`/`jumptable_805D4EA8`/`jumptable_805D4F3C` unpaired (playbook 23).
+ *   flipcheck: `.ctors` (0x4), `.sdata` (0x98) and `.sbss` (0x8) claimed but not emitted; short `.text` 0x944C of
+ *   0x177A4, extab 0x360 of 0x770, extabindex 0x510 of 0xB28, `.data` 0x1B8 of 0x1A18, `.sdata2` 0x50 of 0x208; the
+ *   bytes of all five differ.
+ * SHAPES. Record views: the 0x802D0F34-0x802D44F4 bodies sit in `namespace view_fn_802D0F34` with `ai/ai_npc.h` and
+ *   `ai/fn_802D0F34.h`, whose `_AINPC_W` is a second partial view of `ai/ainpc.h`'s (extern "C" keeps their symbols);
+ *   its three C++-mangled `ai_*` functions stay global and cast to the view.  Unifying the views removes the namespace.
+ *  - Of the eight shared functions the pieces declare differently, each keeps its best-scoring prototype
+ *    (`fn_802D30F8` the sub-state view's); the call of `fn_802D66B8` keeps its `(s16)` narrowing as a cast.
+ *  - The four motion tables (`lbl_805D4784`..`lbl_805D48D8`) are `u16` word arrays indexed `arg * 5`/`arg * 7`: a
+ *    10/14-byte row struct folds the index into one `mulli`.
+ *  - State steps are `self->state++`/`self->sub_step--`/`field += 1`, never `x = x + 1` (a `clrlwi` retail lacks,
+ *    playbook 38); the flag parameters are `u32` tested `(flag & 0xFF)` (retail's `clrlwi` at every test).
+ *  - The `arg == 0 || arg == 2` class tests are a `switch` with shared case labels (playbook 34/37); `fn_802C4EA8`
+ *    declares one output vector per case and `fn_802C58DC` writes the ground result with one chained assignment
+ *    (retail's single `lfs` for two stores).
+ *  - `fn_802D0DCC` writes its `default` arm first: MWCC places it right after the compare chain, as retail does.
+ *  - `ai/ai_npc.h` still defines `_HIT_W` beside `Pl/hit_w.h` (rule 1); unifying the views folds it too.
  */
 
 #include "types.h"
@@ -451,8 +103,8 @@ extern "C" void fn_802C2E6C(LightArm* self);
 #include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its `set_target`/`request` slots (rule 2) */
 
 /* The four motion tables the band's rows live in, `.data` 0x805D4784..0x805D4964: the ladder's
- * 5-word rows (0x805D4810, 0x805D4874) and the wider 7-word rows (0x805D4784, 0x805D48D8).  Their owner
- * is the band's unclaimed `.data` run, so they are `extern`-declared and never defined (playbook 29).
+ * 5-word rows (0x805D4810, 0x805D4874) and the wider 7-word rows (0x805D4784, 0x805D48D8).  They sit in
+ * this unit's `.data` and are `extern`-declared, never defined (playbook 29).
  *
  * They are declared as `u16` word arrays, not as a row struct: a 10/14-byte struct's index scale folds
  * into one `mulli`, and retail's index math is the strength-reduced `arg * 5` / `arg * 7` followed by
@@ -484,7 +136,7 @@ extern u16 lbl_805D4874[];   /* 10 x 5 words */
 extern u16 lbl_805D48D8[];   /* 10 x 7 words */
 
 /* The `.sdata2` constants the state machines compare against and arm (playbook 29: declared, never
- * defined - the pool is the split's). */
+ * defined - this unit's own pool). */
 extern f32 lbl_8079A69C;
 extern f32 lbl_8079A6A0;
 extern f32 lbl_8079A6A4;
@@ -494,9 +146,8 @@ extern f32 lbl_8079A6B0;
 extern f32 lbl_8079A6B4;
 extern f32 lbl_8079A6B8;
 
-/* The band's shared helpers: all unowned (their address band interleaves modules, so rule 2 leaves
- * them here rather than guessing a module header).  Signatures are the call sites' own argument
- * shapes. */
+/* The motion band's shared helpers (this unit's own, 0x802D2904-0x802D9D30), declared ahead of their
+ * definitions in the call sites' own argument shapes; `fn_802D9D30` is not written yet. */
 void fn_802D2904(struct _AINPC_W* self, u32 motion, s32 param, u32 flag);
 void fn_802D2910(struct _AINPC_W* self, u32 motion, s32 param, u32 flag);
 u32 fn_802D2984(struct _AINPC_W* self);
@@ -529,9 +180,8 @@ void fn_802D9D30(struct _AINPC_W* self, s32 a, u32 b, u32 c, u32 d);
 extern "C" {
 #endif
 
-/* The unowned helpers this band dispatches into: 0x802D0F34 onwards is one more unclaimed run, so
- * these are rule 2's counted gap (`tools/units/stylelint.py`, a named unsplit band).  The signatures
- * are the callees' own bodies: each returns in r3 and reads the registers the call sites set. */
+/* More of the motion band's helpers this band dispatches into (this unit's own), declared ahead of
+ * their definitions with the callees' own signatures; `fn_802D9400` is not written yet. */
 void fn_802D3A2C(struct _AINPC_W* self, u32 a);
 void fn_802D3CCC(struct _AINPC_W* self, u32 a);
 void fn_802D3CD4(struct _AINPC_W* self, u32 a);
@@ -554,8 +204,8 @@ void fn_802D3210(struct _AINPC_W* self, u32* out);
 /* `pl.h` pulls `ef.h` in, which declares `setVec3`/`VEC3_ctor` with their owner's type
  * (`nw4r::math::VEC3*`), the same record this file's locals use. */
 
-/* Callees whose owner is a registered unit but whose header does not declare them yet (the same gap
- * `camera/fn_802B5C58.cpp` recorded): each spelling is that owner's own declaration. */
+/* Callees whose owner is a registered unit but whose header does not declare them yet: each spelling
+ * is that owner's own declaration. */
 void fn_8010072C(struct _PLW* owner, u8 type, nw4r::math::VEC3* pos, u32 param, f32 scale);
 u32 fn_8027DCE0(struct _PLW* self, u8 arg1);
 s32 fn_80291B08(struct _PLW* self, nw4r::math::VEC3* pos, LandData* land, f32* out, u32 kind);
@@ -565,16 +215,13 @@ void fn_80114CC8(void* actor, u8 key);
 }
 #endif
 
-/* The target's player work (`_PLW`), stored at +0x16C; only pointed at and forwarded by this band
- * (its +0x3C triple is the position).  `pl.h` cannot be included beside `mh3_pad.h` - `ef.h`
- * re-declares `VEC3_ctor`/`setVec3` with signatures that clash with the owners' headers. */
+/* The target's player work (`_PLW`, `pl.h`), stored at +0x16C; its +0x3C triple is the position. */
 struct _PLW;
 
-/* `_AINPC_W` and `AINPCFormation` come from `ai/ainpc.h` (the band's one view; this source's former local copy is a subset of it). */
+/* `_AINPC_W` and `AINPCFormation` come from `ai/ainpc.h`. */
 
-/* The C++-spelled callees: their map names carry argument lists, so declaring them at global C++
- * scope and calling the plain name is what reproduces the target's mangling (rule 9).  `ai_*` are
- * unowned (module gap), so rule 2 leaves them here. */
+/* The C++-spelled entry points this unit defines below: their map names carry argument lists, so
+ * declaring them at global C++ scope reproduces the target's mangling (rule 9). */
 s32 ai_torch_ck(struct _AINPC_W* self);
 u32 ai_skill_ck(struct _AINPC_W* self, u8 skill);
 
@@ -591,8 +238,8 @@ void fn_802D3A20(struct _AINPC_W* self);
 void fn_802D3AD8(struct _AINPC_W* self);
 f32 fn_802D7258(struct _AINPC_W* self, u32 a);
 
-/* 0x805D4030 - the 4-pointer table the dispatchers hand to `fn_802D32B4`; its entries live in the
- * (`auto`) data band, so it is only referenced here (playbook 29). */
+/* 0x805D4030 - the 4-pointer table the dispatchers hand to `fn_802D32B4`, in this unit's `.data`:
+ * declared, never defined (playbook 29). */
 extern void* lbl_805D4030[4];
 s32 fn_802D3184(struct _AINPC_W* self, u32 flag);
 void fn_802D3B10(struct _AINPC_W* self);
@@ -604,7 +251,7 @@ void fn_802D4238(struct _AINPC_W* self);
 void fn_802D2A00(struct _AINPC_W* self, u32 a, u32 b, u32 c);
 s16 fn_802D9D14(void);
 
-/* 0x802CD20C/0x802CCF00/0x802CCE18 are inside this unit and reconstructed below. */
+/* 0x802CD20C is written below; 0x802CCE18 and 0x802CCF00 are this unit's, not written yet. */
 }
 
 /* The dispatch state object.  Only the two bytes the function reads are named; everything else is
@@ -616,33 +263,28 @@ typedef struct DispatchState {
     u8 state;               /* +0x420: the switch value */
 } DispatchState;            /* size: 0x421 */
 
-/* 16 entries, each handed to the tail-called handler.  Both the table and the handler live outside this
- * unit and have no name in any source, so they are declared here and never defined (playbook 29). */
+/* 16 entries, each handed to the tail-called handler.  The table is this unit's `.data`, declared and
+ * never defined (playbook 29); the handler `fn_802D3398` is defined in the view namespace below. */
 extern "C" {
 extern void* const lbl_805D4150[16];
 extern void fn_802D3398(DispatchState* self, void* entry);
 }
 #include "ai/ainpc_w.h" /* `ainpc_w`, defined at the foot of this file (rule 2) */
 #include "mh3_pad/lb_param_w.h" /* `lb_param_w`, owned by mh3_pad.cpp (rule 2) */
-#include "ai/fn_802D44F4.h"    /* the owner's own header (rule 2) */
+#include "ai/fn_802D44F4.h"    /* this unit's and `hud/cockpit.cpp`'s declarations (rule 2) */
 #include "quest/quest_item_slot.h" /* quest_move_state_valid_ck (rule 2: its owner) */
-#include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/fn_802D44F4.cpp (rule 2) */
+#include "ai/ainpc_w.h" /* `ainpc_w`, defined at the foot of this file (rule 2) */
 
 /* The C++-spelled entry points of this range: their map names carry argument lists, so they are
- * declared at global C++ scope and the front-end reproduces the mangling (rule 9).  `ai_skill_ck`
- * is also called by `src/ai/fn_802CC794.cpp`, which declares it itself (that unit predates this
- * one); this declaration is the range's own. */
+ * declared at global C++ scope and the front-end reproduces the mangling (rule 9). */
 u32 ai_skill_ck(struct _AINPC_W* self, u8 skill);
 extern "C" s32 fn_802D9CE0(struct _AINPC_W* self);
 s32 ai_area_ck(struct _AINPC_W* self);
 
 extern "C" {
 
-/* The unregistered helpers and tables these bodies call or index.  Their addresses are outside this
- * unit's range and owned by nobody yet, so stylelint's rule 2 counts them as an address-band gap
- * (`tools/units/stylelint.py`, "the registered address bands interleave modules"); playbook 29: the
- * table is only ever *declared*, never defined here, and as a **complete** array so the base comes
- * out as `lis`/`addi` like the target's. */
+/* The tables these bodies index, in this unit's `.data`: declared, never defined (playbook 29), each as
+ * a **complete** array so the base comes out as `lis`/`addi` like the target's. */
 extern u8 lbl_805D4190[0x10];
 extern u8 lbl_805D41A0[0x10];
 extern u16 lbl_805D41B0[0x10];
@@ -2030,9 +1672,8 @@ void fn_802CE0D8(struct _AINPC_W* self)
     }
 }
 
-/* 0x802CE170 - rebuild `vec_0x1B0` from `vec_0x178` rotated by the angle the two make, then queue
- * the follow-up command.  The stack VEC3 is the rotated offset `addVec3` turns into the new
- * aim point. */
+/* 0x802CE170 - rebuilds `vec_0x1B0` from `vec_0x178` rotated by the angle the two make (the rotated stack offset
+ * `addVec3` turns into the new aim point), then queues the follow-up command. */
 void fn_802CE170(struct _AINPC_W* self)
 {
     nw4r::math::VEC3 tmp;
@@ -3936,9 +3577,8 @@ void fn_802D2B98(struct _AINPC_W* self, u16 flags)
     self->field_0x1EC &= ~flags;
 }
 
-/* 0x802D2BB0 - fills hit entry `hit` for the attack the NPC is running: the selector bytes, then
- * one OR per skill the NPC owns, the random weak-point roll, and the "blocked" case that zeroes the
- * entry again. */
+/* 0x802D2BB0 - fills hit entry `hit` for the running attack: the selector bytes, one OR per owned skill, the random
+ * weak-point roll, and the "blocked" case that zeroes the entry again. */
 void fn_802D2BB0(struct _AINPC_W* self, struct _HIT_W* hit)
 {
     u8 applied = 0;
@@ -4845,9 +4485,8 @@ void get_joint_wpos_ai(struct _AINPC_W* self, u32 joint, nw4r::math::VEC3* out)
 
 extern "C" {
 
-/* 0x802D6534 - arms the "hold item" timer when the player is within the AI NPC's reach: the gate
- * byte at +0x43D is latched once, and the timer at +0x43E gets the long or the short value from
- * the distance test. */
+/* 0x802D6534 - arms the "hold item" timer when the player is within reach: latches the +0x43D gate once and gives the
+ * +0x43E timer the long or short value by the distance test. */
 void ai_npc_hold_item_arm(void)
 {
     if (quest_move_state_valid_ck() == 0) {
@@ -5080,9 +4719,8 @@ void fn_802D6B98(struct _AINPC_W* self)
     self->field_0x3DC = self->field_0x3DA;
 }
 
-/* 0x802D7464 - the AI NPC's skill load-out: copies the three skill slots out of `lb_param_w`, bumps
- * the two skill counters for every unlocked skill, and scales the +0x3D4 gauge by the resulting
- * percentage. */
+/* 0x802D7464 - the skill load-out: copies the three skill slots out of `lb_param_w`, bumps the two skill counters per
+ * unlocked skill and scales the +0x3D4 gauge by the resulting percentage. */
 void fn_802D7464(struct _AINPC_W* self)
 {
     s32 scale = 100;
@@ -5530,9 +5168,8 @@ struct AinpcPageState {
     /* +0x27 */ u8 pad_0x27[0x29];
 }; /* size: 0x50 */
 
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806BD360..0x806BDA58`), in address order.  Defined at the foot of
- * the file, after every use.  `ainpc_w` is constructed by the `.ctors` word `fn_802D9E14` (a tail call into the
- * record's constructor `fn_802D9E20`, not reconstructed here).  The page state's users continue past this
- * unit's registered text end (0x802DDC04); names of the last two are GUESSes. */
+/* This unit's own `.bss` (0x806BD360-0x806BD808), defined at the foot of the file, after every use.
+ * `ainpc_w` is constructed by the `.ctors` word `fn_802D9E14` (a tail call into the record's constructor
+ * `fn_802D9E20`, not reconstructed here). */
 _AINPC_W ainpc_w;                      /* +0x806BD360 */
 

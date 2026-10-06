@@ -1,36 +1,25 @@
 /*
- * src/menu/fn_8031EA8C.cpp - the menu band above the selection screen, `.text` 0x8031EA8C..0x80324F7C.
- *
- * WHAT IT IS.  The band is the continuation of the item/equipment selection screen
- * (`menu/fn_8031A6C0.cpp`): its head (0x8031EA8C..0x8031FBE8) is the two per-state updater families
- * that drive the selected entry's 3D effect instance (`_EFT`, `ef.h`), each four-state
- * machine dispatched from `state_0x05` with its own `+0x38` work record; its tail (0x803203A0..) is
- * the surrounding screen's label/icon draw passes and the keyboard-driven name/message edit screen
- * (two editable names, a 4-character one at +0x43 and a 0x90-character one at +0x48, edited through
- * `_kbd_open_`/`_kbd_move` and copied back by `fn_80321A14`).
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string covers the range: every
- * `.data` reference of the band resolves to a mask/sprite table (`lbl_805DD638`..`lbl_805DD9A8`), a
- * jumptable (`jumptable_805DD598`) or a pool float; the nearest source-file strings belong to the
- * flanking TUs, not this one.  2. `dumpmap.py lookup` answers only `zz_031ea8c_` for the code.
- * 3. The `menu` module is certain: the band calls the menu/HUD 2D library (`put_menu_cursor`,
- * `get_lsp_data`, the `draw_sprite_*`/`draw_font_*` family), drives the same `_PLW` selection state,
- * and continues the `menu` band below it (`menu/fn_8031A6C0.cpp`, its own left neighbour).  The file
- * therefore keeps the map's stem (brief option 4).
- *
- * LANGUAGE.  C++: the band's own effect callees (`res_eft_model_create`, `setVector3`, `rotVecZXY`,
- * `ran_suu`, ...) are mangled free functions, so the plain `fn_XXXXXXXX` definitions are `extern "C"`
- * and the mangled ones are called through their real signatures (rule 9).  `_EFT`/`MHchar` come from
- * the owner headers `ef.h`/`pl.h`.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked every `.text` row of
- * config/RMHE08/symbols.txt from 0x8031EA8C to 0x80324F7C - 67 functions, all `fn_` stems but the one
- * mangled `eft045_set`, and the runtime dump answers `zz_031ea8c_`).
- *
- * RESIDUALS.  This pass reconstructs the wrappers and the draw helpers whose bodies need no in-band
- * helper that is not itself written here; the two big state-machine updaters (`fn_8031ECF0`,
- * `fn_8031EFEC`) and the screen's own state advance (0x803203A0..0x80320xx / 0x8032214C..) are the
- * next round's work.
+ * menu/fn_8031EA8C.cpp - the continuation of the item/equipment selection screen: the head (0x8031EA8C-0x8031FBE8) is
+ *   the two four-state updater families that drive the selected entry's effect instance (`_EFT`, dispatched on
+ *   `state_0x05`, each with its own `+0x38` work record); the tail (from 0x803203A0) is the screen's label/icon draw
+ *   passes and the keyboard name/message edit screen (a 4-character name at +0x43 and a 0x90-character one at +0x48,
+ *   edited through `_kbd_open_`/`_kbd_move` and copied back by `fn_80321A14`).  C++ callees (`res_eft_model_create`,
+ *   `setVector3`, `rotVecZXY`, `ran_suu`), `extern "C"` for the plain stems.
+ * RANGE. .text 0x8031EA8C-0x80324F7C (67 functions); extab, extabindex, .data 0x805DD598-0x805DD9C8, .bss
+ *   0x806BE120-0x806BE2C8, .sdata 0x80792C50-0x80792CC8, .sdata2 0x8079AEA8-0x8079AF48.
+ * FLAGS. `cflags_menu` (configure.py); `infer.py` on the target: `fn_80324CC4` keeps 0 record forms with 2 fold-shaped
+ *   pairs (the peephole off).
+ * NAMES. Module `menu` from the menu/HUD 2D callees and the `menu` band below; no `__FILE__` string covers the range
+ *   (its `.data` reads are mask/sprite tables, `jumptable_805DD598` and pool floats) and the dump answers `zz_`, so the
+ *   file keeps the map's stem.
+ * RESIDUALS. 38 rows unwritten (objdiff scores them zero), including the two state-machine updaters `fn_8031ECF0`/
+ *   `fn_8031EFEC`: `eft045_set` (0x8031EB54), 0x8031ECF0-0x8031F2F0, `fn_8031F510`, `fn_8031F7DC`,
+ *   0x8031FBE8-0x80320D20, 0x80320D24-0x803210B8, `fn_80321130`, 0x8032145C-0x8032194C, 0x80321A14-0x80322C68,
+ *   0x80322CEC-0x80323318, 0x80323428-0x80323874, `fn_80323884`, 0x80323A24-0x80323C4C, 0x80323CD4-0x80323F08,
+ *   `fn_80323F0C`, 0x80324274-0x80324F7C.  The 29 written rows are byte-identical.
+ *   flipcheck: `.bss` (0x1A8), `.data` (0x430), `.sdata` (0x78) and `.sdata2` (0xA0) claimed but not emitted; short
+ *   `.text` 0x894 of 0x64F0, extab 0x78 of 0x1A8, extabindex 0xB4 of 0x27C; the bytes of all three differ; the pools are
+ *   partial (a low-confidence fold candidate with `enemy/em_action`); `fn_803B4C64` is defined by no link input.
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
@@ -44,7 +33,8 @@
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_state_flags_set_c1 ((void (*)(_EFT*, u32, u32))eft_state_flags_set)
 
-/* The band's unowned callees (no registered unit owns these addresses). */
+/* Callees other units own (`eft_res_slot_get` `ef/eft_res.cpp`, ...); their owners' headers do not declare them
+ * yet. */
 extern "C" {
 
 void* eft_res_slot_get(s32 size);

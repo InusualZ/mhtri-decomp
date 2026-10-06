@@ -1,16 +1,9 @@
 /*
- * `menu/fn_802E4978.cpp`'s records and outbound declarations.
- *
- * The unit is the in-game cockpit/HUD band: `fn_802E4978` builds one player's cockpit work in the
- * global `cockpit_work` array (2 entries, stride 0x194), `fn_802E4AD4`/`fn_802E4B8C` pick which
- * player views it, and the rest drive the item bar, the quest text and the action-button prompt.
- *
- * The 0x194-byte work record and the two records it points at are this unit's own view; where a
- * record is also read by `Pl`/`enemy` the owner header (`pl.h`'s `_PLW`) carries the fuller
- * layout and this file keeps only the offsets it reads (a view, folded by the next pass - rule 1).
- *
- * The outbound block at the bottom is rule 2's blocked case: the callees whose owner's header cannot
- * be included from this translation unit, with the clash that blocks each named there.
+ * menu/fn_802E4978.h - the records and outbound declarations of `hud/cockpit_quest.cpp`'s 0x802E4978 band, the
+ *   in-game cockpit: `fn_802E4978` builds one player's cockpit work in `cockpit_work` (2 entries, stride 0x194),
+ *   `fn_802E4AD4`/`fn_802E4B8C` pick the viewer, the rest drive the item bar, the quest text and the action prompt.  The
+ *   records are the band's views (`pl.h`'s `_PLW` has the fuller layout); the outbound block names the callees whose
+ *   owner header cannot be included here, with the clash for each.
  */
 #ifndef MHTRI_MENU_FN_802E4978_H
 #define MHTRI_MENU_FN_802E4978_H
@@ -214,15 +207,14 @@ u32 get_move_work_max(u8 kind);
  *   * `mh3_pad.h` (0x80046F0C): clashes with `pl.h` on its own pre-existing
  *     `setVec3` declaration.
  *
- * Each is a `shared-file` request in the unit's outbox, `sqrt_f32`'s included.  The signatures are
- * this unit's call sites, measured against the target object (a change here moves a row, so they must
- * not be "tidied"). */
+ * The signatures are this unit's call sites, measured against the target object (a change here moves a
+ * row, so they must not be "tidied"). */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 u32 fn_80046F0C(void*);                /* 0x80046F0C mh3_pad.cpp */
-s32 fn_802D27E0(void);                  /* 0x802D27E0 ai/fn_802D0F34.cpp */
+s32 fn_802D27E0(void);                  /* 0x802D27E0 ai/ai_npc.cpp */
 s32 fn_802E0B54(u16);                   /* 0x802E0B54 hud/layout.cpp */
 u32 color_lerp(u32, u32, u8, f32, f32);/* 0x802E270C hud/layout.cpp */
 /* 0x80050BC0 - `fn_8004CAD8.h` settles ONE float argument (from the callee's own body), and
@@ -238,26 +230,24 @@ void quest_gauge_draw(void);                 /* 0x802E7FA0 hud/cockpit_quest.cpp
 void quest_targets_update_b(void*);                /* 0x802E8C8C hud/cockpit_quest.cpp */
 void quest_marker_arm(void);                 /* 0x802E8E64 hud/cockpit_quest.cpp */
 void quest_marks_flush(void*);                /* 0x802EA33C hud/cockpit_quest.cpp */
-void fn_802EC4F0(void*);                /* 0x802EC4F0 hud/fn_802EBED8.cpp */
-s32 fn_802EC6C4(void*);                 /* 0x802EC6C4 hud/fn_802EBED8.cpp */
-void fn_802EC700(void);                 /* 0x802EC700 hud/fn_802EBED8.cpp */
-void fn_802ED480(void);                 /* 0x802ED480 hud/fn_802EBED8.cpp */
-void fn_802ED88C(void);                 /* 0x802ED88C hud/fn_802EBED8.cpp */
-void fn_802EDAF0(void*, void*, void*);  /* 0x802EDAF0 hud/fn_802EBED8.cpp */
-void fn_802EDB0C(void*, void*, void*);  /* 0x802EDB0C hud/fn_802EBED8.cpp */
-void fn_802EDCE4(void*, void*);         /* 0x802EDCE4 hud/fn_802EBED8.cpp */
-void fn_802EE65C(void*, void*);         /* 0x802EE65C hud/fn_802EBED8.cpp */
-void fn_802EE82C(void*);                /* 0x802EE82C hud/fn_802EBED8.cpp */
-void fn_802EF0FC(void*);                /* 0x802EF0FC hud/fn_802EBED8.cpp */
-void fn_802EF230(void);                 /* 0x802EF230 hud/fn_802EBED8.cpp */
-void fn_802EF424(void);                 /* 0x802EF424 hud/fn_802EBED8.cpp */
-void fn_802EF6B0(void);                 /* 0x802EF6B0 hud/fn_802EBED8.cpp */
-void fn_802EF730(void);                 /* 0x802EF730 hud/fn_802EBED8.cpp */
-/* 0x8033A850 `lobby/lb_companion_ui.cpp` (the companion/status UI band, formerly the band entry
- * `fn_8033A850` in `unsplit/menu.h` - the band may not carry a symbol a registered unit
- * owns).  The owner's header cannot be included here: it redefines `_mh_ivec2_` against
- * `unsplit/lobby.h`, which this unit needs (measured - `(10296) class '_mh_ivec2_'
- * redefined`).  The zero-argument signature is this unit's call site. */
+void fn_802EC4F0(void*);                /* 0x802EC4F0 hud/cockpit_quest.cpp */
+s32 fn_802EC6C4(void*);                 /* 0x802EC6C4 hud/cockpit_quest.cpp */
+void fn_802EC700(void);                 /* 0x802EC700 hud/cockpit_quest.cpp */
+void fn_802ED480(void);                 /* 0x802ED480 hud/cockpit_quest.cpp */
+void fn_802ED88C(void);                 /* 0x802ED88C hud/cockpit_quest.cpp */
+void fn_802EDAF0(void*, void*, void*);  /* 0x802EDAF0 hud/cockpit_quest.cpp */
+void fn_802EDB0C(void*, void*, void*);  /* 0x802EDB0C hud/cockpit_quest.cpp */
+void fn_802EDCE4(void*, void*);         /* 0x802EDCE4 hud/cockpit_quest.cpp */
+void fn_802EE65C(void*, void*);         /* 0x802EE65C hud/cockpit_quest.cpp */
+void fn_802EE82C(void*);                /* 0x802EE82C hud/cockpit_quest.cpp */
+void fn_802EF0FC(void*);                /* 0x802EF0FC hud/cockpit_quest.cpp */
+void fn_802EF230(void);                 /* 0x802EF230 hud/cockpit_quest.cpp */
+void fn_802EF424(void);                 /* 0x802EF424 hud/cockpit_quest.cpp */
+void fn_802EF6B0(void);                 /* 0x802EF6B0 hud/cockpit_quest.cpp */
+void fn_802EF730(void);                 /* 0x802EF730 hud/cockpit_quest.cpp */
+/* 0x8033A850 `lobby/lb_companion_ui.cpp` (the companion/status UI band).  The owner's header cannot be included
+ * here: it redefines `_mh_ivec2_` against `unsplit/lobby.h`, which this unit needs (measured - `(10296) class
+ * '_mh_ivec2_' redefined`).  The zero-argument signature is this unit's call site. */
 s32 lb_quest_work_active_ck(void);
 
 #ifdef __cplusplus
