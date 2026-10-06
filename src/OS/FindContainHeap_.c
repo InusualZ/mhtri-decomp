@@ -35,7 +35,7 @@
  * fn_804C1E00, fn_804C1EE0, MEMAllocFromExpHeapEx, MEMGetAllocatableSizeForExpHeapEx, fn_804C2460, fn_804C2470, fn_804C24C0, fn_804C24E0,
  * fn_804C2550, fn_804C25C0, fn_804C26A0, fn_804C26E0, fn_804C2800, fn_804C2820, fn_804C2830, fn_804C2840,
  * fn_804C3F10..fn_804C40D0, fn_804C5770, fn_804C5BB0, fn_804C5D50, fn_804C5FE0, fn_804C61E0,
- * fn_804C6290, fn_804C6430, fn_804C64E0, fn_804C6660, fn_804C6710, fn_804C6810, fn_804C6900,
+ * PSMTXRotAxisRad, fn_804C6430, fn_804C64E0, fn_804C6660, fn_804C6710, fn_804C6810, fn_804C6900,
  * fn_804C69A0, fn_804C6B30, fn_804C6C60.  The real names (FindContainHeap_, MEMiInitHeapHead,
  * MEMCreateExpHeapEx, MEMDestroyExpHeap, MEMFreeToExpHeap, MEMAllocFromAllocator, MEMFreeToAllocator,
  * MEMInitAllocatorForExpHeap, __MIXSetPan, PSMTX*, PSVEC*, C_MTXOrtho) are used as the map spells them.

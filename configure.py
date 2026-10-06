@@ -272,6 +272,8 @@ cflags_g3d = [
 # cflags_network and cflags_os: -func_align 4 (+ -Cpp_exceptions on for Network); measurements in docs/network.md.
 cflags_network = [*cflags_base, "-func_align", "4", "-Cpp_exceptions", "on"]
 cflags_os = [*cflags_base, "-func_align", "4"]
+# cflags_nw4r: cflags_os + -fp_contract off, compiled with GC/3.0a5.2 (the nw4r lib block); evidence in docs/nw4r.md.
+cflags_nw4r = [*cflags_os, "-fp_contract", "off"]
 # DWCi (the Wii Wi-Fi Connection SDK library the retail link places between the game's own SDK uses
 # and NHTTP).  Same shape as the sibling SDK groups above: the retail .text packs the band's
 # functions back to back with 4-byte gaps, so `-func_align 4`.  Evidence: DWCi/fn_805113B0.c.
@@ -1262,10 +1264,6 @@ config.libs = [
             Object(NonMatching, "RVLGX/GXTexture_tail.cpp"),
             Object(NonMatching, "SC/sc.cpp"),
             Object(NonMatching, "WPAD/wpad.cpp"),
-            Object(NonMatching, "nw4r/db_assert.cpp"),
-            Object(NonMatching, "nw4r/math_arithmetic.cpp"),
-            Object(NonMatching, "nw4r/math_triangular.cpp"),
-            Object(NonMatching, "nw4r/fn_805012C4.cpp"),
             Object(NonMatching, "nw4r/fn_80502828.cpp"),
             Object(NonMatching, "nw4r/fn_80504A3C.cpp"),
             Object(NonMatching, "nw4r/fn_8050661C.cpp"),
@@ -1273,6 +1271,19 @@ config.libs = [
             Object(NonMatching, "NCD/ncdsystem.c"),
             Object(NonMatching, "SO/soi.cpp"),
             Object(NonMatching, "VF/vf.cpp"),
+        ],
+    },
+    {
+        # nw4r units built with the GC compiler: docs/nw4r.md "The nw4r units".
+        "lib": "nw4r",
+        "mw_version": "GC/3.0a5.2",
+        "cflags": cflags_nw4r,
+        "host": False,
+        "objects": [
+            Object(NonMatching, "nw4r/db_assert.cpp"),
+            Object(NonMatching, "nw4r/math_arithmetic.cpp"),
+            Object(NonMatching, "nw4r/math_triangular.cpp"),
+            Object(NonMatching, "nw4r/fn_805012C4.cpp"),
         ],
     },
     {
