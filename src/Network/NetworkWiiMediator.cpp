@@ -9,11 +9,12 @@
  *   seam until V->D at 0x80602988.  The left cut is 0x80413450, not 0x80413384: `NetworkRandom`'s table 0x806024A0
  *   precedes the first jump table 0x806024B8, so `NetworkRandom` is `Network/NetworkPool.cpp`'s.
  * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md: the `-O4,p` epilogue-swap /
- *   hoisted-`li` signature of playbook 27).  The constructors and destructors sit under `#pragma peephole off` (retail
- *   stages the table address in r0, keeps `extsh`+`cmpwi` on the destructor flag); the opening part keeps its file-scope
- *   `#pragma peephole off` (retail's `extsb`+`cmpwi` on the slot argument), back on around `setMediatorTransferMode` and
- *   `setPatTermsFlag` (the raw `stb` of a u32), `#pragma auto_inline off` (retail calls `clearTransferQueue`) and
- *   `#pragma pool_data off` (each log string its own `lis`/`addi`), from where it starts.
+ *   hoisted-`li` signature of playbook 27).  `#pragma peephole off` from the constructor on (retail stages the table
+ *   address in r0, keeps `extsh`/`extsb`+`cmpwi`, and sets a `memcpy`'s address up before its constants:
+ *   `setMediatorParams`, `setMediatorBuffer*`, `getReflectPage`, `parseReflectLines`), back on around
+ *   `setMediatorTransferMode` and `setPatTermsFlag` (the raw `stb` of a u32); the opening part adds
+ *   `#pragma auto_inline off` (retail calls `clearTransferQueue`) and `#pragma pool_data off` (each log string its own
+ *   `lis`/`addi`).
  * NAMES. The `NetworkWiiMediator::*` spellings are the runtime dump's, `ECStart`/`openingStart`/`openingStop` the
  *   strings'. GUESSes: `NetworkMediator` (the `sNetworkLibrary`/`sNetworkLibraryWii` pairing), `update`,
  *   `deleteNetworkPool`, `enableMediatorLinkError`/`disableMediatorLinkError` (the `flag_21` setters); the helpers
@@ -27,28 +28,27 @@
  *   `NetworkPool::start`), `NetworkPool::isECStarted`; the terms wrappers 0x80416800..0x80416C18 (`cancelTermsUpdate`,
  *   `getTermsProgressLevel`, `getMediatorTermsProgress*`, `set/getMediatorTermsFlag`, `isPatTermsReady`,
  *   `set/getPatTermsFlag`) and the `menu/menu_plsearch.cpp` callees (`initPatTerms`, `requestPatTermsCheck`,
- *   `requestPatTermsUpdate`, `cancelPatTermsUpdate`, `getPatTermsProgress`).  The six PatInterface sub-state tests keep
+ *   `requestPatTermsUpdate`, `cancelPatTermsUpdate`, `getPatTermsProgress`).  Also GUESSed:
+ *   `setMediatorParams`/`getMediatorParams` (the five words they copy), `filterReflectText`/`filterReflectTextSingle`
+ *   (the word masking with '*'), the pool forwarders after the `NetworkPool` method each calls (`initNetworkPool`,
+ *   `purchaseNetworkPoolItem`, ...) and the voice helpers after their callees (`writeVoice`, `encodeVoice`,
+ *   `getEncodedVoiceSize`, `suppressVoiceEcho`).  The six PatInterface sub-state tests keep
  *   their semantic names (`isSubState_8254_3`, `isSubState_894F_2..6`).
- * RESIDUALS. 34 rows unwritten (objdiff scores them zero): the head's word copies, `isMessageRestricted` and
- *   `checkMediatorLink` (0x80413980..0x80413BE0), `getCountryCode`/`getLanguage` (0x80413BF8..0x80413C64); the word
- *   filter 0x804155D4 (2520 B), `postMediatorRecord` and the `NetworkPool` forwarding wrappers (0x804155D4..0x80416120,
- *   0x804161D0..0x804165A8); `readVoice` (0x80416DB0); the sound and voice helpers 0x80417080..0x804172CC.
- *   `flipcheck`: 22 functions retail's `.comment` marks force-active are not marked in ours (row 36: unreferenced, the
- *   linker would deadstrip them) - `disableMediatorLinkError`, `getMediatorField24`, `updateServerTime`,
- *   `queryOpeningFlag250`, `queryOpeningFlag290`, `getAccountQuery1..5`, `isShiftJisLeadByte`, `ECStart` and others;
- *   `.rodata` 0x22 against 0x28.  Partial rows:
+ * RESIDUALS. Every row has a body.  `flipcheck`: 22 functions retail's `.comment`
+ *   marks force-active are not marked in ours (row 36: unreferenced, the linker would deadstrip them) -
+ *   `disableMediatorLinkError`, `getMediatorField24`, `updateServerTime`, `queryOpeningFlag250`, `queryOpeningFlag290`,
+ *   `getAccountQuery1..5`, `isShiftJisLeadByte`, `ECStart` and others; `.rodata` 0x22 against 0x28.  Partial rows:
+ *  - `filterReflectText`: same size and instruction stream; the callee-saved registers are coloured differently
+ *    (retail keeps `self`/`text` in r15/r16 and `found` in r25), and retail re-adds `k + n` for the two boundary
+ *    loops' tests where MWCC strength-reduces it into its own register (declaration orders tried);
+ *  - `postMediatorRecord`: retail keeps an `ori r3,r3,0` copy of the first filter result before testing it (a
+ *    `bool` local, a `(u32)` cast and a conditional spelling tried);
  *  - `isShiftJisLeadByte`: retail evaluates the two byte ranges as four unsigned compares; MWCC folds each range into
  *    one `addi`/`clrlwi`/`cmplwi` and the `>= 224` test into branchless code for every spelling tried;
- *  - `setMediatorBufferA`/`B`: retail schedules `addi r3,r3,0x7C` before the `memcpy`'s `li r5,0x106` (the store
- *    direction only: the load direction, `getMediatorBuffer*`, is byte-identical; a typed array, `&self->buffer[0]` and
- *    a byte offset tried);
  *  - `parseReflectPacket`: the lead-byte guard lands in `cr1` where retail reuses `cr0`, and retail re-reads `in[1]`
  *    (`lbz`+`extsb`) before the `out[1] = in[1] - 32` store; the switch and if-chain spellings emit the same object;
- *  - `parseReflectLines`: retail keeps `mr r0,r28` before the `*table = text` store (a temporary and a scoped
- *    `#pragma peephole off` tried);
  *  - `buildReflectPacket`: the same instructions and size (344 B); a relocation artefact of the split;
  *  - `updateServerTime`: the 64-bit tail `return 0` emits `li r3,0` where retail emits `li r4,0` + `mr r3,r4`;
- *  - `getReflectPage`: `mr r4,r31` where retail masks the `u8` page (`clrlwi r4,r31,24`); a `(u32)` cast does not help;
  *  - `isNameSymbolChar`: the `u8` local's mask lands in r3, retail r0 (a `u8` parameter costs `validateReflectName`);
  *  - `popTransferRecord`: retail computes `&length` before the queue address for the first `memcpy`;
  *    `pushTransferRecord`: r29-r31 permuted; `setGameInfo2d1c`: the title length in r29 where retail reuses r28;
@@ -83,6 +83,9 @@
 #include "menu/menu_plsearch.h"            /* initPatTerms and the terms object's requests */
 #include "MSL_C/alloc.h"                   /* memmove, snprintf */
 #include "MSL/strlen.h"
+#include "SC/sc.h"                         /* the parental-control, country and language queries */
+#include "SO/soi.h"                        /* SOGetInterfaceOpt - the link check */
+#include "ARC/arc.h"                       /* the DSP-ADPCM helpers of the voice path */
 
 /* The console's bus clock in Hz (low memory 0x800000F8), spelled exactly as `unsplit/OS.h` defines `OS_BUS_CLOCK`:
    that header clashes with this unit's includes (its thread prototypes), so the one-line spelling is kept locally. */
@@ -159,7 +162,8 @@ void mediatorEventCallback(u32 code, s32 a, s32 b, s32 c, const union GameSpyEve
 
 }
 
-/* The head keeps retail's unfused forms (the table address staged in r0, the destructors' extsh+cmpwi). */
+/* The unit keeps retail's unfused forms (the table address staged in r0, the destructors' extsh+cmpwi, a memcpy's
+   address set up before its constants) from here on. */
 #pragma peephole off
 
 /* Builds the mediator: the terms object, every buffer and table cleared, the default term/maintenance texts and
@@ -168,11 +172,11 @@ NetworkWiiMediator::NetworkWiiMediator()
 {
     s32 slot;
 
-    memset(cleared_004, 0, 4);
-    memset(cleared_008, 0, 4);
-    memset(cleared_00C, 0, 4);
-    memset(cleared_010, 0, 4);
-    memset(cleared_014, 0, 4);
+    memset(param_04, 0, 4);
+    memset(param_08, 0, 4);
+    memset(param_0C, 0, 4);
+    memset(param_10, 0, 4);
+    memset(param_14, 0, 4);
     flag_1C = 0;
     flag_1D = 0;
     flag_1E = 0;
@@ -256,7 +260,6 @@ NetworkWiiMediator::~NetworkWiiMediator()
     deleteNetworkPool();
 }
 
-#pragma peephole on
 
 extern "C" {
 
@@ -289,6 +292,83 @@ void NetworkWiiMediator::update()
 
 extern "C" {
 
+
+/* 0x80413980 (0xB4): copies each given word into the five parameter words. */
+void setMediatorParams(NetworkWiiMediator* self, const u32* a, const u32* b, const u32* c, const u32* d,
+                       const u32* e)
+{
+    if (a != NULL) {
+        memcpy(self->param_04, a, 4);
+    }
+    if (b != NULL) {
+        memcpy(self->param_08, b, 4);
+    }
+    if (c != NULL) {
+        memcpy(self->param_0C, c, 4);
+    }
+    if (d != NULL) {
+        memcpy(self->param_10, d, 4);
+    }
+    if (e != NULL) {
+        memcpy(self->param_14, e, 4);
+    }
+}
+
+/* 0x80413A34 (0xB8): copies the five parameter words out to each given pointer. */
+void getMediatorParams(NetworkWiiMediator* self, u32* a, u32* b, u32* c, u32* d, u32* e)
+{
+    if (a != NULL) {
+        memcpy(a, self->param_04, 4);
+    }
+    if (b != NULL) {
+        memcpy(b, self->param_08, 4);
+    }
+    if (c != NULL) {
+        memcpy(c, self->param_0C, 4);
+    }
+    if (d != NULL) {
+        memcpy(d, self->param_10, 4);
+    }
+    if (e != NULL) {
+        memcpy(e, self->param_14, 4);
+    }
+}
+
+
+/* 0x80413AEC (0x2C): whether the parental controls restrict messaging. */
+s32 isMessageRestricted(NetworkWiiMediator* self)
+{
+    return SCCheckPCMessageRestriction() == 1;
+}
+
+/* 0x80413B18 (0xC8): whether the network interface's link is up; fills `error` when it is not. */
+s32 checkMediatorLink(NetworkWiiMediator* self, struct NetworkErrorInfo* error)
+{
+    s32 linkUp;
+    s32 length;
+    s32 result;
+
+    linkUp = 0;
+    length = 4;
+    if (self->flag_21 != 0) {
+        if (error != NULL) {
+            error->code_00 = 0x80000008;
+            error->param1_04 = 93;
+            error->param2_08 = 0;
+        }
+    } else {
+        result = SOGetInterfaceOpt(NULL, 0xFFFE, 0x1005, &linkUp, &length);
+        if (result < 0 || linkUp == 0) {
+            if (error != NULL) {
+                error->code_00 = 0x80000008;
+                error->param1_04 = 0;
+                error->param2_08 = result;
+            }
+        }
+    }
+    return linkUp == 1;
+}
+
 /* Makes the link check (0x80413B18) report the link as down (error 0x80000008, code 93) without asking SO. */
 void enableMediatorLinkError(NetworkWiiMediator* self)
 {
@@ -299,6 +379,23 @@ void enableMediatorLinkError(NetworkWiiMediator* self)
 void disableMediatorLinkError(NetworkWiiMediator* self)
 {
     self->flag_21 = 0;
+}
+
+/* 0x80413BF8 (0x48): the console's country code, 0 when none is set. */
+s32 getCountryCode(void)
+{
+    u8 country;
+
+    if (SCGetCountryCode(&country) != 0 && country != 0 && country != 0xFF) {
+        return country;
+    }
+    return 0;
+}
+
+/* 0x80413C40 (0x24): the console's language. */
+s32 getLanguage(void)
+{
+    return SCGetLanguage();
 }
 
 }
@@ -337,7 +434,6 @@ void NetworkWiiMediator::reflectFinal()
     finalizeReflectService(getReflectService());
     delete getReflectService();
 }
-#pragma peephole off
 s32  NetworkWiiMediator::getOpeningProgress()
 {
     NetworkWiiMediator* self = (NetworkWiiMediator*)this;
@@ -362,7 +458,6 @@ s32  NetworkWiiMediator::getOpeningProgress()
     }
     return self->flag_1F + self->flag_1E * 10;
 }
-#pragma peephole on
 s32  NetworkWiiMediator::getOpeningTermsVersion()
 {
     if (getPatInstance() != NULL) {
@@ -564,6 +659,9 @@ s32 getReflectModeFromLanguage()
         return 12;
     }
 }
+
+
+/* Copies the 262-byte block A in (nothing for a null source). */
 void setMediatorBufferA(NetworkWiiMediator* self, const u8* src)
 {
     if (src == NULL) {
@@ -592,6 +690,8 @@ void getMediatorBufferB(NetworkWiiMediator* self, u8* dst)
     }
     memcpy(dst, self->buffer_B, 262);
 }
+
+
 void getMediatorNameBuffer(NetworkWiiMediator* self, u32* out1, u8* out2)
 {
     *out1 = (u32)&self->name_buffer_68B;
@@ -713,7 +813,6 @@ u64 updateServerTime(NetworkWiiMediator* self)
 /* The timestamp the account is stamped with: the mediator's own, or the Pat singleton's when the
  * mediator has none yet.  The fallback lands in the *high* half of the 64-bit value, the way the
  * retail code builds it (`li r3,0` + `mr r4,<result>`). */
-#pragma peephole off
 u64 setServerTimeResult(NetworkWiiMediator* self)
 {
     (void)self;
@@ -740,7 +839,6 @@ void setMediatorState68A(NetworkWiiMediator* self, u8 value)
     }
     self->flag_68A = value;
 }
-#pragma peephole on
 void setNetworkPoolTimestamp(NetworkPool* self, u64 value)
 {
     self->timestamp = value;
@@ -954,7 +1052,6 @@ s32 isShiftJisLeadByte(NetworkWiiMediator* self, u8 value)
     }
     return 0;
 }
-#pragma peephole off
 s32 isNameSymbolChar(NetworkWiiMediator* self, char value)
 {
     (void)self;
@@ -967,7 +1064,6 @@ s32 isNameSymbolChar(NetworkWiiMediator* self, char value)
     }
     return 1;
 }
-#pragma peephole on
 void parseReflectLines(NetworkWiiMediator* self, s32 source)
 {
     char** table;
@@ -1081,7 +1177,6 @@ s32 parseReflectPacket(NetworkWiiMediator* self, char* out, const char* in, u32 
     return 1;
 }
 
-#pragma peephole off
 s32 validateReflectName(NetworkWiiMediator* self, const char* name)
 {
     const char* cursor;
@@ -1145,16 +1240,297 @@ s32 buildReflectPacket(NetworkWiiMediator* self, const char* text, s32* skipCoun
     }
     return count;
 }
-#pragma peephole on
 
 /* ----------------------------------------------------------------------------------------- */
 /* The opening part (0x804155D4..0x80417BC0), folded in from `Network/network_opening.cpp`.   */
 /* ----------------------------------------------------------------------------------------- */
 
 
-#pragma peephole off
 #pragma auto_inline off
 #pragma pool_data off
+
+extern "C" {
+
+/* 0x804155D4 (0x9D8): masks with '*' every word of `text` that filter table `table` lists, a 256-byte window at a
+ * time (the words' flags choose which side must end on a symbol), then folds each masked UTF-8 run to one '*' per
+ * character; nonzero when a word matched. */
+s32 filterReflectText(NetworkWiiMediator* self, char* text, s32 table)
+{
+    s32 firstSkip;
+    s32 firstFlags;
+    s32 skip;
+    s32 flags;
+    char normalized[0x100];
+    char masked[0x100];
+    u32 limit;
+    char** words;
+    s32 wordCount;
+    u32 minLength;
+    s32 symbolMap;
+    s32 advance;
+    u32 length;
+    u32 n;
+    s32 found;
+    char* src;
+    s32 pos;
+    u32 chunk;
+    s32 index;
+    const char* word;
+    u32 last;
+    u32 maxLength;
+    s32 k;
+    u32 textLength;
+    s32 j;
+    s32 removed;
+    s32 count;
+    s32 end;
+    s32 run;
+    s32 extra;
+    s32 base;
+    s32 dst;
+    s32 consumed;
+    u32 match;
+
+    found = 0;
+    switch (table) {
+    default:
+        return 0;
+    case 0:
+        words = self->line_table_a;
+        wordCount = 0x400;
+        maxLength = 0;
+        minLength = 1;
+        symbolMap = 0;
+        break;
+    case 1:
+        words = self->line_table_c;
+        wordCount = 1;
+        maxLength = 0;
+        minLength = 1;
+        symbolMap = 0;
+        break;
+    case 2:
+        words = self->line_table_b;
+        wordCount = 0x400;
+        maxLength = 0;
+        minLength = 1;
+        symbolMap = 1;
+        break;
+    }
+
+    for (index = 0; index < wordCount; index++) {
+        word = words[index];
+        firstSkip = 0;
+        firstFlags = 0;
+        if (word == NULL) {
+            wordCount = index;
+            break;
+        }
+        length = buildReflectPacket(self, word, &firstSkip, &firstFlags);
+        if (maxLength < length) {
+            maxLength = length;
+        }
+        if (minLength > length) {
+            minLength = length;
+        }
+    }
+
+    textLength = strlen(text);
+    pos = 0;
+    limit = 0x100 - maxLength;
+    while (pos < textLength) {
+        advance = 0;
+        chunk = (textLength - pos < 0x100) ? textLength - pos : 0x100;
+        if (chunk < minLength) {
+            break;
+        }
+        for (k = 0; k < chunk;) {
+            consumed = parseReflectPacket(self, &normalized[k], &text[pos + k], 0x100 - k, chunk - k, symbolMap);
+            if (consumed > 0) {
+                if (k <= limit) {
+                    advance = k + consumed;
+                }
+                k += consumed;
+            } else {
+                chunk += consumed;
+                break;
+            }
+        }
+        src = &text[pos];
+        memcpy(masked, src, chunk);
+
+        for (index = 0; index < wordCount; index++) {
+            word = words[index];
+            skip = 0;
+            flags = 0;
+            length = buildReflectPacket(self, word, &skip, &flags);
+            if (length == 0 || chunk < length) {
+                continue;
+            }
+            last = chunk - length;
+            if (flags & 4) {
+                for (k = 0; k <= last;) {
+                    for (match = 0; match < length; match++) {
+                        if (normalized[k + match] != word[skip + match]) {
+                            break;
+                        }
+                    }
+                    if (match >= length && (pos + k <= 0 || isNameSymbolChar(self, text[pos + k - 1]))) {
+                        for (n = 0; n < length; n++) {
+                            masked[k + n] = '*';
+                        }
+                        for (; k + n < chunk; n++) {
+                            if (isNameSymbolChar(self, src[k + n])) {
+                                break;
+                            }
+                            masked[k + n] = '*';
+                        }
+                        k = k + n + 1;
+                        found = 1;
+                    } else if (k < chunk) {
+                        k = validateReflectName(self, &text[pos + k]) + k + 1;
+                    }
+                }
+            } else if (flags & 8) {
+                for (k = 0; k <= last; k++) {
+                    for (match = 0; match < length; match++) {
+                        if (normalized[k + match] != word[skip + match]) {
+                            break;
+                        }
+                    }
+                    if (match >= length &&
+                        (pos + k + length >= chunk || isNameSymbolChar(self, text[pos + k + length]))) {
+                        for (j = pos + k - 1; j >= 0; j--) {
+                            if (isNameSymbolChar(self, text[j])) {
+                                break;
+                            }
+                            masked[j] = '*';
+                        }
+                        for (n = 0; n < length; n++) {
+                            masked[k + n] = '*';
+                        }
+                        k += n;
+                        found = 1;
+                    }
+                }
+            } else if (flags & 3) {
+                for (k = 0; k <= last; k++) {
+                    for (match = 0; match < length; match++) {
+                        if (normalized[k + match] != word[skip + match]) {
+                            break;
+                        }
+                    }
+                    if (match >= length) {
+                        for (j = pos + k - 1; j >= 0; j--) {
+                            if (isNameSymbolChar(self, text[j])) {
+                                break;
+                            }
+                            masked[j] = '*';
+                        }
+                        for (n = 0; n < length; n++) {
+                            masked[k + n] = '*';
+                        }
+                        for (; k + n < chunk; n++) {
+                            if (isNameSymbolChar(self, src[k + n])) {
+                                break;
+                            }
+                            masked[k + n] = '*';
+                        }
+                        k += n;
+                        found = 1;
+                    }
+                }
+            } else {
+                for (k = 0; k <= last;) {
+                    for (match = 0; match < length; match++) {
+                        if (normalized[k + match] != word[skip + match]) {
+                            break;
+                        }
+                    }
+                    if (match >= length && (pos + k <= 0 || isNameSymbolChar(self, text[pos + k - 1])) &&
+                        (pos + k + length >= chunk || isNameSymbolChar(self, text[pos + k + length]))) {
+                        for (n = 0; n < length; n++) {
+                            masked[k + n] = '*';
+                        }
+                        k = k + n + 1;
+                        found = 1;
+                    } else if (k < chunk) {
+                        k = validateReflectName(self, &text[pos + k]) + k + 1;
+                    }
+                }
+            }
+        }
+
+        removed = 0;
+        for (k = 0; k < chunk; k++) {
+            if (masked[k] == '*') {
+                count = 0;
+                for (end = k; end < chunk && masked[end] == '*'; end++) {
+                    if ((u8)text[pos + end - removed] < 0x80 || (u8)text[pos + end - removed] >= 0xC0) {
+                        count++;
+                    }
+                }
+                for (n = 0; n < count; n++) {
+                    text[pos + k - removed + n] = '*';
+                }
+                run = end - k;
+                extra = run - count;
+                if (extra != 0) {
+                    base = pos + k;
+                    dst = base - removed;
+                    memmove(&text[dst] + count, &text[run + dst], textLength - (run + base));
+                    removed += extra;
+                    text[textLength - removed] = 0;
+                }
+                k = end - 1;
+            }
+        }
+        if (advance == 0) {
+            break;
+        }
+        pos += advance;
+    }
+    return found;
+}
+
+/* 0x80415FAC (0x74): whether `record` holds a word of the first or the second filter table (each pass masks it). */
+s32 postMediatorRecord(NetworkWiiMediator* self, u8* record)
+{
+    s32 found;
+
+    found = filterReflectText(self, (char*)record, 0) != 0;
+    return (found | filterReflectText(self, (char*)record, 2)) != 0;
+}
+
+/* 0x80416020 (0x8): filters `text` against the single-line table. */
+s32 filterReflectTextSingle(NetworkWiiMediator* self, char* text)
+{
+    return filterReflectText(self, text, 1);
+}
+
+/* 0x80416028 (0x80): creates the network pool when there is none and initialises it. */
+/* untyped: caller-owned payload - the sink's argument */
+void initNetworkPool(NetworkWiiMediator* self, NetworkPoolCallback callback, void* arg,
+                     const NetworkPoolConfig* config)
+{
+    if (getNetworkPool() == NULL) {
+        new NetworkPool();
+    }
+    getNetworkPool()->init(callback, arg, config);
+}
+
+/* 0x804160A8 (0x78): creates the network pool when there is none and initialises it with the timed handler flag. */
+/* untyped: caller-owned payload - the sink's argument */
+void initNetworkPoolTimed(NetworkWiiMediator* self, NetworkPoolCallback callback, void* arg,
+                          const NetworkPoolConfig* config, s32 timed)
+{
+    if (getNetworkPool() == NULL) {
+        new NetworkPool();
+    }
+    getNetworkPool()->init(callback, arg, config, timed);
+}
+
+}
 
 /* Finalizes the network pool singleton, then deletes it. */
 void NetworkWiiMediator::deleteNetworkPool()
@@ -1176,6 +1552,143 @@ void NetworkWiiMediator::ECStart()
     if (getNetworkPool() != NULL) {
         getNetworkPool()->start();
     }
+}
+
+extern "C" {
+
+/* 0x804161D0 (0x30): arms the network pool's cleanup. */
+void stopNetworkPool(NetworkWiiMediator* self)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->startCleanup();
+    }
+}
+
+/* 0x80416200 (0x30): forwards to the pool's (empty) ticket sync. */
+void syncNetworkPoolTickets(NetworkWiiMediator* self)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->syncTickets();
+    }
+}
+
+/* 0x80416230 (0x40): forwards to the pool's (empty) ticket delete. */
+void deleteNetworkPoolTicket(NetworkWiiMediator* self, s32 itemId)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->deleteTicket(itemId);
+    }
+}
+
+/* 0x80416270 (0x40): starts the purchase of catalogue item `itemId`. */
+void purchaseNetworkPoolItem(NetworkWiiMediator* self, s32 itemId)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->purchase(itemId);
+    }
+}
+
+/* 0x804162B0 (0x38): whether the pool's startup finished (0 without a pool). */
+u8 isNetworkPoolConfigRead(NetworkWiiMediator* self)
+{
+    if (getNetworkPool() != NULL) {
+        return getNetworkPool()->isConfigRead();
+    }
+    return 0;
+}
+
+/* 0x804162E8 (0x38): whether the shop is available (0 without a pool). */
+s32 isNetworkPoolShopAvailable(NetworkWiiMediator* self)
+{
+    if (getNetworkPool() != NULL) {
+        return getNetworkPool()->isShopAvailable();
+    }
+    return 0;
+}
+
+/* 0x80416320 (0x50): hands the pool the account's user id and password. */
+void setConnectionPaths(NetworkInstance* connection, const char* userId, const char* password)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->setAccount(userId, password);
+    }
+}
+
+/* 0x80416370 (0x48): the pool's point balance (0 without a pool). */
+s32 getNetworkPoolPointBalance(NetworkWiiMediator* self, struct NetworkErrorInfo* error)
+{
+    if (getNetworkPool() != NULL) {
+        return getNetworkPool()->getPointBalance(error);
+    }
+    return 0;
+}
+
+/* 0x804163B8 (0x38): whether the parental controls restrict the shop (0 without a pool). */
+s32 isNetworkPoolPurchaseRestricted(NetworkWiiMediator* self)
+{
+    if (getNetworkPool() != NULL) {
+        return getNetworkPool()->isPurchaseRestricted();
+    }
+    return 0;
+}
+
+/* 0x804163F0 (0x48): whether the pool bypasses the parental-control check (0 without a pool). */
+u8 isNetworkPoolRestrictionBypassed(NetworkWiiMediator* self, s32 kind)
+{
+    if (getNetworkPool() != NULL) {
+        return getNetworkPool()->isRestrictionBypassed(kind);
+    }
+    return 0;
+}
+
+/* 0x80416438 (0x30): opens the Wii Shop Channel's help page through the pool. */
+void launchNetworkPoolShopHelp(NetworkWiiMediator* self)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->launchShopHelp();
+    }
+}
+
+/* 0x80416468 (0x50): stores the pool's transfer total. */
+void setNetworkPoolTransferTotal(NetworkWiiMediator* self, u64 total)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->setTransferTotal(total);
+    }
+}
+
+/* 0x804164B8 (0x30): clears the pool's transfer total and completes its progress. */
+void finishNetworkPoolTransfer(NetworkWiiMediator* self)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->finishTransfer();
+    }
+}
+
+/* 0x804164E8 (0x50): forwards to the pool's (empty) transfer option. */
+void setNetworkPoolTransferOption(NetworkWiiMediator* self, s32 option, s32 value)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->setTransferOption(option, value);
+    }
+}
+
+/* 0x80416538 (0x40): forwards to the pool's (empty) transfer mode. */
+void setNetworkPoolTransferMode(NetworkWiiMediator* self, s32 mode)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->selectTransferMode(mode);
+    }
+}
+
+/* 0x80416578 (0x30): starts the pool's download operation. */
+void startNetworkPoolDownload(NetworkWiiMediator* self)
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->startDownload();
+    }
+}
+
 }
 
 /* Copies the reflect name (at most 31 characters) into `out` and returns the mediator's own copy. */
@@ -1335,7 +1848,7 @@ s32 isMediatorTermsUpdateFinished(NetworkWiiMediator* self)
 }
 
 /* Whether the terms object reached its update-finished state (11). */
-u32 isTermsUpdateFinished(PatTerms* terms)
+bool isTermsUpdateFinished(PatTerms* terms)
 {
     return terms->state_0x0C == 11;
 }
@@ -1456,6 +1969,19 @@ void NetworkWiiMediator::clearTransferQueue(s8 slot)
     transfer_timer[slot] = 0;
 }
 
+/* 0x80416DB0 (0x88): reads up to `size` bytes of voice samples from the terms object while the transfer mode is on
+ * and the +0x6DD1 flag is clear; 0 otherwise. */
+s32 NetworkWiiMediator::readVoice(u8* out, s32 size)
+{
+    if (transfer_mode != 0 && getPatTerms() != NULL) {
+        if (getTransferFlag6DD1()) {
+            return 0;
+        }
+        return readPatTermsVoice(getPatTerms(), out, size);
+    }
+    return 0;
+}
+
 /* Appends one record (a u16 length, then the bytes) to the slot's queue, restarting a full queue;
  * returns the bytes taken, or 0 for a bad slot or an empty record. */
 s32 NetworkWiiMediator::pushTransferRecord(s8 slot, const u8* data, s32 size)
@@ -1526,12 +2052,82 @@ s32 NetworkWiiMediator::popTransferRecord(s8 slot, u8* out, s32 max)
     return length;
 }
 
+/* 0x80417080 (0x58): writes `size` bytes of voice samples to the terms object; 0 without one. */
+s32 NetworkWiiMediator::writeVoice(const s16* samples, s32 size)
+{
+    if (getPatTerms() != NULL) {
+        return writePatTermsVoice(getPatTerms(), samples, size);
+    }
+    return 0;
+}
+
+/* 0x804170D8 (0xA8): DSP-ADPCM encodes `size` bytes of 8 kHz samples into `out`; returns the encoded size (8 bytes
+ * per started 14-sample frame). */
+s32 NetworkWiiMediator::encodeVoice(u8* out, const s16* samples, s32 size)
+{
+    u8 info[0x60];
+    u8 work[0x2F0];
+    s32 count;
+
+    count = encodeAdpcmSamples(samples, size / 2, 8000, 0, 0, out, info, work);
+    if (count % 14 != 0) {
+        count = (count / 14 + 1) * 14;
+    }
+    return count * 8 / 14;
+}
+
+/* 0x80417180 (0x24): the encoded size of `size` bytes of samples; 0 for a negative size. */
+s32 NetworkWiiMediator::getEncodedVoiceSize(s32 size)
+{
+    if (size < 0) {
+        return 0;
+    }
+    return getBytesForAdpcmSamples(size / 2);
+}
+
+/* 0x804171A4 (0x88): whether `size` bytes of samples average below the silence floor (64 per sample). */
+s32 NetworkWiiMediator::isVoiceSilent(const s16* samples, s32 size)
+{
+    const s16* sample;
+    s32 count;
+    s32 sum;
+    s32 i;
+
+    count = size / 2;
+    sum = 0;
+    i = 0;
+    sample = samples;
+    for (; i < count; i++) {
+        sum += labs(*sample);
+        sample++;
+    }
+    return sum <= count * 64;
+}
+
+/* 0x8041722C (0x68): runs the terms object's echo suppressor over `size` bytes; 0 without one. */
+s32 NetworkWiiMediator::suppressVoiceEcho(const u8* in, u8* out, s32 size)
+{
+    if (getPatTerms() != NULL) {
+        return suppressPatTermsEcho(getPatTerms(), in, out, size);
+    }
+    return 0;
+}
+
+/* 0x80417294 (0x38): whether the terms object's update finished; 0 without one. */
+u32 NetworkWiiMediator::isVoiceReady()
+{
+    if (getPatTerms() != NULL) {
+        return isTermsUpdateFinished(getPatTerms());
+    }
+    return 0;
+}
+
 void setMediatorTransferFlag6DD1(NetworkWiiMediator* self, u8 flag)
 {
     self->transfer_flag_6DD1 = flag;
 }
 
-u8 NetworkWiiMediator::getTransferFlag6DD1()
+BOOL NetworkWiiMediator::getTransferFlag6DD1()
 {
     return transfer_flag_6DD1;
 }
