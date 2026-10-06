@@ -1,54 +1,14 @@
 /*
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/symbols/dumpmap.py - `zz_0229ecc_` at 0x80229ECC - and config/RMHE08/symbols.txt: every callee
- * that is not a C++ mangling is a bare `fn_` placeholder with no signature)
- *
  * Pl/fn_80229ECC.cpp - the player actor's per-motion SE / effect request dispatch.
- *
- * `.text` 0x80229ECC-0x80230FBC (0x70F0 B, one function), extab 0x80011C7C-0x80011C84 (large frame,
- * saved r28-r31), extabindex 0x8002E9A4-0x8002E9B0, and the compiler-emitted 635-entry jump table
- * `.data` 0x805C15A8-0x805C1F94 (0x9EC B) - all four ranges are registered in splits.txt.
- *
- * The body gates on `event_demo_ck() == 1`, `self->field_0x001 == 0` and
- * `PlayMode_ck() == 3 && fn_8026FD94(self) == 0`, then takes the actor's two `_se_w` works
- * (`field_0xAF4` -> `se_work_a`, `field_0xAF8` -> `se_work_b`) and the carve value
- * `v = fn_8027D050(self)`, falling back to `self->field_0x5A7` when that is 0.  It switches on
- * `(u16)Get_motion_no(self)` (0..0x27A, 635 values): 250 distinct bodies issue
- * `se_req_frame_set` / `fn_800DA428` / `fn_80229E10` / `fn_80229EA8` requests and `SE_Code_Make`
- * lookups against those two works, and two motions call
- * `fn_80244E88(&self->field_0xAF4, (u8)v, motion, self->field_0x002)`.  The remaining 385 case values
- * are empty and fall straight to the shared epilogue; a case body that repeats an earlier one is a
- * **second label on the same body** (MWCC emits one copy per distinct body, and the target's jump
- * table points every such value at it), which is why this file writes those labels as one group.
- *
- * Module (docs/plan.md 6.5 naming, the brief's evidence order):
- *   1. no `__FILE__` string - every `lbl_` referenced by every function in the 0x801ECA00-0x8026BA1C
- *      gap was resolved and read out of the DOL, and none holds a `.c`/`.cpp` name;
- *   2. no runtime-dump name - `dumpmap.py lookup 0x80229ECC` answers `zz_0229ecc_`;
- *   3. the class-3 evidence is conclusive for the module: the parameter is `_PLW*`
- *      (`Get_motion_no__FP4_PLW`), and two of the unnamed callees sit *inside* registered Pl ranges
- *      (`fn_8026FD94` in `pl_master`'s, `fn_8027D050` in `pl_act`'s), so this is the `Pl` lib.  The
- *      bracket test is silent (lobby below, Pl above), and the orchestrator confirmed `Pl`.
- *   Class 4 for the file name: nothing names it, so it keeps the map's `fn_80229ECC` stem.
- *
- * Language: C++ (high).  `PlayMode_ck__Fv`, `event_demo_ck__Fv`, `Get_motion_no__FP4_PLW`,
- * `se_req_frame_set__FP5_se_wllll` and `SE_Code_Make__Flsls` are manglings; the function itself is
- * `extern "C"` because the map spells it `fn_80229ECC` (unmangled) - a C++ definition would mangle it
- * to `fn_80229ECC__FP4_PLW` and pair nothing (playbook 42/48).
- *
- * Flags: the unit's `cflags_pl` exactly (`Wii/1.0`, `-O3 -inline noauto -opt nopeephole
- * -Cpp_exceptions on`) - no per-unit deviation, no pragma.
- *
- * Residual: **none**.  `build/RMHE08/report.json` reports 100.000000 fuzzy, 28912/28912 `.text` bytes,
- * 2560/2560 data bytes (`.data` 2540 + extab 8 + extabindex 12; every section 100.0), 1/1 functions.
- * The object is byte-identical to the target, so the unit is a flip candidate.
- *
- * Declaration homes (rule 2): the four foreign symbols a registered unit owns live in that unit's
- * header (`Pl/pl_act.h`, `Pl/pl_master.h`, `sound/fn_800D7F54.h`, `ef/fn_800CDB2C.h`); the five with
- * no owner live in the unsplit band (`unsplit/Pl.h`, `unsplit/unknown.h` for `Get_motion_no`).  Two
- * `_PLW` fields are named here for the first time - `field_0xAF4` / `field_0xAF8` (the actor's two
- * `_se_w` works) - added to `pl.h`; `pad_0x001`, `unk2` and `unk5A7` there were renamed to
- * `field_0x001`, `field_0x002` and `field_0x5A7` because this unit reads all three (rule 5).
+ * RANGE. .text 0x80229ECC-0x80230FBC (1 function); .data 0x805C15A8-0x805C1F94 (the compiler-emitted 635-entry jump
+ *   table), extab, extabindex.
+ * NAMES. The function keeps the map's stem (no `__FILE__` string covers the band; the runtime dump answers a
+ *   placeholder) and is `extern "C"`, because the map spells it unmangled: playbook 42's workaround, which playbook 48
+ *   says to replace with a map rename to the mangled name.
+ * RESIDUALS. none.
+ * SHAPES. The switch on `(u16)Get_motion_no(self)` covers 635 values with 250 distinct bodies: a case whose body
+ *   repeats an earlier one is a second label on that body (MWCC emits one copy per distinct body and the target's
+ *   table points every such value at it), and the 385 empty values are one label group on the shared epilogue.
  */
 
 #include "types.h"

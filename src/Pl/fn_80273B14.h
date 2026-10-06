@@ -1,7 +1,5 @@
-/* The player act-entry/parameter unit `Pl/fn_80273B14.cpp` (`.text` 0x80273B14-0x80276B58).
- *
- * Declarations for the symbols this unit owns that other translation units call (docs/plan.md 6.5
- * rule 2), plus the one global the file reads whose address band names no module.
+/* Declarations of `Pl/pl_act.cpp`'s act-entry section (0x80273B14-0x80276B58) that other code calls, plus the
+ * equipment-slot resolvers that section drives.
  */
 #ifndef MHTRI_PL_FN_80273B14_H
 #define MHTRI_PL_FN_80273B14_H
@@ -72,20 +70,15 @@ void pl_act_gauge_gate(struct _PLW* plw, s16 amount);
 void fn_80276A3C(struct _PLW* plw);
 
 /* 0x802745DC / 0x802748C8 / 0x80274AB8 / 0x80274AEC - the armed-slot and act-kind predicates.
- * `fn_802745DC` returns `u32` (not the pre-merge `u16`): its own body is byte-identical either way,
- * and the landed caller `Pl/fn_8027D684.cpp` only reproduces retail's `mr r0,r3` result copy with
- * the wider return.  The `s16` parameter is narrowed by retail's `extsh`. */
+ * `fn_802745DC` returns `u32`: its own body is byte-identical either way, and its caller `fn_8027D6DC` reproduces
+ * retail's `mr r0,r3` result copy only with the wider return.  The `s16` parameter is narrowed by retail's `extsh`. */
 u32 fn_802745DC(struct _PLW* plw, s16 kind);
 s32 fn_802748C8(void* self);
 s32 fn_80274AB8(struct _PLW* plw);
 s32 fn_80274AEC(u8 kind);
 
-/* The equipment-slot resolvers this unit drives.  They sit inside `Pl/fn_8027D684.cpp`'s range
- * (0x8027D684-0x80288CEC), so they belong to that unit - which has no header of its own yet, so
- * they are declared here, with that unit's own definition signatures, and only this unit sees them
- * (rule 2: the band header must not declare a symbol a registered unit owns, and a second spelling
- * of a name the owner defines is the `illegal function overloading` class).  When
- * `Pl/fn_8027D684.cpp` grows a header these move there. */
+/* The equipment-slot resolvers of `Pl/pl_act.cpp`'s equipment section (0x8027D684-0x802840DC), with their
+ * definitions' signatures. */
 void* fn_8027E344(struct _EQUIP* equip);
 s32 fn_8027E510(void* slot);
 s16 fn_8027E5E4(struct _EQUIP* equip);
@@ -109,7 +102,7 @@ void fn_802754B4(struct _PLW* plw);
 void fn_802754C0(struct _PLW* plw, u8 flag);
 void fn_8027552C(struct _PLW* plw, const char* src);
 
-/* 0x80273ED8 - the single-slot wrapper of the act-kind sum `pl_act.cpp`/`pl_skill.cpp` call. */
+/* 0x80273ED8 - the single-slot wrapper of the act-kind sum the action and skill sections call. */
 s32 fn_80273ED8(struct _PLW* plw, s32 kind, s32 flag);
 
 /* 0x802740F4 / 0x802744A0 / 0x80274748 / 0x80274794 - the armed-value and follow-up stage helpers. */
@@ -136,16 +129,14 @@ u8 fn_80275014(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUIP* equip1, s
 f32 fn_802751B4(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
 
 /* 0x802752C8 / 0x80275394 - the act-id and act-state pair predicates.  `Pl_item_id_usable_ck`'s second
- * argument is never read by its body, but every retail call site passes it (0 in
- * `quest/quest_entry.cpp`, 1 in `enemy/em_pop.cpp`, 2 in `ai/fn_802D44F4.cpp`), so the declaration
- * carries it - the call sites' `li r4,<mode>` is otherwise unrepresentable.  The parameter's NAME
- * is a GUESS: the sites' 0/1/2 are the only evidence for it, and the body's own masks are 1/2/0x10. */
+ * argument is never read by its body, but every retail call site passes it (0 in `quest/quest_entry.cpp`, 1 in
+ * `enemy/em_pop.cpp`, 2 in `ai/fn_802D44F4.cpp`), so the declaration carries it.  The parameter's NAME is a GUESS:
+ * the sites' 0/1/2 are the only evidence for it, and the body's own masks are 1/2/0x10. */
 s32 Pl_item_id_usable_ck(u16 id, s32 mode);
 s32 fn_80275394(struct _PLW* plw);
 
 /* 0x8027403C / 0x8027408C / 0x802740EC / 0x80274174 / 0x80274370 / 0x80274570 / 0x80274584 /
- * 0x80274624 / 0x80274904 / 0x80274988 / 0x80274A04 / 0x80274B5C - the rest of the unit's own
- * entry points, kept here so a later consumer never declares them locally. */
+ * 0x80274624 / 0x80274904 / 0x80274988 / 0x80274A04 / 0x80274B5C - the section's other entry points. */
 u8 fn_8027403C(u16 kind);
 s32 fn_8027408C(struct _PLW* plw);
 void fn_802740EC(struct _PLW* plw);
@@ -161,9 +152,7 @@ s32 fn_80274A04(struct _EQUIP* equip0, struct _EQUIP* equip1, u8 kind);
 s32 fn_80274B5C(struct _PLW* plw, u8 kind, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out);
 
-/* 0x80273B14 - the act-kind delta sum, and the two C++-scope entry points whose map names are
- * manglings (`Pl_critical_get__FP4_PLW`, `Pl_decide_mot_get__FPUsPUs`); a C++ consumer calls these
- * spellings and the front-end mangles them back (rule 9). */
+/* 0x80273B14 - the act-kind delta sum. */
 s32 fn_80273B14(struct _PLW* plw, s32 mode, u8 flag, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out);
 #ifdef __cplusplus

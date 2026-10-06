@@ -1,63 +1,21 @@
 /*
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x80230FBC` -> `zz_0230fbc_`, no runtime name, and
- * `grep -n "^fn_8023" config/RMHE08/symbols.txt` - the four entries are `fn_80230FBC`,
- * `fn_802310D4`, `fn_80233448`, `fn_80234E9C`; every non-mangled callee is a bare `fn_` placeholder)
- *
  * Pl/fn_80230FBC.cpp - the player work's motion-kind dispatch and four of its nine kind banks.
- *
- * `.text` 0x80230FBC-0x802373AC (25584 B): `fn_80230FBC`, the 9-way dispatcher on the kind byte
- * `_PLW`+0x002, then the kind banks for kinds 0-3, each a switch on `Get_motion_no(_PLW*)` over the
- * motion numbers 1002-1271 (270 values).  Registered sections: extab 0x80011C84-0x80011CA4,
- * extabindex 0x8002E9B0-0x8002E9E0, and the compiler-emitted jump tables in
- * `.data` 0x805C1F94-0x805C2C60 (9 + 270 + 270 + 270 entries).
- *
- * Module (evidence order): 1. no `__FILE__` string - the unit's own `.data` pool is nothing but the
- * four jump tables, so the string the discovery pass offered, `enemy_control.cpp` at 0x805A1BB8,
- * cannot be this unit's: the pool order follows the link order, and this unit sits (by its `.data`,
- * 0x805C1F94, between `Pl/fn_80229ECC.cpp`'s 0x805C1F94 end and `Pl/fn_80241558.cpp`'s 0x805C3D20
- * start) after the enemy bands.  2. no runtime-dump name (`zz_0230fbc_`).  3. class 3: the first
- * argument is passed straight to `Get_motion_no` (`Get_motion_no__FP4_PLW`), `_PLW`+0xAF4/+0xAF8/
- * +0xAFC are the player's three `_se_w` works, and the banks call the `Pl` SE/effect helpers, so the
- * module is `Pl`; the file keeps the map's stem (class 4).
- *
- * Language: C++ - the callees are manglings (`Get_motion_no__FP4_PLW`,
- * `se_req_frame_set__FP5_se_wllll`, `SE_Code_Make__Flsls`, `PlayMode_ck__Fv`) and every object in
- * this range carries an extab/extabindex pair, i.e. the Pl lib's `-Cpp_exceptions on`.
- *
- * Flags: none beyond the lib's `cflags_pl` (`Wii/1.0`, `-O3 -inline noauto -opt nopeephole
- * -Cpp_exceptions on`), the same set the sibling Pl switch units measure.
- *
- * Residual: **none**.  Every section of the reconstructed object is byte-identical to the target
- * (`cmp` per section: `.text` 25584 B, `.data` 3276 B, extab 32 B, extabindex 48 B), and objdiff
- * reports 100.00000 for each of the four functions.  The only difference left is a *symbol name*:
- * MWCC emits the four jump tables as anonymous locals (`@211`/`@529`/`@859`/`@1173`) where dtk's
- * analyzer named them `jumptable_805C1F94`/`_805C1FB8`/`_805C23F0`/`_805C2828` in the target; the
- * offsets and every loader reloc against them are the same.
- *
- * Three source shapes are load-bearing, none of them obvious from the code:
- *   1. the three `_se_w` work pointers are *declared* `Part, Main, Frame` but *assigned*
- *      `Part, Frame, Main` - that is the only shape that colours them r31/r29/r30 as retail does;
- *   2. a case body whose target code runs on into the next body is a deliberate source fallthrough
- *      (no `break`): case 1005's body (`0x1a0`) falls into case 1007's (`0x1cc`);
- *   3. the four bodies that arm both `partHi` and a `partHi | 2` value give the `| 2` value its own
- *      variable (`partHi2`) - with the expression written twice MWCC colours the pair the other way
- *      round (r28/r27 against retail's r27/r28, 99.94491 on the function).
- *
- * The case bodies are written in retail's *emission* order, which is not numeric order: the run goes
- * 1002..1111, then 1128, 1131..1135, then 1116..1127 (the table points 1116-1127 past 1135), then
- * 1136 onwards.  The empty case values are one label group, which is how those table entries land on
- * the shared epilogue.
- *
- * `tools/units/flipcheck.py Pl/fn_80230FBC` says READY (4 sections match the claim); the unit is still
- * registered `NonMatching`, and `ninja build/RMHE08/ok` was green with it in that state.  The flip is
- * red for the link's `.data` padding, not the object: MWCC gives this file's `.data` section header an
- * `sh_addralign` of 8 while the claim starts at the 4-mod-8 0x805C1F94, so mwld pads 4 bytes, the four
- * tables land at 0x805C1F98/…+8 and `main.dol` hashes 8D7E9DFC...; setting that *one* field to 4 in a
- * scratch copy of the object (the `.comment` entry left at 8 - the linker does not use it) links to
- * sha1 BF485073... with 0 differing bytes.  Details in `src/Pl/fn_8023C2D0.cpp`'s header.
- * Resolved the same way - `tools/elf/objalign.py` (e242dfecf) plus the flip (6d0cf5705), green; see
- * that header and playbook 55.
+ * RANGE. .text 0x80230FBC-0x802373AC (4 functions): `fn_80230FBC`, the 9-way dispatcher on the kind byte `_PLW`+0x002,
+ *   then the banks for kinds 0-3, each a switch on `Get_motion_no` over the motions 1002-1271; .data
+ *   0x805C1F94-0x805C2C60 (the jump tables, 9 + 270 + 270 + 270 entries), extab, extabindex.  The `.data` claim starts
+ *   at the 4-mod-8 0x805C1F94: `tools/elf/objalign.py` lowers the object's section alignment so it links in place
+ *   (playbook 55).
+ * NAMES. The functions keep the map's stems (no `__FILE__` string covers the band; the runtime dump answers a
+ *   placeholder) and are `extern "C"`.
+ * RESIDUALS. none.  MWCC names the four jump tables as anonymous locals where the target names them
+ *   `jumptable_805C1F94`/`_805C1FB8`/`_805C23F0`/`_805C2828`; offsets and relocations are the same.
+ * SHAPES. The three `_se_w` work pointers are declared `Part, Main, Frame` but assigned `Part, Frame, Main`: the only
+ *   shape that colours them r31/r29/r30 as retail does.
+ *  - case 1005's body falls through into case 1007's (no `break`), as retail's code runs on;
+ *  - the four bodies that arm both `partHi` and `partHi | 2` give the second value its own variable (`partHi2`); the
+ *    expression written twice colours the pair r28/r27 against retail's r27/r28;
+ *  - the case bodies are in retail's emission order, not numeric order: 1002..1111, 1128, 1131..1135, 1116..1127,
+ *    then 1136 on; the empty case values are one label group on the shared epilogue.
  */
 
 #include "types.h"
@@ -74,9 +32,8 @@ extern "C" void fn_802310D4(_PLW* work, u8 part);
 extern "C" void fn_80233448(_PLW* work, u8 part);
 extern "C" void fn_80234E9C(_PLW* work, u8 part);
 
-/* Dispatches on the player's motion-kind byte to the nine per-kind motion banks.  Returns without
- * doing anything during an event demo, outside play mode 3 (unless the master action is running) or
- * for a kind past the last bank. */
+/* Dispatches on the player's motion-kind byte to the nine per-kind banks; does nothing during an event demo,
+ * outside play mode 3 (unless the master action runs) or for a kind past the last bank. */
 extern "C" void fn_80230FBC(_PLW* self)
 {
     u8 part;

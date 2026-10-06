@@ -1,7 +1,15 @@
-/* Pl/player_control.cpp - the player control set
- *
- * `.text` 0x802673A4..0x802693C4, 12 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source.
+/* Pl/player_control.cpp - the player control set: the player count, the per-player work set-up and release, the
+ *   move start-up and the parts' model release.
+ * RANGE. .text 0x802673A4-0x802693C4 (28 functions); .data 0x805C5E58-0x805C5F30, .bss 0x806AB410-0x806AB810, .sdata
+ *   0x80792068-0x80792140, .sbss 0x80794B28-0x80794B30, extab, extabindex.
+ * NAMES. `set_max_player`, `init_player_work`, `player_control_move`, `player_init_data_load`, `player_move_start_ck`,
+ *   `player_move_start`, `player_control_release` and `parts_mdl_release_all` are the runtime dump's names; the file
+ *   name follows them.
+ * RESIDUALS. 16 functions unwritten (objdiff scores them 0) in 5 runs: 0x802673E8-0x80267A78, 0x80267AA0-0x80267C84,
+ *   0x80267D00-0x802681D4, 0x8026837C-0x80268E38, 0x80268E70-0x80269394.  4 partial, none with
+ *   a recorded cause: `player_move_start_ck`..`fn_80268308` (0x802681EC-0x8026837C) and `fn_80268E48`.
+ *  - flipcheck: the object emits no `.bss` (0x400 claimed), `.data` (0xD8), `.sbss` (0x8) or `.sdata` (0xD8); `.text`
+ *    0x2FC, extab 0x10 and extabindex 0x18 against the claims 0x2020, 0x90 and 0xD8; every compared section differs.
  */
 
 #include "types.h"

@@ -1,65 +1,138 @@
 /*
- * Pl/pl_act.cpp - the player actor: the per-frame actor update, the master/skill/item layers and the action state machines.
- *
- * `.text` 0x802693C4..0x802840DC (about 460 functions), `.bss` 0x20 B, `.data` 0x2178 B, `.rodata` 0x40 B, `.sbss` 8 B, `.sdata` 0x48 B,
- * `.sdata2` 0x1D8 B, extab 0x928 B and extabindex 0xD50 B.  Phase 4 fold: the seven registered units
- * `Pl/fn_802693C4`, `Pl/pl_master`, `Pl/fn_8026FFBC`, `Pl/pl_skill`, `Pl/fn_80273B14`, `Pl/pl_act` and `Pl/fn_8027D684` are one TU
- * of the candidate; their bodies are kept below in text order, each under its own former header.
- *
- * Scopes: the seven former units declared some shared callees with different signatures, so each section keeps its own
- * declarations in a namespace (`extern "C"` names stay unmangled; the C++-linkage callees and the types the manglings name stay
- * at global scope, where they are made).  The `_PLW` views of `Pl/pl_master` and `Pl/pl_skill` are merged into `pl.h`'s.
- * Uniting the remaining declarations is the open work of this unit.
- *
- * Flags: `cflags_pl` (the survivor's).  `Pl/pl_skill` was `cflags_pl_skill` (`-opt nopeephole,level=4`), which its section
- * reproduces with `#pragma optimization_level 4`.  `Pl/pl_master` was `Matching` and is demoted to `NonMatching` by the fold.
+ * Pl/pl_act.cpp - the player actor: the part/motion cluster, the master, skill and item layers, the act-entry front
+ *   end, the action state machines and the equipment helpers.
+ * RANGE. .text 0x802693C4-0x802840DC (459 functions); .rodata 0x805706C0-0x80570700, .data 0x805C5F30-0x805C80A8,
+ *   .bss 0x806AB810-0x806AB830, .sdata 0x80792140-0x80792188, .sbss 0x80794B30-0x80794B38, .sdata2
+ *   0x8079A000-0x8079A1D8, extab, extabindex.  Seven sections in address order, each banner-marked: part/motion
+ *   0x802693C4, master 0x8026BA1C, health gate 0x8026FFBC, skill 0x80270018, act entry 0x80273B14, action 0x80276B58,
+ *   equipment 0x8027D684.  Each section keeps its own callee declarations in a namespace (some shared callees are
+ *   declared with different signatures); `extern "C"` names stay unmangled, and the C++-linkage callees and the types
+ *   the manglings name stay at global scope.  Uniting the declarations is open work.
+ *   The left seam is unproven by extabindex: 0x8002F6DC -> 0x8026910C is `Pl/player_control.cpp`'s last record and
+ *   0x8002F6E8 -> 0x802695A4 this unit's first; `fn_80269394` and `fn_802693C4`..`fn_80269508` are frameless, so
+ *   extab cannot place the 0x802693C4 seam.
+ * FLAGS. `cflags_pl` (docs/pl.md).  The skill section is under `#pragma optimization_level 4` (docs/pl.md: level 3
+ *   rematerialises `fn_8027350C`'s base); the file is under `#pragma peephole off` from the act-entry section on.  The
+ *   master section's `#pragma peephole off` runs from `fn_8026BE94` through `fn_8026CBE4` (including `fn_8026BF98`),
+ *   and `off`/`reset` pairs scope `fn_8026F888`, `fn_8026F9A4` and `Pl_act_ck`..`fn_8026FEF0`: recorded as
+ *   load-bearing in six places (they turn the fused record form back into retail's `clrlwi`/`rlwinm`/`and` + `cmpwi`
+ *   pair and keep the byte/short truncations), measured with a flag set without `-opt nopeephole` and not re-measured
+ *   under the lib flag.
+ * NAMES. GUESSes read from each body: `Pl_chr_set_attr_default` 0x8026A224 (`Pl_chr_set_attr` with its last argument
+ *   0), `Pl_motion_end_ck` 0x8026A33C (the model layer's "motion finished" predicate), `Pl_act_set_motion` 0x80275B04
+ *   (arms the act's three status bits from a packed mask), `Pl_act_set_motion_slot` 0x802761B8 (the same hand-off with
+ *   two trailing zeros), `Pl_act_set_step_table` 0x802770E8 (installs the per-act `.data` record at +0x318),
+ *   `Pl_item_id_usable_ck` 0x802752C8 and its parameter `mode` (dead in retail; the call sites pass 0/1/2 against the
+ *   body's 1/2/0x10 masks).
+ * RESIDUALS. 122 functions unwritten (objdiff scores them 0) in 18 runs: 0x802695A4-0x80269998, 0x80269AC4-0x8026A00C,
+ *   0x8026A0D4-0x8026A224, 0x8026A248-0x8026A2BC, 0x8026A3A8-0x8026A4E4, 0x8026A5A4-0x8026A618, 0x8026A738-0x8026BA04,
+ *   0x80274B20-0x80274B5C, 0x8027D7EC-0x8027D874, 0x8027D8A0-0x8027DC64, 0x8027E120-0x8027E1B8, 0x8027E404-0x8027E918,
+ *   0x8027E98C-0x8027EC50, 0x8027ED28-0x8027EE08, 0x8027EE24-0x8027EFB4, 0x8027F008-0x8027FC70, 0x8027FC84-0x8027FF20,
+ *   0x8027FF30-0x802840DC.  Known blockers among them: the rig at 0x80269AC4-0x80269F88 (`new` of 0x1560 bytes) needs
+ *   its 0x90/0x110-byte element types (vtables 0x805BAB58/0x805BAB74); `Pl_chr_set_attr`/0x8026A178/`Pl_chr_setX`
+ *   funnel into `fn_800E12CC`, whose argument order is open; `fn_8027D8A0`, `fn_8027D968`, `fn_8027E5E4` and
+ *   `fn_8027F3CC` carry paired-single / `cror` instructions the front end cannot emit.
+ *  - flipcheck's undefined references: `fn_803B521C` (the map's `quest_flag_80_ck`, declared by `enemy/em_pop.h`;
+ *    call sites in the action section), `fn_803B6078` (the map's `em_work_slot_pair_get`) and `get_ControlType`
+ *    (the map's `get_ControlType__Fl` needs C++ scope).  A rename sweep missed these call sites; the code fix is a
+ *    naming/linkage item for a fixer.
+ *  - 90 functions partial in 51 runs (`sweepcomments.py --unit Pl/pl_act` lists them), including:
+ *  - `fn_80270F50`: the implicit int->float conversion constant rows (compiler-synthesised, playbook 29);
+ *  - `fn_80271BD4`/`fn_80271E0C`: MWCC's `switch` decision tree against retail's three linear `subi`/`cmplwi` range
+ *    tests, and in `fn_80271E0C` the `deco_count` bound retail re-masks from r0; the label-chain shape that rule 8
+ *    removed reproduced more rows (docs/pl.md);
+ *  - `Pl_cat_skill_ck`: MWCC reassociates `(plw + 4) + 0x612` into `plw + 0x616` for every walk tried;
+ *  - `fn_8027350C`: the three call-spanning values are coloured base/`pend`/mask in r24/r25/r26 by retail, mask/base/
+ *    `pend` by ours;
+ *  - `fn_802751B4`: retail saves `f31` through a `psq_st`/`vmrghb` pair (the compiler's own float-save form);
+ *  - `fn_80278144`/`fn_80278310`: the early `(u32)((u8)m - 6) <= 1` exit inlines `li r3,0; b epilogue` (+8 B each)
+ *    where retail shares one block through a label (rule 8; docs/pl.md);
+ *  - `Pl_motion_input_ck`: the case-3/5 failures return inline where retail branches to a shared `return 0`;
+ *  - `fn_8027A57C`: the conformant if/else-if dispatch interleaves the case tests retail lays out `switch`-shaped;
+ *  - `fn_8027885C`: retail's `mr r0,r3; mr r3,self; extsh r4,r0` says `fn_802753E4` returns `s16`; the declaration
+ *    stays wider (`fn_802789EC`/`fn_80278D1C` depend on it) and each of the five `(s16)` call sites costs one row;
+ *  - `fn_8027B0BC`: six `clrlwi r0,r0,24` before the `stb`s into `q + 0x5E1` (a peephole-level residual);
+ *  - `fn_8027BCE0`: a `v`/`id` callee-saved swap; `fn_8027D0D4`: retail gives the jump table r23 and the loop bound
+ *    r30, ours the mirror (playbook 22); `fn_8027C208`: the frame is 0x30 against retail's 0x40 (unused locals);
+ *  - `fn_8027A340`: an extra `li r31,0`/`b` pair where retail shares case 2's block with the guard's edge;
+ *    `Pl_bari_ck`: retail lays the first arm out of line and the second inline, the natural chain is the mirror;
+ *  - `fn_8027DCA8` (`return a || b` shares the `li r3,1` tail), `fn_8027DCE0` (retail merges every `return 0`),
+ *    `fn_8027DE88`/`fn_8027DF38` (retail lays the id-scan loop head after the body), `fn_8027DFE4` (the `case 12`
+ *    equality if-converts to the branchless bool form), `fn_8027DDC4` (written as the negated/nested if-chain; retail
+ *    compares the id signed against 0x41/0x9A where ours is unsigned, and its arm order differs by one `b`);
+ *  - `fn_8027CB1C`: retail re-tests the second byte's range (`li r0,0xff; cmplwi; beq; cmplw; bge`) where ours
+ *    folds it (20 B short); `fn_8027D40C`: the 32-bit scan's two induction variables sit in r5/r6 swapped;
+ *  - `fn_8027CFC0`: two extra `extsh` before its clamp stores (+8 B);
+ *  - `fn_80277FF8`: the `t`-vs-`arg1` test polarity - about a dozen rows around an inlined `li r3,0; blr` (+12 B);
+ *  - the other 63 partial rows have no recorded cause.
+ *  - `fn_8026CC7C` is byte-identical; its switch table relocation goes through MWCC's local `@NNNN` where the target
+ *    names `jumptable_805C5FA0` (same address).  The extab record names agree (`@etb_800126CC` is in both objects).
+ *  - the action and equipment sections are not in `.text` order (`Pl_attack_set_sub` and `fn_80277974`.. sit after
+ *    `fn_8027B0BC`); the object's function order is source order, so the file has to
+ *    be sorted before the unit can link.
+ *  - `.data`: retail has a zero word at 0x805C60A4 between the act-entry section's second switch table and its pick
+ *    table that MWCC does not emit (it puts a zero-initialised variable in `.bss`/`.sdata`), so the pick table sits 4
+ *    bytes early.
+ *  - flipcheck: the object emits no `.bss` (0x20 claimed), `.rodata` (0x40), `.sbss` (0x8) or `.sdata` (0x48);
+ *    `.text` 0x12E5C, `.data` 0x174, `.sdata2` 0x10, extab 0x548 and extabindex 0x7EC against the claims 0x1AD18,
+ *    0x2178, 0x1D8, 0x928 and 0xD50; every compared section differs in bytes.
+ * SHAPES. A `switch` on an unsigned value puts the case blocks out of line with a forward `b` to the default
+ *   (`fn_8027176C`, `fn_80271674`, `fn_80271A18`); `switch (u8)` promotes to a signed `cmpwi` chain.
+ *  - the pool floats are `extern` declarations used as load operands, never definitions (playbook 29), and a multiply
+ *    is written `lbl * value`, the target's `fmuls` operand order;
+ *  - `pl_act_param_tier_ck`: the dead copy chain `classCopy0..2` of `self->field_0x002` plus a separate `weaponClass`
+ *    load fixes MWCC's web order so `value` lands in r4; the load stays `(s16)self->part_tbl_b_0xD4[idx]`, above the
+ *    early-out (docs/pl.md);
+ *  - `fn_8026BF98`/`fn_8026CC7C` take the action state as a local `st` (retail keeps the block base in a callee-saved
+ *    register); `fn_8026BF98`'s `Vec3` loop is `do { } while (p < &vec[16])` (a `for`/`while` adds a guard), it reads
+ *    `st->unk7D` through a `switch` with `default:` first (`cmpwi`, fall-through layout), and it tests the inner
+ *    request bits through `self->unkBC` but the enclosing ones through `st->flagsBC` (the base register shows);
+ *  - `fn_8026CC7C` is the m2c reconstruction: its `1U`/`s32` spellings and `st->flagsB8`/`self->unkCC` base choices
+ *    are load-bearing; `fn_8026CBE4` keeps two unused trailing parameters (its callers pass four);
+ *  - `fn_80271BD4`/`fn_80271E0C` dispatch with `switch ((u32)kind)`: cases 1-5, case 6, then 7-15 as `default`, which
+ *    lays the bodies out in retail's B, C, A order;
+ *  - the record walks index the typed arrays (`rec->skill_id[i]`); `fn_80273044`/`fn_80273228` scan `plw->slot_id`
+ *    with a flat `for (i = 0; i < 24; i++)` (unrolled eight-wide under `mtctr 3`), and `fn_80273228`'s spare-slot scan
+ *    is a `u16*` walk (`p[i * 2]`); `Pl_cat_skill_ck` is a two-iteration loop over a `u16*` walk (`p += 2`);
+ *  - the valid-bit updates in `fn_80273998`/`fn_8027373C`/`fn_802738E8` are compound (`plw->set_valid &= (u16)~mask`);
+ *    the plain assignment adds a `clrlwi` before the `sth`;
+ *  - narrow returns decide where MWCC re-converts: `item_take` and `pl_item_add` return `s16`, `fn_802736A0`'s
+ *    `Get_pl_type__FP6_EQUIPP6_EQUIP` returns `u8`, `fn_802724E8`/`fn_8027252C` take signed-byte `s8*`/`s8` levels;
+ *    `fn_80272D5C` restates `(s16)v` at its second store and compare;
+ *  - `fn_8027252C` declares `tv, tb, ta` in that order (stack slots 0x20/0x18/0x10 and the register order), nests the
+ *    value test `if (v != 0) { if (v > 0) ... } else { zeros }` and swaps tv/tb before ta; `fn_80272B10` indexes
+ *    `plw->slot_id` with `?:` and calls `GetItemData` in each arm; `pl_item_add` skips its second lookup through a
+ *    single-iteration `for (;;)` with `break`, and its `case 4` compares `plw->unk26E` against the first lookup;
+ *  - `fn_80273B14` and `fn_80274B5C` write their case bodies in the order their jump tables point at, not case order;
+ *  - `Pl_net_send` is called through its two-parameter view `PlNetSend2`: retail's call sites pass two arguments to
+ *    the owner's three-parameter function, and a third argument would emit `li r5,X`;
+ *  - an `s16`/`s8` parameter with a compound assignment stores the raw sum and sign-extends only at the compare
+ *    (`fn_80279154`, `fn_80279194`, `fn_8027C89C`, `fn_8027A044`, `fn_80276CE8`, `fn_8027CA48`, `fn_80276E08`,
+ *    `fn_80278674`, `fn_8027D5A4`; playbook 38); `field = field + value` and a temporary extend at the store, and
+ *    `field--` stores raw where `field = field - 1` extends (`fn_8027B0BC`);
+ *  - a 32-bit accumulator that retail sign-extends only at each compare is an `s32` with `b = (s16)(b + N)` on the
+ *    arms that convert and `a -= b` for the difference (`fn_80279490`, `fn_802791FC`, `fn_8027BCE0`);
+ *  - equality on a `u16`/`u8` value pairs as `cmpwi` through a signed local or cast (`s32 id = self->act_no`,
+ *    `(s32)(u8)x`, `(s32)arg0 == N`) and `(u32)` on an `s32` helper gives `cmplwi` (`fn_8027C8B4`, `fn_802789EC`);
+ *  - `x <= N ? 1 : 2` gives retail's `xoris/subfic/addc/subfe/addi` and `x == N ? a : b` its `addi/subfic/nor/srawi`
+ *    (`Get_Shell_bure_type`, `fn_802791FC`, `fn_80279490`); a constant before the index (`lbl + k + idx * 4`) makes
+ *    MWCC form the base first;
+ *  - `extern u8 lbl_80792150;` taken by address gives retail's `@sda21` form where an unsized array gives `lis/addi`;
+ *  - `fn_802784B8`'s first case falls through into a `default:` written between the cases; `fn_8027A57C`'s shared
+ *    tail is the `switch`'s `default:` after the last case; `fn_8027C064` writes its `default:` first;
+ *  - `fn_8027C208` ends in `return 0` with an explicit `default: return 1`, and every refused path is
+ *    `if (!c) return 1; break;` (the `if (c) return 0; return 1;` form if-converts; playbook 34);
+ *  - `fn_8027A340` writes its cases in body address order (0, 4, 2) with the range guard negated and its arms swapped;
+ *  - `fn_8027AF34` keeps the pre-decrement value in an `s16` local and an unreachable `if (v < 0) return;` after the
+ *    store, which reproduces retail's `blelr ... sth ... bltlr`;
+ *  - `pl_pos_blend_start` writes `(f32)(s16)arg1` inline at each division (retail recomputes the conversion);
+ *  - `fn_80278590` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `fn_8027993C` casts its `u16` index to
+ *    `s16` each iteration; `fn_8027C064`'s local declaration order fixes its stack slots; `fn_80277C94` spells its
+ *    constant `-0x1006`; `fn_80279414`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
+ *  - `fn_8027D0D4`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`).
  */
 
-/* ==== absorbed from Pl/fn_802693C4.cpp (0x802693C4..0x8026BA04) ==== */
-/*
- * Pl/fn_802693C4.cpp - the player part/motion cluster (proposal 802693C4).
- *
- * `.text` 0x802693C4-0x8026BA1C (63 functions, 9816 B) and the exception runs the link order places
- * this TU between the two neighbours' - extab 0x80012554-0x8001265C and extabindex
- * 0x8002F6E8-0x8002F808 (the gaps between `Pl/fn_80262940.cpp`'s and `Pl/pl_master.cpp`'s).
- * The range's first record in the unclaimed extabindex run is `fn_802695A4`, so the four functions
- * before it may belong to `Pl/fn_80262940.cpp` instead: the seam is recorded as open on both sides.
- *
- * Home (evidence order): 1. no `__FILE__` string covers the band - the `.data` source-name pool
- * carries none between `enemy_control.cpp` @0x805A1BB8 and `menu_item.cpp` @0x805CDFC8, and this
- * range's own data references are the `.sdata2` float pool, the `.data` tables at
- * 0x805BAB58/0x805BAB74/0x805C0C98/0x805C1584 and 0x805C5F90, and the `.sbss` global at 0x80794B28;
- * 2. `python tools/symbols/dumpmap.py lookup <addr>` answers only `zz_XXXXXXXX_` placeholders for 58
- * of the 63 addresses; 3. the code is the Pl module - every actor parameter is the `_PLW` the
- * sibling units take, the table it walks is `lbl_80794B28` (`_PLGLOBAL`) and the callees are
- * `Pl_chr_set_attr`/`Pl_chr_setX`/`Pl_frame_check`/`Get_motion_no`/`pl_get_joint_wpos`; 4. the stem
- * is the map's `fn_802693C4`.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/symedit.py range 0x802693C4 0x8026BA1C`; 58 of the 63 entries are bare `fn_`
- * placeholders, the other 5 are the manglings this unit defines).
- *
- * Language: C++ - the unit's own symbols carry manglings (`set_com_motion_type__FUc`,
- * `Get_motion_no__FP4_PLW`, `Pl_frame_check__FP4_PLWUlff`, `Pl_chr_setX__FP4_PLWUsll`,
- * `Pl_chr_set_attr__FP4_PLWUsllUl`) and its functions reach class members (`MHchar::get_joint_wpos`).
- *
- * Flags: `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, mw_version Wii/1.0) -
- * the set every sibling Pl unit measures with.
- *
- * Residual (the range is worked in address order; the parts of it without a body yet):
- *   * 0x802695A4 (1012 B) - the equipment-to-part dispatcher: reads `_PLOBJ->group[3][3..5]`, packs
- *     `(type << 24) | value` into the same words and arms `fn_802693C4` per part.
- *   * 0x80269AC4 (788 B) - the player move start-up (`memset(self + 0xB8, 0, 0x84)`, the new rig at
- *     `__nw__FUl(0x1560)`, then the per-part table setup).
- *   * 0x80269DD8 / 0x80269E8C / 0x80269EC8 / 0x80269F04 / 0x80269F88 - the rig's constructor, the two
- *     element constructors (`__construct_array`, vtables 0x805BAB58/0x805BAB74) and its destructor;
- *     they need the two 0x90/0x110-byte element types modelled first.
- *   * 0x8026A0D4 `Pl_chr_set_attr` (164 B) and 0x8026A178 (172 B) / 0x8026A248 `Pl_chr_setX` (116 B):
- *     both funnel into `fn_800E12CC`, whose argument order is still open.
- *   * 0x8026A3A8 / 0x8026A3EC / 0x8026A5A4 / 0x8026A738 / 0x8026A864 / 0x8026A954 / 0x8026AA9C /
- *     0x8026ABB0 / 0x8026AC2C / 0x8026AE04 / 0x8026AE5C / 0x8026AF08 (2604 B) / 0x8026B934 /
- *     0x8026B99C - the motion/act bodies of the range; unwritten.
- */
+/* ==== 0x802693C4-0x8026BA1C: the part/motion cluster ==== */
 
 #include "types.h"
 #include "pl.h"
@@ -203,9 +276,8 @@ u8 fn_802699AC(void)
     return lbl_80794B28->com_motion_type;
 }
 
-/* Clears one player's object record: for every part, a part that is mid-load (state 4 or 5) drops
- * its load request, then the state, the six value words and finally the player's slot byte go to 0
- * (the state and value words to -1). */
+/* Clears one player's object record: a part mid-load (state 4 or 5) drops its load request, then the state and
+ * the six value words go to -1 and the player's slot byte to 0. */
 void fn_802699C8(u8 player)
 {
     _PLGLOBAL* g = lbl_80794B28;
@@ -433,92 +505,13 @@ u32 fn_8026BA04(_PLW* self)
 
 } /* namespace s_802693C4 */
 
-/* ==== absorbed from Pl/pl_master.cpp (0x8026BA1C..0x8026FF20), formerly Matching ==== */
-/*
- * Player master module (Pl_master): the actor-master cluster an earlier session carved out of the auto_*
- * scaffolding. .text 0x8026BA1C-0x8026FFBC (24 functions, 0x45A0 B) with its own exception tables - extab
- * 0x8001265C-0x800126CC, extabindex 0x8002F808-0x8002F8B0.
- *
- * Right edge pinned by the .sdata2 run jump `lbl_8079A02C -> lbl_8079A030`; left edge is the closure edge, and
- * `fn_8026FFBC` (0x8026FFBC-0x80270018) sits on the ambiguous side of that seam and is deliberately left
- * unclaimed rather than guessed in - the reasoning is in configure.py beside the Pl lib entry.
- *
- * It is C++ (the map holds the mangled `Pl_master_ck__FP4_PLW` / `Pl_act_ck__FP4_PLWUcUs`), so the actor type
- * is `_PLW` - that spelling is what the map's mangling encodes - and every unmangled `fn_*` callee is
- * `extern "C"`. The retail object also carries a 14-entry `extab`/`extabindex` pair - one entry per framed
- * function in the range - which `cflags_base`'s `-Cpp_exceptions off` does not emit at all; the probe that
- * reproduces it is in the Flags note below.
- *
- * Flags - measured against `build/RMHE08/obj/Pl/pl_master.o`, per-library for `Pl` (never `cflags_base`).
- * The unit's own `.text` is a one-number check on the flag set: all 24 functions are written and the object's
- * `.text` is 0x45A0 B, which is what the correct flags produce.
- *   * `-O4,p` -> **`-O3`** (playbook 27). Decisive: `.text` 4316 B under `-O4,p` (padding plus extra
- *     instructions) vs 3612 B under `-O3`; and 5 of the 22 functions reach 100 % under `-O4,p`
- *     (`fn_8026BA1C` 83.28, `fn_8026FA6C` 71.44, `fn_8026FB20` 0, `fn_8026FD0C` 75.62, `fn_8026FD94`
- *     86.75, ...) against 18 under `-O3`. `-O4,p` also implies `-func_align 16`, but the retail starts are
- *     only 4/8-byte aligned (.text+0x1254, +0x11c8, +0x3d98).
- *   * `-inline auto` -> **`-inline noauto`** (playbook 28). Decisive: with `-inline auto` the 180-byte
- *     `fn_8026FA6C` is inlined into `fn_8026FB20` (892 B vs the target's 288 B, 0 %); with `-inline noauto`
- *     the retail `bl fn_8026FA6C` is kept (288 B, 100 %). Nothing else in the unit moves.
- *   * `-Cpp_exceptions off` -> **`-Cpp_exceptions on`**. Evidence is the retail object's `extab`/`extabindex`
- *     pair, which `-Cpp_exceptions off` does not emit at all. Turned on, `.text` is unchanged and every
- *     match percent is identical, while the object gains `extab` 96 B / `extabindex` 144 B and each of the
- *     12 entries we can emit carries the same value as the target's entry for the same function
- *     (`fn_8026BA1C` 0x100A, `fn_8026BE94` 0x1008, `fn_8026F7B4` 0x1008, `fn_8026F828`/`fn_8026F888`
- *     0x0808, `fn_8026F9A4`/`fn_8026FA6C`/`fn_8026FC40` 0x2008, `fn_8026FD0C` 0x100A, `fn_8026FD94`/
- *     `Pl_master_ck`/`fn_8026FF20` 0x0808, `fn_8026BF98` 0x200A, `fn_8026CC7C` 0x180A); with all 24 functions
- *     written our `extab` (0x70) / `extabindex` (0xA8) are byte-identical to the target's.
- *   * `#pragma peephole off` is load-bearing in six places - it is what turns MWCC's fused record form back
- *     into retail's `clrlwi`/`rlwinm`/`and` + `cmpwi` pair, and what keeps the byte/short parameter
- *     truncations its peephole deletes: `fn_8026CBE4`+`fn_8026CC70`, `fn_8026F888`, `fn_8026F9A4`,
- *     `Pl_act_ck`+`fn_8026FE98`-`fn_8026FEF0`, `fn_8026BE94`. Each is a scoped `off`/`reset` pair; no other
- *     function in the range needs it.
- *
- * Residual: none. All 24 functions are 100 % and `.text` is byte-identical to the target (0x45A0 B, 0
- * differing bytes).
- *   - `pl_act_param_tier_ck` was the last 9 bytes, and they were a colouring tie-break rather than a code shape.
- *     Retail coalesces the load result with the index-address temp (`add r4,r3,r0; lha r4,212(r4)`, so
- *     `value` r4 and the class temp r5); the natural source - `s16 value = (s16)self->part_tbl_b_0xD4[idx];` before
- *     the early-out, which is the only spelling that puts `level` in r6 - keeps them apart (`lha r5,212(r4)`,
- *     `value` r5 / class temp r4), the exact mirror. ~200 shapes reproduce that mirror: declaration order,
- *     pointer/cast/temp/array spellings, `switch`/`do`/`for`/nested-if early-out forms, bounds and chain
- *     order, named class temporaries, dead statements, all 30 toolchain compilers, and every `-opt` keyword
- *     and `#pragma` (`peephole`, `scheduling`, `optimization_level 0..4`, `opt_lifetimes`, ...) combination.
- *     The lever is the *web list order*: MWCC colours the two webs from the order the IR's copy webs were
- *     born in, so the function carries a three-deep chain of dead copies of `self->field_0x002` (`classCopy0..2`,
- *     all optimised away) and tests a separate `weaponClass` load. That is the only shape tried that lands
- *     `value` in r4 with the same 39 instructions; without the chain the function is retail's mirror.
- *   - The load itself still has to be spelled `(s16)self->part_tbl_b_0xD4[idx]` (the array+cast form is what puts
- *     `level` in r6; the pointer-arithmetic spelling is 15 bytes off), and moving it below the early-out
- *     return puts the 3-instruction load block after the branch - MWCC does not hoist a load across it.
- *   - `fn_8026CC7C` 100 % since the `.data` claim (`.data start:0x805C5FA0 end:0x805C5FC4`, splits.txt) paired
- *     the switch jump table: the section is byte-identical (0x24 B, nine words). The only trace of the old
- *     mismatch is that our reloc reaches the table through the compiler's local symbol (`.data+0`) where the
- *     target names `jumptable_805C5FA0` - same section and offset, so it resolves to the same address.
- *
- * Load-bearing source shapes in the two big dispatchers (everything else there is plain member access):
- *   - both take the action state as a `st = &self->field_0x0B8` local, which is the register retail keeps the whole
- *     block in;
- *   - `fn_8026BF98` opens with a 16-element `Vec3` loop written `do { ... } while (p < &vec[16])`: a
- *     `for`/`while` in the same place makes MWCC emit an extra loop guard, and the array is only ever
- *     initialised (`VEC3_ctor`), never read;
- *   - `fn_8026BF98` reads `st->unk7D` through `switch (st->unk7D) { default: <hold-start>; case 1: <hold-tick>; }`
- *     - MWCC lowers a switch test to `cmpwi` where an `if` on the same `u8` emits `cmplwi`, and the default
- *     arm has to be written first for its body to be laid out as retail's fall-through;
- *   - `fn_8026BF98` reads the two inner request bits as `self->unkBC` (r30-based) while the enclosing test is
- *     `st->flagsBC` (r31-based) - the base register is observable;
- *   - `fn_8026CC7C` is the m2c reconstruction of the target disassembly; its `1U` / `s32` spellings and the
- *     `st->flagsB8` vs `self->unkCC` base choices are load-bearing, so it is deliberately not re-styled;
- *   - `fn_8026CBE4` takes two unused trailing parameters because its retail callers pass four arguments.
- */
+/* ==== 0x8026BA1C-0x8026FFBC: the master layer (the actor's action-state block) ==== */
 
 #include "types.h"
 #include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 typedef nw4r::math::VEC3 Vec3;
-
-/* The actor record `_PLW` is the shared `pl.h` definition (phase 4 fold: this section carried its own partial view). */
 
 /* The actor's 132-byte action-state block, `self + 0xB8`: `fn_8026F7B4`/`fn_8026F828` clear it, the two
  * big dispatchers (`fn_8026BF98`, `fn_8026CC7C`) drive it, and `fn_8026BE94` reads the request word and the
@@ -2350,44 +2343,7 @@ extern "C" s32 fn_8026FF20(_PLW* self)
 
 } /* namespace s_8026BA1C */
 
-/* ==== absorbed from Pl/fn_8026FFBC.cpp (0x8026FFBC) ==== */
-/*
- * The player work's health-ratio gate (`fn_8026FFBC`, .text 0x8026FFBC-0x80270018, ONE function,
- * 92 B) with its own exception tables - extab 0x800126CC-0x800126D4, extabindex
- * 0x8002F8B0-0x8002F8BC.  It sits on the seam between `Pl/pl_master.cpp` and `Pl/pl_skill.cpp` and is
- * registered on its own: both neighbours are registered units whose ranges end/start exactly here.
- *
- * Home is `Pl`: the argument is the player work `_PLW*` - the two callers, both in `Pl/pl_skill.cpp`
- * (0x802701E8, 0x8027060C), pass the same record they hand `Pl_Skill_ck(_PLW*, u16)` and gate the
- * result on `Pl_cat_skill_ck`/`Pl_Skill_ck`.
- *
- * Naming note: the symbol map has only `fn_8026FFBC` for this range and no evidence names it -
- * `dumpmap.py lookup 0x8026FFBC` answers the placeholder `zz_026ffbc_`, the function reads no string
- * (its only data operands are the two `.sdata2` pool words below) and the surrounding pools carry no
- * `__FILE__` name for it.  The behaviour is a ratio test, not a named API of its neighbours' scheme.
- *
- * The `.sdata2` operands are the pooled constants the target object references.  `lbl_8079A02C` is the
- * 0.4f threshold, declared here as an external load operand so the relocation pairs by name: it is the
- * unit's own (private) constant and no other registered unit reads that address.
- *
- * `lbl_8079A008` (0x4330000080000000, the signed int->float magic MWCC synthesises for the two
- * `(f32)(s16)` casts) is a **shared** pool entry and stays unclaimed:
- *   * the address is loaded by 28 `lfd`s in 9 functions of four registered units (`Pl/fn_802693C4.cpp`,
- *     this unit, `Pl/pl_skill.cpp`, `Pl/fn_80273B14.cpp`), and a pool entry is local to its TU - so those
- *     four are fragments of **one** original TU whose pool 0x8079A008 is part of.
- *   * claiming `.sdata2 0x8079A008-0x8079A010` here keeps `main.dol` green while the unit is
- *     `NonMatching`, but the flip cannot link: `undefined: 'lbl_8079A008'`, referenced from
- *     `fn_802751B4` in `fn_80273B14.o` - the linked objects keep the map's global name, our pool entry is
- *     the local `@519`.
- *   * naming the symbol from source is not reachable either: the constant is compiler-synthesised, and
- *     `-pool off`, `-sdata2 0` and `-str reuse` all leave the local 8-byte entry in the object
- *     (measured on this unit's command line).
- *
- * Residual: none in the code - `fn_8026FFBC` is 100.0 % over all 23 rows with the unit's `cflags_pl`.  The
- * unit cannot be flipped until the original TU is one registered unit again (the four fragments above) or
- * the build post-processes the pool entry into the map's global name; the compiler-emitted extab record's
- * name (`@etb_800126CC` in the map) is a relocation-name difference the report metric counts equal.
- */
+/* ==== 0x8026FFBC-0x80270018: the low-health gate ==== */
 
 #include "types.h"
 #include "pl.h"
@@ -2407,135 +2363,9 @@ extern "C" BOOL fn_8026FFBC(_PLW* self)
 
 } /* namespace s_8026FFBC */
 
-/* ==== absorbed from Pl/pl_skill.cpp (0x80270018..0x802739F0), formerly cflags_pl_skill ==== */
+/* ==== 0x80270018-0x80273B14: the skill and item layer (optimization level 4) ==== */
 #include "Pl/pl_act.h"
 #pragma optimization_level 4
-/*
- * Player skill module (Pl_skill): the cluster the previous session split off between pl_master and pl_act.
- * .text 0x80270018-0x80273B14 (50 functions, 0x3AFC B) with its own exception tables - extab
- * 0x800126D4-0x8001280C, extabindex 0x8002F8BC-0x8002FA90.
- *
- * Left edge pinned by the `.sdata2` pool run (`lbl_8079A03C`), right edge by the closure; the reasoning is in
- * configure.py beside the Pl lib entry.
- *
- * C++ (`Pl_Skill_ck__FP4_PLWUs`, `Get_pl_type__FP6_EQUIPP6_EQUIP`), but every symbol the map still calls
- * `fn_XXXXXXXX` is *defined* with `extern "C"` here: an unmangled name is what the target object exports and
- * what objdiff pairs on. The named ones keep their C++ signatures (`Pl_Skill_ck(_PLW*, u16)` and friends).
- *
- * Flags - all four are measured against the target object, none is in configure.py yet (Pl lib entry):
- *   -O3  not `-O4,p`: fn_80270018 is 87.6 % at -O3 and 65.0 % at -O4,p (level 4 = `schedule for gekko`).
- *        Function alignment is 4 (`fn_8027035C` sits at ...35C), so `,p`/func_align 16 is out too.
- *   -opt nopeephole: level 3's constant-merge turns the target's `lis/stw 8(r1); lis/stw 16(r1)` literal
- *        pair into one `lis` + two `stw`, and hoists the `li r0,1 / stb` of each skill branch above the
- *        `addi r31,r31,N`. fn_80270018 87.6 -> 99.7 %, size 832 -> 836 B (target 836).
- *   -inline noauto: fn_80270CA4 must keep its five real `bl fn_80270C64` calls; `auto` inlines them and the
- *        function grows 684 -> 828 B. `-opt noautoinline` is NOT the spelling that works, `-inline noauto` is.
- *   -sdata 0: the target addresses `lobby_w` with lis/addi (ABS16), not `@sda21`. As a flag it now *hurts*:
- *        it fixes Pl_Skill_ck 98.7 -> 100 and Pl_Skill_slot_item_get 97.0 -> 100, but breaks fn_802738B8 100 -> 72.5
- *        and fn_802738D8 100 -> 45.0 (the `lbl_80792140`/`lbl_80792148` byte tables *are* small data in the
- *        target), net -0.12 pt. The two functions are closed in the source instead, by declaring `lobby_w`
- *        as an unsized array (`lobby_w[0]`) so MWCC stops putting it in the small-data area: +0.085 pt,
- *        nothing regresses, no flag touched.
- * With the registered `cflags_base` instead, the same source measures 65.0 / 82.1 / 68.0 / 80.2 / 98.6 / ...
- * and fn_80270F50 0 % (auto-inlining blows it up to 2852 B).
- *
- * Source shapes that are load-bearing (both were found by matching, not guessed):
- *   - A `switch` on an *unsigned* value is what puts the case blocks out of line with a taken `ble`/`beq`
- *     and the default reached by a forward `b` (fn_8027176C, fn_80271674, fn_80271A18); the same chain
- *     written as if/else-if emits the inverted branch and lays the first block inline. `switch (u8)` is not
- *     the same thing - it promotes to a signed switch and emits a `cmpwi` chain.
- *   - The equipment-slot lookups index a 4-byte `_SLOTENT` table at 0x278 with `(slot & 0x7F) + 26` for the
- *     spare-slot half, and the `(u8)slot` re-mask on each use is what the target does.
- *   - The literal-pool floats are `extern` declarations used as load operands, never definitions: the 21
- *     plain-float pool entries are named `lbl_8079A0xx` and the multiply is written `lbl * value`, which is
- *     the operand order the target's `fmuls` rows have. Only the two implicit int->float magics are left.
- *
- * Residuals (all measured with the four flags above; a function not listed is 100 %):
- *   fn_80270018 99.88 fn_8027035C 99.87 fn_802703F4 99.88 fn_80270728 99.71 fn_80270CA4 99.71
- *   fn_80270F50 99.92 fn_802739F0 99.93 - only the two implicit int->float magic rows differ (0x8079A008
- *     `(f32)(s32)` and 0x8079A048 `(f32)(u32)`). MWCC synthesises those for a cast, so they cannot be named
- *     from source; the unit's own pool run is 0x8079A030-0x8079A080 (80 B, 19 entries) but the magics live
- *     in the preceding unit's run, outside any contiguous claim.
- *   fn_80271BD4 98.01 / fn_80271E0C 97.46 - the kind dispatch after the rule 8 sweep took the label chain
- *     out (see below). Everything but the dispatch matches; what is left is MWCC's `switch` decision tree
- *     against the target's three linear `subi`/`cmplwi` range tests, and - in fn_80271E0C - the C block's
- *     `deco_count` bound, which the target keeps in r0 and re-masks (`clrlwi r5, r0, 24`) for the `< 3`
- *     test where we reuse the register. The removed label-chain shapes measured 98.59 / 97.97.
- *   fn_8027350C 99.21 - at the unit's level 4 (`cflags_pl_skill` in configure.py) the target's
- *     shape is reproduced exactly,
- *     including the `plw + i*4` base kept in r24 across the fn_802693C4/fn_80269474 call. The residual is
- *     the allocator's colouring of the three call-spanning values: target base/`pend`/mask in r24/r25/r26,
- *     ours mask/base/`pend` in the same three registers, so `add r24, r27, r0` reads `add r25, r27, r0`
- *     and r25/r26 swap. At the unit's level 3 MWCC *rematerialises* the base instead (three instructions,
- *     416 B, 95.50); an explicit `&set_applied[i]`/`&set_pending[i]` pair, a `u16*` walk and a `u8*` base
- *     all measure lower (91.4 / 91.4 / 90.6) because they shift `plw` out of r27.
- *   Pl_cat_skill_ck 99.88 - the two-iteration decoration-slot loop with a `u16*` walk reproduces the
- *     target's `addi r3, r3, 0x4`. The residual is which constant that add carries: target
- *     `addi r3, r3, 4` + `lhz 0x612/0x614(r3)`, ours `addi r3, r3, 0x616` + `lhz 0x0/0x2(r3)`. MWCC
- *     reassociates `(plw + 4) + 0x612` into `plw + 0x616` for every shape tried (`_PLW*`, `u16*`, `u8*`
- *     and pair-struct walks, an index form, a nested 2x2 loop, a pointer-bounded `while`, a straight-line
- *     two-block body, a `u32*` walk, a two-arm `||`), so the target's split of the two constants is not
- *     reachable from source here; the folded form measures 95.75.
- *
- * Source shapes that are load-bearing, not guesses (the ones below were all found by measuring):
- *   - fn_80271BD4 / fn_80271E0C's kind dispatch is `switch ((u32)kind)` with cases 1-5 (block B), 6 (block
- *     C) and the 7-15 range as `default` (block A): MWCC lays the case blocks out in ascending case order,
- *     i.e. the target's B, C, A body order, and reaches each body with a taken branch like the target. The
- *     `default` form is the only one that keeps that order *and* a short tree (98.01 / 97.46); giving A its
- *     own 7-15 range instead measures 97.34, an if/else chain (A inline) 80.56 / 90.34, a `for (;;)` with
- *     `break` 80.56 / 90.34. The old label chain (a `goto` dispatch, banned by rule 8) is the only shape
- *     that reproduces the target exactly (98.59 / 97.97); it is gone. The full shape table is in the batch
- *     outbox (`pl-skill-6109.json`).
- *   - the walk over a record's three skill ids must index the typed array (`rec->skill_id[i]`), not step a
- *     byte pointer: the typed form is what keeps the record in the target's register (r29) and closes the
- *     old `mr r28, r29` placement residual.
- *   - pl_item_add's "skip the second lookup when the spare-slot one resolved" is a single-iteration
- *     `for (;;)` with `break` (rule 8; the label chain it replaces measured the same 100 %).
- *   - fn_80273044 / fn_80273228's 24-entry slot scan has to be a *flat* `for (i = 0; i < 24; i++)` over
- *     `plw->slot_id[i]`, not the nested 3x8: MWCC unrolls the flat form eight-wide under an `mtctr 3` outer
- *     loop (55.84 -> 100 and 97.40 -> 100). fn_80273228's 8-entry `spare_slot_id` scan additionally wants
- *     a `u16*` walk (`p[i * 2]`), which stops MWCC re-basing it with an `addi r3, r28, 0x8`.
- *   - fn_80272D5C's `s16` result has to be re-stated as `(s16)v` at the second store and in the comparison
- *     (and `(u8)(s16)v` at the byte stores) for the target's single `extsh r3, r3` to appear.
- *   - fn_80273998 / fn_8027373C / fn_802738E8's valid-bit updates have to be *compound* assignments
- *     (`plw->set_valid &= (u16)~mask;`), not `plw->set_valid = plw->set_valid & (u16)~mask;`: the plain form
- *     makes MWCC insert a redundant `clrlwi` before the `sth` (90.9 -> 100, 96.6 -> 100, 97.7 -> 100).
- *   - fn_802736A0's `Get_pl_type__FP6_EQUIPP6_EQUIP` return type is `u8`, not `s8` (only its caller here
- *     constrains it): as `s8` MWCC masks the byte with `clrlwi` before the `stb`.
- *   - Pl_cat_skill_ck's decoration-slot pair has to be a two-iteration loop over a `u16*` walk
- *     (`p += 2`), not four straight compares and not `plw = (_PLW*)((u8*)plw + 4)`: the walk is what makes
- *     MWCC emit the target's `addi r3, r3, 0x4` re-base *and* keep its instruction count (79.92 -> 95.75
- *     -> 99.88; `plw += 4` folds the add into the entry displacements and loses the row).
- *   - fn_8027350C needs level 4 (the unit's `-opt nopeephole,level=4`, i.e. `cflags_pl_skill` in
- *     configure.py): at level 3 the allocator rematerialises the `plw + i*4` base for the
- *     `set_applied[i] = set_pending[i]` copy, at level 4 it keeps it in r24 like the target
- *     (95.50 -> 99.21, 416 -> 404 B). The level is per-object, not per-lib: pl_master loses
- *     fn_8026CC70 at level 4 (100 -> 33.33) and is a flipped Matching unit.
- *
- * Other load-bearing shapes, from the earlier pass:
- *   - A helper's narrow return type is *not* trusted sign-extended, so it decides where MWCC re-emits the
- *     conversion: `item_take` must return `s16` (the `(u32)(s16)v` tests then keep their own `extsh` and
- *     the two 8/24-slot call blocks stay separate) and pl_item_add must return `s16` for `return v` to stay
- *     a bare `mr`. fn_802724E8's `a` and 7th parameter are signed-byte typed (`s8*`, `s8 aval`) - as `u8`
- *     it masks the level the target passes raw - and fn_8027252C's third parameter follows it to `s8*`.
- *   - pl_item_add's `case 4` compares `plw->unk26E` against the *first* slot lookup, not the resolved one;
- *     only `case 0` and the 1-3 block use the resolved slot.
- *   - fn_8027252C's locals are declared `tv, tb, ta` - that order fixes both the stack slots (0x20/0x18/
- *     0x10) and the register order (r7/r8/the table pointer/ta). Its value loop has to be
- *     `if (v != 0) { if (v > 0) ... else ... } else { zeros }` so the zero block lands out of line, the
- *     swap has to do tv/tb first and ta in its own block, and the epilogue stores `a[i] = (s8)tv[i]`.
- *   - fn_80272B10's second slot lookup indexes `plw->slot_id` with a `?:` *and* calls GetItemData in each
- *     arm of the if/else; written as one arm the two loads get merged.
- *
- * 6.5 conformance for this batch: `_EQUIP` is a typed 12-byte record (`kind`, `deco_count`, `item_id`,
- * `deco_level`, `skill_id[3]`) and `_SLOTENT`'s fields are `item_id`/`value`, so the converted dispatch
- * functions reach every field by name instead of a byte offset. `fn_80271BD4`/`fn_80271E0C` keep their map
- * names because objdiff pairs on them (the rename belongs in symbols.txt - see the outbox's
- * `config_requests`), and `_PLW`'s skill-selection group (`unk269`, `unk26A`, `unk26E`, `unk270`, `unk304`)
- * stays `unk`: naming it needs evidence from outside this unit.
- *
- * All 50 functions are written in address order (unit fuzzy 99.76 %).
- */
 
 #include "types.h"
 namespace s_80270018 {
@@ -2565,8 +2395,6 @@ extern f32 lbl_8079A078;
 extern f32 lbl_8079A07C;
 }
 
-
-/* `_EQUIP`, `_SLOTENT` and `_PLW` are the shared `pl.h` definitions (phase 4 fold: this section carried its own views). */
 
 extern "C" {
 void equip_record_copy(_EQUIP*, _EQUIP*);
@@ -2903,11 +2731,8 @@ extern "C" void fn_80270CA4(_PLW* plw) {
     fn_80270B98(plw);
 }
 
-/*
- * Swaps the player's nine equipment slots for another set, re-derives every skill field from it, and
- * fills in the skill summary the status screen reads. Passing a null equipment set only fills the
- * summary in.
- */
+/* Swaps the player's nine equipment slots for another set, re-derives every skill field and fills the status
+ * screen's skill summary; a null equipment set only fills the summary. */
 extern "C" void fn_80270F50(_PLW* plw, _EQUIP* equip, u8* out) {
     _EQUIP saved[9];
     int i;
@@ -4065,63 +3890,10 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
 #pragma optimization_level 3
 #pragma peephole off
 
-/* ==== absorbed from Pl/fn_80273B14.cpp (0x80273B14..0x80276A3C) ==== */
+/* ==== 0x80273B14-0x80276B58: the act-entry front end ==== */
 #include "Pl/pl_act_stage_latch_set.h"
 #include "mh3_pad/Psw.h"
 #include "mh3_pad/lb_param_w.h"
-/* The player act-entry/parameter unit, `Pl` band, `.text` 0x80273B14-0x80276B58 (0x3044 B, 68
- * functions).  It sits between `Pl/pl_skill.cpp` (0x80270018-0x80273B14) and `Pl/pl_act.cpp`
- * (0x80276B58-0x8027D684) and is the band's act-selection front end: `pl_act_enter_raw` resets the
- * player work and arms a new act from its flag word, `fn_80275C34` picks the act's entry motion,
- * and the `fn_80274988`/`fn_80274B5C`/`fn_80274E6C`/`fn_80275014`/`fn_802751B4` family sums the
- * weapon/skill bonus records the player's equipment slots point at.
- *
- * Flags: `cflags_pl` (configure.py) - this lib's units were all built with `-O3 -inline noauto
- * -opt nopeephole -Cpp_exceptions on`.
- *
- * Sections: this unit owns `.text` 0x80273B14-0x80276B58, `extab` 0x8001280C-0x8001294C and
- * `extabindex` 0x8002FA90-0x8002FC70.  Both runs are exactly 40 records that bracket the
- * neighbouring units' runs exactly, and every extabindex record's function address (0x80273B14 ..
- * 0x80276A3C) is one of this unit's - read out of the DOL.  The pooled `.sdata2` constants
- * (0x8079A000 / 0x8079A044 / 0x8079A080 / 0x8079A084) are declared, never defined (playbook 29).
- * `.data` 0x805C5FEC-0x805C6100 (276 B: the two switch tables MWCC emits for `fn_80273B14` and
- * `fn_80274B5C`, the two act-number lists and the pick table) is claimed and emitted; retail has a
- * 4-byte zero word between the second table and the pick table (0x805C60A4) that this build does not
- * reproduce - MWCC puts a zero-initialised variable in `.bss`/`.sdata` and 8-aligns the 88-byte table
- * after it (measured: `.data` 280 B with the word forced in, 272 B without, target 276 B) - so the pick
- * table sits 4 bytes early.  The gate's strict data row demanded the claim: this unit's object changed
- * with the shared `pl.h` edit of the `hud/net_char_sync` batch.
- *
- * Residuals (measured per function; see the branch's outbox for the numbers):
- *   * `fn_802751B4` is the one row that does not reach 100 %.  Retail saves/restores `f31` through
- *     a `psq_st`/`vmrghb` pair and converts the weapon record's `+0x0A` `s16` with the int->float
- *     idiom; the source below is the faithful shape, and the residual is the compiler's own
- *     float-save form.
- *   * `fn_80273B14` and `fn_80274B5C` both switch through a compiler-emitted `.data` jump table
- *     (0x805C5FEC, 17 entries, and 0x805C6068, 15 entries).  The case bodies are written in the
- *     order the table's addresses put them in, not in case-value order.
- *   * rule 2 residual, `Pl_net_send`: the address is owned by `src/hud/net_char_sync.cpp`, whose
- *     prototype is three-parameter and right (that unit's definition is 100 % byte-identical), while
- *     retail's Pl call sites must keep the two-parameter view they were built with - so the
- *     declaration is local, with both measurements in the comment on it below.  The prototype family
- *     is cross-TU in retail's own build (two arguments here, three at the owner), so the structural
- *     fix is the owner's header family, not this unit's edit: recorded as a tooling-register request.
- *   * This file stopped compiling because a rule-2 warning was obeyed without checking the call
- *     sites: moving the declaration to the owner's header changed its arity under three call sites
- *     here.  Check the callers first, then move the declaration.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/symedit.py range 0x80273B14 0x80276B58` - 66 of the 68 stems are `fn_`,
- * and the remaining two, `Pl_critical_get__FP4_PLW` and `Pl_decide_mot_get__FPUsPUs`, are the
- * manglings of the two real C++ declarations this file defines).  `dumpmap.py lookup` answers only
- * `zz_0273b14_` placeholders for the whole band and no `__FILE__` string covers it.  `fn_802752C8`
- * is renamed `Pl_item_id_usable_ck` (0x802752C8, 0xCC B, 96.47 %): `quest/quest_entry.cpp` calls
- * it, and a call to a `fn_XXXXXXXX` stem from another unit's new source is a rule-7 finding.  Its
- * second parameter is dead in retail - the body never reads r4 - but every call site passes one
- * (0, 1 and 2), so both the declaration and the definition carry it; re-measuring the whole unit
- * after that change moved no row.  The parameter's name `mode` is a GUESS (the three sites' 0/1/2
- * against the body's own 1/2/0x10 masks) and is marked as one at the declaration.
- */
 #include "types.h"
 #include "hud/Pl_net_send.h"
 #include "pl.h"
@@ -4129,9 +3901,8 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
 #include "Pl/pl_act.h"
 #include "Pl/Pl_master_ck.h"
 #include "Pl/pl_skill.h"
-#include "Pl/fn_802693C4.h"   /* `Pl/fn_802693C4.cpp` owns 0x802693C4-0x8026BA1C, so its
-                          * `Pl_chr_set_attr_default`/`fn_8026A2DC`/`fn_8026A2F8`/`Pl_chr_setX` declarations
-                          * come from the owner's header, not from the band header (rule 2) */
+#include "Pl/fn_802693C4.h"   /* the part/motion section's `Pl_chr_set_attr_default`/`fn_8026A2DC`/
+                          * `fn_8026A2F8`/`Pl_chr_setX` (rule 2) */
 #include "ef/fn_800CDB2C.h"
 #include "unsplit/unknown.h"
 #include "unsplit/Pl.h"
@@ -4144,12 +3915,9 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
 /* 0x8045F554 - the runtime string copy `fn_8027552C` uses to arm a hunter name (owner: `MSL_C/alloc.cpp`, rule 2). */
 #include "MSL_C/alloc.h"
 
-/* 0x80335CE8 - the client-side act-message sender `pl_act_enter_raw`'s tail calls (owner:
- * `src/hud/net_char_sync.cpp`, declared by its leaf header `hud/Pl_net_send.h`).  Retail's own build carried
- * this one address under two prototypes: the owner's definition takes a third `u16 param` and passes it on to
- * the message builders, while this band's call sites pass two arguments (`bl Pl_net_send` is preceded by only
- * `mr r3, r30` and `li r4, X`).  Supplying the third argument would emit a `li r5, X` at all three call
- * sites, so they call the owner's function through its two-parameter view. */
+/* 0x80335CE8 - the act-message sender `pl_act_enter_raw`'s tail calls (owner `hud/net_char_sync.cpp`, leaf header
+ * `hud/Pl_net_send.h`).  The owner takes a third `u16`; this band's call sites pass two arguments (`mr r3, r30;
+ * li r4, X; bl`), so they call it through this two-parameter view. */
 typedef void (*PlNetSend2)(struct _PLW* plw, s32 kind);
 
 /* The three equipment-slot records `fn_8027ECAC`/`fn_8027ED18`/`fn_8027E344` hand back.  Only this
@@ -4222,9 +3990,8 @@ using ::_EQUIP;
 
 /* --- the act-kind dispatchers ----------------------------------------------------------------- */
 
-/* Sums the act-kind deltas of the three equipment slots; `mode` selects the delta column (0/6 and
- * the 7..16 skill tiers) and `flag` the melee/ranged variant.  `fn_80273ED8` and `fn_80274D98` are
- * its thin wrappers. */
+/* Sums the act-kind deltas of the three equipment slots; `mode` selects the delta column (0/6 and the 7..16 skill
+ * tiers), `flag` the melee/ranged variant (`fn_80273ED8`/`fn_80274D98` wrap it). */
 extern "C" s32 fn_80273B14(struct _PLW* plw, s32 mode, u8 flag, struct _EQUIP* equip0, struct _EQUIP* equip1,
                 struct _EQUIP* equip2, s8* out)
 {
@@ -4237,9 +4004,8 @@ extern "C" s32 fn_80273B14(struct _PLW* plw, s32 mode, u8 flag, struct _EQUIP* e
     if (equip0 != NULL) {
         void* slot;
         void* scratch;
-        /* `Pl/fn_8027D684.cpp` (which now owns 0x8027E...E08) defines this as
-         * `void*(_EQUIP*, u32, u32)`, so the two out-pointers are passed as their addresses and the
-         * register result is read back as the `s32` the caller tests. */
+        /* `fn_8027EE08` is defined `void*(_EQUIP*, u32, u32)`, so the two out-pointers are passed as their
+         * addresses and the register result is read back as the `s32` the caller tests. */
         s32 kind = (s32)fn_8027EE08(equip0, (u32)&slot, (u32)&scratch);
 
         if (kind == 1) {
@@ -5817,258 +5583,7 @@ extern "C" void fn_80276A3C(struct _PLW* plw)
 
 } /* namespace s_80273B14 */
 
-/* ==== survivor: Pl/pl_act.cpp (0x80276B58..0x8027D5A4) ==== */
-/*
- * Player action module (Pl_act): the largest of the three Pl clusters. .text 0x80276B58-0x8027D684
- * (115 functions, 0x6B2C B) with its own exception tables - extab 0x8001294C-0x80012B54, extabindex
- * 0x8002FC70-0x8002FF7C.
- *
- * Left edge pinned by the `.sdata2` pool run (`lbl_8079A0AC`), right edge by the closure; the reasoning is in
- * configure.py beside the Pl lib entry.
- *
- * It is C++ (the map holds the mangled `Pl_attack_set_sub__FP4_PLWP9_HIT_DATAP6_HIT_Ws`,
- * `Pl_suimen_ck__FP4_PLW`, `Pl_get_gunner_pos__FP4_PLWPQ34nw4r4math4VEC3l`, ...), so the actor type is
- * `_PLW` - that spelling is what the map's mangling encodes - and every unmangled `fn_*` callee is
- * `extern "C"`.
- *
- * Flags - measured against `build/RMHE08/obj/Pl/pl_act.o`, and **the store needs two changes** (both are a
- * this-unit `cflags_pl_act`, never `cflags_base`):
- *   * `-O4,p` -> **`-O3`**. `-O4,p` implies `-func_align 16`; the retail function starts are packed on 4 B
- *     (+0x23c, +0x588, +0xcbc), which alone rules it out. On the codegen axis `-O4,p` also loses badly:
- *     fn_80276B58 85.9 / fn_80276CE8 84.7 / fn_80276D94 86.1 / fn_80276E08 87.9, against `-O3`'s
- *     97.3 / 90.0 / 96.4 / 89.6 (same source).
- *   * peephole **off** (`-opt nopeephole`, i.e. `-O3 -opt nopeephole`): the retail object carries exactly
- *     one record-form instruction in all 115 functions (`andi. r0,r0,20` at 0xcbc, an `x & 0x20`
- *     truth test from instruction selection), so the peephole's sign/zero-extend compare fusion never
- *     fired in the retail build. With it on, fn_80276B58 = 97.3 / fn_80276CE8 = 90.0 /
- *     fn_80276D94 = 96.4 / fn_80276E08 = 89.6; with it off, 100.0 / 92.7 / 100.0 / 94.0.
- *     `-O4,p -opt nopeephole` is worse still (92.5 / 87.4 / 78.7 / 93.9), so the level is `-O3`.
- *   * `-inline auto` -> **`-inline noauto`** (playbook 28): with `auto` the 46-instruction
- *     `Pl_act_set_step_table` is inlined into all three arms of `fn_802771A0` (57 -> 229 instructions, 0.00 %);
- *     `noauto` puts it back at 100.00 % and moves nothing else. `-inline off` measures identically here,
- *     but `noauto` is the spelling the sibling `main.cpp` needed, so it is the one to commit.
- *   * `-func_align` stays out: `-O3` already packs on 4 B, which is what the retail starts want.
- *   * the s16-parameter convention: retail sign-extends a `s16` parameter at its first use and keeps the
- *     *raw* register live, which MWCC only does when the parameter is declared `s32` and cast to `s16` at
- *     each use (`fn_80276D94`: `s16 arg1` truncates the `+= 150` and costs 96.4 %, `s32 arg1` + `(s16)`
- *     casts is byte-identical). The unmangled `fn_*` symbols are free to be declared this way, but a
- *     callee's *declaration* has to match its definition's type, so the shared `fn_80276CE8` is declared
- *     `s32` and its call sites cast explicitly.
- *
- * Residual (work in progress - the functions below 100 %, each measured with the flags above, i.e.
- * `-O3 -opt nopeephole -inline noauto`):
- *   * the unclaimed `.sdata2` pool (playbook 23): the unit's own run is `0x8079A080-0x8079A114`
- *     (35 labels - `A080`-`A0B8`, with the two int->float magics as f64s at `A0A0` and `A0B8`, then
- *     `A0C0`-`A110`). All of them are `extern`-declared and used as load operands (`A0C0`, `A0D4`,
- *     `A0D8`, `A0F8` came in with the last bodies), so the `.sdata2` rows pair by name. Three entries
- *     are *shared*: `A080`, `A084` and `A088` are also loaded by `pl_act_enter_raw` / `fn_8027633C` (the
- *     unsplit run before the unit) and `fn_8027D968` (after it), so no contiguous claim can make those
- *     three private - the claim has to leave them global. The only pool-*address* mismatch left is
- *     `.sdata` `lbl_80792150` (`.sdata 0x80792150-0x80792158`), which needs the claim plus the scalar
- *     declaration noted below.
- *   * a byte/short local that accumulates in 32 bits and is sign-extended only where it is *compared*:
- *     retail emits the `extsb`/`extsh` at the compare, not at the assignment. Write `s32 v = *(u8*)...`
- *     and cast at each comparison (`(s8)v <= n`); declaring the local `s8`/`s16` makes MWCC convert at the
- *     assignment instead and shifts the whole function (791FC, 79490, Get_Shell_bure_type, B0BC).
- *   * storing an int into a `u8` field: MWCC inserts a redundant `clrlwi r0,r0,24` where retail's `stb`
- *     truncates. The compound operators (`++`, `--`, `+=`, `-=`) on the lvalue avoid it in some arms only,
- *     so B0BC keeps a residual `clrlwi` on the two `w +- 40` clamp stores.
- *   * the `x > N ? 2 : 1` threshold idiom - **resolved this pass**: the branchless form MWCC picks is
- *     decided by which side of the comparison is written first. `x > N ? 2 : 1` gives the unsigned-bool
- *     form (`xori/srawi/srwi/...`), the negated `x <= N ? 1 : 2` gives retail's
- *     `xoris; subfic; addc; subfe; addi 2`, and the equality form `x == N ? a : b` gives retail's
- *     `addi/subfic/nor/srawi` (Get_Shell_bure_type 90.2 -> 96.7, 791FC 86.8 -> 90.8, 79490 94.2 -> 97.5).
- *   * array base/index order for an offset access - **resolved this pass**: `*(u8*)(lbl + idx * 4 + k)`
- *     makes MWCC compute the index first and fold the base into a scratch register; moving the constant
- *     *before* the index (`*(u8*)(lbl + k + idx * 4)`) makes it compute the base (`lis/addi`) first and
- *     then `add r3,r3,r0`, which is retail (Get_Shell_bure_type 90.2 -> 93.6, 791FC).
- *   * `!= 0` on a `u8` load pairs as `cmpwi` only through a `(s32)` cast (78D1C, B918, B0BC).
- *   * an `if`/`else if` chain whose arm bodies MWCC lays out in reverse has to be written as m2c's
- *     negated/nested form (`>`, `!=`, with the bodies as the `else` arms); the natural `<=` chain flips
- *     the branch polarity and costs a row per arm (78D1C's three-way action-id test).
- *   * D0D4 is size- and instruction-exact with a *different callee-saved numbering only*: retail gives the
- *     switch jump table `r23` and the loop bound `r30`, our allocator inverts that (playbook 22). Its 15-case
- *     `switch` is a jump table (`jumptable_805C61F8`) and one arm assigns the loop counter (`i = 5`) - both
- *     load-bearing.
- *   * 7885C: `(s16)fn_802753E4(...)` - retail's `mr r0,r3; mr r3,self; extsh r4,r0` says the shared helper
- *     returns `s16`, but changing that declaration would disturb 789EC/78D1C, so the cast stays and each of
- *     the five call sites costs one row.
- *   * B358/C89C-family: `quest_element_remaining_get`/`Pl_item_timer_get`/`fn_803B31E0` take/return `s32` (not `s16`/`s8`) - the
- *     missing `extsb` at the call site is the tell; and an `s8` field assigned from an `s32` local needs the
- *     field typed `s8` so `stb` keeps retail's `extsb`.
- *   * `int -> s16`/`s8` store conversion (A044, CA48, 76CE8, 76E08): retail stores the *raw* int sum
- *     (`add r5,r0,r4; sth r5`) and sign-extends only for the compare that follows (`extsh r0,r5`); our
- *     build materialises the s16 value at the store and reuses it. A compound assignment stores raw only
- *     when the RHS is already the field's type (`+= (s8)arg1`) or the operator is `--`/`++`; with a wider
- *     RHS MWCC inserts the conversion. Eight source shapes per function gave the same or an extra row.
- *   * a dead second test whose condition register retail reuses (AF34): keeping the pre-decrement value
- *     in an `s16` local and writing an unreachable `if (v < 0) return;` after the store reproduces
- *     `blelr ... sth ... bltlr` exactly, and is load-bearing - do not "clean it up".
- *   * load-before-pointer-formation (79414, Get_Shell_rate_adj): retail does `lbz r0,0x1e8(r30)` before
- *     `addi r3,r30,0x1e8`, ours forms the pointer first. Two shapes tried (field vs offset cast, a local
- *     for the byte) do not move it.
- *   * boolean-chain layout (7BC48, 784B8, CB1C, D40C): the `||`/`&&` short-circuit blocks, and the two
- *     induction variables of the 32-bit scan, come out in different registers/order; codes are equivalent
- *     but the rows do not pair. 7CFC0 additionally gets two extra `extsh` before its clamp stores.
- *   * `mulli` vs the shift/subf/shift form of `* 14` (78590): MWCC folds `* 7 * 2` before strength
- *     reduction, so the three-instruction form cannot be recovered from a constant product.
- *   * A57C (1668 B): the body (the flag reads, the `get_cfg` swaps, the `lbl_805C6118`
- *     interpolation loop, the per-motion write-back) is instruction-for-instruction, but the two shared
- *     tails were reached through labels until the conformance pass below; see its note for the residual.
- *   * `Pl_zanzo_set` and C89C/A044 read `Get_motion_no` as `s16`: the shared declaration has to stay `s16`
- *     (a `u16` return drops Pl_zanzo_set from 100 to 94.2), so A57C casts at its own call site.
- *
- * Conformance pass (worker `pl-act-09c6`, rule 8: no label as a control-flow device). Four
- * functions carried one - 78144/78310 (their own `ret0`/`ret1` labels), BC48 (`ret1`/`ret0`) and A57C
- * (`block_16`/`block_53`/`block_75`). Every conformant shape is a deliberate approximation of retail's
- * flow, because retail's own source clearly used labels; each was measured against a set of alternatives
- * and the best kept (the numbers are this pass's, `-` = that function's own percent):
- *   * BC48 100 -> 99.24: `do { ... } while (0)` around the whole dispatch. The `(u32)(x - 6) <= 2` test
- *     `break`s out of the loop (a single `ble` into the shared `return 1`, exactly retail's row) and the
- *     case-3/5 failures `return 0` inline. Retail instead branches *to* a shared `return 0`, so those two
- *     arms keep their polarity inverted (2 rows, 152 B either way). Alternatives measured: plain returns
- *     94.47, `switch` case-group 93.68, one result variable 63.6, inline `return 1` per arm 94.47.
- *   * 78144 100 -> 97.74, 78310 100 -> 97.38: the outer `if (m != 9) ... else` becomes a `switch (m)` whose
- *     `default:` (the m != 9 body) is written FIRST and whose `case 9:` is last, which keeps the bodies in
- *     retail's address order and lets the two labelled exits disappear. The residual is the early
- *     `(u32)((u8)m - 6) <= 1` exit: retail reaches it with one `ble` into the block `case 10:` also uses,
- *     and two separate `return 0;` statements cannot share a block without the label, so ours inlines the
- *     `li r3,0; b epilogue` pair (+8 B each). Alternatives measured: compound `||` condition 84.7,
- *     `for (;;)`/`break` dispatch 87.0, shared result variable 67.5.
- *   * A57C 99.96 -> 97.63: the outer dispatch is a `for (;;)` whose `break` carries every "skip the body"
- *     case (retail's `bne 3b40`/`beq 3fc0` edges come out as the same edges), and the body's `block_53` /
- *     `block_75` jumps are gone because the case-0/2 arms now hoist `mag = 5` above their flag-sum test and
- *     `if (mag == 0)` selects the pad scan - `mag` is the discriminator, so no extra live variable is
- *     needed. Same instruction count (417), ~126 rows differ: retail's own dispatch is `switch`-shaped
- *     (`cmpwi 0; beq; cmpwi 2; beq; b body`) where the conformant if/else-if form makes MWCC interleave the
- *     case tests. Alternatives measured: compound `||` dispatch 96.02, extra `skip_scan` variable 96.25,
- *     `mag = 1` marker 97.46, dropping the flag-sum test 94.30.
- *
- * Written so far: all 115 bodies. This pass added the last 13, biggest first: C208 (1684, 93.9),
- * 79C20 (668, 94.3), 7993C (584, 95.4), AC2C (508, 95.4), 77974 (464, 97.2), A340 (428, 94.2),
- * C064 (420, 97.9), 78674 (416, 97.0), 78144 (372, 82.6), 77FF8 (332, 93.5), 79EBC (324, 100.0),
- * 78310 (320, 82.9), 77DAC (276, 97.1); unit fuzzy 70.4 -> 93.8 %, matched bytes 9316 -> 9640,
- * 70 of 115 functions byte-exact, none unwritten. The three source shapes that did most of that, in
- * order of payoff:
- *   * a `switch` whose case bodies end in `return 1` gets folded to a branchless bool; writing `break`
- *     and one `return 1` after the switch restores retail's branchy shared tail (77FF8 72.5 -> 93.5,
- *     78144 66.7 -> 82.6, 78310 66.7 -> 82.9, C208 86.8 -> 93.9).
- *   * an equality on a `u8` lvalue compiles as `cmplwi`; `(s32)(u8)x` compiles as retail's `cmpwi`
- *     (78310 82.2 -> 82.9, and the same rows in 77FF8/78144/C064).
- *   * a small dense `switch` whose *default* body retail emits first means the source's `default:`
- *     (or its highest case) is written first, with the low case bodies after it (C064 71.5 -> 97.9).
- *   * `extern u8 lbl_80792150;` + `&lbl_80792150` gives retail's `li r3, X@sda21` address form where
- *     `extern u8 lbl_80792150[]` gave `lis/addi` (Get_Shell_bure_type 78.6 -> 79.9).
- *
- * This pass (worker `pl-act-09c6`) took the unit 93.73 -> 97.61 % (matched 25714 -> 26780 B; 73 of the 115
- * functions byte-exact) and closed all five symbols below the 80 % bar. The shapes that did it, in order
- * of payoff:
- *   * a sparse `switch` whose first case *falls through into `default:`*: retail's `cmpwi; beq A; cmpwi; beq A;
- *     cmpwi 9; beq B; b default` with A out of line and A's failure falling into `default` is
- *     `switch (m) { case 6: case 17: <body> (falls through) default: ...; case 9: ... }` - `default`
- *     written *between* the cases so the bodies land in address order (784B8 66.6 -> 100.0).
- *   * a big `if` whose failing edge falls into the *next* arm's body: move the shared tail out of the `else`
- *     of the first arm and make it the `switch`'s `default:` after the last case (A57C 66.0 -> 96.0; its
- *     only residual is the two implicit int->float magics, which cannot be named from source - playbook 29).
- *   * a `return` block MWCC refuses to merge: 78144/78310 needed a shared `ret0`/`ret1` label (95.6 -> 100.0,
- *     94.9 -> 100.0) and BC48 a shared `ret1` (94.5 -> 100.0). Rule 8 removed the label again
- *     in the conformance pass below, which records what replaced it and what that cost.
- *   * `(s32)arg0 == N` for a `u8` parameter gives retail's `cmpwi` where `arg0 == N` gives `cmplwi`
- *     (78144, 78310).
- *   * an accumulator retail keeps in 32 bits and sign-extends only at each *compare*: declare it `s32`, write
- *     the widening adds as `b = (s16)(b + N)` on exactly the arms that need the conversion, and let the final
- *     difference reuse the minuend's register by writing `a -= b` on an `s32 a` (79490, 791FC 97.8 -> 100.0,
- *     BCE0 85.3 -> 93.4).
- *   * `n = (f32)(s16)arg1` hoisted into a local is wrong: retail recomputes the int->float magic at every
- *     use, so the conversion has to be written inline at each division (AE28 74.6 -> 99.9, frame 32 -> 48 B).
- *   * the 24-entry `{u16 id; s16 count}` table at 0x278 has to be a *typed array field*, not
- *     `*(u16*)((u8*)self + 0x278 + i * 4)`: the field form gives retail's `lhz r4,632(r3)` displacement loads
- *     and drops the two pointer-materialising `addi`s (BCE0).
- *
- * Round 2 (worker `pl-act-09c6`, same 73 byte-exact functions): 97.42 -> 97.87 %, three functions moved,
- * no flag change. The shapes that did it:
- *   * C208 93.9 -> 99.97 (`.text` now the target's exact 1684 B): retail's switch ends in `return 0` with an
- *     explicit `default: return 1`, and every "not allowed" path is a `break` - so retail shares *one*
- *     `li r3,0` at the function's end and inlines the `li r3,1`s, where the old `return 1`-after-the-switch /
- *     `return 0`-per-case form did the opposite (16 extra instructions). A case body written
- *     `if (c) return 0; break;` has to become its negation, `if (!c) return 1; break;`, because
- *     `if (c) return 0; return 1;` makes MWCC if-convert the two constant arms into a branchless bool.
- *     Its only residual is the frame: 0x30 against retail's 0x40, i.e. 16 B of locals the function never
- *     touches - the target has no stack access we do not, and MWCC drops unused locals (4 `s32`, a `VEC3`
- *     and an `f64` all measured), so the frame cannot be reached from source.
- *   * A340 94.2 -> 98.1: the `switch`'s cases are written in *body address* order (case 0, case 4, case 2 -
- *     not numeric), and the `(u32)(a - 5) <= 6` guard is negated with its arms swapped
- *     (`if ((u32)(a - 5) > 6U) { switch ... } else { ok = 0; }`) so `ok = 0` lands at the end and the
- *     failing edge branches to it. Residual: 2 rows (an extra `li r31,0`/`b` pair where retail shares
- *     case 2's block with the guard's edge).
- *   * Pl_bari_ck 84.4 -> 86.7: `s32 id = self->act_no;` and `s32 m = (u16)Get_motion_no(self);` - the `u16`
- *     locals made the equality tests `cmplwi` where retail has `cmpwi` (the rule in "Load-bearing source
- *     shapes" below). Residual: retail lays the first arm's body out of line and the second arm's inline
- *     (`ble`/`ble` into the body, then the next arm's tests); the natural `if`/`else if` gives the mirror
- *     image and both rewrites tried (negated `&&` with the arms swapped, two separate `if`s) measured
- *     75.0 and 76.7.
- *
- * Still open in the new bodies: 77FF8 has ~6 rows left in the `t`-vs-`arg1` test polarity; 7885C's five
- * `(s16)fn_802753E4(...)` call sites schedule `extsh r4,r3` before `mr r3,self` where retail copies the
- * result first (`mr r0,r3; mr r3,self; extsh r4,r0`); BCE0 keeps only a `v`/`id` callee-saved swap (retail
- * v=r6/id=r4, ours the mirror); B0BC's six `clrlwi r0,r0,24` in front of the `stb`s into
- * `q + 0x5E1` are a flag-level residual, not source-shaped - the peephole removes them but also turns
- * `extsb`/`clrlwi` + `cmpwi` into record forms retail does not have (whole-function `#pragma peephole on`:
- * 93.95 -> 92.28), and `+= (s8)7`, an `s8` field, a `u8` local and an explicit `(u8)` cast all measured
- * identically.
- *
- * Round 3 (worker `pl-act-09c6`, 80 byte-exact functions): 97.87 -> 98.39 %, seven more functions to 100 %,
- * no flag change. The shapes that did it, in order of payoff:
- *   * an `s16` *parameter* plus a compound assignment is what stores a field raw. With `s32 arg1` and
- *     `field = field + arg1` MWCC materialises the `s16` at the store and reuses it for the following
- *     compare; declaring the parameter `s16` and writing `field += arg1` stores the raw sum and extends only
- *     for the compare (A044 82.2 -> 100, 76CE8 92.7 -> 100, CA48 94.0 -> 100, 76E08 98.0 -> 99.9,
- *     78674 97.0 -> 99.0). The float form is the same: `field += (s16)f` (C8B4 95.6 -> 100, D5A4 96.3 ->
- *     100), and `field -= (s16)v` stores raw where `field -= v` / `field = t` extend at the store (76E08);
- *     `field--` stores raw where `field = field - 1` extends (B0BC 94.0 -> 95.7).
- *   * a byte load followed by pointer formation has to use the *field* form, not the field's address: 79414
- *     93.4 -> 100 and Get_Shell_rate_adj 95.0 -> 99.9 read `((u8*)&self->equipC)[0]`/`(&self->equipC)` where
- *     `*((u8*)self + 488)` made MWCC form the pointer before the load.
- *   * `(u32)` on an `s32`-returning helper turns `cmpwi` into retail's `cmplwi` (`(u32)Pl_master_ck`,
- *     `(u32)fn_802753E4`): C8B4, 789EC.
- *   * a negative 16-bit constant written `-0x1006` gives `li r4,-0x1006` where the unsigned `0xEFFA` needs
- *     `lis/subi` (77C94 94.9 -> 97.1).
- *   * 78590's `* 14`: `(x * 7) << 1` keeps MWCC's strength reduction (`slwi/subf/slwi`) where `x * 7 * 2`
- *     folds to `mulli`, and `v <= t[5] ? 5 : 6` gives the negated branchless form (87.0 -> 99.2).
- *   * a `u16` loop index cast to `s16` per iteration reproduces retail's `extsh` (7993C 95.4 -> 96.2);
- *     local declaration order decides the stack slots (swapping the `VEC3`/buffer pair fixed C064 97.9 ->
- *     98.1).
- *   * two real layout bugs: 789EC stored `fn_802753E4(self, 5)` into `unk449` (0x449) where retail writes
- *     0x44C; and `_MOVE_WORK`'s `unk44F[0x464 - 0x44F]` was mis-sized by one byte, so `unk464`/`unk466`
- *     landed at 0x466/0x468 - renaming it `unk450[0x464 - 0x450]` puts them back at 0x464/0x466 (D0D4).
- *
- * Source-order caveat: the bodies were appended in per-batch address order, not as one address-ordered
- * list, so the file is *not* in `.text` order any more (Pl_attack_set_sub in particular sits in the
- * appended run instead of at its seam). The object's function layout is source order, so the file has to
- * be sorted into address order before this unit can link, even at 100 %.
- * 100 %.
- *
- * Load-bearing source shapes (do not "simplify"):
- *   * an `s16`/`s8` *parameter* (not `s32` + a cast) is what keeps the raw register live for a store while
- *     the comparison still sign-extends at its use (79154, 79194, C89C); with a compound assignment it is
- *     also what makes the store raw (A044, 76CE8, CA48, 76E08, 78674, D5A4).
- *   * a `field += value` / `field -= (s16)value` compound assignment stores raw and sign-extends only at the
- *     compare that follows; `field = field + value` and `s16 t = field + value; field = t;` extend at the
- *     store and cost a row (78674, C8B4, D5A4).
- *   * a `u16` id equality needs a signed local (`s32 id = self->act_no;`) to pair as `cmpwi` rather than
- *     `cmplwi` (A198, C030, 78C7C, 78CD0, A4EC, BCE0); the range tests stay `(u32)(id - lo) <= n`.
- *   * counted loops unroll with `mtctr`: `i < 10` -> by 1, `i < 24` -> by 4 (BCE0), `i < 32` -> by 8 with
- *     `mtctr 4` (D40C).
- *   * one-off field offsets are written as `*(s16*)((u8*)self + N)` (789EC, AF88); the struct only names
- *     fields more than one function touches. The 24-entry `{u16 id; s16 count}` table at 0x278 is named
- *     (`slot_table`, with a `_SLOTENT` entry type) because two functions index it and the field form is what
- *     gives retail's displacement loads; `_SLOTENT` is a copy of `Pl/pl_skill.cpp`'s and the two belong in one
- *     Pl-wide header (see the `_PLW` sharing note in the campaign's `config_requests`).
- *   * the exported helpers are C++ functions so the compiler emits the map's mangled names (Pl_bari_ck,
- *     Pl_condition_ck, Pl_dm_condition_ck, Pl_suimen_ck, Pl_get_gunner_pos/vec, Pl_zanzo_set,
- *     Get_Shell_rate_adj); every `fn_*` callee and the SDK entry points are `extern "C"`.
- *   * MWCC emits `b <callee>` plus a dead `blr` for a void tail call (BE2C).
- */
+/* ==== 0x80276B58-0x8027D684: the action state machines ==== */
 
 #include "types.h"
 #include "enemy/enemy_control.h"
@@ -6077,8 +5592,6 @@ extern "C" void fn_80276A3C(struct _PLW* plw)
 #include "Pl/pl_coll.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 #include "quest/quest_item_slot.h" /* quest_item_work_notify (rule 2: its owner) */
-
-/* `_CP_VECTOR`, `_SLOTENT` and `_PLW` are the shared `ef.h`/`pl.h` definitions (phase 4 fold: this section carried its own views). */
 
 /* The actors this unit calls into; the mangling of the source names reproduces the map's spellings. */
 u32 Pl_Skill_ck(_PLW*, u16);
@@ -6137,12 +5650,9 @@ namespace s_80276B58 {
 
 extern "C" s32 fn_802E5CFC(s32);
 extern "C" u32 isServerSelectState(s32);
-/* 0x80338E04 `lobby/lb_companion_ui.cpp` (the companion/status UI band).  The owner's header cannot be
- * included from this unit - it declares `Pl_cat_skill_ck` returning `void` against this file's `u32`
- * (measured: `(10505) illegal overloading 'Pl_cat_skill_ck(_PLW *, unsigned short)'`), and
- * `unsplit/*.h` may not carry a symbol a registered unit owns (rule 2) - so the declaration is
- * this unit's own view in a linkage block, the shape `enemy/fn_80137604.cpp` uses for the same case.
- * The three-argument signature is this unit's call site; the callee reads r3/r4/r5. */
+/* 0x80338E04 - `lobby/lb_companion_ui.cpp`'s.  Its header declares `Pl_cat_skill_ck` returning `void` against this
+ * file's `u32` (`(10505) illegal overloading`), so the declaration is this unit's view in a linkage block; the
+ * three arguments are this unit's call site (the callee reads r3/r4/r5). */
 extern "C" {
 void lb_entry_handover_send(s32, u8, u8);
 }
@@ -6436,13 +5946,13 @@ u32 Pl_suimen_ck(_PLW* self)
     return 0;
 }
 
-/* 0x8027594C: whether any of the given condition bits is set in the actor's condition word. */
+/* 0x802790B4: whether any of the given condition bits is set in the actor's condition word. */
 u32 Pl_condition_ck(_PLW* self, u32 mask)
 {
     return (self->unk3D8 & mask) != 0;
 }
 
-/* 0x8027594C: whether any of the given bits is set in the actor's damage-condition word. */
+/* 0x802790CC: whether any of the given bits is set in the actor's damage-condition word. */
 u32 Pl_dm_condition_ck(_PLW* self, u32 mask)
 {
     return (self->unk3DC & mask) != 0;
@@ -6631,7 +6141,7 @@ extern "C" s32 fn_8027CF70(_PLW* self)
 } /* namespace s_80276B58 */
 
 
-/* 0x8027CFB4: starts a zanzo (afterimage) trail on the actor's current motion. */
+/* 0x8027CF78: starts a zanzo (afterimage) trail on the actor's current motion. */
 void Pl_zanzo_set(_PLW* self, s32 arg1, u8 arg2)
 {
     self->field_0x662 = (s16)arg1;
@@ -7121,7 +6631,7 @@ extern "C" void pl_act_add_charge(_PLW* self, s32 arg1)
 } /* namespace s_80276B58 */
 
 
-/* 0x8027CE94: the gunner's world-space origin, biased by the charge counter. */
+/* 0x8027CDF0: the gunner's world-space origin, biased by the charge counter. */
 void Pl_get_gunner_vec(_PLW* self, _CP_VECTOR* out)
 {
     using s_80276B58::lbl_8079A088; using s_80276B58::lbl_8079A0D0; using s_80276B58::lbl_8079A0DC; using s_80276B58::lbl_8079A0E4; using s_80276B58::lbl_8079A110;
@@ -7216,7 +6726,7 @@ extern "C" s32 fn_8027D40C(_PLW* self)
     return n;
 }
 
-/* 0x8027CD10: builds the gunner's aim matrix from its rotation and gun position. */
+/* 0x8027CD0C: builds the gunner's aim matrix from its rotation and gun position. */
 extern "C" void fn_8027CD0C(_PLW* self, nw4r::math::MTX34* mtx)
 {
     _CP_VECTOR pos;
@@ -7235,7 +6745,7 @@ extern "C" void fn_8027CD0C(_PLW* self, nw4r::math::MTX34* mtx)
 } /* namespace s_80276B58 */
 
 
-/* 0x8027CD18: the gunner's gun position in actor-local space, biased by the charge counter. */
+/* 0x8027CC44: the gunner's gun position in actor-local space, biased by the charge counter. */
 void Pl_get_gunner_pos(_PLW* self, nw4r::math::VEC3* out, s32 arg2)
 {
     using s_80276B58::lbl_8079A0CC; using s_80276B58::lbl_8079A100; using s_80276B58::lbl_8079A104; using s_80276B58::lbl_8079A108; using s_80276B58::lbl_8079A10C;
@@ -7477,7 +6987,7 @@ extern "C" u32 fn_8027BCE0(_PLW* self)
 } /* namespace s_80276B58 */
 
 
-/* 0x80275A80: the shell multiplier adjustment the two shell tables give. */
+/* 0x80279670: the shell multiplier adjustment the two shell tables give. */
 f32 Get_Shell_rate_adj(_PLW* self, u8 arg1)
 {
     using s_80276B58::fn_8027ED18; using s_80276B58::lbl_8079A0D0;
@@ -8068,8 +7578,6 @@ struct _HIT_DATA {
 namespace s_80276B58 {
 
 
-/* `_HIT_W` is the shared `Pl/hit_w.h` record (phase 4 fold: this section carried its own view). */
-
 extern "C" u8 fn_80331210(_PLW*);
 extern "C" s16 fn_80273ED8(_PLW*, s32, s32);
 } /* namespace s_80276B58 */
@@ -8552,7 +8060,7 @@ extern "C" { extern u8 lbl_80792150; }
 } /* namespace s_80276B58 */
 
 
-/* 0x80275A80: the shell "bure" type (0/1/2) the actor's equipped shell and its skills resolve to. */
+/* 0x80279720: the shell "bure" type (0/1/2) the actor's equipped shell and its skills resolve to. */
 u32 Get_Shell_bure_type(_PLW* self, u8 arg1)
 {
     using s_80276B58::fn_8027ED18; using s_80276B58::lbl_805C6100; using s_80276B58::lbl_80792150;
@@ -8657,9 +8165,8 @@ extern "C" { extern u8 lbl_805C6118[]; }
 extern "C" { extern const f32 lbl_8079A080; }
 extern "C" { extern const f32 lbl_8079A0F0; }
 
-/* 0x8027A57C: resolves one motion's stick input into the actor's movement - the four pad-direction
- * flags, the direction and magnitude the move table interpolates for the current speed, and the
- * per-motion write-back. */
+/* 0x8027A57C: resolves one motion's stick input into movement - the four pad-direction flags, the direction and
+ * magnitude the move table interpolates for the current speed, and the per-motion write-back. */
 extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
 {
     u8 sp9;
@@ -8879,10 +8386,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
     }
 }
 
-/* ===== appended pass: the 13 bodies the previous pass left unwritten ==============================
- * Order below is address order of the bodies written here, not the file's; the whole file still has to
- * be sorted into .text order before the unit can link (see the header).
- * New callees these bodies reference, under the map's spellings. */
+/* The callees of the bodies below, under the map's spellings. */
 extern "C" u16 fn_803BA9B0(u8, u8, u8*, s16*, void*, void*, void*);
 extern "C" void hit_flag_set__FP6_HIT_WUl(void*, u32);
 extern "C" void hit_flags_clear(void*);
@@ -9752,41 +9256,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
 
 } /* namespace s_80276B58 */
 
-/* ==== absorbed from Pl/fn_8027D684.cpp (0x8027D684..0x80283FC8) ==== */
-/*
- * Player act/equipment cluster `Pl/fn_8027D684`: the continuation of the Pl_act band after
- * `Pl/pl_act.cpp`, from the act step byte through the player's equipment helpers.  `.text`
- * 0x8027D684-0x802840DC (138 functions, 0x6A58 B) with its own exception tables - extab
- * 0x80012B54-0x80012E7C and extabindex 0x8002FF7C-0x80030438 (101 framed functions, one 8-byte
- * extab record and one 12-byte extabindex record each, which is what pins both ranges).
- *
- * Home is `Pl`: every function's first argument is the player work `_PLW`, the gates are the Pl
- * siblings (`Pl_master_ck`, `Pl_frame_check`, `Pl_Skill_ck`), the equipment helpers take the `_EQUIP`
- * record `pl.h` owns, and both bracketing registered units are Pl.  The target object carries
- * extab/extabindex, so the flags are the lib's `cflags_pl` (`-Cpp_exceptions on`).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/symedit.py range 0x8027D684 0x802840DC`; the runtime dump answers `zz_<addr>_`
- * for every one of them - `python tools/symbols/dumpmap.py lookup`).
- *
- * Residual (work in progress - 32 of the range's 138 functions are reconstructed, 1280 of 27224 B
- * byte-identical; the other 106 keep the target bytes):
- *   * `fn_8027D968` (0x2FC B), `fn_8027E5E4`, `fn_8027F3CC` and `fn_8027D8A0` carry paired-single /
- *     `cror` instructions the frontend cannot emit (playbook, "A paired-single op in a function").
- *   * seven written rows sit above the 80 % bar with a known shape residual: `fn_8027DDC4` 91.2 (the
- *     negated/nested if-chain is retail's), `fn_8027DCA8` 84.2 (`return a || b;` shares the `li r3,1`
- *     tail), `fn_8027DE88` 77.7 and `fn_8027DF38` 67.3 (retail lays the id-scan loop head out *after*
- *     the body and falls through into it; the head-first `for (;;)` costs one `b`), `fn_8027E06C` 71.7,
- *     `fn_8027DFE4` 65.2 (the `case 12` equality if-converts to the branchless bool form) and
- *     `fn_8027DCE0` 65.9 (the comparison tree is identical, retail merges every `return 0` into one
- *     tail block where ours repeats the `li r3,0`).
- *   * the band header `unsplit/Pl.h` still declares six symbols this unit now owns
- *     (`fn_8027D7EC`, `fn_8027D8A0`, `fn_8027E1E4`, `fn_8027E220`, `fn_8027EBA8`, `fn_8027EE24`); the
- *     definitions below match those spellings so no consumer breaks, and moving them into an owner
- *     header needs the seven consumer files (which also spell three of them differently:
- *     `src/ef/eft001.cpp` says `void fn_8027D7EC`, `src/Pl/pl_skill.cpp` says
- *     `s32 fn_8027EBA8(_PLW*, u8*)`, `src/sound/fn_800EF7D8.cpp` says `u8 fn_8027EE24(void* equip)`).
- */
+/* ==== 0x8027D684-0x802840DC: the equipment helpers ==== */
 
 #include "types.h"
 #include "pl.h"
@@ -9885,9 +9355,8 @@ extern "C" void fn_8027D6DC(_PLW* self, s16 value) {
     }
 }
 
-/* Reports the byte at +0x268 as a boolean.  `u32`, not `s32`: the item menu's caller compares the
- * result unsigned (`bl fn_8027D738; cmplwi r3,0x1` at 0x802A008C), which is what its declaration in
- * this unit's header `Pl/fn_8027D684.h` carries too. */
+/* Reports the byte at +0x268 as a boolean; `u32`, because the item menu's caller compares the result
+ * unsigned (`cmplwi r3,0x1` at 0x802A008C), as `Pl/fn_8027D684.h` declares it. */
 extern "C" u32 fn_8027D738(_PLW* self) {
     return self->field_0x268 != 0;
 }

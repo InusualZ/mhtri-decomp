@@ -580,11 +580,11 @@ rules 3 and 4 exist to record.
 is not byte-identical; the conformance work (rules 1-15) rides the same pass, unit by unit, in address order.
 
 **The `goto` backlog from the first protocol round (2026-09-23).** Four functions reached 100 % with a `goto`
-shape before rule 8 existed: `Pl/pl_act`'s `fn_80278144` and `fn_80278310` (`goto ret1; ret0: return 0;`) and
-`fn_8027BC48` (`switch` + `goto`), and `Pl/pl_skill`'s `fn_80271BD4`/`fn_80271E0C` (label dispatch). They are the
-lint's first reported entries: each needs a conformant shape that keeps the score, or a recorded residual with
-the measurement that shows what the conformant shapes score. Their unit headers carry the shapes that were
-tried.
+shape before rule 8 existed, all in `Pl/pl_act.cpp` now: `fn_80278144` and `fn_80278310` (`goto ret1; ret0: return
+0;`), `fn_8027BC48` (`Pl_motion_input_ck`, `switch` + `goto`) and `fn_80271BD4`/`fn_80271E0C` (label dispatch). They
+were the lint's first reported entries: each needs a conformant shape that keeps the score, or a recorded residual
+with the measurement that shows what the conformant shapes score. The unit header records the residuals and
+`docs/pl.md` (Rule 8 shapes) the shapes that were tried, with their measurements.
 
 **Enforcement is a tool, not a promise.** `tools/units/stylelint.py` (roadmap 7.21) reports each rule with
 `file:line`, per unit and as a backlog, and **`land.py verify` refuses a batch that adds a violation** — a rule

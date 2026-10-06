@@ -1,32 +1,24 @@
 /*
- * Pl/pl_yure.cpp - the equipment sway ("yure") band: short spring chains hung off a character's joints (hair,
- * cloth, tails) that lag behind the body.  Records (`YureRec`, 0x90 B) live in the enemy work record (3 at +0x590)
- * and the player work record (8 at +0x674); `yure_move` steps them all each frame through `yure_step`.
- *
- * `.text` 0x802ABD28-0x802AD9C0 (11 functions, 7320 B), extab 0x80013AC4-0x80013B0C, extabindex
- * 0x800316A4-0x80031710, `.ctors` 0x8056F378 (`yure_static_init`), `.data` 0x805CE638-0x805CED40 (the thirteen sway
- * tables, all emitted and byte-equal), `.sdata` 0x807922C0-0x807922E0 (the four `CL-0n` labels), `.bss`
- * 0x806B8798-0x806B87C0 (`yure_world`), `.sdata2` 0x8079A410-0x8079A448.  7 of 11 rows at 100 %; still `NonMatching`.
- * Registered 2026-09-30, carved out of `menu/menu_message.cpp`'s tail together with `stage/shell.cpp`.
- *
- * Seam: see `stage/shell.cpp` - this TU has its own `__sinit` (`yure_static_init`, which builds the gravity vector),
- * its own `.data` tables (referenced only from these functions) and no reference to the shell pool.  Lib `Pl`
- * (`cflags_pl`, Wii/1.0): the functions score 100 % there with no pragma.  Module `Pl` and the name are GUESSES from
- * the behaviour (`yure` = sway, the map's `yure_move__Fv` is this unit's exported entry point).
- *
- * Unwritten: `yure_step` (0x802AC484, 4788 B, the spring integrator) and `yure_player_init_kind` (0x802ABF00,
- * 744 B, the player records' builder, which reads the model's `_PLW_PHYSICS` table through the g3d name-handle
- * helpers).  Until they are written the object lacks their constants (`.sdata2` ours 0x14 B of 0x38) and relocations.
- * `YureParam` is eight f32 coefficients (named by offset: only `yure_step` reads them) and the s32 angle offset at +0x20
- * (the `lwz 32(row)` in `yure_step`, added to the pitch word).  `.data` (1800/1800) and `.sdata` (32/32) are byte-equal to the target.
- * The four `CL-0n` labels are named `char` arrays in `.sdata` (a `const` array would land in `.sdata2`; `yure_label_3[8]` carries the
- * pad the target's 0x20-byte run has) so the `.data` table's relocations name the map's rows.
- *
- * Residuals: `yure_enemy_init` 96.60 (register numbers), `yure_move` 92.61 (register numbers; the target keeps the
- * span table base in r31).  `get_move_work_max` is declared `u32` in `ef/get_move_work_adrs.h`: the retail caller
- * narrows the result with `clrlwi ...,16`.
- *
- * Inventory and evidence: `python tools/units/ledger.py unit Pl/pl_yure.cpp`.
+ * Pl/pl_yure.cpp - the equipment sway ("yure") band: short spring chains hung off a character's joints (hair, cloth,
+ *   tails) that lag behind the body.  The records (`YureRec`, 0x90 B) live in the enemy work record (3 at +0x590) and
+ *   the player work record (8 at +0x674); `yure_move` steps them all each frame through `yure_step`.
+ * RANGE. .text 0x802ABD28-0x802AD9C0 (11 functions); .ctors 0x8056F378 (`yure_static_init`, which builds the gravity
+ *   vector), .data 0x805CE638-0x805CED40 (the thirteen sway tables), .sdata 0x807922C0-0x807922E0 (the four `CL-0n`
+ *   labels), .bss 0x806B8798-0x806B87C0 (`yure_world`), .sdata2 0x8079A410-0x8079A448, extab, extabindex.  The seam
+ *   with `stage/shell.cpp` below: this TU has its own static initialiser and `.data` tables (read only by these
+ *   functions) and no reference to the shell pool.
+ * NAMES. The module and the file name are GUESSes from the behaviour (`yure` = sway; the map's `yure_move__Fv` is the
+ *   exported entry point).
+ * RESIDUALS. `yure_player_init_kind` (0x802ABF00, 744 B, the player records' builder, which reads the model's
+ *   `_PLW_PHYSICS` table through the g3d name-handle helpers) and `yure_step` (0x802AC484, 4788 B, the spring
+ *   integrator) are unwritten; until they are, the object lacks their constants and relocations.  `yure_enemy_init`
+ *   and `yure_move` differ in register numbers (the target keeps `yure_move`'s span table base in r31).
+ *  - flipcheck: `.text` 0x6FC, `.sdata2` 0x14, extab 0x38 and extabindex 0x54 against the claims 0x1C98, 0x38, 0x48
+ *    and 0x6C; `.data` and `.sdata` are byte-equal to the target.
+ * SHAPES. The four `CL-0n` labels are named `char` arrays in `.sdata` (a `const` array lands in `.sdata2`;
+ *   `yure_label_3[8]` carries the pad of the target's 0x20-byte run), so the `.data` table's relocations name the
+ *   map's rows.  `get_move_work_max` is declared `u32` in `ef/get_move_work_adrs.h`: the retail caller narrows the
+ *   result with `clrlwi ...,16`.
  */
 
 #include "types.h"

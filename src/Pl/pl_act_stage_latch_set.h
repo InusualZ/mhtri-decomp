@@ -1,6 +1,6 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): the two `Pl/fn_80273B14.cpp` symbols `quest/quest_entry.cpp` calls,
- * for a consumer that cannot include the owner's full header (its `Psw` declaration clashes with the
- * lobby band's).  Both are C linkage (the map rows are plain names). */
+/* Leaf header (rule 2): the two act-entry symbols of `Pl/pl_act.cpp` that `quest/quest_entry.cpp` calls, for a
+ * consumer that cannot include `Pl/fn_80273B14.h` (its `Psw` declaration clashes with the lobby band's).  Both are
+ * C linkage (the map rows are plain names). */
 #ifndef MHTRI_PL_PL_ACT_STAGE_LATCH_SET_H
 #define MHTRI_PL_PL_ACT_STAGE_LATCH_SET_H
 

@@ -13,7 +13,7 @@
 struct _PLW;
 
 /* `Pl/pl_act.cpp` defines it at C++ scope and the target object references
- * `Pl_master_ck__FP4_PLW`, so it is declared with C++ linkage (relocaudit). */
+ * `Pl_master_ck__FP4_PLW`, so it is declared with C++ linkage. */
 #ifdef __cplusplus
 u32 Pl_master_ck(struct _PLW* plw);
 u32 Pl_act_ck(struct _PLW* self, u8 group, u16 action);

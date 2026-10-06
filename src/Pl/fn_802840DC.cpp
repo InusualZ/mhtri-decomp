@@ -1,42 +1,20 @@
 /*
- * Pl/fn_802840DC.cpp - the player's shell (gunner shot) band of the `Pl` module.  `.text`
- * 0x802840DC-0x80288CEC (54 functions, 0x4C10 B); registered, whose seam is unproven (the extent settles as the
- * functions match).  Nothing is claimed out of `.data`/`.sdata`/`.sdata2`: the band's jump tables,
- * attack-row tables and pool constants are still emitted by the neighbouring `auto_*` objects, so
- * they are declared and never defined (invariant 8.4 / playbook 29).
- *
- * Naming note: the symbol map spells every one of this range's 54 functions as a bare
- * `fn_XXXXXXXX` (checked with `tools/symbols/dumpmap.py` - every address of the range answers the
- * `zz_XXXXXXXX_` placeholder, never a real runtime name - and the range's `config/RMHE08/symbols.txt`
- * entries carry no signature).
- *
- * Home is `Pl`: every callee is Pl API (`Get_motion_no__FP4_PLW`, `Pl_get_gunner_pos`/`_vec`,
- * `Pl_atk_act_flag_ck`, `Pl_Skill_ck`, `Pl_frame_check`, `Pl_master_ck`) and both registered
- * neighbours (`Pl/pl_act.cpp` below 0x8027D684, `Pl/fn_80288CEC.cpp` at 0x80288CEC) are Pl units.
- * The tables and pool constants of the band's unowned Pl-side callees live in
- * `unsplit/Pl.h`; its 16 per-act handlers sit inside `Pl/fn_8027D684.cpp`'s registered
- * range, so they live in this unit's own header `Pl/fn_802840DC.h` (rule 2 - the band header
- * must not declare a symbol a registered unit owns); and the three `Pl/pl_act.cpp` owns were added
- * to `Pl/pl_act.h` (`fn_80277974`, `Pl_get_gunner_pos`, `Pl_get_gunner_vec`).
- *
- * `pl.h` notes for this band (both edits keep `sizeof(_PLW) == 0xB20`, proved with an MWCC
- * probe: a `char[sizeof(_PLW)]` global read back with `nm`): `+0x310`/`+0x312` name the charge gauge
- * and level out of the pre-merge `unk30F` run, and `+0x484` names the actor's own attack entry (`_HIT_W`
- * in `Pl/pl_act.cpp`, which `fn_80277974` fills) - that one sits in a union anchored at +0x480 because
- * its member carries the `u32` at +0x4A4, so an odd-length run would round the union up and grow
- * `_PLW` by 4 (the same trap as an odd-offset union anchor).
- *
- * Rooted from this band: `lbl_80792188`/`lbl_80792190`/`lbl_807921A8` are `.sdata` id lists, and the
- * target addresses them through r13 (`li r7, lbl_80792188@sda21`); MWCC only emits that for a *sized*
- * extern declaration (`s32 lbl_80792188[2]`), an unsized `[]` gives `lis`/`addi`.
- *
- * Residual: `fn_8028732C` measures 88.75 - its two early `return 0`s are laid out as one block at the
- * end where the target keeps the `p == 0` return before the loop, and the target reads the 22-byte
- * row's id with `lhz` + `cmpwi` where our `s16 id` gives `lha` + `cmpwi` (an unsigned load with a
- * signed compare is not reachable from either spelling).  `fn_802872E4` is left unwritten: its only
- * two `_PLW` fields are `pl.h`'s `unk269`/`unk276`, whose meaning this band does not establish, and
- * naming them would be a guess.  The remaining functions are bound for the next batch - the batch
- * outbox lists them with their sizes.
+ * Pl/fn_802840DC.cpp - the player's shell (gunner shot) band: the per-kind act-step machines, the attack-row
+ *   appliers and the actor's own attack entry.
+ * RANGE. .text 0x802840DC-0x80288CEC (54 functions); .data 0x805C9568-0x805CBFC0, .sdata 0x80792188-0x807921B0,
+ *   .sdata2 0x8079A1D8-0x8079A270, extab, extabindex.
+ * NAMES. The file and functions keep the map's stems (no `__FILE__` string covers the band; the runtime dump answers
+ *   placeholders).
+ * RESIDUALS. 41 functions unwritten (objdiff scores them 0) in 5 runs: 0x802844B0-0x80284780, 0x802849F0-0x80286BF0,
+ *   0x80286DF8-0x8028732C, 0x802873D4-0x80288B98, 0x80288C2C-0x80288CEC.  `fn_802872E4` waits for its two `_PLW`
+ *   fields (`unk269`/`unk276`), whose meaning the band does not establish.
+ *  - `fn_8028732C`: its two early `return 0`s are laid out as one block at the end where the target keeps the
+ *    `p == 0` return before the loop, and the target reads the 22-byte row's id with `lhz` + `cmpwi` where the
+ *    `s16 id` gives `lha` (an unsigned load with a signed compare is not reachable from either spelling).
+ *  - flipcheck: the object emits no `.sdata` (0x28 claimed) or `.sdata2` (0x98); `.text` 0x990, `.data` 0x8C, extab
+ *    0x40 and extabindex 0x60 against the claims 0x4C10, 0x2A58, 0x180 and 0x240; every compared section differs.
+ * SHAPES. The `.sdata` id lists (`lbl_80792188`, `lbl_80792190`, `lbl_807921A8`) are sized extern arrays: the target
+ *   addresses them through r13 (`li r7, lbl_80792188@sda21`), which MWCC emits only for a sized declaration.
  */
 
 #include "types.h"
@@ -163,9 +141,8 @@ void fn_802840DC(_PLW* self)
     }
 }
 
-/* Builds the actor's own attack entry from a signed attack value and runs the shared attack set-up:
- * the value's magnitude becomes the attack index, the sign and the attack-flag predicate pick the
- * entry's flag bits, and the caller's own flag adds the rest. */
+/* Builds the actor's own attack entry from a signed attack value: the magnitude is the attack index, the sign,
+ * the attack-flag predicate and the caller's flag pick the entry's flag bits; then runs the shared set-up. */
 void fn_80284204(_PLW* self, s16 value, u8 flag)
 {
     u16 magnitude;
@@ -187,9 +164,8 @@ void fn_80284204(_PLW* self, s16 value, u8 flag)
     }
 }
 
-/* Applies one attack row to the actor: picks the field set the kind/mode selects, sets the motion,
- * adds the row's frame offset onto the actor's frame counters and runs the row's attack value and
- * motion gate. */
+/* Applies one attack row: picks the field set the kind/mode selects, sets the motion, adds the row's frame
+ * offset onto the actor's frame counters and runs the row's attack value and motion gate. */
 void fn_802842D4(_PLW* self, u8 kind, ShellAtkRow* row, u32 table)
 {
     u16 motion;
@@ -264,9 +240,8 @@ u8 fn_80284474(_PLW* self)
 void fn_802845F0(_PLW* self, f32 value);
 u32 fn_8028732C(_PLW* self);
 
-/* The band's first act-step machine: the first step arms the motion, the second waits for the
- * motion gate and applies the next row of `lbl_805C9A78`, the third either runs the follow-up motion
- * or hands the actor's motion gate the band's -1 gate value. */
+/* The band's first act-step machine: arm the motion, wait for the motion gate and apply the next `lbl_805C9A78`
+ * row, then run the follow-up motion or hand the motion gate the band's -1 value. */
 void fn_80284780(_PLW* self, s32 kind)
 {
     switch (self->act_step_0x05) {
@@ -367,9 +342,8 @@ void fn_8028738C(_PLW* self, s16 value, u8 kind)
     }
 }
 
-/* The band's act-step machine for the shell kind whose rows are `lbl_805C9CAC`: the first step arms
- * the motion, the second waits for the motion gate and applies the next row, the third either runs
- * the follow-up motion or falls back to the band's motion gate. */
+/* The act-step machine for the shell kind whose rows are `lbl_805C9CAC`: arm the motion, wait for the motion
+ * gate and apply the next row, then run the follow-up motion or fall back to the band's motion gate. */
 void fn_80286BF0(_PLW* self, s32 kind)
 {
     switch (self->act_step_0x05) {

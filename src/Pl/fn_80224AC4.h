@@ -1,12 +1,7 @@
 /*
- * Types owned by `Pl/fn_80224AC4.cpp` (docs/plan.md 6.5 rule 1).  They were defined in that unit
- * until `Pl/fn_802693C4.cpp` became a second consumer, which is the point the convention moves a
- * shared type to a header.
- *
- * The rig is the object `_PLW.physics_0x13C` points at: `Pl/fn_80224AC4.cpp` walks it as an SE/motion
- * rig, and the 0x802693C4 proposal's part accessors read the same records.  The 0x1560-byte extent is
- * confirmed by the rig's constructor `fn_80269DD8` (`__construct_array` of 7 x 0x90 at +0xE40 and
- * 3 x 0x110 at +0x1230, ending exactly at 0x1560), which still needs the two element types modelled.
+ * The player's SE/motion rig, the object `_PLW.physics_0x13C` points at: `fn_80224AC4` (`lobby/lb_equip_page.cpp`'s
+ * range) walks it and `Pl/pl_act.cpp`'s part accessors read the same records (rule 1).  The rig's constructor
+ * `fn_80269DD8` fixes the 0x1560-byte extent (`__construct_array` of 7 x 0x90 at +0xE40 and 3 x 0x110 at +0x1230).
  */
 #ifndef MHTRI_PL_FN_80224AC4_H
 #define MHTRI_PL_FN_80224AC4_H

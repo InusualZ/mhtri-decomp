@@ -1,7 +1,6 @@
 /*
- * Leaf header (docs/plan.md 6.5 rule 2): `pl_item_add` (0x80272E30), defined by `src/Pl/pl_skill.cpp`.
- * `Pl/pl_skill.h` includes this one, so there is one declaration; it is separate so
- * `lobby/lb_companion_ui.cpp` can call it without taking the rest of `Pl/pl_skill.h`, whose
+ * Leaf header (rule 2): `pl_item_add` (0x80272E30), defined by `Pl/pl_act.cpp`'s skill section.  `Pl/pl_skill.h`
+ * includes it; it is separate so `lobby/lb_companion_ui.cpp` can call it without `Pl/pl_skill.h`, whose
  * `Pl_cat_skill_ck` clashes with the lobby band's own view.
  */
 #ifndef MHTRI_PL_PL_ITEM_ADD_H

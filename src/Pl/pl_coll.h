@@ -1,36 +1,13 @@
 /*
- * Declarations owned by `Pl/pl_coll.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
- * header instead of declaring one of the run's arrays itself.
- *
- * The unit is **data-only**: it owns the Pl band's shared `.bss` collision-work run,
- * `0x806AB848..0x806AC8A8` (0x1060 B, 12 arrays), and its source defines nothing.  For a
- * `NonMatching` unit the original bytes stay in the binary, so the DOL is untouched while the run
- * gains a single owner - which is what stops rule 12 firing for the run's consumers and what stops
- * dtk creating an anonymous `auto_*_bss` unit over the same bytes.
- *
- * The extent is measured, not chosen (`tools/units/callers.py`, one address at a time).  Every array
- * here is read only by the `Pl` ground/hit collision band - `Pl/fn_8028F66C.cpp`, `Pl/fn_80295EF4.cpp`,
- * `Pl/fn_8025F088.cpp` and `Pl/pl_act.cpp` - while the run's neighbours are reader-disjoint: `0x806AB83C`
- * before it is read only by `Pl/fn_80288CEC.cpp`, and `0x806AC8A8` - the seam - is the first address a
- * non-`Pl` unit touches (`menu/menu_item.cpp`).  So the run ends there and the lower half
- * (`0x806AC8A8..0x806AD698`, read by `menu/menu_item`, `menu/fn_8031EA8C`, `ai/fn_802D44F4`,
- * `menu/menu_row` and `lobby/fn_802076D4`) is a different owner's - see the unit header's residual.
- *
- * The construction is what fixes each array's shape: the band's static initializer `fn_80297C30`
- * (0x80297C30, inside `Pl/fn_80295EF4.cpp`) builds them all with `__construct_array`, and its element
- * ctor and stride are reproduced in each member's comment below.
- *
- * `pl_move_work` is declared two-dimensional (`[4][11]`) because that is the shape the motion layer's
- * own addressing spells - `pl_move_work[chunk_ofs][i]`, one chunk of 11 entries per `_PLW::chunk_ofs`
- * - and a flat `[44]` indexed `chunk_ofs * 11 + i` makes MWCC emit a different multiply sequence.
- *
- * The unit name is a **GUESS**: no `__FILE__` string and no runtime-dump name covers the range, so the
- * file was named for the pool by `tools/units/dataclaim.py` and is now folded into `Pl/pl_coll.cpp`.
- *
- * GUESSES: the arrays no written body spells yet - `pl_coll_slot_free`, `pl_coll_closest_0/1/2`,
- * `pl_coll_slot_dist`, `pl_coll_slot_hit`, `pl_coll_slot_kind`, `pl_coll_slot_used`, `pl_hit_id_list` -
- * are named from the read sites recorded beside each of them; the shapes and strides are measured,
- * the semantic names are the best the call sites support.
+ * Pl/pl_coll.h - `Pl/pl_coll.cpp`'s `.bss` collision-work run 0x806AB848..0x806AC8A8 (0x1060 B, 12 arrays, declared,
+ *   never defined) and the record types its readers share.  The readers are `Pl/pl_coll.cpp`, `Pl/pl_act_step.cpp`,
+ *   `Pl/pl_act.cpp` and `menu/menu_item.cpp`; the static initialiser `fn_80297C30` builds the arrays with
+ *   `__construct_array`, and each member's comment gives its element constructor and stride.
+ * `pl_move_work` is `[4][11]`, the shape the motion layer's addressing spells (`pl_move_work[chunk_ofs][i]`): a flat
+ *   `[44]` indexed `chunk_ofs * 11 + i` makes MWCC emit a different multiply sequence.
+ * GUESSes, named from the read sites beside each (no written body spells them): `pl_coll_slot_free`,
+ *   `pl_coll_closest_0/1/2`, `pl_coll_slot_dist`, `pl_coll_slot_hit`, `pl_coll_slot_kind`, `pl_coll_slot_used`,
+ *   `pl_hit_id_list`.
  */
 #ifndef MHTRI_PL_PL_COLL_H
 #define MHTRI_PL_PL_COLL_H
@@ -98,8 +75,8 @@ struct PlHitBox {
 extern "C" {
 #endif
 
-/* The run, in address order.  Each comment is the construction `fn_80297C30` performs (or the read
- * site that fixes the shape) and the address the map row carried. */
+/* The run, in address order: each comment is the construction `fn_80297C30` performs or the read site that
+ * fixes the shape. */
 
 extern PlMoveEntry pl_move_work[4][11];       /* 0x806AB848: 4 chunks x 11 x 0x18, element ctor
                                                   * `fn_80295544` - the shape is the readers' own

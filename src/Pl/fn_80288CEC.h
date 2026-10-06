@@ -1,8 +1,7 @@
 /*
- * `Pl/fn_80288CEC.cpp`'s shared record (docs/plan.md 6.5 rule 1: a type more than one unit uses is
- * defined once and included where needed).  `Pl/fn_8028F66C.cpp`'s point-vs-box distance and the
- * hit tests beside it take the same record, so the definition moved here from that unit's source;
- * the box builders themselves (`fn_8028F44C`/`fn_8028F4B4`) stay in the owner.
+ * The records and declarations shared by `Pl/pl_motion.cpp`, `Pl/pl_hit_sphere.cpp` and `Pl/pl_coll.cpp` (rule 1):
+ * the box record the box builders (`fn_8028F44C`/`fn_8028F4B4`) fill and `Pl/pl_coll.cpp`'s point-vs-box tests read,
+ * and the player-mode root work.
  */
 #ifndef MHTRI_PL_FN_80288CEC_H
 #define MHTRI_PL_FN_80288CEC_H
@@ -100,20 +99,18 @@ u32 root_mode2_ck(void);
 #endif
 
 
-/* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
- * had not declared it yet). */
+/* 0x8028F558 - a box builder of `Pl/pl_hit_sphere.cpp`, called by `enemy/em_action.cpp`. */
 void fn_8028F558(void* a, void* b);
 
 /* 0x8028D0EC - starts a player warp to `pos` facing `angle`: stores the destination in the move work,
  * arms the transfer mode and the fade; `mode` 0xFF warps the current player only.  C linkage (the map
- * row is a plain name).  GUESS name from those effects; declared for `quest/quest_entry.cpp`. */
+ * row is a plain name).  GUESS name from those effects; `quest/quest_entry.cpp` calls it. */
 #ifdef __cplusplus
 extern "C" {
 void pl_warp_start(u8 mode, nw4r::math::VEC3* pos, u16 angle);
 }
 
-/* 0x8028C5B4 - loads the players' motion resources (`pl_motion_set__Fv`, C++ scope).  Added with
- * `quest/arenatask.cpp` (rule 2: this range owns the address). */
+/* 0x8028C5B4 - loads the players' motion resources (`pl_motion_set__Fv`, C++ scope). */
 void pl_motion_set(void);
 #endif
 
