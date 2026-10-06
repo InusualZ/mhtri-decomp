@@ -230,6 +230,31 @@ def test_rename_plans(c):
         c.check("... still one write", len(written), 1)
 
 
+#: Real names dtk and objdiff carry (the map holds the first four; the last three were re-split and linked as a probe).
+REAL_NAMES = ["__ct__Q34nw4r2ut19TagProcessorBase<c>Fv",
+              "Process__Q34nw4r2ut19TagProcessorBase<c>FUsPQ34nw4r2ut15PrintContext<c>",
+              "@LOCAL@GXInit__FPvUl@shutdownFuncRegistered", "__sinit_\\PatConnection_cpp",
+              "probe_tmpl__Q24nw4r9Probe<i,c>Fv", "@GUARD@probe_guard__Fv@x", "ofs_to_obj<Q34nw4r3g3d7ResNode>__FPCvl"]
+
+
+def test_template_and_local_names(c):
+    rows = [("fn_80501FA8", ".text:0x80501FA8", "type:function size:0x10")]
+    for name in REAL_NAMES:
+        c.check("valid: %s" % name, bool(sym_mod.VALID_NAME_RE.fullmatch(name)), True)
+        plan, _u = _plan(rows, lambda m, n=name: m.plan_rename([("fn_80501FA8", n)]))
+        c.check("... renamed and parsed back: %s" % name, sym_mod.parse_line(plan.render().split("\n")[0]).name, name)
+    for bad in ("two words", "a=b", "a;b", "sec:tion", "path/name", "1lead"):
+        c.check("invalid: %r" % bad, bool(sym_mod.VALID_NAME_RE.fullmatch(bad)), False)
+    pat = sym_mod.name_pattern("@LOCAL@f__Fv@x")
+    c.check("a name opening with @ is found in source", bool(pat.search("extern int @LOCAL@f__Fv@x;")), True)
+    pat = sym_mod.name_pattern("__ct__Q34nw4r2ut19TagProcessorBase<c>Fv")
+    c.check("a template name is found, and not inside a longer one",
+            (bool(pat.search("x = __ct__Q34nw4r2ut19TagProcessorBase<c>Fv;")),
+             bool(pat.search("x = __ct__Q34nw4r2ut19TagProcessorBase<c>Fv2;"))), (True, False))
+    c.check("a generated stem inside a path is still found (symedit classifies it as a path)",
+            bool(sym_mod.name_pattern("fn_805113B0").search('#include "DWCi/fn_805113B0.h"')), True)
+
+
 def test_write_text_transaction(c):
     with tempfile.TemporaryDirectory() as tmp:
         p = write(tmp, "symbols.txt", "a = .text:0x1;\r\n")
@@ -291,6 +316,54 @@ def test_merge_plans(c):
     c.check("a clean reference scan passes", refused(adj, [row], lambda names: {}), "")
     c.raises("resize refuses another name's line", ShapeError, sym_mod.resize, "x = .text:0x1; // size:0x4", "y", 8)
     c.raises("resize refuses a row with no size", ShapeError, sym_mod.resize, "x = .text:0x1; // type:function", "x", 8)
+
+
+def test_data_merges(c):
+    """The data half of merge-batch: NET-A's patPacketTable (0x1732 + the stray label lbl_80600042 0x4BE = 0x1BF0),
+    a label inside one object, and a plain resize."""
+    table = [("patPacketTable", ".data:0x805FE910", "type:object size:0x1732 data:byte"),
+             ("lbl_80600042", ".data:0x80600042", "type:object size:0x4BE"),
+             ("lbl_80600500", ".data:0x80600500", "type:object size:0x30")]
+    plan, _u = _plan(table, lambda m: m.plan_merge([("lbl_80600042", "patPacketTable", 0x1BF0)]))
+    c.check("a label at a data object's end folds in (scopes may differ, data: kept)", plan.render(),
+            "patPacketTable = .data:0x805FE910; // type:object size:0x1BF0 data:byte\n"
+            "lbl_80600500 = .data:0x80600500; // type:object size:0x30\n")
+    inner = [("obj", ".data:0x80001000", "type:object size:0x40"), ("lbl_80001010", ".data:0x80001010", "type:object size:0x8")]
+    plan, _u = _plan(inner, lambda m: m.plan_merge([("lbl_80001010", "obj", 0x40)]))
+    c.check("a stray label inside one object is folded, the size unchanged", plan.render(),
+            "obj = .data:0x80001000; // type:object size:0x40\n")
+    plan, _u = _plan(inner[:1], lambda m: m.plan_merge([(None, "obj", 0x48)]))
+    c.check("size: a data object resized", plan.render(), "obj = .data:0x80001000; // type:object size:0x48\n")
+    plan, _u = _plan(inner[:1], lambda m: m.plan_merge([(None, "obj", 0x40)]))
+    c.check("size: the same size is a no-op", (plan.changed, plan.applied), (False, ((None, "obj", 0x40),)))
+
+    def refused(map_rows, batch):
+        try:
+            _plan(map_rows, lambda m: m.plan_merge(batch))
+        except Refused as exc:
+            return str(exc)
+        return ""
+    c.contains("a fold size that is not the union", refused(table, [("lbl_80600042", "patPacketTable", 0x1BF4)]),
+               "the extent of patPacketTable")
+    c.contains("a label past the object's end is not folded",
+               refused([inner[0], ("lbl_80001048", ".data:0x80001048", "type:object size:0x8")],
+                       [("lbl_80001048", "obj", 0x50)]), "neither inside")
+    c.contains("a fold that would swallow another label", refused(
+        table[:2] + [("lbl_80600100", ".data:0x80600100", "type:object size:0x4")],
+        [("lbl_80600042", "patPacketTable", 0x1BF0)]), "would also cover lbl_80600100")
+    c.contains("size: growing over a neighbour", refused(table, [(None, "lbl_80600042", 0x500)]), "would cover lbl_80600500")
+    c.check("size: shrinking (dtk fills the gap) is allowed", refused(table, [(None, "lbl_80600500", 0x20)]), "")
+    c.contains("one row per object per batch", refused(inner, [("lbl_80001010", "obj", 0x40), (None, "obj", 0x48)]),
+               "appears twice")
+    from tools.symbols import symedit
+    with tempfile.TemporaryDirectory() as tmp:
+        batch = write(tmp, "batch.txt", "# NET-A\nfold lbl_80600042 patPacketTable 1BF0\nmerge fn_1 fn_0 24\nsize obj 48\n")
+        c.check("symedit reads fold, merge and size rows", symedit.read_merge_rows(str(batch)),
+                [("lbl_80600042", "patPacketTable", 0x1BF0), ("fn_1", "fn_0", 0x24), (None, "obj", 0x48)])
+        bad = write(tmp, "bad.txt", "size obj\n")
+        c.raises("... and refuses a short row", SystemExit, symedit.read_merge_rows, str(bad))
+    c.contains("size: a function is not resized",
+               refused([("f", ".text:0x80001000", "type:function size:0x4")], [(None, "f", 0x8)]), "only a data object")
 
 
 # --- configure ---------------------------------------------------------------------------------------------

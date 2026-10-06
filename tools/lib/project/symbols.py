@@ -19,8 +19,18 @@ _SCOPE_RE = re.compile(r"scope:(\S+)")
 #: `data:` is a token of its own: `.sdata:`/`.rodata:`/`.data:` in an address all contain the substring.
 _KIND_RE = re.compile(r"(?<![\w.])data:(\S+)")
 _ALIGN_RE = re.compile(r"align:(\S+)")
-#: A name `plan_rename` accepts as the new spelling.
-VALID_NAME_RE = re.compile(r"[A-Za-z_][\w.$]*")
+#: A name `plan_rename` accepts as the new spelling: what MWCC emits and dtk/objdiff carry (measured 2026-10-06 by a
+#: re-split + link + objdiff read of `probe_tmpl__Q24nw4r9Probe<i,c>Fv`, `@GUARD@probe_guard__Fv@x` and
+#: `__sinit_\probe_unit_cpp`: main.dol OK, all three named in the split object and in objdiff's target side) -
+#: template arguments `<` `>` `,` (and `-` for a negative one), MWCC's `@LOCAL@`/`@GUARD@`/`@<n>` labels and the
+#: backslash of `__sinit_\<file>_cpp`. Never whitespace, `=`, `;`, `:` or `/`: the map line could not parse back.
+VALID_NAME_RE = re.compile(r"[A-Za-z_@$][\w.$@<>,\-\\]*")
+
+
+def name_pattern(name: str) -> "re.Pattern[str]":
+    """A reference to the map name `name` in source text: the name, not inside a longer identifier. `\\b` cannot do it -
+    a name may open with `@` or close with `>`, where there is no word boundary to find."""
+    return re.compile(r"(?<![\w$@])%s(?![\w$])" % re.escape(name))
 
 
 class Refused(Exception):
@@ -427,12 +437,17 @@ class SymbolMap:
 
     def plan_merge(self, rows: Iterable[tuple[str, str, int]],
                    scan_refs: Callable[[list[str]], dict] | None = None) -> MergePlan:
-        """Plan a batch of phantom merges `(phantom, previous, new_size)`; nothing is written.
+        """Plan a batch of merges `(phantom, previous, new_size)`; nothing is written.
 
-        Refused unless both are defined once, in one section, the previous ending exactly at the phantom,
-        no other name at the phantom's address, the size being the two sizes added, both `type:function`
-        with one scope, and `scan_refs` (when given) finding no reference to the phantom. An absent phantom
-        whose previous already has `new_size` is the re-apply; with the old size it is a half-applied plan.
+        Functions (the phantom epilogue): refused unless both are defined once, in one section, the previous
+        ending exactly at the phantom, no other name at the phantom's address, the size being the two sizes
+        added, both `type:function` with one scope, and `scan_refs` (when given) finding no reference to the
+        phantom. Data (`type:object` both): the stray label may also sit INSIDE the object (`previous.address <
+        phantom.address <= previous.end`), the size is the union's (`max(ends) - previous.address`), no other symbol
+        may start inside it, and the scopes may differ (a dtk label carries none). `phantom=None` is a plain data
+        resize of `previous`: refused when a function, or when another symbol of its section starts inside the new
+        extent. One row per object per batch. An absent phantom whose previous already has `new_size` is the re-apply; with the old size it is a
+        half-applied plan.
         """
         rows = list(rows)
         text, nl, lines = self._lines()
@@ -449,6 +464,9 @@ class SymbolMap:
         applied: list[tuple[str, str, int]] = []
         used: set[str] = set()
         for phantom, previous, new_size in rows:
+            if phantom is None:
+                self._plan_resize(lines, defined, by_addr, previous, new_size, used, grown, applied)
+                continue
             if phantom == previous:
                 raise Refused("refusing: %s is its own previous symbol" % phantom)
             for name in (phantom, previous):
@@ -481,18 +499,35 @@ class SymbolMap:
             if ph.section != pv.section:
                 raise Refused("refusing: %s is in %s but %s is in %s"
                               % (phantom, ph.section, previous, pv.section))
-            if pv.end != ph.address:
-                raise Refused("refusing: %s ends at 0x%08X, not at %s's 0x%08X"
-                              % (previous, pv.end, phantom, ph.address))
-            if pv.size + ph.size != new_size:
-                raise Refused("refusing: 0x%X (the plan) is not 0x%X + 0x%X (%s + %s)"
-                              % (new_size, pv.size, ph.size, previous, phantom))
-            if ph.size <= 0:
-                raise Refused("refusing: %s has no size to merge" % phantom)
-            if ph.type != "function" or pv.type != "function":
-                raise Refused("refusing: %s and %s are not both type:function" % (previous, phantom))
-            if scope_of(lines[ph_hits[0]]) != scope_of(lines[pv_hits[0]]):
-                raise Refused("refusing: %s and %s disagree on scope" % (previous, phantom))
+            data = ph.type == "object" and pv.type == "object"
+            if data:
+                if not pv.address < ph.address <= pv.end:
+                    raise Refused("refusing: %s (0x%08X) is neither inside %s (0x%08X-0x%08X) nor at its end"
+                                  % (phantom, ph.address, previous, pv.address, pv.end))
+                union = max(pv.end, ph.end) - pv.address
+                if new_size != union:
+                    raise Refused("refusing: 0x%X (the plan) is not 0x%X, the extent of %s with %s folded in"
+                                  % (new_size, union, previous, phantom))
+                inside = sorted(n for (sec, addr), names in by_addr.items() if sec == pv.section
+                                and pv.address < addr < pv.address + new_size for n in names
+                                if n not in (phantom, previous))
+                if inside:
+                    raise Refused("refusing: %s with %s folded in would also cover %s - fold that one first"
+                                  % (previous, phantom, ", ".join(inside[:3])))
+            else:
+                if pv.end != ph.address:
+                    raise Refused("refusing: %s ends at 0x%08X, not at %s's 0x%08X"
+                                  % (previous, pv.end, phantom, ph.address))
+                if pv.size + ph.size != new_size:
+                    raise Refused("refusing: 0x%X (the plan) is not 0x%X + 0x%X (%s + %s)"
+                                  % (new_size, pv.size, ph.size, previous, phantom))
+                if ph.size <= 0:
+                    raise Refused("refusing: %s has no size to merge" % phantom)
+                if ph.type != "function" or pv.type != "function":
+                    raise Refused("refusing: %s and %s are not both type:function (or both type:object)"
+                                  % (previous, phantom))
+                if scope_of(lines[ph_hits[0]]) != scope_of(lines[pv_hits[0]]):
+                    raise Refused("refusing: %s and %s disagree on scope" % (previous, phantom))
             aliases = [n for n in by_addr.get((ph.section, ph.address), []) if n != phantom]
             if aliases:
                 raise Refused("refusing: %s shares its address with %s" % (phantom, ", ".join(sorted(aliases)[:3])))
@@ -502,11 +537,35 @@ class SymbolMap:
                 raise Refused("refusing: %s is referenced at %s:%d (%s)" % (phantom, rel, lineno, txt))
             if ph_hits[0] in grown:
                 raise Refused("refusing: %s is another row's grown symbol" % phantom)
-            grown[pv_hits[0]] = resize(lines[pv_hits[0]], previous, new_size)
+            # a label folded inside its object leaves the object's size as it is: only the label goes
+            grown[pv_hits[0]] = (lines[pv_hits[0]] if new_size == pv.size
+                                 else resize(lines[pv_hits[0]], previous, new_size))
             deleted.append(ph_hits[0])
         if set(deleted) & set(grown):
             raise Refused("refusing: a line is both grown and deleted")
         return MergePlan(path, text, nl, tuple(lines), grown, tuple(deleted), tuple(applied))
+
+    def _plan_resize(self, lines, defined, by_addr, name, new_size, used, grown, applied) -> None:
+        """One `plan_merge` resize row: set data object `name`'s size to `new_size` (see `plan_merge`)."""
+        if name in used:
+            raise Refused("refusing: %s appears twice in the batch" % name)
+        used.add(name)
+        hits = defined.get(name, [])
+        if len(hits) != 1:
+            raise Refused("refusing: %s is defined %d times" % (name, len(hits)))
+        e = parse_line(lines[hits[0]])
+        if e.type != "object":
+            raise Refused("refusing: %s is type:%s - only a data object is resized (a function grows by a merge)"
+                          % (name, e.type or "?"))
+        if e.size == new_size:
+            applied.append((None, name, new_size))
+            return
+        inside = sorted(n for (sec, addr), names in by_addr.items() if sec == e.section
+                        and e.address < addr < e.address + new_size for n in names)
+        if inside:
+            raise Refused("refusing: 0x%X would cover %s - fold it first (`merge <label> <object> <size>`), or pick a smaller size"
+                          % (new_size, ", ".join(inside[:3])))
+        grown[hits[0]] = resize(lines[hits[0]], name, new_size)
 
     def apply(self, plan: RenamePlan | MergePlan, write: Callable[[str, str], None] | None = None) -> bool:
         """Write `plan` once (through `write(path, text)`, default `write_text`); False when it is a no-op."""

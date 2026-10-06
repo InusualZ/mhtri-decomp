@@ -95,7 +95,7 @@ def find_refs(names, roots, limit, exclude=None):
     The scan `rename` warns with and `merge-batch` refuses on: a name mentioned in the source is a
     caller a delete would break.  Bounded by `limit` hits per name, so the output cannot flood.
     """
-    pats = {n: re.compile(r"\b%s\b" % re.escape(n)) for n in names}
+    pats = {n: _sym.name_pattern(n) for n in names}
     hits = {n: [] for n in names}
     for root in roots:
         base_root = os.path.join(repo(), root)
@@ -133,7 +133,7 @@ SRC_SUFFIXES = (".c", ".h", ".cpp", ".hpp")
 def ref_kinds(line, name):
     """The kinds of mention of `name` on `line` - a subset of {code, path, string, comment}."""
     kinds = set()
-    for m in re.finditer(r"\b%s\b" % re.escape(name), line):
+    for m in _sym.name_pattern(name).finditer(line):
         before, after = line[:m.start()], line[m.end():]
         quoted = (before.count('"') % 2) or (before.count("'") % 2)
         commented = "//" in before or "/*" in before
@@ -271,7 +271,7 @@ def merge(a, rows):
     if not rows:
         print("no merge rows in %s" % a.mapfile)
         return 0
-    scan = None if a.no_refs else (lambda names: find_refs(names, a.roots, a.limit, a.file))
+    scan = None if a.no_refs else (lambda names: find_refs([n for n in names if n], a.roots, a.limit, a.file))
     _text, nl, lines, grown, deleted, applied = plan_merge(a.file, rows, scan)
     if not a.dry_run:
         apply_merge(a.file, nl, lines, grown, deleted)
@@ -280,14 +280,19 @@ def merge(a, rows):
     for i in sorted(deleted):
         print("%s %s" % ("would delete" if a.dry_run else "deleted", lines[i]))
     for phantom, previous, new_size in applied:
-        print("no-op: %s -> %s already merged (size:0x%X)" % (phantom, previous, new_size))
+        if phantom is None:
+            print("no-op: %s already has size:0x%X" % (previous, new_size))
+        else:
+            print("no-op: %s -> %s already merged (size:0x%X)" % (phantom, previous, new_size))
     print("%s %d merged, %d deleted, %d already merged in %s"
           % ("dry-run:" if a.dry_run else "wrote", len(grown), len(deleted), len(applied), a.file))
     return 0
 
 
 def read_merge_rows(mapfile):
-    """Parse a `merge <phantom> <previous> <new_size_hex>` batch file (`#` comments allowed)."""
+    """Parse a batch file (`#` comments allowed): `merge <phantom> <previous> <size>` (a phantom function, or a data
+    label at or inside the previous object - `fold` is the same row) and `size <object> <size>` (a data object's
+    size); sizes in hex."""
     rows = []
     with open(mapfile, "r", encoding="utf-8") as fh:
         for lineno, line in enumerate(fh, 1):
@@ -295,16 +300,17 @@ def read_merge_rows(mapfile):
             if not line:
                 continue
             tok = line.split()
-            if len(tok) != 4 or tok[0].lower() != "merge":
-                raise SystemExit("refusing: %s:%d is not 'merge <phantom> <previous> <size>': %s"
-                                 % (mapfile, lineno, line[:80]))
+            verb = tok[0].lower()
+            if not ((verb in ("merge", "fold") and len(tok) == 4) or (verb == "size" and len(tok) == 3)):
+                raise SystemExit("refusing: %s:%d is not 'merge|fold <label> <object> <size>' or "
+                                 "'size <object> <size>': %s" % (mapfile, lineno, line[:80]))
             try:
-                new_size = int(tok[3], 16)
+                new_size = int(tok[-1], 16)
             except ValueError:
-                raise SystemExit("refusing: %s:%d has no hex size: %s" % (mapfile, lineno, tok[3]))
+                raise SystemExit("refusing: %s:%d has no hex size: %s" % (mapfile, lineno, tok[-1]))
             if new_size <= 0:
                 raise SystemExit("refusing: %s:%d has a non-positive size" % (mapfile, lineno))
-            rows.append((tok[1], tok[2], new_size))
+            rows.append((None, tok[1], new_size) if verb == "size" else (tok[1], tok[2], new_size))
     return rows
 
 
