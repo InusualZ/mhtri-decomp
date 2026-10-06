@@ -20,7 +20,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "g3d/g3d_calcview.h" /* fn_8007100C (rule 2) */
-#include "g3d/g3d_state.h" /* fn_80088584 (rule 2) */
+#include "g3d/g3d_state.h" /* g3d_state_get_render_mode (rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_80075DCC/fn_80075DD8, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
 #include "g3d/g3d_camera_types.h"
@@ -86,7 +86,7 @@ extern const char lbl_8058E55C[];
 /* types                                                                                             */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* The render-mode object `fn_80088584` returns (`GXRenderModeObj`-shaped). */
+/* The render-mode object `g3d_state_get_render_mode` returns (`GXRenderModeObj`-shaped). */
 struct RenderModeObj {
     /* +0x00 */ u32 mUnk00;
     /* +0x04 */ u16 mUnk04;
@@ -220,7 +220,7 @@ CameraData* fn_80074A54(nw4r::g3d::Camera* pSelf) {
 
 /* Reset every camera field from the current render mode. */
 void fn_800746DC(nw4r::g3d::Camera* pSelf) {
-    RenderModeObj* pMode = (RenderModeObj*)fn_80088584();
+    RenderModeObj* pMode = (RenderModeObj*)g3d_state_get_render_mode();
     if (pMode == NULL) {
         nw4r::db::Panic(lbl_8058E430, 50, lbl_8058E440);
     }
@@ -529,7 +529,7 @@ void fn_800756DC(nw4r::g3d::Camera* pSelf) {
         return;
     }
     CameraData* pData = fn_80074A54(pSelf);
-    if (fn_80088584()->mUnk18 != 0) {
+    if (g3d_state_get_render_mode()->mUnk18 != 0) {
         fn_804BA7A0((pData->mFlags & 0x100) != 0, pData->mViewportX, pData->mViewportY,
                     pData->mViewportW, pData->mViewportH, pData->mViewportNear, pData->mViewportFar);
         return;

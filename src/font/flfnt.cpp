@@ -17,7 +17,8 @@
  *   under it).
  * NAMES. The map's own names and stems, the stems defined `extern "C"`; the file name `flfnt` is a GUESS from
  *   the `flfnt*` entry points.  `FlFnt` is a GUESS read off the `flfnt*` bodies, its size an approximation;
- *   `getGlyphWidth` (0x8005BF68) is a GUESS (the glyph-width lookup `Network/network_pat_control.cpp` calls).
+ *   `getGlyphWidth` (0x8005BF68) is a GUESS (the glyph-width lookup `Network/network_pat_control.cpp` calls);
+ *   gx_tex_obj_copy is a GUESS (0x8005C50C: the 0x20-byte copy flfntFlush and the g3d texture-object cache call).
  * RESIDUALS. Unwritten (objdiff scores them zero): flfntStackReset, flKnjMsgNumPtr, flKnjMsgNum, flfntPrintf,
  *   fn_8005B278, fn_8005BA68-fn_8005BD3C, utf82unicode2, fn_8005BF20, getGlyphWidth, fn_8005BFDC, flfntFlush,
  *   fn_8005C4CC-fn_8005C500, font_print, fn_8005C618, font_print_ex, fn_8005C8F0, fn_8005C9B8, fn_8005CA64,
@@ -249,7 +250,7 @@ typedef struct MtxBlock8 {
     /* +0x00 */ u32 w[8];
 } MtxBlock8; /* size: 0x20 */
 
-extern "C" void fn_8005C50C(MtxBlock8* dst, MtxBlock8* src)
+extern "C" void gx_tex_obj_copy(MtxBlock8* dst, MtxBlock8* src)
 {
     *dst = *src;
 }

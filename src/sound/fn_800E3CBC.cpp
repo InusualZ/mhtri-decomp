@@ -54,6 +54,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/nw_res_manager.h"
+#include "g3d/g3d_state.h" /* g3d_state_invalidate (rule 2) */
 
 #pragma peephole off
 
@@ -160,7 +161,6 @@ void fn_80081714(void* a, u32 b, WorkBuf* out);
 f32 vec3_dot(const VEC3* a, const VEC3* b);
 void* fn_8007B544(void* a, u32 b);
 void fn_80049728(void* p, s32 n);
-void fn_80088590(s32 n);
 void GXInvalidateVtxCache(void);
 void GXSetBlendMode(u32 a, u32 b, u32 c, u32 d);
 void GXSetZMode(u32 a, u32 b, u32 c);
@@ -461,7 +461,7 @@ extern "C" void fn_800E444C(u8 idx, u8 mode)
             Obj* h = (Obj*)rec->handle;
             void* m = ((PrimMgr*)nw_res_manager)->field_0x29084;
             h->sub->slot7(h, m);
-            fn_80088590(0x7FF);
+            g3d_state_invalidate(0x7FF);
             continue;
         }
     }

@@ -14,6 +14,7 @@
 #include "nw4r/math.h"      /* nw4r::math::MTX34 */
 #include "gx/fn_8009AA78.h" /* fn_8009AB1C / fn_8009AC44 - owner gx/fn_8009AA78.c (rule 2) */
 #include "fn_8004CAD8.h"    /* MTX34_ctor / fn_80050508 - owner src/fn_8004CAD8.cpp (rule 2) */
+#include "g3d/g3d_gpu.h"
 
 /* `Panic(const char* pFile, int line, const char* pFmt, ...)`; the map's name is the C++ mangling
  * `Panic__Q24nw4r2dbFPCciPCce`, so it is called through its owner, never by the mangled spelling
@@ -52,31 +53,6 @@ extern "C" void GXLoadTexMtxImm(const void* pMtx, u32 id, u32 type);
         if (!ok1_)                                                                              \
             nw4r::db::Panic("g3d_gpu.cpp", line, msg, (ptr));                                    \
     }
-
-/* The eight-setting record GDSetCurrentMtx packs.  Its own assert message names it ("Array8(=%p) is not
- * valid pointer."); the caller `fn_80087CCC` fills the eight words from a per-texgen table (the values
- * it writes - 0, 30, 60 - all fit the six bits the packing leaves each field).  The name of each field
- * is its slot in the two emitted command words: `lo_*` goes to the word at bits 0/6/12/18, `hi_*` to
- * the one at bits 6/12/18/24.
- * size: 0x20 (all eight words are read) */
-struct Array8 {
-    /* +0x00 */ u32 hi_bits_6;   /* -> second command word bits 6-11  */
-    /* +0x04 */ u32 hi_bits_12;  /* -> second command word bits 12-17 */
-    /* +0x08 */ u32 hi_bits_18;  /* -> second command word bits 18-23 */
-    /* +0x0C */ u32 hi_bits_24;  /* -> second command word bits 24-29 */
-    /* +0x10 */ u32 lo_bits_0;   /* -> first command word bits 0-5    */
-    /* +0x14 */ u32 lo_bits_6;   /* -> first command word bits 6-11   */
-    /* +0x18 */ u32 lo_bits_12;  /* -> first command word bits 12-17  */
-    /* +0x1C */ u32 lo_bits_18;  /* -> first command word bits 18-23  */
-};
-
-/* The stored 3x3 rotation GDLoadTexMtxImm3x3 expands.  The caller `fn_80087CCC` passes fn_80087F08's result
- * (the resource's matrix block) and the body reads all nine floats as one contiguous 0x24 block, so it
- * is a 3x3 and not the 3x4 `MTX34` the expanded form uses.
- * size: 0x24 */
-struct Mat33 {
-    /* +0x00 */ f32 m[3][3];
-};
 
 extern "C" {
 

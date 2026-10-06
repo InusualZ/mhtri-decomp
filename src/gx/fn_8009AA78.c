@@ -4,7 +4,7 @@
  * A write-gather-pipe command writer and the six entry points built on it. `fn_8009AB1C`/`28`/`38` are
  * the u32/u16/u8 stores to the pipe window at 0xCC008000; the other functions pack a command word and
  * hand it to one of two shape-identical writers, `fn_800868A0` (opcode byte 0x61, then a u32) and
- * `fn_80077420` (0x10, a u16 register, then a u32). `fn_8009AA78`/`fn_8009AB48`/`fn_8009AB8C` build
+ * `GDWriteXFCmd` (0x10, a u16 register, then a u32). `fn_8009AA78`/`fn_8009AB48`/`fn_8009AB8C` build
  * that word from bit fields; `fn_8009AC44`/`fn_8009AC98` emit the fixed 0x10 and 0x08 opcodes. The
  * `.sdata2` byte table `lbl_80795F58` ({0,2,1,3}, owned by another unit) is read as `lbl_80795F58[e]`.
  *
@@ -26,13 +26,14 @@
  * evidence - and no other address in the range resolves, so the provisional names stand.
  *
  * NAMES. GDSetTexCoordScale2 is a GUESS (0x8009AB8C: it writes one texture coordinate's s/t scale, bias and wrap
- *   pair behind the 0xFE03FFFF mask, the SDK's GD call of that name).
+ *   pair behind the 0xFE03FFFF mask, the SDK's GD call of that name); GDSetGenMode2 is a GUESS (0x8009AA78: the gen-mode
+ *   word and the two XF counts, the SDK's GD call of that name).
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit gx/fn_8009AA78.c`.
  */
 
 #include "gx.h"
 #include "g3d/g3d_state.h" /* fn_800868A0 (rule 2) */
-#include "g3d/fn_80075DCC.h" /* fn_80077420, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "g3d/fn_80075DCC.h" /* GDWriteXFCmd, owned by g3d/fn_80075DCC.cpp (rule 2) */
 
 /* The write-gather-pipe window at 0xCC008000 and its `GXWGFifo` macro live in `gx.h` now that
  * a second `auto` unit (the GX-writer family at 0x800C6F90) needs them too (CLAUDE.md -> Conventions,
@@ -40,19 +41,19 @@
 
 /* Pipe writers and the byte table, all defined by other translation units of the same library; the
  * addresses are the map's and the local extab names above are the only object-level difference.
- * `fn_800868A0` comes from `g3d/g3d_state.h`, `fn_80077420` from `g3d/fn_80075DCC.h` (rule 2). */
+ * `fn_800868A0` comes from `g3d/g3d_state.h`, `GDWriteXFCmd` from `g3d/fn_80075DCC.h` (rule 2). */
 extern const u8 lbl_80795F58[4];
 
 #pragma peephole off
 
 /* Packs the four operands and the table's byte into one command word, then writes it and the two
  * register fields it selects. */
-void fn_8009AA78(u8 a, u8 b, u8 c, u8 d, int e) {
+void GDSetGenMode2(u8 a, u8 b, u8 c, u8 d, int e) {
     fn_800868A0(0xFE07FC3F);
     fn_800868A0((((d & 0xFF) << 16) | ((u32)lbl_80795F58[e] << 14))
                 | ((((c & 0xFF) - 1) << 10) | ((a & 0xFF) | ((b & 0xFF) << 4))));
-    fn_80077420(0x1009, b);
-    fn_80077420(0x103F, a);
+    GDWriteXFCmd(0x1009, b);
+    GDWriteXFCmd(0x103F, a);
 }
 
 /* Writes a 32-bit command word to the pipe. */

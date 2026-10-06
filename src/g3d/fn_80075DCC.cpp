@@ -7,9 +7,10 @@
  *   `g3d/g3d_camera.cpp`; the right edge is the discovery's byte cap, not a TU seam (`g3d/g3d_scnmdl.cpp` follows).
  * NAMES. The file keeps the map's stem (no one `__FILE__` names the run).  The bodies are m2c's output, typed
  *   mechanically: each `RawView_N` struct's `field_0xNN` states an offset and a size, not a meaning.
- *   GUESS (from the body and its callers): `sin_cos_deg`, `mtx34_set`; `CopiedMatResources` is a GUESS (the 0x38-byte
+ *   GUESS (from the body and its callers): `sin_cos_deg`, `mtx34_set`; GDWriteXFCmd is a GUESS (the SDK's GD inline that
+ *   writes one XF register: opcode 0x10, a zero count, the address, the value); `CopiedMatResources` is a GUESS (the 0x38-byte
  *   set of material handles fn_80077E70 refills and 0x80078DC0 constructs).  The material resource classes'
- *   constructors, assignments and `ResMat` getters are nw4r's `g3d_resmat_ac.h` members.
+ *   constructors, assignments, ResMatTexCoordGen::IsValid, ResMatTevColor::IsValid and `ResMat` getters are nw4r's `g3d_resmat_ac.h` members.
  * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, mtx34_set, fn_80079EE4, fn_8007A468.
  *   Unwritten (empty stubs, 33 rows, 0x31F0 bytes; objdiff scores them near zero): fn_800769F4, fn_8007868C,
  *   fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8, fn_800793A4, fn_80079604, fn_80079938, fn_800799BC,
@@ -204,7 +205,6 @@ void* fn_800638B8(void*, void*);
 s32 fn_80063964(s32, void*);
 s32 fn_800639D0(void*, void*);
 s32 fn_8006405C(void*);
-s32 fn_80064820(void*);
 u32 fn_80064BD4(void*);
 s32 fn_8006518C(void);
 u32 fn_800651A4(void*);
@@ -225,22 +225,15 @@ s32 fn_80074074(void*);
 u32 fn_80074620(void*);
 void* fn_80074A54(void);
 s32 fn_80075844(s32);
-u32 fn_800869D4(void*);
 u32 fn_80086B2C(void*, s32, s32, s32, s32, void*, s32);
-u32 fn_800870E4(void*);
 u32 fn_8008715C(void*);
 u32 fn_80087978(void*);
 u32 fn_80087AD0(void*, s32, s32);
-u32 fn_80087DF8(s32, s32, s32);
-void* fn_80087F08(s32);
-void* fn_80088048(void);
 u32 fn_8008818C(void);
 s32 fn_80088260(s8);
 s8 fn_80088270(s8);
 u32 fn_800882A0(void*, void*, void*, void*, void*);
-s32 fn_8008831C(void);
 u32 fn_80088574(void*);
-u32 fn_80088590(u32);
 s32 fn_80094094(s32);
 s32 fn_80099974(void*);
 s32 fn_80099BB0(void*);
@@ -268,14 +261,12 @@ u32 math_sincos_idx(f32);
 /* internal */ void fn_80076050(s32 arg0, s32 arg1, s32 arg2, s32 arg3);
 /* internal */ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4);
 /* internal */ void* fn_8007663C(s32 *arg0);
-/* internal */ s32 fn_8007673C(s32 *arg0);
-/* internal */ s32 fn_80076750(s32 *arg0);
 /* internal */ u32 fn_800769F4(s32 *arg0, s32 *arg1, s32 arg2, s32 arg3, s32 arg4, void *arg5, s32 arg6);
 /* internal */ void* fn_80077398(s32 arg0);
 /* internal */ s32 fn_800773FC(s32 *arg0);
 /* internal */ void* fn_80077404(void* a0);
 /* internal */ u32 fn_8007740C(s32 arg0, s32 *arg1);
-/* internal */ u32 fn_80077420(u16 arg0, s32 arg1);
+/* internal */ u32 GDWriteXFCmd(u16 arg0, s32 arg1);
 /* internal */ u32 fn_80077474(s32 arg0);
 /* internal */ u32 fn_80077480(u16 arg0);
 /* internal */ u32 fn_80077490(u8 arg0);
@@ -658,12 +649,12 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
             sp44 = ((RawView_2*)arg2)->field_0x10;
             g3d_state_load_mat_pix(*reinterpret_cast<nw4r::g3d::ResMatPix*>((void*)(&sp44)));
         }
-        if ((arg2 == NULL) || (fn_80076750((s32 *)(&((RawView_2*)arg2)->field_0x14)) == 0)) {
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>((void*)(&((RawView_2*)arg2)->field_0x14))->IsValid() == 0)) {
             sp40 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatTevColor().mpData;
-            fn_800869D4((void*)(&sp40));
+            g3d_state_load_mat_tev_color(*reinterpret_cast<nw4r::g3d::ResMatTevColor*>((void*)(&sp40)));
         } else {
             sp3C = ((RawView_2*)arg2)->field_0x14;
-            fn_800869D4((void*)(&sp3C));
+            g3d_state_load_mat_tev_color(*reinterpret_cast<nw4r::g3d::ResMatTevColor*>((void*)(&sp3C)));
         }
         if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&((RawView_2*)arg2)->field_0x18))->IsValid() == 0)) {
             if (arg3 != NULL) {
@@ -686,7 +677,7 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
         sp79 = sp75;
         sp7A = sp76;
         sp7B = sp77;
-        if ((arg2 == NULL) || (fn_80064820((void*)(&((RawView_2*)arg2)->field_0x1C)) == 0)) {
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatChan*>((void*)(&((RawView_2*)arg2)->field_0x1C))->IsValid() == 0)) {
             sp24 = (s32) sp78;
             sp28 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatChan().mpData;
             fn_80086B2C((void*)(&sp28), (s32)(sp88), (s32)(sp84), (s32)(sp80), (s32)(sp7C), (void*)(&sp24), (s32)((arg1 & 8) != 0));
@@ -695,12 +686,12 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
             sp20 = ((RawView_2*)arg2)->field_0x1C;
             fn_80086B2C((void*)(&sp20), (s32)(sp88), (s32)(sp84), (s32)(sp80), (s32)(sp7C), (void*)(&sp1C), (s32)((arg1 & 8) != 0));
         }
-        if ((arg2 == NULL) || (fn_8007673C((s32 *)(&((RawView_2*)arg2)->field_0x20)) == 0)) {
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatTexCoordGen*>((void*)(&((RawView_2*)arg2)->field_0x20))->IsValid() == 0)) {
             sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatTexCoordGen().mpData;
-            fn_800870E4((void*)(&sp18));
+            g3d_state_load_tex_coord_gen(*reinterpret_cast<nw4r::g3d::ResMatTexCoordGen*>((void*)(&sp18)));
         } else {
             sp14 = ((RawView_2*)arg2)->field_0x20;
-            fn_800870E4((void*)(&sp14));
+            g3d_state_load_tex_coord_gen(*reinterpret_cast<nw4r::g3d::ResMatTexCoordGen*>((void*)(&sp14)));
         }
         if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTexSrt*>((void*)(&((RawView_2*)arg2)->field_0x28))->IsValid() == 0)) {
             sp10 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTexSrt().mpData;
@@ -767,15 +758,19 @@ extern "C" {
 /* 0x80076734 (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatTexCoordGenData)
 
+/* 0x80076750 (0x14): whether the handle is set. */
+bool nw4r::g3d::ResMatTevColor::IsValid() const {
+    return mpData != NULL;
+}
+
+/* 0x8007673C (0x14): whether the handle is set. */
+bool nw4r::g3d::ResMatTexCoordGen::IsValid() const {
+    return mpData != NULL;
+}
+
 extern "C" {
 
-s32 fn_8007673C(s32 *arg0) {
-    return *arg0 != 0;
-}
 
-s32 fn_80076750(s32 *arg0) {
-    return *arg0 != 0;
-}
 
 } /* extern "C" */
 
@@ -1017,10 +1012,10 @@ void* fn_80077404(void* a0) {
 }
 
 u32 fn_8007740C(s32 arg0, s32 *arg1) {
-    fn_80077420((u16)((u16) ((arg0 & 1) + 0x100C)), (s32)(*arg1));
+    GDWriteXFCmd((u16)((u16) ((arg0 & 1) + 0x100C)), (s32)(*arg1));
 }
 
-u32 fn_80077420(u16 arg0, s32 arg1) {
+u32 GDWriteXFCmd(u16 arg0, s32 arg1) {
     fn_80077490((u8)(0x10));
     fn_80077480((u16)(0U));
     fn_80077480((u16)(arg0));
@@ -1310,7 +1305,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
     }
     var_r29 = 0;
     MTX34_ctor((nw4r::math::MTX34*)&spC8);
-    temp_r3 = (void **)(fn_80088048());
+    temp_r3 = (void **)(g3d_state_get_ind_mtx_hook());
     ((RawView_16*)(*temp_r3))->field_0x10();
     var_r28 = 0U;
     var_r31 = (s32 *)(&sp8C);
@@ -1326,7 +1321,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                 if ((s32) ((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08 >= 0) {
                     temp_r20 = fn_8006FDCC((void*)(arg1));
                     if ((u32) ((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08 == temp_r20) {
-                        temp_r3_2 = (void *)(fn_80087F08((s32)(((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08)));
+                        temp_r3_2 = (void *)(g3d_state_get_nrm_mtx((u32)(((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08)));
                         spC8 = ((RawView_18*)temp_r3_2)->field_0x00;
                         spCC = ((RawView_18*)temp_r3_2)->field_0x04;
                         spD0 = ((RawView_18*)temp_r3_2)->field_0x08;
@@ -1348,7 +1343,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                         fn_8005D2C0((void*)(&sp28), (void*)(&sp18));
                         temp_r20_2 = fn_8005D218((void*)(arg1));
                         mtx34_concat((void*)(&spC8), (void*)(fn_8005D218((void*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
-                        temp_r3_4 = (void *)(fn_80087F08((s32)(((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08)));
+                        temp_r3_4 = (void *)(g3d_state_get_nrm_mtx((u32)(((RawView_17*)fn_800773FC((s32 *)(arg2)))->field_0x08)));
                         sp8 = ((RawView_19*)temp_r3_4)->field_0x18;
                         spC = ((RawView_19*)temp_r3_4)->field_0x1C;
                         sp10 = ((RawView_19*)temp_r3_4)->field_0x20;
@@ -1375,7 +1370,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                     spE0 = sp6C;
                     spF0 = sp70;
                 } else {
-                    fn_8007100C((void*)(&spC8), (s32)(fn_8008831C()));
+                    fn_8007100C((void*)(&spC8), (s32)(g3d_state_get_camera_mtx()));
                 }
             }
             temp_r3_5 = fn_80088260((s8)(fn_80088270((s8)((s8) *var_r30))));
@@ -2455,7 +2450,7 @@ s32 OSInitFastCast(void* a0) {
 }
 
 void fn_8007A510(void* a0) {
-    fn_80088590((u32)(0x7FF));
+    g3d_state_invalidate(0x7FF);
 }
 
 void* fn_8007A518(s32 *arg0, s32 *arg1) {
@@ -3005,7 +3000,7 @@ typedef struct {
 s32 fn_8007BC2C(void *arg0, s32 arg1) {
     u32 sp8;
 
-    if (((s32) ((RawView_72*)arg0)->field_0x00 != 0) && (fn_80064820((void*)(&((RawView_72*)arg0)->field_0x14)) != 0)) {
+    if (((s32) ((RawView_72*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatChan*>((void*)(&((RawView_72*)arg0)->field_0x14))->IsValid() != 0)) {
         if (arg1 != 0) {
             fn_8007BB94((void *)(((RawView_72*)arg0)->field_0x00), (s32)(((RawView_72*)arg0)->field_0x04), (s32)(8));
         }
@@ -3077,7 +3072,7 @@ typedef struct {
 s32 fn_8007BE2C(void *arg0, s32 arg1) {
     u32 sp8;
 
-    if (((s32) ((RawView_76*)arg0)->field_0x00 != 0) && (fn_80076750((s32 *)(&((RawView_76*)arg0)->field_0x24)) != 0)) {
+    if (((s32) ((RawView_76*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>((void*)(&((RawView_76*)arg0)->field_0x24))->IsValid() != 0)) {
         if (arg1 != 0) {
             fn_8007BB94((void *)(((RawView_76*)arg0)->field_0x00), (s32)(((RawView_76*)arg0)->field_0x04), (s32)(0x100));
         }

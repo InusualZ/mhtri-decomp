@@ -257,8 +257,13 @@ public:
     static const char* GetClassName();
     bool IsValid() const;
     ResTexSrtData* ptr();
+    const ResTexSrtData* ptr() const;
     ResTexSrtData& ref();
     const ResTexSrtData& ref() const;
+    u32 GetTexMtxMode() const;
+    u32 GetTexSrtFlag(u32 id) const;
+    BOOL IsIdentityTexMtx(u32 id) const;
+    BOOL IsExist(u32 id) const;
 
     /* +0x00 */ void* mpData; /* untyped: opaque handle */
 };
@@ -326,6 +331,7 @@ public:
     void GXSetTevColor(_GXTevRegID id, GXColor color);
     bool GXGetTevKColor(_GXTevKColorID id, GXColor* pColor) const;
     void GXSetTevKColor(_GXTevKColorID id, GXColor color);
+    void CallDisplayList(bool bSync) const;
 };
 
 /* size: 0x4 */

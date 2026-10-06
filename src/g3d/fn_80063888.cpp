@@ -9,7 +9,7 @@
  *   near 0x800649CC.  The left edge is `g3d/g3d_anmchr.cpp`'s end, the right edge `g3d/g3d_anmscn.cpp`.
  * NAMES. The file keeps the map's stem (no one `__FILE__` names the run); the stems are defined `extern "C"`
  *   (playbook 48), `fn_80066C8C` keeps C++ linkage (map row `fn_80066C8C__FPv`), and the `PlayPolicy` pair sits in
- *   `nw4r::g3d`.  The cross-unit declarations are `g3d/fn_80063888.h`.
+ *   `nw4r::g3d`, as do ResMatChan's GetClassName and IsValid.  The cross-unit declarations are `g3d/fn_80063888.h`.
  *   GUESS: `vec3_copy_construct` (0x80067E54): copies three floats into `out` and returns it (a VEC3 copy).
  * RESIDUALS. `fn_80066FA0` lacks retail's call to `fn_80066DB4` (+0x9C).  27 functions unwritten (objdiff scores
  *   them zero) in 17 runs: 0x80063E60-0x80063FC8,
@@ -751,9 +751,10 @@ extern "C" u32 fn_8006403C(void)
     return (u32)lbl_8058C208;
 }
 
-extern "C" u32 fn_80064814(void)
+/* 0x80064814 (0xC): returns the class name. */
+const char* nw4r::g3d::ResMatChan::GetClassName()
 {
-    return (u32)lbl_8058C1D0;
+    return (const char *)lbl_8058C1D0;
 }
 
 extern "C" u32 fn_800658B8(void)
@@ -781,9 +782,10 @@ extern "C" s32 fn_80064048(u32 *p)
     return *p != 0;
 }
 
-extern "C" s32 fn_80064820(void *p)
+/* 0x80064820 (0x14): whether the handle is set. */
+bool nw4r::g3d::ResMatChan::IsValid() const
 {
-    return *(u32 *)p != 0;
+    return mpData != NULL;
 }
 
 extern "C" s32 fn_800658C4(u32 *p)
@@ -979,9 +981,9 @@ extern "C" u32 fn_80063FD0(void *p)
 /* 0x800647A8 (0x64): returns the channel block, panicking on a NULL handle. */
 nw4r::g3d::ResMatChanData& nw4r::g3d::ResMatChan::ref()
 {
-    if (fn_80064820(this) == 0)
+    if (IsValid() == 0)
         nw4r::db::Panic((const char *)lbl_8058C1F8, 0x1d1, (const char *)lbl_8058C1DC,
-                        (const char *)fn_80064814(), "ref");
+                        GetClassName(), "ref");
     return *(ResMatChanData *)fn_8006480C((u32 *)this);
 }
 
