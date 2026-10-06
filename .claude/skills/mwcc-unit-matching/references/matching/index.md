@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (89)
+## Ideas that work (90)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -98,6 +98,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 101 | [A materialised 0/1 that is tested again is an inlined helper's return](101-inlined-bool-retest.md) | works | source-shape | Retail sets `li r0,0` / `li r0,1` and then immediately re-tests r0 (`cmpwi r0,0; bne`) where ours branches straight to the return |
 | 102 | [A signed byte's register pair names its type: in-place extsb is an s8 field, lbz r0 + extsb is a cast from u8](102-signed-bytes-register-pair.md) | works | source-shape, allocator | A byte read that feeds a signed value differs only in registers - retail `lbz r4; extsb r4,r4` against ours `lbz r0; extsb r4,r0`, or the reverse - and no allocator lever moves it. |
 | 103 | [A dead li r0,0 + cmpwi r0,0 after a Panic is the assert written as an expression](103-dead-li-r0-0.md) | works | source-shape | Retail has a branchless `li r0, 0x0` + `cmpwi r0, 0x0` right after an assert's `bl Panic`, ours goes straight on (2 target-only instructions, 8 bytes short). |
+| 104 | [A paired-single body is an asm function or an asm block with register locals](104-paired-single-body-is.md) | works | source-shape, allocator | A function full of `psq_l`/`ps_*` sits at 0-60 % as C, and when it is written as `asm`, the C code around the block (an assert) moves to other registers |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

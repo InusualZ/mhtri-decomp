@@ -186,18 +186,18 @@ void fn_800CBFB0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         return;
     }
     scaleA = 1.1920929e-07f;
-    if (fn_800C9DCC(params->scale_a) > scaleA) {
+    if (ef_fabsf(params->scale_a) > scaleA) {
         scaleA = params->scale_a;
     }
     scaleB = 1.1920929e-07f;
-    if (fn_800C9DCC(params->scale_b) > scaleB) {
+    if (ef_fabsf(params->scale_b) > scaleB) {
         scaleB = params->scale_b;
     }
     if (flags & 0x02000000) {
         scaleC = scaleA;
     } else {
         scaleC = 1.1920929e-07f;
-        if (fn_800C9DCC(params->scale_c) > scaleC) {
+        if (ef_fabsf(params->scale_c) > scaleC) {
             scaleC = params->scale_c;
         }
     }

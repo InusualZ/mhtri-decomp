@@ -47,7 +47,7 @@ static inline LbMenuBigBlock* lb_menu_block(void)
 extern "C" {
 void* fn_8021EFC8(LbMenuScratch* work);
 u32 fn_8021E1B4(LbMenuActor* self, VEC3* pos);
-f32 fn_80463F04(f32 v);
+f32 fabsf(f32 v);
 
 u32 fn_8021DF50(u32 idx, u32 limit);
 void fn_8021DDA8(LbMenuCandidate* candidate, LbMenuRow* row);
@@ -104,7 +104,7 @@ s32 fn_8021E1EC(LbMenuActor* self, LbMenuActor* rec, LbMenuFallback* work, u32 l
 /* The y-window filter's absolute value helper (retail: `b <fabsf>`). */
 f32 fn_8021E300(f32 v)
 {
-    return fn_80463F04(v);
+    return fabsf(v);
 }
 
 /* The entry filter: the entry's kind byte must not be 0x49 on a busy actor, and its mode must not be

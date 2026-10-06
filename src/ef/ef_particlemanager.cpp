@@ -27,7 +27,10 @@
  *   creation frame start.
  *   GUESS: `ef_pm_draw` (0x800ADED8): table slot 7, draws the particles through the manager's draw strategy.
  *   GUESS: `ef_pm_calc_emitter_pos` (0x800ADA5C): a position relative to the emitter, from the three matrices.
- * RESIDUALS. 1 row unwritten (an empty body): 0x800AE6A8-0x800AEE0C (`ef_pm_modulate_color`).  The source order differs from retail's, so `.text`, extab and
+ *   GUESS: `ef_pm_particle_mtx` (0x800AE698): the static matrix the colour fade takes a particle's position with.
+ *   GUESS: `ef_pm_err_pp`, `ef_pm_err_color_pri`, `ef_pm_err_color_sec`, `ef_pm_f32_epsilon`, `ef_pm_f32_256`
+ *   (the colour fade's assert messages and constants, named from their text and value).
+ * RESIDUALS. No row is unwritten.  The source order differs from retail's, so `.text`, extab and
  *   extabindex run in another order.
  *  - `ef_field_random`: three products keep their operands in the other order (`fmuls f1, f1, f0`).
  *  - `ef_pm_calc`: the frame is 0x420 where retail's is 0x430 and the locals sit at other offsets; the field and
@@ -42,7 +45,6 @@
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_805013FC`,
  *     `MTX34RotAxisFIdx__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3f`.
  *   flipcheck: referenced but defined by nothing a flip can use: `fn_805013FC`, `fn_80501C80`.
- *   `ef_pm_modulate_color` is unwritten (an empty body).
  * SHAPES. The pointer asserts are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
  *   ("ef_particlemanager.cpp", "particle.h" or "res_emitter.h"); `#line` reproduces each assert's line (61, 72, 73,
  *   0x29E, 0x2D5, ...).
@@ -92,6 +94,8 @@ extern const f32 ef_pm_f32_minus_one; /* -1.0f */
 extern const f32 ef_pm_f32_32768; /* 32768.0f */
 extern const f32 ef_pm_f32_65535; /* 65535.0f */
 extern const f32 ef_pm_f32_pi; /* pi */
+extern const f32 ef_pm_f32_epsilon; /* FLT_EPSILON: a fade range below it is no range */
+extern const f32 ef_pm_f32_256; /* 256.0f: the fade factor's fixed-point one */
 extern const char lbl_80592F78[]; /* "ef_particlemanager.cpp" */
 extern const char lbl_80592F90[]; /* "NW4R:Pointer Error\ntarget(=%p) is not valid pointer." */
 extern const char lbl_80592FC8[]; /* "NW4R:Failed assertion target->mParticleManager == this" */
@@ -110,6 +114,9 @@ extern const char ef_pm_err_emitter_desc[]; /* "NW4R:Pointer Error\ned(=%p) is n
 extern const char ef_pm_err_draw_strategy[]; /* "NW4R:Pointer Error\nmDrawStrategy(=%p) is not valid pointer." */
 extern const char ef_pm_err_mtx_local_to_emitter[]; /* "NW4R:Pointer Error\nmtxLocalToEmitter(=%p) is not valid pointer." */
 extern const char ef_pm_err_mtx_local_to_global[]; /* "NW4R:Pointer Error\nmtxLocalToGlobal(=%p) is not valid pointer." */
+extern const char ef_pm_err_pp[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer." */
+extern const char ef_pm_err_color_pri[]; /* "NW4R:Pointer Error\ncolorPri(=%p) is not valid pointer." */
+extern const char ef_pm_err_color_sec[]; /* "NW4R:Pointer Error\ncolorSec(=%p) is not valid pointer." */
 extern const char ef_pm_err_mtx_emitter_to_global[]; /* "NW4R:Pointer Error\nmtxEmitterToGlobal(=%p) is not valid pointer." */ /* "NW4R:Pointer Error\nresult(=%p) is not valid pointer." */
 extern const char lbl_80593500[]; /* "NW4R:Pointer Error\nadd(=%p) is not valid pointer." */
 extern const char lbl_80593534[]; /* "particle.h" */
@@ -758,8 +765,8 @@ extern "C" void fn_800AE5B0(EfPmManager* self) {
     }
 }
 
-/* The file's static block accessors. */
-extern "C" nw4r::math::MTX34* fn_800AE698() {
+/* 0x800AE698 (0xC): returns the matrix a particle's position is taken to world space with. */
+extern "C" nw4r::math::MTX34* ef_pm_particle_mtx(EfPmManager* manager) {
     return &lbl_80694568;
 }
 
@@ -1362,4 +1369,67 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
 /* Not yet reconstructed                                                                          */
 /* --------------------------------------------------------------------------------------------- */
 
-extern "C" void ef_pm_modulate_color() {}
+/* 0x800AE6A8 (0x764): multiplies a particle's two colours by the manager's colour, faded toward the
+ * secondary colour with the distance to the manager's point in mode 2. */
+extern "C" void ef_pm_modulate_color(EfPmManager* self, EfPmParticle* pp, u8* colorPri, u8* colorSec) {
+#line 848
+    NW4R_POINTER_ASSERT(lbl_80592F78, pp, ef_pm_err_pp);
+    NW4R_POINTER_ASSERT(lbl_80592F78, colorPri, ef_pm_err_color_pri);
+    NW4R_POINTER_ASSERT(lbl_80592F78, colorSec, ef_pm_err_color_sec);
+    switch (self->stateA.b.dirMode) {
+    case 1:
+        colorPri[0] = (colorPri[0] * self->stateA.b.colorPri[0] + 0x80) >> 8;
+        colorPri[1] = (colorPri[1] * self->stateA.b.colorPri[1] + 0x80) >> 8;
+        colorPri[2] = (colorPri[2] * self->stateA.b.colorPri[2] + 0x80) >> 8;
+        colorPri[3] = (colorPri[3] * self->stateA.b.colorPri[3] + 0x80) >> 8;
+        colorSec[0] = (colorSec[0] * self->stateA.b.colorPri[0] + 0x80) >> 8;
+        colorSec[1] = (colorSec[1] * self->stateA.b.colorPri[1] + 0x80) >> 8;
+        colorSec[2] = (colorSec[2] * self->stateA.b.colorPri[2] + 0x80) >> 8;
+        colorSec[3] = (colorSec[3] * self->stateA.b.colorPri[3] + 0x80) >> 8;
+        break;
+    case 2:
+        if (self->stateA.b.scale < ef_pm_f32_epsilon) {
+            colorPri[0] = (colorPri[0] * self->stateA.b.colorPri[0] + 0x80) >> 8;
+            colorPri[1] = (colorPri[1] * self->stateA.b.colorPri[1] + 0x80) >> 8;
+            colorPri[2] = (colorPri[2] * self->stateA.b.colorPri[2] + 0x80) >> 8;
+            colorPri[3] = (colorPri[3] * self->stateA.b.colorPri[3] + 0x80) >> 8;
+            colorSec[0] = (colorSec[0] * self->stateA.b.colorPri[0] + 0x80) >> 8;
+            colorSec[1] = (colorSec[1] * self->stateA.b.colorPri[1] + 0x80) >> 8;
+            colorSec[2] = (colorSec[2] * self->stateA.b.colorPri[2] + 0x80) >> 8;
+            colorSec[3] = (colorSec[3] * self->stateA.b.colorPri[3] + 0x80) >> 8;
+        } else {
+            nw4r::math::VEC3 world;
+            nw4r::math::MTX34* mtx = ef_pm_particle_mtx(pp->manager);
+            f32 dist;
+            VEC3_ctor(&world);
+            mtx34_mult_vec3(&world, mtx, &pp->accel);
+            PSVECSubtract(&world.x, &world.x, &self->stateA.b.vec.x);
+            dist = vec3_len(&world.x);
+            if (dist > self->stateA.b.scale) {
+                colorPri[0] = (colorPri[0] * self->stateA.b.colorPri[0] + 0x80) >> 8;
+                colorPri[1] = (colorPri[1] * self->stateA.b.colorPri[1] + 0x80) >> 8;
+                colorPri[2] = (colorPri[2] * self->stateA.b.colorPri[2] + 0x80) >> 8;
+                colorPri[3] = (colorPri[3] * self->stateA.b.colorPri[3] + 0x80) >> 8;
+                colorSec[0] = (colorSec[0] * self->stateA.b.colorPri[0] + 0x80) >> 8;
+                colorSec[1] = (colorSec[1] * self->stateA.b.colorPri[1] + 0x80) >> 8;
+                colorSec[2] = (colorSec[2] * self->stateA.b.colorPri[2] + 0x80) >> 8;
+                colorSec[3] = (colorSec[3] * self->stateA.b.colorPri[3] + 0x80) >> 8;
+            } else {
+                s32 t = (s32)(ef_pm_f32_256 * dist / self->stateA.b.scale);
+                u16 r = (self->stateA.b.colorSec[0] << 8) + t * (self->stateA.b.colorPri[0] - self->stateA.b.colorSec[0]);
+                u16 g = (self->stateA.b.colorSec[1] << 8) + t * (self->stateA.b.colorPri[1] - self->stateA.b.colorSec[1]);
+                u16 b = (self->stateA.b.colorSec[2] << 8) + t * (self->stateA.b.colorPri[2] - self->stateA.b.colorSec[2]);
+                u16 a = (self->stateA.b.colorSec[3] << 8) + t * (self->stateA.b.colorPri[3] - self->stateA.b.colorSec[3]);
+                colorPri[0] = (colorPri[0] * r + 0x80) >> 16;
+                colorPri[1] = (colorPri[1] * g + 0x80) >> 16;
+                colorPri[2] = (colorPri[2] * b + 0x80) >> 16;
+                colorPri[3] = (colorPri[3] * a + 0x80) >> 16;
+                colorSec[0] = (colorSec[0] * r + 0x80) >> 16;
+                colorSec[1] = (colorSec[1] * g + 0x80) >> 16;
+                colorSec[2] = (colorSec[2] * b + 0x80) >> 16;
+                colorSec[3] = (colorSec[3] * a + 0x80) >> 16;
+            }
+        }
+        break;
+    }
+}

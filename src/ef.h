@@ -257,7 +257,7 @@ extern f32 ef_random_float(u32* progress);                              /* pseud
 /* 0x80050BC0 is `src/fn_8004CAD8.cpp`'s, declared in `fn_8004CAD8.h`: it takes one float (its body reads only f1
  * and returns `x * FrSqrt(x)`); the second float the callers materialise is the hoisted `1.0f - t` their `else`
  * branch reuses (`ef_disc.cpp` 0x800CCA7C `fsubs f2, f30, f1`, 0x800CCA98 `fsubs f0, f30, f1`). */
-extern f32 fn_800C9DCC(f32 a);                                      /* fabsf */
+extern f32 ef_fabsf(f32 a);                                         /* fabsf */
 extern f32 fn_80463F10(f32 a, f32 b);                               /* fmodf */
 extern f32 fmodf(f32 a, f32 b);                                     /* the same, under the map's name */
 

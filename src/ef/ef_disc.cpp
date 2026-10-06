@@ -19,8 +19,7 @@
  *  - the `.sdata2` constants are our pool's `@N` where retail reads the claimed `lbl_807962B0` run.
  *   flipcheck: `.data` claimed, not emitted.
  * SHAPES. The `.sdata2` constants are literals, so MWCC pools and hoists them out of the loop.
- * SHAPES. This header's line count is load-bearing: with no `#line`, the three `EF_ASSERT_PTR` sites must stay
- *   on lines 42-44 (`__LINE__`).
+ * SHAPES. `#line 42` puts the three `EF_ASSERT_PTR` sites on lines 42-44 (`__LINE__`).
  */
 
 
@@ -39,6 +38,7 @@
 void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
                  u16 id, s32 arg7, f32 farg0) {
     u32 swept; s32 i; f32 scale_a, scale_b, angle, step, range;
+#line 42
     EF_ASSERT_PTR(lbl_80594DE0, lbl_80594DEC, em);
     EF_ASSERT_PTR(lbl_80594DE0, lbl_80594E20, pm);
     EF_ASSERT_PTR(lbl_80594DE0, lbl_80594E54, params);
@@ -47,12 +47,12 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         return;
     }
 
-    scale_a = fn_800C9DCC(params->scale_x) > 1.1920929e-7f ? params->scale_x : 1.1920929e-7f;
+    scale_a = ef_fabsf(params->scale_x) > 1.1920929e-7f ? params->scale_x : 1.1920929e-7f;
 
     if (flags & 0x02000000) {
         scale_b = scale_a;
     } else {
-        scale_b = fn_800C9DCC(params->scale_z) > 1.1920929e-7f ? params->scale_z : 1.1920929e-7f;
+        scale_b = ef_fabsf(params->scale_z) > 1.1920929e-7f ? params->scale_z : 1.1920929e-7f;
     }
 
     angle = 0.0f;

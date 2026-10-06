@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-f32 fn_800C9DCC(f32 arg0); /* 0x800C9DCC - the `fabsf` thunk the emitter shapes call */
+f32 ef_fabsf(f32 arg0); /* 0x800C9DCC - the `fabsf` thunk the emitter shapes call */
 
 #ifdef __cplusplus
 }

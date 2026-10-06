@@ -837,7 +837,7 @@ void fn_8013823C(EnemyWork* self) {
             fn_80130438(self);
         }
         if (self->field_0x1E2 != 4 && self->field_0x1DF == 0) {
-            if (fn_800C9DCC(self->field_0x1AC) <= lbl_80796D54) {
+            if (ef_fabsf(self->field_0x1AC) <= lbl_80796D54) {
                 if (self->field_0x1AC > lbl_80796D58) {
                     self->field_0x1AC = self->field_0x1AC - lbl_80796D58;
                 } else if (self->field_0x1AC < lbl_80796D5C) {
