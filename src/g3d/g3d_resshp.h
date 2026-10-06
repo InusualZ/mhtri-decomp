@@ -17,6 +17,8 @@ struct ResShpData {
 /* The tev block.  size: 0x20 (a lower bound) */
 struct ResTevData {
     /* +0x00 */ u32 size;
+    /* +0x04 */ u8 pad_0x04[0xC];
+    /* +0x10 */ u8 texMapID[8];   /* the texture map each texture coordinate samples, 0xFF for none */
 };
 
 /* The texture block.  size: 0x30 (a lower bound) */
@@ -46,6 +48,11 @@ public:
     /* untyped: opaque handle */
     explicit ResTev(void* pData);
     ResTev& operator=(const ResTev& rhs);
+    static const char* GetClassName();
+    bool IsValid() const;
+    const ResTevData* ptr() const;
+    const ResTevData& ref() const;
+    void CallDisplayList(bool bSync) const;
 };
 
 /* size: 0x4 */

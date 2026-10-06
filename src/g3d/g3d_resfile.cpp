@@ -378,7 +378,7 @@ extern "C" void fn_8009411C(ResHandle* pSelf, s32 flag) {
 
 /* 0x80094164 - the checked `ResMatPix::ref()` accessor. */
 nw4r::g3d::ResMatPixData& nw4r::g3d::ResMatPix::ref() {
-    if (fn_80076800((ResHandle*)this) == 0) {
+    if (IsValid() == 0) {
         nw4r::db::Panic(lbl_80591400, 0x154, lbl_805913E4, fn_800941D0(), lbl_80791294);
     }
     return *(nw4r::g3d::ResMatPixData*)fn_800941C8((ResHandle*)this);
@@ -436,7 +436,7 @@ extern "C" void fn_8009429C(ResHandle* pSelf, s32 flag) {
 
 /* 0x800942E4 - the checked `ResMatIndMtxAndScale::ref()` accessor. */
 nw4r::g3d::ResMatIndMtxAndScaleData& nw4r::g3d::ResMatIndMtxAndScale::ref() {
-    if (fn_8006E6B4((ResHandle*)this) == 0) {
+    if (IsValid() == 0) {
         nw4r::db::Panic(lbl_80591328, 0x19D, lbl_80591308, fn_80094350(), lbl_807912A4);
     }
     return *(nw4r::g3d::ResMatIndMtxAndScaleData*)fn_80094348((ResHandle*)this);
@@ -481,9 +481,9 @@ extern "C" const char* fn_80094410(void) {
     return lbl_80591280;
 }
 
-/* 0x8009441C - `ResMatPix` `ref()` plus a display-list call or the inline pipe writer. */
-extern "C" void fn_8009441C(ResHandle* pSelf, s32 flag) {
-    u32 data = (u32)&reinterpret_cast<const nw4r::g3d::ResMatPix*>(pSelf)->ref();
+/* 0x8009441C (0x48): calls the pixel display list, through `GXCallDisplayList` when `bSync`. */
+void nw4r::g3d::ResMatPix::CallDisplayList(bool flag) const {
+    u32 data = (u32)&ref();
 
     if (flag != 0) {
         GXCallDisplayList((void*)data, 0x20);
@@ -502,7 +502,7 @@ extern "C" void GXFastCallDisplayList(const void* pList, u32 size) {
 
 /* 0x8009447C - the checked `ResMatPix::ref()` accessor (second `_ac.h` instantiation). */
 const nw4r::g3d::ResMatPixData& nw4r::g3d::ResMatPix::ref() const {
-    if (fn_80076800((ResHandle*)this) == 0) {
+    if (IsValid() == 0) {
         nw4r::db::Panic(lbl_80591430, 0x154, lbl_80591410, fn_800941D0(), lbl_80791290);
     }
     return *(const nw4r::g3d::ResMatPixData*)fn_800944E0((ResHandle*)this);
@@ -539,7 +539,7 @@ extern "C" u32 fn_80094594(ResHandle* pSelf) {
 
 /* 0x8009459C - the checked `ResMatIndMtxAndScale::ref()` accessor (second instantiation). */
 const nw4r::g3d::ResMatIndMtxAndScaleData& nw4r::g3d::ResMatIndMtxAndScale::ref() const {
-    if (fn_8006E6B4((ResHandle*)this) == 0) {
+    if (IsValid() == 0) {
         nw4r::db::Panic(lbl_80591358, 0x19D, lbl_80591338, fn_80094350(), lbl_807912A0);
     }
     return *(const nw4r::g3d::ResMatIndMtxAndScaleData*)fn_80094600((ResHandle*)this);

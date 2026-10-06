@@ -21,6 +21,8 @@ void fn_8009AB1C(u32 value);
 void fn_8009AC44(u16 a, u8 b);
 /* 0x8009AC98 - emits the 0x08 opcode with a byte register and a 32-bit operand. */
 void fn_8009AC98(u8 a, u32 b);
+/* 0x8009AB8C - writes texture coordinate `coord`'s scale, bias and wrap pair (caller: g3d/g3d_state.cpp). */
+void GDSetTexCoordScale2(u32 coord, u16 sScale, u8 sBias, u8 sWrap, u16 tScale, u8 tBias, u8 tWrap);
 
 #ifdef __cplusplus
 }

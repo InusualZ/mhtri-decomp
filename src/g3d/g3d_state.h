@@ -38,4 +38,35 @@ void mtx34_inverse(Mtx34* out, const Mtx34* src);
 }
 #endif
 
+#ifdef __cplusplus
+namespace nw4r {
+namespace g3d {
+class ResMatMisc;
+class ResTexObj;
+class ResTlutObj;
+class ResGenMode;
+class ResTev;
+class ResMatPix;
+class ResMatIndMtxAndScale;
+}  // namespace g3d
+}  // namespace nw4r
+
+struct G3dIndMtxOp;
+class G3dIndMtxCallback;
+
+/* The material loaders `g3d/fn_80075DCC.cpp`'s draw path calls (C linkage: the map's names are plain). */
+extern "C" {
+void g3d_state_set_mat_misc(nw4r::g3d::ResMatMisc misc);
+void g3d_state_load_tex_obj(nw4r::g3d::ResTexObj texObj);
+void g3d_state_load_tlut_obj(nw4r::g3d::ResTlutObj tlutObj);
+void g3d_state_set_gen_mode(nw4r::g3d::ResGenMode genMode);
+void g3d_state_load_tev(nw4r::g3d::ResTev tev);
+void g3d_state_load_mat_pix(nw4r::g3d::ResMatPix pix);
+void g3d_state_load_mat_ind_mtx_dl(nw4r::g3d::ResMatIndMtxAndScale ind);
+void g3d_state_load_mat_ind_mtx(nw4r::g3d::ResMatIndMtxAndScale ind, G3dIndMtxCallback* pCallback);
+void g3d_ind_mtx_op_load(G3dIndMtxOp* pSelf);
+void g3d_tex_coord_scale_load(struct StatePairTable* pSelf, u8 count);
+}
+#endif
+
 #endif /* MHTRI_G3D_G3D_STATE_H */

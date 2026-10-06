@@ -605,8 +605,8 @@ void ResMatTevColor::GXSetTevKColor(_GXTevKColorID id, GXColor color) {
 }
 
 /* 0x800965D0 (0x54): calls the tev colour display list, through the GX FIFO directly unless `bSync`. */
-void ResMatTevColor::CallDisplayList(bool bCall, bool bSync) const {
-    if (bCall) {
+void ResMatIndMtxAndScale::CallDisplayList(u8 indNum, bool bSync) const {
+    if (indNum) {
         const void* pDL = &ref();
         if (bSync) {
             GXCallDisplayList(pDL, 64);

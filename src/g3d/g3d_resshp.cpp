@@ -334,9 +334,6 @@ extern u32 lbl_8056F730[];
 /* The neighbours this half calls (plain map stems), each owner named beside it. */
 extern "C" {
 ResShpData* fn_80077398(const ResHandle* pSelf);  /* owner: g3d/fn_80075DCC.cpp            */
-s32 fn_80076814(const ResHandle* pSelf);          /* owner: g3d/fn_80075DCC.cpp            */
-u32 fn_800866FC(ResHandle* pSelf);                /* owner: g3d/g3d_state.cpp              */
-u32* fn_80086768(void);                           /* owner: g3d/g3d_state.cpp              */
 void fn_80091F70(void* pDst, u32 arg1, u32 arg2);  /* owner: g3d/g3d_resanmtexsrt.cpp       */
 void fn_80071008(void* pBase, u32 size);          /* owner: g3d/g3d_calcview.cpp           */
 void GXCallDisplayList(void* pList, u32 size);    /* the SDK's own symbol                  */
@@ -368,7 +365,6 @@ u32 fn_8009A0F8(ResHandle* pSelf);
 void fn_8009A12C(ResHandle* pSelf, s32 flag);
 u32 fn_8009A174(ResHandle* pSelf);
 u32 fn_8009A1D8(ResHandle* pSelf);
-void fn_8009A1E0(ResHandle* pSelf, s32 flag);
 u8 fn_8009A254(ResHandle* pSelf);
 u32 fn_8009A278(ResHandle* pSelf, void* pDst);
 void fn_8009A2F4(ResHandle* pSelf, s32 flag);
@@ -673,8 +669,8 @@ extern "C" void fn_8009A12C(ResHandle* pSelf, s32 flag) {
 
 /* 0x8009A174 - `ResTev::ref` with the `g3d_restev_ac.h` validity assert. */
 extern "C" u32 fn_8009A174(ResHandle* pSelf) {
-    if (fn_80076814(pSelf) == 0) {
-        nw4r::db::Panic(lbl_80591820, 0x25, lbl_80591800, (const char*)fn_80086768(), lbl_807912C8);
+    if (!reinterpret_cast<const nw4r::g3d::ResTev*>(pSelf)->IsValid()) {
+        nw4r::db::Panic(lbl_80591820, 0x25, lbl_80591800, nw4r::g3d::ResTev::GetClassName(), lbl_807912C8);
     }
     return fn_8009A1D8(pSelf);
 }
@@ -686,19 +682,19 @@ extern "C" u32 fn_8009A1D8(ResHandle* pSelf) {
 
 /* 0x8009A1E0 - call the block's display list with the size its primitive count names: `PPCSync` first
  * when the caller asks for it, then `lbl_8056F730[count - 1]` bytes at the block's +0x20. */
-extern "C" void fn_8009A1E0(ResHandle* pSelf, s32 flag) {
-    if (flag != 0) {
+void nw4r::g3d::ResTev::CallDisplayList(bool flag) const {
+    if (flag) {
         PPCSync();
     }
 
-    u32 prim = (u8)fn_8009A254(pSelf) - 1;
+    u32 prim = (u8)fn_8009A254((ResHandle*)this) - 1;
 
-    GXCallDisplayList((void*)(fn_800866FC(pSelf) + 0x20), lbl_8056F730[prim]);
+    GXCallDisplayList((void*)((u32)&ref() + 0x20), lbl_8056F730[prim]);
 }
 
 /* 0x8009A254 - the block's primitive count (its +0x0C byte). */
 extern "C" u8 fn_8009A254(ResHandle* pSelf) {
-    return *(u8*)(fn_800866FC(pSelf) + 0xC);
+    return *(u8*)((u32)&reinterpret_cast<const nw4r::g3d::ResTev*>(pSelf)->ref() + 0xC);
 }
 
 /* 0x8009A278 - copy the block to a 0x20-aligned destination, rebase its recorded size by the amount

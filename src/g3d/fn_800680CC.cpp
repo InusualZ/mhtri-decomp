@@ -112,9 +112,10 @@ bool nw4r::g3d::ResTexSrt::IsValid() const
     return mpData != NULL;
 }
 
-extern "C" u32 fn_8006E6B4(void *p)
+/* 0x8006E6B4 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResMatIndMtxAndScale::IsValid() const
 {
-    return *(u32 *)p != 0;
+    return mpData != NULL;
 }
 
 extern "C" void fn_800686F0(u32 *dst, const u32 *src)

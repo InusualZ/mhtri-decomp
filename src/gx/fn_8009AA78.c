@@ -25,6 +25,8 @@
  * 0x800868D8 *and* 0x8009AB1C, whose bodies are the same single-store pipe write - a dumper alias, not
  * evidence - and no other address in the range resolves, so the provisional names stand.
  *
+ * NAMES. GDSetTexCoordScale2 is a GUESS (0x8009AB8C: it writes one texture coordinate's s/t scale, bias and wrap
+ *   pair behind the 0xFE03FFFF mask, the SDK's GD call of that name).
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit gx/fn_8009AA78.c`.
  */
 
@@ -75,7 +77,7 @@ void fn_8009AB48(int e) {
 }
 
 /* Writes the same field set twice, once for each of two adjacent registers. */
-void fn_8009AB8C(u32 a, u16 b, u8 c, u8 d, u16 e, u8 f, u8 g) {
+void GDSetTexCoordScale2(u32 a, u16 b, u8 c, u8 d, u16 e, u8 f, u8 g) {
     fn_800868A0(0xFE03FFFF);
     fn_800868A0(((d << 17) | ((b - 1) | (c << 16))) | ((a * 2 + 0x30) << 24));
     fn_800868A0(((g << 17) | ((e - 1) | (f << 16))) | ((a * 2 + 0x31) << 24));

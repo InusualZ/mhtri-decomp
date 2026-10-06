@@ -63,6 +63,7 @@ typedef struct {
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_resnode.h"
 #include "g3d/g3d_resshp.h"
+#include "g3d/g3d_state.h"     /* the material loaders (rule 2) */
 #include "nw4r/fn_805012C4.h"
 
 #define M2C_ERROR(x) /* unknown instruction */
@@ -212,7 +213,6 @@ s32 fn_80065204(void*);
 s32 fn_800659C4(s32);
 void* fn_80067A54(s32);
 u32 fn_8006E2A8(s32, s32);
-s32 fn_8006E6B4(void*);
 u32 fn_8006F0E8(void*, void*);
 u32 fn_8006F228(void*, void*);
 u32 fn_8006FDCC(void*);
@@ -225,16 +225,7 @@ s32 fn_80074074(void*);
 u32 fn_80074620(void*);
 void* fn_80074A54(void);
 s32 fn_80075844(s32);
-u32 fn_80085238(void*);
-u32 fn_80085D4C(void*);
-u32 fn_80085DF4(void*);
-u32 fn_80085FF0(void*);
-u32 fn_80086194(void*);
-u32 fn_80086568(void*);
-u32 fn_80086980(void*);
 u32 fn_800869D4(void*);
-u32 fn_80086A28(void*);
-u32 fn_80086AA8(void*, void*);
 u32 fn_80086B2C(void*, s32, s32, s32, s32, void*, s32);
 u32 fn_800870E4(void*);
 u32 fn_8008715C(void*);
@@ -279,8 +270,6 @@ u32 math_sincos_idx(f32);
 /* internal */ void* fn_8007663C(s32 *arg0);
 /* internal */ s32 fn_8007673C(s32 *arg0);
 /* internal */ s32 fn_80076750(s32 *arg0);
-/* internal */ s32 fn_80076800(s32 *arg0);
-/* internal */ s32 fn_80076814(s32 *arg0);
 /* internal */ u32 fn_800769F4(s32 *arg0, s32 *arg1, s32 arg2, s32 arg3, s32 arg4, void *arg5, s32 arg6);
 /* internal */ void* fn_80077398(s32 arg0);
 /* internal */ s32 fn_800773FC(s32 *arg0);
@@ -633,41 +622,41 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
         misc.GetFogIdx();
         fn_8008818C();
         sp6C = (s32)misc.mpData;
-        fn_80085D4C((void*)(&sp6C));
+        g3d_state_set_mat_misc(*reinterpret_cast<nw4r::g3d::ResMatMisc*>((void*)(&sp6C)));
         if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTlutObj*>((s32 *)(&((RawView_2*)arg2)->field_0x04))->IsValid() == 0)) {
             sp68 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTlutObj().mpData;
-            fn_80085FF0((void*)(&sp68));
+            g3d_state_load_tlut_obj(*reinterpret_cast<nw4r::g3d::ResTlutObj*>((void*)(&sp68)));
         } else {
             sp64 = ((RawView_2*)arg2)->field_0x04;
-            fn_80085FF0((void*)(&sp64));
+            g3d_state_load_tlut_obj(*reinterpret_cast<nw4r::g3d::ResTlutObj*>((void*)(&sp64)));
         }
         if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTexObj*>((s32 *)(arg2))->IsValid() == 0)) {
             sp60 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTexObj().mpData;
-            fn_80085DF4((void*)(&sp60));
+            g3d_state_load_tex_obj(*reinterpret_cast<nw4r::g3d::ResTexObj*>((void*)(&sp60)));
         } else {
             sp5C = ((RawView_2*)arg2)->field_0x00;
-            fn_80085DF4((void*)(&sp5C));
+            g3d_state_load_tex_obj(*reinterpret_cast<nw4r::g3d::ResTexObj*>((void*)(&sp5C)));
         }
         if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResGenMode*>((s32 *)(&((RawView_2*)arg2)->field_0x08))->IsValid() == 0)) {
             sp58 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResGenMode().mpData;
-            fn_80086194((void*)(&sp58));
+            g3d_state_set_gen_mode(*reinterpret_cast<nw4r::g3d::ResGenMode*>((void*)(&sp58)));
         } else {
             sp54 = ((RawView_2*)arg2)->field_0x08;
-            fn_80086194((void*)(&sp54));
+            g3d_state_set_gen_mode(*reinterpret_cast<nw4r::g3d::ResGenMode*>((void*)(&sp54)));
         }
-        if ((arg2 == NULL) || (fn_80076814((s32 *)(&((RawView_2*)arg2)->field_0x0C)) == 0)) {
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTev*>((s32 *)(&((RawView_2*)arg2)->field_0x0C))->IsValid() == 0)) {
             sp50 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>(arg0)->GetResTev().mpData;
-            fn_80086568((void*)(&sp50));
+            g3d_state_load_tev(*reinterpret_cast<nw4r::g3d::ResTev*>((void*)(&sp50)));
         } else {
             sp4C = ((RawView_2*)arg2)->field_0x0C;
-            fn_80086568((void*)(&sp4C));
+            g3d_state_load_tev(*reinterpret_cast<nw4r::g3d::ResTev*>((void*)(&sp4C)));
         }
-        if ((arg2 == NULL) || (fn_80076800((s32 *)(&((RawView_2*)arg2)->field_0x10)) == 0)) {
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatPix*>((s32 *)(&((RawView_2*)arg2)->field_0x10))->IsValid() == 0)) {
             sp48 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatPix().mpData;
-            fn_80086980((void*)(&sp48));
+            g3d_state_load_mat_pix(*reinterpret_cast<nw4r::g3d::ResMatPix*>((void*)(&sp48)));
         } else {
             sp44 = ((RawView_2*)arg2)->field_0x10;
-            fn_80086980((void*)(&sp44));
+            g3d_state_load_mat_pix(*reinterpret_cast<nw4r::g3d::ResMatPix*>((void*)(&sp44)));
         }
         if ((arg2 == NULL) || (fn_80076750((s32 *)(&((RawView_2*)arg2)->field_0x14)) == 0)) {
             sp40 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatTevColor().mpData;
@@ -676,20 +665,20 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
             sp3C = ((RawView_2*)arg2)->field_0x14;
             fn_800869D4((void*)(&sp3C));
         }
-        if ((arg2 == NULL) || (fn_8006E6B4((void*)(&((RawView_2*)arg2)->field_0x18)) == 0)) {
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&((RawView_2*)arg2)->field_0x18))->IsValid() == 0)) {
             if (arg3 != NULL) {
                 sp38 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatIndMtxAndScale().mpData;
-                fn_80086AA8((void*)(&sp38), (void*)(arg3));
+                g3d_state_load_mat_ind_mtx(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp38)), (G3dIndMtxCallback*)((void*)(arg3)));
             } else {
                 sp34 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatIndMtxAndScale().mpData;
-                fn_80086A28((void*)(&sp34));
+                g3d_state_load_mat_ind_mtx_dl(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp34)));
             }
         } else if (arg3 != NULL) {
             sp30 = ((RawView_2*)arg2)->field_0x18;
-            fn_80086AA8((void*)(&sp30), (void*)(arg3));
+            g3d_state_load_mat_ind_mtx(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp30)), (G3dIndMtxCallback*)((void*)(arg3)));
         } else {
             sp2C = ((RawView_2*)arg2)->field_0x18;
-            fn_80086A28((void*)(&sp2C));
+            g3d_state_load_mat_ind_mtx_dl(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp2C)));
         }
         misc.GetLightSetIdx();
         fn_800882A0((void*)(&sp88), (void*)(&sp84), (void*)(&sp80), (void*)(&sp7C), (void*)(&sp74));
@@ -723,14 +712,14 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
         return;
     }
     if (arg3 != NULL) {
-        if ((arg2 == NULL) || (fn_8006E6B4((void*)(&((RawView_2*)arg2)->field_0x18)) == 0)) {
+        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&((RawView_2*)arg2)->field_0x18))->IsValid() == 0)) {
             fn_8007663C((s32 *)(&sp90));
             ((RawView_3*)(*arg3))->field_0x08(arg3, &sp90);
-            fn_80085238((void*)(&sp90));
+            g3d_ind_mtx_op_load((G3dIndMtxOp*)((void*)(&sp90)));
             return;
         }
         sp8 = ((RawView_2*)arg2)->field_0x18;
-        fn_80086AA8((void*)(&sp8), (void*)(arg3));
+        g3d_state_load_mat_ind_mtx(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp8)), (G3dIndMtxCallback*)((void*)(arg3)));
     }
 }
 
@@ -818,13 +807,19 @@ NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatPixData)
 
 extern "C" {
 
-s32 fn_80076800(s32 *arg0) {
-    return *arg0 != 0;
+} /* extern "C" */
+
+/* 0x80076800 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResMatPix::IsValid() const {
+    return mpData != NULL;
 }
 
-s32 fn_80076814(s32 *arg0) {
-    return *arg0 != 0;
+/* 0x80076814 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResTev::IsValid() const {
+    return mpData != NULL;
 }
+
+extern "C" {
 
 } /* extern "C" */
 
@@ -3064,7 +3059,7 @@ typedef struct {
 s32 fn_8007BDAC(void *arg0, s32 arg1) {
     u32 sp8;
 
-    if (((s32) ((RawView_75*)arg0)->field_0x00 != 0) && (fn_80076800((s32 *)(&((RawView_75*)arg0)->field_0x20)) != 0)) {
+    if (((s32) ((RawView_75*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatPix*>((s32 *)(&((RawView_75*)arg0)->field_0x20))->IsValid() != 0)) {
         if (arg1 != 0) {
             fn_8007BB94((void *)(((RawView_75*)arg0)->field_0x00), (s32)(((RawView_75*)arg0)->field_0x04), (s32)(0x80));
         }

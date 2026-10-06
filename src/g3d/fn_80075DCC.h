@@ -53,7 +53,6 @@ void fn_800793A4(s32* pArg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s
 /* The `g3d_resmat_ac.h` validity predicates `g3d/g3d_resfile.cpp`'s accessors call. */
 s32 fn_8007673C(void* p);              /* 0x8007673C - `*(u32*)p != 0` */
 s32 fn_80076750(void* p);              /* 0x80076750 - `*(u32*)p != 0` */
-s32 fn_80076800(void* p);              /* 0x80076800 - `*(u32*)p != 0` */
 /* 0x8007B878 - the alignment-asserting offset helper, declared as the owner defines it; `g3d/g3d_resanmtexsrt.cpp`
  * casts at its two call sites. */
 u32 fn_8007B878(s32 pDst, s32 offset);

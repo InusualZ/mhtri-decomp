@@ -272,6 +272,11 @@ public:
     void GXSetNumTevStages(u8 nStages);
     void GXSetCullMode(_GXCullMode cullMode);
     ResGenMode CopyTo(void* pDst) const; /* untyped: byte range */
+    u8 GXGetNumTexGens() const;
+    u8 GXGetNumChans() const;
+    u8 GXGetNumTevStages() const;
+    u8 GXGetNumIndStages() const;
+    _GXCullMode GXGetCullMode() const;
 };
 
 /* size: 0x4 */
@@ -308,6 +313,7 @@ public:
     bool GXGetBlendMode(_GXBlendMode* pType, _GXBlendFactor* pSrcFactor, _GXBlendFactor* pDstFactor,
                         _GXLogicOp* pOp) const;
     void GXSetBlendMode(_GXBlendMode type, _GXBlendFactor srcFactor, _GXBlendFactor dstFactor, _GXLogicOp op);
+    void CallDisplayList(bool bSync) const;
 };
 
 /* size: 0x4 */
@@ -320,7 +326,6 @@ public:
     void GXSetTevColor(_GXTevRegID id, GXColor color);
     bool GXGetTevKColor(_GXTevKColorID id, GXColor* pColor) const;
     void GXSetTevKColor(_GXTevKColorID id, GXColor color);
-    void CallDisplayList(bool bCall, bool bSync) const;
 };
 
 /* size: 0x4 */
@@ -332,6 +337,7 @@ public:
     bool GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx) const;
     bool GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx, s8* pScaleExp) const;
     void GXSetIndTexMtx(_GXIndTexMtxID id, const math::MTX34& mtx, s8 scaleExp);
+    void CallDisplayList(u8 indNum, bool bSync) const;
 };
 
 /* size: 0x4 */

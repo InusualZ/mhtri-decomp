@@ -26,7 +26,6 @@ u32 fn_800689B0(void* p);
 u32 fn_800697A4(void);
 
 /* 0x8006E6B4/0x800695EC/0x8006993C - the `ResFile` revision-check getters `g3d/g3d_resfile.cpp` calls. */
-u32 fn_8006E6B4(void* p);   /* 0x8006E6B4 - `*(u32*)p != 0` */
 u32 fn_800695EC(void* p);   /* 0x800695EC - the checked resource resolver */
 u32 fn_8006993C(void* p);   /* 0x8006993C - the checked resource resolver */
 /* 0x8006E2AC - the `ResTexSrt` non-const slot-array resolver: panics on an invalid handle word, else returns the
