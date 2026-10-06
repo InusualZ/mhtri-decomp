@@ -338,7 +338,7 @@ public:
     /* +0x14814 */ u32 nonceDrop_14814[4];         /* the nonces of peers that dropped */
     /* +0x14824 */ s8 hostIndex_14824;
     /* +0x14825 */ s8 subhostIndex_14825;
-    /* +0x14826 */ u8 ownIndex_14826;              /* the slot this session owns */
+    /* +0x14826 */ s8 ownIndex_14826;              /* the slot this session owns */
     /* +0x14827 */ u8 pad_14827;
     /* +0x14828 */ NetworkSessionSlot slots_14828[4];
     /* +0x16CB8 */ NetworkSlotSmallObject address_16CB8;   /* this session's own address record */

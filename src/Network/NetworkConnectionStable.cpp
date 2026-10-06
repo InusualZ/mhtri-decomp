@@ -18,10 +18,9 @@
  *   0x803CC00C (`GoalOverlay::SceneCreated`, `J3DColorBlockLightOff::setColorChanNum`, `nw4hbm::ut::TextWriterBase`'s
  *   char-space accessors) are folded one-store bodies, not evidence.
  * RESIDUALS. The constructor calls `NetworkConnection(s32)`, which is unwritten in `Network/NetworkConnection.cpp`.
- *   `sendHello`, `sendMtuProbe`, `sendChannel`: retail copies `networkStreamWriter_size`'s result (`mr r0,r3`) before
- *   the `clrlwi` - a `u16` return; `NetworkUnitPacket.h` declares `u32` (the retype costs `NetworkSessionStable::send`
- *   93.73 -> 93.53, so it is filed, not made).  `open`: `rand() + base` adds in the other operand
- *   order (`(s32)`/`(u16)` spellings tried).  `getIndex`: `lbz r0`+`extsb r3,r0` vs `lbz r3`+`extsb r3,r3`.  `sendClose`: the 0x84/0x85
+ *   `sendChannel`: the frame's sequence copy is kept 32-bit where retail keeps it (`mr`, the `u16` return unextended).
+ *   `open`: `rand() + base` adds in the other operand
+ *   order (`(s32)`/`(u16)` spellings tried).  `sendClose`: the 0x84/0x85
  *   select computes in r4 directly (a `u8` local tried).
  *   `.sdata2` (flip blocker): our object emits the `u32`->`f32` conversion double (8 B) that retail pools at
  *   0x8079C6B8 (`dispatchControl`'s pong time); the range is not this unit's to claim.
@@ -641,7 +640,7 @@ void NetworkConnectionStable::receivePackets()
 /* The slot index. */
 s32 NetworkConnectionStable::getIndex()
 {
-    return index_20A4;
+    return (s8)(u8)index_20A4;
 }
 
 /* Two for every open ping among the oldest ones (a ping not answered yet reads 0). */

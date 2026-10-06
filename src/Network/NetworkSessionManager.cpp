@@ -35,8 +35,9 @@
  *  - `networkSessionReflectCallback`: retail saves all six incoming argument registers before building the callee's,
  *    ours does the minimal four-move rotation;
  *  - `~NetworkRequest`: retail's unfused `extsh` of the deleting flag;
- *  - the constructor, destructor, `clear`, `release`, `move`, `putTerminatorA`/`C`,
- *    `NetworkSessionManager_allocRequest`: not characterised one by one (the objdiff rows).
+ *  - the constructor, `release`: the loop counter and element pointer take swapped registers (r30/r31);
+ *    `NetworkSessionManager_allocRequest`: the pointer steps after the counter (a pointer loop costs it the saved `self`);
+ *    `clear`, `move`: not characterised one by one (the objdiff rows).
  * SHAPES. Both tables are compiler output (rule 10): the base table 0x805FA908..0x805FAAD0 (456 B) is emitted here;
  *   `NetworkSessionManagerPat` declares `move` FIRST so it is the key function (its body opens the next unit), so the
  *   Pat constructor stores `__vt__24NetworkSessionManagerPat` without a second table here.  `NetworkBuffer` (table
@@ -180,10 +181,12 @@ NetworkRequest::NetworkRequest()
     NetworkRequest_reset(this);
 }
 
+#pragma peephole off
 NetworkSessionManager::~NetworkSessionManager()
 {
     NetworkSessionManager::release();
 }
+#pragma peephole on
 
 
 void NetworkSessionManager::init(u32 a, u32 b)
@@ -211,21 +214,25 @@ void NetworkSessionManager::release()
 {
     NetworkBuffer* buf;
     s32 i;
+    NetworkRequest** slot;
+    NetworkRequest* request;
 
     buf = this->buffer;
     if (buf != 0) {
-        buf->end();
+        buf->begin();
         buf = this->buffer;
         if (buf != 0) {
-            buf->destroy(1);
+            if (buf != 0) {
+                buf->destroy(1);
+            }
             this->buffer = 0;
         }
     }
-    for (i = 0; i < 0x15; i++) {
-        NetworkSessionManager_deleteRequest(this, &this->requests_10[i]);
+    for (i = 0, slot = this->requests_10; i < 0x15; i++, slot++) {
+        NetworkSessionManager_deleteRequest(this, slot);
     }
-    for (i = 0; i < 2; i++) {
-        NetworkRequest_clear(&this->pool_7C[i]);
+    for (i = 0, request = this->pool_7C; i < 2; i++, request++) {
+        NetworkRequest_clear(request);
     }
 }
 
@@ -732,6 +739,7 @@ void NetworkSessionManager::broadcastPlayerSlots(u32 a, u32 b)
     sendBatch_138(a, b, 4, data);
 }
 
+#pragma peephole off
 void NetworkSessionManager::putTerminatorA(u32 a, u32 b, u8 c)
 {
     s8 data;
@@ -767,6 +775,7 @@ void NetworkSessionManager::putTerminatorC(u32 a, u32 b, u8 c)
         buf->put(a, b, 1, 1, &data, c);
     }
 }
+#pragma peephole on
 
 /* Maps each requested player slot and puts the batch on the current stream buffer. */
 void NetworkSessionManager::sendBatch_138(u32 a, u32 b, s32 count, const s8* data)

@@ -74,7 +74,7 @@ s32 networkStreamReader_test(NetworkStreamWriterDefault* self);
 /* 0x803FAE7C / 0x803FAE8C - the framed writer's scramble overrides (table 0x805FCDD4 +0x30/+0x34). */
 void networkStreamWriter_encrypt(NetworkStreamWriterDefault* self, u8 key, u16 offset, u16 size);
 void networkStreamWriter_decrypt(NetworkStreamWriterDefault* self, u8 key, u16 offset, u16 size);
-u32 networkStreamWriter_size(const void* sub);
+u16 networkStreamWriter_size(const void* sub);
 
 /* 0x803F9E04 - binds a stream to the byte block it reads packets from (GUESS: the parent's init, then
  * the block pointer stored at +0x10). */
