@@ -48,7 +48,7 @@
 #include "nw4r/math.h"
 #include "sound/fn_800E46E8.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/nw_res_manager.h"
 
 #pragma peephole off

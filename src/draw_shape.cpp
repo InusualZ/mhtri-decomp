@@ -31,7 +31,7 @@
 #include "nw4r/math.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "draw_shape_arm.h" /* the `.sdata2` float pool, owned by draw_shape_arm.cpp (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------

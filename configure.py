@@ -562,7 +562,7 @@ config.libs = [
             #   quest_gauge_blend_update  82.810 -> 100.000
             #   quest_gauge_draw          93.728 ->  96.270
             # weighted code 16553.20 B -> 16765.04 B matched, no row lower with the flag.
-            # Phase 4: fold of menu/fn_802E4978.cpp, this unit, hud/fn_802EBED8.cpp and the head of ef/eft035.cpp; `-pool off` is this unit's own and now covers the absorbed bodies (see the unit header).
+            # `-pool off` is this unit's own and covers its whole range 0x802E4978..0x802F2238 (see the unit header).
             Object(NonMatching, "hud/cockpit_quest.cpp", cflags=[*cflags_hud, "-pool off"]),
             # Registered, at its final home (docs/plan.md 12):
             # `.text` 0x803250B0..0x803253BC (1 function, 0x30C B) plus the range's own extab

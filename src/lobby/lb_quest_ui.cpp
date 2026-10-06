@@ -17,10 +17,9 @@
  *  - `lb_ui_clear`: the `memset` argument setup order; `lb_ui_pair_lookup`: the loop shape;
  *  - `lb_ui_angle_step`, `lb_ui_param_apply`, `lb_ui_effect_list_step`: one register name each.
  *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim; the
- *   `.sdata`/`.sdata2` pool is shared with `lobby/lb_quest_board.cpp` and `menu/menu_result.cpp` (fold candidate); the
- *   source still spells `lobby/lb_quest_board.cpp`'s `lb_quest_board_state_next`/`lb_quest_board_effect_retire` (two
- *   `lb_ui_detail_step` switch arms tail into them) by their old stems `fn_80394144`/`fn_80394154`, which the map no
- *   longer has; they are declared in `unsplit/lobby.h`, not their owner's header.
+ *   `.sdata`/`.sdata2` pool is shared with `lobby/lb_quest_board.cpp` and `menu/menu_result.cpp` (fold candidate).
+ *   `lb_ui_detail_step` hands its row work to `lb_quest_board_state_next` as the board's `LbQuestBoardWork` (one block,
+ *   two views: a cast until the views are merged); `lb_ui_pair_tables`/`lb_ui_param_values` are GUESS names.
  */
 
 #include "types.h"
@@ -32,6 +31,15 @@
 #include "enemy/fn_8011D448.h"
 #include "unsplit/enemy.h"
 #include "unsplit/lobby.h"
+#include "lobby/lb_quest_board_reset.h"   /* `lb_quest_board_state_next`/`lb_quest_board_effect_retire` (rule 2) */
+
+/* The `.data` pair/lookup tables (0x805F0EC8, this unit's): `lb_ui_pair_tables[kind]` points at a table of
+ * 6-byte-stride records whose first u16 is the key, ended by a record whose u16 is 0xFFFF
+ * (`lb_ui_pair_lookup`, `lb_ui_pair_offset`). */
+extern u16* lb_ui_pair_tables[];
+/* The 12-entry signed table (0x805F0CDC, this unit's) the option-parameter copy indexes by a byte flag
+ * (`lb_ui_param_apply`). */
+extern const s16 lb_ui_param_values[12];
 
 /* One record of the screen's pooled-effect list at `+0x038`: a count followed by the handles the effect library
  * retires; the same record as `lobby/lb_quest_board.h`'s `LbEftList` (a rule-1 duplicate to fold). size: 0x8 */
@@ -205,7 +213,7 @@ u16 lb_ui_pair_offset(u32 a, u32 b) {
 /* Looks the pair up in the type's key table: the table is walked in 6-byte records and terminated by
  * a record whose first u16 is 0xFFFF, whose address the not-found answer is. */
 u16* lb_ui_pair_lookup(u8 kind, u8 a, u8 b) {
-    u16* p = lbl_805F0EC8[kind];
+    u16* p = lb_ui_pair_tables[kind];
     u16 key;
     if (a < b) {
         key = (u16)((a << 8) | b);
@@ -266,7 +274,7 @@ void lb_ui_clear(LbQuestRowWork* self) {
 void lb_ui_param_apply(LbQuestRowWork* self) {
     for (s32 i = 0; i < 3; i++) {
         lb_param_w.flag_0x0C[i] = self->flags_0x4B[i];
-        s16 value = lbl_805F0CDC[self->flags_0x4B[i]];
+        s16 value = lb_ui_param_values[self->flags_0x4B[i]];
         lb_param_w.value_0x10[i] = value;
     }
 }
@@ -303,10 +311,10 @@ void lb_ui_detail_step(LbQuestRowWork* self) {
         lb_ui_detail_1_draw(self);
         break;
     case 2:
-        fn_80394144(self);
+        lb_quest_board_state_next((struct LbQuestBoardWork*)self);
         break;
     case 3:
-        fn_80394154(self);
+        lb_quest_board_effect_retire((struct LbQuestBoardWork*)self);
         break;
     }
 }

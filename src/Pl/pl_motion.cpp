@@ -52,7 +52,7 @@ struct PlHandleSet {
  * names are the map's own placeholders and stay `extern "C"`.
  * ------------------------------------------------------------------------------------------------ */
 
-/* ef/fn_800CDB2C.cpp owns the pool accessors (`PlayMode_ck` is declared in that unit's header). */
+/* ef/system_core.cpp owns the pool accessors (`PlayMode_ck` is declared in its header `ef/fn_800CDB2C.h`). */
 void* get_move_work_adrs(u8 index);
 
 /* `Pl_zanzo_set` and `Pl_act_ck` are `Pl/pl_act.cpp`'s (`Pl/pl_act.h`, `Pl/Pl_master_ck.h`). */
@@ -74,7 +74,7 @@ void fn_800F6710(void);
 u32 fn_8027CB1C(void* self);
 u32 stage_map_kind_get(u8 idx);
 void fn_802BE568(void* self, u32 sub);
-u32 fn_803A7E1C(void);
+u32 quest_arena_item_count_get(void);
 void fn_803BA814(u8 idx);
 
 }
@@ -236,7 +236,7 @@ u8 Pl_area_flag_get(u8 index) {
 }
 
 /* 0x8028EF7C - find the root entry whose key is `key`: the six fixed slots at +0x2274 first, then
- * the area record `fn_803A7E1C()` names, then the single extra pointer at +0x2258. */
+ * the area record `quest_arena_item_count_get()` names, then the single extra pointer at +0x2258. */
 PlRootEntry* fn_8028EF7C(u32 key) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     PlRootEntry* entry;
@@ -276,7 +276,7 @@ PlRootEntry* fn_8028EF7C(u32 key) {
         return 0;
     }
 
-    index = fn_803A7E1C();
+    index = quest_arena_item_count_get();
     entry = root->recs_0x154[index].entries_0x00;
     count = root->rec_counts_0x2154[index];
     for (i = 0; i < (int)count; i++) {

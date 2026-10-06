@@ -351,8 +351,6 @@ extern "C" u8 fn_802FB8EC(s32 index);
 extern "C" u8 fn_802FB900(void);
 extern "C" u8 fn_802FB97C(void);
 extern "C" u32 fn_802FB9F8(void);
-extern "C" u8 quest_id_head_ck(void);
-extern "C" u8 quest_id_tail_ck(void);
 extern "C" s32 fn_802B2978(u32 from, u32 to, f32 t);
 extern "C" s32 fn_802B46DC(u8 index);
 extern "C" s32 camera_angle_y_get(void);
@@ -391,9 +389,6 @@ extern "C" void fn_802BEAAC(StageAreaObj* area, u8 kind);
 extern "C" void fn_802C20A4(nw4r::math::VEC3* vec);
 extern "C" void fn_802FBA94(void);
 extern "C" void lb_sub12_send(u8 index);
-extern "C" s32 quest_time_elapsed_get(void);
-extern "C" s32 quest_time_limit_get(void);
-extern "C" u8 fn_803A8F60(s32 value);
 extern "C" u8 get_cfg(u8 kind, u8 mode);
 
 /* C++ free functions whose map names are manglings (rule 9). */

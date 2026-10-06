@@ -290,7 +290,7 @@ s32 findInterSection2(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::
 #include "nw4r/math.h"
 #include "pl.h"
 #include "Runtime.PPCEABI.H/memset.h"
-#include "ef/fn_800CDB2C.h"   /* PlayMode_ck (rule 2: the owner is `ef/fn_800CDB2C.cpp`) */
+#include "ef/fn_800CDB2C.h"   /* PlayMode_ck (rule 2: the owner is `ef/system_core.cpp`) */
 #include "menu/hit_attack_list_push.h"
 #include "Pl/pl_coll.h"   /* the owner of the `.bss` arrays `pl_land_data` / `pl_hit_id_list` (rule 2) */
 

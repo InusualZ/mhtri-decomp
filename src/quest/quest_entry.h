@@ -18,17 +18,23 @@
 #include "quest/quest_types.h"
 #include "quest/quest_item_slot.h"  /* the band's head: consumers of the whole band include this one header */
 #include "quest/quest_result_enter.h"  /* quest_result_enter, quest_start_enter, quest_reward_faint_penalty (leaf header) */
-#include "quest/quest_list_values.h"  /* quest_list_values (this unit defines it) */
 #include "menu/menu_item.h"     /* GetItemData - owned by menu/menu_item.cpp (rule 2) */
 #include "fn_80047398.h"        /* item_pair_copy - owned by fn_80047398.cpp (rule 2) */
-#include "unsplit/menu.h"        /* QuestRecord (the arena result accessors below) */
 #include "menu/menu_sysmsg.h"    /* quest_grade_none_text_table - owned by menu/menu_sysmsg.cpp (rule 2) */
 #include "menu/quest_str_tbl_35_get.h"  /* quest_str_tbl_35_get (leaf header) */
+#include "lobby/lb_quest_screen.h"      /* move_work_item_work_get - owned by lobby/lb_quest_screen.cpp (rule 2) */
 
 /* The quest work block and the band's data (declared here since the phase 4 fold: `quest/quest_entry.cpp` owns the ranges; the
- * record types are `unsplit/menu.h`'s). */
+ * record types are `quest/quest_types.h`'s). */
 extern QuestWork quest_work;              /* .bss 0x806C5858 */
 extern QuestWork* quest_work_ptr;         /* .sbss 0x80794C40, set by `quest_init` */
+/* The u16 key/value array inside the quest list block `quest_list_load_hunt`/`_arena` allocate (block + 0x1A0;
+ * `.sbss` 0x80794C24, the third word of the list-block run). */
+extern u16* quest_list_values;
+/* The quest list block's item array and its count (`quest_work_word_get` walks them with
+ * `quest_list_values`). */
+extern QuestListItem** quest_list_items;   /* .sbss 0x80794C3C */
+extern s32 quest_list_count;               /* .sbss 0x80794C44 */
 extern char quest_text_buffer[0x100];     /* .bss 0x806CC310, the 100-byte text scratch */
 extern u8 quest_pair_table[];      /* .data 0x805F7898, read [index * 2 + sub] */
 extern u8 quest_byte_table[];      /* .data 0x805F78B4 */
@@ -61,8 +67,7 @@ extern Q_RewardGroup quest_reward_group_tbl[6];
 extern "C" {
 #endif
 
-/* The item work of the local slot, or NULL when the slot has none. */
-Q_ItemWork* move_work_item_work_get(void);
+/* `move_work_item_work_get` is `lobby/lb_quest_screen.h`'s (included above). */
 /* The low byte of a result record's +0x36C word; a NULL record means the local slot (the two views of this function
  * - the entry band's `s32 slot` caller and the arena band's record - are one declaration since the phase 4 fold). */
 u8 quest_slot_progress_get(QuestRecord* rec);
@@ -163,7 +168,7 @@ s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s3
 /* The quest/arena result record accessors and the result screen's text getters (0x803B0F98..0x803B465C,
  * absorbed from `menu/arena_result.cpp`): `quest_record_get` hands back the record the quest work block's
  * `record_0x03C` points at and `quest_record_find` looks a record up by quest id.  The record type stays in the
- * band header `unsplit/menu.h`. */
+ * shared header `quest/quest_types.h`. */
 
 /* The current result row, or NULL when the screen has none. */
 QuestRecord* quest_record_get(void);
@@ -179,6 +184,12 @@ char* quest_str_tbl_4_get(u32 index);
 /* 0x803B2D50 - how many of item `id` the player `who` holds (the quest band's element accessors
  * subtract it from an element's target). */
 s16 quest_item_count_sum(u16 id, s32 who);
+
+/* 0x803B2C60 - spends `count` of item `id` against the three elements that ask for it, then sends the new total.
+ * 0x803B31E0 - an element's supply state: 0 while the pad input blocks it, 1 when nothing is left to deliver,
+ * 2 otherwise.  The signatures are `Pl/pl_act.cpp`'s call sites. */
+void quest_element_item_use(_PLW* owner, u16 id, s8 count);
+s32 quest_element_supply_state_get(s8 index);
 
 /* 0x803B3454.. - the result screen's text getters: the `_of` forms take the row, the plain forms read the
  * current one; each returns `quest_text_buffer` or a string-table entry. */
@@ -210,7 +221,7 @@ char* quest_monster_text_get(QuestRecord* rec, u8 which);
 struct Q_UserData* get_userdata(void);
 
 /* The move-work accessor this unit reaches every per-slot record through.  Its owner is
- * `ef/fn_800CDB2C.cpp`; that unit's own header cannot carry it (three other headers spell the same
+ * `ef/system_core.cpp`; that unit's own header cannot carry it (three other headers spell the same
  * mangling with a different return type, so a declaration there breaks ten units on
  * `illegal overloading`), so this is the one place the declaration is reachable from here.  Added
  * with the body pass, which nets the file's rule-2 set out by moving `move_work_state_ck` to its
@@ -222,7 +233,7 @@ void* get_move_work_adrs(u8 index);
 
 /* 0x803AD47C - clears the quest work block and returns it; `kind` selects the block's mode.  Added with
  * `quest/arenatask.cpp`, which reads the record the block points at (`record_0x03C`).  The block type is
- * `unsplit/menu.h`'s `QuestWork`. */
+ * `quest/quest_types.h`'s `QuestWork`. */
 struct QuestWork;
 QuestWork* quest_init(u8 kind);
 #endif

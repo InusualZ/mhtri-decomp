@@ -71,7 +71,7 @@
  * apart by `Q_MoveWork::kind_0xFC == 4` (evidence in the type's comment).  `Q_ResultRow` is a prefix of
  * `QuestRecord`, `Q_MoveWork` of the slot's move work.  `Q_ResultWork` (`quest/quest_result_work.h`) is the one
  * view of `get_qResult_work`'s 0x438-byte block, shared with `menu/menu_result.cpp` and `lobby/fn_801F9CD4.cpp`.
- * `Q_ItemWork`, the lobby's `LbCompanionWork` and `unsplit/menu.h`'s `QuestWork` are still three views of one block
+ * `Q_ItemWork`, the lobby's `LbCompanionWork` and `quest/quest_types.h`'s `QuestWork` are still three views of one block
  * (the merge is a follow-up).  The player work is `_PLW` (`pl.h`), not a view of ours.
  */
 
@@ -141,7 +141,7 @@
  *    strings and their pointer table are DEFINED here (the target's pool labels are map globals the
  *    unit does not claim); the three accented characters are `\x` byte escapes so the file stays
  *    ASCII and `sjiswrap` cannot re-encode them.  `QuestRecord`'s text runs (+0x000, +0x02E,
- *    +0x08C, +0x0B5, +0x0DE, +0x13C, +0x19A, +0x1C9) are named in `unsplit/menu.h` now,
+ *    +0x08C, +0x0B5, +0x0DE, +0x13C, +0x19A, +0x1C9) are named in `quest/quest_types.h`,
  *    which is also where the field-kind numbering comes from.
  *  - the `QuestElement` size correction to the 0x60 its own target objects use (`addi r5,r5,96` in
  *    `quest_element_value_get`) moved **eight** rows up and none down: `quest_field2E8_text_get`
@@ -213,7 +213,7 @@
  * handed to the same tooling item: it disappears with the claim (multi-run support or a data-only
  * unit for the strings run).  The pool constants the band
  * addresses (`frames_per_second_60f`, `percent_scale_100f`, `quest_grade_ratio_*`) are declared
- * `extern` in `unsplit/menu.h` and never defined here, so no `.sdata2` is emitted for them.
+ * `extern` in `quest/quest_entry.h` and never defined here, so no `.sdata2` is emitted for them.
  * The other data row is `ours-extra .sdata2 16 B`: MWCC's implicit int->float magic
  * (`0x4330000080000000` unsigned / `0x4330000000000000` signed), which the compiler pools per TU and
  * `quest_grade_get`/`quest_grade_rank_get`/`quest_grade_text_cur_get` are the band's first users of.
@@ -245,9 +245,8 @@
 
 #include "quest/quest_entry.h"
 #include "quest/quest_item_slot.h"
-#include "ef/fn_800CDB2C.h"    /* `move_work_state_ck` - owned by ef/fn_800CDB2C.cpp (rule 2) */
-#include "unsplit/menu.h"       /* `quest_work_ptr` - the band data no registered unit claims */
-#include "unsplit/lobby.h"      /* `lb_param_w` - the option block no registered unit claims */
+#include "ef/fn_800CDB2C.h"    /* `move_work_state_ck` - owned by ef/system_core.cpp (rule 2) */
+#include "unsplit/menu.h"       /* `get_str_tbl`, `Screen_w` - the band's unowned callees and the screen block */
 #include "hud/cockpit.h"
 #include "unsplit/unknown.h"    /* `system_w` - the system block no registered unit claims */
 #include "Network/network_pat_control.h"   /* isServerSelectState (owner header, rule 2) */
@@ -275,12 +274,11 @@
 #include "Runtime.PPCEABI.H/memset.h"  /* memset (owner: the Runtime.PPCEABI.H lib) */
 #include "Runtime.PPCEABI.H/memcpy.h"  /* memcpy (owner: the Runtime.PPCEABI.H lib) */
 #include "types.h"
-#include "quest/quest_list_values.h"     /* `quest_list_values` - owned by quest/quest_entry.cpp (rule 2) */
 #include "font/flfnt.h"                    /* msg_str_gen / flfntStrLen / flKnjMsgNumPtr (rule 2) */
 #include "Pl/fn_80273B14.h"               /* `Pl_item_id_usable_ck`, the id-usable predicate (rule 2) */
 
 /* The band's quest-work pointer in this unit's own view of the record.  `quest_work_ptr` itself is
- * `.sbss` band data `unsplit/menu.h` declares, and that header cannot take this unit's
+ * `.sbss` band data `quest/quest_entry.h` declares, and that header cannot take this unit's
  * offsets, so the two views are cast rather than merged. */
 #define QUEST_WORK ((Q_ItemWork*)quest_work_ptr)
 
@@ -1443,8 +1441,8 @@ u8 quest_pair_chance_tbl_c[0x10] = {
 
 /* This unit's own `.sbss` (`splits.txt` `.sbss 0x80794C1C..0x80794C3C`, in address order): the quest list
  * block `quest_list_load_hunt`/`_arena` allocate (GUESS names: `quest_list_pool` is the 0x4400-byte
- * `work_mem_alloc` block, `quest_list_values` is pool + 0x1A0 - read by `menu/arena_result.cpp`, see
- * `quest/quest_list_values.h` - and `quest_list_file` is that + 0xE0, the `load_file` destination), then the
+ * `work_mem_alloc` block, `quest_list_values` is pool + 0x1A0, declared in `quest/quest_entry.h` - and
+ * `quest_list_file` is that + 0xE0, the `load_file` destination), then the
  * five table pointers the roll functions read - the per-kind entry lists and the two pairs of remaining-lot
  * tables by count (GUESS: the dump names them `em_bui_tbl`, `em_bui_rem_l/h` and `em_hokaku_rem_l/h`).  Set
  * outside this unit. */

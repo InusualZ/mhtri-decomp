@@ -6,7 +6,7 @@
  * `RESmemFree`, `pull_res_mem`, `push_res_mem`, `getResMemAdrs`), the name table (`ckResourceName`,
  * `nwAddResource`, `nwDelResource`) and the loader-work entry points (`nwWorkInitialize`, `nwMoveStart`,
  * `nwMoveEnd`).  `.text` 0x800D2FEC-0x800D6C00 (recut 2026-09-30: it absorbs the memory-manager/g3d-work group 0x800D2FEC..0x800D45AC
- * from `ef/fn_800CDB2C.cpp`, none of whose bodies were written, and hands 0x800D6C00..0x800D77B0 to `g3d/g3d_xsi.cpp`).
+ * that follows `ef/system_core.cpp`, and hands 0x800D6C00..0x800D77B0 to `g3d/g3d_xsi.cpp`).
  *
  * Naming (brief section 2, class 3 - what the code does plus the siblings' scheme): the range carries no
  * `__FILE__` string of its own.  The only file strings it references are the header `memorymanagertmp.h`

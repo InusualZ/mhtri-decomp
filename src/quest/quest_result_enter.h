@@ -19,6 +19,8 @@ void quest_result_enter(struct Q_ItemWork* item, struct Q_MoveWork* work, u8 kin
 void quest_start_enter(struct Q_ItemWork* item, struct Q_MoveWork* work);
 /* Charges one faint of `player` against the quest reward and announces it (0x803AF98C). */
 void quest_reward_faint_penalty(u8 player);
+/* Hands `player`'s arena data step (`id`, `value`) to the quest work (0x803B3074). */
+void quest_arena_data_step(u8 player, u16 id, s16 value);
 
 #ifdef __cplusplus
 }  /* extern "C" */

@@ -54,7 +54,7 @@ struct NoteWork {
     /* +0x1A0 */ u8 field_0x1A0;
     /* +0x1A1 */ u8 field_0x1A1;
     /* +0x1A2 */ u8 pad_0x1A2[0x1A8 - 0x1A2];
-    /* +0x1A8 */ u32 field_0x1A8;   /* the position `fn_803A4170` (this band) eases +0x18C onto */
+    /* +0x1A8 */ u32 field_0x1A8;   /* the position `note_pane_pos_step` (this band) eases +0x18C onto */
     /* +0x1AC */ u8 pad_0x1AC[0x1B0 - 0x1AC];
     /* +0x1B0 */ f32 field_0x1B0;   /* the per-state step `fn_80386028`/`fn_803863C8` set */
     /* +0x1B4 */ u8 pad_0x1B4[0x1C0 - 0x1B4];

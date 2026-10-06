@@ -50,8 +50,8 @@
  *   flipcheck: `.bss`/`.sbss`/`.sdata2` claimed, not emitted; `.data` 0x4F0 against 0x4C3C; `.sdata` 0x20C against
  *   0x354; `.text`/extab/extabindex short of the claim; the `.sdata`/`.sdata2` pool is shared with
  *   `hud/cockpit_quest.cpp` and `menu/menu_placeinfo.cpp` (a low-confidence fold candidate); the source still spells
- *   `my_player_no`, `enemy_data_find`, `eft_slot_persist_ck`, `eft_slot_spawn` and `quest_arena_data_step` by their old
- *   stems `fn_800CF384`, `fn_803438E4`, `fn_80343B44`, `fn_80343B74`, `fn_803B3074`.
+ *   `my_player_no`, `enemy_data_find`, `eft_slot_persist_ck` and `eft_slot_spawn` by their old stems `fn_800CF384`,
+ *   `fn_803438E4`, `fn_80343B44`, `fn_80343B74`.
  */
 
 #include "types.h"
@@ -182,7 +182,8 @@ u16 cockpit_flash_anim_ids[] = { 0x0BCF, 0x0BD0, 0x0BD1, 0x0BD3, 0x0BD4, 0xFFFF 
 #include "menu/quest_str_tbl_35_get.h"  /* quest_str_tbl_35_get (rule 2) */
 #include "ef/eft052.h"               /* hud_msg_push (rule 2) */
 #include "Pl/pl_item_add.h"          /* pl_item_add (rule 2) */
-#include "lobby/lb_quest_screen.h"   /* quest_time_limit_set (rule 2) */
+#include "lobby/lb_quest_screen.h"   /* quest_time_limit_set, quest_element_done_mark (rule 2) */
+#include "enemy/em_pop.h"            /* quest_score_deduct (rule 2) */
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 
 extern "C" {
@@ -523,13 +524,13 @@ void lb_act_row_update(u8 unused, LbActReq* req) {
     }
 }
 
-/* Sends the sub-0x0E command, or hands the two ids to the local row writer `fn_803B6998` when the link is down. */
+/* Sends the sub-0x0E command, or hands the two ids to the local row writer `quest_score_deduct` when the link is down. */
 void lb_sub0e_send(u8 index, u16 id, u8 flag, u16 value) {
     LbCmdSub0E cmd;
     u8 set = flag;
 
     if (isServerSelectState() == 0) {
-        fn_803B6998(id, value);
+        quest_score_deduct(id, value);
         return;
     }
     if ((s32)set == 0) {
@@ -554,7 +555,7 @@ void lb_act_row_apply(u8 unused, LbActReq* req) {
                 lb_sub0e_send(0, req->sel_0x04.bytes_0x00.c_0x02, 2, req->mask_0x08.half_0x00);
             }
         } else {
-            fn_803B6998(req->sel_0x04.bytes_0x00.c_0x02, req->mask_0x08.half_0x00);
+            quest_score_deduct(req->sel_0x04.bytes_0x00.c_0x02, req->mask_0x08.half_0x00);
         }
     }
 }
@@ -673,7 +674,7 @@ void lb_sub13_send(s16 first, s16 second, u8 value) {
 /* Act 19: with the request's word clear, hands its three bytes to the value writer `quest_arena_data_step`. */
 void lb_act_value_apply(u8 unused, LbActReq* req) {
     if (req->mask_0x08.word_0x00 == 0) {
-        fn_803B3074(req->mask_0x0C.byte_0x00, req->mask_0x08.halves.low_0x00,
+        quest_arena_data_step(req->mask_0x0C.byte_0x00, req->mask_0x08.halves.low_0x00,
                     req->mask_0x08.halves.high_0x02);
     }
 }
@@ -746,7 +747,7 @@ void lb_sub16_send(s32 value, s8 flag) {
     }
 }
 
-/* Act 21: sends the row over when this pad owns it, else `fn_803A9F28` writes the value into the companion slot. */
+/* Act 21: sends the row over when this pad owns it, else `quest_element_done_mark` writes the value into the companion slot. */
 void lb_act_slot_write(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -770,7 +771,8 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
             } else if (work->state_0xFA <= 2 && quest_sub_state_end_ck(1) == 0 &&
                        quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1) {
                 index = req->mask_0x08.byte_0x00;
-                fn_803A9F28(companion, &companion->slots_0x94[index], (u16)index, 0);
+                quest_element_done_mark((QuestWork*)companion, (QuestElement*)&companion->slots_0x94[index],
+                                        (u16)index, 0);
             }
         }
     }

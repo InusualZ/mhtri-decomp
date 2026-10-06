@@ -34,6 +34,7 @@
 #include "types.h"
 #include "menu/menu_item.h"
 #include "menu/menu_item_page.h"
+#include "quest/quest_item_slot.h"   /* quest_record_a/b_count_get_wide (rule 2) */
 
 /* This unit's own view of the 0x24-byte sprite-data record `sprite_frame_apply` fills in and the `draw_*`
  * family takes by reference (`_SPR_DATA_` in the map's manglings): `hud/layout.h` owns the full

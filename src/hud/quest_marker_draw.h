@@ -1,6 +1,6 @@
-/* Leaf header: `quest_marker_draw` (0x802EBED8), the one symbol of `src/hud/fn_802EBED8.cpp` that
- * `hud/cockpit_quest.cpp` calls (the owner's full header redefines `CockpitWork` and cannot be included
- * beside this unit's view of it). */
+/* Leaf header: `quest_marker_draw` (0x802EBED8), the one symbol of `src/hud/cockpit_quest.cpp`'s quest-window band
+ * that the unit's top half calls (the band's full header `hud/cockpit_quest_marker.h` redefines `CockpitWork` and is
+ * included only mid-file). */
 #ifndef MHTRI_HUD_QUEST_MARKER_DRAW_H
 #define MHTRI_HUD_QUEST_MARKER_DRAW_H
 

@@ -89,7 +89,7 @@ s32 em_set_work_state_get(void);
 /* The quest/arena accessors at 0x803B4BEC..0x803B68F0 (`quest_flag_*_ck`, `quest_arena_*_get`,
  * `quest_element_value_get`): in this unit's range but the quest/arena UI band's own (the unit is probably several
  * TUs, docs/enemy.md); their callers are the enemy, lobby, menu and quest units. */
-struct QuestRecord;   /* defined in `unsplit/menu.h` (the arena-result band's record) */
+struct QuestRecord;   /* defined in `quest/quest_types.h` (the arena-result band's record) */
 /* The result record's +0x310 flag word, one test per bit; `rec` 0 means the current record (NULL
  * selects the work's own through `quest_record_get`).  The bit names are this header's reading of
  * the call sites, all in the quest board and the result screens; the 0x800000 predicate came in
@@ -141,6 +141,14 @@ s32 quest_all_player_item_count_sum(u16 id);
  * (-1 when the element is not live). */
 s32 quest_arena_count_get(s32 index);
 s32 quest_arena_need_get(s32 index);
+/* 0x803B6998 - takes `points` off the quest work's score (+0x5D8, clamped at 0) and plays the penalty sound at
+ * enemy `unique_id`'s position.  GUESS name. */
+void quest_score_deduct(u16 points, u16 unique_id);
+/* 0x803B7154 - the record's extra condition (`quest_ex_condition_tbl` entry +0x198): kinds 0/4 pass, 1 tests
+ * `param` against the entry's range, 2 tests `arg` against its byte, 3 needs the board data's six counters at 0.
+ * GUESS name. */
+struct LbQuestBoardData;
+u32 quest_ex_condition_ck(QuestRecord* rec, u16 param, u8 arg, struct LbQuestBoardData* data);
 
 /* Whether any of the item work's three elements is in its entry state: `quest_work_ptr` must be set,
  * the move work's own +0x22D4 state byte must not be 1, and one of the three element flag words at

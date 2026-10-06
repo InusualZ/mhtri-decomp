@@ -46,7 +46,7 @@
 #include "menu/menu_message.h"
 
 #include "Runtime.PPCEABI.H/memset.h"
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "fn_80047398/userdata_gunner_ck.h" /* userdata_gunner_ck (rule 2) */
 #include "lobby/lobby_w.h" /* `lobby_w`, owned by lobby/lb_menu_pos_tbl.cpp (rule 2) */
 
@@ -1937,7 +1937,7 @@ void fn_802BECB8(char* buf, u8 index);
 void sprite_frame_apply(void* dst, u16 id, u8 flag, const _mh_ivec2_* src);
 void fn_8032422C(void);
 void fn_8035A9E4(void);
-void fn_803A75D8(void);
+void lobby_res_slots_init(void);
 void fn_803C3A70(void);
 void fn_803C3F60(void);
 s32 fn_80449860(void);
@@ -2057,7 +2057,7 @@ void fn_801FA0DC(LbChgColorWork* self)
 void fn_801FB2A8(u8 a, u8 b, u8 c)
 {
     init_player_work();
-    fn_803A75D8();
+    lobby_res_slots_init();
     fn_802AFA40();
     player_init_data_load();
     fn_800D5CAC((void*)lbl_80582988);

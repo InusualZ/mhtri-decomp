@@ -19,7 +19,7 @@
  *   `fn_80323F0C`, 0x80324274-0x80324F7C.  The 29 written rows are byte-identical.
  *   flipcheck: `.bss` (0x1A8), `.data` (0x430), `.sdata` (0x78) and `.sdata2` (0xA0) claimed but not emitted; short
  *   `.text` 0x894 of 0x64F0, extab 0x78 of 0x1A8, extabindex 0xB4 of 0x27C; the bytes of all three differ; the pools are
- *   partial (a low-confidence fold candidate with `enemy/em_action`); `fn_803B4C64` is defined by no link input.
+ *   partial (a low-confidence fold candidate with `enemy/em_action`).
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
@@ -30,6 +30,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "ai/fn_802D44F4.h" /* ai_slots_clear (rule 2: its owner) */
 #include "lobby/lb_npc.h" /* lb_party_state_reset (rule 2: its owner) */
+#include "enemy/em_pop.h" /* quest_flag_2000000_ck (rule 2: its owner) */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_state_flags_set_c1 ((void (*)(_EFT*, u32, u32))eft_state_flags_set)
 
@@ -45,7 +46,6 @@ f32   fn_800513F0(VEC3* v, f32 s);
 u32   fn_8004D70C(u32 value);
 s32   fn_800CEF18(u32 value);
 s32   fn_80217934(void);
-void  fn_803B4C64(void);
 void  setCockpitTransferMode(u8 index, s32 value);
 void  fn_802DFCD4(void);
 void* memset(void* dst, int value, u32 size);
@@ -313,9 +313,9 @@ extern "C" void fn_80323874(MenuQuestWork* self) {
     fn_803234EC(self, self->state_0x001 == 0 ? 1 : 0);
 }
 
-/* 0x80323F08 - tail call into the icon helper. */
-extern "C" void fn_80323F08(void) {
-    fn_803B4C64();
+/* 0x80323F08 - tail call into the quest record's 0x2000000 flag test. */
+extern "C" void fn_80323F08(QuestRecord* rec) {
+    quest_flag_2000000_ck(rec);
 }
 
 /* 0x8032422C - reset the ten slots and run the screen's two post steps. */

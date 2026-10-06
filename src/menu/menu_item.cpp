@@ -210,6 +210,7 @@ extern "C" u32 fn_8029A140(_HIT_W* self)
 #include "types.h"
 #include "id_value.h"
 #include "menu/menu_item.h"
+#include "quest/quest_item_slot.h"   /* quest_select_ready_ck (rule 2) */
 #include "Pl/pl_act.h"
 #include "unsplit/unknown.h"
 #include "unsplit/lobby.h"
@@ -371,7 +372,6 @@ void fn_802E2358(_SPR_DATA_* spr, s8* text, u32 length, const _mh_ivec2_* pos);
 void fn_802E4828(s16 x, s16 y, s32 flag);
 void fn_802DB140(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
 s16 fn_802D72EC(u16 item_id);
-u32 quest_move_state_valid_ck(void);
 char* strcpy(char* dst, const char* src);
 s32 fn_802A6434(_PLW* plw);
 u32 fn_802A6438(MENU_ITEM_W* self, s16 index);
