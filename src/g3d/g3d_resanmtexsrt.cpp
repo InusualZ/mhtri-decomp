@@ -19,10 +19,12 @@
 
 #include "types.h"
 #include "g3d/g3d_resanmtexsrt.h" /* `nw4r::g3d::ResFile` (this unit's own header, rule 1) */
+#include "g3d/g3d_rescommon.h"    /* `nw4r::g3d::ResName` (rule 1) */
+#include "g3d/g3d_resshp.h"       /* `nw4r::g3d::ResTex`/`ResPltt` (rule 2) */
 #include "nw4r/g3d/res_common.h"   /* ResHandle (rule 1) */
 #include "g3d/g3d_anmchr.h"        /* fn_8006268C/fn_80062750/fn_80062914 (rule 2, owner header) */
 #include "g3d/fn_800680CC.h"       /* fn_80069664/fn_8006CDBC/fn_8006D9FC (rule 2, owner header) */
-#include "g3d/g3d_resanmscn.h"     /* fn_8009125C/fn_800912D4/fn_800913A0/fn_80091614/fn_80091628
+#include "g3d/g3d_resanmscn.h"     /* fn_8009125C/fn_800912D4/fn_800913A0/fn_80091628
                                     * (rule 2, owner header) */
 
 /* The target's constructor guards keep the split `clrlwi` + `cmpwi` pair (no record-form `clrlwi.`),
@@ -114,7 +116,8 @@ extern "C" void fn_80091E44(u8* p, u32 value) {
     fn_80091EAC(p + 3, value & 0xFF);
 }
 
-extern "C" void fn_80091DFC(u8* p, u32 value) {
+/* 0x80091DFC (0x48): writes a BP command: the 0x61 opcode, then the register word. */
+void nw4r::g3d::detail::ResWriteBPCmd(u8* p, u32 value) {
     fn_80091EAC(p, 0x61);
     fn_80091E44(p + 1, value);
 }
@@ -127,7 +130,8 @@ extern "C" u32 fn_80091EE8(const u8* p) {
     return value;
 }
 
-extern "C" void fn_80091EB4(const u8* p, u32* out) {
+/* 0x80091EB4 (0x34): reads a BP command's register word. */
+void nw4r::g3d::detail::ResReadBPCmd(const u8* p, u32* out) {
     *out = fn_80091EE8(p + 1);
 }
 
@@ -137,9 +141,10 @@ extern "C" void fn_80091F70(u8* p, u32 tag, u32 value) {
     fn_80091E44(p + 2, value);
 }
 
-extern "C" void fn_80091FD0(u8* p, u32 value) {
+/* 0x80091FD0 (0x50): ORs `value` into a BP command's word and rewrites it as a mask command. */
+void nw4r::g3d::detail::ResWriteSSMask(u8* p, u32 value) {
     u32 word = fn_80091EE8(p + 1) | value;
-    fn_80091DFC(p, word | 0xFE000000);
+    ResWriteBPCmd(p, word | 0xFE000000);
 }
 
 /* ============================== 0x80092234-0x800924B8: the ResFile helpers ===================== */
@@ -280,14 +285,12 @@ extern "C" u32 fn_80091D20(void* self, void* key) {
     ResAnmTexSrtBody* body = (ResAnmTexSrtBody*)fn_8006CDBC(self);
     u32 tmp = fn_8006D9FC(self, body->field_0x10);
 
-    return fn_80062750(&tmp, key);
+    return (u32)(*reinterpret_cast<nw4r::g3d::ResDic*>(&tmp))[(int)key];
 }
 
 /* ==================== the `ResFile` dictionary chain (rule 2 declarations) ==================== */
 
 extern "C" u32 fn_80092444(void* self);             /* this unit (0x80092444) */
-extern "C" s32 fn_80092330(void* dict, void* arg); /* this unit (0x80092330); `s32` as this unit's
-                                                    * header declares it */
 
 /* The ten "no-key" accessors: build the dictionary name from the category label, resolve the
  * `ResFile` root dictionary at +0x18, look the entry up, then read the body word through the
@@ -295,141 +298,81 @@ extern "C" s32 fn_80092330(void* dict, void* arg); /* this unit (0x80092330); `s
  * label), so they are written once each with the label that differs. */
 
 extern "C" u32 fn_80092588(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590A60);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590A60)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
 
 extern "C" u32 fn_8009284C(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590A80);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590A80)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
 
 extern "C" u32 fn_80092B10(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590AA0);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AA0)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
 
 extern "C" u32 fn_80092CC4(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590AC0);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AC0)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
 
 extern "C" u32 fn_80092E78(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590AE0);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AE0)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
 
 extern "C" u32 fn_8009302C(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590B00);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B00)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
 
 extern "C" u32 fn_800931E0(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590B20);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B20)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
 
 extern "C" u32 fn_80093394(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590B40);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B40)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
 
 extern "C" u32 fn_80093548(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590B60);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B60)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
 
 extern "C" u32 fn_80093690(void* self) {
-    void* tmp;
-    fn_8006268C(&tmp, (u32)lbl_80590B80);
-    void* name = tmp;
-    void* dict;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
-    void* e;
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B80)];
     if (entry != 0) {
-        return fn_80069664(fn_80062914(&e, entry));
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
     }
     return 0;
 }
@@ -445,17 +388,10 @@ extern "C" void* fn_8009326C(u32* self, u32 ptr);
 extern "C" void* fn_80093420(u32* self, u32 ptr);
 
 extern "C" u32 fn_80092DBC(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590AE0);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AE0)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         fn_80092D50(&obj, key);
         return obj;
     }
@@ -464,17 +400,10 @@ extern "C" u32 fn_80092DBC(void* self, u32 arg) {
 }
 
 extern "C" u32 fn_80092F70(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590B00);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B00)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         fn_80092F04(&obj, key);
         return obj;
     }
@@ -483,17 +412,10 @@ extern "C" u32 fn_80092F70(void* self, u32 arg) {
 }
 
 extern "C" u32 fn_80093124(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590B20);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B20)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         fn_800930B8(&obj, key);
         return obj;
     }
@@ -502,17 +424,10 @@ extern "C" u32 fn_80093124(void* self, u32 arg) {
 }
 
 extern "C" u32 fn_800932D8(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590B40);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B40)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         fn_8009326C(&obj, key);
         return obj;
     }
@@ -521,17 +436,10 @@ extern "C" u32 fn_800932D8(void* self, u32 arg) {
 }
 
 extern "C" u32 fn_8009348C(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590B60);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B60)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         fn_80093420(&obj, key);
         return obj;
     }
@@ -546,22 +454,15 @@ extern "C" u32 fn_8009348C(void* self, u32 arg) {
 #include "fn_8004CAD8.h"           /* res_tex_ctor/res_pltt_ctor (rule 2, owner header) */
 #include "g3d/fn_80075DCC.h"       /* fn_8007B878 (rule 2, owner header) */
 #include "g3d/g3d_resanmamblight.h"/* fn_80089F94 (rule 2, owner header) */
+#include "g3d/g3d_resmat.h"
 
-extern "C" u32 fn_80092250(void* self, const char* name);
 extern "C" void* fn_80092B9C(u32* self, u32 ptr);
 
 extern "C" u32 fn_800924CC(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590A60);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590A60)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         fn_8007B878((s32)&obj, (s32)key);
         return obj;
     }
@@ -570,17 +471,10 @@ extern "C" u32 fn_800924CC(void* self, u32 arg) {
 }
 
 extern "C" u32 fn_80092790(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590A80);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590A80)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         res_pltt_ctor(&obj, key);
         return obj;
     }
@@ -589,17 +483,10 @@ extern "C" u32 fn_80092790(void* self, u32 arg) {
 }
 
 extern "C" u32 fn_80092A54(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590AA0);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AA0)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         res_tex_ctor(&obj, key);
         return obj;
     }
@@ -608,17 +495,10 @@ extern "C" u32 fn_80092A54(void* self, u32 arg) {
 }
 
 extern "C" u32 fn_80092C08(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590AC0);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AC0)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         fn_80092B9C(&obj, key);
         return obj;
     }
@@ -627,17 +507,10 @@ extern "C" u32 fn_80092C08(void* self, u32 arg) {
 }
 
 extern "C" u32 fn_800935D4(void* self, u32 arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590B80);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B80)];
     if (entry != 0) {
-        u32 key = fn_80062750(fn_80062914(&e, entry), (void*)arg);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
         fn_80089F94(&obj, key);
         return obj;
     }
@@ -655,17 +528,10 @@ namespace nw4r {
 namespace g3d {
 
 u32 ResFile::GetResPltt(const char* pName) const {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590A80);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444((void*)this) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444((void*)this) + 24))[nw4r::g3d::ResName((void*)lbl_80590A80)];
     if (entry != 0) {
-        u32 key = fn_80092250(fn_80062914(&e, entry), pName);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[pName];
         res_pltt_ctor(&obj, key);
         return obj;
     }
@@ -674,17 +540,10 @@ u32 ResFile::GetResPltt(const char* pName) const {
 }
 
 u32 ResFile::GetResTex(const char* pName) const {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* e;
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590AA0);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444((void*)this) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444((void*)this) + 24))[nw4r::g3d::ResName((void*)lbl_80590AA0)];
     if (entry != 0) {
-        u32 key = fn_80092250(fn_80062914(&e, entry), pName);
+        u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[pName];
         res_tex_ctor(&obj, key);
         return obj;
     }
@@ -702,12 +561,6 @@ extern "C" int strcmp(const char* a, const char* b);
 extern "C" u32 fn_8009213C(void* self, const char* name, u32 len);
 extern "C" u32 fn_80092020(void* self, void* name);
 
-/* A `ResDic` entry record: the target reads an entry's offset value from the word at +0x0C.  Modelled
- * with a named field rather than `*(u32*)(e + 12)` so no pointer arithmetic reaches a field (rule 6). */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0xC];
-    /* +0x0C */ u32 field_0x0C;
-} ResDicEntry; /* size: 0x10 */
 
 /* `ResDic::GetOffset` guarded by the `g3d_rescommon_ac.h` assert. */
 extern "C" u32 fn_800922D0(u32* self, u32 ofs) {
@@ -718,12 +571,14 @@ extern "C" u32 fn_800922D0(u32* self, u32 ofs) {
 }
 
 /* `ResDic::Get(const char*)` - validate, bound, look the name up, then resolve its offset. */
-extern "C" u32 fn_80092250(void* self, const char* name) {
-    if (fn_800628B4(self) != 0) {
+/* 0x80092250 (0x80): returns the data of the entry named `name`, or NULL. */
+/* untyped: opaque handle - the entry's data block */
+void* nw4r::g3d::ResDic::operator[](const char* name) const {
+    if (fn_800628B4(const_cast<ResDic*>(this)) != 0) {
         if (name != 0) {
-            u32 e = fn_8009213C(self, name, strlen(name));
+            u32 e = fn_8009213C(const_cast<ResDic*>(this), name, strlen(name));
             if (e != 0) {
-                return fn_800922D0((u32*)self, ((ResDicEntry*)e)->field_0x0C);
+                return (void*)fn_800922D0((u32*)const_cast<ResDic*>(this), ((const nw4r::g3d::ResDicEntry*)e)->ofsData);
             }
         }
     }
@@ -739,13 +594,15 @@ extern "C" u32 fn_80092444(void* self) {
 }
 
 /* `ResDic::Get(const ResName&)` - validate both the dictionary and the name, then resolve. */
-extern "C" s32 fn_80092330(void* self, void* arg) {
-    if (fn_800628B4(self) != 0) {
-        if (fn_80091614(arg) != 0) {
-            u32 local = *(u32*)arg;
-            u32 e = fn_80092020(self, &local);
+/* 0x80092330 (0x84): returns the data of the entry named by `name`, or NULL. */
+/* untyped: opaque handle - the entry's data block */
+void* nw4r::g3d::ResDic::operator[](const ResName name) const {
+    if (fn_800628B4(const_cast<ResDic*>(this)) != 0) {
+        if (name.IsValid() != 0) {
+            u32 local = (u32)name.mpData;
+            u32 e = fn_80092020(const_cast<ResDic*>(this), &local);
             if (e != 0) {
-                return fn_800922D0((u32*)self, ((ResDicEntry*)e)->field_0x0C);
+                return (void*)fn_800922D0((u32*)const_cast<ResDic*>(this), ((const nw4r::g3d::ResDicEntry*)e)->ofsData);
             }
         }
     }
@@ -755,7 +612,7 @@ extern "C" s32 fn_80092330(void* self, void* arg) {
 /* `ResDic::GetIndex(const ResName&)` - the same lookup, returning the entry index or -1. */
 extern "C" s32 fn_800923B4(void* self, void* arg) {
     if (fn_800628B4(self) != 0) {
-        if (fn_80091614(arg) != 0) {
+        if (reinterpret_cast<const nw4r::g3d::ResName*>(arg)->IsValid() != 0) {
             u32 local = *(u32*)arg;
             u32 e = fn_80092020(self, &local);
             if (e != 0) {
@@ -779,79 +636,49 @@ extern "C" u32 fn_80091D78(void* a, void* b) {
 /* ==================== 0x8009371C/0x80093794: the category-present predicates ==================== */
 
 extern "C" u32 fn_8009371C(void* self) {
-    void* tmp;
-    void* name;
-    void* dict;
-    fn_8006268C(&tmp, (u32)lbl_80590AC0);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    return fn_80092330(&dict, &name) != 0;
+    return (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AC0)] != 0;
 }
 
 extern "C" u32 fn_80093794(void* self) {
-    void* tmp;
-    void* name;
-    void* dict;
-    fn_8006268C(&tmp, (u32)lbl_80590B40);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    return fn_80092330(&dict, &name) != 0;
+    return (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B40)] != 0;
 }
 
 /* ==================== 0x800926CC/0x80092990: the two-level (ResName key) accessors ==================== */
 
-extern "C" u32 fn_800926CC(void* self, u32* arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* sub;
-    u32 local;
+/* 0x800926CC (0xC4): looks `name` up in the file's palette dictionary. */
+nw4r::g3d::ResPltt nw4r::g3d::ResFile::GetResPltt(const ResName name) const {
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590A80);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(const_cast<ResFile*>(this)) + 24))[nw4r::g3d::ResName((void*)lbl_80590A80)];
     if (entry != 0) {
-        local = *arg;
-        u32 e2 = fn_80092330(fn_80062914(&sub, entry), &local);
+        u32 e2 = (u32)nw4r::g3d::ResDic((void*)entry)[name];
         res_pltt_ctor(&obj, e2);
-        return obj;
+        return *reinterpret_cast<ResPltt*>(&obj);
     }
     res_pltt_ctor(&obj, 0);
-    return obj;
+    return *reinterpret_cast<ResPltt*>(&obj);
 }
 
-extern "C" u32 fn_80092990(void* self, u32* arg) {
-    void* tmp;
-    void* name;
-    void* dict;
-    void* sub;
-    u32 local;
+/* 0x80092990 (0xC4): looks `name` up in the file's texture dictionary. */
+nw4r::g3d::ResTex nw4r::g3d::ResFile::GetResTex(const ResName name) const {
     u32 obj;
-    fn_8006268C(&tmp, (u32)lbl_80590AA0);
-    name = tmp;
-    fn_80062914(&dict, fn_80092444(self) + 24);
-    u32 entry = fn_80092330(&dict, &name);
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(const_cast<ResFile*>(this)) + 24))[nw4r::g3d::ResName((void*)lbl_80590AA0)];
     if (entry != 0) {
-        local = *arg;
-        u32 e2 = fn_80092330(fn_80062914(&sub, entry), &local);
+        u32 e2 = (u32)nw4r::g3d::ResDic((void*)entry)[name];
         res_tex_ctor(&obj, e2);
-        return obj;
+        return *reinterpret_cast<ResTex*>(&obj);
     }
     res_tex_ctor(&obj, 0);
-    return obj;
+    return *reinterpret_cast<ResTex*>(&obj);
 }
 
 /* ==================== 0x8009380C/CleanUpTracks: the track walks ==================== */
 
-extern "C" void fn_80098A60(void* p);        /* 0x80098A60 - the resource release */
-extern "C" u32 fn_800989C8(void* a, void* b);/* 0x800989C8 - the key comparator */
 
 extern "C" void CleanUpTracks(void* self) {
     u32 count = fn_80092588(self);
     for (u32 i = 0; i < count; i++) {
         void* value = fn_80092584(self, i);
-        fn_80098A60(&value);
+        reinterpret_cast<nw4r::g3d::ResMdl*>(&value)->Release();
     }
 
     u32 count2 = fn_800931E0(self);
@@ -868,7 +695,8 @@ extern "C" u32 fn_8009380C(void* self, u32* arg) {
         u32 key = *arg;
         void* value = fn_80092584(self, i);
         u32 flag = 0;
-        if (fn_800989C8(&value, &key) != 0 && present != 0) {
+        if (reinterpret_cast<nw4r::g3d::ResMdl*>(&value)->Bind(reinterpret_cast<const nw4r::g3d::ResFile&>(key)) &&
+            present != 0) {
             flag = 1;
         }
         present = flag;

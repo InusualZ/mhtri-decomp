@@ -19,6 +19,7 @@
 #include "types.h"
 #include "nw4r/db_assert.h"
 #include "g3d/g3d_resvtx.h"
+#include "g3d/g3d_resmat.h"
 #include "g3d/g3d_calcvtx.h"
 #include "g3d/fn_800680CC.h"
 #include "unsplit/OS.h"
@@ -42,11 +43,7 @@ extern const char lbl_8058DF50[]; /* "NW4R:Failed assertion numKeyShape > 0" */
 extern const char lbl_8058DF78[]; /* "NW4R:Failed assertion resVtxNrm.IsValid()" */
 extern const char lbl_8058DFA4[]; /* "NW4R:Failed assertion resVtxClr.IsValid()" */
 
-/* The model validity check the driver asserts (owner g3d/g3d_anmchr.cpp) and the model's position-array
- * accessors (owner g3d/g3d_resmat.cpp). */
-extern "C" bool fn_8005D2FC(const void* pMdl);
-extern "C" u32 fn_80098098(const void* pMdl);
-extern "C" u32 fn_80098030(const void* pMdl, s32 id);
+/* The model validity check the driver asserts (owner g3d/g3d_anmchr.cpp). */
 
 #define RESVTX_AC_FILE "g3d_resvtx_ac.h"
 
@@ -223,14 +220,15 @@ NW4R_G3D_RESOURCE_PTR(ResVtxPos)
 extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTable, const void** vtxNrmTable,
                             const void** vtxClrTable) {
     using namespace nw4r::g3d;
+    ResMdl& mdl = *static_cast<ResMdl*>(pMdl);
 
     if (pAnmObjShp == NULL) {
         nw4r::db::Panic(lbl_8058DD68, 36, lbl_8058DD78);
     }
-    if (!fn_8005D2FC(pMdl)) {
+    if (!mdl.IsValid()) {
         nw4r::db::Panic(lbl_8058DD68, 37, lbl_8058DDA4);
     }
-    s32 numVtxPos = (s32)fn_80098098(pMdl);
+    s32 numVtxPos = (s32)mdl.GetResVtxPosNumEntries();
 
     for (s32 i = 0; i < numVtxPos; i++) {
         if (!fn_8006946C(pAnmObjShp, i)) {
@@ -239,8 +237,7 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
         if (vtxPosTable == NULL) {
             nw4r::db::Panic(lbl_8058DD68, 49, lbl_8058DDC8);
         }
-        ResVtxPos vtxPos;
-        vtxPos.mpData = (ResVtxPosData*)fn_80098030(pMdl, i);
+        ResVtxPos vtxPos = mdl.GetResVtxPos((u32)i);
         if (vtxPos.ptr() != vtxPosTable[i]) {
             nw4r::db::Panic(lbl_8058DD68, 50, lbl_8058DDF8);
         }

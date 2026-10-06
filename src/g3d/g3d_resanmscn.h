@@ -18,8 +18,6 @@ u32 fn_800912D4(void* self);
 /* 0x800913A0 - `ResAnmTexPat::Bind(ResFile)`: resolve every texture/palette name against `file` and
  * store the handles; returns whether every entry resolved. */
 u32 fn_800913A0(void* self, void* file);
-/* 0x80091614 - `*(u32*)self != 0`: whether the handle holds a data pointer. */
-u32 fn_80091614(void* self);
 /* 0x80091628 - `ResAnmTexPat::Release()`: reset every texture/palette handle in the two arrays. */
 void fn_80091628(void* self);
 

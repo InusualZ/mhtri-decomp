@@ -32,6 +32,7 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
+#include "g3d/g3d_resshp.h" /* nw4r::g3d::ResTex / ResPltt (rule 2) */
 #include "draw_shape_arm.h" /* the `.sdata2` float pool, owned by draw_shape_arm.cpp (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
@@ -90,17 +91,10 @@ extern "C" {
 void  fn_800539B4(u16 idx);
 void  draw_shape_tex_slots_clear(u32 a, u32 b);
 void  draw_shape_tex_slot_set(void* tex, void* pltt, u16 idx, u32 arg);
-s32   res_tex_has_pltt(void);
 void  res_tex_assign(void* a, void* b);
 void  res_tex_ctor(void* out, u32 arg);
-u16   fn_80052D98(void);
-void* fn_80052E30(void);
-void* fn_80052E54(void);
-s32   fn_80052EF0(void);
 void  res_pltt_ctor(void* out, u32 arg);
 void  res_pltt_assign(void* a, void* b);
-void  fn_8009A490(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h);
-void  fn_8009A5C4(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h);
 
 /* SDK. */
 void  GXInitTlutObj(void* obj, void* data, u32 fmt, u16 num);
@@ -234,12 +228,12 @@ extern "C" void fn_80054C74(u16 idx, u32* outTex, u32* outTlut) {
     DrawShapeWork* w = &lbl_8066A920;
     u32 texHandle;
     u32 plttHandle;
-    u32 image;
+    void* image;
     u16 width;
     u16 height;
     u32 format;
-    u32 field_0x24;
-    u32 field_0x20;
+    f32 minLod;
+    f32 maxLod;
     u8 mipmap;
 
     fn_800539B4(idx);
@@ -250,24 +244,23 @@ extern "C" void fn_80054C74(u16 idx, u32* outTex, u32* outTlut) {
     w->field_0xD8 = 0;
     w->field_0xD4 = 0;
 
-    if (res_tex_has_pltt() == 1) {
-        if (fn_80052EF0() == 0) {
+    if (reinterpret_cast<nw4r::g3d::ResTex*>(&texHandle)->IsCIFmt() == 1) {
+        if (reinterpret_cast<nw4r::g3d::ResPltt*>(&plttHandle)->IsValid() == 0) {
             *outTlut = 0;
         } else {
-            u16 num = fn_80052D98();
-            void* tlutFmt = fn_80052E30();
-            void* tlutData = fn_80052E54();
-            GXInitTlutObj((void*)*outTlut, tlutData, (u32)tlutFmt, num);
+            u16 num = reinterpret_cast<nw4r::g3d::ResPltt*>(&plttHandle)->GetNumEntries();
+            u32 tlutFmt = reinterpret_cast<nw4r::g3d::ResPltt*>(&plttHandle)->GetFmt();
+            void* tlutData = reinterpret_cast<nw4r::g3d::ResPltt*>(&plttHandle)->GetPlttData();
+            GXInitTlutObj((void*)*outTlut, tlutData, tlutFmt, num);
             GXLoadTlut((void*)*outTlut, 0);
-            fn_8009A5C4(&texHandle, &image, &width, &height, &format, &field_0x24, &field_0x20,
-                        &mipmap);
-            GXInitTexObjCI((void*)*outTex, (void*)image, width, height, format, w->field_0xD4,
+            reinterpret_cast<nw4r::g3d::ResTex*>(&texHandle)->GetTexObjCIParam(&image, &width, &height, &format, &minLod, &maxLod, &mipmap);
+            GXInitTexObjCI((void*)*outTex, image, width, height, format, w->field_0xD4,
                            w->field_0xD8, mipmap, 0);
         }
     } else {
         *outTlut = 0;
-        fn_8009A490(&texHandle, &image, &width, &height, &format, &field_0x24, &field_0x20, &mipmap);
-        GXInitTexObj((void*)*outTex, (void*)image, width, height, format, w->field_0xD4,
+        reinterpret_cast<nw4r::g3d::ResTex*>(&texHandle)->GetTexObjParam(&image, &width, &height, &format, &minLod, &maxLod, &mipmap);
+        GXInitTexObj((void*)*outTex, image, width, height, format, w->field_0xD4,
                      w->field_0xD8, mipmap);
     }
 }

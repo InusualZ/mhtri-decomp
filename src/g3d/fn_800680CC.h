@@ -31,14 +31,10 @@ u32 fn_800695EC(void* p);   /* 0x800695EC - the checked resource resolver */
 u32 fn_8006993C(void* p);   /* 0x8006993C - the checked resource resolver */
 /* 0x8006E2AC - the `ResTexSrt` non-const slot-array resolver: panics on an invalid handle word, else returns the
  * base of the 0x34-byte slot array (`ResTexSrt::SetEffectMtx` in `g3d/g3d_resmat.cpp`). */
-u8* fn_8006E2AC(void* pSelf);
 
 /* 0x8006CDBC - the checked resource resolver the `g3d/g3d_resfile.cpp` getters and the
  * `g3d/g3d_resanmtexsrt.cpp` field readers call. */
 u32 fn_8006CDBC(void* p);
-/* 0x80069664 - the indexed resource reader: the body word at +0x4 of the resolved record, or 0 for an invalid
- * handle.  `s32` is the consumers' spelling; the owner defines it `u32` (register-identical). */
-s32 fn_80069664(void* self);
 /* 0x8006D9FC - the indexed handle reader the `g3d_resanmtexsrt.cpp` field readers call (rule 2). */
 u32 fn_8006D9FC(void* self, u32 idx);
 /* 0x8006D9A4 - the keyed field reader (a sibling of the `g3d_resanmtexsrt.cpp` reader). */
@@ -47,5 +43,6 @@ u32 fn_8006D9A4(void* self, void* key);
 #ifdef __cplusplus
 }
 #endif
+
 
 #endif /* MHTRI_G3D_FN_800680CC_H */

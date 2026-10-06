@@ -75,6 +75,7 @@
 #include "main.h"             /* get_ScreenSize / ck_WideMode (rule 2) */
 #include "fn_80047398.h"      /* drawSpr2TF / subTransSet / fltSpr2TF (rule 2) */
 #include "fn_8004CAD8.h"      /* wii_sysmsg_gen (rule 2) */
+#include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat (rule 2) */
 #include "ef/fn_800CDB2C.h"   /* fn_800D0568 (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
@@ -155,8 +156,6 @@ void font_set_size(s16 w, s16 h);
 extern "C" {
 
 /* --- foreign declarations whose map name is a plain `fn_XXXXXXXX` C stem --------------------------- */
-char* fn_8005AA28(void);
-s32 fn_8005AA30(ResHandle* self);
 
 /* 0x8005A648 - draw the message-box text for the system-message ids. */
 void fn_8005A648(u32 a, s32* idPtr) {
@@ -220,39 +219,58 @@ ResHandle* fn_8005A8E0(ResHandle* self, ResHandle* src) {
 }
 
 /* 0x8005A9B4 - store the handle word. */
-void fn_8005A9B4(ResHandle* self, u32 value) {
-    self->mPtr = value;
+} /* extern "C" */
+
+/* 0x8005A9B4 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatChanData)
+
+extern "C" {
+
+} /* extern "C" */
+
+/* 0x8005AA20 (0x8): returns the material block. */
+nw4r::g3d::ResMatData* nw4r::g3d::ResMat::ptr() {
+    return mpData;
 }
 
-/* 0x8005AA20 - read the handle word. */
-u32 fn_8005AA20(ResHandle* self) {
-    return self->mPtr;
-}
+extern "C" {
 
 /* 0x8005A950 - the checked setter: store the word, assert it is 4-byte aligned, return self. */
 #pragma peephole off
-ResHandle* fn_8005A950(ResHandle* self, u32 ptr) {
-    fn_8005A9B4(self, ptr);
-    if ((u32)ptr & 0x3) {
-        nw4r::db::Panic(lbl_8058B340, 465, lbl_8058B318);
+} /* extern "C" */
+
+/* 0x8005A950 (0x64): wraps `pData`, asserting its alignment. */
+/* untyped: opaque handle - the block address */
+nw4r::g3d::ResMatChan::ResMatChan(void* pData) : ResCommon<ResMatChanData>(pData) {
+    if ((u32)pData & 0x3) {
+        nw4r::db::Panic((const char*)lbl_8058B340, 465, (const char*)lbl_8058B318);
     }
-    return self;
 }
+
+extern "C" {
 #pragma peephole on
 
-/* 0x8005A9BC - the checked getter: assert the handle is non-null, then return its word. */
-u32 fn_8005A9BC(ResHandle* self) {
-    if (fn_8005AA30(self) == 0) {
-        nw4r::db::Panic(lbl_8058B308, 621, lbl_8058B2E8, fn_8005AA28(), 0);
+} /* extern "C" */
+
+/* 0x8005A9BC (0x64): returns the material block, panicking on a NULL handle. */
+nw4r::g3d::ResMatData& nw4r::g3d::ResMat::ref() {
+    if (!IsValid()) {
+        nw4r::db::Panic(lbl_8058B308, 621, lbl_8058B2E8, GetClassName(), 0);
     }
-    return fn_8005AA20(self);
+    return *ptr();
 }
 
+extern "C" {
+
 /* 0x8005A91C - checked setter applied to the word at +0x3F0 of the dereferenced handle. */
-u32 fn_8005A91C(ResHandle* self) {
-    ResHandle tmp;
-    return fn_8005A950(&tmp, fn_8005A9BC(self) + 0x3F0)->mPtr;
+} /* extern "C" */
+
+/* 0x8005A91C (0x34): returns the material's MatChan block. */
+nw4r::g3d::ResMatChan nw4r::g3d::ResMat::GetResMatChan() {
+    return ResMatChan((u8*)&ref() + 0x3F0);
 }
+
+extern "C" {
 
 /* 0x8005A63C - the table cosine of `x` (256/(2*pi) == 0x4222F983 40.7437 scaled). */
 f32 fn_8005A63C(f32 x) {

@@ -22,6 +22,8 @@
 #include "nw4r/math.h"
 #include "sound/se.h"
 #include "sound/mhchar.h"
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "sys_mem.h"
 
 #pragma peephole off
@@ -95,7 +97,7 @@ extern "C" void fn_800E0A14(MHchar* self, void* arg, void* dst)
     if (self->field_0x118 == 0) {
         return;
     }
-    void* entry = fn_80097F18(&self->field_0x114, arg);
+    void* entry = reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResNode((u32)arg).mpData;
     int offset = fn_8006FDCC(&entry) * 48;
     MHchar* handle = (MHchar*)self->field_0x118;
     mtx34_copy(dst, (void*)(fn_800E0A8C(handle) + offset));
@@ -110,14 +112,14 @@ extern "C" s32 fn_800E0A8C(MHchar* self)
 /* Copy the +0x114 joint entry selected by `arg` into `dst`. */
 extern "C" void fn_800E0B9C(MHchar* self, void* dst, void* arg)
 {
-    void* entry = fn_80097F18(&self->field_0x114, arg);
+    void* entry = reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResNode((u32)arg).mpData;
     fn_8005D0CC(dst, &entry);
 }
 
 /* The model's joint count, via the +0x114 sub-object. */
 int MHchar::get_joint_num(void)
 {
-    return fn_80097F80(&field_0x114);
+    return reinterpret_cast<const nw4r::g3d::ResMdl*>(&field_0x114)->GetResNodeNumEntries();
 }
 
 /* Store the model's +0x38 word. */
@@ -189,7 +191,7 @@ extern "C" void fn_800E26B4(MHchar* self, u32 index, f32 value)
 /* The model's +0x114 joint-list handle. */
 extern "C" u32 fn_800E28E4(MHchar* self)
 {
-    return fn_80098868(&self->field_0x114);
+    return reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResMatNumEntries();
 }
 
 /* Whether the model's +0x00 word is non-zero. */
@@ -242,7 +244,7 @@ extern "C" u32 fn_800E3150(MHchar* self)
 /* `get_joint_num` for the bare-stem caller. */
 extern "C" int fn_800E31E8(MHchar* self)
 {
-    return fn_80097F80(&self->field_0x114);
+    return reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResNodeNumEntries();
 }
 
 /* Apply `value` to the +0x122 halfword for the motion kinds that carry it. */

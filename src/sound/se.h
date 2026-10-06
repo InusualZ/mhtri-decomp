@@ -119,12 +119,9 @@ s32 fn_800DBB78(s32 bank, s32 id);
 void fn_800D3ACC(void* sub);
 void fn_8007E498(void* obj);
 void fn_800E2680(void* sub);
-int fn_80097F80(void* sub);
-u32 fn_80098868(void* sub);
 
 void fn_80093AA0(void* obj);
 void CleanUpTracks(void* obj);
-void* fn_80097F18(void* sub, void* arg);
 void fn_8005D0CC(void* obj, void* sub);
 int fn_8006FDCC(void* sub);
 void mtx34_copy(void* dst, void* src);

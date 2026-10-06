@@ -324,6 +324,7 @@ g3d/g3d_resanmlight.cpp:
 	extab       start:0x80009108 end:0x800091A0
 	extabindex  start:0x80021D68 end:0x80021E4C
 	.text       start:0x8008F8E4 end:0x800908FC
+	.data       start:0x80590440 end:0x80590700
 
 g3d/g3d_resanmscn.cpp:
 	extab       start:0x800091A0 end:0x80009208

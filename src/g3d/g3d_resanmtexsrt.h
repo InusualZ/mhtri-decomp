@@ -9,13 +9,28 @@
 namespace nw4r {
 namespace g3d {
 
+class ResName;
+class ResTex;
+class ResPltt;
+
 class ResFile {
 public:
     u32 GetResPltt(const char* pName) const;
     u32 GetResTex(const char* pName) const;
+    ResPltt GetResPltt(const ResName name) const;
+    ResTex GetResTex(const ResName name) const;
 
     /* +0x0 */ void* mpData;
 }; /* size: 0x4 (a one-word `ResCommon<ResFileData>` handle) */
+
+namespace detail {
+
+/* The BP-command helpers of the resource display lists. */
+void ResReadBPCmd(const u8* pCmd, u32* pReg);
+void ResWriteBPCmd(u8* pCmd, u32 reg);
+void ResWriteSSMask(u8* pCmd, u32 mask);
+
+}  // namespace detail
 
 }  // namespace g3d
 }  // namespace nw4r
@@ -24,9 +39,6 @@ public:
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* 0x80092330 - the `ResAnmScn` channel-record resolve chain (caller: g3d_resanmlight.cpp). */
-s32 fn_80092330(void* self, void* key);
 
 /* 0x80092584..0x80093690 - the ten resource-category count/item accessors of the `ResFile` container
  * (caller: g3d_resfile.cpp): each pair is `<category> count(self)` and `<category> item(self, i)`; the item
@@ -55,5 +67,6 @@ void* fn_8009368C(void* p, u32 i);
 #ifdef __cplusplus
 }
 #endif
+
 
 #endif /* MHTRI_G3D_G3D_RESANMTEXSRT_H */

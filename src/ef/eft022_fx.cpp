@@ -48,6 +48,8 @@
 #include "ef/fn_8011722C.h"
 #include "g3d/g3d_scnmdlsmpl.h" /* fn_80080B10/fn_800810DC (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_8006FDCC (rule 2) */
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "unsplit/sound.h"
 #include "unsplit/Pl.h"
 #include "unsplit/ef.h"
@@ -191,12 +193,9 @@ extern "C" void mtx34_copy(void* dst, void* src);
 
 extern "C" void fn_80059374(s32 a);
 extern "C" void fn_80059420(void);
-extern "C" void fn_8005D1AC(void* out, s32 a);
 extern "C" void fn_8005D0CC(void* ctx, void* val);
 extern "C" s32 fn_8005D050(void* ctx);
 extern "C" u32 fn_8005AAEC(void* ctx);
-extern "C" s32 fn_80097DE4(void* a, void* b);
-extern "C" s32 fn_80097F18(s32 a, u32 b);
 extern "C" void fn_8050131C(void* a);
 extern "C" f32 fn_80463EE0(s16 a, f32 b);
 extern "C" void fn_80051894(void* a, void* b, void* c, s32 d, f32 e, f32 f);
@@ -363,17 +362,16 @@ extern "C" void fn_80115FB0(_EFT* self)
 /* Releases the eft021 model's texture handles. */
 extern "C" void fn_80115FB4(_EFT_MODEL_OBJ* obj)
 {
+    nw4r::g3d::ResNode h((void*)0);
     _EFT* effect = obj->owner_0x04;
     _EFT_WORK_B* work = (_EFT_WORK_B*)effect->work_0x38;
-    s32 h;
     s32 id;
     s32 i;
 
-    fn_8005D1AC(&h, 0);
     for (i = 0; i < work->count; i++) {
         s32 handle = work->models[i]->field_0x118;
         fn_80080B10((void*)handle, 4);   /* the declaration takes void*, as its C sibling unit casts */
-        id = fn_80097DE4(&work->models[i]->field_0x114, lbl_80791930);
+        id = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&work->models[i]->field_0x114)->GetResNode((const char*)lbl_80791930).mpData;
         fn_8005D0CC(&h, &id);
         if (fn_8005AAEC(&h) == 1U) {
             fn_800E3264((void*)handle, fn_8005D050(&h));
@@ -1141,10 +1139,6 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
     _EFT* effect;
     _EFT_WORK_B* work;
     nw4r::math::MTX34* src;
-    s32 h0;
-    s32 h1;
-    s32 id0;
-    s32 id1;
     s32 k;
     s32 group;
     s32 inner;
@@ -1162,10 +1156,12 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
     MTX34_ctor(&out);
     MTX34_ctor(&ma);
     MTX34_ctor(&mb);
-    fn_8005D1AC(&h0, 0);
-    fn_8005D1AC(&h1, 0);
+    nw4r::g3d::ResNode h0((void*)0);
+    nw4r::g3d::ResNode h1((void*)0);
+    s32 id0;
+    s32 id1;
     src = &work->mtx[obj->index_0x08][0];
-    id0 = fn_80097F18(arg2, 3U);
+    id0 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(arg2)->GetResNode((u32)3).mpData;
     fn_8005D0CC(&h0, &id0);
     copyMat33(&mtx_arr[fn_8006FDCC(&h0)], src);
     k = 4;
@@ -1176,7 +1172,7 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
         for (inner = 0; inner < 6; inner++) {
             a = lbl_805A0330[inner];
             b = lbl_805A0300[inner];
-            id1 = fn_80097F18(arg2, k);
+            id1 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(arg2)->GetResNode((u32)k).mpData;
             fn_8005D0CC(&h1, &id1);
             dst = &mtx_arr[fn_8006FDCC(&h1)];
             fn_80051894(&out, &ma, &mb, 1, a->x, a->y);

@@ -14,6 +14,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMat (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -68,15 +69,19 @@ extern "C" {
 void* fn_8005AAE4(const ResMatHandle* pSelf);
 u32 fn_8005AAEC(const ResMatHandle* pSelf);
 
-/* The `ResMat` type-name accessor: the resource's own name string. */
-const char* fn_8005AA28(void) {
+} /* extern "C" */
+
+/* 0x8005AA28 (0x8): returns the class name. */
+const char* nw4r::g3d::ResMat::GetClassName() {
     return "ResMat";
 }
 
-/* `IsValid()`: the resource pointer is non-null.  The `neg`/`or`/`srwi` word test is MWCC's `!= 0`. */
-u32 fn_8005AA30(const ResMatHandle* pSelf) {
-    return pSelf->mpRes != NULL;
+/* 0x8005AA30 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResMat::IsValid() const {
+    return mpData != NULL;
 }
+
+extern "C" {
 
 /* The `_ac.h` flag setter: assert the handle is valid, then set or clear the mat's 0x100 flag. */
 void fn_8005AA44(ResMatHandle* pSelf, u32 enable) {

@@ -49,6 +49,7 @@
 #include "ef/eft004.h"
 #include "fn_8004CAD8.h"
 #include "g3d/g3d_calcworld.h"
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMatTevColor (rule 2) */
 #include "nw4r/g3d/scnmdl.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -217,8 +218,6 @@ void fn_8028F558(_EFT28_PARAM* param, void* out);
 void fn_800FA3B8(_EFT28_PARAM* param);
 u32 fn_8007BE2C(nw4r::g3d::ScnMdl::CopiedMatAccess* access, u32 arg);
 void fn_8006F0E8(_EFT26_MATOBJ* out, void* in);
-void fn_800963C0(_EFT26_MATOBJ* obj, u32 a, void* out);
-void fn_800964E4(_EFT26_MATOBJ* obj, u32 a, void* in);
 void fn_8006F0DC(_EFT26_MATOBJ* obj);
 void fn_8011D7B0(s32 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 area, u8 team);
 
@@ -621,8 +620,8 @@ extern "C" void fn_8011870C(_EFT* self)
                 u32 handle = fn_8007BE2C(&access, 0);
                 u32 ignored;
                 fn_8006F0E8(&obj, &handle);
-                fn_800963C0(&obj, 3, &ignored);
-                fn_800964E4(&obj, 3, (u32*)&p->color_r);
+                reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXGetTevKColor(GX_KCOLOR3, (GXColor*)&ignored);
+                reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, *(GXColor*)&p->color_r);
                 fn_8006F0DC(&obj);
             }
         }
@@ -934,7 +933,7 @@ extern "C" void fn_80119450(_EFT* self)
                 _EFT26_MATOBJ obj;
                 u32 handle = fn_8007BE2C(&access, 0);
                 fn_8006F0E8(&obj, &handle);
-                fn_800964E4(&obj, 3, (u32*)&p->color_r);
+                reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, *(GXColor*)&p->color_r);
                 fn_8006F0DC(&obj);
             }
         }

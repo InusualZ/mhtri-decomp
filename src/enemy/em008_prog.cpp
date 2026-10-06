@@ -34,6 +34,8 @@
 
 #include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
 #include "types.h"
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_8015D860.h"
@@ -1563,32 +1565,29 @@ u32 fn_80165FC8(_ENEMY_WORK* self, u32 arg1) {
 }
 
 void fn_801661BC(ResUserDataAc* self) {
-    u8 pad[0x1C];
-
-    fn_8005D1AC(pad, 0);
+    nw4r::g3d::ResNode pad((void*)0);
     fn_8013A654_view1(self, 7);
 }
 
 void fn_801661FC(ResUserDataAc* self, MTX34* mtx, void* cursor, s32 arg3) {
-    u32 head[1];
+    nw4r::g3d::ResNode head((void*)0);
     s32 idx;
     MTX34 local;
     MTX34 out;
 
     (void)arg3;
-    fn_8005D1AC(head, 0);
     MTX34_ctor(&out);
     MTX34_ctor(&local);
-    idx = (s32)(u32)fn_80097EB0(cursor, 0x18);
-    fn_8005D0CC(head, &idx);
+    idx = (s32)(u32)reinterpret_cast<const nw4r::g3d::ResMdl*>(cursor)->GetResNode(0x18).mpData;
+    fn_8005D0CC(&head, &idx);
     {
         _ENEMY_WORK* work = self->work;
-        mtx34_copy(&local, &mtx[fn_8006FDCC(head)]);
+        mtx34_copy(&local, &mtx[fn_8006FDCC(&head)]);
         mtx34_identity(&out);
         rotMatrixX_view1(work->field_0x608, &out);
         rotMatrixZ_view1(work->field_0x610, &out);
         mtx34_concat_assign(&local, &out);
-        copyMat33(&mtx[fn_8006FDCC(head)], &local);
+        copyMat33(&mtx[fn_8006FDCC(&head)], &local);
     }
 }
 

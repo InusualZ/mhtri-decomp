@@ -37,6 +37,7 @@
 #include "g3d/g3d_calcview.h" /* fn_8007100C (rule 2) */
 #include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
 #include "g3d/g3d_anmchr.h"      /* fn_800610AC, fn_800618BC, fn_800628C8 (rule 2) */
+#include "g3d/g3d_rescommon.h"   /* nw4r::g3d::ResDic (rule 2) */
 #include "g3d/fn_80063888.h"     /* fn_8006497C (rule 2) */
 #include "fn_8004CAD8.h"         /* anim_tick_angle, mtx34_identity, sqrt_f32 (rule 2) */
 #include "mh3_pad.h"             /* copyVec3, setVec3, VEC3_ctor (rule 2) */
@@ -1284,7 +1285,7 @@ void fn_8008D9B8(u32 self, u32* out)
 {
     u32 tmp = fn_800628C8((void*)self, (s32)*((u32*)fn_800618BC((void*)self) + 4));
 
-    fn_80062750(&tmp, out);
+    (*reinterpret_cast<nw4r::g3d::ResDic*>(&tmp))[(int)out];
 }
 
 void fn_8008DA10(ResAnmChrObj* self, f32* out)

@@ -136,6 +136,7 @@
 #include "nw_resource.h"      /* the resource loader entry points (the owner's header, rule 2) */
 #include "draw_shape.h"       /* `set_arena_idx`, the `ResFile` handle setters (the owner's header, rule 2) */
 #include "g3d/g3d_resanmtexsrt.h" /* `nw4r::g3d::ResFile` (the owner's header, rule 2) */
+#include "g3d/g3d_resshp.h"     /* `nw4r::g3d::ResTex` (the owner's header, rule 2) */
 #include "quest/quest_entry.h"   /* `get_move_work_adrs`, `get_userdata`, `quest_init` (the owner's header, rule 2) */
 #include "Network/network_pat_control.h" /* the net control accessors (the owner's header, rule 2) */
 #include "unsplit/lobby.h"     /* `lb_param_w`, `Psw` (unowned: band header) */
@@ -524,7 +525,7 @@ extern "C" void arena_resource_load(void) {
                     for (i = 0, name = arena_texture_names; i < 31; i++) {
                         tex_word = file.GetResTex(*name);
                         res_tex_assign(&tex, &tex_word);
-                        if (res_tex_has_pltt(&tex)) {
+                        if (reinterpret_cast<nw4r::g3d::ResTex*>(&tex)->IsCIFmt()) {
                             pltt_word = file.GetResPltt(*name);
                             res_pltt_assign(&pltt, &pltt_word);
                         }

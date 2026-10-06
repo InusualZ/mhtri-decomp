@@ -1,6 +1,6 @@
 /* g3d/g3d_resnode.h - the nw4r g3d `ResNode` records more than one unit reads: `ResNodeData` (the +0x14 flag word,
  *   the +0x18 matrix id, the +0x20/+0x2C/+0x38 vectors) and `AnmResult` (scale at +0x04, Euler angles at +0x10, the
- *   3x4 matrix at +0x1C).  `g3d/g3d_calcworld.cpp` still defines its own `ResNodeData` view and `NodeMtxRec`. */
+ *   3x4 matrix at +0x1C).  `g3d/g3d_calcworld.cpp` still defines its own `NodeMtxRec`. */
 #ifndef MHTRI_G3D_G3D_RESNODE_H
 #define MHTRI_G3D_G3D_RESNODE_H
 
@@ -28,5 +28,22 @@ struct ResNodeData {
     /* +0x44 */ u8 pad_0x44[0x6C - 0x44];
     /* +0x6C */ u32 mSubResOfs; /* the offset fn_80099378 resolves a sub-resource through */
 }; /* size: 0x70 (a lower bound: only the fields above are reached) */
+
+#ifdef __cplusplus
+#include "g3d/g3d_rescommon.h"
+
+namespace nw4r {
+namespace g3d {
+
+/* A one-word handle on a `ResNodeData`.  size: 0x4 */
+class ResNode : public ResCommon<ResNodeData> {
+public:
+    /* untyped: opaque handle */
+    explicit ResNode(void* pData);
+};
+
+}  // namespace g3d
+}  // namespace nw4r
+#endif
 
 #endif /* MHTRI_G3D_G3D_RESNODE_H */

@@ -19,6 +19,7 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h"        /* IS_VALID_PTR (rule 1) */
 #include "g3d/fn_80063888.h"            /* fn_8006584C/fn_80066E80, owner g3d/fn_80063888.cpp (rule 2) */
+#include "g3d/g3d_rescommon.h"          /* nw4r::g3d::ResDic / ResName (rule 2) */
 #include "g3d/g3d_anmchr.h"             /* fn_8006268C/fn_80062914/fn_80062750 (rule 2) */
 #include "font/flfnt.h"                 /* fn_8005B1E4 (rule 2) */
 #include "g3d/g3d_resanmamblight.h"     /* fn_8008A188/fn_8008A1A8, owner g3d/g3d_resanmamblight.c */
@@ -251,12 +252,11 @@ extern "C" void fn_8009004C(u32 *self, u32 *src)
 extern "C" u32 fn_80090058(u32 *self, s32 offset)
 {
     u32 base = *self;
-    u32 slot;
 
     if (offset != 0) {
-        return *(u32 *)fn_80062914((void **)&slot, base + offset);
+        return (u32)nw4r::g3d::ResDic((void*)(base + offset)).mpData;
     }
-    return *(u32 *)fn_80062914((void **)&slot, 0);
+    return (u32)nw4r::g3d::ResDic((void*)(0)).mpData;
 }
 
 /* Stores the resolved light-set pointer and asserts its 4-byte alignment. */
@@ -278,21 +278,14 @@ extern "C" void fn_80090108(u32 *self, u32 value)
 /* Resolves the `lbl_80590660` channel record through the scene dictionary. */
 extern "C" s32 fn_80090110(u32 *self)
 {
-    u32 slot;
-    u32 key;
     u32 resolved;
     u32 obj;
-    u32 out;
     s32 found;
 
-    fn_8006268C(&slot, (u32)lbl_80590660);
-    key = slot;
-    resolved = fn_80090058(self, fn_8006584C(self)->field_0x10);
-    fn_8009001C(&obj, &resolved);
-    found = fn_80092330(&obj, &key);
+    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
+                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_80590660)];
     if (found != 0) {
-        fn_80062914((void **)&out, found);
-        return fn_80069664(&out);
+        return nw4r::g3d::ResDic((void*)found).GetNumData();
     }
     return 0;
 }
@@ -316,23 +309,18 @@ extern "C" void fn_80090210(u32 *self, u32 value)
 /* Resolves the `lbl_80590680` channel record and reads the entry for `key`. */
 extern "C" u32 fn_80090218(u32 *self, u32 key)
 {
-    u32 slot;
-    u32 name;
     u32 resolved;
     u32 obj;
-    u32 out;
     s32 found;
 
-    fn_8006268C(&slot, (u32)lbl_80590680);
-    name = slot;
-    resolved = fn_80090058(self, fn_8006584C(self)->field_0x10);
-    fn_8009001C(&obj, &resolved);
-    found = fn_80092330(&obj, &name);
+    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
+                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_80590680)];
     if (found != 0) {
-        fn_80062914((void **)&out, found);
-        return *(u32 *)fn_800901AC(&obj, fn_80062750(&out, (void *)key));
+        u32 light;
+        return *(u32 *)fn_800901AC(&light, (u32)nw4r::g3d::ResDic((void*)found)[(int)key]);
     }
-    return *(u32 *)fn_800901AC(&obj, 0);
+    u32 none;
+    return *(u32 *)fn_800901AC(&none, 0);
 }
 
 /* Tail thunk to fn_80090218. */
@@ -344,21 +332,14 @@ extern "C" u32 fn_800902E0(u32 *self, u32 key)
 /* Resolves the `lbl_80590680` channel record through the scene dictionary. */
 extern "C" s32 fn_800902E4(u32 *self)
 {
-    u32 slot;
-    u32 key;
     u32 resolved;
     u32 obj;
-    u32 out;
     s32 found;
 
-    fn_8006268C(&slot, (u32)lbl_80590680);
-    key = slot;
-    resolved = fn_80090058(self, fn_8006584C(self)->field_0x10);
-    fn_8009001C(&obj, &resolved);
-    found = fn_80092330(&obj, &key);
+    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
+                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_80590680)];
     if (found != 0) {
-        fn_80062914((void **)&out, found);
-        return fn_80069664(&out);
+        return nw4r::g3d::ResDic((void*)found).GetNumData();
     }
     return 0;
 }
@@ -382,23 +363,18 @@ extern "C" void fn_800903E4(u32 *self, u32 value)
 /* Resolves the `lbl_805906A0` channel record and reads the entry for `key`. */
 extern "C" u32 fn_800903EC(u32 *self, u32 key)
 {
-    u32 slot;
-    u32 name;
     u32 resolved;
     u32 obj;
-    u32 out;
     s32 found;
 
-    fn_8006268C(&slot, (u32)lbl_805906A0);
-    name = slot;
-    resolved = fn_80090058(self, fn_8006584C(self)->field_0x10);
-    fn_8009001C(&obj, &resolved);
-    found = fn_80092330(&obj, &name);
+    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
+                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906A0)];
     if (found != 0) {
-        fn_80062914((void **)&out, found);
-        return *(u32 *)fn_80090380(&obj, fn_80062750(&out, (void *)key));
+        u32 light;
+        return *(u32 *)fn_80090380(&light, (u32)nw4r::g3d::ResDic((void*)found)[(int)key]);
     }
-    return *(u32 *)fn_80090380(&obj, 0);
+    u32 none;
+    return *(u32 *)fn_80090380(&none, 0);
 }
 
 /* Tail thunk to fn_800903EC. */
@@ -410,21 +386,14 @@ extern "C" u32 fn_800904B4(u32 *self, u32 key)
 /* Resolves the `lbl_805906A0` channel record through the scene dictionary. */
 extern "C" s32 fn_800904B8(u32 *self)
 {
-    u32 slot;
-    u32 key;
     u32 resolved;
     u32 obj;
-    u32 out;
     s32 found;
 
-    fn_8006268C(&slot, (u32)lbl_805906A0);
-    key = slot;
-    resolved = fn_80090058(self, fn_8006584C(self)->field_0x10);
-    fn_8009001C(&obj, &resolved);
-    found = fn_80092330(&obj, &key);
+    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
+                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906A0)];
     if (found != 0) {
-        fn_80062914((void **)&out, found);
-        return fn_80069664(&out);
+        return nw4r::g3d::ResDic((void*)found).GetNumData();
     }
     return 0;
 }
@@ -448,23 +417,18 @@ extern "C" void fn_800905B8(u32 *self, u32 value)
 /* Resolves the `lbl_805906C0` channel record and reads the entry for `key`. */
 extern "C" u32 fn_800905C0(u32 *self, u32 key)
 {
-    u32 slot;
-    u32 name;
     u32 resolved;
     u32 obj;
-    u32 out;
     s32 found;
 
-    fn_8006268C(&slot, (u32)lbl_805906C0);
-    name = slot;
-    resolved = fn_80090058(self, fn_8006584C(self)->field_0x10);
-    fn_8009001C(&obj, &resolved);
-    found = fn_80092330(&obj, &name);
+    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
+                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906C0)];
     if (found != 0) {
-        fn_80062914((void **)&out, found);
-        return *(u32 *)fn_80090554(&obj, fn_80062750(&out, (void *)key));
+        u32 light;
+        return *(u32 *)fn_80090554(&light, (u32)nw4r::g3d::ResDic((void*)found)[(int)key]);
     }
-    return *(u32 *)fn_80090554(&obj, 0);
+    u32 none;
+    return *(u32 *)fn_80090554(&none, 0);
 }
 
 /* Tail thunk to fn_800905C0. */
@@ -476,21 +440,14 @@ extern "C" u32 fn_80090688(u32 *self, u32 key)
 /* Resolves the `lbl_805906C0` channel record through the scene dictionary. */
 extern "C" s32 fn_8009068C(u32 *self)
 {
-    u32 slot;
-    u32 key;
     u32 resolved;
     u32 obj;
-    u32 out;
     s32 found;
 
-    fn_8006268C(&slot, (u32)lbl_805906C0);
-    key = slot;
-    resolved = fn_80090058(self, fn_8006584C(self)->field_0x10);
-    fn_8009001C(&obj, &resolved);
-    found = fn_80092330(&obj, &key);
+    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
+                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906C0)];
     if (found != 0) {
-        fn_80062914((void **)&out, found);
-        return fn_80069664(&out);
+        return nw4r::g3d::ResDic((void*)found).GetNumData();
     }
     return 0;
 }
@@ -514,23 +471,18 @@ extern "C" void fn_8009078C(u32 *self, u32 value)
 /* Resolves the `lbl_805906E0` channel record and reads the entry for `key`. */
 extern "C" u32 fn_80090794(u32 *self, u32 key)
 {
-    u32 slot;
-    u32 name;
     u32 resolved;
     u32 obj;
-    u32 out;
     s32 found;
 
-    fn_8006268C(&slot, (u32)lbl_805906E0);
-    name = slot;
-    resolved = fn_80090058(self, fn_8006584C(self)->field_0x10);
-    fn_8009001C(&obj, &resolved);
-    found = fn_80092330(&obj, &name);
+    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
+                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906E0)];
     if (found != 0) {
-        fn_80062914((void **)&out, found);
-        return *(u32 *)fn_80090728(&obj, fn_80062750(&out, (void *)key));
+        u32 light;
+        return *(u32 *)fn_80090728(&light, (u32)nw4r::g3d::ResDic((void*)found)[(int)key]);
     }
-    return *(u32 *)fn_80090728(&obj, 0);
+    u32 none;
+    return *(u32 *)fn_80090728(&none, 0);
 }
 
 /* Tail thunk to fn_80090794. */
@@ -542,21 +494,14 @@ extern "C" u32 fn_8009085C(u32 *self, u32 key)
 /* Resolves the `lbl_805906E0` channel record through the scene dictionary. */
 extern "C" s32 fn_80090860(u32 *self)
 {
-    u32 slot;
-    u32 key;
     u32 resolved;
     u32 obj;
-    u32 out;
     s32 found;
 
-    fn_8006268C(&slot, (u32)lbl_805906E0);
-    key = slot;
-    resolved = fn_80090058(self, fn_8006584C(self)->field_0x10);
-    fn_8009001C(&obj, &resolved);
-    found = fn_80092330(&obj, &key);
+    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
+                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906E0)];
     if (found != 0) {
-        fn_80062914((void **)&out, found);
-        return fn_80069664(&out);
+        return nw4r::g3d::ResDic((void*)found).GetNumData();
     }
     return 0;
 }

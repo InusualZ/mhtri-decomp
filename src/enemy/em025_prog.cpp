@@ -57,6 +57,7 @@
 #include "enemy/fn_8011D448.h"
 #include "ef/fn_800CDB2C.h"
 #include "g3d/g3d_anmchr.h"
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "sys_mem.h"
 #include "enemy/fn_80138074.h"
 
@@ -2731,9 +2732,7 @@ void fn_801A9724(struct _ENEMY_WORK* self) {
 /* r3 the work record; the kind-3 request: clears its slot word, arms the aim motion and takes the
  * 3-byte area-table entry. */
 void fn_801A9C6C(struct _ENEMY_WORK* self) {
-    u8 sp8[8];
-
-    fn_8005D1AC(sp8, 0);
+    nw4r::g3d::ResNode sp8((void*)0);
     fn_8013A654(self, 3);
 }
 

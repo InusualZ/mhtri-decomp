@@ -9,14 +9,17 @@
  *   only by g3d calc units; they are nw4r g3d work memory and may be a TU of their own (unproven).  The right
  *   edge is unproven.
  * NAMES. The map's own names and stems, the stems defined `extern "C"`.
- * RESIDUALS. Unwritten (objdiff scores them zero): 75 of the 124 functions, every one except the 42 at 100 % and
+ * RESIDUALS. Unwritten (objdiff scores them zero): 72 of the 124 functions, every one except the 45 written and
  *   these partial ones - fn_8005D27C, fn_8005DC30, fn_8005DCA0, fn_800604DC, fn_8006244C, fn_80062824, fn_800628AC.
  *   flipcheck: `.text` 0x3D0 of 0x69B8; `.data`, `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_80791148`,
  *     `lbl_807911E8`, `lbl_80791168`, `lbl_80791150`.
+ * SHAPES. The ResName constructor is complete: its work is the base initialiser.
  */
 
 #include "types.h"
+#include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
+#include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "fn_8004CAD8.h"   /* mtx34_const_ptr's owner header (docs/plan.md 6.5, rule 2) */
 #include "nw4r/math_arithmetic.h"   /* nw4r::math::detail::FExp, owner nw4r/math_arithmetic.cpp (rule 2) */
 
@@ -35,6 +38,12 @@ extern u8 lbl_80791148[];
 extern u8 lbl_80791150[];
 extern u8 lbl_8066AE80[];
 extern u8 lbl_8058BF14[];
+extern const char anmchr_resnode_align_assert_msg[]; /* the ResNode alignment assertion */
+extern const char anmchr_resnode_ac_file[]; /* "g3d_resnode_ac.h" */
+extern const char anmchr_resdic_idx_bounds_msg[]; /* the ResDic index assertion */
+extern const char anmchr_resdic_ac_file[]; /* "g3d_resdict.h" */
+extern const char anmchr_resdic_align_assert_msg[]; /* the ResDic alignment assertion */
+extern const char anmchr_resdic_ac_file_ctor[]; /* "g3d_resdict.h" */
 extern u8 lbl_8056F500[];
 extern u8 lbl_8056F538[];
 
@@ -81,10 +90,18 @@ extern "C" void fn_8005D118(u32* dst, u32* src)
     *dst = *src;
 }
 
-extern "C" void fn_8005D210(u32* p, u32 v)
-{
-    *p = v;
+/* 0x8005D210 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(ResNodeData)
+
+/* 0x8005D1AC (0x64): wraps `pData`, asserting its alignment. */
+#pragma peephole off
+/* untyped: opaque handle - the node block */
+nw4r::g3d::ResNode::ResNode(void* pData) : ResCommon<ResNodeData>(pData) {
+    if ((u32)pData & 0x3) {
+        nw4r::db::Panic((const char*)anmchr_resnode_ac_file, 44, (const char*)anmchr_resnode_align_assert_msg);
+    }
 }
+#pragma peephole on
 
 extern "C" u8* fn_8005D27C(void)
 {
@@ -96,9 +113,10 @@ extern "C" void fn_8005D2F0(u32* dst, u32* src)
     *dst = *src;
 }
 
-extern "C" u32 fn_8005D2FC(u32* p)
+/* 0x8005D2FC (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResMdl::IsValid() const
 {
-    return *p != 0;
+    return mpData != NULL;
 }
 
 extern "C" void fn_8005D3E0(void)
@@ -196,10 +214,8 @@ extern "C" f32 fn_80062300(f32* p)
     return p[1];
 }
 
-extern "C" void fn_800626BC(u32* p, u32 v)
-{
-    *p = v;
-}
+/* 0x800626BC (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResNameData)
 
 extern "C" u32 fn_800628A4(u32* p)
 {
@@ -211,10 +227,8 @@ extern "C" u8* fn_800628AC(void)
     return lbl_80791150;
 }
 
-extern "C" void fn_80062978(u32* p, u32 v)
-{
-    *p = v;
-}
+/* 0x80062978 (0x8): stores the block address. */
+NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResDicData)
 
 extern "C" void fn_80062D88(u32* dst, u32* src)
 {
@@ -223,11 +237,9 @@ extern "C" void fn_80062D88(u32* dst, u32* src)
 
 /* --- assignment helpers that return the object (nw4r's fluent setters) ------------------------------ */
 
-extern "C" void* fn_8006268C(void* self, u32 value)
-{
-    fn_800626BC((u32*)self, value);
-    return self;
-}
+/* 0x8006268C (0x30): wraps `pData`. */
+/* untyped: opaque handle - the name block */
+nw4r::g3d::ResName::ResName(void* pData) : ResCommon<ResNameData>(pData) {}
 
 extern "C" void* fn_80061B00(void* self, u32* src)
 {
@@ -328,4 +340,31 @@ extern "C" u32 fn_800626C4(u32 a, u32 b)
 extern "C" f32 fn_80060F6C(f32 x)
 {
     return nw4r::math::detail::FExp(x);
+}
+
+/* 0x80062914 (0x64): wraps `pData`, asserting its alignment. */
+#pragma peephole off
+/* untyped: opaque handle - the dictionary block */
+nw4r::g3d::ResDic::ResDic(void* pData) : ResCommon<ResDicData>(pData) {
+    if ((u32)pData & 0x3) {
+        nw4r::db::Panic((const char*)anmchr_resdic_ac_file_ctor, 84, (const char*)anmchr_resdic_align_assert_msg);
+    }
+}
+#pragma peephole on
+
+/* 0x80062750 (0xD4): returns the `idx`-th entry's data, asserting the index is in range. */
+/* untyped: opaque handle - the entry's data block */
+void* nw4r::g3d::ResDic::operator[](int idx) const {
+    if (fn_800628B4((u32*)this)) {
+        bool inRange = false;
+        if (idx >= 0 && idx <= (s32)ref().numData - 1) {
+            inRange = true;
+        }
+        if (!inRange) {
+            nw4r::db::Panic((const char*)anmchr_resdic_ac_file, 42, (const char*)anmchr_resdic_idx_bounds_msg, idx, 0,
+                            ref().numData - 1);
+        }
+        return (void*)fn_80062824((u32*)this, ref().entry[idx + 1].ofsData);
+    }
+    return NULL;
 }

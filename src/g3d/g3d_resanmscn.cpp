@@ -18,6 +18,9 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* IS_VALID_PTR (rule 1) */
+#include "g3d/g3d_rescommon.h"     /* nw4r::g3d::ResName (rule 2) */
+#include "g3d/g3d_resanmtexsrt.h"  /* nw4r::g3d::ResFile (rule 2) */
+#include "g3d/g3d_resshp.h"       /* nw4r::g3d::ResTex / ResPltt (rule 2) */
 #include "nw4r/g3d/res_anm.h"    /* ResAnmAmbLightData, ResAnmFogData (rule 1) */
 
 namespace nw4r {
@@ -201,7 +204,6 @@ u32 fn_80091584(void *self, u32 idx);
 void *fn_800915C0(void *self, s32 offset);
 void *fn_800915DC(void *self, s32 offset);
 void *fn_800915F8(void *self, s32 offset);
-u32 fn_80091614(void *self);
 void fn_80091628(void *self);
 
 /* The `ResAnmScn` handle's out-of-line `IsValid()`/`ref()` copies (0x800658C4 / 0x800658B0). */
@@ -217,15 +219,12 @@ void *fn_80090554(void *self, const void *pData); /* ResAnmFog */
 void *fn_80090728(void *self, const void *pData); /* ResAnmCamera */
 
 /* The texture/palette handle helpers (0x80052xxx band). */
-u32 fn_80052984(const void *handle);                       /* is the ResTex handle valid */
-u32 fn_80052EF0(const void *handle);                       /* is the ResPltt handle valid */
 void *res_tex_assign(void *dst, const void *src);             /* store a ResTex handle */
 void *res_pltt_assign(void *dst, const void *src);             /* store a ResPltt handle */
 void *res_tex_ctor(void *self, u32 value);                  /* construct a ResTex handle */
 void *res_pltt_ctor(void *self, u32 value);                  /* construct a ResPltt handle */
 
 /* The name/handle store helpers: store the source word at +0x0 of `self` and return `self`. */
-void *fn_8006268C(void *self, u32 value); /* g3d/g3d_anmchr.cpp */
 void *fn_80062D58(void *self, void *src); /* g3d/g3d_anmchr.cpp */
 void *fn_80069BD8(void *self, void *src); /* g3d/fn_800680CC.cpp */
 void *fn_80069C14(void *self, void *src); /* g3d/fn_800680CC.cpp */
@@ -236,8 +235,6 @@ u32 fn_800699B4(void *p);
 u32 fn_800699A8(void);
 
 /* The `ResFile` lookups (`g3d/g3d_resanmtexsrt.cpp`): resolve a name to a texture/palette handle. */
-u32 fn_80092990(void *file, ResName name);
-u32 fn_800926CC(void *file, ResName name);
 
 /* ------------------------------------------------------------------------------------------------ *
  * 0x800908FC-0x8009125C - `ResAnmScn`'s five channel getters and their offset helpers.
@@ -522,7 +519,7 @@ u32 fn_800913A0(void *self, void *file)
 
     numBound = 0;
     for (i = 0; i < numTex; i++) {
-        if (fn_80052984(pTexArray) != 0) {
+        if (reinterpret_cast<const nw4r::g3d::ResTex*>(pTexArray)->IsValid() != 0) {
             numBound++;
         } else {
             u32 nameWord = fn_80091584(pTexNameArray, i);
@@ -531,9 +528,9 @@ u32 fn_800913A0(void *self, void *file)
             u32 handle;
 
             fn_80062D58(&name, &nameWord);
-            handle = fn_80092990(file, name);
+            handle = (u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResTex(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData;
             fn_80069C14(&tex, &handle);
-            if (fn_80052984(&tex) != 0) {
+            if (reinterpret_cast<const nw4r::g3d::ResTex*>(&tex)->IsValid() != 0) {
                 res_tex_assign(pTexArray, &tex);
                 numBound++;
             }
@@ -542,7 +539,7 @@ u32 fn_800913A0(void *self, void *file)
     }
 
     for (i = 0; i < numPltt; i++) {
-        if (fn_80052EF0(pPlttArray) != 0) {
+        if (reinterpret_cast<const nw4r::g3d::ResPltt*>(pPlttArray)->IsValid() != 0) {
             numBound++;
         } else {
             u32 nameWord = fn_80091584(pPlttNameArray, i);
@@ -551,9 +548,9 @@ u32 fn_800913A0(void *self, void *file)
             u32 handle;
 
             fn_80062D58(&name, &nameWord);
-            handle = fn_800926CC(file, name);
+            handle = (u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResPltt(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData;
             fn_80069BD8(&pltt, &handle);
-            if (fn_80052EF0(&pltt) != 0) {
+            if (reinterpret_cast<const nw4r::g3d::ResPltt*>(&pltt)->IsValid() != 0) {
                 res_pltt_assign(pPlttArray, &pltt);
                 numBound++;
             }
@@ -569,9 +566,7 @@ u32 fn_800913A0(void *self, void *file)
 u32 fn_80091584(void *self, u32 idx)
 {
     u32 offset = *(u32 *)((u8 *)self + idx * 4);
-    ResName name;
-
-    return *(u32 *)fn_8006268C(&name, (u32)((u8 *)self + offset - 4));
+    return (u32)nw4r::g3d::ResName((void *)((u8 *)self + offset - 4)).mpData;
 }
 
 /* Resolves a self-relative offset against the handle's data base; a zero offset means "no sub-resource". */
@@ -610,11 +605,15 @@ void *fn_800915F8(void *self, s32 offset)
     return 0;
 }
 
-/* Whether the handle holds a data pointer. */
-u32 fn_80091614(void *self)
+} /* extern "C" */
+
+/* 0x80091614 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResName::IsValid() const
 {
-    return *(u32 *)self != 0;
+    return mpData != NULL;
 }
+
+extern "C" {
 
 /* `ResAnmTexPat::Release()`: reset every texture and palette handle in the two arrays. */
 void fn_80091628(void *self)

@@ -25,6 +25,7 @@
 #include "types.h"
 #include "g3d/fn_80063888.h"
 #include "g3d/g3d_resvtx.h"
+#include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResTexSrt (rule 2) */
 #include "g3d/g3d_anmchr.h"  /* the fn_8005Dxx / fn_80062xx helpers the g3d_anmchr.cpp range now owns (rule 2) */
 
 /* The `.rodata` animation name records the helper-backed readers pass by address: lbl_8056F598.. are this unit's
@@ -74,9 +75,10 @@ extern "C" u32 fn_8006CE20(void *p)
     return *(u32 *)p;
 }
 
-extern "C" u32 fn_8006E310(void *p)
+/* 0x8006E310 (0x8): returns the texture-SRT block. */
+nw4r::g3d::ResTexSrtData* nw4r::g3d::ResTexSrt::ptr()
 {
-    return *(u32 *)p;
+    return static_cast<ResTexSrtData *>(mpData);
 }
 
 extern "C" u32 fn_800686AC(void *p)
@@ -104,9 +106,10 @@ extern "C" u32 fn_8006CE34(void *p)
     return *(u32 *)p != 0;
 }
 
-extern "C" u32 fn_8006E324(void *p)
+/* 0x8006E324 (0x14): tells whether the handle is set. */
+bool nw4r::g3d::ResTexSrt::IsValid() const
 {
-    return *(u32 *)p != 0;
+    return mpData != NULL;
 }
 
 extern "C" u32 fn_8006E6B4(void *p)
@@ -173,9 +176,10 @@ extern "C" u32 fn_8006CE28(void)
     return (u32)lbl_8058D678;
 }
 
-extern "C" u32 fn_8006E318(void)
+/* 0x8006E318 (0xC): returns the class name. */
+const char *nw4r::g3d::ResTexSrt::GetClassName()
 {
-    return (u32)lbl_8058D5F8;
+    return (const char *)lbl_8058D5F8;
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -383,10 +387,11 @@ typedef struct {
     /* +0x04 */ u32 field_0x04;
 } G3dResNameWord; /* size: 0x8 */
 
-extern "C" u32 fn_80069664(void *self)
+/* 0x80069664 (0x48): returns the dictionary's entry count, 0 for an empty handle. */
+u32 nw4r::g3d::ResDic::GetNumData() const
 {
-    if (fn_800628B4(self))
-        return ((G3dResNameWord *)fn_800628A4(self))->field_0x04;
+    if (fn_800628B4(const_cast<ResDic*>(this)))
+        return ((G3dResNameWord *)fn_800628A4(const_cast<ResDic*>(this)))->field_0x04;
     return 0;
 }
 
@@ -432,11 +437,10 @@ extern "C" s32 fn_8006E668(f32 x)
 extern "C" u32 fn_8006D9FC(void *self, u32 idx)
 {
     u32 base = *(u32 *)self;
-    void *local;
 
     if (idx != 0)
-        return (u32)*fn_80062914(&local, base + idx);
-    return (u32)*fn_80062914(&local, 0);
+        return (u32)nw4r::g3d::ResDic((void *)(base + idx)).mpData;
+    return (u32)nw4r::g3d::ResDic((void *)0).mpData;
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -509,12 +513,12 @@ extern "C" u32 fn_8006CDBC(void *p)
     return fn_8006CE20(p);
 }
 
-extern "C" u32 fn_8006E2AC(void *p)
+/* 0x8006E2AC (0x64): returns the texture-SRT block, panicking on a NULL handle. */
+nw4r::g3d::ResTexSrtData& nw4r::g3d::ResTexSrt::ref()
 {
-    if (fn_8006E324(p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058D620, 107, (const char *)lbl_8058D604,
-                        (const char *)fn_8006E318(), "ref");
-    return fn_8006E310(p);
+    if (!IsValid())
+        nw4r::db::Panic((const char *)lbl_8058D620, 107, (const char *)lbl_8058D604, GetClassName(), "ref");
+    return *ptr();
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -544,7 +548,7 @@ extern "C" u32 fn_8006D9A4(void *self, void *key)
 {
     u32 tmp = fn_8006D9FC(self, ((ResAnmTexSrtData *)(void *)fn_8006CDBC(self))->field_0x10);
 
-    return fn_80062750(&tmp, key);
+    return (u32)(*reinterpret_cast<nw4r::g3d::ResDic *>(&tmp))[(int)key];
 }
 
 /* --------------------------------------------------------------------------------------------- *
