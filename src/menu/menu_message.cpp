@@ -1,68 +1,44 @@
 /*
- * menu/menu_message.cpp - the menu band's list/cursor layer and its message helpers.
- *
- * `.text` 0x802A6624-0x802AA6A8 (70 functions, 16516 B), extab 0x800137D4-0x80013984 and extabindex
- * 0x8003123C-0x800314C4 (54 records each, one per framed function), `.data` 0x805CE00C-0x805CE198 (396 B).
- * 48 of 70 rows written, 42 byte-identical, 22 unwritten; objdiff unit metric 44.78 %; still `NonMatching`.
- * The object emits no `.sdata`: the target's `.sdata` reads (`"%d"` 0x807922A0, `"%s"` 0x807922A4/0x807922A8)
- * belong to bodies that are not written yet.
- *
- * Provenance: registered and re-homed here on 2026-09-29; the name is
- * a GUESS from what the range does (the selection list and its cursor, the message/frame dialog) - no
- * `__FILE__` string covers it.  The right edge was cut at 0x802AA764 and then again at 0x802AA6A8: the tail is
- * the gunner-shell pool (`stage/shell.cpp`), whose first function `shell_work_init` (0x802AA6A8) clears the shell pool's `.bss` and calls its table initialisers.
- *
- * Seams, both open: the left edge is the proposal's own (`lbl_806BE340` is also read from the range before it,
- * and the first block is `menu_item.h`'s `MenuSlot`); the two `"%s"` copies (0x807922A4 read from 0x802A78F4 and
- * 0x802A7B0C, 0x807922A8 read only at 0x802AA078..0x802AA234) cannot both exist in one TU under `-str reuse`, so
- * a boundary very likely lies somewhere in 0x802A7B80..0x802A9F48.  Not acted on; only data whose referrers all
- * lie below 0x802A7B80 is claimed here (the `.data` table above), and the `"%d"`/`"%s"` `.sdata` claim was tried
- * and dropped (it reclassifies `menu_infomation.cpp`'s three `lbl_80792BE*` externs from rule 12 to rule 2).
- *
- * GUESS names (from the body, not pinned by a caller): `menu_page_count` (ceil-divide of a count by a page
- * size, 0 divisor reported as 1), `menu_text_*center_x*`, `menu_item_pick_seek`, `item_pair*`/`item_pages_*`,
- * `menu_slot_*`, `get_group2_name_str`, `menu_item_row_sprite_ids`; the cursor page move's 0x04/0x08 bits as
- * "first"/"last" is a guess too.
- *
- * Load-bearing source shapes (MWCC 1.3 allocation, measured): a `++x` / `x--` statement instead of
- * `x = x + 1` keeps a narrow local in place (`menu_cursor_move`, `menu_frame_entries_build`,
- * `menu_cursor_page_move`); declaring a local and assigning it later, in the target's register order, decides
- * which callee-saved register it gets (`item_pairs_compact_sort`, `menu_item_pick_seek`,
- * `menu_text_block_center_x`); `menu_frame_entries_build_row` is a four-iteration `for`, not four unrolled
- * blocks; a pooled `u16` result needs the `u16` variable, not a cast (`menu_slot_find`).
- *
- * Residuals (non-identical written rows).
- *   * `menu_page_count` 76.67: target `beqlr ... blr`, ours `bnelr / mr r3,r5 / blr` (60 vs 64 B); the
- *     parameter copies land in other registers (five shapes measured).
- *   * `menu_list_fill` 90.91: register-only - the target keeps `self` in r30 and the record pointer in r29
- *     (ours the other way) and computes each `id` extension before the record test; 520 vs 528 B.
- *   * `menu_scroll_init` 95.00: an inverted branch and a dropped `b` in the target's order, 116 vs 120 B.
- *   * `GetMenuFontColor` 95.59: the target keeps the inner `if (b == 1)` arm as a plain `bne` + `blr` where MWCC
- *     folds the same source into a conditional return, one instruction shorter (four shapes measured, all fold).
- *   * `item_pairs_shell_sort` 98.06 and `menu_frame_page_draw` 98.75: allocation-only (the latter keeps two
- *     locals in the highest callee-saved registers where the target keeps parameters).
- *   * `.data` is emitted in full (the sprite-id run, four value runs with their pointer table, the dialog piece rectangles and three
- *     sprite-id runs) but is 400 B against the target's 396: the compiler 8-aligns every object whose size is a multiple of 8, and the
- *     target has three (the pointer table at +0x84, the rectangles at +0x94, the frame sprite ids at +0x154) on 4-mod-8 offsets, so
- *     everything from the pointer table on sits 4 B late (the first 0x84 B are byte-equal).  Every size-multiple-of-8 object of the
- *     target is 8-aligned in absolute addresses (0x805CE090/A0/160/180) although the claim starts at 0x805CE00C; the section start
- *     is the suspect (an unseen 4-byte object ahead of it), not the tables.  Same result for `#pragma pack/align`, `aligned(4)`, a
- *     struct wrapper and Wii 1.0-1.7.
- *   * Unwritten bodies are blocked by (a) `.sdata2` 120.0f at 0x8079A3F8 (sole referrer `fn_802AA4F4`), (b) callees no header declares
- *     with a usable signature (`fn_802E3D18`, `fn_802D9EA8`, `fn_802E1320`, `get_rare_color`, `draw_number_idx`,
- *     `fn_8027993C`/`fn_80279B84`, the font cluster: `font_print` is `char*` in `unsplit/menu.h` where the map's
- *     variadic `font_print__FPSce` has `crclr`).
- *   * rule-2 debt: `menu/menu_item.cpp`, `menu/fn_8031A6C0.cpp` and `lobby/fn_801EC9F8.cpp` still declare the
- *     record-typed entry points (`menu_slot_*`, `menu_item_slot_accepts`, `menu_list_*`, `menu_cursor_column_step`)
- *     locally because they view the record as `MENU_ITEM_W` / `MenuSel`, not `MenuListWork`; folding the views is a
- *     separate change.  `unsplit/lobby.h` and `lobby/lb_pane_ui.h` declare `menu_cursor_step` as
- *     a C++ five-argument function while this range owns 0x802A8EFC and the target spells it bare.
- *
- * Declaration linkage: every callee the written bodies call is declared the way the map spells it -
- * `extern "C"` for a bare row and global C++ scope for a mangled one (`PutPageArrow`, `get_lsp_data`,
- * `get_wide_offset`, `flfntStrLen`); a declaration in an `extern "C"` block emits the bare stem.
- *
- * Inventory and evidence: `python tools/units/ledger.py unit menu/menu_message.cpp`.
+ * menu/menu_message.cpp - the menu band's list and cursor layer (the selection list `MenuListWork`, its cursor and
+ *   scroll steps, the item pairs) and its message/frame dialog helpers.  C++; a bare map row is declared `extern "C"`,
+ *   a mangled one at global scope (`PutPageArrow`, `get_lsp_data`, `get_wide_offset`, `flfntStrLen`).
+ * RANGE. .text 0x802A6624-0x802AA6A8 (70 functions); extab, extabindex, .data 0x805CE00C-0x805CE198, .sdata
+ *   0x807922A0-0x807922B0 (`"%d"`, the two `"%s"`), .sdata2 0x8079A3F8 (120.0f).  The right edge is `stage/shell.cpp`'s
+ *   `shell_work_init` (0x802AA6A8).  A TU boundary very likely lies inside 0x802A7B80-0x802A9F48: the two `"%s"` copies
+ *   (0x807922A4 read from 0x802A78F4/0x802A7B0C, 0x807922A8 from 0x802AA078-0x802AA234) cannot share a TU under
+ *   `-str reuse`.
+ * FLAGS. `cflags_menu` (configure.py).
+ * NAMES. Module `menu` from the left neighbour `menu/menu_item.cpp` and the range's own entry points
+ *   (`put_message__FPScsUl`, `put_frame_dialog__FssssUlUl`, `GetMenuFontColor__Fbbbb`).
+ *   The file name is a GUESS from what the range does (the selection list and its cursor, the frame dialog); no
+ *   `__FILE__` string covers it.  GUESSes from the bodies: `menu_page_count` (a ceil-divide, a 0 divisor read as 1),
+ *   `menu_text_*center_x*`, `menu_item_pick_seek`, `item_pair*`/`item_pages_*`, `menu_slot_*`, `get_group2_name_str`,
+ *   `menu_item_row_sprite_ids`, the `.data` tables marked in place, and the cursor page move's 0x04/0x08 bits as
+ *   "first"/"last".
+ * RESIDUALS. 22 rows unwritten (objdiff scores them zero): 0x802A6F64-0x802A736C, 0x802A7524-0x802A7978,
+ *   0x802A79B8-0x802A7B80, 0x802A7C44-0x802A8D74, 0x802A907C-0x802A91AC, 0x802A9BCC-0x802A9CD8,
+ *   0x802A9F48-0x802AA3EC, 0x802AA4F4-0x802AA59C, 0x802AA68C-0x802AA6A8.  They need the `.sdata2` 120.0f (sole referrer
+ *   `fn_802AA4F4`) or callees no header declares with a usable signature (`fn_802E3D18`, `fn_802D9EA8`, `fn_802E1320`,
+ *   `get_rare_color`, `draw_number_idx`, `fn_8027993C`/`fn_80279B84`, and `font_print`, `char*` in `unsplit/menu.h` where
+ *   the map's variadic `font_print__FPSce` sets `crclr`).  The 6 partial rows:
+ *  - `menu_page_count`: retail `beqlr ... blr`, ours `bnelr / mr r3,r5 / blr` (60 vs 64 B; five shapes measured);
+ *  - `menu_list_fill`: `self` and the record pointer in r29/r30 swapped, each `id` extension before the record test;
+ *  - `menu_scroll_init`: an inverted branch and a dropped `b` (116 vs 120 B);
+ *  - `GetMenuFontColor`: retail keeps the inner `if (b == 1)` as `bne` + `blr`, MWCC folds it into a conditional return;
+ *  - `item_pairs_shell_sort`, `menu_frame_page_draw`: register allocation only.
+ *  - `.data` is emitted whole but 0x190 against 0x18C: MWCC 8-aligns the three 8-multiple objects the target keeps at
+ *    4-mod-8 (the pointer table +0x84, the rectangles +0x94, the frame sprite ids +0x154), so the bytes from +0x84 sit
+ *    4 late; `#pragma pack/align`, `aligned(4)`, a struct wrapper and Wii 1.0-1.7 give the same.
+ *   flipcheck: `.sdata` (0x10) and `.sdata2` (0x4) claimed but not emitted; short `.text` 0x1D80 of 0x4084, extab 0x108
+ *   of 0x1B0, extabindex 0x18C of 0x288; `.data` 4 bytes long; the bytes of all four differ.
+ *   `menu/menu_item.cpp` and `menu/fn_8031A6C0.cpp` still declare `menu_slot_*`, `menu_item_slot_accepts`, `menu_list_*`
+ *   and `menu_cursor_column_step` themselves, over their `MENU_ITEM_W`/`MenuSel` views of `MenuListWork`.
+ * SHAPES. `++x`/`x--` instead of `x = x + 1` keeps a narrow local in place (`menu_cursor_move`,
+ *   `menu_frame_entries_build`, `menu_cursor_page_move`).
+ *  - A local declared first and assigned later, in the target's register order, picks its callee-saved register
+ *    (`item_pairs_compact_sort`, `menu_item_pick_seek`, `menu_text_block_center_x`).
+ *  - `menu_frame_entries_build_row` is a four-iteration `for`, not four blocks; `menu_slot_find`'s pooled `u16` result
+ *    needs a `u16` variable, not a cast.
  */
 
 #include "types.h"
@@ -99,12 +75,11 @@ s32 get_move_work_max(u8 kind);
 extern "C" void menu_frame_draw_blocks(void* dst, void* src, s8 a, s8 b, u16 c, s32 d, struct _mh_ivec2_* e);
 extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, u32 d, u8 e);
 
-/* The two source tables the list is built from (map symbols, unclaimed - playbook 29). */
+/* The source table the list is built from: `lobby/lb_companion_ui.cpp`'s `.bss`, declared here. */
 extern MenuSourceRecord lbl_806BE340[10];   /* 2 x 5 records: validity byte + two names */
 
-/* The draw helper that sits in no registered range, so the declaration is this unit's call
- * sites' (rule 2's unsplit case - the address bands interleave, so `unsplit/<module>.h` has
- * no sound module to move them to). */
+/* `hud/cockpit.cpp`'s page-arrow helper (0x802DAF48), declared in this unit's call sites' shape; its owner's
+ * declaration in `ai/fn_802D44F4.h` is not included here. */
 void PutPageArrow(u16* table, s16 a, s16 b, u16 flags, const struct _mh_ivec2_* pos, u8 mode);
 
 /* The sprite-id run (terminated by 0xFFFF) `menu_item_row_draw_values` hands to `draw_sprite_ary` (`.data` 0x805CE00C). */
@@ -151,10 +126,8 @@ extern "C" void menu_item_row_draw(u16* item, struct _mh_ivec2_* pos);
 extern "C" void menu_item_row_draw_values(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
 extern "C" void eft052_page_counts_get(u16 id, s32* a, s32* b, s32* c);
 
-/* The list length the active kind's table yields for the current selection: kind 1 walks the move
- * table's records, kind 2 the item-record table's two blocks of five.  An index of 0x80 is the "no
- * selection" case and copies the table's own label into both name buffers.  Returns how many list
- * ids were written. */
+/* The list length the active kind's table yields for the selection (kind 1 the move table, kind 2 the item table's two
+ * blocks of five; 0x80 = no selection, the table's label into both names); returns how many ids were written. */
 extern "C" u8 menu_list_mode_get(MenuListWork* self)
 {
     u8 result = 0;
@@ -199,9 +172,8 @@ extern "C" u8 menu_list_count_update(MenuListWork* self)
     return self->count_0x016;
 }
 
-/* Fills the list at +0x1BE from the active kind's table, skipping the currently selected index, and
- * stores the count.  Kind 2 walks two blocks of five records of the item table, kind 1 the move
- * table's variable-length block.  A negative index means "the current selection". */
+/* Fills the list at +0x1BE from the active kind's table (kind 2 the item table's two blocks of five, kind 1 the move
+ * table), skipping the selected index (negative = the current selection), and stores the count. */
 extern "C" u8 menu_list_fill(MenuListWork* self, s32 index)
 {
     s8* dst = self->list_0x1BE;
@@ -268,9 +240,8 @@ extern "C" u8 menu_list_fill(MenuListWork* self, s32 index)
     return self->list_count_0x1BB;
 }
 
-/* Copies the active kind's record names into the two name buffers: the item table's record for the
- * index, or the move table's.  Index 0x80 is the "no selection" case, which copies the table's own
- * label over both.  Reports whether a record was found. */
+/* Copies the active kind's record names (item or move table) into the two name buffers, the table's own label for index
+ * 0x80 (no selection); reports whether a record was found. */
 extern "C" s32 menu_list_names_set(MenuListWork* self, u8 index)
 {
     s32 found = 0;
@@ -357,10 +328,8 @@ extern "C" void menu_cursor_column_step(MenuListWork* self)
     menu_cursor_move(self, self->columns_0x007);
 }
 
-/* Builds the list of two 0x60-byte entry blocks the message frame draws from: copies the 0x60-byte
- * source into a work buffer, folds it through `item_pages_sort`, marks each of the eight entries with its
- * ordinal and whether its source slot is in use, then hands the lot to `menu_frame_draw_blocks` with the LSP
- * position the `flags` word selects.  `mode` 1 adds the 0x800 bit to the draw flags. */
+/* Builds the two 0x60-byte entry blocks the message frame draws (sorted by `item_pages_sort`, each entry marked with its
+ * ordinal and slot use) and hands them to `menu_frame_draw_blocks`; `mode` 1 adds draw flag 0x800. */
 extern "C" void menu_frame_entries_build(u16* src_a, u16* src_b, s8 kind, u16 lsp_index, u8 mode)
 {
     s16 lsp[2];
@@ -425,9 +394,8 @@ extern "C" void menu_frame_entries_build(u16* src_a, u16* src_b, s8 kind, u16 ls
     menu_frame_draw_blocks(work, entries, 1, kind, 0, flags, (struct _mh_ivec2_*)lsp);
 }
 
-/* The one-block form: fills a single block of four entries from the 0x60-byte source `src` and the
- * optional 0x20-byte mask, then hands it to the `menu_frame_page_draw` draw path.  The ordinals are the
- * constants 0..3, so the block is the frame's own row. */
+/* The one-block form: fills four entries (ordinals 0..3) from the 0x60-byte source and the optional 0x20-byte mask and
+ * hands them to `menu_frame_page_draw`. */
 extern "C" void menu_frame_entries_build_row(void* unused, u16* src_a, u16* src_b, s8 kind, u16 lsp_index, u8 mode)
 {
     s16 lsp[2];
@@ -466,10 +434,8 @@ extern "C" void menu_frame_draw_page(void* a, void* b, s8 c, s8 d, u16 e, s32 f)
     menu_frame_draw_blocks(a, b, c, d, e, f, (struct _mh_ivec2_*)lsp);
 }
 
-/* The menu's own LSP position rows.  `menu_frame_page_draw` draws a four-row page: it takes the page's
- * anchor position, the per-kind offset and a row stride of 26 pixels, then walks the four entries
- * of the block `menu_frame_entries_build`/`menu_frame_entries_build_row` filled.  `mode` 0..2 selects the page style; anything
- * else is a no-op. */
+/* Draws a four-row page at the page's anchor plus the per-kind offset, 26 pixels per row, from the block
+ * `menu_frame_entries_build`/`menu_frame_entries_build_row` filled; `mode` 0..2 picks the style, anything else is a no-op. */
 extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, u32 flags_in, u8 mode)
 {
     MenuLspPos pos;
@@ -659,9 +625,8 @@ extern "C" s32 toggle_word_step_dpad(void* state, u16 keys, s32 dec_mask, s32 in
     return toggle_word_step(state, keys, (u16)dec_mask, (u16)inc_mask, 0);
 }
 
-/* The item row at the position the caller supplies: `eft052_page_counts_get` yields the row's two value words
- * (the second already summed), which the `menu_item_row_draw_values` page routine draws.  A null or empty item is
- * skipped. */
+/* Draws the item row at the caller's position: `eft052_page_counts_get`'s two value words through
+ * `menu_item_row_draw_values`; a null or empty item is skipped. */
 extern "C" void menu_item_row_draw_pages(u16* item, struct _mh_ivec2_* pos)
 {
     s32 value;
@@ -690,9 +655,8 @@ extern "C" void menu_hold_row_draw_by_lsp(u16 id, u16* item)
     menu_item_row_draw_pages(item, (struct _mh_ivec2_*)&pos);
 }
 
-/* Moves the 1-based cursor `*cursor` inside [1, max] from the pad word `keys` (bits 0x04 / 0x08 jump to the
- * first / last entry) and the held word `held` (bits 0x01 / 0x02 step up / down), plays the move SE and
- * reports the bit that moved it through `*moved`.  Returns 1 for the 0x10 button, 2 for the 0x20 one. */
+/* Moves the 1-based cursor inside [1, max] (`keys` 0x04/0x08 first/last, `held` 0x01/0x02 up/down), plays the move SE
+ * and reports the moving bit through `*moved`; returns 1 for button 0x10, 2 for 0x20. */
 extern "C" s32 menu_cursor_page_move(s16* cursor, s16 max, u16 keys, u16 held, u16* moved)
 {
     s32 result = 0;
@@ -758,9 +722,8 @@ extern "C" void menu_scroll_init(MenuScroll* scroll, u16 index, u16 total, u8 ro
     scroll->move_flags = 0;
 }
 
-/* Moves the scroll cursor from the pad word `buttons`: bits 0x04 / 0x08 turn the page (wrapping, playing the
- * `sfx` SE), bits 0x01 / 0x02 move the row inside the page (wrapping, SE 3); the move bits go to
- * `move_flags` and the flat index is recomputed. */
+/* Moves the scroll cursor from `buttons`: 0x04/0x08 turn the page (SE `sfx`), 0x01/0x02 move the row (SE 3), both
+ * wrapping; the move bits go to `move_flags` and the flat index is recomputed. */
 extern "C" void menu_scroll_step(MenuScroll* scroll, u16 buttons, s32 sfx)
 {
     s16 col;
@@ -875,9 +838,8 @@ extern "C" s16 menu_text_block_center_x(char* text, s32 center, s16 size, s16* o
     return center - (widest >> 1) * (size >> 1);
 }
 
-/* The next list slot from the player's current pick that holds an item the pick may land on (one whose
- * record has the pickable bit and is not kind 1), walking the 26 slots once; stores it as the new pick.
- * Returns -1 when the list is empty. */
+/* Stores as the new pick the next of the 26 slots after the current one whose item is pickable and not kind 1;
+ * returns -1 when the list is empty. */
 extern "C" s32 menu_item_pick_seek(_PLW* plw, IdValue* pairs)
 {
     s32 left;
@@ -992,9 +954,8 @@ extern "C" void item_pairs_compact_sort(IdValue* pairs, s32 count)
     item_pairs_shell_sort(pairs, filled);
 }
 
-/* Inserts `*pair` into the 8-slot ordered `table`: the first empty slot takes it, otherwise it displaces the
- * first slot it sorts before and the displaced pairs ripple down.  `*pair` is cleared when it found a place
- * and holds the pair pushed off the end when the table was full. */
+/* Inserts `*pair` into the 8-slot ordered `table` (an empty slot, or before the first it sorts ahead of, rippling the
+ * rest down); `*pair` is then cleared, or holds the pair pushed off a full table. */
 extern "C" void item_pair_table_insert(IdValue* pair, IdValue* table)
 {
     IdValue carry;
@@ -1184,9 +1145,8 @@ extern "C" s16 menu_slot_find(MenuListWork* self, u16 id)
  * The dialog/page draw layer and the palette getters (0x802A7C44, 0x802A8020, 0x802AA3EC..0x802AA4F4).
  * --------------------------------------------------------------------------------------------------- */
 
-/* The palette the menu's own text is drawn in, as RGBA8888 words: `d == 1` is answered first, `a == 0`
- * (the disabled case) second, then `c`/`b` select one of the four grey/amber shades.  The arms are
- * written in the order the target branches on them. */
+/* The menu text colour (RGBA8888): `d == 1` first, `a == 0` (disabled) second, then `c`/`b` pick one of four grey/amber
+ * shades; the arms are in the order the target branches on them. */
 s32 GetMenuFontColor(bool a, bool b, bool c, bool d)
 {
     if (d == 1) {
@@ -1238,11 +1198,8 @@ s32 GetMenuIconColor(bool a, bool b, bool c, bool d)
     return 0xAAAAAAFF;
 }
 
-/* The string-table accessors the HUD/cockpit rows read their text from: each picks the `index`-th
- * string of one of the master string table's first groups (`get_str_tbl(group)`).  Group 0 is the
- * item-name group (`ef/eft050.cpp` indexes it by a hold slot's item id), group 1 the player-slot
- * names, group 3 the digit glyphs.  MARKED GUESS: group 2's content is not pinned by this range (its
- * only two call sites are `lobby/lb_companion_ui.cpp`'s), so it keeps an index-based name. */
+/* The string-table accessors: the `index`-th string of `get_str_tbl(group)`, group 0 the item names, 1 the player-slot
+ * names, 3 the digit glyphs; group 2's content is unpinned, a GUESS, so its accessor keeps an index-based name. */
 extern "C" s8* get_item_name_str(u8 index)
 {
     return (s8*)get_str_tbl(0)[index];

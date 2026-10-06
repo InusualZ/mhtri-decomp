@@ -1,16 +1,7 @@
 /*
- * The unit's own view of the menu list work the first (0x802A6624-0x802A7CC8) block operates on,
- * plus the window's message/frame/dialog entry points' declarations.  Re-homed here from
- * `menu/fn_802A6624.h` on 2026-09-29 (the unit is `menu/menu_message.cpp` now; its file
- * header carries the name's derivation, the two open seam questions and the residuals).
- *
- * The block is the menu's list/cursor layer: `menu_list_fill` fills the list at +0x1BE from one of two
- * source tables and `menu_cursor_move`/`menu_cursor_seek` step the cursor over it.  The record is the same
- * object `menu/menu_item.h` views as `MenuSlot` (0x330 B): the kind byte at +0x0F and the count at
- * +0x16 are that struct's `field_0x00F`/`entry_count_a`, and the list/name fields here sit inside
- * `MenuSlot`'s untraced +0x19C..+0x23A run.  The two views are folded into one definition by a later
- * pass, not here (the same rule-1 residual `menu_item.h` records for `_HIT_W`), because the sibling
- * unit's header is the natural home and this range only needs the offsets it reads.
+ * menu/menu_message.h - `menu/menu_message.cpp`'s list work record and its message/frame/dialog entry points.
+ *   `MenuListWork` is the same object `menu/menu_item.h` views as `MenuSlot` (0x330 B): its +0x0F kind and +0x16 count
+ *   are `MenuSlot`'s `field_0x00F`/`entry_count_a`, its list and name fields sit in `MenuSlot`'s untraced +0x19C..+0x23A.
  */
 #ifndef MHTRI_MENU_MENU_MESSAGE_H
 #define MHTRI_MENU_MENU_MESSAGE_H
@@ -90,10 +81,8 @@ struct MenuListWork {
     /* +0x1D2 */ char long_name_0x1D2[0x0E];
 };
 
-/* The range's own entry points the neighbouring units call.  `unsplit/lobby.h` and
- * `lobby/lb_pane_ui.h` published them while the band had no registered unit; this range now
- * owns 0x802A6624-0x802AA6A8 (re-cut from 0x802AD9C0 on 2026-09-29 and 0x802AA764 on 2026-09-30; the unit header has the open seams),
- * so the declarations live here and both headers include this one (docs/plan.md 6.5 rule 2).  The spellings are this range's own definitions' (the `s32` first two
+/* The range's own entry points the neighbouring units call; `unsplit/lobby.h` and `lobby/lb_pane_ui.h` include this
+ * header for them (rule 2).  The spellings are this range's own definitions' (the `s32` first two
  * parameters are what the retail call sites need: a narrow argument must not be narrowed back to `s16`
  * for the call).  `toggle_word_step*` take their caller-owned state word untyped; the cursor steps' `moved`
  * tail is the `u16*` the callers hand in.  The record-typed helpers (`menu_list_*`, `menu_slot_*`,

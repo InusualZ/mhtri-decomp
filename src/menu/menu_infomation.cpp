@@ -1,133 +1,43 @@
-/* menu/menu_infomation.cpp - the equipment-information screen: the whole `menu_infomation.cpp` TU,
- * `.text` 0x80308FB4..0x8031A6C0 (0x1170C B, 149 symbols), extab 0x80015B54..0x80015F3C (125
- * records) and extabindex 0x80034764..0x80034D40 (125 x 12 B).
- *
- * NAME AND EXTENT (class 1 evidence, `.pi/notes/seam-round.md`).  `.data` 0x805DCCDC is the bare
- * source name `"menu_infomation.cpp"` (the retail misspelling is the original) and 0x805DCCF0 its
- * `"NW4R:Failed assertion "` message; `fn_80312F84` (this unit) builds the pair at 0x80313020.  That
- * static has exactly ONE copy in the DOL, and the functions whose relocations name it span
- * 0x8030A328 .. `Set_equip_column_arrangement` (0x8031A244) - a TU-local static has one emitter, so
- * that whole run is one original source file.  The seams that used to cut it (0x8030D338: 2 referrers
- * above / 9 below; 0x80313E24: 3 / 8) were FALSE; the left edge 0x80308FB4 (0 above / 11 below) is
- * the cut this file took, and 0x8031A6C0 is the right one (11 / 0, and the extab/extabindex runs tile
- * there).  Three registrations were redrawn onto it: `ef/fn_8030681C.cpp`'s tail, this file's old
- * 0x8030D338..0x80313E24 fragment, and the never-landed `menu/fn_80313E24.cpp`.
- *
- * MODULE is `menu` (the `menu_*` file family this band's data pool carries: `menu_item.cpp`,
- * `menu_note.cpp`, `menu_placeinfo.cpp`), extension `.cpp` (the range's mangled callees).
- * `fn_8027FF88`'s caller and the `Set_equip_column_arrangement` mangling are the two C++ signals.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for most of this range (`symedit.py range`
- * 0x80308FB4 0x8031A6C0: of 149 rows five are named - the four `Put_*` putters and
- * `Set_equip_column_arrangement` - and `dumpmap.py lookup` answers `zz_<addr>_` for the rest).  The
- * named rows are written as the C++ free functions their manglings spell; every bare stem is
- * `extern "C"` so the emitted name stays the map's.
- *
- * SECTIONS.  extab/extabindex are this unit's own runs; the split at 0x80308FB4 is the first
- * extabindex record whose function is `equip_info_update` (0x80034674 + 12*20 = 0x80034764, its extab
- * pointer 0x80015B54), and both runs tile exactly with the neighbours `ef/fn_8030681C.cpp`
- * (0x80015AB4 / 0x80034674) and `menu/fn_8031A6C0.cpp` (0x80015F3C / 0x80034D40).  No `.data`/`.sdata`
- * run is claimed: every table and constant the bodies read is shared with the neighbouring units of
- * this band, and our object emits no data section at all (`datagap.py`: ours-extra empty in every
- * section; every gap is target-extra, i.e. an unwritten body).
- *
- * STATUS (official metric, this worktree's `build/RMHE08/obj/menu/menu_infomation.o` vs ours):
- * **8.986390 % fuzzy, 2092 / 71436 `.text` bytes matched, 27 byte-identical rows**; 91 of the 149
- * rows are written.  They came from the three registrations this seam redrew (28 rows of the old
- * 0x8030D338 fragment, 5 screen wrappers of the old `ef/fn_8030681C.cpp` head, the 50 rows the
- * never-landed `menu/fn_80313E24.cpp` brought) plus the five bodies this pass added.
- *
- * THIS PASS.  Seven bodies written and measured (7.71 % -> 8.99 %), plus the names of 22
- * of this unit's own `fn_XXXXXXXX` rows (rule 7), which the new call sites needed anyway:
- *   `put_lsp_sprite_offset` (0x8030FAC0, 160 B), `put_lsp_sprite_runs` (0x80312F18, 108 B),
- *       `put_equip_panel_row_variant` (0x803115E0, 124 B) and `put_equip_panel_row`
- *       (0x803118B4, 108 B) 100.00.
- *   `put_lsp_sprite_at_anchor` (0x80311A88, 96 B) 99.79  one sprite row, at the caller's packed
- *       position when the id is 0.
- *   `put_equip_panel_row_zero` (0x80311840, 116 B) 94.48 and `equip_info_update` (0x80308FB4, 228 B)
- *       85.75.
- *   `fn_8030FB78` (0x8030FB78, 200 B) 96.00 -> 100.00: an existing row, fixed by playbook 38 - the
- *       `d.x = d.x - pos.x` pair stores through an `extsh` MWCC does not emit for `d.x -= pos.x`.
- *
- * RESIDUALS, in address order:
- *   `fn_80311540` 46.25  its tail-call argument is masked with `rlwinm r0,r6,0,31,28` + `clrlwi` (a
- *       bitfield/`char` conversion whose source shape is not recovered).
- *   `fn_803159CC` 69.19  the target branches on `(flags & 2)` in three arms where MWCC folds all
- *       four to one select.
- *   `equip_info_update` 85.75: a register-colouring residual (the same instruction multiset, the
- *       allocator's web order differs) on the `PutPageArrow` argument setup - `mt.py diff` shows the
- *       two `extsb` pairs in r4/r5 where the target has them in r5/r6.
- *   `put_equip_panel_row_zero` 94.48: `flag &= 7` on a `u8` gives `clrlwi r0,r0,29` where the target
- *       has `rlwinm r0,r0,0,31,28` + `clrlwi r6,r0,24`, i.e. `(u8)(x & 0x80000007)` - the mask's
- *       spelling is not recovered.
- *   `put_lsp_sprite_at_anchor` 99.79: one argument-register move (`mr r3,r0` + `clrlwi r3,r3,16` taken
- *       in the other order).
- *   the unwritten rows, largest first: `fn_80311C3C` (0xC64), `fn_80312F84` (0xBB8) - the Panic that
- *       builds this unit's `__FILE__` pair at 0x80313020 -, `put_equip_info_upper_page`,
- *       `fn_8030A9B4`, `put_equip_info_piece_page`, `fn_8031994C`/`fn_8031949C` and the bowgun panels
- *       (`fn_8030E79C`/`fn_8031077C`/`fn_80310F30`/`put_equip_panel_row_ex`).
- *   the 37 tail placeholders (`fn_80315C00`, `fn_8031A428`, ...) are empty definitions kept so the
- *       map's rows pair by name; each is a body still to write, not a reconstruction.
- *
- * BLOCKED BY A DECLARATION, NOT BY THE CODE (each measured, then held out of this commit).  Five more
- * bodies were written and measured in this pass and are not in it, because each newly references a
- * symbol whose correct spelling would mean editing a file another live lane owns this wave (`hud/`):
- *   `fn_8030BFB4`/`fn_8030C0D4`/`fn_8030C1F4` (0x8030BFB4.., 288 B each) **measured 100.00 %** - the
- *       equip panel's per-kind dispatcher, its three variants differing only in the case-0 builder.
- *       They call `fn_802E14CC__FUsP6_EQUIPPC10_mh_ivec2_` and `fn_8030A05C` (below) calls
- *       `fn_802E1134__FUsUcUlPC10_mh_ivec2_`; both addresses are in `hud/layout.cpp`'s registered
- *       range and both are declared in `hud/layout.h` **inside its `extern "C"` block**, so
- *       our object emits the unmangled name and `undefrefs.py` refuses the unit.  The fixing pass is
- *       mechanical: rename the two symbols (rule 7), move those two declarations into that header's
- *       C++-scope block, sweep `src/hud/layout.cpp`, and land these four bodies unchanged.
- *   `fn_8030A05C` (0x8030A05C, 372 B) **measured 94.01 %** - the three-row piece preview, the same
- *       `fn_802E1134` blocker.
- *   `fn_8030C314` (520 B) **measured 87.50 %** as `put_equip_category_panel` - the per-category panel
- *       dispatch.  Its tail calls `get_rare_color` (0x802DB254, owned by `ai/fn_802D44F4.cpp`), which
- *       `hud/layout.h` likewise declares `extern "C"`: our object emits `get_rare_color`
- *       where the map has `get_rare_color__FUc`.  Declaring it at C++ scope in the *owner's* header
- *       (`ai/fn_802D44F4.h`, rule 2's home) clashes with that declaration while this unit
- *       includes `hud/layout.h`, so the fix is the same one-line move.  Its `EquipWork` view stays
- *       below, because `equip_detail_page_refresh` takes it too.
- *   `PutPageArrow` (0x802DAF48) and `GetEquipName` (0x8027E9F0) were the same class of blocker and are
- *       fixed in this commit: each is now declared at C++ scope in its owner's header
- *       (`ai/fn_802D44F4.h` and `Pl/fn_8027D684.h`), so our object emits the map's
- *       mangled spelling.  `undefrefs.py` listed both before that fix and lists neither now.
- *   `get_lsp_data` (0x802E0550) is the one unresolved reference `undefrefs.py` still reports, and it
- *       is **pre-existing** (`git show main:src/menu/menu_infomation.cpp` spells it 9 times): the same
- *       `extern "C"` declaration, the same one-line fix, the same reason it is not in this commit.
- *   `put_equip_info_upper_page`/`put_equip_info_piece_page` additionally read `lbl_80792BF4` and
- *       `lobby_world_block`, unowned `.data`/`.sdata` of which this range is the only referrer: rule 12
- *       says the unit claims those runs and emits them, its own measured step (a `.data` claim can
- *       drop the target's `R_PPC_NONE` pool relocations) - deferred, not forgotten.
- *
- * RULE 7 NAMES.  The 22 renames are the names of this unit's own rows, derived from what each body
- * does for its caller (the calling screen, the anchor id it draws at, the record it resolves).  The
- * unwritten ones are explicit **GUESS**es: `fn_80315440`/`fn_803155BC` become
- * `equip_variant_resolve`/`equip_variant_resolve_ex`, `fn_803116D8`/`fn_80311920` become
- * `put_equip_panel_row_ex`/`put_equip_panel_row_base`, and `fn_803128A0`/`fn_80313C04` become
- * `put_equip_panel_kind4`/`put_equip_panel_kind5` - each from the only evidence there is, the
- * argument list `put_equip_category_panel` calls it with.  Refine them when the bodies are written.
- *
- * MOVED BODIES.  The head's five wrappers and the tail's 13 bodies are the same source, with the
- * signature reconciliations one TU needs: `equip_variant_resolve`/`equip_variant_resolve_ex`/`fn_80315730`/`fn_80315A60`/
- * `fn_80315274`/`fn_803153F8` now take the argument list the old 0x8030D338 half already called them
- * with (they were `void f(void)` placeholders in a separate TU), and `Set_equip_column_arrangement`
- * was written with `void*` parameters, which mangles to a name objdiff cannot pair; it now spells the
- * map's `Set_equip_column_arrangement__FP4_PLWP12_EQUIP_INDEXP6_EQUIP` (rule 9).  `equip_list_page_count`
- * measures 81.48 -> 94.63 across the move because the merged unit compiles it with `cflags_menu`
- * (`-opt nopeephole`), which that body's target codegen wants.
- *
- * TYPES.  `MenuSlot` (menu/menu_item.h) is the 0x330-byte menu working record; the
- * `+0x19E`/`+0x1A0..+0x1A3`/`+0x1B0`/`+0x1EC`/`+0x1F0` fields this unit's tail reads were named on it
- * with `menu/fn_80313E24.cpp`, which is where `menu_item.h`'s own `fn_8031A638(MenuSlot*)` caller puts
- * them too.  `StatusScreenWork` (menu/menu_infomation.h) is the head's partial view of the
- * same record - it lives in this unit's header because `ef/fn_8030681C.cpp`'s two below-the-seam
- * bodies read it as well.  The three tail records (`EquipColumnPanel`, `EquipSlotInfo`,
- * `EquipSubInfo`) and `EquipListWork` are this unit's own.  `EquipWork` (this unit's own, defined
- * below the declaration block) is the record `StatusScreenWork::equip` points at - the view the
- * category panel proves, with the six piece records at 0x140 and the bowgun/ammo triple at
- * 0x1D0/0x1E8/0x1F4.
+/*
+ * menu/menu_infomation.cpp - the equipment-information screen: the status pages, the equipment detail putters per
+ *   weapon kind, the panel rows and the column arrangement (`Set_equip_column_arrangement`).  C++; the named rows are
+ *   the free functions their manglings spell, every bare stem is `extern "C"`.
+ * RANGE. .text 0x80308FB4-0x8031A6C0 (149 functions); extab, extabindex, .data 0x805DCC50-0x805DCE98, .sdata
+ *   0x80792BB8-0x80792C20, .sdata2 0x8079AE30-0x8079AE50.  The whole run is one TU: `.data` 0x805DCCDC is the bare
+ *   source name "menu_infomation.cpp" (one copy in the DOL; `fn_80312F84` builds it with its assert message at
+ *   0x80313020) and its referrers span 0x8030A328-0x8031A244.  The extab/extabindex runs tile with
+ *   `ef/fn_8030681C.cpp` below and `menu/fn_8031A6C0.cpp` above.
+ * FLAGS. `cflags_menu` (configure.py); its `-opt nopeephole` is what `equip_list_page_count`'s target wants.
+ * NAMES. Module `menu` and the file name from the `__FILE__` string (the retail misspelling is the original).  Of the
+ *   map's rows five are named (the four `Put_*` putters, `Set_equip_column_arrangement`); the rest are named for their
+ *   bodies.  GUESSes, from the argument list `put_equip_category_panel` calls them with: `equip_variant_resolve`/
+ *   `equip_variant_resolve_ex`, `put_equip_panel_row_ex`/`put_equip_panel_row_base`, `put_equip_panel_kind4`/
+ *   `put_equip_panel_kind5`.
+ * RESIDUALS. 59 rows unwritten (objdiff scores them zero): 0x80309098-0x8030A1D0, 0x8030A1DC-0x8030A30C,
+ *   0x8030A328-0x8030B790, 0x8030B868-0x8030BACC, 0x8030BAF4-0x8030CA50, 0x8030CA68-0x8030D338,
+ *   0x8030D798-0x8030D808, 0x8030D980-0x8030E784, 0x8030E79C-0x8030F374, 0x8030F38C-0x8030F7B0,
+ *   0x8030F87C-0x8030FAC0, 0x8030FDA0-0x8030FEF4, 0x8030FF0C-0x80310548, 0x8031077C-0x80310E40,
+ *   0x80310F30-0x80311540, 0x8031165C-0x80311840, 0x80311920-0x80311A88, 0x80311AE8-0x80312DF0,
+ *   0x80312E34-0x80312F18, 0x80312F84-0x80313E24.  37 more rows in 0x80313E24-0x8031A638 are empty definitions kept
+ *   so the map's rows pair by name (0.3-2.1 %); each is a body still to write.
+ *  - Blocked by a declaration: `fn_8030C314` (`put_equip_category_panel`) calls `get_rare_color__FUc`, which
+ *    `hud/layout.h` declares inside its `extern "C"` block, so our object would emit the unmangled name; the fix is
+ *    moving it to the C++ block (and the owner's `ai/fn_802D44F4.h`).
+ *  - `put_equip_info_upper_page`/`put_equip_info_piece_page` read `lbl_80792BF4` and `lobby_world_block`.
+ *   The 26 partial rows include:
+ *  - `fn_80311540`: its tail-call argument masked with `rlwinm r0,r6,0,31,28` + `clrlwi`; the source shape is open;
+ *  - `fn_803159CC`: retail branches on `(flags & 2)` in three arms where MWCC folds all four to one select;
+ *  - `equip_info_update`: the two `extsb` pairs of the `PutPageArrow` arguments in r4/r5, retail r5/r6;
+ *  - `put_equip_panel_row_zero`: `flag &= 7` on a `u8` gives `clrlwi r0,r0,29`, retail `(u8)(x & 0x80000007)`;
+ *  - `put_lsp_sprite_at_anchor`: one argument-register move taken in the other order.
+ *   flipcheck: `.data` (0x248), `.sdata` (0x68) and `.sdata2` (0x20) claimed but not emitted; short `.text` 0x1A28 of
+ *   0x1170C, extab 0x108 of 0x3E8, extabindex 0x18C of 0x5DC; the bytes of all three differ.
+ * SHAPES. `fn_8030FB78`'s `d.x = d.x - pos.x` stores through the `extsh` retail has; `d.x -= pos.x` drops it
+ *   (playbook 38).
+ *  - Records: `MenuSlot` (`menu/menu_item.h`) is the 0x330-byte working record; `StatusScreenWork`
+ *    (`menu/menu_infomation.h`) is the head's partial view of it, shared with `ef/fn_8030681C.cpp`; `EquipColumnPanel`,
+ *    `EquipSlotInfo`, `EquipSubInfo`, `EquipListWork` and `EquipWork` (what `StatusScreenWork::equip` points at: the six
+ *    piece records at 0x140, the bowgun/ammo triple at 0x1D0/0x1E8/0x1F4) are this unit's own.
  */
 
 #include "types.h"
@@ -313,8 +223,7 @@ void fn_8031A638(MenuSlot*);
  * and `pl_item_add` in `Pl/pl_skill.h`; `fn_8029FFFC` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
  * `GameMode_ck` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `unsplit/menu.h`).
  * The two below cannot: `fn_8031AE38`/`fn_8031BFEC` are owned by `menu/fn_8031A6C0.cpp`, whose header
- * declares neither and `unsplit/menu.h` (their old home) may not.  Declared here as this unit's
- * view, the way `lobby/fn_801EC9F8.cpp` declares its own. */
+ * declares neither and `unsplit/menu.h` may not.  Declared here as this unit's view. */
 void fn_8031AE38(MenuSlot* self);
 void fn_8031BFEC(void* cursor, s32 kind, MenuSlot* owner);
 
@@ -384,9 +293,8 @@ s32 equip_list_page_count(EquipListWork* self)
     return 1;
 }
 
-/* 0x8030D338 - the sword's colour panel.  Classify the slot (`fn_8027FF88`), then draw the sprite
- * run `get_menu_lsp_tbl(0x8E|0x8F)` names (each frame recoloured from `lbl_805DCD48`) and, for the
- * colour forms, up to two label rows from the string table. */
+/* 0x8030D338 - the sword's colour panel: classifies the slot (`fn_8027FF88`), draws the `get_menu_lsp_tbl(0x8E|0x8F)`
+ * sprite run recoloured from `lbl_805DCD48` and, for the colour forms, up to two label rows. */
 void Put_equip_dtl_basis_sword_colorX(_PLW* plw, _EQUIP_INDEX* idx, u16 a, u16 b,
                                       _mh_ivec2_* pos, u8 c) {    u8 n = fn_8027FF88(idx->equip_0x00);
     if (n == 0) {
@@ -553,9 +461,8 @@ void fn_8030FB78(u16 a, u8 b) {
     draw_font_idx(0x8A8, (s8*)((u8**)get_str_tbl(0x2E))[b], 0, &pos);
 }
 
-/* 0x8030D808 - the weapon detail's shared body: position the panel from the 0x84E anchor (or the
- * caller's offset), then dispatch on `fn_80315A60`'s row - one label, the caller's value, or the
- * three bowgun panels plus the trailing text row. */
+/* 0x8030D808 - the weapon detail's shared body: positions the panel from the 0x84E anchor (or the caller's offset) and
+ * dispatches on `fn_80315A60`'s row: one label, the caller's value, or the three bowgun panels and a text row. */
 void fn_8030D808(void* s0, void* s1, u16 a, u8 b) {
     _mh_ivec2_ pos;
     _mh_ivec2_ off;
@@ -1100,9 +1007,8 @@ void fn_8031A410(void* self, u32* slot, void* arg) {
 /* 0x8031A428 */
 void fn_8031A428(void* self, void* slot, u32 a, u32 b, void* work) {}
 
-/* 0x8031A58C - reset a menu slot into its "equipment panel" state: pick the row height from the
- * slot's +0x10 flag, seed the panel's own fields and hand the embedded +0x1EC record to its
- * constructor. */
+/* 0x8031A58C - resets a menu slot into its "equipment panel" state: the row height from its +0x10 flag, the panel's
+ * own fields, and the embedded +0x1EC record handed to its constructor. */
 void fn_8031A58C(MenuSlot* self) {
     s16 size = 0x18;
     if (self->field_0x010 != 0) {
@@ -1145,9 +1051,8 @@ void fn_8031A638(MenuSlot* self) {
  * that shape is not obvious from the call list.
  * --------------------------------------------------------------------------------------------------- */
 
-/* 0x80308FB4 - the equip-information screen's per-frame dispatch on its page mode: build the two
- * sub-screens for modes 0 and 1, or refresh the detail page for the modes 2..10 with the mode's own
- * value as the page delta. */
+/* 0x80308FB4 - the equip-information screen's per-frame dispatch on its page mode: builds the two sub-screens for
+ * modes 0 and 1, or refreshes the detail page for modes 2..10 with the mode as the page delta. */
 void equip_info_update(StatusScreenWork* self) {
     u16* table;
     _mh_ivec2_ pos;

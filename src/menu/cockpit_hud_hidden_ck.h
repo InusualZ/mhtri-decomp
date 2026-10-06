@@ -1,5 +1,5 @@
-/* Leaf header: the one symbol `src/menu/fn_802E4978.cpp` owns that `hud/cockpit_quest.cpp` calls
- * (the owner's full header redefines `CockpitWork`, so it cannot be included beside this unit's view). */
+/* Leaf header: `cockpit_hud_hidden_ck` (0x802E54F8), defined in `hud/cockpit_quest.cpp`'s 0x802E4978 band, for its
+ * `_PLW` callers (the band header `menu/fn_802E4978.h` redefines the cockpit records). */
 #ifndef MHTRI_MENU_COCKPIT_HUD_HIDDEN_CK_H
 #define MHTRI_MENU_COCKPIT_HUD_HIDDEN_CK_H
 

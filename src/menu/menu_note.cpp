@@ -1,53 +1,14 @@
-/* menu/menu_note.cpp - the note-list entry table: which item record a note entry stands for.
- *
- * `.text` 0x8034C0C4..0x8034C1D0, one function (`get_note_item_slot`, 0x10C B) - a switch on a note
- * entry 0..9 that writes the item-table slot and the entry index the caller looks the record up
- * with.
- *
- * NAME (evidence class 1, the `__FILE__` string).  The range's only two `.data` references are
- * `s_menu_note_cpp` = "menu_note.cpp" (0xE B incl. the NUL) and `s_nw4r_assert_failed` =
- * "NW4R:Failed assertion 0" (0x18 B), passed as `Panic(__FILE__, 2301, ...)`.  `menu_note.cpp`
- * occurs exactly ONCE in the DOL (`grep` over `orig/RMHE08/sys/main.dol`), so it is TU-local and the
- * file's original name; the module is `menu` (the `menu_*` family the band's pool carries:
- * `menu_item.cpp` 0x805CDFC8, `menu_infomation.cpp` 0x805DCCDC) and the extension is the name's own
- * suffix.  Both labels are referenced by exactly one object in the whole split tree - this range's
- * object - so no neighbour shares this TU and the 0x8034C1D0 edge is a real one (the seam the pool
- * brief pinned).
- *
- * SYMBOL NAMES (naming pass).  The map and the runtime dump had nothing for this
- * range (`dumpmap.py lookup 0x8034C0C4` answers `zz_034c0c4_`; `symedit.py range 0x8034C000
- * 0x8034D000` shows bare stems up to the registered `hud/` and `ef/` units), so the names are
- * derived from the body and the band's scheme.  It reads one note entry and writes the menu
- * item-table slot (0..3 - `fn_8029F818`'s `lbl_806ACF28.array_0x758` run) plus the index into that
- * table, i.e. an item-record location: `get_note_item_slot`, verb-first like the `menu` band's own
- * accessors (`get_menu_tbl_ptr`, `get_menu_lsp_tbl`, `get_lsp_data`).  The two pool strings dropped
- * their `lbl_` names for the same reason - their content is this TU's own `__FILE__` and its
- * `NW4R_ASSERT` message, so each is named for what it holds.  MARKED GUESS: that the argument is a
- * *note-list* entry comes from the file name (the same class-1 string), and that the pair addresses
- * an *item* record is inferred from the callers; a pass with the screen's own symbols can sharpen
- * both, and the switch's ten constants are otherwise unexplained.
- *
- * The two out parameters are inferred, and marked as such: both callers hand the pair to
- * `note_slot_cursor_bounds`, which switches on the FIRST one (0..3) to pick one of four item tables via
- * `fn_8029F818` and then indexes it with the SECOND, so they are the table slot and the entry index
- * rather than a pair of undifferentiated bytes.  They are `note_slot_cursor_step` and `note_slot_draw_row` - the
- * list row's select/update and draw handlers, called from `fn_8033A160` (0x8033A4D4) and
- * `fn_8033A7DC` (0x8033A808); a scan of every `bl` in the DOL finds no other caller.
- *
- * SECTIONS.  The unit claims `.data` 0x805E91F8..0x805E9248 (0x50 B): the two string labels above (0x805E91F8..0x805E9220), which
- * this file defines ahead of the table, and the 10-entry jump table at 0x805E9220..0x805E9248 that MWCC emits from the switch below.
- *
- * Flags: the lib's `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, mw
- * version Wii/1.3).  No pragma is needed - the body has no fold-shaped pair and no `bl` to a
- * same-file helper.
- *
- * STATUS: `Object(Matching, ...)`.  The object is byte-identical to the target in both sections
- * (`.text` 0x10C, `.data` 0x50; only MWCC's `.comment` version byte differs, `0f` against the
- * target's `0e`, as in every other unit of this lib), objdiff's official metric reads 100.0 % fuzzy
- * / 268 of 268 `.text` bytes / 80 of 80 `.data` bytes, and `flipcheck.py` answers READY.  Proved by
- * the link, not by the score alone: with the unit flipped, a full `ninja` in this branch's worktree
- * ends `build/RMHE08/main.dol: OK` and the built DOL's SHA-1 is the documented
- * `bf4850739478caaedfe675949eb7c28595a7fde9`.  No residual.
+/*
+ * menu/menu_note.cpp - the note-list entry table: `get_note_item_slot` maps a note entry 0..9 to the item table's slot
+ *   (0..3, `fn_8029F818`'s `lbl_806ACF28.array_0x758` run) and the index into it.
+ * RANGE. .text 0x8034C0C4-0x8034C1D0 (1 function); .data 0x805E91F8-0x805E9248: `s_menu_note_cpp`, `s_nw4r_assert_failed`
+ *   and the switch's 10-entry jump table.
+ * FLAGS. `cflags_menu` (configure.py); no pragma.
+ * NAMES. Module and file from the `__FILE__` string "menu_note.cpp" (one copy in the DOL, referenced by this object
+ *   only, so the 0x8034C1D0 edge is real).  `get_note_item_slot` is a GUESS from the body and its callers
+ *   (`note_slot_cursor_step`, `note_slot_draw_row`, which hand the pair to `note_slot_cursor_bounds`); that the argument
+ *   is a note-list entry comes from the file name, and the switch's ten constants are otherwise unexplained.
+ * RESIDUALS. none: `Object(Matching)`, flipcheck READY (`.text` 0x10C and `.data` 0x50 byte-identical).
  */
 
 #include "types.h"
@@ -63,8 +24,8 @@ void Panic(const char* file, int line, const char* fmt, ...);
 }  // namespace nw4r
 
 /* The unit's own two literals, in `.data` (the retail build did not use `-str readonly`, so the
- * pool is `.data` and not `.rodata`); the map names them after what they hold.  Phase 4 claims
- * them with this unit (0x805E91F8..0x805E9220), so they are defined here, ahead of the jump table. */
+ * pool is `.data` and not `.rodata`); the map names them after what they hold.  The unit claims
+ * them (0x805E91F8..0x805E9220), so they are defined here, ahead of the jump table. */
 char s_menu_note_cpp[] = "menu_note.cpp";                /* .data 0x805E91F8 */
 char s_nw4r_assert_failed[] = "NW4R:Failed assertion 0"; /* .data 0x805E9208 */
 

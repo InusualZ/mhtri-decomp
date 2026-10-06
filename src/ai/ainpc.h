@@ -1,22 +1,7 @@
 /*
- * The AI-NPC work record (`_AINPC_W`), shared by the `ai` band's translation units.
- *
- * The name is the target's own: `ai_skill_ck__FP8_AINPC_WUc` and `ai_torch_ck__FP8_AINPC_W` mangle the
- * parameter as `_AINPC_W*`, and `get_move_work_adrs(3) + enemy_index*0xB18` reaches the
- * `_ENEMY_WORK` array, so the record every function in this band takes in r3 is that one (rule 9: the
- * mangling is the evidence, the declaration must reproduce it).
- *
- * The layout is the union of the offsets the band's reconstructed functions access; an offset none of
- * them touches is kept as padding so the numbers stay exact.  The block up to +0x492 is the layout
- * `src/ai/fn_802CC794.cpp` carries (that unit's own header text, verbatim) - the fields this unit does
- * not name keep their offsets and their `unused_`/`field_` spellings, so the two units agree on every
- * offset they share.  The tail past +0x492 is proposal/802C474C's: the six data tables it reads are
- * 10-byte records, so the record carries their scalar fields too.
- *
- * The record's owner is `src/ai/fn_802CC794.cpp`; this header is that unit's header made shared, so a
- * second consumer includes it instead of copying the union (docs/plan.md 6.5 rule 1).  Follow-up for
- * the owner: drop its inline copy and `#include "ai/ainpc.h"` (filed with the orchestrator).
- *
+ * ai/ainpc.h - the AI companion record `_AINPC_W` (spelled by the map's `ai_skill_ck__FP8_AINPC_WUc` and
+ *   `ai_torch_ck__FP8_AINPC_W`), shared by `ai/ai_npc.cpp`, `hud/cockpit.cpp`, `hud/cockpit_quest.cpp` and the enemy
+ *   programs; the layout is the union of the offsets their bodies access, untouched offsets kept as padding.
  * size: 0x4A8 (the map's size of the `ainpc_w` object; evidenced to +0x498)
  */
 #ifndef MHTRI_AI_AINPC_H

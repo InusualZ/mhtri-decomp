@@ -1,90 +1,30 @@
-/* menu/menu_row.cpp - the menu row / note slot / placement list code, `.text` 0x8034C1D0..0x8034D2B0
- * (27 functions / 4320 B), with its extab 0x80017094..0x800170F4 (12 records), extabindex
- * 0x80036744..0x800367D4 (12 x 12 B) and `.sdata2` 0x8079B368..0x8079B3A8 (the pool `fn_8034CDDC`
- * loads; the written bodies emit no pool).  Re-cut out of `enemy/em024_ai.cpp`: that
- * unit's range 0x8034C1D0..0x80358624 was three translation units, and this is the first of them.
- *
- * WHAT IT IS.  Menu-band item-page code: it calls `get_note_item_slot`, `item_page_option_*` and
- * `item_page_draw_closed_column`, indexes the 0x10-byte `MenuRowData` table `fn_8004EA24` returns,
- * walks the `MenuSlot::place_entries` placement list and draws a sprite through `draw_sprite`.  It
- * references no enemy symbol.  The last nine functions (0x8034D124..0x8034D2B0, 0x2C B each, no
- * extab, no data) are the `MenuRowData` fillers: each stores its kind 1-9 at +0x00, its halfword
- * arguments at +0x04.. and returns the kind - the record `menu_row_find`'s kind switch reads.
- *
- * MODULE AND NAME (evidence order).  1. No `__FILE__` string is reachable from the range (the one
- * string next to it, `..\..\menu_note.cpp` at 0x805E91F8, is `get_note_item_slot`'s).  2. The dump
- * answers only `zz_` placeholders.  3. Module `menu`: 47 call sites into the head come from menu,
- * lobby-menu and `ai/fn_802D44F4` units (see `.pi/notes/em024-recut.md`), none from an enemy unit,
- * and the fillers' callers are `menu/menu_infomation`, `lobby/fn_80212810`, `lobby/lb_companion_ui`
- * and `lobby/lb_quest_ui`.  4. GUESS: the file name `menu_row` is the dominant type
- * (`MenuRowData`: find/clear/empty_count/reserve plus the nine row fillers).
- *
- * SEAMS.  Right edge 0x8034D2B0: the `extabindex` run breaks there (the 12th record is
- * `fn_8034CDDC`, the next is `fn_8034D2B0`), the `.sdata2` pool run breaks there (0x8079B368..
- * 0x8079B3A0 here, 0x8079B3A8.. the player unit's) and the callee set changes from menu/sprite to
- * `_PLW`.  Left edge 0x8034C1D0: NOT proven - `menu/menu_note.cpp` (0x8034C0C4..0x8034C1D0, one
- * 268 B function `get_note_item_slot`, Matching) may be the head of this same TU
- * (`note_slot_cursor_step` calls it first); the string and jump table it owns are the only data
- * the two could share and neither is cited from here.  Inside the range `tudiscover.py` reports
- * only weak cuts (0x8034CBE4 "codegen fingerprint change", 0x8034CCBC): the placement-list
- * functions could be a fourth TU; kept as one until a body or a data claim says otherwise.
- *
- * NAMING (the 14 written symbols; every one is a guess derived from its body, renamed in
- * `config/RMHE08/symbols.txt` and here in one edit, playbook 31/48).  Scheme: the menu band's own
- * (`get_note_item_slot`, `item_page_option_row_index`).
- *
- *   note_slot_cursor_step   per-frame step of a note slot's option row: steps `cursor` on the caller's
- *                           0x10 flag against `note_slot_cursor_bounds`'s count, then notifies
- *   note_slot_draw_row      draws that slot's row through `item_page_draw_closed_column`
- *   menu_row_find           finds the 8-row `MenuRowData` table entry matching its argument
- *   menu_row_clear          clears the row at `index`
- *   menu_row_empty_count    counts the table's empty rows
- *   menu_row_reserve        1 = already listed, 2 = a row is free, else evict and 0
- *   note_slot_cursor_bounds builds a note slot's cursor bounds from the option table `fn_8029F818`
- *                           returns for its kind
- *   item_page_option_item_id maps an item page option id to the item it unlocks, -1 when not yet
- *                           available (declared in `menu/menu_item_page.h`)
- *   place_list_deactivate_all clears `active` on every `MenuSlot::place_entries` record
- *   place_list_overlap_find first active record whose rectangle overlaps the box, else -1
- *   place_rec_key_ptr       the key word's address, 0 when the list is absent
- *   place_list_key_count    counts the active records carrying a key
- *   place_rec_free_get      the first inactive record
- *   place_rec_alloc         fills a free record (box, halves, 16-byte body), returns its index
- *
- * LANGUAGE.  C++ (`-Cpp_exceptions on`); the range reaches mangled callees
- * (`get_lsp_data__FUsP10_mh_ivec2_`, `draw_sprite__FRC10_SPR_DATA_PC10_mh_ivec2_`) through their
- * real signatures (rule 9), and every plain `fn_` definition is `extern "C"`.
- *
- * FLAGS.  This lib's `cflags_menu` (`-opt nopeephole`) scores 8 of the 14 bodies higher than the
- * `cflags_main` they were measured under in `enemy/em024_ai.cpp` (before -> after): `note_slot_draw_row`
- * 95.79 -> 100.00, `place_rec_alloc` 94.44 -> 100.00, `menu_row_reserve` 95.21 -> 99.58,
- * `note_slot_cursor_bounds` 84.02 -> 91.90, `item_page_option_item_id` 85.24 -> 87.66,
- * `menu_row_clear` 79.00 -> 85.67, `note_slot_cursor_step` 74.55 -> 80.95, `place_rec_free_get`
- * 88.33 -> 88.89.  It scores `place_list_overlap_find` LOWER (73.85 -> 68.39) - retail keeps the
- * folded form there - so that one body sits under a scoped `#pragma peephole on` /
- * `#pragma peephole reset` and stays at 73.85.  No function is worse than before the re-cut.
- *
- * STATUS / RESIDUALS.  Written, 14 bodies (percent under this file's flags):
- *   * 100.00  `menu_row_empty_count`, `place_rec_key_ptr`, `note_slot_draw_row`, `place_rec_alloc`.
- *   *  99.58 `menu_row_reserve`;  97.50 `place_list_key_count`;  91.90 `note_slot_cursor_bounds`;
- *      88.89 `place_rec_free_get`;  87.66 `item_page_option_item_id`;  87.02
- *      `place_list_deactivate_all`;  85.67 `menu_row_clear`.
- *   *  `menu_row_find` 77.85 % - retail duplicates the four-halfword compare block for the kinds
- *      1/2 range and the 3/4/5 range; this source shares one body, so ours is one block shorter.
- *   *  `place_list_overlap_find` 73.85 % - the halving and the four comparisons match; the loop's
- *      record pointer is re-loaded per iteration where retail hoists it.
- *   *  `note_slot_cursor_step` 80.95 % - the slot pair is packed into the HIGH half of
- *      `note_slot_cursor_bounds`'s return value (reproduced); the residual is the
- *      `fn_802DA2D4`/`return 0` tail's register allocation.
- *   *  `menu_row_clear` 85.67 % - retail keeps the scaled index and the zero in separate
- *      registers (`slwi r4,r0,4` + `li r0,0` + `stwx r0,r3,r4`), ours reuses one.
- * NOT written: `fn_8034C350` (8 B), `fn_8034CCBC` (0xB0) and `fn_8034CD6C` (0x70) - the last two
- * read `_SPR_DATA_`'s rectangle and cannot be typed here: `hud/layout.h` (owner of `_SPR_DATA_`)
- * and `menu/menu_item.h` both define `_mh_ivec2_`, so the two headers collide in one TU (the
- * per-consumer-view split `menu/menu_item_page.h` documents); `fn_8034CDDC` (0x348); the
- * nine row fillers `fn_8034D124`..`fn_8034D284`.
- * DATA.  `.sdata2` 0x8079B368..0x8079B3A8 is claimed; no `.data` (the unit owns none).  The
- * `.bss` word `lbl_806AC8C8` the placement functions read is the shared menu work block, unowned.
+/*
+ * menu/menu_row.cpp - the menu's item-page row code: the note slots' cursor and draw steps, the 8-row `MenuRowData`
+ *   table (`fn_8004EA24`'s; find/clear/empty count/reserve and the nine row fillers 0x8034D124-0x8034D2B0, each storing
+ *   its kind 1-9 at +0x00 and its halfwords from +0x04) and the `MenuSlot::place_entries` placement list.  C++; every
+ *   plain `fn_` definition is `extern "C"`.
+ * RANGE. .text 0x8034C1D0-0x8034D2B0 (27 functions); extab, extabindex, .sdata2 0x8079B368-0x8079B3A8 (the pool
+ *   `fn_8034CDDC` loads).  The right edge is where the extabindex and `.sdata2` runs break and the callees turn to `_PLW`.
+ *   The left edge is open: `menu/menu_note.cpp`'s `get_note_item_slot` (0x8034C0C4), which `note_slot_cursor_step`
+ *   calls first, may be the head of this TU; `tudiscover.py` reports only weak cuts inside (0x8034CBE4, 0x8034CCBC).
+ * FLAGS. `cflags_menu` (configure.py); `place_list_overlap_find` alone sits under a scoped `#pragma peephole on` /
+ *   `reset` (retail keeps the folded form there: 73.85 with it, 68.39 without).
+ * NAMES. Module `menu`: no `__FILE__` string and only `zz_` dump names, but the head's callers are menu, lobby-menu and
+ *   `hud/cockpit.cpp` units and no enemy unit, and the fillers' callers are `menu/menu_infomation`, `lobby/lb_companion_ui`
+ *   and `lobby/lb_quest_ui`.  The file name (the dominant type `MenuRowData`) and every symbol name are GUESSes from the
+ *   bodies, in the band's scheme (`get_note_item_slot`, `item_page_option_row_index`).
+ * RESIDUALS. 13 rows unwritten (objdiff scores them zero): `fn_8034C350` (8 B), 0x8034CCBC-0x8034D2B0
+ *   (`fn_8034CCBC`, `fn_8034CD6C`, `fn_8034CDDC` and the nine fillers).  `fn_8034CCBC`/`fn_8034CD6C` read
+ *   `_SPR_DATA_`'s rectangle, and `hud/layout.h` (its owner) and `menu/menu_item_page.h` both define `_mh_ivec2_`, so the two
+ *   headers collide in one TU.  The 10 partial rows include:
+ *  - `menu_row_find`: retail duplicates the four-halfword compare block for the kinds 1/2 and 3/4/5 ranges; ours shares
+ *    one body, one block shorter;
+ *  - `place_list_overlap_find`: the loop's record pointer reloads each iteration where retail hoists it;
+ *  - `note_slot_cursor_step`: the `fn_802DA2D4`/`return 0` tail's register allocation;
+ *  - `menu_row_clear`: retail keeps the scaled index and the zero in separate registers (`slwi r4,r0,4` + `li r0,0`).
+ *   flipcheck: `.sdata2` (0x40) claimed but not emitted; short `.text` 0xAE0 of 0x10E0, extab 0x48 of 0x60,
+ *   extabindex 0x6C of 0x90; the bytes of all three differ.
+ * SHAPES. `note_slot_cursor_bounds` returns the slot pair packed into the high half of its result.
  */
 
 #include "types.h"

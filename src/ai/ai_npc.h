@@ -1,35 +1,11 @@
 /*
- * ai/ai_npc.h - the AI-NPC work record `_AINPC_W` the `ai` bands operate on, and the attack
- * record `_HIT_W` embedded in it.
- *
- * `_AINPC_W` is the type name the target's own manglings use (`ai_area_ck__FP8_AINPC_W`,
- * `ai_get_motion_no__FP8_AINPC_W`,
- * `get_joint_wpos_ai__FP8_AINPC_WUlPQ34nw4r4math4VEC3`, `ai_skill_ck__FP8_AINPC_WUc` in
- * config/RMHE08/symbols.txt), so every unit that forwards this pointer must spell the type that
- * way or its definitions mangle to a name objdiff cannot pair.
- *
- * The record embeds the actor's `MHchar` model at +0x008: `move__6MHcharFUs`,
- * `get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3` and `setVisibility__6MHcharFUlb` are all reached
- * with `self + 8`, and the motion number `ai_get_motion_no` returns is `MHchar::+0x50`.  `MHchar`
- * and `_PLW` come from `pl.h`, their owner.
- *
- * `_HIT_W` is this band's view of the attack record - `menu/menu_item.h` and
- * `menu/hit_attack_list_push.h` carry their own views of the same type (both record it as rule-1
- * debt), and none of the three names the offsets this band reads (+0x08, +0x18..+0x1E, +0x31,
- * +0x32, +0x40..+0x4E).  Folding the views into one union-aware definition is the rule-1
- * follow-up this header records for the unit.
- *
- * Every field carries its offset in ascending order and a name from the call sites that read it;
- * offsets no reconstructed function touches stay padding so the numbers stay exact.  `_AINPC_W`'s
- * size is a lower bound: the highest offset the band touches is +0x498.
- *
- * RULE-1 DEBT, filed for the next `ai` worker: `ai/ainpc.h` is the *other* home of this same
- * record - the view `src/ai/fn_802CC794.cpp` and src/ai/fn_802C474C.cpp share (same size, 0x49C, and
- * the same offsets for every field both name).  This header is the 0x802D0F34 band's view: it embeds
- * the actor model as `MHchar` (which is what makes `self + 8` and `MHchar::get_joint_wpos` type out)
- * and names the band's own tail.  Folding the two into `ai/ainpc.h` (or the reverse) is the follow-up;
- * until then a unit must include exactly one of them, because both define `_AINPC_W` and
- * `AINPCFormation`.
+ * ai/ai_npc.h - the 0x802D0F34-0x802D44F4 bodies' view of the AI companion record `_AINPC_W` and of the attack record
+ *   `_HIT_W` it embeds, read inside `ai/ai_npc.cpp`'s `namespace view_fn_802D0F34` (and by `ai/fn_802D0F34.h`).
+ * SHAPES. `_AINPC_W` is the spelling the map's manglings use (`ai_area_ck__FP8_AINPC_W`, `ai_get_motion_no__FP8_AINPC_W`,
+ *   `get_joint_wpos_ai__FP8_AINPC_WUlPQ34nw4r4math4VEC3`); the record embeds the actor's `MHchar` at +0x008
+ *   (`move__6MHcharFUs`, `get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3`, `setVisibility__6MHcharFUlb` take `self + 8`).
+ *  - `ai/ainpc.h` is the other view of the same record and `Pl/hit_w.h` the shared `_HIT_W`; both pairs define the same
+ *    tags, so a unit includes one of each pair.
  */
 #ifndef MHTRI_AI_AI_NPC_H
 #define MHTRI_AI_AI_NPC_H

@@ -515,8 +515,6 @@ config.libs = [
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
-                        # Phase 4: fold of ai/fn_802D0DCC.c (was Matching, demoted), fn_802CC794, fn_802C474C, fn_802C5D10, fn_802D0F34
-                        # and the head of fn_802D44F4, plus the tail of light/light.cpp; the lib's cflags_main, the same for every absorbed unit.
                         Object(NonMatching, "ai/ai_npc.cpp"),
                         # Registered (`.text`
                         # 0x802D44F4..0x802DDC04, 165 functions / 38672 B).  See the unit header for
@@ -652,140 +650,25 @@ config.libs = [
     },
 
     {
-        # New module, registered: the
-        # item menu (`.text` 0x8029F3C8..0x802A6624, 99 functions, 0x725C B; extab
-        # 0x8001360C..0x800137D4 and extabindex 0x80030F90..0x8003123C for the 57 framed functions in
-        # that range - both runs are exactly the gap between the bracketing auto objects).  Module
-        # `menu` and file name `menu_item.cpp` come from the range's own `__FILE__` string
-        # (`.data` 0x805CDFC8, 0xE B = "menu_item.cpp"; the dump's local symbol for it is
-        # `_802a22a4s_menu_item.cpp_805cdfc8`, i.e. it is emitted by 0x802A22A4, a function of this
-        # range, and every `nw4r::db::Panic` assert of the range passes it - including the
-        # 0x802A5444..0x802A6624 half the 2026-09-26 fold brought in).  cflags_main: the range keeps
-        # `bl`s to its tiny same-file helpers
-        # (`GetItemData` from `fn_8029F704`/`fn_8029F73C`, `hit_flag_set` from `fn_8029F4C4`), which is
-        # cflags_main's `-inline noauto`, and it carries 0 record-form instructions like the stage and
-        # Pl bands (the peephole is not proven off here - `infer.py` reads absence as no evidence).
+        # The menu lib: `cflags_menu` (the group's evidence is its comment above); each unit's notes are its header.
         "lib": "menu",
         "mw_version": "Wii/1.3",
         "cflags": cflags_menu,
         "progress_category": "game",
         "objects": [
             Object(NonMatching, "menu/menu_item.cpp"),
-            Object(NonMatching, "menu/menu_item_sub.cpp"),  # phase 4 stub: new unit after ef/eft053, cflags_menu of the lib
-            # The continuation of the menu band: proposal `802A6624_fn_802A6624.cpp` (`.text`
-            # 0x802A6624..0x802AD9C0, 139 functions / 29596 B; extab 0x800137D4..0x80013B0C and
-            # extabindex 0x8003123C..0x80031710).  Module `menu` from the left neighbour and from the
-            # range's own entry points (`put_message`, `put_frame_dialog`, `GetMenuFontColor`); no
-            # `__FILE__` string covers the range and the dump answers `zz_` for most of it, so the file
-            # name is derived from what the range does (see its header - `menu_message.cpp`,
-            # re-homed 2026-09-29 from the map's stem by `worker/menu-num-8725`).  Same `cflags_menu`
-            # as `menu_item.cpp`: the band carries 0 record-form instructions and keeps its tiny
-            # same-file `bl`s.
+            Object(NonMatching, "menu/menu_item_sub.cpp"),
             Object(NonMatching, "menu/menu_message.cpp"),
-            # Registered
-            # and re-drawn by the seam round (`.text` 0x80308FB4..0x8031A6C0, 149 functions /
-            # 71436 B).  Module `menu` and file name `menu_infomation.cpp` are class-1 evidence:
-            # `.data` 0x805DCCDC is the bare `__FILE__` string, it has exactly one copy in the DOL
-            # and its referrers span 0x8030A328..`Set_equip_column_arrangement` (0x8031A244), so the
-            # whole run is one TU (the old 0x8030D338/0x80313E24 edges were proven false; see the
-            # unit header and `.pi/notes/seam-round.md`).  Sections: .text 0x80308FB4..0x8031A6C0,
-            # extab 0x80015B54..0x80015F3C (125 records), extabindex 0x80034764..0x80034D40
-            # (125 x 12 B).
             Object(NonMatching, "menu/menu_infomation.cpp"),
-            # Registered (the `.text` 0x8031A6C0..0x8031EA8C
-            # run, 59 functions / 17356 B): the item/equipment selection screen.  Module `menu`,
-            # map stem as file name (brief section 2, class 4 - the band's own `.data` run carries
-            # only the *neighbouring* TU's `menu_infomation.cpp` string, never this range's).  The
-            # extab/extabindex runs are 0x80015F3C..0x80016074 / 0x80034D40..0x80034F14, contiguous
-            # with the previous proposal's, so the 0x8031A6C0 seam is a discovery size cap.  Same
-            # `cflags_menu` as its menu siblings.  This pass registers the range and measures it;
-            # the unit header names the bodies still to write.
             Object(NonMatching, "menu/fn_8031A6C0.cpp"),
-            Object(NonMatching, "menu/menu_item_effect.cpp"),  # phase 4 recut of the line above (its tail), same cflags_menu
-            Object(NonMatching, "menu/menu_effect_slot.cpp"),  # phase 4 stub: tail recut of ef/eft_slot.cpp, cflags_menu of the lib
-            # Registered: the continuation of the
-            # item/equipment selection-screen band above `menu/fn_8031A6C0.cpp` (`.text`
-            # 0x8031EA8C..0x80324F7C, 67 functions / 25840 B; extab 0x80016074..0x8001621C and
-            # extabindex 0x80034F14..0x80035190, both runs contiguous with the predecessor's and the
-            # successor's).  Module `menu` from the left neighbour and the range's own callees (the
-            # menu/HUD 2D library); no `__FILE__` string covers the range (every `.data` reference is
-            # a mask/sprite table, a jumptable or a pool float) and the dump answers `zz_`, so the
-            # file keeps the map's stem (brief section 2, class 4).  Same `cflags_menu` as the band
-            # below: `infer.py` reads the peephole off on its objects (`fn_80324CC4`, 0 record forms
-            # with 2 fold-shaped pairs) and `-use_lmw_stmw off`.
+            Object(NonMatching, "menu/menu_item_effect.cpp"),
+            Object(NonMatching, "menu/menu_effect_slot.cpp"),
             Object(NonMatching, "menu/fn_8031EA8C.cpp"),
-            # Registered (`.text` 0x80349DD8..0x8034C0C4, 22
-            # functions / 8940 B; extab 0x80016FE4..0x80017094, extabindex 0x8003663C..0x80036744,
-            # `.data` 0x805E91E8..0x805E91F8, `.sdata` 0x807932F0..0x80793308).  Module `menu` from the
-            # band its own `.data`/`.sdata` fragments sit in and from its entry points
-            # (`get_str_tbl`/`get_menu_lsp_tbl`/`ItemName`/`ItemExp`/`font_print_ex`); no `__FILE__`
-            # string covers the range (the flanking `menu_note.cpp` string at 0x805E91F8 belongs to the
-            # 0x8034C0C4 TU) and the dump answers `zz_` for all 22 addresses, so the file and its
-            # symbols are named for what they do - the menu's item page draw layer (naming pass
-            # 2026-09-27; every name is a guess recorded in the file header).  Same `cflags_menu` as
-            # its menu siblings.  `.data`/`.sdata` are claimed: both are this object's own and
-            # byte-identical to the target's (`datagap.py` reports no data gap).
             Object(NonMatching, "menu/menu_item_page.cpp"),
-            # Registered (`.text` 0x8034C0C4..0x8034C1D0, one
-            # function / 268 B): the note-list entry table.  Module `menu` and file name
-            # `menu_note.cpp` are class-1 evidence - the range's `__FILE__` string `.data` 0x805E91F8
-            # reads "menu_note.cpp", it has exactly ONE copy in the DOL, and it is referenced by
-            # exactly this range's object, so no neighbour shares the TU.  Sections: `.text` plus
-            # `.data` 0x805E9220..0x805E9248 (the unit's own 10-entry switch jump table); the two
-            # `.data` literals the body loads stay unowned (declared, never defined).  Same
-            # `cflags_menu` as its file family (`menu_item.cpp` and `menu_infomation.cpp` carry the
-            # same `menu_*` name pattern); the body keeps no fold-shaped pair.
             Object(Matching, "menu/menu_note.cpp"),
-            # Re-cut 2026-09-29 out of `enemy/em024_ai.cpp`: `.text` 0x8034C1D0..0x8034D2B0 (27
-            # functions / 4320 B), extab 0x80017094..0x800170F4, extabindex 0x80036744..0x800367D4
-            # and `.sdata2` 0x8079B368..0x8079B3A8.  Module `menu`: the range calls
-            # `get_note_item_slot`/`item_page_option_*`/`draw_sprite`, works the `MenuRowData` table
-            # and the `MenuSlot::place_entries` list and references no enemy symbol; the seam to the
-            # player band is the `extabindex` and `.sdata2` runs breaking at 0x8034D2B0.  File name
-            # a GUESS from the dominant type; evidence in the file header.  `cflags_menu` (this lib).
             Object(NonMatching, "menu/menu_row.cpp"),
-            # Registered once, at its final home: the
-            # quest-result screen band (`.text` 0x803967F0..0x8039D278, 85 functions / 0x6A88 B).
-            # Module `menu` (evidence class 3): the `.data` band its own tables sit in carries
-            # `menu_note.cpp` (0x805E91F8) below and `menu_placeinfo.cpp` (0x80604780) above, and
-            # every callee is the menu library's (`get_menu_lsp_tbl`, `put_menu_cursor`,
-            # `GetMenuFontColor`, `ItemName`, `PutPageArrow`, `font_print_ex`).  C++ because the
-            # bodies reach genuinely mangled callees (`get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3`).
-            # The seam at 0x803967F0 is a real TU edge, not the brief's `--max-bytes` cap: the
-            # `.data` referrer runs below and above it are disjoint (last below 0x803960BC, first
-            # above 0x80396BBC) and this unit's `.data` run ends where `em029_prog_tbl` begins.
-            # Same `cflags_menu` as its menu siblings: the band keeps unfused narrow-load pairs.
-            # This pass writes 24 of the 85 bodies; the rest are map stems measuring 0 %, and the
-            # unit's `.data`/`.sdata`/`.sdata2` runs are not claimed until the bodies that emit
-            # them land (see the unit header's residual list).
             Object(NonMatching, "menu/menu_result.cpp"),
-            # Registered once, at its final home: the
-            # multiplayer-result screen's box cursor band plus the enemy action/substate dispatchers
-            # that share its address range (`.text` 0x8039D278..0x803A3A50, 80 functions / 0x67D8 B).
-            # Module `menu` (evidence class 3): the range's head is the multi-result screen, its
-            # neighbours are `menu_result.cpp` below and the `menu/*` band above, and its two
-            # original manglings are the box helpers on `_multi_result_work`.  C++ because those
-            # manglings are defined by the range (`...__FP18_multi_result_work`).  The seam is
-            # UNPROVEN - it is the discovery `--max-bytes` cap, no `__FILE__` string reaches the
-            # range, and the range is really a *sequence* of objects: `tudiscover at 0x8039FD4C`
-            # gives a 40-function `.sdata2`-sharing enemy cluster in the middle, and the runtime dump
-            # names SDK objects interleaved with the game ones (`DBClose` 0x8039E714,
-            # `gdev_cc_shutdown` 0x803A1108, `GoalOverlay::SceneCreated` 0x803A1680,
-            # `homebutton::MotorCallback` 0x803A26A8).  The unit header carries the full evidence and
-            # the residual list; a seam re-draw is the follow-up.  Same `cflags_menu` as its menu
-            # siblings.
             Object(NonMatching, "menu/multi_result.cpp"),
-            # Registered once, at its final home: the
-            # pop-data / option / demo system file (`.text` 0x803BE30C..0x803C4BA0, 110 functions /
-            # 26772 B).  Module `menu` (evidence class 3): the range's callee surface is the menu 2D
-            # library's and it shares 48-66 callees with `menu_result.cpp`/`menu_item.cpp`/
-            # `menu_item_page.cpp`; the file name keeps the range's first symbol, which is the runtime
-            # dump's own real name (`get_pop_dat_ptr`).  The seam is UNPROVEN - the discovery
-            # `--max-bytes` cap, with `tudiscover`'s best cut at 0x803BF294 only weak; the unit header
-            # carries the full evidence.  Only `.text` is claimed this pass: the unit's extab
-            # 0x80019164..0x800193D4, extabindex 0x8003987C..0x80039C24 and its own `.data`/`.sdata`/
-            # `.sdata2`/`.bss`/`.sbss` runs are claimed by the pass that writes the bodies emitting
-            # them (docs/plan.md 8.4).  Same `cflags_menu` as its menu siblings.
             Object(NonMatching, "menu/get_pop_dat_ptr.cpp"),
             Object(NonMatching, "lobby/lb_server_sel_trans.cpp"),  # phase 4 recut of the line above (its tail), same cflags_menu
             # Registered once, at its final home: the quest
@@ -839,7 +722,6 @@ config.libs = [
             # This pass writes 6 of the 19 bodies (740 B of 10784); the other 13 keep their original
             # bytes and are listed with their blockers in the unit header and the outbox.
             Object(NonMatching, "quest/arenatask.cpp"),
-            # Phase 4 stubs: candidate units with no bodies yet, `cflags_menu` of the lib.
             Object(NonMatching, "menu/menu_placeinfo.cpp"),
             Object(NonMatching, "menu/movie.cpp"),
             Object(NonMatching, "menu/menu_plsearch.cpp"),

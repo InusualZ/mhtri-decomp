@@ -1,7 +1,6 @@
 /*
- * `menu/menu_item.cpp`'s hit-registry record and its remaining unowned declaration (docs/plan.md 6.5
- * rules 3/4).  The array types this band reads are owned by `Pl/pl_coll.cpp`'s header
- * `Pl/pl_coll.h`, which `src/menu/menu_item.cpp` includes (rule 2).
+ * menu/hit_attack_list_push.h - `menu/menu_item.cpp`'s hit-registry record and the two globals it declares; the
+ *   array types the band reads are `Pl/pl_coll.h`'s (rule 2).
  */
 #ifndef MHTRI_MENU_HIT_ATTACK_LIST_PUSH_H
 #define MHTRI_MENU_HIT_ATTACK_LIST_PUSH_H
@@ -13,8 +12,8 @@
 
 
 /* The land record (`.bss` `pl_land_data`, 15 x 0x88) and the 0x3C-byte hit-box record (`.bss`
- * `pl_hit_box`, 10 of them) are declared by their owner's header `Pl/pl_coll.h`, which
- * `src/Pl/fn_80295EF4.cpp` includes (rule 2); the layouts live there. */
+ * `pl_hit_box`, 10 of them) are declared by their owner's header `Pl/pl_coll.h` (rule 2); the layouts live
+ * there. */
 
 /* The 0x14-byte position record `fn_80297BE4` copies, `fn_802977E4` initialises and the joint
  * followers write through `fn_8029971C`/`fn_80299780`.  `fn_802977E4` zeroes the eight header bytes
@@ -37,9 +36,9 @@ extern "C" {
 
 /* The remaining globals this unit's functions operate on: the hit registry (`.bss` `lbl_806AC8A8`,
  * 0x10, through the `HitRegistry` type above) and the 0x25-byte tile-id table `lbl_805CDC88`
- * (`.data`).  Both are unowned, so they are declared here; the land table `pl_land_data` and the
+ * (`.data`), both in `menu/menu_item.cpp`'s own sections, declared never defined (playbook 29); the land table `pl_land_data` and the
  * hit-id list `pl_hit_id_list` moved to their owner's header `Pl/pl_coll.h` (rule 2). */
-/* The 0x25-byte tile-id table `fn_8029B8F4` indexes (`.data`; unowned, so declared here). */
+/* The 0x25-byte tile-id table `fn_8029B8F4` indexes (`menu/menu_item.cpp`'s own `.data`). */
 extern u8 lbl_805CDC88[];
 extern HitRegistry lbl_806AC8A8;
 

@@ -1,17 +1,7 @@
 /*
- * The cross-unit declarations `src/ai/fn_802D0F34.cpp` needs, plus the two `.bss`/`.data` blocks it
- * reads.
- *
- * Rule 2 (docs/plan.md 6.5): a declaration belongs in the owner's header.  None of the symbols
- * below has an owner header yet - their owning units are the unregistered bands above and below
- * this one (`0x802D44F4..`, `0x802C474C..0x802CC794`) or registered units whose headers do not
- * declare them - so this header carries them for the one unit that needs them now.  When an owner
- * unit registers, the declaration moves there and this file includes it.
- *
- * The signatures are the call sites' registers/stack in `build/RMHE08/obj/ai/fn_802D0F34.o`, spelled
- * with the record types (`_AINPC_W`, `_HIT_W`, `MHchar`, `nw4r::math::VEC3`) the callee's own
- * mangling or body shows.  C-linkage names are inside `extern "C"`; the mangled ones are declared at
- * C++ scope with their real signature so the front-end reproduces the map's mangling (rule 9).
+ * ai/fn_802D0F34.h - the callees, `.bss` and `.data` that `ai/ai_npc.cpp`'s `namespace view_fn_802D0F34` bodies use,
+ *   spelled with the view's record types (`_AINPC_W`, `_HIT_W`, `MHchar`); C-linkage names inside `extern "C"`, mangled
+ *   ones at C++ scope (rule 9).  `lobby/fn_8030121C.cpp` includes it too.
  */
 #ifndef MHTRI_AI_FN_802D0F34_H
 #define MHTRI_AI_FN_802D0F34_H
@@ -26,14 +16,14 @@
 extern "C" {
 #endif
 
-/* ---- the `ai` band below (0x802CC794..0x802D0DCC and its neighbours) ---- */
+/* ---- `ai/ai_npc.cpp`'s own rows below the view (0x802CC794..0x802D0F34) ---- */
 void fn_802CD770(struct _AINPC_W* self);
 void fn_802CDA1C(struct _AINPC_W* self);
 void fn_802CDB10(struct _AINPC_W* self);
 void fn_802D0C9C(struct _AINPC_W* self);
 void fn_802D0DCC(struct _AINPC_W* self);
 
-/* ---- the `ai` band above (0x802D44F4..) ---- */
+/* ---- `ai/ai_npc.cpp`'s own rows above the view (0x802D44F4..) ---- */
 void fn_802D6888(struct _AINPC_W* self);
 void fn_802D6B2C(struct _AINPC_W* self, s32 a);
 void fn_802D6D4C(struct _AINPC_W* self);
@@ -78,11 +68,10 @@ f32 calcVecDistXZ(const void* a, const void* b);
 void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 s32 calcVecAng2(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
- /* owner `src/mh3_pad.cpp`; normalised to its body
-    * (returns `dst`) with the declaration fold-in, 2026-09-27 */
+ /* owner `src/mh3_pad.cpp`; its body returns `dst` */
 s32 fn_8045AB38(s16 value);
 
-/* ---- the model (`sound/fn_800DD1F0.cpp`'s range) ---- */
+/* ---- the model (`sound/mhchar.cpp`'s range) ---- */
 void fn_800E0914(struct MHchar* chr);
 void fn_800E0A14(struct MHchar* chr);
 void fn_800E11C0(struct MHchar* chr, u32 a, u32 b, u16 motion, s32 c, s32 d, s32 e, f32 f,
@@ -100,7 +89,7 @@ void fn_800DCCF8(u32 handle, nw4r::math::VEC3* pos, s32 a);
 }
 #endif
 
-/* ---- the pooled constants (`.sdata2`, shared and unclaimed: declared, never defined - playbook 29) ---- */
+/* ---- the pooled constants (`.sdata2`, this unit's own pool, declared never defined - playbook 29) ---- */
 extern const f32 lbl_8079A670;
 extern const f32 lbl_8079A674;
 extern const f32 lbl_8079A678;
@@ -128,7 +117,7 @@ extern const f32 lbl_8079A7B0;
 extern void* lbl_805D3FB8[8];              /* the two-level motion table `fn_802D282C` walks */
 extern u8 lbl_805D3AD8[];                  /* the motion-entry records `fn_802D2F7C` walks (stride 0x1A) */
 extern u32 lbl_80792508[];                 /* the motion ids the entries' +0x0F byte indexes */
-extern void* lbl_805D4150[16];             /* the dispatcher table `ai/fn_802D0DCC.c` also uses */
+extern void* lbl_805D4150[16];             /* the dispatcher table `fn_802D0DCC` also uses */
 
 /* ---- C++-linkage callees (their map names are manglings; rule 9) ---- */
 u16 ran_suu(s32 index);

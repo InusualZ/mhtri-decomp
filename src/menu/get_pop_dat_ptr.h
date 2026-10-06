@@ -1,15 +1,7 @@
 /*
- * The owner header for `src/menu/get_pop_dat_ptr.cpp` (`.text` 0x803BE30C-0x803C4BA0).
- *
- * RULE 2 HOME.  The four symbols the band headers used to carry - `get_option_cfg`
- * (`unsplit/lobby.h`), `get_arena_cfg` and `get_cfg` (`unsplit/menu.h`) and
- * `event_demo_ck` (`unsplit/Pl.h`) - are defined by this unit, so their declarations live
- * here and those three headers include this file instead of copying them.
- *
- * Linkage follows the map name, not the band header's old spelling: `get_option_cfg__FUc`,
- * `get_arena_cfg__FUcUc` and `event_demo_ck__Fv` are C++ free functions (so they are declared at C++
- * scope and the front-end reproduces the mangling, rule 9), while `get_cfg` keeps the map's plain
- * `fn_803BECA0`-style name and is `extern "C"`.
+ * menu/get_pop_dat_ptr.h - the declarations `menu/get_pop_dat_ptr.cpp` owns (rule 2; `unsplit/lobby.h`, `unsplit/menu.h`
+ *   and `unsplit/Pl.h` include it).  `get_option_cfg__FUc`, `get_arena_cfg__FUcUc` and `event_demo_ck__Fv` are C++ free
+ *   functions at C++ scope (rule 9); `get_cfg` keeps the map's plain name inside `extern "C"`.
  */
 #ifndef MHTRI_MENU_GET_POP_DAT_PTR_H
 #define MHTRI_MENU_GET_POP_DAT_PTR_H
@@ -23,8 +15,8 @@ u8 get_option_cfg(u8 index);
 u8 ck_option_cfg(u8 index);
 /* 0x803BEBF0 - one option out of the arena profile of the VS user work. */
 u8 get_arena_cfg(u8 index, u8 value);
-/* `event_demo_ck` (0x803C4814) is `lobby/lb_server_sel_trans.cpp`'s since the phase 4 recut; its header is included for the
- * consumers of this one. */
+/* `event_demo_ck` (0x803C4814) is `lobby/lb_server_sel_trans.cpp`'s; its header is included for the consumers of this
+ * one. */
 #include "lobby/lb_server_sel_trans.h"
 
 #ifdef __cplusplus

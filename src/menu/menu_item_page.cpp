@@ -1,82 +1,34 @@
 /*
- * `menu/menu_item_page.cpp` - the menu's item page draw layer: `.text` 0x80349DD8-0x8034C0C4 (22
- * functions, 8940 B).
- *
- * MODULE AND NAME.  Module `menu`: the unit's own fragments sit inside the menu band's data - `.data`
- * 0x805E91E8-0x805E91F8 and `.sdata` 0x807932F0-0x80793308 - immediately below the `menu_note.cpp`
- * `__FILE__` string at 0x805E91F8, which the next TU's single function (0x8034C0C4) is the sole
- * referencer of; its calls are the menu UI helpers (`get_str_tbl`, `get_menu_lsp_tbl`,
- * `ItemName`/`ItemExp`, `font_print_ex`, `draw_sprite_anim_ary`).  No `__FILE__` string covers the
- * range (the only referencer of the string at this data offset is the 0x8034C0C4 TU) and
- * `dumpmap.py lookup` answers `zz_` for every address here, so the file name and the symbol names
- * are the naming pass's own, each derived from its body and the band's `menu_*` file
- * family (`menu_item.cpp`, `menu_infomation.cpp`, `menu_note.cpp`): the page's scroll/fill/update
- * trio, its per-frame draw, and the per-page column/detail pair the `switch (page_index)` arms of
- * `item_page_draw` select (`item_page_draw_column0`/`item_page_draw_detail0` .. `3`).  MARKED GUESS:
- * what each page number shows (0 = the item's detail panel, 1 = the row's damage/quality block,
- * 2 = the item card, 3 = the option/season card) is read off the bodies' call surface, not off a
- * name; a later pass with the screen's own symbols can sharpen it.
- *
- * THE RECORD IT DRAWS.  `MenuSlot` (`menu/menu_item.h`, the landed half's view): callers hand
- * it `&slot->entries_b[0]` (0x6C) or the embedded `MenuScroll` at +0x1A4.  This unit is why
- * `MenuEntry`'s +0x06/+0x0C, `MenuSlot`'s +0x01C..+0x01F, the `MenuScroll` record and the +0x2ED kind
- * table are named there (one definition, rule 1 - the extension was proven inert:
- * `build/RMHE08/src/menu/menu_item.o` is byte-identical before and after it).
- *
- * Naming note: the `fn_XXXXXXXX` names this file carries are all *references* to other units'
- * symbols (`sprite_frame_apply`, `fn_8004EA24`, `fn_8033ADD0`, `get_menu_lsp_tbl`'s band, ...) which the map
- * still spells as stems and which are not this batch's to rename; every one of this file's own 22
- * symbols is named above.  The shape is the one `hud/net_char_sync.cpp` and `menu/fn_8031EA8C.cpp`
- * record for the same case (the gate's `rule7_defer_growth` refuses only a *defined* generated name
- * behind the escape, and this file defines none).
- *
- * SECTIONS.  All four non-`.text` sections are byte-identical to the target object (`datagap.py`
- * reports no data gap): `.data` 0x805E91E8-0x805E91F8 (the four page colour words
- * `item_page_colour_table`, defined here) and `.sdata` 0x807932F0-0x80793308 (the pooled `"%d"`,
- * `"%s"`, `"%6.1f"`, `"%d%"` literals, the `s16` line gap `item_page_line_gap` and their padding -
- * the pool order is the source's function order, which is why the bodies sit in address order).
- * extab/extabindex are claimed with the target's exact ranges.  `.text` is 88 B larger than the
- * target's: `item_page_draw_detail1` +60, `item_page_draw_detail0` +24, `item_page_draw_detail2` +12,
- * `item_page_option_value_string` +8, `item_page_item_price` +4, `item_page_draw_closed_column` +4
- * against `item_page_draw` -20 and `item_page_draw_column3` -4.
- *
- * RESIDUALS (measured with `recompile.py --measure` / the official report, 2026-09-27; the unit's own
- * score is 93.29 fuzzy / 1088 of 8940 code bytes, and the naming pass plus the width fixes below moved
- * it 92.58 -> 93.29 with no row lower):
- *   * 7 functions are byte-identical: `item_page_scroll_rows`, `item_page_fill_rows`,
- *     `item_page_update_rows`, `item_page_draw_page_widget`, `item_page_draw_column1`,
- *     `item_page_draw_column2`, `item_page_option_available` (100.0).
- *   * `item_page_draw_page_arrow` 98.98: two callee-saved registers are swapped against retail (`pos`
- *     r31 vs r30) and the colour `or` keeps retail's other operand order - four source shapes tried
- *     (inline `id - 30`, a `u16`/`u32` `part`, both declaration orders), none flips it.
- *   * `item_page_draw` 95.89 (916/936 B): the `case 1` arm's `else` body and the `page_ofs` test land
- *     in a different block order (5 instructions); three shapes tried.
- *   * `item_page_draw_detail0` 96.49 (1612/1588) - the `MenuRowData` record this unit owns declares
- *     `kind` as `s32` on purpose: retail's `switch (data->kind)` is a signed binary search
- *     (`cmpwi`/`bge`), and with `u32` MWCC emits an unsigned linear chain instead (94.92 with the
- *     fix reverted, and the whole arm bodies shift with it).  `item_page_draw_detail1` 91.12
- *     (1176/1116), `item_page_draw_detail2` 82.89 (604/592), `item_page_draw_column3` 88.22 (516/520):
- *     the arm bodies' reload/step order differs by 1-15 instructions; the call sequences are
- *     identical, so this is in-block scheduling/colouring, not missing code.
- *   * `item_page_draw_rows` 87.58 / `item_page_draw_blank_rows` 93.70: the row draws' argument
- *     narrowing (`(u16)` on the id and the `s16` step) - same size, instruction-order and masking
- *     differences.  `item_page_draw_rows`'s target also narrows its `first` parameter with `extsb`
- *     where our `u8` gives `clrlwi`, and sets `row_id` up *after* the first `sprite_frame_apply` call where
- *     we set it up before: a signed `first` and a reordered declaration are the next two things to
- *     try there (not tried - the row's remaining diff is dominated by the block order).
- *   * `item_page_item_price` 97.5 (260/256 B): the return and callee widths are load-bearing - the
- *     target masks NOTHING on the three `fn_8004B*` results or on `fn_8026FE44`'s compare, so this
- *     unit's view declares `item_page_item_price` and `fn_8004B0A4`/`item_count_find`/`fn_8004B70C` as
- *     `u32` and `fn_8026FE44` as `u32`, and the price chain is two statements
- *     (`base = Pl_item_timer_get(worker, id); base += fn_8004B70C(...);`) so the worker call comes first
- *     like retail's.  That took the row 81.09 -> 97.5; the residual is one instruction, the mask the
- *     third argument's narrowing emits after `fn_8004AE70` instead of before the other two argument
- *     setups (retail masks into r5 immediately, we copy to r0 and mask at the call).  Three shapes
- *     tried on that one (inline call, `u16` and `u32` temporaries), none flips it.
- *   * `item_page_draw_wrapped_text` 96.32 / `item_page_draw_column0` 96.36 /
- *     `item_page_draw_closed_column` 95.57 / `item_page_draw_option_frame` 94.85 /
- *     `item_page_option_row_index` 90.10 / `item_page_option_value_string` 84.46: the same in-block
- *     ordering/masking class.
+ * menu/menu_item_page.cpp - the menu's item page draw layer: the page's scroll/fill/update trio, its per-frame draw and
+ *   the per-page column/detail pairs `item_page_draw`'s `switch (page_index)` selects (`item_page_draw_column0`/
+ *   `item_page_draw_detail0` .. 3), over the `MenuSlot` record (`menu/menu_item.h`).
+ * RANGE. .text 0x80349DD8-0x8034C0C4 (22 functions); extab, extabindex, .data 0x805E91E8-0x805E91F8 (the page colour
+ *   words `item_page_colour_table`), .sdata 0x807932F0-0x80793308 (the `"%d"`, `"%s"`, `"%6.1f"`, `"%d%"` literals and
+ *   the line gap `item_page_line_gap`, pooled in the source's function order, hence the address order of the bodies).
+ * FLAGS. `cflags_menu` (configure.py).
+ * NAMES. Module `menu`: the unit's data sits just below the `menu_note.cpp` `__FILE__` string (0x805E91F8, the next
+ *   TU's) and its calls are the menu UI helpers.  No `__FILE__` string covers the range and the dump answers `zz_`, so the
+ *   file name and all 22 symbol names are GUESSes from the bodies, in the `menu_*` family's scheme; so is what each page
+ *   shows (0 the item's detail panel, 1 the row's damage/quality block, 2 the item card, 3 the option/season card).
+ * RESIDUALS. 15 partial rows (the other 7 are byte-identical):
+ *  - `item_page_draw`: the `case 1` arm's `else` body and the `page_ofs` test in another block order (three shapes);
+ *  - `item_page_draw_page_arrow`: `pos` in r31 against r30 and the colour `or`'s operand order (four shapes);
+ *  - `item_page_draw_detail0`/`1`/`2`, `item_page_draw_column3`: in-block reload/step order and colouring, the call
+ *    sequences identical;
+ *  - `item_page_draw_rows`/`item_page_draw_blank_rows`: the row draws' argument narrowing; `item_page_draw_rows` also
+ *    narrows `first` with `extsb` where our `u8` gives `clrlwi`, and sets `row_id` after the first `sprite_frame_apply`;
+ *  - `item_page_item_price`: retail masks the third argument into r5 at once, we copy to r0 and mask at the call;
+ *  - `item_page_draw_wrapped_text`, `item_page_draw_column0`, `item_page_draw_closed_column`,
+ *    `item_page_draw_option_frame`, `item_page_option_row_index`, `item_page_option_value_string`: the same in-block
+ *    ordering/masking class.
+ *   flipcheck: `.text` 0x50 long (0x233C against 0x22EC); extab 1 byte and extabindex 8 bytes differ;
+ *   `font_print_ex__FsssPCce`, `get_userdata` (the map's `get_userdata__Fv`) and `spr_data_copy__FPsPv` are defined by no
+ *   link input.
+ * SHAPES. The `MenuRowData` record declares `kind` `s32`: retail's `switch (data->kind)` is a signed binary search; `u32`
+ *   gives an unsigned linear chain.
+ *  - `item_page_item_price`, `fn_8004B0A4`, `item_count_find`, `fn_8004B70C` and `fn_8026FE44` are `u32` in this unit's
+ *    view (retail masks none of those results), and the price is two statements (`base = Pl_item_timer_get(worker, id);
+ *    base += fn_8004B70C(...);`) so the worker call comes first.
  */
 
 #include "types.h"
@@ -812,9 +764,8 @@ extern "C" s8 item_page_option_row_index(u8 kind, u8 index, s8 light)
     return -1;
 }
 
-/* 0x8034BC58: the value string the option card shows for one row - the row's own table, the variant
- * table the option config selects and the two "same as the player's" comparisons, with the status
- * code the card colours by written back through `out`. */
+/* 0x8034BC58: the value string the option card shows for one row, from the row's table, the variant table the option
+ * config selects and two "same as the player's" tests; the status code the card colours by goes to `out`. */
 extern "C" s8* item_page_option_value_string(u8 kind, u8 index, s8 light, s8* out)
 {
     u8** head = get_str_tbl(0x49);
