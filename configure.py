@@ -292,29 +292,11 @@ cflags_nwc24 = [*cflags_base, "-func_align", "4"]
 # function packing at 0x805145B8 is the DWCi/NHTTP boundary (see NHTTP/NHTTP_bgnend.c).
 cflags_nhttp = [*cflags_base, "-func_align", "4"]
 
-# lobby flags (src/lobby/lobby_scene.c). Evidence: the retail fn_801EC9E0 (0x18 B / 6 instructions) reads the
-# small-data scene pointer, then the +0x10 table base, before the argument's byte, and keeps the table base
-# in r4; -O4,p instead hoists the byte load, splits the base across r3 and reorders the two loads. -O3 is
-# byte-identical. Note the OS unit next to this list wants -O4,p: the level is per unit, so probe both.
+# cflags_lobby: cflags_base with -O3, -inline noauto and -Cpp_exceptions on; measurements in docs/lobby.md.
 cflags_lobby = [
     *[f for f in cflags_base if f != "-O4,p"],
     "-O3",
-    # Evidence (lib-wide before/after, 2026-09-25): `-inline noauto` over the whole lobby lib. Of the 13
-    # registered units, 5 improve (fn_801E7530 27.64778 -> 31.76088, fn_801F9CD4 20.33288 -> 22.07398,
-    # fn_8021E1EC 9.21654 -> 9.66140, lb_npc 13.36667 -> 13.74540, fn_80219260 11.00314 -> 11.08171), 8 are
-    # unchanged (including every unit already at its ceiling), and NONE regresses - verified at per-function
-    # granularity, not just per unit, and the already-Matching lobby_scene.c stays byte-identical at 100.0.
-    # The same knob is what closed four main.cpp functions (cflags_main derives from this list); cflags_lobby
-    # keeps `-O3` for the same reason main does.
     "-inline noauto",
-    # `-Cpp_exceptions on` (flags-audit 2026-09-28): 19 of the lib's 20 registered targets carry
-    # extab/extabindex (lobby_scene.c, a C file, is the one that does not - and the flag leaves its
-    # object byte-identical, measured), and 8 of them spelled it out as a file-wide
-    # `#pragma exceptions on`. With the lib flag on and all 8 pragmas deleted: all 20 objects'
-    # allocatable sections byte-identical (lobby_scene.c included), every unit score identical,
-    # main.dol still BF4850739478CAAEDFE675949EB7C28595A7FDE9. The 11 lobby targets that carry extab
-    # but had no pragma now emit it (extab 0 -> 56..216 B of their 480..752 B targets), which is the
-    # first time those units can score their extab at all.
     "-Cpp_exceptions",
     "on",
 ]
@@ -640,7 +622,8 @@ config.libs = [
             Object(NonMatching, "menu/menu_result.cpp"),
             Object(NonMatching, "menu/multi_result.cpp"),
             Object(NonMatching, "menu/get_pop_dat_ptr.cpp"),
-            Object(NonMatching, "lobby/lb_server_sel_trans.cpp"),  # phase 4 recut of the line above (its tail), same cflags_menu
+            # Flags: unit header of src/lobby/lb_server_sel_trans.cpp
+            Object(NonMatching, "lobby/lb_server_sel_trans.cpp"),
             # Registered once, at its final home: the quest
             # entry/init band (`.text` 0x803AA4A4..0x803B0F98, 70 functions / 27380 B) with extab
             # 0x80018A6C..0x80018C54 (60 records) and extabindex 0x80038E08..0x800390E4 (60 x 12 B) -
@@ -1735,160 +1718,22 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "lobby/lobby_scene.c"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `801E0ADC_fn_801E0ADC.cpp` (`.text` 0x801E0ADC..0x801E7530, 77 functions / 27220 B) -
-            # the effect/flag bookkeeping group that precedes the lobby menu layer.  Module `lobby`:
-            # 23 call sites go into the registered `lobby/fn_80212810.cpp`, the rest of the foreign
-            # calls are the lobby/HUD API (`LbStr`, `GetMenuFontColor`, `get_lsp_data`,
-            # `draw_sprite_*`), and the range's data is the lobby `.sbss`/`.data` run
-            # (`lbl_80794880`); both link neighbours are the enemy/lobby units.  No `__FILE__` string
-            # covers the range and the dump answers only `zz_` placeholders, so the file keeps the map
-            # stem (brief section 2, class 3+4).  C++ from the range's mangled callees.
-            # Sections: extab 0x800103D4..0x800105B4 (60 records), extabindex
-            # 0x8002C4A8..0x8002C778 (60 x 12 B), .text 0x801E0ADC..0x801E7530 - each is exactly the
-            # gap between the bracketing enemy/lobby claims.  The seam is unproven (`--max-bytes`
-            # cap) and the run holds several original TUs (see the file header).
             Object(NonMatching, "lobby/fn_801E0ADC.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `801E7530_fn_801E7530.cpp` (`.text` 0x801E7530..0x801EC9E0, 77 functions / 21680 B) -
-            # the lobby menu-layer group.  Module `lobby` from the code (`lobby_w`, `lb_param_w`,
-            # `LbStr`, `GetMenuFontColor`, `draw_font_idx`) and from the neighbour above; no `__FILE__`
-            # string survives and the dump answers only `zz_` placeholders, so the file keeps the map
-            # stem (brief section 2, class 3+4).  Sections: extab 0x800105B4..0x8001079C (61 records),
-            # extabindex 0x8002C778..0x8002CA54 (61 x 12 B), .text 0x801E7530..0x801EC9E0.
             Object(NonMatching, "lobby/fn_801E7530.cpp"),
             Object(NonMatching, "lobby/lb_pane_ui.cpp"),
             Object(NonMatching, "lobby/lb_npc.cpp"),
-            # `80212810_fn_80212810.cpp` (`.text` 0x80212810..0x80219260, 105 functions / 27216 B) -
-            # the lobby item/equipment page layer.  Module `lobby` from the code (`LbStr`,
-            # `LbPutAnaPageArrow`, `get_lsp_data`, `draw_sprite_ary`, `GetMenuFontColor`) and from the
-            # `.bss` run it reads (`lobby_w`, `lb_npc`); no `__FILE__` string survives and the dump
-            # answers only `zz_` placeholders, so the file keeps the map stem (brief section 2,
-            # class 3+4).  `.text` only: the naive switch tables live in a `.data` run this range only
-            # partly references, so no data range is claimed yet.
             Object(NonMatching, "lobby/fn_80212810.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80219260_fn_80219260.cpp` (`.text` 0x80219260..0x8021E1EC, 76 functions / 20364 B) -
-            # the equipment-page group between the two item/equipment page units.  Module `lobby`
-            # from the band (both bracketing registered units are `lobby`) and from the code: it
-            # hands the player actor `_PLW` (`self->plw_0x34`) to the `Put_equip_dtl_*` /
-            # `Put_status_equip_*` page and calls the `_EQUIP` accessors (`Gunner_opt_ok_ck`,
-            # `Get_equip_rare`).  C++ from the range's mangled callees.  No `__FILE__` string covers
-            # the range - the band's only source-name string (`enemy_control.cpp`, 0x805A1BB8) is
-            # never addressed by the range's code - and the dump answers only `zz_` placeholders, so
-            # the file keeps the map stem (brief section 2, class 4).
-            # Sections: extab 0x80011724..0x800118CC (53 records), extabindex
-            # 0x8002E1A0..0x8002E41C (53 x 12 B), .text 0x80219260..0x8021E1EC - each run is exactly
-            # the gap between the two bracketing registered claims.  `.text` + the two unwind runs
-            # only: the `.data` (0x805C0xxx) and `.bss` runs this range reads are shared and leak
-            # outside it, so no data range is claimed yet.
             Object(NonMatching, "lobby/fn_80219260.cpp"),
             Object(NonMatching, "lobby/lb_menu_scratch.cpp"),
             Object(NonMatching, "lobby/lb_menu_pos_tbl.cpp"),
             Object(NonMatching, "lobby/lb_equip_page.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): the lobby event/status band
-            # (`.text` 0x802FA9A0..0x8030121C, 120 symbols / 26748 B, plus its extab run
-            # 0x800156B4..0x80015964 and extabindex run 0x80034074..0x8003447C - 86 records each, both
-            # exactly the gap between the bracketing registered units' runs).  It links between the
-            # `ef` bands (`ef/eft035.cpp` below it, `ef/fn_803066F0.c` above it), but the module is
-            # `lobby` (class 3): the range's own predicates read the lobby work block `lobby_w`
-            # (.bss 0x806AAB44) at +0x003/+0x15F/+0x161 and its `.sbss` run is the lobby pointer block
-            # `lbl_80794880`; no `__FILE__` string covers the range, so the file keeps the map's stem
-            # (class 4).  Same `cflags_lobby` as the band below, with the per-file
-            # `#pragma exceptions on` the other lobby units use to emit the unwind records.
             Object(NonMatching, "lobby/fn_802FA9A0.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): the lobby UI band
-            # (`.text` 0x8030121C..0x803066F0, 52 symbols / 21716 B, plus its extab run
-            # 0x80015964..0x80015AAC and extabindex run 0x8003447C..0x80034668 - both exactly the gap
-            # between the bracketing registered units' runs).  Module `lobby` (class 3): the range's
-            # callees are the lobby/menu UI API (`LbStr`, `get_lsp_data`, `draw_sprite_ary`,
-            # `draw_font_idx`, `put_menu_cursor`, `GetMenuFontColor`, `ItemName`) and its `.sbss`
-            # reference is the lobby pointer block `lbl_80794880`; no `__FILE__` string covers the
-            # range and the dump answers only `zz_` placeholders, so the file keeps the map's stem
-            # (class 4).  Same `cflags_lobby` as the band below, with the per-file
-            # `#pragma exceptions on` the other lobby units use to emit the unwind records.
             Object(NonMatching, "lobby/fn_8030121C.cpp"),
-            # lobby/lb_companion_ui.cpp: the lobby companion/status UI band
-            # (`.text` 0x80338808..0x8033F270, 133 functions / 27240 B, plus its extab run
-            # 0x80016994..0x80016CA4 and extabindex run 0x80035CC4..0x8003615C - 98 records each,
-            # both exactly the gap the bracketing split objects leave: `fn_803386C4`'s record ends
-            # at 0x80016994 / 0x80035CC4 and the next function's begins at 0x80016CA4 /
-            # 0x8003615C).  Module `lobby` (class 3): the range references the lobby work block
-            # `lobby_w` (`.bss` 0x806AAB44), `lb_param_w` (`.bss` 0x806590B4) and the global
-            # `lb_deli_data` (`.data` 0x8060DDB8), calls the lobby string helper `LbStr` 11 times,
-            # and its callee profile is exactly the one the registered lobby bands document
-            # (`LbStr`, `get_lsp_data`, `draw_sprite_ary`/`_idx`/`_anim_*`, `draw_font*`,
-            # `GetMenuFontColor`, `sysSE_req`); no `__FILE__` string covers the range and the dump
-            # answers only `zz_XXXXXXXX_` for it, so every symbol the file defines is named from its
-            # own body (the naming pass of 2026-09-26, 79 names - see the unit header and
-            # `.pi/notes/80338808-named.md`; the map's 78 `fn_` rows in the range moved with it and
-            # the 79th follows main's `hud_key_lookup`).  Same
-            # `cflags_lobby` as the bands above, with the per-file `#pragma exceptions on` the
-            # other lobby units use to emit the unwind records.  Seam UNPROVEN (measured): the
-            # decisive `__FILE__` class is absent for the whole band, no private pool crosses
-            # either edge, and the `.data`/`.sdata` runs continue across both with ascending owners
-            # (candidate-only class); see the unit header for the counts and the bracket.
             Object(NonMatching, "lobby/lb_companion_ui.cpp"),
-            Object(NonMatching, "lobby/lb_screen_step.cpp"),  # phase 4 stub: new unit, cflags_lobby of the lib
-            # Registered once, at its final home (docs/plan.md 12): the lobby menu page's frame step and its
-            # info/text selector (`.text` 0x80365C84..0x80366618, 2 functions / 2452 B, plus their
-            # extab run 0x800177C4..0x800177D4 and extabindex run 0x8003720C..0x80037224 - each run
-            # is exactly the gap the bracketing split objects leave).  Module `lobby` and the names
-            # from the code (class 3, GUESS marked in the unit header): the frame step reads
-            # `lobby_w` (.bss 0x806AAB44) at +0x0AC - the menu pointer `lobby/fn_801E7530.cpp` uses -
-            # and the selector reads the lobby page block `lbl_80794880`; every callee is a lobby/hud
-            # symbol (set_zmode/set_blendmode, the 0x1877/0x1878/0x1879 panel setters fn_80214EF0/
-            # fn_80214FB8/fn_802150DC/fn_80215170, fn_801E66A8/fn_801E677C/fn_801E68B4,
-            # fn_801EF73C/fn_801F0834, fn_8033C1AC) plus the Pl icon queries
-            # equip_kind_table_class/fn_8027F1B8/fn_8027F21C.  No `__FILE__` string covers the range and the
-            # dump answers only `zz_` placeholders, so the unit and its two symbols are named for
-            # what the bodies do - `lb_menu_page_step` (the frame step) and `lb_menu_info_update`
-            # (the text selector); both map rows were renamed with the source via `symedit.py`.
-            # C++; every plain `fn_` definition that remains is another unit's symbol.
-            # `.data` 0x805EDAB4..0x805EDAE0 is claimed: it is `lb_menu_page_step`'s own 11-entry
-            # jump table (`jumptable_805EDAB4`, `scope:local`), the only data either body emits.  Same
-            # `cflags_lobby` as the band above, with the per-file `#pragma exceptions on` and
-            # `#pragma peephole off` the other lobby units use (both measured, see the unit header).
+            Object(NonMatching, "lobby/lb_screen_step.cpp"),
             Object(NonMatching, "lobby/lb_menu_page.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80394038_fn_80394038.cpp` (`.text` 0x80394038..0x803967F0, 41 functions / 10168 B;
-            # extab 0x8001833C..0x8001843C, extabindex 0x80038340..0x800384C0 - each run exactly the
-            # gap the bracketing split objects leave).  Module `lobby` from the code (42 `lobby_w`
-            # reads, `LbStr`, `lb_npc_Get_motion_no`, `get_now_areano`, `get_move_work_adrs`,
-            # `get_option_cfg`, the lobby/HUD 2D layer) and from the module's own units; the file name
-            # is derived from the range's one real map name `draw_quest_board` in the `lb_*` scheme of
-            # its siblings (`lb_npc.cpp`, `lb_menu_page.cpp`, `lb_companion_ui.cpp`) - MARKED GUESS,
-            # no `__FILE__` string covers the range and the dump answers `zz_` for 40 of 41 addresses.
-            # C++: mangled callees (`LbStr__FUcUs`, `set_zmode__FbUcb`, `sysSE_req__Fl`,
-            # `draw_font_idx__FUsPScUlPC10_mh_ivec2_`) reached through their real signatures (rule 9).
-            # Same `cflags_lobby` as its siblings.  Same `cflags_lobby` as the band above.
             Object(NonMatching, "lobby/lb_quest_board.cpp"),
-            # Registered: the lobby list/detail UI band
-            # (`.text` 0x8038E8E8..0x80394038, 70 functions / 22352 B) plus its extab run
-            # 0x8001819C..0x8001833C (52 x 8 B) and extabindex run 0x800380D0..0x80038340
-            # (52 x 12 B) - both runs are exactly the gap the bracketing units leave
-            # (`enemy/em009_act.cpp` ends at 0x8001819C / 0x800380D0).  Module `lobby`,
-            # evidence class 3 (see the unit header): the range reads `lobby_w`/`lb_param_w`,
-            # calls `LbStr` 28 times and the whole lobby/HUD 2D API, and the lobby menu
-            # dispatcher `fn_80211E68` calls two of its functions as screen entry points.  The
-            # file name is the marked GUESS `lb_quest_ui.cpp`; the seam is unproven with two
-            # candidates (0x8038EF28 strong `.sdata2` cut, 0x8038EC44 where the six
-            # `em009_prog_tbl` entry slots end) - both are in the unit header and the outbox.
-            # Same `cflags_lobby` as its siblings with the per-file `#pragma exceptions on`.
             Object(NonMatching, "lobby/lb_quest_ui.cpp"),
-            # Registered once, at its final home (`.text`
-            # 0x803A3A50..0x803AA4A4, 95 functions / 27220 B; extab 0x8001882C..0x80018A6C and
-            # extabindex 0x80038AA8..0x80038E08, both exactly the gap the bracketing registered
-            # units leave; `.data` 0x805F2038..0x805F2090, the range's two private switch tables).
-            # Module `lobby` and the file name `lb_quest_screen.cpp` are a MARKED GUESS (see the
-            # unit header): no `__FILE__` string covers the range, the dump answers `zz_` for 92 of
-            # its 95 functions, and the range is a `--max-bytes` cap over five different bands.  The
-            # module comes from the range's globals and API (`lobby_w`, `lb_param_w`, `Screen_w`,
-            # `lbl_80794880`, `LbStr`, `lb_item_get_data`, `subTransSet`) and the nearest registered
-            # same-lib family (`lobby/lb_quest_ui.cpp`, `lobby/lb_quest_board.cpp`).  C++ with
-            # exceptions on (every framed function of the range owns an extab record).  Same
-            # `cflags_lobby` as its siblings; the seam is unproven and the unit header lists the
-            # five bands and the bodies still to write.
             Object(NonMatching, "lobby/lb_quest_screen.cpp"),
         ],
     },

@@ -1,40 +1,26 @@
 /* lobby/fn_801E0ADC.cpp - the effect/flag bookkeeping group that precedes the lobby menu layer.
- *
- * `.text` 0x801E0ADC..0x801E7530 (77 functions, 27220 B), extab 0x800103D4..0x800105B4 (60 unwind-only
- * 8-byte records), extabindex 0x8002C4A8..0x8002C778 (60 x 12 B).  Registered; both section gaps are exactly the space between the registered
- * `enemy/fn_801D80EC.cpp` and `lobby/fn_801E7530.cpp` claims, which is why the whole capped run is one
- * registration (the seam is unproven, see below).
- *
- * Module `lobby`.  Every foreign call is a lobby/HUD symbol (`LbStr`, `GetMenuFontColor`, `get_lsp_data`,
- * `draw_sprite_*`, `ItemName`) or a call into the registered `lobby/fn_80212810.cpp` (23 sites); the
- * range's data lives in the lobby `.sbss`/`.data` runs (`lobby_world_block`, `lbl_805B75E8`), and both link
- * neighbours are the enemy/lobby units.  Language C++: every call out is a mangled symbol.
- *
- * Name.  The map has only `fn_XXXXXXXX` for this range and the runtime dump answers only `zz_`
- * placeholders (`dumpmap.py lookup 0x801E0ADC` -> `zz_01e0adc_`, and the same for the rest of the
- * inventory), so the file keeps the map's stem.
- *
- * Seam.  The proposal was cut by `--max-bytes`, so its edge is a size cap, not a boundary.  `tudiscover
- * at 0x801E0ADC` puts a strong left cut exactly here (a `.sdata2` pool split) and finds the certain
- * match set 0x801E0ADC..0x801E2864; it also finds *separate* certain sets inside the run (0x801E2A9C..
- * 0x801E3E04 with `eft033_set` in it, 0x801E41D0..0x801E448C, 0x801E5000..0x801E5828), so the run holds
- * several original TUs and the extent is provisional: it settles as its functions match.
- *
- * Flags.  `#pragma peephole off` is required: retail keeps the unfused `clrlwi`+`slwi` index scale
- * (`fn_801E1A40`) and unfused narrow compares, where the pass folds them into `clrlslwi`/an
- * if-converted branch chain.  Per-function measurements are in the outbox.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `dumpmap.py lookup` on the range's inventory - every name is a bare `fn_XXXXXXXX`/`zz_XXXXXXXX_`
- * placeholder; the only real names in the run, `eft033_set`/`eft033_set_ofs`, are used as they are)
+ * RANGE. .text 0x801E0ADC-0x801E7530 (77 functions); .data 0x805B75E8-0x805B7CB0, .sdata 0x80791B38-0x80791B70, .sbss
+ *   0x80794AA8-0x80794AB0, .sdata2 0x80799788-0x80799870, extab, extabindex.  `tudiscover at 0x801E0ADC` puts a strong
+ *   left cut here (a `.sdata2` pool split) but finds separate certain sets inside the run (0x801E0ADC-0x801E2864,
+ *   0x801E2A9C-0x801E3E04 with `eft033_set`, 0x801E41D0-0x801E448C, 0x801E5000-0x801E5828): several original TUs.
+ * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off` (retail keeps `fn_801E1A40`'s unfused `clrlwi` + `slwi`
+ *   index scale and the unfused narrow compares).
+ * NAMES. The map and the dump give only placeholders (the run's real names `eft033_set`/`eft033_set_ofs` are used as
+ *   they are), so the file keeps the map's stem.  Module `lobby`: every foreign call is the lobby/HUD API (`LbStr`,
+ *   `GetMenuFontColor`, `get_lsp_data`, `draw_sprite_*`, `ItemName`) or one of 23 calls into `lobby/fn_80212810.cpp`.
+ * RESIDUALS. 56 rows unwritten: 0x801E0ADC-0x801E1A2C, 0x801E1B68-0x801E3EDC, 0x801E3EF8-0x801E403C,
+ *   0x801E41D0-0x801E448C, 0x801E451C-0x801E4E38, 0x801E4ED0-0x801E4F78, 0x801E5000-0x801E6850, 0x801E68B4-0x801E6DCC,
+ *   0x801E6E04-0x801E6EA8, 0x801E6F80-0x801E72F4, 0x801E732C-0x801E7530.  Partial: `fn_801E1A40`, `fn_801E4E44`.
+ *   flipcheck: `.data`/`.sdata`/`.sbss`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim;
+ *   the `.sdata`/`.sdata2` pool is shared with `enemy/em007_act.cpp` (fold candidate); `chk_pointer` is the map's
+ *   `chk_pointer__Fv`, and `lbl_805CA660`/`lbl_805CA6D4`/`lbl_805CA718` point inside `.data` objects the map does not
+ *   split there.
  */
 
 #include "types.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
-/* Foreign callees whose owners' headers do not publish them.  Bare prototypes (no `extern` keyword)
- * inside the linkage block is how the neighbouring units carry them; each is filed as a shared-file
- * request to move it to its owner's header (docs/plan.md 6.5 rule 2). */
+/* Foreign callees whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
 void fn_8004D334(s32 size);
 void fn_8004C038(void* a, void* b);
@@ -99,11 +85,9 @@ extern LbIdRow6 lbl_805CA660[];
 extern LbIdRow6 lbl_805CA6D4[];
 extern LbIdRow8 lbl_805CA718[];
 
-/* The lookup record `fn_8027E354` hands back for a slot and an item id - the same record the sibling
- * `lobby/fn_80212810.cpp` views as `LbRefEntry` (0x10 B, its s32 fields at +0x04/+0x08/+0x0C).  Only the
- * value at +0x08 is reached here.  The record is owned outside this range, so the durable fix is one
- * header both units include, filed as a shared-file request; this view exists because the sibling's is
- * a definition in a `.cpp` and a second definition of the same name is what rule 1 forbids. */
+/* The lookup record `fn_8027E354` hands back for a slot and an item id: `lobby/fn_80212810.cpp` defines the same record
+ * as `LbRefEntry` in its `.cpp` (s32 fields at +0x04/+0x08/+0x0C), so this view keeps its own name until one header
+ * holds it (rule 1).  Only +0x08 is read here. */
 typedef struct LbItemRef {
     /* +0x00 */ u8 unused_0x00[8];
     /* +0x08 */ u32 value_0x08;
@@ -179,9 +163,7 @@ typedef struct LbEftWork {
     /* +0x4C0 */ u16 time_0x4C0;
 } LbEftWork; /* size: 0x4C2 (approximate) */
 
-/* Foreign callees whose owners' headers do not publish them.  Bare prototypes (no `extern` keyword)
- * inside the linkage block is how the neighbouring units carry them; each is filed as a shared-file
- * request to move it to its owner's header (docs/plan.md 6.5 rule 2). */
+/* Foreign callees whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
 void fn_8004D334(s32 size);
 void fn_8004C038(void* a, void* b);

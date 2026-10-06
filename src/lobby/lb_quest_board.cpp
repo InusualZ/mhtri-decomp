@@ -1,63 +1,20 @@
-/* lobby/lb_quest_board.cpp - the lobby's quest-board screen: its step machine, its cursor, the
- * panel frame it draws into and the effects it spawns.  `.text` 0x80394038..0x803967F0, 41
- * functions / 10168 B.
- *
- * MODULE AND FILE NAME (brief section 2, evidence order).  1. No `__FILE__` string covers the range:
- * every `lis`/`addi` pair in it resolves to the `.sdata2` float pool, a switch table or one of the
- * band's own tables (`xref` over the whole DOL text; the only nearby source-name literal,
- * `s_menu_note_cpp` at `.data` 0x805E91F8, has exactly one referrer, 0x8034C1B4, inside the
- * registered `menu/menu_note.cpp` unit).  2. `dumpmap.py lookup` answers `zz_XXXXXXXX_` for every
- * address except 0x80394DA4, where the map already carries the real name `draw_quest_board`.
- * 3. The code places the unit in `lobby`: it reads the lobby work block `lobby_w` (.bss 0x806AAB44)
- * 42 times, calls the lobby string table (`LbStr`), the lobby NPC motion query
- * (`lb_npc_Get_motion_no`), the lobby scene's helpers (`get_now_areano`, `get_move_work_adrs`,
- * `get_option_cfg`) and the lobby/HUD 2D layer (`get_lsp_data`, `draw_sprite_*`, `draw_font_idx`,
- * `font_flush`, `set_zmode`, `set_blendmode`); the module's own units (`lobby/lb_npc.cpp`,
- * `lobby/lb_menu_page.cpp`, `lobby/lb_companion_ui.cpp`) carry the same call set.  The file name is
- * derived from the range's own entry point `draw_quest_board` and its dominant content, in the
- * `lb_*` scheme of the module's named units - MARKED GUESS: the original file name is not
- * recoverable, so `lb_quest_board.cpp` is the best descriptive fit.
- *
- * SECTIONS.  `.text` 0x80394038..0x803967F0; `extab` 0x8001833C..0x8001843C (32 records) and
- * `extabindex` 0x80038340..0x800384C0 (32 x 12 B) - both runs are exactly the gap the bracketing
- * split objects leave, and both tile in link order with the neighbours' (the run below ends at
- * 0x8001833C / 0x80038340).  The unit's own `.data` run is 0x805F13D0..0x805F1500: `lbl_805F13D0`
- * (0x30) and `jumptable_805F1400` (0x3C) are read by 0x80394038 / 0x80394200, the tables at
- * 0x805F143C..0x805F14A4 and 0x805F14B0 / 0x805F14D8 / 0x805F14EC by `draw_quest_board`,
- * 0x803950E0 and 0x80396070; 0x805F13C0 (a pointer pair) belongs to the unit below and 0x805F1500
- * to the one above, both measured by referrer address.  `.sdata` 0x80793470..0x80793488 and
- * `.sdata2` 0x8079C2B4..0x8079C2EC are the same story.  NONE of them is emitted by the source yet -
- * they are residual, see STATUS.
- *
- * SEAM.  Unproven, and consistent with one TU: the `.sdata2` label runs of the band are ordered by
- * their referrer's `.text` address across both edges (0x8079C2A8/0x8079C2B0 -> 0x80393B28/0x80393D4C
- * below, 0x8079C2B4..0x8079C2E8 -> this range, 0x8079C2EC.. -> 0x803967F0 above), and the same
- * holds for `.data` (0x805F13B8 -> 0x80393D4C below, 0x805F13D0..0x805F14EC -> this range,
- * 0x805F1500 -> 0x80396CAC above) and `.sdata` (0x8079346C -> 0x803933E8 below,
- * 0x80793470..0x80793480 -> this range, 0x80793488 -> 0x8039AFBC above).  The attribution pass's
- * "candidate seam inside it was not taken" note for this proposal is the `.sdata2` *shared* words
- * 0x8079C2C8/0x8079C2E0 (each also referenced by 0x804BF530 / 0x8027D968), which defeat the
- * single-referrer pair test; the other words' owners rise monotonically, so no internal seam exists.
- *
- * Naming note: references only to OTHER units' unrenamed fn_XXXXXXXX symbols - every `fn_` this
- * file names (`fn_80396070`, `fn_80396248`, `fn_8039631C`, `fn_803963F4`, `fn_80396654`,
- * `fn_803967F0`, `fn_80396934`, `fn_80396944`, `fn_80395DF4`, `fn_8004DF10`, `sysSE_stop`,
- * `fn_80214EF0`, `fn_80215170`, `fn_803772A8`, `fn_803B7154`, `getProfileQuestRecord`) is still
- * `fn_XXXXXXXX` in the map and none is a row this unit defines (checked with
- * `python tools/symbols/symedit.py range 0x80394000 0x80397000` against the 18 renamed rows this
- * file owns).
- *
- * NAMES.  Every name below is derived from the body (what it stores, compares, passes on) and the
- * `lb_*` scheme; each is marked GUESS in the function's own comment.  The map rows were renamed with
- * `tools/symbols/symedit.py rename` in the same commit (playbook 31/48).
- *
- * STATUS / RESIDUALS.  See the outbox `config_requests` for the measured numbers.  The 25 functions
- * that are not written yet, with their sizes (B), are: 80394038/268, 80394200/1216, 80394758/348,
- * 803948C8/296, 80394A64/368, 80394BD4/464, draw_quest_board/828, 803950E0/640, 80395360/224,
- * 80395440/188, 803954FC/420, 803957EC/292, 80395910/160, 803959C8/132, 80395A4C/568,
- * 80395C84/128, 80395D04/240, 80395DF4/292, 80395F18/96, 80396248/212, 8039631C/180,
- * 803963F4/608, 80396654/412.  Their bodies are the draw/update passes whose struct views
- * (`LbQuestBoardWork`'s payload and the `lobby_w` screen block) are not yet reconstructed.
+/* lobby/lb_quest_board.cpp - the lobby's quest-board screen: its step machine, its cursor, the panel frame it draws
+ *   into and the effects it spawns.
+ * RANGE. .text 0x80394038-0x803967F0 (42 functions); .data 0x805F13D0-0x805F1500 (`lbl_805F13D0`, `jumptable_805F1400`
+ *   and the tables `draw_quest_board`, 0x803950E0 and 0x80396070 read), .sdata 0x80793470-0x80793488, .sdata2
+ *   0x8079C2B0-0x8079C2E8, extab, extabindex.  The data order is consistent with one TU (docs/lobby.md).
+ * FLAGS. `cflags_lobby`; `#pragma peephole off` around `lb_quest_board_cursor_step` (retail keeps `and` + `cmpwi` and
+ *   `subi` + `cmpwi` unfused; playbook 39).
+ * NAMES. `lb_quest_board` is a GUESS from the range's one real map name, `draw_quest_board` (0x80394DA4), in the
+ *   module's `lb_*` scheme; every other name is a GUESS from its body.  Module `lobby`: 42 `lobby_w` reads, `LbStr`,
+ *   `lb_npc_Get_motion_no`, `get_now_areano`, `get_move_work_adrs`, `get_option_cfg` and the lobby/HUD 2D layer.
+ * RESIDUALS. 25 rows unwritten: 0x80394038-0x80394144, 0x80394200-0x803946C0, 0x80394758-0x803948B4,
+ *   0x803948C8-0x803949F0, 0x80394A64-0x803956A0, 0x803957EC-0x803959B0, 0x803959C8-0x80395F80, 0x80396070-0x803963D0,
+ *   0x803963F4-0x803967F0 (they need `LbQuestBoardWork`'s payload and the `lobby_w` screen block).  flipcheck:
+ *   `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim; the
+ *   `.sdata`/`.sdata2` pool is shared with `lobby/lb_quest_ui.cpp` and `menu/menu_result.cpp` (fold candidate); the
+ *   source still spells `menu/menu_result.cpp`'s `q_result_anim_counter_inc`/`q_result_release_effect` by their old
+ *   stems `fn_80396934`/`fn_80396944`, which the map no longer has.
  */
 
 #include "types.h"
@@ -114,19 +71,14 @@ extern "C" void lb_quest_board_open_board(LbQuestBoardData* data) {
     fn_8004DF10(&work->value_0x38C, &value_a, &value_b);
 }
 
-/* Leaves the board screen: clears the selector and the screen's active byte.  GUESS: `close` rather
- * than `cancel` is arbitrary between this body and `lb_quest_board_cancel`, which are byte-identical
- * - the two callers that tell them apart are outside the unit. */
+/* Leaves the board screen: clears the selector and the screen's active byte.  GUESS: `close` against the byte-identical
+ * `lb_quest_board_cancel` is arbitrary (the callers that tell them apart are outside the unit). */
 extern "C" void lb_quest_board_close(void) {
     lobby_w.active_0x008 = 0;
     lobby_w.state_0x000 = 0;
 }
 
-/* Moves a row cursor with wrap-around, playing the move sound only while the row the pressed mask
- * matches is still the one the two direction masks select.  The caller passes the cursor, the row
- * count and three masks.  `#pragma peephole off`: retail keeps the unfused `and` + `cmpwi` of the
- * mask test and the unfused `subi` + `cmpwi` of the wrap-around test, which the peephole folds into
- * `and.` / `subic.` (playbook 39). */
+/* Moves a row cursor with wrap-around, playing the move sound while the pressed row is the selected one. */
 #pragma peephole off
 extern "C" s32 lb_quest_board_cursor_step(s32 index, s32 count, u32 current, u32 next, u32 prev) {
     if (count > 1) {
@@ -154,9 +106,8 @@ extern "C" void lb_quest_board_cursor_reset(LbQuestBoardWork* work) {
     work->count_0x250 = 4;
 }
 
-/* Reports whether the board accepts input right now: the selected row's label must have a live
- * entry and, if it does, the row must be the one the payload marks as current.  GUESS: the polarity
- * and the row/label semantics come from the two callees' own names. */
+/* Whether the board accepts input: the selected row's label has a live entry and the row is the payload's current one.
+ * GUESS: the polarity and the row/label semantics come from the two callees' names. */
 extern "C" bool lb_quest_board_accept_input(void) {
     LbQuestBoardWork* work = lobby_w.menu_0xAC;
     QuestRecord* row = quest_record_find(*getProfileQuestRecord(work->index_0x249));
@@ -254,9 +205,8 @@ extern "C" void lb_quest_board_step(LbQuestBoardWork* work) {
     }
 }
 
-/* Runs the effect kind's own first step, the step `lb_quest_board_step` enters the screen with.
- * GUESS: the map merged this body into `lb_quest_board_step`'s symbol row (the row covered both
- * functions' 0x60 bytes); it was split with the registration (see the unit header). */
+/* Runs the effect kind's own first step, the one `lb_quest_board_step` enters the screen with.  GUESS name; the map row
+ * is split out of `lb_quest_board_step`'s 0x60 bytes. */
 extern "C" void lb_quest_board_step_kind(LbQuestBoardWork* work) {
     switch (work->kind_0x002) {
     case 8:

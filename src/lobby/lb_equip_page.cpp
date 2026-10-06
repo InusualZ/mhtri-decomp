@@ -1,89 +1,37 @@
 /*
  * lobby/lb_equip_page.cpp - the lobby item/equipment page layer and the player actor's per-model SE/motion rig update.
- *
- * `.text` 0x80220038..0x80229ECC (118 functions), `.data` 0x34F8 B, `.sdata` 0x140 B, `.sdata2` 0x128 B, extab 0x320 B and extabindex
- * 0x4B0 B.  Phase 4 fold/recut: the tail of `lobby/fn_8021E1EC` (0x80220038..0x80224AC4) and the whole of
- * `Pl/fn_80224AC4` (0x80224AC4..0x80229ECC) are one TU of the candidate (one `.sdata2`/`.data` pool run).
- *
- * Name: GUESS, from the item/equipment page the first half draws; no `__FILE__` string covers the range.
- * Flags: `cflags_lobby` (Wii/1.3) as `lobby/fn_8021E1EC`; the `Pl/fn_80224AC4` half was `cflags_pl` (Wii/1.0, `-opt nopeephole`),
- * which the section below reproduces with `#pragma peephole off`.  Compiler version, measured: this object recompiled with the
- * Wii/1.0 compiler has a byte-identical `.text` (4160 B), `extab` and `extabindex`, and the 44 functions of the old
- * `Pl/fn_80224AC4` score the same before and after the fold (44 of 44), so the version change moves no code here.
- */
-
-/* ==== recut from lobby/fn_8021E1EC.cpp (0x80220038..0x80224AC4) ==== */
-/* lobby/fn_8021E1EC.cpp - a lobby screen layer (item/equipment page family).
- *
- * `.text` 0x8021E1EC..0x80224AC4 (108 functions, 26840 B), registered.
- *
- * Module `lobby`.  The range's callees are the lobby UI API - `LbStr__FUcUs` (13 call sites),
- * `draw_sprite_ary` (23), `draw_font_idx` (17), `get_lsp_data` (40), `ItemName`, `put_menu_cursor`,
- * `GetMenuFontColor` - and the `.bss` labels it reads inside this band (`lb_menu_scratch`, `lobby_w`,
- * `lb_npc`); both bracketing registered units in the address band are `lobby`
- * (`lobby/fn_80212810.cpp` below at 0x80212810, `lobby/fn_801E7530.cpp` and `lobby/lb_npc.cpp`
- * further below).  Language C++: every call out of the range is a mangled symbol
- * (`LbStr__FUcUs`, `draw_sprite_ary__FPCUsPC10_mh_ivec2_`, `setMatColor__6MHcharFUl12_GXChannelID8_GXColorb`).
- *
- * Seam.  `tools/splits/tudiscover.py at 0x8021E1EC` reports the left edge as a *strong* cut
- * (`.sdata2` pool run `lbl_80799C58 -> lbl_80799C60`) and the right edge only weakly (the closure edge
- * 0x8021E538, or the far jump 0x8021F3A8); the proposal's right edge 0x80224AC4 is the `--max-bytes`
- * cap, not a TU boundary.  The extab/extabindex runs agree with *both* edges exactly: this range owns
- * 77 consecutive extabindex records, the first of which is `fn_8021E1EC` (the record before it is
- * `fn_8021E1B4`, size 0x38, which ends exactly at 0x8021E1EC) and the last of which is `fn_80224A28`
- * (the record after it is `fn_80224AC4`).  Registered whole; the next proposal (0x80224AC4) continues
- * the same band.
- *
- * Name.  The map has only `fn_XXXXXXXX` for this range (`tools/symbols/dumpmap.py lookup` over the
- * whole inventory answers `zz_XXXXXXXX_` placeholders, and every name but the callees is a bare
- * `.text` entry in config/RMHE08/symbols.txt), so the file keeps the map's stem (brief section 2,
- * class 4).
- *
- * Types and globals.  This unit's `.bss` 0x806AA8C8..0x806AACC0 is claimed and defined at the foot of the file:
- * `lb_menu_scratch`, `lb_item_list_state`, two `.data`-referenced page records (GUESS names
- * `lb_page_state_0/1`), five fixed positions `fn_8021FF5C` sets (GUESS names `lb_menu_pos_*`) and `lobby_w`
- * (record `LbLobbyWork` in `lobby/lobby_work.h`, the merge of this unit's and the lobby band's views).  Its
- * two static constructors (`fn_8021EFBC`, `fn_8021FF5C`) are not reconstructed.  `lobby_world_block` is
- * read as the 4-byte pointer the map records, through this unit's own `LbMenuBigBlock` view.
- *
- * Flags.  `tools/flags/infer.py` reads the target object: `-func_align 4` (83 of 108 functions start off a
- * 16-byte boundary), no `lmw/stmw`, and "3 kept `clrlwi` before a narrowing store" - the peephole pass
- * was off.  The unit therefore carries `#pragma peephole off` (playbook 39), with the pass turned back on
- * for the two bodies whose retail form has no such `clrlwi` (`fn_8021E304`, `fn_802216B4`).  The pass-off
- * build took fn_8021E1EC 94.78 -> 97.10, fn_8021E484 95.33 -> 100.00, fn_80220B50 92.31 -> 100.00, and
- * cost fn_8021E304 100.00 -> 93.33 and fn_802216B4 100.00 -> 87.69 (hence the two `on` regions).  A
- * unit-level `-opt nopeephole` would express the same intent more honestly; it is in the outbox as a
- * `flag` request (the `lobby` lib's own `lobby_scene.c` is `Matching`, so the lib's cflags must not move
- * for a one-unit measurement).
- *
- * Residuals (recompile.py --measure, official report metric; the bar is 80 %).  25 of the 108 functions
- * are byte-identical and 35 clear the bar; the rest are not reconstructed yet.
- *  - the 73 unreconstructed functions, largest first: fn_8021E538 1720 B, fn_80220DFC 1456 B,
- *    fn_8021F7DC 1268 B, fn_80221E04 1076 B, fn_80223EF0 968 B, fn_8022015C 916 B, fn_80221890 812 B,
- *    fn_8021EC98 804 B, fn_802213AC 776 B, fn_80222908 700 B, fn_80224550 672 B, fn_80223318 652 B ...
- *  - fn_8021E1EC 97.10 % (276 B): the only row left is the allocator's tie-break - retail copies the 4th
- *    integer argument (`mr r30, r6`) *after* the float argument (`fmr f31, f1`), ours before.  Swapping
- *    the parameter declaration order, the local declaration order and the `~limit` spelling
- *    (`subfic r0,r30,-1`) all fixed everything else; the register/parameter order does not move.
- *  - fn_802235E0 85.00 % (28 B): hoisting `*base` before the `offset == 0` test fixed the load order;
- *    the remaining row is a scheduling/ordering delta in the same 10-instruction body.
- *  - fn_802216B4 80.00 % (52 B): retail zero-extends the `u16 id` parameter (`clrlwi r3,r3,16`) and
- *    reaches `lbl_80791F30` through `lbl_80791F30@sda21`; ours passes the parameter through and emits
- *    `lis`/`addi`.  Declaring the table with an explicit small-data size is the next probe.
- *  - fn_80220AF0 95.62 % (96 B): retail materialises the `extsh`-ed index before the `lbzx`; ours folds
- *    it.  Best-scoring variant kept.
- *  - syncItemListClock 78.89 % (188 B): below the bar.  Two rows: retail keeps no third callee-saved register
- *    (ours saves `r29` for the surviving argument) and it emits `frsp f1,f1` + `fcmpo`/`cror` for the
- *    `depth == lbl_80799C7C` test where ours emits `fcmpu`.  `count` is converted unsigned (no `xoris`),
- *    which is why the parameter is `u32`.
- *  - fn_80221BBC 41.48 % (108 B): reconstructed but the sprite-row argument ordering differs; kept as the
- *    best-scoring variant (the 0 % baseline is worse).
- *  - fn_80223A18/fn_80223A44 85.45 % (44 B each): the two table accessors - the row-stride `add` comes
- *    out right, the leading `clrlwi`/`slwi` pair is scheduled differently.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
- * lookup over the range's inventory: all 108 definitions are bare `.text` entries in
- * config/RMHE08/symbols.txt and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
+ * RANGE. .text 0x80220038-0x80229ECC (118 functions); .data 0x805BA750-0x805BDC48, .sdata 0x80791EF0-0x80792030,
+ *   .sdata2 0x80799CD8-0x80799E00, extab, extabindex.  Two halves of one TU (one `.sdata2`/`.data` pool run): the page
+ *   layer 0x80220038-0x80224AC4 and the rig update 0x80224AC4-0x80229ECC, whose actor parameters are all `_PLW*` (its
+ *   SE work is `_PLW.field_0xAF4`).  The extabindex run ends with `fn_80224A28` / begins the rig half with
+ *   `fn_80224AC4`.
+ * FLAGS. `cflags_lobby` and `#pragma peephole off` (retail keeps the narrowing `clrlwi`s), back on around
+ *   `fn_802216B4`; the rig half was `cflags_pl` (`Wii/1.0`, `-opt nopeephole`), which this reproduces byte for byte
+ *   (docs/lobby.md).
+ * NAMES. `lb_equip_page` is a GUESS from the item/equipment page the first half draws; the map and the dump give only
+ *   placeholders for the functions.
+ * RESIDUALS. 85 rows unwritten: 0x80220078-0x80220114, 0x8022015C-0x80220818, 0x8022081C-0x802208A8,
+ *   0x80220994-0x80220AF0, 0x80220B84-0x802216B4, 0x802216E8-0x80221864, 0x80221890-0x80221BBC, 0x80221C28-0x80222238,
+ *   0x802222C0-0x802227BC, 0x80222848-0x802230C8, 0x802230F8-0x802235A4, 0x802235FC-0x80223A18, 0x80223A70-0x80224AC4,
+ *   0x8022511C-0x80226A0C, 0x80226A4C-0x802292D0, 0x802294A4-0x80229868, 0x802298AC-0x80229BFC.  The rig family
+ *   0x80225734/0x80225B34/0x80225D54/0x80225F48/0x802260E4/0x8022632C/0x80226728 is one template (each opens
+ *   `lwz r5,316(r3); lfs f0,72(r5); fcmpo` against `lbl_80799CDC`, the body pitch test) and needs the `+0x48` float of
+ *   `_PLW.physics_0x13C` (`_PLW_PHYSICS`'s `MHchar` +0x44, still `pad_0x44` in `pl.h`).  `fn_80226A4C` (two
+ *   `fn_80045330` copies) is unwritten; the `mh3_pad.h`-beside-`pl.h` overload clash that kept it out no longer holds
+ *   (this file includes both).
+ *  - `fn_80220AF0`: retail materialises the `extsh`-ed index before the `lbzx`, ours folds it;
+ *  - `fn_802216B4`: retail zero-extends the `u16 id` (`clrlwi r3,r3,16`) and reaches `lbl_80791F30` through `@sda21`,
+ *    ours passes the parameter through and emits `lis`/`addi`;
+ *  - `fn_802235E0`: one scheduling delta left after `*base` is hoisted above the `offset == 0` test;
+ *  - `fn_80223A18`/`fn_80223A44`: the leading `clrlwi`/`slwi` pair is scheduled differently;
+ *  - `fn_80224AC4`: the allocator's colouring - retail keeps its loop bases in r23/r24 (`_savegpr_23`), ours saves
+ *    r25-r31, and the third loop's element pointer is addressed off `rig` (+284) where ours uses `rig+4` (+280);
+ *  - `fn_80220114`: retail forms `lobby_world_block + 0x465C` once and addresses +0x8/+0x10 off it, ours folds the
+ *    offset into each access and reloads the pointer; `fn_802208D4`: the same for +0x4654, and retail stores +0x46 with
+ *    `sth` where ours uses `stb` (a field width).
+ *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim.  The rig
+ *   half's `.data` holds two class tables, `lbl_805BAB58` and `lbl_805BAB74` (0x1C each), the source does not emit
+ *   (rule 10).
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -100,9 +48,7 @@ static inline LbMenuBigBlock* lb_menu_block(void)
     return (LbMenuBigBlock*)lobby_world_block;
 }
 
-/* The retail object keeps the narrowing `clrlwi` the peephole pass folds away (flags/infer.py: "3 kept
- * `clrlwi` before a narrowing store"), so the unit is built with the pass off.  Two functions keep the
- * pass on: their retail bodies have no `clrlwi` to keep, and the pass-off build re-narrows. */
+/* Retail keeps the narrowing `clrlwi` the peephole pass folds away; `fn_802216B4` keeps the pass on (measured). */
 #pragma peephole off
 namespace s_8021E1EC {
 
@@ -138,11 +84,6 @@ void* fn_802235E0(u32* base, s32 offset);
 
 extern "C" {
 
-/* The entry filter: the entry's kind byte must not be 0x49 on a busy actor, and its mode must not be
- * the "special" one.  (peephole on: this body has no narrowing store the pass could fold.) */
-#pragma peephole on
-
-#pragma peephole off
 
 /* The 8-byte row copy. */
 void fn_802208A8(LbMenuRow8* dst, LbMenuRow8* src)
@@ -197,7 +138,7 @@ void fn_80220818(void)
     fn_80217934();
 }
 
-/* One shared sprite row: the layout entry plus its row table.  (peephole on: see fn_8021E304.) */
+/* One shared sprite row: the layout entry plus its row table. */
 #pragma peephole on
 void fn_802216B4(u16 id)
 {
@@ -360,77 +301,15 @@ s16 fn_80220AF0(u8* state, u16* id)
 void fn_802235A4(u32* base)
 {
     fn_802235E0(base, fn_80064080()->field_0x08);
-}             /* +0x806AAB44 */
+}
 
 }  /* extern "C" */
 
 } /* namespace s_8021E1EC */
 #pragma peephole reset
 
-/* ==== absorbed from Pl/fn_80224AC4.cpp (0x80224AC4..0x80229EA8) ==== */
+/* The player actor's per-model SE/motion rig update (0x80224AC4-0x80229ECC). */
 #pragma peephole off
-/*
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/symbols/dumpmap.py - `zz_0224ac4_` at 0x80224AC4 - and config/RMHE08/symbols.txt, where every
- * name between 0x80224AC4 and 0x80229ECC is a bare `fn_` or `dtor_` placeholder with no signature)
- *
- * Pl/fn_80224AC4.cpp - the player actor's per-model SE/motion rig update.
- *
- * `.text` 0x80224AC4-0x80229ECC (0x8408 B, 44 functions), extab 0x80011B34-0x80011C7C and extabindex
- * 0x8002E7B8-0x8002E9A4 (41 records) - all three ranges are registered in splits.txt, and both
- * exception runs agree with the unit's edges exactly.  The `.data` run the range references (the
- * motion jump tables at 0x805BAB20 and the two vtables at 0x805BAB58/0x805BAB74) is *not* claimed:
- * `Pl/fn_8021E1EC.cpp`, the unit on the other side of the same seam, left its own run unclaimed for
- * the same reason (the run leaks into neighbouring units, and defining the symbols costs the target's
- * pool relocations - playbook 23).
- *
- * Module (brief section 2 evidence order):
- *   1. no `__FILE__` string - every `.c`/`.cpp` string in the DOL was extracted with its address and
- *      none falls inside the range's data (the nearest are 0x805A1BB8 `enemy_control.cpp` and
- *      0x805CDFC8 `menu_item.cpp`, i.e. the whole 0x805B... band carries none);
- *   2. no runtime-dump name - `dumpmap.py lookup 0x80224AC4` answers `zz_0224ac4_`;
- *   3. the code is `Pl`: every actor parameter is a `_PLW*` (`Get_motion_no__FP4_PLW`,
- *      `Pl_master_ck__FP4_PLW`, `Pl_act_ck__FP4_PLWUcUs`), the SE work is `_PLW.field_0xAF4`, and
- *      `unsplit/Pl.h` already homes this range's tail (`fn_80229CB4`/`fn_80229E10`/
- *      `fn_80229EA8`) in the `Pl` band.  The `lobby` lib next door cannot host it: the target object
- *      carries extab/extabindex while `cflags_lobby` is `-Cpp_exceptions off`, and the range contains
- *      zero record-form instructions - the `-opt nopeephole` fingerprint of `cflags_pl`.
- *   Class 4 for the file name: nothing names it, so it keeps the map's `fn_80224AC4` stem.
- *
- * Language: C++ (high).  `move__6MHcharFUs` (called as a member through `MHchar`), `PlayMode_ck__Fv`
- * and `se_req_frame_set__FP5_se_wllll` are manglings.  The unit's own functions are `extern "C"`
- * because the map spells them unmangled (playbook 42).
- *
- * Flags: exactly `cflags_pl` (`Wii/1.0`, `-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`) - no
- * per-unit deviation, no pragma.
- *
- * Residuals (measured one row at a time with `recompile.py <unit> --measure <symbol>`; the official
- * per-symbol report metric).  14 of the 15 reconstructed functions are byte-identical (100.00 %);
- * 2944 of the range's 21512 `.text` bytes are reconstructed.
- *  - fn_80224AC4 93.72811 % (868 B target, 860 B ours): every instruction is the right one in the right
- *    order and only the allocator's colouring is left - the target keeps its loop bases at `r23`/`r24`
- *    and so saves `r23`-`r31` (`_savegpr_23`), ours saves `r25`-`r31`, and the third loop's element
- *    pointer is folded from `rig` (target: `lwz r4,284(r28)` off `rig`, ours: `lwz r4,280(r28)` off
- *    `rig+4`).  Both are encodings of the same address, so no source shape reaches them from here.
- *  - fn_80226A4C 0x80226A4C (148 B) is written but **not landed**: its whole body is two
- *    `fn_80045330` copies, and that symbol is owned by `src/mh3_pad.cpp`, whose header re-declares
- *    `VEC3_ctor`/`setVec3` with different parameter types than `ef.h` - so including
- *    `mh3_pad.h` from a unit that also includes `pl.h` (which pulls `ef.h`) is an illegal
- *    overload.  The fix is a rule-2/rule-1 pass over `mh3_pad.h` (one declaration per symbol,
- *    in the owner's header); until then the function is left out rather than declared locally.
- *  - the remaining 28 functions are not reconstructed yet, largest first: fn_802283C8 1584 B,
- *    fn_80227354 1452 B, fn_80226EC4 1168 B, fn_80226728 740 B, fn_8022632C 1020 B, fn_80225734
- *    1024 B, fn_80227D8C 1028 B, fn_80228ED4 1020 B, fn_802289F8 912 B, fn_80225434 768 B,
- *    fn_80225B34 544 B, fn_80227AF0 668 B, fn_80225D54 500 B, fn_802260E4 584 B, fn_80226AE0 400 B,
- *    fn_80227900 496 B, fn_80229698 464 B, fn_802294A4 500 B, fn_80225280 436 B, fn_80229A20 476 B,
- *    fn_80225F48 412 B, fn_8022511C 356 B, fn_802298AC 372 B, fn_80228190 304 B, fn_80228D88 332 B,
- *    fn_802282C0 264 B, fn_80226D90 308 B, fn_80226C70 288 B.  The 0x80225734/0x80225B34/0x80225D54/
- *    0x80225F48/0x802260E4/0x8022632C/0x80226728 family is a template (all seven start with
- *    `lwz r5,316(r3); lfs f0,72(r5); fcmpo` against `lbl_80799CDC` - the `_PLW.physics_0x13C` body
- *    pitch test) and is the cheapest block left; it needs `_PLW_PHYSICS`'s `+0x48` float, which is
- *    `MHchar +0x44` in today's `pl.h` (still a `pad_0x44` there) and would have to move out of
- *    `src/ef/fn_80114E34.cpp` first.
- */
 
 #define MHTRI_FN_800E3B3C_TAKES_ACTOR 1
 

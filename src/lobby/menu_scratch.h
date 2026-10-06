@@ -1,9 +1,5 @@
-/*
- * `lb_menu_scratch` records: the screen work block `lb_menu_scratch` (.bss 0x806AA8C8, 0x1C0 B) is defined by
- * `src/lobby/fn_8021E1EC.cpp` (its static constructor `fn_8021EFBC`); the object is declared in
- * `lb_menu_scratch.h`.  The one home of the record types (rule 1): it merges `fn_8021E1EC.cpp`'s view with the
- * selection-flag bytes `lobby/fn_80219260.cpp` writes at +0x156.
- */
+/* The record types of `lb_menu_scratch` (.bss 0x806AA8C8, 0x1C0 B; `lobby/lb_menu_scratch.cpp`, declared in
+ * `lobby/lb_menu_scratch.h`), with the selection-flag bytes `lobby/fn_80219260.cpp` writes at +0x156. */
 #ifndef MHTRI_LOBBY_MENU_SCRATCH_H
 #define MHTRI_LOBBY_MENU_SCRATCH_H
 

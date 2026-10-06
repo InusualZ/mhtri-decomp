@@ -1,8 +1,6 @@
-/* The command-mask accessors of `lobby/lb_npc.cpp` (0x8021213C/0x802121F4/0x802122AC) in the view the lobby page units
- * (`lobby/lb_pane_ui.cpp`, `lobby/lb_menu_page.cpp`) call them with: constant mask arguments, and the `u32`/`s32`
- * returns their compares were written against.  The owner's own view is `lobby/fn_8021213C.h`; the two cannot
- * be visible in one TU (illegal overloading).
- */
+/* `lobby/lb_npc.cpp`'s command-mask accessors in the view the page units (`lobby/lb_pane_ui.cpp`,
+ * `lobby/lb_menu_page.cpp`) call them with; the owner's view is `lobby/fn_8021213C.h`, and the two cannot meet in one
+ * TU (illegal overloading). */
 #ifndef MHTRI_LOBBY_FN_802121F4_H
 #define MHTRI_LOBBY_FN_802121F4_H
 

@@ -1,14 +1,6 @@
-/*
- * This unit's own views of the lobby records `src/lobby/lb_quest_board.cpp` reads, plus the
- * declarations of the symbols of OTHER units it calls (docs/plan.md 6.5, rules 1/2/9).
- *
- * `lobby_w` (`LbQuestBoardLobby`): the `.bss` lobby work block is 0x17C bytes at 0x806AAB44 and
- * every lobby unit needs a different set of its bytes.  The band's own convention, already carried
- * by `lobby/lb_npc.h`, `include/lobby/fn_8020C588.h`, `lobby/fn_8021E1EC.h`,
- * `lobby/fn_802FA9A0.h` and `unsplit/lobby.h`, is one view per unit - the views
- * genuinely disagree (different byte is the "state" to each), so no single header can hold them and
- * this one keeps only the offsets the quest-board screen reads.
- */
+/* `lobby/lb_quest_board.cpp`'s views of the lobby records it reads and the other units' callees it needs; `lobby_w` is
+ * viewed as `LbQuestBoardLobby`, one view per unit like `lobby/fn_8021E1EC.h` and `lobby/fn_802FA9A0.h` (the views
+ * disagree on which byte is the "state"). */
 #ifndef MHTRI_LOBBY_LB_QUEST_BOARD_H
 #define MHTRI_LOBBY_LB_QUEST_BOARD_H
 
@@ -81,10 +73,7 @@ typedef struct LbQuestBoardLobby {
 extern "C" {
 extern LbQuestBoardLobby lobby_w;   /* .bss 0x806AAB44 */
 
-/* Other units' still-unrenamed `fn_XXXXXXXX` symbols.  rule 7 deferred: these are references to
- * OTHER units' unrenamed symbols only (checked with `symedit.py range` over the two bands that
- * bracket this one, 0x8038E8E8 and 0x803D3CE8, both registered as `enemy`/`Network` placeholders
- * whose `fn_` names the map still carries). */
+/* Other units' callees. */
 void fn_8004DF10(void* work, u32* out_a, u32* out_b);
 void sysSE_stop(u32 id);
 void eft_res_slot_release(void* work);

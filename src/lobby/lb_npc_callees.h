@@ -1,9 +1,5 @@
-/* The callees `lobby/lb_npc.cpp`'s lobby control band (0x8020C588..0x80212760) takes from other units.
- *
- * Declared here (not in their owners' headers) because no header of theirs does it yet - `fn_803768F8` is
- * `enemy/em020_ai.cpp`'s, `fn_801E9888`/`fn_801E9C58` are `lobby/fn_801E7530.cpp`'s and have no header, and
- * `fn_802FF2C0` is `lobby/fn_802FA9A0.cpp`'s; the argument types are the ones the callees' own bodies show.
- */
+/* The callees `lobby/lb_npc.cpp`'s control band takes from other units (`enemy/em020_prog.cpp`,
+ * `lobby/fn_801E7530.cpp`, `lobby/fn_802FA9A0.cpp`), typed as the callees' own bodies show. */
 #ifndef MHTRI_LOBBY_LB_NPC_CALLEES_H
 #define MHTRI_LOBBY_LB_NPC_CALLEES_H
 

@@ -1,88 +1,22 @@
-/*
- * lobby/lb_menu_scratch.cpp - the lobby menu scratch block and its item-list page head.
- *
- * `.text` 0x8021E1EC..0x8021F020 (14 functions), `.bss` 0x806AA8C8..0x806AAA88 (`lb_menu_scratch`, 0x1C0 B), `.data` 0x480 B,
- * `.sdata` 0x10 B, `.sdata2` 0x18 B, `.ctors` 4 B, extab 0x30 B and extabindex 0x48 B.  Phase 4 recut of
- * `lobby/fn_8021E1EC`: the registered range 0x8021E1EC..0x80224AC4 is three TUs of the candidate -
- * this one, `lobby/lb_menu_pos_tbl` and `lobby/lb_equip_page`; each part keeps the former source's text for its own
- * functions, the shared declarations and its own `.bss` definitions.
- *
- * Name: the candidate's (`lb_menu_scratch` is the `.bss` block the unit constructs, `fn_8021EFC8`).
- * Flags: `cflags_lobby` as the former unit, with its file-scope `#pragma peephole off`.
- */
-
-/* ==== recut from lobby/fn_8021E1EC.cpp (0x8021E1EC..0x8021F020) ==== */
-/* lobby/fn_8021E1EC.cpp - a lobby screen layer (item/equipment page family).
- *
- * `.text` 0x8021E1EC..0x80224AC4 (108 functions, 26840 B), registered.
- *
- * Module `lobby`.  The range's callees are the lobby UI API - `LbStr__FUcUs` (13 call sites),
- * `draw_sprite_ary` (23), `draw_font_idx` (17), `get_lsp_data` (40), `ItemName`, `put_menu_cursor`,
- * `GetMenuFontColor` - and the `.bss` labels it reads inside this band (`lb_menu_scratch`, `lobby_w`,
- * `lb_npc`); both bracketing registered units in the address band are `lobby`
- * (`lobby/fn_80212810.cpp` below at 0x80212810, `lobby/fn_801E7530.cpp` and `lobby/lb_npc.cpp`
- * further below).  Language C++: every call out of the range is a mangled symbol
- * (`LbStr__FUcUs`, `draw_sprite_ary__FPCUsPC10_mh_ivec2_`, `setMatColor__6MHcharFUl12_GXChannelID8_GXColorb`).
- *
- * Seam.  `tools/splits/tudiscover.py at 0x8021E1EC` reports the left edge as a *strong* cut
- * (`.sdata2` pool run `lbl_80799C58 -> lbl_80799C60`) and the right edge only weakly (the closure edge
- * 0x8021E538, or the far jump 0x8021F3A8); the proposal's right edge 0x80224AC4 is the `--max-bytes`
- * cap, not a TU boundary.  The extab/extabindex runs agree with *both* edges exactly: this range owns
- * 77 consecutive extabindex records, the first of which is `fn_8021E1EC` (the record before it is
- * `fn_8021E1B4`, size 0x38, which ends exactly at 0x8021E1EC) and the last of which is `fn_80224A28`
- * (the record after it is `fn_80224AC4`).  Registered whole; the next proposal (0x80224AC4) continues
- * the same band.
- *
- * Name.  The map has only `fn_XXXXXXXX` for this range (`tools/symbols/dumpmap.py lookup` over the
- * whole inventory answers `zz_XXXXXXXX_` placeholders, and every name but the callees is a bare
- * `.text` entry in config/RMHE08/symbols.txt), so the file keeps the map's stem (brief section 2,
- * class 4).
- *
- * Types and globals.  This unit's `.bss` 0x806AA8C8..0x806AACC0 is claimed and defined at the foot of the file:
- * `lb_menu_scratch`, `lb_item_list_state`, two `.data`-referenced page records (GUESS names
- * `lb_page_state_0/1`), five fixed positions `fn_8021FF5C` sets (GUESS names `lb_menu_pos_*`) and `lobby_w`
- * (record `LbLobbyWork` in `lobby/lobby_work.h`, the merge of this unit's and the lobby band's views).  Its
- * two static constructors (`fn_8021EFBC`, `fn_8021FF5C`) are not reconstructed.  `lobby_world_block` is
- * read as the 4-byte pointer the map records, through this unit's own `LbMenuBigBlock` view.
- *
- * Flags.  `tools/flags/infer.py` reads the target object: `-func_align 4` (83 of 108 functions start off a
- * 16-byte boundary), no `lmw/stmw`, and "3 kept `clrlwi` before a narrowing store" - the peephole pass
- * was off.  The unit therefore carries `#pragma peephole off` (playbook 39), with the pass turned back on
- * for the two bodies whose retail form has no such `clrlwi` (`fn_8021E304`, `fn_802216B4`).  The pass-off
- * build took fn_8021E1EC 94.78 -> 97.10, fn_8021E484 95.33 -> 100.00, fn_80220B50 92.31 -> 100.00, and
- * cost fn_8021E304 100.00 -> 93.33 and fn_802216B4 100.00 -> 87.69 (hence the two `on` regions).  A
- * unit-level `-opt nopeephole` would express the same intent more honestly; it is in the outbox as a
- * `flag` request (the `lobby` lib's own `lobby_scene.c` is `Matching`, so the lib's cflags must not move
- * for a one-unit measurement).
- *
- * Residuals (recompile.py --measure, official report metric; the bar is 80 %).  25 of the 108 functions
- * are byte-identical and 35 clear the bar; the rest are not reconstructed yet.
- *  - the 73 unreconstructed functions, largest first: fn_8021E538 1720 B, fn_80220DFC 1456 B,
- *    fn_8021F7DC 1268 B, fn_80221E04 1076 B, fn_80223EF0 968 B, fn_8022015C 916 B, fn_80221890 812 B,
- *    fn_8021EC98 804 B, fn_802213AC 776 B, fn_80222908 700 B, fn_80224550 672 B, fn_80223318 652 B ...
- *  - fn_8021E1EC 97.10 % (276 B): the only row left is the allocator's tie-break - retail copies the 4th
- *    integer argument (`mr r30, r6`) *after* the float argument (`fmr f31, f1`), ours before.  Swapping
- *    the parameter declaration order, the local declaration order and the `~limit` spelling
- *    (`subfic r0,r30,-1`) all fixed everything else; the register/parameter order does not move.
- *  - fn_802235E0 85.00 % (28 B): hoisting `*base` before the `offset == 0` test fixed the load order;
- *    the remaining row is a scheduling/ordering delta in the same 10-instruction body.
- *  - fn_802216B4 80.00 % (52 B): retail zero-extends the `u16 id` parameter (`clrlwi r3,r3,16`) and
- *    reaches `lbl_80791F30` through `lbl_80791F30@sda21`; ours passes the parameter through and emits
- *    `lis`/`addi`.  Declaring the table with an explicit small-data size is the next probe.
- *  - fn_80220AF0 95.62 % (96 B): retail materialises the `extsh`-ed index before the `lbzx`; ours folds
- *    it.  Best-scoring variant kept.
- *  - syncItemListClock 78.89 % (188 B): below the bar.  Two rows: retail keeps no third callee-saved register
- *    (ours saves `r29` for the surviving argument) and it emits `frsp f1,f1` + `fcmpo`/`cror` for the
- *    `depth == lbl_80799C7C` test where ours emits `fcmpu`.  `count` is converted unsigned (no `xoris`),
- *    which is why the parameter is `u32`.
- *  - fn_80221BBC 41.48 % (108 B): reconstructed but the sprite-row argument ordering differs; kept as the
- *    best-scoring variant (the 0 % baseline is worse).
- *  - fn_80223A18/fn_80223A44 85.45 % (44 B each): the two table accessors - the row-stride `add` comes
- *    out right, the leading `clrlwi`/`slwi` pair is scheduled differently.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
- * lookup over the range's inventory: all 108 definitions are bare `.text` entries in
- * config/RMHE08/symbols.txt and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
+/* lobby/lb_menu_scratch.cpp - the lobby menu scratch block and its item-list page head: the candidate recorder, the
+ *   entry filter and the scratch block's constructor.
+ * RANGE. .text 0x8021E1EC-0x8021F020 (14 functions); .ctors 0x8056F360-0x8056F364, .data 0x805BA0C0-0x805BA540, .bss
+ *   0x806AA8C8-0x806AAA88 (`lb_menu_scratch`), .sdata 0x80791EE0-0x80791EF0, .sdata2 0x80799C60-0x80799C78, extab,
+ *   extabindex.  `tudiscover` reports the left edge as a strong cut (the `.sdata2` run `lbl_80799C58` ->
+ *   `lbl_80799C60`), and the extabindex run starts with `fn_8021E1EC` (`fn_8021E1B4`'s record ends there).
+ *   `lobby/lb_menu_pos_tbl.cpp` and `lobby/lb_equip_page.cpp` follow; the three share `lobby/fn_8021E1EC.h`.
+ * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off` (retail keeps the narrowing `clrlwi`s), back on around
+ *   `fn_8021E304`, whose retail body has none to keep (docs/lobby.md).
+ * NAMES. `lb_menu_scratch` is the `.bss` block the unit constructs (`fn_8021EFC8`); the map and the dump give only
+ *   placeholders for the functions.
+ * RESIDUALS. Unwritten: `fn_8021E538` (0x8021E538-0x8021EBF0), `fn_8021EC98` (0x8021EC98-0x8021EFBC).  `fn_8021EFBC`,
+ *   which the `.ctors` word points at, is written as a plain function, so the object emits no `.ctors`.
+ *  - `fn_8021E1EC`: retail copies the fourth integer argument (`mr r30,r6`) after the float one (`fmr f31,f1`), ours
+ *    before; the parameter order, local order and `~limit` spellings do not move it;
+ *  - `fn_8021EFC8`: the loop cursor and end pointer sit in r31/r30 where retail uses r30/r31.
+ *   flipcheck: `.ctors`/`.sdata`/`.sdata2` claimed, not emitted; `.data` 0x40 against 0x480; `.text`/extab/extabindex
+ *   short of the claim.
+ * SHAPES. The `.bss` objects are defined at the foot of the file, after every use, so each keeps its own `lis`/`addi`.
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -100,9 +34,7 @@ static inline LbMenuBigBlock* lb_menu_block(void)
     return (LbMenuBigBlock*)lobby_world_block;
 }
 
-/* The retail object keeps the narrowing `clrlwi` the peephole pass folds away (flags/infer.py: "3 kept
- * `clrlwi` before a narrowing store"), so the unit is built with the pass off.  Two functions keep the
- * pass on: their retail bodies have no `clrlwi` to keep, and the pass-off build re-narrows. */
+/* Retail keeps the narrowing `clrlwi` the peephole pass folds away; `fn_8021E304` (none to keep) keeps the pass on. */
 #pragma peephole off
 
 /* ---------------------------------------------------------------------------------------------------
@@ -331,16 +263,8 @@ void* fn_8021EFC8(LbMenuScratch* work)
     return work;
 }
 
-/* One shared sprite row: the layout entry plus its row table.  (peephole on: see fn_8021E304.) */
-#pragma peephole on
 
-#pragma peephole off
-
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806AA8C8..0x806AACC0`), in address order.  Defined at the foot
- * of the file, after every use, so MWCC keeps one `lis`/`addi` pair per symbol like the target.  The two static
- * constructors the `.ctors` claim carries build `lb_menu_scratch` (`fn_8021EFBC`) and the position tables plus
- * `lobby_w` (`fn_8021FF5C`, which `setVec3`s the five vectors and calls `fn_8021FFFC(&lobby_w)`); the
- * constructors are not reconstructed, so the objects are plain storage here. */
-LbMenuScratch lb_menu_scratch;             /* +0x806AAB44 */
+/* This unit's `.bss`, defined after every use so each access keeps its own `lis`/`addi` like the target. */
+LbMenuScratch lb_menu_scratch;             /* .bss 0x806AA8C8 */
 
 }  /* extern "C" */

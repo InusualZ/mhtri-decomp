@@ -1,25 +1,21 @@
-/* The lobby UI band, `.text` 0x8030121C..0x803066F0 (21 716 B, 52 map symbols).
- *
- * Registered once, at its final home (docs/plan.md 12) from proposal `8030121C_fn_8030121C.cpp`.
- * Module `lobby` (class 3): the range's own predicates read the lobby pointer block `lobby_world_block`
- * (`.sbss`), and its callees are the lobby/menu UI API - `LbStr__FUcUs` (18 call sites),
- * `get_lsp_data__FUsP10_mh_ivec2_` (58), `draw_sprite_ary__FPCUsPC10_mh_ivec2_` (16),
- * `draw_font_idx__FUsPScUlPC10_mh_ivec2_` (14), `put_menu_cursor__FPUsUsPC10_mh_ivec2_` (5),
- * `GetMenuFontColor__Fbbbb` (4), `ItemName__FUs`.  No `__FILE__` string covers the range and the
- * runtime dump answers `zz_` for every in-range address, so the file keeps the map's stem - brief
- * section 2, class 4.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `python
- * tools/symbols/symedit.py range 0x8030121C 0x803066F0`), so every definition below keeps the map's
- * own name.
- *
- * Seam: the proposal's edges are the discovery `--max-bytes` cap, not a proven TU boundary; the
- * supports are the `.sdata2` pool-run boundary at 0x8079AD98..0x8079ADC8 (a run no other unit
- * references) and the extab/extabindex runs, which are exactly the gaps between the bracketing
- * registered units (extab 0x80015964..0x80015AAC, extabindex 0x8003447C..0x80034668).
- *
- * Flags: the `lobby` lib's `cflags_lobby` (`-O3`, `-inline noauto`), whose `-Cpp_exceptions on`
- * (flags-audit 2026-09-28) emits the unwind records the lobby target objects carry.
+/* lobby/fn_8030121C.cpp - the lobby UI band.
+ * RANGE. .text 0x8030121C-0x803066F0 (52 functions); .data 0x805DAFE8-0x805DBFB8, .sdata 0x80792A58-0x80792B70, .sdata2
+ *   0x8079AD98-0x8079ADE0 (its head 0x8079AD98-0x8079ADC8 a pool run no other unit references), extab, extabindex.
+ * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off` (its evidence is not recorded).
+ * NAMES. The map and the dump give only placeholders, so the file keeps the map's stem.  Module `lobby`: the predicates
+ *   read `lobby_world_block`, and the callees are the lobby/menu UI API (`LbStr__FUcUs` 18 sites,
+ *   `get_lsp_data__FUsP10_mh_ivec2_` 58, `draw_sprite_ary__FPCUsPC10_mh_ivec2_` 16,
+ *   `draw_font_idx__FUsPScUlPC10_mh_ivec2_` 14, `put_menu_cursor__FPUsUsPC10_mh_ivec2_` 5, `GetMenuFontColor__Fbbbb` 4,
+ *   `ItemName__FUs`).
+ * RESIDUALS. 32 rows unwritten: 0x8030121C-0x8030170C, 0x8030174C-0x80301A20, 0x80301AB8-0x80302228,
+ *   0x8030230C-0x80302754, 0x80302790-0x80302844, 0x80302880-0x8030326C, 0x803032EC-0x80303580, 0x80303630-0x80304088,
+ *   0x80304194-0x80304508, 0x80304550-0x80304804, 0x8030487C-0x80305910, 0x80305924-0x80306510, 0x803066B4-0x803066F0.
+ *  - `fn_80302274`: retail compares with `cmpwi` against 3 and 5, ours `cmplwi` (a signedness difference);
+ *  - `fn_803035F8`: register allocation only (the table pointer in r4/r5 against ours r0/r4);
+ *  - `fn_80306524`: retail copies the argument to r30 before narrowing, ours narrows into r30 and copies back;
+ *  - `fn_80306614`: retail's frame is 0x30 saving from r25, ours 0x20 from r26.
+ *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim; `sprintf`
+ *   is declared with C++ linkage, so the object references `sprintf__FPcPCce`, which nothing defines.
  */
 #include "types.h"
 #include "ef.h"
@@ -47,8 +43,8 @@ int ck_WideMode(void);
  * are unclaimed band addresses - rule 2's named unsplit gap - so they are declared here. */
 int sprintf(char* dst, const char* fmt, ...);
 void draw_font_idx(u16, s8*, u32, const _mh_ivec2_*);
-/* `LbStr__FUcUs` - owned by `src/lobby/fn_8020C588.cpp`, whose header cannot be included here (it
- * declares `game_ready_ck` as `s32`, which clashes with `ef/fn_800CDB2C.h`'s `u32`). */
+/* `LbStr__FUcUs`, owned by `lobby/lb_npc.cpp`, whose callee header declares `game_ready_ck` as `s32` against
+ * `ef/fn_800CDB2C.h`'s `u32`, so it is declared here. */
 void* LbStr(u8 kind, u16 idx);
 
 /* The effect-41/42 spawners' pooled work block (`_EFT::work_0x38`) as this band views it.  The count

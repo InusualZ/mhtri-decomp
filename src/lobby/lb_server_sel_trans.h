@@ -1,10 +1,6 @@
 /*
- * Declarations of `src/lobby/lb_server_sel_trans.cpp` (`.text` 0x803C3A5C..0x803CCDF8): the demo/event work accessors and the
- * server-selection transition band.  Moved here from `menu/get_pop_dat_ptr.h` (`event_demo_ck`) and from the units that
- * declared them locally when the phase 4 recut moved the addresses out of `menu/get_pop_dat_ptr`.
- *
- * Linkage follows the map name: `event_demo_ck__Fv` is a C++ free function (declared at C++ scope, rule 9); the
- * plain-named symbols are `extern "C"`.
+ * Declarations of `lobby/lb_server_sel_trans.cpp`: the demo/event work accessors and the server-selection transition
+ * band.  Linkage follows the map: `event_demo_ck__Fv` is C++ (rule 9), the plain-named symbols are `extern "C"`.
  */
 #ifndef MHTRI_LOBBY_LB_SERVER_SEL_TRANS_H
 #define MHTRI_LOBBY_LB_SERVER_SEL_TRANS_H

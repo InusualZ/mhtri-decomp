@@ -1,23 +1,11 @@
-/* This unit's own types and declarations (`src/lobby/fn_801F3294.cpp`).
- *
- * A header rather than the unit's own source because the lobby C++ ABI it declares is spelled with the
- * map's own type names - `_mh_ivec2_` must be a type with exactly that name for MWCC to re-emit
- * `get_lsp_data__FUsP10_mh_ivec2_` - and a name that more than one file needs belongs in one header
- * (docs/plan.md 6.5 rule 1).  `_mh_ivec2_` is also defined by `unsplit/lobby.h` and by
- * `src/hud/fn_80324F7C.c` (that file's own rule-1 backlog); the copies are identical (`s16 x; s16 y;`)
- * and this unit's one is here because it cannot include the unsplit header - that header spells
- * `lobby_world_block` as a byte array where this range loads the 4-byte pointer the map records, and it
- * declares `fn_8021213C` with two parameters where this range calls it with one.  Recorded as a
- * config_request.
- *
- * docs/plan.md 6.5 rules 3/4/5: every type states its size, every field its offset and a name.
- */
+/* The types and declarations of `lobby/lb_pane_ui.cpp`'s page/panel band, with the map's own type names its manglings
+ * need (`_mh_ivec2_`); `unsplit/lobby.h` cannot be included beside it (a byte-array `lobby_world_block`, a two-argument
+ * `fn_8021213C`). */
 #ifndef MHTRI_LOBBY_LB_PANE_UI_H
 #define MHTRI_LOBBY_LB_PANE_UI_H
 
 #include "types.h"
-/* The owner's header for `menu_cursor_step` (0x802A8EFC, the menu range `menu/menu_message.cpp` owns): the
- * declaration lives there now and this header re-exports it (docs/plan.md 6.5 rule 2). */
+/* `menu_cursor_step`'s owner header (`menu/menu_message.cpp`), re-exported. */
 #include "menu/menu_message.h"
 #include "fn_80047398/userdata_gunner_ck.h"   /* userdata_gunner_ck (rule 2) */
 
@@ -164,11 +152,6 @@ void fn_8004D0D8(LbWorldBlock* world, u8 id);
 void fn_8004D0E0(LbWorldBlock* world, u8 id);
 void fn_8004C038(LbPage* page, LbWorldBlock* world);
 void fn_802DF7CC(s32 kind, const _mh_ivec2_* pos);
-/* `menu_cursor_step` (0x802A8EFC) stood here as `s32 (s16, s16, u16, s32, s32)` - the call site's narrow
- * view - while its band had no registered unit, and the two spellings could not both be visible
- * ((10505) illegal overloading).  `menu/menu_message.cpp` owns the address and its header
- * `menu/menu_message.h` (included below) declares the definition's `s32`/`u16` spelling
- * (docs/plan.md 6.5 rule 2). */
 
 #ifdef __cplusplus
 }

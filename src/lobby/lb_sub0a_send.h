@@ -1,8 +1,6 @@
-/* Leaf header for the lobby link senders and entry checks `lobby/lb_companion_ui.cpp` owns (0x80338AD4,
- * 0x80338B4C, 0x80338C48, 0x80338CE4, 0x80339EA8) - the owner's full header carries the lobby's own record
- * views, so the arena task includes this one (rule 2).  The two `lb_sub0*_send` names are GUESSES named
- * after the protocol sub-command their bodies build (owner's note: the protocol slot is the evidence).
- */
+/* Leaf header for the link senders and entry checks of `lobby/lb_companion_ui.cpp` (0x80338AD4, 0x80338B4C, 0x80338C48,
+ * 0x80338CE4, 0x80339EA8) the arena task includes; the `lb_sub0*_send` names are GUESSes after the protocol
+ * sub-command their bodies build. */
 #ifndef MHTRI_LOBBY_LB_SUB0A_SEND_H
 #define MHTRI_LOBBY_LB_SUB0A_SEND_H
 
@@ -21,7 +19,8 @@ void lb_sub0b_send(u8 index, u8 value);
 s32 lb_seen_pad_ck(u8 index);
 s32 lb_handled_ck(u8 index);
 
-/* Sends the sub-0x1D command with two bytes (retail passes the flag byte without an `extsb`; the owner's `s8` spelling keeps `lb_sub1d_send` at 100 %, `u8` there drops it to 95.4 %, so the two prototypes differ and no TU may include both). */
+/* Sends the sub-0x1D command with two bytes.  Retail passes the flag without an `extsb`: the owner's `s8` spelling
+ * matches and a `u8` one does not, so the two prototypes differ and no TU may include both. */
 void lb_sub1d_send(u8 value, u8 flag);
 
 #ifdef __cplusplus

@@ -1,153 +1,57 @@
 /*
- * lobby/lb_companion_ui.cpp - unit, `.text` 0x80338808..0x8033F270 (133 functions, 27240 bytes).
- *
- * Fold of 2 registered units: lb_companion_ui.cpp, cockpit_icon_data.cpp.
- * The functions below are the ones those sources define, in address order; every other function of the range keeps its
- * original bytes.  79 of 133 functions have a body here.
- *
- * FLAGS.  `cflags_lobby`.  The tables of the data-only unit hud/cockpit_icon_data.cpp (cflags_hud, no code) are
- * defined here, ahead of the code.
- *
- * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .data, .sbss, .sdata, .sdata2, .text, extab,
- * extabindex).
- */
-/* ---- header inherited from src/lobby/lb_companion_ui.cpp (written against its pre-phase-4 range) ---- */
-/* lobby/lb_companion_ui.cpp - the lobby companion/status UI band, `.text` 0x80338808..0x8033F270
- *
- * NAMES.  The 79 functions this file defines are named from their own bodies (each declaration
- * carries its `Name:` evidence; the table is in `.pi/notes/80338808-named.md`).  Two classes were
- * not derivable and are marked as guesses where they stand: the link-gated senders whose caller is
- * unwritten are named after the protocol sub-command their body builds (`lb_sub0a_send`, ...), and
- * 0x8033A0BC follows the map row main's `hud/move_work_update` landing renamed (`hud_key_lookup`),
- * which is also what restored that row's pairing after the merge.  The runtime dump's own answer
- * for 0x8033C4D8/0x8033C570 (`homebutton::MotorCallback(OSAlarm...)`) is NOT adopted: their bodies
- * are two 0x24-byte refresh wrappers with no argument, so the dump's answer contradicts them and is
- * recorded for a later pass with the caller graph.
- *
- * Naming note: the file's own 79 symbols are named above.  What the escape still covers is
- * precisely the names this file *references* in other units - the 40-odd unsplit lobby/runtime
- * callees (`fn_80334A34`, `broadcastSessionCommand`, `fn_800CF384`, ...) and the two neighbouring handlers
- * `eft_net_recv_state`..`eft_net_recv_release` - which are not this lane's to rename; the dump answers `zz_` for
- * them too and no `__FILE__` string covers the region.  Removing the escape would put every one of
- * those occurrences into rule 7's `fn_` half, and this file is new to `main`, so every finding would
- * be an addition the gate's style-lint row refuses.
- *
- * WHAT IT IS.  UI band: 133 functions / 27240 B that draw and maintain a lobby screen through the
- * 2D library - `get_lsp_data`, `draw_sprite_ary`/`draw_sprite_idx`/`draw_sprite_anim_*`,
- * `draw_font`/`draw_font_idx`, `subTransSet(Prio)`, `sysSE_req` - and read the lobby state
- * (`lb_param_w`, `lb_deli_data`, `Screen_w`, `system_w`) plus the lobby string helper `LbStr`.  The
- * act dispatchers (`lb_act_dispatch`, `lb_act_dispatch_ex`) are called from the game-root dispatcher at
- * 0x80432154 as `(u8 index, LbActReq* req)`, and every per-act handler below has that shape.
- *
- * MODULE AND NAME (brief section 2).  1. No `__FILE__` string: the range's whole `.data`/`.sdata`
- * reference set is the shared UI vocabulary.  2. `dumpmap.py` answers only `zz_` placeholders.
- * 3. Module `lobby`: the range references the lobby work block `lobby_w` (`.bss` 0x806AAB44),
- * `lb_param_w` (`.bss` 0x806590B4) and the global `lb_deli_data` (`.data` 0x8060DDB8), calls the
- * lobby string helper `LbStr` 11 times, and its callee profile is the one the registered lobby
- * bands document (`LbStr`, `get_lsp_data`, `draw_sprite*`/`draw_font*`, `GetMenuFontColor`,
- * `sysSE_req` - `lobby/fn_801E7530.cpp`, `lobby/fn_801F3294.cpp`, `lobby/fn_802FA9A0.cpp`).
- * 4. The file name is the band's own (`lb_companion_ui`); every symbol it defines carries a
- *    body-derived name (see NAMES above).
- *
- * SEAM: UNPROVEN (measured 2026-09-26; the seam round's `undecidable yet` stands).
- * The range is an `attribute.py` `--max-bytes` cut of the unclaimed 0x8030121C..0x8035E034
- * stretch, and no evidence class settles either edge:
- *  - no `__FILE__` string exists for the band at all, so the decisive class-1 test cannot fire:
- *    the region 0x8030121C..0x80349DD8 holds exactly two (`menu_infomation.cpp`, `menu_note.cpp`,
- *    both outside), and a relocation sweep of every target object finds no `.c`/`.cpp` string
- *    cited by any function of 0x80334568..0x803432B4;
- *  - `.sdata2` pins: 4805 single-referrer labels, 4 inversions DOL-wide, 0 near either edge; the
- *    band's pool run is an ordered disjoint partition - 0x8079B2B0 (below) | 0x8079B2B8/BC (here)
- *    | 0x8079B2C0+ (above);
- *  - nothing private crosses an edge: no `.sdata2`/`.sdata`/`.data` label is cited from both
- *    sides (only the globals `lobby_world_block`, `lobby_w` and the `_savegpr_*` helpers are), so no
- *    must-link exists in either direction;
- *  - the `scope:local` anchors (654 `.data` labels, 0/653 owner-order inversions DOL-wide) put
- *    this band's three switch tables in order - 0x805E27D4 <- lb_act_dispatch, 0x805E27F8 <-
- *    lb_act_dispatch_ex, 0x805E71FC <- fn_8033C9B0 - and the `.data`/`.sdata` runs continue across both
- *    edges with ascending owners (fn_8033F13C -> fn_8033F270).  That is the `candidate, never
- *    proof` class: a contiguous data run with ascending owners looks identical whether it is one
- *    object or two adjacent ones, which is why the DOL alone cannot settle this seam.
- * What does agree with the extent: the unwind pair (extab starts where `eft_net_send`'s record ends,
- * 0x8001698C + 8 = 0x80016994, and ends where the next function's begins, 0x80016CA4; extabindex
- * 0x80035CB8 + 0xC = 0x80035CC4 .. 0x8003615C) and the two bracketing registrations
- * (`hud/net_char_sync.cpp` ends at 0x80338808, `ef/eft050.cpp` starts at 0x8033F270).  The
- * "game-root dispatcher calls both sides" argument is NOT evidence - a dispatcher calls handlers
- * from several TUs.  Registered whole; a re-cut needs evidence that does not exist yet.
- *
- * RENAME (done 2026-09-26, the naming pass this branch was parked for; merger.md M5).  The map's 78
- * `fn_` rows in this range were renamed with the file's own definitions and every source/header that
- * spells them (`unsplit/menu.h`, `unsplit/unknown.h`, `stage/fn_802B2AA0.h`,
- * `src/Pl/pl_act.cpp`, `src/ef/eft050.cpp`, `src/enemy/fn_80137604.cpp`,
- * `src/enemy/fn_801A9540.cpp`, `src/menu/fn_802E4978.cpp`, `src/stage/fn_802B2AA0.cpp`), so objdiff
- * still pairs every row: 0 rows moved by the rename, and the one row the merge itself had broken
- * (0x8033A0BC, 100 -> 0 when main renamed its map row) is restored to 100.  The 79th name,
- * `hud_key_lookup`, was already main's map row, so only this file's definition moved.
- * The dump's `homebutton::MotorCallback` answer for 0x8033C4D8/0x8033C570 is recorded under NAMES
- * and not adopted; it also questions this file's `lobby` home for that sub-band.
- *
- * LANGUAGE AND SECTIONS.  C++ - the range's callees include genuine manglings
- * (`get_lsp_data__FUsP10_mh_ivec2_`, `draw_sprite_ary__FPCUsPC10_mh_ivec2_`, `LbStr__FUcUs`,
- * `sysSE_req__Fl`) that rule 9 forbids spelling as identifiers, so they are declared at C++ scope
- * with the real signatures in this unit's header; every plain `fn_` definition is `extern "C"` so
- * it keeps the map's name (playbook 42).  Lib `lobby` (`cflags_lobby`: `-O3`, `-inline noauto` -
- * the target packs its functions on 4 B, so it is not `-O4,p`): the target object carries extab
- * 0x80016994..0x80016CA4 (98 records) and extabindex 0x80035CC4..0x8003615C (98 x 12 B).
- *
- * FLAGS.  `cflags_lobby` (which now sets `-Cpp_exceptions on`, flags-audit 2026-09-28) plus one
- * per-file pragma, measured over this whole file:
- *   * `-Cpp_exceptions on` - the target object carries the 98 unwind records the old default
- *     (`-Cpp_exceptions off`) did not emit.
- *   * `#pragma peephole off` - retail keeps the unfused narrow forms (`clrlwi` + `slwi`, `lobby_world_block
- *     + (i >> 3)` kept in a register) that the pass folds into one `rlwinm`/`addi`.  A/B over the whole
- *     file: 24 -> 47 functions byte-identical and 60 -> 73 of the 133 at or above the 80 % bar.
- *
- * STATUS / RESIDUALS.  78 of the 133 functions are written below and 76 of them are at or above the
- * 80 % bar (47 byte-identical); the official report reads fuzzy 25.447577 %, matched_code 3292 of
- * 27240 B.  The 55 unwritten functions keep the map's `fn_XXXXXXXX` names and are absent from this
- * file, so objdiff reports them as 0 %; the largest are `fn_8033A160` (1204 B), `fn_8033C9B0`
- * (1036 B), `fn_8033D590` (992 B), `fn_8033AED0` (968 B), `fn_8033BCB0` (956 B), `fn_8033E960`
- * (816 B), `fn_8033B380` (764 B), `fn_8033D1F8` (740 B), `fn_8033C77C` (564 B) and `fn_8033EDAC`
- * (504 B) - the tutorial/quest state machine, the page/dialog update chain and the drawing helpers.
- * Two written functions are the honest residual (measured with `recompile.py --measure`):
- *   * `lb_page_entry_bit_set` 29.58 % - retail computes `lobby_world_block + (index >> 3)` into a register and keeps
- *     the bit-field offset as the load displacement (`add r5,r3,r0` + `lbz r4,14688(r5)`); ours folds
- *     the offset into the base (`addi r5,r3,14688`) and indexes by the raw shift, so the two
- *     addressing idioms differ on every instruction of this 48-byte helper.
- *   * `lb_entry_flags_clear` 79.95 % - the 16 byte stores: retail materialises both `.sbss` bases before the
- *     first store, ours folds the first one into its `stb` sda21 operand.  `u8* seen = lbl_80794B90;`
- *     locals (the variant below) do not change it; the remaining difference is one instruction.
- *   * `fn_8033B67C` and the two other functions that call `sprintf` with a pool format string are not
- *     written yet (they need the `.sdata` format operand, which the pool claims do not cover).
- *
- * DATA.  `.data` 0x805E27D4..0x805E27F8 is claimed: it is `lb_act_dispatch`'s own 9-entry switch table
- * (`jumptable_805E27D4`, `scope:local`, referenced by no other unit - playbook 58's private entry),
- * and claiming it makes the target object's `.data` pair with ours.  `datagap.py --unit
- * lobby/lb_act_dispatch` reports no `ours-extra` section at all and `--flip-blockers` does not list this
- * unit.  The extab/extabindex claims are complete for the whole range while only 78 functions are
- * written, so our object's unwind sections are short (368/552 B of the target's 784/1176 B).
- */
-/* ---- header inherited from src/hud/cockpit_icon_data.cpp (written against its pre-phase-4 range) ---- */
-/*
- * hud/cockpit_icon_data.cpp - the quest cockpit's map icon tables, a data-only unit (GUESS: the file name and the one
- * owner for the run; precedent `Network/network_shared_data.cpp`).
- *
- * Claims `.data` 0x805E6A58..0x805E70F8 and `.sdata` 0x80792D80..0x80792F8C.  The `.sdata` run is the icon id lists of
- * 8 bytes or less (MWCC's small-data cut) and their pointer arrays; the `.data` run holds the longer lists, the per-map
- * pointer tables `hud/cockpit_quest.cpp` indexes by map number, and the flash/slot sprite id lists
- * `menu/fn_802E4978.cpp` reads.  Both runs are reached by pointer only (no code loads a list through `sda21`), and the
- * tables are read with `lis`/`addi`, i.e. through extern arrays of unknown size (`hud/cockpit_icon_data.h`).
- *
- * Why one unit: a TU's `.data` is contiguous and this run is interleaved with other readers' lists, so the evidence
- * disagrees with "cockpit_quest.cpp owns it" (its readers are `hud/cockpit_quest.cpp`, `hud/fn_802EBED8.cpp`,
- * `ef/eft035.cpp` and `menu/fn_802E4978.cpp`, whose `.sdata2`/`.sdata` pools are shared); the owner question for the four
- * units (one TU spanning them or not) is open and not decided here.
- *
- * Emitted: every list and table up to 0x805E6EF8 (by map, by quest id, and the pit map's lists; names are GUESSes from the
- * tables' indices: `<table>_area<n>` is entry n of that table), the two slot sprite id lists and the flash id list.
- * Not emitted (owned, other readers' data): 0x805E6EF8..0x805E70C8, the lists `hud/fn_802EBED8.cpp` (0x805E6EF8..0x805E6FEC),
- * `ef/eft035.cpp` (0x805E6FEC..0x805E707C) and `menu/fn_802E4978.cpp` (0x805E707C..0x805E70C8) read - so the two slot lists
- * and the flash id list sit 0x1F0 bytes earlier in our object, and the `.data` section is that much shorter than the claim.
+ * lobby/lb_companion_ui.cpp - the lobby companion/status UI band: the act dispatchers and their per-act handlers, the
+ *   page/dialog chain and its drawing helpers, and the quest cockpit's map icon tables.
+ * RANGE. .text 0x80338808-0x8033F270 (133 functions); .data 0x805E27D4-0x805E7410 (from `lb_act_dispatch`'s switch
+ *   table `jumptable_805E27D4`; the icon tables 0x805E6A58-0x805E70F8), .bss 0x806BE340-0x806BF0A0, .sdata
+ *   0x80792D38-0x8079308C (the icon id lists of 8 bytes or less and their pointer arrays, 0x80792D80-0x80792F8C), .sbss
+ *   0x80794B90-0x80794BE0, .sdata2 0x8079B2B8-0x8079B2C0, extab, extabindex.  The seam is undecidable from the DOL
+ *   (docs/lobby.md).  The icon tables are defined ahead of the code; the lists `hud/cockpit_quest.cpp` and
+ *   `ef/eft035.cpp` read at 0x805E6EF8-0x805E70C8 are not emitted, so the slot and flash id lists sit 0x1F0 bytes
+ *   early.
+ * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off` (retail keeps `clrlwi` + `slwi` and
+ *   `lobby_world_block + (i >> 3)` in a register; measured in docs/lobby.md).
+ * NAMES. The 79 defined functions are named from their bodies.  GUESSes: the link-gated senders whose caller is
+ *   unwritten, after the protocol sub-command they build (`lb_sub0a_send`, ...), and the icon tables (`<table>_area<n>`
+ *   is entry n).  `hud_key_lookup` (0x8033A0BC) is the map's.  The dump's `homebutton::MotorCallback(OSAlarm...)` for
+ *   0x8033C4D8/0x8033C570 is not adopted: both are 0x24-byte refresh wrappers without an argument.  The game-root
+ *   dispatcher at 0x80432154 calls `lb_act_dispatch`/`lb_act_dispatch_ex` as `(u8 index, LbActReq* req)`.  Module
+ *   `lobby`: `lobby_w`, `lb_param_w`, `lb_deli_data`, 11 `LbStr` calls.
+ * RESIDUALS. 55 rows unwritten or scoring zero: 0x80339F10-0x8033A0BC (`lb_act_dispatch_ex`), 0x8033A160-0x8033A850,
+ *   0x8033A868-0x8033A9F4, 0x8033AAFC-0x8033ADAC, 0x8033ADD0-0x8033AE58, 0x8033AED0-0x8033B298, 0x8033B2C8-0x8033B7D0
+ *   (`fn_8033B67C` among the `sprintf` users that need the `.sdata` format operand), 0x8033B808-0x8033C36C,
+ *   0x8033C4FC-0x8033C570, 0x8033C594-0x8033CEC0, 0x8033CF18-0x8033E050 (with the written `lb_byte_list_has`, which
+ *   scores zero), 0x8033E088-0x8033F270.
+ *  - `lb_page_entry_bit_set`: retail forms `lobby_world_block + (index >> 3)` in a register and keeps the bit-field
+ *    offset as the load displacement (`add r5,r3,r0; lbz r4,14688(r5)`), ours folds it into the base
+ *    (`addi r5,r3,14688`);
+ *  - `lb_entry_flags_clear`: retail materialises both `.sbss` bases before the first store, ours folds the first into
+ *    its `stb`'s sda21 operand (a `u8* seen = lbl_80794B90;` local does not change it);
+ *  - `lb_act_limit_set`, `lb_companion_tick`, `lb_companion_mode_set`, `lb_entry_start_send`, `lb_act_entry_start`:
+ *    retail addresses the companion work at +0x6A2A/+0x69A4/+0x6978/+0x6A40/+0x6A3C where ours uses
+ *    +0xA2A/+0x9A4/+0x978/+0xA40/+0xA3C (an `LbCompanionWork` offset 0x6000 off); `lb_act_entry_start` also copies the
+ *    request's +0x18..+0x1B bytes ours drops;
+ *  - `lb_entry_id_get`, `lb_entry_publish`, `lb_page_flags_update`, `lb_entry_model_publish`: retail reads
+ *    `lobby_world_block` +0x5180/+0x519C/+0x51A0/+0x51A4/+0x51A6 where ours is 0x80 higher (+0x5200 ...);
+ *    `lb_entry_publish` reads a record's +0x1/+0x2/+0x3 where ours reads +0x0 three times, `lb_entry_model_publish`
+ *    stores a byte where ours stores a word;
+ *  - `lb_act_value_apply`, `lb_act_limit_set`, `lb_act_slot_write`: retail reads the request's +0x4 (+0x9) where ours
+ *    reads +0x8 (+0x7);
+ *  - `lb_act_row_apply`: retail loads +0x6 with `lhz`, ours `lbz` + `clrlwi` (a field width);
+ *  - `lb_tbl3_get`: retail scales by 4 and loads a word, ours by 2 with `lhzx` (the table holds `u32`s);
+ *  - `lb_entry_start_default`: retail zero-extends the byte, ours sign-extends it (the parameter is `u8`, not `s8`);
+ *  - `lb_seen_bit_set`, `lb_act_award_handover`, `lb_companion_tick`, `lb_act_slot_write`: ours emits a `clrlwi` or
+ *    `extsb` retail does not; `lb_quest_work_init`: retail narrows the kind before storing it;
+ *  - `lb_page_id_find`: retail tests at the bottom of the loop with a 4-byte stride, ours at the top with 8;
+ *  - `lb_page_row_ck`: ours passes two extra zero arguments; `lb_act_announce`: ours adds one `b`;
+ *  - `lb_act_handover`: ours saves one register fewer and its branch targets shift;
+ *  - `lb_name_tail_copy`: the word copies' load/store order;
+ *  - `lb_seen_pad_ck`, `lb_act_row_update`, `lb_act_best_keep`, `lb_triplet_value2_get`, `lb_triplet_value1_get`,
+ *    `lb_page_bits_set`: register colouring only.
+ *   flipcheck: `.bss`/`.sbss`/`.sdata2` claimed, not emitted; `.data` 0x4F0 against 0x4C3C; `.sdata` 0x20C against
+ *   0x354; `.text`/extab/extabindex short of the claim; the `.sdata`/`.sdata2` pool is shared with
+ *   `hud/cockpit_quest.cpp` and `menu/menu_placeinfo.cpp` (a low-confidence fold candidate); the source still spells
+ *   `my_player_no`, `enemy_data_find`, `eft_slot_persist_ck`, `eft_slot_spawn` and `quest_arena_data_step` by their old
+ *   stems `fn_800CF384`, `fn_803438E4`, `fn_80343B44`, `fn_80343B74`, `fn_803B3074`.
  */
 
 #include "types.h"
@@ -296,10 +200,8 @@ LbCmdSub0F* lb_sub0f_init(LbCmdSub0F* cmd);
 
 extern "C" {
 
-/* The per-act entry point: gate the request against `Pl_net_can_send`/`fn_800CF384`, look the entry up
- * from the request's two ids, and dispatch on its act byte to the matching handler.
- * Name: the band's per-act entry: gate (`Pl_net_can_send`), entry lookup (`fn_803438E4`/`fn_80343B74`) and
- *   a switch on `act_0x03` 1..8 into the neighbouring band's handlers */
+/* Gates the request (`Pl_net_can_send`, `my_player_no`), looks its entry up (`enemy_data_find`/`eft_slot_spawn`) and
+ * switches on `act_0x03` 1..8 into the per-act handlers. */
 void lb_act_dispatch(u8 index, LbActReq* req) {
     void* entry;
 
@@ -340,9 +242,8 @@ void lb_act_dispatch(u8 index, LbActReq* req) {
     }
 }
 
-/* Sends the "entry +0x08 selected" command to the lobby server when the link is up.
- * Name: the header-only sub-0x05 packet ("this entry was selected"), id = the request's mask byte; the
- *   only sender with no payload */
+/* Sends the header-only sub-0x05 packet ("entry +0x08 selected", id = the request's mask byte) when the link is up;
+ * the only sender with no payload. */
 void lb_entry_selected_send(LbActReq* req) {
     LbCmdSub05 cmd;
 
@@ -352,9 +253,7 @@ void lb_entry_selected_send(LbActReq* req) {
     }
 }
 
-/* The same command with the index taken from the caller and the entry id offset by six.
- * Name: the same header-only packet with sub-command 6+index and the entry id in its pad field;
- *   `lb_act_announce` calls it with index 1 */
+/* The same header-only packet with sub-command 6+index and the entry id in its pad field. */
 void lb_entry_notify_send(s32 index, u8 entry) {
     LbCmdSub05 cmd;
 
@@ -364,10 +263,8 @@ void lb_entry_notify_send(s32 index, u8 entry) {
     }
 }
 
-/* Acts 6 and 7: 6 announces the companion work's entry when its step byte is not 4, 7 hands the
- * index to the entry handler.
- * Name: act 6 announces the companion entry when its step byte is not 4, act 7 forwards the index to
- *   `quest_reward_faint_penalty` */
+/* Acts 6 and 7: 6 announces the companion work's entry when its step byte is not 4, 7 forwards the index to
+ * `quest_reward_faint_penalty`. */
 void lb_act_announce(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -391,8 +288,7 @@ void lb_act_announce(u8 unused, LbActReq* req) {
     }
 }
 
-/* Clears the two per-entry byte arrays (`lbl_80794B90`/`lbl_80794B98`, 8 entries each).
- * Name: zeroes the two 8-byte per-entry arrays `lbl_80794B90`/`lbl_80794B98`; no caller in this file */
+/* Zeroes the two 8-entry per-entry byte arrays `lbl_80794B90`/`lbl_80794B98`; no caller in this file. */
 void lb_entry_flags_clear(void) {
     u8* seen = lbl_80794B90;
     u8* handled = lbl_80794B98;
@@ -415,9 +311,8 @@ void lb_entry_flags_clear(void) {
     handled[7] = 0;
 }
 
-/* Sends the index-selected command with a u8 payload.
- * Name: (guess) sub-0x0A with one word payload - the caller is unwritten, so the protocol slot is the
- *   evidence */
+/* Sends the index-selected sub-0x0A command with a u8 payload.  GUESS name: the caller is unwritten, so the protocol
+ * slot is the evidence. */
 void lb_sub0a_send(u8 index, u8 value) {
     LbCmdSub0A cmd;
 
@@ -428,14 +323,12 @@ void lb_sub0a_send(u8 index, u8 value) {
     }
 }
 
-/* Sets this entry's seen bit in `lbl_80794B90` (act 10).
- * Name: act 10: one `lb_seen_bit_set` call with the request's word */
+/* Act 10: sets this entry's seen bit in `lbl_80794B90` (one `lb_seen_bit_set` call with the request's word). */
 void lb_act_seen_set(u8 bit, LbActReq* req) {
     lb_seen_bit_set(bit, (u8)req->sel_0x04.word_0x00);
 }
 
-/* The same command as `lb_sub0a_send` with sub-command 11.
- * Name: (guess) the sub-0x0B twin of `lb_sub0a_send`; caller unwritten */
+/* The sub-0x0B twin of `lb_sub0a_send`.  GUESS name: caller unwritten. */
 void lb_sub0b_send(u8 index, u8 value) {
     LbCmdSub0A cmd;
 
@@ -446,34 +339,30 @@ void lb_sub0b_send(u8 index, u8 value) {
     }
 }
 
-/* Marks this entry handled in `lbl_80794B98` (act 11).
- * Name: act 11: one `lb_handled_set` call with the request's word */
+/* Act 11: marks this entry handled in `lbl_80794B98` (one `lb_handled_set` call with the request's word). */
 void lb_act_handled_set(u8 bit, LbActReq* req) {
     lb_handled_set(bit, (u8)req->sel_0x04.word_0x00);
 }
 
-/* Act 9: publishes the entry's id into the system block's ring cell 3 unless the pad owns it.
- * Name: act 9: writes the entry id into `system_w.ring_0x18[3]` unless the pad owns it */
+/* Act 9: writes the entry's id into `system_w.ring_0x18[3]` unless the pad owns it. */
 void lb_act_entry_publish(u8 unused, LbActReq* req) {
     if (isReadyCountOne() != 1) {
         system_w.ring_0x18[3] = (u16)req->sel_0x04.word_0x00;
     }
 }
 
-/* Sets bit `bit` of the per-entry byte `lbl_80794B90[index]`.
- * Name: sets one bit of the per-entry byte `lbl_80794B90[index]` */
+/* Sets bit `bit` of the per-entry byte `lbl_80794B90[index]`. */
 void lb_seen_bit_set(u8 bit, u8 index) {
     lbl_80794B90[(u8)index] = lbl_80794B90[(u8)index] | (u8)(1 << (u8)bit);
 }
 
-/* Marks the per-entry byte `lbl_80794B98[index]` handled.
- * Name: writes 1 into `lbl_80794B98[index]` (the first parameter is unused) */
+/* Writes 1 into the per-entry byte `lbl_80794B98[index]` (the first parameter is unused). */
 void lb_handled_set(u8 unused, u8 index) {
     lbl_80794B98[(u8)index] = 1;
 }
 
-/* Whether every set bit of `lbl_80794B90[index]`'s low nibble belongs to a pad that is present.
- * Name: counts the set low-nibble bits whose pad is present and compares the count with `countOccupiedServerSlots()` */
+/* Whether every set bit of `lbl_80794B90[index]`'s low nibble belongs to a present pad: their count against
+ * `countOccupiedServerSlots()`. */
 s32 lb_seen_pad_ck(u8 index) {
     s32 count;
     u8 bits;
@@ -492,14 +381,13 @@ s32 lb_seen_pad_ck(u8 index) {
     return count == countOccupiedServerSlots();
 }
 
-/* Whether the per-entry byte `lbl_80794B98[index]` is set.
- * Name: the per-entry byte `lbl_80794B98[index] != 0` */
+/* Whether the per-entry byte `lbl_80794B98[index]` is set. */
 s32 lb_handled_ck(u8 index) {
     return lbl_80794B98[index] != 0;
 }
 
-/* Act 8: hands the award screen over to act 5's or act 3's entry state.
- * Name: act 8: sel 5/3 set `work->state_0xFA` and start the `quest_time_limit_set` delay scaled by `Screen_w` */
+/* Act 8: sel 5/3 hand the award screen to act 5's or act 3's entry state (`work->state_0xFA`) and start the
+ * `quest_time_limit_set` delay scaled by `Screen_w`. */
 void lb_act_award_handover(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -528,9 +416,7 @@ void lb_act_award_handover(u8 unused, LbActReq* req) {
     }
 }
 
-/* Sends the "hand this entry over" command (act 12) with the companion work's two value words.
- * Name: the sub-0x0C/0x01 handover packet from the companion's two mask words; `Pl/pl_act.cpp` calls it
- *   too */
+/* Sends the sub-0x0C/0x01 "hand this entry over" packet (act 12) from the companion work's two mask words. */
 void lb_entry_handover_send(u8 kind, u8 index, u8 value) {
     LbCmdSub010C cmd;
     LbMoveWork* work;
@@ -559,8 +445,7 @@ void lb_entry_handover_send(u8 kind, u8 index, u8 value) {
     }
 }
 
-/* Acts 1 and 12: records this entry's bit in the companion work's mask and announces it.
- * Name: acts 1 and 12: records the entry bit in `companion->bits_0x684` and announces it */
+/* Acts 1 and 12: records this entry's bit in `companion->bits_0x684` and announces it. */
 void lb_act_handover(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbMoveEntry* moves;
@@ -607,8 +492,7 @@ void lb_act_handover(u8 unused, LbActReq* req) {
     }
 }
 
-/* Sends the sub-0x0D command with the request's three bytes and its word.
- * Name: sub-0x0D with the request's three bytes and its halfword; called from the act-13 row update */
+/* Sends the sub-0x0D command with the request's three bytes and its halfword; the act-13 row update calls it. */
 void lb_sub0d_send(u8 index, LbActReq* req, s8 flag) {
     LbCmdSub0D cmd;
 
@@ -622,9 +506,8 @@ void lb_sub0d_send(u8 index, LbActReq* req, s8 flag) {
     }
 }
 
-/* Act 13: hands the request's row and word to the row updater, or marks the row started.
- * Name: act 13: `serial_find` row lookup, then either the state-4 start (with `lb_sub0d_send`) or
- *   `serial_state_set_word` */
+/* Act 13: looks the row up (`serial_find`), then either starts it in state 4 (`lb_sub0d_send`) or hands the word to
+ * `serial_state_set_word`. */
 void lb_act_row_update(u8 unused, LbActReq* req) {
     ShellSerialEntry* row;
 
@@ -640,9 +523,7 @@ void lb_act_row_update(u8 unused, LbActReq* req) {
     }
 }
 
-/* Sends the sub-0x0E command, or hands the two ids to the local row updater when the link is down.
- * Name: sub-0x0E, or the local row writer `fn_803B6998` when the link is down; `enemy/fn_80137604.cpp`
- *   calls it */
+/* Sends the sub-0x0E command, or hands the two ids to the local row writer `fn_803B6998` when the link is down. */
 void lb_sub0e_send(u8 index, u16 id, u8 flag, u16 value) {
     LbCmdSub0E cmd;
     u8 set = flag;
@@ -662,9 +543,7 @@ void lb_sub0e_send(u8 index, u16 id, u8 flag, u16 value) {
     broadcastSessionCommand(&cmd, 0xA);
 }
 
-/* Act 14: 1 sends the row over when this pad owns it, anything else updates it locally.
- * Name: act 14: kind 1 sends the row with `lb_sub0e_send` when this pad owns it, other kinds write it
- *   locally */
+/* Act 14: kind 1 sends the row with `lb_sub0e_send` when this pad owns it; anything else updates it locally. */
 void lb_act_row_apply(u8 unused, LbActReq* req) {
     u8 kind;
 
@@ -680,9 +559,7 @@ void lb_act_row_apply(u8 unused, LbActReq* req) {
     }
 }
 
-/* Act 15: sends the sub-0x0F text command with the caller's block copied into its payload.
- * Name: act 15: the 0x2C-byte sub-0x0F text packet built from the caller's block; link down ->
- *   `fn_80142C58` */
+/* Act 15: sends the 0x2C-byte sub-0x0F text packet built from the caller's block; with the link down, `fn_80142C58`. */
 void lb_sub0f_send(u8 index, u8 value, void* text, u16 id, u8 flag, f32 scale) {
     LbCmdSub0F cmd;
 
@@ -700,10 +577,8 @@ void lb_sub0f_send(u8 index, u8 value, void* text, u16 id, u8 flag, f32 scale) {
     broadcastSessionCommand(&cmd, 0x2C);
 }
 
-/* Copies the 0x20-byte text block: its first 8 bytes a byte at a time, the rest word-wise (MWCC's
- * idiom for the two members' alignments).
- * Name: the 0x20-byte `LbNameTail` copy (8 bytes + 6 words), MWCC's split-copy idiom for the two member
- *   alignments */
+/* Copies the 0x20-byte `LbNameTail`: its first 8 bytes a byte at a time, the rest word-wise (MWCC's idiom for the two
+ * members' alignments). */
 void lb_name_tail_copy(LbNameTail* dst, LbNameTail* src) {
     u8 i;
 
@@ -715,23 +590,20 @@ void lb_name_tail_copy(LbNameTail* dst, LbNameTail* src) {
     }
 }
 
-/* Clears the sub-0x0F packet's text payload and returns the packet.
- * Name: clears the sub-0x0F packet's text payload (`fn_80125F54`) and returns the packet */
+/* Clears the sub-0x0F packet's text payload (`fn_80125F54`) and returns the packet. */
 LbCmdSub0F* lb_sub0f_init(LbCmdSub0F* cmd) {
     fn_80125F54(cmd->text_0x0C.bytes_0x00);
     return cmd;
 }
 
-/* Act 15 with the link down: hands the packet's fields straight to the text writer.
- * Name: the link-down half of act 15: the packet's own fields go to `fn_80142C58` */
+/* The link-down half of act 15: hands the packet's own fields straight to the text writer `fn_80142C58`. */
 void lb_text_apply(u8 unused, LbCmdSub0F* cmd) {
     void* text = cmd->text_0x0C.bytes_0x00;
 
     fn_80142C58(cmd->value_0x04, text, cmd->id_0x06, cmd->flag_0x05, cmd->scale_0x08);
 }
 
-/* Sends the sub-0x10 command, or hands the byte to the local handler when the link is down.
- * Name: sub-0x10 with one signed byte; link down -> `fn_80146C00` */
+/* Sends the sub-0x10 command with one signed byte, or hands it to `fn_80146C00` when the link is down. */
 void lb_sub10_send(u8 index, s8 value) {
     LbCmdSub10 cmd;
 
@@ -744,14 +616,12 @@ void lb_sub10_send(u8 index, s8 value) {
     broadcastSessionCommand(&cmd, 5);
 }
 
-/* Act 16: hands the request's byte and index to the local handler.
- * Name: act 16: the request's byte and the pad index go to `fn_80146C00` */
+/* Act 16: hands the request's byte and the pad index to `fn_80146C00`. */
 void lb_act_byte_apply(u8 unused, LbActReq* req) {
     fn_80146C00((s8)req->sel_0x04.bytes_0x00.a_0x00, req->index_0x01);
 }
 
-/* Sends the sub-0x11 command with two signed bytes.
- * Name: (guess) sub-0x11 with two signed bytes; caller unwritten */
+/* Sends the sub-0x11 command with two signed bytes.  GUESS name: caller unwritten. */
 void lb_sub11_send(s8 a, s8 b) {
     LbCmdSub11 cmd;
 
@@ -763,14 +633,12 @@ void lb_sub11_send(s8 a, s8 b) {
     }
 }
 
-/* Act 17: hands the request's two bytes to the local handler.
- * Name: act 17: the request's two bytes go to `fn_802B09B8` */
+/* Act 17: hands the request's two bytes to `fn_802B09B8`. */
 void lb_act_pair_apply(u8 unused, LbActReq* req) {
     fn_802B09B8(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
 }
 
-/* Sends the sub-0x12 command, or hands the byte to the local handler when the link is down.
- * Name: sub-0x12 with one byte; link down -> `fn_802B45F4`; `stage/fn_802B2AA0.cpp` calls it */
+/* Sends the sub-0x12 command with one byte, or hands it to `fn_802B45F4` when the link is down. */
 void lb_sub12_send(u8 value) {
     LbCmdSub12 cmd;
 
@@ -783,14 +651,12 @@ void lb_sub12_send(u8 value) {
     broadcastSessionCommand(&cmd, 5);
 }
 
-/* Act 18: hands the request's byte to the local handler.
- * Name: act 18: the request's byte goes to `fn_802B45F4` */
+/* Act 18: hands the request's byte to `fn_802B45F4`. */
 void lb_act_index_apply(u8 unused, LbActReq* req) {
     fn_802B45F4(req->sel_0x04.bytes_0x00.a_0x00);
 }
 
-/* Sends the sub-0x13 command with the two values and this pad's index.
- * Name: (guess) sub-0x13: value byte, two halfwords and this pad's index; caller unwritten */
+/* Sends the sub-0x13 command: the value byte, two halfwords and this pad's index.  GUESS name: caller unwritten. */
 void lb_sub13_send(s16 first, s16 second, u8 value) {
     LbCmdSub13 cmd;
 
@@ -804,8 +670,7 @@ void lb_sub13_send(s16 first, s16 second, u8 value) {
     }
 }
 
-/* Act 19: hands the request's three bytes to the value writer when its word is clear.
- * Name: act 19: with the request's word clear, three bytes go to `fn_803B3074` */
+/* Act 19: with the request's word clear, hands its three bytes to the value writer `quest_arena_data_step`. */
 void lb_act_value_apply(u8 unused, LbActReq* req) {
     if (req->mask_0x08.word_0x00 == 0) {
         fn_803B3074(req->mask_0x0C.byte_0x00, req->mask_0x08.halves.low_0x00,
@@ -813,8 +678,7 @@ void lb_act_value_apply(u8 unused, LbActReq* req) {
     }
 }
 
-/* Sends the sub-0x14 command with one signed byte.
- * Name: (guess) sub-0x14 with one signed byte; caller unwritten */
+/* Sends the sub-0x14 command with one signed byte.  GUESS name: caller unwritten. */
 void lb_sub14_send(s8 value) {
     LbCmdSub10 cmd;
 
@@ -825,8 +689,7 @@ void lb_sub14_send(s8 value) {
     }
 }
 
-/* Act 20: sets the companion's limit flag once its value reaches the limit byte.
- * Name: act 20: sets `companion->flag_0x6A29` once the request's word reaches `limit_0x6A2A` */
+/* Act 20: sets `companion->flag_0x6A29` once the request's word reaches `limit_0x6A2A`. */
 void lb_act_limit_set(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -840,8 +703,7 @@ void lb_act_limit_set(u8 unused, LbActReq* req) {
     }
 }
 
-/* Sends the header-only sub-0x15 command.
- * Name: (guess) header-only sub-0x15; caller unwritten */
+/* Sends the header-only sub-0x15 command.  GUESS name: caller unwritten. */
 void lb_sub15_send(void) {
     LbCmdSub05 cmd;
 
@@ -849,8 +711,7 @@ void lb_sub15_send(void) {
     broadcastSessionCommand(&cmd, 4);
 }
 
-/* Increments the companion work's tick counter.
- * Name: increments `companion->count_0x69A4` */
+/* Increments the companion work's tick counter `count_0x69A4`. */
 void lb_companion_tick(void) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -864,8 +725,7 @@ void lb_companion_tick(void) {
     }
 }
 
-/* Sends the header-only sub-0x1C command.
- * Name: (guess) header-only sub-0x1C; caller unwritten */
+/* Sends the header-only sub-0x1C command.  GUESS name: caller unwritten. */
 void lb_sub1c_send(void) {
     LbCmdSub05 cmd;
 
@@ -873,8 +733,7 @@ void lb_sub1c_send(void) {
     broadcastSessionCommand(&cmd, 4);
 }
 
-/* Sends the sub-0x16 command with a word and two signed bytes.
- * Name: sub-0x16: a word and two signed bytes; act 21 builds the same packet inline */
+/* Sends the sub-0x16 command with a word and two signed bytes; act 21 builds the same packet inline. */
 void lb_sub16_send(s32 value, s8 flag) {
     LbCmdSub16 cmd;
 
@@ -887,8 +746,7 @@ void lb_sub16_send(s32 value, s8 flag) {
     }
 }
 
-/* Act 21: sends the row over when this pad owns it, or writes the value into the companion slot.
- * Name: act 21: sends the row when this pad owns it, else `fn_803A9F28` writes the companion slot */
+/* Act 21: sends the row over when this pad owns it, else `fn_803A9F28` writes the value into the companion slot. */
 void lb_act_slot_write(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -918,8 +776,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
     }
 }
 
-/* Sends the sub-0x17 command with a halfword and three signed bytes.
- * Name: (guess) sub-0x17: a halfword and three signed bytes; caller unwritten */
+/* Sends the sub-0x17 command with a halfword and three signed bytes.  GUESS name: caller unwritten. */
 void lb_sub17_send(s16 value, s8 first, s8 second, s8 third) {
     LbCmdSub17 cmd;
 
@@ -931,9 +788,8 @@ void lb_sub17_send(s16 value, s8 first, s8 second, s8 third) {
     broadcastSessionCommand(&cmd, 0xA);
 }
 
-/* Act 22: keeps the companion work's high score and hands the row on.
- * Name: act 22: keeps `companion->best_0x8F` and hands the row on (`quest_item_pair_copy_row`,
- * `hud_msg_push`) */
+/* Act 22: keeps the companion work's high score `best_0x8F`, then hands the row on (`quest_item_pair_copy_row`,
+ * `hud_msg_push`). */
 void lb_act_best_keep(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -956,8 +812,7 @@ void lb_act_best_keep(u8 unused, LbActReq* req) {
     }
 }
 
-/* Sends the header-only sub-0x18 command.
- * Name: (guess) header-only sub-0x18; caller unwritten */
+/* Sends the header-only sub-0x18 command.  GUESS name: caller unwritten. */
 void lb_sub18_send(void) {
     LbCmdSub05 cmd;
 
@@ -965,8 +820,7 @@ void lb_sub18_send(void) {
     broadcastSessionCommand(&cmd, 4);
 }
 
-/* Puts the companion work into mode 3 (the area-change announcement).
- * Name: sets `companion->mode_0x6978 = 3`, the area-change announcement */
+/* Puts the companion work into mode 3 (`mode_0x6978`), the area-change announcement. */
 void lb_companion_mode_set(void) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -980,10 +834,8 @@ void lb_companion_mode_set(void) {
     }
 }
 
-/* Sends the sub-0x19 entry-start command and records the start in the companion work; while the act
- * is already announced the caller's flag is dropped.
- * Name: the sub-0x19 entry-start announcement from the companion's slots and params; records
- *   `started_0x6A40` */
+/* Sends the sub-0x19 entry-start command and records the start (`started_0x6A40`); while the act is already
+ * announced the caller's flag is dropped. */
 void lb_entry_start_send(LbCompanionWork* companion, s8 value, s32 arg, u8 flag) {
     LbCmdSub19 cmd;
     u8 started;
@@ -1020,14 +872,12 @@ void lb_entry_start_send(LbCompanionWork* companion, s8 value, s32 arg, u8 flag)
     companion->step_0x2C = 4;
 }
 
-/* The act-19 announcement with the default flag.
- * Name: `lb_entry_start_send` with the default flag 0 */
+/* The act-19 announcement: `lb_entry_start_send` with the default flag 0. */
 void lb_entry_start_default(LbCompanionWork* companion, u8 value, s32 arg) {
     lb_entry_start_send(companion, value, arg, 0);
 }
 
-/* Act 23: copies the request's fields into the companion work and sends or applies the entry start.
- * Name: act 23: copies the request into the companion work, then sends or applies the entry start */
+/* Act 23: copies the request's fields into the companion work, then sends or applies the entry start. */
 void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -1077,8 +927,7 @@ void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
     }
 }
 
-/* Sends the sub-0x1A command with one signed byte.
- * Name: (guess) sub-0x1A with one signed byte; caller unwritten */
+/* Sends the sub-0x1A command with one signed byte.  GUESS name: caller unwritten. */
 void lb_sub1a_send(u8 index, s8 value) {
     LbCmdSub1A cmd;
 
@@ -1089,14 +938,12 @@ void lb_sub1a_send(u8 index, s8 value) {
     }
 }
 
-/* Act 24: hands the request's byte to the page handler.
- * Name: act 24: the pad index and the request's byte go to `fn_802BC000` */
+/* Act 24: hands the pad index and the request's byte to the page handler `fn_802BC000`. */
 void lb_act_page_apply(u8 index, LbActReq* req) {
     fn_802BC000((u8)index, req->sel_0x04.bytes_0x00.a_0x00);
 }
 
-/* Sends the header-only sub-0x1B command, or flags the area change locally when the link is down.
- * Name: header-only sub-0x1B, or `work->flag_0x22E3` locally; `enemy/fn_801A9540.cpp` calls it */
+/* Sends the header-only sub-0x1B command, or sets `work->flag_0x22E3` locally when the link is down. */
 void lb_area_change_send(u8 index) {
     LbCmdSub1B cmd;
     LbMoveWork* work;
@@ -1112,8 +959,7 @@ void lb_area_change_send(u8 index) {
     }
 }
 
-/* Flags the area change in the move work without sending anything.
- * Name: sets `work->flag_0x22E3 = 1` without sending */
+/* Flags the area change in the move work (`work->flag_0x22E3 = 1`) without sending anything. */
 void lb_area_change_flag(void) {
     LbMoveWork* work;
 
@@ -1123,8 +969,7 @@ void lb_area_change_flag(void) {
     }
 }
 
-/* Sends the sub-0x1D command with two bytes.
- * Name: (guess) sub-0x1D with two bytes; caller unwritten */
+/* Sends the sub-0x1D command with two bytes.  GUESS name: caller unwritten. */
 void lb_sub1d_send(u8 value, s8 flag) {
     LbCmdSub1D cmd;
 
@@ -1134,15 +979,13 @@ void lb_sub1d_send(u8 value, s8 flag) {
     broadcastSessionCommand(&cmd, 8);
 }
 
-/* Act 25: hands the request's two bytes to the pad handler.
- * Name: act 25: the request's two bytes go to `arena_other_player_eq_set` */
+/* Act 25: hands the request's two bytes to `arena_other_player_eq_set`. */
 void lb_act_pad_apply(u8 unused, LbActReq* req) {
     arena_other_player_eq_set(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
 }
 
-/* Scans the ten 0x130-byte page records for the six-byte key the caller points at; 0xFF on a hole.
- * Name: the map name main's `hud/move_work_update` landing gave 0x8033A0BC (that unit calls it by this
- *   name); the body scans the ten 0x130-byte records for a 6-byte key, 0xFF on a hole */
+/* Scans the ten 0x130-byte page records for the six-byte key the caller points at; 0xFF on a hole.  The name is the
+ * map's (`hud/move_work_update.cpp` calls it by it). */
 u8 hud_key_lookup(u8* key) {
     u8 i;
 
@@ -1154,8 +997,7 @@ u8 hud_key_lookup(u8* key) {
     return 0xFF;
 }
 
-/* Resets the tutorial/quest announcement block and stores the kind byte.
- * Name: resets `lbl_806BEF20`'s four fields and stores the kind byte */
+/* Resets the tutorial/quest announcement block `lbl_806BEF20`'s four fields and stores the kind byte. */
 void lb_quest_work_init(u8 kind) {
     lbl_806BEF20.active_0x00 = 0;
     lbl_806BEF20.flag_0x08 = 0;
@@ -1163,52 +1005,44 @@ void lb_quest_work_init(u8 kind) {
     lbl_806BEF20.ptr_0x0C = NULL;
 }
 
-/* Whether the announcement block is idle.
- * Name: `lbl_806BEF20.active_0x00 != 0` (the old comment said "idle"; the body is the opposite) */
+/* Whether the announcement block is active (`lbl_806BEF20.active_0x00 != 0`). */
 s32 lb_quest_work_active_ck(void) {
     return lbl_806BEF20.active_0x00 != 0;
 }
 
-/* The three-level table lookup `lb_tbl3_get`/`lb_triplet_value2_get`/`lb_triplet_value0_get`/`lb_triplet_value1_get` share.
- * Name: the three-level lookup `lbl_805E6A20[a][b][c]` */
+/* The three-level table lookup `lbl_805E6A20[a][b][c]` the triplet getters share. */
 s32 lb_tbl3_get(u8 a, u8 b, u8 c) {
     u32** level = (u32**)lbl_805E6A20[a];
 
     return (s32)level[b][c];
 }
 
-/* The third byte of the entry's 12-byte record.
- * Name: the third byte of the `LbTriplet` row at `lbl_805E69E8[a][b]` */
+/* The third byte of the 12-byte `LbTriplet` row at `lbl_805E69E8[a][b]`. */
 u8 lb_triplet_value2_get(u8 a, u8 b) {
     return lbl_805E69E8[a][b].value_0x02;
 }
 
-/* The word at the head of the entry's 12-byte record.
- * Name: the first byte of that row */
+/* The first byte of that row. */
 u8 lb_triplet_value0_get(u8 a, u8 b) {
     return lbl_805E69E8[a][b].value_0x00;
 }
 
-/* The second byte of the entry's 12-byte record.
- * Name: the second byte of that row */
+/* The second byte of that row. */
 u8 lb_triplet_value1_get(u8 a, u8 b) {
     return lbl_805E69E8[a][b].value_0x01;
 }
 
-/* The tutorial quest's name pointer.
- * Name: `*tutorial_quest_name` */
+/* The tutorial quest's name pointer (`*tutorial_quest_name`). */
 s32 lb_quest_name_get(void) {
     return *tutorial_quest_name;
 }
 
-/* The tutorial message pointer for one entry.
- * Name: `tutorial_quest_msg[index]` */
+/* The tutorial message pointer for one entry (`tutorial_quest_msg[index]`). */
 s32 lb_quest_msg_get(u8 index) {
     return *(tutorial_quest_msg + index);
 }
 
-/* Scans the 4-word-stride id table for `id`; the 0xFFFF terminator answers NULL.
- * Name: scans the 4-word-stride `lbl_806042B8` table for the id; the 0xFFFF terminator answers NULL */
+/* Scans the 4-word-stride `lbl_806042B8` id table for `id`; the 0xFFFF terminator answers NULL. */
 u16* lb_page_id_find(u16 id) {
     u16* row;
 
@@ -1222,14 +1056,12 @@ u16* lb_page_id_find(u16 id) {
     return NULL;
 }
 
-/* Forwards the row of the page table at `index` to the row writer.
- * Name: forwards `lbl_806043E8[index]`'s two halfwords to `fn_8033AC78` */
+/* Forwards the two halfwords of the page table row `lbl_806043E8[index]` to the row writer `fn_8033AC78`. */
 void lb_page_row_apply(u16 index, s32 value) {
     fn_8033AC78(lbl_806043E8[index].first_0x00, lbl_806043E8[index].second_0x02, value);
 }
 
-/* Act 26: whether the request carries no "already handled" bit.
- * Name: act 26: whether the request's fourth byte has bit 0 clear */
+/* Act 26: whether the request's fourth byte has bit 0 (the "already handled" bit) clear. */
 u32 lb_act_handled_bit_ck(u8 unused, LbActReq* req) {
     if (req != NULL && (req->sel_0x04.bytes_0x00.d_0x03 & 1) == 0) {
         return 1;
@@ -1237,8 +1069,7 @@ u32 lb_act_handled_bit_ck(u8 unused, LbActReq* req) {
     return 0;
 }
 
-/* Looks the row up and hands it to the writer; -1 when the row is not in the page table.
- * Name: `fn_8033AC78`'s row lookup; -1 when the row is absent, else `fn_8033AED0` */
+/* `fn_8033AC78`'s row lookup: -1 when the row is not in the page table, else the row goes to `fn_8033AED0`. */
 s8 lb_page_row_ck(u16 id, u16 value, s16* out) {
     if (fn_8033AC78(id, value, 0) == NULL) {
         return -1;
@@ -1246,8 +1077,7 @@ s8 lb_page_row_ck(u16 id, u16 value, s16* out) {
     return fn_8033AED0(out, 0, 0);
 }
 
-/* Sets the page block's per-entry bit for `index`.
- * Name: sets the bit for `index` in `lobby_world_block->bits_0x3960` */
+/* Sets the bit for `index` in the page block's per-entry bit field `lobby_world_block->bits_0x3960`. */
 void lb_page_entry_bit_set(u8 unused, LbActReq* req) {
     u8 index = req->sel_0x04.bytes_0x00.c_0x02;
 
@@ -1255,8 +1085,7 @@ void lb_page_entry_bit_set(u8 unused, LbActReq* req) {
         lobby_world_block->bits_0x3960[index >> 3] | (u8)(1 << (index & 7));
 }
 
-/* Copies the 0xC-byte settings record from one owner to another.
- * Name: copies the 0xC-byte `LbSettings` record field by field */
+/* Copies the 0xC-byte `LbSettings` record from one owner to another, field by field. */
 void lb_settings_copy(LbSettings* dst, LbSettings* src) {
     dst->first_0x00 = src->first_0x00;
     dst->second_0x02 = src->second_0x02;
@@ -1266,27 +1095,24 @@ void lb_settings_copy(LbSettings* dst, LbSettings* src) {
     dst->value_0x0C = src->value_0x0C;
 }
 
-/* The area-name/quest path helper the tutorial block drives.
- * Name: a 4-byte tail call of `fn_80217934`, the area-name/quest path helper */
+/* A tail call of `fn_80217934`, the area-name/quest path helper the tutorial block drives. */
 void lb_area_name_apply(void) {
     fn_80217934();
 }
 
-/* The page block's id-table row `index` (the entry the companion page binds).
- * Name: `&lobby_world_block->ids_0x5180[index]`; `ef/eft050.cpp` calls it */
+/* The page block's id-table row `&lobby_world_block->ids_0x5180[index]` (the entry the companion page binds);
+ * `ef/eft050.cpp` calls it. */
 LbEntryId* lb_entry_id_get(u8 index) {
     return &lobby_world_block->ids_0x5180[index];
 }
 
-/* Clears the block's "changed" bit and republishes the entry byte to `lb_param_w`.
- * Name: clears the block's 0x80 "changed" bit and republishes the entry byte to `lb_param_w` */
+/* Clears the block's 0x80 "changed" bit and republishes the entry byte to `lb_param_w`. */
 void lb_entry_changed_clr(void) {
     lobby_world_block->entry_0x3E03 = (u8)(lobby_world_block->entry_0x3E03 & 0x7F);
     lb_param_w.entry_0x08 = (u8)lobby_world_block->entry_0x3E03;
 }
 
-/* Republishes the selected entry's id and its five sub-values into `lb_param_w`.
- * Name: republishes the selected entry id and its five sub-values into `lb_param_w` */
+/* Republishes the selected entry's id and its five sub-values into `lb_param_w`. */
 void lb_entry_publish(void) {
     LbEntryId* entry;
     u8 index;
@@ -1304,37 +1130,32 @@ void lb_entry_publish(void) {
     lb_param_w.sub_0x2E = lobby_world_block->word_0x51A2;
 }
 
-/* Recomputes the block's page flags from the entry's model id.
- * Name: ORs `fn_802D8F84(fn_802D7B5C(word_0x51A0))` into `flags_0x519C` */
+/* Recomputes the block's page flags: ORs `fn_802D8F84(fn_802D7B5C(word_0x51A0))` into `flags_0x519C`. */
 void lb_page_flags_update(void) {
     lobby_world_block->flags_0x519C =
         lobby_world_block->flags_0x519C | fn_802D8F84(fn_802D7B5C(lobby_world_block->word_0x51A0));
 }
 
-/* Publishes the selected entry's model id into the block's id table.
- * Name: stores `fn_802D7C6C(ids_0x51A6[entry])` into the id-table row */
+/* Publishes the selected entry's model id (`fn_802D7C6C(ids_0x51A6[entry])`) into the block's id table. */
 void lb_entry_model_publish(void) {
     u8 entry = lobby_world_block->entry_0x3E03 & 0x7F;
 
     lobby_world_block->ids_0x5180[entry].word_0x00 = fn_802D7C6C(lobby_world_block->ids_0x51A6[entry]);
 }
 
-/* Both of the block's refresh steps, in order.
- * Name: the two refresh steps in order (`lb_page_flags_update`, `lb_entry_model_publish`) */
+/* Both of the block's refresh steps in order (`lb_page_flags_update`, `lb_entry_model_publish`). */
 void lb_page_refresh(void) {
     lb_page_flags_update();
     lb_entry_model_publish();
 }
 
-/* Republishes the entry byte and then the page's name path.
- * Name: `lb_entry_publish` then `fn_80217934` */
+/* Republishes the entry byte (`lb_entry_publish`) and then the page's name path (`fn_80217934`). */
 void lb_entry_republish(void) {
     lb_entry_publish();
     fn_80217934();
 }
 
-/* Sets the bit of the entry the block has selected in the companion page's bit field.
- * Name: sets `page->bits_0x72` for the entry the block selected and mirrors the count */
+/* Sets `page->bits_0x72` for the entry the block has selected and mirrors the count. */
 void lb_page_bits_set(LbPageWork* page) {
     u8 i;
     u32 selected;
@@ -1348,8 +1169,7 @@ void lb_page_bits_set(LbPageWork* page) {
     }
 }
 
-/* Whether the NUL-terminated byte list contains `value`.
- * Name: whether the NUL-terminated byte list contains `value` */
+/* Whether the NUL-terminated byte list contains `value`. */
 u32 lb_byte_list_has(u8* list, u8 value) {
     u8* p;
 
@@ -1363,8 +1183,7 @@ u32 lb_byte_list_has(u8* list, u8 value) {
     }
 }
 
-/* Draws the sub-page's arrow sprites at the layout position.
- * Name: `get_lsp_data(0x1EB6)` + `draw_sprite_ary(lbl_805E723C)` */
+/* Draws the sub-page's arrow sprites at the layout position (`get_lsp_data(0x1EB6)`, `lbl_805E723C`). */
 void lb_subpage_arrow_draw(void) {
     _mh_ivec2_ pos;
 

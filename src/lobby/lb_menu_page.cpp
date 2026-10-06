@@ -1,106 +1,17 @@
-/* lobby/lb_menu_page.cpp - the lobby menu page's per-frame handler and its info/message selector.
- *
- * `.text` 0x80365C84..0x80366618, two functions (0x788 and 0x20C bytes) plus their extab records
- * 0x800177C4..0x800177D4 and extabindex entries 0x8003720C..0x80037224 - each run is exactly the gap
- * between the split objects that bracket this unit (`auto_fn_803659E8_text`'s record ends at
- * 0x800177C4/0x8003720C, `auto_fn_80366618_text`'s begins at 0x800177D4/0x80037224), and the two
- * functions are one TU: `lb_menu_page_step` calls `lb_menu_info_update` and nothing else in the DOL does.
- *
- * WHAT IT IS.  `lb_menu_page_step` is the page's frame step: it resets the 2D state
- * (`set_zmode(0,0,0)`, `set_blendmode(4,5,1)`), switches on the page's `state_0x00` 1..10 and runs
- * one per-page draw/update arm (`fn_803642B8`/`fn_803645C4`/`fn_80364BD8`/`fn_80364EE8`/
- * `fn_803653A0`/`fn_803659E8`/`fn_8033C1AC`, the neighbouring functions of this band), then calls
- * `lb_menu_info_update`.  That one turns the page's state into the two text ids the info panel shows:
- * it picks a page id (6263/6264/6265 = the map's 0x1877/0x1878/0x1879) and a primary/secondary id,
- * and pushes them with `fn_80214EF0(page, id)` and `fn_802150DC(page, id, a, b)`; the arms that need
- * an icon record copy one out of the shared lobby block (`lobby_world_block + 0xE00`, stride 0xC) or use
- * the page's own record tables (+0x264 stride 0x18, +0x328 stride 0x10, +0x20C icons, +0x23C words,
- * +0x24C u16s).
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string: a relocation sweep of
- * both split objects finds no `.c`/`.cpp` literal at all - the range's only data references are the
- * `.sbss` pointer `lobby_world_block`, the `.data` jump table below and calls.  (The `menu_note.cpp`
- * string the proposal's discovery note cites at 0x805E91F8 is NOT this unit's: it is referenced by
- * `src/menu/menu_note.cpp`'s object and by nothing else, and neither object here names it.)
- * 2. `dumpmap.py lookup 0x80365C84` / `0x8036640C` answer `zz_0365c84_` / `zz_036640c_` placeholders,
- * and `symedit.py range 0x80365C84 0x80366618` showed two bare stems before this lane named them.
- * 3. Module `lobby` and the unit's name come from the code: the frame step reads the lobby work block
- * `lobby_w` (.bss 0x806AAB44) at +0x0AC - the same menu pointer `lobby/fn_801E7530.cpp` uses - and
- * the selector reads the lobby page block `lobby_world_block` (.sbss 0x80794880, the 4-byte pointer); all
- * 20 callee sites are lobby/hud symbols (`set_zmode`/`set_blendmode`, the 0x1877/0x1878/0x1879 panel
- * family `fn_80214EF0`/`fn_80214FB8`/`fn_802150DC`/`fn_80215170`, `fn_801E66A8`/`fn_801E677C`/
- * `fn_801E68B4`, `fn_801EF73C`/`fn_801F0834`, `fn_802142D8`/`fn_802179D4`/`fn_80217F4C`,
- * `fn_8033C1AC`) plus the Pl/HUD icon queries `equip_kind_table_class`/`fn_8027F1B8`/`fn_8027F21C` and the
- * 12-byte icon copy `equip_record_copy`.
- *
- * NAMES: GUESS, derived from the two bodies (marked per the brief, for a later naming pass).  The pair
- * is the lobby menu page's frame step and its info-text selector, so the unit is `lb_menu_page.cpp`
- * and its symbols are `lb_menu_page_step` / `lb_menu_info_update` - the module's own `lb_*` scheme
- * (`lb_companion_ui`, `lb_npc`, `lb_act_dispatch`) with a verb phrase per body.  The map rows at
- * 0x80365C84 / 0x8036640C were renamed with the source, one edit each, through
- * `symedit.py rename`; nothing else referenced either (its own check plus a `grep` over
- * `build/RMHE08/obj/`: the only other citations are the jump table below and a call from the
- * unregistered `fn_80363A5C`, which has no source yet).
- *
- * Naming note: the `fn_XXXXXXXX` names this file still carries are OTHER units' symbols - the
- * lobby/hud/Pl callees in the linkage block below and the six 0x8036xxxx siblings - whose map rows
- * this lane does not own.  The two symbols this unit defines are named.
- *
- * LANGUAGE AND FLAGS.  C++: the range reaches genuinely mangled callees (`set_zmode__FbUcb`,
- * `set_blendmode__FUcUcUc`) through their real signatures (rule 9), and every plain `fn_` definition
- * is `extern "C"` so it keeps the map's name (playbook 42).  Lib `lobby` (`cflags_lobby`: -O3,
- * -inline noauto), whose `-Cpp_exceptions on` (flags-audit 2026-09-28) emits the unwind records: the
- * target objects carry one extab record each (8 B) and one extabindex entry each (12 B).
- *
- * DATA.  `.data` 0x805EDAB4..0x805EDAE0 (0x2C B) is this unit's own jump table: MWCC emits it for
- * `lb_menu_page_step`'s dense 0..10 switch, the map records it as `jumptable_805EDAB4` (`scope:local`,
- * 11 entries x 4 B), and it is the only data either body emits.  It is a slice of the unclaimed
- * `.data` run 0x805E9248.., so the claim is one island inside an `auto_*_data` chunk - the bytes on
- * both sides belong to other TUs (the neighbouring tables resolve to `fn_80360A58`/`fn_80363A5C`/
- * `fn_803667EC` jump tables).  No `.sdata2` is emitted or claimed.
- *
- * SEAM: UNPROVEN at the trailing edge (brief section 8.3).  The leading edge is solid (the previous
- * split object is a different band and nothing here is cited from it); the trailing edge at
- * 0x80366618 is attribute.py's `--max-bytes` cut - the next functions (0x80366618, 0x803667EC) draw
- * with `cpSetRotMatrixZXY`/`mulVecMatAddTrans` and lead into `eft053` at 0x803669A0, and no evidence
- * class settles where this unit ends.
- *
- * FLAGS, MEASURED.  The lib's `-Cpp_exceptions on` (flags-audit 2026-09-28) is required: without it
- * the object emits no
- * extab/extabindex at all (`datagap.py --mode both` reports `extab 16B (ours 0B)`,
- * `extabindex 24B (ours 0B)`, `matched_data` 44 of 84).  `#pragma peephole off` is required too:
- * retail keeps the unfused `rlwinm` + `cmpwi` and `clrlwi` + `cmpwi` pairs this unit is full of,
- * and the pass folds them into `rlwinm.`/`clrlwi.` (A/B over the unit: 96.484505 -> 99.55954).
- *
- * STATUS AND RESIDUAL.  `lb_menu_page_step` is byte-identical (524 B, 100.00 %).  `lb_menu_info_update`
- * measures
- * 99.439835 %: with the peephole pass off the two functions' instruction streams have the same
- * length (482 instructions each), and the whole residual is one register/association choice in
- * case 10 / mode 1.  Retail loads the icon record's base pointer into `r3` - the register the
- * argument pointer `self` has just died in - and forms the record as `(base + 0xE00) + index * 12`;
- * ours loads the same `.sbss` pointer into a fresh `r4` one instruction earlier and forms
- * `(base + index * 12) + 0xE00`:
- *
- *   retail                                          ours
- *   330 lha   r0,962(r3)    ; self->icon_index_0x3C2 330 lwz  r4,0(0)
- *   334 mulli r0,r0,12                               334 lha  r0,962(r3)
- *   338 lwz   r3,0(0)       ; lobby_world_block          338 mulli r0,r0,12
- *   33c addi  r3,r3,3584                             33c add  r3,r4,r0
- *   340 add   r25,r3,r0                              340 addi r25,r3,3584
- *   344 lbz   r3,0(r25)                              344 lbz  r3,0(r25)
- *
- * Both forms occur in retail itself (the case 10 / mode 0 twin at 0x27c uses ours), so the
- * association is the allocator's, not the source's, and no source spelling tried moved it: the
- * plain `&entries[i]` and `entries + i` forms, an index local, a `rec`-first declaration (which
- * *did* fix the other half of the pair - `flags` moved from r25 to retail's r26 and the unit went
- * 99.49429 -> 99.55954), a `table` local, and `#pragma scheduling off` scoped over the function
- * (97.22023, rejected).  Nine measured variants in all (seven source shapes for this pair plus the two flag A/Bs); this is the
- * best of them.
- *
- * UNIT SCORE.  fuzzy 99.55954 %, `.text` 2452 B with 524 B byte-identical, and `.data`/`extab`/
- * `extabindex` 84 of 84 B - `datagap.py --unit lobby/lb_menu_page --mode both` reports no gap in
- * either direction, and the unit is `NonMatching` (the 0.44 % residual above is what stands
- * between it and a flip).
+/* lobby/lb_menu_page.cpp - the lobby menu page's frame step and its info-text selector.
+ * RANGE. .text 0x80365C84-0x80366618 (2 functions); .data 0x805EDAB4-0x805EDAE0 (`jumptable_805EDAB4`, the frame step's
+ *   0..10 switch table, an island inside another TU's `.data` run), extab, extabindex.  One TU: `lb_menu_page_step` is
+ *   `lb_menu_info_update`'s only caller.  `ef/eft053.cpp` starts at the right edge.
+ * FLAGS. `cflags_lobby` (its `-Cpp_exceptions on` emits the two unwind records) and file-scope `#pragma peephole off`
+ *   (retail keeps the unfused `rlwinm`/`clrlwi` + `cmpwi` pairs; measured in docs/lobby.md).
+ * NAMES. The unit, `lb_menu_page_step` and `lb_menu_info_update` are GUESSes from the two bodies in the module's `lb_*`
+ *   scheme.  Module `lobby`: the frame step reads `lobby_w` +0x0AC (the menu pointer `lobby/fn_801E7530.cpp` uses), the
+ *   selector `lobby_world_block`, and every callee is a lobby/hud or Pl icon symbol.
+ * RESIDUALS. `lb_menu_info_update`: case 10 / mode 1 loads the icon table base into a fresh r4 one instruction early
+ *   and forms `(base + index * 12) + 0xE00`, retail `(base + 0xE00) + index * 12` in r3 (19 of 2452 `.text` bytes).
+ *   Retail's own mode-0 twin at +0x27C uses our form, so the association is the allocator's; the `&entries[i]`,
+ *   `entries + i`, index-local and `table`-local spellings and a scoped `#pragma scheduling off` do not move it.
+ * SHAPES. The `rec`-first declaration in case 10 / mode 1 puts `flags` in retail's r26.
  */
 
 #include "types.h"
@@ -111,8 +22,7 @@
  * owner's header (rule 2). */
 #include "lobby/lb_pane_ui.h"
 
-/* The target objects carry one 8-byte extab record and one 12-byte extabindex entry per function
- * (both runs are claimed in splits.txt); `cflags_lobby`'s `-Cpp_exceptions off` would emit none. */
+/* Retail keeps the unfused `rlwinm`/`clrlwi` + `cmpwi` pairs the peephole pass folds into record forms. */
 #pragma peephole off
 
 typedef struct LbMenuPage LbMenuPage;
@@ -190,8 +100,7 @@ typedef struct LbMenuPage {
     /* +0x3C4 */ u8 tail_0x3C4[];
 } LbMenuPage; /* size: 0x3C4+ */
 
-/* Foreign callees whose owners do not publish them: bare prototypes inside the linkage block, the
- * convention the neighbouring lobby units use (each is filed as a shared-file request, rule 2). */
+/* Foreign callees whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
 void fn_801E66A8(s32 a, s32 b);                  /* 0x801E66A8 - resets the band's work group */
 void fn_801E677C(void* work, u8 kind, u8 flag);  /* 0x801E677C - initialises one sub-work record */

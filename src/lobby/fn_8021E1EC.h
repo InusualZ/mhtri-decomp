@@ -1,23 +1,13 @@
-/* This unit's own types and declarations (`src/lobby/fn_8021E1EC.cpp`).
- *
- * A header rather than the unit's own source because the lobby C++ ABI it declares is spelled with the
- * map's own type names - `_mh_ivec2_` must be a type with exactly that name for MWCC to re-emit
- * `get_lsp_data__FUsP10_mh_ivec2_` - and a name that more than one file needs belongs in one header
- * (docs/plan.md 6.5 rule 1).  NOTE for the next pass: `_mh_ivec2_` is also defined locally by
- * `src/hud/fn_80324F7C.c` (that file's own rule-1 backlog) and by `unsplit/lobby.h`; the three
- * copies are identical (`s16 x; s16 y;`) and should collapse to the unsplit lobby header - this unit
- * cannot include that header, because its `lobby_w`/`lobby_world_block` views are not the ones this range
- * reads (see the source's file header).  Recorded as a config_request.
- *
- * docs/plan.md 6.5 rules 3/4/5: every type states its size, every field its offset and a name.
- */
+/* The types and declarations `lobby/lb_menu_scratch.cpp`, `lb_menu_pos_tbl.cpp` and `lb_equip_page.cpp` share, with
+ * the map's own type names the lobby ABI's manglings need (`_mh_ivec2_`, also defined identically by `unsplit/lobby.h`
+ * and `hud/fn_80324F7C.c`, whose `lobby_w`/`lobby_world_block` views these units cannot include). */
 #ifndef MHTRI_LOBBY_FN_8021E1EC_H
 #define MHTRI_LOBBY_FN_8021E1EC_H
 
 #include "types.h"
 #include "nw4r/math.h"
 
-#include "lobby/lobby_w.h" /* `LbLobbyWork`/`lobby_w`, owned by this unit (rule 1/2) */
+#include "lobby/lobby_w.h" /* `LbLobbyWork`/`lobby_w`, owned by `lobby/lb_menu_pos_tbl.cpp` (rule 1/2) */
 #include "fn_80047398/lobby_world_block.h" /* `lobby_world_block`, owned by fn_80047398.cpp (rule 2) */
 
 /* The block `lobby_world_block` (a 4-byte pointer in `.sbss`) points at.  This range reads the one byte the
@@ -186,15 +176,10 @@ extern const f32 lbl_80799C78;       /* .sdata2 0x80799C78 - the per-row step sc
 extern const f32 lbl_80799C7C;       /* .sdata2 0x80799C7C - the "scrolled to the end" mark */
 extern u32 frame_counter;             /* .sbss 0x80794868 - the page's tick counter */
 s32 CalculateEvents();
-/* 0x80223E54 - the `.text` helper in this unit's range (0x8021E1EC-0x80224AC4) that
- * `Pl/fn_80262940.cpp` calls on the actor model; an unmangled `fn_` stem, so C linkage.  Owned here by
- * range (rule 2), so the consumer includes this header rather than declaring it in the unsplit band. */
+/* 0x80223E54 - `lobby/lb_equip_page.cpp`'s helper the Pl units call on the actor model (C linkage). */
 s32 fn_80223E54(s32 model);
-/* The model-layer helpers of this range that `Pl/fn_80224AC4.cpp` (the next unit up,
- * 0x80224AC4-0x80229ECC) calls: they are defined here by range (rule 2), so the consumer includes
- * this header.  `fn_80223258` was previously spelled `(LbPage*, u8)` in `unsplit/lobby.h`'s
- * neighbour `lobby/fn_801F3294.h`; its body reads `self->equipA`, so the actor is a `_PLW`.
- * `fn_80223708`/`fn_80223830` take the actor's +0x25C/+0x258 blocks by pointer. */
+/* The page layer's model helpers the rig update (0x80224AC4-0x80229ECC) calls: `fn_80223258` reads `self->equipA`
+ * (a `_PLW`), `fn_80223708`/`fn_80223830` take the actor's +0x25C/+0x258 blocks by pointer. */
 struct _PLW;
 void fn_80223258(struct _PLW* self, u32 slot);
 void fn_80223708(void* rig, void* block_0x25C, u32 slot);
@@ -211,11 +196,8 @@ typedef struct _mh_ivec2_ {
     /* +0x02 */ s16 y;
 } _mh_ivec2_; /* size: 0x4 */
 
-/* The lobby UI ABI this range calls.  C++ linkage (the map's `__F...` manglings with C++ parameter
- * types), so they sit outside `extern "C"`; the front-end reproduces the map's names from these exact
- * signatures (rule 9).  They are declared here rather than included from `unsplit/lobby.h`
- * because that header's `lobby_w`/`lobby_world_block` views conflict with this unit's (see the file
- * header). */
+/* The lobby UI ABI these units call: C++ linkage, the map's manglings reproduced from these signatures (rule 9); not
+ * included from `unsplit/lobby.h`, whose `lobby_w`/`lobby_world_block` views conflict with these units'. */
 void* get_lsp_data(u16 id, _mh_ivec2_* out);
 void draw_sprite_ary(const u16* table, const _mh_ivec2_* pos);
 void draw_sprite_anim_ary(const u16* table, u16 index, const _mh_ivec2_* pos);
@@ -223,9 +205,8 @@ void draw_sprite_anim_idx(u16 id, u16 index, const _mh_ivec2_* pos);
 void draw_sprite_idx(u16 id, const _mh_ivec2_* pos);
 s32 ck_WideMode(void);
 
-/* The map's `calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3` is a FREE function (`__F`) whose
- * parameters carry the namespace type, so it is declared at global scope (the same shape
- * `nw4r/math.h` uses for `setVector3`). */
+/* A free function whose parameters carry the namespace type (`__FPQ34nw4r4math4VEC3...`), so declared at global
+ * scope like `nw4r/math.h`'s `setVector3`. */
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
 
 

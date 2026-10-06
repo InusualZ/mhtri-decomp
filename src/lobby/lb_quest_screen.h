@@ -1,14 +1,5 @@
-/* The declarations `src/lobby/lb_quest_screen.cpp` owns (docs/plan.md 6.5 rule 2: a consumer includes
- * the owner's header, it never declares the symbol itself).
- *
- * The unit is the quest/multiplayer screen band 0x803A3A50..0x803AA4A4 whose head reconstructs the
- * note pane the `enemy` band at 0x80385A54..0x80385CA0 drives (see the unit's file header for the
- * seam and naming evidence).  `note_pane_get_motion` is the one entry point another registered unit
- * calls today: `src/enemy/fn_80382310.cpp`'s `fn_80385A54` tail-calls it for the pane's state 1.
- *
- * The parameter is spelled `NoteWork*` - the consumer's own record, which IS the 0x1F8 bytes
- * `qn_get_motion_no` reads as `_QNPC_W` (the owner's header names both views of the same record).
- */
+/* The declarations `lobby/lb_quest_screen.cpp` owns.  `note_pane_get_motion` takes `NoteWork*`, the record
+ * `enemy/em_prog_support.cpp`'s pane drives (the 0x1F8 bytes `qn_get_motion_no` reads as `_QNPC_W`). */
 #ifndef MHTRI_LOBBY_LB_QUEST_SCREEN_H
 #define MHTRI_LOBBY_LB_QUEST_SCREEN_H
 
@@ -32,31 +23,22 @@ void note_pane_get_motion(struct NoteWork* self);
  * enemy id and a fixed 0 (GUESS: the role; the signature is the call site's). */
 void quest_enemy_spawn_req(u8 a, u16 id, u16 b, s32 c, u8 d);
 
-/* The range's quest-work accessors, moved here from `unsplit/menu.h` when this unit
- * registered over their addresses (docs/plan.md 6.5 rule 2).  Their bodies are still unwritten, so
- * they keep the map's stems; renaming them is the batch that writes them (rule 7's unblock is the
- * name, and nine consumer sites across `enemy/fn_8012BDF4.cpp`, `enemy/fn_80176C58.cpp`,
- * `lobby/lb_companion_ui.cpp` and the two `menu` units have to be swept with it). */
+/* The quest-work accessors (unwritten; two still carry the map's stems). */
 s32 quest_time_elapsed_get(void);
 s32 fn_803A881C(void);
 s32 quest_time_limit_get(void);
 s32 fn_803A9690(void);
 s32 quest_sub_state_end_ck(s32 flag);
 
-/* 0x803A8DA4 - seeds the quest random source: the item work's 0x5A halfword becomes the sum of its seven
- * (low, high << 8) halfword pairs at +0x6C (halfwords 0..13 of the 15-entry clock snapshot; the last is
- * unread), and 451 when that sum is 0.  Names are GUESSes (the pair is a clock snapshot the quest start
- * stores). */
+/* 0x803A8DA4 - seeds the quest random source (the item work's 0x5A halfword) with the sum of the seven (low, high << 8)
+ * pairs of the clock snapshot at +0x6C, or 451 when that is 0.  GUESS name. */
 void quest_rand_seed_set(void);
-/* 0x803A8EE4 - the quest random source: the next value of the item work's 0x5A halfword, a multiplicative
- * step (x176 mod 65363, `mulli 176` then `lis 1; subi 0xAD`; state 0 is taken as 1) kept in the
- * halfword; 0 when the item work is missing.  The value is 16 bits wide;
- * `enemy/fn_801926EC.cpp` masks it, so the return stays `u32` as that caller reads it. */
+/* 0x803A8EE4 - the next quest random value (x176 mod 65363 on the 0x5A halfword, state 0 taken as 1; 0 without an item
+ * work); `u32` because the caller masks the 16-bit value. */
 u32 quest_rand_next(void);
 
-/* 0x803A7E68 - sets the lobby area up from `count` area entry handles (the quest work's +0x69A8 list), spawning
- * the quest's monsters into the slot's move work.  GUESS name from the allocation, the `memset` and the
- * monster setup it drives. */
+/* 0x803A7E68 - sets the lobby area up from `count` area entry handles (the quest work's +0x69A8 list) and spawns the
+ * quest's monsters into the slot's move work.  GUESS name. */
 void quest_area_spawn_setup(struct Q_MoveWork* work, u32* area, u8 count, u8 flag);
 /* 0x803A8128 - applies the area `index`'s spawn for sub-state `sub` to the slot's move work.  GUESS name. */
 void quest_area_spawn_apply(struct Q_MoveWork* work, u8 index, u8 sub);
@@ -65,20 +47,16 @@ void quest_area_spawn_apply(struct Q_MoveWork* work, u8 index, u8 sub);
  * name from those two stores. */
 void quest_time_limit_set(s32 frames);
 
-/* 0x803A8D4C - the current quest id: the option block's selected id while the local slot has a quest
- * in progress, else the item work's own +0x10 key.  Read by `enemy/fn_80176C58.cpp` (its 0x3EC
- * test) and by the quest selector band. */
+/* 0x803A8D4C - the current quest id: the option block's selected id while the local slot has a quest in progress, else
+ * the item work's +0x10 key. */
 u32 quest_id_get(void);
 
 /* 0x803A9DEC - writes one 0x60-byte quest-work element's flag word (`value` is the flag mask). */
 void quest_element_set(struct QuestWork* work, u16 index, u32 value);
 
-/* 0x803AA060 - whether the caller-owned work record may take a roll for element `index`: the
- * element's flags need bit 3 set and bit 6 clear, and the record's own word at +0x2D8 + index*4 needs
- * bit 6 set; `index` 4 is the whole-array form and counts the three elements instead.  The record is
- * the item work (`get_move_work_adrs(0) + 0xDC`), whose three views disagree (this header's
- * `QuestWork`, `lobby/lb_companion_ui.h`'s `LbCompanionWork`, `quest/quest_entry.h`'s `Q_ItemWork`),
- * so the parameter is the forward-declared struct here and each caller passes its own view. */
+/* 0x803AA060 - whether the item work may roll element `index` (flag bit 3 set, bit 6 clear, its +0x2D8 word's bit 6
+ * set; `index` 4 counts all three).  The item work's views disagree (`QuestWork` here, `LbCompanionWork` in
+ * `lobby/lb_companion_ui.h`, `Q_ItemWork` in `quest/quest_entry.h`), so the parameter is forward-declared. */
 u32 quest_element_pick_ck(struct QuestWork* work, u8 index, s32 use_alt);
 
 
@@ -86,15 +64,12 @@ u32 quest_element_pick_ck(struct QuestWork* work, u8 index, s32 use_alt);
 }
 #endif
 
-/* Declarations moved here from `unsplit/lobby.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* The four 6-entry sprite/index tables `fn_803A4F7C`/`fn_803A5070` search, and the flat u16 run
- * their search continues into (both terminated by a 0 entry).  The addresses are in the unclaimed
- * `.data` run 0x805F2038..0x805F2A38 / `.sdata` run 0x80793530.., which no registered unit owns
- * (rule 2: the band header carries them). */
+/* The four 6-entry sprite/index tables `note_value_to_slot`/`note_slot_to_value` search and the flat u16 run they
+ * continue into (both 0-terminated), in this unit's `.data`/`.sdata` claims. */
 extern const u16* note_slot_table[4];
 
 extern const u16 note_slot_flat_table[];

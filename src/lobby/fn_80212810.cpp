@@ -1,42 +1,28 @@
 /* lobby/fn_80212810.cpp - the lobby item/equipment page layer.
- *
- * `.text` 0x80212810..0x80219260 (105 functions, 27216 B).
- *
- * Module `lobby`.  The range's callees are the lobby UI API (`LbStr`, `draw_sprite_ary`,
- * `get_lsp_data`, `GetMenuFontColor`, `put_menu_cursor`) and the `.bss` run this unit reads names
- * `lobby_w`, `lb_npc`; its lower neighbour in the address band is the registered
- * `lobby/fn_801E7530.cpp` menu layer.  Language C++: every call out of the range is a mangled symbol
- * (`LbPutAnaPageArrow__FUsUsssUsP10_mh_ivec2_bb` is defined in this range).
- *
- * Seam.  `tudiscover.py at 0x80212810` puts the left edge at 0x80212810 with strong evidence (the
- * `.data` jump table `jumptable_805B9770 -> jumptable_805B97BC` cut) and the right edge only weakly
- * (0x80213290 / 0x80213870); the proposal's right edge 0x80219260 is the `--max-bytes` cap, not a TU
- * boundary.  The range is registered whole; the next proposal (0x80219260) continues the same band.
- *
- * Name.  The map has only `fn_XXXXXXXX` for this range (checked with `dumpmap.py lookup` over the
- * whole inventory: every name but `LbPutAnaPageArrow__FUsUsssUsP10_mh_ivec2_bb` is a bare `.text`
- * entry and the runtime dump answers `zz_XXXXXXXX_`), so the file keeps the map's stem.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
- * lookup over the range's inventory: all names are bare `.text` entries in
- * config/RMHE08/symbols.txt and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
- *
- * Residuals (recompile.py --measure, official report metric; the bar is 80 %):
- *  - fn_802128A8 70.15 % (target 388 B, ours 400 B).  The retail entry zero-extends `kind` in place
- *    (`clrlwi r3,r3,24`) before the switch.  With `u8 kind` MWCC trusts the ABI and drops the mask;
- *    with `s32 kind` + `switch ((u8)kind)` the range tests come out as a signed tree instead of the
- *    retail `addi r0,r3,-1; cmplwi r0,4`; with `s32 kind` + `kind = (u8)kind` the tree is right but
- *    the allocator moves the narrowed copy to r31 and arg/sel to r29/r30.  Best shape kept: the
- *    `u8 kind` + `switch (kind)` version (correct tree and registers, missing the 4-byte entry mask).
- *  - fn_80215E6C 73.33 % (target 24 B, ours 20 B).  The retail body materialises the byte mask and
- *    the `*4` scale as two instructions (`clrlwi r0,r3,24; slwi r0,r0,2`); every source shape tried
- *    (`(u8)id` index, `id = (u8)id`, `u8` parameter) fuses them into one `rlwinm r0,r3,2,22,29`.
- *  - fn_80214948 (20 B) is not reconstructed: lobby.h declares it with five parameters, but the
- *    retail callee reads a sixth register argument (`clrlwi r8,r8,24`), so defining the real six-
- *    parameter signature in this unit is an illegal redeclaration.  Left undefined; the declaration
- *    and the caller `fn_801E8994` are wrong in the same way (their own residuals).
- *  - the remaining 68 of the 105 functions are not reconstructed yet (largest first: fn_80218138
- *    3912 B, fn_80215F8C 1380 B, fn_80216D50 776 B, fn_80216A68 744 B, fn_802142D8 716 B).
+ * RANGE. .text 0x80212810-0x80219260 (105 functions); .data 0x805B97BC-0x805B9DDC, .sdata 0x80791DC0-0x80791EB0,
+ *   .sdata2 0x80799C18-0x80799C40, extab, extabindex.  `tudiscover at 0x80212810` puts the left edge here with strong
+ *   evidence (the `jumptable_805B9770` -> `jumptable_805B97BC` cut) and the right edge only weakly (0x80213290 /
+ *   0x80213870).
+ * NAMES. The map and the dump give only placeholders (`LbPutAnaPageArrow__FUsUsssUsP10_mh_ivec2_bb` is the range's one
+ *   real name), so the file keeps the map's stem.  Module `lobby`: `LbStr`, `draw_sprite_ary`, `get_lsp_data`,
+ *   `GetMenuFontColor`, `put_menu_cursor`, and the `.bss` it reads (`lobby_w`, `lb_npc`).
+ * RESIDUALS. 68 rows unwritten: 0x80212B1C-0x80214EF0, 0x80214F30-0x80215A74, 0x80215AE4-0x80215E6C,
+ *   0x80215E84-0x802164F0, 0x8021677C-0x80216A08, 0x80216A68-0x80217934, 0x802179D4-0x80217B04, 0x80217C68-0x80217DA0,
+ *   0x80217DD8-0x80217F4C, 0x80217FA0-0x802180D8, 0x80218138-0x80219080.  `fn_80214948` among them: `unsplit/lobby.h`
+ *   declares five parameters where retail reads a sixth (`clrlwi r8,r8,24`), so its real definition would clash.
+ *  - `fn_802128A8`: retail zero-extends `kind` (`clrlwi r3,r3,24`) before the switch; a `u8` parameter drops the mask,
+ *    `s32` + `switch ((u8)kind)` gives a signed tree, `kind = (u8)kind` moves the copy to r31; the `u8` form is kept;
+ *  - `fn_80215E6C`: retail keeps `clrlwi r0,r3,24; slwi r0,r0,2`, ours fuses them into one `rlwinm` (the unit does not
+ *    set the `#pragma peephole off` its siblings use);
+ *  - `fn_80212A2C`: ours fuses `clrlwi.` where retail keeps `clrlwi` + `cmpwi` (the same missing pragma);
+ *  - `fn_80216560`, `fn_80216678`, `fn_80217B04`: retail narrows the `u8`/`u16` values (`clrlwi`) where ours passes
+ *    them through; `fn_80217944`, `fn_80217988`: the narrowed copy lands in r4 where ours uses r3;
+ *  - `fn_80215A74`: `li r0,1` is scheduled earlier in retail; `fn_80217BE4`: its two counters swap r28/r29;
+ *  - `fn_802180D8`: the compare tree is laid out differently (ours 16 B longer);
+ *  - `fn_802190FC`: `addi r3` and `li r5` swap (the copy's argument setup order).
+ *   flipcheck: `.data` 0x38 against 0x620; `.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of
+ *   the claim; `GetItemData`, `LbPutAnaPageArrow` and `PutPageArrow` are referenced unmangled where the map spells
+ *   `GetItemData__FUs`, `LbPutAnaPageArrow__FUsUsssUsP10_mh_ivec2_bb` and `PutPageArrow__FPUsssUsPC10_mh_ivec2_Uc`.
  */
 #include "types.h"
 

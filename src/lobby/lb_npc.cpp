@@ -1,79 +1,67 @@
 /*
- * lobby/lb_npc.cpp - the lobby NPC group: the NPC tables and motion lookups, the NPC work state machines, the NPC/character
- * action layer and the player-character control band.
- *
- * `.text` 0x801FBF78..0x80212810 (389 functions), `.bss` 0x2C00 B, `.data` 0xA78 B, `.sbss` 0x58 B, `.sdata` 0x70 B, `.sdata2` 0x398 B,
- * `.ctors` 4 B, extab 0x958 B and extabindex 0xE04 B.  Phase 4 fold: the four registered units
- * `lobby/lb_npc`, `lobby/fn_802029B4`, `lobby/fn_802076D4` and `lobby/fn_8020C588` are one TU of the candidate (the `.sdata2`
- * pool and the `lb_npc` `.bss` tables run on across their old edges); their bodies are kept below in text order, each under
- * its own former header.
- *
- * Scopes: the four former units were written against different views of the same lobby globals (`lobby_w`,
- * `lobby_world_block`) and declare some unsplit callees with different signatures, so each section keeps its own declarations in a
- * namespace (`extern "C"` names stay unmangled; the C++-linkage callees and the types the manglings name stay at global scope,
- * where they are made).  Uniting the views into one declaration set is the open work of this unit.
- * Name: the survivor's own, `lb_npc` (the range owns `lb_npc`, `npc_data_town`, `npc_model_*`).
- * Flags: `cflags_lobby` for all four former units; the pragmas the third band used (`dont_inline on`, `peephole off`) are
- * scoped to its own section below.
- * Data: no `.data`/`.sdata`/`.sdata2` is defined here beyond what the former sources defined; the claimed ranges keep the
- * original bytes (`NonMatching`).
- */
-
-/* ==== survivor: lobby/lb_npc.cpp (0x801FBF78..0x802027CC) ==== */
-/* lobby/lb_npc.cpp - the lobby NPC / world-update group.
- *
- * `.text` 0x801FBF78..0x802029B4 (127 functions, 27196 B), extab 0x80010ADC..0x80010DBC,
- * extabindex 0x8002CF34..0x8002D384 (92 x 12 B), .ctors 0x8056F35C..0x8056F360 (one word, fn_801FF700).
- * Registered once, at its final home (docs/plan.md 12).
- *
- * Module `lobby`: the range owns the `lb_npc` NPC work array (.bss 0x806A7BA0, 0x12 x 0x268), the npc
- * data tables (`npc_data_town`, `npc_data_village`, `npc_lp_tbl`, `npc_model_*`, `npc_sub_data`,
- * `npc_event_set_data`), defines `lb_npc_Get_motion_no`, `lb_npc_area_ck` and `get_talk_npc_data_ptr`,
- * and its predecessors/successors in splits.txt are `lobby/lobby_scene.c` and `Pl/pl_master.cpp`
- * (the lobby band).  Language C++: `get_talk_npc_data_ptr__Fv` / `lb_npc_*__FP7_LB_NPC` are defined
- * mangled and the range calls `LbCheckKujiraEvent__Fv`, `get_move_work_adrs__FUc`, `ran_suu__Fl`, ...
- *
- * Name.  Nothing in the range emits a `__FILE__` string (the .rodata/.data pools were scanned for a
- * bare source-file name; none sits in this range) and `dumpmap.py lookup 0x801FBF78` answers only
- * `zz_01fbf78_`.  The file name is taken from what the code is (brief section 2, class 3): the
- * subsystem's own global is `lb_npc` and its two named functions are `lb_npc_*`.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup
- * on the range inventory: 124 of the 127 .text entries are bare fn_XXXXXXXX/LbCheckKujiraEvent-style
- * map placeholders and the runtime dump answers only zz_XXXXXXXX_ for them)
- *
- * State: 35 of the 127 rows are written (0x801FBF78..0x801FBF78's first 6 rows, 0x801FC268..0x801FCB68,
- * 0x801FD0F8, 0x801FD174, 0x801FDD9C..0x801FE1F8); 22 are byte-identical and 13 more are above 80 %.
- * Unit `report generate`: 13.366672 % fuzzy, 1668 / 27196 matched bytes, 22/127 matched functions.
- * The unwritten rows are the 0x801FC318..0x801FCBC8 block and 0x801FD338..0x802029B4 - they are absent,
- * not stubbed, so the next session continues at 0x801FC318 in address order.
- *
- * Shapes that earned their score:
- *   - `__declspec(noinline)` on the small helpers the target keeps out of line (`fn_801FDE3C`,
- *     `fn_801FE11C`, `fn_801FE130`, `fn_801FCAC8`): `-inline auto` (cflags_lobby) otherwise inlines
- *     them into `fn_801FDEE4`/`fn_801FE13C`/`fn_801FCA80` (91.1 / 84.4 / 69.7 -> 100.0 / 99.6 / 98.9).
- *     A scoped `#pragma inline off` does not stop MWCC's auto-inliner; `-inline noauto` is a lib flag
- *     and would move the two already-landed lobby units, so the attribute is per function.
- *   - `#pragma peephole off` scoped to `fn_801FC268`: the target keeps `clrlwi r0,r3,24` + `cmpwi`
- *     unfused (96.9 -> 100.0); every other row is unaffected.
- *   - `if (a <= 0) {clear} else {tick}` for `fn_801FDE74`: the target lays the clear block first and
- *     branches `bgt` over it (33.1 -> 100.0); the natural `> 0` order emits `ble` the other way.
- *   - a full-width id parameter with `(u16)` at the use for `fn_801FE1AC`/`fn_801FE1CC`/`fn_801FE1DC`:
- *     a `u16` parameter drops the target's `clrlwi r4,r4,16`.
- *   - `(u16)id - field == 0` for `fn_801FE1AC`: the subtraction's operand order is the whole diff (65.0 ->
- *     100.0); `==` alone emits `subf` the other way round.
- *   - the value computed before the range test for `fn_801FCB68` (75.4 -> 86.25).
- *
- * Residuals (measurements in .pi/outbox/801fbf78-fn-801fbf78-814b.json):
- *   - `fn_801FDFA4` 14.3 %: the target's first store is `rlwinm r0,r4,0,24,24` (a mask of bit 7) and the
- *     `setVector3` pointer is materialised before the constant load; `(u8)(flag & 0x80)` matches the
- *     mask but MWCC schedules the `lfs` ahead of the `addi`.
- *   - `fn_801FE1CC`/`fn_801FE1DC` 50 %, `fn_801FE1EC` 60 %: the tail call's setup order is
- *     `addi r3,r3,0x58` first in the target and `li r4/r5` first here - a scheduling delta on a 3-row row.
- *   - `fn_801FC8C8` 83.3 %: the target has `lbz; extsb; stb`; MWCC forwards the byte store and drops the
- *     `extsb` for every source spelling tried (`s8`, `u8`, an `s32` temporary).
- *   - `fn_801FC810` 91.2 %: the loop's `p += 2` / `i += 1` order - the target increments the pointer
- *     before the counter, MWCC schedules the counter first for both the indexed and the pointer loop.
+ * lobby/lb_npc.cpp - the lobby NPC group: the NPC tables and motion lookups, the NPC work state machines, the
+ *   NPC/character act layer and the player-character control band.
+ * RANGE. .text 0x801FBF78-0x80212810 (389 functions); .ctors 0x8056F35C-0x8056F360 (`fn_801FF700`), .data
+ *   0x805B8D44-0x805B97BC, .bss 0x806A7B90-0x806AA790 (`lb_npc`, the 0x12 x 0x268 NPC work array), .sdata
+ *   0x80791D50-0x80791DC0, .sbss 0x80794AB0-0x80794B08, .sdata2 0x80799880-0x80799C18, extab, extabindex.  Four bands
+ *   whose `.sdata2` pool and `.bss` tables run on across their edges, so one TU: the NPC tables and motion lookups
+ *   0x801FBF78-0x802029B4; the NPC work band 0x802029B4-0x802076D4 (a byte state machine on `_LB_NPC::field_0x006` that
+ *   arms motions through `fn_801FDFE4`/`fn_801FDEE4`/`fn_801FDF70`/`fn_801FE13C` and waits on `fn_801FDFD0`); the act
+ *   layer 0x802076D4-0x8020C588 (on `_LB_NPC` or on `_PLW`, for the functions that reach past +0x268); the control band
+ *   0x8020C588-0x80212810 (it defines `LbStr__FUcUs` and drives `_PLW` through `Pl_act_ck`/`Pl_master_ck`/
+ *   `Pl_frame_check`).  `fn_80207698` is tail-called from `fn_80207A44`'s act dispatch beside the act layer's own
+ *   handlers, a hint that an original seam sits at 0x80207698.  Each band keeps its own declarations in a namespace
+ *   (different views of `lobby_w` and `lobby_world_block`, different callee signatures); uniting them is open work.
+ * FLAGS. `cflags_lobby`; `#pragma peephole off` around `fn_801FC268`, and from `fn_80203114` to the end of the NPC work
+ *   band (0x802076D4); the control band is under `#pragma dont_inline on` (retail keeps the accessors'
+ *   `bl fn_80212060`) and `#pragma peephole off` (`fn_80211DCC`'s `clrlwi` + `slwi`); measured in docs/lobby.md.
+ * NAMES. `lb_npc` is the NPC work array the range owns, with `npc_data_town`, `npc_data_village`, `npc_lp_tbl`,
+ *   `npc_model_*`, `npc_sub_data`, `npc_event_set_data`, `lb_npc_Get_motion_no`, `lb_npc_area_ck` and
+ *   `get_talk_npc_data_ptr`; the map and the dump give only placeholders for the rest.
+ * RESIDUALS. 238 rows unwritten: 0x801FC318-0x801FC6A0, 0x801FCBC8-0x801FD0F8, 0x801FD338-0x801FDD9C,
+ *   0x801FE200-0x802029B4, 0x80204DA8-0x8020505C, 0x8020623C-0x80206824, 0x80206AD0-0x80206CB4, 0x80207284-0x80207698,
+ *   0x80207B3C-0x80207E9C, 0x80207EEC-0x802080C0, 0x80208100-0x80208928, 0x80208AFC-0x8020A5D4, 0x8020A714-0x8020AD14,
+ *   0x8020ADD8-0x8020AEF0, 0x8020B02C-0x8020B264, 0x8020B2EC-0x80211DCC, 0x80211E68-0x80212060, 0x80212370-0x80212540.
+ *   `fn_80211E68`'s arms in `jumptable_805B96D8` order are 0, 28|33|37, 27, 7, 17, 23, 24, 2, 21, 22, 3, 15, 4, 11, 5,
+ *   6, 8, 12, 29, 13, 14, 16, 18, 19, 10, 20, 26, 30, 31, 32, 34, 25, 35; cases 1, 9 and 36 fall through to the end.
+ *  - `fn_801FDFA4`: retail's first store is `rlwinm r0,r4,0,24,24` and it materialises the `setVector3` pointer before
+ *    the constant load; `(u8)(flag & 0x80)` matches the mask but MWCC schedules the `lfs` ahead of the `addi`;
+ *  - `fn_801FE1CC`, `fn_801FE1DC`, `fn_801FE1EC`: retail sets up the tail call with `addi r3,r3,0x58` first;
+ *  - `fn_801FC8C8`: retail keeps `lbz; extsb; stb`, MWCC forwards the byte and drops the `extsb` (`s8`, `u8` and an
+ *    `s32` temporary tried); `fn_801FC810`: retail bumps the pointer before the counter;
+ *  - `fn_802050AC`: retail schedules `lwz r4,44(r31)` between the `(s16)(u16)` mask and the signed `/ 5`, ours after
+ *    the divide (`+=`, `a = a + b` and a named temporary measure the same);
+ *  - `fn_801FC6EC`: ours fuses `extsb.` where retail keeps `extsb` + `cmpwi` (the peephole is on there); `fn_801FC874`:
+ *    retail keeps a `clrlwi r0,r0,24` ours drops;
+ *  - `fn_801FC8F0`, `fn_801FCA00`, `fn_801FCA80`: the loop counter/base registers are coloured differently;
+ *  - `fn_801FCADC`: frame 0x20 against ours 0x30, and retail calls `ckResourceName__FPc` where ours mangles `__FPSc`
+ *    (the parameter is `char*`, not `s8*`);
+ *  - `fn_801FCB68`: retail loads `npc_lp_tbl` early as an sda21 pointer, ours addresses it with `lis`/`addi`;
+ *  - `fn_801FD0F8`: retail calls `fn_80207B28` before setting up the table base, ours after;
+ *  - `fn_801FD174`: retail loads its float constant once into f1, ours reloads it, and keeps one more `clrlwi`;
+ *  - `fn_801FDFE4`: ours loads a compiler-pooled double (`@345`) where retail uses `lbl_807998D0`;
+ *  - `fn_801FE0AC`: retail narrows the motion id (`clrlwi r4,r29,16`) before the compare;
+ *  - `fn_801FE13C`, `fn_802076D4`: the float register of a constant (f1/f0, f31/f30), and `fn_802076D4`'s epilogue
+ *    reloads f31 with `psq_lx` where ours uses `psq_l`;
+ *  - `fn_80207938`, `fn_8020AD14`, `fn_8020AEF0`, `fn_8020AF90`, `fn_8020B264`: retail increments the state byte
+ *    (`addi r0,rX,1`) where ours stores the constant 1; `fn_8020AD14` also reads +0xB6 where ours reads +0x182, and
+ *    `fn_8020AEF0`'s address is `addis 1` where ours is `addis 2`;
+ *  - `fn_80208928`: retail branches to one shared tail that calls `get_move_work_adrs`, ours inverts the tests and
+ *    returns early;
+ *  - `fn_8020A5F4`: retail narrows (`clrlwi`) before the `stb`, and the argument registers shift by one.
+ *   flipcheck: `.bss`/`.ctors`/`.sbss`/`.sdata` claimed, not emitted; `.data` 0x74 against 0xA78 (and its target range
+ *   spans two TUs, a seam at 0x805B8DA0); `.sdata2` 0x8 against 0x398; `.text`/extab/extabindex short of the claim;
+ *   `ckResourceName__FPSc`, `push_g3d_wk__FPv`, `wii_sysmsg_gen__FlPScl` are referenced but have no map row.
+ * SHAPES. `__declspec(noinline)` on the helpers retail keeps out of line (`fn_801FDE3C`, `fn_801FE11C`, `fn_801FE130`,
+ *   `fn_801FCAC8`, and the eight rows `fn_80203114` dispatches to).  `fn_801FCB68` computes the value before the range
+ *   test (`< 0x3E8`).  `fn_801FDE74` writes `if (a <= 0) {clear} else {tick}` (retail lays the clear block first behind
+ *   a `bgt`). `fn_801FE1AC`/`fn_801FE1CC`/`fn_801FE1DC` take a full-width id narrowed with `(u16)` at the use, and
+ *   `fn_801FE1AC` writes `(u16)id - field == 0` (the `subf` operand order).  Every `ran_suu` use narrows with `(u16)`
+ *   (the callee returns `u32`: `cmplwi r3,1`).  Negative angles are `(u16)-8192` and the like (retail builds the
+ *   unsigned value with `lis r3,1` + `addi`/`subi`).  A two-arm chain on one value is a `switch` (`fn_80203EC4`,
+ *   `fn_802047C8`), with the small arm last in `fn_802069D0`.  `fn_802055D8` declares and initialises `i` at the top
+ *   (self in r30, `i` in r31), and its `self->field_0x204[0]` against `[self->field_0x208]` decides whether retail's
+ *   `mulli 20` is kept.
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -792,88 +780,7 @@ void fn_801FD174(_LB_NPC* self)
 
 } /* namespace s_801FBF78 */
 
-/* ==== absorbed from lobby/fn_802029B4.cpp (0x802029B4..0x80207698) ==== */
-/* lobby/fn_802029B4.cpp - `.text` 0x802029B4..0x802076D4 (68 functions, 0x4D20 bytes), extab
- * 0x80010DBC..0x80010F7C (56 unwind records), extabindex 0x8002D384..0x8002D624 (56 x 12 B).
- * Registered once, at its final home (docs/plan.md 12).
- *
- * What it is.  The lobby NPC work band: every function takes the shared `_LB_NPC` record and runs a
- * byte state machine on `_LB_NPC::field_0x006` (0..3), arming one of the NPC's motions through the
- * `lobby/lb_npc.cpp` helper set (`fn_801FDFE4` = set motion + build the MHchar, `fn_801FDEE4`/
- * `fn_801FDF70` = play the motion over the model's own frame, `fn_801FE13C` = restart the motion the
- * NPC's motion table entry names) and waiting on `fn_801FDFD0` (the lobby's field_0x000 flag).  The
- * band also carries the NPC's own steering/position code (the `nw4r` math and `VEC3_ctor`/
- * `copyVec3` vector work) and three 0x14-stride switch tables in `.data`.
- *
- * Module and name (brief section 2, in evidence order).
- *   1. No `__FILE__` string covers the range: the only bare source name in the image's `.data` is
- *      `enemy_control.cpp` (0x805A1BB8) and it is referred to by the registered `enemy/enemy_control.cpp`
- *      unit far below, never from here (this range's `.data` references are the `jumptable_805B8F88`/
- *      `805B8FBC`/`805B9000`/`lbl_805B8E**` tables only).  `attribute.py`'s `source_owner` soft vote
- *      reports the same name for this proposal, but it reports it for the registered `lobby/lb_npc.cpp`
- *      band below and for 21 other unrelated ranges, so it is an artefact of the vote's width, not
- *      evidence.
- *   2. `dumpmap.py lookup` answers `zz_02029b4_` for the range (a placeholder is not evidence).
- *   3. The band is `lobby`: both bracketing registered units are `lobby` (`lobby/lb_npc.cpp` below at
- *      0x801FBF78..0x802029B4, `lobby/fn_80212810.cpp` above at 0x80212810..0x80219260), the code takes
- *      the `_LB_NPC` record `lobby/lb_npc.h` owns, calls its helpers, and reads the band's own
- *      `.bss` (`lb_npc_move_data`, `lobby_w`).  The file keeps the map's own stem, like its neighbours.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/symedit.py range 0x802029B4 0x802076D4`: all 68 rows are bare
- * `fn_XXXXXXXX = .text:0x...` entries, and `python tools/symbols/dumpmap.py lookup` answers
- * `zz_XXXXXXXX_` for them in the shared runtime dump).
- *
- * Language.  C++: the range's callees are C++ manglings (`lb_npc_Get_motion_no__FP7_LB_NPC`,
- * `ran_suu__Fl`, `get_move_work_adrs__FUc`, `get_now_mapno__Fv`, `LbCheckKujiraEvent__Fv`,
- * `setVector3__FPQ34nw4r4math4VEC3fff`, `rotVecY__FPQ34nw4r4math4VEC3Ul`, `mulVecMat__FP...`,
- * `calcVecAng2__FP...`, `calcDistanceSqXZ__FP...`).  Rule 9: those are declared with the signature
- * their mangling encodes and called through it; every `fn_*` definition stays `extern "C"`.
- *
- * Sections.  The target object's extab is exactly the 56 framed functions' unwind records (the other
- * 12 rows are frameless), so the unit claims 0x80010DBC..0x80010F7C / 0x8002D384..0x8002D624 - pinned
- * by the split's own per-function objects, whose `extabindex` relocations run `@etb_80010DBC` (this
- * range's `fn_802029B4`) up to `@etb_80010F74` and then hand `@etb_80010F7C` to `fn_802076D4`, the
- * next proposal's first framed function.  `cflags_lobby`'s `-Cpp_exceptions on` (flags-audit
- * 2026-09-28, no longer a per-file pragma) is what emits them; see the residual note below.
- *
- * Seam.  Unproven, as the brief says.  Both edges are function boundaries at the registered units'
- * addresses; the left edge is `attribute.py`'s byte cap rather than evidence, and this band may be the
- * tail of `lobby/lb_npc.cpp`'s original file (they share the `_LB_NPC` type, the `.bss` and the helper
- * set) - the outbox records the merge question.
- *
- * Status.  63 of the 68 rows are written, 62 of them byte-identical (`report.json`: `.text` 81.05 %,
- * 15524/19744 B).  Still absent (not stubbed): fn_80204DA8, fn_8020623C, fn_80206AD0, fn_80207284,
- * fn_802074E8 - continue at fn_80204DA8 in address order.
- *
- * Residuals.
- *   - fn_802050AC 98.2377 %: the target schedules the accumulation's `lwz r4,44(r31)` between the
- *     `(s16)(u16)` mask and the signed `/ 5`, ours issues the load after the divide; `+=`, `a = a + b`
- *     and a named temporary all measure the same.
- *   - extab 63.19 %: all 56 records are emitted (the lib's `-Cpp_exceptions on`) and paired, and a
- *     few records' flag words differ from the target's.
- *   - extabindex 0 %: the 672 bytes are emitted at the target's exact size but objdiff pairs none of
- *     the entries (the target's carry relocations to functions the linker placed at their DOL
- *     addresses, ours resolve inside this object).
- *
- * Shapes that earned their score.
- *   - `__declspec(noinline)` on the eight rows `fn_80203114` dispatches to: with the lib's
- *     `-inline auto` MWCC inlines them into the dispatcher and it scores 54.81 instead of 99.09 (the
- *     outbox asks for `-inline noauto` on the lib, which reaches the same 99.09 without the
- *     attributes).
- *   - `#pragma peephole off` around `fn_80203114`: the target keeps `clrlwi`+`clrlwi`+`cmpwi` unfused
- *     for `(ran_suu(1) & 1) != 0` (99.38 -> 100.0).
- *   - callee return width is codegen: `cmplwi r3,1` means the callee returns `u32`; `u16 ran_suu`
- *     would drop the target's `clrlwi r0,r3,16`, so every `ran_suu` use narrows with `(u16)`.
- *   - the target materialises the negative angles `-8192`/`-7281`/`-1819`/`-909`/`-17202` as
- *     `lis r3,1` + `addi`/`subi` (the unsigned 16-bit value), so the source writes `(u16)-8192`.
- *   - a two-arm chain on a value is a `switch`, not `if/else if`, where the target keeps the compare
- *     chain at the top (`fn_80203EC4`, `fn_802047C8`); and the small arm goes last in the source
- *     (`fn_802069D0`), which is what puts the `bgt` on the target's side.
- *   - `i` declared and initialised at the top of `fn_802055D8` (not in the `for`) flips the allocator's
- *     colouring to the target's (self in r30, `i` in r31); `self->field_0x204[0]` vs
- *     `[self->field_0x208]` picks whether the target's `mulli 20` is kept or folded.
- */
+/* The NPC work band (0x802029B4-0x802076D4). */
 #include "types.h"
 #include "nw4r/math.h"
 
@@ -884,10 +791,8 @@ namespace s_802029B4 {
 
 
 /* ---------------------------------------------------------------------------------------------------
- * Declarations.  The lobby band's helper set is defined in `lobby/lb_npc.cpp`; its header publishes the
- * `_LB_NPC` type this range needs but not these prototypes, so they are declared here and the header
- * corrections are a `shared-file` request in the worker's outbox.  Functions and scalars without a
- * mangling are C linkage; the mangled callees are declared at C++ scope (rule 9).
+ * Declarations: the first band's helpers (`lobby/lb_npc.h` publishes `_LB_NPC` but not these prototypes).  Unmangled
+ * names are C linkage; the mangled callees are declared at C++ scope (rule 9).
  */
 extern "C" {
 f32 fn_80050EF4(VEC3* a, VEC3* b);
@@ -1120,9 +1025,8 @@ __declspec(noinline) void fn_80202E6C(_LB_NPC* self)
     }
 }
 
-/* 0x80202F00 - the NPC's `state` 4-arm machine for the motion it is playing: arm 1092 (or 1188 when
- * motion 37 is up), wait for the motion to stop, then either walk the last leg of the motion (turning
- * 20 ticks onto the angle to the motion's own vector) or hand the motion off once the lobby is idle. */
+/* 0x80202F00 - the 4-arm motion machine: arm 1092 (1188 with motion 37 up), wait for the stop, then walk the last leg
+ * (a 20-tick turn onto the motion's vector) or hand the motion off once the lobby is idle. */
 __declspec(noinline) void fn_80202F00(_LB_NPC* self)
 {
     VEC3 offset;
@@ -1178,9 +1082,8 @@ __declspec(noinline) void fn_80202F00(_LB_NPC* self)
 
 #pragma peephole off
 
-/* 0x80203114 - the band's top-level per-frame dispatcher: it forces the action byte to 1 and then
- * routes on the model kind (and, for the kinds without a handler, arms one of the motions the kind
- * selects), which is how each per-kind row below is reached. */
+/* 0x80203114 - the band's per-frame dispatcher: forces the action byte to 1 and routes on the model kind, arming the
+ * kind's motion where it has no handler. */
 void fn_80203114(_LB_NPC* self)
 {
     fn_801FDFC0(self, 1);
@@ -1279,9 +1182,8 @@ void fn_80203114(_LB_NPC* self)
 }
 
 
-/* 0x80203664 - the NPC's 5-arm `state` cycle for the "look around" action: hold motion 1040 for a random
- * 100..355 frames, then either move on (state 1) or hand the action over (state 4); states 2..4 wait for
- * the motion to stop and pick the next hold or restart. */
+/* 0x80203664 - the 5-arm "look around" cycle: hold motion 1040 for 100..355 random frames, then move on or hand the
+ * action over; states 2..4 wait for the stop and pick the next hold or restart. */
 void fn_80203664(_LB_NPC* self)
 {
     switch (self->field_0x006) {
@@ -1350,9 +1252,8 @@ void fn_8020385C(_LB_NPC* self)
     fn_801FE0AC(self, 1086, 6, 0);
 }
 
-/* 0x80203884 - the NPC's idle `state` machine: play motion 10, arm 1081 when the turn runs out, wait for
- * the motion to stop and for the lobby flag to arm 1082, then either release the action byte and arm 1078
- * or release it and restart the motion the table names. */
+/* 0x80203884 - the idle machine: motion 10, 1081 when the turn runs out, 1082 on the lobby flag, then release the
+ * action byte and arm 1078 or restart the table's motion. */
 void fn_80203884(_LB_NPC* self)
 {
     switch (self->field_0x006) {
@@ -1491,10 +1392,8 @@ void fn_80203BE4(_LB_NPC* self)
     }
 }
 
-/* 0x80203D10 - the NPC's four-arm "notice and greet" machine: hold motion 1063 with the shell visible,
- * then either walk one of two 24-frame motions (1064/1065, off a coin flip) or, if the player's motion
- * never arrived, flash the shell; states 2/3 restart motion 1063 or the table's motion once their own
- * motion is done. */
+/* 0x80203D10 - the 4-arm "notice and greet" machine: hold 1063 with the shell visible, then walk 1064/1065 (a coin
+ * flip) or flash the shell; states 2/3 restart 1063 or the table's motion. */
 void fn_80203D10(_LB_NPC* self)
 {
     switch (self->field_0x006) {
@@ -1534,9 +1433,8 @@ void fn_80203D10(_LB_NPC* self)
     }
 }
 
-/* 0x80203EC4 - the NPC's four-arm "map greeting" machine: it picks motion 1055 or 1051 by whether the
- * current map is map 22, waits for the motion, counts 2 motions down, then arms 1056/1058 the same way
- * and finally restarts the table's motion. */
+/* 0x80203EC4 - the 4-arm "map greeting" machine: 1055 or 1051 by whether the map is 22, two motions counted down, then
+ * 1056/1058 the same way and the table's motion. */
 void fn_80203EC4(_LB_NPC* self)
 {
     s32 other_map;
@@ -1679,10 +1577,8 @@ void fn_802043D4(_LB_NPC* self, u8 kind)
     }
 }
 
-/* 0x80204148 - the NPC's four-arm "wave the player over" machine: play motion 10, arm 1184 and set the
- * three shell flags, arm 1185 once the lobby flag is up (keeping the shell visible while the pad is
- * idle), answer 1184/1185's window by re-flagging the shell or handing over to the band above, then
- * restart the table's motion. */
+/* 0x80204148 - the 4-arm "beckon the player" machine: motion 10, 1184 with the three shell flags, 1185 on the lobby
+ * flag, then re-flag the shell or hand over, and restart the table's motion. */
 void fn_80204148(_LB_NPC* self)
 {
     fn_801FDFC0(self, 0);
@@ -1779,9 +1675,8 @@ void fn_8020471C(_LB_NPC* self)
     }
 }
 
-/* 0x802047C8 - the NPC's four-arm "keep the player company" machine: hold 1174 for 8 frames or 0, then
- * 1173 for 3, then 1101; while 1101 plays it nudges the NPC onto a neighbouring move table half the
- * time, and it steps the NPC 910 units along the path while either of the two pad checks answers. */
+/* 0x802047C8 - the 4-arm "keep the player company" machine: 1174, 1173, then 1101, during which it half the time moves
+ * to a neighbouring move table and steps 910 units along the path while a pad check answers. */
 void fn_802047C8(_LB_NPC* self)
 {
     switch (self->field_0x006) {
@@ -2080,9 +1975,8 @@ void fn_80205544(_LB_NPC* self)
     }
 }
 
-/* 0x802055D8 - pick the NPC's move table off the current map and its part kind, then scan that map's
- * spot table for the first spot the NPC's position is inside of (past it in both x and z) and point the
- * NPC at the matching table entry; the spot scan's 10000 x terminator leaves the table base in place. */
+/* 0x802055D8 - picks the move table by map and part kind and points the NPC at the first spot it is past in x and z
+ * (the 10000 x terminator leaves the table base). */
 void fn_802055D8(_LB_NPC* self)
 {
     LbNpcMotionEntry** list;
@@ -2215,9 +2109,8 @@ void fn_80205FEC(_LB_NPC* self)
     }
 }
 
-/* 0x80206074 - the NPC's three-arm "walk a set route" machine: it aims the NPC's position vector at the
- * route's first point with the heading latched for 95 frames, then at the second point for 80, then
- * restarts the route. */
+/* 0x80206074 - the 3-arm "walk a set route" machine: aim at the first point (heading latched 95 frames), the second
+ * (80), then restart. */
 void fn_80206074(_LB_NPC* self)
 {
     switch (self->field_0x006) {
@@ -2373,9 +2266,8 @@ void fn_80205BD0(_LB_NPC* self)
     }
 }
 
-/* 0x80205D54 - the NPC's four-arm "settle in" machine: arm 1115 with a random 0..14 frame wait, then
- * 1193 over 8 frames with a coin-flip sign, then re-arm 1193 while the player's approach is not over,
- * then step the counter down and restart the band's arms. */
+/* 0x80205D54 - the 4-arm "settle in" machine: 1115 after 0..14 random frames, 1193 over 8 with a coin-flip sign
+ * (re-armed while the player approaches), then count down and restart. */
 void fn_80205D54(_LB_NPC* self)
 {
     switch (self->field_0x006) {
@@ -2634,9 +2526,8 @@ void fn_80206CB4(_LB_NPC* self)
     }
 }
 
-/* 0x80204528 - the NPC's five-arm "turn to face" machine: arm 1170, then 1171 (latching the turn for
- * one frame) or, while 1170 still plays, start a 15-tick turn to angle 0xC001 and latch it; then step
- * the motion counter down, play 1172, and finally either restart the move table or aim over 11 ticks. */
+/* 0x80204528 - the 5-arm "turn to face" machine: 1170, then 1171 or a latched 15-tick turn to 0xC001, a count down,
+ * 1172, then restart the move table or aim over 11 ticks. */
 void fn_80204528(_LB_NPC* self)
 {
     switch (self->field_0x006) {
@@ -2679,9 +2570,8 @@ void fn_80204528(_LB_NPC* self)
     }
 }
 
-/* 0x80206824 - the NPC's six-arm "walk the meeting-point route" machine: motion 1012 onto the first
- * point for 123 frames, then 1012 over 24, 1012 over 16, 1013 over 40 with the 141-frame latch, 1009
- * with the 292-frame delay, and 1010 over 6. */
+/* 0x80206824 - the 6-arm "meeting-point route" machine: 1012 for 123 frames, over 24 and over 16, 1013 over 40
+ * (141-frame latch), 1009 after 292, 1010 over 6. */
 void fn_80206824(_LB_NPC* self)
 {
     switch (self->field_0x006) {
@@ -2728,9 +2618,8 @@ void fn_80206824(_LB_NPC* self)
     }
 }
 
-/* 0x80205764 - the NPC's "keep station on the move work's own record" machine: it copies the record's
- * vector into its target, marks its two flags, then walks between the 80/200/400-unit distance bands,
- * turning 10% of the heading error onto its own heading each tick. */
+/* 0x80205764 - keeps station on the move work's record: takes its vector as the target and walks the 80/200/400-unit
+ * distance bands, turning a tenth of the heading error each tick. */
 void fn_80205764(_LB_NPC* self)
 {
     LbNpcMoveWorkEntry* work;
@@ -2781,9 +2670,8 @@ void fn_80205764(_LB_NPC* self)
     }
 }
 
-/* 0x802050AC - the NPC's "find a move table entry" machine: arm 1098 and mark its flag byte, then on
- * the lobby's flag either restart motion 55 or pick a table entry for the current part (with two map-22
- * kinds gated on the shop's own state), then aim the NPC 1/5 of the way onto its heading each frame. */
+/* 0x802050AC - the "find a move table entry" machine: 1098, then on the lobby flag motion 55 or a table entry for the
+ * part (two map-22 kinds gated on the shop), aiming a fifth of the way each frame. */
 void fn_802050AC(_LB_NPC* self)
 {
     LbNpcMotionEntry* entry;
@@ -2845,47 +2733,8 @@ void fn_802050AC(_LB_NPC* self)
 
 } /* namespace s_802029B4 */
 
-/* ==== absorbed from lobby/fn_802076D4.cpp (0x802076D4..0x8020C4C8) ==== */
+/* The NPC/character act layer (0x802076D4-0x8020C588). */
 #define EF_FN_800CDB2C_NO_RAN_SUU 1
-/* lobby/fn_802076D4.cpp - the lobby NPC/character act layer.
- *
- * `.text` 0x802076D4..0x8020C588 (82 functions, 20148 B), extab 0x80010F7C..0x80011184 and extabindex
- * 0x8002D624..0x8002D930 (both 65 records, abutting the bracketing registered units
- * `lobby/lb_npc.cpp` and `lobby/fn_80212810.cpp`).  Registered once, at its final home
- * (docs/plan.md 12).
- *
- * Module and language.  `lobby`: the range reads `lobby_w`/`lb_npc_move_data`/`lb_param_w`, calls the
- * neighbours' `fn_801FExxx`/`fn_801FDE3C` and the lobby UI helpers (`LbStr`, `get_lsp_data`), and both
- * bracketing registered units are `lobby`.  C++: the range's undefined set is full of manglings
- * (`Pl_chr_setX__FP4_PLWUsll`, `calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`, ...).
- *
- * Name.  No `__FILE__` string covers the range (the `.rodata`/`.data` pools were scanned for a bare
- * source-file name: the only one that could be argued for is `enemy_control.cpp` at 0x805A1BB8, and it
- * is never referenced anywhere in this band - the discovery seam note `one source file
- * (enemy_control.cpp)` comes from `attribute.py:source_owner`, which returns *the latest accepted
- * source name at or before the cut*, and that is the last `__FILE__` string before this band) and
- * `dumpmap.py lookup` answers only `zz_` placeholders, so the file keeps the map stem (brief section 2,
- * class 4).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with tools/symbols/symedit.py at 0x802076D4 for the inventory and python tools/symbols/dumpmap.py lookup on all 82 rows - all of them answer zz_0207xxx_)
- *
- * Seam.  Unproven: the range edges are `dtk` pool-run cuts and the interior ones were joined by
- * `owner_merge` on the artefact above, so this may be more than one file.  `fn_80207698`
- * (0x80207698..0x802076D4) is tail-called from `fn_80207A44`'s act dispatch with the same four act
- * handlers this range defines, which is the strongest hint that the real seam is 0x80207698.
- *
- * Two record types.  The range's functions take one of two records and both are already reconstructed:
- *   - `_LB_NPC` (lobby/lb_npc.h, 0x268 B) for the act-state functions - `fn_802076D4` reads the
- *     VEC3 at +0x10 and the VEC3 at +0x1EC, and `_LB_NPC` is the only view with both.
- *   - `_PLW` (pl.h, 0xB20) for the ones that drive the player work and reach past +0x268
- *     (`fn_8020A3E4` walks +0x322, `fn_80208928` memcmps the name at +0xB05, most call
- *     `Pl_chr_setX`/`Pl_master_ck`, whose map parameter type is `_PLW*`).
- *
- * Residuals (measured with `tools/units/recompile.py lobby/fn_802076D4.cpp --measure <symbol>`):
- *   - the rows below the 80 % bar are listed in the campaign outbox, not here.
- *   - the unwritten rows are absent, not stubbed, so a re-measure reports them as 0 % (`objdiff` pairs
- *     by symbol name) - the next session continues at 0x80207B3C in address order.
- */
 #include "types.h"
 #include "nw4r/math.h"
 
@@ -2956,10 +2805,7 @@ s32 fn_801FDE3C(_LB_NPC* self, VEC3* target);
 extern "C" {
 #endif
 
-/* ---------------------------------------------------------------------------------------------------
- * 0x802076D4 - the first act-state handler: face the move work's target vector, then run the close/far
- * distance ladder that picks the next state.
- */
+/* 0x802076D4 - the first act-state handler: faces the move work's target and runs the close/far distance ladder. */
 void fn_802076D4(_LB_NPC* self)
 {
     u8* work;
@@ -3111,9 +2957,7 @@ void fn_80207B28(void)
     lbl_806AA6F0[17] = 0;
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * 0x80207E9C and the two small id decoders.
- */
+/* 0x80207E9C - raises the +0x234 flag with `state` beside it; the two small id decoders follow. */
 __declspec(noinline) void fn_80207E9C(_LB_NPC* self, u8 state)
 {
     self->field_0x234[0] = 1;
@@ -3383,86 +3227,15 @@ void fn_8020B264(_PLW* self)
 
 } /* namespace s_802076D4 */
 
-/* ==== absorbed from lobby/fn_8020C588.cpp (0x8020C588..0x80212760) ==== */
+/* The player-character control band (0x8020C588-0x80212810). */
 #include "menu/menu_message.h"
 /* C++-linkage declarations of this section: they stay at global scope (their manglings are made there). */
 void* LbStr(u8 kind, u16 idx);
 s32 get_fade_stat(s32 slot);
-/* lobby/fn_8020C588.cpp - the lobby player-character control band.
- *
- * `.text` 0x8020C588..0x80212810 (112 functions, 25224 B), extab 0x80011184..0x80011434 (86 records),
- * extabindex 0x8002D930..0x8002DD38 (86 x 12 B) and one `.data` jump table
- * `jumptable_805B9770` 0x805B9770..0x805B97BC (19 words, the arms of `fn_80212760`'s switch - the
- * table at 0x805B96D8 in front of it is `fn_80211E68`'s and is unclaimed while that body is not
- * written).
- *
- * Module `lobby`: both registered units bracketing the range in the address band are `lobby`
- * (`lobby/lb_npc.cpp` ends at 0x802029B4, `lobby/fn_80212810.cpp` starts at 0x80212810), and this
- * range both **defines** `LbStr__FUcUs` - the lobby string helper `unsplit/lobby.h` declares
- * and `lobby/fn_801E7530.cpp`/`fn_80212810.cpp` call - and reads `lobby_w` and the lobby UI tables.
- *
- * Name.  No `__FILE__` string is reachable from the range and the runtime dump answers only
- * `zz_XXXXXXXX_` placeholders, so the file keeps the map's `fn_8020C588` stem (brief section 2,
- * classes 3+4).  Siblings: `lobby/fn_80212810.cpp`, `lobby/fn_8021E1EC.cpp`.
- *
- * Seam.  Unproven (this is one maximal unclaimed run).  The left edge 0x8020C588 is a proposal
- * boundary, not a TU boundary; the range's extab/`extabindex` runs agree with the right edge exactly
- * (86 records, `fn_8020C588` first, `fn_8021261C` last, and the run ends where
- * `lobby/fn_80212810.cpp`'s extab begins at 0x80011434).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `dumpmap.py lookup` over the range's inventory: every name but `LbStr__FUcUs` and
- * `glplatTextureGetHeight` is a bare `.text` entry in config/RMHE08/symbols.txt and the runtime dump
- * has only `zz_XXXXXXXX_` placeholders for them)
- *
- * Residuals (official report metric; the bar is 80 %):
- *  - 21 of the 112 functions are reconstructed and every one of them is 100.000000 (1660 / 25224
- *    `.text` bytes, 6.58 % of the unit; the `.data` table above is 100 % too).  Measured with
- *    `build/tools/objdiff-cli.exe diff -p . -u main/lobby/fn_8020C588` against this worktree's own
- *    split target object (MAIN has no `obj/lobby/fn_8020C588.o`, so `recompile.py --measure` falls
- *    back to the retired single-symbol objects and cannot pair these).
- *  - the other 91 functions are unwritten.  Every one of them takes the shared `_PLW` player record
- *    and drives it with `Pl_act_ck`/`Pl_master_ck`/`Pl_frame_check`, so the blocker is `pl.h`,
- *    which still spells the offsets this range reads `pad_*`/`unk*` (+0x004/+0x005/+0x006 state,
- *    +0x028 timer, +0x03C/+0x040/+0x044 floats, +0x0B4/+0x0B6, +0x30E, +0x313, +0x354,
- *    +0x656/+0x657, +0x265..0x267, +0x5C8).  Naming them in `pl.h` is the sanctioned ``wave 2'' work
- *    (the header says so) but it renames fields `src/Pl/pl_master.cpp` and
- *    `src/sound/fn_800EF7D8.cpp` already read, so it is a config_request, not this batch's edit.  The
- *    enforce-lint would otherwise flag every `unk` member access in this file (rule 7's unk half is
- *    not covered by the `Naming note` line above).
- *  - `fn_80212370` (352 B) reads the `Psw` pad record's 0x2C0..0x2DF bytes; the only `PlayerPad`
- *    definition lives in `src/mh3_pad.cpp` (rule 1: a shared type in one header), so naming them here
- *    would copy it.  Config_request: move `PlayerPad` into `mh3_pad.h`.
- *  - `fn_80211E68` (504 B, 0x80211E68) is the range's other jump-table switch and needs no `_PLW`
- *    field, only `Pl_act_ck(_PLW*, u8, u16)` + `my_player_work_get()` passed straight through.  Its arms are
- *    in the DOL's table order `0, 28|33|37, 27, 7, 17, 23, 24, 2, 21, 22, 3, 15, 4, 11, 5, 6, 8, 12,
- *    29, 13, 14, 16, 18, 19, 10, 20, 26, 30, 31, 32, 34, 25, 35` (read out of `jumptable_805B96D8`),
- *    and cases 1, 9 and 36 fall straight through to the end.  Left for the next session rather than
- *    half-written, because it needs 35 callee declarations that belong in other units' headers.
- *  - largest unwritten, largest first: fn_8020EE14 1840 B, fn_8020FE18 1428 B, fn_8020F880 764 B,
- *    fn_8020F544 680 B, fn_8020EBF4 544 B, fn_80211E68 504 B, fn_8020D1FC 488 B.
- *
- * Flags.  The unit needs the auto-inliner and the peephole pass off, and both are file-scoped pragmas
- * (neither setting is one the other `lobby` lib units want): with `-inline auto` MWCC inlined the
- * 220 B `fn_80212060` into each of its five callers (fn_8021213C came out 276 B against a 92 B
- * target, 0 %), and with the peephole on it folds fn_80211DCC's `clrlwi` + `slwi` into one `rlwinm`
- * (16 B against 20).  `#pragma inline off`, `#pragma inline_depth 0` and `#pragma dont_inline on` all
- * work; `dont_inline on` is the one kept.  Measured alternative: `-inline noauto` on `cflags_lobby`
- * fixes this unit too (2.71 -> 5.98 % before the bodies below existed) and moves four other lobby
- * units up (fn_801E7530 27.65 -> 31.76, lb_npc 13.37 -> 13.75, fn_8021E1EC 9.22 -> 9.66) with
- * `lobby_scene` unchanged at 100 - recorded as a config_request rather than applied, since it is a
- * lib-wide change.
- */
 #include "types.h"
 
 
-/* The range was built with the auto-inliner and the peephole pass off: retail keeps the `bl
- * fn_80212060` the accessors below make (with `-inline auto` MWCC inlines its 220-byte body into each
- * of them - fn_8021213C came out 276 B instead of 92) and keeps the unfused `clrlwi` + `slwi` of the
- * species-id index in fn_80211DCC (the peephole folds it into one `rlwinm`).  Both are file-scoped
- * pragmas because neither setting is something the rest of the `lobby` lib needs: `-inline noauto` for
- * the lib does fix this unit, but it also moves four other lobby units' numbers and the pragma keeps
- * the change inside this unit. */
+/* Retail keeps the accessors' `bl fn_80212060` out of line and the species-id index's unfused `clrlwi` + `slwi`. */
 #pragma dont_inline on
 #pragma peephole off
 namespace s_8020C588 {
@@ -3473,7 +3246,7 @@ namespace s_8020C588 {
 
 
 
-/* The four species-id string tables, indexed by the id byte (`fn_80211DCC`..`fn_80211E08`). */
+/* The four species-id string tables, indexed by the id byte (this accessor and the three after it). */
 extern "C" s32 fn_80211DCC(u32 id) {
     return lb_chacha_skill_str[(u8)id];
 }
