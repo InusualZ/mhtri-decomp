@@ -1,55 +1,22 @@
-/* ef/fn_80105314.cpp - the effect band at 0x80105314
- *
- * `.text` 0x80105314..0x80107250, 28 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `ef/fn_80105314.cpp` (kept for its notes and residuals): */
-/* ef/fn_80105314.cpp - the enemy/player effect-setter batch, .text 0x80105314..0x8010BDE4 (93
- * functions, 27344 bytes).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
- * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt; only `eft013_set`,
- * `eft013_set_dmeft_pl`, `eft014_set_daihouden` and `eft015_set` carry a real name).
- *
- * Registration evidence (brief §2).  No `__FILE__` string: `strings` over
- * `orig/RMHE08/sys/main.dol` finds no `.cpp`/`.c` source name and no `eft0NN` token at all, so class 1
- * is empty.  Class 2 (`tools/symbols/dumpmap.py lookup`) names only four symbols, and they span three
- * different families (`eft013_set` 0x80107250, `eft013_set_dmeft_pl` 0x80107784,
- * `eft014_set_daihouden` 0x8010A988, `eft015_set` 0x8010BBE0) - a single file name is not supported by
- * them, so the range is *not* one of the `eft0NN.cpp` TUs.  Class 3: the code is the same `_EFT`
- * effect-object state machine the bracketing `ef/fn_80104BD0.c` (100 %) and `ef/fn_8010D1A8.c` units
- * are, and those two neighbours both use the map's `fn_<address>` stem as their file name.  Class 4
- * therefore decides it: the file keeps the map's `fn_80105314` stem, and the module is `ef` (both
- * bracketing registered units are `ef/`).  The seam is unproven - the discovery capped this at
- * --max-bytes and the run plainly holds several original families (see the inventory below).
- *
- * Language: C++.  The range's own definition `eft013_set__FP4_PLWUc` is mangled (MWCC `__F` argument
- * list), which is langcheck's conclusive signal; a C++ definition would mangle unless it is
- * `extern "C"`, so every definition whose map name is plain (`fn_80105314`, ...) is `extern "C"` and
- * objdiff pairs it by name.  The mangled *callees* are declared with the signature their map name
- * encodes (rule 9), not with the mangled spelling.
- *
- * Inventory in address order (family clusters):
- *   0x80105314..0x8010724C  the `_EFT` enemy/emitter base cluster: per-frame handlers
- *                           (`fn_80105314`, `eft_spawn_type10`, ...), state dispatchers
- *                           (`fn_801059AC`, `fn_80106920`, `fn_80106F20`), pool releases
- *                           (`fn_80105970`, `fn_801068E4`, `fn_80106EE4`), type dispatch tables
- *                           (`fn_80105564`, `fn_80105EFC`) and the setters (`fn_801057A4`,
- *                           `fn_80105888`, ...).
- *   0x80107250..0x80107DDC  the `eft013` cluster (`eft013_set`, `eft013_set_dmeft_pl`, helpers).
- *   0x80107E5C..0x8010A8CC  the large player-weapon handlers and their setters.
- *   0x8010A988..0x8010B154  the `eft014` cluster (`eft014_set_daihouden`).
- *   0x8010B198..0x8010BDA8  the `eft015` cluster (`eft015_set`).
- *
- * Flags: the whole unit runs with the peephole pass off (`#pragma peephole off`, playbook 39) - the
- * target object carries no fused record forms (tools/flags/infer.py on
- * `build/RMHE08/obj/auto_fn_80105314_text.o`: peephole off [med], 0 record forms).
- *
- * Data: the unit owns no pool section; its `.data` jump tables (`jumptable_8059E9AC`, ...), `.sdata`
- * type tables (`lbl_80791808`) and `.sdata2` floats are the shared pool, `extern`-declared here and
- * never defined (playbook 29).
- *
- * Residuals are recorded per function below as the reconstruction proceeds.
+/* ef/fn_80105314.cpp - the `_EFT` enemy/emitter base cluster: per-frame handlers, state dispatchers, pool releases,
+ *   type dispatch tables and the setters, ahead of the eft013 families in `ef/eft013_fx.cpp`.
+ * RANGE. .text 0x80105314-0x80107250 (35 functions); extab 0x8000BFBC-0x8000C074, extabindex 0x80025E84-0x80025F98,
+ *   .data 0x8059E688-0x8059EB50, .sdata2 0x80796784-0x807967A8.  The seam is unproven (a discovery cut).
+ * FLAGS. `cflags_main`; `#pragma peephole off` from `fn_80105550` to `fn_8010724C`; the functions defined after the
+ *   `#pragma peephole on` line (`fn_80106F5C` onward in the file) build with the pass on.
+ * NAMES. The map has only `fn_` stems here apart from `eft_spawn_type10` and `eft_spawn_type11`, GUESSes from their
+ *   bodies; plain definitions are `extern "C"` in a C++ unit.
+ * RESIDUALS. 7 rows unwritten: 0x80105314-0x80105550 (`fn_80105314`), 0x801059E8-0x80105EFC (`fn_801059E8`),
+ *   0x80105F30-0x80106530 (`fn_80105F30` to `fn_801063A8`), 0x80106694-0x801067F4 (`eft_spawn_type11`),
+ *   0x80106BB4-0x80106DC8 (`fn_80106BB4`).
+ *   9 partial rows, all after the `#pragma peephole on` line, including:
+ *  - `fn_8010695C`, `fn_80106F5C`: retail reloads the stored handle (`lwz r0,4(r31)`, `lwz r0,0xc(r28)`) before the
+ *    test, ours forwards it; `fn_8010695C` also lowers the type switch to a signed compare chain where retail uses
+ *    `subi` + `cmplwi` range tests;
+ *  - `fn_80106530`: ours fuses `subic.` where retail keeps `subi` + `cmpwi`.
+ *   The other 6 partial rows have no recorded cause (`symdiff.py -u ef/fn_80105314 --all`).
+ *   flipcheck: `.sdata2` claimed, not emitted; `.text` (0xE6C of 0x1F3C), extab (0x80 of 0xB8), extabindex (0xC0 of
+ *   0x114) and `.data` (0xF8 of 0x4C8) short of the claim and differing.
  */
 
 #include "types.h"
@@ -68,7 +35,7 @@
 #include "unsplit/unknown.h"
 #include "unsplit/ef.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/fn_80105314_types.h"
 
 /* size: 0x10 - lower bound, an approximation (the pooled block the handlers walk). */
@@ -221,9 +188,8 @@ extern "C" void fn_801059AC(_EFT013* self) {
     }
 }
 
-/* 0x80105EFC - type dispatch table (types 0..32).  Every value 0..32 is a case: the compiler emitted a
- * 33-entry jump table with no default body (out-of-range returns), so the non-case values fall to the
- * fn_80105F30 body through the shared run (the table is `jumptable_8059E9AC`, read from the DOL). */
+/* 0x80105EFC (0x34): Dispatches on the type through a 33-entry jump table (`jumptable_8059E9AC`) with no default
+ * body; the non-case values share `fn_80105F30`'s run. */
 extern "C" void fn_80105EFC(_EFT013* self) {
     switch (self->type_0x02) {
     case 0:
@@ -351,9 +317,8 @@ extern "C" void fn_8010724C(_EFT013* self) {
 
 #pragma peephole on
 
-/* 0x80106F5C - state-0 handler for the fn_80106F5C family: create the per-type effect, scale it (the
- * type<=2 group multiplies the spawn scale into it), place every pooled effect on the matrix and
- * position, then recolour by type and hand off to the state-1 handler. */
+/* 0x80106F5C (0x1B0): Creates and scales the per-type effect, places every pooled effect, recolours by type and
+ * hands off to the state-1 handler. */
 extern "C" void fn_80106F5C(_EFT013* self) {
     nw4r::math::VEC3 v;
     nw4r::math::MTX34 mtx;
@@ -607,9 +572,8 @@ extern "C" void fn_80106ACC(_EFT013* self) {
     eft_res_models_spawn((_EFT*)self, (void**)work->effects, 1, work->count, 0);
 }
 
-/* 0x8010562C - spawn an enemy effect: pool the object, seed the work block from the type table, gate on
- * the area and the enemy's sleep state, then copy the caller's position into either the effect's own
- * `pos_0x18` or the work block's `pos_0x14` (the type switch). */
+/* 0x8010562C (0x178): Spawns an enemy effect gated on the area and the enemy's sleep state, copying the position
+ * into `pos_0x18` or the work block's `pos_0x14` by type. */
 extern "C" void eft_spawn_type10(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale) {
     _EFT013* e = (_EFT013*)eft_res_slot_get(0x24);
     if (e == NULL) {
@@ -693,9 +657,8 @@ extern "C" void fn_80105844(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3
     }
 }
 
-/* 0x80105888 - the allocator every `fn_801057xx` setter funnels through: pool a 0x24-slot object,
- * seed the work block from the type table, copy the enemy position and install the release/dispatch
- * pair. */
+/* 0x80105888 (0xE8): Allocates the 0x24-slot object every `fn_801057xx` setter funnels through, seeds it from the
+ * type table and installs the release/dispatch pair. */
 extern "C" _EFT013* fn_80105888(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale) {
     _EFT013* e = (_EFT013*)eft_res_slot_get(0x24);
     if (e == NULL) {

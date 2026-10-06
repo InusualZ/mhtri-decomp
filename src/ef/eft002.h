@@ -1,8 +1,5 @@
-/*
- * Declarations owned by `ef/eft002.cpp` (docs/plan.md 6.5 rule 2): the effect state machine's
- * dispatcher targets and the "is this effect legal for the player" gate.  A consumer includes this
- * header instead of declaring the symbol itself.  Keep it minimal.
- */
+/* ef/eft002.h - the declarations of `ef/eft002.cpp`'s state-machine targets and its player gate (docs/plan.md 6.5
+ * rule 2). */
 #ifndef MHTRI_EF_EFT002_H
 #define MHTRI_EF_EFT002_H
 

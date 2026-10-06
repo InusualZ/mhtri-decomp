@@ -1,50 +1,32 @@
-/* ef/fn_8010D1A8.c - the player action-effect state machine, `.text` 0x8010D1A8..0x801121DC.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * What it is.  The unit drives the nw4r effects a player action spawns: an `Eft` record carries a
- * `state_0x05` the per-variant handler advances and a `type_0x02` selecting the variant body, and its
- * `EftWork` block holds the nw4r effect handle (`effect`), its colour and scale, the per-variant light
- * handles and the joint matrix.  The entry points are the spawn helpers (`eft_spawn_pos_in_area`, `fn_8010D608`,
- * `fn_8010D678`, `fn_8010D688`), which build the record through `eft_res_slot_get`/`fn_8010D70C` and install
- * `fn_8010D3C4`/`fn_8010D8B0` as the update hook; the variants then create effects, lights and colours
- * through `res_eft_create`/`res_eft_model_create_light` and the `change_*_eff` helpers.  The day-cycle
- * interpolation in `fn_8010D1A8` scales the effect over the keyframe table `lbl_8059F530`.
- *
- * Source shapes worth keeping (each measured against the target):
- *   * `fn_8010D400` and the `eft_res_slot_get` handle store need `#pragma peephole off` (playbook 39) - the
- *     pool-block store has to keep the target's reload; the pragma is scoped to that one function.
- *   * the colour split in `fn_8010D400` is written with explicit `(color & mask) >> shift` terms; the
- *     `(color >> shift) & 0xFF` form folds into one `rlwinm` and loses the target's three-instruction
- *     window.
- *   * `eft_spawn_pos_in_area`'s areano parameter is `s8` compared as `(u8)arg1`; `fn_8010D70C`'s last two are `s32`
- *     narrowed with `(u8)` - the mask is in the target and only appears from the cast.
- *   * `fn_8010D8B0`'s outer switch lists case 0 last so MWCC emits the per-state tail calls before the
- *     nested per-type switch (the compare chain is then 1,2,3,0 where retail has 0,1,2,3).
- *
- * Residuals.  `fn_8010D1A8` (61.90 %) keeps the table base and index in the wrong registers and
- * materialises the int-to-float magic from the unit's own pool where the target references the shared
- * `lbl_80796840`.  `fn_8010D8B0` (93.20 %) differs only in the outer switch's compare order.
- * `fn_8010D70C` (96.71 %) misses the callback's `addi r0` form and the loop's reload (the peephole
- * pragma that fixes the reload costs the type store's mask, net negative).
- *
- * Unrecovered.  Eight functions are still the original bytes: `fn_8010DA48` (0x3F8), `fn_8010E044`,
- * `fn_8010E2A8` (the 0x2770-byte jump-table switch), `fn_80110A18`, `fn_80110FE0`, `fn_80111344`,
- * `fn_80111870` and `fn_80112000`.
- *
- * Data.  The unit owns no pool section: its `.sdata2` floats and `.sdata`/`.data` tables live in a shared
- * pool, so they are `extern`-declared by their map names and never defined (playbook 29).  `lbl_8059F530`
- * is the day-cycle keyframe array, `lbl_8059F560` the per-move position offsets, `lbl_8059F588`/
- * `lbl_8059F59C` the per-type effect/parameter ids, `lbl_80791838` the per-item light ids, `lbl_8059F5B0`/
- * `lbl_8059F5C8` the colour tables and `lbl_80591828` the light colour.
- *
- * Types.  `Eft`, `EftWork`, `EftLight`, `EftModel` and `Plw` are reconstructed from the field offsets in
- * `.text` (no DWARF in an MWCC object); the overlapping views (`EftRot`, `EftWorkSlots`, `EftWorkBody`)
- * are unions because the variants reuse the same bytes for different payloads.
- *
- * Language.  The unit's own symbols are plain, so the file stays C and the mangled callees are declared
- * by their map spelling, as `ef/fn_800FD520.c` does.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_8010D1A8.c`.
+/* ef/fn_8010D1A8.c - the player action-effect state machine: the spawn helpers that build an `Eft` record and install
+ *   its update hook, and the per-variant bodies that create the nw4r effects, lights and colours.
+ * RANGE. .text 0x8010D1A8-0x801121DC (37 functions); extab 0x8000C25C-0x8000C32C, extabindex 0x80026274-0x800263AC,
+ *   .data 0x8059F530-0x8059F670, .sdata 0x80791828-0x80791840, .sdata2 0x80796838-0x807969D8.  The spawn helpers
+ *   (`eft_spawn_pos_in_area`, `fn_8010D608`, `fn_8010D678`, `fn_8010D688`) build the record through
+ *   `eft_res_slot_get`/`fn_8010D70C` and install `fn_8010D3C4`/`fn_8010D8B0`; `fn_8010D1A8` scales the effect over
+ *   the day-cycle keyframes `lbl_8059F530`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` around `fn_8010D400` (the pool-block store keeps retail's reload).
+ * NAMES. `eft_spawn_pos_in_area` is a GUESS from its body; the map has only `fn_` stems for the rest.  The file is
+ *   C: its own symbols are plain, the mangled callees are declared by their map spelling.
+ * RESIDUALS. 8 rows unwritten: 0x8010DA48-0x8010DE40 (`fn_8010DA48`), 0x8010E044-0x80111624 (`fn_8010E044`,
+ *   `fn_8010E2A8` - the 0x2770-byte jump-table switch - `fn_80110A18`, `fn_80110FE0`, `fn_80111344`),
+ *   0x80111870-0x80111BC0 (`fn_80111870`), 0x80112000-0x801121DC (`fn_80112000`).
+ *   13 partial rows, including:
+ *  - `fn_8010D1A8`: ours materialises the int-to-float magic from its own pool (`@225`) where retail reads the
+ *    shared `lbl_80796840`, reloads the table base, and fuses an `fmadds`;
+ *  - `fn_8010D8B0`: case 0 is written last; ours still compares 1, 2, 3, 0 against retail's 0, 1, 2, 3;
+ *  - `fn_80111BC0`: retail reloads `+0x30` and narrows the `u16` id (`clrlwi`) before the range test, ours reorders
+ *    the two tests;
+ *  - `fn_8010D608`: ours drops two `cmpwi`/`bne` null tests retail keeps;
+ *  - `fn_8010D928`: ours addresses `lbl_80791838` with `lis`/`addi` where retail uses `@sda21`.
+ *   The other 8 partial rows have no recorded cause (`symdiff.py -u ef/fn_8010D1A8 --all`).
+ *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text` (0x10FC of 0x5034), extab (0x90 of 0xD0), extabindex
+ *   (0xD8 of 0x138) and `.sdata2` (0x8 of 0x1A0) short of the claim and differing.
+ * SHAPES. `fn_8010D400`'s colour split uses explicit `(color & mask) >> shift` terms: `(color >> shift) & 0xFF` folds
+ *   into one `rlwinm`.
+ *   `eft_spawn_pos_in_area`'s area parameter is `s8` compared as `(u8)arg1`, and `fn_8010D70C`'s last two parameters
+ *   are `s32` narrowed with `(u8)`: the masks come from the casts.
+ *   `EftRot`, `EftWorkSlots` and `EftWorkBody` are unions: the variants reuse the same bytes for different payloads.
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
@@ -54,7 +36,7 @@
 #include "unsplit/sound.h"
 #include "ef/eft004.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_state_flags_set_c1 ((void (*)(Eft*, s32, s32))eft_state_flags_set)

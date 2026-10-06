@@ -1,31 +1,19 @@
-/* ef/eft001.cpp - effect 001 setup
- *
- * `.text` 0x800FAE08..0x800FBE64, 7 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `ef/eft001.cpp` (kept for its notes and residuals): */
-/* ef/eft001.cpp - the `eft001` effect cluster, 0x800FAE08..0x800FCED4 (23 functions).
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
- * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt; the one non-fn_ name,
- * eft001_set_pos__FPQ34nw4r4math4VEC3UlP10_CP_VECTORUcf, is the unit's own runtime-dump name).
- *
- * The name is `eft001`: the range's only real
- * runtime-dump symbol is `eft001_set_pos` (dumpmap lookup 0x800FC250), and its family is the
- * neighbouring ef/eft002.cpp / eft004.cpp / eft007.cpp / eft009.cpp units.  C++ from that mangled
- * definition (langcheck: conclusive) and from the mangled undefined callees.
- *
- * The unit is the model-placement half of the eft001 effect: a 0x48-byte `_EFT` record (ef.h) whose
- * +0x38 pool block carries the pooled effect and its `MHchar` model(s), and a two-state machine
- * (create -> per-frame place -> retire) that recolours and re-poses the model on an enemy joint or
- * the player.
- *
- * Every `fn_XXXXXXXX` callee is `extern "C"` so the compiler emits the map's spelling; the mangled
- * callees (`ran_suu__Fl`, `setVector3__FP...`, the `MHchar` members, ...) come from real C++
- * declarations (docs/plan.md 6.5 rule 9).
- *
- * Residual: the bodies below are reconstructed one at a time; the functions still stubbed and what
- * was measured are in the unit report and the `.pi/notes/800fae08-fn-800fae08-d3c2.md` note.
+/* ef/eft001.cpp - the head of the eft001 effect family: the model-placement half of a 0x48-byte `_EFT` record whose
+ *   +0x38 pool block carries the pooled effect and its `MHchar` model(s), re-posed on an enemy joint or the player.
+ * RANGE. .text 0x800FAE08-0x800FBE64 (7 functions); extab 0x8000BD6C-0x8000BD8C, extabindex 0x80025B0C-0x80025B3C,
+ *   .data 0x8059B5F8-0x8059B638, .sdata 0x80791698-0x807916C8, .sdata2 0x80796608-0x80796640.
+ * NAMES. `eft001` is the family of the runtime dump's `eft001_set_pos` (in `ef/eft002.cpp`); the map has only `fn_`
+ *   stems here, so the definitions are `extern "C"`.
+ * RESIDUALS. 1 row unwritten (an empty stub): 0x800FB160-0x800FBB90 (`fn_800FB160`).
+ *   3 partial rows:
+ *  - `fn_800FAE08`: ours fuses `fnmsubs` and `rlwinm.` where retail keeps `fmuls` + `fsubs` and the compare, keeps
+ *    `+0x04`'s pointer in a register where retail reloads it, and addresses `lbl_807916A0` with `lis`/`addi` where
+ *    retail uses `@sda21`;
+ *  - `fn_800FBBC0`: ours compares the type signed (`cmpwi`) and drops the `addis` of the `u16` key;
+ *  - `fn_800FBD68`: ours drops the `clrlwi` narrowing of the `u8` index and keeps the hook addresses in the stored
+ *    register.
+ *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text` (0x620 of 0x105C), extab (0x18 of 0x20) and
+ *   extabindex (0x24 of 0x30) short of the claim and differing.
  */
 
 #include "ef/fn_800FAD90.h" /* fn_800FAD90 (rule 2: the owner's header) */
@@ -40,7 +28,7 @@
 #include "sound/fn_800D7F54.h"
 #include "ef/eft002.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define fn_800FAD90_c1 ((void (*)(_EFT*))fn_800FAD90)
 #define fn_800FADCC_c1 ((void (*)(_EFT*))fn_800FADCC)
@@ -243,9 +231,8 @@ extern "C" void fn_800FBBC0(_EFT* self, u32 index, u32 flags)
     copyVec3(&work->models[index]->pos_0x04, &pos);
 }
 
-/* The per-frame body of a model effect: builds its models on the first frame, then places and
- * recolours them from the enemy's pose (or the `type_0x02 == 2` variant).  `state_0x05` selects the
- * stage: 0 creates, 1 places on an enemy joint, 2 re-places after the model swap. */
+/* Builds the model effect's models on the first frame, then places and recolours them from the enemy's pose;
+ * `state_0x05` 0 creates, 1 places on an enemy joint, 2 re-places after the model swap. */
 extern "C" void fn_800FAE08(_EFT* self)
 {
     _EFT001_MODEL_WORK* work = (_EFT001_MODEL_WORK*)self->work_0x38;
@@ -332,7 +319,5 @@ extern "C" void fn_800FAE08(_EFT* self)
     fn_800FB160(self);
 }
 
-/* ---------------------------------------------------------------------------------------------------
- * still stubbed - the residual (see the unit report)
- * ------------------------------------------------------------------------------------------------- */
+/* Not written yet (an empty stub). */
 extern "C" void fn_800FB160(_EFT* self) {}

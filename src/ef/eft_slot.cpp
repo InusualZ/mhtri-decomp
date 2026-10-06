@@ -1,201 +1,43 @@
 /*
- * ef/eft_slot.cpp - unit, `.text` 0x803432B4..0x80348A48 (76 functions, 22420 bytes).
- *
- * 34 of 76 functions have a body here.
- *
- * FLAGS.  `cflags_main`.  The tail (0x80348A48..) is `menu/menu_effect_slot.cpp`.
- *
- * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
- * extabindex).
- */
-/* ---- header inherited from src/ef/eft_slot.cpp (written against its pre-phase-4 range) ---- */
-/* ef/eft_slot.cpp - the `_EFT` family's slot pool at `.text` 0x803432B4..0x80349DD8 (92 functions).
- * The range's still-unwritten entries keep the map's `fn_` stems (`fn_803432B4`, the head, is the one
- * `ef/eft050.cpp`'s state dispatcher calls); every symbol this file DEFINES is named from its own body
- * (NAMES below, and the evidence next to each declaration).  The escape below records what is left.
- *
- * WHAT IT IS.  Every body drives the 0x48-byte effect instance `_EFT` (`ef.h`): the
- * range reads `flag_0x01`, `state_0x05`, `field_0x06`, `timer_0x0C`, `pos_0x18`, `rot_0x24`,
- * `work_0x38` and `area_0x44`, spawns and releases models through `ef/eft_res.cpp`'s
- * `res_eft_model_create`/`res_eft_UV_model_create`, and gates on the effect manager's
- * `eft_control`.  The `.data` band at 0x805E7F80..0x805E9200 belongs to the same code band: its
- * records hold this range's function pointers (the five three-entry sets
- * 0x805E7FB0/0x805E87F0/0x805E8B48/0x805E9118/0x805E9140 are one `{init, step, exit}` triple each)
- * and its `jumptable_805E918C` is `enemy_data_grp`'s own switch table.
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string is reachable from the
- * range: the only `lis`/`addi` pairs that do not resolve to a call are the `.sdata2` pool words
- * 0x8079B320..0x8079B360, and no `.rodata` string is referenced at all.  2. `dumpmap.py lookup`
- * answers only `zz_` placeholders (see the rule-7 line above).  3. The module is `ef` from the code:
- * the range's `self` is `_EFT` field for field (`+0x01`/`+0x05`/`+0x06`/`+0x0C`/`+0x18`/`+0x38`/
- * `+0x44`, the `ef.h` layout the sibling `ef/eft035.cpp` measured), it calls
- * `res_eft_model_create`/`res_eft_UV_model_create` (`ef/eft_res.cpp`) and the effect manager
- * `eft_control`; 4. nothing names the range - `dumpmap.py lookup` answers the dump's `zz_XXXXXXXX_`
- * placeholder for its entry points (`fn_803432B4`, `enemy_data_grp`, `eft_slot_spawn_targets`,
- * `fn_80344658`, `fn_80347B54`, `fn_80349398`, `fn_80349928` all checked) and no `__FILE__` string is
- * reachable, so every name this file defines is DERIVED from its own body and is a guess a later pass
- * may refine.
- *
- * NAMES.  The file is `eft_slot` because the range is the `eft` family's 10-entry slot pool
- * (`lbl_806BF0A0`, one 0x3C-byte `EftSlot` per entry - the record `enemy/ENEMY_DATA.h` also
- * views as the enemy per-entry data record) plus the enemy-record scan that drives it, and the family
- * dispatches into it from the `.data` tables above.  The 34 definitions, by body:
- *
- *   * the pool: `eft_slot_clear`/`eft_slot_pool_clear` (one / all entries cleared, the +0x14 byte
- *     stamped 255), `eft_slot_find_free` (first entry with a zero key, 255 = full), `eft_slot_find`
- *     (the (key_0x00, key_0x01) lookup), `eft_slot_spawn` (find-or-allocate and seed the whole state
- *     block), `eft_slot_spawn_targets` (one spawn per live enemy work record and per live target
- *     record);
- *   * `enemy_data_find`/`enemy_data_grp` are named for the ENEMY band's use, not this one's: its
- *     20+ call sites (`enemy/fn_8013BE60.c`, `enemy/fn_80165FC8.cpp`, `enemy/fn_80170600.cpp`,
- *     `enemy/em_action.cpp`) read the returned record as `_ENEMY_DATA` (its one home is
- *     `enemy/ENEMY_DATA.h`) and call `enemy_data_grp(team, id)` for the group the table is
- *     keyed on.  This unit owns both addresses, so the names have to serve those call sites;
- *   * the definition table (`lbl_805E9168`, the `EftDef` records): `eft_def_get`, `eft_def_flags`,
- *     `eft_def_handler`, `eft_def_model_block`;
- *   * the predicates: `eft_slot_armed_ck`, `eft_slot_live_ck` (a definition flag bit AND a non-zero
- *     +0x18, the entry's live enemy work), `eft_slot_persist_ck`, `eft_slot_area_ck`;
- *   * the per-frame work: `eft_slot_work_bind`, `eft_slot_work_update`, `eft_slot_counters_step`,
- *     `eft_slot_kind_set`, `eft_slot_effect_key`, `eft_slot_state_set`, `eft_slot_state_request`;
- *   * the record match tests: `eft_work_match_ck`/`eft_target_match_ck` (the exact key) and
- *     `eft_work_wide_ck`/`eft_target_wide_ck` (the wider one), `eft_slot_match_count`;
- *   * the (mode, value) pair the record keeps at +0x0F/+0x10: `eft_slot_mode_set`,
- *     `eft_slot_mode_set_imm`/`eft_slot_mode_set_defer` (the two wrappers), `eft_slot_mode_set_map`
- *     (mode/kind/value mapped onto the pair) and `eft_slot_mode_set_work` (the work record rewrites
- *     the triple first);
- *   * `eft_state_advance`/`eft_instance_release`: the two instance arms, `ef/eft050.cpp`'s state
- *     dispatcher cases 2 and 3, named for what they do to the `_EFT`.
- *
- * A later pass may refine any of them; only the bodies support them.  The record's own type is still
- * this file's `EftSlot` view (its fields are the ones these bodies read) - folding it onto
- * `_ENEMY_DATA` is a shared-file change, recorded in this unit's outbox rather than smuggled in here.
- *
- * Naming note: the 34 symbols this file defines are named above, so the escape covers only the
- * names it REFERENCES - this range's own still-unwritten entries (`fn_803432B4`, `fn_80345A2C`) and
- * eight callees other units own (`eft_res_slot_release`, `fn_80125FF0`, `fn_8012A9E8`, `fn_8012D1A8`,
- * `fn_80143BF8`, `eft_net_send`, `isServerSelectState`, `isReadyCountOne`).
- *
- * SEAM (UNPROVEN - not settled; the merger round re-checked it from the DOL and left it that way).  The
- * range is an `attribute.py` `--max-bytes` cut, and the code band above it (0x8033F270..0x803432B4) is
- * the same `_EFT` family - `fn_80343130`, which ends where this range starts, already takes an `_EFT*`
- * and calls `res_eft_UV_model_create`.  Falsification tests, all negative (so neither edge is FALSE):
- *   * `__FILE__` copies: 117 single-copy file-name strings in the DOL; the only two in the whole region
- *     0x8030121C..0x8034C0C4 are `menu_infomation.cpp` @0x805DCCDC (referrers all in
- *     0x8030A328..0x8031A244) and `menu_note.cpp` @0x805E91F8 (sole referrer fn_8034C0C4, above the
- *     right edge).  Neither is cited on both sides of either edge, and no string covers this band.
- *   * data straddle: of every `.data`/`.sdata`/`.sdata2`/`.rodata` label with a code referrer, **0** are
- *     referenced from both sides of either edge.
- *   * `extab`/`extabindex`: the section is globally sorted by function address (11,210 entries, only 4
- *     non-ascending, all in the trailing pad), so the entry ORDER carries no object-chunk information;
- *     this band's 70-entry run names exactly this range's functions, ascending, its last entry
- *     (fn_80349C9C + 0x13C) ends exactly on 0x80349DD8, and its extab pointers are exactly the
- *     contiguous block 0x80016DB4..0x80016FE4 - self-consistent tiling, but the run boundary is derived
- *     from the registration, so it cannot pin the edge.
- *   * alignment: no gap at either edge (fn_80343130 + 0x184 = 0x803432B4, fn_80349C9C + 0x13C =
- *     0x80349DD8) and only 9 `gap_` symbols exist repo-wide, so the `-func_align` padding oracle is empty.
- * What the reliable `.sdata2` class does say is only a BRACKET: this band's own pool run is exactly
- * 0x8079B320..0x8079B368, and the next owner above it is fn_8034CDDC, so the object containing the band
- * ends at a function start in (0x8034782C, 0x8034CDDC] - 0x80349DD8 is one of ~24 candidates.  The left
- * hand-off (0x8079B31C owned by fn_80343130 -> 0x8079B320 owned by fn_803432B4) is adjacent+ascending,
- * which is NOT evidence: the PROVEN boundary at `menu_note.cpp`'s TU has the identical shape
- * (lbl_805E91E8/fn_8034A448 -> lbl_805E91F8/fn_8034C0C4).  The `.data` fragment edge at 0x805E91E8 is a
- * candidate only (~7 % noise floor).  The Dolphin map is no help either: 92 entries for this range's
- * `.text`, only 3 non-`zz_` (`J3DColorBlockLightOff::getColorChanNum(void)` @0x80343AE8, `DBClose`
- * @0x803489F0, `FUN_80348a14` @0x80348A14 - the last is a Ghidra auto-name), and its `_<hex>` prefix is
- * NOT the owner (measured here: `_8034239cswitchdataD_805e918c` names a function in the band BELOW,
- * while the DOL's only referrer of that table is enemy_data_grp - the same correction playbook 54 records
- * for the `__FILE__` strings, extended to the `switchdataD_` entries).  So the range is registered whole
- * with both edges where the proposal put them; matching is the arbiter, and the land-or-delete call is
- * the orchestrator's.
- *
- * LANGUAGE AND SECTIONS.  C++ (the range reaches genuinely mangled callees - `move__6MHcharFUs`,
- * `setVector3__FPQ34nw4r4math4VEC3fff`, `get_now_areano__Fv`, `em_work_die_ck__FP11_ENEMY_WORK` -
- * through their real signatures, rule 9).  Every definition whose map name is plain is `extern "C"`
- * so its emitted name stays the map's stem (playbook 42).  The lib is `ef` (`cflags_main`).  dtk's
- * own split gave the range `extab` 0x80016DB4..0x80016FE4, `extabindex` 0x800362F4..0x8003663C and
- * one `.ctors` word at 0x8056F3A4 from the functions the claim covers.
- *
- * FLAGS.  The whole file builds with `#pragma peephole off`.  Retail keeps the *unfused* form of
- * every fold this band's code triggers: `eft_slot_live_ck` keeps `clrlwi r0,r3,24` + `clrlwi r0,r0,31` +
- * `cmpwi` where the pass emits one record-form `clrlwi.`, and `eft_slot_persist_ck` keeps
- * `clrlwi`/`rlwinm 0,30,30`/`cntlzw`/`srwi` where the pass emits `rlwinm 31,31,31` + `xori`.  Measured
- * per symbol with `recompile.py --measure` (before -> after): `eft_slot_live_ck` 90.0 -> 100.0,
- * `eft_slot_persist_ck` 73.33 -> 100.0, `enemy_data_find` 70.25 -> 98.33, `eft_slot_work_bind` 78.74 -> 82.94,
- * `eft_slot_spawn_targets` 88.29 -> 91.24, `eft_slot_spawn` 87.83 -> 91.20, `eft_slot_clear` 28.5 -> 57.5; only
- * `eft_def_handler` moved the other way (92.29 -> 91.25).  No function is below its peephole-on score.
- *
- * DATA.  The unit's own `.data` is claimed in full (0x805E9168..0x805E91E8, 128 B) and defined here: the
- * 9-entry definition table `lbl_805E9168` (36 B, index 0 NULL, values read from the DOL) and the switch
- * table `jumptable_805E918C` (23 x 4 B) MWCC emits for `enemy_data_grp`.  The table is this unit's by the
- * sole-referencer rule (playbook 58): the only object that names it is this one - 6 relocs, 2 per caller
- * (`eft_def_get`, `eft_def_flags`, `eft_def_handler`), no referrer outside the band - and it is contiguous
- * with the compiler-emitted table, so the two are one object's `.data` chunk.  Both sides now carry
- * `.data` 128 B and `.rela.data` 372 B, `.data` is 100 % fuzzy and `matched_data` is 128 of 1496 B.  The
- * remaining `.sdata`/`.sdata2` words (0x8079B320..0x8079B360) and `lbl_806A54E0` are `extern`-declared by
- * their map names and never defined (playbook 29).  The EftDef records the table points at are claimed:
- * `.data` 0x805E7FC0-0x805E91E8 (4648 B, every byte the original's - only the table at 0x805E9168 is
- * emitted, the records and the parameter blocks between them are claim-only) and `.bss`
- * 0x806BF0A0-0x806BF310 (`lbl_806BF0A0` and `lbl_806BF2F8`, both defined and byte-for-byte the target's
- * 624 B).  The gate's strict data row demanded the claim: this unit's object changed with the shared
- * `EftSlot.h` edit of the `hud/net_char_sync` batch, which makes its sole-owned pairs refusable.
- *
- * STATUS / RESIDUALS (measured with `recompile.py --measure`, official report metric).  33 of the
- * range's 92 functions are reconstructed; 16 are byte-identical and every one but `eft_def_model_block` is
- * at or above the 80 % bar:
- *
- *   byte-identical  eft_state_advance, eft_instance_release, eft_slot_pool_clear, eft_slot_find_free, eft_def_get, eft_def_flags,
- *                   eft_slot_armed_ck, eft_slot_live_ck, eft_slot_persist_ck, eft_work_match_ck, eft_target_match_ck, eft_slot_state_set,
- *                   eft_slot_effect_key, eft_slot_mode_set_imm, eft_slot_mode_set_defer, eft_slot_mode_set_map
- *   eft_work_wide_ck     99.56   eft_target_wide_ck 99.54   eft_slot_state_request 98.28   enemy_data_find 98.33
- *   eft_slot_mode_set     98.17   eft_slot_kind_set 97.67   eft_slot_area_ck 97.05   eft_slot_match_count 96.30
- *   eft_slot_mode_set_work     94.98   eft_slot_work_update 90.24   enemy_data_grp 91.69   eft_def_handler 91.25
- *   eft_slot_spawn_targets     91.24   eft_slot_spawn 91.20   eft_slot_counters_step 90.29   eft_slot_clear 88.0
- *   eft_slot_work_bind     82.94
- *
- *   * `enemy_data_grp` 91.69 - the instruction stream is the target's exactly (128 B) and the only
- *     difference is the switch table's relocation name: retail's `.data` symbol is the map's
- *     `jumptable_805E918C`, ours is MWCC's anonymous `@499`.  No source shape can name a
- *     compiler-emitted table (playbook 53's residual), and the data claim above only makes the
- *     target object carry the same bytes, not the same reloc name.
- *   * `eft_def_model_block` 77.64 - the three-level table walk.  Our 248 B against the target's 244 B: the
- *     `fn_80125FF0(slot->field_0x13, index)` call's second argument is *live* in r4 at the target's
- *     call site (the source passed only one argument through a wider declaration), so our version
- *     materialises it.  The sibling walkers `fn_803457A8`/`fn_80345894` were left unwritten for the
- *     same reason: their call passes no second argument at all (r4 is dead), which the owner header's
- *     two-parameter declaration cannot spell without a materialised argument.
- *   * `eft_def_handler` 91.25, `eft_slot_work_bind` 82.94, `eft_slot_spawn` 91.20, `eft_slot_spawn_targets` 91.24 - each is
- *     4 bytes off with the same instructions in a different order (MWCC's block placement around the
- *     `== NULL` early return and the slot-pool pointer arithmetic); the source shapes tried are the
- *     ones the sibling units record for this class.
- *   * `eft_slot_work_update` 90.24 (632 B target / 644 B ours) - the merge round measured this row at 90.24 in
- *     BOTH the pre-merge and the merged tree (those objects are byte-identical), so the outbox's 92.87
- *     is stale: the target object `recompile.py --measure` used for it was regenerated in MAIN at 19:52,
- *     after that worker's session.  The three real differences: the target's two calls relocate to the
- *     map's mangled `get_move_work_adrs__FUc` / `get_move_work_max__FUc` while ours call the plain names
- *     (this unit's closure carries no declaration of them - an implicit call, which is also why retail
- *     has no argument mask where ours emits `clrlwi`/`extsb`), and one stride constant reads 0xB20 in
- *     the target against 0xB18 in ours.
- *
- * The 58 functions still unwritten, in address order (size): fn_803432B4 (0x490), fn_80344658 (0x74C),
- * fn_80344E9C (0x288), fn_80345124 (0xEC), fn_803455F0 (0xC4), fn_803457A8 (0xEC), fn_80345894
- * (0x100), fn_80345994 (0x98), fn_80345A2C (0x40), fn_80345A6C (0x184), fn_80345BF0 (0xD0),
- * fn_80345CC0 (0xCC), fn_80345D8C (0x158), fn_80345EE4 (0x68), fn_80345F4C (0x124),
- * fn_80346070 (0xCC), fn_8034613C (0xB0), eft_slot_marks_set (0x7C), fn_80346268 (0x4C),
- * fn_803462B4 (0xAC), fn_80346360 (0x124), fn_80346484 (0x50), fn_803464D4 (0xDC),
- * fn_803465B0 (0x428), fn_803469D8 (0x54), fn_80346A2C (0x4), fn_80346A30 (0x5C),
- * fn_80346A8C (0x57C), fn_80347008 (0xDC), fn_803470E4 (0x124), fn_80347208 (0x50),
- * fn_80347258 (0x104), fn_8034735C (0x4D0), fn_8034782C (0x2D8), fn_80347B04 (0x50),
- * fn_80347B54 (0x780), fn_803482D4 (0x1BC), fn_80348490 (0x5C), fn_803484EC (0x504),
- * fn_803489F0 (0x4), fn_803489F4 (0x20), fn_80348A14 (0x34), fn_80348A48 (0x30),
- * fn_80348A78 (0x22C), fn_80348CA4 (0x50), fn_80348CF4 (0x2E0), fn_80348FD4 (0xAC),
- * fn_80349080 (0x104), fn_80349184 (0xA4), fn_80349228 (0x104), fn_8034932C (0x6C),
- * fn_80349398 (0x57C), fn_80349914 (0x14), fn_80349928 (0x16C), fn_80349A94 (0x70),
- * fn_80349B04 (0x140), fn_80349C44 (0x58), fn_80349C9C (0x13C).  The `.data` records
- * 0x805E7FB0/0x805E87F0/0x805E8B48/0x805E9118/0x805E9140 list the entry points of the five
- * three-function programs those bodies implement (`fn_80346484`/`fn_803465B0`/`fn_803469D8`,
- * `fn_80346A2C`/`fn_80346A8C`/`fn_80347008`, `fn_80347208`/`fn_8034735C`/`fn_8034782C`,
- * `fn_80347B04`/`fn_80347B54`/`fn_803482D4`, `fn_80348490`/`fn_803484EC`/`fn_803489F0`), which is
- * where the next pass should start - `fn_80344658` is the shared distance sort they call.
+ * ef/eft_slot.cpp - the `_EFT` family's 10-entry slot pool (`lbl_806BF0A0`, one 0x3C-byte `EftSlot` per entry), the
+ *   enemy-record scan that drives it, the `EftDef` definition table and the slot predicates and state setters.
+ * RANGE. .text 0x803432B4-0x80348A48 (76 functions); extab 0x80016DB4-0x80016F74, extabindex 0x800362F4-0x80036594,
+ *   .ctors 0x8056F3A4-0x8056F3A8, .data 0x805E7B70-0x805E91E8, .bss 0x806BF0A0-0x806BF310, .sdata
+ *   0x807930F0-0x807932F0, .sdata2 0x8079B320-0x8079B368.  The tail from 0x80348A48 is `menu/menu_effect_slot.cpp`.
+ *   The seam is unproven: no `__FILE__` string covers the band, no data label straddles either edge, and the
+ *   band's own `.sdata2` run (0x8079B320-0x8079B368) only brackets the object's end between 0x8034782C and
+ *   0x8034CDDC.  The `.data` records 0x805E7FB0/0x805E87F0/0x805E8B48/0x805E9118/0x805E9140 are `{init, step, exit}`
+ *   triples of this range's unwritten programs.
+ * FLAGS. `cflags_main`; `#pragma peephole off` over every body (retail keeps the unfused `clrlwi` + `cmpwi` of
+ *   `eft_slot_live_ck` and the `cntlzw`/`srwi` of `eft_slot_persist_ck`; playbook 39).
+ * NAMES. Every definition is a GUESS from its body (the dump has only placeholders here): the pool (`eft_slot_clear`,
+ *   `eft_slot_pool_clear`, `eft_slot_find_free`, `eft_slot_find`, `eft_slot_spawn`, `eft_slot_spawn_targets`), the
+ *   definition table (`eft_def_get`, `eft_def_flags`, `eft_def_handler`, `eft_def_model_block`), the predicates
+ *   (`eft_slot_armed_ck`, `eft_slot_live_ck`, `eft_slot_persist_ck`, `eft_slot_area_ck`), the per-frame work
+ *   (`eft_slot_work_bind`, `eft_slot_work_update`, `eft_slot_counters_step`, `eft_slot_kind_set`,
+ *   `eft_slot_effect_key`, `eft_slot_state_set`, `eft_slot_state_request`), the match tests (`eft_work_match_ck`, `eft_target_match_ck`,
+ *   `eft_work_wide_ck`, `eft_target_wide_ck`, `eft_slot_match_count`), the (mode, value) pair at +0x0F/+0x10
+ *   (`eft_slot_mode_set`, `eft_slot_mode_set_imm`, `eft_slot_mode_set_defer`, `eft_slot_mode_set_map`,
+ *   `eft_slot_mode_set_work`) and the two instance arms `eft_state_advance`/`eft_instance_release`.
+ *   `enemy_data_find`/`enemy_data_grp` are named for the enemy band's callers, which read the record as
+ *   `_ENEMY_DATA` (`enemy/ENEMY_DATA.h`); this file keeps its own `EftSlot` view.
+ * RESIDUALS. 42 rows unwritten: 0x803432B4-0x80343744 (`fn_803432B4`), 0x80344658-0x80344DA4 (`fn_80344658`, the
+ *   shared distance sort), 0x80344E9C-0x80345210 (`fn_80344E9C`, `fn_80345124`), 0x803455F0-0x803456B4
+ *   (`fn_803455F0`), 0x803457A8-0x80348A48 (37 rows; the walkers `fn_803457A8`/`fn_80345894` call `fn_80125FF0`
+ *   with no second argument, which its two-parameter owner declaration cannot spell).
+ *   16 partial rows, including:
+ *  - `enemy_data_grp`: the code is the target's; ours names its switch table `@2246` where retail names
+ *    `jumptable_805E918C`;
+ *  - `eft_def_model_block`: ours materialises `fn_80125FF0`'s second argument (`clrlwi r4`) and reorders the walk;
+ *  - `eft_slot_work_update`: one stride reads 0xB20 in retail and 0xB18 in ours, and ours narrows the two ids
+ *    (`extsb`, `clrlwi`) at the call where retail does not;
+ *  - `eft_slot_clear`: ours indexes the +0x14 store with `stbx` where retail adds first;
+ *  - `eft_slot_counters_step`: ours loads the counter `lhz` where retail loads `lha` and masks.
+ *   The other 11 partial rows have no recorded cause (`symdiff.py -u ef/eft_slot --all`).
+ *   flipcheck: `.ctors`/`.sdata`/`.sdata2` claimed, not emitted; `.text` (0x14F4 of 0x5794), extab (0x98 of 0x1C0),
+ *   extabindex (0xE4 of 0x2A0) and `.data` (0x80 of 0x1678) short of the claim and differing.
+ * SHAPES. The definition table `lbl_805E9168` (9 entries, index 0 NULL) and `.bss` `lbl_806BF0A0`/`lbl_806BF2F8` are
+ *   defined here; `enemy_data_grp`'s switch table is emitted beside the table (one `.data` chunk, playbook 58).
  */
 
 #include "enemy/lbl_806A54E0.h" /* lbl_806A54E0 (rule 2: the owner's header) */
@@ -208,9 +50,9 @@
 #include "fn_8004CAD8.h" /* the vector/geometry helpers the range calls */
 #include "Network/network_pat_control.h" /* isReadyCountOne */
 #include "camera/camera.h" /* get_camera_pos / get_camera_direction / fn_802BE088 */
-#include "ef/fn_800CDB2C.h" /* my_player_no (`fn_800CF384` before the hud/move_work_update landing named it) */
+#include "ef/fn_800CDB2C.h" /* my_player_no */
 #include "ef/EftSlot.h"
-#include "ef/eft_slot.h" /* eft_net_send - its owner (`hud/net_char_sync.cpp`) owns the address, its header is unreachable here */
+#include "ef/eft_slot.h" /* the unit's own declarations (eft_net_send via hud/eft_net_send.h) */
 #include "enemy/ENEMY_WORK.h" /* the move-work records `eft_slot_spawn_targets`/`eft_slot_work_bind` walk */
 #include "enemy/fn_8012BDF4.h" /* em_work_die_ck, fn_8012D1A8 */
 #include "enemy/fn_801251D0.h" /* fn_80125FF0, fn_8012A9E8 */

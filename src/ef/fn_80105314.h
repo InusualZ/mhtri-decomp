@@ -1,10 +1,5 @@
-/*
- * Declarations owned by `ef/fn_80105314.cpp` (docs/plan.md 6.5 rule 2): the symbols the enemy/effect
- * units call that this unit defines.  A consumer includes this header instead of declaring them itself.
- *
- * The parameters are the callers' views (`void*` for the effect/enemy record, `void*` for the position
- * triple); the ABI is the same pointer register, so nothing but the header changes at the call sites.
- */
+/* ef/fn_80105314.h - the declarations of `ef/fn_80105314.cpp`'s symbols the enemy/effect units call (docs/plan.md
+ * 6.5 rule 2), with the callers' `void*` views of the record and the position (the same pointer registers). */
 #ifndef MHTRI_EF_FN_80105314_H
 #define MHTRI_EF_FN_80105314_H
 
@@ -27,11 +22,11 @@ void fn_80105560(void* self);
 /* The enemy effect setter (position, scale, trailing id) and the id-only setter. */
 void fn_801057A4(void* self, u32 a, void* v, f32 scale, u32 id);
 void fn_8010A7D4(void* self, u32 a);
-/* 0x8010562C - this unit's joint-effect spawner: r3 (`self`), r4/r5 two scalars, r6 the `VEC3*` and
- * f1 the scale.  Added with `enemy/em009_act.cpp` (rule 2: this unit owns the address). */
+/* 0x8010562C - this unit's joint-effect spawner: r3 (`self`), r4/r5 two scalars, r6 the `VEC3*` and f1 the scale
+ * (`enemy/em009_act.cpp` calls it). */
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale);
-/* 0x80106694 - the second spawner of the same band: r3 (`self`), r4 the `VEC3*`, r5 a byte kind and
- * f1 the scale.  Added with `enemy/em009_act.cpp` (rule 2). */
+/* 0x80106694 - the second spawner of the same band: r3 (`self`), r4 the `VEC3*`, r5 a byte kind and f1 the scale
+ * (`enemy/em009_act.cpp` calls it). */
 void eft_spawn_type11(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 kind, f32 scale);
 
 #ifdef __cplusplus

@@ -1,25 +1,8 @@
-/* ef/eft_slot.cpp's header: the declarations the unit's consumers need, and the one call-site
- * declaration the unit itself cannot take from its owner's header.
- *
- * RULE 2 HOMES.  `enemy_data_find`/`enemy_data_grp`/`eft_slot_effect_key` are defined by
- * `ef/eft_slot.cpp` (map 0x803438E4 / 0x803439D4 / 0x8034539C) and called from the enemy band -
- * `enemy/fn_8013BE60.c`, `enemy/fn_80165FC8.cpp`, `enemy/fn_80170600.cpp`, `enemy/em_action.cpp`
- * (20+ call sites read the returned record as `_ENEMY_DATA`, `enemy/ENEMY_DATA.h`).  This
- * unit owns the addresses, so this is their home: the consumers include this header and keep no
- * declaration of their own.  `struct EftSlot` is this unit's own view of the 0x3C-byte record it
- * hands back, forward-declared so a caller with its own view (`_ENEMY_DATA`) can pass its pointer
- * meaning what this unit means; the type itself is defined in `ef/EftSlot.h`.
- *
- * `eft_net_send` (0x803386C4, size 0x144) is the ef band's slot-state sender: r3 the slot record, r4 the
- * mode, r5 the value the mode carries.  `ef/eft_slot.cpp` calls it nine times.  `hud/net_char_sync.cpp` owns
- * the address (its band is 0x80334568..0x80338808); the declaration is repeated here with the owner's own
- * signature, so this unit does not include `hud/net_char_sync.h`, which drags in the whole net message
- * family (an earlier probe measured that the wider declaration surface moved `eft_slot_work_update`).
- *
- * `copyVec3` itself (0x80041E40, `src/mh3_pad.cpp`) is no longer one of these: it comes from
- * `mh3_pad.h`, which this unit includes (the `(10197)` clash that used to make that header
- * unreachable is closed).
- */
+/* ef/eft_slot.h - the declarations of `ef/eft_slot.cpp`'s symbols its consumers call: `enemy_data_find`,
+ * `enemy_data_grp` and `eft_slot_effect_key` for the enemy band (which reads the record as `_ENEMY_DATA`), with
+ * `struct EftSlot` forward-declared (defined in `ef/EftSlot.h`).  `eft_net_send` (0x803386C4: r3 the slot record,
+ * r4 the mode, r5 its value) comes from its owner's leaf header `hud/eft_net_send.h`.  `fn_80349914` is
+ * `menu/menu_effect_slot.cpp`'s, declared here until that unit has a header. */
 #ifndef MHTRI_EF_EFT_SLOT_H
 #define MHTRI_EF_EFT_SLOT_H
 
@@ -59,8 +42,8 @@ void eft_slot_state_set(struct EftSlot* slot, u8 state, struct _ENEMY_WORK* work
 /* 0x803461EC - stores the two marks a received mark message carries on the slot. */
 void eft_slot_marks_set(struct EftSlot* slot, u8 a, u8 b);
 
-/* 0x80349914 - the two-byte copy MWCC emits for a `u16` pair assignment (`*dst = *src`).  Added with
- * `menu/menu_row.cpp`, its consumer (rule 2: the address is in this unit's range). */
+/* 0x80349914 - the two-byte copy MWCC emits for a `u16` pair assignment (`*dst = *src`); `menu/menu_row.cpp` calls
+ * it.  It is `menu/menu_effect_slot.cpp`'s, declared here until that unit has a header. */
 void fn_80349914(u16* dst, const u16* src);
 
 #ifdef __cplusplus

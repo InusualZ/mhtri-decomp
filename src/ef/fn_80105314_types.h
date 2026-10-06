@@ -1,4 +1,4 @@
-/* Types and macros the units cut from `ef/fn_80105314.cpp` share (hoisted at phase 4 so each is defined once). */
+/* ef/fn_80105314_types.h - the types and macros `ef/fn_80105314.cpp` and `ef/eft013_fx.cpp` share. */
 #ifndef MHTRI_EF_FN_80105314_TYPES_H
 #define MHTRI_EF_FN_80105314_TYPES_H
 
@@ -18,7 +18,7 @@
 #include "unsplit/unknown.h"
 #include "unsplit/ef.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 
 /* ---------------------------------------------------------------------------------------------------
  * the 72-byte effect object and its pool blocks (the `_EFT` shape of ef/eft002.cpp, named per-unit so

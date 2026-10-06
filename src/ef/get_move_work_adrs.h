@@ -1,7 +1,6 @@
-/* Leaf header for the two per-kind move-work accessors `ef/fn_800CDB2C.cpp` owns (0x800CFA90, 0x800CFAD0):
- * the owner's full header is included by units that carry their own spellings of these, so the
- * declarations stay out of it (rule 2).  The accessors hand out the per-kind work arrays (kind 2 players, kind 3 enemies).
- */
+/* ef/get_move_work_adrs.h - the leaf header for `ef/system_core.cpp`'s two per-kind move-work accessors (0x800CFA90,
+ * 0x800CFAD0), which hand out the per-kind work arrays (kind 2 players, kind 3 enemies); the owner's full header is
+ * included by units that carry their own spellings of these. */
 #ifndef MHTRI_EF_GET_MOVE_WORK_ADRS_H
 #define MHTRI_EF_GET_MOVE_WORK_ADRS_H
 

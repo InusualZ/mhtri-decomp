@@ -1,8 +1,4 @@
-/*
- * Declarations owned by `ef/eft001.cpp` (docs/plan.md 6.5 rule 2): the symbols the eft001 cluster
- * defines that its ef siblings call.  A consumer includes this header instead of declaring the symbol
- * itself.  Keep it minimal.
- */
+/* ef/eft001.h - the declarations of the `ef/eft001.cpp` symbols its ef siblings call (docs/plan.md 6.5 rule 2). */
 #ifndef MHTRI_EF_EFT001_H
 #define MHTRI_EF_EFT001_H
 
@@ -22,8 +18,8 @@ void fn_800FBB90(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
 struct _CP_VECTOR;
 void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 
-/* Added with `Pl/fn_80273B14.cpp` (rule 2): 0x800FC0F0 is the effect spawn the player's act frame
- * step issues from the player's joint position. */
+/* 0x800FC0F0 - the effect spawn the player's act frame step issues from the player's joint position
+ * (`Pl/fn_80273B14.cpp`). */
 void fn_800FC0F0(nw4r::math::VEC3* pos, u32 type, u32 field_08, u32 area, _CP_VECTOR* rot,
                  f32 scale);
 

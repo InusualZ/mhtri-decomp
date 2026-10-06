@@ -1,59 +1,25 @@
-/* ef/em_effect_ctrl.cpp - the enemy-effect (`em`) controller
- *
- * `.text` 0x80101FA4..0x80102994, 6 functions written (the rest of the range is not decompiled yet).
- * Phase 4: the head of the retired `ef/eft007.cpp`, cut away from the player-weapon `eft007` controller (which keeps the name `ef/eft007`).
- * Name is a GUESS: the range holds the `em` controller (`EmEffectWork`/`EmEffectUnit`, `fn_80101FA4`'s per-frame screen-box test).
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `ef/eft007.cpp` (kept for its notes and residuals): */
-/* ef/em_effect_ctrl.cpp - the `ef` effect-setup batch: three controller families whose
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * per-frame hooks share one object, 22 function(s), 0x80101FA4..0x80103D28.
- *
- * The seam is pinned by the `.data` pool run jumptable_8059E160 -> jumptable_8059E268
- * (`tu-boundary-discovery`).  The unit is C++ (`tools/units/langcheck.py`): two definitions and 21
- * callees arrive mangled, so every definition the map spells plainly is `extern "C"` - a C++ free
- * function would mangle and objdiff pairs by name (playbook 42).  A mangled *callee* is a
- * C++ declaration whose signature reproduces the map's argument list; the ones the map spells plainly
- * are `extern "C"`.
- *
- * Three families in address order, each with its own work record: the `em` controller
- * (0x80101FA4..0x80102994, `EmEffectWork`/`EmEffectUnit`), the player-weapon `eft007` controller
- * (0x80102994..0x80103960, `_EFT007`/`_EFT007_WORK`/`_PLW`) and the enemy emitter
- * (0x80103960..0x80103D28, `_EFT_EMITTER`/`_ENEMY_WORK`).  `eft_res_slot_get` hands each family one of the
- * 0x48-byte effect pool slots, so the shared prototype returns `void*` and each call site names its view.
- *
- * Load-bearing source shapes (each measured, not stylistic):
- *   - `#pragma peephole off` for `fn_80101FA4`, `fn_801025FC`, `fn_801027D0`, the whole `eft007` block
- *     and `eft007_part_spawn`/`fn_80103B60`: retail keeps the unfused `subi`+`cmpwi`, `clrlwi`+`cmpwi`,
- *     `extsb`+`cmpwi` and `rlwinm`+`cmpwi` forms our `-O3` peephole fuses into their record forms
- *     (row 39).  The whole target object has zero fused record forms.
- *   - `#pragma fp_contract off` for `fn_80101FA4`: retail keeps `fmuls` + `fsubs` where the default
- *     contracts them into `fnmsubs` (row 40).
- *   - `EmEffectUnit::handles` is an array member, not a pointer, and `fn_80101FA4` writes
- *     `unit->handles[i]->field` inline rather than through a local: retail reloads both the handle and
- *     `unit->entries[i]` at every access, and hoisting either into a local costs ~2.5 points.
- *   - `fn_80101FA4`'s screen-box test and its off-screen accumulator use the negated comparisons
- *     (`!(x <= lo)`, `!(x >= hi)`, `x >= 640.0f`, `x <= 0.0f`): retail branches on the precise
- *     `fcmpo`+`cror` pair only the `<=`/`>=` spellings produce.
- *   - The `eft007` setters take the part index as `u8` while the enemy wrappers take it as `u32`; the
- *     `u32`->`u8` narrowing at the call *is* retail's `clrlwi`.
- *
- * Residuals (none of them source-reachable):
- *   - `fn_80101FA4` 98.12 %: one `lfd` of the int->f64 conversion magic names an anonymous pool entry
- *     where the split names `lbl_80796728` (dtk's reloc naming), plus register colouring.
- *   - `fn_801027D0` 97.79 %: retail's frame puts `eye` at +0x08, the probe copy at +0x18, `seg` at
- *     +0x28, `cam` at +0x34 and the quad at +0x40 with a 4-byte hole at +0x14; MWCC allocates the same
- *     five locals in the reverse order and the order is not source-reachable (reordering the
- *     declarations changes nothing).
- *   - `fn_80103518` 98.38 %: instruction-identical (105/105 rows ignoring register numbers); only the
- *     callee-saved colours differ - the allocator's web priority (row 22).
- *   - The three switch functions emit their own `.data` jump tables, so their `bctr` relocs name local
- *     labels where the split names `jumptable_8059DB00/DB50/DBA0`.  Those tables are not claimed.
- *   - `_EmHandle` here and `MHchar` in the `eft007` block are two views of one map name whose fields
- *     disagree (+0x04 is a position here, a byte and a `u16` there); they are kept apart rather than
- *     forced into one layout.
+/* ef/em_effect_ctrl.cpp - the enemy-effect (`em`) controller: `EmEffectWork`/`EmEffectUnit` and `fn_80101FA4`'s
+ *   per-frame screen-box test.
+ * RANGE. .text 0x80101FA4-0x80102994 (6 functions); extab 0x8000BEFC-0x8000BF1C, extabindex 0x80025D64-0x80025D94,
+ *   .sdata 0x80791790-0x80791798, .sdata2 0x807966F0-0x80796740.  The player-weapon controller from 0x80102994 is
+ *   `ef/eft007.cpp`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` for `fn_80101FA4`, `fn_801025FC` and `fn_801027D0` (retail keeps the
+ *   unfused `subi`/`clrlwi`/`extsb`/`rlwinm` + `cmpwi` forms; playbook 39) and `#pragma fp_contract off` for
+ *   `fn_80101FA4` (retail keeps `fmuls` + `fsubs`; playbook 40).
+ * NAMES. The unit name is a GUESS (the range holds the `em` controller); the map has only `fn_` stems, so the
+ *   definitions are `extern "C"` in a C++ unit.
+ * RESIDUALS. 2 partial rows:
+ *  - `fn_80101FA4`: one `lfd` of the int-to-f64 magic names our pool entry where retail names `lbl_80796728`, and
+ *    the registers are coloured differently;
+ *  - `fn_801027D0`: retail's frame places `eye` at +0x08, the probe copy at +0x18, `seg` at +0x28, `cam` at +0x34 and
+ *    the quad at +0x40; MWCC allocates the five locals in reverse order whatever the declaration order.
+ *   flipcheck: `.sdata` claimed, not emitted; `.text` (0x9E8 of 0x9F0) and `.sdata2` (0x10 of 0x50) short of the
+ *   claim and differing; extabindex differs in 1 byte.
+ * SHAPES. `EmEffectUnit::handles` is an array member and `fn_80101FA4` writes `unit->handles[i]->field` inline:
+ *   retail reloads the handle and `unit->entries[i]` at every access.
+ *   The screen-box test and its off-screen accumulator use the negated comparisons (`!(x <= lo)`, `!(x >= hi)`,
+ *   `x >= 640.0f`, `x <= 0.0f`): only the `<=`/`>=` spellings give retail's `fcmpo` + `cror`.
+ *   `_EmHandle` here and `MHchar` in `ef/eft007.cpp` are two views of one map name whose fields disagree.
  */
 
 #include "ef/eft_res_models_spawn.h" /* eft_res_models_spawn (rule 2: the owner's header) */
@@ -70,7 +36,7 @@
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 #include "ef/eft007_types.h"
 
@@ -213,7 +179,7 @@ extern "C" void move__6MHcharFUs(_EmHandle* self, u32 motion);
 extern "C" void setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor(_EmHandle* self, u32 index, u32 id,
                                                                   _GXColor* color);
 
-/* --- pooled constants (declared, never defined: the pool belongs to the data pass) --------------- */
+/* --- the unit's own pool, declared, never defined (playbook 29) ---------------------------------- */
 extern f32 lbl_807966F0; /* 0.0001f  */
 extern f32 lbl_807966F4; /* 0.0f     */
 extern f32 lbl_807966F8; /* 50.0f    */

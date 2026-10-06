@@ -1,4 +1,4 @@
-/* Types and macros the units cut from `ef/eft004.cpp` share (hoisted at phase 4 so each is defined once). */
+/* ef/fn_800FD864_fx_types.h - the eft004 types and macros `ef/fn_800FD864_fx.cpp` and `ef/eft004_fx.cpp` share. */
 #ifndef MHTRI_EF_FN_800FD864_FX_TYPES_H
 #define MHTRI_EF_FN_800FD864_FX_TYPES_H
 

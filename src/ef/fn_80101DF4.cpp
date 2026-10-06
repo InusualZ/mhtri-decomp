@@ -1,45 +1,18 @@
-/* ef/fn_80101DF4.cpp - the effect-state machine's state-0 handler: `fn_80101DF4`,
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- * `.text` 0x80101DF4-0x80101FA4.
- *
- * One C++ TU of the `ef` (effect) library, `auto` / `Wii/1.3` / `cflags_main` (`-O3 -inline noauto`).
- * The object's language is C++ (langcheck: both callees are mangled), so the file is `.cpp` and the
- * map's plain `fn_80101DF4` definition carries `extern "C"` (playbook 42).
- *
- * What it is: the state-0 handler of the effect-state machine `fn_80101DB8` dispatches on
- * (`EftState::state`, +0x05).  It advances the state to 1 and fills the state's `EftModelSet`
- * (`EftState::set`, +0x38): the per-type effect-record run `lbl_8059CF78[type_id]`, the set's scale,
- * the main character's effect (fixed id 14) and one effect per record of the run (id through the
- * shared table `lbl_8059CFB0`, scale copied into the model's +0x1C/+0x20).  A failed
- * `res_eft_model_create` bails out through `fn_801025F8` (a tail call to the library's error path
- * `eft_res_slot_release`).
- *
- * Flags: retail keeps the peephole's `clrlwi r0,r3,24` + `slwi r0,r0,2` pair unfused at the
- * `get_now_mapno()` index, so the file needs `#pragma peephole off` (playbook 39); with the peephole
- * on the function is 97.87 %.
- *
- * The source shape that is load-bearing:
- *   * the record cursor is the **source's** `i * sizeof(EftModelRecord)` element index - MWCC
- *     strength-reduces it into the separate byte-offset register retail has (`addi r27,r27,20`).
- *     Declaring that offset as its own local instead swaps it with the `chars` index pointer and costs
- *     0.56 points (playbook 19/20).
- *
- * Pool: the two scale constants are literals, so this object emits the unit's 8-byte `.sdata2`
- * (`42840000 40e66666`, i.e. 66.0f then 7.2f), and the DOL holds exactly those bytes at
- * 0x807966E8-0x807966F0.  That range is claimed: it is the unit's **own** pool entry, so no other
- * registered unit's object references it, the claim pairs the target object's `.sdata2` with ours and
- * the unit is linked (`Object(Matching, ...)`).  A claim on a *shared* pool entry does not work this
- * way - `Pl/fn_8026FFBC.cpp` is the measured counter-example.
- *
- * The types below are shared with the sibling state handlers of this library (`fn_80101DB8`,
- * `fn_80101C74`, `fn_80101D70` are the evidence for `EftState`); they move to a shared `ef` header the
- * second time another unit needs them (rule 1).
- *
- * Residual: none - all 108 rows match, `.text` 0x1B0/0x1B0 and `extab`/`extabindex` byte-equal.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_80101DF4.cpp`.
- * The name is provisional (`auto/` plus the first symbol's address) because nothing in the object names
- * the original source file.
+/* ef/fn_80101DF4.cpp - the state-0 handler of the effect-state machine `ef/eft004_fx.cpp`'s `fn_80101DB8` dispatches
+ *   on: it advances the state and fills the state's `EftModelSet` (the per-type record run `lbl_8059CF78[type_id]`,
+ *   the main character's effect and one effect per record); a failed `res_eft_model_create` bails out through
+ *   `ef/em_effect_ctrl.cpp`'s `fn_801025F8`.
+ * RANGE. .text 0x80101DF4-0x80101FA4 (1 function); extab 0x8000BEF4-0x8000BEFC, extabindex 0x80025D58-0x80025D64,
+ *   .data 0x8059C8E8-0x8059DAA0, .sdata2 0x807966E8-0x807966F0 (66.0f and 7.2f, the unit's own literals).
+ * FLAGS. `cflags_main`; `#pragma peephole off` (retail keeps `clrlwi r0,r3,24` + `slwi r0,r0,2` unfused at the
+ *   `get_now_mapno()` index; playbook 39).
+ * NAMES. The map has only the `fn_` stem, so the definition is `extern "C"`; the unit is C++ (both callees mangled).
+ * RESIDUALS. none in code: the row matches and the `.sdata2` pair is emitted.
+ *   flipcheck: `.data` claimed, not emitted (the target relocates against `lbl_8059CF78` and the `lbl_8059D9xx`
+ *   tables, ours against extern declarations).
+ * SHAPES. The record cursor is the source's `i * sizeof(EftModelRecord)` index, which MWCC strength-reduces into
+ *   retail's separate byte-offset register (`addi r27,r27,20`); a byte-offset local swaps it with the `chars`
+ *   pointer (playbook 19/20).
  */
 
 #include "types.h"

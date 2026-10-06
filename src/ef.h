@@ -16,8 +16,8 @@ extern "C" {
  *
  * The game-side effect records live here too: `_EFT` is the 0x48-byte effect instance, `_EFT_WORK` the
  * counter block it carries at +0x38, `_CP_VECTOR` the three-word rotation `cpSetRotMatrix` takes, and
- * `_SHELL_W` the shell actor the player effect holds at +0x2C.  Each was copied into 2-6 units; the
- * canonical layouts below are the union of every copy's fields (see each type's note).
+ * `_SHELL_W` the shell actor the player effect holds at +0x2C; each layout is the union of the fields the ef
+ * units read (see each type's note).
  */
 
 /* The engine's 3-float vector.  Same LAYOUT as `nw4r::math::VEC3`, but a different type: the
@@ -155,7 +155,7 @@ typedef struct EfWork {
 } EfWork; /* size: at least 0xFD (the record continues past what this unit reads) */
 
 /* --------------------------------------------------------------------------------------------------
- * the game-side effect records (union of every unit's private copy)
+ * the game-side effect records
  * -------------------------------------------------------------------------------------------------- */
 
 #include "ef/cp_vector.h" /* `_CP_VECTOR`, the rotation triple `cpSetRotMatrix` takes */
@@ -241,17 +241,10 @@ typedef struct _se_w _se_w;
 
 /* nw4r::math and effect-library helpers, all still `fn_*` in the symbol map.
  * The two `src/mh3_pad.cpp` helpers declared here (`VEC3_ctor`, `setVec3`) are spelled EXACTLY as
- * `mh3_pad/vec3.h` spells them - that header is their owner's.  The two used to disagree
- * (the owner's header carried the record's type, these carried `void*`), so a TU including both
- * failed with MWCC `(10197) illegal function overloading` (measured on `src/Pl/fn_8028F66C.cpp`;
- * the `mh3_pad/control.h` bracket note, filed 2026-09-27).  Both spellings now name the record's
- * real type, `nw4r::math::VEC3` (docs/plan.md 6.5 rule 11).
- * Folding these two into an `#include "mh3_pad.h"` is the remaining step; it is deferred because
- * `mh3_pad.h` also carries `screen_split_mode_ck`/`word_copy_return_dst`/`get_ControlType`, whose other declarations in
- * the tree are still being settled.  Keeping the two here (rather than in `mh3_pad/vec3.h`) also keeps
- * this header's consumers' declaration set byte-for-byte what it was, which the compiler's anonymous
- * pool numbering is sensitive to (measured: adding one declaration to `ef/ef_disc.cpp` moved
- * `fn_800CC5B0` by 0.006). */
+ * `mh3_pad/vec3.h` spells them (the owner's header), with the record's real type `nw4r::math::VEC3`; two
+ * spellings in one TU are MWCC `(10197) illegal function overloading`.  They stay here rather than in an
+ * `#include "mh3_pad.h"`: that header carries other declarations its consumers spell differently, and this
+ * header's declaration set is a codegen input (adding one declaration moved `ef/ef_disc.cpp`'s `fn_800CC5B0`). */
 extern void VEC3_ctor(VEC3* out);                                   /* 0x80043EA8 - owner mh3_pad.cpp */
 extern VEC3* setVec3(VEC3* out, f32 x, f32 y, f32 z);               /* 0x80041E8C - owner mh3_pad.cpp */
 extern void assignVec3(Vec* out, Vec* in);                         /* out = in */
@@ -260,14 +253,9 @@ extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);         /* sin/cos o
 extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);
 extern u16 fn_800A9FB0(s32 ctx, u16 id, f32 scale, EfWork* em);
 extern f32 fn_800A8A08(u32* progress);                              /* pseudo-random 0..1 */
-/* 0x80050BC0 is NOT declared here: `src/fn_8004CAD8.cpp` owns the address and publishes it in
- * `fn_8004CAD8.h` (rule 2), which this unit includes.  The `(f32 a, f32 b)` view that stood
- * here was wrong about the callee's arity - its body reads only f1 and returns `x * FrSqrt(x)` - and
- * it collided with the owner's declaration in every TU that included both headers
- * (`(10197) illegal function overloading`, measured on `src/fn_80059550.cpp`).  The second float the
- * retail call sites materialise is the hoisted common subexpression `1.0f - t`, which the `else`
- * branch of those callers also needs (`ef_disc.cpp` 0x800CCA7C `fsubs f2, f30, f1`, reused at
- * 0x800CCA98 `fsubs f0, f30, f1`), not a second argument. */
+/* 0x80050BC0 is `src/fn_8004CAD8.cpp`'s, declared in `fn_8004CAD8.h`: it takes one float (its body reads only f1
+ * and returns `x * FrSqrt(x)`); the second float the callers materialise is the hoisted `1.0f - t` their `else`
+ * branch reuses (`ef_disc.cpp` 0x800CCA7C `fsubs f2, f30, f1`, 0x800CCA98 `fsubs f0, f30, f1`). */
 extern f32 fn_800C9DCC(f32 a);                                      /* fabsf */
 extern f32 fn_80463F10(f32 a, f32 b);                               /* fmodf */
 
@@ -311,16 +299,14 @@ inline int IsValidPointer(u32 ptr) {
 
 /* nw4r::ef::Effect - the pooled effect object.  It is a C++ class (the `change_color_eff` /
  * `setTevKColor` / `setMatColor` mangled names encode `Q34nw4r2ef6Effect`), so it can only be declared
- * from C++.  A C unit reaches it as `void*` through `_EFT_WORK::effect`.  Union of the three private
- * copies (`ef/eft004.cpp` `RetireEmitterAll`, `ef/eft007.cpp` both methods, `ef/eft009.cpp` `SetRootMtx`,
- * `ef/eft001.cpp`/`ef/effect.cpp` `ForeachParticleManager`); the two leading words are the storage the
- * spawn handler writes, so the size is stated at the closing brace. */
+ * from C++.  A C unit reaches it as `void*` through `_EFT_WORK::effect`.  The methods are the ones the ef units
+ * call (`RetireEmitterAll`, `SetRootMtx`, `ForeachParticleManager`, ...); the size is stated at the closing brace. */
 #ifdef __cplusplus
 namespace nw4r {
 namespace ef {
 struct Effect {
     /* +0x00 */ u8 pad_0x00[0x44];
-    /* +0x44 */ void* owner_0x44;   /* back-pointer to the spawning `_EFT` (ef/fn_800FE978.cpp) */
+    /* +0x44 */ void* owner_0x44;   /* back-pointer to the spawning `_EFT` (ef/fn_800FD864_fx.cpp) */
     void SetRootMtx(const nw4r::math::MTX34& mtx); /* eft007/eft009 */
     u32 RetireEmitterAll();                         /* eft004/eft007; ef/ef_effectsystem.cpp adds it */
     /* Walks the effect's particle-manager pool, calling `cb` with each entry and its index; the
@@ -330,18 +316,12 @@ struct Effect {
     u32 ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bool flag); /* eft001/effect.cpp */
 }; /* size: 0x48 (lower bound: +0x44 is the highest offset the spawn handler reads) */
 
-/* The effect system the manager keeps at `eft_control` +0x04 (`fn_800D3C0C` builds it).  `RetireEffect`
- * is a direct call; `virtual_0x0C` is the fourth vtable slot the per-frame handler reaches through
- * `fn_800A4420` (ef/eft004.cpp).  One definition, here (rule 1) - the per-frame handler and the
- * resource manager both need it.
- *
- * `RetireEffect` returns `u32` because its owner `ef/ef_effectsystem.cpp` does (`li r3, 1` / `li r3, 0`
- * in the target, and the range's sweep adds the result); the consumers call it as a statement, whose
- * `.text` is unaffected.  NOTE: the two `virtual_0xN` below are ef/eft004.cpp's model of the *memory
- * manager* `fn_800A4420` returns (that object's table is [0x08, 0x0C]), not of this class' own layout -
- * the system's first word is a data member, not a vptr.  The system's real layout is stated once in
- * `src/ef/ef_effectsystem.cpp` (`EfSys`, size 0xC068 = the map's size for lbl_806884D0); the two have
- * to become one definition (booked in that unit's outbox). */
+/* The effect system the manager keeps at `eft_control` +0x04 (`fn_800D3C0C` builds it); the per-frame handler
+ * and the resource manager both need it.  `RetireEffect` is a direct call returning `u32`, as its owner
+ * `ef/ef_effectsystem.cpp` defines it; the consumers call it as a statement.  The two `virtual_0xN` model the
+ * *memory manager* `fn_800A4420` returns (that object's table is [0x08, 0x0C]), which the eft004 per-frame handler
+ * calls through, not this class' own layout: the system's first word is a data member, and its real layout is
+ * `ef/ef_effectsystem.cpp`'s `EfSys` (size 0xC068, the map's size for lbl_806884D0) - two definitions to fold. */
 class EffectSystem {
 public:
     virtual void virtual_0x08();

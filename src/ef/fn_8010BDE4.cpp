@@ -1,47 +1,21 @@
-/* ef/fn_8010BDE4.cpp - the player/enemy action-effect frame handlers, `.text` 0x8010BDE4..0x8010D1A8.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>`: every address answers `zz_XXXXXXXX_`, which is not
- * a name; the file's own symbols are bare `.text` entries in config/RMHE08/symbols.txt).
- *
- * Registration evidence (brief section 2, in order):
- *   1. no `__FILE__`/assert source-name string exists anywhere in the range (the 16 `.text` blocks of
- *      the old auto split reference only data labels - `lbl_8059F518`, `lbl_8059F574`, `lbl_80791820`,
- *      `lbl_807967E8`..`lbl_80796834` and `pRoot` - none of which is a `.c`/`.cpp` name);
- *   2. `dumpmap.py lookup` gives only `zz_XXXXXXXX_` for every function, which is not evidence;
- *   3. module = `ef`, class 3: the range sits in the `ef` link band directly below
- *      `ef/fn_8010D1A8.c` (0x8010D1A8..0x801121DC) and above the `ef/fn_80104BD0.c` /
- *      `ef/eft009.cpp` cluster, and it drives the same `_EFT` pool records those units own
- *      (`eft_res_slot_get`/`eft_res_model_get`/`fn_800F8A44`/`eft_res_slot_release`, `fn_800F9D80`/`eft_state_flags_set`,
- *      `res_eft_model_create`, the `MHchar` members) - so it goes in the `ef` lib block of
- *      configure.py, next to its neighbours;
- *   4. name = the map's own stem `fn_8010BDE4` (class 4): no evidence supports a better one and the
- *      `ef` siblings use exactly this scheme (`ef/fn_80104BD0.c`, `ef/fn_8010D1A8.c`).
- *
- * Language: C++.  The map carries no conclusive C++ evidence for the range's own symbols (they are
- * plain `fn_XXXXXXXX`, so rule 7's deferral applies), but every callee it reaches is a C++ mangling -
- * a `MHchar` member (`move`, `move2`), a namespaced nw4r function and the `_PLW`/`_ENEMY_WORK`
- * accessors - and section 6.5 rule 9 (checked, not deferred) forbids spelling those manglings as
- * callable identifiers.  A C translation unit cannot reach them any other way, so the range is built
- * as C++ with its own symbols declared `extern "C"` (exactly the shape `sound/fn_800EF7D8.cpp` and
- * `ef/effect.cpp` landed with); the language hint in the brief was C++ (medium) for the same reason.
- *
- * What the unit is.  Two effect families share the `_EFT` record (`ef.h`), reached through
- * `_EFT::work_0x38`:
- *   * the light family - `fn_8010C468` allocates the effect from the 0x50-entry pool, installs the
- *     `fn_8010C77C` state dispatcher and the `fn_8010C710` release hook, and pools `count` light
- *     handles; `fn_8010C554`/`fn_8010C5DC`/`fn_8010C680` are the spawn wrappers (a 5-light player
- *     effect, a 1-light parameterised one, a 5-light one with a y offset), and `fn_8010C7B8` /
- *     `fn_8010C8F8` are its first two per-frame states.
- *   * the frame family - `fn_8010BDE4` seeds two 0x48-byte per-model records (random timers, angles
- *     and per-frame steps) and hands off to `fn_8010C0E0`, which places each model along its angles
- *     for the state the record is in.
- * `fn_8010CD68`, `fn_8010CE80` and `fn_8010CFCC`/`fn_8010D12C` are the light/matrix helpers the
- * second half drives.
- *
- * The work block layouts are the two per-family views of `_EFT::work_0x38`; both are reconstructed
- * from the field offsets in `.text` (no DWARF in an MWCC object) and carry their size.
- *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_8010BDE4.cpp`.
+/* ef/fn_8010BDE4.cpp - the player/enemy action-effect frame handlers: a light family (`fn_8010C468` pools the effect
+ *   and its light handles, installs the `fn_8010C77C` dispatcher and the `fn_8010C710` release; three spawn wrappers
+ *   and two per-frame states) and a frame family (`fn_8010BDE4` seeds two 0x48-byte per-model records and hands off
+ *   to `fn_8010C0E0`), with their light/matrix helpers.
+ * RANGE. .text 0x8010BDE4-0x8010D1A8 (16 functions); extab 0x8000C1F4-0x8000C25C, extabindex 0x800261D8-0x80026274,
+ *   .data 0x8059F518-0x8059F530, .sdata 0x80791820-0x80791828, .sdata2 0x807967E8-0x80796838.
+ * NAMES. The map has only `fn_` stems for this range, so the definitions are `extern "C"`; the unit is C++ because
+ *   every callee it reaches is a C++ mangling (`MHchar` members, nw4r functions).
+ * RESIDUALS. 11 partial rows, including:
+ *  - `fn_8010C8F8`, `fn_8010CE80`: ours save the registers through `_savegpr_27` and a frame 0x10 larger where retail
+ *    stores four registers inline, and invert the null/flag test before the state bump;
+ *  - `fn_8010C0E0`: ours keeps the work pointer where retail reloads `+0x30`'s byte (`lbz r0,0(r3)`), and the
+ *    registers are coloured one lower;
+ *  - `fn_8010C7B8`: ours addresses `lbl_80791820` with `lis`/`addi` where retail uses `@sda21`.
+ *   The other 7 partial rows have no recorded cause (`symdiff.py -u ef/fn_8010BDE4 --all`).
+ *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text` (0x13A0 of 0x13C4) and `.sdata2` (0x10 of 0x50) short of
+ *   the claim; `.text`, `.sdata2`, extab and extabindex differing.
+ * SHAPES. The two families' work blocks are two views of `_EFT::work_0x38`.
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
@@ -57,7 +31,7 @@
 #include "pl.h"
 #include "enemy/ENEMY_WORK.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "ef/pRoot.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_state_flags_set_c1 ((void (*)(void*, u8, u8))eft_state_flags_set)

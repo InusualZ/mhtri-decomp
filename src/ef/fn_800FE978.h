@@ -3,14 +3,11 @@
 
 #include "types.h"
 
-/* The spawn/init state machine `src/ef/fn_800FE978.cpp` owns (docs/plan.md 6.5 rule 2).  Its one caller
- * outside the owner is `ef/fn_800FD864.cpp`, which passes the 0x48-byte effect slot, so the declaration
- * uses that view (`struct _EFT` is `ef.h`'s, and the owner defines it against the same tag).
- */
+/* ef/fn_800FE978.h - the declaration of `ef/fn_800FD864_fx.cpp`'s spawn/init state machine `fn_800FE978`
+ * (docs/plan.md 6.5 rule 2), against the 0x48-byte effect slot (`struct _EFT` is `ef.h`'s). */
 struct _EFT;
-/* The owner defines it `extern "C"` (the target object references the plain name), so the header
- * must carry C linkage too; a C++ declaration mangled it (fn_800FE978__FP4_EFT) at the consumer
- * (relocaudit). */
+/* The owner defines it `extern "C"` (the target references the plain name); a C++ declaration would mangle it
+ * (`fn_800FE978__FP4_EFT`) at the consumer. */
 #ifdef __cplusplus
 extern "C" {
 #endif

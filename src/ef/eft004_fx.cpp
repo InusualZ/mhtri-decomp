@@ -1,7 +1,30 @@
-/* ef/eft004_fx.cpp - effect 004 fx band
- *
- * `.text` 0x80100448..0x80101DF4, 21 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source.
+/* ef/eft004_fx.cpp - the eft004 effect family's setters (`eft004_set`, `eft004_set_pl`, `eft004_set_pl2` and two
+ *   unnamed siblings), the spawn helper `fn_801007BC`, the record dispatchers and pool releases, and the per-frame
+ *   handlers of the family's second half.
+ * RANGE. .text 0x80100448-0x80101DF4 (26 functions); extab 0x8000BE74-0x8000BEF4, extabindex 0x80025C98-0x80025D58,
+ *   .data 0x8059C528-0x8059C8E8, .sdata 0x80791788-0x80791790, .sdata2 0x807966B8-0x807966E8.  The family's spawner
+ *   and first handlers below 0x80100448 are `ef/fn_800FD864_fx.cpp`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` over every body (retail keeps `rlwinm` + `cmpwi` and the hook address
+ *   in `r0`; playbook 39).
+ * NAMES. `eft004_set`, `eft004_set_pl` and `eft004_set_pl2` are the runtime dump's own names; `mtx34_trans_get` and
+ *   `mtx34_trans_add` are GUESSes from their bodies; the map has only `fn_` stems for the rest.
+ * RESIDUALS. 5 rows unwritten: 0x801007BC-0x80100A30 (`fn_801007BC`), 0x80100AA8-0x8010140C (`fn_80100AA8`,
+ *   `fn_801011B4`), 0x801017B0-0x80101C60 (`fn_801017B0`, `fn_80101980`).
+ *   6 partial rows:
+ *  - `eft004_set`, `fn_801006A0`, `fn_8010072C`, `eft004_set_pl2`: ours schedules the parameter block's address
+ *    (`addi r7,r1,8`) before the `lfs`/`fmr` constant setup, retail after it;
+ *  - `fn_80101470`: MWCC lays the state-0 and state-2/3 blocks out in the other order and folds the `state == 1`
+ *    return into a `bnelr` (retail `cmpwi r5,1; beqlr; blr`);
+ *  - `fn_80101C74`: ours drops the `clrlwi` of the `u8` argument and colours the loop registers differently.
+ *   flipcheck: `.sdata`/`.sdata2` claimed, not emitted; `.text` (0x904 of 0x19AC), extab (0x58 of 0x80), extabindex
+ *   (0x84 of 0xC0) and `.data` (0x178 of 0x3C0) short of the claim and differing.
+ * SHAPES. The four-case dispatchers `fn_80100A6C`/`fn_80101774`/`fn_80101DB8` `return` from each case (a `break`
+ *   emits a shared trailing branch).
+ *   `fn_80100A30`/`fn_80101738` and `fn_80101D70` read `self->work_0x38` through two views (`EftEffectPool`,
+ *   `EftHeapPool`).
+ *   `fn_80101470`'s outer `switch (state)` lists `case 2` and `case 3` together and has no `case 1`.
+ *   `eft004_set_pl`/`eft004_set_pl2` pass the owner (`_PLW*`) as `fn_801007BC`'s first argument; the others pass
+ *   `NULL`.
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */

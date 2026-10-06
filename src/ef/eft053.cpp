@@ -1,106 +1,36 @@
-/* ef/eft053.cpp - the `eft053` effect family at `.text` 0x80366618..0x8036A828 (18 functions).
- *
- * WHAT IT IS.  The `eft053` family of the game-side effect bank: the range drives one `_EFT` effect
- * instance through its `work_0x38` model block - `eft053_get_shell_data` pulls the shell actor's
- * frame out of a `_PLW` player record, `eft053_get_model_ang` looks the model up in the family's
- * model table, and the rest is the family's per-state machine (`eft053_dispatch` dispatches on
- * `_EFT::state_0x05` into `fn_80367124`/`fn_8036A690`), its model spawn/update path and the two
- * enemy-work walks that drive it.
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string is reachable from the
- * range: the only `lis`/`addi` pair that is not a call is `lbl_80570A10` (16 bytes of `.rodata`, the
- * arm table of `fn_80369D50`), and no `.rodata` string is referenced at all.  2. `dumpmap.py lookup`
- * answers the runtime dump's own `eft053_get_shell_data` (0x803669A0) and `eft053_get_model_ang`
- * (0x80366E8C) - real names, not `zz_` placeholders - so the module is `ef` and the file follows the
- * `eft0NN.cpp` scheme of the neighbouring units (`ef/eft035.cpp`, `ef/eft050.cpp`).  3./4. The other
- * 13 addresses answer the dump's `zz_XXXXXXXX_` placeholder, so no dump name exists for them: the
- * eight this unit DEFINES are named from their own bodies (NAMES below, each a GUESS), and only the
- * five still unwritten keep the map's `fn_` stems (Naming note below).
- *
- * NAMES.  Every symbol this file defines is `eft053_<what the body does>`, derived from the body and
- * left as a GUESS a later pass may refine - the family's own tag names the band (`eft053_set` seeds
- * `_EFT::field_0x03 = 53`, `li r0,53` / `stb r0,3` in the target object, exactly the class-4 evidence
- * `ef/eft052.cpp` records for its own tag) and the sibling `eft052_*` band is the naming scheme.
- * Evidence per name:
- *   * `eft053_shell_pos_project` (0x80366618) - projects the player's shell frame into the caller's
- *     12-byte `VEC3`: builds the Z-X-Y rotation from `_PLW::shell_ang_0x583` (the `45.0f`/`35.0f`
- *     arms are its negative-angle branch), picks the per-kind scale triple off `kind_0x09`
- *     (`35/75/3000` for kind 3, `130/75/2000` otherwise) and transforms the facing vector through the
- *     matrix.  The HUD is the external witness that the output is a position:
- *     `hud/fn_802EBED8.cpp`'s `fn_802EF0A0` calls it and hands the 12-byte result on.
- *   * `eft053_model_list_get` (0x803667EC) - maps the current map number and area onto the stage's
- *     model-record list (the `lbl_805EDE88` index plus the slot count).  Both callers use exactly that
- *     pair: `eft053_get_model_ang` indexes `lbl_805EDE88[kind]` and loops `count`, `eft053_set` stores
- *     them as the work record's `kind_0x24`/`count`.
- *   * `eft053_work_act_ck` (0x80366F54) - `em_act_ck(work, 13, 0|2|3|4)`: true while the enemy work
- *     record is in one of the four act states this family reacts to (`_ck` is `eft052`'s predicate
- *     suffix - `eft052_part_damage_ck`, `eft052_page_count_ck`).
- *   * `eft053_set` (0x80366FE4) - the family's creation entry, the shape `ef/eft050.cpp`'s
- *     `eft050_set` documents: pool the 0x7C record with `eft_res_slot_get(0x7C)`, install the `+0x40`
- *     hook, take the model list, allocate one handle per slot, install the `+0x34` hook, record the
- *     area and seed the family tag.  No arguments, so it is the bank's plain entry rather than
- *     `eft050_set`'s placed one.
- *   * `eft053_release` (0x803670D8) / `eft053_dispatch` (0x803670E8) - the two hooks that entry
- *     installs: the `+0x40` release hands the work block's handle array and its count to the pool
- *     (`fn_800F8A44`), the `+0x34` dispatch is one handler per `_EFT::state_0x05`.
- *     `eft052_release`/`eft052_dispatch` name the same pair.
- *   * `eft053_slot_rot_step` (0x80368A30) - one slot's rotation step of the first state machine: the
- *     area picks the step's position, the seven `states[index]` stages sweep `model->field_0x30` and
- *     fire `eft019_set_core`/`fn_80056A84`/`map_se_req`, and `counters[index]` drives the sweep.
- *   * `eft053_slot_move_step` (0x80368D68) - one slot's translation step of the second machine: the
- *     per-slot frame window `field_0x6E[field_0x35[index]]` sets the z step, the seven stages sweep
- *     `model->pos_0x04.z`, the family's `Vec` table re-seeds the counter when a stage completes and the
- *     function returns 1 on the last stage.
- *
- * SEAM.  Registered, whose 0x80366618..0x8036CF64 range is a
- * discovery `--max-bytes` cut.  `tudiscover.py at 0x80366618` returns a 15-function MATCH SET,
- * 0x80366618..0x8036A690, from two must-link `lbl_8079B744` anchors; the range's private `.sdata2`
- * pool run (0x8079B740..0x8079B820, 54 labels, dense 1.00, no leak) ends at its last referrer
- * `fn_80369D50`, and the NEXT run's first referrer is `fn_8036E320` - so the TU's constants stop
- * there.  The right edge is the tool's best weak cut (a codegen fingerprint change between
- * `fn_80369D50` and `fn_8036A690`); the 0x8036A690..0x8036CF64 tail of the proposal is left unclaimed
- * (26 functions with no pool of their own - the seam re-draw is reported in this unit's outbox).
- *
- * SECTIONS.  `.text` 0x80366618..0x8036A690, extab 0x800177D4..0x8001783C (13 records x 8 B),
- * extabindex 0x80037224..0x800372C0 (13 x 12 B), `.data` 0x805EDF40..0x805EDF7C (the 15-arm table
- * `eft053_model_list_get`'s map switch uses) and `.sdata2` 0x8079B740..0x8079B820 (the range's own
- * pool).
- * The extab/extabindex edges are exact: the left neighbour `fn_8036640C` owns up to
- * 0x800177D4 / 0x80037224 and the next record after the last one here belongs to `fn_8036A690`.
- *
- * RESIDUALS (measured with `build/tmp/m.py`, the report's own metric):
- *   * `eft053_shell_pos_project` 97.80 - the target's frame is 128 B and ours 112 B (the same 117
- *     instructions, so it is stack-slot allocation, not source shape); the two arms of the angle test
- *     are necessary (with one shared arm MWCC if-converts them and the function is 16 instructions
- *     short).  Needs `#pragma peephole off` around it: retail keeps `extsb` + `cmpwi`, `-O3` fuses
- *     them into `extsb.`.
- *   * `eft053_model_list_get` 99.04 - the `li r3,0` argument setups at the `quest_flag_200000_ck` calls are
- *     there since `enemy/em_pop.h` declares the helper with its real work-record parameter
- *     (2026-09-30 recut); four bytes of residual remain.
- *   * `eft053_get_shell_data` 93.50 (1260 B) - 40 bytes; every one of its seven map-number cases
- *     shares one tail, which the original reached with a jump - the C here computes the case
- *     selectors and runs the tail after the switch, so MWCC's block layout differs at the joins.
- *   * `eft053_get_model_ang` 94.60 - 8 bytes: the record address is `mulli`/`add` in retail,
- *     indexed here.
- *   * `eft053_work_act_ck` 89.78 - the `||` chain keeps an extra saved register where retail branches
- *     to its two constant tails; the early-return spelling measures 65.47 and was rejected.
- *   * `eft053_set` 97.95 - 4 bytes in the loop's compare/tail shape.
- *   * `eft053_release` / `eft053_dispatch` are byte-identical (100.0).
- *   * `eft053_slot_rot_step` 88.83 - 32 bytes: the `counters[index]` reloads retail keeps separate
- *     where MWCC reuses one load.
- *   * `eft053_slot_move_step` 81.40 (1316 B) - 116 bytes; retail's float tests keep the
- *     `fcmpo`/`cror` pair per case (the `>=`/`<=` spellings here) where MWCC merges two of them.
- *   * NOT WRITTEN YET (11 536 B, all still 0 %): `fn_80367124` (1596 B), `fn_80367760` (3092 B),
- *     `fn_80368374` (1724 B), `fn_8036928C` (2756 B), `fn_80369D50` (2368 B).  Their `m2c` drafts are
- *     in `build/tmp/draft_*.c`; each still needs its loop/goto shape rewritten to the conformant
- *     form, and no body was invented for them.
- *
- * Naming note: every remaining `fn_XXXXXXXX` here is a REFERENCE, never a definition - either a
- * declaration of one of this range's five still-unwritten bodies (0x80367124, 0x80367760, 0x80368374,
- * 0x8036928C, 0x80369D50; `python tools/symbols/dumpmap.py lookup <addr>` answers the dump's
- * `zz_XXXXXXXX_` placeholder for each, so no name is derivable yet) or a call to a callee ANOTHER unit
- * owns (`eft_res_slot_get`, `VEC3_ctor`, ...).  Every symbol this file DEFINES is named above; the two
- * runtime-dump spellings (`eft053_get_shell_data`, `eft053_get_model_ang`) are the dump's own.
+/* ef/eft053.cpp - the eft053 effect family: one `_EFT` instance driven through its `work_0x38` model block, the
+ *   shell-actor lookups it reads from a `_PLW`, its per-state machine and its two slot step machines.
+ * RANGE. .text 0x80366618-0x8036A828 (18 functions); extab 0x800177D4-0x80017844, extabindex 0x80037224-0x800372CC,
+ *   .rodata 0x80570A10-0x80570A20 (`fn_80369D50`'s arm table), .data 0x805EDAE0-0x805EE078, .sdata2
+ *   0x8079B740-0x8079B820 (the range's own pool).  The right edge 0x8036A828, where `menu/menu_item_sub.cpp` starts, is
+ *   the registered cut, not a proven seam.
+ * FLAGS. `cflags_main`; `#pragma peephole off` around `eft053_shell_pos_project` and `eft053_model_list_get` (retail
+ *   keeps `extsb` + `cmpwi`).
+ * NAMES. `eft053_get_shell_data` and `eft053_get_model_ang` are the runtime dump's own names; the other eight
+ *   definitions are GUESSes named `eft053_<what the body does>` in `ef/eft052.cpp`'s scheme (`eft053_set` seeds
+ *   `_EFT::field_0x03 = 53`): `eft053_shell_pos_project` (projects the shell frame into a `VEC3`;
+ *   `hud/cockpit_quest.cpp`'s `fn_802EF0A0` uses the result as a position), `eft053_model_list_get` (map and area to
+ *   the `lbl_805EDE88` model list and count), `eft053_work_act_ck` (`em_act_ck(work, 13, 0|2|3|4)`), `eft053_set`
+ *   (the creation entry, `eft050_set`'s shape without arguments), `eft053_release`/`eft053_dispatch` (its `+0x40`
+ *   and `+0x34` hooks), `eft053_slot_rot_step`/`eft053_slot_move_step` (one slot's rotation and translation step),
+ *   each a GUESS from its own body.
+ * RESIDUALS. 8 rows unwritten: 0x80367124-0x80368A30 (`fn_80367124`, `fn_80367760`, `fn_80368374`) and
+ *   0x8036928C-0x8036A828 (`fn_8036928C`, `fn_80369D50`, `fn_8036A690`, `fn_8036A814`, `fn_8036A824`).
+ *   8 partial rows; `eft053_release` and `eft053_dispatch` match:
+ *  - `eft053_shell_pos_project`: frame 0x70 against retail's 0x80 (same instruction count, stack slots only);
+ *  - `eft053_model_list_get`: ours fuses `clrlwi.` where retail keeps `clrlwi` + `cmpwi`;
+ *  - `eft053_get_shell_data`: ours compares the map cases unsigned (`cmplwi`), drops a `clrlwi`, and emits its
+ *    switch table locally (`@1613`) where retail reads `jumptable_805EDF7C`;
+ *  - `eft053_get_model_ang`: ours drops the `clrlwi` narrowing of both `u8` arguments;
+ *  - `eft053_work_act_ck`: ours keeps an extra saved register where retail branches to its two constant tails;
+ *  - `eft053_set`: retail reloads the count (`lwz r0,4(r31)`) before the loop test, ours reuses `r3`;
+ *  - `eft053_slot_rot_step`, `eft053_slot_move_step`: the slot-address arithmetic (`slwi`/`add`/`lwz`) sits at
+ *    each use in ours and the registers are coloured differently; `eft053_slot_rot_step` calls `map_se_req` by its
+ *    plain name where retail calls `map_se_req__FUcPQ34nw4r4math4VEC3`.
+ *   flipcheck: `.rodata` claimed, not emitted; `.text` (0x12A4 of 0x4210), extab (0x40 of 0x70), extabindex (0x60 of
+ *   0xA8), `.data` (0x78 of 0x598) and `.sdata2` (0x10 of 0xE0) short of the claim and differing; `map_se_req` has
+ *   no map row.
+ * SHAPES. `eft053_shell_pos_project` keeps both arms of the angle test: with one shared arm MWCC if-converts them.
  */
 #include "types.h"
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
@@ -267,8 +197,7 @@ typedef struct EftModelRec {
     /* +0x16 */ u8 pad_0x16[0x02];
 } EftModelRec; /* size: 0x18 */
 
-/* the unclaimed tail of the proposal's original range (0x8036A690..0x8036CF64) - the seam re-draw
- * leaves it unowned, so these three are declared here */
+/* The range's own unwritten bodies, declared before use. */
 extern "C" void fn_8036A690(_EFT* self);
 extern "C" void fn_8036A814(_EFT* self);
 extern "C" void fn_8036A824(_EFT* self);
@@ -279,9 +208,8 @@ extern "C" void fn_8036A824(_EFT* self);
 
 #pragma peephole off
 
-/* Project the player's shell frame into `out`: build the shell's Z-X-Y rotation from the signed
- * frame angle, pick the per-kind scale triple and transform the actor's facing vector through the
- * resulting matrix. */
+/* Projects the player's shell frame into `out` through the Z-X-Y rotation of the signed frame angle and the
+ * per-kind scale triple. */
 extern "C" void eft053_shell_pos_project(_PLW* plw, VEC3* out)
 {
     MTX34 mtx;
@@ -462,9 +390,8 @@ extern "C" void eft053_set(void)
     eft_state_flags_set(eft, 8, 0);
 }
 
-/* Step one slot of the family's state machine: the area picks the position the step works at, the
- * state byte at `states[index]` runs one of the seven stages, and the counter at `counters[index]`
- * feeds the slot's model rotation. */
+/* Steps one slot of the rotation machine: `states[index]` runs one of seven stages and `counters[index]` feeds the
+ * model's rotation. */
 extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
 {
     VEC3 pos;
@@ -560,9 +487,8 @@ extern "C" void eft053_slot_rot_step(_EFT* self, s32 index)
     }
 }
 
-/* Step one slot of the family's second state machine: the slot's frame window comes from
- * `field_0x6E[field_0x35[index]]`, the state byte at `states[index]` runs one of the seven stage
- * bodies, and the model is placed from the family's `Vec` table when a stage completes. */
+/* Steps one slot of the translation machine over its frame window and re-places the model from the `Vec` table
+ * when a stage completes; returns 1 on the last stage. */
 extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 randomize)
 {
     VEC3 pos;
@@ -650,9 +576,8 @@ extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 ra
     return ret;
 }
 
-/* Build the shell's frame for one record kind: the map and area pick the model angles the record's
- * kind is matched against, and on a match the three vectors are filled with the transformed record
- * placement, returning 1; 0 when the current map has no record for this kind and index. */
+/* Fills the three vectors with the shell's transformed record placement for one kind; returns 0 when the current
+ * map has no record for it. */
 s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
 {
     VEC3 tmp_a;

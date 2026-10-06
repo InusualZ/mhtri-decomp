@@ -1,87 +1,20 @@
-/* ef/fn_801173AC.cpp - the effect band at 0x801173AC
- *
- * `.text` 0x801173AC..0x80117DA8, 10 functions written (the rest of the range is not decompiled yet).
- * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- */
-
-/* Retired header of `ef/fn_801173AC.cpp` (kept for its notes and residuals): */
-/* ef/fn_801173AC.cpp - the `.text` 0x801173AC..0x80119C44 run (30 functions), the tail of the eft024
- * job machine plus the whole eft025 player family, the whole eft026 enemy family and the head of eft028.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_
- * name this file uses is a bare .text entry in config/RMHE08/symbols.txt); the runtime dump resolves only
- * the two family setters `eft026_set` (0x80117DA8) and `eft028_set_koware` (0x80119A40).
- *
- * Registration (docs/plan.md 12).  Class 2/3 evidence: the runtime dump's own `eft026_set` /
- * `eft028_set_koware` are defined inside the range, so the module is `ef`; the range is NOT one TU (it
- * holds the eft024 tail, all of eft025, all of eft026 and the eft028 head), so no single family name
- * covers it and class 4 applies - the file keeps the map's `fn_801173AC` stem, the scheme the bracketing
- * `ef/fn_8011722C.c` and `ef/fn_80119C44.c` units use.  C++: the range's own definitions
- * `eft026_set__FP4_PLWUcUlUl` and `eft028_set_koware__FUcPQ34nw4r4math4VEC3Ucl` are manglings, so the
- * file is `.cpp` and every plain definition is `extern "C"` so its emitted name stays the map's stem
- * (playbook row 42).  Sections: extab 0x8000C49C..0x8000C554, extabindex 0x800265D4..0x800266E8,
- * `.text` 0x801173AC..0x80119C44 - the runs the two neighbouring units leave.
- *
- * What it is.
- *   * fn_801173AC is the eft024 job machine's kind-1 state-1 handler (the sibling of
- *     `ef/fn_8011722C.c`'s kind-1 state-0): it integrates the job's spin deltas into the rotation,
- *     pushes the resulting transform onto the pooled `MHchar` and advances the job when the model
- *     falls below the ground.
- *   * fn_80117688..fn_80117DA4 are the whole `eft025` player family: two setters (the second carries a
- *     scale), the allocator that stamps the family tag 25 and installs the two hooks, the release, the
- *     state dispatcher and its four state handlers.
- *   * eft026_set, fn_80117E58 and fn_80117EFC are the three `eft026` setters (the enemy-fold family's
- *     spawn path - horse/boat style folding), fn_80117FF8 is its allocator (family tag 26), fn_80118154
- *     its release, and fn_801181D8/fn_80118214/fn_801186C4/fn_8011870C/fn_80118B2C/fn_80118FF0/
- *     fn_80119450/fn_80119804/fn_80119814/fn_80119818/fn_801198F8 its state machine and helpers.
- *   * fn_80119970, eft028_set_koware, fn_80119AA8 and fn_80119BB0 are the `eft028` (break/crumble)
- *     family's setters; they build their records through the next unit's `fn_80119C44`.
- *
- * Language notes.  `get_camera_pos`/`get_camera_direction` are declared with C++ linkage at the global
- * scope (their map names are `__Fv` and the SDK returns by value through sret - the same finding as
- * `ef/effect.cpp`).  `rotMatrixX/Y`, `rotLocalMatX/Y/Z`, `get_joint_wmat_em`, `em_get_mot_no`,
- * `res_eft_UV_model_create`, `getKeyData3`, `ran_suu` and `msl::`-free `push_g3d_wk` are mangled in the
- * target, so they are declared at C++ scope (rule 9: the call never spells the mangling).
- *
- * Types.  `_EFT`, `_PLW` and `MHchar` come from `ef.h`/`pl.h`; the agent 3d `ScnMdl::CopiedMatAccess`
- * from `nw4r/g3d/scnmdl.h`.  The per-family work blocks are unit-local views (`_EFT24_CHARA`,
- * `_EFT25_WORK`, `_EFT26_WORK`, `_EFT26_EM`, `_EFT28_WORK`) because each family reads a different
- * subset at the same offsets; the `MHchar`/`Effect` vtable entries are reached through the
- * function-pointer tables the target's own `lwz r12, off(r12)` shape requires (the `ef/ef_creationqueue`
- * convention - a real `virtual` cannot be declared without re-emitting the class's `.data` vtable).
- *
- * Data.  The unit owns no pool section (the target object carries none): the shared key tables,
- * id/frame/rate tables, jump table and the `.sdata2` scalars are declared by their map names and never
- * defined (playbook 29).
- *
- * Result (this round).  All 30 symbols are >= 80 % and 15 are byte-identical; the unit measures
- * 94.01193 % fuzzy over the real split object (`.text` 10380 B against the target's 10392, extab 184 B
- * and extabindex 276 B - both the target's exact sizes).  Residuals, all measured, none a source shape:
- *   fn_80118154 87.67  the four `slots[]` pushes pair; the pointer walk `_g3d_work** p =
- *                      (_g3d_work**)&work->slots[i*2+1]` with `p[0]`/`p--` is best (the indexed
- *                      `slots[i*2+j]` form is 87.09), the last 4 B being retail's own base+offset
- *                      induction (`r31 = work; addi r30,r31,4; addi r31,r31,8`)
- *   fn_80118214 89.89  the 12-way switch and its `jumptable_805A06BC` pair; residual is the placement
- *                      tail's register pressure
- *   fn_801173AC 91.30, fn_80118FF0 91.01, fn_80119AA8 91.86, fn_80118B2C 92.09, fn_80119450 92.13,
- *   fn_8011870C 93.59, fn_80117FF8 94.08, fn_80119818 95.71, fn_801198F8 96.0, fn_80117688 97.69,
- *   fn_80117760 97.77, fn_80117894 97.96, fn_80117A1C 98.82 - scheduling / frame layout only.
- *
- * Load-bearing source shapes (each measured; the wrong form costs real points):
- *   * `#pragma peephole off` is required file-wide (playbook 39, the same finding as
- *     `ef/fn_80114E34.cpp`): with the pass on MWCC fuses the nested slot loop's `subi`/`cmpwi` into
- *     `subic.` and compresses the frame, costing fn_80118B2C 20 points, fn_80119970 10 and
- *     eft028_set_koware 14.
- *   * `_EFT26_PHASE`'s colour must be four plain `u8` fields, not a union: a union is alignment 4,
- *     which moves it to +0x04 and pushes `_EFT26_WORK::slots` from +0x7C to +0x90 (the target's own
- *     `lwz r0,0x16(r30)` reads the four bytes as a word, so the two `fn_800964E4` call sites pun
- *     `(u32*)&phase[i].color_r`).
- *   * `lbl_805A04B0` is `s32[]`, not `u32[]`: the eft026 timer tests compile to the target's signed
- *     `cmpw` only with the signed view.
- *   * `get_camera_direction()` is called mid-case, after the position accumulation - the target's own
- *     instruction order (fn_80118B2C).
- *   * the eft026 jump table is the compiler's own switch table (data stays out of the split object), so
- *     `splits.txt` claims only `.text`/extab/extabindex.
+/* ef/fn_801173AC.cpp - the eft024 job machine's kind-1 state-1 handler (the sibling of `ef/fn_8011722C.c`'s state-0
+ *   entry: it integrates the spin deltas, pushes the transform onto the pooled `MHchar` and advances the job when the
+ *   model falls below the ground) and the whole eft025 player family (two setters, the allocator stamping tag 25,
+ *   the release, the dispatcher and its four states).
+ * RANGE. .text 0x801173AC-0x80117DA8 (10 functions); extab 0x8000C49C-0x8000C4D4, extabindex 0x800265D4-0x80026628,
+ *   .sdata 0x80791938-0x80791940, .sdata2 0x80796A88-0x80796AC0.  The eft026/eft028 families from 0x80117DA8 are
+ *   `ef/eft026_fx.cpp`.
+ * FLAGS. `cflags_main`; `#pragma peephole off` over every body (playbook 39).
+ * NAMES. The map has only `fn_` stems here, so the definitions are `extern "C"` in a C++ unit.
+ * RESIDUALS. 5 partial rows: `fn_801173AC`, `fn_80117688`, `fn_80117760` scheduling and frame layout; `fn_80117894`
+ *   addresses `lbl_80791938` with `lis`/`addi` where retail uses `@sda21`; `fn_80117A1C` calls `event_demo_ck` by its
+ *   plain name where retail calls `event_demo_ck__Fv`.
+ *   flipcheck: `.sdata` claimed, not emitted; `.text` 0xA14 against the claimed 0x9FC, `.sdata2` 0x8 of 0x38, both
+ *   differing; extabindex differs in 3 bytes; `event_demo_ck` has no map row.
+ * SHAPES. `get_camera_pos`/`get_camera_direction` are declared with C++ linkage (their map names are `__Fv`).
+ *   The `MHchar`/`Effect` vtable slots are reached through function-pointer tables (retail's `lwz r12, off(r12)`
+ *   shape; a `virtual` declaration would emit the class's vtable into this object).
  */
 
 #include "types.h"
@@ -180,9 +113,7 @@ s32 ran_suu(s32 max);
 
 #pragma peephole off
 
-/* ---------------------------------------------------------------------------------------------------
- * fn_801173AC - the eft024 kind-1 state-1 handler
- * ------------------------------------------------------------------------------------------------- */
+/* The eft024 kind-1 state-1 handler. */
 extern "C" void fn_801173AC(_EFT* self)
 {
     _EFT24_CHARA* work = (_EFT24_CHARA*)self->work_0x38;
@@ -361,10 +292,7 @@ extern "C" void fn_80117894(_EFT* self)
     fn_80117A1C(self);
 }
 
-/* State 1: place the pooled handles each frame.  Type 0 seats them at the source's joint-11 matrix,
- * type 1 seats them at the source position (both then push the world position), type 2 re-seats them
- * against the source's joint-17 matrix and its per-frame parameter scale, and type 3 places them from
- * the source's joint-16 matrix with the record scale.  Then every live handle is moved and the record
+/* Seats the pooled handles each frame from the source's joint matrix or position by type, moves the live ones and
  * advances to state 2 once they all die. */
 extern "C" void fn_80117A1C(_EFT* self)
 {

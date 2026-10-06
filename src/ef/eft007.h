@@ -1,9 +1,5 @@
-/* The effect unit `ef/eft007.cpp`.
- *
- * Declarations moved here from the consumer units' `src/` files (docs/plan.md 6.5 rule 2:
- * an extern lives with the TU that owns the symbol).  The signature set is what the
- * consumers used; where only the parameter spelling differed the wider form is kept.
- */
+/* ef/eft007.h - the declarations of `ef/eft007.cpp`'s symbols its consumers call (docs/plan.md 6.5 rule 2); where
+ * consumers' spellings differed only in parameter names the wider form is kept. */
 #ifndef MHTRI_EF_EFT007_H
 #define MHTRI_EF_EFT007_H
 
@@ -36,8 +32,7 @@ void eft007_part_spawn();
 #endif
 
 
-/* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
- * needed that the first did not; a symbol both named keeps the first (verified) signature. */
+/* `ef/em_effect_ctrl.cpp`'s hooks, which its consumers reach through this header. */
 void fn_80101FA4(void* self);
 void fn_801025E8(void* self);
 void fn_801025F8(void* self);

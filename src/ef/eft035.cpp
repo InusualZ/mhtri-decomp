@@ -1,105 +1,31 @@
 /*
- * ef/eft035.cpp - unit, `.text` 0x802F2238..0x802F5138 (28 functions, 12032 bytes).
- *
- * 17 of 28 functions have a body here.
- *
- * FLAGS.  `cflags_main`.  The first 11 functions of the old range moved to `hud/cockpit_quest.cpp` (no source existed
- * for them).
- *
- * Sections: the unit's block in config/RMHE08/splits.txt (.data, .sdata, .sdata2, .text, extab, extabindex).
- */
-/* ---- header inherited from src/ef/eft035.cpp (written against its pre-phase-4 range) ---- */
-/* ef/eft035.cpp - the `eft035` effect family, `.text` 0x802F140C..0x802F5138 (39 functions).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump resolves only the two
- * `eft035_*` names - `eft035_set` at 0x802F2238 and `eft035_set2` at 0x802F2394 - and every other
- * address in the range is the dump's placeholder `zz_XXXXXXXX_`).
- *
- * Registration (docs/plan.md 12).  Class 2 evidence named it: the runtime dump's own name at
- * 0x802F2238 is `eft035_set`, so the module is `ef` and the file is `eft035.cpp` - the scheme of its
- * neighbours `ef/eft001.cpp` ... `ef/eft029.cpp`.  Language: both dumped names are C++ manglings
- * (`eft035_set__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3P10_CP_VECTORUcf`), so the file is `.cpp` and
- * every definition whose map name is plain (`fn_XXXXXXXX`) is `extern "C"` so its emitted name stays
- * the map's stem and objdiff can pair it (playbook row 42).  Sections: `extab`
- * 0x80015424..0x80015514 and `extabindex` 0x80033C9C..0x80033E04 (30 records each - exactly the
- * bytes the bracketing units leave unclaimed: `hud/fn_802EBED8.cpp` ends at 0x80015424/0x80033C9C
- * and the next unclaimed run starts at 0x80015514/0x80033E04).  No data section belongs to the unit
- * (the target object carries none); its `.data`/`.sdata`/`.sdata2` pool is `extern` here and never
- * defined (playbook 29).  One `.ctors` word belongs to the range, at 0x8056F38C - the address of the
- * file-scope static initialiser `fn_802F20D8`, read out of the DOL's `.ctors`; it is not claimed,
- * because dtk's auto split gave the range no `.ctors` unit.
- *
- * Seam (unproven).  This is one maximal unclaimed run, registered whole.  Two clusters share it and
- * there is no call edge between them: 0x802F140C..0x802F2238 (11 functions) drives the cockpit HUD
- * records (`cockpit_work`/`cockpit_state`, the `draw_sprite`/`drawshape` helpers) and carries the
- * file-scope static initialiser `fn_802F20D8`, while 0x802F2238..0x802F5138 (28 functions) is the
- * `eft035` family proper.  A *second* effect family (tag 34; `fn_802F39DC` seeds `field_0x03 = 34`
- * where `eft035_set` seeds 35) sits in the same half, so the range may hold more than one original
- * TU.  The extent settles as the functions match; the seam did not have to be cut to register, so it
- * was not.
- *
- * What it is.  `eft035_set`/`eft035_set2` are the spawn entry points of enemy effect 35: each
- * rejects a foreign area, takes a 64-byte (resp. 56-byte) work block from `eft_res_slot_get`, stamps
- * `field_0x03 = 35`, `type_0x02`, the source `_ENEMY_WORK` at +0x30, the position, the two copied
- * rotation words and the area, then installs the two hooks that travel with the record -
- * `fn_802F24E0` (`release_0x40`, the pool release) and `fn_802F2640` (`dispatch_0x34`, the
- * `state_0x05` machine).  The two setters differ in their work block: the type-0/1/3 family pools
- * 20-byte model records at work+0x08 (`memset` of the 16-byte handle list at work+0x30), the
- * type-4..7 family pools 4-byte model handles at work+0x08 (`memset` of the 24-byte list at
- * work+0x20).  Both block sizes are pinned by the allocation (`eft_res_slot_get(64)` / `eft_res_slot_get(56)`
- * against the 0x40 / 0x38 the two layouts need).
- *
- * The state machine is `fn_802F2640`: `state_0x05` 0 -> the type switch
- * (`fn_802F26B4`/`fn_802F288C`/`fn_802F2988`), 1 -> `fn_802F2C78`, 2 -> `fn_802F3940`,
- * 3 -> `fn_802F3950`.  `fn_802F2C78` is the alive-state body of the same family
- * (`fn_802F2CB0`/`fn_802F31F0`/`fn_802F3358`), and `fn_802F3B0C` is the machine of the tag-34 family
- * (`fn_802F3B48`/`fn_802F3D94`/`fn_802F49C8`/`fn_802F49D8`).
- *
- * Data.  The `.data` tables, the `.sdata` property tables (`lbl_80792860`, `lbl_80792868`,
- * `lbl_80792870`, `lbl_80792878`) and the `.sdata2` constants are `extern`-declared by their map
- * names and never defined (playbook 29).
- *
- * Residuals.  17 of the range's 39 functions are reconstructed; 11 of them are byte-identical and
- * every one but `eft035_set` is at or above the 80 % bar (`python tools/units/recompile.py
- * ef/eft035.cpp --main . --measure <symbol>`, against this worktree's own split target object):
- *
- *   byte-identical  fn_802F288C, fn_802F250C, fn_802F25BC, fn_802F2C78, fn_802F3940, fn_802F3950,
- *                   fn_802F3954, fn_802F3AD0, fn_802F3B0C, fn_802F49C8, fn_802F49D8
- *   fn_802F26B4     99.11  ours 468 B against the target's 472 B: retail keeps one more instruction
- *                          in the type-1 arm (the `em015_denki_eft_se_req` + `fn_802F3954` +
- *                          `eft019_set_core` argument setup)
- *   fn_802F39DC     99.18  the register colouring of the two-model seeding loop
- *   eft035_set2     98.73  ours 328 B against 332 B: we hoist `lbl_80792860[type]` where retail
- *                          re-reads it with `lbzx` inside the loop
- *   fn_802F24E0     94.55  the `== 2` arm: retail is `cmpwi` where our `u32` operand makes MWCC emit
- *                          `cmplwi` (the `<= 1` arm above it needs the unsigned form, so one operand
- *                          type cannot spell both tests)
- *   fn_802F2640     92.97  the outer switch: case 0 written first gives retail's chain order
- *                          (`cmpwi 0,1,2,3`) but its nested block then lands before the three
- *                          tail-call bodies (71.90); case 0 written last gives the bodies retail's
- *                          order and the chain 1,2,3,0 (92.97).  Retail has chain 0,1,2,3 *and*
- *                          bodies 1,2,3,0 - its case-0 body is a `b` to a block emitted after the
- *                          whole switch, which no source order we tried reproduces.
- *   eft035_set      73.85  the seeding loop's colouring: retail holds the narrowed type in r25 and
- *                          the table base in r26 and iterates with r23/r24 (`_savegpr_23`), we
- *                          hoist `lbl_80792860[type]` into r26 and save one register fewer
- *                          (`_savegpr_24`); our object is exactly the target's 348 B.  Tried: the
- *                          bound through a `u8` local (73.85), through a local table pointer (73.22
- *                          - worse), `memset(..., sizeof(work->works_0x30))` and reloading the work
- *                          pointer for the final scale store (71.32 -> 73.85).
- *
- * The 22 functions still to write, in address order (size): fn_802F140C (0x2B4), fn_802F16C0 (0x284),
- * fn_802F1944 (0x1D8), fn_802F1B1C (0x1DC), fn_802F1CF8 (0x23C), fn_802F1F34 (0x1A4),
- * fn_802F20D8 (0x48), fn_802F2120 (0x58), fn_802F2178 (0x30), fn_802F21A8 (0x60), fn_802F2208 (0x30),
- * fn_802F2988 (0x2F0), fn_802F2CB0 (0x540), fn_802F31F0 (0x168), fn_802F3358 (0x5E8),
- * fn_802F3B48 (0x24C), fn_802F3D94 (0xC34), fn_802F49DC (0x17C), fn_802F4B58 (0x2F0),
- * fn_802F4E48 (0x270), fn_802F50B8 (0x44), fn_802F50FC (0x3C).  What they need beyond this pass: the
- * 11 HUD functions drive `cockpit_work`/`cockpit_state` (their types live in `hud/cockpit_quest.h` and
- * `hud/cockpit_quest_marker.h`) plus the `draw_sprite`/`drawshape` helpers, and `fn_802F20D8` needs the
- * `__construct_array` runtime helper (whose only declaration today sits in `sound/sound_work.h`);
- * the two tag-34 bodies (`fn_802F3B48`, `fn_802F3D94`) read the `_ENEMY_WORK` motion/sound block and
- * `fn_802F50FC` reads a `u16` at `_ENEMY_WORK`+0x306 that the shared header does not name yet.
+ * ef/eft035.cpp - the eft035 enemy-effect family (`eft035_set`/`eft035_set2`, its `state_0x05` machine
+ *   `fn_802F2640` and the per-type bodies) and a second family with tag 34 (`fn_802F39DC` seeds `field_0x03 = 34`,
+ *   `fn_802F3B0C` is its machine).
+ * RANGE. .text 0x802F2238-0x802F5138 (28 functions); extab 0x8001547C-0x80015514, extabindex 0x80033D20-0x80033E04,
+ *   .data 0x805D69A8-0x805D6D10, .sdata 0x80792860-0x80792880 (the per-type property tables), .sdata2
+ *   0x8079A9C8-0x8079AA88.  The cockpit HUD functions below 0x802F2238 are `hud/cockpit_quest.cpp`'s.  The two
+ *   families share no call edge, so the range may hold more than one original TU.
+ * FLAGS. `cflags_main`; `#pragma peephole off` from `fn_802F250C` to the end of the file.
+ * NAMES. `eft035_set` and `eft035_set2` are the runtime dump's own names; the map has only `fn_` stems for the rest,
+ *   so plain definitions are `extern "C"`.
+ * RESIDUALS. 11 rows unwritten: 0x802F2988-0x802F2C78 (`fn_802F2988`), 0x802F2CB0-0x802F3940 (`fn_802F2CB0`,
+ *   `fn_802F31F0`, `fn_802F3358`), 0x802F3B48-0x802F49C8 (`fn_802F3B48`, `fn_802F3D94`: they read the `_ENEMY_WORK`
+ *   motion/sound block), 0x802F49DC-0x802F5138 (`fn_802F49DC`, `fn_802F4B58`, `fn_802F4E48`, `fn_802F50B8`,
+ *   `fn_802F50FC`: it reads a `u16` at `_ENEMY_WORK`+0x306 the shared header does not name).
+ *   6 partial rows:
+ *  - `eft035_set`: retail holds the narrowed type in r25 and the table base in r26 and iterates with r23/r24
+ *    (`_savegpr_23`); ours hoists `lbl_80792860[type]` into r26 and saves one register fewer (same 348 B);
+ *  - `eft035_set2`: ours hoists `lbl_80792860[type]` where retail re-reads it with `lbzx` in the loop;
+ *  - `fn_802F24E0`: the `== 2` arm is `cmpwi` in retail, `cmplwi` in ours (the `<= 1` arm needs the `u32` operand);
+ *  - `fn_802F2640`: case 0 is written last, so ours compares 1, 2, 3, 0 where retail compares 0, 1, 2, 3
+ *    (docs/ef.md, "The case-0 nested dispatch");
+ *  - `fn_802F26B4`: retail keeps one more instruction in the type-1 arm's argument setup;
+ *  - `fn_802F39DC`: the two-model seeding loop's registers are coloured differently.
+ *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text` (0x994 of 0x2F00), extab (0x48 of 0x98) and
+ *   extabindex (0x6C of 0xE4) short of the claim and differing.
+ * SHAPES. `eft035_set`/`eft035_set2` take a 64- and a 56-byte work block (`eft_res_slot_get(64)`/`(56)`): 20-byte model
+ *   records at work+0x08 for types 0/1/3, 4-byte handles at work+0x08 for types 4-7.
  */
 
 #include "types.h"
@@ -308,9 +234,8 @@ extern "C" void fn_802F2C78(_EFT* self)
     }
 }
 
-/* Builds the family's first model (type 0/1/3): pools one model record's handle, binds the created
- * model to the effect's position and rotation, seeds its three random scales, then runs the
- * per-type setup. */
+/* Builds the family's first model (types 0/1/3): binds the pooled model to the effect's position and rotation,
+ * seeds its three random scales and runs the per-type setup. */
 extern "C" void fn_802F26B4(_EFT* self)
 {
     nw4r::math::MTX34 mtx;

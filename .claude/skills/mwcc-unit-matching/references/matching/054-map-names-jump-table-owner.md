@@ -64,6 +64,12 @@ prints that entry). **Only the file name is reliable.** This also outranks a spa
 *rejected* by `--source-span-max` for its 65 KB span, and its single copy proved that span is one genuine TU
 (0x80308FB4..0x8031A6C0) - three registered files had cut it in three, and the cuts were false.
 
+**Correction (2026-10-06): a `switchdataD` prefix need not be the owner either.** `_8034239cswitchdataD_805e918c`
+(`dumpmap.py lookup 0x805E918C`) has its prefix inside `ef/eft050.cpp`'s `fn_8034235C` (+0x40, not a function start),
+while the DOL's only referrer of `jumptable_805E918C` is `ef/eft_slot.cpp`'s `enemy_data_grp` (`lis`/`addi` at
+0x803439E4/0x803439E8, `callers.py 0x805E918C`), whose `switch` MWCC emits the table for. Settle a table's owner from
+its referrers; the prefix is a hint.
+
 **When NOT to apply.** The dump is an oracle for *names and ownership*, never for codegen (`CLAUDE.md`, external
 oracles), and it is read-only. The `switchdataD` owner prefix is a bound on where the TU starts, not its edge.
 Treat any range you derive from it as a claim to measure before and after (ideas 23/53).

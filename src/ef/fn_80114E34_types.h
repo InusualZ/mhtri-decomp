@@ -1,4 +1,4 @@
-/* Types and macros the units cut from `ef/fn_80114E34.cpp` share (hoisted at phase 4 so each is defined once). */
+/* ef/fn_80114E34_types.h - the types and macros `ef/fn_80114E34.cpp` and `ef/eft022_fx.cpp` share. */
 #ifndef MHTRI_EF_FN_80114E34_TYPES_H
 #define MHTRI_EF_FN_80114E34_TYPES_H
 
@@ -19,7 +19,7 @@
 #include "unsplit/ef.h"
 #include "sound/fn_800D7F54.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 
 namespace nw4r {
 

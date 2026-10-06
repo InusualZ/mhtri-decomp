@@ -1,25 +1,6 @@
-/* ef/eft052.cpp's header: the item-page / hold-block entry points other units call (rule 2 - an
- * `extern` lives with the unit that owns the symbol, never in a consumer's source and never in
- * `unsplit/<module>.h` once the address is registered).
- *
- * RULE 2 HOMES.  The three declarations below stood in `unsplit/lobby.h` while
- * 0x80358624..0x8035E034 was unclaimed; `ef/eft052.cpp` owns that range now, so they moved here and
- * the band header re-exports this one for the units that already include it (the same move
- * `menu/menu_message.h` and `camera/camera.h` made for their bands).
- * `lobby/fn_801E7530.cpp` calls `eft052_hold_entry_set`; `eft052_item_value_get` and
- * `eft052_page_counts_get` are called by `lobby/fn_801EC9F8.cpp` and `menu/menu_message.cpp`, which
- * still declare them at their own call sites (their rule-2 pass moves those to their headers).
- *
- * `eft052_hold_entry_set`'s entry argument is `void*`, not the unit's private `CockpitHoldEntry`
- * view: `lobby/fn_801E7530.cpp` hands its own 0x1C-byte item-hold parameter block (the same field
- * layout from +0x04 up) by address, and publishing the record as a shared type is a separate
- * change - the shape `ef/eft_slot.h` uses for `EftSlot`/`_ENEMY_DATA`.  The definition is
- * the fuller spelling: `void eft052_hold_entry_set(CockpitHoldEntry* entry, u8 flag)` in
- * `src/ef/eft052.cpp`.
- *
- * `eft052_page_count_add` and `eft052_hold_row_get` have no caller in `src/` today; they are kept
- * because the band header declared them (with `s32` tails the definitions do not have).
- */
+/* ef/eft052.h - the item-page and hold-block entry points of `ef/eft052.cpp` other units call (docs/plan.md 6.5
+ * rule 2); `unsplit/lobby.h` re-exports it.  `eft052_hold_entry_set` takes `void*`: `lobby/fn_801E7530.cpp` hands
+ * its own 0x1C-byte item-hold block, the definition spells it `CockpitHoldEntry*`. */
 #ifndef MHTRI_EF_EFT052_H
 #define MHTRI_EF_EFT052_H
 
@@ -55,9 +36,9 @@ void eft052_hold_entry_set(void* entry, u8 flag);
  * entry's id (-1 when the list is missing or full).  GUESS name; `lobby/lb_companion_ui.h` still carries
  * its own two-argument view. */
 s32 hud_msg_push(u32 ch, const char* text);
-/* 0x8035B700 - pushes one item message (`kind` the channel, `id` the message, `arg` the item id it names) onto
- * the HUD log: builds the line from the string table and the item name and hands it on.  Renamed from
- * `hud_item_msg_push` (GUESS name from those two uses); moved here from `unsplit/unknown.h`. */
+/* 0x8035B700 - pushes one item message (`kind` the channel, `id` the message, `arg` the item id it names) onto the
+ * HUD log: builds the line from the string table and the item name.  `hud_item_msg_push` is a GUESS name from
+ * those two uses. */
 s32 hud_item_msg_push(s32 kind, s32 id, u16 arg);
 
 #ifdef __cplusplus
