@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Query and surgically edit a dtk symbol map without loading it into context.
-Spec: docs/tools/spec/symedit.md. CLI: symedit.py find|show|at|range|refs|check|rename|rename-batch|rewrite-batch|merge-batch
+Spec: docs/tools/spec/symedit.md. CLI: symedit.py find|show|at|range|refs|check|rename|rename-batch|rewrite-batch|merge-batch|split
 [--file F] [--json] [--limit N] [--roots R..] | --selftest."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
@@ -318,6 +318,24 @@ def cmd_merge_batch(a):
     return merge(a, read_merge_rows(a.mapfile))
 
 
+def cmd_split(a):
+    """`split <row> <offset> <new-name> [--scope S]`: the inverse of a merge (a row that is really two functions)."""
+    try:
+        offset = int(a.offset, 0)
+    except ValueError:
+        raise SystemExit("refusing: %r is not a number" % a.offset)
+    sm = _sym.SymbolMap(a.file)
+    plan = _lib_call(sm.plan_split, a.row, offset, a.new_name, a.scope)
+    if not plan.changed:
+        print("no-op: %s is already split at +0x%X as %s" % (a.row, offset, a.new_name))
+        return 0
+    if not a.dry_run:
+        sm.apply(plan)
+    print("%s %s" % ("would shrink" if a.dry_run else "shrank", plan.head))
+    print("%s %s" % ("would add" if a.dry_run else "added", plan.tail))
+    return 0
+
+
 #: The trees `--rewrite` edits and the files it reads there: the source, never docs/ or tools/ (a regenerable
 #: cache keeps its own name strings; the map is the authority there).
 REWRITE_ROOTS = ("src", "include")
@@ -476,6 +494,15 @@ def main():
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--no-refs", action="store_true", help="skip the reference scan")
     p.set_defaults(func=cmd_merge_batch)
+
+    p = sub.add_parser("split", parents=[common],
+                       help="split a row at a byte offset into itself and a new row (the inverse of a merge)")
+    p.add_argument("row")
+    p.add_argument("offset", help="byte offset into the row, 0 < offset < size (0x.. or decimal)")
+    p.add_argument("new_name")
+    p.add_argument("--scope", default=None, help="scope of the new row (default: the row's own attributes)")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(func=cmd_split)
 
     a = ap.parse_args()
     if a.selftest:

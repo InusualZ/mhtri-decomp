@@ -193,6 +193,29 @@ class MergePlan:
         return self.newline.join(self.grown.get(i, ln) for i, ln in enumerate(self.lines) if i not in drop)
 
 
+@dataclass(frozen=True)
+class SplitPlan:
+    """What `apply` would write: row `index` becomes `head` (the shrunk row) followed by the new row `tail`."""
+    path: str
+    text: str
+    newline: str
+    lines: tuple[str, ...]
+    index: int = -1
+    head: str = ""
+    tail: str = ""
+    applied: bool = False
+
+    @property
+    def changed(self) -> bool:
+        return self.index >= 0
+
+    def render(self) -> str:
+        out = list(self.lines)
+        if self.changed:
+            out[self.index:self.index + 1] = [self.head, self.tail]
+        return self.newline.join(out)
+
+
 def rewrite_name(line: str, old: str, new: str) -> str:
     """The name token of one definition line replaced, or `ShapeError` when the line is not that shape.
 
@@ -567,11 +590,58 @@ class SymbolMap:
                           % (new_size, ", ".join(inside[:3])))
         grown[hits[0]] = resize(lines[hits[0]], name, new_size)
 
-    def apply(self, plan: RenamePlan | MergePlan, write: Callable[[str, str], None] | None = None) -> bool:
+    def plan_split(self, row: str, offset: int, new_name: str, scope: str | None = None) -> SplitPlan:
+        """Plan the split of `row` at `offset` bytes into itself and a new row `new_name` (the inverse of a merge);
+        nothing is written. The row is shrunk to `offset`, the new row starts at `address + offset`, takes the
+        remainder, and keeps the row's section, type and attributes (`scope` replaces the scope when given). Refused
+        unless `row` is defined once with a size, `0 < offset < size`, `new_name` is a valid name that is not taken,
+        and no other row of the section already starts at the new address. A new name already defined at exactly
+        that place with the planned size, beside the shrunk row, is the re-apply (`applied`, no change)."""
+        text, nl, lines = self._lines()
+        defined = _definitions(lines)
+        hits = defined.get(row, [])
+        if len(hits) != 1:
+            raise Refused("refusing: %s is defined %d times in %s" % (row, len(hits), self.path))
+        i = hits[0]
+        e = parse_line(lines[i])
+        at = e.address + offset
+        new_hits = defined.get(new_name, [])
+        if len(new_hits) == 1:
+            n = parse_line(lines[new_hits[0]])
+            if (n.section, n.address) == (e.section, at) and e.size == offset:
+                return SplitPlan(self.path, text, nl, tuple(lines), applied=True)
+        if not e.sized or e.size <= 0:
+            raise Refused("refusing: %s has no size to split" % row)
+        if not 0 < offset < e.size:
+            raise Refused("refusing: offset 0x%X is not inside %s (size:0x%X)" % (offset, row, e.size))
+        if new_hits:
+            raise Refused("refusing: %s is already defined in %s" % (new_name, self.path))
+        if not VALID_NAME_RE.fullmatch(new_name):
+            raise Refused("refusing: %s is not a valid symbol name" % new_name)
+        if scope is not None and not re.fullmatch(r"[a-z]+", scope):
+            raise Refused("refusing: %r is not a scope" % scope)
+        for line in lines:
+            o = parse_line(line)
+            if o and (o.section, o.address) == (e.section, at):
+                raise Refused("refusing: %s already starts at %s:0x%08X" % (o.name, e.section, at))
+        head = resize(lines[i], row, offset)
+        tail = rewrite_name(lines[i], row, new_name)
+        tail = re.sub(r"^(\S+\s*=\s*[.\w]+:)\S+;", lambda m: "%s0x%08X;" % (m.group(1), at), tail, count=1)
+        tail = re.sub(r"size:0x[0-9a-fA-F]+", "size:0x%X" % (e.size - offset), tail, count=1)
+        if scope is not None:
+            if _SCOPE_RE.search(tail):
+                tail = _SCOPE_RE.sub("scope:" + scope, tail, count=1)
+            else:
+                tail = tail + " scope:" + scope
+        t = parse_line(tail)
+        if t is None or (t.name, t.section, t.address, t.size) != (new_name, e.section, at, e.size - offset):
+            raise ShapeError("the split row %r did not parse back as planned" % tail[:80])
+        return SplitPlan(self.path, text, nl, tuple(lines), i, head, tail)
+
+    def apply(self, plan: RenamePlan | MergePlan | SplitPlan,
+              write: Callable[[str, str], None] | None = None) -> bool:
         """Write `plan` once (through `write(path, text)`, default `write_text`); False when it is a no-op."""
-        if isinstance(plan, RenamePlan) and not plan.changed:
-            return False
-        if isinstance(plan, MergePlan) and not plan.changed:
+        if isinstance(plan, (RenamePlan, MergePlan, SplitPlan)) and not plan.changed:
             return False
         (write or write_text)(plan.path, plan.render())
         self._rows = None
