@@ -22,10 +22,21 @@ struct LobbyTimerRow {
     /* +0x20 */ s32 timer_0x20;
 }; /* size: 0x24 */
 
-/* The block, viewed as its timer table: the count at +0x16D0 and the rows from +0x16D4.  size: 0x2EB8 (the
- * map's object size, and the length the work-record init clears) */
+/* One 0x120-byte copy of a connected peer the lobby keeps (the network pat control's `updatePeerCardBlock` finds the
+ * row by the peer's id and refreshes its card): the id text, the name and the 0x100-byte card. */
+struct LobbyPeerCopy {
+    /* +0x000 */ char id_0x00[0xA];
+    /* +0x00A */ char name_0x0A[0x14];
+    /* +0x01E */ u8 pad_0x1E[0x2];
+    /* +0x020 */ u8 card_0x20[0x100];
+}; /* size: 0x120 */
+
+/* The block, viewed as its peer copies (+0x0008) and its timer table: the count at +0x16D0 and the rows from
+ * +0x16D4.  size: 0x2EB8 (the map's object size, and the length the work-record init clears) */
 struct LobbyTimerBlock {
-    /* +0x0000 */ u8 pad_0x0000[0x16D0];
+    /* +0x0000 */ u8 pad_0x0000[0x8];
+    /* +0x0008 */ struct LobbyPeerCopy peers_0x0008[4];
+    /* +0x0488 */ u8 pad_0x0488[0x1248];
     /* +0x16D0 */ s32 timer_count_0x16D0;
     /* +0x16D4 */ struct LobbyTimerRow timers_0x16D4[169];
     /* +0x2E98 */ u8 pad_0x2E98[0x20];

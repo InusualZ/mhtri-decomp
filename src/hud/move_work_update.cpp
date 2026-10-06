@@ -3,7 +3,7 @@
  * range's own extab 0x80016224-0x8001622C and extabindex 0x8003519C-0x800351A8 (one framed function).
  *
  * It walks the 0xB20-byte move-work records `get_move_work_adrs(2)` hands back: for each one it resolves
- * the record's 6-byte HUD key through the 0x130-stride table `lbl_806BE340` (`hud_key_lookup`, 0xFF for "not
+ * the record's 6-byte HUD key through the 0x130-stride table `lobby_hunter_cards` (`hud_key_lookup`, 0xFF for "not
  * present"), asks `draw_lsp_element` for the record's on-screen position and hands it to `move_work_draw` as a
  * 4-byte `_mh_ivec2_`.  It then walks the 0x12 lobby NPC records (`lb_npc`, stride 0x268) and, when the
  * lobby is idle, lets `lb_npc_move_work_draw` tick the live ones; the lobby's own screen state (`lobby_w`) and
@@ -31,9 +31,9 @@
  *     and the mangled ones at C++ scope.  `menu_slot_panel_draw`'s own header declares it `void` while its body takes the
  *     u8 index this call site passes (`clrlwi r3,r3,24`), and `menu_busy_ck`'s header says `u32` while
  *     every call site here compares with a signed `cmpwi`, so both are declared to this call site.
- *   * `lbl_806BE340` keeps the map's stem: three units read the same 0xBE0 `.bss` block with three
- *     different views (`menu/menu_item.cpp`'s option table, `menu/fn_802A6624.cpp`'s item records, this
- *     range's keyed HUD table), so naming it is a shared-file decision, and rule 7 does not cover `lbl_`.
+ *   * `lobby_hunter_cards` (GUESS name, owner `lobby/lb_companion_ui.cpp`): several units read the same 0xBE0
+ *     `.bss` block with their own views (`menu/menu_item.cpp`'s option table, `menu/menu_message.cpp`'s item records,
+ *     this range's keyed HUD table).
  *   * `HudMoveWork` / `HudKeyTableEntry` / `HudLobbyWork` are per-unit views: `lobby_w` already has four
  *     differently-named views in `include/` (each unit reads different offsets) and this range reads four
  *     more, and `src/hud/fn_80324F7C.c` owns a `_mh_move_work_` that names only +0xB01 - the one shared
@@ -56,7 +56,7 @@
 #include "lobby/lb_npc.h"    /* _LB_NPC, the map's own class name (`lb_npc_Get_motion_no__FP7_LB_NPC`) */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 
-/* One 0x130-byte entry of the keyed table `lbl_806BE340` (10 entries, the map's own 0xBE0 bytes).
+/* One 0x130-byte entry of the keyed table `lobby_hunter_cards` (10 entries, the map's own 0xBE0 bytes).
  * `hud_key_lookup` identifies an entry by memcmp-ing this range's 6-byte key against the entry's +0x03, and
  * the two payload bytes `draw_lsp_element` takes come out of it.  The rest of the entry is the table's own
  * data, untouched here (rule 5's padding exception).  size: 0x130 */
@@ -100,7 +100,7 @@ typedef struct HudLobbyWork {
     /* +0x027 */ u8 pad_0x027[0x155];
 } HudLobbyWork; /* size: 0x17C */
 
-extern HudKeyTableEntry lbl_806BE340[]; /* .bss 0x806BE340, 0xBE0 B = 10 entries */
+extern HudKeyTableEntry lobby_hunter_cards[]; /* .bss 0x806BE340, 0xBE0 B = 10 entries */
 extern HudMoveWork* get_move_work_adrs(u8 kind);
 extern u16 get_move_work_max(u8 kind);
 extern HudLobbyWork lobby_w;            /* .bss 0x806AAB44 */
@@ -165,9 +165,9 @@ extern "C" void move_work_update(void)
         pos.x = pos.y = 0;
         if (game_ready_ck() == 1) {
             found = hud_key_lookup(p->key_0x5DB);
-            if (found != 0xFF && lbl_806BE340[found].active_0x000 != 0) {
-                pos.y = draw_lsp_element(p, lbl_806BE340[found].index_0x117, p->index_0x002,
-                                    lbl_806BE340[found].id_0x024);
+            if (found != 0xFF && lobby_hunter_cards[found].active_0x000 != 0) {
+                pos.y = draw_lsp_element(p, lobby_hunter_cards[found].index_0x117, p->index_0x002,
+                                    lobby_hunter_cards[found].id_0x024);
             }
         }
         if (p->flags_0xB01 != 0) {

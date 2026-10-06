@@ -12,7 +12,9 @@
  *   `lobby_world_block + (i >> 3)` in a register; measured in docs/lobby.md).
  * NAMES. The 79 defined functions are named from their bodies.  GUESSes: the link-gated senders whose caller is
  *   unwritten, after the protocol sub-command they build (`lb_sub0a_send`, ...), and the icon tables (`<table>_area<n>`
- *   is entry n).  `hud_key_lookup` (0x8033A0BC) is the map's.  The dump's `homebutton::MotorCallback(OSAlarm...)` for
+ *   is entry n).  GUESS: `lobby_hunter_cards` (.bss 0x806BE340, ten 0x130-byte records keyed by a hunter id at +0x03
+ *   with the hunter's 0x100-byte card at +0x24, which `updatePeerCardBlock` refreshes).  `hud_key_lookup` (0x8033A0BC)
+ *   is the map's.  The dump's `homebutton::MotorCallback(OSAlarm...)` for
  *   0x8033C4D8/0x8033C570 is not adopted: both are 0x24-byte refresh wrappers without an argument.  The game-root
  *   dispatcher at 0x80432154 calls `lb_act_dispatch`/`lb_act_dispatch_ex` as `(u8 index, LbActReq* req)`.  Module
  *   `lobby`: `lobby_w`, `lb_param_w`, `lb_deli_data`, 11 `LbStr` calls.
@@ -992,7 +994,7 @@ u8 hud_key_lookup(u8* key) {
     u8 i;
 
     for (i = 0; i < 0xA; i++) {
-        if (memcmp(key, &lbl_806BE340[i].key_0x03, 6) == 0) {
+        if (memcmp(key, &lobby_hunter_cards[i].key_0x03, 6) == 0) {
             return i;
         }
     }
