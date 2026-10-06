@@ -69,11 +69,11 @@ void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 s32 calcVecAng2(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
  /* owner `src/mh3_pad.cpp`; its body returns `dst` */
-s32 fn_8045AB38(s16 value);
+s32 abs(s16 value);
 
 /* ---- the model (`sound/mhchar.cpp`'s range) ---- */
 void fn_800E0914(struct MHchar* chr);
-void fn_800E0A14(struct MHchar* chr);
+void mhchar_joint_mtx_get(struct MHchar* chr);
 void fn_800E11C0(struct MHchar* chr, u32 a, u32 b, u16 motion, s32 c, s32 d, s32 e, f32 f,
                  f32 g);
 void fn_800E1640(struct MHchar* chr, f32 value);

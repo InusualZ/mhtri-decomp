@@ -4,7 +4,7 @@
  * One function. It is handed the game's user-data block, an equipment-pool index and a one-byte out
  * flag, and writes that index into the per-category "selected equipment" slot the record's kind
  * belongs to.  The sibling 0x8004CAD8 (`set_slot_none`) is the exact inverse (it clears the same slots
- * to 0xFFFF); `fn_8004C514` allocates the pool record whose index this function stores, and
+ * to 0xFFFF); `userdata_equip_box_add_new` allocates the pool record whose index this function stores, and
  * `Gunner_opt_ok_ck` (Pl band, 0x8027F0C4) gates the kind-0xB (bowgun) case.
  *
  * Naming / module - which evidence class decided it
@@ -42,7 +42,7 @@ typedef struct UserData {
     /* +0x000 */ u8 pad_0x000[0x8C];
     /* +0x08C */ u16 equip_sel[9]; /* per-category selected pool index; 0xFFFF = nothing selected */
     /* +0x09E */ u8 pad_0x09E[0xE00 - 0x09E];
-    /* +0xE00 */ _EQUIP equip[0x320]; /* the equipment pool `fn_8004C514` allocates from */
+    /* +0xE00 */ _EQUIP equip[0x320]; /* the equipment pool `userdata_equip_box_add_new` allocates from */
 } UserData;
 
 /* `Gunner_opt_ok_ck` (Pl band, 0x8027F0C4): true when the record is a kind-0xB (bowgun) whose +0x2

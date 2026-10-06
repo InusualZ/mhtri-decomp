@@ -12,6 +12,7 @@
  * NAMES. Module `menu` from the menu/HUD 2D callees and the `menu` band below; no `__FILE__` string covers the range
  *   (its `.data` reads are mask/sprite tables, `jumptable_805DD598` and pool floats) and the dump answers `zz_`, so the
  *   file keeps the map's stem.
+ *   GUESS: `quest_party_state_reset`, `quest_detail_label_draw`
  * RESIDUALS. 38 rows unwritten (objdiff scores them zero), including the two state-machine updaters `fn_8031ECF0`/
  *   `fn_8031EFEC`: `eft045_set` (0x8031EB54), 0x8031ECF0-0x8031F2F0, `fn_8031F510`, `fn_8031F7DC`,
  *   0x8031FBE8-0x80320D20, 0x80320D24-0x803210B8, `fn_80321130`, 0x8032145C-0x8032194C, 0x80321A14-0x80322C68,
@@ -43,9 +44,9 @@ void* eft_res_model_get(void);
 void  eft_res_slot_release(_EFT* self);
 void  fn_800F8A44(MHchar** models, s32 count);
 f32   fn_800513F0(VEC3* v, f32 s);
-u32   fn_8004D70C(u32 value);
+u32   userdata_flag_ck(u32 value);
 s32   fn_800CEF18(u32 value);
-s32   fn_80217934(void);
+s32   lb_panel_close(void);
 void  setCockpitTransferMode(u8 index, s32 value);
 void  fn_802DFCD4(void);
 void* memset(void* dst, int value, u32 size);
@@ -258,14 +259,14 @@ extern "C" void fn_8031F778(_EFT* self) {
     eft_res_slot_release(self);
 }
 
-/* 0x8031F77C - count the non-zero `u16` entries of a string table whose value `fn_8004D70C`
+/* 0x8031F77C - count the non-zero `u16` entries of a string table whose value `userdata_flag_ck`
  * accepts. */
 extern "C" s16 fn_8031F77C(u16* table) {
     u16* p = table;
     s16 count = 0;
 
     while (*p != 0) {
-        if (fn_8004D70C(*p) == 1) {
+        if (userdata_flag_ck(*p) == 1) {
             count++;
         }
         p++;
@@ -305,7 +306,7 @@ extern "C" void fn_803210DC(void) {
 
 /* 0x80320D20 - the screen's teardown tail. */
 extern "C" void fn_80320D20(void) {
-    fn_80217934();
+    lb_panel_close();
 }
 
 /* 0x80323874 - hand `state_0x01 == 0` to `fn_803234EC`. */
@@ -342,7 +343,7 @@ extern "C" void fn_80321444(MenuQuestWork* self, u8 value) {
 }
 
 /* 0x8032194C - when the option block is live, play the confirm sound and run the two post steps. */
-extern "C" void fn_8032194C(void) {
+extern "C" void quest_party_state_reset(_PLW* plw) {
     if (lb_param_w.field_0x04 != 0) {
         sysSE_req(9);
     }
@@ -366,7 +367,7 @@ extern "C" void fn_80321990(MenuQuestWork* self, u8 mode) {
 }
 
 /* 0x80322C68 - draw the two label rows of one entry. */
-extern "C" void fn_80322C68(MenuQuestWork* self) {
+extern "C" void quest_detail_label_draw(MenuQuestWork* self) {
     _mh_ivec2_ pos;
     char* text;
 
@@ -386,8 +387,8 @@ extern "C" void fn_80323318(MenuQuestWork* self, u8 arg) {
         fn_803223B0(self, arg);
         return;
     case 2:
-        fn_80214EF0(0x1877, 0x15B);
-        fn_80215170(0x1879, self->field_0x168);
+        lb_panel_msg_draw(0x1877, 0x15B);
+        lb_panel_yes_no_draw(0x1879, self->field_0x168);
         break;
     }
     fn_80323204(self, self->field_0x036, self->field_0x03C);

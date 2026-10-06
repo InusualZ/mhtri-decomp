@@ -11,6 +11,7 @@
  * NAMES. `em_prog_support` and the `note_pane_*`/`qn_chr_flag_set` names are GUESSES from the band's role and the
  *   bodies; `qn_get_motion_no` is the map's mangled name.
  *   GUESS (from each body and its callers): em_prog_slots_init, em_prog_work_init, qnpc_load_ck, qnpc_res_load_done
+ *   GUESS: `note_pane_motion_start`
  * RESIDUALS. 28 rows unwritten: 0x80383148-0x803831B0, 0x803831B4-0x803836EC, 0x80383720-0x8038392C,
  *   0x80383944-0x803839C0, 0x803839EC-0x80384004, 0x80384048-0x80384304, 0x80384434-0x80384B34, 0x80384BA0-0x80384ECC,
  *   0x803850A4-0x803851D4, 0x8038530C-0x803853C8, 0x803855D4-0x8038575C, 0x80385828-0x80385A54, 0x80385CAC-0x80385E7C.
@@ -22,7 +23,7 @@
  *  - `note_pane_motion_end_ck`, `fn_80385C70`, `fn_80385C80`: retail adds 4 to r3 before the argument setup of the
  *    tail call, ours after;
  *  - `fn_80384F48`, `qnpc_load_ck`, `fn_80384FF8`, `fn_803853C8`, `fn_8038541C`, `fn_80385538`, `fn_80385B28`,
- *    `fn_80385B5C`, `note_pane_anim_pair_ck`, `note_pane_motion_set`: retail narrows the argument with `clrlwi`, ours
+ *    `note_pane_motion_start`, `note_pane_anim_pair_ck`, `note_pane_motion_set`: retail narrows the argument with `clrlwi`, ours
  *    drops it;
  *  - `fn_80384004`, `fn_80384B34`: retail keeps `extsh`/`extsb` + `cmpwi`, ours the record form; `fn_803843D8`:
  *    retail sign-extends twice more;
@@ -55,7 +56,7 @@
 
 extern "C" {
 /* The lobby helpers the band calls (`lobby/fn_80212810.cpp`, `lobby/lb_npc.cpp`, `lobby/lb_menu_pos_tbl.cpp`). */
-void fn_80217934(void);
+void lb_panel_close(void);
 void fn_802125C8(void);
 void fn_8021F248(u8 a);
 void fn_801FC2F0(void);
@@ -131,7 +132,7 @@ extern f32 lbl_8079BF6C;
 
 /* 0x803831B0 - a tail-call thunk. */
 extern "C" void fn_803831B0(void) {
-    fn_80217934();
+    lb_panel_close();
 }
 
 /* 0x803836EC - the note band's per-frame step: refresh, then rebuild the note pane from the block
@@ -356,7 +357,7 @@ extern "C" u32 note_pane_anim_pair_ck(NoteWork* self, u8 a, u8 b) {
 
 /* 0x80385B18 */
 extern "C" void fn_80385B18(NoteWork* self, u32 joint, nw4r::math::MTX34* out) {
-    fn_800E0A14(&self->model, joint, out);
+    mhchar_joint_mtx_get(&self->model, joint, out);
 }
 
 /* 0x80385B20 */
@@ -525,7 +526,7 @@ extern "C" void fn_803857BC(NoteWork* self) {
 }
 
 /* 0x80385B5C */
-extern "C" void fn_80385B5C(NoteWork* self, u16 a, u32 b, s32 c) {
+extern "C" void note_pane_motion_start(NoteWork* self, u16 a, u32 b, s32 c) {
     if (a <= 16) {
         fn_800E1280(&self->model, 0, a, b, fn_80385B28(self, a), 0, (f32)c, lbl_8079BF6C);
     }
@@ -534,7 +535,7 @@ extern "C" void fn_80385B5C(NoteWork* self, u16 a, u32 b, s32 c) {
 /* 0x80385BF4 */
 extern "C" void note_pane_motion_set(NoteWork* self, u16 a, u32 b, u32 c) {
     if ((u16)qn_get_motion_no((_QNPC_W*)self) != a) {
-        fn_80385B5C(self, a, b, c);
+        note_pane_motion_start(self, a, b, c);
     }
 }
 

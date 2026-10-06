@@ -24,6 +24,15 @@ void demo_work_process(struct DemoWork* work);
 void fn_803C7EAC(void);
 void fn_803C7F88(void);
 
+/* 0x803C8454 - opens NPC `npc`'s talk message `msg` (a formatted string when `arg` is 0) in window kind `kind`; 0
+ * while a demo runs or the talk cannot open.  GUESS name. */
+s32 npc_talk_start(s8 npc, u8 msg, u16 arg, u8 kind);
+/* 0x803C8660 / 0x803C8690 / 0x803C86B4 - whether the talk window is open, closes it, and sets its flag byte.  GUESS
+ * names. */
+u8 npc_talk_active_ck(void);
+void npc_talk_end(void);
+void npc_talk_flag_set(u8 flag);
+
 #ifdef __cplusplus
 }
 #endif

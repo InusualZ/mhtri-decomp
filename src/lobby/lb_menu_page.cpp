@@ -108,17 +108,17 @@ void fn_801E68B4(void* work, u8 flag);           /* 0x801E68B4 - ditto, one argu
 s16 fn_801EF73C(void* work);                     /* 0x801EF73C - the icon index of the sub-work (s16) */
 s32 fn_801F0834(void* work);                     /* 0x801F0834 - non-zero while the sub-work is live */
 s32 fn_802142D8(LbIconRec* icon, s32 flag, void* table_a, void* table_b);
-s32 fn_80214EF0(s32 page, s16 id);               /* the 0x1877 panel's primary text */
+s32 lb_panel_msg_draw(s32 page, s16 id);               /* the 0x1877 panel's primary text */
 s32 fn_80214FB8(s32 page, s32 id, void* data);   /* the same panel's row text plus its data */
-s32 fn_802150DC(s32 page, s16 id, s32 a, s32 b); /* its secondary text */
-s32 fn_80215170(s32 page, s32 data);             /* its value */
+s32 lb_panel_line_draw(s32 page, s16 id, s32 a, s32 b); /* its secondary text */
+s32 lb_panel_yes_no_draw(s32 page, s32 data);             /* its value */
 s32 fn_802179D4(LbIconRec* icon);                /* non-zero while the record is already held */
 s32 fn_80217F4C(LbIconRec* icon, u8 kind, u16 value); /* fills a record from a kind and a value */
 s32 fn_8021A5FC(void);                           /* 0x8021A5FC - the banner/message step */
 s32 equip_kind_table_class(u8 kind);                        /* the equipment kind's row-table class (Pl) */
 s32 fn_8027F1B8(LbIconRec* icon);                /* the record's stack count (Pl) */
 s32 fn_8027F21C(LbIconRec* icon);                /* the record's "held" test (Pl) */
-s32 fn_802DF6E4(s32 id);                         /* 0x802DF6E4 - the HUD/2D element release */
+s32 menu_money_draw(s32 id);                         /* 0x802DF6E4 - the HUD/2D element release */
 s32 fn_8033C1AC(void);                           /* 0x8033C1AC - the companion-page step */
 void fn_803642B8(LbMenuPage* self);              /* 0x803642B8 - the band's per-state draw arms */
 void fn_803645C4(LbMenuPage* self);
@@ -171,11 +171,11 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             break;
         case 1:
             fn_80214FB8(6263, 95, self->records_0x264[self->record_index_0x16].data_0x08);
-            fn_80215170(6265, self->data_0x200);
+            lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         case 3:
             msg_a = 77;
-            fn_80215170(6265, self->data_0x200);
+            lb_panel_yes_no_draw(6265, self->data_0x200);
             {
                 LbPageRecord* rec = &self->records_0x264[self->list_mode_0x0C];
 
@@ -191,7 +191,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             break;
         case 4:
             msg_a = 79;
-            fn_80215170(6265, self->data_0x200);
+            lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         case 7:
             msg_a = 80;
@@ -268,7 +268,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             break;
         case 2:
             fn_80214FB8(6263, 102, (void*)self->values_0x23C[self->index_0x128]);
-            fn_80215170(6265, self->data_0x200);
+            lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         case 3:
             msg_a = 77;
@@ -276,11 +276,11 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             if ((u8)equip_kind_table_class(icon.kind_0x00) == 1 && fn_802179D4(&icon) == 0) {
                 msg_b = 78;
             }
-            fn_80215170(6265, self->data_0x200);
+            lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         case 4:
             msg_a = 79;
-            fn_80215170(6265, self->data_0x200);
+            lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         }
         break;
@@ -308,7 +308,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             break;
         case 1:
             fn_80214FB8(6263, 95, self->records_0x264[self->record_index_0x16].data_0x08);
-            fn_80215170(6265, self->data_0x200);
+            lb_panel_yes_no_draw(6265, self->data_0x200);
             return;
         case 5:
             page = 6263;
@@ -362,7 +362,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             break;
         case 2:
             fn_80214FB8(6263, 108, self->entries_0x328[self->list_mode_0x0C].data_0x00);
-            fn_80215170(6265, self->data_0x200);
+            lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         }
         break;
@@ -404,7 +404,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             break;
         case 2:
             fn_80214FB8(6263, 115, self->entries_0x328[self->list_mode_0x0C].data_0x00);
-            fn_80215170(6265, self->data_0x200);
+            lb_panel_yes_no_draw(6265, self->data_0x200);
             break;
         case 3:
             page = 6264;
@@ -415,10 +415,10 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
     }
 
     if (msg_a != 0xFFFF) {
-        fn_80214EF0(page, (s16)msg_a);
+        lb_panel_msg_draw(page, (s16)msg_a);
     }
     if (msg_b != 0xFFFF) {
-        fn_802150DC(page, (s16)msg_b, arg_c, arg_d);
+        lb_panel_line_draw(page, (s16)msg_b, arg_c, arg_d);
     }
 }
 
@@ -454,41 +454,41 @@ extern "C" void lb_menu_page_step(void) {
         switch (self->work_0xA0.kind_0x00) {
         case 0:
             if (self->state_0x00 == 4) {
-                fn_80214EF0(6263, 90);
+                lb_panel_msg_draw(6263, 90);
             } else {
-                fn_80214EF0(6263, 89);
+                lb_panel_msg_draw(6263, 89);
             }
             break;
         case 1:
-            fn_80214EF0(6263, 91);
+            lb_panel_msg_draw(6263, 91);
             break;
         }
         break;
     case 5:
         if (self->mode_0x01 != 2 && self->mode_0x01 != 3) {
             fn_8021A5FC();
-            fn_802DF6E4(6360);
+            menu_money_draw(6360);
         }
         fn_803642B8(self);
         break;
     case 10:
         fn_8021A5FC();
-        fn_802DF6E4(6360);
+        menu_money_draw(6360);
         fn_803659E8(self);
         break;
     case 6:
         fn_8021A5FC();
-        fn_802DF6E4(6360);
+        menu_money_draw(6360);
         fn_80364BD8(self);
         break;
     case 7:
         fn_8021A5FC();
-        fn_802DF6E4(6360);
+        menu_money_draw(6360);
         fn_80364EE8(self);
         break;
     case 8:
         fn_8021A5FC();
-        fn_802DF6E4(6360);
+        menu_money_draw(6360);
         fn_803653A0(self);
         break;
     case 9:

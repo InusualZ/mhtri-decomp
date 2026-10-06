@@ -1101,7 +1101,7 @@ void lb_settings_copy(LbSettings* dst, LbSettings* src) {
 
 /* A tail call of `fn_80217934`, the area-name/quest path helper the tutorial block drives. */
 void lb_area_name_apply(void) {
-    fn_80217934();
+    lb_panel_close();
 }
 
 /* The page block's id-table row `&lobby_world_block->ids_0x5180[index]` (the entry the companion page binds);
@@ -1156,7 +1156,7 @@ void lb_page_refresh(void) {
 /* Republishes the entry byte (`lb_entry_publish`) and then the page's name path (`fn_80217934`). */
 void lb_entry_republish(void) {
     lb_entry_publish();
-    fn_80217934();
+    lb_panel_close();
 }
 
 /* Sets `page->bits_0x72` for the entry the block has selected and mirrors the count. */

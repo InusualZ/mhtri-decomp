@@ -8,6 +8,8 @@
 
 #ifdef __cplusplus
 void set_zmode(bool depth_test, u8 func, bool write);
+/* 0x800E4574 - the blend mode setter (`set_blendmode__FUcUcUc`), the same owner's. */
+void set_blendmode(u8 src, u8 dst, u8 op);
 #endif
 
 #endif /* MHTRI_SOUND_SET_ZMODE_H */

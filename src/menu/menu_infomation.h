@@ -59,6 +59,18 @@ s32 fn_8030A1D0(void* equip, s32 mode);
 /* 0x8030B790 - the number of six-row pages the equip list record fills (never below one). */
 s32 equip_list_page_count(EquipListWork* list);
 
+/* 0x8030CA50 / 0x8030D6A8 / 0x8030F374 / 0x8030F814 - the equipment detail page's per-kind stat blocks (the
+ * blade weapons, the bowgun parts, kind 6) and its decoration-slot row, for the player work and the equipment
+ * record the caller hands in.  GUESS names, from the kinds the quest-result screen picks them by. */
+/* untyped: opaque handle passed through - the owner forwards the player work and the record untouched to its variant resolver */
+s32 equip_detail_melee_draw(void* plw, void* equip, u32 row, u32 sel);
+/* untyped: opaque handle passed through - the owner forwards the player work and the record untouched to its variant resolver */
+void equip_detail_bowgun_draw(void* plw, void* equip, u16 row, u8 sel);
+/* untyped: opaque handle passed through - the owner forwards the player work and the record untouched to its variant resolver */
+void equip_detail_kind6_draw(void* plw, void* equip, u16 row, u8 sel);
+/* untyped: opaque handle passed through - the owner forwards the player work and the record untouched to its variant resolver */
+void equip_detail_slots_draw(void* plw, void* equip, u16 row, u8 sel);
+
 #ifdef __cplusplus
 }
 #endif

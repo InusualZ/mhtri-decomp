@@ -18,7 +18,7 @@
  * RESIDUALS. 22 rows unwritten (objdiff scores them zero): 0x802A6F64-0x802A736C, 0x802A7524-0x802A7978,
  *   0x802A79B8-0x802A7B80, 0x802A7C44-0x802A8D74, 0x802A907C-0x802A91AC, 0x802A9BCC-0x802A9CD8,
  *   0x802A9F48-0x802AA3EC, 0x802AA4F4-0x802AA59C, 0x802AA68C-0x802AA6A8.  They need the `.sdata2` 120.0f (sole referrer
- *   `fn_802AA4F4`) or callees no header declares with a usable signature (`fn_802E3D18`, `fn_802D9EA8`, `fn_802E1320`,
+ *   `fn_802AA4F4`) or callees no header declares with a usable signature (`fn_802E3D18`, `fn_802D9EA8`, `draw_itemicon_anim_idx`,
  *   `get_rare_color`, `draw_number_idx`, `fn_8027993C`/`fn_80279B84`, and `font_print`, `char*` in `unsplit/menu.h` where
  *   the map's variadic `font_print__FPSce` sets `crclr`).  The 6 partial rows:
  *  - `menu_page_count`: retail `beqlr ... blr`, ours `bnelr / mr r3,r5 / blr` (60 vs 64 B; five shapes measured);
@@ -72,7 +72,6 @@ void sysSE_req(long id);
 u8** get_str_tbl(long index);
 u8* get_move_work_adrs(u8 kind);
 s32 get_move_work_max(u8 kind);
-extern "C" void menu_frame_draw_blocks(void* dst, void* src, s8 a, s8 b, u16 c, s32 d, struct _mh_ivec2_* e);
 extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, u32 d, u8 e);
 
 /* The source table the list is built from: `lobby/lb_companion_ui.cpp`'s `.bss`, declared here. */
@@ -391,7 +390,7 @@ extern "C" void menu_frame_entries_build(u16* src_a, u16* src_b, s8 kind, u16 ls
         entry += 4;
     }
     get_lsp_data(lsp_index, (struct _mh_ivec2_*)lsp);
-    menu_frame_draw_blocks(work, entries, 1, kind, 0, flags, (struct _mh_ivec2_*)lsp);
+    menu_frame_draw_blocks((IdValue*)work, entries, 1, kind, 0, flags, (struct _mh_ivec2_*)lsp);
 }
 
 /* The one-block form: fills four entries (ordinals 0..3) from the 0x60-byte source and the optional 0x20-byte mask and
@@ -431,7 +430,7 @@ extern "C" void menu_frame_draw_page(void* a, void* b, s8 c, s8 d, u16 e, s32 f)
     s16 lsp[2];
 
     get_lsp_data(628, (struct _mh_ivec2_*)lsp);
-    menu_frame_draw_blocks(a, b, c, d, e, f, (struct _mh_ivec2_*)lsp);
+    menu_frame_draw_blocks((IdValue*)a, (MenuListEntry*)b, c, d, e, f, (struct _mh_ivec2_*)lsp);
 }
 
 /* Draws a four-row page at the page's anchor plus the per-kind offset, 26 pixels per row, from the block

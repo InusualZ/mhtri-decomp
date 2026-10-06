@@ -53,6 +53,7 @@
  *   flipcheck: `.data` size gap.
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: force-active in retail .comment, not in ours: `fn_800DB684`.
+ * NAMES. GUESS: `sysSE_bank32_req`, `sysSE_bank20_req`, `sysSE_bank24_req`, `se_talk_point_set`
  */
 #pragma optimization_level 4
 #pragma peephole off
@@ -401,7 +402,7 @@ extern "C" void sysSE_stop(s32 id) {
     }
 }
 
-extern "C" void fn_800DBCD8(s32 id) {
+extern "C" void sysSE_bank32_req(s32 id) {
     if (fn_800F04FC(32) != 0) {
         fn_800DBB78(32, id);
     }
@@ -420,13 +421,13 @@ extern "C" void fn_800DBD1C(u32 row, u32 column) {
     }
 }
 
-extern "C" void fn_800DBD90(s32 id) {
+extern "C" void sysSE_bank20_req(s32 id) {
     if (fn_800F04FC(20) != 0) {
         fn_800DBB78(20, id);
     }
 }
 
-extern "C" void fn_800DBDD4(void) {
+extern "C" void sysSE_bank24_req(void) {
     if (fn_800F04FC(24) != 0) {
         fn_800DBB78(24, 0);
     }
@@ -1255,7 +1256,7 @@ extern "C" SeSlot* fn_800DA72C(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  *
  * Residuals / notes live in this header. Nothing here is committed; the orchestrator owns the unit.
  *
- * fn_800DBACC (89.19 %): 12 of 13 functions here are byte-identical; this one is one instruction long.
+ * se_talk_point_set (89.19 %): 12 of 13 functions here are byte-identical; this one is one instruction long.
  *   The target keeps the *biased* base (`base + 0x30000`) in the callee-saved r31 and lets the loaded
  *   pointer die in r3; we keep the loaded pointer in r31 and recompute `addis r3, r31, 3` after the
  *   copyVec3 call. Same instruction count either way, so it is the allocator's tie-break between
@@ -1462,7 +1463,7 @@ extern "C" void fn_800DB86C(_PLW* plw) {
 /* --- 0x800DBACC -------------------------------------------------------------------------------- */
 
 /* Resets the sound-system work object and seeds its default position. */
-extern "C" void fn_800DBACC(nw4r::math::VEC3* pos) {
+extern "C" void se_talk_point_set(nw4r::math::VEC3* pos) {
     SeSysWork* self = (SeSysWork*)lbl_80794978;
 
     if (self == NULL) {

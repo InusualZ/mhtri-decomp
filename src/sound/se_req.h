@@ -19,6 +19,8 @@ extern "C" {
 void fn_800DFDCC(struct SePool* self, s32 arg);
 /* 0x800E0428 - the positional request that takes the SE work object and a world position. */
 u32 fn_800E0428(struct _se_w* work, nw4r::math::VEC3* pos);
+/* 0x800DD40C - starts the pool's point voice `kind` (0..2 pick voices 9..11) at `pos`.  GUESS name. */
+void se_point_req(u8 kind, nw4r::math::VEC3* pos);
 
 #ifdef __cplusplus
 }

@@ -62,12 +62,16 @@ void fn_800DA428(struct _se_w* work, s32 a, u32 param, s32 d, s32 e);
 void fn_800DCC24(struct _se_w* work, s32 kind, u8 c);
 /* 0x800DBDD4 - the fixed-SE request the quest-result band's swap timer arms (`li r3,0x18` then
  * `fn_800F04FC`/`fn_800DBB78(0x18,0)`), so it takes no argument and is declared at C linkage like
- * its `fn_` siblings here (the map name is the plain `fn_800DBDD4`).  Added with
+ * its `fn_` siblings here (the map name is the plain `sysSE_bank24_req`).  Added with
  * `menu/menu_result.cpp` (rule 2: this TU owns the address). */
-void fn_800DBDD4(void);
+void sysSE_bank24_req(void);
+/* 0x800DBD90 - the bank-0x14 twin: plays `id` of SE bank 0x14 once the bank is loaded.  GUESS name. */
+void sysSE_bank20_req(s32 id);
 
 /* 0x800DBC84 - stops sound effect `id`. */
 void sysSE_stop(u32 id);
+/* 0x800DBACC - points the SE pool's talk voice at `pos` (mode 3/2, kinds 21/16).  GUESS name. */
+void se_talk_point_set(nw4r::math::VEC3* pos);
 
 /* 0x800DACA8 - plays the "item could not be used" sound for the local hunter (the `fn_800F0C14` voice of its
  * move work's +0x13C record).  GUESS name from its two callers, which raise the "cannot use" message first. */

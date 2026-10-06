@@ -3556,7 +3556,7 @@ s32 fn_802D2B38(struct _AINPC_W* self, s32 motion, s32 step)
 /* 0x802D2B68 - resets the model's joint layer. */
 void fn_802D2B68(struct _AINPC_W* self)
 {
-    fn_800E0A14(&self->model);
+    mhchar_joint_mtx_get(&self->model);
 }
 
 /* 0x802D2B78 - tests the record's flag word. */
@@ -3700,7 +3700,7 @@ u16 fn_802D30F8(u16 angle, s32 target, u16 limit)
     u16 diff = angle - target;
     u16 result;
 
-    if (fn_8045AB38((s16)diff) < limit) {
+    if (abs((s16)diff) < limit) {
         result = angle;
     } else {
         result = target - limit;

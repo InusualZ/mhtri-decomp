@@ -9,6 +9,8 @@
  *   it) and the dump answers `zz_` throughout, so the file keeps the map's stem.  Module `lobby`: the lobby/HUD API
  *   (`LbStr`, `get_lsp_data`, `draw_sprite_ary`, `get_menu_lsp_tbl`) and the `_EQUIP` accessors (`Get_equip_rare`,
  *   `Gunner_opt_ok_ck`, `GetEquipName`, `ItemName`, `draw_weaponicon_idx`).
+ *   GUESS: `userdata_award_bit_set`, `lb_talk_page_value_get`, `lb_talk_page_mode_set`,
+ *   GUESS: `lb_talk_page_mode_reset`
  * RESIDUALS. 48 rows unwritten: 0x802196F0-0x8021AC24, 0x8021AD14-0x8021B5AC, 0x8021B690-0x8021B890,
  *   0x8021B94C-0x8021C900, 0x8021C938-0x8021CE0C, 0x8021CE70-0x8021D160, 0x8021D21C-0x8021D5A8, 0x8021D5D0-0x8021D704,
  *   0x8021D72C-0x8021D86C, 0x8021D884-0x8021D9E0, 0x8021D9F8-0x8021DED8, 0x8021DEFC-0x8021E1EC.
@@ -16,7 +18,7 @@
  *  - `fn_8021C900`: retail addresses the id table at 0x805C9F50 as its own base, the map's only symbol there is
  *    `lbl_805C9F40`, so ours needs one more `addi`; `fn_8021B5AC`: the same at 0x805C968C plus one `extsh`;
  *  - `fn_8021CE0C`: the base and byte registers swap (r4/r3). `fn_80218138` (owned by `lobby/fn_80212810.cpp`, which
- *    has no header) is declared here; `fn_8021CBB0` and `fn_8021D5BC`, this unit's own, are also declared in
+ *    has no header) is declared here; `lb_talk_page_open` and `lb_talk_page_mode_reset`, this unit's own, are also declared in
  *    `unsplit/lobby.h`.
  *   flipcheck: `.data`/`.bss`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim;
  *   `Gunner_opt_ok_ck` and `get_menu_lsp_tbl` are referenced unmangled where the map spells
@@ -53,7 +55,7 @@ s32 Gunner_opt_ok_ck(_EQUIP* equip);
 void fn_800D0754(u8 value);
 void fn_800DCFE4(void);
 const u16* get_menu_lsp_tbl(u16 id);
-void fn_801FF5FC(void* slot, s32 value);
+void lb_npc_talk_mode_set(void* slot, s32 value);
 s32 fn_8021D21C(u8 a, s32 b, s32 c, s32 d);
 
 void fn_8021B94C(void);
@@ -348,7 +350,7 @@ extern "C" u16 fn_8021AC8C(LbEquipWork* self, s32 index) {
 }
 
 /* Sets bit `index` of the page's owned-slot mask. */
-extern "C" void fn_8021ACCC(LbEquipWork* self, s32 index) {
+extern "C" void userdata_award_bit_set(LbEquipWork* self, s32 index) {
     if ((s16)index < 12) {
         self->maskA_0x40F8 |= (u16)(1 << (s16)index);
         return;
@@ -455,7 +457,7 @@ extern "C" s32 fn_8021C900(u16 id) {
 }
 
 /* Returns the page's current menu value. */
-extern "C" u32 fn_8021D160(void) {
+extern "C" u32 lb_talk_page_value_get(void) {
     return lbl_806AA790.word_0x014;
 }
 
@@ -475,13 +477,13 @@ extern "C" void fn_8021D188(LbMenuSlot* slot, s32 id) {
         if ((u16)id != 184) {
             return;
         }
-        fn_801FF5FC(slot, 2);
+        lb_npc_talk_mode_set(slot, 2);
         return;
     case 15:
         if ((u16)id != 208) {
             return;
         }
-        fn_801FF5FC(slot, 0);
+        lb_npc_talk_mode_set(slot, 0);
         return;
     default:
         return;
@@ -499,12 +501,12 @@ extern "C" s32 fn_8021D1D4(void) {
 }
 
 /* Switches the page to the given menu mode. */
-extern "C" s32 fn_8021D5A8(s32 mode) {
+extern "C" s32 lb_talk_page_mode_set(s32 mode) {
     return fn_8021D21C((u8)mode, 0, 0, 1);
 }
 
 /* Switches the page back to menu mode 1. */
-extern "C" s32 fn_8021D5BC(void) {
+extern "C" s32 lb_talk_page_mode_reset(void) {
     return fn_8021D21C(1, 0, 0, 1);
 }
 
@@ -548,7 +550,7 @@ extern "C" void fn_8021CE0C(void) {
         fn_800DCFE4();
         break;
     case 1:
-        if ((u32)(fn_8021D5BC() - 1) <= 1U) {
+        if ((u32)(lb_talk_page_mode_reset() - 1) <= 1U) {
             fn_8021B94C();
         }
         break;

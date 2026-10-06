@@ -85,7 +85,7 @@ _EFT* eft_res_slot_get(u32 pool);
 void eft_res_slot_release(_EFT* self);
 void fn_80306D6C(void* self, s32 a, void* b, void* c, u8 d, f32 e);
 u8 fn_80331210(void* self);
-void fn_800E0A14(void* chr, u32 joint, nw4r::math::MTX34* out);
+void mhchar_joint_mtx_get(void* chr, u32 joint, nw4r::math::MTX34* out);
 
 #ifdef __cplusplus
 }
@@ -1238,7 +1238,7 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
     VEC3_ctor(&axis);
     VEC3_ctor(&spin);
     VEC3_ctor(&pos);
-    fn_800E0A14(&((_EFT019_PHYSICS*)((_PLW*)self->source_0x30)->physics_0x13C)->chr_0x04, 7, mtx);
+    mhchar_joint_mtx_get(&((_EFT019_PHYSICS*)((_PLW*)self->source_0x30)->physics_0x13C)->chr_0x04, 7, mtx);
     mtx34_trans_get(mtx, &pos);
     axis.x = -mtx->m[0][2];
     axis.y = -mtx->m[1][2];

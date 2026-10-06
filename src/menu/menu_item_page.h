@@ -27,7 +27,7 @@ typedef struct MenuRowData {
     /* +0x0E */ u8 unused_0x0E[0x10 - 0x0E];
 } MenuRowData; /* size: 0x10 */
 
-/* The 4-byte row record the item list's data table (`fn_8029F808()`) holds, indexed by
+/* The 4-byte row record the item list's data table (`menu_row_table_get()`) holds, indexed by
  * `MenuEntry::field_0x06`: the kind the row's damage/quality block switches on (+0) and the row id
  * `get_menu_lsp_tbl(0x55)` is indexed with (+1). */
 /* The item record `fn_8033ADD0` selects: the item id the panel's icon/name/exp lines take. */
@@ -89,20 +89,20 @@ extern "C" {
 
 void sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out); /* 0x802E0AD4, hud/layout.cpp */
 void fn_802E1A7C(u16 id, u16 part, u16 arg2, const _mh_ivec2_* pos);
-void fn_802E23D0(u32 id, u32 part, s8* text, u8 flag, const _mh_ivec2_* pos);
+void draw_font_anim_idx(u32 id, u32 part, s8* text, u8 flag, const _mh_ivec2_* pos);
 u32 color_lerp(u32 value, u32 mask);
 void fn_802A9F48(u8 value, u16 kind, s8* text, const _mh_ivec2_* pos, s32 flag);
 u8 GameMode_ck(void);
-u16 fn_8004AE70(void* userdata);
-s32 fn_8004AF0C(u8 idx);
-void* fn_8004AF60(void* userdata, u8 idx);
+u16 userdata_box_capacity(void* userdata);
+s32 userdata_pouch_size(u8 idx);
+void* userdata_pouch_get(void* userdata, u8 idx);
 u32 item_count_find(u16 id, void* a, s32 b);
-u32 fn_8004B0A4(u16 id, void* userdata);
-u32 fn_8004B70C(u16 id, void* a, u16 b);
-u8 fn_8004E634(u8 a, u16 b);
+u32 userdata_item_count_total(u16 id, void* userdata);
+u32 item_slots_count_sum(u16 id, void* a, u16 b);
+u8 monster_size_crown_get(u8 a, u16 b);
 MenuRowData* fn_8004EA24(void);
 char* flfntStrChr(char* text, s32 c);   /* owner: `g3d/g3d_anmchr.cpp` */
-void fn_800CEE74(u8 a, u16 b, f32* out);
+void monster_size_value_get(u8 a, u16 b, f32* out);
 u32 fn_8026FE44(s32 worker);
 s32 Pl_item_timer_get(s32 worker, u16 id);
 void fn_802D9EA8(void);
@@ -120,7 +120,7 @@ void* get_userdata(void);
  * size: 0x3F06 (approximate: the highest offset this unit touches + 2) */
 typedef struct LbItemDb {
     /* +0x0000 */ u8 unused_0x0000[0x0180];
-    /* +0x0180 */ u8 field_0x0180;     /* the sub-block `fn_8004B70C` is handed */
+    /* +0x0180 */ u8 field_0x0180;     /* the sub-block `item_slots_count_sum` is handed */
     /* +0x0181 */ u8 unused_0x0181[0x3F04 - 0x0181];
     /* +0x3F04 */ u16 field_0x3F04;    /* the value the "%d" price line prints */
 } LbItemDb;

@@ -6,9 +6,10 @@
  * NAMES. The map and the dump give only placeholders (`LbPutAnaPageArrow__FUsUsssUsP10_mh_ivec2_bb` is the range's one
  *   real name), so the file keeps the map's stem.  Module `lobby`: `LbStr`, `draw_sprite_ary`, `get_lsp_data`,
  *   `GetMenuFontColor`, `put_menu_cursor`, and the `.bss` it reads (`lobby_w`, `lb_npc`).
+ *   GUESS: `lb_item_cell_draw_wide`, `lb_item_cell_draw`, `lb_panel_close`, `lb_panel_msg_draw`
  * RESIDUALS. 68 rows unwritten: 0x80212B1C-0x80214EF0, 0x80214F30-0x80215A74, 0x80215AE4-0x80215E6C,
  *   0x80215E84-0x802164F0, 0x8021677C-0x80216A08, 0x80216A68-0x80217934, 0x802179D4-0x80217B04, 0x80217C68-0x80217DA0,
- *   0x80217DD8-0x80217F4C, 0x80217FA0-0x802180D8, 0x80218138-0x80219080.  `fn_80214948` among them: `unsplit/lobby.h`
+ *   0x80217DD8-0x80217F4C, 0x80217FA0-0x802180D8, 0x80218138-0x80219080.  `lb_choice_draw` among them: `unsplit/lobby.h`
  *   declares five parameters where retail reads a sixth (`clrlwi r8,r8,24`), so its real definition would clash.
  *  - `fn_802128A8`: retail zero-extends `kind` (`clrlwi r3,r3,24`) before the switch; a `u8` parameter drops the mask,
  *    `s32` + `switch ((u8)kind)` gives a signed tree, `kind = (u8)kind` moves the copy to r31; the `u8` form is kept;
@@ -282,12 +283,12 @@ void* fn_80215E6C(u8 id)
 }
 
 /* The page drawers, one per table kind. */
-void fn_802164F0(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
+void lb_item_cell_draw_wide(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
     fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 7);
 }
 
-void fn_80216528(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
+void lb_item_cell_draw(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g)
 {
     fn_80215F8C((u16)a, b, c, d, e, f, 0, (u16)g, 0);
 }
@@ -353,7 +354,7 @@ void fn_80216A38(s32 a, s32 b, s32 c, s32 d, s32 e, s32 f, s32 g, s32 h)
 s32 fn_802178B8(s32 on);
 s32 fn_80217B04(u8 a, u16 b);
 
-s32 fn_80217934(void)
+s32 lb_panel_close(void)
 {
     return fn_802178B8(0);
 }
@@ -385,7 +386,7 @@ s32 fn_80217988(s32 a, s32 b, s32 bits)
 
 s32 fn_80214F30(u16 a, void* str);
 
-s32 fn_80214EF0(s32 a, s16 b)
+s32 lb_panel_msg_draw(s32 a, s16 b)
 {
     return fn_80214F30((u16)a, LbStr(3, (u16)b));
 }

@@ -28,7 +28,8 @@ typedef struct LbLobbyWork {
         u8 field_0x003;   /* the NPC band resets it to 0xFF */
     };
     /* +0x006 */ u8 field_0x006;
-    /* +0x007 */ u8 unused_0x007[0x02];
+    /* +0x007 */ u8 unused_0x007;
+    /* +0x008 */ u8 active_0x008;   /* 1 while a lobby screen (kitchen, trade, board) is open */
     /* +0x009 */ u8 community_flag_0x009;   /* cleared when community command 12 succeeds (GUESS name) */
     /* +0x00A */ u8 unused_0x00A[0x02];
     /* +0x00C */ u32 slots_0x00C[2];
@@ -50,7 +51,9 @@ typedef struct LbLobbyWork {
     };
     /* +0x050 */ u8 unused_0x050[0x2];
     /* +0x052 */ u8 page_0x052;
-    /* +0x053 */ u8 unused_0x053[0x23];
+    /* +0x053 */ u8 unused_0x053;
+    /* +0x054 */ u8 kitchen_busy_0x054;   /* set while the kitchen serves a meal */
+    /* +0x055 */ u8 unused_0x055[0x21];
     /* +0x076 */ u8 field_0x076;
     /* +0x077 */ u8 field_0x077;
     /* +0x078 */ u8 unused_0x078[0x1];
@@ -91,7 +94,12 @@ typedef struct LbLobbyWork {
     /* +0x12D */ u8 param_0x12D;
     /* +0x12E */ u8 unused_0x12E[0x1];
     /* +0x12F */ u8 param_0x12F;
-    /* +0x130 */ u8 unused_0x130[0x2C];
+    /* +0x130 */ u8 unused_0x130[0x19];
+    /* +0x149 */ u8 meal_area_0x149;      /* the online meal's area code (the cook's +0xB6 byte / 4) */
+    /* +0x14A */ u8 meal_received_0x14A;  /* nonzero once the host's meal has arrived */
+    /* +0x14B */ u8 meal_skill_0x14B[3];  /* the received meal's skill ids */
+    /* +0x14E */ s16 meal_value_0x14E[3]; /* their values */
+    /* +0x154 */ u16 meal_bonus_0x154[4]; /* the received meal's bonuses */
     /* +0x15C */ u8 field_0x15C;
     /* +0x15D */ u8 field_0x15D;
     /* +0x15E */ u8 field_0x15E;

@@ -26,9 +26,9 @@
  *   link input.
  * SHAPES. The `MenuRowData` record declares `kind` `s32`: retail's `switch (data->kind)` is a signed binary search; `u32`
  *   gives an unsigned linear chain.
- *  - `item_page_item_price`, `fn_8004B0A4`, `item_count_find`, `fn_8004B70C` and `fn_8026FE44` are `u32` in this unit's
+ *  - `item_page_item_price`, `userdata_item_count_total`, `item_count_find`, `item_slots_count_sum` and `fn_8026FE44` are `u32` in this unit's
  *    view (retail masks none of those results), and the price is two statements (`base = Pl_item_timer_get(worker, id);
- *    base += fn_8004B70C(...);`) so the worker call comes first.
+ *    base += item_slots_count_sum(...);`) so the worker call comes first.
  */
 
 #include "types.h"
@@ -341,14 +341,14 @@ extern "C" u32 item_page_item_price(MenuSlot* slot, u16 id)
     s32 base;
 
     if (GameMode_ck() == 2) {
-        return fn_8004B0A4(id, (void*)lobby_world_block);
+        return userdata_item_count_total(id, (void*)lobby_world_block);
     }
     base = Pl_item_timer_get(worker, id);
-    base += fn_8004B70C(id, (void*)&lobby_world_block->field_0x0180, fn_8004AE70((void*)lobby_world_block));
+    base += item_slots_count_sum(id, (void*)&lobby_world_block->field_0x0180, userdata_box_capacity((void*)lobby_world_block));
     if (fn_8026FE44(worker) == 1) {
-        return base + item_count_find(id, fn_8004AF60((void*)lobby_world_block, 0), fn_8004AF0C(0));
+        return base + item_count_find(id, userdata_pouch_get((void*)lobby_world_block, 0), userdata_pouch_size(0));
     }
-    return base + item_count_find(id, fn_8004AF60((void*)lobby_world_block, 1), fn_8004AF0C(1));
+    return base + item_count_find(id, userdata_pouch_get((void*)lobby_world_block, 1), userdata_pouch_size(1));
 }
 
 /* 0x8034A914: the page-0 detail panel - the panel frame, then the row record's own fields rendered
@@ -370,65 +370,65 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
         switch (data->kind) {
         case 1:
         case 2:
-            fn_802E23D0(0x4EA, id, (s8*)ItemName(data->item_id), 4, &pos);
-            fn_802E23D0(0x4FC, id, (s8*)GetEquipName((u8)data->equip_kind, data->equip_id), 0, &pos);
+            draw_font_anim_idx(0x4EA, id, (s8*)ItemName(data->item_id), 4, &pos);
+            draw_font_anim_idx(0x4FC, id, (s8*)GetEquipName((u8)data->equip_kind, data->equip_id), 0, &pos);
             sprintf(text, "%d", data->field_0x0A);
-            fn_802E23D0(0x4F7, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F7, id, text, 2, &pos);
             sprintf(text, "%d", item_page_item_price(slot, data->item_id));
-            fn_802E23D0(0x4F8, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F8, id, text, 2, &pos);
             sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
             font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->item_id));
             break;
         case 3:
-            fn_802E23D0(0x4EA, id, (s8*)ItemName(data->equip_id), 4, &pos);
-            fn_802E23D0(0x4FC, id, (s8*)ItemName(data->equip_kind), 0, &pos);
+            draw_font_anim_idx(0x4EA, id, (s8*)ItemName(data->equip_id), 4, &pos);
+            draw_font_anim_idx(0x4FC, id, (s8*)ItemName(data->equip_kind), 0, &pos);
             sprintf(text, "%d", data->item_id);
-            fn_802E23D0(0x4F7, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F7, id, text, 2, &pos);
             sprintf(text, "%d", item_page_item_price(slot, data->equip_id));
-            fn_802E23D0(0x4F8, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F8, id, text, 2, &pos);
             sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
             font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->equip_id));
             break;
         case 4:
-            fn_802E23D0(0x4EA, id, (s8*)ItemName(data->equip_id), 4, &pos);
-            fn_802E23D0(0x4FC, id, (s8*)((u8**)get_str_tbl(0x44))[5], 0, &pos);
+            draw_font_anim_idx(0x4EA, id, (s8*)ItemName(data->equip_id), 4, &pos);
+            draw_font_anim_idx(0x4FC, id, (s8*)((u8**)get_str_tbl(0x44))[5], 0, &pos);
             sprintf(text, "%d", data->item_id);
-            fn_802E23D0(0x4F7, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F7, id, text, 2, &pos);
             sprintf(text, "%d", item_page_item_price(slot, data->equip_id));
-            fn_802E23D0(0x4F8, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F8, id, text, 2, &pos);
             sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
             font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->equip_id));
             break;
         case 5:
-            fn_802E23D0(0x4EA, id, (s8*)((u8**)get_str_tbl(0x44))[3], 4, &pos);
-            fn_802E23D0(0x4FC, id, (s8*)((u8**)get_str_tbl(0x44))[5], 0, &pos);
+            draw_font_anim_idx(0x4EA, id, (s8*)((u8**)get_str_tbl(0x44))[3], 4, &pos);
+            draw_font_anim_idx(0x4FC, id, (s8*)((u8**)get_str_tbl(0x44))[5], 0, &pos);
             sprintf(text, "%d", data->item_id);
-            fn_802E23D0(0x4F7, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F7, id, text, 2, &pos);
             sprintf(text, "%d", lobby_world_block->field_0x3F04);
-            fn_802E23D0(0x4F8, id, text, 2, &pos);
-            fn_802E23D0(0x4F0, id, (s8*)((u8**)get_str_tbl(0x44))[7], 0, &pos);
+            draw_font_anim_idx(0x4F8, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F0, id, (s8*)((u8**)get_str_tbl(0x44))[7], 0, &pos);
             break;
         case 6:
-            fn_802E23D0(0x4EA, id, (s8*)ItemName(data->field_0x0A), 4, &pos);
-            fn_802E23D0(0x4FC, id, (s8*)((u8**)get_str_tbl(0x44))[6], 0, &pos);
+            draw_font_anim_idx(0x4EA, id, (s8*)ItemName(data->field_0x0A), 4, &pos);
+            draw_font_anim_idx(0x4FC, id, (s8*)((u8**)get_str_tbl(0x44))[6], 0, &pos);
             sprintf(text, "%d", data->field_0x0C);
-            fn_802E23D0(0x4F7, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F7, id, text, 2, &pos);
             sprintf(text, "%d", item_page_item_price(slot, data->field_0x0A));
-            fn_802E23D0(0x4F8, id, text, 2, &pos);
+            draw_font_anim_idx(0x4F8, id, text, 2, &pos);
             sprite_frame_apply((_SPR_DATA_*)&spr, 0x4F0, id, NULL);
             font_set_size(spr.width, spr.height);
             flfntSetColor(spr.colour_0x1C);
             font_print_ex(pos.x + spr.pos.x, pos.y + spr.pos.y, -1, "%s", ItemExp(data->field_0x0A));
             break;
         default:
-            fn_802E23D0(0x4EA, id, (s8*)((u8**)get_str_tbl(0x44))[1], 4, &pos);
-            fn_802E23D0(0x4FC, id, (s8*)((u8**)get_str_tbl(0x44))[1], 0, &pos);
+            draw_font_anim_idx(0x4EA, id, (s8*)((u8**)get_str_tbl(0x44))[1], 4, &pos);
+            draw_font_anim_idx(0x4FC, id, (s8*)((u8**)get_str_tbl(0x44))[1], 0, &pos);
             break;
         }
         font_flush();
@@ -508,7 +508,7 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
     if (slot->field_0x002 != 0 || slot->field_0x23B != 0) {
         id = slot->field_0x23B;
         entry = &slot->entries_b[slot->scroll.row];
-        data = &((MenuRowRec*)fn_8029F808())[entry->field_0x06];
+        data = &((MenuRowRec*)menu_row_table_get())[entry->field_0x06];
         sprite_frame_apply((_SPR_DATA_*)&spr, 0x46C, id, &pos);
         draw_sprite_anim_ary((const u16*)get_menu_lsp_tbl(0x54), id, &pos);
         if (entry->selected != 0) {
@@ -518,12 +518,12 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
             u16* user = (u16*)get_userdata();
             u16 id_a = user[data->kind * 2 + 0x1DE1];
             u16 id_b = user[data->kind * 2 + 0x1DE0];
-            fn_800CEE74(data->kind, id_a, &value_a);
-            fn_800CEE74(data->kind, id_b, &value_b);
-            u8 res_a = fn_8004E634(data->kind, id_a);
-            u8 res_b = fn_8004E634(data->kind, id_b);
-            fn_802E23D0(0x493, id, (s8*)entry->field_0x08, 4, &pos);
-            fn_802E23D0(0x4A9, id, fn_802DFB18(data->field_0x02), 0, &pos);
+            monster_size_value_get(data->kind, id_a, &value_a);
+            monster_size_value_get(data->kind, id_b, &value_b);
+            u8 res_a = monster_size_crown_get(data->kind, id_a);
+            u8 res_b = monster_size_crown_get(data->kind, id_b);
+            draw_font_anim_idx(0x493, id, (s8*)entry->field_0x08, 4, &pos);
+            draw_font_anim_idx(0x4A9, id, fn_802DFB18(data->field_0x02), 0, &pos);
             fn_802E1A7C(0x48E, data->kind, id, &pos);
             item_page_draw_wrapped_text(0x483, id, (s8*)fn_8029F7E0(0, entry->field_0x06), &pos);
             switch (data->mode) {
@@ -535,12 +535,12 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
                     limit_b = 0x3E7;
                 }
                 sprintf(text, "%d", limit_a);
-                fn_802E23D0(0x4AA, id, text, 0, &pos);
+                draw_font_anim_idx(0x4AA, id, text, 0, &pos);
                 sprintf(text, "%d", limit_b);
-                fn_802E23D0(0x4AC, id, text, 0, &pos);
+                draw_font_anim_idx(0x4AC, id, text, 0, &pos);
                 if (id_a != 0) {
                     sprintf(text, "%6.1f", value_a);
-                    fn_802E23D0(0x4AE, id, text, 2, &pos);
+                    draw_font_anim_idx(0x4AE, id, text, 2, &pos);
                     if ((u8)(res_a + 0xFF) <= 1) {
                         sprite_frame_apply((_SPR_DATA_*)&bar, 0x4A6, id, NULL);
                         if (res_a == 2) {
@@ -550,22 +550,22 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
                         draw_sprite(*(_SPR_DATA_*)&bar, &pos);
                     }
                 } else {
-                    fn_802E23D0(0x4AE, id, (s8*)((u8**)get_str_tbl(0x44))[2], 2, &pos);
+                    draw_font_anim_idx(0x4AE, id, (s8*)((u8**)get_str_tbl(0x44))[2], 2, &pos);
                 }
                 if (id_b != 0) {
                     sprintf(text, "%6.1f", value_b);
-                    fn_802E23D0(0x4AF, id, text, 2, &pos);
+                    draw_font_anim_idx(0x4AF, id, text, 2, &pos);
                     if (res_b == 3) {
                         draw_sprite_anim_idx(0x4A7, id, &pos);
                     }
                 } else {
-                    fn_802E23D0(0x4AF, id, (s8*)((u8**)get_str_tbl(0x44))[2], 2, &pos);
+                    draw_font_anim_idx(0x4AF, id, (s8*)((u8**)get_str_tbl(0x44))[2], 2, &pos);
                 }
                 /* fallthrough */
             case 0:
             case 2:
                 sprintf(text, "%d", limit_a);
-                fn_802E23D0(0x4AA, id, text, 0, &pos);
+                draw_font_anim_idx(0x4AA, id, text, 0, &pos);
                 if (data->field_0x03 != 0) {
                     sprite_frame_apply((_SPR_DATA_*)&bar, 0x49F, id, NULL);
                     for (i = 0; i < data->field_0x03; i++) {
@@ -580,10 +580,10 @@ extern "C" void item_page_draw_detail1(MenuSlot* slot)
         } else {
             draw_sprite_anim_ary((const u16*)*get_menu_lsp_tbl(0x55), id, &pos);
             u8** blank = get_str_tbl(0x44);
-            fn_802E23D0(0x493, id, (s8*)blank[1], 4, &pos);
-            fn_802E23D0(0x4A9, id, (s8*)blank[1], 0, &pos);
-            fn_802E23D0(0x4AA, id, (s8*)blank[1], 0, &pos);
-            fn_802E23D0(0x4A8, id, (s8*)blank[1], 0, &pos);
+            draw_font_anim_idx(0x493, id, (s8*)blank[1], 4, &pos);
+            draw_font_anim_idx(0x4A9, id, (s8*)blank[1], 0, &pos);
+            draw_font_anim_idx(0x4AA, id, (s8*)blank[1], 0, &pos);
+            draw_font_anim_idx(0x4A8, id, (s8*)blank[1], 0, &pos);
         }
     }
     font_flush();
@@ -619,13 +619,13 @@ extern "C" void item_page_draw_detail2(MenuSlot* slot)
             if (item != NULL) {
                 sprite_frame_apply((_SPR_DATA_*)&spr, 0x4C4, id, NULL);
                 draw_itemicon_item_id(*(_SPR_DATA_*)&spr, item->id, &pos);
-                fn_802E23D0(0x4C8, id, (s8*)ItemName(item->id), 4, &pos);
-                fn_802E23D0(0x4C9, id, (s8*)ItemName(item_a), 0, &pos);
-                fn_802E23D0(0x4CA, id, (s8*)ItemName(item_b), 0, &pos);
+                draw_font_anim_idx(0x4C8, id, (s8*)ItemName(item->id), 4, &pos);
+                draw_font_anim_idx(0x4C9, id, (s8*)ItemName(item_a), 0, &pos);
+                draw_font_anim_idx(0x4CA, id, (s8*)ItemName(item_b), 0, &pos);
                 sprintf(text, "%d%", (s8)fn_8033AED0(item, 3));
-                fn_802E23D0(0x4D4, id, text, 1, &pos);
+                draw_font_anim_idx(0x4D4, id, text, 1, &pos);
                 fn_8033B67C(text, item);
-                fn_802E23D0(0x4D5, id, text, 1, &pos);
+                draw_font_anim_idx(0x4D5, id, text, 1, &pos);
                 sprite_frame_apply((_SPR_DATA_*)&spr, 0x4D7, id, NULL);
                 font_set_size(spr.width, spr.height);
                 flfntSetColor(spr.colour_0x1C);
@@ -634,9 +634,9 @@ extern "C" void item_page_draw_detail2(MenuSlot* slot)
             }
         } else {
             u8** blank = get_str_tbl(0x44);
-            fn_802E23D0(0x4C8, id, (s8*)blank[1], 4, &pos);
-            fn_802E23D0(0x4C9, id, (s8*)blank[1], 0, &pos);
-            fn_802E23D0(0x4CA, id, (s8*)blank[1], 0, &pos);
+            draw_font_anim_idx(0x4C8, id, (s8*)blank[1], 4, &pos);
+            draw_font_anim_idx(0x4C9, id, (s8*)blank[1], 0, &pos);
+            draw_font_anim_idx(0x4CA, id, (s8*)blank[1], 0, &pos);
         }
     }
     font_flush();

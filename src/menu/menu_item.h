@@ -251,7 +251,7 @@ struct MenuFrameWork {
  * so the accessors take their addresses instead of defining them. */
 extern HitRegistry lbl_806AC8A8;
 extern ItemDataHead lbl_806AC8B8;
-extern MenuWork lbl_806AC8C8;
+extern MenuWork menu_work;
 extern MenuTables lbl_806ACF28;
 extern u32 lbl_805CDE78[];              /* .data:0x805CDE78 - 0x30 B, indexed by `ItemDataRecord::kind` */
 extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
@@ -315,7 +315,7 @@ u32 fn_8029F774(u16 id);
 u32 fn_8029F788(u16 kind);
 u32 fn_8029F7C4(u16 idx);
 u32 fn_8029F7E0(u16 idx, u16 sub);
-u32 fn_8029F808(void);
+u32 menu_row_table_get(void);
 u32 fn_8029F818(u16 idx);
 void fn_8029FCFC(void);
 void fn_8029FFB8(MenuSlot* slot, s32 index);

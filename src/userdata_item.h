@@ -8,6 +8,8 @@
 
 struct NetUserProfile;   /* Network/net_session_close.h */
 struct _EQUIP;           /* the 12-byte equipment record - Pl/plw.h */
+struct Q_UserData;       /* the 0x6000-byte save block - quest/quest_types.h */
+struct IdValue;          /* the (id, value) pair - id_value.h */
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,9 +38,21 @@ s32 fillNetUserProfileRange7C(struct NetUserProfile* profile);
 s32 fillNetUserProfileRank(struct NetUserProfile* profile);
 s32 fillNetUserProfileRecord(struct NetUserProfile* profile);
 
+/* 0x8004C004 - how many of the `count` pairs at `table` are empty (id 0).  GUESS name. */
+u32 item_slots_free_count(const struct IdValue* table, s32 count);
+/* 0x8004C29C - how many of the save's equipment box records (`userdata_box_capacity` of them) are empty.
+ * GUESS name. */
+u16 userdata_equip_box_free_count(void);
+/* 0x8004C514 / 0x8004C5BC - files a new equipment record of `kind`/`item_id` (a copy of `equip`) into the
+ * first empty slot of the save's equipment box; the slot index, or 0xFFFF when the box is full.  GUESS names. */
+u16 userdata_equip_box_add_new(struct Q_UserData* user, u8 kind, u16 item_id);
+u16 userdata_equip_box_add(struct Q_UserData* user, const struct _EQUIP* equip);
 /* 0x8004BA3C - adds `count` of item `id` to an `{id, value}` table of `n` slots, capping each at `max`; returns 3 when
  * the table could not take all of it (the callers' reading). */
 s16 item_take(u16 id, s16 count, struct IdValue* table, s32 n, s32 flag, s32 max);
+
+/* 0x8004B0A4 - how many of item `id` the user holds in the pouch, the box and the stock, capped at 999.  GUESS. */
+s32 userdata_item_count_total(u16 id, u8* userdata);
 
 #ifdef __cplusplus
 }

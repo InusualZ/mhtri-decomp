@@ -15,6 +15,7 @@
  *   flipcheck: `.sbss` claimed, not emitted.
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: `.sdata2` claimed, not emitted.
+ * NAMES. GUESS: `mhchar_joint_mtx_get`, `mhchar_node_count`
  */
 
 #include "types.h"
@@ -92,7 +93,7 @@ void MHchar::setScaleAll(f32 scale)
 }
 
 /* Place `dst` at the joint whose index the +0x114 list resolves, scaled by 48 bytes per entry. */
-extern "C" void fn_800E0A14(MHchar* self, void* arg, void* dst)
+extern "C" void mhchar_joint_mtx_get(MHchar* self, void* arg, void* dst)
 {
     if (self->field_0x118 == 0) {
         return;
@@ -242,7 +243,7 @@ extern "C" u32 fn_800E3150(MHchar* self)
 }
 
 /* `get_joint_num` for the bare-stem caller. */
-extern "C" int fn_800E31E8(MHchar* self)
+extern "C" int mhchar_node_count(MHchar* self)
 {
     return reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResNodeNumEntries();
 }

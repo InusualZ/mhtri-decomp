@@ -1135,7 +1135,9 @@ struct _PLW {
         s16 field_0x664_s;   /* the signed view `Pl/pl_act.cpp` tests against 0 */
     };
     /* +0x666 */ u16 field_0x666;
-    /* +0x668 */ u8 pad_0x668[0x48C];
+    /* +0x668 */ u8 talk_wait_0x668;    /* re-armed to 5 each frame a lobby NPC talk runs; 0 ends the talk */
+    /* +0x669 */ u8 talk_left_0x669;    /* the talks the NPC still has (3 once the progress flag is set) */
+    /* +0x66A */ u8 pad_0x66A[0x48A];
     /* +0xAF4 */ struct _se_w* field_0xAF4;
     /* +0xAF8 */ struct _se_w* field_0xAF8;
     /* +0xAFC */ struct _se_w* field_0xAFC;

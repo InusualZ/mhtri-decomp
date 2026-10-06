@@ -136,6 +136,11 @@ void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c);
  * (`pl_act_enter`/`fn_80275ADC` emit `clrlwi r6,r6,16`). */
 void pl_act_enter_raw(struct _PLW* self, u8 kind, u16 no, u16 mask);
 
+/* 0x8027FAC4 - clears `out` and builds the equipment record item `item_id` stands for (the five equipment-ticket
+ * ids 110/111/440/441/442 pick their builders).  GUESS name; added with `menu/menu_result.cpp` (rule 2). */
+struct _EQUIP;
+void equip_from_item_id(u16 item_id, struct _EQUIP* out);
+
 #ifdef __cplusplus
 }
 #endif

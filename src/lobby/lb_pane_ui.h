@@ -22,7 +22,7 @@ typedef struct _mh_ivec2_ {
 #endif
 #include "hud/spr_data.h"
 #include "lobby/lobby_w.h"       /* `LbLobbyWork` / `lobby_w`, owned by lobby/lb_menu_pos_tbl.cpp (rule 2) */
-#include "lobby/fn_802121F4.h"    /* the command-mask accessors of lobby/lb_npc.cpp, in this unit's view (rule 2) */
+#include "lobby/lb_cmd_repeat_ck.h"    /* the command-mask accessors of lobby/lb_npc.cpp, in this unit's view (rule 2) */
 #include "lobby/lb_equip_page.h"  /* fn_80223258, owned by lobby/lb_equip_page.cpp (rule 2) */
 #include "Pl/pl_act.h"            /* fn_802738E8 / fn_80273998 / fn_802738B8, owned by Pl/pl_act.cpp (rule 2) */
 
@@ -139,7 +139,7 @@ extern u16 lbl_805B8914[];         /* .data 0x805B8914 */
 u32 fn_801EC9E0(LbPage* page);
 void fn_801EC828(LbPageOwner* owner);
 void fn_801EC7AC(LbPageOwner* owner);
-u32 fn_8004D70C(s32 id);
+u32 userdata_flag_ck(s32 id);
 void fn_802DB140(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
 void sprite_frame_apply(_SPR_DATA_* spr, u32 id, u8 flag, s32 arg);
 void equip_record_copy(LbIconRec* dst, const LbIconRec* src);

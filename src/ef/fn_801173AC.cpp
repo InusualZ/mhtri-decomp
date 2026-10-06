@@ -84,7 +84,7 @@ void fn_80117DA4(_EFT* self);
 /* eft_res_model_get comes from the owner's header `ef/eft_res.h` (rule 2): this unit's local
  * `void*` copy collided with the owner's `u8*` definition once the header declared it. */
 s32 eft_res_spawn_gate_ck(_EFT* self, u32 flag);
-void fn_800E0A14(void* mhchar, u32 joint, Mtx34* out);
+void mhchar_joint_mtx_get(void* mhchar, u32 joint, Mtx34* out);
 u32 event_demo_ck(void);
 
 extern u16 lbl_80791938[];
@@ -270,7 +270,7 @@ extern "C" void fn_80117894(_EFT* self)
             self->state_0x05 = 3;
             return;
         }
-        fn_800E0A14(&((_EFT25_PHYSICS*)actor->physics_0x13C)->chr_0x04, 0xb, &mtx);
+        mhchar_joint_mtx_get(&((_EFT25_PHYSICS*)actor->physics_0x13C)->chr_0x04, 0xb, &mtx);
         setVector3(&vec, lbl_80796AB0, lbl_80796AB4, lbl_80796AB8);
         mulVecMat(&vec, &mtx);
         self->pos_0x18.x = mtx.m[0][3] + vec.x;
@@ -321,7 +321,7 @@ extern "C" void fn_80117A1C(_EFT* self)
 
     switch (self->type_0x02) {
     case 0:
-        fn_800E0A14(&((_EFT25_PHYSICS*)((_PLW*)self->source_0x30)->physics_0x13C)->chr_0x04, 0xb, &mtxA);
+        mhchar_joint_mtx_get(&((_EFT25_PHYSICS*)((_PLW*)self->source_0x30)->physics_0x13C)->chr_0x04, 0xb, &mtxA);
         setVector3(&vec, lbl_80796AB0, lbl_80796AB4, lbl_80796AB8);
         mulVecMat(&vec, &mtxA);
         self->pos_0x18.x = mtxA.m[0][3] + vec.x;
@@ -342,7 +342,7 @@ extern "C" void fn_80117A1C(_EFT* self)
             return;
         }
         self->field_0x10 = actor->angle_0x58 + 0x4000;
-        fn_800E0A14(&actor->physics_0x13C->chr_0x04, 0xb, &mtxA);
+        mhchar_joint_mtx_get(&actor->physics_0x13C->chr_0x04, 0xb, &mtxA);
         setVector3(&vec, lbl_80796AB0, lbl_80796AB4, lbl_80796AB8);
         mulVecMat(&vec, &mtxA);
         mtx34_identity(&mtxB);
@@ -359,7 +359,7 @@ extern "C" void fn_80117A1C(_EFT* self)
         break;
     }
     case 3:
-        fn_800E0A14(&((_EFT25_CHARA_SRC*)self->source_0x30)->chr_0x08, 0x10, &mtxA);
+        mhchar_joint_mtx_get(&((_EFT25_CHARA_SRC*)self->source_0x30)->chr_0x08, 0x10, &mtxA);
         setVector3(&vec, lbl_80796AB4, lbl_80796AB8, lbl_80796ABC);
         mulVecMat(&vec, &mtxA);
         self->pos_0x18.x = mtxA.m[0][3] + vec.x;

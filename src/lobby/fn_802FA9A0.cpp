@@ -7,6 +7,7 @@
  * NAMES. The map and the dump give only placeholders (`LbCheckKujiraEvent__Fv` at 0x802FB9DC is the one real name), so
  *   the file keeps the map's stem.  Module `lobby`: the predicates read `lobby_w` +0x003/+0x15F/+0x161 and
  *   `lobby_world_block`, and the callees are the lobby UI API plus the `ef`/`enemy` helpers the screens drive.
+ *   GUESS: `lb_unlock_cond_ck`, `kujira_event_over_ck`
  * RESIDUALS. 93 rows unwritten: 0x802FA9A0-0x802FB3B0, 0x802FB600-0x802FB8C4, 0x802FBA14-0x802FBA60,
  *   0x802FBA94-0x802FBE40, 0x802FBE60-0x802FDB90, 0x802FDBA4-0x802FDF9C, 0x802FDFB0-0x802FEE4C, 0x802FEE54-0x802FF0A4,
  *   0x802FF0A8-0x802FF234, 0x802FF2C0-0x802FF478, 0x802FF4AC-0x802FF90C, 0x802FF928-0x8030121C.
@@ -40,7 +41,7 @@ u32 fn_802FB3B0(u32 raw) {
         return 0;
     }
     while (*entry != 0xFFFF) {
-        if (fn_8004D27C(*entry) == 0) {
+        if (userdata_progress_flag_ck(*entry) == 0) {
             return 0;
         }
         entry++;
@@ -62,7 +63,7 @@ u32 fn_802FB434(u32 raw) {
         return 0;
     }
     while (*entry != 0xFFFF) {
-        if (fn_8004D27C(*entry) == 0) {
+        if (userdata_progress_flag_ck(*entry) == 0) {
             return 0;
         }
         entry++;
@@ -72,7 +73,7 @@ u32 fn_802FB434(u32 raw) {
 
 /* Dispatches an id to the table that covers it: 0xFFFF (the empty id) and id 0 answer directly, ids
  * 28 and above go to the second table, the rest to the first. */
-u32 fn_802FB4BC(u32 raw) {
+u32 lb_unlock_cond_ck(u32 raw) {
     u16 id = (u16)raw;
 
     if (id == 0xFFFF) {
@@ -90,13 +91,13 @@ u32 fn_802FB4BC(u32 raw) {
 /* Whether `id` and `id + 1` together form the run boundary the caller is looking for: `id` accepted
  * and the next id rejected. */
 u32 fn_802FB4F4(u32 id) {
-    if (fn_802FB4BC((u16)id) == 1 && fn_802FB4BC((u16)(id + 1)) == 0) {
+    if (lb_unlock_cond_ck((u16)id) == 1 && lb_unlock_cond_ck((u16)(id + 1)) == 0) {
         return 1;
     }
     return 0;
 }
 
-/* Returns the first id of the requested table that `fn_802FB4BC` accepts: ids 27 downwards for kind 0
+/* Returns the first id of the requested table that `lb_unlock_cond_ck` accepts: ids 27 downwards for kind 0
  * and 39 down to 28 for kind 1; any other kind answers 0. */
 u16 fn_802FB54C(u32 raw) {
     u16 id;
@@ -104,14 +105,14 @@ u16 fn_802FB54C(u32 raw) {
     switch ((u8)raw) {
     case 0:
         for (id = 27; id >= 0; id--) {
-            if (fn_802FB4BC(id) != 0) {
+            if (lb_unlock_cond_ck(id) != 0) {
                 return id;
             }
         }
         break;
     case 1:
         for (id = 39; id >= 28; id--) {
-            if (fn_802FB4BC(id) != 0) {
+            if (lb_unlock_cond_ck(id) != 0) {
                 return id;
             }
         }
@@ -134,7 +135,7 @@ u8 fn_802FB5F0(void) {
 
 /* Whether the lobby currently stands in id 5's area. */
 u8 fn_802FB8C4(void) {
-    return fn_802FB4BC(5);
+    return lb_unlock_cond_ck(5);
 }
 
 /* A per-kind state byte of the block `lobby_world_block` points at, +0x4654. */
@@ -144,7 +145,7 @@ u8 fn_802FB8EC(u32 raw) {
 
 /* Whether id 22 is accepted and the 0x58 event flag is up. */
 u32 fn_802FB900(void) {
-    if (fn_802FB4BC(22) == 1 && fn_8004D27C(0x58) == 1) {
+    if (lb_unlock_cond_ck(22) == 1 && userdata_progress_flag_ck(0x58) == 1) {
         return 1;
     }
     return 0;
@@ -152,7 +153,7 @@ u32 fn_802FB900(void) {
 
 /* Whether the 0xB8 event flag is up. */
 u8 fn_802FB948(void) {
-    return fn_8004D27C(0xB8) == 1;
+    return userdata_progress_flag_ck(0xB8) == 1;
 }
 
 /* The lobby's "new area reached" gate: id 0's boundary, or id 20's boundary with mode 4 selected. */
@@ -184,7 +185,7 @@ u32 fn_802FB9F8(void) {
 
 /* Whether id 5 is accepted. */
 u8 fn_802FBA60(void) {
-    return fn_802FB4BC(5) == 1;
+    return lb_unlock_cond_ck(5) == 1;
 }
 
 /* Forwards to the effect-model release helper. */
@@ -231,7 +232,7 @@ void fn_802FF0A4(void) {
 }
 
 /* Whether the whale-event work's countdown byte has gone negative. */
-u32 fn_802FF234(void) {
+u32 kujira_event_over_ck(void) {
     return lobby_world_block->work_0x4832.count_0x02 < 0;
 }
 

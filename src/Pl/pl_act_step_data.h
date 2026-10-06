@@ -7,9 +7,20 @@
 
 #include "types.h"
 
+/* One meal skill row of `meal_skill_tbl` (0x805BFFF8, 52 rows): two skills and their values, read by the lobby
+ * kitchen (`lobby/lb_quest_ui.cpp`). size: 0x8 */
+typedef struct MealSkill {
+    /* +0x0 */ u16 kind_a;
+    /* +0x2 */ s16 value_a;
+    /* +0x4 */ u16 kind_b;
+    /* +0x6 */ s16 value_b;
+} MealSkill;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+extern MealSkill meal_skill_tbl[52];
 
 extern u16 lbl_805C0198[];
 extern u16 lbl_805C01B8[];

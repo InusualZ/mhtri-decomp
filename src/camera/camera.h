@@ -52,12 +52,12 @@ void fn_802BE7E8(void* self, void* channel, u8 index);
  * `fn_802BE638`/`fn_802B8DF8` keep the call sites' spellings - neither body is written yet. */
 
 /* 0x802BBA64 - stores the argument in the camera work's +0x47E byte (1 while the sub-scene is up). */
-void fn_802BBA64(u8 value);
+void camera_talk_lock_set(u8 value);
 
 /* 0x802BBAC0 - the four-byte stub at 0x802BBAC0. */
 void fn_802BBAC0(void);
 
-/* 0x802BBAC4 - like `fn_802BBA64`, for the +0x47F byte. */
+/* 0x802BBAC4 - like `camera_talk_lock_set`, for the +0x47F byte. */
 void fn_802BBAC4(u8 value);
 
 /* 0x802B8DF8 - r3 the player work; `Pl/fn_802489D4.cpp`'s leaves call it. */

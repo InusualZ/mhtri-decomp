@@ -31,12 +31,12 @@ void fn_802190FC(void*, s32, s32, void*, void*);
 void fn_80219530(void*, void*);
 s32 fn_802754B4(void*);
 s32 fn_8027E354(u8, u16);
-s32 fn_802FB4BC(u16);
+s32 lb_unlock_cond_ck(u16);
 u32 fn_803768F8(void);
 u32 chk_pointer(void);
 void eft_res_slot_release(void* obj);
 void fn_8021AA78(void*, u32, void*, void*, void*);
-s32 fn_80217934(void);
+s32 lb_panel_close(void);
 }
 
 /* The two `.data` colour tables `fn_801E1A40` reads as flat byte runs (0x805B75E8 and 0x805B75F8 are
@@ -174,12 +174,12 @@ void fn_802190FC(void*, s32, s32, void*, void*);
 void fn_80219530(void*, void*);
 s32 fn_802754B4(void*);
 s32 fn_8027E354(u8, u16);
-s32 fn_802FB4BC(u16);
+s32 lb_unlock_cond_ck(u16);
 u32 fn_803768F8(void);
 u32 chk_pointer(void);
 void eft_res_slot_release(void* obj);
 void fn_8021AA78(void*, u32, void*, void*, void*);
-s32 fn_80217934(void);
+s32 lb_panel_close(void);
 }
 
 #pragma peephole off
@@ -313,7 +313,7 @@ s32 fn_801E6EA8(u16 idx, u8 kind)
 /* Forwards to the lobby item-table rebuild helper (a one-instruction tail call). */
 s32 fn_801E6DCC(void)
 {
-    return fn_80217934();
+    return lb_panel_close();
 }
 
 /* Returns the 8-byte table row for an id, or the null pointer. */
@@ -378,11 +378,11 @@ void fn_801E403C(LbEftWork* self, s16 value)
 s32 fn_801E40A4(LbEftWork* self)
 {
     if (game_ready_ck() == 0) {
-        if (fn_802FB4BC(self->id_0x002) == 0) {
+        if (lb_unlock_cond_ck(self->id_0x002) == 0) {
             return 0;
         }
     } else {
-        if (fn_802FB4BC(self->id_0x004) == 0) {
+        if (lb_unlock_cond_ck(self->id_0x004) == 0) {
             return 0;
         }
     }

@@ -109,9 +109,9 @@
  * `fn_802E2D84` calls `fn_802A2550` (`menu/menu_item.cpp`, 3 referrer lines); the two font-order
  * entries call `menu_text_center_x`/`menu_text_center_x_by_gaps`/`menu_text_block_center_x`
  * (`menu/menu_message.cpp`, already renamed there; 11 call sites) and
- * `fn_802E21C0` also `fn_8005C8F0` (`font/flfnt.cpp`, 4 call sites); `fn_802E23D0` calls
+ * `fn_802E21C0` also `fn_8005C8F0` (`font/flfnt.cpp`, 4 call sites); `draw_font_anim_idx` calls
  * `sprite_frame_apply` (this unit's own row, but 44 referrer lines across 8 files).  `fn_802E2440`,
- * `fn_802E2524`, `fn_802E4798`/`fn_802E4828`, the four 0x802E33B4-family layout entries and
+ * `fn_802E2524`, `draw_window_frame_style`/`fn_802E4828`, the four 0x802E33B4-family layout entries and
  * `fn_802E4850` are blocked on **data** (the `lbl_805D58xx`/`lbl_805D5Axx` tables and the `__FILE__`
  * and panic strings), i.e. on the `.data`/`.sdata` claim below.
  *
@@ -128,6 +128,7 @@
  * (the two 2^52 conversion doubles plus the `1.0f` `color_lerp` subtracts).  It grew by 4 B this run
  * because a new body cannot reference the `lbl_8079A8D8` word without a rule-7 finding of its own;
  * the pool claim stays blocked until every word of the 28-byte run is written, per the note above.
+ * NAMES. GUESS: `draw_itemicon_anim_idx`, `draw_equipicon_idx`, `draw_sprite_uv_color_idx`, `draw_sprite_uv_idx`
  */
 
 #include "types.h"
@@ -497,7 +498,7 @@ u32 fn_802E12A0(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 }
 
 /* 0x802E1320 (0x74) - the same keyed by the item record. */
-void fn_802E1320(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos)
+void draw_itemicon_anim_idx(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos)
 {
     ItemDataRecord* item = GetItemData(item_id);
 
@@ -526,7 +527,7 @@ void fn_802E1400(_SPR_DATA_* spr, _EQUIP* equip, const _mh_ivec2_* pos, u8 rare)
 }
 
 /* 0x802E14CC (0x4C) - the equipment icon for a sprite id. */
-void fn_802E14CC(u16 id, _EQUIP* equip, const _mh_ivec2_* pos)
+void draw_equipicon_idx(u16 id, _EQUIP* equip, const _mh_ivec2_* pos)
 {
     draw_equipicon(*get_lsp_data(id, 0), equip, pos);
 }
@@ -544,7 +545,7 @@ void draw_weaponicon_idx(u16 id, u8 kind, u32 color, const _mh_ivec2_* pos)
 }
 
 /* 0x802E1588 (0xB4) - the copy with texture `tex_idx` of the *colour* uv table and a colour word. */
-void fn_802E1588(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
+void draw_sprite_uv_color_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work = *get_lsp_data(id, 0);
 
@@ -554,7 +555,7 @@ void fn_802E1588(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 }
 
 /* 0x802E163C (0xA4) - the same without the colour override. */
-void fn_802E163C(u16 id, u8 tex_idx, const _mh_ivec2_* pos)
+void draw_sprite_uv_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work = *get_lsp_data(id, 0);
 

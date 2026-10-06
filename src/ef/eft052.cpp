@@ -332,13 +332,13 @@ extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
 {
     u32 a = fn_8004AF20(lobby_world_block);
     u32 b = item_count_find(id, userdata_equip_item_slots_get(lobby_world_block), a);
-    u32 c = fn_8004B70C(id, &lobby_world_block->field_0x0180, fn_8004AE70(lobby_world_block));
+    u32 c = item_slots_count_sum(id, &lobby_world_block->field_0x0180, userdata_box_capacity(lobby_world_block));
     u32 d;
 
     if (userdata_gunner_ck(lobby_world_block) == 1)
-        d = item_count_find(id, fn_8004AF60(lobby_world_block, 0), fn_8004AF0C(0));
+        d = item_count_find(id, userdata_pouch_get(lobby_world_block, 0), userdata_pouch_size(0));
     else
-        d = item_count_find(id, fn_8004AF60(lobby_world_block, 1), fn_8004AF0C(1));
+        d = item_count_find(id, userdata_pouch_get(lobby_world_block, 1), userdata_pouch_size(1));
     if (out1 != NULL)
         *out1 = b;
     if (out2 != NULL)
@@ -365,14 +365,14 @@ extern "C" void eft052_page_take(u16 id, s16 count, u8 flag)
     avail = eft052_page_count_ck(id, 0);
     if (avail > 0) {
         if (avail < count) {
-            fn_8004BCBC(lobby_world_block, id, avail, 1);
+            userdata_item_give(lobby_world_block, id, avail, 1);
         } else {
-            fn_8004BCBC(lobby_world_block, id, count, 1);
+            userdata_item_give(lobby_world_block, id, count, 1);
             return;
         }
     }
     if (flag == 1 && count != 0)
-        fn_8004BEA4(id, count, sp8);
+        item_box_store(id, count, sp8);
 }
 
 /* 0x8035921C (0xB8): Moves `count` of an item from the caller's hand into the page. */
@@ -385,14 +385,14 @@ extern "C" void eft052_page_put(u16 id, s16 count, u8 flag)
     avail = eft052_page_count_ck(id, 1);
     if (avail > 0) {
         if (avail >= left) {
-            fn_8004BEA4(id, left, sp8);
+            item_box_store(id, left, sp8);
             return;
         }
-        fn_8004BEA4(id, avail, sp8);
+        item_box_store(id, avail, sp8);
         left -= avail;
     }
     if (flag == 1 && left != 0)
-        fn_8004BCBC(lobby_world_block, id, left, 1);
+        userdata_item_give(lobby_world_block, id, left, 1);
 }
 
 /* 0x803592D4 (0x60): Returns one of the item page's two counts for an id, from the cabinet or the hand. */
@@ -400,7 +400,7 @@ extern "C" s16 eft052_page_count_ck(u16 id, u8 use_rows)
 {
     if (use_rows == 0)
         return fn_8004B624(lobby_world_block, id);
-    return fn_8004B7B0(id, &lobby_world_block->field_0x0180, fn_8004AE70(lobby_world_block));
+    return item_slots_room_get(id, &lobby_world_block->field_0x0180, userdata_box_capacity(lobby_world_block));
 }
 
 /* 0x803594C8 (0x68): Re-points the hold block at its clamped cursor row and clears its dirty byte. */

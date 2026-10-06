@@ -18,6 +18,13 @@ void* CntSdRsoTerminate(const char* path, void* buffer);
 
 #ifdef __cplusplus
 }
+
+/* 0x80040798 / 0x80040770 / 0x800407C4 - the keyboard dispatchers (C++ free functions: `kbd_open__FUc`, `kbd_move__Fv`,
+ * `set_kbd_param__FPcUl` - rule 9): open keyboard `mode` (1 once it opened), step it (1 done, -1 cancelled) and hand
+ * it the buffer it edits. */
+u32 kbd_open(u8 mode);
+s32 kbd_move(void);
+void set_kbd_param(char* buffer, u32 length);
 #endif
 
 #endif /* MHTRI_FN_80040598_H */
