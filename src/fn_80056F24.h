@@ -33,4 +33,18 @@ void fade_set(s32 slot, s32 table_index);
 void filter_reset(void);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x80058008 - turns the filter panel on. */
+void filter_panel_on(void);
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+/* 0x800578A0 - turns the glare filter on (C++ scope: the map row is `GlareFilter_on__Fv`). */
+void GlareFilter_on(void);
+#endif
+
 #endif /* MHTRI_FN_80056F24_H */

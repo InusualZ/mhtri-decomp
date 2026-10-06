@@ -20,16 +20,7 @@ typedef struct LbEftList {
     /* +0x004 */ nw4r::ef::Effect* effects_0x004[1];
 } LbEftList;
 
-/* The record `LbQuestBoardWork::data_0x264` points at: the screen's payload buffer (the block's
- * whole body is memset before it is filled, so only the offsets the band touches are named).
- * size: 0xB03 (lower bound) */
-typedef struct LbQuestBoardData {
-    /* +0x000 */ u8 pad_0x000[0x14];
-    /* +0x014 */ u8 field_0x014;
-    /* +0x015 */ u8 pad_0x015[0xAEC];
-    /* +0xB01 */ u8 flags_0xB01;
-    /* +0xB02 */ u8 param_0xB02;
-} LbQuestBoardData;
+#include "lobby/lb_quest_board_data.h" /* LbQuestBoardData */
 
 /* The quest-board screen work block reachable through `lobby_w.menu_0xAC` - the object the band
  * memsets whole (0x2000 bytes) and the update/draw steps take as their `this`.

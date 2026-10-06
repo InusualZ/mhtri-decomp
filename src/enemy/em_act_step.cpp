@@ -66,7 +66,7 @@ void fn_8027D3F0(struct _PLW* self, u8 a);
 void fn_8012E664(struct _ENEMY_WORK* self);
 void* em_res_user_data_ctor(void* self);
 u32 fn_801421E4(u16 id, EmGroundRec* rec);
-void fn_80125F54(EmGroundRec* rec);
+void em_ground_rec_clear(EmGroundRec* rec);
 
 #ifdef __cplusplus
 }
@@ -245,7 +245,7 @@ extern "C" void em_eff_ground_set(_EM_CHARA_WORK* self)
 {
     EmGroundRec rec;
 
-    fn_80125F54(&rec);
+    em_ground_rec_clear(&rec);
     if (fn_801421E4(self->field_0x01A, &rec) != 0) {
         fn_80051B7C(&self->pos, &rec.pos_0x08, lbl_8079B114, 0);
         eft_rot_vec_copy(&self->rot, (_CP_VECTOR*)&rec.field_0x14);

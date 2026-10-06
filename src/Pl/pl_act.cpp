@@ -8385,7 +8385,7 @@ extern "C" u16 fn_803BA9B0(u8, u8, u8*, s16*, void*, void*, void*);
 extern "C" void hit_flag_set__FP6_HIT_WUl(void*, u32);
 extern "C" void hit_flags_clear(void*);
 extern "C" void hud_item_msg_push(s32, s32, s32);
-extern "C" void fn_8033A920(s32);
+extern "C" void lb_event_request(s32);
 extern "C" u16 ran_suu__Fl(s32);
 extern "C" void item_pair_copy(void*, void*);
 extern "C" u32 fn_80274DCC(_PLW*, u8);
@@ -8682,7 +8682,7 @@ extern "C" void fn_80278674(_PLW* self, s16 arg1, u8 arg2)
         if ((u8)m != old) {
             if (old > (u8)m) {
                 hud_item_msg_push(1, 4, 0);
-                fn_8033A920(0x15);
+                lb_event_request(0x15);
             } else {
                 hud_item_msg_push(1, 5, 0);
             }

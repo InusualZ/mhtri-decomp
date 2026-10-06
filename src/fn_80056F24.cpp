@@ -46,6 +46,7 @@
  * reconstructed; the large GX setup bodies (`fn_80056F24`, `fn_800572F0`, `fn_800579A4`, `fn_8005880C`,
  * `fn_80058BD0`, `fn_80057DE0`, `fn_80057EF4`, `fn_80058140`, `fn_8005920C`, the `disp_beta` trio) are
  * not written yet.  The per-symbol scores are in the unit notes / outbox.
+ * NAMES. GUESS (from each body and its callers): filter_panel_on
  */
 
 #include "types.h"
@@ -353,7 +354,7 @@ extern "C" void fn_8005792C(void) {
  * ------------------------------------------------------------------------------------------------- */
 
 /* `fn_80058008`/`fn_8005801C`: the panel enable flag. */
-extern "C" void fn_80058008(void) {
+extern "C" void filter_panel_on(void) {
     lbl_8066ACF8.panel_0x0B0.field_0x00 = 1;
 }
 

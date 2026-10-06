@@ -12,6 +12,7 @@
  *
  * Status: 11 of the 20 functions have bodies (the flag accessors and the word copies); `fn_80046C80`, the pad-connect callbacks
  * and the rest (9 functions) are not decompiled.  The bodies were measured with the old unit's flags (`cflags_main`).
+ * NAMES. GUESS (from each body and its callers): pad_hold_ck
  */
 
 #include "types.h"
@@ -33,7 +34,7 @@ extern "C" void fn_80046EF8(void)
     system_w.field_0x30 = 0;
 }
 
-extern "C" s32 fn_80046F0C(void)
+extern "C" s32 pad_hold_ck(void)
 {
     return system_w.field_0x30 != 0;
 }

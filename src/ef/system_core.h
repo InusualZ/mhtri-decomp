@@ -20,4 +20,10 @@ void setTransferDisplayState(u8 mode);
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x800CEAB0 - requests a file load (C++ scope: `load_file_req__FPcUllUllPUl`): name, destination, size,
+ * callback, mode and the callback's context. */
+void load_file_req(char* name, u32 data, s32 size, u32 callback, s32 mode, u32* ctx);
+#endif
+
 #endif /* MHTRI_EF_SYSTEM_CORE_H */

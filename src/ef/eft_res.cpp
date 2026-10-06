@@ -7,6 +7,7 @@
  *   `res_eft_*`, `get_eft_res_name` and `push_eft_effect_heap_num` name the `eft` resource layer).  The dump names
  *   seven functions; `eft_res_slot_get`, `eft_res_slot_release`, `eft_res_model_get`, `eft_res_spawn_gate_ck` and
  *   `eft_res_models_spawn` are GUESSes from their bodies; the map has only `fn_` stems for the rest.
+ *   GUESS (from each body and its callers): eft_control_init
  * RESIDUALS. `fn_800F8634` saves from r27 where retail calls `_savegpr_26` (and ours restores with `_restgpr_27`
  *   where retail's epilogue differs); `eft_res_models_spawn` calls `_savegpr_23`/`_restgpr_23` where retail calls
  *   `_savegpr_24`/`_restgpr_24`;
@@ -168,7 +169,7 @@ extern "C" {
 #endif
 
 void fn_800F6520(void);
-void fn_800F65B4(void);
+void eft_control_init(void);
 void fn_800F6688(void);
 void fn_800F6984(u32, u32, void*, void*);
 void fn_800F69A0(u32, void*, void*);
@@ -261,7 +262,7 @@ extern "C" void fn_800F6520(void) {
 
 /* 0x800F65B4 - allocate the three work pools (0x48-byte effect slots, 0x168-byte model records and the
  * 0x40-byte block heap with its trailing flag run) and mark the manager initialised. */
-extern "C" void fn_800F65B4(void) {
+extern "C" void eft_control_init(void) {
     u8* heap;
     u32 count;
 

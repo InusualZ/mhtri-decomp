@@ -9,6 +9,13 @@
 
 #include "types.h"
 
+/* The 4-byte `(item id, count)` slot `item_pair_copy` moves - and the record the lot picks write
+ * their output with: a u16 id and a u16 count (the pick stores a sign-extended byte payload). */
+struct Q_ItemPair {
+    /* +0x0 */ u16 id;
+    /* +0x2 */ u16 num;
+};  /* size: 0x4 */
+
 /* The 16-byte quest stat the save block keeps and `quest_init` copies into the work block. */
 struct Q_QuestStat {
     /* +0x00 */ u8 valid_0x00;     /* 1 when the stat is live */
@@ -33,19 +40,33 @@ struct Q_ResultWork {
             /* +0x104 */ u8 pad_0x104[0x44];
         };
     };
-    /* +0x148 */ u8 pad_0x148[0x1E0 - 0x148];
+    /* +0x148 */ u32 elapsed_0x148;    /* the quest's elapsed frames at the result */
+    /* +0x14C */ u32 seconds_0x14C;    /* the same in seconds */
+    /* +0x150 */ s32 time_base_0x150;  /* the quest work's time base (+0x20) */
+    /* +0x154 */ Q_ItemPair items_0x154[0x23];  /* the carried items at the result (pouch, then spare slots from 0x18) */
     /* +0x1E0 */ u16 progress_0x1E0;   /* GUESS name: compared against 10000 by the result screen's phase 6 */
     /* +0x1E2 */ u8 phase_0x1E2;       /* the load phase: 2 while loading, 3 when done */
     /* +0x1E3 */ u8 kind_0x1E3;        /* the result kind (1 and 3 are checked by the lobby colour step) */
     /* +0x1E4 */ s32 field_0x1E4;      /* cleared by the flush; no reader names it */
     /* +0x1E8 */ s32 field_0x1E8;      /* cleared by the flush; no reader names it */
-    /* +0x1EC */ u8 pad_0x1EC[0x304 - 0x1EC];
-    /* +0x304 */ u8 block_0x304[0xA0];
+    /* +0x1EC */ Q_ItemPair kept_0x1EC[0x23];   /* the category-1 items the result keeps, packed */
+    /* +0x278 */ s32 kept_value_0x278[0x23];    /* each kept item's value (`GetItemData` +0x10) */
+    /* +0x304 */ union {
+        u8 block_0x304[0xA0];
+        Q_ItemPair delivered_0x304[0x28];       /* the category-0x10 items the result delivers, packed */
+    };
     /* +0x3A4 */ u8 present_0x3A4;     /* a "records present" flag */
-    /* +0x3A5 */ u8 pad_0x3A5[0x3E0 - 0x3A5];
+    /* +0x3A5 */ u8 pad_0x3A5;
+    /* +0x3A6 */ s16 rank_0x3A6;       /* the run's rank from the two count sets */
+    /* +0x3A8 */ s16 time_rank_0x3A8;  /* the rank of the elapsed minutes */
+    /* +0x3AA */ u8 rank_rows_0x3AA[0x30];  /* the rank breakdown the result screen lists */
+    /* +0x3DA */ u8 pad_0x3DA[0x2];
+    /* +0x3DC */ s32 rank_points_0x3DC;  /* the points the two count sets are worth */
     /* +0x3E0 */ Q_QuestStat stat_0x3E0;
     /* +0x3F0 */ s32 credit_0x3F0;     /* GUESS name: the amount the lobby colour step credits to the score */
-    /* +0x3F4 */ u8 pad_0x3F4[0x438 - 0x3F4];
+    /* +0x3F4 */ u8 pad_0x3F4[0x434 - 0x3F4];
+    /* +0x434 */ u8 time_medal_0x434;  /* 2 under the arena's gold time, 1 under its silver, else 0 */
+    /* +0x435 */ u8 pad_0x435[0x438 - 0x435];
 };  /* size: 0x438 */
 
 #endif /* MHTRI_QUEST_QUEST_RESULT_WORK_H */

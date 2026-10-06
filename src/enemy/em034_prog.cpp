@@ -35,7 +35,7 @@
 #include "enemy/fn_8013072C.h" /* fn_8013072C (rule 2: the owner's header) */
 #include "enemy/em_se_tbl_play.h" /* em_se_tbl_play (rule 2: the owner's header) */
 #include "enemy/em_se_tbl_play_alt.h" /* em_se_tbl_play_alt (rule 2: the owner's header) */
-#include "enemy/fn_80125F54.h" /* fn_80125F54 (rule 2: the owner's header) */
+#include "enemy/em_ground_rec_clear.h" /* fn_80125F54 (rule 2: the owner's header) */
 #include "enemy/fn_80126324.h" /* fn_80126324 (rule 2: the owner's header) */
 #include "enemy/em_hit_window_set_default.h" /* em_hit_window_set_default (rule 2: the owner's header) */
 #include "enemy/fn_8012D0B4.h" /* fn_8012D0B4 (rule 2: the owner's header) */
@@ -242,12 +242,12 @@ extern u8 lbl_805B1F18[];
 extern u8 lbl_805B1FF0[];
 extern u8 lbl_805B20E8[];
 
-/* 0x801B4348 (0x50).  The em030 ground-position hook: the ground record `fn_80125F54` builds for the
+/* 0x801B4348 (0x50).  The em030 ground-position hook: the ground record `em_ground_rec_clear` builds for the
  * work's +0x1A id is copied onto the work's +0x1B0 when the enemy-control lookup finds it. */
 extern "C" void fn_801B4348(_ENEMY_WORK* work) {
     EmGroundRec rec;
 
-    fn_80125F54(&rec);
+    em_ground_rec_clear(&rec);
     if (fn_801421E4(work->field_0x01A, &rec) == 1) {
         copyVec3(&work->aim, &rec.pos_0x08);
     }
@@ -279,7 +279,7 @@ extern "C" u32 fn_801B4398(_ENEMY_WORK* work, u32 kind, u32* out) {
     return 0;
 }
 
-/* The 0x20-byte ground record `fn_80125F54` prepares and `fn_801421E4` fills is `EmGroundRec`
+/* The 0x20-byte ground record `em_ground_rec_clear` prepares and `fn_801421E4` fills is `EmGroundRec`
  * (`enemy/ENEMY_WORK.h`). */
 
 /* The range's functions, in address order. */
@@ -520,7 +520,7 @@ extern "C" s32 fn_801B4C54(u16 id) {
     EmGroundRec rec;
     s32 pct;
 
-    fn_80125F54(&rec);
+    em_ground_rec_clear(&rec);
     if (move_work_state_ck() == 0) {
         return 0;
     }
@@ -1624,7 +1624,7 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
     EmGroundRec rec;
     u32 unmatched = 0;
 
-    fn_80125F54(&rec);
+    em_ground_rec_clear(&rec);
     switch (stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         switch (self->area_no) {

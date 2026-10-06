@@ -34,6 +34,7 @@
 #include "enemy/enemy_control.h"
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
+#include "lobby/lb_event_request.h" /* lb_event_request (rule 2) */
 #include "lobby/fn_802FA9A0.h"
 #include "stage/stg_w.h"
 /* the call sites use the argument-less view: a cast call is the same direct call. */
@@ -371,7 +372,7 @@ extern "C" u8 fn_802F8B28(_ENEMY_WORK* work, u32 index) {
 /* Retires the record's model when it is in the idle mode. */
 extern "C" s32 fn_802F8B68(_ENEMY_WORK* work) {
     if (work->field_0x00A == 1) {
-        fn_8033A920(20);
+        lb_event_request(20);
     }
     return 0;
 }

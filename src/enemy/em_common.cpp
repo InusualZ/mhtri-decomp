@@ -20,6 +20,8 @@
  *   `JASSeqCtrl::setIntrMask` (0x8012CE8C), `DBClose` (0x8012B604), `CBGetBytesAvailableForRead` (0x8012C204) and
  *   `GXGetTexObjMipMap` (0x8013023C) hits are signature matches on 4- to 36-byte bodies, not evidence; every other
  *   non-`fn_` name is a GUESS from its body.
+ *   GUESS (from each body and its callers): em_record_hit_ck, em_mini_hit_ck, em_captured_ck
+ *   GUESS: em_mini_kill_kind_get, em_quest_element_set, em_quest_element_set_large
  * RESIDUALS. 379 rows unwritten in 23 runs, the largest 0x8012F3F4-0x80137604 (270 functions);
  *   `sweepcomments.py --unit enemy/em_common` lists them.
  *  - `fn_8012E040`, `fn_8012E5D4`: dense-case dispatch trees; retail shares one tail per constant return and lowers
@@ -269,7 +271,7 @@ struct EnemyExtraData {
 /* Callees and pooled data. */
 extern "C" f32 fn_80050EAC(void* ref, nw4r::math::VEC3* pos);
 extern "C" u8 fn_80133BCC(void);
-extern "C" void* fn_8028EF7C(u16 id);
+extern "C" void* quest_spawn_rec_find(u16 id);
 
 extern "C" f32 fn_80050EF4(void* ref, nw4r::math::VEC3* pos);
 extern "C" f32 calcVecDistXZ(void* ref, nw4r::math::VEC3* pos);
@@ -302,13 +304,13 @@ extern "C" s32 fn_8012E464(_ENEMY_WORK* enemy, u32 flag);
 extern "C" s32 fn_8012E548(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E5A8(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E5D4(u32 actor, u32 flags);
-extern "C" s32 fn_8012E644(_ENEMY_WORK* record);
-extern "C" s32 fn_8012E654(_ENEMY_WORK* record);
+extern "C" s32 em_record_hit_ck(_ENEMY_WORK* record);
+extern "C" s32 em_mini_hit_ck(_ENEMY_WORK* record);
 extern "C" void fn_8012E664(_ENEMY_WORK* enemy);
 extern "C" void fn_8012E694(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012E6A0(u32 kind, u16 id);
-extern "C" u8 fn_8012E884(_ENEMY_WORK* enemy);
-extern "C" s32 fn_8012E8C0(_ENEMY_WORK* enemy);
+extern "C" u8 em_captured_ck(_ENEMY_WORK* enemy);
+extern "C" s32 em_mini_kill_kind_get(_ENEMY_WORK* enemy);
 extern "C" void fn_8012E8DC(_ENEMY_WORK* record);
 extern "C" s32 fn_8012E8F4(f32 seconds);
 
@@ -1812,13 +1814,13 @@ extern "C" s32 fn_8012E5D4(u32 actor, u32 flags)
 }
 
 /* The hit test for the actor/mode pair the record carries. */
-extern "C" s32 fn_8012E644(_ENEMY_WORK* record)
+extern "C" s32 em_record_hit_ck(_ENEMY_WORK* record)
 {
     return fn_8012E5D4(record->team, record->field_0x00A);
 }
 
 /* The hit test for the record's secondary actor/mode pair. */
-extern "C" s32 fn_8012E654(_ENEMY_WORK* record)
+extern "C" s32 em_mini_hit_ck(_ENEMY_WORK* record)
 {
     return fn_8012E5D4(record->group, record->team);
 }
@@ -1848,7 +1850,7 @@ extern "C" s32 fn_8012E6A0(u32 kind, u16 id)
     if (Pl_motion_input_ck(0) == 1) {
         return 0;
     }
-    entry = (u8*)fn_8028EF7C(id);
+    entry = (u8*)quest_spawn_rec_find(id);
     if (entry == NULL || (s16)((u16*)entry)[2] <= 0) {
         return 0;
     }
@@ -1857,13 +1859,13 @@ extern "C" s32 fn_8012E6A0(u32 kind, u16 id)
 
 
 /* Whether the enemy is in the "charge" state pair. */
-extern "C" u8 fn_8012E884(_ENEMY_WORK* enemy)
+extern "C" u8 em_captured_ck(_ENEMY_WORK* enemy)
 {
     return (u8)((fn_8012E2A8(enemy->action, enemy->state_sub) - 1) == 0);
 }
 
 /* The two-state mask the record's mode byte selects. */
-extern "C" s32 fn_8012E8C0(_ENEMY_WORK* enemy)
+extern "C" s32 em_mini_kill_kind_get(_ENEMY_WORK* enemy)
 {
     return (enemy->field_0x014 == 2) ? 2 : 0;
 }
@@ -2128,13 +2130,13 @@ extern "C" s32 fn_8012F39C(_ENEMY_WORK* self)
 /* 0x80137604..0x801376B4 - the state accessors. */
 
 /* Stores the record's byte +0x0D. */
-extern "C" void fn_80137604(_ENEMY_WORK* self, u8 value)
+extern "C" void em_quest_element_set(_ENEMY_WORK* self, u8 value)
 {
     self->field_0x00D = value;
 }
 
 /* The second entry point that stores the same byte. */
-extern "C" void fn_8013760C(_ENEMY_WORK* self, u8 value)
+extern "C" void em_quest_element_set_large(_ENEMY_WORK* self, u8 value)
 {
     self->field_0x00D = value;
 }

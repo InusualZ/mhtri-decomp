@@ -593,9 +593,9 @@ void lb_name_tail_copy(LbNameTail* dst, LbNameTail* src) {
     }
 }
 
-/* Clears the sub-0x0F packet's text payload (`fn_80125F54`) and returns the packet. */
+/* Clears the sub-0x0F packet's text payload (`em_ground_rec_clear`) and returns the packet. */
 LbCmdSub0F* lb_sub0f_init(LbCmdSub0F* cmd) {
-    fn_80125F54(cmd->text_0x0C.bytes_0x00);
+    em_ground_rec_clear(cmd->text_0x0C.bytes_0x00);
     return cmd;
 }
 

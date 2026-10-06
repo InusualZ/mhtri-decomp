@@ -27,6 +27,9 @@ void draw_shape_arm(u32 a, u32 b, u32 c);
  * with `ef/eft053.cpp`, whose state machine fires it (`fn_80056A84(&pos, 10, area)`). */
 void fn_80056A84(const nw4r::math::VEC3* pos, u32 handle, u8 flag);
 
+/* 0x800553B4 - loads the stage's shape textures (GUESS name). */
+void draw_shape_stage_load(u8 stage);
+
 #ifdef __cplusplus
 }
 #endif

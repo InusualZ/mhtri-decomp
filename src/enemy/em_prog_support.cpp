@@ -10,6 +10,7 @@
  *   0x80385E7C-0x80386028 and the right edge 0x80385EE0 is a GUESS.
  * NAMES. `em_prog_support` and the `note_pane_*`/`qn_chr_flag_set` names are GUESSES from the band's role and the
  *   bodies; `qn_get_motion_no` is the map's mangled name.
+ *   GUESS (from each body and its callers): em_prog_slots_init, em_prog_work_init
  * RESIDUALS. 28 rows unwritten: 0x80383148-0x803831B0, 0x803831B4-0x803836EC, 0x80383720-0x8038392C,
  *   0x80383944-0x803839C0, 0x803839EC-0x80384004, 0x80384048-0x80384304, 0x80384434-0x80384B34, 0x80384BA0-0x80384ECC,
  *   0x803850A4-0x803851D4, 0x8038530C-0x803853C8, 0x803855D4-0x8038575C, 0x80385828-0x80385A54, 0x80385CAC-0x80385E7C.
@@ -102,7 +103,7 @@ void fn_80385AA8(NoteWork* self, u8 a, u8 b);
 void note_pane_set_anim_pair(NoteWork* self, u32 a, u32 b);
 void fn_803854E4(void);
 void fn_80385598(void);
-void fn_803852B8(void);
+void em_prog_work_init(void);
 void fn_800D58B0(s32 handle);
 s32 fn_800D9804(u32 a, void* b, void* c);
 void mhchar_reset(MHchar* self);
@@ -220,7 +221,7 @@ extern "C" u32 fn_80384F48(u8 a, u8 b) {
 }
 
 /* 0x80385068 */
-extern "C" void fn_80385068(void) {
+extern "C" void em_prog_slots_init(void) {
     for (u32 i = 0; i < 3; i++) {
         fn_80384FF8((u8)i);
     }
@@ -238,7 +239,7 @@ extern "C" void fn_8038526C(NoteWork* self) {
 }
 
 /* 0x803852B8 */
-extern "C" void fn_803852B8(void) {
+extern "C" void em_prog_work_init(void) {
     for (u32 i = 0; i < 5; i++) {
         fn_8038526C(&lbl_806C4A88[i]);
     }

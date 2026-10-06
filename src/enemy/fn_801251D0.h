@@ -137,7 +137,7 @@ void fn_8012B604(void);
 
 /* 0x80125F54 - r3 is the caller's `EmSelRec`; the body zeroes its +0x08 vector (`VEC3_ctor(out + 8)`) and returns
  * the same pointer. */
-void* fn_80125F54(void* out);
+void* em_ground_rec_clear(void* out);
 
 #ifdef __cplusplus
 }

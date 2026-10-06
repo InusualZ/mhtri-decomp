@@ -20,6 +20,8 @@
  *
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sbss, .sdata, .sdata2, .text, extab,
  * extabindex).
+ * NAMES. GUESS (from each body and its callers): stage_entry_angle_get, stage_cell_get, stage_gate_a_ck
+ *   GUESS: stage_gate_b_ck
  */
 /* ---- header inherited from src/stage/stg_w.cpp (written against its pre-phase-4 range) ---- */
 /*
@@ -513,7 +515,7 @@ extern "C" u32* fn_802AFE5C(u8 id, u8 j)
 }
 
 /* Returns the record's +0x24 word, or 0 for the unmapped id. */
-extern "C" u32 fn_802AFE08(u8 id, u8 j)
+extern "C" u32 stage_entry_angle_get(u8 id, u8 j)
 {
     StageGroup* g;
     if ((u8)id == 0xFF)
@@ -550,7 +552,7 @@ extern "C" u32 stage_map_area_count_get(u8 id)
 }
 
 /* Returns the current area's word [i][j] lookup. */
-extern "C" u32 fn_802B025C(u8 i, u8 j)
+extern "C" u32 stage_cell_get(u8 i, u8 j)
 {
     return SW->areas[SW->areano].rows[(u8)i].words[(u8)j];
 }
@@ -672,7 +674,7 @@ extern "C" void fn_802B09B8(u8 id, u8 j)
 }
 
 /* Whether at least two of the three map flags (ids 3, 11, 4) are set. */
-extern "C" u32 fn_802B20A4()
+extern "C" u32 stage_gate_a_ck()
 {
     u8 count = 0;
     if (fn_802B0998(3) == 1)
@@ -1712,7 +1714,7 @@ extern "C" void fn_802B4704(StageRuntime* st)
 }
 
 /* Reports whether every area from 1 to 4 is armed for the current map's stage kind 4. */
-extern "C" s32 fn_802B47B0(void)
+extern "C" u32 stage_gate_b_ck(void)
 {
     StageRuntime* st = (StageRuntime*)stage_w;
     u8 index;

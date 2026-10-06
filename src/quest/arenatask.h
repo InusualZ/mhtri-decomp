@@ -63,11 +63,11 @@ extern nw4r::math::VEC3 arena_camera_vec[2];   /* eye + look-at */
 extern nw4r::math::VEC3 arena_light_vec[4];    /* four direct-light positions */
 
 /* The arena quest-info row list `arena_quest_info_build` fills (`.sbss` 0x80794D3C, ten 0x18-byte rows,
- * the dump's `que_info`) and the arena LSP data the 8-byte accessor `fn_804459DC` returns
- * (`.sbss` 0x80794D40 - the accessor itself is the band's candidate first function, outside the
- * registered range). */
+ * the dump's `que_info`) and the arena LSP data `arena_lsp_data_get` returns (`.sbss` 0x80794D40). */
 extern ArenaQuestInfoList* que_info;
 extern u8* arena_lsp_data_adrs;
+/* 0x804459DC - the arena's loaded LSP data block (`hud/cockpit.cpp`'s `get_lsp_data` reads it in the arena). */
+extern "C" u8* arena_lsp_data_get(void);
 
 /* The arena texture pack's resource record (`.sdata` 0x80793B28: the archive size and its name) and the
  * table of texture names `arena_resource_load` looks up in it (`.data` 0x80607310, 32 slots, the last

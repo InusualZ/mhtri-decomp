@@ -67,14 +67,14 @@ struct EmVecWords {
     /* +0x08 */ u32 z;
 };
 
-/* The 0x20-byte out record `fn_80125F54` prepares and `fn_801421E4` fills: the mode byte at +0x03
+/* The 0x20-byte out record `em_ground_rec_clear` prepares and `fn_801421E4` fills: the mode byte at +0x03
  * (`fn_801B7118`), the vector at +0x08 and the u32 at +0x18 `fn_801B71F4` narrows to u16.
  * size: 0x20 */
 struct EmSelRec {
     /* +0x00 */ u8 unused_0x00[0x03];
     /* +0x03 */ u8 mode;          /* 0 or 2: the random threshold `fn_801B7118` picks */
     /* +0x04 */ u8 unused_0x04[0x04];
-    /* +0x08 */ nw4r::math::VEC3 vec_0x08; /* zeroed by `fn_80125F54` through `VEC3_ctor` */
+    /* +0x08 */ nw4r::math::VEC3 vec_0x08; /* zeroed by `em_ground_rec_clear` through `VEC3_ctor` */
     /* +0x14 */ u8 unused_0x14[0x04];
     /* +0x18 */ u32 value_0x18;   /* the id `fn_801B71F4` latches into the work's +0x32E */
 };
@@ -198,7 +198,7 @@ extern "C" s32 fn_801B7118(u16 id) {
     EmSelRec rec;
     s32 roll;
 
-    fn_80125F54(&rec);
+    em_ground_rec_clear(&rec);
     if (move_work_state_ck() == 0) {
         return 0;
     }
@@ -221,7 +221,7 @@ extern "C" void fn_801B71F4(EmProgWork* self, u8 mode) {
     EmSelRec rec;
     s32 pick;
 
-    fn_80125F54(&rec);
+    em_ground_rec_clear(&rec);
     self->field_0x32C = 0;
     if (fn_801421E4(self->field_0x01A, &rec) == 1) {
         self->field_0x32E = (u16)rec.value_0x18;

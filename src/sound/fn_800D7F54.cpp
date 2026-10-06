@@ -368,7 +368,7 @@ extern "C" void fn_800DCFE4(void) { sysSE_req(12); }
 
 extern "C" s32 fn_800F0C14(s32 bank);
 extern "C" s32 fn_800F04FC(s32 id);
-extern "C" u8 fn_803C482C(void);
+extern "C" u8 event_demo_running_ck(void);
 extern "C" u32 fn_800D843C(void);
 extern "C" u8 system_w[];
 extern "C" u8 lbl_80597A20[];
@@ -388,15 +388,15 @@ extern "C" s32 fn_800DBB78(s32 bank, s32 id) {
     return fn_800E80DC_c1(handle, id, 0);
 }
 
-/* The `sysSE_req` family: bank 0, gated on the `fn_803C482C` predicate and the id being playable. */
+/* The `sysSE_req` family: bank 0, gated on the `event_demo_running_ck` predicate and the id being playable. */
 void sysSE_req(s32 id) {
-    if (fn_803C482C() == 0 && fn_800F04FC(0) != 0) {
+    if (event_demo_running_ck() == 0 && fn_800F04FC(0) != 0) {
         fn_800DBB78(0, id);
     }
 }
 
 extern "C" void sysSE_stop(s32 id) {
-    if (fn_803C482C() == 0 && fn_800F04FC(30) != 0) {
+    if (event_demo_running_ck() == 0 && fn_800F04FC(30) != 0) {
         fn_800DBB78(30, id);
     }
 }

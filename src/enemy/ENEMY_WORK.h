@@ -75,7 +75,7 @@ struct EmPartRec {
     /* +0x4 */ s16 value_0x04;
 };
 
-/* The 0x20-byte ground/seat record `fn_80125F54` prepares and `fn_801421E4` fills: both take it as
+/* The 0x20-byte ground/seat record `em_ground_rec_clear` prepares and `fn_801421E4` fills: both take it as
  * a `void* out` (their declarations are in `enemy/fn_801251D0.h` and
  * `enemy/enemy_control.h`), so it is the CALLERS' record and the two units that own one
  * share this one definition (docs/plan.md 6.5 rule 1): `enemy/em034_prog.cpp` names the seat flags
@@ -207,7 +207,7 @@ struct _ENEMY_WORK {
     /* +0x00B */ u8 field_0x00B;        /* the byte `em_mot_set_blend` hands the effect queue as its flag */
     /* +0x00C */ u8 field_0x00C;        /* the mode `fn_80166DF8` gates its case-0/case-3 blocks on
                                         * (3 = the "entry seated" state) */
-    /* +0x00D */ u8 field_0x00D;        /* the byte `fn_80137604`/`fn_8013760C` latch */
+    /* +0x00D */ u8 field_0x00D;        /* the byte `em_quest_element_set`/`em_quest_element_set_large` latch */
     /* +0x00E */ u8 field_0x00E;        /* `fn_80137C94` hands it to `em_act_advance` */
     /* +0x00F */ u8 field_0x00F;        /* `enemy/em034_prog.cpp`'s `fn_801B4D14` gates its
                                         * seat re-test on it being zero */

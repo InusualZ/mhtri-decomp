@@ -4,6 +4,7 @@
  * Phase 4: fold of 2 registered units, built from `sound/fn_800E8E60.cpp`, `sound/fn_800EF7D8.cpp`.
  * Name is a GUESS: the range holds `snd_bank_layout`, `scene_se_bank_load`, `system_se_load`, `title_se_load` and the `*_bgm_load` family over the `SndWork` record.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
+ * NAMES. GUESS (from each body and its callers): snd_player_banks_load
  */
 
 /* Retired header of `sound/fn_800EF7D8.cpp` (kept for its notes and residuals): */
@@ -239,7 +240,7 @@ void cnvt_eur_fname(char* dst, char* src);
 extern "C" u8 fn_8028F288(void);
 extern "C" u8  stage_map_kind_get(u8 a);
 extern "C" u8  quest_pair_table_get(u8 a, u8 b);
-extern "C" u32 fn_8044FB98(void);
+extern "C" u32 demo_play_ck(void);
 u8  get_now_mapno(void);
 void get_gm_daynight(void);
 u32 get_move_work_adrs(u8 kind);
@@ -344,7 +345,7 @@ extern const char lbl_8059B150[]; /* "16/srt/bgm/MH3BGM_LOBBY.srt" */
  * --------------------------------------------------------------------------------------------- */
 extern "C" void snd_bank_layout(u8 mode);
 extern "C" void scene_se_bank_load(u8 a, u8 b);
-extern "C" void fn_800EFAC0(u8 arg0);
+extern "C" void snd_player_banks_load(u8 arg0);
 extern "C" void fn_800EFC68(_PLW* work);
 extern "C" s32 fn_800EFD88(u8 id, u32 kind);
 extern "C" void fn_800EFDD8(_PLW* work);
@@ -624,7 +625,7 @@ extern "C" void scene_se_bank_load(u8 a, u8 b)
 }
 
 /* One enemy slot's files: one `whd` per chunk plus the shared `tsb`. */
-extern "C" void fn_800EFAC0(u8 arg0)
+extern "C" void snd_player_banks_load(u8 arg0)
 {
     char name[0x88];
     u32 args[3];
@@ -1342,7 +1343,7 @@ s32 demo_bgm_load(u8 index)
         fn_800E4D60(2);
         lbl_80794A2C->stream_ready[2] = 0;
     }
-    if (fn_8044FB98() == 1 && (index == 0xE || index == 0x2B || index == 0x2C || index == 0x2F)) {
+    if (demo_play_ck() == 1 && (index == 0xE || index == 0x2B || index == 0x2C || index == 0x2F)) {
         PlayStream(1, 1);
         PlayStream(2, 1);
         fn_800E4D60(2);
@@ -1374,7 +1375,7 @@ s32 demo_bgm_load(u8 index)
         load_file_req(name, 0x92D18000, 0x2000, (u32)fn_800F0448, 5, args);
         lbl_80794A38[0] = 0;
     }
-    if (fn_8044FB98() == 1 && (index == 0xE || index == 0x2B || index == 0x2C || index == 0x2F)) {
+    if (demo_play_ck() == 1 && (index == 0xE || index == 0x2B || index == 0x2C || index == 0x2F)) {
         lbl_80794A2C->bgm_loading_1 = 1;
         sprintf(name, lbl_8059B0B0, index);
         strcat(name, lbl_80791640);
@@ -1393,12 +1394,12 @@ s32 demo_bgm_load(u8 index)
         }
         sprintf(lbl_806A1138, lbl_8059B0D0, index);
     } else {
-        if (fn_8044FB98() == 0) {
+        if (demo_play_ck() == 0) {
             if ((u8)(index + 0xF2) <= 4U || index == 0x2B) {
-                fn_800F48F4();
+                snd_bgm_hold_set();
             }
         } else if ((u8)(index + 0xF1) <= 3U) {
-            fn_800F48F4();
+            snd_bgm_hold_set();
         }
         return 0;
     }
@@ -1410,12 +1411,12 @@ s32 demo_bgm_load(u8 index)
     args[4] = 0;
     load_file_req(name, 0x92D1C000, 0x2000, (u32)fn_800F0448, 5, args);
     lbl_80794A38[0] = 2;
-    if (fn_8044FB98() == 0) {
+    if (demo_play_ck() == 0) {
         if ((u8)(index + 0xF2) <= 4U || index == 0x2B) {
-            fn_800F48F4();
+            snd_bgm_hold_set();
         }
     } else if ((u8)(index + 0xF1) <= 3U) {
-        fn_800F48F4();
+        snd_bgm_hold_set();
     }
     return 0;
 }

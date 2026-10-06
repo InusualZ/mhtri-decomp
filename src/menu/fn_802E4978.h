@@ -213,7 +213,7 @@ u32 get_move_work_max(u8 kind);
 extern "C" {
 #endif
 
-u32 fn_80046F0C(void*);                /* 0x80046F0C mh3_pad.cpp */
+u32 pad_hold_ck(void*);                /* 0x80046F0C mh3_pad.cpp */
 s32 fn_802D27E0(void);                  /* 0x802D27E0 ai/ai_npc.cpp */
 s32 fn_802E0B54(u16);                   /* 0x802E0B54 hud/layout.cpp */
 u32 color_lerp(u32, u32, u8, f32, f32);/* 0x802E270C hud/layout.cpp */
