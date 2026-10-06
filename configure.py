@@ -1046,7 +1046,8 @@ config.libs = [
             Object(NonMatching, "Network/NetworkUnitPacket.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/PatConnection.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/PatConnection.cpp"),
+            Object(NonMatching, "Network/PatConnection.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/PatInterface.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/PatInterface.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
@@ -1096,7 +1097,8 @@ config.libs = [
             Object(NonMatching, "Network/NetworkSessionStable.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             # Flags: unit header of src/Network/NetworkStreamSink.cpp.
-            Object(NonMatching, "Network/NetworkStreamSink.cpp"),
+            Object(NonMatching, "Network/NetworkStreamSink.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
             # Flags: unit header of src/Network/network_shared_data.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/network_shared_data.cpp"),
             # Flags: unit header of src/Network/GameSpyInterfaceThread.cpp; measurements in docs/network.md.

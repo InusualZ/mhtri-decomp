@@ -21,30 +21,30 @@
  *   `NetworkStateMachine`'s fields (the object is 0x16D08 B, beyond the dump's views); `writeUInt32Shared` (the 4-byte
  *   tail-branch twin of `writeUInt32`); `getSomething6`/`getSomething9` (the map's `getSomethingN` scheme);
  *   `dispatchSessionHandlers` (0x8041233C, walks the eight handler slots); `clearErrorRecord613c`,
- *   `buildErrorInfo613c`, `getErrorInfoOrCode654c` (the `errorRecordCode613c` scheme); `initItemList`, `readItemList`,
+ *   `buildErrorInfo613c`, `getErrorInfoOrCode654c` (the `errorRecordCode613c` scheme); `initItemList`,
  *   `createItemListStack` (at most 64 16-byte rows off the call stack), `releaseItemListStack` and the records
  *   `PatItem`/`PatItemList`/`PatItemNotice`/`PatUserPositionNotice`/ `PatDetailSearchResult`; the `recv*` parameter
- *   types (r4 the packet table index `recvAnsNg` stores, r5 the 8-byte header).  Data rows from their content:
+ *   types (r4 the packet table index `recvAnsNg` stores, r5 the 8-byte header).  The item writers and readers carry
+ *   GUESS names from the record each one reads or the request that calls it (`putItemList`, `writeSearchFilters`,
+ *   `writeCircleInfoItems`, `readMemoryCheckData`, `readTimeOffset`, `stepPatConnect`/`stepPatDisconnect`,
+ *   `restoreFmpSelection`, `sendNtcLayerBinaryTo`/`sendNtcCircleBinaryTo` ...); `getFo` and the `getItem*` names
+ *   are the log strings' (`PatInterface:getFo()`), and so are the real names of `stepPatInterface`
+ *   ("PatInterface::move()") and `chooseServerAddress` ("setCurrentServer").  Data rows from their content:
  *   `sessionTimeoutParam`/`Param2` (0x8079C7D8/DDA, the bytes {1,2,3}), `requestHeaderWord0`/`1` (0x8079C7E0/E4),
  *   `maskedUserName` (0x80793968, "******").  GUESSes named by the mediator band for the field or slot each touches:
- *   `setPatReflectPageRange`, `PatInterface_clear`, `PatInterface_isReady`, `getPatServerTime`, `setPatBuffer`,
- *   `setPatRange`, `getPatAccountName`, `setPatReflectField30/34/38`, `setPatReflectName3C/5C`, `setPatField854/860`.
- * RESIDUALS. 151 rows unwritten (objdiff scores them zero), in address order:
- *   - the singleton: `setPatReflectPageRange` (0x803FD04C), `stepPatInterface`, `buildErrorInfo613c`,
- *     `getErrorInfoOrCode654c`, `postError`, `pushStack`, `setConnectServerType`/`chooseServerAddress`/
- *     `getFmpSelection`/`copyServerBlock` (0x803FDCB0..0x803FDE84), `saveFmpSelection`..`updatePatInterface`
- *     (0x803FE03C..0x803FE184), `getPatServerTime`, `getBinaryToken`, `getPatAccountName`, `getSomething4` (its
- *     header-declared `s8` return would add an `extsb` retail lacks), `createItemListStack`/`releaseItemListStack`/
- *     `appendItemList` (0x803FE4D8..0x803FE73C);
- *   - the request builders: `sendReqLayerChildInfo`, `sendReqLayerUserInfoSet`, `sendReqLayerUserListHead`,
- *     `sendReqLayerUserSearchHead`, the layer notices, mediation and detail-search requests and circle create/info/join
- *     (0x80401EC8..0x8040275C), `sendReqCircleMatchOptionSet`, `sendReqCircleInfoSet`/`ListLayer`/`ListHead`
- *     (0x80402930..0x80402B04), `sendReqCircleUserList` through `sendReqBinaryUser` (0x80402CC8..0x80403670),
- *     `sendReqUserSearchHead`, `sendReqUserSearchInfo`..`sendReqFriendAdd` (0x80403978..0x80403C80),
- *     `sendReqFriendList`/`sendReqBlackAdd`, `sendReqBlackList`/`sendReqChannelInfo`;
- *   - `recvReqMemoryCheck` (0x80404EE8), a `recv*` virtual with no body;
- *   - the item readers/writers, `recvCommand` and `dispatchSessionHandlers` (0x8040E48C..0x804123F8, 84 rows).
- *   The packet table is not emitted.  Partial rows:
+ *   `setPatReflectPageRange` (the body installs handler 0 and resets the login state), `PatInterface_clear`,
+ *   `PatInterface_isReady`, `getPatServerTime`, `setPatBuffer`, `setPatRange`, `getPatAccountName`,
+ *   `setPatReflectField30/34/38`, `setPatReflectName3C/5C`, `setPatField854/860`.
+ * RESIDUALS. Every row has a body; the open ones, in address order:
+ *  - signature-bound (the declarations other units call through; a retype measured at 100 % is filed as a request):
+ *    `getSomething4` (the `s8` return adds an `extsb`), `sendNtcLayerUserPosition`, `sendNtcCircleChat`,
+ *    `sendReqCircleInfoNoticeSet`, `reqUserSearchInfoMine`, `sendReqChannelInfo` (declared `void`, retail returns the
+ *    request id), `sendReqUserSearchInfo`/`sendReqUserSearchHead` (the `s32`/`u8` mode parameter is retail's `s8`);
+ *  - `buildErrorInfo613c`: retail lowers the switch on the server code to `code + 0x9A0000` range tests, ours to a
+ *    compare chain (signed and unsigned case spellings tried);
+ *  - `pushStack`: allocator colouring in the tail's three loads;
+ *  - `sendNtcCircleUserValue`, `sendNtcLayerUserTransfer`, `sendLayerBinaryRecord`: retail keeps the kind byte's
+ *    `li`/`beq`/`li` where ours if-converts to `neg`/`or`/`srwi` (ternary and if/else spellings tried);
  *  - `handleNetworkState2Binary`: the case-60 tokenizer leaves a loop from inside two nested loops (the conformant
  *    `&& != 0` plus `break` is 76 B short); retail recomputes the offset from `i` with `lbzx` off `self`, unrolls the
  *    token fill by 8 with an `andi.` remainder and saves 2 registers in line (ours 5, `_savegpr_27`); `-O2`, `-opt
@@ -66,6 +66,8 @@
  *    and a struct local tried);
  *  - `reportPatError`: retail materialises `&pendingError_654C` after the code load;
  *  - `recvAnsAgreementPageInfo`: retail addresses the page count as `infoPtr+12`, ours folds it to `r1+28`.
+ *  Data: `.data` and `.rodata` are byte-identical up to their tail padding; `.sdata2` differs from +0x9 (the state
+ *  machine's constants stay `extern`, the builders' tag lists are emitted as their own literals).
  * SHAPES. The destructor 0x803FCF8C is the key function, so this object emits `__vt__12PatInterface` (rule 10); the
  *   class derives from `PatConnection` (`Network/PatConnection.h`).  The `recv*` handlers are virtuals (slots
  *   +0x10..+0x280) that `recvCommand` reaches through the packet table's member pointers (`__ptmf_scall`), so their map
@@ -83,8 +85,10 @@
  *    relocations);
  *  - `count = count + 1; tags[count - 1] = v` (an alignment effect, kept for its score); `tags[count++] = v` with a
  *    known count is retail's `li`/`li`/`stb`; `u32* tokens = self->binaryTokens_D60C;` in `handleNetworkState2Binary`;
- *  - locals of one size are laid out in reverse declaration order (playbook 63); a failed `readBodySlice` returns its
- *    own result; the stack-clamped list answers divide into a `maxCount` local; `x == 0 ? a : b` decides which constant
+ *  - locals of one size are laid out in reverse declaration order (playbook 63), a byte array shorter than 4 below the
+ *    words (`u8 tags[4]` keeps retail's slot); an address-taken parameter is homed below the locals (the notices pass
+ *    `&value` itself); the record readers walk `for (i = 0, entry = recs; ...) { ...; entry++; }` (the loop index
+ *    declared first); a failed `readBodySlice` returns its own result; the stack-clamped list answers divide into a `maxCount` local; `x == 0 ? a : b` decides which constant
  *    loads first; the position notice's loop indexes `list.items_04[i]` (a walking pointer swaps r3/r4);
  *  - the state machine's constants are this unit's `.sdata2`/`.sdata` rows, declared `extern` in the unit header and
  *    never defined (playbook 29: defining them rebuilds the pool); `buildErrorInfo613c`'s codes 0x80050038/0x80050044
@@ -95,6 +99,8 @@
 #include "Network/PatInterface.h"
 #include "Network/PatConnection.h"          /* the request writers */
 #include "Network/NetworkWiiMediator.h"     /* setMediatorState68A / getMediatorState68A */
+#include "Network/NetworkSessionManager.h"  /* PatCircleInfo, PatMatchOptions, PatCircleFilter - the circle records */
+#include "Network/NetworkLayerPat.h"        /* NetLayerAddress - the layer path */
 #include "unsplit/Network.h"                /* getNetworkLogger */
 #include "unsplit/Runtime.PPCEABI.H.h"      /* strlen, strcmp */
 #include "Runtime.PPCEABI.H/memcpy.h"
@@ -201,6 +207,21 @@ PatInterface::~PatInterface()
     mpInstance = NULL;
 }
 
+/* Installs `address` with its argument `size` as session handler 0 when that slot is free, then clears the binary
+ * state, the login block (its name selector reads 0xFF: unset) and this client's row, and restores the connection's
+ * defaults (the two words are the handler and its argument; the name is the mediator band's GUESS). */
+void setPatReflectPageRange(PatInterface* self, u32 address, u32 size)
+{
+    if (self->eventCallbacks_60D8[0] == NULL) {
+        setCallback(self, (void (*)())address, (void*)size, 0);
+    }
+    self->binaryActive_D400 = 0;
+    memset(self->loginFields_82AC, 0, sizeof(PatLoginBlock));
+    self->loginInfoSent_82B4 = 0xFF;
+    memset(&self->userRow_8B54, 0, sizeof(self->userRow_8B54));
+    self->resetDefaults();
+}
+
 /* Restores the connection's defaults, then clears the error records, the clock, the state machine's state bytes, the
  * login and user rows, the binary reply and the call stack (18 KB free). */
 void PatInterface::resetDefaults()
@@ -245,11 +266,11 @@ void PatInterface::resetDefaults()
     fmpListReady_6C3C = 0;
     fmpSelected_8040 = -1;
     fmpQueryValue_8044 = -1;
-    memset(fmpReply_8048, 0, sizeof(fmpReply_8048));
+    memset(&fmpReply_8048, 0, sizeof(fmpReply_8048));
     layerMovePending_D62C = 0;
     matchStartValue_D630 = 0;
-    stackRemaining_8BD4 = 0;
-    stackUsed_8BD8 = 0x4800;
+    stackTop_8BD4 = 0;
+    stackFree_8BD8 = 0x4800;
 }
 
 /* Takes a reference on the singleton; the first one clears the ticket's size and restores the defaults. */
@@ -290,6 +311,86 @@ void PatInterface_clear(PatInterface* self)
 }
 
 /* Whether the singleton is referenced. */
+/* One frame of the session ("PatInterface::move()" in its log): the clock, then the close or open step while armed,
+ * else the connection: wait for the mediator link, pump receive/dispatch/send while connected (posting a lost link or
+ * a 90-second receive silence), and after a close reconnect to the OPN or the next FMP server or report the error. */
+void stepPatInterface(NetworkInstance* self)
+{
+    NetworkErrorInfo error;
+
+    self->clock_611C = getNetworkLogger()->getTime_60();
+    if (self->termsArmed_6131 != 0) {
+        stepPatDisconnect(self);
+        return;
+    }
+    if (self->sessionArmed_6130 != 0) {
+        stepPatConnect(self);
+        return;
+    }
+    switch (self->binaryState_6134) {
+    case 0:
+        if (PatInterface_isReady(self) != 0) {
+            if (checkMediatorLink(getInstance(), &error) == 0 && self->pendingError_654C.code_00 == 0) {
+                self->postError(error);
+            }
+        }
+        break;
+    case 10: {
+        s32 result = self->receiveCommand(&self->pendingError_654C);
+
+        if (result > 0) {
+            self->connectTime_6124 = self->clock_611C;
+        }
+        if (result >= 0) {
+            result = self->dispatchCommand(&self->pendingError_654C);
+            if (result == 0) {
+                result = sendCommand(self, &self->pendingError_654C);
+            }
+        }
+        if (result < 0) {
+            self->binaryState_6134 = 90;
+        } else if (checkMediatorLink(getInstance(), &error) == 0) {
+            self->postError(error);
+        } else if (self->connectTime_6124 < self->clock_611C - 90.0f) {
+            getNetworkLogger()->warn_10("PatInterface::move() no receive timeout[%d]\n", 90);
+            error.code_00 = 0x80000000;
+            error.param1_04 = 0x6B;
+            error.param2_08 = 90;
+            self->postError(error);
+        }
+        break;
+    }
+    case 90:
+        self->shutdownFlag_6559 = 0;
+        if (self->disconnect() != 0) {
+            if (self->flag_6558 == 0) {
+                if (self->serverType_65F0 == 2 && self->sessionState_6132 == 1) {
+                    chooseServerAddress(self, 2, 0);
+                    setConnectServerType(self, 2);
+                    memset(&self->pendingError_654C, 0, sizeof(self->pendingError_654C));
+                    self->binaryState_6134 = 0;
+                    self->sessionArmed_6130 = 1;
+                    self->sessionState_6132 = 0;
+                    break;
+                }
+                if (self->serverType_65F0 == 1 && (s32)self->fmpQueryValue_8044 != -1) {
+                    restoreFmpSelection(self);
+                    self->binaryState_6134 = 0;
+                    self->sessionArmed_6130 = 1;
+                    break;
+                }
+            }
+            if (self->shutdownMode_6136 != 0) {
+                dispatchSessionHandlers(self, 0x8006, NULL, self->pendingError_654C.code_00, 1, (const u8*)&self->pendingError_654C);
+            } else {
+                dispatchSessionHandlers(self, 0x8000, NULL, self->pendingError_654C.code_00, 1, (const u8*)&self->pendingError_654C);
+            }
+            self->binaryState_6134 = 0;
+        }
+        break;
+    }
+}
+
 /* free: retail C linkage - the map names it unmangled */
 s32 PatInterface_isReady(PatInterface* self)
 {
@@ -320,6 +421,40 @@ s32 errorRecordCode613c(NetworkInstance* self, const void* record)
     return ((PatInterface*)self)->errorRecord_613C.code_000;
 }
 
+/* Fills `out` with the negative reply's error (code 0x80000007 unless `code` is a failure code itself, step 0x68, the
+ * server's code), mapping the server codes of request 0x80050012 to their own failure codes. */
+void buildErrorInfo613c(NetworkInstance* self, u32 code, NetworkErrorInfo* out)
+{
+    if (out != NULL) {
+        if ((s32)code < 0) {
+            out->code_00 = code;
+        } else {
+            out->code_00 = 0x80000007;
+        }
+        out->param1_04 = 0x68;
+        out->param2_08 = self->errorRecord_613C.code_000;
+        if (code == 0x80050012) {
+            switch ((u32)self->errorRecord_613C.code_000) {
+            case 0xFF667F17:
+            case 0xFF667F18:
+            case 0xFF667F20:
+                out->code_00 = 0x80050037;
+                break;
+            case 0xFF667F19:
+            case 0xFF667F1A:
+                out->code_00 = 0x80050038;
+                break;
+            case 0xFF667F1C:
+                out->code_00 = 0x80050039;
+                break;
+            case 0xFF667F1B:
+                out->code_00 = 0x80050044;
+                break;
+            }
+        }
+    }
+}
+
 /* Copies the pending error out when `info` is non-null and returns its code (0 while none is kept). */
 s32 getErrorInfo654c(NetworkInstance* self, u32* info)
 {
@@ -329,6 +464,45 @@ s32 getErrorInfo654c(NetworkInstance* self, u32* info)
         info[2] = ((PatInterface*)self)->pendingError_654C.param2_08;
     }
     return ((PatInterface*)self)->pendingError_654C.code_00;
+}
+
+/* Copies the kept error out; a generic one (0x80000000) is replaced by `code` when that is a failure code. */
+void getErrorInfoOrCode654c(NetworkInstance* self, u32 code, NetworkErrorInfo* out)
+{
+    if (out != NULL) {
+        getErrorInfo654c(self, (u32*)out);
+        if (out->code_00 == 0x80000000 && (s32)code < 0) {
+            out->code_00 = code;
+        }
+    }
+}
+
+/* Keeps the first error (and, while connected, tells the server and flushes), then closes the connection or reports
+ * the error event (0x8006 while shutting down, else 0x8000). */
+s32 PatInterface::postError(NetworkErrorInfo* info)
+{
+    if (pendingError_654C.code_00 == 0) {
+        pendingError_654C.code_00 = info->code_00;
+        pendingError_654C.param1_04 = info->param1_04;
+        pendingError_654C.param2_08 = info->param2_08;
+        if (binaryState_6134 != 0) {
+            u32 values[3];
+
+            values[0] = info->code_00;
+            values[1] = info->param1_04;
+            values[2] = info->param2_08;
+            sendServerTimeout(this, values);
+            sendCommand(this, &pendingError_654C);
+        }
+    }
+    if (binaryState_6134 != 0) {
+        binaryState_6134 = 90;
+    } else if (shutdownMode_6136 != 0) {
+        dispatchSessionHandlers(this, 0x8006, NULL, pendingError_654C.code_00, 1, (const u8*)&pendingError_654C);
+    } else {
+        dispatchSessionHandlers(this, 0x8000, NULL, pendingError_654C.code_00, 1, (const u8*)&pendingError_654C);
+    }
+    return -1;
 }
 
 /* Keeps `error` as the pending error unless one is kept, then reports the pending one with event `kind`. */
@@ -385,14 +559,60 @@ u8* createStack(NetworkStateMachine* self, u32 size, u32* outSize)
     return pushStack(self, size, outSize, &align);
 }
 
+#pragma pool_data off
+/* Takes `size` bytes off the call stack, first padding its top to a multiple of `*align` (the padding comes back in
+ * `*align`); the granted size (at most what is free) comes back in `outSize`.  NULL when nothing can be taken. */
+u8* pushStack(NetworkStateMachine* self, u32 size, u32* outSize, u32* align)
+{
+    u32 padding;
+    u8* block;
+
+    if (size == 0) {
+        *outSize = 0;
+        *align = 0;
+        getNetworkLogger()->signal_0C(2, "PatInterface:pushStack(): Require stack_size is zero.\n");
+        return NULL;
+    }
+    if (self->stackFree_8BD8 == 0) {
+        *outSize = 0;
+        *align = 0;
+        getNetworkLogger()->warn_10("PatInterface:pushStack(): mStackSize is zero.\n");
+        return NULL;
+    }
+    padding = *align;
+    if (padding != 0) {
+        padding = padding * ((self->stackTop_8BD4 + padding - 1) / padding) - self->stackTop_8BD4;
+        *align = padding;
+        if (self->stackFree_8BD8 < padding) {
+            *outSize = 0;
+            *align = 0;
+            getNetworkLogger()->warn_10("PatInterface:pushStack(): mStackSize is lack for align.\n");
+            return NULL;
+        }
+    }
+    if (self->stackFree_8BD8 - padding < size) {
+        getNetworkLogger()->warn_10("PatInterface:pushStack(): mStackSize is lack.\n");
+    }
+    if (self->stackFree_8BD8 - *align < size) {
+        size = self->stackFree_8BD8 - *align;
+    }
+    *outSize = size;
+    block = &self->stack_8C00[self->stackTop_8BD4 + *align];
+    memset(block, 0, size);
+    self->stackTop_8BD4 = self->stackTop_8BD4 + *outSize + *align;
+    self->stackFree_8BD8 = self->stackFree_8BD8 - (*outSize + *align);
+    return block;
+}
+#pragma pool_data reset
+
 /* Gives `size` bytes back to the call stack (at most what is in use). */
 void growStackSize(NetworkStateMachine* self, u32 size)
 {
-    if (self->stackRemaining_8BD4 < size) {
-        size = self->stackRemaining_8BD4;
+    if (self->stackTop_8BD4 < size) {
+        size = self->stackTop_8BD4;
     }
-    self->stackRemaining_8BD4 -= size;
-    self->stackUsed_8BD8 += size;
+    self->stackTop_8BD4 -= size;
+    self->stackFree_8BD8 += size;
 }
 
 /* 1 when the busy flag is already set, else sets it and returns 0. */
@@ -409,6 +629,68 @@ s32 testAndSet611b(NetworkInstance* self)
 void set611b(NetworkInstance* self)
 {
     ((PatInterface*)self)->busy_611B = 0;
+}
+
+/* Selects the connect server type (modulo 4) and hands its server block to the connection; logs when no address was
+ * chosen for it (`chooseServerAddress`, "setCurrentServer" in the log). */
+void setConnectServerType(NetworkInstance* self, s32 type)
+{
+    s32 kind = type % 4;
+    PatServerBlock* block;
+    u16 port;
+
+    self->serverType_65F0 = kind;
+    if ((s32)self->serverIndex_65F4[kind] == -1) {
+        getNetworkLogger()->warn_10("PatInterface:setConnectServerType(): setCurrentServer(%d) have not been called.\n", kind);
+        return;
+    }
+    block = &self->serverReserve_6614[kind];
+    port = block->port_104;
+    setServerAddress(self, block->host_000, block->address_100, &port);
+}
+
+/* Chooses the address of server type `a` (modulo 4): the lobby, OPN and RFP servers have one, copied into their
+ * block; for FMP `b` (modulo 80) is the slot. */
+void chooseServerAddress(NetworkStateMachine* self, u32 a, u32 b)
+{
+    self->serverType_65F0 = (s32)a % 4;
+    switch (self->serverType_65F0) {
+    case 0:
+        self->serverIndex_65F4[0] = 0;
+        memcpy(&self->serverReserve_6614[0], &(&self->lmpServer_6B32)[self->serverIndex_65F4[0]], sizeof(PatServerBlock));
+        break;
+    case 1:
+        self->serverIndex_65F4[1] = (s32)b % 80;
+        break;
+    case 2:
+        self->serverIndex_65F4[2] = 0;
+        memcpy(&self->serverReserve_6614[2], &(&self->serverAddress_6A2C)[self->serverIndex_65F4[2]], sizeof(PatServerBlock));
+        break;
+    case 3:
+        self->serverIndex_65F4[3] = 0;
+        memcpy(&self->serverReserve_6614[3], &self->rfpServer_814E, sizeof(PatServerBlock));
+        break;
+    }
+}
+
+/* The selected server type and its chosen address index; both -1 when the type is out of range. */
+void getFmpSelection(NetworkInstance* self, s32* kind, s32* index)
+{
+    if ((u32)self->serverType_65F0 > 3) {
+        *kind = -1;
+        *index = -1;
+        return;
+    }
+    *kind = self->serverType_65F0;
+    *index = self->serverIndex_65F4[self->serverType_65F0];
+}
+
+/* Copies server block `type` (modulo 4) to `out`; nothing for a null `out`. */
+void copyServerBlock(NetworkInstance* self, s32 type, u8* out)
+{
+    if (out != NULL) {
+        memcpy(out, &self->serverReserve_6614[type % 4], sizeof(PatServerBlock));
+    }
 }
 
 /* The game time: the server's game time at the last sync plus the clock's progress since. */
@@ -471,6 +753,57 @@ u32 getFmpSlotIndex(NetworkStateMachine* self, u32 value)
     return -1;
 }
 
+/* Keeps the chosen FMP slot and its server block while the server type is FMP; the slot, else -1. */
+s32 saveFmpSelection(NetworkInstance* self)
+{
+    s32 slot;
+
+    if (self->serverType_65F0 != 1) {
+        return -1;
+    }
+    slot = self->serverIndex_65F4[1];
+    if (slot == -1) {
+        return -1;
+    }
+    self->fmpQueryValue_8044 = slot;
+    memcpy(&self->fmpReply_8048, &self->serverReserve_6614[1], sizeof(PatServerBlock));
+    return self->fmpQueryValue_8044;
+}
+
+/* Puts the kept FMP selection back (re-choosing the FMP server, restoring its block and re-applying the type) and
+ * returns its slot; -1 when the type is not FMP or nothing is kept. */
+s32 restoreFmpSelection(NetworkInstance* self)
+{
+    if (self->serverType_65F0 != 1) {
+        return -1;
+    }
+    if ((s32)self->fmpQueryValue_8044 == -1) {
+        return -1;
+    }
+    chooseServerAddress(self, self->serverType_65F0, self->fmpQueryValue_8044);
+    self->fmpQueryValue_8044 = -1;
+    memcpy(&self->serverReserve_6614[1], &self->fmpReply_8048, sizeof(PatServerBlock));
+    memset(&self->fmpReply_8048, 0, sizeof(PatServerBlock));
+    setConnectServerType(self, self->serverType_65F0);
+    memset(&self->pendingError_654C, 0, sizeof(self->pendingError_654C));
+    return self->serverIndex_65F4[1];
+}
+
+/* While the server type is FMP, whether the PAT phase reads 5; else -1. */
+s32 isFmpServerRejected(NetworkInstance* self)
+{
+    if (self->serverType_65F0 != 1) {
+        return -1;
+    }
+    return self->patPhase_894E == 5;
+}
+
+/* Hands the secure server's host, root certificate and size to the connection. */
+void updatePatInterface(PatInterface* self, u32 a, u32 b, u32 c)
+{
+    setSecureServer(self, (const char*)a, (const u8*)b, c);
+}
+
 /* Records the terms version the caller holds and marks it unchanged. */
 void setTermVersion(PatInterface* self, u32 value)
 {
@@ -482,6 +815,14 @@ void setTermVersion(PatInterface* self, u32 value)
 s32 getTermsVersion(PatInterface* self)
 {
     return self->termsVersion_8264;
+}
+
+/* The sum of the login block's two words. */
+u32 getPatServerTime(PatInterface* self)
+{
+    const PatLoginBlock* login = (const PatLoginBlock*)self->loginFields_82AC;
+
+    return login->fields_00[0] + login->fields_00[1];
 }
 
 /* The media version string. */
@@ -616,6 +957,31 @@ void setPatByteD400(NetworkInstance* self, u8 value)
     ((PatInterface*)self)->binaryActive_D400 = value;
 }
 
+/* Token `index` (0..7) of the split binary reply; NULL past 7. */
+char* getBinaryToken(NetworkInstance* self, u32 index)
+{
+    if (index <= 7) {
+        return &self->binaryText_D409[self->binaryTokens_D60C[index]];
+    }
+    return NULL;
+}
+
+/* The login block's name while its selector reads 0..3, else NULL. */
+char* getPatAccountName(PatInterface* self)
+{
+    PatLoginBlock* login = (PatLoginBlock*)self->loginFields_82AC;
+
+    u8 selector = login->nameSet_08;
+
+    if ((u32)(selector - 1) > 2) {
+        if (selector == 0) {
+            return login->name_09;
+        }
+        return NULL;
+    }
+    return login->name_09;
+}
+
 /* Copies this client's 8-byte short id out. */
 void getSelectedID(NetworkInstance* self, u8* out)
 {
@@ -636,6 +1002,12 @@ void setSomething(NetworkInstance* self, s32 value)
 }
 
 #pragma peephole off
+
+/* The +0x6138 flag `setPatByte6138On` sets. */
+s8 getSomething4(NetworkInstance* self)
+{
+    return self->flag_6138;
+}
 
 /* The login data getters: the reflect values the mediator mirrored. */
 u32 getSomething3(NetworkStateMachine* self)
@@ -662,6 +1034,87 @@ u32 getSomething8(NetworkStateMachine* self)
 u32 getSomething7(NetworkStateMachine* self)
 {
     return self->mySearchValue_65EC;
+}
+
+/* Takes at most 64 item rows (8-byte aligned) off the call stack and binds them to `list` (`reserved` carries the
+ * alignment in and the padding out; a part row goes back). */
+void createItemListStack(NetworkStateMachine* self, PatItemList* list, u32* reserved)
+{
+    u32 size;
+    u8* rows;
+    u8 count;
+
+    *reserved = 8;
+    rows = pushStack(self, 0x410, &size, reserved);
+    count = size >> 4;
+    if (count < 65) {
+        growStackSize(self, size - (count << 4));
+        if (count == 0) {
+            initItemList(self, list, NULL, 0);
+            return;
+        }
+    }
+    initItemList(self, list, (PatItem*)rows, count);
+}
+
+/* Gives a list's rows and the padding before them back to the call stack. */
+void releaseItemListStack(NetworkStateMachine* self, PatItemList* list, u32 reserved)
+{
+    growStackSize(self, reserved + list->capacity_03 * sizeof(PatItem));
+}
+
+/* Appends one tagged item to a list (while it has a free row) and grows the list's byte size by its encoding. */
+void appendItemList(NetworkStateMachine* self, PatItemList* list, u8 tag, u8 type, const u8* value, u16 size)
+{
+    if (list->count_02 < list->capacity_03) {
+        PatItem* item = &list->items_04[list->count_02];
+
+        item->tag_00 = tag;
+        list->marker_00++;
+        item->type_01 = type;
+        list->marker_00++;
+        switch (type) {
+        case 1:
+            item->value_08.byte = *value;
+            list->marker_00 += 1;
+            break;
+        case 2:
+            item->value_08.half = *(const u16*)value;
+            list->marker_00 += 2;
+            break;
+        case 3:
+            item->value_08.word = *(const u32*)value;
+            list->marker_00 += 4;
+            break;
+        case 4:
+            item->value_08.dword = *(const u64*)value;
+            list->marker_00 += 8;
+            break;
+        case 5:
+            item->value_08.real = *(const f32*)value;
+            list->marker_00 += 4;
+            break;
+        case 6:
+            item->value_08.dreal = *(const f64*)value;
+            list->marker_00 += 8;
+            break;
+        case 7:
+            item->value_08.word = *(const u32*)value;
+            list->marker_00 += 4;
+            break;
+        case 8:
+            item->value_08.bytes.data = value;
+            item->value_08.bytes.size = strlen((const char*)value);
+            list->marker_00 += (u16)(item->value_08.bytes.size + 2);
+            break;
+        case 9:
+            item->value_08.bytes.data = value;
+            item->value_08.bytes.size = size;
+            list->marker_00 += (u16)(item->value_08.bytes.size + 2);
+            break;
+        }
+        list->count_02++;
+    }
 }
 
 /* Sets the +0x6138 flag. */
@@ -1277,7 +1730,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         break;
     }
     case 50:
-        memcpy(st->fmpReply_8048, st->serverReserve_6614[1], 262);
+        memcpy(&st->fmpReply_8048, &st->serverReserve_6614[1], 262);
         st->requestState_6135 += 10;
         break;
     case 60:
@@ -2198,6 +2651,25 @@ u32 sendReqLayerParentInfo(NetworkInstance* self, const PatTagList* tags)
     return (u16)id;
 }
 
+/* Requests the child layer `layer_id`'s settings with the layer items and the first four tags. */
+u32 sendReqLayerChildInfo(NetworkInstance* self, s16 layer_id, u32 unused_arg)
+{
+    PatTagList tags;
+    u32 id = flushBuffer(self, 119, 0);
+    u8 i;
+
+    writeShortPlusOne(self, layer_id);
+    writeLayerItemRequest(self);
+    tags.count_000 = 4;
+    for (i = 0; i < tags.count_000; i++) {
+        tags.values_004[i].tag_0 = i + 1;
+        tags.values_004[i].type_1 = 1;
+    }
+    writeUnk2ByteArray(self, &tags);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
 /* Requests the child layer list's head with the layer items. */
 u32 sendReqLayerChildListHead(NetworkInstance* self, s32 first, s32 count)
 {
@@ -2265,6 +2737,17 @@ u32 sendReqLayerHost(NetworkInstance* self, const u8* path)
     return (u16)id;
 }
 
+/* Sends this console's user record (its key). */
+u32 sendReqLayerUserInfoSet(NetworkInstance* self, const NetLayerUserRecord* record)
+{
+    u8 items[1] = { 6 };
+    u32 id = flushBuffer(self, 136, 0);
+
+    writeLayerUserItems(self, (const PatLayerUser*)record, 1, items);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
 /* Requests the layer's users with five user items. */
 u32 sendReqLayerUserList(NetworkInstance* self)
 {
@@ -2272,6 +2755,20 @@ u32 sendReqLayerUserList(NetworkInstance* self)
     u32 id = flushBuffer((PatInterface*)self, 139, 0);
     writeUInt8Array2((PatInterface*)self, 5, items);
     encryptBuffer((PatInterface*)self);
+    return (u16)id;
+}
+
+/* Requests the user list head of the layer at `path`. */
+u32 sendReqLayerUserListHead(NetworkInstance* self, u8 kind, const u8* path, u32 first, u32 count)
+{
+    u32 id = flushBuffer(self, 141, 0);
+
+    writeUInt8(self, kind);
+    writeUnkShortArray(self, path);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    writeLayerUserItemRequest(self);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2293,6 +2790,23 @@ u32 sendReqLayerUserListFoot(NetworkInstance* self)
     return (u16)id;
 }
 
+/* Requests the user search head of the layer at `path` (the user id, the name and the filters). */
+u32 sendReqLayerUserSearchHead(NetworkInstance* self, u8 kind, const u8* path, u32 first, u32 count, const char* userId, const char* name, const NetLayerFilter* filters, s32 filterCount)
+{
+    u32 id = flushBuffer(self, 147, 0);
+
+    writeUInt8(self, kind);
+    writeUnkShortArray(self, path);
+    writeString(self, userId);
+    writeString(self, name);
+    writeSearchFilters(self, (const PatCircleFilter*)filters, filterCount, 0);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    writeLayerUserItemRequest(self);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
 /* Requests a range of the layer user search. */
 u32 sendReqLayerUserSearchData(NetworkInstance* self, s32 first, s32 count)
 {
@@ -2311,12 +2825,222 @@ u32 sendReqLayerUserSearchFoot(NetworkInstance* self)
     return (u16)id;
 }
 
+/* Sends an item list to the whole layer (an empty sender block first). */
+u32 sendNtcLayerBinary(NetworkInstance* self, PatItemList list)
+{
+    u32 id = flushBuffer(self, 154, 0);
+
+    writeCompoundLayerBinary(self, NULL, 0, NULL);
+    PatItemList copy = list;
+    writeAny(self, &copy);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Sends this console's position to the layer as six items (three floats, three words). */
+void sendNtcLayerUserPosition(NetworkInstance* self, const NetUserPosition* position)
+{
+    PatItem items[6];
+    PatItemList list;
+
+    flushBuffer(self, 156, 0);
+    memset(items, 0, sizeof(items));
+    initItemList(self, &list, items, 6);
+    appendItemList(self, &list, 1, 5, (const u8*)&position->position_00[0], 4);
+    appendItemList(self, &list, 2, 5, (const u8*)&position->position_00[1], 4);
+    appendItemList(self, &list, 3, 5, (const u8*)&position->position_00[2], 4);
+    appendItemList(self, &list, 4, 3, (const u8*)&position->value_0C[0], 4);
+    appendItemList(self, &list, 5, 3, (const u8*)&position->value_0C[1], 4);
+    appendItemList(self, &list, 6, 3, (const u8*)&position->value_0C[2], 4);
+    putItemList(self, list);
+    encryptBuffer(self);
+}
+
+/* Sends a chat line to the layer channel `channel`. */
+u32 sendNtcLayerChat(NetworkInstance* self, u8 channel, const PatMatchOptions* options, const char* text)
+{
+    u8 items[4] = { 1, 2, 3, 4 };
+    u32 id = flushBuffer(self, 158, 0);
+
+    writeUInt8(self, channel);
+    writeChatOptionItems(self, options, 4, items);
+    writeString(self, text);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Sends a tell to the layer member `userId`. */
+u32 sendReqLayerTell(NetworkInstance* self, const u8* userId, const PatMatchOptions* options, const char* text)
+{
+    u8 items[4] = { 1, 2, 3, 4 };
+    u32 id = flushBuffer(self, 159, 0);
+
+    writeString(self, (const char*)userId);
+    writeChatOptionItems(self, options, 4, items);
+    writeString(self, text);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Sends an item list to the layer member `userId` (an empty sender block first). */
+u32 sendNtcLayerBinaryTo(NetworkInstance* self, PatItemList list, const char* userId)
+{
+    u32 id = flushBuffer(self, 165, 0);
+
+    writeString(self, userId);
+    writeCompoundLayerBinary(self, NULL, 0, NULL);
+    PatItemList copy = list;
+    writeAny(self, &copy);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests the mediation lock `lock` with the key `key`. */
+u32 sendReqLayerMediationLock(NetworkInstance* self, u8 lock, u8 key)
+{
+    u8 items[1] = { 3 };
+    PatMediation entry;
+    u32 id;
+
+    memset(&entry, 0, sizeof(entry));
+    entry.key_9 = key;
+    id = flushBuffer(self, 166, 0);
+    writeUInt8(self, lock);
+    writeMediationItems(self, &entry, 1, items);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests the release of the mediation lock `lock` with the key `key`. */
+u32 sendReqLayerMediationUnlock(NetworkInstance* self, u8 lock, u8 key)
+{
+    u8 items[1] = { 3 };
+    PatMediation entry;
+    u32 id;
+
+    memset(&entry, 0, sizeof(entry));
+    entry.key_9 = key;
+    id = flushBuffer(self, 169, 0);
+    writeUInt8(self, lock);
+    writeMediationItems(self, &entry, 1, items);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests the mediation list. */
+u32 sendReqLayerMediationList(NetworkInstance* self, u8 mode, u8 count)
+{
+    u32 id = flushBuffer(self, 172, 0);
+
+    writeUInt8(self, mode);
+    writeUInt8(self, count);
+    writeMediationItemRequest(self);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests the detail search head: the kind (sent 1-based), the filters, the range and the item lists asked for. */
+u32 sendReqLayerDetailSearchHead(NetworkInstance* self, u32 kind, u32 mode, s32 count, const NetLayerFilter* filters, s32 filterCount)
+{
+    u8 layerItems[11] = { 1, 2, 3, 6, 7, 9, 11, 12, 16, 21, 22 };
+    u8 userItems[2] = { 1, 2 };
+    u32 id = flushBuffer(self, 174, 0);
+
+    writeBytePlusOne(self, kind);
+    writeSearchFilters(self, (const PatCircleFilter*)filters, filterCount, 0);
+    writeUInt32Shared(self, mode);
+    writeUInt32Shared(self, count);
+    writeUInt8Array2(self, sizeof(layerItems), layerItems);
+    writeUInt8Array2(self, sizeof(userItems), userItems);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests a range of the detail search. */
+u32 sendReqLayerDetailSearchData(NetworkInstance* self, s32 first, s32 count)
+{
+    u32 id = flushBuffer(self, 176, 0);
+
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Ends the detail search request. */
+u32 sendReqLayerDetailSearchFoot(NetworkInstance* self)
+{
+    u32 id = flushBuffer(self, 178, 0);
+
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests a new circle: its info block's set items and its option list. */
+u32 sendReqCircleCreate(NetworkInstance* self, PatCircleInfo* info, PatCircleOptionList* options)
+{
+    u32 id = flushBuffer(self, 180, 0);
+
+    writeCircleInfoItems(self, info);
+    writeUnkByteIntStruct(self, (PatTagList*)options);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests circle `circleId`'s info with the circle items and the tag list `mode` points at. */
+u32 sendReqCircleInfo(NetworkInstance* self, s32 circleId, s32 mode)
+{
+    u32 id = flushBuffer(self, 182, 0);
+
+    writeUInt32Shared(self, circleId);
+    writeCircleItemRequest(self);
+    writeUnk2ByteArray(self, (const PatTagList*)mode);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests to join a circle: its id, and the session name items while the block carries one. */
+u32 sendReqCircleJoin(NetworkInstance* self, PatCircleInfo* info)
+{
+    u8 items[3] = { 11, 3, 4 };
+    u8 count = 3;
+    u32 id = flushBuffer(self, 184, 0);
+
+    writeUInt32Shared(self, info->id_000);
+    if (info->flag_044 != 1) {
+        count = 1;
+    }
+    putCircleInfoItems(self, info, count, items);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
 /* Requests leaving the circle. */
 u32 sendReqCircleLeave(NetworkInstance* self, s32 circleId)
 {
     u32 id = flushBuffer((PatInterface*)self, 187, 0);
     writeUInt32Shared((PatInterface*)self, circleId);
     encryptBuffer((PatInterface*)self);
+    return (u16)id;
+}
+
+/* Sends this member's match options: the tag while set, the session key while set, and the mode. */
+u32 sendReqCircleMatchOptionSet(NetworkInstance* self, PatMatchOptions* options)
+{
+    u8 items[3];
+    u8 count = 0;
+    u32 id;
+
+    if (((const u8*)&options->tag_00)[0] != 0) {
+        items[count++] = 1;
+    }
+    if (options->sessionKey_04 != 0) {
+        items[count++] = 2;
+    }
+    items[count++] = 3;
+    id = flushBuffer(self, 193, 0);
+    writeMatchOptionItems(self, options, count, items);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2334,6 +3058,53 @@ u32 sendReqCircleMatchEnd(NetworkInstance* self, s32 mode)
     u32 id = flushBuffer((PatInterface*)self, 201, 0);
     writeUInt8((PatInterface*)self, mode);
     encryptBuffer((PatInterface*)self);
+    return (u16)id;
+}
+
+/* Sends a circle's changed info (its set items) and the tag list `name` points at. */
+u32 sendReqCircleInfoSet(NetworkInstance* instance, u32 request_id, PatCircleInfo* info, const char* name)
+{
+    u32 id = flushBuffer(instance, 203, 0);
+
+    writeUInt32Shared(instance, request_id);
+    writeCircleInfoItems(instance, info);
+    writeUnkByteIntStruct(instance, (PatTagList*)name);
+    encryptBuffer(instance);
+    return (u16)id;
+}
+
+/* Requests the circle list of the layer with the circle items and the first eight tags; arms the layer move. */
+u32 sendReqCircleListLayer(NetworkInstance* self)
+{
+    PatTagList tags;
+    u32 id;
+    u8 i;
+
+    tags.count_000 = 8;
+    for (i = 0; i < tags.count_000; i++) {
+        tags.values_004[i].tag_0 = i + 1;
+        tags.values_004[i].type_1 = 1;
+    }
+    self->layerMovePending_D62C = 1;
+    id = flushBuffer(self, 206, 0);
+    writeCircleItemRequest(self);
+    writeUnk2ByteArray(self, &tags);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests the circle search head: the filters, the range and the circle items. */
+u32 sendReqCircleListHead(NetworkInstance* self, s32 mode, s32 count, PatCircleFilter* filters, s32 filterCount, u32 flag)
+{
+    u32 id;
+
+    self->layerMovePending_D62C = 0;
+    id = flushBuffer(self, 208, 0);
+    writeSearchFilters(self, filters, filterCount, flag);
+    writeUInt32Shared(self, mode);
+    writeUInt32Shared(self, count);
+    writeCircleItemRequest(self);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2378,6 +3149,214 @@ u32 sendReqCircleHost(NetworkInstance* self, s32 circleId)
     return (u16)id;
 }
 
+/* Requests the circle's users with the circle user items. */
+u32 sendReqCircleUserList(NetworkInstance* self)
+{
+    u32 id = flushBuffer(self, 225, 0);
+
+    writeCircleUserItemRequest(self);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Sends an item list to circle `circleId` (an empty sender block first). */
+u32 sendNtcCircleBinary(NetworkInstance* self, s32 circleId, PatItemList list)
+{
+    u32 id = flushBuffer(self, 228, 0);
+
+    writeUInt32Shared(self, circleId);
+    writeCompoundLayerBinary(self, NULL, 0, NULL);
+    PatItemList copy = list;
+    writeAny(self, &copy);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Sends an item list to the member `userId` of circle `circleId` (an empty sender block first). */
+u32 sendNtcCircleBinaryTo(NetworkInstance* self, s32 circleId, PatItemList list, const char* userId)
+{
+    u32 id = flushBuffer(self, 230, 0);
+
+    writeUInt32Shared(self, circleId);
+    writeString(self, userId);
+    writeCompoundLayerBinary(self, NULL, 0, NULL);
+    PatItemList copy = list;
+    writeAny(self, &copy);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Sends a chat line to the circle. */
+void sendNtcCircleChat(NetworkInstance* self, PatMatchOptions* options, const char* text)
+{
+    u8 items[4] = { 1, 2, 3, 4 };
+
+    flushBuffer(self, 232, 0);
+    writeChatOptionItems(self, options, 4, items);
+    writeString(self, text);
+    encryptBuffer(self);
+}
+
+/* Sends a tell to the circle member `userId`. */
+u32 sendReqCircleTell(NetworkInstance* self, const char* userId, PatMatchOptions* options, const char* text)
+{
+    u8 items[4] = { 1, 2, 3, 4 };
+    u32 id = flushBuffer(self, 233, 0);
+
+    writeString(self, userId);
+    writeChatOptionItems(self, options, 4, items);
+    writeString(self, text);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Asks for the circle info notices with the circle items (twice: the changed and the new circles). */
+void sendReqCircleInfoNoticeSet(NetworkInstance* self)
+{
+    flushBuffer(self, 236, 0);
+    writeCircleItemRequest(self);
+    writeCircleItemRequest(self);
+    encryptBuffer(self);
+}
+
+/* Sends a member value to circle `circleId` (kind 2 when `notify` is set, else 1). */
+void sendNtcCircleUserValue(NetworkInstance* self, s32 circleId, s32 value, u8 notify)
+{
+    PatItem items[2];
+    PatItemList list;
+    s8 kind;
+
+    memset(items, 0, sizeof(items));
+    initItemList(self, &list, items, 2);
+    if (notify != 0) {
+        kind = 2;
+    } else {
+        kind = 1;
+    }
+    appendItemList(self, &list, 1, 1, (const u8*)&kind, 1);
+    appendItemList(self, &list, 2, 3, (const u8*)&value, 4);
+    sendNtcCircleBinary(self, circleId, list);
+}
+
+/* Answers a member value to the circle member at `address` (kind 1). */
+void sendNtcCircleUserValueReply(NetworkInstance* self, s32 circleId, s32 value, const u8* address)
+{
+    PatItem items[2];
+    PatItemList list;
+    s8 kind;
+
+    memset(items, 0, sizeof(items));
+    initItemList(self, &list, items, 2);
+    kind = 1;
+    appendItemList(self, &list, 1, 1, (const u8*)&kind, 1);
+    appendItemList(self, &list, 2, 3, (const u8*)&value, 4);
+    sendNtcCircleBinaryTo(self, circleId, list, (const char*)address);
+}
+
+/* Sends the match state to circle `circleId` (kind 3). */
+void sendNtcCircleMatchState(NetworkInstance* self, s32 circleId, s32 state)
+{
+    PatItem items[2];
+    PatItemList list;
+    s8 kind;
+
+    memset(items, 0, sizeof(items));
+    initItemList(self, &list, items, 2);
+    kind = 3;
+    appendItemList(self, &list, 1, 1, (const u8*)&kind, 1);
+    appendItemList(self, &list, 2, 3, (const u8*)&state, 4);
+    sendNtcCircleBinary(self, circleId, list);
+}
+
+/* Sends a transfer state to the layer member `userId` (kind 5 while `active`, else 4). */
+void sendNtcLayerUserTransfer(NetworkInstance* self, u32 state, const u8* userId, u32 active)
+{
+    PatItem items[2];
+    PatItemList list;
+    s8 kind;
+
+    memset(items, 0, sizeof(items));
+    initItemList(self, &list, items, 2);
+    if (active != 0) {
+        kind = 5;
+    } else {
+        kind = 4;
+    }
+    appendItemList(self, &list, 1, 1, (const u8*)&kind, 1);
+    appendItemList(self, &list, 2, 3, (const u8*)&state, 4);
+    sendNtcLayerBinaryTo(self, list, (const char*)userId);
+}
+
+/* Packs a kind byte and the 14-byte record as five items and sends them to the layer (kind 6) or to the member
+ * `userId` (kind 7). */
+void sendLayerBinaryRecord(NetworkInstance* self, u32 a, u32 b, u32 c, u16 d, const u8* userId, s32 broadcast)
+{
+    PatItem items[5];
+    PatItemList list;
+    s8 kind;
+
+    memset(items, 0, sizeof(items));
+    initItemList(self, &list, items, 5);
+    if (broadcast != 0) {
+        kind = 6;
+    } else {
+        kind = 7;
+    }
+    appendItemList(self, &list, 1, 1, (const u8*)&kind, 1);
+    appendItemList(self, &list, 3, 3, (const u8*)&a, 4);
+    appendItemList(self, &list, 4, 3, (const u8*)&b, 4);
+    appendItemList(self, &list, 5, 3, (const u8*)&c, 4);
+    appendItemList(self, &list, 6, 2, (const u8*)&d, 2);
+    if (broadcast != 0) {
+        sendNtcLayerBinary(self, list);
+    } else {
+        sendNtcLayerBinaryTo(self, list, (const char*)userId);
+    }
+}
+
+/* Packs (from, to, state) as four items (kind 8) and sends them to the layer. */
+void sendNtcLayerBinaryNatState(NetworkInstance* self, u32 from, u32 to, s8 state)
+{
+    PatItem items[4];
+    PatItemList list;
+    s8 kind;
+
+    memset(items, 0, sizeof(items));
+    initItemList(self, &list, items, 4);
+    kind = 8;
+    appendItemList(self, &list, 1, 1, (const u8*)&kind, 1);
+    appendItemList(self, &list, 7, 3, (const u8*)&from, 4);
+    appendItemList(self, &list, 8, 3, (const u8*)&to, 4);
+    appendItemList(self, &list, 9, 1, (const u8*)&state, 1);
+    sendNtcLayerBinary(self, list);
+}
+
+/* Sends a tell to the user `id`. */
+s32 sendReqTell(NetworkInstance* self, const u8* id, const u32* options, const char* text)
+{
+    u8 items[4] = { 1, 2, 3, 4 };
+    u32 request = flushBuffer(self, 245, 0);
+
+    writeString(self, (const char*)id);
+    writeChatOptionItems(self, (const PatMatchOptions*)options, 4, items);
+    writeString(self, text);
+    encryptBuffer(self);
+    return (u16)request;
+}
+
+/* Sends `size` bytes to the user `id` (an empty sender block first). */
+s32 sendReqBinaryUser(NetworkInstance* self, const u8* id, const u8* data, u16 size)
+{
+    u8 items[3] = { 1, 2, 3 };
+    u32 request = flushBuffer(self, 248, 0);
+
+    writeString(self, (const char*)id);
+    writeCompoundLayerBinary(self, NULL, 3, items);
+    writeUInt8Array(self, data, size);
+    encryptBuffer(self);
+    return (u16)request;
+}
+
 /* Sends this user's search tags. */
 u32 sendReqUserSearchSet(NetworkInstance* self, PatTagList* tags)
 {
@@ -2413,6 +3392,24 @@ u32 sendReqUserBinaryNotice(NetworkInstance* self, u8 kind, const char* text, u3
     return (u16)id;
 }
 
+/* Requests the user search head: the user id, the name, the filters, the range and the four user items. */
+u32 sendReqUserSearchHead(NetworkInstance* self, u32 kind, u32 count, const char* userId, const char* name, const NetLayerFilter* filters, s32 filterCount, u8 flag)
+{
+    u8 items[4] = { 1, 2, 3, 4 };
+    u32 id;
+
+    self->searchMode_6118 = flag;
+    id = flushBuffer(self, 259, 0);
+    writeString(self, userId);
+    writeString(self, name);
+    writeSearchFilters(self, (const PatCircleFilter*)filters, filterCount, 0);
+    writeUInt32Shared(self, kind);
+    writeUInt32Shared(self, count);
+    writeUInt8Array2(self, sizeof(items), items);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
 /* Requests a range of the user search. */
 u32 sendReqUserSearchData(NetworkInstance* self, s32 first, s32 count)
 {
@@ -2429,6 +3426,77 @@ u32 sendReqUserSearchFoot(NetworkInstance* self)
     u32 id = flushBuffer((PatInterface*)self, 263, 0);
     encryptBuffer((PatInterface*)self);
     return (u16)id;
+}
+
+/* Requests the search info of the user `query` names (ten items); `mode` selects the answer's event. */
+s32 sendReqUserSearchInfo(NetworkInstance* self, const u8* query, s32 mode)
+{
+    u8 items[10] = { 1, 2, 3, 4, 7, 8, 11, 12, 13, 14 };
+    u32 id;
+
+    self->searchKind_6119 = mode;
+    id = flushBuffer(self, 265, 0);
+    writeString(self, (const char*)query);
+    writeUserSearchItems(self, query, sizeof(items), items);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests this console's own search info (items 15 and 16). */
+void reqUserSearchInfoMine(NetworkInstance* self, s32 mode)
+{
+    u8 items[2] = { 15, 16 };
+
+    flushBuffer(self, 267, 0);
+    writeUserSearchItems(self, (const u8*)mode, sizeof(items), items);
+    encryptBuffer(self);
+}
+
+/* Sends this console's status: each of the seven bytes that is not 0xFF (unset). */
+s32 sendReqUserStatusSet(NetworkInstance* self, const u8* settings)
+{
+    u8 items[10];
+    u8 count = 0;
+    u32 id;
+
+    if (settings[0] != 0xFF) {
+        items[count++] = 1;
+    }
+    if (settings[1] != 0xFF) {
+        items[count++] = 2;
+    }
+    if (settings[2] != 0xFF) {
+        items[count++] = 3;
+    }
+    if (settings[3] != 0xFF) {
+        items[count++] = 4;
+    }
+    if (settings[4] != 0xFF) {
+        items[count++] = 5;
+    }
+    if (settings[5] != 0xFF) {
+        items[count++] = 8;
+    }
+    if (settings[6] != 0xFF) {
+        items[count++] = 9;
+    }
+    id = flushBuffer(self, 269, 0);
+    writeUserStatusItems(self, settings, count, items);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Asks the user `id` to become a friend, with a message. */
+s32 sendReqFriendAdd(NetworkInstance* self, const u8* id, const u32* options, const char* text)
+{
+    u8 items[2] = { 3, 4 };
+    u32 request = flushBuffer(self, 273, 0);
+
+    writeString(self, (const char*)id);
+    writeChatOptionItems(self, (const PatMatchOptions*)options, sizeof(items), items);
+    writeString(self, text);
+    encryptBuffer(self);
+    return (u16)request;
 }
 
 /* Answers a friend request (GUESS name: op-code 276, after the friend request 273). */
@@ -2450,6 +3518,30 @@ u32 sendReqFriendDelete(NetworkInstance* self, const char* userId)
     return (u16)id;
 }
 
+/* Requests a range of the friend list. */
+s32 sendReqFriendList(NetworkInstance* self, s32 mode, s32 max)
+{
+    u32 id = flushBuffer(self, 281, 0);
+
+    writeUInt32Shared(self, mode);
+    writeUInt32Shared(self, max);
+    writeFriendItemRequest(self);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Adds the user `id` to the black list. */
+s32 sendReqBlackAdd(NetworkInstance* self, const u8* id, const u32* options)
+{
+    u8 items[3] = { 1, 2, 3 };
+    u32 request = flushBuffer(self, 283, 0);
+
+    writeString(self, (const char*)id);
+    writeBlackListItems(self, options, sizeof(items), items);
+    encryptBuffer(self);
+    return (u16)request;
+}
+
 /* Removes a user from the black list (GUESS name: op-code 285). */
 u32 sendReqBlackDelete(NetworkInstance* self, const char* userId)
 {
@@ -2457,6 +3549,29 @@ u32 sendReqBlackDelete(NetworkInstance* self, const char* userId)
     writeString((PatInterface*)self, userId);
     encryptBuffer((PatInterface*)self);
     return (u16)id;
+}
+
+/* Requests a range of the black list. */
+s32 sendReqBlackList(NetworkInstance* self, s32 mode, s32 max)
+{
+    u32 id = flushBuffer(self, 287, 0);
+
+    writeUInt32Shared(self, mode);
+    writeUInt32Shared(self, max);
+    writeBlackListItemRequest(self);
+    encryptBuffer(self);
+    return (u16)id;
+}
+
+/* Requests channel `handle`'s info (the warning kind first) with the two channel item lists. */
+void sendReqChannelInfo(NetworkInstance* self, u32 handle)
+{
+    flushBuffer(self, 291, 0);
+    writeUInt8(self, self->warningKind_8BBC);
+    writeUInt8(self, handle);
+    writeChannelItemRequest(self);
+    writeChannelDataItemRequest(self);
+    encryptBuffer(self);
 }
 
 /* Requests a range of a reflect channel. */
@@ -2695,6 +3810,35 @@ s32 PatInterface::recvAnsCommonKey(s32 index, const PatPacketHeader* header)
     return 0;
 }
 
+/* Answers the server's memory check: reads the two check bytes, the address and the size, and sends back the set bytes,
+ * the address and that many bytes from it. */
+s32 PatInterface::recvReqMemoryCheck(s32 index, const PatPacketHeader* header)
+{
+    u8 tags[4];
+    u32 address;
+    u32 size;
+    u8 check[2];
+    u8 count = 0;
+
+    PAT_TRACE("%s:recvReqMemoryCheck ok\n");
+    memset(check, 0, sizeof(check));
+    readMemoryCheckData(this, check, 1);
+    readUInt32_(this, &address);
+    readUInt32_(this, &size);
+    if (check[0] != 0) {
+        tags[count++] = 1;
+    }
+    if (check[1] != 0) {
+        tags[count++] = 2;
+    }
+    flushBuffer(this, 22, 0);
+    putMemoryCheckBytes(this, check, count, tags);
+    writeUInt32(this, address);
+    writeUInt8Array(this, (const u8*)address, size);
+    encryptBuffer(this);
+    return 0;
+}
+
 /* Reads the login answer: the session flag, its message and the charge items. */
 s32 PatInterface::recvAnsLoginInfo(s32 index, const PatPacketHeader* header)
 {
@@ -2814,12 +3958,12 @@ s32 PatInterface::recvAnsFmpListData(s32 index, const PatPacketHeader* header)
         count = 80 - replySent_8BCC;
     }
     if (fmpListReady_6C3C != 0) {
-        readFmpCompoundData(this, &fmpSlots_6C40[replySent_8BCC], reserve, count);
+        readFmpCompoundData(this, &fmpSlots_6C40[replySent_8BCC], (PatServerBlock*)reserve, count);
         serverCount_6604[1] += count;
     } else {
         for (i = 0; i < count; i++) {
             memset(&slot, 0, sizeof(NetworkFmpSlot));
-            readFmpCompoundData(this, &slot, reserve, 1);
+            readFmpCompoundData(this, &slot, (PatServerBlock*)reserve, 1);
             if (slot.payload_00 != 0) {
                 for (j = 0; j < (s32)serverCount_6604[1]; j++) {
                     if (slot.payload_00 == fmpSlots_6C40[j].payload_00) {
@@ -2848,8 +3992,8 @@ s32 PatInterface::recvAnsFmpListFoot(s32 index, const PatPacketHeader* header)
 s32 PatInterface::recvAnsFmpInfo(s32 index, const PatPacketHeader* header)
 {
     PAT_TRACE("%s:recvAnsFmpInfo ok\n");
-    memset(serverReserve_6614[1], 0, sizeof(serverReserve_6614[1]));
-    readFmpCompoundData(this, &fmpSlots_6C40[serverIndex_65F4[1]], serverReserve_6614[1], 1);
+    memset(&serverReserve_6614[1], 0, sizeof(serverReserve_6614[1]));
+    readFmpCompoundData(this, &fmpSlots_6C40[serverIndex_65F4[1]], &serverReserve_6614[1], 1);
     dispatchSessionHandlers(this, 0x8008, header->requestId_02, header->status_07, 0, NULL);
     requestState_6135 += 5;
     return 0;
@@ -3608,7 +4752,7 @@ s32 PatInterface::recvNtcLayerBinary(s32 index, const PatPacketHeader* header)
     readNtcCompoundData(this, &sender, 1);
     createItemListStack(this, &notice.items_08, &reserved);
     buffer = createStack(this, 8192, &stackSize);
-    readItemList(this, &notice.items_08, buffer, stackSize);
+    getFo(this, &notice.items_08, buffer, stackSize);
     if (notice.items_08.count_02 <= notice.items_08.capacity_03) {
         dispatchSessionHandlers(this, 0x8033, NULL, header->status_07, 1, (const u8*)&notice);
     }
@@ -3634,7 +4778,7 @@ s32 PatInterface::recvNtcLayerUserPosition(s32 index, const PatPacketHeader* hea
     memset(items, 0, sizeof(items));
     initItemList(this, &list, items, 6);
     buffer = createStack(this, 8192, &stackSize);
-    readItemList(this, &list, buffer, stackSize);
+    getFo(this, &list, buffer, stackSize);
     if (list.count_02 <= list.capacity_03) {
         for (i = 0; i < list.count_02; i++) {
             switch (list.items_04[i].tag_00) {
@@ -3871,8 +5015,8 @@ s32 PatInterface::recvAnsCircleInfo(s32 index, const PatPacketHeader* header)
 
     PAT_TRACE("%s:recvAnsCircleInfo ok\n");
     memset(&circle, 0, sizeof(PatCircleEntry));
-    readInt32(this, &circle.circleId_000);
-    readCircleInfoDataArray(this, &circle, 1);
+    readInt32(this, &circle.info_000.id_000);
+    readCircleInfoDataArray(this, &circle.info_000, 1);
     readUnkByteIntStruct(this, &circle.tags_37C, 1);
     dispatchSessionHandlers(this, 0x8043, header->requestId_02, header->status_07, 1, (const u8*)&circle);
     return 0;
@@ -4027,7 +5171,7 @@ s32 PatInterface::recvNtcCircleMatchStart(s32 index, const PatPacketHeader* head
         remaining -= 1;
         readString(this, &length, member->userId_08, 8);
         remaining -= (u16)(length + 2);
-        readUInt8Array(this, &length, &member->flag_00, 1);
+        readUInt8Array(this, &length, member->tag_00, 1);
         remaining -= (u16)(length + 2);
         readUInt16(this, &member->value_04);
         remaining -= 2;
@@ -4072,8 +5216,8 @@ s32 PatInterface::recvNtcCircleInfoSet(s32 index, const PatPacketHeader* header)
 
     PAT_TRACE("%s:recvNtcCircleInfoSet ok\n");
     memset(&circle, 0, sizeof(PatCircleEntry));
-    readInt32(this, &circle.circleId_000);
-    readCircleInfoDataArray(this, &circle, 1);
+    readInt32(this, &circle.info_000.id_000);
+    readCircleInfoDataArray(this, &circle.info_000, 1);
     readUnkByteIntStruct(this, &circle.tags_37C, 1);
     dispatchSessionHandlers(this, 0x8052, NULL, header->status_07, 1, (const u8*)&circle);
     return 0;
@@ -4098,7 +5242,7 @@ s32 PatInterface::recvAnsCircleListLayer(s32 index, const PatPacketHeader* heade
         values[1] = maxCount;
     }
     for (i = 0, info = list; i < values[1]; info++, i++) {
-        readCircleInfoDataArray(this, info, 1);
+        readCircleInfoDataArray(this, &info->info_000, 1);
         readUnkByteIntStruct(this, &info->tags_37C, 1);
     }
     dispatchSessionHandlers(this, 0x8053, header->requestId_02, header->status_07, values[1], (const u8*)list);
@@ -4137,7 +5281,7 @@ s32 PatInterface::recvAnsCircleSearchData(s32 index, const PatPacketHeader* head
         values[1] = maxCount;
     }
     for (i = 0, info = list; i < values[1]; info++, i++) {
-        readCircleInfoDataArray(this, info, 1);
+        readCircleInfoDataArray(this, &info->info_000, 1);
         readUnkByteIntStruct(this, &info->tags_37C, 1);
     }
     dispatchSessionHandlers(this, 0x8055, header->requestId_02, header->status_07, values[1], (const u8*)list);
@@ -4278,7 +5422,7 @@ s32 PatInterface::recvNtcCircleBinary(s32 index, const PatPacketHeader* header)
     readNtcCompoundData(this, &sender, 1);
     createItemListStack(this, &notice.items_08, &reserved);
     buffer = createStack(this, 8192, &stackSize);
-    readItemList(this, &notice.items_08, buffer, stackSize);
+    getFo(this, &notice.items_08, buffer, stackSize);
     if (notice.items_08.count_02 <= notice.items_08.capacity_03) {
         dispatchSessionHandlers(this, 0x805F, NULL, header->status_07, 1, (const u8*)&notice);
     }
@@ -4340,8 +5484,8 @@ s32 PatInterface::recvNtcCircleListLayerCreate(s32 index, const PatPacketHeader*
 
     PAT_TRACE("%s:recvNtcCircleListLayerCreate ok\n");
     memset(&circle, 0, sizeof(PatCircleEntry));
-    readInt32(this, &circle.circleId_000);
-    readCircleInfoDataArray(this, &circle, 1);
+    readInt32(this, &circle.info_000.id_000);
+    readCircleInfoDataArray(this, &circle.info_000, 1);
     readUnkByteIntStruct(this, &circle.tags_37C, 1);
     if (layerMovePending_D62C != 0) {
         dispatchSessionHandlers(this, 0x8064, NULL, header->status_07, 1, (const u8*)&circle);
@@ -4356,8 +5500,8 @@ s32 PatInterface::recvNtcCircleListLayerChange(s32 index, const PatPacketHeader*
 
     PAT_TRACE("%s:recvNtcCircleListLayerChange ok\n");
     memset(&circle, 0, sizeof(PatCircleEntry));
-    readInt32(this, &circle.circleId_000);
-    readCircleInfoDataArray(this, &circle, 1);
+    readInt32(this, &circle.info_000.id_000);
+    readCircleInfoDataArray(this, &circle.info_000, 1);
     readUnkByteIntStruct(this, &circle.tags_37C, 1);
     if (layerMovePending_D62C != 0) {
         dispatchSessionHandlers(this, 0x8065, NULL, header->status_07, 1, (const u8*)&circle);
@@ -4546,7 +5690,7 @@ s32 PatInterface::recvAnsUserSearchData(s32 index, const PatPacketHeader* header
         values[1] = maxCount;
     }
     for (i = 0, info = list; i < values[1]; info++, i++) {
-        readUserSearchData(this, info, 1);
+        readUserSearchData(this, &info->row_000, 1);
         readUnkByteIntStruct(this, &info->tags_230, 1);
     }
     if (searchMode_6118 == 0) {
@@ -4573,7 +5717,7 @@ s32 PatInterface::recvAnsUserSearchInfo(s32 index, const PatPacketHeader* header
 
     PAT_TRACE("%s:recvAnsUserSearchInfo\n");
     memset(&row, 0, sizeof(PatUserSearch));
-    readUserSearchData(this, &row, 1);
+    readUserSearchData(this, &row.row_000, 1);
     readUnkByteIntStruct(this, &row.tags_230, 1);
     switch (searchKind_6119) {
     case 1:
@@ -4593,9 +5737,9 @@ s32 PatInterface::recvAnsUserSearchInfoMine(s32 index, const PatPacketHeader* he
 
     PAT_TRACE("%s:recvAnsUserSearchInfoMine\n");
     memset(&row, 0, sizeof(PatUserSearch));
-    readUserSearchData(this, &row, 1);
-    mySearchValue_65E8 = row.value_228;
-    mySearchValue_65EC = row.value_22C;
+    readUserSearchData(this, &row.row_000, 1);
+    mySearchValue_65E8 = row.row_000.value_228;
+    mySearchValue_65EC = row.row_000.value_22C;
     requestState_6135 += 5;
     return 0;
 }
@@ -4758,16 +5902,16 @@ s32 PatInterface::recvAnsAgreementPageInfo(s32 index, const PatPacketHeader* hea
     PAT_TRACE("%s:recvAnsAgreementPageInfo\n");
     readUInt8(this, &kind);
     infoPtr = &info;
-    readUInt8(this, &infoPtr->version_00);
-    readUInt8(this, &infoPtr->pageCount_0C);
-    infoPtr->pages_10 = createStack(this, infoPtr->pageCount_0C * 40, &stackSize);
-    if (infoPtr->pageCount_0C * 40 > stackSize) {
+    readUInt8(this, &infoPtr->head_00.version_00);
+    readUInt8(this, &infoPtr->head_00.pageCount_0C);
+    infoPtr->pages_10 = createStack(this, infoPtr->head_00.pageCount_0C * 40, &stackSize);
+    if (infoPtr->head_00.pageCount_0C * 40 > stackSize) {
         PAT_KEEP_FAILURE();
         growStackSize(this, stackSize);
         return -1;
     }
-    readAgreementPageData(this, infoPtr->pages_10, infoPtr->pageCount_0C);
-    readAgreementInfoData(this, infoPtr, 1);
+    readAgreementPageData(this, (PatAgreementPageInfo*)infoPtr->pages_10, infoPtr->head_00.pageCount_0C);
+    readAgreementInfoData(this, &infoPtr->head_00, 1);
     dispatchSessionHandlers(this, 0x8080, header->requestId_02, header->status_07, 1, (const u8*)infoPtr);
     growStackSize(this, stackSize);
     return 0;
@@ -4807,4 +5951,2135 @@ s32 PatInterface::recvAnsAgreement(s32 index, const PatPacketHeader* header)
     readUInt8(this, &value);
     dispatchSessionHandlers(this, 0x8082, header->requestId_02, header->status_07, 0, NULL);
     return 0;
+}
+
+/* ==== the request item writers ================================================================================ */
+
+/* Writes `count` and then `count` bytes of `data`, one byte at a time. */
+void writeUInt8Array2(NetworkStateMachine* self, u8 count, const u8* data)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, data[i]);
+    }
+}
+
+/* Writes a byte item (type 1). */
+void putItemByte(NetworkStateMachine* self, u8 value)
+{
+    writeUInt8(self, PAT_ITEM_BYTE);
+    writeUInt8(self, value);
+}
+
+/* Writes a 16-bit item (type 2). */
+void putUInt16(NetworkStateMachine* self, u16 value)
+{
+    writeUInt8(self, PAT_ITEM_HALF);
+    writeUInt16(self, value);
+}
+
+/* Writes a 32-bit item (type 3). */
+void putItemLong(NetworkStateMachine* self, u32 value)
+{
+    writeUInt8(self, PAT_ITEM_WORD);
+    writeUInt32(self, value);
+}
+
+/* Writes a signed byte item. */
+void putItemByte_(NetworkStateMachine* self, s32 value)
+{
+    putItemByte(self, value);
+}
+
+/* Writes a 32-bit item (the tail-branch twin of `putItemLong`). */
+void putItemLong2(NetworkStateMachine* self, u32 value)
+{
+    putItemLong(self, value);
+}
+
+/* Writes a string item (type 5: a 16-bit length and the characters). */
+void putItemString(NetworkStateMachine* self, const char* text)
+{
+    writeUInt8(self, PAT_ITEM_STRING);
+    writeString(self, text);
+}
+
+/* Writes a byte array item (type 6: a 16-bit length and the bytes). */
+void putItemBinary(NetworkStateMachine* self, const u8* data, u16 size)
+{
+    writeUInt8(self, PAT_ITEM_BINARY);
+    writeUInt8Array(self, data, size);
+}
+
+/* Writes an item list: its marker, its count and each item's tag, type and value. */
+void writeAny(NetworkStateMachine* self, const PatItemList* list)
+{
+    u8 i;
+
+    writeUInt16(self, list->marker_00);
+    writeUInt8(self, list->count_02);
+    for (i = 0; i < list->count_02; i++) {
+        const PatItem* item = &list->items_04[i];
+
+        writeUInt8(self, item->tag_00);
+        writeUInt8(self, item->type_01);
+        switch (item->type_01) {
+        case 1:
+            writeUInt8(self, item->value_08.byte);
+            break;
+        case 2:
+            writeUInt16(self, item->value_08.half);
+            break;
+        case 3:
+            writeUInt32(self, item->value_08.word);
+            break;
+        case 4:
+            writeUInt64(self, item->value_08.dword);
+            break;
+        case 5: {
+            u32 bits;
+            memcpy(&bits, &item->value_08, sizeof(bits));
+            writeUInt32(self, bits);
+            break;
+        }
+        case 6: {
+            u64 bits;
+            memcpy(&bits, &item->value_08, sizeof(bits));
+            writeUInt64(self, bits);
+            break;
+        }
+        case 7:
+            writeUInt32(self, item->value_08.word);
+            break;
+        case 8:
+            writeString(self, item->value_08.text);
+            break;
+        case 9:
+            writeUInt8Array(self, item->value_08.bytes.data, item->value_08.bytes.size);
+            break;
+        }
+    }
+}
+
+/* Binds `capacity` rows at `items` to an empty list. */
+void initItemList(NetworkStateMachine* self, PatItemList* list, PatItem* items, u8 capacity)
+{
+    list->marker_00 = 1;
+    list->count_02 = 0;
+    list->capacity_03 = capacity;
+    list->items_04 = items;
+}
+
+/* Writes an item list handed over by value. */
+void putItemList(NetworkStateMachine* self, PatItemList list)
+{
+    PatItemList copy = list;
+
+    writeAny(self, &copy);
+}
+
+/* Writes a tag list: its count, then each tag, its type and (type 1) its value. */
+void writeUnkByteIntStruct(NetworkStateMachine* self, PatTagList* tags)
+{
+    u8 count;
+    u8 i;
+
+    if (tags != NULL) {
+        count = tags->count_000;
+    } else {
+        count = 0;
+    }
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        PatTagValue* value = &tags->values_004[i];
+
+        writeUInt8(self, value->tag_0);
+        writeUInt8(self, value->type_1);
+        if ((s32)value->type_1 == 1) {
+            writeUInt32(self, value->value_4);
+        }
+    }
+}
+
+/* Writes the tags and types of a tag list, without the values (the items a request asks for). */
+void writeUnk2ByteArray(NetworkStateMachine* self, const PatTagList* tags)
+{
+    u32 count;
+    u8 i;
+
+    if (tags != NULL) {
+        count = tags->count_000;
+    } else {
+        count = 0;
+    }
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        const PatTagValue* value = &tags->values_004[i];
+
+        writeUInt8(self, value->tag_0);
+        writeUInt8(self, value->type_1);
+    }
+}
+
+/* Writes a search's mode, its filter count and each filter (field, enable flag, operator and, when enabled, the
+ * value). */
+void writeSearchFilters(NetworkStateMachine* self, const PatCircleFilter* filters, s32 count, u32 mode)
+{
+    s32 i;
+
+    writeUInt32Shared(self, mode);
+    writeUInt32Shared(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, filters->slot_04);
+        writeUInt8(self, filters->enabled_05);
+        writeUInt8(self, filters->op_00);
+        if ((s32)filters->enabled_05 == 1) {
+            writeUInt32(self, filters->value_08);
+        }
+        filters++;
+    }
+}
+
+/* Writes `count` tagged items of the login block (`tags` selects each one). */
+void putSomethingList(NetworkStateMachine* self, const u8* loginFields, u8 count, const u8* tags)
+{
+    const PatLoginBlock* login = (const PatLoginBlock*)loginFields;
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            if (login->nameSet_08 == 0) {
+                putItemString(self, login->name_09);
+            } else {
+                putItemString(self, self->reflectName5C_65C8);
+            }
+            break;
+        case 2:
+            if (self->ticket_8BB0 != NULL) {
+                putItemBinary(self, self->ticket_8BB0->data_000, self->ticket_8BB0->size_400);
+            } else {
+                putItemBinary(self, NULL, 0);
+            }
+            break;
+        case 3:
+            putItemLong(self, self->loginDataSize_655C);
+            break;
+        case 4:
+            putItemLong2(self, 2);
+            break;
+        case 5:
+            putItemLong(self, self->loginDataCursor_6560);
+            break;
+        case 6:
+            putItemLong(self, self->loginDataPtr_6564);
+            break;
+        case 7:
+            putItemString(self, self->reflectName3C_6568);
+            break;
+        case 8:
+            putItemLong2(self, 0x4000);
+            break;
+        case 9:
+            getInstance();
+            putItemLong2(self, getCountryCode());
+            break;
+        case 10:
+            getInstance();
+            putItemLong2(self, getLanguage());
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes `count` tagged items of three words (tags 1..3). */
+void putItemTaggedLongs(NetworkStateMachine* self, const u32* values, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemLong2(self, values[0]);
+            break;
+        case 2:
+            putItemLong2(self, values[1]);
+            break;
+        case 3:
+            putItemLong2(self, values[2]);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes `count` tagged items of two bytes (tags 1 and 2). */
+void putItemTaggedBytes(NetworkStateMachine* self, const u8* values, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemByte(self, values[0]);
+            break;
+        case 2:
+            putItemByte(self, values[1]);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes the memory check reply's `count` tagged bytes (tags 1 and 2). */
+void putMemoryCheckBytes(NetworkStateMachine* self, const u8* values, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemByte(self, values[0]);
+            break;
+        case 2:
+            putItemByte(self, values[1]);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes `count` tagged items of the login block for the login request (the ids, the ticket-sized blob, the names,
+ * the flag and the NAS token). */
+void putItemAny(NetworkStateMachine* self, const u8* values, u32 count, const u8* tags)
+{
+    const PatLoginBlock* login = (const PatLoginBlock*)values;
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < (u8)count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemLong(self, login->fields_00[0]);
+            break;
+        case 2:
+            putItemLong(self, login->fields_00[1]);
+            break;
+        case 6:
+            putItemBinary(self, login->blob_55, sizeof(login->blob_55));
+            break;
+        case 7:
+            putItemString(self, login->name_09);
+            break;
+        case 8:
+            putItemString(self, login->userId_29);
+            break;
+        case 9:
+            putItemByte(self, login->nameSet_08);
+            break;
+        case 10: {
+            u16 length = strlen(getNASToken(getInstance()));
+            putItemBinary(self, (const u8*)getNASToken(getInstance()), length);
+            break;
+        }
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes `count` tagged items of a user row. */
+void putUserSlotObjects(NetworkStateMachine* self, const u8* row, u8 count, const u8* tags)
+{
+    const NetworkUserRow* user = (const NetworkUserRow*)row;
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemLong(self, user->id_00);
+            break;
+        case 2:
+            putItemString(self, user->shortName_04);
+            break;
+        case 3:
+            putItemString(self, user->accountName_0C);
+            break;
+        case 5:
+            putItemLong(self, user->field_30);
+            break;
+        case 4:
+            putItemLong(self, user->field_2C);
+            break;
+        case 6:
+            putItemLong(self, user->field_34);
+            break;
+        case 7:
+            putItemLong(self, user->field_38);
+            break;
+        case 8:
+            putItemString(self, user->playerName_3C);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes a byte the server reads 1-based. */
+void writeBytePlusOne(NetworkStateMachine* self, s8 value)
+{
+    writeBool(self, value + 1);
+}
+
+/* Writes a halfword the server reads 1-based. */
+void writeShortPlusOne(NetworkStateMachine* self, s16 value)
+{
+    writeInt16(self, value + 1);
+}
+
+/* Writes `count` tagged items of a layer record. */
+void writeLayerDownData(NetworkStateMachine* self, PatLayerData* layer, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemLong(self, layer->id_000);
+            break;
+        case 2:
+            writeUInt8(self, PAT_ITEM_BINARY);
+            writeUnkShortArray(self, layer->path_004);
+            break;
+        case 3:
+            putItemString(self, layer->name_014);
+            break;
+        case 5:
+            writeUInt8(self, PAT_ITEM_BINARY);
+            writeShortPlusOne(self, layer->layerId_054);
+            break;
+        case 9:
+            putItemLong2(self, layer->userMax_064);
+            break;
+        case 10:
+            putItemLong2(self, layer->userCount_068);
+            break;
+        case 12:
+            putItemLong(self, layer->flags_070);
+            break;
+        case 23:
+            putItemBinary(self, layer->binary_13E, layer->value_23E);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes the item list a layer request asks the server for. */
+void writeLayerItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[15] = { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* Writes the item list a layer user request asks the server for. */
+void writeUserItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[7] = { 1, 2, 3, 4, 5, 6, 7 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* Writes `count` tagged items of a layer user record. */
+void writeLayerUserItems(NetworkStateMachine* self, const PatLayerUser* record, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemString(self, record->userId_000);
+            break;
+        case 2:
+            putItemString(self, record->name_008);
+            break;
+        case 6:
+            putItemLong(self, record->key_038);
+            break;
+        case 7:
+            putItemBinary(self, record->binary_03C, record->binarySize_13C);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes the item list a layer user list request asks the server for. */
+void writeLayerUserItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[3] = { 1, 2, 3 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* Writes a layer path: its 14-byte size, the two id words and the three layer indices. */
+void writeUnkShortArray(NetworkStateMachine* self, const u8* path)
+{
+    const NetLayerAddress* address = (const NetLayerAddress*)path;
+    s32 i;
+
+    writeUInt16(self, 14);
+    writeUInt32(self, address->id_00);
+    writeUInt32(self, address->id_04);
+    for (i = 0; i < 3; i++) {
+        writeUInt16(self, address->path_08[i]);
+    }
+}
+
+/* Writes `count` tagged items of a mediation entry (the user, the lock and the key). */
+void writeMediationItems(NetworkStateMachine* self, const PatMediation* entry, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemString(self, entry->userId_0);
+            break;
+        case 2:
+            putItemByte(self, entry->value_8);
+            break;
+        case 3:
+            putItemByte(self, entry->key_9);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes the item list a mediation list request asks the server for. */
+void writeMediationItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[3] = { 1, 2, 3 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* Writes the items a circle info block carries: the name, the session name, the records, the comment, the limits and
+ * the three state bytes, each only when set. */
+void writeCircleInfoItems(NetworkStateMachine* self, const PatCircleInfo* info)
+{
+    u8 tags[16];
+    u8 count = 0;
+
+    if (info != NULL) {
+        if (info->name_004[0] != 0) {
+            tags[count++] = 2;
+        }
+        if (info->flag_044 == 1 && info->sessionName_045[0] != 0) {
+            tags[count++] = 3;
+            tags[count++] = 4;
+        }
+        if (info->recordCount_156 != 0) {
+            tags[count++] = 5;
+        }
+        if (info->comment_158[0] != 0) {
+            tags[count++] = 6;
+        }
+        if (info->limitB_360 > 0) {
+            tags[count++] = 9;
+        }
+        if (info->usedB_364 > 0) {
+            tags[count++] = 10;
+        }
+        if (info->mode_378 > 0) {
+            tags[count++] = 14;
+        }
+        if (info->state_379 != 0) {
+            tags[count++] = 15;
+        }
+        if (info->state_37A != 0) {
+            tags[count++] = 16;
+        }
+    }
+    putCircleInfoItems(self, info, count, tags);
+}
+
+/* Writes `count` tagged items of a circle info block. */
+void putCircleInfoItems(NetworkStateMachine* self, const PatCircleInfo* info, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemLong2(self, info->id_000);
+            break;
+        case 2:
+            putItemString(self, info->name_004);
+            break;
+        case 3:
+            putItemByte_(self, info->flag_044);
+            break;
+        case 4:
+            putItemString(self, info->sessionName_045);
+            break;
+        case 5:
+            putItemBinary(self, info->records_56, info->recordCount_156);
+            break;
+        case 6:
+            putItemString(self, info->comment_158);
+            break;
+        case 7:
+            putItemLong2(self, info->limitA_358);
+            break;
+        case 8:
+            putItemLong2(self, info->usedA_35C);
+            break;
+        case 9:
+            putItemLong2(self, info->limitB_360);
+            break;
+        case 10:
+            putItemLong2(self, info->usedB_364);
+            break;
+        case 11:
+            putItemLong(self, info->ownerId_368);
+            break;
+        case 12:
+            putItemLong2(self, info->slotNumber_36C);
+            break;
+        case 13:
+            putItemString(self, (const char*)info->address_370);
+            break;
+        case 14:
+            putItemByte_(self, info->mode_378);
+            break;
+        case 15:
+            putItemByte_(self, info->state_379);
+            break;
+        case 16:
+            putItemByte_(self, info->state_37A);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes the item list a circle request asks the server for. */
+void writeCircleItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[13] = { 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* Writes the item list a circle user list request asks the server for. */
+void writeCircleUserItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[4] = { 3, 4, 5, 6 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* Writes `count` tagged items of a match option block (the tag word as a 4-byte string, the session key, the mode). */
+void writeMatchOptionItems(NetworkStateMachine* self, const PatMatchOptions* options, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            writeUInt8(self, PAT_ITEM_STRING);
+            writeUInt8Array(self, (const u8*)&options->tag_00, sizeof(options->tag_00));
+            break;
+        case 2:
+            putUInt16(self, options->sessionKey_04);
+            break;
+        case 3:
+            putItemByte_(self, options->mode_06);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes `count` tagged items of a chat's sender block (the tag word; empty names and a zero word for the rest). */
+void writeChatOptionItems(NetworkStateMachine* self, const PatMatchOptions* options, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemLong(self, options->tag_00);
+            break;
+        case 2:
+            putItemLong(self, 0);
+            break;
+        case 3:
+            putItemString(self, "");
+            break;
+        case 4:
+            putItemString(self, "");
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes `count` tagged items of a binary notice's sender block (all empty). */
+void writeCompoundLayerBinary(NetworkStateMachine* self, const u8* sender, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemLong(self, 0);
+            break;
+        case 2:
+            putItemString(self, "");
+            break;
+        case 3:
+            putItemString(self, "");
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes `count` tagged items of a user search query (all empty). */
+void writeUserSearchItems(NetworkStateMachine* self, const u8* query, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemString(self, "");
+            break;
+        case 2:
+            putItemString(self, "");
+            break;
+        case 3:
+            putItemBinary(self, NULL, 0);
+            break;
+        case 4:
+            putItemBinary(self, NULL, 0);
+            break;
+        case 7:
+            putItemByte(self, 0);
+            break;
+        case 8:
+            putItemString(self, "");
+            break;
+        case 11:
+            putItemByte(self, 0);
+            break;
+        case 12:
+            putItemString(self, "");
+            break;
+        case 13:
+            putItemLong(self, 0);
+            break;
+        case 14:
+            putItemLong(self, 0);
+            break;
+        case 15:
+            putItemLong(self, 0);
+            break;
+        case 16:
+            putItemLong(self, 0);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes `count` tagged items of the 7-byte user status record. */
+void writeUserStatusItems(NetworkStateMachine* self, const u8* status, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemByte(self, status[0]);
+            break;
+        case 2:
+            putItemByte(self, status[1]);
+            break;
+        case 3:
+            putItemByte(self, status[2]);
+            break;
+        case 4:
+            putItemByte(self, status[3]);
+            break;
+        case 5:
+            putItemByte(self, status[4]);
+            break;
+        case 8:
+            putItemByte(self, status[5]);
+            break;
+        case 9:
+            putItemByte(self, status[6]);
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes the item list a friend list request asks the server for. */
+void writeFriendItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[3] = { 1, 2, 3 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* Writes `count` tagged items of a black list entry (all empty). */
+void writeBlackListItems(NetworkStateMachine* self, const u32* options, u8 count, const u8* tags)
+{
+    u8 i;
+
+    writeUInt8(self, count);
+    for (i = 0; i < count; i++) {
+        writeUInt8(self, tags[i]);
+        switch (tags[i]) {
+        case 1:
+            putItemLong(self, 0);
+            break;
+        case 2:
+            putItemString(self, "");
+            break;
+        case 3:
+            putItemString(self, "");
+            break;
+        default:
+            writeUInt8(self, 0);
+            break;
+        }
+    }
+}
+
+/* Writes the item list a black list request asks the server for. */
+void writeBlackListItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[3] = { 1, 2, 3 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* Writes the item list a channel info request asks the server for. */
+void writeChannelItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[3] = { 1, 2, 3 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* Writes the channel info request's second item list. */
+void writeChannelDataItemRequest(NetworkStateMachine* self)
+{
+    u8 tags[4] = { 1, 2, 3, 4 };
+
+    writeUInt8Array2(self, sizeof(tags), tags);
+}
+
+/* ==== the received item readers =============================================================================== */
+
+/* Skips one item of a tag the reader does not know: reads its type and its value into scratch. */
+void getItemAny(NetworkStateMachine* self)
+{
+    PatItem item;
+    u64 dword;
+    PatItemList list;
+    u32 word;
+    u32 length;
+    u16 half;
+    u8 byte;
+    char text;
+    u8 type;
+
+    readUInt8(self, &type);
+    switch (type) {
+    case 1:
+        readUInt8(self, &byte);
+        break;
+    case 2:
+        readUInt16(self, &half);
+        break;
+    case 3:
+        readUInt32_(self, &word);
+        break;
+    case 4:
+        readUInt64(self, &dword);
+        break;
+    case 5:
+        readString(self, &length, &text, 1);
+        break;
+    case 6:
+        readUInt8Array(self, &length, &byte, 1);
+        break;
+    case 7:
+        initItemList(self, &list, &item, 1);
+        getFo(self, &list, &byte, 1);
+        break;
+    default:
+        getNetworkLogger()->warn_10("PatInterface:getItemAny(): item_type %d is bad\n", type);
+        break;
+    }
+}
+
+/* Reads a byte item. */
+void getItemByte(NetworkStateMachine* self, u8* out)
+{
+    u8 type;
+
+    readUInt8(self, &type);
+    if (type != 1) {
+        getNetworkLogger()->warn_10("PatInterface:getItemByte(): item_type %d is bad\n", type);
+    }
+    readUInt8(self, out);
+}
+
+/* Reads a 16-bit item. */
+void getItemWord(NetworkStateMachine* self, u16* out)
+{
+    u8 type;
+
+    readUInt8(self, &type);
+    if (type != 2) {
+        getNetworkLogger()->warn_10("PatInterface:getItemWord(): item_type %d is bad\n", type);
+    }
+    readUInt16(self, out);
+}
+
+/* Reads a 32-bit item. */
+void getItemLong(NetworkStateMachine* self, u32* out)
+{
+    u8 type;
+
+    readUInt8(self, &type);
+    if (type != 3) {
+        getNetworkLogger()->warn_10("PatInterface:getItemLong(): item_type %d is bad\n", type);
+    }
+    readUInt32_(self, out);
+}
+
+/* Reads a 64-bit item. */
+void getItemLongLong(NetworkStateMachine* self, u64* out)
+{
+    u8 type;
+
+    readUInt8(self, &type);
+    if (type != 4) {
+        getNetworkLogger()->warn_10("PatInterface:getItemLongLong(): item_type %d is bad\n", type);
+    }
+    readUInt64(self, out);
+}
+
+/* Reads a byte item as a signed byte. */
+void getItemChar(NetworkStateMachine* self, s8* out)
+{
+    u8 value;
+
+    getItemByte(self, &value);
+    *out = (s8)value;
+}
+
+/* Reads a 32-bit item as a signed word. */
+void getItemLong_(NetworkStateMachine* self, s32* out)
+{
+    u32 value;
+
+    getItemLong(self, &value);
+    *out = value;
+}
+
+/* Reads a string item into `buffer` (at most `size - 1` characters). */
+void getItemString(NetworkStateMachine* self, u32* length, char* buffer, u16 size)
+{
+    u8 type;
+
+    readUInt8(self, &type);
+    if (type != 5) {
+        getNetworkLogger()->warn_10("PatInterface:getItemString(): item_type %d is bad\n", type);
+    }
+    readString(self, length, buffer, size);
+}
+
+/* Reads a byte array item into `buffer` (at most `size` bytes). */
+void getItemBinary(NetworkStateMachine* self, u32* length, u8* buffer, u16 size)
+{
+    u8 type;
+
+    readUInt8(self, &type);
+    if (type != 6) {
+        getNetworkLogger()->warn_10("PatInterface:getItemBinary(): item_type %d is bad\n", type);
+    }
+    readUInt8Array(self, length, buffer, size);
+}
+
+/* Reads an item list: its marker, its count and each typed item, the strings and byte arrays into `buffer` (at most
+ * `size` bytes; the rest is skipped) and the items past the list's capacity into scratch. */
+void getFo(NetworkStateMachine* self, PatItemList* list, u8* buffer, u16 size)
+{
+    PatItem scratch;
+    u64 dword;
+    u32 length;
+    u32 word;
+    char text;
+    u8 byte;
+    PatItem* item;
+    u16 used = 0;
+    s32 i;
+
+    readUInt16(self, &list->marker_00);
+    if (list->marker_00 == 0) {
+        getNetworkLogger()->warn_10("PatInterface:getFo(): fo_size is zero or minus.\n");
+        list->count_02 = 0;
+        return;
+    }
+    readUInt8(self, &list->count_02);
+    if (list->count_02 > list->capacity_03) {
+        getNetworkLogger()->warn_10("PatInterface:getFo(): fo_num is over fo_max.\n");
+    }
+    for (i = 0; i < list->count_02; i++) {
+        if (i < list->capacity_03) {
+            item = &list->items_04[i];
+        } else {
+            item = &scratch;
+        }
+        readUInt8(self, &item->tag_00);
+        readUInt8(self, &item->type_01);
+        switch (item->type_01) {
+        case 1:
+            readUInt8(self, &item->value_08.byte);
+            break;
+        case 2:
+            readUInt16(self, &item->value_08.half);
+            break;
+        case 3:
+            readUInt32_(self, &item->value_08.word);
+            break;
+        case 4:
+            readUInt64(self, &item->value_08.dword);
+            break;
+        case 5:
+            readUInt32_(self, &word);
+            memcpy(&item->value_08, &word, sizeof(word));
+            break;
+        case 6:
+            readUInt64(self, &dword);
+            memcpy(&item->value_08, &dword, sizeof(dword));
+            break;
+        case 7:
+            readUInt32_(self, &item->value_08.word);
+            break;
+        case 8:
+            if (size <= used) {
+                readString(self, &length, &text, 1);
+                item->value_08.bytes.data = NULL;
+                item->value_08.bytes.size = 0;
+            } else {
+                u8* string = &buffer[used];
+                readString(self, &length, (char*)string, size - used);
+                item->value_08.bytes.data = string;
+                item->value_08.bytes.size = length;
+                used += item->value_08.bytes.size + 1;
+            }
+            break;
+        case 9:
+            if (size <= used) {
+                readUInt8Array(self, &length, &byte, 1);
+                item->value_08.bytes.data = NULL;
+                item->value_08.bytes.size = 0;
+            } else {
+                u8* bytes = &buffer[used];
+                readUInt8Array(self, &length, bytes, size - used);
+                item->value_08.bytes.data = bytes;
+                item->value_08.bytes.size = length;
+                used += item->value_08.bytes.size;
+            }
+            break;
+        }
+    }
+}
+
+/* Reads `count` tag lists: each count (at most 32 are kept, the rest skipped) and each tag, type and (type 1) value. */
+void readUnkByteIntStruct(NetworkStateMachine* self, PatTagList* lists, s32 count)
+{
+    u32 value;
+    PatTagList* entry;
+    PatTagValue* tag;
+    s8 j;
+    s32 i;
+    s8 itemCount;
+    u8 skip;
+
+    for (i = 0, entry = lists; i < count; i++) {
+        readUInt8_(self, &itemCount);
+        entry->count_000 = itemCount < 32 ? itemCount : 32;
+        for (j = 0, tag = entry->values_004; j < entry->count_000; j++) {
+            readUInt8(self, &tag->tag_0);
+            readUInt8(self, &tag->type_1);
+            if ((s32)tag->type_1 == 1) {
+                readUInt32_(self, &tag->value_4);
+            }
+            tag++;
+        }
+        for (; j < itemCount; j++) {
+            readUInt8(self, &skip);
+            readUInt8(self, &skip);
+            if ((s32)skip == 1) {
+                readUInt32_(self, &value);
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` two-byte memory check records (tags 1 and 2). */
+void readMemoryCheckData(NetworkStateMachine* self, u8* records, s32 count)
+{
+    s32 i;
+    u8* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = records; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemByte(self, &entry[0]);
+                break;
+            case 2:
+                getItemByte(self, &entry[1]);
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry += 2;
+    }
+}
+
+/* Reads the login block's charge items: the two id words, the user id and the name. */
+void readChargeInfo(NetworkStateMachine* self, u8* loginFields)
+{
+    PatLoginBlock* login = (PatLoginBlock*)loginFields;
+    u32 length;
+    u8 i;
+    u8 itemCount;
+    u8 tag;
+
+    readUInt8(self, &itemCount);
+    for (i = 0; i < itemCount; i++) {
+        readUInt8(self, &tag);
+        switch (tag) {
+        case 1:
+            getItemLong(self, &login->fields_00[0]);
+            break;
+        case 2:
+            getItemLong(self, &login->fields_00[1]);
+            break;
+        case 5:
+            getItemBinary(self, &length, (u8*)login->userId_29, sizeof(login->userId_29));
+            break;
+        case 7:
+            getItemString(self, &length, login->name_09, sizeof(login->name_09));
+            break;
+        default:
+            getItemAny(self);
+            break;
+        }
+    }
+}
+
+/* Reads `count` user rows. */
+void readUserObjects(NetworkStateMachine* self, NetworkUserRow* rows, s32 count)
+{
+    u32 length;
+    s32 i;
+    NetworkUserRow* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = rows; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemLong(self, &entry->id_00);
+                break;
+            case 2:
+                getItemString(self, &length, entry->shortName_04, sizeof(entry->shortName_04));
+                break;
+            case 3:
+                getItemString(self, &length, entry->accountName_0C, sizeof(entry->accountName_0C));
+                break;
+            case 5:
+                getItemLong(self, &entry->field_30);
+                break;
+            case 4:
+                getItemLong(self, &entry->field_2C);
+                break;
+            case 6:
+                getItemLong(self, &entry->field_34);
+                break;
+            case 7:
+                getItemLong(self, &entry->field_38);
+                break;
+            case 8:
+                getItemString(self, &length, entry->playerName_3C, sizeof(entry->playerName_3C));
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` FMP slots, the server name and port of each into `reserve`. */
+void readFmpCompoundData(NetworkStateMachine* self, NetworkFmpSlot* slots, PatServerBlock* reserve, s32 count)
+{
+    u32 length;
+    s32 i;
+    NetworkFmpSlot* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = slots; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemLong(self, &entry->payload_00);
+                break;
+            case 2:
+                getItemString(self, &length, reserve->host_000, sizeof(reserve->host_000));
+                break;
+            case 3:
+                getItemWord(self, &reserve->port_104);
+                break;
+            case 7:
+                getItemLongLong(self, &entry->time_08);
+                break;
+            case 8:
+                getItemLong_(self, (s32*)&entry->done_10);
+                break;
+            case 9:
+                getItemLong_(self, (s32*)&entry->total_14);
+                break;
+            case 10:
+                getItemString(self, &length, entry->name_18, sizeof(entry->name_18));
+                break;
+            case 11:
+                getItemString(self, &length, entry->text_38, 1);
+                break;
+            case 12:
+                getItemLong(self, &entry->value_3C);
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads one slice of a body transfer (its offset and length) into `buffer`: -1 (and a kept failure) when the offset
+ * is not the next one or the buffer is full, else 0. */
+s32 readBodySlice(NetworkStateMachine* self, u8* buffer, u32 capacity)
+{
+    u32 offset;
+    u32 size;
+    u32 length;
+    u32 remaining;
+
+    readUInt32_(self, &offset);
+    readUInt32_(self, &size);
+    if (self->dataSent_8260 != offset || capacity < offset) {
+        if (self->pendingError_654C.code_00 == 0) {
+            self->pendingError_654C.code_00 = 0x80000000;
+            self->pendingError_654C.param1_04 = 0;
+            self->pendingError_654C.param2_08 = 0;
+        }
+        return -1;
+    }
+    remaining = capacity - offset;
+    readUInt8Array(self, &length, &buffer[offset], remaining < 0x2000 ? remaining : 0x2000);
+    self->dataSent_8260 += length;
+    return 0;
+}
+
+/* Reads `count` media version records (item 2 is the text `getStr1` returns; `unused` is not read). */
+void readMediaVersionData(NetworkStateMachine* self, u8* unused, s32 count)
+{
+    u32 length;
+    s32 i;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+    s8 value;
+
+    for (i = 0; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemChar(self, &value);
+                break;
+            case 2:
+                getItemString(self, &length, self->mediaVersionText_65A8, sizeof(self->mediaVersionText_65A8));
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+    }
+}
+
+/* Reads a byte the server sends 1-based. */
+void readByteMinusOne(NetworkStateMachine* self, s8* out)
+{
+    readUInt8_(self, out);
+    *out -= 1;
+}
+
+/* Reads a halfword the server sends 1-based. */
+void readShortMinusOne(NetworkStateMachine* self, s16* out)
+{
+    readInt16(self, out);
+    *out -= 1;
+}
+
+/* Reads `count` layer records. */
+void readLayerData(NetworkStateMachine* self, PatLayerData* layers, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatLayerData* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+    u8 pathType;
+    u8 idType;
+    u8 currentType;
+
+    for (i = 0, entry = layers; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemLong(self, &entry->id_000);
+                break;
+            case 2:
+                readUInt8(self, &pathType);
+                readUnkShortArrayStruct(self, entry->path_004);
+                break;
+            case 3:
+                getItemString(self, &length, entry->name_014, sizeof(entry->name_014));
+                break;
+            case 5:
+                readUInt8(self, &idType);
+                readShortMinusOne(self, &entry->layerId_054);
+                break;
+            case 6:
+                getItemLong_(self, &entry->counts_058[0]);
+                break;
+            case 7:
+                getItemLong_(self, &entry->counts_058[1]);
+                break;
+            case 8:
+                getItemLong_(self, &entry->counts_058[2]);
+                break;
+            case 9:
+                getItemLong_(self, &entry->userMax_064);
+                break;
+            case 10:
+                getItemLong_(self, &entry->userCount_068);
+                break;
+            case 11:
+                getItemLong_(self, &entry->value_06C);
+                break;
+            case 12:
+                getItemLong(self, &entry->flags_070);
+                break;
+            case 13:
+                getItemWord(self, &entry->value_074);
+                break;
+            case 16:
+                getItemChar(self, &entry->value_076);
+                break;
+            case 17:
+                getItemLong(self, &entry->value_078);
+                break;
+            case 18:
+                getItemChar(self, &entry->value_07C);
+                break;
+            case 21:
+                readUInt8(self, &currentType);
+                readByteMinusOne(self, &entry->isCurrent_07D);
+                break;
+            case 22:
+                getItemString(self, &length, entry->comment_07E, sizeof(entry->comment_07E));
+                break;
+            case 23:
+                getItemBinary(self, &length, entry->binary_13E, sizeof(entry->binary_13E));
+                entry->value_23E = length;
+                /* fallthrough: retail also skips the next item here */
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` layer records of the counting form (the path and the six counters). */
+void readLayerCountData(NetworkStateMachine* self, PatLayerData* layers, s32 count)
+{
+    PatLayerData* entry;
+    s32 i;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+    u8 pathType;
+
+    for (i = 0, entry = layers; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                readUInt8(self, &pathType);
+                readUnkShortArrayStruct(self, entry->path_004);
+                break;
+            case 2:
+                getItemLong_(self, &entry->counts_058[0]);
+                break;
+            case 3:
+                getItemLong_(self, &entry->counts_058[1]);
+                break;
+            case 4:
+                getItemLong_(self, &entry->counts_058[2]);
+                break;
+            case 5:
+                getItemLong_(self, &entry->userMax_064);
+                break;
+            case 6:
+                getItemLong_(self, &entry->userCount_068);
+                break;
+            case 7:
+                getItemLong_(self, &entry->value_06C);
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` layer users. */
+void readLayerUserData(NetworkStateMachine* self, PatLayerUser* users, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatLayerUser* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+    u8 pathType;
+
+    for (i = 0, entry = users; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemString(self, &length, entry->userId_000, sizeof(entry->userId_000));
+                break;
+            case 2:
+                getItemString(self, &length, entry->name_008, sizeof(entry->name_008));
+                break;
+            case 3:
+                readUInt8(self, &pathType);
+                readUnkShortArrayStruct(self, entry->path_028);
+                break;
+            case 6:
+                getItemLong(self, &entry->key_038);
+                break;
+            case 7:
+                getItemBinary(self, &length, entry->binary_03C, sizeof(entry->binary_03C));
+                entry->binarySize_13C = length;
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads a layer path block: the two id words and as many layer indices as the block holds (at most three). */
+void readUnkShortArrayStruct(NetworkStateMachine* self, u8* path)
+{
+    NetLayerAddress* address = (NetLayerAddress*)path;
+    s32 depth;
+    s32 i;
+    u16 size;
+
+    beginReadBlock(self, &size);
+    readUInt32_(self, &address->id_00);
+    readUInt32_(self, &address->id_04);
+    depth = (s32)(size - 8) / 2;
+    if (depth > 3) {
+        depth = 3;
+    }
+    for (i = 0; i < depth; i++) {
+        readUInt16(self, &address->path_08[i]);
+    }
+    endReadBlock(self);
+}
+
+/* Reads `count` mediation entries. */
+void readMediationData(NetworkStateMachine* self, PatMediation* entries, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatMediation* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = entries; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemString(self, &length, entry->userId_0, sizeof(entry->userId_0));
+                break;
+            case 2:
+                getItemByte(self, &entry->value_8);
+                break;
+            case 3:
+                getItemByte(self, &entry->key_9);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads a 1-based circle slot. */
+void readCircleSlot(NetworkStateMachine* self, s8* out)
+{
+    readUInt8_(self, out);
+    *out -= 1;
+}
+
+/* Reads `count` circle info blocks. */
+void readCircleInfoDataArray(NetworkStateMachine* self, PatCircleInfo* circles, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatCircleInfo* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = circles; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemLong_(self, &entry->id_000);
+                break;
+            case 2:
+                getItemString(self, &length, entry->name_004, sizeof(entry->name_004));
+                break;
+            case 3:
+                getItemChar(self, &entry->flag_044);
+                break;
+            case 5:
+                getItemBinary(self, &length, entry->records_56, sizeof(entry->records_56));
+                entry->recordCount_156 = length;
+                break;
+            case 6:
+                getItemString(self, &length, entry->comment_158, 0x200);
+                break;
+            case 7:
+                getItemLong_(self, &entry->limitA_358);
+                break;
+            case 8:
+                getItemLong_(self, &entry->usedA_35C);
+                break;
+            case 9:
+                getItemLong_(self, &entry->limitB_360);
+                break;
+            case 10:
+                getItemLong_(self, &entry->usedB_364);
+                break;
+            case 11:
+                getItemLong(self, (u32*)&entry->ownerId_368);
+                break;
+            case 12:
+                getItemLong_(self, &entry->slotNumber_36C);
+                break;
+            case 13:
+                getItemString(self, &length, (char*)entry->address_370, sizeof(entry->address_370));
+                break;
+            case 14:
+                getItemChar(self, &entry->mode_378);
+                break;
+            case 15:
+                getItemChar(self, &entry->state_379);
+                break;
+            case 16:
+                getItemChar(self, &entry->state_37A);
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` circle members' match options. */
+void readCircleMatchData(NetworkStateMachine* self, PatCircleMatch* members, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatCircleMatch* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+    u8 tagType;
+    u8 slotType;
+
+    for (i = 0, entry = members; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                readUInt8(self, &tagType);
+                readUInt8Array(self, &length, entry->tag_00, sizeof(entry->tag_00));
+                break;
+            case 2:
+                getItemWord(self, &entry->value_04);
+                break;
+            case 3:
+                getItemChar(self, &entry->mode_06);
+                break;
+            case 4:
+                readUInt8(self, &slotType);
+                readCircleSlot(self, &entry->slot_07);
+                break;
+            case 5:
+                getItemString(self, &length, entry->userId_08, sizeof(entry->userId_08));
+                break;
+            case 6:
+                getItemString(self, &length, entry->name_10, sizeof(entry->name_10));
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads a time the server sends relative to its clock and makes it absolute. */
+void readTimeOffset(NetworkStateMachine* self, u32* out)
+{
+    readUInt32_(self, out);
+    *out += self->serverTime_612C;
+}
+
+/* Reads `count` chat senders. */
+void readChatData(NetworkStateMachine* self, PatChatInfo* senders, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatChatInfo* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+    u8 timeType;
+
+    for (i = 0, entry = senders; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemLong(self, &entry->value_00);
+                break;
+            case 2:
+                readUInt8(self, &timeType);
+                readTimeOffset(self, &entry->time_04);
+                break;
+            case 3:
+                getItemString(self, &length, entry->userId_08, sizeof(entry->userId_08));
+                break;
+            case 4:
+                getItemString(self, &length, entry->name_10, sizeof(entry->name_10));
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` binary notice senders. */
+void readNtcCompoundData(NetworkStateMachine* self, PatNtcCompound* senders, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatNtcCompound* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+    u8 timeType;
+
+    for (i = 0, entry = senders; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                readUInt8(self, &timeType);
+                readTimeOffset(self, &entry->time_00);
+                break;
+            case 2:
+                getItemString(self, &length, entry->userId_04, sizeof(entry->userId_04));
+                break;
+            case 3:
+                getItemString(self, &length, entry->name_0C, sizeof(entry->name_0C));
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` user search rows. */
+void readUserSearchData(NetworkStateMachine* self, PatUserSearchRow* rows, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatUserSearchRow* entry;
+    s32 j;
+    u8 itemCount;
+    u8 tag;
+    u8 pathType;
+    u8 valueType;
+
+    for (i = 0, entry = rows; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemString(self, &length, entry->userId_000, sizeof(entry->userId_000));
+                break;
+            case 2:
+                getItemString(self, &length, entry->name_008, sizeof(entry->name_008));
+                break;
+            case 3:
+                getItemBinary(self, &length, entry->binary_028, sizeof(entry->binary_028));
+                entry->binarySize_128 = length;
+                break;
+            case 4:
+                readUInt8(self, &pathType);
+                readUnkShortArrayStruct(self, entry->path_12C);
+                break;
+            case 7:
+                readUInt8(self, &valueType);
+                readByteMinusOne(self, &entry->value_13C);
+                break;
+            case 8:
+                getItemString(self, &length, entry->comment_13D, sizeof(entry->comment_13D));
+                break;
+            case 11:
+                getItemChar(self, &entry->value_1FD);
+                break;
+            case 12:
+                getItemString(self, &length, entry->text_1FE, sizeof(entry->text_1FE));
+                break;
+            case 13:
+                getItemLong_(self, &entry->value_220);
+                break;
+            case 14:
+                getItemLong_(self, &entry->value_224);
+                break;
+            case 15:
+                getItemLong(self, &entry->value_228);
+                break;
+            case 16:
+                getItemLong(self, &entry->value_22C);
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` 7-byte user status records. */
+void readUserStatusData(NetworkStateMachine* self, u8* status, s32 count)
+{
+    s32 i;
+    u8* entry;
+    s32 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = status; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemByte(self, &entry[0]);
+                break;
+            case 2:
+                getItemByte(self, &entry[1]);
+                break;
+            case 3:
+                getItemByte(self, &entry[2]);
+                break;
+            case 4:
+                getItemByte(self, &entry[3]);
+                break;
+            case 5:
+                getItemByte(self, &entry[4]);
+                break;
+            case 8:
+                getItemByte(self, &entry[5]);
+                break;
+            case 9:
+                getItemByte(self, &entry[6]);
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry += 7;
+    }
+}
+
+/* Reads `count` friends. */
+void readFriendData(NetworkStateMachine* self, PatFriend* friends, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatFriend* entry;
+    s32 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = friends; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemLong(self, &entry->value_00);
+                break;
+            case 2:
+                getItemString(self, &length, entry->userId_04, sizeof(entry->userId_04));
+                break;
+            case 3:
+                getItemString(self, &length, entry->name_0C, sizeof(entry->name_0C));
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` black list entries. */
+void readBlackListData(NetworkStateMachine* self, PatBlackListEntry* entries, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatBlackListEntry* entry;
+    s32 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = entries; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemLong(self, &entry->value_00);
+                break;
+            case 2:
+                getItemString(self, &length, entry->userId_04, sizeof(entry->userId_04));
+                break;
+            case 3:
+                getItemString(self, &length, entry->name_0C, sizeof(entry->name_0C));
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` agreement page records. */
+void readAgreementPageData(NetworkStateMachine* self, PatAgreementPageInfo* pages, s32 count)
+{
+    u32 length;
+    s32 i;
+    PatAgreementPageInfo* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = pages; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemByte(self, &entry->page_00);
+                break;
+            case 2:
+                getItemString(self, &length, entry->title_08, sizeof(entry->title_08));
+                break;
+            case 3:
+                getItemLong(self, &entry->value_04);
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Reads `count` agreement page info heads. */
+void readAgreementInfoData(NetworkStateMachine* self, PatAgreementHead* infos, s32 count)
+{
+    s32 i;
+    PatAgreementHead* entry;
+    u8 j;
+    u8 itemCount;
+    u8 tag;
+
+    for (i = 0, entry = infos; i < count; i++) {
+        readUInt8(self, &itemCount);
+        for (j = 0; j < itemCount; j++) {
+            readUInt8(self, &tag);
+            switch (tag) {
+            case 1:
+                getItemByte(self, &entry->version_00);
+                break;
+            case 2:
+                getItemLong(self, &entry->value_08);
+                break;
+            case 3:
+                getItemByte(self, &entry->pageCount_0C);
+                break;
+            case 4:
+                getItemLong(self, &entry->value_04);
+                break;
+            default:
+                getItemAny(self);
+                break;
+            }
+        }
+        entry++;
+    }
+}
+
+/* Dispatches one received packet: finds its op-code in the packet table and calls the row's handler, or the
+ * negative/alert reply handler for those statuses; an op-code with no row goes to `recvNotProvided`. */
+s32 PatInterface::recvCommand(const PatPacketHeader* header)
+{
+    s32 index;
+
+    for (index = 0; index < 297; index++) {
+        if (header->opcode_04[0] == patPacketTable[index].opcode_00[0] &&
+            header->opcode_04[1] == patPacketTable[index].opcode_00[1] &&
+            header->opcode_04[2] == patPacketTable[index].opcode_00[2]) {
+            switch (header->status_07) {
+            case -1:
+                return recvAnsNg(index, header);
+            case 1:
+                return recvAnsAlert(index, header);
+            default:
+                return (this->*patPacketTable[index].handler_04)(index, header);
+            }
+        }
+    }
+    return recvNotProvided(-1, header);
+}
+
+/* One step of the connection's open: on success turns the crypt on or off, takes the chosen FMP slot and copies the
+ * server's address into its block; on failure tries the next FMP server or reports the error event. */
+void stepPatConnect(NetworkStateMachine* self)
+{
+    s32 result = self->connectServer(&self->pendingError_654C);
+
+    if (result < 0) {
+        if (self->serverType_65F0 == 1 && (s32)self->fmpQueryValue_8044 != -1) {
+            restoreFmpSelection(self);
+            return;
+        }
+        dispatchSessionHandlers(self, 0x8000, NULL, self->pendingError_654C.code_00, 1, (const u8*)&self->pendingError_654C);
+        self->binaryState_6134 = 0;
+        self->sessionArmed_6130 = 0;
+    } else if (result > 0) {
+        if (self->serverType_65F0 == 2) {
+            disableCrypt(self);
+        } else {
+            if (self->commonKeyReady_894C != 0) {
+                enableCrypt(self, self->commonKeyBuffer_8948);
+            }
+            if (self->serverType_65F0 == 1) {
+                s32 slot = self->serverIndex_65F4[self->serverType_65F0];
+                if (slot >= 0 && slot < getFmpSize(self)) {
+                    self->fmpSelected_8040 = self->fmpSlots_6C40[slot].payload_00;
+                }
+            }
+        }
+        memset(&self->pendingError_654C, 0, sizeof(self->pendingError_654C));
+        getServerAddress(self, self->serverReserve_6614[self->serverType_65F0].address_100);
+        self->connectTime_6124 = self->clock_611C;
+        self->binaryState_6134 = 10;
+        self->sessionArmed_6130 = 0;
+    }
+}
+
+/* One step of the connection's close: once closed, reports event 0x8005 and clears the state bytes. */
+void stepPatDisconnect(NetworkStateMachine* self)
+{
+    if (self->disconnect() != 0) {
+        dispatchSessionHandlers(self, 0x8005, NULL, 0, 0, NULL);
+        self->binaryState_6134 = 0;
+        self->termsArmed_6131 = 0;
+    }
+}
+
+/* Hands an event to the eight session handler slots: the code, the request id (converted from network order), the
+ * value, the payload and each slot's bound argument. */
+void dispatchSessionHandlers(NetworkStateMachine* self, u32 code, const u8* requestId, s32 value, u32 count, const u8* data)
+{
+    u16 id = 0;
+    s32 i;
+
+    if (requestId != NULL) {
+        memcpy(&id, requestId, sizeof(id));
+        id = getNetworkLogger()->flag_48(id);
+    }
+    for (i = 0; i < 8; i++) {
+        if (self->eventCallbacks_60D8[i] != NULL) {
+            self->eventCallbacks_60D8[i](code, id, value, count, data, self->eventCallbackArgs_60F8[i]);
+        }
+    }
 }
