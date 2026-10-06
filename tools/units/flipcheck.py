@@ -85,6 +85,56 @@ def claims() -> dict[str, dict[str, tuple[int, int]]]:
     return units
 
 
+_RANGES: dict = {}
+
+
+def _range_index() -> tuple[dict, dict]:
+    """`({(unit stem, object section): (start, end)}, {(section, start): unit stem})` from splits.txt, read once
+    per `SPLITS` path."""
+    if SPLITS not in _RANGES:
+        own, starts = {}, {}
+        for block in _project.Splits.read(SPLITS).blocks:
+            stem = re.sub(r"\.(c|cpp|cp|cc)$", "", block.unit)
+            for r in block.ranges:
+                own[(stem, r.object_section)] = (r.start, r.end)
+                starts[(r.section, r.start)] = (stem, r.object_section)
+        _RANGES[SPLITS] = (own, starts)
+    return _RANGES[SPLITS]
+
+
+def pad_context(unit: str, section: str) -> tuple[int | None, list[int]]:
+    """`(the claim's start, [alignments the next linked section may carry])` for a trailing-pad judgement: the
+    registered range that starts where this claim ends, its target object's alignment and - when built - our
+    object's. `(start, [])` when the next section is not a registered unit's (it is not judged)."""
+    own, starts = _range_index()
+    span = own.get((unit, section))
+    if span is None:
+        return None, []
+    nxt = starts.get((section.split("$")[0], span[1]))
+    if nxt is None:
+        return span[0], []
+    stem, objsec = nxt
+    aligns = []
+    for side in ("obj", "src"):
+        got = sections(os.path.join(MAIN, "build", "RMHE08", side, stem + ".o")).get(objsec)
+        if got is not None:
+            aligns.append(1 << got[1])
+    return span[0], aligns
+
+
+def pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_path: str) -> str | None:
+    """`lib.objcompare.trailing_pad` for one section of this unit, with the target's bytes, symbols and alignment."""
+    tgt = sections(obj_path).get(name)
+    if tgt is None:
+        return None
+    align = 1 << max(ours[1], tgt[1])
+    start, next_aligns = pad_context(unit, name)
+    data = raw_section(obj_path, name)
+    nobits = tgt is not None and data is not None and len(data) == 0 and size > 0
+    return objcompare.trailing_pad(name, ours[0], size, align, None if nobits else data,
+                                   section_symbols(obj_path, name), start, next_aligns)
+
+
 def unit_name_for(path: str) -> str:
     """build/RMHE08/src/Network/NetworkWiiMediator.o -> Network/NetworkWiiMediator"""
     return os.path.relpath(path, SRC).replace("\\", "/")[:-2]
@@ -440,6 +490,7 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
         return missing_or_empty_object(unit, src_path, claim), []
     problems = []
     notes: list[str] = []
+    padded: dict[str, int] = {}             # section -> our size, where the shortfall is only alignment fill
     for name, (size, _) in sorted(claim.items()):
         got = ours.get(name)
         if got is None:
@@ -447,6 +498,11 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
                             "flipping drops %d bytes from the link and shifts everything after it"
                             % (name, size, size))
         elif got[0] != size:
+            pad = pad_note(unit, name, got, size, obj_path) if got[0] < size else None
+            if pad:
+                padded[name] = got[0]
+                notes.append(pad)
+                continue
             problems.append("%s: object is 0x%X, splits.txt claims 0x%X (%+d)" % (name, got[0], size, got[0] - size))
     for name in sorted(set(ours) - set(claim)):
         problems.append("%s (0x%X) is in the object but not claimed by splits.txt - "
@@ -463,6 +519,8 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
         tgt = raw_section(obj_path, name)
         if mine is None or tgt is None:
             continue
+        if name in padded:
+            tgt = tgt[:padded[name]]        # the tail is fill (judged above): only our own bytes are compared
         if mine != tgt:
             problems += section_byte_problems(name, mine, tgt, src_path, obj_path)
             problems += data_seam_problems(unit, name, src_path, obj_path)

@@ -278,6 +278,41 @@ def section_symbols(obj, name: str) -> dict[str, tuple[int, int]]:
             if s.name and s.shndx < nsec and elf.sections[s.shndx].name == name}
 
 
+#: Sections a trailing pad never excuses: code and its exception tables carry no alignment fill of their own.
+PAD_NEVER = (".text", ".init", "extab", "extabindex")
+#: The largest alignment a trailing pad may stand for.
+PAD_MAX_ALIGN = 8
+#: dtk's label for a padding run it assigned to a unit (`gap_09_8079398D_sdata`): fill, not content.
+PAD_LABEL_PREFIX = "gap_"
+
+
+def trailing_pad(section: str, ours_size: int, claim_size: int, align: int, target_bytes: bytes | None,
+                 target_symbols: dict, start: int | None, next_aligns: list[int]) -> str | None:
+    """Why a section `claim_size - ours_size` bytes short of its claim is only the alignment fill the link puts back,
+    or None when it is not. All of: not `PAD_NEVER`; `align` (bytes, the larger of the two objects') at most
+    `PAD_MAX_ALIGN` and `ours_size` rounded up to it is the claim; the target's tail is all zero (NOBITS: no bytes);
+    no target symbol in the tail but dtk's `gap_` labels; and the next linked section of that name, at every
+    alignment it may be linked with (`next_aligns`, its target's and ours'), starts exactly at the claim's end
+    (`start` is the claim's address). An unknown next section is not accepted."""
+    short = claim_size - ours_size
+    if section in PAD_NEVER or short <= 0 or align > PAD_MAX_ALIGN or align < 1:
+        return None
+    if (ours_size + align - 1) // align * align != claim_size:
+        return None
+    if target_bytes is not None and (len(target_bytes) < claim_size or any(target_bytes[ours_size:claim_size])):
+        return None
+    inside = [n for n, (off, _size) in target_symbols.items()
+              if ours_size <= off < claim_size and not n.startswith(PAD_LABEL_PREFIX)]
+    if inside or start is None or not next_aligns:
+        return None
+    end = start + ours_size
+    if any((end + a - 1) // a * a != start + claim_size for a in next_aligns):
+        return None
+    return ("%s: 0x%X of 0x%X bytes - the 0x%X-byte tail is alignment fill (target zero, no symbol, the next "
+            "section aligned to %s starts at the claim's end)" % (section, ours_size, claim_size, short,
+                                                                    "/".join(str(a) for a in sorted(set(next_aligns)))))
+
+
 def mislaid_layout(mine: bytes, tgt: bytes, ours: dict, theirs: dict):
     """`(symbols compared, differing bytes)` when two same-sized sections hold the same symbols permuted: every
     shared symbol identical at its own address, at least two of them, at least one moved; else None. `ours` and

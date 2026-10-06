@@ -26,7 +26,10 @@ object for drift and for "touched". Every function takes a path, the bytes of an
 * Section content: `object_sections(obj, all_sections) -> {sections, order, relocs}`, `sections(target, ours, all_sections) ->
   [SectionGap(section, ours, target, reasons)]` (`.why`, `.to_dict()`, `.finding(unit)`), `section_reasons`, `reloc_reasons`.
 * Layout: `section_symbols(obj, section) -> {name: (offset, size)}`, `mislaid_layout(mine, tgt, ours, theirs)`,
-  `mislaid_order(...)`, `section_byte_reasons(name, mine, tgt, ours, theirs) -> [line]` (flipcheck's wording).
+  `mislaid_order(...)`, `section_byte_reasons(name, mine, tgt, ours, theirs) -> [line]` (flipcheck's wording);
+  `trailing_pad(section, ours_size, claim_size, align, target_bytes, target_symbols, start, next_aligns) -> note | None`
+  (a short section whose tail is only alignment fill: never `PAD_NEVER`, align <= `PAD_MAX_ALIGN`, zero tail, no
+  symbol but `gap_` labels, the next section placed at the claim's end; flipcheck's rule, see its spec).
 * Symbols: `section_kind`, `wanted_kinds`, `defined_symbols(obj, kinds) -> {name: SymbolSize}`, `size_delta`,
   `symbols(target, ours, threshold, mode) -> [SymbolGap]`, `symbol_locations(obj)`, `symbol_rows(target, ours)` (a dtk-named row
   resolved by address).
