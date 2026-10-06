@@ -22,11 +22,16 @@
  *   GUESS: `ef_draw_info_set_depth_offset` (0x800AE298): sets the draw info's depth offset and origin.
  *   GUESS: `ef_pm_initialize` (0x800ABA6C): table slot 4, binds the manager to its emitter and resource.
  *   GUESS: `ef_pm_create_particle` (0x800AC1BC): table slot 5, allocates, initialises and lists a particle.
+ *   GUESS: `ef_pm_calc` (0x800AC2F8): table slot 6, one frame of the particles' curve tracks, fields and steps.
+ *   GUESS: `ef_emres_num_ptcl_track_init` (0x800ADE74): the track table's second count, where tracks past the
+ *   creation frame start.
  *   GUESS: `ef_pm_draw` (0x800ADED8): table slot 7, draws the particles through the manager's draw strategy.
  *   GUESS: `ef_pm_calc_emitter_pos` (0x800ADA5C): a position relative to the emitter, from the three matrices.
- * RESIDUALS. 2 rows unwritten (empty bodies): 0x800AC2F8-0x800AD0C4, 0x800AE6A8-0x800AEE0C.  The source order differs from retail's, so `.text`, extab and
+ * RESIDUALS. 1 row unwritten (an empty body): 0x800AE6A8-0x800AEE0C (`ef_pm_modulate_color`).  The source order differs from retail's, so `.text`, extab and
  *   extabindex run in another order.
  *  - `ef_field_random`: three products keep their operands in the other order (`fmuls f1, f1, f0`).
+ *  - `ef_pm_calc`: the frame is 0x420 where retail's is 0x430 and the locals sit at other offsets; the field and
+ *    post-field record addresses add their block sizes in another order (`lwz`/`add` scheduling).
  *  - `ef_pm_create_particle`: the arguments take r23-r29 with `self` in r30 where retail keeps `self` in r31, and
  *    the memory manager's slot +0x4C is called through a function-pointer table (`lwz r4`) where retail's is a
  *    virtual (`lwz r12`).
@@ -63,6 +68,13 @@
 #include "g3d/fn_80063888.h" /* fn_80067E54 (rule 2) */
 #include "draw_shape/mtx34_copy.h" /* mtx34_copy (rule 2) */
 #include "vec3_scale.h" /* vec3_scale (rule 2) */
+#include "nw4r/fn_805012C4.h" /* nw4r::ut::List_GetNext (rule 2) */
+#include "g3d/g3d_calcworld.h" /* addVec3To (rule 2) */
+#include "g3d/fn_8005AA28.h" /* mtx34_trans_apply (rule 2) */
+#include "ef/ef_particle_get_move_dir.h" /* ef_particle_get_move_dir (rule 2) */
+#include "ef/ef_pf_calc_particle.h" /* ef_pf_calc_particle (rule 2) */
+#include "Runtime.PPCEABI.H/memcpy.h" /* memcpy (rule 2) */
+#include "ef/ef_mtx34_scale_columns.h" /* ef_mtx34_scale_columns / ef_mtx34_rotate_xyz (rule 2) */
 
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 namespace nw4r { namespace math { f32 SinFIdx(f32); } }
@@ -74,6 +86,9 @@ extern const f32 lbl_807960A8;
 extern const f32 lbl_807960C0;
 extern const f32 ef_pm_f32_zero; /* 0.0f */
 extern const f32 ef_pm_f32_two; /* 2.0f */
+extern const f32 ef_pm_f32_inv_sqrt3; /* 1/sqrt(3) */
+extern const f32 ef_pm_f32_nan; /* NaN: no tail origin */
+extern const f32 ef_pm_f32_minus_one; /* -1.0f */
 extern const f32 ef_pm_f32_32768; /* 32768.0f */
 extern const f32 ef_pm_f32_65535; /* 65535.0f */
 extern const f32 ef_pm_f32_pi; /* pi */
@@ -81,6 +96,9 @@ extern const char lbl_80592F78[]; /* "ef_particlemanager.cpp" */
 extern const char lbl_80592F90[]; /* "NW4R:Pointer Error\ntarget(=%p) is not valid pointer." */
 extern const char lbl_80592FC8[]; /* "NW4R:Failed assertion target->mParticleManager == this" */
 extern const char ef_pm_result_pointer_error[];
+extern const char ef_pm_err_track_keyed[]; /* "NW4R:Failed assertion *ptr == 0xac" */
+extern const char ef_pm_err_track_rotate[]; /* "NW4R:Failed assertion kind == AC_TARGET_ROTATE" */
+extern const char ef_pm_err_post_field_name[]; /* "...postfieldResource->mChildOption.mNameIdx < ..." */
 extern const char ef_pm_err_parent[]; /* "NW4R:Pointer Error\nparent(=%p) is not valid pointer." */
 extern const char ef_pm_err_resource_arg[]; /* "NW4R:Pointer Error\nresource(=%p) is not valid pointer." */
 extern const char ef_pm_err_manager_em[]; /* "...\nmManagerEM(=%p) ..." */
@@ -116,7 +134,6 @@ void color_rgba_copy(void* dst, const void* src);
 void mtx34_mult_vec3(void* dst, const void* a, const void* b);
 s32 ef_get_life_status(void* self);
 u8* ef_emres_get_ptcl_track();
-void fn_80501C80(void* self, s32 v);
 void fn_805013FC(void* a, void* b, f32 f);
 }
 
@@ -137,15 +154,21 @@ struct EfPmParticle {
     /* +0x0C */ s32 state;            /* 1 = created (ad/retire), 3 = retired */
     /* +0x10 */ u8 pad_0x10[0x0C];
     /* +0x1C */ struct EfPmParticleSlots* slots; /* the particle class's table */
-    /* +0x20 */ u8 pad_0x20[0x8C];
-    /* +0xAC */ nw4r::math::VEC3 accel; /* the velocity the fields add into */
-    /* +0xB8 */ u8 pad_0xB8[0x0C];
+    /* +0x20 */ u8 animParams[0x20];  /* the block the curve tracks write at their target offset */
+    /* +0x40 */ nw4r::math::VEC3 rotate; /* the signed-curve target (track target 0x20) */
+    /* +0x4C */ u8 pad_0x4C[0x4A];
+    /* +0x96 */ u8 texTypeBits;        /* the texture layers' key types, two bits each */
+    /* +0x97 */ u8 pad_0x97[0x09];
+    /* +0xA0 */ nw4r::math::VEC3 velocity;
+    /* +0xAC */ nw4r::math::VEC3 accel; /* the position the velocity moves */
+    /* +0xB8 */ nw4r::math::VEC3 prevPos; /* the position at the start of the frame */
     /* +0xC4 */ f32 accelScale;       /* the factor every added acceleration is scaled by */
     /* +0xC8 */ EfPmManager* manager; /* the ParticleManager that owns this particle */
     /* +0xCC */ u8 pad_0xCC[0x0C];
-    /* +0xD8 */ s32 retireFlag;       /* distinguished by value 1 and 3 in the frame walk */
+    /* +0xD8 */ s32 retireFlag;       /* distinguished by value 1 and 3 in the frame walk; 1 once calculated */
     /* +0xDC */ u16 age;              /* frames lived; 0 on the creation frame */
-    /* +0xDE */ u8 pad_0xDE[0x04];
+    /* +0xDE */ u16 seed;             /* the particle's random seed for its curve tracks */
+    /* +0xE0 */ u16 lifeTime;         /* the age at which the particle retires */
     /* +0xE2 */ u16 life;             /* decremented each frame while non-zero */
     /* +0xE4 */ u8 field_0xE4;
     /* +0xE5 */ u8 field_0xE5;
@@ -157,7 +180,7 @@ struct EfPmList {
     /* +0x04 */ u8 pad_0x04[0x06];
     /* +0x0A */ u16 linkOffset;
     /* +0x0C */ u8 pad_0x0C[0x10];
-    /* +0x1C */ s32 activeCount;      /* zeroed at the start of each frame walk */
+    /* +0x1C */ s32 activeCount;      /* the last particle the frame walk calculated (cleared by the ager) */
 }; /* size: 0x20 */
 
 struct EfEmitterManager;
@@ -298,22 +321,81 @@ struct EfPmEffectSystem {
     /* +0x08 */ EfPmDrawStrategyBuilder* drawStrategyBuilder;
 }; /* size: 0x0C */
 
-/* The effect an emitter belongs to: its effect system at +0x20. */
+/* The calc hooks an effect may carry: called with the manager, its list and the first particle of the walk. */
+typedef void (*EfPmCalcHook)(EfPmManager* manager, EfPmList* list, EfPmParticle* first);
+
+/* The effect an emitter belongs to: its effect system at +0x20, the two calc hooks at +0x4C/+0x50. */
 struct EfPmEffect {
     /* +0x00 */ u8 pad_0x00[0x20];
     /* +0x20 */ EfPmEffectSystem* system;
+    /* +0x24 */ u8 pad_0x24[0x28];
+    /* +0x4C */ EfPmCalcHook preCalc;
+    /* +0x50 */ EfPmCalcHook postCalc;
+}; /* size: 0x54 */
+
+/* The three-vec block used by the particle transform paths. */
+struct EfPmVecBlock {
+    /* +0x00 */ nw4r::math::VEC3 a;
+    /* +0x0C */ nw4r::math::VEC3 b;
+    /* +0x18 */ nw4r::math::VEC3 c;
 }; /* size: 0x24 */
 
 /* The emitter fields the particle manager reads: its flags (+0x20, bit 1: hidden), its effect and its
  * random block. */
 struct EfPmEmitterView {
-    /* +0x00 */ u8 pad_0x00[0x20];
-    /* +0x20 */ u32 flags;
-    /* +0x24 */ u8 pad_0x24[0x98];
-    /* +0xBC */ EfPmEffect* effect;
-    /* +0xC0 */ u8 pad_0xC0[0x2C];
-    /* +0xEC */ u32 random;
-}; /* size: 0xF0 */
+    /* +0x000 */ u8 pad_0x000[0x20];
+    /* +0x020 */ u32 flags;          /* bit 1: hidden; bit 2: the emitter time never ends */
+    /* +0x024 */ u8 pad_0x024[0x18];
+    /* +0x03C */ u16 emitTime;       /* the emitter's end frame */
+    /* +0x03E */ u8 pad_0x03E[0x7E];
+    /* +0x0BC */ EfPmEffect* effect;
+    /* +0x0C0 */ u8 pad_0x0C0[0x24];
+    /* +0x0E4 */ u32 tick;           /* the emitter's frame counter */
+    /* +0x0E8 */ u8 pad_0x0E8[0x02];
+    /* +0x0EA */ u16 seed;
+    /* +0x0EC */ u32 random;
+    /* +0x0F0 */ u8 pad_0x0F0[0x24];
+    /* +0x114 */ nw4r::math::VEC3 tailOrigin; /* the point the tail field pulls toward (NaN: none) */
+}; /* size: 0x120 */
+
+/* A particle curve track as the calc reads it (the animation curve record `ef/ef_animcurve.cpp` evaluates):
+ * its kind byte (0xAB baked, 0xAC keyed), its target offset, its type, its flags and its block sizes. */
+struct EfPmTrack {
+    /* +0x00 */ u8 kind;
+    /* +0x01 */ u8 target;
+    /* +0x02 */ u8 type;            /* 0 u8, 2 post field, 3 f32, 4 pattern, 5 child, 6 rotation, 7 field */
+    /* +0x03 */ u8 pad_0x03;
+    /* +0x04 */ u8 flags;           /* bit 3: skipped; bit 4: driven by the emitter's frame */
+    /* +0x05 */ u8 pad_0x05[0x07];
+    /* +0x0C */ u32 keyBytes;
+    /* +0x10 */ u32 randomBytes;
+    /* +0x14 */ u32 randomTableBytes;
+    /* +0x18 */ u32 nameTableBytes;
+    /* +0x1C */ u32 dataBytes;      /* the size of the record past the tables (a field or post-field block) */
+}; /* size: 0x20 */
+
+/* A field track's 0x1C-byte record: the space its result is taken in, where it is added, and the field's own
+ * parameters (the power at +0x04). */
+struct EfPmFieldRecord {
+    /* +0x00 */ u8 space;          /* 0 manager space, 1 emitter space, 3 manager space scaled by the emitter */
+    /* +0x01 */ u8 addTo;          /* 0 the velocity, 1 the position */
+    /* +0x02 */ u8 pad_0x02[0x02];
+    /* +0x04 */ f32 power;
+    /* +0x08 */ u8 params[0x14];
+}; /* size: 0x1C */
+
+/* A post-field track's record: the field's transform (copied out), the collision info `ef/ef_postfield.cpp`
+ * reads, the index of its spawned effect, and the optional wrap region. */
+struct EfPmPostField {
+    /* +0x00 */ EfPmVecBlock transform;
+    /* +0x24 */ u8 info[0x22];
+    /* +0x46 */ u16 effectIndex;   /* into the name table that follows the record's key tables */
+    /* +0x48 */ u8 wrapFlags;      /* bit 0: wrap the particle into the region; bit 1: centre it on the emitter */
+    /* +0x49 */ u8 pad_0x49[0x03];
+    /* +0x4C */ nw4r::math::VEC3 wrapScale;
+    /* +0x58 */ nw4r::math::VEC3 wrapRotate;
+    /* +0x64 */ nw4r::math::VEC3 wrapTranslate;
+}; /* size: 0x70 */
 
 /* The random field's parameter record. */
 struct EfPmFieldRandomParam {
@@ -339,12 +421,6 @@ struct EfPmFieldOwner {
     /* +0x04 */ u8 flags;
 }; /* size: 0x05 */
 
-/* The three-vec block used by the particle transform paths. */
-struct EfPmVecBlock {
-    /* +0x00 */ nw4r::math::VEC3 a;
-    /* +0x0C */ nw4r::math::VEC3 b;
-    /* +0x18 */ nw4r::math::VEC3 c;
-}; /* size: 0x24 */
 
 /* --------------------------------------------------------------------------------------------- */
 /* Assert (shared shape, ef shape units)                                                          */
@@ -381,6 +457,7 @@ extern "C" u8* ef_emres_get_ptcl_track_tbl(void* self);
 extern "C" u16 ef_emres_num_ptcl_track(void* self);
 extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, f32 f, const nw4r::math::VEC3* d);
 extern "C" void fn_800AEE14();
+extern "C" u16 ef_emres_num_ptcl_track_init(void* self);
 extern "C" void fn_800AC0E4(EfPmManager* self, EfPmSetterParams* p);
 extern "C" EfDrawInfo* ef_draw_info_copy(EfDrawInfo* dst, const EfDrawInfo* src);
 extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, const nw4r::math::VEC3* origin);
@@ -535,9 +612,10 @@ extern "C" void* fn_800AC178(void* p, s32 n) {
     return p;
 }
 
-/* Slot-6 helper: forward to the SDK's matrix function. */
-extern "C" void ef_list_get_last(void* self) {
-    fn_80501C80(self, 0);
+/* Returns the list's last element (the previous of none), or null. */
+/* untyped: caller-owned payload - the list holds elements of any type */
+extern "C" void* ef_list_get_last(const nw4r::ut::List* list) {
+    return nw4r::ut::List_GetPrev(list, NULL);
 }
 
 /* The resource-table accessors: the table's count, its first array base and its third u16. */
@@ -546,7 +624,7 @@ extern "C" u16 ef_emres_num_ptcl_track(void* self) {
     return *(u16*)ef_emres_get_ptcl_track();
 }
 
-extern "C" u16 fn_800ADE74(void* self) {
+extern "C" u16 ef_emres_num_ptcl_track_init(void* self) {
     (void)self;
     return *(u16*)(ef_emres_get_ptcl_track() + 2);
 }
@@ -933,9 +1011,355 @@ extern "C" MTX34* ef_pm_get_mtx(void* target, MTX34* out) {
     return out;
 }
 
+/* 0x800AC2F8 (0xDCC): table slot 6, one frame of every particle not yet calculated: the effect's pre-calc hook,
+ * the space matrices, then per particle its curve tracks (values, patterns, children, fields, post fields), the
+ * velocity and position step, the post field and the wrap region; the post-calc hook last. */
+extern "C" void ef_pm_calc(EfPmManager* self) {
+    EfPmParticle* first = (EfPmParticle*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list,
+                                                                  (void*)self->list.activeCount);
+    if (first == NULL) {
+        return;
+    }
+    EfPmParticle* p = first;
+#line 225
+    NW4R_POINTER_ASSERT(lbl_80592F78, self->managerEM, ef_pm_err_manager_em);
+    NW4R_POINTER_ASSERT(lbl_80592F78, ((EfPmEmitterView*)self->managerEM)->effect, ef_pm_err_manager_ef);
+    if (((EfPmEmitterView*)self->managerEM)->effect->preCalc != NULL) {
+        ((EfPmEmitterView*)self->managerEM)->effect->preCalc(self, &self->list, first);
+    }
+
+    nw4r::math::MTX34 pmMtx;
+    MTX34_ctor(&pmMtx);
+    ef_pm_get_mtx(self, &pmMtx);
+    nw4r::math::MTX34 pmInv;
+    MTX34_ctor(&pmInv);
+    mtx34_inverse(&pmInv, &pmMtx);
+    nw4r::math::MTX34 emMtx;
+    MTX34_ctor(&emMtx);
+    ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &emMtx);
+    nw4r::math::VEC3 axisSum;
+    setVec3(&axisSum, emMtx.m[0][2] + (emMtx.m[0][0] + emMtx.m[0][1]),
+            emMtx.m[1][2] + (emMtx.m[1][0] + emMtx.m[1][1]), emMtx.m[2][2] + (emMtx.m[2][0] + emMtx.m[2][1]));
+    f32 emScale = ef_pm_f32_inv_sqrt3 * vec3_len(&axisSum.x);
+    nw4r::math::MTX34 localToEm;
+    MTX34_ctor(&localToEm);
+    mtx34_concat(&localToEm, &pmInv, &emMtx);
+    nw4r::math::MTX34 emToLocal;
+    MTX34_ctor(&emToLocal);
+    mtx34_inverse(&emToLocal, &localToEm);
+    nw4r::math::MTX34 pmRot;
+    ef_mtx34_copy(&pmRot, &pmInv);
+    pmRot.m[0][3] = ef_pm_f32_zero;
+    pmRot.m[1][3] = ef_pm_f32_zero;
+    pmRot.m[2][3] = ef_pm_f32_zero;
+    nw4r::math::MTX34 pmRotInv;
+    MTX34_ctor(&pmRotInv);
+    mtx34_inverse(&pmRotInv, &pmRot);
+    nw4r::math::MTX34 emToLocalRot;
+    ef_mtx34_copy(&emToLocalRot, &emToLocal);
+    emToLocalRot.m[0][3] = ef_pm_f32_zero;
+    emToLocalRot.m[1][3] = ef_pm_f32_zero;
+    emToLocalRot.m[2][3] = ef_pm_f32_zero;
+    nw4r::math::MTX34 localToEmRot;
+    ef_mtx34_copy(&localToEmRot, &localToEm);
+    localToEmRot.m[0][3] = ef_pm_f32_zero;
+    localToEmRot.m[1][3] = ef_pm_f32_zero;
+    localToEmRot.m[2][3] = ef_pm_f32_zero;
+
+    while (p != NULL) {
+        EfPmParticle* next = *(EfPmParticle**)((u8*)p + self->list.linkOffset + 4);
+        if (p->state == 1 && p->retireFlag == 0) {
+            p->retireFlag = 1;
+            if (p->life != 0) {
+                ef_effect_set_calc_flag(((EfPmEmitterView*)self->managerEM)->effect, 1);
+            }
+            nw4r::math::VEC3 pos;
+            nw4r::math::VEC3 vel;
+            nw4r::math::VEC3 moveDir;
+            EfDrawParticleManager* handle;
+            assignVec3((Vec*)&pos, (Vec*)&p->accel);
+            assignVec3((Vec*)&vel, (Vec*)&p->velocity);
+            VEC3_ctor(&moveDir);
+            ef_particle_get_move_dir((EfDrawParticle*)p, &moveDir);
+            copyVec3(&p->prevPos, &p->accel);
+            ef_pm_handle(&handle, self);
+            if ((ef_emitter_tex_flags(&handle)[3] & 1) == 0 && p->lifeTime <= p->age) {
+                fn_800AB880(self, p);
+            } else {
+                nw4r::math::VEC3 addVel;
+                nw4r::math::VEC3 addPos;
+                EfPmVecBlock pfTransform;
+                EfPmPostField* pf;
+                EffectHandle* pfEffect;
+                BOOL hasPostField;
+                u16 i;
+                setVec3(&addVel, ef_pm_f32_zero, ef_pm_f32_zero, ef_pm_f32_zero);
+                setVec3(&addPos, ef_pm_f32_zero, ef_pm_f32_zero, ef_pm_f32_zero);
+                hasPostField = FALSE;
+                fn_800ADE98(&pfTransform);
+                pfEffect = NULL;
+                if (p->age == 0) {
+                    i = 0;
+                } else {
+                    i = ef_emres_num_ptcl_track_init(self->resource);
+                }
+                for (; (u16)i < ef_emres_num_ptcl_track(self->resource); i++) {
+                    EfPmTrack* track = (EfPmTrack*)ef_emres_get_ptcl_track_at(self->resource, (u16)i);
+                    u32 tick;
+                    u32 mode;
+                    u32 seed;
+                    if ((track->flags & 8) != 0) {
+                        continue;
+                    }
+                    if ((track->flags & 0x10) != 0) {
+                        EfPmEmitterView* em = (EfPmEmitterView*)p->manager->managerEM;
+                        tick = em->tick;
+                        if ((em->flags & 4) != 0) {
+                            mode = 0xFFFFFFFF;
+                        } else {
+                            mode = em->emitTime;
+                        }
+                        seed = em->seed;
+                    } else {
+                        tick = p->age;
+                        mode = p->lifeTime;
+                        seed = p->seed;
+                    }
+                    if ((u8)(track->kind + 0x55) > 1) {
+                        continue;
+                    }
+                    u8 target = track->target;
+                    switch (track->type) {
+                    case 4: {
+                        const u8* nameTable;
+                        u32* channel;
+                        EfAnimDivider divider;
+                        u8* flags;
+                        if (track->kind != 0xAC) {
+                            nw4r::db::Panic(lbl_80592F78, 0x181, ef_pm_err_track_keyed);
+                        }
+                        ef_pm_handle(&handle, self);
+                        flags = ef_emitter_tex_flags(&handle);
+                        ef_anim_curve_texture((const u8*)track, (EfAnimParticle*)p, tick, seed, mode, &nameTable, &channel, &divider);
+                        if ((flags[2] & 1) != 0) {
+                            ef_anim_latch_tex_type((EfAnimParticle*)p, &divider);
+                        } else {
+                            p->texTypeBits &= (u8)~(3 << (divider.mChannel * 2));
+                            p->texTypeBits |= (u8)((divider.mType & 3) << (divider.mChannel * 2));
+                        }
+                        if ((flags[3] & 2) != 0) {
+                            ef_anim_tex_ramp((EfAnimParticle*)p, &divider, (const EfAnimRamp*)flags, self, (const EfAnimNameTable*)nameTable, channel);
+                        }
+                        break;
+                    }
+                    case 5:
+                        if (track->kind != 0xAC) {
+                            nw4r::db::Panic(lbl_80592F78, 0x198, ef_pm_err_track_keyed);
+                        }
+                        ef_anim_curve_child((const u8*)track, (EfAnimParticle*)p, tick, seed, mode);
+                        break;
+                    case 6:
+                        if (target != 0x20) {
+                            nw4r::db::Panic(lbl_80592F78, 0x19D, ef_pm_err_track_rotate);
+                        }
+                        if (track->kind != 0xAC) {
+                            nw4r::db::Panic(lbl_80592F78, 0x19E, ef_pm_err_track_keyed);
+                        }
+                        ef_anim_curve_rotate((const u8*)track, &p->rotate.x, tick, seed, mode);
+                        break;
+                    case 0:
+                        ef_anim_curve_u8((const u8*)track, p->animParams + target, tick, seed, mode);
+                        break;
+                    case 3:
+                        ef_anim_curve_f32((const u8*)track, (f32*)(p->animParams + target), tick, seed, mode);
+                        break;
+                    case 7: {
+                        EfPmFieldRecord field;
+                        nw4r::math::VEC3 rel;
+                        nw4r::math::VEC3 out;
+                        memcpy(&field,
+                               (u8*)track + track->keyBytes + track->randomBytes + track->randomTableBytes +
+                                   track->nameTableBytes + sizeof(EfPmTrack),
+                               sizeof(EfPmFieldRecord));
+                        if (track->keyBytes != 0) {
+                            ef_anim_curve_f32((const u8*)track, &field.power, tick, seed, mode);
+                        }
+                        VEC3_ctor(&rel);
+                        if (target == 6 || (u8)(target + 0xFE) <= 2) {
+                            nw4r::math::VEC3 emPos;
+                            ef_pm_calc_emitter_pos(&emPos, field.space == 1, &emToLocal, &pmMtx, &emMtx, &pos);
+                            copyVec3(&rel, &emPos);
+                        }
+                        setVec3(&out, ef_pm_f32_zero, ef_pm_f32_zero, ef_pm_f32_zero);
+                        switch (target) {
+                        case 1:
+                            fn_800ADA24(&out, (EfPmDirParam*)&field, &vel);
+                            break;
+                        case 0:
+                            ef_field_gravity(&out, (EfPmFieldRotation*)&field);
+                            break;
+                        case 7:
+                            ef_field_random(&out, (EfPmFieldRandomParam*)&field, (EfPmFieldHeader*)track,
+                                            (EfPmFieldOwner*)track, p, tick, seed, &vel, &moveDir, &emToLocalRot);
+                            break;
+                        case 6:
+                            ef_field_spin(&out, (EfPmFieldRotation*)&field, &rel);
+                            break;
+                        case 2:
+                            ef_field_magnet(&out, (EfPmFieldPoint*)&field, &rel);
+                            break;
+                        case 3:
+                            ef_field_newton(&out, (EfPmFieldNewtonParam*)&field, &rel);
+                            break;
+                        case 4:
+                            ef_field_vortex(&out, (EfPmFieldVortexParam*)&field, &rel);
+                            break;
+                        case 8: {
+                            EfPmEmitterView* em = (EfPmEmitterView*)self->managerEM;
+                            if (ef_pm_f32_nan != em->tailOrigin.x) {
+                                nw4r::math::MTX34 m;
+                                nw4r::math::VEC3 origin;
+                                MTX34_ctor(&m);
+                                ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &m);
+                                setVec3(&origin, m.m[0][3], m.m[1][3], m.m[2][3]);
+                                PSVECSubtract(&out.x, &origin.x, &((EfPmEmitterView*)self->managerEM)->tailOrigin.x);
+                                fn_800513F0(&out, field.power);
+                            }
+                            break;
+                        }
+                        }
+                        switch (field.space) {
+                        case 1:
+                            mtx34_mult_vec3(&out, &localToEmRot, &out);
+                            break;
+                        case 0:
+                            mtx34_mult_vec3(&out, &pmRot, &out);
+                            break;
+                        case 3:
+                            fn_800513F0(&out, emScale);
+                            mtx34_mult_vec3(&out, &pmRot, &out);
+                            break;
+                        }
+                        switch (field.addTo) {
+                        case 0:
+                            addVec3To(&addVel, &out);
+                            break;
+                        case 1:
+                            addVec3To(&addPos, &out);
+                            break;
+                        }
+                        break;
+                    }
+                    case 2:
+                        if (track->dataBytes != 0) {
+                            u8* names = (u8*)track + track->keyBytes + sizeof(EfPmTrack) + track->randomBytes +
+                                        track->randomTableBytes;
+                            pf = (EfPmPostField*)(names + track->nameTableBytes);
+                            memcpy(&pfTransform, pf, sizeof(EfPmVecBlock));
+                            if (track->nameTableBytes > 4) {
+                                if (!(pf->effectIndex < *(u16*)names)) {
+                                    nw4r::db::Panic(lbl_80592F78, 0x226, ef_pm_err_post_field_name);
+                                }
+                                pfEffect = ((EffectHandle**)(names + 4))[pf->effectIndex];
+                            }
+                        }
+                        if (track->keyBytes != 0) {
+                            ef_anim_curve_f32((const u8*)track, (f32*)((u8*)&pfTransform + target), tick, seed, mode);
+                        }
+                        hasPostField = TRUE;
+                        break;
+                    }
+                }
+
+                for (;;) {
+                if (hasPostField) {
+                    nw4r::math::VEC3 newVel;
+                    u8 killed;
+                    assignVec3((Vec*)&newVel, (Vec*)&p->velocity);
+                    addVec3To(&newVel, &addVel);
+                    killed = 0;
+                    s32 moved = ef_pf_calc_particle((EfDrawParticle*)p, (EfPostFieldTransform*)&pfTransform,
+                                                    (EfPostFieldInfo*)pf, pfEffect, &emMtx, &pmInv, &pos,
+                                                    addPos, &newVel, &killed);
+                    if (killed != 0) {
+                        fn_800AB880(self, p);
+                        break;
+                    }
+                    if (moved != 0) {
+                        copyVec3(&p->velocity, &newVel);
+                        fn_800AD0CC(p, &addPos);
+                        fn_800AD0CC(p, &p->velocity);
+                    }
+                    if ((pf->wrapFlags & 1) != 0) {
+                        nw4r::math::MTX34 region;
+                        nw4r::math::MTX34 rot;
+                        nw4r::math::MTX34 regionInv;
+                        nw4r::math::VEC3 local;
+                        BOOL wrapped;
+                        MTX34_ctor(&region);
+                        mtx34_identity(&region);
+                        ef_mtx34_scale_columns(region.m[0], &pf->wrapScale.x, region.m[0]);
+                        MTX34_ctor(&rot);
+                        ef_mtx34_rotate_xyz(rot.m[0], pf->wrapRotate.x, pf->wrapRotate.y, pf->wrapRotate.z);
+                        mtx34_concat(&region, &rot, &region);
+                        mtx34_trans_apply(&region, &pf->wrapTranslate, &region);
+                        if ((pf->wrapFlags & 2) != 0) {
+                            nw4r::math::VEC3 emPos;
+                            setVec3(&emPos, emMtx.m[0][3], emMtx.m[1][3], emMtx.m[2][3]);
+                            mtx34_trans_apply(&region, &emPos, &region);
+                        }
+                        mtx34_concat(&region, &pmInv, &region);
+                        MTX34_ctor(&regionInv);
+                        mtx34_inverse(&regionInv, &region);
+                        VEC3_ctor(&local);
+                        mtx34_mult_vec3(&local, &regionInv, &p->accel);
+                        wrapped = FALSE;
+                        if (local.x > lbl_807960A8) {
+                            local.x = fmodf(lbl_807960A8 + local.x, ef_pm_f32_two) - lbl_807960A8;
+                            wrapped = TRUE;
+                        } else if (local.x < ef_pm_f32_minus_one) {
+                            local.x = lbl_807960A8 + fmodf(local.x - lbl_807960A8, ef_pm_f32_two);
+                            wrapped = TRUE;
+                        }
+                        if (local.y > lbl_807960A8) {
+                            local.y = fmodf(lbl_807960A8 + local.y, ef_pm_f32_two) - lbl_807960A8;
+                            wrapped = TRUE;
+                        } else if (local.y < ef_pm_f32_minus_one) {
+                            local.y = lbl_807960A8 + fmodf(local.y - lbl_807960A8, ef_pm_f32_two);
+                            wrapped = TRUE;
+                        }
+                        if (local.z > lbl_807960A8) {
+                            local.z = fmodf(lbl_807960A8 + local.z, ef_pm_f32_two) - lbl_807960A8;
+                            wrapped = TRUE;
+                        } else if (local.z < ef_pm_f32_minus_one) {
+                            local.z = lbl_807960A8 + fmodf(local.z - lbl_807960A8, ef_pm_f32_two);
+                            wrapped = TRUE;
+                        }
+                        if (wrapped) {
+                            mtx34_mult_vec3(&p->accel, &region, &local);
+                        }
+                    }
+                } else {
+                    addVec3To(&p->velocity, &addVel);
+                    fn_800AD0CC(p, &addPos);
+                    fn_800AD0CC(p, &p->velocity);
+                }
+                p->age++;
+                break;
+                }
+            }
+        }
+        p = next;
+    }
+
+    self->list.activeCount = (s32)ef_list_get_last((nw4r::ut::List*)&self->list);
+    if (((EfPmEmitterView*)self->managerEM)->effect->postCalc != NULL) {
+        ((EfPmEmitterView*)self->managerEM)->effect->postCalc(self, &self->list, first);
+    }
+}
+
 /* --------------------------------------------------------------------------------------------- */
 /* Not yet reconstructed                                                                          */
 /* --------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800AC2F8() {}
 extern "C" void ef_pm_modulate_color() {}

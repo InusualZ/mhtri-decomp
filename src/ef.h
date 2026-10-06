@@ -259,6 +259,7 @@ extern f32 ef_random_float(u32* progress);                              /* pseud
  * branch reuses (`ef_disc.cpp` 0x800CCA7C `fsubs f2, f30, f1`, 0x800CCA98 `fsubs f0, f30, f1`). */
 extern f32 fn_800C9DCC(f32 a);                                      /* fabsf */
 extern f32 fn_80463F10(f32 a, f32 b);                               /* fmodf */
+extern f32 fmodf(f32 a, f32 b);                                     /* the same, under the map's name */
 
 /* This file's own pooled data (`ef_disc.cpp`), declared but never defined here. */
 extern char lbl_80594DE0[]; /* "ef_disc.cpp"                                  .data 0x80594DE0 */

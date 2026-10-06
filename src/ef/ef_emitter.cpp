@@ -134,14 +134,14 @@ void* fn_800A4654(void* manager, void* em, u8 flag, s32 mode);
 void ef_ref_object_add_ref(void* p);
 void fn_800A3390(void* dst, const void* src);
 void fn_800A3800(void* p);
-void fn_800A5114(void* manager, s32 flag);
+void ef_effect_set_calc_flag(void* manager, s32 flag);
 void fn_800A5900(void* random, u32 seed);
 void* fn_800A5484(void* p);
 void* fn_800A60C0(void* manager);
 void fn_800A52E4(void* manager, void* cb, void* arg, s32 flag, void* self);
 void ef_pm_handle(void* dst, const void* src);
 void fn_8035B998(void* p);
-void fn_8009F85C(void* rec, void* target, u32 life, u16 seed, s32 range);
+void ef_anim_curve_f32(void* rec, void* target, u32 life, u16 seed, s32 range);
 void* ef_resource_instance(void);
 
 void fn_8009BF08(void* vec, void* out);
@@ -1350,7 +1350,7 @@ extern "C" void fn_800A8A5C(EfEmitterObj* self) {
                 continue;
             }
             u8 off = rec->offset;
-            fn_8009F85C(rec, (u8*)self + off + 0x20, self->field_0x0E4, self->seed, range);
+            ef_anim_curve_f32(rec, (u8*)self + off + 0x20, self->field_0x0E4, self->seed, range);
             if (off >= 0x70) {
                 found = 1;
             }
@@ -1440,7 +1440,7 @@ extern "C" void fn_800A8DF8(EfEmitterObj* self) {
     }
     self->field_0x0B4 = 1;
     if (self->field_0x0E8 != 0) {
-        fn_800A5114(self->managerEF, 1);
+        ef_effect_set_calc_flag(self->managerEF, 1);
     }
     if (self->state == 1) {
         EfParticleRec* pm = (EfParticleRec*)ef_list_get_first(&self->particles);

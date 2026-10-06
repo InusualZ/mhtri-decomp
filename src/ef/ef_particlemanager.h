@@ -19,7 +19,7 @@ struct EfPmManager;
 struct EfPmParticle;
 s32 fn_800AB740(struct EfPmManager* self, struct EfPmParticle* target);
 
-/* The ramp helper `ef/ef_animcurve.cpp`'s fn_800A1504 calls at a ramp's last key (declared with the
+/* The ramp helper `ef/ef_animcurve.cpp`'s ef_anim_tex_ramp calls at a ramp's last key (declared with the
  * owner's record tags). */
 s32 fn_800AB880(struct EfPmManager* self, struct EfPmParticle* target);
 

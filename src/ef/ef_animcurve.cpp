@@ -15,19 +15,25 @@
  *   `random`, `randomTable`, `nameTable`, `pp`, `ptrFixed`, `ptrBase`). GUESS: the record names (`EfAnimCurveKey`,
  *   `EfAnimChildKey`, `EfAnimRandomRange`, ...) and the particle owner chain's field names (`mManager`,
  *   `mManagerEM`, `mManagerEF`, `mManagerES`, after nw4r::ef's spelling) come from the offsets these bodies read.
+ *   GUESS: `ef_anim_curve_u8` (0x8009DEB0), `ef_anim_curve_f32` (0x8009F85C), `ef_anim_curve_rotate` (0x800A02F8):
+ *   the u8, f32 and signed-f32 curve evaluators.
+ *   GUESS: `ef_anim_curve_texture` (0x800A0D04), `ef_anim_curve_child` (0x800A1CA8): the texture-pattern and
+ *   child-creation curve evaluators.
+ *   GUESS: `ef_anim_latch_tex_type` (0x800A14A4), `ef_anim_tex_ramp` (0x800A1504): the texture key type's latch
+ *   and the pattern ramp.
  *   GUESS: `ef_anim_rand_next` (0x8009EEDC): the random generator's LCG step.
  *   GUESS: `ef_anim_name_hash` (0x8009EEF4): hashes the seed, the curve's id, the key and the division.
  * RESIDUALS. 12 partial rows, every one written:
- *  - `fn_800A14A4`: retail stores the masked byte before or-ing the new bits in and reloads `arg->mChannel`;
+ *  - `ef_anim_latch_tex_type`: retail stores the masked byte before or-ing the new bits in and reloads `arg->mChannel`;
  *    ours drops the first store (no alias between the two records);
  *  - `ef_anim_name_hash`: the hash constant is added after the `a`/`b` products in retail; MWCC folds it in earlier;
- *  - `fn_800A02F8`, `fn_8009F85C`, `fn_8009DEB0`: register colouring only (the mask, the two record strides and
+ *  - `ef_anim_curve_rotate`, `ef_anim_curve_f32`, `ef_anim_curve_u8`: register colouring only (the mask, the two record strides and
  *    the key pointer take other callee-saved registers; retail reuses one pointer for the key data and the
  *    random range, flags read at -0xA);
  *  - `fn_8009E854`, `fn_800A01C4`: float register colours of the cubic terms;
  *  - `fn_8009EF88`: the exact-key bool is narrowed (`clrlwi`) before its two stores;
- *  - `fn_8009D5C0`, `fn_8009CDBC`, `fn_800A0D04`, `fn_800A1504`: register colours only;
- *  - `fn_800A02F8` keeps the key record pointers beside their data pointers, one callee-saved register more than
+ *  - `fn_8009D5C0`, `fn_8009CDBC`, `ef_anim_curve_texture`, `ef_anim_tex_ramp`: register colours only;
+ *  - `ef_anim_curve_rotate` keeps the key record pointers beside their data pointers, one callee-saved register more than
  *    retail: `_savegpr_20`/`_restgpr_20` where retail calls `_savegpr_21`/`_restgpr_21`.
  *   flipcheck: `.data` claimed, not emitted (the strings would have to come out of literal pools: the
  *   `fn_800A12AC`/`fn_8009EF88` messages each carry their own copy of the file name after the main pool);
@@ -216,17 +222,6 @@ struct EfAnimRandomRange {
     /* +0x04 */ f32 mRange;
 }; /* size: 0x8 */
 
-/* The per-channel state a pattern curve leaves behind: the key count, the channel, the key's type and
- * its name-table index (fn_800A1504 and fn_800A14A4 read it back). */
-struct EfAnimDivider {
-    /* +0x00 */ u16 mKeyCount;
-    /* +0x02 */ u8 pad_0x02[0x2];
-    /* +0x04 */ u32 mChannel;
-    /* +0x08 */ u8 mType;
-    /* +0x09 */ u8 pad_0x09[0x3];
-    /* +0x0C */ u32 mSlotBase;
-}; /* size: 0x10 */
-
 /* The owner chain a particle reaches its effect system's creation queue through: particle manager ->
  * emitter -> effect -> effect system (the queue sits at +0x10; `ef/ef_effect.cpp` executes it). */
 struct EfAnimEffectSystem {
@@ -303,7 +298,7 @@ union EfAnimHash {
     u8 mByte[4];
 }; /* size: 0x4 */
 
-/* The ramp record fn_800A1504 reads: its two curve endpoints as bytes, plus the flags byte whose bit 2
+/* The ramp record ef_anim_tex_ramp reads: its two curve endpoints as bytes, plus the flags byte whose bit 2
  * picks the wrap rule. */
 struct EfAnimRamp {
     /* +0x00 */ u8 mEnd;
@@ -315,7 +310,7 @@ struct EfAnimRamp {
 /* The key searches walk a table of records `stride` bytes apart whose leading u16 is the key. */
 #define EF_ANIM_KEY_AT(base, stride, i) (*(const u16*)((const u8*)(base) + (i) * (stride)))
 
-/* Fires one child-creation key of fn_800A1CA8's curve. */
+/* Fires one child-creation key of ef_anim_curve_child's curve. */
 #define EF_ANIM_FIRE(entry)                                                                        \
     fn_800A16C4((entry), seed, header, (const EfAnimNameTable*)nameTable,                          \
                 (const EfAnimChildTable*)randomTable, pp, divA)
@@ -330,7 +325,7 @@ void fn_8009CDBC(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32*
                  u32* resDiv);
 void fn_8009D5C0(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
                  u32* resDiv, u8* final);
-void fn_8009DEB0(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mode);
+void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mode);
 u8 fn_8009E854(u32 tick, u8 start, u8 end, u8 type);
 void fn_8009EA4C(const EfAnimHeader* header, const EfAnimKeyRange* key, u32 lo, u32* divL,
                  u32* divH);
@@ -342,20 +337,20 @@ void fn_8009F22C(const u8* pHead, const EfAnimHeader** header, const u8** key, c
                  const u8** randomTable, const u8** nameTable);
 u8 fn_8009F834(u32 index);
 u8 fn_8009F848(u32 index);
-void fn_8009F85C(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode);
+void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode);
 f32 fn_800A01C4(f32 t, f32 a, f32 b, u8 type);
-void fn_800A02F8(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode);
-void fn_800A0D04(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode,
+void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode);
+void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode,
                  const u8** nameTableOut, u32** target, EfAnimDivider* divider);
 void fn_800A1290(EfAnimKey* dst, const EfAnimKey* src);
 void fn_800A12AC(s32* out, s32 target, const u16* ptrBase, u32 stride, s32 lo, s32 hi, int flag);
-void fn_800A14A4(EfAnimParticle* self, const EfAnimDivider* arg);
-void fn_800A1504(EfAnimParticle* self, const EfAnimDivider* divider, const EfAnimRamp* ramp,
+void ef_anim_latch_tex_type(EfAnimParticle* self, const EfAnimDivider* arg);
+void ef_anim_tex_ramp(EfAnimParticle* self, const EfAnimDivider* divider, const EfAnimRamp* ramp,
                  struct EfPmManager* manager, const EfAnimNameTable* nameTable, u32* target);
 void fn_800A16C4(const EfAnimChildKey* ptrFixed, u16 seed, const EfAnimHeader* header,
                  const EfAnimNameTable* nameTable, const EfAnimChildTable* randomTable, EfAnimParticle* pp,
                  u32 div);
-void fn_800A1CA8(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode);
+void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode);
 void fn_800A2504(const u8* mCmdList, u8* target, u32 step, u32 mode);
 void fn_800A27B4(const EfAnimHeader* header, u32 step, u16* tick, u32 mode);
 void fn_800A2CF0(const u8* mCmdList, f32* target, u32 step, u32 mode);
@@ -556,10 +551,10 @@ void fn_8009D5C0(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32*
     *tickF32 = (f32)*tick;
 }
 
-/* 0x8009DEB0 (0x9A4): the u8 twin of fn_8009F85C: a baked curve (0xAB) is a table copy, otherwise an exact
+/* 0x8009DEB0 (0x9A4): the u8 twin of ef_anim_curve_f32: a baked curve (0xAB) is a table copy, otherwise an exact
  * key is copied (or drawn from its random byte range) and a key span is interpolated in u16.16 fixed point
  * with each channel's kernel type. */
-void fn_8009DEB0(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mode) {
+void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mode) {
     NW4R_POINTER_ASSERT(mCmdList, 0x31C, lbl_80591F8C, lbl_80591E68);
     NW4R_POINTER_ASSERT(target, 0x31D, lbl_80591FC4, lbl_80591E68);
 
@@ -978,7 +973,7 @@ u8 fn_8009F848(u32 index) {
 /* 0x8009F85C (0x968): evaluates an f32 curve at `step` into the channels its mask selects: a baked curve
  * (0xAB) is a table copy, otherwise an exact key is copied (or drawn from its random range) and a key
  * span is interpolated with each channel's kernel type, either end possibly random. */
-void fn_8009F85C(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode) {
+void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode) {
     NW4R_POINTER_ASSERT(mCmdList, 0x418, lbl_80591F8C, lbl_80591E68);
     NW4R_POINTER_ASSERT(target, 0x419, lbl_80591FC4, lbl_80591E68);
 
@@ -1209,9 +1204,9 @@ f32 fn_800A01C4(f32 t, f32 a, f32 b, u8 type) {
     }
 }
 
-/* 0x800A02F8 (0xA0C): the signed twin of fn_8009F85C: a random record carries a sign byte after its
+/* 0x800A02F8 (0xA0C): the signed twin of ef_anim_curve_f32: a random record carries a sign byte after its
  * pairs, and a set byte negates the drawn values on a coin flip of the hash. */
-void fn_800A02F8(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode) {
+void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode) {
     NW4R_POINTER_ASSERT(mCmdList, 0x51A, lbl_80591F8C, lbl_80591E68);
     NW4R_POINTER_ASSERT(target, 0x51B, lbl_80591FC4, lbl_80591E68);
 
@@ -1461,7 +1456,7 @@ void fn_800A02F8(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode) 
 /* 0x800A0D04 (0x58C): evaluates a pattern curve ('h'/'l'/'p' channel) at `step`: finds the key, resolves a
  * random key through the seed hash, writes the key's name word to the particle's channel and records the
  * key's value and type bits. */
-void fn_800A0D04(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode,
+void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode,
                  const u8** nameTableOut, u32** target, EfAnimDivider* divider) {
     NW4R_POINTER_ASSERT(mCmdList, 0x669, lbl_80591F8C, lbl_80591E68);
     NW4R_POINTER_ASSERT(pp, 0x66A, lbl_80592198, lbl_80591E68);
@@ -1589,7 +1584,7 @@ void fn_800A12AC(s32* out, s32 target, const u16* ptrBase, u32 stride, s32 lo, s
 
 /* 0x800A14A4 - latches the one-shot flag and, the first time, folds the key type of `arg`'s channel into
  * the particle's key-type bit pairs. */
-void fn_800A14A4(EfAnimParticle* self, const EfAnimDivider* arg) {
+void ef_anim_latch_tex_type(EfAnimParticle* self, const EfAnimDivider* arg) {
     if (self->mLatched == 0) {
         self->mKeyTypeBits &= (u8)~(3 << (arg->mChannel * 2));
         self->mKeyTypeBits |= (u8)((arg->mType & 3) << (arg->mChannel * 2));
@@ -1599,7 +1594,7 @@ void fn_800A14A4(EfAnimParticle* self, const EfAnimDivider* arg) {
 
 /* 0x800A1504 - resolves a key's slot (`mPhase` folded into the divider's range) and returns the table word
  * at slot + 1 through `target`; ramp flag bit 2 picks calling the ramp helper or wrapping at the last key. */
-void fn_800A1504(EfAnimParticle* self, const EfAnimDivider* divider, const EfAnimRamp* ramp,
+void ef_anim_tex_ramp(EfAnimParticle* self, const EfAnimDivider* divider, const EfAnimRamp* ramp,
                  struct EfPmManager* manager, const EfAnimNameTable* nameTable, u32* target) {
     s32 span = ramp->mEnd - ramp->mStart;
     s32 idx = (u16)(divider->mSlotBase + self->mPhase % span);
@@ -1661,7 +1656,7 @@ void fn_800A16C4(const EfAnimChildKey* ptrFixed, u16 seed, const EfAnimHeader* h
  * one division the keys between the two ticks, otherwise the rest of the first division, every key of
  * the divisions in between and the start of the last one; a ping-pong curve (flag bit 6) walks the odd
  * divisions backwards and skips the turning keys. */
-void fn_800A1CA8(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode) {
+void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode) {
     NW4R_POINTER_ASSERT(mCmdList, 0x768, lbl_80591F8C, lbl_80591E68);
     NW4R_POINTER_ASSERT(pp, 0x769, lbl_80592198, lbl_80591E68);
 

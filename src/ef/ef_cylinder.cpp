@@ -88,7 +88,7 @@ extern void assignVec3(VEC3* out, VEC3* in);
 extern void ef_sin_cos(f32* out_a, f32* out_b, f32 angle);
 extern void fn_800A99B4(s32 ctx, VEC3* out, EfWork* em, VEC3* pos, VEC3* a, VEC3* b, VEC3* c);
 extern u32  fn_800A9FB0(s32 ctx, u16 id, EfWork* em, f32 scale);
-extern f32  fn_80463F10(f32 a, f32 b);
+extern f32  fmodf(f32 a, f32 b);
 }
 
 extern char lbl_80594D20[]; /* "ef_cylinder.cpp"                .data  0x80594D20 */
@@ -208,7 +208,7 @@ void fn_800CBFB0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         phase = 2.0f * (3.14159265f * ef_random_float(&em->progress));
     }
     if (flags & 0x00020000) {
-        range_phase = fn_80463F10(params->range_end - params->range_begin, 6.2831855f);
+        range_phase = fmodf(params->range_end - params->range_begin, 6.2831855f);
         if (range_phase < 0.000191747604f || range_phase > 6.28299379f || em->split_count == 1) {
             angle_step = (params->range_end - params->range_begin) / (f32)em->split_count;
         } else {

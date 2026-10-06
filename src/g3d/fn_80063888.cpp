@@ -713,11 +713,11 @@ extern "C" u16 fn_800658E8(void *p)
 }
 
 /* The three-float setter forwarder and the empty-base forwarder. */
-extern "C" void fn_80463F10(void *p);
+extern "C" void fmodf(void *p);
 
 extern "C" void fn_80064984(void *p)
 {
-    fn_80463F10(p);
+    fmodf(p);
 }
 
 extern "C" void fn_80064C04(void *self, const f32 *v)
