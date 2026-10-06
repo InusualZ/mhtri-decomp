@@ -10,8 +10,7 @@
  * FLAGS. the library's flags plus `#pragma peephole off`, measured on the six written rows.
  * NAMES. The file and class names are GUESSes: the base class of `NetworkConnectionStable`; the slot names are read off
  *   the derived class's overrides.  GUESS: setInterval, setTimeout, setLimit (the defaults each new connection copies).
- * RESIDUALS. Unwritten: the constructor (0x803CA1D4, 288 B) - `new` of each peer kind is refused while
- *   `NetworkPeerBase` carries its pure `slot_2C` table pad (the peers are abstract); the mutex record's destructor and
+ * RESIDUALS. Unwritten: the mutex record's destructor and
  *   constructor (0x803CA338, 0x803CA37C, 132 B) - a class (its constructor stores 0x805F91E0) that seven units call as
  *   the C pair `networkInstance_destroyMutex`/`_initMutex` on byte blocks (`NetworkRequest` among them is built through
  *   a hand-written `__construct_array`).  `.data`: the mutex table (0x805F91E0) is not emitted until its class is.
@@ -20,11 +19,39 @@
  */
 
 #include "Network/NetworkConnection.h"
+#include "Network/NetworkPeerBuffer.h"
 #include "Network/NetworkPeerUdp.h"
+#include "Network/NetworkPeerMcs.h"
 #include "Network/GameSpyInterfaceThread.h"      /* NetworkPeerGameSpy */
 #include "Network/network_shared_data.h"      /* the connection defaults */
 
 #pragma peephole off
+
+/* Clears the callback, owner and peer, then creates the peer of `kind`: 1 a buffer peer, 2 a Udp peer, 4 and 5 an Mcs
+ * peer (armed and not), 6 a GameSpy peer. */
+NetworkConnection::NetworkConnection(s32 kind)
+{
+    callback_04 = NULL;
+    owner_08 = NULL;
+    peer_0C = NULL;
+    switch (kind) {
+    case 1:
+        peer_0C = new NetworkPeerBuffer();
+        break;
+    case 2:
+        peer_0C = new NetworkPeerUdp();
+        break;
+    case 4:
+        peer_0C = new NetworkPeerMcs(1);
+        break;
+    case 5:
+        peer_0C = new NetworkPeerMcs(0);
+        break;
+    case 6:
+        peer_0C = new NetworkPeerGameSpy();
+        break;
+    }
+}
 
 /* Chains the peer base and builds the receive queue's mutex; the interface is bound later (`setContext`). */
 NetworkPeerGameSpy::NetworkPeerGameSpy()

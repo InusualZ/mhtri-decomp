@@ -43,7 +43,7 @@ enum NetworkPeerErrorSource {
 
 /* The abstract peer the transport peers derive from (GUESS on the name: the class is the error-record
    holder every peer constructor chains, and its table carries the eight slots the three peers below
-   fill).  Its vtable (0x805F94E0, 0x30 B: the deleting `destroy` and eight pure slots plus `slot_2C`, size padding: the +0x2C word is the size's alignment tail) is emitted here,
+   fill).  Its vtable (0x805F94E0, 0x2C B: the deleting `destroy` and eight pure slots; the object's 0x30 claim ends in alignment fill) is emitted here,
    from the `destroy` this unit defines.  The pure slots carry the *union* of the derived peers'
    signatures - a derived slot with a different parameter list would be a new virtual and would move
    every later slot - so the peers that ignore an argument simply leave it unused (GUESS on every
@@ -65,7 +65,6 @@ public:
     /* +0x20 (GUESS: only the Mcs peer does anything) */ virtual void armDrop() = 0;
     /* +0x24 (GUESS: the peers clear through the +0x28 slot and report usable) */ virtual s32 init() = 0;
     /* +0x28 (GUESS: empties the peer's payload/queue; the Mcs peer's close) */ virtual void reset() = 0;
-    /* +0x2C - not a code slot (retail relocates 9 per table): a pure slot only so the table is 0x30 B, the size's alignment tail */ virtual void slot_2C() = 0;
 
     const void* source_04;  /* +0x04 - what failed: a `NetworkPeerErrorSource` value or the table the failing operation was given */
     u32 argument_08;        /* +0x08 - its size or argument */
