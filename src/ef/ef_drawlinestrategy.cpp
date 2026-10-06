@@ -14,8 +14,9 @@
  * NAMES. GUESS: `ef_min_float` (0x800BF5B0) from its body; the assert names (`pm`, `pm->mResource`, `&ed`) are
  *   NintendoWare's.
  * RESIDUALS. 1 partial row: `fn_800BF58C` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the
- *   three `lfs` and the three FIFO stores and loads into f1-f3 (ours f0-f2); no source shape tried (a block,
- *   `if (1)`, `do {} while (0)`, `for (;;)`, a `switch`, a local array, a forwarder) emits the branch.
+ *   three `lfs` and the three FIFO stores and loads into f1-f3 (ours f0-f2): the row is two functions, a tail call
+ *   into a 0x14 static FIFO writer at +0x10 that the map folds into it (reproduced byte for byte with a
+ *   `dont_inline` static helper; the map split is request nw4r-l3#21).
  *   flipcheck: `.data` claimed, not emitted; `.sdata` (the width clamp) and `.sdata2` (the literals' pool) are emitted
  *   with their bytes equal, 0x4 short of the claim each (the trailing pad the next object's alignment adds).
  *   `DrawPointStrategy` (constructor): the empty body is the whole source - the compiler

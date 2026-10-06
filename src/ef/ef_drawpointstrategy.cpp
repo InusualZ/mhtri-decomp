@@ -18,7 +18,9 @@
  *  - `Draw` (0x800BF818): one `lwz r6, 0x24(pm)` (the asserted resource) is scheduled before the six assert
  *    temporaries where retail loads it after them, and one `lfs` is placed differently;
  *  - `fn_800BFD60` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the three `lfs` and the
- *    `lis` of the FIFO base (the `ef/ef_drawlinestrategy.cpp` row `fn_800BF58C` is the same).
+ *    `lis` of the FIFO base (the `ef/ef_drawlinestrategy.cpp` row `fn_800BF58C` is the same):
+ *    the row is two functions, a tail call into a 0x14 static FIFO writer at +0x10 that the map folds into it
+ *    (reproduced byte for byte with a `dont_inline` static helper; the map split is request nw4r-l3#21).
  *   flipcheck: `.data` claimed, not emitted; `.sdata` (the size clamp) is emitted with its bytes equal (0x4 short of
  *   the claim, the trailing pad); `.sdata2` (the literals' pool) holds 0.0f before 6.0f where retail has 6.0f first.
  *   `DrawSmoothStripeStrategy` (constructor): the empty body is the whole source - the compiler
