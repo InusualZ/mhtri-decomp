@@ -639,6 +639,8 @@ config.libs = [
             # link neighbour `menu/multi_result.cpp` (cflags_menu: the band carries 0 record-form
             # instructions and needs `-Cpp_exceptions on`, which every one of its 60 framed functions
             # shows in its own extab record).
+            # Data-only unit: src/quest/quest_file_table.cpp header.
+            Object(Matching, "quest/quest_file_table.cpp"),
             Object(NonMatching, "quest/quest_item_slot.cpp"),
             Object(NonMatching, "quest/quest_entry.cpp"),
             Object(NonMatching, "enemy/em_pop.cpp"),

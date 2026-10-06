@@ -259,7 +259,6 @@ extern u8 lbl_805B85B8[32];
 extern u32 lbl_80582988[44];
 extern u8 lbl_80582B30[40];
 extern u32 lbl_8058AA98[4];
-extern u32 lbl_8058AFE8[28];
 /* The 0xA-byte colour record the character-edit screen's `lbl_805B8674` table holds, and the two
  * 14-entry selection index tables beside it (`-2`/`-3` are the "no colour" sentinels the callers test).
  * Declared here because no registered unit owns the `.data` range (rule 2). */

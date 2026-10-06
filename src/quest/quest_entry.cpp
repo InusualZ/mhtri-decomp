@@ -33,18 +33,18 @@
  *   * `.data` 0x805F2A98 (read by `quest_init`) and 0x805F4F80 (`quest_monsters_spawn`): a second run of this
  *     unit's `.data`, with other units' data between it and 0x805F7AB0 - one spanning claim is impossible and
  *     two runs make dtk's `.data` order cyclic through the unclaimed unit between them (playbook 53).
- *   * `lbl_8058AFC8`/`lbl_8058AFE8` (.data pool shared with `enemy/em_pop`, `lobby/fn_801F9CD4`), `lbl_805F78C4`,
+ *   * `quest_file_table`/`stage_dcm_file_table` (.data pool shared with `enemy/em_pop`, `lobby/fn_801F9CD4`), `lbl_805F78C4`,
  *     `lbl_805F7B50/64` (second `.data` runs), `lbl_805F76A0`/`nora_set_proc` (shared with
  *     `enemy/enemy_control`, `menu/arena_result`), the `.sdata2` floats (a partial pool does not link): the
  *     bodies that read them are unwritten.
  *
  * UNWRITTEN (size, blocker): `fn_803ABE44` 2156 / `fn_803AC6B0` 1632 (reward rolls: data ready, the inlined fill
  * loops are not reproduced), `quest_monster_setup` 384 (`nora_set_proc`), `quest_list_load_hunt` 636 /
- * `quest_list_load_arena` 532 / `quest_init` 612 (`lbl_8058AFC8`, `lbl_805F2A98`), `quest_pair_apply` 376,
+ * `quest_list_load_arena` 532 / `quest_init` 612 (`quest_file_table`, `lbl_805F2A98`), `quest_pair_apply` 376,
  * `quest_monsters_spawn` 1296 / `quest_monster_spawn_area` 1012 (`lbl_805F76A0`, `lbl_805F4F80`),
  * `quest_entry_setup` 264 (not attempted: it stores through `Q_ItemWork` offsets +0x58/+0x59/+0x8B/+0x8E/+0x8F/
  * +0x5E0/+0x5E2/+0x684/+0x688 that the record does not name yet), `fn_803AEED0` 1508 / `fn_803AF4B4` 1240 /
- * `fn_803B01C4` 2832 (the entry state machine: `lbl_805F7B50/64`, `lbl_805F78C4`, `lbl_8058AFE8`, `nora_set_proc`
+ * `fn_803B01C4` 2832 (the entry state machine: `lbl_805F7B50/64`, `lbl_805F78C4`, `stage_dcm_file_table`, `nora_set_proc`
  * and ~20 unnamed callees).  The last three are the orchestration of everything above.
  *
  * RESIDUAL.
