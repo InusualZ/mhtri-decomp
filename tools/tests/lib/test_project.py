@@ -318,6 +318,47 @@ def test_merge_plans(c):
     c.raises("resize refuses a row with no size", ShapeError, sym_mod.resize, "x = .text:0x1; // type:function", "x", 8)
 
 
+def test_split_plans(c):
+    rows = [("before", ".text:0x800BA6EC", "type:function size:0x10"),
+            ("fn_800BA710", ".text:0x800BA710", "type:function size:0x24"),
+            ("after", ".text:0x800BA734", "type:function size:0x120 scope:local")]
+    for nl in ("\n", "\r\n"):
+        plan, untouched = _plan(rows, lambda m: m.plan_split("fn_800BA710", 0x10, "fn_800BA720_tail", "local"), nl=nl)
+        want = nl.join(["before = .text:0x800BA6EC; // type:function size:0x10",
+                        "fn_800BA710 = .text:0x800BA710; // type:function size:0x10",
+                        "fn_800BA720_tail = .text:0x800BA720; // type:function size:0x14 scope:local",
+                        "after = .text:0x800BA734; // type:function size:0x120 scope:local", ""])
+        c.check("split shrinks the row and adds the remainder (%r)" % nl, plan.render(), want)
+        c.check("planning a split writes nothing (%r)" % nl, untouched, True)
+    plan, _u = _plan(rows[:1] + [("g", ".text:0x800BA710", "type:function size:0x24 scope:global")] + rows[2:],
+                     lambda m: m.plan_split("g", 8, "g_tail"))
+    c.contains("without --scope the new row keeps the row's scope", plan.tail, "size:0x1C scope:global")
+    plan, _u = _plan(rows[:1] + [("g", ".text:0x800BA710", "type:function size:0x24 scope:global")] + rows[2:],
+                     lambda m: m.plan_split("g", 8, "g_tail", "local"))
+    c.contains("--scope replaces an existing scope", plan.tail, "scope:local")
+    c.check("... and does not leave the old one", "scope:global" in plan.tail, False)
+    done = rows[:1] + [("fn_800BA710", ".text:0x800BA710", "type:function size:0x10"),
+                       ("fn_800BA720_tail", ".text:0x800BA720", "type:function size:0x14")] + rows[2:]
+    plan, _u = _plan(done, lambda m: m.plan_split("fn_800BA710", 0x10, "fn_800BA720_tail"))
+    c.check("an already split row is the re-apply", (plan.changed, plan.applied), (False, True))
+
+    def refused(map_rows, *args):
+        try:
+            _plan(map_rows, lambda m: m.plan_split(*args))
+        except Refused as exc:
+            return str(exc)
+        return ""
+    c.contains("offset 0", refused(rows, "fn_800BA710", 0, "x"), "is not inside")
+    c.contains("offset at the size", refused(rows, "fn_800BA710", 0x24, "x"), "is not inside")
+    c.contains("a taken name", refused(rows, "fn_800BA710", 0x10, "after"), "is already defined")
+    c.contains("an unknown row", refused(rows, "nope", 0x10, "x"), "defined 0 times")
+    c.contains("a bad name", refused(rows, "fn_800BA710", 0x10, "a b"), "not a valid symbol name")
+    c.contains("a row with no size", refused([("f", ".text:0x80001000", "type:function")], "f", 4, "x"), "no size to split")
+    c.contains("another row already at the new address",
+               refused(rows[:2] + [("mid", ".text:0x800BA720", "type:label")], "fn_800BA710", 0x10, "x"), "already starts at")
+    c.contains("a bad scope", refused(rows, "fn_800BA710", 0x10, "x", "lo cal"), "is not a scope")
+
+
 def test_data_merges(c):
     """The data half of merge-batch: NET-A's patPacketTable (0x1732 + the stray label lbl_80600042 0x4BE = 0x1BF0),
     a label inside one object, and a plain resize."""
