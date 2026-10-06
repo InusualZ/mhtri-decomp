@@ -9,9 +9,33 @@
 namespace nw4r {
 namespace g3d {
 
-/* The shape block.  size: 0x64 (a lower bound) */
+/* The `ResTagDL` block embedded in the `ResShp` data at +0x18 and +0x24.  +0x08 is the offset from the tag's
+ * own address to the display list it marks.  size: 0xC */
+struct ResTagDLData {
+    /* +0x00 */ u32 mSize;       /* the marked block's total size */
+    /* +0x04 */ u32 mDlSize;     /* the display-list size */
+    /* +0x08 */ u32 mPrePrimOfs; /* the offset from this tag to the block it marks */
+};
+
+/* The shape block: the model offset, the current matrix index (bit 31: several matrices), the vertex
+ * description the pre-primitive list loads, the two display-list tags, the vertex attribute bitmap, the flags
+ * and the per-vertex-resource ids (-1 = none).  size: 0x64 (a lower bound: only the fields below are reached) */
 struct ResShpData {
     /* +0x00 */ u32 size;
+    /* +0x04 */ u32 mToResMdlData;
+    /* +0x08 */ s32 curMtxIdx;
+    /* +0x0C */ u32 vtxDesc[3];
+    /* +0x18 */ ResTagDLData mTag;            /* the pre-primitive tag */
+    /* +0x24 */ ResTagDLData mDlTag;          /* the primitive display-list tag */
+    /* +0x30 */ u32 vtxAttrFlags;             /* bit n: GX vertex attribute n is present */
+    /* +0x34 */ u32 flag;                     /* bit 1: invisible */
+    /* +0x38 */ u8 pad_0x38[0x10];
+    /* +0x48 */ s16 idVtxPosition;            /* vertex-position id (asserted `>= 0`) */
+    /* +0x4A */ s16 idVtxNrm;
+    /* +0x4C */ s16 idVtxClr[2];
+    /* +0x50 */ s16 idVtxTexCoord[8];
+    /* +0x60 */ u8 pad_0x60[0x2];
+    /* +0x62 */ s16 idTex;
 };
 
 /* The tev block.  size: 0x20 (a lower bound) */
@@ -40,6 +64,15 @@ public:
     explicit ResShp(void* pData);
     void Init();
     void Terminate();
+    static const char* GetClassName();
+    bool IsValid() const;
+    ResShpData* ptr();
+    const ResShpData* ptr() const;
+    ResShpData& ref();
+    const ResShpData& ref() const;
+    bool IsVtxAttrEnabled(u32 attr) const;
+    void CallPrePrimitiveDisplayList(bool bSync, bool bSkipHeader) const;
+    void CallPrimitiveDisplayList(bool bSync) const;
 };
 
 /* size: 0x4 */

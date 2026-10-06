@@ -55,24 +55,24 @@
  *   g3d_state_load_fog is a GUESS, g3d_fog_table_load is a GUESS, g3d_state_set_light_setting is a GUESS,
  *   g3d_state_get_light_obj is a GUESS, g3d_state_get_light_set_entry is a GUESS, g3d_state_load_light_set is a
  *   GUESS, g3d_light_table_set_setting is a GUESS, g3d_light_table_load_light_set is a GUESS,
- *   g3d_state_set_camera is a GUESS, g3d_camera_table_set_camera is a GUESS (nw4r's G3DState light, fog and
+ *   g3d_state_load_shp_pre_prim is a GUESS, g3d_state_set_camera is a GUESS, g3d_camera_table_set_camera is a GUESS (nw4r's G3DState light, fog and
  *   camera entry points, by their bodies and callers); G3dLightTable is a GUESS, G3dCameraTable is a GUESS.
  *   G3dIndMtxCallback is a GUESS, G3dIndMtxCallbackStd is a GUESS (nw4r's G3DState IndMtxOp and its standard
  *   implementation: the two vtables' slots, the ITM asserts and the normal-map matrices); its members
  *   Exec is a GUESS, Reset is a GUESS, SetNrmMapMtx is a GUESS (nw4r's IndMtxOp slot names, by their bodies).
  *   ResGenMode's GXGet*, ResTev's ref/ptr/GetClassName, ResMatChan::ptr and ResTexSrt's
- *   ref/ptr/GetTexMtxMode/GetTexSrtFlag/IsIdentityTexMtx/IsExist
+ *   ref/ptr/GetTexMtxMode/GetTexSrtFlag/IsIdentityTexMtx/IsExist, ResShp::IsVtxAttrEnabled
  *   are nw4r's members.
- * RESIDUALS. 31 functions unwritten (objdiff scores them zero) in 14 runs:
+ * RESIDUALS. 29 functions unwritten (objdiff scores them zero) in 12 runs:
  *   0x80084630-0x8008503C and 0x8008715C-0x800873E4 (the projection functions and the texture-SRT load: their
  *     matrix copy is `g3d/g3d_calcview.cpp`'s fn_8007100C, 32 call sites in other units; fn_80084B9C also calls
  *     `MTX/vec.c`'s fn_804C6C60), 0x8008540C-0x80085478 (the light table constructor: the light objects'
  *     constructor and destructor are `g3d/fn_80075DCC.cpp` stems), 0x800854B8-0x8008569C and 0x800856F4-0x80085ACC
  *     (g3d_light_table_set_setting, g3d_light_table_load_light_set: their light load is `EXI/ProbeBarnacle.c`'s
  *     unnamed fn_804B7C40), 0x80085C70-0x80085D4C (g3d_camera_table_set_camera: its view-matrix getter
- *     fn_80075394 is also declared by `sound/fn_800E3CBC.cpp`), 0x80087978-0x80087A14 and 0x80087AD0-0x80087C80
- *     and 0x80087DB0-0x80087DF8 (the ResShp accessors are `g3d/fn_80075DCC.cpp` free stems and
- *     `g3d/g3d_resshp.cpp` keeps a private `ResShpData`), 0x80087F18-0x80087FA8 (g3d_view_mtx_arrays_nrm_mtx: it
+ *     fn_80075394 is also declared by `sound/fn_800E3CBC.cpp`), 0x80087AD0-0x80087C80
+ *     (g3d_state_load_shp_prim: its indexed matrix loads are `RVLGX/GXTexture_tail.cpp`'s unnamed fn_804BA560 and
+ *     fn_804BA5F0), 0x80087F18-0x80087FA8 (g3d_view_mtx_arrays_nrm_mtx: it
  *     calls `fn_8004CAD8.cpp`'s fn_800516F0 and `hud/pl_frame_sync.cpp`'s fn_80330E14), 0x80088050-0x8008812C and
  *     0x8008819C-0x80088250 (the fog set and g3d_fog_table_load: the Fog members are `g3d/fn_80075DCC.cpp` m2c
  *     stems, and GXSetFog has no declaration in `RVLGX/GXTexture_tail.cpp`), 0x80088574-0x80088584 (its copy is
@@ -1196,12 +1196,12 @@ BOOL nw4r::g3d::ResTexSrt::IsExist(u32 id) const {
 extern "C" {
 
 /* 0x80087A14 (0x60): records `pDesc` as the loaded vertex description, returning whether it already was. */
-BOOL g3d_vtx_desc_cache_update(G3dVtxDescCache* pSelf, const G3dVtxDescCache* pDesc) {
+bool g3d_vtx_desc_cache_update(G3dVtxDescCache* pSelf, const G3dVtxDescCache* pDesc) {
     if (g3d_vtx_desc_equal(pDesc, pSelf)) {
-        return TRUE;
+        return true;
     }
     g3d_vtx_desc_copy(pSelf, pDesc);
-    return FALSE;
+    return false;
 }
 
 /* 0x80087A74 (0x1C): copies the vertex description. */
@@ -1930,3 +1930,24 @@ void g3d_state_set_camera(const nw4r::g3d::Camera& camera, u32 id, bool bUpdate)
 }
 
 } /* extern "C" */
+
+extern "C" {
+
+/* 0x80087978 (0x9C): loads the shape's pre-primitive display list, telling it whether its vertex description is
+ * already loaded. */
+void g3d_state_load_shp_pre_prim(const nw4r::g3d::ResShp shp) {
+    if (shp.IsValid()) {
+        fn_80086610(&g3d_state_tex_coord_scale_cache, fn_80086640((StateByte*)&g3d_state_gen_mode_cache));
+        g3d_gen_mode_cache_load_full(&g3d_state_gen_mode_cache);
+        bool same = g3d_vtx_desc_cache_update(&g3d_state_vtx_desc_cache,
+                                              (const G3dVtxDescCache*)shp.ref().vtxDesc);
+        shp.CallPrePrimitiveDisplayList(fn_80086770(&g3d_state_dl_dirty), same);
+    }
+}
+
+} /* extern "C" */
+
+/* 0x80087DB0 (0x48): whether the shape carries GX vertex attribute `attr`. */
+bool nw4r::g3d::ResShp::IsVtxAttrEnabled(u32 attr) const {
+    return (ref().vtxAttrFlags & (1 << attr)) != 0;
+}
