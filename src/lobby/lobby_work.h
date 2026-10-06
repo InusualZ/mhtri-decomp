@@ -1,14 +1,6 @@
-/*
- * `lobby_w` - the lobby work block (.bss 0x806AAB44, 0x17C B), defined by `src/lobby/lb_menu_pos_tbl.cpp`
- * (its `.bss` 0x806AAA88-0x806AACC0; the static constructor `fn_8021FF5C` calls `fn_8021FFFC(&lobby_w)`).
- * The one home of the record type (rule 1; the object is declared in `lobby_w.h`).  It merges the views the
- * lobby band carried: `unsplit/lobby.h`'s (the menu pointer, the NPC band's +0x76/+0x77 state
- * bytes, the act-layer hold at +0x12C), the equipment/menu units' (+0x027, +0x052, +0x0B1), the NPC unit's
- * (`lobby/lb_npc.cpp`: the countdown/slide/command-mask words, the talk block, +0x163/+0x16F/+0x172), the
- * page unit's (`lobby/lb_pane_ui.cpp`: the panel pointer and the counter at +0x084) and the sound unit's
- * (+0xB8/+0xBC).  A byte that two views spell differently is a union of both spellings.  Only the named
- * offsets are read by matched code.
- */
+/* `LbLobbyWork`, the record of `lobby_w` (.bss 0x806AAB44, 0x17C B; declared in `lobby/lobby_w.h`), merged from every
+ * lobby unit's view (the NPC, page, equipment/menu and sound units'); a byte two views spell differently is a union of
+ * both spellings. */
 #ifndef MHTRI_LOBBY_LOBBY_WORK_H
 #define MHTRI_LOBBY_LOBBY_WORK_H
 

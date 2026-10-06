@@ -1,9 +1,5 @@
-/* The lobby player-character control band of `lobby/lb_npc.cpp` (0x8020C588..0x80212760): the string tables and the
- * command-mask accessors the band owns and its callers drive.  `lobby_w`'s view is `LbLobbyWork` in
- * `lobby/lobby_work.h` (declared by `lobby/lobby_w.h`); the foreign callees are in `lobby/lb_npc_callees.h`.
- *
- * docs/plan.md 6.5 rules 3/4/5: every declaration states what it reads.
- */
+/* The string tables and command-mask accessors of `lobby/lb_npc.cpp`'s player-character control band
+ * (0x8020C588-0x80212810); its foreign callees are in `lobby/lb_npc_callees.h`. */
 #ifndef MHTRI_LOBBY_FN_8021213C_H
 #define MHTRI_LOBBY_FN_8021213C_H
 

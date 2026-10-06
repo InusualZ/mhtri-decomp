@@ -1,13 +1,5 @@
-/* Declarations for the symbols `src/lobby/fn_802FA9A0.cpp` owns, and this range's own view of the
- * `.bss`/`.sbss`/`.data` blocks it reads (docs/plan.md 6.5 rule 2).
- *
- * The range is the lobby band `0x802FA9A0..0x8030121C` (lobby/fn_802FA9A0.cpp).  Its module is `lobby`:
- * its own predicates read the lobby work block `lobby_w` (`.bss` 0x806AAB44) at +0x003/+0x15F/+0x161,
- * and its callees are the lobby UI API (`LbStr`).  The addresses below are unclaimed in splits.txt (or
- * lie inside this range's own unclaimed data runs), so this header is their rule-2 home - the same
- * pattern as `lobby/fn_8021E1EC.h` and `include/lobby/fn_8020C588.h`, whose `lobby_w` and
- * `lobby_world_block` views are also this-range-specific.
- */
+/* Declarations of `lobby/fn_802FA9A0.cpp`'s symbols and its own views of the `lobby_w`/`lobby_world_block` blocks it
+ * reads (one view per unit, like `lobby/fn_8021E1EC.h`). */
 #ifndef MHTRI_LOBBY_FN_802FA9A0_H
 #define MHTRI_LOBBY_FN_802FA9A0_H
 
@@ -88,9 +80,8 @@ extern "C" {
 extern LbLobbyView lobby_w;      /* .bss 0x806AAB44 */
 extern LbBlockView* lobby_world_block; /* .sbss 0x80794880 */
 
-/* The two id tables this range's predicates walk (both inside the range's own unclaimed `.data` run
- * 0x805D8B00..0x805DAFE8): 28 entries (ids 0..27) at 0x805D8BA0 and 12 (ids 28..39) at 0x805D8C10.
- * Each entry points at a `u16` array terminated by 0xFFFF. */
+/* The two id tables the predicates walk, in this unit's `.data` claim: 28 entries (ids 0..27) and 12 (ids 28..39),
+ * each pointing at a `u16` array terminated by 0xFFFF. */
 extern u16* lbl_805D8BA0[28];
 extern u16* lbl_805D8C10[12];
 
@@ -110,12 +101,8 @@ void fn_802FDDCC(LbKujiraEventWork* work);
 void fn_802FF29C(u32 raw);
 void fn_802FF478(LbKujiraWork* work);
 
-/* The four per-action step machines the `enemy` band below this range (`enemy/fn_802F5138.cpp`, whose
- * `fn_802FA964` dispatches into them) tail-calls: 0x802FA9A0, 0x802FAB98, 0x802FAFB4, 0x802FAFC4 -
- * all inside this range, so they are this unit's own symbols and belong here rather than in the
- * caller's unsplit band (rule 2).  They are still unwritten; the parameter is the caller's
- * record (`_ENEMY_WORK`), the only type the call sites set.  Added by the merge lane that re-homed
- * them out of `unsplit/unknown.h`. */
+/* The four unwritten per-action step machines `enemy/em_sub_state_prog.cpp`'s `fn_802FA964` tail-calls; the
+ * parameter is the caller's `_ENEMY_WORK`, the only type the call sites set. */
 void fn_802FA9A0(struct _ENEMY_WORK* work);
 void fn_802FAB98(struct _ENEMY_WORK* work);
 void fn_802FAFB4(struct _ENEMY_WORK* work);
@@ -126,10 +113,8 @@ void fn_802FAFC4(struct _ENEMY_WORK* work);
 #endif
 
 #ifdef __cplusplus
-/* `LbCheckKujiraEvent` (0x802FB9DC) is defined by this range and called from the `ef` band
- * (`src/ef/fn_800FE978.cpp`), which used to declare it locally.  C++ linkage: the map's name IS the
- * mangling `LbCheckKujiraEvent__Fv`, so the declaration sits outside the `extern "C"` block and the
- * front-end reproduces it (rule 9). */
+/* 0x802FB9DC - whether the whale event is up; the `ef` band calls it.  C++ linkage: the map spells it mangled
+ * (rule 9). */
 u32 LbCheckKujiraEvent(void);
 #endif
 

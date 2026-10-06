@@ -1,59 +1,32 @@
-/* lobby/fn_80219260.cpp - the lobby equipment page layer.
- *
- * `.text` 0x80219260..0x8021E1EC (76 functions, 20364 B).
- *
- * Module `lobby`.  Both bracketing registered units are `lobby` (`fn_80212810.cpp` below,
- * `fn_8021E1EC.cpp` above); the range's callees are the lobby/HUD API (`LbStr`, `get_lsp_data`,
- * `draw_sprite_ary`, `get_menu_lsp_tbl`) plus the equipment/system page (`Put_equip_dtl_*`,
- * `Put_status_equip_*`, `GetEquipName`, `ItemName`, `draw_weaponicon_idx`, `Get_equip_rare`), and it
- * hands the player actor `_PLW` (`self->plw_0x34`) to `Put_equip_dtl_*`, so the page edits one
- * player's equipment set.  Language C++: the range's callees are mangled
- * (`Get_equip_rare__FP6_EQUIP`, `Gunner_opt_ok_ck__FP6_EQUIP`).
- *
- * Sections: `.text` 0x80219260..0x8021E1EC, `extab` 0x80011724..0x800118CC (53 records) and
- * `extabindex` 0x8002E1A0..0x8002E41C (53 x 12 B) - each run is exactly the gap between the two
- * bracketing registered units' claims, and the first record is this range's first function.
- *
- * Seam, unproven: the left edge 0x80219260 is the retired proposal's `--max-bytes` cap, but the
- * extab run starts exactly there and ends exactly at the next unit's first record.
- *
- * Name.  No `__FILE__` string covers the range: the only source-name string in the band's `.data` is
- * `enemy_control.cpp` at 0x805A1BB8, and no instruction in the range materialises any 0x805A address
- * (the range's pools are 0x805C0xxx and 0x806B0xxx), so it belongs to another TU.  The runtime dump
- * answers only `zz_XXXXXXXX_` for every address in the range (`dumpmap.py lookup`), so the file keeps
- * the map's stem (brief section 2, class 4).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
- * lookup over the range's inventory - every address answers `zz_XXXXXXXX_` - and the map's own rows
- * are bare `.text` entries)
- *
- * Residuals (docs/plan.md 6.5; per-symbol `recompile.py --measure`, bar 80 %):
- *  - 28 of the 76 rows are written; 23 of them are byte-identical (100 %), the other five are
- *    fn_8021CE0C 82.80, fn_8021B5AC 87.13, fn_80219640 91.43, fn_80219340 92.02, fn_8021C900 92.86.
- *    Unit 11.003142 % fuzzy / 1384 matched bytes of 20364.
- *  - the remaining 48 rows are unwritten, largest first: fn_802196F0 2612 B, fn_8021BD48 1208 B,
- *    fn_8021B144 1128 B, fn_8021B94C 1020 B, fn_8021A784 756 B, fn_8021CE70 752 B, fn_8021C738 456 B,
- *    fn_8021AA78 428 B, fn_8021A124 436 B, fn_8021D21C 908 B, fn_8021DF50 612 B, fn_8021DC24 388 B.
- *  - the unit is built with the peephole pass off (`#pragma peephole off`): retail keeps unfused
- *    forms the pass folds (`extsb` + `cmpwi` in fn_8021CE0C, `clrlwi` + `cmpwi` in fn_80219640) and
- *    the pragma moved fn_802195E0, fn_8021AC8C and fn_8021D1D4 to 100 %.
- *  - fn_8021C900 loses 2 instructions to a symbol the map merges: retail materialises the id table
- *    as its own base (0x805C9F50), the map's only symbol there is `lbl_805C9F40`, so our address
- *    needs one extra `addi`.
- *  - fn_80219340 (92.02 %) and fn_80219640 (91.43 %) share one cause: the two guard pairs and the
- *    `kind` byte are read from `self` in a different order than retail's register allocation.
- *  - fn_8021B5AC (87.13 %) has the same merged-symbol difference at 0x805C968C plus one `extsh` of
- *    the `s16` result placement.
- *  - fn_80218138 is declared in this file because its owner unit (`lobby/fn_80212810.cpp`) has no
- *    header yet; a new `lobby/fn_80212810.h` is requested in the outbox's `config_requests`.
- *    `fn_8021CBB0`/`fn_8021D5BC` are also declared in `unsplit/lobby.h` (the band header)
- *    although this unit now owns them - the two lines are a leftover for the next data/rename pass.
+/* lobby/fn_80219260.cpp - the lobby equipment page layer: it hands one player's `_PLW` (`self->plw_0x34`) to the
+ *   `Put_equip_dtl_*` / `Put_status_equip_*` page and edits that player's equipment set.
+ * RANGE. .text 0x80219260-0x8021E1EC (76 functions); .data 0x805B9DDC-0x805BA0C0, .bss 0x806AA790-0x806AA8C8, .sdata
+ *   0x80791EB0-0x80791EE0, .sdata2 0x80799C40-0x80799C60, extab, extabindex.
+ * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off`: retail keeps `extsb` + `cmpwi` (`fn_8021CE0C`) and
+ *   `clrlwi` + `cmpwi` (`fn_80219640`) unfused, and the pragma took `fn_802195E0`, `fn_8021AC8C`, `fn_8021D1D4` to
+ *   byte-identical.
+ * NAMES. No `__FILE__` string covers the range (the band's `enemy_control.cpp` at 0x805A1BB8 is never addressed from
+ *   it) and the dump answers `zz_` throughout, so the file keeps the map's stem.  Module `lobby`: the lobby/HUD API
+ *   (`LbStr`, `get_lsp_data`, `draw_sprite_ary`, `get_menu_lsp_tbl`) and the `_EQUIP` accessors (`Get_equip_rare`,
+ *   `Gunner_opt_ok_ck`, `GetEquipName`, `ItemName`, `draw_weaponicon_idx`).
+ * RESIDUALS. 48 rows unwritten: 0x802196F0-0x8021AC24, 0x8021AD14-0x8021B5AC, 0x8021B690-0x8021B890,
+ *   0x8021B94C-0x8021C900, 0x8021C938-0x8021CE0C, 0x8021CE70-0x8021D160, 0x8021D21C-0x8021D5A8, 0x8021D5D0-0x8021D704,
+ *   0x8021D72C-0x8021D86C, 0x8021D884-0x8021D9E0, 0x8021D9F8-0x8021DED8, 0x8021DEFC-0x8021E1EC.
+ *  - `fn_80219340`, `fn_80219640`: the two guard pairs and the `kind` byte are read from `self` in another order;
+ *  - `fn_8021C900`: retail addresses the id table at 0x805C9F50 as its own base, the map's only symbol there is
+ *    `lbl_805C9F40`, so ours needs one more `addi`; `fn_8021B5AC`: the same at 0x805C968C plus one `extsh`;
+ *  - `fn_8021CE0C`: the base and byte registers swap (r4/r3). `fn_80218138` (owned by `lobby/fn_80212810.cpp`, which
+ *    has no header) is declared here; `fn_8021CBB0` and `fn_8021D5BC`, this unit's own, are also declared in
+ *    `unsplit/lobby.h`.
+ *   flipcheck: `.data`/`.bss`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim;
+ *   `Gunner_opt_ok_ck` and `get_menu_lsp_tbl` are referenced unmangled where the map spells
+ *   `Gunner_opt_ok_ck__FP6_EQUIP` and `get_menu_lsp_tbl__FUs`; `lbl_806BAB44` has no map row.
  */
 #include "types.h"
 
 #include "pl.h"
 #include "unsplit/lobby.h"
-#include "lobby/lb_menu_scratch.h" /* `lb_menu_scratch`, owned by lobby/fn_8021E1EC.cpp (rule 2) */
+#include "lobby/lb_menu_scratch.h" /* `lb_menu_scratch`, owned by lobby/lb_menu_scratch.cpp (rule 2) */
 
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -266,9 +239,8 @@ extern "C" void fn_80219590(LbEquipWork* self, _EQUIP* src) {
     }
 }
 
-/* Returns the player's equipment record for `kind`: the weapon slots 1-6 are indexed through
- * fn_8027E290, the armour guards 7-11/13 are the player's own set, and 12/14/15 pick between the
- * player's set and the gunner-specific copies. */
+/* Returns the player's equipment record for `kind`: weapon slots 1-6 through fn_8027E290, the player's own armour for
+ * 7-11/13, and the player's or the gunner copy for 12/14/15. */
 extern "C" _EQUIP* fn_80219260(LbEquipWork* self, s32 kind) {
     switch ((u8)kind) {
     case 7:

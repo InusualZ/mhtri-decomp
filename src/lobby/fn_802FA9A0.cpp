@@ -1,54 +1,19 @@
-/* The lobby event/status band, `.text` 0x802FA9A0..0x8030121C (26 748 B, 120 map symbols).
- *
- * Registered once, at its final home (docs/plan.md 12) from proposal `802FA9A0_fn_802FA9A0.cpp`.
- * Module `lobby` (class 3): the range's own predicates read the lobby work block `lobby_w`
- * (`.bss` 0x806AAB44) at +0x003/+0x15F/+0x161, its `.sbss` run is the lobby pointer block
- * `lobby_world_block`, and its callees are the lobby UI API (`LbStr`) plus the `ef`/`enemy` helpers the
- * lobby screens drive.  No `__FILE__` string is reachable from the range (the literal runs it
- * addresses are id/mask tables) and the runtime dump answers `zz_` for every in-range address, so the
- * file keeps the map's stem - brief section 2, class 4.  `LbCheckKujiraEvent` (0x802FB9DC) is the one
- * real name in the band.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `python
- * tools/symbols/symedit.py range 0x802FA9A0 0x8030121C` - the single non-`fn_` row is
- * `LbCheckKujiraEvent__Fv`), so every definition below keeps the map's own name.
- *
- * Seam: the proposal's edges are the discovery `--max-bytes` cap, not a proven TU boundary; the
- * supports are the `.sdata2` pool-run boundary at 0x8079AC20..0x8079AD98 (a run no other unit
- * references, `leak 0`) and the extab/extabindex runs, which are exactly the gaps between the
- * bracketing registered units.  Sections: .text 0x802FA9A0..0x8030121C, extab 0x800156B4..0x80015964
- * (86 x 8 B, one record per framed function), extabindex 0x80034074..0x8003447C (86 x 12 B).  Both
- * unwind runs are claimed; the data runs are not (see the residual list below).
- *
- * Flags: the `lobby` lib's `cflags_lobby` (`-O3`, `-inline noauto`), whose `-Cpp_exceptions on`
- * (flags-audit 2026-09-28) emits the unwind records every lobby target object carries, plus
- * `#pragma peephole off`, which is what makes `fn_802FB3B0` and `fn_802FB948` byte-identical: retail
- * keeps `slwi` after `clrlwi` where the pass folds them into one `rlwinm`, and keeps `srwi`+`clrlwi`
- * separate where it folds them into `rlwinm r,27,24,31`.  Measured over the whole file both ways.
- *
- * A parameter of a narrow type (`u8`/`u16`) arrives already narrowed per the ABI, so every mask the
- * target keeps in a function's body means the original took the value wide and narrowed it in the
- * source - all six of the id-table predicates below are spelled that way (`u32` parameter, narrowing
- * temporary), which is what reproduces the target's `clrlwi`s.
- *
- * Residual (measured; this file is a partial reconstruction):
- *   - 27 of the 120 symbols are written below and all 27 are byte-identical to the target; the unit
- *     reports 4.800359 % fuzzy (matched_code 1284 of 26748 B, 27/120 functions).  The other 93 keep the
- *     map's `fn_XXXXXXXX` names and are absent from this file, so objdiff reports them as 0 %.  The
- *     largest are `fn_803004D0` (2216 B), `fn_802FE550` (1988 B), `fn_802FAB98` (1052 B),
- *     `fn_802FAFC8` (1000 B) and `fn_802FA9A0` (504 B).
- *   - `.data` 0x805D8B00..0x805DAFE8 (37 labels, 5 of them `jumptable_*`), `.rodata`
- *     0x805707C0..0x80570840, `.sdata2` 0x8079AC20..0x8079AD98 (88 pool entries) and `.sdata`
- *     0x80791BC8..0x80792A58 are this range's data runs; the object emits none of them (the tables are
- *     reached through the `extern` declarations the unit header carries), so no data range is claimed -
- *     policy 8.4 forbids a claim that names bytes no object of ours produces, and a partial `.sdata2`
- *     claim is unlinkable anyway (playbook 23).  `datagap.py --unit main/lobby/fn_802FA9A0` reports no
- *     `ours-extra` section at all and lists no flip blocker for this unit.
- *   - `.ctors` 0x8056F394 holds this range's static initializer (it points at `fn_802FF180`, 180 B);
- *     dtk already attributes the word to this unit, but the object emits no `.ctors`, so that static
- *     and its constructor still have to be reconstructed before the word can be claimed.
- *   - The unwind claims are complete for the whole range (86 records) while only 27 functions are
- *     written, so our object's extab/extabindex are short (88/132 B of 688/1032 B).
+/* lobby/fn_802FA9A0.cpp - the lobby event/status band.
+ * RANGE. .text 0x802FA9A0-0x8030121C (120 functions); .ctors 0x8056F394-0x8056F398 (the static initializer
+ *   `fn_802FF180`), .rodata 0x805707C0-0x80570840, .data 0x805D8B00-0x805DAFE8, .bss 0x806BE0D8-0x806BE108, .sdata
+ *   0x80792948-0x80792A58, .sdata2 0x8079AC20-0x8079AD98 (a pool run no other unit references), extab, extabindex.
+ * FLAGS. `cflags_lobby` and file-scope `#pragma peephole off`: retail keeps `slwi` after `clrlwi` and `srwi` + `clrlwi`
+ *   apart where the pass folds them into one `rlwinm` (`fn_802FB3B0`, `fn_802FB948`).
+ * NAMES. The map and the dump give only placeholders (`LbCheckKujiraEvent__Fv` at 0x802FB9DC is the one real name), so
+ *   the file keeps the map's stem.  Module `lobby`: the predicates read `lobby_w` +0x003/+0x15F/+0x161 and
+ *   `lobby_world_block`, and the callees are the lobby UI API plus the `ef`/`enemy` helpers the screens drive.
+ * RESIDUALS. 93 rows unwritten: 0x802FA9A0-0x802FB3B0, 0x802FB600-0x802FB8C4, 0x802FBA14-0x802FBA60,
+ *   0x802FBA94-0x802FBE40, 0x802FBE60-0x802FDB90, 0x802FDBA4-0x802FDF9C, 0x802FDFB0-0x802FEE4C, 0x802FEE54-0x802FF0A4,
+ *   0x802FF0A8-0x802FF234, 0x802FF2C0-0x802FF478, 0x802FF4AC-0x802FF90C, 0x802FF928-0x8030121C.
+ *   flipcheck: `.ctors`/`.rodata`/`.data`/`.bss`/`.sdata`/`.sdata2` claimed, not emitted (the tables are reached
+ *   through `extern` declarations in `lobby/fn_802FA9A0.h`); `.text`/extab/extabindex short of the claim.
+ * SHAPES. The six id-table predicates take a `u32` and narrow it in a temporary: a narrow parameter arrives narrowed
+ *   per the ABI and drops the `clrlwi`s retail keeps.
  */
 #include "types.h"
 #include "lobby/fn_802FA9A0.h"
@@ -205,8 +170,7 @@ u32 fn_802FB97C(void) {
 
 } /* extern "C" */
 
-/* Whether the whale event is up.  C++ linkage: the map's own name is the mangling
- * `LbCheckKujiraEvent__Fv`, so this one definition sits outside the block above (rule 9). */
+/* Whether the whale event is up; outside the block above because the map spells it mangled (C++ linkage, rule 9). */
 u32 LbCheckKujiraEvent(void) {
     return lobby_w.kujira_0x15F == 1;
 }

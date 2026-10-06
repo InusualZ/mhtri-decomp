@@ -1,87 +1,26 @@
-/* lobby/lb_quest_ui.cpp - the lobby's list/detail UI band, `.text` 0x8038EC44..0x80394038.
- *
- * WHAT IT IS.  A lobby screen: it draws scrolling list rows with sprite icons and glyph text
- * (`get_lsp_data` / `draw_sprite_ary` / `draw_sprite_idx` / `draw_font` / `draw_font_idx`), colours
- * the selected row with `GetMenuFontColor`, draws the cursor with `put_menu_cursor`, prints counts
- * with `sprintf` and the lobby's localized strings with `LbStr`, and plays UI sounds with
- * `sysSE_req`.  The rows live in the record the screen's entry point is handed (a `+0xC4` array of
- * `{u16 id, u8 payload}` rows) and the screen's state is driven by `game_ready_ck` plus the
- * `fn_8021D5BC` lobby state query.  The `em009` action slots that used to head the range
- * (`0x8038E8E8..0x8038EC44`) moved to `enemy/em009_act.cpp` - see SEAM below.
- *
- * MODULE AND NAME (brief section 2, evidence order), evidence class 3.  1. No `__FILE__` string
- * covers the range: every `s_*`/`lbl_*` reference of its 65 split objects is a `.data` table, a
- * `.sdata` format string, a jumptable or a `.sdata2` float, never a source-file-name literal.  (The
- * `menu_note.cpp` string the proposal's discovery note cites at `.data` 0x805E91F8 is NOT this
- * unit's: it has exactly one copy in the DOL and is referenced by `src/menu/menu_note.cpp`'s object,
- * which declares it - the note is a tool artefact, and the queue carries the same one for six other
- * proposals of this band.)  2. `dumpmap.py lookup` answers `zz_XXXXXXXX_` for every address of the
- * range (the dump's two real names inside it - `DBClose`, `JASDsp::TChannel::forceStop` - are a
- * different build's layout: the code under them is this range's).  3. Module `lobby` and the
- * screen's name from the code and the band: the range reads the lobby work block `lobby_w`
- * (`.bss` 0x806AAB44) at `+0x0AC` and the option block `lb_param_w` (`.bss` 0x806590B4), calls
- * `LbStr` 28 times and `get_lsp_data`/`draw_sprite_ary`/`GetMenuFontColor`/`put_menu_cursor`
- * throughout, and the registered lobby bands document exactly this callee profile
- * (`lobby/fn_8030121C.cpp`, `lobby/lb_companion_ui.cpp`).  It is reached from the lobby's own menu
- * dispatcher: `fn_80211E68` (`src/lobby/fn_8020C588.cpp`) switches on the lobby menu index and calls
- * two of this range's functions (`fn_80390F20`, `fn_80392CC8`) as screen entry points, and
- * `lobby/fn_802076D4.cpp`/`lobby/fn_80219260.cpp` call `fn_8038F4D8`/`fn_803928F0`.  The file name
- * `lb_quest_ui.cpp` is a **GUESS** (marked: nothing pins which of the lobby's screens this is - the
- * list rows carry no literal screen title, and the ids the code hands `LbStr` index a string table
- * loaded at runtime), chosen under the module's own `lb_*` scheme (`lb_npc`, `lb_companion_ui`,
- * `lb_menu_page`) for what the range plainly is: the frame step, list rows, detail pane and sprites
- * of one lobby screen.
- *
- * SEAM (2026-09-30 recut).  The range used to start at 0x8038E8E8; its first functions
- * (`0x8038E8E8..0x8038EBE8`) are entry slots of `em009_prog_tbl` (`.data` 0x805EF990, the enemy
- * program-table block) whose only `.data` reference is `lbl_805EFAB8`, which sits between the `em009`
- * band's own tables, so they belong to that TU.  `fn_8038EBE8` (0x5C) is the same deleting destructor
- * as `fn_8019E5A8`/`fn_801AA0F8`, each the last function of its TU, so the em009 TU ends at 0x8038EC44
- * (`enemy/em009_act.cpp`).  The `.sdata2` pool corroborates the window (the repeated 1.0 at
- * `lbl_8079C2A4` starts a new pool somewhere in 0x8038E8E8..0x8038EFEC).  GUESS: this unit's true first
- * function could be anywhere up to 0x8038EF28 (`fn_8038EF28` is the first reader of the new pool); the
- * dtor closes the em009 TU, so 0x8038EC44 is taken.
- *
- * SECTIONS.  `.text` 0x8038EC44..0x80394038, extab 0x800181C4..0x8001833C and extabindex 0x8003810C..0x80038340 -
- * each run is exactly the gap the bracketing registered units leave.  No `.data`/`.sdata`/`.sdata2` claim: the range *references*
- * 45 `.data` labels, 20 `.sdata` ones and the `.sdata2` run but owns none of the bytes it does not
- * emit, and the two compiler-emitted switch tables it would need (`jumptable_805F0F5C`,
- * `jumptable_805F1020`) sit inside an unclaimed `.data` band - claiming it would take other units'
- * bytes with it (playbook 53/55).
- *
- * FLAGS.  The `lobby` lib's `cflags_lobby` (`-O3 -inline noauto`, `wii/1.3`), whose `-Cpp_exceptions on`
- * (flags-audit 2026-09-28, replacing the per-file pragma) emits the unwind records: the range's 52
- * extab records are the target's own.
- *
- * RULE 2 BOUNDARY ARTEFACT (reported, not resolved here).  Two of the switch arms of
- * `lb_ui_detail_step` tail into 0x80394144 / 0x80394154, which the *next* band owns
- * (`src/lobby/lb_quest_board.cpp` landed on main after this branch was cut).  That unit's header does
- * not declare them, so this branch declares them in the band header `unsplit/lobby.h` and
- * reports it: `land.band_ownership_warnings` lists the two lines (a warning the gate never refuses -
- * see its docstring), and the fix on the merged tree is to move the two declarations into
- * `lobby/lb_quest_board.h`.
- *
- * Naming note: references only to other units' unrenamed fn_XXXXXXXX symbols (checked with
- * `grep -rn "fn_80" src/lobby/lb_quest_ui.cpp` - the only `fn_` names this file names
- * (`fn_80394144`, `fn_80394154`) are the next band's, declared by the band header it includes).
- *
- * STATUS and RESIDUALS.  21 of the 70 functions carry a body, 13 of them byte-identical (unit fuzzy
- * 5.6330, matched_functions 13 of 70, matched_code 536 of 22352 `.text` bytes).  `lb_ui_tri_sum` has a
- * body and scores 0.0, and seven written bodies sit below the bar (see the list below).  Measured residuals on the written bodies: `lb_ui_page_flag_ck` 81.22 /
- * `lb_ui_page_flag_set` 79.23 (measured before `lobby_world_block` was re-declared as the `u8*` it is, in
- * `fn_80047398/lobby_world_block.h`; re-measure);
- * `lb_ui_pair_offset` 77.14 (argument register order), `lb_ui_clear` 94.52 (`memset` argument setup
- * order), `lb_ui_effect_list_step` 98.71 / `lb_ui_param_apply` 99.57 / `lb_ui_angle_step` 99.43 (a
- * register name each), `lb_ui_pair_lookup` 17.71 (loop shape),
- * `lb_ui_tri_sum` 0.0 (retail is MWCC's 8x-unrolled countdown loop and the source shape that produces
- * it is not settled yet).  The `em009` fragment's `0x8038E8EC` (0x6C) is not written: its
- * first arm is a masked-compare idiom (`xori 0x708` / `srawi 1` / `andi.` / `subf` / `srwi 31`) whose
- * C source shape is not settled yet; `0x8038EBE8` (0x5C), `0x8038EEC8` (0x54) and the four large
- * UI bodies above 0x8038F150 are unwritten for the same reason - they need the row/panel types the
- * next pass derives.  `0x8038EF1C` (0xC, `b fn_80385AD4`) is unwritten too: the callee is a symbol of
- * `enemy/fn_80382310.cpp` whose record type (`NoteWork`) is that unit's own local type, so the
- * declaration cannot be spelled here without first moving that type into a header (rule 2) - the
- * header move is reported for the round that registers the `em009` fragment.
+/* lobby/lb_quest_ui.cpp - a lobby list/detail screen: scrolling rows of sprite icons and glyph text, the selected-row
+ *   colour, the cursor, counts and localized strings, driven by `game_ready_ck` and the `fn_8021D5BC` state query.
+ * RANGE. .text 0x8038EC44-0x80394038 (63 functions); .data 0x805F0CB8-0x805F13D0, .sdata 0x807933D8-0x80793470, .sdata2
+ *   0x8079C298-0x8079C2B0, extab, extabindex.  The left edge is the end of the em009 TU (`fn_8038EBE8`, the deleting
+ *   destructor that closes it, is `enemy/em009_act.cpp`'s); the first function of this TU could be anywhere up to
+ *   0x8038EF28 (the first reader of the new `.sdata2` pool at `lbl_8079C2A4`), a GUESS.
+ * NAMES. `lb_quest_ui` is a GUESS in the module's `lb_*` scheme: nothing pins which lobby screen this is (the `LbStr`
+ *   ids index a runtime-loaded table).  Module `lobby`: `lobby_w` +0x0AC, `lb_param_w`, 28 `LbStr` calls; the lobby
+ *   menu dispatcher `fn_80211E68` (`lobby/lb_npc.cpp`) calls `fn_80390F20`/`fn_80392CC8` as screen entry points. The
+ *   function names are GUESSes from their bodies.
+ * RESIDUALS. 46 rows unwritten or scoring zero: 0x8038EC44-0x8038EEC8, 0x8038EF1C-0x8038EF9C, 0x8038EFEC-0x8038F264,
+ *   0x8038F4D8-0x8038F748, 0x8038F74C-0x8038F884, 0x8038F8A8-0x8038FAC4, 0x8038FB20-0x803905FC, 0x8039065C-0x80390928,
+ *   0x80390984-0x80392328, 0x80392394-0x80392960, 0x80392964-0x80393A70, 0x80393B28-0x80394038, and the written
+ *   `lb_ui_tri_sum` (0x8038F2BC-0x8038F344: retail is MWCC's 8x-unrolled countdown loop, its source shape unsettled).
+ *  - `lb_ui_pair_offset`: argument register order; `lb_ui_page_flag_set`/`lb_ui_page_flag_ck`: retail narrows both
+ *    `u16` arguments before calling `lb_ui_pair_offset`, ours passes them raw;
+ *  - `lb_ui_clear`: the `memset` argument setup order; `lb_ui_pair_lookup`: the loop shape;
+ *  - `lb_ui_angle_step`, `lb_ui_param_apply`, `lb_ui_effect_list_step`: one register name each.
+ *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim; the
+ *   `.sdata`/`.sdata2` pool is shared with `lobby/lb_quest_board.cpp` and `menu/menu_result.cpp` (fold candidate); the
+ *   source still spells `lobby/lb_quest_board.cpp`'s `lb_quest_board_state_next`/`lb_quest_board_effect_retire` (two
+ *   `lb_ui_detail_step` switch arms tail into them) by their old stems `fn_80394144`/`fn_80394154`, which the map no
+ *   longer has; they are declared in `unsplit/lobby.h`, not their owner's header.
  */
 
 #include "types.h"
@@ -94,18 +33,15 @@
 #include "unsplit/enemy.h"
 #include "unsplit/lobby.h"
 
-/* The screen's row work: the box the screen's entry point is handed.  Only the fields the
- * reconstructed bodies touch are named; the byte mass between them is untouched here and the size is
- * an approximation (nothing in this range allocates or `memset`s it). size: 0x1A8 (approximate) */
-/* One record of the screen's pooled-effect list at `+0x038`: a count followed by the handles the
- * effect library retires.  This unit keeps its own view because the next band's header
- * (`lobby/lb_quest_board.h`, which documents the same record as `LbEftList`) only exists on
- * main - this branch was cut before it landed, so the fold is recorded in the outbox instead. size: 0x8 */
+/* One record of the screen's pooled-effect list at `+0x038`: a count followed by the handles the effect library
+ * retires; the same record as `lobby/lb_quest_board.h`'s `LbEftList` (a rule-1 duplicate to fold). size: 0x8 */
 typedef struct LbUiEftList {
     /* +0x000 */ s32 count_0x000;
     /* +0x004 */ void* handles_0x004[1];
 } LbUiEftList;
 
+/* The screen's row work: the box the screen's entry point is handed.  Only the fields the reconstructed bodies touch
+ * are named; nothing in this range allocates or `memset`s it. size: 0x1A8 (approximate) */
 typedef struct LbQuestRowWork {
     /* +0x000 */ u8 state_0x00;
     /* +0x001 */ u8 active_0x01;

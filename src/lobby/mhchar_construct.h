@@ -1,5 +1,4 @@
-/* Leaf header for `mhchar_construct` (0x801FF984), owned by `lobby/lb_npc.cpp`: the constructor of the model object `MHchar`.
- */
+/* Leaf header for `lobby/lb_npc.cpp`'s 0x801FF984, the constructor of the model object `MHchar`. */
 struct MHchar;
 
 #ifndef MHTRI_LOBBY_MHCHAR_CONSTRUCT_H

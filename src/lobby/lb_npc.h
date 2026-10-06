@@ -1,11 +1,5 @@
-/* The `lobby` NPC group's reconstructed types (`src/lobby/lb_npc.cpp`).
- *
- * A header rather than the unit's own source because `_LB_NPC` is the name the map's mangling encodes
- * (`lb_npc_Get_motion_no__FP7_LB_NPC`) and `src/sound/fn_800D7F54.cpp` already defines a partial view of
- * that name - rule 1's "a shared type is defined once" keeps the reconstruction here, and the sound
- * unit's view is part of the pre-existing backlog (its own header move is a config_request).
- * docs/plan.md 6.5 rules 3/4/5: every type states its size, every field its offset and a name.
- */
+/* The types of `lobby/lb_npc.cpp`: `_LB_NPC` is the name the map's mangling encodes
+ * (`lb_npc_Get_motion_no__FP7_LB_NPC`); `sound/fn_800D7F54.cpp` still defines its own partial view of it (rule 1). */
 #ifndef MHTRI_LOBBY_LB_NPC_H
 #define MHTRI_LOBBY_LB_NPC_H
 
@@ -85,8 +79,7 @@ typedef struct LbNpcMotion {
 
 /* One `_LB_NPC` record - the type `lb_npc_Get_motion_no__FP7_LB_NPC` / `lb_npc_area_ck__FP7_LB_NPCUc`
  * take and the 0x12-element `lb_npc` array's element (stride 0x268).  The class name is the map's own
- * (`7_LB_NPC`); the sound unit `src/sound/fn_800D7F54.cpp` carries a partial view of the same name that
- * only reads +0x002 - the shared home is a config_request. */
+ * (`7_LB_NPC`); `sound/fn_800D7F54.cpp` still carries a partial view of the same name that reads only +0x002. */
 typedef struct _LB_NPC {
     /* +0x000 */ u8 field_0x000;
     /* +0x001 */ u8 field_0x001;
@@ -176,9 +169,7 @@ typedef struct _LB_NPC {
 } _LB_NPC; /* size: 0x268 */
 
 /* ---------------------------------------------------------------------------------------------------
- * This unit's own callable surface, for the lobby consumers that call it
- * (`src/lobby/fn_802076D4.cpp`).  docs/plan.md 6.5 rule 2: an extern lives with the TU that owns the
- * symbol.  The names are unmangled in the map, so the declarations are `extern "C"` (rule 9).
+ * This unit's callable surface; the map spells the names unmangled, so the declarations are `extern "C"`.
  */
 /* One of the 0x12 NPC work records in the `lb_npc` array (stride 0x268). */
 typedef struct LbNpcWork {
@@ -190,9 +181,8 @@ typedef struct LbNpcWork {
 extern "C" {
 #endif
 
-/* 0x801FF984 - the block constructor this range's `fn_802C2698` hands a record's +0x08 to.  Added
- * with the `light/light.cpp` registration (rule 2: this range owns the address); the owner's own body
- * does not exist yet, so the declaration is that call site's view. */
+/* 0x801FF984 - the block constructor `fn_802C2698` hands a record's +0x08 to; unwritten, so the declaration is that
+ * call site's view. */
 void mhchar_construct(void* block);
 
 #ifdef __cplusplus

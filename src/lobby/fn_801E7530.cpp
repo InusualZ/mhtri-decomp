@@ -1,20 +1,31 @@
 /* lobby/fn_801E7530.cpp - the lobby menu-layer group.
- *
- * `.text` 0x801E7530..0x801EC9E0 (77 functions, 21680 B), extab 0x800105B4..0x8001079C (61 unwind-only
- * 8-byte records), extabindex 0x8002C778..0x8002CA54 (61 x 12 B).
- *
- * Module `lobby`.  The range's callees are the lobby UI API (`lobby_w` .bss 0x806AAB44, `LbStr`,
- * `lb_param_w`, `get_lsp_data`, `GetMenuFontColor`, `set_blendmode`, `draw_font_idx`,
- * `draw_sprite_ary`) and its neighbour above is the registered `lobby/lobby_scene.c`; the .bss run
- * around `lobby_w` (`Screen_w`, `option_w`, `lb_param_w`) is the lobby/option state.  Language C++:
- * every call out of the range is a mangled symbol.
- *
- * Name.  The map has only `fn_XXXXXXXX` for this range and the runtime dump answers only `zz_`
- * placeholders (`dumpmap.py lookup 0x801E7530` -> `zz_01e7530_`), so the file keeps the map's stem.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py
- * lookup on the range's inventory: all 77 names are bare `.text` entries in
- * config/RMHE08/symbols.txt and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
+ * RANGE. .text 0x801E7530-0x801EC9E0 (77 functions); .data 0x805B7CB0-0x805B85D8, .sdata 0x80791B70-0x80791C58, extab,
+ *   extabindex.
+ * NAMES. The map and the dump give only placeholders for the range, so the file keeps the map's stem.  Module `lobby`:
+ *   the callees are the lobby UI API (`lobby_w`, `LbStr`, `lb_param_w`, `get_lsp_data`, `GetMenuFontColor`,
+ *   `set_blendmode`, `draw_font_idx`, `draw_sprite_ary`).
+ * RESIDUALS. 43 rows unwritten: 0x801E9010-0x801E92B0, 0x801E938C-0x801E9600, 0x801E9640-0x801E9AA8,
+ *   0x801E9B68-0x801E9FC8, 0x801E9FF0-0x801EAC30, 0x801EAC84-0x801EB0B8, 0x801EB1B8-0x801EB524, 0x801EB560-0x801EB6F4,
+ *   0x801EB7A4-0x801EC194, 0x801EC19C-0x801EC7AC, 0x801EC85C-0x801EC9E0.
+ *  - `fn_801E7530`: retail loads the `lbl_805BA6D4`/`lbl_805BA718` table bases into saved registers up front and is 132
+ *    B shorter than ours (the body's structure differs);
+ *  - `fn_801E8994`: it calls `fn_80214948` with the five arguments `unsplit/lobby.h` declares, so every argument sits
+ *    one register early against retail's six;
+ *  - `fn_801E7EA8`, `fn_801E88E8`, `fn_801E8CDC`, `fn_801EB744`, `fn_801E936C`: retail narrows `u8`/`u16` values with
+ *    `clrlwi` at the use where ours passes them through (`fn_801E936C` narrows the sum and returns with `blelr`);
+ *    `fn_801EB138`: retail sign-extends (`extsh`) twice more;
+ *  - `fn_801E79E4`: ours emits its own switch table (`@1070`) where retail uses `jumptable_805B7CD8`, plus register
+ *    drift;
+ *  - `fn_801E790C`: ours materialises zero three more times and addresses +0x24 where retail uses +0x12;
+ *  - `fn_801E80FC`: register colouring and a `lwz` of +0x100 where ours uses `lhz` (a field width);
+ *  - `fn_801E8348`: ours fuses `add.` (retail `add` + `cmpwi`) and reads +0x1C where retail reads +0x18;
+ *  - `fn_801E8CA0`: retail reaches `lbl_80791BAC` through `@sda21`, ours with `lis`/`addi`;
+ *  - `fn_801E7FEC`, `fn_801E843C`, `fn_801E89B4`, `fn_801E8D5C`: frame size and saved-register range differ (retail
+ *    0x30/0x60/0xA0 against ours 0x20/0x50/0x30; `fn_801E8D5C` saves from r25 against ours r24);
+ *  - `fn_801E9600`: retail runs a `mtctr` count loop on narrowed bytes, ours a decrementing compare loop;
+ *  - `fn_801E92B0`, `fn_801E9AA8`, `fn_801EC804`: setup scheduling and register colouring (`fn_801E9AA8` is 36 B
+ *    shorter in ours, `fn_801EC804` stores after the `extsh` where retail stores before).
+ *   flipcheck: `.data` 0x24 against 0x928; `.sdata` claimed, not emitted; `.text`/extab/extabindex short of the claim.
  */
 #include "types.h"
 
@@ -32,9 +43,7 @@ extern "C" {
 int sprintf(char* dst, const char* fmt, ...);
 }
 
-/* Foreign functions owned by other registered units: declared here as plain prototypes (no `extern`
- * keyword), which is how the existing units carry the callees their owners' headers do not yet publish.
- * Each is filed as a shared-file request so the declaration can move to its owner's header. */
+/* Foreign functions whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
 void item_pair_copy(void* p);
 s32 fn_8004B0A4(u16 id, void* out);

@@ -1,4 +1,4 @@
-/* Declarations owned by `src/lobby/fn_801E7530.*` (docs/plan.md 6.5 rule 2): a consumer includes this header instead of declaring the symbols itself. */
+/* Declarations owned by `lobby/fn_801E7530.cpp`. */
 #ifndef MHTRI_LOBBY_FN_801E7530_H
 #define MHTRI_LOBBY_FN_801E7530_H
 
@@ -8,7 +8,6 @@
 #include "ef/eft052.h"
 #include "menu/menu_message.h"
 
-/* Declarations moved here from `unsplit/lobby.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

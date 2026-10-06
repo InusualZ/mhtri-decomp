@@ -1,74 +1,45 @@
 /*
  * lobby/lb_pane_ui.cpp - the lobby's pane group: the digit-entry and item-list panes, the page/panel group and the
- * character-edit (hair/inner colour) screen.
- *
- * `.text` 0x801EC9F8..0x801FBF78 (129 functions), `.data` 0x76C B, `.sdata` 0xF8 B, `.sdata2` 0x10 B, extab 0x340 B and
- * extabindex 0x4E0 B.  Phase 4 fold: the three registered units `lobby/fn_801EC9F8`,
- * `lobby/fn_801F3294` and `lobby/fn_801F9CD4` are one TU of the candidate (their `.sdata2`/`.data` pools run on without a
- * break across the old edges); their bodies are kept below in text order, each under its own former header.
- *
- * Scopes: the three former units were written against different views of the same lobby globals (`lobby_w`,
- * `lobby_world_block`, the `lbl_805B8xxx` tables) and call some unsplit callees with different argument lists, so the first two
- * sections keep their own declarations in a namespace (`extern "C"` names stay unmangled; the C++-linkage callees stay at global
- * scope, where their manglings are made).  Uniting the views into one declaration set is the open work of this unit.
- * Name: GUESS, from what the three bands draw (digit-entry/item-list panes, a page/panel group, the hair/inner colour
- * edit screen); no `__FILE__` string and no runtime-dump name covers the range.
- * Flags: `cflags_lobby` for all three former units; the pragmas each used are scoped to its own section below.
- * Data: no `.data`/`.sdata`/`.sdata2` is defined here yet; the claimed ranges keep the original bytes (`NonMatching`).
- */
-
-/* ==== absorbed from lobby/fn_801EC9F8.cpp (0x801EC9F8..0x801F3188) ==== */
-/* lobby/fn_801EC9F8.cpp - the lobby band's digit-entry / item-selection pane group.
- *
- * `.text` 0x801EC9F8..0x801F3294 (67 functions, 26780 B), extab 0x8001079C..0x8001094C (54 unwind-only
- * 8-byte records), extabindex 0x8002CA54..0x8002CCDC (54 x 12 B).  Registered; that proposal's edge is a `--max-bytes` size cap, not a
- * translation-unit boundary, and `tudiscover` finds no anchor in either direction, so the extent
- * settles as the functions match.
- *
- * Module `lobby`: both bracketing registered units are `lobby` (`lobby_scene.c` above,
- * `lobby/lb_npc.cpp` below), the range reads `lobby_w` (+0xAC menu pointer, +0x84/+0x86 counters) and
- * the lobby item database `lobby_world_block`, and its callees are the lobby UI API.
- *
- * Name.  The map has only `fn_XXXXXXXX` for this range, the runtime dump answers only `zz_` placeholders
- * (`dumpmap.py lookup 0x801EC9F8` -> `zz_01ec9f8_`), and no `__FILE__`/assert string covers the range
- * (its only data references are the numeric tables `lbl_805B85D8`/`lbl_805B8618`/`lbl_805B8638` and the
- * switch table `jumptable_805B8B98`), so the file keeps the map's stem (brief section 2, class 4).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit.py range
- * over the proposal inventory and dumpmap.py lookup on the range's addresses: all 67 names are bare
- * `.text` entries and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
- *
- * Flags.  The unit needs two pragmas the lib's `cflags_lobby` does not set, both scoped to this file:
- *   `#pragma peephole off`   retail keeps the unfused `clrlwi` + `rlwinm` + `cmpwi` triple where -O3's
- *                            peephole folds it into a record-form `rlwinm.` - fn_801EC9F8 measured
- *                            78.90 % with the pass on and 100.00 % with it off (256 -> 308 B).
- *   `#pragma dont_inline on` retail keeps `fn_801ED3E8`/`fn_801ED464` out of line; with `-inline auto`
- *                            they are inlined into fn_801ED688 (860 -> 1556 B, 7.00 %); with the pragma
- *                            that function measures 95.86 %.
- * A lib-level `flag` request is filed for both (two lobby units would have to agree before `cflags_lobby`
- * moves); until then the pragmas keep the deviation inside this unit.
- *
- * State.  31 of the 67 functions are reconstructed (all >= 83 %, six at 100 %): the digit-entry pane
- * (0x801ECD50..0x801ED200), the item-list pane (0x801ED284..0x801EDB34) and the two step machines
- * (0x801EDC4C/0x801EE1E4/0x801EEDC4/0x801EEFA0).  Unit: 33.03 % fuzzy, 632 / 26780 B matched.
- * Not reconstructed yet - the trailing 36 functions, 0x801EE988..0x801F3294 (fn_801EE988, fn_801EF3B0,
- * fn_801EF760, fn_801EFD74..fn_801F3294): their object types (a third pane with a 0x650-byte config
- * block, the icon/attribute run at 0x801F085C) still need deriving, so no body is guessed.
- *
- * Residuals in the reconstructed set (all allocator/scheduling deltas, no structural gap):
- *   fn_801ED56C 83.00, fn_801EDA34 83.27, fn_801ED184 84.35, fn_801EDC4C 85.86, fn_801EF244 88.08,
- *   fn_801EE1E4 88.20, fn_801EF73C 88.33, fn_801ED9E4 88.50, fn_801ED200 87.12, fn_801ED464 92.31,
- *   fn_801ED048 92.77, fn_801ECEF0 93.03, fn_801EDA9C 93.95, fn_801ED284 95.28, fn_801ECF74 96.42,
- *   fn_801ECD50 96.82, fn_801ECDD4 97.04, fn_801EDB34 97.43, fn_801ECB2C 98.00, fn_801ECB40 98.41.
- * At 100 %: fn_801EC9F8, fn_801ED160, fn_801ED3E8, fn_801ED53C, fn_801ED554, fn_801EF1D0.
- *
- * Types.  The two panes and the item database are this range's own views (`LbDigitPane`, `LbListPane`,
- * `LbEquipPane`, `LbItemDb`, `LbConfigWork`); `lobby_w.menu_0xAC` is also read by
- * `lobby/fn_801E7530.cpp`, whose `LbMenuWork` in `unsplit/lobby.h` marks +0x02/+0x06/+0x0A as
- * padding where this range reads them - filed as a shared-file request to merge the two views.
- * `unsplit/lobby.h` itself cannot be included: its `fn_8021213C(s32, s16)` takes two arguments
- * where this range passes one, and its `menu_cursor_step_fixed_tail` takes `s16`s where the call sites pass `u8`s, so
- * the callee declarations live in this file (plain prototypes, one shared-file request each).
+ *   character-edit (hair/inner colour) screen.
+ * RANGE. .text 0x801EC9F8-0x801FBF78 (129 functions); .data 0x805B85D8-0x805B8D44, .sdata 0x80791C58-0x80791D50,
+ *   .sdata2 0x80799870-0x80799880, extab, extabindex.  Three bands whose `.sdata2`/`.data` pools run on without a
+ *   break, so one TU: the panes 0x801EC9F8-0x801F3294, the page/panel group 0x801F3294-0x801F9CD4, the colour screen
+ *   0x801F9CD4-0x801FBF78.  Each band keeps its own declarations in a namespace: they view `lobby_w`,
+ *   `lobby_world_block` and the `lbl_805B8xxx` tables differently and call some callees with different argument lists
+ *   (`unsplit/lobby.h`'s `fn_8021213C(s32, s16)` takes two where the panes pass one; the colour screen's `lb_chg` scope
+ *   spells `lobby_world_block` as the pointer it is and `fn_80215C98` with the five arguments every call passes).
+ *   Uniting the views is open work.
+ * FLAGS. `cflags_lobby`; `#pragma peephole off` throughout and `#pragma dont_inline on` over the panes band
+ *   (0x801EC9F8-0x801F3294) only (retail keeps `fn_801ED3E8`/`fn_801ED464` out of line); measured in docs/lobby.md.
+ * NAMES. `lb_pane_ui` is a GUESS from what the three bands draw; no `__FILE__` string or dump name covers the range,
+ *   and the map gives only placeholders for the functions.
+ * RESIDUALS. 69 rows unwritten: 0x801EE988-0x801EEDC4, 0x801EF3B0-0x801EF73C, 0x801EF760-0x801F3294,
+ *   0x801F35B0-0x801F37C8, 0x801F3828-0x801F3998, 0x801F39E8-0x801F3DEC, 0x801F3FDC-0x801F4444, 0x801F44CC-0x801F54C4,
+ *   0x801F55B4-0x801F5FB0, 0x801F6168-0x801F6A9C, 0x801F6AEC-0x801F865C, 0x801F87B0-0x801F8ABC, 0x801F8B3C-0x801FA0DC,
+ *   0x801FA2C8-0x801FB1D8, 0x801FB80C-0x801FBAE4, 0x801FBB64-0x801FBF78.
+ *  - the panes' `fn_801ECB2C`, `fn_801ECEF0`, `fn_801ECF74`, `fn_801ED048`, `fn_801ED184`, `fn_801ED200`,
+ *    `fn_801ED464`, `fn_801ED56C`, `fn_801ED9E4`, `fn_801EDA34`, `fn_801EDA9C`, `fn_801EDB34`, `fn_801EDC4C`,
+ *    `fn_801EE1E4`, `fn_801EF244`, `fn_801EF73C`: allocator/scheduling deltas, no structural gap;
+ *  - `fn_801ED688`, `fn_801EEDC4`: register colouring (ours saves r28 in `fn_801EEDC4`, 20 B shorter in `fn_801ED688`);
+ *    `fn_801EE900`, `fn_801EE940`: retail narrows into the same register, ours into r0; `fn_801EEFA0`: retail loads
+ *    `lobby_world_block` two instructions later;
+ *  - `fn_801F3294`: retail's case-0 "done" step branches into the case-2 body, ours duplicates the five instructions
+ *    and pays a trailing `b` (the duplicated form and the 0/2/1 label order score lower);
+ *  - `fn_801F5534`: `(u16)count <= 1` needs a bare `cmplwi r5,1`, the cast emits `clrlwi` (a `u16` local turns the
+ *    index `lha` into `lhz`); `fn_801F86FC`: retail keeps the `flags` pointer in r30, ours in r31;
+ *  - `fn_801FA0DC`: ours keeps the `lbl_805B875C` switch value in a saved register across the two `get_lsp_data` calls,
+ *    retail reloads it; `fn_801FB364`: frame 0x30 against 0x20 with the same local offsets;
+ *  - `fn_801FB524`: retail merges the three identical `system_w.field_0x865 = 0` / `state = 3` blocks into one and
+ *    binary-searches the dispatch, ours keeps three copies and a linear compare chain.
+ *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short of the claim;
+ *   `Gunner_opt_ok_ck__FP10LbEquipRec` is not the map's spelling, and `chg_nand_err2msgcode`, `game_save_wait`,
+ *   `sysSE_req` are referenced unmangled where the map spells `chg_nand_err2msgcode__Fv`, `game_save_wait__Fv`,
+ *   `sysSE_req__Fl`.
+ * SHAPES. In the page/panel band: `__declspec(noinline)` on `fn_801F353C`, `fn_801F3588`, `fn_801F6034`;
+ *   `while (*table != -1)` (retail tests below the body); a `switch` where retail branches past the chain
+ *   (`fn_801F37C8`, `fn_801F3998` and `fn_801F4444` with the labels in the order -1, -3, -2, `fn_801F3EDC`, and
+ *   `fn_801F3DEC` with `default` first); a `u32`/`u16` parameter narrowed at the use (`fn_801F8ABC`, `fn_801F60D4`) but
+ *   a `u8` one for `fn_801F3DEC`; `fn_801F4444`'s unused middle parameter; `fn_801F60D4`'s 12-byte `_SPR_DATA_` local.
  */
 #include "types.h"
 #include "id_value.h"
@@ -174,10 +145,8 @@ typedef struct LbEquipPane {
     /* +0x90 */ s32 icon_index_0x90;
 } LbEquipPane; /* size: 0x94 (the extent this range reads) */
 
-/* The lobby menu work object `lobby_w.menu_0xAC` points at.  `fn_801ECB40` is the only reader in this
- * range, so only the six fields it drives are named; the full record belongs to
- * `lobby/fn_801E7530.cpp`, which owns `LbMenuWork` in `unsplit/lobby.h` (recorded as a
- * shared-file request: these two views of +0x02/+0x06/+0x0A should collapse into one). */
+/* The lobby menu work object `lobby_w.menu_0xAC` points at, with the six fields `fn_801ECB40` drives; `LbMenuWork` in
+ * `unsplit/lobby.h` is the full record and spells +0x02/+0x06/+0x0A as padding (two views to merge). */
 typedef struct LbMenuPanel {
     /* +0x00 */ u8 state_0x00;
     /* +0x01 */ u8 mode_0x01;
@@ -213,17 +182,13 @@ typedef struct LbItemDb {
     /* +0x0092 */ u8 unused_0x0092[0xEE];
     /* +0x0180 */ IdValue slots_0x180[0x320]; /* the slot table the item calls index */
     /* +0x0E00 */ LbEquipRec equip_0x0E00[0x100]; /* the 0xC-byte equipment records */
-} LbItemDb;
+} LbItemDb; /* size: 0x1A00+ (only the runs this range indexes are named) */
 namespace s_801EC9F8 {
- /* size: 0x1A00+ (only the runs this range indexes are named) */
 
 /* ------------------------------------------------------------------------------------------------
- * The symbols this range reads.  Everything below is a plain prototype at file scope (the project's
- * convention for callees whose owner has no publishable header); each one is filed as a shared-file
- * request.  `lobby_w` and `lobby_world_block` are re-declared here with this range's own view because the
- * callee signatures `unsplit/lobby.h` publishes for `menu_cursor_step_fixed_tail`/`fn_8021213C` do not match
- * the ones this range calls (the header declares `fn_8021213C(s32, s16)` where this range passes one
- * argument), so including it cannot compile.
+ * The symbols this range reads, as plain prototypes (their owners' headers do not declare them).  `lobby_w` and
+ * `lobby_world_block` carry this range's own view: `unsplit/lobby.h` cannot be included (its `fn_8021213C(s32, s16)`
+ * and `menu_cursor_step_fixed_tail` do not match the calls here).
  */
 extern "C" {
 /* This range's own functions, called by earlier bodies. */
@@ -1420,77 +1385,13 @@ extern "C" u16 fn_801EF73C(LbDigitPane* self)
 #pragma dont_inline reset
 #pragma peephole reset
 
-/* ==== absorbed from lobby/fn_801F3294.cpp (0x801F3294..0x801F9AF8) ==== */
+/* The page/panel band (0x801F3294-0x801F9CD4). */
 #include "unsplit/lobby.h"
 #include "hud/spr_data.h"
 /* C++-linkage callees of this section that `unsplit/lobby.h` does not declare: they stay at global scope (their manglings are made there). */
 void PutPageArrow(u16* table, s16 a, s16 b, u16 c, const _mh_ivec2_* pos, u8 flags);
 void sysSE_req(s32 id);
 void set_blendmode(u8 a, u8 b, u8 c);
-/* lobby/fn_801F3294.cpp - a lobby page/panel group.
- *
- * `.text` 0x801F3294..0x801F9CD4 (48 functions, 27200 B), extab 0x8001094C..0x80010A7C (38 unwind-only
- * 8-byte records), extabindex 0x8002CCDC..0x8002CEA4 (38 x 12 B).  Registered once, at its final home
- * (docs/plan.md 12).
- *
- * Module `lobby`.  The range's callees are the lobby UI/equipment API (`LbStr`, `get_lsp_data`,
- * `chk_pointer`, `PutPageArrow`, `LbPutAnaPageArrow`, `draw_sprite*`, `sysSE_req`) and its neighbours in
- * splits.txt are `lobby/fn_801E7530.cpp` below and `lobby/lb_npc.cpp` above.  Language C++: the callee
- * set is full of compiler manglings (`get_lsp_data__FUsP10_mh_ivec2_`, `LbStr__FUcUs`,
- * `PutPageArrow__FPUsssUsPC10_mh_ivec2_Uc`) and the target objects carry extab.
- *
- * Name.  No `__FILE__` string sits in the range's data pool and `dumpmap.py lookup 0x801F3294` answers
- * only `zz_01f3294_`, so the file keeps the map's stem (brief section 2, class 3+4).
- *
- * Seam.  The right edge 0x801F9CD4 is the discovery byte cap, not a proven TU end - the next proposal
- * (0x801F9CD4) continues the same band - and the left edge is a weak cut (`tudiscover at 0x801F3294`
- * reports only closure-edge signals on both sides).  The extent settles as the rows match.
- *
- * State: 20 of the 48 rows are written, in address order fn_801F3294..fn_801F60D4 and fn_801F6A9C,
- * fn_801F6AC8, fn_801F865C, fn_801F86FC, fn_801F8ABC.  Seventeen are byte-identical and three are above
- * the 80 % bar.  `ninja build/RMHE08/report.json`: 10.302206 % fuzzy, 20 of 48 functions.
- * The 28 unwritten rows are absent, not stubbed, so the next session continues in address order at
- * 0x801F35B0 (284 B), 0x801F36CC (252 B), 0x801F3828 (368 B), 0x801F39E8 (1028 B), 0x801F3FDC (576 B),
- * 0x801F421C/0x801F4330 (276 B each), 0x801F44CC (336 B), 0x801F461C (256 B), 0x801F471C (232 B),
- * 0x801F4804 (1040 B), 0x801F4C14 (1892 B) ... and the two largest, fn_801F6168 (2356 B) and
- * fn_801F6DBC (5008 B), which alone are 27 % of the range.
- *
- * Shapes that earn their score:
- *   - `#pragma peephole off` over the whole unit: the target keeps the unfused forms the pass folds - a
- *     `clrlwi r0,r3,24` before `cmpwi`/`cmplwi` (fn_801F3998, fn_801F54C4, fn_801F3F78, fn_801F3DEC,
- *     fn_801F5534) and a `clrlwi` + `slwi` where we emit one `rlwinm` (fn_801F3F14) - playbook 39.
- *   - `__declspec(noinline)` on fn_801F353C, fn_801F3588 and fn_801F6034: `-inline auto` (cflags_lobby)
- *     folds each of the three into its caller, where the target keeps the out-of-line call.
- *   - `while (*table != -1)`, not `for (;;) { if (*table == -1) break; }`: the target rotates the loop so
- *     the test sits *below* the body and the preheader jumps to it.
- *   - a `switch` (not an if/else chain) wherever the target tests a value with `beq` to a body placed
- *     after the chain: fn_801F37C8, fn_801F3998 and fn_801F4444 (labels in the source order -1, -3, -2),
- *     fn_801F3EDC, and fn_801F3DEC (which needs the `default`-first block order).
- *   - the parameter widths the call sites show: a `u32`/`u16` parameter with the narrowing cast *at the
- *     use* keeps the target's `clrlwi` (fn_801F8ABC, fn_801F60D4), while a `u8` parameter keeps the
- *     target's raw `stb` and its own `clrlwi` for the compare (fn_801F3DEC).
- *   - two signatures the target's register use pins down: `fn_801F4444` takes three parameters, the
- *     middle one unused, and `fn_801F60D4` keeps a 12-byte `_SPR_DATA_` local (`+0x1C` is the colour
- *     word it overwrites), so `_SPR_DATA_` is completed here (a config_request asks for it to become the
- *     one shared definition - `unsplit/lobby.h` only forward-declares it).
- *
- * Residuals (measured with `ninja build/RMHE08/report.json`, per symbol):
- *   - fn_801F3294 97.03 %: the target's case-0 "done" step *shares* the case-2 body (a `b` into it) where
- *     our build duplicates the five-instruction block and pays a trailing `b` - everything else,
- *     including the dispatch, the mode switch and the unrolled `fn_802738E8` chain, matches.  Tried and
- *     rejected: the duplicated form (88.50), and the label order 0/2/1 that makes the share a real
- *     fallthrough (86.68 - it moves the case-2 body in front of case 1's and reorders the chain).
- *   - fn_801F86FC 97.00 %: register allocation only - the target keeps the `flags` pointer in r30 and
- *     uses r31 as the copy's scratch; ours takes r31 for the pointer.  The `world + 0xE00` base is
- *     hoisted to the top for both.
- *   - fn_801F5534 96.72 %: `(u16)count <= 1` needs the target's bare `cmplwi r5,1`; our `(u16)` cast
- *     emits `clrlwi r0,r5,16` first.  A `u16` local instead drops the mask but turns the index load into
- *     `lhz` where the target has `lha`.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup
- * over the range's inventory: all 48 names are bare `.text` entries in config/RMHE08/symbols.txt and the
- * runtime dump answers only `zz_XXXXXXXX_` placeholders for them)
- */
 #include "types.h"
 
 #include "Runtime.PPCEABI.H/memset.h"
@@ -1821,9 +1722,8 @@ void fn_801F5FB0(s16 a, s16 b, u16 c, u8 kind)
     fn_802DB140(lbl_805B88D4, a, b, c, &pos);
 }
 
-/* 0x801F6034 - draw one entry's icon with the add-blend the item icons need, and the cursor underneath
- * when the caller asks for it.  `fn_801F60D4` must keep the out-of-line call, so `-inline auto` may not
- * fold the body into it. */
+/* 0x801F6034 - draws one entry's icon with the item icons' add-blend, and the cursor under it on request (kept out of
+ * line: `fn_801F60D4` calls it). */
 __declspec(noinline) void fn_801F6034(const _mh_ivec2_* pos, u32 id, u8 flag)
 {
     if ((s16)id != -1 && (u32)chk_pointer() == 0) {
@@ -1922,60 +1822,7 @@ void fn_801F8ABC(u32 id, u8 a, u8 b, u32 c, s32 room)
 
 } /* namespace s_801F3294 */
 
-/* ==== absorbed from lobby/fn_801F9CD4.cpp (0x801F9CD4..0x801FBB64) ==== */
-/* lobby/fn_801F9CD4.cpp - the lobby character-edit (hair/inner colour) screen group.
- *
- * `.text` 0x801F9CD4..0x801FBF78 (14 functions, 8868 B), extab 0x80010A7C..0x80010ADC (12 unwind-only
- * 8-byte records), extabindex 0x8002CEA4..0x8002CF34 (12 x 12 B).  Registered; the extent is a maximal unclaimed run whose seam is unproven.
- *
- * Module `lobby`: the range reads the lobby state blocks (`lobby_w`, `lb_param_w`, `Screen_w`,
- * `system_w`), its callees are the lobby UI API (`get_lsp_data`, `draw_sprite_ary`,
- * `draw_sprite_anim_ary`, `GetMenuFontColor`, `LbStr`) and both bracketing registered units are
- * `lobby/*`.  Language C++: the two named symbols in the range are mangled and most of its callees
- * are (`GetMenuFontColor__Fbbbb`, `create_move_work__Fl`, `file_loading_ck__FPcPl`, ...).
- *
- * Flags: `cflags_lobby`, the group its two neighbours use.  Two file-scope pragmas are load-bearing and
- * measured:
- *   - `#pragma peephole off`: retail keeps the unfused `clrlwi`+`slwi` index scale and the separate
- *     `slwi`/`or` steps of the ARGB pack where the default peephole fuses them into `rlwinm`/`rlwimi`
- *     (`get_change_hair_color` 84.23 -> 100.00, `get_change_inner_color` the same).
- *   - `-Cpp_exceptions on` (`cflags_lobby`, flags-audit 2026-09-28): the target object carries
- *     extab/extabindex and the old `-Cpp_exceptions off` default emitted none.  With the pragma the `.text` is unchanged (all nine written
- *     functions keep their scores) and the unwind sections appear - one 8-byte record and one 12-byte
- *     index entry per written function, 0x38/0x54 against the target's 0x60/0x90 for the twelve the
- *     range will have.
- *
- * Shared headers this unit needed (each filed as a shared-file request in the handoff):
- *   - `unsplit/lobby.h`: the `.data`/`.sdata` tables of the range, `LbChangeColorRec`, the typed
- *     `lb_param_w` block, the `Psw` pad records, and `LbLobbyWork`'s +0x01/+0x02/+0x06/+0x14 fields.
- *   - `unsplit/unknown.h`: `system_w` +0x2D/+0x7CE/+0x8B1 split out of padding, and `unk2149` renamed
- *     to `field_0x865` (main.cpp's one use renamed with it).
- *   - two spellings in those headers disagree with the DOL and are worked around here rather than
- *     edited under another unit: `lobby_world_block` is a `.sbss` **pointer** (`lwz` in every reader, and
- *     `get_userdata` writes it), and `fn_80215C98` takes **five** arguments (all four DOL call sites
- *     pass `r7`).  Both are declared in the `lb_chg` scope below with the real shape.
- *
- * Residuals (measured with `recompile.py ... --measure <symbol>`):
- *   - `fn_801FB364` 99.89: the instructions are equal and only the frame differs - ours 0x30, the
- *     target's 0x20, with the same local offsets (0x8/0xC/0x10), so 16 bytes of the frame are an
- *     allocation difference, not a source one.
- *   - `fn_801FA0DC` 93.13: the range's shape is reproduced (both sentinel arms, the mode tail), but
- *     our allocator keeps the `lbl_805B875C` switch value in a callee-saved register across the two
- *     `get_lsp_data` calls where retail reloads it, which costs a save/restore and one register.
- *   - `fn_801FB524` 50.16: the state machine is reconstructed but 992 B against the target's 744 B -
- *     MWCC did not merge this compile's three identical `system_w.field_0x865 = 0` / `state = 3`
- *     blocks into the one copy retail has, and the dispatch came out a linear compare chain where
- *     retail has a binary search.
- *   - not reconstructed: `fn_801F9CD4` (0x408), `fn_801FA2C8` (0x690), `fn_801FA958` (0x880),
- *     `fn_801FB80C` (0x2D8), `fn_801FBB64` (0x414).  They are left unwritten rather than guessed;
- *     `fn_801FA0DC` is the sibling of `fn_801F9CD4` and already shows the shape the pair shares.
- *   - the unit's `.data` tables are declared, not claimed: the split range is `.text` + extab +
- *     extabindex only, and claiming data moves relocation handling (playbook row 23).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py lookup
- * on all 14 names in config/RMHE08/symbols.txt: 12 are bare `fn_` entries and the dump answers only
- * `zz_XXXXXXXX_` placeholders for them)
- */
+/* The character-edit (hair/inner colour) screen band (0x801F9CD4-0x801FBF78). */
 #include "types.h"
 
 #include "lobby/lb_npc.h" /* LbResId / LbResource / LbResRec - the lobby resource types (rule 2) */
@@ -2043,8 +1890,8 @@ typedef struct LbChgFileReq {
 /* ---------------------------------------------------------------------------------------------------
  * Declarations.  `fn_*`/`ckResourceName` are plain C symbols; the lobby UI helpers come from
  * `unsplit/lobby.h`; the mangled C++ callees are declared with the signatures that reproduce their map
- * names (rule 9).  Declarations whose owner is another registered unit (`fn_801FCA80`, `fn_801FCADC`,
- * `fn_803C3F60`, ... - the `lobby/lb_npc.cpp` range) are filed as shared-file requests.
+ * names (rule 9).  Some belong to other units whose headers do not declare them (`fn_801FCA80`, `fn_801FCADC`,
+ * `fn_803C3F60`, ...).
  * ------------------------------------------------------------------------------------------------- */
 extern "C" {
 s32 score_add_clamped(s32 delta, s32* value);
@@ -2114,10 +1961,7 @@ void subTransSet(u32 a, long b, u32* value);
 void village_tex_load(void);
 void* work_mem_alloc(u32 size);
 
-/**
- * Fills the caller's colour word and shape outputs from the hair-colour table entry the selection
- * index names.
- */
+/* Fills the caller's colour word and shape outputs from the hair-colour table entry `index` names. */
 void get_change_hair_color(u8 index, u32* color, u16* out_id, s16* out_value_0x06, s16* out_value_0x08)
 {
     const LbChangeColorRec* rec = &lbl_805B8674[lbl_805B87D8[index]];
@@ -2128,10 +1972,7 @@ void get_change_hair_color(u8 index, u32* color, u16* out_id, s16* out_value_0x0
     *out_value_0x08 = rec->value_0x08;
 }
 
-/**
- * Fills the caller's colour word and shape outputs from the inner-colour table entry the selection
- * index names.
- */
+/* Fills the caller's colour word and shape outputs from the inner-colour table entry `index` names. */
 void get_change_inner_color(u8 index, u32* color, u16* out_id, s16* out_value_0x06, s16* out_value_0x08)
 {
     const LbChangeColorRec* rec = &lbl_805B8674[lbl_805B87F4[index]];

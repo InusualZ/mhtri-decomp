@@ -3,9 +3,8 @@
 
 #include "types.h"
 
-/* Leaf header of `lobby/lb_quest_board.cpp`: the prototype has no record types, so it can be included
- * beside the band header `unsplit/lobby.h` (the owner header `lobby/lb_quest_board.h` spells its own
- * `lobby_w`). */
+/* Leaf header of `lobby/lb_quest_board.cpp`: no record types, so it can sit beside `unsplit/lobby.h` (the owner header
+ * spells its own `lobby_w`). */
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -1,16 +1,6 @@
-/* This unit's own types and declarations (`src/lobby/lb_companion_ui.cpp`, the lobby companion/status UI
- * band, `.text` 0x80338808..0x8033F270).
- *
- * A header rather than the unit's own source because the lobby C++ ABI it declares is spelled with the
- * map's own type names (`_mh_ivec2_` must be a type with exactly that name for MWCC to re-emit
- * `get_lsp_data__FUsP10_mh_ivec2_`, `LbStr__FUcUs`, ...), and a name that more than one file needs
- * belongs in one header (docs/plan.md 6.5 rule 1).  `_mh_ivec2_` is also defined by
- * `unsplit/lobby.h`; this unit cannot include that header, because it spells `lobby_world_block`
- * as a byte array where this range loads the 4-byte pointer the map records (`size:0x4 data:4byte`)
- * and it gives `lb_param_w` a view without the +0x26..+0x30 fields this range writes.
- *
- * docs/plan.md 6.5 rules 3/4/5: every type states its size, every field its offset and a name.
- */
+/* The types and declarations of `lobby/lb_companion_ui.cpp`, with the map's own type names its manglings need
+ * (`_mh_ivec2_`); `unsplit/lobby.h` cannot be included beside it (a byte-array `lobby_world_block`, not the 4-byte
+ * pointer, and an `lb_param_w` without the +0x26..+0x30 fields this unit writes). */
 #ifndef MHTRI_LOBBY_LB_COMPANION_UI_H
 #define MHTRI_LOBBY_LB_COMPANION_UI_H
 
@@ -21,10 +11,7 @@
 #include "quest/arenatask.h" /* arena_other_player_eq_set: this band's act 25 calls it (rule 2) */
 #include "stage/shell.h" /* ShellSerialEntry, serial_find, serial_state_set_word (rule 2) */
 
-/* `lobby/lb_quest_screen.h` (where `quest_element_pick_ck` belongs) cannot be included from
- * here: it declares `fmt_803AA41C(s32, f32)` (the owner's two-argument form) where this header's own
- * list carries the one-argument `quest_sub_state_end_ck(s32)`, so the pair trips `illegal function overloading`.
- * The declaration below is the owner's own signature, so a TU that sees both still agrees. */
+/* `quest_element_pick_ck` (owner `lobby/lb_quest_screen.h`) is declared below with the owner's signature. */
 struct QuestWork;
 
 /* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
@@ -51,7 +38,7 @@ struct _SPR_DATA_;
  *     byte in `lb_entry_selected_send` (`lbz r4,8(r31)`).
  * size: 0x14 */
 typedef struct LbActSelBytes {
-    /* +0x00 */ u8 a_0x00;   /* the first byte `fn_803438E4`/`fn_80343B74` look the entry up with */
+    /* +0x00 */ u8 a_0x00;   /* the first byte `enemy_data_find`/`eft_slot_spawn` look the entry up with */
     /* +0x01 */ u8 b_0x01;
     /* +0x02 */ u8 c_0x02;
     /* +0x03 */ u8 d_0x03;
@@ -78,7 +65,7 @@ typedef union LbActMask {
 
 typedef struct LbActReq {
     /* +0x00 */ u8 unused_0x00;
-    /* +0x01 */ u8 index_0x01;   /* the pad index every handler checks against `fn_800CF384()` */
+    /* +0x01 */ u8 index_0x01;   /* the pad index every handler checks against `my_player_no()` */
     /* +0x02 */ u8 unused_0x02;
     /* +0x03 */ u8 act_0x03;     /* the act id the dispatchers switch on */
     /* +0x04 */ LbActSel sel_0x04;
