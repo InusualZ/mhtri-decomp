@@ -15,6 +15,7 @@
  *   GUESS: `ef_activity_list_add` (0x800A43E8), `ef_activity_list_clear` (0x800A4428): an activity list's append
  *   and reset.
  *   GUESS: `ef_system_memory_manager` (0x800A4420): the effect system's memory manager (its first word).
+ *   GUESS: `ef_effect_set_calc_flag` (0x800A5114): sets or clears bit 16 of the effect's flags word.
  *   GUESS: `ef_ref_object_init` (0x800A444C): a referenced object's initialisation (no link, state 1).
  *   GUESS (from `ef/ef_resource.cpp`'s use - the emitter resource's name word and the out-of-line
  *   GUESS: `ut::List_GetFirst`): `ef_emres_get_name`, `ef_list_get_first`.
@@ -43,7 +44,7 @@
  * SHAPES. `#line` puts each `Panic`/`Warning` on retail's line (`fn_800A45DC` 134, `fn_800A51D8` 423,
  *   `RetireEmitterAll` 160, `fn_800A4AF8` 180, `fn_800A4BBC` 267/292/312/323).
  * SHAPES. `fn_800A40F4`'s fourth argument is `u16` (retail adds it with no mask), `EfEffEmitter::mField_0xB4` is
- *   `s32` (`cmpwi`), `fn_800A5114`'s bit is 0x10000, and `fn_800A559C`/`fn_800A5618` return the object.
+ *   `s32` (`cmpwi`), `ef_effect_set_calc_flag`'s bit is 0x10000, and `fn_800A559C`/`fn_800A5618` return the object.
  * SHAPES. The effect record is a local view (`EfEff`, `EfEffEmitter`, `EfEffManager`): `ef.h`'s `struct Effect` is
  *   a union of the sibling units' copies; the map-named methods cast `this` to it.
  */
@@ -263,7 +264,7 @@ u32 fn_800A4AF8(EfEff* self);
 void fn_800A4BBC(EfEff* self, u32 flag);
 u32 fn_800A50EC(EfEff* self);
 u32 fn_800A5104(void* p);
-void fn_800A5114(EfEff* self, u32 on);
+void ef_effect_set_calc_flag(EfEff* self, u32 on);
 u32 fn_800A513C(EfEff* self);
 void fn_800A5154(EfEff* self, void* arg);
 u32 fn_800A51B0(EfEff* self);
@@ -578,10 +579,10 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
         }
     }
 
-    fn_800A5114(self, 1);
+    ef_effect_set_calc_flag(self, 1);
 
     while (fn_800A50EC(self) != 0) {
-        fn_800A5114(self, 0);
+        ef_effect_set_calc_flag(self, 0);
 
         for (;;) {
 #line 266
@@ -696,7 +697,7 @@ extern "C" u32 fn_800A5104(void* p) {
 }
 
 /* 0x800A5114 - sets/clears the +0x54 bit 0. */
-extern "C" void fn_800A5114(EfEff* self, u32 on) {
+extern "C" void ef_effect_set_calc_flag(EfEff* self, u32 on) {
     if (on) {
         self->mFlags_0x54 |= 0x10000u;
     } else {

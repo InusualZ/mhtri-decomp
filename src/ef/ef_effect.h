@@ -30,6 +30,10 @@ void ef_activity_list_clear(void* list);
 /* untyped: opaque handle - the object is each caller's own record view */
 u32 ef_ref_object_init(void* self);
 
+/* 0x800A5114 - sets or clears the effect's calc flag (bit 16 of its flags word). */
+/* untyped: opaque handle - the effect is each caller's own record view */
+void ef_effect_set_calc_flag(void* effect, u32 on);
+
 /* 0x800A43E8 - appends `node` to an activity list's active list and counts it. */
 /* untyped: opaque handle - the list and its node are each caller's own record views */
 void ef_activity_list_add(void* list, void* node);

@@ -12,7 +12,7 @@
  *   request op 0x47) too.  `Network/NetworkFileFetcher.h` also declares the three neighbour units' classes.
  * RESIDUALS. `onReply`: the read reply's `transferred_20` copy sits in r4 and the available byte count in r7, retail the
  *   other way round (all 24 declaration orders of the locals measured).  The error code 0x800A0004 is relocated in the
- *   target (`fn_8009F85C+0x7A8`); `config.yml`'s `block_relocations` entries remove those relocations.
+ *   target (`ef_anim_curve_f32+0x7A8`); `config.yml`'s `block_relocations` entries remove those relocations.
  */
 
 #include "Network/NetworkFileFetcher.h"

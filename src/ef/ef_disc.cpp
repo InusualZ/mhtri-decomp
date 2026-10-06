@@ -66,7 +66,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
 
     swept = flags & 0x00020000;
     if (swept) {
-        f32 t = fn_80463F10(params->angle_end - params->angle_base, 6.2831855f);
+        f32 t = fmodf(params->angle_end - params->angle_base, 6.2831855f);
         if (t < 0.0001917476f || t > 6.2829938f || em->split_count == 1) {
             step = (params->angle_end - params->angle_base) / (f32)em->split_count;
         } else {
