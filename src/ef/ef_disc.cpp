@@ -9,16 +9,16 @@
  * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around the function (no `rlwinm.` or
  *   `fmadds` in any target object of the 0x800BFFD4-0x800CCFB0 shapes).
  * NAMES. `em`/`pm`/`params` are the source's names, from the `NW4R:Pointer Error` strings of the three asserts.
- * RESIDUALS. 1 partial row, `fn_800CC5B0__FlP6EfWorkP10EfParticlelUlP8EfParamsUslf`:
- *  - the prologue saves `arg7` (`mr r30,r10`) one step early, and the saved arguments take r23-r30 where
- *    retail takes r22-r28 and r31;
- *  - the `v16`/`v28` copies move floats (`lfs`/`stfs`) where retail moves words (`lwz`/`stw`); `ef/ef_torus.cpp`
- *    gets retail's form by initialising its copies;
- *  - the spawn call's `fmr f1` is late and the slot +0x14 dispatch loads through the saved `pm` (`lwz r11,
- *    0x1C(r25)`) where retail goes through r3;
+ * RESIDUALS. 1 partial row, `fn_800CC5B0__FlP6EfWorkP10EfParticlelUlP8EfParamsUsfl`:
+ *  - the `v16`/`v28` copies take each other's stack slots (0x10/0x1C), the spawn call's `fmr f1` is late and the
+ *    slot +0x14 dispatch loads through the saved `pm` (`lwz r11, 0x1C(r25)`) where retail goes through r3: retail
+ *    calls a virtual `CreateParticle` with the vectors by value (the `ef/ef_torus.cpp` shape), which needs `ef.h`'s
+ *    `EfParticle` to become that class (the mangling names it);
  *  - the `.sdata2` constants are our pool's `@N` where retail reads the claimed `lbl_807962B0` run.
  *   flipcheck: `.data` claimed, not emitted.
  * SHAPES. The `.sdata2` constants are literals, so MWCC pools and hoists them out of the loop.
+ * SHAPES. The emission's float argument precedes the last integer one (nw4r's `Emission(..., u16 life, f32 lifeRnd,
+ *   const MTX34* space)`), which orders the prologue's moves; the map row carries that mangling.
  * SHAPES. `#line 42` puts the three `EF_ASSERT_PTR` sites on lines 42-44 (`__LINE__`).
  */
 
@@ -36,7 +36,7 @@
 #pragma fp_contract off
 
 void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
-                 u16 id, s32 arg7, f32 farg0) {
+                 u16 id, f32 farg0, s32 arg7) {
     u32 swept; s32 i; f32 scale_a, scale_b, angle, step, range;
 #line 42
     EF_ASSERT_PTR(lbl_80594DE0, lbl_80594DEC, em);
@@ -75,7 +75,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     }
 
     for (i = 0; i < count; i++) {
-        VEC3 v88, v76, v64, v52, v40, v28, v16;
+        VEC3 v88, v76, v64, v52, v40;
         f32 fC, f8;
         f32 scale, rate, t;
 
@@ -110,11 +110,11 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
             v40.z = -f8 * v40.x;
             v40.x = v40.x * fC;
         }
-        fn_800A99B4(ctx, (Vec*)&v76, em, (Vec*)&v88, (Vec*)&v40, (Vec*)&v52, (Vec*)&v64);
-        v16 = v76;
-        v28 = v88;
+        ef_form_calc_velocity(ctx, (Vec*)&v76, em, (Vec*)&v88, (Vec*)&v40, (Vec*)&v52, (Vec*)&v64);
+        VEC3 v16 = v76;
+        VEC3 v28 = v88;
         scale = 1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress);
-        pm->slots->spawn(pm, fn_800A9FB0(ctx, id, farg0, em), (Vec*)&v28, (Vec*)&v16, arg7, &em->spawn_data,
+        pm->slots->spawn(pm, ef_form_calc_life(ctx, id, farg0, em), (Vec*)&v28, (Vec*)&v16, arg7, &em->spawn_data,
                          em->spawn_extra, em->spawn_flag, scale);
         if (swept) {
             angle += step;

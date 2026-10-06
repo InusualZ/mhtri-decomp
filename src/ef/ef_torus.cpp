@@ -8,22 +8,22 @@
  *   psq_lx`) and `#pragma fp_contract off` (retail keeps every `a*b+c` as two instructions).
  * NAMES. The map has only `fn_` stems for the range.
  *   GUESS: `ef_fabsf` (0x800C9DCC): the out-of-line `fabsf` thunk (`b fabsf`) the emitter shapes call.
- * RESIDUALS. 1 partial row, `fn_800C9540` (the `ef/ef_cube.cpp` and `ef/ef_disc.cpp` shapes share each one):
- *  - the prologue saves `spawn_arg` (`mr r28,r10`) one instruction early;
- *  - the two spawn argument copies take each other's stack slots (0x18/0x24);
- *  - the spawn call's `fmr f1,<scale>` is one slot late, and the slot +0x14 dispatch loads through the saved
- *    `pm` (`lwz r11, 0x1C(r24)`) where retail goes through r3 (playbook 22).
+ * RESIDUALS. `fn_800C9540` is byte-identical; the `.sdata2` literals are our pool's `@N`.
  *   flipcheck: `.data` claimed, not emitted (the strings are declared, never defined).
  * SHAPES. The `.sdata2` constants are literals, not `extern` floats, so MWCC pools and hoists them as retail does.
- * SHAPES. The spawn argument copies are initialised (`Vec x = y;`), not assigned: an initialiser emits retail's
- *   `lwz`/`stw` block where an assignment copies field-wise with `lfs`/`stfs`.
+ * SHAPES. The particle manager is a class whose vtable pointer follows a 0x1C-byte non-polymorphic head; the spawn
+ *   is its virtual `CreateParticle`, taking the position and velocity by value (copied velocity first, momentum
+ *   evaluated before the life, dispatch through r3).  The emission's float argument precedes the last integer one
+ *   (nw4r's `Emission(..., u16 life, f32 lifeRnd, const MTX34* space)`), which orders the prologue's moves.
  * SHAPES. `#line 42` puts the three `EF_ASSERT_PTR` sites on lines 42-44.
  */
 
 #include "ef.h"
+#include "ef/ef_particlemanager.h" /* ParticleManager (rule 1) */
 
 #pragma peephole off
 #pragma fp_contract off
+
 
 /* The unit's own strings (its claimed `.data`, declared, never defined). */
 extern char lbl_80594BA8[]; /* "ef_torus.cpp"                                        .data 0x80594BA8 */
@@ -38,8 +38,8 @@ extern "C" {
 extern void ef_vec3_normalize_to(VEC3* out, VEC3* in);
 extern f32 fabsf(f32 x);
 
-void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
-                 u16 id, s32 spawn_arg, f32 scale) {
+void fn_800C9540(s32 ctx, EfWork* em, ParticleManager* pm, s32 count, u32 flags, EfParams* params,
+                 u16 id, f32 scale, s32 spawn_arg) {
     f32 scale_a, scale_b, scale_c, phase, angle, step, tube, ratio;
     u32 swept;
     s32 i, total;
@@ -115,12 +115,10 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         }
         ef_vec3_normalize_to(&v_dir, &v_dir);
 
-        fn_800A99B4(ctx, (Vec*)&v_out, em, (Vec*)&v_pt, (Vec*)&v_dir, (Vec*)&v_norm, (Vec*)&v_flat);
-        VEC3 v_out_copy = v_out;
-        VEC3 v_pt_copy = v_pt;
-        ratio = 1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress);
-        pm->slots->spawn(pm, fn_800A9FB0(ctx, id, scale, em), (Vec*)&v_pt_copy, (Vec*)&v_out_copy, spawn_arg,
-                         &em->spawn_data, em->spawn_extra, em->spawn_flag, ratio);
+        ef_form_calc_velocity(ctx, (Vec*)&v_out, em, (Vec*)&v_pt, (Vec*)&v_dir, (Vec*)&v_norm, (Vec*)&v_flat);
+        pm->CreateParticle(ef_form_calc_life(ctx, id, scale, em), v_pt, v_out, spawn_arg,
+                           1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), &em->spawn_data,
+                           em->spawn_extra, em->spawn_flag);
 
         if (swept) {
             if ((i + 1) % count == 0) {

@@ -16,17 +16,19 @@
  *   `ef_cube_f32_percent`, `ef_cube_f64_int_bias`, `ef_cube_f32_min_size`, `ef_cube_f32_pi`, `ef_cube_f32_pi_epsilon`,
  *   `ef_cube_f32_minus_one`; the fields `Em::diffusionAngle` (+0x78) and `Em::random` (+0xEC).
  * RESIDUALS.
- *  - `fn_800CA200__FUiP2EmP2PmUiUiPvUsUif`: `e` is moved into r31 before `d` where retail moves it after; the
+ *  - `fn_800CA200__FUiP2EmP2PmUiUiPvUsfUi`: the
  *    spiral's `dir = 0` is scheduled before the `n % 2` test where retail sets it after; the side faces' row counter
  *    takes r18 where retail's takes r23; and the `ef_random_u16(...) % 6` keeps a `clrlwi r4,r3,16` of the u16
  *    return that retail does not (4 bytes longer).
  *   Relocation names that differ from retail (pool constants): `ef_cube_f64_int_bias` (the int-to-float bias reads
  *     our `@N` pool copy).
- *  - `fn_800C9DD0__FUiP4Vec3P4Vec3P2EmP2PmUsfUi`: the `v3_copy`/`b_copy` copies move floats (`lfs`/`stfs`) where
- *    retail moves words (`lwz`/`stw`), and the slot +0x14 dispatch keeps `pm` in r29 (`lwz r11,28(r29)`) where
- *    retail goes through r3; declaration order, a named `Pm*` local, a cast and `-lang=c++` do not move it.
  *  - flipcheck: `.data` claimed, not emitted; `.sdata2` 0x8 of 0x30 (the pool is declared, so the conversion
  *    constant reads our `@N`); `.text` 0x1B7C of 0x1B78; extabindex differs in the cube row's size word.
+ * SHAPES. The emission's float argument precedes the last integer one (nw4r's `Emission(..., u16 life, f32 lifeRnd,
+ *   const MTX34* space)`), which orders the prologue's moves; the map row carries that mangling.
+ * SHAPES. `Pm` is a class whose vtable pointer follows a 0x1C-byte non-polymorphic head; the spawn is the virtual
+ *   `CreateParticle`, taking the position and velocity by value: the call copies them (velocity first) and evaluates
+ *   the momentum before the life, and the dispatch goes through r3, as in retail.
  * SHAPES. The pool constants are declared `extern const`: retail hoists their loads out of every loop, which a
  *   non-`const` declaration (the calls might write it) prevents.  The three spiral/ring blocks declare their own
  *   counters in the order that reproduces retail's register assignment.
@@ -78,8 +80,8 @@ extern "C" {
 extern void ef_vec3_normalize_to(Vec3* dst, Vec3* src);
 extern void assignVec3(Vec3* dst, const Vec3* src);
 extern f32 vec3_length_sq(const Vec3* v);
-extern u16 fn_800A9FB0(u32 a, u16 b, f32 f, void* em);
-extern void fn_800A99B4(u32 a, Vec3* b, void* em, Vec3* c, Vec3* d, Vec3* e, Vec3* f);
+extern u16 ef_form_calc_life(u32 a, u16 b, f32 f, void* em);
+extern void ef_form_calc_velocity(u32 a, Vec3* b, void* em, Vec3* c, Vec3* d, Vec3* e, Vec3* f);
 }
 
 /* The "em" object this unit is handed: an effect manager. Only the fields the two functions touch are
@@ -99,17 +101,20 @@ struct Em {
     u8 field_0xFC[4];  /* +0xFC */
 }; /* size: 0x100 (approx: only the accessed offsets are evidenced) */
 
-/* The "pm" object: its vtable pointer sits at +0x1C and slot 5 is the spawn call this unit makes. */
-typedef struct Pm Pm;
-typedef struct PmVtbl PmVtbl;
-struct PmVtbl {
-    u8 pad_0x00[0x14];                                                  /* +0x00 */
-    void (*spawn_0x14)(Pm* self, u16 a, Vec3* b, Vec3* c, u32 d, f32 e, /* +0x14 */
-                       u8* f, u32 g, u16 h);
-}; /* size: 0x18 */
-struct Pm {
+/* The non-polymorphic head of the particle manager: MWCC places the vtable pointer after it, at +0x1C. */
+struct PmHead {
     u8 pad_0x00[0x1C]; /* +0x00 */
-    PmVtbl* vtbl;      /* +0x1C */
+}; /* size: 0x1C */
+
+/* The "pm" object, a particle manager: its vtable pointer sits at +0x1C and the table's +0x14 slot is the spawn
+ * call this unit makes (declared only, so this unit emits no table). */
+struct Pm : PmHead {
+    /* +0x1C: the vtable pointer */
+    virtual void slot_0x08();
+    virtual void slot_0x0C();
+    virtual void slot_0x10();
+    virtual void CreateParticle(u16 life, Vec3 pos, Vec3 vel, u32 space, f32 momentum, u8* inherit, u32 ref,
+                                u16 remain);
 }; /* size: 0x20 */
 
 /* The cube form's parameter block: the half sizes and the hollow ratio in percent. */
@@ -142,8 +147,6 @@ void fn_800C9DD0(unsigned int a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f,
     Vec3 v1;
     Vec3 v2;
     Vec3 v3;
-    Vec3 b_copy;
-    Vec3 v3_copy;
     f32 s;
     u16 r;
     int ok;
@@ -175,13 +178,10 @@ void fn_800C9DD0(unsigned int a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f,
     /* This unit's `Vec3` (the map's `P4Vec3`) and the helper's `nw4r::math::VEC3` share one 0xC-byte
      * layout. */
     VEC3_ctor((nw4r::math::VEC3*)&v3);
-    fn_800A99B4(a, &v3, em, b, c, &v1, &v2);
-    v3_copy = v3;
-    b_copy = *b;
-    s = ef_cube_f32_one + ef_cube_f32_percent * (f32)em->field_0x67 * ef_random_float(&em->random);
-    r = fn_800A9FB0(a, d, f, em);
-    pm->vtbl->spawn_0x14(pm, r, &b_copy, &v3_copy, e, s, em->field_0xFC, em->field_0xF8,
-                         em->field_0xE8);
+    ef_form_calc_velocity(a, &v3, em, b, c, &v1, &v2);
+    pm->CreateParticle(ef_form_calc_life(a, d, f, em), *b, v3, e,
+                       ef_cube_f32_one + ef_cube_f32_percent * (f32)em->field_0x67 * ef_random_float(&em->random),
+                       em->field_0xFC, em->field_0xF8, em->field_0xE8);
 }
 
 /* The larger of two magnitudes through the shapes' `fabsf` thunk; retail evaluates each side twice. */
@@ -193,7 +193,7 @@ void fn_800C9DD0(unsigned int a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f,
 /* Emits `n` particles from the cube: on an even grid over the six faces (flag 0x20000), or at random inside the
  * shell the hollow ratio leaves; each direction leans out of its face by the emitter's diffusion angle. */
 void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int flags, void* params, u16 d,
-                 unsigned int e, f32 f)
+                 f32 f, unsigned int e)
 {
     int ok;
     const EfCubeParams* cube;
