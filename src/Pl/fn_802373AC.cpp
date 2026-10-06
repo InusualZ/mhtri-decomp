@@ -1,46 +1,17 @@
 /*
- * Player motion -> SE (sound-effect) frame dispatch for `_PLW` (the player work object), the third
- * and fourth of the band's per-motion banks: the 0x3EA-0x4F8 half of the family whose 0x3EA-0x4F7
- * and 0x3EA-0x4EE halves are `Pl/fn_8023C2D0.cpp` and `Pl/fn_80241558.cpp`.
- *
- * The range is TWO functions, each a dense `switch` on `Get_motion_no(_PLW*)` (defined at
- * 0x8026A308) that arms frame-timed sound requests on the three `_se_w` work objects hanging off the
- * player work (`_PLW`+0xAF4 / +0xAF8 / +0xAFC).  MWCC lowers both switches to `.data` jump tables,
- * so the unit owns them: `fn_802373AC`'s 271-entry table at `jumptable_805C2C60`
- * (0x805C2C60-0x805C309C) and `fn_802399C8`'s 270-entry table at `jumptable_805C309C`
- * (0x805C309C-0x805C34D4), the shape of the sibling units' tables.
- *
- * Final home: module `Pl`, file stem kept as the map's `fn_802373AC` (class 4, docs/plan.md 12).  The
- * map has only `fn_802373AC` / `fn_802399C8` for this range; no `__FILE__` string covers it (the
- * range's `.data` is the two jump tables and nothing else, and the `enemy_control.cpp` string the
- * proposal's seam note mentions is referenced from 0x801411B8, a different module), and
- * `dumpmap.py lookup` returns only `zz_` placeholders.  The subsystem is the player: both functions
- * pass their first argument straight to `Get_motion_no` (`Get_motion_no__FP4_PLW`) and their other
- * callees are the Pl SE helpers.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/symedit.py show fn_802373AC` / `... fn_802399C8` - the range's sole entries
- * are the two `type:function` lines, and `dumpmap.py lookup` gives only the `zz_` placeholders).
- *
- * Language: C++.  The map's undefined set carries the mangled `Get_motion_no__FP4_PLW` and
- * `se_req_frame_set__FP5_se_wllll` alongside the C-linkage `fn_80229E10`/`fn_800DA428`, and the
- * retail object carries an extab/extabindex pair (one unwind-only record per function, r27-r31),
- * which is why the `Pl` lib sets `-Cpp_exceptions on`.
- *
- * Flags: none beyond the lib's `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`,
- * mw_version Wii/1.0) - the set the sibling `Pl/fn_8023C2D0.cpp` needs.
- *
- * Residual: `fn_802399C8` is byte-identical (100.0 %) and `fn_802373AC` measures 99.9713 % - the only
- * difference left is the register the shared `partHi` value is coloured onto in four of the first
- * function's arms (0x465, 0x46A, 0x4C5, 0x4C6): retail keeps it in r27, MWCC reuses r28, the register
- * `part`'s last read frees in the same instruction that feeds the shift (12 of the function's 2439
- * instructions; every other instruction and both objects' sizes are identical).  It is an allocator
- * web-priority residual, not a source one - measured and identical (99.9713) with the declaration
- * moved, its type spelled `u32`/`int`/`register u32`, an initialiser added, a cast spelling, a dead
- * copy of `part` before the assignment, and the fully inlined `(part << 0x18)` spelling.  The one arm
- * where the inline spelling does matter is `fn_802399C8`'s 0x4C5, which it takes from 99.98858 to
- * 100.0 (the sibling `Pl/fn_8023C2D0.cpp`'s finding, and why that arm spells the shift in each
- * argument).  Both `.data` jump tables and the extab/extabindex pair are byte-identical.
+ * Pl/fn_802373AC.cpp - the player motion -> SE frame dispatch, the third and fourth per-motion banks (motions
+ *   0x3EA-0x4F8; `Pl/fn_8023C2D0.cpp` and `Pl/fn_80241558.cpp` are the siblings).
+ * RANGE. .text 0x802373AC-0x8023C2D0 (2 functions); .data 0x805C2C60-0x805C34D4 (`fn_802373AC`'s 271-entry
+ *   `jumptable_805C2C60` and `fn_802399C8`'s 270-entry `jumptable_805C309C`), extab, extabindex.
+ * NAMES. The functions keep the map's stems (no `__FILE__` string covers the band; the runtime dump answers a
+ *   placeholder).
+ * RESIDUALS. `fn_802373AC`: in four arms (0x465, 0x46A, 0x4C5, 0x4C6) MWCC colours the shared `partHi` onto r28, the
+ *   register `part`'s last read frees, where retail keeps r27 (12 of 2439 instructions); an allocator web-priority
+ *   residual - the declaration moved, `u32`/`int`/`register u32`, an initialiser, a cast, a dead copy of `part` and the
+ *   inline `(part << 0x18)` spelling all measure the same.  flipcheck: 19 of the 20260 `.text` bytes differ (first at
+ *   +0x1671); both jump tables, extab and extabindex are byte-identical.
+ * SHAPES. The three `_se_w` locals are declared in a different order than they are assigned (`Pl/fn_8023C2D0.cpp`'s
+ *   shape); `fn_802399C8`'s case 0x4C5 spells the shift in each argument instead of through `partHi`.
  */
 
 #include "types.h"
@@ -54,7 +25,7 @@
  * `_PLW`+0x002 kind byte selects. */
 
 extern "C" void fn_802373AC(_PLW* work, u8 part) {
-    /* The part byte is shifted into its own byte lane by most arms, so it is a local. */
+    /* Most arms shift the part byte into the top byte, so the shifted value is a local. */
     u32 partHi;
     /* The three per-part `_se_w` work objects.  The declaration order and the assignment
      * order differ deliberately (the `Pl/fn_8023C2D0.cpp` shape) - it is what reproduces
@@ -641,7 +612,7 @@ extern "C" void fn_802373AC(_PLW* work, u8 part) {
  * the one above. */
 
 extern "C" void fn_802399C8(_PLW* work, u8 part) {
-    /* The part byte is shifted into its own byte lane by most arms, so it is a local. */
+    /* Most arms shift the part byte into the top byte, so the shifted value is a local. */
     u32 partHi;
     /* The three per-part `_se_w` work objects.  The declaration order and the assignment
      * order differ deliberately (the `Pl/fn_8023C2D0.cpp` shape) - it is what reproduces

@@ -325,16 +325,7 @@ cflags_lobby = [
 # GXRenderModeObj copy, and `off` makes MWCC emit a call to the implicit copy-assignment operator (99.02 %)
 # where `noauto` inlines it (100.00 %) - nothing else in the unit moves between the two.
 
-# Pl flags (src/Pl/*.cpp). Measured on this lib's three units with the real ninja command line:
-#   -O4,p -> -O3          pl_master: 5/22 functions at 100 % under -O4,p, 18/22 under -O3 (and the target
-#                         packs on 4 B, which -O4,p's implied -func_align 16 cannot produce);
-#                         pl_skill fn_80270018 65.0 -> 87.6; pl_act fn_80276B58 85.9 -> 97.3
-#   -inline auto -> noauto  pl_master fn_8026FA6C was inlined into fn_8026FB20 (892 B vs target 288);
-#                         pl_skill fn_80270CA4 828 -> 684 B (= target); pl_act fn_802770E8 57 -> 229 ins
-#   -opt nopeephole       pl_skill fn_80270018 87.6 -> 99.73; pl_act fn_80276B58 97.3 -> 100.0 (retail has
-#                         exactly one record-form instruction in all 115 of its functions)
-#   -Cpp_exceptions on    every Pl target object carries extab/extabindex and `off` emits none; with `on`
-#                         the .text is unchanged and all 12 extab entries we can emit equal the target's
+# cflags_pl (src/Pl/*.cpp): -O3 -inline noauto -opt nopeephole -Cpp_exceptions on; measurements in docs/pl.md.
 cflags_pl = [
     *[f for f in cflags_base if f not in ("-O4,p", "-inline auto", "-Cpp_exceptions off")],
     "-O3",
@@ -343,13 +334,8 @@ cflags_pl = [
     "-Cpp_exceptions on",
 ]
 
-# pl_skill flags (src/Pl/pl_skill.cpp). cflags_pl plus `-opt nopeephole,level=4`: at level 3 the
-# allocator rematerialises fn_8027350C's `plw + i*4` base across the fn_802693C4/fn_80269474 call;
-# at level 4 it keeps it in r24 like the target (416 -> 404 B, 95.50 -> 99.21). Measured on the
-# whole TU: the pragma-free source under this flag set is codegen-identical to the pragma build -
-# 0 of 197 symbols move and every allocatable section is byte-equal (only MWCC's generated local
-# `@NNN` names in .strtab shift by 2). The level is per-object, not per-lib: pl_master loses
-# fn_8026CC70 at level 4 (100 -> 33.33) and is a flipped Matching unit, so cflags_pl stays level 3.
+# cflags_pl_skill: cflags_pl at `-opt nopeephole,level=4`; no object uses it (src/Pl/pl_act.cpp states the level
+# as a pragma); measurements in docs/pl.md.
 cflags_pl_skill = [
     *[f for f in cflags_pl if f != "-opt nopeephole"],
     "-opt nopeephole,level=4",
@@ -1413,105 +1399,26 @@ config.libs = [
     },
 {
         "lib": "Pl",
-        # Wii/1.0 (mwcc 4.3 build 145): game code, neither runtime-style code (Wii/1.3) nor a REL.
-        # Both ranges come from tools/splits/tudiscover.py: the must-link anchors are .sdata2 pools
-        # (`lbl_8079A03C` for pl_skill.c, `lbl_8079A0AC` for pl_act.c), so the extents are lower
-        # bounds and `NonMatching` keeps the original bytes in the link until a unit actually matches.
-        # 50 of the region's 372 functions are pinned; the rest have no layout evidence and stay in
-        # auto units on purpose (see the `tu-boundary-discovery` skill).
+        # Wii/1.0 (mwcc 4.3 build 145): game code. Each unit's evidence is its file header under src/Pl/.
         "mw_version": "Wii/1.0",
         "cflags": cflags_pl,
         "progress_category": "game",
         "host": False,
         "objects": [
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80230FBC_fn_80230FBC` - the player work's motion-kind dispatch plus four of its nine
-            # per-kind motion banks (`.text` 0x80230FBC-0x802373AC, 4 functions, 25584 B) with
-            # extab 0x80011C84-0x80011CA4, extabindex 0x8002E9B0-0x8002E9E0 and the four
-            # compiler-emitted jump tables in `.data` 0x805C1F94-0x805C2C60.  Home is `Pl`: the
-            # first argument goes straight to `Get_motion_no(_PLW*)`, the third/fourth fields are
-            # the player's `_se_w` works (+0xAF4/+0xAF8/+0xAFC) and the banks' callees are the Pl
-            # SE helpers.  No `__FILE__` string covers the range (its own .data pool is jump tables
-            # only), so the stem is the map's `fn_80230FBC` with a rule-7 deferral.  It uses
-            # `cflags_pl` (this lib).
             Object(Matching, "Pl/fn_80230FBC.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `802373AC_fn_802373AC` - the third and fourth of the player work's per-motion SE banks
-            # (`.text` 0x802373AC-0x8023C2D0, TWO functions, 20260 B) with extab
-            # 0x80011CA4-0x80011CB4, extabindex 0x8002E9E0-0x8002E9F8 and their two
-            # compiler-emitted jump tables in `.data` 0x805C2C60-0x805C34D4 (271 + 270 entries).
-            # Home is `Pl`: both functions pass their first argument straight to
-            # `Get_motion_no(_PLW*)`, the three `_se_w` fields they load are `_PLW`+0xAF4/+0xAF8/
-            # +0xAFC (the same pair of banks as the sibling `Pl/fn_80230FBC.cpp` next door) and
-            # their callees are the Pl SE helpers.  No `__FILE__` string covers the range (its own
-            # .data pool is the two jump tables and nothing else), so the stem is the map's
-            # `fn_802373AC` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_802373AC.cpp"),
             Object(Matching, "Pl/fn_80229ECC.cpp"),
-            # `8023C2D0_fn_8023C2D0` - the other half of the player motion -> SE frame dispatcher
-            # family (0x8023C2D0-0x80241558, 0x50B8 B, TWO functions).  Home is `Pl` and the stem is
-            # the map's `fn_8023C2D0` with a rule-7 deferral: both functions dispatch on
-            # `Get_motion_no__FP4_PLW` and `fn_8023C2D0` gates two arms on `Pl_act_ck__FP4_PLWUcUs`,
-            # no `__FILE__` string covers the range and `dumpmap.py` has only `zz_` placeholders.
-            # The unit owns its two `.data` jump tables (270 entries at 0x805C34D4, 261 entries at
-            # 0x805C390C = 0x805C34D4-0x805C3D20) and its extab/extabindex pair.  It uses
-            # `cflags_pl` (this lib), and the object is byte-identical to the target (.text 0x5288,
-            # .data 0x84C, extab 0x10, extabindex 0x18; both functions 100.0 %).  It stays
-            # `NonMatching` for a LINK reason, not a code one: MWCC emits the two jump tables as an
-            # 8-byte-aligned `.data` section while retail's first table sits at the 4-mod-8 address
-            # 0x805C34D4 (the split warns about it), so mwld pads the section up to 0x805C34D8 and the
-            # DOL goes red - measured: `Matching` -> main.dol sha1 5324C567..., 403822 bytes differ.
-            # See the unit header and this claim's outbox (`shared-file`).
             Object(Matching, "Pl/fn_8023C2D0.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80241558_fn_80241558` - the player motion -> SE frame dispatcher, ONE function
-            # (0x80241558-0x802430E8, 0x1B90 B) whose ~58-case switch on `Get_motion_no(_PLW*)` is
-            # compiled to a 261-entry `.data` jump table (`jumptable_805C3D20`, 0x805C3D20-0x805C4134).
-            # Home is `Pl`: the first argument is passed straight to `Get_motion_no`, whose map
-            # spelling is `Get_motion_no__FP4_PLW`, and the sibling switch `fn_8023C2D0` calls
-            # `Pl_act_ck__FP4_PLWUcUs`.  No `__FILE__` string covers the range (the .data pool around
-            # the jump table carries none), so the stem is the map's `fn_80241558` with a rule-7
-            # deferral.  It uses `cflags_pl` (this lib).
             Object(Matching, "Pl/fn_80241558.cpp"),
             Object(NonMatching, "Pl/player_control.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `8024F200_fn_8024F200` - the player's per-act state machine cluster
-            # (0x8024F200-0x80258FCC, 92 functions, 40396 B).  Home is `Pl`: every function takes the
-            # player work (`_PLW*`) and the per-part index byte, reads the act step byte at `_PLW`+0x005
-            # and drives one step through `Pl_Skill_ck`/`Pl_cat_skill_ck`/`Pl_frame_check` and the
-            # `Pl` motion helpers.  No `__FILE__` string covers the range (the `.data` pool between
-            # `enemy_control.cpp` at 0x805A1BB8 and `menu_item.cpp` at 0x805CDFC8 carries none for the
-            # whole band), so the stem is the map's `fn_8024F200` with a rule-7 deferral.  It uses
-            # `cflags_pl` (this lib).
             Object(NonMatching, "Pl/pl_act_step.cpp"),
             Object(NonMatching, "Pl/pl_coll.cpp"),
             Object(NonMatching, "Pl/pl_act.cpp"),
             Object(NonMatching, "Pl/pl_act_step_data.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal `802840DC_fn_802840DC`.
-            # 54 functions, 0x802840DC-0x80288CEC (0x4C10 B).  Home is `Pl`: the band's callees are
-            # all Pl API (`Get_motion_no__FP4_PLW`, `Pl_get_gunner_pos`/`Pl_get_gunner_vec`,
-            # `Pl_atk_act_flag_ck`, `Pl_Skill_ck`, `Pl_frame_check`, `Pl_master_ck`) and its two
-            # registered neighbours (`Pl/pl_act.cpp` below 0x8027D684, `Pl/fn_80288CEC.cpp` at
-            # 0x80288CEC) are Pl units.  No `__FILE__` string covers the range (its own `.data` pool
-            # is jump tables only) and the runtime dump answers `zz_XXXXXXXX_` placeholders
-            # (`tools/symbols/dumpmap.py`), so the stem is the map's `fn_802840DC` with a rule-7
-            # deferral - the sibling class-4 pattern of `Pl/fn_8026FFBC.cpp` / `Pl/fn_80288CEC.cpp`.
-            # It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_802840DC.cpp"),
             Object(NonMatching, "Pl/pl_motion.cpp"),
             Object(NonMatching, "Pl/pl_hit_sphere.cpp"),
-            # Re-cut 2026-09-29 out of `enemy/em024_ai.cpp`: the player act-state handlers of
-            # `_PLW::field_0x002` class 3 (`Pl/fn_80258FCC.cpp`'s `jumptable_805C5648` entry 3 is
-            # this band's dispatcher `fn_8034EE18`), `.text` 0x8034D2B0..0x8034F138 (24 functions /
-            # 7816 B), extab 0x800170F4..0x800171A4, extabindex 0x800367D4..0x800368DC, `.data`
-            # 0x805E9248..0x805EBBE0, `.sdata` 0x80793308..0x80793330 and `.sdata2` 0x8079B3A8..
-            # 0x8079B3C8.  The file name is a GUESS (the selector's meaning is unproven); evidence
-            # and the data caveat are in the file header.  It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/pl_act_class3.cpp"),
-            # The equipment sway band below the shell pool: `.text` 0x802ABD28..0x802AD9C0, extab
-            # 0x80013AC4..0x80013B0C, extabindex 0x800316A4..0x80031710, `.ctors` 0x8056F378 (its own
-            # static initialiser), `.data` 0x805CE638..0x805CED40, `.sdata` 0x807922C0..0x807922E0,
-            # `.bss` 0x806B8798..0x806B87C0, `.sdata2` 0x8079A410..0x8079A448 - see `Pl/pl_yure.cpp`.
             Object(NonMatching, "Pl/pl_yure.cpp"),
         ],
     },

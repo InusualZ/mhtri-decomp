@@ -1,8 +1,5 @@
-/* The equipment sway unit `Pl/pl_yure.cpp` - its sway record and the entry points the player, enemy and
- * arena units call (docs/plan.md 6.5 rules 1-5).
- *
- * `.text` 0x802ABD28-0x802AD9C0.  The unit's notes, extent and residuals live in the source file's header
- * comment.
+/* Declarations owned by `Pl/pl_yure.cpp`: the sway record and the entry points the player, enemy and arena units
+ * call (rule 2).
  */
 #ifndef MHTRI_PL_PL_YURE_H
 #define MHTRI_PL_PL_YURE_H

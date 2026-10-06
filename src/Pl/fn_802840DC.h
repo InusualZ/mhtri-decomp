@@ -1,12 +1,5 @@
-/* The player shell (gunner shot) band `Pl/fn_802840DC.cpp` (`.text` 0x802840DC-0x80288CEC).
- *
- * Declarations for the symbols this unit calls that live inside its left neighbour's range
- * (0x8027D684-0x802840DC, owned by `Pl/fn_8027D684.cpp`).  That unit has no header of its own yet,
- * so they are declared here, with the widths this unit's own call sites use, and only this unit
- * sees them (rule 2: the band header `unsplit/Pl.h` must not declare a symbol a registered
- * unit owns, and a second spelling of a name the owner defines is the `illegal function
- * overloading` class).  When `Pl/fn_8027D684.cpp` grows a header these move there - the same
- * arrangement `Pl/fn_80273B14.h` uses for the equipment resolvers that unit drives.
+/* `Pl/fn_802840DC.cpp`'s view of the per-act handlers it tail-calls in `Pl/pl_act.cpp`'s equipment section
+ * (0x8027D684-0x802840DC), with the widths its own call sites use; they belong in `Pl/pl_act.h` (rule 2).
  */
 #ifndef MHTRI_PL_FN_802840DC_H
 #define MHTRI_PL_FN_802840DC_H

@@ -1,14 +1,9 @@
 /*
- * Declarations owned by `Pl/fn_802693C4.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
- * header instead of declaring the symbol itself; the signatures are the callers' (every one of them
- * is a landed Pl/ef/lobby/sound unit) or the definition's, whichever the caller settled.
- *
- * The unit's `.text` is 0x802693C4-0x8026BA1C.  Five of its symbols carry a compiler mangling
- * (`set_com_motion_type__FUc`, `Get_motion_no__FP4_PLW`, `Pl_frame_check__FP4_PLWUlff`,
- * `Pl_chr_setX__FP4_PLWUsll`, `Pl_chr_set_attr__FP4_PLWUsllUl` and
- * `pl_get_joint_wpos__FP4_PLWUlPQ34nw4r4math4VEC3`), so their declarations are the real C++
- * signatures and the front-end mangles them back to the map's spelling (rule 9); the rest are the
- * map's unmangled `fn_` stems and stay `extern "C"`.
+ * Declarations of `Pl/pl_act.cpp`'s part/motion section (0x802693C4-0x8026BA1C) and its equipment-type reader; the
+ * signatures are the callers' or the definition's, whichever the caller settled.  The six mangled symbols
+ * (`set_com_motion_type__FUc`, `Get_motion_no__FP4_PLW`, `Pl_frame_check__FP4_PLWUlff`, `Pl_chr_setX__FP4_PLWUsll`,
+ * `Pl_chr_set_attr__FP4_PLWUsllUl`, `pl_get_joint_wpos__FP4_PLWUlPQ34nw4r4math4VEC3`) are declared with their real
+ * C++ signatures (rule 9); the map's unmangled `fn_` stems stay `extern "C"`.
  */
 #ifndef MHTRI_PL_FN_802693C4_H
 #define MHTRI_PL_FN_802693C4_H
@@ -51,9 +46,8 @@ void fn_8026A518(struct _PLW* self);
 void fn_8026A570(struct _PLW* self);
 void fn_8026A590(struct _PLW* self);
 void fn_8026A618(struct _PLW* self, s32 id);
-/* The id-flag tests return the unsigned `u32` the map's base spelling and this unit's callers agree on:
- * `Pl/fn_802489D4.cpp`, `Pl/pl_act_step.cpp` and `Pl/fn_80258FCC.cpp` compare `pl_part_flag_ck(...) == 1`
- * and retail performs a `cmplwi r3,1` there (`cmpwi` is the signed form). */
+/* The id-flag tests return `u32`: `Pl/pl_act_step.cpp` compares `pl_part_flag_ck(...) == 1` and retail performs a
+ * `cmplwi r3,1` there (`cmpwi` is the signed form). */
 u32 pl_part_flag_ck(struct _PLW* self, s32 id);
 void fn_8026A678(struct _PLW* self, s32 id);
 s32 fn_8026A6A4(struct _PLW* self, s32 id);
@@ -78,9 +72,8 @@ void Pl_chr_setX(struct _PLW* self, u16 motion, s32 a, s32 b);
 u32 Pl_chr_set_attr(struct _PLW* self, u16 motion, s32 a, s32 b, u32 d);
 void pl_get_joint_wpos(struct _PLW* self, u32 joint, nw4r::math::VEC3* out);
 
-/* 0x8027EED0 - the equipment-type reader `fn_802695A4` calls.  The map spells it
- * `Get_pl_type__FP6_EQUIPP6_EQUIP`, so the declaration is the real C++ signature (rule 9); no
- * registered unit owns the address, so it is declared here rather than in a band header. */
+/* 0x8027EED0 - the equipment-type reader `fn_802695A4` calls (`Pl/pl_act.cpp`'s equipment section); the map spells
+ * it `Get_pl_type__FP6_EQUIPP6_EQUIP`, so the declaration is the real C++ signature (rule 9). */
 u8 Get_pl_type(struct _EQUIP* equipA, struct _EQUIP* equipB);
 #endif
 

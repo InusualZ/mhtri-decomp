@@ -1,9 +1,6 @@
-/* The player skill unit `Pl/pl_skill.cpp`.
- *
- * `Pl_Skill_ck` is a C++ free function (the map's name `Pl_Skill_ck__FP4_PLWUs` is its mangling),
- * moved here from `enemy/fn_8012BDF4.cpp` (docs/plan.md 6.5 rule 2).  A C++ consumer calls it through
- * the owner's real declaration, which the front-end mangles back to the map's name; a C consumer
- * cannot name the mangling, so it gets the map's spelling under `extern "C"` (rule 9's C limitation).
+/* Declarations of `Pl/pl_act.cpp`'s skill and item section (0x80270018-0x80273B14) and the player records.
+ * `Pl_Skill_ck` is a C++ free function (the map's `Pl_Skill_ck__FP4_PLWUs` is its mangling): a C++ consumer calls
+ * the real declaration, which the front-end mangles back; a C consumer gets the map's spelling (rule 9's C limitation).
  */
 #ifndef MHTRI_PL_PL_SKILL_H
 #define MHTRI_PL_PL_SKILL_H
@@ -20,36 +17,30 @@ u32 Pl_Skill_ck(struct _PLW* work, u16 skill); /* -> Pl_Skill_ck__FP4_PLWUs */
 u32 Pl_Skill_ck__FP4_PLWUs(struct _PLW* work, u16 skill);
 #endif
 
-/* 0x80272AB0 - the cat-skill predicate `Pl/fn_80262940.cpp` gates several states on; the owner defines
- * it at C++ scope (`Pl/pl_skill.cpp:1060`), so this is the callable spelling of the map name
- * `Pl_cat_skill_ck__FP4_PLWUs` (docs/plan.md 6.5 rule 9). */
+/* 0x80272AB0 - the cat-skill predicate the main/control cluster gates several states on; defined at C++ scope, so
+ * this is the callable spelling of the map name `Pl_cat_skill_ck__FP4_PLWUs` (rule 9). */
 #ifdef __cplusplus
 u32 Pl_cat_skill_ck(struct _PLW* work, u16 skill);
 #else
 u32 Pl_cat_skill_ck__FP4_PLWUs(struct _PLW* work, u16 skill);
 #endif
 
-/* 0x8027350C - this unit's per-part motion dispatcher (`Pl/fn_80262940.cpp`'s player start-up calls
- * it); the owner defines it unmangled, so the declaration is `extern "C"`. */
+/* 0x8027350C - the per-part motion dispatcher the player start-up calls; defined unmangled, so `extern "C"`. */
 #ifdef __cplusplus
 extern "C" {
 #endif
 void fn_8027350C(struct _PLW* self, s32 part);
-/* 0x80272E30 - `pl_item_add`, the item/skill value setter `Pl/fn_802489D4.cpp` calls; declared in the leaf
+/* 0x80272E30 - `pl_item_add`, the item/skill value setter `Pl/pl_act_step.cpp` calls; declared in the leaf
  * header `Pl/pl_item_add.h`, included below. */
-/* 0x802739F0 - the equipment-slot record resolver `Pl/fn_80273B14.cpp`'s act-kind switch calls;
- * the owner defines it `extern "C" s32` at `Pl/pl_skill.cpp:1682`. */
+/* 0x802739F0 - the equipment-slot record resolver the act-entry section's act-kind switch calls. */
 s32 fn_802739F0(struct _PLW* plw, s16 value, s32 mode, s8* out);
 /* 0x802715A0 - the skill/slot classifier the equipment screen steps its slot selection through
- * (its own row height `menu_page_count` is resolved from this).  Owned by this unit
- * (`Pl/pl_skill.cpp:738`); added with `menu/menu_infomation.cpp` (docs/plan.md 6.5 rule 2). */
+ * (its own row height `menu_page_count` is resolved from this). */
 u8 Pl_Skill_slot_item_get(struct _PLW* plw, u32 slot);
-/* 0x802731B4 - the item/skill timer lookup the same unit's consumers and `Pl/fn_8027D684.cpp`'s
- * `fn_8027D76C` call; the owner defines it `int` (`Pl/pl_skill.cpp:1265`), so the declaration keeps
- * that return (docs/plan.md 6.5 rule 2: this is the owner's header). */
+/* 0x802731B4 - the item/skill timer lookup the equipment section's `fn_8027D76C` and other consumers call;
+ * `int`, like the definition. */
 int Pl_item_timer_get(struct _PLW* plw, u16 item);
-/* 0x80273044 - the item-id -> slot lookup `Pl/fn_8027D684.cpp`'s `fn_8027DE88` walks its id tables
- * with; the owner declares it `u16` (`Pl/pl_skill.cpp:279`). */
+/* 0x80273044 - the item-id -> slot lookup `fn_8027DE88` walks its id tables with; `u16`, like the definition. */
 u16 fn_80273044(struct _PLW* plw, u16 item);
 #ifdef __cplusplus
 }
@@ -61,8 +52,8 @@ u16 fn_80273044(struct _PLW* plw, u16 item);
  * size: 0x14C */
 struct _PLOBJ {
     /* +0x000 */ u8 state[11];
-    /* +0x00B */ union {   /* the pre-merge `unk00B` run (0x00B-0x017) kept whole, with this branch's
-                            * split of the same bytes inside it (M4: same byte total) */
+    /* +0x00B */ union {   /* the `unk00B` run (0x00B-0x017) kept whole, with a
+                            * split of the same bytes inside it (same byte total) */
         /* +0x00B */ u8 unk00B[0xD];
         struct {
             /* +0x00B */ u8 part_flag_0x0B[11];  /* the per-part armed/consumed flag `fn_802693C4`
@@ -84,12 +75,8 @@ struct _PLWORK {
     /* +0x268 */ u8 unk268[0xB20 - 0x268];
 };
 
-/* The 0x47C-byte player-global record `lbl_80794B28` points at (the allocation size `fn_80267548`
- * requests).  `.sbss:0x80794B28` has no registered owner (no `.sbss` range is in splits.txt), so - like
- * the band headers - the declaration sits with the type's owner.  `Pl/pl_skill.cpp` still carries a
- * private 0x14-byte prefix of this layout (it does not include this header); reconciling it is recorded
- * in the branch's outbox.  The middle fields are named from the uses in `Pl/fn_80262940.cpp`; the record
- * has no owner unit that could name them.
+/* The 0x47C-byte player-global record `lbl_80794B28` (`Pl/player_control.cpp`'s `.sbss`) points at - the allocation
+ * size `fn_80267548` requests.  The middle fields are named from the player-control code's uses.
  * size: 0x47C */
 struct _PLGLOBAL {
     /* +0x000 */ u8 state;              /* the player-control state machine, 0..5 */
@@ -100,8 +87,8 @@ struct _PLGLOBAL {
     /* +0x010 */ struct _PLOBJ* table;    /* one record per player, `fn_80269394`/`pl_skill` walk it */
     /* +0x014 */ u8 unk014[0x8];
     /* +0x01C */ s32 res_0x1C[0x79];      /* the per-player resource word table */
-    /* +0x200 */ union {   /* the pre-merge view is `loaded[7]` plus the four gate words; this branch
-                            * named the whole 0x2C-byte run as one 11-word array (M4) */
+    /* +0x200 */ union {   /* two views: `loaded[7]` plus the four gate words, and
+                            * the whole 0x2C-byte run as one 11-word array */
         struct {
             /* +0x200 */ s32 loaded[7];   /* per-player "load requested" flags */
             /* +0x21C */ s32 gate21C;
@@ -121,7 +108,7 @@ struct _PLGLOBAL {
     /* +0x478 */ s8 limit478;
     /* +0x479 */ s8 limit479;
     /* +0x47A */ s8 limit47A;
-    /* +0x47B */ union {   /* one u8, two spellings: the pre-merge `unk47B` and this branch's name */
+    /* +0x47B */ union {   /* one u8, two spellings: `unk47B` and a name */
         /* +0x47B */ u8 unk47B;
         /* +0x47B */ u8 com_motion_type;   /* the common motion type `set_com_motion_type` stores and
                                             * `fn_802699AC` returns */

@@ -1,37 +1,10 @@
 /*
- * Declarations owned by `Pl/pl_act_data.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
- * header instead of declaring a pool word itself.
- *
- * The unit is **data-only**: it owns the Pl band's second shared `.sdata2` constant run,
- * `0x80799F98..0x80799FDC` (68 B, 17 named words), and its source defines nothing.  For a
- * `NonMatching` unit the original bytes stay in the binary, so the DOL is untouched while the run
- * gains a single owner - which is what stops rule 12 firing for the run's consumers and what stops
- * dtk creating an anonymous `auto_*_sdata2` unit over the same bytes.  The run is the MWLD *merge*
- * of two objects' own pools, so no single consumer can emit it: the referrer runs are disjoint and
- * ordered - `0x80799F98..0x80799FBC` is loaded by `Pl/fn_80258FCC.cpp`, `0x80799FC0..0x80799FD8` by
- * `Pl/fn_8025F088.cpp`, with `0x80799F98` read by both.
- *
- * The extent is measured, not guessed: the word before the run (`0x80799F94`) is loaded only by
- * `Pl/pl_act_step.cpp` and the word after it (`0x80799FDC`) only by `Pl/fn_80262940.cpp`, so the run
- * is the head of dtk's tail bulk unit `auto_11_80799F98_sdata2` (0x80799F98-0x8079B740) and the next
- * owner's pool starts exactly at 0x80799FDC.
- *
- * The unit name is a **GUESS**: no `__FILE__` string and no runtime-dump name covers the range, so
- * the file is named for its readers' role (the player act state-machine band and the per-frame
- * control cluster) and for what the words are used as - act frame windows, distance thresholds and
- * blend factors.  `tools/units/dataclaim.py`'s default for a pool like this is `Pl/sdata2_pool.cpp`;
- * a context name is preferred over the section name (docs/plan.md 6.5 rule 7 is read as "not a
- * generated name", but `sdata2_pool` says only which section the bytes are in).
- *
- * The values in the comments are read out of the target object's `.sdata2` and the names follow
- * `Pl/pl_frame_data.h`'s scheme for the same pool: an integral frame window is
- * `pl_frame_window_<n>`, any other constant is `pl_float_<value>`.  Each role is the load site that
- * identifies it, so a later pass can refine the name where the value alone does not decide it.
- *
- * This unit owns this run only.  The `.bss` collision-work run that follows the two `.sdata2` runs
- * (the move-work table, the hit-box and land tables, the per-slot collision results) is a different
- * pool shared by the `Pl` ground/hit collision band, and it has its own data-only owner,
- * `Pl/pl_coll.cpp` (`Pl/pl_coll.h`), so it is not this unit's.
+ * Pl/pl_act_data.h - the `.sdata2` constant run 0x80799F98..0x80799FDC (17 named words) of `Pl/pl_act_step.cpp`'s
+ *   pool, declared, never defined (playbook 29): 0x80799F98..0x80799FBC is loaded by the act state-machine band,
+ *   0x80799FC0..0x80799FD8 by the per-frame control cluster, 0x80799F98 by both.
+ * The file name is a GUESS from its readers' role.  The values are read from the target's `.sdata2` and the names
+ *   follow `Pl/pl_frame_data.h`'s scheme (`pl_frame_window_<n>` for an integral frame window, `pl_float_<value>`
+ *   otherwise); each comment's role is the load site that identifies it.
  */
 #ifndef MHTRI_PL_ACT_DATA_H
 #define MHTRI_PL_ACT_DATA_H

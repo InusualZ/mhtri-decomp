@@ -1,6 +1,6 @@
-/* The master action predicates and status-bit helpers of `Pl/pl_act.cpp` (0x8026F888-0x8026FEF0): `Pl/fn_80229ECC.cpp`,
- * `Pl/fn_802489D4.cpp`, `Pl/pl_act_step.cpp`, `Pl/fn_80273B14.cpp` and the ef/enemy/camera consumers drive them.
- * The map names are bare `fn_` stems, so they take C linkage; the header is C-visible.
+/* The master action predicates and status-bit helpers of `Pl/pl_act.cpp` (0x8026F888-0x8026FEF0), which
+ * `Pl/fn_80229ECC.cpp`, `Pl/pl_act_step.cpp`, `Pl/pl_act.cpp` and the ef/enemy/camera consumers drive.  The map names
+ * are bare `fn_` stems, so they take C linkage; the header is C-visible.
  */
 #ifndef MHTRI_PL_FN_8026FD94_H
 #define MHTRI_PL_FN_8026FD94_H

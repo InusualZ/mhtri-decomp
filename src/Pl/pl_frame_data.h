@@ -1,26 +1,10 @@
 /*
- * Declarations owned by `Pl/pl_frame_data.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
- * header instead of declaring the pool word itself.
- *
- * The unit is **data-only**: it owns the Pl band's shared frame-window/float pool, the `.sdata2`
- * run `0x80799E00..0x80799F98` (408 B, 78 named words plus the unnamed interior), and its source
- * defines nothing.  For a `NonMatching` unit the original bytes stay in the binary, so the DOL is
- * untouched while the run gains a single owner - which is what stops rule 12 firing for every one of
- * the ~20 `_PLW` units that read these words (`Pl/fn_802430E8.cpp`, `Pl/fn_802489D4.cpp`,
- * `Pl/fn_80258FCC.cpp`, `Pl/fn_8025F088.cpp`, `Pl/pl_act_step.cpp`, ...), and what stops dtk
- * creating an anonymous `auto_*_sdata2` unit for the same band.  The run is the MWLD *merge* of those
- * units' own pools (one address is read by several objects), so no single consumer can emit it; the
- * owner is the model for "the pool is one run, and it has one owner" (playbook 23/53 route 2).
- *
- * The values in the comments are read out of `orig/RMHE08/sys/main.dol` at each address, and the names
- * are derived from them in the band's scheme: an integral frame count is `pl_frame_window_<n>`, any
- * other constant is `pl_float_<value>` (`pl_float_neg8` for -8, `pl_float_0_66` for 0.66).  The words the
- * consumers above actually spell are named that way here; the run's remaining interior words keep their
- * `lbl_` rows and are named as the bodies that read them are written.
- *
- * The unit owns this run only.  The `.sdata2` run that follows it, 0x80799F98-0x80799FDC (17 words, read
- * by `Pl/fn_8025F088.cpp` and `Pl/fn_80258FCC.cpp`), has its own owner now - `Pl/pl_act_data.cpp`,
- * whose header `Pl/pl_act_data.h` declares those words.
+ * Pl/pl_frame_data.h - the `.sdata2` frame-window/float run 0x80799E00..0x80799F98 (408 B, 78 named words plus the
+ *   unnamed interior) of `Pl/pl_act_step.cpp`'s pool, declared, never defined (playbook 29); 0x80799F98 on is
+ *   `Pl/pl_act_data.h`'s.
+ * The values are read out of the DOL at each address and the names derived from them: an integral frame count is
+ *   `pl_frame_window_<n>`, any other constant `pl_float_<value>` (`pl_float_neg8` for -8, `pl_float_0_66` for 0.66);
+ *   the interior words keep their `lbl_` rows until a body reads them.
  */
 #ifndef MHTRI_PL_FRAME_DATA_H
 #define MHTRI_PL_FRAME_DATA_H

@@ -1,66 +1,18 @@
 /*
- * Player motion -> SE (sound-effect) frame dispatch for `_PLW` (the player work object), the
- * 0x3EA-0x4F7 half of the family whose 0x3EA-0x4EE half is `Pl/fn_80241558.cpp`.
- *
- * The range is TWO functions, each a dense `switch` on `Get_motion_no(_PLW*)` (defined at
- * 0x8026A308) that arms frame-timed sound requests on the three `_se_w` work objects hanging off the
- * player work (`_PLW`+0xAF4 / +0xAF8 / +0xAFC).  MWCC lowers both switches to `.data` jump tables,
- * so the unit owns them: `fn_8023C2D0`'s 270-entry table at `jumptable_805C34D4`
- * (0x805C34D4-0x805C390C) and `fn_8023FC20`'s 261-entry table at `jumptable_805C390C`
- * (0x805C390C-0x805C3D20), which is also the shape of the sibling unit's single table.
- *
- * Final home: module `Pl`, file stem kept as the map's `fn_8023C2D0` (class 4, docs/plan.md 12).  The
- * map has only `fn_8023C2D0` / `fn_8023FC20` for this range; no `__FILE__` string covers it (the
- * range's `.data` is the two jump tables and nothing else - the band's only source-name string,
- * `enemy_control.cpp` at 0x805A1BB8, is referenced from 0x801411B8, a different module), and
- * `dumpmap.py lookup` returns only the `zz_023c2d0_` placeholders.  The subsystem is the player:
- * both functions pass their first argument straight to `Get_motion_no` (`Get_motion_no__FP4_PLW`),
- * and `fn_8023C2D0` gates two of its cases on `Pl_act_ck__FP4_PLWUcUs`.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/symedit.py show fn_8023C2D0` / `... fn_8023FC20` - the range's sole entries
- * are the two `type:function` lines, and `dumpmap.py lookup` gives only the `zz_` placeholders).
- *
- * Language: C++.  The map's undefined set carries the mangled `Get_motion_no__FP4_PLW` and
- * `Pl_act_ck__FP4_PLWUcUs` alongside the C-linkage `fn_80229E10`/`fn_800DA428`; the retail object
- * also carries an extab/extabindex pair (one unwind-only record per function, r27-r31 and r28-r31),
- * which is why the `Pl` lib sets `-Cpp_exceptions on`.
- *
- * Flags: none beyond the lib's `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`,
- * mw_version Wii/1.0) - the same set the sibling `Pl/fn_80241558.cpp` needs, and it lands `.text` at
- * exactly retail's 0x3950 + 0x1938 B and `.data` at 0x438 + 0x414 B.
- *
- * Residual: none in the object.  Both functions measure 100.0 %; `.text` (0x5288), `.data` (0x84C),
- * extab (0x10) and extabindex (0x18) are byte-identical to the target object, and all 531 `.data`
- * relocations carry the target's symbols and addends.  Two load-bearing source shapes: the three
- * `_se_w` locals are declared in a different order than they are assigned (the sibling unit's
- * finding - it is the only shape that reproduces retail's r30/r28/r29 colouring together with its
- * load order), and the two arms that OR `part << 0x18` (0x450, 0x4C7) must spell the shift in each
- * argument instead of through `partHi`, or MWCC colours those arms' two temporaries the other way
- * round (10 instructions, 99.984 %).  Both functions' last arm falls through into `default:` (retail
- * keeps no branch there; that is where the shared epilogue lives).
- *
- * Landing blocker - why this unit stays `NonMatching` although its object is byte-identical.  MWCC
- * emits the two jump tables as a `.data` section with 8-byte alignment, while retail's first table
- * sits at the 4-mod-8 address 0x805C34D4; the split warns about exactly this ("Alignment for
- * Pl/fn_8023C2D0.cpp .data expected 8, but starts at 7:0x805C34D4").  Linking the object makes mwld
- * pad the section up to 0x805C34D8, so both functions' `lis`/`addi` jump-table bases resolve 4 bytes
- * high and every following `.data` reference moves with them.  Measured: `Object(Matching, ...)` ->
- * main.dol sha1 5324C567... and 403822 differing bytes against the original (first at 0x8023101F);
- * `Object(NonMatching, ...)` -> sha1 BF485073... (the original) with `ninja build/RMHE08/ok` green.
- * The sibling `Pl/fn_80241558.cpp` never meets this because its `.data` starts at the 8-aligned
- * 0x805C3D20.  The fix is a tool or registration decision, not a source one, and the lever is one
- * field: the `.data` *section header's* `sh_addralign` (8 from MWCC, only 4 allowed by the claim's
- * start address).  MWCC emits 8 for every file - measured across eight compilers (GC/1.0 … Wii/1.7)
- * and seven flag spellings (`-pool off`, `-align mac68k4byte`, `-sdata 0`, …), none gives 4 - and the
- * `.comment` symbol-table alignment (which also says 8 here) is *not* what the linker uses: a scratch
- * copy of this object with `sh_addralign` alone set to 4 links to sha1 BF485073... with 0 differing
- * bytes, i.e. the flip is byte-exact once that field is normalised.  The same one field is the whole
- * blocker for `Pl/fn_80230FBC.cpp` and `enemy/fn_80165FC8.cpp`, the tree's other two 4-mod-8 `.data`
- * claims.
- * Resolved: `tools/elf/objalign.py` (landed e242dfecf) lowers a section's `sh_addralign` to what its
- * claim address allows, is chained into every MWCC rule and is a no-op elsewhere; with it this unit
- * links in place and the flip to `Matching` is green (c1ed8e946).  See playbook 55.
+ * Pl/fn_8023C2D0.cpp - the player motion -> SE frame dispatch for motions 0x3EA-0x4F7 (`Pl/fn_80241558.cpp` is the
+ *   0x3EA-0x4EE sibling); `fn_8023C2D0` gates two motion groups on `Pl_act_ck`.
+ * RANGE. .text 0x8023C2D0-0x80241558 (2 functions); .data 0x805C34D4-0x805C3D20 (`fn_8023C2D0`'s 270-entry
+ *   `jumptable_805C34D4` and `fn_8023FC20`'s 261-entry `jumptable_805C390C`), extab, extabindex.  The `.data` claim
+ *   starts at the 4-mod-8 0x805C34D4: `tools/elf/objalign.py` lowers the object's section alignment so it links in
+ *   place (playbook 55).
+ * NAMES. The functions keep the map's stems (no `__FILE__` string covers the band; the runtime dump answers a
+ *   placeholder).
+ * RESIDUALS. none.
+ * SHAPES. The three `_se_w` locals are declared in a different order than they are assigned: the only shape that gives
+ *   retail's r30/r28/r29 colouring together with its load order.
+ *  - the two arms that OR `part << 0x18` (0x450, 0x4C7) spell the shift in each argument instead of through `partHi`,
+ *    or MWCC colours their two temporaries the other way round;
+ *  - both functions' last arm falls through into `default:`, where the shared epilogue lives (retail keeps no branch).
  */
 
 #include "types.h"
@@ -73,7 +25,7 @@
 /* Arms the frame-timed sound requests for every motion the player can be in above 0x3EA, with the
  * two motion groups whose extra frames depend on the active action gated on `Pl_act_ck`. */
 extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
-    /* `part` widened to its own byte lane once, the shape the shifted arguments need. */
+    /* `part` shifted into the top byte once, the shape the shifted arguments need. */
     u32 partHi;
     /* The three per-part `_se_w` work objects; the declaration order and the assignment order are
      * deliberately different (the `Pl/fn_80241558.cpp` shape) - it is what reproduces retail's
@@ -808,9 +760,8 @@ extern "C" void fn_8023C2D0(_PLW* work, u8 part) {
     }
 }
 
-/* The same walk as the sibling unit's `fn_80241558`: the identical 261-slot switch span (0x3EA-0x4EE),
- * six of that function's arms absent here (those motions take the default) and three arms whose SE
- * codes differ. */
+/* The same 261-slot walk (0x3EA-0x4EE) as `fn_80241558`, with six of its arms absent (those motions take the
+ * default) and three arms whose SE codes differ. */
 extern "C" void fn_8023FC20(_PLW* work, u8 part) {
     u32 partHi;
     _se_w* seWorkPart;

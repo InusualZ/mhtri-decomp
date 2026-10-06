@@ -1,36 +1,13 @@
 /*
- * Player motion -> SE (sound-effect) frame dispatch for `_PLW` (the player work object).
- *
- * Proposal 80241558: the whole .text range 0x80241558-0x802430E8 is ONE function. It reads the current
- * motion number (`Get_motion_no(_PLW*)`, defined at 0x8026A308) and, for each motion the game cares
- * about, arms a fixed set of frame-timed sound requests on the SE work objects hanging off the player
- * work (`_PLW`+0xAF4 / +0xAF8 / +0xAFC). The compiler turns the ~58-case switch into a 261-entry
- * `.data` jump table (`jumptable_805C3D20`, 0x805C3D20-0x805C4134), so the unit owns that section too.
- *
- * Final home: module `Pl`, file stem kept as the map's `fn_80241558` (class 4, docs/plan.md 12) - the
- * map has only `fn_80241558` for this range and no `__FILE__` string covers it (the .data/.rodata pools
- * between `enemy_control.cpp` at 0x805A1BB8 and `menu_item.cpp` at 0x805CDFC8 carry no source name for
- * this band). The subsystem is the player: the first argument is passed straight to `Get_motion_no`,
- * whose map spelling is `Get_motion_no__FP4_PLW`, and the sibling big switch `fn_8023C2D0` calls
- * `Pl_act_ck__FP4_PLWUcUs` the same way.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `grep -n "^fn_8024" config/RMHE08/symbols.txt` - the range's sole entry is
- * `fn_80241558 = .text:0x80241558; // type:function size:0x1B90`, and dumpmap.py lookup 0x80241558
- * gives only the `zz_0241558_` placeholder, no real runtime name).
- *
- * Language: C++. The map's undefined set carries the mangled `Get_motion_no__FP4_PLW`,
- * `se_req_frame_set__FP5_se_wllll` and `SE_Code_Make__Flsls`; the retail object also carries an
- * extab/extabindex pair (unwind-only records), which is why the Pl lib sets -Cpp_exceptions on.
- *
- * Flags: none beyond the lib's `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`,
- * mw_version Wii/1.0), which is what the sibling Pl units already measure.  The lib's own flags are the
- * right set for this unit too: `.text` lands at exactly retail's 0x1B90 B and `.data` at 0x414 B.
- *
- * Residual: none.  The reconstructed object is byte-identical to the target: `fn_80241558` measures
- * 100.0 % (7056 B / 1764 instructions, paired), and its 261-entry `.data` jump table carries the same
- * 261 relocations against `fn_80241558` with the same addends as the retail table (checked word for
- * word).  The one non-obvious shape is the three-pointer load order below.
+ * Pl/fn_80241558.cpp - the player motion -> SE frame dispatch: for each motion the game cares about, a fixed set of
+ *   frame-timed sound requests on the three `_se_w` works at `_PLW`+0xAF4/+0xAF8/+0xAFC.
+ * RANGE. .text 0x80241558-0x802430E8 (1 function); .data 0x805C3D20-0x805C4134 (the 261-entry `jumptable_805C3D20`
+ *   the ~58-case switch compiles to), extab, extabindex.
+ * NAMES. The function keeps the map's stem (no `__FILE__` string covers the band; the runtime dump answers a
+ *   placeholder).
+ * RESIDUALS. none.
+ * SHAPES. The three `_se_w` locals are declared in a different order than they are assigned: the only shape that gives
+ *   retail's colouring (r31 = +0xAF4, r29 = +0xAF8, r30 = +0xAFC) together with its load order (docs/pl.md).
  */
 
 #include "types.h"
@@ -41,12 +18,8 @@
 
 extern "C" void fn_80241558(_PLW* work, u8 part) {
     u32 partHi;
-    /* The three per-part `_se_w` work objects the requests are armed on.  The declaration order and
-     * the assignment order are deliberately different: it is the only shape (tried both three-initializer
-     * orders plus the direct-field spelling) that reproduces retail's register colouring
-     * (r31 = +0xAF4, r29 = +0xAF8, r30 = +0xAFC) together with retail's load order (+0xAF4, +0xAF8,
-     * +0xAFC).  A plain `a = +0xAF4; b = +0xAF8; c = +0xAFC;` declaration is 99.456 % (r29/r30 swapped),
-     * the same three in the allocator's order is 99.993 % (loads swapped); this shape is 100 %. */
+    /* The three per-part `_se_w` work objects the requests are armed on; the declaration order and the
+     * assignment order differ deliberately (see the unit header). */
     _se_w* seWorkPart;
     _se_w* seWorkMain;
     _se_w* seWorkFrame;

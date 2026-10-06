@@ -1,8 +1,7 @@
 /*
- * The hit registry's record types, shared by `Pl/pl_coll.cpp` (the registry helpers' head) and `menu/menu_item.cpp` (the registry
- * helpers' tail and the attack-entry accessors).  Phase 4 fold: the two units' headers each carried a view of
- * `_HIT_W` and of the registry head `lbl_806AC8A8`; one TU cannot hold both, so the views are merged here (rule 1) - where the two
- * views name the same offset, the names share an anonymous union.
+ * The hit registry's record types, shared by `Pl/pl_coll.cpp` (the registry helpers' head) and `menu/menu_item.cpp` (the
+ * registry helpers' tail and the attack-entry accessors), rule 1.  Where the two units name the same offset differently,
+ * the names share an anonymous union.
  */
 #ifndef MHTRI_PL_HIT_W_H
 #define MHTRI_PL_HIT_W_H

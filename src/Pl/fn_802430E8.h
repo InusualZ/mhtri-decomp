@@ -1,7 +1,6 @@
-/* The declarations `src/Pl/fn_802430E8.cpp` owns that other units call (docs/plan.md 6.5 rule 2).
- *
- * The hit-effect spawn the net receivers replay: `pos` is the impact position, `param` the effect parameter,
- * `kind`/`area` the actor's kind and area bytes and `extra` the effect variant flag.
+/* Leaf declaration of `Pl/pl_act_step.cpp`'s hit-effect spawn (0x802462FC), which the net receivers replay: `pos`
+ * is the impact position, `param` the effect parameter, `kind`/`area` the actor's kind and area bytes and `extra`
+ * the effect variant flag.
  */
 #ifndef MHTRI_PL_FN_802430E8_H
 #define MHTRI_PL_FN_802430E8_H

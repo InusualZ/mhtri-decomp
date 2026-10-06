@@ -1,5 +1,5 @@
-/* The declarations `src/Pl/fn_802489D4.cpp` owns that other units call (docs/plan.md 6.5 rule 2): the
- * per-act-number state appliers the net receiver runs after it has copied a player-state message in.
+/* Leaf declarations of `Pl/pl_act_step.cpp`'s per-act-number state appliers (0x8024CE54-0x8024EE88), which the net
+ * receiver runs after it has copied a player-state message in.
  */
 #ifndef MHTRI_PL_FN_802489D4_H
 #define MHTRI_PL_FN_802489D4_H
