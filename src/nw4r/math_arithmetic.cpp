@@ -10,7 +10,7 @@
  *   0x18, mantissa 0x14, mantissa pun 0x10; ours swap the last two (and the register colouring that follows).
  *   `.sdata2`: the claim ends on a 4-byte pad after 3.0f that the object does not emit.
  * SHAPES. The stack temporaries are laid out in inline-creation order, shallowest first, so the helper depth is
- *   load-bearing: FExp's exponent step goes through FAddExpPart, the FGetExpPart/FGetMantPart helpers sit in the header.
+ *   load-bearing: FExp puns through F32AsU32/U32AsF32, FLog through the header's FGetExpPart/FGetMantPart.
  */
 
 #include "nw4r/math_arithmetic.h"
@@ -328,11 +328,6 @@ LogSample sLogTbl[256 + 1] = {
     {0.6931472f, 0.00195122f},
 };
 
-/* The float with `exp` added to its exponent field. */
-inline f32 FAddExpPart(f32 f, s32 exp) {
-    return U32AsF32((static_cast<u32>(exp << 23) + F32AsU32(f)) & 0x7FFFFFFF);
-}
-
 namespace detail {
 
 /* 0x80500CF8 (0x8C): e^x as 2^n times a sampled fraction. */
@@ -345,7 +340,7 @@ f32 FExp(f32 x) {
     f32 frac = fidx - U16ToF32(idx);
     f32 val = sExpTbl[idx].exp_val + frac * sExpTbl[idx].exp_delta;
 
-    return FAddExpPart(val, exp);
+    return U32AsF32((static_cast<u32>(exp << 23) + F32AsU32(val)) & 0x7FFFFFFF);
 }
 
 /* 0x80500D84 (0x8C): ln x as the exponent times ln 2 plus the sampled log of the mantissa. */

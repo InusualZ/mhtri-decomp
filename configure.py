@@ -272,8 +272,8 @@ cflags_g3d = [
 # cflags_network and cflags_os: -func_align 4 (+ -Cpp_exceptions on for Network); measurements in docs/network.md.
 cflags_network = [*cflags_base, "-func_align", "4", "-Cpp_exceptions", "on"]
 cflags_os = [*cflags_base, "-func_align", "4"]
-# cflags_nw4r: cflags_os + -fp_contract off, compiled with GC/3.0a5.2 (the nw4r lib block); evidence in docs/nw4r.md.
-cflags_nw4r = [*cflags_os, "-fp_contract", "off"]
+# cflags_nw4r: cflags_os + -fp_contract off + -ipa file, compiled with GC/3.0a5.2 (the nw4r lib block); evidence in docs/nw4r.md.
+cflags_nw4r = [*cflags_os, "-fp_contract", "off", "-ipa", "file"]
 # DWCi (the Wii Wi-Fi Connection SDK library the retail link places between the game's own SDK uses
 # and NHTTP).  Same shape as the sibling SDK groups above: the retail .text packs the band's
 # functions back to back with 4-byte gaps, so `-func_align 4`.  Evidence: DWCi/fn_805113B0.c.
