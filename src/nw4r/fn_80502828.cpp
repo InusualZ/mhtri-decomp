@@ -8,8 +8,6 @@
  *   ut_ResFont (-0x80503314) and ut_CharWriter (-0x80504A3C); each has its own `.data`/`.sdata2` run, which one
  *   object cannot reproduce (the emission-order seam at 0x8062FBE8, the pad words after each vtable).
  * FLAGS. the `nw4r` lib block: GC/3.0a5.2 with `cflags_nw4r` (`cflags_os` + `-fp_contract off`); evidence in docs/nw4r.md.
- *   The ut_CharWriter part is compiled under `#pragma defer_codegen on` (retail inlines UpdateVertexColor, defined
- *   below the constructor).
  * NAMES. GUESS from the nw4r source, read off the bodies and the vtable slots: Font::InitReaderFunc (fn_80502828),
  *   Font::~Font, detail::ResFontBase's constructor, destructor, SetResourceBuffer, the virtual getters in vtable order,
  *   FindGlyphIndex(map, c) and GetGlyphFromIndex (fn_80502910..fn_80502F08), ResFont's constructor, destructor,
@@ -18,7 +16,9 @@
  *   file-local SetupGXWithColorMapping (fn_805046F0).
  * RESIDUALS. Every function matches.  Data: the four retail files' `.data`/`.sdata2`/`.bss` runs are interleaved with
  *   pads one object does not emit; the CharWriter constructor calls the out-of-line SetTextColor that retail links
- *   from 0x80500844 (`WPAD/wpad.cpp`'s range) and the static fog colour's destructor (0x8005B228).
+ *   from 0x80500844 (`WPAD/wpad.cpp`'s range).  SetupGX and SetupGXWithColorMapping register the static fog colour
+ *   with our `__dt__Q34nw4r2ut5ColorFv` where retail names `dtor_8005B228` (the weak Color destructor the link keeps
+ *   from `font/flfnt.cpp`'s range; request filed to rename it).
  * SHAPES. ResFont's constructor, destructor and SetResource sit under `#pragma dont_inline` (ResFontBase is another
  *   retail file there).  SetupGXForRGBA spells out the default setup instead of calling it (the inline depth orders
  *   the fog copies' stack slots).
@@ -416,8 +416,6 @@ FontInformation* ResFont::Rebuild(BinaryFileHeader* fileHeader) {
 namespace nw4r {
 namespace ut {
 
-#pragma defer_codegen on
-
 CharWriter::LoadingTexture CharWriter::mLoadingTexture;
 
 /* 0x80503314 (0x220): makes a writer with white text, unit scale, the cursor at the origin and linear filtering. */
@@ -468,29 +466,7 @@ static inline void SetupVertexFormat() {
     GXSetVtxDesc(13, 1);
 }
 
-/* Maps the glyph intensity between `min` and `max` in a first TEV stage and modulates by the vertex colour in a
- * second. */
-static void SetupGXWithColorMapping(Color min, Color max) {
-    SetupGXCommon();
-    GXSetNumTevStages(2);
-    GXSetTevDirect(0);
-    GXSetTevDirect(1);
-    GXSetTevSwapMode(0, 0, 0);
-    GXSetTevSwapMode(1, 0, 0);
-    GXSetTevOrder(0, 0, 0, 0xFF);
-    GXSetTevColor(1, min);
-    GXSetTevColor(2, max);
-    GXSetTevColorIn(0, 2, 4, 8, 15);
-    GXSetTevAlphaIn(0, 1, 2, 4, 7);
-    GXSetTevColorOp(0, 0, 0, 0, 1, 0);
-    GXSetTevAlphaOp(0, 0, 0, 0, 1, 0);
-    GXSetTevOrder(1, 0xFF, 0xFF, 4);
-    GXSetTevColorIn(1, 15, 0, 10, 15);
-    GXSetTevAlphaIn(1, 7, 0, 5, 7);
-    GXSetTevColorOp(1, 0, 0, 0, 1, 0);
-    GXSetTevAlphaOp(1, 0, 0, 0, 1, 0);
-    SetupVertexFormat();
-}
+static void SetupGXWithColorMapping(Color min, Color max);
 
 /* Intensity textures: the vertex colour, with the texture as alpha. */
 static inline void SetupGXForI() {
@@ -675,6 +651,30 @@ void CharWriter::UpdateVertexColor() {
     mVertexColor.ru.a = mVertexColor.ru.a * mAlpha / 0xFF;
     mVertexColor.ld.a = mVertexColor.ld.a * mAlpha / 0xFF;
     mVertexColor.rd.a = mVertexColor.rd.a * mAlpha / 0xFF;
+}
+
+/* Maps the glyph intensity between `min` and `max` in a first TEV stage and modulates by the vertex colour in a
+ * second. */
+static void SetupGXWithColorMapping(Color min, Color max) {
+    SetupGXCommon();
+    GXSetNumTevStages(2);
+    GXSetTevDirect(0);
+    GXSetTevDirect(1);
+    GXSetTevSwapMode(0, 0, 0);
+    GXSetTevSwapMode(1, 0, 0);
+    GXSetTevOrder(0, 0, 0, 0xFF);
+    GXSetTevColor(1, min);
+    GXSetTevColor(2, max);
+    GXSetTevColorIn(0, 2, 4, 8, 15);
+    GXSetTevAlphaIn(0, 1, 2, 4, 7);
+    GXSetTevColorOp(0, 0, 0, 0, 1, 0);
+    GXSetTevAlphaOp(0, 0, 0, 0, 1, 0);
+    GXSetTevOrder(1, 0xFF, 0xFF, 4);
+    GXSetTevColorIn(1, 15, 0, 10, 15);
+    GXSetTevAlphaIn(1, 7, 0, 5, 7);
+    GXSetTevColorOp(1, 0, 0, 0, 1, 0);
+    GXSetTevAlphaOp(1, 0, 0, 0, 1, 0);
+    SetupVertexFormat();
 }
 
 }  // namespace ut

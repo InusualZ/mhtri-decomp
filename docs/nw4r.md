@@ -28,15 +28,14 @@ What separates them:
 * `-inline deferred` is ruled out: it scrambles the `.sdata2` pool order (math_triangular, math_arithmetic) and the
   `.data` string order (db_assert) away from retail's.
 
-## `-ipa file` (measured, not in the flags)
+## `-ipa file`
 
-The ut files inline functions defined further down and still emit in source order: CharWriter's constructor
-inlines UpdateVertexColor (0x805045A0, defined below it), LinkListImpl's destructor inlines Clear, and
-TagProcessorBase's members come out in vtable order (Process before CalcRect). Only `-ipa file` reproduces all three
-on GC/3.0a3..3.0a5.2: plain `-inline auto` does not inline from below, and `-inline deferred` / `#pragma
-defer_codegen on` inline but emit the functions in reverse. Under `-ipa file` TagProcessorBase::CalcRect goes to
-100 %, the `.sdata2` pools keep their order, and FExp drops to 99.89 % (a stack slot) until its helpers are re-tuned.
-The units stay on `-ipa`-free flags until that is ruled; the two `defer_codegen` scopes stand in for it.
+`cflags_nw4r` carries `-ipa file`. The ut files inline functions defined further down and still emit in source
+order: CharWriter's constructor inlines UpdateVertexColor (defined below it), LinkListImpl's destructor inlines
+Clear, and TagProcessorBase's members come out in vtable order (Process before CalcRect). Only `-ipa file`
+reproduces all three on GC/3.0a3..3.0a5.2: plain `-inline auto` does not inline from below, and `-inline deferred` /
+`#pragma defer_codegen on` inline but emit the functions in reverse. It keeps the `.sdata2` pool order and takes
+TagProcessorBase::CalcRect from 98.28 % to 100 %.
 
 ## Source shapes that the codegen depends on
 
@@ -44,8 +43,5 @@ The units stay on `-ipa`-free flags until that is ruled; the two `defer_codegen`
   owns a temporary decides its slot (FExp's FAddExpPart, AtanFIdx_ calling the OS casts directly).
 * Paired-single bodies are C functions with one inline-asm block over `register` locals; MWCC schedules and
   colours the block with the surrounding code, so declaration order and variable reuse pick the registers.
-* The ut files that inline a function defined further down (LinkListImpl's destructor, CharWriter's
-  constructor) were built with deferred code generation; the math files were not (deferral reorders their
-  `.sdata2` pools). `#pragma defer_codegen on` scopes it to the ut part of a unit.
 * An unreferenced public function (`AtanFIdx`, `Assertion_ShowConsole`) is kept where retail's pool order or
   inlining shows it; the link drops it.
