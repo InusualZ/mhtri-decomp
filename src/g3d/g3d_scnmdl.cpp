@@ -25,7 +25,8 @@
 #include "g3d/fn_80075DCC.h"      /* fn_8007B424..fn_800793A4 (rule 2: owner g3d/fn_80075DCC.cpp) */
 #include "g3d/g3d_anmvis.h"      /* fn_8006ECB4/fn_8006ED84 (rule 2: owner g3d/g3d_anmvis.cpp) */
 #include "g3d/g3d_calcview.h"     /* fn_8006FFBC/fn_8006FFC8 (rule 2: owner g3d/g3d_calcview.cpp) */
-#include "g3d/g3d_calcvtx.h"       /* fn_8007270C/fn_800730D8/fn_800732F0 (rule 2: g3d_calcvtx.cpp) */
+#include "g3d/g3d_calcvtx.h"       /* fn_8007270C (rule 2: g3d_calcvtx.cpp) */
+#include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_scnmdlsmpl.h"   /* fn_8007F41C? and the ScnMdlSimple helpers (rule 2) */
 #include "fn_80047398.h"          /* fn_800497AC (rule 2: owner fn_80047398.cpp) */
 
@@ -87,9 +88,6 @@ u32 fn_8009435C(void* pSelf, u32 flag);  /* 0x8009435C - the tex-color-DL replac
 u32 fn_8009411C(void* pSelf, u32 flag);  /* 0x8009411C - the ind-mtx/scale replacement's teardown */
 
 u32 fn_8007D38C(u32 p);
-u32 fn_8007D398(ResHandle* pSelf);
-u32 fn_8007D3BC(ResHandle* pSelf);
-u32 fn_8007D3E0(ResHandle* pSelf);
 u32 fn_8007D404(ResHandle* pSelf);
 u32 fn_8007D468(const ResHandle* pSelf);
 u32 fn_8007D470(u32 p);
@@ -145,20 +143,24 @@ u32 fn_8007D38C(u32 p) {
     return (p + 3) & 0xFFFFFFFC;
 }
 
-/* 0x8007D398 - the `ResVtxNrm` block's size word (`g3d_resvtx_ac.h`'s block accessor chain). */
-u32 fn_8007D398(ResHandle* pSelf) {
-    return ((ResVtxBlockHead*)fn_800730D8(pSelf))->mSize;
+} /* extern "C" */
+
+/* 0x8007D398 (0x24): returns the colour block's size. */
+u32 nw4r::g3d::ResVtxClr::GetSize() const {
+    return ref().size;
 }
 
-/* 0x8007D3BC - the `ResVtxClr` block's size word. */
-u32 fn_8007D3BC(ResHandle* pSelf) {
-    return ((ResVtxBlockHead*)fn_800732F0(pSelf))->mSize;
+/* 0x8007D3BC (0x24): returns the normal block's size. */
+u32 nw4r::g3d::ResVtxNrm::GetSize() const {
+    return ref().size;
 }
 
-/* 0x8007D3E0 - the `ResVtxPos` block's size word. */
-u32 fn_8007D3E0(ResHandle* pSelf) {
-    return ((ResVtxBlockHead*)fn_800696E4(pSelf))->mSize;
+/* 0x8007D3E0 (0x24): returns the position block's size. */
+u32 nw4r::g3d::ResVtxPos::GetSize() const {
+    return ref().size;
 }
+
+extern "C" {
 
 /* 0x8007D404 - `ResCommon<ResMdl>::ref()`: the `g3d_resmdl_ac.h` inlined assert, then the handle. */
 u32 fn_8007D404(ResHandle* pSelf) {

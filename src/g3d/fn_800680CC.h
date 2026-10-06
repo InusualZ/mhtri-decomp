@@ -11,13 +11,6 @@ extern "C" {
 #endif
 
 /* 0x8006946C..0x80069768 - the `g3d_resvtx_ac.h` accessor group (callers: g3d_calcvtx.cpp). */
-void* fn_800695D4(const void* p);
-void* fn_800695DC(const void* p);
-void* fn_800696E4(const void* p);
-const char* fn_80069748(void);
-s32 fn_80069754(const void* p);
-void fn_80069768(void* pDst, const void* pSrc);
-u32 fn_800696C0(const void* p);
 #ifdef __cplusplus
 bool fn_8006946C(const void* p, s32 id); /* C++ only: `bool` is not a C type */
 #endif

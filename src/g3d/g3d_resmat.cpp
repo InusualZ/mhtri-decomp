@@ -25,6 +25,7 @@
 #include "g3d/g3d_state.h"                 /* fn_80087870, owner g3d/g3d_state.cpp (rule 2) */
 #include "fn_8004CAD8.h"                   /* mtx34_identity, owner fn_8004CAD8.cpp (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_8007100C (rule 2) */
+#include "g3d/g3d_resvtx.h"
 
 /* nw4r::db::Panic - the assert failure handler (variadic).  Called through its namespace
  * owner, never its mangled spelling (rule 9). */
@@ -40,6 +41,7 @@ void Panic(const char* pFile, int line, const char* pMsg, ...);
 extern u8 lbl_80590D78[]; /* "g3d_resmat.cpp"                                                      */
 extern u8 lbl_80590D88[]; /* "NW4R:Failed assertion IsValid()"                                    */
 extern u8 lbl_80590DA8[]; /* "NW4R:Failed assertion id >= GX_TEXMAP0 && id <= GX_TEXMAP7"         */
+extern u8 resmat_tlut_id_range_assert_msg[]; /* the GX_TLUT range assertion                                        */
 extern u8 lbl_80590E70[]; /* "NW4R:Failed assertion idx >= 1 && idx <= 3"                          */
 extern u8 lbl_80590EBC[]; /* "NW4R:Failed assertion id <= 7"                                       */
 extern u8 lbl_80590DE4[]; /* "NW4R:Failed assertion !((u32)p & 0x3)"                              */
@@ -239,7 +241,7 @@ extern "C" u8* fn_80094CB8(ResHandle* pSelf, u32 id)
     }
     valid = (id <= 7);
     if (!valid) {
-        nw4r::db::Panic((const char*)lbl_80590D78, 491, (const char*)lbl_80590DA8);
+        nw4r::db::Panic((const char*)lbl_80590D78, 491, (const char*)resmat_tlut_id_range_assert_msg);
     }
     if (fn_800768F0(pSelf) && id <= 7) {
         return (u8*)fn_80094D7C(pSelf) + id * 0xC + 4;
@@ -257,7 +259,7 @@ extern "C" u8* fn_80094D84(ResHandle* pSelf, u32 id)
     }
     valid = (id <= 7);
     if (!valid) {
-        nw4r::db::Panic((const char*)lbl_80590D78, 507, (const char*)lbl_80590DA8);
+        nw4r::db::Panic((const char*)lbl_80590D78, 507, (const char*)resmat_tlut_id_range_assert_msg);
     }
     if (fn_800768F0(pSelf) && id <= 7) {
         return (u8*)fn_80094E48(pSelf) + id * 0xC + 4;
@@ -275,7 +277,7 @@ extern "C" u32 fn_80094E50(ResHandle* pSelf, u32 id)
     }
     valid = (id <= 7);
     if (!valid) {
-        nw4r::db::Panic((const char*)lbl_80590D78, 523, (const char*)lbl_80590DA8);
+        nw4r::db::Panic((const char*)lbl_80590D78, 523, (const char*)resmat_tlut_id_range_assert_msg);
     }
     if (fn_800768F0(pSelf) && id <= 7) {
         u32 word = *(u32*)fn_80094D7C(pSelf);
@@ -294,7 +296,7 @@ extern "C" void fn_80094F24(ResHandle* pSelf, u32 id)
     }
     valid = (id <= 7);
     if (!valid) {
-        nw4r::db::Panic((const char*)lbl_80590D78, 539, (const char*)lbl_80590DA8);
+        nw4r::db::Panic((const char*)lbl_80590D78, 539, (const char*)resmat_tlut_id_range_assert_msg);
     }
     if (fn_800768F0(pSelf) && id <= 7) {
         u32* pWord = (u32*)fn_80094E48(pSelf);
@@ -312,7 +314,7 @@ extern "C" void fn_80094FE8(ResHandle* pSelf, u32 id)
     }
     valid = (id <= 7);
     if (!valid) {
-        nw4r::db::Panic((const char*)lbl_80590D78, 551, (const char*)lbl_80590DA8);
+        nw4r::db::Panic((const char*)lbl_80590D78, 551, (const char*)resmat_tlut_id_range_assert_msg);
     }
     if (fn_800768F0(pSelf) && id <= 7) {
         u32* pWord = (u32*)fn_80094E48(pSelf);
@@ -412,12 +414,12 @@ extern "C" u8* fn_80097458(ResHandle* pSelf, u32 offset)
 
 /* --- the `ResTlut`-style tail-call thunks (0x80098CC0-0x80098CF8) --------------------------------- */
 
-extern "C" void fn_80098CC0(void* pSelf) { fn_80089844(pSelf, 0); }
-extern "C" void fn_80098CC8(void* pSelf) { fn_800897D8(pSelf, 0); }
-extern "C" void fn_80098CD0(void* pSelf) { fn_8008976C(pSelf, 0); }
-extern "C" void fn_80098CD8(void* pSelf) { fn_80089700(pSelf, 0); }
-extern "C" void fn_80098CE0(void* pSelf) { fn_80089694(pSelf, 0); }
-extern "C" void fn_80098CE8(void* pSelf) { fn_80089624(pSelf, 0); }
+extern "C" void fn_80098CC0(void* pSelf) { reinterpret_cast<nw4r::g3d::ResVtxFurPos*>(pSelf)->DCStore(false); }
+extern "C" void fn_80098CC8(void* pSelf) { reinterpret_cast<nw4r::g3d::ResVtxFurVec*>(pSelf)->DCStore(false); }
+extern "C" void fn_80098CD0(void* pSelf) { reinterpret_cast<nw4r::g3d::ResVtxTexCoord*>(pSelf)->DCStore(false); }
+extern "C" void fn_80098CD8(void* pSelf) { reinterpret_cast<nw4r::g3d::ResVtxClr*>(pSelf)->DCStore(false); }
+extern "C" void fn_80098CE0(void* pSelf) { reinterpret_cast<nw4r::g3d::ResVtxNrm*>(pSelf)->DCStore(false); }
+extern "C" void fn_80098CE8(void* pSelf) { reinterpret_cast<nw4r::g3d::ResVtxPos*>(pSelf)->DCStore(false); }
 
 /* --- the `ResTexSrt` per-slot accessor pair (0x80095438-0x8009559C) ----------------------------- */
 

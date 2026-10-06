@@ -23,10 +23,9 @@
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h"
 #include "gx.h"                 /* GXWGFifo, the 0xCC008000 write window (rule 1)        */
-#include "g3d/g3d_cpu.h"        /* fn_8009A748, owner g3d/g3d_cpu.cpp (rule 2)           */
-#include "g3d/g3d_calcvtx.h"    /* fn_800734E4, owner g3d/g3d_calcvtx.cpp (rule 2)       */
-#include "g3d/g3d_state.h"      /* fn_80089690, owner g3d/g3d_state.cpp (rule 2)         */
-#include "g3d/g3d_resvtx.h" /* fn_80088E84/fn_80088FFC/fn_8008918C (rule 2) */
+#include "g3d/g3d_cpu.h"
+#include "g3d/g3d_state.h"
+#include "g3d/g3d_resvtx.h"
 
 /* The target's `-O3` schedule is retail only with the peephole pass off: every flag extract keeps an
  * explicit `cmpwi` after the `rlwinm` instead of the folded record form `rlwinm.`. */
@@ -334,16 +333,8 @@ extern "C" {
 ResShpData* fn_80077398(const ResHandle* pSelf);  /* owner: g3d/fn_80075DCC.cpp            */
 s32 fn_80076814(const ResHandle* pSelf);          /* owner: g3d/fn_80075DCC.cpp            */
 void fn_800783EC(ResHandle* pSelf, u32 pData);    /* owner: g3d/fn_80075DCC.cpp            */
-ResHandle* fn_800731EC(ResHandle* pSelf, u32 pData); /* owner: g3d/g3d_calcvtx.cpp         */
-s32 fn_8007327C(ResHandle* pSelf);                /* owner: g3d/g3d_calcvtx.cpp            */
-ResHandle* fn_80073290(ResHandle* pSelf, const ResHandle* pRhs); /* owner: g3d/g3d_calcvtx.cpp */
-ResHandle* fn_80073404(ResHandle* pSelf, u32 pData); /* owner: g3d/g3d_calcvtx.cpp          */
-s32 fn_80073494(ResHandle* pSelf);                /* owner: g3d/g3d_calcvtx.cpp            */
-ResHandle* fn_800734A8(ResHandle* pSelf, const ResHandle* pRhs); /* owner: g3d/g3d_calcvtx.cpp */
 u32 fn_800866FC(ResHandle* pSelf);                /* owner: g3d/g3d_state.cpp              */
 u32* fn_80086768(void);                           /* owner: g3d/g3d_state.cpp              */
-s32 fn_8008931C(ResHandle* pSelf);                /* owner: g3d/g3d_state.cpp              */
-void fn_8008939C(ResHandle* pSelf, const void** ppBaseVtx, u8* pStride); /* g3d/g3d_state.cpp */
 void fn_80091F70(void* pDst, u32 arg1, u32 arg2);  /* owner: g3d/g3d_resanmtexsrt.cpp       */
 u32 fn_80097FC8(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
 u32 fn_800980E0(ResHandle* pMdl, s32 idx);        /* owner: g3d/g3d_resmat.cpp             */
@@ -472,8 +463,7 @@ extern "C" u32 fn_800999E8(ResHandle* pSelf) {
         return fn_800980E0((ResHandle*)&mdl, pData->idVtxNrm);
     }
 
-    ResHandle ret;
-    return (u32)fn_80073404(&ret, 0)->mpData;
+    return (u32)nw4r::g3d::ResVtxNrm((void*)NULL).mpData;
 }
 
 /* 0x80099A58 - one colour-channel resource (two per shape, hence the `idx == 0 || idx == 1` assert). */
@@ -492,8 +482,7 @@ extern "C" u32 fn_80099A58(ResHandle* pSelf, u32 idx) {
         return fn_800981F8((ResHandle*)&mdl, *pId);
     }
 
-    ResHandle ret;
-    return (u32)fn_800731EC(&ret, 0)->mpData;
+    return (u32)nw4r::g3d::ResVtxClr((void*)NULL).mpData;
 }
 
 /* 0x80099B10 - one tex-coord resource (eight per shape, hence the `idx < 8` assert). */
@@ -533,25 +522,23 @@ extern "C" void fn_80099C20(ResHandle* pSelf) {
     u8 stride;
 
     u32 vtxPos = fn_80099974(pSelf);
-    fn_80088E84(&vtxPos, &pBaseVtx, &stride);
+    reinterpret_cast<nw4r::g3d::ResVtxPos*>(&vtxPos)->GetArray(&pBaseVtx, &stride);
     fn_800997E0(pSelf, 9, (u32)pBaseVtx, stride);
 
     u32 vtxNrm = fn_800999E8(pSelf);
-    ResHandle nrm;
-    fn_800734A8(&nrm, (const ResHandle*)&vtxNrm);
+    nw4r::g3d::ResVtxNrm nrm(reinterpret_cast<const nw4r::g3d::ResVtxNrm*>(&vtxNrm));
 
-    if (fn_80073494(&nrm)) {
-        fn_80088FFC(&nrm, &pBaseVtx, &stride);
+    if (nrm.IsValid()) {
+        nrm.GetArray(&pBaseVtx, &stride);
         fn_800997E0(pSelf, 10, (u32)pBaseVtx, stride);
     }
 
     for (u32 i = 0; i < 2; i++) {
         u32 vtxClr = fn_80099A58(pSelf, i);
-        ResHandle clr;
-        fn_80073290(&clr, (const ResHandle*)&vtxClr);
+        nw4r::g3d::ResVtxClr clr(reinterpret_cast<const nw4r::g3d::ResVtxClr*>(&vtxClr));
 
-        if (fn_8007327C(&clr)) {
-            fn_8008918C(&clr, &pBaseVtx, &stride);
+        if (clr.IsValid()) {
+            clr.GetArray(&pBaseVtx, &stride);
             fn_800997E0(pSelf, i + 11, (u32)pBaseVtx, stride);
         }
     }
@@ -561,8 +548,8 @@ extern "C" void fn_80099C20(ResHandle* pSelf) {
         ResHandle tex;
         fn_80099E2C(&tex, (const ResHandle*)&vtxTex);
 
-        if (fn_8008931C(&tex)) {
-            fn_8008939C(&tex, &pBaseVtx, &stride);
+        if (reinterpret_cast<nw4r::g3d::ResVtxTexCoord*>(&tex)->IsValid()) {
+            reinterpret_cast<nw4r::g3d::ResVtxTexCoord*>(&tex)->GetArray(&pBaseVtx, &stride);
             fn_800997E0(pSelf, i + 13, (u32)pBaseVtx, stride);
         }
     }
@@ -575,7 +562,7 @@ extern "C" void fn_80099C20(ResHandle* pSelf) {
     u32 tagSize = fn_80099DF8(pSelf);
     u32 tagAddr = fn_80099DF8(pSelf);
     u32 size = fn_80099DD4((ResHandle*)&tagSize);
-    fn_80089690((void*)fn_800996E8((ResHandle*)&tagAddr), size);
+    nw4r::g3d::DC::StoreRangeNoSync((void*)fn_800996E8((ResHandle*)&tagAddr), size);
 }
 
 /* 0x80099DD4 - the display-list tag's total size (`ResTagDL::ref` then its +0x00 word). */
@@ -697,9 +684,9 @@ extern "C" void fn_8009A12C(ResHandle* pSelf, s32 flag) {
     u32 data = fn_80099640(pSelf);
 
     if (flag != 0) {
-        fn_800734E4((void*)data, 0xE0);
+        nw4r::g3d::DC::StoreRange((void*)data, 0xE0);
     } else {
-        fn_80089690((void*)data, 0xE0);
+        nw4r::g3d::DC::StoreRangeNoSync((void*)data, 0xE0);
     }
 }
 
@@ -741,7 +728,7 @@ extern "C" u8 fn_8009A254(ResHandle* pSelf) {
  * the copy moved it by, and store the copy back to the cache. */
 extern "C" u32 fn_8009A278(ResHandle* pSelf, void* pDst) {
     u32 src = fn_8009A174(pSelf);
-    fn_8009A748(pDst, (const void*)src, 0x200);
+    nw4r::g3d::detail::Copy32ByteBlocks(pDst, (const void*)src, 0x200);
 
     ResHandle copy;
     fn_800783EC(&copy, (u32)pDst);
@@ -761,9 +748,9 @@ extern "C" void fn_8009A2F4(ResHandle* pSelf, s32 flag) {
     u32 size = *(u32*)fn_8009A174(pSelf);
 
     if (flag != 0) {
-        fn_800734E4((void*)base, size);
+        nw4r::g3d::DC::StoreRange((void*)base, size);
     } else {
-        fn_80089690((void*)base, size);
+        nw4r::g3d::DC::StoreRangeNoSync((void*)base, size);
     }
 }
 
@@ -778,9 +765,9 @@ extern "C" void fn_8009A360(ResHandle* pSelf, s32 flag) {
     u32 size = *(u32*)(fn_80052E8C(pSelf) + 0x4);
 
     if (flag != 0) {
-        fn_800734E4((void*)base, size);
+        nw4r::g3d::DC::StoreRange((void*)base, size);
     } else {
-        fn_80089690((void*)base, size);
+        nw4r::g3d::DC::StoreRangeNoSync((void*)base, size);
     }
 }
 
