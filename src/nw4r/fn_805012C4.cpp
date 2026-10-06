@@ -18,8 +18,6 @@
  *   (fn_80501FA8..fn_80502490, the map carrying the template manglings).  `mtx34_rotate_vec3` keeps the map's C name
  *   for nw4r's VEC3TransformNormal.
  * RESIDUALS. `.sdata2`: the object is 0x20 where splits.txt claims 0x28 (each retail file pads its own pool).
- * RESIDUALS. The static initialiser 0x80502810 is written as sLCImpl's constructor; the compiler names it
- *   `__sinit_\fn_805012C4_cpp`, which the map cannot carry.
  * RESIDUALS. MTX34RotXYZFIdx 90.9 % (retail keeps the circle pair's address in r0 and schedules the
  *   table `lis` first); AABB::Set 89.4 % (row maxima colour f1/f3 where retail has f2/f3); Frustum::IntersectAABB_Ex
  *   99.4 % (VEC3Dot's register colouring); List_Remove 97.2 % (r5/r6 swap).

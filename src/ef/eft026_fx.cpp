@@ -497,7 +497,7 @@ extern "C" void fn_80118214(_EFT* self)
             subVec3(&cam, &self->pos_0x18, &vC);
             copyVec3(&vA, &cam);
             {
-                f32 dist = fn_80050F24((const f32*)&vA);
+                f32 dist = vec3_len((const f32*)&vA);
                 if (dist < lbl_80796ADC) {
                     work->chara[0]->setVisibility(2, false);
                     work->chara[0]->setVisibility(4, false);

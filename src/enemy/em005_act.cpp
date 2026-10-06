@@ -1163,7 +1163,7 @@ void fn_801CE5A0(struct _ENEMY_WORK* self, u8 mode) {
         } else if (self->field_0x314 < -limit) {
             self->field_0x314 = -limit;
         }
-        self->value_0x378 = self->value_0x378 - fn_80050F24(&self->offset_0x30C.vec_0x310.x);
+        self->value_0x378 = self->value_0x378 - vec3_len(&self->offset_0x30C.vec_0x310.x);
         if (self->value_0x378 <= lbl_80799220) {
             fn_801CAFBC(self);
         }
@@ -1207,7 +1207,7 @@ void fn_801CE71C(struct _ENEMY_WORK* self, u8 mode) {
         } else if (self->field_0x314 < -limit) {
             self->field_0x314 = -limit;
         }
-        self->value_0x378 = self->value_0x378 - fn_80050F24(&self->offset_0x30C.vec_0x310.x);
+        self->value_0x378 = self->value_0x378 - vec3_len(&self->offset_0x30C.vec_0x310.x);
         if (self->value_0x378 <= lbl_80799220) {
             em_action_finish_fall(self);
         }

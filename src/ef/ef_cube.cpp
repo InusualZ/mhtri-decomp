@@ -26,20 +26,13 @@
  *     `lbl_80796268`, `lbl_80796258`, `lbl_80796244`, `lbl_8079626C`, `VEC3_ctor`, `ef_random_float`,
  *     `fn_80463F04`, `fn_80463F98`, `math_reciprocal`, `sqrt_f32`, `fn_800C9DD0__FUiP4Vec3P4Vec3P2EmP2PmUsfUi`,
  *     `fn_800A6E70`, `setVec3`, `_restgpr_18`.
- * SHAPES. The unit keeps its own scalar typedefs (below): its manglings encode `unsigned int`.
+ * SHAPES. The two definitions spell their integer parameters `unsigned int`: their manglings encode `Ui`, which
+ *   `types.h`'s `u32` (`unsigned long`) would not.
  */
 
+#include "types.h"
 #include "mh3_pad/vec3.h" /* the owner header (rule 2) */
-
-/* The unit's own scalar typedefs: `types.h` spells `u32` `unsigned long`, while this unit's manglings
- * encode `unsigned int` (`fn_800C9DD0__FUiP4Vec3...`).  `mh3_pad/vec3.h` pulls in no typedefs. */
-
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-typedef signed char s8;
-typedef float f32;
-typedef double f64;
+#include "ef/ef_emitter.h" /* ef_random_float (rule 2) */
 
 /* nw4r::math::VEC3, the type assignVec3/vec3_length_sq and this unit's three vector locals use. */
 typedef struct {
@@ -73,7 +66,6 @@ extern "C" {
 extern void ef_vec3_normalize_to(Vec3* dst, Vec3* src);
 extern void assignVec3(Vec3* dst, const Vec3* src);
 extern f32 vec3_length_sq(const Vec3* v);
-extern f32 ef_random_float(const void* p);
 extern u16 fn_800A9FB0(u32 a, u16 b, f32 f, void* em);
 extern void fn_800A99B4(u32 a, Vec3* b, void* em, Vec3* c, Vec3* d, Vec3* e, Vec3* f);
 }
@@ -123,7 +115,7 @@ struct Pm {
 
 /* Normalises the effect's two direction vectors, derives a spawn position from them, and hands the
  * result to the effect parameter object's spawn method. */
-void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
+void fn_800C9DD0(unsigned int a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, unsigned int e)
 {
     Vec3 v1;
     Vec3 v2;
@@ -172,7 +164,8 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
 
 /* Builds the effect cube's vertex grid and emits it through fn_800C9DD0 once per face; only the three
  * pointer asserts are written. */
-void fn_800CA200(u32 a, Em* em, Pm* pm, u32 n, u32 flags, void* params, u16 d, u32 e, f32 f)
+void fn_800CA200(unsigned int a, Em* em, Pm* pm, unsigned int n, unsigned int flags, void* params, u16 d,
+                 unsigned int e, f32 f)
 {
     int ok;
 

@@ -15,8 +15,8 @@
  * RESIDUALS. TextWriterBase's constructor and destructor have empty bodies by design (member-list construction and
  *   nw4r's empty destructor).
  *   CalcLineRectImpl 99.65 %: retail keeps the unused prMaxRect copy as one stack Rect at 0x38, this
- *   compiler splits it into four slots and the frame grows 0x70.  The static initialiser is named
- *   `__sinit_\fn_80504A3C_cpp`, which the map cannot carry yet.  Font::GetCharStrmReader is a strong function here
+ *   compiler splits it into four slots and the frame grows 0x70.
+ *   Font::GetCharStrmReader is a strong function here
  *   (retail links a weak copy at 0x80504AB8, after GetLineHeight<c>); the char instantiation's other functions are
  *   emitted and dropped by the link.
  * SHAPES. GetCharStrmReader is defined under `#pragma auto_inline off` (retail calls it); PrintImpl declares useLimit,

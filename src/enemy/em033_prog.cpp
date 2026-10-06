@@ -10,6 +10,8 @@
  *   mixes `fn_8035F004`/`fn_8035EF50`/`fn_8035EF58` with `enemy/fn_80138074.c`'s `fn_801394D4`..`fn_8013A650`.
  * NAMES. `em033_prog` is a GUESS from `em033_prog_tbl`, the first object of the unit's `.data`.
  * RESIDUALS. 39 rows unwritten: 0x8035BAB4-0x8035E034 (`fn_8035BAB4` .. `fn_8035DFC0`).
+ *  - `fn_8035E580` saves from r20 where retail calls `_restgpr_22`; `fn_8035EF58` saves no registers through
+ *    the helpers where retail calls `_savegpr_27`/`_restgpr_27` (register pressure, not a callee choice).
  *  - `fn_8035E1E0`: retail repeats the `fn_80126324` call (with `lbl_8079B70C`) and the `fn_8012B380` tail in every
  *    case body (920 B), ours shares them (756 B);
  *  - `fn_8035E580`: retail reads the `prev` byte before any store (uninitialised), ours starts it at 0, and the
@@ -111,19 +113,19 @@ extern "C" u8 fn_8035E034(_ENEMY_WORK* self, u8 mode)
         fn_8035EE40(self, 0, &a);
         subVec3(&c, &a, &self->pos);
         copyVec3(&b, &c);
-        return fn_80050F24((const f32*)&b) <= lbl_8079B704;
+        return vec3_len((const f32*)&b) <= lbl_8079B704;
     case 3:
         fn_8035EE40(self, 1, &a);
         subVec3(&c, &a, &self->pos);
         copyVec3(&b, &c);
-        return fn_80050F24((const f32*)&b) <= lbl_8079B708;
+        return vec3_len((const f32*)&b) <= lbl_8079B708;
     case 4:
         return self->field_0x33F;
     case 5:
         fn_8035EE40(self, 2, &a);
         subVec3(&c, &a, &self->pos);
         copyVec3(&b, &c);
-        return fn_80050F24((const f32*)&b) <= lbl_8079B70C;
+        return vec3_len((const f32*)&b) <= lbl_8079B70C;
     case 6:
         return em_roster_kind_aim_pos_get(self->field_0x33B, self->act_id) != 0;
     default:
@@ -258,7 +260,7 @@ extern "C" u8 fn_8035E580(_ENEMY_WORK* self, u8 a)
                         VEC3 v3;
                         subVec3(&v3, &v1, p);
                         copyVec3(&v2, &v3);
-                        if (fn_80050F24((const f32*)&v2) > em_roster_record_get(id)->radius_0x1F0) {
+                        if (vec3_len((const f32*)&v2) > em_roster_record_get(id)->radius_0x1F0) {
                             ok = 0;
                         }
                     }
@@ -430,7 +432,7 @@ extern "C" void fn_8035EB80(_ENEMY_WORK* self)
         if (findInterSection(&self->pos, p, &v1, 1, 0xFFFF, self->act_id, ang, 0) > 0) {
             subVec3(&v3, &v1, p);
             copyVec3(&v2, &v3);
-            if (fn_80050F24((const f32*)&v2) > em_roster_record_get(self->field_0x33B)->radius_0x1F0) {
+            if (vec3_len((const f32*)&v2) > em_roster_record_get(self->field_0x33B)->radius_0x1F0) {
                 keep = 0;
             }
         }

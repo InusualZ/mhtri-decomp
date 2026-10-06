@@ -1224,7 +1224,7 @@ s32 fn_800B83C0(void* ctx, EfParticleState* particle) {
 /* Builds the particle's +0xB0 transform into a local and copies it into `dst`. */
 void ef_ahead_manager_axis_y(nw4r::math::VEC3* dst, EfParticleState* particle) {
     u8 tmp[0x10];
-    copyVec3(dst, (const nw4r::math::VEC3*)fn_80067E54(tmp, &particle->field_0xB0));
+    copyVec3(dst, (const nw4r::math::VEC3*)vec3_copy_construct(tmp, &particle->field_0xB0));
 }
 
 /* Copies the particle's +0x98 block into `dst`. */

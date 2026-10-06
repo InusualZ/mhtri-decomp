@@ -23,8 +23,8 @@
  *    passes its own (`lbl_80592EFC`/`F2C`/`F38`/`F68`);
  *  - `ef_particle_get_scale` (ours 0x1C of 0x24): retail keeps an inlined call's `mr r4,r3` and its vestigial `b` to the
  *    next instruction; the arithmetic is retail's;
- *  - `ef_particle_flick_alpha` (ours 0x240 of 0x25C): the parameter record and `mode` live in r5/r31 where retail uses
- *    r31/r6, and the `+0x108` product is computed later.
+ *  - `ef_particle_flick_alpha`: the `+0x108` step is loaded after the `+0x99` byte where retail loads it first, the
+ *    clamped count is narrowed into its own register, and `3 * amplitude` is computed after the division.
  *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x10 of 0x40 (a partial pool: flipcheck names a fold with
  *   `ef/ef_particlemanager.cpp`, one shared literal); `.text` 0x7D0 of 0x14CC; extab 0x58 of 0x68; extabindex
  *   0x84 of 0x9C.
@@ -38,6 +38,7 @@
 #include "sys_mem.h"
 #include "unsplit/ef.h"
 #include "ef/ef_emitter.h" /* ef_truncate_float/ef_res_block_body (rule 2) */
+#include "ef/ef_particlemanager.h" /* fn_800AB740 / fn_800AB658 (rule 2) */
 #include "g3d/g3d_scnroot.h" /* VEC2_ctor (rule 2) */
 
 #pragma fp_contract off
@@ -64,7 +65,7 @@ extern f32 lbl_80796080; /* 0.5f    .sdata2 */
 
 /* nw4r helpers, declared locally with C linkage. */
 extern "C" void fn_800A4080(void* self); /* the particle's base constructor */
-extern "C" void* fn_800A4864(void* p);   /* walks to an object's chain head */
+extern "C" void* ef_res_emitter_desc(void* p);   /* walks to an object's chain head */
 extern f32 lbl_807960A0; /* 2pi  .sdata2 */
 
 /* nw4r::db::Panic.  The map already carries its real C++ mangling, and declaring the C++ spelling is
@@ -128,7 +129,7 @@ extern "C" void* fn_800AA27C(void* p, s32 flag)
 /* The destructor slot: hands the record to its owner for the actual teardown. */
 extern "C" void* fn_800AA2C0(EfParticle* self)
 {
-    return fn_800AB740(self->params.manager, self);
+    return (void*)fn_800AB740((struct EfPmManager*)self->params.manager, (struct EfPmParticle*)self);
 }
 
 /* The empty slot. */
@@ -214,7 +215,7 @@ extern "C" f32 fn_800AB37C(EfParticleMgr* mgr, EfParticle* self, f32 v)
 /* The owner's colour block: the chain head plus its colour-table offset. */
 extern "C" u8* ef_resource_draw_setting(void* p)
 {
-    return (u8*)fn_800A4864(p) + 148;
+    return (u8*)ef_res_emitter_desc(p) + 148;
 }
 
 /* The record's scale product for the current phase, with the owner's factor folded in. */
@@ -277,50 +278,45 @@ extern "C" u8 ef_particle_flick_alpha(EfParticle* self)
     EfParticleChain* p;
     u32 n;
     u16 count;
-    u16 period;
     u16 rem;
     s16 out;
-    u8 f;
-    s32 v;
+    u8 mode;
 
-    p = (EfParticleChain*)fn_800A4864(self->params.manager->context);
-    if (p->mode == 0) {
+    p = (EfParticleChain*)ef_res_emitter_desc(self->params.manager->context);
+    mode = p->mode;
+    if (mode == 0) {
         return 255;
     }
 
-    f = p->amplitude;
     count = p->count;
-    v = self->params.field_0x79;
-    n = count + (p->count_step * count * v) / 12700;
+    n = count + (p->count_step * count * self->params.field_0x79) / 12700;
     count = (u16)(n > 65535 ? 65535 : n);
-
-    period = self->field_0xDC;
-    rem = (period - 1) % count;
+    rem = (self->field_0xDC - 1) % count;
 
     out = 0;
-    switch (p->mode) {
+    switch (mode) {
     case 1:
-        if (rem * 2 > count) {
-            out = (s16)((3 * f + (-4 * f * rem) / count) + 128);
+        if (rem * 2 <= count) {
+            out = (s16)((128 - p->amplitude) + (p->amplitude * (rem * 4)) / count);
         } else {
-            out = (s16)((128 - f) + (f * (rem * 4)) / count);
+            out = (s16)((p->amplitude * 4 - p->amplitude) + -(p->amplitude * rem * 4) / count + 128);
         }
         break;
     case 2:
-        out = (s16)((f + (-2 * f * rem) / count) + 128);
+        out = (s16)(p->amplitude + -(p->amplitude * rem * 2) / count + 128);
         break;
     case 3:
-        out = (s16)((128 - f) + (f * (rem * 2)) / count);
+        out = (s16)((128 - p->amplitude) + (p->amplitude * (rem * 2)) / count);
         break;
     case 4:
-        if (rem * 2 > count) {
-            out = (s16)(128 - f);
+        if (rem * 2 <= count) {
+            out = (s16)(p->amplitude + 128);
         } else {
-            out = (s16)(f + 128);
+            out = (s16)(128 - p->amplitude);
         }
         break;
     case 5:
-        out = (s16)(128.0f + (f32)f * (f32)fn_800AB658(p, (lbl_807960A0 * (f32)rem) / (f32)count));
+        out = (s16)(128.0f + (f32)p->amplitude * fn_800AB658((lbl_807960A0 * (f32)rem) / (f32)count));
         break;
     default:
         nw4r::db::Panic(lbl_80592D50, 353, lbl_80592E14);

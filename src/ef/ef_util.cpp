@@ -8,10 +8,14 @@
  *   their own 0.0f (0x80795F6C) apart from this TU's (0x80795F7C).  Right edge: `fn_8009CDBC` cites
  *   "ef_animcurve.cpp"; the tail `ef_mtx34_column_length` cites none of this TU's strings or pool, only the `.sdata` pair
  *   {3.0f, 0.5f} at 0x807912D8.
- * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around `fn_8009B374`/`fn_8009B448` only
+ * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around `fn_8009B374`/`ef_mtx34_from_y_axis` only
  *   (retail's unfused `clrlwi` + `slwi`, `li r0,<slot>; psq_lx` and `fmuls` + `fsubs` there; file-wide, the pass
- *   costs `fn_8009C6F0`/`ef_sin_cos`).
+ *   costs `ef_vec_sin_cos`/`ef_sin_cos`).
  * NAMES. The map has only `fn_` stems for the range.
+ *   GUESS: `ef_vec_sin_cos` (0x8009C6F0): writes an angle's sine and cosine into a vector's x and y.
+ *   GUESS: `ef_mtx34_from_y_axis` (0x8009B448): builds an orthonormal frame whose Y axis is a unit direction.
+ *   GUESS: `ef_vec3_from_rotation` (0x8009C7D4): turns three rotation angles into the direction the particle
+ *   manager's gravity and spin fields use.
  *   GUESS (from the body and its callers): `ef_sin_cos`, `ef_vec3_normalize_to`.
  *   GUESS: `ef_mtx34_rotate_xyz` (the Euler rotation its callers build), `ef_mtx34_scale_columns` (the
  *   column scale).
@@ -20,9 +24,9 @@
  *   source order differs from retail's, so `.text`, extab and extabindex run in another order.
  *   2 rows written and at 0: `fn_8009CBA0`, `ef_mtx34_scale_columns` (paired-single bodies, playbook 85).
  *   7 partial rows:
- *  - `ef_vec3_normalize_to`, `fn_8009C6F0`, `ef_sin_cos`: paired-single bodies (playbook 85); our C versions also read
+ *  - `ef_vec3_normalize_to`, `ef_vec_sin_cos`, `ef_sin_cos`: paired-single bodies (playbook 85); our C versions also read
  *    `lbl_80795FA8`/`lbl_80795F7C` where retail does not;
- *  - `fn_8009B448`: the float registers of the assert's distance test differ;
+ *  - `ef_mtx34_from_y_axis`: the float registers of the assert's distance test differ;
  *  - `fn_8009BCB4`: the FPR restores are `psq_l <off>(r1)` where retail has `li r0,<off>; psq_lx` (the
  *    peephole region does not cover it);
  *  - `fn_8009C040`: the frame is 0x50 against retail's 0x60;
@@ -47,6 +51,7 @@
 #include "mh3_pad.h"        /* VEC3_ctor - owner src/mh3_pad.cpp (rule 2) */
 #include "g3d/g3d_anmchr.h" /* fn_800610AC - owner src/g3d/g3d_anmchr.cpp (rule 2) */
 #include "nw4r/math_triangular.h" /* nw4r::math::sSinCosTbl - owner src/nw4r/math_triangular.cpp (rule 2) */
+#include "ef/ef_util.h" /* the unit's own header */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`). */
@@ -69,8 +74,6 @@ f32 FrSqrt(f32 x);
  * callees. */
 extern "C" {
 void* fn_80501C60(void* list, void* node);
-/* 0x8009CD64 - the matrix-axis scale helper fn_8009BCB4 reaches (unwritten). */
-f32 ef_mtx34_column_length(const f32* mtx, s32 index);
 f32 fn_80463DE4(f32 x);
 f32 atan2f(f32 y, f32 x);
 f32 fn_8005A63C(f32 x);
@@ -78,14 +81,13 @@ f32 fn_8005A63C(f32 x);
 /* This unit's own bodies, in address order: a forward declaration for the ones a later body calls
  * (the owner is this file, so rule 2 is satisfied by construction). */
 u16 fn_8009B374(void* list, void** buf, s32 size);
-void fn_8009B448(f32* mtx, const f32* vec);
+
 void fn_8009B650(const f32* src, f32* mtx);
 void fn_8009B840(f32* mtx, s32 index, const f32* vec);
 f32* fn_8009BA78(const f32* mtx, s32 index, f32* vec);
 void fn_8009BCB4(const f32* vec, f32* mtx);
 void fn_8009BF08(const f32* mtx, f32* vec);
 s32 ef_vec3_normalize_to(f32* dst, const f32* src);
-void fn_8009C7D4(f32* mtx, const f32* a, const f32* b);
 void ef_mtx34_rotate_xyz(f32* mtx, f32 x, f32 y, f32 z);
 void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale);
 void fn_8050133C(f32* dst, const f32* mtx, const f32* scale);
@@ -188,14 +190,14 @@ extern "C" u16 fn_8009B374(void* list, void** buf, s32 size) {
 }
 
 /* Builds the orthonormal basis whose third row is the unit vector `vec`, into the 3x4 matrix `mtx`. */
-extern "C" void fn_8009B448(f32* mtx, const f32* vec) {
+extern "C" void ef_mtx34_from_y_axis(f32* mtx, const f32* vec) {
     f32 s;
     f32 a;
     f32 b;
     f32 z;
 
     NW4R_POINTER_ASSERT(mtx, 0x1AE, lbl_8059199C);
-    NW4R_ASSERT(abs_f32(fn_80050F24(vec) - lbl_80795F80) < lbl_80795F84, 0x1AF, lbl_805919D0);
+    NW4R_ASSERT(abs_f32(vec3_len(vec) - lbl_80795F80) < lbl_80795F84, 0x1AF, lbl_805919D0);
 
     z = vec[2];
     s = abs_f32(z);
@@ -328,7 +330,7 @@ extern "C" void fn_8009BF08(const f32* mtx, f32* vec) {
 }
 
 /* Writes the sine and cosine of `angle` as a two-float pair at `pOut`. */
-extern "C" void fn_8009C6F0(f32* pOut, f32 angle) {
+extern "C" void ef_vec_sin_cos(f32* pOut, f32 angle) {
     f32 y = angle * lbl_80795F78;
     f32 a = __fabs(y);
     f32 s;
@@ -378,8 +380,9 @@ extern "C" void ef_sin_cos(f32* pSin, f32* pCos, f32 angle) {
 }
 
 /* Builds a rotation matrix from three Euler angles: a pointer assert, then 46 paired-single instructions
- * sharing fn_8009C6F0's table lookup and reduce-to-65536 loops (unwritten). */
-extern "C" void fn_8009C7D4(f32* mtx, const f32* a, const f32* b) {
+ * sharing ef_vec_sin_cos's table lookup and reduce-to-65536 loops (unwritten). */
+extern "C" VEC3* ef_vec3_from_rotation(const EfRotation* rot, VEC3* out) {
+    return out;
 }
 
 /* Builds a rotation matrix from three Euler angles: 60 paired-single instructions and nothing else
@@ -471,11 +474,11 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
             d1 = vec3_dot(v20, v14);
             vec3_scale_by(v8, v20, d1);
             PSVECSubtract(v14, v14, v8);
-            scale[2] = fn_80050F24(v14);
+            scale[2] = vec3_len(v14);
         } else {
             scale[1] = lbl_80795F7C;
             fn_8009BA78(mtx, 2, v14);
-            scale[2] = fn_80050F24(v14);
+            scale[2] = vec3_len(v14);
         }
     }
 }

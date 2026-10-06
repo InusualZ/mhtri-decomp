@@ -10,7 +10,9 @@
  * NAMES. The file keeps the map's stem (no one `__FILE__` names the run); the stems are defined `extern "C"`
  *   (playbook 48), `fn_80066C8C` keeps C++ linkage (map row `fn_80066C8C__FPv`), and the `PlayPolicy` pair sits in
  *   `nw4r::g3d`.  The cross-unit declarations are `g3d/fn_80063888.h`.
- * RESIDUALS. 27 functions unwritten (objdiff scores them zero) in 17 runs: 0x80063E60-0x80063FC8,
+ *   GUESS: `vec3_copy_construct` (0x80067E54): copies three floats into `out` and returns it (a VEC3 copy).
+ * RESIDUALS. `fn_80066FA0` lacks retail's call to `fn_80066DB4` (+0x9C).  27 functions unwritten (objdiff scores
+ *   them zero) in 17 runs: 0x80063E60-0x80063FC8,
  *   0x80064080-0x800640E4, 0x80064128-0x800646E8, 0x800648B0-0x8006497C (`PlayPolicy_Loop`), 0x800649CC-0x80064BD4,
  *   0x80064C24-0x80064CE0, 0x80064CF0-0x8006518C, 0x80065284-0x8006553C, 0x8006560C-0x800657C4,
  *   0x800659D8-0x80065ED8, 0x80065EF0-0x80065FFC, 0x800660DC-0x80066C68, 0x80066EF8-0x80066F2C,
@@ -717,7 +719,7 @@ extern "C" u32 fn_80067A54(u32 *p)
     return *p;
 }
 
-extern "C" void *fn_80067E54(void *out, void *in)
+extern "C" void *vec3_copy_construct(void *out, void *in)
 {
     Vec3f *dst = (Vec3f *)out;
     const Vec3f *src = (const Vec3f *)in;

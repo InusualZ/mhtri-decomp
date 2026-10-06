@@ -12,6 +12,8 @@
  * NAMES. The map has only `fn_` stems for the range except `RetireEmitterAll`, `ForeachParticleManager` and
  *   `SetRootMtx`, written as `nw4r::ef::Effect` members.
  *   GUESS (from the body and its callers): `ef_get_life_status`.
+ *   GUESS: `ef_res_emitter_desc` (0x800A4864): returns the record 8 bytes into an emitter resource, the emitter
+ *   description its callers read flags and draw settings from.
  * RESIDUALS. The source defines `fn_800A4AF0` (8 bytes) before `RetireEmitterAll`, so the two swap places in our
  *   `.text`.
  *   6 partial rows:
@@ -144,7 +146,7 @@ typedef struct EfEff {
     /* +0xA0 */ void* mField_0xA0; /* the object fn_800A5154 dispatches to */
 } EfEff; /* size: 0xA4 (lower bound: +0xA0 is the highest field any body touches) */
 
-/* The work record `fn_800A4864` hands back for an emitter: the flags word at its first byte. */
+/* The work record `ef_res_emitter_desc` hands back for an emitter: the flags word at its first byte. */
 typedef struct EfEffEmitterWork {
     /* +0x00 */ u32 flags;
 } EfEffEmitterWork; /* size: 0x04 (lower bound: only this word is read) */
@@ -153,7 +155,7 @@ typedef struct EfEffEmitterWork {
 typedef struct EfEffEmitter {
     /* +0x000 */ const char* mName; /* fn_800A485C hands it back for the Warning */
     /* +0x004 */ u8 pad_0x004[0x04];
-    /* +0x008 */ u32 mFlags_0x08; /* fn_800A4864 hands the record at +0x08 back */
+    /* +0x008 */ u32 mFlags_0x08; /* ef_res_emitter_desc hands the record at +0x08 back */
     /* +0x00C */ s32 mState;
     /* +0x010 */ void* mField_0x10;
     /* +0x014 */ u8 pad_0x014[0x08];
@@ -245,7 +247,7 @@ u32 fn_800A4474(EfEff* self, EfEffEmitter* em);
 void fn_800A45DC(EfEffActivityList* list, void* node);
 u32 fn_800A4654(EfEff* self, EfEffEmitter* emitter, u8 a, u16 b);
 void* fn_800A485C(void* p);
-void* fn_800A4864(void* p);
+void* ef_res_emitter_desc(void* p);
 u32 fn_800A486C(EfEff* self, EfEffEmitter* em);
 void fn_800A49B8(EfEffEmitter* em);
 void fn_800A4A18(void* p);
@@ -421,7 +423,7 @@ extern "C" u32 fn_800A4654(EfEff* self, EfEffEmitter* emitter, u8 a, u16 b) {
 #line 114
     NW4R_POINTER_ASSERT(emitter, lbl_80592430, lbl_80592478);
 
-    if ((((EfEffEmitterWork*)fn_800A4864(emitter))->flags & 0x40000000u) == 0) {
+    if ((((EfEffEmitterWork*)ef_res_emitter_desc(emitter))->flags & 0x40000000u) == 0) {
 #line 118
         nw4r::db::Warning(lbl_80592430, __LINE__, lbl_805924E4, fn_800A485C(emitter));
         return 0;
@@ -448,7 +450,7 @@ extern "C" void* fn_800A485C(void* p) {
 }
 
 /* 0x800A4864 - the emitter's work record (the object at +0x08). */
-extern "C" void* fn_800A4864(void* p) {
+extern "C" void* ef_res_emitter_desc(void* p) {
     return (u8*)p + 8;
 }
 
