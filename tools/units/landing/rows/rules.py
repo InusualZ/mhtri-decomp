@@ -428,6 +428,10 @@ def rule10_row(b: Batch) -> None:
               "addition): %s; %d removed: %s"
               % (len(delta["shifted"]), "; ".join("%s <- %s" % (a, r) for a, r in delta["shifted"]) or "-",
                  len(delta["removed"]), "; ".join(delta["removed"]) or "-"))
+    if delta.get("reowned"):
+        # a recut's re-owned run is credited by `diff_rows`, and the credit is printed, never silent
+        print("rule 10: %d re-owned (a run the batch's splits.txt moved from another unit, credited): %s"
+              % (len(delta["reowned"]), "; ".join("%s <- %s" % (k, was) for k, was in delta["reowned"])))
     # A sanctioned claim is accepted by an explicit, recorded allowance (`--allow-rule10 <key>`) - never by a key
     # in a file - and the acceptance is printed so the landing's own log carries the exception **and** the key it
     # excused. An allowance that matches nothing stays out of `accepted` and the row still refuses.

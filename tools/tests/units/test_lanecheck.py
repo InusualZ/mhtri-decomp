@@ -85,6 +85,39 @@ def test_branch_checks(c):
         g.cleanup()
 
 
+def test_object_freshness(c):
+    """The object-reading checks judge this tree's build: refused for a branch whose source is not the file on disk, or
+    for an object older than its source; run when the object is current. Nothing is built."""
+    import os
+    from tools.lib.binary.build import ElfBuilder
+    g = _repo()
+    try:
+        blob = ElfBuilder().section(".text", b"\0" * 0x80).symbol("named_ok", ".text", 0x20, 0x20, type="func").build()
+        for side in ("src", "obj"):
+            p = g.root / ("build/RMHE08/%s/mod/a.o" % side)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(blob)
+        res = lc.run(str(g.root), "main", "work", flipcheck=False, dump_path=None, dump=DUMP)
+        c.check("--branch from a tree whose source differs: refused, never judged",
+                [s for s in res["skipped"] if s.startswith("wrong-callee/flip-blocker mod/a: refused")
+                 and "is not that branch's object" in s] != [], True)
+        c.check("... and the run names whose build it read", (res["build"]["built"], res["build"]["tree"]),
+                (1, str(g.root).replace("\\", "/")))
+        g.checkout("work")
+        obj = g.root / "build/RMHE08/src/mod/a.o"
+        os.utime(obj, (1_000_000_000, 1_000_000_000))
+        res = lc.run(str(g.root), "main", None, flipcheck=False, dump_path=None, dump=DUMP)
+        c.check("an object older than its source: refused with the reason",
+                any("refused" in s and "predates" in s for s in res["skipped"]), True)
+        now = os.path.getmtime(g.root / "src/mod/a.c") + 10
+        os.utime(obj, (now, now))
+        res = lc.run(str(g.root), "main", None, flipcheck=False, dump_path=None, dump=DUMP)
+        c.check("a current object is judged (no refusal, no missing-object skip)",
+                [s for s in res["skipped"] if "mod/a" in s and "wrong-callee" in s], [])
+    finally:
+        g.cleanup()
+
+
 def test_callee_and_blocker_rules(c):
     header = HEADER.replace("register swap.", "register swap; `setColor` takes the wrong parameter type.").replace(
         "(4 functions).", "(4 functions); .sdata2 0x80005000-0x80005040.")       # RANGE names sections, not blockers

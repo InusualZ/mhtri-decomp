@@ -69,7 +69,8 @@ Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
 13. every unit the batch flips to `Matching` is `flipcheck` READY (GATE).
 14. rule 10 (vtable ownership) adds no violation (`vtableaudit --diff`, add-only, decided by `vtableaudit.diff_rows`: a
     `run:` key whose start and end each moved by at most one word against a removed run is SHIFTED, not added, and the
-    shifted/removed keys are printed in the row's evidence; `ref:` keys are a set difference; `--allow-rule10` records an
+    shifted/removed keys are printed in the row's evidence; a run a recut re-owned from another unit is credited and
+    printed `rule 10: N re-owned ... <key> <- <old owner>`; `ref:` keys are a set difference; `--allow-rule10` records an
     allowance) (GATE).
 15. data closure: no batch unit's target object references data no claim covers, and no unit the batch really changes leaves data only it references unclaimed (`datagap` snapshot rows; `--allow-orphan`) (GATE); the base must carry the snapshot (BOOKKEEPING).
 16. no unit's split target object moved under the batch (a neighbour re-ranged) (GATE) - "moved" is the

@@ -61,6 +61,13 @@ runtime dump (`lib.dumpsyms`). Writes stdout only.
   by name: a class-qualified dump name and its mangled map spelling never compare equal as text.
 * A check that could not run (no object, no dump, flipcheck off or failing) is listed `not checked:` - never silently
   clean.
+* **Whose build it judges.** It builds nothing. The first output line names the tree whose `build/RMHE08` objects (b)
+  and (d) read, how many touched units have an object there and the oldest/newest object time (`build` in `--json`),
+  and with `--branch` says it is this tree's build, not the branch's. Per unit those two checks are refused
+  (`not checked: wrong-callee/flip-blocker <unit>: refused - <reason>`) when the object cannot stand for the judged
+  source: older than the unit's include closure on disk (`lib.report.unit_reasons`), or, with `--branch`, the
+  branch's copy of the source is not the file on disk. Measured: `--branch faa04ea9c` from this worktree refuses all 35
+  units (sources moved since, objects older than `src/nw4r/math.h`), where the first version judged them silently.
 
 ## Measured
 
@@ -88,15 +95,17 @@ runtime dump (`lib.dumpsyms`). Writes stdout only.
 
 ## Test contract
 
-Tier: fixture (`tools/tests/units/test_lanecheck.py`, 15 checks: a `GitFixture` repo with two units; a branch whose
+Tier: fixture (`tools/tests/units/test_lanecheck.py`, 19 checks: a `GitFixture` repo with two units; a branch whose
 added comments mis-cite an owner, name a gone path, call owned data unowned (and truly unowned data and a phrase in
 another clause, which are not findings), add an empty 0x20-byte stub and a 4-byte one, and add names the injected dump
 does not carry; the working tree mode and a GUESS mark; `check_callees` and `check_blockers` on fixed inputs; the CLI's
-lines, JSON, exit codes and `--strict`). Mutations: no clause break fails 1, no tiny-function exemption 1, an
+lines, JSON, exit codes and `--strict`; the object gate: refused for a branch source that is not on disk and for an
+object older than its source, judged when current - `object_reasons` returning nothing fails 2). Mutations: no clause break fails 1, no tiny-function exemption 1, an
 `owner_at` that finds nothing 5, the whole header as the residual text 1.
 
 ## Known gaps
 
-* (b) and (d) read the objects in the invocation tree's `build/`; for `--branch` from MAIN they are MAIN's objects.
+* (b) and (d) only read the invocation tree's `build/`: a branch is judged there only when its sources are the ones on
+  disk and the objects are current; otherwise they are refused, not rebuilt.
 * The ownership-claim grammar is English and narrow on purpose: a claim phrased otherwise is not judged.
 * A header without a RESIDUALS label is read whole (minus RANGE), so a section named anywhere else counts as named.
