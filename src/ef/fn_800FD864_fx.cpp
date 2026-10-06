@@ -246,7 +246,7 @@ struct EftEmitter {
 #include "unsplit/ef_control.h" /* eft_control (rule 2: the band) */
 
 extern "C" u32 fn_80100330(u32* p);
-extern "C" void* fn_800A485C(u32 color);
+extern "C" void* ef_emres_get_name(u32 color);
 extern "C" void* fn_800A60C0(void* self);
 extern "C" void fn_800A4AF8(nw4r::ef::Effect* effect);
 extern "C" nw4r::ef::EffectSystem* fn_800A4420(nw4r::ef::EffectSystem* system);
@@ -1711,7 +1711,7 @@ extern "C" void fn_80100300(u32* dst, const u32* src)
 /* Returns the emitter the color is resolved through. */
 extern "C" void* fn_8010030C(void* p)
 {
-    return fn_800A485C(fn_80100330((u32*)p));
+    return ef_emres_get_name(fn_80100330((u32*)p));
 }
 
 /* Asserts that the value is a valid console pointer and returns it. */

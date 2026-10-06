@@ -183,7 +183,7 @@ void VEC2_ctor(void* out);
 void* ef_emitter_tex_flags(void* self);
 void fn_800A898C(void* dst, const void* src);
 void ef_pm_handle(void* dst, void* src);
-void fn_800B38C0(void* out, void* a, void* b, void* c);
+void ef_resource_find_emitter_handle(void* out, void* a, void* b, void* c);
 void fn_800A602C(void* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* mtx, f32 a, f32 b);
 void fn_800AC100(void* mgr, u8 mode, u8* a, u8* b, u8* c, f32 scale);
 
@@ -200,9 +200,9 @@ void* fn_800A9714(void* handle, u32 idx);
 void fn_800A95D8(void* handle);
 
 /* the resource / model helpers */
-s32 fn_800B2878(void);
-void fn_800B483C(void);
-void fn_800B4A14(s32 handle);
+s32 ef_resource_instance(void);
+void ef_resource_remove_all_effect_projects(void);
+void ef_resource_remove_all_texture_projects(s32 handle);
 s32 fn_800E28E4(void* chr);
 s32 fn_800E2994(void* access);
 
@@ -307,9 +307,9 @@ extern "C" void fn_800F9628(void) {
     }
     void** vt = (void**)fn_800A4420(effect);
     ((void (*)(void*))vt[3])(fn_800A4420(effect));
-    s32 handle = fn_800B2878();
-    fn_800B483C();
-    fn_800B4A14(handle);
+    s32 handle = ef_resource_instance();
+    ef_resource_remove_all_effect_projects();
+    ef_resource_remove_all_texture_projects(handle);
 }
 
 /* 0x800F96D4 - the 4-byte copy the transform setters share. */
@@ -354,7 +354,7 @@ extern "C" s32 fn_800F97F0(s32 idx, EftNameEntry* node, void* out) {
         return 0;
     }
     s32 frame;
-    fn_800B38C0(&frame, (void*)fn_800B2878(), lbl_8058A880[idx], node->field_0x10);
+    ef_resource_find_emitter_handle(&frame, (void*)ef_resource_instance(), lbl_8058A880[idx], node->field_0x10);
     fn_800A898C(out, &frame);
     return 1;
 }

@@ -18,20 +18,22 @@
  *   +0xB8, the parent at +0xF4 and the object's MTX34 at +0x124.
  *   GUESS (from the body and its callers): `ef_particle_get_move_dir`, `ef_emitter_tex_flags`,
  *   GUESS: `ef_emitter_get_mtx`.
+ *   GUESS (the emitter resource's track blocks, from `ef/ef_resource.cpp`'s relocation): `ef_emres_num_emit_track`,
+ *   GUESS: `ef_emres_get_ptcl_track`, `ef_emres_get_emit_track_tbl`.
  *   GUESS: `ef_vec3_dist_sq` (0x800A8300): the squared distance of two positions.
  *   GUESS: `ef_mtx34_copy` (0x800A89A0): copies the twelve words of a 3x4 matrix and returns the destination.
  *   GUESS: `ef_calc_inherit_mtx` (0x800A90AC): builds the transform a child inherits (scale, rotation, a share of
  *   the translation) from its parent's matrix; the parent chain and the particle manager call it.
  * RESIDUALS. 25 partial rows, including:
  *  - `fn_800A834C`: retail fuses one `f2*f1 - f0` into `fmsubs` under the rest's unfused chain, and it calls
- *    `fn_800B2878` and asserts `mManagerEF` (`lbl_80592A6C`) where ours does not;
+ *    `ef_resource_instance` and asserts `mManagerEF` (`lbl_80592A6C`) where ours does not;
  *  - `fn_800A7750`, `fn_800A7378`: retail calls `ef_res_emitter_desc` where ours does not, and `fn_800A7750` has a
  *    `Panic(..., "Failed assertion false")` path ours lacks;
  *  - `fn_800A6A04`: ours calls `ef_res_emitter_desc` and `fn_800A4420` where retail reads `lbl_80796008`;
- *  - `fn_800A8A5C`: the `fn_800A8BC8` call sits at another point of the pass;
+ *  - `fn_800A8A5C`: the `ef_emres_num_emit_track` call sits at another point of the pass;
  *  - `fn_800A8220`, `ef_vec3_dist_sq`: the argument copy `mr r3, r4` is scheduled elsewhere and the float registers
  *    differ;
- *  - `ef_res_block_body`, `fn_800A8BF8`, `fn_800A8BC8`, `fn_800A8CB8`, `fn_800A8CE8`: retail adds the offset as the
+ *  - `ef_res_block_body`, `ef_emres_get_ptcl_track`, `ef_emres_num_emit_track`, `ef_emres_get_emit_track_tbl`, `fn_800A8CE8`: retail adds the offset as the
  *    first `add` operand (`add r3, r0, r3`), every spelling tried gives `add r3, r3, r0`;
  *  - `fn_800A8DF8`: ours reloads `+0xC8` where retail reuses the pointer.
  *   The other partial rows are register colours with no recorded cause.
@@ -113,7 +115,7 @@ u16 fn_800A4AF0(void* list);                       /* UtlistSize */
 u16 fn_8009B374(void* list, void** buf, u16 size); /* UtlistGetArray */
 void* fn_80501C60(void* list, void* node);         /* GetNext */
 void* fn_80501C9C(void* list, u16 index);          /* GetNth */
-void* fn_800A5250(void* list);                     /* GetFirst */
+void* ef_list_get_first(void* list);                     /* GetFirst */
 s32 ef_get_life_status(void* node);
 void fn_800A43E8(void* list, void* node);
 void fn_800A45DC(void* list, void* node);
@@ -125,7 +127,7 @@ void fn_800A4474(void* manager, void* self);
 void* fn_800A4420(void* self);
 void* ef_res_emitter_desc(void* p); /* walks to an object's chain head */
 void fn_800A486C(void* manager, void* emitter);
-u32 fn_800A485C(void* p);
+u32 ef_emres_get_name(void* p);
 void* fn_800A4654(void* manager, void* em, u8 flag, s32 mode);
 void fn_800A337C(void* p);
 void fn_800A3390(void* dst, const void* src);
@@ -138,7 +140,7 @@ void fn_800A52E4(void* manager, void* cb, void* arg, s32 flag, void* self);
 void ef_pm_handle(void* dst, const void* src);
 void fn_8035B998(void* p);
 void fn_8009F85C(void* rec, void* target, u32 life, u16 seed, s32 range);
-void* fn_800B2878(void);
+void* ef_resource_instance(void);
 
 void fn_8009BF08(void* vec, void* out);
 void fn_8009C040(void* vec, void* out);
@@ -352,7 +354,7 @@ typedef struct EfPmView {
 } EfPmView; /* size: 0x8B (lower bound) */
 
 /* The length-prefixed blocks the emitter resource is walked through: `ef_res_block_body` steps 8 bytes in
- * from its own `offset`, `fn_800A8BF8` 4. */
+ * from its own `offset`, `ef_emres_get_ptcl_track` 4. */
 typedef struct EfResHeader {
     /* +0x00 */ u32 field_0x00;
     /* +0x04 */ u32 offset;
@@ -472,11 +474,11 @@ nw4r::math::MTX34* ef_mtx34_copy(nw4r::math::MTX34* dst, const nw4r::math::MTX34
 f32 ef_truncate_float(f32 x);
 f32 ef_random_float(u32* random);
 void fn_800A8A5C(EfEmitterObj* self);
-u16 fn_800A8BC8(void* res);
-void* fn_800A8BF8(void* res);
+u16 ef_emres_num_emit_track(void* res);
+void* ef_emres_get_ptcl_track(void* res);
 void* ef_res_block_body(void* res);
 void* fn_800A8C34(void* res, u16 index);
-void* fn_800A8CB8(void* res);
+void* ef_emres_get_emit_track_tbl(void* res);
 u16 fn_800A8CE8(void* res);
 u32 fn_800A8D18(EfEmitterObj* self);
 void fn_800A8D30(EfEmitterObj* self);
@@ -728,7 +730,7 @@ extern "C" s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef) {
         self->float_0x068[i] = work->float_0x38[i];
     }
     copyVec3(&self->vec_0x84, &work->vec_0x54);
-    fn_800B2878();
+    ef_resource_instance();
     self->seed = (u16)work->field_0x088;
     if (self->seed == 0) {
         self->seed = fn_800A6E70(&ef->effect->random);
@@ -841,7 +843,7 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
 #line 307
     NW4R_POINTER_ASSERT(lbl_80592850, em, lbl_80592954);
     if ((EfGetWork(em)->flags & 2) == 0) {
-        nw4r::db::Warning(lbl_80592850, 0x137, lbl_80592A14, fn_800A485C(em));
+        nw4r::db::Warning(lbl_80592850, 0x137, lbl_80592A14, ef_emres_get_name(em));
         return NULL;
     }
     EfEmitterObj* e = (EfEmitterObj*)fn_800A4654(self->managerEF, em, params->field_0x05, 0);
@@ -919,7 +921,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
 #line 432
     NW4R_POINTER_ASSERT(lbl_80592850, eh, lbl_80592954);
     if ((EfGetWork(eh)->flags & 2) == 0) {
-        nw4r::db::Warning(lbl_80592850, 0x1B4, lbl_80592A14, fn_800A485C(eh));
+        nw4r::db::Warning(lbl_80592850, 0x1B4, lbl_80592A14, ef_emres_get_name(eh));
         return 0;
     }
     {
@@ -1111,7 +1113,7 @@ extern "C" EfVec* ef_particle_get_move_dir(EfParticleRec* self, EfVec* result) {
 extern "C" void* fn_800A8040(EfEmitterObj* self, void* eh, u32 a, u32 b, s8 c, u32 d, u8 e) {
 #line 700
     NW4R_POINTER_ASSERT(lbl_80592850, eh, lbl_80592954);
-    void* node = fn_800A5250(&self->particles);
+    void* node = ef_list_get_first(&self->particles);
     while (node != NULL) {
         EfPmView* pm = (EfPmView*)node;
         if (pm->param == eh) {
@@ -1205,7 +1207,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
     }
     if (self->life >= lbl_8079601C) {
         EfEmitterWork* work = EfGetWork(self->work);
-        fn_800B2878();
+        ef_resource_instance();
         if (self->field_0x0F0 != NULL) {
             if (self->managerEF->field_0x48 != NULL) {
                 s32 life_i = (s32)self->life;
@@ -1336,7 +1338,7 @@ extern "C" void fn_800A8A5C(EfEmitterObj* self) {
         s32 range = flags != 0 ? -1 : (s32)self->life_max;
         s32 found = 0;
         u16 start = self->field_0x0E4 != 0 ? fn_800A8CE8(self->work) : 0;
-        u16 count = fn_800A8BC8(self->work);
+        u16 count = ef_emres_num_emit_track(self->work);
         for (u16 i = start; i < count; i++) {
             EfTrack* rec = (EfTrack*)fn_800A8C34(self->work, i);
             if ((rec->flags & 8) != 0) {
@@ -1362,12 +1364,12 @@ extern "C" void fn_800A8A5C(EfEmitterObj* self) {
  * emitter-resource track walkers.
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" u16 fn_800A8BC8(void* res) {
-    u8* p = (u8*)fn_800A8BF8(res);
+extern "C" u16 ef_emres_num_emit_track(void* res) {
+    u8* p = (u8*)ef_emres_get_ptcl_track(res);
     return *(u16*)(p + (*(u16*)p) * 8 + 4);
 }
 
-extern "C" void* fn_800A8BF8(void* res) {
+extern "C" void* ef_emres_get_ptcl_track(void* res) {
     EfChainHeader* h = (EfChainHeader*)ef_res_block_body(res);
     return (u8*)h + h->offset + sizeof(EfChainHeader);
 }
@@ -1378,21 +1380,21 @@ extern "C" void* ef_res_block_body(void* res) {
 }
 
 extern "C" void* fn_800A8C34(void* res, u16 index) {
-    void* array = fn_800A8CB8(res);
+    void* array = ef_emres_get_emit_track_tbl(res);
 #line 736
-    if ((u32)index >= (u32)fn_800A8BC8(res)) {
+    if ((u32)index >= (u32)ef_emres_num_emit_track(res)) {
         nw4r::db::Panic(lbl_80592CC0, __LINE__, lbl_80592C94);
     }
     return *(void**)((u8*)array + (u32)index * 4);
 }
 
-extern "C" void* fn_800A8CB8(void* res) {
-    u8* p = (u8*)fn_800A8BF8(res);
+extern "C" void* ef_emres_get_emit_track_tbl(void* res) {
+    u8* p = (u8*)ef_emres_get_ptcl_track(res);
     return p + (*(u16*)p) * 8 + 8;
 }
 
 extern "C" u16 fn_800A8CE8(void* res) {
-    u8* p = (u8*)fn_800A8BF8(res);
+    u8* p = (u8*)ef_emres_get_ptcl_track(res);
     return *(u16*)(p + (*(u16*)p) * 8 + 6);
 }
 
@@ -1439,7 +1441,7 @@ extern "C" void fn_800A8DF8(EfEmitterObj* self) {
         fn_800A5114(self->managerEF, 1);
     }
     if (self->state == 1) {
-        EfParticleRec* pm = (EfParticleRec*)fn_800A5250(&self->particles);
+        EfParticleRec* pm = (EfParticleRec*)ef_list_get_first(&self->particles);
         nw4r::math::MTX34 m1, m2;
         MTX34_ctor(&m1);
         MTX34_ctor(&m2);
@@ -1674,7 +1676,7 @@ extern "C" void fn_800A9790(EfEmitterObj* self, EfWalkCtx* arg) {
 #pragma peephole on
 extern "C" s32 fn_800A98D4(EfEmitterObj* self, void* cb, void* arg, s32 flag, s32 recurse) {
     s32 count = 0;
-    void* node = fn_800A5250(&self->particles);
+    void* node = ef_list_get_first(&self->particles);
     while (node != NULL) {
         void* next = fn_80501C60(&self->particles, node);
         if (flag != 0 || ef_get_life_status(node) == 1) {

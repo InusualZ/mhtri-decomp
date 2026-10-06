@@ -404,13 +404,13 @@ extern "C" void fn_800F7C74(u32 mode) {
         }
     }
     ctrl->system_0x04 = (void*)fn_800D3C0C();
-    ctrl->resource_0x08 = fn_800B2878();
-    u16 count = (u16)fn_800B4A90((EfPostField*)ctrl->resource_0x08);
+    ctrl->resource_0x08 = ef_resource_instance();
+    u16 count = (u16)ef_resource_num_texture_projects((EfResourceManager*)ctrl->resource_0x08);
     for (int i = 0; i < count; i++) {
-        fn_800B4A98((EfPostField*)ctrl->resource_0x08, (u16)i);
+        ef_resource_texture_project_at((EfResourceManager*)ctrl->resource_0x08, (u16)i);
     }
     if (ctrl->resource_0x08 != NULL) {
-        fn_800B44F4(ctrl->resource_0x08);
+        ef_resource_bind_references((EfResourceManager*)ctrl->resource_0x08);
     }
 }
 
@@ -419,7 +419,7 @@ extern "C" void fn_800F7C74(u32 mode) {
 extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx* ctx) {
     EftControl* ctrl = &eft_control;
     u8* table = lbl_806A2D34;
-    void* work = fn_800B2878();
+    void* work = ef_resource_instance();
     EftProSlot* slot = ctx->slot;
     u32 unshared = ctx->unshared_0x08;
 
@@ -443,7 +443,7 @@ extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx
         slot->field_0x0C = nwAddResource((char*)name, data);
         ctrl->id_a_0x3C[ctrl->loaded_a_0x30] = slot->field_0x0C;
         ctrl->loaded_a_0x30++;
-        slot->field_0x10 = fn_800B3670(work, data);
+        slot->field_0x10 = ef_resource_add_effect_project(work, data);
         if (unshared == 1) {
             table[2]++;
         } else {
@@ -462,7 +462,7 @@ extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx
             slot->field_0x05 = table[3];
             table[3]++;
         }
-        slot->field_0x14 = fn_800B3E80(work, data);
+        slot->field_0x14 = ef_resource_add_texture_project(work, data);
         break;
     }
     fn_800F7C74(1);
@@ -707,7 +707,7 @@ extern "C" u32 fn_800F8D80(u32 size) {
 extern "C" void fn_800F8DA4(void) {
     EftResSlot* slot;
 
-    fn_800B2878();
+    ef_resource_instance();
     void* system = eft_control.system_0x04;
     if (system == NULL) {
         return;
