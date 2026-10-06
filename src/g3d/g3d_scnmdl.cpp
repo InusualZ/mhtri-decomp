@@ -19,7 +19,7 @@
 #include "nw4r/g3d/res_common.h" /* ResHandle, IS_VALID_PTR (rule 1) */
 #include "nw4r/g3d/scnmdl.h"      /* nw4r::g3d::ScnMdl (rule 1) */
 #include "g3d/fn_80063888.h"      /* fn_800649B4 (rule 2: owner g3d/fn_80063888.cpp) */
-#include "g3d/g3d_anmchr.h"       /* fn_8005D3E0, fn_8005DC24, type_obj_set_name, fn_800639D0, G3dObj (rule 2: owner g3d/g3d_anmchr.cpp) */
+#include "g3d/g3d_anmchr.h"       /* G3dObj::operator delete, TypeObj::GetTypeName, type_obj_set_name, TypeObj::operator==, G3dObj (rule 2: owner g3d/g3d_anmchr.cpp) */
 #include "g3d/fn_800680CC.h"      /* fn_800696E4, fn_800697A4 (rule 2: owner g3d/fn_800680CC.cpp) */
 #include "g3d/fn_8005AA28.h"      /* fn_8005AB00 (rule 2: owner g3d/fn_8005AA28.cpp) */
 #include "g3d/fn_80075DCC.h"      /* fn_8007B424..fn_800793A4 (rule 2: owner g3d/fn_80075DCC.cpp) */
@@ -480,7 +480,7 @@ u32 fn_8007ED58(ScnMdl* pSelf, void* pArg2, u32* pArg3, u32 a4, u32 a5, u32 a6, 
 void* fn_8007EE68(ScnMdl* pSelf, s16 flag) {
     if (pSelf != 0) {
         *(const char**)pSelf = lbl_8058F028;
-        if (fn_800600C0((u32*)pSelf) != 0) {
+        if (reinterpret_cast<nw4r::g3d::G3dObj*>(pSelf)->GetParent() != 0) {
             nw4r::db::Panic(lbl_8058EDA0, 1627, lbl_8058F004);
         }
         if (pSelf->mpAnmObjShp != 0) {
@@ -488,7 +488,7 @@ void* fn_8007EE68(ScnMdl* pSelf, s16 flag) {
         }
         dtor_80080F7C(pSelf, 0);
         if ((s16)flag > 0) {
-            fn_8005D3E0(pSelf);
+            nw4r::g3d::G3dObj::operator delete(pSelf);
         }
     }
     return pSelf;
@@ -502,11 +502,11 @@ u32 fn_8007EF1C(void) {
 }
 
 /* 0x8007EF4C - the vtable-dispatch wrapper: run the object's slot +0x14 and read the word back
- * through the `fn_8005DC24` helper. */
+ * through the `TypeObj::GetTypeName` helper. */
 u32 fn_8007EF4C(G3dObj* pSelf) {
     u32 tmp = pSelf->vt->method_0x14(pSelf);
 
-    return fn_8005DC24(&tmp);
+    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
 }
 
 /* 0x8007EF84 - one step of the name-record chain: resolve the ScnMdl record, compare the caller's key
@@ -514,7 +514,7 @@ u32 fn_8007EF4C(G3dObj* pSelf) {
 u32 fn_8007EF84(void* pSelf, u32* pKey) {
     u32 res = fn_8007B764(pSelf);
 
-    if (fn_800639D0((u32**)pKey, (u32**)&res)) {
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(pKey) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res))) {
         return 1;
     }
     {
@@ -528,7 +528,7 @@ u32 fn_8007EF84(void* pSelf, u32* pKey) {
 u32 fn_8007EFF0(void* pSelf, u32* pKey) {
     u32 res = fn_8007B734(pSelf);
 
-    if (fn_800639D0((u32**)pKey, (u32**)&res)) {
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(pKey) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res))) {
         return 1;
     }
     {

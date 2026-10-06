@@ -19,7 +19,8 @@
  *   0x800659D8-0x80065ED8, 0x80065EF0-0x80065FFC, 0x800660DC-0x80066C68, 0x80066EF8-0x80066F2C,
  *   0x800670D4-0x800677D8, 0x80067824-0x80067A54, 0x80067B90-0x80067E54, 0x80067EFC-0x800680A8.
  *   Partial (12): fn_800646E8, fn_80064758, fn_8006497C, fn_80064988, fn_8006518C, fn_8006522C, fn_8006553C,
- *   fn_800655A4, fn_800657C4, fn_80065ED8, fn_80066080, fn_80066FA0.
+ *   fn_800655A4, fn_80065ED8, fn_80066080, fn_80066FA0.  AnmScn's constructor has an empty body by design (the
+ *   compiler emits the G3dObj base call and the vtable store); AnmObj::SetAnmFlag is nw4r's member.
  *   flipcheck: `.text` 0xEF4 of 0x4248; extab 0x170 of 0x3A8; extabindex 0x228 of 0x360; `.rodata`, `.data` and `.sdata2` are claimed and not emitted; `.sdata` is
  *   0x4 of 0x20.
  */
@@ -92,14 +93,14 @@ extern "C" u32 fn_8006553C(void *p)
 {
     G3dObj *obj = (G3dObj *)p;
     u32 tmp = obj->vt->method_0x14(p);
-    return fn_8005DC24(&tmp);
+    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
 }
 
 extern "C" u32 fn_800655A4(void *p)
 {
     G3dObj *obj = (G3dObj *)p;
     u32 tmp = obj->vt->method_0x14(p);
-    return fn_8005DC24(&tmp);
+    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
 }
 
 /* Copies one word through the `fn_8006411C` helper and hands the destination back. */
@@ -133,14 +134,9 @@ typedef struct {
     /* +0x00 */ void *vt;
 } G3dVtObj; /* size: 0x4 */
 
-extern u8 lbl_8058C898[];
-extern "C" void fn_8005D428(void *self, void *a, u32 flag);
-
-extern "C" void *fn_800657C4(void *self, void *a)
+/* 0x800657C4 (0x40): constructs the scene animation with no parent. */
+nw4r::g3d::AnmScn::AnmScn(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
 {
-    fn_8005D428(self, a, 0);
-    ((G3dVtObj *)self)->vt = lbl_8058C898;
-    return self;
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -616,12 +612,13 @@ typedef struct {
     /* +0x0C */ u32 field_0x0C;
 } G3dFlagWord; /* size: 0x10 (approximate - only the +0xC word is evidenced) */
 
-extern "C" void fn_80064988(G3dFlagWord *self, u32 bits, s32 set)
+/* 0x80064988 (0x2C): sets or clears animation flag `flag`. */
+void nw4r::g3d::AnmObj::SetAnmFlag(AnmFlag flag, bool on)
 {
-    if (set != 0)
-        self->field_0x0C |= bits;
+    if (on)
+        mFlags |= flag;
     else
-        self->field_0x0C &= ~bits;
+        mFlags &= ~flag;
 }
 
 /* Tests `bits` in the object's +0xC flag word; the object is opaque, as `g3d/fn_80063888.h` declares it (the
@@ -816,7 +813,7 @@ extern "C" void *fn_80066080(void *self, s16 flags)
     if (self != 0) {
         dtor_80065768(self, 0);
         if (flags > 0)
-            fn_8005D3E0(self);
+            nw4r::g3d::G3dObj::operator delete(self);
     }
     return self;
 }

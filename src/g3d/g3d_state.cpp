@@ -111,7 +111,7 @@
 #include "nw4r/math.h"
 #include "gx.h"              /* GXWGFifo, the 0xCC008000 write window (rule 1) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResGenMode (rule 2) */
-#include "g3d/g3d_anmchr.h"    /* fn_8005DC24, fn_800639D0, owned by g3d/g3d_anmchr.cpp (rule 2) */
+#include "g3d/g3d_anmchr.h"    /* TypeObj::GetTypeName and operator==, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/fn_80063888.h"   /* the cluster declarations, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_identity/MTX34_ctor, owned by fn_8004CAD8.cpp (rule 2) */
 #include "g3d/g3d_camera.h"    /* fn_80075390..fn_80075620, owned by g3d/g3d_camera.cpp (rule 2) */
@@ -384,17 +384,17 @@ void* fn_80084600(void) {
     return *fn_8007BB8C(&pScnRoot, lbl_8056F6D0);
 }
 
-/* A virtual dispatch on slot +0x14 whose result is handed to the `fn_8005DC24` unwrapper. */
+/* A virtual dispatch on slot +0x14 whose result is handed to the `TypeObj::GetTypeName` unwrapper. */
 u32 fn_8008455C(G3dVtObject* pSelf) {
     u32 value = pSelf->m14();
-    return fn_8005DC24(&value);
+    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&value)->GetTypeName();
 }
 
 /* Register `pArg`'s bound object with the state's table, and on a miss insert it under the current
  * `ScnRoot`. */
 u32 fn_80084594(void* pSelf, u32* pArg) {
     void* pScnRoot = fn_80084600();
-    if (fn_800639D0((u32**)pArg, (u32**)&pScnRoot)) {
+    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(pArg) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&pScnRoot))) {
         return 1;
     }
     u32 key = *pArg;
