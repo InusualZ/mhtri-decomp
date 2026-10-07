@@ -2303,16 +2303,123 @@ Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp:
 	.data       start:0x8060E8A0 end:0x8060E8E4
 	.bss        start:0x806F4B48 end:0x806F4CC8
 
-MSL_C/alloc.cpp:
+Runtime.PPCEABI.H/ExceptionPPC.cp:
 	extab       start:0x8001E400 end:0x8001E464
 	extabindex  start:0x8003F18C end:0x8003F1C8
-	.text       start:0x804578FC end:0x804642C8
-	.rodata     start:0x80572450 end:0x80573190
-	.data       start:0x8060E8E4 end:0x8060F538
-	.bss        start:0x806F4CC8 end:0x806F5020
-	.sdata      start:0x80793CD0 end:0x80793D00
-	.sbss       start:0x80794E00 end:0x80794E28
-	.sdata2     start:0x8079C9A8 end:0x8079CAB8
+	.text       start:0x804578FC end:0x80458BDC
+	.rodata     start:0x80572450 end:0x805724B8
+	.data       start:0x8060E8E4 end:0x8060E958
+	.sdata      start:0x80793CD0 end:0x80793CD8
+
+MSL_C/GCN_Mem_Alloc.c:
+	.text       start:0x80458BDC end:0x80458C94
+	.rodata     start:0x805724B8 end:0x80572528
+
+MSL_C/alloc.cpp:
+	.text       start:0x80458C94 end:0x804591A8
+	.rodata     start:0x80572528 end:0x80572540
+	.bss        start:0x806F4CC8 end:0x806F4D00
+	.sbss       start:0x80794E00 end:0x80794E08
+
+MSL_C/errno.c:
+	.sbss       start:0x80794E08 end:0x80794E10
+
+MSL_C/ansi_files.c:
+	.text       start:0x804591A8 end:0x804592B8
+	.data       start:0x8060E958 end:0x8060EA98
+	.bss        start:0x806F4D00 end:0x806F5000
+
+MSL_C/ansi_fp.c:
+	.text       start:0x804592B8 end:0x8045AB38
+	.rodata     start:0x80572540 end:0x80572620
+	.data       start:0x8060EA98 end:0x8060EC00
+	.sdata2     start:0x8079C9A8 end:0x8079C9E0
+
+MSL_C/locale.c:
+	.rodata     start:0x80572620 end:0x80572B28
+	.data       start:0x8060EC00 end:0x8060EDF8
+	.sdata2     start:0x8079C9E0 end:0x8079C9F8
+
+MSL_C/file_io.c:
+	.text       start:0x8045AB38 end:0x8045B3A0
+
+MSL_C/mbstring.c:
+	.text       start:0x8045B3A0 end:0x8045B598
+
+MSL_C/mem.c:
+	.text       start:0x8045B598 end:0x8045B9D8
+
+MSL_C/misc_io.c:
+	.text       start:0x8045B9D8 end:0x8045BADC
+
+MSL_C/printf.c:
+	.text       start:0x8045BADC end:0x8045DFA0
+	.rodata     start:0x80572B28 end:0x80572B50
+	.data       start:0x8060EDF8 end:0x8060F028
+	.sdata      start:0x80793CD8 end:0x80793CE0
+	.sdata2     start:0x8079C9F8 end:0x8079CA00
+
+MSL_C/rand.c:
+	.text       start:0x8045DFA0 end:0x8045DFC8
+	.sdata      start:0x80793CE0 end:0x80793CE8
+
+MSL_C/scanf.c:
+	.text       start:0x8045DFC8 end:0x8045F4AC
+	.rodata     start:0x80572B50 end:0x80572B78
+	.data       start:0x8060F028 end:0x8060F298
+
+MSL_C/signal.c:
+	.text       start:0x8045F4AC end:0x8045F554
+	.bss        start:0x806F5000 end:0x806F5020
+
+MSL_C/string.c:
+	.text       start:0x8045F554 end:0x8045F9E8
+	.sdata      start:0x80793CE8 end:0x80793CF0
+	.sdata2     start:0x8079CA00 end:0x8079CA08
+
+MSL_C/float.c:
+	.sdata      start:0x80793CF0 end:0x80793D00
+
+MSL_C/strtold.c:
+	.text       start:0x8045F9E8 end:0x80460D0C
+	.rodata     start:0x80572B78 end:0x80572B88
+	.sdata2     start:0x8079CA08 end:0x8079CA28
+
+MSL_C/wctype.c:
+	.rodata     start:0x80572B88 end:0x80573188
+
+MSL_C/strtoul.c:
+	.text       start:0x80460D0C end:0x80461778
+
+MSL_C/wmem.c:
+	.text       start:0x80461778 end:0x80461808
+
+MSL_C/wprintf.c:
+	.text       start:0x80461808 end:0x80463B20
+	.rodata     start:0x80573188 end:0x80573190
+	.data       start:0x8060F298 end:0x8060F538
+	.sdata2     start:0x8079CA28 end:0x8079CA30
+
+MSL_C/wstring.c:
+	.text       start:0x80463B20 end:0x80463C48
+
+MSL_C/wchar_io.c:
+	.text       start:0x80463C48 end:0x80463CC0
+
+MSL_C/uart_console_io.c:
+	.text       start:0x80463CC0 end:0x80463D98
+	.sbss       start:0x80794E10 end:0x80794E18
+
+MSL_C/abort_exit.c:
+	.text       start:0x80463D98 end:0x80463DE4
+	.sbss       start:0x80794E18 end:0x80794E28
+
+MSL/mathf.cpp:
+	.text       start:0x80463DE4 end:0x80463FFC
+
+MSL/e_acos.cpp:
+	.text       start:0x80463FFC end:0x804642C8
+	.sdata2     start:0x8079CA30 end:0x8079CAB8
 
 MSL/e_asin.cpp:
 	.text       start:0x804642C8 end:0x80464560
@@ -2399,14 +2506,99 @@ MSL/s_sin.cpp:
 	.text       start:0x80467E20 end:0x80467EEC
 	.sdata2     start:0x8079CF28 end:0x8079CF30
 
+MSL/s_tan.cpp:
+	.text       start:0x80467EEC end:0x80467F64
+	.sdata2     start:0x8079CF30 end:0x8079CF38
+
+MSL/w_math.cpp:
+	.text       start:0x80467F64 end:0x804681CC
+	.sdata2     start:0x8079CF38 end:0x8079CF40
+
+MSL_C/extras.c:
+	.text       start:0x804681CC end:0x80468358
+
+TRK/TRKAccessFile.c:
+	.text       start:0x80468358 end:0x80468378
+
+TRK/gdev_cc.c:
+	.text       start:0x80468378 end:0x804685F0
+	.bss        start:0x806F5020 end:0x806F5540
+	.sbss       start:0x80794E38 end:0x80794E40
+
+TRK/CircleBuffer.c:
+	.text       start:0x804685F0 end:0x80468868
+
 TRK/TRK_flush_cache.cpp:
-	.text       start:0x80467EEC end:0x8046D9F0
+	.text       start:0x80468868 end:0x804688A0
+
+TRK/main_TRK.c:
+	.text       start:0x804688A0 end:0x804689C8
+	.sbss       start:0x80794E40 end:0x80794E48
+
+TRK/mem_TRK.c:
+	.text       start:0x804689C8 end:0x80468C2C
+
+TRK/dispatch.c:
+	.text       start:0x80468C2C end:0x80468D4C
+	.data       start:0x8060F538 end:0x8060F5A8
+
+TRK/dolphin_trk.c:
+	.text       start:0x80468D4C end:0x8046940C
+	.data       start:0x8060F5A8 end:0x8060F6D0
+	.bss        start:0x806F5540 end:0x806F5568
+	.sbss       start:0x80794E48 end:0x80794E58
+	.sdata2     start:0x8079CF40 end:0x8079CF48
+
+TRK/nubevent.c:
+	.text       start:0x8046940C end:0x80469638
+	.data       start:0x8060F6D0 end:0x8060F6F0
+	.bss        start:0x806F5568 end:0x806F5590
+
+TRK/nubinit.c:
+	.text       start:0x80469638 end:0x80469788
+	.data       start:0x8060F6F0 end:0x8060F710
+	.sbss       start:0x80794E58 end:0x80794E68
+
+TRK/serpoll.c:
+	.text       start:0x80469788 end:0x804698D0
+
+TRK/support.c:
+	.text       start:0x804698D0 end:0x80469F10
+	.data       start:0x8060F710 end:0x8060F758
+
+TRK/targcont.c:
+	.text       start:0x80469F10 end:0x8046A26C
+
+TRK/msg.c:
+	.text       start:0x8046A26C end:0x8046A2D0
+	.data       start:0x8060F758 end:0x8060F780
+	.sbss       start:0x80794E68 end:0x80794E70
+
+TRK/msgbuf.c:
+	.text       start:0x8046A2D0 end:0x8046AADC
+	.data       start:0x8060F780 end:0x8060F7A8
+	.bss        start:0x806F5590 end:0x806F6F38
+
+TRK/msghndlr.c:
+	.text       start:0x8046AADC end:0x8046BA60
+	.data       start:0x8060F7A8 end:0x8060F810
+	.sbss       start:0x80794E70 end:0x80794E78
+
+TRK/mslsupp.c:
+	.text       start:0x8046BA60 end:0x8046BBEC
+
+TRK/targimpl.c:
+	.text       start:0x8046BBEC end:0x8046D420
 	.rodata     start:0x805734A8 end:0x80573530
-	.data       start:0x8060F538 end:0x8060F868
-	.bss        start:0x806F5020 end:0x806F74E0
+	.data       start:0x8060F810 end:0x8060F820
+	.bss        start:0x806F6F38 end:0x806F74E0
+	.sbss       start:0x80794E78 end:0x80794E88
+
+AI_SDK/ai.c:
+	.text       start:0x8046D420 end:0x8046D9F0
+	.data       start:0x8060F820 end:0x8060F868
 	.sdata      start:0x80793D00 end:0x80793D08
-	.sbss       start:0x80794E38 end:0x80794EC8
-	.sdata2     start:0x8079CF30 end:0x8079CF48
+	.sbss       start:0x80794E88 end:0x80794EC8
 
 ARC/arc.cpp:
 	.text       start:0x8046D9F0 end:0x80474CB0
