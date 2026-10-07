@@ -27,46 +27,82 @@ typedef struct MEMList {
     u16 offset; /* +0x0A  node displacement inside the object */
 } MEMList; /* size: 0x0C */
 
-/* The allocator's function table: `MEMAllocFromAllocator` calls entry 0, `MEMFreeToAllocator` entry 1. */
+struct MEMAllocator;
+
+/* The allocator's function table: `MEMAllocFromAllocator` calls `alloc`, `MEMFreeToAllocator` calls `free`. */
 typedef struct MEMAllocatorFuncs {
-    void* alloc; /* +0x00 */
-    void* free;  /* +0x04 */
+    void* (*alloc)(struct MEMAllocator* allocator, u32 size);  /* +0x00 */ /* untyped: raw heap block */
+    void (*free)(struct MEMAllocator* allocator, void* block); /* +0x04 */ /* untyped: raw heap block */
 } MEMAllocatorFuncs; /* size: 0x08 */
 
 typedef struct MEMAllocator {
-    MEMAllocatorFuncs* funcs; /* +0x00 */
-    void* heap;               /* +0x04 */
-    u32 heapArg;              /* +0x08 */
-    u32 unused_0x0C;          /* +0x0C */
+    const MEMAllocatorFuncs* funcs; /* +0x00 */
+    struct MEMiHeapHead* heap;      /* +0x04 */
+    u32 heapArg;                    /* +0x08 */
+    u32 unused_0x0C;                /* +0x0C */
 } MEMAllocator; /* size: 0x10 */
 
 /* A free/used region header: the pointer handed out is 16 bytes past it. */
 typedef struct MEMiHeapRegion {
-    u16 signature; /* +0x00 */
-    u16 flags;     /* +0x02 */
-    u32 size;      /* +0x04 */
-    u32 prev;      /* +0x08 */
-    u32 next;      /* +0x0C */
+    u16 signature;                 /* +0x00  'RF' free, 'UD' used */
+    union {
+        u16 value;                 /* +0x02 */
+        struct {
+            u16 allocDirection : 1; /* +0x02  bit 15: 0 from the region start, 1 from its end */
+            u16 alignment : 7;      /* +0x02  bits 8..14: padding bytes in front of the header */
+            u16 groupID : 8;        /* +0x02  bits 0..7 */
+        } bits; /* size: 0x02 */
+    } attribute;                   /* +0x02 */
+    u32 size;                      /* +0x04  bytes after the header */
+    struct MEMiHeapRegion* prev;   /* +0x08 */
+    struct MEMiHeapRegion* next;   /* +0x0C */
 } MEMiHeapRegion; /* size: 0x10 */
+
+/* Head and tail of a region list (the free list or the used list). */
+typedef struct MEMiRegionList {
+    MEMiHeapRegion* head; /* +0x00 */
+    MEMiHeapRegion* tail; /* +0x04 */
+} MEMiRegionList; /* size: 0x08 */
+
+/* Heap attribute word: the option flags occupy its low byte. */
+typedef union MEMiHeapAttribute {
+    u32 value; /* +0x00 */
+    struct {
+        u32 reserved : 24; /* +0x38 */
+        u32 optFlag : 8;   /* +0x38 */
+    } fields; /* size: 0x04 */
+} MEMiHeapAttribute; /* size: 0x04 */
 
 /* SDK heap head (mem_Heap base). */
 typedef struct MEMiHeapHead {
     u32 signature;   /* +0x00 */
-    u32 unused_0x04; /* +0x04 */
-    u32 unused_0x08; /* +0x08 */
-    MEMList link;    /* +0x0C  child-heap list */
+    MEMLink link;    /* +0x04  node in the parent heap's (or the root) list */
+    MEMList children; /* +0x0C  child-heap list; nodes at +0x04 */
     void* start;     /* +0x18 */
     void* end;       /* +0x1C */
     u8 mutex[0x18];  /* +0x20  OSMutex */
-    u8 attribute;    /* +0x38 */
-    u8 pad_0x39[3];  /* +0x39 */
-    void* freeHead;  /* +0x3C */
-    void* freeTail;  /* +0x40 */
-    void* usedHead;  /* +0x44 */
-    void* usedTail;  /* +0x48 */
-    u16 freeCount;   /* +0x4C */
-    u16 freeOffset;  /* +0x4E */
-} MEMiHeapHead; /* size: 0x50 */
+    MEMiHeapAttribute attribute; /* +0x38 */
+} MEMiHeapHead; /* size: 0x3C */
+
+/* The expandable heap's own data, directly after its MEMiHeapHead. */
+typedef struct MEMiExpHeapHead {
+    MEMiRegionList freeList; /* +0x00 */
+    MEMiRegionList usedList; /* +0x08 */
+    u16 groupID;             /* +0x10 */
+    union {
+        u16 value;                /* +0x12 */
+        struct {
+            u16 reserved : 14;    /* +0x12  bits 2..15 */
+            u16 reuseMargins : 1; /* +0x12  bit 1: alignment margins become free regions */
+            u16 bestFit : 1;      /* +0x12  bit 0: best-fit instead of first-fit search */
+        } bits; /* size: 0x02 */
+    } features;                   /* +0x12 */
+} MEMiExpHeapHead; /* size: 0x14 */
+
+typedef struct MEMiExpHeap {
+    MEMiHeapHead head;       /* +0x00 */
+    MEMiExpHeapHead exp;     /* +0x3C */
+} MEMiExpHeap; /* size: 0x50 */
 
 typedef struct MEMRegion {
     u32 start; /* +0x00 */

@@ -5,6 +5,7 @@
 #define OS_OSMESSAGE_H
 
 #include "types.h"
+#include "OS/OSThread.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,7 +13,12 @@ extern "C" {
 
 /* size: 0x20 - two thread queues, the message-array pointer, the count and the two ring indices */
 typedef struct OSMessageQueue {
-    /* +0x00 */ u8 pad_0x00[0x20];
+    /* +0x00 */ OSThreadQueue queueSend;    /* threads waiting for room */
+    /* +0x08 */ OSThreadQueue queueReceive; /* threads waiting for a message */
+    /* +0x10 */ void** msgArray;            /* the caller-owned ring of message words */
+    /* +0x14 */ s32 msgCount;               /* ring capacity */
+    /* +0x18 */ s32 firstIndex;             /* index of the oldest message */
+    /* +0x1C */ s32 usedCount;              /* messages in the ring */
 } OSMessageQueue; /* size: 0x20 */
 
 /* size: 0x08 - the queued message and its priority */
@@ -29,8 +35,13 @@ void OSInitMessageQueue(OSMessageQueue* queue, OSMessage* msgArray, s32 msgCount
 
 /* 0x804D14C0 / 0x804D1590 - post to / take from a queue; the block flag is OS_MESSAGE_BLOCK or
  * OS_MESSAGE_NOBLOCK. */
-BOOL OSSendMessage(OSMessageQueue* queue, OSMessage* msg, BOOL block);
+/* untyped: the message word is passed through to the receiver */
+BOOL OSSendMessage(OSMessageQueue* queue, void* msg, BOOL block);
 BOOL OSReceiveMessage(OSMessageQueue* queue, OSMessage* buffer, BOOL block);
+
+/* 0x804D1670 - posts a message at the front of the queue. */
+/* untyped: the message word is passed through to the receiver */
+BOOL OSJamMessage(OSMessageQueue* queue, void* msg, BOOL block);
 
 #ifdef __cplusplus
 }

@@ -24,6 +24,18 @@ char* OSGetAppGamename(void);
  * `NWC24_RTC_USER_ID` in `unsplit/NWC24.h`). */
 #define OS_BUS_CLOCK (*(u32*)0x800000F8)
 
+/* The low-memory words the OS boot code and the module loader share (the original object carries no relocation for
+ * them, so the source spelled the addresses out). */
+typedef struct OSModuleQueue {
+    void* head; /* +0x00 */
+    void* tail; /* +0x04 */
+} OSModuleQueue; /* size: 0x08 */
+
+#define OS_MODULE_QUEUE (*(OSModuleQueue*)0x800030C8)
+#define OS_STRING_TABLE (*(void**)0x800030D0)
+#define OS_IPC_BUFFER_LO (*(void**)0x80003130)
+#define OS_IPC_BUFFER_HI (*(void**)0x80003134)
+
 #ifdef __cplusplus
 }
 #endif
