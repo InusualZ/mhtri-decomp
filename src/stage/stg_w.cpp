@@ -729,6 +729,7 @@ extern "C" {
 #include "stage/fn_802B2AA0.h"
 }
 #include "stage/stg_w.h"
+#include "g3d/g3d_scnroot.h" /* nw4r::g3d::ScnRoot::GetFog (rule 2) */
 
 extern "C" {
 /* The shell-set job table pointer (`.sbss` 0x80794B60); an RSO stores it, nothing in the DOL does. */
@@ -808,7 +809,7 @@ extern "C" void fn_802B2E2C(void)
     StageColourRec rec;
     s32 handle;
 
-    handle = fn_80082C80(pRoot, 0);
+    handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetFog(0);
     fn_802AE250(&rec, &handle);
     fn_8007A1B8(&rec, 0, &rec.flags, &rec.b, 0, 0, &rec.a);
 
