@@ -1304,7 +1304,7 @@ config.libs = [
             Object(NonMatching, "OS/OSPlayTime.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSLaunch.c", cflags=cflags_base),
             Object(NonMatching, "Runtime.PPCEABI.H/__init_user.c", cflags=cflags_base),
-            Object(NonMatching, "PAD/PADClamp.c", cflags=cflags_base),
+            Object(Matching, "PAD/PADClamp.c", cflags=cflags_base),
             Object(NonMatching, "PAD/pad.c", cflags=cflags_base),
             Object(NonMatching, "RSO/rso_notify.c"),
             # Registered once, at its final home (docs/plan.md 12): proposal `80474CB0_AXFXReverbHiInit` -

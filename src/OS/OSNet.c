@@ -4,7 +4,7 @@
  *    0x804C1760-0x804D9B4C.  Evidence: the NWC24/kd device strings (.data 0x80629650..0x806297B8, one 0x168-byte
  *    label) are read only by `__OSInitNet`.
  * FLAGS. `cflags_base` per object (configure.py).
- * NAMES. map name; `OSIOSRevision` is a GUESS (the IOS revision word `__OSGetIOSRev` fills: byte 1 is the major version).
+ * NAMES. map name; `OSIOSRev` (OS/OS.h) is the record `__OSGetIOSRev` fills.
  * RESIDUALS. `__OSInitNet` (97 %): the target tests the revision with `bne` plus an unconditional `b` to the epilogue where the
  *    compiler folds both into one `beq`; no source spelling kept the pair.  .data: only the three `OSReport` messages (0x80629650, 0x80629684, 0x806296B8) are emitted; the 0xC4 bytes after
  *    them (the NWC24 function-name and /dev/net/kd path strings) are referenced by no function of the image.
@@ -18,20 +18,13 @@
 #include "OS/OS.h"
 #include "OS/OSError.h"
 
-/* The IOS revision word: byte 1 is the major version. */
-typedef struct OSIOSRevision {
-    /* +0x00 */ u8 pad_0x00;
-    /* +0x01 */ u8 major;
-    /* +0x02 */ u16 minor;
-} OSIOSRevision; /* size: 0x04 */
-
 /* Shuts the NWC24 scheduler and the network time sync down on IOS builds newer than 4 (except 9). */
 void __OSInitNet(void)
 {
-    OSIOSRevision revision;
+    OSIOSRev revision;
     int result;
 
-    __OSGetIOSRev((u32*)&revision);
+    __OSGetIOSRev(&revision);
     if (revision.major > 4 && revision.major != 9) {
         result = NWC24iPrepareShutdown();
         if (result != 0) {

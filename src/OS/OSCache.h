@@ -21,6 +21,12 @@ void DCStoreRange(void* start, u32 size); /* untyped: byte range */
 /* 0x804CC640 - writes a cached range back to main memory and waits. */
 void DCFlushRange(void* start, u32 size); /* untyped: byte range */
 
+/* 0x804CC700 - zeroes whole cache lines of a range without fetching them. */
+void DCZeroRange(void* start, u32 nBytes); /* untyped: byte range */
+
+/* 0x804CC770 - invalidates the whole instruction cache. */
+void ICFlashInvalidate(void);
+
 /* 0x804CC730 - invalidates a range of the instruction cache. */
 void ICInvalidateRange(void* start, u32 size); /* untyped: byte range */
 

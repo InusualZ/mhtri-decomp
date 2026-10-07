@@ -54,7 +54,10 @@ typedef struct OSModuleQueue {
 typedef struct OSRebootParams {
     /* +0x00 */ u32 valid;       /* non-zero when a reboot was requested */
     /* +0x04 */ u32 resetCode;
-    /* +0x08 */ u8 pad_0x08[0x14];
+    /* +0x08 */ u8 pad_0x08[4];
+    /* +0x0C */ u32 arenaLimit; /* end of the region the previous title left to keep, zero for none */
+    /* +0x10 */ u32 arenaResume; /* start of the second region to clear */
+    /* +0x14 */ u8 pad_0x14[8];
 } OSRebootParams; /* size: 0x1C */
 
 /* 0x8074D280 - the pending reboot request. */
@@ -63,8 +66,22 @@ extern OSRebootParams __OSRebootParams;
 /* 0x807952CC - set when the title was started from the NAND boot path. */
 extern BOOL __OSInNandBoot;
 
+/* The IOS revision and its build date. size: 0x8 */
+typedef struct OSIOSRev {
+    /* +0x00 */ u8 platform;
+    /* +0x01 */ u8 major;
+    /* +0x02 */ u8 minor;
+    /* +0x03 */ u8 micro;
+    /* +0x04 */ u8 month;
+    /* +0x05 */ u8 day;
+    /* +0x06 */ u16 year;
+} OSIOSRev;
+
 /* 0x804CA030 - reads the IOS revision. */
-void __OSGetIOSRev(u32* rev);
+void __OSGetIOSRev(OSIOSRev* rev);
+
+/* 0x807952D8 - the exception handler table the vectors dispatch through. */
+extern OSExceptionHandler* OSExceptionTable;
 
 #ifdef __cplusplus
 }

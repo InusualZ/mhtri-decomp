@@ -51,7 +51,7 @@ BOOL __OSWriteNandbootInfo(OSNandbootInfo* info)
     u32 i;
 
     sum = 0;
-    word = info->payload;
+    word = info->body.payload;
     for (i = 0; i < 0x407; i++) {
         sum += *word++;
     }

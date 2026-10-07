@@ -68,6 +68,8 @@ typedef struct NANDStatus {
 s32 NANDGetStatus(const char* path, NANDStatus* status);
 /* 0x804C8170 - reads the status record of `path` (an absolute name) asynchronously. */
 s32 NANDPrivateGetStatusAsync(const char* path, NANDStatus* status, NANDAsyncCallback callback, NANDCommandBlock* block);
+/* 0x804C9560 - the blocks and inodes the files below `path` use (`ISFS_GetUsage` on the absolute path). */
+s32 NANDGetUsage(const char* path, u32* blockCount, u32* inodeCount);
 /* 0x804C8100 - `NANDGetStatus` on an absolute path. */
 s32 NANDPrivateGetStatus(const char* path, NANDStatus* status);
 /* 0x804C70E0 - create `path` by its absolute name with `permission` and `attribute`. */
