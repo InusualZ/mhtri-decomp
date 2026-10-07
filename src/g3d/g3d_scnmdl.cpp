@@ -442,8 +442,8 @@ extern "C" {
 u32 res_mdl_info_ref(const void* pInfo) {
     ResHandle* pSelf = (ResHandle*)pInfo;
 
-    if (fn_8006FFC8(pSelf) == 0) {
-        nw4r::db::Panic(lbl_8058F090, 57, lbl_8058F070, fn_8006FFBC(), lbl_80791208);
+    if (res_mdl_info_is_valid(pSelf) == 0) {
+        nw4r::db::Panic(lbl_8058F090, 57, lbl_8058F070, res_mdl_info_get_class_name(), lbl_80791208);
     }
     return fn_8007D468(pSelf);
 }

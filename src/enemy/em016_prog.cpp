@@ -10,7 +10,8 @@
  *   0x80797E88-0x80798238.
  * FLAGS. `cflags_main`; `#pragma peephole off` from `fn_80191598` to the end (the peephole fuses the `extsh` +
  *   `cmpwi` of a 16-bit test into `extsh.`), on before it.
- * NAMES. The file name follows the runtime dump's `em016_prog_tbl`, which opens the TU's `.data`; the map has only
+ * NAMES. MTX33_ctor is a GUESS (the 3x3 matrix constructor, the MTX34_ctor scheme).
+ *   The file name follows the runtime dump's `em016_prog_tbl`, which opens the TU's `.data`; the map has only
  *   `fn_` stems for the functions.  Callees whose call sites disagree with the owner's header are called through
  *   `<name>_viewN`/`<name>_cN` cast macros (the same direct call), and `#define stage_map_kind_get
  *   stage_map_kind_get_hidden_<header>` hides the disagreeing declaration.  `EmActWork` is this unit's own view of

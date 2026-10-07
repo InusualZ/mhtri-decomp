@@ -189,9 +189,7 @@ s32 res_node_is_valid(s32);
 void* fn_8005CEEC(void);
 s32 res_node_get_id(void*);
 u32 res_node_assign(void*, void*);
-s32 res_node_ref_nonconst(void*);
 u32 res_node_copy_ctor(void*, void*);
-void* res_node_ref(s32);
 s32 fn_8006405C(void*);
 u32 fn_80064BD4(void*);
 s32 fn_8006518C(void);
@@ -204,7 +202,7 @@ u32 fn_8006E2A8(s32, s32);
 u32 res_mat_tev_color_copy_ctor(void*, void*);
 u32 res_mat_ind_mtx_copy_ctor(void*, void*);
 u32 fn_8006FDCC(void*);
-s32 fn_8006FEC8(void*, s32);
+s32 res_mdl_info_get_node_of_pos_nrm_mtx(void*, s32);
 s32 fn_80070020(s32);
 u32 mtx34_copy_ps(void*, s32);
 u32 mtx34_concat(void*, void*, void*);
@@ -1279,14 +1277,14 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                         sp20 = fn_80094094((s32)(arg0));
                         fn_80077E34((s32)(&sp2C), (void*)(&sp20));
                         sp1C = res_mdl_get_info((void*)(&sp2C));
-                        temp_r3_3 = fn_8006FEC8((void*)(&sp1C), (s32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx));
+                        temp_r3_3 = res_mdl_info_get_node_of_pos_nrm_mtx((void*)(&sp1C), (s32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx));
                         if (temp_r3_3 < 0) {
                             nw4r::db::Panic((const char*)&lbl_8058E880, 0x64, (const char*)&lbl_8058E890);
                         }
                         sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMdl*>(&sp2C)->GetResNode((int)temp_r3_3).mpData;
                         res_node_copy_ctor((void*)(&sp28), (void*)(&sp18));
-                        temp_r20_2 = res_node_ref_nonconst((void*)(arg1));
-                        mtx34_concat((void*)(&spC8), (void*)(res_node_ref_nonconst((void*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
+                        temp_r20_2 = (s32)res_node_ref_nonconst((ResHandle*)(arg1));
+                        mtx34_concat((void*)(&spC8), (void*)((u32)res_node_ref_nonconst((ResHandle*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
                         temp_r3_4 = (void *)(g3d_state_get_nrm_mtx((u32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx)));
                         sp8 = ((RawView_19*)temp_r3_4)->field_0x18;
                         spC = ((RawView_19*)temp_r3_4)->field_0x1C;
@@ -1825,7 +1823,7 @@ s32 fn_80078904(s32 arg0) {
         nw4r::db::Panic((const char*)&lbl_8058EA50, 0xA5, (const char*)&lbl_8058EA30);
     }
     if (res_node_is_valid((s32)(arg0)) != 0) {
-        return (((RawView_25*)res_node_ref((s32)(arg0)))->field_0x14 & 0x100) != 0;
+        return (((RawView_25*)res_node_ref((const ResHandle*)(arg0)))->field_0x14 & 0x100) != 0;
     }
     return 0;
 }
