@@ -14,6 +14,10 @@ extern "C" {
 /* untyped: byte range */
 void* __memrchr(const void* buf, int ch, u32 n);
 
+/* 0x8045B664 (0x2C): returns the first occurrence of byte `ch` in the first `n` bytes of `buf`, or NULL. */
+/* untyped: byte range */
+void* memchr(const void* buf, int ch, u32 n);
+
 #ifdef __cplusplus
 }
 #endif

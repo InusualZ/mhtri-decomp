@@ -27,9 +27,19 @@ typedef struct LocaleRecord {
     /* +0x3C */ u8 pad_0x3c[0xC];
 } LocaleRecord; /* size: 0x48 */
 
+/* The numeric-formatting record of the C locale. */
+typedef struct LocaleConv {
+    /* +0x00 */ const char* decimal_point;  /* "." */
+    /* +0x04 */ const char* strings_0x04[8]; /* empty strings of the other string fields */
+    /* +0x24 */ char chars_0x24[0x14];      /* CHAR_MAX markers of the integer fields */
+} LocaleConv; /* size: 0x38 */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 0x8060EC00 - the C locale's numeric-formatting record. */
+extern LocaleConv _lconv;
 
 extern LocaleRecord _current_locale;
 

@@ -929,7 +929,7 @@ config.libs = [
             Object(NonMatching, "MSL/e_pow.cpp"),
             Object(Matching, "MSL/e_rem_pio2.cpp"),
             Object(Matching, "MSL/k_cos.cpp"),
-            Object(NonMatching, "MSL/k_rem_pio2.cpp"),
+            Object(Matching, "MSL/k_rem_pio2.cpp"),
             Object(Matching, "MSL/k_sin.cpp"),
             Object(Matching, "MSL/k_tan.cpp"),
             Object(Matching, "MSL/s_atan.cpp"),

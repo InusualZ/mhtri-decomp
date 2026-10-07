@@ -10,8 +10,14 @@
 extern "C" {
 #endif
 
+/* 0x8045F554 (0xC0): copies the string `src` including its terminator to `dst`. */
+char* strcpy(char* dst, const char* src);
+
 /* 0x8045F614 (0x44): copies at most `n` bytes of `src` to `dst`, padding with zeros. */
 char* strncpy(char* dst, const char* src, u32 n);
+
+/* 0x8045F7E0 (0x30): returns the first occurrence of `c` in `s`, or NULL. */
+char* strchr(const char* s, int c);
 
 #ifdef __cplusplus
 }
