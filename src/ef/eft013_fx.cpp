@@ -15,10 +15,13 @@
  *   GUESS: `eft014_glow_joints`, `eft014_glow_offset_y`, `eft014_glow_offset_z`, `eft014_glow_scale`,
  *   GUESS: `eft014_glow_alpha_key`; the foreign `em015_damage_level` (0x80182918, `enemy/em015_prog.cpp`); the spark
  *   GUESS: tables `eft014_spark_joint_lists`, `eft014_spark_ids_type0`, `eft014_spark_ids_type7`,
- *   GUESS: `eft014_spark_scales_type7`, `eft014_spark_counts`.
- * RESIDUALS. 6 rows unwritten: 0x80107E5C-0x801089C0 (`eft013_setup_effect`, `eft013_setup_uv_model`),
- *   0x80108A74-0x8010A1D4 (`fn_80108A74`, `fn_801093F4`, `fn_80109A84`, `fn_80109D00`).
- *   6 partial rows:
+ *   GUESS: `eft014_spark_scales_type7`, `eft014_spark_counts`; the foreign SE requests `se_req_pos_id72`,
+ *   GUESS: `se_req_pos_id73` (0x800DC4C4, 0x800DC4D4, `sound/fn_800D7F54.cpp`).
+ * RESIDUALS. 5 rows unwritten: 0x80107E5C-0x801089C0 (`eft013_setup_effect`, `eft013_setup_uv_model`),
+ *   0x80108A74-0x80109A84 (`fn_80108A74`, `fn_801093F4`), 0x80109D00-0x8010A1D4 (`fn_80109D00`).
+ *   7 partial rows:
+ *  - `fn_80109A84`: retail keeps the work pointer in r31 and the object in r30 (ours the reverse) and tests the
+ *    previous-frame flag against the zero it just stored (`cmplw r0, r3`) where ours compares with `cmpwi 0`;
  *  - `fn_8010B198`: retail keeps the slot flag 1 and the search's trip count 2 in callee-saved registers and colours
  *    the type's tables r20-r23 where ours takes other registers (so ours saves from r21: `_savegpr_21`/`_restgpr_21`
  *    where retail calls `_savegpr_20`/`_restgpr_20`);
@@ -65,6 +68,10 @@
 #include "camera/camera.h" /* get_camera_pos (rule 2) */
 #include "enemy/em015_damage_level.h" /* em015_damage_level (rule 2) */
 #include "ef/mtx34_trans_add.h" /* mtx34_trans_add (rule 2) */
+#include "Pl/pl_act.h" /* Pl_condition_ck (rule 2) */
+#include "lobby/lb_server_sel_trans.h" /* event_demo_ck (rule 2) */
+#include "ef/eft019.h" /* eft019_set / eft019_set_vec (rule 2) */
+#include "sound/fn_800DD1F0.h" /* mhchar_joint_mtx_get (rule 2) */
 #include "fn_8004CAD8.h" /* subVec3 (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h" /* memset (rule 2) */
 #include "g3d/mtx34_inverse.h" /* mtx34_inverse (rule 2) */
@@ -120,6 +127,13 @@ struct _EFT014_POOL_E {
     /* +0x45 */ u8 alpha_0x45;
 };
 /* size: 0x48 - lower bound, an approximation. */
+
+/* The player's physics block (+0x13C): the joint character at +0x04. */
+struct _EFT013_PL_PHYS {
+    /* +0x00 */ u8 unused_0x00[0x04];
+    /* +0x04 */ u8 chr_0x04;
+};
+/* size: 0x05 - lower bound, an approximation. */
 
 /* Pool block of the `fn_80107804` family: the setter state at +0x28 and the two payload bytes. */
 struct _EFT013_WORK_E {
@@ -1717,4 +1731,71 @@ extern "C" void fn_8010B198(_EFT013* self) {
             }
         }
     }
+}
+
+/* 0x80109A84 (0x27C): per-frame step of the player's charge glow: while the player charges (condition 0x100) or
+ * holds (0x200) it shows the matching model parts, re-arms the eft013 sparks every 19 frames and seats the model on
+ * the player's joint 2; when the charge ends it plays the release effect once. */
+extern "C" void fn_80109A84(_EFT013* self) {
+    _EFT013_WORK_H* work = (_EFT013_WORK_H*)self->work_0x38;
+    MHchar* pl = (MHchar*)self->source_0x30;
+    nw4r::math::MTX34 mtx;
+    MTX34_ctor(&mtx);
+    if (eft_res_spawn_gate_ck((_EFT*)self, 0) == 0) {
+        self->flag_0x01 = 0;
+        self->state_0x05++;
+        return;
+    }
+    if (event_demo_ck() == 1) {
+        return;
+    }
+    if (Pl_condition_ck((struct _PLW*)pl, 0x100) == 0 && Pl_condition_ck((struct _PLW*)pl, 0x200) == 0) {
+        self->field_0x06 = 0;
+        self->flag_0x01 = 0;
+        if (self->field_0x08 != 0) {
+            if (self->field_0x07 == 0) {
+                if (self->area_0x44 == get_now_areano()) {
+                    se_req_pos_id73(&self->pos_0x18);
+                }
+                eft019_set_vec(&self->pos_0x18, &self->rot_0x24, self->area_0x44, 108, eft013_f32_one);
+            } else {
+                eft019_set(&self->pos_0x18, self->area_0x44, 46);
+            }
+        }
+        self->field_0x08 = self->flag_0x01;
+        return;
+    }
+    self->flag_0x01 = 1;
+    self->field_0x08 = 1;
+    if (Pl_condition_ck((struct _PLW*)pl, 0x100) == 1) {
+        if (self->field_0x06 == 0) {
+            if (self->area_0x44 == get_now_areano()) {
+                se_req_pos_id72(&self->pos_0x18);
+            }
+            self->field_0x06 = 1;
+        }
+        self->field_0x07 = 0;
+        fn_8010A728(self, 0);
+    } else {
+        self->field_0x07 = 1;
+        self->field_0x06 = 0;
+        fn_8010A728(self, 1);
+    }
+    if (--self->timer_0x0C < 0 && Get_motion_no((struct _PLW*)pl) != 0x33) {
+        self->timer_0x0C = 19;
+        if (self->field_0x07 == 0) {
+            eft013_set((struct _PLW*)pl, 30);
+        } else {
+            eft013_set((struct _PLW*)pl, 23);
+        }
+    }
+    self->area_0x44 = pl->area_0x16;
+    mhchar_joint_mtx_get(&((_EFT013_PL_PHYS*)pl->field_0x13C)->chr_0x04, 2, &mtx);
+    mtx34_trans_get(&mtx, &self->pos_0x18);
+    eft_rot_vec_copy(&self->rot_0x24, &((_EFT013_PL*)pl)->rot_0x54);
+    MHchar* model = (MHchar*)work->effects[0];
+    copyVec3(&model->pos_0x04, &self->pos_0x18);
+    eft_rot_vec_copy((_CP_VECTOR*)&model->field_0x28, &self->rot_0x24);
+    model->move2(&mtx, 0);
+    eft_res_models_spawn((_EFT*)self, (void**)work->effects, 2, work->count, NULL);
 }

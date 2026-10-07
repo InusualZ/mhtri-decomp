@@ -56,6 +56,7 @@
  *   flipcheck: force-active in retail .comment, not in ours: `fn_800DB684`.
  *   GUESS (from each body and its callers): se_work_init, se_frame_step, se_handle_clear
  *   GUESS (from each body and its callers): sysSE_bank32_req, se_ch2_req
+ *   GUESS (from each body and its callers): se_req_pos_id72, se_req_pos_id73
  * NAMES. GUESS: `sysSE_bank32_req`, `sysSE_bank20_req`, `sysSE_bank24_req`, `se_talk_point_set`
  */
 #pragma optimization_level 4
@@ -304,9 +305,9 @@ extern "C" void fn_800DC46C(nw4r::math::VEC3* pos) {
 
 extern "C" void fn_800DC4B4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 71, pos); }
 
-extern "C" void fn_800DC4C4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 72, pos); }
+extern "C" void se_req_pos_id72(nw4r::math::VEC3* pos) { fn_800DA72C(0, 72, pos); }
 
-extern "C" void fn_800DC4D4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 73, pos); }
+extern "C" void se_req_pos_id73(nw4r::math::VEC3* pos) { fn_800DA72C(0, 73, pos); }
 
 extern "C" void fn_800DC4E4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 46, pos); }
 
