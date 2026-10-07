@@ -52,6 +52,9 @@ void fn_800DA9F4(Vec3* pos);
 void fn_800DC46C(Vec3* pos);
 void fn_800DC4B4(Vec3* pos);
 
+/* 0x800DC4C4 / 0x800DC4D4 - the position-seated SE requests of ids 72 and 73 (the eft013 charge start and end). */
+void se_req_pos_id72(nw4r::math::VEC3* pos);
+void se_req_pos_id73(nw4r::math::VEC3* pos);
 /* 0x800DA428 - the player's frame-set request; the owner defines it `extern "C"`.  Added with
  * `Pl/fn_80229ECC.cpp`, which calls it once per motion. */
 void fn_800DA428(struct _se_w* work, s32 a, u32 param, s32 d, s32 e);
