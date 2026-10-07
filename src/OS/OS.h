@@ -50,6 +50,22 @@ typedef struct OSModuleQueue {
 #define OS_IPC_BUFFER_LO (*(void**)0x80003130)
 #define OS_IPC_BUFFER_HI (*(void**)0x80003134)
 
+/* size: 0x1C - the reboot request the previous title left in low memory */
+typedef struct OSRebootParams {
+    /* +0x00 */ u32 valid;       /* non-zero when a reboot was requested */
+    /* +0x04 */ u32 resetCode;
+    /* +0x08 */ u8 pad_0x08[0x14];
+} OSRebootParams; /* size: 0x1C */
+
+/* 0x8074D280 - the pending reboot request. */
+extern OSRebootParams __OSRebootParams;
+
+/* 0x807952CC - set when the title was started from the NAND boot path. */
+extern BOOL __OSInNandBoot;
+
+/* 0x804CA030 - reads the IOS revision. */
+void __OSGetIOSRev(u32* rev);
+
 #ifdef __cplusplus
 }
 #endif

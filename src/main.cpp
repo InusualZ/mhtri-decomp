@@ -155,6 +155,7 @@
 #include "gx.h"                  /* the SDK colour record `GXColor` (rule 1) */
 #include "RVLGX/GXSetZCompLoc.h"
 #include "MEM/mem.h"               /* `MEMAllocator` (rule 1) */
+#include "OS/OSReset.h"             /* `OSShutdownSystem`, owned by OS/OSReset.c (rule 2) */
 #include "mh3_pad/Screen_w.h"      /* `ScreenWork`/`Screen_w`, owned by mh3_pad.cpp (rule 1/2) */
 #include "unsplit/unknown.h"     /* `system_w`/`SystemWork` (undecided module, rule 1/2) */
 #include "Runtime.PPCEABI.H/memset.h" /* owned by Runtime.PPCEABI.H/memset.c (rule 2) */
@@ -340,7 +341,6 @@ extern "C" void fn_80046C80(void);
 extern "C" void fn_80046D34(void);
 extern "C" int fn_804ED620(void);
 extern "C" void fn_804E7480(void);
-extern "C" void fn_804D2520(void);
 extern "C" void fn_804D56B0(void* arg);
 extern "C" void fn_804D57A0(void* arg);
 extern "C" void fn_8043F290(void);
@@ -461,7 +461,7 @@ int main(void)
             OSRestart(restart);
         }
         if (lbl_807947A6 != 0) {
-            fn_804D2520();
+            OSShutdownSystem();
         }
     }
 }

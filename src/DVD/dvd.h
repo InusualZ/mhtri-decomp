@@ -18,6 +18,12 @@ typedef struct DVDCommandBlock {
     /* +0x08 */ u8 pad_0x08[0x28];
 } DVDCommandBlock; /* size: 0x30 */
 
+/* 0x804AAC70 - the drive's cover state (2 when the cover is closed with a disc). */
+u32 __DVDGetCoverStatus(void);
+
+/* 0x804AAEC0 - quiesces the drive ahead of a reset. */
+void __DVDPrepareReset(void);
+
 #ifdef __cplusplus
 }
 #endif
