@@ -16,7 +16,7 @@ extern "C" {
 void eft052_page_count_add(u16 id, s16 delta);
 
 /* 0x803592D4 - the item page's count for item `id` (`use_rows` selects the row-limited count). */
-s16 eft052_page_count_ck(u16 id, u8 use_rows);
+s32 eft052_page_count_ck(u16 id, u8 use_rows);
 
 /* 0x80359628 - steps the item-hold strip's input (the confirm and cancel buttons) and answers 1 when the
  * entry was taken, 2 when cancelled (GUESS name). */

@@ -16,6 +16,7 @@
  *   `eft052_hold_cursor_step`, `eft052_hold_row_get`, `eft052_hold_entry_set`, `eft052_hold_entry_copy`).
  *   GUESS (from each body and its callers): eft052_item_get_open, eft052_item_get_step, eft052_box_list_draw
  *   GUESS: eft052_item_box
+ *   GUESS: eft052_page_count_ck
  *   GUESS (from each body and its lobby caller): eft052_hold_step, eft052_hold_draw
  * RESIDUALS. 33 rows unwritten: 0x80358B40-0x80358FB8 (`fn_80358B40`), 0x80359334-0x803594C8 (`eft052_hold_row_set`),
  *   0x80359628-0x8035BAB4 (31 rows, `eft052_hold_step` to `fn_8035B998`).
@@ -326,7 +327,7 @@ struct CockpitHoldBlock {
 extern CockpitHoldBlock lbl_806BF368;
 
 /* This unit's own out-of-order definitions. */
-extern "C" s16 eft052_page_count_ck(u16 id, u8 use_rows);
+extern "C" s32 eft052_page_count_ck(u16 id, u8 use_rows);
 extern "C" void eft052_hold_row_set(CockpitHoldBlock* block, s16 row);
 extern "C" void eft052_hold_entry_copy(CockpitHoldEntry* dst, CockpitHoldEntry* src);
 
@@ -399,7 +400,7 @@ extern "C" void eft052_page_put(u16 id, s16 count, u8 flag)
 }
 
 /* 0x803592D4 (0x60): Returns one of the item page's two counts for an id, from the cabinet or the hand. */
-extern "C" s16 eft052_page_count_ck(u16 id, u8 use_rows)
+extern "C" s32 eft052_page_count_ck(u16 id, u8 use_rows)
 {
     if (use_rows == 0)
         return fn_8004B624(lobby_world_block, id);

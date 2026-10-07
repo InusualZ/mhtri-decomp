@@ -31,15 +31,12 @@
  * RESIDUALS. Every row is written.
  *  - `lb_kitchen_open`: retail keeps two row counters for the rolled pairs (one byte offset, one index) and saves two
  *    more registers (`_savegpr_25`/`_restgpr_25` against our `_savegpr_27`/`_restgpr_27`);
- *  - `lb_kitchen_list_page_set`: retail steps a dead per-entry counter (`addi r7`) inside the 3x-unrolled copy;
  *  - `lb_kitchen_courses_roll`, `lb_kitchen_step`: register order in the loops (retail gives the loop index r31/r27);
  *  - `lb_scene_eft_move`: retail schedules the 1.0f `lfs` after the area byte's `lbz`, and its pool word is named by
  *    the map (`lbl_8079C2AC`) where ours is anonymous;
- *  - `lb_trade_offer_state`: retail does not sign-extend `eft052_page_count_ck`'s result (`ef/eft052.h` declares it
- *    `s16`; its body returns `item_slots_room_get`'s value unextended);
  *  - `lb_trade_list_draw`: register order, and retail reloads `choice.cursor` for the pouch test;
- *  - `lb_trade_step`: retail truncates `toggle_word_step`'s last argument (`clrlwi r7`), a `u16` parameter in the
- *    shared header our declaration types wider;
+ *  - `lb_trade_step`: retail truncates `toggle_word_step`'s last argument (`clrlwi r7`), a `u16` parameter that
+ *    `menu/menu_message.h` declares `s32` (request quest-q3#19);
  *  - `lb_kitchen_meal_serve`: the two rare bytes load in the other order and one `lhz` is scheduled after the
  *    `lb_param_w` address;
  *  - `lb_kitchen_skill_text`: retail keeps the comparison limit in r3; ours (`limit = size`, the better of the two
@@ -593,18 +590,18 @@ s32 lb_kitchen_pick_input(LbKitchenWork* work) {
 
 /* 0x8038FF70 (0xDC): Fills the special list from page `page` of the special-course table (up to six, 0-ended). */
 void lb_kitchen_list_page_set(LbKitchenWork* work, s16 page) {
+    s16 i;
     u8* course;
-    s32 i;
 
     work->page = page;
     work->page_count = 2;
     work->row_count = 0;
-    course = &lb_kitchen_special_tbl[(s16)(page * 6)];
-    for (i = 0; i < 6; i++) {
-        if (*course == 0) {
+    for (i = 0, course = &lb_kitchen_special_tbl[(s16)(page * 6)]; i < 6; i++) {
+        u8 id = *course;
+        if (id == 0) {
             break;
         }
-        work->list[work->row_count] = *course;
+        work->list[work->row_count] = id;
         work->row_count++;
         course++;
     }
