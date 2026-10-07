@@ -12,7 +12,8 @@ struct _QNPC_W;
 struct _g3d_work;
 
 /* The +0x110 pointer the pane's scene-model teardown reads: it lives over the `MHchar`'s padding
- * (`MHchar` occupies +0x04..+0x168), so it is the model view's own field.
+ * (`MHchar` is 0x140 bytes, `Pl/fn_80224AC4.h`'s model record 0x164: this view spans the 0x164),
+ * so it is the model view's own field.
  * size: 0x164 */
 struct NoteModelView {
     /* +0x000 */ u8 pad_0x000[0x10C];
@@ -30,7 +31,7 @@ struct NoteWork {
     /* +0x002 */ u8 field_0x002;     /* the slot index `fn_803851D4` marks on a free record */
     /* +0x003 */ u8 field_0x003;
     /* +0x004 */ union {
-        MHchar model;                   /* size 0x164: the actor model the note pane poses */
+        MHchar model;                   /* the actor model the note pane poses (0x140 of the 0x164) */
         NoteModelView view;             /* the same bytes, read as the +0x110 scene-model pointer */
     };
     /* +0x168 */ u8 field_0x168;
@@ -58,7 +59,14 @@ struct NoteWork {
     /* +0x1AC */ u8 flag_0x1AC;     /* set by `note_pane_init` */
     /* +0x1AD */ u8 pad_0x1AD[0x1B0 - 0x1AD];
     /* +0x1B0 */ f32 field_0x1B0;   /* the per-state step `fn_80386028`/`fn_803863C8` set */
-    /* +0x1B4 */ nw4r::math::VEC3 vec_0x1B4;   /* the rest position `note_pane_init` copies from +0x170 */
+    /* +0x1B4 */ union {
+        nw4r::math::VEC3 vec_0x1B4;   /* the rest position `note_pane_init` copies from +0x170 */
+        struct {   /* the NPC talk program's view of the same 0x0C bytes */
+            /* +0x1B4 */ u8 pad_0x1B4;
+            /* +0x1B5 */ u8 talk_step_0x1B5;   /* 0 opens the talk, 1/2 wait for the window (`lobby/lb_quest_ui.cpp`) */
+            /* +0x1B6 */ u8 pad_0x1B6[0x1C0 - 0x1B6];
+        }; /* size: 0x0C */
+    };
     /* +0x1C0 */ u8 field_0x1C0;    /* the talk step `npc_talk_step` switches on */
     /* +0x1C1 */ u8 field_0x1C1;
     /* +0x1C2 */ u8 pad_0x1C2[0x1F4 - 0x1C2];

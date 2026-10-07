@@ -18,6 +18,9 @@ void setTransferDisplayState(u8 mode);
 /* 0x800CEF18 - one step of the random ring's generator (0 is taken as 1; GUESS name). */
 u16 rand_lcg_step(u16 value);
 
+/* 0x800D2EA4 - the string table's course-name entry `id` (its +0xFC list; GUESS name). */
+u32 str_tbl_course_get(u32 id);
+
 /* 0x800D2F1C - steps the system's two stream counters (GUESS name). */
 void system_stream_count_step(void);
 /* 0x800CF1B4 / 0x800CF154 - stop the sound, release both stage slots and reset the scene; the second also clears the
