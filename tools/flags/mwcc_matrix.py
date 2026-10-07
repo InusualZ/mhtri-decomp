@@ -45,10 +45,18 @@ def diff_unit(unit, label, symbol):
     return (path, "") if path else (None, log)
 
 
+def official_score(entry):
+    """The report metric of one `official[name]` value: a `lib.report.score_entries` entry (a function without
+    `fuzzy_match_percent` is 0 %) or a bare number."""
+    if isinstance(entry, (int, float)) and not isinstance(entry, bool):
+        return float(entry)
+    return report.score_of(entry)
+
+
 def summarize(path, official=None):
     """Rows for one variant: (name, target size, ours size, match percent, first diff).
 
-    `official` is `{function: fuzzy_match_percent}` from `lib.report.score_entries` for the same object
+    `official` is `{function: report entry}` (`lib.report.score_entries`, or bare numbers) for the same object
     pair - the score a flag decision must be made on. The diff JSON's own `match_percent` is positional
     and relocation-sensitive, so it is only a fallback for a function the report did not score (marked
     with `~` in the printed row).
@@ -70,8 +78,8 @@ def summarize(path, official=None):
                 continue
             first = (i, ins["instruction"]["formatted"])
             break
-        if name in official and isinstance(official[name], (int, float)):
-            pct, approx = round(official[name], 2), False
+        if name in official:
+            pct, approx = round(official_score(official[name]), 2), False
         else:
             pct, approx = round(e.get("match_percent") or 0.0, 2), True
         rows.append((name, od_size(e), od_size(ri) if ri else -1, pct, first, approx))

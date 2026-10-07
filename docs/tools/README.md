@@ -16,6 +16,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | stamped caches | `lib/cache.py` | `spec/lib-cache.md` | callers, tudiscover, undefrefs, verifyunit |
 | generated names and manglings | `lib/names.py` | `spec/lib-names.md` | callees, dumpmap, undefrefs, langcheck, mangle, methodize, stylelint, typeregistry |
 | `symbols.txt`, `splits.txt`, `configure.py`, ownership | `lib/project/` | `spec/lib-project.md` | symedit, stylelint, symbolpreflight, ledger, datagap, dataclaim, dataqueue, flipcheck, vtableaudit, unwindcut, land, brief, queue, ... |
+| asm source from a gekko listing | `lib/asmgen.py` | `spec/lib-asmgen.md` | gen_asm |
 | ELF, DOL, objdump text, DWARF, fixture builders | `lib/binary/` | `spec/lib-binary.md` | elfsect, objalign, objextab, dwarfmap, dossier, linkorder, langcheck, flipcheck, verifyunit, datagap, sectiongap, pairgap, relocdiff, undefrefs, vtableaudit, vtslot, unwindcut, m2cinput, callees, infer, mwlink |
 | instruction decode, reference scan | `lib/ppc.py` | `spec/lib-ppc.md` | splitcheck, phantom, infer, dossier, accessextent, callers, vtableaudit |
 | who references what (index, census, the query, the dump's stamp) | `lib/refs.py` | `spec/lib-refs.md` | callers, accessextent, datagap, dataclosure, dataclaim, poolseams, tudiscover, splitcheck |
@@ -46,7 +47,7 @@ Core gate: `land` (+ `lane-manifest`), `verifyunit`, `stylelint`, `vtableaudit`,
 Core evidence: `callers`, `callees`, `accessextent`, `dossier`, `symedit`, `dumpmap`, `phantom`, `mangle`, `methodize`,
 `symbolpreflight`, `tudiscover`, `dataorder`, `dataseams`, `poolseams` (+ `seams`), `splitcheck` (+ `invariants`), `dump_asm`,
 `dataclaim`, `dataqueue`,
-`sectiongap`, `pairgap`, `relocdiff`, `rawsame`, `unitscore`, `symdiff`, `fnasm`, `immreloc`, `measure`, `unwindcut`, `vtslot`, `linkorder`, `m2cinput`,
+`sectiongap`, `pairgap`, `relocdiff`, `rawsame`, `unitscore`, `symdiff`, `fnasm`, `immreloc`, `measure`, `unwindcut`, `vtslot`, `linkorder`, `m2cinput`, `gen_asm`,
 `typeregistry`, `declclash`, `elfsect`, `dwarfmap`, `unitinfo`.
 
 Agent plumbing: `claims`, `slots`, `lane`, `rescue`, `wtsafe`, `queue`, `lanecmd`, `worktreehook`, `landlog`, `brief` (+ `briefing`), `backlog`, `integrate`,

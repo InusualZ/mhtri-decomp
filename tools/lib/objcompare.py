@@ -313,6 +313,59 @@ def trailing_pad(section: str, ours_size: int, claim_size: int, align: int, targ
                                                                     "/".join(str(a) for a in sorted(set(next_aligns)))))
 
 
+#: Sections a short claim is never excused in, even before a flipped successor: the exception tables.
+LINKED_PAD_NEVER = ("extab", "extabindex", ".init")
+#: The largest alignment a flipped successor may carry that the link pads up to (`-func_align 16` objects).
+LINKED_PAD_MAX_ALIGN = 16
+
+
+def linked_trailing_pad(section: str, ours_size: int, claim_size: int, target_bytes: bytes | None,
+                        target_symbols: dict, start: int | None, successor_aligns: list[int]) -> str | None:
+    """Why a section `claim_size - ours_size` bytes short of its claim is excused because its SUCCESSOR is a linked
+    (flipped) object: the link pads our section up to the successor's alignment. All of: not an exception table;
+    the target's tail is all zero (NOBITS: no bytes) with no symbol in it but dtk's `gap_` labels; and the
+    successor, at every alignment OUR object carries (`successor_aligns`, at most `LINKED_PAD_MAX_ALIGN`), starts
+    exactly at the claim's end (`start` is the claim's address). No linked successor, no judgement."""
+    short = claim_size - ours_size
+    if section in LINKED_PAD_NEVER or short <= 0 or start is None or not successor_aligns:
+        return None
+    if any(a < 1 or a > LINKED_PAD_MAX_ALIGN for a in successor_aligns):
+        return None
+    if target_bytes is not None and (len(target_bytes) < claim_size or any(target_bytes[ours_size:claim_size])):
+        return None
+    if [n for n, (off, _size) in target_symbols.items()
+            if ours_size <= off < claim_size and not n.startswith(PAD_LABEL_PREFIX)]:
+        return None
+    end = start + ours_size
+    if any((end + a - 1) // a * a != start + claim_size for a in successor_aligns):
+        return None
+    return ("%s: 0x%X of 0x%X bytes - the 0x%X-byte tail is link padding (target zero, no symbol, the flipped "
+            "successor aligned to %s starts at the claim's end)" % (section, ours_size, claim_size, short,
+                                                                      "/".join(str(a) for a in sorted(set(successor_aligns)))))
+
+
+#: Sections whose symbol offsets decide where every later object's data lands, so an object that matches in size
+#: and bytes can still move the DOL: a spare global dead-stripped, a 4 B object where the original had 8 B, an order.
+POSITIONED = (".bss", ".sbss", ".sbss2", ".sdata", ".sdata2")
+
+
+def data_symbol_gaps(ours: dict, theirs: dict, limit: int = 6) -> list[str]:
+    """Lines naming where our named symbols of one section sit at another offset than the target's, or a target
+    symbol with a real name that our object does not define. `ours`/`theirs` are `section_symbols` maps. Anonymous
+    `@`-names, dtk's `gap_` fill labels and generated `lbl_`/`zz_` names (the target's spelling of compiler-pooled
+    constants) and a function-local static's `name$NNN` ordinal carry no identity and are skipped; a size is not compared (the section size and the offsets are what
+    the link uses)."""
+    def named(m):
+        return {n: v for n, v in m.items()
+                if not n.startswith(("@", PAD_LABEL_PREFIX, "lbl_", "zz_")) and not re.search(r"\$\d+$", n)}
+    o, t = named(ours), named(theirs)
+    lines = ["%s: the target defines it at +0x%X (0x%X bytes), our object does not" % (n, t[n][0], t[n][1])
+             for n in sorted(t, key=lambda n: t[n][0]) if n not in o]
+    lines += ["%s: at +0x%X in our object, +0x%X in the target" % (n, o[n][0], t[n][0])
+              for n in sorted(o, key=lambda n: o[n][0]) if n in t and o[n][0] != t[n][0]]
+    return lines if len(lines) <= limit else lines[:limit] + ["... %d more" % (len(lines) - limit)]
+
+
 def mislaid_layout(mine: bytes, tgt: bytes, ours: dict, theirs: dict):
     """`(symbols compared, differing bytes)` when two same-sized sections hold the same symbols permuted: every
     shared symbol identical at its own address, at least two of them, at least one moved; else None. `ours` and

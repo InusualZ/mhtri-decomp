@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Try source rewrites of a unit and report the official per-function score of each. Spec: docs/tools/spec/tryvar.md.
 CLI: python tools/flags/tryvar.py [-u <unit>] [<name>...] [--variants <file.py|file.txt>] [--permute <file.txt>] [--symbol S] [--max-variants N]
-[--flags-extra "<flags>"] [--json] [--list] [--apply <name>] | --permdecl FN[,FN...] [--max-lines N] [--max-perms N] [--seed N] [--apply]."""
+[--flags-extra "<flags>"] [--json] [--list] [--apply <name>] | --permdecl FN[,FN...] [--max-lines N] [--max-perms N] [--seed N] [--plain-only] [--apply]."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import importlib.util
@@ -253,7 +253,8 @@ def try_all(unit, tokens, selected, symbol=None, score=None, diverge=None, as_is
     return results
 
 
-def permdecl_one(unit, tokens, function, max_lines, cap, seed, score=None, diverge=None, out=None):
+def permdecl_one(unit, tokens, function, max_lines, cap, seed, score=None, diverge=None, out=None,
+                 initialised=True):
     """Permute `function`'s leading plain declarations: `{function, status, run, orders, sampled, tried, table,
     best}`. Every order is compiled as a probe (the source is only read) and ranked by the function's official
     score; the as-is source is tried first and wins every tie, and the search ends at the first 100 %."""
@@ -261,14 +262,14 @@ def permdecl_one(unit, tokens, function, max_lines, cap, seed, score=None, diver
     rec = {"function": function, "status": "ok", "run": [], "orders": 0, "sampled": False, "tried": 0,
            "table": [], "best": None, "best_order": None}
     try:
-        run = declperm.find_run(src, function, max_lines)
+        run = declperm.find_run(src, function, max_lines, initialised)
     except ValueError as exc:
         rec.update(status="ambiguous", error=str(exc))
         return rec
     if run is None:
         rec["status"] = "no-run"
         return rec
-    ords, sampled = declperm.orders(len(run.lines), cap, seed)
+    ords, sampled = declperm.orders(len(run.lines), cap, seed, run.deps)
     rec.update(run=[l.strip() for l in run.lines], orders=len(ords), sampled=sampled)
     by_name = {declperm.name_of(o): o for o in ords}
     results = try_all(unit, tokens, declperm.variants(run, ords), function, score, diverge, as_is=True, out=out,
@@ -287,13 +288,13 @@ def permdecl_one(unit, tokens, function, max_lines, cap, seed, score=None, diver
     return rec
 
 
-def permdecl_apply(lf_text, records, max_lines):
+def permdecl_apply(lf_text, records, max_lines, initialised=True):
     """The source text with every record's best order written, or `None` when there is nothing to write."""
     changed = False
     for rec in records:
         if not rec.get("best_order"):
             continue
-        run = declperm.find_run(lf_text, rec["function"], max_lines)
+        run = declperm.find_run(lf_text, rec["function"], max_lines, initialised)
         new = declperm.reorder(lf_text, run, tuple(rec["best_order"])) if run else None
         if new is not None and new != lf_text:
             lf_text, changed = new, True
@@ -303,7 +304,7 @@ def permdecl_apply(lf_text, records, max_lines):
 def print_permdecl(rec) -> None:
     fn = rec["function"]
     if rec["status"] in ("ambiguous", "no-run"):
-        print("%s: %s" % (fn, rec.get("error") or "no run of two or more plain leading declarations"))
+        print("%s: %s" % (fn, rec.get("error") or "no run of two or more leading declarations"))
         return
     print("%s: %d declaration(s), %d order(s)%s, %d tried" % (
         fn, len(rec["run"]), rec["orders"], " (sampled)" if rec["sampled"] else "", rec["tried"]))
@@ -324,7 +325,8 @@ def run_permdecl(args, unit, tokens, root):
     """`--permdecl`: the table per function, and with `--apply` the best orders written to the real source."""
     records = []
     for fn in [f for f in args.permdecl.split(",") if f]:
-        rec = permdecl_one(unit, tokens, fn, args.max_lines, args.max_perms, args.seed)
+        rec = permdecl_one(unit, tokens, fn, args.max_lines, args.max_perms, args.seed,
+                           initialised=not getattr(args, "plain_only", False))
         records.append(rec)
         if not args.json:
             print_permdecl(rec)
@@ -332,7 +334,7 @@ def run_permdecl(args, unit, tokens, root):
     if args.apply:
         raw = open(unit.source, "rb").read()
         lf = raw.decode("utf-8", "surrogateescape").replace("\r\n", "\n")
-        new = permdecl_apply(lf, records, args.max_lines)
+        new = permdecl_apply(lf, records, args.max_lines, not getattr(args, "plain_only", False))
         if new is not None:
             out = new.replace("\n", "\r\n") if b"\r\n" in raw else new
             text.atomic_write(unit.source, out.encode("utf-8", "surrogateescape"))
@@ -371,6 +373,9 @@ def main(argv=None):
     ap.add_argument("--max-perms", type=int, default=120,
                     help="--permdecl: compile at most this many orders per function; more are a fixed-seed "
                          "sample (default %(default)s)")
+    ap.add_argument("--plain-only", action="store_true",
+                    help="--permdecl: permute only declarations without an initialiser (initialised ones are "
+                         "otherwise members of the run, kept after the declarations their initialiser uses)")
     ap.add_argument("--seed", type=int, default=0, help="--permdecl: the sample's seed (default %(default)s)")
     args = ap.parse_args(argv)
 

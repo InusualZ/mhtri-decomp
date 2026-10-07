@@ -17,6 +17,12 @@ ORIG_REL = os.path.join("orig", "RMHE08")
 #: `orig/` is copied below this size and junctioned above it (measured 2026-09-27: 6.6 MB here).
 ORIG_JUNCTION_MIN_BYTES = 64 * 1024 * 1024
 RMHE08_REL = os.path.join("build", "RMHE08")
+#: What a plain `git worktree add` tree needs to compile and score: the toolchain, the VMX tables, the DOL.
+ESSENTIAL_DIRS = SEED_COPY_DIRS + (os.path.join("build", "_vmx"),)
+#: `--obj` adds the split target objects and the config they came from (a re-split needs the toolchain and minutes).
+OBJ_REL = (os.path.join("build", "RMHE08", "obj"), os.path.join("build", "RMHE08", "config.json"),
+           os.path.join("build", "RMHE08", "ldscript.lcf"))
+M2C_REL = os.path.join("tools", "m2c")
 #: The on-demand asm dump (92 MB, no ninja edge reads it) is never seeded.
 SEED_SKIP_DIRS = ("asm",)
 #: The generated files ninja reads to decide what is built; `.ninja_deps` is path-rewritten onto the target.
@@ -270,6 +276,68 @@ def age_seeded_inputs(wt: str, t: float) -> int:
                 except OSError:
                     pass
     return touched
+
+
+def seed_essentials(main: str, wt: str, with_obj: bool = False) -> dict:
+    """Seed a plain worktree with the essentials only (never writing MAIN, never the whole 1.5 GB build): the
+    toolchain and `_vmx` by copy, `orig/RMHE08/sys/main.dol` and `files/*.sel`, the `tools/m2c` submodule's files
+    (its `.git` file is left out, so the worktree's `git status` is unchanged), and with `with_obj` the split
+    objects. Existing files are kept. -> `{item: files copied}`, plus `missing` for what MAIN itself lacks."""
+    if os.path.normcase(os.path.realpath(main)) == os.path.normcase(os.path.realpath(wt)):
+        raise ValueError("refusing to seed MAIN from MAIN (%s)" % main)
+    out: dict = {}
+    missing: list[str] = []
+    for rel in ESSENTIAL_DIRS:
+        src = os.path.join(main, rel)
+        if os.path.isdir(src):
+            out[rel.replace(os.sep, "/")] = copy_missing_files(src, os.path.join(wt, rel))
+        else:
+            missing.append(rel.replace(os.sep, "/"))
+    dol = os.path.join(ORIG_REL, "sys", "main.dol")
+    wanted = [dol] + [os.path.join(ORIG_REL, "files", n) for n in sorted(
+        os.listdir(os.path.join(main, ORIG_REL, "files"))) if n.endswith(".sel")] \
+        if os.path.isdir(os.path.join(main, ORIG_REL, "files")) else [dol]
+    n = 0
+    for rel in wanted:
+        s, d = os.path.join(main, rel), os.path.join(wt, rel)
+        if not os.path.isfile(s):
+            missing.append(rel.replace(os.sep, "/"))
+        elif not os.path.exists(d):
+            os.makedirs(os.path.dirname(d), exist_ok=True)
+            shutil.copy2(s, d)
+            n += 1
+    out["orig/RMHE08"] = n
+    src = os.path.join(main, M2C_REL)
+    if os.path.isfile(os.path.join(src, "m2c.py")):
+        n = 0
+        for root_dir, dirs, files in os.walk(src):
+            dirs[:] = [d for d in dirs if d not in (".git", "__pycache__")
+                       and not teardown.is_reparse_point(os.path.join(root_dir, d))]
+            rel = os.path.relpath(root_dir, src)
+            target = os.path.join(wt, M2C_REL) if rel == "." else os.path.join(wt, M2C_REL, rel)
+            os.makedirs(target, exist_ok=True)
+            for name in files:
+                d = os.path.join(target, name)
+                if name != ".git" and not os.path.exists(d):
+                    shutil.copy2(os.path.join(root_dir, name), d)
+                    n += 1
+        out[M2C_REL.replace(os.sep, "/")] = n
+    else:
+        missing.append(M2C_REL.replace(os.sep, "/"))
+    if with_obj:
+        for rel in OBJ_REL:
+            s, d = os.path.join(main, rel), os.path.join(wt, rel)
+            if os.path.isdir(s):
+                out[rel.replace(os.sep, "/")] = copy_tree_missing(s, d)
+            elif os.path.isfile(s):
+                if not os.path.exists(d):
+                    os.makedirs(os.path.dirname(d), exist_ok=True)
+                    shutil.copy2(s, d)
+                out[rel.replace(os.sep, "/")] = 1
+            else:
+                missing.append(rel.replace(os.sep, "/"))
+    out["missing"] = missing
+    return out
 
 
 def seed_worktree_build(main: str, wt: str, copy_orig: bool | None = None, overwrite: bool = False) -> str:

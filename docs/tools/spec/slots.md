@@ -23,10 +23,11 @@ python tools/units/slots.py status [--json]
 python tools/units/slots.py refresh N [--force] [--json]   # copy only what differs from MAIN, then re-verify
 python tools/units/slots.py verify [--slot N] [--json]
 python tools/units/slots.py shadow <slot> <dir> [--seed-build] [--force]
+python tools/units/slots.py seed-worktree <path> [--obj] [--json]   # a plain `git worktree add` tree: toolchain, DOL, tools/m2c
 python tools/units/slots.py --selftest
 ```
-Subcommands: `init`, `acquire`, `release`, `reclaim`, `spawn`, `collect`, `status`, `refresh`, `verify`, `shadow`.
-Flags: `--branch`, `--count`, `--dry-run`, `--force`, `--group`, `--json`, `--keep-branch`, `--kind`, `--main`, `--path`, `--release`, `--seed-build`, `--selftest`, `--slot`, `--task-file`, `--unit`, `--units`, `--worker`.
+Subcommands: `init`, `acquire`, `release`, `reclaim`, `spawn`, `collect`, `status`, `refresh`, `verify`, `shadow`, `seed-worktree`.
+Flags: `--branch`, `--count`, `--dry-run`, `--force`, `--group`, `--json`, `--keep-branch`, `--kind`, `--main`, `--obj`, `--path`, `--release`, `--seed-build`, `--selftest`, `--slot`, `--task-file`, `--unit`, `--units`, `--worker`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -36,6 +37,12 @@ Inputs -> outputs: <repo>.slotN, .pi/slots, ~/.claude/sessions -> state.
 
 ## Invariants and rules
 
+* **`seed-worktree <path>`** (`lib.lanes.seed.seed_essentials`) readies a worktree that is not a slot (an agent's `git worktree add`
+  tree) without copying the build: `build/{tools,compilers,binutils,_vmx}` (~210 MB), `orig/RMHE08/sys/main.dol` and
+  `files/*.sel`, and the `tools/m2c` submodule's files (the submodule is empty in a plain worktree; its `.git` pointer is not
+  copied, so `git status` is unchanged). Existing files are kept, so a rerun copies nothing; `--obj` adds `build/RMHE08/obj`,
+  `config.json` and `ldscript.lcf`. Refuses MAIN itself and a path with no `.git`; exits 1 and names what MAIN lacks.
+  Never junction MAIN's `build/` (a junction writes through). Measured on MAIN: 281 files, 211 MB build dir.
 ```
 git worktree add -b worker/<slug> <sibling>.ws-<slug> main
 git submodule update --init tools/m2c

@@ -21,8 +21,9 @@ python tools/flags/tryvar.py -u <unit> --variants v.txt --symbol S   # `//@@` bl
 python tools/flags/tryvar.py -u <unit> --permute order.txt --symbol S  # every other order of a declaration run
 python tools/flags/tryvar.py ... --json
 python tools/flags/tryvar.py --apply <name>          # LAND the winning rewrite in the real source
-python tools/flags/tryvar.py -u <unit> --permdecl FN[,FN...] [--max-lines N] [--max-perms N] [--seed N] [--apply]
+python tools/flags/tryvar.py -u <unit> --permdecl FN[,FN...] [--max-lines N] [--max-perms N] [--seed N] [--plain-only] [--apply]
 python .claude/skills/mwcc-unit-matching/scripts/mt.py permdecl <unit> FN[,FN...]   # the same, as the skill spells it
+#   (`-u/--unit U` and `--permdecl FN` may also be spelled out; `mt.permdecl_argv` forwards each part once)
 ```
 Flags: `--apply`, `--flags-extra`, `--json`, `--list`, `--max-variants`, `--permute`, `--symbol`, `--unit`, `--variants`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
@@ -56,13 +57,18 @@ VARIANTS = [(name, repls), ...]
   `fn_800417F0` three index rewrites all read 94.79 % with the first divergence at row 6, the `extsh` retail emits.
 * `--apply <name>` writes that variant's rewrite into the unit's real source file (preserving its line endings), so a win becomes progress on the unit instead of staying an experiment. It refuses to write anything unless the rewrite applies cleanly and actually changes the file. Rebuild and re-measure afterwards - the recorded evidence must come from the real source, not from the probe.
 
-* **`--permdecl FN[,FN...]` (2026-10-07, the lanes' `permdecl.py`/`autoperm.py`).** For each function, `lib.declperm` finds the leading plain declarations (at most `--max-lines`, default 6, after any initialised ones), every other order is compiled as a probe and ranked by that function's official score, first divergence and the unit's matched bytes, and a table is printed (best 12 rows). Above `--max-perms` (default 120) orders a fixed-seed sample is tried. The as-is source is tried first and wins every tie; the search ends at the first 100 %. The real source is never written - it is not touched even transiently, unlike the lane scripts that rewrote it per order and scored a stale object when the rewrite landed in the build's second - unless `--apply` (no name) is given, which writes each function's best order (CRLF kept) and says to rebuild. Functions are scored independently against the source as it is, not cumulatively. `--json` prints `{unit, functions: [{function, status, run, orders, sampled, tried, table, best, best_order}], applied}`; `status` is `ok`, `no-gain`, `no-run` or `ambiguous`.
+* **`--permdecl FN[,FN...]` (2026-10-07, the lanes' `permdecl.py`/`autoperm.py`).** For each function, `lib.declperm` finds the leading local declarations, initialised ones included (at most `--max-lines`, default 6; an
+initialised declaration moves whole and stays after the declarations its initialiser names; `--plain-only` restores the
+old reading: plain lines only, leading initialised ones skipped), every other order is compiled as a probe and ranked by that function's official score, first divergence and the unit's matched bytes, and a table is printed (best 12 rows). Above `--max-perms` (default 120) orders a fixed-seed sample is tried. The as-is source is tried first and wins every tie; the search ends at the first 100 %. The real source is never written - it is not touched even transiently, unlike the lane scripts that rewrote it per order and scored a stale object when the rewrite landed in the build's second - unless `--apply` (no name) is given, which writes each function's best order (CRLF kept) and says to rebuild. Functions are scored independently against the source as it is, not cumulatively. `--json` prints `{unit, functions: [{function, status, run, orders, sampled, tried, table, best, best_order}], applied}`; `status` is `ok`, `no-gain`, `no-run` or `ambiguous`.
 
 ## Lib dependencies
 
 units, report, text, declperm (`spec/lib-declperm.md`).
 
 ## Test contract
+
+`tools/tests/flags/test_mt_permdecl.py` (smoke: it loads the skill's `mt.py`) pins `permdecl_argv`: positional, spelled-out and mixed
+forms; the old `-u rest[0] --permdecl rest[1]` fails the spelled-out ones.
 
 Tier: fixture (`tools/tests/flags/test_tryvar.py`), plus `metric_selftest` for `match_pcts`. The marker and permutation
 loaders, `divergence_of` on an `objdiff diff` JSON, and `try_all` over a `FixtureTree` unit with a **stub compiler** (a

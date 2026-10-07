@@ -102,6 +102,53 @@ def _range_index() -> tuple[dict, dict]:
     return _RANGES[SPLITS]
 
 
+#: Units the caller flips together with the one being checked (the gate passes the batch): linked like `Matching`.
+BATCH: set[str] = set()
+
+
+def linked_units() -> set[str]:
+    """Unit stems whose object the link takes from our build: `Object(Matching, ...)` in this tree's configure.py, and
+    the units named on this run's command line (a batch flips them together)."""
+    path = os.path.join(MAIN, "configure.py")
+    got: set[str] = set()
+    if os.path.isfile(path):
+        try:
+            got = {re.sub(r"\.(c|cpp|cp|cc)$", "", p) for p in _project.configure.load(path).matching_units()}
+        except Exception:
+            got = set()
+    return got | set(BATCH)
+
+
+def successor_of(unit: str, section: str) -> tuple[str, str] | None:
+    """`(unit stem, object section)` of the registered range that starts where this claim ends, or None."""
+    own, starts = _range_index()
+    span = own.get((unit, section))
+    return None if span is None else starts.get((section.split("$")[0], span[1]))
+
+
+def linked_pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_path: str) -> tuple[str | None, str | None]:
+    """`(note, hint)`: the note when the shortfall is link padding before a linked successor (`linked_trailing_pad`),
+    else the hint naming the unflipped successor whose flip would make it so (flip from the tail of each run)."""
+    tgt = sections(obj_path).get(name)
+    nxt = successor_of(unit, name)
+    if tgt is None or nxt is None:
+        return None, None
+    stem, objsec = nxt
+    start = pad_context(unit, name)[0]
+    data = raw_section(obj_path, name)
+    nobits = data is not None and len(data) == 0 and size > 0
+    symbols = section_symbols(obj_path, name)
+    body = None if nobits else data
+    if stem in linked_units():
+        built = sections(os.path.join(SRC, stem + ".o")).get(objsec)
+        aligns = [1 << built[1]] if built else []
+        return objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, aligns), None
+    if start is not None and objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, [16]):
+        return None, ("the shortfall is link padding only once its successor %s is flipped (16-aligned); "
+                      "flip from the tail of each run" % stem)
+    return None, None
+
+
 def pad_context(unit: str, section: str) -> tuple[int | None, list[int]]:
     """`(the claim's start, [alignments the next linked section may carry])` for a trailing-pad judgement: the
     registered range that starts where this claim ends, its target object's alignment and - when built - our
@@ -133,6 +180,19 @@ def pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_path: s
     nobits = tgt is not None and data is not None and len(data) == 0 and size > 0
     return objcompare.trailing_pad(name, ours[0], size, align, None if nobits else data,
                                    section_symbols(obj_path, name), start, next_aligns)
+
+
+def positioned_symbol_problems(claim: dict, ours: dict, src_path: str, obj_path: str) -> list[str]:
+    """Per positioned data section (`objcompare.POSITIONED`) the symbols whose offset, size or presence differs from
+    the target's: equal sizes and bytes do not make the DOL hash hold when a spare global is dead-stripped or an
+    object is 4 B instead of 8 B. `python tools/mwlink_debugger.py trace <unit>` names the cause."""
+    out = []
+    for name in sorted(set(claim) & set(ours) & set(objcompare.POSITIONED)):
+        gaps = objcompare.data_symbol_gaps(section_symbols(src_path, name), section_symbols(obj_path, name))
+        if gaps:
+            out.append("%s: symbol layout differs from the target (the link moves later data; `python "
+                       "tools/mwlink_debugger.py trace <unit>` names the cause): %s" % (name, "; ".join(gaps)))
+    return out
 
 
 def unit_name_for(path: str) -> str:
@@ -499,11 +559,15 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
                             % (name, size, size))
         elif got[0] != size:
             pad = pad_note(unit, name, got, size, obj_path) if got[0] < size else None
+            hint = None
+            if got[0] < size and not pad:
+                pad, hint = linked_pad_note(unit, name, got, size, obj_path)
             if pad:
                 padded[name] = got[0]
                 notes.append(pad)
                 continue
-            problems.append("%s: object is 0x%X, splits.txt claims 0x%X (%+d)" % (name, got[0], size, got[0] - size))
+            problems.append("%s: object is 0x%X, splits.txt claims 0x%X (%+d)%s"
+                            % (name, got[0], size, got[0] - size, " - " + hint if hint else ""))
     for name in sorted(set(ours) - set(claim)):
         problems.append("%s (0x%X) is in the object but not claimed by splits.txt - "
                         "it will be linked somewhere the original had nothing" % (name, ours[name][0]))
@@ -526,6 +590,7 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
             problems += data_seam_problems(unit, name, src_path, obj_path)
 
     problems += pool_group_problems(unit, claim, ours, src_path, obj_path)
+    problems += positioned_symbol_problems(claim, ours, src_path, obj_path)
 
     # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function
     # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.
@@ -585,6 +650,7 @@ def main() -> int:
         return flipcheck_selftest.selftest()
     if args.root:
         set_root(args.root)
+    BATCH.update(norm_unit(u.strip("/")) for u in args.units)
 
     link_ctx, refs, map_rows = link_setup()
 

@@ -30,6 +30,9 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   `trailing_pad(section, ours_size, claim_size, align, target_bytes, target_symbols, start, next_aligns) -> note | None`
   (a short section whose tail is only alignment fill: never `PAD_NEVER`, align <= `PAD_MAX_ALIGN`, zero tail, no
   symbol but `gap_` labels, the next section placed at the claim's end; flipcheck's rule, see its spec).
+  `linked_trailing_pad(section, ours_size, claim_size, target_bytes, target_symbols, start, successor_aligns) -> note | None`
+  (the same tail test, but excused by a linked successor our object aligns to <= 16, so `.text` qualifies; never `LINKED_PAD_NEVER`).
+  `data_symbol_gaps(ours, theirs) -> [line]` with `POSITIONED` (the data sections whose symbol offsets position later data).
 * Symbols: `section_kind`, `wanted_kinds`, `defined_symbols(obj, kinds) -> {name: SymbolSize}`, `size_delta`,
   `symbols(target, ours, threshold, mode) -> [SymbolGap]`, `symbol_locations(obj)`, `symbol_rows(target, ours)` (a dtk-named row
   resolved by address).
