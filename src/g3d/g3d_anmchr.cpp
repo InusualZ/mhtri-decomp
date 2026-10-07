@@ -32,11 +32,13 @@
  *   is a GUESS; anmchr_ref_name is a GUESS (the strings ResAnmChr::ref passes to Panic).
  *   type_obj_set_name_anmchr is a GUESS (0x8005DCD0: the type-name store copy the AnmObjChr, AnmObjMatClr,
  *   AnmObjTexPat and ScnMdlSimple type members call).
- * RESIDUALS. 30 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
+ * RESIDUALS. 20 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
  *   lists them), the largest GetResult__Q34nw4r3g3d14AnmObjChrBlendFPQ34nw4r3g3d12ChrAnmResultUl (0x8D0), the
  *   AnmObjChrRes members Bind(ResMdl, u32, BindOption) (0x384) and Release(ResMdl, u32, BindOption) (0x320).
+ *   GetAnmPlayPolicy (0x80061C70) is unwritten: its policy table (.sdata 0x80790E70) sits in `mh3_pad.cpp`'s claim.
+ *   FrameCtrl::smBaseUpdateRate (.sdata 0x80791168) is `g3d/fn_80063888.cpp`'s claim, declared in the class only.
  *   Partial: fn_8005D27C, g3d_round_up (retail materialises `~(align - 1)` with `nor` + `and` where MWCC folds it
- *   into `andc`), fn_8006244C, fn_80062824, fn_800628AC, and the members whose only difference is a relocation name
+ *   into `andc`), fn_80062824, fn_800628AC, and the members whose only difference is a relocation name
  *   (the strings).
  *   G3dObj::operator delete, AnmObj, AnmObjChr, AnmObjChrBlend, AnmObjChrRes: the empty bodies are complete (retail's
  *   operator delete is a bare `blr`; the compiler emits the constructors' base calls, vtable stores and member
@@ -47,7 +49,7 @@
  *   only by that unit's fn_80064868): the two owners interleave there, which one seam cannot express.
  *   flipcheck: `.text` 0xB38 of 0x6F90; extab 0x110 of 0x3A4; extabindex 0x198 of 0x4E0; `.rodata`, `.data`, `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_80791148`,
- *     `lbl_807911E8`, `lbl_80791168`, `lbl_80791150`.
+ *     `lbl_80791150`.
  * SHAPES. The ResName constructor is complete: its work is the base initialiser.  The unit includes the leaf
  *   `g3d/anm_typename_AnmObj.h` instead of `g3d/fn_80063888.h`: a visible global placement `operator delete` gives
  *   AnmObjChrBlend::Construct a landing pad (`__dl__FPvPv`) retail does not have.
@@ -76,10 +78,6 @@
 
 extern "C" void fn_804C6F40(u32, u32, void*);
 extern "C" void fn_804C6D70(void*, u32);
-extern "C" void fn_80061EC4(void*, f32);
-
-/* The g3d math constant fn_8006244C scales by (`.sdata` 0x807911E8). */
-extern f32 lbl_807911E8;
 
 /* The `.sdata` strings fn_8005D27C / fn_800628AC hand back (`_SDA_BASE_`-relative), and the two
  * absolute constants the blocked-return helpers hand back (`.bss` / `.data`). */
@@ -262,19 +260,28 @@ extern "C" void res_anm_chr_common_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const n
     pDst->mpData = pSrc->mpData;
 }
 
-extern "C" f32 fn_80062024(f32* p)
+/* 0x80062024 (0x8): the current frame. */
+f32 nw4r::g3d::FrameCtrl::GetFrm() const
 {
-    return *p;
+    return mFrame;
 }
 
-extern "C" void fn_800621DC(f32* p, f32 v)
+/* 0x800621DC (0x8): sets the update rate. */
+void nw4r::g3d::FrameCtrl::SetRate(f32 rate)
 {
-    p[1] = v;
+    mUpdateRate = rate;
 }
 
-extern "C" f32 fn_80062300(f32* p)
+/* 0x80062300 (0x8): the update rate. */
+f32 nw4r::g3d::FrameCtrl::GetRate() const
 {
-    return p[1];
+    return mUpdateRate;
+}
+
+/* 0x80061EC4 (0x44): sets the frame, folded into the frame range by the play policy. */
+void nw4r::g3d::FrameCtrl::SetFrm(f32 frame)
+{
+    mFrame = mpPlayPolicy(mStartFrame, mEndFrame, frame);
 }
 
 extern "C" {
@@ -424,13 +431,12 @@ extern "C" void* fn_80060FAC(void* self, u32 a)
     return self;
 }
 
-/* The animated-float advance: offset[0] += offset[1] * scale, then the virtual step. */
-extern "C" void fn_8006244C(f32* p)
+/* 0x8006244C (0x18): advances the frame by the update rate times the base rate. */
+void nw4r::g3d::FrameCtrl::UpdateFrm()
 {
-    f32 scale = lbl_807911E8;
-    f32 value = p[1] * scale;
+    f32 step = mUpdateRate * smBaseUpdateRate;
 
-    fn_80061EC4(p, p[0] + value);
+    SetFrm(mFrame + step);
 }
 
 /* --- nw4r's ``fn_800626F4``-returns-this pair ------------------------------------------------------- */
@@ -960,6 +966,131 @@ static inline bool anmchr_value_valid(f32 value)
     }
     return valid;
 }
+
+/* 0x80061B3C (0x134): starts at frame 0 with rate 1 over [startFrame, endFrame], folding with `pPolicy`. */
+nw4r::g3d::FrameCtrl::FrameCtrl(f32 startFrame, f32 endFrame, PlayPolicyFunc pPolicy)
+    : mFrame(0.0f), mUpdateRate(1.0f), mStartFrame(startFrame), mEndFrame(endFrame), mpPlayPolicy(pPolicy)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmobj.h", pPolicy, 0x6A, "NW4R:Pointer Error\npolicy(=%p) is not valid pointer.");
+}
+
+/* 0x80061D2C (0x198): sets the frame and refreshes the result cache. */
+void nw4r::g3d::AnmObjChrRes::SetFrame(f32 frame)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x419, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_value_valid(frame)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x41A, "NW4R:Floating Point Value Error(%f)\nframe is infinite or nan.", frame);
+    }
+    SetFrm(frame);
+    if (mpResultCache) {
+        UpdateCache();
+    }
+}
+
+/* 0x80061F08 (0x11C): the current frame. */
+f32 nw4r::g3d::AnmObjChrRes::GetFrame() const
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x428, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    return GetFrm();
+}
+
+/* 0x8006202C (0x1B0): sets the update rate; a rate of 0 refreshes the result cache. */
+void nw4r::g3d::AnmObjChrRes::SetUpdateRate(f32 rate)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x430, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_value_valid(rate)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x431, "NW4R:Floating Point Value Error(%f)\nrate is infinite or nan.", rate);
+    }
+    SetRate(rate);
+    if (rate == 0.0f && mpResultCache) {
+        UpdateCache();
+    }
+}
+
+/* 0x800621E4 (0x11C): the update rate. */
+f32 nw4r::g3d::AnmObjChrRes::GetUpdateRate() const
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x440, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    return GetRate();
+}
+
+/* 0x80062308 (0x144): advances the frame unless the rate is 0, refreshing the result cache. */
+void nw4r::g3d::AnmObjChrRes::UpdateFrame()
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x448, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (GetRate() != 0.0f) {
+        UpdateFrm();
+        if (mpResultCache) {
+            UpdateCache();
+        }
+    }
+}
+
+/* 0x800636B0 (0x1D8): advances the frame on the update pass and handles being attached to or detached from a
+ * parent. */
+void nw4r::g3d::AnmObjChrRes::G3dProc(u32 task, u32 param, void* pInfo) /* untyped: caller-owned payload */
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x543, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    switch (task) {
+    case G3DPROC_UPDATEFRAME:
+        UpdateFrame();
+        break;
+    case G3DPROC_DETACH_PARENT:
+        if (!GetParent()) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x54F, "NW4R:Failed assertion GetParent()");
+        }
+        SetParent(NULL);
+        break;
+    case G3DPROC_ATTACH_PARENT:
+        if (GetParent()) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x556, "NW4R:Failed assertion !GetParent()");
+        }
+        SetParent(static_cast<G3dObj*>(pInfo));
+        break;
+    }
+}
+
+/* 0x80063170 (0x2CC): node `idx`'s result: nothing for an unbound node, the cached result, or the resource evaluated
+ * at the current frame into `pResult`. */
+const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrRes::GetResult(ChrAnmResult* pResult, u32 idx)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x511, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!((int)idx <= mNumBinding - 1)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x512, "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied.",
+                        idx, mNumBinding - 1);
+    }
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pResult, 0x513, "NW4R:Pointer Error\npResult(=%p) is not valid pointer.");
+    u32 anmId = mpBinding[idx];
+    if (anmId & 0xC000) {
+        pResult->flags = 0;
+        return pResult;
+    }
+    if (anmId != (anmId & 0x3FFF)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x51D, "NW4R:Failed assertion anmId == (anmId & BINDING_ID_MASK)");
+    }
+    if (mpResultCache) {
+        return &mpResultCache[anmId];
+    }
+    mRes.GetAnmResult(pResult, anmId, GetFrm());
+    return pResult;
+}
+
+/* 0x8006343C (0x274): evaluates every bound node's result at the current frame into the result cache. */
+void nw4r::g3d::AnmObjChrRes::UpdateCache()
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x52E, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", mpResultCache, 0x52F,
+                          "NW4R:Pointer Error\nmpResultCache(=%p) is not valid pointer.");
+    f32 frame = GetFrm();
+    for (u32 i = 0; i < mNumBinding; i++) {
+        u16 binding = mpBinding[i];
+        if (!(binding & 0x8000)) {
+            u32 anmId = binding & 0x3FFF;
+            mRes.GetAnmResult(&mpResultCache[anmId], anmId, frame);
+        }
+    }
+}
+
 /* 0x8005F054 (0x1C4): sets every child's frame. */
 void nw4r::g3d::AnmObjChrNode::SetFrame(f32 frame)
 {
