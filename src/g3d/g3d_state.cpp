@@ -1,10 +1,11 @@
 /*
  * g3d/g3d_state.cpp - the nw4r g3d `G3DState` cluster: GX state writes and the camera matrix table the
  *   `mtxID < NUM_CAMERA` asserts guard.
- * RANGE. .text 0x8008452C-0x80088E24 (170 functions); extab, extabindex, .ctors 0x8056F2D4-0x8056F2D8, .rodata
- *   0x8056F6D0-0x8056F710, .data 0x8058F750-0x8058FCE8 (opens on "g3d_state.cpp"), .bss 0x80682E80-0x80688420,
+ * RANGE. .text 0x80084630-0x80088E24 (166 functions); extab, extabindex, .ctors 0x8056F2D4-0x8056F2D8, .rodata
+ *   0x8056F6E0-0x8056F710, .data 0x8058F750-0x8058FCE8 (opens on "g3d_state.cpp"), .bss 0x80682E80-0x80688420,
  *   .sdata 0x80791238-0x80791258, .sbss 0x807948F0-0x80794910, .sdata2 0x80795E70-0x80795E98.  Left seam:
- *   `g3d/g3d_scnroot.cpp`'s `.data` fragment ends at 0x8058F74A; the right edge is `g3d/g3d_resvtx.cpp`, whose
+ *   `g3d/g3d_scnroot.cpp`'s `.text` ends at 0x80084630 (fn_80084630 is the first function citing "g3d_state.cpp") and
+ *   its `.data` fragment ends at 0x8058F74A; the right edge is `g3d/g3d_resvtx.cpp`, whose
  *   fragment opens at 0x8058FCE8.
  * NAMES. Map stems (`fn_`/`dtor_`, no mangling to derive from) for the unwritten rows;
  *   mtx34_inverse is a GUESS (0x800883C4: the 3x4 matrix inverse its body computes).  The material-state cache functions are GUESSES from their
@@ -81,7 +82,6 @@
  *   G3dRandomAccessTag: its inline constructor is empty on purpose (the tag temporary stays uninitialised, and
  *     retail copies an uninitialised byte).
  *   __ct__14G3dCameraTableFv: register choice only (retail alternates r30/r31 through the member array loops).
- *   fn_8008455C: one relocation argument differs.
  *   G3dIndMtxCallback, G3dIndMtxCallbackStd: the constructors' and destructors' empty bodies are complete (the
  *     compiler emits the vtable stores, the base constructor call and the deleting tail).
  *   g3d_tex_obj_cache_load and SetNrmMapMtx save one register more than retail (`_savegpr_23`/`_restgpr_23` for
@@ -141,7 +141,6 @@
 
 /* The panic file/format strings the target references as map symbols, declared here rather than as
  * literals for the same reason `g3d_camera.cpp` does: `-str reuse` would pool a literal. */
-extern const char lbl_8056F6D0[]; /* "ScnRoot" */
 extern const char lbl_8058F750[]; /* "g3d_state.cpp" */
 extern const char lbl_8058F80C[]; /* "NW4R:Failed assertion mtxID < NUM_CAMERA && mtxID >= 0" */
 
@@ -321,27 +320,12 @@ struct StateValidFlag {
     /* +0x00 */ u8 mValid;
 }; /* size: 0x1 (approximation) */
 
-/* The object `fn_8008455C` dispatches on: its first word is a vtable and the call is slot +0x14. */
-class G3dVtObject {
-public:
-    virtual void m00(); /* +0x00 */
-    virtual void m04(); /* +0x04 */
-    virtual void m08(); /* +0x08 */
-    virtual void m0C(); /* +0x0C */
-    virtual void m10(); /* +0x10 */
-    virtual u32 m14();  /* +0x14 - the slot fn_8008455C calls */
-}; /* size: 0x4 */
-
 extern "C" {
 
 /* ------------------------------------------------------------------------------------------------ */
 /* forward declarations (one per function this unit defines; keeps the source order free)             */
 /* ------------------------------------------------------------------------------------------------ */
 
-void* fn_8008452C(void);
-u32 fn_8008455C(G3dVtObject* pSelf);
-u32 fn_80084594(void* pSelf, u32* pArg);
-void* fn_80084600(void);
 void fn_80085344(StateValidFlag* pSelf);
 void fn_80085478(G3dLightTable* pSelf);
 u32* fn_8008569C(G3DResRef* pSelf);
@@ -371,37 +355,6 @@ void fn_800868A0(u32 value);
 /* ------------------------------------------------------------------------------------------------ */
 /* g3d_state.cpp                                                                                     */
 /* ------------------------------------------------------------------------------------------------ */
-
-/* The `ScnRoot` singleton lookup: `type_obj_set_name_scnleaf` stores the found object through its out-parameter
- * and returns that parameter, so the result is the word it stored. */
-void* fn_8008452C(void) {
-    const u8* pScnRoot;
-    return (void*)*type_obj_set_name_scnleaf(&pScnRoot, (const u8*)lbl_8056F6D0);
-}
-
-/* The same lookup, emitted a second time for the state object's own caller. */
-void* fn_80084600(void) {
-    const u8* pScnRoot;
-    return (void*)*type_obj_set_name_scnleaf(&pScnRoot, (const u8*)lbl_8056F6D0);
-}
-
-/* A virtual dispatch on slot +0x14 whose result is handed to the `TypeObj::GetTypeName` unwrapper. */
-u32 fn_8008455C(G3dVtObject* pSelf) {
-    u32 value = pSelf->m14();
-    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&value)->GetTypeName();
-}
-
-/* Register `pArg`'s bound object with the state's table, and on a miss insert it under the current
- * `ScnRoot`. */
-u32 fn_80084594(void* pSelf, u32* pArg) {
-    void* pScnRoot = fn_80084600();
-    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(pArg) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&pScnRoot))) {
-        return 1;
-    }
-    u32 key = *pArg;
-    return reinterpret_cast<nw4r::g3d::ScnGroup*>(pSelf)->nw4r::g3d::ScnGroup::IsDerivedFrom(
-        *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&key));
-}
 
 void fn_80085344(StateValidFlag* pSelf) {
     pSelf->mValid = 1;

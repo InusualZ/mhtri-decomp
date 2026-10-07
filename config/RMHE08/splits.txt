@@ -242,6 +242,7 @@ g3d/g3d_scnmdl.cpp:
 	extab       start:0x80008588 end:0x80008674
 	extabindex  start:0x80020E74 end:0x80020FB8
 	.text       start:0x8007C540 end:0x8007F0E4
+	.rodata     start:0x8056F678 end:0x8056F688
 	.data       start:0x8058EDA0 end:0x8058F0A0
 	.sdata      start:0x80791208 end:0x80791210
 
@@ -249,6 +250,7 @@ g3d/g3d_scnmdlsmpl.cpp:
 	extab       start:0x80008674 end:0x80008794
 	extabindex  start:0x80020FB8 end:0x8002112C
 	.text       start:0x8007F0E4 end:0x80081188
+	.rodata     start:0x8056F688 end:0x8056F6A0
 	.data       start:0x8058F0A0 end:0x8058F3D8
 	.sdata      start:0x80791210 end:0x80791228
 
@@ -262,19 +264,20 @@ g3d/g3d_scnobj.cpp:
 	.sdata2     start:0x80795E60 end:0x80795E68
 
 g3d/g3d_scnroot.cpp:
-	extab       start:0x800088F4 end:0x80008ADC
-	extabindex  start:0x800212C4 end:0x8002148C
-	.text       start:0x800827E4 end:0x8008452C
+	extab       start:0x800088F4 end:0x80008AFC
+	extabindex  start:0x800212C4 end:0x800214BC
+	.text       start:0x800827E4 end:0x80084630
+	.rodata     start:0x8056F6D0 end:0x8056F6E0
 	.data       start:0x8058F530 end:0x8058F750
 	.sdata      start:0x80791228 end:0x80791238
 	.sdata2     start:0x80795E68 end:0x80795E70
 
 g3d/g3d_state.cpp:
-	extab       start:0x80008ADC end:0x80008DE0
-	extabindex  start:0x8002148C end:0x800218AC
-	.text       start:0x8008452C end:0x80088E24
+	extab       start:0x80008AFC end:0x80008DE0
+	extabindex  start:0x800214BC end:0x800218AC
+	.text       start:0x80084630 end:0x80088E24
 	.ctors      start:0x8056F2D4 end:0x8056F2D8
-	.rodata     start:0x8056F6D0 end:0x8056F710
+	.rodata     start:0x8056F6E0 end:0x8056F710
 	.data       start:0x8058F750 end:0x8058FCE8
 	.bss        start:0x80682E80 end:0x80688420
 	.sdata      start:0x80791238 end:0x80791258

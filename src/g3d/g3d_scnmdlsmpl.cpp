@@ -1,7 +1,7 @@
 /*
  * g3d/g3d_scnmdlsmpl.cpp - nw4r g3d `ScnMdlSimple` scene model.
- * RANGE. .text 0x8007F0E4-0x80081188 (46 functions); extab, extabindex, .data 0x8058F0A0-0x8058F3D8 (opens on
- *   "g3d_scnmdlsmpl.cpp" with the class's assert texts), .sdata 0x80791210-0x80791228.  Both edges are tudiscover's
+ * RANGE. .text 0x8007F0E4-0x80081188 (46 functions); extab, extabindex, .rodata 0x8056F688-0x8056F6A0 (the "ScnMdlSimple" name record), .data
+ *   0x8058F0A0-0x8058F3D8 (opens on "g3d_scnmdlsmpl.cpp" with the class's assert texts), .sdata 0x80791210-0x80791228.  Both edges are tudiscover's
  *   weak codegen-fingerprint cuts and `.data` fragment boundaries; the 0x800810DC-0x80081188 tail is here because
  *   GetTypeObj reads the "ScnMdlSimple" name record (scn_typename_ScnMdlSimple).  The right edge 0x80081188 is where
  *   `g3d/g3d_scnobj.cpp` opens: ScnObj::CalcWorldMtx, ScnObj::CalcViewMtx and the ScnObj constructor (it stores that
@@ -24,8 +24,8 @@
  *   forbids; the two-switch dispatch measures 88.2 and saves r25 through `_savegpr_25`/`_restgpr_25`, per-case
  *   inline attach helpers 34.3).  The constructor copies
  *   mResMdl inline where retail calls the out-of-line ResMdl copy constructor (fn_80077E34, 0x80077E34).
- *   flipcheck: `.data` and `.sdata` are claimed and not emitted; the "ScnMdlSimple" name record (`.rodata`
- *   0x8056F688) has no registered owner.
+ *   flipcheck: `.rodata` (the "ScnMdlSimple" name record, declared not defined), `.data` and `.sdata` are claimed and
+ *   not emitted.
  * SHAPES. The unit compiles with `#pragma peephole off` (retail keeps every `clrlwi` + `cmpwi` pair).
  *   GetNumViewMtx and GetCalcWorldNodeID return u32: their callers use the `lhz` result unmasked.
  */
@@ -33,7 +33,7 @@
 #include "types.h"
 #include "g3d/g3d_scnmdlsmpl.h" /* this unit's own declarations (rule 1) */
 #include "mh3_pad.h"            /* VEC3_ctor (rule 2) */
-#include "unsplit/g3d.h"        /* scn_typename_ScnMdlSimple, no registered owner (rule 2) */
+#include "unsplit/g3d.h"
 
 /* 0x80080F44 (0x38): constructs the box's two corner records. */
 extern "C" nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox)
