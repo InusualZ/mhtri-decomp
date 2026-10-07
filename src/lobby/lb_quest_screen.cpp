@@ -47,14 +47,14 @@
  *   GUESS (from each body and its callers): lobby_res_slots_init, note_pane_state_0, note_pane_state_1
  *   GUESS: note_pane_state_2, note_pane_state_3, note_pane_state_4, note_pane_state_5, note_pane_state_6
  *   GUESS: note_pane_state_9
- * RESIDUALS. Every row is written (95).  Partial: `note_pane_init` (retail keeps `&vec_0x1B4` in a register),
+ * RESIDUALS. Every row is written (95).  Partial:
  *   `note_pane_angle_step`, `note_pane_state_1` (`calcVecAng2`'s second argument: retail passes r4 unset),
  *   `note_pane_pos_step`, `note_value_to_slot`/`note_slot_to_value` (retail reaches
  *   `note_slot_flat_table` through `r13`, ours through `lis`/`addi`), `note_trade_open` (the loop counters' `li` pair
  *   sits before the table base), `note_trade_offers_roll`/`note_trade_slots_draw`/`note_trade_route_draw`/
  *   `note_trade_select_step`/`note_itembox_row_draw`/`note_trade_voyage_draw`/
- *   `note_trade_offer_draw` (register choice); in the tail `quest_area_spawn_apply` (the six-kind membership test:
- *   retail compares without an index register), the kill bookkeeping and spawn-list rows (`quest_enemy_kill_record`
+ *   `note_trade_offer_draw` (register choice); in the tail `quest_area_spawn_apply` (the two six-kind membership
+ *   tests are written out; retail reloads each `need` word for the free-slot search where ours keeps them in r3-r7), the kill bookkeeping and spawn-list rows (`quest_enemy_kill_record`
  *   saves one register more, `_savegpr_20`/`_restgpr_20` against `_savegpr_21`/`_restgpr_21`), `quest_net_kill_apply`
  *   (retail tests the element against 3 with two branches), `quest_arena_key_set`, `quest_arena_need_add` (operand
  *   order of the shift and the index add).
@@ -265,11 +265,15 @@ extern "C" s32 note_timer_ready_ck(NoteTimer* timer) {
 /* 0x803A4F7C - the inverse of `note_slot_to_value`: the flat slot index holding `value` in `note_slot_table`'s four
  * 6-entry tables, then `note_slot_flat_table`; 255 when absent. */
 extern "C" u32 note_value_to_slot(u16 value) {
-    u32 index = 0;
     s8 t;
+    u32 index;
+    const u16* p;
+    u32 j;
+    const u16* q;
+
+    index = 0;
     for (t = 0; t < 4; t++) {
-        const u16* p = note_slot_table[t];
-        u32 j;
+        p = note_slot_table[t];
         for (j = 0; j < 6; j++) {
             if (value == p[j]) {
                 return index;
@@ -277,15 +281,13 @@ extern "C" u32 note_value_to_slot(u16 value) {
             index++;
         }
     }
-    {
-        const u16* q = note_slot_flat_table;
-        while (*q != 0) {
-            if (value == *q) {
-                return index;
-            }
-            index++;
-            q++;
+    q = note_slot_flat_table;
+    while (*q != 0) {
+        if (value == *q) {
+            return index;
         }
+        index++;
+        q++;
     }
     return 255;
 }
@@ -293,11 +295,15 @@ extern "C" u32 note_value_to_slot(u16 value) {
 /* 0x803A5070 - maps a flat slot index to its table value over the same four 6-entry tables and the
  * flat run at `note_slot_flat_table`; 0 past the end of both. */
 extern "C" u16 note_slot_to_value(u8 slot) {
-    u32 index = 0;
-    u16 t;
+    u32 index;
+    const u16* p;
+    s32 t;
+    s16 j;
+    const u16* q;
+
+    index = 0;
     for (t = 0; t < 4; t++) {
-        const u16* p = note_slot_table[t];
-        u32 j;
+        p = note_slot_table[t];
         for (j = 0; j < 6; j++) {
             if (slot == (u8)index) {
                 return p[j];
@@ -305,15 +311,13 @@ extern "C" u16 note_slot_to_value(u8 slot) {
             index++;
         }
     }
-    {
-        const u16* q = note_slot_flat_table;
-        while (*q != 0) {
-            if (slot == (u8)index) {
-                return *q;
-            }
-            index++;
-            q++;
+    q = note_slot_flat_table;
+    while (*q != 0) {
+        if (slot == (u8)index) {
+            return *q;
         }
+        index++;
+        q++;
     }
     return 0;
 }
@@ -743,12 +747,8 @@ extern "C" void quest_area_spawn_apply(Q_MoveWork* work, u8 index, u8 sub) {
         } else if (em_area_entry_near_ck(entry, index, sub) == 0) {
             continue;
         }
-        for (j = 0; j < 6; j++) {
-            if (slot->monster_0x00 == need[j]) {
-                break;
-            }
-        }
-        if (j != 6) {
+        if (slot->monster_0x00 == need[0] || slot->monster_0x00 == need[1] || slot->monster_0x00 == need[2] ||
+            slot->monster_0x00 == need[3] || slot->monster_0x00 == need[4] || slot->monster_0x00 == need[5]) {
             continue;
         }
         for (j = 0; j < 6; j++) {
@@ -766,12 +766,8 @@ extern "C" void quest_area_spawn_apply(Q_MoveWork* work, u8 index, u8 sub) {
         if (enemy->active == 0 || (enemy->field_0x1C8 & 1) != 0 || enemy->field_0x00C != 0) {
             continue;
         }
-        for (j = 0; j < 6; j++) {
-            if (enemy->team == need[j]) {
-                break;
-            }
-        }
-        if (j != 6) {
+        if (enemy->team == need[0] || enemy->team == need[1] || enemy->team == need[2] || enemy->team == need[3] ||
+            enemy->team == need[4] || enemy->team == need[5]) {
             continue;
         }
         for (j = 0; j < 6; j++) {
@@ -1770,7 +1766,7 @@ extern "C" u16 note_pane_angle_step(u16 target, u16 cur, u16 step) {
  * entry. */
 extern "C" void note_pane_init(NoteWork* self) {
     nw4r::math::VEC3 home;
-    nw4r::math::VEC3* rest = &self->vec_0x1B4;
+    NoteRestBlock* rest = &self->rest_0x1B4;
 
     VEC3_ctor(&home);
     self->field_0x001 = 1;
@@ -1778,9 +1774,9 @@ extern "C" void note_pane_init(NoteWork* self) {
     vec_to_mh_vec3(&home, &note_pane_home_table[stage_map_kind_get(self->map_0x194)]);
     copyVec3(&self->vec_0x170, copyVec3(&self->vec_0x17C, &home));
     self->field_0x1A8 = self->field_0x18C;
-    copyVec3(rest, &self->vec_0x170);
-    self->field_0x1C0 = 0;
-    self->field_0x1C1 = 0;
+    copyVec3(&rest->pos_0x00, &self->vec_0x170);
+    rest->talk_step_0x0C = 0;
+    rest->field_0x0D = 0;
     note_pane_anim_pair_0_1(self);
     self->field_0x1F4 = (s32)se_entry_request(10, (struct _ENEMY_WORK*)self, qnpc_snd_func_get());
 }
