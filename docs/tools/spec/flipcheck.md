@@ -38,6 +38,22 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
 * A section byte difference prints the **first** differing byte on its own line (unchanged), then the **differing-byte count**, then - when the two sections are the same size and every symbol's bytes match at its *own* address - names the section a **permutation**: the object's layout is the source's definition order, not the address order. That class (`Network/NetworkPat`: 577 of 720 `.text` bytes mislaid, every per-symbol score at 100 %) is invisible to the first-byte line, which reads the same as a three-instruction residual. The same defect got measured with a moved symbol carrying a word of its own too (`NetworkPat`'s three `delete*` functions score 99.7 %, not 100 %), which no lane can act on either, so a fourth line names the weaker case as `the section's layout is a permutation` when the sizes agree, every shared symbol has the same size on both sides, at least one sits at a different address and the mislaid layout accounts for more of the differing bytes than the symbols' own content does.
 * Referenced symbol(s) our object relocates that a flip would leave **undefined**: not defined by our object, no row in `symbols.txt`, no link input other than the target object providing them, and the target object not defining them either (`Network/NetworkWiiMediator`: four constructor names, `undefined: '<name>'` on a flip). This is the general relocation half of a flip check, not just the `@etb_`/`@eti_` fragment class.
 * **Row 36 is one line per unit**: the target-exported symbols our `.comment` leaves un-exported and nothing in the link references are folded into `row 36: N function(s) force-active in retail .comment, not in ours: a, b, c, d, e, f, ... (first 6) - ...; mark each __declspec(export) (--verbose lists all)` (`row36_lines`; `ROW36_FIRST` names). `--verbose` adds the old per-symbol line (`ROW36_SYMBOL_LINE`, the wording `comment_trim_risks` still returns) after it. Measured on `Network/NetworkWiiMediator` at `6a1c9583a`: 22 row-36 lines -> 1 (53 -> 32 output lines for it and `Network/net_session_close`), every other line identical; the gate's `flipcheck_problems` reads the ` - ` lines, so a refusal still names the row.
+* **Symbol offsets in the positioned data sections (2026-10-07).** `.bss`/`.sbss`/`.sbss2`/`.sdata`/`.sdata2` are compared by
+  symbol, not only by size and bytes (a NOBITS section has none): a named symbol at another offset than the target's, or a
+  named target symbol our object does not define (the dead-stripped spare global), is a problem line pointing at
+  `python tools/mwlink_debugger.py trace <unit>` (`lib.objcompare.data_symbol_gaps`). Skipped as carrying no identity: `@`
+  names, `gap_` labels, `lbl_`/`zz_` names (the target's spelling of pooled constants) and `name$NNN` function statics; a
+  symbol's size is not compared (`MSL_C/errno` is 4 B ours, 8 B in the target and links). Measured on MAIN's 502 objects: the
+  92 units READY before stay READY except `TRK/gdev_cc` (`.bss` buffers swapped: a real order defect).
+* **A short section before a flipped successor is link padding (2026-10-07).** A unit whose section ends short of its
+  claim (`OS/OSLink` .text 0x18 of 0x20; the `.sdata`/`.sbss` 4-byte shortfalls) links correctly when the next unit in
+  link order for that section is a linked object, because the link pads it up to the successor's alignment
+  (`lib.objcompare.linked_trailing_pad`, `flipcheck.linked_pad_note`): the section is not `extab`/`extabindex`/`.init`; the
+  target's tail is zero with no symbol but `gap_` labels; and the successor - `Object(Matching)` in this tree's
+  configure.py, or named on the same command line (the gate passes the batch) - built by us at an alignment (at most 16)
+  that starts exactly at the claim's end. The note reads `... the 0xK-byte tail is link padding ...`. An unflipped
+  successor (its target object aligned to 4) is refused, and when the successor flipped at 16 would excuse the shortfall
+  the size line says so: `... only once its successor <unit> is flipped (16-aligned); flip from the tail of each run`.
 * **A trailing alignment pad is not a size gap (2026-10-06).** dtk gives a unit the zero fill up to the next
   object's aligned start, MWCC's object ends before it, and the link puts the fill back. A section shorter than its
   claim is accepted - a `.` note `<section>: 0xN of 0xM bytes - the 0xK-byte tail is alignment fill (...)` instead of
@@ -65,8 +81,13 @@ The row-36 summary is pinned there too (`row36_lines`, and `check` folding eight
 The pad rule: `tools/tests/units/test_flipcheck_pad.py` (15 checks; objects shaped like the five real sections and
 NetworkPool's NOBITS `.sbss`: each is fill; a non-zero tail, a non-`gap_` symbol in the tail, a next section aligned to
 4, no registered next section and a shortfall past the alignment each stay a problem; `.text`/`extab` and an alignment
-over 8 are never fill; our own bytes are still compared). Mutations: no pad rule fails 6, any tail symbol accepted 1,
+over 8 are never fill; our own bytes are still compared). `test_positioned_symbols` pins the symbol check (swapped order, spare global, `.sdata2`, the skipped names, size not compared; check off fails 1).
+Mutations: no pad rule fails 6, any tail symbol accepted 1,
 the next section's alignment ignored 2.
+`test_linked_successor_pad` (9 more checks, 24 in all): OSLink/OSMessage-shaped objects - a Matching 16-aligned successor and a
+same-batch successor accept, an unflipped one (target aligned to 4, with the hint), a successor our object aligns to 4 and a
+non-zero tail refuse; `.text` is excused, `extab` never, `.sdata` 4 B before an 8-aligned successor is. Mutation: the
+linked-successor test off fails 2.
 Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

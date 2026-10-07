@@ -26,6 +26,31 @@ def test_only_open(c):
     c.contains("a positional fallback keeps its ~ mark", block[2], "99.99%~")
 
 
+def test_summarize_official(c):
+    """`summarize` prints the report's entry score, never the positional `match_percent` (mutation: reading the
+    entry as a number falls back to `~` for every row)."""
+    import json
+    side = lambda pct: {"symbols": [{"name": n, "size": 8, "match_percent": pct, "instructions": [{}]}
+                                    for n in ("hit", "unscored")]}
+    with testing.FixtureTree() as t:
+        path = t.write("d.json", json.dumps({"left": side(11.0), "right": side(12.0)}))
+        rows = {r[0]: r for r in mm.summarize(str(path), {"hit": {"fuzzy_match_percent": 87.5, "size": 8},
+                                                           "unscored": {"size": 8}})}
+        c.check("the entry's score is the printed one, not the positional 11.0", rows["hit"][3:6:2], (87.5, False))
+        c.check("an entry with no score key is 0 %, still official", rows["unscored"][3:6:2], (0.0, False))
+        rows = {r[0]: r for r in mm.summarize(str(path), {"hit": 55.0})}
+        c.check("a bare number is accepted, a function the report lacks falls back with ~",
+                (rows["hit"][3], rows["hit"][5], rows["unscored"][3], rows["unscored"][5]), (55.0, False, 11.0, True))
+
+
+def test_func_align_override(c):
+    from tools.lib import units
+    flags = ["-O4,p", "-func_align", "4", "-sym", "on", "-W", "off", "-lang=c"]
+    c.check("--flags-extra \"-func_align 16\" replaces the earlier value instead of appending a second",
+            units.override_flags(flags, "-func_align 16"), ["-O4,p", "-sym", "on", "-W", "off", "-lang=c", "-func_align", "16"])
+    c.check("-W error replaces -W off", units.override_flags(flags, "-W error")[-3:], ["-lang=c", "-W", "error"])
+
+
 def test_scratch_object(c):
     with testing.FixtureTree() as t:
         real = t.write("build/RMHE08/src/g3d/x.o", b"real object")

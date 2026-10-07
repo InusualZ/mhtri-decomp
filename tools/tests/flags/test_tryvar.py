@@ -131,8 +131,8 @@ def perm_score(retail):
 
 def test_declperm_run_and_orders(c):
     from tools.lib import declperm
-    run = declperm.find_run(PERM_SOURCE, "g")
-    c.check("the run skips a leading initialised declaration", [l.strip() for l in run.lines],
+    run = declperm.find_run(PERM_SOURCE, "g", initialised=False)
+    c.check("plain-only: the run skips a leading initialised declaration", [l.strip() for l in run.lines],
             ["int a;", "int b;", "int c;"])
     c.check("... and its span is exactly those lines", PERM_SOURCE[run.start:run.end], run.block)
     c.check("a single plain declaration is no run",
@@ -153,6 +153,39 @@ def test_declperm_run_and_orders(c):
             declperm.reorder(PERM_SOURCE.replace("int b;", "int z;"), run, (1, 0, 2)), None)
 
 
+INIT_SOURCE = (
+    "int g(int n) {\n    int a = n + 1;\n    int b;\n    int c = a * 2;\n    char *d = f(n);\n"
+    "    a = 3;\n    return a + b + c;\n}\n")
+
+
+def test_declperm_initialised(c):
+    """Initialised leading locals are units of the run, kept after the declarations their initialiser uses.
+    Mutation: ignoring `deps` lets `c = a * 2` move before `a`, failing the dependency checks."""
+    from tools.lib import declperm
+    run = declperm.find_run(INIT_SOURCE, "g")
+    c.check("the run holds plain and initialised declarations, stopping at the first statement",
+            [l.strip() for l in run.lines], ["int a = n + 1;", "int b;", "int c = a * 2;", "char *d = f(n);"])
+    c.check("c's initialiser uses a, nothing else depends on anything",
+            run.deps, ((), (), (0,), ()))
+    allo, sampled = declperm.orders(len(run.lines), 120, 0, run.deps)
+    c.check("12 of the 24 orders keep c after a (the identity is not offered): 11, not sampled",
+            (len(allo), sampled), (11, False))
+    c.check("every offered order keeps a before c", all(o.index(0) < o.index(2) for o in allo), True)
+    samp, flag = declperm.orders(len(run.lines), 5, 0, run.deps)
+    c.check("a sample over a small cap is distinct, dependency-safe and reproducible",
+            (len(set(samp)), flag, all(o.index(0) < o.index(2) for o in samp), samp == declperm.orders(4, 5, 0, run.deps)[0]),
+            (5, True, True, True))
+    c.check("plain-only still reads this function as no run of two plain lines after the leading initialised one",
+            declperm.find_run(INIT_SOURCE, "g", initialised=False), None)
+    c.check("a statement that merely resembles a declaration is not a member",
+            declperm.find_run("int g(void) {\n    else x = 1;\n    int a = 1;\n    int b = 2;\n}\n", "g"), None)
+    two = declperm.find_run("int g(void) {\n    int a = 1;\n    int b = a;\n    return b;\n}\n", "g")
+    c.check("two dependent lines have no other order", declperm.orders(2, 120, 0, two.deps), ([], False))
+    moved = declperm.reorder(INIT_SOURCE, run, (1, 0, 2, 3))
+    c.check("a rewrite moves the initialised line whole", moved.startswith(
+        "int g(int n) {\n    int b;\n    int a = n + 1;\n    int c = a * 2;\n"), True)
+
+
 def test_permdecl(c):
     import contextlib
     import io
@@ -167,7 +200,7 @@ def test_permdecl(c):
         os.environ["TRYVAR_TOOLS_ROOT"] = str(testing.LIVE_ROOT)
         try:
             rec = tryvar.permdecl_one(unit, tokens, "g", 6, 120, 0, score=perm_score(["c", "a", "b"]),
-                                      diverge=lambda *_a: 0)
+                                      diverge=lambda *_a: 0, initialised=False)
             c.check("the retail order is the best", (rec["status"], rec["best"], rec["best_order"]),
                     ("ok", "order-2,0,1", [2, 0, 1]))
             c.check("the table is ranked, best first, and says which lines", rec["table"][0]["lines"],
@@ -177,18 +210,18 @@ def test_permdecl(c):
             c.check("the source is byte-identical after a probe run", pathlib.Path(unit.source).read_bytes(), before)
             c.check("no probe is left", sorted(os.listdir(os.path.dirname(unit.source))), ["unit.cpp"])
             same = tryvar.permdecl_one(unit, tokens, "g", 6, 120, 0, score=perm_score(["a", "b", "c"]),
-                                       diverge=lambda *_a: 0)
+                                       diverge=lambda *_a: 0, initialised=False)
             c.check("the source's own order already best: no-gain, nothing to apply",
-                    (same["status"], same["best"], tryvar.permdecl_apply(PERM_SOURCE, [same], 6)),
+                    (same["status"], same["best"], tryvar.permdecl_apply(PERM_SOURCE, [same], 6, False)),
                     ("no-gain", None, None))
             c.check("a function with no run is reported, not tried",
                     tryvar.permdecl_one(unit, tokens, "nope", 6, 120, 0)["status"], "no-run")
             # --apply writes the best order into g only and keeps CRLF; h (the same lines, earlier) is untouched
             pathlib.Path(unit.source).write_bytes(PERM_SOURCE.replace("\n", "\r\n").encode())
-            args = types.SimpleNamespace(permdecl="g", max_lines=6, max_perms=120, seed=0, apply=True, json=True)
+            args = types.SimpleNamespace(permdecl="g", max_lines=6, max_perms=120, seed=0, apply=True, json=True, plain_only=True)
             orig_one = tryvar.permdecl_one
             tryvar.permdecl_one = lambda u, t, fn, ml, cap, seed, **k: orig_one(
-                u, t, fn, ml, cap, seed, score=perm_score(["c", "a", "b"]), diverge=lambda *_a: 0)
+                u, t, fn, ml, cap, seed, score=perm_score(["c", "a", "b"]), diverge=lambda *_a: 0, **k)
             try:
                 with contextlib.redirect_stdout(io.StringIO()):
                     tryvar.run_permdecl(args, unit, tokens, str(tree.root))

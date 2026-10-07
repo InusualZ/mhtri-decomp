@@ -49,9 +49,10 @@ units, report.
 
 ## Test contract
 
-Tier: fixture (`tools/tests/flags/test_mwcc_matrix.py`, 10 checks: `open_rows`/`render_block` on 100 %, 0.00 % and
+Tier: fixture (`tools/tests/flags/test_mwcc_matrix.py`, 15 checks: `open_rows`/`render_block` on 100 %, 0.00 % and
 99.99 % rows; `ScratchObject` keeps the variant, restores bytes and mtime, leaves no backup, removes an object that was
-not there). Mutations: filtering out 0.00 % instead of 100 % fails 3, a restore without the mtime fails 1. The compile
+not there; `summarize` prints a report entry's score, not the positional one; `-func_align`/`-sym`/`-W` are valued options
+`--flags-extra` replaces). Mutations: reading the entry as a number fails 2, dropping `-func_align` from `lib.units.VALUED` fails 1; filtering out 0.00 % instead of 100 % fails 3, a restore without the mtime fails 1. The compile
 itself is not under test (it needs the toolchain).
 Target: `tools/tests/flags/test_mwcc_matrix.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
@@ -60,6 +61,9 @@ Target: `tools/tests/flags/test_mwcc_matrix.py` on `lib.testing` (`FixtureTree`/
 * without `--one` it still leaves a foreign object in the unit's output path (printed with the restore command)
 * `--list-versions` listed the files of the compiler's own version directory until WP3b; it now lists the sibling version
   directories (`lib.units.available_versions`, shared with `frame.py --versions`).
+
+* `summarize` takes `official` as `{function: report entry}` (what `score_entries` returns) and reads it with `report.score_of`
+  (no `fuzzy_match_percent` key = 0 %); it once tested for a bare number, so every row printed the positional score with `~`.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

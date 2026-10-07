@@ -454,7 +454,7 @@ asked again.
 python tools/units/symbolpreflight.py <address|name>   # owner, collision verdict, registration drafts
 python tools/splits/tudiscover.py at <address|name>    # TU boundary proposal for an unowned address
 #   the bulk tiler (`attribute.py plan`) is retired: every range is registered in `splits.txt`; a re-cut of one
-#   region uses `tools/splits/unwindcut.py` and `splitcheck.py --baseline` audits the result (docs/splits-program.md).
+#   region uses `tools/units/unwindcut.py` and `splitcheck.py --baseline` audits the result (docs/splits-program.md).
 ```
 
 * **A unit is registered once, at its final `src/<module>/<name>.<ext>` home** (§12), inside the worker's own worktree so

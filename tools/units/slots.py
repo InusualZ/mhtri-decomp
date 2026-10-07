@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The slot pool's CLI over `lib.lanes.pool`: reusable lane directories at stable paths, a slot holds no branch.
 Spec: docs/tools/spec/slots.md. CLI: slots.py init | acquire <unit> | spawn --kind K [--slot N] | release | reclaim |
-collect [--slot N|--path P] [--release] | status [--json] | refresh N [--force] | verify | shadow <slot> <dir> | --selftest."""
+collect [--slot N|--path P] [--release] | status [--json] | refresh N [--force] | verify | shadow <slot> <dir> | seed-worktree <path> | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -1665,6 +1665,10 @@ def main() -> int:
                     help="also copy the warm build/input trees, so the shadow can compile and score")
     sh.add_argument("--force", action="store_true", help="replace a non-empty destination directory")
     sh.add_argument("--json", action="store_true")
+    sw = sub.add_parser("seed-worktree", help="copy MAIN's toolchain, DOL and tools/m2c into a plain worktree")
+    sw.add_argument("path", help="the worktree to seed (any `git worktree add` tree; never MAIN)")
+    sw.add_argument("--obj", action="store_true", help="also copy build/RMHE08/obj (the split target objects)")
+    sw.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
     if args.selftest:
@@ -1674,6 +1678,22 @@ def main() -> int:
         return 0
     main_wt = args.main or _main_root()
 
+    if args.cmd == "seed-worktree":
+        if not os.path.exists(os.path.join(args.path, ".git")):
+            raise SystemExit("REFUSED seed-worktree: %s is not a git worktree (no .git)" % args.path)
+        try:
+            out = seed.seed_essentials(main_wt, args.path, args.obj)
+        except ValueError as exc:
+            raise SystemExit("REFUSED seed-worktree: %s" % exc)
+        if args.json:
+            print(json.dumps(out, indent=2))
+        else:
+            for item, n in out.items():
+                if item != "missing":
+                    print("  %-24s %d file(s) copied" % (item, n))
+            for item in out["missing"]:
+                print("  MISSING in MAIN: %s" % item)
+        return 1 if out["missing"] else 0
     if args.cmd == "init":
         out = init(main_wt, args.count, args.force)
         if args.json:

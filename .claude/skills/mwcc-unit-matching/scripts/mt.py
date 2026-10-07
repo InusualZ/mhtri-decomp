@@ -12,7 +12,7 @@ Usage:
     python scripts/mt.py matrix [-u <unit>] [--flags-extra "..."] [--only-open] [--one] [--json] [versions...]
     python scripts/mt.py sweep  [-u <unit>] [subs...]
     python scripts/mt.py variants [-u <unit>] [--variants f.py] [names...]
-    python scripts/mt.py permdecl <unit> <fn[,fn...]> [--max-perms N] [--apply]   (tryvar --permdecl: declaration orders)
+    python scripts/mt.py permdecl <unit> <fn[,fn...]> [--max-perms N] [--plain-only] [--apply]   (tryvar --permdecl: declaration orders)
     python scripts/mt.py rawsame <unit>... [--report [R]] [--min-percent P]   (every 100 % row, raw bytes + reloc types)
     python scripts/mt.py shapes [-u <unit>] [-f <function>] [--scan N] [--gens ...] [--depth N]
     python scripts/mt.py diff   [-u <unit>] <symbol> [n] [--all]        (symdiff: side by side)
@@ -47,10 +47,40 @@ TOOLS = {
 }
 
 
+#: tryvar options that take a value, so `permdecl_argv` does not mistake the value for the unit or the function
+_VALUED = frozenset(("-u", "--unit", "--permdecl", "--max-perms", "--max-lines", "--seed", "--flags-extra", "--symbol",
+                     "--variants"))
+
+
+def permdecl_argv(rest):
+    """tryvar's argv for `permdecl`: `<unit> <fn[,fn]> [options]`, or the options spelled out (`-u/--unit U`,
+    `--permdecl FN`), or a mix; the unit and the function are only added for the part not already spelled."""
+    opts, pos, have_unit, have_fn, i = [], [], False, False, 0
+    while i < len(rest):
+        a = rest[i]
+        name = a.split("=", 1)[0]
+        if not a.startswith("-"):
+            pos.append(a)
+        else:
+            have_unit |= name in ("-u", "--unit")
+            have_fn |= name == "--permdecl"
+            opts.append(a)
+            if "=" not in a and name in _VALUED and i + 1 < len(rest):
+                opts.append(rest[i + 1])
+                i += 1
+        i += 1
+    lead = []
+    if not have_unit and pos:
+        lead += ["-u", pos.pop(0)]
+    if not have_fn and pos:
+        lead += ["--permdecl", pos.pop(0)]
+        have_fn = True
+    return lead + opts + pos if have_fn else ["--help"]
+
+
 #: subcommands that are another tool's mode: name -> (tool key, function turning the rest of argv into that tool's argv)
 ALIASES = {
-    "permdecl": ("variants", lambda rest: (["-u", rest[0], "--permdecl", rest[1]] + rest[2:]) if len(rest) >= 2
-                 else ["--help"]),
+    "permdecl": ("variants", permdecl_argv),
 }
 
 
