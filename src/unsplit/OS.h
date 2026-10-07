@@ -1,106 +1,21 @@
 /*
- * OS declarations with no registered owner (docs/plan.md 6.5 rule 2).
- *
- * The Revolution SDK OS library's bootstrap helpers `OSRegisterVersion` (0x804CB380),
- * `OSDisableInterrupts` (0x804D0C70) and `OSRestoreInterrupts` (0x804D0CB0) are called by units whose
- * own ranges the OS module's registered units do not cover: `NWC24/nwc24_msg.c` registers the NWC24
- * library's version string through `OSRegisterVersion` and brackets its message-library state update
- * with the interrupt pair.  The module the band names is `OS` (its bracketing registered units are the
- * OS band's), and no registered unit defines any of the three, so this file is their home.
- *
- * Added with the `NWC24/nwc24_msg.c` registration (the NWC24 SDK band, 0x8051D710-0x8051E864).
+ * OS declarations: the aggregator of the per-library mirror headers `src/OS/*.h` (docs/plan.md 6.5 rule 2) and of
+ * `NAND/nand.h`; every includer keeps the view it had.
  */
 #ifndef MHTRI_UNSPLIT_OS_H
 #define MHTRI_UNSPLIT_OS_H
 
 #include "types.h"
-/* `OSGetTime`, the interrupt pair, the mutex set, `OSCreateThread`/`OSResumeThread`, `OSReport` and `OSPanic`
- * are `NAND/nand.c`'s (the NAND/OS SDK block 0x804C6D70..0x804D9B4C), declared once in its header. */
 #include "NAND/nand.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* 0x804CB380 - records a library's version string with the OS. */
-void OSRegisterVersion(const char* version);
-
-/* 0x804CB420 - which kind of title is running (the SDK's `OS_APP_TYPE_*` values). */
-u8 OSGetAppType(void);
-
-/* size: 0x10 - the record `OSRegisterShutdownFunction` links into the OS's shutdown list; the
- * library fills `func` and `priority`, the OS owns the two list links. */
-typedef struct OSShutdownFunctionInfo {
-    /* +0x00 */ BOOL (*func)(BOOL final, u32 event);
-    /* +0x04 */ u32 priority;
-    /* +0x08 */ struct OSShutdownFunctionInfo* next;
-    /* +0x0C */ struct OSShutdownFunctionInfo* prev;
-} OSShutdownFunctionInfo; /* size: 0x10 */
-
-/* 0x804D21F0 - add a shutdown-function record to the OS's ordered list. */
-void OSRegisterShutdownFunction(OSShutdownFunctionInfo* info);
-
-/* 0x800000F8 - the console's bus clock in Hz, read straight out of the low-memory arena.  The original
- * object carries no relocation for it, i.e. the source spelled the address out (same shape as
- * `NWC24_RTC_USER_ID` in `unsplit/NWC24.h`). */
-#define OS_BUS_CLOCK (*(u32*)0x800000F8)
-
-/* ----------------------------------------------------------------------------------------------
- * The OS thread and message-queue set the NHTTP library creates its comm thread with
- * (`NHTTP/NHTTP_bgnend.c` -> `OSInitMessageQueue` / `OSCreateThread` / `OSResumeThread` /
- * `OSJoinThread` / `OSSendMessage` / `OSReceiveMessage`), plus the two diagnostics NHTTPi_Startup
- * and NHTTPi_CleanupAsync print through.  None of these addresses is inside a registered unit
- * (0x804D1460-0x804D4600 is the OS library's own band), so rule 2 puts them here. */
-
-/* size: 0x20 - two thread queues, the message-array pointer, the count and the two ring indices */
-typedef struct OSMessageQueue { u8 pad_0x00[0x20]; } OSMessageQueue;
-
-/* size: 0x08 - the queued message and its priority */
-typedef struct OSMessage { void* msg; s32 prio; } OSMessage;
-
-/* size: 0x318 - the OS thread control block (`NHTTPThreadInfo` places one at +0x30) */
-typedef struct OSThread { u8 pad_0x000[0x318]; } OSThread;
-
-/* size: 0x18 - the OS mutex the NHTTP and NWC24 bands initialise, lock and unlock */
-typedef struct OSMutex { u8 pad_0x00[0x18]; } OSMutex;
-
-/* size: 0x08 - the head and tail of a queue of waiting threads */
-typedef struct OSThreadQueue { void* head; void* tail; } OSThreadQueue;
-
-/* 0x804D2140 / 0x804D2150 - the 4-byte branch stubs the NHTTP completion record reaches
- * `OSInitThreadQueue` (0x804D3960) and the wakeup routine (0x804D4B20, the dump's `OSWakeupThread`)
- * through.  Their names are GUESSes from the branch each one holds. */
-void OSInitThreadQueueThunk(OSThreadQueue* queue);
-void OSWakeupThreadThunk(OSThreadQueue* queue);
-
-/* 0x804D3C00 - the thread the OS is currently running, null before the scheduler starts. */
-OSThread* OSGetCurrentThread(void);
-
-/* 0x804D4350 - write a cached range back to main memory. */
-void DCStoreRange(void* start, u32 size); /* untyped: byte range */
-
-/* the entry point OSCreateThread is handed: the thread's own argument in, its exit value out */
-typedef void* (*OSThreadEntry)(void* arg); /* untyped: opaque handle */
-
-#define OS_MESSAGE_NOBLOCK 0
-#define OS_MESSAGE_BLOCK   1
-
-/* 0x804D1460 - initialise a message queue over a caller-owned array. */
-void OSInitMessageQueue(OSMessageQueue* queue, OSMessage* msgArray, s32 msgCount);
-
-/* 0x804D14C0 / 0x804D1590 - post to / take from a queue; the block flag is OS_MESSAGE_BLOCK or
- * OS_MESSAGE_NOBLOCK. */
-BOOL OSSendMessage(OSMessageQueue* queue, OSMessage* msg, BOOL block);
-BOOL OSReceiveMessage(OSMessageQueue* queue, OSMessage* buffer, BOOL block);
-
-/* 0x804D3C00 - the thread the OS is currently running, null before the scheduler starts. */
-OSThread* OSGetCurrentThread(void);
-
-/* 0x804D44B0 - wait for the thread to exit (`OSCreateThread`/`OSResumeThread` are in `NAND/nand.h`). */
-BOOL OSJoinThread(OSThread* thread, s32* exitValue);
-
-#ifdef __cplusplus
-}
-#endif
+#include "OS/OS.h"
+#include "OS/OSCache.h"
+#include "OS/OSError.h"
+#include "OS/OSInterrupt.h"
+#include "OS/OSLaunch.h"
+#include "OS/OSMessage.h"
+#include "OS/OSMutex.h"
+#include "OS/OSReset.h"
+#include "OS/OSThread.h"
+#include "OS/OSTime.h"
 
 #endif /* MHTRI_UNSPLIT_OS_H */

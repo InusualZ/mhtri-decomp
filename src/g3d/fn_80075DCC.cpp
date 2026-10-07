@@ -59,7 +59,7 @@
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "g3d/g3d_xsi.h" /* g3d_calc_tex_mtx_xsi (rule 2) */
 #include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 2) */
-#include "OS/MEMAllocFromAllocator.h" /* MEMFreeToAllocator (rule 2) */
+#include "MEM/MEMAllocFromAllocator.h" /* MEMFreeToAllocator (rule 2) */
 #include "g3d/g3d_anmchr.h" /* type_obj_set_name (rule 2) */
 #include "g3d/g3d_cpu.h"
 #include "g3d/g3d_resvtx.h"

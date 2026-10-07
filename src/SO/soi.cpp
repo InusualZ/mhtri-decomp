@@ -29,7 +29,7 @@
  */
 #include "SO/soi.h"
 #include "NAND/nand.h"
-#include "NAND/__OSGetSystemTime.h"
+#include "OS/__OSGetSystemTime.h"
 #include "NCD/ncdsystem.h"
 #include "NWC24/nwc24_msg.h"
 #include "RVLGX/GXTexture_tail.h"

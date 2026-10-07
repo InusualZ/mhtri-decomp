@@ -48,10 +48,11 @@
 #include "mh3_pad.h"          /* setVec3 (rule 2) */
 #include "nw4r/fn_805012C4.h"  /* nw4r::math::MTX34Zero (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_get_ptr, mtx34_const_ptr (rule 2) */
-#include "OS/PSMTXCopy.h"      /* PSMTXCopy, PSMTXConcat, PSMTXConcatArray, owner OS/FindContainHeap_.c (rule 2) */
-#include "NAND/DCInvalidateRange.h" /* DCInvalidateRange, DCFlushRangeNoSync, owner NAND/nand.c (rule 2) */
-#include "NAND/LCEnable.h"     /* LCQueueLength, LCQueueWait, owner NAND/nand.c (rule 2) */
-#include "NAND/OSVReport.h"    /* OSYieldThread, owner NAND/nand.c (rule 2) */
+#include "MTX/PSMTXCopy.h"      /* PSMTXCopy, PSMTXConcat, PSMTXConcatArray, owner MTX/mtx.c (rule 2) */
+#include "OS/DCInvalidateRange.h" /* DCInvalidateRange, DCFlushRangeNoSync, owner NAND/nand.c (rule 2) */
+#include "OS/LCEnable.h"     /* LCQueueLength, LCQueueWait, owner NAND/nand.c (rule 2) */
+#include "OS/OSVReport.h"
+#include "OS/OSThread.h"    /* OSYieldThread, owner OS/OSThread.c (rule 2) */
 
 /* The alignment-assert wrappers need the un-fused compare (retail keeps `clrlwi` + `cmpwi`), exactly
  * as g3d/g3d_basic.cpp and g3d/g3d_calcmaterial.cpp found. */

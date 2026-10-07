@@ -5,8 +5,8 @@
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 
-#include "NAND/OSDisableInterrupts.h" /* OSDisableInterrupts (rule 2: the owner's header) */
-#include "NAND/OSRestoreInterrupts.h" /* OSRestoreInterrupts (rule 2: the owner's header) */
+#include "OS/OSDisableInterrupts.h" /* OSDisableInterrupts (rule 2: the owner's header) */
+#include "OS/OSRestoreInterrupts.h" /* OSRestoreInterrupts (rule 2: the owner's header) */
 #include "sound/snd_reloc_state_rebase.h" /* snd_reloc_state_rebase (rule 2: the owner's header) */
 #include "sound/snd_reverb_state_advance.h" /* snd_reverb_state_advance (rule 2: the owner's header) */
 #include "sound/sound_obj.h" /* sound_obj (rule 2: the owner's header) */

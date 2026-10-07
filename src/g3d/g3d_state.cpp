@@ -129,7 +129,7 @@
 #include "nw4r/fn_805012C4.h"    /* nw4r::math::MTX34Zero (rule 2) */
 #include "font/gx_tex_obj_copy.h" /* gx_tex_obj_copy (rule 2) */
 #include "RVLGX/GXGetTexObjWidth.h" /* GXGetTexObjWidth, GXGetTexObjHeight (rule 2) */
-#include "OS/PSMTXInverse.h"     /* PSMTXInverse (rule 2) */
+#include "MTX/PSMTXInverse.h"     /* PSMTXInverse (rule 2) */
 
 #pragma peephole off
 #pragma pool_data off
