@@ -7,21 +7,16 @@
  *     0x80793E38 / 0x80793E40) and the init flag, device path and heap id (`.sbss` 0x807951B0..0x807951C8) are read
  *     only by this run
  *   - the run starts at `ISFS_OpenLib` and ends before the GX library's first function (0x804B32D0)
- * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`, `cflags_os`); every function start is 16-aligned, which
- *   `#pragma function_align 16` restores.
- * NAMES. the five entry points the map does not name are named in the comment above each body (the ioctl number and
- *   argument shape prove them): `fn_804B1F50` = `ISFS_CreateDirAsync`, `fn_804B2050` = `ISFS_ReadDir`,
- *   `fn_804B21B0` = `ISFS_ReadDirAsync`, `fn_804B2AB0` = `ISFS_GetUsageAsync`, `fn_804B2CE0` = `ISFS_CreateFileAsync`;
- *   the dump answers `ISFS_CreateFileAsync` for two addresses, so it is not evidence on its own. `_isfsFuncCb` is a
- *   GUESS (the completion callback every async ISFS command registers; the map carries the placeholder only).
- * RESIDUALS. `fn_804B2AB0`: two register colours (r28/r29, the block pointer and the path-work pointer) are swapped,
- *   every other instruction matches (17 of 5680 `.text` bytes differ). `lo$688` / `hi$689` (the two IPC-arena statics
- *   of `ISFS_OpenLib`) are function-local statics whose map spelling C cannot declare, so this unit emits them: `.sbss`
- *   is 0x8 of the 0x18 claimed (the other words are declared) and `.sdata` is 0x8 of the 0x10 claimed (`__fsFd`, which
- *   the target initialises to -1, is declared, so the `/dev/fs` string lands at +0 instead of +8: 15 of 16 bytes differ).
+ * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (-O4,p, default alignment 16): every
+ *   function start of the file is 16-aligned and `-func_align 4` loses the layout.
+ * NAMES. the five entry points the map did not name are `ISFS_CreateDirAsync`, `ISFS_ReadDir`,
+ *   `ISFS_ReadDirAsync`, `ISFS_GetUsageAsync` (`ISFS_CreateDirAsync` is a GUESS, `ISFS_ReadDir` is a GUESS, `ISFS_ReadDirAsync` is a GUESS and `ISFS_GetUsageAsync` is a GUESS, all in the SDK's scheme) and `ISFS_CreateFileAsync` (the ioctl number and argument shape prove them;
+ *   the dump answers `ISFS_CreateFileAsync` for two addresses, so it is not evidence on its own). `_isfsFuncCb` is a
+ *   GUESS (the completion callback every async ISFS command registers; the map carries the placeholder only);
+ *   `__fsRequestPending` is a GUESS (the word `_isfsFuncCb` clears; one writer, no reader in the DOL).
+ * RESIDUALS. none in `.text` / `.data` / `.sdata` / `.sbss`; relocdiff by name differs only on literal and local-static spellings
+ *   (`@191`/`@192` vs `@1687`/`@1688`, `lo`/`hi` vs `lo$688`/`hi$689`).
  */
-
-#pragma function_align 16
 
 #include "types.h"
 #include "IPC/ipcMain.h"
@@ -34,8 +29,7 @@
  * FS/ISFS - the SDK file-system library's entry points at 0x804B1CA0..0x804B32D0.
  *
  * The library keeps one IPC heap and one `/dev/fs` fd, hands every ioctl a 0x140-byte command block out
- * of that heap and completes the async ones through `_isfsFuncCb`.  The map's `fn_804B...` names are kept
- * for the five entry points the map does not name (see NAMES above).
+ * of that heap and completes the async ones through `_isfsFuncCb`.  
  * =================================================================================================== */
 
 
@@ -158,25 +152,22 @@ typedef struct FSCommandBlock {
     } ctx;
 } FSCommandBlock;
 
-/* The FS library's own state: the `/dev/fs` fd, the heap id, the initialised flag, the reserved IPC
- * arena window and the outstanding-async counter.  They are this unit's claimed `.sdata` 0x80793E38 and
- * `.sbss` 0x807951B0..0x807951C8, declared here and never defined - except `lo`/`hi`, which the map spells
- * with MWCC's local-static suffix and which therefore cannot be declared from C (the two 4-byte `.sbss`
- * words this unit emits). */
-extern s32 __fsFd;
-extern u32 __fsInitialized;
-extern char* __devfs;
-extern s32 hId;
-extern u32 lbl_807951B8;
+/* The FS library's own state: the `/dev/fs` fd (-1 until opened), the heap id, the reserved IPC arena window, the
+ * request-pending flag the completion callback clears, the IPC-arena device path and the initialised flag.  The
+ * compiler emits `.sbss` in reverse definition order, so this order lays the words out as the target has them. */
+static s32 __fsFd = -1;
+static s32 hId;
+static void* hi;
+static void* lo;
+static u32 __fsRequestPending;
+static char* __devfs;
+static u32 __fsInitialized;
 
 char* strcpy(char* dst, const char* src);
 
 /* Open the `/dev/fs` device, carve the IPC arena window for it and create the FS heap. */
 s32 ISFS_OpenLib(void)
 {
-    static void* lo;
-    static void* hi;
-
     s32 ret = IPC_RESULT_OK;
     u8* base;
 
@@ -280,7 +271,7 @@ s32 _isfsFuncCb(s32 result, void* arg)
         }
     }
 
-    lbl_807951B8 = 0;
+    __fsRequestPending = 0;
 
     if (block->callback != NULL) {
         ((void (*)(s32, void*))block->callback)(result, block->callbackArg);
@@ -290,9 +281,9 @@ s32 _isfsFuncCb(s32 result, void* arg)
     return result;
 }
 
-/* fn_804B1F50 is the SDK's `ISFS_CreateDirAsync`: ioctl 3, the 0x4C-byte FSFileIoctl, completion
+/* Creates a directory: ioctl 3, the 0x4C-byte FSFileIoctl, completion
  * callback `_isfsFuncCb`. */
-s32 fn_804B1F50(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u32 otherPerm, void* callback,
+s32 ISFS_CreateDirAsync(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u32 otherPerm, void* callback,
                 void* callbackArg)
 {
     FSCommandBlock* block;
@@ -322,8 +313,8 @@ s32 fn_804B1F50(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u32 ot
                           sizeof(FSFileIoctl), NULL, 0, _isfsFuncCb, block);
 }
 
-/* fn_804B2050 is the SDK's `ISFS_ReadDir`: ioctlv 4, a 2-in/2-out vector list built in the work area. */
-s32 fn_804B2050(const char* path, char* filesOut, u32* fileCountOut)
+/* Lists a directory: ioctlv 4, a 2-in/2-out vector list built in the work area. */
+s32 ISFS_ReadDir(const char* path, char* filesOut, u32* fileCountOut)
 {
     s32 ret;
     FSCommandBlock* block;
@@ -386,9 +377,9 @@ s32 fn_804B2050(const char* path, char* filesOut, u32* fileCountOut)
     return ret;
 }
 
-/* fn_804B21B0 is the SDK's `ISFS_ReadDirAsync`: the same vector list as `fn_804B2050`, completed by
+/* The async form of `ISFS_ReadDir`: the same vector list as `ISFS_ReadDir`, completed by
  * `_isfsFuncCb`, which copies the file count back through the stored context. */
-s32 fn_804B21B0(const char* path, char* filesOut, u32* fileCountOut, void* callback, void* callbackArg)
+s32 ISFS_ReadDirAsync(const char* path, char* filesOut, u32* fileCountOut, void* callback, void* callbackArg)
 {
     FSCommandBlock* block;
     char* pathWork;
@@ -701,17 +692,17 @@ s32 ISFS_GetUsage(const char* path, s32* blockCountOut, s32* fileCountOut)
     return ret;
 }
 
-/* fn_804B2AB0 is the SDK's `ISFS_GetUsageAsync`: the same 1-in/2-out vector list as `ISFS_GetUsage`,
+/* The async form of `ISFS_GetUsage`: the same vector list,
  * completed by `_isfsFuncCb`, which copies both counts back through the stored context. */
-s32 fn_804B2AB0(const char* path, s32* blockCountOut, s32* fileCountOut, void* callback,
+s32 ISFS_GetUsageAsync(const char* path, s32* blockCountOut, s32* fileCountOut, void* callback,
                 void* callbackArg)
 {
-    FSCommandBlock* block;
     u32* blockCountWork;
+    FSCommandBlock* block;
+    u32 len;
+    IPCIOVector* vectors;
     u32* fileCountWork;
     char* pathWork;
-    IPCIOVector* vectors;
-    u32 len;
 
     if (path == NULL || __fsFd < 0 || blockCountOut == NULL || fileCountOut == NULL ||
         (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
@@ -784,9 +775,9 @@ s32 ISFS_CreateFile(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u3
     return ret;
 }
 
-/* fn_804B2CE0 is the SDK's `ISFS_CreateFileAsync`: the same 0x4C-byte ioctl as `ISFS_CreateFile`,
+/* The async form of `ISFS_CreateFile`: the same 0x4C-byte ioctl as `ISFS_CreateFile`,
  * completed by `_isfsFuncCb`. */
-s32 fn_804B2CE0(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u32 otherPerm, void* callback,
+s32 ISFS_CreateFileAsync(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u32 otherPerm, void* callback,
                 void* callbackArg)
 {
     FSCommandBlock* block;
@@ -894,7 +885,7 @@ s32 ISFS_Read(s32 fd, void* dst, s32 len)
         return IPC_RESULT_INVALID;
     }
 
-    return fn_804BC3F0(fd, dst, len);
+    return IOS_Read(fd, dst, len);
 }
 
 /* The async form of `ISFS_Read`. */
@@ -925,7 +916,7 @@ s32 ISFS_Write(s32 fd, const void* src, s32 len)
         return IPC_RESULT_INVALID;
     }
 
-    return fn_804BC600(fd, src, len);
+    return IOS_Write(fd, src, len);
 }
 
 /* The async form of `ISFS_Write`. */

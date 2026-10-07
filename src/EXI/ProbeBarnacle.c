@@ -6,50 +6,23 @@
  *     driver above them (EXILock, EXISelect, EXIImm, EXISync, EXIDeselect, EXIGetID)
  *   - `.sbss` 0x807951A0..0x807951B0 holds the four barnacle statics read by `__OSEnableBarnacle`; the next
  *     unit (`FS/fs.c`) starts at `ISFS_OpenLib`, whose data begins at 0x807951B0
- * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`, `cflags_os`); every function start is 16-aligned, which
- *   `#pragma function_align 16` restores (`-O4,p` default; `cflags_os` sets 4 for OSAlarm).
- * RESIDUALS. the three functions are byte-identical; `.sbss` 0x10 is claimed and not emitted (the four statics are
- *   declared), and `.text` is 0x4C8 of the 0x4D0 claimed (the 8-byte pad after `EXIWriteReg` is not emitted).
+ * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (-O4,p, default alignment 16): every
+ *   function start of the EXI band is 16-aligned; `-func_align 4` loses the layout and the pragma is redundant
+ *   (byte-identical .text/.data/.sdata/.sdata2 with and without it).
+ * NAMES. the four `.sbss` words are GUESSes from their use (`__OSEnableBarnacle` is the only writer, no reader in the DOL).
+ * RESIDUALS. the three functions are byte-identical; `.text` is 0x4C8 of the 0x4D0 claimed (the 8-byte pad after
+ *   `EXIWriteReg` is not emitted: flipcheck blocker).
  */
 
-#pragma function_align 16
-
 #include "types.h"
+#include "EXI/ProbeBarnacle.h"
 
-/* The EXI bus driver entry points the probe calls.  `EXI/EXIBios.c` owns them and has no header yet, so
- * they are bare prototypes here (the lint's rule 2 named gap). */
-
-typedef enum { EXI_CHAN_0, EXI_CHAN_1, EXI_CHAN_2, EXI_MAX_CHAN } EXIChannel;
-typedef enum { EXI_READ, EXI_WRITE, EXI_TYPE_2, EXI_MAX_TYPE } EXIType;
-typedef enum { EXI_DEV_EXT, EXI_DEV_INT, EXI_DEV_NET, EXI_MAX_DEV } EXIDev;
-typedef enum {
-    EXI_FREQ_1MHZ,
-    EXI_FREQ_2MHZ,
-    EXI_FREQ_4MHZ,
-    EXI_FREQ_8MHZ,
-    EXI_FREQ_16MHZ,
-    EXI_FREQ_32HZ,
-    EXI_MAX_FREQ
-} EXIFreq;
-typedef void (*EXICallback)(EXIChannel chan, void* ctx);
-
-BOOL EXIAttach(EXIChannel chan, EXICallback callback);
-BOOL EXIDetach(EXIChannel chan);
-BOOL EXILock(EXIChannel chan, u32 dev, EXICallback callback);
-BOOL EXIUnlock(EXIChannel chan);
-BOOL EXISelect(EXIChannel chan, u32 dev, u32 freq);
-BOOL EXIDeselect(EXIChannel chan);
-BOOL EXIImm(EXIChannel chan, void* buf, s32 len, u32 type, EXICallback callback);
-BOOL EXISync(EXIChannel chan);
-BOOL EXIGetID(EXIChannel chan, u32 dev, u32* out);
-
-/* The statics the barnacle records its result in: the channel/device it was last enabled on and the two
- * `0xA5FF005A` flags the EUART path reads (`.sbss` 0x807951A0..0x807951B0).  Declarations, never definitions:
- * the range is this unit's own. */
-extern u32 lbl_807951AC;
-extern u32 lbl_807951A8;
-extern u32 lbl_807951A4;
-extern u32 lbl_807951A0;
+/* The statics the barnacle records its result in (`.sbss` 0x807951A0..0x807951B0, laid out in reverse definition
+ * order): the channel/device it was last enabled on and the two `0xA5FF005A` flags. */
+u32 __OSBarnacleChan;
+u32 __OSBarnacleDev;
+u32 __OSBarnacleMagicB;
+u32 __OSBarnacleMagicA;
 
 /* The device IDs the barnacle probe recognises (the SDK's EXIDeviceID). */
 typedef enum {
@@ -135,10 +108,10 @@ void __OSEnableBarnacle(EXIChannel chan, u32 dev)
         break;
     default:
         if (ProbeBarnacle(chan, dev, &id)) {
-            lbl_807951AC = chan;
-            lbl_807951A8 = dev;
-            lbl_807951A4 = 0xA5FF005A;
-            lbl_807951A0 = 0xA5FF005A;
+            __OSBarnacleChan = chan;
+            __OSBarnacleDev = dev;
+            __OSBarnacleMagicB = 0xA5FF005A;
+            __OSBarnacleMagicA = 0xA5FF005A;
         }
         break;
     }

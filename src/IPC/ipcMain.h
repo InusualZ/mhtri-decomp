@@ -10,9 +10,13 @@
 extern "C" {
 #endif
 
-void* IPCGetBufferHi(void);
-void* IPCGetBufferLo(void);
-void IPCSetBufferLo(void* lo);
+void IPCInit(void);
+void IPCReInit(void);
+u32 IPCReadReg(u32 reg);
+void IPCWriteReg(u32 reg, u32 value);
+u8* IPCGetBufferHi(void);
+u8* IPCGetBufferLo(void);
+void IPCSetBufferLo(u8* lo);
 
 #ifdef __cplusplus
 }
