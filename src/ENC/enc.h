@@ -1,9 +1,8 @@
 /*
- * BTE/gki_buffer.h - declarations of the symbols owned by `BTE/gki_buffer.cpp` (the 0x804772F0..0x804AFED0 band)
- * that other units call (docs/plan.md 6.5 rule 2).
+ * ENC/enc.h - declarations of the symbols owned by `ENC/enc.c` that other units call (docs/plan.md 6.5 rule 2).
  */
-#ifndef BTE_GKI_BUFFER_H
-#define BTE_GKI_BUFFER_H
+#ifndef MHTRI_ENC_ENC_H
+#define MHTRI_ENC_ENC_H
 
 #include "types.h"
 
@@ -23,4 +22,4 @@ s32 ENCConvertStringUtf8ToUtf16(u16* dst, s32* dstLength, const u8* src, s32* sr
 }
 #endif
 
-#endif /* BTE_GKI_BUFFER_H */
+#endif /* MHTRI_ENC_ENC_H */

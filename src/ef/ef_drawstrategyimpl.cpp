@@ -69,9 +69,14 @@
 #include "ef/fn_800AEE48.h"              /* the stripe unit's walkers and ef_vec3_normalize (rule 2) */
 #include "ef/ef_particle.h"              /* fn_800AB388 (rule 2) */
 #include "ef/ef_particlemanager.h"       /* fn_800AE360 (rule 2) */
-#include "EXI/GXBegin.h"                 /* the GX entry points EXI/ProbeBarnacle.c owns (rule 2) */
-#include "RVLGX/GXSetTevOrder.h"         /* the GX entry points RVLGX/GXTexture_tail.cpp owns (rule 2) */
-#include "EXI/GXSetTexCoordGen2.h"       /* GXSetTexCoordGen2 (rule 2) */
+#include "RVLGX/GXAttr.h"
+#include "RVLGX/GXGeometry.h"
+#include "RVLGX/GXLight.h"
+#include "RVLGX/GXBump.h"
+#include "RVLGX/GXPixel.h"
+#include "RVLGX/GXTev.h"
+#include "RVLGX/GXTexture.h"
+#include "RVLGX/GXTransform.h"
 #include "g3d/g3d_scnroot.h"             /* VEC2_ctor (rule 2) */
 #include "g3d/fn_80075DCC.h"             /* fn_80077DF0 (rule 2) */
 #include "g3d/g3d_calcview.h"            /* fn_800710BC (rule 2) */

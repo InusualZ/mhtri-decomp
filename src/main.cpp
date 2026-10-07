@@ -153,7 +153,7 @@
 #include "types.h"
 #include "main.h"                /* `_MH_VEC2` (rule 1: the owner's header) */
 #include "gx.h"                  /* the SDK colour record `GXColor` (rule 1) */
-#include "RVLGX/GXSetZCompLoc.h"  /* owned by RVLGX/GXTexture_tail.cpp (rule 2) */
+#include "RVLGX/GXSetZCompLoc.h"
 #include "MEM/mem.h"               /* `MEMAllocator` (rule 1) */
 #include "mh3_pad/Screen_w.h"      /* `ScreenWork`/`Screen_w`, owned by mh3_pad.cpp (rule 1/2) */
 #include "unsplit/unknown.h"     /* `system_w`/`SystemWork` (undecided module, rule 1/2) */

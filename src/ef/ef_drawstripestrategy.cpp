@@ -69,8 +69,9 @@
 #include "g3d/fn_80063888.h" /* fn_80067E54, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "ef/ef_particle.h"   /* fn_800AB388 (rule 2) */
-#include "RVLGX/GXSetTevOrder.h" /* GXLoadPosMtxImm (rule 2) */
-#include "EXI/GXBegin.h"      /* the GX vertex-format entry points (rule 2) */
+#include "RVLGX/GXTransform.h"
+#include "RVLGX/GXAttr.h"
+#include "RVLGX/GXGeometry.h"
 #include "g3d/g3d_calcview.h" /* fn_800710BC (rule 2) */
 #include "nw4r/fn_805012C4.h" /* mtx34_rotate_vec3 (rule 2) */
 #include "fn_8004CAD8.h"      /* MTX34_ctor, fn_80050508 (rule 2) */

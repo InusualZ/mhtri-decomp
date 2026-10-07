@@ -1335,24 +1335,8 @@ config.libs = [
             # source restores -O4,p's 16-byte function alignment with `#pragma function_align 16`
             # (every start in the range is 16-aligned).
             Object(NonMatching, "OS/PPCArch.c"),
-            # Registered by the BTE-region survey (`worker/bte-survey-846f`): `EXI/EXIBios.c`
-            # (`.text` 0x804AFED0..0x804B17D0, 20 functions / 6400 B).  Module `EXI`, lib `OS`, same
-            # block as EXI/ProbeBarnacle.c.  The range is the SDK's EXIBios.c verbatim (every symbol
-            # already carries its real SDK name, in the SDK file's own order), its right edge is
-            # *proven* - the registered EXI/ProbeBarnacle.c starts at exactly 0x804B17D0 - and its
-            # left edge is roster-proven (WriteUARTN, the UART layer above it, calls into the range,
-            # so it consumes EXIBios and is not part of it).  Claims its own `.data` Ecb, `.sdata`
-            # __EXIVersion and `.sbss` IDSerialPort1; `__OSInIPL` is left unclaimed on purpose (OS
-            # shared global, 16 readers in DVD + EXI - see the unit header).
-            Object(NonMatching, "EXI/EXIBios.c"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `804B17D0_ProbeBarnacle.c` (`.text` 0x804B17D0..0x804B8020, 118 functions / 26704 B).  Module
-            # `EXI` from the range's head (the dump names ProbeBarnacle / __OSEnableBarnacle / EXIWriteReg,
-            # the EXI library's own entry points) and the sibling SDK modules (OS/, AX/, DWCi/); the band
-            # holds three SDK libraries (EXI, FS/ISFS, GX) - see the file header.  Lib `OS` + cflags_os,
-            # like the AX band above, and the source restores -O4,p's 16-byte function alignment with
-            # `#pragma function_align 16` (every start in the range is 16-aligned).
-            Object(NonMatching, "EXI/ProbeBarnacle.c"),
+            Object(NonMatching, "EXI/EXIBios.c"),  # evidence: the unit header
+            Object(NonMatching, "EXI/ProbeBarnacle.c"),  # evidence: the unit header
             # Phase 4 stubs (window fg): SDK candidate units with no bodies yet.
             # The tan / libm wrapper / MetroTRK / AI run recut by file (unit headers carry the evidence).
             Object(NonMatching, "MSL/s_tan.cpp"),
@@ -1379,7 +1363,40 @@ config.libs = [
             Object(NonMatching, "AI_SDK/ai.c"),
             Object(NonMatching, "ARC/arc.cpp"),
             Object(NonMatching, "BTE/gki_buffer.cpp"),
-            Object(NonMatching, "RVLGX/GXTexture_tail.cpp"),
+            # The BTE tail 0x804A4AC0..0x804C1760 recut per SDK library; each unit's header carries its evidence.
+            Object(NonMatching, "DB/db.c"),
+            Object(NonMatching, "mh3_pad/rc_record.c"),
+            Object(NonMatching, "DSP/dsp.c"),
+            Object(NonMatching, "DVD/dvdfs.c"),
+            Object(NonMatching, "DVD/dvd.c"),
+            Object(NonMatching, "DVD/dvdqueue.c"),
+            Object(NonMatching, "DVD/dvderror.c"),
+            Object(NonMatching, "DVD/dvdidutils.c"),
+            Object(NonMatching, "DVD/dvdFatal.c"),
+            Object(NonMatching, "DVD/dvddevice.c"),
+            Object(NonMatching, "DVD/dvd_broadway.c"),
+            Object(NonMatching, "ENC/enc.c"),
+            Object(NonMatching, "ESP/esp.c"),
+            Object(NonMatching, "EUART/EUART.c"),
+            Object(NonMatching, "FS/fs.c"),
+            Object(NonMatching, "RVLGX/GXInit.c"),
+            Object(NonMatching, "RVLGX/GXFifo.c"),
+            Object(NonMatching, "RVLGX/GXAttr.c"),
+            Object(NonMatching, "RVLGX/GXMisc.c"),
+            Object(NonMatching, "RVLGX/GXGeometry.c"),
+            Object(NonMatching, "RVLGX/GXFrameBuf.c"),
+            Object(NonMatching, "RVLGX/GXLight.c"),
+            Object(NonMatching, "RVLGX/GXTexture.c"),
+            Object(NonMatching, "RVLGX/GXBump.c"),
+            Object(NonMatching, "RVLGX/GXTev.c"),
+            Object(NonMatching, "RVLGX/GXPixel.c"),
+            Object(NonMatching, "RVLGX/GXTransform.c"),
+            Object(NonMatching, "RVLGX/GXPerf.c"),
+            Object(NonMatching, "IPC/ipcMain.c"),
+            Object(NonMatching, "IPC/ipcclt.c"),
+            Object(NonMatching, "IPC/memory.c"),
+            Object(NonMatching, "IPC/ipcProfile.c"),
+            Object(NonMatching, "KPAD/kpad.c"),
             Object(NonMatching, "SC/sc.cpp"),
             # Flags: unit headers of src/TPL/tpl.cpp .. src/WUD/wud.cpp (the former WPAD/wpad.cpp block, recut by file)
             Object(NonMatching, "TPL/tpl.cpp"),

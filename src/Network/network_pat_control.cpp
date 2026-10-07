@@ -104,7 +104,7 @@ etwork_pat_control_cpp`: retail builds `net_pats_object` with `constructNetworkP
 #include "unsplit/Runtime.PPCEABI.H.h"           /* strcpy - unowned MSL helper (rule 2's unsplit gap) */
 #include "font/flfnt.h"                           /* flfntStrLen, owner font/flfnt.cpp (rule 2) */
 #include "hud/cockpit.h"                          /* setCockpitTransferMode - owner hud/cockpit.cpp */
-#include "BTE/gki_buffer.h"                       /* ENCConvertStringUtf8ToUtf16 / Utf16ToUtf8 */
+#include "ENC/enc.h"
 #include "enemy/em020_ai.h"
 #include "enemy/em_pop.h"                          /* matchesFileVersion, owner enemy/em_pop.cpp (rule 2) */
 #include "fn_80047398.h"                          /* decodePlayerCard, owner fn_80047398.cpp (rule 2) */

@@ -1,9 +1,8 @@
 /*
  * EXI/EXIBios.c - the Revolution SDK EXI bus driver (EXIBios.c).
  *
- * `.text` 0x804AFED0..0x804B17D0 (20 functions / 6400 B).  Registered by the BTE-region survey
- * (branch `worker/bte-survey-846f`); it is the tail of the 238 KB unclaimed run
- * 0x80475E24..0x804B17D0 and the part of it with the strongest boundary evidence on both edges.
+ * `.text` 0x804AFED0..0x804B17D0 (20 functions / 6400 B).  Cut from the BTE band with the strongest
+ * boundary evidence on both edges.
  *
  * Evidence for the name (an already-complete SDK roster, as in `OS/PPCArch.c`).
  *   - the 20 symbols in the range already carry their real SDK names and are exactly EXIBios.c's
@@ -22,11 +21,8 @@
  *     `WriteUARTN` (0x804AFCA0..0x804AFFB8, the UART/debug-print layer), *calls into* this range
  *     (EXIImm / EXISync / EXISelect / EXIDeselect / EXILock / EXIUnlock), so it consumes EXIBios and
  *     cannot be part of it.
- *   - the two SDK TUs below it in the same auto run are **left unclaimed** and are the next surveyor's
- *     step 1: `EXI/EXIUart.c` (EUARTInit + InitializeUART + WriteUARTN, 0x804AFB50..0x804AFED0,
- *     896 B, four still-unnamed `.sbss` statics at 0x80795188..0x80795198) and the `ESP_*` library
- *     (0x804AF420..0x804AFB50, 1840 B, one unnamed `fn_804AF830`).  They are not claimed here because
- *     neither has a proven edge and the `ESP` one would need a name invented for fn_804AF830.
+ *   - the two SDK libraries below it are the registered units `EUART/EUART.c` (EUARTInit, InitializeUART,
+ *     WriteUARTN, 0x804AFB50..0x804AFED0) and `ESP/esp.c` (the ES proxy, 0x804AF420..0x804AFB50).
  *
  * Data this range reads, and why only part of it is claimed.
  *   - `__EXIVersion` (`.sdata` 0x80793E30, 4 B) is this file's own version word - `EXIInit` is its only

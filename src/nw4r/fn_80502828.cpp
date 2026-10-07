@@ -25,9 +25,13 @@
  */
 
 #include "nw4r/fn_80502828.h"
-#include "EXI/ProbeBarnacle.h"
-#include "RVLGX/GXTexture_tail.h"
-#include "EXI/GXSetTexCoordGen2.h"
+#include "RVLGX/GXAttr.h"
+#include "RVLGX/GXGeometry.h"
+#include "RVLGX/GXLight.h"
+#include "RVLGX/GXBump.h"
+#include "RVLGX/GXPixel.h"
+#include "RVLGX/GXTev.h"
+#include "RVLGX/GXTexture.h"
 
 /* ---------------------------------------------------------------------------------------------------------------
  * ut_Font

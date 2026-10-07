@@ -11,6 +11,8 @@
  * Residuals (measured when the range was one unit, `draw_shape.cpp`): `fn_800565E4`/`fn_80056954` 62.50 % (retail sign/zero-extends
  * each argument before the FIFO store; MWCC folds the extension away), `draw_shape_arm` 70.42 % and `fn_80056E00` 71.43 % (register
  * colouring only).  Not reconstructed: the two big GX draws `fn_80055F58` (0x678) / `fn_80056608` (0x34C) and `fn_80056AF0` (0x310).
+ * RESIDUALS. relocdiff --callees: `fn_80055EC4` (the sprite constructor) has one extra relocation at +0x7c, ours `draw_shape_f32_zero`,
+ *   where retail has none.  flipcheck: `.sbss` 0x8, `.sdata` 0x10 and `.sdata2` 0x30 are claimed and the object emits none of them.
  */
 
 #include "types.h"
@@ -20,7 +22,7 @@
 #include "mh3_pad.h" /* copyVec3 (rule 2) */
 #include "draw_shape_arm.h" /* the `.sdata2` float pool this unit owns */
 #include "fn_80056F24/lbl_8066ACF8.h" /* DrawShapeState / lbl_8066ACF8, owned by fn_80056F24.cpp (rule 2) */
-#include "EXI/GXSetTexCoordGen2.h" /* the SDK texcoord generator (rule 2) */
+#include "RVLGX/GXAttr.h"
 #include "fn_80047398.h" /* color_rgba_copy, owned by userdata_item.cpp's range (rule 2) */
 
 extern "C" {
