@@ -2641,7 +2641,7 @@ AX/AXSPB.c:
 
 AX/AXVPB.c:
 	.text       start:0x804709B0 end:0x80471960 align:16
-	.bss        start:0x806FB6E0 end:0x8070C414
+	.bss        start:0x806FB6E0 end:0x8070CDE0
 	.sbss       start:0x80794FD8 end:0x80794FF8
 	.sdata2     start:0x8079CF48 end:0x8079CF68
 

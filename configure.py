@@ -1364,10 +1364,10 @@ config.libs = [
             # The ARC archive and AX audio band 0x8046D9F0..0x80474CB0 recut per library and source file; each unit's header carries
             # its evidence.  Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
             Object(NonMatching, "ARC/arc.c", cflags=cflags_base),
-            Object(NonMatching, "AX/AX.c", cflags=cflags_base),
+            Object(Matching, "AX/AX.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXAlloc.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXAux.c", cflags=cflags_base),
-            Object(NonMatching, "AX/AXCL.c", cflags=cflags_base),
+            Object(Matching, "AX/AXCL.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXOut.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXSPB.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXVPB.c", cflags=cflags_base),

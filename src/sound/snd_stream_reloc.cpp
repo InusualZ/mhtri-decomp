@@ -122,9 +122,9 @@ void* fn_800E8DE0(void* obj, s32 flags);
 
 void fn_804DF140(void);
 void fn_804C40D0(void);
-void fn_8046FDD0(u16 id);
+void AXSetMasterVolume(u16 id);
 u32 OSEnableInterrupts(void);
-void fn_8046E490(void* obj);
+void AXQuit(void* obj);
 void fn_804C2800(void);
 void __register_global_object(void* obj, void* dtor, void* ref);
 
@@ -133,14 +133,14 @@ void fn_800E8730(void);
 void fn_800E87E4(u32 mode);
 
 void AIInit(u32 mode);
-void fn_8046E430(u32 v);
+void AXInitEx(u32 v);
 void fn_804C26E0(void);
 void fn_804DF0A0(void);
 
 void AXRegisterCallback(void* cb);
-void fn_8046FD90(u32 v);
+void AXSetCompressor(u32 v);
 void* AIRegisterDMACallback(void* cb);
-void fn_8046FD70(u32 v);
+void AXSetMode(u32 v);
 void fn_804C2820(u32 mode);
 
 
@@ -559,7 +559,7 @@ extern "C" void fn_800E86E8(u32 id)
 {
     u32 level = OSDisableInterrupts();
 
-    fn_8046FDD0((u16)id);
+    AXSetMasterVolume((u16)id);
     OSRestoreInterrupts(level);
 }
 
@@ -596,7 +596,7 @@ extern "C" void fn_800E8DA4(void)
 extern "C" void* fn_800E8DE0(void* obj, s32 flags)
 {
     if (obj != 0) {
-        fn_8046E490(obj);
+        AXQuit(obj);
         fn_804C2800();
         if ((s16)flags > 0) {
             __dl__FPv(obj);
@@ -611,12 +611,12 @@ extern "C" void fn_800E8730(void)
     u32 level;
 
     AIInit(0);
-    fn_8046E430(1);
+    AXInitEx(1);
     fn_804C26E0();
     fn_804DF0A0();
     SEQInit();
     AXRegisterCallback((void*)fn_800E8698);
-    fn_8046FD90(0);
+    AXSetCompressor(0);
     fn_800E87E4(1);
     level = OSDisableInterrupts();
     lbl_807949D8 = AIRegisterDMACallback((void*)fn_800E8888);
@@ -636,9 +636,9 @@ extern "C" void fn_800E87E4(u32 mode)
 {
     switch (mode) {
     case 0:
-    case 1: fn_8046FD70(0); break;
-    case 2: fn_8046FD70(1); break;
-    case 3: fn_8046FD70(2); break;
+    case 1: AXSetMode(0); break;
+    case 2: AXSetMode(1); break;
+    case 3: AXSetMode(2); break;
     }
     fn_804C2820(mode);
     snd_handle_store((u32*)fn_800E66D0());
