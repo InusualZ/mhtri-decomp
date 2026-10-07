@@ -23,13 +23,13 @@
  *   GUESS: `lb_quest_board_flash_init`, `lb_quest_board_follow_init`, `lb_quest_board_effect_update`,
  *   GUESS: `lb_quest_board_flash_move`, `q_result_effect_follow_npc`, `q_result_anim_counter_inc`,
  *   GUESS: `q_result_release_effect` (the three keep their `menu_result` scheme names)
- * RESIDUALS. Unwritten: `q_result_effect_follow_npc` (0x803967F0, 0x144: its `MTX34` translation store is
- *   `ef/eft001.cpp`'s `fn_800FBB90`, rename requested; the ef lanes own it),`lb_quest_board_effect_init` (0x80396070, 0x1D8: `SetRootMtxTrans` has no declaration in its
- *   owner's header) and `lb_quest_board_effect_move` (0x803963F4, 0x260: it calls `ef/effect.cpp`'s `effect_retire`,
- *   which the ef lanes own).  flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short
- *   of the claim; the pools are three TUs' (see RANGE).  Unwritten: `lb_quest_board_party_step` (0x80395A4C, 0x238):
- *   it tests the results of `requestReadyOnAlias`/`requestReadyOnAlias2`, which the Network owner's header declares
- *   `void` (decl request filed).  `lb_quest_board_step_screen`: retail shares the case-2/case-3 error tails
+ *   GUESS: `lb_quest_board_party_step`, `lb_quest_board_effect_init`, `lb_quest_board_effect_move`
+ * RESIDUALS. Every row is written.  flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/
+ *   extabindex short of the claim.
+ *  - `lb_quest_board_effect_init`/`_effect_move`: retail range-tests kinds 0..4 unsigned (`cmplwi 4`) and compares the
+ *    kind bytes signed; `lb_quest_board_party_step`: `getOwnMemberFlag`'s `u8` result is narrowed again before its
+ *    compare (retail compares the raw word);
+ *  - `lb_quest_board_step_screen`: retail shares the case-2/case-3 error tails
  *   (`step = 2; wait = 30`) after the first error branch; the if/else-chain and duplicated-tail spellings both lose.
  *   `lb_quest_board_draw_task`: retail reaches `lb_quest_board_detail_draw` from two call sites, ours from three (the
  *   range test plus cases 14 and 5); the one-switch spellings that share the call measure lower (91-94 %).
@@ -63,6 +63,12 @@
 #include "mh3_pad/system_w.h"
 #include "ef/eft_res.h"
 #include "ef/effect.h"
+#include "fn_8004CAD8/mtx.h"
+#include "g3d/g3d_calcworld.h"
+#include "lobby/lb_npc_motion_play.h"
+#include "ef/eft001.h"
+#include "ef/mtx34_trans_get.h"
+#include "ef/mtx34_trans_add.h"
 #include "ef/eft_rot_vec_copy.h"
 #include "ef/get_move_work_adrs.h"
 #include "ef/eft052.h"
@@ -927,6 +933,78 @@ extern "C" void lb_quest_board_ready_panel_draw(void) {
     lb_panel_yes_no_draw(0x1879, work->field_0x258);
 }
 
+/* 0x80395A4C (0x238): The party screen's step: reads the member counts, asks for the ready check and raises the
+ * ready flag on the payload once this player is a member. */
+extern "C" void lb_quest_board_party_step(void) {
+    LbQuestBoardWork* work = lobby_w.menu_0xAC;
+
+    switch (work->step_0x242) {
+    case 0:
+        work->step_0x242 = 1;
+        break;
+    case 1:
+        if (lobby_w.flags_0x052 == 1) {
+            if (getProfileMemberCounts(&work->members_0x397, &work->active_0x396, &work->capacity_0x395) == 0) {
+                lb_quest_board_cancel();
+            } else {
+                work->field_0x258 = 1;
+                work->step_0x242 = 2;
+                sysSE_req(0);
+            }
+        } else if (lobby_w.flags_0x052 == 2) {
+            sysSE_req(0);
+            if (requestReadyOnAlias2() == 1) {
+                work->step_0x242 = 4;
+            } else {
+                lb_quest_board_cancel();
+            }
+        }
+        break;
+    case 2:
+        if (isPartyCountRead() == 0) {
+            lb_quest_board_cancel();
+            break;
+        }
+        getProfileMemberCounts(&work->members_0x397, &work->active_0x396, &work->capacity_0x395);
+        if (work->members_0x397 == work->active_0x396 - 1) {
+            work->not_last_0x3A3 = 0;
+        } else {
+            work->not_last_0x3A3 = 1;
+        }
+        switch (lb_yes_no_step(&work->field_0x258)) {
+        case 1:
+            if (requestReadyOnAlias() == 1) {
+                work->step_0x242 = 5;
+            } else {
+                lb_quest_board_cancel();
+            }
+            break;
+        case 2:
+            lb_quest_board_cancel();
+            break;
+        }
+        subTransSet((u32)lb_quest_board_ready_panel_draw, 0, NULL);
+        break;
+    case 4:
+        if (!(lobby_w.flags_0x052 & 4) && getOwnMemberFlag() == 1) {
+            lobby_w.flags_0x052 |= 4;
+            work->data_0x264->flags_0xB01 |= 4;
+            quest_board_flags_send(work->data_0x264->flags_0xB01, work->data_0x264->param_0xB02);
+            lobby_w.state_0x000 = 10;
+            lobby_w.active_0x008 = 1;
+        }
+        break;
+    case 5:
+        if (getOwnMemberFlag() == 1) {
+            lobby_w.flags_0x052 |= 4;
+            work->step_0x242 = 3;
+            work->data_0x264->flags_0xB01 &= ~7;
+            quest_board_flags_send(work->data_0x264->flags_0xB01, work->data_0x264->param_0xB02);
+        }
+        break;
+    }
+}
+
 /* 0x80395C84 (0x80): Resets the quest board: closes the lobby panel, resets the party state and clears the
  * payload's three party bits. */
 extern "C" void lb_quest_board_reset(s32 unused, s32 mode) {
@@ -1089,6 +1167,74 @@ extern "C" void lb_quest_board_step_kind(_EFT* self) {
     }
 }
 
+/* 0x80396070 (0x1D8): Creates the kind's pooled effect, then for the joint-riding kinds places it on the NPC's joint
+ * (plus the rotated offset); plays the kind's sound and starts updating it.  A dead NPC ends the effect. */
+extern "C" void lb_quest_board_effect_init(_EFT* self) {
+    VEC3 offset;
+    nw4r::math::MTX34 mtx;
+    LbQuestBoardEft* work;
+    _LB_NPC* npc;
+    s32 i;
+
+    VEC3_ctor(&offset);
+    MTX34_ctor(&mtx);
+    work = (LbQuestBoardEft*)self->work_0x38;
+    npc = (_LB_NPC*)self->source_0x30;
+    self->state_0x05++;
+    for (i = 0; i < work->count; i++) {
+        work->effect = res_eft_create(lb_quest_board_effect_groups[self->type_0x02],
+                                      lb_quest_board_effect_ids[self->type_0x02], 0);
+        if (work->effect == NULL) {
+            q_result_release_effect(self);
+            return;
+        }
+    }
+    if (eft_res_spawn_gate_ck(self, 3) == 0) {
+        q_result_release_effect(self);
+        return;
+    }
+    switch (self->type_0x02) {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 7:
+        if (npc->field_0x001 == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        ((MHchar*)npc->body_0x058)->get_joint_wpos(work->joint, &self->pos_0x18);
+        cpSetRotMatrix(&self->rot_0x24, &mtx);
+        copyVec3(&offset, &work->offset);
+        mulVecMat(&offset, &mtx);
+        addVec3To(&self->pos_0x18, &offset);
+        SetRootMtxTrans(work->effect, &self->pos_0x18);
+        break;
+    case 6:
+        if (npc->field_0x001 == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        break;
+    }
+    self->flag_0x01 = 1;
+    switch (self->type_0x02) {
+    case 1:
+        sysSE_bank32_req(24);
+        break;
+    case 2:
+        sysSE_bank32_req(25);
+        break;
+    case 3:
+        sysSE_bank32_req(20);
+        break;
+    }
+    lb_quest_board_effect_update(self);
+}
+
 /* 0x80396248 (0xD4): Creates the kind-8 flash model (model 0xA8, motion 0x4C), shows only its first part and scales
  * it, then starts updating it. */
 extern "C" void lb_quest_board_flash_init(_EFT* self) {
@@ -1149,6 +1295,89 @@ extern "C" void lb_quest_board_effect_update(_EFT* self) {
     }
 }
 
+/* 0x803963F4 (0x260): Steps the kind's pooled effect: it ends with the area or the NPC; the joint-riding kinds take
+ * the joint's matrix (kind 5 only spawns its models during the board motions) and the effect is scaled and moved. */
+extern "C" void lb_quest_board_effect_move(_EFT* self) {
+    u32 spawn = 1;
+    VEC3 offset;
+    nw4r::math::MTX34 mtx;
+    LbQuestBoardEft* work;
+    _LB_NPC* npc;
+    u32 apply;
+    s32 motion;
+
+    VEC3_ctor(&offset);
+    MTX34_ctor(&mtx);
+    work = (LbQuestBoardEft*)self->work_0x38;
+    npc = (_LB_NPC*)self->source_0x30;
+    if (eft_res_spawn_gate_ck(self, 3) == 0) {
+        self->flag_0x01 = 0;
+        self->state_0x05++;
+        return;
+    }
+    if (self->area_0x44 != get_now_areano()) {
+        self->flag_0x01 = 0;
+        self->state_0x05++;
+        return;
+    }
+    switch (self->type_0x02) {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 7:
+        if (npc->field_0x001 == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        apply = 0;
+        break;
+    case 5:
+        if (npc->field_0x001 == 0) {
+            return;
+        }
+        motion = lb_npc_Get_motion_no(npc);
+        if ((u32)(motion - 1008) <= 2 || (u32)(motion - 1012) <= 1 || motion == 1001 || motion == 1003) {
+            mhchar_joint_mtx_get(npc->body_0x058, work->joint, &mtx);
+            apply = 1;
+        } else {
+            mhchar_joint_mtx_get(npc->body_0x058, work->joint, &mtx);
+            apply = 1;
+            spawn = 0;
+        }
+        break;
+    default:
+        if (npc->field_0x001 == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        mhchar_joint_mtx_get(npc->body_0x058, work->joint, &mtx);
+        apply = 1;
+        break;
+    }
+    if (apply == 1) {
+        copyVec3(&offset, &work->offset);
+        mulVecMat(&offset, &mtx);
+        mtx34_trans_add(&mtx, &offset);
+        mtx34_trans_get(&mtx, &self->pos_0x18);
+        work->effect->SetRootMtx(mtx);
+    }
+    change_paramscale_eff(work->effect, work->scale);
+    if (self->type_0x02 == 5) {
+        effect_retire(work->effect, 0);
+    } else if (effect_move(work->effect) == 0) {
+        self->flag_0x01 = 0;
+        self->state_0x05++;
+        return;
+    }
+    if (spawn == 1) {
+        eft_res_models_spawn(self, (void**)&work->effect, 1, work->count, NULL);
+    }
+}
+
 /* 0x80396654 (0x19C): Moves the kind-8 flash model with the NPC's joint 10 for its frame count, tinting it half
  * green inside its flash window. */
 extern "C" void lb_quest_board_flash_move(_EFT* self) {
@@ -1189,6 +1418,46 @@ extern "C" void lb_quest_board_flash_move(_EFT* self) {
     copyVec3(&work->model->pos_0x04, &self->pos_0x18);
     eft_rot_vec_copy(&work->model->rot_0x54, &self->rot_0x24);
     work->model->move(0);
+    eft_res_models_spawn(self, (void**)&work->model, 2, work->count, NULL);
+}
+
+/* 0x803967F0 (0x144): Keeps the follower model on the NPC's joint 11 (plus a rotated offset) while the NPC is in its
+ * board motions; motion 54 holds it only until frame 108. */
+extern "C" void q_result_effect_follow_npc(_EFT* self) {
+    LbQuestBoardEft* work = (LbQuestBoardEft*)self->work_0x38;
+    _LB_NPC* npc = (_LB_NPC*)self->source_0x30;
+    VEC3 offset;
+    nw4r::math::MTX34 mtx;
+    s32 motion;
+
+    VEC3_ctor(&offset);
+    MTX34_ctor(&mtx);
+    if (eft_res_spawn_gate_ck(self, 3) == 0) {
+        self->flag_0x01 = 0;
+        self->state_0x05++;
+        return;
+    }
+    self->flag_0x01 = npc->field_0x001;
+    motion = lb_npc_Get_motion_no(npc);
+    switch (motion) {
+    case 51:
+    case 52:
+        break;
+    case 54:
+        if (lb_npc_motion_play(npc, 1, 108.0f, 0.0f) == 1) {
+            return;
+        }
+        break;
+    default:
+        return;
+    }
+    cpSetRotMatrix(&npc->rot_0x028, &mtx);
+    ((MHchar*)npc->body_0x058)->get_joint_wpos(11, &self->pos_0x18);
+    setVector3(&offset, 25.0f, 16.0f, 3.0f);
+    mulVecMat(&offset, &mtx);
+    addVec3To(&self->pos_0x18, &offset);
+    mtx34_set_trans(&mtx, &self->pos_0x18);
+    work->model->move2(&mtx, 0);
     eft_res_models_spawn(self, (void**)&work->model, 2, work->count, NULL);
 }
 

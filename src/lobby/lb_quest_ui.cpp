@@ -25,24 +25,22 @@
  *   GUESS: `lb_trade_list_draw`, `lb_trade_cost_draw`, `lb_trade_msg_draw`, `lb_trade_draw_task`,
  *   GUESS: `lb_scene_eft_spawn`, `lb_scene_eft_release`, `lb_scene_eft_step`, `lb_scene_model_slide`,
  *   GUESS: `lb_quest_board_state_next`, `lb_quest_board_effect_retire`
- * RESIDUALS. 17 rows unwritten, each blocked on a declaration or a name other lanes own (requests filed):
- *   0x8038EC44-0x8038EF28 and 0x8038EF28-0x8038EF9C (`note_talk_step`, `note_idle_set`, `note_talk_init`) and
- *   0x8038EFEC-0x8038F264 (`note_talk_wait_step`/`_greet_step`/`_react_step`): the talk program needs `NoteWork`, whose
- *   `sound/mhchar.h` `MHchar` cannot sit beside `hud/layout.h`'s `pl.h` one, and `menu/multi_result.cpp`'s 0x803A357C;
- *   0x8038F4D8-0x8038F748 (`lb_kitchen_open`), 0x8038F9A4-0x8038FAC4 (`lb_kitchen_courses_roll`),
- *   0x8039065C-0x803907F4 (`lb_kitchen_bonus_roll`, `lb_kitchen_extra_roll`): `ef/system_core.cpp`'s 0x800CEF18;
- *   0x80390F20-0x803914D4 (`lb_kitchen_step`), 0x80391EF4-0x803921A4 (`lb_kitchen_course_draw`): its 0x800D2EA4;
- *   0x80390154-0x803905FC (`lb_kitchen_special_input`), 0x80392504-0x803925A0 (`lb_kitchen_special_screen_draw`):
- *   `ef/eft052.cpp`'s 0x80359628/0x80359B00; 0x80392964-0x80392A4C (`lb_trade_offer_state`): `eft052_page_count_ck`
- *   is not in `ef/eft052.h`; 0x80393B28-0x80393D4C (`lb_scene_eft_init`): `pl.h`'s `MHchar` has no `frame_init`;
- *   0x80393D4C-0x80394038 (`lb_scene_eft_move`): `ef/eft026_fx.cpp`'s 0x80119BB0.
+ *   GUESS: `note_talk_step`, `note_idle_set`, `note_talk_init`, `note_talk_wait_step`, `note_talk_greet_step`,
+ *   GUESS: `note_talk_react_step`, `lb_kitchen_open`, `lb_kitchen_courses_roll`, `lb_kitchen_special_input`,
+ *   GUESS: `lb_kitchen_bonus_roll`, `lb_kitchen_extra_roll`, `lb_kitchen_step`, `lb_kitchen_course_draw`,
+ *   GUESS: `lb_kitchen_special_screen_draw`, `lb_trade_offer_state`, `lb_scene_eft_init`, `lb_scene_eft_move`
+ * RESIDUALS. Every row is written.
+ *  - `lb_kitchen_open`: retail keeps two row counters for the rolled pairs (one byte offset, one index) and saves one
+ *    more register; `lb_kitchen_courses_roll`, `lb_kitchen_bonus_roll`, `lb_trade_offer_state`: register order;
+ *  - `lb_scene_eft_move`: the 1.0f pool word is named by the map in retail (`lbl_8079C2AC`), ours is anonymous;
+ *  - `lb_kitchen_step`, `lb_kitchen_course_draw`: register order.
  *  - `lb_kitchen_tri_sum`: retail's 8x-unrolled countdown keeps no separate counter; ours decrements one;
  *  - `lb_kitchen_list_draw`, `lb_kitchen_special_list_draw`: `active` takes r31 where retail has r25/r27;
  *  - `lb_kitchen_list_page_set`: retail steps a dead per-entry counter (`addi r7`) inside the 3x-unrolled copy;
  *  - `lb_trade_list_draw`: retail scales the offer index by 4 twice (a 4-byte-element table), ours by 16 once;
  *  - `lb_kitchen_meal_serve`: the two rare bytes load in the other order; `lb_trade_page_set`: register order.
- *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted (the tables are declared, not defined; the unwritten
- *   rows' jump tables would be missing anyway); `.text`/extab/extabindex short of the claim.
+ *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted (the tables are declared, not defined);
+ *   `.text`/extab/extabindex short of the claim.
  */
 
 #pragma peephole off
@@ -56,6 +54,7 @@
 #include "ef/eft_res.h"
 #include "ef/effect.h"
 #include "ef/eft052.h"
+#include "ef/system_core.h"
 #include "sound/fn_800DD1F0.h"
 #include "sound/fn_800D7F54.h"
 #include "sound/set_zmode__FbUcb.h"
@@ -88,6 +87,7 @@
 #include "Pl/pl_item_add.h"
 #include "Pl/fn_80262940.h"
 #include "Pl/pl_coll.h"
+#include "Pl/fn_802693C4.h"
 #include "Pl/pl_act_step_data.h"
 #include "fn_8004CAD8.h"
 #include "get_FqResult_work.h"
@@ -95,30 +95,23 @@
 #include "main.h"
 #include "stage/stg_w.h"
 #include "Network/network_pat_control.h"
-
-/* The note-pane NPC record (`enemy/note_work.h`'s 0x1F8-byte `NoteWork`) as the talk program reads it: this TU draws
- * through `hud/layout.h`, whose `pl.h` `MHchar` cannot sit beside the `sound/mhchar.h` one `enemy/note_work.h` embeds,
- * so the program keeps its own view of the bytes it touches. size: 0x1F8 (a view) */
-typedef struct NoteTalkView {
-    /* +0x000 */ u8 pad_0x000[0x18C];
-    /* +0x18C */ u32 angle_0x18C;     /* the facing angle `note_turn_step` eases */
-    /* +0x190 */ u8 pad_0x190[0xD];
-    /* +0x19D */ u8 state_0x19D;      /* the arm `note_talk_state_step` runs */
-    /* +0x19E */ u8 pad_0x19E;
-    /* +0x19F */ u8 mode_0x19F;       /* the mode `note_talk_mode_step` runs */
-    /* +0x1A0 */ u8 pad_0x1A0;
-    /* +0x1A1 */ u8 again_0x1A1;      /* 1 runs the state arm a second time this frame */
-    /* +0x1A2 */ u8 pad_0x1A2[0x6];
-    /* +0x1A8 */ u32 target_0x1A8;    /* the angle the NPC turns to */
-    /* +0x1AC */ u8 pad_0x1AC[0x4C];
-} NoteTalkView;
+#include "enemy/note_work.h"
+#include "sound/mhchar.h"
+#include "stage/get_now_mapno.h"
+#include "mh3_pad/system_w.h"
+#include "g3d/g3d_calcworld.h"
+#include "ef/eft028_set_scaled.h"
+#include "enemy/em_prog_support.h"
+#include "menu/note_pane_player_near_ck.h"
 
 /* The kitchen's tables (this unit's `.data`/`.sdata`, declared until the unit emits them). */
 extern s32 lb_kitchen_cost_tbl[6];            /* per tier: the zenny cost, then the resource-point cost */
 extern u8 lb_kitchen_special_tbl[12];         /* the special courses of the two list pages, 0-ended */
 extern s16 lb_kitchen_special_values[12];     /* the value each special course gives */
 extern s16* lb_kitchen_bonus_tbls[3];         /* the (skill, value) pairs of the skill rows 0x8000..0x8002 */
-extern u16* lb_kitchen_pair_tbls[3];          /* per tier: the pair table, 6-byte records ended by 0xFFFF */
+extern u16 lb_kitchen_area_codes[4];          /* the four online areas' meal codes */
+extern u16* lb_kitchen_pair_tbls[3];
+extern u8* lb_kitchen_course_lists[5];      /* the five course rolls' candidate lists, 0-ended */          /* per tier: the pair table, 6-byte records ended by 0xFFFF */
 extern u16 lb_kitchen_special_holds[4];       /* the two special courses and their hold slots */
 extern LbChoiceDef lb_kitchen_choice_defs[3];
 extern u16 lb_kitchen_frame_ids[6];
@@ -184,15 +177,35 @@ typedef struct LbQuestDetailModel {
     /* +0x00 */ u8 step;
     /* +0x01 */ u8 pad_0x01[0x3];
     /* +0x04 */ VEC3 pos;
-} LbQuestDetailModel; /* size: 0x10 */
+    /* +0x10 */ u8 pad_0x10[0x24];
+    /* +0x34 */ u8 visible;       /* `MHchar::field_0x34`: 0 hides the model and stops its step */
+} LbQuestDetailModel; /* size: 0x35 (a view of the model's first bytes) */
+
+/* One emitter of a scene model's 0xFF-ended table (`lb_scene_emitter_tbls`): the effect kind, its position, its
+ * heading and the base and spread of its random interval in frames. size: 0x18 */
+typedef struct LbSceneEmitter {
+    /* +0x00 */ u8 kind;
+    /* +0x01 */ u8 pad_0x01[0x3];
+    /* +0x04 */ Vec pos;
+    /* +0x10 */ u16 heading;
+    /* +0x12 */ s16 base;
+    /* +0x14 */ s16 spread;
+    /* +0x16 */ u8 pad_0x16[0x2];
+} LbSceneEmitter;
+
+extern Vec lb_scene_model_pos[5];               /* the five models' start positions */
+extern Vec lb_scene_model_target[5];            /* the positions model 1 moves towards */
+extern LbSceneEmitter* lb_scene_emitter_tbls[5]; /* each model's emitter table, or null */
 
 extern "C" {
 
 /* The unit's own entry points the bodies below reach before their definitions (or that are unwritten). */
-void note_talk_wait_step(NoteTalkView* self);
-void note_talk_greet_step(NoteTalkView* self);
-void note_talk_react_step(NoteTalkView* self);
-void note_talk_state_step(NoteTalkView* self);
+void note_talk_wait_step(NoteWork* self);
+void note_talk_greet_step(NoteWork* self);
+void note_talk_react_step(NoteWork* self);
+void note_talk_state_step(NoteWork* self);
+void note_idle_set(NoteWork* self);
+s32 note_talk_step(NoteWork* self);
 void lb_kitchen_page_set(LbKitchenWork* work, s16 page);
 void lb_kitchen_row_copy(LbKitchenRow* dst, const LbKitchenRow* src);
 void lb_kitchen_courses_roll(LbKitchenWork* work, s16 course);
@@ -203,7 +216,7 @@ u16 lb_kitchen_extra_roll(LbKitchenWork* work, u8 chance);
 void lb_kitchen_special_apply(LbKitchenWork* work);
 void lb_kitchen_list_draw(LbKitchenWork* work);
 void lb_kitchen_pick_draw(LbKitchenWork* work);
-void lb_kitchen_course_draw(LbKitchenWork* work, s32 active);
+void lb_kitchen_course_draw(LbKitchenWork* work, bool active);
 void lb_kitchen_confirm_draw(LbKitchenWork* work);
 void lb_kitchen_special_screen_draw(LbKitchenWork* work);
 u8 lb_trade_offer_state(LbTradeOffer* offer, s16 dest);
@@ -222,35 +235,214 @@ void lb_quest_board_effect_retire(_EFT* self);
  * The note-pane NPC talk program.
  * --------------------------------------------------------------------------------------------- */
 
+/* 0x8038EC44 (0x284): Runs one frame of the NPC's talk: re-arms the player's talk wait, opens the talk the remaining
+ * count selects and closes it when the message window does; 0 once the talk has ended. */
+s32 note_talk_step(NoteWork* self) {
+    _PLW* plw = my_player_work_get();
+
+    if (userdata_progress_flag_ck(19) == 1) {
+        plw->talk_left_0x669 = 3;
+    }
+    if (plw->talk_wait_0x668 == 0) {
+        plw->talk_left_0x669--;
+        npc_talk_end();
+        return 0;
+    }
+    plw->talk_wait_0x668 = 5;
+    switch (plw->talk_left_0x669) {
+    default:
+        plw->talk_wait_0x668 = 0;
+        return 0;
+    case 1:
+        switch (self->talk_step_0x1B5) {
+        case 0:
+            self->talk_step_0x1B5++;
+            npc_talk_start(0, 0, 0, 1);
+            se_talk_point_set(&self->vec_0x170);
+            break;
+        case 1:
+            if (npc_talk_active_ck() == 0) {
+                plw->talk_wait_0x668 = 0;
+                self->talk_step_0x1B5 = 0;
+                return 0;
+            }
+            break;
+        }
+        break;
+    case 2:
+        switch (self->talk_step_0x1B5) {
+        case 0:
+            if (Pl_item_timer_get(plw, 29) >= 1) {
+                self->talk_step_0x1B5 = 1;
+                npc_talk_start(0, 9, 0, 1);
+                se_talk_point_set(&self->vec_0x170);
+            } else {
+                self->talk_step_0x1B5 = 2;
+                npc_talk_start(0, 14, 0, 1);
+                se_talk_point_set(&self->vec_0x170);
+            }
+            break;
+        case 1:
+            if (npc_talk_active_ck() == 0) {
+                plw->talk_wait_0x668 = 0;
+                self->talk_step_0x1B5 = 0;
+                pl_item_add(plw, 29, -1);
+                userdata_progress_flag_set(19);
+                pl_model_state_set(plw, 1, 40, 0);
+                return 0;
+            }
+            break;
+        case 2:
+            if (npc_talk_active_ck() == 0) {
+                plw->talk_wait_0x668 = 0;
+                plw->talk_left_0x669--;
+                self->talk_step_0x1B5 = 0;
+                return 0;
+            }
+            break;
+        }
+        break;
+    case 3:
+        switch (self->talk_step_0x1B5) {
+        case 0:
+            self->talk_step_0x1B5++;
+            npc_talk_start(0, 18, 0, 1);
+            se_talk_point_set(&self->vec_0x170);
+            break;
+        case 1:
+            if (npc_talk_active_ck() == 0) {
+                plw->talk_wait_0x668 = 0;
+                plw->talk_left_0x669--;
+                self->talk_step_0x1B5 = 0;
+                return 0;
+            }
+            break;
+        }
+        break;
+    }
+    return 1;
+}
+
 /* 0x8038EEC8 (0x54): Moves the work's 16-bit angle one 1820-step towards its target, snapping when it is inside one
  * step, and wrapping through 0 the way the record's own 16-bit field does. */
-void note_turn_step(NoteTalkView* self) {
-    u32 target = self->target_0x1A8;
-    u32 cur = self->angle_0x18C;
+void note_turn_step(NoteWork* self) {
+    u32 target = self->field_0x1A8;
+    u32 cur = self->field_0x18C;
     u16 diff = (u16)(target - (u16)cur);
     if ((u16)(diff + 1820) < 3640) {
-        self->angle_0x18C = target;
+        self->field_0x18C = target;
     } else if (diff < 0x8000) {
-        self->angle_0x18C = (u16)(cur + 1820);
+        self->field_0x18C = (u16)(cur + 1820);
     } else {
-        self->angle_0x18C = (u16)(cur - 1820);
+        self->field_0x18C = (u16)(cur - 1820);
     }
+}
+
+/* 0x8038EF1C (0xC): Puts the pane back on its idle animation pair. */
+void note_idle_set(NoteWork* self) {
+    note_pane_set_anim_pair(self, 0, 0);
+}
+
+/* 0x8038EF28 (0x74): Places the NPC at its spot facing +0x4000, hides model part 22 and starts it idling. */
+void note_talk_init(NoteWork* self) {
+    self->field_0x001 = 1;
+    self->vec_0x170.x = -849.0f;
+    self->vec_0x170.y = 263.0f;
+    self->vec_0x170.z = 252.0f;
+    self->field_0x18C = 0x4000;
+    self->field_0x1A8 = 0x4000;
+    self->talk_step_0x1B5 = 0;
+    self->model.setVisibility(22, false);
+    note_idle_set(self);
 }
 
 /* 0x8038EF9C (0x50): Runs the program's frame: the state arm, once more when the work raised its one-shot flag, then
  * the turn step. */
-void note_talk_frame(NoteTalkView* self) {
+void note_talk_frame(NoteWork* self) {
     note_talk_state_step(self);
-    if (self->again_0x1A1 == 1) {
+    if (self->field_0x1A1 == 1) {
         note_talk_state_step(self);
-        self->again_0x1A1 = 0;
+        self->field_0x1A1 = 0;
     }
     note_turn_step(self);
 }
 
+/* 0x8038EFEC (0xB0): The waiting mode: starts the idle motion and a 200-frame countdown, idles when it runs out and
+ * goes to the greeting pair once the player comes near. */
+void note_talk_wait_step(NoteWork* self) {
+    switch (self->field_0x169) {
+    case 0:
+        self->field_0x169++;
+        note_pane_mode_set(self, 0);
+        note_pane_motion_set(self, 1, 4, 0);
+        self->field_0x16C = 200;
+        self->field_0x1B0 = 1.0f;
+        break;
+    case 1:
+        if (--self->field_0x16C < 0) {
+            note_idle_set(self);
+        }
+        if (note_pane_player_near_ck(self) == 1) {
+            note_pane_set_anim_pair(self, 0, 1);
+        }
+        break;
+    }
+}
+
+/* 0x8038F09C (0xB4): The greeting mode: starts the greeting motion, turns to the player and talks until the talk
+ * ends, then goes back to the idle pair 2. */
+void note_talk_greet_step(NoteWork* self) {
+    _PLW* plw = my_player_work_get();
+
+    switch (self->field_0x169) {
+    case 0:
+        self->field_0x169++;
+        note_pane_mode_set(self, 0);
+        note_pane_motion_start(self, 2, 4, 0);
+        note_talk_step(self);
+        self->field_0x1A8 = calcVecAng2(&self->vec_0x170, &plw->vec_0x03C);
+        break;
+    case 1:
+        if (note_talk_step(self) == 0) {
+            note_pane_set_anim_pair(self, 0, 2);
+        }
+        break;
+    }
+}
+
+/* 0x8038F150 (0x114): The reaction mode: plays the reaction motion, turns to the player when near and talks; idles
+ * when the motion or the talk ends. */
+void note_talk_react_step(NoteWork* self) {
+    _PLW* plw = my_player_work_get();
+
+    switch (self->field_0x169) {
+    case 0:
+        self->field_0x169++;
+        note_pane_mode_set(self, 0);
+        note_pane_motion_start(self, 3, 6, 0);
+        npc_talk_flag_set(45);
+        break;
+    case 1:
+        if (note_pane_player_near_ck(self) == 1) {
+            self->field_0x169++;
+            self->field_0x1A8 = calcVecAng2(&self->vec_0x170, &plw->vec_0x03C);
+        } else if (note_pane_motion_end_ck(self) != 0) {
+            note_idle_set(self);
+        }
+        break;
+    case 2:
+        if (note_talk_step(self) == 0) {
+            note_idle_set(self);
+        } else if (note_pane_motion_end_ck(self) != 0) {
+            note_pane_set_anim_pair(self, 0, 1);
+        }
+        break;
+    }
+}
+
 /* 0x8038F264 (0x30): Runs the mode the work's +0x19F byte selects. */
-void note_talk_mode_step(NoteTalkView* self) {
-    switch (self->mode_0x19F) {
+void note_talk_mode_step(NoteWork* self) {
+    switch (self->field_0x19F) {
     case 0:
         note_talk_wait_step(self);
         break;
@@ -268,8 +460,8 @@ void note_talk_noop(void) {
 }
 
 /* 0x8038F298 (0x24): Runs the arm the work's +0x19D byte selects. */
-void note_talk_state_step(NoteTalkView* self) {
-    switch (self->state_0x19D) {
+void note_talk_state_step(NoteWork* self) {
+    switch (self->field_0x19D) {
     case 0:
         note_talk_mode_step(self);
         break;
@@ -331,6 +523,87 @@ int lb_kitchen_pair_seen_ck(u16 a, u16 b) {
     }
     Q_UserData* user = (Q_UserData*)lobby_world_block;
     return (user->kitchen_pairs_0x525C[(u32)key >> 3] & (1 << (key & 7))) != 0;
+}
+
+/* 0x8038F4D8 (0x270): Opens the kitchen for the cook `npc`: clears the screen block, works out the online meal's
+ * area, clears the received meal, picks the tier from the unlocks and rolls the twelve ingredients from the seed. */
+void lb_kitchen_open(_PLW* npc, s32 arg) {
+    LbKitchenWork* work = (LbKitchenWork*)lobby_w.menu_0xAC;
+    u32 code;
+    u32 area;
+    s32 online;
+    u16 seed;
+    s32 group;
+    s32 row;
+    s32 base;
+    u16 pick;
+
+    memset(work, 0, 0x2000);
+    work->npc = npc;
+    work->arg_0x0EC = arg;
+    if (game_ready_ck() == 1) {
+        code = (u8)npc->field_0x0B6;
+        area = code >> 2;
+        lobby_w.meal_area_0x149 = area;
+        if (code == lb_kitchen_area_codes[area]) {
+            work->online = 1;
+        } else {
+            work->online = 2;
+        }
+    } else {
+        work->online = 0;
+    }
+    lobby_w.meal_received_0x14A = 0;
+    lobby_w.meal_skill_0x14B[0] = 0;
+    lobby_w.meal_value_0x14E[0] = 0;
+    lobby_w.meal_skill_0x14B[1] = 0;
+    lobby_w.meal_value_0x14E[1] = 0;
+    lobby_w.meal_skill_0x14B[2] = 0;
+    lobby_w.meal_value_0x14E[2] = 0;
+    lobby_w.meal_bonus_0x154[0] = 0;
+    lobby_w.meal_bonus_0x154[1] = 0;
+    lobby_w.meal_bonus_0x154[2] = 0;
+    lobby_w.meal_bonus_0x154[3] = 0;
+    lobby_w.state_0x000 = 17;
+    lobby_w.active_0x008 = 1;
+    if (game_ready_ck() == 0) {
+        online = 0;
+        if (lb_unlock_cond_ck(20) != 0) {
+            work->tier = 2;
+        } else if (lb_unlock_cond_ck(16) != 0) {
+            work->tier = 1;
+        } else {
+            work->tier = 0;
+        }
+        lb_talk_page_open(2);
+        lb_talk_page_mode_set(0);
+    } else {
+        online = 1;
+        if (lb_unlock_cond_ck(33) != 0) {
+            work->tier = 2;
+        } else if (lb_unlock_cond_ck(31) != 0) {
+            work->tier = 1;
+        } else {
+            work->tier = 0;
+        }
+    }
+    row = 0;
+    seed = lobby_w.field_0x036[online];
+    base = 0;
+    for (group = 0; group < 6; group++) {
+        seed = rand_lcg_step(seed);
+        pick = seed % 3;
+        work->rows[row].id = base + pick % 3;
+        work->rows[row].rare = (seed >> 3) & 1;
+        work->rows[row].group = group;
+        work->rows[row].enabled = 1;
+        work->rows[row + 1].id = base + (pick + 1) % 3;
+        work->rows[row + 1].rare = (seed >> 4) & 1;
+        work->rows[row + 1].group = group;
+        work->rows[row + 1].enabled = 1;
+        row += 2;
+        base += 3;
+    }
 }
 
 /* 0x8038F748 (0x4): Closes the kitchen screen. */
@@ -415,6 +688,43 @@ u32 lb_kitchen_course_ck(u8 course) {
         break;
     }
     return ok;
+}
+
+/* 0x8038F9A4 (0x120): Rolls course set `course`: steps the saved seed 37 times per set, then draws each of the four
+ * courses and the extra one from its list's candidates that can be rolled now. */
+void lb_kitchen_courses_roll(LbKitchenWork* work, s16 course) {
+    u8 picks[0x20];
+    s32 i;
+    s32 count;
+    u8* list;
+    u8* pick;
+    u16 seed;
+
+    work->seed = ((Q_UserData*)lobby_world_block)->kitchen_seed_0x484E;
+    for (i = 0; i < course * 37; i++) {
+        work->seed = rand_lcg_step(work->seed);
+    }
+    for (i = 0; i < 5; i++) {
+        count = 0;
+        list = lb_kitchen_course_lists[i];
+        memset(picks, 0, sizeof(picks));
+        pick = picks;
+        while (*list != 0) {
+            if (lb_kitchen_course_ck(*list) == 1) {
+                *pick = *list;
+                pick++;
+                count++;
+            }
+            list++;
+        }
+        seed = rand_lcg_step(work->seed);
+        work->seed = seed;
+        if (i == 4) {
+            work->extra_course = picks[seed % count];
+        } else {
+            work->courses[i] = picks[seed % count];
+        }
+    }
 }
 
 /* 0x8038FAC4 (0x5C): Empties both picks and shows the first ingredient page and the first course roll. */
@@ -625,6 +935,141 @@ void lb_kitchen_special_open(LbKitchenWork* work) {
     lb_kitchen_list_page_set(work, 0);
 }
 
+/* 0x80390154 (0x4A8): The special page's input: the item-hold strip picks the course, then the special list, the
+ * course box and the payment box; 1 once the course is ordered, 2 when the page is left. */
+s32 lb_kitchen_special_input(LbKitchenWork* work) {
+    s32 result = 0;
+    u16 entry;
+    s16 page;
+    s16 course;
+    s16 cursor;
+
+    switch (work->step) {
+    case 0:
+        switch (eft052_hold_step()) {
+        case 1:
+            eft052_hold_row_get(&work->special_id, NULL);
+            memset(work->special, 0, 6);
+            work->step = 1;
+            work->page = 0;
+            work->list_cursor = 0;
+            lb_kitchen_list_page_set(work, 0);
+            switch (work->special_id) {
+            case 0x1B0:
+                work->special_count = 3;
+                break;
+            default:
+                work->special_count = 2;
+                break;
+            }
+            sysSE_req(27);
+            break;
+        case 2:
+            result = 2;
+            sysSE_req(1);
+            break;
+        }
+        break;
+    case 1:
+        if (lb_cmd_pressed_ck(16) != 0) {
+            entry = work->list[work->list_cursor];
+            if (work->special[0] != entry && work->special[1] != entry && work->special[2] != entry) {
+                if (work->special[0] == 0) {
+                    work->special[0] = entry;
+                    sysSE_req(0);
+                } else if (work->special[1] == 0) {
+                    work->special[1] = entry;
+                    if (work->special_count == 2) {
+                        work->step = 2;
+                        work->course_cursor = 0;
+                        lb_kitchen_courses_roll(work, 0);
+                        sysSE_req(27);
+                    } else {
+                        sysSE_req(0);
+                    }
+                } else if (work->special[2] == 0) {
+                    work->special[2] = entry;
+                    work->step = 2;
+                    work->course_cursor = 0;
+                    lb_kitchen_courses_roll(work, 0);
+                    sysSE_req(27);
+                }
+            } else {
+                sysSE_req(2);
+            }
+        } else if (lb_cmd_pressed_ck(32) != 0) {
+            if (work->special[2] != 0) {
+                work->special[2] = 0;
+                lb_kitchen_list_page_set(work, work->page);
+            } else if (work->special[1] != 0) {
+                work->special[1] = 0;
+                lb_kitchen_list_page_set(work, work->page);
+            } else if (work->special[0] != 0) {
+                work->special[0] = 0;
+                lb_kitchen_list_page_set(work, work->page);
+            } else {
+                work->step = 0;
+            }
+            sysSE_req(1);
+        } else if (lb_cmd_repeat_ck(3) != 0) {
+            work->list_cursor = menu_cursor_step(work->list_cursor, work->row_count, lb_cmd_repeat_get(), 1, 2);
+        } else if (lb_cmd_repeat_ck(12) != 0) {
+            page = menu_cursor_step_fixed_tail(work->page, work->page_count, lb_cmd_repeat_get(), 4, 8,
+                                               &work->page_moved);
+            work->page = page;
+            lb_kitchen_list_page_set(work, page);
+        }
+        break;
+    case 2:
+        if (lb_cmd_pressed_ck(16) != 0) {
+            work->step = 3;
+            work->confirm_cursor = 0;
+            work->pay_menu = 1;
+            work->confirm_count = 2;
+            sysSE_req(0);
+            work->confirm_enabled[0] = 1;
+            work->confirm_enabled[1] = 1;
+            work->confirm_enabled[2] = 1;
+        } else if (lb_cmd_pressed_ck(32) != 0) {
+            work->step = 1;
+            if (work->special_count == 2) {
+                work->special[1] = 0;
+            } else {
+                work->special[2] = 0;
+            }
+            sysSE_req(1);
+        } else if (lb_cmd_repeat_ck(3) != 0) {
+            course = menu_cursor_step(work->course_cursor, 4, lb_cmd_repeat_get(), 1, 2);
+            work->course_cursor = course;
+            lb_kitchen_courses_roll(work, course);
+        }
+        break;
+    case 3:
+        if (lb_cmd_pressed_ck(16) != 0) {
+            cursor = work->confirm_cursor;
+            if (work->confirm_enabled[cursor] == 1) {
+                if (cursor != 0) {
+                    work->step = 2;
+                    sysSE_req(1);
+                } else {
+                    work->payment = 0;
+                    result = 1;
+                    sysSE_req(0);
+                }
+            } else {
+                sysSE_req(2);
+            }
+        } else if (lb_cmd_pressed_ck(32) != 0) {
+            work->step = 2;
+            sysSE_req(1);
+        } else if (lb_cmd_repeat_ck(3) != 0) {
+            work->confirm_cursor = menu_cursor_step(work->confirm_cursor, work->confirm_count, lb_cmd_repeat_get(), 1, 2);
+        }
+        break;
+    }
+    return result;
+}
+
 /* 0x803905FC (0x60): Finds the pair (`a`, `b`) in tier `kind`'s pair table: 6-byte records keyed by the two groups
  * (smaller one high), ended by 0xFFFF, whose address the not-found answer is. */
 u16* lb_kitchen_pair_find(u8 kind, u8 a, u8 b) {
@@ -642,6 +1087,50 @@ u16* lb_kitchen_pair_find(u8 kind, u8 a, u8 b) {
         p += 3;
     }
     return p;
+}
+
+/* 0x8039065C (0x11C): Rolls one bonus course with `chance` percent: takes a random one of the rolled courses still
+ * left and closes the gap behind it; 0 when the roll fails. */
+u16 lb_kitchen_bonus_roll(LbKitchenWork* work, u8 chance) {
+    s32 count = 0;
+    u16 bonus = 0;
+    u16 seed;
+    u16 index;
+
+    seed = rand_lcg_step(work->seed);
+    work->seed = seed;
+    if (seed % 100 < chance) {
+        if (work->courses[0] != 0) {
+            count = 1;
+            if (work->courses[1] != 0) {
+                count = 2;
+                if (work->courses[2] != 0) {
+                    count = 3;
+                    if (work->courses[3] != 0) {
+                        count = 4;
+                    }
+                }
+            }
+        }
+        seed = rand_lcg_step(seed);
+        work->seed = seed;
+        index = seed % count;
+        bonus = work->courses[index];
+        memcpy(&work->courses[index], &work->courses[index + 1], (4 - (index + 1)) * 2);
+        work->courses[3] = 0;
+    }
+    return bonus;
+}
+
+/* 0x80390778 (0x7C): The extra course with `chance` percent, 0 when the roll fails. */
+u16 lb_kitchen_extra_roll(LbKitchenWork* work, u8 chance) {
+    u16 seed = rand_lcg_step(work->seed);
+
+    work->seed = seed;
+    if (seed % 100 < chance) {
+        return work->extra_course;
+    }
+    return 0;
 }
 
 /* 0x803907F4 (0x134): Copies a skill row's two skills into the meal parameters: rows 0x8000.. pick two of the bonus
@@ -853,6 +1342,175 @@ void lb_kitchen_meal_serve(LbKitchenWork* work) {
         meal_result_send(lobby_w.meal_area_0x149);
     }
     ((Q_UserData*)lobby_world_block)->kitchen_seed_0x484E = ran_suu(1);
+}
+
+/* 0x80390F20 (0x5B4): The kitchen screen's frame step: the opening talk page and choice, the pick and special pages,
+ * the guest's wait for the host's meal, the eating motion with its messages, and the close; then the draw callback. */
+void lb_kitchen_step(void) {
+    LbKitchenWork* work = (LbKitchenWork*)lobby_w.menu_0xAC;
+    char text[0x40];
+    void* name;
+    s32 i;
+
+    work->page_moved = 0;
+    switch (work->state) {
+    case 0:
+        if (game_ready_ck() == 0) {
+            work->state = 1;
+            lb_talk_page_mode_set(0);
+        } else {
+            work->state = 2;
+            lb_choice_init(&work->choice, &lb_kitchen_choice_defs[work->online], 0, 0);
+            work->choice.se = -1;
+            sysSE_stop(41);
+        }
+        break;
+    case 1:
+        if ((u32)(lb_talk_page_mode_reset() - 1) <= 1) {
+            if (lb_talk_page_value_get() == 0) {
+                work->state = 2;
+                lb_choice_init(&work->choice, lb_kitchen_choice_defs, 0, 0);
+                work->choice.se = -1;
+                camera_talk_lock_set(1);
+                lb_act_latch_set(work->npc, 4);
+                sysSE_stop(41);
+            } else {
+                work->state = 7;
+                lb_talk_page_open(1);
+                sysSE_req(1);
+            }
+        }
+        break;
+    case 2:
+        ainpc_page_hold_set();
+        switch (lb_choice_step(&work->choice)) {
+        case 1:
+            work->step = 0;
+            switch (work->choice.cursor) {
+            case 0:
+                work->state = 4;
+                lb_kitchen_pick_reset(work);
+                sysSE_req(27);
+                break;
+            case 1:
+                if (work->online == 2) {
+                    work->state = 5;
+                    lb_npc_act_set(work->npc, 0, 16, 32);
+                    sysSE_req(0);
+                } else {
+                    work->state = 3;
+                    lb_kitchen_special_open(work);
+                    sysSE_req(5);
+                }
+                break;
+            }
+            break;
+        case 2:
+            work->state = 7;
+            if (game_ready_ck() == 0) {
+                lb_npc_act_set(work->npc, 0, 5, 32);
+                lb_talk_page_open(1);
+                camera_talk_lock_set(0);
+            }
+            break;
+        }
+        break;
+    case 3:
+        ainpc_page_hold_set();
+        switch (lb_kitchen_special_input(work)) {
+        case 1:
+            work->state = 6;
+            work->tier = 2;
+            lb_npc_act_set(work->npc, 0, (u16)(work->tier + 9), 32);
+            lb_kitchen_meal_serve(work);
+            break;
+        case 2:
+            work->state = 2;
+            break;
+        }
+        break;
+    case 4:
+        ainpc_page_hold_set();
+        switch (lb_kitchen_pick_input(work)) {
+        case 1:
+            work->state = 6;
+            lb_npc_act_set(work->npc, 0, (u16)(work->tier + 9), 32);
+            lb_kitchen_meal_serve(work);
+            break;
+        case 2:
+            work->state = 2;
+            break;
+        }
+        break;
+    case 5:
+        if (lobby_w.meal_received_0x14A != 0) {
+            sysSE_stop(9);
+            work->state = 6;
+            work->tier = 2;
+            work->act = 15;
+            work->message = 0x7A;
+            lobby_w.kitchen_busy_0x054 = 1;
+            lb_npc_act_set(work->npc, 0, (u16)(work->tier + 9), 32);
+            lb_param_w.flag_0x0C[0] = lobby_w.meal_skill_0x14B[0];
+            lb_param_w.value_0x10[0] = lobby_w.meal_value_0x14E[0];
+            lb_param_w.flag_0x0C[1] = lobby_w.meal_skill_0x14B[1];
+            lb_param_w.value_0x10[1] = lobby_w.meal_value_0x14E[1];
+            lb_param_w.flag_0x0C[2] = lobby_w.meal_skill_0x14B[2];
+            lb_param_w.value_0x10[2] = lobby_w.meal_value_0x14E[2];
+            work->bonuses[0] = lobby_w.meal_bonus_0x154[0];
+            work->bonuses[1] = lobby_w.meal_bonus_0x154[1];
+            work->bonuses[2] = lobby_w.meal_bonus_0x154[2];
+            work->bonuses[3] = lobby_w.meal_bonus_0x154[3];
+        } else if (lb_cmd_pressed_ck(32) != 0) {
+            work->state = 7;
+            lb_npc_act_set(work->npc, 0, 5, 32);
+        }
+        break;
+    case 6:
+        if (Get_motion_no(work->npc) != 622) {
+            work->state = 7;
+            lb_npc_act_set(work->npc, 0, work->act, 32);
+            hud_msg_push(0, (const char*)LbStr(0, work->message));
+            for (i = 0; i < 3; i++) {
+                if (lb_param_w.flag_0x0C[i] != 0 && lb_param_w.value_0x10[i] != 0) {
+                    if (lb_param_w.value_0x10[i] > 0) {
+                        name = LbStr(0, lb_param_w.flag_0x0C[i] + 89);
+                        sprintf(text, (const char*)LbStr(0, 145), name);
+                    } else {
+                        name = LbStr(0, lb_param_w.flag_0x0C[i] + 89);
+                        sprintf(text, (const char*)LbStr(0, 146), name);
+                    }
+                    hud_msg_push(0, text);
+                }
+            }
+            for (i = 0; i < 4; i++) {
+                lb_param_w.slots_0x16[i] = work->bonuses[i];
+                if (work->bonuses[i] != 0) {
+                    name = (void*)str_tbl_course_get(work->bonuses[i]);
+                    sprintf(text, (const char*)LbStr(0, 144), name);
+                    hud_msg_push(0, text);
+                }
+            }
+            camera_talk_reset();
+            if (game_ready_ck() == 0) {
+                lb_talk_page_open(1);
+                lb_npc_talk_mode_set(lb_npc_find(13), 4);
+            }
+        }
+        break;
+    case 7:
+        if (game_ready_ck() == 0) {
+            if ((u32)(lb_talk_page_mode_reset() - 1) <= 1) {
+                lb_kitchen_close();
+            }
+        } else {
+            lb_kitchen_close();
+        }
+        break;
+    }
+    if (work->state > 1 && work->state != 7) {
+        subTransSet((u32)lb_kitchen_draw_task, 0, NULL);
+    }
 }
 
 /* 0x803914D4 (0x9C): Draws the kitchen's frame (its wide-screen variant), its title and the money and points. */
@@ -1121,6 +1779,69 @@ void lb_kitchen_special_pick_draw(LbKitchenWork* work) {
     }
 }
 
+/* 0x80391EF4 (0x2B0): Draws the course box (the four course rows, the cursor's lit while `active`) and the bonus
+ * box: each rolled course's name with its help record. */
+void lb_kitchen_course_draw(LbKitchenWork* work, bool active) {
+    _SPR_DATA_ spr;
+    PlaceRec place;
+    _mh_ivec2_ base;
+    _mh_ivec2_ pos;
+    u32 i;
+    u16* lsp;
+    bool cursor;
+    u32 flags;
+    u32 color;
+    s16 x;
+    s16 y;
+    s16 width;
+
+    get_lsp_data(0x214A, &base);
+    draw_sprite_ary(lb_kitchen_course_ids, &base);
+    get_lsp_data(0x215D, &base);
+    draw_sprite_ary(lb_kitchen_course_row_ids, &base);
+    uv_pair_copy(&pos, &base);
+    for (i = 0, lsp = lb_kitchen_course_lsp; i < 4; i++) {
+        if (i == work->course_cursor) {
+            cursor = true;
+            flags = 5;
+        } else {
+            cursor = false;
+            flags = 1;
+        }
+        color = GetMenuFontColor(true, cursor, active, false);
+        draw_sprite_ary(lb_kitchen_course_row_ids, &pos);
+        spr_data_copy(&spr, get_lsp_data(0x215E, NULL));
+        spr.color = color;
+        draw_font(spr, (s8*)LbStr(0, i + 77), flags, &pos);
+        if (active && cursor) {
+            put_menu_cursor(lb_kitchen_course_cursor_ids, 0, &pos);
+        }
+        get_lsp_data(*lsp, &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        lsp++;
+    }
+    get_lsp_data(0x216A, &base);
+    draw_sprite_ary(lb_kitchen_bonus_ids, &base);
+    get_lsp_data(0x2179, &base);
+    uv_pair_copy(&pos, &base);
+    for (i = 0, lsp = lb_kitchen_bonus_lsp; i < 4; i++) {
+        draw_sprite_ary(lb_kitchen_bonus_frame_ids, &pos);
+        spr_data_copy(&spr, get_lsp_data(0x217A, NULL));
+        draw_font(spr, (s8*)str_tbl_course_get(work->courses[i]), 1, &pos);
+        x = menu_text_center_x((char*)str_tbl_course_get(work->courses[i]), (s16)(spr.pos.x + pos.x), spr.width);
+        y = spr.pos.y + pos.y;
+        width = (spr.width * flfntStrLen((char*)str_tbl_course_get(work->courses[i]))) / 2;
+        place_rec_course_set(&place, work->courses[i]);
+        place_rec_alloc(&place, x, y, width, spr.height, 0, 9);
+        get_lsp_data(*lsp, &pos);
+        pos.x += base.x;
+        pos.y += base.y;
+        lsp++;
+    }
+    ainpc_page_mark_a_draw(0x2196, NULL);
+}
+
 /* 0x803921A4 (0x184): Draws the payment box: one row per payment the menu offers, the cursor's row lit. */
 void lb_kitchen_confirm_draw(LbKitchenWork* work) {
     _SPR_DATA_ spr;
@@ -1217,6 +1938,31 @@ void lb_kitchen_special_list_draw(LbKitchenWork* work) {
         }
         lb_list_row_draw((s8*)LbStr(0, work->list[i] + 0x59), cursor, &pos, color, 13);
         lsp++;
+    }
+}
+
+/* 0x80392504 (0x9C): Draws the special screen: the item-hold strip before a course is picked, then the list and the
+ * picks, the course box and the payment box as the steps advance. */
+void lb_kitchen_special_screen_draw(LbKitchenWork* work) {
+    switch (work->step) {
+    default:
+        eft052_hold_draw(0);
+        break;
+    case 1:
+        lb_kitchen_special_list_draw(work);
+        lb_kitchen_special_pick_draw(work);
+        break;
+    case 2:
+        lb_kitchen_special_list_draw(work);
+        lb_kitchen_special_pick_draw(work);
+        lb_kitchen_course_draw(work, 1);
+        break;
+    case 3:
+        lb_kitchen_special_list_draw(work);
+        lb_kitchen_special_pick_draw(work);
+        lb_kitchen_course_draw(work, 0);
+        lb_kitchen_confirm_draw(work);
+        break;
     }
 }
 
@@ -1366,6 +2112,36 @@ void lb_trade_open(s32 arg, LbTradeSource* source) {
 /* 0x80392960 (0x4): Closes the trade screen. */
 s32 lb_trade_close(void) {
     return lb_panel_close();
+}
+
+/* 0x80392964 (0xE8): The state bits of one offer: 1 when its stock (box or pouch, `dest`) is gone, 4 when it is short,
+ * 2 when the player can pay none of its prices. */
+u8 lb_trade_offer_state(LbTradeOffer* offer, s16 dest) {
+    s32 i;
+    u8 state = 0;
+    s32 stock = eft052_page_count_ck(offer->item.item, dest);
+    u8 payable;
+
+    if (dest == 1) {
+        if (stock < offer->item.count) {
+            state |= 1;
+        }
+    } else if (stock < 0) {
+        state |= 1;
+    } else if (stock < offer->item.count) {
+        state |= 4;
+    }
+    payable = 0;
+    for (i = 0; i < 3; i++) {
+        if (offer->costs[i].item != 0 &&
+            userdata_item_count_total(offer->costs[i].item, lobby_world_block) >= offer->costs[i].count) {
+            payable++;
+        }
+    }
+    if (payable == 0) {
+        state |= 2;
+    }
+    return state;
 }
 
 /* 0x80392A4C (0x17C): Fills trade page `page` (five offers of the ten, or fifteen during the event) with each offer's
@@ -1854,6 +2630,161 @@ void lb_scene_eft_step(_EFT* self) {
     case 3:
         lb_quest_board_effect_retire(self);
         break;
+    }
+}
+
+/* 0x80393B28 (0x224): Sets the scene effect up: binds the five models (retires the effect if one cannot be made),
+ * hides the ones whose lobby part is not open, places them, shows each one's own node and arms its timers. */
+void lb_scene_eft_init(_EFT* self) {
+    LbSceneEftWork* work = (LbSceneEftWork*)self->work_0x38;
+    Vec* pos;
+    s32 i;
+    u32 nodes;
+    u32 node;
+
+    self->state_0x05++;
+    for (i = 0; i < work->count; i++) {
+        if (res_eft_model_create(work->models[i], 147, 43) == NULL) {
+            lb_quest_board_effect_retire(self);
+            return;
+        }
+    }
+    self->flag_0x01 = 1;
+    self->field_0x10 = 0;
+    switch (get_now_mapno()) {
+    case 22:
+        if (self->area_0x44 == 0) {
+            pos = lb_scene_model_pos;
+        }
+        break;
+    }
+    nodes = mhchar_node_count(work->models[0]);
+    for (i = 0; i < work->count; i++) {
+        switch (i) {
+        case 0:
+            if (lb_part_slot_open_ck(0) == 0) {
+                work->models[i]->field_0x34 = 0;
+            }
+            break;
+        case 1:
+            if (lb_part_slot_open_ck(1) == 0) {
+                work->models[i]->field_0x34 = 0;
+            }
+            break;
+        case 2:
+            if (lb_part_slot_open_ck(2) == 0) {
+                work->models[i]->field_0x34 = 0;
+            }
+            break;
+        case 3:
+        case 4:
+            if (kujira_event_over_ck() == 0) {
+                work->models[i]->field_0x34 = 0;
+            }
+            break;
+        }
+        work->models[i]->pos_0x04.x = pos->x;
+        work->models[i]->pos_0x04.y = pos->y;
+        work->models[i]->pos_0x04.z = pos->z;
+        pos++;
+        work->models[i]->ready = 0;
+        work->models[i]->frame_init(0, 0, 0.0f, 0, 1.0f);
+        for (node = 0; node < nodes; node++) {
+            if ((s32)node != i + 1) {
+                work->models[i]->setVisibility(node, false);
+            }
+        }
+        work->frames[i] = 0;
+        work->timers[i][0] = 30;
+        work->timers[i][1] = 30;
+        work->timers[i][2] = 30;
+        work->timers[i][3] = 30;
+    }
+    lb_scene_eft_move(self);
+}
+
+/* 0x80393D4C (0x2EC): Steps the scene effect's models: models 3 and 4 slide by the camera keys, the others fire their
+ * emitters once the lobby part is up, model 1 travels to its target leaving a trail; then each model moves. */
+void lb_scene_eft_move(_EFT* self) {
+    LbSceneEftWork* work = (LbSceneEftWork*)self->work_0x38;
+    _CP_VECTOR rot;
+    VEC3 from;
+    VEC3 to;
+    VEC3 pos;
+    VEC3 step;
+    s32 i;
+    LbQuestDetailModel* view;
+    LbSceneEmitter* emitter;
+    s32 j;
+    s32 voice;
+
+    rot.x = 0;
+    rot.y = 0;
+    rot.z = 0;
+    VEC3_ctor(&from);
+    VEC3_ctor(&to);
+    VEC3_ctor(&pos);
+    for (i = 0; i < work->count; i++) {
+        view = (LbQuestDetailModel*)work->models[i];
+        emitter = lb_scene_emitter_tbls[i];
+        if (view->visible == 0) {
+            continue;
+        }
+        if ((u32)(i - 3) <= 1) {
+            if (lb_scene_model_slide(self, view, i) == 1) {
+                continue;
+            }
+        } else {
+            switch (view->step) {
+            case 0:
+                if (lobby_w.slots_0x07D[i] == 2) {
+                    view->step++;
+                    switch (i) {
+                    default:
+                        voice = 0;
+                        break;
+                    case 1:
+                        voice = 2;
+                        break;
+                    case 2:
+                        voice = 1;
+                        break;
+                    }
+                    se_point_req(voice, &view->pos);
+                }
+                if (emitter != NULL) {
+                    for (j = 0; emitter->kind != 0xFF; emitter++, j++) {
+                        if (system_w.field_0x0c % work->timers[i][j] == 0) {
+                            work->timers[i][j] = emitter->base + ran_suu(1) % emitter->spread;
+                            rot.y = emitter->heading;
+                            vec_to_mh_vec3(&pos, &emitter->pos);
+                            eft028_set_scaled(emitter->kind, &pos, &rot, 1.0f, self->area_0x44, 0);
+                        }
+                    }
+                }
+                break;
+            case 1:
+                vec_to_mh_vec3(&from, &lb_scene_model_pos[i]);
+                vec_to_mh_vec3(&to, &lb_scene_model_target[i]);
+                subVec3(&step, &to, &from);
+                copyVec3(&from, &step);
+                vec3_scale_inv(&from, 1350.0f);
+                addVec3To(&view->pos, &from);
+                rot.y = calcVecAng2(&to, &from);
+                if (++work->frames[i] > 1350) {
+                    view->step++;
+                }
+                if (--work->timers[i][0] <= 0) {
+                    work->timers[i][0] = 8;
+                    eft028_set_scaled(12, &view->pos, &rot, 1.0f, self->area_0x44, 0);
+                }
+                break;
+            case 2:
+                continue;
+            }
+        }
+        work->models[i]->move(0);
+        eft_res_models_spawn(self, (void**)&work->models[i], 2, 1, 0);
     }
 }
 

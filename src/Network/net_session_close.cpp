@@ -17,6 +17,7 @@
  *   `postQuestBoardRecord` (its one caller is the quest board); the `userdata_item` profile fillers
  *   `fillNetUserProfile*` (declared in `userdata_item.h`); `refreshRosterCache`, `copyPeerProfileCard`, `sendPeerMessage`,
  *   `net_peer_address` and the `NetPeerCard` fields from what the bodies copy.
+ *   GUESS: `requestReadyOnAlias`, `requestReadyOnAlias2`
  * RESIDUALS. Partial: the static initialiser 0x80437204 (the map names it after the compiler's `__sinit`)
  *   - typing `net_community_state` as `NetworkCommunityPeer` (with its constructor/destructor declared in
  *     `Network/NetworkCommunityPat.h` and defined there) makes the static initialiser call them as retail does, but
@@ -1227,14 +1228,14 @@ s32 requestReadyOff(void)
 /*
  * The quest board's ready-on entry points (two call sites) and its ready-off entry point.
  */
-void requestReadyOnAlias(void)
+u32 requestReadyOnAlias(void)
 {
-    requestReadyOn();
+    return requestReadyOn();
 }
 
-void requestReadyOnAlias2(void)
+u32 requestReadyOnAlias2(void)
 {
-    requestReadyOn();
+    return requestReadyOn();
 }
 
 void requestReadyOffAlias(void)

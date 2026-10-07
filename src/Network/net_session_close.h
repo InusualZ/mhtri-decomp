@@ -175,8 +175,8 @@ void setSessionDisplayName(const char* name);
  * board's entry points to them. */
 s32 requestReadyOn(void);
 s32 requestReadyOff(void);
-void requestReadyOnAlias(void);
-void requestReadyOnAlias2(void);
+u32 requestReadyOnAlias(void);
+u32 requestReadyOnAlias2(void);
 void requestReadyOffAlias(void);
 
 /* 0x804344BC / 0x804346CC - the completions of pending action 1 (command 0x18) and of the leave (command 0x1E),

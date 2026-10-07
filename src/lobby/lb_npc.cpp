@@ -26,6 +26,7 @@
  *   GUESS: lb_chacha_mask_name_get, lb_cat_name_get, lb_pig_name_get, lb_npc_find, lb_npc_event_set
  *   GUESS: lb_npc_motion_restart, lb_npc_act_set, lb_player_act_latch, lb_player_angle_to
  *   GUESS: `lb_cmd_pressed_ck`, `lb_cmd_held_ck`, `lb_cmd_repeat_ck`, `lb_cmd_repeat_get`, `lb_yes_no_step`
+ *   GUESS: `lb_npc_motion_play`
  * RESIDUALS. 238 rows unwritten: 0x801FC318-0x801FC6A0, 0x801FCBC8-0x801FD0F8, 0x801FD338-0x801FDD9C,
  *   0x801FE200-0x802029B4, 0x80204DA8-0x8020505C, 0x8020623C-0x80206824, 0x80206AD0-0x80206CB4, 0x80207284-0x80207698,
  *   0x80207B3C-0x80207E9C, 0x80207EEC-0x802080C0, 0x80208100-0x80208928, 0x80208AFC-0x8020A5D4, 0x8020A714-0x8020AD14,
@@ -34,7 +35,7 @@
  *   6, 8, 12, 29, 13, 14, 16, 18, 19, 10, 20, 26, 30, 31, 32, 34, 25, 35; cases 1, 9 and 36 fall through to the end.
  *  - `fn_801FDFA4`: retail's first store is `rlwinm r0,r4,0,24,24` and it materialises the `setVector3` pointer before
  *    the constant load; `(u8)(flag & 0x80)` matches the mask but MWCC schedules the `lfs` ahead of the `addi`;
- *  - `fn_801FE1CC`, `fn_801FE1DC`, `fn_801FE1EC`: retail sets up the tail call with `addi r3,r3,0x58` first;
+ *  - `lb_npc_motion_play`, `fn_801FE1DC`, `fn_801FE1EC`: retail sets up the tail call with `addi r3,r3,0x58` first;
  *  - `fn_801FC8C8`: retail keeps `lbz; extsb; stb`, MWCC forwards the byte and drops the `extsb` (`s8`, `u8` and an
  *    `s32` temporary tried); `fn_801FC810`: retail bumps the pointer before the counter;
  *  - `fn_802050AC`: retail schedules `lwz r4,44(r31)` between the `(s16)(u16)` mask and the signed `/ 5`, ours after
@@ -63,7 +64,7 @@
  * SHAPES. `__declspec(noinline)` on the helpers retail keeps out of line (`fn_801FDE3C`, `fn_801FE11C`, `fn_801FE130`,
  *   `fn_801FCAC8`, and the eight rows `fn_80203114` dispatches to).  `fn_801FCB68` computes the value before the range
  *   test (`< 0x3E8`).  `fn_801FDE74` writes `if (a <= 0) {clear} else {tick}` (retail lays the clear block first behind
- *   a `bgt`). `fn_801FE1AC`/`fn_801FE1CC`/`fn_801FE1DC` take a full-width id narrowed with `(u16)` at the use, and
+ *   a `bgt`). `fn_801FE1AC`/`lb_npc_motion_play`/`fn_801FE1DC` take a full-width id narrowed with `(u16)` at the use, and
  *   `fn_801FE1AC` writes `(u16)id - field == 0` (the `subf` operand order).  Every `ran_suu` use narrows with `(u16)`
  *   (the callee returns `u32`: `cmplwi r3,1`).  Negative angles are `(u16)-8192` and the like (retail builds the
  *   unsigned value with `lis r3,1` + `addi`/`subi`).  A two-arm chain on one value is a `switch` (`fn_80203EC4`,
@@ -467,7 +468,7 @@ s32 fn_801FE1AC(_LB_NPC* self, u32 motion_id)
 }
 
 /* 0x801FE1CC / 0x801FE1DC - play the NPC's motion, once or looped. */
-void fn_801FE1CC(_LB_NPC* self, u32 motion_id)
+void lb_npc_motion_play(_LB_NPC* self, u32 motion_id)
 {
     fn_800E16DC(self->body_0x058, (u16)motion_id, 0);
 }
@@ -816,7 +817,7 @@ u32 fn_801FDFD0(_LB_NPC* self);
 void fn_801FDFE4(_LB_NPC* self, u16 id, s32 a3, s32 a4);
 void fn_801FE0AC(_LB_NPC* self, u16 id, s32 a3, s32 a4);
 void lb_npc_motion_restart(_LB_NPC* self, u16 id);
-u32 fn_801FE1CC(_LB_NPC* self, u16 id, f32 a, f32 b);
+u32 lb_npc_motion_play(_LB_NPC* self, u16 id, f32 a, f32 b);
 u32 fn_801FE1DC(_LB_NPC* self, u16 id, f32 a, f32 b);
 u32 fn_801FE1EC(_LB_NPC* self);
 void fn_801FE200(_LB_NPC* self, u8 visible, bool flag);
@@ -889,7 +890,7 @@ __declspec(noinline) void fn_802029B4(_LB_NPC* self)
         break;
     case 1:
         if (fn_801FDFD0(self) == 1) {
-            if (fn_801FE1CC(self, 2, lbl_807999C4, lbl_807999A0) == 1) {
+            if (lb_npc_motion_play(self, 2, lbl_807999C4, lbl_807999A0) == 1) {
                 fn_801FDFE4(self, 1148, 12, 50);
             } else {
                 fn_801FDFE4(self, 1148, 8, 0);
@@ -957,7 +958,7 @@ __declspec(noinline) void fn_80202C24(_LB_NPC* self)
         fn_801FDFE4(self, 1130, 4, 0);
         break;
     case 1:
-        if (fn_801FE1CC(self, 1, lbl_807999C8, lbl_807999A0) == 1) {
+        if (lb_npc_motion_play(self, 1, lbl_807999C8, lbl_807999A0) == 1) {
             self->field_0x006++;
             fn_801FDFE4(self, 1129, 16, 24);
         } else if (fn_801FDFD0(self) == 1) {
@@ -1419,14 +1420,14 @@ void fn_80203D10(_LB_NPC* self)
                 fn_801FDFE4(self, 1065, 24, 0);
                 self->field_0x006 = 3;
             }
-        } else if (fn_801FE1CC(self, 0, lbl_807999D4, lbl_807999A0) != 0) {
+        } else if (lb_npc_motion_play(self, 0, lbl_807999D4, lbl_807999A0) != 0) {
             fn_801FE200(self, 25, 1);
         }
         break;
     case 2:
         if (fn_801FE1EC(self) == 1) {
             lb_npc_motion_restart(self, 0);
-        } else if (fn_801FE1CC(self, 0, lbl_807999D8, lbl_807999A0) != 0) {
+        } else if (lb_npc_motion_play(self, 0, lbl_807999D8, lbl_807999A0) != 0) {
             fn_801FE200(self, 25, 0);
         }
         break;
@@ -1434,7 +1435,7 @@ void fn_80203D10(_LB_NPC* self)
         if (fn_801FE1EC(self) == 1) {
             self->field_0x006 = 1;
             fn_801FDFE4(self, 1063, 4, 0);
-        } else if (fn_801FE1CC(self, 0, lbl_807999DC, lbl_807999A0) != 0) {
+        } else if (lb_npc_motion_play(self, 0, lbl_807999DC, lbl_807999A0) != 0) {
             fn_801FE200(self, 25, 0);
         }
         break;
@@ -1574,7 +1575,7 @@ void fn_802043D4(_LB_NPC* self, u8 kind)
             speed = lbl_807999E8;
             break;
         }
-        if (fn_801FE1CC(self, 0, speed, lbl_807999A0) == 1) {
+        if (lb_npc_motion_play(self, 0, speed, lbl_807999A0) == 1) {
             s32 slot = fn_802080C0(self);
 
             self->field_0x234[0] = 2;
@@ -1613,10 +1614,10 @@ void fn_80204148(_LB_NPC* self)
             if (fn_802FB948() == 0) {
                 fn_801FE200(self, 24, 1);
             }
-        } else if (fn_801FE1CC(self, 0, lbl_807999C8, lbl_807999A0) != 0) {
+        } else if (lb_npc_motion_play(self, 0, lbl_807999C8, lbl_807999A0) != 0) {
             fn_801FE200(self, 24, 0);
             fn_801FE200(self, 25, 1);
-        } else if (fn_801FE1CC(self, 0, lbl_807999E0, lbl_807999A0) != 0) {
+        } else if (lb_npc_motion_play(self, 0, lbl_807999E0, lbl_807999A0) != 0) {
             fn_802BE4FC(8);
         }
         break;
@@ -1710,14 +1711,14 @@ void fn_802047C8(_LB_NPC* self)
                 self->field_0x006++;
                 fn_801FDFE4(self, 1101, 4, 0);
             }
-        } else if (fn_801FE1CC(self, 0, lbl_807999C4, lbl_807999A0) != 0) {
+        } else if (lb_npc_motion_play(self, 0, lbl_807999C4, lbl_807999A0) != 0) {
             if ((u16)ran_suu(1) % 100 < 50) {
                 self->field_0x204 = lb_npc_move_data.table_0x10;
                 self->field_0x208 = 0;
                 lb_npc_motion_restart(self, self->field_0x204[0].motion_0x0C);
             }
-        } else if (fn_801FE1CC(self, 5, lbl_807999F8, lbl_8079999C) == 1 ||
-                   fn_801FE1CC(self, 5, lbl_807999FC, lbl_80799A00) == 1) {
+        } else if (lb_npc_motion_play(self, 5, lbl_807999F8, lbl_8079999C) == 1 ||
+                   lb_npc_motion_play(self, 5, lbl_807999FC, lbl_80799A00) == 1) {
             self->field_0x02C -= 910;
         }
         break;
@@ -1837,7 +1838,7 @@ void fn_80204CB8(_LB_NPC* self, u8 kind)
         if (fn_801FE1EC(self) == 1) {
             self->field_0x006++;
             fn_801FE0AC(self, 1187, 2, 0);
-        } else if (fn_801FE1CC(self, 0, lbl_807999D0, lbl_807999A0) != 0) {
+        } else if (lb_npc_motion_play(self, 0, lbl_807999D0, lbl_807999A0) != 0) {
             switch (kind) {
             case 0:
                 fn_801FDEB4(self, 26943, 17);
@@ -2294,7 +2295,7 @@ void fn_80205D54(_LB_NPC* self)
         break;
     case 2:
         if (self->field_0x00C > 0) {
-            if (fn_801FE1CC(self, 0, lbl_807999B0, lbl_807999A0) == 1) {
+            if (lb_npc_motion_play(self, 0, lbl_807999B0, lbl_807999A0) == 1) {
                 fn_801FDFE4(self, 1193, 4, 0);
                 self->field_0x00C--;
             }
@@ -2329,7 +2330,7 @@ void fn_80206DE8(_LB_NPC* self)
         self->field_0x02C = (u16)-1819;
         break;
     case 1:
-        if (fn_801FE1CC(self, 0, lbl_80799AB4, lbl_807999A0) == 1) {
+        if (lb_npc_motion_play(self, 0, lbl_80799AB4, lbl_807999A0) == 1) {
             self->field_0x006++;
             fn_801FDFE4(self, 1129, 4, 0);
         }
@@ -2548,7 +2549,7 @@ void fn_80204528(_LB_NPC* self)
             self->field_0x006++;
             fn_801FDFE4(self, 1171, 0, 0);
             self->field_0x00C = 1;
-        } else if (fn_801FE1CC(self, 0, lbl_807999EC, lbl_807999A0) != 0) {
+        } else if (lb_npc_motion_play(self, 0, lbl_807999EC, lbl_807999A0) != 0) {
             fn_801FDEB4(self, 0xC001, 15);
             self->field_0x218 = self->field_0x02C;
         }
@@ -2562,7 +2563,7 @@ void fn_80204528(_LB_NPC* self)
         }
         break;
     case 3:
-        if (fn_801FE1CC(self, 1, lbl_807999F0, lbl_807999A0) != 0) {
+        if (lb_npc_motion_play(self, 1, lbl_807999F0, lbl_807999A0) != 0) {
             self->field_0x006++;
             fn_801FDFE4(self, 1172, 0, 0);
         }
@@ -2571,7 +2572,7 @@ void fn_80204528(_LB_NPC* self)
         if (fn_801FE1EC(self) == 1) {
             fn_801FDEB4(self, (u16)-909, 10);
             lb_npc_motion_restart(self, self->field_0x204[self->field_0x208].motion_0x0C);
-        } else if (fn_801FE1CC(self, 0, lbl_807999F4, lbl_807999A0) != 0) {
+        } else if (lb_npc_motion_play(self, 0, lbl_807999F4, lbl_807999A0) != 0) {
             fn_801FDEE4(self, 11);
         }
         break;
@@ -2598,13 +2599,13 @@ void fn_80206824(_LB_NPC* self)
         }
         break;
     case 2:
-        if (fn_801FE1CC(self, 0, lbl_80799A80, lbl_807999A0) == 1) {
+        if (lb_npc_motion_play(self, 0, lbl_80799A80, lbl_807999A0) == 1) {
             self->field_0x006++;
             fn_801FDFE4(self, 1012, 16, 0);
         }
         break;
     case 3:
-        if (fn_801FE1CC(self, 0, lbl_80799A84, lbl_807999A0) == 1) {
+        if (lb_npc_motion_play(self, 0, lbl_80799A84, lbl_807999A0) == 1) {
             self->field_0x006++;
             fn_801FDFE4(self, 1013, 40, 6);
             self->field_0x00C = 141;

@@ -41,6 +41,10 @@ s32 eft_water_state_ck(_EFT* self);
  * it `effect_move__FPQ34nw4r2ef6Effect`, so it is a C++ free function (rule 9);
  * `stage/shell.cpp`'s `shell_draw_set_eff` drives it. */
 u32 effect_move(nw4r::ef::Effect* effect);
+/* 0x800F96E0 - sets the pooled effect's root matrix translation to `pos` (`SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3`). */
+void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
+/* 0x800F9AC0 - sets the pooled effect's parameter scale (`change_paramscale_eff__FPQ34nw4r2ef6Effectf`). */
+void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale);
 #endif
 
 #endif /* MHTRI_EF_EFFECT_H */

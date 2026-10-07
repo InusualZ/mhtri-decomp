@@ -103,6 +103,8 @@ s32 menu_cursor_step_open_last(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
 s32 menu_cursor_step_forward(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f, u16* moved);
 s32 menu_cursor_step(s32 a, s32 b, u16 c, u16 d, u16 e);
 s16 menu_page_count(s16 a, s16 b);
+/* 0x802A9508 - the x that centres `text` (glyph width `size`) on `center`. */
+s16 menu_text_center_x(char* text, s32 center, s16 size);
 s32 menu_cursor_page_move(s16* cursor, s16 max, u16 keys, u16 held, u16* moved);
 void menu_scroll_init(struct MenuScroll* scroll, u16 index, u16 total, u8 rows_per_page);
 void menu_scroll_step(struct MenuScroll* scroll, u16 buttons, s32 sfx);

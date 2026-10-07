@@ -85,8 +85,8 @@ typedef struct LbKitchenWork {
     /* +0x028 */ LbChoiceMenu choice;     /* the opening choice box; its cursor picks meal (0) or special (1) */
     /* +0x048 */ bool confirm_enabled[3]; /* per confirm row: whether it can be taken */
     /* +0x04B */ s8 special[3];           /* the special picks, 0 when empty */
-    /* +0x04E */ s16 courses[4];          /* the rolled bonus courses */
-    /* +0x056 */ s16 extra_course;        /* the rolled fifth course */
+    /* +0x04E */ u16 courses[4];          /* the rolled bonus courses */
+    /* +0x056 */ u16 extra_course;        /* the rolled fifth course */
     /* +0x058 */ u16 bonuses[4];          /* the bonuses the meal gives */
     /* +0x060 */ u16 holds[2];            /* the special courses the player holds */
     /* +0x064 */ u16 list[6];             /* the special list's entries */

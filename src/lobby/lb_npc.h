@@ -6,6 +6,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "Pl/plw.h"   /* _PLW (`lb_npc_act_set`'s player work) */
+#include "ef/cp_vector.h"   /* _CP_VECTOR, the NPC's rotation view */
 
 /* ---------------------------------------------------------------------------------------------------
  * Types
@@ -95,9 +96,14 @@ typedef struct _LB_NPC {
     /* +0x00C */ s32 field_0x00C;
     /* +0x010 */ VEC3 pos_0x10;
     /* +0x01C */ VEC3 field_0x01C;
-    /* +0x028 */ s32 field_0x028;
-    /* +0x02C */ s32 field_0x02C;
-    /* +0x030 */ s32 field_0x030;
+    /* +0x028 */ union {
+        struct {
+            /* +0x028 */ s32 field_0x028;
+            /* +0x02C */ s32 field_0x02C;   /* the heading */
+            /* +0x030 */ s32 field_0x030;
+        }; /* size: 0xC */
+        _CP_VECTOR rot_0x028;   /* the same three words as the rotation triple (`lobby/lb_quest_board.cpp`) */
+    };
     /* +0x034 */ f32 field_0x034;
     /* +0x038 */ VEC3 field_0x038;
     /* +0x044 */ VEC3 field_0x044;
@@ -217,6 +223,10 @@ void lb_npc_motion_restart(struct _LB_NPC* self, u16 motion_id);
 /* 0x8020A3E4 - starts act `act`/`sub` on the player work, with the request `flags` (bit 0x20 re-rolls the random
  * pick).  GUESS name; the spelling is the owner's own (`lobby/lb_npc.cpp`). */
 void lb_npc_act_set(_PLW* self, u32 act, s32 sub, s32 flags);
+/* 0x801FF5FC - stores the NPC's talk mode byte (+0x255); a null NPC is skipped (GUESS name). */
+void lb_npc_talk_mode_set(struct _LB_NPC* self, u8 mode);
+/* 0x8020EB00 - stores the player's lobby act latch byte (+0xB00) (GUESS name). */
+void lb_act_latch_set(struct _PLW* self, u8 value);
 /* 0x80208A00 - latches the act step when the master act runs (GUESS name). */
 void lb_player_act_latch(struct _PLW* self);
 /* 0x8020E778 - the heading from the player towards `target` (GUESS name). */
