@@ -18,8 +18,8 @@
 
 void* __OSArenaLo = (void*)0xFFFFFFFF;
 static void* s_mem2ArenaLo = (void*)0xFFFFFFFF;
-void* __OSArenaHi;
 static void* s_mem2ArenaHi;
+void* __OSArenaHi;
 
 /* Returns the upper arena bound. */
 /* untyped: raw arena address */

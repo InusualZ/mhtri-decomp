@@ -10,6 +10,12 @@
 extern "C" {
 #endif
 
+/* 0x804CC130 - programs the audio clock from clock source `source`. */
+void __AIClockInit(int source);
+
+/* 0x804CC350 - brings the DSP audio system up. */
+void __OSInitAudioSystem(void);
+
 /* 0x804CC520 - stops the DSP audio system. */
 void __OSStopAudioSystem(void);
 

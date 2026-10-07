@@ -50,12 +50,12 @@ typedef void (*OSSwitchThreadCallback)(OSThread* from, OSThread* to);
 static OSThread DefaultThread;
 static OSThreadQueue RunQueue[OS_PRIORITY_MAX + 1];
 static OSContext IdleContext;
-static OSThread IdleThread;
+__declspec(export) OSThread IdleThread;
 static OSSwitchThreadCallback SwitchThreadCallback = (OSSwitchThreadCallback)DBClose;
 
-static volatile s32 Reschedule;
-static volatile BOOL RunQueueHint;
 static volatile u32 RunQueueBits;
+static volatile BOOL RunQueueHint;
+static volatile s32 Reschedule;
 
 /* Appends `thread` to `queue` through the list node `link`. */
 #define AddTail(queue, thread, link)                                                                                   \

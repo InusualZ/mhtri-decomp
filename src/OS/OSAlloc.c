@@ -36,10 +36,10 @@ typedef struct OSHeapDesc {
 } OSHeapDesc;
 
 s32 s_currentHeap = -1;
-static void* s_arenaEnd;
-static void* s_arenaStart;
-static s32 s_heapCount;
 static OSHeapDesc* s_heapTable;
+static s32 s_heapCount;
+static void* s_arenaStart;
+static void* s_arenaEnd;
 
 /* Unlinks `cell` from `list` and returns the list head. */
 static inline OSHeapCell* DLExtract(OSHeapCell* list, OSHeapCell* cell)
