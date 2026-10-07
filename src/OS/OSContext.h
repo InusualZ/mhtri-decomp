@@ -36,6 +36,14 @@ void OSClearContext(OSContext* context);
 void OSDumpContext(OSContext* context);
 /* 0x804CCFB0 - makes a context the running thread's current one. */
 void OSSetCurrentContext(OSContext* context);
+/* 0x804CD010 - the running thread's current context. */
+OSContext* OSGetCurrentContext(void);
+/* 0x804CD020 - saves the registers a caller keeps; returns 1 when the context is resumed and 0 on the first return. */
+BOOL OSSaveContext(OSContext* context);
+/* 0x804CD180 - the caller's stack pointer. */
+u32 OSGetStackPointer(void);
+/* 0x804CD220 - makes `context` run `pc` on stack `sp` when loaded. */
+void OSInitContext(OSContext* context, u32 pc, u32 sp);
 
 #ifdef __cplusplus
 }

@@ -5,6 +5,7 @@
 #define OS_OSTHREAD_H
 
 #include "types.h"
+#include "OS/OSContext.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,8 +33,14 @@ typedef struct OSThreadLink {
 } OSThreadLink; /* size: 0x08 */
 
 /* size: 0x318 - the OS thread control block (`NHTTPThreadInfo` places one at +0x30) */
+#define OS_THREAD_STATE_READY 1
+#define OS_THREAD_STATE_RUNNING 2
+#define OS_THREAD_STATE_WAITING 4
+#define OS_THREAD_STATE_MORIBUND 8
+#define OS_THREAD_ATTR_DETACH 1
+
 typedef struct OSThread {
-    /* +0x000 */ u8 pad_0x000[0x2C8];        /* the saved CPU context (OSContext) */
+    /* +0x000 */ OSContext context;          /* the saved CPU context */
     /* +0x2C8 */ u16 state;                  /* ready, running, waiting or moribund */
     /* +0x2CA */ u16 attr;                   /* detached flag */
     /* +0x2CC */ s32 suspend;                /* suspend count */
@@ -57,11 +64,34 @@ typedef void* (*OSThreadEntry)(void* arg); /* untyped: opaque handle */
 
 /* 0x804D3F70 / 0x804D4600 - create a thread on `stack` (growing down, `stackSize` bytes) that runs `entry(param)`,
  * and start it; non-zero on success.  The callers pass their own spellings of the thread record (an OS thread
- * block, a `u8` array) and of the entry, so the parameters are still untyped. */
+ * block, a `u8` array) and of the entry, so the public parameters stay untyped for them; `OS/OSThread.c` defines
+ * `OS_THREAD_TYPED_API` to see the typed signatures it implements. */
+#ifdef OS_THREAD_TYPED_API
+/* untyped: caller-owned payload and a raw stack range */
+BOOL OSCreateThread(OSThread* thread, OSThreadEntry entry, void* param, void* stack, u32 stackSize, s32 priority, u16 attr);
+s32 OSResumeThread(OSThread* thread);
+BOOL OSIsThreadTerminated(OSThread* thread);
+#else
+/* untyped: opaque handles and a raw stack range, typed by the callers' views */
 s32 OSCreateThread(void* thread, void* entry, void* param, void* stack, u32 stackSize, s32 priority, u32 flags);
+/* untyped: opaque handle passed through - the OS thread record */
 s32 OSResumeThread(void* thread);
 /* untyped: opaque handle passed through - the OS thread record */
 s32 OSIsThreadTerminated(void* thread);
+#endif
+
+/* 0x804D36D0 - turns the boot context into the default thread and clears the run queues. */
+void __OSThreadInit(void);
+
+/* 0x804D41E0 - ends the calling thread. */
+/* untyped: caller-owned payload */
+void OSExitThread(void* exitValue);
+
+/* 0x804D42D0 - terminates a thread and wakes its joiners. */
+void OSCancelThread(OSThread* thread);
+
+/* 0x804D48A0 - raises a thread's suspend count and takes it off the run queue; returns the previous count. */
+s32 OSSuspendThread(OSThread* thread);
 
 /* 0x804D3960 - empties a thread queue. */
 void OSInitThreadQueue(OSThreadQueue* queue);
