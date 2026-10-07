@@ -94,6 +94,8 @@ The full policy, with its dated reasons, is `docs/pipeline.md` 13.1 and the ruli
 * **A wave** (several multi-unit lanes at once) runs recon (`spawn --kind recon --group G`) -> pre-pass batches landed alone ->
   lanes with disjoint ownership, each without a claim carrying a manifest (`land.py land --manifest`) -> review -> land ->
   retro in `docs/waves.md` (`docs/pipeline.md` 14).
+* **A lane never merges `main`**: after a landing it continues on a fresh branch cut from main's tip, carrying only unlanded
+  commits (`docs/pipeline.md` 11, 2026-10-07).
 * Keep `ninja build/RMHE08/ok` green and `orig/RMHE08/**` untouched as the invariant of every step.
 
 The steady loop, per unit:
