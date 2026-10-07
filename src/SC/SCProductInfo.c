@@ -15,9 +15,9 @@
  *    0x80629F00 (the region table `JP`, `US`, `EU`, `KR`, `CN`) are read by `SCGetProductArea` and
  *    `SCGetProductGameRegion`; `.sbss` 0x80795460 (8 B) by `SCGetProductCode`.  `__SCF1` decodes the scrambled
  *    key=value text at 0x80003800 with a rotating key and returns the value of the tag.
- * RESIDUALS. `__SCF1` 0x804DD010 is 93.9 %: identical instruction stream, five loop registers numbered differently
+ * RESIDUALS. `__SCF1` 0x804DD010 is 95.1 %: identical instruction stream, five loop registers numbered differently
  *    (target key r11 / found r9 / tag r12 / count r6, ours r8 / r12 / r9 / r11); `mt.py permdecl` over all 119
- *    declaration orders reaches 95.05 % at best and was not applied.  flipcheck: .text, and the .rodata/.sdata strings carry
+ *    declaration orders reaches 95.05 % at best (applied).  flipcheck: .text, and the .rodata/.sdata strings carry
  *    `@NN` names where the target has labels (relocation names only).
  * SHAPES. the tag scan and the value copy are two loops over the 256-byte block, the key rotated in place.
  */
@@ -55,11 +55,11 @@ static char ProductCode[8];
 
 BOOL __SCF1(const char* tag, char* buf, u32 size)
 {
-    u32 key = 0x73B5DBFA;
-    u32 tagIndex = 0;
-    u32 i = 0;
     u32 n = 0;
     BOOL found = FALSE;
+    u32 i = 0;
+    u32 key = 0x73B5DBFA;
+    u32 tagIndex = 0;
 
     for (i = 0; i < 256; i++) {
         u8 c = ProductInfoBlock[i];
