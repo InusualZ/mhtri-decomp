@@ -23,17 +23,16 @@
  *   Partial: SetBoundingVolume and GetBoundingVolume (retail calls the out-of-line AABB copy `fn_80081804`; ours
  *   copies inline), Remove(u32) (retail keeps `idx * 4` in
  *   a saved register across the detach call), Insert (one `subf` scheduled later), DefG3dProcScnGroup (retail keeps
- *   a dead `b` after the CALC_VIEW case).  The ScnObj and ScnGroup constructors stage the vtable address in r3
- *   where retail uses r0; DefG3dProcScnLeaf, G3dProcGatherScnObj, G3dProcCalcWorld and Remove(ScnObj*) load one
- *   virtual call's vtable through the saved `this` register where retail reloads it through r3 (one register field
- *   each).
+ *   a dead `b` after the CALC_VIEW case).
  *   IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and the CheckCallback members sit in
  *   `g3d/fn_80075DCC.cpp`'s range.
  *   flipcheck: `.rodata` (the three name records) is claimed and not emitted.
  * SHAPES. The ScnObj constructor builds its MTX34/AABB arrays with explicit do-while loops over MTX34_ctor and
  *   AABB_ctor (retail's member-array construction: the math types declare no constructors to let MWCC emit it).
  *   `(int)mCallbackDeleteOption == 1` and `(u32)type < MTX_TYPE_MAX` reproduce retail's signed and unsigned
- *   compares; the destructors and CalcWorldMtx keep `#pragma peephole off` (retail's `extsh` and `clrlwi` + `cmpwi`).
+ *   compares.  The unit compiles with `#pragma peephole off`: retail keeps the destructors' `extsh`, the `clrlwi` +
+ *   `cmpwi` pairs, `addi r0` for a vtable store and `mr r3,rN` + `lwz r12,0(r3)` for a virtual call's table load
+ *   (the pass folds them into one instruction each).
  */
 
 #include "types.h"
@@ -49,6 +48,7 @@
 #include "mh3_pad.h"            /* setVec3 / copyVec3 (rule 2) */
 
 #pragma pool_data off
+#pragma peephole off
 
 /* The frustum the gather pass culls against while it is set (`ScnRoot`'s camera); a NOTEST status clears it for the
  * subtree.  `.sbss` 0x807948E8, between g3d_scnmdlsmpl's and g3d_scnroot's words in link order. */
@@ -60,7 +60,6 @@ const nw4r::math::Frustum* scnobj_culling_frustum;
 
 /* 0x80081188 (0xC8): composes the world matrix from the parent's and the local one, and the world box; bit 0 of the
  * parameter skips one pass. */
-#pragma peephole off
 void nw4r::g3d::ScnObj::CalcWorldMtx(const math::MTX34* pParent, u32* pParam)
 {
     if (pParam != NULL && (*pParam & 1)) {
@@ -80,7 +79,7 @@ void nw4r::g3d::ScnObj::CalcWorldMtx(const math::MTX34* pParent, u32* pParam)
         mAABB[BOUNDINGVOLUME_AABB_WORLD].Set(&mAABB[BOUNDINGVOLUME_AABB_LOCAL], &mMtxArray[MTX_WORLD]);
     }
 }
-#pragma peephole on
+
 
 /* 0x80081250 (0x10): composes the view matrix from the camera and the world matrix. */
 void nw4r::g3d::ScnObj::CalcViewMtx(const math::MTX34* pCamera)
@@ -127,8 +126,8 @@ nw4r::g3d::ScnObj::ScnObj(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
     copyVec3(&mAABB[BOUNDINGVOLUME_AABB_WORLD].max, setVec3(&zero3, 0.0f, 0.0f, 0.0f));
 }
 
+
 /* 0x800813B8 (0xC4): asserts the object is detached and deletes an owned callback. */
-#pragma peephole off
 nw4r::g3d::ScnObj::~ScnObj()
 {
     if (GetParent()) {
@@ -138,7 +137,7 @@ nw4r::g3d::ScnObj::~ScnObj()
         delete mpFnCallback;
     }
 }
-#pragma peephole on
+
 
 /* 0x800814C0 (0xB4): sets the flag an option id names; false for an unknown id. */
 bool nw4r::g3d::ScnObj::SetScnObjOption(u32 option, u32 value)
@@ -324,7 +323,6 @@ bool nw4r::g3d::ScnLeaf::GetScnObjOption(u32 option, u32* pValue) const
 
 /* 0x80081968 (0x88): computes the world matrix with the leaf's scale and its world box; bit 0 of the parameter
  * skips one pass. */
-#pragma peephole off
 void nw4r::g3d::ScnLeaf::CalcWorldMtx(const math::MTX34* pParent, u32* pParam)
 {
     if (pParam != NULL && (*pParam & 1)) {
@@ -337,7 +335,7 @@ void nw4r::g3d::ScnLeaf::CalcWorldMtx(const math::MTX34* pParent, u32* pParam)
         mAABB[BOUNDINGVOLUME_AABB_WORLD].Set(&mAABB[BOUNDINGVOLUME_AABB_LOCAL], &mMtxArray[MTX_WORLD]);
     }
 }
-#pragma peephole on
+
 
 /* 0x800819F0 (0x40): classifies the scale as none, uniform or non-uniform. */
 nw4r::g3d::ScnLeaf::ScaleProperty nw4r::g3d::ScnLeaf::GetScaleProperty() const
@@ -383,6 +381,7 @@ void nw4r::g3d::ScnLeaf::DefG3dProcScnLeaf(u32 task, u32 param, void* pInfo)
         break;
     }
 }
+
 
 /* ------------------------------------------------------------------------------------------------ */
 /* ScnGroup                                                                                         */
@@ -433,6 +432,7 @@ void nw4r::g3d::ScnGroup::G3dProcGatherScnObj(u32 param, IScnObjGather* pGather)
     }
 }
 
+
 /* 0x80081DEC (0xE4): computes the group's world matrix and passes it to the children. */
 void nw4r::g3d::ScnGroup::G3dProcCalcWorld(u32 param, const math::MTX34* pParent)
 {
@@ -445,6 +445,7 @@ void nw4r::g3d::ScnGroup::G3dProcCalcWorld(u32 param, const math::MTX34* pParent
     }
     CheckCallback_CALC_WORLD(CALLBACK_TIMING_C, param, (void*)pParent);
 }
+
 
 /* 0x80081ED0 (0xA0): passes the material pass to the children. */
 /* untyped: caller-owned payload - the pass's info block */
@@ -551,6 +552,7 @@ nw4r::g3d::ScnObj* nw4r::g3d::ScnGroup::Remove(u32 idx)
     return NULL;
 }
 
+
 /* 0x80082490 (0x94): removes the object if it is a child; false otherwise. */
 bool nw4r::g3d::ScnGroup::Remove(ScnObj* pObj)
 {
@@ -573,8 +575,8 @@ nw4r::g3d::ScnGroup::ScnGroup(MEMAllocator* pHeap, ScnObj** ppObjArray, u32 capa
     SetScnObjFlag(SCNOBJFLAG_NOT_GATHER_DRAW_XLU, true);
 }
 
+
 /* 0x800825CC (0x9C): asserts the group is detached and removes every child. */
-#pragma peephole off
 nw4r::g3d::ScnGroup::~ScnGroup()
 {
     if (GetParent()) {
@@ -582,7 +584,7 @@ nw4r::g3d::ScnGroup::~ScnGroup()
     }
     Clear();
 }
-#pragma peephole on
+
 
 /* 0x80082668 (0x44): removes children until the group is empty. */
 void nw4r::g3d::ScnGroup::Clear()

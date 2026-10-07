@@ -1,77 +1,56 @@
 /*
- * The nw4r `g3d::ScnMdl` material-access type the game's effect code builds on the stack.
+ * nw4r/g3d/scnmdl.h - nw4r g3d's `ScnMdl`: a ScnMdlSimple with a shape animation, a node-visibility buffer and the
+ *   replacement buffers that let a model draw copied materials (`ScnMdl::CopiedMatAccess`).
  *
+ * Evidence: the ScnMdl vtable (.data 0x8058F028: ScnMdlSimple's slots with ScnMdl's IsDerivedFrom, G3dProc,
+ * destructor, type members, options, SetAnmObj, the two RemoveAnmObj and the two GetAnmObj), the constructor
+ * 0x8007ED58 (the shape animation at +0x138, the flag word at +0x13C, the material-buffer flags at +0x140, the
+ * 0x40-byte replacement record at +0x144 and the buffer option at +0x184) and the `mReplacement.*Array` asserts.
  * `__ct__Q44nw4r3g3d6ScnMdl15CopiedMatAccessFPQ34nw4r3g3d6ScnMdlUl` (the map's mangling) is
- * `nw4r::g3d::ScnMdl::CopiedMatAccess::CopiedMatAccess(ScnMdl*, unsigned long)`, so the class and its
- * nested accessor must be declared for the constructor to mangle correctly (docs/plan.md 6.5 rule 9:
- * call the owner, never the mangled spelling).  The other two accessors the effect code calls arrive
- * with the map's own `fn_XXXXXXXX` spelling, so they stay free `extern "C"` functions.
+ * `nw4r::g3d::ScnMdl::CopiedMatAccess::CopiedMatAccess(ScnMdl*, unsigned long)`.  The destructor is declared first so
+ * the vtable is emitted with it.
  */
 #ifndef MHTRI_NW4R_G3D_SCNMDL_H
 #define MHTRI_NW4R_G3D_SCNMDL_H
 
 #include "types.h"
+#include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple, owner g3d/g3d_scnmdlsmpl.cpp (rule 1) */
 
 namespace nw4r {
 namespace g3d {
 
 /*
- * The 0x40-byte replacement record the ScnMdl constructor copies in, word by word, from its caller's
- * argument (`fn_8007ED58`'s 40 bytes of `lwz`/`stw` at +0x144).  The range reads only two parts of it: the
- * node-visibility byte array at +0x04 (`fn_8007E7FC` writes one byte per node, `fn_8007D47C` hands it to
- * the two visibility walkers) and the three tables at +0x34..+0x3C, which `fn_8007DD94` passes on as the
- * vertex-position/colour/tex-coord tables of the shape-blend driver `fn_8007270C`.  The rest is copied but
- * never read, so it keeps its offset as unused space.
+ * The 0x40-byte replacement record the ScnMdl constructor copies in, word by word, from its caller's argument.  The
+ * range reads its flag word (bit 0: the vertex tables need refreshing), the node-visibility byte array at +0x04
+ * (UpdateVisBuffer writes one byte per node, the world pass hands it to the visibility walker), the eleven
+ * per-material replacement arrays (the asserts name pixDLArray .. tevDataArray; the per-material sizes come from
+ * Construct 0x8007C540) and the three per-array vertex tables at +0x34..+0x3C, which the vertex pass hands the
+ * shape-blend driver and RemoveAnmObj refills from the resource.
  */
 struct ReplacementBlock {
-    /* +0x00 */ u32 unused_0x00;
+    /* +0x00 */ u32 mFlag;
     /* +0x04 */ u8* mpNodeVisible;
-    /* +0x08 */ u8 unused_0x08[0x2C];
-    /* +0x34 */ const void* mpVtxPosTable;
-    /* +0x38 */ const void* mpClrTable;
-    /* +0x3C */ const void* mpTexTable;
+    /* +0x08 */ void* mpTexObjDataArray;       /* 0x104 bytes per material */
+    /* +0x0C */ void* mpTlutObjDataArray;      /* 0x64 bytes per material */
+    /* +0x10 */ void* mpTexSrtDataArray;       /* 0x248 bytes per material */
+    /* +0x14 */ void* mpChanDataArray;         /* 0x28 bytes per material */
+    /* +0x18 */ void* mpGenModeDataArray;      /* 8 bytes per material */
+    /* +0x1C */ void* mpMatMiscDataArray;      /* 0xC bytes per material */
+    /* +0x20 */ void* mpPixDLArray;            /* 0x20 bytes per material */
+    /* +0x24 */ void* mpTevColorDLArray;       /* 0x80 bytes per material */
+    /* +0x28 */ void* mpIndMtxAndScaleDLArray; /* 0x40 bytes per material */
+    /* +0x2C */ void* mpTexCoordGenDLArray;    /* 0xA0 bytes per material */
+    /* +0x30 */ void* mpTevDataArray;          /* 0x200 bytes per material */
+    /* +0x34 */ void** mpVtxPosTable;
+    /* +0x38 */ void** mpVtxNrmTable;
+    /* +0x3C */ void** mpVtxClrTable;
 }; /* size: 0x40 */
 
-struct ScnMdl { /* size: 0x188 - lower bound, an approximation (only ever used through a pointer) */
-    /* The vtable the ScnMdl unit's bodies dispatch through (slots +0x08, +0x14, +0x34, +0x38).  The
-     * two entries at +0x00/+0x04 are MWCC's hidden vtable words (the offset-to-top and the RTTI
-     * pointer), so the first declared virtual lands at +0x08.  The twelve slots ahead of the first
-     * called one are un-evidenced occupancy: they are never called and never defined, so no vtable is
-     * emitted for this type.  Defined here, once, because `g3d/g3d_scnmdl.cpp` (the owner) and the
-     * effect units that include this header both use it (docs/plan.md 6.5 rule 1). */
-    virtual u32 mpfn_0x08(void* arg);             /* +0x08 */
-    virtual u32 mpfn_0x0C();                      /* +0x0C */
-    virtual u32 mpfn_0x10();                      /* +0x10 */
-    virtual u32 mpfn_0x14();                      /* +0x14 */
-    virtual u32 mpfn_0x18();                      /* +0x18 */
-    virtual u32 mpfn_0x1C();                      /* +0x1C */
-    virtual u32 mpfn_0x20();                      /* +0x20 */
-    virtual u32 mpfn_0x24();                      /* +0x24 */
-    virtual u32 mpfn_0x28();                      /* +0x28 */
-    virtual u32 mpfn_0x2C();                      /* +0x2C */
-    virtual u32 mpfn_0x30();                      /* +0x30 */
-    virtual u32 mpfn_0x34(u32 handle, u32 id);    /* +0x34 */
-    virtual u32 mpfn_0x38(u32 value);             /* +0x38 */
-
-    /* The data members are the offsets `g3d/g3d_scnmdl.cpp`'s bodies touch; every gap between two of
-     * them is padding, because no body in that unit reads it. */
-    /* +0x04 */ u8 pad_0x04[0xE0];   /* the G3dObj/ScnObj/ScnLeaf/ScnMdlSimple base chain */
-    /* +0xE4 */ u32 mResMdl;         /* the embedded ResMdl handle's resource pointer */
-    /* +0xE8 */ u8 pad_0xE8[0x28];
-    /* +0x110 */ u32 mNumTexMtx;     /* the counts the replacement arrays are sized from */
-    /* +0x114 */ u32 mNumTexSrt;
-    /* +0x118 */ u8 pad_0x118[0x10];
-    /* +0x128 */ u32 mNumMat;
-    /* +0x12C */ u32 mNumPixDL;
-    /* +0x130 */ u32 mNumTevColorDL;
-    /* +0x134 */ u32 mNumIndMtxAndScaleDL;
-    /* +0x138 */ u32 mpAnmObjShp;    /* the shape animation object the destructor releases */
-    /* +0x13C */ u32 mFlags;         /* bit 0: visible; bit 1: the shape-animation option (inverted) */
-    /* +0x140 */ u32* mpDLBuffer;    /* the DL-buffer word array the option query indexes */
-    /* +0x144 */ ReplacementBlock mReplacement; /* the record the constructor copies in from its caller */
-    /* +0x184 */ u32 field_0x184;    /* the constructor's last argument; never read by this unit */
-
-    struct CopiedMatAccess { /* size: 0x34 - lower bound, an approximation */
+/* size: 0x188 */
+class ScnMdl : public ScnMdlSimple {
+public:
+    /* The material accessor the game's effect code builds on the stack.  size: 0x34 (approximation) */
+    struct CopiedMatAccess {
         /* +0x00 */ u32 handle_0x00;
         /* +0x04 */ u8 pad_0x04[0x30];
 
@@ -80,8 +59,45 @@ struct ScnMdl { /* size: 0x188 - lower bound, an approximation (only ever used t
         /* 0x8007BBAC - the material handle accessor, defined by `g3d/fn_80075DCC.cpp` (rule 2 owner). */
         u32 GetResTexSrt(bool arg1);
     };
-};
 
+    ScnMdl(MEMAllocator* pHeap, ResMdl mdl, math::MTX34* pWorldMtxArray, u32* pWorldMtxAttribArray,
+           math::MTX34* pViewPosMtxArray, math::MTX33* pViewNrmMtxArray, math::MTX34* pViewTexMtxArray, int numView,
+           int numViewMtx, const ReplacementBlock* pReplacement, u32* pMatBufferFlags, u32 bufferOption);
+
+    virtual ~ScnMdl();
+    virtual bool IsDerivedFrom(TypeObj type) const;
+    virtual void G3dProc(u32 task, u32 param, void* pInfo); /* untyped: caller-owned payload */
+    virtual const TypeObj GetTypeObj() const;
+    virtual const char* GetTypeName() const;
+    virtual bool SetScnObjOption(u32 option, u32 value);
+    virtual bool GetScnObjOption(u32 option, u32* pValue) const;
+    virtual bool SetAnmObj(AnmObj* pObj, AnmObjType type);
+    virtual bool RemoveAnmObj(AnmObj* pObj);
+    virtual AnmObj* RemoveAnmObj(AnmObjType type);
+    virtual AnmObj* GetAnmObj(AnmObjType type);
+    virtual const AnmObj* GetAnmObj(AnmObjType type) const;
+
+    static const TypeObj GetTypeObjStatic();
+
+    AnmObjShp* GetAnmObjShp();
+    bool IsVisBufferRefreshNeeded() const;
+    bool IsVisBufferEnabled() const;
+    void UpdateVisBuffer();
+    bool TestMatBufferFlag(u32 idx, u32 mask) const;
+    void G3dProcCalcWorld(u32 param, const math::MTX34* pParent);
+    /* untyped: caller-owned payload - the pass's info block */
+    void G3dProcCalcVtx(u32 param, void* pInfo);
+    /* untyped: caller-owned payload - the pass's info block */
+    void G3dProcCalcMat(u32 param, void* pInfo);
+    void G3dProcDrawOpa(u32 param, const u32* pDrawMode);
+    void G3dProcDrawXlu(u32 param, const u32* pDrawMode);
+
+    /* +0x138 */ AnmObjShp* mpAnmObjShp;
+    /* +0x13C */ u32 mFlags;            /* bit 0: the visibility buffer needs a refresh; bit 1: the buffer is off */
+    /* +0x140 */ u32* mpDLBuffer;       /* the per-material buffer flag words TestMatBufferFlag reads */
+    /* +0x144 */ ReplacementBlock mReplacement;
+    /* +0x184 */ u32 mBufferOption;     /* the constructor's last argument; never read by this unit */
+};
 
 }  // namespace g3d
 }  // namespace nw4r

@@ -23,7 +23,6 @@ u32 fn_80068634(void* p);
 u32 fn_800689B0(void* p);
 /* 0x800697A4 - the name-record reader the ScnMdl type query (g3d/g3d_scnmdl.cpp's fn_8007EA10)
  * resolves against (rule 2: declared in its owner's header, not in the consumer). */
-u32 fn_800697A4(void);
 
 /* 0x8006E6B4/0x800695EC/0x8006993C - the `ResFile` revision-check getters `g3d/g3d_resfile.cpp` calls. */
 u32 fn_800695EC(void* p);   /* 0x800695EC - the checked resource resolver */

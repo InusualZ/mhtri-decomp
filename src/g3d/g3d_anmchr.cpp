@@ -47,6 +47,8 @@
  * SHAPES. The ResName constructor is complete: its work is the base initialiser.  The unit includes the leaf
  *   `g3d/anm_typename_AnmObj.h` instead of `g3d/fn_80063888.h`: a visible global placement `operator delete` gives
  *   AnmObjChrBlend::Construct a landing pad (`__dl__FPvPv`) retail does not have.
+ *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
+ *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
  */
 
 #include "types.h"
@@ -60,6 +62,8 @@
 #include "nw4r/db_assert.h"  /* nw4r::db::Warning (rule 2) */
 #include "MSL_C/alloc.h"     /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
 #include "OS/MEMAllocFromAllocator.h" /* MEMAllocFromAllocator, owner OS/FindContainHeap_.c (rule 2) */
+
+#pragma peephole off
 
 #pragma pool_data off
 
@@ -135,14 +139,12 @@ extern "C" void fn_8005D118(u32* dst, u32* src)
 NW4R_G3D_RESCOMMON_CTOR(ResNodeData)
 
 /* 0x8005D1AC (0x64): wraps `pData`, asserting its alignment. */
-#pragma peephole off
 /* untyped: opaque handle - the node block */
 nw4r::g3d::ResNode::ResNode(void* pData) : ResCommon<ResNodeData>(pData) {
     if ((u32)pData & 0x3) {
         nw4r::db::Panic((const char*)anmchr_resnode_ac_file, 44, (const char*)anmchr_resnode_align_assert_msg);
     }
 }
-#pragma peephole on
 
 extern "C" u8* fn_8005D27C(void)
 {
@@ -353,12 +355,10 @@ extern "C" u32 fn_80062824(u32* p, u32 offset)
 }
 
 /* The align-up helper: (~(align - 1)) & (offset + align - 1). */
-#pragma peephole off
 extern "C" u32 g3d_round_up(u32 offset, u32 align)
 {
     return ~(align - 1) & (align + offset - 1);
 }
-#pragma peephole on
 
 /* nw4r's four-float vector setter. */
 extern "C" void dVector4Set(f32* dst, f32 x, f32 y, f32 z, f32 w)
@@ -413,14 +413,12 @@ extern "C" f32 fn_80060F6C(f32 x)
 }
 
 /* 0x80062914 (0x64): wraps `pData`, asserting its alignment. */
-#pragma peephole off
 /* untyped: opaque handle - the dictionary block */
 nw4r::g3d::ResDic::ResDic(void* pData) : ResCommon<ResDicData>(pData) {
     if ((u32)pData & 0x3) {
         nw4r::db::Panic((const char*)anmchr_resdic_ac_file_ctor, 84, (const char*)anmchr_resdic_align_assert_msg);
     }
 }
-#pragma peephole on
 
 /* 0x80062750 (0xD4): returns the `idx`-th entry's data, asserting the index is in range. */
 /* untyped: opaque handle - the entry's data block */
@@ -452,16 +450,11 @@ extern "C" const u8 **type_obj_set_name(const u8 **out, const u8 *v)
 }
 
 
-
-
-
-
 extern "C" void **fn_80063B24(void **out, void *v)
 {
     *out = v;
     return out;
 }
-
 
 
 extern "C" void **fn_80063C8C(void **out, void *v)
@@ -471,15 +464,11 @@ extern "C" void **fn_80063C8C(void **out, void *v)
 }
 
 
-
-
 /* --------------------------------------------------------------------------------------------- *
  * The vtable-dispatch wrappers (0x800638C0/0x80063B2C/0x80063C94): the object's word 0 is its vtable,
  * the entry at +0x14 runs with the object as its argument and a word is read back through the
  * `TypeObj::GetTypeName` helper.
  * --------------------------------------------------------------------------------------------- */
-
-
 
 
 /* The two equality readers: compare the words reached through each argument. */
@@ -488,9 +477,6 @@ extern "C" void **fn_80063C8C(void **out, void *v)
 /* The five list-insert steps (0x800638F8-0x80063DC4): resolve a type name, compare the caller's key
  * against it through fn_800639D0, and on a miss run the previous step's insertion with a copy of the
  * key word.  They chain in address order. */
-
-
-
 
 
 /* The two deleting destructors (0x80063C00/0x80063D68): clear the base, and free only when the signed
@@ -526,7 +512,6 @@ extern "C" u32 g3d_round_up(u32 offset, u32 align);
 
 /* 0x800600C8 (0x404): sizes a blend node for `mdl` with `numChildren` weighted children, reports the size through
  * `pSize`, and builds it in one block from `pHeap` (NULL without a heap or memory). */
-#pragma peephole off
 nw4r::g3d::AnmObjChrBlend* nw4r::g3d::AnmObjChrBlend::Construct(MEMAllocator* pHeap, u32* pSize, ResMdl mdl,
                                                                 int numChildren)
 {
@@ -560,15 +545,12 @@ nw4r::g3d::AnmObjChrBlend* nw4r::g3d::AnmObjChrBlend::Construct(MEMAllocator* pH
                                      (AnmObjChrRes**)(pBuf + childrenOffset), numChildren,
                                      (f32*)(pBuf + weightOffset));
 }
-#pragma peephole on
 
 
 /* 0x8005D384 (0x5C): destroys the animation object. */
-#pragma peephole off
 nw4r::g3d::AnmObj::~AnmObj()
 {
 }
-#pragma peephole on
 
 /* 0x8005D3E4 (0x44): constructs the animation object with no flags set. */
 nw4r::g3d::AnmObj::AnmObj(MEMAllocator* pHeap, G3dObj* pParent) : G3dObj(pHeap, pParent), mFlags(0)
@@ -601,7 +583,6 @@ bool nw4r::g3d::AnmObjChr::TestExistence(u32 idx) const
 }
 
 /* 0x8005D6BC (0x168): whether node `idx`'s binding is defined. */
-#pragma peephole off
 bool nw4r::g3d::AnmObjChr::TestDefined(u32 idx) const
 {
     ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x65, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
@@ -611,7 +592,6 @@ bool nw4r::g3d::AnmObjChr::TestDefined(u32 idx) const
     }
     return (mpBinding[idx] & 0x8000) == 0;
 }
-#pragma peephole on
 
 /* 0x8005D824 (0x154): unbinds every node. */
 void nw4r::g3d::AnmObjChr::Release()
@@ -681,11 +661,9 @@ void nw4r::g3d::AnmObjChr::DetachAll()
 }
 
 /* 0x8005E58C (0x5C): destroys the character animation. */
-#pragma peephole off
 nw4r::g3d::AnmObjChr::~AnmObjChr()
 {
 }
-#pragma peephole on
 
 /* ------------------------------------------------------------------------------------------------ */
 /* The run-time type members of G3dObj, AnmObj and AnmObjChr                                        */
@@ -791,13 +769,11 @@ nw4r::g3d::AnmObjChrNode::AnmObjChrNode(MEMAllocator* pHeap, u16* pBindingBuf, i
 }
 
 /* 0x8005E5E8 (0x16C): detaches every child and destroys the node. */
-#pragma peephole off
 nw4r::g3d::AnmObjChrNode::~AnmObjChrNode()
 {
     ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0xE1, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
     DetachAll();
 }
-#pragma peephole on
 
 /* 0x8005E754 (0x314): attaches `pRes` as child `idx`, binding the nodes it defines, and returns the child it
  * replaced. */
@@ -1117,11 +1093,9 @@ f32 nw4r::g3d::AnmObjChrBlend::GetWeight(int idx) const
 }
 
 /* 0x80063C00 (0x5C): destroys the blend. */
-#pragma peephole off
 nw4r::g3d::AnmObjChrBlend::~AnmObjChrBlend()
 {
 }
-#pragma peephole on
 
 /* 0x80063C5C (0x30): returns the type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrBlend::GetTypeObj() const
@@ -1203,11 +1177,9 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObj() const
 }
 
 /* 0x80063D68 (0x5C): destroys the resource animation. */
-#pragma peephole off
 nw4r::g3d::AnmObjChrRes::~AnmObjChrRes()
 {
 }
-#pragma peephole on
 
 /* 0x80063DC4 (0x6C): whether the object is an AnmObjChrRes or derives from `type`. */
 bool nw4r::g3d::AnmObjChrRes::IsDerivedFrom(TypeObj type) const

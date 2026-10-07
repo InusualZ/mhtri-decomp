@@ -6,11 +6,11 @@
  *   the `g3d_anmvis.cpp`/`ResAnmVis` strings.
  *   g3d_apply_vis_anm_result is a GUESS (0x8006ECB4: applies the visibility animation to the model's nodes, called
  *   by ScnMdlSimple's world pass).
- * RESIDUALS. g3d_apply_vis_anm_result: retail loads the vtable through r3 (`mr r3,r27; lwz r12,0(r3)`), ours through r27.
- *   flipcheck: `.rodata`, `.data` and `.sdata` are claimed and not emitted.
+ * RESIDUALS. flipcheck: `.rodata`, `.data` and `.sdata` are claimed and not emitted.
  * SHAPES. `AnmObjVis` is polymorphic with twelve placeholder slots ahead of the called one, so the call is a real
  *   virtual dispatch (`lwz r12,0x38(r12)`); a function-pointer field emits a different temp register.
- *   `#pragma peephole off` around fn_8006ED84 keeps retail's `clrlwi r0,r3,24` ahead of the `stb`.
+ *   `#pragma peephole off` from g3d_apply_vis_anm_result through fn_8006ED84 keeps retail's `mr r3,rN` +
+ *   `lwz r12,0(r3)` virtual-call table load and its `clrlwi r0,r3,24` ahead of the `stb`.
  *   `lbl_807911A0` is a sized `char[4]` (`li r7, @sda21`); the file/format strings are extern labels, because
  *   `-str reuse` would pool the twice-used `lbl_8058D6C0` into one base register.
  */
@@ -143,6 +143,7 @@ const char* fn_8006ECA8(void)
 
 /* Walk the model's node table and, for every node the object marks visible, query the node handle's ID
  * (asserting it equals the index) and forward the per-node virtual result into the handle. */
+#pragma peephole off
 void g3d_apply_vis_anm_result(void* pModel, AnmObjVis* pSelf)
 {
     s32 numNodes = reinterpret_cast<const nw4r::g3d::ResMdl*>(pModel)->GetResNodeNumEntries();

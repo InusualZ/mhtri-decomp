@@ -10,14 +10,14 @@
  *   fn_8007507C, fn_80075258, 0x80075394-0x80075844 (six, `Camera::GetCameraMtx` first), fn_80075940.
  *   flipcheck: `.text` 0x16A0 of 0x16F0; `.data` is claimed and not emitted; `.sdata2` is 0x34 of 0x30 - one pooled
  *   literal is shared with `g3d/fn_80075DCC.cpp` (a candidate fold).
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_8050168C`,
- *     `MTX44Copy__Q24nw4r4mathFPQ34nw4r4math5MTX44PCQ34nw4r4math5MTX44`.
- *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050168C`.
  * SHAPES. `#pragma peephole off` around fn_80075940 (playbook 32); file-scope `#pragma fp_contract off`.
+ *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except fn_800756DC,
+ *   which measure better with the pass on.
  */
 
 
 #include "types.h"
+#include "nw4r/fn_805012C4.h" /* nw4r::math::MTX44Copy (rule 2) */
 #include "nw4r/math.h"
 #include "g3d/g3d_calcview.h" /* mtx34_copy_ps (rule 2) */
 #include "g3d/g3d_state.h" /* g3d_state_get_render_mode (rule 2) */
@@ -27,6 +27,8 @@
 #include "g3d/fn_80063888.h" /* fn_80067EE8, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
+
+#pragma peephole off
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
  * `-fp_contract on`, so the original file carried the pragma. File-scoped (see header). */
@@ -67,7 +69,6 @@ extern "C" void fn_804C64E0(s32 a, s32 b, s32 c);
 extern "C" void fn_804C6660(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h, f32 i);
 extern "C" void fn_804C6710(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f);
 extern "C" void fn_804C6810(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h);
-extern "C" void fn_8050168C(void* pOut, const void* pIn);
 
 /* The panic file/format strings the target references as map symbols. They are extern here rather
  * than literals: MWCC's `-str reuse` would pool a literal into one blob and address it through a
@@ -474,7 +475,7 @@ void fn_80075440(nw4r::g3d::Camera* pSelf, void* pOut) {
     if ((pData->mFlags & 0x80) == 0) {
         fn_80075DD8(pSelf);
     }
-    fn_8050168C(pOut, &pData->mProjMtx);
+    nw4r::math::MTX44Copy((nw4r::math::MTX44*)pOut, (const nw4r::math::MTX44*)&pData->mProjMtx);
 }
 
 void fn_800754EC(nw4r::g3d::Camera* pSelf, void* pOut) {
@@ -521,6 +522,7 @@ void fn_80075620(nw4r::g3d::Camera* pSelf, void* pOut) {
     pMtx[11] = 1.0f;
 }
 
+#pragma peephole on
 void fn_800756DC(nw4r::g3d::Camera* pSelf) {
     if (!fn_80067EE8(pSelf)) {
         nw4r::db::Panic(lbl_8058E430, 736, lbl_8058E468);
@@ -537,6 +539,7 @@ void fn_800756DC(nw4r::g3d::Camera* pSelf) {
     GXSetViewport(pData->mViewportX, pData->mViewportY, pData->mViewportW, pData->mViewportH,
                   pData->mViewportNear, pData->mViewportFar);
 }
+#pragma peephole off
 
 void fn_800757A8(nw4r::g3d::Camera* pSelf) {
     if (!fn_80067EE8(pSelf)) {
@@ -578,7 +581,6 @@ void fn_800758C8(nw4r::g3d::Camera* pSelf) {
     GXSetScissorBoxOffset(pData->mScissorOffsetX, pData->mScissorOffsetY);
 }
 
-#pragma peephole off
 
 /* Rebuild the camera's view matrix from the posture the flags word selects: the +1 branch uses the
  * three-node path, +4 the position/target/up path and +2 the three-angle (Euler) path. */
@@ -691,7 +693,6 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
     pData->mFlags |= 8;
 }
 
-#pragma peephole on
 
 } /* extern "C" */
 

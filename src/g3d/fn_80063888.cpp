@@ -27,6 +27,8 @@
  *   compiler emits the G3dObj base call and the vtable store).
  *   flipcheck: `.text` 0xEF4 of 0x4248; extab 0x170 of 0x3A8; extabindex 0x228 of 0x360; `.rodata`, `.data` and `.sdata2` are claimed and not emitted; `.sdata` is
  *   0x4 of 0x20.
+ * SHAPES. The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
+ *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
  */
 
 #include "types.h"
@@ -36,6 +38,8 @@
 #include "g3d/g3d_anmchr.h"   /* the fn_8005Dxx helpers, the type-info members and G3dObj, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
 #include "mh3_pad.h"        /* VEC3_ctor, owned by mh3_pad.cpp (rule 2) */
+
+#pragma peephole off
 
 /* Forward declarations: this unit's own copy helpers. */
 extern "C" void fn_8006411C(u32 *dst, const u32 *src);
@@ -345,7 +349,6 @@ extern "C" void *fn_80067098(void *dst, void *src)
  * The resolved-resource accessors (0x80066C68-0x80067060): each resolves an object through a checked
  * getter and reads one field of it.
  * --------------------------------------------------------------------------------------------- */
-
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x10];
     /* +0x10 */ u32 field_0x10;
@@ -401,7 +404,6 @@ extern "C" u32 fn_8006405C(void *p)
  * The composite teardown destructors (0x80067B5C/0x80067E70/0x80067EB4): construct-or-clear each
  * sub-record of the object through `VEC3_ctor`/`fn_80064834`, then hand the object back.
  * --------------------------------------------------------------------------------------------- */
-
 typedef struct {
     /* +0x00 */ u32 head_0x00;
     /* +0x04 */ u32 head_0x04;
@@ -755,7 +757,6 @@ f32 PlayPolicy_Onetime(f32 frame, f32 start, f32 end)
  * pointer (or one of its fields).  The panic shape is nw4r's `NW4R_ASSERT` (the file/line/message and
  * the `"ref"` reference-name argument).
  * --------------------------------------------------------------------------------------------- */
-
 namespace nw4r {
 namespace db {
 
@@ -868,7 +869,6 @@ ResAnmLightConfig *fn_80066E80(void *p)
 }
 
 /* The two resolved-object writers (0x80067A5C/0x80067AE4). */
-
 typedef struct {
     /* +0x00 */ void *field_0x00;
 } G3dPtrObj; /* size: 0x4 */

@@ -14,6 +14,8 @@
  *   The `ResCommon<T>` copy helpers (CopyResVtxClrHandle, CopyResVtxNrmHandle, fn_80069798) keep their stems.
  * SHAPES. the ShpAnm* constructors are complete: their work is the members' default constructions.
  *   the accessor copies are defined by the NW4R_G3D_RESOURCE_* macros (g3d/g3d_rescommon.h) in retail order.
+ *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
+ *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
  */
 
 #include "types.h"
@@ -23,6 +25,8 @@
 #include "g3d/g3d_calcvtx.h"
 #include "g3d/fn_800680CC.h"
 #include "unsplit/OS.h"
+
+#pragma peephole off
 
 #pragma fp_contract off
 #pragma pool_data off
@@ -109,9 +113,7 @@ void* ResVtxClr::GetData() {
 NW4R_G3D_RESOURCE_REF(ResVtxClr, RESVTX_AC_FILE, 154)
 NW4R_G3D_RESOURCE_PTR(ResVtxClr)
 
-#pragma peephole off
 NW4R_G3D_RESOURCE_CTOR_ALIGNED(ResVtxClr, RESVTX_AC_FILE, 154)
-#pragma peephole on
 
 /* 0x80073258 (0x24): returns the array's ID. */
 u32 ResVtxClr::GetID() const {

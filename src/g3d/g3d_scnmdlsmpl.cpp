@@ -20,8 +20,6 @@
  *   g3d_apply_vis_anm_result, g3d_draw_res_mdl_directly, type_obj_set_name_anmchr).
  * RESIDUALS. Unwritten: 0x80080B10-0x80080B5C (the callback-timing setter: foreign units call its stem) and
  *   0x800810DC-0x80081120 (ICalcWorldCallback's destructor: defining it would emit the interface's vtable here).
- *   Written but unpaired while `g3d/g3d_scnmdl.cpp`'s C-style ScnMdl constructor and destructor call their stems:
- *   the constructor (fn_80080C60) and the destructor (dtor_80080F7C).
  *   Partial: SetAnmObj (retail's NOT_SPECIFIED case jumps into the per-type attach blocks, a goto shape rule 8
  *   forbids; the two-switch dispatch measures 88.2 and saves r25 through `_savegpr_25`/`_restgpr_25`, per-case
  *   inline attach helpers 34.3).  The constructor copies
