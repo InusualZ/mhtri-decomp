@@ -7,8 +7,7 @@
  *    lower table).
  * EVIDENCE. family only; all three read the locale class table `.data` 0x8060EDB0; no data of their own; the TRK
  *    access stubs follow.
- * RESIDUALS. COARSE; `stricmp` and `strupr` differ in where the sign extension of the second character and the stored byte
- *    sit (same instruction count).
+ * RESIDUALS. COARSE; `strupr` 98: the target keeps the character, the range flag and the table byte in r0/r4 where ours takes r7.
  * SHAPES. the case maps are read through `_current_locale.ctype`; the inline `tolower`/`toupper` return the
  *    character unchanged outside 0..255.
  */
@@ -36,8 +35,8 @@ static inline u16 towlower_c(u16 c)
 
 int stricmp(const char* a, const char* b)
 {
-    int c1;
-    int c2;
+    char c1;
+    char c2;
 
     do {
         c1 = tolower_c(*a++);

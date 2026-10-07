@@ -15,7 +15,7 @@ extern "C" {
 s32 TRKStringLength(const char* text);
 
 /* 0x804698EC (0x1F4): reads or writes `*count` bytes of a host file in chunks; stores the bytes moved and the host status. */
-s32 TRKSuppAccessFile(s32 handle, u8* data, u32* count, u32* io_result, u8 need_reply, u8 is_read);
+s32 TRKSuppAccessFile(s32 handle, u8* data, u32* count, u32* io_result, s32 need_reply, s32 is_read);
 
 /* 0x80469C08 (0x118): opens a host file by path; stores its handle and the host status. */
 s32 TRKSuppOpenFile(const char* path, u8 mode, u32* handle, u32* io_result);

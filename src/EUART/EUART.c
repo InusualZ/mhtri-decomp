@@ -68,7 +68,7 @@ BOOL EUARTInit(void)
 }
 
 /* Enables UART output when the console is a development unit. */
-s32 InitializeUART(void)
+s32 InitializeUART(u32 baud_rate)
 {
     if (!(OSGetConsoleType() & 0x10000000)) {
         UARTEnabled = 0;

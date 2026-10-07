@@ -301,8 +301,8 @@ char* strtok(char* str, const char* set)
 char* strstr(const char* haystack, const char* needle)
 {
     const u8* h = (const u8*)haystack;
-    u32 first;
     u32 c;
+    u32 first;
 
     h--;
     if (needle != 0) {

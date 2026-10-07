@@ -8,30 +8,52 @@
 #include "TRK/msgbuf.h"
 #include "TRK/nubevent.h"
 
-/* The target program's saved CPU state (approximate: the BAT word the address translation tests is named). */
+/* The target program's saved CPU state (approximate: only the words the target layer reads are named). */
 typedef struct TRKCPUState {
-    /* +0x000 */ u32 gpr[32];          /* general registers */
-    /* +0x080 */ u32 pc;               /* program counter */
-    /* +0x084 */ u8 pad_0x084[0x124];
-    /* +0x1A8 */ u32 pad_0x1A8[20];    /* segment registers and the first SPR images */
-    /* +0x1F8 */ u32 srr1;             /* MSR image the target resumes with */
+    /* +0x000 */ u32 gpr[32];             /* general registers */
+    /* +0x080 */ u32 pc;                  /* program counter (SRR0 at the stop) */
+    /* +0x084 */ u32 lr;
+    /* +0x088 */ u32 cr;
+    /* +0x08C */ u32 ctr;
+    /* +0x090 */ u32 xer;
+    /* +0x094 */ u8 pad_0x094[0x114];
+    /* +0x1A8 */ u32 pad_0x1A8[16];       /* segment registers and the first SPR images */
+    /* +0x1E8 */ u32 time_base_image[2];  /* time base words; a debugger write sets restore_time_base */
+    /* +0x1F0 */ u32 pad_0x1F0[2];
+    /* +0x1F8 */ u32 srr1;                /* MSR image the target resumes with */
     /* +0x1FC */ u32 pad_0x1FC[15];
-    /* +0x238 */ u32 dbat3_upper;      /* DBAT3U image: bits 0-1 tell whether the locked cache is mapped */
-    /* +0x23C */ u32 pad_0x23C[47];
-    /* +0x2F8 */ u32 exception_id;     /* low 16 bits: the exception vector that stopped the target */
-    /* +0x2FC */ u32 pad_0x2FC[12];    /* rest of the extended block */
+    /* +0x238 */ u32 dbat3_upper;         /* DBAT3U image: bits 0-1 tell whether the locked cache is mapped */
+    /* +0x23C */ u32 pad_0x23C[15];
+    /* +0x278 */ u32 flagged_reg_image;   /* register image a debugger write flags in restore_flag_1 */
+    /* +0x27C */ u32 pad_0x27C[31];
+    /* +0x2F8 */ u32 exception_id;        /* low 16 bits: the exception vector that stopped the target */
+    /* +0x2FC */ u32 pad_0x2FC[12];       /* rest of the extended block */
     /* +0x32C */ u8 pad_0x32C[0x104];
 } TRKCPUState; /* size: 0x430 */
 
-/* The nub's run state (approximate: only the words the target layer start-up writes are named). */
+/* The nub's own register image, saved while the target runs. */
 typedef struct TRKState {
-    /* +0x00 */ u8 pad_0x00[0x8C];
-    /* +0x8C */ u32 msr;               /* MSR captured by TRKInitializeTarget */
-    /* +0x90 */ u8 pad_0x90[8];
-    /* +0x98 */ s32 stopped;           /* nonzero while the target is stopped */
-    /* +0x9C */ u8 pad_0x9C[4];
-    /* +0xA0 */ u8* input_pending_ptr; /* the nub's input-pending flag, published by the UART driver */
+    /* +0x00 */ u32 gpr[32];              /* nub general registers */
+    /* +0x80 */ u32 lr;
+    /* +0x84 */ u32 ctr;
+    /* +0x88 */ u32 xer;
+    /* +0x8C */ u32 msr;                  /* MSR captured by TRKInitializeTarget and TRKSwapAndGo */
+    /* +0x90 */ u32 dar;
+    /* +0x94 */ u32 dsisr;
+    /* +0x98 */ s32 stopped;              /* nonzero while the target is stopped */
+    /* +0x9C */ s32 input_activated;      /* set when a debugger byte arrived while the target ran */
+    /* +0xA0 */ u8* input_pending_ptr;    /* the nub's input-pending flag, published by the UART driver */
 } TRKState; /* size: 0xA4 */
+
+/* The register block the exception vector stubs save before they enter the nub. */
+typedef struct TRKSaveState {
+    /* +0x00 */ u32 gpr[32];
+    /* +0x80 */ u32 pc;
+    /* +0x84 */ u32 lr;
+    /* +0x88 */ u32 cr;
+    /* +0x8C */ u32 ctr;
+    /* +0x90 */ u32 xer;
+} TRKSaveState; /* size: 0x94 */
 
 /* The pending single-step or step-out-of-range request. */
 typedef struct TRKStepState {
@@ -65,16 +87,28 @@ u32 __TRK_get_MSR(void);
 void __TRK_set_MSR(u32 msr);
 
 /* 0x8046D300 (0x68): patches a blr into the ten-word instruction template, flushes it and calls it with `data`. */
-s32 TRKPPCAccessSpecialReg(u32* data, u32* instructions);
+s32 TRKPPCAccessSpecialReg(u32* data, u32* instructions, s32 is_read);
 
 /* 0x8046D378 (0x8): maps an address into the cached view. */
-u32 ConvertAddress(u32 address);
+u32* ConvertAddress(u32 address);
 
 /* 0x8046D380 (0x90): counts the OS active threads and reports the index of the running one. */
 void GetThreadInfo(u32* count, u32* currentIndex);
 
 /* 0x8046C418 (0x194): the exception entry the vector stubs jump to; saves the target and posts an event. */
 void TRKInterruptHandler(void);
+
+/* 0x8046C5AC (0x9C): handles an exception raised while the nub itself runs; skips trapping instructions and flags it. */
+void TRKExceptionHandler(void);
+
+/* 0x8046C648 (0xB8): posts the event that matches the exception that stopped the target. */
+void TRKPostInterruptEvent(void);
+
+/* 0x8046C7C4 (0x54): restores the nub's register image and continues in TRKPostInterruptEvent. */
+void TRKInterruptHandlerEnableInterrupts(void);
+
+/* 0x8046CB10 (0x124): advances an armed step request after a trace exception; returns whether one is still armed. */
+s32 TRKTargetCheckStep(void);
 
 /* 0x8046CF44 (0x10): records whether the target is stopped. */
 void TRKTargetSetStopped(s32 stopped);
@@ -83,7 +117,7 @@ void TRKTargetSetStopped(s32 stopped);
 void TRKSwapAndGo(void);
 
 /* 0x8046C818 (0x5C): handles a breakpoint or exception event. */
-void TRKTargetInterrupt(TRKEvent* event);
+s32 TRKTargetInterrupt(TRKEvent* event);
 
 /* 0x8046C874 (0x200): appends the stop description to the notification in `message`. */
 s32 TRKTargetAddStopInfo(TRKBuffer* message);
@@ -95,11 +129,11 @@ s32 TRKTargetAddExceptionInfo(TRKBuffer* message);
 void TRKTargetSetInputPendingPtr(u8* inputPendingPtr);
 
 /* 0x8046CD40 (0x1F4): services a file or console request raised by the program. */
-void TRKTargetSupportRequest(void);
+s32 TRKTargetSupportRequest(void);
 
 /* 0x8046BDC0 (0x150): reads (`is_read`) or writes `*length` bytes of target memory at `address` through `data`; returns 0 or an error code. */
 /* untyped: byte range */
-s32 TRKTargetAccessMemory(void* data, u32 address, u32* length, s32 mapped, s32 is_read);
+s32 TRKTargetAccessMemory(void* data, u32 address, u32* length, s32 options, s32 is_read);
 
 /* 0x8046BF10 (0xF8): reads or writes the general registers `first`..`last` through `message`; returns 0 or an error code. */
 s32 TRKTargetAccessDefault(u32 first, u32 last, TRKBuffer* message, u32* count, s32 is_read);

@@ -82,7 +82,7 @@ s32 TRKStringLength(const char* text)
 }
 #pragma dont_inline reset
 
-s32 TRKSuppAccessFile(s32 handle, u8* data, u32* count, u32* io_result, u8 need_reply, u8 is_read)
+s32 TRKSuppAccessFile(s32 handle, u8* data, u32* count, u32* io_result, s32 need_reply, s32 is_read)
 {
     TRKSupportPacket packet;
     s32 reply_id;

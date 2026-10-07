@@ -73,6 +73,10 @@ long labs(long n);
  * `g3d/g3d_anmchr.cpp`'s frame and rate setters assert on it. */
 int __fpclassifyf(float x);
 
+/* 0x80459078 (0x130) - releases a block of the MSL heap. */
+/* untyped: caller-owned heap block */
+void free(void* ptr);
+
 /* 0x80463E74 - the global frame thunk `g3d/g3d_resanmlight.cpp`'s `fn_8008FFFC` tail-calls. */
 f32 floorf(void);
 
