@@ -1,18 +1,16 @@
-/*
- * WPAD/wpad.cpp - STUB (no bodies yet).
- *
- * `.text` 0x804E45B0..0x80500868.  Sections of the candidate unit: .text 0x804E45B0..0x80500868; .rodata 0x80573C40..0x80573CD8; .data 0x8062AB68..0x8062F030; .bss 0x8075B110..0x80760C48; .sdata 0x80794148..0x807941E0; .sbss 0x807955C8..0x80795758; .sdata2 0x8079D3C0..0x8079D480.
- *
- * WHAT IT IS. a merged block of TPL, USB (`IUSB_*`), VI, i2c, WENC, WPAD and WUD, ending in three nw4r::db console / ut
- *   functions (0x80500770-0x80500868) that only `nw4r/db_assert.cpp` and other units call; 301 functions.
- *   merged candidate pieces (guess cuts the renderer does not emit): TPL, usb, fn_804E5600, vi, i2c, vi3in1, WENC, wbc_dummy, wpad, wud, WUDHidHost.
- *
- * WHY IT SITS HERE. phase 1 grade strong, class anchor: TPLBind (the `TPL.c` __FILE__ anchor)/TPLGet.
- *
- * UNKNOWN. every body and, for a merged block, the file boundaries between its pieces.
- *
- * FLAGS. the `OS` lib's `cflags_os` (unmeasured until bodies exist).
- *
- * The unit's `.data`/`.sdata`/`.sbss` claims are the candidate's (config/RMHE08/splits.txt); the symbols they hold are
- * in the map (`ledger.py unit WPAD/wpad.cpp`), and the pass that writes the bodies defines them.
+/* WPAD/wpad.cpp - the Wii remote driver: control block, connect/disconnect, speaker, stream data and the report queue.
+ * RANGE. .text 0x804EB510-0x804F9B30 (131 functions); .rodata 0x80573C80-0x80573CD8; .data 0x8062BF30-0x8062DBF0;
+ *   .bss 0x8075B2A0-0x8075EAA0; .sdata 0x80794198-0x807941C8; .sbss 0x807956A8-0x80795720; .sdata2 0x8079D3C8-0x8079D478.
+ *   Edges: the "<< RVL_SDK - WPAD ... Jun 22 2009 ... (0x4302_145) >>" build string (.data 0x8062BF30) and the
+ *   `WBCReadDummy`/`WBCSetZEROPointDummy`/`WBCGetTGCWeightDummy` print strings follow it before any other string, so
+ *   the nine 8-byte stubs and the three dummies at 0x804EB510..0x804EB630 belong to this TU; the right edge 0x804F9B30
+ *   is the first reader of the WUD state (.sbss 0x80795738, .bss 0x8075EAA0).
+ * FLAGS. the `OS` lib block of configure.py (`cflags_os`); every function start is 16-aligned.
+ * NAMES. the map's names (`WPADInit`, `WPADDisconnect`, `WPADProbe`, `WPADControlSpeaker`, `WPADSendStreamData`,
+ *   `WPADiSendWriteData`, `WPADiSendSetReportType`, `WPADiClearQueue`, ...); the other functions are generated.
+ * RESIDUALS. every body unwritten (stub).  The TU is probably two: the .sdata2 pool holds the double 4330000080000000
+ *   twice (0x8079D418 read by 0x804F3150/0x804F5050/0x804F54F0, 0x8079D460 read by 0x804F84E0/0x804F8C00/0x804F8D30) and
+ *   the float 0 twice (0x8079D3E0, 0x8079D46C); the second TU starts after 0x804F5768 and no later than 0x804F8380
+ *   (the first reader of 0x8079D430), and the 17 functions 0x804F5770..0x804F8380 read no pool entry, so the seam is
+ *   not pinned and the unit is kept whole.
  */

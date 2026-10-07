@@ -5,7 +5,7 @@
  * RANGE. Left edge 0x80500868: its first function reads the console pointer at .sbss 0x8079575C that only
  *   this range reads (Assertion_Printf_, VPanic, Warning, WarningAlarmFunc_).  0x80500770-0x80500868 before it
  *   (an empty varargs printer, a ring-buffer line count, a text-colour setter that tail-calls 0x805045A0) is
- *   nw4r::db console and ut code by content and stays in `WPAD/wpad.cpp` (unproven seam).
+ *   nw4r::db console and ut code by content and sits in `nw4r/db_console.cpp` (unproven seam).
  * RANGE. Right edge 0x80500CF8: the next two functions are nw4r::math's table-driven exp/log (they read
  *   .data 0x8062F0B0/0x8062F1B8 and .sdata2 0x8079D480-0x8079D494), which `nw4r/math_arithmetic.cpp` owns.
  *   Every data piece here is read only from this range.
@@ -18,8 +18,10 @@
  *   0x804E7110(NULL) (filed as the VI retrace-callback setters; the runtime dump calls 0x804E7110
  *   AIRegisterDMACallback) and, in VPanic and Warning, the console print 0x80500770 (console, "%s:%d Panic:" /
  *   "%s:%d Warning:", file, line), 0x80500770 (console, "\n") and the scroll to the latest line through the line count
- *   0x805007D8 (console->viewTopLine = max(0, count - console->viewLines)); all four sit in `WPAD/wpad.cpp`.  With
- *   them written, VPanic and Panic were 100 % and Warning 99.3 % (r30/r31 swap in the scroll).
+ *   0x805007D8 (console->viewTopLine = max(0, count - console->viewLines)); all four sit in `nw4r/db_console.cpp`.  With
+ *   them written, VPanic and Panic were 100 % and Warning 99.3 % (r30/r31 swap in the scroll).  The relocation targets
+ *   missing from ours are `fn_804E70C0` and `fn_804E7110` (`VI/vi.cpp`), `fn_80500770` and `fn_805007D8`
+ *   (`nw4r/db_console.cpp`), `sAssertionConsole`, `lbl_8062F090`, `lbl_8062F0A0` and `lbl_807941E4` (this unit's data).
  * RESIDUALS. The `.sdata`/`.sbss` claims end on alignment pad the object does not emit.
  * SHAPES. ShowStack_ and VPanic are kept out of line by a scoped `#pragma dont_inline` (retail calls both).
  *   `Assertion_ShowConsole` and `GetWarningAlarm_` are nw4r's helpers: the first is unreferenced (the link drops it)

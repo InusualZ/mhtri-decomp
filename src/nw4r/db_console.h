@@ -1,5 +1,5 @@
 /* nw4r/db_console.h - nw4r::db's on-screen console record, as `nw4r/db_assert.cpp` reads it.  The console
- *   functions themselves sit in `WPAD/wpad.cpp`'s range (its header comment: unproven seam). */
+ *   functions themselves sit in `nw4r/db_console.cpp` (its header comment: unproven seam). */
 #ifndef MHTRI_NW4R_DB_CONSOLE_H
 #define MHTRI_NW4R_DB_CONSOLE_H
 

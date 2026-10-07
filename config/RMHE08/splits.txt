@@ -2894,14 +2894,60 @@ SC/sc.cpp:
 	.sbss       start:0x80795440 end:0x807955C8
 	.sdata2     start:0x8079D330 end:0x8079D3C0
 
+TPL/tpl.cpp:
+	.text       start:0x804E45B0 end:0x804E46F0
+	.data       start:0x8062AB68 end:0x8062AB98
+	.sdata      start:0x80794148 end:0x80794150
+
+USB/usb.cpp:
+	.text       start:0x804E46F0 end:0x804E6710
+	.data       start:0x8062AB98 end:0x8062B3C8
+	.sdata      start:0x80794150 end:0x80794160
+	.sbss       start:0x807955C8 end:0x807955D8
+
+VI/vi.cpp:
+	.text       start:0x804E6710 end:0x804E91C0
+	.data       start:0x8062B3C8 end:0x8062B920
+	.bss        start:0x8075B110 end:0x8075B280
+	.sdata      start:0x80794160 end:0x80794180
+	.sbss       start:0x807955D8 end:0x80795688
+
+VI/i2c.cpp:
+	.text       start:0x804E91C0 end:0x804E9AE0
+	.sdata      start:0x80794180 end:0x80794188
+	.sbss       start:0x80795688 end:0x80795690
+
+VI/vi3in1.cpp:
+	.text       start:0x804E9AE0 end:0x804EB22C
+	.data       start:0x8062B920 end:0x8062BF30
+	.bss        start:0x8075B280 end:0x8075B2A0
+	.sdata      start:0x80794188 end:0x80794198
+	.sbss       start:0x80795690 end:0x807956A8
+
+WENC/wenc.cpp:
+	.text       start:0x804EB22C end:0x804EB510
+	.rodata     start:0x80573C40 end:0x80573C80
+	.sdata2     start:0x8079D3C0 end:0x8079D3C8
+
 WPAD/wpad.cpp:
-	.text       start:0x804E45B0 end:0x80500868
-	.rodata     start:0x80573C40 end:0x80573CD8
-	.data       start:0x8062AB68 end:0x8062F030
-	.bss        start:0x8075B110 end:0x80760C48
-	.sdata      start:0x80794148 end:0x807941E0
-	.sbss       start:0x807955C8 end:0x80795758
-	.sdata2     start:0x8079D3C0 end:0x8079D480
+	.text       start:0x804EB510 end:0x804F9B30
+	.rodata     start:0x80573C80 end:0x80573CD8
+	.data       start:0x8062BF30 end:0x8062DBF0
+	.bss        start:0x8075B2A0 end:0x8075EAA0
+	.sdata      start:0x80794198 end:0x807941C8
+	.sbss       start:0x807956A8 end:0x80795720
+	.sdata2     start:0x8079D3C8 end:0x8079D478
+
+WUD/wud.cpp:
+	.text       start:0x804F9B30 end:0x80500770
+	.data       start:0x8062DBF0 end:0x8062F030
+	.bss        start:0x8075EAA0 end:0x80760C48
+	.sdata      start:0x807941C8 end:0x807941E0
+	.sbss       start:0x80795720 end:0x80795758
+	.sdata2     start:0x8079D478 end:0x8079D480
+
+nw4r/db_console.cpp:
+	.text       start:0x80500770 end:0x80500868
 
 nw4r/db_assert.cpp:
 	.text       start:0x80500868 end:0x80500CF8
