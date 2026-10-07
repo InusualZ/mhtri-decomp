@@ -144,6 +144,9 @@ def padding_chain_break(stem: str, objsec: str) -> str | None:
         nxt = starts.get((objsec.split("$")[0], span[1]))
         if nxt is None:
             return None
+        standin = sections(os.path.join(MAIN, "build", "RMHE08", "obj", nxt[0] + ".o")).get(nxt[1])
+        if nxt[0] not in linked and standin and standin[1] >= 4:
+            return None  # an unflipped successor aligned to 16 by splits.txt places itself and fills its claim
         if nxt[0] not in linked:
             return "%s (short by 0x%X) is followed by unflipped %s: flip from the tail of the run" % (
                 stem, span[1] - span[0] - built[0], nxt[0])
@@ -174,6 +177,13 @@ def linked_pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_
                 return None, ("the shortfall is link padding only while the run after it stays on its claimed addresses, "
                               "and %s" % broken)
         return note, None
+    standin = sections(os.path.join(MAIN, "build", "RMHE08", "obj", stem + ".o")).get(objsec)
+    if standin and start is not None:
+        # an unflipped successor is its target object, which fills its own claim: it carries the alignment
+        # splits.txt gives it (`align:N`), so the link pads this unit up to it without any chain
+        note = objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, [1 << standin[1]])
+        if note:
+            return note, None
     if start is not None and objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, [16]):
         return None, ("the shortfall is link padding only once its successor %s is flipped (16-aligned); "
                       "flip from the tail of each run" % stem)
