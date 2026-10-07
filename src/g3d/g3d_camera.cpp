@@ -65,7 +65,7 @@ extern "C" void vec3_cross(void* pOut, const void* pA, const void* pB);
 extern "C" f32 vec3_dot(const void* pA, const void* pB);
 extern "C" void fn_804BA230(const f32* pViewMtx, const f32* pParams, const f32* pFrustum, void* pA,
                             void* pB, void* pC, f32 x, f32 y, f32 z);
-extern "C" void fn_804BA7A0(s32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g);
+extern "C" void GXSetViewportJitter(s32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g);
 extern "C" void fn_804C64E0(s32 a, s32 b, s32 c);
 extern "C" void fn_804C6660(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h, f32 i);
 extern "C" void fn_804C6710(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f);
@@ -487,7 +487,7 @@ void fn_800756DC(nw4r::g3d::Camera* pSelf) {
     }
     CameraData* pData = fn_80074A54(pSelf);
     if (g3d_state_get_render_mode()->mUnk18 != 0) {
-        fn_804BA7A0((pData->mFlags & 0x100) != 0, pData->mViewportX, pData->mViewportY,
+        GXSetViewportJitter((pData->mFlags & 0x100) != 0, pData->mViewportX, pData->mViewportY,
                     pData->mViewportW, pData->mViewportH, pData->mViewportNear, pData->mViewportFar);
         return;
     }

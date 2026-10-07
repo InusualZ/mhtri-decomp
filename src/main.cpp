@@ -276,7 +276,7 @@ extern "C" void OSReport(const char* fmt, ...);
 extern "C" void fn_804B6C00(void* src, void* dst, u32 offset, u32 size);
 extern "C" void render_mode_copy(GXRenderModeObj* dst, GXRenderModeObj* src);
 extern "C" u32 GXInit(void* base, u32 size);
-extern "C" void fn_804BA7A0(f32, f32, f32, f32, f32, f32);
+extern "C" void GXSetViewportJitter(f32, f32, f32, f32, f32, f32);
 extern "C" void GXSetViewport(f32, f32, f32, f32, f32, f32);
 extern "C" void GXSetScissor(u32, u32, u32, u32);
 /* The SDK clear-colour record `GXColor` comes from `gx.h` (rule 1). */
@@ -868,7 +868,7 @@ extern "C" void fn_8003FEBC(void)
 
     if (mode->field_rendering != 0) {
         VIGetNextField();
-        fn_804BA7A0(lbl_80795AC8, lbl_80795AC8, (f32)mode->fbWidth, (f32)mode->efbHeight,
+        GXSetViewportJitter(lbl_80795AC8, lbl_80795AC8, (f32)mode->fbWidth, (f32)mode->efbHeight,
                     lbl_80795AC8, lbl_80795ACC);
     } else {
         GXSetViewport(lbl_80795AC8, lbl_80795AC8, (f32)mode->fbWidth, (f32)mode->efbHeight,
