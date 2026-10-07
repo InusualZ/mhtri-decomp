@@ -16,7 +16,7 @@ extern "C" {
 u32 KBDSetLedsAsync(u32 index, u32 value, void* callback, u32 arg);
 
 /* 0x80529B50 - store the word at +0x258 of the channel's 0x2A8-byte record; returns 0. */
-void KBDSetChannelValue(u8 index, u32 value);
+s32 KBDSetChannelValue(u8 index, u32 value);
 
 #ifdef __cplusplus
 }
