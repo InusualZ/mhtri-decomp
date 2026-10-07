@@ -153,7 +153,7 @@ typedef struct _multi_result_work {
     /* +0x05 */ u8 cursor_y;          /* grid cursor, row */
     /* +0x06 */ u8 box_w;             /* the grid's width  (cursor index = x + y * box_w) */
     /* +0x07 */ u8 box_h;             /* the grid's height */
-    /* +0x08 */ u8 field_0x08;        /* a counter that saturates at 2 */
+    /* +0x08 */ s8 field_0x08;        /* a counter that saturates at 2 (-1 until the record starts) */
     /* +0x09 */ u8 saved_cursor_x;    /* the cursor latched when the box was confirmed */
     /* +0x0A */ u8 saved_cursor_y;
     /* +0x0B */ u8 pad_0x0B;

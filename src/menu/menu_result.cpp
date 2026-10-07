@@ -49,8 +49,11 @@
  *   scheduling residue: `q_result_unlock_next` (the target keeps one more value live and saves r31),
  *   `q_result_equip_detail_draw` (retail tests the kind with range compares, our `switch` with a compare tree),
  *   `q_result_hunt_recs_build`, `q_result_box_list_draw`, `q_result_equip_sel_count`, `q_result_phase_enter`,
- *   `q_result_owned_count_get` (`userdata_gunner_ck`/`item_slots_count_sum` are unsigned in retail's view),
- *   `q_result_sub_screen_ready` (MWCC if-converts the second `return (B == 1)`).
+ *   `q_result_owned_count_get` (retail returns the sum without the final `extsh` and moves the box capacity
+ *   straight into r5), `q_result_item_page_init` (retail sign-extends the constant slot count before
+ *   `menu_page_count`; `s16`/`s32`/`u16` locals all fold it), `q_result_msg_frame_rect` (ours sign-extends
+ *   `get_wide_offset`'s result before the add; `+=` and `= +` measured the same), `q_result_equip_info_draw`
+ *   (the two `sprintf` formats are pooled `@` strings where retail names `.sdata` labels).
  *   Every row written.
  *   Partial rows of the box band:
  *  - `multi_box_rem_exist_ck`: 2 instructions short, the target keeps a dead loop counter;
@@ -375,12 +378,11 @@ BOOL q_result_ready_ck(QResultScreen* self)
 /* 0x80396C5C (0x48): Whether either of the two sub-screen resource sets has finished loading. */
 u32 q_result_sub_screen_ready(QResultScreen* self)
 {
-    if (quest_flag_2000000_ck(NULL) != 1) {
-        if (quest_flag_80000000_ck(NULL) != 1) {
-            return FALSE;
-        }
+    if (quest_flag_2000000_ck(NULL) == 1 || quest_flag_80000000_ck(NULL) == 1) {
+        return TRUE;
+    } else {
+        return FALSE;
     }
-    return TRUE;
 }
 
 /* 0x80396CA4 (0x8): The screen's unlock notice count at +0x306E. */
@@ -649,7 +651,7 @@ void q_result_phase_init(QResultScreen* self, s32 phase)
         break;
     case 5:
         q_result_init_flag_set(self);
-        score_add_clamped(self->zenny_total + self->hunt_zenny_total + self->item_value_total,
+        score_add_clamped(self->zenny_total + self->item_value_total + self->hunt_zenny_total,
                           &((Q_UserData*)lobby_world_block)->zenny_0x18);
         self->cursor = 0;
         self->cursor_count = 4;
@@ -1057,15 +1059,15 @@ u32 q_result_items_left_ck(QResultScreen* self, u8 which)
         return 0;
     }
     if (items != NULL) {
-        for (i = 0; i < 0x30; i++) {
-            if (items[i].id != 0 && items[i].value > 0) {
+        for (i = 0; i < 0x30; i++, items++) {
+            if (items->id != 0 && items->value > 0) {
                 return 1;
             }
         }
     }
     if (equip != NULL) {
-        for (i = 0; i < 0x28; i++) {
-            if (equip[i].kind != 0) {
+        for (i = 0; i < 0x28; i++, equip++) {
+            if (equip->kind != 0) {
                 return 1;
             }
         }
@@ -1091,8 +1093,8 @@ u32 q_result_delivery_left_ck(QResultScreen* self, u8 which)
         return 0;
     }
     if (items != NULL) {
-        for (i = 0; i < 0x30; i++) {
-            if (items[i].id != 0 && items[i].value > 0 && (GetItemData(items[i].id)->field_0x002 & 0x10)) {
+        for (i = 0; i < 0x30; i++, items++) {
+            if (items->id != 0 && items->value > 0 && (GetItemData(items->id)->field_0x002 & 0x10)) {
                 return 1;
             }
         }
@@ -1124,19 +1126,19 @@ s32 q_result_sell_total_get(QResultScreen* self, u8 which)
         return 0;
     }
     if (items != NULL) {
-        for (i = 0; i < 0x30; i++) {
-            if (items[i].id != 0 && items[i].value > 0) {
-                data = GetItemData(items[i].id);
+        for (i = 0; i < 0x30; i++, items++) {
+            if (items->id != 0 && items->value > 0) {
+                data = GetItemData(items->id);
                 if (!(data->field_0x002 & 0x10)) {
-                    total += data->field_0x010 * items[i].value;
+                    total += data->field_0x010 * items->value;
                 }
             }
         }
     }
     if (equip != NULL) {
-        for (i = 0; i < 0x28; i++) {
-            if (equip[i].kind != 0) {
-                total += equip_sell_price_get(&equip[i]);
+        for (i = 0; i < 0x28; i++, equip++) {
+            if (equip->kind != 0) {
+                total += equip_sell_price_get(equip);
             }
         }
     }
@@ -1167,24 +1169,24 @@ void q_result_items_sell(QResultScreen* self, u8 which)
         return;
     }
     if (items != NULL) {
-        for (i = 0; i < 0x30; i++) {
-            if (items[i].id != 0 && items[i].value > 0) {
-                data = GetItemData(items[i].id);
+        for (i = 0; i < 0x30; i++, items++) {
+            if (items->id != 0 && items->value > 0) {
+                data = GetItemData(items->id);
                 if (data->field_0x002 & 0x10) {
-                    q_result_delivered_add(self, &items[i]);
+                    q_result_delivered_add(self, items);
                 } else {
-                    score_add_clamped(data->field_0x010 * items[i].value, &((Q_UserData*)lobby_world_block)->zenny_0x18);
+                    score_add_clamped(data->field_0x010 * items->value, &((Q_UserData*)lobby_world_block)->zenny_0x18);
                 }
-                items[i].id = 0;
-                items[i].value = 0;
+                items->id = 0;
+                items->value = 0;
             }
         }
     }
     if (equip != NULL) {
-        for (i = 0; i < 0x28; i++) {
-            if (equip[i].kind != 0) {
-                score_add_clamped(equip_sell_price_get(&equip[i]), &((Q_UserData*)lobby_world_block)->zenny_0x18);
-                memset(&equip[i], 0, sizeof(_EQUIP));
+        for (i = 0; i < 0x28; i++, equip++) {
+            if (equip->kind != 0) {
+                score_add_clamped(equip_sell_price_get(equip), &((Q_UserData*)lobby_world_block)->zenny_0x18);
+                memset(equip, 0, sizeof(_EQUIP));
             }
         }
     }
@@ -1244,9 +1246,8 @@ void q_result_equip_cells_fill(QResultScreen* self)
         if (item->id == 0 || item->value <= 0) {
             memset(cell, 0, sizeof(_EQUIP));
         } else {
-            for (n = 0; n < item->value; n++) {
+            for (n = 0; n < item->value; n++, cell++) {
                 equip_from_item_id(item->id, cell);
-                cell++;
             }
         }
     }
@@ -1832,8 +1833,8 @@ void q_result_msg_frame_rect(u8 frame_kind, s16* x, s16* y, u16* width, u16* hei
  * when `with_value` is set. */
 void q_result_font_print_row(s16 row, u8 with_value, s32 value, u8 frame_kind)
 {
-    s16 x;
     s16 y;
+    s16 x;
     u16 width;
     u16 height;
     s16 text_x;
@@ -1940,7 +1941,7 @@ void q_result_equip_info_draw(QResultScreen* self, _EQUIP* equip, _mh_ivec2_* po
     u32 color;
     _SPR_DATA_ spr;
     char text[0x10];
-    u16 free;
+    s32 free;
 
     draw_sprite_ary(q_result_equip_info_ids, pos);
     if (equip != NULL && equip->item_id != 0) {
@@ -2104,14 +2105,18 @@ void q_result_info_panel_draw(QResultScreen* self, u8 which, u32 active)
     u16* ids;
     u16 lsp;
     IdValue* cell;
+    ItemDataRecord* data;
 
     sprite_frame_apply(&spr, 0x11F3, self->open_frame, &anchor);
-    if (which != 2) {
+    switch (which) {
+    default:
         ids = q_result_panel_anim_a;
         lsp = 0x11F7;
-    } else {
+        break;
+    case 2:
         ids = q_result_panel_anim_b;
         lsp = 0x11F8;
+        break;
     }
     draw_sprite_anim_ary(ids, self->open_frame, &anchor);
     get_lsp_data(lsp, &pos);
@@ -2121,7 +2126,8 @@ void q_result_info_panel_draw(QResultScreen* self, u8 which, u32 active)
         if (active == 1) {
             cell = q_result_grid_entry(self, which);
             if (cell != NULL) {
-                q_result_item_info_draw(cell->id, cell->value, GetItemData(cell->id)->max_num_0x003, NULL, &pos);
+                data = GetItemData(cell->id);
+                q_result_item_info_draw(cell->id, cell->value, data->max_num_0x003, NULL, &pos);
             }
         } else {
             q_result_item_info_draw(0, 0, 0, NULL, &pos);
@@ -3249,7 +3255,7 @@ void q_result_box_take(u16 item, s16 count)
 
     if (GetItemData(item)->kind_0x00 != 1 || userdata_gunner_ck(user) != 1 ||
         item_pair_index_find(item, &q->box_0x154[0], 0x18) != -1 ||
-        (u16)item_take(item, count, &q->box_0x154[0x18], 8, 1, 0) > 4) {
+        (u32)item_take(item, count, &q->box_0x154[0x18], 8, 1, 0) > 4) {
         item_take(item, count, &q->box_0x154[0], 0x18, 1, 0);
     }
 }
@@ -3294,7 +3300,7 @@ void q_result_box_record_init(_multi_result_work* rec, u8 player_no)
     rec->cursor_y = 0;
     rec->box_h = 4;
     rec->field_0x0E = 0;
-    rec->field_0x08 = 0xFF;
+    rec->field_0x08 = -1;
     rec->saved_cursor_x = 0;
     rec->saved_cursor_y = 0;
     rec->field_0x0C = 0;
@@ -3462,7 +3468,7 @@ extern "C" void multi_box_grid_step(_multi_result_work* box) {
     s32 held;
     s32 room;
 
-    if (box->field_0x08 <= 2) {
+    if ((u8)box->field_0x08 <= 2) {
         box->field_0x08++;
     }
     if (++box->field_0x0E > 40) {
