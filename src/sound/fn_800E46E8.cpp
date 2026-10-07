@@ -148,15 +148,15 @@ void fn_800E5304(ReverbFx* fx);
 ReverbMgr* fn_800E53A4(ReverbMgr* mgr);
 void fn_800E5420(ReverbFx* fx, ReverbSetFn handler);
 
-void fn_80474DD0(void);
-void fn_80474EB0(ReverbHiData* data);
-void fn_80474F20(void);
-void fn_80474D50(ReverbStdData* data);
-void fn_80474E80(ReverbHiData* data);
-void fn_80476DF0(ReverbStdData* data);
-void fn_80476E80(ReverbHiData* data);
-void fn_80476F10(ReverbStdData* data);
-void fn_80476F40(ReverbHiData* data);
+void AXFXReverbStdInit(void);
+void AXFXReverbStdSettings(ReverbHiData* data);
+void AXFXReverbStdCallback(void);
+void AXFXReverbHiSettings(ReverbStdData* data);
+void AXFXReverbStdShutdown(ReverbHiData* data);
+void AXFXChorus3Shutdown(ReverbStdData* data);
+void AXFXChorus4Shutdown(ReverbHiData* data);
+void AXFXDelay3Shutdown(ReverbStdData* data);
+void AXFXDelay4Shutdown(ReverbHiData* data);
 void AXFXReverbHiInit(ReverbStdData* data);
 void AXFXReverbHiShutdown(ReverbStdData* data);
 void AXFXReverbHiCallback(void);
@@ -607,9 +607,9 @@ extern "C" void snd_reverb_unit_set(ReverbMgr* mgr, ReverbCfg* cfg)
         data->coloration = cfg->coloration;
         data->pre_delay = cfg->pre_delay;
         data->crosstalk = cfg->crosstalk;
-        fn_80474DD0();
-        fn_80474EB0(data);
-        fx->set_handler((ReverbSetFn)(void*)fn_80474F20, data);
+        AXFXReverbStdInit();
+        AXFXReverbStdSettings(data);
+        fx->set_handler((ReverbSetFn)(void*)AXFXReverbStdCallback, data);
         fx->active = 1;
     } else {
         ReverbStdData* data = fn_800E517C(fx);
@@ -620,7 +620,7 @@ extern "C" void snd_reverb_unit_set(ReverbMgr* mgr, ReverbCfg* cfg)
         data->pre_delay = cfg->pre_delay;
         data->crosstalk = cfg->crosstalk;
         AXFXReverbHiInit(data);
-        fn_80474D50(data);
+        AXFXReverbHiSettings(data);
         fx->set_handler((ReverbSetFn)(void*)AXFXReverbHiCallback, data);
         fx->active = 0;
     }
@@ -690,7 +690,7 @@ extern "C" void fn_800E522C(ReverbFx* fx)
 extern "C" void fn_800E523C(ReverbFx* fx)
 {
     if (fx->active == 1) {
-        fn_80474E80(fn_800E5184(fx));
+        AXFXReverbStdShutdown(fn_800E5184(fx));
     } else {
         AXFXReverbHiShutdown(fn_800E517C(fx));
     }
@@ -702,9 +702,9 @@ extern "C" void fn_800E523C(ReverbFx* fx)
 extern "C" void fn_800E52A0(ReverbFx* fx)
 {
     if (fx->active == 3) {
-        fn_80476E80(fn_800E5194(fx));
+        AXFXChorus4Shutdown(fn_800E5194(fx));
     } else {
-        fn_80476DF0(fn_800E518C(fx));
+        AXFXChorus3Shutdown(fn_800E518C(fx));
     }
     fx->set_handler(0, 0);
     fn_800E522C(fx);
@@ -714,9 +714,9 @@ extern "C" void fn_800E52A0(ReverbFx* fx)
 extern "C" void fn_800E5304(ReverbFx* fx)
 {
     if (fx->active == 3) {
-        fn_80476F40(fn_800E51A4(fx));
+        AXFXDelay4Shutdown(fn_800E51A4(fx));
     } else {
-        fn_80476F10(fn_800E519C(fx));
+        AXFXDelay3Shutdown(fn_800E519C(fx));
     }
     fx->set_handler(0, 0);
     fn_800E522C(fx);

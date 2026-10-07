@@ -44,17 +44,11 @@ typedef struct AXFXReverbHi {
     /* +0x0BC */ u32 length6;
     /* +0x0C0 */ u32 size3[2];
     /* +0x0C8 */ void* delay4[3];        /* per-channel buffers, size4[] */
-    /* +0x0D4 */ u32 idx9;
-    /* +0x0D8 */ u32 idx10;
-    /* +0x0DC */ u32 idx11;
-    /* +0x0E0 */ u32 length7;
-    /* +0x0E4 */ u32 length8;
-    /* +0x0E8 */ u32 length9;
+    /* +0x0D4 */ u32 idx9[3];
+    /* +0x0E0 */ u32 length7[3];
     /* +0x0EC */ u32 size4[3];
     /* +0x0F8 */ f32 coef6;
-    /* +0x0FC */ f32 coef7;
-    /* +0x100 */ f32 coef8;
-    /* +0x104 */ f32 coef9;
+    /* +0x0FC */ f32 coef7[3];
     /* +0x108 */ f32 coef10;
     /* +0x10C */ u32 flags;
     /* +0x110 */ u32 mode;
@@ -67,8 +61,8 @@ typedef struct AXFXReverbHi {
     /* +0x12C */ f32 crosstalk;
     /* +0x130 */ f32 out_gain;
     /* +0x134 */ f32 dry_gain;
-    /* +0x138 */ void* early_buf;
-    /* +0x13C */ void* fused_buf;
+    /* +0x138 */ AXFXBuffer* early_buf;
+    /* +0x13C */ AXFXBuffer* fused_buf;
     union {
         struct {
             /* +0x140 */ f32 mix;
