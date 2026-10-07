@@ -92,14 +92,14 @@
 #include "g3d/fn_8005AA28.h" /* res_node_is_valid (rule 2) */
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
 #include "fn_8004CAD8.h"   /* mtx34_const_ptr's owner header (docs/plan.md 6.5, rule 2) */
-#include "OS/PSMTXQuat.h"      /* PSMTXQuat, owner OS/FindContainHeap_.c (leaf header, rule 2) */
-#include "NAND/QUATMtx.h"      /* QUATMtx, QUATSlerp, owner NAND/nand.c (leaf header, rule 2) */
+#include "MTX/PSMTXQuat.h"      /* PSMTXQuat, owner MTX/mtx.c (leaf header, rule 2) */
+#include "MTX/QUATMtx.h"      /* QUATMtx, QUATSlerp, owner NAND/nand.c (leaf header, rule 2) */
 #include "nw4r/fn_805012C4.h"   /* nw4r::math::MTX33Identity, MTX34Zero (rule 2) */
 #include "mh3_pad/vec3.h"   /* VEC3_ctor (rule 2) */
 #include "nw4r/math_arithmetic.h"   /* nw4r::math::detail::FExp, owner nw4r/math_arithmetic.cpp (rule 2) */
 #include "nw4r/db_assert.h"  /* nw4r::db::Warning (rule 2) */
 #include "MSL_C/alloc.h"     /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
-#include "OS/MEMAllocFromAllocator.h" /* MEMAllocFromAllocator, owner OS/FindContainHeap_.c (rule 2) */
+#include "MEM/MEMAllocFromAllocator.h" /* MEMAllocFromAllocator, owner MTX/mtx.c (rule 2) */
 
 #pragma peephole off
 

@@ -1259,18 +1259,54 @@ config.libs = [
         "cflags": cflags_os,
         "host": False,
         "objects": [
-            Object(NonMatching, "NAND/nand.c"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `804C1760_FindContainHeap_.c` (`.text` 0x804C1760..0x804C6D68, 68 functions / 22024 B).  Module
-            # `OS`: the nearest registered unit in splits.txt is OS/OSAlarm.c and the mem half's foreign
-            # calls are all the OS library (OSInitMutex / OSLockMutex / OSUnlockMutex).  The run is the SDK
-            # low-level runtime band (`tudiscover at` finds the mtx and vec clusters as separate certain TUs
-            # inside it); the seam is a byte cap, not a boundary.  Real dump names are used where the map has
-            # them; the rest keep their map stem under rule 7's deferral (see the file header).
-            Object(NonMatching, "OS/FindContainHeap_.c"),
+            # The OS core band 0x804C1760..0x804D9B4C, cut per SDK library and source file (evidence: the RANGE line of
+            # each unit header; flags unchanged: cflags_os, the group of the units it was cut from).
+            Object(NonMatching, "MEM/mem_heap.c"),
+            Object(NonMatching, "MEM/mem_expheap.c"),
+            Object(NonMatching, "MEM/mem_allocator.c"),
+            Object(NonMatching, "MEM/mem_list.c"),
+            Object(NonMatching, "MIX/mix.c"),
+            Object(NonMatching, "MTX/mtx.c"),
             Object(NonMatching, "MTX/mtxvec.c"),
             Object(NonMatching, "MTX/mtx44.c"),
             Object(NonMatching, "MTX/vec.c"),
+            Object(NonMatching, "MTX/quat.c"),
+            Object(NonMatching, "NAND/nand.c"),
+            Object(NonMatching, "OS/OS.c"),
+            Object(NonMatching, "OS/OSAlarm.c"),
+            Object(NonMatching, "OS/OSAlloc.c"),
+            Object(NonMatching, "OS/OSArena.c"),
+            Object(NonMatching, "OS/OSAudioSystem.c"),
+            Object(NonMatching, "OS/OSCache.c"),
+            Object(NonMatching, "OS/OSContext.c"),
+            Object(NonMatching, "OS/OSError.c"),
+            Object(NonMatching, "OS/OSExec.c"),
+            Object(NonMatching, "OS/OSFatal.c"),
+            Object(NonMatching, "OS/OSFont.c"),
+            Object(NonMatching, "OS/OSInterrupt.c"),
+            Object(NonMatching, "OS/OSLink.c"),
+            Object(NonMatching, "OS/OSMessage.c"),
+            Object(NonMatching, "OS/OSMemory.c"),
+            Object(NonMatching, "OS/OSMutex.c"),
+            Object(NonMatching, "OS/OSReboot.c"),
+            Object(NonMatching, "OS/OSReset.c"),
+            Object(NonMatching, "OS/OSRtc.c"),
+            Object(NonMatching, "OS/OSSync.c"),
+            Object(NonMatching, "OS/OSThread.c"),
+            Object(NonMatching, "OS/OSTime.c"),
+            Object(NonMatching, "OS/OSUtf.c"),
+            Object(NonMatching, "OS/OSIpc.c"),
+            Object(NonMatching, "OS/OSStateTM.c"),
+            Object(NonMatching, "OS/OSPlayRecord.c"),
+            Object(NonMatching, "OS/OSStateFlags.c"),
+            Object(NonMatching, "OS/OSNet.c"),
+            Object(NonMatching, "OS/OSNandbootInfo.c"),
+            Object(NonMatching, "OS/OSPlayTime.c"),
+            Object(NonMatching, "OS/OSLaunch.c"),
+            Object(NonMatching, "Runtime.PPCEABI.H/__init_user.c"),
+            Object(NonMatching, "PAD/PADClamp.c"),
+            Object(NonMatching, "PAD/pad.c"),
+            Object(NonMatching, "RSO/rso_notify.c"),
             # Registered once, at its final home (docs/plan.md 12): proposal `80474CB0_AXFXReverbHiInit` -
             # the Revolution SDK AXFX reverb-hi effect pair (16 functions / 0x1174 B,
             # 0x80474CB0..0x80475E24): AXFXReverbHiInit/Shutdown/Callback + AXFXReverbHiExpInit and the

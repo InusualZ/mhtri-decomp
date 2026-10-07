@@ -2660,13 +2660,31 @@ RVLGX/GXTexture_tail.cpp:
 	.sbss       start:0x80795228 end:0x80795298
 	.sdata2     start:0x8079D160 end:0x8079D270
 
-OS/FindContainHeap_.c:
-	.text       start:0x804C1760 end:0x804C68A0
+MEM/mem_heap.c:
+	.text       start:0x804C1760 end:0x804C1BD0
+	.bss        start:0x80748B90 end:0x80748BB8
+	.sbss       start:0x80795298 end:0x807952A0
+
+MEM/mem_expheap.c:
+	.text       start:0x804C1BD0 end:0x804C2460
+
+MEM/mem_allocator.c:
+	.text       start:0x804C2460 end:0x804C24C0
+	.sdata2     start:0x8079D270 end:0x8079D278
+
+MEM/mem_list.c:
+	.text       start:0x804C24C0 end:0x804C25E0
+
+MIX/mix.c:
+	.text       start:0x804C25E0 end:0x804C5C10
 	.data       start:0x8061AE00 end:0x8061B9A0
-	.bss        start:0x80748B90 end:0x8074CF40
+	.bss        start:0x80748BB8 end:0x8074CF40
+	.sbss       start:0x807952A0 end:0x807952B8
+
+MTX/mtx.c:
+	.text       start:0x804C5C10 end:0x804C68A0
 	.sdata      start:0x80793F00 end:0x80793F08
-	.sbss       start:0x80795298 end:0x807952B8
-	.sdata2     start:0x8079D270 end:0x8079D298
+	.sdata2     start:0x8079D278 end:0x8079D298
 
 MTX/mtxvec.c:
 	.text       start:0x804C68A0 end:0x804C6900
@@ -2679,14 +2697,189 @@ MTX/vec.c:
 	.text       start:0x804C6B60 end:0x804C6D70
 	.sdata2     start:0x8079D2B0 end:0x8079D2C0
 
+MTX/quat.c:
+	.text       start:0x804C6D70 end:0x804C70E0
+	.rodata     start:0x80573A00 end:0x80573A10
+	.sdata2     start:0x8079D2C0 end:0x8079D2D0
+
 NAND/nand.c:
-	.text       start:0x804C6D70 end:0x804D9B4C
-	.rodata     start:0x80573A00 end:0x80573B58
-	.data       start:0x8061B9A0 end:0x80629B90
-	.bss        start:0x8074CF40 end:0x8074E460
-	.sdata      start:0x80793F08 end:0x80794000
-	.sbss       start:0x807952B8 end:0x80795440
-	.sdata2     start:0x8079D2C0 end:0x8079D330
+	.text       start:0x804C70E0 end:0x804C9F00
+	.rodata     start:0x80573A10 end:0x80573B58
+	.data       start:0x8061B9A0 end:0x8061BC20
+	.bss        start:0x8074CF40 end:0x8074D280
+	.sdata      start:0x80793F08 end:0x80793F50
+	.sbss       start:0x807952B8 end:0x807952C8
+
+OS/OS.c:
+	.text       start:0x804C9F00 end:0x804CB440
+	.data       start:0x8061BC20 end:0x8061C0C8
+	.bss        start:0x8074D280 end:0x8074D2F0
+	.sdata      start:0x80793F50 end:0x80793F80
+	.sbss       start:0x807952C8 end:0x80795310
+	.sdata2     start:0x8079D2D0 end:0x8079D2D8
+
+OS/OSAlarm.c:
+	.text       start:0x804CB440 end:0x804CBD10
+	.data       start:0x8061C0C8 end:0x8061C0D8
+	.sbss       start:0x80795310 end:0x80795318
+
+OS/OSAlloc.c:
+	.text       start:0x804CBD10 end:0x804CC030
+	.sdata      start:0x80793F80 end:0x80793F88
+	.sbss       start:0x80795318 end:0x80795328
+
+OS/OSArena.c:
+	.text       start:0x804CC030 end:0x804CC130
+	.sdata      start:0x80793F88 end:0x80793F90
+	.sbss       start:0x80795328 end:0x80795330
+
+OS/OSAudioSystem.c:
+	.text       start:0x804CC130 end:0x804CC5F0
+	.data       start:0x8061C0D8 end:0x8061C158
+
+OS/OSCache.c:
+	.text       start:0x804CC5F0 end:0x804CCD40
+	.data       start:0x8061C158 end:0x8061C390
+
+OS/OSContext.c:
+	.text       start:0x804CCD40 end:0x804CD620
+	.data       start:0x8061C390 end:0x8061C570
+
+OS/OSError.c:
+	.text       start:0x804CD620 end:0x804CDD70
+	.data       start:0x8061C570 end:0x8061C850
+	.bss        start:0x8074D2F0 end:0x8074D340
+	.sdata      start:0x80793F90 end:0x80793F98
+
+OS/OSExec.c:
+	.text       start:0x804CDD70 end:0x804CF350
+	.data       start:0x8061C850 end:0x8061C8C0
+	.bss        start:0x8074D340 end:0x8074D360
+	.sdata      start:0x80793F98 end:0x80793FA8
+	.sbss       start:0x80795330 end:0x80795348
+
+OS/OSFatal.c:
+	.text       start:0x804CF350 end:0x804CFF80
+	.bss        start:0x8074D360 end:0x8074D640
+	.sdata      start:0x80793FA8 end:0x80793FB0
+	.sdata2     start:0x8079D2D8 end:0x8079D318
+
+OS/OSFont.c:
+	.text       start:0x804CFF80 end:0x804D0C70
+	.data       start:0x8061C8C0 end:0x8061D3D0
+	.sdata      start:0x80793FB0 end:0x80793FB8
+	.sbss       start:0x80795348 end:0x80795358
+	.sdata2     start:0x8079D318 end:0x8079D320
+
+OS/OSInterrupt.c:
+	.text       start:0x804D0C70 end:0x804D1440
+	.data       start:0x8061D3D0 end:0x8061D400
+	.sbss       start:0x80795358 end:0x80795370
+
+OS/OSLink.c:
+	.text       start:0x804D1440 end:0x804D1460
+
+OS/OSMessage.c:
+	.text       start:0x804D1460 end:0x804D1740
+
+OS/OSMemory.c:
+	.text       start:0x804D1740 end:0x804D1EE0
+	.data       start:0x8061D400 end:0x8061D410
+	.sbss       start:0x80795370 end:0x80795378
+
+OS/OSMutex.c:
+	.text       start:0x804D1EE0 end:0x804D2160
+
+OS/OSReboot.c:
+	.text       start:0x804D2160 end:0x804D21F0
+	.sbss       start:0x80795378 end:0x80795380
+
+OS/OSReset.c:
+	.text       start:0x804D21F0 end:0x804D2B90
+	.data       start:0x8061D410 end:0x8061D678
+	.sbss       start:0x80795380 end:0x80795390
+
+OS/OSRtc.c:
+	.text       start:0x804D2B90 end:0x804D3640
+	.bss        start:0x8074D640 end:0x8074D698
+
+OS/OSSync.c:
+	.text       start:0x804D3640 end:0x804D36D0
+
+OS/OSThread.c:
+	.text       start:0x804D36D0 end:0x804D4D50
+	.bss        start:0x8074D698 end:0x8074E0A0
+	.sdata      start:0x80793FB8 end:0x80793FC0
+	.sbss       start:0x80795390 end:0x807953A0
+
+OS/OSTime.c:
+	.text       start:0x804D4D50 end:0x804D5420
+	.data       start:0x8061D678 end:0x8061D6D8
+
+OS/OSUtf.c:
+	.text       start:0x804D5420 end:0x804D5670
+	.data       start:0x8061D6D8 end:0x80629518
+
+OS/OSIpc.c:
+	.text       start:0x804D5670 end:0x804D56B0
+	.sdata      start:0x80793FC0 end:0x80793FC8
+	.sbss       start:0x807953A0 end:0x807953A8
+
+OS/OSStateTM.c:
+	.text       start:0x804D56B0 end:0x804D5E00
+	.data       start:0x80629518 end:0x806295E0
+	.bss        start:0x8074E0A0 end:0x8074E160
+	.sbss       start:0x807953A8 end:0x807953D0
+
+OS/OSPlayRecord.c:
+	.text       start:0x804D5E00 end:0x804D6520
+	.data       start:0x806295E0 end:0x80629628
+	.bss        start:0x8074E160 end:0x8074E360
+	.sdata      start:0x80793FC8 end:0x80793FD0
+	.sbss       start:0x807953D0 end:0x807953F0
+
+OS/OSStateFlags.c:
+	.text       start:0x804D6520 end:0x804D6740
+	.data       start:0x80629628 end:0x80629650
+	.bss        start:0x8074E360 end:0x8074E380
+
+OS/OSNet.c:
+	.text       start:0x804D6740 end:0x804D6800
+	.data       start:0x80629650 end:0x806297B8
+
+OS/OSNandbootInfo.c:
+	.text       start:0x804D6800 end:0x804D6A10
+	.data       start:0x806297B8 end:0x806297D8
+
+OS/OSPlayTime.c:
+	.text       start:0x804D6A10 end:0x804D71F0
+	.data       start:0x806297D8 end:0x80629818
+	.bss        start:0x8074E380 end:0x8074E3B0
+	.sdata      start:0x80793FD0 end:0x80793FD8
+	.sbss       start:0x807953F0 end:0x80795408
+	.sdata2     start:0x8079D320 end:0x8079D330
+
+OS/OSLaunch.c:
+	.text       start:0x804D71F0 end:0x804D7FF0
+	.data       start:0x80629818 end:0x80629B38
+	.sdata      start:0x80793FD8 end:0x80793FE0
+	.sbss       start:0x80795408 end:0x80795410
+
+Runtime.PPCEABI.H/__init_user.c:
+	.text       start:0x804D7FF0 end:0x804D80B0
+
+PAD/PADClamp.c:
+	.text       start:0x804D80B0 end:0x804D82D0
+
+PAD/pad.c:
+	.text       start:0x804D82D0 end:0x804D9B3C
+	.data       start:0x80629B38 end:0x80629B90
+	.bss        start:0x8074E3B0 end:0x8074E460
+	.sdata      start:0x80793FE0 end:0x80794000
+	.sbss       start:0x80795410 end:0x80795440
+
+RSO/rso_notify.c:
+	.text       start:0x804D9B3C end:0x804D9B4C
 
 RSO/runtime.c:
 	.text       start:0x804D9B4C end:0x804DAE40

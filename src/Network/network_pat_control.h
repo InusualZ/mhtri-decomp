@@ -8,7 +8,7 @@
 #define MHTRI_NETWORK_NETWORK_PAT_CONTROL_H
 
 #include "types.h"
-#include "OS/mem.h"                /* MEMiHeapHead - the network heap's head */
+#include "MEM/mem.h"                /* MEMiHeapHead - the network heap's head */
 #include "MSL_C/alloc.h"           /* strcpy (owner: MSL_C/alloc.cpp, rule 2) */
 #include "Network/NetworkPat.h"
 #include "Network/NetworkSessionManagerPat.h"   /* getPatsObject, isNetworkSessionManagerPatReady (owner's header, rule 2) */

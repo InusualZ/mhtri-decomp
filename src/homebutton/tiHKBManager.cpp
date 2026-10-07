@@ -92,7 +92,8 @@
 
 #include "homebutton/gui_manager.h"
 #include "NAND/nand.h"
-#include "OS/FindContainHeap_.h"
+#include "MEM/mem_allocator.h"
+#include "MEM/mem_expheap.h"
 #include "VF/vf.h"
 #include "homebutton/hbm_hermite.h"
 #include "nw4r/fn_805012C4.h"

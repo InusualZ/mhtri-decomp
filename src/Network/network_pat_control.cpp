@@ -133,7 +133,8 @@ etwork_pat_control_cpp`: retail builds `net_pats_object` with `constructNetworkP
 
 #include "Network/sNetworkLibraryWii.h"   /* sNetworkLibraryInitParam (the Pat holder family is in Network/NetworkPat.h) */
 #include "Network/NetworkWiiMediator.h"   /* the mediator's terms and transfer-state setters - owner Network/NetworkWiiMediator.cpp */
-#include "OS/FindContainHeap_.h"       /* the expandable-heap API - owner OS/FindContainHeap_.c */
+#include "MEM/mem_allocator.h"
+#include "MEM/mem_expheap.h"       /* the expandable-heap API - owner MEM/mem_expheap.c */
 #include "NAND/nand.h"                 /* OSReport - owner NAND/nand.c */
 #include "pad_connect.h"               /* game_mutex - owner pad_connect.cpp */
 #include "ef/system_core.h"            /* work_mem_alloc / setTransferDisplayState - owner ef/system_core.cpp */

@@ -22,7 +22,8 @@
 
 #include "homebutton/hbm_widget.h"
 #include "homebutton/hbm_vu_object.h"
-#include "OS/FindContainHeap_.h"
+#include "MEM/mem_allocator.h"
+#include "MEM/mem_expheap.h"
 #include "homebutton/fn_8052B004.h"
 #include "homebutton/fn_80533474.h"
 #include "homebutton/fn_8053E808.h"

@@ -30,8 +30,9 @@
 #include "nw4r/db_console.h"
 #include "OS/OSAlarm.h"
 #include "NAND/nand.h"
-#include "NAND/OSSetAlarm.h"
-#include "NAND/OSVReport.h"
+#include "OS/OSSetAlarm.h"
+#include "OS/OSVReport.h"
+#include "OS/OSThread.h"
 #include "OS/PPCHalt.h"
 #include "stdarg.h"
 

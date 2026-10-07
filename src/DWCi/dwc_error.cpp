@@ -23,7 +23,7 @@
 #include "DWCi/DWCi_NatNeg.h"
 #include "DWCi/fn_805113B0.h"
 #include "NAND/nand.h"
-#include "NAND/OSVReport.h"
+#include "OS/OSVReport.h"
 #include "stdarg.h"
 #include "unsplit/DWCi.h"
 #include "unsplit/OS.h"

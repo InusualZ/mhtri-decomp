@@ -73,7 +73,7 @@
 #include "mh3_pad/Screen_w.h"   /* ScreenWork / Screen_w (rule 1/2) */
 #include "mh3_pad/lb_param_w.h" /* LbParamWork / lb_param_w (rule 1/2) */
 #include "mh3_pad/option_w.h"   /* option_w (rule 2) */
-#include "OS/mem.h"            /* MEMAllocator (rule 1) */
+#include "MEM/mem.h"            /* MEMAllocator (rule 1) */
 #include "RSO/runtime.h"     /* RSOModule + RSOStaticLocateObject (rule 2) */
 #include "fn_80040598.h"     /* the game-root RSO loaders (rule 2) */
 #include "ef/fn_800CDB2C.h"  /* GameMode_ck / fn_800CEE2C (rule 2) */
