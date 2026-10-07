@@ -292,7 +292,7 @@ extern "C" void GXSetPixelFmt(u32, u32);
 extern "C" void fn_804B7500(void* fb, u32);
 extern "C" void GXDrawDone(void);
 extern "C" void fn_804B64B0(void*);
-extern "C" void fn_804E7F60(void*);
+extern "C" void VIConfigure(void*);
 extern "C" void VISetNextFrameBuffer(void*);
 extern "C" void VIGetNextField(void);
 extern "C" void GXInvalidateVtxCache(void);
@@ -340,7 +340,7 @@ extern "C" void fn_80044A54(void);
 extern "C" void fn_80046C80(void);
 extern "C" void fn_80046D34(void);
 extern "C" int fn_804ED620(void);
-extern "C" void fn_804E7480(void);
+extern "C" void VIInit(void);
 extern "C" void OSSetResetCallback(void* arg);
 extern "C" void OSSetPowerCallback(void* arg);
 extern "C" void fn_8043F290(void);
@@ -367,7 +367,7 @@ int main(void)
     fn_8003F4D8();
     OSInit();
     DVDInit();
-    fn_804E7480();
+    VIInit();
     fn_8003F730(0);
     fn_8003F620();
     fn_8003FCCC();
@@ -693,7 +693,7 @@ extern "C" void fn_8003F9E4(u32 arg)
 
     Rmode->viWidth = mode.viWidth;
     Rmode->viXOrigin = mode.viXOrigin;
-    fn_804E7F60(Rmode);
+    VIConfigure(Rmode);
 
     ScreenWork* sw = &Screen_w;
     sw->width = 640;
@@ -848,7 +848,7 @@ extern "C" void fn_8003FE30(void)
 {
     fn_804B6F70(Rmode->efbHeight, Rmode->xfbHeight);
     GXSetDispCopyYScale();
-    fn_804E7F60(Rmode);
+    VIConfigure(Rmode);
     VISetNextFrameBuffer(lbl_80794770[lbl_8079477C]);
     lbl_8079477C ^= 1;
     lbl_80794778 = lbl_80794770[lbl_8079477C];

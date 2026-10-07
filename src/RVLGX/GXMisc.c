@@ -8,6 +8,6 @@
  *   from; unmeasured until bodies exist.
  * RESIDUALS. the left edge (0x804B5DB0) and the right edge (0x804B65F0, `__GXSetDirtyState`) lie in gaps with no data
  *   evidence; both are placed by the SDK function order. No body is written (20 functions), the largest
- *   `fn_804B5FA0` at 0x804B5FA0 (0x1B4 B); `python tools/units/sweepcomments.py --unit RVLGX/GXMisc.c` lists
+ *   `GXAbortFrame` at 0x804B5FA0 (0x1B4 B); `python tools/units/sweepcomments.py --unit RVLGX/GXMisc.c` lists
  *   them.
  */

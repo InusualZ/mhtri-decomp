@@ -28,4 +28,21 @@ typedef struct OSFontHeader {
     /* +0x2C */ u8 c[4];
 } OSFontHeader;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x804D0270 (0x78) - selects the string encoding (0 ANSI, 1 Shift-JIS, 3 UTF-8, 4 UTF-16, 5 UTF-32); returns the previous one. */
+u16 OSSetFontEncode(u16 encode);
+
+/* 0x804D0600 (0x118) - reads the ROM fonts into `dst` using `work` as the compressed buffer; returns the bytes used. */
+u32 OSInitFont(OSFontHeader* dst, u8* work);
+
+/* 0x804D09E0 (0x288) - renders the glyph of the first character of `string` into the 4-bit texture `image`; returns the position after it. */
+char* OSGetFontTexel(const char* string, u8* image, s32 pos, s32 stride, s32* width);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_OS_OSFONT_H */
