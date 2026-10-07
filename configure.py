@@ -1349,18 +1349,18 @@ config.libs = [
             Object(Matching, "TRK/main_TRK.c"),
             Object(NonMatching, "TRK/mem_TRK.c"),
             Object(Matching, "TRK/dispatch.c"),
-            Object(NonMatching, "TRK/dolphin_trk.c"),
+            Object(NonMatching, "TRK/dolphin_trk.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/nubevent.c"),
             Object(Matching, "TRK/nubinit.c"),
             Object(Matching, "TRK/serpoll.c"),
-            Object(NonMatching, "TRK/support.c"),
+            Object(NonMatching, "TRK/support.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/targcont.c"),
             Object(NonMatching, "TRK/msg.c"),
             Object(NonMatching, "TRK/msgbuf.c"),
-            Object(NonMatching, "TRK/msghndlr.c"),
+            Object(NonMatching, "TRK/msghndlr.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/mslsupp.c"),
             Object(NonMatching, "TRK/targimpl.c"),
-            Object(NonMatching, "AI_SDK/ai.c"),
+            Object(NonMatching, "AI_SDK/ai.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
             Object(NonMatching, "ARC/arc.cpp"),
             Object(NonMatching, "BTE/gki_buffer.cpp"),
             # The BTE tail 0x804A4AC0..0x804C1760 recut per SDK library; each unit's header carries its evidence.

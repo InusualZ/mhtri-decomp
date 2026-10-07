@@ -138,7 +138,7 @@ void fn_804DF0A0(void);
 void fn_804DD430(void);
 void AXRegisterCallback(void* cb);
 void fn_8046FD90(u32 v);
-void* fn_8046D420(void* cb);
+void* AIRegisterDMACallback(void* cb);
 void fn_8046FD70(u32 v);
 void fn_804C2820(u32 mode);
 
@@ -618,7 +618,7 @@ extern "C" void fn_800E8730(void)
     fn_8046FD90(0);
     fn_800E87E4(1);
     level = OSDisableInterrupts();
-    lbl_807949D8 = fn_8046D420((void*)fn_800E8888);
+    lbl_807949D8 = AIRegisterDMACallback((void*)fn_800E8888);
     OSRestoreInterrupts(level);
     /* The same reverb work-area clear `clearReverbWorkArea` performs; retail has the body here too. */
     lbl_807949E4 = 0x8000;

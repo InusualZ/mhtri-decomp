@@ -54,6 +54,14 @@ carrying the flag: it changed **Camellia** (`.text` 0x5F64 with the flag, 0x5F34
 (`NetworkMultipleUdp_receive` 94.06 % with, 89.53 % without - its log strings), and it was byte-identical on `RSO/runtime`
 and seven other `Network` objects, where the flag was removed. Do not add it "in case".
 
+**The reverse case (a unit that needs `pool`).** When the target's strings are packed contiguously behind one `@stringBase0` (offsets 0,
+0x15, 0x3a ... with no alignment padding), a 4 B string such as `"%s
+"` sits inside that pool, and the first string is addressed
+`addi r3,r30,@stringBase0@l` with no displacement, the unit was built with `-str reuse,pool`; plain `-str reuse` aligns each string
+to 4, moves strings of 8 B or less to `.sdata` and adds a `+0x40`-style displacement when other `.data` precedes the pool. Per object:
+`Object(NonMatching, "TRK/dolphin_trk.c", extra_cflags=["-str reuse,pool"])` (measured: `TRK/dolphin_trk` 14 -> 17 of 20 rows at 100,
+`.sdata` extra gone; `TRK/support` `TRK_RequestSend` 95.5 -> 96.8; `TRK/msg` and `TRK/msgbuf` unchanged).
+
 **Example.**
 
 ```

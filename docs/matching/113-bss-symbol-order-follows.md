@@ -27,6 +27,17 @@ reference touches (a read of the intended-first object ahead of the call); a bis
 all left the order unchanged (circle buffer first), so the unit stays NonMatching with the residual recorded in its header.
 The scratch test (`init(&circ, buf, 0x500)` with `buf` defined first) reproduces the circle-first layout.
 
+**Qualification (re-measured on `TRK/gdev_cc` with the `.sbss` object fixed).** The first diagnosis blamed the `.bss` order alone, but
+the same `ninja diff` line (`Expected to find symbol @eti_8001E558`) is printed for **any** layout defect, and the unit also had a
+second one: its `.sbss` open-state object is 8 B in the target while the source declared only the 4 B word the code reads, so the
+linker dead-stripped the unreferenced half and shifted the following addresses (`mwlink_debugger.py trace <unit>` shows the `.sbss`
+size; modelling the object as a struct with an `unused_0x04` word fixes it, idea 116). With that fixed the flip **still** fails the
+hash while `trace` shows `gdev_cc_circle_buffer .bss+0x0` and `gdev_cc_buffer .bss+0x20` (target: `+0x500` and `+0x0`), so the order
+is a real, separate defect; but it is not "first use" alone: declaring the circle buffer as a plain `u8[0x20]` array, defining it
+after the receive buffer, `static`, a local alias and an enclosing struct all leave the small object first (the layout looks
+size-ascending for these two). Read `trace` for **every** section of a unit that reads READY before attributing the hash to one of
+them, and fix the byte-less sections (`.sbss`/`.bss` object sizes) before spending time on their order.
+
 **Example.**
 
 ```
