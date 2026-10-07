@@ -16,7 +16,7 @@ Sections:
 main.cpp:
 	extab       start:0x800066E0 end:0x80006770
 	extabindex  start:0x8001E480 end:0x8001E558
-	.text       start:0x8003F200 end:0x80040478
+	.text       start:0x8003F200 end:0x80040478 align:16
 	.data       start:0x8057C82C end:0x8057C880
 	.bss        start:0x80658540 end:0x806585B8
 	.sdata      start:0x80790E20 end:0x80790E28
@@ -47,7 +47,7 @@ mh3_pad.cpp:
 pad_connect.cpp:
 	extab       start:0x80006A48 end:0x80006A90
 	extabindex  start:0x8001E8DC end:0x8001E948
-	.text       start:0x80046C80 end:0x80047398
+	.text       start:0x80046C80 end:0x80047398 align:16
 	.data       start:0x80581088 end:0x80581158
 	.bss        start:0x806694D0 end:0x806694E8
 	.sdata      start:0x80790EE0 end:0x80790EE8
@@ -75,7 +75,7 @@ userdata_item.cpp:
 fn_8004C9A0.cpp:
 	extab       start:0x80006CF0 end:0x80006CF8
 	extabindex  start:0x8001ECD8 end:0x8001ECE4
-	.text       start:0x8004C9A0 end:0x8004CAD8
+	.text       start:0x8004C9A0 end:0x8004CAD8 align:16
 
 fn_8004CAD8.cpp:
 	extab       start:0x80006CF8 end:0x80007000
@@ -124,7 +124,7 @@ fn_80056F24.cpp:
 fn_80059550.cpp:
 	extab       start:0x800072D0 end:0x80007310
 	extabindex  start:0x8001F5A8 end:0x8001F608
-	.text       start:0x80059550 end:0x8005AA28
+	.text       start:0x80059550 end:0x8005AA28 align:16
 	.data       start:0x8058B220 end:0x8058B350
 	.sdata      start:0x80791110 end:0x80791124
 	.sbss       start:0x807948C8 end:0x807948D8
@@ -153,7 +153,7 @@ font/flfnt.cpp:
 g3d/g3d_anmchr.cpp:
 	extab       start:0x800073C8 end:0x8000776C
 	extabindex  start:0x8001F71C end:0x8001FBFC
-	.text       start:0x8005CED0 end:0x80063E60
+	.text       start:0x8005CED0 end:0x80063E60 align:16
 	.rodata     start:0x8056F500 end:0x8056F550
 	.data       start:0x8058B410 end:0x8058C118
 	.bss        start:0x8066AE80 end:0x80682E80
@@ -163,7 +163,7 @@ g3d/g3d_anmchr.cpp:
 g3d/fn_80063888.cpp:
 	extab       start:0x8000776C end:0x80007B14
 	extabindex  start:0x8001FBFC end:0x8001FF5C
-	.text       start:0x80063E60 end:0x800680A8
+	.text       start:0x80063E60 end:0x800680A8 align:16
 	.rodata     start:0x8056F550 end:0x8056F578
 	.data       start:0x8058C118 end:0x8058CC40
 	.sdata      start:0x80791158 end:0x80791178
@@ -186,7 +186,7 @@ g3d/fn_800680CC.cpp:
 g3d/g3d_anmvis.cpp:
 	extab       start:0x80007E98 end:0x80007EC0
 	extabindex  start:0x8002040C end:0x80020448
-	.text       start:0x8006EAC0 end:0x8006EE78
+	.text       start:0x8006EAC0 end:0x8006EE78 align:16
 	.rodata     start:0x8056F628 end:0x8056F638
 	.data       start:0x8058D6C0 end:0x8058D7E0
 	.sdata      start:0x807911A0 end:0x807911A8
@@ -241,7 +241,7 @@ g3d/fn_80075DCC.cpp:
 g3d/g3d_scnmdl.cpp:
 	extab       start:0x80008588 end:0x80008674
 	extabindex  start:0x80020E74 end:0x80020FB8
-	.text       start:0x8007C540 end:0x8007F0E4
+	.text       start:0x8007C540 end:0x8007F0E4 align:16
 	.rodata     start:0x8056F678 end:0x8056F688
 	.data       start:0x8058EDA0 end:0x8058F0A0
 	.sdata      start:0x80791208 end:0x80791210
@@ -275,7 +275,7 @@ g3d/g3d_scnroot.cpp:
 g3d/g3d_state.cpp:
 	extab       start:0x80008AFC end:0x80008DE0
 	extabindex  start:0x800214BC end:0x800218AC
-	.text       start:0x80084630 end:0x80088E24
+	.text       start:0x80084630 end:0x80088E24 align:16
 	.ctors      start:0x8056F2D4 end:0x8056F2D8
 	.rodata     start:0x8056F6E0 end:0x8056F710
 	.data       start:0x8058F750 end:0x8058FCE8
@@ -294,7 +294,7 @@ g3d/g3d_resvtx.cpp:
 g3d/g3d_resanm.c:
 	extab       start:0x80008EB0 end:0x80008EE8
 	extabindex  start:0x800219E4 end:0x80021A38
-	.text       start:0x800898B0 end:0x80089F94
+	.text       start:0x800898B0 end:0x80089F94 align:16
 	.data       start:0x8058FDC8 end:0x8058FE90
 	.sdata2     start:0x80795E98 end:0x80795EC0
 
@@ -308,7 +308,7 @@ g3d/g3d_resanmamblight.c:
 g3d/g3d_resanmcamera.cpp:
 	extab       start:0x80008F00 end:0x80008F10
 	extabindex  start:0x80021A5C end:0x80021A74
-	.text       start:0x8008A220 end:0x8008A664
+	.text       start:0x8008A220 end:0x8008A664 align:16
 	.data       start:0x8058FF20 end:0x80590010
 
 g3d/g3d_resanmchr.cpp:
@@ -349,7 +349,7 @@ g3d/g3d_resanmtexsrt.cpp:
 g3d/g3d_resfile.cpp:
 	extab       start:0x800093A8 end:0x800094E0
 	extabindex  start:0x80022158 end:0x8002232C
-	.text       start:0x80093990 end:0x800947A4
+	.text       start:0x80093990 end:0x800947A4 align:16
 
 g3d/g3d_resmat.cpp:
 	extab       start:0x800094E0 end:0x80009850
@@ -368,7 +368,7 @@ g3d/g3d_resnode.cpp:
 g3d/g3d_resshp.cpp:
 	extab       start:0x80009880 end:0x800099E0
 	extabindex  start:0x8002289C end:0x80022AAC
-	.text       start:0x80099400 end:0x8009A748
+	.text       start:0x80099400 end:0x8009A748 align:16
 	.rodata     start:0x8056F730 end:0x8056F770
 	.data       start:0x80591618 end:0x80591860
 	.sdata      start:0x807912B8 end:0x807912D8
@@ -394,7 +394,7 @@ gx/fn_8009ACE4.c:
 g3d/g3d_gpu.cpp:
 	extab       start:0x80009A28 end:0x80009A38
 	extabindex  start:0x80022B18 end:0x80022B30
-	.text       start:0x8009B140 end:0x8009B374
+	.text       start:0x8009B140 end:0x8009B374 align:16
 	.data       start:0x80591900 end:0x80591948
 	.sdata2     start:0x80795F6C end:0x80795F70
 
@@ -436,7 +436,7 @@ ef/ef_effect.cpp:
 ef/ef_effectsystem.cpp:
 	extab       start:0x80009C38 end:0x80009CBC
 	extabindex  start:0x80022E30 end:0x80022EC0
-	.text       start:0x800A56B0 end:0x800A6258
+	.text       start:0x800A56B0 end:0x800A6258 align:16
 	.ctors      start:0x8056F2D8 end:0x8056F2DC
 	.data       start:0x80592698 end:0x80592850
 	.bss        start:0x80688420 end:0x80694538
@@ -553,14 +553,14 @@ ef/ef_drawstrategyimpl.cpp:
 ef/ef_torus.cpp:
 	extab       start:0x8000A554 end:0x8000A55C
 	extabindex  start:0x80023BA4 end:0x80023BB0
-	.text       start:0x800C9540 end:0x800C9DD0
+	.text       start:0x800C9540 end:0x800C9DD0 align:16
 	.data       start:0x80594BA8 end:0x80594C68
 	.sdata2     start:0x80796208 end:0x80796240
 
 ef/ef_cube.cpp:
 	extab       start:0x8000A55C end:0x8000A56C
 	extabindex  start:0x80023BB0 end:0x80023BC8
-	.text       start:0x800C9DD0 end:0x800CB948
+	.text       start:0x800C9DD0 end:0x800CB948 align:16
 	.data       start:0x80594C68 end:0x80594D20
 	.sdata2     start:0x80796240 end:0x80796270
 
@@ -574,7 +574,7 @@ ef/ef_cylinder.cpp:
 ef/ef_disc.cpp:
 	extab       start:0x8000A57C end:0x8000A584
 	extabindex  start:0x80023BE0 end:0x80023BEC
-	.text       start:0x800CC5B0 end:0x800CCCF8
+	.text       start:0x800CC5B0 end:0x800CCCF8 align:16
 	.data       start:0x80594DE0 end:0x80594E98
 	.sdata2     start:0x807962B0 end:0x807962E8
 
@@ -589,7 +589,7 @@ ef/ef_emform.cpp:
 ef/ef_line.cpp:
 	extab       start:0x8000A5CC end:0x8000A5D4
 	extabindex  start:0x80023C58 end:0x80023C64
-	.text       start:0x800CCFB0 end:0x800CD584
+	.text       start:0x800CCFB0 end:0x800CD584 align:16
 	.data       start:0x80594EE0 end:0x80594F98
 	.sdata2     start:0x807962E8 end:0x80796300
 
@@ -630,7 +630,7 @@ nw_resource.cpp:
 g3d/g3d_xsi.cpp:
 	extab       start:0x8000AC0C end:0x8000AC54
 	extabindex  start:0x80024258 end:0x800242C4
-	.text       start:0x800D6C00 end:0x800D77B0
+	.text       start:0x800D6C00 end:0x800D77B0 align:16
 	.rodata     start:0x8056F830 end:0x8056F868
 	.data       start:0x80595790 end:0x80595840
 	.sdata2     start:0x807963C8 end:0x807963D0
@@ -638,7 +638,7 @@ g3d/g3d_xsi.cpp:
 g3d/fn_800D77B0.cpp:
 	extab       start:0x8000AC54 end:0x8000AC5C
 	extabindex  start:0x800242C4 end:0x800242D0
-	.text       start:0x800D77B0 end:0x800D79B4
+	.text       start:0x800D77B0 end:0x800D79B4 align:16
 
 g3d/g3d_basic.cpp:
 	extab       start:0x8000AC5C end:0x8000AC74
@@ -703,7 +703,7 @@ sound/fn_800E46E8.cpp:
 sound/sound_obj.cpp:
 	extab       start:0x8000B2D4 end:0x8000B44C
 	extabindex  start:0x80024C84 end:0x80024E70
-	.text       start:0x800E5430 end:0x800E7D34
+	.text       start:0x800E5430 end:0x800E7D34 align:16
 	.ctors      start:0x8056F2F8 end:0x8056F2FC
 	.rodata     start:0x8056F878 end:0x8056F8D0
 	.data       start:0x80597DA8 end:0x80597E20
@@ -725,7 +725,7 @@ sound/snd_level_tbl.cpp:
 sound/fn_800E8E60.cpp:
 	extab       start:0x8000B554 end:0x8000B638
 	extabindex  start:0x80024FFC end:0x800250F8
-	.text       start:0x800E8E60 end:0x800E9D00
+	.text       start:0x800E8E60 end:0x800E9D00 align:16
 	.ctors      start:0x8056F300 end:0x8056F304
 	.data       start:0x80598020 end:0x80598038
 	.bss        start:0x80698AF0 end:0x8069A810
@@ -734,7 +734,7 @@ sound/fn_800E8E60.cpp:
 sound/snd_stream_mgr.cpp:
 	extab       start:0x8000B638 end:0x8000B7E8
 	extabindex  start:0x800250F8 end:0x80025320
-	.text       start:0x800E9D00 end:0x800ED780
+	.text       start:0x800E9D00 end:0x800ED780 align:16
 	.ctors      start:0x8056F304 end:0x8056F308
 	.data       start:0x80598038 end:0x80598090
 	.bss        start:0x8069A810 end:0x8069A8E8
@@ -745,7 +745,7 @@ sound/snd_stream_mgr.cpp:
 sound/snd_voice_pool.cpp:
 	extab       start:0x8000B7E8 end:0x8000B8BC
 	extabindex  start:0x80025320 end:0x80025404
-	.text       start:0x800ED780 end:0x800EE014
+	.text       start:0x800ED780 end:0x800EE014 align:16
 	.ctors      start:0x8056F308 end:0x8056F30C
 	.data       start:0x80598090 end:0x805980A8
 	.bss        start:0x8069A8E8 end:0x806A1110
@@ -761,7 +761,7 @@ sound/quest_snd.cpp:
 sound/snd_bank_loader.cpp:
 	extab       start:0x8000B8E4 end:0x8000BA6C
 	extabindex  start:0x80025440 end:0x8002568C
-	.text       start:0x800EEAE0 end:0x800F2A94
+	.text       start:0x800EEAE0 end:0x800F2A94 align:16
 	.data       start:0x805980A8 end:0x8059B170
 	.bss        start:0x806A1120 end:0x806A11B8
 	.sdata      start:0x80791470 end:0x80791650
@@ -780,7 +780,7 @@ sound/fn_800F2A94.cpp:
 ef/eft_res.cpp:
 	extab       start:0x8000BB6C end:0x8000BC5C
 	extabindex  start:0x8002580C end:0x80025974
-	.text       start:0x800F6520 end:0x800F95A4
+	.text       start:0x800F6520 end:0x800F95A4 align:16
 	.data       start:0x8059B3B0 end:0x8059B5D0
 	.sbss       start:0x80794A40 end:0x80794A88
 	.sdata2     start:0x807965D0 end:0x807965D8
@@ -818,7 +818,7 @@ ef/eft002.cpp:
 ef/fn_800FD520.c:
 	extab       start:0x8000BDFC end:0x8000BE04
 	extabindex  start:0x80025BE4 end:0x80025BF0
-	.text       start:0x800FD520 end:0x800FD718
+	.text       start:0x800FD520 end:0x800FD718 align:16
 	.sdata      start:0x807916E0 end:0x807916E8
 	.sdata2     start:0x80796658 end:0x80796688
 
@@ -875,7 +875,7 @@ ef/eft009.cpp:
 ef/fn_80104BD0.c:
 	extab       start:0x8000BFB4 end:0x8000BFBC
 	extabindex  start:0x80025E78 end:0x80025E84
-	.text       start:0x80104BD0 end:0x80105314
+	.text       start:0x80104BD0 end:0x80105314 align:16
 	.data       start:0x8059E430 end:0x8059E688
 	.sdata2     start:0x80796778 end:0x80796784
 
@@ -889,7 +889,7 @@ ef/fn_80105314.cpp:
 ef/eft013_fx.cpp:
 	extab       start:0x8000C074 end:0x8000C1F4
 	extabindex  start:0x80025F98 end:0x800261D8
-	.text       start:0x80107250 end:0x8010BDE4
+	.text       start:0x80107250 end:0x8010BDE4 align:16
 	.data       start:0x8059EB50 end:0x8059F518
 	.sdata      start:0x807917A0 end:0x80791820
 	.sdata2     start:0x807967A8 end:0x807967E8
@@ -930,7 +930,7 @@ ef/fn_80114E34.cpp:
 ef/eft022_fx.cpp:
 	extab       start:0x8000C3F4 end:0x8000C494
 	extabindex  start:0x800264D8 end:0x800265C8
-	.text       start:0x801153D0 end:0x8011722C
+	.text       start:0x801153D0 end:0x8011722C align:16
 	.data       start:0x805A0208 end:0x805A0460
 	.sdata      start:0x80791930 end:0x80791938
 	.sdata2     start:0x80796A30 end:0x80796A80
@@ -992,7 +992,7 @@ enemy/fn_8011D448.cpp:
 enemy/em_common.cpp:
 	extab       start:0x8000C8AC end:0x8000D2A4
 	extabindex  start:0x80026BEC end:0x80027AE0
-	.text       start:0x801251D0 end:0x8013791C
+	.text       start:0x801251D0 end:0x8013791C align:16
 	.ctors      start:0x8056F318 end:0x8056F31C
 	.rodata     start:0x8056F8D0 end:0x8056F8E0
 	.data       start:0x805A0FB0 end:0x805A1358
@@ -1022,7 +1022,7 @@ enemy/fn_8013ACC4.cpp:
 enemy/em_kind.cpp:
 	extab       start:0x8000D424 end:0x8000D664
 	extabindex  start:0x80027D20 end:0x80028080
-	.text       start:0x8013BE60 end:0x801411B8
+	.text       start:0x8013BE60 end:0x801411B8 align:16
 	.data       start:0x805A19D0 end:0x805A1A80
 	.sdata2     start:0x80796D90 end:0x80796DC8
 
@@ -1050,7 +1050,7 @@ enemy/em001_prog.cpp:
 enemy/em003_prog.cpp:
 	extab       start:0x8000DCFC end:0x8000DFA4
 	extabindex  start:0x80028A64 end:0x80028E60
-	.text       start:0x80154E40 end:0x8015D860
+	.text       start:0x80154E40 end:0x8015D860 align:16
 	.ctors      start:0x8056F324 end:0x8056F328
 	.rodata     start:0x8056FA38 end:0x8056FB50
 	.data       start:0x805A44A8 end:0x805A5D48
@@ -1061,7 +1061,7 @@ enemy/em003_prog.cpp:
 enemy/em008_prog.cpp:
 	extab       start:0x8000DFA4 end:0x8000E1D4
 	extabindex  start:0x80028E60 end:0x800291A8
-	.text       start:0x8015D860 end:0x801663E4
+	.text       start:0x8015D860 end:0x801663E4 align:16
 	.ctors      start:0x8056F328 end:0x8056F32C
 	.rodata     start:0x8056FB50 end:0x8056FC10
 	.data       start:0x805A5D48 end:0x805A6D58
@@ -1091,7 +1091,7 @@ enemy/em011_prog.cpp:
 enemy/em012_prog.cpp:
 	extab       start:0x8000E52C end:0x8000E6D4
 	extabindex  start:0x800296AC end:0x80029928
-	.text       start:0x80170600 end:0x80176C30
+	.text       start:0x80170600 end:0x80176C30 align:16
 	.ctors      start:0x8056F334 end:0x8056F338
 	.rodata     start:0x8056FD10 end:0x8056FDD0
 	.data       start:0x805A8370 end:0x805A94A0
@@ -1102,7 +1102,7 @@ enemy/em012_prog.cpp:
 enemy/em015_prog.cpp:
 	extab       start:0x8000E6D4 end:0x8000E9E4
 	extabindex  start:0x80029928 end:0x80029DC0
-	.text       start:0x80176C30 end:0x80182C40
+	.text       start:0x80176C30 end:0x80182C40 align:16
 	.ctors      start:0x8056F338 end:0x8056F33C
 	.rodata     start:0x8056FDD0 end:0x8056FF50
 	.data       start:0x805A94A0 end:0x805AA930
@@ -1112,7 +1112,7 @@ enemy/em015_prog.cpp:
 enemy/em016_prog.cpp:
 	extab       start:0x8000E9E4 end:0x8000EDC4
 	extabindex  start:0x80029DC0 end:0x8002A390
-	.text       start:0x80182C40 end:0x80192348
+	.text       start:0x80182C40 end:0x80192348 align:16
 	.ctors      start:0x8056F33C end:0x8056F340
 	.rodata     start:0x8056FF50 end:0x80570050
 	.data       start:0x805AA930 end:0x805AD370
@@ -1135,7 +1135,7 @@ enemy/em018_prog.cpp:
 enemy/em025_prog.cpp:
 	extab       start:0x8000F124 end:0x8000F374
 	extabindex  start:0x8002A8A0 end:0x8002AC18
-	.text       start:0x8019E670 end:0x801AA154
+	.text       start:0x8019E670 end:0x801AA154 align:16
 	.rodata     start:0x80570150 end:0x805701A0
 	.data       start:0x805AE750 end:0x805B06D0
 	.sdata      start:0x80791A80 end:0x80791A88
@@ -1153,7 +1153,7 @@ enemy/em027_prog.cpp:
 enemy/em030_prog.cpp:
 	extab       start:0x8000F54C end:0x8000F6A4
 	extabindex  start:0x8002AEDC end:0x8002B0E0
-	.text       start:0x801B0010 end:0x801B4348
+	.text       start:0x801B0010 end:0x801B4348 align:16
 	.ctors      start:0x8056F344 end:0x8056F348
 	.data       start:0x805B0FD0 end:0x805B17A8
 	.bss        start:0x806A7A88 end:0x806A7AA0
@@ -1173,7 +1173,7 @@ enemy/em034_prog.cpp:
 enemy/fn_801B7020.cpp:
 	extab       start:0x8000F7EC end:0x8000F904
 	extabindex  start:0x8002B2CC end:0x8002B470
-	.text       start:0x801B7020 end:0x801B98C8
+	.text       start:0x801B7020 end:0x801B98C8 align:16
 	.ctors      start:0x8056F34C end:0x8056F350
 	.data       start:0x805B2118 end:0x805B2804
 	.bss        start:0x806A7AB8 end:0x806A7AD0
@@ -1240,12 +1240,12 @@ lobby/fn_801E0ADC.cpp:
 lobby/fn_801E7530.cpp:
 	extab       start:0x800105B4 end:0x8001079C
 	extabindex  start:0x8002C778 end:0x8002CA54
-	.text       start:0x801E7530 end:0x801EC9E0
+	.text       start:0x801E7530 end:0x801EC9E0 align:16
 	.data       start:0x805B7CB0 end:0x805B85D8
 	.sdata      start:0x80791B70 end:0x80791C58
 
 lobby/lobby_scene.c:
-	.text       start:0x801EC9E0 end:0x801EC9F8
+	.text       start:0x801EC9E0 end:0x801EC9F8 align:16
 
 lobby/lb_pane_ui.cpp:
 	extab       start:0x8001079C end:0x80010ADC
@@ -1269,7 +1269,7 @@ lobby/lb_npc.cpp:
 lobby/fn_80212810.cpp:
 	extab       start:0x80011434 end:0x80011724
 	extabindex  start:0x8002DD38 end:0x8002E1A0
-	.text       start:0x80212810 end:0x80219260
+	.text       start:0x80212810 end:0x80219260 align:16
 	.data       start:0x805B97BC end:0x805B9DDC
 	.sdata      start:0x80791DC0 end:0x80791EB0
 	.sdata2     start:0x80799C18 end:0x80799C40
@@ -1277,7 +1277,7 @@ lobby/fn_80212810.cpp:
 lobby/fn_80219260.cpp:
 	extab       start:0x80011724 end:0x800118CC
 	extabindex  start:0x8002E1A0 end:0x8002E41C
-	.text       start:0x80219260 end:0x8021E1EC
+	.text       start:0x80219260 end:0x8021E1EC align:16
 	.data       start:0x805B9DDC end:0x805BA0C0
 	.bss        start:0x806AA790 end:0x806AA8C8
 	.sdata      start:0x80791EB0 end:0x80791EE0
@@ -1296,7 +1296,7 @@ lobby/lb_menu_scratch.cpp:
 lobby/lb_menu_pos_tbl.cpp:
 	extab       start:0x800118FC end:0x8001195C
 	extabindex  start:0x8002E464 end:0x8002E4F4
-	.text       start:0x8021F020 end:0x80220038
+	.text       start:0x8021F020 end:0x80220038 align:16
 	.ctors      start:0x8056F364 end:0x8056F368
 	.data       start:0x805BA650 end:0x805BA660
 	.bss        start:0x806AAA88 end:0x806AACC0
@@ -1335,7 +1335,7 @@ Pl/fn_802373AC.cpp:
 Pl/fn_8023C2D0.cpp:
 	extab       start:0x80011CB4 end:0x80011CC4
 	extabindex  start:0x8002E9F8 end:0x8002EA10
-	.text       start:0x8023C2D0 end:0x80241558
+	.text       start:0x8023C2D0 end:0x80241558 align:16
 	.data       start:0x805C34D4 end:0x805C3D20
 
 Pl/fn_80241558.cpp:
@@ -1449,7 +1449,7 @@ Pl/pl_yure.cpp:
 stage/stg_w.cpp:
 	extab       start:0x80013B0C end:0x80013E04
 	extabindex  start:0x80031710 end:0x80031B84
-	.text       start:0x802AD9C0 end:0x802B5640
+	.text       start:0x802AD9C0 end:0x802B5640 align:16
 	.ctors      start:0x8056F37C end:0x8056F380
 	.data       start:0x805CED40 end:0x805CFBE8
 	.bss        start:0x806B87C0 end:0x806BB7E0
@@ -1460,7 +1460,7 @@ stage/stg_w.cpp:
 camera/camera_main.cpp:
 	extab       start:0x80013E04 end:0x8001420C
 	extabindex  start:0x80031B84 end:0x80032190
-	.text       start:0x802B5640 end:0x802BF278
+	.text       start:0x802B5640 end:0x802BF278 align:16
 	.ctors      start:0x8056F380 end:0x8056F384
 	.data       start:0x805CFBE8 end:0x805D39A0
 	.bss        start:0x806BB7E0 end:0x806BC300
@@ -1481,7 +1481,7 @@ light/light.cpp:
 ai/ai_npc.cpp:
 	extab       start:0x80014384 end:0x80014AF4
 	extabindex  start:0x800323AC end:0x80032ED4
-	.text       start:0x802C2700 end:0x802D9EA4
+	.text       start:0x802C2700 end:0x802D9EA4 align:16
 	.ctors      start:0x8056F388 end:0x8056F38C
 	.data       start:0x805D3A88 end:0x805D54A0
 	.bss        start:0x806BD360 end:0x806BD808
@@ -1502,7 +1502,7 @@ hud/cockpit.cpp:
 hud/layout.cpp:
 	extab       start:0x80014DAC end:0x80014FFC
 	extabindex  start:0x800332E8 end:0x80033660
-	.text       start:0x802E0740 end:0x802E4978
+	.text       start:0x802E0740 end:0x802E4978 align:16
 	.data       start:0x805D5798 end:0x805D5B48
 	.sdata      start:0x807927B0 end:0x807927C0
 	.sdata2     start:0x8079A8C0 end:0x8079A8E0
@@ -1548,7 +1548,7 @@ enemy/em_sub_state_prog.cpp:
 lobby/fn_802FA9A0.cpp:
 	extab       start:0x800156B4 end:0x80015964
 	extabindex  start:0x80034074 end:0x8003447C
-	.text       start:0x802FA9A0 end:0x8030121C
+	.text       start:0x802FA9A0 end:0x8030121C align:16
 	.ctors      start:0x8056F394 end:0x8056F398
 	.rodata     start:0x805707C0 end:0x80570840
 	.data       start:0x805D8B00 end:0x805DAFE8
@@ -1567,7 +1567,7 @@ lobby/fn_8030121C.cpp:
 ef/fn_803066F0.c:
 	extab       start:0x80015AAC end:0x80015AB4
 	extabindex  start:0x80034668 end:0x80034674
-	.text       start:0x803066F0 end:0x8030681C
+	.text       start:0x803066F0 end:0x8030681C align:16
 	.sdata      start:0x80792B70 end:0x80792B78
 
 ef/fn_8030681C.cpp:
@@ -1589,7 +1589,7 @@ menu/menu_infomation.cpp:
 menu/fn_8031A6C0.cpp:
 	extab       start:0x80015F3C end:0x80016034
 	extabindex  start:0x80034D40 end:0x80034EB4
-	.text       start:0x8031A6C0 end:0x8031DAA8
+	.text       start:0x8031A6C0 end:0x8031DAA8 align:16
 	.ctors      start:0x8056F398 end:0x8056F39C
 	.data       start:0x805DCE98 end:0x805DCF38
 	.bss        start:0x806BE108 end:0x806BE120
@@ -1623,7 +1623,7 @@ hud/fn_80324F7C.c:
 hud/move_work_update.cpp:
 	extab       start:0x80016224 end:0x8001622C
 	extabindex  start:0x8003519C end:0x800351A8
-	.text       start:0x803250B0 end:0x803253BC
+	.text       start:0x803250B0 end:0x803253BC align:16
 
 enemy/em_action.cpp:
 	extab       start:0x8001622C end:0x80016464
@@ -1640,7 +1640,7 @@ enemy/em_action.cpp:
 enemy/em_act_step.cpp:
 	extab       start:0x80016464 end:0x80016614
 	extabindex  start:0x800354FC end:0x80035784
-	.text       start:0x8032C920 end:0x80330194
+	.text       start:0x8032C920 end:0x80330194 align:16
 	.ctors      start:0x8056F3A0 end:0x8056F3A4
 	.data       start:0x805DFC30 end:0x805E0510
 	.bss        start:0x806BE328 end:0x806BE340
@@ -1673,7 +1673,7 @@ lobby/lb_companion_ui.cpp:
 ef/eft050.cpp:
 	extab       start:0x80016CA4 end:0x80016DB4
 	extabindex  start:0x8003615C end:0x800362F4
-	.text       start:0x8033F270 end:0x803432B4
+	.text       start:0x8033F270 end:0x803432B4 align:16
 	.data       start:0x805E7410 end:0x805E7B50
 	.sdata      start:0x8079308C end:0x807930F0
 	.sdata2     start:0x8079B2C0 end:0x8079B320
@@ -1707,13 +1707,13 @@ menu/menu_note.cpp:
 menu/menu_row.cpp:
 	extab       start:0x80017094 end:0x800170F4
 	extabindex  start:0x80036744 end:0x800367D4
-	.text       start:0x8034C1D0 end:0x8034D2B0
+	.text       start:0x8034C1D0 end:0x8034D2B0 align:16
 	.sdata2     start:0x8079B368 end:0x8079B3A8
 
 Pl/pl_act_class3.cpp:
 	extab       start:0x800170F4 end:0x800171A4
 	extabindex  start:0x800367D4 end:0x800368DC
-	.text       start:0x8034D2B0 end:0x8034F138
+	.text       start:0x8034D2B0 end:0x8034F138 align:16
 	.data       start:0x805E9248 end:0x805EBBE0
 	.sdata      start:0x80793308 end:0x80793330
 	.sdata2     start:0x8079B3A8 end:0x8079B3C8
@@ -1820,7 +1820,7 @@ enemy/em_prog_support.cpp:
 enemy/em_prog_tail.cpp:
 	extab       start:0x80017FF4 end:0x8001803C
 	extabindex  start:0x80037E54 end:0x80037EC0
-	.text       start:0x80385EE0 end:0x803868DC
+	.text       start:0x80385EE0 end:0x803868DC align:16
 	.sdata2     start:0x8079BF90 end:0x8079BFF8
 
 enemy/em009_act.cpp:
@@ -1883,7 +1883,7 @@ menu/multi_result.cpp:
 lobby/lb_quest_screen.cpp:
 	extab       start:0x8001882C end:0x80018A6C
 	extabindex  start:0x80038AA8 end:0x80038E08
-	.text       start:0x803A3A50 end:0x803AA4A4
+	.text       start:0x803A3A50 end:0x803AA4A4 align:16
 	.data       start:0x805F2038 end:0x805F2940
 	.sdata      start:0x80793530 end:0x807935D0
 	.sdata2     start:0x8079C448 end:0x8079C4C0
@@ -1981,7 +1981,7 @@ Network/NetworkPeerBase.cpp:
 Network/NetworkPeerBuffer.cpp:
 	extab       start:0x800198E0 end:0x80019940
 	extabindex  start:0x8003A0E0 end:0x8003A134
-	.text       start:0x803CCF30 end:0x803CD248
+	.text       start:0x803CCF30 end:0x803CD248 align:16
 	.data       start:0x805F9510 end:0x805F9540
 
 Network/NetworkPeerUdp.cpp:
@@ -2002,7 +2002,7 @@ Network/NetworkPeerMcs.cpp:
 Network/network_socket_streams.cpp:
 	extab       start:0x800199B0 end:0x80019A68
 	extabindex  start:0x8003A1DC end:0x8003A2F0
-	.text       start:0x803CE060 end:0x803CF14C
+	.text       start:0x803CE060 end:0x803CF14C align:16
 	.data       start:0x805F9610 end:0x805F9958
 
 Network/NetworkResolverWii.cpp:
@@ -2085,7 +2085,7 @@ Network/NetworkFileFetcher.cpp:
 Network/NetworkNullFetcher.cpp:
 	extab       start:0x8001B850 end:0x8001B87C
 	extabindex  start:0x8003B9D0 end:0x8003B9F4
-	.text       start:0x803F73C0 end:0x803F74D8
+	.text       start:0x803F73C0 end:0x803F74D8 align:16
 	.data       start:0x805FC8A8 end:0x805FC8D0
 
 Network/NetworkSocketBase.cpp:
@@ -2145,7 +2145,7 @@ Network/NetworkPool.cpp:
 Network/NetworkWiiMediator.cpp:
 	extab       start:0x8001C9B4 end:0x8001CD94
 	extabindex  start:0x8003D278 end:0x8003D764
-	.text       start:0x80413450 end:0x80417BC0
+	.text       start:0x80413450 end:0x80417BC0 align:16
 	.rodata     start:0x80570E70 end:0x80570E98
 	.data       start:0x806024B8 end:0x80602988
 	.sdata2     start:0x8079C870 end:0x8079C878
@@ -2153,7 +2153,7 @@ Network/NetworkWiiMediator.cpp:
 Network/sNetworkLibrary.cpp:
 	extab       start:0x8001CD94 end:0x8001CE1C
 	extabindex  start:0x8003D764 end:0x8003D7DC
-	.text       start:0x80417BC0 end:0x8041891C
+	.text       start:0x80417BC0 end:0x8041891C align:16
 	.data       start:0x80602988 end:0x80602AF8
 	.sbss       start:0x80794CC0 end:0x80794CD0
 
@@ -2189,7 +2189,7 @@ Network/GameSpyInterfaceThread.cpp:
 Camellia/camellia.c:
 	extab       start:0x8001D16C end:0x8001D1B4
 	extabindex  start:0x8003DBD8 end:0x8003DC44
-	.text       start:0x8041DF10 end:0x80423E74
+	.text       start:0x8041DF10 end:0x80423E74 align:16
 	.rodata     start:0x80570E98 end:0x80571E98
 
 Network/network_pat_control.cpp:
@@ -2215,7 +2215,7 @@ Network/net_session_close.cpp:
 menu/menu_placeinfo.cpp:
 	extab       start:0x8001DA94 end:0x8001DBEC
 	extabindex  start:0x8003E514 end:0x8003E718
-	.text       start:0x80437270 end:0x8043D524
+	.text       start:0x80437270 end:0x8043D524 align:16
 	.ctors      start:0x8056F3C8 end:0x8056F3CC
 	.data       start:0x80603E90 end:0x806047D0
 	.bss        start:0x806E1B38 end:0x806E26E0
@@ -2266,7 +2266,7 @@ menu/menu_sysmsg.cpp:
 	.sdata2     start:0x8079C998 end:0x8079C9A8
 
 MSL/strlen.cpp:
-	.text       start:0x804565C0 end:0x804565DC
+	.text       start:0x804565C0 end:0x804565DC align:16
 
 Runtime.PPCEABI.H/__va_arg.cpp:
 	.text       start:0x804565DC end:0x804566A4
@@ -2286,11 +2286,11 @@ Runtime.PPCEABI.H/ptmf.c:
 	.rodata     start:0x80572428 end:0x80572438
 
 Runtime.PPCEABI.H/runtime.cpp:
-	.text       start:0x80456CE0 end:0x80457420
+	.text       start:0x80456CE0 end:0x80457420 align:16
 	.rodata     start:0x80572438 end:0x80572450
 
 Runtime.PPCEABI.H/__init_cpp_exceptions.cpp:
-	.text       start:0x80457420 end:0x80457490
+	.text       start:0x80457420 end:0x80457490 align:16
 	.ctors      start:0x8056F2C0 end:0x8056F2C4 rename:.ctors$10
 	.dtors      start:0x8056F440 end:0x8056F444 rename:.dtors$10
 	.dtors      start:0x8056F444 end:0x8056F448 rename:.dtors$15
@@ -2299,7 +2299,7 @@ Runtime.PPCEABI.H/__init_cpp_exceptions.cpp:
 Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp:
 	extab       start:0x8001E3F0 end:0x8001E400
 	extabindex  start:0x8003F174 end:0x8003F18C
-	.text       start:0x80457490 end:0x804578FC
+	.text       start:0x80457490 end:0x804578FC align:16
 	.data       start:0x8060E8A0 end:0x8060E8E4
 	.bss        start:0x806F4B48 end:0x806F4CC8
 
@@ -2344,7 +2344,7 @@ MSL_C/file_io.c:
 	.text       start:0x8045AB38 end:0x8045B3A0
 
 MSL_C/mbstring.c:
-	.text       start:0x8045B3A0 end:0x8045B598
+	.text       start:0x8045B3A0 end:0x8045B598 align:16
 
 MSL_C/mem.c:
 	.text       start:0x8045B598 end:0x8045B9D8
@@ -2360,7 +2360,7 @@ MSL_C/printf.c:
 	.sdata2     start:0x8079C9F8 end:0x8079CA00
 
 MSL_C/rand.c:
-	.text       start:0x8045DFA0 end:0x8045DFC8
+	.text       start:0x8045DFA0 end:0x8045DFC8 align:16
 	.sdata      start:0x80793CE0 end:0x80793CE8
 
 MSL_C/scanf.c:
@@ -2401,13 +2401,13 @@ MSL_C/wprintf.c:
 	.sdata2     start:0x8079CA28 end:0x8079CA30
 
 MSL_C/wstring.c:
-	.text       start:0x80463B20 end:0x80463C48
+	.text       start:0x80463B20 end:0x80463C48 align:16
 
 MSL_C/wchar_io.c:
 	.text       start:0x80463C48 end:0x80463CC0
 
 MSL_C/uart_console_io.c:
-	.text       start:0x80463CC0 end:0x80463D98
+	.text       start:0x80463CC0 end:0x80463D98 align:16
 	.sbss       start:0x80794E10 end:0x80794E18
 
 MSL_C/abort_exit.c:
@@ -2426,7 +2426,7 @@ MSL/e_asin.cpp:
 	.sdata2     start:0x8079CAB8 end:0x8079CB40
 
 MSL/e_atan2.cpp:
-	.text       start:0x80464560 end:0x804647B8
+	.text       start:0x80464560 end:0x804647B8 align:16
 	.sdata2     start:0x8079CB40 end:0x8079CB98
 
 MSL/e_fmod.cpp:
@@ -2444,7 +2444,7 @@ MSL/e_log10.cpp:
 	.sdata2     start:0x8079CC18 end:0x8079CC48
 
 MSL/e_pow.cpp:
-	.text       start:0x80464F00 end:0x80465714
+	.text       start:0x80464F00 end:0x80465714 align:16
 	.rodata     start:0x805731A0 end:0x805731D0
 	.sdata2     start:0x8079CC48 end:0x8079CD58
 
@@ -2463,21 +2463,21 @@ MSL/k_rem_pio2.cpp:
 	.sdata2     start:0x8079CDF8 end:0x8079CE38
 
 MSL/k_sin.cpp:
-	.text       start:0x80467260 end:0x80467320
+	.text       start:0x80467260 end:0x80467320 align:16
 	.sdata2     start:0x8079CE38 end:0x8079CE70
 
 MSL/k_tan.cpp:
-	.text       start:0x80467320 end:0x80467570
+	.text       start:0x80467320 end:0x80467570 align:16
 	.rodata     start:0x805733A8 end:0x80573410
 	.sdata2     start:0x8079CE70 end:0x8079CEA8
 
 MSL/s_atan.cpp:
-	.text       start:0x80467570 end:0x804677A0
+	.text       start:0x80467570 end:0x804677A0 align:16
 	.rodata     start:0x80573410 end:0x805734A8
 	.sdata2     start:0x8079CEA8 end:0x8079CED0
 
 MSL/s_ceil.cpp:
-	.text       start:0x804677A0 end:0x804678EC
+	.text       start:0x804677A0 end:0x804678EC align:16
 	.sdata2     start:0x8079CED0 end:0x8079CEE0
 
 MSL/s_copysign.cpp:
@@ -2488,11 +2488,11 @@ MSL/s_cos.cpp:
 	.sdata2     start:0x8079CEE0 end:0x8079CEE8
 
 MSL/s_floor.cpp:
-	.text       start:0x804679E0 end:0x80467B30
+	.text       start:0x804679E0 end:0x80467B30 align:16
 	.sdata2     start:0x8079CEE8 end:0x8079CEF8
 
 MSL/s_frexp.cpp:
-	.text       start:0x80467B30 end:0x80467BB8
+	.text       start:0x80467B30 end:0x80467BB8 align:16
 	.sdata2     start:0x8079CEF8 end:0x8079CF00
 
 MSL/s_ldexp.cpp:
@@ -2503,7 +2503,7 @@ MSL/s_modf.cpp:
 	.text       start:0x80467D24 end:0x80467E20
 
 MSL/s_sin.cpp:
-	.text       start:0x80467E20 end:0x80467EEC
+	.text       start:0x80467E20 end:0x80467EEC align:16
 	.sdata2     start:0x8079CF28 end:0x8079CF30
 
 MSL/s_tan.cpp:
@@ -2526,13 +2526,13 @@ TRK/gdev_cc.c:
 	.sbss       start:0x80794E38 end:0x80794E40
 
 TRK/CircleBuffer.c:
-	.text       start:0x804685F0 end:0x80468868
+	.text       start:0x804685F0 end:0x80468868 align:16
 
 TRK/TRK_flush_cache.cpp:
 	.text       start:0x80468868 end:0x804688A0
 
 TRK/main_TRK.c:
-	.text       start:0x804688A0 end:0x804689C8
+	.text       start:0x804688A0 end:0x804689C8 align:16
 	.sbss       start:0x80794E40 end:0x80794E48
 
 TRK/mem_TRK.c:
@@ -2563,11 +2563,11 @@ TRK/serpoll.c:
 	.text       start:0x80469788 end:0x804698D0
 
 TRK/support.c:
-	.text       start:0x804698D0 end:0x80469F10
+	.text       start:0x804698D0 end:0x80469F10 align:16
 	.data       start:0x8060F710 end:0x8060F758
 
 TRK/targcont.c:
-	.text       start:0x80469F10 end:0x8046A26C
+	.text       start:0x80469F10 end:0x8046A26C align:16
 
 TRK/msg.c:
 	.text       start:0x8046A26C end:0x8046A2D0
@@ -2575,7 +2575,7 @@ TRK/msg.c:
 	.sbss       start:0x80794E68 end:0x80794E70
 
 TRK/msgbuf.c:
-	.text       start:0x8046A2D0 end:0x8046AADC
+	.text       start:0x8046A2D0 end:0x8046AADC align:16
 	.data       start:0x8060F780 end:0x8060F7A8
 	.bss        start:0x806F5590 end:0x806F6F38
 
@@ -2585,7 +2585,7 @@ TRK/msghndlr.c:
 	.sbss       start:0x80794E70 end:0x80794E78
 
 TRK/mslsupp.c:
-	.text       start:0x8046BA60 end:0x8046BBEC
+	.text       start:0x8046BA60 end:0x8046BBEC align:16
 
 TRK/targimpl.c:
 	.text       start:0x8046BBEC end:0x8046D420
@@ -2595,13 +2595,13 @@ TRK/targimpl.c:
 	.sbss       start:0x80794E78 end:0x80794E88
 
 AI_SDK/ai.c:
-	.text       start:0x8046D420 end:0x8046D9F0
+	.text       start:0x8046D420 end:0x8046D9F0 align:16
 	.data       start:0x8060F820 end:0x8060F868
 	.sdata      start:0x80793D00 end:0x80793D08
 	.sbss       start:0x80794E88 end:0x80794EC8
 
 ARC/arc.cpp:
-	.text       start:0x8046D9F0 end:0x80474CB0
+	.text       start:0x8046D9F0 end:0x80474CB0 align:16
 	.data       start:0x8060F868 end:0x80612980
 	.bss        start:0x806F74E0 end:0x8070C414
 	.sdata      start:0x80793D08 end:0x80793D20
@@ -2609,26 +2609,26 @@ ARC/arc.cpp:
 	.sdata2     start:0x8079CF48 end:0x8079CFF0
 
 AX/AXFXReverbHi.c:
-	.text       start:0x80474CB0 end:0x80474F30
+	.text       start:0x80474CB0 end:0x80474F30 align:16
 	.sdata2     start:0x8079CFF0 end:0x8079D000
 
 AX/AXFXReverbHiExp.c:
-	.text       start:0x80474F30 end:0x80475E30
+	.text       start:0x80474F30 end:0x80475E30 align:16
 	.data       start:0x80612980 end:0x80612B20
 	.sdata2     start:0x8079D000 end:0x8079D040
 
 AX/AXFXReverbStd.cpp:
-	.text       start:0x80475E30 end:0x804770E0
+	.text       start:0x80475E30 end:0x804770E0 align:16
 	.data       start:0x80612B20 end:0x80612CE0
 	.sdata      start:0x80793D20 end:0x80793D28
 	.sdata2     start:0x8079D040 end:0x8079D080
 
 OS/PPCArch.c:
-	.text       start:0x804770E0 end:0x804772F0
+	.text       start:0x804770E0 end:0x804772F0 align:16
 	.data       start:0x80612CE0 end:0x80612D18
 
 BTE/gki_buffer.cpp:
-	.text       start:0x804772F0 end:0x804A4AC0
+	.text       start:0x804772F0 end:0x804A4AC0 align:16
 	.rodata     start:0x80573530 end:0x805739A8
 	.data       start:0x80612D18 end:0x806184E0
 	.bss        start:0x8070CDE0 end:0x80741998
@@ -2638,50 +2638,50 @@ BTE/gki_buffer.cpp:
 	.sbss2      start:0x8079D7E0 end:0x8079D7F0
 
 DB/db.c:
-	.text       start:0x804A4AC0 end:0x804A4BC0
+	.text       start:0x804A4AC0 end:0x804A4BC0 align:16
 	.data       start:0x806184E0 end:0x806184F8
 	.sbss       start:0x80795040 end:0x80795048
 
 mh3_pad/rc_record.c:
-	.text       start:0x804A4BC0 end:0x804A4F20
+	.text       start:0x804A4BC0 end:0x804A4F20 align:16
 	.data       start:0x806184F8 end:0x80618508
 	.bss        start:0x80741998 end:0x80741A40
 	.sbss       start:0x80795048 end:0x80795050
 
 DSP/dsp.c:
-	.text       start:0x804A4F20 end:0x804A5AB0
+	.text       start:0x804A4F20 end:0x804A5AB0 align:16
 	.data       start:0x80618508 end:0x806186C8
 	.sdata      start:0x80793DC8 end:0x80793DD0
 	.sbss       start:0x80795050 end:0x80795070
 
 DVD/dvdfs.c:
-	.text       start:0x804A5AB0 end:0x804A6410
+	.text       start:0x804A5AB0 end:0x804A6410 align:16
 	.data       start:0x806186C8 end:0x80618800
 	.sdata      start:0x80793DD0 end:0x80793DE0
 	.sbss       start:0x80795070 end:0x807950A0
 
 DVD/dvd.c:
-	.text       start:0x804A6410 end:0x804AB040
+	.text       start:0x804A6410 end:0x804AB040 align:16
 	.data       start:0x80618800 end:0x80618C10
 	.bss        start:0x80741A40 end:0x807466F0
 	.sdata      start:0x80793DE0 end:0x80793DF8
 	.sbss       start:0x807950A0 end:0x80795138
 
 DVD/dvdqueue.c:
-	.text       start:0x804AB040 end:0x804AB2C0
+	.text       start:0x804AB040 end:0x804AB2C0 align:16
 	.bss        start:0x807466F0 end:0x80746720
 
 DVD/dvderror.c:
-	.text       start:0x804AB2C0 end:0x804ABCE0
+	.text       start:0x804AB2C0 end:0x804ABCE0 align:16
 	.data       start:0x80618C10 end:0x80618C40
 	.bss        start:0x80746720 end:0x80746980
 	.sbss       start:0x80795138 end:0x80795148
 
 DVD/dvdidutils.c:
-	.text       start:0x804ABCE0 end:0x804ABDD0
+	.text       start:0x804ABCE0 end:0x804ABDD0 align:16
 
 DVD/dvdFatal.c:
-	.text       start:0x804ABDD0 end:0x804ABF40
+	.text       start:0x804ABDD0 end:0x804ABF40 align:16
 	.rodata     start:0x805739A8 end:0x805739E0
 	.data       start:0x80618C40 end:0x806195A0
 	.sdata      start:0x80793DF8 end:0x80793E00
@@ -2689,7 +2689,7 @@ DVD/dvdFatal.c:
 	.sdata2     start:0x8079D0D8 end:0x8079D0E0
 
 DVD/dvddevice.c:
-	.text       start:0x804ABF40 end:0x804AC1D0
+	.text       start:0x804ABF40 end:0x804AC1D0 align:16
 	.rodata     start:0x805739E0 end:0x80573A00
 	.bss        start:0x80746980 end:0x807469A0
 	.sdata      start:0x80793E00 end:0x80793E08
@@ -2697,46 +2697,46 @@ DVD/dvddevice.c:
 	.sdata2     start:0x8079D0E0 end:0x8079D0E8
 
 DVD/dvd_broadway.c:
-	.text       start:0x804AC1D0 end:0x804AE880
+	.text       start:0x804AC1D0 end:0x804AE880 align:16
 	.data       start:0x806195A0 end:0x8061A4A8
 	.bss        start:0x807469A0 end:0x80746B60
 	.sdata      start:0x80793E08 end:0x80793E18
 	.sbss       start:0x80795158 end:0x80795180
 
 ENC/enc.c:
-	.text       start:0x804AE880 end:0x804AF420
+	.text       start:0x804AE880 end:0x804AF420 align:16
 	.data       start:0x8061A4A8 end:0x8061A4F0
 	.sdata      start:0x80793E18 end:0x80793E20
 	.sbss       start:0x80795180 end:0x80795188
 
 ESP/esp.c:
-	.text       start:0x804AF420 end:0x804AFB50
+	.text       start:0x804AF420 end:0x804AFB50 align:16
 	.sdata      start:0x80793E20 end:0x80793E30
 
 EUART/EUART.c:
-	.text       start:0x804AFB50 end:0x804AFED0
+	.text       start:0x804AFB50 end:0x804AFED0 align:16
 	.sbss       start:0x80795188 end:0x80795198
 	.sdata2     start:0x8079D0E8 end:0x8079D0F0
 
 EXI/EXIBios.c:
-	.text       start:0x804AFED0 end:0x804B17D0
+	.text       start:0x804AFED0 end:0x804B17D0 align:16
 	.data       start:0x8061A4F0 end:0x8061A538
 	.bss        start:0x80746B60 end:0x80746C20
 	.sdata      start:0x80793E30 end:0x80793E34
 	.sbss       start:0x80795198 end:0x8079519C
 
 EXI/ProbeBarnacle.c:
-	.text       start:0x804B17D0 end:0x804B1CA0
+	.text       start:0x804B17D0 end:0x804B1CA0 align:16
 	.sbss       start:0x807951A0 end:0x807951B0
 
 FS/fs.c:
-	.text       start:0x804B1CA0 end:0x804B32D0
+	.text       start:0x804B1CA0 end:0x804B32D0 align:16
 	.data       start:0x8061A538 end:0x8061A560
 	.sdata      start:0x80793E38 end:0x80793E48
 	.sbss       start:0x807951B0 end:0x807951C8
 
 RVLGX/GXInit.c:
-	.text       start:0x804B32D0 end:0x804B4460
+	.text       start:0x804B32D0 end:0x804B4460 align:16
 	.data       start:0x8061A560 end:0x8061A7A0
 	.bss        start:0x80746C20 end:0x807472A0
 	.sdata      start:0x80793E48 end:0x80793E50
@@ -2744,80 +2744,80 @@ RVLGX/GXInit.c:
 	.sdata2     start:0x8079D0F0 end:0x8079D118
 
 RVLGX/GXFifo.c:
-	.text       start:0x804B4460 end:0x804B4E40
+	.text       start:0x804B4460 end:0x804B4E40 align:16
 	.data       start:0x8061A7A0 end:0x8061A7D0
 	.bss        start:0x807472A0 end:0x80747300
 	.sbss       start:0x807951F0 end:0x80795210
 
 RVLGX/GXAttr.c:
-	.text       start:0x804B4E40 end:0x804B5DB0
+	.text       start:0x804B4E40 end:0x804B5DB0 align:16
 	.data       start:0x8061A7D0 end:0x8061A9C0
 	.sdata      start:0x80793E50 end:0x80793E60
 
 RVLGX/GXMisc.c:
-	.text       start:0x804B5DB0 end:0x804B65F0
+	.text       start:0x804B5DB0 end:0x804B65F0 align:16
 	.sbss       start:0x80795210 end:0x80795228
 
 RVLGX/GXGeometry.c:
-	.text       start:0x804B65F0 end:0x804B6C00
+	.text       start:0x804B65F0 end:0x804B6C00 align:16
 
 RVLGX/GXFrameBuf.c:
-	.text       start:0x804B6C00 end:0x804B77E0
+	.text       start:0x804B6C00 end:0x804B77E0 align:16
 	.data       start:0x8061A9C0 end:0x8061AAF0
 	.sdata2     start:0x8079D118 end:0x8079D128
 
 RVLGX/GXLight.c:
-	.text       start:0x804B77E0 end:0x804B7F60
+	.text       start:0x804B77E0 end:0x804B7F60 align:16
 	.sdata2     start:0x8079D128 end:0x8079D160
 
 RVLGX/GXTexture.c:
-	.text       start:0x804B7F60 end:0x804B8F00
+	.text       start:0x804B7F60 end:0x804B8F00 align:16
 	.data       start:0x8061AAF0 end:0x8061AC20
 	.sdata      start:0x80793E60 end:0x80793EA8
 	.sdata2     start:0x8079D160 end:0x8079D198
 
 RVLGX/GXBump.c:
-	.text       start:0x804B8F00 end:0x804B9360
+	.text       start:0x804B8F00 end:0x804B9360 align:16
 	.sdata2     start:0x8079D198 end:0x8079D1A0
 
 RVLGX/GXTev.c:
-	.text       start:0x804B9360 end:0x804B9A30
+	.text       start:0x804B9360 end:0x804B9A30 align:16
 	.data       start:0x8061AC20 end:0x8061AC98
 
 RVLGX/GXPixel.c:
-	.text       start:0x804B9A30 end:0x804BA230
+	.text       start:0x804B9A30 end:0x804BA230 align:16
 	.data       start:0x8061AC98 end:0x8061ACB8
 	.sdata2     start:0x8079D1A0 end:0x8079D1F0
 
 RVLGX/GXTransform.c:
-	.text       start:0x804BA230 end:0x804BA9F0
+	.text       start:0x804BA230 end:0x804BA9F0 align:16
 	.sdata2     start:0x8079D1F0 end:0x8079D200
 
 RVLGX/GXPerf.c:
-	.text       start:0x804BA9F0 end:0x804BB220
+	.text       start:0x804BA9F0 end:0x804BB220 align:16
 	.data       start:0x8061ACB8 end:0x8061ADA0
 
 IPC/ipcMain.c:
-	.text       start:0x804BB220 end:0x804BB310
+	.text       start:0x804BB220 end:0x804BB310 align:16
 	.sbss       start:0x80795228 end:0x80795240
 
 IPC/ipcclt.c:
-	.text       start:0x804BB310 end:0x804BD070
+	.text       start:0x804BB310 end:0x804BD070 align:16
 	.bss        start:0x80747300 end:0x807473C0
 	.sdata      start:0x80793EA8 end:0x80793EB0
 	.sbss       start:0x80795240 end:0x80795258
 
 IPC/memory.c:
-	.text       start:0x804BD070 end:0x804BD5A0
+	.text       start:0x804BD070 end:0x804BD5A0 align:16
 	.bss        start:0x807473C0 end:0x80747440
 
 IPC/ipcProfile.c:
-	.text       start:0x804BD5A0 end:0x804BD780
+	.text       start:0x804BD5A0 end:0x804BD780 align:16
 	.bss        start:0x80747440 end:0x80747540
 	.sbss       start:0x80795258 end:0x80795260
 
 KPAD/kpad.c:
-	.text       start:0x804BD780 end:0x804C1760
+	.text       start:0x804BD780 end:0x804C1760 align:16
 	.data       start:0x8061ADA0 end:0x8061AE00
 	.bss        start:0x80747540 end:0x80748B90
 	.sdata      start:0x80793EB0 end:0x80793F00
@@ -2825,49 +2825,49 @@ KPAD/kpad.c:
 	.sdata2     start:0x8079D200 end:0x8079D270
 
 MEM/mem_heap.c:
-	.text       start:0x804C1760 end:0x804C1BD0
+	.text       start:0x804C1760 end:0x804C1BD0 align:16
 	.bss        start:0x80748B90 end:0x80748BB8
 	.sbss       start:0x80795298 end:0x807952A0
 
 MEM/mem_expheap.c:
-	.text       start:0x804C1BD0 end:0x804C2460
+	.text       start:0x804C1BD0 end:0x804C2460 align:16
 
 MEM/mem_allocator.c:
-	.text       start:0x804C2460 end:0x804C24C0
+	.text       start:0x804C2460 end:0x804C24C0 align:16
 	.sdata2     start:0x8079D270 end:0x8079D278
 
 MEM/mem_list.c:
-	.text       start:0x804C24C0 end:0x804C25E0
+	.text       start:0x804C24C0 end:0x804C25E0 align:16
 
 MIX/mix.c:
-	.text       start:0x804C25E0 end:0x804C5C10
+	.text       start:0x804C25E0 end:0x804C5C10 align:16
 	.data       start:0x8061AE00 end:0x8061B9A0
 	.bss        start:0x80748BB8 end:0x8074CF40
 	.sbss       start:0x807952A0 end:0x807952B8
 
 MTX/mtx.c:
-	.text       start:0x804C5C10 end:0x804C68A0
+	.text       start:0x804C5C10 end:0x804C68A0 align:16
 	.sdata      start:0x80793F00 end:0x80793F08
 	.sdata2     start:0x8079D278 end:0x8079D298
 
 MTX/mtxvec.c:
-	.text       start:0x804C68A0 end:0x804C6900
+	.text       start:0x804C68A0 end:0x804C6900 align:16
 
 MTX/mtx44.c:
-	.text       start:0x804C6900 end:0x804C6B60
+	.text       start:0x804C6900 end:0x804C6B60 align:16
 	.sdata2     start:0x8079D298 end:0x8079D2B0
 
 MTX/vec.c:
-	.text       start:0x804C6B60 end:0x804C6D70
+	.text       start:0x804C6B60 end:0x804C6D70 align:16
 	.sdata2     start:0x8079D2B0 end:0x8079D2C0
 
 MTX/quat.c:
-	.text       start:0x804C6D70 end:0x804C70E0
+	.text       start:0x804C6D70 end:0x804C70E0 align:16
 	.rodata     start:0x80573A00 end:0x80573A10
 	.sdata2     start:0x8079D2C0 end:0x8079D2D0
 
 NAND/nand.c:
-	.text       start:0x804C70E0 end:0x804C9F00
+	.text       start:0x804C70E0 end:0x804C9F00 align:16
 	.rodata     start:0x80573A10 end:0x80573B58
 	.data       start:0x8061B9A0 end:0x8061BC20
 	.bss        start:0x8074CF40 end:0x8074D280
@@ -2875,7 +2875,7 @@ NAND/nand.c:
 	.sbss       start:0x807952B8 end:0x807952C8
 
 OS/OS.c:
-	.text       start:0x804C9F00 end:0x804CB440
+	.text       start:0x804C9F00 end:0x804CB440 align:16
 	.data       start:0x8061BC20 end:0x8061C0C8
 	.bss        start:0x8074D280 end:0x8074D2F0
 	.sdata      start:0x80793F50 end:0x80793F80
@@ -2883,140 +2883,140 @@ OS/OS.c:
 	.sdata2     start:0x8079D2D0 end:0x8079D2D8
 
 OS/OSAlarm.c:
-	.text       start:0x804CB440 end:0x804CBD10
+	.text       start:0x804CB440 end:0x804CBD10 align:16
 	.data       start:0x8061C0C8 end:0x8061C0D8
 	.sbss       start:0x80795310 end:0x80795318
 
 OS/OSAlloc.c:
-	.text       start:0x804CBD10 end:0x804CC030
+	.text       start:0x804CBD10 end:0x804CC030 align:16
 	.sdata      start:0x80793F80 end:0x80793F88
 	.sbss       start:0x80795318 end:0x80795328
 
 OS/OSArena.c:
-	.text       start:0x804CC030 end:0x804CC130
+	.text       start:0x804CC030 end:0x804CC130 align:16
 	.sdata      start:0x80793F88 end:0x80793F90
 	.sbss       start:0x80795328 end:0x80795330
 
 OS/OSAudioSystem.c:
-	.text       start:0x804CC130 end:0x804CC5F0
+	.text       start:0x804CC130 end:0x804CC5F0 align:16
 	.data       start:0x8061C0D8 end:0x8061C158
 
 OS/OSCache.c:
-	.text       start:0x804CC5F0 end:0x804CCD40
+	.text       start:0x804CC5F0 end:0x804CCD40 align:16
 	.data       start:0x8061C158 end:0x8061C390
 
 OS/OSContext.c:
-	.text       start:0x804CCD40 end:0x804CD620
+	.text       start:0x804CCD40 end:0x804CD620 align:16
 	.data       start:0x8061C390 end:0x8061C570
 
 OS/OSError.c:
-	.text       start:0x804CD620 end:0x804CDD70
+	.text       start:0x804CD620 end:0x804CDD70 align:16
 	.data       start:0x8061C570 end:0x8061C850
 	.bss        start:0x8074D2F0 end:0x8074D340
 	.sdata      start:0x80793F90 end:0x80793F98
 
 OS/OSExec.c:
-	.text       start:0x804CDD70 end:0x804CF350
+	.text       start:0x804CDD70 end:0x804CF350 align:16
 	.data       start:0x8061C850 end:0x8061C8C0
 	.bss        start:0x8074D340 end:0x8074D360
 	.sdata      start:0x80793F98 end:0x80793FA8
 	.sbss       start:0x80795330 end:0x80795348
 
 OS/OSFatal.c:
-	.text       start:0x804CF350 end:0x804CFF80
+	.text       start:0x804CF350 end:0x804CFF80 align:16
 	.bss        start:0x8074D360 end:0x8074D640
 	.sdata      start:0x80793FA8 end:0x80793FB0
 	.sdata2     start:0x8079D2D8 end:0x8079D318
 
 OS/OSFont.c:
-	.text       start:0x804CFF80 end:0x804D0C70
+	.text       start:0x804CFF80 end:0x804D0C70 align:16
 	.data       start:0x8061C8C0 end:0x8061D3D0
 	.sdata      start:0x80793FB0 end:0x80793FB8
 	.sbss       start:0x80795348 end:0x80795358
 	.sdata2     start:0x8079D318 end:0x8079D320
 
 OS/OSInterrupt.c:
-	.text       start:0x804D0C70 end:0x804D1440
+	.text       start:0x804D0C70 end:0x804D1440 align:16
 	.data       start:0x8061D3D0 end:0x8061D400
 	.sbss       start:0x80795358 end:0x80795370
 
 OS/OSLink.c:
-	.text       start:0x804D1440 end:0x804D1460
+	.text       start:0x804D1440 end:0x804D1460 align:16
 
 OS/OSMessage.c:
-	.text       start:0x804D1460 end:0x804D1740
+	.text       start:0x804D1460 end:0x804D1740 align:16
 
 OS/OSMemory.c:
-	.text       start:0x804D1740 end:0x804D1EE0
+	.text       start:0x804D1740 end:0x804D1EE0 align:16
 	.data       start:0x8061D400 end:0x8061D410
 	.sbss       start:0x80795370 end:0x80795378
 
 OS/OSMutex.c:
-	.text       start:0x804D1EE0 end:0x804D2160
+	.text       start:0x804D1EE0 end:0x804D2160 align:16
 
 OS/OSReboot.c:
-	.text       start:0x804D2160 end:0x804D21F0
+	.text       start:0x804D2160 end:0x804D21F0 align:16
 	.sbss       start:0x80795378 end:0x80795380
 
 OS/OSReset.c:
-	.text       start:0x804D21F0 end:0x804D2B90
+	.text       start:0x804D21F0 end:0x804D2B90 align:16
 	.data       start:0x8061D410 end:0x8061D678
 	.sbss       start:0x80795380 end:0x80795390
 
 OS/OSRtc.c:
-	.text       start:0x804D2B90 end:0x804D3640
+	.text       start:0x804D2B90 end:0x804D3640 align:16
 	.bss        start:0x8074D640 end:0x8074D698
 
 OS/OSSync.c:
-	.text       start:0x804D3640 end:0x804D36D0
+	.text       start:0x804D3640 end:0x804D36D0 align:16
 
 OS/OSThread.c:
-	.text       start:0x804D36D0 end:0x804D4D50
+	.text       start:0x804D36D0 end:0x804D4D50 align:16
 	.bss        start:0x8074D698 end:0x8074E0A0
 	.sdata      start:0x80793FB8 end:0x80793FC0
 	.sbss       start:0x80795390 end:0x807953A0
 
 OS/OSTime.c:
-	.text       start:0x804D4D50 end:0x804D5420
+	.text       start:0x804D4D50 end:0x804D5420 align:16
 	.data       start:0x8061D678 end:0x8061D6D8
 
 OS/OSUtf.c:
-	.text       start:0x804D5420 end:0x804D5670
+	.text       start:0x804D5420 end:0x804D5670 align:16
 	.data       start:0x8061D6D8 end:0x80629518
 
 OS/OSIpc.c:
-	.text       start:0x804D5670 end:0x804D56B0
+	.text       start:0x804D5670 end:0x804D56B0 align:16
 	.sdata      start:0x80793FC0 end:0x80793FC8
 	.sbss       start:0x807953A0 end:0x807953A8
 
 OS/OSStateTM.c:
-	.text       start:0x804D56B0 end:0x804D5E00
+	.text       start:0x804D56B0 end:0x804D5E00 align:16
 	.data       start:0x80629518 end:0x806295E0
 	.bss        start:0x8074E0A0 end:0x8074E160
 	.sbss       start:0x807953A8 end:0x807953D0
 
 OS/OSPlayRecord.c:
-	.text       start:0x804D5E00 end:0x804D6520
+	.text       start:0x804D5E00 end:0x804D6520 align:16
 	.data       start:0x806295E0 end:0x80629628
 	.bss        start:0x8074E160 end:0x8074E360
 	.sdata      start:0x80793FC8 end:0x80793FD0
 	.sbss       start:0x807953D0 end:0x807953F0
 
 OS/OSStateFlags.c:
-	.text       start:0x804D6520 end:0x804D6740
+	.text       start:0x804D6520 end:0x804D6740 align:16
 	.data       start:0x80629628 end:0x80629650
 	.bss        start:0x8074E360 end:0x8074E380
 
 OS/OSNet.c:
-	.text       start:0x804D6740 end:0x804D6800
+	.text       start:0x804D6740 end:0x804D6800 align:16
 	.data       start:0x80629650 end:0x806297B8
 
 OS/OSNandbootInfo.c:
-	.text       start:0x804D6800 end:0x804D6A10
+	.text       start:0x804D6800 end:0x804D6A10 align:16
 	.data       start:0x806297B8 end:0x806297D8
 
 OS/OSPlayTime.c:
-	.text       start:0x804D6A10 end:0x804D71F0
+	.text       start:0x804D6A10 end:0x804D71F0 align:16
 	.data       start:0x806297D8 end:0x80629818
 	.bss        start:0x8074E380 end:0x8074E3B0
 	.sdata      start:0x80793FD0 end:0x80793FD8
@@ -3024,19 +3024,19 @@ OS/OSPlayTime.c:
 	.sdata2     start:0x8079D320 end:0x8079D330
 
 OS/OSLaunch.c:
-	.text       start:0x804D71F0 end:0x804D7FF0
+	.text       start:0x804D71F0 end:0x804D7FF0 align:16
 	.data       start:0x80629818 end:0x80629B38
 	.sdata      start:0x80793FD8 end:0x80793FE0
 	.sbss       start:0x80795408 end:0x80795410
 
 Runtime.PPCEABI.H/__init_user.c:
-	.text       start:0x804D7FF0 end:0x804D80B0
+	.text       start:0x804D7FF0 end:0x804D80B0 align:16
 
 PAD/PADClamp.c:
-	.text       start:0x804D80B0 end:0x804D82D0
+	.text       start:0x804D80B0 end:0x804D82D0 align:16
 
 PAD/pad.c:
-	.text       start:0x804D82D0 end:0x804D9B3C
+	.text       start:0x804D82D0 end:0x804D9B3C align:16
 	.data       start:0x80629B38 end:0x80629B90
 	.bss        start:0x8074E3B0 end:0x8074E460
 	.sdata      start:0x80793FE0 end:0x80794000
@@ -3050,7 +3050,7 @@ RSO/runtime.c:
 	.data       start:0x80629B90 end:0x80629CA8
 
 SC/sc.cpp:
-	.text       start:0x804DAE40 end:0x804E45B0
+	.text       start:0x804DAE40 end:0x804E45B0 align:16
 	.rodata     start:0x80573B58 end:0x80573C40
 	.data       start:0x80629CA8 end:0x8062AB68
 	.bss        start:0x8074E460 end:0x8075B110
@@ -3059,30 +3059,30 @@ SC/sc.cpp:
 	.sdata2     start:0x8079D330 end:0x8079D3C0
 
 TPL/tpl.cpp:
-	.text       start:0x804E45B0 end:0x804E46F0
+	.text       start:0x804E45B0 end:0x804E46F0 align:16
 	.data       start:0x8062AB68 end:0x8062AB98
 	.sdata      start:0x80794148 end:0x80794150
 
 USB/usb.cpp:
-	.text       start:0x804E46F0 end:0x804E6710
+	.text       start:0x804E46F0 end:0x804E6710 align:16
 	.data       start:0x8062AB98 end:0x8062B3C8
 	.sdata      start:0x80794150 end:0x80794160
 	.sbss       start:0x807955C8 end:0x807955D8
 
 VI/vi.cpp:
-	.text       start:0x804E6710 end:0x804E91C0
+	.text       start:0x804E6710 end:0x804E91C0 align:16
 	.data       start:0x8062B3C8 end:0x8062B920
 	.bss        start:0x8075B110 end:0x8075B280
 	.sdata      start:0x80794160 end:0x80794180
 	.sbss       start:0x807955D8 end:0x80795688
 
 VI/i2c.cpp:
-	.text       start:0x804E91C0 end:0x804E9AE0
+	.text       start:0x804E91C0 end:0x804E9AE0 align:16
 	.sdata      start:0x80794180 end:0x80794188
 	.sbss       start:0x80795688 end:0x80795690
 
 VI/vi3in1.cpp:
-	.text       start:0x804E9AE0 end:0x804EB22C
+	.text       start:0x804E9AE0 end:0x804EB22C align:16
 	.data       start:0x8062B920 end:0x8062BF30
 	.bss        start:0x8075B280 end:0x8075B2A0
 	.sdata      start:0x80794188 end:0x80794198
@@ -3094,7 +3094,7 @@ WENC/wenc.cpp:
 	.sdata2     start:0x8079D3C0 end:0x8079D3C8
 
 WPAD/wpad.cpp:
-	.text       start:0x804EB510 end:0x804F9B30
+	.text       start:0x804EB510 end:0x804F9B30 align:16
 	.rodata     start:0x80573C80 end:0x80573CD8
 	.data       start:0x8062BF30 end:0x8062DBF0
 	.bss        start:0x8075B2A0 end:0x8075EAA0
@@ -3103,7 +3103,7 @@ WPAD/wpad.cpp:
 	.sdata2     start:0x8079D3C8 end:0x8079D478
 
 WUD/wud.cpp:
-	.text       start:0x804F9B30 end:0x80500770
+	.text       start:0x804F9B30 end:0x80500770 align:16
 	.data       start:0x8062DBF0 end:0x8062F030
 	.bss        start:0x8075EAA0 end:0x80760C48
 	.sdata      start:0x807941C8 end:0x807941E0
@@ -3111,7 +3111,7 @@ WUD/wud.cpp:
 	.sdata2     start:0x8079D478 end:0x8079D480
 
 nw4r/db_console.cpp:
-	.text       start:0x80500770 end:0x80500868
+	.text       start:0x80500770 end:0x80500868 align:16
 
 nw4r/db_assert.cpp:
 	.text       start:0x80500868 end:0x80500CF8
@@ -3160,33 +3160,33 @@ nw4r/fn_8050661C.cpp:
 	.sbss       start:0x80795780 end:0x807957B0
 
 DWCi/dwc_error.cpp:
-	.text       start:0x805073C0 end:0x80507C40
+	.text       start:0x805073C0 end:0x80507C40 align:16
 	.data       start:0x8062FD00 end:0x8062FF90
 	.sdata      start:0x807941F8 end:0x80794200
 	.sbss       start:0x807957B0 end:0x807957D0
 
 DWCi/DWCi_Np_CPUCopyFast.c:
-	.text       start:0x80507C40 end:0x80509DB0
+	.text       start:0x80507C40 end:0x80509DB0 align:16
 	.data       start:0x8062FF90 end:0x806302C8
 	.bss        start:0x80760F00 end:0x807613B8
 	.sdata      start:0x80794200 end:0x807942FC
 	.sbss       start:0x807957D0 end:0x807957F8
 
 DWCi/dwc_nasfunc.c:
-	.text       start:0x80509DB0 end:0x805113B0
+	.text       start:0x80509DB0 end:0x805113B0 align:16
 	.data       start:0x806307F0 end:0x806308A8
 	.bss        start:0x807613B8 end:0x807614D8
 	.sdata      start:0x807942FC end:0x80794358
 	.sbss       start:0x807957F8 end:0x80795820
 
 DWCi/fn_805113B0.c:
-	.text       start:0x805113B0 end:0x80512490
+	.text       start:0x805113B0 end:0x80512490 align:16
 	.data       start:0x806308A8 end:0x806308E8
 	.sdata      start:0x80794358 end:0x80794368
 	.sbss       start:0x80795820 end:0x80795828
 
 DWCi/DWCi_NatNeg.c:
-	.text       start:0x80512490 end:0x805145B8
+	.text       start:0x80512490 end:0x805145B8 align:16
 	.data       start:0x806308E8 end:0x80630A08
 	.bss        start:0x807614D8 end:0x80762C20
 	.sdata      start:0x80794368 end:0x807943A0
@@ -3197,7 +3197,7 @@ NHTTP/NHTTP_bgnend.c:
 	.data       start:0x80630A08 end:0x80630AE8
 
 NHTTP/NHTTP_os_RVL.c:
-	.text       start:0x80515010 end:0x80515774
+	.text       start:0x80515010 end:0x80515774 align:16
 	.data       start:0x80630AE8 end:0x80630B28
 	.sdata      start:0x807943A0 end:0x807943A8
 
@@ -3224,7 +3224,7 @@ NCD/ncdsystem.c:
 	.sbss       start:0x80795890 end:0x80795898
 
 NWC24/nwc24_msg.c:
-	.text       start:0x8051D710 end:0x8051E068
+	.text       start:0x8051D710 end:0x8051E068 align:16
 	.data       start:0x80631128 end:0x806311C0
 	.bss        start:0x80766980 end:0x80766B00
 	.sdata      start:0x80794438 end:0x80794440
@@ -3246,7 +3246,7 @@ SO/soi.cpp:
 	.sbss       start:0x807958D8 end:0x807958F0
 
 VF/vf.cpp:
-	.text       start:0x80521340 end:0x8052A040
+	.text       start:0x80521340 end:0x8052A040 align:16
 	.rodata     start:0x80574E10 end:0x80579450
 	.data       start:0x80631468 end:0x806498C8
 	.bss        start:0x80766C68 end:0x807901C0
@@ -3255,7 +3255,7 @@ VF/vf.cpp:
 	.sdata2     start:0x8079D528 end:0x8079D550
 
 homebutton/fn_8052A040.cpp:
-	.text       start:0x8052A040 end:0x8052B004
+	.text       start:0x8052A040 end:0x8052B004 align:16
 	.ctors      start:0x8056F3E0 end:0x8056F3E4
 	.data       start:0x806498C8 end:0x8064A5E8
 	.sbss       start:0x80795A18 end:0x80795A28
@@ -3269,7 +3269,7 @@ homebutton/fn_8052B004.cpp:
 	.sdata2     start:0x8079D570 end:0x8079D580
 
 homebutton/fn_8052C880.cpp:
-	.text       start:0x8052C880 end:0x8052E0CC
+	.text       start:0x8052C880 end:0x8052E0CC align:16
 	.ctors      start:0x8056F3E8 end:0x8056F3EC
 	.data       start:0x8064A6B0 end:0x8064A738
 	.sdata      start:0x807944B0 end:0x807944B8
@@ -3284,7 +3284,7 @@ homebutton/fn_8052E0CC.cpp:
 	.sdata2     start:0x8079D598 end:0x8079D5B0
 
 homebutton/fn_80530680.cpp:
-	.text       start:0x80530680 end:0x8053072C
+	.text       start:0x80530680 end:0x8053072C align:16
 	.ctors      start:0x8056F3F0 end:0x8056F3F4
 	.data       start:0x8064A800 end:0x8064A878
 	.sbss       start:0x80795A40 end:0x80795A48
@@ -3361,7 +3361,7 @@ homebutton/hbm_value.cpp:
 	.sdata2     start:0x8079D6D0 end:0x8079D718
 
 homebutton/hbm_hermite.cpp:
-	.text       start:0x8055EAF0 end:0x8055F728
+	.text       start:0x8055EAF0 end:0x8055F728 align:16
 	.ctors      start:0x8056F414 end:0x8056F418
 	.data       start:0x80652340 end:0x80652530
 	.sbss       start:0x80795A78 end:0x80795A90
@@ -3374,7 +3374,7 @@ homebutton/fn_8055F728.cpp:
 	.data       start:0x80652530 end:0x806553C0
 
 homebutton/fn_8055FB70.cpp:
-	.text       start:0x8055FB70 end:0x8055FD58
+	.text       start:0x8055FB70 end:0x8055FD58 align:16
 	.ctors      start:0x8056F41C end:0x8056F420
 	.data       start:0x80655630 end:0x80655BD8
 	.sdata      start:0x80794660 end:0x80794668
@@ -3395,7 +3395,7 @@ homebutton/hbm_kb_event.cpp:
 	.sdata2     start:0x8079D738 end:0x8079D750
 
 homebutton/hbm_kb_cursor.cpp:
-	.text       start:0x80566440 end:0x80569DAC
+	.text       start:0x80566440 end:0x80569DAC align:16
 	.rodata     start:0x8057C258 end:0x8057C760
 	.data       start:0x80657BA8 end:0x80658200
 	.sdata      start:0x80794708 end:0x80794750

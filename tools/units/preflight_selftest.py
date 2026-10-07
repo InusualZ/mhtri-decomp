@@ -68,7 +68,7 @@ TYPE_RE = re.compile(r"\btype:(?P<type>\w+)")
 BLOCK_RE = re.compile(r"^(?P<unit>\S+):\s*$")
 RANGE_RE = re.compile(
     r"^[ \t]+(?P<section>[.\w]+)\s+start:(?P<start>0x[0-9A-Fa-f]+)"
-    r"\s+end:(?P<end>0x[0-9A-Fa-f]+)(?:\s+rename:(?P<rename>\S+))?\s*$"
+    r"\s+end:(?P<end>0x[0-9A-Fa-f]+)(?:\s+align:\d+)?(?:\s+rename:(?P<rename>\S+))?(?:\s+align:\d+)?\s*$"
 )
 OBJECT_RE = re.compile(r'Object\(\s*(?P<flag>Matching|NonMatching|Equivalent)\s*,\s*"(?P<path>[^"]+)"')
 
@@ -471,6 +471,14 @@ def main() -> int:
     rows, notes = derived_rows(repo)
     checks = failures = 0
     print("symbolpreflight self-test")
+    # the private reader must read a split line carrying `align:N` (config/splits aligns .text units to 16) as a range
+    for line, want in (("\t.text       start:0x804D1740 end:0x804D1EE0 align:16", None),
+                       ("\t.ctors      start:0x8056F2C0 end:0x8056F2C4 align:4 rename:.ctors$10", ".ctors$10")):
+        got = RANGE_RE.match(line)
+        checks += 1
+        if not got or got.group("rename") != want or got.group("end") != line.split("end:")[1].split()[0]:
+            failures += 1
+            print(f"  FAIL  reader misreads a split line with align:  {line.strip()}")
     print(f"  sources   {os.path.join('config', 'RMHE08')}/symbols.txt + splits.txt + configure.py "
           f"(tracked, no build/)")
     print("  derived   symbols and owners picked from that data at run time")

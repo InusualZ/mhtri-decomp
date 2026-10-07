@@ -137,6 +137,10 @@ def test_linked_successor_pad(c):
         c.check("an unflipped successor (target aligned to 4): refused, and the hint says to flip from the tail",
                 (len(size), "flip from the tail of each run" in size[0], "OS/OSMessage" in size[0]), (1, True, True))
     with testing.FixtureTree() as t:
+        problems, notes = run("OS/OSLink", link_tree(t, "NonMatching", tgt_align_exp=4))
+        c.check("an unflipped successor whose target object splits.txt aligns to 16 pads the shortfall itself",
+                (problems, any("link padding" in n for n in notes)), ([], True))
+    with testing.FixtureTree() as t:
         problems, _n = run("OS/OSLink", link_tree(t, "NonMatching", batch={"OS/OSMessage"}))
         c.check("... accepted when the successor is flipped in the same batch", problems, [])
     with testing.FixtureTree() as t:

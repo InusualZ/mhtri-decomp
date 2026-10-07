@@ -60,6 +60,13 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   OSMutex (-0xC) -> OSReboot (-0xC) -> OSReset unflipped moved every symbol after OSReboot by 0xC, 64228 `.text` bytes of
   the DOL (call sites), and READY was printed for OSMemory and OSMutex. It now reads `... and <unit> (short by 0xN) is
   followed by unflipped <next>: flip from the tail of the run`.
+* **An unflipped successor aligned by splits.txt pads the shortfall (2026-10-07).** A `.text` split line may carry
+  `align:16` (dtk accepts it, the DOL is unchanged, the stand-in object under `build/RMHE08/obj` then reports align 16).
+  A short unit whose unflipped successor's stand-in is 16-aligned links at its claimed addresses without flipping the
+  successor (the stand-in fills its own claim, so there is no chain): `flipcheck.linked_pad_note` reads the stand-in's
+  alignment and `padding_chain_break` ends the chain there. Measured on 201 `.text` splits that start 16-aligned: 9 units
+  became READY (IPC/ipcMain, MTX/mtxvec, MTX/vec, OS/OSIpc, OS/OSMemory, OS/OSMutex, OS/OSNandbootInfo, OS/OSReboot,
+  OS/OSSync), none lost it, and flipping all nine together keeps the DOL hash.
 * **`ninja diff` is not a flip signal.** `dtk dol diff` fails on main itself with `Expected to find symbol @eti_8001E558`:
   420 `@etb_`/`@eti_` symbols of the already-Matching units (objextab renames them global) are absent from the linked ELF's
   symbol table although their bytes are present and the DOL hash holds. No dead-strip is involved (`__nwa__FUl`,
