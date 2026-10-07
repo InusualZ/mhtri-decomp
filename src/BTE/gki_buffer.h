@@ -29,6 +29,12 @@ typedef struct BtmPmPwrMode {
     /* +0x09 */ u8 pad_0x09;
 } BtmPmPwrMode; /* size: 0x0A */
 
+/* size: 0x08 - the HID report descriptor `BTA_HhAddDev` registers with a device. */
+typedef struct BtaHhDscpInfo {
+    /* +0x00 */ u16 length;
+    /* +0x04 */ const u8* descriptor;
+} BtaHhDscpInfo; /* size: 0x08 */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,6 +44,44 @@ BT_HDR* GKI_getbuf(u8 size);
 
 /* 0x8047FF98 - sends the output report in `buf` to the HID device `handle`. */
 void BTA_HhSendData(u8 handle, BT_HDR* buf);
+
+/* 0x8047D98C / 0x8047DA7C - adds or removes the device at `bdAddr` in the stack's device database. */
+u8 BTA_DmAddDevice(const u8* bdAddr, const u8* linkKey, u32 trustedMask, u8 trusted);
+u8 BTA_DmRemoveDevice(const u8* bdAddr);
+
+/* 0x80480028 / 0x804800D0 - registers or forgets a HID device (`dscp` is the report descriptor). */
+void BTA_HhAddDev(const u8* bdAddr, u16 attrMask, u8 subClass, u8 appId, BtaHhDscpInfo dscp);
+void BTA_HhRemoveDev(u8 handle);
+
+/* 0x8047FEE4 - opens the HID connection to the device at `bdAddr` (`mode` and `security` are the stack's). */
+void BTA_HhOpen(const u8* bdAddr, u8 mode, u8 security);
+
+/* 0x8047A630 / 0x8047B128 / 0x80493A40 / 0x804A0290 - initialise the application layer and set the trace levels of the layers. */
+void BTA_Init(void);
+void bta_sys_set_trace_level(u8 level);
+void L2CA_SetTraceLevel(u8 level);
+void SDP_SetTraceLevel(u8 level);
+
+/* 0x8047D788 - sets the host's device name (a NUL-terminated string). */
+void BTA_DmSetDeviceName(const char* name);
+
+/* 0x80482FF0 / 0x80483FEC - resets the controller, or sends the vendor specific HCI command `opcode` with `length` parameter bytes;
+ * `callback` runs when the controller answered. */
+void BTM_DeviceReset(void (*callback)(void));
+void BTM_VendorSpecificCommand(u16 opcode, u8 length, const u8* params, void (*callback)(s32 result));
+
+/* 0x80483F34 / 0x80484224 / 0x804814E8 / 0x804818B4 - class of device, page timeout and the default link policy and supervision timeout. */
+void BTM_SetDeviceClass(const u8* deviceClass);
+void BTM_WritePageTimeout(u16 timeout);
+void BTM_SetDefaultLinkPolicy(u16 policy);
+void BTM_SetDefaultLinkSuperTout(u16 timeout);
+
+/* 0x80484154 / 0x80483FD4 / 0x80486450 - register the vendor event, device status and power mode callbacks. */
+typedef void (*BtmVsEventCallback)(u8 length, u8* data);
+typedef void (*BtmPmCallback)(const u8* bdAddr, u32 status, u16 value, u8 hciStatus);
+void BTM_RegisterForVSEvents(BtmVsEventCallback callback);
+void BTM_RegisterForDeviceStatusNotif(void (*callback)(u32 event));
+u8 BTM_PmRegister(u8 mask, u8* pmId, BtmPmCallback callback);
 
 /* 0x8047FE80 - closes the HID connection of `handle`. */
 void BTA_HhClose(u8 handle);

@@ -324,6 +324,24 @@ u8 wpadGetAppType(void);
 char* wpadGetGameName(void);
 s32 wpadDispatchReport(s32 chan, u8* report);
 void wpadResetSpeakerState(s32 chan);
+
+/* One stick axis as the extension report stores it: a byte or a halfword, selected by the caller's `wide` flag. size: 0x02 */
+typedef union WPADStickAxis {
+    /* +0x00 */ s8 narrow;
+    /* +0x00 */ s16 wide;
+} WPADStickAxis;
+
+/* The full-scale value of each accelerometer axis. size: 0x06 */
+typedef struct WPADAxisScale {
+    /* +0x00 */ s16 x;
+    /* +0x02 */ s16 y;
+    /* +0x04 */ s16 z;
+} WPADAxisScale;
+
+/* 0x804F8A40 / 0x804F8C00 - dead zone and range limit of a stick pair; 0x804F8D30 - clamps the accelerometer axes. */
+void wpadStickDeadzoneSquare(WPADStickAxis* x, WPADStickAxis* y, s32 outer, s32 scale, s32 dead, s32 wide);
+void wpadStickDeadzoneCircle(WPADStickAxis* x, WPADStickAxis* y, s32 limit, s32 dead, s32 wide);
+void wpadClampAxes(s16* x, s16* y, s16* z, WPADAxisScale* scale, f32 limit);
 void wpadSetDpdStatusA(s32 chan, s32 error);
 void wpadSetDpdStatusB(s32 chan, s32 error);
 void wpadReportButtons(u8 chan, u8* report, WPADSample* sample);

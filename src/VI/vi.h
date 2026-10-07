@@ -17,6 +17,7 @@ VIRetraceCallback VISetPostRetraceCallback(VIRetraceCallback callback);
 void VIWaitForRetrace(void);
 u32 VIGetRetraceCount(void);
 u32 VIGetNextField(void);
+void VIFlush(void);
 u32 VIGetCurrentLine(void);
 u32 VIGetTvFormat(void);
 u32 VIGetScanMode(void);
@@ -26,7 +27,7 @@ void VISetBlack(BOOL black);
 void __VIDisplayPositionToXY(u32 hcount, u32 vcount, s16* x, s16* y);
 u32 VIResetDimmingCount(void);
 u32 VIEnableDimming(s32 enable);
-u32 VISetDimmingMode(u32 mode);
+s32 VISetDimmingMode(s32 mode);
 u32 __VIResetDimmingControlA(void);
 u32 __VIResetDimmingControlB(void);
 

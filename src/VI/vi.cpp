@@ -14,17 +14,16 @@
  *   `VISetDimmingMode` (GUESS, 0x804E9080), `VIGetRetraceCount`, `VIGetScanMode` (GUESS), `__VIResetDimmingControlA` and `__VIResetDimmingControlB` (GUESS: each clears one control word
  *   the dimming code reads) and the variables `viCurrTiming`, `viPostRetraceCallback`, `viPreRetraceCallback`,
  *   `viRetraceQueue`, `viRetraceCount`, `viHorVer`, `viFrameBufferChanged`, `viDimming`, `viDimmingControlA/B` (GUESSES).
- * RESIDUALS. Flip blockers: .bss object 0x80 vs claimed 0x170 and .sdata 0x20 claimed but not emitted (the unwritten bodies own them);
- *   `VIGetTvFormat` lacks the retail jump table `@4022` (if chain instead).  Written: the callback setters, `VIWaitForRetrace`, the getters, `VISetNextFrameBuffer`, `VISetBlack`,
- *   `__VIDisplayPositionToXY` and the three reset helpers.  Not attempted (the register-programming bodies):
- *   0x804E6710, 0x804E68B0 (retrace handler), 0x804E7160, 0x804E7280, 0x804E7480, setFbbRegs 0x804E7A30, 0x804E7CE0,
- *   setVerticalRegs 0x804E7DC0, 0x804E7F60, 0x804E8630, VIFlush (needs a 64-bit count-leading-zeros inline the
- *   compiler has no intrinsic for), `VISetDimmingMode` is 71% because it inlines `VIGetTvFormat` with its own jump table `jumptable_8062B8FC` (ours: if chain, no table).  `VIGetTvFormat`: the target switches through a nine-entry jump table whose cases share
- *   blocks, ours compiles an if chain.  `VIGetScanMode`: the target normalises the extracted bit with neg/or/srwi.
- *   Register numbering differs in `VIGetNextField`, `VIGetCurrentLine`, `VIWaitForRetrace` (the retrace count load
- *   is scheduled before the interrupt-state move) and `__VIDisplayPositionToXY` (r9/r10 swap).
- *   Data: only the state used by the written functions is defined; the .data tables, jump tables and the other .sbss
- *   words are not emitted yet, so the data sections do not compare.
+ * RESIDUALS. Flip blockers: .bss object 0x80 vs claimed 0x170, .sdata 0x20 claimed but not emitted, .sbss 0x34 vs 0xB0, .data 0x48 vs
+ *   0x558 and the .text size (the unwritten bodies own them).  Written at 100 %: the callback setters, `VIGetTvFormat`,
+ *   `VIGetScanMode`, `VIGetCurrentLine`, `VISetDimmingMode`, `VISetNextFrameBuffer`, `VISetBlack` and the reset helpers.
+ *   Not attempted (the register-programming bodies): 0x804E6710, 0x804E68B0 (retrace handler), 0x804E7160, 0x804E7280, 0x804E7480,
+ *   setFbbRegs 0x804E7A30, 0x804E7CE0, setVerticalRegs 0x804E7DC0, 0x804E7F60, 0x804E8630 and `VIFlush` (it needs a 64-bit
+ *   count-leading-zeros the compiler has no intrinsic for).  Partial: `VIWaitForRetrace` (the target moves the interrupt state
+ *   into r31 before it loads the retrace count), `VIGetNextField` (r6/r8 and the shift scheduling) and `__VIDisplayPositionToXY`
+ *   (r9/r10 swap).  SHAPES: `VIGetTvFormat` returns `CurrTvMode` for the two modes the target leaves alone, which is what makes
+ *   MWCC emit the nine-entry jump table; the ternary on a bit-field register read (`VI_DISP_CONFIG.nin ? 1 : 0`) is what keeps
+ *   the neg/or/srwi normalisation.  Data: only the state used by the written functions is defined.
  */
 #include "VI/vi.h"
 #include "OS/OSDisableInterrupts.h"
@@ -35,6 +34,19 @@
 
 /* The video interface registers. */
 #define VI_REG16(offset) (*(volatile u16*)(0xCC002000 + (offset)))
+
+/* The display configuration register (VI_REG16(0x02)); size: 0x02 */
+typedef struct VIDispConfig {
+    /* +0x00 */ u16 reserved : 6;
+    /* +0x00 */ u16 format : 2;
+    /* +0x00 */ u16 le1 : 2;
+    /* +0x00 */ u16 le0 : 2;
+    /* +0x00 */ u16 dlr : 1;
+    /* +0x00 */ u16 nin : 1; /* non-interlaced */
+    /* +0x00 */ u16 reset : 1;
+    /* +0x00 */ u16 enable : 1;
+} VIDispConfig; /* size: 0x02 */
+#define VI_DISP_CONFIG (*(volatile VIDispConfig*)(0xCC002002))
 
 /* One video timing: the vertical timing numbers and the half-line geometry. size: 0x28 (the tail is unwritten) */
 struct VITimingInfo {
@@ -72,6 +84,16 @@ struct VIHorVer {
 
 u32 CurrTvMode;
 
+static u16 viRegs[0x3C];
+static u16 viShdwRegs[0x3C];
+static u32 viChangeMode;
+static u32 viShdwChangeMode;
+static volatile u64 viChanged;
+static u64 viShdwChanged;
+static u32 viNextBufAddr;
+static u32 viFlushPending;
+static u32 viFlushDone;
+
 static VITimingInfo* viCurrTiming;
 static VIRetraceCallback viPostRetraceCallback;
 static VIRetraceCallback viPreRetraceCallback;
@@ -90,7 +112,7 @@ struct VIDimming {
 static VIDimming viDimming;
 static u32 viDimmingEnabled;
 static u32 viDimmingTimeout;
-static u32 viDimmingMode;
+static s32 viDimmingMode;
 
 extern "C" {
 void setFbbRegs(VIHorVer* horVer, u32* tfbb, u32* bfbb, u32* rtfbb, u32* rbfbb);
@@ -164,6 +186,40 @@ u32 VIGetRetraceCount(void)
     return viRetraceCount;
 }
 
+/* Counts the leading zero bits of a 64-bit value. */
+static inline u32 cntlzd(u64 value)
+{
+    u32 high = (u32)(value >> 32);
+    u32 low = (u32)(value & 0xFFFFFFFF);
+    u32 count = __cntlzw(high);
+
+    if (count < 32) {
+        return count;
+    }
+    return __cntlzw(low) + 32;
+}
+
+/* Copies every changed shadow register into the register file and publishes the pending frame buffer. */
+void VIFlush(void)
+{
+    BOOL enabled;
+    u32 val;
+
+    enabled = OSDisableInterrupts();
+    viShdwChangeMode |= viChangeMode;
+    viChangeMode = 0;
+    viShdwChanged |= viChanged;
+    while (viChanged != 0) {
+        val = cntlzd(viChanged);
+        viRegs[val] = viShdwRegs[val];
+        viChanged &= ~(1ULL << (63 - val));
+    }
+    viNextBufAddr = viHorVer.bufAddr;
+    viFlushPending = 1;
+    viFlushDone = 1;
+    OSRestoreInterrupts(enabled);
+}
+
 /* Returns the field (0 top, 1 bottom) the next frame buffer flip will draw. */
 u32 VIGetNextField(void)
 {
@@ -180,8 +236,8 @@ u32 VIGetNextField(void)
 u32 VIGetCurrentLine(void)
 {
     BOOL enabled;
-    VITimingInfo* timing = viCurrTiming;
     u32 halfLine;
+    VITimingInfo* timing = viCurrTiming;
 
     enabled = OSDisableInterrupts();
     halfLine = getCurrentHalfLine();
@@ -214,6 +270,7 @@ u32 VIGetTvFormat(void)
         break;
     case 2:
     case 5:
+        format = CurrTvMode;
         break;
     }
     OSRestoreInterrupts(enabled);
@@ -232,7 +289,7 @@ u32 VIGetScanMode(void)
     if (progressive == 1) {
         mode = 2;
     } else {
-        mode = (VI_REG16(0x02) >> 2 & 1) != 0;
+        mode = VI_DISP_CONFIG.nin ? 1 : 0;
     }
     OSRestoreInterrupts(enabled);
     return mode;
@@ -386,9 +443,9 @@ u32 VIEnableDimming(s32 enable)
 }
 
 /* Selects the screen-dimming delay class (1, 2 or other) and derives the timeout in frames from the TV format. Returns the previous class. */
-u32 VISetDimmingMode(u32 mode)
+s32 VISetDimmingMode(s32 mode)
 {
-    u32 old = viDimmingMode;
+    s32 old = viDimmingMode;
 
     viDimmingMode = mode;
     if (VIGetTvFormat() == 1) {

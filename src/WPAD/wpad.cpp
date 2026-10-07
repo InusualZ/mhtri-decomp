@@ -29,16 +29,19 @@
  *   `wpadExtInitCallback`, `wpadDpdCalibrationReadDone`, `wpadSendWbcCommand`, `wpadBulkWrite`, `wpadBulkWriteNext`,
  *   `wpadBulkWriteFirst`, `wpadCopyTitleString` (the title string copy); named but unwritten: `wpadSampleChanged` (0x804EBAF0),
  *   `wpadSamplingFiber` (0x804EC650), `wpadInitSequence` (0x804ED880), `wpadAccCalibrationReadDone` (0x804F3150),
- *   `wpadExtCalibrationReadDone` (0x804F3C40), `wpadExtIdReadDone` (0x804F4180).  `fn_` names remain on the 0x804F14A0,
- *   0x804F72C0, 0x804F79B0 and 0x804F8380..0x804F8D30 rows.  Struct fields
+ *   `wpadExtCalibrationReadDone` (0x804F3C40), `wpadExtIdReadDone` (0x804F4180).  GUESS names `wpadStickDeadzoneSquare`, `wpadStickDeadzoneCircle`
+ *   (the dead zone of a stick pair on 8-bit or 16-bit axes) and `wpadClampAxes` (the accelerometer axes against a full-scale limit).
+ *   `fn_` names remain on the 0x804F14A0,
+ *   0x804F72C0, 0x804F79B0, 0x804F8380 and 0x804F84E0 rows.  Struct fields
  *   are named from use; a `unused_0xNN` field is written but never read by a written body.  Statics are named from use; the
  *   `.sbss` rows `wpadChanStateA/B` and the `.bss` rows at 0x8075EA00.. are not understood yet.  Foreign names given here:
  *   WUD (`WUDInit`, `WUDShutdown`, `WUDGetStatus`, `WUDRegisterAllocator`, `WUDSet*Callback`, `WUDStart*`, `WUDStop*`,
  *   `WUDSetHidRecvCallback`, `WUDSetHidConnCallback`, `WUDIsSyncing`, `WUDIsHistoryAddr`, from the `WUD...()` log strings
  *   where one exists), SC (`SCGetWpadMotorMode`, `SCGetWpadSensorBarPosition`, `SCGetWpadSpeakerVolume`), `OSReturnToMenuPending`.
- * RESIDUALS. Written: 116 of 131 rows, 58 at 100 %; 15 rows are not attempted (0x804EBAF0, 0x804EC650, 0x804ED880, 0x804EF900
- *   `WPADControlSpeaker`, 0x804F14A0, 0x804F3150, 0x804F3C40, 0x804F4180, 0x804F72C0, 0x804F79B0, 0x804F8380, 0x804F84E0,
- *   0x804F8A40, 0x804F8C00, 0x804F8D30).  The new report decoders re-read the sample pointer per statement in the original
+ * RESIDUALS. Written: 119 of 131 rows, 59 at 100 %; 12 rows are not attempted (0x804EBAF0, 0x804EC650, 0x804ED880, 0x804EF900
+ *   `WPADControlSpeaker`, 0x804F14A0, 0x804F3150, 0x804F3C40, 0x804F4180, 0x804F72C0, 0x804F79B0, 0x804F8380, 0x804F84E0).
+ *   `wpadStickDeadzoneSquare` keeps r31 for the sign copy where the target does not, and `wpadClampAxes` differs in the float register
+ *   numbering and in the .sdata2 constant names.  The new report decoders re-read the sample pointer per statement in the original
  *   (`wpadDecodeExtBoard` 2 %, `wpadDecodeDpdInterleaved` 53 %: the source's statement order differs and the original keeps no
  *   stack frame); `wpadReportReadData`, `wpadReportStatus` and `wpadBulkWrite*` differ in register numbering and one reload.
  *   Register-numbering differences only (the variable order) remain in `WPADDisconnect`, `wpadAssignChannel`,
@@ -83,6 +86,7 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL_C/alloc.h"
 #include "MSL/s_cos.h"
+#include "MSL/sqrt.h"
 #include "MSL/s_sin.h"
 
 /* .bss */
@@ -1765,6 +1769,165 @@ u8 wpadGetAppType(void)
 char* wpadGetGameName(void)
 {
     return wpadGameName;
+}
+
+/* Applies a square dead zone to the stick (x, y) and scales the pair back inside the octagon of radius `outer`; `wide` selects 16-bit axes. */
+void wpadStickDeadzoneSquare(WPADStickAxis* x, WPADStickAxis* y, s32 outer, s32 scale, s32 dead, s32 wide)
+{
+    s32 vx;
+    s32 vy;
+    s32 signX;
+    s32 signY;
+    s32 scaledX;
+    s32 scaledY;
+    s32 denominator;
+    s32 numerator;
+
+    if (wide == 0) {
+        vx = x->narrow;
+        vy = y->narrow;
+    } else {
+        vx = x->wide;
+        vy = y->wide;
+    }
+    if (vx >= 0) {
+        signX = 1;
+    } else {
+        signX = -1;
+        vx = -vx;
+    }
+    if (vy >= 0) {
+        signY = 1;
+    } else {
+        signY = -1;
+        vy = -vy;
+    }
+    vx = vx <= dead ? 0 : vx - dead;
+    vy = vy <= dead ? 0 : vy - dead;
+    if (vx == 0 && vy == 0) {
+        if (wide == 0) {
+            x->narrow = 0;
+            y->narrow = 0;
+        } else {
+            x->wide = 0;
+            y->wide = 0;
+        }
+        return;
+    }
+    scaledX = scale * vx;
+    scaledY = scale * vy;
+    if (scaledY <= scaledX) {
+        numerator = scale * outer;
+        denominator = scaledX + vy * (outer - scale);
+        if (numerator < denominator) {
+            if (wide == 0) {
+                vx = (s8)((vx * numerator) / denominator);
+                vy = (s8)((vy * numerator) / denominator);
+            } else {
+                vx = (s16)((vx * numerator) / denominator);
+                vy = (s16)((vy * numerator) / denominator);
+            }
+        }
+    } else {
+        numerator = scale * outer;
+        denominator = scaledY + vx * (outer - scale);
+        if (numerator < denominator) {
+            if (wide == 0) {
+                vx = (s8)((vx * numerator) / denominator);
+                vy = (s8)((vy * numerator) / denominator);
+            } else {
+                vx = (s16)((vx * numerator) / denominator);
+                vy = (s16)((vy * numerator) / denominator);
+            }
+        }
+    }
+    if (wide == 0) {
+        x->narrow = signX * vx;
+        y->narrow = signY * vy;
+    } else {
+        x->wide = signX * vx;
+        y->wide = signY * vy;
+    }
+}
+
+/* Applies a circular dead zone to the stick (x, y), shrinking the pair to the radius `limit` when it is longer; `wide` selects 16-bit axes. */
+void wpadStickDeadzoneCircle(WPADStickAxis* x, WPADStickAxis* y, s32 limit, s32 dead, s32 wide)
+{
+    s32 vx;
+    s32 vy;
+    s32 lengthSq;
+
+    if (wide == 0) {
+        vx = x->narrow;
+        vy = y->narrow;
+    } else {
+        vx = x->wide;
+        vy = y->wide;
+    }
+    if (-dead < vx && vx < dead) {
+        vx = 0;
+    } else if (vx > 0) {
+        vx = vx - dead;
+    } else {
+        vx = vx + dead;
+    }
+    if (-dead < vy && vy < dead) {
+        vy = 0;
+    } else if (vy > 0) {
+        vy = vy - dead;
+    } else {
+        vy = vy + dead;
+    }
+    lengthSq = vx * vx + vy * vy;
+    if (limit * limit < lengthSq) {
+        s32 length = (s32)(f32)sqrt((f32)lengthSq);
+        vx = (vx * limit) / length;
+        vy = (vy * limit) / length;
+    }
+    if (wide == 0) {
+        x->narrow = vx;
+        y->narrow = vy;
+    } else {
+        x->wide = vx;
+        y->wide = vy;
+    }
+}
+
+/* Clamps the three accelerometer axes to `limit` times their full-scale value, keeping each sign. */
+void wpadClampAxes(s16* x, s16* y, s16* z, WPADAxisScale* scale, f32 limit)
+{
+    s16 fullScaleX = scale->x;
+    f32 nx = (f32)*x / (f32)fullScaleX;
+    f32 signX = 1.0f;
+    f32 signY = signX;
+    f32 signZ = signX;
+    f32 ny = (f32)*y / (f32)scale->y;
+    f32 nz = (f32)*z / (f32)scale->z;
+
+    if (nx < 0.0f) {
+        signX = -1.0f;
+        nx = -nx;
+    }
+    if (ny < 0.0f) {
+        signY = -1.0f;
+        ny = -ny;
+    }
+    if (nz < 0.0f) {
+        signZ = -1.0f;
+        nz = -nz;
+    }
+    if (nx > limit) {
+        nx = limit;
+    }
+    if (ny > limit) {
+        ny = limit;
+    }
+    if (nz > limit) {
+        nz = limit;
+    }
+    *x = (s16)(nx * signX * (f32)fullScaleX);
+    *y = (s16)(ny * signY * (f32)scale->y);
+    *z = (s16)(nz * signZ * (f32)scale->z);
 }
 
 /* Clears the speaker state words of a channel. */

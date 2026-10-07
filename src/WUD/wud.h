@@ -11,13 +11,29 @@
 typedef struct WUDDevice {
     /* +0x00 */ u8 name[0x40];
     /* +0x40 */ u8 bdAddr[6];
-    /* +0x46 */ u8 pad_0x46[0x13];
+    /* +0x46 */ u8 linkKey[0x10];
+    /* +0x56 */ u8 handle;
+    /* +0x57 */ u8 subClass;
+    /* +0x58 */ u8 appId;
     /* +0x59 */ u8 linkState;
-    /* +0x5A */ u8 pad_0x5A[6];
+    /* +0x5A */ u8 pad_0x5A;
+    /* +0x5B */ u8 type;
+    /* +0x5C */ u8 pad_0x5C[2];
+    /* +0x5E */ u16 attrMask;
 } WUDDevice; /* size: 0x60 */
+
+/* size: 0x0C - one entry of a recently-used device list: the record and its neighbours. */
+typedef struct WUDDeviceNode {
+    /* +0x00 */ WUDDevice* device;
+    /* +0x04 */ struct WUDDeviceNode* prev;
+    /* +0x08 */ struct WUDDeviceNode* next;
+} WUDDeviceNode;
 
 /* Reports the result of a pairing or clear request (0 = success). */
 typedef void (*WUDResultCallback)(s32 result);
+
+/* The pairing result callbacks are invoked with the result and the number of retries. */
+typedef void (*WUDSyncCallback)(s32 result, u8 retries);
 
 #ifdef __cplusplus
 extern "C" {
@@ -97,11 +113,35 @@ s32 WUDiTerminateDevice(void);
 /* 0x804FC1F0 / 0x804FC270 - the firmware patch sequence's step callbacks. */
 void WUDiPatchCallback(s32 result);
 void WUDiPatchStepDone(void);
+/* 0x804FD990 .. 0x804FDF00 - the firmware patch download: record and code write callbacks, the patch removal and peek-poke callbacks and the start. */
+void WUDiPatchRecordCallback(s32 result);
+void WUDiPatchWriteCallback(s32 result);
+void RemovePatchCallback(s32 result);
+void SuperPeekPokeCallback(s32 result);
+void __wudAppendRuntimePatch(void);
+/* 0x804FF680 / 0x804FFCE0 - the stack's vendor event and power mode callbacks. */
+void WUDiVendorEventCallback(u8 length, u8* data);
+void __wudPowerMangeEventStackCallback(const u8* bdAddr, u32 status, u16 value, u8 hciStatus);
 /* 0x804FD960 / 0x804FE000 - the firmware download's completion callback and the stack setup it starts. */
 void WUDiFirmwareDoneCallback(void);
 void __wudInitSub(void);
+/* 0x804FE170 / 0x804FE2D0 - adds or removes a device in the stack's device database and the HID host. */
+void WUDiAddDevice(const u8* bdAddr);
+void WUDiRemoveDevice(const u8* bdAddr);
+/* 0x804FA5E0 - finishes a pairing search and reports it; 0x804FF470 - the stack's device search event callback. */
+s32 WUDiSyncDone(void);
+void WUDiSearchCallback(s32 event, const u8* data);
+/* 0x804F9C60 - stops advertising and picks the next pairing step. */
+s32 WUDiSyncCheckSearch(void);
+/* 0x804F9DC0 - opens the HID link of the device a pairing inquiry found; returns the next sync step. */
+s32 WUDiSyncCheckInquiry(void);
 /* 0x804FE450 - finds the stored record of the device at `bdAddr`, or NULL. */
 WUDDevice* WUDiGetDevInfo(const u8* bdAddr);
+/* 0x804FE530 / 0x804FE650 / 0x804FE8E0 / 0x804FEA00 - move a device's list entry to the head or the tail of the balance board list or the remote list. */
+void WUDiMoveWbcToHead(WUDDevice* device);
+void WUDiMoveWbcToTail(WUDDevice* device);
+void WUDiMoveDeviceToHead(WUDDevice* device);
+void WUDiMoveDeviceToTail(WUDDevice* device);
 /* 0x804FEED0 - the stack shutdown callback. */
 void CleanupCallback(s32 result);
 /* 0x804FD380 - starts the pairing state machine. */
@@ -111,7 +151,7 @@ void WUDSetSniffMode(const u8* bdAddr, s16 interval);
 /* 0x804FF930 - the stack's device status callback. */
 void WUDDeviceStatusCallback(u32 event);
 /* 0x804FFF70 - the stored-device work area. */
-u8* WUDiGetStoredDeviceInfo(void);
+WUDDevice* WUDiGetStoredDeviceInfo(void);
 /* 0x80500060 - writes the device table back to the console settings when it changed. */
 void WUDiFlushDeviceInfo(void);
 /* 0x805000B0 .. 0x80500110 - the per-device table setters and the unchecked getter. */
