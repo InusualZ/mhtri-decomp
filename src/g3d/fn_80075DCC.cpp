@@ -5,7 +5,8 @@
  *   0x8058E570-0x8058EDA0, .sdata 0x807911E0-0x80791208, .sdata2 0x80795DF8-0x80795E60.  fn_80075E9C cites
  *   "g3d_dcc.cpp" and fn_8007A8E0 onward "g3d_light.cpp".  The left edge is a tudiscover strong cut after
  *   `g3d/g3d_camera.cpp`; the right edge is the discovery's byte cap, not a TU seam (`g3d/g3d_scnmdl.cpp` follows).
- * NAMES. fog_ctor is a GUESS (the evidence follows).
+ * NAMES. fog_init is a GUESS; light_setting_ctor is a GUESS (the evidence follows).
+ *   fog_ctor is a GUESS (the evidence follows).
  *   res_shp_copy_ctor is a GUESS (the evidence follows).
  *   scn_mdl_set_mat_buffer_flag is a GUESS (it ORs a mask into the ScnMdl's +0x140 buffer-flag word; the
  *   material pass calls it after each applied animation).  The file keeps the map's stem (no one `__FILE__` names the run).  The bodies are m2c's output, typed
@@ -20,7 +21,8 @@
  *   type_obj_set_name_scnleaf and type_obj_set_name_scngroup are GUESSES (the type-name store copies they call).
  *   g3d_draw_res_mdl_directly is a GUESS (0x800793A4: draws a model's opaque or translucent byte code over its view
  *   matrices; ScnMdlSimple's draw passes call it).
- * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, mtx34_set, fn_80079EE4, fn_8007A468.
+ * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, mtx34_set, fn_80079EE4, fn_8007A468,
+ *   light_setting_ctor (unwritten: an empty body).
  *   Unwritten (empty stub): g3d_draw_res_mdl_directly.
  *   Unwritten (empty stubs, 33 rows, 0x31F0 bytes; objdiff scores them near zero): fn_800769F4, fn_8007868C,
  *   fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8, g3d_draw_res_mdl_directly, fn_80079604, fn_80079938, fn_800799BC,
@@ -290,7 +292,7 @@ u32 math_sincos_idx(f32);
 /* internal */ s32 fn_80079F78(void *arg0, void *arg1);
 /* internal */ s32 fog_ctor(s32 arg0, void* a1);
 /* internal */ u32 fn_80079FE4(s32 *arg0, s32 arg1);
-/* internal */ void fn_80079FEC(s32 arg0);
+/* internal */ void fog_init(s32 arg0);
 /* internal */ s32 fn_8007A0B4(s32 arg0, s32 arg1);
 /* internal */ s32 fn_8007A1B0(s32 *arg0);
 /* internal */ void fn_8007A1B8(s32 arg0, s32 *arg1, f32 *arg2, f32 *arg3, f32 *arg4, f32 *arg5, s32 arg6, u32 arg_sp0);
@@ -318,7 +320,7 @@ u32 math_sincos_idx(f32);
 /* internal */ u32 fn_8007A7E4(s32 arg0, s32 arg1);
 /* internal */ void fn_8007A800(s32 arg0, s32 arg1);
 /* internal */ u32 fn_8007A814(s32 *arg0, s32 arg1);
-/* internal */ void* fn_8007A8E0(void *arg0, s32 arg1, s32 arg2, u16 arg3, s32 arg4, u16 arg5);
+/* internal */ void* light_setting_ctor(void *arg0, s32 arg1, s32 arg2, u32 arg3, s32 arg4, u32 arg5);
 /* internal */ u32 fn_8007AEF8(void *arg0, void *arg1);
 /* internal */ u32 fn_8007AF1C(s32 *arg0);
 /* internal */ s32 dtor_8007AF28(s32 arg0, s16 arg1);
@@ -2169,7 +2171,7 @@ typedef struct {
     /* +0x30 */ u8 field_0x30;
     /* +0x31 */ u8 field_0x31;
 } RawView_42; /* size: 0x32 */
-void fn_80079FEC(s32 arg0) {
+void fog_init(s32 arg0) {
     void *temp_r3;
 
     if (fn_800659C4(0) == 0) {
@@ -2511,7 +2513,7 @@ typedef struct {
     /* +0x05 */ u8 pad_0x05[0x3];
     /* +0x08 */ u32 field_0x08;
 } RawView_50; /* size: 0xC */
-void* fn_8007A8E0(void *arg0, s32 arg1, s32 arg2, u16 arg3, s32 arg4, u16 arg5) {
+void* light_setting_ctor(void *arg0, s32 arg1, s32 arg2, u32 arg3, s32 arg4, u32 arg5) {
 }
 
 

@@ -66,6 +66,12 @@ u32 scn_mdl_set_mat_buffer_flag(void* pMdl, s32 matID, s32 mask);
 /* 0x80079FB4 (0x30): constructs a fog handle at `pSelf` on the record `pData` and returns `pSelf`. */
 /* untyped: opaque handle - the FogData record */
 s32 fog_ctor(s32 pSelf, void* pData);
+/* 0x80079FEC (0xC8): resets the fog the handle at `pSelf` names. */
+void fog_init(s32 pSelf);
+/* 0x8007A8E0 (0x618): builds a light setting over its light-object, light-animation and ambient buffers. */
+/* untyped: opaque handle - the LightSetting record */
+void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 numLightObj, s32 pAmbLightObjBuf,
+                         u32 numAmbLightObj);
 
 #ifdef __cplusplus
 }

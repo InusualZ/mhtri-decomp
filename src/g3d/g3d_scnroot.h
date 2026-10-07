@@ -7,6 +7,10 @@
 #include "types.h"
 
 #ifdef __cplusplus
+#ifdef MHTRI_G3D_G3D_SCNOBJ_H
+#include "g3d/g3d_camera_types.h" /* CameraData (rule 1) */
+#endif
+
 namespace nw4r {
 namespace g3d {
 
@@ -19,6 +23,9 @@ class AnmScn;
 #ifdef MHTRI_G3D_G3D_SCNOBJ_H
 class ScnRoot : public ScnGroup {
 public:
+    /* untyped: opaque handle - the draw collection, the light-object buffers */
+    ScnRoot(MEMAllocator* pHeap, void* pCollection, ScnObj** ppChildren, u32 maxChildren, u32 numLightObj,
+            u32 numAmbLightObj, void* pLightObjBuf, void* pLightAnmBuf, void* pAmbLightObjBuf);
     virtual ~ScnRoot();
     virtual bool IsDerivedFrom(TypeObj type) const;
     virtual void G3dProc(u32 task, u32 param, void* pInfo); /* untyped: caller-owned payload */
@@ -36,7 +43,7 @@ public:
     /* +0xF0 */ u32 mScnRootFlags;        /* 0 after construction */
     /* +0xF4 */ u8 mCurrentCameraID;
     /* +0xF5 */ u8 pad_0xF5[3];
-    /* +0xF8 */ u8 mCamera[32][0x10C];    /* the CameraData records */
+    /* +0xF8 */ CameraData mCamera[32];
     /* +0x2278 */ u8 mFog[32][0x30];      /* the FogData records */
     /* +0x2878 */ u8 mLightSetting[0x10]; /* the LightSetting record */
     /* +0x2888 */ AnmScn* mpAnmScn;

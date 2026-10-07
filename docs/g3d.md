@@ -25,3 +25,17 @@ measurements behind the lib's flags, which `configure.py` points at.
 * **`-Cpp_exceptions on`**. The retail objects carry `extab`/`extabindex`; `g3d/g3d_anmscn.cpp`'s are extab 0x8 +
   extabindex 0xC, unwind-only records (a 4-byte flag word and a zero terminator, no PC ranges, no actions), and
   the flag alone reproduces them - the same finding as `cflags_pl` and `Gecko_ExceptionPPC.cp`.
+
+## Headers
+
+* **Accessor views.** g3d's own headers (`g3d/g3d_scnobj.h`, `g3d/g3d_resmat.h`, ...) redefine types that some
+  consumers outside g3d already define (eft002's `ResTexSrt`, the C `G3dObj` record stage includes), so a
+  consumer cannot always include a g3d class with its base. `g3d/g3d_scnroot.h` therefore defines `ScnRoot` in
+  full (base `ScnGroup`, virtuals, fields, `CameraData`) only when `g3d/g3d_scnobj.h` was included first, which
+  the owner does; any other consumer gets a view that declares only the non-virtual accessors (`GetCamera`,
+  `SetCurrentCamera`, `GetFog`). A non-virtual member mangles the same in both views, so the call sites link to the
+  owner's definitions. Use the view only for non-virtual members that need no layout; a consumer that needs a
+  field or a virtual has to include the full chain.
+* **Out-of-line copies.** Retail calls the implicit handle copy constructors out of line (playbook idea 107);
+  the units call them as C-linkage helpers (`res_mat_copy_ctor`, `res_tex_obj_copy_ctor`, ...) on `ResHandle`
+  locals, and a returned handle word becomes a class temporary so its address can be taken.
