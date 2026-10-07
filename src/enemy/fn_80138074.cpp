@@ -247,7 +247,7 @@ extern void subVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern f32 fn_80050EF4(const Vec3* a, const Vec3* b);
 extern f32 calcVecDistXZ(const Vec3* a, const Vec3* b);
 extern void addVec3(Vec3* out, const Vec3* a, const Vec3* b);
-extern void fn_800516F0(Mtx34* mtx);
+extern void MTX33_ctor(Mtx34* mtx);
 extern void fn_80051894(Mtx34* out, const Mtx34* a, const Mtx34* b, s32 arg3, f32 t, f32 u);
 extern void vec3_scale(Vec3* out, const Vec3* v, f32 scale);
 extern f32 vec3_dot(const Vec3* a, const Vec3* b);
@@ -1248,7 +1248,7 @@ void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4
 
     VEC3_ctor(&angles);
     MTX34_ctor(&mtx);
-    fn_800516F0(&dst);
+    MTX33_ctor(&dst);
     switch (arg5->field_0x04) {
     case 0:
     case 3: {

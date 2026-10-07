@@ -551,7 +551,7 @@ void mtx34_set_trans(MTX34* mtx, VEC3* vec);
 void eft_rot_vec_copy(void* dst, void* src);
 void fn_805012E8(EmMtx33* dst, const MTX34* src);
 
-void fn_800516F0(void* mtx);
+void MTX33_ctor(void* mtx);
 
 /* This block's own entry points. */
 void fn_80191598(EmActWork* self, u8* out_class, u8* out_state);
@@ -4085,7 +4085,7 @@ void fn_80191CE4(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind
 
     work = (EmActWork*)self->work_0x04;
     MTX34_ctor(&mtx);
-    fn_800516F0(&dst);
+    MTX33_ctor(&dst);
     switch (item->type_0x04) {
     case 0xFF:
         switch (kind) {

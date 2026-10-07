@@ -574,7 +574,7 @@ extern "C" u32 fn_800922D0(u32* self, u32 ofs) {
 /* 0x80092250 (0x80): returns the data of the entry named `name`, or NULL. */
 /* untyped: opaque handle - the entry's data block */
 void* nw4r::g3d::ResDic::operator[](const char* name) const {
-    if (fn_800628B4(const_cast<ResDic*>(this)) != 0) {
+    if (res_dic_is_valid(const_cast<ResDic*>(this)) != 0) {
         if (name != 0) {
             u32 e = fn_8009213C(const_cast<ResDic*>(this), name, strlen(name));
             if (e != 0) {
@@ -597,7 +597,7 @@ extern "C" u32 fn_80092444(void* self) {
 /* 0x80092330 (0x84): returns the data of the entry named by `name`, or NULL. */
 /* untyped: opaque handle - the entry's data block */
 void* nw4r::g3d::ResDic::operator[](const ResName name) const {
-    if (fn_800628B4(const_cast<ResDic*>(this)) != 0) {
+    if (res_dic_is_valid(const_cast<ResDic*>(this)) != 0) {
         if (name.IsValid() != 0) {
             u32 local = (u32)name.mpData;
             u32 e = fn_80092020(const_cast<ResDic*>(this), &local);
@@ -610,13 +610,13 @@ void* nw4r::g3d::ResDic::operator[](const ResName name) const {
 }
 
 /* `ResDic::GetIndex(const ResName&)` - the same lookup, returning the entry index or -1. */
-extern "C" s32 fn_800923B4(void* self, void* arg) {
-    if (fn_800628B4(self) != 0) {
-        if (reinterpret_cast<const nw4r::g3d::ResName*>(arg)->IsValid() != 0) {
-            u32 local = *(u32*)arg;
-            u32 e = fn_80092020(self, &local);
+int nw4r::g3d::ResDic::GetIndex(const ResName name) const {
+    if (res_dic_is_valid(const_cast<ResDic*>(this)) != 0) {
+        if (name.IsValid() != 0) {
+            u32 local = (u32)name.mpData;
+            u32 e = fn_80092020(const_cast<ResDic*>(this), &local);
             if (e != 0) {
-                u32 base = (u32)fn_800628A4(self);
+                u32 base = (u32)res_dic_ptr(const_cast<ResDic*>(this));
                 return (s32)(e - (base + 24)) / 16;
             }
         }

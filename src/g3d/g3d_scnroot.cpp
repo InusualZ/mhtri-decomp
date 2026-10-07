@@ -7,7 +7,10 @@
  *   `g3d/g3d_state.cpp` opens: fn_80084630 is the first function citing "g3d_state.cpp"; the four functions
  *   0x8008452C-0x80084630 are the class's run-time type members (the vtable in this unit's `.data` names three of
  *   them).
- * NAMES. The ScnRoot members (G3dProc, the destructor, GetTypeObj, GetTypeName, IsDerivedFrom, GetTypeObjStatic,
+ * NAMES. math_f32_to_u16 is a GUESS; os_f32_to_u16_store is a GUESS; os_f32_to_u16_cast is a GUESS;
+ *   vec3_ctor_return is a GUESS; scn_root_calc_world is a GUESS; scn_root_calc_material is a GUESS;
+ *   scn_root_apply_anm_scn is a GUESS (the evidence follows).
+ *   The ScnRoot members (G3dProc, the destructor, GetTypeObj, GetTypeName, IsDerivedFrom, GetTypeObjStatic,
  *   GetCamera, SetCurrentCamera, GetFog) are nw4r's; the vtable in this unit's `.data` orders the virtuals.  The
  *   field names past ScnGroup are GUESSES (mpCollection, mDrawMode, mScnRootFlags by the constructor's stores).
  *   scnroot_align4 is a GUESS; scn_root_get_current_camera is a GUESS (C linkage: `ef/eft019.cpp` and
@@ -15,14 +18,16 @@
  *   (the handle constructors the camera and fog accessors call); camera_data_ctor is a GUESS (0x80083488, the
  *   record constructor the ScnRoot constructor runs on each camera).  scn_typename_ScnRoot is a GUESS.
  * RESIDUALS. The ScnRoot constructor: the camera loop's counter and byte offset swap r29/r30.
- *   35 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_scnroot`
- *   lists them): Construct (0x800827E4), the camera/fog/light pass (0x80082CDC), the ScnObjGather members and its std::sort instantiations
- *   (0x80083598..0x8008446C).
+ *   28 functions unwritten: Construct (0x800827E4, needs the ScnObjGather constructor), the camera/fog/light pass
+ *   (0x80082CDC) and the Fog/Camera accessors it calls (0x80082F94, 0x8008301C, 0x80083070, 0x800830F8: their owners'
+ *   members still carry generated names), scn_root_apply_anm_scn (0x8008311C), the ScnObjGather members and its
+ *   std::sort instantiations (0x80083598..0x8008446C: the introsort pivot state is the `.sdata` word 0x80791230).
  *   flipcheck: `.text` short of the claim; `.rodata`, `.data`, `.sdata` and `.sdata2` are claimed and not emitted.
  * SHAPES. File-scope `#pragma peephole off` and `#pragma pool_data off` (retail keeps every `clrlwi` + `cmpwi`).
  */
 
 #include "types.h"
+#include "OS/OSFastCast.h" /* OS_FASTCAST_U16 (rule 2) */
 #include "g3d/g3d_anmchr.h"  /* TypeObj::GetTypeName and operator==, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/fn_80075DCC.h" /* type_obj_set_name_scnleaf (rule 2) */
 #include "g3d/g3d_scnobj.h"  /* nw4r::g3d::ScnGroup, owned by g3d/g3d_scnobj.cpp (rule 2) */
@@ -55,6 +60,59 @@ extern "C" void* light_setting_dtor(void* pSelf, s16 flag)
 extern "C" u32 scnroot_align4(u32 size)
 {
     return (size + 3) & ~3;
+}
+
+/* 0x80082F7C (0x18): the float as an unsigned 16-bit integer through the quantised store. */
+extern "C" u16 os_f32_to_u16_cast(register f32 arg)
+{
+    f32 a;
+    register f32* ptr = &a;
+    register u16 r;
+    asm {
+        psq_st arg, 0(ptr), 1, OS_FASTCAST_U16
+        lhz r, 0(ptr)
+    }
+    return r;
+}
+
+/* 0x80082F48 (0x34): stores the converted float through `out`. */
+extern "C" void os_f32_to_u16_store(f32* in, u16* out)
+{
+    *out = os_f32_to_u16_cast(*in);
+}
+
+/* 0x80082F18 (0x30): the float as an unsigned 16-bit integer. */
+extern "C" u16 math_f32_to_u16(f32 value)
+{
+    u16 result;
+    os_f32_to_u16_store(&value, &result);
+    return result;
+}
+
+/* 0x800832F8 (0x30): constructs a vector and returns it. */
+extern "C" nw4r::math::VEC3* vec3_ctor_return(nw4r::math::VEC3* pVec)
+{
+    VEC3_ctor(pVec);
+    return pVec;
+}
+
+/* 0x80083290 (0x4C): applies the bound scene animation, then runs the world pass over the children. */
+extern "C" void scn_root_calc_world(ScnRoot* pRoot)
+{
+    scn_root_apply_anm_scn(pRoot);
+    pRoot->G3dProc(ScnRoot::G3DPROC_CALC_WORLD, 0, NULL);
+}
+
+/* 0x800832DC (0x1C): runs the material pass over the children. */
+extern "C" void scn_root_calc_material(ScnRoot* pRoot)
+{
+    pRoot->G3dProc(ScnRoot::G3DPROC_CALC_MAT, 0, NULL);
+}
+
+/* 0x800834F0 (0x4): constructs an 8-byte vector (leaves it unset). */
+/* untyped: opaque handle - callers pass their own 8-byte vector records */
+extern "C" void VEC2_ctor(void* p)
+{
 }
 
 /* 0x80082AC0 (0xB0): drops a detaching scene animation, otherwise runs the group's default processing. */

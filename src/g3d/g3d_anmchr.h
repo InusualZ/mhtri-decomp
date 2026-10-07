@@ -7,6 +7,7 @@
 #include "types.h"
 #include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 1) */
 #include "g3d/g3d_rescommon.h" /* nw4r::g3d::ResCommon (rule 1) */
+#include "nw4r/math.h" /* nw4r::math::VEC3, MTX34, QUAT (rule 1) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,8 +15,8 @@ extern "C" {
 
 void **fn_8005DC60(void **out, void *v);   /* 0x8005DC60 - stores `v` through `out`, returns `out` */
 void **type_obj_set_name_anmchr(void **out, void *v);   /* 0x8005DCD0 - stores `v` through `out`, returns `out` */
-u32 fn_800628B4(void *self);               /* 0x800628B4 - `*(u32*)self != 0` */
-void *fn_800628A4(void *self);             /* 0x800628A4 - loads the word at +0x0 of `self` */
+u32 res_dic_is_valid(void *self);               /* 0x800628B4 - `*(u32*)self != 0` */
+void *res_dic_ptr(void *self);             /* 0x800628A4 - loads the word at +0x0 of `self` */
 
 
 /* The animation type-name records (`.rodata`: a length word, then the NUL-terminated name) this unit's type-info
@@ -30,7 +31,7 @@ const u8 **type_obj_set_name(const u8 **out, const u8 *v); /* stores `v` through
 
 /* The frame/rate helpers `g3d/g3d_resanmchr.cpp`'s channel evaluators call (types the target bodies imply). */
 f32 math_reciprocal(f32 value);                /* 0x800610AC - the reciprocal helper */
-s32 fn_800628C8(void *self, s32 key);      /* 0x800628C8 - the table entry lookup */
+
 
 
 #ifdef __cplusplus
@@ -56,8 +57,20 @@ class AnmObjChrRes;
 /* One node's evaluated character-animation result: the flag word (0: nothing animated) and the transform the
  * blend and the world pass read.  size: 0x4C (the cache's per-node stride) */
 struct ChrAnmResult {
+    enum {
+        FLAG_ANM_EXISTS = (1 << 0),
+        FLAG_SCALE_ONE = (1 << 3),
+        FLAG_ROT_ZERO = (1 << 5),
+        FLAG_TRANS_ZERO = (1 << 6),
+        FLAG_SSC_APPLY = (1 << 7),
+        FLAG_SSC_PARENT = (1 << 8),
+        FLAG_XSI_SCALING = (1 << 9)
+    };
+
     /* +0x00 */ u32 flags;
-    /* +0x04 */ u8 pad_0x04[0x48];
+    /* +0x04 */ math::VEC3 s;
+    /* +0x10 */ math::VEC3 rawR;
+    /* +0x1C */ math::MTX34 rt;
 };
 
 /* The animation's play policy: what a frame past the end folds back to. */
@@ -233,6 +246,9 @@ public:
 
 }  // namespace g3d
 }  // namespace nw4r
+
+/* 0x800628C8 (0x4C) - the dictionary `key` bytes into the animation resource, as the handle word (0 for key 0). */
+extern "C" s32 res_anm_chr_ofs_to_dic(const nw4r::g3d::ResAnmChr* pSelf, s32 key);
 #endif
 
 #endif /* MHTRI_G3D_G3D_ANMCHR_H */

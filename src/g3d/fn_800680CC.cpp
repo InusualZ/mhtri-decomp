@@ -355,8 +355,8 @@ typedef struct {
 /* 0x80069664 (0x48): returns the dictionary's entry count, 0 for an empty handle. */
 u32 nw4r::g3d::ResDic::GetNumData() const
 {
-    if (fn_800628B4(const_cast<ResDic*>(this)))
-        return ((G3dResNameWord *)fn_800628A4(const_cast<ResDic*>(this)))->field_0x04;
+    if (res_dic_is_valid(const_cast<ResDic*>(this)))
+        return ((G3dResNameWord *)res_dic_ptr(const_cast<ResDic*>(this)))->field_0x04;
     return 0;
 }
 

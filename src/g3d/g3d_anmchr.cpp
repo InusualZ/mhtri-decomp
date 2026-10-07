@@ -12,7 +12,18 @@
  *   the other 8 of the run are called only from inside it or from other g3d units (fn_80063964, fn_80063AC4), and
  *   0x80063E60 onward is called by g3d_calcmaterial, g3d_scnmdl and g3d_resfile; the extabindex records of the
  *   run end at 0x8001FBFC, the last record (0x80063E30) with its extab 0x80007764-0x8000776C.
- * NAMES. anmchr_resnode_ref_name is a GUESS; res_node_assign is a GUESS; res_node_common_assign is a GUESS;
+ * NAMES. res_anm_chr_get_node_anm is a GUESS (the evidence follows).
+ *   res_dic_is_valid is a GUESS; res_dic_ptr is a GUESS; res_dic_get_class_name is a GUESS;
+ *   res_dic_ofs_to_ptr is a GUESS; res_anm_chr_ofs_to_dic is a GUESS; quat_slerp is a GUESS;
+ *   quat_from_mtx34 is a GUESS; quat_empty_ctor is a GUESS; mtx34_from_quat is a GUESS; math_fexp is a GUESS;
+ *   math_flog_checked is a GUESS; chr_anm_result_init is a GUESS; MTX33_ctor is a GUESS; PSMTXQuat is a GUESS;
+ *   QUATMtx is a GUESS; QUATSlerp is a GUESS; anmchr_resnode_class_name is a GUESS;
+ *   anmchr_resdic_class_name is a GUESS (the evidence follows).
+ *   The quaternion/matrix helpers are nw4r's blend support: the SDK names follow the neighbours (0x804C6430 sits among
+ *   the PSMTX scale/rotation builders), the class-name strings are the `.sdata` records 'ResNode'/'ResDic', and the
+ *   ResDic accessors (0x800628A4..0x80062914) mirror the ResNode ones.  The blend flag names (ANMFLAG_BLEND_*, the
+ *   ChrAnmResult FLAG_*) follow the asserts' text and the branches they select.
+ *   anmchr_resnode_ref_name is a GUESS; res_node_assign is a GUESS; res_node_common_assign is a GUESS;
  *   res_node_empty_assign is a GUESS; res_node_get_id is a GUESS; res_node_get_next_sibling is a GUESS;
  *   res_node_get_parent is a GUESS; res_node_ofs_to_node is a GUESS;
  *   res_node_ref_nonconst is a GUESS (the evidence follows).
@@ -43,15 +54,15 @@
  *   is a GUESS; anmchr_ref_name is a GUESS (the strings ResAnmChr::ref passes to Panic).
  *   type_obj_set_name_anmchr is a GUESS (0x8005DCD0: the type-name store copy the AnmObjChr, AnmObjMatClr,
  *   AnmObjTexPat and ScnMdlSimple type members call).
- * RESIDUALS. 11 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
- *   lists them), the largest GetResult__Q34nw4r3g3d14AnmObjChrBlendFPQ34nw4r3g3d12ChrAnmResultUl (0x8D0).
- *   Partial: AnmObjChrRes::Release(ResMdl, u32, BindOption) (the unrolled clear loop schedules its `subf` one slot
- *   early).
+ * RESIDUALS. 1 function unwritten: GetAnmPlayPolicy (0x80061C70, 0x74).
+ *   Partial: AnmObjChrBlend::GetResult (0x8D0: the loop's index and the result-flag word take r24/r23 swapped; every
+ *   other instruction matches, with `#pragma fp_contract off` around it), AnmObjChrRes::Release(ResMdl, u32,
+ *   BindOption) (the unrolled clear loop schedules its `subf` one slot early).
  *   GetAnmPlayPolicy (0x80061C70) is unwritten: its policy table (.sdata 0x80790E70) sits in `mh3_pad.cpp`'s claim.
  *   FrameCtrl::smBaseUpdateRate (.sdata 0x80791168) is `g3d/fn_80063888.cpp`'s claim, declared in the class only.
- *   Partial: fn_8005D27C, g3d_round_up (retail materialises `~(align - 1)` with `nor` + `and` where MWCC folds it
- *   into `andc`), fn_80062824, fn_800628AC, and the members whose only difference is a relocation name
- *   (the strings).
+ *   Partial: g3d_round_up (retail materialises `~(align - 1)` with `nor` + `and` where MWCC folds it into `andc`;
+ *   tried: a named mask local, swapped operands), and the members whose only difference is a relocation name (the
+ *   strings).
  *   G3dObj::operator delete, AnmObj, AnmObjChr, AnmObjChrBlend, AnmObjChrRes: the empty bodies are complete (retail's
  *   operator delete is a bare `blr`; the compiler emits the constructors' base calls, vtable stores and member
  *   initialisers and the destructors' base calls).  The G3dObj vtable is emitted here (its first virtual,
@@ -59,9 +70,10 @@
  *   The AnmObj type-name record (0x8056F568, read only by AnmObj::GetTypeObj and GetTypeObjStatic here) sits in
  *   `g3d/fn_80063888.cpp`'s `.rodata` claim (0x8056F550-0x8056F578) beside the AnmObjMatClr record (0x8056F550, read
  *   only by that unit's fn_80064868): the two owners interleave there, which one seam cannot express.
- *   flipcheck: `.text` 0xB38 of 0x6F90; extab 0x110 of 0x3A4; extabindex 0x198 of 0x4E0; `.rodata`, `.data`, `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_80791148`,
- *     `lbl_80791150`.
+ *   flipcheck: `.text` 0x6F18 of 0x6F90; extab 0x3EC of 0x3A4 (__dt__AnmObjChrNode's record is 108 B against 28 B);
+ *   extabindex 0x4D4 of 0x4E0; `.rodata`, `.data` (0xA74 of 0xD08), `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
+ *   Relocation names that differ from retail: the string literals (ours are `@NNN` pool names, the target's are the
+ *   named `.data` rows) and the float pool constants.
  * SHAPES. The ResName constructor is complete: its work is the base initialiser.  The unit includes the leaf
  *   `g3d/anm_typename_AnmObj.h` instead of `g3d/fn_80063888.h`: a visible global placement `operator delete` gives
  *   AnmObjChrBlend::Construct a landing pad (`__dl__FPvPv`) retail does not have.
@@ -78,6 +90,10 @@
 #include "g3d/fn_8005AA28.h" /* res_node_is_valid (rule 2) */
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
 #include "fn_8004CAD8.h"   /* mtx34_const_ptr's owner header (docs/plan.md 6.5, rule 2) */
+#include "OS/PSMTXQuat.h"      /* PSMTXQuat, owner OS/FindContainHeap_.c (leaf header, rule 2) */
+#include "NAND/QUATMtx.h"      /* QUATMtx, QUATSlerp, owner NAND/nand.c (leaf header, rule 2) */
+#include "nw4r/fn_805012C4.h"   /* nw4r::math::MTX33Identity, MTX34Zero (rule 2) */
+#include "mh3_pad/vec3.h"   /* VEC3_ctor (rule 2) */
 #include "nw4r/math_arithmetic.h"   /* nw4r::math::detail::FExp, owner nw4r/math_arithmetic.cpp (rule 2) */
 #include "nw4r/db_assert.h"  /* nw4r::db::Warning (rule 2) */
 #include "MSL_C/alloc.h"     /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
@@ -88,15 +104,19 @@
 #pragma pool_data off
 
 
-/* --- the SDK entry points this unit tail-calls (owners are unsplit; declared, never defined) --------- */
-
-extern "C" void fn_804C6F40(u32, u32, void*);
-extern "C" void fn_804C6D70(void*, u32);
 
 /* The `.sdata` strings fn_8005D27C / fn_800628AC hand back (`_SDA_BASE_`-relative), and the two
  * absolute constants the blocked-return helpers hand back (`.bss` / `.data`). */
-extern u8 lbl_80791148[];
-extern u8 lbl_80791150[];
+extern u8 anmchr_resnode_class_name[8];
+extern u8 anmchr_resdic_class_name[7];
+extern const char anmchr_resdic_ref_invalid_fmt[];     /* "%s::%s: Object not valid." */
+extern const char anmchr_resdic_ac_file_ref[];         /* "g3d_resdict.h" */
+extern const char anmchr_arithmetic_h_file[];          /* "arithmetic.h" */
+extern const char anmchr_flog_domain_msg[];            /* "FLog: Input is out of the domain." */
+extern const char anmchr_resnode_ref_const_invalid_fmt[]; /* "%s::%s: Object not valid." */
+extern const char anmchr_resnode_ac_file_ref_const[];  /* "g3d_resnode_ac.h" */
+extern const char anmchr_resdic_ref_name[4];           /* "ref" (sized: an SDA21 address) */
+extern const char anmchr_resnode_ref_const_name[4];    /* "ref" (the const ResNode accessor's copy) */
 extern u8 lbl_8066AE80[];
 extern u8 anmchr_resanmchr_class_name[];    /* "ResAnmChr" */
 extern const char anmchr_resanmchr_ac_file[]; /* "g3d_resanmchr_ac.h" */
@@ -191,7 +211,7 @@ nw4r::g3d::ResNode::ResNode(void* pData) : ResCommon<ResNodeData>(pData) {
 
 extern "C" u8* res_node_get_class_name(void)
 {
-    return lbl_80791148;
+    return anmchr_resnode_class_name;
 }
 
 extern "C" void res_node_common_copy_ctor(u32* dst, u32* src)
@@ -260,7 +280,8 @@ void* nw4r::g3d::G3dObj::operator new(unsigned long size, void* pBlock)
     return pBlock;
 }
 
-extern "C" void fn_80060FEC(void)
+/* 0x80060FEC (0x4): constructs a quaternion (leaves it unset). */
+extern "C" void quat_empty_ctor(nw4r::math::QUAT*)
 {
 }
 
@@ -358,14 +379,14 @@ asm f32 math_reciprocal(register f32 value)
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResNameData)
 
 /* untyped: opaque handle - the dictionary block */
-extern "C" void* fn_800628A4(void* self)
+extern "C" void* res_dic_ptr(void* self)
 {
     return *(void**)self;
 }
 
-extern "C" u8* fn_800628AC(void)
+extern "C" u8* res_dic_get_class_name(void)
 {
-    return lbl_80791150;
+    return anmchr_resdic_class_name;
 }
 
 /* 0x80062978 (0x8): stores the block address. */
@@ -423,26 +444,26 @@ int nw4r::g3d::ResAnmChr::GetNumFrame() const
 
 
 /* untyped: opaque handle - the dictionary block */
-extern "C" u32 fn_800628B4(void* self)
+extern "C" u32 res_dic_is_valid(void* self)
 {
     return *(u32*)self != 0;
 }
 
 /* Returns the word at +0 plus `offset`, or 0 when `offset` is 0 (nw4r's null-safe offset helper). */
-extern "C" u32 fn_80062824(u32* p, u32 offset)
+extern "C" u8* res_dic_ofs_to_ptr(u8** p, s32 offset)
 {
-    u32 base = *p;
+    u8* base = *p;
 
     if (offset != 0) {
         return base + offset;
     }
-    return 0;
+    return NULL;
 }
 
 /* The align-up helper: (~(align - 1)) & (offset + align - 1). */
 extern "C" u32 g3d_round_up(u32 offset, u32 align)
 {
-    return ~(align - 1) & (align + offset - 1);
+    return (align + offset - 1) & ~(align - 1);
 }
 
 /* nw4r's four-float vector setter. */
@@ -456,16 +477,19 @@ extern "C" void dVector4Set(f32* dst, f32 x, f32 y, f32 z, f32 w)
 
 /* --- forwarders into the SDK allocator / matrix helpers --------------------------------------------- */
 
-extern "C" void* fn_80060F70(void* self, u32 a, u32 b)
+/* 0x80060F70 (0x3C): the quaternion interpolation of `pFrom` towards `pTo` by `t` into `pOut`. */
+extern "C" nw4r::math::QUAT* quat_slerp(nw4r::math::QUAT* pOut, const nw4r::math::QUAT* pFrom,
+                                        const nw4r::math::QUAT* pTo, f32 t)
 {
-    fn_804C6F40(a, b, self);
-    return self;
+    QUATSlerp(pFrom, pTo, pOut, t);
+    return pOut;
 }
 
-extern "C" void* fn_80060FAC(void* self, u32 a)
+/* 0x80060FAC (0x40): the quaternion of the matrix at `pMtx`. */
+extern "C" nw4r::math::QUAT* quat_from_mtx34(nw4r::math::QUAT* pOut, const nw4r::math::MTX34* pMtx)
 {
-    fn_804C6D70(self, mtx34_const_ptr(a));
-    return self;
+    QUATMtx(pOut, mtx34_const_ptr((u32)pMtx));
+    return pOut;
 }
 
 /* 0x8006244C (0x18): advances the frame by the update rate times the base rate. */
@@ -491,9 +515,37 @@ extern "C" u32 ut_add_offset_to_ptr(u32 a, u32 b)
 /* --- forwarders into nw4r math ---------------------------------------------------------------------- */
 
 /* The exp forwarder (nw4r's inline `math::FExp`): a tail call with the argument untouched. */
-extern "C" f32 fn_80060F6C(f32 x)
+extern "C" f32 math_fexp(f32 x)
 {
     return nw4r::math::detail::FExp(x);
+}
+
+/* 0x80060F28 (0x44): builds the rotation matrix of the quaternion into `pOut` and returns it. */
+extern "C" nw4r::math::MTX34* mtx34_from_quat(nw4r::math::MTX34* pOut, const nw4r::math::QUAT* pQuat)
+{
+    PSMTXQuat((nw4r::math::MTX34*)mtx34_get_ptr(pOut), pQuat);
+    return pOut;
+}
+
+/* 0x80060FF0 (0x78): the natural log, NaN (with a warning) outside the domain. */
+extern "C" f32 math_flog_checked(f32 x)
+{
+    if (!(x > 0.0f)) {
+        nw4r::db::Warning(anmchr_arithmetic_h_file, 295, anmchr_flog_domain_msg);
+    }
+    if (x > 0.0f) {
+        return nw4r::math::detail::FLog(x);
+    }
+    return -(0.0f / 0.0f);
+}
+
+/* 0x80061068 (0x44): constructs a character animation result (scale, rotation vector and matrix). */
+extern "C" nw4r::g3d::ChrAnmResult* chr_anm_result_init(nw4r::g3d::ChrAnmResult* pSelf)
+{
+    VEC3_ctor(&pSelf->s);
+    VEC3_ctor(&pSelf->rawR);
+    MTX34_ctor(&pSelf->rt);
+    return pSelf;
 }
 
 /* 0x80062914 (0x64): wraps `pData`, asserting its alignment. */
@@ -507,7 +559,7 @@ nw4r::g3d::ResDic::ResDic(void* pData) : ResCommon<ResDicData>(pData) {
 /* 0x80062750 (0xD4): returns the `idx`-th entry's data, asserting the index is in range. */
 /* untyped: opaque handle - the entry's data block */
 void* nw4r::g3d::ResDic::operator[](int idx) const {
-    if (fn_800628B4((u32*)this)) {
+    if (res_dic_is_valid((u32*)this)) {
         bool inRange = false;
         if (idx >= 0 && idx <= (s32)ref().numData - 1) {
             inRange = true;
@@ -516,7 +568,7 @@ void* nw4r::g3d::ResDic::operator[](int idx) const {
             nw4r::db::Panic((const char*)anmchr_resdic_ac_file, 42, (const char*)anmchr_resdic_idx_bounds_msg, idx, 0,
                             ref().numData - 1);
         }
-        return (void*)fn_80062824((u32*)this, ref().entry[idx + 1].ofsData);
+        return (void*)res_dic_ofs_to_ptr((u8**)this, ref().entry[idx + 1].ofsData);
     }
     return NULL;
 }
@@ -1289,6 +1341,62 @@ extern "C" ResNodeData* res_node_ref_nonconst(ResHandle* pSelf)
     return (ResNodeData*)res_handle_ptr(pSelf);
 }
 
+/* 0x80062840 (0x64): the dictionary block, asserting the handle is valid. */
+const nw4r::g3d::ResDicData& nw4r::g3d::ResDic::ref() const
+{
+    if (!res_dic_is_valid(const_cast<ResDic*>(this))) {
+        nw4r::db::Panic(anmchr_resdic_ac_file_ref, 84, anmchr_resdic_ref_invalid_fmt, res_dic_get_class_name(),
+                        anmchr_resdic_ref_name);
+    }
+    return *static_cast<const ResDicData*>(res_dic_ptr(const_cast<ResDic*>(this)));
+}
+
+/* 0x800628C8 (0x4C): the dictionary the offset `ofs` bytes into the resource names (a null dictionary for 0). */
+extern "C" s32 res_anm_chr_ofs_to_dic(const nw4r::g3d::ResAnmChr* pSelf, s32 key)
+{
+    u8* pBase = (u8*)pSelf->mpData;
+    if (key) {
+        return (s32)nw4r::g3d::ResDic(pBase + key).mpData;
+    }
+    return (s32)nw4r::g3d::ResDic(NULL).mpData;
+}
+
+/* 0x800626F8 (0x58): animated node `idx`'s record, from the resource's node dictionary. */
+extern "C" const nw4r::g3d::ResAnmChrNodeData* res_anm_chr_get_node_anm(const nw4r::g3d::ResAnmChr* pSelf, u32 idx)
+{
+    u32 dic = res_anm_chr_ofs_to_dic(pSelf, pSelf->ref().toChrDataDic);
+    return (const nw4r::g3d::ResAnmChrNodeData*)(*reinterpret_cast<nw4r::g3d::ResDic*>(&dic))[(int)idx];
+}
+
+/* 0x80062D04 (0x54): the index of the animated node called `name`, -1 when the resource has none. */
+extern "C" int res_anm_chr_get_node_index(const nw4r::g3d::ResAnmChr* pSelf, nw4r::g3d::ResName name)
+{
+    return reinterpret_cast<nw4r::g3d::ResDic*>(
+               &HandleWord(res_anm_chr_ofs_to_dic(pSelf, pSelf->ref().toChrDataDic)).mWord)
+        ->GetIndex(name);
+}
+
+/* 0x80062DEC (0x64): the node's block, asserting the handle is valid. */
+extern "C" const ResNodeData* res_node_ref(const ResHandle* pSelf)
+{
+    if (!res_node_is_valid(pSelf)) {
+        nw4r::db::Panic(anmchr_resnode_ac_file_ref_const, 44, anmchr_resnode_ref_const_invalid_fmt,
+                        res_node_get_class_name(), anmchr_resnode_ref_const_name);
+    }
+    return (const ResNodeData*)res_node_ptr((u32**)pSelf);
+}
+
+/* 0x80062D94 (0x58): the node's name. */
+extern "C" nw4r::g3d::ResName res_node_get_res_name(const ResHandle* pNode)
+{
+    const ResNodeData* pData = res_node_ref(pNode);
+    s32 ofs = pData->mToResName;
+    if (ofs) {
+        return nw4r::g3d::ResName((u8*)pData + ofs - 4);
+    }
+    return nw4r::g3d::ResName(NULL);
+}
+
 /* 0x8005D160 (0x4C): the node `ofs` bytes from this one (a null node for offset 0). */
 extern "C" u32 res_node_ofs_to_node(const ResHandle* pSelf, s32 ofs)
 {
@@ -1541,6 +1649,178 @@ nw4r::g3d::AnmObjChrBlend::AnmObjChrBlend(MEMAllocator* pHeap, u16* pBindingBuf,
         mpWeightArray[i] = 1.0f;
     }
 }
+
+#pragma fp_contract off
+
+/* 0x80060658 (0x8D0): node `idx`'s blended result: the weighted sum of the bound children's results (scale, matrix
+ * and translation), blending rotation through quaternions or matrix rows as the animation's flags choose. */
+const nw4r::g3d::ChrAnmResult* nw4r::g3d::AnmObjChrBlend::GetResult(ChrAnmResult* pResult, u32 idx)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x29D, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pResult, 0x29E, "NW4R:Pointer Error\npResult(=%p) is not valid pointer.");
+    if (!((int)idx <= mNumBinding - 1)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x29F, "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied.",
+                        idx, mNumBinding - 1);
+    }
+    AnmObjChrRes* pOnlyChild = NULL;
+    int numAnm = 0;
+    f32 sumWeight = 0.0f;
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        f32 weight = mpWeightArray[i];
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL && weight != 0.0f && pChild->TestExistence(idx)) {
+            if (!(weight > 0.0f)) {
+                nw4r::db::Panic("g3d_anmchr.cpp", 0x2AD, "NW4R:Failed assertion weight > 0.0f");
+            }
+            numAnm++;
+            sumWeight += weight;
+            if (pOnlyChild == NULL) {
+                pOnlyChild = pChild;
+            }
+        }
+    }
+    if (numAnm == 0) {
+        pResult->flags = 0;
+        return pResult;
+    }
+    if (numAnm == 1) {
+        return pOnlyChild->GetResult(pResult, idx);
+    }
+    bool bQuatRot = TestAnmFlag(ANMFLAG_BLEND_QUATERNION_ROT);
+    bool bGeoScale = TestAnmFlag(ANMFLAG_BLEND_GEOMETRIC_SCALE);
+    f32 logSx = 0.0f;
+    f32 logSy = 0.0f;
+    f32 logSz = 0.0f;
+    nw4r::math::QUAT blendQuat;
+    dVector4Set(&blendQuat.x, 0.0f, 0.0f, 0.0f, 1.0f);
+    f32 quatWeight = 0.0f;
+    nw4r::math::MTX33 firstRot;
+    MTX33_ctor(&firstRot);
+    f32 invSum = math_reciprocal(sumWeight);
+    pResult->flags = 0xFFFFFFFF;
+    pResult->s.x = 0.0f;
+    pResult->s.y = 0.0f;
+    pResult->s.z = 0.0f;
+    nw4r::math::MTX34Zero(&pResult->rt);
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        ChrAnmResult childResult;
+        chr_anm_result_init(&childResult);
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        f32 weight = mpWeightArray[i];
+        if (pChild != NULL && weight != 0.0f && pChild->TestExistence(idx)) {
+            const ChrAnmResult* pMy = pChild->GetResult(&childResult, idx);
+            f32 w = weight * invSum;
+            u32 myFlags = pMy->flags;
+            if (!(myFlags & ChrAnmResult::FLAG_ANM_EXISTS)) {
+                nw4r::db::Panic("g3d_anmchr.cpp", 0x2EC,
+                                "NW4R:Failed assertion pMyResult->flags & ChrAnmResult::FLAG_ANM_EXISTS");
+            }
+            if (myFlags & (ChrAnmResult::FLAG_SSC_APPLY | ChrAnmResult::FLAG_SSC_PARENT | ChrAnmResult::FLAG_XSI_SCALING)) {
+                nw4r::db::Panic("g3d_anmchr.cpp", 0x2F3,
+                                "NW4R Internal error\n"
+                                "モデルデータを使用したキャラクタアニメーションのブレンド処理は未実装です。");
+            }
+            if (bGeoScale) {
+                if (!(myFlags & ChrAnmResult::FLAG_SCALE_ONE)) {
+                    logSx += w * math_flog_checked(pMy->s.x);
+                    logSy += w * math_flog_checked(pMy->s.y);
+                    logSz += w * math_flog_checked(pMy->s.z);
+                }
+            } else if (!(myFlags & ChrAnmResult::FLAG_SCALE_ONE)) {
+                pResult->s.x += pMy->s.x * w;
+                pResult->s.y += pMy->s.y * w;
+                pResult->s.z += pMy->s.z * w;
+            } else {
+                pResult->s.x += w;
+                pResult->s.y += w;
+                pResult->s.z += w;
+            }
+            if (bQuatRot) {
+                nw4r::math::QUAT childQuat;
+                quat_empty_ctor(&childQuat);
+                if (!(myFlags & ChrAnmResult::FLAG_ROT_ZERO)) {
+                    quat_from_mtx34(&childQuat, &pMy->rt);
+                } else {
+                    childQuat.x = 0.0f;
+                    childQuat.y = 0.0f;
+                    childQuat.z = 0.0f;
+                    childQuat.w = 1.0f;
+                }
+                quatWeight += weight;
+                quat_slerp(&blendQuat, &blendQuat, &childQuat, weight * math_reciprocal(quatWeight));
+            } else if (!(myFlags & ChrAnmResult::FLAG_ROT_ZERO)) {
+                if (i == 0) {
+                    firstRot.m[0][0] = pMy->rt.m[0][0];
+                    firstRot.m[0][1] = pMy->rt.m[0][1];
+                    firstRot.m[0][2] = pMy->rt.m[0][2];
+                    firstRot.m[1][0] = pMy->rt.m[1][0];
+                    firstRot.m[1][1] = pMy->rt.m[1][1];
+                    firstRot.m[1][2] = pMy->rt.m[1][2];
+                    firstRot.m[2][0] = pMy->rt.m[2][0];
+                    firstRot.m[2][1] = pMy->rt.m[2][1];
+                    firstRot.m[2][2] = pMy->rt.m[2][2];
+                }
+                pResult->rt.m[0][0] += pMy->rt.m[0][0] * w;
+                pResult->rt.m[0][1] += pMy->rt.m[0][1] * w;
+                pResult->rt.m[0][2] += pMy->rt.m[0][2] * w;
+                pResult->rt.m[1][0] += pMy->rt.m[1][0] * w;
+                pResult->rt.m[1][1] += pMy->rt.m[1][1] * w;
+                pResult->rt.m[1][2] += pMy->rt.m[1][2] * w;
+            } else {
+                if (i == 0) {
+                    nw4r::math::MTX33Identity(&firstRot);
+                }
+                pResult->rt.m[0][0] += w;
+                pResult->rt.m[1][1] += w;
+            }
+            if (!(myFlags & ChrAnmResult::FLAG_TRANS_ZERO)) {
+                pResult->rt.m[0][3] += pMy->rt.m[0][3] * w;
+                pResult->rt.m[1][3] += pMy->rt.m[1][3] * w;
+                pResult->rt.m[2][3] += pMy->rt.m[2][3] * w;
+            }
+            pResult->flags &= myFlags;
+        }
+    }
+    if (bGeoScale) {
+        pResult->s.x = math_fexp(logSx);
+        pResult->s.y = math_fexp(logSy);
+        pResult->s.z = math_fexp(logSz);
+    }
+    if (bQuatRot) {
+        nw4r::math::VEC3 trans;
+        trans.x = pResult->rt.m[0][3];
+        trans.y = pResult->rt.m[1][3];
+        trans.z = pResult->rt.m[2][3];
+        mtx34_from_quat(&pResult->rt, &blendQuat);
+        pResult->rt.m[0][3] = trans.x;
+        pResult->rt.m[1][3] = trans.y;
+        pResult->rt.m[2][3] = trans.z;
+    } else {
+        f32* pRow0 = pResult->rt.m[0];
+        f32* pRow1 = pResult->rt.m[1];
+        f32* pRow2 = pResult->rt.m[2];
+        vec3_cross(pRow2, pRow0, pRow1);
+        if (0.0f == vec3_length_sq(pRow0) || 0.0f == vec3_length_sq(pRow2)) {
+            pResult->rt.m[0][0] = firstRot.m[0][0];
+            pResult->rt.m[0][1] = firstRot.m[0][1];
+            pResult->rt.m[0][2] = firstRot.m[0][2];
+            pResult->rt.m[1][0] = firstRot.m[1][0];
+            pResult->rt.m[1][1] = firstRot.m[1][1];
+            pResult->rt.m[1][2] = firstRot.m[1][2];
+            pResult->rt.m[2][0] = firstRot.m[2][0];
+            pResult->rt.m[2][1] = firstRot.m[2][1];
+            pResult->rt.m[2][2] = firstRot.m[2][2];
+        } else {
+            vec3_normalize_into(pRow0, pRow0);
+            vec3_normalize_into(pRow2, pRow2);
+            vec3_cross(pRow1, pRow2, pRow0);
+        }
+    }
+    pResult->flags &= 0x7FFFFFFF;
+    return pResult;
+}
+
+#pragma fp_contract on
 
 /* 0x800610D8 (0x1CC): sets child `idx`'s weight. */
 void nw4r::g3d::AnmObjChrBlend::SetWeight(int idx, f32 weight)

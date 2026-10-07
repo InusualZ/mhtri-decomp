@@ -18,7 +18,8 @@ struct AnmResult {
 /* The node resource block `fn_8005D0C4`/`fn_8005D218` hand back.  Only the fields the reconstructed
  * bodies reach are named; the untouched runs keep their offsets as padding. */
 struct ResNodeData {
-    /* +0x00 */ u8 pad_0x00[0xC];
+    /* +0x00 */ u8 pad_0x00[0x8];
+    /* +0x08 */ s32 mToResName;  /* offset from this block to the node name's characters (the length word is 4 before) */
     /* +0x0C */ u32 mNodeID;  /* the node's index in its model */
     /* +0x10 */ u8 pad_0x10[0x4];
     /* +0x14 */ u32 mFlags;   /* the channel flags fn_80099134/9178/9278 set and clear */

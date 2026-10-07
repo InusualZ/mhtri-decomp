@@ -86,7 +86,9 @@ class AnmObj : public G3dObj {
 public:
     /* The flag bits of mFlags. */
     enum AnmFlag {
-        ANMFLAG_ISBOUND = (1 << 2)
+        ANMFLAG_ISBOUND = (1 << 2),
+        ANMFLAG_BLEND_QUATERNION_ROT = (1 << 3),
+        ANMFLAG_BLEND_GEOMETRIC_SCALE = (1 << 4)
     };
 
     AnmObj(MEMAllocator* pHeap, G3dObj* pParent);
