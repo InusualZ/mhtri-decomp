@@ -1174,7 +1174,7 @@ void fn_801148E4(_EFT* self)
     VEC3_ctor((nw4r::math::VEC3*)v);
     if (self->area_0x44 == get_now_areano() && self->timer_0x0C > 0) {
         fn_8004030C((struct _MH_VEC2*)max);
-        handle = fn_80082BCC(pRoot);
+        handle = scn_root_get_current_camera(pRoot);
         fn_80075258((nw4r::g3d::Camera*)&handle, (u8*)v, &self->pos_0x18);
         if (v[2] <= lbl_80796A08 || v[2] >= lbl_807969DC || v[0] < lbl_80796A08 ||
             v[0] > max[0] || v[1] < lbl_80796A08 || v[1] > max[1]) {

@@ -22,6 +22,8 @@ u32 world_mtx_attr_scale_uniform(u32 attrib);
 u32 world_mtx_attr_scale_one(u32 attrib);
 /* 0x80074114 - the attribute word of a model's root matrix (every scale bit set). */
 u32 world_mtx_attr_root_mtx(void);
+/* 0x800746A4 (0x30): constructs a camera handle on the record at `value` and returns the handle. */
+struct ResHandle* camera_ctor(struct ResHandle* pSelf, u32 value);
 
 #ifdef __cplusplus
 }

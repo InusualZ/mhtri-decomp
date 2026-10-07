@@ -63,6 +63,10 @@ struct ResHandle* res_shp_copy_ctor(struct ResHandle* pDst, const struct ResHand
 /* untyped: opaque handle passed through - the ScnMdl */
 u32 scn_mdl_set_mat_buffer_flag(void* pMdl, s32 matID, s32 mask);
 
+/* 0x80079FB4 (0x30): constructs a fog handle at `pSelf` on the record `pData` and returns `pSelf`. */
+/* untyped: opaque handle - the FogData record */
+s32 fog_ctor(s32 pSelf, void* pData);
+
 #ifdef __cplusplus
 }
 

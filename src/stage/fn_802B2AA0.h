@@ -324,7 +324,6 @@ extern "C" void fn_80057DE0(s32 a, s32 count, u32* colours, f32 param);
 extern "C" void fn_80057EF4(s32 a, s32 count, u32* colours, f32 param);
 extern "C" void camera_posture_info_ctor(s32* out);
 extern "C" s32 fn_8007A1B8(const void* a, s32 b, void* c, void* d, s32 e, s32 f, void* g);
-extern "C" s32 fn_80082C80(s32 root, s32 mode);
 extern "C" void my_player_no_set(s8 value);  /* s8 is the owner's spelling (the argument
  * narrows with `extsb` in retail); `ef/fn_800CDB2C.h` declares it the same way. */
 extern "C" void fn_800DD38C(void);

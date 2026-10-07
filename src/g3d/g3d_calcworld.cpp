@@ -4,7 +4,8 @@
  *   passes "g3d_calcworld.cpp", lbl_8058E184; the fn_80073E80..world_mtx_attr_root_mtx helpers read lbl_8058E340..lbl_8058E420),
  *   .sdata 0x807911D0-0x807911E0, .sdata2 0x80795DC0-0x80795DC8.  The six accessors res_mdl_info_num_view_mtx..fn_800746D4 carry no
  *   data reference: the candidate cut 0x800746DC puts them here, 0x80074620 is the alternative.
- * NAMES. Map stems.
+ * NAMES. camera_ctor is a GUESS (the evidence follows).
+ *   Map stems.
  *   world_mtx_attr_not_scale_uniform is a GUESS, world_mtx_attr_not_scale_one is a GUESS,
  *   world_mtx_attr_scale_uniform is a GUESS, world_mtx_attr_scale_one is a GUESS and world_mtx_attr_root_mtx is a
  *   GUESS (the world-matrix attribute bit helpers), g3d_calc_world is a GUESS and g3d_calc_skinning is a GUESS (the
@@ -184,7 +185,7 @@ s32 fn_80074644(const ResHandle* pSelf);
 void fn_80074698(ResHandle* pSelf, const ResHandle* pRhs);
 ResHandle* fn_80074668(ResHandle* pSelf, const ResHandle* pRhs);
 void fn_800746D4(ResHandle* pSelf, u32 value);
-ResHandle* fn_800746A4(ResHandle* pSelf, u32 value);
+ResHandle* camera_ctor(ResHandle* pSelf, u32 value);
 
 /* Store the three scale values and pick the scale-mode flag word: 0x40000000 when all three are 1.0f,
  * 0x10000000 then 0x3FFFFFFF when they are equal but not 1.0f, otherwise just clear the mode bits. */
@@ -506,7 +507,7 @@ void fn_800746D4(ResHandle* pSelf, u32 value) {
     pSelf->mpData = (void*)value;
 }
 
-ResHandle* fn_800746A4(ResHandle* pSelf, u32 value) {
+ResHandle* camera_ctor(ResHandle* pSelf, u32 value) {
     fn_800746D4(pSelf, value);
     return pSelf;
 }

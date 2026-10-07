@@ -282,7 +282,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     get_camera_pos_c1(&vA0);
     subVec3(&vAC, &unit->world_pos, &vA0);
     copyVec3(&vF4, &vAC);
-    model = fn_80082BCC(pRoot);
+    model = scn_root_get_current_camera(pRoot);
     fn_80075258(&model, &v130, &unit->world_pos);
     f29 = vec3_dot(&v100, &vF4);
     vec3_normalize_into(&v100, &v100);

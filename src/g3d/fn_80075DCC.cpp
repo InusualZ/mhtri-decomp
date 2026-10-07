@@ -5,7 +5,8 @@
  *   0x8058E570-0x8058EDA0, .sdata 0x807911E0-0x80791208, .sdata2 0x80795DF8-0x80795E60.  fn_80075E9C cites
  *   "g3d_dcc.cpp" and fn_8007A8E0 onward "g3d_light.cpp".  The left edge is a tudiscover strong cut after
  *   `g3d/g3d_camera.cpp`; the right edge is the discovery's byte cap, not a TU seam (`g3d/g3d_scnmdl.cpp` follows).
- * NAMES. res_shp_copy_ctor is a GUESS (the evidence follows).
+ * NAMES. fog_ctor is a GUESS (the evidence follows).
+ *   res_shp_copy_ctor is a GUESS (the evidence follows).
  *   scn_mdl_set_mat_buffer_flag is a GUESS (it ORs a mask into the ScnMdl's +0x140 buffer-flag word; the
  *   material pass calls it after each applied animation).  The file keeps the map's stem (no one `__FILE__` names the run).  The bodies are m2c's output, typed
  *   mechanically: each `RawView_N` struct's `field_0xNN` states an offset and a size, not a meaning.
@@ -287,7 +288,7 @@ u32 math_sincos_idx(f32);
 /* internal */ void* fn_80079F10(void* a0, void* a1);
 /* internal */ s32 fn_80079F14(void *arg0, void *arg1);
 /* internal */ s32 fn_80079F78(void *arg0, void *arg1);
-/* internal */ s32 fn_80079FB4(s32 arg0, void* a1);
+/* internal */ s32 fog_ctor(s32 arg0, void* a1);
 /* internal */ u32 fn_80079FE4(s32 *arg0, s32 arg1);
 /* internal */ void fn_80079FEC(s32 arg0);
 /* internal */ s32 fn_8007A0B4(s32 arg0, s32 arg1);
@@ -2122,7 +2123,7 @@ s32 fn_80079F78(void *arg0, void *arg1) {
     return ((RawView_41*)arg0)->field_0x00 > ((RawView_40*)arg1)->field_0x00;
 }
 
-s32 fn_80079FB4(s32 arg0, void* a1) {
+s32 fog_ctor(s32 arg0, void* a1) {
     fn_80079FE4(0, 0);
     return arg0;
 }
@@ -2241,9 +2242,9 @@ s32 fn_8007A0B4(s32 arg0, s32 arg1) {
         ((RawView_43*)arg1)->field_0x18 = (f64) ((RawView_44*)temp_r3)->field_0x18;
         ((RawView_43*)arg1)->field_0x20 = (f64) ((RawView_44*)temp_r3)->field_0x20;
         ((RawView_43*)arg1)->field_0x28 = (f64) ((RawView_44*)temp_r3)->field_0x28;
-        return *((s32*)fn_80079FB4((s32)(&spC), (void*)(arg1)));
+        return *((s32*)fog_ctor((s32)(&spC), (void*)(arg1)));
     }
-    return *((s32*)fn_80079FB4((s32)(&sp8), (void*)(0)));
+    return *((s32*)fog_ctor((s32)(&sp8), (void*)(0)));
 }
 
 s32 fn_8007A1B0(s32 *arg0) {
