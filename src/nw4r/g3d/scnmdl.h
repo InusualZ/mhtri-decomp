@@ -78,11 +78,13 @@ public:
     virtual const AnmObj* GetAnmObj(AnmObjType type) const;
 
     static const TypeObj GetTypeObjStatic();
+    static ScnMdl* Construct(MEMAllocator* pHeap, u32* pSize, ResMdl mdl, u32 bufferOption, int numView);
 
     AnmObjShp* GetAnmObjShp();
     bool IsVisBufferRefreshNeeded() const;
     bool IsVisBufferEnabled() const;
     void UpdateVisBuffer();
+    void InitBuffer();
     bool TestMatBufferFlag(u32 idx, u32 mask) const;
     void G3dProcCalcWorld(u32 param, const math::MTX34* pParent);
     /* untyped: caller-owned payload - the pass's info block */

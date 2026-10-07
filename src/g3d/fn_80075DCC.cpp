@@ -5,7 +5,9 @@
  *   0x8058E570-0x8058EDA0, .sdata 0x807911E0-0x80791208, .sdata2 0x80795DF8-0x80795E60.  fn_80075E9C cites
  *   "g3d_dcc.cpp" and fn_8007A8E0 onward "g3d_light.cpp".  The left edge is a tudiscover strong cut after
  *   `g3d/g3d_camera.cpp`; the right edge is the discovery's byte cap, not a TU seam (`g3d/g3d_scnmdl.cpp` follows).
- * NAMES. The file keeps the map's stem (no one `__FILE__` names the run).  The bodies are m2c's output, typed
+ * NAMES. res_shp_copy_ctor is a GUESS (the evidence follows).
+ *   scn_mdl_set_mat_buffer_flag is a GUESS (it ORs a mask into the ScnMdl's +0x140 buffer-flag word; the
+ *   material pass calls it after each applied animation).  The file keeps the map's stem (no one `__FILE__` names the run).  The bodies are m2c's output, typed
  *   mechanically: each `RawView_N` struct's `field_0xNN` states an offset and a size, not a meaning.
  *   GUESS (from the body and its callers): `sin_cos_deg`, `mtx34_set`; g3d_gd_set_chan_mat_color is a GUESS (XF 0x100C
  *   plus the channel); GDWriteXFCmd is a GUESS (the SDK's GD inline that
@@ -41,7 +43,7 @@
  *   ScnLeaf's destructor is complete with an empty body (the compiler emits the base call and the deleting tail).
  * SHAPES. The CopiedMatResources constructor is complete: its work is the member initialisers.  The material
  *   resource constructors keep `#pragma peephole off` (retail keeps `clrlwi` + `cmpwi` for the alignment test).
- *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except fn_800761BC, fn_800777B0, fn_8007A1B8, fn_8007A2A8, fn_8007A354 and fn_8007BB94,
+ *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except fn_800761BC, fn_800777B0, fn_8007A1B8, fn_8007A2A8, fn_8007A354 and scn_mdl_set_mat_buffer_flag,
  *   which measure better with the pass on.
  */
 
@@ -179,7 +181,7 @@ u32 color_rgba_copy(s32, void*);
 u32 mtx34_identity(s32);
 u32 vec3_normalize_into(void*, void*, f32, f32);
 u32 mtx34_mult_vec3(void*, s32, void*);
-u32 fn_8005A8E0(void*, void*);
+u32 res_mat_chan_copy_ctor(void*, void*);
 s32 fn_8005AAEC(s32);
 void* fn_8005CEEC(void);
 s32 fn_8005D050(void*);
@@ -196,8 +198,8 @@ s32 fn_80065204(void*);
 s32 fn_800659C4(s32);
 void* fn_80067A54(s32);
 u32 fn_8006E2A8(s32, s32);
-u32 fn_8006F0E8(void*, void*);
-u32 fn_8006F228(void*, void*);
+u32 res_mat_tev_color_copy_ctor(void*, void*);
+u32 res_mat_ind_mtx_copy_ctor(void*, void*);
 u32 fn_8006FDCC(void*);
 s32 fn_8006FEC8(void*, s32);
 s32 fn_80070020(s32);
@@ -213,7 +215,6 @@ u32 fn_80087978(void*);
 u32 fn_80087AD0(void*, s32, s32);
 u32 fn_80088574(void*);
 s32 fn_80094094(s32);
-s32 fn_80099974(void*);
 s32 fn_80099BB0(void*);
 u32 fn_8009AB48(u32);
 s32 fn_800D79B4(s32, s32, s32, s32);
@@ -332,7 +333,7 @@ u32 math_sincos_idx(f32);
 /* internal */ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
 /* internal */ s32 fn_8007B794(s32 arg0, s16 arg1);
 /* internal */ s32 dtor_8007B7F0(s32 arg0, s16 arg1);
-/* internal */ s32 fn_8007B834(s32 arg0);
+/* internal */ s32 res_shp_copy_ctor(s32 arg0);
 /* internal */ u32 fn_8007B864(s32 *arg0, s32 *arg1);
 /* internal */ s32 fn_8007B878(s32 arg0, s32 arg1);
 /* internal */ u32 fn_8007B8DC(s32 *arg0, s32 arg1);
@@ -344,7 +345,7 @@ u32 math_sincos_idx(f32);
 /* internal */ s32 fn_8007BA08(s32 arg0);
 /* internal */ u32 fn_8007BA38(s32 *arg0, s32 *arg1);
 /* internal */ const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
-/* internal */ u32 fn_8007BB94(void *arg0, s32 arg1, s32 arg2);
+/* internal */ u32 scn_mdl_set_mat_buffer_flag(void *arg0, s32 arg1, s32 arg2);
 /* internal */ s32 fn_8007BC2C(void *arg0, s32 arg1);
 /* internal */ s32 fn_8007BCAC(void *arg0, s32 arg1);
 /* internal */ s32 fn_8007BD2C(void *arg0, s32 arg1);
@@ -2836,7 +2837,7 @@ s32 dtor_8007B7F0(s32 arg0, s16 arg1) {
 }
 
 
-s32 fn_8007B834(s32 arg0) {
+s32 res_shp_copy_ctor(s32 arg0) {
     fn_8007B864(0, 0);
     return arg0;
 }
@@ -2995,7 +2996,7 @@ typedef struct {
     /* +0x140 */ u32 field_0x140;
 } RawView_70; /* size: 0x144 */
 #pragma peephole on
-u32 fn_8007BB94(void *arg0, s32 arg1, s32 arg2) {
+u32 scn_mdl_set_mat_buffer_flag(void *arg0, s32 arg1, s32 arg2) {
     s32 temp_r3;
     s32 * temp_r6;
 
@@ -3017,7 +3018,7 @@ u32 nw4r::g3d::ScnMdl::CopiedMatAccess::GetResTexSrt(bool arg1) {
 
     if (((s32) ((RawView_71*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResTexSrt*>((void*)(&((RawView_71*)arg0)->field_0x10))->IsValid() != 0)) {
         if (arg1 != 0) {
-            fn_8007BB94((void *)(((RawView_71*)arg0)->field_0x00), (s32)(((RawView_71*)arg0)->field_0x04), (s32)(4));
+            scn_mdl_set_mat_buffer_flag((void *)(((RawView_71*)arg0)->field_0x00), (s32)(((RawView_71*)arg0)->field_0x04), (s32)(4));
         }
         return ((RawView_71*)arg0)->field_0x10;
     }
@@ -3043,7 +3044,7 @@ s32 fn_8007BC2C(void *arg0, s32 arg1) {
 
     if (((s32) ((RawView_72*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatChan*>((void*)(&((RawView_72*)arg0)->field_0x14))->IsValid() != 0)) {
         if (arg1 != 0) {
-            fn_8007BB94((void *)(((RawView_72*)arg0)->field_0x00), (s32)(((RawView_72*)arg0)->field_0x04), (s32)(8));
+            scn_mdl_set_mat_buffer_flag((void *)(((RawView_72*)arg0)->field_0x00), (s32)(((RawView_72*)arg0)->field_0x04), (s32)(8));
         }
         return ((RawView_72*)arg0)->field_0x14;
     }
@@ -3061,7 +3062,7 @@ s32 fn_8007BCAC(void *arg0, s32 arg1) {
 
     if (((s32) ((RawView_73*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResGenMode*>((s32 *)(&((RawView_73*)arg0)->field_0x18))->IsValid() != 0)) {
         if (arg1 != 0) {
-            fn_8007BB94((void *)(((RawView_73*)arg0)->field_0x00), (s32)(((RawView_73*)arg0)->field_0x04), (s32)(0x10));
+            scn_mdl_set_mat_buffer_flag((void *)(((RawView_73*)arg0)->field_0x00), (s32)(((RawView_73*)arg0)->field_0x04), (s32)(0x10));
         }
         return ((RawView_73*)arg0)->field_0x18;
     }
@@ -3079,7 +3080,7 @@ s32 fn_8007BD2C(void *arg0, s32 arg1) {
 
     if (((s32) ((RawView_74*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatMisc*>((s32 *)(&((RawView_74*)arg0)->field_0x1C))->IsValid() != 0)) {
         if (arg1 != 0) {
-            fn_8007BB94((void *)(((RawView_74*)arg0)->field_0x00), (s32)(((RawView_74*)arg0)->field_0x04), (s32)(0x20));
+            scn_mdl_set_mat_buffer_flag((void *)(((RawView_74*)arg0)->field_0x00), (s32)(((RawView_74*)arg0)->field_0x04), (s32)(0x20));
         }
         return ((RawView_74*)arg0)->field_0x1C;
     }
@@ -3097,7 +3098,7 @@ s32 fn_8007BDAC(void *arg0, s32 arg1) {
 
     if (((s32) ((RawView_75*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatPix*>((s32 *)(&((RawView_75*)arg0)->field_0x20))->IsValid() != 0)) {
         if (arg1 != 0) {
-            fn_8007BB94((void *)(((RawView_75*)arg0)->field_0x00), (s32)(((RawView_75*)arg0)->field_0x04), (s32)(0x80));
+            scn_mdl_set_mat_buffer_flag((void *)(((RawView_75*)arg0)->field_0x00), (s32)(((RawView_75*)arg0)->field_0x04), (s32)(0x80));
         }
         return ((RawView_75*)arg0)->field_0x20;
     }
@@ -3115,7 +3116,7 @@ s32 fn_8007BE2C(void *arg0, s32 arg1) {
 
     if (((s32) ((RawView_76*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>((void*)(&((RawView_76*)arg0)->field_0x24))->IsValid() != 0)) {
         if (arg1 != 0) {
-            fn_8007BB94((void *)(((RawView_76*)arg0)->field_0x00), (s32)(((RawView_76*)arg0)->field_0x04), (s32)(0x100));
+            scn_mdl_set_mat_buffer_flag((void *)(((RawView_76*)arg0)->field_0x00), (s32)(((RawView_76*)arg0)->field_0x04), (s32)(0x100));
         }
         return ((RawView_76*)arg0)->field_0x24;
     }

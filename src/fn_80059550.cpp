@@ -6,6 +6,7 @@
  * (`drawSpr2TF__FUcP9fltSpr2TFUc`, `subTransSet__FUllPUl`, `disp_beta_tex__FP3VecP4Vec28_GXColorP9_GXTexObj`,
  * `Panic__Q24nw4r2dbFPCciPCce`, `CosFIdx__Q24nw4r4mathFf`) are spelled by their real declarations, never
  * as callable identifiers (rule 9).
+ * NAMES. res_mat_chan_copy_ctor is a GUESS (0x8005A8E0: the ResMatChan handle copy the ScnMdl material pass calls).
  *
  * The game-root "system message / save-create" callback unit.  `.text` 0x80059550..0x8005AA28 (0x14D8 B,
  * 12 functions), extab 0x800072D0..0x80007310, extabindex 0x8001F5A8..0x8001F608 (8 framed functions).
@@ -29,7 +30,7 @@
  * `chg_nand_err2msgcode`), the Wii system message (`wii_sysmsg_gen`) and the on-screen message box
  * (`font_print_ex` / `font_set_size`).  `fn_80059550`/`fn_8005A36C`/`fn_8005A648` draw the message box's
  * background/beta sprite and text with `disp_beta_tex` and the 2D sprite pipeline `drawSpr2TF`; the
- * `fn_8005A8E0..fn_8005AA20` cluster is the NW4R `ResMat`-style validity-checked handle wrapper.
+ * `res_mat_chan_copy_ctor..fn_8005AA20` cluster is the NW4R `ResMat`-style validity-checked handle wrapper.
  *
  * Measurement path: the unit has no single registered target object yet (it is registered here for the
  * first time), so the source is compiled with MAIN's real `cflags_main` command line and each symbol is
@@ -38,7 +39,7 @@
  *
  * Results (objdiff `report generate`, the official metric; each symbol scored against the retired
  * per-range object that contains it, source compiled with MAIN's real `cflags_main` command line):
- *   100.00: fn_8005A63C, fn_8005A8E0, fn_8005A910, fn_8005A91C, fn_8005A950, fn_8005A9B4, fn_8005AA20
+ *   100.00: fn_8005A63C, res_mat_chan_copy_ctor, fn_8005A910, fn_8005A91C, fn_8005A950, fn_8005A9B4, fn_8005AA20
  *    99.80: fn_8005A9BC
  *    98.38: fn_80059550
  *    94.38: fn_8005A36C
@@ -127,7 +128,7 @@ typedef struct BetaWork {
 
 /* `fltSpr2TF` now lives in its owner's header `fn_80047398.h` (rule 1: one definition). */
 
-/* The NW4R-`ResMat`-style validity-checked handle the `fn_8005A8E0..fn_8005AA20` cluster wraps.
+/* The NW4R-`ResMat`-style validity-checked handle the `res_mat_chan_copy_ctor..fn_8005AA20` cluster wraps.
  * size: 0x04 */
 typedef struct ResHandle {
     /* +0x00 */ u32 mPtr;
@@ -213,7 +214,7 @@ void fn_8005A910(ResHandle* dst, ResHandle* src) {
 }
 
 /* 0x8005A8E0 - copy-construct from `src` and return the new handle. */
-ResHandle* fn_8005A8E0(ResHandle* self, ResHandle* src) {
+ResHandle* res_mat_chan_copy_ctor(ResHandle* self, ResHandle* src) {
     fn_8005A910(self, src);
     return self;
 }

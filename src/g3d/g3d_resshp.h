@@ -117,4 +117,14 @@ public:
 }  // namespace g3d
 }  // namespace nw4r
 
+extern "C" {
+/* The shape's vertex resources (a null handle when the shape has none) and the tev block's copy and range
+ * store; each takes the resource's one-word handle. */
+u32 res_shp_get_vtx_pos(struct ResHandle* pSelf);
+u32 res_shp_get_vtx_nrm(struct ResHandle* pSelf);
+u32 res_shp_get_vtx_clr(struct ResHandle* pSelf, u32 idx);
+u32 res_tev_copy_to(struct ResHandle* pSelf, void* pDst); /* untyped: byte range */
+void res_tev_dc_store(struct ResHandle* pSelf, s32 flag);
+}
+
 #endif /* MHTRI_G3D_G3D_RESSHP_H */

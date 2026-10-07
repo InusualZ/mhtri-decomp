@@ -5,10 +5,12 @@
  *   of `g3d_anmobj.cpp`, `g3d_anmclr.cpp` and `g3d_anmscn.cpp`.
  * RANGE. .text 0x80063E60-0x800680A8 (139 functions); extab, extabindex, .rodata 0x8056F550-0x8056F578, .data
  *   0x8058C118-0x8058CC40, .sdata 0x80791158-0x80791178, .sdata2 0x80795D68-0x80795D90.  More than one TU:
- *   fn_80063E60 cites "g3d_anmclr.cpp" (0x8058C118) and fn_800649CC onward "g3d_anmscn.cpp" (0x8058C288), a seam
+ *   TestExistence__Q34nw4r3g3d12AnmObjMatClrCFUl cites "g3d_anmclr.cpp" (0x8058C118) and fn_800649CC onward "g3d_anmscn.cpp" (0x8058C288), a seam
  *   near 0x800649CC.  The left edge is `g3d/g3d_anmchr.cpp`'s end (the weak type-info members of its five vtables,
  *   0x80063888-0x80063E60, belong to that unit), the right edge `g3d/g3d_anmscn.cpp`.
- * NAMES. The file keeps the map's stem (no one `__FILE__` names the run); the stems are defined `extern "C"`
+ * NAMES. apply_clr_anm_result and AnmObjMatClr::TestExistence (0x80063E60) are GUESSES (nw4r's ApplyClrAnmResult,
+ *   by the ScnMdl material pass).  res_mat_copy_ctor and res_mat_common_copy_ctor are GUESSES (the ResMat copy the ScnMdl buffer refill
+ *   makes of GetResMat's result, and its one-word base copy).  The file keeps the map's stem (no one `__FILE__` names the run); the stems are defined `extern "C"`
  *   (playbook 48), `fn_80066C8C` keeps C++ linkage (map row `fn_80066C8C__FPv`), and the `PlayPolicy` pair sits in
  *   `nw4r::g3d`, as do ResMatChan's GetClassName and IsValid.  The cross-unit declarations are `g3d/fn_80063888.h`.
  *   GUESS: `vec3_copy_construct` (0x80067E54): copies three floats into `out` and returns it (a VEC3 copy).
@@ -32,6 +34,7 @@
  */
 
 #include "types.h"
+#include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
 #include "unsplit/g3d.h"      /* the math types it reads through the band header */
 #include "g3d/fn_80075DCC.h" /* fn_8007A5E4/fn_8007A5A8/fn_8007A724, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/fn_80063888.h"
@@ -42,7 +45,6 @@
 #pragma peephole off
 
 /* Forward declarations: this unit's own copy helpers. */
-extern "C" void fn_8006411C(u32 *dst, const u32 *src);
 extern "C" void *fn_80064754(void *self);
 extern "C" void fn_8006602C(u32 *dst, const u32 *src);
 extern "C" void fn_80066D48(u32 *dst, const u32 *src);
@@ -111,11 +113,11 @@ extern "C" u32 fn_800655A4(void *p)
     return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
 }
 
-/* Copies one word through the `fn_8006411C` helper and hands the destination back. */
-extern "C" void *fn_800640EC(void *dst, void *src)
+/* 0x800640EC (0x30): copy-constructs a material handle through its base-handle copy and returns the destination. */
+extern "C" struct ResHandle *res_mat_copy_ctor(struct ResHandle *pDst, const struct ResHandle *pSrc)
 {
-    fn_8006411C((u32 *)dst, (const u32 *)src);
-    return dst;
+    res_mat_common_copy_ctor(pDst, pSrc);
+    return pDst;
 }
 
 extern "C" u32 fn_80064730(void *self)
@@ -168,9 +170,10 @@ const nw4r::g3d::ResMatData* nw4r::g3d::ResMat::ptr() const
     return mpData;
 }
 
-extern "C" void fn_8006411C(u32 *dst, const u32 *src)
+/* 0x8006411C (0xC): copies the base handle's data pointer. */
+extern "C" void res_mat_common_copy_ctor(struct ResHandle *pDst, const struct ResHandle *pSrc)
 {
-    *dst = *src;
+    pDst->mpData = pSrc->mpData;
 }
 
 /* Returns its argument unchanged; the callers read the word through it (0x80064754 is the 4-byte

@@ -209,8 +209,8 @@ s32 fn_800E2994(void* access);
 
 void* fn_8007BE2C(void* access, u32 idx);
 void* fn_8007BC2C(void* access, u32 idx);
-void fn_8006F0E8(void* out, void* handle);
-void fn_8005A8E0(void* out, void* handle);
+void res_mat_tev_color_copy_ctor(void* out, void* handle);
+void res_mat_chan_copy_ctor(void* out, void* handle);
 
 /* the emitter data helpers */
 s32 fn_800F6984(u32 a, u32 b, void* table, void* names);
@@ -733,7 +733,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
             }
             u32 handle = (u32)fn_8007BE2C(&access, 0);
             void* tex;
-            fn_8006F0E8(&tex, &handle);
+            res_mat_tev_color_copy_ctor(&tex, &handle);
             if (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>(&tex)->IsValid() == 0) {
                 return;
             }
@@ -746,7 +746,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
             }
             u32 handle = (u32)fn_8007BC2C(&access, 0);
             void* tex;
-            fn_8005A8E0(&tex, &handle);
+            res_mat_chan_copy_ctor(&tex, &handle);
             if (reinterpret_cast<const nw4r::g3d::ResMatChan*>(&tex)->IsValid() == 0) {
                 return;
             }

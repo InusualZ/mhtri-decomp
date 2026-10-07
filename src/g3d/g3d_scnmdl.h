@@ -14,9 +14,21 @@ extern "C" {
 void g3d_root_model_bind(s32 root, u32 id);
 /* 0x8007D404 - the `ResMdlInfo` handle's block (asserting the handle is valid). */
 u32 res_mdl_info_ref(const void* pInfo); /* untyped: opaque handle - the info handle */
+/* The tev, texture-coordinate-generator, pixel-engine, misc and gen-mode blocks' `EndEdit` hooks, each on the
+ * block's one-word handle (the first three store the display list back, the last two are empty). */
+void res_tev_end_edit(struct ResHandle* pSelf);
+void res_mat_tex_coord_gen_end_edit(struct ResHandle* pSelf);
+void res_mat_pix_end_edit(struct ResHandle* pSelf);
+void res_mat_misc_end_edit(struct ResHandle* pSelf);
+void res_gen_mode_end_edit(struct ResHandle* pSelf);
 
 #ifdef __cplusplus
 }
+
+namespace nw4r { namespace g3d { class ScnMdl; } }
+
+/* 0x8007E498 (0x364): copies the flagged blocks of material `matID` into the model's replacement buffers. */
+extern "C" void scn_mdl_clean_mat_buffer(nw4r::g3d::ScnMdl* pMdl, u32 matID, u32 option);
 #endif
 
 #endif /* MHTRI_G3D_G3D_SCNMDL_H */

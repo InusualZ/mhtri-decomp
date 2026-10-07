@@ -5,7 +5,14 @@
  *   "g3d_scnmdl.cpp"), .sdata 0x80791208-0x80791210.  The left edge is `g3d/fn_80075DCC.cpp`'s cap, not a proven
  *   seam; tudiscover proves one TU through 0x8007EF1C, and the 0x8007EF1C-0x8007F0E4 tail is here because its head
  *   GetTypeObj reads the "ScnMdl" name record (scn_typename_ScnMdl), which only the class's own TU registers.
- * NAMES. The ScnMdl members are nw4r's (`src/nw4r/g3d/scnmdl.h`: the vtable gives the virtual order, the asserts name
+ * NAMES. res_gen_mode_end_edit is a GUESS; res_mat_misc_end_edit is a GUESS; res_mat_pix_end_edit is a GUESS;
+ *   res_mat_tex_coord_gen_end_edit is a GUESS; res_tev_end_edit is a GUESS; res_tex_obj_common_copy_ctor is a GUESS;
+ *   res_tex_obj_copy_ctor is a GUESS; res_tlut_obj_common_copy_ctor is a GUESS;
+ *   res_tlut_obj_copy_ctor is a GUESS (the evidence follows).
+ *   res_tev_end_edit, res_mat_tex_coord_gen_end_edit, res_mat_pix_end_edit, res_mat_misc_end_edit,
+ *   res_gen_mode_end_edit, Construct, InitBuffer, HandleTemp, scn_mdl_psize_error_msg, res_tex_obj_copy_ctor, res_tlut_obj_copy_ctor (and their *_common_copy_ctor
+ *   halves) and scn_mdl_clean_mat_buffer are GUESSES (nw4r's EndEdit hooks, by the DCStore each
+ *   tail-calls; the per-material refill that copies each flagged block into its mReplacement buffer).  The ScnMdl members are nw4r's (`src/nw4r/g3d/scnmdl.h`: the vtable gives the virtual order, the asserts name
  *   `mpAnmObjShp` and the `mReplacement.*Array` buffers, the map rows carry the manglings).  G3dProcCalcWorld,
  *   G3dProcCalcMat, G3dProcCalcVtx, G3dProcDrawOpa, G3dProcDrawXlu, IsVisBufferRefreshNeeded, IsVisBufferEnabled,
  *   UpdateVisBuffer, TestMatBufferFlag and GetAnmObjShp are GUESSES (the per-pass helpers G3dProc dispatches to and the
@@ -15,32 +22,41 @@
  *   getters, G3dProcUpdateFrame and IsDerivedFrom defined here are its weak copies (members of
  *   `g3d/g3d_scnmdlsmpl.h`), as is AnmObj::IsBound; ScnGroup::PopBack and ScnGroup::Empty (0x8007F05C, 0x8007F0BC)
  *   are `g3d/g3d_scnobj.h`'s.
- * RESIDUALS. Unwritten (objdiff scores them zero): fn_8007C540 (ScnMdl::Construct, 0xE4C), G3dProcCalcMat (0x590),
- *   fn_8007E01C (0x45C, the replacement-buffer initialiser Construct ends with) and fn_8007E498 (0x364, the
- *   per-material buffer refill G3dProcCalcMat calls; `sound/mhchar.cpp` calls its stem).  They need the ResMat
- *   accessors' remaining names.
- *   Partial: RemoveAnmObj(AnmObj*) (the vertex-position loop's counter and destination swap r27/r28).
- *   flipcheck: `.text` is short of the four unwritten rows; `.data` and `.sdata` are claimed and not emitted; the
+ * RESIDUALS. Partial: RemoveAnmObj(AnmObj*) (the vertex-position loop's counter and destination swap r27/r28; its
+ *   extab saved-register byte differs with it).
+ *   flipcheck: `.data` and `.sdata` are claimed and not emitted; the
  *   "ScnMdl" name record (`.rodata` 0x8056F678) has no registered owner.
- * SHAPES. The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
+ * SHAPES. The handle copies retail calls out of line (res_mat_copy_ctor, res_tex_obj_copy_ctor, ...) are explicit calls
+ *   on `ResHandle` locals, declared in Construct/G3dProcCalcMat/InitBuffer order so the stack slots match; a
+ *   by-value handle word the callee returns becomes a `HandleTemp` class temporary, whose address is then taken.
+ *   The unit does not include `g3d/fn_80063888.h`: its global placement `operator delete` gives Construct's
+ *   `new (pBuf) ScnMdl` a landing pad retail lacks (the leaf `g3d/res_mat_copy_ctor.h` carries what is needed).
+ *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
  *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
  */
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle, IS_VALID_PTR (rule 1) */
 #include "nw4r/g3d/scnmdl.h"      /* nw4r::g3d::ScnMdl (rule 1) */
-#include "g3d/fn_80063888.h"      /* fn_800649B4 (rule 2: owner g3d/fn_80063888.cpp) */
+#include "g3d/res_mat_copy_ctor.h" /* res_mat_copy_ctor, apply_clr_anm_result (rule 2: owner g3d/fn_80063888.cpp) */
 #include "g3d/g3d_anmchr.h"       /* G3dObj::operator delete, TypeObj::GetTypeName, type_obj_set_name, TypeObj::operator==, G3dObj (rule 2: owner g3d/g3d_anmchr.cpp) */
 #include "g3d/fn_800680CC.h"      /* fn_800696E4, fn_800697A4 (rule 2: owner g3d/fn_800680CC.cpp) */
 #include "g3d/fn_80075DCC.h"      /* fn_8007B734..g3d_draw_res_mdl_directly (rule 2: owner g3d/fn_80075DCC.cpp) */
 #include "g3d/g3d_scnobj.h"       /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
 #include "g3d/g3d_anmvis.h"      /* g3d_apply_vis_anm_result/fn_8006ED84 (rule 2: owner g3d/g3d_anmvis.cpp) */
 #include "g3d/g3d_calcview.h"     /* fn_8006FFBC/fn_8006FFC8 (rule 2: owner g3d/g3d_calcview.cpp) */
+#include "g3d/g3d_calcworld.h"     /* res_mdl_get_info, res_mdl_info_num_view_mtx (rule 2) */
 #include "g3d/g3d_calcvtx.h"       /* fn_8007270C (rule 2: g3d_calcvtx.cpp) */
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_resnode.h"
 #include "g3d/g3d_scnmdlsmpl.h"   /* nw4r::g3d::ScnMdlSimple (rule 2) */
+#include "g3d/g3d_scnmdl.h"
+#include "g3d/g3d_resfile.h"     /* res_mat_*_dc_store, res_mat_*_copy_to (rule 2) */
+#include "g3d/g3d_resshp.h"      /* res_tev_dc_store, res_tev_copy_to (rule 2) */
+#include "g3d/g3d_calcmaterial.h" /* res_*_end_edit (rule 2) */
+#include "g3d/g3d_anmtexsrt.h"   /* nw4r::g3d::AnmObjTexSrt (rule 1) */
+#include "g3d/res_mat_chan_copy_ctor.h" /* res_mat_chan_copy_ctor (rule 2: owner fn_80059550.cpp) */
 #include "unsplit/g3d.h"           /* scn_typename_ScnMdl, no registered owner (rule 2) */
 
 #pragma peephole off
@@ -49,6 +65,7 @@
 using nw4r::g3d::ReplacementBlock;
 using nw4r::g3d::ScnMdl;
 using nw4r::g3d::ResMdl;
+using nw4r::g3d::ResMat;
 
 namespace nw4r {
 namespace db {
@@ -65,6 +82,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
  * labels, not literals: MWCC's `-str reuse` would pool a repeated literal into one blob addressed
  * through a shared base register, while the target loads each one with its own `lis`/`addi`. */
 extern const char lbl_8058EDA0[]; /* "g3d_scnmdl.cpp" */
+extern const char scn_mdl_psize_error_msg[]; /* "NW4R:Pointer Error\npSize(=%p) is not valid pointer." */
 extern const char lbl_8058EDE4[]; /* "NW4R:Failed assertion ((u32)buf & 0x1f) == 0" */
 extern const char lbl_8058EE14[]; /* "NW4R:Failed assertion pos.GetSize() == ResVtxPos(rep.vtxPosTable..." */
 extern const char lbl_8058EE64[]; /* "...((u32)&mReplacement.pixDLArray[i] & 0x1f) == 0" */
@@ -94,23 +112,306 @@ struct ResVtxBlockHead {
 
 extern "C" {
 
-/* -------- the two node-table helpers of `g3d/g3d_resmat.cpp`, declared here -------- */
-u32 fn_8009A2F4(void* pSelf, u32 flag);  /* 0x8009A2F4 - the pix-DL replacement's teardown */
-u32 fn_8009435C(void* pSelf, u32 flag);  /* 0x8009435C - the tex-color-DL replacement's teardown */
-u32 fn_8009411C(void* pSelf, u32 flag);  /* 0x8009411C - the ind-mtx/scale replacement's teardown */
-
 u32 fn_8007D38C(u32 p);
 u32 fn_8007D468(const ResHandle* pSelf);
 u32 fn_8007D470(u32 p);
-u32* fn_8007DB3C(u32* pDst, const u32* pSrc);
-void fn_8007DB6C(u32* pDst, const u32* pSrc);
-u32* fn_8007DB78(u32* pDst, const u32* pSrc);
-void fn_8007DBA8(u32* pDst, const u32* pSrc);
-u32 fn_8007E478(ScnMdl* pSelf);
-u32 fn_8007E480(ScnMdl* pSelf);
-u32 fn_8007E488(ScnMdl* pSelf);
-void fn_8007E490(void);
-void fn_8007E494(void);
+ResHandle* res_tlut_obj_copy_ctor(ResHandle* pDst, const ResHandle* pSrc);
+void res_tlut_obj_common_copy_ctor(ResHandle* pDst, const ResHandle* pSrc);
+ResHandle* res_tex_obj_copy_ctor(ResHandle* pDst, const ResHandle* pSrc);
+void res_tex_obj_common_copy_ctor(ResHandle* pDst, const ResHandle* pSrc);
+
+} /* extern "C" */
+
+/* Wraps a copied block's handle word in a class temporary, so the edit hook gets the temporary's address. */
+struct HandleTemp {
+    HandleTemp(u32 word) { mHandle.mpData = (void*)word; }
+    /* +0x00 */ ResHandle mHandle;
+}; /* size: 0x4 */
+
+/* 0x8007C540 (0xE4C): sizes a model for `mdl` with `numView` views and the replacement buffers `bufferOption`
+ * selects, reports the size through `pSize`, and builds the model and its buffers in one block from `pHeap`. */
+ScnMdl* ScnMdl::Construct(MEMAllocator* pHeap, u32* pSize, ResMdl mdl, u32 bufferOption, int numView)
+{
+    if (!mdl.IsValid()) {
+        return NULL;
+    }
+    if (numView == 0) {
+        numView = 1;
+    } else if (numView > 16) {
+        numView = 16;
+    }
+    ScnMdl* pScnMdl = NULL;
+    u32 numPosNrmMtx = res_mdl_info_num_pos_nrm_mtx(&HandleTemp(res_mdl_get_info(&mdl)).mHandle);
+    u32 numViewMtx = res_mdl_info_num_view_mtx(&HandleTemp(res_mdl_get_info(&mdl)).mHandle);
+    u32 numMat = mdl.GetResMatNumEntries();
+    u32 numNode = mdl.GetResNodeNumEntries();
+
+    u32 worldMtxSize = numPosNrmMtx * sizeof(nw4r::math::MTX34);
+    u32 worldAttribSize = numPosNrmMtx * sizeof(u32);
+    u32 viewMtxSize = numViewMtx * sizeof(nw4r::math::MTX34);
+    u32 viewPosSize = numView * fn_8007D470(viewMtxSize);
+    u32 viewNrmSize = numViewMtx * sizeof(nw4r::math::MTX33);
+    if (((const ScnMdlResMdlInfoData*)res_mdl_info_ref(&HandleTemp(res_mdl_get_info(&mdl)).mHandle))->needNrmMtxArray) {
+        viewNrmSize = numView * fn_8007D470(viewNrmSize);
+    } else {
+        viewNrmSize = 0;
+    }
+    u32 viewTexSize;
+    if (((const ScnMdlResMdlInfoData*)res_mdl_info_ref(&HandleTemp(res_mdl_get_info(&mdl)).mHandle))->needTexMtxArray) {
+        viewTexSize = numView * fn_8007D470(viewMtxSize);
+    } else {
+        viewTexSize = 0;
+    }
+    u32 matFlagsSize = numMat * sizeof(u32);
+    u32 texObjSize = (bufferOption & 0x1) ? numMat * 0x104 : 0;
+    u32 tlutObjSize = (bufferOption & 0x2) ? numMat * 0x64 : 0;
+    u32 texSrtSize = (bufferOption & 0x4) ? numMat * 0x248 : 0;
+    u32 chanSize = (bufferOption & 0x8) ? numMat * 0x28 : 0;
+    u32 genModeSize = (bufferOption & 0x10) ? numMat * 0x8 : 0;
+    u32 matMiscSize = (bufferOption & 0x20) ? numMat * 0xC : 0;
+    u32 visSize = (bufferOption & 0x40) ? numNode : 0;
+    u32 pixSize = (bufferOption & 0x80) ? numMat * 0x20 : 0;
+    u32 tevColorSize = (bufferOption & 0x100) ? numMat * 0x80 : 0;
+    u32 indMtxSize = (bufferOption & 0x200) ? numMat * 0x40 : 0;
+    u32 texCoordGenSize = (bufferOption & 0x400) ? numMat * 0xA0 : 0;
+    u32 tevSize = (bufferOption & 0x800) ? numMat * 0x200 : 0;
+
+    u32 vtxPosTableSize = 0;
+    u32 vtxPosDataSize = 0;
+    if (bufferOption & 0x1000) {
+        u32 numVtxPos = mdl.GetResVtxPosNumEntries();
+        u32 numShp = mdl.GetResShpNumEntries();
+        vtxPosTableSize = numVtxPos * sizeof(void*);
+        for (u32 i = 0; i < numVtxPos; i++) {
+            nw4r::g3d::ResVtxPos pos(&mdl.GetResVtxPos(i));
+            u32 j;
+            for (j = 0; j < numShp; j++) {
+                ResHandle shp;
+                res_shp_copy_ctor(&shp, (ResHandle*)&mdl.GetResShp(j));
+                if (pos.ptr() == reinterpret_cast<nw4r::g3d::ResVtxPos*>(&HandleTemp(res_shp_get_vtx_pos(&shp)).mHandle)->ptr()) {
+                    break;
+                }
+            }
+            if (j != numShp) {
+                vtxPosDataSize += fn_8007D470(pos.GetSize());
+            }
+        }
+    }
+
+    u32 vtxNrmTableSize = 0;
+    u32 vtxNrmDataSize = 0;
+    if (bufferOption & 0x2000) {
+        u32 numVtxNrm = mdl.GetResVtxNrmNumEntries();
+        u32 numShp = mdl.GetResShpNumEntries();
+        vtxNrmTableSize = numVtxNrm * sizeof(void*);
+        for (u32 i = 0; i < numVtxNrm; i++) {
+            nw4r::g3d::ResVtxNrm nrm(&mdl.GetResVtxNrm(i));
+            u32 j;
+            for (j = 0; j < numShp; j++) {
+                ResHandle shp;
+                res_shp_copy_ctor(&shp, (ResHandle*)&mdl.GetResShp(j));
+                if (nrm.ptr() == reinterpret_cast<nw4r::g3d::ResVtxNrm*>(&HandleTemp(res_shp_get_vtx_nrm(&shp)).mHandle)->ptr()) {
+                    break;
+                }
+            }
+            if (j != numShp) {
+                vtxNrmDataSize += fn_8007D470(nrm.GetSize());
+            }
+        }
+    }
+
+    u32 vtxClrTableSize = 0;
+    u32 vtxClrDataSize = 0;
+    if (bufferOption & 0x4000) {
+        u32 numVtxClr = mdl.GetResVtxClrNumEntries();
+        u32 numShp = mdl.GetResShpNumEntries();
+        vtxClrTableSize = numVtxClr * sizeof(void*);
+        for (u32 i = 0; i < numVtxClr; i++) {
+            nw4r::g3d::ResVtxClr clr(&mdl.GetResVtxClr(i));
+            u32 j;
+            for (j = 0; j < numShp; j++) {
+                ResHandle shp;
+                res_shp_copy_ctor(&shp, (ResHandle*)&mdl.GetResShp(j));
+                bool used = clr.ptr() == reinterpret_cast<nw4r::g3d::ResVtxClr*>(
+                                &HandleTemp(res_shp_get_vtx_clr(&shp, 0)).mHandle)->ptr() ||
+                            clr.ptr() == reinterpret_cast<nw4r::g3d::ResVtxClr*>(
+                                &HandleTemp(res_shp_get_vtx_clr(&shp, 1)).mHandle)->ptr();
+                if (used) {
+                    break;
+                }
+            }
+            if (j != numShp) {
+                vtxClrDataSize += fn_8007D470(clr.GetSize());
+            }
+        }
+    }
+
+    u32 worldMtxOffset = fn_8007D470(sizeof(ScnMdl));
+    u32 worldAttribOffset = fn_8007D470(worldMtxOffset + worldMtxSize);
+    u32 viewPosOffset = fn_8007D470(worldAttribOffset + worldAttribSize);
+    u32 viewNrmOffset = fn_8007D470(viewPosOffset + viewPosSize);
+    u32 viewTexOffset = fn_8007D470(viewNrmOffset + viewNrmSize);
+    u32 matFlagsOffset = fn_8007D38C(viewTexOffset + viewTexSize);
+    u32 texObjOffset = fn_8007D470(matFlagsOffset + matFlagsSize);
+    u32 tlutObjOffset = fn_8007D38C(texObjOffset + texObjSize);
+    u32 texSrtOffset = fn_8007D38C(tlutObjOffset + tlutObjSize);
+    u32 chanOffset = fn_8007D38C(texSrtOffset + texSrtSize);
+    u32 genModeOffset = fn_8007D38C(chanOffset + chanSize);
+    u32 matMiscOffset = fn_8007D38C(genModeOffset + genModeSize);
+    u32 visOffset = fn_8007D38C(matMiscOffset + matMiscSize);
+    u32 pixOffset = fn_8007D470(visOffset + visSize);
+    u32 tevColorOffset = fn_8007D470(pixOffset + pixSize);
+    u32 indMtxOffset = fn_8007D470(tevColorOffset + tevColorSize);
+    u32 texCoordGenOffset = fn_8007D470(indMtxOffset + indMtxSize);
+    u32 tevOffset = fn_8007D470(texCoordGenOffset + texCoordGenSize);
+    u32 vtxPosTableOffset = fn_8007D470(tevOffset + tevSize);
+    u32 vtxNrmTableOffset = vtxPosTableOffset + vtxPosTableSize;
+    u32 vtxClrTableOffset = vtxNrmTableOffset + vtxNrmTableSize;
+    u32 vtxPosDataOffset = fn_8007D470(vtxClrTableOffset + vtxClrTableSize);
+    u32 vtxNrmDataOffset = fn_8007D470(vtxPosDataOffset + vtxPosDataSize);
+    u32 vtxClrDataOffset = fn_8007D470(vtxNrmDataOffset + vtxNrmDataSize);
+    u32 size = fn_8007D470(vtxClrDataOffset + vtxClrDataSize);
+
+    if (pSize != NULL) {
+        BOOL ok1 = TRUE, ok2 = TRUE, ok3 = TRUE, ok4 = TRUE, ok5 = TRUE, ok6 = TRUE;
+        u32 top = (u32)pSize & 0xFF000000u;
+        if (!(top == 0x80000000u) && !(((u32)pSize & 0xFF800000u) == 0x81000000u))
+            ok6 = FALSE;
+        if (!ok6 && !(((u32)pSize & 0xF8000000u) == 0x90000000u))
+            ok5 = FALSE;
+        if (!ok5 && !(top == 0xC0000000u))
+            ok4 = FALSE;
+        if (!ok4 && !(((u32)pSize & 0xFF800000u) == 0xC1000000u))
+            ok3 = FALSE;
+        if (!ok3 && !(((u32)pSize & 0xF8000000u) == 0xD0000000u))
+            ok2 = FALSE;
+        if (!ok2 && !(((u32)pSize & 0xFFFFC000u) == 0xE0000000u))
+            ok1 = FALSE;
+        if (!ok1)
+            nw4r::db::Panic(lbl_8058EDA0, 802, scn_mdl_psize_error_msg, pSize);
+        *pSize = size;
+    }
+
+    if (pHeap != NULL) {
+        u8* pBuf = (u8*)Alloc(pHeap, size);
+        if ((u32)pBuf & 0x1F) {
+            nw4r::db::Panic(lbl_8058EDA0, 813, lbl_8058EDE4);
+        }
+        if (pBuf == NULL) {
+            return NULL;
+        }
+
+        ReplacementBlock rep;
+        rep.mFlag = 0;
+        u32 keepVtx = bufferOption & 0x01000000;
+        if (keepVtx == 0) {
+            rep.mFlag |= 1;
+        }
+        rep.mpNodeVisible = visSize ? pBuf + visOffset : NULL;
+        rep.mpTexObjDataArray = texObjSize ? pBuf + texObjOffset : NULL;
+        rep.mpTlutObjDataArray = tlutObjSize ? pBuf + tlutObjOffset : NULL;
+        rep.mpTexSrtDataArray = texSrtSize ? pBuf + texSrtOffset : NULL;
+        rep.mpChanDataArray = chanSize ? pBuf + chanOffset : NULL;
+        rep.mpGenModeDataArray = genModeSize ? pBuf + genModeOffset : NULL;
+        rep.mpMatMiscDataArray = matMiscSize ? pBuf + matMiscOffset : NULL;
+        rep.mpPixDLArray = pixSize ? pBuf + pixOffset : NULL;
+        rep.mpTevColorDLArray = tevColorSize ? pBuf + tevColorOffset : NULL;
+        rep.mpIndMtxAndScaleDLArray = indMtxSize ? pBuf + indMtxOffset : NULL;
+        rep.mpTexCoordGenDLArray = texCoordGenSize ? pBuf + texCoordGenOffset : NULL;
+        rep.mpTevDataArray = tevSize ? pBuf + tevOffset : NULL;
+        rep.mpVtxPosTable = vtxPosTableSize ? (void**)(pBuf + vtxPosTableOffset) : NULL;
+        rep.mpVtxNrmTable = vtxNrmTableSize ? (void**)(pBuf + vtxNrmTableOffset) : NULL;
+        rep.mpVtxClrTable = vtxClrTableSize ? (void**)(pBuf + vtxClrTableOffset) : NULL;
+
+        if (rep.mpVtxPosTable) {
+            u32 numVtxPos = mdl.GetResVtxPosNumEntries();
+            u32 numShp = mdl.GetResShpNumEntries();
+            for (u32 i = 0; i < numVtxPos; i++) {
+                nw4r::g3d::ResVtxPos pos(&mdl.GetResVtxPos(i));
+                u32 j;
+                for (j = 0; j < numShp; j++) {
+                    ResHandle shp;
+                    res_shp_copy_ctor(&shp, (ResHandle*)&mdl.GetResShp(j));
+                    if (pos.ptr() == reinterpret_cast<nw4r::g3d::ResVtxPos*>(&HandleTemp(res_shp_get_vtx_pos(&shp)).mHandle)->ptr()) {
+                        break;
+                    }
+                }
+                if (j != numShp) {
+                    rep.mpVtxPosTable[i] = pBuf + vtxPosDataOffset;
+                    vtxPosDataOffset += fn_8007D470(pos.GetSize());
+                    pos.CopyTo(rep.mpVtxPosTable[i]);
+                    if (pos.GetSize() != nw4r::g3d::ResVtxPos(rep.mpVtxPosTable[i]).GetSize()) {
+                        nw4r::db::Panic(lbl_8058EDA0, 866, lbl_8058EE14);
+                    }
+                } else {
+                    rep.mpVtxPosTable[i] = pos.ptr();
+                }
+            }
+        }
+        if (rep.mpVtxNrmTable) {
+            u32 numVtxNrm = mdl.GetResVtxNrmNumEntries();
+            u32 numShp = mdl.GetResShpNumEntries();
+            for (u32 i = 0; i < numVtxNrm; i++) {
+                nw4r::g3d::ResVtxNrm nrm(&mdl.GetResVtxNrm(i));
+                u32 j;
+                for (j = 0; j < numShp; j++) {
+                    ResHandle shp;
+                    res_shp_copy_ctor(&shp, (ResHandle*)&mdl.GetResShp(j));
+                    if (nrm.ptr() == reinterpret_cast<nw4r::g3d::ResVtxNrm*>(&HandleTemp(res_shp_get_vtx_nrm(&shp)).mHandle)->ptr()) {
+                        break;
+                    }
+                }
+                if (j != numShp) {
+                    rep.mpVtxNrmTable[i] = pBuf + vtxNrmDataOffset;
+                    vtxNrmDataOffset += fn_8007D470(nrm.GetSize());
+                    nrm.CopyTo(rep.mpVtxNrmTable[i]);
+                } else {
+                    rep.mpVtxNrmTable[i] = nrm.ptr();
+                }
+            }
+        }
+        if (rep.mpVtxClrTable) {
+            u32 numVtxClr = mdl.GetResVtxClrNumEntries();
+            u32 numShp = mdl.GetResShpNumEntries();
+            for (u32 i = 0; i < numVtxClr; i++) {
+                nw4r::g3d::ResVtxClr clr(&mdl.GetResVtxClr(i));
+                u32 j;
+                for (j = 0; j < numShp; j++) {
+                    ResHandle shp;
+                    res_shp_copy_ctor(&shp, (ResHandle*)&mdl.GetResShp(j));
+                    bool used = clr.ptr() == reinterpret_cast<nw4r::g3d::ResVtxClr*>(
+                                &HandleTemp(res_shp_get_vtx_clr(&shp, 0)).mHandle)->ptr() ||
+                                clr.ptr() == reinterpret_cast<nw4r::g3d::ResVtxClr*>(
+                                &HandleTemp(res_shp_get_vtx_clr(&shp, 1)).mHandle)->ptr();
+                    if (used) {
+                        break;
+                    }
+                }
+                if (j != numShp) {
+                    rep.mpVtxClrTable[i] = pBuf + vtxClrDataOffset;
+                    vtxClrDataOffset += fn_8007D470(clr.GetSize());
+                    clr.CopyTo(rep.mpVtxClrTable[i]);
+                } else {
+                    rep.mpVtxClrTable[i] = clr.ptr();
+                }
+            }
+        }
+
+        u32 option = 0;
+        if (keepVtx) {
+            option |= 1;
+        }
+        pScnMdl = new (pBuf) ScnMdl(pHeap, mdl, (nw4r::math::MTX34*)(pBuf + worldMtxOffset),
+                                    (u32*)(pBuf + worldAttribOffset), (nw4r::math::MTX34*)(pBuf + viewPosOffset),
+                                    viewNrmSize ? (nw4r::math::MTX33*)(pBuf + viewNrmOffset) : NULL,
+                                    viewTexSize ? (nw4r::math::MTX34*)(pBuf + viewTexOffset) : NULL, numView,
+                                    numViewMtx, &rep, (u32*)(pBuf + matFlagsOffset), option);
+        pScnMdl->InitBuffer();
+    }
+    return pScnMdl;
+}
+
+extern "C" {
 
 /* 0x8007D38C - the block pointer aligned up to 4 (the `buf & 0x3` shape the asserts below test). */
 u32 fn_8007D38C(u32 p) {
@@ -200,6 +501,114 @@ bool ScnMdl::IsVisBufferEnabled() const
     return (mFlags & 2) == 0;
 }
 
+/* 0x8007D59C (0x590): the material pass: refreshes the flagged replacement buffers, then applies the
+ * texture-pattern, texture-SRT and colour animations to each material's replacement (or resource) blocks. */
+/* untyped: caller-owned payload - the pass's info block */
+void ScnMdl::G3dProcCalcMat(u32 param, void* pInfo)
+{
+    CheckCallback_CALC_MAT(CALLBACK_TIMING_A, param, pInfo);
+
+    u32 view;
+    ResHandle matHandle;
+    ResHandle texObj;
+    ResHandle tlutObj;
+    ResHandle texSrt;
+    ResHandle indMtx;
+    ResHandle tevColor;
+    ResHandle chan;
+    nw4r::g3d::TexPatAnmResult texPatResult;
+    nw4r::g3d::ClrAnmResult clrResult;
+    nw4r::g3d::TexSrtAnmResult texSrtResult;
+
+    fn_80077E34((s32)&view, &GetResMdl());
+    u32 numMat = reinterpret_cast<ResMdl*>(&view)->GetResMatNumEntries();
+
+    for (u32 i = 0; i < numMat; i++) {
+        res_mat_copy_ctor(&matHandle, (ResHandle*)&reinterpret_cast<ResMdl*>(&view)->GetResMat(i));
+
+        if (TestMatBufferFlag(i, 0x1)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x1);
+        }
+        if (TestMatBufferFlag(i, 0x2)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x2);
+        }
+        if (TestMatBufferFlag(i, 0x200)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x200);
+        }
+        if (TestMatBufferFlag(i, 0x4)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x4);
+        }
+        if (TestMatBufferFlag(i, 0x8)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x8);
+        }
+        if (TestMatBufferFlag(i, 0x100)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x100);
+        }
+        if (TestMatBufferFlag(i, 0x10)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x10);
+        }
+        if (TestMatBufferFlag(i, 0x20)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x20);
+        }
+        if (TestMatBufferFlag(i, 0x80)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x80);
+        }
+        if (TestMatBufferFlag(i, 0x400)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x400);
+        }
+        if (TestMatBufferFlag(i, 0x800)) {
+            scn_mdl_clean_mat_buffer(this, i, 0x800);
+        }
+
+        if (GetAnmObjTexPat() && GetAnmObjTexPat()->TestExistence(i)) {
+            tex_pat_anm_result_ctor(&texPatResult);
+            const nw4r::g3d::TexPatAnmResult* pResult = GetAnmObjTexPat()->GetResult(&texPatResult, i);
+
+            res_tex_obj_copy_ctor(&texObj, mReplacement.mpTexObjDataArray
+                ? (ResHandle*)&nw4r::g3d::ResTexObj((u8*)mReplacement.mpTexObjDataArray + i * 0x104)
+                : (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTexObj());
+            res_tlut_obj_copy_ctor(&tlutObj, mReplacement.mpTlutObjDataArray
+                ? (ResHandle*)&nw4r::g3d::ResTlutObj((u8*)mReplacement.mpTlutObjDataArray + i * 0x64)
+                : (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTlutObj());
+            apply_tex_pat_anm_result(texObj, tlutObj, pResult);
+            res_tex_obj_end_edit(&texObj);
+            res_tlut_obj_end_edit(&tlutObj);
+            scn_mdl_set_mat_buffer_flag(this, i, 0x3);
+        }
+
+        if (GetAnmObjTexSrt() && GetAnmObjTexSrt()->TestExistence(i)) {
+            const nw4r::g3d::TexSrtAnmResult* pResult = GetAnmObjTexSrt()->GetResult(&texSrtResult, i);
+
+            res_tex_srt_copy_ctor(&texSrt, *(const u32*)(mReplacement.mpTexSrtDataArray
+                ? (ResHandle*)&nw4r::g3d::ResTexSrt((u8*)mReplacement.mpTexSrtDataArray + i * 0x248)
+                : (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTexSrt()));
+            res_mat_ind_mtx_copy_ctor(&indMtx, mReplacement.mpIndMtxAndScaleDLArray
+                ? (ResHandle*)&nw4r::g3d::ResMatIndMtxAndScale((u8*)mReplacement.mpIndMtxAndScaleDLArray + i * 0x40)
+                : (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatIndMtxAndScale());
+            apply_tex_srt_anm_result(texSrt, indMtx, pResult);
+            res_mat_ind_mtx_end_edit(&indMtx);
+            res_tex_srt_end_edit(&texSrt);
+            scn_mdl_set_mat_buffer_flag(this, i, 0x204);
+        }
+
+        if (GetAnmObjMatClr() && GetAnmObjMatClr()->TestExistence(i)) {
+            res_mat_tev_color_copy_ctor(&tevColor, mReplacement.mpTevColorDLArray
+                ? (ResHandle*)&nw4r::g3d::ResMatTevColor((u8*)mReplacement.mpTevColorDLArray + i * 0x80)
+                : (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatTevColor());
+            res_mat_chan_copy_ctor(&chan, mReplacement.mpChanDataArray
+                ? (ResHandle*)&nw4r::g3d::ResMatChan((u8*)mReplacement.mpChanDataArray + i * 0x28)
+                : (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatChan());
+            const nw4r::g3d::ClrAnmResult* pResult = GetAnmObjMatClr()->GetResult(&clrResult, i);
+            apply_clr_anm_result(chan, tevColor, pResult);
+            res_mat_chan_end_edit(&chan);
+            res_mat_tev_color_end_edit(&tevColor);
+            scn_mdl_set_mat_buffer_flag(this, i, 0x108);
+        }
+    }
+
+    CheckCallback_CALC_MAT(CALLBACK_TIMING_C, param, pInfo);
+}
+
 /* 0x8007DB2C (0x8): the material-colour animation. */
 nw4r::g3d::AnmObjMatClr* nw4r::g3d::ScnMdlSimple::GetAnmObjMatClr()
 {
@@ -214,26 +623,26 @@ nw4r::g3d::AnmObjTexSrt* nw4r::g3d::ScnMdlSimple::GetAnmObjTexSrt()
 
 extern "C" {
 
-/* 0x8007DB3C - the word copy that hands the destination back (the `mReplacement` setter's shape). */
-u32* fn_8007DB3C(u32* pDst, const u32* pSrc) {
-    fn_8007DB6C(pDst, pSrc);
+/* 0x8007DB3C (0x30): copy-constructs a palette-object handle and returns the destination. */
+ResHandle* res_tlut_obj_copy_ctor(ResHandle* pDst, const ResHandle* pSrc) {
+    res_tlut_obj_common_copy_ctor(pDst, pSrc);
     return pDst;
 }
 
-/* 0x8007DB6C - a one-word copy. */
-void fn_8007DB6C(u32* pDst, const u32* pSrc) {
-    *pDst = *pSrc;
+/* 0x8007DB6C (0xC): copies the base handle's data pointer. */
+void res_tlut_obj_common_copy_ctor(ResHandle* pDst, const ResHandle* pSrc) {
+    pDst->mpData = pSrc->mpData;
 }
 
-/* 0x8007DB78 - the same copy shape for the second replacement buffer. */
-u32* fn_8007DB78(u32* pDst, const u32* pSrc) {
-    fn_8007DBA8(pDst, pSrc);
+/* 0x8007DB78 (0x30): copy-constructs a texture-object handle and returns the destination. */
+ResHandle* res_tex_obj_copy_ctor(ResHandle* pDst, const ResHandle* pSrc) {
+    res_tex_obj_common_copy_ctor(pDst, pSrc);
     return pDst;
 }
 
-/* 0x8007DBA8 - a one-word copy. */
-void fn_8007DBA8(u32* pDst, const u32* pSrc) {
-    *pDst = *pSrc;
+/* 0x8007DBA8 (0xC): copies the base handle's data pointer. */
+void res_tex_obj_common_copy_ctor(ResHandle* pDst, const ResHandle* pSrc) {
+    pDst->mpData = pSrc->mpData;
 }
 
 } /* extern "C" */
@@ -399,28 +808,172 @@ bool ScnMdl::GetScnObjOption(u32 option, u32* pValue) const
 
 extern "C" {
 
-/* 0x8007E478 - the pix-DL replacement's teardown (the shared destructor, flag 0). */
-u32 fn_8007E478(ScnMdl* pSelf) {
-    return fn_8009A2F4(pSelf, 0);
+/* 0x8007E478 (0x8): stores the tev block's display list back without waiting. */
+void res_tev_end_edit(struct ResHandle* pSelf) {
+    res_tev_dc_store(pSelf, 0);
 }
 
-/* 0x8007E480 - the tex-color-DL replacement's teardown. */
-u32 fn_8007E480(ScnMdl* pSelf) {
-    return fn_8009435C(pSelf, 0);
+/* 0x8007E480 (0x8): stores the texture-coordinate-generator block back without waiting. */
+void res_mat_tex_coord_gen_end_edit(struct ResHandle* pSelf) {
+    res_mat_tex_coord_gen_dc_store(pSelf, 0);
 }
 
-/* 0x8007E488 - the indirect-matrix/scale replacement's teardown. */
-u32 fn_8007E488(ScnMdl* pSelf) {
-    return fn_8009411C(pSelf, 0);
+/* 0x8007E488 (0x8): stores the pixel-engine block back without waiting. */
+void res_mat_pix_end_edit(struct ResHandle* pSelf) {
+    res_mat_pix_dc_store(pSelf, 0);
 }
 
-/* 0x8007E490 - an empty body (`blr`): the range's no-op override. */
-void fn_8007E490(void) {}
+/* 0x8007E490 (0x4): the misc block's edit hook, empty. */
+void res_mat_misc_end_edit(struct ResHandle* pSelf) {
+    (void)pSelf;
+}
 
-/* 0x8007E494 - an empty body (`blr`): the range's second no-op override. */
-void fn_8007E494(void) {}
+/* 0x8007E494 (0x4): the gen-mode block's edit hook, empty. */
+void res_gen_mode_end_edit(struct ResHandle* pSelf) {
+    (void)pSelf;
+}
 
 } /* extern "C" */
+
+/* 0x8007E01C (0x45C): fills the node-visibility buffer from the nodes' flags, then copies every material's blocks
+ * into the replacement buffers that exist and clears each material's buffer-flag word. */
+void ScnMdl::InitBuffer()
+{
+    u32 view;
+    ResHandle matHandle;
+    fn_80077E34((s32)&view, &GetResMdl());
+    u32 numMat = reinterpret_cast<ResMdl*>(&view)->GetResMatNumEntries();
+    u32 numNode = reinterpret_cast<ResMdl*>(&view)->GetResNodeNumEntries();
+    u32 i;
+
+    if (mReplacement.mpNodeVisible != 0) {
+        for (i = 0; i < numNode; i++) {
+            if (fn_80078904((s32)&reinterpret_cast<ResMdl*>(&view)->GetResNode(i)) != 0) {
+                mReplacement.mpNodeVisible[i] = 1;
+            } else {
+                mReplacement.mpNodeVisible[i] = 0;
+            }
+        }
+    }
+
+    for (i = 0; i < numMat; i++) {
+        res_mat_copy_ctor(&matHandle, (ResHandle*)&reinterpret_cast<ResMdl*>(&view)->GetResMat(i));
+        mpDLBuffer[i] = 0;
+
+        if (mReplacement.mpTexObjDataArray) {
+            res_tex_obj_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTexObj().CopyTo(
+                (u8*)mReplacement.mpTexObjDataArray + i * 0x104));
+        }
+        if (mReplacement.mpTlutObjDataArray) {
+            res_tlut_obj_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTlutObj().CopyTo(
+                (u8*)mReplacement.mpTlutObjDataArray + i * 0x64));
+        }
+        if (mReplacement.mpTexSrtDataArray) {
+            res_tex_srt_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTexSrt().CopyTo(
+                (u8*)mReplacement.mpTexSrtDataArray + i * 0x248));
+        }
+        if (mReplacement.mpChanDataArray) {
+            res_mat_chan_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatChan().CopyTo(
+                (u8*)mReplacement.mpChanDataArray + i * 0x28));
+        }
+        if (mReplacement.mpGenModeDataArray) {
+            res_gen_mode_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResGenMode().CopyTo(
+                (u8*)mReplacement.mpGenModeDataArray + i * 0x8));
+        }
+        if (mReplacement.mpMatMiscDataArray) {
+            res_mat_misc_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatMisc().CopyTo(
+                (u8*)mReplacement.mpMatMiscDataArray + i * 0xC));
+        }
+        if (mReplacement.mpPixDLArray) {
+            if (((u32)mReplacement.mpPixDLArray + i * 0x20) & 0x1F) {
+                nw4r::db::Panic(lbl_8058EDA0, 1312, lbl_8058EE64);
+            }
+            res_mat_pix_end_edit(&HandleTemp(res_mat_pix_copy_to(
+                (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatPix(),
+                (u32)mReplacement.mpPixDLArray + i * 0x20)).mHandle);
+        }
+        if (mReplacement.mpTevColorDLArray) {
+            if (((u32)mReplacement.mpTevColorDLArray + i * 0x80) & 0x1F) {
+                nw4r::db::Panic(lbl_8058EDA0, 1318, lbl_8058EEAC);
+            }
+            res_mat_tev_color_end_edit(&HandleTemp(res_mat_tev_color_copy_to(
+                (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatTevColor(),
+                (u32)mReplacement.mpTevColorDLArray + i * 0x80)).mHandle);
+        }
+        if (mReplacement.mpIndMtxAndScaleDLArray) {
+            if (((u32)mReplacement.mpIndMtxAndScaleDLArray + i * 0x40) & 0x1F) {
+                nw4r::db::Panic(lbl_8058EDA0, 1324, lbl_8058EEF8);
+            }
+            res_mat_ind_mtx_end_edit(&HandleTemp(res_mat_ind_mtx_copy_to(
+                (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatIndMtxAndScale(),
+                (u32)mReplacement.mpIndMtxAndScaleDLArray + i * 0x40)).mHandle);
+        }
+        if (mReplacement.mpTexCoordGenDLArray) {
+            if (((u32)mReplacement.mpTexCoordGenDLArray + i * 0xA0) & 0x1F) {
+                nw4r::db::Panic(lbl_8058EDA0, 1330, lbl_8058EF48);
+            }
+            res_mat_tex_coord_gen_end_edit(&HandleTemp(res_mat_tex_coord_gen_copy_to(
+                (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatTexCoordGen(),
+                (u32)mReplacement.mpTexCoordGenDLArray + i * 0xA0)).mHandle);
+        }
+        if (mReplacement.mpTevDataArray) {
+            if (((u32)mReplacement.mpTevDataArray + i * 0x200) & 0x1F) {
+                nw4r::db::Panic(lbl_8058EDA0, 1336, lbl_8058EF98);
+            }
+            res_tev_end_edit(&HandleTemp(res_tev_copy_to(
+                (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTev(),
+                (u8*)mReplacement.mpTevDataArray + i * 0x200)).mHandle);
+        }
+    }
+}
+
+/* 0x8007E498 (0x364): copies each block `option` flags of material `matID` into its replacement buffer, closes each
+ * copy's edit, and clears those flags in the material's buffer-flag word. */
+extern "C" void scn_mdl_clean_mat_buffer(ScnMdl* pMdl, u32 matID, u32 option)
+{
+    ResHandle matHandle;
+    res_mat_copy_ctor(&matHandle, (ResHandle*)&pMdl->GetResMdl().GetResMat(matID));
+    ReplacementBlock& rep = pMdl->mReplacement;
+
+    if ((option & 0x1) && rep.mpTexObjDataArray) {
+        res_tex_obj_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTexObj().CopyTo((u8*)rep.mpTexObjDataArray + matID * 0x104));
+    }
+    if ((option & 0x2) && rep.mpTlutObjDataArray) {
+        res_tlut_obj_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTlutObj().CopyTo((u8*)rep.mpTlutObjDataArray + matID * 0x64));
+    }
+    if ((option & 0x4) && rep.mpTexSrtDataArray) {
+        res_tex_srt_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTexSrt().CopyTo((u8*)rep.mpTexSrtDataArray + matID * 0x248));
+    }
+    if ((option & 0x8) && rep.mpChanDataArray) {
+        res_mat_chan_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatChan().CopyTo((u8*)rep.mpChanDataArray + matID * 0x28));
+    }
+    if ((option & 0x10) && rep.mpGenModeDataArray) {
+        res_gen_mode_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResGenMode().CopyTo((u8*)rep.mpGenModeDataArray + matID * 0x8));
+    }
+    if ((option & 0x20) && rep.mpMatMiscDataArray) {
+        res_mat_misc_end_edit((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatMisc().CopyTo((u8*)rep.mpMatMiscDataArray + matID * 0xC));
+    }
+    if ((option & 0x80) && rep.mpPixDLArray) {
+        res_mat_pix_end_edit(&HandleTemp(res_mat_pix_copy_to((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatPix(), (u32)rep.mpPixDLArray + matID * 0x20)).mHandle);
+    }
+    if ((option & 0x100) && rep.mpTevColorDLArray) {
+        res_mat_tev_color_end_edit(&HandleTemp(res_mat_tev_color_copy_to((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatTevColor(),
+                                                 (u32)rep.mpTevColorDLArray + matID * 0x80)).mHandle);
+    }
+    if ((option & 0x200) && rep.mpIndMtxAndScaleDLArray) {
+        res_mat_ind_mtx_end_edit(&HandleTemp(res_mat_ind_mtx_copy_to((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatIndMtxAndScale(),
+                                             (u32)rep.mpIndMtxAndScaleDLArray + matID * 0x40)).mHandle);
+    }
+    if ((option & 0x400) && rep.mpTexCoordGenDLArray) {
+        res_mat_tex_coord_gen_end_edit(&HandleTemp(res_mat_tex_coord_gen_copy_to((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatTexCoordGen(),
+                                                        (u32)rep.mpTexCoordGenDLArray + matID * 0xA0)).mHandle);
+    }
+    if ((option & 0x800) && rep.mpTevDataArray) {
+        res_tev_end_edit(&HandleTemp(res_tev_copy_to((ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTev(), (u8*)rep.mpTevDataArray + matID * 0x200)).mHandle);
+    }
+
+    pMdl->mpDLBuffer[matID] &= ~option;
+}
 
 /* 0x8007E7FC (0xB8): writes one byte per node into the visibility buffer (1 where the node is visible) and clears
  * the refresh bit. */

@@ -23,7 +23,7 @@
  *   Partial: SetAnmObj (retail's NOT_SPECIFIED case jumps into the per-type attach blocks, a goto shape rule 8
  *   forbids; the two-switch dispatch measures 88.2 and saves r25 through `_savegpr_25`/`_restgpr_25`, per-case
  *   inline attach helpers 34.3).  The constructor copies
- *   mResMdl inline where retail calls the out-of-line ResMdl copy constructor (0x80077E34).
+ *   mResMdl inline where retail calls the out-of-line ResMdl copy constructor (fn_80077E34, 0x80077E34).
  *   flipcheck: `.data` and `.sdata` are claimed and not emitted; the "ScnMdlSimple" name record (`.rodata`
  *   0x8056F688) has no registered owner.
  * SHAPES. The unit compiles with `#pragma peephole off` (retail keeps every `clrlwi` + `cmpwi` pair).
@@ -80,18 +80,6 @@ using nw4r::g3d::ScnMdlSimple;
         if (!ok1_)                                                                              \
             nw4r::db::Panic("g3d_scnmdlsmpl.cpp", line, msg, (ptr));                             \
     }
-
-/* The fields of a model's `ResMdlInfo` block the constructor and Construct read.  size: 0x40 (approximation: only
- * the read fields are named) */
-struct ScnMdlResMdlInfoData {
-    /* +0x00 */ u8 pad_0x00[0x20];
-    /* +0x20 */ u8 needNrmMtxArray;
-    /* +0x21 */ u8 needTexMtxArray;
-    /* +0x22 */ u8 isValidVolume;
-    /* +0x23 */ u8 pad_0x23[0x5];
-    /* +0x28 */ nw4r::math::VEC3 volumeMin;
-    /* +0x34 */ nw4r::math::VEC3 volumeMax;
-};
 
 extern "C" {
 u32 scnmdlsmpl_align32(u32 size);

@@ -4,6 +4,7 @@
 #define MHTRI_G3D_FN_80063888_H
 
 #include "types.h"
+#include "g3d/res_mat_copy_ctor.h" /* res_mat_copy_ctor, apply_clr_anm_result (this unit's leaf header) */
 #include "g3d/anm_typename_AnmObj.h" /* anm_typename_AnmObj, this unit's record (leaf header) */
 #include "g3d/g3d_camera_types.h" /* `nw4r::g3d::Camera::PostureInfo`, the object `camera_posture_info_ctor` initialises */
 

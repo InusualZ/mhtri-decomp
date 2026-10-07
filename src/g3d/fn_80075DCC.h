@@ -56,6 +56,13 @@ u32 fn_8007B878(s32 pDst, s32 offset);
 /* 0x8007A510 - the softreset/return-to-title request (callers: src/mh3_pad.cpp, src/pad_connect.cpp). */
 void fn_8007A510(void);
 
+/* 0x8007B834 (0x30): copy-constructs a shape handle and returns the destination. */
+struct ResHandle* res_shp_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
+
+/* 0x8007BB94 (0x18): sets `mask` in material `matID`'s buffer-flag word of the ScnMdl. */
+/* untyped: opaque handle passed through - the ScnMdl */
+u32 scn_mdl_set_mat_buffer_flag(void* pMdl, s32 matID, s32 mask);
+
 #ifdef __cplusplus
 }
 

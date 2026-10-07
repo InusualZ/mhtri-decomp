@@ -31,6 +31,18 @@ void fn_800810DC(void* arg0, s32 arg1);
  * constructor ScnObj's bounding-box array is built with. */
 extern "C" nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox);
 
+/* The fields of a model's `ResMdlInfo` block the ScnMdlSimple and ScnMdl constructors and Constructs read.  size: 0x40 (approximation: only
+ * the read fields are named) */
+struct ScnMdlResMdlInfoData {
+    /* +0x00 */ u8 pad_0x00[0x20];
+    /* +0x20 */ u8 needNrmMtxArray;
+    /* +0x21 */ u8 needTexMtxArray;
+    /* +0x22 */ u8 isValidVolume;
+    /* +0x23 */ u8 pad_0x23[0x5];
+    /* +0x28 */ nw4r::math::VEC3 volumeMin;
+    /* +0x34 */ nw4r::math::VEC3 volumeMax;
+};
+
 namespace nw4r {
 namespace g3d {
 

@@ -21,7 +21,7 @@
  *   0xA8), `.data` (0x120 of 0x370) and `.sdata2` (0x8 of 0x18) short of the claim and differing.
  *   Relocation names that differ from retail (pool constants, save helpers, statics):
  *     `eftGetKeyRGB__FPUclPUcPUcPUc`.
- * SHAPES. The two returned values consumed by pointer (`fn_8006F304(&srt, access.GetResTexSrt(false))`,
+ * SHAPES. The two returned values consumed by pointer (`res_tex_srt_copy_ctor(&srt, access.GetResTexSrt(false))`,
  *   `mtx34_copy(&mtx_a, get_current_view_mtx())`) go through a reference parameter, so MWCC places the temporary
  *   below the named locals; a named local swaps the slots or copies the 48-byte matrix.
  *   `fn_800FD2B0`'s switch covers case 0 (a 0-based table, `cmplwi r0,29`) and the `flag != 1` return follows it;
@@ -56,7 +56,7 @@
 #include "ef/fn_800FD520.h"
 #include "ef/fn_800FD718.h"
 #include "g3d/g3d_scnroot.h" /* VEC2_ctor (rule 2) */
-#include "g3d/g3d_calcmaterial.h" /* fn_8006F304 (rule 2) */
+#include "g3d/g3d_calcmaterial.h" /* res_tex_srt_copy_ctor (rule 2) */
 #include "g3d/g3d_state.h"
 #include "unsplit/sound.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
@@ -792,7 +792,7 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self)
         nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*)work->model->field_0x118, 0);
         if (fn_800E2994(&access) != 0) {
             nw4r::g3d::ResTexSrt srt;
-            fn_8006F304(&srt, access.GetResTexSrt(false));
+            res_tex_srt_copy_ctor(&srt, access.GetResTexSrt(false));
             srt.GetEffectMtx(0, &mtx_b);
             mtx_b.m[0][3] = getKeyData(lbl_8059B760, (f32)self->frame_0x10);
             srt.SetEffectMtx(0, &mtx_b);
@@ -802,7 +802,7 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self)
         nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*)work->model->field_0x118, 1);
         if (fn_800E2994(&access) != 0) {
             nw4r::g3d::ResTexSrt srt;
-            fn_8006F304(&srt, access.GetResTexSrt(false));
+            res_tex_srt_copy_ctor(&srt, access.GetResTexSrt(false));
             srt.GetEffectMtx(0, &mtx_b);
             mtx_b.m[0][3] = getKeyData(lbl_8059B778, (f32)self->frame_0x10);
             srt.SetEffectMtx(0, &mtx_b);

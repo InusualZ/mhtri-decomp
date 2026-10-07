@@ -71,7 +71,7 @@ extern "C" {
 #include "nw4r/g3d/scnmdl.h"     /* ScnMdl::CopiedMatAccess */
 #include "g3d/g3d_resmat.h" /* ResTexSrt */
 #include "fn_8004CAD8.h"         /* MTX34_ctor, fn_8005024C (their owner's header) */
-#include "g3d/g3d_calcmaterial.h" /* fn_8006F304 (rule 2) */
+#include "g3d/g3d_calcmaterial.h" /* res_tex_srt_copy_ctor (rule 2) */
 #include "unsplit/sound.h"       /* fn_800E2994 */
 #include "unsplit/unknown.h"     /* SystemWork / system_w */
 #include "enemy/em020_ai.h"      /* em020_aim_target_ck (this unit's) */
@@ -399,8 +399,8 @@ extern "C" void em020_model_refresh(_ENEMY_WORK* self) {
             nw4r::g3d::ResTexSrt srt_a;
             nw4r::g3d::ResTexSrt srt_b;
 
-            fn_8006F304(&srt_a, access_a.GetResTexSrt(false));
-            fn_8006F304(&srt_b, access_b.GetResTexSrt(false));
+            res_tex_srt_copy_ctor(&srt_a, access_a.GetResTexSrt(false));
+            res_tex_srt_copy_ctor(&srt_b, access_b.GetResTexSrt(false));
             srt_a.GetEffectMtx(1, &mtx);
             mtx.m[0][3] = lbl_8079B8CC * fn_8005024C((u16) (system_w.field_0x0c << 7));
             mtx.m[1][3] += lbl_8079BC64;

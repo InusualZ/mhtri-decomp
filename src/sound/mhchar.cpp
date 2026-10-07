@@ -232,7 +232,7 @@ extern "C" void fn_800E30DC(MHchar* self)
 {
     void* handle = (void*)self->field_0x118;
     if (handle) {
-        return fn_8007E498(handle);
+        return scn_mdl_clean_mat_buffer(handle);
     }
 }
 

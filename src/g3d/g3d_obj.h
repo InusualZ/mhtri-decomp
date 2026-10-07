@@ -134,13 +134,46 @@ public:
     static const TypeObj GetTypeObjStatic();
 };
 
+/* The colour animation's per-material result: the present-register bits, the colours and their write masks.
+ * size: 0x5C */
+struct ClrAnmResult {
+    /* +0x00 */ u32 bRgbaExist;
+    /* +0x04 */ u32 rgba[11];
+    /* +0x30 */ u32 rgbaMask[11];
+};
+
+/* The texture-pattern animation's per-material result: the present bits and the texture and palette handles.
+ * size: 0x44 */
+struct TexPatAnmResult {
+    /* +0x00 */ u8 bTexExist;
+    /* +0x01 */ u8 bPlttExist;
+    /* +0x02 */ u8 pad_0x02[2];
+    /* +0x04 */ void* tex[8];  /* untyped: opaque handle - ResTex */
+    /* +0x24 */ void* pltt[8]; /* untyped: opaque handle - ResPltt */
+};
+
+/* The texture-SRT animation's per-material result: the present bits, the matrix mode and the eight texture and
+ * three indirect SRT records (scale x/y, rotation, translation x/y).  size: 0xE8 */
+struct TexSrtAnmResult {
+    /* +0x00 */ u32 flags;
+    /* +0x04 */ u32 indFlags;
+    /* +0x08 */ u32 texMtxMode;
+    /* +0x0C */ f32 srt[11][5];
+};
+
 class AnmObjMatClr : public AnmObj {
 public:
+    virtual const ClrAnmResult* GetResult(ClrAnmResult* pResult, u32 idx) = 0;
+
+    bool TestExistence(u32 idx) const;
     static const TypeObj GetTypeObjStatic();
 };
 
 class AnmObjTexPat : public AnmObj {
 public:
+    virtual const TexPatAnmResult* GetResult(TexPatAnmResult* pResult, u32 idx) = 0;
+
+    bool TestExistence(u32 idx) const;
     static const TypeObj GetTypeObjStatic();
 };
 

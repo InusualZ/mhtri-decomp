@@ -217,8 +217,8 @@ void eft_em_spawn(struct _ENEMY_WORK* em, s32 a, s32 b, nw4r::math::VEC3* v, f32
 void fn_8028F558(_EFT28_PARAM* param, void* out);
 void fn_800FA3B8(_EFT28_PARAM* param);
 u32 fn_8007BE2C(nw4r::g3d::ScnMdl::CopiedMatAccess* access, u32 arg);
-void fn_8006F0E8(_EFT26_MATOBJ* out, void* in);
-void fn_8006F0DC(_EFT26_MATOBJ* obj);
+void res_mat_tev_color_copy_ctor(_EFT26_MATOBJ* out, void* in);
+void res_mat_tev_color_end_edit(_EFT26_MATOBJ* obj);
 void fn_8011D7B0(s32 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 area, u8 team);
 
 /* the shared data the range reads (declared, never defined here) */
@@ -619,10 +619,10 @@ extern "C" void fn_8011870C(_EFT* self)
                 _EFT26_MATOBJ obj;
                 u32 handle = fn_8007BE2C(&access, 0);
                 u32 ignored;
-                fn_8006F0E8(&obj, &handle);
+                res_mat_tev_color_copy_ctor(&obj, &handle);
                 reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXGetTevKColor(GX_KCOLOR3, (GXColor*)&ignored);
                 reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, *(GXColor*)&p->color_r);
-                fn_8006F0DC(&obj);
+                res_mat_tev_color_end_edit(&obj);
             }
         }
     }
@@ -932,9 +932,9 @@ extern "C" void fn_80119450(_EFT* self)
             if (fn_800E2994(&access) != 0) {
                 _EFT26_MATOBJ obj;
                 u32 handle = fn_8007BE2C(&access, 0);
-                fn_8006F0E8(&obj, &handle);
+                res_mat_tev_color_copy_ctor(&obj, &handle);
                 reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, *(GXColor*)&p->color_r);
-                fn_8006F0DC(&obj);
+                res_mat_tev_color_end_edit(&obj);
             }
         }
     }

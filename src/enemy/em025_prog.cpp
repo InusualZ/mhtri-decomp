@@ -45,7 +45,7 @@
 #include "sound/mhchar.h"
 #include "nw4r/g3d/scnmdl.h"
 #include "g3d/g3d_resmat.h"
-#include "g3d/g3d_calcmaterial.h" /* fn_8006F304 (rule 2) */
+#include "g3d/g3d_calcmaterial.h" /* res_tex_srt_copy_ctor (rule 2) */
 #include "enemy/enemy_control.h"
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
@@ -2592,7 +2592,7 @@ void fn_801A9210(_ENEMY_WORK* self) {
         if (fn_800E2994(&access) != 0) {
             nw4r::g3d::ResTexSrt srt;
             u32 handle = access.GetResTexSrt(false);
-            fn_8006F304(&srt, handle);
+            res_tex_srt_copy_ctor(&srt, handle);
             srt.GetEffectMtx(0, &mtx);
             mtx.m[0][3] -= lbl_8079851C;
             if (mtx.m[0][3] < lbl_80798538) {
