@@ -225,7 +225,7 @@ void *res_tex_ctor(void *self, u32 value);                  /* construct a ResTe
 void *res_pltt_ctor(void *self, u32 value);                  /* construct a ResPltt handle */
 
 /* The name/handle store helpers: store the source word at +0x0 of `self` and return `self`. */
-void *fn_80062D58(void *self, void *src); /* g3d/g3d_anmchr.cpp */
+void *res_name_copy_ctor(void *self, void *src); /* g3d/g3d_anmchr.cpp */
 void *fn_80069BD8(void *self, void *src); /* g3d/fn_800680CC.cpp */
 void *fn_80069C14(void *self, void *src); /* g3d/fn_800680CC.cpp */
 
@@ -527,7 +527,7 @@ u32 fn_800913A0(void *self, void *file)
             ResTex tex;
             u32 handle;
 
-            fn_80062D58(&name, &nameWord);
+            res_name_copy_ctor(&name, &nameWord);
             handle = (u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResTex(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData;
             fn_80069C14(&tex, &handle);
             if (reinterpret_cast<const nw4r::g3d::ResTex*>(&tex)->IsValid() != 0) {
@@ -547,7 +547,7 @@ u32 fn_800913A0(void *self, void *file)
             ResPltt pltt;
             u32 handle;
 
-            fn_80062D58(&name, &nameWord);
+            res_name_copy_ctor(&name, &nameWord);
             handle = (u32)reinterpret_cast<nw4r::g3d::ResFile*>(file)->GetResPltt(*reinterpret_cast<nw4r::g3d::ResName*>(&name)).mpData;
             fn_80069BD8(&pltt, &handle);
             if (reinterpret_cast<const nw4r::g3d::ResPltt*>(&pltt)->IsValid() != 0) {

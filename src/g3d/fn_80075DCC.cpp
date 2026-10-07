@@ -191,7 +191,7 @@ s32 res_node_get_id(void*);
 u32 fn_8005D0CC(void*, void*);
 s32 fn_8005D218(void*);
 u32 res_node_copy_ctor(void*, void*);
-void* fn_80062DEC(s32);
+void* res_node_ref(s32);
 s32 fn_8006405C(void*);
 u32 fn_80064BD4(void*);
 s32 fn_8006518C(void);
@@ -1825,7 +1825,7 @@ s32 fn_80078904(s32 arg0) {
         nw4r::db::Panic((const char*)&lbl_8058EA50, 0xA5, (const char*)&lbl_8058EA30);
     }
     if (res_node_is_valid((s32)(arg0)) != 0) {
-        return (((RawView_25*)fn_80062DEC((s32)(arg0)))->field_0x14 & 0x100) != 0;
+        return (((RawView_25*)res_node_ref((s32)(arg0)))->field_0x14 & 0x100) != 0;
     }
     return 0;
 }

@@ -68,7 +68,7 @@ extern "C" {
 /* -------- the helpers this unit calls (still unsplit `fn_XXXXXXXX`, C linkage) -------- */
 f32 sqrt_f32(f32 value);                      /* reciprocal-square-root / length helper */
 u32 res_node_is_valid(void* self);
-u32* fn_8005D0C4(void* self);
+u32* res_node_ptr(void* self);
 void fn_80069CF4(void* p0, void* p1);
 
 /* -------- this unit's own bodies -------- */
@@ -124,7 +124,7 @@ u32 fn_8006FDCC(void* self) {
     if (!res_node_is_valid(self)) {
         return 0;
     }
-    return *(u32*)((u8*)fn_8005D0C4(self) + 16);
+    return *(u32*)((u8*)res_node_ptr(self) + 16);
 }
 
 /* 0x8006FE7C - a checked resource pointer from a base handle and an offset (0 -> null). */

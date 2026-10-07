@@ -60,7 +60,7 @@ extern "C" s32 res_node_is_valid(const void* p);
 extern "C" f32* fn_8005CED0(void);
 extern "C" u32* fn_8005CEDC(void);
 extern "C" void* res_node_get_id(const void* p);
-extern "C" ResNodeData* fn_8005D0C4(const void* p);
+extern "C" ResNodeData* res_node_ptr(const void* p);
 extern "C" void res_node_copy_ctor(void* pOut, const void* pIn);
 extern "C" void fn_80061068(void* pOut);
 extern "C" void* fn_8008E1C0(void* pOut, const void* pIn);
@@ -421,7 +421,7 @@ u32 fn_80073E8C(void* pSelf) {
         nw4r::db::Panic(lbl_8058E340, 90, lbl_8058E320);
     }
     if (res_node_is_valid(pSelf)) {
-        return ((ResNodeData*)fn_8005D0C4(pSelf))->mMtxID;
+        return ((ResNodeData*)res_node_ptr(pSelf))->mMtxID;
     }
     return 0;
 }
