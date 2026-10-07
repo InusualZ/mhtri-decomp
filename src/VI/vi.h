@@ -5,6 +5,7 @@
 #define VI_VI_H
 
 #include "types.h"
+#include "gx/GXRenderModeObj.h"
 
 typedef void (*VIRetraceCallback)(u32 retraceCount);
 
@@ -14,6 +15,10 @@ extern "C" {
 
 VIRetraceCallback VISetPreRetraceCallback(VIRetraceCallback callback);
 VIRetraceCallback VISetPostRetraceCallback(VIRetraceCallback callback);
+/* 0x804E7480 / 0x804E7F60 / 0x804E8630 - brings the video interface up / programs it for a render mode / sets the pan window. */
+void VIInit(void);
+void VIConfigure(const GXRenderModeObj* mode);
+void VIConfigurePan(u16 xOrg, u16 yOrg, u16 width, u16 height);
 void VIWaitForRetrace(void);
 u32 VIGetRetraceCount(void);
 u32 VIGetNextField(void);
