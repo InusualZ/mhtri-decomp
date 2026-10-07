@@ -198,5 +198,38 @@ def test_prefix_still_compared(c):
                 any("bytes differ from the target object at +0x0" in p for p in problems), True)
 
 
+CONFIGURE3 = CONFIGURE.replace('    Object(%s, "OS/OSMessage.c"),\n', '    Object(Matching, "OS/OSMessage.c"),\n    Object(%s, "OS/OSMutex.c"),\n')
+
+
+def test_padding_chain(c):
+    """A short unit before a flipped short unit is placed by the link only while the run ends on a unit that fills its
+    claim: OSLink and OSMessage both 8 short, OSMutex after them unflipped (target aligned to 4) moves."""
+    def chain(t, third, third_built):
+        start = 0x804D1440
+        body = b"\x60" * 0x18
+        for stem in ("OSLink", "OSMessage"):
+            t.write("build/RMHE08/src/OS/%s.o" % stem, obj({".text": (body, 16)}))
+        t.write("build/RMHE08/obj/OS/OSLink.o", obj({".text": (body + b"\0" * 8, 4)}, [("gap_00_804D1458_text", ".text", 0x18)]))
+        t.write("build/RMHE08/obj/OS/OSMessage.o", obj({".text": (body + b"\0" * 8, 4)}, [("gap_00_804D1478_text", ".text", 0x18)]))
+        t.write("build/RMHE08/obj/OS/OSMutex.o", obj({".text": (b"\0" * 0x20, 4)}))
+        if third_built:
+            t.write("build/RMHE08/src/OS/OSMutex.o", obj({".text": (b"\0" * 0x20, 16)}))
+        t.write("config/RMHE08/splits.txt", "".join(
+            "OS/%s.c:\n\t.text       start:0x%08X end:0x%08X\n\n" % (n, start + 0x20 * i, start + 0x20 * (i + 1))
+            for i, n in enumerate(("OSLink", "OSMessage", "OSMutex"))))
+        t.write("configure.py", CONFIGURE3 % third)
+        flipcheck._RANGES.clear()
+        flipcheck.set_root(str(t.root))
+        flipcheck.BATCH.clear()
+        return {".text": (0x20, 2)}
+    with testing.FixtureTree() as t:
+        problems, _n = run("OS/OSLink", chain(t, "NonMatching", False))
+        size = [p for p in problems if p.startswith(".text: object is 0x")]
+        c.check("a short successor followed by an unflipped unit: refused, naming the break",
+                (len(size), "OS/OSMessage (short by 0x8) is followed by unflipped OS/OSMutex" in size[0]), (1, True))
+    with testing.FixtureTree() as t:
+        problems, _n = run("OS/OSLink", chain(t, "Matching", True))
+        c.check("... ready when the run ends on a unit that fills its claim", problems, [])
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))
