@@ -78,10 +78,10 @@ u16* wcsncat(u16* dst, const u16* src, u32 n)
 
 int wcscmp(const u16* a, const u16* b)
 {
-    const u16* p = a - 1;
-    const u16* q = b - 1;
     u32 d;
     u32 c;
+    const u16* p = a - 1;
+    const u16* q = b - 1;
 
     while ((c = *++p) == (d = *++q)) {
         if (c == 0) {

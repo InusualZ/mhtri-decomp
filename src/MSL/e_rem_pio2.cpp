@@ -8,7 +8,7 @@
  * NAMES. `__ieee754_rem_pio2` is the dump's name; `two_over_pi` and `npio2_hw` are the algorithm's own table names.
  * EVIDENCE. the first `.rodata` words are 0xA2F983, 0x6E4E44, ... (the bits of 2/pi in 24-bit chunks); the second table
  *    is the high words of n*pi/2.
- * RESIDUALS. `npio2_hw[n - 1]` is addressed with `slwi`+`add`+`lwz -4` where the target uses `subi`+`slwi`+`lwzx` (2 words).
+ * RESIDUALS. none known (the table index needs the `(s32)(n - 1)` cast to keep the subtraction out of the displacement).
  * SHAPES. the scalar constants are literals so the compiler pools them itself; the two tables are static arrays.
  */
 #pragma fp_contract off
@@ -89,7 +89,7 @@ extern "C" s32 __ieee754_rem_pio2(f64 x, f64* y)
         fn = (f64)n;
         r = t - fn * 1.57079632673412561417e+00;
         w = fn * 6.07710050650619224932e-11;
-        if (n < 32 && ix != npio2_hw[n - 1]) {
+        if (n < 32 && ix != npio2_hw[(s32)(n - 1)]) {
             y[0] = r - w;
         } else {
             j = ix >> 20;

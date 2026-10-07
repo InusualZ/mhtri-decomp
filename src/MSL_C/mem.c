@@ -101,9 +101,9 @@ void* __memrchr(const void* buf, int ch, u32 n)
 int memcmp(const void* a, const void* b, u32 n)
 {
     const u8* q;
-    const u8* p;
-    u32 c;
     u32 d;
+    u32 c;
+    const u8* p;
 
     q = b;
     p = a;
@@ -218,10 +218,10 @@ static void __copy_longs_rev_aligned(u8* dst, const u8* src, u32 n)
 static void __copy_longs_unaligned(u8* dst, const u8* src, u32 n)
 {
     u32 i = (-(u32)dst) & 3;
-    u32 soff;
     u32 lsh;
     u32 rsh;
     u32* wd;
+    u32 soff;
     const u32* ws;
     u8* wb;
     const u8* sb;
@@ -275,10 +275,10 @@ static void __copy_longs_rev_unaligned(u8* dst, const u8* src, u32 n)
 {
     u8* d = dst + n;
     u32 i = (u32)d & 3;
-    u32 soff;
-    u32 lsh;
     u32 rsh;
+    u32 lsh;
     u32* wd;
+    u32 soff;
     const u32* ws;
     u32 w0;
     u32 w1;

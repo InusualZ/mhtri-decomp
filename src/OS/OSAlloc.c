@@ -17,6 +17,7 @@
 #include "types.h"
 
 #include "OS/OSAlloc.h"
+#include "OS/s_currentHeap.h"
 
 #define OS_HEAP_HEADER_SIZE 32 /* bytes in front of every allocated block */
 
@@ -34,7 +35,7 @@ typedef struct OSHeapDesc {
     /* +0x08 */ OSHeapCell* allocated;  /* blocks handed out */
 } OSHeapDesc;
 
-static s32 s_currentHeap = -1;
+s32 s_currentHeap = -1;
 static void* s_arenaEnd;
 static void* s_arenaStart;
 static s32 s_heapCount;
