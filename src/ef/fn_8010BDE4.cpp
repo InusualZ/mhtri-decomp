@@ -175,7 +175,7 @@ void* eft_res_model_get();
 void fn_800F8A44(void* p, s32 mode);
 u32 eft_res_models_spawn(void* self, void* list, s32 a, s32 b, void* c);
 u32 fn_800F9D80(void* self);
-void fn_800FBB90(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
+void mtx34_set_trans(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
 void fn_8026A394(_PLW* plw, s32 id, nw4r::math::MTX34* mtx);
 u32 fn_802D2B38(_ENEMY_WORK* enemy, u8 a, u16 b);
 void fn_802D2B68(_ENEMY_WORK* enemy, u32 id, nw4r::math::MTX34* mtx);
@@ -769,11 +769,11 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 rotVecY(&work->entries[i].vecB_0x14, self->rot_0x24.y);
                 rotLocalMatY(work->entries[i].angle_0x30, &mtx);
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
-                fn_800FBB90(&mtx, &work->entries[i].vecC_0x20);
+                mtx34_set_trans(&mtx, &work->entries[i].vecC_0x20);
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);
             } else {
-                fn_800FBB90(&mtx, &work->entries[i].vecC_0x20);
+                mtx34_set_trans(&mtx, &work->entries[i].vecC_0x20);
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
                 eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);

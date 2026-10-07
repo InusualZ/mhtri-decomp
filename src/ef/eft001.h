@@ -11,7 +11,7 @@ extern "C" {
 
 /* Writes a VEC3 into an MTX34's translation column (`m[0][3]`, `m[1][3]`, `m[2][3]`); the family's
  * spawn handlers call it after they build a rotation matrix for a placed model. */
-void fn_800FBB90(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
+void mtx34_set_trans(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
 
 /* Copies a three-word rotation vector into a `_CP_VECTOR` (`ef/eft007.cpp` and `ef/eft019.cpp` are the
  * consumers; the owner defines it over the same two pointers). */

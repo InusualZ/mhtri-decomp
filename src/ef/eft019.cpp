@@ -1057,7 +1057,7 @@ void fn_80112D58(_EFT* self)
     }
     case 0x88:
         SetRootMtxTrans(work->effects[0], &self->pos_0x18);
-        fn_800F996C(work->effects[0], 0);
+        effect_retire(work->effects[0], 0);
         obj = (_EFT019_SND_OBJ*)fn_800A51D8(work->effects[0], 0);
         i = (s32)fn_800A9714(obj, (u16)(fn_800A970C() - 1));
         fn_800AB9F4((struct EfPmManager*)i);
@@ -1251,7 +1251,7 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
     rotVecY(&spin, rot.y);
     addVec3To(&pos, &spin);
     cpSetRotMatrix(&rot, mtx);
-    fn_800FBB90(mtx, &pos);
+    mtx34_set_trans(mtx, &pos);
 }
 
 /* 0x80114C20 (0x4C): Spawns an eft020 record for a per-key effect on an actor. */

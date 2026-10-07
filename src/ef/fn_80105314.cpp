@@ -491,7 +491,7 @@ extern "C" void fn_80106530(_EFT013* self) {
         self->field_0x06++;
         work->effects[0]->RetireEmitterAll();
     case 1:
-        fn_800F996C(work->effects[0], 0);
+        effect_retire(work->effects[0], 0);
         break;
     default:
         return;

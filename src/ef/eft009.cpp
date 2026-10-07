@@ -136,7 +136,7 @@ extern "C" void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
 extern "C" void eft_res_slot_release(void* self);
 extern "C" void eft_res_models_spawn(void* self, void* list, u32 mode, s32 count, u32 arg);
 extern "C" _EFT* eft_res_slot_get(u32 pool_id);
-extern "C" void fn_800FBB90(nw4r::math::MTX34* mtx, nw4r::math::VEC3* pos);
+extern "C" void mtx34_set_trans(nw4r::math::MTX34* mtx, nw4r::math::VEC3* pos);
 extern "C" void mtx34_trans_get(nw4r::math::MTX34* mtx, void* vec);
 /* fn_80104BD0 comes from its owner's header (rule 2). */
 
@@ -264,7 +264,7 @@ extern "C" void fn_80103D28(_EFT* self)
         copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         addVec3To(&self->pos_0x18, &vec);
-        fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
+        mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         work->items_0x04[0]->SetRootMtx(work->mtx_0x0C);
         change_paramscale_eff(work->items_0x04[0], get_em_scale(enemy));
         break;
@@ -291,7 +291,7 @@ extern "C" void fn_80103D28(_EFT* self)
         copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         addVec3To(&self->pos_0x18, &vec);
-        fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
+        mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
             change_paramscale_eff(work->items_0x04[i], get_em_scale(enemy));
@@ -309,7 +309,7 @@ extern "C" void fn_80103D28(_EFT* self)
             }
             mulVecMat(&vec, &work->mtx_0x0C);
             addVec3To(&self->pos_0x18, &vec);
-            fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
+            mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
             change_paramscale_eff(work->items_0x04[i], get_em_scale(enemy));
         }
@@ -320,7 +320,7 @@ extern "C" void fn_80103D28(_EFT* self)
         copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         addVec3To(&self->pos_0x18, &vec);
-        fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
+        mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         rotLocalMatX(self->rot_0x24.x, &work->mtx_0x0C);
         for (i = 0; i < work->count; i++) {
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
@@ -337,7 +337,7 @@ extern "C" void fn_80103D28(_EFT* self)
         mulVecMat(&vec, &work->mtx_0x0C);
         addVec3To(&self->pos_0x18, &vec);
         cpSetRotMatrix(&self->rot_0x24, &work->mtx_0x0C);
-        fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
+        mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
             change_paramscale_eff(work->items_0x04[i], get_em_scale(enemy));
@@ -410,7 +410,7 @@ extern "C" void fn_801041BC(_EFT* self)
         copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         addVec3To(&self->pos_0x18, &vec);
-        fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
+        mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
             change_paramscale_eff(work->items_0x04[i], get_em_scale(enemy));
@@ -429,7 +429,7 @@ extern "C" void fn_801041BC(_EFT* self)
             }
             mulVecMat(&vec, &work->mtx_0x0C);
             addVec3To(&self->pos_0x18, &vec);
-            fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
+            mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
             change_paramscale_eff(work->items_0x04[i], get_em_scale(enemy));
         }
@@ -444,7 +444,7 @@ extern "C" void fn_801041BC(_EFT* self)
         copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         addVec3To(&self->pos_0x18, &vec);
-        fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
+        mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);
             change_paramscale_eff(work->items_0x04[i], get_em_scale(enemy));
@@ -466,7 +466,7 @@ extern "C" void fn_801041BC(_EFT* self)
         copyVec3(&vec, &work->offset_0x3C);
         mulVecMat(&vec, &work->mtx_0x0C);
         addVec3To(&self->pos_0x18, &vec);
-        fn_800FBB90(&work->mtx_0x0C, &self->pos_0x18);
+        mtx34_set_trans(&work->mtx_0x0C, &self->pos_0x18);
         rotLocalMatX(self->rot_0x24.x, &work->mtx_0x0C);
         for (i = 0; i < work->count; i++) {
             work->items_0x04[i]->SetRootMtx(work->mtx_0x0C);

@@ -145,8 +145,8 @@ struct _EFT007 { /* size: 0x48 */
  * mangled one is a C++ declaration whose signature reproduces the map's argument list.
  * ------------------------------------------------------------------------------------------------- */
 extern "C" s32 eft_res_spawn_gate_ck(void* self, u32 arg);
-extern "C" void fn_800F996C(nw4r::ef::Effect* effect, u32 arg);
-extern "C" void fn_800FBB90(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec);
+extern "C" void effect_retire(nw4r::ef::Effect* effect, u32 arg);
+extern "C" void mtx34_set_trans(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec);
 extern "C" u8 fn_803311A0(MHchar* model);
 extern "C" u8 fn_80331210(_PLW* self);
 
@@ -694,7 +694,7 @@ extern "C" void fn_80103518(_EFT007* self)
             mtx34_trans_get(&mtx, &self->pos_0x18);
             for (s32 i = 0; i < work->count; i++) {
                 work->effects[i]->SetRootMtx(mtx);
-                fn_800F996C(work->effects[i], 0);
+                effect_retire(work->effects[i], 0);
             }
             if (--self->delay_0x10 < 0) {
                 self->state_0x05++;
@@ -805,7 +805,7 @@ extern "C" void fn_8010383C(_EFT007* self, nw4r::math::MTX34* mtx)
     case 18:
         mtx34_trans_get(mtx, &pos);
         cpSetRotMatrix(&model->rot_0x54, mtx);
-        fn_800FBB90(mtx, &pos);
+        mtx34_set_trans(mtx, &pos);
         return;
     }
 }

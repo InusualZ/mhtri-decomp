@@ -547,7 +547,7 @@ void joint_mtx_store(EmMtxHolder* holder, void* src);
 void joint_mtx_load(EmMtxHolder* holder, void* mtx);
 void fn_8008E8D0(void* holder, void* vec);
 void fn_8008EE68(void* holder, void* mtx);
-void fn_800FBB90(MTX34* mtx, VEC3* vec);
+void mtx34_set_trans(MTX34* mtx, VEC3* vec);
 void eft_rot_vec_copy(void* dst, void* src);
 void fn_805012E8(EmMtx33* dst, const MTX34* src);
 
@@ -4144,7 +4144,7 @@ void fn_80191E30(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind
         }
         if (work->clusters_0x590[index].live_0x03 >= 1) {
             joint_mtx_load(holder, &mtx);
-            fn_800FBB90(&mtx, &work->clusters_0x590[index].pos_0x24);
+            mtx34_set_trans(&mtx, &work->clusters_0x590[index].pos_0x24);
             joint_mtx_store(holder, &mtx);
         }
         break;

@@ -4,6 +4,7 @@
  *   .data 0x8059B5F8-0x8059B638, .sdata 0x80791698-0x807916C8, .sdata2 0x80796608-0x80796640.
  * NAMES. `eft001` is the family of the runtime dump's `eft001_set_pos` (in `ef/eft002.cpp`); the map has only `fn_`
  *   stems here, so the definitions are `extern "C"`.
+ *   GUESS (from the body): `mtx34_set_trans` (0x800FBB90) writes a vector into a matrix's translation column.
  * RESIDUALS. 1 row unwritten (an empty stub): 0x800FB160-0x800FBB90 (`fn_800FB160`).
  *   3 partial rows:
  *  - `fn_800FAE08`: ours fuses `fnmsubs` and `rlwinm.` where retail keeps `fmuls` + `fsubs` and the compare, keeps
@@ -121,7 +122,7 @@ extern f32 lbl_80796614;
 extern "C" void fn_800FB160(_EFT* self);
 
 /* Writes a VEC3 into an MTX34's translation column: `m[0][3]`, `m[1][3]`, `m[2][3]`. */
-extern "C" void fn_800FBB90(nw4r::math::MTX34* m, nw4r::math::VEC3* v)
+extern "C" void mtx34_set_trans(nw4r::math::MTX34* m, nw4r::math::VEC3* v)
 {
     m->m[0][3] = v->x;
     m->m[1][3] = v->y;
