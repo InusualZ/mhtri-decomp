@@ -2517,7 +2517,7 @@ void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 
 /* Runtime helpers. */
 f32 fn_80050EF4(void* a, void* b);
-void fn_8005D0CC(void* out, void* src);
+void res_node_assign(void* out, void* src);
 void fn_8006FDCC(void* a);
 void fn_800810DC(void* self, u32 a);
 

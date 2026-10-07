@@ -44,9 +44,9 @@ extern const f32 lbl_80795F4C;          /* 0.0f                                 
 extern "C" {
 void mtx34_identity(MTX34* pMtx);                               /* owner: src/fn_8004CAD8.cpp */
 s32 res_node_is_valid(const ResHandle* pSelf);                     /* owner: src/g3d/fn_8005AA28.cpp */
-void* fn_8005AAE4(const ResHandle* pSelf);                   /* owner: src/g3d/fn_8005AA28.cpp */
+void* res_handle_ptr(const ResHandle* pSelf);                   /* owner: src/g3d/fn_8005AA28.cpp */
 ResNodeData* res_node_ptr(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
-ResNodeData* fn_8005D218(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
+ResNodeData* res_node_ref_nonconst(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
 VEC3* vec3_copy_construct(VEC3* pOut, const VEC3* pIn);              /* owner: src/g3d/fn_80063888.cpp */
 void fn_8008C484(f32* pOut, f32 x, f32 y, f32 z);            /* owner: src/g3d/g3d_resanmchr.cpp */
 void* fn_8008A220(void* pOut, u32 value);                    /* owner: src/g3d/g3d_resanmcamera.cpp */
@@ -205,7 +205,7 @@ void fn_80099178(ResHandle* pSelf, f32 x, f32 y, f32 z) {
         nw4r::db::Panic(lbl_805915C0, 0xEF, lbl_805915F8);
     }
     if (res_node_is_valid(pSelf) != 0) {
-        ResNodeData* pData = (ResNodeData*)fn_8005AAE4(pSelf);
+        ResNodeData* pData = (ResNodeData*)res_handle_ptr(pSelf);
         if (lbl_80795F4C == x && lbl_80795F4C == y && lbl_80795F4C == z) {
             pData->mFlags |= 0x2;
         } else {
@@ -224,7 +224,7 @@ void fn_80099278(ResHandle* pSelf, f32 x, f32 y, f32 z) {
         nw4r::db::Panic(lbl_805915C0, 0x103, lbl_805915F8);
     }
     if (res_node_is_valid(pSelf) != 0) {
-        ResNodeData* pData = (ResNodeData*)fn_8005AAE4(pSelf);
+        ResNodeData* pData = (ResNodeData*)res_handle_ptr(pSelf);
         if (lbl_80795F4C == x && lbl_80795F4C == y && lbl_80795F4C == z) {
             pData->mFlags |= 0x4;
         } else {
@@ -239,7 +239,7 @@ void fn_80099278(ResHandle* pSelf, f32 x, f32 y, f32 z) {
 
 /* Resolve the node's sub-resource: the offset at +0x6C, from the node's own base. */
 u32 fn_80099378(ResHandle* pSelf) {
-    ResNodeData* pData = fn_8005D218(pSelf);
+    ResNodeData* pData = res_node_ref_nonconst(pSelf);
     return fn_800993B4(pSelf, pData->mSubResOfs);
 }
 

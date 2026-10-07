@@ -114,7 +114,7 @@ extern "C" s32 fn_800E0A8C(MHchar* self)
 extern "C" void fn_800E0B9C(MHchar* self, void* dst, void* arg)
 {
     void* entry = reinterpret_cast<const nw4r::g3d::ResMdl*>(&self->field_0x114)->GetResNode((u32)arg).mpData;
-    fn_8005D0CC(dst, &entry);
+    res_node_assign(dst, &entry);
 }
 
 /* The model's joint count, via the +0x114 sub-object. */

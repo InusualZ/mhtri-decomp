@@ -3,7 +3,8 @@
  * RANGE. .text 0x8005AA28-0x8005ABD8 (8 functions); extab, extabindex, .ctors 0x8056F2D0-0x8056F2D4 (fn_8005AB78's
  *   word), .data 0x8058B350-0x8058B388, .bss 0x8066AE48-0x8066AE60, .sdata 0x80791124-0x80791130, .sdata2
  *   0x80795CF0-0x80795CF8.
- * NAMES. res_node_is_valid is a GUESS (the evidence follows).
+ * NAMES. res_handle_ptr is a GUESS (the evidence follows).
+ *   res_node_is_valid is a GUESS (the evidence follows).
  *   The file keeps the map's stem: the range's only `__FILE__` string is the accessor header
  *   "g3d_resnode_ac.h" (lbl_8058B370, fn_8005AA44's assert).  Module `g3d` from the callers
  *   (`nw4r::g3d::ScnMdl::CopiedMatAccess`, `g3d/g3d_calcworld.cpp`'s fn_80073E8C; mtx34_trans_apply's twin is
@@ -68,7 +69,7 @@ void PSMTXTransApply(Mtx34* pDst, const Mtx34* pSrc, f32 x, f32 y, f32 z);
 extern "C" {
 
 /* Forward declarations for the two `_ac.h` accessors fn_8005AA44 re-checks after its assert. */
-void* fn_8005AAE4(const ResMatHandle* pSelf);
+void* res_handle_ptr(const ResMatHandle* pSelf);
 u32 res_node_is_valid(const ResMatHandle* pSelf);
 
 } /* extern "C" */
@@ -92,15 +93,15 @@ void fn_8005AA44(ResMatHandle* pSelf, u32 enable) {
     }
     if (res_node_is_valid(pSelf)) {
         if (enable != 0) {
-            ((ResMatData*)fn_8005AAE4(pSelf))->mFlags |= 0x100;
+            ((ResMatData*)res_handle_ptr(pSelf))->mFlags |= 0x100;
         } else {
-            ((ResMatData*)fn_8005AAE4(pSelf))->mFlags &= ~0x100;
+            ((ResMatData*)res_handle_ptr(pSelf))->mFlags &= ~0x100;
         }
     }
 }
 
 /* `ptr()`: the resource pointer the handle stores. */
-void* fn_8005AAE4(const ResMatHandle* pSelf) {
+void* res_handle_ptr(const ResMatHandle* pSelf) {
     return pSelf->mpRes;
 }
 

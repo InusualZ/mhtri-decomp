@@ -96,7 +96,7 @@ u32 fn_80176AA8(void* p);
 void mtx34_identity(void* out);
 void mtx34_copy(void* dst, const void* src);
 int fn_8006FDCC(const void* p);
-void fn_8005D0CC(void* obj, const void* sub);
+void res_node_assign(void* obj, const void* sub);
 void assignVec3(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 void mtx34_concat_assign(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 u32 fn_802B0998(u32 kind);

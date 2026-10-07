@@ -188,8 +188,8 @@ u32 res_mat_chan_copy_ctor(void*, void*);
 s32 res_node_is_valid(s32);
 void* fn_8005CEEC(void);
 s32 res_node_get_id(void*);
-u32 fn_8005D0CC(void*, void*);
-s32 fn_8005D218(void*);
+u32 res_node_assign(void*, void*);
+s32 res_node_ref_nonconst(void*);
 u32 res_node_copy_ctor(void*, void*);
 void* res_node_ref(s32);
 s32 fn_8006405C(void*);
@@ -1285,8 +1285,8 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                         }
                         sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMdl*>(&sp2C)->GetResNode((int)temp_r3_3).mpData;
                         res_node_copy_ctor((void*)(&sp28), (void*)(&sp18));
-                        temp_r20_2 = fn_8005D218((void*)(arg1));
-                        mtx34_concat((void*)(&spC8), (void*)(fn_8005D218((void*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
+                        temp_r20_2 = res_node_ref_nonconst((void*)(arg1));
+                        mtx34_concat((void*)(&spC8), (void*)(res_node_ref_nonconst((void*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
                         temp_r3_4 = (void *)(g3d_state_get_nrm_mtx((u32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx)));
                         sp8 = ((RawView_19*)temp_r3_4)->field_0x18;
                         spC = ((RawView_19*)temp_r3_4)->field_0x1C;

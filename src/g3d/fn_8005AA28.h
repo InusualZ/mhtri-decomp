@@ -16,6 +16,9 @@ void fn_8005AA44(void* pSelf, u32 enable);
 
 /* 0x8005AAEC (0x14): whether a one-word resource handle names a block (the shared `IsValid` copy). */
 u32 res_node_is_valid(const struct ResHandle* pSelf);
+/* 0x8005AAE4 (0x8): the block address a one-word resource handle holds. */
+/* untyped: byte range - the resource block */
+void* res_handle_ptr(const struct ResHandle* pSelf);
 
 /* 0x8005AB00 - the `ResMat` handle's resource pointer; the ScnMdl unit's replacement passes read it
  * (rule 2: declared here, in its owner's header, not in the consumer). */
