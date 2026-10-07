@@ -2506,8 +2506,8 @@ s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
 void* em_res_user_data_ctor(void* self);
 
 /* The effect and runtime callees. */
-void fn_801049D0(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, nw4r::math::VEC3* pos,
-                 f32 scale);
+void eft009_spawn_at_pos(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale,
+                 nw4r::math::VEC3* pos);
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
 void fn_801057FC(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, s32 d);
 void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
@@ -2814,7 +2814,7 @@ void fn_801D4F78(struct _ENEMY_WORK* self) {
     case 0xD2:
         if (em_after_frame_check(self, 0, lbl_8079936C, lbl_80799220) == 1) {
             setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079923C);
-            fn_801049D0(self, 8, 2, 0, &spot, lbl_80799448);
+            eft009_spawn_at_pos(self, 8, 2, 0, lbl_80799448, &spot);
         }
         if (em_after_frame_check(self, 0, lbl_80799380, lbl_80799220) == 1) {
             fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799448);
@@ -2823,7 +2823,7 @@ void fn_801D4F78(struct _ENEMY_WORK* self) {
     case 0xD3:
         if (em_after_frame_check(self, 0, lbl_8079936C, lbl_80799220) == 1) {
             setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079923C);
-            fn_801049D0(self, 0x11, 2, 0, &spot, lbl_80799448);
+            eft009_spawn_at_pos(self, 0x11, 2, 0, lbl_80799448, &spot);
         }
         if (em_after_frame_check(self, 0, lbl_80799380, lbl_80799220) == 1) {
             fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799448);
@@ -3033,7 +3033,7 @@ void fn_801D428C(struct _ENEMY_WORK* self) {
         fn_80133C3C(self);
         if (em_frame_check(self, 0, lbl_80799274, lbl_80799220) == 1) {
             setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079923C);
-            fn_801049D0(self, 1, 5, 0, &spot, lbl_807993A0);
+            eft009_spawn_at_pos(self, 1, 5, 0, lbl_807993A0, &spot);
         }
         if (em_demo_time_ck(0x294) == 1) {
             self->state++;

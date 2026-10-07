@@ -109,7 +109,8 @@ typedef struct SystemWork {
     /* +0x7DC */ u8 field_0x7dc[4]; /* per-channel motor-on state */
     /* +0x7E0 */ u8 field_0x7e0[4];
     /* +0x7E4 */ u8 field_0x7e4[4];
-    /* +0x7E8 */ u8 pad_0x7e8[0x68];
+    /* +0x7E8 */ u8 vs_load_player_0x7e8;  /* GUESS name: the VS player whose save `multi_box_phase_input` starts loading */
+    /* +0x7E9 */ u8 pad_0x7e9[0x67];
     /* +0x850 */ u8 vs_player_pending_0x850[4];   /* GUESS name: per-player flag `arena_result_next` raises through the player's Vs block */
     /* +0x854 */ u8 pad_0x854[0xF];
     /* +0x863 */ u8 unk2147;
@@ -140,7 +141,9 @@ typedef struct SystemWork {
     /* +0x890 */ u32 field_0x890;
     /* +0x894 */ u32 field_0x894;
     /* +0x898 */ u8 pad_0x898[0x4];
-    /* +0x89C */ u8 vs_player_done_0x89c[4];   /* GUESS name: per-player flag `arena_result_next` tests before raising +0x850 */
+    /* +0x89C */ u8 vs_player_done_0x89c[2];   /* 1: `multi_box_phase_input` writes the player's box to the remote */
+    /* +0x89E */ u8 vs_save_slot_0x89e[2];     /* GUESS name: each VS player's save slot (`setPlayerSave2Userdata`, `createDataFile_init`) */
+      /* GUESS name: per-player flag `arena_result_next` tests before raising +0x850 */
     /* +0x8A0 */ u8 pad_0x8a0[0x3];
     /* +0x8A3 */ char player_name_0x8a3[0xB];   /* the player name the network work record copies (`strcpy`) */
     /* +0x8AE */ u8 online_0x8ae;       /* GUESS name: 0 = offline play (`arena_result_next` then arms the solo flag), 1 = online */
@@ -171,7 +174,8 @@ typedef struct SystemWork {
     /* +0x908 */ int (*kbd_input)(void);
     /* +0x90C */ u8 pad_0x90C[0x3];
     /* +0x90F */ u8 net_session_0x90f;   /* GUESS name: non-zero while the arena runs as a network session */
-    /* +0x910 */ u8 pad_0x910[0x21];
+    /* +0x910 */ u8 save_keep_0x910[2];  /* GUESS name: two bytes `multi_box_phase_input` keeps across a box save */
+    /* +0x912 */ u8 pad_0x912[0x1F];
     /* +0x931 */ u8 unk2353;
     /* +0x932 */ u8 pad_0x932[0x16];
     /* +0x948 */ void* field_0x948;    /* work-heap base, cleared by fn_800CE5B4 */

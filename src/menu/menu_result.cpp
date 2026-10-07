@@ -44,25 +44,23 @@
  *   GUESS: `q_result_box_record_init`, `q_result_phase_enter`
  *   GUESS (the box band, from each body and its callers): `multi_box_phase_apply`, `multi_box_cursor_index`,
  *   GUESS: `multi_box_grid_clear`, `multi_box_cursor_clamp`, `multi_box_grid_step`, `multi_box_phase_ck`,
- *   GUESS: `multi_box_phase_step`; `multi_box_rem_exist_ck` and `multi_box_cursor_item_get` carry the dump's manglings
+ *   GUESS: `multi_box_phase_step`, `multi_box_result_step`, `multi_box_phase_input`; `multi_box_rem_exist_ck` and `multi_box_cursor_item_get` carry the dump's manglings
  * RESIDUALS. Partial rows, all register-allocation or
  *   scheduling residue: `q_result_unlock_next` (the target keeps one more value live and saves r31),
  *   `q_result_equip_detail_draw` (retail tests the kind with range compares, our `switch` with a compare tree),
  *   `q_result_hunt_recs_build`, `q_result_box_list_draw`, `q_result_equip_sel_count`, `q_result_phase_enter`,
  *   `q_result_owned_count_get` (`userdata_gunner_ck`/`item_slots_count_sum` are unsigned in retail's view),
  *   `q_result_sub_screen_ready` (MWCC if-converts the second `return (B == 1)`).
- *   2 rows unwritten (objdiff scores them zero): 0x8039DBC8-0x8039E5CC (`fn_8039DBC8`, `multi_box_result_step`).
- *   Known needs:
- *  - `multi_box_result_step`'s object (+0x150 is the screen) is typed by no registered caller, and the screen's +0x10..+0x28,
- *    +0x48, +0x33D0, +0x33F0 and +0x3408 fields are padding in `QResultScreen`;
- *  - `fn_8039DBC8` (the save/VS-wpad step, the one reader of `.sbss` 0x80794C08) needs `fn_8004F3B4` and callees outside
- *    the range.
+ *   Every row written.
  *   Partial rows of the box band:
  *  - `multi_box_rem_exist_ck`: 2 instructions short, the target keeps a dead loop counter;
  *  - `multi_box_phase_ck`: the ready mask in r31 against retail's r30 (playbook 22);
  *  - `multi_box_grid_clear`: `items`/`i` mirrored and a `mullw` operand order (both spellings measured).
- *   flipcheck: `.text` 0x7298 of the claimed 0x7C84, extab and extabindex short of the claim, and the `.sbss` claim
- *   (0x8) emitted by no body (the unwritten `fn_8039DBC8` is its only reader).
+ *  - `multi_box_phase_input`: phase 1's "any record still choosing" loop keeps its flag in r3 and the pointer in r4
+ *    where ours swaps them, and the last save step computes `Psw[box_player]` with the `mulli` ahead of the base
+ *    (index, inline-helper and separate-pointer spellings measured lower or equal).
+ *   flipcheck: `.text`, extab and extabindex differ (the partial rows above); `.sbss` emits `multi_box_save_keep`'s 2 bytes
+ *   of the claimed 0x8 (the body reads only bytes 0 and 1).
  * SHAPES. A two-way test on a `u8` mode is a `switch` in retail (`cmpwi`, the default body first); a mode tested
  *   for `<= 2` then `== 3` is `case 0: case 1: case 2:` / `case 3:`; the `GetMenuFontColor` flags are `bool` locals;
  *   the per-frame `frame` arguments are `u8` locals (the `u16` parameter then takes a `clrlwi`);
@@ -92,8 +90,12 @@
 #include "quest/quest_entry.h"
 #include "quest/quest_types.h"
 #include "mh3_pad/system_w.h"
+#include "pad_connect.h"
 #include "mh3_pad/Screen_w.h"
 #include "mh3_pad/Psw.h"
+#include "mh3_pad/option_w.h"
+#include "menu/menu_plsearch.h"
+#include "Runtime.PPCEABI.H/memcpy.h"
 #include "hud/cockpit.h"
 #include "menu/menu_row.h"
 #include "userdata_item.h"
@@ -219,6 +221,8 @@ BOOL q_result_phase_next(QResultScreen* self, u8 phase);
 void q_result_item_page_init(QResultScreen* self);
 void q_result_phase_init(QResultScreen* self, s32 phase);
 BOOL q_result_task(Q_MoveWork* move);
+s32 multi_box_phase_input(QResultScreen* self);
+BOOL multi_box_result_step(Q_MoveWork* move);
 void q_result_draw_task(void);
 void q_result_cursor_anim_step(QResultScreen* self);
 u32 q_result_items_left_ck(QResultScreen* self, u8 which);
@@ -3339,8 +3343,8 @@ void q_result_phase_enter(QResultScreen* self, s32 phase)
         q_result_swap_start(self);
         break;
     case 9:
-        self->box_cursor = -1;
-        self->box_frame = 0;
+        self->box_msg = -1;
+        self->box_player = 0;
         recs->records[0].field_0x03 = 4;
         recs->records[0].field_0x02 = 0;
         break;
@@ -3617,4 +3621,327 @@ u32 multi_box_phase_step(QResultScreen* self, u8 mode) {
         self->phase = next;
         return 1;
     }
+}
+
+/* The two `system_w` bytes the box save keeps while the player's options are swapped in. */
+u8 multi_box_save_keep[2];
+
+/* 0x8039DBC8 (0x780): Runs the box band's current phase: the grid choice (1), the reward (5), the ready flags (8) and
+ * the save that writes each player's box back to the remote or the save file (9); returns 1 when the phase is done. */
+s32 multi_box_phase_input(QResultScreen* self)
+{
+    PadButtons* pad = &Psw[0].button_0x2C0;
+    _multi_result_work* rec = ((MultiResultRecordArray*)self)->records;
+    _vs_user_data* vs;
+    Q_UserData* user;
+    s32 result;
+    s32 i;
+    s32 player;
+    s32 slot;
+
+    switch (self->phase) {
+    case 1:
+        ai_npc_reaction_forward();
+        for (i = 0; i < self->field_0x0007; i++, rec++) {
+            multi_box_grid_step(rec);
+        }
+        result = 0;
+        rec = (_multi_result_work*)self->box_records;
+        for (i = 0; i < self->field_0x0007; i++) {
+            if (rec->state != 0xFF) {
+                result = 1;
+                break;
+            }
+            rec++;
+        }
+        if (result == 0) {
+            return 1;
+        }
+        break;
+    case 5:
+        if (pad->pressed_0x04 & 0x10) {
+            sysSE_req(0);
+            for (player = 0; player < self->field_0x0007; player++) {
+                score_add_clamped(self->zenny_total, &get_vsUser_work(player)->point_0x18);
+            }
+            return 1;
+        }
+        break;
+    case 8:
+        if (pad->pressed_0x04 & 0x10) {
+            for (player = 0; player < self->field_0x0007; player++) {
+                get_vsUser_work(player)->ready_mask_0xBC |= 0x380;
+            }
+            sysSE_req(0);
+            return 1;
+        }
+        break;
+    case 9:
+        switch (self->select_mode) {
+        case 0:
+            system_w.hbm_disabled = 1;
+            if (system_w.vs_player_done_0x89c[self->box_player] == 1) {
+                vs_user_checksum_set(self->box_player);
+                wpad_memory_access_init(self->box_player, self->box_player);
+                self->select_mode = 1;
+            } else {
+                vs = get_vsUser_work(self->box_player);
+                readDataFile_init(vs->player_0xCF, -1);
+                system_w.vs_load_player_0x7e8 = vs->player_0xCF;
+                self->select_mode = 4;
+                self->phase_step = 0;
+            }
+            break;
+        case 1:
+            result = read_wpad_memory(&self->box_vs_user, 0);
+            switch (result) {
+            case 0:
+                break;
+            case 1:
+                if (ck_mydata_vs(get_vsUser_work(self->box_player), &self->box_vs_user) == 0) {
+                    sysSE_req(5);
+                    self->select_mode = 110;
+                    system_w.hbm_disabled = 0;
+                } else {
+                    wpad_memory_access_init(self->box_player, self->box_player);
+                    self->select_mode = 2;
+                }
+                break;
+            case -3:
+            case -2:
+                sysSE_req(5);
+                self->box_msg = 7;
+                self->select_mode = 100;
+                self->unlock_wait = 0;
+                system_w.hbm_disabled = 0;
+                break;
+            default:
+                sysSE_req(5);
+                self->unlock_wait = 0;
+                self->select_mode = 110;
+                system_w.hbm_disabled = 0;
+                break;
+            }
+            break;
+        case 2:
+            result = write_wpad_memory(self->box_player, 1);
+            switch (result) {
+            case 0:
+                self->box_msg = 6;
+                break;
+            case 1:
+            case -100:
+                self->box_msg = -1;
+                self->box_player++;
+                if (self->box_player < self->field_0x0007) {
+                    self->select_mode = 0;
+                } else {
+                    sysSE_req(8);
+                    self->select_mode++;
+                    system_w.hbm_disabled = 0;
+                }
+                break;
+            case 101:
+                sysSE_req(5);
+                self->box_msg = 9;
+                break;
+            case -6:
+            case -5:
+                sysSE_req(5);
+                self->box_msg = 8;
+                self->select_mode = 100;
+                self->unlock_wait = 0;
+                system_w.hbm_disabled = 0;
+                break;
+            default:
+                sysSE_req(5);
+                self->box_msg = 7;
+                self->select_mode = 100;
+                self->unlock_wait = 0;
+                system_w.hbm_disabled = 0;
+                break;
+            }
+            break;
+        case 3:
+            if (pad->pressed_0x04 & 0x10) {
+                if (rec->field_0x02 == 4) {
+                    self->select_mode = 0;
+                    self->box_msg = -1;
+                    self->box_player = 0;
+                } else {
+                    self->box_result = rec->field_0x02 + 1;
+                    sysSE_req(0);
+                    return 1;
+                }
+            } else {
+                rec->field_0x02 = menu_cursor_step(rec->field_0x02, rec->field_0x03, pad->pressed_0x04 | pad->held_0x14, 1, 2);
+            }
+            break;
+        case 4:
+            switch (self->phase_step) {
+            case 0:
+                if (readDataFile() != 0) {
+                    vs = get_vsUser_work(self->box_player);
+                    setPlayerSave2Userdata(system_w.vs_save_slot_0x89e[self->box_player]);
+                    user = get_userdata();
+                    for (slot = 0; slot < 16; slot++) {
+                        item_pair_copy(&user->vs_items_0x5364[slot], &vs->item_0x2C[slot]);
+                    }
+                    for (slot = 0; slot < 10; slot++) {
+                        user->vs_slot_a_0x52E4[slot] = vs->slot_a_0x6C[slot];
+                        user->vs_slot_b_0x530C[slot] = vs->slot_b_0x94[slot];
+                    }
+                    user->event_bits_0x52E2 = vs->ready_mask_0xBC;
+                    user->vs_point_0x53A4 = vs->point_0x18;
+                    multi_box_save_keep[0] = system_w.save_keep_0x910[0];
+                    multi_box_save_keep[1] = system_w.save_keep_0x910[1];
+                    memcpy(option_w, vs->option_0xD0, 31);
+                    if (createDataFile_init(vs->player_0xCF, system_w.vs_save_slot_0x89e[self->box_player], 0) == 1) {
+                        self->phase_step++;
+                    } else {
+                        self->select_mode = 3;
+                        system_w.hbm_disabled = 0;
+                    }
+                }
+                break;
+            case 1:
+                result = game_save_wait();
+                switch (result) {
+                case 1:
+                    self->box_msg = -1;
+                    self->box_player++;
+                    if (self->box_player < self->field_0x0007) {
+                        self->select_mode = 0;
+                    } else {
+                        sysSE_req(8);
+                        self->select_mode = 3;
+                        system_w.hbm_disabled = 0;
+                    }
+                    break;
+                case -2:
+                case -1:
+                    sysSE_req(5);
+                    self->box_msg = chg_nand_err2msgcode();
+                    self->select_mode = 200;
+                    self->unlock_wait = 0;
+                    system_w.hbm_disabled = 0;
+                    break;
+                }
+                if (result != 0) {
+                    system_w.save_keep_0x910[0] = multi_box_save_keep[0];
+                    system_w.save_keep_0x910[1] = multi_box_save_keep[1];
+                }
+                break;
+            }
+            break;
+        case 100:
+        case 110:
+        case 200:
+            if (self->unlock_wait < 30) {
+                self->unlock_wait++;
+            } else if (Psw[self->box_player].button_0x2C0.pressed_0x04 & 0x10) {
+                sysSE_req(0);
+                self->box_msg = -1;
+                self->box_player++;
+                if (self->box_player < self->field_0x0007) {
+                    self->select_mode = 0;
+                } else {
+                    self->select_mode = 3;
+                    system_w.hbm_disabled = 0;
+                }
+            }
+            break;
+        }
+        break;
+    }
+    return 0;
+}
+
+/* 0x8039E348 (0x284): The multiplayer box screen's task: sets the screen up from the result record and the
+ * delivered items, then runs the box phases until the closing fade ends and returns `box_result`. */
+BOOL multi_box_result_step(Q_MoveWork* move)
+{
+    QResultScreen* self = (QResultScreen*)move->result_buffer_0x150;
+    Q_ResultWork* q = get_qResult_work();
+    Q_ItemWork* work = move_work_item_work_get();
+    MultiResultRecordArray* recs;
+    s32 i;
+
+    q_result_noop(self);
+    switch (self->state) {
+    case 0:
+        if (file_loading_ck(NULL, NULL) == 1) {
+            break;
+        }
+        pad_connect_disp_set(0);
+        recs = (MultiResultRecordArray*)self;
+        recs->records[0].work = (MultiResultBoxGrids*)self;
+        recs->records[1].work = (MultiResultBoxGrids*)self;
+        if (system_w.field_0x8af == 0) {
+            self->field_0x0007 = 1;
+        } else {
+            self->field_0x0007 = 2;
+        }
+        self->state++;
+        self->sub_state = 0;
+        self->zenny_rows[0] = 0;
+        self->zenny_rows[1] = 0;
+        self->zenny_rows[2] = 0;
+        self->zenny_rows[3] = 0;
+        self->point_rows[0] = 0;
+        self->point_rows[1] = 0;
+        self->point_rows[2] = 0;
+        q->field_0x1E8 = 0;
+        if (q_result_phase_is_3(self) == 0 && q_result_phase_is_2(self) == 0) {
+            q->field_0x1E4 = work->reward_0x2E8;
+            for (i = 0; i < 16; i++) {
+                item_pair_copy(&self->grid_items[i], item_pair_copy(&self->grid_kept[i], &q->box_items_0x3F4[i]));
+            }
+        }
+        self->zenny_total = q->field_0x1E4;
+        self->swap_counter = 0;
+        multi_box_phase_step(self, 0);
+        break;
+    case 1:
+        if (self->swap_timer > 0) {
+            self->swap_timer--;
+        }
+        switch (self->sub_state) {
+        case 0:
+            system_copy_filter_arm();
+            multi_box_phase_apply(self);
+            break;
+        case 1:
+            if (multi_box_phase_input(self) == 1) {
+                self->sub_state++;
+            }
+            break;
+        case 2:
+            self->phase_timer++;
+            if (self->phase_timer > 20) {
+                self->phase_timer = 0;
+                if (multi_box_phase_step(self, self->phase) == 0) {
+                    self->sub_state++;
+                    system_copy_filter_clear();
+                    self->phase_timer = 16;
+                    if (self->phase_timer < self->swap_timer) {
+                        self->phase_timer = self->swap_timer;
+                    }
+                } else {
+                    self->sub_state = 0;
+                    q_result_phase_apply(self);
+                }
+            }
+            break;
+        case 3:
+            if (self->phase_timer > 0) {
+                self->phase_timer--;
+                break;
+            }
+            return self->box_result;
+        }
+        subTransSet((u32)q_result_draw_task, 0, NULL);
+        break;
+    }
+    return FALSE;
 }

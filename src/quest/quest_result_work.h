@@ -77,7 +77,7 @@ struct Q_ResultWork {
     /* +0x3DC */ s32 rank_points_0x3DC;  /* the points the two count sets are worth */
     /* +0x3E0 */ Q_QuestStat stat_0x3E0;
     /* +0x3F0 */ s32 credit_0x3F0;     /* GUESS name: the amount the lobby colour step credits to the score */
-    /* +0x3F4 */ u8 pad_0x3F4[0x434 - 0x3F4];
+    /* +0x3F4 */ IdValue box_items_0x3F4[0x10];  /* the 16 items the multiplayer box screen starts from (`multi_box_result_step`) */
     /* +0x434 */ u8 time_medal_0x434;  /* 2 under the arena's gold time, 1 under its silver, else 0 */
     /* +0x435 */ u8 pad_0x435[0x438 - 0x435];
 };  /* size: 0x438 */

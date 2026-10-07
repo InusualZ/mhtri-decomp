@@ -30,6 +30,7 @@
 
 #include "types.h"
 #include "enemy/ENEMY_WORK.h"
+#include "enemy/em_se_record.h"
 #include "enemy/enemy_control.h"
 #include "enemy/fn_8011D448.h"
 #include "enemy/fn_801251D0.h"
@@ -121,41 +122,6 @@ struct EmKey3 {
     /* +0x08 */ f32 value_0x08;
     /* +0x0C */ f32 value_0x0C;
 }; /* size: 0x10 */
-
-/* The two-float `.sdata` offset a sound record can point at. */
-struct EmSeOffset {
-    /* +0x00 */ f32 x_0x00;
-    /* +0x04 */ f32 y_0x04;
-}; /* size: 0x08 */
-
-/* The sound-position record the mot202 table's kind 0x0A entry points at. */
-struct EmSePos {
-    /* +0x00 */ f32 x_0x00;
-    /* +0x04 */ f32 y_0x04;
-    /* +0x08 */ s16 channel_0x08;
-    /* +0x0A */ s16 angle_0x0A;
-    /* +0x0C */ s32 pad_0x0C;
-}; /* size: 0x10 */
-
-/* One sound-effect record of a per-motion table (`em_se_tbl_play` walks the tables).  Field names are a GUESS
- * from the values: the id runs 0x64..0x72, the delay is a small frame count. */
-struct EmSeRecord {
-    /* +0x00 */ u16 se_id_0x00;
-    /* +0x02 */ u16 pad_0x02;
-    /* +0x04 */ s32 delay_0x04;
-    /* +0x08 */ s32 length_0x08;
-    /* +0x0C */ s32 pad_0x0C;
-    /* +0x10 */ u8 flags_0x10[4];
-    /* +0x14 */ const EmSeOffset* shift_0x14;
-}; /* size: 0x18 */
-
-/* One entry of a per-motion sound table: a kind byte and a word that is a record, a count or a callback,
- * by kind (0 = record, 0xFF/0xFE/0xFD end the table). */
-struct EmSeEntry {
-    /* +0x00 */ u8 kind_0x00;
-    /* +0x01 */ u8 pad_0x01[3];
-    /* +0x04 */ const EmSeRecord* arg_0x04;
-}; /* size: 0x08 */
 
 /* The em024 program table (`em024_prog_tbl`): the entry points the shared enemy program driver calls.
  * Slot names are a GUESS from the callers' arguments. */

@@ -725,7 +725,7 @@ void fn_801676C4(_ENEMY_WORK* self) {
         self->state = state + 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 3, 2, 0);
-        em_motion_param_set(self, 0x1A, lbl_807974FC);
+        em_motion_param_set(self, lbl_807974FC, 0x1A);
         break;
     case 1:
         if (self->field_0x1D4 <= lbl_807974FC) {
@@ -757,7 +757,7 @@ void fn_80167770(_ENEMY_WORK* self) {
             self->field_0x314 = lbl_8079750C;
             self->field_0x318 = lbl_80797510;
             self->field_0x320 = lbl_80797514;
-            em_motion_param_set(self, 0x10, lbl_807974FC);
+            em_motion_param_set(self, lbl_807974FC, 0x10);
         }
         break;
     case 2:
@@ -781,7 +781,7 @@ void fn_801678A0(_ENEMY_WORK* self) {
         self->state = state + 1;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xE, 8, 0);
-        em_motion_param_set(self, 0x1E, lbl_807974FC);
+        em_motion_param_set(self, lbl_807974FC, 0x1E);
         self->timer_0x020 = 0x20;
         break;
     case 1:

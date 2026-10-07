@@ -19,8 +19,7 @@
  *   25 partial rows, including:
  *  - `fn_80156920`, `fn_80156B28`: retail lays the `(a1 & 0xFF) == 1` and `== 2` bodies out of line and the `else`
  *    inline, ours nests them the other way (a plain `switch` scores lower);
- *  - `fn_80154E90`: retail keeps `clrlwi r0,r31,24` + `cmpwi` for `arg1 != 0` (the peephole folds it here) and
- *    loads the two `em_motion_param_set` float arguments one call later;
+ *  - `fn_80154E90`: retail keeps `clrlwi r0,r31,24` + `cmpwi` for `arg1 != 0` (the peephole folds it here);
  *  - `fn_80154F70`: retail picks r0 for the table address where ours picks r3.
  *   The other 21 partial rows have no recorded cause.
  *   flipcheck: `.ctors`/`.rodata`/`.sdata` claimed, not emitted; `.data` 0x264 against 0x18A0, `.sdata2` 0x10
@@ -243,8 +242,8 @@ extern "C" void fn_80154E90(_ENEMY_WORK* self, u8 arg1) {
 
     VEC3_ctor(&pos);
     if (arg1 != 0) {
-        em_motion_param_set(self, 0, lbl_807970C0);
-        em_motion_param_set(self, 0xA, lbl_807970C4);
+        em_motion_param_set(self, lbl_807970C0, 0);
+        em_motion_param_set(self, lbl_807970C4, 0xA);
     }
     if (em_res_user_data_ck(self) == 0) {
         helper = (s32)operator new(0xC);

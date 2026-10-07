@@ -17,6 +17,9 @@ extern u8 game_mutex[0x18];
 /* 0x80047058 - non-zero while the screen is split between two players. */
 s32 screen_split_mode_ck(void);
 
+/* 0x80047074 - shows (1) or hides the controller-connection notice. */
+void pad_connect_disp_set(u32 on);
+
 #ifdef __cplusplus
 }
 #endif

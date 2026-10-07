@@ -161,8 +161,8 @@ s32 fn_8028F558(void* a, void* b);
 s32 fn_802907BC(void* a, void* b);
 void eft_spawn_pos_in_area(void* pos, u8 area, u8 kind, s32 mode, f32 scale);
 void eft009_spawn_at_joint(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale);
-void fn_801049D0(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, nw4r::math::VEC3* pos,
-                 f32 scale);
+void eft009_spawn_at_pos(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale,
+                 nw4r::math::VEC3* pos);
 s32 em_roster_record_slot_id_get(s32 handle);
 void em_roster_record_release(s32 handle);
 }
@@ -1567,29 +1567,29 @@ extern "C" void fn_801B670C(_ENEMY_WORK* self) {
                 return;
             }
             setVector3(&pos, lbl_80798C74, lbl_80798C74, lbl_80798CC0);
-            fn_801049D0(self, 0x1A, 9, 0, &pos, lbl_80798CB8);
+            eft009_spawn_at_pos(self, 0x1A, 9, 0, lbl_80798CB8, &pos);
         }
         return;
     case 0x12:
         if (em_after_frame_check(self, 0, lbl_80798CA0, lbl_80798C74) == 1) {
             if ((self->field_0x228 & 6) != 0) {
                 setVector3(&pos, lbl_80798C74, lbl_80798C74, lbl_80798CC4);
-                fn_801049D0(self, 0x1A, 0x33, 0, &pos, lbl_80798CA4);
+                eft009_spawn_at_pos(self, 0x1A, 0x33, 0, lbl_80798CA4, &pos);
                 return;
             }
             setVector3(&pos, lbl_80798C74, lbl_80798C74, lbl_80798CC4);
-            fn_801049D0(self, 0x1A, 9, 0, &pos, lbl_80798CB8);
+            eft009_spawn_at_pos(self, 0x1A, 9, 0, lbl_80798CB8, &pos);
         }
         return;
     case 0x67:
         if (em_after_frame_check(self, 0, lbl_80798CC8, lbl_80798C74) == 1) {
             if ((self->field_0x228 & 6) != 0) {
                 setVector3(&pos, lbl_80798CAC, lbl_80798C74, lbl_80798C74);
-                fn_801049D0(self, 3, 0x35, 0, &pos, lbl_80798CCC);
+                eft009_spawn_at_pos(self, 3, 0x35, 0, lbl_80798CCC, &pos);
                 return;
             }
             setVector3(&pos, lbl_80798CAC, lbl_80798C74, lbl_80798C74);
-            fn_801049D0(self, 3, 0x24, 0, &pos, lbl_80798CB8);
+            eft009_spawn_at_pos(self, 3, 0x24, 0, lbl_80798CB8, &pos);
         }
         return;
     }
