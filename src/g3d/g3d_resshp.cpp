@@ -310,7 +310,7 @@ extern u32 lbl_8056F730[];
 /* The neighbours this half calls (plain map stems), each owner named beside it. */
 extern "C" {
 void fn_80091F70(void* pDst, u32 arg1, u32 arg2);  /* owner: g3d/g3d_resanmtexsrt.cpp       */
-void fn_80071008(void* pBase, u32 size);          /* owner: g3d/g3d_calcview.cpp           */
+void g3d_dc_flush_range_nosync(void* pBase, u32 size);          /* owner: g3d/g3d_calcview.cpp           */
 void GXCallDisplayList(void* pList, u32 size);    /* the SDK's own symbol                  */
 void PPCSync(void);                               /* the SDK's own symbol                  */
 void* memset(void* pDst, int value, u32 size);    /* the runtime's own symbol              */
@@ -838,5 +838,5 @@ extern "C" u32 fn_8009A6FC(ResHandle* pSelf) {
  * store the loader ends with; fn_80071008 is the SDK's `DCFlushRangeNoSync`). */
 extern "C" void fn_8009A720(ResHandle* pSelf) {
     ResTexBlock* pData = reinterpret_cast<ResTexBlock*>(&reinterpret_cast<nw4r::g3d::ResTex*>(pSelf)->ref());
-    fn_80071008(pData, pData->mSize);
+    g3d_dc_flush_range_nosync(pData, pData->mSize);
 }

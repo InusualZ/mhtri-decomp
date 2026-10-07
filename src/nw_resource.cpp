@@ -166,8 +166,8 @@ void fn_800A5D8C(void* p, u32 index);
 void fn_800D31B0(void);
 void fn_800D320C(void);
 void fn_800D3C4C(void);
-void fn_80083290(void* root);
-void fn_800832DC(void* root);
+void scn_root_calc_world(void* root);
+void scn_root_calc_material(void* root);
 }
 
 /* The C++-linkage entry points (defined below with their real signature, never the mangled spelling -
@@ -580,8 +580,8 @@ void nwMoveStart(void) {
 /* 0x800D5D2C - end the move phase. */
 void nwMoveEnd(void) {
     if (pRoot != 0) {
-        fn_80083290((void*)pRoot);
-        fn_800832DC((void*)pRoot);
+        scn_root_calc_world((void*)pRoot);
+        scn_root_calc_material((void*)pRoot);
     }
 }
 

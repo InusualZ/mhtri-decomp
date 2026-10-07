@@ -30,6 +30,9 @@ u32 LCStoreData(void* dst, void* src, u32 size); /* untyped: byte range */
 /* 0x804CCA80 - the number of queued locked-cache DMAs. */
 u32 LCQueueLength(void);
 
+/* 0x804CCA90 - waits until at most `length` locked-cache DMAs are queued. */
+void LCQueueWait(u32 length);
+
 #ifdef __cplusplus
 }
 #endif

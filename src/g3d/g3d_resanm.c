@@ -94,7 +94,7 @@ f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)
         return pLast->value;
     }
     delta = frame - pData->keys[0].frame;
-    pos = fn_80082F18(delta * anim_tick_angle(pData->count) * pData->rate);
+    pos = math_f32_to_u16(delta * anim_tick_angle(pData->count) * pData->rate);
     if (pos > pData->count - 1) {
         Panic__Q24nw4r2dbFPCciPCce("g3d_resanm.cpp", 135,
             "estimatePos is out of bounds(%f)\nestimatePos <= %f not satisfied.",

@@ -100,6 +100,7 @@ public:
     void* operator[](const ResName name) const; /* untyped: opaque handle */
     void* operator[](int idx) const; /* untyped: opaque handle */
     u32 GetNumData() const;
+    int GetIndex(const ResName name) const;
     const ResDicData& ref() const;
 };
 

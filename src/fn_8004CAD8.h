@@ -259,7 +259,7 @@ void drawshape_set_tex_offset_f32(const f32* scale, u16 tex_no, const f32* offse
  * had not declared it yet). */
 s32 fn_80050C40(void* a, void* b);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
-void fn_800516F0(void* out);
+void MTX33_ctor(void* out);
 /* 0x8004EAF4 - the 16-byte struct copy MWCC emits for a four-word assignment (`dst[0..3] = src[0..3]`)
  * as four separate word moves.  Added with `menu/menu_row.cpp`, its consumer (rule 2). */
 void fn_8004EAF4(void* dst, const void* src);

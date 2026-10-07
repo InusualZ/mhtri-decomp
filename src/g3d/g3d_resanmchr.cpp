@@ -777,7 +777,7 @@ f32 fn_8008C600(u32 self, u16 index, f32 frame)
     if (!valid) {
         nw4r::db::Panic(lbl_80590010, 0x16C, lbl_80590088, self);
     }
-    pos = fn_80082F18(frame);
+    pos = math_f32_to_u16(frame);
     if (frame == lbl_80795ED0) {
         return fn_8008C7F0(self, 0);
     }
@@ -803,7 +803,7 @@ f32 fn_8008C968(u32 self, u16 index, f32 frame)
     if (!valid) {
         nw4r::db::Panic(lbl_80590010, 0x16C, lbl_80590088, self);
     }
-    pos = fn_80082F18(frame);
+    pos = math_f32_to_u16(frame);
     if (frame == lbl_80795ED0) {
         return fn_8008CB58((const ResAnmChrU16Channel*)self, 0);
     }
@@ -829,7 +829,7 @@ f32 fn_8008CD00(u32 self, u16 index, f32 frame)
     if (!valid) {
         nw4r::db::Panic(lbl_80590010, 0x16C, lbl_80590088, self);
     }
-    pos = fn_80082F18(frame);
+    pos = math_f32_to_u16(frame);
     if (frame == lbl_80795ED0) {
         return fn_8008CEF0((const ResAnmChrU8Channel*)self, 0);
     }
@@ -887,7 +887,7 @@ f32 fn_8008AA8C(u32 self, f32 frame)
         return fn_8008AFEC(&last, self);
     }
     delta = frame - fn_8008AFF8(&first);
-    pos = fn_80082F18(ch->rate * (delta * anim_tick_angle(ch->count)));
+    pos = math_f32_to_u16(ch->rate * (delta * anim_tick_angle(ch->count)));
     if (pos > ch->count - 1) {
         nw4r::db::Panic(lbl_80590010, 0x11A, lbl_805900BC, (f64)pos, (f64)(ch->count - 1));
     }
@@ -982,7 +982,7 @@ f32 fn_8008B200(u32 self, f32 frame)
         return fn_8008B71C(&last, (const f32*)self);
     }
     delta = frame - fn_8008B784(&first);
-    pos = fn_80082F18(ch->rate * (delta * anim_tick_angle(ch->count)));
+    pos = math_f32_to_u16(ch->rate * (delta * anim_tick_angle(ch->count)));
     if (pos > ch->count - 1) {
         nw4r::db::Panic(lbl_80590010, 0x11A, lbl_805900BC, (f64)pos, (f64)(ch->count - 1));
     }
@@ -1062,7 +1062,7 @@ f32 fn_8008B95C(u32 self, f32 frame)
         return fn_8008BF08(&last, (const f32*)self);
     }
     delta = frame - fn_8008BF5C(&first);
-    pos = fn_80082F18(ch->rate * (delta * anim_tick_angle(ch->count)));
+    pos = math_f32_to_u16(ch->rate * (delta * anim_tick_angle(ch->count)));
     if (pos > ch->count - 1) {
         nw4r::db::Panic(lbl_80590010, 0x11A, lbl_805900BC, (f64)pos, (f64)(ch->count - 1));
     }
@@ -1276,7 +1276,7 @@ void fn_8008D528(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
 /* The resource-table step (no pointer guard). */
 void fn_8008D9B8(u32 self, u32* out)
 {
-    u32 tmp = fn_800628C8((void*)self, reinterpret_cast<const nw4r::g3d::ResAnmChr*>(self)->ref().toChrDataDic);
+    u32 tmp = res_anm_chr_ofs_to_dic(reinterpret_cast<const nw4r::g3d::ResAnmChr*>(self), reinterpret_cast<const nw4r::g3d::ResAnmChr*>(self)->ref().toChrDataDic);
 
     (*reinterpret_cast<nw4r::g3d::ResDic*>(&tmp))[(int)out];
 }

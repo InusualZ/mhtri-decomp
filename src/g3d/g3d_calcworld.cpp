@@ -62,7 +62,7 @@ extern "C" u32* fn_8005CEDC(void);
 extern "C" void* res_node_get_id(const void* p);
 extern "C" ResNodeData* res_node_ptr(const void* p);
 extern "C" void res_node_copy_ctor(void* pOut, const void* pIn);
-extern "C" void fn_80061068(void* pOut);
+extern "C" void chr_anm_result_init(void* pOut);
 extern "C" void* fn_8008E1C0(void* pOut, const void* pIn);
 extern "C" void fn_8008F148(void* pOut, const void* pIn);
 extern "C" void fn_80098D5C(void* pA, const void* pB);
@@ -242,7 +242,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
     s32 sC;
     s32 s8;
     u8* pCode = pByteCode;
-    fn_80061068(&rec);
+    chr_anm_result_init(&rec);
     if (pCode == NULL) {
         pCode = (u8*)(void*)reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->GetResByteCode(lbl_8058E178);
     }
