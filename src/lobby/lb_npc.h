@@ -222,7 +222,7 @@ void lb_npc_event_set(struct _LB_NPC* self, u8 state);
 void lb_npc_motion_restart(struct _LB_NPC* self, u16 motion_id);
 /* 0x8020A3E4 - starts act `act`/`sub` on the player work, with the request `flags` (bit 0x20 re-rolls the random
  * pick).  GUESS name; the spelling is the owner's own (`lobby/lb_npc.cpp`). */
-void lb_npc_act_set(_PLW* self, u32 act, s32 sub, s32 flags);
+void lb_npc_act_set(_PLW* self, u32 act, u16 sub, u16 flags);
 /* 0x801FF5FC - stores the NPC's talk mode byte (+0x255); a null NPC is skipped (GUESS name). */
 void lb_npc_talk_mode_set(struct _LB_NPC* self, u8 mode);
 /* 0x8020EB00 - stores the player's lobby act latch byte (+0xB00) (GUESS name). */

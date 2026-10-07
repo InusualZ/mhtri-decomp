@@ -4,8 +4,9 @@
  *   note-pane NPC talk program (0x8038EC44-0x8038F2BC, on `enemy/note_work.h`'s `NoteWork`), the kitchen screen (lobby
  *   screen 0x11, to 0x803928F0), the trade screen (screen 0x12, to 0x80393994) and the scene effect (effect 0x36),
  *   whose tail is `lb_scene_model_slide` and the two helpers after it (0x80394038-0x80394158).
- * FLAGS. `cflags_lobby`; `#pragma peephole off` file-wide (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi` +
- *   `slwi` unfused; every written row measured better with it off).
+ * FLAGS. `cflags_lobby`; `#pragma pool_data off` (retail loads every table with its own `lis`/`addi`); `#pragma peephole off` file-wide (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi` +
+ *   `slwi` unfused; every written row measured better with it off); `#pragma optimization_level 4` around
+ *   `lb_trade_msg_draw` (retail's subi + cmplwi switch-range lowering, playbook 108).
  * NAMES. `lb_quest_ui` is the registered GUESS; the groups' names (`note_talk_*`, `lb_kitchen_*`, `lb_trade_*`,
  *   `lb_scene_eft_*`) and every data name are GUESSes from the bodies: the kitchen pays zenny or resource points for a
  *   pair of ingredients (`lb_kitchen_pair_find` keys the pair tables on the two groups) and fills `lb_param_w`'s meal
@@ -30,19 +31,27 @@
  *   GUESS: `lb_kitchen_bonus_roll`, `lb_kitchen_extra_roll`, `lb_kitchen_step`, `lb_kitchen_course_draw`,
  *   GUESS: `lb_kitchen_special_screen_draw`, `lb_trade_offer_state`, `lb_scene_eft_init`, `lb_scene_eft_move`
  * RESIDUALS. Every row is written.
- *  - `lb_kitchen_open`: retail keeps two row counters for the rolled pairs (one byte offset, one index) and saves one
- *    more register; `lb_kitchen_courses_roll`, `lb_kitchen_bonus_roll`, `lb_trade_offer_state`: register order;
+ *  - `lb_kitchen_open`: retail keeps two row counters for the rolled pairs (one byte offset, one index) and saves two
+ *    more registers (`_savegpr_25`/`_restgpr_25` against our `_savegpr_27`/`_restgpr_27`); `lb_kitchen_courses_roll`, `lb_kitchen_bonus_roll`, `lb_trade_offer_state`: register order;
  *  - `lb_scene_eft_move`: the 1.0f pool word is named by the map in retail (`lbl_8079C2AC`), ours is anonymous;
+ *  - `lb_kitchen_skill_text`, `lb_kitchen_pick_draw`, `lb_trade_cost_draw`: their format strings are literals, so
+ *    their relocations name our anonymous string symbols where retail's name the map's labels
+ *    (`lb_kitchen_skill_none_fmt`, `lb_kitchen_skill_value_fmt`, `lb_kitchen_text_fmt`, `lb_kitchen_cost_fmt`,
+ *    `lb_kitchen_skill1_fmt`, `lb_kitchen_skill2_fmt`, `lb_trade_count_fmt`) (same bytes, same addresses); named `aligned(4)` arrays keep the bytes but cost
+ *    `lb_kitchen_pick_draw` 2.5 points of register colouring, and an all-zero `""` array lands in `.sbss`;
  *  - `lb_kitchen_step`, `lb_kitchen_course_draw`: register order.
  *  - `lb_kitchen_tri_sum`: retail's 8x-unrolled countdown keeps no separate counter; ours decrements one;
  *  - `lb_kitchen_list_draw`, `lb_kitchen_special_list_draw`: `active` takes r31 where retail has r25/r27;
  *  - `lb_kitchen_list_page_set`: retail steps a dead per-entry counter (`addi r7`) inside the 3x-unrolled copy;
  *  - `lb_trade_list_draw`: retail scales the offer index by 4 twice (a 4-byte-element table), ours by 16 once;
  *  - `lb_kitchen_meal_serve`: the two rare bytes load in the other order; `lb_trade_page_set`: register order.
- *   flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted (the tables are declared, not defined);
+ *   flipcheck: `.data`/`.sdata` are emitted byte-identical (tables defined before their first users, strings as
+ *   literals); `.sdata2` cannot match from one TU - the target pools 1.0f twice (0x8079C2A4 for the talk program,
+ *   0x8079C2AC for the scene effect), so the talk program 0x8038EC44-0x8038F2BC is a separate TU (seam request filed);
  *   `.text`/extab/extabindex short of the claim.
  */
 
+#pragma pool_data off
 #pragma peephole off
 
 #include "types.h"
@@ -104,72 +113,7 @@
 #include "enemy/em_prog_support.h"
 #include "menu/note_pane_player_near_ck.h"
 
-/* The kitchen's tables (this unit's `.data`/`.sdata`, declared until the unit emits them). */
-extern s32 lb_kitchen_cost_tbl[6];            /* per tier: the zenny cost, then the resource-point cost */
-extern u8 lb_kitchen_special_tbl[12];         /* the special courses of the two list pages, 0-ended */
-extern s16 lb_kitchen_special_values[12];     /* the value each special course gives */
-extern s16* lb_kitchen_bonus_tbls[3];         /* the (skill, value) pairs of the skill rows 0x8000..0x8002 */
-extern u16 lb_kitchen_area_codes[4];          /* the four online areas' meal codes */
-extern u16* lb_kitchen_pair_tbls[3];
-extern u8* lb_kitchen_course_lists[5];      /* the five course rolls' candidate lists, 0-ended */          /* per tier: the pair table, 6-byte records ended by 0xFFFF */
-extern u16 lb_kitchen_special_holds[4];       /* the two special courses and their hold slots */
-extern LbChoiceDef lb_kitchen_choice_defs[3];
-extern u16 lb_kitchen_frame_ids[6];
-extern u16 lb_kitchen_frame_wide_ids[6];
-extern u16 lb_kitchen_title_ids[14];
-extern u16 lb_kitchen_list_ids[10];
-extern u16 lb_kitchen_row_lsp[6];
-extern u16 lb_kitchen_rare_lsp[6];
-extern u16 lb_kitchen_pick_ids[18];
-extern u16 lb_kitchen_slot_ids[8];
-extern u16 lb_kitchen_slot_pulse_ids[8];
-extern char lb_kitchen_skill2_fmt[10];
-extern u16 lb_kitchen_course_ids[20];
-extern u16 lb_kitchen_course_row_ids[6];
-extern u16 lb_kitchen_course_cursor_ids[6];
-extern u16 lb_kitchen_bonus_ids[16];
-extern u16 lb_kitchen_confirm_ids[8];
-extern u16 lb_kitchen_confirm_row_ids[6];
-extern u16 lb_kitchen_confirm_cursor_ids[6];
-extern u16 lb_kitchen_choice_sprites[12];
-extern u16 lb_kitchen_slot_frame_ids[4];
-extern u16 lb_kitchen_slot_lsp[2];
-extern u16 lb_kitchen_slot_label_ids[2];
-extern char lb_kitchen_skill_none_fmt[4];
-extern char lb_kitchen_skill_value_fmt[8];
-extern char lb_kitchen_text_fmt[4];
-extern char lb_kitchen_cost_fmt[8];
-extern char lb_kitchen_skill1_fmt[8];
-extern u16 lb_kitchen_special_label_ids[3];
-extern u16 lb_kitchen_course_lsp[4];
-extern u16 lb_kitchen_bonus_frame_ids[4];
-extern u16 lb_kitchen_bonus_lsp[4];
-extern u16 lb_kitchen_confirm_lsp[4];
-extern u16 lb_kitchen_choice_ids[2];
 
-/* The trade screen's tables. */
-extern LbChoiceDef lb_trade_choice_def;
-extern u16 lb_trade_frame_ids[6];
-extern u16 lb_trade_frame_wide_ids[6];
-extern u16 lb_trade_title_ids[14];
-extern u16 lb_trade_list_ids[10];
-extern u16 lb_trade_row_lsp[6];
-extern u16 lb_trade_detail_ids[20];
-extern u16 lb_trade_pouch_ids[6];
-extern u16 lb_trade_box_ids[6];
-extern u16 lb_trade_detail_lsp[8];
-extern u16 lb_trade_cost_ids[24];
-extern u16 lb_trade_cost_cursor_ids[16];
-extern u16 lb_trade_cost_row_ids[16];
-extern u16 lb_trade_label_ids[4];
-extern u16 lb_trade_choice_ids[2];
-extern u16 lb_trade_cost_lsp[3];
-extern char lb_trade_count_fmt[4];
-
-/* The camera model's key-frame table `lb_scene_model_slide` reads: six (frame, value) pairs. */
-f32 lb_quest_detail_camera_keys[12] = {
-    0.0f, -3160.0f, 82.0f, -3080.9f, 144.0f, -3035.2f, 212.0f, -2965.3f, 310.0f, -2960.0f, -1.0f, -2960.0f,
-};
 
 /* The model record `lb_scene_eft_move` hands `lb_scene_model_slide`: its step byte and the position the
  * camera keys drive.  size: 0x10 (a view: the model continues) */
@@ -193,9 +137,6 @@ typedef struct LbSceneEmitter {
     /* +0x16 */ u8 pad_0x16[0x2];
 } LbSceneEmitter;
 
-extern Vec lb_scene_model_pos[5];               /* the five models' start positions */
-extern Vec lb_scene_model_target[5];            /* the positions model 1 moves towards */
-extern LbSceneEmitter* lb_scene_emitter_tbls[5]; /* each model's emitter table, or null */
 
 extern "C" {
 
@@ -475,6 +416,33 @@ void note_talk_state_step(NoteWork* self) {
  * The kitchen screen.
  * --------------------------------------------------------------------------------------------- */
 
+/* The kitchen's tables. */
+s32 lb_kitchen_cost_tbl[6] = {50, 5, 150, 15, 300, 30};
+u8 lb_kitchen_special_tbl[12] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x00, 0x00};
+s16 lb_kitchen_special_values[11] = {0, 50, 300, 50, 5, 15, 5, 5, 5, 5, 5};
+s16 lb_kitchen_bonus_tbl_0[10] = {1, 30, 4, 3, 5, 5, 3, -30, 2, -150};
+s16 lb_kitchen_bonus_tbl_1[10] = {1, 40, 4, 3, 5, 10, 3, -30, 2, -150};
+s16 lb_kitchen_bonus_tbl_2[10] = {1, 50, 4, 5, 5, 15, 3, -30, 2, -150};
+s16* lb_kitchen_bonus_tbls[3] = {lb_kitchen_bonus_tbl_0, lb_kitchen_bonus_tbl_1, lb_kitchen_bonus_tbl_2};
+u16 lb_kitchen_pairs_0[66] = {0x0000, 0x0002, 0x0074, 0x0001, 0x0003, 0x0067, 0x0002, 0x0001, 0x0066, 0x0003, 0x0001, 0x0066, 0x0004, 0x0004, 0x0077, 0x0005, 0x0005, 0x0072, 0x0101, 0x0006, 0x006F, 0x0102, 0x0007, 0x006B, 0x0103, 0x0008, 0x006E, 0x0104, 0x0009, 0x0086, 0x0105, 0x000A, 0x0068, 0x0202, 0x000B, 0x006A, 0x0203, 0x000C, 0x008A, 0x0204, 0x000D, 0x0071, 0x0205, 0x0001, 0x0066, 0x0303, 0x000E, 0x0087, 0x0304, 0x0001, 0x0066, 0x0305, 0x000F, 0x0087, 0x0404, 0x0010, 0x0070, 0x0405, 0x0011, 0x0086, 0x0505, 0x8000, 0x008F, 0xFFFF, 0x0001, 0x0066};
+u16 lb_kitchen_pairs_1[66] = {0x0000, 0x0012, 0x0074, 0x0001, 0x0013, 0x0078, 0x0002, 0x0014, 0x006D, 0x0003, 0x0001, 0x0066, 0x0004, 0x0015, 0x0077, 0x0005, 0x0016, 0x0072, 0x0101, 0x0017, 0x006F, 0x0102, 0x0018, 0x006B, 0x0103, 0x0008, 0x006E, 0x0104, 0x0019, 0x008E, 0x0105, 0x001A, 0x0073, 0x0202, 0x001B, 0x006A, 0x0203, 0x001C, 0x0088, 0x0204, 0x001D, 0x0071, 0x0205, 0x0001, 0x0066, 0x0303, 0x001E, 0x008B, 0x0304, 0x0001, 0x0066, 0x0305, 0x001F, 0x0088, 0x0404, 0x0020, 0x008B, 0x0405, 0x0001, 0x0066, 0x0505, 0x8001, 0x008F, 0xFFFF, 0x0001, 0x0066};
+u16 lb_kitchen_pairs_2[66] = {0x0000, 0x0021, 0x007C, 0x0001, 0x0022, 0x007E, 0x0002, 0x0023, 0x007A, 0x0003, 0x0024, 0x007F, 0x0004, 0x0025, 0x0081, 0x0005, 0x0026, 0x0072, 0x0101, 0x0027, 0x007B, 0x0102, 0x0028, 0x0076, 0x0103, 0x0029, 0x0085, 0x0104, 0x002A, 0x0089, 0x0105, 0x002B, 0x0084, 0x0202, 0x002C, 0x0083, 0x0203, 0x002D, 0x0082, 0x0204, 0x002E, 0x0080, 0x0205, 0x0001, 0x0066, 0x0303, 0x002F, 0x007B, 0x0304, 0x0030, 0x008C, 0x0305, 0x0031, 0x008D, 0x0404, 0x0032, 0x007D, 0x0405, 0x0033, 0x008C, 0x0505, 0x8002, 0x008F, 0xFFFF, 0x0001, 0x0066};
+u16* lb_kitchen_pair_tbls[3] = {lb_kitchen_pairs_0, lb_kitchen_pairs_1, lb_kitchen_pairs_2};
+u16 lb_kitchen_area_codes[4] = {0x0003, 0x0006, 0x0008, 0x0000};
+u8 lb_kitchen_courses_0[12] = {0x09, 0x0B, 0x15, 0x16, 0x18, 0x1F, 0x20, 0x22, 0x2A, 0x00, 0x00, 0x00};
+u8 lb_kitchen_courses_1[16] = {0x08, 0x0A, 0x0D, 0x14, 0x17, 0x1D, 0x21, 0x23, 0x24, 0x27, 0x2E, 0x2F, 0x30, 0x00, 0x00, 0x00};
+u8 lb_kitchen_courses_2[16] = {0x03, 0x05, 0x07, 0x0C, 0x0E, 0x13, 0x1C, 0x1E, 0x25, 0x26, 0x2B, 0x2D, 0x31, 0x00, 0x00, 0x00};
+u8 lb_kitchen_courses_3[12] = {0x04, 0x06, 0x0F, 0x12, 0x19, 0x1A, 0x1B, 0x28, 0x2C, 0x32, 0x00, 0x00};
+u8 lb_kitchen_courses_4[8] = {0x01, 0x02, 0x10, 0x11, 0x29, 0x00, 0x00, 0x00};
+u8* lb_kitchen_course_lists[5] = {lb_kitchen_courses_0, lb_kitchen_courses_1, lb_kitchen_courses_2, lb_kitchen_courses_3,
+                                    lb_kitchen_courses_4};
+LbChoiceDef lb_kitchen_choice_defs[3] = {
+    {2, 0, 0, 0x11, 0x166, 0, 0, 3},
+    {2, 0, 0, 0x13, 0x168, 0, 0, 3},
+    {2, 0, 0, 0x15, 0x16A, 0, 0, 3},
+};
+u16 lb_kitchen_special_holds[4] = {0x01AF, 0x01B0, 0x0000, 0x0000};
+
 /* 0x8038F2BC (0x88): The triangular number below a count - how many pair keys the lower groups take.  The second
  * argument is part of the retail call shape and unused here. */
 s32 lb_kitchen_tri_sum(u16 count) {
@@ -614,8 +582,8 @@ s32 lb_kitchen_close(void) {
 /* 0x8038F74C (0x138): Shows ingredient page `page`: copies its six rows and marks each one pickable when the meal is
  * affordable and the row is not the first pick. */
 void lb_kitchen_page_set(LbKitchenWork* work, s16 page) {
-    u8 enabled;
     s32 i;
+    u8 enabled;
 
     work->row_count = 6;
     work->page = page;
@@ -1513,6 +1481,20 @@ void lb_kitchen_step(void) {
     }
 }
 
+/* The kitchen screen's sprite tables. */
+u16 lb_kitchen_frame_ids[6] = {0x20AF, 0x20B0, 0x20AD, 0x20AE, 0xFFFF, 0x0000};
+u16 lb_kitchen_frame_wide_ids[6] = {0x20B4, 0x20B5, 0x20B2, 0x20B3, 0xFFFF, 0x0000};
+u16 lb_kitchen_title_ids[14] = {0x20BC, 0x20BD, 0x20B9, 0x20BA, 0x20BB, 0x20BE, 0x20BF, 0x20C0, 0x20C1, 0x20C2, 0x20B7, 0x20B8, 0xFFFF, 0x0000};
+u16 lb_kitchen_list_ids[10] = {0x20F8, 0x20F9, 0x20FA, 0x20F6, 0x20F7, 0x20F2, 0x20F3, 0x20F4, 0x20F5, 0xFFFF};
+u16 lb_kitchen_row_lsp[6] = {0x20FB, 0x20FC, 0x20FD, 0x20FE, 0x20FF, 0x2100};
+u16 lb_kitchen_rare_lsp[6] = {0x2101, 0x2102, 0x2103, 0x2104, 0x2105, 0x2106};
+u16 lb_kitchen_pick_ids[18] = {0x211B, 0x211C, 0x211D, 0x211E, 0x211F, 0x2120, 0x2121, 0x2122, 0x2123, 0x2124, 0x2125, 0x2129, 0x212A, 0x2126, 0x2127, 0x2128, 0x212B, 0xFFFF};
+u16 lb_kitchen_slot_ids[8] = {0x213B, 0x213C, 0x213D, 0x213E, 0x213F, 0x2140, 0xFFFF, 0x0000};
+u16 lb_kitchen_slot_pulse_ids[8] = {0x213B, 0x213C, 0x213D, 0x213E, 0x213F, 0x2140, 0xFFFF, 0x0000};
+u16 lb_kitchen_slot_frame_ids[4] = {0x2138, 0x2139, 0x213A, 0xFFFF};
+u16 lb_kitchen_slot_lsp[4] = {0x2148, 0x2149, 0x0000, 0x0000};
+u16 lb_kitchen_slot_label_ids[2] = {0x2136, 0x2137};
+
 /* 0x803914D4 (0x9C): Draws the kitchen's frame (its wide-screen variant), its title and the money and points. */
 void lb_kitchen_frame_draw(void) {
     _mh_ivec2_ pos;
@@ -1602,22 +1584,22 @@ void lb_kitchen_skill_text(char* out, u8 kind, u16 str, s16 value) {
 
     switch (kind) {
     case 0:
-        sprintf(out, lb_kitchen_skill_none_fmt);
+        sprintf(out, "");
         break;
     case 1:
     case 3:
-        sprintf(out, lb_kitchen_skill_value_fmt, LbStr(1, str), size);
+        sprintf(out, "%s%d", LbStr(1, str), size);
         break;
     case 2:
-        sprintf(out, lb_kitchen_skill_value_fmt, LbStr(1, str), size / 6);
+        sprintf(out, "%s%d", LbStr(1, str), size / 6);
         break;
     case 5:
         if (value >= 15) {
-            sprintf(out, lb_kitchen_text_fmt, LbStr(0, 0x93));
+            sprintf(out, "%s", LbStr(0, 0x93));
         } else if (value >= 10) {
-            sprintf(out, lb_kitchen_text_fmt, LbStr(0, 0x94));
+            sprintf(out, "%s", LbStr(0, 0x94));
         } else {
-            sprintf(out, lb_kitchen_text_fmt, LbStr(0, 0x95));
+            sprintf(out, "%s", LbStr(0, 0x95));
         }
         break;
     case 4:
@@ -1629,9 +1611,9 @@ void lb_kitchen_skill_text(char* out, u8 kind, u16 str, s16 value) {
         limit = 5;
     default:
         if (value >= limit) {
-            sprintf(out, lb_kitchen_text_fmt, LbStr(0, 0x93));
+            sprintf(out, "%s", LbStr(0, 0x93));
         } else {
-            sprintf(out, lb_kitchen_text_fmt, LbStr(0, 0x95));
+            sprintf(out, "%s", LbStr(0, 0x95));
         }
         break;
     }
@@ -1657,10 +1639,10 @@ void lb_kitchen_pick_draw(LbKitchenWork* work) {
 
     get_lsp_data(0x211A, &base);
     draw_sprite_ary(lb_kitchen_pick_ids, &base);
-    sprintf(text, lb_kitchen_cost_fmt, lb_kitchen_cost_tbl[work->tier * 2], LbStr(1, 2));
+    sprintf(text, "%d%s", lb_kitchen_cost_tbl[work->tier * 2], LbStr(1, 2));
     draw_font_idx(0x212D, (s8*)text, 6, &base);
     if (game_ready_ck() == 0) {
-        sprintf(text, lb_kitchen_cost_fmt, lb_kitchen_cost_tbl[work->tier * 2 + 1], LbStr(1, 44));
+        sprintf(text, "%d%s", lb_kitchen_cost_tbl[work->tier * 2 + 1], LbStr(1, 44));
         draw_font_idx(0x212C, (s8*)text, 6, &base);
     }
     get_lsp_data(0x212E, &base);
@@ -1713,27 +1695,43 @@ void lb_kitchen_pick_draw(LbKitchenWork* work) {
         draw_sprite_idx(0x2132, &pos);
         row = &work->page_rows[work->row_cursor];
         if (work->picks[0].id == row->id) {
-            sprintf(text, lb_kitchen_text_fmt, LbStr(0, 100));
+            sprintf(text, "%s", LbStr(0, 100));
         } else if (lb_kitchen_pair_seen_ck(work->picks[0].id, row->id) != 0) {
             skill = &meal_skill_tbl[lb_kitchen_pair_find(work->tier, work->picks[0].group, row->group)[1]];
             if (skill->kind_a == 0) {
-                sprintf(text, lb_kitchen_text_fmt, LbStr(0, 89));
+                sprintf(text, "%s", LbStr(0, 89));
             } else {
                 lb_kitchen_skill_text(first, skill->kind_a, (skill->value_a < 0) + 8, skill->value_a);
                 if (skill->kind_b == 0) {
-                    sprintf(text, lb_kitchen_skill1_fmt, LbStr(0, skill->kind_a + 89), first);
+                    sprintf(text, "%s%s", LbStr(0, skill->kind_a + 89), first);
                 } else {
                     lb_kitchen_skill_text(second, skill->kind_b, (skill->value_b < 0) + 8, skill->value_b);
                     str = LbStr(0, skill->kind_b + 89);
-                    sprintf(text, lb_kitchen_skill2_fmt, LbStr(0, skill->kind_a + 89), first, str, second);
+                    sprintf(text, "%s%s %s%s", LbStr(0, skill->kind_a + 89), first, str, second);
                 }
             }
         } else {
-            sprintf(text, lb_kitchen_text_fmt, LbStr(0, 101));
+            sprintf(text, "%s", LbStr(0, 101));
         }
         draw_font_idx(0x2131, (s8*)text, 5, &pos);
     }
 }
+
+/* The kitchen boxes' sprite tables. */
+u16 lb_kitchen_course_ids[20] = {0x214B, 0x214C, 0x214D, 0x214E, 0x214F, 0x2150, 0x2151, 0x2152, 0x2153, 0x2154, 0x2155, 0x2156, 0x2157, 0x2158, 0x2159, 0x215A, 0x215B, 0x215C, 0xFFFF, 0x0000};
+u16 lb_kitchen_course_row_ids[6] = {0x215F, 0x2160, 0x2161, 0x2162, 0xFFFF, 0x0000};
+u16 lb_kitchen_course_cursor_ids[6] = {0x2166, 0x2163, 0x2164, 0x2165, 0xFFFF, 0x0000};
+u16 lb_kitchen_bonus_ids[16] = {0x216B, 0x216C, 0x216D, 0x216E, 0x216F, 0x2170, 0x2171, 0x2172, 0x2173, 0x2174, 0x2175, 0x2176, 0x2177, 0x2178, 0xFFFF, 0x0000};
+u16 lb_kitchen_confirm_ids[8] = {0x2182, 0x2183, 0x2184, 0x2185, 0x2186, 0x2187, 0x2188, 0xFFFF};
+u16 lb_kitchen_confirm_row_ids[6] = {0x218B, 0x218C, 0x218D, 0x218E, 0x218F, 0xFFFF};
+u16 lb_kitchen_confirm_cursor_ids[6] = {0x2190, 0x2191, 0x2192, 0x2193, 0xFFFF, 0x0000};
+u16 lb_kitchen_choice_sprites[12] = {0x20CE, 0x20CF, 0x20D0, 0x20CA, 0x20CB, 0x20CC, 0x20CD, 0x20C6, 0x20C7, 0x20C8, 0x20C9, 0xFFFF};
+u16 lb_kitchen_special_label_ids[3] = {0x2133, 0x2134, 0x2135};
+u16 lb_kitchen_course_lsp[4] = {0x2167, 0x2168, 0x2169, 0x0000};
+u16 lb_kitchen_bonus_frame_ids[4] = {0x217B, 0x217C, 0x217D, 0xFFFF};
+u16 lb_kitchen_bonus_lsp[4] = {0x217E, 0x217F, 0x2180, 0x0000};
+u16 lb_kitchen_confirm_lsp[4] = {0x2194, 0x2195, 0x0000, 0x0000};
+u16 lb_kitchen_choice_ids[4] = {0x20D1, 0x20D2, 0x0000, 0x0000};
 
 /* 0x80391D54 (0x1A0): Draws the special pick panel: one slot per pick the course takes, the slot being filled
  * pulsing, and each pick's name. */
@@ -1968,7 +1966,7 @@ void lb_kitchen_special_screen_draw(LbKitchenWork* work) {
 
 /* 0x803925A0 (0x25C): Draws the help panel's message and its second line for the current step. */
 void lb_kitchen_msg_draw(LbKitchenWork* work) {
-    u16 msg = 0xFFFF;
+    u32 msg = 0xFFFF;
     u16 sub = 0xFFFF;
     s32 color = 2;
     s32 line = 1;
@@ -1980,7 +1978,7 @@ void lb_kitchen_msg_draw(LbKitchenWork* work) {
         switch (work->step) {
         case 0:
             pick = work->picks[0].id;
-            msg = (pick != 0xFFFF) + 0x16F;
+            msg = (pick == 0xFFFF) ? 0x16E : 0x16F;
             row = &work->page_rows[work->row_cursor];
             if (row->enabled == 0) {
                 if (pick == row->id) {
@@ -2031,7 +2029,7 @@ void lb_kitchen_msg_draw(LbKitchenWork* work) {
             if (work->special[0] == 0) {
                 msg = 0x179;
             } else {
-                msg = 0x17B - (work->special[1] == 0);
+                msg = (work->special[1] == 0) ? 0x17A : 0x17B;
             }
             if (work->special[0] == work->list[work->list_cursor] ||
                 work->special[1] == work->list[work->list_cursor]) {
@@ -2054,7 +2052,7 @@ void lb_kitchen_msg_draw(LbKitchenWork* work) {
         }
         break;
     }
-    if (msg != 0xFFFF) {
+    if ((u16)msg != 0xFFFF) {
         lb_panel_msg_draw(0x1877, msg);
         if (sub != 0xFFFF) {
             lb_panel_line_draw(0x1877, sub, color, line);
@@ -2095,6 +2093,24 @@ u32 lb_kitchen_idle_ck(void) {
 /* --------------------------------------------------------------------------------------------- *
  * The trade screen.
  * --------------------------------------------------------------------------------------------- */
+
+/* The trade screen's tables. */
+LbChoiceDef lb_trade_choice_def = {2, 0, 0, 0x96, 0x20, 0, 27, 3};
+u16 lb_trade_frame_ids[6] = {0x21A7, 0x21A8, 0x21A5, 0x21A6, 0xFFFF, 0x0000};
+u16 lb_trade_frame_wide_ids[6] = {0x21AC, 0x21AD, 0x21AA, 0x21AB, 0xFFFF, 0x0000};
+u16 lb_trade_title_ids[14] = {0x219D, 0x219E, 0x219A, 0x219B, 0x219C, 0x219F, 0x21A0, 0x21A1, 0x21A2, 0x21A3, 0x2198, 0x2199, 0xFFFF, 0x0000};
+u16 lb_trade_list_ids[10] = {0x21BE, 0x21BF, 0x21C0, 0x21B6, 0x21B7, 0x21B8, 0x21B9, 0x21BA, 0x21BB, 0xFFFF};
+u16 lb_trade_row_lsp[6] = {0x21C3, 0x21C4, 0x21C5, 0x21C6, 0x21C7, 0x0000};
+u16 lb_trade_detail_ids[20] = {0x21CA, 0x21E7, 0x21CE, 0x21CF, 0x21D0, 0x21D1, 0x21D2, 0x21D3, 0x21D4, 0x21D5, 0x21D6, 0x21D7, 0x21D8, 0x21D9, 0x21DA, 0x21CB, 0x21CC, 0x21CD, 0xFFFF, 0x0000};
+u16 lb_trade_pouch_ids[6] = {0x21E0, 0x21E1, 0x21E2, 0x21DF, 0xFFFF, 0x0000};
+u16 lb_trade_box_ids[6] = {0x21DC, 0x21DD, 0x21DE, 0x21DB, 0xFFFF, 0x0000};
+u16 lb_trade_detail_lsp[8] = {0x21E3, 0x21E9, 0x21EA, 0x21E8, 0x21E5, 0x21E6, 0x0000, 0x0000};
+u16 lb_trade_cost_ids[24] = {0x21ED, 0x21EE, 0x21EF, 0x21F0, 0x21F1, 0x21F2, 0x21F3, 0x21F4, 0x21F5, 0x21F6, 0x21F7, 0x21F8, 0x21F9, 0x21FA, 0x21FB, 0x21FC, 0x21FD, 0x21FE, 0x21FF, 0x2200, 0x2201, 0x2202, 0x2203, 0xFFFF};
+u16 lb_trade_cost_cursor_ids[16] = {0x2204, 0x2205, 0x2206, 0x2207, 0x2208, 0x2209, 0x220A, 0x220B, 0x220C, 0x220D, 0x220E, 0x220F, 0x2210, 0xFFFF, 0x0000, 0x0000};
+u16 lb_trade_cost_row_ids[16] = {0x2214, 0x2215, 0x2216, 0x2217, 0x2218, 0x2219, 0x221A, 0x221B, 0x221C, 0x2227, 0x2228, 0x2229, 0x222A, 0x222B, 0x222C, 0xFFFF};
+u16 lb_trade_label_ids[4] = {0x21B2, 0x21B3, 0x21B4, 0x21B5};
+u16 lb_trade_choice_ids[2] = {0x21C1, 0x21C2};
+u16 lb_trade_cost_lsp[3] = {0x2230, 0x2231, 0x0009};
 
 /* 0x803928F0 (0x70): Opens the trade screen: clears the whole screen block, files the opener's records and puts the
  * lobby into screen 0x12. */
@@ -2193,9 +2209,8 @@ s32 lb_trade_exchange(LbTradeWork* work) {
     LbTradeCost item;
     LbTradeCost cost;
     u8 stored[4];
-    LbTradeRow* row;
 
-    offer = &((LbTradeOffer*)NetCtrlWk::getServerNotice())[work->rows[work->row_cursor].index];
+    offer = (LbTradeOffer*)&((u32*)NetCtrlWk::getServerNotice())[work->rows[work->row_cursor].index * 4];
     item_pair_copy(&item, &offer->item);
     item_pair_copy(&cost, &offer->costs[work->cost_cursor]);
     work->hold = 4;
@@ -2206,8 +2221,7 @@ s32 lb_trade_exchange(LbTradeWork* work) {
         item_box_store(item.item, item.count, stored);
     }
     lb_trade_page_set(work, work->page);
-    row = &work->rows[work->row_cursor];
-    if (row->state == 0 && row->affordable[work->cost_cursor] == 1) {
+    if (work->rows[work->row_cursor].state == 0 && work->rows[work->row_cursor].affordable[work->cost_cursor] == 1) {
         return 1;
     }
     return 0;
@@ -2217,6 +2231,7 @@ s32 lb_trade_exchange(LbTradeWork* work) {
  * and the held repeat; then the draw callback. */
 void lb_trade_step(void) {
     LbTradeWork* work = (LbTradeWork*)lobby_w.menu_0xAC;
+    u32* notice;
     LbTradeOffer* offer;
     s32 again;
 
@@ -2252,7 +2267,8 @@ void lb_trade_step(void) {
         ainpc_page_hold_set();
         if (lb_cmd_pressed_ck(16) != 0) {
             if (work->rows[work->row_cursor].state == 0) {
-                offer = &((LbTradeOffer*)NetCtrlWk::getServerNotice())[work->rows[work->row_cursor].index];
+                notice = (u32*)NetCtrlWk::getServerNotice();
+                offer = (LbTradeOffer*)&notice[work->rows[work->row_cursor].index * 4];
                 if (offer->costs[2].item != 0) {
                     work->cost_count = 3;
                 } else if (offer->costs[1].item != 0) {
@@ -2363,7 +2379,7 @@ void lb_trade_list_draw(LbTradeWork* work) {
     s32 box_mark = 0;
     s32 pouch_mark = 0;
     bool active = work->state == 2;
-    LbTradeOffer* offers;
+    u32* notice;
     s32 i;
     u16* lsp;
     LbTradeOffer* offer;
@@ -2373,9 +2389,9 @@ void lb_trade_list_draw(LbTradeWork* work) {
     get_lsp_data(0x21B1, &base);
     draw_sprite_anim_ary(lb_trade_list_ids, 5, &base);
     draw_sprite_idx(lb_trade_label_ids[1], &base);
-    offers = (LbTradeOffer*)NetCtrlWk::getServerNotice();
+    notice = (u32*)NetCtrlWk::getServerNotice();
     for (i = 0, lsp = lb_trade_row_lsp; i < work->row_count; i++) {
-        offer = &offers[work->rows[i].index];
+        offer = (LbTradeOffer*)&notice[work->rows[i].index * 4];
         if (i == work->row_cursor) {
             cursor = 1;
             item = offer->item.item;
@@ -2433,7 +2449,7 @@ void lb_trade_cost_draw(LbTradeWork* work) {
     offset = 0;
     lsp = lb_trade_cost_lsp;
     for (i = 0; i < 3; i++) {
-        offer = &((LbTradeOffer*)NetCtrlWk::getServerNotice())[work->rows[work->row_cursor].index];
+        offer = (LbTradeOffer*)&((u32*)NetCtrlWk::getServerNotice())[work->rows[work->row_cursor].index * 4];
         cost = (LbTradeCost*)((u8*)offer->costs + offset);
         if (cost->item != 0) {
             if (active) {
@@ -2460,13 +2476,13 @@ void lb_trade_cost_draw(LbTradeWork* work) {
                                 cost->count);
             rect = get_lsp_data(0x2213, NULL);
             place_rec_alloc(&place, pos.x, pos.y, rect->width, rect->height, 4, 14);
-            sprintf(text, lb_trade_count_fmt, cost->count);
+            sprintf(text, "%d", cost->count);
             spr_data_copy(&spr, get_lsp_data(0x222E, NULL));
             if (work->rows[work->row_cursor].affordable[i] == 0) {
                 spr.color = 0x646464FF;
             }
             draw_font(spr, (s8*)text, 1, &pos);
-            sprintf(text, lb_trade_count_fmt, userdata_item_count_total(cost->item, lobby_world_block));
+            sprintf(text, "%d", userdata_item_count_total(cost->item, lobby_world_block));
             if (cursor != 0 && work->hold != 0) {
                 draw_font_anim_idx(0x222F, 2, (s8*)text, 2, &pos);
             } else {
@@ -2495,6 +2511,7 @@ void lb_trade_cost_draw(LbTradeWork* work) {
     ainpc_page_mark_b_draw(0x2232, NULL);
 }
 
+#pragma optimization_level 4
 /* 0x80393750 (0x16C): Draws the help panel's message and its second line for the current step (the yes/no while an
  * exchange runs). */
 void lb_trade_msg_draw(LbTradeWork* work) {
@@ -2549,6 +2566,7 @@ void lb_trade_msg_draw(LbTradeWork* work) {
     }
 }
 
+#pragma optimization_level reset
 /* 0x803938BC (0xD8): The trade screen's draw callback: the frame, the opening choice or the list and prices, then
  * the help panel. */
 void lb_trade_draw_task(void) {
@@ -2559,12 +2577,14 @@ void lb_trade_draw_task(void) {
     set_blendmode(4, 5, 1);
     lb_trade_frame_draw();
     if ((u32)(work->state - 2) > 3) {
-        if (work->state == 1) {
+        switch (work->state) {
+        case 1:
             lb_choice_draw(&work->choice, 0x21B1, lb_trade_list_ids, lb_trade_choice_ids, 0x1877, 0);
             get_lsp_data(0x21B1, &pos);
             draw_sprite_idx(0x21BC, &pos);
             draw_sprite_idx(0x21BD, &pos);
             draw_sprite_idx(lb_trade_label_ids[0], &pos);
+            break;
         }
     } else {
         lb_trade_list_draw(work);
@@ -2576,6 +2596,45 @@ void lb_trade_draw_task(void) {
 /* --------------------------------------------------------------------------------------------- *
  * The scene effect.
  * --------------------------------------------------------------------------------------------- */
+
+/* The scene effect's model positions and emitter tables. */
+Vec lb_scene_model_pos[5] = {
+    {-374.0f, -40.0f, 1114.0f},
+    {490.0f, -40.0f, 1853.0f},
+    {-503.0f, -40.0f, 1820.0f},
+    {-2960.0f, -40.0f, 370.0f},
+    {-2960.0f, -40.0f, 370.0f},
+};
+Vec lb_scene_model_target[5] = {
+    {-4150.0f, -40.0f, 2500.0f},
+    {1300.0f, -40.0f, 5600.0f},
+    {-4300.0f, -40.0f, 3400.0f},
+    {0.0f, 0.0f, 0.0f},
+    {0.0f, 0.0f, 0.0f},
+};
+LbSceneEmitter lb_scene_emitters_0[2] = {
+    {0x0E, {0, 0, 0}, {-470.0f, -14.0f, 1070.0f}, 0x1111, 18, 12},
+    {0xFF, {0, 0, 0}, {0.0f, 0.0f, 0.0f}, 0x0000, 0, 0},
+};
+LbSceneEmitter lb_scene_emitters_1[2] = {
+    {0x0E, {0, 0, 0}, {500.0f, -14.0f, 1960.0f}, 0xC667, 18, 12},
+    {0xFF, {0, 0, 0}, {0.0f, 0.0f, 0.0f}, 0x0000, 0, 0},
+};
+LbSceneEmitter lb_scene_emitters_2[3] = {
+    {0x0E, {0, 0, 0}, {-560.0f, -14.0f, 1820.0f}, 0x0E39, 18, 12},
+    {0x0F, {0, 0, 0}, {-530.0f, -24.0f, 1831.0f}, 0x1111, 70, 30},
+    {0xFF, {0, 0, 0}, {0.0f, 0.0f, 0.0f}, 0x0000, 0, 0},
+};
+LbSceneEmitter lb_scene_emitters_3[5] = {
+    {0x0E, {0, 0, 0}, {-2980.0f, -14.0f, 620.0f}, 0x0000, 18, 12},
+    {0x0E, {0, 0, 0}, {-2080.0f, -14.0f, 500.0f}, 0x0B61, 18, 12},
+    {0x0F, {0, 0, 0}, {-2100.0f, -24.0f, 410.0f}, 0x0E39, 70, 30},
+    {0x0F, {0, 0, 0}, {-2700.0f, -24.0f, 510.0f}, 0x0000, 70, 30},
+    {0xFF, {0, 0, 0}, {0.0f, 0.0f, 0.0f}, 0x0000, 0, 0},
+};
+LbSceneEmitter* lb_scene_emitter_tbls[6] = {
+    lb_scene_emitters_0, lb_scene_emitters_1, lb_scene_emitters_2, lb_scene_emitters_3, NULL, NULL,
+};
 
 /* 0x80393994 (0xDC): Spawns the scene effect: five pooled models, released again when the pool runs short. */
 void lb_scene_eft_spawn(void) {
@@ -2608,8 +2667,9 @@ void lb_scene_eft_spawn(void) {
 
 /* 0x80393A70 (0x7C): Releases the scene effect's models. */
 void lb_scene_eft_release(_EFT* self) {
+    s32 i;
     LbSceneEftWork* work = (LbSceneEftWork*)self->work_0x38;
-    for (s32 i = 0; i < work->count; i++) {
+    for (i = 0; i < work->count; i++) {
         fn_800E26C4(work->models[i]);
         fn_800F8A44((void*)&work->models[i], 1);
     }
@@ -2787,6 +2847,11 @@ void lb_scene_eft_move(_EFT* self) {
         eft_res_models_spawn(self, (void**)&work->models[i], 2, 1, 0);
     }
 }
+
+/* The camera model's key-frame table `lb_scene_model_slide` reads: six (frame, value) pairs. */
+f32 lb_quest_detail_camera_keys[12] = {
+    0.0f, -3160.0f, 82.0f, -3080.9f, 144.0f, -3035.2f, 212.0f, -2997.3f, 310.0f, -2960.0f, -1.0f, -2960.0f,
+};
 
 /* 0x80394038 (0x10C): Steps one of the scene effect's models: it waits for the lobby's camera mode 2, slides back when
  * the camera work stops, and for model 3 follows the key table by the camera's frame; 1 for model 4. */
