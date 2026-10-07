@@ -44,7 +44,8 @@ Inputs -> outputs: obj/ + src/ objects -> tables, exit.
   each of our compiler labels (`@N`, `x$N`, section symbols) cancels one target pool or jump-table label (`lbl_<ADDR>`,
   `jumptable_<ADDR>`, `@N`) of the same relocation type, and the rest of ours are dropped as noise; what remains pairs
   in offset order and is classed `callee` (another symbol), `mangling` (one owner stem, two argument lists),
-  `linkage` (one side C), `extra` or `missing`. Two named data labels (`lbl_80592EF0` vs `lbl_80592F68`) are a real
+  `linkage` (one side C), `extra` or `missing`; one of our local labels and a target symbol of the same type at the
+  same address (section, value + addend) are `name-only` (a naming difference, not a callee). Two named data labels (`lbl_80592EF0` vs `lbl_80592F68`) are a real
   difference, never noise. The motivating cases, all in the landed tree at 65b341058 and all found:
   `enemy/em001_prog` `fn_801502C8` (a 100 % row) calls `em_after_frame_check` where retail calls `em_frame_check`
   (+0x158; `fn_801507CC` twice); `ef/ef_particle` `fn_800AB220` passes `fn_800AB058`'s copies of the assert strings

@@ -111,6 +111,9 @@ class Fixture:
                             (self.header, source if header is None else header), (self.types, source)):
             stamp = self.now + delta
             os.utime(path, (stamp, stamp))
+        stamps = os.path.join(self.dir, "build", "RMHE08", ".content-stamps.json")
+        if os.path.exists(stamps):                    # a new timeline: what the tree remembered of the last one is moot
+            os.remove(stamps)
 
     def spec(self, us):
         """A `Spec` pointing at the fixture, for the in-process checks (child processes resolve it)."""
@@ -316,6 +319,38 @@ def selftest() -> int:
         fails = check("... reading every row out of the report",
                       json.loads(child.stdout) if child.returncode == 0 else child.stderr[-300:],
                       {"rows": 4, "stale": False}, fails)
+
+        # 12b. a stale report with a current object is scored from the objects (one objdiff run), not refused
+        def child_cli(*argv):
+            code = ("import importlib.util,sys,json;"
+                    "spec=importlib.util.spec_from_file_location('u',%r);"
+                    "m=importlib.util.module_from_spec(spec);sys.modules['u']=m;spec.loader.exec_module(m);"
+                    "calls=[];"
+                    "m._report.score=lambda t,b,u=None,d=None,**k: (calls.append(1), m._report.Report({'units': [{'name': u,"
+                    "'measures': {}, 'functions': [{'name': 'solo', 'size': '16', 'fuzzy_match_percent': 75.0}]}]}))[1];"
+                    "rc=m.cli(%r);print(json.dumps({'rc': rc, 'objdiff_runs': len(calls)}))" % (TOOL, list(argv)))
+            r = subprocess.run([sys.executable, "-c", code], cwd=fx.dir, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", env=ENV)
+            body, _sep, meta = r.stdout.strip().rpartition("\n")
+            try:
+                return json.loads(body), json.loads(meta)
+            except ValueError:
+                return {}, {"error": (r.stdout + r.stderr)[-300:]}
+        fx.write_report()
+        fx.set_times(report=-2 * DAY, obj=0, source=-DAY)
+        rec, meta = child_cli("demo/unit", "--json")
+        fails = check("a stale report with a current object: scored from the objects, one objdiff run, exit 0",
+                      meta, {"rc": 0, "objdiff_runs": 1}, fails)
+        fails = check("... saying so: mode measure, the stale report's reasons carried, the objects' rows",
+                      (rec.get("mode"), bool((rec.get("fallback") or {}).get("reasons")),
+                       [x["name"] for x in rec.get("rows") or []]), ("measure", True, ["solo"]), fails)
+        rec, meta = child_cli("demo/unit", "--report", fx.report, "--json")
+        fails = check("an explicit --report is still refused: exit 1, no objdiff run (the caller named the file)",
+                      meta, {"rc": 1, "objdiff_runs": 0}, fails)
+        fx.set_times(report=-2 * DAY, obj=-2 * DAY, source=0)
+        rec, meta = child_cli("demo/unit", "--json")
+        fails = check("a stale object too: refused, nothing measured", meta, {"rc": 1, "objdiff_runs": 0}, fails)
+        fx.set_times(report=0, obj=-DAY, source=-2 * DAY)
 
         # 13. the pure helpers, so a regression names itself instead of showing up as a wrong number
         rows = us.rows_of({"functions": [{"name": "b", "size": "8", "fuzzy_match_percent": 50.0},

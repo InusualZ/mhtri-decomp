@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The mechanical pre-review of a lane's branch: owners by address, wrong callees, empty stubs, flip blockers, GUESS names.
 Spec: docs/tools/spec/lanecheck.md. CLI: lanecheck.py [--branch B] [--base REF] [--no-flipcheck] [--no-dump] [--strict]
-[--json] [--root TREE]."""
+[--range BASE..HEAD] [--json] [--root TREE]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -31,6 +31,12 @@ TOOL = cli.Tool("lanecheck", "docs/tools/spec/lanecheck.md", tests="tools/tests/
 
 #: The finding classes, in report order.
 CLASSES = ("owner-by-address", "stale-path", "unowned-claim", "wrong-callee", "empty-stub", "flip-blocker", "guess")
+#: The classes that sit on one line of a source: `--range` marks the ones on lines it did not add as carried over.
+LINE_CLASSES = ("owner-by-address", "stale-path", "unowned-claim", "empty-stub", "guess")
+#: What the hint says when the judged text is a committed one (`--branch`, `--range`).
+COMMITTED_NOTE = " (reads committed state only: commit the fix, then re-run)"
+#: A NAMES sentence marks names a GUESS with this word (`X is a GUESS`, `A, B and C are GUESSES`).
+GUESS_RE = re.compile(r"\bGUESS(?:ES|ED)?\b")
 SOURCE_SUFFIXES = (".c", ".cp", ".cpp")
 HEADER_SUFFIXES = (".h", ".hpp")
 #: A unit path cited in comment text: at least one `/`, a C/C++ source or header suffix, `src/` optional.
@@ -74,12 +80,14 @@ class Item:
     what: str
     hint: str
     token: str | None = None
+    carried: bool = False                       # --range: on a line or definition the range did not add
 
     def finding(self) -> _findings.Finding:
         return _findings.Finding(self.cls, self.file, self.line, self.token, self.what, self.hint)
 
     def render(self) -> str:
-        return "%s:%d | %s | %s | %s" % (self.file, self.line, self.cls, self.what, self.hint)
+        return "%s:%d | %s | %s | %s%s" % (self.file, self.line, self.cls, self.what, self.hint,
+                                           " [carried over]" if self.carried else "")
 
 
 # --- the unit header ------------------------------------------------------------------------------------------------
@@ -134,11 +142,12 @@ def mentions(text: str, names) -> bool:
 class Context:
     """The branch (or the working tree) against its base: the files, the head map and splits, the registered units."""
 
-    def __init__(self, root: str, base: str = "main", branch: str | None = None) -> None:
+    def __init__(self, root: str, base: str = "main", branch: str | None = None, exact_base: bool = False) -> None:
         self.root = root
         self.branch = branch
         self.git = Git(root)
-        self.base = self.git.merge_base(base, branch or "HEAD") or base
+        self.whole = exact_base                                 # `--range`: judge the touched files whole
+        self.base = base if exact_base else (self.git.merge_base(base, branch or "HEAD") or base)
         self.tree = _facts.Tree(root, branch)
         texts = self.tree.read_many([SYMBOLS_REL, SPLITS_REL, "configure.py"])
         self.own = Ownership.from_texts(texts.get(SYMBOLS_REL) or "", texts.get(SPLITS_REL) or "")
@@ -153,12 +162,16 @@ class Context:
         if p.returncode != 0:
             raise RuntimeError("git diff failed: %s" % (p.stderr or "").strip())
         self.added = _facts.parse_added(p.stdout or "")
+        self.diff_added = {rel: list(lines) for rel, lines in self.added.items()}
         if branch is None:                                      # untracked new files are added text too
             for rel in self.git.out("ls-files", "-z", "--others", "--exclude-standard", "--", "src",
                                     check=False).split("\0"):
                 if rel and rel not in self.added:
                     body = self.tree.read(rel) or ""
                     self.added[rel] = list(enumerate(body.split("\n"), 1))
+        if self.whole:                                          # every line of a touched file is judged
+            for rel in list(self.added):
+                self.added[rel] = list(enumerate(self.text(rel).split("\n"), 1))
 
     def text(self, rel: str) -> str:
         return self.tree.read(rel) or ""
@@ -298,6 +311,8 @@ def check_callees(rel: str, header: str, header_line: int, diffs: list[dict]) ->
     for fn in diffs:
         left = []
         for d in fn["diffs"]:
+            if d["kind"] == "name-only":                        # the same address under another name: no callee
+                continue
             names = set()
             for side in (d["ours"], d["target"]):
                 if side:
@@ -327,10 +342,11 @@ def definitions(text: str) -> list[tuple[str, str | None, int, bool]]:
     for d in cscan.function_declarations(t):
         if d.body is None:
             continue
-        qual = re.search(r"([A-Za-z_]\w*)\s*::\s*~?\s*$", t.code[max(0, d.pos - 200):d.pos])
+        qual = re.search(r"([A-Za-z_]\w*)\s*::\s*(~?)\s*$", t.code[max(0, d.pos - 200):d.pos])
         body = t.code[d.body[0] + 1:d.body[1]]
         body = re.sub(r"\(\s*void\s*\)\s*[A-Za-z_]\w*\s*;", "", body)
-        out.append((d.name, qual.group(1) if qual else None, d.line, not body.strip()))
+        out.append((("~" if qual and qual.group(2) else "") + d.name, qual.group(1) if qual else None, d.line,
+                    not body.strip()))
     return out
 
 
@@ -340,9 +356,20 @@ def map_row(own: Ownership, name: str, qual: str | None) -> tuple[str, str, int]
     if not qual:
         e = own.symbols.get(name)
         return (name, e[0][0], e[0][1]) if e and len(e) == 1 else None
+    if name.lstrip("~") == qual:
+        return None                                             # a constructor or destructor: `special_rows`
     prefix = "%s__%d%s" % (name, len(qual), qual)
     hits = [(n, e[0][0], e[0][1]) for n, e in own.symbols.items() if n.startswith(prefix) and len(e) == 1]
     return hits[0] if len(hits) == 1 else None
+
+
+def special_rows(own: Ownership, name: str, qual: str | None) -> list[str]:
+    """The map rows of a constructor (`Class`) or destructor (`~Class`) definition: every `__ct__<len>Class...` or
+    `__dt__<len>Class...` name (an overloaded constructor has several)."""
+    if not qual or name.lstrip("~") != qual:
+        return []
+    prefix = "%s%d%s" % ("__dt__" if name.startswith("~") else "__ct__", len(qual), qual)
+    return sorted(n for n in own.symbols if n.startswith(prefix))
 
 
 def function_size(own: Ownership, address: int) -> int | None:
@@ -350,19 +377,24 @@ def function_size(own: Ownership, address: int) -> int | None:
     return rows[0][1] if rows else None
 
 
-def check_stubs(rel: str, text: str, header: str, own: Ownership, lines: set | None = None) -> list[Item]:
+def check_stubs(rel: str, text: str, header: str, own: Ownership, lines: set | None = None,
+                emitted: dict | None = None) -> list[Item]:
     """(c) A function whose body is empty while retail's is more than `blr`: the header must call it unwritten, and
-    must not list it as a partial residual. `lines` limits it to the definitions the diff added (None: every one)."""
+    must not list it as a partial residual. `lines` limits it to the definitions the diff added (None: every one).
+    A constructor or destructor with an empty source body is written when our object emits its row (the compiler
+    writes the vtable store and the member and base calls): `emitted` is `{name: size}` of our object's functions."""
     res = residual_text(header)
     out = []
     for name, qual, line, empty in definitions(text):
         if not empty or (lines is not None and line not in lines):
             continue
+        if emitted is not None and any(emitted.get(r, 0) > TINY_FUNCTION for r in special_rows(own, name, qual)):
+            continue
         row = map_row(own, name, qual)
         size = function_size(own, row[2]) if row else None
         if size is not None and size <= TINY_FUNCTION:
             continue
-        spelled = {name} | (plain_names(row[0]) if row else set())
+        spelled = {name, name.lstrip("~")} | (plain_names(row[0]) if row else set())
         said = [ln for ln in res.split("\n") if mentions(ln, spelled)]
         if said and any(UNWRITTEN_RE.search(ln) for ln in said):
             continue
@@ -373,6 +405,13 @@ def check_stubs(rel: str, text: str, header: str, own: Ownership, lines: set | N
         out.append(Item(rel, line, "empty-stub", what,
                         "write the body, or say `unwritten` for it in RESIDUALS (never `partial`)", name))
     return out
+
+
+def name_sentences(section: str) -> list[str]:
+    """A NAMES section as sentences: the comment's line wrapping and ` * ` margins are undone, then it is cut after
+    each `.` or `;`, so `A, B and C are GUESSES (why)` over three lines is one sentence naming all three."""
+    flat = " ".join(re.sub(r"^\s*\*?\s*", "", ln) for ln in section.split("\n"))
+    return [t for t in re.split(r"(?<=[.;])\s+", flat) if t]
 
 
 def check_guesses(rel: str, text: str, header: str, own: Ownership, dump: dict | None,
@@ -395,8 +434,7 @@ def check_guesses(rel: str, text: str, header: str, own: Ownership, dump: dict |
         real = {e["clean"].split("::")[-1] for e in entries}
         if name in real or (row[0] in {e["name"] for e in entries}):
             continue
-        marked = [ln for ln in names_text.split("\n") if "GUESS" in ln and mentions(ln, {name, row[0]})]
-        if marked:
+        if any(GUESS_RE.search(sn) and mentions(sn, {name, row[0]}) for sn in name_sentences(names_text)):
             continue
         dump_says = ", ".join(sorted({e["clean"] for e in entries})) or "a placeholder"
         out.append(Item(rel, line, "guess",
@@ -485,11 +523,23 @@ def build_summary(ctx: "Context", units: dict) -> dict:
 
 # --- the run ----------------------------------------------------------------------------------------------------------
 
+def emitted_functions(path: str) -> dict | None:
+    """`{name: size}` of the functions our compiled object defines, None when it is absent or unreadable."""
+    if not os.path.exists(path):
+        return None
+    try:
+        return {n: size for n, (sec, _off, size, _data) in objcompare.symbol_locations(path).items()
+                if sec.startswith(".text") or sec == ".init"}
+    except (OSError, ValueError):
+        return None
+
+
 def run(root: str, base: str = "main", branch: str | None = None, flipcheck: bool = True,
-        dump_path: str | None = dumpsyms.DEFAULT_DUMP, dump: dict | None = None) -> dict:
-    """Every check over the units the diff touches: `{base, head, units, items, skipped, seconds}`."""
+        dump_path: str | None = dumpsyms.DEFAULT_DUMP, dump: dict | None = None, whole: bool = False) -> dict:
+    """Every check over the units the diff touches: `{base, head, units, items, skipped, seconds}`. `whole` (the
+    `--range` mode) judges each touched file whole and marks the findings the diff did not add `carried`."""
     t0 = time.time()
-    ctx = Context(root, base, branch)
+    ctx = Context(root, base, branch, exact_base=whole)
     items: list[Item] = []
     skipped: list[str] = []
     if dump is None and dump_path:
@@ -527,11 +577,16 @@ def run(root: str, base: str = "main", branch: str | None = None, flipcheck: boo
                 skipped.append("wrong-callee %s: %s" % (stem, exc))
         else:
             skipped.append("wrong-callee %s: no compiled or split object in this tree's build/" % stem)
-        new = {n for n, _t in ctx.added.get(src, [])}
-        items += check_stubs(src, text, header, ctx.own, new)
+        new = None if whole else {n for n, _t in ctx.added.get(src, [])}
+        items += check_stubs(src, text, header, ctx.own, new, emitted_functions(ours) if not fresh[stem] else None)
         items += check_guesses(src, text, header, ctx.own, dump, new)
         if problems and not fresh[stem]:
             items += check_blockers(src, header, hline, problems.get(stem, []))
+    for i in items:
+        if whole and i.cls in LINE_CLASSES:
+            i.carried = i.line not in {n for n, _t in ctx.diff_added.get(i.file, [])}
+        if branch is not None:
+            i.hint += COMMITTED_NOTE
     order = {c: i for i, c in enumerate(CLASSES)}
     items.sort(key=lambda i: (order.get(i.cls, 99), i.file, i.line))
     return {"base": ctx.base, "head": branch or "(working tree)", "units": list(units), "items": items,
@@ -541,18 +596,27 @@ def run(root: str, base: str = "main", branch: str | None = None, flipcheck: boo
 def main(args) -> object:
     root = _repo.worktree_root(args.root)
     try:
-        res = run(root, args.base, args.branch, flipcheck=not args.no_flipcheck,
-                  dump_path=None if args.no_dump else (args.dump or dumpsyms.DEFAULT_DUMP))
+        base, branch, whole = args.base, args.branch, False
+        if args.range:
+            base, _sep, branch = args.range.partition("..")
+            if not base or not branch:
+                raise RuntimeError("--range wants BASE..HEAD, not %r" % args.range)
+            whole = True
+        res = run(root, base, branch, flipcheck=not args.no_flipcheck,
+                  dump_path=None if args.no_dump else (args.dump or dumpsyms.DEFAULT_DUMP), whole=whole)
     except RuntimeError as exc:
         print("lanecheck: %s" % exc, file=sys.stderr)
         return _findings.EXIT_ERROR
     findings = [i.finding() for i in res["items"]]
-    failed = bool(findings) or (args.strict and bool(res["skipped"]))
+    carried = sum(1 for i in res["items"] if i.carried)
+    failed = len(findings) > carried or (args.strict and bool(res["skipped"]))
     if args.json:
         payload = {"tool": TOOL.name, "ok": not failed, "base": res["base"], "head": res["head"],
                    "units": res["units"], "skipped": res["skipped"], "build": res["build"], "seconds": res["seconds"],
-                   "rows": [dict(f.to_dict(), hint=i.hint) for f, i in zip(findings, res["items"])],
-                   "summary": "%d finding(s) over %d unit(s)" % (len(findings), len(res["units"]))}
+                   "rows": [dict(f.to_dict(), hint=i.hint, carried=i.carried) for f, i in zip(findings, res["items"])],
+                   "carried": carried,
+                   "summary": "%d finding(s) over %d unit(s)%s"
+                              % (len(findings), len(res["units"]), ", %d carried over" % carried if carried else "")}
         print(json.dumps(payload, indent=1))
         return 1 if failed else 0
     b = res["build"]
@@ -565,15 +629,20 @@ def main(args) -> object:
     for s in res["skipped"]:
         print("not checked: %s" % s)
     counts = {c: sum(1 for i in res["items"] if i.cls == c) for c in CLASSES}
-    print("lanecheck: %s..%s: %d unit(s), %d finding(s) (%s) in %.1f s"
+    print("lanecheck: %s..%s: %d unit(s), %d finding(s) (%s)%s in %.1f s"
           % (res["base"][:12], res["head"], len(res["units"]), len(findings),
-             ", ".join("%s %d" % (c, n) for c, n in counts.items() if n) or "none", res["seconds"]))
+             ", ".join("%s %d" % (c, n) for c, n in counts.items() if n) or "none",
+             "; %d carried over (not added by the range, do not fail it)" % carried if carried else "",
+             res["seconds"]))
     return 1 if failed else 0
 
 
 def build_parser():
     ap = TOOL.parser()
     ap.add_argument("--branch", default=None, help="judge this branch's committed tree (default: the working tree)")
+    ap.add_argument("--range", default=None, metavar="BASE..HEAD",
+                    help="judge a landed range: the files it touched whole, at HEAD; findings on lines it did not add "
+                         "are listed as carried over and do not fail the run")
     ap.add_argument("--base", default="main", help="the base it is judged against (its merge base; default: main)")
     ap.add_argument("--no-flipcheck", action="store_true", help="skip the flipcheck-blocker check (it builds nothing "
                                                                 "but reads every touched unit's objects)")

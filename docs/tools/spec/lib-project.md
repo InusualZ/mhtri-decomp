@@ -30,7 +30,7 @@ Ownership, Owner, AutoObjects, Refused, ShapeError`.
   `scope`, `kind` (`data:`), `align`, `hidden`, `sized`, `end`, `to_dict()` = symedit's dict); `SymbolMap(path)`: `rows()`
   (streamed once, then cached), `by_name()`, `by_section()`, `names()`, `find(regex, section, type)`, `in_range(lo, hi,
   section)`, `infer_section(address, section)`, `at(address, count, section)`, `check() -> CheckResult(symbols, duplicates,
-  unparsed, aliases)`, `plan_rename(pairs, force) -> RenamePlan`, `plan_merge(rows, scan_refs) -> MergePlan`, `apply(plan,
+  unparsed, aliases)`, `plan_rename(pairs, force) -> RenamePlan`, `plan_merge(rows, scan_refs) -> MergePlan`, `plan_resize(row, size)` / `plan_delete(row, scan_refs)` (a `MergePlan`), `plan_add(name, section, address, size, scope, type) -> AddPlan`, `apply(plan,
   write=None)`; `write_text(path, text, rename=None)` (the verified `lib.text.Transaction` write); `rewrite_name`, `resize`,
   `infer_section(rows, address, section)`; `rename_pairs(removed_lines, added_lines) -> {old: new}` (a map diff's rows
   renamed at an unchanged `section:address`, one row each side) and `stem_renames(rows) -> {fn_/lbl_<ADDR>: name}` (every

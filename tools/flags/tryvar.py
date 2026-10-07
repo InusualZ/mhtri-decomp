@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Try source rewrites of a unit and report the official per-function score of each. Spec: docs/tools/spec/tryvar.md.
 CLI: python tools/flags/tryvar.py [-u <unit>] [<name>...] [--variants <file.py|file.txt>] [--permute <file.txt>] [--symbol S] [--max-variants N]
-[--flags-extra "<flags>"] [--json] [--list] [--apply <name>]."""
+[--flags-extra "<flags>"] [--json] [--list] [--apply <name>] | --permdecl FN[,FN...] [--max-lines N] [--max-perms N] [--seed N] [--apply]."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import importlib.util
@@ -9,7 +9,7 @@ import itertools
 import json
 import os
 
-from tools.lib import repo, report, text, units
+from tools.lib import declperm, repo, report, text, units
 
 #: The marker that starts a block in a text variants file (`//@@ old`, `//@@ variant <name>`, `//@@ permute`,
 #: `//@@ item`).
@@ -238,8 +238,9 @@ def print_ranking(ranked, symbol=None) -> None:
                  "full" if symbol and d is None else d, r["text_size"], r["matched_bytes"]))
 
 
-def try_all(unit, tokens, selected, symbol=None, score=None, diverge=None, as_is=False, out=print):
-    """Every selected variant (the unmodified source first when `as_is`) -> `[result]`, each line printed."""
+def try_all(unit, tokens, selected, symbol=None, score=None, diverge=None, as_is=False, out=print, stop=None):
+    """Every selected variant (the unmodified source first when `as_is`) -> `[result]`, each line printed.
+    `stop(result)` true ends the run early (the rest are not compiled)."""
     results = []
     plan = ([(AS_IS, None)] if as_is else []) + list(selected)
     for name, repls in plan:
@@ -247,7 +248,103 @@ def try_all(unit, tokens, selected, symbol=None, score=None, diverge=None, as_is
         results.append(res)
         if out:
             out(describe(res))
+        if stop and stop(res):
+            break
     return results
+
+
+def permdecl_one(unit, tokens, function, max_lines, cap, seed, score=None, diverge=None, out=None):
+    """Permute `function`'s leading plain declarations: `{function, status, run, orders, sampled, tried, table,
+    best}`. Every order is compiled as a probe (the source is only read) and ranked by the function's official
+    score; the as-is source is tried first and wins every tie, and the search ends at the first 100 %."""
+    src = open(unit.source, encoding="utf-8", errors="surrogateescape").read()
+    rec = {"function": function, "status": "ok", "run": [], "orders": 0, "sampled": False, "tried": 0,
+           "table": [], "best": None, "best_order": None}
+    try:
+        run = declperm.find_run(src, function, max_lines)
+    except ValueError as exc:
+        rec.update(status="ambiguous", error=str(exc))
+        return rec
+    if run is None:
+        rec["status"] = "no-run"
+        return rec
+    ords, sampled = declperm.orders(len(run.lines), cap, seed)
+    rec.update(run=[l.strip() for l in run.lines], orders=len(ords), sampled=sampled)
+    by_name = {declperm.name_of(o): o for o in ords}
+    results = try_all(unit, tokens, declperm.variants(run, ords), function, score, diverge, as_is=True, out=out,
+                      stop=lambda r: (r.get("symbol_percent") or 0.0) >= 100.0)
+    ranked = rank(results, function)
+    rec["tried"] = len(results) - 1
+    for r in ranked:
+        o = by_name.get(r["name"])
+        rec["table"].append({"name": r["name"], "percent": r.get("symbol_percent"),
+                             "first_divergence": r.get("first_divergence"), "matched_bytes": r["matched_bytes"],
+                             "lines": [run.lines[i].strip() for i in o] if o else [l.strip() for l in run.lines]})
+    if not ranked or ranked[0]["name"] == AS_IS:
+        rec["status"] = "no-gain" if ranked else "no-result"
+    else:
+        rec.update(best=ranked[0]["name"], best_order=list(by_name[ranked[0]["name"]]))
+    return rec
+
+
+def permdecl_apply(lf_text, records, max_lines):
+    """The source text with every record's best order written, or `None` when there is nothing to write."""
+    changed = False
+    for rec in records:
+        if not rec.get("best_order"):
+            continue
+        run = declperm.find_run(lf_text, rec["function"], max_lines)
+        new = declperm.reorder(lf_text, run, tuple(rec["best_order"])) if run else None
+        if new is not None and new != lf_text:
+            lf_text, changed = new, True
+    return lf_text if changed else None
+
+
+def print_permdecl(rec) -> None:
+    fn = rec["function"]
+    if rec["status"] in ("ambiguous", "no-run"):
+        print("%s: %s" % (fn, rec.get("error") or "no run of two or more plain leading declarations"))
+        return
+    print("%s: %d declaration(s), %d order(s)%s, %d tried" % (
+        fn, len(rec["run"]), rec["orders"], " (sampled)" if rec["sampled"] else "", rec["tried"]))
+    print("  %-4s %-16s %9s %10s %12s  %s" % ("#", "order", "symbol %", "first div", "matched B", "declarations"))
+    for i, row in enumerate(rec["table"][:12], 1):
+        d = row["first_divergence"]
+        print("  %-4d %-16s %9s %10s %12.2f  %s" % (
+            i, row["name"], "%.2f" % row["percent"] if row["percent"] is not None else "-",
+            "full" if row["percent"] and row["percent"] >= 100.0 else d, row["matched_bytes"],
+            " | ".join(row["lines"])))
+    if len(rec["table"]) > 12:
+        print("  ... %d more" % (len(rec["table"]) - 12))
+    print("  verdict: %s" % ({"no-gain": "no order beats the source's own", "no-result": "no order scored"}
+                             .get(rec["status"]) or "best is %s" % rec["best"]))
+
+
+def run_permdecl(args, unit, tokens, root):
+    """`--permdecl`: the table per function, and with `--apply` the best orders written to the real source."""
+    records = []
+    for fn in [f for f in args.permdecl.split(",") if f]:
+        rec = permdecl_one(unit, tokens, fn, args.max_lines, args.max_perms, args.seed)
+        records.append(rec)
+        if not args.json:
+            print_permdecl(rec)
+    applied = None
+    if args.apply:
+        raw = open(unit.source, "rb").read()
+        lf = raw.decode("utf-8", "surrogateescape").replace("\r\n", "\n")
+        new = permdecl_apply(lf, records, args.max_lines)
+        if new is not None:
+            out = new.replace("\n", "\r\n") if b"\r\n" in raw else new
+            text.atomic_write(unit.source, out.encode("utf-8", "surrogateescape"))
+            applied = os.path.relpath(unit.source, root)
+    if args.json:
+        print(json.dumps({"unit": unit.report_name, "functions": records, "applied": applied}, indent=2))
+    elif args.apply:
+        print("applied the best orders to %s - rebuild and re-measure" % applied if applied
+              else "nothing to apply: the source's own orders are the best found")
+    elif any(r.get("best") for r in records):
+        print("source untouched; --apply writes the best order of each function")
+    return 0
 
 
 def main(argv=None):
@@ -263,12 +360,29 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="the results and the ranking as JSON")
     ap.add_argument("--flags-extra", default="", help="flags to add, replacing same-family ones")
     ap.add_argument("--list", action="store_true", help="list the variants and exit")
-    ap.add_argument("--apply", metavar="NAME",
-                    help="apply this variant's rewrite to the unit's real source and exit")
+    ap.add_argument("--apply", metavar="NAME", nargs="?", const=True,
+                    help="apply this variant's rewrite to the unit's real source and exit (with --permdecl: "
+                         "write the best declaration order of each function, no name)")
+    ap.add_argument("--permdecl", metavar="FN[,FN...]",
+                    help="permute each function's leading plain declarations, rank the orders by the "
+                         "function's score and print the table (the source is only written with --apply)")
+    ap.add_argument("--max-lines", type=int, default=declperm.DEFAULT_MAX_LINES,
+                    help="--permdecl: permute at most this many leading declarations (default %(default)s)")
+    ap.add_argument("--max-perms", type=int, default=120,
+                    help="--permdecl: compile at most this many orders per function; more are a fixed-seed "
+                         "sample (default %(default)s)")
+    ap.add_argument("--seed", type=int, default=0, help="--permdecl: the sample's seed (default %(default)s)")
     args = ap.parse_args(argv)
 
     root = repo.repo_root()
     unit = units.Unit.resolve(args.unit, root)
+    if args.permdecl:
+        if not os.path.exists(unit.obj_target):
+            raise SystemExit("no target object at %s - split the unit first" % unit.obj_target)
+        head, flags, tail = units.split_command(unit)
+        return run_permdecl(args, unit, head + units.override_flags(flags, args.flags_extra) + tail, root)
+    if args.apply is True:
+        raise SystemExit("--apply takes a variant name (or comes with --permdecl)")
     if args.permute:
         with open(args.permute, encoding="utf-8", newline="") as fh:
             variants = permutation_variants(fh.read().replace("\r\n", "\n"), args.max_variants)

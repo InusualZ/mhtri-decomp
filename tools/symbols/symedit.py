@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Query and surgically edit a dtk symbol map without loading it into context.
-Spec: docs/tools/spec/symedit.md. CLI: symedit.py find|show|at|range|refs|check|rename|rename-batch|rewrite-batch|merge-batch|split
+Spec: docs/tools/spec/symedit.md. CLI: symedit.py find|show|at|range|refs|check|rename|rename-batch|rewrite-batch|merge-batch|split|resize|delete|add
 [--file F] [--json] [--limit N] [--roots R..] | --selftest."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
@@ -336,6 +336,58 @@ def cmd_split(a):
     return 0
 
 
+def _number(text: str) -> int:
+    try:
+        return int(text, 0)
+    except ValueError:
+        raise SystemExit("refusing: %r is not a number" % text)
+
+
+def _edit(a, plan, shown) -> int:
+    """Write a planned edit (unless `--dry-run`) and print what changed: `shown` is `[(verb, text)]`."""
+    if not plan.changed:
+        return 0
+    if not a.dry_run:
+        _sym.SymbolMap(a.file).apply(plan)
+    for verb, text in shown:
+        print("%s %s" % (("would " if a.dry_run else "") + verb, text))
+    return 1
+
+
+def cmd_resize(a):
+    """`resize <row> <size>`: set a data object's `size:`."""
+    plan = _lib_call(_sym.SymbolMap(a.file).plan_resize, a.row, _number(a.size))
+    if not plan.changed:
+        print("no-op: %s already has size:0x%X" % (a.row, _number(a.size)))
+        return 0
+    (i, line), = plan.grown.items()
+    _edit(a, plan, [("resize" if a.dry_run else "resized", line)])
+    return 0
+
+
+def cmd_delete(a):
+    """`delete <row>`: drop one data row that nothing references."""
+    scan = None if a.no_refs else (lambda names: find_refs(names, a.roots, a.limit, a.file))
+    plan = _lib_call(_sym.SymbolMap(a.file).plan_delete, a.row, scan)
+    (i,) = plan.deleted
+    _edit(a, plan, [("delete" if a.dry_run else "deleted", plan.lines[i])])
+    return 0
+
+
+def cmd_add(a):
+    """`add <name> <section:addr> <size>`: insert a data row in its section's order."""
+    loc = _sym.ADDR_RE.match(a.where)
+    if not loc:
+        raise SystemExit("refusing: %r is not <section>:<address> (e.g. .data:0x805A3860)" % a.where)
+    plan = _lib_call(_sym.SymbolMap(a.file).plan_add, a.name, loc.group("section"), int(loc.group("addr"), 16),
+                     _number(a.size), a.scope, a.type)
+    if not plan.changed:
+        print("no-op: %s is already defined at %s with size:0x%X" % (a.name, a.where, _number(a.size)))
+        return 0
+    _edit(a, plan, [("add" if a.dry_run else "added", plan.line)])
+    return 0
+
+
 #: The trees `--rewrite` edits and the files it reads there: the source, never docs/ or tools/ (a regenerable
 #: cache keeps its own name strings; the map is the authority there).
 REWRITE_ROOTS = ("src", "include")
@@ -503,6 +555,27 @@ def main():
     p.add_argument("--scope", default=None, help="scope of the new row (default: the row's own attributes)")
     p.add_argument("--dry-run", action="store_true")
     p.set_defaults(func=cmd_split)
+
+    p = sub.add_parser("resize", parents=[common], help="set a data object's size (refused over another symbol)")
+    p.add_argument("row")
+    p.add_argument("size", help="the new size in bytes (0x.. or decimal)")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(func=cmd_resize)
+
+    p = sub.add_parser("delete", parents=[common], help="delete a data row nothing in the source names")
+    p.add_argument("row")
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--no-refs", action="store_true", help="skip the reference scan")
+    p.set_defaults(func=cmd_delete)
+
+    p = sub.add_parser("add", parents=[common], help="add a data row (refused over an existing row or a taken name)")
+    p.add_argument("name")
+    p.add_argument("where", help="<section>:<address>, e.g. .data:0x805A3860")
+    p.add_argument("size", help="the size in bytes (0x.. or decimal)")
+    p.add_argument("--scope", default=None, help="scope word (global, local, ...; default: none written)")
+    p.add_argument("--type", default="object", help="type word (default: object)")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(func=cmd_add)
 
     a = ap.parse_args()
     if a.selftest:

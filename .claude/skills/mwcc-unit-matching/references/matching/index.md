@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (96)
+## Ideas that work (97)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -105,6 +105,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 109 | [Retail's explicit compares for empty switch cases survive when the cases return and the default breaks](109-retails-explicit-compares-for.md) | works | source-shape | Retail's switch keeps `cmpwi x,2 ; beq End ; cmpwi x,5 ; beq End` for two cases whose arm is empty, and ours folds those labels into the default, so the function is two compares (16 bytes) short. |
 | 110 | [Pointer-walk loops put the counter increment before the pointer increment](110-pointer-walk-loops-put.md) | works | source-shape | A counted loop's two `addi`s swap places (ours bumps the pointer before the counter), the only diff in the row |
 | 111 | [Index the table when retail initialises the counter before the pointers](111-index-the-table-when.md) | works | source-shape, allocator | A loop's set-up is reordered (retail `li rI,0` first, then the table bases) and every induction register is renamed, though the bodies are the same |
+| 112 | [A table's source position fixes its .data order against the switch tables of the functions that use it](112-data-source-order.md) | works | data, source-shape, sections | A unit's `.data` holds the right tables and the right switch tables but in another order, and the functions that use the tables load them through a section-anchor base where retail loads each by name - the tables were... |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

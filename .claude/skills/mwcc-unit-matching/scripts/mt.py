@@ -12,6 +12,8 @@ Usage:
     python scripts/mt.py matrix [-u <unit>] [--flags-extra "..."] [--only-open] [--one] [--json] [versions...]
     python scripts/mt.py sweep  [-u <unit>] [subs...]
     python scripts/mt.py variants [-u <unit>] [--variants f.py] [names...]
+    python scripts/mt.py permdecl <unit> <fn[,fn...]> [--max-perms N] [--apply]   (tryvar --permdecl: declaration orders)
+    python scripts/mt.py rawsame <unit>... [--report [R]] [--min-percent P]   (every 100 % row, raw bytes + reloc types)
     python scripts/mt.py shapes [-u <unit>] [-f <function>] [--scan N] [--gens ...] [--depth N]
     python scripts/mt.py diff   [-u <unit>] <symbol> [n] [--all]        (symdiff: side by side)
     python scripts/mt.py slots  [-u <unit>] <symbol> [--map] [--slot 0x64]
@@ -37,10 +39,18 @@ TOOLS = {
     "variants": "tools/flags/tryvar.py",
     "shapes":   "tools/flags/shapesearch.py",
     "diff":     "tools/objdiff/symdiff.py",
+    "rawsame":  "tools/objdiff/rawsame.py",
     "slots":    "tools/objdiff/slotmap.py",
     "sections": "tools/elf/elfsect.py",
     "dwarf":    "tools/elf/dwarfmap.py",
     "ideas":    "tools/agents/ideas.py",
+}
+
+
+#: subcommands that are another tool's mode: name -> (tool key, function turning the rest of argv into that tool's argv)
+ALIASES = {
+    "permdecl": ("variants", lambda rest: (["-u", rest[0], "--permdecl", rest[1]] + rest[2:]) if len(rest) >= 2
+                 else ["--help"]),
 }
 
 
@@ -61,6 +71,8 @@ def main(argv):
         print(__doc__.strip())
         return 0
     cmd, rest = argv[0], argv[1:]
+    if cmd in ALIASES:
+        cmd, rest = ALIASES[cmd][0], ALIASES[cmd][1](rest)
     if cmd not in TOOLS:
         print("unknown command %r\n\n%s" % (cmd, __doc__.strip()), file=sys.stderr)
         return 2
