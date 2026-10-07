@@ -18,7 +18,12 @@
  *   type_obj_set_name_texsrt_override is a GUESS (the type-name store copies the texture-SRT GetTypeObj members call;
  *   the dump's GXInitTexObjUserData at those addresses is an identical-body fold, not evidence).
  *   AnmScn's constructor and AnmObj::SetAnmFlag are nw4r's members.
- * RESIDUALS. `fn_80066FA0` lacks retail's call to `fn_80066DB4` (+0x9C).  27 functions unwritten (objdiff scores
+ *   math_fmod is a GUESS; f32_select_nonneg is a GUESS; obj_delete_flagged is a GUESS; fog_set_color is a GUESS;
+ *   res_anm_light_config_test_flag8 is a GUESS (the bodies' behaviour); anmobj_cpp_file and anmobj_start_lt_end_msg name the strings.
+ * RESIDUALS. `fn_80066FA0` lacks retail's call to `fn_80066DB4` (+0x9C).  PlayPolicy_Loop is 96 % (the `fmr` after the first
+ *   fmodf branch: retail keeps the result in the frame's register).  AnmScn's destructor (dtor_80065768) stays
+ *   undefined: defining `AnmScn::~AnmScn` makes the explicit call from fn_80066080 pass -1 where retail passes 0.
+ *   21 functions unwritten (objdiff scores
  *   them zero) in 17 runs: 0x80063E60-0x80063FC8,
  *   0x80064080-0x800640E4, 0x80064128-0x800646E8, 0x800648B0-0x8006497C (`PlayPolicy_Loop`), 0x800649CC-0x80064BD4,
  *   0x80064C24-0x80064CE0, 0x80064CF0-0x8006518C, 0x80065284-0x8006553C, 0x8006560C-0x800657C4,
@@ -40,6 +45,7 @@
 #include "g3d/fn_80063888.h"
 #include "g3d/g3d_anmchr.h"   /* the fn_8005Dxx helpers, the type-info members and G3dObj, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
+#include "fn_80047398.h" /* color_rgba_copy (rule 2) */
 #include "mh3_pad.h"        /* VEC3_ctor, owned by mh3_pad.cpp (rule 2) */
 
 #pragma peephole off
@@ -94,6 +100,8 @@ extern u8 lbl_8058CBA8[];
 extern u8 lbl_8058CBC8[];
 extern u8 lbl_8058CBD8[];
 extern u8 lbl_8058CBF8[];
+extern const char anmobj_cpp_file[];          /* "g3d_anmobj.cpp" */
+extern const char anmobj_start_lt_end_msg[];  /* "NW4R:Failed assertion startFrame < endFrame" */
 
 /* --------------------------------------------------------------------------------------------- *
  * More vtable-dispatch wrappers and the ownership-copy helpers (0x800640EC-0x800657C4).
@@ -147,6 +155,16 @@ typedef struct {
 /* 0x800657C4 (0x40): constructs the scene animation with no parent. */
 nw4r::g3d::AnmScn::AnmScn(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
 {
+}
+
+/* 0x80065284 (0x44): the deleting destructor of a trivially destructible object. */
+/* untyped: opaque handle - the object to free */
+extern "C" void* obj_delete_flagged(void* pSelf, s16 flag)
+{
+    if (pSelf && flag > 0) {
+        operator delete(pSelf);
+    }
+    return pSelf;
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -205,9 +223,12 @@ extern "C" const u8 **type_obj_set_name_texsrt_node(const u8 **out, const u8 *v)
  * The float and flag helpers (0x8006497C-0x80065ED8).
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" f32 fn_8006497C(f32 frame, f32 looped, f32 oneTime)
+/* 0x8006497C (0x8): `looped` when `frame` is not negative, else `oneTime`. */
+extern "C" asm f32 f32_select_nonneg(register f32 frame, register f32 looped, register f32 oneTime)
 {
-    return (f32)__fsel(frame, looped, oneTime);
+    nofralloc
+    fsel frame, frame, looped, oneTime
+    blr
 }
 
 extern "C" void fn_80064BD4(u32 *p)
@@ -373,6 +394,13 @@ extern "C" s32 fn_80066E2C(void *p)
 extern "C" u32 fn_80066E5C(void *p)
 {
     return fn_80066E80(p)->field_0x14;
+}
+
+/* 0x80066EF8 (0x34): whether bit 3 of the light config's channel flags is set. */
+/* untyped: opaque handle - the light-config handle */
+extern "C" u32 res_anm_light_config_test_flag8(void *p)
+{
+    return (fn_80066E80(p)->flags & 8) != 0;
 }
 
 extern "C" u32 fn_80066F2C(void *p)
@@ -723,11 +751,12 @@ extern "C" u16 fn_800658E8(void *p)
 }
 
 /* The three-float setter forwarder and the empty-base forwarder. */
-extern "C" void fmodf(void *p);
+extern "C" f32 fmodf(f32 x, f32 y);
 
-extern "C" void fn_80064984(void *p)
+/* 0x80064984 (0x4): the float remainder. */
+extern "C" f32 math_fmod(f32 x, f32 y)
 {
-    fmodf(p);
+    return fmodf(x, y);
 }
 
 extern "C" void fn_80064C04(void *self, const f32 *v)
@@ -749,6 +778,17 @@ f32 PlayPolicy_Onetime(f32 frame, f32 start, f32 end)
     (void)frame;
     (void)start;
     return end;
+}
+
+/* 0x800648B0 (0xCC): folds `frame` into [0, end - start) by the remainder, a negative frame wrapping from the end. */
+f32 PlayPolicy_Loop(f32 start, f32 end, f32 frame)
+{
+    if (!(start < end)) {
+        nw4r::db::Panic(anmobj_cpp_file, 38, anmobj_start_lt_end_msg);
+    }
+    f32 duration = end - start;
+    frame = (frame >= 0.0f) ? math_fmod(frame, duration) : math_fmod(frame + duration, duration);
+    return frame + f32_select_nonneg(frame, 0.0f, duration);
 }
 
 } /* namespace g3d */
@@ -891,6 +931,16 @@ extern "C" void fn_80067A5C(void *self, f32 a, f32 b)
         obj->field_0x04 = a;
         obj->field_0x08 = b;
     }
+}
+
+/* 0x800679D4 (0x80): copies a colour into the fog record the handle names. */
+/* untyped: opaque handle - the fog handle */
+extern "C" void fog_set_color(void *self, const u8 *rgba)
+{
+    if (fn_800659C4((u32 *)self) == 0)
+        nw4r::db::Panic((const char *)lbl_8058CBF8, 0x63, (const char *)lbl_8058CBD8);
+    if (fn_800659C4((u32 *)self) != 0)
+        color_rgba_copy((u8 *)fn_80067A54((u32 *)self) + 20, rgba);
 }
 
 extern "C" void fn_80067AE4(void *self, void *value)

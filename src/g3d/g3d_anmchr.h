@@ -7,11 +7,19 @@
 #include "types.h"
 #include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 1) */
 #include "g3d/g3d_rescommon.h" /* nw4r::g3d::ResCommon (rule 1) */
-#include "nw4r/math.h" /* nw4r::math::VEC3, MTX34, QUAT (rule 1) */
+#include "nw4r/math.h"
+#include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
+#include "g3d/g3d_resnode.h" /* ResNodeData (rule 1) */ /* nw4r::math::VEC3, MTX34, QUAT (rule 1) */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 0x8005D218 / 0x80062DEC / 0x8005D160 - the ResNode handle accessors: the block with the validity assert (mutable and
+ * const) and the node `ofs` bytes from a handle. */
+ResNodeData* res_node_ref_nonconst(ResHandle* pSelf);
+const ResNodeData* res_node_ref(const ResHandle* pSelf);
+u32 res_node_ofs_to_node(const ResHandle* pSelf, s32 ofs);
 
 void **fn_8005DC60(void **out, void *v);   /* 0x8005DC60 - stores `v` through `out`, returns `out` */
 void **type_obj_set_name_anmchr(void **out, void *v);   /* 0x8005DCD0 - stores `v` through `out`, returns `out` */

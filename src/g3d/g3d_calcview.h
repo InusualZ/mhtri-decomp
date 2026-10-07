@@ -5,15 +5,14 @@
 #include "types.h"
 #include "nw4r/math.h"
 
-/* The `g3d_calcworld` work record `fn_8006FF50` returns; only used through a pointer. */
-struct G3DWorkObj;
+#include "g3d/res_mdl_info.h" /* ResMdlInfoData, what res_mdl_info_data returns (rule 1) */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-const char* fn_8006FFBC(void);      /* 0x8006FFBC - the `ResMdlInfo` type name the assert prints */
-u32 fn_8006FFC8(void* pSelf);       /* 0x8006FFC8 - the `ResMdlInfo` handle validity test */
+const char* res_mdl_info_get_class_name(void);      /* 0x8006FFBC - the `ResMdlInfo` type name the assert prints */
+u32 res_mdl_info_is_valid(void* pSelf);       /* 0x8006FFC8 - the `ResMdlInfo` handle validity test */
 
 /* The checked resource resolver `g3d/g3d_resfile.cpp` calls. */
 
@@ -23,7 +22,10 @@ void mtx34_concat(Mtx34* out, const Mtx34* a, const Mtx34* b);
 /* 0x8006FDCC..0x8007100C - the `g3d_calcworld` node/resource helpers (callers: g3d_calcworld.cpp and the
  * matrix users).  `fn_8006FDCC`'s callers use the word as a matrix id or an array index. */
 u32 fn_8006FDCC(const void* p);
-struct G3DWorkObj* fn_8006FF50(void);
+/* untyped: opaque handle - the ResMdlInfo handle */
+const struct ResMdlInfoData* res_mdl_info_data(const void* pInfo); /* 0x8006FF50 - the info block, asserting the handle is valid */
+/* 0x8006FEC8 - the node id of position/normal matrix `mtxID` */
+u32 res_mdl_info_get_node_of_pos_nrm_mtx(const void* pInfo, u32 mtxID); /* untyped: opaque handle - the info handle */
 s32* fn_80070054(void* pOut, const void* pKey);
 void mtx34_copy_ps(Mtx34* pDst, const Mtx34* pSrc);   /* 0x8007100C - paired-single copy of a 3x4 matrix */
 

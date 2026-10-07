@@ -1,5 +1,6 @@
 /*
- * NAMES. GUESS (from each body and its callers): nw_res_entry_clear
+ * NAMES. scn_root_calc_world is a GUESS; scn_root_calc_material is a GUESS (the g3d_scnroot.cpp thunks this unit calls).
+ *   GUESS (from each body and its callers): nw_res_entry_clear
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `nm build/RMHE08/main.elf`
  * and `python tools/symbols/dumpmap.py lookup`, which give a `zz_` placeholder for every fn_ address).
  *

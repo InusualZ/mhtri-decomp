@@ -49,7 +49,6 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 
 struct ResNodeData;
-struct G3DWorkObj;
 
 /* ------------------------------------------------------------------------------------------------ */
 /* externs: the SDK and the neighbouring units this one calls (the map owns their names)            */
@@ -135,20 +134,6 @@ struct ResMdlData {
     /* +0x4C */ u32 mNodeTableKey;
 }; /* size: 0x50 */
 
-/* The engine's shared node/matrix work object `fn_8006FF50` returns. */
-struct G3DWorkObj {
-    /* +0x00 */ u32 mUnk00;
-    /* +0x04 */ u32 mUnk04;
-    /* +0x08 */ s32 mNumNode;
-    /* +0x0C */ u32 mUnk0C;
-    /* +0x10 */ u32 mUnk10;
-    /* +0x14 */ u32 mUnk14;
-    /* +0x18 */ u32 mUnk18;
-    /* +0x1C */ u32 mNumMtx;
-    /* +0x20 */ u16 mUnk20;
-    /* +0x22 */ u8 mUnk22;
-    /* +0x23 */ u8 mEnvelopeMtxMode;
-}; /* size: 0x24 */
 
 extern "C" {
 
@@ -455,7 +440,7 @@ s32 fn_8007403C(u32 flags) {
 }
 
 s32 fn_80074050(const void* p) {
-    return fn_8006FF50()->mNumNode;
+    return res_mdl_info_data(p)->mNumNode;
 }
 
 /* Look one entry up in the model's node table (`fn_800740A8` hands back the model data, +0x4C is the
@@ -487,11 +472,11 @@ u32 world_mtx_attr_root_mtx(void) {
 /* ------------------------------------------------------------------------------------------------ */
 
 u32 res_mdl_info_num_view_mtx(const ResHandle* pSelf) {
-    return fn_8006FF50()->mNumMtx;
+    return res_mdl_info_data(pSelf)->mNumMtx;
 }
 
 s32 fn_80074644(const ResHandle* pSelf) {
-    return fn_8006FF50()->mEnvelopeMtxMode;
+    return res_mdl_info_data(pSelf)->mEnvelopeMtxMode;
 }
 
 void fn_80074698(ResHandle* pSelf, const ResHandle* pRhs) {

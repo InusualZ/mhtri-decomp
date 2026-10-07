@@ -4,7 +4,8 @@
  *   (0x801394B8-0x8013AC08).
  * RANGE. .text 0x80138074-0x8013ACC4 (73 functions); .data 0x805A1358-0x805A1530, .sdata 0x807919F0-0x80791A20,
  *   .sdata2 0x80796D40-0x80796D90, extab, extabindex.
- * NAMES. The map stem; the `ResUserData`/`ResUserDataItem` panics name the NW4R accessor header `g3d_resuser_ac.h`,
+ * NAMES. MTX33_ctor is a GUESS (the 3x3 matrix constructor, the MTX34_ctor scheme).
+ *   The map stem; the `ResUserData`/`ResUserDataItem` panics name the NW4R accessor header `g3d_resuser_ac.h`,
  *   not this file.  `em_res_user_data_set` is a GUESS (it installs a callback).
  *   From their bodies: em_userdata_motion_head_load is a GUESS (0x8013817C); em_userdata_state_exit is a GUESS
  *   (0x8013AACC); em_userdata_state_reenter_alt is a GUESS (0x8013AB6C); em_userdata_roll is a GUESS (0x8013AC00);

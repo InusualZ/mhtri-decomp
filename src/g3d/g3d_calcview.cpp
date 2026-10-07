@@ -5,7 +5,10 @@
  * RANGE. .text 0x8006F738-0x8007270C (44 functions); extab, extabindex, .rodata 0x8056F638-0x8056F658, .data
  *   0x8058D938-0x8058DD68 (opens on "g3d_calcview.cpp", then the billboard warning strings), .sdata
  *   0x807911A8-0x807911B8, .sdata2 0x80795DA8-0x80795DB0.  Both neighbours cite their own `__FILE__` strings.
- * NAMES. Map stems.
+ * NAMES. res_mdl_info_is_valid is a GUESS; res_mdl_info_get_class_name is a GUESS; res_mdl_info_ptr is a GUESS;
+ *   res_mdl_info_data is a GUESS; res_mdl_info_get_node_of_pos_nrm_mtx is a GUESS;
+ *   res_node_get_parent_const is a GUESS; res_node_get_child is a GUESS (the evidence follows).
+ *   Map stems.
  *   g3d_dc_flush_range_nosync is a GUESS; test_flag_bit29 is a GUESS; u8_cast is a GUESS;
  *   mtx34_concat_array is a GUESS; round_up_32 is a GUESS; word_forward_a is a GUESS; word_swap_a is a GUESS;
  *   word_forward_b is a GUESS; word_swap_b is a GUESS; g3d_lc_queue_drain is a GUESS;
@@ -20,17 +23,17 @@
  *   g3d_calc_view_lc is a GUESS and g3d_calc_view_lc_dma is a GUESS (the three view-matrix calculators
  *   ScnMdlSimple's view pass picks between), g3d_lc_queue_wait is a GUESS, g3d_dc_invalidate_range is a GUESS and
  *   g3d_lc_base is a GUESS (the tail calls of LCQueueWait / DCInvalidateRange and the locked cache's address).
- * RESIDUALS. Unwritten (empty stubs, 9 rows, 0x2B3C bytes; objdiff scores them near zero): fn_8006F738, fn_8006F934,
- *   fn_8006FBBC, fn_8006FE40, fn_80070134, fn_80070410, fn_80070600, fn_80071064, and the three view passes
+ * RESIDUALS. Unwritten (empty stubs, 7 rows, 0x2AC4 bytes; objdiff scores them near zero): fn_8006F738, fn_8006F934,
+ *   fn_8006FBBC, fn_80070134, fn_80070410, fn_80070600, and the three view passes
  *   g3d_calc_view, g3d_calc_view_lc, g3d_calc_view_lc_dma (paired-single bodies of 2-2.7 KB: not attempted).
- *   The ResMdlInfo accessors fn_8006FF50 (declared `G3DWorkObj* fn_8006FF50(void)` for g3d_calcworld.cpp's three
- *   callers, which pass r3 through), fn_8006FEC8, res_mdl_info_num_pos_nrm_mtx, fn_8006FE7C, fn_8006FDCC and
- *   fn_8006F908 are partial or stubs; their renames wait for the g3d_calcworld.cpp callers to take the handle.
+ *   fn_8006F908 is partial (98 %).  fn_8006FF50's three g3d_calcworld.cpp callers now pass their handle.
  *   flipcheck: `.text` short of the claim; `.rodata`, `.data`, `.sdata` and `.sdata2` are claimed and not emitted.
  */
 #include "types.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
+#include "g3d/res_mdl_info.h" /* ResMdlInfoData (rule 1) */
+#include "g3d/g3d_anmchr.h" /* res_node_ref, res_node_ref_nonconst, res_node_ofs_to_node (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_get_ptr, mtx34_const_ptr (rule 2) */
 #include "OS/PSMTXCopy.h"      /* PSMTXCopy, PSMTXConcat, PSMTXConcatArray, owner OS/FindContainHeap_.c (rule 2) */
 #include "NAND/DCInvalidateRange.h" /* DCInvalidateRange, DCFlushRangeNoSync, owner NAND/nand.c (rule 2) */
@@ -88,14 +91,14 @@ f32 fn_8006F908(const f32* pMtx, u32 idx);
 void fn_8006F934(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void fn_8006FBBC(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 u32 fn_8006FDCC(void* self);
-void fn_8006FE40(void* self);
+u32 res_node_get_parent_const(const ResHandle* pSelf);
+const ResMdlInfoData* res_mdl_info_data(const void* pInfo);
+u32 res_mdl_info_get_node_of_pos_nrm_mtx(const void* pInfo, u32 mtxID);
+u32 res_mdl_info_num_pos_nrm_mtx(const void* pInfo);
 u32 fn_8006FE7C(void* self, u32 off);
-u32 fn_8006FEC8(void* self, u32 index);
-u32 fn_8006FF50(void* self);
-u32 fn_8006FFB4(void* self);
-const char* fn_8006FFBC(void);
-u32 fn_8006FFC8(void* self);
-u32 res_mdl_info_num_pos_nrm_mtx(void* self);
+u32 res_mdl_info_ptr(void* self);
+const char* res_mdl_info_get_class_name(void);
+u32 res_mdl_info_is_valid(void* self);
 u32 fn_80070020(void* self);
 u32* fn_80070054(u32* pDst, u32 ptr);
 void fn_800700B8(u32* pDst, u32 value);
@@ -103,7 +106,7 @@ void fn_80070134(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, voi
 void fn_80070410(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void fn_80070600(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void g3d_calc_view(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
-void fn_80071064(void* p);
+u32 res_node_get_child(ResHandle* pSelf);
 void g3d_calc_view_lc(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void g3d_calc_view_lc_dma(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 
@@ -114,19 +117,31 @@ u32 fn_8006FDCC(void* self) {
     if (!res_node_is_valid(self)) {
         nw4r::db::Panic(lbl_8058DC78, 83, lbl_8058DC58);
     }
-    if (!res_node_is_valid(self)) {
-        return 0;
+    if (res_node_is_valid(self)) {
+        return *(u32*)((u8*)res_node_ptr(self) + 16);
     }
-    return *(u32*)((u8*)res_node_ptr(self) + 16);
+    return 0;
 }
 
 /* 0x8006FE7C - a checked resource pointer from a base handle and an offset (0 -> null). */
 u32 fn_8006FE7C(void* self, u32 off) {
     u32 base = *(u32*)self;
-    if (off == 0) {
-        return (u32)nw4r::g3d::ResNode((void*)0).mpData;
+    if (off != 0) {
+        return (u32)nw4r::g3d::ResNode((void*)(base + off)).mpData;
     }
-    return (u32)nw4r::g3d::ResNode((void*)(base + off)).mpData;
+    return (u32)nw4r::g3d::ResNode((void*)0).mpData;
+}
+
+/* 0x8006FE40 (0x3C): the parent node. */
+u32 res_node_get_parent_const(const ResHandle* pSelf)
+{
+    return fn_8006FE7C((void*)pSelf, res_node_ref(pSelf)->mToParentNode);
+}
+
+/* 0x80071064 (0x3C): the first child node. */
+u32 res_node_get_child(ResHandle* pSelf)
+{
+    return res_node_ofs_to_node(pSelf, res_node_ref_nonconst(pSelf)->mToChildNode);
 }
 
 /* 0x8006F908 - the length of column `idx` of a 48-byte (12-float) matrix. */
@@ -139,17 +154,17 @@ f32 fn_8006F908(const f32* pMtx, u32 idx) {
 }
 
 /* 0x8006FFB4 - dereference the handle. */
-u32 fn_8006FFB4(void* self) {
+u32 res_mdl_info_ptr(void* self) {
     return *(u32*)self;
 }
 
 /* 0x8006FFBC - the "NodeTree" name string. */
-const char* fn_8006FFBC(void) {
+const char* res_mdl_info_get_class_name(void) {
     return lbl_8058DCF0;
 }
 
 /* 0x8006FFC8 - is the handle non-null. */
-u32 fn_8006FFC8(void* self) {
+u32 res_mdl_info_is_valid(void* self) {
     return *(u32*)self != 0;
 }
 
@@ -200,25 +215,39 @@ extern "C" {
 void fn_8006F738(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_8006F934(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_8006FBBC(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
-void fn_8006FE40(void* self) {}
-u32 fn_8006FEC8(void* self, u32 index) {
-    (void)self;
-    (void)index;
-    return 0;
+/* 0x8006FF50 (0x34): the info block, asserting the handle is valid. */
+/* untyped: opaque handle - the ResMdlInfo handle */
+const ResMdlInfoData* res_mdl_info_data(const void* pInfo)
+{
+    if (!res_mdl_info_is_valid((void*)pInfo)) {
+        nw4r::db::Panic(lbl_8058DD18, 57, lbl_8058DCFC, res_mdl_info_get_class_name(), (const char*)&lbl_807911A8);
+    }
+    return (const ResMdlInfoData*)res_mdl_info_ptr((void*)pInfo);
 }
-u32 fn_8006FF50(void* self) {
-    (void)self;
-    return 0;
+
+/* 0x8006FEC8 (0x58): the node id of position/normal matrix `mtxID`. */
+/* untyped: opaque handle - the ResMdlInfo handle */
+u32 res_mdl_info_get_node_of_pos_nrm_mtx(const void* pInfo, u32 mtxID)
+{
+    if (!(mtxID < res_mdl_info_num_pos_nrm_mtx(pInfo))) {
+        nw4r::db::Panic(lbl_8058DD58, 103, lbl_8058DD28);
+    }
+    u32 ofs = res_mdl_info_data(pInfo)->mToPosNrmMtxTable;
+    const u32* pTable = (const u32*)((const u8*)res_mdl_info_data(pInfo) + ofs + 4);
+    return pTable[mtxID];
 }
-u32 res_mdl_info_num_pos_nrm_mtx(void* self) {
-    (void)self;
-    return 0;
+
+/* 0x8006FFDC (0x44): the number of position/normal matrices. */
+/* untyped: opaque handle - the ResMdlInfo handle */
+u32 res_mdl_info_num_pos_nrm_mtx(const void* pInfo)
+{
+    u32 ofs = res_mdl_info_data(pInfo)->mToPosNrmMtxTable;
+    return *(const u32*)((const u8*)res_mdl_info_data(pInfo) + ofs);
 }
 void fn_80070134(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_80070410(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_80070600(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void g3d_calc_view(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
-void fn_80071064(void* p) {}
 void g3d_calc_view_lc(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void g3d_calc_view_lc_dma(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 

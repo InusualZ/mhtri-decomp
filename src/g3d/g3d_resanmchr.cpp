@@ -1585,7 +1585,7 @@ s32 fn_8008DC4C(ResAnmChrObj* self, f32* out)
     r = sqrt_f32(lbl_80795EE8 - self->mat[8] * self->mat[8]);
     if (r == lbl_80795ED0) {
         out[0] = fn_8008DF64(self->mat[2] + self->mat[5], self->mat[6] + self->mat[1]);
-        out[1] = fn_8006497C(self->mat[8], lbl_80795EF8, lbl_80795EFC);
+        out[1] = f32_select_nonneg(self->mat[8], lbl_80795EF8, lbl_80795EFC);
         out[2] = fn_8008DF64(self->mat[2] + self->mat[5], self->mat[6] - self->mat[1]);
     } else {
         out[0] = fn_8008DF64(self->mat[9], self->mat[10]);
