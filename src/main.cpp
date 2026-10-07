@@ -341,8 +341,8 @@ extern "C" void fn_80046C80(void);
 extern "C" void fn_80046D34(void);
 extern "C" int fn_804ED620(void);
 extern "C" void fn_804E7480(void);
-extern "C" void fn_804D56B0(void* arg);
-extern "C" void fn_804D57A0(void* arg);
+extern "C" void OSSetResetCallback(void* arg);
+extern "C" void OSSetPowerCallback(void* arg);
 extern "C" void fn_8043F290(void);
 
 /* C++ symbols: declared by their real (unmangled) source names so the compiler emits the map's mangled
@@ -404,8 +404,8 @@ int main(void)
     sw->inner_width = sw->width_f - sw->margin_x;
     sw->inner_height = sw->height_f - sw->margin_y;
 
-    fn_804D56B0(_f_text);
-    fn_804D57A0((void*)fn_8003F20C);
+    OSSetResetCallback(_f_text);
+    OSSetPowerCallback((void*)fn_8003F20C);
     lbl_807947A5 = 0;
     lbl_807947A6 = 0;
     NANDInit();
