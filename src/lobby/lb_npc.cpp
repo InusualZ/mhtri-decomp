@@ -2780,7 +2780,7 @@ extern "C" {
 __declspec(noinline) u32 fn_80208AB8(void);
 __declspec(noinline) u32 fn_80208AC0(_PLW* self);
 __declspec(noinline) u32 fn_80208AE8(_PLW* self);
-void lb_npc_act_set(_PLW* self, u32 a, s32 b, s32 c);
+void lb_npc_act_set(_PLW* self, u32 a, u16 b, u16 c);
 __declspec(noinline) void fn_8020A5D4(_PLW* self, u32 a, s32 b, s32 c);
 __declspec(noinline) void fn_8020A5EC(_PLW* self, u8 id);
 void fn_8020A5F4(_PLW* self, u32 a, s32 b, s32 c, u16 d);

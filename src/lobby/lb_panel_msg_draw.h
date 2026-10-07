@@ -33,7 +33,7 @@ s32 lb_choice_step(struct LbChoiceMenu* menu);
 /* 0x80214948 - draws the choice box at layout `panel`.  GUESS name. */
 void lb_choice_draw(struct LbChoiceMenu* menu, u16 panel, const u16* frame_ids, const u16* row_ids, u16 msg_panel, u8 mode);
 /* 0x802150DC - draws lobby string 3/`id` as line `line` of layout `panel` in colour `color`.  GUESS name. */
-void lb_panel_line_draw(u16 panel, u16 id, s16 color, s32 line);
+void lb_panel_line_draw(u16 panel, s16 id, s16 color, s32 line);
 /* 0x8021584C - draws the sprites `ids` (0xFFFF-ended) with a pulsing additive blend.  GUESS name. */
 void lb_sprite_pulse_draw(const u16* ids, const struct _mh_ivec2_* pos);
 /* 0x80215C04 - draws the resource-point total at layout `panel`.  GUESS name. */

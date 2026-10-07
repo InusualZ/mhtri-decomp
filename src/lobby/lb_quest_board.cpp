@@ -8,7 +8,8 @@
  *   0x8079C2EC-0x8079C300 and owns the one extab/extabindex record after `lb_quest_board_flash_move`'s).
  * FLAGS. `cflags_lobby`; `#pragma pool_data off` (retail materialises each table with its own `lis`/`addi`);
  *   `#pragma peephole off` file-wide (retail keeps `and`/`subi`/`extsb` + `cmpwi` unfused; playbook 39) except
- *   `lb_quest_board_step_screen` and `lb_quest_board_effect_spawn`, which measure better with it on.
+ *   `lb_quest_board_step_screen` and `lb_quest_board_effect_spawn`, which measure better with it on.  `#pragma optimization_level 4` around
+ *   `lb_quest_board_draw_task`, `_effect_init` and `_effect_move` (retail's subi + cmplwi switch ranges, playbook 108).
  * NAMES. `lb_quest_board` is a GUESS from the range's one real map name, `draw_quest_board` (0x80394DA4), in the
  *   module's `lb_*` scheme; every other name is a GUESS from its body.  Module `lobby`: 42 `lobby_w` reads, `LbStr`,
  *   `lb_npc_Get_motion_no`, `get_now_areano`, `get_move_work_adrs`, `get_option_cfg` and the lobby/HUD 2D layer.
@@ -24,8 +25,10 @@
  *   GUESS: `lb_quest_board_flash_move`, `q_result_effect_follow_npc`, `q_result_anim_counter_inc`,
  *   GUESS: `q_result_release_effect` (the three keep their `menu_result` scheme names)
  *   GUESS: `lb_quest_board_party_step`, `lb_quest_board_effect_init`, `lb_quest_board_effect_move`
- * RESIDUALS. Every row is written.  flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/
- *   extabindex short of the claim.
+ * RESIDUALS. Every row is written.  flipcheck: `.data`/`.sdata`/`.sdata2` emitted byte-identical (the tables sit
+ *   before their first users, so the step screen's jump table leads `.data`); `.text`/extab/extabindex short.
+ *  - `lb_quest_board_flash_move`: retail copies the rotation into the model's +0x28 triple, which `pl.h`'s `MHchar` has
+ *    no field for (ours writes `rot_0x54`);
  *  - `lb_quest_board_effect_init`/`_effect_move`: retail range-tests kinds 0..4 unsigned (`cmplwi 4`) and compares the
  *    kind bytes signed; `lb_quest_board_party_step`: `getOwnMemberFlag`'s `u8` result is narrowed again before its
  *    compare (retail compares the raw word);
@@ -82,26 +85,6 @@
 
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
 
-u16 lb_quest_board_frame_ids[14] = {
-    0x1646, 0x1647, 0x1640, 0x1641, 0x1642, 0x1643, 0x1644, 0x1645, 0x163E, 0x163F, 0xFFFF, 0x0000, 0x0000, 0x0000,
-};
-u16 lb_quest_board_row_ids[12] = {
-    0x165E, 0x165F, 0x1660, 0x1661, 0x1662, 0x1663, 0x1664, 0x1665, 0x1666, 0x1657, 0x1654, 0xFFFF,
-};
-u16 lb_quest_board_entry_ids[10] = {0x1658, 0x165A, 0x165B, 0x165C, 0x165D, 0x164B, 0x164C, 0x1655, 0x1656, 0xFFFF};
-u16 lb_quest_board_shade_ids[10] = {0x1667, 0x1668, 0x1669, 0x166A, 0x166B, 0x166C, 0x166D, 0x166E, 0x166F, 0xFFFF};
-u16 lb_quest_board_row_lsp[6] = {0x0000, 0x1670, 0x1671, 0x1672, 0x1673, 0x0000};
-char lb_quest_board_blank_name[11] = "          ";
-u16 lb_quest_board_summary_ids[20] = {
-    0x1684, 0x1685, 0x1686, 0x1687, 0x1688, 0x1689, 0x168A, 0x168B, 0x168C, 0x1675,
-    0x1676, 0x1677, 0x167F, 0x1680, 0x1681, 0x1682, 0x1683, 0x168D, 0x168E, 0xFFFF,
-};
-u16 lb_quest_board_effect_groups[10] = {0x06A1, 0x06A2, 0x06A3, 0x06A4, 0x06A5, 0x06A6, 0x06A7, 0x0630, 0x00FF, 0x00FF};
-u16 lb_quest_board_effect_ids[10] = {0x001B, 0x001B, 0x001B, 0x001B, 0x001B, 0x001B, 0x001B, 0x0018, 0x00FF, 0x00FF};
-
-u16 lb_quest_board_empty_ids[2] = {0x1659, 0xFFFF};
-u16 lb_quest_board_label_ids[4] = {0x1692, 0x1693, 0x1694, 0xFFFF};
-u16 lb_quest_board_label_lsp[4] = {0x1695, 0x1696, 0x1697, 0x1697};
 
 /* Declarations of this range's own symbols, so the bodies can stay in address order.  They are `extern "C"`
  * because the map spells them unmangled (playbook 42). */
@@ -369,15 +352,15 @@ extern "C" s32 lb_quest_board_cursor_step(s32 index, s32 count, u32 current, u32
 /* 0x80394758 (0x15C): The list's input: confirm picks the entry under the cursor (1, or 3 when it has no quest),
  * cancel leaves (2), the pad moves the row. */
 extern "C" s32 lb_quest_board_list_input(LbQuestBoardWork* work) {
-    s32 result = 0;
     LbQuestBoardEntry* entry;
+    s32 result = 0;
 
     if (work->anim_0x260 < 8) {
         work->anim_0x260++;
     }
     if (lb_cmd_pressed_ck(16) != 0) {
         work->index_0x249 = work->row_0x247 + work->page_0x24A * 4;
-        entry = (LbQuestBoardEntry*)getProfileQuestRecord((u8)work->index_0x249);
+        entry = (LbQuestBoardEntry*)getProfileQuestRecord(work->index_0x249);
         if (entry == NULL || entry->quest_id == 0) {
             sysSE_req(2);
             return 3;
@@ -565,6 +548,25 @@ extern "C" s32 lb_quest_board_enter_step(LbQuestBoardWork* work) {
     return result;
 }
 
+u16 lb_quest_board_frame_ids[14] = {
+    0x1646, 0x1647, 0x1640, 0x1641, 0x1642, 0x1643, 0x1644, 0x1645, 0x163E, 0x163F, 0xFFFF, 0x0000, 0x0000, 0x0000,
+};
+u16 lb_quest_board_row_ids[12] = {
+    0x165E, 0x165F, 0x1660, 0x1661, 0x1662, 0x1663, 0x1664, 0x1665, 0x1666, 0x1657, 0x1654, 0xFFFF,
+};
+u16 lb_quest_board_entry_ids[10] = {0x1658, 0x165A, 0x165B, 0x165C, 0x165D, 0x164B, 0x164C, 0x1655, 0x1656, 0xFFFF};
+u16 lb_quest_board_shade_ids[10] = {0x1667, 0x1668, 0x1669, 0x166A, 0x166B, 0x166C, 0x166D, 0x166E, 0x166F, 0xFFFF};
+u16 lb_quest_board_row_lsp[6] = {0x0000, 0x1670, 0x1671, 0x1672, 0x1673, 0x0000};
+char lb_quest_board_blank_name[11] = "          ";
+u16 lb_quest_board_summary_ids[20] = {
+    0x1684, 0x1685, 0x1686, 0x1687, 0x1688, 0x1689, 0x168A, 0x168B, 0x168C, 0x1675,
+    0x1676, 0x1677, 0x167F, 0x1680, 0x1681, 0x1682, 0x1683, 0x168D, 0x168E, 0xFFFF,
+};
+u16 lb_quest_board_effect_groups[10] = {0x06A1, 0x06A2, 0x06A3, 0x06A4, 0x06A5, 0x06A6, 0x06A7, 0x0630, 0x00FF, 0x00FF};
+u16 lb_quest_board_effect_ids[10] = {0x001B, 0x001B, 0x001B, 0x001B, 0x001B, 0x001B, 0x001B, 0x0018, 0x00FF, 0x00FF};
+
+u16 lb_quest_board_empty_ids[2] = {0x1659, 0xFFFF};
+
 /* 0x80394DA4 (0x33C): Draws the board list: four rows of the current page, each with its number and, for a live
  * entry, the quest name, the poster, the players wanted and the sub-label count. */
 extern "C" void draw_quest_board(LbQuestBoardWork* work) {
@@ -656,6 +658,9 @@ extern "C" void draw_quest_board(LbQuestBoardWork* work) {
         }
     }
 }
+
+u16 lb_quest_board_label_ids[4] = {0x1692, 0x1693, 0x1694, 0xFFFF};
+u16 lb_quest_board_label_lsp[4] = {0x1695, 0x1696, 0x1697, 0x1697};
 
 /* 0x803950E0 (0x280): Draws the detail page's summary tab: the sub-label count, the players wanted, the session icon,
  * the wrapped comment and the four labels. */
@@ -779,6 +784,7 @@ extern "C" void lb_quest_board_panel_draw(LbQuestBoardWork* work) {
     }
 }
 
+#pragma optimization_level 4
 /* 0x803954FC (0x1A4): The board's draw callback: the list or the detail page for the step, the message panel, and in
  * step 7 the blinking "connecting" dialog. */
 extern "C" void lb_quest_board_draw_task(void) {
@@ -789,20 +795,22 @@ extern "C" void lb_quest_board_draw_task(void) {
 
     set_zmode(false, 0, false);
     set_blendmode(4, 5, 1);
-    if ((u32)(work->step_0x242 - 2) <= 2 || (u32)(work->step_0x242 - 6) <= 2) {
+    switch (work->step_0x242) {
+    case 1:
+        draw_quest_board(work);
+        break;
+    case 2:
+    case 3:
+    case 4:
+    case 6:
+    case 7:
+    case 8:
+    case 14:
         lb_quest_board_detail_draw(work);
-    } else {
-        switch (work->step_0x242) {
-        case 1:
-            draw_quest_board(work);
-            break;
-        case 14:
-            lb_quest_board_detail_draw(work);
-            break;
-        case 5:
-            lb_quest_board_detail_draw(work);
-            break;
-        }
+        break;
+    case 5:
+        lb_quest_board_detail_draw(work);
+        break;
     }
     lb_quest_board_panel_draw(work);
     font_flush();
@@ -822,6 +830,7 @@ extern "C" void lb_quest_board_draw_task(void) {
     font_flush();
 }
 
+#pragma optimization_level reset
 /* 0x803956A0 (0x80): Opens the notice screen (screen 20) - the same setup as the board, minus the payload lookup,
  * with the menu's cancel sound. */
 extern "C" void lb_quest_board_open_notice(LbQuestBoardData* data) {
@@ -909,7 +918,7 @@ extern "C" void lb_quest_board_open_ready(LbQuestBoardData* plw) {
     work->step_0x242 = 0;
     work->enter_step_0x243 = 0;
     work->enter_error_0x244 = 0;
-    lb_npc_act_set((struct _PLW*)plw, 0, 0, (u16)0x8000);
+    lb_npc_act_set((struct _PLW*)plw, 0, 0, 0x8000);
 }
 
 /* 0x803959B0 (0x18): Leaves the notice screen.  GUESS: see `lb_quest_board_close`, whose body this repeats byte for
@@ -1167,6 +1176,7 @@ extern "C" void lb_quest_board_step_kind(_EFT* self) {
     }
 }
 
+#pragma optimization_level 4
 /* 0x80396070 (0x1D8): Creates the kind's pooled effect, then for the joint-riding kinds places it on the NPC's joint
  * (plus the rotated offset); plays the kind's sound and starts updating it.  A dead NPC ends the effect. */
 extern "C" void lb_quest_board_effect_init(_EFT* self) {
@@ -1235,6 +1245,7 @@ extern "C" void lb_quest_board_effect_init(_EFT* self) {
     lb_quest_board_effect_update(self);
 }
 
+#pragma optimization_level reset
 /* 0x80396248 (0xD4): Creates the kind-8 flash model (model 0xA8, motion 0x4C), shows only its first part and scales
  * it, then starts updating it. */
 extern "C" void lb_quest_board_flash_init(_EFT* self) {
@@ -1295,6 +1306,7 @@ extern "C" void lb_quest_board_effect_update(_EFT* self) {
     }
 }
 
+#pragma optimization_level 4
 /* 0x803963F4 (0x260): Steps the kind's pooled effect: it ends with the area or the NPC; the joint-riding kinds take
  * the joint's matrix (kind 5 only spawns its models during the board motions) and the effect is scaled and moved. */
 extern "C" void lb_quest_board_effect_move(_EFT* self) {
@@ -1378,6 +1390,7 @@ extern "C" void lb_quest_board_effect_move(_EFT* self) {
     }
 }
 
+#pragma optimization_level reset
 /* 0x80396654 (0x19C): Moves the kind-8 flash model with the NPC's joint 10 for its frame count, tinting it half
  * green inside its flash window. */
 extern "C" void lb_quest_board_flash_move(_EFT* self) {
