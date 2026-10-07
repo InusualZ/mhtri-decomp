@@ -28,7 +28,7 @@ extern "C" void fn_80555FB4(HbmWidget* self, int flag);
 
 extern "C" void fn_805563D0(HbmWidget* self, int flag);
 
-extern "C" void fn_80461780(void* dst, int value, u16 size);
+extern "C" void wmemset(void* dst, int value, u16 size);
 
 extern "C" void* fn_80555F5C(void* self, int flag);
 

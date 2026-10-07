@@ -34,7 +34,7 @@ extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *m
 extern f32 anim_tick_angle(u16 value);
 extern f32 math_reciprocal(f32 value);
 extern void fn_8005B1B4(u32 *self, u32 value);
-extern f32 fn_80463F34(f32 *out, f32 frame);
+extern f32 modff(f32 *out, f32 frame);
 
 /* A single animation key. */
 typedef struct {
@@ -216,5 +216,5 @@ s16 fn_80089F78(f32 value)
 /* Tail call into the frame-index helper. */
 f32 fn_80089F90(f32 *out, f32 frame)
 {
-    return fn_80463F34(out, frame);
+    return modff(out, frame);
 }

@@ -197,7 +197,7 @@ extern "C" void res_node_assign(void* ctx, void* val);
 extern "C" s32 res_node_get_id(void* ctx);
 extern "C" u32 res_node_is_valid(void* ctx);
 extern "C" void fn_8050131C(void* a);
-extern "C" f32 fn_80463EE0(s16 a, f32 b);
+extern "C" f32 sinf(s16 a, f32 b);
 extern "C" void fn_80051894(void* a, void* b, void* c, s32 d, f32 e, f32 f);
 
 extern "C" u32 get_joint_num__6MHcharFv(void* chr);
@@ -981,7 +981,7 @@ extern "C" void fn_80116B00(_EFT* self)
         self->field_0x10++;
         work->field_0x18[i] = (s16)(work->field_0x18[i] + 1);
         t = work->field_0x18[i];
-        f = fn_80463EE0(t, (f26 * (f32)(u16)(t << table->field_0x18)) / f27);
+        f = sinf(t, (f26 * (f32)(u16)(t << table->field_0x18)) / f27);
         if ((f >= f28 || f <= f29) && table->field_0x1A > 0) {
             work->field_0x2C[i] = (s16)(work->field_0x2C[i] + 1);
             if (work->field_0x2C[i] > table->field_0x1A) {

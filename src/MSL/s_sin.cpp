@@ -1,17 +1,42 @@
 /*
- * MSL/s_sin.cpp - STUB (no bodies yet).
+ * MSL/s_sin.cpp - the MSL `sin` (fdlibm shape): argument reduction around `__kernel_sin` / `__kernel_cos`.
  *
- * `.text` 0x80467E20..0x80467EEC.  Sections of the candidate unit: .text 0x80467E20..0x80467EEC; .sdata2 0x8079CF28..0x8079CF30.
- *
- * WHAT IT IS. fdlibm `sin`, one function that calls `__kernel_sin`, `__ieee754_rem_pio2` and `__kernel_cos`.
- *   GUESS from those callees.
- *
- * WHY IT SITS HERE. phase 1 grade medium, class file: fdlibm one function per file.
- *
- * UNKNOWN. every body and, for a merged block, the file boundaries between its pieces.
- *
- * FLAGS. the `Runtime.PPCEABI.H` lib's `cflags_ppceabi` (unmeasured until bodies exist).
- *
- * The unit's `.data`/`.sdata`/`.sbss` claims are the candidate's (config/RMHE08/splits.txt); the symbols they hold are
- * in the map (`ledger.py unit MSL/s_sin.cpp`), and the pass that writes the bodies defines them.
+ * RANGE. .text 0x80467E20..0x80467EEC (1 function in the map, 0xCC B); .sdata2 0x8079CF28..0x8079CF30 (the
+ *    pooled 0.0 passed as the tail).
+ * FLAGS. the `Runtime.PPCEABI.H` lib's `cflags_ppceabi`; compiled as C++ with `extern "C"` linkage.
+ * NAMES. `sin` is the dump's name.
+ * EVIDENCE. the pooled double is zero; the quadrant switch calls the kernels with sign flips.
+ * RESIDUALS. none measured.
+ * SHAPES. the reduction result lives in a two-element stack array.
  */
+#include "MSL/s_sin.h"
+#include "MSL/k_cos.h"
+#include "MSL/k_sin.h"
+#include "MSL/e_rem_pio2.h"
+#include "MSL/fdlibm.h"
+
+extern "C" f64 sin(f64 x)
+{
+    f64 y[2];
+    f64 z = 0.0;
+    s32 n;
+    s32 ix = F64_HI(x) & 0x7FFFFFFF;
+
+    if (ix <= 0x3FE921FB) {
+        return __kernel_sin(x, z, 0);
+    }
+    if (ix >= 0x7FF00000) {
+        return x - x;
+    }
+    n = __ieee754_rem_pio2(x, y);
+    switch (n & 3) {
+    case 0:
+        return __kernel_sin(y[0], y[1], 1);
+    case 1:
+        return __kernel_cos(y[0], y[1]);
+    case 2:
+        return -__kernel_sin(y[0], y[1], 1);
+    default:
+        return -__kernel_cos(y[0], y[1]);
+    }
+}

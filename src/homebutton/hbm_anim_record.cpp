@@ -27,7 +27,7 @@ extern "C" void fn_80557744(void* self);
 
 extern "C" void fn_80557E8C(void* self);
 
-extern "C" void fn_80461780(void* dst, int value, u16 size);
+extern "C" void wmemset(void* dst, int value, u16 size);
 
 extern "C" void* fn_805576EC(void* self, int flag);
 

@@ -45,7 +45,7 @@ extern "C" {
 
 /* 0x8060EDB0 - the character-class record `DWCi_parseAddress` validates port digits against (a header
  * whose +0x38 pointer reaches the per-character u16 flags, bit 3 marking a decimal digit). */
-extern struct DWCiCType DWCi_digitClassTable;
+extern struct DWCiCType _current_locale;
 
 /* 0x8045DFA0 - the C library's `rand` (the 0x41C64E6D linear congruential step, top 15 bits). */
 s32 rand(void);
@@ -74,7 +74,7 @@ long labs(long n);
 int __fpclassifyf(float x);
 
 /* 0x80463E74 - the global frame thunk `g3d/g3d_resanmlight.cpp`'s `fn_8008FFFC` tail-calls. */
-f32 fn_80463E74(void);
+f32 floorf(void);
 
 #ifdef __cplusplus
 }

@@ -78,9 +78,9 @@ s32 fn_80331104(void);
  * `lobby/fn_802FA9A0.cpp` (0x802FA9A0..0x8030121C, which owns all four) - they are declared in
  * `lobby/fn_802FA9A0.h` now (rule 2). */
 /* 0x80463EE0 - a float-returning two-argument function: `ef/fn_80114E34.cpp` carries the
- * signature its own call sites set (`f32 fn_80463EE0(s16, f32)`), which is the one declared
+ * signature its own call sites set (`f32 sinf(s16, f32)`), which is the one declared
  * here; the action band tail-calls it with its own parameters. */
-f32 fn_80463EE0(s16 a, f32 b);
+f32 sinf(s16 a, f32 b);
 /* The `.sdata2` / `.data` pool entries the 0x805482CC-0x8054E894 game-UI band loads.  The band's
  * target object carries no data section at all, so every constant it uses is another translation
  * unit's pool entry and is declared here `extern` and used as a load operand - never defined

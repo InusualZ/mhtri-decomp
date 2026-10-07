@@ -29,7 +29,7 @@ extern "C" void fn_80554714(void* self);
 
 extern "C" void fn_80554BA8(void* self);
 
-extern "C" void fn_80461780(void* dst, int value, u16 size);
+extern "C" void wmemset(void* dst, int value, u16 size);
 
 /* The layout strings the band passes to its widgets (`.sdata` words; their band is unregistered). */
 extern char lbl_80794610[5];     /* "N_UP" */

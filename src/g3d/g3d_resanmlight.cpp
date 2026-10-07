@@ -25,7 +25,7 @@
 #include "g3d/g3d_resanmamblight.h"     /* fn_8008A188/fn_8008A1A8, owner g3d/g3d_resanmamblight.c */
 #include "g3d/fn_800680CC.h" /* fn_80069664 (rule 2) */
 #include "g3d/g3d_resanmtexsrt.h" /* fn_80092330 (rule 2) */
-#include "MSL_C/alloc.h" /* fn_80463E74 (rule 2) */
+#include "MSL_C/alloc.h" /* floorf (rule 2) */
 #include "g3d/g3d_resanmcamera.h" /* fn_8008A644 (rule 2) */
 
 #pragma peephole off
@@ -220,7 +220,7 @@ extern "C" s32 fn_8008FE88(u32 *self, s32 index)
 /* The global frame thunk (a tail call into the shared frame getter). */
 extern "C" f32 fn_8008FFFC(void)
 {
-    return fn_80463E74();
+    return floorf();
 }
 
 /* Resolves a sub-resource offset against the object base; a zero offset means "none". */

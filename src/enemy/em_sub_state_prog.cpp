@@ -4,8 +4,8 @@
  *   .sdata 0x807928D0-0x80792948, .sdata2 0x8079ABC0-0x8079AC20, extab, extabindex.
  * NAMES. `em_sub_state_prog` is a GUESS from the sub-state dispatchers the band holds.
  * RESIDUALS. 6 rows unwritten: 0x802F9994-0x802F9BF0, 0x802F9C2C-0x802FA7EC, 0x802FA804-0x802FA964.
- *  - `fn_802FA7EC` (written, 0 %): the 4-byte `b fn_80463EE0` thunk; the callee's declaration,
- *    `f32 fn_80463EE0(s16, f32)` (`unsplit/unknown.h`; `ef/eft022_fx.cpp` declares it the same way), makes ours
+ *  - `fn_802FA7EC` (written, 0 %): the 4-byte `b sinf` thunk; the callee's declaration,
+ *    `f32 sinf(s16, f32)` (`unsplit/unknown.h`; `ef/eft022_fx.cpp` declares it the same way), makes ours
  *    narrow the argument with an `extsh`.
  *   flipcheck: `.bss`/`.data`/`.sdata`/`.sdata2`/extab/extabindex claimed, not emitted; `.text` short of the claim.
  */
@@ -56,7 +56,7 @@ extern "C" void fn_802F9BF0(_ENEMY_WORK* work) {
 
 /* Forwards to the shared release helper (a tail call: the parameters pass straight through). */
 extern "C" f32 fn_802FA7EC(s16 a, f32 b) {
-    return fn_80463EE0(a, b);
+    return sinf(a, b);
 }
 
 /* Advances a byte counter in a record above the work record. */
