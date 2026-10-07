@@ -1,6 +1,6 @@
 /* ef/eft026_fx.cpp - the eft026 enemy-fold family (`eft026_set` and two sibling setters, the allocator `fn_80117FF8`
  *   stamping tag 26, the release `fn_80118154` and its state machine) and the eft028 break/crumble family's setters
- *   (`fn_80119970`, `eft028_set_koware`, `fn_80119AA8`, `fn_80119BB0`), which build their records through
+ *   (`fn_80119970`, `eft028_set_koware`, `fn_80119AA8`, `eft028_set_scaled`), which build their records through
  *   `ef/fn_80119C44.c`.
  * RANGE. .text 0x80117DA8-0x80119C44 (20 functions); extab 0x8000C4D4-0x8000C554, extabindex 0x80026628-0x800266E8,
  *   .data 0x805A0488-0x805A06F0, .sdata 0x80791940-0x80791970, .sdata2 0x80796AC0-0x80796B2C.
@@ -8,6 +8,7 @@
  *   `subi`/`cmpwi` into `subic.` and compresses the frame; playbook 39).
  * NAMES. `eft026_set` and `eft028_set_koware` are the runtime dump's own names; the map has only `fn_` stems for the
  *   rest, so plain definitions are `extern "C"`.
+ *   GUESS (from its body and its caller): eft028_set_scaled
  * RESIDUALS. 10 partial rows, including:
  *  - `fn_80118154`: retail's base+offset induction (`addi r30,r31,4; addi r31,r31,8`) for the four `slots[]` pushes;
  *    the pointer walk `p[0]`/`p--` here is the closest spelling;
@@ -47,6 +48,7 @@
 #include "ef/effect.h"
 #include "ef/eft001.h"
 #include "ef/eft004.h"
+#include "ef/eft028_set_scaled.h"
 #include "fn_8004CAD8.h"
 #include "g3d/g3d_calcworld.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMatTevColor (rule 2) */
@@ -131,7 +133,7 @@ typedef struct _EFT28_WORK {
     /* +0x0A */ u8 col_b;
     /* +0x0B */ u8 col_a;
     /* +0x0C */ u8 param_0x0C[0x10 - 0x0C]; /* fn_8028F558's output */
-    /* +0x10 */ f32 field_0x10;             /* fn_80119BB0's scale */
+    /* +0x10 */ f32 field_0x10;             /* eft028_set_scaled's scale */
     /* +0x14 */ u8 key_0x14;                /* fn_80119970's colour keys */
     /* +0x15 */ u8 key_0x15;
     /* +0x16 */ u8 key_0x16;
@@ -197,7 +199,6 @@ void fn_80119818(MHchar* chr, u8 mode);
 void fn_801198F8(MHchar* chr, u8 index);
 void fn_80119970(u8 kind, u8 variant, u8 id);
 _EFT* fn_80119AA8(u8 area);
-void fn_80119BB0(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 variant, long timer);
 
 /* the plain callees with no reconstructed owner yet (declared here, never `extern`-spelled, so the
  * symbol is the target's plain name; the landing pass moves the ones a registered unit owns) */
@@ -1136,7 +1137,7 @@ extern "C" _EFT* fn_80119AA8(u8 area)
     return rec;
 }
 
-extern "C" void fn_80119BB0(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 variant, long timer)
+extern "C" void eft028_set_scaled(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 variant, long timer)
 {
     _EFT* rec = fn_80119C44(kind, variant, 1);
     _EFT28_WORK* work;

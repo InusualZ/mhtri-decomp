@@ -15,6 +15,16 @@ extern "C" {
 /* The item page's count for one item id moved by `delta` (a negative `delta` adds). */
 void eft052_page_count_add(u16 id, s16 delta);
 
+/* 0x803592D4 - the item page's count for item `id` (`use_rows` selects the row-limited count). */
+s16 eft052_page_count_ck(u16 id, u8 use_rows);
+
+/* 0x80359628 - steps the item-hold strip's input (the confirm and cancel buttons) and answers 1 when the
+ * entry was taken, 2 when cancelled (GUESS name). */
+s32 eft052_hold_step(void);
+
+/* 0x80359B00 - draws the item-hold strip and its help lines for `mode` (GUESS name). */
+void eft052_hold_draw(s32 mode);
+
 /* The hold block's cursor row table value and its +0x0A word, through optional out pointers. */
 void eft052_hold_row_get(u16* out_row, s32* out_value);
 

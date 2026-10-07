@@ -456,8 +456,6 @@ u16 fn_802FB54C(s32);
 s16 fn_8033B6C0(s32, s32);
 s32 fn_8033B990(void);
 s32 fn_8033C1AC(void);
-s32 fn_80359628(void);
-s32 fn_80359B00(s32);
 s32 eft052_item_get_open(void *, void *);
 s32 eft052_item_get_step(void);
 s32 eft052_box_list_draw(s32, void*, void*, s32, s32);

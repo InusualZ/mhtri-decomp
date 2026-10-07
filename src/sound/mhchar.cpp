@@ -21,8 +21,8 @@
 #include "types.h"
 #include "mh3_pad.h" /* the owner header (rule 2) */
 #include "nw4r/math.h"
-#include "sound/se.h"
 #include "sound/mhchar.h"
+#include "sound/se.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "sys_mem.h"

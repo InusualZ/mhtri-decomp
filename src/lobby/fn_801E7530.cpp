@@ -895,7 +895,7 @@ void fn_801EC828(u8* self)
 
 void fn_801EC194(void)
 {
-    fn_80359B00(0);
+    eft052_hold_draw(0);
 }
 
 void fn_801E9FC8(void)

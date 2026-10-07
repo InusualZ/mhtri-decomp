@@ -16,8 +16,9 @@
  *   `eft052_hold_cursor_step`, `eft052_hold_row_get`, `eft052_hold_entry_set`, `eft052_hold_entry_copy`).
  *   GUESS (from each body and its callers): eft052_item_get_open, eft052_item_get_step, eft052_box_list_draw
  *   GUESS: eft052_item_box
+ *   GUESS (from each body and its lobby caller): eft052_hold_step, eft052_hold_draw
  * RESIDUALS. 33 rows unwritten: 0x80358B40-0x80358FB8 (`fn_80358B40`), 0x80359334-0x803594C8 (`eft052_hold_row_set`),
- *   0x80359628-0x8035BAB4 (31 rows, `fn_80359628` to `fn_8035B998`).
+ *   0x80359628-0x8035BAB4 (31 rows, `eft052_hold_step` to `fn_8035B998`).
  *   10 partial rows, including:
  *  - `eft052_hold_row_get`, `eft052_hold_cursor_step`: retail materialises `lbl_806BF368` once and keeps it in a
  *    register, ours re-materialises it at each use;

@@ -36,7 +36,9 @@
 #include "ef/eft009.h"       /* eft009_set_pos (rule 2: the owner's header) */
 #include "fn_8004CAD8.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#define assignVec3 assignVec3_hidden_ef_h
 #include "sound/mhchar.h"
+#undef assignVec3
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "stage/stg_w.h"
 

@@ -18,6 +18,7 @@
  *   `setTransferDisplayState` are GUESSes from their bodies and callers (the dump's `SaveLoad::DidGameIDChange` /
  *   `BTM_IsDeviceUp` at four of these addresses contradict the one-byte bodies).
  *   GUESS (from each body and its callers): rand_lcg_step
+ *   GUESS (from its body and its kitchen caller): str_tbl_course_get
  *   GUESS (from each body and its callers): system_stream_count_step, system_scene_reset, system_full_reset
  *   GUESS: `monster_size_value_get` (0x800CEE74, from its body and its quest-result caller).
  * RESIDUALS. 54 rows unwritten in 23 runs (and `TPLtexLoad`, written, at 0 %: ours emits the plain `TPLtexLoad`
@@ -305,7 +306,7 @@ u32 fn_800D2E68(u32 id) {
     return ((StrTbl*)get_str_tbl_ptr())->field_0x90[(u16)id];
 }
 
-u32 fn_800D2EA4(u32 id) {
+u32 str_tbl_course_get(u32 id) {
     return ((StrTbl*)get_str_tbl_ptr())->field_0xfc[(u16)id];
 }
 
