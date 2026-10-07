@@ -12,6 +12,9 @@ extern "C" {
 /* 0x804CC610 - invalidates the data-cache lines of the range. */
 void DCInvalidateRange(void* start, u32 nBytes); /* untyped: byte range */
 
+/* 0x804CC640 - writes back and invalidates the data-cache lines of the range. */
+void DCFlushRange(void* start, u32 nBytes); /* untyped: byte range */
+
 /* 0x804CC6A0 - flushes the data-cache lines of the range without waiting. */
 void DCFlushRangeNoSync(void* start, u32 nBytes); /* untyped: byte range */
 

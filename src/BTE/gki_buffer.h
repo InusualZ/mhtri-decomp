@@ -19,6 +19,16 @@ typedef struct BT_BUF {
     /* +0x08 */ u8 data[1];
 } BT_BUF; /* size: 0x09 */
 
+/* size: 0x0A - the sniff-mode parameters `BTM_SetPowerMode` takes. */
+typedef struct BtmPmPwrMode {
+    /* +0x00 */ u16 maxInterval;
+    /* +0x02 */ u16 minInterval;
+    /* +0x04 */ u16 attempt;
+    /* +0x06 */ u16 timeout;
+    /* +0x08 */ u8 mode;
+    /* +0x09 */ u8 pad_0x09;
+} BtmPmPwrMode; /* size: 0x0A */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,6 +41,18 @@ void BTA_HhSendData(u8 handle, BT_HDR* buf);
 
 /* 0x8047FE80 - closes the HID connection of `handle`. */
 void BTA_HhClose(u8 handle);
+
+/* 0x8047D7EC - sets whether the host is discoverable and connectable. */
+void BTA_DmSetVisibility(u8 discoverable, u8 connectable);
+
+/* 0x8047D8C8 - cancels a running device search. */
+void BTA_DmSearchCancel(void);
+
+/* 0x80483150 - restricts the frequency hopping to the channels from `first` to `last`; returns the stack's status. */
+u8 BTM_SetAfhChannels(u8 first, u8 last);
+
+/* 0x8048650C - requests the power mode `mode` for the device at `bdAddr`. */
+u8 BTM_SetPowerMode(u8 pmId, const u8* bdAddr, BtmPmPwrMode* mode);
 
 /* 0x804824F8 - drops the ACL link to the device at `bdAddr`. */
 void btm_remove_acl(u8* bdAddr);

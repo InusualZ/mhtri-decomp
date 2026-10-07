@@ -27,6 +27,9 @@ s32 SCSetWpadSpeakerVolume(u8 volume);
 /* 0x804DCCE0 - the stored Bluetooth pointer sensitivity (1..5). */
 u8 SCGetBtDpdSensibility(void);
 
+/* 0x804DCCB0 - stores the Bluetooth device table; non-zero on success. */
+s32 SCSetBtDeviceInfoArray(const void* array); /* untyped: the caller-owned device table */
+
 /* 0x804DC480 - writes the pending configuration back; `callback` gets the result (0 = ok). */
 void SCFlushAsync(void (*callback)(s32 result));
 
