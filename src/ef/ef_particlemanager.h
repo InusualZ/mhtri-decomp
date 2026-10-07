@@ -52,6 +52,8 @@ struct ParticleManager : ParticleManagerHead {
     virtual void Initialize();
     virtual void CreateParticle(u16 life, VEC3 pos, VEC3 vel, const MTX34* space, f32 momentum, u8* inherit, u32 reference,
                                 u16 remain);
+    virtual void Calc();                              /* +0x18: `ef_pm_calc` */
+    virtual void Draw(const struct EfDrawInfo* info); /* +0x1C: `ef_pm_draw` */
 }; /* size: 0x20 */
 #endif
 

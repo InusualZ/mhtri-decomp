@@ -35,10 +35,8 @@
  *  - `ef_field_random`: three products keep their operands in the other order (`fmuls f1, f1, f0`).
  *  - `ef_pm_calc`: the frame is 0x420 where retail's is 0x430 and the locals sit at other offsets; the field and
  *    post-field record addresses add their block sizes in another order (`lwz`/`add` scheduling).
- *  - `ef_pm_create_particle`: the arguments take r23-r29 with `self` in r30 where retail keeps `self` in r31, and
- *    the memory manager's slot +0x4C is called through a function-pointer table (`lwz r4`) where retail's is a
- *    virtual (`lwz r12`).
- *  - `ef_pm_draw`: retail tests the emitter's hidden bit as `beq` + `b` where ours branches once.
+ *  - `ef_pm_draw`: retail tests the emitter's hidden bit as `beq` + `b` where ours branches once (an early return
+ *    and a `bool` local give the same single branch).
  *   relocdiff: our `.ctors` word carries the symbol `lbl_8056F2DC`, retail's none.
  *   flipcheck: `.bss`, `.data` and `.sdata2` claimed, not emitted (`.sdata2` is a partial pool: flipcheck names a
  *   fold with `ef/ef_particle.cpp`, one shared literal; request #28 moves the seam).
@@ -48,6 +46,8 @@
  * SHAPES. The pointer asserts are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
  *   ("ef_particlemanager.cpp", "particle.h" or "res_emitter.h"); `#line` reproduces each assert's line (61, 72, 73,
  *   0x29E, 0x2D5, ...).
+ * SHAPES. The memory manager and the particle are classes with declared virtual tables (the particle's after a
+ *   0x1C-byte head): `ef_pm_create_particle` calls `AllocParticle` and `Initialize` as virtual members.
  * SHAPES. A particle's link sits at `manager->list.linkOffset` (`next` at `node + linkOffset + 4`, retail's `lhz
  *   r0,0x42(self)` + `lwz rX,4(r3)`); the offset is a runtime value, so the walk keeps the byte offset.
  */
@@ -156,11 +156,19 @@ struct EfPmManager;
 
 /* A particle on a manager's active list. Only the fields this unit touches are named; the link is
  * addressed through the list's own `linkOffset`, so no fixed link field is declared. */
-struct EfPmParticle {
+struct EfPmParticleHead {
     /* +0x00 */ u8 pad_0x00[0x0C];
     /* +0x0C */ s32 state;            /* 1 = created (ad/retire), 3 = retired */
     /* +0x10 */ u8 pad_0x10[0x0C];
-    /* +0x1C */ struct EfPmParticleSlots* slots; /* the particle class's table */
+}; /* size: 0x1C */
+
+struct EfPmParticle : EfPmParticleHead {
+    /* +0x1C: the particle class's vtable pointer; slot +0x10 initialises a freshly allocated particle (by-value
+     * position and velocity), nonzero on success.  Declared only. */
+    virtual void slot_0x08();
+    virtual void slot_0x0C();
+    virtual s32 Initialize(u16 life, nw4r::math::VEC3 pos, nw4r::math::VEC3 vel, EfPmManager* manager, s32 param0,
+                           f32 scale, s32 param1, s32 param2);
     /* +0x20 */ u8 animParams[0x20];  /* the block the curve tracks write at their target offset */
     /* +0x40 */ nw4r::math::VEC3 rotate; /* the signed-curve target (track target 0x20) */
     /* +0x4C */ u8 pad_0x4C[0x4A];
@@ -297,22 +305,28 @@ struct EfPmDrawSetting {
     /* +0xB4 */ f32 depthOffset;
 }; /* size: 0xB8 */
 
-/* The particle class's table: slot +0x10 initialises a freshly allocated particle (by-value position and
- * velocity), nonzero on success. */
-struct EfPmParticleSlots {
-    /* +0x00 */ u8 pad_0x00[0x10];
-    /* +0x10 */ s32 (*initialize)(EfPmParticle* self, u16 life, nw4r::math::VEC3 pos, nw4r::math::VEC3 vel,
-                                  EfPmManager* manager, s32 param0, f32 scale, s32 param1, s32 param2);
-}; /* size: 0x14 */
-
-/* The effect system's memory manager: its table's slot +0x4C allocates a particle. */
-struct EfPmMemoryManagerSlots {
-    /* +0x00 */ u8 pad_0x00[0x4C];
-    /* +0x4C */ EfPmParticle* (*allocParticle)(EfMemoryManager* self);
-}; /* size: 0x50 */
-
+/* The effect system's memory manager: its table's slot +0x4C allocates a particle (the slots before it are declared
+ * only to place it; the class's table is not this unit's). */
 struct EfMemoryManager {
-    /* +0x00 */ EfPmMemoryManagerSlots* slots;
+    /* +0x00: the vtable pointer */
+    virtual void slot_0x08();
+    virtual void slot_0x0C();
+    virtual void slot_0x10();
+    virtual void slot_0x14();
+    virtual void slot_0x18();
+    virtual void slot_0x1C();
+    virtual void slot_0x20();
+    virtual void slot_0x24();
+    virtual void slot_0x28();
+    virtual void slot_0x2C();
+    virtual void slot_0x30();
+    virtual void slot_0x34();
+    virtual void slot_0x38();
+    virtual void slot_0x3C();
+    virtual void slot_0x40();
+    virtual void slot_0x44();
+    virtual void slot_0x48();
+    virtual EfPmParticle* AllocParticle();
 }; /* size: 0x04 */
 
 /* The draw-strategy builder (`nw4r::ef::DrawStrategyBuilder`, defined elsewhere): its first virtual hands out the
@@ -588,11 +602,11 @@ extern "C" EfPmParticle* ef_pm_create_particle(EfPmManager* self, u16 life, cons
                                      const nw4r::math::VEC3* vel, s32 param0, f32 scale, s32 param1, s32 param2,
                                      u16 lifeAdd) {
     EfMemoryManager* mm = ef_system_memory_manager(((EfPmEmitterView*)self->managerEM)->effect->system);
-    EfPmParticle* p = mm->slots->allocParticle(mm);
+    EfPmParticle* p = mm->AllocParticle();
     if (p == NULL) {
         return NULL;
     }
-    if (p->slots->initialize(p, life, *pos, *vel, self, param0, scale, param1, param2) == 0) {
+    if (p->Initialize(life, *pos, *vel, self, param0, scale, param1, param2) == 0) {
         return NULL;
     }
     p->life += lifeAdd;
