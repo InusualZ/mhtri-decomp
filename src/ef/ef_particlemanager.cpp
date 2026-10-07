@@ -32,7 +32,8 @@
  *   (the colour fade's assert messages and constants, named from their text and value).
  * RESIDUALS. No row is unwritten.  The source order differs from retail's, so `.text`, extab and
  *   extabindex run in another order.
- *  - `ef_field_random`: three products keep their operands in the other order (`fmuls f1, f1, f0`).
+ *  - `ef_field_random`: the random-scaled push product inside the `vec3_scale_by` argument comes out
+ *    `fmuls f1, f0, f1` in either source order; a unit local fixes it but moves the argument `mr`s after it.
  *  - `ef_pm_calc`: the frame is 0x420 where retail's is 0x430 and the locals sit at other offsets; the field and
  *    post-field record addresses add their block sizes in another order (`lwz`/`add` scheduling).
  *  - `ef_pm_draw`: retail tests the emitter's hidden bit as `beq` + `b` where ours branches once (an early return
@@ -43,6 +44,7 @@
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_805013FC`,
  *     `MTX34RotAxisFIdx__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3f`.
  *   flipcheck: referenced but defined by nothing a flip can use: `fn_805013FC`, `fn_80501C80`.
+ * SHAPES. `ef_field_random` names the cone tilt's and the push's unit randoms as locals (retail's operand order).
  * SHAPES. The pointer asserts are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
  *   ("ef_particlemanager.cpp", "particle.h" or "res_emitter.h"); `#line` reproduces each assert's line (61, 72, 73,
  *   0x29E, 0x2D5, ...).
@@ -933,7 +935,8 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
         MTX34_ctor(&frame);
         ef_mtx34_from_y_axis(frame.m[0], &dir.x);
         if (ef_pm_f32_zero != p->diffusion) {
-            f32 tilt = (f32)(hash >> 16) / ef_pm_f32_65535 * p->diffusion;
+            f32 unit = (f32)(hash >> 16) / ef_pm_f32_65535;
+            f32 tilt = unit * p->diffusion;
             hash = ef_anim_rand_next(hash);
             f32 turn = ef_pm_f32_two * (ef_pm_f32_pi * ((f32)(hash >> 16) / ef_pm_f32_65535));
             hash = ef_anim_rand_next(hash);
@@ -945,14 +948,15 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
             if ((p->flags & 1) != 0) {
                 vec3_scale_by(&out->x, &out->x, p->power);
             } else {
-                vec3_scale_by(&out->x, &out->x, (f32)(hash >> 16) / ef_pm_f32_65535 * p->power);
+                vec3_scale_by(&out->x, &out->x, (f32)((f32)(hash >> 16) / ef_pm_f32_65535) * p->power);
             }
         } else {
             out->x = ef_pm_f32_zero;
             if ((p->flags & 1) != 0) {
                 out->y = p->power;
             } else {
-                out->y = (f32)(s16)(hash >> 16) / ef_pm_f32_32768 * p->power;
+                f32 r = (f32)(s16)(hash >> 16) / ef_pm_f32_32768;
+                out->y = r * p->power;
             }
             out->z = ef_pm_f32_zero;
         }
