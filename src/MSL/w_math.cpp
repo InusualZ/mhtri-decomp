@@ -7,8 +7,8 @@
  * FLAGS. the `OS` lib's `cflags_os` (these functions scored as written with it); compiled as C++ with `extern "C"`
  *    linkage; the body is the bit-by-bit square root.
  * NAMES. file name GUESS (MSL `w_*` wrappers merged); `acos`, `asin`, `atan2`, `fmod` name the unnamed thunks by their
- *    target, `__ieee754_sqrt` names the 0x248-byte body (GUESS: the fdlibm bit-by-bit root) and `__libm_unused_stub`
- *    the bare return (GUESS).
+ *    target, `__ieee754_sqrt` names the 0x248-byte body (GUESS: the fdlibm bit-by-bit root) and `nan`
+ *    the bare return (GUESS: `__strtold` passes its `NAN(` tag buffer and takes the double result).
  * EVIDENCE. each thunk is a single `b` to the matching fdlibm unit (e_acos, e_asin, e_atan2, e_fmod, e_log10,
  *    e_pow); the 0x248-byte function reads `errno`, `__float_nan` and `.sdata2` 0x8079CF38 (`1.0`).
  * RESIDUALS. COARSE: the thunks may be several files; no data separates them.
@@ -171,7 +171,7 @@ extern "C" f64 __ieee754_sqrt(f64 x)
     return z;
 }
 
-extern "C" void __libm_unused_stub(void)
+extern "C" f64 nan(const char* tag)
 {
 }
 

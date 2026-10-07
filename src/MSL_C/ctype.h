@@ -22,6 +22,11 @@ static inline int ctype_class(int c, int mask)
     return ctype_out_of_range(c) ? 0 : (_current_locale.ctype->ctype_map[c] & mask);
 }
 
+static inline int ctype_wclass(int c, int mask)
+{
+    return (u32)c >= 0x100 ? 0 : (_current_locale.ctype->wctype_map[c] & mask);
+}
+
 static inline int ctype_toupper(int c)
 {
     return ctype_out_of_range(c) ? c : _current_locale.ctype->upper_map[c];

@@ -1355,7 +1355,7 @@ config.libs = [
             Object(Matching, "TRK/serpoll.c"),
             Object(NonMatching, "TRK/support.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/targcont.c"),
-            Object(NonMatching, "TRK/msg.c"),
+            Object(Matching, "TRK/msg.c"),
             Object(NonMatching, "TRK/msgbuf.c"),
             Object(NonMatching, "TRK/msghndlr.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/mslsupp.c"),

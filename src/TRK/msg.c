@@ -7,9 +7,7 @@
  * NAMES. file name GUESS (MetroTRK `msg`); `trk_message_id_counter` and `trk_write_uart_error_format` are GUESS (the
  *    sequence word the function bumps and the report string it prints).
  * EVIDENCE. `.data` 0x8060F758 (`MetroTRK - TRK_WriteUARTN returned %ld`) and `.sbss` 0x80794E68 are read only by it.
- * RESIDUALS. the id lives in r4 where the target uses r0 and the target zero-extends it (`clrlwi`) before the increment, which
- *    the compiler omits (96 B vs 100 B); the `OSReport` call goes through a fixed-argument prototype so it
- *    carries no `crclr`, as the target.
+ * RESIDUALS. none; the `OSReport` call goes through a fixed-argument prototype so it carries no `crclr`, as the target.
  * SHAPES. the id counter skips 0 on wrap; a failed UART write is reported through `OSReport`.
  */
 #include "TRK/msg.h"
@@ -26,14 +24,12 @@ static u16 trk_message_id_counter;
 
 s32 TRK_MessageSend(TRKBuffer* buffer)
 {
-    u16 id = trk_message_id_counter;
     s32 err;
 
-    if (id == 0) {
-        id = 1;
+    if (trk_message_id_counter == 0) {
+        trk_message_id_counter = 1;
     }
-    ((TRKFrame*)buffer->data)->message_id = id;
-    trk_message_id_counter = id + 1;
+    ((TRKFrame*)buffer->data)->message_id = trk_message_id_counter++;
     err = TRK_WriteUARTN(buffer->data, buffer->length);
     if (err != 0) {
         TRK_REPORT_S32("MetroTRK - TRK_WriteUARTN returned %ld\n", err);
