@@ -1,19 +1,18 @@
-/* lobby/lb_quest_ui.cpp - the lobby NPC talk program, the kitchen screen, the trade screen and the scene effect.
- * RANGE. .text 0x8038EC44-0x80394158 (66 functions); .data 0x805F0CB8-0x805F1400 (ends with the camera key table),
- *   .sdata 0x807933D8-0x80793470, .sdata2 0x8079C298-0x8079C2D0, extab, extabindex.  Four groups in address order: the
- *   note-pane NPC talk program (0x8038EC44-0x8038F2BC, on `enemy/note_work.h`'s `NoteWork`), the kitchen screen (lobby
+/* lobby/lb_quest_ui.cpp - the lobby kitchen screen, the trade screen and the scene effect.
+ * RANGE. .text 0x8038F2BC-0x80394158 (55 functions); .data 0x805F0CB8-0x805F1400 (ends with the camera key table),
+ *   .sdata 0x807933D8-0x80793470, .sdata2 0x8079C2A8-0x8079C2D0, extab 0x800181F4-0x80018344, extabindex
+ *   0x80038154-0x8003834C.  Three groups in address order: the kitchen screen (lobby
  *   screen 0x11, to 0x803928F0), the trade screen (screen 0x12, to 0x80393994) and the scene effect (effect 0x36),
  *   whose tail is `lb_scene_model_slide` and the two helpers after it (0x80394038-0x80394158).
  * FLAGS. `cflags_lobby`; `#pragma pool_data off` (retail loads every table with its own `lis`/`addi`); `#pragma peephole off` file-wide (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi` +
  *   `slwi` unfused; every written row measured better with it off); `#pragma optimization_level 4` around
  *   `lb_trade_msg_draw` (retail's subi + cmplwi switch-range lowering, playbook 108).
- * NAMES. `lb_quest_ui` is the registered GUESS; the groups' names (`note_talk_*`, `lb_kitchen_*`, `lb_trade_*`,
+ * NAMES. `lb_quest_ui` is the registered GUESS; the groups' names (`lb_kitchen_*`, `lb_trade_*`,
  *   `lb_scene_eft_*`) and every data name are GUESSes from the bodies: the kitchen pays zenny or resource points for a
  *   pair of ingredients (`lb_kitchen_pair_find` keys the pair tables on the two groups) and fills `lb_param_w`'s meal
  *   skills; the trade screen exchanges `NetCtrlWk::getServerNotice`'s offers.  `lb_kitchen_idle_ck` answers whether
  *   the kitchen is outside its menu states 2..4.
- *   GUESS: `note_turn_step`, `note_talk_frame`, `note_talk_mode_step`, `note_talk_noop`,
- *   GUESS: `note_talk_state_step`, `lb_kitchen_tri_sum`, `lb_kitchen_pair_index`, `lb_kitchen_pair_seen_set`,
+ *   GUESS: `lb_kitchen_tri_sum`, `lb_kitchen_pair_index`, `lb_kitchen_pair_seen_set`,
  *   GUESS: `lb_kitchen_pair_seen_ck`, `lb_kitchen_close`, `lb_kitchen_page_set`, `lb_kitchen_row_copy`,
  *   GUESS: `lb_kitchen_course_ck`, `lb_kitchen_pick_reset`, `lb_kitchen_pick_input`,
  *   GUESS: `lb_kitchen_list_page_set`, `lb_kitchen_special_open`, `lb_kitchen_pair_find`,
@@ -26,8 +25,7 @@
  *   GUESS: `lb_trade_list_draw`, `lb_trade_cost_draw`, `lb_trade_msg_draw`, `lb_trade_draw_task`,
  *   GUESS: `lb_scene_eft_spawn`, `lb_scene_eft_release`, `lb_scene_eft_step`, `lb_scene_model_slide`,
  *   GUESS: `lb_quest_board_state_next`, `lb_quest_board_effect_retire`
- *   GUESS: `note_talk_step`, `note_idle_set`, `note_talk_init`, `note_talk_wait_step`, `note_talk_greet_step`,
- *   GUESS: `note_talk_react_step`, `lb_kitchen_open`, `lb_kitchen_courses_roll`, `lb_kitchen_special_input`,
+ *   GUESS: `lb_kitchen_open`, `lb_kitchen_courses_roll`, `lb_kitchen_special_input`,
  *   GUESS: `lb_kitchen_bonus_roll`, `lb_kitchen_extra_roll`, `lb_kitchen_step`, `lb_kitchen_course_draw`,
  *   GUESS: `lb_kitchen_special_screen_draw`, `lb_trade_offer_state`, `lb_scene_eft_init`, `lb_scene_eft_move`
  * RESIDUALS. Every row is written.
@@ -46,9 +44,8 @@
  *  - `lb_trade_list_draw`: retail scales the offer index by 4 twice (a 4-byte-element table), ours by 16 once;
  *  - `lb_kitchen_meal_serve`: the two rare bytes load in the other order; `lb_trade_page_set`: register order.
  *   flipcheck: `.data`/`.sdata` are emitted byte-identical (tables defined before their first users, strings as
- *   literals); `.sdata2` cannot match from one TU - the target pools 1.0f twice (0x8079C2A4 for the talk program,
- *   0x8079C2AC for the scene effect), so the talk program 0x8038EC44-0x8038F2BC is a separate TU (seam request filed);
- *   `.text`/extab/extabindex short of the claim.
+ *   literals); the NPC talk program 0x8038EC44-0x8038F2BC is `lobby/lb_note_talk.cpp` (retail pools 1.0f once per
+ *   unit: 0x8079C2A4 for the talk program, 0x8079C2AC for the scene effect); `.text`/extab/extabindex short of the claim.
  */
 
 #pragma pool_data off
@@ -104,14 +101,11 @@
 #include "main.h"
 #include "stage/stg_w.h"
 #include "Network/network_pat_control.h"
-#include "enemy/note_work.h"
 #include "sound/mhchar.h"
 #include "stage/get_now_mapno.h"
 #include "mh3_pad/system_w.h"
 #include "g3d/g3d_calcworld.h"
 #include "ef/eft028_set_scaled.h"
-#include "enemy/em_prog_support.h"
-#include "menu/note_pane_player_near_ck.h"
 
 
 
@@ -141,12 +135,6 @@ typedef struct LbSceneEmitter {
 extern "C" {
 
 /* The unit's own entry points the bodies below reach before their definitions (or that are unwritten). */
-void note_talk_wait_step(NoteWork* self);
-void note_talk_greet_step(NoteWork* self);
-void note_talk_react_step(NoteWork* self);
-void note_talk_state_step(NoteWork* self);
-void note_idle_set(NoteWork* self);
-s32 note_talk_step(NoteWork* self);
 void lb_kitchen_page_set(LbKitchenWork* work, s16 page);
 void lb_kitchen_row_copy(LbKitchenRow* dst, const LbKitchenRow* src);
 void lb_kitchen_courses_roll(LbKitchenWork* work, s16 course);
@@ -171,246 +159,6 @@ void lb_scene_eft_move(_EFT* self);
 u8 lb_scene_model_slide(_EFT* self, LbQuestDetailModel* model, u8 index);
 void lb_quest_board_state_next(_EFT* self);
 void lb_quest_board_effect_retire(_EFT* self);
-
-/* --------------------------------------------------------------------------------------------- *
- * The note-pane NPC talk program.
- * --------------------------------------------------------------------------------------------- */
-
-/* 0x8038EC44 (0x284): Runs one frame of the NPC's talk: re-arms the player's talk wait, opens the talk the remaining
- * count selects and closes it when the message window does; 0 once the talk has ended. */
-s32 note_talk_step(NoteWork* self) {
-    _PLW* plw = my_player_work_get();
-
-    if (userdata_progress_flag_ck(19) == 1) {
-        plw->talk_left_0x669 = 3;
-    }
-    if (plw->talk_wait_0x668 == 0) {
-        plw->talk_left_0x669--;
-        npc_talk_end();
-        return 0;
-    }
-    plw->talk_wait_0x668 = 5;
-    switch (plw->talk_left_0x669) {
-    default:
-        plw->talk_wait_0x668 = 0;
-        return 0;
-    case 1:
-        switch (self->talk_step_0x1B5) {
-        case 0:
-            self->talk_step_0x1B5++;
-            npc_talk_start(0, 0, 0, 1);
-            se_talk_point_set(&self->vec_0x170);
-            break;
-        case 1:
-            if (npc_talk_active_ck() == 0) {
-                plw->talk_wait_0x668 = 0;
-                self->talk_step_0x1B5 = 0;
-                return 0;
-            }
-            break;
-        }
-        break;
-    case 2:
-        switch (self->talk_step_0x1B5) {
-        case 0:
-            if (Pl_item_timer_get(plw, 29) >= 1) {
-                self->talk_step_0x1B5 = 1;
-                npc_talk_start(0, 9, 0, 1);
-                se_talk_point_set(&self->vec_0x170);
-            } else {
-                self->talk_step_0x1B5 = 2;
-                npc_talk_start(0, 14, 0, 1);
-                se_talk_point_set(&self->vec_0x170);
-            }
-            break;
-        case 1:
-            if (npc_talk_active_ck() == 0) {
-                plw->talk_wait_0x668 = 0;
-                self->talk_step_0x1B5 = 0;
-                pl_item_add(plw, 29, -1);
-                userdata_progress_flag_set(19);
-                pl_model_state_set(plw, 1, 40, 0);
-                return 0;
-            }
-            break;
-        case 2:
-            if (npc_talk_active_ck() == 0) {
-                plw->talk_wait_0x668 = 0;
-                plw->talk_left_0x669--;
-                self->talk_step_0x1B5 = 0;
-                return 0;
-            }
-            break;
-        }
-        break;
-    case 3:
-        switch (self->talk_step_0x1B5) {
-        case 0:
-            self->talk_step_0x1B5++;
-            npc_talk_start(0, 18, 0, 1);
-            se_talk_point_set(&self->vec_0x170);
-            break;
-        case 1:
-            if (npc_talk_active_ck() == 0) {
-                plw->talk_wait_0x668 = 0;
-                plw->talk_left_0x669--;
-                self->talk_step_0x1B5 = 0;
-                return 0;
-            }
-            break;
-        }
-        break;
-    }
-    return 1;
-}
-
-/* 0x8038EEC8 (0x54): Moves the work's 16-bit angle one 1820-step towards its target, snapping when it is inside one
- * step, and wrapping through 0 the way the record's own 16-bit field does. */
-void note_turn_step(NoteWork* self) {
-    u32 target = self->field_0x1A8;
-    u32 cur = self->field_0x18C;
-    u16 diff = (u16)(target - (u16)cur);
-    if ((u16)(diff + 1820) < 3640) {
-        self->field_0x18C = target;
-    } else if (diff < 0x8000) {
-        self->field_0x18C = (u16)(cur + 1820);
-    } else {
-        self->field_0x18C = (u16)(cur - 1820);
-    }
-}
-
-/* 0x8038EF1C (0xC): Puts the pane back on its idle animation pair. */
-void note_idle_set(NoteWork* self) {
-    note_pane_set_anim_pair(self, 0, 0);
-}
-
-/* 0x8038EF28 (0x74): Places the NPC at its spot facing +0x4000, hides model part 22 and starts it idling. */
-void note_talk_init(NoteWork* self) {
-    self->field_0x001 = 1;
-    self->vec_0x170.x = -849.0f;
-    self->vec_0x170.y = 263.0f;
-    self->vec_0x170.z = 252.0f;
-    self->field_0x18C = 0x4000;
-    self->field_0x1A8 = 0x4000;
-    self->talk_step_0x1B5 = 0;
-    self->model.setVisibility(22, false);
-    note_idle_set(self);
-}
-
-/* 0x8038EF9C (0x50): Runs the program's frame: the state arm, once more when the work raised its one-shot flag, then
- * the turn step. */
-void note_talk_frame(NoteWork* self) {
-    note_talk_state_step(self);
-    if (self->field_0x1A1 == 1) {
-        note_talk_state_step(self);
-        self->field_0x1A1 = 0;
-    }
-    note_turn_step(self);
-}
-
-/* 0x8038EFEC (0xB0): The waiting mode: starts the idle motion and a 200-frame countdown, idles when it runs out and
- * goes to the greeting pair once the player comes near. */
-void note_talk_wait_step(NoteWork* self) {
-    switch (self->field_0x169) {
-    case 0:
-        self->field_0x169++;
-        note_pane_mode_set(self, 0);
-        note_pane_motion_set(self, 1, 4, 0);
-        self->field_0x16C = 200;
-        self->field_0x1B0 = 1.0f;
-        break;
-    case 1:
-        if (--self->field_0x16C < 0) {
-            note_idle_set(self);
-        }
-        if (note_pane_player_near_ck(self) == 1) {
-            note_pane_set_anim_pair(self, 0, 1);
-        }
-        break;
-    }
-}
-
-/* 0x8038F09C (0xB4): The greeting mode: starts the greeting motion, turns to the player and talks until the talk
- * ends, then goes back to the idle pair 2. */
-void note_talk_greet_step(NoteWork* self) {
-    _PLW* plw = my_player_work_get();
-
-    switch (self->field_0x169) {
-    case 0:
-        self->field_0x169++;
-        note_pane_mode_set(self, 0);
-        note_pane_motion_start(self, 2, 4, 0);
-        note_talk_step(self);
-        self->field_0x1A8 = calcVecAng2(&self->vec_0x170, &plw->vec_0x03C);
-        break;
-    case 1:
-        if (note_talk_step(self) == 0) {
-            note_pane_set_anim_pair(self, 0, 2);
-        }
-        break;
-    }
-}
-
-/* 0x8038F150 (0x114): The reaction mode: plays the reaction motion, turns to the player when near and talks; idles
- * when the motion or the talk ends. */
-void note_talk_react_step(NoteWork* self) {
-    _PLW* plw = my_player_work_get();
-
-    switch (self->field_0x169) {
-    case 0:
-        self->field_0x169++;
-        note_pane_mode_set(self, 0);
-        note_pane_motion_start(self, 3, 6, 0);
-        npc_talk_flag_set(45);
-        break;
-    case 1:
-        if (note_pane_player_near_ck(self) == 1) {
-            self->field_0x169++;
-            self->field_0x1A8 = calcVecAng2(&self->vec_0x170, &plw->vec_0x03C);
-        } else if (note_pane_motion_end_ck(self) != 0) {
-            note_idle_set(self);
-        }
-        break;
-    case 2:
-        if (note_talk_step(self) == 0) {
-            note_idle_set(self);
-        } else if (note_pane_motion_end_ck(self) != 0) {
-            note_pane_set_anim_pair(self, 0, 1);
-        }
-        break;
-    }
-}
-
-/* 0x8038F264 (0x30): Runs the mode the work's +0x19F byte selects. */
-void note_talk_mode_step(NoteWork* self) {
-    switch (self->field_0x19F) {
-    case 0:
-        note_talk_wait_step(self);
-        break;
-    case 1:
-        note_talk_greet_step(self);
-        break;
-    case 2:
-        note_talk_react_step(self);
-        break;
-    }
-}
-
-/* 0x8038F294 (0x4): The empty state arm. */
-void note_talk_noop(void) {
-}
-
-/* 0x8038F298 (0x24): Runs the arm the work's +0x19D byte selects. */
-void note_talk_state_step(NoteWork* self) {
-    switch (self->field_0x19D) {
-    case 0:
-        note_talk_mode_step(self);
-        break;
-    case 1:
-        note_talk_noop();
-        break;
-    }
-}
 
 /* --------------------------------------------------------------------------------------------- *
  * The kitchen screen.

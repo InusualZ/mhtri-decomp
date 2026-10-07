@@ -1831,13 +1831,19 @@ enemy/em009_act.cpp:
 	.data       start:0x805EF990 end:0x805F0CB8
 	.sdata2     start:0x8079BFF8 end:0x8079C298
 
+lobby/lb_note_talk.cpp:
+	extab       start:0x800181C4 end:0x800181F4
+	extabindex  start:0x8003810C end:0x80038154
+	.text       start:0x8038EC44 end:0x8038F2BC
+	.sdata2     start:0x8079C298 end:0x8079C2A8
+
 lobby/lb_quest_ui.cpp:
-	extab       start:0x800181C4 end:0x80018344
-	extabindex  start:0x8003810C end:0x8003834C
-	.text       start:0x8038EC44 end:0x80394158
+	extab       start:0x800181F4 end:0x80018344
+	extabindex  start:0x80038154 end:0x8003834C
+	.text       start:0x8038F2BC end:0x80394158
 	.data       start:0x805F0CB8 end:0x805F1400
 	.sdata      start:0x807933D8 end:0x80793470
-	.sdata2     start:0x8079C298 end:0x8079C2D0
+	.sdata2     start:0x8079C2A8 end:0x8079C2D0
 
 lobby/lb_quest_board.cpp:
 	extab       start:0x80018344 end:0x80018444
