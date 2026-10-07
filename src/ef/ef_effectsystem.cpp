@@ -12,26 +12,27 @@
  *   0x80795FF8-0x80796000.
  * FLAGS. `cflags_main` plus `-pool off` (configure.py: the static initializer addresses each static with its own
  *   `lis`/`addi`); `#pragma peephole off` from `Initialize` on (the table stores as `lis` + `addi r0` + `stw r0`, the
- *   sweeps' unfused `clrlwi` + `slwi`) and `#pragma dont_inline on` at the end (the implicit constructors stay out of
- *   line, as retail's).
+ *   sweeps' unfused `clrlwi` + `slwi`); `#pragma dont_inline on` over `Initialize` (retail calls its inline helpers)
+ *   and again at the end (the implicit constructors stay out of line, as retail's).
  * NAMES. The classes are nw4r's (`DrawOrder`, `DrawStrategyBuilder`, `EmitterFormBuilder`, `DrawInfo`); `EfSys`
  *   keeps this layout's own name while `ef.h` carries an `EffectSystem` stub.  The other functions keep `fn_`
- *   stems except `RetireEffect`, written as an `nw4r::ef::EffectSystem` member.
+ *   stems except `RetireEffect`, written as an `nw4r::ef::EffectSystem` member, and the four inline helpers
+ *   after `Initialize`, named by the compiler's manglings (`Srand__Q34nw4r2ef6RandomFUl`, `__dla__FPvPv`,
+ *   `__ct__17EfSysActivityListFv`, `__nwa__FUlPv`).
  *   GUESS (from the body and its callers): `ef_draw_info_projection`.
  *   GUESS: `sDrawOrder`, `sDrawStrategyBuilder`, `sEmitterFormBuilder`, `sDrawInfo` (the statics, named for their
  *   class), `ef_system_version_registered` (the once-flag the system's constructor tests).
- * RESIDUALS. 4 partial rows:
- *  - `fn_800A56B0` (ours 0x24C of 0x250): the two allocation sizes share the `maxGroupID * 0x1C` product, which
- *    MWCC computes once into a callee-saved register where retail has one `mulli` per call;
+ * RESIDUALS. 3 partial rows:
  *  - `fn_800A5D8C`, `fn_800A5E6C`, `fn_800A5F4C` (ours 0xE8 of 0xE0 each): retail keeps `groupID * 0x1C` in a
  *    callee-saved register across the `Panic` and reuses it, ours re-materialises the `mulli` per use; a group
- *    pointer local and a scaled index local both score lower.
- *   flipcheck: `.data` and `.sdata2` are byte-identical; `.text` differs in the rows above (0xBBC of 0xBA8).
+ *    pointer local, a scaled index local, an `int` group, hoisted `num`/`i` declarations and the expression-form
+ *    assert all score the same or lower.
+ *   flipcheck: `.data` and `.sdata2` are byte-identical; `.text` differs in the rows above (0xBC0 of 0xBA8).
  * SHAPES. `#line` puts each assert on retail's line (0x4F, 0x50, 0x67, 0x7B, 0x83, 0x9F, 0xA0, 0xB2, 0xC9, 0xDD).
- * SHAPES. The group table uses the compiler's array form: the allocator call, the shim and
- *   `__construct_new_array(block, fn_800A590C, NULL, 0x1C, maxGroupID)` inside one try/catch whose handler calls
- *   the empty `fn_800A5908` and rethrows with `__throw(0, 0, 0)` declared `noreturn` (a source `throw;` adds the
- *   `__end__catch` bookkeeping and an extab action word).
+ * SHAPES. The group table is `new (allocator->Alloc(n * 0x1C + 0x20)) EfSysActivityList[n]` with the allocation
+ *   as the placement argument (a named block local shares the `mulli` and swaps the loop registers); the
+ *   compiler emits the size, the `__construct_new_array` try/catch and the inline helpers after the function in
+ *   the reverse order of use (`Srand`, placement `delete[]`, the record constructor, placement `new[]`).
  * SHAPES. The effect object and the memory manager are classes with virtual tables (the effect's after a 0x1C-byte
  *   head, at +0x1C): `CreateEffect` calls `GetEffect`/`ReleaseEffect`/`Create` as virtual members, dispatching
  *   through r3/r12 as retail does.
@@ -52,6 +53,7 @@
 #include "ef/ef_emform.h" /* nw4r::ef::EmitterFormBuilder (rule 1) */
 #include "ef/ef_drawstrategyimpl.h" /* nw4r::ef::DrawStrategyBuilder (rule 1) */
 #include "ef/ef_effectsystem.h" /* EfSys, the unit's own header */
+#include "MSL/new.h" /* the placement array forms */
 
 namespace nw4r {
 namespace db {
@@ -131,10 +133,6 @@ char ef_effectsystem_err_list_size[] = "NW4R:Failed assertion UtlistSize(&mActiv
 extern "C" {
 /* this unit's own symbols */
 u32 fn_800A56B0(EfSys* self, u32 maxGroupID);
-void fn_800A5900(u32* random, u32 seed);
-void fn_800A5908(void* array, void* block);
-void* fn_800A590C(void* element);
-void* fn_800A5940(u32 size, void* block);
 u32 fn_800A5948(EfSys* self, EfSysEffect* target);
 EfSysEffect* fn_800A5A90(EfSys* self, void* emitter, u32 groupID, u16 flag);
 u32 fn_800A5D8C(EfSys* self, u32 groupID);
@@ -160,9 +158,6 @@ u16 fn_8009B374(void* list, void** buf, u16 size);
 void* mtx34_identity(void* mtx);
 void* mtx34_get_ptr(void* mtx);
 void* mtx34_const_ptr(const void* src);
-void* __construct_new_array(void* block, void* (*ctor)(void*), void (*dtor)(void*), u32 size,
-                            u32 count);
-void __throw(void*, void*, void*) __attribute__((noreturn)); /* the EABI rethrow */
 void PSMTXCopy(const void* src, void* dst);
 }
 
@@ -264,64 +259,41 @@ static inline EfSysMemoryManager* EfGetMemoryManager(EfSys* self) {
 
 #pragma peephole off
 
+/* Seeds the random state word. */
+inline void nw4r::ef::Random::Srand(u32 seed) {
+    mState = seed;
+}
+
+/* Initialises the record's live list with a zero link offset. */
+inline EfSysActivityList::EfSysActivityList() {
+    fn_800A4030(this, 0);
+}
+
+#pragma dont_inline on
+
 /* ===================================================================================================
  * 0x800A56B0 - `Initialize`: build the group table and bind the borrowed objects.
  * =================================================================================================== */
 
 extern "C" u32 fn_800A56B0(EfSys* self, u32 maxGroupID) {
-    EfSysActivityList* list;
-    void* block;
-
 #line 79
     NW4R_POINTER_ASSERT(self->mMemoryManager, ef_effectsystem_err_memory_manager);
 #line 80
     NW4R_ASSERT(maxGroupID > 0, ef_effectsystem_err_max_group);
     self->mMaxGroupID = maxGroupID;
-    block = self->mMemoryManager->Alloc(maxGroupID * 0x1C + 0x20);
-    list = (EfSysActivityList*)fn_800A5940(maxGroupID * sizeof(EfSysActivityList) + 0x10, block);
-    if (list != NULL) {
-        try {
-            list = (EfSysActivityList*)__construct_new_array(list, fn_800A590C, NULL,
-                                                            sizeof(EfSysActivityList), maxGroupID);
-        } catch (...) {
-            fn_800A5908(list, block);
-            __throw(0, 0, 0);
-        }
-    }
-    self->mActivityList = list;
-    for (u32 i = 0; i < self->mMaxGroupID; i++) {
+    self->mActivityList = new (self->mMemoryManager->Alloc(maxGroupID * 0x1C + 0x20)) EfSysActivityList[maxGroupID];
+    for (u32 i = 0; i < self->mMaxGroupID; ++i) {
         fn_800A4030(&self->mActivityList[i], 0x14);
         ef_activity_list_clear(&self->mActivityList[i]);
     }
-    fn_800A5900(&self->mRandom, 0);
+    self->mRandom.Srand(0);
     self->mDrawOrder = &nw4r::ef::sDrawOrder;
     self->mStrategy = &nw4r::ef::sDrawStrategyBuilder;
     self->mLineStrategy = &nw4r::ef::sEmitterFormBuilder;
     return 1;
 }
 
-/* 0x800A5900 - the random block's seed setter (ef/ef_emitter.cpp calls it with the same shape). */
-extern "C" void fn_800A5900(u32* random, u32 seed) {
-    *random = seed;
-}
-
-/* 0x800A5908 - the array form's release hook (empty in this build). */
-extern "C" void fn_800A5908(void* array, void* block) {
-    (void)array;
-    (void)block;
-}
-
-/* 0x800A590C - the array element constructor the compiler's array form calls. */
-extern "C" void* fn_800A590C(void* element) {
-    fn_800A4030(element, 0);
-    return element;
-}
-
-/* 0x800A5940 - the allocation shim the compiler's array form calls; it hands the block back. */
-extern "C" void* fn_800A5940(u32 size, void* block) {
-    (void)size;
-    return block;
-}
+#pragma dont_inline reset
 
 /* 0x800A5948 - retires one effect on the spot: move it to its group's retiring list and mark it done. */
 extern "C" u32 fn_800A5948(EfSys* self, EfSysEffect* target) {

@@ -8,6 +8,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef/ef_random.h"
 
 /* The library's list record: head, tail, live count and the link offset `fn_800A4030` sets. */
 typedef struct EfSysList {
@@ -22,6 +23,8 @@ typedef struct EfSysList {
 typedef struct EfSysActivityList {
     /* +0x00 */ EfSysList mActiveList;
     /* +0x0C */ EfSysList mRetireList;
+    EfSysActivityList(); /* defined inline by ef/ef_effectsystem.cpp */
+
     /* +0x18 */ u16 mNumActive;
     /* +0x1A */ u16 pad_0x1A;
 } EfSysActivityList; /* size: 0x1C */
@@ -74,7 +77,7 @@ public:
     /* +0x0010 */ u8 mCreationQueue[0xC004]; /* the queue the constructor builds (`fn_800A2FA4`) */
     /* +0xC014 */ u32 mMaxGroupID;
     /* +0xC018 */ EfSysActivityList* mActivityList;
-    /* +0xC01C */ u32 mRandom;          /* the seed fn_800A5900 writes (ef/ef_emitter.cpp reads the same word) */
+    /* +0xC01C */ nw4r::ef::Random mRandom;
     /* +0xC020 */ nw4r::math::VEC3 mRefPos; /* copyVec3 copies the caller's vector into it */
     /* +0xC02C */ nw4r::math::MTX34 mRefMtx;
     /* +0xC05C */ f32 mRangeB;

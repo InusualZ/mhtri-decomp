@@ -63,6 +63,7 @@
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "ef/ef_util.h" /* ef_mtx34_column_length, owned by ef_util.cpp's range (rule 2) */
 #include "draw_shape/mtx34_copy.h" /* mtx34_copy, owned by draw_shape.cpp's range (rule 2) */
+#include "ef/ef_random.h" /* nw4r::ef::Random, seeded through its Srand (rule 1) */
 
 namespace nw4r {
 namespace db {
@@ -135,7 +136,6 @@ void ef_ref_object_add_ref(void* p);
 void fn_800A3390(void* dst, const void* src);
 void fn_800A3800(void* p);
 void ef_effect_set_calc_flag(void* manager, s32 flag);
-void fn_800A5900(void* random, u32 seed);
 void* fn_800A5484(void* p);
 void* fn_800A60C0(void* manager);
 void fn_800A52E4(void* manager, void* cb, void* arg, s32 flag, void* self);
@@ -186,11 +186,6 @@ typedef struct EfList {
     /* +0x10 */ void* field_0x10;
     /* +0x14 */ void* field_0x14;
 } EfList; /* size: 0x18 */
-
-/* The random block `fn_800A5900` seeds and `ef_random_float` steps. */
-typedef struct EfRandom {
-    /* +0x00 */ u32 state;
-} EfRandom; /* size: 0x04 */
 
 /* The parameter record the object is initialised from (`em` in fn_800A6A04's body).  Only the
  * offsets this unit reads are named; the record continues past them. */
@@ -331,7 +326,7 @@ typedef struct EfEmitterObj {
     /* +0x0E4 */ u32 field_0x0E4;
     /* +0x0E8 */ u16 field_0x0E8;
     /* +0x0EA */ u16 seed;
-    /* +0x0EC */ EfRandom random;
+    /* +0x0EC */ nw4r::ef::Random random;
     /* +0x0F0 */ void* field_0x0F0;
     /* +0x0F4 */ EfEmitterObj* parent;
     /* +0x0F8 */ void* orig;
@@ -737,7 +732,7 @@ extern "C" s32 fn_800A6A04(EfEmitterObj* self, void* eh, EfEmitterManager* ef) {
     if (self->seed == 0) {
         self->seed = ef_random_u16(&ef->effect->random);
     }
-    fn_800A5900(&self->random, self->seed);
+    self->random.Srand(self->seed);
     self->animate_0x4C[0] = work->vec_0x1C[0];
     self->animate_0x4C[1] = work->vec_0x1C[1];
     self->animate_0x4C[2] = work->vec_0x1C[2];
@@ -1176,7 +1171,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
     }
     self->field_0x0E0 = self->interval;
     if (self->rate != lbl_80796004) {
-        f32 r = ef_random_float(&self->random.state);
+        f32 r = ef_random_float(&self->random.mState);
         self->field_0x0E0 +=
             (u16)(s32)(ef_truncate_float(((f32)self->interval * self->rate) - lbl_8079601C) * r);
     }
@@ -1189,7 +1184,7 @@ extern "C" void fn_800A834C(EfEmitterObj* self, EfParticleRec* pm, const nw4r::m
         } else {
             step = self->scale_0x028.scale +
                    self->scale_0x028.scale * self->scale_step *
-                       (lbl_80796020 * ef_random_float(&self->random.state) - lbl_8079601C);
+                       (lbl_80796020 * ef_random_float(&self->random.mState) - lbl_8079601C);
         }
         if ((self->flags2 & 0x100) != 0) {
             EfEffectData* effect = self->managerEF->effect;
