@@ -241,10 +241,10 @@ typedef struct LbCmdSub13 {          /* sub 0x13: a word, two halfwords and a by
     /* +0x0D */ u8 unused_0x0D[0x3];
 } LbCmdSub13; /* size: 0x10 */
 
-typedef struct LbCmdSub16 {          /* sub 0x16: a word and two signed bytes */
+typedef struct LbCmdSub16 {          /* sub 0x16: a word and two bytes */
     /* +0x00 */ u32 head_0x00;
     /* +0x04 */ s32 value_0x04;
-    /* +0x08 */ s8 flag_0x08;
+    /* +0x08 */ u8 flag_0x08;
     /* +0x09 */ u8 value_0x09;
     /* +0x0A */ u8 unused_0x0A[0x2];
 } LbCmdSub16; /* size: 0xC */

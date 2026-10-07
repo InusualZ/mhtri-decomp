@@ -42,18 +42,21 @@
  *   GUESS: `q_result_unlock_page_draw`, `q_result_draw`, `q_result_noop`, `q_result_box_count_get`,
  *   GUESS: `q_result_box_fit_ck`, `q_result_box_take`, `q_result_owned_count_get`, `q_result_box_slot_set`,
  *   GUESS: `q_result_box_record_init`, `q_result_phase_enter`
+ *   GUESS (the `.sdata` format strings): `q_result_fmt_int`, `q_result_fmt_zenny`, `q_result_fmt_str`
  *   GUESS (the box band, from each body and its callers): `multi_box_phase_apply`, `multi_box_cursor_index`,
  *   GUESS: `multi_box_grid_clear`, `multi_box_cursor_clamp`, `multi_box_grid_step`, `multi_box_phase_ck`,
  *   GUESS: `multi_box_phase_step`, `multi_box_result_step`, `multi_box_phase_input`; `multi_box_rem_exist_ck` and `multi_box_cursor_item_get` carry the dump's manglings
  * RESIDUALS. Partial rows, all register-allocation or
- *   scheduling residue: `q_result_unlock_next` (the target keeps one more value live and saves r31),
- *   `q_result_equip_detail_draw` (retail tests the kind with range compares, our `switch` with a compare tree),
+ *   scheduling residue: `q_result_unlock_next` (the target keeps one more value live and saves r31, so it
+ *   also carries the extab/extabindex record ours lacks - the flipcheck's extab -8/extabindex -12; a `mask` local
+ *   measured lower),
+ *   `q_result_equip_detail_draw` (retail tests the kind with range compares, our `switch` with a compare tree;
+ *   an `if` chain measured lower),
  *   `q_result_hunt_recs_build`, `q_result_box_list_draw`, `q_result_equip_sel_count`, `q_result_phase_enter`,
  *   `q_result_owned_count_get` (retail returns the sum without the final `extsh` and moves the box capacity
  *   straight into r5), `q_result_item_page_init` (retail sign-extends the constant slot count before
  *   `menu_page_count`; `s16`/`s32`/`u16` locals all fold it), `q_result_msg_frame_rect` (ours sign-extends
- *   `get_wide_offset`'s result before the add; `+=` and `= +` measured the same), `q_result_equip_info_draw`
- *   (the two `sprintf` formats are pooled `@` strings where retail names `.sdata` labels).
+ *   `get_wide_offset`'s result before the add; `+=` and `= +` measured the same).
  *   Every row written.
  *   Partial rows of the box band:
  *  - `multi_box_rem_exist_ck`: 2 instructions short, the target keeps a dead loop counter;
@@ -210,6 +213,12 @@ u16 q_result_points_frame_ids[4] = {0x1253, 0xFFFF, 0x0000, 0x0000};
 u16 q_result_rank_ids[4] = {0x1257, 0x1258, 0x1259, 0xFFFF};
 u16 q_result_rank_up_ids[4] = {0x125A, 0x125B, 0x125C, 0xFFFF};
 u16 q_result_size_frame_ids[2] = {0x1264, 0xFFFF};
+
+/* The `sprintf` formats the pages share (`.sdata`, beside the tables above). */
+char q_result_fmt_int[] = "%d";
+char q_result_fmt_zenny[] = "%dz";
+/* Defined after `q_result_time_page_draw`, whose static row kinds come first in `.sdata`. */
+extern char q_result_fmt_str[3];
 
 char*** q_result_msg_adrs[12];
 
@@ -1779,7 +1788,7 @@ void q_result_timer_draw(QResultScreen* self)
     if (self->sub_state != 3) {
         get_lsp_data(0x11EF, &pos);
         draw_sprite_idx(0x11F0, &pos);
-        sprintf(text, "%d", self->phase_timer / 30);
+        sprintf(text, q_result_fmt_int, self->phase_timer / 30);
         draw_font_idx(0x11F1, (s8*)text, 2, &pos);
     }
 }
@@ -1901,12 +1910,12 @@ void q_result_item_info_draw(u16 item, s32 count, s32 max, _mh_ivec2_* unused, _
         spr_data_copy(&spr, get_lsp_data(0x1206, NULL));
         if (count >= max && max != 0) {
             spr.color = 0xFF435DFF;
-            sprintf(text, "%d", max);
+            sprintf(text, q_result_fmt_int, max);
         } else {
-            sprintf(text, "%d", count);
+            sprintf(text, q_result_fmt_int, count);
         }
         draw_font(spr, (s8*)text, 1, pos);
-        sprintf(text, "%dz", count * data->field_0x010);
+        sprintf(text, q_result_fmt_zenny, count * data->field_0x010);
         draw_font_idx(0x1203, (s8*)text, 2, pos);
         spr_data_copy(&spr, get_lsp_data(0x11FF, NULL));
         draw_itemicon_item_id(spr, item, pos);
@@ -1937,11 +1946,11 @@ void q_result_item_counts_draw(IdValue* item)
 /* 0x8039A1E8 (0x150): Draws the equipment info panel (icon, rarity, name, price) and the free box slots left. */
 void q_result_equip_info_draw(QResultScreen* self, _EQUIP* equip, _mh_ivec2_* pos)
 {
+    s32 free;
     u8 rare;
     u32 color;
     _SPR_DATA_ spr;
     char text[0x10];
-    s32 free;
 
     draw_sprite_ary(q_result_equip_info_ids, pos);
     if (equip != NULL && equip->item_id != 0) {
@@ -1953,11 +1962,11 @@ void q_result_equip_info_draw(QResultScreen* self, _EQUIP* equip, _mh_ivec2_* po
         draw_sprite(spr, pos);
         draw_number_idx(0x1201, rare + 1, color, pos);
         draw_font_idx(0x1205, (s8*)GetEquipName(equip->kind, equip->item_id), 1, pos);
-        sprintf(text, "%dz", equip_sell_price_get(equip));
+        sprintf(text, q_result_fmt_zenny, equip_sell_price_get(equip));
         draw_font_idx(0x1203, (s8*)text, 2, pos);
     }
     free = userdata_equip_box_free_count();
-    sprintf(text, "%d", free - q_result_equip_sel_count(self));
+    sprintf(text, q_result_fmt_int, free - q_result_equip_sel_count(self));
     draw_font_idx(0x1204, (s8*)text, 2, pos);
 }
 
@@ -2007,8 +2016,8 @@ void q_result_box_list_draw(QResultScreen* self, u8 which)
 {
     IdValue* cell;
     ItemDataRecord* data;
-    s32 flags;
     s16 index;
+    s32 flags;
     u32 extra;
     IdValue* box;
     u8 enabled;
@@ -2679,7 +2688,7 @@ void q_result_time_page_draw(QResultScreen* self)
             if ((u32)((s16)i - 1) <= 2) {
                 pos.x = box->pos.x + 0x78;
                 pos.y = box->pos.y;
-                sprintf(text, "%s", quest_arena_time_text_get(rec, q_result_time_rank_kind[i - 1]));
+                sprintf(text, q_result_fmt_str, quest_arena_time_text_get(rec, q_result_time_rank_kind[i - 1]));
                 strcat(text, q_result_msg_string(15));
                 draw_font_order(&pos, box->width, box->height, 0xC0C0C0FF, (s8*)text, 0, &anchor);
             }
@@ -2703,6 +2712,8 @@ void q_result_time_page_draw(QResultScreen* self)
     }
     q_result_page_set(self, 0);
 }
+
+char q_result_fmt_str[] = "%s";
 
 /* 0x8039B9B0 (0x8): Draws the kept-items page. */
 void q_result_page_step_a(QResultScreen* self)
@@ -2769,7 +2780,7 @@ void q_result_reward_page_draw(QResultScreen* self)
             label.pos.x -= 34;
             draw_font(label, (s8*)q_result_msg_entry(0, i), 0, &anchor);
             value_spr.pos.y = row_pos.y;
-            sprintf(text, "%dz", value);
+            sprintf(text, q_result_fmt_zenny, value);
             draw_font(value_spr, (s8*)text, 2, &anchor);
         }
         break;
@@ -2821,7 +2832,7 @@ void q_result_reward_page_draw(QResultScreen* self)
             }
             draw_font(label, (s8*)text, 0, &anchor);
             value_spr.pos.y = row_pos.y;
-            sprintf(text, "%dz", value);
+            sprintf(text, q_result_fmt_zenny, value);
             draw_font(value_spr, (s8*)text, 2, &anchor);
             lsp++;
         }
@@ -2829,7 +2840,7 @@ void q_result_reward_page_draw(QResultScreen* self)
     case 2:
         for (i = 0, zenny = self->hunt_count, lsp = q_result_hunt_row_lsp; i < 2; i++, zenny++) {
             if (zenny[0] != 0) {
-                sprintf(text, "%s", str_tbl_33_get(self->hunt_monster[i]));
+                sprintf(text, q_result_fmt_str, str_tbl_33_get(self->hunt_monster[i]));
                 sprintf(count_text, q_result_msg_string(9), zenny[0]);
                 value = zenny[2] * zenny[0];
                 total += value;
@@ -2839,7 +2850,7 @@ void q_result_reward_page_draw(QResultScreen* self)
                 count_spr.pos.y = row_pos.y;
                 draw_font(count_spr, (s8*)count_text, 0, &anchor);
                 value_spr.pos.y = row_pos.y;
-                sprintf(text, "%dz", value);
+                sprintf(text, q_result_fmt_zenny, value);
                 draw_font(value_spr, (s8*)text, 2, &anchor);
                 lsp++;
             }
@@ -2849,7 +2860,7 @@ void q_result_reward_page_draw(QResultScreen* self)
         for (i = 0, item = self->kept_items, lsp = q_result_item_row_lsp; i < self->kept_item_count;
              i++, item++, lsp++) {
             data = GetItemData(item->id);
-            sprintf(text, "%s", (char*)ItemName(item->id));
+            sprintf(text, q_result_fmt_str, (char*)ItemName(item->id));
             sprintf(count_text, q_result_msg_string(9), item->value);
             value = data->field_0x010 * item->value;
             total += value;
@@ -2859,7 +2870,7 @@ void q_result_reward_page_draw(QResultScreen* self)
             count_spr.pos.y = row_pos.y;
             draw_font(count_spr, (s8*)count_text, 0, &anchor);
             value_spr.pos.y = row_pos.y;
-            sprintf(text, "%dz", value);
+            sprintf(text, q_result_fmt_zenny, value);
             draw_font(value_spr, (s8*)text, 2, &anchor);
         }
         break;
@@ -2868,10 +2879,10 @@ void q_result_reward_page_draw(QResultScreen* self)
     label.pos.x -= 24;
     if (self->cursor == 0) {
         draw_font(label, (s8*)q_result_msg_string(10), 0, &anchor);
-        sprintf(text, "%dz", user->zenny_0x18);
+        sprintf(text, q_result_fmt_zenny, user->zenny_0x18);
     } else {
         draw_font(label, (s8*)q_result_msg_string(8), 0, &anchor);
-        sprintf(text, "%dz", total);
+        sprintf(text, q_result_fmt_zenny, total);
     }
     spr_data_copy(&label, get_lsp_data(0x1251, NULL));
     label.pos.x += 24;
@@ -2931,7 +2942,7 @@ void q_result_points_page_draw(QResultScreen* self)
             label.pos.x -= 20;
             if (normal == 0) {
                 if (i == 0) {
-                    sprintf(text, "%s", q_result_msg_string(7));
+                    sprintf(text, q_result_fmt_str, q_result_msg_string(7));
                     if (self->reward_cut == 1) {
                         strcat(text, q_result_msg_string(0));
                     }
@@ -2943,7 +2954,7 @@ void q_result_points_page_draw(QResultScreen* self)
                 if (self->reward_shown[i] != 1) {
                     continue;
                 }
-                sprintf(text, "%s", q_result_msg_entry(2, i));
+                sprintf(text, q_result_fmt_str, q_result_msg_entry(2, i));
                 if (self->reward_cut == 1) {
                     strcat(text, q_result_msg_string(0));
                 }
@@ -2959,7 +2970,7 @@ void q_result_points_page_draw(QResultScreen* self)
                 } else if (normal != 0 && hunt < 2 && hunt_done[hunt] == 0 && self->hunt_count[hunt] != 0) {
                     hunt_done[hunt] = 1;
                     count = self->hunt_count[hunt];
-                    sprintf(text, "%s", str_tbl_33_get(self->hunt_monster[hunt]));
+                    sprintf(text, q_result_fmt_str, str_tbl_33_get(self->hunt_monster[hunt]));
                     sprintf(count_text, q_result_msg_string(9), count);
                     value = count * self->hunt_points[hunt];
                     total += value;
@@ -2976,7 +2987,7 @@ void q_result_points_page_draw(QResultScreen* self)
         } else if (i == 7) {
             spr_data_copy(&label, get_lsp_data(*total_lsp, &row_pos));
             label.pos.x -= 20;
-            sprintf(text, "%s", q_result_msg_string(8));
+            sprintf(text, q_result_fmt_str, q_result_msg_string(8));
             value = total;
         } else {
             continue;
@@ -2988,13 +2999,13 @@ void q_result_points_page_draw(QResultScreen* self)
                 draw_font(count_spr, (s8*)count_text, 0, &anchor);
             }
             value_spr.pos.y = row_pos.y;
-            sprintf(text, "%d", value);
+            sprintf(text, q_result_fmt_int, value);
             draw_font(value_spr, (s8*)text, 2, &anchor);
         }
         lsp++;
     }
     draw_font_idx(0x124E, (s8*)q_result_msg_string(1), 0, &anchor);
-    sprintf(text, "%d", user->hunter_points_0x3DE0);
+    sprintf(text, q_result_fmt_int, user->hunter_points_0x3DE0);
     draw_font_idx(0x1251, (s8*)text, 2, &anchor);
     if (user->hunter_rank_0x3DE4 > self->rank_before && (self->rank_state == 0 || self->rank_anim < 40)) {
         draw_sprite_anim_ary(q_result_rank_up_ids, self->rank_anim, &frame_pos);
@@ -3025,22 +3036,22 @@ void q_result_points_page_draw(QResultScreen* self)
         frame = 0;
     }
     if (rank < 10) {
-        sprintf(text, "%d", rank);
+        sprintf(text, q_result_fmt_int, rank);
         draw_font_anim_idx(0x125D, frame, (s8*)text, 0, &frame_pos);
         return;
     }
     if (rank < 100) {
-        sprintf(text, "%d", rank / 10);
+        sprintf(text, q_result_fmt_int, rank / 10);
         draw_font_anim_idx(0x125F, frame, (s8*)text, 0, &frame_pos);
-        sprintf(text, "%d", user->hunter_rank_0x3DE4 % 10);
+        sprintf(text, q_result_fmt_int, user->hunter_rank_0x3DE4 % 10);
         draw_font_anim_idx(0x125E, frame, (s8*)text, 0, &frame_pos);
         return;
     }
-    sprintf(text, "%d", rank / 100);
+    sprintf(text, q_result_fmt_int, rank / 100);
     draw_font_anim_idx(0x1260, frame, (s8*)text, 0, &frame_pos);
-    sprintf(text, "%d", (user->hunter_rank_0x3DE4 % 100) / 10);
+    sprintf(text, q_result_fmt_int, (user->hunter_rank_0x3DE4 % 100) / 10);
     draw_font_anim_idx(0x1261, frame, (s8*)text, 0, &frame_pos);
-    sprintf(text, "%d", user->hunter_rank_0x3DE4 % 10);
+    sprintf(text, q_result_fmt_int, user->hunter_rank_0x3DE4 % 10);
     draw_font_anim_idx(0x1262, frame, (s8*)text, 0, &frame_pos);
 }
 
@@ -3056,7 +3067,7 @@ void q_result_size_row_draw(QResultScreen* self, u8 which, u8 monster, u16 size_
     draw_font_idx(0x1274, str_tbl_33_get(monster), 0, pos);
     draw_font_idx(0x1275, (s8*)q_result_msg_string(16), 0, pos);
     if (size_max == 0) {
-        sprintf(text, "%s", (char*)get_str_tbl(0x44)[2]);
+        sprintf(text, q_result_fmt_str, (char*)get_str_tbl(0x44)[2]);
     } else {
         monster_size_value_get(monster, size_max, &size);
         sprintf(text, q_result_msg_string(18), size);
@@ -3073,7 +3084,7 @@ void q_result_size_row_draw(QResultScreen* self, u8 which, u8 monster, u16 size_
     }
     draw_font_idx(0x1277, (s8*)q_result_msg_string(17), 0, pos);
     if (size_min == 0) {
-        sprintf(text, "%s", (char*)get_str_tbl(0x44)[2]);
+        sprintf(text, q_result_fmt_str, (char*)get_str_tbl(0x44)[2]);
     } else {
         monster_size_value_get(monster, size_min, &size);
         sprintf(text, q_result_msg_string(18), size);
