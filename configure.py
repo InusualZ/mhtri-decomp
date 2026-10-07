@@ -1412,7 +1412,7 @@ config.libs = [
             # The SC / SEQ / SI / SYN / THP band 0x804DB050..0x804E45B0 recut per library and source file (unit headers carry the
             # evidence); its function starts are 16-aligned, so cflags_base.  The 4-packed head 0x804DAE40..0x804DB050 is RSO/runtime.c.
             Object(NonMatching, "SC/SCSystemConfig.c", cflags=cflags_base),
-            Object(NonMatching, "SC/SCApi.c", cflags=cflags_base),
+            Object(Matching, "SC/SCApi.c", cflags=cflags_base),
             Object(NonMatching, "SC/SCProductInfo.c", cflags=cflags_base),
             Object(NonMatching, "SEQ/seq.c", cflags=cflags_base),
             Object(NonMatching, "SI/SIBios.c", cflags=cflags_base),
