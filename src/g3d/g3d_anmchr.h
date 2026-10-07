@@ -6,6 +6,7 @@
 
 #include "types.h"
 #include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 1) */
+#include "g3d/g3d_rescommon.h" /* nw4r::g3d::ResCommon (rule 1) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +30,6 @@ const u8 **type_obj_set_name(const u8 **out, const u8 *v); /* stores `v` through
 
 /* The frame/rate helpers `g3d/g3d_resanmchr.cpp`'s channel evaluators call (types the target bodies imply). */
 f32 math_reciprocal(f32 value);                /* 0x800610AC - the reciprocal helper */
-void *fn_800618BC(void *self);             /* 0x800618BC - the resource-table base */
 s32 fn_800628C8(void *self, s32 key);      /* 0x800628C8 - the table entry lookup */
 
 
@@ -53,6 +53,39 @@ namespace g3d {
 
 class AnmObjChrRes;
 struct ChrAnmResult;
+
+/* The animation's play policy: what a frame past the end folds back to. */
+enum AnmPolicy {
+    ANM_POLICY_ONETIME = 0,
+    ANM_POLICY_LOOP = 1
+};
+
+/* 0x80061C70 (0x74): the frame-folding function for `policy`. */
+PlayPolicyFunc GetAnmPlayPolicy(AnmPolicy policy);
+
+/* A character-animation resource block: its revision, the node dictionary, the frame and node counts and the
+ * play policy.  size: 0x28 (approximation: only the read fields are named) */
+struct ResAnmChrData {
+    /* +0x00 */ u8 pad_0x00[0x8];
+    /* +0x08 */ u32 revision;
+    /* +0x0C */ u8 pad_0x0C[0x4];
+    /* +0x10 */ s32 toChrDataDic;
+    /* +0x14 */ u8 pad_0x14[0xC];
+    /* +0x20 */ u16 numFrame;
+    /* +0x22 */ u16 numNode;
+    /* +0x24 */ AnmPolicy policy;
+};
+
+/* The one-word handle on a character-animation resource.  size: 0x4 */
+class ResAnmChr : public ResCommon<ResAnmChrData> {
+public:
+    NW4R_G3D_RESOURCE_FUNC_DECL(ResAnmChr)
+    ResAnmChr() {}
+
+    u32 GetNumNode() const;
+    AnmPolicy GetAnmPolicy() const;
+    int GetNumFrame() const;
+};
 
 /* The character animation interface: one binding word per model node (bit 15: no animation, bit 14: undefined)
  * and the attach/weight protocol the blend and node classes implement.  size: 0x18 */
@@ -153,17 +186,34 @@ public:
 
 /* A character animation played from a resource: its frame counter, the animation resource and the result cache.
  * The members are declared as they are written.  size: 0x34 */
-class AnmObjChrRes : public AnmObjChr {
+class AnmObjChrRes : public AnmObjChr, protected FrameCtrl {
 public:
+    AnmObjChrRes(MEMAllocator* pHeap, ResAnmChr res, u16* pBindingBuf, int numBinding, ChrAnmResult* pCacheBuf);
+    static AnmObjChrRes* Construct(MEMAllocator* pHeap, u32* pSize, ResAnmChr res, ResMdl mdl, bool bHasCache);
+
     virtual bool IsDerivedFrom(TypeObj type) const;
+    virtual void G3dProc(u32 task, u32 param, void* pInfo); /* untyped: caller-owned payload */
     virtual ~AnmObjChrRes();
     virtual const TypeObj GetTypeObj() const;
     virtual const char* GetTypeName() const;
 
-    static const TypeObj GetTypeObjStatic();
+    virtual void SetFrame(f32 frame);
+    virtual f32 GetFrame() const;
+    virtual void UpdateFrame();
+    virtual void SetUpdateRate(f32 rate);
+    virtual f32 GetUpdateRate() const;
+    virtual bool Bind(ResMdl mdl);
+    using AnmObjChr::Release;
 
-    /* +0x18 */ FrameCtrl mFrameCtrl;
-    /* +0x2C */ void* mpRes;               /* untyped: opaque handle - the ResAnmChr block */
+    virtual const ChrAnmResult* GetResult(ChrAnmResult* pResult, u32 idx);
+    virtual bool Bind(ResMdl mdl, u32 target, BindOption option);
+    virtual void Release(ResMdl mdl, u32 target, BindOption option);
+
+    static const TypeObj GetTypeObjStatic();
+    void UpdateCache();
+
+    /* +0x18 */ /* FrameCtrl base (0x14 bytes) */
+    /* +0x2C */ ResAnmChr mRes;
     /* +0x30 */ ChrAnmResult* mpResultCache;
 };
 

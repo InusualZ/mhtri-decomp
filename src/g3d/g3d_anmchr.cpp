@@ -25,12 +25,16 @@
  *   (0x800604CC) is the member the Construct functions build their objects with.  g3d_obj_alloc_tail is a GUESS
  *   (the allocation forwarder above); math_reciprocal is a GUESS (0x800610AC: one Newton-Raphson step on `fres`,
  *   nw4r's `math::FInv`).
+ *   ResAnmChr (0x80061898..0x80061D08: GetNumNode, ref, ptr, GetClassName, IsValid, GetAnmPolicy, GetNumFrame), the
+ *   AnmObjChrRes constructor, Construct and its vtable members are nw4r's (the vtable at .data 0x8058BCA8 orders
+ *   them; ResAnmChrData's field names are GUESSES).  res_anm_chr_copy_ctor is a GUESS; res_anm_chr_common_copy_ctor
+ *   is a GUESS; anmchr_resanmchr_class_name is a GUESS; anmchr_resanmchr_ac_file is a GUESS; anmchr_ref_invalid_fmt
+ *   is a GUESS; anmchr_ref_name is a GUESS (the strings ResAnmChr::ref passes to Panic).
  *   type_obj_set_name_anmchr is a GUESS (0x8005DCD0: the type-name store copy the AnmObjChr, AnmObjMatClr,
  *   AnmObjTexPat and ScnMdlSimple type members call).
- * RESIDUALS. 36 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
- *   lists them), the largest fn_80060658 (AnmObjChrBlend::GetResult, 0x8D0), fn_80061424 (AnmObjChrRes::Construct,
- *   0x474: its ResAnmChr accessors and the AnmObjChrRes constructor are unwritten), fn_80062980 (0x384) and
- *   fn_80062E50 (0x320).
+ * RESIDUALS. 30 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
+ *   lists them), the largest GetResult__Q34nw4r3g3d14AnmObjChrBlendFPQ34nw4r3g3d12ChrAnmResultUl (0x8D0), the
+ *   AnmObjChrRes members Bind(ResMdl, u32, BindOption) (0x384) and Release(ResMdl, u32, BindOption) (0x320).
  *   Partial: fn_8005D27C, g3d_round_up (retail materialises `~(align - 1)` with `nor` + `and` where MWCC folds it
  *   into `andc`), fn_8006244C, fn_80062824, fn_800628AC, and the members whose only difference is a relocation name
  *   (the strings).
@@ -82,7 +86,11 @@ extern f32 lbl_807911E8;
 extern u8 lbl_80791148[];
 extern u8 lbl_80791150[];
 extern u8 lbl_8066AE80[];
-extern u8 lbl_8058BF14[];
+extern u8 anmchr_resanmchr_class_name[];    /* "ResAnmChr" */
+extern const char anmchr_resanmchr_ac_file[]; /* "g3d_resanmchr_ac.h" */
+extern const char anmchr_ref_invalid_fmt[];   /* "%s::%s: Object not valid." */
+extern const char anmchr_ref_name[4];         /* "ref" (sized: an SDA21 address) */
+extern "C" void res_anm_chr_common_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc);
 extern const char anmchr_resnode_align_assert_msg[]; /* the ResNode alignment assertion */
 extern const char anmchr_resnode_ac_file[]; /* "g3d_resnode_ac.h" */
 extern const char anmchr_resdic_idx_bounds_msg[]; /* the ResDic index assertion */
@@ -221,19 +229,37 @@ extern "C" void fn_80060FEC(void)
 {
 }
 
-extern "C" u32 fn_80061920(u32* p)
+/* 0x80061898 (0x24): the animated node count. */
+u32 nw4r::g3d::ResAnmChr::GetNumNode() const
 {
-    return *p;
+    return ref().numNode;
 }
 
-extern "C" u8* fn_80061928(void)
+/* 0x800618BC (0x64): the resource block, asserting the handle is valid. */
+const nw4r::g3d::ResAnmChrData& nw4r::g3d::ResAnmChr::ref() const
 {
-    return lbl_8058BF14;
+    if (!IsValid()) {
+        nw4r::db::Panic(anmchr_resanmchr_ac_file, 39, anmchr_ref_invalid_fmt, GetClassName(), anmchr_ref_name);
+    }
+    return *ptr();
 }
 
-extern "C" void fn_80061B30(u32* dst, u32* src)
+/* 0x80061920 (0x8): the resource block, unchecked. */
+const nw4r::g3d::ResAnmChrData* nw4r::g3d::ResAnmChr::ptr() const
 {
-    *dst = *src;
+    return mpData;
+}
+
+/* 0x80061928 (0xC): the class name the asserts print. */
+const char* nw4r::g3d::ResAnmChr::GetClassName()
+{
+    return (const char*)anmchr_resanmchr_class_name;
+}
+
+/* 0x80061B30 (0xC): copies the base handle's data pointer. */
+extern "C" void res_anm_chr_common_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc)
+{
+    pDst->mpData = pSrc->mpData;
 }
 
 extern "C" f32 fn_80062024(f32* p)
@@ -312,10 +338,11 @@ extern "C" void fn_80062D88(u32* dst, u32* src)
 /* untyped: opaque handle - the name block */
 nw4r::g3d::ResName::ResName(void* pData) : ResCommon<ResNameData>(pData) {}
 
-extern "C" void* fn_80061B00(void* self, u32* src)
+/* 0x80061B00 (0x30): copy-constructs a character-animation handle and returns the destination. */
+extern "C" nw4r::g3d::ResAnmChr* res_anm_chr_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc)
 {
-    fn_80061B30((u32*)self, src);
-    return self;
+    res_anm_chr_common_copy_ctor(pDst, pSrc);
+    return pDst;
 }
 
 extern "C" void* fn_80062D58(void* self, u32* src)
@@ -332,10 +359,24 @@ extern "C" void* fn_8005D2C0(void* self, u32* src)
 
 /* --- more one-instruction accessors ----------------------------------------------------------------- */
 
-extern "C" u32 fn_80061934(u32* p)
+/* 0x80061934 (0x14): whether the handle names a block. */
+bool nw4r::g3d::ResAnmChr::IsValid() const
 {
-    return *p != 0;
+    return mpData != NULL;
 }
+
+/* 0x80061CE4 (0x24): the play policy. */
+nw4r::g3d::AnmPolicy nw4r::g3d::ResAnmChr::GetAnmPolicy() const
+{
+    return ref().policy;
+}
+
+/* 0x80061D08 (0x24): the frame count. */
+int nw4r::g3d::ResAnmChr::GetNumFrame() const
+{
+    return ref().numFrame;
+}
+
 
 /* untyped: opaque handle - the dictionary block */
 extern "C" u32 fn_800628B4(void* self)
@@ -509,6 +550,61 @@ extern "C" void **fn_80063C8C(void **out, void *v)
     }
 
 extern "C" u32 g3d_round_up(u32 offset, u32 align);
+
+/* 0x80061948 (0x1B8): builds a resource-played character animation over `res`, with an optional result cache. */
+nw4r::g3d::AnmObjChrRes::AnmObjChrRes(MEMAllocator* pHeap, ResAnmChr res, u16* pBindingBuf, int numBinding,
+                                      ChrAnmResult* pCacheBuf)
+    : AnmObjChr(pHeap, pBindingBuf, numBinding), FrameCtrl(0.0f, res.GetNumFrame(), GetAnmPlayPolicy(res.GetAnmPolicy()))
+{
+    res_anm_chr_copy_ctor(&mRes, &res);
+    mpResultCache = pCacheBuf;
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x40F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (mpResultCache) {
+        UpdateCache();
+    }
+}
+
+/* 0x80061424 (0x474): sizes a resource-played animation of `res` for `mdl` (with a per-node result cache when
+ * `bHasCache`), reports the size through `pSize`, and builds it in one block from `pHeap`. */
+nw4r::g3d::AnmObjChrRes* nw4r::g3d::AnmObjChrRes::Construct(MEMAllocator* pHeap, u32* pSize, ResAnmChr res,
+                                                            ResMdl mdl, bool bHasCache)
+{
+    if (!res.IsValid() || !mdl.IsValid()) {
+        return NULL;
+    }
+    int numNode = res.GetNumNode();
+    int numBinding = mdl.GetResNodeNumEntries();
+    u32 cacheSize = (bHasCache ? numNode : 0) * 0x4C; /* sizeof(ChrAnmResult) */
+    u32 size = sizeof(AnmObjChrRes) + cacheSize + numBinding * sizeof(u16);
+    if (pSize != NULL) {
+        ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pSize, 0x3DB, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.");
+        *pSize = size;
+    }
+    if (pHeap == NULL) {
+        return NULL;
+    }
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pHeap, 0x3E4, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
+    u8* pBuf = (u8*)Alloc(pHeap, size);
+    if (pBuf == NULL) {
+        return NULL;
+    }
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pBuf, 0x3EE, "NW4R:Pointer Error\nbuf(=%p) is not valid pointer.");
+    ChrAnmResult* pCacheBuf = bHasCache ? (ChrAnmResult*)(pBuf + sizeof(AnmObjChrRes)) : NULL;
+    u16* pBindingBuf = (u16*)(pBuf + sizeof(AnmObjChrRes) + cacheSize);
+    if ((u32)pBuf & 3) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x3F2, "NW4R:Alignment Error(0x%x)\nbuf must be aligned to 4 bytes boundary.",
+                        pBuf);
+    }
+    if ((u32)pCacheBuf & 3) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x3F3,
+                        "NW4R:Alignment Error(0x%x)\npCacheBuf must be aligned to 4 bytes boundary.", pCacheBuf);
+    }
+    if ((u32)pBindingBuf & 1) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x3F4,
+                        "NW4R:Alignment Error(0x%x)\npBindBuf must be aligned to 2 bytes boundary.", pBindingBuf);
+    }
+    return new (pBuf) AnmObjChrRes(pHeap, res, pBindingBuf, numBinding, pCacheBuf);
+}
 
 /* 0x800600C8 (0x404): sizes a blend node for `mdl` with `numChildren` weighted children, reports the size through
  * `pSize`, and builds it in one block from `pHeap` (NULL without a heap or memory). */
