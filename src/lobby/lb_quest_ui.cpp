@@ -1,9 +1,9 @@
 /* lobby/lb_quest_ui.cpp - the lobby NPC talk program, the kitchen screen, the trade screen and the scene effect.
- * RANGE. .text 0x8038EC44-0x80394038 (63 functions); .data 0x805F0CB8-0x805F13D0, .sdata 0x807933D8-0x80793470, .sdata2
- *   0x8079C298-0x8079C2B0, extab, extabindex.  Four groups in address order: the note-pane NPC talk program
- *   (0x8038EC44-0x8038F2BC, on `enemy/note_work.h`'s `NoteWork`), the kitchen screen (lobby screen 0x11, to
- *   0x803928F0), the trade screen (screen 0x12, to 0x80393994) and the scene effect (effect 0x36), whose tail
- *   (`lb_scene_model_slide` and the two helpers after it) sits in `lobby/lb_quest_board.cpp`'s range (seam request).
+ * RANGE. .text 0x8038EC44-0x80394158 (66 functions); .data 0x805F0CB8-0x805F1400 (ends with the camera key table),
+ *   .sdata 0x807933D8-0x80793470, .sdata2 0x8079C298-0x8079C2D0, extab, extabindex.  Four groups in address order: the
+ *   note-pane NPC talk program (0x8038EC44-0x8038F2BC, on `enemy/note_work.h`'s `NoteWork`), the kitchen screen (lobby
+ *   screen 0x11, to 0x803928F0), the trade screen (screen 0x12, to 0x80393994) and the scene effect (effect 0x36),
+ *   whose tail is `lb_scene_model_slide` and the two helpers after it (0x80394038-0x80394158).
  * FLAGS. `cflags_lobby`; `#pragma peephole off` file-wide (retail keeps `clrlwi`/`rlwinm` + `cmpwi` and `clrlwi` +
  *   `slwi` unfused; every written row measured better with it off).
  * NAMES. `lb_quest_ui` is the registered GUESS; the groups' names (`note_talk_*`, `lb_kitchen_*`, `lb_trade_*`,
@@ -23,7 +23,8 @@
  *   GUESS: `lb_kitchen_msg_draw`, `lb_kitchen_draw_task`, `lb_kitchen_idle_ck`, `lb_trade_open`,
  *   GUESS: `lb_trade_close`, `lb_trade_page_set`, `lb_trade_exchange`, `lb_trade_step`, `lb_trade_frame_draw`,
  *   GUESS: `lb_trade_list_draw`, `lb_trade_cost_draw`, `lb_trade_msg_draw`, `lb_trade_draw_task`,
- *   GUESS: `lb_scene_eft_spawn`, `lb_scene_eft_release`, `lb_scene_eft_step`
+ *   GUESS: `lb_scene_eft_spawn`, `lb_scene_eft_release`, `lb_scene_eft_step`, `lb_scene_model_slide`,
+ *   GUESS: `lb_quest_board_state_next`, `lb_quest_board_effect_retire`
  * RESIDUALS. 17 rows unwritten, each blocked on a declaration or a name other lanes own (requests filed):
  *   0x8038EC44-0x8038EF28 and 0x8038EF28-0x8038EF9C (`note_talk_step`, `note_idle_set`, `note_talk_init`) and
  *   0x8038EFEC-0x8038F264 (`note_talk_wait_step`/`_greet_step`/`_react_step`): the talk program needs `NoteWork`, whose
@@ -61,7 +62,6 @@
 #include "sound/se_req.h"
 #include "enemy/em020_prog.h"
 #include "lobby/lobby_w.h"
-#include "lobby/lb_quest_board_reset.h"
 #include "lobby/lb_cmd_pressed_ck.h"
 #include "lobby/LbStr.h"
 #include "lobby/lb_panel_msg_draw.h"
@@ -173,6 +173,19 @@ extern u16 lb_trade_choice_ids[2];
 extern u16 lb_trade_cost_lsp[3];
 extern char lb_trade_count_fmt[4];
 
+/* The camera model's key-frame table `lb_scene_model_slide` reads: six (frame, value) pairs. */
+f32 lb_quest_detail_camera_keys[12] = {
+    0.0f, -3160.0f, 82.0f, -3080.9f, 144.0f, -3035.2f, 212.0f, -2965.3f, 310.0f, -2960.0f, -1.0f, -2960.0f,
+};
+
+/* The model record `lb_scene_eft_move` hands `lb_scene_model_slide`: its step byte and the position the
+ * camera keys drive.  size: 0x10 (a view: the model continues) */
+typedef struct LbQuestDetailModel {
+    /* +0x00 */ u8 step;
+    /* +0x01 */ u8 pad_0x01[0x3];
+    /* +0x04 */ VEC3 pos;
+} LbQuestDetailModel; /* size: 0x10 */
+
 extern "C" {
 
 /* The unit's own entry points the bodies below reach before their definitions (or that are unwritten). */
@@ -201,6 +214,9 @@ void lb_scene_eft_release(_EFT* self);
 void lb_scene_eft_step(_EFT* self);
 void lb_scene_eft_init(_EFT* self);
 void lb_scene_eft_move(_EFT* self);
+u8 lb_scene_model_slide(_EFT* self, LbQuestDetailModel* model, u8 index);
+void lb_quest_board_state_next(_EFT* self);
+void lb_quest_board_effect_retire(_EFT* self);
 
 /* --------------------------------------------------------------------------------------------- *
  * The note-pane NPC talk program.
@@ -1839,6 +1855,42 @@ void lb_scene_eft_step(_EFT* self) {
         lb_quest_board_effect_retire(self);
         break;
     }
+}
+
+/* 0x80394038 (0x10C): Steps one of the scene effect's models: it waits for the lobby's camera mode 2, slides back when
+ * the camera work stops, and for model 3 follows the key table by the camera's frame; 1 for model 4. */
+u8 lb_scene_model_slide(_EFT* self, LbQuestDetailModel* model, u8 index) {
+    switch (model->step) {
+    case 0:
+        if (lobby_w.field_0x003 == 2) {
+            model->step++;
+            setVector3(&model->pos, -3160.0f, -40.0f, 370.0f);
+        }
+        /* fall through */
+    case 1:
+        if (camera_work_ck() == 0) {
+            setVector3(&model->pos, -2960.0f, -40.0f, 370.0f);
+            model->step = 0;
+            return 0;
+        }
+        if (index == 3) {
+            model->pos.x = getKeyData(lb_quest_detail_camera_keys, (f32)(camera_frame_get(1) * 2));
+        } else if (index == 4) {
+            return 1;
+        }
+        break;
+    }
+    return 0;
+}
+
+/* 0x80394144 (0x10): Advances the work's step byte.  GUESS: the step is what `lb_scene_eft_step`'s arm 2 runs. */
+void lb_quest_board_state_next(_EFT* self) {
+    self->state_0x05++;
+}
+
+/* 0x80394154 (0x4): Retires one pooled effect runtime record. */
+void lb_quest_board_effect_retire(_EFT* self) {
+    eft_res_slot_release(self);
 }
 
 }  /* extern "C" */

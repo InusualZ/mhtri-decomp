@@ -3,19 +3,16 @@
  *   table `q_result_msg_adrs` (by id and language), the reward, item, rank, size-record and unlock pages, and the
  *   item grids the player sorts the quest's spoils on.  C++ (the bodies call mangled callees such as
  *   `get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3`).
- * RANGE. .text 0x803967F0-0x8039D278 (85 functions); extab, extabindex, .data 0x805F1500-0x805F1704 (the sprite-id
+ * RANGE. .text 0x80396948-0x8039D278 (82 functions); extab, extabindex, .data 0x805F1500-0x805F1704 (the sprite-id
  *   and unlock tables and three switch tables), .bss 0x806C5528-0x806C5558 (`q_result_msg_adrs`), .sdata
- *   0x80793488-0x80793520, .sdata2 0x8079C2E8-0x8079C330.  The `.data` referrer runs break below 0x80396BBC, but the
- *   first three functions (0x803967F0-0x80396948) are `_EFT` effect helpers of the quest board's effect band and the
- *   `.sdata2` run 0x8079C2E8-0x8079C300 is theirs (`lb_quest_board`'s 0x80396654 reads 0x8079C2E8): this TU's own pool
- *   is 0x8079C300-0x8079C330 and its `.text` starts at 0x80396948 (seam request filed).
+ *   0x80793488-0x80793520, .sdata2 0x8079C300-0x8079C330.  The `.data` referrer runs break below 0x80396BBC.
  * FLAGS. `cflags_menu` (configure.py); `#pragma pool_data off` (retail reaches every table by its own `lis`/`addi`:
  *   `q_result_grid_draw` 90.3 -> 91.5, `q_result_reward_page_draw` 96.2 -> 98.3).
  * NAMES. Module `menu`: its tables sit between `menu_note.cpp` (0x805E91F8) and `menu_placeinfo.cpp` (0x80604780) in
  *   `.data`, and every callee is the menu library's.  No `__FILE__` string reaches the range and the dump answers `zz_`,
  *   so the file name and every function and table name (the `q_result_*` scheme, the `QResult*` records) are GUESSes
  *   from the bodies; `q_result_msg_adrs` is the runtime dump's own name.
- *   GUESS: `q_result_anim_counter_inc`, `q_result_release_effect`, `q_result_work_clear`,
+ *   GUESS: `q_result_work_clear`,
  *   GUESS: `q_result_hunt_recs_build`, `q_result_hunt_events_raise`, `q_result_file_ready`,
  *   GUESS: `q_result_ready_ck`, `q_result_sub_screen_ready`, `q_result_swap_counter_get`,
  *   GUESS: `q_result_unlock_next`, `q_result_phase_is_2`, `q_result_phase_is_3`, `q_result_phase_next`,
@@ -39,14 +36,13 @@
  *   GUESS: `q_result_unlock_page_draw`, `q_result_draw`, `q_result_noop`, `q_result_box_count_get`,
  *   GUESS: `q_result_box_fit_ck`, `q_result_box_take`, `q_result_owned_count_get`, `q_result_box_slot_set`,
  *   GUESS: `q_result_box_record_init`, `q_result_phase_enter`
- * RESIDUALS. `q_result_effect_follow_npc` (0x803967F0, 0x144) is unwritten: its `MTX34` translation store is
- *   `ef/eft001.cpp`'s `fn_800FBB90` (rename requested; the ef lanes own it).  Partial rows, all register-allocation or
+ * RESIDUALS. Partial rows, all register-allocation or
  *   scheduling residue: `q_result_unlock_next` (the target keeps one more value live and saves r31),
  *   `q_result_equip_detail_draw` (retail tests the kind with range compares, our `switch` with a compare tree),
  *   `q_result_hunt_recs_build`, `q_result_box_list_draw`, `q_result_equip_sel_count`, `q_result_phase_enter`,
  *   `q_result_owned_count_get` (`userdata_gunner_ck`/`item_slots_count_sum` are unsigned in retail's view),
- *   `q_result_sub_screen_ready` (MWCC if-converts the second `return (B == 1)`).  flipcheck: `.text`, extab and
- *   extabindex short by the unwritten row; `.sdata2` 0x2C of 0x48 (the seam above).
+ *   `q_result_sub_screen_ready` (MWCC if-converts the second `return (B == 1)`).  flipcheck: `.text` is 0x20 over the
+ *   claim, extab 8 and extabindex 12 short of it.
  * SHAPES. A two-way test on a `u8` mode is a `switch` in retail (`cmpwi`, the default body first); a mode tested
  *   for `<= 2` then `== 3` is `case 0: case 1: case 2:` / `case 3:`; the `GetMenuFontColor` flags are `bool` locals;
  *   the per-frame `frame` arguments are `u8` locals (the `u16` parameter then takes a `clrlwi`).
@@ -249,18 +245,6 @@ void q_result_box_take(u16 item, s16 count);
 s16 q_result_owned_count_get(u16 item);
 void q_result_box_slot_set(u16 item, s16 count, u16 index);
 void q_result_box_record_init(_multi_result_work* rec, u8 player_no);
-
-/* 0x80396934 (0x10): Bumps the quest board effect's state byte. */
-void q_result_anim_counter_inc(_EFT* self)
-{
-    self->state_0x05 += 1;
-}
-
-/* 0x80396944 (0x4): Hands the quest board effect to the effect system's release. */
-void q_result_release_effect(_EFT* self)
-{
-    eft_res_slot_release(self);
-}
 
 /* 0x80396948 (0x2C): The language-selected message table for one message id: `q_result_msg_adrs[id][language]`. */
 char** q_result_msg_table(u8 id)
