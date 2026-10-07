@@ -1381,7 +1381,15 @@ config.libs = [
             Object(NonMatching, "BTE/gki_buffer.cpp"),
             Object(NonMatching, "RVLGX/GXTexture_tail.cpp"),
             Object(NonMatching, "SC/sc.cpp"),
+            # Flags: unit headers of src/TPL/tpl.cpp .. src/WUD/wud.cpp (the former WPAD/wpad.cpp block, recut by file)
+            Object(NonMatching, "TPL/tpl.cpp"),
+            Object(NonMatching, "USB/usb.cpp"),
+            Object(NonMatching, "VI/vi.cpp"),
+            Object(NonMatching, "VI/i2c.cpp"),
+            Object(NonMatching, "VI/vi3in1.cpp"),
+            Object(NonMatching, "WENC/wenc.cpp"),
             Object(NonMatching, "WPAD/wpad.cpp"),
+            Object(NonMatching, "WUD/wud.cpp"),
             Object(NonMatching, "VF/vf.cpp"),
         ],
     },
@@ -1392,6 +1400,7 @@ config.libs = [
         "cflags": cflags_nw4r,
         "host": False,
         "objects": [
+            Object(NonMatching, "nw4r/db_console.cpp"),
             Object(NonMatching, "nw4r/db_assert.cpp"),
             Object(NonMatching, "nw4r/math_arithmetic.cpp"),
             Object(NonMatching, "nw4r/math_triangular.cpp"),

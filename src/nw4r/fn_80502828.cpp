@@ -16,7 +16,7 @@
  *   file-local SetupGXWithColorMapping (fn_805046F0).
  * RESIDUALS. Every function matches.  Data: the four retail files' `.data`/`.sdata2`/`.bss` runs are interleaved with
  *   pads one object does not emit; the CharWriter constructor calls the out-of-line SetTextColor that retail links
- *   from 0x80500844 (`WPAD/wpad.cpp`'s range).  SetupGX and SetupGXWithColorMapping register the static fog colour
+ *   from 0x80500844 (`nw4r/db_console.cpp`).  SetupGX and SetupGXWithColorMapping register the static fog colour
  *   with our `__dt__Q34nw4r2ut5ColorFv` where retail names `dtor_8005B228` (the weak Color destructor the link keeps
  *   from `font/flfnt.cpp`'s range; request filed to rename it).
  * SHAPES. ResFont's constructor, destructor and SetResource sit under `#pragma dont_inline` (ResFontBase is another
