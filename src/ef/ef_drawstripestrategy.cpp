@@ -3,14 +3,14 @@
  *   constructor, the out-of-line DrawStrategyImpl/DrawStrategy destructors, `Draw`, its ahead context, the
  *   `Particle`/`ParticleManager` walkers, the draw-time particle copies and ahead-vector builders the billboard
  *   dispatch hands out, and the class's destructor, which closes the range.
- * RANGE. .text 0x800B4AC8-0x800B9A44 (60 functions); extab 0x8000A10C-0x8000A23C, extabindex 0x80023538-0x80023700,
+ * RANGE. .text 0x800B4AC8-0x800B9A44 (61 functions); extab 0x8000A10C-0x8000A23C, extabindex 0x80023538-0x80023700,
  *   .data 0x805939E8-0x80593E88 (the `__FILE__` string "ef_drawstripestrategy.cpp" first, copies at 0x80593D0C,
  *   0x80593D5C and 0x80593DAC), .sdata2 0x80796120-0x80796150.  Left edge: `ef/ef_resource.cpp`
  *   ends there; right edge: `ef/ef_drawbillboardstrategy.cpp` starts there.
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off`, `#pragma fp_contract off` and `#pragma dont_inline on`
  *   before the includes (the base destructors the constructor's unwind entry emits call their bases out of line,
- *   as retail's do); inlining comes back on after `fn_800B4FE0` and goes off again at the end (the class's own
- *   destructor).
+ *   as retail's do); inlining comes back on after `ef_stripe_noop` and goes off again at the end (the class's own
+ *   destructor); it is on again around `ef_stripe_draw_count`, which calls `GetNumActive` out of line.
  * NAMES. GUESS: `ef_vec3_normalize`, `ef_vec3_transform`, `ef_draw_info_view_mtx`, `ef_particle_get_rotate`,
  *   `ef_pm_modify_rotate`, the `ef_draw_setting_*` accessors and the `ef_stripe_*` builders from their bodies and
  *   from how `Draw`, `GetCalcAheadFunc` and the tube select them; `AheadContext` (0x800B8888) from the base context
@@ -25,23 +25,32 @@
  *   GUESS: `ef_ahead_emitter_axis_y`, `ef_ahead_from_emitter`, `ef_ahead_move_dir`, `ef_stripe_ahead_type3`,
  *   GUESS: `ef_stripe_ahead_type6`, `ef_stripe_ahead_type6_link1`, `ef_stripe_ahead_type6_link2`,
  *   GUESS: `ef_pm_prev_alive`, `ef_pm_list_prev`, `ef_pm_last_alive`, `ef_pm_list_tail`.
- * RESIDUALS. 5 partial rows:
- *  - `Draw` (0x800B76C4): ours allocates 0x20 fewer bytes of stack temporaries (frame 0x210 against 0x230), so
- *    every local sits at another offset, and the asserted resource is loaded before the assert temporaries;
- *  - `GetCalcAheadFunc` (0x800B83CC): the same asserted-resource load placement;
- *  - `ef_stripe_draw_count` (ours 0xC of 0x10): retail keeps an inlined call's `b` to the next instruction;
+ *   GUESS: `EfDrawParticleList::GetNumActive` (0x800B5B5C, nw4r's `ActivityList::GetNumActive`), the weak copy
+ *   the compiler emits after `ef_stripe_draw_count`.
+ *   GUESS (from the bodies): `ef_stripe_noop`, `ef_stripe_write_edge_pair`, `ef_gx_write_f32x2`,
+ *   GUESS: `ef_gx_write_vec3`, `ef_gx_write_f32x3` (the FIFO writers; the dump's `GXPosition3f32` at 0x800B52BC),
+ *   GUESS: `ef_flag_bit0`, `ef_flag_bit3`, `ef_flag_bit4`, `ef_draw_setting_flags_hi2`,
+ *   GUESS: `ef_draw_setting_flags_mid3`, `ef_draw_setting_draw_order`, `ef_stripe_param_copy`,
+ *   GUESS: `ef_stripe_sample_ctor`; the constants `ef_stripe_one`, `ef_stripe_zero`, `ef_stripe_epsilon` by value.
+ * RESIDUALS. 3 partial rows:
+ *  - `Draw` (0x800B76C4): two stack temporaries sit in swapped slots and the loop's saved registers differ;
  *  - `ef_draw_info_view_mtx`: retail reloads the depth offset for every product (ours keeps it in f2);
  *  - `ef_vec3_transform`: two saved values swap r30/r31.
  *   flipcheck: `.data` and `.sdata2` claimed, not emitted (declared by their map names, playbook 29).
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `_savegpr_25`,
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `ef_stripe_zero`, `ef_stripe_one`,
+ *     `_savegpr_25`,
  *     `_savegpr_26`, `_restgpr_25`, `_restgpr_26`.
  *   `DrawStripeStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
- * SHAPES. `fn_800B51F8` takes the scale before the flags (the caller loads f1 before r5).  `EfStripeParam` (in
+ * SHAPES. `ef_stripe_write_edge_pair` takes the scale before the flags (the caller loads f1 before r5).  `EfStripeParam` (in
  *   `ef_drawstripestrategy.h`, shared with the smooth stripe) is the tube ring (three `VEC3` and the texture
  *   coordinate); its copy is the implicit member-wise assignment (words for the vectors, `lfs`/`stfs` for the
  *   scalar).  Stack-slot order follows the
  *   declaration order (first declared, highest offset), which the tube builders' locals rely on.
+ * SHAPES. `Draw` picks the ribbon or the tube with a `switch` on the type option (`cmpwi`; an `if` compares
+ *   `cmplwi`).
+ * SHAPES. `ef_stripe_draw_count` returns `GetNumActive()` as `s32` (both `s32`: the call becomes retail's tail `b`
+ *   with no `clrlwi`; a `u16` return adds one to every caller).
  */
 
 #pragma peephole off
@@ -51,6 +60,7 @@
 #include "types.h"
 #include "gx.h"
 #include "ef.h"
+#include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "ef/ef_drawstrategyimpl.h"
 #include "ef/fn_800AEE48.h"
 #include "ef/ef_drawstripestrategy.h" /* the ahead-vector builders and EfAheadItem (this unit's own header) */
@@ -85,9 +95,9 @@ extern "C" {
 #endif
 
 
-extern f32 lbl_80796140;    /* a stripe-strategy constant                                 .sdata2 0x80796140 */
-extern f32 lbl_80796124; /* a scale factor  .sdata2 0x80796124 */
-extern f32 lbl_80796130; /* a scale factor  .sdata2 0x80796130 */
+extern f32 ef_stripe_epsilon; /* FLT_EPSILON (2^-23)  .sdata2 0x80796140 */
+extern f32 ef_stripe_one;     /* 1.0f                 .sdata2 0x80796124 */
+extern f32 ef_stripe_zero;    /* 0.0f                 .sdata2 0x80796130 */
 
 /* This unit's `__FILE__` and pointer-assert strings (its claimed `.data`), declared, never defined. */
 extern char ef_stripe_file_str[]; /* "ef_drawstripestrategy.cpp"                                  .data 0x805939E8 */
@@ -126,7 +136,7 @@ extern void* fn_800508AC(void* arg);
 extern void  PSMTXMultVec(const f32* mtx, const void* src, void* dst);
 extern void  ef_particle_get_move_dir(void* arg, Vec* v);
 
-/* Three positions the sample zeroer walks; `fn_800B6954` zeroes them one `Vec` at a time. */
+/* Three positions the sample zeroer walks; `ef_stripe_sample_ctor` zeroes them one `Vec` at a time. */
 typedef struct EfStripeSample {
     Vec a; /* +0x00 */
     Vec b; /* +0x0C */
@@ -140,14 +150,14 @@ typedef struct EfNodeManager {
 } EfNodeManager; /* size: 0x44 */
 
 /* The unit's own symbols that are used before their definition. */
-void fn_800B4FE0(void);
-void fn_800B5288(f32 x, f32 y);
-int  fn_800B5298(u32 value);
-void fn_800B52AC(Vec* v);
-void fn_800B52BC(f32 x, f32 y, f32 z);
+void ef_stripe_noop(void);
+void ef_gx_write_f32x2(f32 x, f32 y);
+int  ef_flag_bit0(u32 value);
+void ef_gx_write_vec3(Vec* v);
+void ef_gx_write_f32x3(f32 x, f32 y, f32 z);
 void* ef_pm_list_prev(void* self, void* node);
 u32 ef_pm_list_tail(EfParticleState* self);
-u32 fn_800B6994(void* ctx, EfParticleState* particle);
+u32 ef_draw_setting_draw_order(void* ctx, EfParticleState* particle);
 
 /* The ahead-vector builders `GetCalcAheadFunc` hands out (unwritten). */
 void ef_stripe_ahead_type3(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* ctx, EfDrawParticle* p);
@@ -158,7 +168,7 @@ void ef_stripe_ahead_type6_link2(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadCon
 /* The stripe builders `Draw` hands the particles to (unwritten). */
 void ef_stripe_first_ahead(VEC3* out, nw4r::ef::DrawStripeStrategy* self, EfEmitterDrawSetting* ed,
                            nw4r::ef::DrawStripeStrategy::AheadContext* ctx);
-s32 fn_800B83C0(void* ctx, EfParticleState* particle);
+s32 ef_draw_setting_flags_mid3(void* ctx, EfParticleState* particle);
 void ef_stripe_draw_segment(MTX34* out, nw4r::ef::DrawStripeStrategy* self,
                             nw4r::ef::DrawStripeStrategy::AheadContext* ctx, u32 flags, EfDrawParticle* p,
                             const VEC3* ahead, const VEC3* pos);
@@ -170,8 +180,8 @@ void ef_stripe_ribbon_vertex(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawS
                              const VEC3* pos, const VEC3* a, const VEC3* b, f32 width, f32 t);
 void ef_stripe_scale_mtx(MTX34* out, nw4r::ef::DrawStripeStrategy* self, EfDrawParticle* p, f32 width);
 void ef_pm_modify_rotate(EfDrawParticleManager* pm, const EfDrawParticle* p, VEC3* rotate);
-s32 fn_800B5B48(void* ctx, EfParticleState* particle);
-void fn_800B51F8(Vec* a, Vec* b, f32 scale, u32 flags);
+s32 ef_draw_setting_flags_hi2(void* ctx, EfParticleState* particle);
+void ef_stripe_write_edge_pair(Vec* a, Vec* b, f32 scale, u32 flags);
 void ef_stripe_draw_tube(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStripeStrategy::AheadContext* ctx,
                          u32 flags, u32 flush);
 void ef_stripe_tube_open(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStripeStrategy::AheadContext* ctx,
@@ -185,9 +195,9 @@ void ef_stripe_tube_ring(nw4r::ef::DrawStripeStrategy* self, EfStripeParam* out,
                          nw4r::ef::DrawStrategyImpl::CalcAheadFunc calc_ahead, f32 offset_x, f32 offset_y, f32 t);
 void ef_stripe_tube_strip(nw4r::ef::DrawStripeStrategy* self, const EfStripeParam* a, const EfStripeParam* b,
                           u32 flags, s32 divide, const f32* trig);
-EfStripeSample* fn_800B6954(EfStripeSample* self);
-void fn_800B6900(EfStripeParam* dst, EfStripeParam* src);
-int fn_800B6534(u32 value);
+EfStripeSample* ef_stripe_sample_ctor(EfStripeSample* self);
+void ef_stripe_param_copy(EfStripeParam* dst, EfStripeParam* src);
+int ef_flag_bit4(u32 value);
 s32 ef_draw_setting_tube_divide(void* ctx, EfParticleState* particle);
 s32 ef_draw_setting_connect_type(void* ctx, EfParticleState* particle);
 void ef_stripe_begin_side(u32 cull_mode, u32 enabled, u32 flags);
@@ -210,7 +220,7 @@ extern "C" {
 #endif
 
 /* Nothing to do. */
-void fn_800B4FE0(void) {}
+void ef_stripe_noop(void) {}
 #pragma dont_inline off
 
 /* 0x800B4BA4 (0x43C): draws the stripe as one ribbon strip: two vertices per particle (the `a`/`b` edge offsets
@@ -250,8 +260,8 @@ void ef_stripe_draw_ribbon(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStr
         count++;
     }
     GXBegin(0x98, 0, count * 2);
-    if (fn_800B5B48(self, (EfParticleState*)ed) == 0x40) {
-        step = lbl_80796124;
+    if (ef_draw_setting_flags_hi2(self, (EfParticleState*)ed) == 0x40) {
+        step = ef_stripe_one;
     } else {
         step = math_reciprocal(count - 1);
     }
@@ -278,7 +288,7 @@ void ef_stripe_draw_ribbon(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStr
     if (to_emitter && order != 0) {
         ef_stripe_ribbon_vertex(self, ctx, flags, NULL, calc_ahead, &ctx->emitter_center, a, b, width, step * index);
     }
-    fn_800B4FE0();
+    ef_stripe_noop();
 }
 
 /* 0x800B4FE4 (0x214): the two ribbon vertices of one particle (or, for NULL, of the eldest one at `pos`): its frame
@@ -309,39 +319,39 @@ void ef_stripe_ribbon_vertex(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawS
     VEC3_ctor(&vb);
     mtx34_mult_vec3(&va, &mtx, a);
     mtx34_mult_vec3(&vb, &mtx, b);
-    fn_800B51F8((Vec*)&va, (Vec*)&vb, t, flags);
+    ef_stripe_write_edge_pair((Vec*)&va, (Vec*)&vb, t, flags);
 }
 
 
 /* Emits two stripe endpoints, each preceded by its scale when the flag's low bit is set. */
-void fn_800B51F8(Vec* a, Vec* b, f32 scale, u32 flags) {
-    fn_800B52AC(a);
-    if (fn_800B5298(flags)) {
-        fn_800B5288(lbl_80796124, scale);
+void ef_stripe_write_edge_pair(Vec* a, Vec* b, f32 scale, u32 flags) {
+    ef_gx_write_vec3(a);
+    if (ef_flag_bit0(flags)) {
+        ef_gx_write_f32x2(ef_stripe_one, scale);
     }
-    fn_800B52AC(b);
-    if (fn_800B5298(flags)) {
-        fn_800B5288(lbl_80796130, scale);
+    ef_gx_write_vec3(b);
+    if (ef_flag_bit0(flags)) {
+        ef_gx_write_f32x2(ef_stripe_zero, scale);
     }
 }
 
 /* Writes a pair of f32 to the pipe. */
-void fn_800B5288(f32 x, f32 y) {
+void ef_gx_write_f32x2(f32 x, f32 y) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
 }
 
 /* Tests the low bit of a status word (the booleanised `(value & 1) != 0`). */
-int fn_800B5298(u32 value) {
+int ef_flag_bit0(u32 value) {
     return (value & 1) != 0;
 }
 
-void fn_800B52AC(Vec* v) {
-    fn_800B52BC(v->x, v->y, v->z);
+void ef_gx_write_vec3(Vec* v) {
+    ef_gx_write_f32x3(v->x, v->y, v->z);
 }
 
 /* Writes three f32 to the pipe. */
-void fn_800B52BC(f32 x, f32 y, f32 z) {
+void ef_gx_write_f32x3(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
     GXWGFifo.f32 = z;
@@ -409,11 +419,11 @@ int ef_vec3_normalize(void* self) {
 
 /* A stripe-strategy constant. */
 f32 ef_float_epsilon(void) {
-    return lbl_80796140;
+    return ef_stripe_epsilon;
 }
 
 /* Tests one bit of a status word. */
-int fn_800B5A50(u32 value) {
+int ef_flag_bit3(u32 value) {
     return (value & 0x8) != 0;
 }
 
@@ -447,7 +457,7 @@ u32 ef_pm_list_head(EfParticleState* self) {
 }
 
 /* The particle's packed flags, bits 6-7. */
-s32 fn_800B5B48(void* ctx, EfParticleState* particle) {
+s32 ef_draw_setting_flags_hi2(void* ctx, EfParticleState* particle) {
     return particle->field_0xB2 & 0xC0;
 }
 
@@ -465,7 +475,7 @@ void ef_stripe_draw_segment(MTX34* out, nw4r::ef::DrawStripeStrategy* self,
     }
     VEC3_ctor(&side);
     VEC3_ctor(&up);
-    if (fn_800B5A50(flags) == 0) {
+    if (ef_flag_bit3(flags) == 0) {
         vec3_cross((f32*)&side, (const f32*)ahead, (const f32*)&p->ahead);
     } else {
         vec3_cross((f32*)&side, (const f32*)ahead, (const f32*)&ctx->view_axis_z);
@@ -480,10 +490,19 @@ void ef_stripe_draw_segment(MTX34* out, nw4r::ef::DrawStripeStrategy* self,
                 pos->z);
 }
 
-/* 0x800B5B54 (0x10): the number of particles the manager holds. */
-s32 ef_stripe_draw_count(nw4r::ef::DrawStrategyImpl* self, EfDrawParticleManager* pm) {
-    return pm->particles.count;
+#pragma dont_inline on
+
+/* Returns the list's live particle count. */
+inline s32 EfDrawParticleList::GetNumActive() const {
+    return count;
 }
+
+/* 0x800B5B54 (0x8): the number of particles the manager holds. */
+s32 ef_stripe_draw_count(nw4r::ef::DrawStrategyImpl* self, EfDrawParticleManager* pm) {
+    return pm->particles.GetNumActive();
+}
+
+#pragma dont_inline off
 
 /* 0x800B5B64 (0x5C8): one ring of a tube: the particle's frame times its rotation-and-scale matrix, kept as a centre
  * and the X/Z axes, with texture coordinate `t`. */
@@ -545,7 +564,7 @@ void ef_stripe_tube_strip(nw4r::ef::DrawStripeStrategy* self, const EfStripePara
     }
     inv = math_reciprocal(divide);
     GXBegin(0x98, 0, divide * 2 + 2);
-    if (fn_800B6534(flags)) {
+    if (ef_flag_bit4(flags)) {
         for (i = 0; i <= divide; trig += 2, i++) {
             f32 s = trig[0];
             f32 c = trig[1];
@@ -562,17 +581,17 @@ void ef_stripe_tube_strip(nw4r::ef::DrawStripeStrategy* self, const EfStripePara
             vec3_scale(&a_side, (VEC3*)&a->side, c);
             addVec3(&a_sum, &a_side, &a_up);
             addVec3(&a_pos, &a_sum, (VEC3*)&a->center);
-            fn_800B52AC((Vec*)&a_pos);
-            if (fn_800B5298(flags)) {
-                fn_800B5288(inv * i, a->tex_t);
+            ef_gx_write_vec3((Vec*)&a_pos);
+            if (ef_flag_bit0(flags)) {
+                ef_gx_write_f32x2(inv * i, a->tex_t);
             }
             vec3_scale(&b_up, (VEC3*)&b->up, s);
             vec3_scale(&b_side, (VEC3*)&b->side, c);
             addVec3(&b_sum, &b_side, &b_up);
             addVec3(&b_pos, &b_sum, (VEC3*)&b->center);
-            fn_800B52AC((Vec*)&b_pos);
-            if (fn_800B5298(flags)) {
-                fn_800B5288(inv * i, b->tex_t);
+            ef_gx_write_vec3((Vec*)&b_pos);
+            if (ef_flag_bit0(flags)) {
+                ef_gx_write_f32x2(inv * i, b->tex_t);
             }
         }
     } else {
@@ -592,21 +611,21 @@ void ef_stripe_tube_strip(nw4r::ef::DrawStripeStrategy* self, const EfStripePara
             vec3_scale(&b_side, (VEC3*)&b->side, c);
             addVec3(&b_sum, &b_side, &b_up);
             addVec3(&b_pos, &b_sum, (VEC3*)&b->center);
-            fn_800B52AC((Vec*)&b_pos);
-            if (fn_800B5298(flags)) {
-                fn_800B5288(inv * i, b->tex_t);
+            ef_gx_write_vec3((Vec*)&b_pos);
+            if (ef_flag_bit0(flags)) {
+                ef_gx_write_f32x2(inv * i, b->tex_t);
             }
             vec3_scale(&a_up, (VEC3*)&a->up, s);
             vec3_scale(&a_side, (VEC3*)&a->side, c);
             addVec3(&a_sum, &a_side, &a_up);
             addVec3(&a_pos, &a_sum, (VEC3*)&a->center);
-            fn_800B52AC((Vec*)&a_pos);
-            if (fn_800B5298(flags)) {
-                fn_800B5288(inv * i, a->tex_t);
+            ef_gx_write_vec3((Vec*)&a_pos);
+            if (ef_flag_bit0(flags)) {
+                ef_gx_write_f32x2(inv * i, a->tex_t);
             }
         }
     }
-    fn_800B4FE0();
+    ef_stripe_noop();
 }
 
 /* 0x800B6548 (0x3B0): an open tube: one segment between each pair of neighbouring particles. */
@@ -632,14 +651,14 @@ void ef_stripe_tube_open(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStrip
     pm = ctx->particle_manager;
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     calc_ahead = self->GetCalcAheadFunc(pm);
-    order = fn_800B6994(self, (EfParticleState*)ed);
+    order = ef_draw_setting_draw_order(self, (EfParticleState*)ed);
     first = self->GetGetFirstDrawParticleFunc(order);
     next = self->GetGetNextDrawParticleFunc(order);
     offset_x = ef_stripe_percent * ed->scale_a;
     offset_y = ef_stripe_percent * ed->scale_b;
     count = ef_stripe_draw_count(self, pm);
-    if (fn_800B5B48(self, (EfParticleState*)ed) == 0x40) {
-        step = lbl_80796124;
+    if (ef_draw_setting_flags_hi2(self, (EfParticleState*)ed) == 0x40) {
+        step = ef_stripe_one;
     } else {
         step = math_reciprocal(count - 1);
     }
@@ -653,13 +672,13 @@ void ef_stripe_tube_open(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStrip
         EfStripeParam cur;
         EfStripeParam prev;
 
-        fn_800B6954((EfStripeSample*)&prev);
-        fn_800B6954((EfStripeSample*)&cur);
+        ef_stripe_sample_ctor((EfStripeSample*)&prev);
+        ef_stripe_sample_ctor((EfStripeSample*)&cur);
         p = first(pm);
         ef_stripe_tube_ring(self, &cur, ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
         index += dir;
         for (p = next(pm, p); p != NULL; p = next(pm, p), index += dir) {
-            fn_800B6900(&prev, &cur);
+            ef_stripe_param_copy(&prev, &cur);
             ef_stripe_tube_ring(self, &cur, ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
             ef_stripe_tube_strip(self, &prev, &cur, flags, ef_draw_setting_tube_divide(self, (EfParticleState*)ed),
                                  ctx->trig_table);
@@ -690,14 +709,14 @@ void ef_stripe_tube_loop(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStrip
     pm = ctx->particle_manager;
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     calc_ahead = self->GetCalcAheadFunc(pm);
-    order = fn_800B6994(self, (EfParticleState*)ed);
+    order = ef_draw_setting_draw_order(self, (EfParticleState*)ed);
     first = self->GetGetFirstDrawParticleFunc(order);
     next = self->GetGetNextDrawParticleFunc(order);
     offset_x = ef_stripe_percent * ed->scale_a;
     offset_y = ef_stripe_percent * ed->scale_b;
     count = ef_stripe_draw_count(self, pm);
-    if (fn_800B5B48(self, (EfParticleState*)ed) == 0x40) {
-        step = lbl_80796124;
+    if (ef_draw_setting_flags_hi2(self, (EfParticleState*)ed) == 0x40) {
+        step = ef_stripe_one;
     } else {
         step = math_reciprocal(count);
     }
@@ -712,15 +731,15 @@ void ef_stripe_tube_loop(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStrip
         EfStripeParam prev;
         EfStripeParam head;
 
-        fn_800B6954((EfStripeSample*)&head);
-        fn_800B6954((EfStripeSample*)&prev);
-        fn_800B6954((EfStripeSample*)&cur);
+        ef_stripe_sample_ctor((EfStripeSample*)&head);
+        ef_stripe_sample_ctor((EfStripeSample*)&prev);
+        ef_stripe_sample_ctor((EfStripeSample*)&cur);
         p = first(pm);
         ef_stripe_tube_ring(self, &head, ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
-        fn_800B6900(&cur, &head);
+        ef_stripe_param_copy(&cur, &head);
         index += dir;
         for (p = next(pm, p); p != NULL; p = next(pm, p), index += dir) {
-            fn_800B6900(&prev, &cur);
+            ef_stripe_param_copy(&prev, &cur);
             ef_stripe_tube_ring(self, &cur, ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
             ef_stripe_tube_strip(self, &prev, &cur, flags, ef_draw_setting_tube_divide(self, (EfParticleState*)ed),
                                  ctx->trig_table);
@@ -755,14 +774,14 @@ void ef_stripe_tube_to_emitter(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::Dra
     pm = ctx->particle_manager;
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     calc_ahead = self->GetCalcAheadFunc(pm);
-    order = fn_800B6994(self, (EfParticleState*)ed);
+    order = ef_draw_setting_draw_order(self, (EfParticleState*)ed);
     first = self->GetGetFirstDrawParticleFunc(order);
     next = self->GetGetNextDrawParticleFunc(order);
     offset_x = ef_stripe_percent * ed->scale_a;
     offset_y = ef_stripe_percent * ed->scale_b;
     count = ef_stripe_draw_count(self, pm);
-    if (fn_800B5B48(self, (EfParticleState*)ed) == 0x40) {
-        step = lbl_80796124;
+    if (ef_draw_setting_flags_hi2(self, (EfParticleState*)ed) == 0x40) {
+        step = ef_stripe_one;
     } else {
         step = math_reciprocal(count);
     }
@@ -778,12 +797,12 @@ void ef_stripe_tube_to_emitter(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::Dra
         EfDrawParticle* youngest;
         VEC3 offset;
 
-        fn_800B6954((EfStripeSample*)&prev);
-        fn_800B6954((EfStripeSample*)&cur);
+        ef_stripe_sample_ctor((EfStripeSample*)&prev);
+        ef_stripe_sample_ctor((EfStripeSample*)&cur);
         p = first(pm);
         ef_stripe_tube_ring(self, &prev, ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
         index += dir;
-        fn_800B6900(&cur, &prev);
+        ef_stripe_param_copy(&cur, &prev);
         cur.tex_t = step * index;
         youngest = (EfDrawParticle*)ef_pm_first_alive((EfDrawList*)pm);
         if (!youngest) {
@@ -795,7 +814,7 @@ void ef_stripe_tube_to_emitter(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::Dra
         ef_stripe_tube_strip(self, &prev, &cur, flags, ef_draw_setting_tube_divide(self, (EfParticleState*)ed),
                              ctx->trig_table);
         for (p = next(pm, p); p != NULL; p = next(pm, p), index += dir) {
-            fn_800B6900(&prev, &cur);
+            ef_stripe_param_copy(&prev, &cur);
             ef_stripe_tube_ring(self, &cur, ctx, flags, p, calc_ahead, offset_x, offset_y, step * index);
             ef_stripe_tube_strip(self, &prev, &cur, flags, ef_draw_setting_tube_divide(self, (EfParticleState*)ed),
                                  ctx->trig_table);
@@ -814,7 +833,7 @@ const VEC3* ef_get_unit_x_vec(void) {
 }
 
 /* Tests one bit of a status word. */
-int fn_800B6534(u32 value) {
+int ef_flag_bit4(u32 value) {
     return (value & 0x10) != 0;
 }
 
@@ -824,12 +843,12 @@ s32 ef_draw_setting_tube_divide(void* ctx, EfParticleState* particle) {
 }
 
 /* Copies a stripe sample. */
-void fn_800B6900(EfStripeParam* dst, EfStripeParam* src) {
+void ef_stripe_param_copy(EfStripeParam* dst, EfStripeParam* src) {
     *dst = *src;
 }
 
 /* Zeroes the three positions of a stripe sample and returns it. */
-EfStripeSample* fn_800B6954(EfStripeSample* self) {
+EfStripeSample* ef_stripe_sample_ctor(EfStripeSample* self) {
     VEC3_ctor((VEC3*)&self->a);
     VEC3_ctor((VEC3*)&self->b);
     VEC3_ctor((VEC3*)&self->c);
@@ -837,7 +856,7 @@ EfStripeSample* fn_800B6954(EfStripeSample* self) {
 }
 
 /* The particle's state bit 0x800. */
-u32 fn_800B6994(void* ctx, EfParticleState* particle) {
+u32 ef_draw_setting_draw_order(void* ctx, EfParticleState* particle) {
     return particle->flags_0x00 & 0x800;
 }
 
@@ -847,12 +866,12 @@ void ef_stripe_begin_side(u32 cull_mode, u32 enabled, u32 flags) {
     if (enabled != 0) {
         GXBegin(0x98, 0, 8);
         for (int i = 0; i < 8; i++) {
-            fn_800B52BC(lbl_80796130, lbl_80796130, lbl_80796130);
-            if (fn_800B5298(flags)) {
-                fn_800B5288(lbl_80796130, lbl_80796130);
+            ef_gx_write_f32x3(ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
+            if (ef_flag_bit0(flags)) {
+                ef_gx_write_f32x2(ef_stripe_zero, ef_stripe_zero);
             }
         }
-        fn_800B4FE0();
+        ef_stripe_noop();
     }
 }
 
@@ -870,9 +889,7 @@ void DrawStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm)
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_stripe_file_str, 738, ef_stripe_pm_assert_str, pm);
     }
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_stripe_file_str, 740, ef_stripe_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_stripe_file_str, 740, ef_stripe_resource_assert_str, pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
         nw4r::db::Panic(ef_stripe_file_str, 742, ef_stripe_ed_assert_str, ed);
@@ -897,11 +914,11 @@ void DrawStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm)
             copyVec3(&p->ahead, &ahead);
         }
 
-        flags = (fn_800B6994(this, (EfParticleState*)ed) ? 0x10 : 0) | (ed->type_option == 2 ? 8 : 0);
+        flags = (ef_draw_setting_draw_order(this, (EfParticleState*)ed) ? 0x10 : 0) | (ed->type_option == 2 ? 8 : 0);
         MTX34_ctor(&mtx);
         ef_draw_info_view_mtx(&info, &mtx);
         mtx34_concat(&mtx, &mtx, &ctx.manager_mtx);
-        if (fn_800B5A50(flags)) {
+        if (ef_flag_bit3(flags)) {
             MTX34 inv;
             MTX34_ctor(&inv);
             if (mtx34_inverse(&inv, &mtx)) {
@@ -935,7 +952,8 @@ void DrawStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm)
         flags |= (mNumTexmap != 0);
         p = GetGetFirstDrawParticleFunc(ed->flags & 0x800)(pm);
         SetupGP(p, *ed, info, true, false);
-        if (ed->type_option != 3) {
+        switch (ed->type_option) {
+        default: {
             VEC3 a;
             VEC3 b;
             const VEC3* pb = setVec3(&b, -1.0f, 0.0f, 0.0f);
@@ -946,12 +964,16 @@ void DrawStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm)
                 const VEC3* pd = setVec3(&d, 0.0f, 0.0f, 1.0f);
                 ef_stripe_draw_ribbon(this, &ctx, flags, setVec3(&c, 0.0f, 0.0f, -1.0f), pd);
             }
-        } else {
+            break;
+        }
+        case 3: {
             u32 flush = 0;
             if ((ed->flags & 8) != 0 || p->manager->emitter->effect->system->flush_gp == 0) {
                 flush = 1;
             }
             ef_stripe_draw_tube(this, &ctx, flags, flush);
+            break;
+        }
         }
     }
 }
@@ -964,9 +986,7 @@ DrawStrategyImpl::CalcAheadFunc DrawStripeStrategy::GetCalcAheadFunc(EfDrawParti
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_stripe_file_str, 949, ef_stripe_pm_assert_str, pm);
     }
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_stripe_file_str, 950, ef_stripe_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_stripe_file_str, 950, ef_stripe_resource_assert_str, pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
         nw4r::db::Panic(ef_stripe_file_str, 953, ef_stripe_ed_assert_str, ed);
@@ -1101,13 +1121,13 @@ void ef_stripe_draw_tube(nw4r::ef::DrawStripeStrategy* self, nw4r::ef::DrawStrip
             f32* pair;
             s32 i;
 
-            trig[1] = lbl_80796124;
-            trig[0] = lbl_80796130;
+            trig[1] = ef_stripe_one;
+            trig[0] = ef_stripe_zero;
             for (i = 1, pair = trig + 2; i < divide; pair += 2, i++) {
                 sin_cos_deg(&pair[0], &pair[1], step * i);
             }
-            trig[divide * 2 + 1] = lbl_80796124;
-            trig[divide * 2] = lbl_80796130;
+            trig[divide * 2 + 1] = ef_stripe_one;
+            trig[divide * 2] = ef_stripe_zero;
             ctx->trig_table = trig;
             switch (ef_draw_setting_connect_type(self, (EfParticleState*)ed)) {
             default:
@@ -1163,7 +1183,7 @@ void ef_stripe_first_ahead(VEC3* out, nw4r::ef::DrawStripeStrategy* self, EfEmit
 
     VEC3_ctor(out);
     if (ed->type_direction == 7) {
-        switch (fn_800B83C0(self, (EfParticleState*)ed)) {
+        switch (ef_draw_setting_flags_mid3(self, (EfParticleState*)ed)) {
         case 8:
             copyVec3(out, setVec3(&axis_x, ctx->manager_mtx_inv.m[0][0], ctx->manager_mtx_inv.m[1][0],
                                   ctx->manager_mtx_inv.m[2][0]));
@@ -1192,7 +1212,7 @@ void ef_stripe_first_ahead(VEC3* out, nw4r::ef::DrawStripeStrategy* self, EfEmit
         }
         }
     } else {
-        switch (fn_800B83C0(self, (EfParticleState*)ed)) {
+        switch (ef_draw_setting_flags_mid3(self, (EfParticleState*)ed)) {
         case 8:
             mtx34_rotate_vec3(out, &ctx->emitter_mtx, ef_get_unit_x_vec());
             mtx34_rotate_vec3(out, &ctx->manager_mtx_inv, out);
@@ -1205,7 +1225,7 @@ void ef_stripe_first_ahead(VEC3* out, nw4r::ef::DrawStripeStrategy* self, EfEmit
             mtx34_rotate_vec3(out, &ctx->manager_mtx_inv, out);
             break;
         case 24:
-            setVec3(&diagonal, lbl_80796124, lbl_80796124, lbl_80796124);
+            setVec3(&diagonal, ef_stripe_one, ef_stripe_one, ef_stripe_one);
             mtx34_rotate_vec3(out, &ctx->emitter_mtx, &diagonal);
             mtx34_rotate_vec3(out, &ctx->manager_mtx_inv, out);
             break;
@@ -1217,7 +1237,7 @@ void ef_stripe_first_ahead(VEC3* out, nw4r::ef::DrawStripeStrategy* self, EfEmit
 }
 
 /* The particle's packed flags, bits 3-5. */
-s32 fn_800B83C0(void* ctx, EfParticleState* particle) {
+s32 ef_draw_setting_flags_mid3(void* ctx, EfParticleState* particle) {
     return particle->field_0xB2 & 0x38;
 }
 
@@ -1295,18 +1315,18 @@ void ef_stripe_ahead_type6(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadContext* 
     }
     younger = (EfDrawParticle*)ef_pm_next_alive(ctx->particle_manager, p);
     elder = (EfDrawParticle*)ef_pm_prev_alive(ctx->particle_manager, p);
-    setVec3(&to_younger, lbl_80796130, lbl_80796130, lbl_80796130);
+    setVec3(&to_younger, ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
     if (younger != NULL) {
         PSVECSubtract((f32*)&to_younger, (const f32*)&younger->world_pos, (const f32*)&p->world_pos);
         if (ef_vec3_normalize(&to_younger) == 0) {
-            copyVec3(&to_younger, setVec3(&zero_a, lbl_80796130, lbl_80796130, lbl_80796130));
+            copyVec3(&to_younger, setVec3(&zero_a, ef_stripe_zero, ef_stripe_zero, ef_stripe_zero));
         }
     }
-    setVec3(&to_elder, lbl_80796130, lbl_80796130, lbl_80796130);
+    setVec3(&to_elder, ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
     if (elder != NULL) {
         PSVECSubtract((f32*)&to_elder, (const f32*)&elder->world_pos, (const f32*)&p->world_pos);
         if (ef_vec3_normalize(&to_elder) == 0) {
-            copyVec3(&to_elder, setVec3(&zero_b, lbl_80796130, lbl_80796130, lbl_80796130));
+            copyVec3(&to_elder, setVec3(&zero_b, ef_stripe_zero, ef_stripe_zero, ef_stripe_zero));
         }
     }
     PSVECSubtract((f32*)out, (const f32*)&to_younger, (const f32*)&to_elder);
@@ -1344,12 +1364,12 @@ void ef_stripe_ahead_type6_link1(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadCon
     VEC3_ctor(&to_younger);
     PSVECSubtract((f32*)&to_younger, (const f32*)&younger->world_pos, (const f32*)&p->world_pos);
     if (ef_vec3_normalize(&to_younger) == 0) {
-        copyVec3(&to_younger, setVec3(&zero_a, lbl_80796130, lbl_80796130, lbl_80796130));
+        copyVec3(&to_younger, setVec3(&zero_a, ef_stripe_zero, ef_stripe_zero, ef_stripe_zero));
     }
     VEC3_ctor(&to_elder);
     PSVECSubtract((f32*)&to_elder, (const f32*)&elder->world_pos, (const f32*)&p->world_pos);
     if (ef_vec3_normalize(&to_elder) == 0) {
-        copyVec3(&to_elder, setVec3(&zero_b, lbl_80796130, lbl_80796130, lbl_80796130));
+        copyVec3(&to_elder, setVec3(&zero_b, ef_stripe_zero, ef_stripe_zero, ef_stripe_zero));
     }
     PSVECSubtract((f32*)out, (const f32*)&to_younger, (const f32*)&to_elder);
     if (ef_vec3_normalize(out) == 0) {
@@ -1375,7 +1395,7 @@ void ef_stripe_ahead_type6_link2(VEC3* out, nw4r::ef::DrawStrategyImpl::AheadCon
     }
     younger = (EfDrawParticle*)ef_pm_next_alive(ctx->particle_manager, p);
     elder = (EfDrawParticle*)ef_pm_prev_alive(ctx->particle_manager, p);
-    setVec3(&to_younger, lbl_80796130, lbl_80796130, lbl_80796130);
+    setVec3(&to_younger, ef_stripe_zero, ef_stripe_zero, ef_stripe_zero);
     if (younger != NULL) {
         PSVECSubtract((f32*)&to_younger, (const f32*)&younger->world_pos, (const f32*)&p->world_pos);
         ef_vec3_normalize(&to_younger);

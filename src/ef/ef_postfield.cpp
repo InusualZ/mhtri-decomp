@@ -17,20 +17,23 @@
  *   GUESS: `ef_pf_collision_test`, `ef_pf_hit_plane`, `ef_pf_hit_rectangle`, `ef_pf_hit_circle`, `ef_pf_hit_sphere`,
  *   GUESS: `ef_pf_hit_cylinder`, `ef_pf_hit_cube`, `ef_pf_collide`, `ef_pf_calc_particle`, `ef_vec3_lerp`,
  *   GUESS: `ef_res_drawparam_data`, `ef_res_emitterparam_cdata`, `ef_res_emitterparam_data`; the `.sdata2`
- *   constants `ef_pf_*` and the strings by their values.  The other helpers keep the map's `fn_` stems.
+ *   constants `ef_pf_*` and the strings by their values.
+ *   GUESS (from the bodies): `vec3_sub_assign` (nw4r's `VEC3::operator-=`), `ef_res_drawparam_set_flag_0400`,
+ *   GUESS: `ef_res_slot_set_emitter_desc`, `ef_res_slot_set_params` (the dump's folded `GXInitTexObjUserData`),
+ *   GUESS: `ef_res_slot_bind_emitter_desc`, `ef_res_slot_bind_params`, `ef_res_emitterparam_scale`,
+ *   GUESS: `ef_res_emitterparam_vec`, `ef_res_emitterparam_set_scale`, `ef_res_emitterparam_set_vec`.
  * SHAPES. `ef_vec3_lerp` is an `asm` function (retail's own paired-single body).  The hit tests take the crossing's
  *   step as one `f32 none = 2` returned at the end; their `-1` reflections are literals (the pool symbol is
  *   reloaded after every store).  `ef_pf_calc_particle` takes a non-const `EfPostFieldInfo*` (retail reloads the
  *   scale after each store), switches on the collision mode as `u32` (`cmplwi`) and keeps the 2^-46 test as a
- *   literal (hoisted into f31).
- * RESIDUALS. 5 partial rows; every row is written.  The source order differs from retail's, so our `.text` and the
+ *   literal (hoisted into f31).  The hit tests name the shared `-2 * b` (retail's `fadds` operand order).
+ * SHAPES. The parameter accessors use `EF_VALID_PTR_ASSERT` (`ef/ef_pointer_assert.h`): the flags are set
+ *   before the pointer is read, as retail's.
+ * RESIDUALS. 2 partial rows; every row is written.  The source order differs from retail's, so our `.text` and the
  *   extab and extabindex records run in another order.
- *  - `ef_res_drawparam_data`, `ef_res_emitterparam_cdata`, `ef_res_emitterparam_data` (0x800B23A4, 0x800B2598,
- *    0x800B26F8): the asserted `lwz r6, 0(r3)` is scheduled before the assert's `li` flags (retail after them; a
- *    `const void*` inline, a `||` expression and a macro were measured, none moves it; nor do `-inline auto`,
- *    `-O2` or `-schedule off` (unchanged) or `-O4,p` (worse));
- *  - `ef_pf_hit_sphere`, `ef_pf_hit_cylinder`: two commutative operand pairs (`4 * b * b`, `-2b + root`) come out
- *    swapped.
+ *  - `ef_pf_hit_sphere`, `ef_pf_hit_cylinder`: `4 * b * b` comes out `fmuls f2, b, 4b` where retail has
+ *    `fmuls f2, 4b, b` (`b * (4 * b)` and the source order give the same; a `4 * b` local fixes the order but
+ *    loads the 4.0 into another register).
  *   Relocation names that differ from retail (pool constants): the literals' pool where retail names `ef_pf_two`,
  *     `ef_pf_minus_one`, `ef_pf_tiny`.
  *   flipcheck: `.data` and `.sdata2` claimed, not emitted (declared by their map names, playbook 29).
@@ -39,6 +42,7 @@
 #include "types.h"
 #include "gx.h"
 #include "ef.h"
+#include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "ef/ef_drawstrategyimpl.h"
 #include "ef/fn_800AEE48.h"
 #include "ef/ef_postfield.h"
@@ -745,6 +749,7 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
     f32 b;
     f32 disc;
     f32 root;
+    f32 minus_two_b;
     f32 t0;
     f32 t1;
 
@@ -756,8 +761,9 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
         return ef_pf_two;
     }
     root = sqrt_f32(disc);
-    t0 = (ef_pf_minus_two * b - root) / (ef_pf_two * dir_sq);
-    t1 = (ef_pf_minus_two * b + root) / (ef_pf_two * dir_sq);
+    minus_two_b = ef_pf_minus_two * b;
+    t0 = (minus_two_b - root) / (ef_pf_two * dir_sq);
+    t1 = (minus_two_b + root) / (ef_pf_two * dir_sq);
     if (t0 > ef_pf_zero && t0 < ef_pf_one_ulp1) {
         ef_vec3_lerp(hit, prev, cur, t0);
         if (!(info->option == 1 && hit->y < ef_pf_minus_epsilon) && !(info->option == 2 && hit->y > ef_pf_epsilon)) {
@@ -846,12 +852,12 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             VEC3_ctor(&normal_part);
             mtx34_mult_vec3(&local, &frame, dir);
             vec3_scale_by((f32*)&normal_part, (const f32*)hit, local.y);
-            fn_800B0B90((Vec*)dir, (Vec*)&normal_part);
-            fn_800B0B90((Vec*)dir, (Vec*)&normal_part);
+            vec3_sub_assign((Vec*)dir, (Vec*)&normal_part);
+            vec3_sub_assign((Vec*)dir, (Vec*)&normal_part);
             mtx34_mult_vec3(&local, &frame, velocity);
             vec3_scale_by((f32*)&normal_part, (const f32*)hit, local.y);
-            fn_800B0B90((Vec*)velocity, (Vec*)&normal_part);
-            fn_800B0B90((Vec*)velocity, (Vec*)&normal_part);
+            vec3_sub_assign((Vec*)velocity, (Vec*)&normal_part);
+            vec3_sub_assign((Vec*)velocity, (Vec*)&normal_part);
             if (prev_sq > ef_pf_one) {
                 vec3_scale_by((f32*)hit, (const f32*)hit, ef_pf_one_plus_1e5);
             } else {
@@ -875,6 +881,7 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
     f32 b = prev->x * dir->x + prev->z * dir->z;
     f32 disc;
     f32 root;
+    f32 minus_two_b;
     f32 t0;
     f32 t1;
 
@@ -883,8 +890,9 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
         return best;
     }
     root = sqrt_f32(disc);
-    t0 = (ef_pf_minus_two * b - root) / (ef_pf_two * dir_sq);
-    t1 = (ef_pf_minus_two * b + root) / (ef_pf_two * dir_sq);
+    minus_two_b = ef_pf_minus_two * b;
+    t0 = (minus_two_b - root) / (ef_pf_two * dir_sq);
+    t1 = (minus_two_b + root) / (ef_pf_two * dir_sq);
     if (t0 > ef_pf_zero && t0 < ef_pf_one_ulp1) {
         ef_vec3_lerp(hit, prev, cur, t0);
         if (abs_f32(hit->y) < ef_pf_one_ulp1) {
@@ -992,8 +1000,8 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             normal.z = hit->z;
             vec3_normalize_into(&normal, &normal);
             vec3_scale_by((f32*)&normal, (const f32*)&normal, d);
-            fn_800B0B90((Vec*)dir, (Vec*)&normal);
-            fn_800B0B90((Vec*)dir, (Vec*)&normal);
+            vec3_sub_assign((Vec*)dir, (Vec*)&normal);
+            vec3_sub_assign((Vec*)dir, (Vec*)&normal);
             sqrt_f32(velocity->x * velocity->x + velocity->z * velocity->z);
             d = velocity->x * hit->x + velocity->z * hit->z;
             normal.x = hit->x;
@@ -1001,8 +1009,8 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             normal.z = hit->z;
             vec3_normalize_into(&normal, &normal);
             vec3_scale_by((f32*)&normal, (const f32*)&normal, d);
-            fn_800B0B90((Vec*)velocity, (Vec*)&normal);
-            fn_800B0B90((Vec*)velocity, (Vec*)&normal);
+            vec3_sub_assign((Vec*)velocity, (Vec*)&normal);
+            vec3_sub_assign((Vec*)velocity, (Vec*)&normal);
             if (prev_sq > ef_pf_one) {
                 vec3_scale_by((f32*)hit, (const f32*)hit, ef_pf_one_plus_1e5);
             } else {
@@ -1405,14 +1413,14 @@ s32 ef_pf_calc_particle(EfDrawParticle* p, const EfPostFieldTransform* xform, Ef
  * The resource-parameter accessor family (res_drawparam_ac.h / res_emitterparam_ac.h, 0x800B23A4..0x800B2878).
  * --------------------------------------------------------------------------------------------- */
 
-/* The `RES_ACCESS` record: its first word is the checked `mData` pointer, and `fn_800B23A4` asserts
+/* The `RES_ACCESS` record: its first word is the checked `mData` pointer, and `ef_res_drawparam_data` asserts
  * and returns it (the out-of-line `IsValidPointer` instantiation - `ef.h`). */
 typedef struct EfResDrawParam {
     u8 pad_0x00[0x94];   /* +0x00 */
     u8 field_0x94[0x4C]; /* +0x94  the parameter payload the accessors return */
 } EfResDrawParam; /* size: 0xE0 */
 
-/* The state word `fn_800B23A4` returns (a `Res*` block whose flags sit at +0). */
+/* The state word `ef_res_drawparam_data` returns (a `Res*` block whose flags sit at +0). */
 typedef struct EfResState {
     u16 flags_0x00; /* +0x00 */
 } EfResState; /* size: 0x02 */
@@ -1429,16 +1437,14 @@ typedef struct EfResAccessor {
 
 /* 0x800B23A4 (0x118): the draw-parameter accessor's checked block (res_drawparam_ac.h). */
 EfResState* ef_res_drawparam_data(const EfResAccessor* self) {
-    if (!IsValidPointer((u32)self->data)) {
-        nw4r::db::Panic(ef_res_drawparam_file_str, 90, ef_res_drawparam_mdata_str, self->data);
-    }
+    EF_VALID_PTR_ASSERT(ef_res_drawparam_file_str, 90, ef_res_drawparam_mdata_str, self->data);
     return (EfResState*)self->data;
 }
 extern EfResDrawParam* fn_800A5484(void* arg);
 extern EfResDrawParam* ef_res_emitter_desc(EfResDrawParam* arg);
 
 /* Sets or clears the 0x400 flag on the accessor's state word. */
-void fn_800B24BC(void* self, int enable) {
+void ef_res_drawparam_set_flag_0400(void* self, int enable) {
     if (enable != 0) {
         ef_res_drawparam_data((EfResAccessor*)self)->flags_0x00 |= 0x400;
     } else {
@@ -1447,23 +1453,23 @@ void fn_800B24BC(void* self, int enable) {
 }
 
 /* Stores a pointer into the record's first field. */
-void fn_800B2544(EfResSlot* self, void* value) {
+void ef_res_slot_set_emitter_desc(EfResSlot* self, void* value) {
     self->field_0x00 = value;
 }
 
 /* Stores a pointer into the record's first field. */
-void fn_800B2590(EfResSlot* self, void* value) {
+void ef_res_slot_set_params(EfResSlot* self, void* value) {
     self->field_0x00 = value;
 }
 
 /* Resolves the parameter through the two accessors and stores it. */
-void fn_800B2504(EfResSlot* self, void* arg) {
-    fn_800B2544(self, ef_res_emitter_desc(fn_800A5484(arg)));
+void ef_res_slot_bind_emitter_desc(EfResSlot* self, void* arg) {
+    ef_res_slot_set_emitter_desc(self, ef_res_emitter_desc(fn_800A5484(arg)));
 }
 
 /* Resolves the parameter and stores the second block's +0x94 field. */
-void fn_800B254C(EfResSlot* self, void* arg) {
-    fn_800B2590(self, &ef_res_emitter_desc(fn_800A5484(arg))->field_0x94);
+void ef_res_slot_bind_params(EfResSlot* self, void* arg) {
+    ef_res_slot_set_params(self, &ef_res_emitter_desc(fn_800A5484(arg))->field_0x94);
 }
 
 /* The resolved parameter block the +0x4C/+0x54 accessors read. */
@@ -1477,42 +1483,38 @@ typedef struct EfResParams {
 
 /* 0x800B2598 (0x118): the emitter-parameter accessor's checked block (res_emitterparam_ac.h, the const copy). */
 EfResParams* ef_res_emitterparam_cdata(const EfResAccessor* self) {
-    if (!IsValidPointer((u32)self->data)) {
-        nw4r::db::Panic(ef_res_emitterparam_file2_str, 97, ef_res_emitterparam_mdata2_str, self->data);
-    }
+    EF_VALID_PTR_ASSERT(ef_res_emitterparam_file2_str, 97, ef_res_emitterparam_mdata2_str, self->data);
     return (EfResParams*)self->data;
 }
 
 /* 0x800B26F8 (0x118): the emitter-parameter accessor's checked block (res_emitterparam_ac.h). */
 EfResParams* ef_res_emitterparam_data(const EfResAccessor* self) {
-    if (!IsValidPointer((u32)self->data)) {
-        nw4r::db::Panic(ef_res_emitterparam_file_str, 90, ef_res_emitterparam_mdata_str, self->data);
-    }
+    EF_VALID_PTR_ASSERT(ef_res_emitterparam_file_str, 90, ef_res_emitterparam_mdata_str, self->data);
     return (EfResParams*)self->data;
 }
 
 /* The resolved parameter's scale. */
-f32 fn_800B26B0(void* self) {
+f32 ef_res_emitterparam_scale(void* self) {
     return ef_res_emitterparam_cdata((EfResAccessor*)self)->field_0x4C;
 }
 
 /* The resolved parameter's second block. */
-void* fn_800B26D4(void* self) {
+void* ef_res_emitterparam_vec(void* self) {
     return &ef_res_emitterparam_cdata((EfResAccessor*)self)->field_0x54;
 }
 
 /* Sets the resolved parameter's scale. */
-void fn_800B2810(void* self, f32 value) {
+void ef_res_emitterparam_set_scale(void* self, f32 value) {
     ef_res_emitterparam_data((EfResAccessor*)self)->field_0x4C = value;
 }
 
 /* Copies a source block over the resolved parameter's second block. */
-void fn_800B2840(void* self, const nw4r::math::VEC3* src) {
+void ef_res_emitterparam_set_vec(void* self, const nw4r::math::VEC3* src) {
     copyVec3(&ef_res_emitterparam_data((EfResAccessor*)self)->field_0x54, src);
 }
 
 /* Subtracts `b` from `self` in place and returns `self`. */
-Vec* fn_800B0B90(Vec* self, Vec* b) {
+Vec* vec3_sub_assign(Vec* self, Vec* b) {
     PSVECSubtract((f32*)self, (const f32*)self, (const f32*)b);
     return self;
 }

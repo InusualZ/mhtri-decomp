@@ -27,14 +27,14 @@
  *   GUESS: `ef_smooth_begin_side`, `ef_smooth_curve_steps`, `ef_smooth_setup_gx`, `ef_smooth_first_ahead`,
  *   GUESS: `ef_smooth_axis_mode`, `ef_smooth_ahead_type3`, `ef_smooth_ahead_type6`, `ef_smooth_ahead_type6_link1`,
  *   GUESS: `ef_smooth_ahead_type6_link2`.
+ * SHAPES. `Draw` clamps the curve steps before the axis statics and picks the ribbon or the tube with a `switch`
+ *   on the type option (`cmpwi`; an `if` compares `cmplwi`).
  * SHAPES. The `.bss` edge offsets are function-local statics constructed through `setVec3` behind `.sbss` guards;
  *   the ribbon pair writer takes the scale before the flags (the caller loads f1 before r5); a spline weight's `t`
  *   is computed into a local before the call; the connection dispatches list `default` first.
- * RESIDUALS. Every row is written.  9 partial rows:
+ * RESIDUALS. Every row is written.  8 partial rows:
  *  - `Draw` (0x800C3D88): retail's `copyVec3(.., setVec3(&tmp, ..))` temporaries sit below the loop locals (the
  *    out-of-line VEC3 constructor's temporaries), ours above, and `ed`/`count` take r31/r29 where ours has r30/r31;
- *    the asserted resource's `lwz r6, 0x24(pm)` is scheduled before the assert's `li` flags;
- *  - `GetCalcAheadFunc` (0x800C4930): the same asserted-resource load placement;
  *  - `ef_smooth_ribbon_open`/`_loop`/`_to_emitter`, `ef_smooth_tube_open`/`_loop`/`_to_emitter`: the register
  *    allocator gives the parameters r20-r25 and the loop state the high registers in retail, the reverse in ours;
  *  - `ef_smooth_tube_curve`: the second side loop's counter and table pointer swap r20/r21.
@@ -53,6 +53,7 @@
 #include "types.h"
 #include "gx.h"
 #include "ef.h"
+#include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "ef/ef_drawstrategyimpl.h"
 #include "ef/fn_800AEE48.h"            /* ef_vec3_normalize / ef_pm_*_alive (rule 2) */
 #include "ef/ef_drawstripestrategy.h"  /* EfStripeParam, ef_stripe_draw_count, the shared ahead builders (rule 2) */
@@ -1236,9 +1237,7 @@ void DrawSmoothStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManage
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_smooth_file_str, 1003, ef_smooth_pm_assert_str, pm);
     }
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_smooth_file_str, 1005, ef_smooth_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_smooth_file_str, 1005, ef_smooth_resource_assert_str, pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
         nw4r::db::Panic(ef_smooth_file_str, 1007, ef_smooth_ed_assert_str, ed);
@@ -1308,25 +1307,30 @@ void DrawSmoothStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManage
         SetupGP(p, *ed, info, true, false);
         {
             s32 steps = ef_smooth_curve_steps(this, ed);
+            if (steps == 0) {
+                steps = 1;
+            }
             static EfSmoothAxis ef_smooth_axis_x(1.0f, 0.0f, 0.0f);
             static EfSmoothAxis ef_smooth_axis_neg_x(-1.0f, 0.0f, 0.0f);
             static EfSmoothAxis ef_smooth_axis_z(0.0f, 0.0f, 1.0f);
             static EfSmoothAxis ef_smooth_axis_neg_z(0.0f, 0.0f, -1.0f);
 
-            if (steps == 0) {
-                steps = 1;
-            }
-            if (ed->type_option != 3) {
+            switch (ed->type_option) {
+            default: {
                 ef_smooth_draw_ribbon(this, &ctx, steps, flags, &ef_smooth_axis_x, &ef_smooth_axis_neg_x);
                 if (ed->type_option == 1) {
                     ef_smooth_draw_ribbon(this, &ctx, steps, flags, &ef_smooth_axis_z, &ef_smooth_axis_neg_z);
                 }
-            } else {
+                break;
+            }
+            case 3: {
                 u32 flush = 0;
                 if ((ed->flags & 8) != 0 || p->manager->emitter->effect->system->flush_gp == 0) {
                     flush = 1;
                 }
                 ef_smooth_draw_tube(this, &ctx, steps, flags, flush);
+                break;
+            }
             }
         }
     }
@@ -1448,9 +1452,7 @@ DrawStrategyImpl::CalcAheadFunc DrawSmoothStripeStrategy::GetCalcAheadFunc(EfDra
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_smooth_file_str, 1226, ef_smooth_pm_assert_str, pm);
     }
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_smooth_file_str, 1227, ef_smooth_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_smooth_file_str, 1227, ef_smooth_resource_assert_str, pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
         nw4r::db::Panic(ef_smooth_file_str, 1230, ef_smooth_ed_assert_str, ed);

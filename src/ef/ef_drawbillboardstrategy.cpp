@@ -42,14 +42,10 @@
  *   expression form `(void)(ok || (Panic(...), 0))`, whose value leaves retail's dead `li r0,0; cmpwi r0,0`
  *   (playbook 103).
  * RESIDUALS. Every row is written.  The source order differs from retail's, so `.text` and the extab and extabindex
- *   records run in another order.  7 partial rows:
+ *   records run in another order.  1 partial row:
  *  - `ef_billboard_normal_quad` (0x800BA1E0): the `register` parameters the asm block needs keep the roll branch's
  *    temporaries out of f21-f31, so our frame saves f15-f20 too (0x1B0 against 0x150) and the roll branch's
- *    registers differ;
- *  - the two `Draw`s (0x800B9A80, 0x800BC1B4), both `GetCalcAheadFunc`s, `ef_directional_draw_world` and
- *    `ef_directional_draw_view`: the `lwz r6, 0x24(pm)` (0x20 for the manager-EM assert) of a member assert is
- *    scheduled before the `li` flags where retail loads it after (0x800BC1B4 also compares `cmplwi` where retail
- *    has `cmpwi`; 0x800BB93C's argument registers shift down one).
+ *    registers differ.
  *   Data: `.rodata` and `.sdata` are emitted and match; `.sdata2` is our own pool (the literals); `.data` holds only
  *   our two vtables - the strings stay `extern` because the range is two TUs (the three quad writers' strings, one
  *   "ef_drawbillboardstrategy.cpp" copy each, sit after the billboard vtable, and the directional TU's after them).
@@ -67,6 +63,7 @@
 #pragma peephole off
 
 #include "ef.h"
+#include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "gx.h"
 #include "sys_mem.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -168,7 +165,7 @@ void ef_directional_local_mtx(MTX34* out, u8 pivot_mode, f32 pivot_x, f32 pivot_
 void ef_directional_rotate_mtx(MTX34* out, EfDrawParticle* p, u8 axis);
 void ef_directional_write_quad(void* mtx, Vec* src, u32 flags);
 void ef_directional_setup_gx(nw4r::ef::DrawStrategyImpl* self, const EfDrawInfo* info, EfDrawParticleManager* args);
-u32 ef_directional_draw_mode(void* unused, EfParticleFlags* self);
+s32 ef_directional_draw_mode(void* unused, EfParticleFlags* self);
 
 /* SDK GX state setters and the matrix helpers, declared locally. */
 extern void GXLoadPosMtxImm(void* mtx, u32 id);
@@ -232,9 +229,7 @@ void DrawBillboardStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* 
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_billboard_file_str, 502, ef_billboard_pm_assert_str, pm);
     }
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_billboard_file_str, 503, ef_billboard_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_billboard_file_str, 503, ef_billboard_resource_assert_str, pm->resource);
     shape = (EfEmitterShape*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)shape)) {
         nw4r::db::Panic(ef_billboard_file_str, 506, ef_billboard_ed_assert_str, shape);
@@ -925,9 +920,7 @@ namespace ef {
 DrawStrategyImpl::CalcAheadFunc DrawBillboardStrategy::GetCalcAheadFunc(EfDrawParticleManager* pm) {
     EfEmitterShape* shape;
 
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_billboard_file_str, 784, ef_billboard_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_billboard_file_str, 784, ef_billboard_resource_assert_str, pm->resource);
     shape = (EfEmitterShape*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)shape)) {
         nw4r::db::Panic(ef_billboard_file_str, 786, ef_billboard_ed_assert_str, shape);
@@ -1057,9 +1050,7 @@ void DrawDirectionalStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager
         nw4r::db::Panic(ef_directional_file_str, 342, ef_directional_pm_assert_str, pm);
     }
     ef_directional_setup_gx(this, &info, pm);
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_directional_file_str, 346, ef_directional_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_directional_file_str, 346, ef_directional_resource_assert_str, pm->resource);
     if (ef_directional_draw_mode(this, (EfParticleFlags*)ef_resource_draw_setting(pm->resource)) != 1) {
         ef_directional_draw_world(this, &info, pm);
         return;
@@ -1109,9 +1100,7 @@ void ef_directional_draw_world(nw4r::ef::DrawDirectionalStrategy* self, const Ef
         nw4r::db::Panic(ef_directional_file_str, 365, ef_directional_pm_assert_str, pm);
     }
     ef_directional_setup_gx(self, info, pm);
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_directional_file_str, 369, ef_directional_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_directional_file_str, 369, ef_directional_resource_assert_str, pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
         nw4r::db::Panic(ef_directional_file_str, 371, ef_directional_ed_assert_str, ed);
@@ -1145,9 +1134,7 @@ void ef_directional_draw_world(nw4r::ef::DrawDirectionalStrategy* self, const Ef
         MTX34_ctor(&mtx);
         mtx34_concat(&mtx, &view, &ctx.manager_mtx);
         GXLoadPosMtxImm(mtx34_get_ptr(&mtx), 0);
-        if (!IsValidPointer((u32)pm->emitter)) {
-            nw4r::db::Panic(ef_directional_file_str, 403, ef_directional_manager_em_assert_str, pm->emitter);
-        }
+        EF_VALID_PTR_ASSERT(ef_directional_file_str, 403, ef_directional_manager_em_assert_str, pm->emitter);
         MTX34_ctor(&em_mtx);
         ef_emitter_get_mtx(pm->emitter, &em_mtx);
         mtx34_concat(&em_mtx, &ctx.manager_mtx_inv, &em_mtx);
@@ -1343,9 +1330,7 @@ void ef_directional_draw_view(nw4r::ef::DrawDirectionalStrategy* self, const EfD
         nw4r::db::Panic(ef_directional_file_str, 512, ef_directional_pm_assert_str, pm);
     }
     ef_directional_setup_gx(self, info, pm);
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_directional_file_str, 516, ef_directional_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_directional_file_str, 516, ef_directional_resource_assert_str, pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
         nw4r::db::Panic(ef_directional_file_str, 518, ef_directional_ed_assert_str, ed);
@@ -1493,9 +1478,7 @@ DrawStrategyImpl::CalcAheadFunc DrawDirectionalStrategy::GetCalcAheadFunc(EfDraw
     if (!IsValidPointer((u32)pm)) {
         nw4r::db::Panic(ef_directional_file_str, 687, ef_directional_pm_assert_str, pm);
     }
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_directional_file_str, 688, ef_directional_resource_assert_str, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(ef_directional_file_str, 688, ef_directional_resource_assert_str, pm->resource);
     shape = (EfEmitterShape*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)shape)) {
         nw4r::db::Panic(ef_directional_file_str, 691, ef_directional_ed_assert_str, shape);
@@ -1530,7 +1513,7 @@ extern "C" {
 #endif
 
 /* The first two draw/rotate flag bits of a particle. */
-u32 ef_directional_draw_mode(void* unused, EfParticleFlags* self) {
+s32 ef_directional_draw_mode(void* unused, EfParticleFlags* self) {
     return self->flags_0xB2 & 3;
 }
 

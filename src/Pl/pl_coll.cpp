@@ -37,7 +37,7 @@
 #include "nw4r/math.h"
 #include "pl.h"              /* the Pl module header; pulls in `ef.h`'s `VEC3_ctor` */
 #include "fn_8004CAD8.h"     /* the vector helpers this unit calls (rule 2) */
-#include "ef/fn_800AEE48.h"  /* `fn_800B0B90` (rule 2) */
+#include "ef/fn_800AEE48.h"  /* `vec3_sub_assign` (rule 2) */
 #include "Pl/fn_80288CEC.h"
 #include "Pl/fn_8028F66C.h"  /* the two callees whose owners' headers cannot declare them */
 
@@ -163,9 +163,9 @@ f32 fn_8028F86C(PlBox* box, const VEC3* point, f32* param) {
 
         t = fn_8028F84C(vec3_dot(&sep.x, &box->vec_0x18.x) / axis_len2, 0.0f, 1.0f);
         vec3_scale(&scaled, &box->vec_0x18, t);
-        /* `fn_800B0B90` is declared with the `ef` module's `Vec`, a distinct 0xC record with the same
+        /* `vec3_sub_assign` is declared with the `ef` module's `Vec`, a distinct 0xC record with the same
          * layout (`ef.h`); the conversion is a view, not arithmetic. */
-        fn_800B0B90((Vec*)&sep, (Vec*)&scaled);
+        vec3_sub_assign((Vec*)&sep, (Vec*)&scaled);
     }
     *param = t;
     return vec3_length_sq(&sep.x);

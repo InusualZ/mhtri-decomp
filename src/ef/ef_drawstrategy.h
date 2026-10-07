@@ -153,6 +153,8 @@ typedef struct EfDrawEmitter {
 
 /* The particle list a manager keeps (`nw4r::ut::List`-shaped): only its element count is read here. */
 typedef struct EfDrawParticleList {
+    s32 GetNumActive() const; /* defined inline by ef/ef_drawstripestrategy.cpp */
+
     /* +0x00 */ u8 pad_0x00[0x18];
     /* +0x18 */ u16 count;
 } EfDrawParticleList; /* size: 0x1A (lower bound) */

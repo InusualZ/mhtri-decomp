@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* 0x800B0B90 - `self -= b` in place, returning `self`. */
-Vec* fn_800B0B90(Vec* self, Vec* b);
+Vec* vec3_sub_assign(Vec* self, Vec* b);
 
 #ifdef __cplusplus
 }

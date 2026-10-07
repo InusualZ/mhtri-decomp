@@ -23,18 +23,18 @@
  *   GUESS: `ef_particle_tex_scale_t`, `ef_particle_tex_scale_s`, `ef_particle_wrap_t`, `ef_particle_wrap_s`.
  * RESIDUALS. 4 partial rows:
  *  - `SetupGP` (0x800C68E8): retail keeps an explicit `cmpwi 0` for the GX_NONE case of the position, normal and
- *    texcoord switches (ours folds it into the default), and tests the effect system's flush flag `bne; b` where ours
- *    `beq`s;
- *  - `SetupGPAlpha` (0x800C7270): retail follows the reference compare with a redundant `bne`/`beq` pair;
- *  - `SetupGPTexture` (0x800C7CE0): the texture pointer lives in r30 (ours r23), the asserted texture pointer is loaded
- *    after the six temporaries are seeded (ours before), and the LOD's 0.0f comes from a hoisted register;
- *  - `AheadContext::AheadContext` (0x800C8F10): the same field-assert load placement, and the two `(0, 1, 0)`
- *    temporaries sit in swapped stack slots.
+ *    texcoord switches (ours folds it into the default; an explicit `default: break;` does not keep it);
+ *  - `SetupGPAlpha` (0x800C7270): retail follows the reference compare with a redundant `bne`/`beq` pair (swapped
+ *    compare operands, a reference local, `!(==)`, `(!=) != false` and an early return do not produce it);
+ *  - `SetupGPTexture` (0x800C7CE0): the texture pointer lives in r30 (ours r23) and the loop's saved registers
+ *    number one higher;
+ *  - `AheadContext::AheadContext` (0x800C8F10): the two `(0, 1, 0)` temporaries sit in swapped stack slots.
  *   flipcheck: `.ctors` and `.data` claimed, not emitted (the strings are declared by their map names).
  *   `DrawStrategyImpl` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
  *   `DrawStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
+ * SHAPES. `SetupGP` returns early on one `||` of the per-emitter and the system flush flags (retail's `bne`/`b`).
  * SHAPES. `IsValidPointer` field asserts pass the pointer as the fourth `Panic` argument (retail loads it into r6);
  *   `InitTev`'s `GXSetZMode` arguments are ternaries (ours evaluates them in retail's order only that way); the
  *   attenuation selector is an enum; the accessors take `int layer` (the `layer >= 0 && layer < 3` assert folds into
@@ -44,6 +44,7 @@
 #pragma peephole off
 
 #include "ef.h"
+#include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "gx.h"
 #include "ef/ef_drawstrategyimpl.h"
 #include "ef/ef_drawbillboardstrategy.h" /* DrawBillboardStrategy/DrawDirectionalStrategy (rule 2) */
@@ -485,10 +486,7 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
     texture_loaded = SetupGPTexture(pp, setting, info, first);
     flush = color_dirty && !texture_loaded;
 
-    if ((setting.flags & 8) != 0) {
-        return;
-    }
-    if (pp->manager->emitter->effect->system->flush_gp == 0) {
+    if ((setting.flags & 8) != 0 || pp->manager->emitter->effect->system->flush_gp == 0) {
         return;
     }
     if (flush) {
@@ -1118,9 +1116,7 @@ bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSet
         if (mTexmapMap[layer] >= 0) {
             EfTextureData* tex;
 
-            if (!IsValidPointer((u32)pp->texture[layer])) {
-                nw4r::db::Panic(lbl_80594850, 890, lbl_805948C8, pp->texture[layer]);
-            }
+            EF_VALID_PTR_ASSERT(lbl_80594850, 890, lbl_805948C8, pp->texture[layer]);
             tex = pp->texture[layer];
             if (tex != NULL) {
                 s32 wrap_s = ef_particle_wrap_s(pp, layer);
@@ -1484,9 +1480,7 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
     }
     view_mtx = view;
     particle_manager = pm;
-    if (!IsValidPointer((u32)pm->emitter)) {
-        nw4r::db::Panic(lbl_80594850, 1224, lbl_80594968, pm->emitter);
-    }
+    EF_VALID_PTR_ASSERT(lbl_80594850, 1224, lbl_80594968, pm->emitter);
     ef_emitter_get_mtx(pm->emitter, &emitter_mtx);
     ef_pm_get_mtx(pm, &manager_mtx);
     mtx34_inverse(&manager_mtx_inv, &manager_mtx);
@@ -1503,9 +1497,7 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
     ef_vec3_transform(&center, &manager_mtx_inv, &center);
     copyVec3(&emitter_center, &center);
 
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(lbl_80594850, 1250, lbl_805949A8, pm->resource);
-    }
+    EF_VALID_PTR_ASSERT(lbl_80594850, 1250, lbl_805949A8, pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
         nw4r::db::Panic(lbl_80594850, 1253, lbl_805949E4, ed);

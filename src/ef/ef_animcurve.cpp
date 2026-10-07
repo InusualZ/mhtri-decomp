@@ -23,10 +23,9 @@
  *   and the pattern ramp.
  *   GUESS: `ef_anim_rand_next` (0x8009EEDC): the random generator's LCG step.
  *   GUESS: `ef_anim_name_hash` (0x8009EEF4): hashes the seed, the curve's id, the key and the division.
- * RESIDUALS. 12 partial rows, every one written:
+ * RESIDUALS. 11 partial rows, every one written:
  *  - `ef_anim_latch_tex_type`: retail stores the masked byte before or-ing the new bits in and reloads `arg->mChannel`;
  *    ours drops the first store (no alias between the two records);
- *  - `ef_anim_name_hash`: the hash constant is added after the `a`/`b` products in retail; MWCC folds it in earlier;
  *  - `ef_anim_curve_rotate`, `ef_anim_curve_f32`, `ef_anim_curve_u8`: register colouring only (the mask, the two record strides and
  *    the key pointer take other callee-saved registers; retail reuses one pointer for the key data and the
  *    random range, flags read at -0xA);
@@ -38,6 +37,7 @@
  *   flipcheck: `.data` claimed, not emitted (the strings would have to come out of literal pools: the
  *   `fn_800A12AC`/`fn_8009EF88` messages each carry their own copy of the file name after the main pool);
  *   `.sdata2` 0x10 of 0x38 (only the two conversion doubles MWCC re-emits); `.text` 0x6280 of 0x6288.
+ * SHAPES. `ef_anim_name_hash` sums `d*K + c*K + (a*K + b*K) + 0x4BF53` in that grouping (retail's add order).
  * SHAPES. The `.sdata2` constants are referenced by name, never spelled as literals (a literal re-pools them).
  *   The kernels take the curve type last (retail evaluates it after the three floats). The key searches read
  *   their u16 keys `stride` bytes apart. `fn_800A2FA4` walks the queue entries with a bottom-tested loop.
@@ -873,7 +873,7 @@ u32 ef_anim_rand_next(u32 seed) {
 /* 0x8009EEF4 - the four-word name hash the sequence name table is keyed by. */
 u32 ef_anim_name_hash(u16 a, u16 b, u16 c, u32 d) {
     EfAnimHash h;
-    h.mWord = (u32)d * 0x7B929 + (u32)c * 0x371097E7 + (0x4BF53 + (u32)a * 0x3F81F635 + (u32)b * 0x30A74193);
+    h.mWord = (u32)d * 0x7B929 + (u32)c * 0x371097E7 + ((u32)a * 0x3F81F635 + (u32)b * 0x30A74193) + 0x4BF53;
     h.mByte[2] ^= h.mByte[3];
     h.mByte[1] ^= h.mByte[2];
     h.mByte[0] ^= h.mByte[1];
