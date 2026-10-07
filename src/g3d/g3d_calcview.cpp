@@ -5,7 +5,12 @@
  * RANGE. .text 0x8006F738-0x8007270C (44 functions); extab, extabindex, .rodata 0x8056F638-0x8056F658, .data
  *   0x8058D938-0x8058DD68 (opens on "g3d_calcview.cpp", then the billboard warning strings), .sdata
  *   0x807911A8-0x807911B8, .sdata2 0x80795DA8-0x80795DB0.  Both neighbours cite their own `__FILE__` strings.
- * NAMES. res_mdl_info_is_valid is a GUESS; res_mdl_info_get_class_name is a GUESS; res_mdl_info_ptr is a GUESS;
+ * NAMES. mtx34_calc_billboard_std is a GUESS; mtx34_calc_billboard_std_persp is a GUESS;
+ *   mtx34_calc_billboard_y is a GUESS; mtx34_calc_billboard_y_persp is a GUESS;
+ *   mtx34_calc_billboard_y_rot is a GUESS; mtx34_calc_billboard_y_rot_persp is a GUESS;
+ *   mtx34_axis_in_parent is a GUESS; mtx34_up_axis_in_parent is a GUESS; res_mdl_info_handle is a GUESS;
+ *   calcview_epsilon_f32 is a GUESS; calcview_zero_f32 is a GUESS (the evidence follows).
+ *   res_mdl_info_is_valid is a GUESS; res_mdl_info_get_class_name is a GUESS; res_mdl_info_ptr is a GUESS;
  *   res_mdl_info_data is a GUESS; res_mdl_info_get_node_of_pos_nrm_mtx is a GUESS;
  *   res_node_get_parent_const is a GUESS; res_node_get_child is a GUESS (the evidence follows).
  *   Map stems.
@@ -23,17 +28,20 @@
  *   g3d_calc_view_lc is a GUESS and g3d_calc_view_lc_dma is a GUESS (the three view-matrix calculators
  *   ScnMdlSimple's view pass picks between), g3d_lc_queue_wait is a GUESS, g3d_dc_invalidate_range is a GUESS and
  *   g3d_lc_base is a GUESS (the tail calls of LCQueueWait / DCInvalidateRange and the locked cache's address).
- * RESIDUALS. Unwritten (empty stubs, 7 rows, 0x2AC4 bytes; objdiff scores them near zero): fn_8006F738, fn_8006F934,
- *   fn_8006FBBC, fn_80070134, fn_80070410, fn_80070600, and the three view passes
+ * RESIDUALS. Unwritten (empty stubs, 3 rows, 0x1DD0 bytes; objdiff scores them near zero): the three view passes
  *   g3d_calc_view, g3d_calc_view_lc, g3d_calc_view_lc_dma (paired-single bodies of 2-2.7 KB: not attempted).
- *   fn_8006F908 is partial (98 %).  fn_8006FF50's three g3d_calcworld.cpp callers now pass their handle.
+ *   Partial: fn_8006F908 (98 %), mtx34_calc_billboard_y and mtx34_calc_billboard_y_persp (99.8 %: the parent node index
+ *   takes r5 where retail keeps it in r0).
  *   flipcheck: `.text` short of the claim; `.rodata`, `.data`, `.sdata` and `.sdata2` are claimed and not emitted.
  */
 #include "types.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "g3d/res_mdl_info.h" /* ResMdlInfoData (rule 1) */
+#include "g3d/g3d_calcmaterial.h" /* mtx34_axis_in_parent (rule 2) */
 #include "g3d/g3d_anmchr.h" /* res_node_ref, res_node_ref_nonconst, res_node_ofs_to_node (rule 2) */
+#include "mh3_pad.h"          /* setVec3 (rule 2) */
+#include "nw4r/fn_805012C4.h"  /* nw4r::math::MTX34Zero (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_get_ptr, mtx34_const_ptr (rule 2) */
 #include "OS/PSMTXCopy.h"      /* PSMTXCopy, PSMTXConcat, PSMTXConcatArray, owner OS/FindContainHeap_.c (rule 2) */
 #include "NAND/DCInvalidateRange.h" /* DCInvalidateRange, DCFlushRangeNoSync, owner NAND/nand.c (rule 2) */
@@ -72,6 +80,7 @@ extern const char lbl_8058DCFC[];
 extern const char lbl_8058DD18[];
 extern const char lbl_8058DD28[];
 extern const char lbl_8058DD58[];
+extern const f32 calcview_epsilon_f32; /* 1.0e-18f */
 extern const f32 calcview_zero_f32; /* 0.0f: the unit's pooled constant (claimed, not emitted) */
 extern u32 lbl_807911A8;
 extern u32 lbl_807911AC;
@@ -86,10 +95,7 @@ u32* res_node_ptr(void* self);
 void fn_80069CF4(void* p0, void* p1);
 
 /* -------- this unit's own bodies -------- */
-void fn_8006F738(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 f32 fn_8006F908(const f32* pMtx, u32 idx);
-void fn_8006F934(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
-void fn_8006FBBC(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 u32 fn_8006FDCC(void* self);
 u32 res_node_get_parent_const(const ResHandle* pSelf);
 const ResMdlInfoData* res_mdl_info_data(const void* pInfo);
@@ -99,12 +105,9 @@ u32 fn_8006FE7C(void* self, u32 off);
 u32 res_mdl_info_ptr(void* self);
 const char* res_mdl_info_get_class_name(void);
 u32 res_mdl_info_is_valid(void* self);
-u32 fn_80070020(void* self);
+u32 res_mdl_info_handle(void* self);
 u32* fn_80070054(u32* pDst, u32 ptr);
 void fn_800700B8(u32* pDst, u32 value);
-void fn_80070134(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
-void fn_80070410(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
-void fn_80070600(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void g3d_calc_view(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 u32 res_node_get_child(ResHandle* pSelf);
 void g3d_calc_view_lc(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
@@ -183,7 +186,7 @@ u32* fn_80070054(u32* pDst, u32 ptr) {
 }
 
 /* 0x80070020 - the checked pointer the model info lives at. */
-u32 fn_80070020(void* self) {
+u32 res_mdl_info_handle(void* self) {
     u8* p = (u8*)&reinterpret_cast<const nw4r::g3d::ResMdl*>(self)->ref();
     u32 handle;
     return *fn_80070054((u32*)&handle, (u32)(p + 76));
@@ -212,9 +215,6 @@ const char* nw4r::g3d::ResMdl::GetClassName() {
 extern "C" {
 
 /* -------- registration stubs (reconstruction pending) -------- */
-void fn_8006F738(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
-void fn_8006F934(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
-void fn_8006FBBC(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 /* 0x8006FF50 (0x34): the info block, asserting the handle is valid. */
 /* untyped: opaque handle - the ResMdlInfo handle */
 const ResMdlInfoData* res_mdl_info_data(const void* pInfo)
@@ -244,9 +244,6 @@ u32 res_mdl_info_num_pos_nrm_mtx(const void* pInfo)
     u32 ofs = res_mdl_info_data(pInfo)->mToPosNrmMtxTable;
     return *(const u32*)((const u8*)res_mdl_info_data(pInfo) + ofs);
 }
-void fn_80070134(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
-void fn_80070410(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
-void fn_80070600(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void g3d_calc_view(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void g3d_calc_view_lc(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void g3d_calc_view_lc_dma(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
@@ -320,6 +317,240 @@ asm void mtx34_from_axes_scaled(register Mtx34* pOut, register const f32* pA, re
     fmuls f0, f0, sc
     stfs f0, 40(pOut)
     blr
+}
+
+/* 0x8006F738 (0x160): the matrix of a 'std' billboard: the Y axis of `pOut` (read as its column 1) normalised in the
+ * XY plane, rotated onto the node's world scale (uniform when `bUniformScale`). */
+void mtx34_calc_billboard_std(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, u32 unused3, u32 unused4,
+                              u32 mtxId)
+{
+    nw4r::math::VEC3 axis;
+    setVec3(&axis, pOut->m[0][1], pOut->m[1][1], calcview_zero_f32);
+    if (abs_f32(axis.x) >= calcview_epsilon_f32 || abs_f32(axis.y) >= calcview_epsilon_f32) {
+        vec3_normalize_into(&axis, &axis);
+        if (bUniformScale) {
+            mtx34_from_rot2d_scale1(pOut, &axis.x, fn_8006F908((const f32*)&pWorldArray[mtxId], 0));
+        } else {
+            const Mtx34* pWorld = &pWorldArray[mtxId];
+            f32 sx = fn_8006F908((const f32*)pWorld, 0);
+            f32 sy = fn_8006F908((const f32*)pWorld, 1);
+            mtx34_from_rot2d_scale3(pOut, &axis.x, sx, sy, fn_8006F908((const f32*)pWorld, 2));
+        }
+    } else {
+        nw4r::db::Warning(lbl_8058D938, 0x24B, lbl_8058D94C);
+        nw4r::math::MTX34Zero(pOut);
+    }
+}
+
+/* 0x8006F934 (0x22C): the matrix of a 'std_persp' billboard: the node's up axis kept, the Z axis turned onto the eye
+ * direction (the translation negated), the X axis their cross product, each scaled by the node's world scale. */
+void mtx34_calc_billboard_std_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, u32 unused3, u32 unused4,
+                                    u32 mtxId)
+{
+    nw4r::math::VEC3 right;
+    VEC3_ctor(&right);
+    nw4r::math::VEC3 up;
+    setVec3(&up, pOut->m[0][1], pOut->m[1][1], pOut->m[2][1]);
+    nw4r::math::VEC3 eye;
+    setVec3(&eye, -pOut->m[0][3], -pOut->m[1][3], -pOut->m[2][3]);
+    if (abs_f32(eye.x) >= calcview_epsilon_f32 || abs_f32(eye.y) >= calcview_epsilon_f32 ||
+        abs_f32(eye.z) >= calcview_epsilon_f32) {
+        vec3_normalize_into(&eye, &eye);
+        vec3_cross(&right.x, &up.x, &eye.x);
+        if (abs_f32(right.x) >= calcview_epsilon_f32 || abs_f32(right.y) >= calcview_epsilon_f32 ||
+            abs_f32(right.z) >= calcview_epsilon_f32) {
+            vec3_normalize_into(&right, &right);
+            vec3_cross(&up.x, &eye.x, &right.x);
+            if (bUniformScale) {
+                f32 s = fn_8006F908((const f32*)&pWorldArray[mtxId], 0);
+                mtx34_from_axes_scaled(pOut, &right.x, &up.x, &eye.x, s, s, s);
+            } else {
+                const Mtx34* pWorld = &pWorldArray[mtxId];
+                f32 sx = fn_8006F908((const f32*)pWorld, 0);
+                f32 sy = fn_8006F908((const f32*)pWorld, 1);
+                mtx34_from_axes_scaled(pOut, &right.x, &up.x, &eye.x, sx, sy, fn_8006F908((const f32*)pWorld, 2));
+            }
+            return;
+        }
+    }
+    nw4r::db::Warning(lbl_8058D938, 0x292, lbl_8058D984);
+    nw4r::math::MTX34Zero(pOut);
+}
+
+/* A node handle word wrapped in a temporary, so a copy helper gets its address. */
+struct CalcViewHandleWord {
+    CalcViewHandleWord(u32 word) { mWord = word; }
+    /* +0x00 */ u32 mWord;
+}; /* size: 0x4 */
+
+/* 0x8006FBBC (0x210): the matrix of a 'y' billboard: the node's axis expressed against its parent (the node's own
+ * when it has none), normalised in the XY plane and applied with the node's world scale. */
+void mtx34_calc_billboard_y(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, u32 unused4,
+                            const nw4r::g3d::ResMdl* pMdl, u32 mtxId)
+{
+    nw4r::math::VEC3 axis;
+    VEC3_ctor(&axis);
+    u32 node;
+    u32 parent;
+    u32 info = res_mdl_info_handle((void*)pMdl);
+    const Mtx34* pWorld;
+    int nodeId = res_mdl_info_get_node_of_pos_nrm_mtx(&info, mtxId);
+    if (nodeId >= 0) {
+        res_node_copy_ctor(&node, (u32*)&CalcViewHandleWord((u32)pMdl->GetResNode(nodeId).mpData).mWord);
+        res_node_copy_ctor(&parent, &CalcViewHandleWord(res_node_get_parent_const((const ResHandle*)&node)).mWord);
+        if (res_node_is_valid(&parent)) {
+            u32 parentId = fn_8006FDCC(&parent);
+            pWorld = &pWorldArray[mtxId];
+            mtx34_axis_in_parent(&axis.x, (const f32*)pWorld, (const f32*)&pWorldArray[parentId]);
+        } else {
+            pWorld = &pWorldArray[mtxId];
+            axis.x = pWorld->m[0][1];
+            axis.y = pWorld->m[1][1];
+            axis.z = calcview_zero_f32;
+        }
+    } else {
+        pWorld = &pWorldArray[mtxId];
+        axis.x = pWorld->m[0][1];
+        axis.y = pWorld->m[1][1];
+        axis.z = calcview_zero_f32;
+    }
+    if (abs_f32(axis.x) >= calcview_epsilon_f32 || abs_f32(axis.y) >= calcview_epsilon_f32) {
+        vec3_normalize_into(&axis, &axis);
+        if (bUniformScale) {
+            mtx34_from_rot2d_scale1(pOut, &axis.x, fn_8006F908((const f32*)pWorld, 0));
+        } else {
+            f32 sx = fn_8006F908((const f32*)pWorld, 0);
+            f32 sy = fn_8006F908((const f32*)pWorld, 1);
+            mtx34_from_rot2d_scale3(pOut, &axis.x, sx, sy, fn_8006F908((const f32*)pWorld, 2));
+        }
+    } else {
+        nw4r::db::Warning(lbl_8058D938, 0x2F8, lbl_8058D9C4);
+        nw4r::math::MTX34Zero(pOut);
+    }
+}
+
+/* 0x80070134 (0x2DC): the matrix of a 'y_persp' billboard: the Z axis turned onto the eye direction, the up axis taken
+ * from the node against its parent (the node's own when it has none), the X axis their cross product. */
+void mtx34_calc_billboard_y_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, u32 unused4,
+                                  const nw4r::g3d::ResMdl* pMdl, u32 mtxId)
+{
+    nw4r::math::VEC3 right;
+    VEC3_ctor(&right);
+    nw4r::math::VEC3 up;
+    VEC3_ctor(&up);
+    nw4r::math::VEC3 eye;
+    setVec3(&eye, -pOut->m[0][3], -pOut->m[1][3], -pOut->m[2][3]);
+    u32 node;
+    u32 parent;
+    u32 info = res_mdl_info_handle((void*)pMdl);
+    const Mtx34* pWorld;
+    int nodeId = res_mdl_info_get_node_of_pos_nrm_mtx(&info, mtxId);
+    if (nodeId >= 0) {
+        res_node_copy_ctor(&node, (u32*)&CalcViewHandleWord((u32)pMdl->GetResNode(nodeId).mpData).mWord);
+        res_node_copy_ctor(&parent, &CalcViewHandleWord(res_node_get_parent_const((const ResHandle*)&node)).mWord);
+        if (res_node_is_valid(&parent)) {
+            u32 parentId = fn_8006FDCC(&parent);
+            pWorld = &pWorldArray[mtxId];
+            mtx34_up_axis_in_parent(&up.x, (const f32*)pWorld, (const f32*)&pWorldArray[parentId]);
+        } else {
+            pWorld = &pWorldArray[mtxId];
+            up.x = pWorld->m[0][1];
+            up.y = pWorld->m[1][1];
+            up.z = pWorld->m[2][1];
+        }
+    } else {
+        pWorld = &pWorldArray[mtxId];
+        up.x = pWorld->m[0][1];
+        up.y = pWorld->m[1][1];
+        up.z = pWorld->m[2][1];
+    }
+    if (abs_f32(eye.x) >= calcview_epsilon_f32 || abs_f32(eye.y) >= calcview_epsilon_f32 ||
+        abs_f32(eye.z) >= calcview_epsilon_f32) {
+        vec3_normalize_into(&eye, &eye);
+        vec3_cross(&right.x, &up.x, &eye.x);
+        if (abs_f32(right.x) >= calcview_epsilon_f32 || abs_f32(right.y) >= calcview_epsilon_f32 ||
+            abs_f32(right.z) >= calcview_epsilon_f32) {
+            vec3_normalize_into(&right, &right);
+            vec3_cross(&up.x, &eye.x, &right.x);
+            if (bUniformScale) {
+                f32 s = fn_8006F908((const f32*)pWorld, 0);
+                mtx34_from_axes_scaled(pOut, &right.x, &up.x, &eye.x, s, s, s);
+            } else {
+                f32 sx = fn_8006F908((const f32*)pWorld, 0);
+                f32 sy = fn_8006F908((const f32*)pWorld, 1);
+                mtx34_from_axes_scaled(pOut, &right.x, &up.x, &eye.x, sx, sy, fn_8006F908((const f32*)pWorld, 2));
+            }
+            return;
+        }
+    }
+    nw4r::db::Warning(lbl_8058D938, 0x363, lbl_8058D9FC);
+    nw4r::math::MTX34Zero(pOut);
+}
+
+/* 0x80070410 (0x1F0): the matrix of a 'y' rotating billboard: the node's up axis divided by its Y scale, the X axis its
+ * XY-plane perpendicular, the Z axis their cross product. */
+void mtx34_calc_billboard_y_rot(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, u32 unused3, u32 unused4,
+                                u32 mtxId)
+{
+    nw4r::math::VEC3 right;
+    VEC3_ctor(&right);
+    nw4r::math::VEC3 up;
+    setVec3(&up, pOut->m[0][1], pOut->m[1][1], pOut->m[2][1]);
+    nw4r::math::VEC3 axis;
+    setVec3(&axis, up.y, -up.x, calcview_zero_f32);
+    if (abs_f32(up.x) >= calcview_epsilon_f32 || abs_f32(up.y) >= calcview_epsilon_f32 ||
+        abs_f32(up.z) >= calcview_epsilon_f32) {
+        const Mtx34* pWorld = &pWorldArray[mtxId];
+        f32 sy = fn_8006F908((const f32*)pWorld, 1);
+        vec3_scale_in_place(&up, math_reciprocal(sy));
+        if (abs_f32(axis.x) >= calcview_epsilon_f32 || abs_f32(axis.y) >= calcview_epsilon_f32) {
+            vec3_normalize_into(&axis, &axis);
+            vec3_cross(&right.x, &axis.x, &up.x);
+            if (bUniformScale) {
+                mtx34_from_axes_scaled(pOut, &axis.x, &up.x, &right.x, sy, sy, sy);
+            } else {
+                f32 sx = fn_8006F908((const f32*)pWorld, 0);
+                mtx34_from_axes_scaled(pOut, &axis.x, &up.x, &right.x, sx, sy, fn_8006F908((const f32*)pWorld, 2));
+            }
+            return;
+        }
+    }
+    nw4r::db::Warning(lbl_8058D938, 0x3AB, lbl_8058DA3C);
+    nw4r::math::MTX34Zero(pOut);
+}
+
+/* 0x80070600 (0x220): the matrix of a 'y' billboard facing the eye: the node's up axis divided by its Y scale, the X axis
+ * perpendicular to it and the eye direction (the translation negated), the Z axis their cross product. */
+void mtx34_calc_billboard_y_rot_persp(Mtx34* pOut, const Mtx34* pWorldArray, u32 bUniformScale, u32 unused3,
+                                      u32 unused4, u32 mtxId)
+{
+    nw4r::math::VEC3 right;
+    VEC3_ctor(&right);
+    nw4r::math::VEC3 up;
+    setVec3(&up, pOut->m[0][1], pOut->m[1][1], pOut->m[2][1]);
+    nw4r::math::VEC3 eye;
+    setVec3(&eye, -pOut->m[0][3], -pOut->m[1][3], -pOut->m[2][3]);
+    if (abs_f32(up.x) >= calcview_epsilon_f32 || abs_f32(up.y) >= calcview_epsilon_f32 ||
+        abs_f32(up.z) >= calcview_epsilon_f32) {
+        const Mtx34* pWorld = &pWorldArray[mtxId];
+        f32 sy = fn_8006F908((const f32*)pWorld, 1);
+        vec3_scale_in_place(&up, math_reciprocal(sy));
+        vec3_cross(&right.x, &up.x, &eye.x);
+        if (abs_f32(right.x) >= calcview_epsilon_f32 || abs_f32(right.y) >= calcview_epsilon_f32 ||
+            abs_f32(right.z) >= calcview_epsilon_f32) {
+            vec3_normalize_into(&right, &right);
+            vec3_cross(&eye.x, &right.x, &up.x);
+            if (bUniformScale) {
+                mtx34_from_axes_scaled(pOut, &right.x, &up.x, &eye.x, sy, sy, sy);
+            } else {
+                f32 sx = fn_8006F908((const f32*)pWorld, 0);
+                mtx34_from_axes_scaled(pOut, &right.x, &up.x, &eye.x, sx, sy, fn_8006F908((const f32*)pWorld, 2));
+            }
+            return;
+        }
+    }
+    nw4r::db::Warning(lbl_8058D938, 0x3F4, lbl_8058DA70);
+    nw4r::math::MTX34Zero(pOut);
 }
 
 /* 0x80071008 (0x4): flushes the data-cache range without waiting. */

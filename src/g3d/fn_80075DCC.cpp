@@ -189,7 +189,6 @@ s32 res_node_is_valid(s32);
 void* fn_8005CEEC(void);
 s32 res_node_get_id(void*);
 u32 res_node_assign(void*, void*);
-u32 res_node_copy_ctor(void*, void*);
 s32 fn_8006405C(void*);
 u32 fn_80064BD4(void*);
 s32 fn_8006518C(void);
@@ -203,7 +202,7 @@ u32 res_mat_tev_color_copy_ctor(void*, void*);
 u32 res_mat_ind_mtx_copy_ctor(void*, void*);
 u32 fn_8006FDCC(void*);
 s32 res_mdl_info_get_node_of_pos_nrm_mtx(void*, s32);
-s32 fn_80070020(s32);
+s32 res_mdl_info_handle(s32);
 u32 mtx34_copy_ps(void*, s32);
 u32 mtx34_concat(void*, void*, void*);
 u32 g3d_lc_queue_wait(u32);
@@ -1282,7 +1281,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                             nw4r::db::Panic((const char*)&lbl_8058E880, 0x64, (const char*)&lbl_8058E890);
                         }
                         sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMdl*>(&sp2C)->GetResNode((int)temp_r3_3).mpData;
-                        res_node_copy_ctor((void*)(&sp28), (void*)(&sp18));
+                        res_node_copy_ctor((void*)(&sp28), (u32*)(&sp18));
                         temp_r20_2 = (s32)res_node_ref_nonconst((ResHandle*)(arg1));
                         mtx34_concat((void*)(&spC8), (void*)((u32)res_node_ref_nonconst((ResHandle*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
                         temp_r3_4 = (void *)(g3d_state_get_nrm_mtx((u32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx)));
