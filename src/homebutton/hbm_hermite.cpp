@@ -29,7 +29,7 @@
  * ------------------------------------------------------------------------------------------------ */
 extern "C" {
 
-s32   fn_80463C1C(void* base, void* key);
+s32   wcschr(void* base, void* key);
 
 s32   strlen(const char* s);
 
@@ -75,19 +75,19 @@ extern "C" {
 s32 fn_8055F4D8(void* self)
 {
     u32* base = lbl_80795A78;
-    return fn_80463C1C((void*)base[1], self) != 0;
+    return wcschr((void*)base[1], self) != 0;
 }
 
 s32 fn_8055F510(void* self)
 {
     u32* base = lbl_80795A80;
-    return fn_80463C1C((void*)base[1], self) != 0;
+    return wcschr((void*)base[1], self) != 0;
 }
 
 s32 fn_8055F548(void* self)
 {
     u32* base = lbl_80795A88;
-    return fn_80463C1C((void*)base[1], self) != 0;
+    return wcschr((void*)base[1], self) != 0;
 }
 
 s32 fn_8055F580(const char* a, const char* b)

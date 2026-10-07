@@ -164,7 +164,7 @@ void mtx34_inverse(void* mtx, void* in);
 void ef_mtx34_rotate_xyz(void* mtx, f32 x, f32 y, f32 z);
 void fn_8009CBA0(void* dst, void* mtx, void* vec);
 void fn_80501390(void* dst, void* mtx, void* vec);
-f32 fn_80463E2C(f32 x);
+f32 ceilf(f32 x);
 s32 ef_vec3_normalize_to(void* a, void* b);
 }
 
@@ -1290,7 +1290,7 @@ extern "C" nw4r::math::MTX34* ef_mtx34_copy(nw4r::math::MTX34* dst, const nw4r::
  * ------------------------------------------------------------------------------------------------- */
 
 extern "C" f32 ef_truncate_float(f32 x) {
-    return fn_80463E2C(x);
+    return ceilf(x);
 }
 
 /* -------------------------------------------------------------------------------------------------

@@ -45,7 +45,7 @@ extern "C" u32 fn_8055BEDC(void* current);
 
 extern "C" u32 fn_8055BEF0(void* self);
 
-extern "C" void fn_80461780(void* dst, int value, u16 size);
+extern "C" void wmemset(void* dst, int value, u16 size);
 
 extern "C" void* fn_8055C494(void* self, int flag);
 
@@ -62,7 +62,7 @@ extern "C" {
 
 void  fn_8055B7D4(void* sub, s32 flag);
 
-s32   fn_80463C1C(void* base, void* key);
+s32   wcschr(void* base, void* key);
 
 s32   strlen(const char* s);
 
@@ -88,7 +88,7 @@ extern "C" void fn_805594C0(HbmU16Array* self, u16 index, u16 value) {
 
 /* Clears the widget's u16 array and its counters. */
 extern "C" void fn_80559568(HbmU16Array* self) {
-    fn_80461780(self->data, 0, self->capacity);
+    wmemset(self->data, 0, self->capacity);
     self->length = 0;
     self->offset = 0;
 }

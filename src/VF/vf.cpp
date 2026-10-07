@@ -16,7 +16,9 @@
  * NAMES. The file name is a GUESS from the first library of the block, VF.  GUESSES read off the bodies:
  *   `KPRLookAhead` (0x80526F00: counts the queued u16 characters, copying up to a maximum), `KBDSetLedsAsync`
  *   (0x80529430: queues an LED request through `kbd_alloc_led` with a callback) and `KBDSetChannelValue`
- *   (0x80529B50: stores a word in the channel's 0x2A8-byte record); `VFipf2*` are GUESSES in the prfile2 scheme.
+ *   (0x80529B50: stores a word in the channel's 0x2A8-byte record); `VFipf2*` are GUESSES in the prfile2 scheme;
+ *   `EXI2_Reserve` (0x80522660) and `EXI2_Unreserve` (0x80522664) are GUESS names for the two 4-byte stubs
+ *   `TRK/gdev_cc.c` calls around a continue/stop.
  * RESIDUALS. Unwritten: every function in the range.
  */
 

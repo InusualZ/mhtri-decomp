@@ -1,16 +1,23 @@
 /*
- * MSL/strlen.cpp - STUB (no bodies yet).
+ * MSL/strlen.cpp - the MSL `strlen`.
  *
- * `.text` 0x804565C0..0x804565DC.  Sections of the candidate unit: .text 0x804565C0..0x804565DC.
- *
- * WHAT IT IS. `strlen` (0x804565C0, 28 B), the MSL string length routine.
- *
- * WHY IT SITS HERE. phase 1 grade medium: the first function after the own-slot run of the `menu_sysmsg` band, named in the map.
- *
- * UNKNOWN. the body (not written yet).
- *
- * FLAGS. the `Runtime.PPCEABI.H` lib's `cflags_ppceabi` (the MSL C runtime's group; unmeasured).
- *
- * The unit's `.data`/`.sdata`/`.sbss` claims are the candidate's (config/RMHE08/splits.txt); the symbols they hold are
- * in the map (`ledger.py unit MSL/strlen.cpp`), and the pass that writes the bodies defines them.
+ * RANGE. .text 0x804565C0..0x804565DC (1 function in the map, 0x1C B).
+ * FLAGS. the `Runtime.PPCEABI.H` lib's `cflags_ppceabi`.
+ * NAMES. `strlen` is the dump's name.
+ * EVIDENCE. the first function after the own-slot run of the `menu_sysmsg` band, named in the map.
+ * RESIDUALS. none measured.
+ * SHAPES. pre-incremented walk with the length counted from -1.
  */
+#include "MSL/strlen.h"
+
+u32 strlen(const char* s)
+{
+    const u8* p = (const u8*)s;
+    u32 n = -1;
+
+    p--;
+    do {
+        n++;
+    } while (*++p != 0);
+    return n;
+}

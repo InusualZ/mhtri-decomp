@@ -5,8 +5,8 @@
  * RANGE. .rodata 0x80572620..0x80572B28; .data 0x8060EC00..0x8060EDF8; .sdata2 0x8079C9E0..0x8079C9F8.
  * FLAGS. the `Runtime.PPCEABI.H` lib's `cflags_ppceabi` (the group of the unit it was cut from; unmeasured until
  *    bodies exist).
- * NAMES. file name GUESS (MSL `locale.c`); the map name `DWCi_digitClassTable` (0x8060EDB0) is another unit's name
- *    for one of its records.
+ * NAMES. file name GUESS (MSL `locale.c`); `_current_locale` (0x8060EDB0) is a GUESS (the MSL name of the
+ *    record whose +0x38 reaches the character tables).
  * EVIDENCE. no code in the band reads these objects by name: `.data` 0x8060EC00..0x8060EDF8 holds records whose
  *    words point at `.rodata` 0x80572620 (the 0x200 B class table), 0x80572820 / 0x80572920 (lower/upper maps)
  *    and at `.sdata2` 0x8079C9E0..0x8079C9F8 (`.`, ``, `AM|PM`); the `.rodata` run 0x80572A20..0x80572B28 is `%a

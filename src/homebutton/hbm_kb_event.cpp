@@ -33,7 +33,7 @@
  * ------------------------------------------------------------------------------------------------ */
 extern "C" {
 
-s32   fn_80463C1C(void* base, void* key);
+s32   wcschr(void* base, void* key);
 
 s32   strlen(const char* s);
 

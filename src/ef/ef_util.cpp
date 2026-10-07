@@ -78,7 +78,7 @@ f32 FrSqrt(f32 x);
  * callees. */
 extern "C" {
 void* fn_80501C60(void* list, void* node);
-f32 fn_80463DE4(f32 x);
+f32 asinf(f32 x);
 f32 atan2f(f32 y, f32 x);
 f32 fn_8005A63C(f32 x);
 
@@ -313,7 +313,7 @@ extern "C" void fn_8009BCB4(const f32* mtx, f32* rot) {
             t = ef_util_f32_one;
         if (t < ef_util_f32_minus_one)
             t = ef_util_f32_minus_one;
-        rot[1] = fn_80463DE4(t);
+        rot[1] = asinf(t);
         if (fn_8005A63C(rot[1]) >= ef_util_f32_flt_min) {
             rot[0] = atan2f(mtx[9] / sy, mtx[10] / sz);
             rot[2] = atan2f(mtx[4], mtx[0]);

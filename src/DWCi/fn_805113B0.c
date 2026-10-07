@@ -655,7 +655,7 @@ u32 DWCi_parseAddress(char* str, u32* outAddr, u16* outPort)
             p = colon + 1;
             while (*p != 0) {
                 if ((u32)(s8)*p > 0xFFu ||
-                    (DWCi_digitClassTable.cls->bits[(u8)*p] & 8) == 0) {
+                    (_current_locale.cls->bits[(u8)*p] & 8) == 0) {
                     return 0;
                 }
                 p++;

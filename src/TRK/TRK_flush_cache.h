@@ -11,6 +11,8 @@ extern "C" {
 #endif
 
 extern f64 pow(f64 x, f64 y);
+/* untyped: cache-line range start */
+void TRK_flush_cache(void* addr, u32 len);
 
 #ifdef __cplusplus
 }

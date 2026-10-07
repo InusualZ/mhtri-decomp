@@ -218,7 +218,7 @@ s32 fn_80094094(s32);
 s32 fn_80099BB0(void*);
 u32 fn_8009AB48(u32);
 s32 fn_800D79B4(s32, s32, s32, s32);
-f32 fn_80463EBC(f32 x, f32 y);
+f32 powf(f32 x, f32 y);
 u32 fn_804B7800(s32);
 u32 fn_804B7810(s32);
 u32 fn_804B7820(s32);
@@ -974,7 +974,7 @@ u32 fn_80077490(u8 arg0) {
 namespace nw4r {
 namespace math {
 f32 FPow(f32 x, f32 y) {
-    return fn_80463EBC(x, y);
+    return powf(x, y);
 }
 }  // namespace math
 }  // namespace nw4r
