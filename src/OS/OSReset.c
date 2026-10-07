@@ -10,8 +10,7 @@
  *    `OSReturnToDataManager` (names the "OSReturnToDataManager()" failure text), `__OSDoHotReset` (the hot-reset tail
  *    `OSRestart` and the menu launchers share), `__OSGetDiscState` (the 1/2/3 disc state the state-flags record keeps; it has no
  *    caller in the DOL's OS core but `fn_804D7A80`), `BootDol` (0x80795380: the DOL offset `OSRestart` hands `__OSReboot`).
- * RESIDUALS. `__OSShutdownDevices` (97.3 %): the two inlined shutdown-function walks take swapped info/err registers (r29/r30) vs the target's.
- *    data: the object's string pool also holds the texts of the obsolete functions the linker stripped
+ * RESIDUALS. data: the object's string pool also holds the texts of the obsolete functions the linker stripped
  *    (`OSReturnToSetting` and the data-manager page names, `OSSetBootDol`); no function of this source references them, so
  *    the pool is shorter than the target's.
  * SHAPES. plain C; the shutdown-function walk is an inline helper expanded in `__OSCallShutdownFunctions` and
@@ -110,6 +109,24 @@ static inline BOOL CallShutdownFunctions(BOOL final, u32 event)
     return !err;
 }
 
+/* The same walk for the device shutdown; its locals are declared in the order that reproduces the target's registers. */
+static inline BOOL CallShutdownFunctionsForDevices(BOOL final, u32 event)
+{
+    OSShutdownFunctionInfo* info;
+    u32 priority = 0;
+    BOOL err = FALSE;
+
+    for (info = ShutdownFunctionQueue.head; info != NULL; info = info->next) {
+        if (err && priority != info->priority) {
+            break;
+        }
+        err |= !info->func(final, event);
+        priority = info->priority;
+    }
+    err |= !__OSSyncSram();
+    return !err;
+}
+
 /* Calls the shutdown functions for `event`. */
 BOOL __OSCallShutdownFunctions(BOOL final, u32 event)
 {
@@ -119,10 +136,10 @@ BOOL __OSCallShutdownFunctions(BOOL final, u32 event)
 /* Shuts down every device: shutdown functions in two passes, the LC, the pad calibration and all live threads. */
 void __OSShutdownDevices(u32 event)
 {
-    BOOL padState;
-    BOOL keepPadState;
     OSThread* thread;
     OSThread* next;
+    BOOL padState;
+    BOOL keepPadState;
 
     if ((u32)(event - 5) <= 1 || event == 0) {
         keepPadState = FALSE;
@@ -133,19 +150,19 @@ void __OSShutdownDevices(u32 event)
     if (!keepPadState) {
         padState = __PADDisableRecalibration(TRUE);
     }
-    while (!CallShutdownFunctions(FALSE, event)) {
+    while (!CallShutdownFunctionsForDevices(FALSE, event)) {
     }
     while (!__OSSyncSram()) {
     }
     OSDisableInterrupts();
-    CallShutdownFunctions(TRUE, event);
+    CallShutdownFunctionsForDevices(TRUE, event);
     LCDisable();
     if (!keepPadState) {
         __PADDisableRecalibration(padState);
     }
     for (thread = OS_ACTIVE_THREAD_QUEUE.head; thread; thread = next) {
         next = thread->linkActive.next;
-        if (thread->state == OS_THREAD_STATE_READY || thread->state == OS_THREAD_STATE_WAITING) {
+        if ((s32)thread->state == OS_THREAD_STATE_READY || (s32)thread->state == OS_THREAD_STATE_WAITING) {
             OSCancelThread(thread);
         }
     }
@@ -201,16 +218,6 @@ void OSShutdownSystem(void)
     OSDisableScheduler();
     __OSShutdownDevices(2);
     __OSShutdownToSBY();
-}
-
-/* Hot-resets the console; a failure to do so is fatal. */
-void __OSDoHotReset(void)
-{
-    if (__OSInNandBoot || __OSInReboot) {
-        __OSInitSTM();
-    }
-    __OSHotReset();
-    OSPanic("OSReset.c", 1034, "__OSHotReset(): Falied to reset system.\n");
 }
 
 /* Restarts into the same title (or reboots the DOL) when started from a channel, otherwise hot-resets. */
@@ -327,6 +334,16 @@ void OSReturnToDataManager(void)
 void __OSReturnToMenuForError(void)
 {
     ReturnToMenuForError();
+}
+
+/* Hot-resets the console; a failure to do so is fatal. */
+void __OSDoHotReset(void)
+{
+    if (__OSInNandBoot || __OSInReboot) {
+        __OSInitSTM();
+    }
+    __OSHotReset();
+    OSPanic("OSReset.c", 1034, "__OSHotReset(): Falied to reset system.\n");
 }
 
 /* Returns the reset code: the pending reboot's, else the hardware's. */

@@ -8,9 +8,10 @@
  * NAMES. `__OSInitSram`, `UnlockSram`, `__OSSyncSram`, `OSGetWirelessID`, ... are the map's names; GUESS: `WriteSramCallback`
  *    (the write-back retry the EXI lock runs), `__OSReadROM` (the boot-ROM read `OSFont` calls), `statusBits` (the SRAM word
  *    at +0x3C that `__OSInitSram` repairs).
- * RESIDUALS. `UnlockSram` (93.6 %): the checksum loop keeps a `clrlwi` after each `nor` and the Scb base is formed earlier than in the target;
- *    `__OSInitSram` (99.0 %): the second LockSram result takes r3 where the target uses r5. No source spelling tried changed either.
- * SHAPES. the EXI write sequence is an inline helper expanded in `WriteSramCallback` and `UnlockSram`; lock/unlock of the
+ * RESIDUALS. `__OSInitSram` (99.0 %): the target keeps `clrlwi r3,r30,16` before comparing the repaired status with the stored one and the
+ *    second LockSram result takes r5; the compiler drops the redundant mask and uses r3 (u16/s32/cast spellings and `peephole off` tried).
+ * SHAPES. the checksum loop reads `Scb.sram` directly for its bound and writes `sum = inv = 0` as a chain; `sram` is declared inside the
+ *    `offset == 0` block (hoisting it above the test moves the branch).  The EXI write sequence is an inline helper expanded in `WriteSramCallback` and `UnlockSram`; lock/unlock of the
  *    control block are inline helpers.
  */
 
@@ -135,43 +136,7 @@ static inline BOOL ReadSram(void* buffer)
     return !err;
 }
 
-/* Recomputes the checksums when `commit` is set, writes the changed bytes back and releases the control block. */
-static BOOL UnlockSram(BOOL commit, u32 offset)
-{
-    u16* p;
-
-    if (commit) {
-        OSSram* sram = (OSSram*)Scb.sram;
-
-        if (offset == 0) {
-            if ((u32)(sram->flags & 3) > 2) {
-                sram->flags &= ~3;
-            }
-            sram->checkSumInv = sram->checkSum = 0;
-            for (p = (u16*)&sram->counterBias; p < (u16*)((u8*)sram + SRAM_EX_OFFSET); p++) {
-                sram->checkSum += *p;
-                sram->checkSumInv += ~*p;
-            }
-        }
-        if (offset < Scb.offset) {
-            Scb.offset = offset;
-        }
-        if (Scb.offset <= SRAM_EX_OFFSET) {
-            OSSramEx* ex = (OSSramEx*)(Scb.sram + SRAM_EX_OFFSET);
-
-            if ((u32)(ex->statusBits & 0x7C00) == 0x5000 || (u32)(ex->statusBits & 0xC0) == 0xC0) {
-                ex->statusBits = 0;
-            }
-        }
-        Scb.sync = WriteSram(Scb.sram + Scb.offset, Scb.offset, 0x40 - Scb.offset);
-        if (Scb.sync) {
-            Scb.offset = 0x40;
-        }
-    }
-    Scb.locked = FALSE;
-    OSRestoreInterrupts(Scb.enabled);
-    return Scb.sync;
-}
+static BOOL UnlockSram(BOOL commit, u32 offset);
 
 /* Reads the SRAM and repairs an invalid status word. */
 void __OSInitSram(void)
@@ -197,6 +162,44 @@ void __OSInitSram(void)
     }
     ex->statusBits = status;
     UnlockSram(TRUE, SRAM_EX_OFFSET);
+}
+
+/* Recomputes the checksums when `commit` is set, writes the changed bytes back and releases the control block. */
+static BOOL UnlockSram(BOOL commit, u32 offset)
+{
+    u16* p;
+
+    if (commit) {
+        if (offset == 0) {
+            OSSram* sram = (OSSram*)Scb.sram;
+
+            if ((u32)(sram->flags & 3) > 2) {
+                sram->flags &= ~3;
+            }
+            sram->checkSum = sram->checkSumInv = 0;
+            for (p = (u16*)&sram->counterBias; p < (u16*)(Scb.sram + SRAM_EX_OFFSET); p++) {
+                sram->checkSum += *p;
+                sram->checkSumInv = sram->checkSumInv + ~*p;
+            }
+        }
+        if (offset < Scb.offset) {
+            Scb.offset = offset;
+        }
+        if (Scb.offset <= SRAM_EX_OFFSET) {
+            OSSramEx* ex = (OSSramEx*)(Scb.sram + SRAM_EX_OFFSET);
+
+            if ((u32)(ex->statusBits & 0x7C00) == 0x5000 || (u32)(ex->statusBits & 0xC0) == 0xC0) {
+                ex->statusBits = 0;
+            }
+        }
+        Scb.sync = WriteSram(Scb.sram + Scb.offset, Scb.offset, 0x40 - Scb.offset);
+        if (Scb.sync) {
+            Scb.offset = 0x40;
+        }
+    }
+    Scb.locked = FALSE;
+    OSRestoreInterrupts(Scb.enabled);
+    return Scb.sync;
 }
 
 /* Returns the result of the last SRAM write-back. */
