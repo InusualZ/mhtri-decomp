@@ -122,3 +122,7 @@ block_relocations:
   end: .text:0x803F82DC
 - source: .text:0x803F8414
   end: .text:0x803F841C
+# VF/vf.cpp's .rodata is a 16-bit character code conversion table: dtk reads 12 of its code pairs as addresses
+# (lbl_80778272, __AXAuxBufferA+0xF0E, em_action_finish_fall+0x34, hid_device_build+0x198, ...); they are plain data.
+- source: .rodata:0x80574E10
+  end: .rodata:0x80579088

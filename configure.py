@@ -1307,23 +1307,14 @@ config.libs = [
             Object(Matching, "PAD/PADClamp.c", cflags=cflags_base),
             Object(NonMatching, "PAD/pad.c", cflags=cflags_base),
             Object(NonMatching, "RSO/rso_notify.c"),
-            # Registered once, at its final home (docs/plan.md 12): proposal `80474CB0_AXFXReverbHiInit` -
-            # the Revolution SDK AXFX reverb-hi effect pair (16 functions / 0x1174 B,
-            # 0x80474CB0..0x80475E24): AXFXReverbHiInit/Shutdown/Callback + AXFXReverbHiExpInit and the
-            # shared __AllocDelayLine/__BzeroDelayLines/__FreeDelayLine delay-line helpers.  Module `AX`:
-            # the runtime dump names the range's head AXFXReverbHi* and its neighbours are the rest of the
-            # AX library (`__AXVPBInit` below, `AXFXSetHooks` above), which is a game-independent SDK
-            # library with no config.libs block of its own yet.  Lib `OS` + cflags_os: the range's link
-            # neighbours in the same SDK run are the OS units (OSAlarm.c at 0x804CBC50 above it) and the
-            # runtime block below it is `Runtime.PPCEABI.H`; the source restores -O4,p's 16-byte function
-            # alignment with `#pragma function_align 16` (every start in the range is 16-aligned).
-            # The discovery seam between AXFXReverbHi.c and AXFXReverbHiExp.c was not taken: the same
-            # two-file split exists in a sister SDK build (MotoGP 08), but this run is one maximal
-            # unclaimed run, so it lands as one unit.  Claims .text only; the size/coefficient tables it
-            # reads (lbl_80612980 / lbl_80612A40) are an unclaimed auto .data range for the data pass.
+            # AXFX reverb run (lib OS flags, function_align 16): ranges, names and seams in the unit headers under src/AX/AXFX*.
             Object(NonMatching, "AX/AXFXReverbHi.c"),
+            Object(NonMatching, "AX/AXFXReverbStd.c"),
             Object(NonMatching, "AX/AXFXReverbHiExp.c"),
-            Object(NonMatching, "AX/AXFXReverbStd.cpp"),
+            Object(NonMatching, "AX/AXFXReverbStdExp.cpp"),
+            Object(NonMatching, "AX/AXFXChorus.cpp"),
+            Object(NonMatching, "AX/AXFXDelay.cpp"),
+            Object(NonMatching, "AX/AXFXHooks.cpp"),
             # Registered by the BTE-region survey (`worker/bte-survey-846f`, notes
             # `.pi/notes/bte-survey-846f.md`): `OS/PPCArch.c` (`.text` 0x804770E0..0x804772F0,
             # 22 functions / 528 B, plus its `.data` string at 0x80612CE0).  Module `OS`, lib `OS`:

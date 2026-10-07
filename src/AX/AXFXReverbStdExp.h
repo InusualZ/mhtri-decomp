@@ -1,9 +1,9 @@
 /*
- * AX/AXFXReverbStd.h - the four-channel AXFX reverb body and the entry points of `AX/AXFXReverbStd.cpp`
- * (0x80475E30..0x804770E0) that the AXFXReverbHi wrappers and other units call.
+ * AX/AXFXReverbStdExp.h - the four-channel AXFX reverb body and the entry points of `AX/AXFXReverbStdExp.cpp`
+ * (0x80475E30..0x80476DF0) that the AXFXReverbStd wrappers call.
  */
-#ifndef AX_AXFXREVERBSTD_H
-#define AX_AXFXREVERBSTD_H
+#ifndef AX_AXFXREVERBSTDEXP_H
+#define AX_AXFXREVERBSTDEXP_H
 
 #include "AX/AXFXReverbHi.h"
 
@@ -72,60 +72,14 @@ typedef struct AXFXReverbStd {
     /* +0x190 */ u8 pad_0x190[0x258];
 } AXFXReverbStd; /* size: 0x3E8 */
 
-/* The leading fields of the four small effects whose line-free helpers this unit holds: the delay-line pointers
- * and the flag word; the full bodies are larger (sizes are approximations of the part read here). */
-typedef struct AXFXChorus3 {
-    /* +0x00 */ void* line[3];
-    /* +0x0C */ u8 pad_0x0C[0x30];
-    /* +0x3C */ u32 flags;
-} AXFXChorus3; /* size: 0x40 (approximation) */
-
-typedef struct AXFXChorus4 {
-    /* +0x00 */ void* line[4];
-    /* +0x10 */ u8 pad_0x10[0x40];
-    /* +0x50 */ u32 flags;
-} AXFXChorus4; /* size: 0x54 (approximation) */
-
-typedef struct AXFXDelay3 {
-    /* +0x00 */ void* line[3];
-    /* +0x0C */ u8 pad_0x0C[0x70];
-    /* +0x7C */ u32 flags;
-} AXFXDelay3; /* size: 0x80 (approximation) */
-
-typedef struct AXFXDelay4 {
-    /* +0x00 */ void* line[4];
-    /* +0x10 */ u8 pad_0x10[0x80];
-    /* +0x90 */ u32 flags;
-} AXFXDelay4; /* size: 0x94 (approximation) */
-
-/* The allocator and free hooks every AXFX effect takes its delay lines from. */
-/* untyped: raw heap memory */
-typedef void* (*AXFXAllocFunc)(u32 size);
-/* untyped: raw heap memory */
-typedef void (*AXFXFreeFunc)(void* block);
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* 0x80793D20 / 0x80793D24 - the hooks installed by AXFXSetHooks. */
-extern AXFXAllocFunc AXFXAlloc;
-extern AXFXFreeFunc AXFXFree;
 
 BOOL AXFXReverbStdExpInit(AXFXReverbStd* reverb);
 BOOL AXFXReverbStdExpSettings(AXFXReverbStd* reverb);
 void AXFXReverbStdExpShutdown(AXFXReverbStd* reverb);
 void AXFXReverbStdExpCallback(AXFXBufferStd* buffer, AXFXReverbStd* reverb);
-void AXFXChorus3Shutdown(AXFXChorus3* effect);
-void AXFXChorus4Shutdown(AXFXChorus4* effect);
-BOOL AXFXDelay3Shutdown(AXFXDelay3* effect);
-BOOL AXFXDelay4Shutdown(AXFXDelay4* effect);
-/* untyped: raw heap memory */
-void* AXFXDefaultAlloc(u32 size);
-/* untyped: raw heap memory */
-void AXFXDefaultFree(void* block);
-void AXFXSetHooks(AXFXAllocFunc alloc, AXFXFreeFunc free);
-void AXFXGetHooks(AXFXAllocFunc* alloc, AXFXFreeFunc* free);
 
 #ifdef __cplusplus
 }
