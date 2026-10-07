@@ -663,5 +663,105 @@ def test_covering_agrees_with_every_retired_search(c):
     c.check("... and the overlap case is the first in address order", sp.covering(".text", 0x385).unit, "c.c")
 
 
+DATA_ROWS = [("code", ".text:0x80001000", "type:function size:0x20"),
+             ("obj_a", ".data:0x80500000", "type:object size:0x10 scope:local"),
+             ("obj_b", ".data:0x80500020", "type:object size:0x8"),
+             ("lbl_unsized", ".data:0x80500030", "type:object"),
+             ("obj_c", ".data:0x80500040", "type:object size:0x10")]
+
+
+def test_data_row_edits(c):
+    def refused(fn, rows=DATA_ROWS):
+        try:
+            _plan(rows, fn)
+        except Refused as exc:
+            return str(exc)
+        return ""
+    for nl in ("\n", "\r\n"):
+        plan, untouched = _plan(DATA_ROWS, lambda m: m.plan_resize("obj_a", 0x20), nl=nl)
+        c.check("resize: one line changes, in the file's ending (%r)" % nl, plan.render(),
+                map_text(DATA_ROWS, nl).replace("obj_a = .data:0x80500000; // type:object size:0x10",
+                                                "obj_a = .data:0x80500000; // type:object size:0x20"))
+        c.check("planning a resize writes nothing (%r)" % nl, untouched, True)
+        plan, _u = _plan(DATA_ROWS, lambda m: m.plan_delete("obj_b"), nl=nl)
+        c.check("delete: exactly that line goes (%r)" % nl, plan.render(),
+                nl.join(x for x in map_text(DATA_ROWS, nl).split(nl) if not x.startswith("obj_b ")))
+        plan, _u = _plan(DATA_ROWS, lambda m: m.plan_add("new_obj", ".data", 0x80500010, 0x10, "local"), nl=nl)
+        c.check("add: the row lands after the last row at or below its address (%r)" % nl,
+                plan.render().split(nl)[2:4],
+                ["new_obj = .data:0x80500010; // type:object size:0x10 scope:local",
+                 "obj_b = .data:0x80500020; // type:object size:0x8"])
+    plan, _u = _plan(DATA_ROWS, lambda m: m.plan_add("first", ".data", 0x80400000, 4))
+    c.check("add below every row of the section goes before its first row", plan.render().split("\n")[1],
+            "first = .data:0x80400000; // type:object size:0x4")
+    plan, _u = _plan(DATA_ROWS, lambda m: m.plan_add("tail", ".data", 0x80500100, 4, None, "label"))
+    c.check("add past the end goes after its last row, with a given type and no scope",
+            plan.render().split("\n")[5], "tail = .data:0x80500100; // type:label size:0x4")
+    c.check("a resize to the size it has is the re-apply", _plan(DATA_ROWS, lambda m: m.plan_resize("obj_a", 0x10))[0].changed,
+            False)
+    plan, _u = _plan(DATA_ROWS, lambda m: m.plan_add("obj_c", ".data", 0x80500040, 0x10))
+    c.check("an add that is already there is the re-apply", (plan.changed, plan.applied), (False, True))
+    c.contains("resize: over the next object", refused(lambda m: m.plan_resize("obj_a", 0x30)), "would cover obj_b")
+    c.contains("resize: a function", refused(lambda m: m.plan_resize("code", 0x30)), "only a data object")
+    c.contains("resize: an unknown row", refused(lambda m: m.plan_resize("nope", 0x30)), "defined 0 times")
+    c.contains("resize: not positive", refused(lambda m: m.plan_resize("obj_a", 0)), "not positive")
+    c.contains("delete: a function", refused(lambda m: m.plan_delete("code")), "type:function")
+    c.contains("delete: an unknown row", refused(lambda m: m.plan_delete("nope")), "is not defined")
+    c.contains("delete: a referenced row",
+               refused(lambda m: m.plan_delete("obj_b", lambda names: {"obj_b": [("src/x.cpp", 9, "use(obj_b);")]})),
+               "referenced at src/x.cpp:9")
+    c.check("delete: an unreferenced row passes the scan",
+            refused(lambda m: m.plan_delete("obj_b", lambda names: {"obj_b": []})), "")
+    c.contains("add: a taken name", refused(lambda m: m.plan_add("obj_b", ".data", 0x80500200, 4)), "already defined")
+    c.contains("add: a bad name", refused(lambda m: m.plan_add("a b", ".data", 0x80500200, 4)), "not a valid symbol name")
+    c.contains("add: over an object's extent", refused(lambda m: m.plan_add("x", ".data", 0x80500004, 4)), "meets obj_a")
+    c.contains("add: a new extent that covers another row's start",
+               refused(lambda m: m.plan_add("x", ".data", 0x80500018, 0x10)), "meets obj_b")
+    c.contains("add: on an unsized row", refused(lambda m: m.plan_add("x", ".data", 0x80500030, 4)), "meets lbl_unsized")
+    c.contains("add: a section the map has no rows in", refused(lambda m: m.plan_add("x", ".bss", 0x80600000, 4)),
+               "no rows in")
+    c.contains("add: size 0", refused(lambda m: m.plan_add("x", ".data", 0x80500200, 0)), "not positive")
+    c.contains("add: a bad scope", refused(lambda m: m.plan_add("x", ".data", 0x80500200, 4, "lo cal")), "not a scope")
+
+
+def test_data_row_cli(c):
+    import contextlib
+    import io
+    import types
+    from tools.symbols import symedit
+    with tempfile.TemporaryDirectory() as tmp:
+        p = write(tmp, "symbols.txt", map_text(DATA_ROWS))
+        before = p.read_bytes()
+
+        def run(fn, **kw):
+            out = io.StringIO()
+            args = types.SimpleNamespace(**dict(dict(file=str(p), dry_run=False, no_refs=True, roots=(), limit=5), **kw))
+            try:
+                with contextlib.redirect_stdout(out):
+                    rc = fn(args)
+            except SystemExit as exc:
+                rc = exc.code
+            return rc, out.getvalue().strip()
+        rc, out = run(symedit.cmd_resize, row="obj_a", size="0x8", dry_run=True)
+        c.check("--dry-run says what it would do and writes nothing",
+                (rc, out, p.read_bytes() == before),
+                (0, "would resize obj_a = .data:0x80500000; // type:object size:0x8 scope:local", True))
+        rc, out = run(symedit.cmd_resize, row="obj_a", size="8")
+        c.check("resize writes the row", (rc, "size:0x8 scope:local" in p.read_text()), (0, True))
+        rc, out = run(symedit.cmd_add, name="obj_n", where=".data:0x80500010", size="0x8", scope="local", type="object")
+        c.check("add writes the row", (rc, "obj_n = .data:0x80500010; // type:object size:0x8 scope:local" in p.read_text()),
+                (0, True))
+        rc, out = run(symedit.cmd_add, name="obj_x", where=".data:0x80500000", size="4", scope=None, type="object")
+        c.check("an overlapping add is refused with the neighbour named", (rc != 0, "meets obj_a" in str(rc)), (True, True))
+        c.check("a malformed address is refused", run(symedit.cmd_add, name="obj_x", where="nope", size="4", scope=None,
+                                                      type="object")[0] != 0, True)
+        rc, out = run(symedit.cmd_delete, row="obj_n")
+        c.check("delete removes the row", (rc, "obj_n" in p.read_text()), (0, False))
+        rc, out = run(symedit.cmd_delete, row="code")
+        c.check("deleting a function row is refused", (rc != 0, "type:function" in str(rc)), (True, True))
+        c.check("the refused edits changed nothing: only the resize remains",
+                p.read_text().replace("size:0x8 scope:local", "size:0x10 scope:local"), before.decode())
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

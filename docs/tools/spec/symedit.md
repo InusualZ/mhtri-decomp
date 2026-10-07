@@ -25,9 +25,12 @@ symedit.py merge-batch <file> [--dry-run] [--no-refs]   # lines: "merge <phantom
                                                          # "fold <label> <object> <size>", "size <object> <size>"
 symedit.py split <row> <offset> <new-name> [--scope S] [--dry-run]   # the inverse of a merge: shrink <row> to <offset> bytes,
                                                          # add <new-name> at address+offset with the remainder
+symedit.py resize <row> <size> [--dry-run]       # a data object's size (0x.. or decimal); refused over another symbol
+symedit.py delete <row> [--dry-run] [--no-refs]  # drop one data row; refused for a function or a row the source names
+symedit.py add <name> <section:addr> <size> [--scope S] [--type T] [--dry-run]   # a data row, in its section's order
 symedit.py --selftest                            # the checks, against temp fixtures only
 ```
-Subcommands: `find`, `show`, `at`, `range`, `refs`, `check`, `rename`, `rename-batch`, `merge-batch`, `split`.
+Subcommands: `find`, `show`, `at`, `range`, `refs`, `check`, `rename`, `rename-batch`, `merge-batch`, `split`, `resize`, `delete`, `add`.
 Flags: `--code-only`, `--count`, `--dry-run`, `--file`, `--force`, `--json`, `--limit`, `--no-refs`, `--roots`, `--section`, `--selftest`, `--type`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
@@ -77,8 +80,14 @@ Today's selftest: in-file `selftest()` (`--selftest`). The name rule: `tools/tes
 `name_pattern` on `@`/template names; the old `[A-Za-z_][\w.$]*` rule fails it, a `\b` pattern fails 1). The data
 merges: `test_data_merges` (patPacketTable's end fold, an inner label, a resize, the no-op, the refusals, the batch-file
 grammar); a resize that plans nothing fails 5. The split: `test_split_plans` (the shrunk row and the remainder row in both line endings, scope inherited/replaced, the re-apply, eight refusals).
+The data-row commands: `test_data_row_edits` (both line endings, the insert position at the start, middle and end of a
+section, the re-applies, nine refusals) and `test_data_row_cli` (`cmd_resize`/`cmd_add`/`cmd_delete` on a temp map: the
+`--dry-run` line, the written rows, refusals exiting nonzero and leaving the bytes). Dropping the add overlap check fails 5
+checks, allowing a function delete 3, ignoring references 1, inserting at the file's end 3.
 Target: `tools/tests/symbols/test_symedit.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps
 
-the proxy cannot resize or delete a symbol except through `merge-batch` (and `split` shrinks the row it cuts)
+`resize`/`delete`/`add` act on data rows only (a function row changes by `merge-batch`/`split`, whose refusals check the
+neighbouring code); `add` writes `type:`, `size:` and an optional `scope:` and nothing else (`align:`/`data:` by hand);
+a new section is not created.

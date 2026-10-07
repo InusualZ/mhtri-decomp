@@ -327,5 +327,63 @@ def test_freshness_modes(c):
             [])
 
 
+def test_content_freshness(c):
+    """A source rewritten in the object's own timestamp tick reads as current by the timestamps; the content stamps
+    (`content_reasons`) catch it. Each check below is one the timestamps alone answer wrongly."""
+    base = 1_700_000_000.0
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src, hdr, obj = root / "src" / "u.cpp", root / "src" / "u.h", root / "build" / "RMHE08" / "src" / "u.o"
+        _touch(hdr, base, "// header\n")
+        _touch(src, base, '#include "u.h"\nint f() { return 1; }\n')
+        _touch(obj, base + 10, "object")
+
+        def judged():
+            return report.unit_reasons(str(src), str(obj), str(root))[0]
+        c.check("a first look at a current object: no reasons, and it is recorded", (judged(),
+                os.path.exists(root / report.CONTENT_REL)), ([], True))
+        _touch(src, base + 10, '#include "u.h"\nint f() { return 2; }\n')       # rewritten in the object's tick
+        newest = report.newest(report.source_closure(str(src), str(root)))
+        c.check("the timestamps alone read the rewrite as current (the gap this closes)",
+                report.freshness(False, None, report.mtime(str(obj)), newest, "", str(obj)), [])
+        reasons = judged()
+        c.check("... the content stamps do not: one reason, naming the source and the object",
+                (len(reasons), "src/u.cpp" in reasons[0], "u.o" in reasons[0]), (1, True, True))
+        c.check("report mode judges the same",
+                len(report.report_reasons(str(root / "build" / "r.json"), str(obj), str(src), str(root))[0]) >= 1, True)
+        _touch(src, base - 50, '#include "u.h"\nint f() { return 3; }\n')       # rewritten with an OLDER stamp
+        c.check("an older stamp with other content is caught too", len(judged()), 1)
+        _touch(src, base, '#include "u.h"\nint f() { return 1; }\n')              # restored byte for byte
+        c.check("the same content again is current", judged(), [])
+        _touch(hdr, base + 10, "// header changed\n")
+        c.check("a header's content counts", len(judged()), 1)
+        _touch(hdr, base, "// header\n")
+        _touch(src, base + 20, '#include "u.h"\nint f() { return 7; }\n')       # edited, then the object is rebuilt
+        _touch(obj, base + 30, "object, rebuilt")                                # a rebuilt object is judged afresh
+        c.check("a rebuilt object (another stamp) is current, whatever the old record said, and re-recorded",
+                judged(), [])
+        _touch(src, base + 30, '#include "u.h"\nint f() { return 9; }\n')
+        c.check("... and the next tie after the rebuild is caught", len(judged()), 1)
+        # a tree that never saw the object current gives no verdict
+        os.remove(root / report.CONTENT_REL)
+        c.check("no record, no verdict: the timestamps stand alone", judged(), [])
+        _touch(src, base + 30, '#include "u.h"\nint f() { return 10; }\n')
+        c.check("a tie is never recorded (it proves nothing): a second rewrite is no verdict either", judged(), [])
+        # one object, two callers with different closures: each source judged on its own record
+        _touch(obj, base + 40, "object, rebuilt again")
+        _touch(src, base + 5, '#include "u.h"\nint f() { return 1; }\n')
+        c.check("record with the full closure", judged(), [])
+        c.check("a caller that passes only the unit's source gets no false verdict",
+                report.content_reasons(str(obj), [str(src)], str(root)), [])
+        _touch(hdr, base + 40, "// header rewritten in the tick\n")
+        c.check("... and does not judge the header it was not given",
+                report.content_reasons(str(obj), [str(src)], str(root)), [])
+        c.check("... which the full closure still does", len(judged()), 1)
+        (root / report.CONTENT_REL).write_text("{not json", encoding="utf-8")
+        c.check("an unreadable store is ignored (and rewritten on the next provable look)",
+                report.content_reasons(str(obj), [str(src)], str(root)), [])
+        c.check("a missing object has nothing to judge", report.content_reasons(str(root / "nope.o"), [str(src)], str(root)), [])
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

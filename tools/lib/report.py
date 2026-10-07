@@ -2,6 +2,7 @@
 Spec: docs/tools/spec/lib-report.md. CLI: none (library)."""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -23,6 +24,8 @@ PROJECT_DIR = "unitutil_project"
 REPORT_FILE = "unitutil_report.json"
 #: objdiff-cli under a tree.
 OBJDIFF_REL = os.path.join("build", "tools", "objdiff-cli.exe")
+#: Where the tree remembers which source content each object was last seen current against (`content_reasons`).
+CONTENT_REL = os.path.join("build", "RMHE08", ".content-stamps.json")
 #: The smallest score movement that counts as a move.
 DEFAULT_EPS = 1e-9
 #: The tolerance of `arithmetic_check`: a float unit percent reproduces up to its report rounding.
@@ -789,17 +792,102 @@ def newest(paths: list[str]) -> tuple[str, float] | None:
     return best
 
 
+def file_hash(path: str) -> str | None:
+    """The SHA-1 of a file's bytes, None when it cannot be read."""
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.sha1(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def _object_stat(obj: str) -> tuple[int, int] | None:
+    try:
+        st = os.stat(obj)
+    except OSError:
+        return None
+    return st.st_mtime_ns, st.st_size
+
+
+#: A source older than the object by less than this is not provably older (file systems stamp in coarse ticks).
+CONTENT_MARGIN_NS = 1_000_000
+
+
+def content_reasons(obj: str, sources: list[str], root: str, rel=lambda p: p) -> list[str]:
+    """What the timestamps cannot see: sources whose content changed after the object was built, with a timestamp
+    that ties or precedes the object's (a script rewriting a source within the file system's timestamp tick of the
+    last build, which `freshness`'s strict `<` reads as current).
+
+    The tree keeps, per object, `{mtime_ns, size, files: {path: sha1}}` in `CONTENT_REL`. A source's hash is recorded
+    only while the object is **strictly** newer than that source (the one moment its content provably is what the
+    object was built from), and judged only while the object's own stamp is unchanged - a rebuilt object is judged
+    afresh by the timestamps and re-recorded. A source with no recorded hash, and an object with no record, give no
+    verdict (`[]`): the timestamps stand alone. Callers may pass different closures of one object; each file is
+    judged on its own record. The store is a cache: unreadable or unwritable, it is ignored.
+    """
+    stat = _object_stat(obj)
+    if stat is None:
+        return []
+    key = rel_path(obj, root)
+    store_path = os.path.join(root, CONTENT_REL)
+    try:
+        with open(store_path, encoding="utf-8") as fh:
+            store = json.load(fh)
+        if not isinstance(store, dict):
+            store = {}
+    except (OSError, ValueError):
+        store = {}
+    rec = store.get(key)
+    same = isinstance(rec, dict) and (rec.get("mtime_ns"), rec.get("size")) == stat and isinstance(rec.get("files"), dict)
+    files = dict(rec["files"]) if same else {}
+    changed, added = [], False
+    for src in dict.fromkeys(os.path.abspath(q) for q in sources):
+        name = rel_path(src, root)
+        t = mtime(src)
+        digest = None
+        if name in files:
+            digest = file_hash(src)
+            if digest != files[name]:
+                changed.append(name)
+        elif t is not None and stat[0] > int(t * 1e9) + CONTENT_MARGIN_NS:
+            digest = file_hash(src)
+            if digest is not None:
+                files[name] = digest
+                added = True
+    if added and not changed:
+        store[key] = {"mtime_ns": stat[0], "size": stat[1], "files": files}
+        try:
+            from tools.lib.text import atomic_write  # noqa: PLC0415 - only the recording needs it
+            os.makedirs(os.path.dirname(store_path), exist_ok=True)
+            atomic_write(store_path, json.dumps(store, indent=0, sort_keys=True) + "\n")
+        except OSError:
+            pass
+    if changed:
+        return ["the content of %s changed after %s was built (its stamp is unchanged, so the timestamps read it as "
+                "current): rebuild it - `rm %s` first when the source's timestamp ties the object's"
+                % (", ".join(changed[:3]) + (" (+%d more)" % (len(changed) - 3) if len(changed) > 3 else ""),
+                   rel(obj), rel(obj))]
+    return []
+
+
 def unit_reasons(src: str, obj: str, root: str, rel=lambda p: p) -> tuple[list[str], tuple[str, float] | None]:
-    """The stale reasons for a unit's prebuilt object against its include closure, and the newest source."""
-    newest_source = newest(source_closure(src, root))
-    return freshness(False, None, mtime(obj), newest_source, "", obj, rel=rel), newest_source
+    """The stale reasons for a unit's prebuilt object against its include closure, and the newest source: the
+    timestamps first, then (`content_reasons`) the content of each source against the one the object was seen current
+    with."""
+    closure = source_closure(src, root)
+    newest_source = newest(closure)
+    reasons = freshness(False, None, mtime(obj), newest_source, "", obj, rel=rel)
+    return reasons or content_reasons(obj, closure, root, rel), newest_source
 
 
 def report_reasons(report: str, obj: str, src: str, root: str,
                    rel=lambda p: p) -> tuple[list[str], tuple[str, float] | None]:
-    """The stale reasons for a report's rows of one unit (report vs object vs include closure)."""
-    newest_source = newest(source_closure(src, root))
-    return freshness(True, mtime(report), mtime(obj), newest_source, report, obj, rel=rel), newest_source
+    """The stale reasons for a report's rows of one unit (report vs object vs include closure, then each source's
+    content against the object's, as `unit_reasons`)."""
+    closure = source_closure(src, root)
+    newest_source = newest(closure)
+    reasons = freshness(True, mtime(report), mtime(obj), newest_source, report, obj, rel=rel)
+    return reasons or content_reasons(obj, closure, root, rel), newest_source
 
 
 class Freshness:

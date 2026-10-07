@@ -93,7 +93,8 @@ them before you form an opinion, and cite the rule number rather than your taste
       per owning symbol: type, symbol **name**, addend, only the differences plus `N/N relocations match`, exit
       1 on a difference (without `--by-owner` it prints both sides' tables paired by offset, which a moved
       function floods). objdiff scores a `bl` to the wrong symbol as equal to the right one, so a 100 % row can hide a
-      wrong callee, vtable slot or pool entry; this is the check that sees it. A `note` line (same names, moved
+      wrong callee, vtable slot or pool entry; this is the check that sees it. `python tools/objdiff/rawsame.py <unit>` is the byte-level twin: every 100 % row's words (relocated bits
+      masked) and relocation types against the target's, which sees a register field objdiff scored as equal. A `note` line (same names, moved
       offsets) is an instruction-placement residual, not a name error;
     * **relocations, not just bytes**: a flip is bytes **and** relocs, and the two can disagree. That same
       finding measured three spellings byte-identical in `.text`, `extab` and `extabindex` - the decision

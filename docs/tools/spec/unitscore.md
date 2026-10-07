@@ -48,6 +48,15 @@ Inputs -> outputs: report.json or objects -> table/JSON.
   read 200 up / 70 down, every one of the 70 a rename or a move whose row did not fall; `--baseline` reads 130 up,
   0 down, 132 renamed, 20 507 paired.
 * **The freshness policy is `lib.artifacts`' (2026-10-04).** Default `refuse` (unchanged); `--force-stale` is `FRESH=warn`; `FRESH=auto` rebuilds what the score reads (`--refresh`'s target, which is now the registry's `report` / `objects` command) only when the guard would refuse, then scores. Fresh: output unchanged.
+* **A stale report with a current object is measured, not refused (2026-10-07).** After a `symedit rename-batch` or any edit
+  `report.json` predates the sources while the unit's object, rebuilt since, is current. With the default `refuse` policy,
+  no `--report` and no `--refresh`, the tool scores the objects on disk (`--measure`, one `objdiff report generate`) and
+  prints a `note` with the report's reasons (`fallback` in `--json`). A stale object is still refused, with no objdiff
+  run; an explicit `--report` is still refused (the caller named the file); `--force-stale` and `FRESH=auto` behave as before.
+* **The content stamps back the guard (2026-10-07).** After the timestamps agree, `lib.report.content_reasons` compares each
+  source's content with what the object was last seen current against: a source rewritten in the object's own timestamp
+  tick is stale (`the content of <path> changed after <object> was built`), where the strict-`<` timestamp rule read it
+  as current.
 * **`--refresh` costs a build, and says so.** It runs `ninja build/RMHE08/report.json` in the unit's tree before the read: the report depends on `all_source`, so every stale object of the tree is compiled first (and a changed map or `splits.txt` re-splits). With `--measure` it builds only the unit's object, the one thing that mode reads. The record carries `refreshed: {target, seconds, ok, error}`; a failed build is exit 2 with ninja's tail, and the freshness guard still runs on the rebuilt files. `--refresh --report R` is a usage error: an arbitrary report is not a ninja target.
 
 ## Lib dependencies
@@ -61,6 +70,11 @@ Today's selftest (`tools/objdiff/unitscore_selftest.py`): **Fixtures only.** The
 `--baseline` (block 15): a renamed row and a row moved in from a neighbour pair by address, a fall is DOWN and exits 1,
 a lost row is REMOVED, the no-unit mode, no down row exits 0, an unreadable baseline exits 2; `tests/lib/test_report.py`
 pins `diff_by_address`. Keying by name instead fails 6 checks.
+Block 12b: a stale report with a current object is scored from the objects with one objdiff run (mode `measure`, `fallback`
+reasons carried), an explicit `--report` and a stale object are still refused with none; switching the fallback off fails 3.
+`tools/tests/lib/test_report.py::test_content_freshness` (17 checks) pins the content stamps: a rewrite in the object's tick,
+an older stamp, a header, a rebuilt object, no record, a tie never recorded, differing closures, a garbage store; the content
+layer off fails 2, the stamp ignored 1, recording ties 1, closure-wide judging 2.
 Target: `tools/tests/objdiff/test_unitscore.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

@@ -363,12 +363,15 @@ def run(spec: Spec, *, report: str | None = None, threshold: float | None = None
         "error": error,
         "forced": bool(force),
         "refreshed": refreshed,
+        "fallback": None,
     }
     # the guard is only meaningful when there is something to print: a missing report is an error, and an
     # error is exit 2 whatever the mtimes say.
     reasons = [] if error else freshness(not measure, mtimes["report"], obj_mtime, newest_source,
                                          report_path, spec.obj,
                                          rel=lambda p: _rel(p, spec.tree))
+    if not error and not reasons:                     # the timestamps tie or agree: ask the content
+        reasons = _report.content_reasons(spec.obj, spec.sources, spec.tree, rel=lambda p: _rel(p, spec.tree))
     record["freshness"] = {"stale": bool(reasons), "reasons": reasons}
     if error:
         record["summary"] = "cannot score %s: %s" % (spec.unit, error)
@@ -417,6 +420,10 @@ def render(record: dict) -> None:
         row("report", record["report"]["path"], record["report"]["mtime_iso"])
     else:
         print("%-10s %s" % ("report", "-  (not read: --measure scores the objects on disk)"))
+    if record.get("fallback"):
+        print("note       the project report is stale, so the objects on disk were scored instead (--measure):")
+        for reason in record["fallback"]["reasons"]:
+            print("             - " + reason)
     row("object", record["object"]["path"], record["object"]["mtime_iso"])
     row("source", record["sources"]["newest_path"], record["sources"]["newest_mtime_iso"],
         "   (+%d file(s) in the include closure)" % max(0, record["sources"]["count"] - 1))
@@ -503,6 +510,17 @@ def cli(argv: list[str] | None = None) -> int:
     policy = _artifacts.effective_policy("warn" if args.force_stale else None, "refuse")
     record = run(spec, report=args.report, threshold=args.threshold, force=policy == "warn",
                  measure=args.measure, refresh_build=args.refresh, baseline=args.baseline)
+    if (record["refused"] and policy == "refuse" and not args.measure and not args.report and not args.refresh
+            and not args.baseline):
+        # the report is the stale one (a rename-batch or an edit since the last `report.json`) but the unit's object
+        # may be current: score the objects on disk (one `objdiff report generate`) rather than refuse
+        rel = lambda p: _rel(p, spec.tree)  # noqa: E731
+        stale_object = (freshness(False, None, mtime(spec.obj), newest(spec.sources), "", spec.obj, rel=rel)
+                        or _report.content_reasons(spec.obj, spec.sources, spec.tree, rel=rel))
+        alt = None if stale_object else run(spec, measure=True)
+        if alt is not None and not alt["refused"] and not alt["error"]:
+            alt["fallback"] = {"from": "report", "reasons": record["freshness"]["reasons"]}
+            record = alt
     if record["refused"] and policy == "auto" and not (args.report and not args.measure):
         print("refreshing %s: %s" % ("objects" if args.measure else "report", record["freshness"]["reasons"][0]),
               file=sys.stderr)

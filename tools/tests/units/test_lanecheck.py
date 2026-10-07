@@ -175,5 +175,94 @@ def test_cli(c):
         g.cleanup()
 
 
+CTOR_SYMBOLS = (SYMBOLS + "__ct__3FooFv = .text:0x80001080; // type:function size:0x40\n"
+                "__dt__3FooFv = .text:0x800010C0; // type:function size:0x40\n")
+CTOR_SPLITS = SPLITS.replace("end:0x80001080", "end:0x80001100")
+CTOR_TEXT = ("Foo::Foo() {}\nFoo::~Foo() {}\nvoid known_fn(void) { }\n")
+
+
+def test_constructor_rows(c):
+    own = lc.Ownership.from_texts(CTOR_SYMBOLS, CTOR_SPLITS)
+    c.check("a constructor and a destructor definition are told apart and find their map rows",
+            [(n, lc.special_rows(own, n, q)) for n, q, _l, _e in lc.definitions(CTOR_TEXT)[:2]],
+            [("Foo", ["__ct__3FooFv"]), ("~Foo", ["__dt__3FooFv"])])
+    got = [i.token for i in lc.check_stubs("src/mod/a.c", CTOR_TEXT, HEADER, own)]
+    c.check("with no object to read, an empty constructor is still an empty stub", got, ["Foo", "~Foo", "known_fn"])
+    got = [i.token for i in lc.check_stubs("src/mod/a.c", CTOR_TEXT, HEADER, own, None,
+                                           {"__ct__3FooFv": 0x30, "__dt__3FooFv": 4})]
+    c.check("our object emits the constructor's row (written); a destructor row of 4 bytes is still a stub",
+            got, ["~Foo", "known_fn"])
+
+
+def test_guess_forms(c):
+    own = lc.Ownership.from_texts(SYMBOLS, SPLITS)
+    text = "void known_fn(void) { }\nvoid tiny_fn(void) { }\n"
+
+    def left(names):
+        header = "/* mod/a.c\n" + names + " * RESIDUALS. none.\n */\n"
+        return [i.token for i in lc.check_guesses("src/mod/a.c", text, header, own, DUMP)]
+    c.check("both unmarked: both are findings", left(" * NAMES. Map stems.\n"), ["known_fn", "tiny_fn"])
+    c.check("a plural list `A and B are GUESSES` marks both",
+            left(" * NAMES. `known_fn` and `tiny_fn` are GUESSES (what they do).\n"), [])
+    c.check("a three-name comma list with `and` marks all of them",
+            left(" * NAMES. Map stems; known_fn, tiny_fn and other_fn are GUESSES (what they do).\n"), [])
+    c.check("a wrapped NAMES paragraph: the name on one line, GUESS on the next",
+            left(" * NAMES. `known_fn` and\n *        `tiny_fn` are both\n *        GUESSES (what they do).\n"), [])
+    c.check("a GUESS sentence that does not name the function leaves it a finding",
+            left(" * NAMES. `known_fn` is a GUESS (why). `tiny_fn` is mapped.\n"), ["tiny_fn"])
+
+
+def _range_repo():
+    stale = "/* the old home was `mod/old.c`. */\n"
+    g = testing.GitFixture().init()
+    g.commit({"configure.py": CONFIGURE, "config/RMHE08/symbols.txt": SYMBOLS, "config/RMHE08/splits.txt": SPLITS,
+              "src/mod/a.c": BASE_A + stale, "src/mod/b.c": "int other_fn(void) { return 0; }\n"}, "base")
+    g.branch("work", checkout=True)
+    g.commit({"src/mod/a.c": BASE_A + stale + "/* the older home was `mod/gone.c`. */\n"}, "the range")
+    g.checkout("main")
+    return g
+
+
+def test_range_and_hint(c):
+    g = _range_repo()
+    try:
+        res = lc.run(str(g.root), "main", "work", flipcheck=False, dump_path=None, dump=DUMP)
+        c.check("a branch run judges only the added line", [(i.line, i.token, i.carried) for i in res["items"]
+                                                           if i.cls == "stale-path"], [(9, "mod/gone.c", False)])
+        c.check("(e) a committed-state run says so in every hint",
+                all(i.hint.endswith(lc.COMMITTED_NOTE) for i in res["items"]), True)
+        res = lc.run(str(g.root), "main", "work", flipcheck=False, dump_path=None, dump=DUMP, whole=True)
+        c.check("--range judges the touched file whole: the base's stale path is listed, marked carried over",
+                [(i.line, i.token, i.carried) for i in res["items"] if i.cls == "stale-path"],
+                [(8, "mod/old.c", True), (9, "mod/gone.c", False)])
+        g.checkout("work")
+        res = lc.run(str(g.root), "main", None, flipcheck=False, dump_path=None, dump=DUMP)
+        c.check("(e) the working-tree run reads the working tree: no committed-state note",
+                [i.hint for i in res["items"] if i.hint.endswith(lc.COMMITTED_NOTE)], [])
+        g.checkout("main")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = lc.TOOL.run(lc.main, ["--root", str(g.root), "--range", "main..work", "--no-flipcheck", "--no-dump"],
+                             parser=lc.build_parser())
+        text = out.getvalue()
+        c.check("the CLI marks the carried line and the added one fails the run",
+                (rc, "src/mod/a.c:8 | stale-path" in text and "[carried over]" in text, "1 carried over" in text),
+                (1, True, True))
+        g.checkout("work")
+        g.commit({"src/mod/a.c": BASE_A + "/* the old home was `mod/old.c`. */\n"
+                  + "/* a note about nothing. */\n"}, "a range that adds no finding")
+        g.checkout("main")
+        with contextlib.redirect_stdout(io.StringIO()):
+            rc = lc.TOOL.run(lc.main, ["--root", str(g.root), "--range", "work~1..work", "--no-flipcheck",
+                                       "--no-dump"], parser=lc.build_parser())
+        c.check("a range that adds nothing wrong passes though the file still carries an old finding", rc, 0)
+        with contextlib.redirect_stdout(io.StringIO()):
+            rc = lc.TOOL.run(lc.main, ["--root", str(g.root), "--range", "nonsense", "--no-flipcheck", "--no-dump"],
+                             parser=lc.build_parser())
+        c.check("a malformed --range is an error, not a clean run", rc, 2)
+    finally:
+        g.cleanup()
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

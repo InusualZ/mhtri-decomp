@@ -216,6 +216,28 @@ class SplitPlan:
         return self.newline.join(out)
 
 
+@dataclass(frozen=True)
+class AddPlan:
+    """What `apply` would write: the new row `line` inserted at `index` (a position in `lines`)."""
+    path: str
+    text: str
+    newline: str
+    lines: tuple[str, ...]
+    index: int = -1
+    line: str = ""
+    applied: bool = False
+
+    @property
+    def changed(self) -> bool:
+        return self.index >= 0
+
+    def render(self) -> str:
+        out = list(self.lines)
+        if self.changed:
+            out.insert(self.index, self.line)
+        return self.newline.join(out)
+
+
 def rewrite_name(line: str, old: str, new: str) -> str:
     """The name token of one definition line replaced, or `ShapeError` when the line is not that shape.
 
@@ -638,10 +660,83 @@ class SymbolMap:
             raise ShapeError("the split row %r did not parse back as planned" % tail[:80])
         return SplitPlan(self.path, text, nl, tuple(lines), i, head, tail)
 
-    def apply(self, plan: RenamePlan | MergePlan | SplitPlan,
+    def plan_resize(self, row: str, new_size: int) -> MergePlan:
+        """Plan a data object's new `size:` (nothing is written): `plan_merge`'s plain resize row, so its refusals are
+        this one's - a function is refused, and so is a size that would cover a symbol of the section (fold it first).
+        A row that already has the size is the re-apply (`applied`, no change)."""
+        if new_size <= 0:
+            raise Refused("refusing: size 0x%X is not positive" % new_size)
+        return self.plan_merge([(None, row, new_size)])
+
+    def plan_delete(self, row: str, scan_refs: Callable[[list[str]], dict] | None = None) -> MergePlan:
+        """Plan the deletion of one row (nothing is written). Refused unless `row` is defined once, is not a function
+        (a function row leaves by a merge), and `scan_refs([row])` finds no in-repo reference to it."""
+        text, nl, lines = self._lines()
+        hits = _definitions(lines).get(row, [])
+        if not hits:
+            raise Refused("refusing: %s is not defined in %s" % (row, self.path))
+        if len(hits) != 1:
+            raise Refused("refusing: %s is defined %d times in %s" % (row, len(hits), self.path))
+        e = parse_line(lines[hits[0]])
+        if e.type == "function":
+            raise Refused("refusing: %s is type:function - a function row leaves by `merge-batch`, never a delete" % row)
+        found = (scan_refs([row]) if scan_refs else {}).get(row) or []
+        if found:
+            rel, lineno, txt = found[0]
+            raise Refused("refusing: %s is referenced at %s:%d (%s)" % (row, rel, lineno, txt))
+        return MergePlan(self.path, text, nl, tuple(lines), {}, (hits[0],))
+
+    def plan_add(self, name: str, section: str, address: int, size: int, scope: str | None = None,
+                 type: str = "object") -> AddPlan:
+        """Plan a new row `name = section:0xADDR; // type:T size:0xS [scope:S]` (nothing is written), inserted after the
+        last row of its section at or below the address (the file's own order). Refused unless `name` is a valid name
+        that is not taken, the section already has rows, the size is positive, `type` and `scope` are words, and the
+        extent `[address, address + size)` meets no row of the section: not the extent of a sized row, not the start
+        of any row. The same name already at exactly this place and size is the re-apply (`applied`, no change)."""
+        text, nl, lines = self._lines()
+        defined = _definitions(lines)
+        hits = defined.get(name, [])
+        if len(hits) == 1:
+            e = parse_line(lines[hits[0]])
+            if (e.section, e.address, e.size) == (section, address, size):
+                return AddPlan(self.path, text, nl, tuple(lines), applied=True)
+        if hits:
+            raise Refused("refusing: %s is already defined in %s" % (name, self.path))
+        if not VALID_NAME_RE.fullmatch(name):
+            raise Refused("refusing: %s is not a valid symbol name" % name)
+        if size <= 0:
+            raise Refused("refusing: size 0x%X is not positive" % size)
+        for what, word in (("type", type), ("scope", scope)):
+            if word is not None and not re.fullmatch(r"[a-z]+", word):
+                raise Refused("refusing: %r is not a %s" % (word, what))
+        last = -1
+        for i, line in enumerate(lines):
+            o = parse_line(line)
+            if o is None or o.section != section:
+                continue
+            if o.address <= address:
+                last = i
+            hit = (o.sized and o.size > 0 and o.address <= address < o.end) or address <= o.address < address + size
+            if hit:
+                raise Refused("refusing: 0x%X-0x%X meets %s (%s:0x%08X, size:0x%X)"
+                              % (address, address + size, o.name, section, o.address, o.size))
+        if last < 0:
+            same = [i for i, line in enumerate(lines) if (parse_line(line) or Symbol("", "", 0, "", 0, "")).section == section]
+            if not same:
+                raise Refused("refusing: %s has no rows in %s - a typo, or a new section (add it by hand)"
+                              % (section, self.path))
+            last = same[0] - 1
+        row = "%s = %s:0x%08X; // type:%s size:0x%X%s" % (name, section, address, type, size,
+                                                          " scope:" + scope if scope else "")
+        parsed = parse_line(row)
+        if parsed is None or (parsed.name, parsed.section, parsed.address, parsed.size) != (name, section, address, size):
+            raise ShapeError("the new row %r did not parse back as planned" % row)
+        return AddPlan(self.path, text, nl, tuple(lines), last + 1, row)
+
+    def apply(self, plan: RenamePlan | MergePlan | SplitPlan | AddPlan,
               write: Callable[[str, str], None] | None = None) -> bool:
         """Write `plan` once (through `write(path, text)`, default `write_text`); False when it is a no-op."""
-        if isinstance(plan, (RenamePlan, MergePlan, SplitPlan)) and not plan.changed:
+        if isinstance(plan, (RenamePlan, MergePlan, SplitPlan, AddPlan)) and not plan.changed:
             return False
         (write or write_text)(plan.path, plan.render())
         self._rows = None

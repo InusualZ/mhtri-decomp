@@ -109,5 +109,37 @@ def test_cli(c):
                 ["f_wrong", "f_mangle", "f_linkage"])
 
 
+def data_obj(sym_at: dict, reloc_sym: str, addend: int = 0, typ: str = "R_PPC_EMB_SDA21"):
+    """One 0x40-byte function `f` with a relocation to `reloc_sym`; `sym_at` is `{symbol: (section offset, bind)}`
+    defined in `.sdata2`."""
+    b = ElfBuilder().section(".text", b"\0" * 0x40).section(".sdata2", b"\0" * 0x20)
+    b.symbol("f", ".text", 0, 0x40, type="func")
+    for name, (off, bind) in sym_at.items():
+        b.symbol(name, ".sdata2", off, 4, bind=bind)
+    b.reloc(".text", 0x10, reloc_sym, typ, addend)
+    return b.build()
+
+
+def test_name_only(c):
+    target = data_obj({"kFormat": (8, "global")}, "kFormat")
+    same = data_obj({"@77": (8, "local")}, "@77")
+    got = [(d["kind"], d["ours"], d["target"]) for d in objcompare.callee_diffs(target, same)[0]["diffs"]]
+    c.check("our @N and the map's name for the same address are `name-only`, not a callee",
+            got, [("name-only", "@77", "kFormat")])
+    elsewhere = data_obj({"@77": (12, "local")}, "@77")
+    got = [(d["kind"], d["ours"], d["target"]) for d in objcompare.callee_diffs(target, elsewhere)[0]["diffs"]]
+    c.check("another address is still a difference (`missing` once the local label is dropped)",
+            got, [("missing", None, "kFormat")])
+    addend = data_obj({"@77": (4, "local")}, "@77", addend=4)
+    c.check("the address is the symbol's value plus the addend", [d["kind"] for f in objcompare.callee_diffs(target, addend)
+                                                                for d in f["diffs"]], ["name-only"])
+    other_type = data_obj({"@77": (8, "local")}, "@77", typ="R_PPC_ADDR16_LO")
+    c.check("another relocation type at that address is not paired",
+            [d["kind"] for f in objcompare.callee_diffs(target, other_type) for d in f["diffs"]], ["missing"])
+    pool = data_obj({"lbl_80500008": (8, "global")}, "lbl_80500008")
+    c.check("a lbl_ pool label still cancels silently (never reported as name-only)",
+            objcompare.callee_diffs(pool, same), [])
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

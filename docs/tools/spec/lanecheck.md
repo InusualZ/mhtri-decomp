@@ -16,15 +16,17 @@ The `codereviewer` and `decompiler` lanes before a review round; the orchestrato
 python tools/units/lanecheck.py                          # the working tree against merge-base(main, HEAD)
 python tools/units/lanecheck.py --branch worker/x        # a branch's committed tree, read from git (nothing checked out)
 python tools/units/lanecheck.py --branch C --base C~1    # one commit (the historical sweep below)
+python tools/units/lanecheck.py --range BASE..HEAD       # a landed range: the touched files whole, carried-over findings listed
 python tools/units/lanecheck.py --no-flipcheck --no-dump # skip the two checks that read outside the diff
 python tools/units/lanecheck.py --json                   # {tool, ok, base, head, units, skipped, seconds, rows, summary}
 python tools/units/lanecheck.py --strict                 # also fail when a check could not run
 ```
-Flags: `--branch B`, `--base REF` (default `main`; the diff starts at the merge base), `--no-flipcheck`, `--no-dump`,
+Flags: `--branch B`, `--base REF` (default `main`; the diff starts at the merge base), `--range BASE..HEAD`, `--no-flipcheck`, `--no-dump`,
 `--dump FILE` (default `$MHTRI_DUMP_SYMBOLS` or `lib.dumpsyms.DEFAULT_DUMP`), `--strict`, `--json`, `--root`.
 Exit codes: 0 no finding (a check that could not run is listed `not checked:` and does not fail without `--strict`),
 1 at least one finding (or, with `--strict`, a skipped check), 2 could not run (git failed).
-`--json` rows are `lib.findings.Finding` dicts (`rule` = the class, `file`, `line`, `token`, `detail`) plus `hint`.
+`--json` rows are `lib.findings.Finding` dicts (`rule` = the class, `file`, `line`, `token`, `detail`) plus `hint` and
+`carried`; the payload also carries `carried` (the count).
 
 ## Inputs and outputs
 
@@ -52,13 +54,28 @@ runtime dump (`lib.dumpsyms`). Writes stdout only.
 * **(c) empty-stub.** A function definition the diff added whose body has no statement but `(void)x;` casts, while
   retail's (the map row's size) is more than 8 bytes: a finding unless the header's residuals say it is unwritten
   (`unwritten`, `stub`, `empty`, `0 %`, ...) - and a different finding when the header lists it as a partial residual.
+  A constructor (`Class::Class`) or destructor (`Class::~Class`) with an empty source body is **written** when our
+  compiled object emits one of its `__ct__<len>Class...` / `__dt__<len>Class...` rows with more than 8 bytes (the
+  compiler writes the vtable store and the member and base calls); with no object to read it stays a finding. An
+  overloaded constructor is read leniently: any emitted row clears it.
 * **(d) flip-blocker.** flipcheck's problems of four classes - an undefined reference, a row-36 force-active function,
   a section claimed and not emitted, a size gap or an unclaimed emitted section outside `.text`/`extab`/`extabindex` -
   each must be mentioned in the header's residuals by a name or its section. Byte differences of a partial unit are not
   read.
 * **(e) guess.** A name defined on an added line, not generated (rule 7's), whose map row's ADDRESS carries no real
-  (non-placeholder) dump name equal to it, and that no header NAMES line containing `GUESS` mentions. By address, never
+  (non-placeholder) dump name equal to it, and that no NAMES **sentence** containing `GUESS`/`GUESSES`/`GUESSED` mentions
+  (the section's wrapping and ` * ` margins are undone and it is cut after `.` and `;`, so `A, B and C are GUESSES
+  (why)` over several lines marks all three). By address, never
   by name: a class-qualified dump name and its mangled map spelling never compare equal as text.
+* **`--range BASE..HEAD`** judges a landed range: the diff is exactly `BASE..HEAD` (no merge base), every file it
+  touched is judged **whole** at HEAD, and a finding of a line class (owner-by-address, stale-path, unowned-claim,
+  empty-stub, guess) on a line the range did not add is printed `[carried over]`, counted apart, and does not fail the
+  run; an added finding does. Unit-level findings (wrong-callee, flip-blocker) are never marked carried over.
+* **The hint says what it read.** With `--branch` or `--range` every hint ends `(reads committed state only: commit the
+  fix, then re-run)`: a fix left in the working tree is not seen.
+* **`name-only` is not a wrong callee.** `callee_diffs` pairs one of our compiler-local labels (`@N`) with one target
+  symbol of the same relocation type that resolves to the same address (section, symbol value + addend) as `name-only`:
+  a naming difference, never reported by (b).
 * A check that could not run (no object, no dump, flipcheck off or failing) is listed `not checked:` - never silently
   clean.
 * **Whose build it judges.** It builds nothing. The first output line names the tree whose `build/RMHE08` objects (b)
@@ -90,12 +107,13 @@ runtime dump (`lib.dumpsyms`). Writes stdout only.
 ## Lib dependencies
 
 `lib.facts` (`Tree`, `parse_added`), `lib.comments` (`comment_only`), `lib.cscan` (definitions and bodies),
-`lib.objcompare` (`callee_diffs`), `lib.dumpsyms` (the dump by address), `lib.project` (`Ownership`, `configure`),
+`lib.objcompare` (`callee_diffs`, `symbol_locations`), `lib.dumpsyms` (the dump by address), `lib.project` (`Ownership`, `configure`),
 `lib.names`, `lib.findings`, `lib.cli`, `lib.git`, `lib.proc`, `lib.repo`; `flipcheck.py` as a subprocess (no import).
 
 ## Test contract
 
-Tier: fixture (`tools/tests/units/test_lanecheck.py`, 19 checks: a `GitFixture` repo with two units; a branch whose
+Tier: fixture (`tools/tests/units/test_lanecheck.py`, 34 checks, 15 of them for constructors/destructors, the GUESS
+sentence forms, `--range` and the committed-state hint; the first 19: a `GitFixture` repo with two units; a branch whose
 added comments mis-cite an owner, name a gone path, call owned data unowned (and truly unowned data and a phrase in
 another clause, which are not findings), add an empty 0x20-byte stub and a 4-byte one, and add names the injected dump
 does not carry; the working tree mode and a GUESS mark; `check_callees` and `check_blockers` on fixed inputs; the CLI's

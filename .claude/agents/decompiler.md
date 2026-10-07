@@ -238,6 +238,9 @@ is not measured), so measure it yourself before you report.
                                                  # necessary, not sufficient - the DOL hash is the proof
     python tools/objdiff/relocdiff.py <unit> --by-owner   # relocations vs the target's, by symbol NAME: a bl to
                                                  # the wrong callee scores 100 % in objdiff; exit 1 on a difference
+    python tools/objdiff/rawsame.py <unit>       # every row at 100 %: raw words (relocated bits masked, SDA21 low 16
+                                                 # only) and relocation types vs the target's; objdiff scored rA/rD
+                                                 # differences beside a relocation as equal; exit 1 on a difference
 
 The data row is not optional and not a later lane's work. `ours-extra` means your source emits a section the
 original TU did not own - drop the definition, or restructure the source (playbook 29/58). `target-extra` on a

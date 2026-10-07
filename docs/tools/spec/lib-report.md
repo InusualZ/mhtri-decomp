@@ -42,6 +42,8 @@ older than the sources it describes.
 * Freshness: `freshness(use_report, report_mtime, object_mtime, newest_source, report_path, object_path, rel)`,
   `unit_reasons(src, obj, root, rel)`, `report_reasons(report, obj, src, root, rel)`, `source_closure(src, root)`,
   `includes_of`, `resolve_include`, `newest`, `mtime`, `stamp`, `stamp_json`, `rel_path`; `Freshness` groups the three.
+  `content_reasons(obj, sources, root, rel)` (the content layer `unit_reasons`/`report_reasons` and `unitscore` add after the
+  timestamps agree), `file_hash`, `CONTENT_REL`.
 
 ## Invariants and rules
 
@@ -70,6 +72,14 @@ older than the sources it describes.
   (4) the lifted unit lost or gained a function. A per-symbol row is never lifted; a snapshot without `addrs` lifts nothing.
 * **The snapshot is taken at `record-base` and kept in `.pi/`**: `ninja baseline` rewrites the baseline a later comparison
   would need, so two verifies of one tree both read "no regression" while the ledger said 231 -> 228.
+* **Content stamps (2026-10-07).** The timestamps cannot see a source rewritten within the file system's timestamp tick of
+  the last build (equal stamps read as current), so the tree remembers, per object, `{mtime_ns, size, files: {path: sha1}}`
+  in `build/RMHE08/.content-stamps.json` (untracked, a cache). A source's hash is recorded only while the object is
+  **strictly** newer than it (by more than 1 ms: the one moment its content provably is what the object was built
+  from), and judged only while the object's own stamp is unchanged; a rebuilt object is judged afresh and re-recorded; a
+  source with no record, and an object with none, give no verdict (the timestamps stand alone); callers passing
+  different closures of one object judge each file on its own record. Measured on this tree: 373 units with both objects, 8724
+  recorded sources, 0 stale by timestamp and 0 by content on two passes, about 55 ms per unit once recorded.
 * **Freshness is strict `<`**: `report.json` is written in the same whole second as the last object, so an equal stamp is
   current. A unit's inputs are its source **and every in-tree header it reaches** (beside the includer, then `src/`, then
   `src/`; commented includes and system headers never date it). `report.json` is an order-only target of `all_source`:

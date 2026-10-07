@@ -27,6 +27,8 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | the runtime dump's symbol map, by address | `lib/dumpsyms.py` | `spec/lib-dumpsyms.md` | dumpmap, lanecheck |
 | comment vocabulary: stale-path and narrative markers, the stale judgement | `lib/comments.py` | `spec/lib-comments.md` | stylelint (rule 15), sweepcomments |
 | C/C++ text scanning | `lib/cscan.py` | `spec/lib-cscan.md` | stylelint, typeregistry, declclash, recordmerge, methodize, vtableaudit, shapes |
+| a function's leading plain declarations, their orders | `lib/declperm.py` | `spec/lib-declperm.md` | tryvar (`--permdecl`, `mt.py permdecl`) |
+| a function's raw bytes against the target's, relocated bits masked | `lib/rawsame.py` | `spec/lib-rawsame.md` | rawsame |
 | findings, rows, verdicts, add-only diff | `lib/findings.py` | `spec/lib-findings.md` | land, stylelint, vtableaudit, undefrefs, datagap, splitcheck, flipcheck, verifyunit, dataclaim, symbolpreflight, handoff |
 | the CLI entry point | `lib/cli.py` | `spec/lib-cli.md` | every tool |
 | the test harness | `lib/testing.py` | `spec/lib-testing.md` | every test under `tools/tests/` |
@@ -44,7 +46,7 @@ Core gate: `land` (+ `lane-manifest`), `verifyunit`, `stylelint`, `vtableaudit`,
 Core evidence: `callers`, `callees`, `accessextent`, `dossier`, `symedit`, `dumpmap`, `phantom`, `mangle`, `methodize`,
 `symbolpreflight`, `tudiscover`, `dataorder`, `dataseams`, `poolseams` (+ `seams`), `splitcheck` (+ `invariants`), `dump_asm`,
 `dataclaim`, `dataqueue`,
-`sectiongap`, `pairgap`, `relocdiff`, `unitscore`, `symdiff`, `fnasm`, `immreloc`, `measure`, `unwindcut`, `vtslot`, `linkorder`, `m2cinput`,
+`sectiongap`, `pairgap`, `relocdiff`, `rawsame`, `unitscore`, `symdiff`, `fnasm`, `immreloc`, `measure`, `unwindcut`, `vtslot`, `linkorder`, `m2cinput`,
 `typeregistry`, `declclash`, `elfsect`, `dwarfmap`, `unitinfo`.
 
 Agent plumbing: `claims`, `slots`, `lane`, `rescue`, `wtsafe`, `queue`, `lanecmd`, `worktreehook`, `landlog`, `brief` (+ `briefing`), `backlog`, `integrate`,

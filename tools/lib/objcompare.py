@@ -680,9 +680,20 @@ TARGET_LABEL_RE = re.compile(r"^(?:@|\.|<|jumptable_[0-9A-Fa-f]{8}$|lbl_[0-9A-Fa
 STUB_MAX_BYTES = 8
 
 
+def _label_addresses(elf: Elf) -> dict[str, tuple[str, int]]:
+    """`{symbol name: (section name, value)}` of every defined symbol (the first definition of a name)."""
+    nsec = len(elf.sections)
+    out: dict[str, tuple[str, int]] = {}
+    for s in elf.symbols:
+        if s.name and 0 < s.shndx < nsec and s.name not in out:
+            out[s.name] = (elf.sections[s.shndx].name, s.value)
+    return out
+
+
 def callee_kind(ours: str | None, target: str | None) -> str:
     """How one paired difference reads: `mangling` (the same stem, two manglings), `linkage` (the same stem, one side
-    C), `callee` (a different symbol), or `extra`/`missing` (no counterpart)."""
+    C), `callee` (a different symbol), or `extra`/`missing` (no counterpart). (`name-only` - the same address under
+    another name - is decided by `callee_diffs`, which can see the addresses.)"""
     if target is None:
         return "extra"
     if ours is None:
@@ -707,16 +718,19 @@ def callee_diffs(target, ours) -> list[dict]:
     rows then cancel by name, so a relocation that only moved (a slid instruction) is not a difference; then each local label of ours (`LOCAL_LABEL_RE`) cancels one target pool or jump-table
     label (`TARGET_LABEL_RE`) of the same relocation type, and the leftover local labels are dropped (noise). The
     remaining names pair in offset order (`offset` is the target's, else ours', in the function); `callee_kind`
-    classifies each pair."""
+    classifies each pair. Before that, one of our local labels and one target symbol of the same relocation type that
+    resolve to the same address (section, symbol value + addend) pair as `name-only`: our compiler-local name against
+    the map's name for the same data, a naming difference and no wrong callee."""
     o_elf, t_elf = load(ours), load(target)
+    o_addr, t_addr = _label_addresses(o_elf), _label_addresses(t_elf)
     o_funcs, t_funcs = _functions(o_elf), _functions(t_elf)
     a, b = owner_groups(o_elf), owner_groups(t_elf)
     out = []
     for name in sorted(set(o_funcs) & set(t_funcs), key=lambda n: t_funcs[n][0]):
         if o_funcs[name][1] <= STUB_MAX_BYTES:
             continue
-        mine = [(off, typ, sym) for off, typ, sym, _add in a.get((".text", name), [])]
-        theirs = [(off, typ, sym) for off, typ, sym, _add in b.get((".text", name), [])]
+        mine = [(off, typ, sym, add) for off, typ, sym, add in a.get((".text", name), [])]
+        theirs = [(off, typ, sym, add) for off, typ, sym, add in b.get((".text", name), [])]
         sm = difflib.SequenceMatcher(None, [r[2] for r in mine], [r[2] for r in theirs], autojunk=False)
         left_o, left_t = [], []
         for op, i1, i2, j1, j2 in sm.get_opcodes():
@@ -733,7 +747,21 @@ def callee_diffs(target, ours) -> list[dict]:
                 else:
                     keep.append(row)
             left[:] = keep
-        locals_by_type = Counter(typ for _o, typ, sym in left_o if LOCAL_LABEL_RE.search(sym))
+        diffs = []
+
+        def at(table: dict, row: tuple):
+            base = table.get(row[2])
+            return (base[0], base[1] + row[3]) if base else None
+        for row in [r for r in left_o if LOCAL_LABEL_RE.search(r[2])]:
+            here = at(o_addr, row)
+            twin = next((t for t in left_t if here is not None and t[1] == row[1] and t[2] != row[2]
+                         and not TARGET_LABEL_RE.search(t[2])
+                         and at(t_addr, t) == here), None)
+            if twin is not None:
+                left_o.remove(row)
+                left_t.remove(twin)
+                diffs.append({"kind": "name-only", "ours": row[2], "target": twin[2], "offset": twin[0]})
+        locals_by_type = Counter(typ for _o, typ, sym, _a in left_o if LOCAL_LABEL_RE.search(sym))
         left_o = [r for r in left_o if not LOCAL_LABEL_RE.search(r[2])]
         kept_t = []
         for row in left_t:
@@ -741,7 +769,6 @@ def callee_diffs(target, ours) -> list[dict]:
                 locals_by_type[row[1]] -= 1
                 continue
             kept_t.append(row)
-        diffs = []
         for i in range(max(len(left_o), len(kept_t))):
             o = left_o[i] if i < len(left_o) else None
             t = kept_t[i] if i < len(kept_t) else None
