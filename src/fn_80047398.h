@@ -70,8 +70,8 @@ void* userdata_equip_item_slots_get(void* userdata);
 u32 item_count_find(u16 id, void* a, s32 b);
 u32 item_slots_count_sum(u16 id, void* a, u16 b);
 void fn_8004B200(void* userdata, u16 id, s16 delta);
-s16 fn_8004B624(void* userdata, u16 id);
-s16 item_slots_room_get(u16 id, void* a, u16 b);
+s32 fn_8004B624(void* userdata, u16 id);
+s32 item_slots_room_get(u16 id, void* a, u16 b);
 void userdata_item_give(void* userdata, u16 id, s16 count, s32 flag);
 void item_box_store(u16 id, s16 count, void* out);
 

@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (95)
+## Ideas that work (96)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -104,6 +104,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 108 | [A switch lowered to subi + cmplwi range tests in a -O3 unit is #pragma optimization_level 4](108-switch-lowered-to-subi.md) | works | pragma, source-shape | Retail's multi-case switch tests ranges with `subi r0,rN,K ; cmplwi r0,1 ; ble` (ranges first, then the single values) where ours emits a `cmpwi rN,K ; blt ; cmpwi rN,K+1 ; ble` pair per range, so the chain is longer... |
 | 109 | [Retail's explicit compares for empty switch cases survive when the cases return and the default breaks](109-retails-explicit-compares-for.md) | works | source-shape | Retail's switch keeps `cmpwi x,2 ; beq End ; cmpwi x,5 ; beq End` for two cases whose arm is empty, and ours folds those labels into the default, so the function is two compares (16 bytes) short. |
 | 110 | [Pointer-walk loops put the counter increment before the pointer increment](110-pointer-walk-loops-put.md) | works | source-shape | A counted loop's two `addi`s swap places (ours bumps the pointer before the counter), the only diff in the row |
+| 111 | [Index the table when retail initialises the counter before the pointers](111-index-the-table-when.md) | works | source-shape, allocator | A loop's set-up is reordered (retail `li rI,0` first, then the table bases) and every induction register is renamed, though the bodies are the same |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

@@ -25,6 +25,11 @@
  * are unwritten (their real signatures come from the map's `load_file_req__FPcUllUllPUl` / `load_file__FPcUll`, which rule 9
  * forbids spelling as identifiers).
  *
+ * RESIDUALS. The object emits no `.data` (0x28), `.sdata` (0x8) or `.sdata2` (0x38) for the claimed ranges yet (flip
+ *   blockers); `fn_80047884` loads `lbl_80790EE8` where retail folds it, and `fn_80047CAC` saves r27..r31 through
+ *   `_savegpr_27`/`_restgpr_27` in retail, ours does not; `fn_80047470`, `fn_800474A8`, `fn_80047B58` and `fn_80047BE0`
+ *   carry an `@ha`/`@l` pair on `face_work` that retail's object does not relocate.
+ *
  * Inventory / addresses / sizes: `python tools/units/ledger.py unit fn_80047398.cpp`.
  */
 

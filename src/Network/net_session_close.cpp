@@ -19,6 +19,7 @@
  *   `net_peer_address` and the `NetPeerCard` fields from what the bodies copy.
  *   GUESS: `requestReadyOnAlias`, `requestReadyOnAlias2`
  *   GUESS: `getOwnMemberFlag`, `getProfileFlag`
+ *   GUESS: `requestProfileEnter`, `hasSelectedProfile`
  * RESIDUALS. Partial: the static initialiser 0x80437204 (the map names it after the compiler's `__sinit`)
  *   - typing `net_community_state` as `NetworkCommunityPeer` (with its constructor/destructor declared in
  *     `Network/NetworkCommunityPat.h` and defined there) makes the static initialiser call them as retail does, but
@@ -1109,7 +1110,7 @@ void onProfileEntered(s32 status, s32* values)
  * Requests entry into party `index` (session command 6); 0 when there is no session manager or a request
  * is busy.
  */
-s32 requestProfileEnter(s32 index)
+u32 requestProfileEnter(s32 index)
 {
     NetCtrlWk* work = net_ctrl_wk;
 
@@ -1544,7 +1545,7 @@ s32 runPendingAction8(void)
 /*
  * Whether a party is selected.
  */
-BOOL hasSelectedProfile(void)
+u32 hasSelectedProfile(void)
 {
     return net_ctrl_wk->profile_index_0x170 != -1;
 }

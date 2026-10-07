@@ -27,15 +27,14 @@
  *   GUESS: `lb_quest_board_party_step`, `lb_quest_board_effect_init`, `lb_quest_board_effect_move`
  * RESIDUALS. Every row is written.  flipcheck: `.data`/`.sdata`/`.sdata2` emitted byte-identical (the tables sit
  *   before their first users, so the step screen's jump table leads `.data`); `.text`/extab/extabindex short.
- *  - `lb_quest_board_flash_move`: retail copies the rotation into the model's +0x28 triple, which `pl.h`'s `MHchar` has
- *    no field for (ours writes `rot_0x54`);
- *  - `lb_quest_board_effect_init`/`_effect_move`: retail range-tests kinds 0..4 unsigned (`cmplwi 4`) and compares the
- *    kind bytes signed; `lb_quest_board_party_step`: `getOwnMemberFlag`'s `u8` result is narrowed again before its
- *    compare (retail compares the raw word);
- *  - `lb_quest_board_step_screen`: retail shares the case-2/case-3 error tails
- *   (`step = 2; wait = 30`) after the first error branch; the if/else-chain and duplicated-tail spellings both lose.
- *   `lb_quest_board_draw_task`: retail reaches `lb_quest_board_detail_draw` from two call sites, ours from three (the
- *   range test plus cases 14 and 5); the one-switch spellings that share the call measure lower (91-94 %).
+ *  - `lb_quest_board_step_screen`: retail cross-jumps the identical error tails (`step = 2; wait = 30`) into one copy
+ *    (case 2: after the first error, case 3: after the second); the first error with its own tail and the others
+ *    sharing one is the best spelling, duplicated tails stay separate and measure lower;
+ *  - `draw_quest_board`: register colouring of the hoisted table bases (`lis` r31/r24/r23/r22 in retail);
+ *  - `lb_quest_board_summary_draw`: retail adds 0x1678 to the session flag in r3 directly, ours through r0.
+ * SHAPES. The row loops index their layout tables (`lb_quest_board_row_lsp[row]`, playbook 111); a two-way test on
+ *   a `u8` kind that retail compares signed is a `switch`; `lb_cmd_repeat_get()` goes through a `u16` local before
+ *   the cursor step (retail evaluates it first).
  */
 
 #pragma pool_data off
@@ -189,7 +188,11 @@ extern "C" void lb_quest_board_step_screen(void) {
             case 1:
                 if (lobby_w.flags_0x052 != 0) {
                     NetCtrlWk::setSubError(26);
-                } else if (profile->flag_0x08D == 1) {
+                    work->step_0x242 = 2;
+                    work->wait_0x3A4 = 30;
+                    break;
+                }
+                if (profile->flag_0x08D == 1) {
                     NetCtrlWk::setSubError(25);
                 } else if (entry->players <= profile->active_0x040) {
                     NetCtrlWk::setSubError(24);
@@ -379,7 +382,8 @@ extern "C" s32 lb_quest_board_list_input(LbQuestBoardWork* work) {
         result = 2;
         sysSE_req(1);
     } else if (lb_cmd_repeat_ck(3) != 0) {
-        work->row_0x247 = lb_quest_board_cursor_step(work->row_0x247, work->rows_0x252, lb_cmd_repeat_get(), 1, 2);
+        u16 repeat = lb_cmd_repeat_get();
+        work->row_0x247 = lb_quest_board_cursor_step(work->row_0x247, work->rows_0x252, repeat, 1, 2);
         work->anim_0x260 = 0;
     }
     return result;
@@ -575,20 +579,19 @@ extern "C" void draw_quest_board(LbQuestBoardWork* work) {
     _SPR_DATA_ spr;
     char text[0x10];
     s16 row;
-    u16* lsp;
     s32 index;
     LbQuestBoardEntry* entry;
     NetProfileRec* profile;
-    u8 frame;
+    u16 frame;
     s32 selected;
     char* name;
-    s8 count;
+    s32 count;
 
     get_lsp_data(0x163D, &anchor);
     draw_sprite_ary(lb_quest_board_frame_ids, &anchor);
     get_lsp_data(0x1648, &anchor);
     uv_pair_copy(&row_pos, &anchor);
-    for (row = 0, lsp = lb_quest_board_row_lsp; row < 4; row++, lsp++) {
+    for (row = 0; row < 4; row++) {
         index = row + work->page_0x24A * 4;
         entry = (LbQuestBoardEntry*)getProfileQuestRecord(index);
         profile = &refreshAllProfiles()[index];
@@ -601,7 +604,7 @@ extern "C" void draw_quest_board(LbQuestBoardWork* work) {
         }
         sprite_frame_apply(&spr, 0x1648, frame, &anchor);
         if (row != 0) {
-            get_lsp_data(*lsp, &row_pos);
+            get_lsp_data(lb_quest_board_row_lsp[row], &row_pos);
         } else {
             uv_pair_copy(&row_pos, &anchor);
         }
@@ -670,13 +673,10 @@ extern "C" void lb_quest_board_summary_draw(LbQuestBoardWork* work) {
     _mh_ivec2_ anchor;
     _mh_ivec2_ pos;
     char text[0x10];
-    char comment[0xA0];
-    s8 count;
-    NetProfileLabels* labels;
+    char comment[0x90];
+    s32 count;
     s32 i;
-    char* label;
-    char* sublabel;
-    u16* lsp;
+    NetProfileLabels* labels;
 
     get_lsp_data(0x1674, &anchor);
     draw_sprite_ary(lb_quest_board_summary_ids, &anchor);
@@ -706,18 +706,17 @@ extern "C" void lb_quest_board_summary_draw(LbQuestBoardWork* work) {
     labels = &entry->labels;
     get_lsp_data(0x168F, &anchor);
     uv_pair_copy(&pos, &anchor);
-    for (i = 0, label = labels->label_0x00[0], sublabel = labels->sublabel_0x40[0], lsp = lb_quest_board_label_lsp; i < 4;
-         i++, label += 0x10, sublabel += 0x10, lsp++) {
-        if (label[0x40] != 0) {
+    for (i = 0; i < 4; i++) {
+        if (labels->sublabel_0x40[i][0] != 0) {
             draw_sprite_ary(lb_quest_board_label_ids, &pos);
             if (get_option_cfg(12) == 0) {
-                draw_font_idx(0x1690, (s8*)sublabel, 0, &pos);
+                draw_font_idx(0x1690, (s8*)labels->sublabel_0x40[i], 0, &pos);
             } else {
-                draw_font_idx(0x1690, (s8*)label, 0, &pos);
+                draw_font_idx(0x1690, (s8*)labels->label_0x00[i], 0, &pos);
             }
             draw_sprite_uv_color_idx(0x1691, labels->count_0x80[i], -1, &pos);
         }
-        get_lsp_data(*lsp, &pos);
+        get_lsp_data(lb_quest_board_label_lsp[i], &pos);
         pos.x += anchor.x;
         pos.y += anchor.y;
     }
@@ -816,7 +815,7 @@ extern "C" void lb_quest_board_draw_task(void) {
     font_flush();
     if (work->step_0x242 == 7) {
         get_ScreenSize(&size);
-        x = (size.x - width) * 0.5f;
+        x = (size.x - width) / 2.0f;
         set_zmode(false, 0, false);
         set_blendmode(4, 5, 1);
         put_frame_dialog(x, 40, 590, 400, 0, 0x14120AF0);
@@ -1375,12 +1374,17 @@ extern "C" void lb_quest_board_effect_move(_EFT* self) {
         work->effect->SetRootMtx(mtx);
     }
     change_paramscale_eff(work->effect, work->scale);
-    if (self->type_0x02 == 5) {
+    switch (self->type_0x02) {
+    case 5:
         effect_retire(work->effect, 0);
-    } else if (effect_move(work->effect) == 0) {
-        self->flag_0x01 = 0;
-        self->state_0x05++;
-        return;
+        break;
+    default:
+        if (effect_move(work->effect) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        break;
     }
     if (spawn == 1) {
         eft_res_models_spawn(self, (void**)&work->effect, 1, work->count, NULL);
@@ -1426,7 +1430,7 @@ extern "C" void lb_quest_board_flash_move(_EFT* self) {
     ((MHchar*)npc->body_0x058)->get_joint_wpos(10, &self->pos_0x18);
     self->pos_0x18.y += 30.0f;
     copyVec3(&work->model->pos_0x04, &self->pos_0x18);
-    eft_rot_vec_copy(&work->model->rot_0x54, &self->rot_0x24);
+    eft_rot_vec_copy(&work->model->rot_0x28, &self->rot_0x24);
     work->model->move(0);
     eft_res_models_spawn(self, (void**)&work->model, 2, work->count, NULL);
 }

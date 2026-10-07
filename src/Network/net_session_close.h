@@ -168,7 +168,7 @@ void copyCircleToProfile(s32 index, s32 unused);
 /* 0x80433DC4 / 0x80433EEC / 0x80433FC8 - the party enter (command 6): its result and the request; the
  * published session name. */
 s32 getProfileEnterResult(void);
-s32 requestProfileEnter(s32 index);
+u32 requestProfileEnter(s32 index);
 void setSessionDisplayName(const char* name);
 
 /* 0x8043405C / 0x8043413C / 0x8043420C..0x80434214 - the ready on/off requests (command 0x1A) and the quest
@@ -189,7 +189,7 @@ s32 requestLeave(void);
 void requestLeaveOrAbort(void);
 
 /* 0x80434908 / 0x80434924 / 0x804349A4 - the party table queries. */
-BOOL hasSelectedProfile(void);
+u32 hasSelectedProfile(void);
 struct NetProfileRec* refreshAllProfiles(void);
 BOOL getProfileMemberCounts(u8* members, u8* active, u8* capacity);
 

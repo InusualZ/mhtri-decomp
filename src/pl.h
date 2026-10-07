@@ -60,9 +60,14 @@ typedef struct MHchar {
         };
     };
     /* +0x01C */ VEC3 scale_0x1C;
-    /* +0x028 */ s32 field_0x28;
-    /* +0x02C */ s32 field_0x2C;
-    /* +0x030 */ s32 field_0x30;
+    /* +0x028 */ union {   /* the effects copy their rotation into this run (`eft_rot_vec_copy`) */
+        struct {
+            /* +0x028 */ s32 field_0x28;
+            /* +0x02C */ s32 field_0x2C;
+            /* +0x030 */ s32 field_0x30;
+        };
+        /* +0x028 */ _CP_VECTOR rot_0x28;
+    };
     /* +0x034 */ u8 field_0x34;
     /* +0x035 */ u8 ready;
     /* +0x036 */ u8 pad_0x36[0x2];
