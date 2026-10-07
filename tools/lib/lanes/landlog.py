@@ -28,7 +28,8 @@ class Attempt:
     paths `apply` could not resolve; `units` the batch's units; `seconds` the wall time; `allow` the allowances
     the command line granted (`ALLOW_CLASSES`; `{}` when none); `warnings` the WARNING rows' findings
     (`<row>: <finding>`; a warning never refuses); `manifest` the lane manifest id `land --manifest` named (absent
-    from the line when none - an optional key, so the schema stays 2)."""
+    from the line when none - an optional key, so the schema stays 2); `seam_moves` the pure seam moves the
+    regression row credited (`"A -> B (N functions)"`; absent from the line when none, likewise optional)."""
     branch: str
     outcome: str
     seconds: float
@@ -42,6 +43,7 @@ class Attempt:
     allow: dict = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
     manifest: str | None = None
+    seam_moves: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.outcome not in OUTCOMES:
@@ -59,6 +61,10 @@ class Attempt:
             del data["extra"]
         if data["manifest"] is None:
             del data["manifest"]
+        if self.seam_moves:
+            data["seam_moves"] = list(self.seam_moves)
+        else:
+            del data["seam_moves"]
         return json.dumps(data, sort_keys=True, separators=(",", ":"))
 
 
@@ -73,7 +79,8 @@ def append(main: str, attempt: Attempt) -> str:
     if not attempt.at:
         attempt = Attempt(**{**asdict(attempt), "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                              "conflicts": tuple(attempt.conflicts), "units": tuple(attempt.units),
-                             "warnings": tuple(attempt.warnings)})
+                             "warnings": tuple(attempt.warnings),
+                             "seam_moves": tuple(attempt.seam_moves)})
     path = log_path(main)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8", newline="\n") as fh:

@@ -24,7 +24,8 @@ Ownership, Owner, AutoObjects, Refused, ShapeError`.
   else by stem), `text_ranges()`, `by_section()` (`{section: [(start, end, unit)]}` sorted), `by_unit()`
   (`{unit: {section: (start, end)}}`), `covering(section, address)`, `overlap(section|None, lo, hi)`,
   `neighbours(section, address)`; edits return a new value: `add_block(unit, ranges, attrs, before)`, `rename_unit(old, new)`,
-  `remove_block(unit)`; `first_overlap(ranges, start, end, section, unit)`; `stem(unit)`.
+  `remove_block(unit)`; `first_overlap(ranges, start, end, section, unit)`; `range_moves(before, after, section)` (`[(from, to, start, end)]`: addresses
+  one unit owned before and another owns after) and `touched_units(before, after)`; `stem(unit)`.
 * `symbols.py`: `parse_line(line) -> Symbol | None` (`name section address type size line lineno`, properties `comment`,
   `scope`, `kind` (`data:`), `align`, `hidden`, `sized`, `end`, `to_dict()` = symedit's dict); `SymbolMap(path)`: `rows()`
   (streamed once, then cached), `by_name()`, `by_section()`, `names()`, `find(regex, section, type)`, `in_range(lo, hi,

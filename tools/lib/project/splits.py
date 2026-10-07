@@ -318,6 +318,35 @@ def first_overlap(ranges: Iterable[Range | tuple[str, str, int, int]], start: in
     return None
 
 
+def range_moves(before: Splits, after: Splits, section: str = ".text") -> list[tuple[str, str, int, int]]:
+    """Where `section` changed hands between two `splits.txt` texts: `[(from_unit, to_unit, start, end)]`.
+
+    Every address owned by one unit before and another after is a move; adjacent addresses with the same pair
+    merge into one row. An address claimed on one side only (a new claim, a dropped one) is not a move."""
+    cuts = sorted({p for s in (before, after) for r in s.ranges if r.section == section for p in (r.start, r.end)})
+    out: list[list] = []
+    for lo, hi in zip(cuts, cuts[1:]):
+        a, b = before.covering(section, lo), after.covering(section, lo)
+        if a is None or b is None or stem(a.unit) == stem(b.unit):
+            continue
+        if out and out[-1][0] == a.unit and out[-1][1] == b.unit and out[-1][3] == lo:
+            out[-1][3] = hi
+        else:
+            out.append([a.unit, b.unit, lo, hi])
+    return [tuple(row) for row in out]
+
+
+def touched_units(before: Splits, after: Splits) -> set[str]:
+    """The units whose claimed ranges differ between two `splits.txt` texts (any section; added or removed too)."""
+    def claims(s: Splits) -> dict[str, set[tuple[str, int, int]]]:
+        out: dict[str, set[tuple[str, int, int]]] = {}
+        for r in s.ranges:
+            out.setdefault(r.unit, set()).add((r.section, r.start, r.end))
+        return out
+    b, a = claims(before), claims(after)
+    return {u for u in set(a) | set(b) if a.get(u) != b.get(u)}
+
+
 def parse(text: str) -> Splits:
     """`Splits.parse(text)`."""
     return Splits.parse(text)

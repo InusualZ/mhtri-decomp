@@ -62,6 +62,12 @@ older than the sources it describes.
   `after` reached 100 %. The unit average speaks only when no symbol does and the unit did not grow (a sub-100 % symbol it
   did not hold, or more matched bytes) - the gate refused the g3d_resshp head-plus-tail join and the 800997e0 extension
   before that (2026-09-25). `auto_*` scaffold units outside `/auto/` are bookkeeping. `allow` authorises a measured cost.
+* **The seam-move credit** (`seam_exempt`, 2026-10-07). The snapshot also holds each function's address (`addrs`) and the
+  unit's `total_code`. When the batch's `splits.txt` diff moves `.text` between units (`lib.project.splits.range_moves`),
+  a *unit-average* row of a unit a move names is lifted iff: (1) every function in both snapshots, paired by address,
+  scores >= before; (2) every function that changed unit lies inside a move from its old unit to its new one, and none
+  vanished; (3) the matched code over the touched units and `whole_fuzzy` did not fall (tolerance 1e-3 percent points);
+  (4) the lifted unit lost or gained a function. A per-symbol row is never lifted; a snapshot without `addrs` lifts nothing.
 * **The snapshot is taken at `record-base` and kept in `.pi/`**: `ninja baseline` rewrites the baseline a later comparison
   would need, so two verifies of one tree both read "no regression" while the ledger said 231 -> 228.
 * **Freshness is strict `<`**: `report.json` is written in the same whole second as the last object, so an equal stamp is
