@@ -1,11 +1,17 @@
 /*
  * menu/menu_result.cpp - the quest-result screen: the state machine over `get_qResult_work()`'s record, the message
  *   table `q_result_msg_adrs` (by id and language), the reward, item, rank, size-record and unlock pages, and the
- *   item grids the player sorts the quest's spoils on.  C++ (the bodies call mangled callees such as
- *   `get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3`).
- * RANGE. .text 0x80396948-0x8039D278 (82 functions); extab, extabindex, .data 0x805F1500-0x805F1704 (the sprite-id
- *   and unlock tables and three switch tables), .bss 0x806C5528-0x806C5558 (`q_result_msg_adrs`), .sdata
- *   0x80793488-0x80793520, .sdata2 0x8079C300-0x8079C330.  The `.data` referrer runs break below 0x80396BBC.
+ *   item grids the player sorts the quest's spoils on, then the multiplayer result's box band (`multi_box_*`, the box
+ *   cursor, grid credit and phase latch).  C++ (the bodies call mangled callees such as
+ *   `get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3`; the two box helpers carry the original manglings).
+ * RANGE. .text 0x80396948-0x8039E5CC (93 functions); extab 0x80018444-0x80018684, extabindex 0x800384CC-0x8003882C,
+ *   .data 0x805F1500-0x805F1704 (the sprite-id and unlock tables and three switch tables), .bss 0x806C5528-0x806C5558
+ *   (`q_result_msg_adrs`), .sdata 0x80793488-0x80793520, .sbss 0x80794C08-0x80794C10 (the box band's one byte pair),
+ *   .sdata2 0x8079C300-0x8079C330.  The `.data` referrer runs break below 0x80396BBC.  The box band 0x8039D278-0x8039E5CC
+ *   (11 functions) joins this TU: it takes this screen's `QResultScreen`, calls `q_result_phase_enter`/`_is_2`/`_is_3`/
+ *   `_apply` and `q_result_draw_task`, walks the same +0x33DC array of 0x18-byte records as `q_result_phase_enter`, owns
+ *   no `.data`, `.rodata`, `.sdata` or `.sdata2` word, and its extab/extabindex records continue this run without a gap;
+ *   the right edge is where `enemy/em029_prog.cpp` opens its own pool and tables.
  * FLAGS. `cflags_menu` (configure.py); `#pragma pool_data off` (retail reaches every table by its own `lis`/`addi`:
  *   `q_result_grid_draw` 90.3 -> 91.5, `q_result_reward_page_draw` 96.2 -> 98.3).
  * NAMES. Module `menu`: its tables sit between `menu_note.cpp` (0x805E91F8) and `menu_placeinfo.cpp` (0x80604780) in
@@ -36,16 +42,32 @@
  *   GUESS: `q_result_unlock_page_draw`, `q_result_draw`, `q_result_noop`, `q_result_box_count_get`,
  *   GUESS: `q_result_box_fit_ck`, `q_result_box_take`, `q_result_owned_count_get`, `q_result_box_slot_set`,
  *   GUESS: `q_result_box_record_init`, `q_result_phase_enter`
+ *   GUESS (the box band, from each body and its callers): `multi_box_phase_apply`, `multi_box_cursor_index`,
+ *   GUESS: `multi_box_grid_clear`, `multi_box_cursor_clamp`, `multi_box_grid_step`, `multi_box_phase_ck`,
+ *   GUESS: `multi_box_phase_step`; `multi_box_rem_exist_ck` and `multi_box_cursor_item_get` carry the dump's manglings
  * RESIDUALS. Partial rows, all register-allocation or
  *   scheduling residue: `q_result_unlock_next` (the target keeps one more value live and saves r31),
  *   `q_result_equip_detail_draw` (retail tests the kind with range compares, our `switch` with a compare tree),
  *   `q_result_hunt_recs_build`, `q_result_box_list_draw`, `q_result_equip_sel_count`, `q_result_phase_enter`,
  *   `q_result_owned_count_get` (`userdata_gunner_ck`/`item_slots_count_sum` are unsigned in retail's view),
- *   `q_result_sub_screen_ready` (MWCC if-converts the second `return (B == 1)`).  flipcheck: `.text` is 0x20 over the
- *   claim, extab 8 and extabindex 12 short of it.
+ *   `q_result_sub_screen_ready` (MWCC if-converts the second `return (B == 1)`).
+ *   2 rows unwritten (objdiff scores them zero): 0x8039DBC8-0x8039E5CC (`fn_8039DBC8`, `multi_box_result_step`).
+ *   Known needs:
+ *  - `multi_box_result_step`'s object (+0x150 is the screen) is typed by no registered caller, and the screen's +0x10..+0x28,
+ *    +0x48, +0x33D0, +0x33F0 and +0x3408 fields are padding in `QResultScreen`;
+ *  - `fn_8039DBC8` (the save/VS-wpad step, the one reader of `.sbss` 0x80794C08) needs `fn_8004F3B4` and callees outside
+ *    the range.
+ *   Partial rows of the box band:
+ *  - `multi_box_rem_exist_ck`: 2 instructions short, the target keeps a dead loop counter;
+ *  - `multi_box_phase_ck`: the ready mask in r31 against retail's r30 (playbook 22);
+ *  - `multi_box_grid_clear`: `items`/`i` mirrored and a `mullw` operand order (both spellings measured).
+ *   flipcheck: `.text` 0x7298 of the claimed 0x7C84, extab and extabindex short of the claim, and the `.sbss` claim
+ *   (0x8) emitted by no body (the unwritten `fn_8039DBC8` is its only reader).
  * SHAPES. A two-way test on a `u8` mode is a `switch` in retail (`cmpwi`, the default body first); a mode tested
  *   for `<= 2` then `== 3` is `case 0: case 1: case 2:` / `case 3:`; the `GetMenuFontColor` flags are `bool` locals;
- *   the per-frame `frame` arguments are `u8` locals (the `u16` parameter then takes a `clrlwi`).
+ *   the per-frame `frame` arguments are `u8` locals (the `u16` parameter then takes a `clrlwi`);
+ *   `multi_box_phase_ck` declares the mask, index and count at function scope and leaves its loop with a `break` (a
+ *   second constant return makes MWCC if-convert the mask test into a branchless `srwi`).
  */
 
 #pragma pool_data off
@@ -58,7 +80,6 @@
 #include "font/flfnt.h"
 #include "menu/menu_item.h"
 #include "menu/menu_message.h"
-#include "menu/multi_result.h"
 #include "menu/get_pop_dat_ptr.h"
 #include "fn_8004CAD8.h"
 #include "fn_80047398.h"
@@ -3327,3 +3348,273 @@ void q_result_phase_enter(QResultScreen* self, s32 phase)
 }
 
 } /* extern "C" */
+
+/* The box band's phase latch: enter the phase the screen names, then step the sub-state on.  Cases 0
+ * and 1 enter the same phase - the target keeps the two bodies separately, so the source does too. */
+void multi_box_phase_apply(QResultScreen* self) {
+    switch (self->phase) {
+    case 0:
+        q_result_phase_enter(self, 1);
+        self->sub_state++;
+        break;
+    case 1:
+        q_result_phase_enter(self, 1);
+        self->sub_state++;
+        break;
+    case 5:
+        system_copy_filter_clear();
+        q_result_phase_enter(self, 5);
+        self->sub_state++;
+        break;
+    case 8:
+        q_result_phase_enter(self, 8);
+        self->sub_state++;
+        break;
+    case 9:
+        q_result_phase_enter(self, 9);
+        self->sub_state++;
+        break;
+    }
+}
+
+/* Returns the box grid slot the cursor is on: `x + y * width` of the record's own cursor. */
+u16 multi_box_cursor_index(_multi_result_work* box) {
+    return (u16)(box->cursor_x + box->cursor_y * box->box_w);
+}
+
+/* The grid slot the cursor is on: the player's own box when the record's player number is 0, the
+ * shared one otherwise. */
+MultiResultBoxItem* multi_box_cursor_item_get(_multi_result_work* box) {
+    MultiResultBoxGrids* work = box->work;
+    MultiResultBoxItem* items = box->player_no == 0 ? work->my_box : work->other_box;
+
+    return &items[multi_box_cursor_index(box)];
+}
+
+/* Whether the player's box still has anything in it: 1 as soon as one of the 16 slots carries an
+ * item with a positive count. */
+u32 multi_box_rem_exist_ck(_multi_result_work* box) {
+    MultiResultBoxGrids* work = box->work;
+    MultiResultBoxItem* items = box->player_no == 0 ? work->my_box : work->other_box;
+    u32 i;
+
+    if (items != NULL) {
+        /* Two groups of eight slots, the eight checks written out: retail keeps one pointer walking
+         * 0x20 B per group with fixed offsets 0..0x1C (an inner `for` over eight slots makes MWCC index
+         * the second group through a second pointer and costs the function 4 B).  RESIDUAL: the
+         * target also keeps a *dead* loop counter - `li r3, 0` plus `addi r3, r3, 7` per group, which
+         * also puts the walking pointer in r4 - and MWCC eliminates it from every spelling tried
+         * (for-increment, body increment, hoisted init), so this function is 2 instructions short
+         * (316 B vs 324 B, 96.27 %). */
+        for (i = 0; i < 14; i += 7) {
+            if (items[0].item_id != 0 && items[0].count > 0) return 1;
+            if (items[1].item_id != 0 && items[1].count > 0) return 1;
+            if (items[2].item_id != 0 && items[2].count > 0) return 1;
+            if (items[3].item_id != 0 && items[3].count > 0) return 1;
+            if (items[4].item_id != 0 && items[4].count > 0) return 1;
+            if (items[5].item_id != 0 && items[5].count > 0) return 1;
+            if (items[6].item_id != 0 && items[6].count > 0) return 1;
+            if (items[7].item_id != 0 && items[7].count > 0) return 1;
+            items += 8;
+        }
+    }
+    return 0;
+}
+
+/* Credits every item the player's box still holds into the VS user block's point counter, then
+ * empties the 16 slots.  The `items != NULL` guard is retail's own (the grids hang off `work`). */
+void multi_box_grid_clear(_multi_result_work* box, _vs_user_data* user) {
+    MultiResultBoxGrids* work = box->work;
+    MultiResultBoxItem* items = box->player_no == 0 ? work->my_box : work->other_box;
+
+    if (items != NULL) {
+        u32 i;
+
+        for (i = 0; i < 16; i++) {
+            if (items[i].item_id != 0 && items[i].count > 0) {
+                score_add_clamped(GetItemData(items[i].item_id)->field_0x010 * items[i].count,
+                                  &user->point_0x18);
+                items[i].item_id = 0;
+                items[i].count = 0;
+            }
+        }
+    }
+}
+
+/* 0x8039D5B0 (0x8C): steps the box record's grid cursor with the pad's pressed and auto-repeat words (columns on
+ * left/right, rows on up/down), inside the grid's width and height. */
+extern "C" void multi_box_cursor_clamp(_multi_result_work* box, PadButtons* pad) {
+    box->cursor_x = menu_cursor_step(box->cursor_x, box->box_w, pad->pressed_0x04 | pad->held_0x14, 4, 8);
+    box->cursor_y = menu_cursor_step(box->cursor_y, box->box_h, pad->pressed_0x04 | pad->held_0x14, 1, 2);
+}
+
+/* 0x8039D63C (0x308): one frame of a player's box screen: the timers, then either the box choice (confirm opens
+ * the box or banks what is left, cancel jumps to the last entry) or the grid (confirm takes the item under the
+ * cursor into the player's VS item slots, up to 99, cancel goes back). */
+extern "C" void multi_box_grid_step(_multi_result_work* box) {
+    PadButtons* pad = &Psw[box->player_no].button_0x2C0;
+    _vs_user_data* user = get_vsUser_work(box->player_no);
+    MultiResultBoxItem* item;
+    s32 held;
+    s32 room;
+
+    if (box->field_0x08 <= 2) {
+        box->field_0x08++;
+    }
+    if (++box->field_0x0E > 40) {
+        box->field_0x0E = 0;
+    }
+    if (box->field_0x0C > 0) {
+        if (++box->field_0x0C >= 12) {
+            box->field_0x0C = 0;
+        }
+    }
+    switch (box->state) {
+    case 0:
+        if ((pad->pressed_0x04 & 0x10) != 0) {
+            sysSE_req(0);
+            switch (box->field_0x02) {
+            case 0:
+                if (multi_box_rem_exist_ck(box) == 1) {
+                    box->state = 1;
+                    sysSE_req(0);
+                }
+                break;
+            case 1:
+                if (multi_box_rem_exist_ck(box) == 1) {
+                    multi_box_grid_clear(box, user);
+                    box->state = 0xFF;
+                    sysSE_req(9);
+                } else {
+                    box->state = 0xFF;
+                    sysSE_req(0);
+                }
+                break;
+            }
+        } else if ((pad->pressed_0x04 & 0x20) != 0) {
+            box->field_0x02 = box->field_0x03 - 1;
+            sysSE_req(1);
+        } else if (multi_box_rem_exist_ck(box) == 1) {
+            box->field_0x02 = menu_cursor_step(box->field_0x02, box->field_0x03, pad->pressed_0x04 | pad->held_0x14, 1, 2);
+        }
+        break;
+    case 1:
+        if ((pad->pressed_0x04 & 0x10) != 0) {
+            item = multi_box_cursor_item_get(box);
+            if (item->item_id != 0) {
+                held = item_count_find(item->item_id, (IdValue*)user->item_0x2C, 16);
+                if (held < 99) {
+                    if (item_take(item->item_id, item->count, (IdValue*)user->item_0x2C, 16, 0, 99) == 3) {
+                        room = 99 - held;
+                        if (item->count > room) {
+                            item->count -= (s16)room;
+                        } else {
+                            item->item_id = 0;
+                            item->count = 0;
+                        }
+                    } else {
+                        item->item_id = 0;
+                        item->count = 0;
+                    }
+                    box->saved_cursor_x = box->cursor_x;
+                    box->saved_cursor_y = box->cursor_y;
+                    box->field_0x0C = 1;
+                    sysSE_req(8);
+                } else {
+                    sysSE_req(2);
+                }
+            } else {
+                sysSE_req(2);
+            }
+            if (multi_box_rem_exist_ck(box) == 0) {
+                box->state = 0;
+                box->field_0x02 = box->field_0x03 - 1;
+            }
+        } else if ((pad->pressed_0x04 & 0x20) != 0) {
+            box->state = 0;
+            sysSE_req(1);
+        } else {
+            multi_box_cursor_clamp(box, pad);
+        }
+        break;
+    }
+}
+
+/* Whether the screen may enter the phase `mode` names: 1 is refused while the quest result is still
+ * showing, and 8 waits until every player has seven of the eight slots settled. */
+u32 multi_box_phase_ck(QResultScreen* self, u8 mode) {
+    u16 mask = 0;
+    u8 n = 0;
+    s32 i;
+
+    switch (mode) {
+    case 0:
+        return 0;
+    case 1:
+        if (q_result_phase_is_2(self) == 1 || q_result_phase_is_3(self) == 1) {
+            return 0;
+        }
+        break;
+    case 8: {
+        s32 i;
+
+        for (i = 0; i < self->field_0x0007; i++) {
+            _vs_user_data* user = get_vsUser_work(i);
+
+            mask |= user->ready_mask_0xBC;
+            n = 0;
+            if (user->slot_a_0x6C[0] != 0 || user->slot_b_0x94[0] != 0) n++;
+            if (user->slot_a_0x6C[1] != 0 || user->slot_b_0x94[1] != 0) n++;
+            if (user->slot_a_0x6C[2] != 0 || user->slot_b_0x94[2] != 0) n++;
+            if (user->slot_a_0x6C[3] != 0 || user->slot_b_0x94[3] != 0) n++;
+            if (user->slot_a_0x6C[4] != 0 || user->slot_b_0x94[4] != 0) n++;
+            if (user->slot_a_0x6C[5] != 0 || user->slot_b_0x94[5] != 0) n++;
+            if (user->slot_a_0x6C[6] != 0 || user->slot_b_0x94[6] != 0) n++;
+            if (n >= 7) break;
+        }
+        if (n >= 7) {
+            if ((mask & 0x380) != 0x380) {
+                break;
+            }
+            return 0;
+        }
+        return 0;
+    }
+    }
+    return 1;
+}
+
+/* Advances the screen's phase: each phase names the next one, and the phase only latches once the
+ * box band says the screen is ready for it.  Returns 1 once a phase was latched. */
+u32 multi_box_phase_step(QResultScreen* self, u8 mode) {
+    u32 next;
+
+    for (;;) {
+        switch (mode) {
+        case 0:
+            if (q_result_phase_is_2(self) == 1 || q_result_phase_is_3(self) == 1) {
+                next = 9;
+            } else {
+                next = 1;
+            }
+            break;
+        case 1:
+            next = 5;
+            break;
+        case 5:
+            next = 8;
+            break;
+        case 8:
+            next = 9;
+            break;
+        default:
+            return 0;
+        }
+        if (multi_box_phase_ck(self, (u8)next) == 0) {
+            mode = (u8)next;
+            continue;
+        }
+        self->phase = next;
+        return 1;
+    }
+}

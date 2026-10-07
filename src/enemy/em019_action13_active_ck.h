@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): the `enemy/em019_ai.cpp` symbol `menu/multi_result.cpp` calls.  C linkage (the
+/* Leaf header (docs/plan.md 6.5 rule 2): the `enemy/em019_ai.cpp` symbol `enemy/em029_prog.cpp` calls.  C linkage (the
  * map row is a plain name). */
 #ifndef MHTRI_ENEMY_EM019_ACTION13_ACTIVE_CK_H
 #define MHTRI_ENEMY_EM019_ACTION13_ACTIVE_CK_H

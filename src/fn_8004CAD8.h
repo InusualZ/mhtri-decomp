@@ -44,7 +44,7 @@ struct _vs_user_data {
 
 /* 0x8004D14C - one of the two 0x100 B VS user slots, or null when the index is out of range (the
  * owner defines it with the same `long` parameter, which is what its mangling `__Fl` asks for).
- * Added with `menu/multi_result.cpp`, its first consumer (rule 2). */
+ * Added with `menu/menu_result.cpp`, its first consumer (rule 2). */
 _vs_user_data* get_vsUser_work(long index);
 #endif
 
@@ -99,7 +99,7 @@ void unlock_bit_raise(u8 event);
 #endif
 /* 0x8004D0E8 - clamp `*value += delta` into [0, 9999999], the score/point accumulator the VS result
  * and skill bands credit.  The owner defines it at C linkage, so the declaration sits inside the
- * `extern "C"` region (rule 2: added with `menu/multi_result.cpp`, its second consumer). */
+ * `extern "C"` region (rule 2: added with `menu/menu_result.cpp`, its second consumer). */
 void score_add_clamped(s32 delta, s32* value);
 u32 mtx34_const_ptr(u32);
 /* 0x8005220C - an 8-byte `fabs f1,f1; blr` helper (caller: `gx/fn_8009ACE4.c`, rule 2: this range
