@@ -1579,7 +1579,7 @@ void fn_801661FC(ResUserDataAc* self, MTX34* mtx, void* cursor, s32 arg3) {
     MTX34_ctor(&out);
     MTX34_ctor(&local);
     idx = (s32)(u32)reinterpret_cast<const nw4r::g3d::ResMdl*>(cursor)->GetResNode(0x18).mpData;
-    fn_8005D0CC(&head, &idx);
+    res_node_assign(&head, &idx);
     {
         _ENEMY_WORK* work = self->work;
         mtx34_copy(&local, &mtx[fn_8006FDCC(&head)]);

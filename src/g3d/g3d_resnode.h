@@ -18,14 +18,20 @@ struct AnmResult {
 /* The node resource block `fn_8005D0C4`/`fn_8005D218` hand back.  Only the fields the reconstructed
  * bodies reach are named; the untouched runs keep their offsets as padding. */
 struct ResNodeData {
-    /* +0x00 */ u8 pad_0x00[0x14];
+    /* +0x00 */ u8 pad_0x00[0xC];
+    /* +0x0C */ u32 mNodeID;  /* the node's index in its model */
+    /* +0x10 */ u8 pad_0x10[0x4];
     /* +0x14 */ u32 mFlags;   /* the channel flags fn_80099134/9178/9278 set and clear */
     /* +0x18 */ u32 mMtxID;   /* the matrix slot the node was assigned (read by g3d_calcworld.cpp) */
     /* +0x1C */ u8 pad_0x1C[0x20 - 0x1C];
     /* +0x20 */ f32 mScale[3];
     /* +0x2C */ f32 mRotate[3];
     /* +0x38 */ f32 mTranslate[3];
-    /* +0x44 */ u8 pad_0x44[0x6C - 0x44];
+    /* +0x44 */ u8 pad_0x44[0x5C - 0x44];
+    /* +0x5C */ s32 mToParentNode;  /* offset from this block to the parent's, 0 for none */
+    /* +0x60 */ s32 mToChildNode;
+    /* +0x64 */ s32 mToNextSibling;
+    /* +0x68 */ s32 mToPrevSibling;
     /* +0x6C */ u32 mSubResOfs; /* the offset fn_80099378 resolves a sub-resource through */
 }; /* size: 0x70 (a lower bound: only the fields above are reached) */
 

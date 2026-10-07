@@ -193,7 +193,7 @@ extern "C" void mtx34_copy(void* dst, void* src);
 
 extern "C" void fn_80059374(s32 a);
 extern "C" void fn_80059420(void);
-extern "C" void fn_8005D0CC(void* ctx, void* val);
+extern "C" void res_node_assign(void* ctx, void* val);
 extern "C" s32 res_node_get_id(void* ctx);
 extern "C" u32 res_node_is_valid(void* ctx);
 extern "C" void fn_8050131C(void* a);
@@ -372,7 +372,7 @@ extern "C" void fn_80115FB4(_EFT_MODEL_OBJ* obj)
         s32 handle = work->models[i]->field_0x118;
         fn_80080B10((void*)handle, 4);   /* the declaration takes void*, as its C sibling unit casts */
         id = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&work->models[i]->field_0x114)->GetResNode((const char*)lbl_80791930).mpData;
-        fn_8005D0CC(&h, &id);
+        res_node_assign(&h, &id);
         if (res_node_is_valid(&h) == 1U) {
             fn_800E3264((void*)handle, res_node_get_id(&h));
         }
@@ -1162,7 +1162,7 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
     s32 id1;
     src = &work->mtx[obj->index_0x08][0];
     id0 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(arg2)->GetResNode((u32)3).mpData;
-    fn_8005D0CC(&h0, &id0);
+    res_node_assign(&h0, &id0);
     copyMat33(&mtx_arr[fn_8006FDCC(&h0)], src);
     k = 4;
     for (group = 0; group < 4; group++) {
@@ -1173,7 +1173,7 @@ extern "C" void fn_80116080(_EFT_MODEL_OBJ* obj, nw4r::math::MTX34* mtx_arr, s32
             a = lbl_805A0330[inner];
             b = lbl_805A0300[inner];
             id1 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(arg2)->GetResNode((u32)k).mpData;
-            fn_8005D0CC(&h1, &id1);
+            res_node_assign(&h1, &id1);
             dst = &mtx_arr[fn_8006FDCC(&h1)];
             fn_80051894(&out, &ma, &mb, 1, a->x, a->y);
             out.m[0][3] *= lbl_805A0244[effect->type_0x02];

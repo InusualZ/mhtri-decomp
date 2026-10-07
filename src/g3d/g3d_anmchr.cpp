@@ -12,7 +12,11 @@
  *   the other 8 of the run are called only from inside it or from other g3d units (fn_80063964, fn_80063AC4), and
  *   0x80063E60 onward is called by g3d_calcmaterial, g3d_scnmdl and g3d_resfile; the extabindex records of the
  *   run end at 0x8001FBFC, the last record (0x80063E30) with its extab 0x80007764-0x8000776C.
- * NAMES. res_mdl_node_subtree_end is a GUESS (the evidence follows).
+ * NAMES. anmchr_resnode_ref_name is a GUESS; res_node_assign is a GUESS; res_node_common_assign is a GUESS;
+ *   res_node_empty_assign is a GUESS; res_node_get_id is a GUESS; res_node_get_next_sibling is a GUESS;
+ *   res_node_get_parent is a GUESS; res_node_ofs_to_node is a GUESS;
+ *   res_node_ref_nonconst is a GUESS (the evidence follows).
+ *   res_mdl_node_subtree_end is a GUESS (the evidence follows).
  *   res_name_common_copy_ctor is a GUESS; res_node_ref is a GUESS; res_node_get_res_name is a GUESS;
  *   res_anm_chr_get_node_index is a GUESS (the evidence follows).
  *   res_name_copy_ctor is a GUESS; res_node_get_class_name is a GUESS;
@@ -39,9 +43,8 @@
  *   is a GUESS; anmchr_ref_name is a GUESS (the strings ResAnmChr::ref passes to Panic).
  *   type_obj_set_name_anmchr is a GUESS (0x8005DCD0: the type-name store copy the AnmObjChr, AnmObjMatClr,
  *   AnmObjTexPat and ScnMdlSimple type members call).
- * RESIDUALS. 17 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
- *   lists them), the largest GetResult__Q34nw4r3g3d14AnmObjChrBlendFPQ34nw4r3g3d12ChrAnmResultUl (0x8D0) and
- *   res_mdl_node_subtree_end (0x140).
+ * RESIDUALS. 11 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
+ *   lists them), the largest GetResult__Q34nw4r3g3d14AnmObjChrBlendFPQ34nw4r3g3d12ChrAnmResultUl (0x8D0).
  *   Partial: AnmObjChrRes::Release(ResMdl, u32, BindOption) (the unrolled clear loop schedules its `subf` one slot
  *   early).
  *   GetAnmPlayPolicy (0x80061C70) is unwritten: its policy table (.sdata 0x80790E70) sits in `mh3_pad.cpp`'s claim.
@@ -99,6 +102,14 @@ extern u8 anmchr_resanmchr_class_name[];    /* "ResAnmChr" */
 extern const char anmchr_resanmchr_ac_file[]; /* "g3d_resanmchr_ac.h" */
 extern const char anmchr_ref_invalid_fmt[];   /* "%s::%s: Object not valid." */
 extern const char anmchr_ref_name[4];         /* "ref" (sized: an SDA21 address) */
+extern const char anmchr_resnode_ref_name[4]; /* "ref" (ResNode's copy, sized: an SDA21 address) */
+/* The strings the ResNode accessors and the subtree walk pass to Panic, declared so the unit's `.data` keeps its
+ * size (literals would grow it and shift the vtables behind them). */
+extern const char anmchr_target_node_valid_msg[]; /* "NW4R:Failed assertion targetNode.IsValid()" */
+extern const char anmchr_resnode_ac_file_ref[];   /* "g3d_resnode_ac.h" */
+extern const char anmchr_resnode_ref_invalid_fmt[]; /* "%s::%s: Object not valid." */
+extern const char anmchr_resnode_ac_file_id[];    /* "g3d_resnode_ac.h" */
+extern const char anmchr_resnode_is_valid_msg[];  /* "NW4R:Failed assertion IsValid()" */
 extern "C" void res_anm_chr_common_copy_ctor(nw4r::g3d::ResAnmChr* pDst, const nw4r::g3d::ResAnmChr* pSrc);
 
 extern "C" {
@@ -156,13 +167,13 @@ extern "C" u32* res_node_ptr(u32** pp)
     return *pp;
 }
 
-extern "C" void fn_8005D114(u32* a, u32* b)
+extern "C" void res_node_empty_assign(u32* a, u32* b)
 {
     (void)a;
     (void)b;
 }
 
-extern "C" void fn_8005D118(u32* dst, u32* src)
+extern "C" void res_node_common_assign(u32* dst, u32* src)
 {
     *dst = *src;
 }
@@ -222,10 +233,10 @@ extern "C" void **type_obj_set_name_anmchr(void **out, void *v)
 
 
 /* The two-word copy pair the character-animation constructor uses. */
-extern "C" void* fn_8005D0CC(u32* dst, u32* src)
+extern "C" void* res_node_assign(u32* dst, u32* src)
 {
-    fn_8005D118(dst, src);
-    fn_8005D114(dst + 1, src + 1);
+    res_node_common_assign(dst, src);
+    res_node_empty_assign(dst + 1, src + 1);
     return dst;
 }
 
@@ -1246,6 +1257,87 @@ void nw4r::g3d::AnmObjChrRes::Release(ResMdl mdl, u32 target, BindOption option)
         nw4r::db::Panic("g3d_anmchr.cpp", 0x4F3, "NW4R:Fatal Error\nUnknown bind-option (=%d)", option);
         break;
     }
+}
+
+/* Wraps a returned handle word in a class temporary, so a copy helper gets the temporary's address. */
+struct HandleWord {
+    HandleWord(u32 word) { mWord = word; }
+    /* +0x00 */ u32 mWord;
+}; /* size: 0x4 */
+
+extern "C" void* res_node_assign(u32* dst, u32* src);
+
+/* 0x8005D050 (0x74): the node's index in its model (0 for an invalid handle). */
+extern "C" u32 res_node_get_id(const ResHandle* pSelf)
+{
+    if (!res_node_is_valid(pSelf)) {
+        nw4r::db::Panic(anmchr_resnode_ac_file_id, 56, anmchr_resnode_is_valid_msg);
+    }
+    if (res_node_is_valid(pSelf)) {
+        return ((ResNodeData*)res_node_ptr((u32**)pSelf))->mNodeID;
+    }
+    return 0;
+}
+
+/* 0x8005D218 (0x64): the node's block, asserting the handle is valid. */
+extern "C" ResNodeData* res_node_ref_nonconst(ResHandle* pSelf)
+{
+    if (!res_node_is_valid(pSelf)) {
+        nw4r::db::Panic(anmchr_resnode_ac_file_ref, 44, anmchr_resnode_ref_invalid_fmt, res_node_get_class_name(),
+                        anmchr_resnode_ref_name);
+    }
+    return (ResNodeData*)res_handle_ptr(pSelf);
+}
+
+/* 0x8005D160 (0x4C): the node `ofs` bytes from this one (a null node for offset 0). */
+extern "C" u32 res_node_ofs_to_node(const ResHandle* pSelf, s32 ofs)
+{
+    u8* pBase = (u8*)pSelf->mpData;
+    if (ofs) {
+        return (u32)nw4r::g3d::ResNode(pBase + ofs).mpData;
+    }
+    return (u32)nw4r::g3d::ResNode(NULL).mpData;
+}
+
+/* 0x8005D124 (0x3C): the parent node. */
+extern "C" u32 res_node_get_parent(ResHandle* pSelf)
+{
+    return res_node_ofs_to_node(pSelf, res_node_ref_nonconst(pSelf)->mToParentNode);
+}
+
+/* 0x8005D284 (0x3C): the next sibling node. */
+extern "C" u32 res_node_get_next_sibling(ResHandle* pSelf)
+{
+    return res_node_ofs_to_node(pSelf, res_node_ref_nonconst(pSelf)->mToNextSibling);
+}
+
+/* 0x8005CF10 (0x140): one past the last node of node `idx`'s subtree: the next sibling of the node or of its
+ * nearest ancestor that has one, else the node count. */
+extern "C" u32 res_mdl_node_subtree_end(nw4r::g3d::ResMdl mdl, u32 idx)
+{
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 42, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    ResHandle target;
+    res_node_copy_ctor(&target, (u32*)&mdl.GetResNode(idx));
+    if (!res_node_is_valid(&target)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 45, anmchr_target_node_valid_msg);
+    }
+    ResHandle node;
+    ResHandle next;
+    res_node_copy_ctor(&node, (u32*)&target);
+    res_node_copy_ctor(&next, &HandleWord(res_node_get_next_sibling(&node)).mWord);
+    while (!res_node_is_valid(&next)) {
+        res_node_assign((u32*)&node, &HandleWord(res_node_get_parent(&node)).mWord);
+        if (!res_node_is_valid(&node)) {
+            break;
+        }
+        res_node_assign((u32*)&next, &HandleWord(res_node_get_next_sibling(&node)).mWord);
+    }
+    if (res_node_is_valid(&next)) {
+        return res_node_get_id(&next);
+    }
+    return mdl.GetResNodeNumEntries();
 }
 
 /* 0x8005F054 (0x1C4): sets every child's frame. */

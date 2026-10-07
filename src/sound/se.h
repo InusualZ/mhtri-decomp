@@ -122,7 +122,7 @@ void fn_800E2680(void* sub);
 
 void fn_80093AA0(void* obj);
 void CleanUpTracks(void* obj);
-void fn_8005D0CC(void* obj, void* sub);
+void res_node_assign(void* obj, void* sub);
 int fn_8006FDCC(void* sub);
 void mtx34_copy(void* dst, void* src);
 void fn_80080B10(void* obj, s32 kind);
