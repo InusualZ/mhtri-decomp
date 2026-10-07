@@ -20,21 +20,6 @@
 extern "C" {
 #endif
 
-/* size: 0x09 - the idle-mode record `SCGetIdleMode` fills (`SCFindByteArrayItem(info, 2, 9)`); only
- * `subIdle` is read by the NWC24 band.  The field names past `idle` are derived from the record's own
- * order (a GUESS - the image carries no spelling for them). */
-typedef struct SCIdleModeInfo {
-    /* +0x00 */ u8 idle;
-    /* +0x01 */ u8 subIdle;
-    /* +0x02 */ u8 subIdle2;
-    /* +0x03 */ u8 disc;
-    /* +0x04 */ u8 pad_0x04[0x05];
-} SCIdleModeInfo; /* size: 0x09 */
-
-/* 0x804DCAC0 - copy the idle-mode record out of the SC configuration. */
-BOOL SCGetIdleMode(SCIdleModeInfo* info);
-
-
 #ifdef __cplusplus
 }
 #endif

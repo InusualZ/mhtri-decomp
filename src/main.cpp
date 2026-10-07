@@ -266,8 +266,8 @@ extern "C" void* OSGetMEM2ArenaLo(void);
 extern "C" void* OSGetMEM2ArenaHi(void);
 extern "C" void OSSetMEM1ArenaLo(void* lo);
 extern "C" void MEMInitAllocatorForExpHeap(void* allocator, void* heap, int align);
-extern "C" u8 fn_804DCB40(void);
-extern "C" u8 fn_804DC9E0(void);
+extern "C" u8 SCGetProgressiveMode(void);
+extern "C" u8 SCGetAspectRatio(void);
 extern "C" u8 SCGetLanguage(void);
 extern "C" u32 VIGetDTVStatus(void);
 extern "C" void fn_804E8D40(void);
@@ -594,8 +594,8 @@ extern "C" void* fn_8003F728(void* startAddress, u32 size)
  * unit's own render-mode object and publishes it. */
 extern "C" void fn_8003F730(s32 arg)
 {
-    lbl_80794780 = fn_804DCB40();
-    lbl_80794781 = fn_804DC9E0();
+    lbl_80794780 = SCGetProgressiveMode();
+    lbl_80794781 = SCGetAspectRatio();
     lbl_80794782 = SCGetLanguage();
     lbl_80794785 = VIGetDTVStatus();
     fn_804E8D40();
