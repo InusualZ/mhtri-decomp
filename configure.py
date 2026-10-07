@@ -1297,7 +1297,7 @@ config.libs = [
             Object(NonMatching, "OS/OSUtf.c", cflags=cflags_base),
             Object(Matching, "OS/OSIpc.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSStateTM.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSPlayRecord.c", cflags=cflags_base),
+            Object(NonMatching, "OS/OSPlayRecord.c", cflags=cflags_base, mw_version="GC/3.0a5.2"),
             Object(NonMatching, "OS/OSStateFlags.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSNet.c", cflags=cflags_base),
             Object(Matching, "OS/OSNandbootInfo.c", cflags=cflags_base),
