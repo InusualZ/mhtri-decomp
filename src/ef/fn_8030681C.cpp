@@ -722,7 +722,7 @@ extern "C" void fn_803088FC(_EFT* self)
         mtx34_identity(&mtx);
         rotLocalMatY(self->rot_0x24.y, &mtx);
         rotLocalMatX(self->rot_0x24.x, &mtx);
-        fn_800FBB90(&mtx, &self->pos_0x18);
+        mtx34_set_trans(&mtx, &self->pos_0x18);
         work->model->move2(&mtx, 0);
         eft_res_models_spawn(self, (void**)&work->model, 2, work->count, NULL);
     }

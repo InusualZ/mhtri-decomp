@@ -1456,7 +1456,7 @@ extern "C" void fn_800FE978(_EFT* self)
                         fn_800FFCA8(self);
                         return;
                     }
-                    fn_800F996C(work->effects[i], 0);
+                    effect_retire(work->effects[i], 0);
                     i++;
                 }
             } else if (self->type_0x02 == 1) {
@@ -1480,7 +1480,7 @@ extern "C" void fn_800FE978(_EFT* self)
                 while (i < work->count) {
                     work->types_0x8D5[i] = set.slots_0x90[i].field_0x00;
                     cpSetRotMatrix(&set.slots_0x90[i].rot_0x20, &mtx);
-                    fn_800FBB90(&mtx, &set.slots_0x90[i].vec_0x14);
+                    mtx34_set_trans(&mtx, &set.slots_0x90[i].vec_0x14);
                     mtx34_copy(&work->matrices[i], &mtx);
 
                     if (set.slots_0x90[i].flags_0x03 & 2) {
@@ -1488,14 +1488,14 @@ extern "C" void fn_800FE978(_EFT* self)
                                                        work->kind, 1, ran_suu(0) & 0x3F);
                         if (work->effects[i] != NULL) {
                             work->effects[i]->SetRootMtx(work->matrices[i]);
-                            fn_800F996C(work->effects[i], 0);
+                            effect_retire(work->effects[i], 0);
                         }
                     } else if ((ran_suu(0) & 3) == 0) {
                         work->effects[i] = fn_800F91C4((u16)(work->id_base + work->types_0x8D5[i]),
                                                        work->kind, 1, ran_suu(0) & 0xF);
                         if (work->effects[i] != NULL) {
                             work->effects[i]->SetRootMtx(work->matrices[i]);
-                            fn_800F996C(work->effects[i], 0);
+                            effect_retire(work->effects[i], 0);
                         }
                     } else {
                         work->effects[i] = NULL;

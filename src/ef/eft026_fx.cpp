@@ -719,7 +719,7 @@ extern "C" void fn_80118B2C(_EFT* self)
     switch (self->type_0x02) {
     case 1:
     case 8:
-        fn_800FBB90(&mtx, &self->pos_0x18);
+        mtx34_set_trans(&mtx, &self->pos_0x18);
         copyVec3(&v2, &self->pos_0x18);
         copyVec3(&v4, &work->scale);
         break;
@@ -735,7 +735,7 @@ extern "C" void fn_80118B2C(_EFT* self)
         self->pos_0x18.x += v1.x;
         self->pos_0x18.y += em->height_0x18C - work->field_0x74;
         self->pos_0x18.z += v1.z;
-        fn_800FBB90(&mtx, &self->pos_0x18);
+        mtx34_set_trans(&mtx, &self->pos_0x18);
         work->field_0x74 = em->height_0x18C;
         {
             nw4r::math::VEC3 camDir = get_camera_direction();

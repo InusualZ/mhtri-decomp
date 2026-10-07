@@ -7,6 +7,7 @@
  * FLAGS. `cflags_main`; `#pragma fp_contract off` and `#pragma peephole off` for the whole file.
  * NAMES. `SetRootMtxTrans`, `effect_move`, `change_color_eff`, `change_paramscale_eff`, `change_paramscale_eff_vec3`,
  *   `eftGetKeyRGB` and `eftGetKeyAlpha` are the runtime dump's own names; the map has only `fn_` stems for the rest.
+ *   GUESS (from the body): `effect_retire` (0x800F996C) calls the effect's retire slot with the flag as a bool.
  * RESIDUALS. 21 partial rows, including:
  *  - `fn_800FA9B8`: ours inverts the name-table walk's test and drops the second record check (`lwz`/`cmpwi`);
  *  - `fn_800FA208`: ours keeps an extra saved register and lays the state compares out 1, 2, 3 where retail
@@ -45,7 +46,7 @@
  * ------------------------------------------------------------------------------------------------- */
 
 /* One pooled effect instance (`fn_800A51D8` returns it).  It carries a vtable at +0x1C (the emitter
- * retire call in `fn_800F996C` is vtable slot 6) and its root position at +0x9C. */
+ * retire call in `effect_retire` is vtable slot 6) and its root position at +0x9C. */
 typedef struct EftHandle {
     /* +0x00 */ u8 pad_0x00[0x1C];
     /* +0x1C */ void** vtable_0x1C;
@@ -237,7 +238,7 @@ void* memcpy(void* dst, const void* src, u32 n);
 void fn_800F9A70(void* mgr, EftParticleArgs* data);
 EftParticleArgs* fn_800F9A8C(EftParticleArgs* self);
 void fn_800F9B68(EftHandle* handle, nw4r::math::VEC3* v);
-void fn_800F996C(EftHandle* handle, u32 flag);
+void effect_retire(EftHandle* handle, u32 flag);
 void fn_800F99D4(void* effect, u8 mode, _GXColor* color, _GXColor* color2, nw4r::math::VEC3* pos, u8 flag, f32 scale);
 }
 
@@ -379,12 +380,12 @@ u32 effect_move(nw4r::ef::Effect* effect) {
     if (fn_800F9884(effect) == 0) {
         return 0;
     }
-    fn_800F996C((EftHandle*)(void*)effect, 0);
+    effect_retire((EftHandle*)(void*)effect, 0);
     return 1;
 }
 
 /* 0x800F996C - call vtable slot 6 of the effect with `flag != 0`. */
-extern "C" void fn_800F996C(EftHandle* handle, u32 flag) {
+extern "C" void effect_retire(EftHandle* handle, u32 flag) {
     u32 b = (flag != 0);
     ((void (*)(void*, u32))handle->vtable_0x1C[6])(handle, b);
 }

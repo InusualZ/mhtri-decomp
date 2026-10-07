@@ -25,8 +25,8 @@
  *   GUESS: `lb_quest_board_flash_init`, `lb_quest_board_follow_init`, `lb_quest_board_effect_update`,
  *   GUESS: `lb_quest_board_flash_move`
  * RESIDUALS. Unwritten: `lb_quest_board_effect_init` (0x80396070, 0x1D8: `SetRootMtxTrans` has no declaration in its
- *   owner's header) and `lb_quest_board_effect_move` (0x803963F4, 0x260: `ef/effect.cpp`'s `fn_800F996C` is unnamed and
- *   the ef lanes own it).  flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short
+ *   owner's header) and `lb_quest_board_effect_move` (0x803963F4, 0x260: it calls `ef/effect.cpp`'s `effect_retire`,
+ *   which the ef lanes own).  flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short
  *   of the claim; the pools are three TUs' (see RANGE).  Unwritten: `lb_quest_board_party_step` (0x80395A4C, 0x238):
  *   it tests the results of `requestReadyOnAlias`/`requestReadyOnAlias2`, which the Network owner's header declares
  *   `void` (decl request filed).  `lb_quest_board_step_screen`: retail shares the case-2/case-3 error tails

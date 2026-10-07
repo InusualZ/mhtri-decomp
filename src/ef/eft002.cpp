@@ -260,7 +260,7 @@ struct _EFT_MODEL {
 extern "C" void mtx34_identity(void* mtx);
 extern "C" void mtx34_copy(void* dst, const nw4r::math::MTX34& src);
 extern "C" void mtx34_concat_assign(void* dst, void* src);
-extern "C" void fn_800FBB90(void* mtx, nw4r::math::VEC3* pos);
+extern "C" void mtx34_set_trans(void* mtx, nw4r::math::VEC3* pos);
 extern "C" void eft_res_slot_release(void* self);
 extern "C" void fn_800FD4A8(_EFT* self);
 extern "C" void fn_800FD4E4(_EFT* self);
@@ -842,7 +842,7 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self)
     mtx34_copy(&mtx_a, get_current_view_mtx());
     mtx34_inverse(&mtx_a, &mtx_a);
     mtx34_identity(&mtx_b);
-    fn_800FBB90(&mtx_b, &self->pos_0x18);
+    mtx34_set_trans(&mtx_b, &self->pos_0x18);
     mtx34_concat_assign(&mtx_b, &mtx_a);
     work->model->move2(&mtx_b, 0);
     fn_800F93D8_view1(self, &work->model, 2, 1, 0);

@@ -89,7 +89,7 @@ typedef struct _EM_EFT {
 /* C-linkage callees (the map spells these plainly). */
                   /* mtx = identity */
        /* vec = (0, 0, 0) */
-void fn_800FBB90(MTX34* mtx, VEC3* pos);
+void mtx34_set_trans(MTX34* mtx, VEC3* pos);
 void fn_80105314(_EM_EFT* self);
 void fn_80105560(_EM_EFT* self);               /* effect creation failed */
 void fn_80105564(_EM_EFT* self);
@@ -236,7 +236,7 @@ void fn_80104BD0(_EM_EFT* self)
 
     if (work->joint_0x04 != 0xFF) {
         mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(&self->pos_0x18, &mtx);
-        fn_800FBB90(&mtx, &self->pos_0x18);
+        mtx34_set_trans(&mtx, &self->pos_0x18);
         get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3(enemy, work->joint_0x04, &self->pos_0x18);
 
         switch (self->type_0x02) {
@@ -340,7 +340,7 @@ void fn_80104BD0(_EM_EFT* self)
     } else {
         if (enemy != NULL) {
             mulVecMat__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34(&self->pos_0x18, &mtx);
-            fn_800FBB90(&mtx, &self->pos_0x18);
+            mtx34_set_trans(&mtx, &self->pos_0x18);
             copyVec3(&self->pos_0x18, &enemy->field_0x188);
         }
 

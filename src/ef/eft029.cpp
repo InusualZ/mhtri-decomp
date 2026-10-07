@@ -272,7 +272,7 @@ extern "C" void fn_80119DEC(_EFT* self)
     case 12:
     case 13:
         cpSetRotMatrix(&self->rot_0x24, &mtx);
-        fn_800FBB90(&mtx, &self->pos_0x18);
+        mtx34_set_trans(&mtx, &self->pos_0x18);
         for (i = 0; i < work->count; i++) {
             work->effects[i]->SetRootMtx(mtx);
         }

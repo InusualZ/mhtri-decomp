@@ -22,7 +22,7 @@ extern "C" {
 void eft_state_flags_set(struct _EFT* self, u8 a, u8 b);
 
 /* Calls vtable slot 6 of the pooled effect with `flag != 0` (its retire/flag hook). */
-void fn_800F996C(nw4r::ef::Effect* effect, u32 arg);
+void effect_retire(nw4r::ef::Effect* effect, u32 arg);
 
 /* Places/moves the pooled effect at a world position (the enemy/emitter state-0 handlers and
  * eft019's creation path), and reports whether the pooled effect is still alive. */
