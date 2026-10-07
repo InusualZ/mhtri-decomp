@@ -20,6 +20,7 @@ extern "C" {
 ResNodeData* res_node_ref_nonconst(ResHandle* pSelf);
 const ResNodeData* res_node_ref(const ResHandle* pSelf);
 u32 res_node_ofs_to_node(const ResHandle* pSelf, s32 ofs);
+void* res_node_copy_ctor(void* pSelf, u32* pSrc); /* 0x8005CF70-area: copies a node handle and returns the destination */ /* untyped: opaque handle */
 
 void **fn_8005DC60(void **out, void *v);   /* 0x8005DC60 - stores `v` through `out`, returns `out` */
 void **type_obj_set_name_anmchr(void **out, void *v);   /* 0x8005DCD0 - stores `v` through `out`, returns `out` */

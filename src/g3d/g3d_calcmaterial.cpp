@@ -5,7 +5,8 @@
  *   list and drives the per-material matrix updates.
  * RANGE. .text 0x8006EE78-0x8006F738 (33 functions); extab, extabindex, .data 0x8058D7E0-0x8058D938 (opens on
  *   "g3d_calcmaterial.cpp", g3d_calc_material_directly's assert).  The right seam is proven: fn_8006F738 cites "g3d_calcview.cpp".
- * NAMES. res_mat_chan_end_edit is a GUESS; res_mat_ind_mtx_copy_ctor is a GUESS;
+ * NAMES. mtx34_axis_in_parent is a GUESS; mtx34_up_axis_in_parent is a GUESS (the evidence follows).
+ *   res_mat_chan_end_edit is a GUESS; res_mat_ind_mtx_copy_ctor is a GUESS;
  *   res_mat_ind_mtx_end_edit is a GUESS; res_mat_tev_color_copy_ctor is a GUESS;
  *   res_mat_tev_color_end_edit is a GUESS; res_tex_obj_end_edit is a GUESS; res_tex_srt_copy_ctor is a GUESS;
  *   res_tex_srt_end_edit is a GUESS; res_tlut_obj_end_edit is a GUESS;
@@ -17,7 +18,7 @@
  *   GUESSES (the handle copies and the TexPatAnmResult constructor the ScnMdl material pass calls).
  *   g3d_calc_material_directly is a GUESS (0x8006EE78: applies the texture and colour animations to the model's
  *   materials, called by ScnMdlSimple's material pass).
- * RESIDUALS. The large vector/matrix bodies g3d_calc_material_directly, fn_8006F5A0 and fn_8006F660 are stubs; fn_8006F200 and
+ * RESIDUALS. The large vector/matrix bodies g3d_calc_material_directly, mtx34_axis_in_parent (0x8006F5A0, 0xC0 bytes) and mtx34_up_axis_in_parent (0x8006F660, 0xD8 bytes) are unwritten empty stubs; fn_8006F200 and
  *   tex_pat_anm_result_ctor are partial.
  *   flipcheck: `.text` 0x4D4 of 0x8C0; `.data` is claimed and not emitted.
  */
@@ -54,8 +55,8 @@ void* res_tex_srt_copy_ctor(void* pDst, const void* pSrc);
 void fn_8006F334(void* pDst, const void* pSrc);
 void fn_8006F3D8(u32* pDst, u32 value);
 u32* tex_pat_anm_result_ctor(u32* self);
-void fn_8006F5A0(f32* pDst, const f32* pMtx, const f32* pVec);
-void fn_8006F660(f32* pDst, const f32* pMtx, const f32* pVec);
+void mtx34_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec);
+void mtx34_up_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec);
 }
 
 /* The pooled file-name/assert strings this unit reads, declared, not defined: the claimed `.data` is not
@@ -305,12 +306,12 @@ void* g3d_calc_material_directly(void* pMdl, void* pMatArray, void* pTexArray, v
 }
 
 /* The paired-single matrix/vector builders, a compiler-cloned pair (stubs). */
-void fn_8006F5A0(f32* pDst, const f32* pMtx, const f32* pVec) {
+void mtx34_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec) {
     (void)pDst;
     (void)pMtx;
     (void)pVec;
 }
-void fn_8006F660(f32* pDst, const f32* pMtx, const f32* pVec) {
+void mtx34_up_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec) {
     (void)pDst;
     (void)pMtx;
     (void)pVec;

@@ -20,6 +20,10 @@ void res_mat_ind_mtx_end_edit(struct ResHandle* pSelf);
 /* The tex-colour and indirect-matrix handles' copy constructors: copy the handle and return the destination. */
 struct ResHandle* res_mat_tev_color_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
 struct ResHandle* res_mat_ind_mtx_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
+/* 0x8006F5A0 - `pDst` = the axis of matrix `pMtx` expressed in the parent matrix `pParentMtx`'s frame. */
+void mtx34_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pParentMtx);
+/* 0x8006F660 - `pDst` = the up axis of matrix `pMtx` expressed in the parent matrix `pParentMtx`'s frame. */
+void mtx34_up_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pParentMtx);
 
 #ifdef __cplusplus
 }
