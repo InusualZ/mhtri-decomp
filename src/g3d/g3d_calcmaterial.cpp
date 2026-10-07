@@ -5,15 +5,25 @@
  *   list and drives the per-material matrix updates.
  * RANGE. .text 0x8006EE78-0x8006F738 (33 functions); extab, extabindex, .data 0x8058D7E0-0x8058D938 (opens on
  *   "g3d_calcmaterial.cpp", g3d_calc_material_directly's assert).  The right seam is proven: fn_8006F738 cites "g3d_calcview.cpp".
- * NAMES. Map stems.
+ * NAMES. res_mat_chan_end_edit is a GUESS; res_mat_ind_mtx_copy_ctor is a GUESS;
+ *   res_mat_ind_mtx_end_edit is a GUESS; res_mat_tev_color_copy_ctor is a GUESS;
+ *   res_mat_tev_color_end_edit is a GUESS; res_tex_obj_end_edit is a GUESS; res_tex_srt_copy_ctor is a GUESS;
+ *   res_tex_srt_end_edit is a GUESS; res_tlut_obj_end_edit is a GUESS;
+ *   tex_pat_anm_result_ctor is a GUESS (the evidence follows).
+ *   Map stems, except the material blocks' edit hooks: res_mat_chan_end_edit, res_tex_srt_end_edit,
+ *   res_tlut_obj_end_edit, res_tex_obj_end_edit, res_mat_tev_color_end_edit and res_mat_ind_mtx_end_edit are
+ *   GUESSES (C spellings of nw4r's `EndEdit`, by the ScnMdl buffer refill that calls each after the block's CopyTo).
+ *   res_mat_tev_color_copy_ctor, res_mat_ind_mtx_copy_ctor, res_tex_srt_copy_ctor and tex_pat_anm_result_ctor are
+ *   GUESSES (the handle copies and the TexPatAnmResult constructor the ScnMdl material pass calls).
  *   g3d_calc_material_directly is a GUESS (0x8006EE78: applies the texture and colour animations to the model's
  *   materials, called by ScnMdlSimple's material pass).
  * RESIDUALS. The large vector/matrix bodies g3d_calc_material_directly, fn_8006F5A0 and fn_8006F660 are stubs; fn_8006F200 and
- *   fn_8006F528 are partial.
+ *   tex_pat_anm_result_ctor are partial.
  *   flipcheck: `.text` 0x4D4 of 0x8C0; `.data` is claimed and not emitted.
  */
 #include "types.h"
 #include "g3d/g3d_resmat.h"
+#include "g3d/g3d_resfile.h"       /* res_mat_*_dc_store (rule 2) */
 
 /* The five assert wrappers below need the *un-fused* compare (retail keeps `clrlwi` + `cmpwi` and a
  * separate `add`/`blr`, where the peephole pass folds them into `clrlwi.`/`bnelr`), exactly as
@@ -30,31 +40,20 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 extern "C" {
 /* The helpers this unit calls (C linkage, plain map stems). */
-/* Allocator/registry pair behind fn_8006F0DC / fn_8006F220. */
-u32 fn_800941DC(void* p, u32 flag);
-u32 fn_8009429C(void* p, u32 flag);
-/* The two handle-array element constructors fn_8006F528 runs. */
+/* The two handle-array element constructors tex_pat_anm_result_ctor runs. */
 void res_tex_ctor(void* p, u32 flag);
 void res_pltt_ctor(void* p, u32 flag);
 /* The global material-table accessor the accessor chain reads at +0x3C. */
 
 /* This unit's own bodies, in address order. */
 void* g3d_calc_material_directly(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray);
-u32 fn_8006F0DC(void* p);
-void fn_8006F0E4(void* p);
-void* fn_8006F0E8(void* pDst, const void* pSrc);
 void fn_8006F118(void* pDst, const void* pSrc);
 void* fn_8006F200(void* pHandle, u32 offset);
-void fn_8006F21C(void* p);
-u32 fn_8006F220(void* p);
-void* fn_8006F228(void* pDst, const void* pSrc);
 void fn_8006F258(void* pDst, const void* pSrc);
-void* fn_8006F304(void* pDst, const void* pSrc);
+void* res_tex_srt_copy_ctor(void* pDst, const void* pSrc);
 void fn_8006F334(void* pDst, const void* pSrc);
 void fn_8006F3D8(u32* pDst, u32 value);
-void fn_8006F3E0(void* p);
-void fn_8006F3E4(void* p);
-u32* fn_8006F528(u32* self);
+u32* tex_pat_anm_result_ctor(u32* self);
 void fn_8006F5A0(f32* pDst, const f32* pMtx, const f32* pVec);
 void fn_8006F660(f32* pDst, const f32* pMtx, const f32* pVec);
 }
@@ -120,17 +119,17 @@ void fn_8006F258(void* pDst, const void* pSrc) {
 }
 
 /* The empty hooks. */
-void fn_8006F0E4(void* p) {
-    (void)p;
+void res_mat_chan_end_edit(struct ResHandle* pSelf) {
+    (void)pSelf;
 }
-void fn_8006F21C(void* p) {
-    (void)p;
+void res_tex_srt_end_edit(struct ResHandle* pSelf) {
+    (void)pSelf;
 }
-void fn_8006F3E0(void* p) {
-    (void)p;
+void res_tlut_obj_end_edit(struct ResHandle* pSelf) {
+    (void)pSelf;
 }
-void fn_8006F3E4(void* p) {
-    (void)p;
+void res_tex_obj_end_edit(struct ResHandle* pSelf) {
+    (void)pSelf;
 }
 
 /* Base handle + offset, with offset 0 meaning the null resource. */
@@ -143,23 +142,23 @@ void* fn_8006F200(void* pHandle, u32 offset) {
 }
 
 /* Tail calls into the pool allocator/registry with a null flag. */
-u32 fn_8006F0DC(void* p) {
-    return fn_800941DC(p, 0);
+void res_mat_tev_color_end_edit(struct ResHandle* pSelf) {
+    res_mat_tev_color_dc_store(pSelf, 0);
 }
-u32 fn_8006F220(void* p) {
-    return fn_8009429C(p, 0);
+void res_mat_ind_mtx_end_edit(struct ResHandle* pSelf) {
+    res_mat_ind_mtx_dc_store(pSelf, 0);
 }
 
 /* Copy-construct and return the destination. */
-void* fn_8006F0E8(void* pDst, const void* pSrc) {
+ResHandle* res_mat_tev_color_copy_ctor(ResHandle* pDst, const ResHandle* pSrc) {
     fn_8006F118(pDst, pSrc);
     return pDst;
 }
-void* fn_8006F228(void* pDst, const void* pSrc) {
+ResHandle* res_mat_ind_mtx_copy_ctor(ResHandle* pDst, const ResHandle* pSrc) {
     fn_8006F258(pDst, pSrc);
     return pDst;
 }
-void* fn_8006F304(void* pDst, const void* pSrc) {
+void* res_tex_srt_copy_ctor(void* pDst, const void* pSrc) {
     fn_8006F334(pDst, pSrc);
     return pDst;
 }
@@ -284,7 +283,7 @@ nw4r::g3d::ResTexObj nw4r::g3d::ResMat::GetResTexObj() {
 extern "C" {
 
 /* Constructs the 8+8 entry handle arrays at +0x4 and +0x24 of the record. */
-u32* fn_8006F528(u32* self) {
+u32* tex_pat_anm_result_ctor(u32* self) {
     u32* p = self + 1;
     u32* mid = self + 9;
     for (; p < mid; p++) {

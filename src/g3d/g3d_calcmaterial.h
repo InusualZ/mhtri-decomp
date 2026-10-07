@@ -9,6 +9,17 @@
 extern "C" {
 #endif
 
+/* The material resource blocks' `EndEdit` hooks, each on the block's one-word handle: the tex-colour and
+ * indirect-matrix blocks store their display list back (no wait), the other four are empty. */
+void res_mat_chan_end_edit(struct ResHandle* pSelf);
+void res_tex_srt_end_edit(struct ResHandle* pSelf);
+void res_tlut_obj_end_edit(struct ResHandle* pSelf);
+void res_tex_obj_end_edit(struct ResHandle* pSelf);
+void res_mat_tev_color_end_edit(struct ResHandle* pSelf);
+void res_mat_ind_mtx_end_edit(struct ResHandle* pSelf);
+/* The tex-colour and indirect-matrix handles' copy constructors: copy the handle and return the destination. */
+struct ResHandle* res_mat_tev_color_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
+struct ResHandle* res_mat_ind_mtx_copy_ctor(struct ResHandle* pDst, const struct ResHandle* pSrc);
 
 #ifdef __cplusplus
 }
@@ -32,7 +43,11 @@ extern "C" void g3d_calc_material_directly(const nw4r::g3d::ResMdl* pMdl, nw4r::
 /* 0x8006F304 - the word copy through a reference.  C++-only: `const u32&` cannot be spelled in C, and
  * `extern "C"` keeps the plain map name the target objects reference while the reference parameter stays
  * (load-bearing for the caller's stack layout - see eft002.cpp's file header). */
-extern "C" void fn_8006F304(void* dst, const u32& src);
+extern "C" void res_tex_srt_copy_ctor(void* dst, const u32& src);
+
+namespace nw4r { namespace g3d { struct TexPatAnmResult; } }
+/* 0x8006F528 (0x78): constructs the texture-pattern result's texture and palette handle arrays. */
+extern "C" nw4r::g3d::TexPatAnmResult* tex_pat_anm_result_ctor(nw4r::g3d::TexPatAnmResult* pResult);
 #endif
 
 #endif /* MHTRI_G3D_G3D_CALCMATERIAL_H */

@@ -117,7 +117,7 @@ s32 fn_800DBB78(s32 bank, s32 id);
  * (`returns dst`) - its header cannot be included from the `ef` band (VEC3_ctor/
  * setVec3 conflict, filed 2026-09-27). */
 void fn_800D3ACC(void* sub);
-void fn_8007E498(void* obj);
+void scn_mdl_clean_mat_buffer(void* obj);
 void fn_800E2680(void* sub);
 
 void fn_80093AA0(void* obj);

@@ -40,6 +40,16 @@ u32 fn_8006D9A4(void* self, void* key);
 
 #ifdef __cplusplus
 }
+
+struct ResHandle;
+namespace nw4r { namespace g3d { struct TexPatAnmResult; struct TexSrtAnmResult; } }
+
+/* 0x800699C8 (0x210): applies a texture-pattern result to a material's texture and palette objects. */
+extern "C" void apply_tex_pat_anm_result(struct ResHandle texObj, struct ResHandle tlutObj,
+                                         const nw4r::g3d::TexPatAnmResult* pResult);
+/* 0x8006E338 (0x330): applies a texture-SRT result to a material's SRT block and indirect matrices. */
+extern "C" void apply_tex_srt_anm_result(struct ResHandle texSrt, struct ResHandle indMtx,
+                                         const nw4r::g3d::TexSrtAnmResult* pResult);
 #endif
 
 

@@ -5,17 +5,20 @@
  *   0x80591618-0x80591860, .sdata 0x807912B8-0x807912D8.  Left seam: fn_80099400 calls `ResShp::ref`
  *   (fn_80077674) on its own `this` where fn_800993B4 calls `ResNode::ref` (fn_8005D218), and the `.data`
  *   fragment opens with "g3d_resshp.cpp"; the right edge is `g3d/g3d_cpu.cpp`.
- * NAMES. Map stems (the dump answers `zz_` placeholders) except the nw4r members ResShp::Init/Terminate,
+ * NAMES. res_shp_get_vtx_clr is a GUESS; res_shp_get_vtx_nrm is a GUESS (the evidence follows).
+ *   res_shp_get_vtx_pos/nrm/clr, res_tev_copy_to and res_tev_dc_store are GUESSES (nw4r's ResShp::GetResVtx*,
+ *   ResTev::CopyTo/DCStore, by the asserts and the ScnMdl buffer refill).  Map stems (the dump answers `zz_`
+ *   placeholders) except the nw4r members ResShp::Init/Terminate,
  *   ResShp::CallPrePrimitiveDisplayList/CallPrimitiveDisplayList and
  *   ResTex::ref/GetTexObjParam/GetTexObjCIParam/GetTexData (named by the retail `_ac.h` accessor set).  The `ResTagDLData` fields (`mPrePrimOfs` at +0x08,
  *   `mSize`/`mDlSize`) and the `ResTevData`/`ResTexBlock` fields are GUESSes; the `ResShpData` `id*` fields are
- *   spelled by fn_80099974's assert (`ref().idVtxPosition >= 0`).
+ *   spelled by res_shp_get_vtx_pos's assert (`ref().idVtxPosition >= 0`).
  * RESIDUALS. fn_80099724: the base word loads into r3 where retail uses r0.
  *   fn_800997E0: `fn_80099640(...) + (attr - 9) * 0xC` accumulates in the local's register; retail uses r3, then +0x32.
  *   fn_80099C20: stack-slot order of the three `ResXxx` copies' destination handles and value temporaries.
  *   fn_8009A1E0: retail keeps `lbl_8056F730` in r31 across the `fn_800866FC` call (frame 0x20, r29-r31); ours
  *     rematerialises it after the call (frame 0x10, 8 bytes shorter); every spelling of the table read emits the same.
- *   fn_8009A278: the final `subf`'s destination register (r0 in retail, r4 here).
+ *   res_tev_copy_to: the final `subf`'s destination register (r0 in retail, r4 here).
  *   flipcheck: `.text` 0x1340 of 0x1348; `.rodata`, `.data` and `.sdata` are claimed and not emitted.
  * SHAPES. File-scope `#pragma peephole off`: the `rlwinm` flag extracts keep retail's `cmpwi`, and fn_800997E0/
  *   fn_800998CC materialise their range check (`li r3, 0` / `li r3, 1` + `cmpwi`).
@@ -53,8 +56,8 @@ using nw4r::g3d::ResTagDLData;
  * `g3d_restex_ac.h`, the file names of their asserts).  Only the words the tail's bodies reach are
  * named; the names are the best the offsets support (the offsets are the facts). */
 struct ResTevData {
-    /* +0x00 */ u32 mSize;     /* the block's size, the DC range fn_8009A2F4 stores/flushes */
-    /* +0x04 */ u32 mDlSize;   /* the display-list size fn_8009A278 rebases by the copy     */
+    /* +0x00 */ u32 mSize;     /* the block's size, the DC range res_tev_dc_store stores/flushes */
+    /* +0x04 */ u32 mDlSize;   /* the display-list size res_tev_copy_to rebases by the copy     */
     /* +0x08 */ u8 pad_0x08[0x4];
     /* +0x0C */ u8 mPrimCount; /* the primitive count fn_8009A1E0 indexes the size table by */
     /* +0x0D */ u8 pad_0x0D[0x13];
@@ -318,9 +321,9 @@ void* memset(void* pDst, int value, u32 size);    /* the runtime's own symbol   
 extern "C" {
 void fn_800997E0(ResHandle* pSelf, s32 attr, u32 pData, u32 size);
 void fn_800998CC(ResHandle* pSelf, u32 attr);
-u32 fn_80099974(ResHandle* pSelf);
-u32 fn_800999E8(ResHandle* pSelf);
-u32 fn_80099A58(ResHandle* pSelf, u32 idx);
+u32 res_shp_get_vtx_pos(ResHandle* pSelf);
+u32 res_shp_get_vtx_nrm(ResHandle* pSelf);
+u32 res_shp_get_vtx_clr(ResHandle* pSelf, u32 idx);
 u32 fn_80099B10(ResHandle* pSelf, u32 idx);
 u32 fn_80099BB0(ResHandle* pSelf);
 u32 fn_80099DD4(ResHandle* pSelf);
@@ -336,8 +339,8 @@ void fn_8009A12C(ResHandle* pSelf, s32 flag);
 u32 fn_8009A174(ResHandle* pSelf);
 u32 fn_8009A1D8(ResHandle* pSelf);
 u8 fn_8009A254(ResHandle* pSelf);
-u32 fn_8009A278(ResHandle* pSelf, void* pDst);
-void fn_8009A2F4(ResHandle* pSelf, s32 flag);
+u32 res_tev_copy_to(ResHandle* pSelf, void* pDst);
+void res_tev_dc_store(ResHandle* pSelf, s32 flag);
 void fn_8009A360(ResHandle* pSelf, s32 flag);
 u32 fn_8009A3CC(ResHandle* pSelf);
 u32 fn_8009A408(ResHandle* pSelf);
@@ -390,7 +393,7 @@ extern "C" void fn_800998CC(ResHandle* pSelf, u32 attr) {
 
 /* 0x80099974 - the shape's vertex-position resource: resolve the owning model's position array at the
  * shape's own `idVtxPosition` (the assert the target bakes into `ref().idVtxPosition >= 0`). */
-extern "C" u32 fn_80099974(ResHandle* pSelf) {
+extern "C" u32 res_shp_get_vtx_pos(ResHandle* pSelf) {
     if (reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref().idVtxPosition < 0) {
         nw4r::db::Panic(lbl_80591618, 0x31E, lbl_80591664);
     }
@@ -400,7 +403,7 @@ extern "C" u32 fn_80099974(ResHandle* pSelf) {
 }
 
 /* 0x800999E8 - the vertex-normal resource, or a null handle when the shape has none (`idVtxNrm == -1`). */
-extern "C" u32 fn_800999E8(ResHandle* pSelf) {
+extern "C" u32 res_shp_get_vtx_nrm(ResHandle* pSelf) {
     const ResShpData* pData = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref();
 
     if (pData->idVtxNrm != -1) {
@@ -412,7 +415,7 @@ extern "C" u32 fn_800999E8(ResHandle* pSelf) {
 }
 
 /* 0x80099A58 - one colour-channel resource (two per shape, hence the `idx == 0 || idx == 1` assert). */
-extern "C" u32 fn_80099A58(ResHandle* pSelf, u32 idx) {
+extern "C" u32 res_shp_get_vtx_clr(ResHandle* pSelf, u32 idx) {
     const ResShpData* pData = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref();
     bool inRange = (idx == 0 || idx == 1);
 
@@ -464,11 +467,11 @@ void nw4r::g3d::ResShp::Init() {
     const void* pBaseVtx;
     u8 stride;
 
-    u32 vtxPos = fn_80099974(reinterpret_cast<ResHandle*>(this));
+    u32 vtxPos = res_shp_get_vtx_pos(reinterpret_cast<ResHandle*>(this));
     reinterpret_cast<nw4r::g3d::ResVtxPos*>(&vtxPos)->GetArray(&pBaseVtx, &stride);
     fn_800997E0(reinterpret_cast<ResHandle*>(this), 9, (u32)pBaseVtx, stride);
 
-    u32 vtxNrm = fn_800999E8(reinterpret_cast<ResHandle*>(this));
+    u32 vtxNrm = res_shp_get_vtx_nrm(reinterpret_cast<ResHandle*>(this));
     nw4r::g3d::ResVtxNrm nrm(reinterpret_cast<const nw4r::g3d::ResVtxNrm*>(&vtxNrm));
 
     if (nrm.IsValid()) {
@@ -477,7 +480,7 @@ void nw4r::g3d::ResShp::Init() {
     }
 
     for (u32 i = 0; i < 2; i++) {
-        u32 vtxClr = fn_80099A58(reinterpret_cast<ResHandle*>(this), i);
+        u32 vtxClr = res_shp_get_vtx_clr(reinterpret_cast<ResHandle*>(this), i);
         nw4r::g3d::ResVtxClr clr(reinterpret_cast<const nw4r::g3d::ResVtxClr*>(&vtxClr));
 
         if (clr.IsValid()) {
@@ -669,7 +672,7 @@ extern "C" u8 fn_8009A254(ResHandle* pSelf) {
 
 /* 0x8009A278 - copy the block to a 0x20-aligned destination, rebase its recorded size by the amount
  * the copy moved it by, and store the copy back to the cache. */
-extern "C" u32 fn_8009A278(ResHandle* pSelf, void* pDst) {
+extern "C" u32 res_tev_copy_to(ResHandle* pSelf, void* pDst) {
     u32 src = fn_8009A174(pSelf);
     nw4r::g3d::detail::Copy32ByteBlocks(pDst, (const void*)src, 0x200);
 
@@ -680,12 +683,12 @@ extern "C" u32 fn_8009A278(ResHandle* pSelf, void* pDst) {
     size -= (u32)pDst - src;
     pData->mDlSize = size;
 
-    fn_8009A2F4((ResHandle*)&copy, 0);
+    res_tev_dc_store((ResHandle*)&copy, 0);
     return (u32)copy.mpData;
 }
 
 /* 0x8009A2F4 - store or invalidate the block's own `mSize` bytes. */
-extern "C" void fn_8009A2F4(ResHandle* pSelf, s32 flag) {
+extern "C" void res_tev_dc_store(ResHandle* pSelf, s32 flag) {
     u32 base = fn_8009A174(pSelf);
     u32 size = *(u32*)fn_8009A174(pSelf);
 
@@ -701,7 +704,7 @@ extern "C" void fn_8009A2F4(ResHandle* pSelf, s32 flag) {
 /* -------------------------------------------------------------------------------------------------- */
 
 /* 0x8009A360 - store or invalidate the block's `mSize` bytes (the second `ref` copy's twin of
- * fn_8009A2F4). */
+ * res_tev_dc_store). */
 extern "C" void fn_8009A360(ResHandle* pSelf, s32 flag) {
     u32 base = (u32)&reinterpret_cast<nw4r::g3d::ResPltt*>(pSelf)->ref();
     u32 size = *(u32*)((u32)&reinterpret_cast<nw4r::g3d::ResPltt*>(pSelf)->ref() + 0x4);

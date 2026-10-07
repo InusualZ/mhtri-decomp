@@ -2,7 +2,12 @@
  * g3d/g3d_resfile.cpp - nw4r g3d `ResFile` container checks/releases and the out-of-line `g3d_resmat_ac.h` accessors.
  * RANGE. .text 0x80093990-0x800947A4 (53 functions); extab, extabindex.  fn_80093990's `CheckRevision()` assert
  *   passes "g3d_resfile.cpp" (lbl_80590BA0); the next body, fn_800947A4, cites "g3d_resmat.cpp".
- * NAMES. Map stems (the dump answers `zz_` placeholders); GXFastCallDisplayList is a GUESS (the inline that
+ * NAMES. res_mat_ind_mtx_copy_to is a GUESS; res_mat_ind_mtx_dc_store is a GUESS; res_mat_pix_copy_to is a GUESS;
+ *   res_mat_pix_dc_store is a GUESS; res_mat_tev_color_copy_to is a GUESS; res_mat_tev_color_dc_store is a GUESS;
+ *   res_mat_tex_coord_gen_copy_to is a GUESS; res_mat_tex_coord_gen_dc_store is a GUESS (the evidence follows).
+ *   Map stems (the dump answers `zz_` placeholders); res_mat_{pix,tev_color,ind_mtx,tex_coord_gen}_dc_store
+ *   and res_mat_{pix,tev_color,ind_mtx,tex_coord_gen}_copy_to are GUESSES (nw4r's DCStore/CopyTo, by the block
+ *   sizes 0x20/0x80/0x40/0xA0 and the ScnMdl buffer refill's per-flag order); GXFastCallDisplayList is a GUESS (the inline that
  *   writes the call-display-list command straight into the GX FIFO).
  * RESIDUALS. none.  The flip links because `tools/elf/objextab.py` gives the object's extab/extabindex entries the
  *   map's `@etb_`/`@eti_` names with global binding (`@eti_800222FC` is referenced from the `.data` blob at
@@ -366,7 +371,7 @@ extern "C" u32 fn_800940D0(ResHandle* pSelf, u32 offset) {
 }
 
 /* 0x8009411C - `ResMatPix` `ref()` plus the 0x20-byte range store. */
-extern "C" void fn_8009411C(ResHandle* pSelf, s32 flag) {
+extern "C" void res_mat_pix_dc_store(ResHandle* pSelf, s32 flag) {
     u32 data = (u32)&reinterpret_cast<nw4r::g3d::ResMatPix*>(pSelf)->ref();
 
     if (flag != 0) {
@@ -395,7 +400,7 @@ extern "C" const char* fn_800941D0(void) {
 }
 
 /* 0x800941DC - `ResMatTevColor` `ref()` plus the 0x80-byte range store. */
-extern "C" void fn_800941DC(ResHandle* pSelf, s32 flag) {
+extern "C" void res_mat_tev_color_dc_store(ResHandle* pSelf, s32 flag) {
     u32 data = (u32)&reinterpret_cast<nw4r::g3d::ResMatTevColor*>(pSelf)->ref();
 
     if (flag != 0) {
@@ -424,7 +429,7 @@ extern "C" const char* fn_80094290(void) {
 }
 
 /* 0x8009429C - `ResMatIndMtxAndScale` `ref()` plus the 0x40-byte range store. */
-extern "C" void fn_8009429C(ResHandle* pSelf, s32 flag) {
+extern "C" void res_mat_ind_mtx_dc_store(ResHandle* pSelf, s32 flag) {
     u32 data = (u32)&reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>(pSelf)->ref();
 
     if (flag != 0) {
@@ -453,7 +458,7 @@ extern "C" const char* fn_80094350(void) {
 }
 
 /* 0x8009435C - `ResMatTexCoordGen` `ref()` plus the 0xA0-byte range store. */
-extern "C" void fn_8009435C(ResHandle* pSelf, s32 flag) {
+extern "C" void res_mat_tex_coord_gen_dc_store(ResHandle* pSelf, s32 flag) {
     u32 data = fn_800943A4(pSelf);
 
     if (flag != 0) {
@@ -564,14 +569,14 @@ extern "C" u32 fn_8009466C(ResHandle* pSelf) {
 }
 
 /* 0x80094674 - copy 0x20 bytes of the `ResMatPix` block and return the 0x20-aligned handle. */
-extern "C" u32 fn_80094674(ResHandle* pSelf, u32 pDst) {
+extern "C" u32 res_mat_pix_copy_to(ResHandle* pSelf, u32 pDst) {
     nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_800944E0(pSelf), 0x20);
 
     return (u32)nw4r::g3d::ResMatPix((void*)pDst).mpData;
 }
 
 /* 0x800946C0 - copy 0x80 bytes of the `ResMatTevColor` block and return the 0x20-aligned handle. */
-extern "C" u32 fn_800946C0(ResHandle* pSelf, u32 pDst) {
+extern "C" u32 res_mat_tev_color_copy_to(ResHandle* pSelf, u32 pDst) {
     nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_80094594(pSelf), 0x80);
 
     return (u32)nw4r::g3d::ResMatTevColor((void*)pDst).mpData;
@@ -579,14 +584,14 @@ extern "C" u32 fn_800946C0(ResHandle* pSelf, u32 pDst) {
 
 /* 0x8009470C - copy 0x40 bytes of the `ResMatIndMtxAndScale` block and return the 0x20-aligned
  * handle. */
-extern "C" u32 fn_8009470C(ResHandle* pSelf, u32 pDst) {
+extern "C" u32 res_mat_ind_mtx_copy_to(ResHandle* pSelf, u32 pDst) {
     nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_80094600(pSelf), 0x40);
 
     return (u32)nw4r::g3d::ResMatIndMtxAndScale((void*)pDst).mpData;
 }
 
 /* 0x80094758 - copy 0xA0 bytes of the `ResMatTexCoordGen` block and return the 0x20-aligned handle. */
-extern "C" u32 fn_80094758(ResHandle* pSelf, u32 pDst) {
+extern "C" u32 res_mat_tex_coord_gen_copy_to(ResHandle* pSelf, u32 pDst) {
     nw4r::g3d::detail::Copy32ByteBlocks((void*)pDst, (void*)fn_8009466C(pSelf), 0xA0);
 
     return (u32)nw4r::g3d::ResMatTexCoordGen((void*)pDst).mpData;

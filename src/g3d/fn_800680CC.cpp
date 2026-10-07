@@ -5,9 +5,11 @@
  * RANGE. .text 0x800680CC-0x8006EAC0 (133 functions); extab, extabindex, .rodata 0x8056F598-0x8056F628, .data
  *   0x8058CC40-0x8058D6C0, .sdata 0x80791188-0x807911A0, .sdata2 0x80795D90-0x80795DA8.  Four TUs by the `__FILE__`
  *   each body cites: fn_800680CC "g3d_anmscn.cpp" (lbl_8058C288), fn_8006946C "g3d_anmshp.cpp" (lbl_8058CC40),
- *   fn_800697D4 "g3d_anmtexpat.cpp" (lbl_8058CD40), fn_80069CF4 onward "g3d_anmtexsrt.cpp" (lbl_8058CE10).  The left
+ *   TestExistence__Q34nw4r3g3d12AnmObjTexPatCFUl "g3d_anmtexpat.cpp" (lbl_8058CD40), fn_80069CF4 onward "g3d_anmtexsrt.cpp" (lbl_8058CE10).  The left
  *   edge is `g3d/g3d_anmscn.cpp`, the right edge `g3d/g3d_anmvis.cpp`.
- * NAMES. The file keeps the map's stem (`g3d_anmscn.cpp` already names `g3d/g3d_anmscn.cpp`); the stems are defined
+ * NAMES. apply_tex_pat_anm_result, apply_tex_srt_anm_result and AnmObjTexPat::TestExistence (0x800697D4, the
+ *   "g3d_anmtexpat.cpp" asserts) are GUESSES (nw4r's ApplyTexPatAnmResult/ApplyTexSrtAnmResult, by the ScnMdl
+ *   material pass that hands each the copied handles and the animation's result).  The file keeps the map's stem (`g3d_anmscn.cpp` already names `g3d/g3d_anmscn.cpp`); the stems are defined
  *   `extern "C"` (playbook 48).  The AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride and AnmObjTexSrtRes
  *   members are nw4r's (the `AnmObjTexSrt::Attach(...)` / `AnmObjTexSrtNode::G3dProc(...)` warnings and the four
  *   vtables); type_obj_set_name_texsrt_res/_node/_override are GUESSES (the store copies in
