@@ -3,9 +3,9 @@
 #define MHTRI_OS_OSALARM_H
 
 #include "types.h"
+#include "OS/OSContext.h"
 
 typedef struct OSAlarm OSAlarm;
-typedef struct OSContext OSContext;
 
 /* The callback an alarm runs when it fires. */
 typedef void (*OSAlarmHandler)(OSAlarm* alarm, OSContext* context);
@@ -35,6 +35,10 @@ void __OSInitAlarm(void);
 void OSSetAlarmUserData(OSAlarm* alarm, void* userData);
 /* untyped: caller-owned payload */
 void* OSGetAlarmUserData(OSAlarm* alarm);
+
+/* 0x804CBC50 - stores `userData` and marks the alarm as OS-owned. */
+/* untyped: caller-owned payload */
+void cPhs_Set(OSAlarm* alarm, void* userData);
 
 /* 0x804CBC60 - cancels every OS-owned alarm whose user data is `userData`. */
 void __OSCancelInternalAlarms(u32 userData);
