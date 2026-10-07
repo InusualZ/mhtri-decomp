@@ -30,6 +30,7 @@
 #include "MSL_C/ctype.h"
 #include "MSL_C/file_io.h"
 #include "MSL_C/printf.h"
+#include "MSL_C/printf_format.h"
 #include "MSL_C/wchar_io.h"
 #include "MSL_C/abort_exit.h"
 #include "MSL_C/mbstring.h"
@@ -50,21 +51,6 @@ typedef struct OutStrCtrl {
     /* +0x04 */ u32 max_char_count;     /* capacity, including the terminator */
     /* +0x08 */ u32 chars_written;      /* characters stored so far */
 } OutStrCtrl; /* size: 0xC */
-
-enum Justification { LEFT_JUSTIFY = 0, RIGHT_JUSTIFY = 1, ZERO_FILL = 2 };
-enum SignOption { SIGN_ONLY_MINUS = 0, SIGN_ALWAYS = 1, SIGN_SPACE = 2 };
-enum ArgumentOption {
-    ARG_NORMAL = 0,
-    ARG_CHAR = 1,
-    ARG_SHORT = 2,
-    ARG_LONG = 3,
-    ARG_LONG_LONG = 4,
-    ARG_WIDE = 5,
-    ARG_INTMAX = 6,
-    ARG_SIZE_T = 7,
-    ARG_PTRDIFF_T = 8,
-    ARG_LONG_DOUBLE = 9
-};
 
 /* One parsed conversion specification. */
 typedef struct print_format {

@@ -30,6 +30,30 @@ typedef struct decform {
 extern "C" {
 #endif
 
+/* 0x804592B8 (0xDC): writes the decimal digits of an unsigned 64-bit integer. */
+void __ull2dec(decimal* result, u64 val);
+
+/* 0x80459394 (0x288): multiplies two decimals. */
+void __timesdec(decimal* result, const decimal* x, const decimal* y);
+
+/* 0x8045961C (0xEC): builds a decimal from a digit string and an exponent. */
+void __str2dec(decimal* d, const char* s, s16 exp);
+
+/* 0x80459708 (0x31C): builds 2^exp as a decimal. */
+void __two_exp(decimal* result, s32 exp);
+
+/* 0x80459A24 (0xE4): nonzero when two decimals are equal. */
+int __equals_dec(const decimal* x, const decimal* y);
+
+/* 0x80459B08 (0x100): nonzero when `x` is less than `y`. */
+int __less_dec(const decimal* x, const decimal* y);
+
+/* 0x80459C08 (0x4DC): subtracts `y` from `x`. */
+void __minus_dec(decimal* result, const decimal* x, const decimal* y);
+
+/* 0x8045A0E4 (0x164): converts a double to exact decimal digits. */
+void __num2dec_internal(decimal* result, f64 x);
+
 /* 0x8045A248 (0x1A4): converts `x` to its decimal digits under `form`. */
 void __num2dec(const decform* form, f64 x, decimal* d);
 

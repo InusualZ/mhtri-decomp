@@ -32,6 +32,9 @@ f64 pow(f64 x, f64 y);
 /* 0x80467F7C - the square root of `x` (Newton iteration), with `errno` set for negative input. */
 f64 __ieee754_sqrt(f64 x);
 
+/* 0x804681C4 - the quiet NaN selected by the tag string (the body is a bare return). */
+f64 nan(const char* tag);
+
 /* 0x804681C8 - the square root of `x`. */
 f64 sqrt(f64 x);
 
