@@ -29,7 +29,7 @@
  */
 #include "SSL/ssl.h"
 #include "NAND/nand.h"
-#include "RVLGX/GXTexture_tail.h"
+#include "IPC/ipcclt.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/OS.h"

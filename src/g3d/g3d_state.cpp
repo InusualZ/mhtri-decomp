@@ -123,17 +123,18 @@
 #include "gx/GDSetIndTexMtx.h"  /* GDSetIndTexMtx, GDResetCurrentMtx (rule 2) */
 #include "draw_shape/mtx34_copy.h" /* mtx34_copy (rule 2) */
 #include "g3d/g3d_gpu.h"         /* GDSetCurrentMtx, GDLoadTexMtxImm3x3, Array8, Mat33 (rule 2) */
-#include "EXI/ProbeBarnacle.h"   /* GXSetArray (rule 2) */
+#include "RVLGX/GXAttr.h"
+#include "RVLGX/GXLight.h"
 #include "g3d/g3d_calcview.h"    /* mtx34_concat (rule 2) */
 #include "mh3_pad.h"             /* setVec3 (rule 2) */
 #include "nw4r/fn_805012C4.h"    /* nw4r::math::MTX34Zero (rule 2) */
 #include "font/gx_tex_obj_copy.h" /* gx_tex_obj_copy (rule 2) */
-#include "RVLGX/GXGetTexObjWidth.h" /* GXGetTexObjWidth, GXGetTexObjHeight (rule 2) */
+#include "RVLGX/GXTexture.h"
 #include "MTX/PSMTXInverse.h"     /* PSMTXInverse (rule 2) */
 
 #pragma peephole off
 #pragma pool_data off
-#include "RVLGX/GXSetTevOrder.h" /* GXLoadTlut, GXSetZCompLoc (rule 2) */
+#include "RVLGX/GXSetZCompLoc.h"
 
 /* ------------------------------------------------------------------------------------------------ */
 /* externs: the SDK and the neighbouring units this one calls (the map owns their names)             */

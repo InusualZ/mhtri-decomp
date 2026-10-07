@@ -32,7 +32,7 @@
 #include "OS/__OSGetSystemTime.h"
 #include "NCD/ncdsystem.h"
 #include "NWC24/nwc24_msg.h"
-#include "RVLGX/GXTexture_tail.h"
+#include "IPC/ipcclt.h"
 #include "unsplit/OS.h"
 #include "MSL/strlen.h"
 #include "MSL_C/alloc.h"

@@ -61,8 +61,9 @@
 #include "sys_mem.h"
 #include "mh3_pad.h"                   /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "ef/ef_particle.h"            /* ef_particle_get_scale / ef_particle_get_scale_y (rule 2) */
-#include "RVLGX/GXSetTevOrder.h"       /* GXLoadPosMtxImm (rule 2) */
-#include "EXI/GXBegin.h"               /* the GX vertex-format entry points (rule 2) */
+#include "RVLGX/GXTransform.h"
+#include "RVLGX/GXAttr.h"
+#include "RVLGX/GXGeometry.h"
 #include "g3d/g3d_calcview.h"          /* mtx34_concat (rule 2) */
 #include "nw4r/fn_805012C4.h"          /* mtx34_rotate_vec3 (rule 2) */
 #include "fn_8004CAD8.h"               /* MTX34_ctor, vec3_cross, addVec3, subVec3 (rule 2) */

@@ -15,7 +15,7 @@
 
 #include "types.h"
 #include "g3d/g3d_resvtx.h"
-#include "EXI/ProbeBarnacle.h"
+#include "RVLGX/GXAttr.h"
 #include "g3d/g3d_cpu.h"
 #include "unsplit/OS.h"
 

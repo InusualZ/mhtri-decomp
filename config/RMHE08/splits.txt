@@ -2628,14 +2628,95 @@ OS/PPCArch.c:
 	.data       start:0x80612CE0 end:0x80612D18
 
 BTE/gki_buffer.cpp:
-	.text       start:0x804772F0 end:0x804AFED0
-	.rodata     start:0x80573530 end:0x80573A00
-	.data       start:0x80612D18 end:0x8061A4F0
-	.bss        start:0x8070CDE0 end:0x80746B60
-	.sdata      start:0x80793D28 end:0x80793E30
-	.sbss       start:0x80795008 end:0x80795198
-	.sdata2     start:0x8079D080 end:0x8079D0F0
+	.text       start:0x804772F0 end:0x804A4AC0
+	.rodata     start:0x80573530 end:0x805739A8
+	.data       start:0x80612D18 end:0x806184E0
+	.bss        start:0x8070CDE0 end:0x80741998
+	.sdata      start:0x80793D28 end:0x80793DC8
+	.sbss       start:0x80795008 end:0x80795040
+	.sdata2     start:0x8079D080 end:0x8079D0D8
 	.sbss2      start:0x8079D7E0 end:0x8079D7F0
+
+DB/db.c:
+	.text       start:0x804A4AC0 end:0x804A4BC0
+	.data       start:0x806184E0 end:0x806184F8
+	.sbss       start:0x80795040 end:0x80795048
+
+mh3_pad/rc_record.c:
+	.text       start:0x804A4BC0 end:0x804A4F20
+	.data       start:0x806184F8 end:0x80618508
+	.bss        start:0x80741998 end:0x80741A40
+	.sbss       start:0x80795048 end:0x80795050
+
+DSP/dsp.c:
+	.text       start:0x804A4F20 end:0x804A5AB0
+	.data       start:0x80618508 end:0x806186C8
+	.sdata      start:0x80793DC8 end:0x80793DD0
+	.sbss       start:0x80795050 end:0x80795070
+
+DVD/dvdfs.c:
+	.text       start:0x804A5AB0 end:0x804A6410
+	.data       start:0x806186C8 end:0x80618800
+	.sdata      start:0x80793DD0 end:0x80793DE0
+	.sbss       start:0x80795070 end:0x807950A0
+
+DVD/dvd.c:
+	.text       start:0x804A6410 end:0x804AB040
+	.data       start:0x80618800 end:0x80618C10
+	.bss        start:0x80741A40 end:0x807466F0
+	.sdata      start:0x80793DE0 end:0x80793DF8
+	.sbss       start:0x807950A0 end:0x80795138
+
+DVD/dvdqueue.c:
+	.text       start:0x804AB040 end:0x804AB2C0
+	.bss        start:0x807466F0 end:0x80746720
+
+DVD/dvderror.c:
+	.text       start:0x804AB2C0 end:0x804ABCE0
+	.data       start:0x80618C10 end:0x80618C40
+	.bss        start:0x80746720 end:0x80746980
+	.sbss       start:0x80795138 end:0x80795148
+
+DVD/dvdidutils.c:
+	.text       start:0x804ABCE0 end:0x804ABDD0
+
+DVD/dvdFatal.c:
+	.text       start:0x804ABDD0 end:0x804ABF40
+	.rodata     start:0x805739A8 end:0x805739E0
+	.data       start:0x80618C40 end:0x806195A0
+	.sdata      start:0x80793DF8 end:0x80793E00
+	.sbss       start:0x80795148 end:0x80795150
+	.sdata2     start:0x8079D0D8 end:0x8079D0E0
+
+DVD/dvddevice.c:
+	.text       start:0x804ABF40 end:0x804AC1D0
+	.rodata     start:0x805739E0 end:0x80573A00
+	.bss        start:0x80746980 end:0x807469A0
+	.sdata      start:0x80793E00 end:0x80793E08
+	.sbss       start:0x80795150 end:0x80795158
+	.sdata2     start:0x8079D0E0 end:0x8079D0E8
+
+DVD/dvd_broadway.c:
+	.text       start:0x804AC1D0 end:0x804AE880
+	.data       start:0x806195A0 end:0x8061A4A8
+	.bss        start:0x807469A0 end:0x80746B60
+	.sdata      start:0x80793E08 end:0x80793E18
+	.sbss       start:0x80795158 end:0x80795180
+
+ENC/enc.c:
+	.text       start:0x804AE880 end:0x804AF420
+	.data       start:0x8061A4A8 end:0x8061A4F0
+	.sdata      start:0x80793E18 end:0x80793E20
+	.sbss       start:0x80795180 end:0x80795188
+
+ESP/esp.c:
+	.text       start:0x804AF420 end:0x804AFB50
+	.sdata      start:0x80793E20 end:0x80793E30
+
+EUART/EUART.c:
+	.text       start:0x804AFB50 end:0x804AFED0
+	.sbss       start:0x80795188 end:0x80795198
+	.sdata2     start:0x8079D0E8 end:0x8079D0F0
 
 EXI/EXIBios.c:
 	.text       start:0x804AFED0 end:0x804B17D0
@@ -2645,20 +2726,103 @@ EXI/EXIBios.c:
 	.sbss       start:0x80795198 end:0x8079519C
 
 EXI/ProbeBarnacle.c:
-	.text       start:0x804B17D0 end:0x804B8020
-	.data       start:0x8061A538 end:0x8061ABE4
-	.bss        start:0x80746C20 end:0x80747300
-	.sdata      start:0x80793E38 end:0x80793E60
-	.sbss       start:0x807951A0 end:0x80795228
-	.sdata2     start:0x8079D0F0 end:0x8079D160
+	.text       start:0x804B17D0 end:0x804B1CA0
+	.sbss       start:0x807951A0 end:0x807951B0
 
-RVLGX/GXTexture_tail.cpp:
-	.text       start:0x804B8020 end:0x804C1760
-	.data       start:0x8061ABE4 end:0x8061AE00
-	.bss        start:0x80747300 end:0x80748B90
-	.sdata      start:0x80793E60 end:0x80793F00
-	.sbss       start:0x80795228 end:0x80795298
-	.sdata2     start:0x8079D160 end:0x8079D270
+FS/fs.c:
+	.text       start:0x804B1CA0 end:0x804B32D0
+	.data       start:0x8061A538 end:0x8061A560
+	.sdata      start:0x80793E38 end:0x80793E48
+	.sbss       start:0x807951B0 end:0x807951C8
+
+RVLGX/GXInit.c:
+	.text       start:0x804B32D0 end:0x804B4460
+	.data       start:0x8061A560 end:0x8061A7A0
+	.bss        start:0x80746C20 end:0x807472A0
+	.sdata      start:0x80793E48 end:0x80793E50
+	.sbss       start:0x807951C8 end:0x807951F0
+	.sdata2     start:0x8079D0F0 end:0x8079D118
+
+RVLGX/GXFifo.c:
+	.text       start:0x804B4460 end:0x804B4E40
+	.data       start:0x8061A7A0 end:0x8061A7D0
+	.bss        start:0x807472A0 end:0x80747300
+	.sbss       start:0x807951F0 end:0x80795210
+
+RVLGX/GXAttr.c:
+	.text       start:0x804B4E40 end:0x804B5DB0
+	.data       start:0x8061A7D0 end:0x8061A9C0
+	.sdata      start:0x80793E50 end:0x80793E60
+
+RVLGX/GXMisc.c:
+	.text       start:0x804B5DB0 end:0x804B65F0
+	.sbss       start:0x80795210 end:0x80795228
+
+RVLGX/GXGeometry.c:
+	.text       start:0x804B65F0 end:0x804B6C00
+
+RVLGX/GXFrameBuf.c:
+	.text       start:0x804B6C00 end:0x804B77E0
+	.data       start:0x8061A9C0 end:0x8061AAF0
+	.sdata2     start:0x8079D118 end:0x8079D128
+
+RVLGX/GXLight.c:
+	.text       start:0x804B77E0 end:0x804B7F60
+	.sdata2     start:0x8079D128 end:0x8079D160
+
+RVLGX/GXTexture.c:
+	.text       start:0x804B7F60 end:0x804B8F00
+	.data       start:0x8061AAF0 end:0x8061AC20
+	.sdata      start:0x80793E60 end:0x80793EA8
+	.sdata2     start:0x8079D160 end:0x8079D198
+
+RVLGX/GXBump.c:
+	.text       start:0x804B8F00 end:0x804B9360
+	.sdata2     start:0x8079D198 end:0x8079D1A0
+
+RVLGX/GXTev.c:
+	.text       start:0x804B9360 end:0x804B9A30
+	.data       start:0x8061AC20 end:0x8061AC98
+
+RVLGX/GXPixel.c:
+	.text       start:0x804B9A30 end:0x804BA230
+	.data       start:0x8061AC98 end:0x8061ACB8
+	.sdata2     start:0x8079D1A0 end:0x8079D1F0
+
+RVLGX/GXTransform.c:
+	.text       start:0x804BA230 end:0x804BA9F0
+	.sdata2     start:0x8079D1F0 end:0x8079D200
+
+RVLGX/GXPerf.c:
+	.text       start:0x804BA9F0 end:0x804BB220
+	.data       start:0x8061ACB8 end:0x8061ADA0
+
+IPC/ipcMain.c:
+	.text       start:0x804BB220 end:0x804BB310
+	.sbss       start:0x80795228 end:0x80795240
+
+IPC/ipcclt.c:
+	.text       start:0x804BB310 end:0x804BD070
+	.bss        start:0x80747300 end:0x807473C0
+	.sdata      start:0x80793EA8 end:0x80793EB0
+	.sbss       start:0x80795240 end:0x80795258
+
+IPC/memory.c:
+	.text       start:0x804BD070 end:0x804BD5A0
+	.bss        start:0x807473C0 end:0x80747440
+
+IPC/ipcProfile.c:
+	.text       start:0x804BD5A0 end:0x804BD780
+	.bss        start:0x80747440 end:0x80747540
+	.sbss       start:0x80795258 end:0x80795260
+
+KPAD/kpad.c:
+	.text       start:0x804BD780 end:0x804C1760
+	.data       start:0x8061ADA0 end:0x8061AE00
+	.bss        start:0x80747540 end:0x80748B90
+	.sdata      start:0x80793EB0 end:0x80793F00
+	.sbss       start:0x80795260 end:0x80795298
+	.sdata2     start:0x8079D200 end:0x8079D270
 
 MEM/mem_heap.c:
 	.text       start:0x804C1760 end:0x804C1BD0

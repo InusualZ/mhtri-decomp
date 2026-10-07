@@ -37,7 +37,8 @@
 
 #include "NCD/ncdsystem.h"
 #include "NAND/nand.h"
-#include "RVLGX/GXTexture_tail.h"
+#include "IPC/ipcMain.h"
+#include "IPC/ipcclt.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/OS.h"

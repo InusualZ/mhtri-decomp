@@ -16,13 +16,14 @@
  * Status: the small table helpers and the FIFO writers have bodies; the rest of the range (87 functions) is not decompiled.
  * NAMES. GUESS: `userdata_pouch_size`, `userdata_pouch_get`, `item_slots_free_count`
  *   GUESS (from each body and its callers): userdata_opening_seen_set, userdata_item_count_total
+ * RESIDUALS. flipcheck: `.data` 0x15C and `.sdata2` 0x18 are claimed and the object emits neither (the data its unwritten bodies read).
  */
 
 #include "types.h"
 #include "id_value.h"
 #include "gx.h"
 
-#include "EXI/GXSetTexCoordGen2.h" /* the SDK function the pipe helper tail-calls (rule 2) */
+#include "RVLGX/GXAttr.h"
 
 /* --- the GX pipe writers (second family) and the small table helpers ----------------------------------- */
 

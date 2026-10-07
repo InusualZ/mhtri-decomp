@@ -36,7 +36,7 @@
 #include "types.h"
 #include "gx.h"
 #include "Runtime.PPCEABI.H/memset.h" /* owned by Runtime.PPCEABI.H/memset.c (rule 2) */
-#include "EXI/GXSetTexCoordGen2.h" /* the SDK function the pipe helpers tail-call (rule 2) */
+#include "RVLGX/GXAttr.h"
 
 /* --- the unit's own work block, `face_work` (.bss 0x806694E8, 0x4D0 B) ------------------------ */
 

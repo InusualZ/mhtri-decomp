@@ -15,7 +15,7 @@
  *   GetIndirectMethod calls `ptr() const` where retail calls the non-const copy; ResMatTevColor::CallDisplayList
  *   and the three ResMatIndMtxAndScale matrix accessors reach `ref()` through a different copy than retail;
  *   ResTexPlttInfo::Bind copy-constructs the names and the found handles inline (retail calls fn_80062D58,
- *   fn_80069C14 and fn_80069BD8).
+ *   fn_80069C14 and fn_80069BD8; `res_name_copy_ctor` is the retail call at +0x38 and +0x120 that ours omits).
  *   flipcheck: `.data` 0x4A8 of 0x508 and `.sdata2` 0x2C of 0x38 (the accessor copies' strings and pool sit
  *   elsewhere), `.sdata` 0x4 emitted and not claimed.
  * SHAPES. every accessor copy another unit keeps is called through its class (g3d/g3d_rescommon.h); the copies
@@ -40,7 +40,9 @@
 #include "g3d/fn_80075DCC.h"
 #include "fn_8004CAD8.h"
 #include "fn_80047398.h"
-#include "RVLGX/GXTexture_tail.h"
+#include "RVLGX/GXPixel.h"
+#include "RVLGX/GXTev.h"
+#include "RVLGX/GXTexture.h"
 
 #pragma peephole off
 

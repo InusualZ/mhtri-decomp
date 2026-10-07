@@ -80,7 +80,8 @@
 #include "g3d/g3d_anmchr.h"           /* math_reciprocal (rule 2) */
 #include "nw4r/mtx34_mult_vec3.h"     /* mtx34_mult_vec3 (rule 2) */
 #include "fn_8004CAD8.h"              /* sqrt_f32 / PSVECSubtract (rule 2) */
-#include "EXI/GXBegin.h"              /* GXBegin (rule 2) */
+#include "RVLGX/GXAttr.h"
+#include "RVLGX/GXGeometry.h"
 #include "ef/ef_get_life_status.h"     /* ef_get_life_status (rule 2) */
 #include "ef/ef_particle_get_move_dir.h" /* ef_particle_get_move_dir (rule 2) */
 #include "nw4r/fn_805012C4.h"         /* mtx34_rotate_vec3 (rule 2) */
