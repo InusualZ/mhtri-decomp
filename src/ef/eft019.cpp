@@ -73,12 +73,12 @@ void fn_80114C6C(void* actor, u8 key, s32 joint);
 void fn_80114CC8(void* actor, u8 key);
 void fn_80114D28(void* actor, u8 kind, u8 type, f32 scale);
 
-/* Callees other units own, declared locally (a rule-2 residual): `vec3_normalize_into`/`fn_800513F0` are
+/* Callees other units own, declared locally (a rule-2 residual): `vec3_normalize_into`/`vec3_scale_in_place` are
  * `fn_8004CAD8.cpp`'s, `fn_8005696C`/`fn_80056A20` `draw_shape_arm.cpp`'s, `eft_res_slot_get`/`eft_res_slot_release`
  * `ef/eft_res.cpp`'s, `fn_80306D6C` `ef/fn_8030681C.cpp`'s, `fn_80331210` `hud/pl_frame_sync.cpp`'s and
  * `fn_800E0A14` `sound/mhchar.cpp`'s. */
 void vec3_normalize_into(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
-void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
+void vec3_scale_in_place(nw4r::math::VEC3* v, f32 angle);
 void fn_8005696C(s32 id, s32 kind, s32 mode, s32* color, s32 timer, f32 x, f32 y);
 void fn_80056A20(f32 a, f32 b);
 _EFT* eft_res_slot_get(u32 pool);
@@ -277,7 +277,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         d0 = get_camera_direction();
         copyVec3(&v, &d0);
         vec3_normalize_into(&v, &v);
-        fn_800513F0(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969DC, lbl_807969DC);
         return;
@@ -287,7 +287,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         d1 = get_camera_direction();
         copyVec3(&v, &d1);
         vec3_normalize_into(&v, &v);
-        fn_800513F0(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969E0, lbl_807969E0);
         work = (_EFT019_WORK*)effect->work_0x38;
@@ -300,7 +300,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         d2 = get_camera_direction();
         copyVec3(&v, &d2);
         vec3_normalize_into(&v, &v);
-        fn_800513F0(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969E4, lbl_807969E4);
         work = (_EFT019_WORK*)effect->work_0x38;
@@ -312,7 +312,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         d3 = get_camera_direction();
         copyVec3(&v, &d3);
         vec3_normalize_into(&v, &v);
-        fn_800513F0(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 13, lbl_807969DC, lbl_807969DC);
         return;
@@ -321,7 +321,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         d4 = get_camera_direction();
         copyVec3(&v, &d4);
         vec3_normalize_into(&v, &v);
-        fn_800513F0(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 13, lbl_807969E0, lbl_807969E0);
         return;
@@ -330,7 +330,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         d5 = get_camera_direction();
         copyVec3(&v, &d5);
         vec3_normalize_into(&v, &v);
-        fn_800513F0(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 13, lbl_807969EC, lbl_807969EC);
         return;
@@ -348,7 +348,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         d6 = get_camera_direction();
         copyVec3(&v, &d6);
         vec3_normalize_into(&v, &v);
-        fn_800513F0(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969E8, lbl_807969E8);
         work = (_EFT019_WORK*)effect->work_0x38;
@@ -361,7 +361,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         d7 = get_camera_direction();
         copyVec3(&v, &d7);
         vec3_normalize_into(&v, &v);
-        fn_800513F0(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 13, lbl_807969E8, lbl_807969E8);
         work = (_EFT019_WORK*)effect->work_0x38;
@@ -373,7 +373,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         d8 = get_camera_direction();
         copyVec3(&v, &d8);
         vec3_normalize_into(&v, &v);
-        fn_800513F0(&v, lbl_807969D8);
+        vec3_scale_in_place(&v, lbl_807969D8);
         addVec3To(pos, &v);
         eft019_set_core(pos, area, 58, lbl_807969F8, lbl_807969F8);
         break;
@@ -530,7 +530,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
             dir = get_camera_direction();
             copyVec3(&v, &dir);
             vec3_normalize_into(&v, &v);
-            fn_800513F0(&v, lbl_807969D8);
+            vec3_scale_in_place(&v, lbl_807969D8);
             addVec3To(pos, &v);
             eft019_set_core(pos, area, 12, lbl_807969DC, lbl_807969DC);
             break;
@@ -539,7 +539,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
             dir = get_camera_direction();
             copyVec3(&v, &dir);
             vec3_normalize_into(&v, &v);
-            fn_800513F0(&v, lbl_807969D8);
+            vec3_scale_in_place(&v, lbl_807969D8);
             addVec3To(pos, &v);
             eft019_set_core(pos, area, 12, lbl_807969E0, lbl_807969E0);
             work->scale_b_0x48 = lbl_807969DC;
@@ -550,7 +550,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
             dir = get_camera_direction();
             copyVec3(&v, &dir);
             vec3_normalize_into(&v, &v);
-            fn_800513F0(&v, lbl_807969D8);
+            vec3_scale_in_place(&v, lbl_807969D8);
             addVec3To(pos, &v);
             eft019_set_core(pos, area, 12, lbl_807969E4, lbl_807969E4);
             work->scale_b_0x48 = lbl_807969E8;
@@ -1074,7 +1074,7 @@ void fn_80112D58(_EFT* self)
         cam = get_camera_direction();
         copyVec3(&dir, &cam);
         vec3_normalize_into(&dir, &dir);
-        fn_800513F0(&dir, lbl_807969D8);
+        vec3_scale_in_place(&dir, lbl_807969D8);
         for (i = 1; i < work->count; i++) {
             fn_800F975C(work->effects[i], &dir);
         }

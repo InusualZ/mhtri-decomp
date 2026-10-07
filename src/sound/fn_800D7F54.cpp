@@ -56,7 +56,9 @@
  *   flipcheck: force-active in retail .comment, not in ours: `fn_800DB684`.
  *   GUESS (from each body and its callers): se_work_init, se_frame_step, se_handle_clear
  *   GUESS (from each body and its callers): sysSE_bank32_req, se_ch2_req
- *   GUESS (from each body and its callers): se_req_pos_id72, se_req_pos_id73
+ *   GUESS (from each body and its callers): se_req_pos_id72, se_req_pos_id73, se_req_pos_id53, se_req_pos_id74
+ *   GUESS (from each body): se_req_pos_id228, se_req_pos_id250, se_req_pos_id63, se_req_pos_id54, se_req_pos_id84
+ *   GUESS (from each body): se_req_pos_id83, se_req_pos_id49
  * NAMES. GUESS: `sysSE_bank32_req`, `sysSE_bank20_req`, `sysSE_bank24_req`, `se_talk_point_set`
  */
 #pragma optimization_level 4
@@ -225,7 +227,7 @@ extern "C" void fn_800DAA4C(nw4r::math::VEC3* pos) {
     fn_800DA72C(0, id, pos);
 }
 
-extern "C" void fn_800DAA94(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id54(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 54 : 154;
     fn_800DA72C(0, id, pos);
 }
@@ -249,9 +251,9 @@ extern "C" void fn_800DAE38(nw4r::math::VEC3* pos) { fn_800DA72C(0, 186, pos); }
 
 extern "C" void fn_800DB4BC(nw4r::math::VEC3* pos) { fn_800DA72C(0, 27, pos); }
 
-extern "C" void fn_800DB4CC(nw4r::math::VEC3* pos) { fn_800DA72C(0, 228, pos); }
+extern "C" void se_req_pos_id228(nw4r::math::VEC3* pos) { fn_800DA72C(0, 228, pos); }
 
-extern "C" void fn_800DB4DC(nw4r::math::VEC3* pos) { fn_800DA72C(0, 250, pos); }
+extern "C" void se_req_pos_id250(nw4r::math::VEC3* pos) { fn_800DA72C(0, 250, pos); }
 
 extern "C" void fn_800DB684(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 174 : 74;
@@ -268,7 +270,7 @@ extern "C" void fn_800DB714(nw4r::math::VEC3* pos) {
     fn_800DA72C(0, id, pos);
 }
 
-extern "C" void fn_800DB91C(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id84(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 84 : 184;
     fn_800DA72C(0, id, pos);
 }
@@ -287,9 +289,9 @@ extern "C" void fn_800DC098(nw4r::math::VEC3* pos) { fn_800DBE94(0, 23, pos); }
 
 extern "C" void fn_800DC338(nw4r::math::VEC3* pos) { fn_800DA72C(0, 101, pos); }
 
-extern "C" void fn_800DC3F4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 63, pos); }
+extern "C" void se_req_pos_id63(nw4r::math::VEC3* pos) { fn_800DA72C(0, 63, pos); }
 
-extern "C" void fn_800DC404(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id53(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 53 : 153;
     fn_800DA72C(0, id, pos);
 }
@@ -311,7 +313,7 @@ extern "C" void se_req_pos_id73(nw4r::math::VEC3* pos) { fn_800DA72C(0, 73, pos)
 
 extern "C" void fn_800DC4E4(nw4r::math::VEC3* pos) { fn_800DA72C(0, 46, pos); }
 
-extern "C" void fn_800DC4F4(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id74(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 0) ? 74 : 174;
     fn_800DA72C(0, id, pos);
 }
@@ -330,7 +332,7 @@ void kemuri_hit_se_req(nw4r::math::VEC3* pos) { fn_800DA72C(0, 48, pos); }
 
 void koyasi_hit_se_req(nw4r::math::VEC3* pos) { fn_800DA72C(0, 126, pos); }
 
-extern "C" void fn_800DC7F0(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id49(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 149 : 49;
     fn_800DA72C(0, id, pos);
 }
@@ -353,7 +355,7 @@ extern "C" void fn_800DCA08(nw4r::math::VEC3* pos) {
     fn_800DA72C(0, id, pos);
 }
 
-extern "C" void fn_800DCA50(nw4r::math::VEC3* pos) {
+extern "C" void se_req_pos_id83(nw4r::math::VEC3* pos) {
     u32 id = (fn_800D8D8C(pos) == 1) ? 183 : 83;
     fn_800DA72C(0, id, pos);
 }

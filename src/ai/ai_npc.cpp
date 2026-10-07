@@ -13,7 +13,8 @@
  *   `get_joint_wpos_ai__FP8_AINPC_WUlPQ34nw4r4math4VEC3`); no `__FILE__` string covers the range and the runtime dump
  *   answers `zz_` for the `fn_` rows.  `ainpc_entry_tbl`/`ainpc_page_state` (`hud/cockpit.cpp`'s `.bss`, typed here
  *   as `AinpcEntry`/`AinpcPageState`) are GUESSes from their users; `ai_npc_hold_item_arm`, `ai_npc_hold_ck` and
- *   `ai_npc_arrived_ck` are GUESSes from their bodies (the dump has only `zz_` names).
+ *   `ai_npc_arrived_ck` are GUESSes from their bodies (the dump has only `zz_` names); `ai_npc_motion_step_ck` is a GUESS
+ *   (it matches the NPC motion byte at +0x171 and step half-word at +0x172 against a pair).
  * RESIDUALS. 153 rows unwritten (objdiff scores them zero): 0x802C2700-0x802C2F08, 0x802C2F2C-0x802C474C,
  *   0x802C6908-0x802C6BE0, 0x802C75F4-0x802CCD90, 0x802CCE18-0x802CD20C, 0x802CD348-0x802CD588,
  *   0x802CD770-0x802CDAB8, 0x802CDB10-0x802CDDC4, 0x802CE698-0x802CF390, 0x802CF588-0x802CF704,
@@ -306,7 +307,7 @@ void fn_800DCCF8(void* state, nw4r::math::VEC3* pos, s32 enable);
 s32 fn_802D77A0(u8 value);
 void fn_802D9544(void);
 s32 fn_802D77DC(u8 slot);
-s32 fn_802D2B38(struct _AINPC_W* self, s32 a, s32 b);
+s32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 a, s32 b);
 s32 fn_802D66B8(struct _AINPC_W* self);
 void fn_802D84D0(struct _AINPC_W* self, s16 value);
 }
@@ -2882,7 +2883,7 @@ void fn_802D15DC(struct _AINPC_W* self)
         self->field_0x3C8 = 0;
         return;
     }
-    if (fn_802D2B38(self, 2, 9) == 1 || fn_802D2B38(self, 2, 0x13) == 1) {
+    if (ai_npc_motion_step_ck(self, 2, 9) == 1 || ai_npc_motion_step_ck(self, 2, 0x13) == 1) {
         blocked = 1;
     }
     if (fn_802D7B24(self) == 1) {
@@ -2918,7 +2919,7 @@ void fn_802D1710(struct _AINPC_W* self)
                     fn_802D2A00(self, 6, 0, 0);
                 }
             } else if (self->variant == 2) {
-                if (fn_802D2B38(self, 2, 0x0D) != 1) {
+                if (ai_npc_motion_step_ck(self, 2, 0x0D) != 1) {
                     fn_802D2A00(self, 2, 0x0D, 0);
                     fn_802D29F8(self, 0);
                     fn_802D4200(self);
@@ -3545,7 +3546,7 @@ void fn_802D2AD4(struct _AINPC_W* self, u8 variant)
 }
 
 /* 0x802D2B38 - whether the record is already on the given motion and sub-step. */
-s32 fn_802D2B38(struct _AINPC_W* self, s32 motion, s32 step)
+s32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 motion, s32 step)
 {
     if (self->motion == (u8)motion && self->motion_step == (u16)step) {
         return 1;
@@ -5016,7 +5017,7 @@ s32 ai_npc_arrived_ck(struct _AINPC_W* self)
     if (self->active == 0) {
         return 0;
     }
-    return fn_802D2B38(self, 5, 3) == 1;
+    return ai_npc_motion_step_ck(self, 5, 3) == 1;
 }
 
 /* 0x802D7E68 - the same arrival test for the other motion slot. */
@@ -5025,7 +5026,7 @@ s32 fn_802D7E68(struct _AINPC_W* self)
     if (self->active == 0) {
         return 0;
     }
-    return fn_802D2B38(self, 5, 2) == 1;
+    return ai_npc_motion_step_ck(self, 5, 2) == 1;
 }
 
 /* 0x802D7F10 - whether the id is one of the three slots of the list. */

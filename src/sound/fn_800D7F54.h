@@ -55,6 +55,20 @@ void fn_800DC4B4(Vec3* pos);
 /* 0x800DC4C4 / 0x800DC4D4 - the position-seated SE requests of ids 72 and 73 (the eft013 charge start and end). */
 void se_req_pos_id72(nw4r::math::VEC3* pos);
 void se_req_pos_id73(nw4r::math::VEC3* pos);
+/* 0x800DC404 / 0x800DC4F4 - the position-seated SE requests of ids 53 and 74 (each takes the `+100` variant
+ * when the position test holds; the eft013 model effects' start sound). */
+void se_req_pos_id53(nw4r::math::VEC3* pos);
+void se_req_pos_id74(nw4r::math::VEC3* pos);
+/* 0x800DB4CC / 0x800DB4DC / 0x800DC3F4 - the position-seated SE requests of ids 228, 250 and 63;
+ * 0x800DAA94 / 0x800DB91C / 0x800DCA50 / 0x800DC7F0 - those of ids 54, 84, 83 and 49, each with its `+100` variant
+ * when the position test holds (the eft013 effects' start sounds). */
+void se_req_pos_id228(nw4r::math::VEC3* pos);
+void se_req_pos_id250(nw4r::math::VEC3* pos);
+void se_req_pos_id63(nw4r::math::VEC3* pos);
+void se_req_pos_id54(nw4r::math::VEC3* pos);
+void se_req_pos_id84(nw4r::math::VEC3* pos);
+void se_req_pos_id83(nw4r::math::VEC3* pos);
+void se_req_pos_id49(nw4r::math::VEC3* pos);
 /* 0x800DA428 - the player's frame-set request; the owner defines it `extern "C"`.  Added with
  * `Pl/fn_80229ECC.cpp`, which calls it once per motion. */
 void fn_800DA428(struct _se_w* work, s32 a, u32 param, s32 d, s32 e);

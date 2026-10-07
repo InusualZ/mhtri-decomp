@@ -157,7 +157,7 @@ void scaleMat34W(nw4r::math::MTX34* mtx, nw4r::math::VEC3* v);
 /* The unmangled `fn_XXXXXXXX` callees: inside a linkage block they need no per-declaration spelling. */
 extern "C" {
 void mtx34_identity(nw4r::math::MTX34* mtx);
-void fn_800513F0(nw4r::math::VEC3* v, f32 s);
+void vec3_scale_in_place(nw4r::math::VEC3* v, f32 s);
 void mtx34_copy(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void mtx34_copy_ps(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void mtx34_concat(nw4r::math::MTX34* a, nw4r::math::MTX34* b, nw4r::math::MTX34* m);
@@ -174,10 +174,10 @@ void eft_res_slot_release(void* self);
 void* eft_res_model_get();
 void fn_800F8A44(void* p, s32 mode);
 u32 eft_res_models_spawn(void* self, void* list, s32 a, s32 b, void* c);
-u32 fn_800F9D80(void* self);
+u32 eft_water_state_ck(void* self);
 void mtx34_set_trans(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
 void fn_8026A394(_PLW* plw, s32 id, nw4r::math::MTX34* mtx);
-u32 fn_802D2B38(_ENEMY_WORK* enemy, u8 a, u16 b);
+u32 ai_npc_motion_step_ck(_ENEMY_WORK* enemy, u8 a, u16 b);
 void fn_802D2B68(_ENEMY_WORK* enemy, u32 id, nw4r::math::MTX34* mtx);
 void fn_8010D29C(void* self);
 void fn_8010D2AC(void* self);
@@ -496,7 +496,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
         break;
     case 2:
         if (em->active != 0 &&
-            fn_802D2B38((_ENEMY_WORK*)self->source_0x30, work->field_0x49, work->field_0x4a) != 0 &&
+            ai_npc_motion_step_ck((_ENEMY_WORK*)self->source_0x30, work->field_0x49, work->field_0x4a) != 0 &&
             em->field_0x232 > 0) {
             fn_802D2B68((_ENEMY_WORK*)self->source_0x30, work->id_0x34, &mtxA);
             f31 = lbl_80796814;
@@ -693,7 +693,7 @@ extern "C" void fn_8010BDE4(_EFT* self)
     MTX34_ctor(&mtx);
 
     self->state_0x05++;
-    scale = (fn_800F9D80(self) == 1) ? lbl_807967E8 : lbl_807967EC;
+    scale = (eft_water_state_ck(self) == 1) ? lbl_807967E8 : lbl_807967EC;
     neg = lbl_807967F8;
     sa = lbl_807967FC * scale;
     sb = lbl_80796800 * scale;
@@ -725,7 +725,7 @@ extern "C" void fn_8010BDE4(_EFT* self)
         work->entries[i].step_0x38 = base_a + ((u16)ran_suu(0) % 512);
         work->entries[i].step_0x3c = base_b + ((u16)ran_suu(0) % 512);
         work->entries[i].step_0x40 = base_c + ((u16)ran_suu(0) % 512);
-        fn_800513F0(&work->entries[i].vecB_0x14, scale);
+        vec3_scale_in_place(&work->entries[i].vecB_0x14, scale);
         work->scale_a_0x94 = sa;
         work->scale_b_0x98 = sb;
     }
@@ -789,7 +789,7 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 work->entries[i].state_0x00++;
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 work->entries[i].vecB_0x14.y = work->entries[i].vecB_0x14.y - work->scale_a_0x94;
-                fn_800513F0(&work->entries[i].vecA_0x08, work->scale_b_0x98);
+                vec3_scale_in_place(&work->entries[i].vecA_0x08, work->scale_b_0x98);
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
                 work->entries[i].angle_0x30 = work->entries[i].angle_0x30 + work->entries[i].step_0x3c;
@@ -807,7 +807,7 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 work->entries[i].state_0x00++;
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 work->entries[i].vecB_0x14.y = work->entries[i].vecB_0x14.y - work->scale_a_0x94;
-                fn_800513F0(&work->entries[i].vecA_0x08, work->scale_b_0x98);
+                vec3_scale_in_place(&work->entries[i].vecA_0x08, work->scale_b_0x98);
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
                 work->entries[i].angle_0x30 = work->entries[i].angle_0x30 + work->entries[i].step_0x3c;

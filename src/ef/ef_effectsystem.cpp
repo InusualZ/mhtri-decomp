@@ -151,7 +151,7 @@ void fn_800A45DC(void* list, void* node);
 void fn_800A49B8(void* effect);
 void fn_800A4A1C(void* list, void* node);
 u16 fn_800A4AF0(void* list);
-u32 fn_800A4AF8(void* effect);
+u32 RetireParticleAll(void* effect);
 const char* ef_emres_get_name(void* p);
 void* ef_res_emitter_desc(void* p);
 u16 fn_8009B374(void* list, void** buf, u16 size);
@@ -401,7 +401,7 @@ extern "C" u32 fn_800A5F4C(EfSys* self, u32 groupID) {
     u16 num = fn_8009B374(&self->mActivityList[groupID].mActiveList, (void**)list,
                           (u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList));
     for (u16 i = 0; i < num; i++) {
-        count += fn_800A4AF8(list[i]);
+        count += RetireParticleAll(list[i]);
     }
     return count;
 }

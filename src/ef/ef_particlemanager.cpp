@@ -980,7 +980,7 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
 extern "C" s32 ef_field_gravity(nw4r::math::VEC3* out, const EfPmFieldRotation* p) {
     EfRotation rotation;
     ef_vec3_from_rotation((const EfRotation*)vec3_copy_construct(&rotation, (void*)&p->rotation), out);
-    fn_800513F0(out, p->power);
+    vec3_scale_in_place(out, p->power);
     return 1;
 }
 
@@ -1249,7 +1249,7 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                                 ef_emitter_get_mtx((EfDrawEmitter*)self->managerEM, &m);
                                 setVec3(&origin, m.m[0][3], m.m[1][3], m.m[2][3]);
                                 PSVECSubtract(&out.x, &origin.x, &((EfPmEmitterView*)self->managerEM)->tailOrigin.x);
-                                fn_800513F0(&out, field.power);
+                                vec3_scale_in_place(&out, field.power);
                             }
                             break;
                         }
@@ -1262,7 +1262,7 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                             mtx34_mult_vec3(&out, &pmRot, &out);
                             break;
                         case 3:
-                            fn_800513F0(&out, emScale);
+                            vec3_scale_in_place(&out, emScale);
                             mtx34_mult_vec3(&out, &pmRot, &out);
                             break;
                         }

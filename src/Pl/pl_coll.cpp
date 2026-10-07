@@ -259,10 +259,10 @@ VEC3* fn_80292468(VEC3* pair) {
     return pair;
 }
 
-/* 0x80293A7C - scale `v` by the reciprocal of `divisor` through the in-place scale `fn_800513F0`;
+/* 0x80293A7C - scale `v` by the reciprocal of `divisor` through the in-place scale `vec3_scale_in_place`;
  * the tail call is the whole body. */
 void vec3_scale_inv(VEC3* v, f32 divisor) {
-    return fn_800513F0(v, 1.0f / divisor);
+    return vec3_scale_in_place(v, 1.0f / divisor);
 }
 
 /* 0x8029573C - construct one vector in place and return it. */

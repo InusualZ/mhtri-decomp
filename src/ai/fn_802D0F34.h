@@ -154,7 +154,7 @@ void fn_802D29F8(struct _AINPC_W* self, s8 variant);
 void fn_802D2A00(struct _AINPC_W* self, u8 motion, u16 step, s16 gauge);
 void fn_802D2ABC(struct _AINPC_W* self, s32 motion, s32 step, s32 gauge);
 void fn_802D2AD4(struct _AINPC_W* self, u8 variant);
-s32 fn_802D2B38(struct _AINPC_W* self, s32 motion, s32 step);
+s32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 motion, s32 step);
 void fn_802D2B68(struct _AINPC_W* self);
 s32 fn_802D2B78(struct _AINPC_W* self, s32 mask);
 void fn_802D2B88(struct _AINPC_W* self, u16 flags);

@@ -755,7 +755,7 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
             vec3_scale(&tmp_b, c, off_a);
             addVec3(&tmp_c, b, &tmp_b);
             copyVec3(a, &tmp_c);
-            fn_800513F0(c, e * lbl_8079B7AC);
+            vec3_scale_in_place(c, e * lbl_8079B7AC);
             return 1;
         }
     }

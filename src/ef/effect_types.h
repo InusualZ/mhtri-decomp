@@ -12,7 +12,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 
-/* The effect state `fn_800F9D80`/`eft_state_flags_set` read and write. */
+/* The effect state `eft_water_state_ck`/`eft_state_flags_set` read and write. */
 typedef struct EftFrameState {
     /* +0x00 */ u32 field_0x00;
     /* +0x04 */ u8 flags_0x04;

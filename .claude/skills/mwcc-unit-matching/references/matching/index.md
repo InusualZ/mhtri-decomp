@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (92)
+## Ideas that work (94)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -101,6 +101,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 104 | [A paired-single body is an asm function or an asm block with register locals](104-paired-single-body-is.md) | works | source-shape, allocator | A function full of `psq_l`/`ps_*` sits at 0-60 % as C, and when it is written as `asm`, the C code around the block (an assert) moves to other registers |
 | 105 | [A virtual call with by-value vector arguments and the parameter order behind the prologue's moves](105-virtual-call-with-by.md) | works | source-shape, allocator | A slot call loads its table through the saved object (`lwz r11,0x1C(r29)`) where retail goes through r3, two argument copies swap stack slots, and the prologue moves the last integer argument one slot early |
 | 106 | [A virtual call's table load through the saved object register: peephole folded retail's mr r3 + lwz r12,0(r3)](106-virtual-calls-table-load.md) | works | pragma, vtable | A virtual call loads its table through the callee-saved object register (`lwz r12,0(r30)`) where retail moves the object into r3 first and loads through r3; a vtable store uses `addi r3` where retail uses `addi r0` |
+| 108 | [A switch lowered to subi + cmplwi range tests in a -O3 unit is #pragma optimization_level 4](108-switch-lowered-to-subi.md) | works | pragma, source-shape | Retail's multi-case switch tests ranges with `subi r0,rN,K ; cmplwi r0,1 ; ble` (ranges first, then the single values) where ours emits a `cmpwi rN,K ; blt ; cmpwi rN,K+1 ; ble` pair per range, so the chain is longer... |
+| 109 | [Retail's explicit compares for empty switch cases survive when the cases return and the default breaks](109-retails-explicit-compares-for.md) | works | source-shape | Retail's switch keeps `cmpwi x,2 ; beq End ; cmpwi x,5 ; beq End` for two cases whose arm is empty, and ours folds those labels into the default, so the function is two compares (16 bytes) short. |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

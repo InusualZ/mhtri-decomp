@@ -413,7 +413,7 @@ int ef_vec3_normalize(void* self) {
     if (length < ef_float_epsilon()) {
         return 0;
     }
-    fn_800513F0((VEC3*)self, nw4r::math::FrSqrt(length));
+    vec3_scale_in_place((VEC3*)self, nw4r::math::FrSqrt(length));
     return 1;
 }
 

@@ -8,11 +8,12 @@
  * NAMES. `SetRootMtxTrans`, `effect_move`, `change_color_eff`, `change_paramscale_eff`, `change_paramscale_eff_vec3`,
  *   `eftGetKeyRGB` and `eftGetKeyAlpha` are the runtime dump's own names; the map has only `fn_` stems for the rest.
  *   GUESS (from the body): `effect_retire` (0x800F996C) calls the effect's retire slot with the flag as a bool.
+ *   GUESS: `change_color_scale_eff` (0x800F99D4), `eft_water_state_ck` (0x800F9D80: the water-flag legality test).
  * RESIDUALS. 21 partial rows, including:
  *  - `fn_800FA9B8`: ours inverts the name-table walk's test and drops the second record check (`lwz`/`cmpwi`);
  *  - `fn_800FA208`: ours keeps an extra saved register and lays the state compares out 1, 2, 3 where retail
  *    branches on 2, 0, 4;
- *  - `fn_800F99D4`: ours turns the `u8` flag test into `neg`/`or`/`srwi` where retail passes it through;
+ *  - `change_color_scale_eff`: ours turns the `u8` flag test into `neg`/`or`/`srwi` where retail passes it through;
  *  - `fn_800FA5D4`: the stack slots and the loop's exit branch differ;
  *  - `eftGetKeyRGB`: ours re-masks each channel with an extra `clrlwi`;
  *  - `fn_800F9CDC`: ours drops the `xoris` of the signed int-to-float conversion;
@@ -102,7 +103,7 @@ typedef struct EftNameEntry {
     /* +0x10 */ void* field_0x10;
 } EftNameEntry; /* size: 0x14 */
 
-/* The per-manager payload `fn_800F99D4` builds and `fn_800F9A70` reads back. */
+/* The per-manager payload `change_color_scale_eff` builds and `fn_800F9A70` reads back. */
 typedef struct EftParticleArgs {
     /* +0x00 */ u8 mode_0x00;
     /* +0x01 */ u8 color_0x01[4];
@@ -239,7 +240,7 @@ void fn_800F9A70(void* mgr, EftParticleArgs* data);
 EftParticleArgs* fn_800F9A8C(EftParticleArgs* self);
 void fn_800F9B68(EftHandle* handle, nw4r::math::VEC3* v);
 void effect_retire(EftHandle* handle, u32 flag);
-void fn_800F99D4(void* effect, u8 mode, _GXColor* color, _GXColor* color2, nw4r::math::VEC3* pos, u8 flag, f32 scale);
+void change_color_scale_eff(void* effect, u8 mode, _GXColor* color, _GXColor* color2, nw4r::math::VEC3* pos, u8 flag, f32 scale);
 }
 
 /* C++ callees: the target object references their manglings (`ran_suu__Fl`,
@@ -397,11 +398,11 @@ void change_color_eff(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos, _GXColor 
     c.g = 0;
     c.b = 0;
     c.a = 0xFF;
-    fn_800F99D4(effect, 1, &color, &c, pos, 1, lbl_807965D8);
+    change_color_scale_eff(effect, 1, &color, &c, pos, 1, lbl_807965D8);
 }
 
 /* 0x800F99D4 - hand a colour/scale request to every particle manager of the effect. */
-extern "C" void fn_800F99D4(void* effect, u8 mode, _GXColor* color, _GXColor* color2, nw4r::math::VEC3* pos, u8 flag, f32 scale) {
+extern "C" void change_color_scale_eff(void* effect, u8 mode, _GXColor* color, _GXColor* color2, nw4r::math::VEC3* pos, u8 flag, f32 scale) {
     EftParticleArgs args;
     fn_800F9A8C(&args);
     args.mode_0x00 = mode;
@@ -412,7 +413,7 @@ extern "C" void fn_800F99D4(void* effect, u8 mode, _GXColor* color, _GXColor* co
     ((nw4r::ef::Effect*)effect)->ForeachParticleManager((void (*)(void*, u32))fn_800F9A70, (u32)&args, flag != 0);
 }
 
-/* 0x800F9A70 - the per-manager callback `fn_800F99D4` installs. */
+/* 0x800F9A70 - the per-manager callback `change_color_scale_eff` installs. */
 extern "C" void fn_800F9A70(void* mgr, EftParticleArgs* data) {
     fn_800AC100(mgr, data->mode_0x00, data->color_0x01, data->color2_0x05, (u8*)&data->pos_0x10,
                 data->scale_0x0C);
@@ -494,7 +495,7 @@ extern "C" f32 fn_800F9D2C(void) {
 }
 
 /* 0x800F9D80 - whether the effect is still legal for its owner. */
-extern "C" s32 fn_800F9D80(EftFrameState* self) {
+extern "C" s32 eft_water_state_ck(EftFrameState* self) {
     s32 result = 0;
     if (self->value_0x1C < lbl_807965F4) {
         u8 flags = self->flags_0x04;
