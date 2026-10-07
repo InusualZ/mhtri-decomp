@@ -7,7 +7,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-void OSRestoreInterrupts(u32 level);
+BOOL OSRestoreInterrupts(BOOL level);
 #ifdef __cplusplus
 }
 #endif

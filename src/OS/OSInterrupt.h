@@ -13,7 +13,9 @@ extern "C" {
 
 BOOL OSDisableInterrupts(void);
 
-void OSRestoreInterrupts(BOOL level);
+BOOL OSRestoreInterrupts(BOOL level);
+
+BOOL OSEnableInterrupts(void);
 
 /* The handler of one interrupt source; `interrupt` is the source index, `context` the interrupted context. */
 typedef void (*__OSInterruptHandler)(s16 interrupt, OSContext* context);
