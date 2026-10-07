@@ -44,7 +44,8 @@
  * SHAPES. `#line` puts each `Panic`/`Warning` on retail's line (`fn_800A45DC` 134, `fn_800A51D8` 423,
  *   `RetireEmitterAll` 160, `fn_800A4AF8` 180, `fn_800A4BBC` 267/292/312/323).
  * SHAPES. `fn_800A40F4`'s fourth argument is `u16` (retail adds it with no mask), `EfEffEmitter::mField_0xB4` is
- *   `s32` (`cmpwi`), `ef_effect_set_calc_flag`'s bit is 0x10000, and `fn_800A559C`/`fn_800A5618` return the object.
+ *   `s32` (`cmpwi`), `ef_effect_set_calc_flag`'s bit is 0x10000, and the effect system's
+ *   constructor and destructor are `EfSys` members (`ef/ef_effectsystem.h`).
  * SHAPES. The effect record is a local view (`EfEff`, `EfEffEmitter`, `EfEffManager`): `ef.h`'s `struct Effect` is
  *   a union of the sibling units' copies; the map-named methods cast `this` to it.
  */
@@ -54,6 +55,7 @@
 #include "ef.h" /* nw4r::ef::Effect (rule 9's owner) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
+#include "ef/ef_effectsystem.h" /* EfSys, whose constructor and destructor this unit defines (rule 1) */
 
 namespace nw4r {
 namespace db {
@@ -186,18 +188,7 @@ typedef struct EfEffEmitter {
 } EfEffEmitter; /* size: 0x120 (lower bound: +0x114 is the highest field any body touches) */
 
 /* The EffectSystem the constructor/destructor work on: only the words they touch. */
-typedef struct EfEffSys {
-    /* +0x0000 */ void* mMemoryManager;
-    /* +0x0004 */ u8 pad_0x0004[0x0C];
-    /* +0x0010 */ u8 field_0x10;
-    /* +0x0011 */ u8 pad_0x0011[0xC003];
-    /* +0xC014 */ u32 mMaxGroupID;
-    /* +0xC018 */ u8 pad_0xC018[0x08];
-    /* +0xC020 */ VEC3 mRefPos;
-    /* +0xC02C */ MTX34 mRefMtx;
-    /* +0xC05C */ u8 pad_0xC05C[0x08];
-    /* +0xC064 */ u8 mField_0xC064;
-} EfEffSys; /* size: 0xC068 (the symbol map's size for lbl_806884D0) */
+typedef EfSys EfEffSys; /* the effect system, `ef/ef_effectsystem.h` */
 
 /* ===================================================================================================
  * The strings and constants of this unit's claimed data, `ef/ef_effectsystem.cpp`'s once-flag and singleton
@@ -219,8 +210,6 @@ extern const char lbl_80592600[]; /* "...mActiveList.numObjects >= mNumActive"  
 extern const char lbl_8059263C[]; /* "activitylist.h"                                        */
 extern f32 lbl_80795FF0;          /* 0.0f (the three cleared floats)                         */
 extern void* lbl_807912E0;        /* the version string registered once                      */
-extern u32 lbl_8079491C;          /* the once-only init flag fn_800A559C sets                */
-extern u8 lbl_806884D0[];         /* the EffectSystem singleton (0xC068 B)                   */
 
 /* Callees outside this unit, with C linkage: retail's relocations carry their plain map names. */
 void fn_800A2FA4(void* p);
@@ -276,8 +265,6 @@ void* ef_list_get_first(EfEffList* list);
 u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32 flag, EfEffEmitter* match);
 u32 fn_800A5428(EfEff* self, void** pp, u8 a, u16 b);
 void* fn_800A5484(void** pp);
-EfEffSys* fn_800A559C(EfEffSys* self);
-void* fn_800A5618(EfEffSys* self, s16 flag);
 void* fn_800A56A4(void);
 
 } /* extern "C" */
@@ -817,35 +804,29 @@ extern "C" void* fn_800A5484(void** pp) {
     return *pp;
 }
 
-/* 0x800A559C - the EffectSystem constructor. */
-extern "C" EfEffSys* fn_800A559C(EfEffSys* self) {
-    fn_800A2FA4(&self->field_0x10);
-    VEC3_ctor(&self->mRefPos);
-    MTX34_ctor(&self->mRefMtx);
-    if (lbl_8079491C == 0) {
-        lbl_8079491C = 1;
+/* 0x800A559C (0x7C): builds the effect system: its creation queue, the reference position and matrix, and the
+ * library version, registered once. */
+EfSys::EfSys() {
+    fn_800A2FA4(mCreationQueue);
+    VEC3_ctor(&mRefPos);
+    MTX34_ctor(&mRefMtx);
+    if (ef_system_version_registered == 0) {
+        ef_system_version_registered = 1;
         OSRegisterVersion((const char*)lbl_807912E0);
     }
-    self->mMemoryManager = NULL;
-    self->mMaxGroupID = 0;
-    self->mField_0xC064 = 0;
-    return self;
+    mMemoryManager = NULL;
+    mMaxGroupID = 0;
+    mField_0xC064 = 0;
 }
 
-/* 0x800A5618 - the EffectSystem deleting destructor. */
-extern "C" void* fn_800A5618(EfEffSys* self, s16 flag) {
-    if (self != NULL) {
-        for (u32 i = 0; i < self->mMaxGroupID; i++) {
-            fn_800A5D8C(self, i);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
+/* 0x800A5618 (0x8C): retires every group's effects. */
+EfSys::~EfSys() {
+    for (u32 i = 0; i < mMaxGroupID; i++) {
+        fn_800A5D8C(this, i);
     }
-    return self;
 }
 
 /* 0x800A56A4 - the singleton accessor. */
 extern "C" void* fn_800A56A4(void) {
-    return lbl_806884D0;
+    return &ef_system_instance;
 }

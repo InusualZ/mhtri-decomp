@@ -8,9 +8,9 @@
  *   their own 0.0f (0x80795F6C) apart from this TU's (0x80795F7C).  Right edge: `fn_8009CDBC` cites
  *   "ef_animcurve.cpp"; the tail `ef_mtx34_column_length` cites none of this TU's strings or pool, only the `.sdata` pair
  *   {3.0f, 0.5f} at 0x807912D8.
- * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around `fn_8009B374`/`ef_mtx34_from_y_axis` only
- *   (retail's unfused `clrlwi` + `slwi`, `li r0,<slot>; psq_lx` and `fmuls` + `fsubs` there; file-wide, the pass
- *   costs `ef_vec_sin_cos`/`ef_sin_cos`).
+ * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around `fn_8009B374`/`ef_mtx34_from_y_axis`,
+ *   and `#pragma peephole off` around `fn_8009BCB4` and `fn_8009C040` (retail's unfused `clrlwi` + `slwi`,
+ *   `li r0,<slot>; psq_lx` and `fmuls` + `fsubs` there; file-wide, the pass costs `ef_vec_sin_cos`/`ef_sin_cos`).
  * NAMES. The map has only `fn_` stems for the range.
  *   GUESS: `ef_vec_sin_cos` (0x8009C6F0): writes an angle's sine and cosine into a vector's x and y.
  *   GUESS: `ef_mtx34_from_y_axis` (0x8009B448): builds an orthonormal frame whose Y axis is a unit direction.
@@ -26,10 +26,6 @@
  *   `ef_util_f32_min_scale_pair`, `ef_util_rsqrt_three_half`.
  * RESIDUALS. The source order differs from retail's, so `.text`, extab and extabindex run in another order.
  *  - `ef_mtx34_from_y_axis`: the float registers of the assert's distance test differ;
- *  - `fn_8009BCB4`: the FPR restores are `psq_l <off>(r1)` where retail has `li r0,<off>; psq_lx` (the
- *    peephole region does not cover it);
- *  - `fn_8009C040`: the frame is 0x50 against retail's 0x60;
- *  - `fn_8009CCAC`: the two clamp branches store the loaded constant from f0 where retail uses f1.
  *   relocdiff: `fn_8009B840` and `fn_8009BA78` score 100 but retail passes per-function copies of the
  *   "ef_util.cpp" string (`lbl_80591B98`/`lbl_80591BD8`, `lbl_80591C18`/`lbl_80591C58`) where ours passes
  *   `lbl_80591948`.
@@ -37,9 +33,13 @@
  *   0x1A48; extab and extabindex differ in the open rows' records.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_80501C60`,
  *     `List_GetNext__Q24nw4r2utFPCQ34nw4r2ut4ListPCv`, `lbl_80591948`, `lbl_80591BD8`, `lbl_80591B98`,
- *     `lbl_80591C58`, `lbl_80591C18`, `ef_util_f32_zero`, `ef_util_f32_min_scale`, `ef_util_f64_minus_one`, `fn_8050133C`,
+ *     `lbl_80591C58`, `lbl_80591C18`, `ef_util_f32_zero`, `ef_util_f32_min_scale`, `fn_8050133C`,
  *     `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`.
  *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050133C`, `fn_80501C60`.
+ * SHAPES. `fn_8009C040` keeps its three dot products in one local array (retail's frame and its stores of each
+ *   product), declared first; the column vectors are declared and constructed in column order, and the sign flip
+ *   multiplies by the named `-1.0` double.  `fn_8009CCAC`'s second and third reciprocals are conditional
+ *   expressions (one shared store), its first an `if`/`else`.
  * SHAPES. The paired-single rows are retail's own assembly (playbook 85: no compiler emits them): `ef_vec_sin_cos`,
  *   `ef_sin_cos`, `fn_8009CBA0`, `ef_mtx34_scale_columns` and `ef_mtx34_column_length` are `asm` functions
  *   (`nofralloc`, no extab record, as in retail); `ef_mtx34_rotate_xyz`, `ef_vec3_from_rotation` and
@@ -286,6 +286,7 @@ extern "C" f32* fn_8009BA78(const f32* mtx, s32 index, f32* vec) {
     return vec;
 }
 
+#pragma peephole off
 /* Decomposes the rotation part of the 3x4 matrix `mtx` into the Euler angles at `rot`, zeroing them when
  * any of the three columns collapses (a length below FLT_MIN). */
 extern "C" void fn_8009BCB4(const f32* mtx, f32* rot) {
@@ -326,6 +327,7 @@ extern "C" void fn_8009BCB4(const f32* mtx, f32* rot) {
     rot[1] = ef_util_f32_zero;
     rot[2] = ef_util_f32_zero;
 }
+#pragma peephole on
 
 /* Reads the translation column of the 3x4 matrix `mtx` into `vec`. */
 extern "C" void fn_8009BF08(const f32* mtx, f32* vec) {
@@ -623,72 +625,71 @@ extern "C" void ef_mtx34_rotate_xyz(register f32* mtx, register f32 x, register 
     }
 }
 
+#pragma peephole off
 /* Computes the 3x4 matrix's three column scales into `scale` (Gram-Schmidt lengths, negated for a
  * left-handed basis; a collapsed column gives 0). */
 extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
-    f32 v8[3];
-    f32 v14[3];
-    f32 v20[3];
-    f32 v2c[3];
-    f32 d0;
-    f32 d1;
-    f32 d2;
+    f32 d[3];
+    f32 vCol0[3];
+    f32 vCol1[3];
+    f32 vCol2[3];
+    f32 vTmp[3];
     f32 len;
     f32 r;
 
     NW4R_POINTER_ASSERT(scale, 0x266, lbl_80591AC8);
 
-    VEC3_ctor((nw4r::math::VEC3*)v8);
-    VEC3_ctor((nw4r::math::VEC3*)v14);
-    VEC3_ctor((nw4r::math::VEC3*)v20);
-    VEC3_ctor((nw4r::math::VEC3*)v2c);
+    VEC3_ctor((nw4r::math::VEC3*)vCol0);
+    VEC3_ctor((nw4r::math::VEC3*)vCol1);
+    VEC3_ctor((nw4r::math::VEC3*)vCol2);
+    VEC3_ctor((nw4r::math::VEC3*)vTmp);
 
-    fn_8009BA78(mtx, 0, v2c);
-    len = vec3_length_sq(v2c);
+    fn_8009BA78(mtx, 0, vCol0);
+    len = vec3_length_sq(vCol0);
     if (len > ef_util_f32_epsilon) {
         r = nw4r::math::FrSqrt(len);
         scale[0] = math_reciprocal(r);
-        vec3_scale_by(v2c, v2c, r);
+        vec3_scale_by(vCol0, vCol0, r);
 
-        fn_8009BA78(mtx, 1, v20);
-        d0 = vec3_dot(v2c, v20);
-        vec3_scale_by(v8, v2c, d0);
-        PSVECSubtract(v20, v20, v8);
+        fn_8009BA78(mtx, 1, vCol1);
+        d[0] = vec3_dot(vCol0, vCol1);
+        vec3_scale_by(vTmp, vCol0, d[0]);
+        PSVECSubtract(vCol1, vCol1, vTmp);
 
-        len = vec3_length_sq(v20);
+        len = vec3_length_sq(vCol1);
         if (len > ef_util_f32_epsilon) {
             r = nw4r::math::FrSqrt(len);
             scale[1] = math_reciprocal(r);
-            d0 = d0 * r;
-            vec3_scale_by(v20, v20, r);
+            d[0] = d[0] * r;
+            vec3_scale_by(vCol1, vCol1, r);
 
-            fn_8009BA78(mtx, 2, v14);
-            d1 = vec3_dot(v20, v14);
-            vec3_scale_by(v8, v20, d1);
-            PSVECSubtract(v14, v14, v8);
-            d2 = vec3_dot(v2c, v14);
-            vec3_scale_by(v8, v2c, d2);
-            PSVECSubtract(v14, v14, v8);
+            fn_8009BA78(mtx, 2, vCol2);
+            d[2] = vec3_dot(vCol1, vCol2);
+            vec3_scale_by(vTmp, vCol1, d[2]);
+            PSVECSubtract(vCol2, vCol2, vTmp);
+            d[1] = vec3_dot(vCol0, vCol2);
+            vec3_scale_by(vTmp, vCol0, d[1]);
+            PSVECSubtract(vCol2, vCol2, vTmp);
 
-            len = vec3_length_sq(v14);
+            len = vec3_length_sq(vCol2);
             if (len > ef_util_f32_epsilon) {
                 scale[2] = sqrt_f32(len);
-                vec3_cross(v8, v20, v14);
-                if (vec3_dot(v2c, v8) < ef_util_f32_zero) {
-                    scale[0] = scale[0] * -1.0;
-                    scale[1] = scale[1] * -1.0;
-                    scale[2] = scale[2] * -1.0;
+                vec3_cross(vTmp, vCol1, vCol2);
+                if (vec3_dot(vCol0, vTmp) < ef_util_f32_zero) {
+                    scale[0] = scale[0] * ef_util_f64_minus_one;
+                    scale[1] = scale[1] * ef_util_f64_minus_one;
+                    scale[2] = scale[2] * ef_util_f64_minus_one;
                 }
             } else {
                 scale[2] = ef_util_f32_zero;
             }
         } else {
             scale[1] = ef_util_f32_zero;
-            fn_8009BA78(mtx, 2, v14);
-            d2 = vec3_dot(v2c, v14);
-            vec3_scale_by(v8, v2c, d2);
-            PSVECSubtract(v14, v14, v8);
-            len = vec3_length_sq(v14);
+            fn_8009BA78(mtx, 2, vCol2);
+            d[1] = vec3_dot(vCol0, vCol2);
+            vec3_scale_by(vTmp, vCol0, d[1]);
+            PSVECSubtract(vCol2, vCol2, vTmp);
+            len = vec3_length_sq(vCol2);
             if (len > ef_util_f32_epsilon)
                 scale[2] = sqrt_f32(len);
             else
@@ -696,25 +697,26 @@ extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
         }
     } else {
         scale[0] = ef_util_f32_zero;
-        fn_8009BA78(mtx, 1, v20);
-        len = vec3_length_sq(v20);
+        fn_8009BA78(mtx, 1, vCol1);
+        len = vec3_length_sq(vCol1);
         if (len > ef_util_f32_epsilon) {
             r = nw4r::math::FrSqrt(len);
             scale[1] = math_reciprocal(r);
-            vec3_scale_by(v20, v20, r);
+            vec3_scale_by(vCol1, vCol1, r);
 
-            fn_8009BA78(mtx, 2, v14);
-            d1 = vec3_dot(v20, v14);
-            vec3_scale_by(v8, v20, d1);
-            PSVECSubtract(v14, v14, v8);
-            scale[2] = vec3_len(v14);
+            fn_8009BA78(mtx, 2, vCol2);
+            d[2] = vec3_dot(vCol1, vCol2);
+            vec3_scale_by(vTmp, vCol1, d[2]);
+            PSVECSubtract(vCol2, vCol2, vTmp);
+            scale[2] = vec3_len(vCol2);
         } else {
             scale[1] = ef_util_f32_zero;
-            fn_8009BA78(mtx, 2, v14);
-            scale[2] = vec3_len(v14);
+            fn_8009BA78(mtx, 2, vCol2);
+            scale[2] = vec3_len(vCol2);
         }
     }
 }
+#pragma peephole on
 
 /* 0x8009C484 (0x26C): normalises `vec` into `dst` and returns 1, or copies `vec` unchanged and returns 0 when
  * it is the zero vector (paired-single, one reciprocal square root step). */
@@ -849,14 +851,8 @@ extern "C" void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale) {
         inv[0] = math_reciprocal(scale[0]);
     else
         inv[0] = ef_util_f32_100000;
-    if (ef_util_f32_zero != scale[1])
-        inv[1] = math_reciprocal(scale[1]);
-    else
-        inv[1] = ef_util_f32_100000;
-    if (ef_util_f32_zero != scale[2])
-        inv[2] = math_reciprocal(scale[2]);
-    else
-        inv[2] = ef_util_f32_100000;
+    inv[1] = ef_util_f32_zero != scale[1] ? math_reciprocal(scale[1]) : ef_util_f32_100000;
+    inv[2] = ef_util_f32_zero != scale[2] ? math_reciprocal(scale[2]) : ef_util_f32_100000;
     fn_8050133C(dst, mtx, inv);
 }
 

@@ -772,7 +772,8 @@ config.libs = [
             Object(NonMatching, "ef/ef_creationqueue.cpp"),
             Object(NonMatching, "ef/ef_draworder.cpp"),
             Object(NonMatching, "ef/ef_effect.cpp"),
-            Object(NonMatching, "ef/ef_effectsystem.cpp"),
+            # Flags: unit header of src/ef/ef_effectsystem.cpp (`-pool off`: one `lis`/`addi` per static).
+            Object(NonMatching, "ef/ef_effectsystem.cpp", extra_cflags=["-pool off"]),
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
             Object(NonMatching, "ef/ef_postfield.cpp"),
@@ -796,7 +797,7 @@ config.libs = [
             Object(NonMatching, "ef/ef_emitter.cpp"),
             Object(NonMatching, "ef/ef_particle.cpp"),
             # Flags: unit header of src/ef/ef_emform.cpp (`-pool off`: one `lis`/`addi` per string).
-            Object(NonMatching, "ef/ef_emform.cpp", extra_cflags=["-pool off"]),
+            Object(Matching, "ef/ef_emform.cpp", extra_cflags=["-pool off"]),
             # Flags: unit header of src/ef/ef_line.cpp (`-pool off`: one `lis`/`addi` per string).
             Object(Matching, "ef/ef_line.cpp", extra_cflags=["-pool off"]),
             # Flags: unit header of src/ef/ef_point.cpp (`-pool off`: one `lis`/`addi` per string).

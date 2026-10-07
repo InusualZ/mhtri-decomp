@@ -1,20 +1,26 @@
 /*
- * ef/ef_effectsystem.cpp - the nw4r::ef::EffectSystem (the 0xC068-byte singleton `lbl_806884D0` the game's effect
- *   manager holds, read by `fn_800D3C0C` at +0x29074): `Initialize` (the group table of 0x1C-byte `mActivityList`
- *   records out of the system's allocator), its array helpers, the immediate retire, `CreateEffect`, `RetireEffect`,
- *   the three per-group sweeps (0x200-entry stack buffers), the reference-transform setter and two sub-object
- *   accessors, the static initializer `fn_800A60C8`, the 0xA0-byte record's constructor, and out-of-line copies of
- *   four other units' constructors (the three borrowed engine objects and the `ef/ef_draworder.cpp` list class).
+ * ef/ef_effectsystem.cpp - the effect system (`EfSys`, nw4r's `EffectSystem`; the 0xC068-byte instance the game's
+ *   effect manager holds, read by `fn_800D3C0C` at +0x29074): `Initialize` (the group table of 0x1C-byte
+ *   `mActivityList` records out of the system's allocator), its array helpers, the immediate retire, `CreateEffect`,
+ *   `RetireEffect`, the three per-group sweeps (0x200-entry stack buffers), the reference-transform setter and two
+ *   sub-object accessors; then the unit's statics - the draw-order object, the draw-strategy and emitter-form
+ *   builders, the default draw info and the system instance - whose static initializer and implicit constructors
+ *   the compiler emits after them.
  * RANGE. .text 0x800A56B0-0x800A6258 (20 functions); extab 0x80009C38-0x80009CBC, extabindex 0x80022E30-0x80022EC0,
- *   .ctors 0x8056F2D8-0x8056F2DC, .data 0x80592698-0x80592850 (the `__FILE__` string "ef_effectsystem.cpp" first),
- *   .bss 0x80688420-0x80694538, .sbss 0x80794910-0x80794920, .sdata2 0x80795FF8-0x80796000.
- * FLAGS. `cflags_main`; `#pragma peephole off` through the static initializer (the five table stores as `lis` +
- *   `addi r0` + `stw r0`, the deleting destructor's `extsh` + `cmpwi`, the sweeps' unfused `clrlwi` + `slwi`), on
- *   for `fn_800A6134` (it keeps its two `.sdata2` constants in f1/f0 across the stores).
- * NAMES. The map has only `fn_` stems for the range except `RetireEffect`, written as an `nw4r::ef::EffectSystem`
- *   member.
+ *   .ctors 0x8056F2D8-0x8056F2DC, .data 0x80592698-0x80592850 (the `__FILE__` string "ef_effectsystem.cpp" first,
+ *   `DrawOrderBase`'s table last), .bss 0x80688420-0x80694538, .sbss 0x80794910-0x80794920, .sdata2
+ *   0x80795FF8-0x80796000.
+ * FLAGS. `cflags_main` plus `-pool off` (configure.py: the static initializer addresses each static with its own
+ *   `lis`/`addi`); `#pragma peephole off` from `Initialize` on (the table stores as `lis` + `addi r0` + `stw r0`, the
+ *   sweeps' unfused `clrlwi` + `slwi`) and `#pragma dont_inline on` at the end (the implicit constructors stay out of
+ *   line, as retail's).
+ * NAMES. The classes are nw4r's (`DrawOrder`, `DrawStrategyBuilder`, `EmitterFormBuilder`, `DrawInfo`); `EfSys`
+ *   keeps this layout's own name while `ef.h` carries an `EffectSystem` stub.  The other functions keep `fn_`
+ *   stems except `RetireEffect`, written as an `nw4r::ef::EffectSystem` member.
  *   GUESS (from the body and its callers): `ef_draw_info_projection`.
- * RESIDUALS. 5 partial rows (ours 0xBBC of 0xBA8):
+ *   GUESS: `sDrawOrder`, `sDrawStrategyBuilder`, `sEmitterFormBuilder`, `sDrawInfo` (the statics, named for their
+ *   class), `ef_system_version_registered` (the once-flag the system's constructor tests).
+ * RESIDUALS. 5 partial rows:
  *  - `fn_800A56B0` (ours 0x24C of 0x250): the two allocation sizes share the `maxGroupID * 0x1C` product, which
  *    MWCC computes once into a callee-saved register where retail has one `mulli` per call;
  *  - `fn_800A5A90`: the three table calls load the table and the slot through an intermediate where retail reuses
@@ -22,19 +28,17 @@
  *  - `fn_800A5D8C`, `fn_800A5E6C`, `fn_800A5F4C` (ours 0xE8 of 0xE0 each): retail keeps `groupID * 0x1C` in a
  *    callee-saved register across the `Panic` and reuses it, ours re-materialises the `mulli` per use; a group
  *    pointer local and a scaled index local both score lower.
- *   flipcheck: `.bss`, `.data`, `.sbss` and `.sdata2` claimed, not emitted; `.text` 0xBBC of 0xBA8.
- *   relocdiff: our `.ctors` word carries the symbol `lbl_8056F2D8`, retail's none; both relocate to `fn_800A60C8`.
+ *   flipcheck: `.data` and `.sdata2` declared, not emitted; `.text` differs in the rows above.
  * SHAPES. `#line` puts each assert on retail's line (0x4F, 0x50, 0x67, 0x7B, 0x83, 0x9F, 0xA0, 0xB2, 0xC9, 0xDD).
  * SHAPES. The group table uses the compiler's array form: the allocator call, the shim and
  *   `__construct_new_array(block, fn_800A590C, NULL, 0x1C, maxGroupID)` inside one try/catch whose handler calls
  *   the empty `fn_800A5908` and rethrows with `__throw(0, 0, 0)` declared `noreturn` (a source `throw;` adds the
  *   `__end__catch` bookkeeping and an extab action word).
  * SHAPES. The effect object's +0x1C is a table whose every entry takes the effect as its first argument.
- * SHAPES. `fn_800A6134` declares its second constant after the first is stored (`f32 one = ...; use; f32 zero;
- *   zero = ...; use;`; declared together both load up front), and its colour bytes are stored in retail's order
- *   (0x9A/0x99/0x98/0x9B, then 0x9E/0x9D/0x9C).
- * SHAPES. The system layout is this file's `EfSys`: `ef.h`'s `class EffectSystem` models the memory manager (its
- *   first word) for `ef/fn_800FD864_fx.cpp`.  `RetireEffect` and `Effect::RetireEmitterAll` return the sweeps' count.
+ * SHAPES. The statics are defined in retail's construction order; the compiler's static initializer builds them and
+ *   registers the instance's destructor, and the implicit constructors come out after it in the reverse order of
+ *   use.  `DrawInfo`'s constructor declares its second constant after the first is stored and stores the colour
+ *   bytes in retail's order.
  */
 
 #include "types.h"
@@ -42,9 +46,10 @@
 #include "ef.h" /* nw4r::ef::EffectSystem / nw4r::ef::Effect (rule 9's owner) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
-#include "ef/ef_draworder.h" /* lbl_8059241C (rule 2) */
-#include "ef/ef_emform.h" /* lbl_80594EC4 (rule 2) */
-#include "unsplit/ef_tables.h" /* lbl_80594840: no registered owner yet (rule 2) */
+#include "ef/ef_draworder.h" /* nw4r::ef::DrawOrder (rule 1) */
+#include "ef/ef_emform.h" /* nw4r::ef::EmitterFormBuilder (rule 1) */
+#include "ef/ef_drawstrategyimpl.h" /* nw4r::ef::DrawStrategyBuilder (rule 1) */
+#include "ef/ef_effectsystem.h" /* EfSys, the unit's own header */
 
 namespace nw4r {
 namespace db {
@@ -57,37 +62,6 @@ void Warning(const char* file, int line, const char* fmt, ...);
  * Types.  The `EfSys` prefix keeps this unit's views apart from the sibling units' (`EfList`, ...).
  * =================================================================================================== */
 
-/* The library's list record: head, tail, live count and the link offset `fn_800A4030` sets. */
-typedef struct EfSysList {
-    /* +0x00 */ void* head;
-    /* +0x04 */ void* tail;
-    /* +0x08 */ u16 numObjects;
-    /* +0x0A */ u16 linkOffset;
-} EfSysList; /* size: 0x0C */
-
-/* One `mActivityList` group record: the group's live list, its retiring list and the live count.  The
- * assert names it (`mActivityList[group].mActiveList`); `ef_activity_list_clear` zeroes exactly these words and
- * `ef_activity_list_add` / `fn_800A45DC` / `fn_800A4A1C` keep them. size: 0x1C */
-typedef struct EfSysActivityList {
-    /* +0x00 */ EfSysList mActiveList;
-    /* +0x0C */ EfSysList mRetireList;
-    /* +0x18 */ u16 mNumActive;
-    /* +0x1A */ u16 pad_0x1A;
-} EfSysActivityList; /* size: 0x1C */
-
-/* `mMemoryManager`'s table: the effect pool at +0x10/+0x14 and the byte allocator at +0x60. */
-typedef struct EfSysMemoryManagerVtbl {
-    /* +0x00 */ u8 pad_0x00[0x10];
-    /* +0x10 */ void* (*getEffect)(void* self);
-    /* +0x14 */ void (*releaseEffect)(void* self, void* effect);
-    /* +0x18 */ u8 pad_0x18[0x48];
-    /* +0x60 */ void* (*alloc)(void* self, u32 size);
-} EfSysMemoryManagerVtbl; /* size: 0x64 */
-
-/* The allocator/pool object the system was handed (`fn_800D3D48` stores it into the system's +0x00). */
-typedef struct EfSysMemoryManager {
-    /* +0x00 */ EfSysMemoryManagerVtbl* vtable;
-} EfSysMemoryManager; /* size: 0x04 (lower bound: the manager's own state is not this unit's) */
 
 /* The table the effect object carries at +0x1C.  Every entry is called with the *effect* as its first
  * argument, so the field is the table itself. */
@@ -113,24 +87,6 @@ typedef struct EfSysEffect {
     /* +0x40 */ u32 mGroupID; /* the index into `mActivityList` */
 } EfSysEffect; /* size: 0x44 (lower bound: +0x40 is the highest field any body touches) */
 
-/* `nw4r::ef::EffectSystem`: the object this unit's functions work on.  Only the fields this range's
- * bodies touch are named; the record's size is the symbol map's own for `lbl_806884D0`. */
-typedef struct EfSys {
-    /* +0x0000 */ EfSysMemoryManager* mMemoryManager;
-    /* +0x0004 */ void* mDrawOrder;    /* &lbl_80794910 - the draw-order list object */
-    /* +0x0008 */ void* mStrategy;     /* &lbl_80794914 - the strategy object */
-    /* +0x000C */ void* mLineStrategy; /* &lbl_80794918 - the line-strategy object */
-    /* +0x0010 */ u8 pad_0x0010[0xC004];
-    /* +0xC014 */ u32 mMaxGroupID;
-    /* +0xC018 */ EfSysActivityList* mActivityList;
-    /* +0xC01C */ u32 mRandom; /* the seed fn_800A5900 writes (ef/ef_emitter.cpp reads the same word) */
-    /* +0xC020 */ nw4r::math::VEC3 mRefPos; /* copyVec3 copies the caller's vector into it */
-    /* +0xC02C */ nw4r::math::MTX34 mRefMtx;
-    /* +0xC05C */ f32 mRangeB;
-    /* +0xC060 */ f32 mRangeA;
-    /* +0xC064 */ u8 mField_0xC064; /* cleared by the constructor ef/ef_effect.cpp defines */
-    /* +0xC065 */ u8 pad_0xC065[0x03];
-} EfSys; /* size: 0xC068 (the symbol map's size for lbl_806884D0) */
 
 /* The record `ef_res_emitter_desc` hands back for an emitter: the relocation flag `CreateEffect` tests at +0x00
  * (the name the Warning prints comes from `ef_emres_get_name`, the emitter's own +0x00). size: 0x04 (lower
@@ -139,11 +95,6 @@ typedef struct EfSysEmitterWork {
     /* +0x00 */ u32 flags;
 } EfSysEmitterWork; /* size: 0x04 (lower bound) */
 
-/* An object whose first word is its table (the three borrowed engine objects and the class
- * fn_800A6248's constructor belongs to). */
-typedef struct EfSysVtblObj {
-    /* +0x00 */ void* vtable;
-} EfSysVtblObj; /* size: 0x04 */
 
 /* The object ef_draw_info_projection / fn_800A60C0 are called with: ef/effect.cpp casts fn_800A60C0's result to a
  * MTX34 (the effect's root matrix) and the two returned offsets are the only thing this range
@@ -155,35 +106,6 @@ typedef struct EfSysAccessObj {
     /* +0x58 */ nw4r::math::MTX34 mtx_0x58; /* the matrix fn_800A60C0 returns */
 } EfSysAccessObj; /* size: 0x88 (lower bound: +0x58 is the highest field returned) */
 
-/* The 0xA0-byte record `fn_800A6134` constructs (the game allocates 0xA0 bytes at 0x800D3D0C and calls
- * it as the constructor; the map's size for lbl_80688420 is 0xA0).  No `__FILE__` string or dump name
- * identifies the type, so the fields are named for what the constructor stores in them. size: 0xA0 */
-typedef struct EfSysDefaultRecord {
-    /* +0x00 */ nw4r::math::MTX34 mtx_0x00;
-    /* +0x30 */ nw4r::math::MTX34 mtx_0x30;
-    /* +0x60 */ u8 field_0x60;
-    /* +0x61 */ u8 pad_0x61[0x03];
-    /* +0x64 */ u32 field_0x64;
-    /* +0x68 */ u32 field_0x68;
-    /* +0x6C */ u8 field_0x6C;
-    /* +0x6D */ u8 pad_0x6D[0x03];
-    /* +0x70 */ u32 field_0x70;
-    /* +0x74 */ f32 scale_0x74;
-    /* +0x78 */ f32 scale_0x78;
-    /* +0x7C */ f32 scale_0x7C;
-    /* +0x80 */ f32 scale_0x80;
-    /* +0x84 */ u32 pad_0x84; /* present in the object, untouched by the constructor */
-    /* +0x88 */ f32 scale_0x88;
-    /* +0x8C */ nw4r::math::VEC3 vec_0x8C;
-    /* +0x98 */ u8 color_0x98; /* white */
-    /* +0x99 */ u8 color_0x99;
-    /* +0x9A */ u8 color_0x9A;
-    /* +0x9B */ u8 color_0x9B;
-    /* +0x9C */ u8 color_0x9C; /* black */
-    /* +0x9D */ u8 color_0x9D;
-    /* +0x9E */ u8 color_0x9E;
-    /* +0x9F */ u8 color_0x9F;
-} EfSysDefaultRecord; /* size: 0xA0 */
 
 /* This unit's `.data`: the `__FILE__` string, the assert messages and the class table the last
  * constructor stores (`lbl_8059283C`), declared, never defined. */
@@ -195,16 +117,7 @@ extern const char lbl_8059274C[];
 extern const char lbl_80592788[];
 extern const char lbl_805927AC[];
 extern const char lbl_805927E0[];
-extern void* lbl_8059283C[];
 
-/* This unit's `.sbss`/`.bss`/`.sdata2` objects: the three engine objects the system holds, the 0xA0-byte
- * record, the system singleton and its link record, and the record's two float constants. */
-extern void* lbl_80794910; /* the three borrowed engine objects (their constructors are below) */
-extern void* lbl_80794914;
-extern void* lbl_80794918;
-extern u8 lbl_80688420[];
-extern u8 lbl_806884D0[];
-extern u8 lbl_806884C0[];
 extern f32 lbl_80795FF8;
 extern f32 lbl_80795FFC;
 
@@ -228,12 +141,6 @@ u32 fn_800A5F4C(EfSys* self, u32 groupID);
 void fn_800A602C(EfSys* self, const nw4r::math::VEC3* pos, const nw4r::math::MTX34* src, f32 a, f32 b);
 void* ef_draw_info_projection(EfSysAccessObj* self);
 nw4r::math::MTX34* fn_800A60C0(EfSysAccessObj* self);
-void fn_800A60C8(void);
-void* fn_800A6134(EfSysDefaultRecord* self);
-EfSysVtblObj* fn_800A61EC(EfSysVtblObj* self);
-EfSysVtblObj* fn_800A61FC(EfSysVtblObj* self);
-EfSysVtblObj* fn_800A620C(EfSysVtblObj* self);
-EfSysVtblObj* fn_800A6248(EfSysVtblObj* self);
 
 /* the callees */
 void fn_800A4030(void* list, u16 linkOffset);
@@ -251,12 +158,9 @@ u16 fn_8009B374(void* list, void** buf, u16 size);
 void* mtx34_identity(void* mtx);
 void* mtx34_get_ptr(void* mtx);
 void* mtx34_const_ptr(const void* src);
-void fn_800A559C(EfSys* self); /* the system's constructor lives in ef/ef_effect.cpp */
-void fn_800A5618(EfSys* self, s16 flag); /* ... and so does its destructor */
 void* __construct_new_array(void* block, void* (*ctor)(void*), void (*dtor)(void*), u32 size,
                             u32 count);
 void __throw(void*, void*, void*) __attribute__((noreturn)); /* the EABI rethrow */
-void __register_global_object(void* object, void* dtor, void* link);
 void PSMTXCopy(const void* src, void* dst);
 }
 
@@ -293,6 +197,62 @@ void PSMTXCopy(const void* src, void* dst);
     }
 
 #define NW4R_EF_MAX_EFFECT 0x200
+
+namespace nw4r {
+namespace ef {
+
+/* The default draw info the system draws with: `nw4r::ef::DrawInfo`'s constructor sets both matrices to the
+ * identity, lighting and fog off, unit scales and a white material over a black ambient colour. */
+class DrawInfo : public EfDrawInfo {
+public:
+    DrawInfo() {
+        MTX34_ctor(&view_mtx);
+        MTX34_ctor(&mtx_0x30);
+        VEC3_ctor(&depth_origin);
+        mtx34_identity(&view_mtx);
+        mtx34_identity(&mtx_0x30);
+        light_enable = false;
+        light_mask = 0;
+        light_mask1 = 0;
+        is_spot_light = true;
+        fog_type = 0;
+        f32 zero;
+        f32 one = lbl_80795FF8;
+
+        fog_start_z = one;
+        zero = lbl_80795FFC;
+        fog_end_z = zero;
+        fog_near_z = one;
+        fog_far_z = zero;
+        depth_offset = one;
+        depth_origin.x = one;
+        depth_origin.y = one;
+        depth_origin.z = one;
+        mat_color.b = 0xFF;
+        mat_color.g = 0xFF;
+        mat_color.r = 0xFF;
+        mat_color.a = 0xFF;
+        amb_color.b = 0;
+        amb_color.g = 0;
+        amb_color.r = 0;
+        amb_color.a = 0xFF;
+    }
+}; /* size: 0xA0 */
+
+/* The objects the system hands out, in construction order (the static initializer builds them). */
+static DrawOrder sDrawOrder;
+static DrawStrategyBuilder sDrawStrategyBuilder;
+static EmitterFormBuilder sEmitterFormBuilder;
+static DrawInfo sDrawInfo;
+
+} // namespace ef
+} // namespace nw4r
+
+/* Set once the library version has been registered. */
+u32 ef_system_version_registered;
+
+/* The system singleton (its constructor and destructor are `ef/ef_effect.cpp`'s). */
+EfSys ef_system_instance;
 
 /* The system's allocator, reached through `ef_system_memory_manager` (the map's `GetMemoryManager__Q34nw4r2ef12EffectSystemCFv`
  * sits at an .init offset, not here). */
@@ -332,9 +292,9 @@ extern "C" u32 fn_800A56B0(EfSys* self, u32 maxGroupID) {
         ef_activity_list_clear(&self->mActivityList[i]);
     }
     fn_800A5900(&self->mRandom, 0);
-    self->mDrawOrder = &lbl_80794910;
-    self->mStrategy = &lbl_80794914;
-    self->mLineStrategy = &lbl_80794918;
+    self->mDrawOrder = &nw4r::ef::sDrawOrder;
+    self->mStrategy = &nw4r::ef::sDrawStrategyBuilder;
+    self->mLineStrategy = &nw4r::ef::sEmitterFormBuilder;
     return 1;
 }
 
@@ -495,84 +455,9 @@ extern "C" nw4r::math::MTX34* fn_800A60C0(EfSysAccessObj* self) {
     return &self->mtx_0x58;
 }
 
-/* 0x800A60C8 - the file's static initializer: the three borrowed engine objects, the 0xA0-byte record,
- * then the system singleton and the link that registers its destructor. */
-extern "C" void fn_800A60C8(void) {
-    fn_800A620C((EfSysVtblObj*)&lbl_80794910);
-    fn_800A61FC((EfSysVtblObj*)&lbl_80794914);
-    fn_800A61EC((EfSysVtblObj*)&lbl_80794918);
-    fn_800A6134((EfSysDefaultRecord*)lbl_80688420);
-    fn_800A559C((EfSys*)lbl_806884D0);
-    __register_global_object(lbl_806884D0, (void*)fn_800A5618, lbl_806884C0);
-}
-
-/* The `.ctors` word (0x8056F2D8) the split assigns to this unit - it points at the initializer. */
-__declspec(section ".ctors") void* const lbl_8056F2D8 = (void*)fn_800A60C8;
-
-/* The pass is on from here: fn_800A6134 keeps its two constants in f1/f0 across the stores. */
-#pragma peephole on
-
-/* 0x800A6134 - the constructor of the 0xA0-byte record the game allocates at 0x800D3D0C. */
-extern "C" void* fn_800A6134(EfSysDefaultRecord* self) {
-    MTX34_ctor(&self->mtx_0x00);
-    MTX34_ctor(&self->mtx_0x30);
-    VEC3_ctor(&self->vec_0x8C);
-    mtx34_identity(&self->mtx_0x00);
-    mtx34_identity(&self->mtx_0x30);
-    self->field_0x60 = 0;
-    self->field_0x64 = 0;
-    self->field_0x68 = 0;
-    self->field_0x6C = 1;
-    self->field_0x70 = 0;
-    f32 zero;
-    f32 one = lbl_80795FF8;
-
-    self->scale_0x74 = one;
-    zero = lbl_80795FFC;
-    self->scale_0x78 = zero;
-    self->scale_0x7C = one;
-    self->scale_0x80 = zero;
-    self->scale_0x88 = one;
-    self->vec_0x8C.x = one;
-    self->vec_0x8C.y = one;
-    self->vec_0x8C.z = one;
-    self->color_0x9A = 0xFF;
-    self->color_0x99 = 0xFF;
-    self->color_0x98 = 0xFF;
-    self->color_0x9B = 0xFF;
-    self->color_0x9E = 0;
-    self->color_0x9D = 0;
-    self->color_0x9C = 0;
-    self->color_0x9F = 0xFF;
-    return self;
-}
-
-#pragma peephole off
-
-/* 0x800A61EC - the line-strategy object's constructor (ef_line.cpp's class; its key function is there). */
-extern "C" EfSysVtblObj* fn_800A61EC(EfSysVtblObj* self) {
-    self->vtable = lbl_80594EC4;
-    return self;
-}
-
-/* 0x800A61FC - the strategy object's constructor (ef_drawstrategyimpl.cpp's class). */
-extern "C" EfSysVtblObj* fn_800A61FC(EfSysVtblObj* self) {
-    self->vtable = lbl_80594840;
-    return self;
-}
-
-/* 0x800A620C - the draw-order list object's constructor (ef_draworder.cpp's class). */
-extern "C" EfSysVtblObj* fn_800A620C(EfSysVtblObj* self) {
-    fn_800A6248(self);
-    self->vtable = lbl_8059241C;
-    return self;
-}
-
-/* 0x800A6248 - that class's base constructor. */
-extern "C" EfSysVtblObj* fn_800A6248(EfSysVtblObj* self) {
-    self->vtable = lbl_8059283C;
-    return self;
-}
 
 
 
+
+
+#pragma dont_inline on
