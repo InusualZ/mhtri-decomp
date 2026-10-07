@@ -18,6 +18,7 @@
  *   `fillNetUserProfile*` (declared in `userdata_item.h`); `refreshRosterCache`, `copyPeerProfileCard`, `sendPeerMessage`,
  *   `net_peer_address` and the `NetPeerCard` fields from what the bodies copy.
  *   GUESS: `requestReadyOnAlias`, `requestReadyOnAlias2`
+ *   GUESS: `getOwnMemberFlag`, `getProfileFlag`
  * RESIDUALS. Partial: the static initialiser 0x80437204 (the map names it after the compiler's `__sinit`)
  *   - typing `net_community_state` as `NetworkCommunityPeer` (with its constructor/destructor declared in
  *     `Network/NetworkCommunityPat.h` and defined there) makes the static initialiser call them as retail does, but
@@ -1629,7 +1630,7 @@ BOOL isPartyCountRead(void)
 /*
  * This player's own member flag in the selected party (0 while counted ready, unjoined or unselected).
  */
-u8 getOwnMemberFlag(void)
+u32 getOwnMemberFlag(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
     NetMemberSlot* member;
@@ -1653,7 +1654,7 @@ u8 getOwnMemberFlag(void)
 /*
  * The selected party's flag byte at +0x8D (0 while counted ready or unselected).
  */
-u8 getProfileFlag(void)
+u32 getProfileFlag(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
 

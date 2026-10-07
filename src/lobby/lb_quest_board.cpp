@@ -8,7 +8,7 @@
  *   0x8079C2EC-0x8079C300 and owns the one extab/extabindex record after `lb_quest_board_flash_move`'s).
  * FLAGS. `cflags_lobby`; `#pragma pool_data off` (retail materialises each table with its own `lis`/`addi`);
  *   `#pragma peephole off` file-wide (retail keeps `and`/`subi`/`extsb` + `cmpwi` unfused; playbook 39) except
- *   `lb_quest_board_step_screen` and `lb_quest_board_effect_spawn`, which measure better with it on.  `#pragma optimization_level 4` around
+ *   `lb_quest_board_step_screen`, which measures better with it on.  `#pragma optimization_level 4` around
  *   `lb_quest_board_draw_task`, `_effect_init` and `_effect_move` (retail's subi + cmplwi switch ranges, playbook 108).
  * NAMES. `lb_quest_board` is a GUESS from the range's one real map name, `draw_quest_board` (0x80394DA4), in the
  *   module's `lb_*` scheme; every other name is a GUESS from its body.  Module `lobby`: 42 `lobby_w` reads, `LbStr`,
@@ -96,7 +96,7 @@ s32 lb_quest_board_accept_input(void);
 void lb_quest_board_begin_panel(void);
 void lb_quest_board_end_panel(LbQuestBoardWork* work);
 void lb_quest_board_cancel(void);
-_EFT* lb_quest_board_model_spawn(_LB_NPC* npc, s8 kind);
+_EFT* lb_quest_board_model_spawn(_LB_NPC* npc, u8 kind);
 void lb_quest_board_step_screen(void);
 s32 lb_quest_board_list_input(LbQuestBoardWork* work);
 s32 lb_quest_board_detail_input(LbQuestBoardWork* work);
@@ -1027,10 +1027,9 @@ extern "C" void lb_quest_board_reset(s32 unused, s32 mode) {
     quest_board_flags_send(work->data_0x264->flags_0xB01, work->data_0x264->param_0xB02);
 }
 
-#pragma peephole on
 /* 0x80395D04 (0xF0): Spawns a kind-`kind` effect riding on the NPC `npc`'s joint `joint`, at `offset` from it, with
  * the parameter scale `scale` - when the NPC is in the current area. */
-extern "C" void lb_quest_board_effect_spawn(_LB_NPC* npc, s8 kind, u32 joint, VEC3* offset, f32 scale) {
+extern "C" void lb_quest_board_effect_spawn(_LB_NPC* npc, u8 kind, u32 joint, VEC3* offset, f32 scale) {
     _EFT* self;
     LbQuestBoardEft* work;
 
@@ -1057,14 +1056,12 @@ extern "C" void lb_quest_board_effect_spawn(_LB_NPC* npc, s8 kind, u32 joint, VE
     }
 }
 
-#pragma peephole off
 /* 0x80395DF4 (0x124): Spawns a kind-`kind` model effect on the NPC `npc` (in the current area only): one model out of
  * the effect-model pool; null when either pool is empty. */
-extern "C" _EFT* lb_quest_board_model_spawn(_LB_NPC* npc, s8 kind) {
+extern "C" _EFT* lb_quest_board_model_spawn(_LB_NPC* npc, u8 kind) {
     _EFT* self;
     LbQuestBoardEft* work;
     s32 i;
-    MHchar** model;
 
     if (npc->field_0x004 != get_now_areano()) {
         return NULL;
@@ -1078,9 +1075,9 @@ extern "C" _EFT* lb_quest_board_model_spawn(_LB_NPC* npc, s8 kind) {
     self->dispatch_0x34 = lb_quest_board_step;
     work = (LbQuestBoardEft*)self->work_0x38;
     work->count = 1;
-    for (i = 0, model = &work->model; i < work->count; i++, model++) {
-        *model = (MHchar*)eft_res_model_get();
-        if (*model == NULL) {
+    for (i = 0; i < work->count; i++) {
+        work->models[i] = (MHchar*)eft_res_model_get();
+        if (work->models[i] == NULL) {
             eft_res_slot_release(self);
             return NULL;
         }
