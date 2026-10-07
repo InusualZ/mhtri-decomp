@@ -20,6 +20,8 @@
  *   elsewhere), `.sdata` 0x4 emitted and not claimed.
  * SHAPES. every accessor copy another unit keeps is called through its class (g3d/g3d_rescommon.h); the copies
  *   this TU keeps are defined here in retail's order.
+ *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except GetIndirectMethod, ResMatMiscData's assignment and the first GXGetIndTexMtx,
+ *   which measure better with the pass on.
  */
 
 #include "types.h"
@@ -39,6 +41,8 @@
 #include "fn_8004CAD8.h"
 #include "fn_80047398.h"
 #include "RVLGX/GXTexture_tail.h"
+
+#pragma peephole off
 
 #pragma pool_data off
 
@@ -381,6 +385,7 @@ void ResMatMisc::SetIndirectMethod(_GXIndTexMtxID id, ResMatMiscData::IndirectMe
 }
 
 /* 0x80095ADC (0xE8): reads indirect matrix `id`'s method and the light a normal map follows. */
+#pragma peephole on
 void ResMatMisc::GetIndirectMethod(_GXIndTexMtxID id, ResMatMiscData::IndirectMethod* pMethod, s8* pNormalMapRef) const {
     RESMAT_ASSERT(IsValid(), 903, "IsValid()");
     RESMAT_ASSERT(id == GX_ITM_0 || id == GX_ITM_1 || id == GX_ITM_2, 907, "id == GX_ITM_0 || id == GX_ITM_1 || id == GX_ITM_2");
@@ -394,6 +399,7 @@ void ResMatMisc::GetIndirectMethod(_GXIndTexMtxID id, ResMatMiscData::IndirectMe
         }
     }
 }
+#pragma peephole off
 
 /* 0x80095BC4 (0x80): copies the block to `pDst` and returns a handle on the copy. */
 /* untyped: byte range */
@@ -404,6 +410,7 @@ ResMatMisc ResMatMisc::CopyTo(void* pDst) const {
 }
 
 /* 0x80095C44 (0x34): copies the four bytes and the two indirect tables. */
+#pragma peephole on
 ResMatMiscData& ResMatMiscData::operator=(const ResMatMiscData& rhs) {
     zCompLoc = rhs.zCompLoc;
     light_set_idx = rhs.light_set_idx;
@@ -413,6 +420,7 @@ ResMatMiscData& ResMatMiscData::operator=(const ResMatMiscData& rhs) {
     normal_map_ref_word = rhs.normal_map_ref_word;
     return *this;
 }
+#pragma peephole off
 
 NW4R_G3D_RESOURCE_REF_CONST(ResMatMisc, RESMAT_AC_FILE, 243)
 NW4R_G3D_RESOURCE_CLASS_NAME(ResMatMisc)
@@ -617,6 +625,7 @@ void ResMatIndMtxAndScale::CallDisplayList(u8 indNum, bool bSync) const {
 }
 
 /* 0x80096624 (0x344): reads indirect matrix `id` (1..3) from the display list, the scale folded in. */
+#pragma peephole on
 bool ResMatIndMtxAndScale::GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx) const {
     const u8* pDL;
     switch (id) {
@@ -669,6 +678,7 @@ bool ResMatIndMtxAndScale::GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx) 
     }
     return true;
 }
+#pragma peephole off
 
 /* 0x80096968 (0x244): reads indirect matrix `id` (1..3) and its scale exponent from the display list. */
 bool ResMatIndMtxAndScale::GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx, s8* pScaleExp) const {

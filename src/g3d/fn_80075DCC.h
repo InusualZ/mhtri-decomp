@@ -43,7 +43,6 @@ const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
 const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
 
 /* The ScnMdl/ScnMdlSimple material and draw-buffer helpers `g3d/g3d_scnmdl.cpp` calls. */
-s32 fn_8007B764(void* pSelf);  /* 0x8007B764 - a name-record reader */
 u32 fn_8007C464(void* pSelf);
 s32 fn_80077E34(s32 pOut, void* pIn);  /* 0x80077E34 - builds the model view the node walks read */
 

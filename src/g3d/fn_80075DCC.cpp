@@ -41,6 +41,8 @@
  *   ScnLeaf's destructor is complete with an empty body (the compiler emits the base call and the deleting tail).
  * SHAPES. The CopiedMatResources constructor is complete: its work is the member initialisers.  The material
  *   resource constructors keep `#pragma peephole off` (retail keeps `clrlwi` + `cmpwi` for the alignment test).
+ *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except fn_800761BC, fn_800777B0, fn_8007A1B8, fn_8007A2A8, fn_8007A354 and fn_8007BB94,
+ *   which measure better with the pass on.
  */
 
 #include "types.h"
@@ -66,13 +68,13 @@
 #include "MSL/algorithm.h"     /* std::find / std::distance */
 #include "unsplit/g3d.h"      /* the scene objects' type-name records no unit owns (rule 2) */
 
-#define M2C_ERROR(x) /* unknown instruction */
+#pragma peephole off
 
+#define M2C_ERROR(x) /* unknown instruction */
 
 
 /* Data objects the range references (unsplit, address-only). */
 extern u32 lbl_8056F658;
-extern u32 lbl_8056F678;
 extern const char lbl_8058E570[];
 extern const char lbl_8058E57C[];
 extern const char lbl_8058E5B0[];
@@ -328,7 +330,6 @@ u32 math_sincos_idx(f32);
 /* internal */ void fn_8007B540(void* a0);
 /* internal */ void fn_8007B5BC(void* a0);
 /* internal */ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
-/* internal */ s32 fn_8007B764(void* a0);
 /* internal */ s32 fn_8007B794(s32 arg0, s16 arg1);
 /* internal */ s32 dtor_8007B7F0(s32 arg0, s16 arg1);
 /* internal */ s32 fn_8007B834(s32 arg0);
@@ -506,6 +507,7 @@ typedef struct {
     /* +0x24 */ s32 field_0x24;
     /* +0x28 */ u32 field_0x28;
 } RawView_2; /* size: 0x2C */
+#pragma peephole on
 u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
 
     u32 sp90;
@@ -643,6 +645,7 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
         g3d_state_load_mat_ind_mtx(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp8)), (G3dIndMtxCallback*)((void*)(arg3)));
     }
 }
+#pragma peephole off
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x30];
@@ -671,7 +674,6 @@ extern "C" {
 
 } /* extern "C" */
 
-#pragma peephole off
 /* 0x800766D0 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatTexCoordGen::ResMatTexCoordGen(void* pData) : ResCommon<ResMatTexCoordGenData>(pData) {
@@ -679,7 +681,6 @@ nw4r::g3d::ResMatTexCoordGen::ResMatTexCoordGen(void* pData) : ResCommon<ResMatT
         nw4r::db::Panic((const char*)&lbl_8058E758, 0x201, (const char*)&lbl_8058E730);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -701,7 +702,6 @@ bool nw4r::g3d::ResMatTexCoordGen::IsValid() const {
 extern "C" {
 
 
-
 } /* extern "C" */
 
 /* 0x80076764 (0x30): returns the material's MatPix block. */
@@ -713,7 +713,6 @@ extern "C" {
 
 } /* extern "C" */
 
-#pragma peephole off
 /* 0x80076794 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatPix::ResMatPix(void* pData) : ResCommon<ResMatPixData>(pData) {
@@ -721,7 +720,6 @@ nw4r::g3d::ResMatPix::ResMatPix(void* pData) : ResCommon<ResMatPixData>(pData) {
         nw4r::db::Panic((const char*)&lbl_8058E790, 0x154, (const char*)&lbl_8058E768);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -757,7 +755,6 @@ extern "C" {
 
 } /* extern "C" */
 
-#pragma peephole off
 /* 0x8007685C (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResGenMode::ResGenMode(void* pData) : ResCommon<ResGenModeData>(pData) {
@@ -765,7 +762,6 @@ nw4r::g3d::ResGenMode::ResGenMode(void* pData) : ResCommon<ResGenModeData>(pData
         nw4r::db::Panic((const char*)&lbl_8058E870, 0xAF, (const char*)&lbl_8058E848);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -838,7 +834,6 @@ extern "C" {
 
 } /* extern "C" */
 
-#pragma peephole off
 /* 0x80076988 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatMisc::ResMatMisc(void* pData) : ResCommon<ResMatMiscData>(pData) {
@@ -846,7 +841,6 @@ nw4r::g3d::ResMatMisc::ResMatMisc(void* pData) : ResCommon<ResMatMiscData>(pData
         nw4r::db::Panic((const char*)&lbl_8058E838, 0xF3, (const char*)&lbl_8058E810);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -1115,7 +1109,6 @@ u32 fn_80077738(s32 *arg0, s32 *arg1) {
 
 } /* extern "C" */
 
-#pragma peephole off
 /* 0x80077744 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatFur::ResMatFur(void* pData) : ResCommon<ResMatFurData>(pData) {
@@ -1123,7 +1116,6 @@ nw4r::g3d::ResMatFur::ResMatFur(void* pData) : ResCommon<ResMatFurData>(pData) {
         nw4r::db::Panic((const char*)&lbl_8058E7C8, 0x11F, (const char*)&lbl_8058E7A0);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -1165,6 +1157,7 @@ typedef struct {
     /* +0x1C */ u32 field_0x1C;
     /* +0x20 */ u32 field_0x20;
 } RawView_19; /* size: 0x24 */
+#pragma peephole on
 void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
     u32 sp54;
     u32 sp58;
@@ -1362,6 +1355,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
     M2C_ERROR(/* unknown instruction: vmrghb v29, v1, v0 */);
     return temp_r3;
 }
+#pragma peephole off
 
 s32 fn_80077D4C(s32 *arg0) {
     return (*arg0 & 2) != 0;
@@ -1666,7 +1660,6 @@ extern "C" {
 
 } /* extern "C" */
 
-#pragma peephole off
 /* 0x800783EC (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResTev::ResTev(void* pData) : ResCommon<ResTevData>(pData) {
@@ -1674,7 +1667,6 @@ nw4r::g3d::ResTev::ResTev(void* pData) : ResCommon<ResTevData>(pData) {
         nw4r::db::Panic((const char*)&lbl_8058EA90, 0x25, (const char*)&lbl_8058EA64);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -1845,7 +1837,6 @@ u32 fn_800789B8(s32 *arg0, s32 *arg1) {
 
 } /* extern "C" */
 
-#pragma peephole off
 /* 0x800789C4 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResShp::ResShp(void* pData) : ResCommon<ResShpData>(pData) {
@@ -1853,7 +1844,6 @@ nw4r::g3d::ResShp::ResShp(void* pData) : ResCommon<ResShpData>(pData) {
         nw4r::db::Panic((const char*)&lbl_8058EA20, 0x3A, (const char*)&lbl_8058E9F4);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -1866,7 +1856,6 @@ extern "C" {
 
 } /* extern "C" */
 
-#pragma peephole off
 /* 0x80078A30 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMat::ResMat(void* pData) : ResCommon<ResMatData>(pData) {
@@ -1874,7 +1863,6 @@ nw4r::g3d::ResMat::ResMat(void* pData) : ResCommon<ResMatData>(pData) {
         nw4r::db::Panic((const char*)&lbl_8058EAC8, 0x26D, (const char*)&lbl_8058EAA0);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -2269,6 +2257,7 @@ typedef struct {
     /* +0x10 */ u32 field_0x10;
     /* +0x14 */ s32 field_0x14;
 } RawView_45; /* size: 0x18 */
+#pragma peephole on
 void fn_8007A1B8(s32 arg0, s32 *arg1, f32 *arg2, f32 *arg3, f32 *arg4, f32 *arg5, s32 arg6, u32 arg_sp0) {
     void *temp_r3;
 
@@ -2297,6 +2286,7 @@ void fn_8007A1B8(s32 arg0, s32 *arg1, f32 *arg2, f32 *arg3, f32 *arg4, f32 *arg5
         }
     }
 }
+#pragma peephole off
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x1A];
@@ -2307,6 +2297,7 @@ typedef struct {
     /* +0x1E */ u8 field_0x1E;
     /* +0x1F */ u8 field_0x1F;
 } RawView_46; /* size: 0x20 */
+#pragma peephole on
 void fn_8007A2A8(s32 arg0, u16 arg1, s16 arg2, s32 arg3) {
     void *temp_r3;
 
@@ -2319,6 +2310,7 @@ void fn_8007A2A8(s32 arg0, u16 arg1, s16 arg2, s32 arg3) {
         fn_804B9C60((void*)(&((RawView_46*)temp_r3)->field_0x1C), (u16)(arg1), (s32)(fn_80075844((s32)(arg3))));
     }
 }
+#pragma peephole off
 
 typedef struct {
     /* +0x00 */ u32 field_0x00;
@@ -2336,6 +2328,7 @@ typedef struct {
     /* +0x1E */ u8 field_0x1E;
     /* +0x1F */ u8 field_0x1F;
 } RawView_47; /* size: 0x20 */
+#pragma peephole on
 void fn_8007A354(s32 arg0) {
     s32 sp8;
     void *temp_r3;
@@ -2352,6 +2345,7 @@ void fn_8007A354(s32 arg0) {
         GXSetFog((s32)(((RawView_47*)temp_r3)->field_0x00), (void*)(&sp8), (f32)(((RawView_47*)temp_r3)->field_0x04), (f32)(((RawView_47*)temp_r3)->field_0x08), (f32)(((RawView_47*)temp_r3)->field_0x0C), (f32)(((RawView_47*)temp_r3)->field_0x10));
     }
 }
+#pragma peephole off
 
 void fn_8007A400(s32 arg0) {
     u32 *var_r3;
@@ -2740,7 +2734,6 @@ typedef struct {
 }   /* extern "C": the scene object members below have C++ linkage */
 
 /* 0x8007B5C0 (0x34): whether the object's flags disable G3dProc pass `task`. */
-#pragma peephole off
 bool nw4r::g3d::ScnObj::IsG3dProcDisabled(u32 task) const
 {
     if (task < 9 && ((1 << (task - 1)) & mScnObjFlags)) {
@@ -2748,7 +2741,6 @@ bool nw4r::g3d::ScnObj::IsG3dProcDisabled(u32 task) const
     }
     return false;
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -2793,7 +2785,6 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnObj::GetTypeObjStatic()
 extern "C" {
 
 
-
 }   /* extern "C": the scene object members below have C++ linkage */
 
 /* 0x8007B6FC (0x30): returns the ScnGroup type. */
@@ -2804,7 +2795,6 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnGroup::GetTypeObjStatic()
 }
 
 extern "C" {
-
 
 
 /* 0x8007B72C (0x8): stores `v` through `out` and returns `out`. */
@@ -2826,8 +2816,16 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnMdlSimple::GetTypeObjStatic()
 extern "C" {
 
 
-s32 fn_8007B764(void* a0) {
+}   /* extern "C": the ScnMdl member below has C++ linkage */
+
+/* 0x8007B764 (0x30): returns the ScnMdl type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnMdl::GetTypeObjStatic()
+{
+    void* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name((const u8**)&pName, scn_typename_ScnMdl));
 }
+
+extern "C" {
 
 
 s32 fn_8007B794(s32 arg0, s16 arg1) {
@@ -2913,7 +2911,6 @@ typedef struct {
 }   /* extern "C": the scene object members below have C++ linkage */
 
 /* 0x8007B9D4 (0x2C): sets or clears `flag`'s bits. */
-#pragma peephole off
 void nw4r::g3d::ScnObj::SetScnObjFlag(ScnObjFlag flag, u32 on)
 {
     if (on) {
@@ -2922,7 +2919,6 @@ void nw4r::g3d::ScnObj::SetScnObjFlag(ScnObjFlag flag, u32 on)
         mScnObjFlags &= ~flag;
     }
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -2943,11 +2939,9 @@ u32 fn_8007BA38(s32 *arg0, s32 *arg1) {
 }   /* extern "C": the scene object members below have C++ linkage */
 
 /* 0x8007BA44 (0x5C): destroys the leaf. */
-#pragma peephole off
 nw4r::g3d::ScnLeaf::~ScnLeaf()
 {
 }
-#pragma peephole on
 
 extern "C" {
 
@@ -2989,7 +2983,6 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnLeaf::GetTypeObjStatic()
 extern "C" {
 
 
-
 /* 0x8007BB8C (0x8): stores `v` through `out` and returns `out`. */
 const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v)
 {
@@ -3001,6 +2994,7 @@ typedef struct {
     /* +0x00 */ u8 pad_0x00[0x140];
     /* +0x140 */ u32 field_0x140;
 } RawView_70; /* size: 0x144 */
+#pragma peephole on
 u32 fn_8007BB94(void *arg0, s32 arg1, s32 arg2) {
     s32 temp_r3;
     s32 * temp_r6;
@@ -3009,6 +3003,7 @@ u32 fn_8007BB94(void *arg0, s32 arg1, s32 arg2) {
     temp_r3 = arg1 * 4;
     *(temp_r6 + temp_r3) = *(temp_r6 + temp_r3) | arg2;
 }
+#pragma peephole off
 
 typedef struct {
     /* +0x00 */ u32 field_0x00;
@@ -3169,7 +3164,6 @@ extern "C" {
 }   /* extern "C": the scene object members below have C++ linkage */
 
 /* 0x8007B48C (0x58): runs the callback's CALC_VIEW hook at `timing` when it is enabled for the pass and the timing. */
-#pragma peephole off
 /* untyped: caller-owned payload - the pass's info block */
 void nw4r::g3d::ScnObj::CheckCallback_CALC_VIEW(Timing timing, u32 param, void* pInfo)
 {
@@ -3177,14 +3171,12 @@ void nw4r::g3d::ScnObj::CheckCallback_CALC_VIEW(Timing timing, u32 param, void* 
         mpFnCallback->ExecCallback_CALC_VIEW(timing, this, param, pInfo);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
 }   /* extern "C": the scene object members below have C++ linkage */
 
 /* 0x8007B4E8 (0x58): runs the callback's CALC_MAT hook at `timing` when it is enabled for the pass and the timing. */
-#pragma peephole off
 /* untyped: caller-owned payload - the pass's info block */
 void nw4r::g3d::ScnObj::CheckCallback_CALC_MAT(Timing timing, u32 param, void* pInfo)
 {
@@ -3192,14 +3184,12 @@ void nw4r::g3d::ScnObj::CheckCallback_CALC_MAT(Timing timing, u32 param, void* p
         mpFnCallback->ExecCallback_CALC_MAT(timing, this, param, pInfo);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
 }   /* extern "C": the scene object members below have C++ linkage */
 
 /* 0x8007B564 (0x58): runs the callback's CALC_WORLD hook at `timing` when it is enabled for the pass and the timing. */
-#pragma peephole off
 /* untyped: caller-owned payload - the pass's info block */
 void nw4r::g3d::ScnObj::CheckCallback_CALC_WORLD(Timing timing, u32 param, void* pInfo)
 {
@@ -3207,14 +3197,12 @@ void nw4r::g3d::ScnObj::CheckCallback_CALC_WORLD(Timing timing, u32 param, void*
         mpFnCallback->ExecCallback_CALC_WORLD(timing, this, param, pInfo);
     }
 }
-#pragma peephole on
 
 extern "C" {
 
 }   /* extern "C": the scene object members below have C++ linkage */
 
 /* 0x8007B8E4 (0x58): runs the callback's DRAW_XLU hook at `timing` when it is enabled for the pass and the timing. */
-#pragma peephole off
 /* untyped: caller-owned payload - the pass's info block */
 void nw4r::g3d::ScnObj::CheckCallback_DRAW_XLU(Timing timing, u32 param, void* pInfo)
 {
@@ -3222,10 +3210,8 @@ void nw4r::g3d::ScnObj::CheckCallback_DRAW_XLU(Timing timing, u32 param, void* p
         mpFnCallback->ExecCallback_DRAW_XLU(timing, this, param, pInfo);
     }
 }
-#pragma peephole on
 
 /* 0x8007B940 (0x58): runs the callback's DRAW_OPA hook at `timing` when it is enabled for the pass and the timing. */
-#pragma peephole off
 /* untyped: caller-owned payload - the pass's info block */
 void nw4r::g3d::ScnObj::CheckCallback_DRAW_OPA(Timing timing, u32 param, void* pInfo)
 {
@@ -3233,7 +3219,6 @@ void nw4r::g3d::ScnObj::CheckCallback_DRAW_OPA(Timing timing, u32 param, void* p
         mpFnCallback->ExecCallback_DRAW_OPA(timing, this, param, pInfo);
     }
 }
-#pragma peephole on
 
 extern "C" {
 }

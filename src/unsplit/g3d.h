@@ -28,6 +28,8 @@ extern "C" {
 /* 0x8056F688 - the "ScnMdlSimple" type-name record (`.rodata`: a length word, then the NUL-terminated name)
  * ScnMdlSimple's run-time type members read; no registered range covers it. */
 extern u8 scn_typename_ScnMdlSimple[];
+/* 0x8056F678 - the "ScnMdl" type-name record ScnMdl's run-time type members read; no registered range covers it. */
+extern u8 scn_typename_ScnMdl[];
 #ifdef __cplusplus
 }
 #endif

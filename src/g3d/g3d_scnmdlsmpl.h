@@ -19,10 +19,6 @@ extern "C" {
  * their consumers spell the stems). */
 void fn_80080B10(void* arg0, u32 arg1);
 void fn_800810DC(void* arg0, s32 arg1);
-/* The ScnMdlSimple constructor and destructor `g3d/g3d_scnmdl.cpp`'s C-style ScnMdl constructor and destructor call
- * by their map stems until ScnMdl is a class (0x80080C60, 0x80080F7C). */
-void fn_80080C60(void* pSelf, void* pArg2, u32* pArg3);
-void dtor_80080F7C(void* pSelf, s32 flag);
 
 #ifdef __cplusplus
 }

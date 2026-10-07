@@ -12,12 +12,12 @@
  *   (the ResMdlInfo handle and its view-matrix count).
  * RESIDUALS. Unwritten (objdiff scores it zero): g3d_calc_skinning.  Partial: fn_800736F8, g3d_calc_world, fn_80073CE0,
  *   fn_80073D34, fn_80073F00, addVec3To.
- *   Relocation names that differ from retail: `g3d_calc_world` calls `fn_8050133C` where retail calls
- *   `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3` (undefined in a flip).
  *   flipcheck: `.text` 0xAD0 of 0xFE4; `.data` is claimed and not emitted; `.sdata` is 0x4 of 0x10, `.sdata2` 0x4
  *   of 0x8.
  * SHAPES. `#pragma peephole off` around fn_8007403C keeps retail's masked compare (playbook 32); file-scope
  *   `#pragma fp_contract off`.
+ *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
+ *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
  */
 
 
@@ -26,8 +26,11 @@
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
+#include "nw4r/fn_805012C4.h" /* nw4r::math::MTX34Scale (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_8006FDCC..mtx34_copy_ps (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+
+#pragma peephole off
 
 /* The target object contains no fused multiply-add at all while `cflags_g3d` passes
  * `-fp_contract on`, so the original file carried the pragma. File-scoped (see header). */
@@ -65,7 +68,6 @@ extern "C" void fn_80098D5C(void* pA, const void* pB);
 extern "C" void fn_80098F6C(void* pA, void* pOut);
 extern "C" s32 fn_800D77B0(void* pA, void* pB, void* pC, void* pD, s32 e, void* pF);
 extern "C" s32 fn_800D7D24(void* pA, void* pB, void* pC, void* pD, s32 e, void* pF);
-extern "C" void fn_8050133C(void* pOut, const void* pA, const void* pB);
 
 /* The panic file/format strings the target references as map symbols. They are extern here rather
  * than literals: MWCC's `-str reuse` would pool a literal into one blob and address it through a
@@ -355,7 +357,9 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
             }
             f32* pS = pScale + mtxID * 3;
             if (1.0f != pS[0] || 1.0f != pS[1] || 1.0f != pS[2]) {
-                fn_8050133C(pMtxArray + mtxID * 0x30, pMtxArray + mtxID * 0x30, pS);
+                nw4r::math::MTX34Scale((nw4r::math::MTX34*)(pMtxArray + mtxID * 0x30),
+                                       (const nw4r::math::MTX34*)(pMtxArray + mtxID * 0x30),
+                                       (const nw4r::math::VEC3*)pS);
             }
         }
         if (pNodeCallback2 != NULL) {
@@ -445,11 +449,9 @@ void fn_80073FA0(NodeMtxRec* pDst, const NodeMtxRec* pSrc) {
 
 /* `peephole off` keeps retail's generic `!= 0` conversion (`rlwinm r3,r3,0,4,4; neg; or; srwi`), which `-O3`
  * folds into one `rlwinm r3,r3,5,31,31` (playbook 32). */
-#pragma peephole off
 s32 fn_8007403C(u32 flags) {
     return (flags & 0x08000000) != 0;
 }
-#pragma peephole on
 
 s32 fn_80074050(const void* p) {
     return fn_8006FF50()->mNumNode;

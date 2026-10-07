@@ -24,6 +24,8 @@
  *   instruction fewer).
  *   flipcheck: `.text` 0xC8C of 0x69F4; `.rodata`, `.data` and `.sdata2` are claimed and not emitted; `.sdata` is
  *   0x4 of 0x18.
+ * SHAPES. The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
+ *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
  */
 
 #include "types.h"
@@ -34,6 +36,8 @@
 #include "g3d/g3d_anmtexsrt.h" /* the texture-SRT classes this range defines (rule 1) */
 #include "nw4r/db_assert.h"   /* nw4r::db::Warning (rule 2) */
 #include "MSL_C/alloc.h"      /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
+
+#pragma peephole off
 
 #pragma pool_data off
 
@@ -291,10 +295,11 @@ extern "C" u32 fn_8006943C(void)
     return (u32)*fn_8005DC60(&local, lbl_8056F588);
 }
 
-extern "C" u32 fn_800697A4(void)
+/* 0x800697A4 (0x30): returns the AnmObjShp type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjShp::GetTypeObjStatic()
 {
     void *local;
-    return (u32)*fn_8005DC60(&local, lbl_8056F598);
+    return *reinterpret_cast<const TypeObj*>(fn_8005DC60(&local, lbl_8056F598));
 }
 
 /* 0x80069C50 (0x30): returns the AnmObjTexPat type. */
@@ -303,7 +308,6 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexPat::GetTypeObjStatic()
     void *local;
     return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&local, lbl_8056F5A8));
 }
-
 
 
 /* --------------------------------------------------------------------------------------------- *
@@ -335,16 +339,12 @@ extern "C" u32 fn_800693D0(void *self, u32 *key)
 }
 
 
-
-
-
 /* --------------------------------------------------------------------------------------------- *
  * The teardown destructors and the checked word reader (0x8006AA4C-0x8006E9C8).
  * --------------------------------------------------------------------------------------------- */
 
 /* The g3d/main-band teardown helper this unit declares itself; fn_8005D384/G3dObj::operator delete/fn_800628A4/
  * fn_800628B4/fn_80062914 come from `g3d/g3d_anmchr.h`. */
-
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x4];
     /* +0x04 */ u32 field_0x04;
@@ -357,8 +357,6 @@ u32 nw4r::g3d::ResDic::GetNumData() const
         return ((G3dResNameWord *)fn_800628A4(const_cast<ResDic*>(this)))->field_0x04;
     return 0;
 }
-
-
 
 
 /* --------------------------------------------------------------------------------------------- *
@@ -385,7 +383,6 @@ extern "C" u32 fn_8006D9FC(void *self, u32 idx)
  * word through the resolver beside it.  The shape is nw4r's `NW4R_ASSERT` (file/line/message and the
  * `"ref"` reference-name argument).
  * --------------------------------------------------------------------------------------------- */
-
 namespace nw4r {
 namespace db {
 
@@ -460,7 +457,6 @@ nw4r::g3d::ResTexSrtData& nw4r::g3d::ResTexSrt::ref()
 /* --------------------------------------------------------------------------------------------- *
  * The three field readers of the resolved `ResAnmTexSrt` record (0x8006D03C/0x8006D060/0x8006D9A4).
  * --------------------------------------------------------------------------------------------- */
-
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x10];
     /* +0x10 */ u32 field_0x10;
@@ -492,9 +488,6 @@ extern "C" u32 fn_8006D9A4(void *self, void *key)
  * vtable, the entry at +0x14 runs with the object and a word is read back through the `TypeObj::GetTypeName`
  * helper (the shape `g3d/fn_80063888.cpp` uses for its three wrappers).
  * --------------------------------------------------------------------------------------------- */
-
-
-
 
 
 namespace nw4r {
@@ -593,7 +586,6 @@ bool nw4r::g3d::AnmObjTexSrt::TestExistence(u32 idx) const
 }
 
 /* 0x80069E5C (0x168): whether material `idx`'s binding is defined. */
-#pragma peephole off
 bool nw4r::g3d::AnmObjTexSrt::TestDefined(u32 idx) const
 {
     TEXSRT_POINTER_ASSERT(this, 0x3F, TEXSRT_THIS_MSG);
@@ -603,7 +595,6 @@ bool nw4r::g3d::AnmObjTexSrt::TestDefined(u32 idx) const
     }
     return (mpBinding[idx] & 0x8000) == 0;
 }
-#pragma peephole on
 
 /* 0x80069FC4 (0x154): unbinds every material. */
 void nw4r::g3d::AnmObjTexSrt::Release()
@@ -693,20 +684,16 @@ nw4r::g3d::AnmObjTexSrtNode::AnmObjTexSrtNode(MEMAllocator* pHeap, u16* pBinding
 }
 
 /* 0x8006AA4C (0x5C): destroys the texture-SRT animation. */
-#pragma peephole off
 nw4r::g3d::AnmObjTexSrt::~AnmObjTexSrt()
 {
 }
-#pragma peephole on
 
 /* 0x8006AAA8 (0x16C): detaches every child and destroys the node. */
-#pragma peephole off
 nw4r::g3d::AnmObjTexSrtNode::~AnmObjTexSrtNode()
 {
     TEXSRT_POINTER_ASSERT(this, 0x9D, TEXSRT_THIS_MSG);
     DetachAll();
 }
-#pragma peephole on
 
 /* 0x8006AC14 (0x314): attaches `pRes` as child `idx`, binding the materials it defines, and returns the child it
  * replaced. */
@@ -974,11 +961,9 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrtNode::GetTypeObjStatic()
 }
 
 /* 0x8006E868 (0x5C): destroys the override node. */
-#pragma peephole off
 nw4r::g3d::AnmObjTexSrtOverride::~AnmObjTexSrtOverride()
 {
 }
-#pragma peephole on
 
 /* 0x8006E8C4 (0x30): returns the type. */
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrtOverride::GetTypeObj() const
@@ -1012,11 +997,9 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrtOverride::GetTypeObjStat
 }
 
 /* 0x8006E9C8 (0x5C): destroys the resource animation. */
-#pragma peephole off
 nw4r::g3d::AnmObjTexSrtRes::~AnmObjTexSrtRes()
 {
 }
-#pragma peephole on
 
 /* 0x8006EA24 (0x6C): whether the object is an AnmObjTexSrtRes or derives from `type`. */
 bool nw4r::g3d::AnmObjTexSrtRes::IsDerivedFrom(TypeObj type) const

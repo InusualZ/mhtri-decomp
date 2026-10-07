@@ -126,7 +126,7 @@ public:
     virtual const char* GetTypeName() const;
 };
 
-/* The visibility, material-colour and texture-pattern animation interfaces; only their run-time type is reconstructed
+/* The visibility, material-colour, texture-pattern and shape animation interfaces; only their run-time type is reconstructed
  * (ScnMdlSimple::SetAnmObj casts to them).  size: 0x10 each (approximation: AnmObj's size, the derived classes add
  * their members) */
 class AnmObjVis : public AnmObj {
@@ -140,6 +140,11 @@ public:
 };
 
 class AnmObjTexPat : public AnmObj {
+public:
+    static const TypeObj GetTypeObjStatic();
+};
+
+class AnmObjShp : public AnmObj {
 public:
     static const TypeObj GetTypeObjStatic();
 };
