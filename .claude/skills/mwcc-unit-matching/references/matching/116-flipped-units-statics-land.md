@@ -23,6 +23,10 @@ demo:
    also a `src/` object (alignment 16, which re-creates the pad). Flipped in front of an unflipped target object (alignment 4) the following
    `.text`, then `.data`, moves (`IPC/ipcMain` before `IPC/ipcclt`). Flip the successor first, or emit the pad.
 
+4. An object whose map row is **larger than the part the code reads** (an 8 B `.sbss` open-state or byte-order object of which only the first
+   word is touched) is dead-stripped as the shorter global the source declares, with the same effect as 2. Model the whole object: a struct
+   with an `unused_0x04` word (`TRK/gdev_cc`, `TRK/nubinit`), and check the section sizes with `mwlink_debugger.py trace <unit>`.
+
 **How to work it.** Define statics in the reverse of the target's address order; cover an unread claimed tail with the preceding array; flip a unit
 only when its `.text` equals the claim or its successor is already flipped; run `trace <unit>` after every flip that moves the hash.
 

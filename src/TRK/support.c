@@ -3,7 +3,8 @@
  *    `TRKTargetSupportRequest` forwards (access, open, close, position).
  *
  * RANGE. .text 0x804698D0..0x80469F10 (6 functions in the map, 0x640 B); .data 0x8060F710..0x8060F758.
- * FLAGS. the `OS` lib's `cflags_os` with `use_lmw_stmw on` (the bodies save r19..r31 with stmw) and `dont_inline` around
+ * FLAGS. the `OS` lib's `cflags_os` plus `-str reuse,pool` (configure.py `extra_cflags`: pooled strings, `TRK_RequestSend` 95.5 -> 96.8)
+ *    with `use_lmw_stmw on` (the bodies save r19..r31 with stmw) and `dont_inline` around
  *    `TRKStringLength` (the target calls it from the open request instead of inlining it).
  * NAMES. file name GUESS (MetroTRK `support`); `TRKStringLength`, `TRKSuppAccessFile`, `TRKSuppOpenFile`, `TRKSuppCloseFile`
  *    and `TRKSuppPositionFile` (map rows renamed from fn_) are GUESS (a string length, and the requests that send command
