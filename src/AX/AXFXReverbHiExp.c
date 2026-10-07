@@ -4,7 +4,7 @@
  *
  * RANGE. .text 0x80474F30-0x80475E30 (8 functions, 0x3A5C B of rows); .data 0x80612980-0x80612B20; .sdata2
  *    0x8079D000-0x8079D040.  Left edge: the end of the `AXFXReverbHi.c` wrapper run; right edge: the start of
- *    `AX/AXFXReverbStd.cpp` (0x80475E30).  Layout of the body: AX/AXFXReverbHi.h.
+ *    `AX/AXFXReverbStdExp.cpp` (0x80475E30).  Layout of the body: AX/AXFXReverbHi.h.
  * FLAGS. the `OS` lib group with the 16-byte function alignment restored below (every start is 16-aligned);
  *    `#pragma fp_contract off` (retail keeps `fmuls`+`fadds` in the mix kernel); loop counters are `u32`
  *    (retail compares with `cmplwi`).
@@ -29,7 +29,7 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "AX/AXFXReverbHi.h"
 #include "AX/AXFXReverbHiExp.h"
-#include "AX/AXFXReverbStd.h"
+#include "AX/AXFXHooks.h"
 #include "NAND/nand.h"
 #include "TRK/TRK_flush_cache.h"
 

@@ -15,6 +15,9 @@
  *    exactly where the KPR unit's table begins; `.bss` 0x80766C68..0x8078FA38 are the disk, volume and hash
  *    work areas read by `VFipdm_init_diskmanager`, 0x805215A0, `VFipf2Init`, `VFSysInit`,
  *    `dHash_InitHashTable` and `dCommon_initDriveInfo`; `.sbss` 0x807958F0..0x80795920 is the init state.
+ *    The table holds no pointers: `config.yml` `block_relocations` covers the whole range (dtk had read 12 code pairs as
+ *    addresses into AXAux, AXVPB, the enemy and OS data), and a `.bss` label at an odd address
+ *    (`lbl_80778272`, 0x80778272) is a by-product of the same misreading, not an object boundary.
  * RESIDUALS. no bodies yet: all 25 functions are unwritten (largest fn_805218F0, 0x258 B).
  * SHAPES. none yet: no body is written, so nothing is measured.
  */

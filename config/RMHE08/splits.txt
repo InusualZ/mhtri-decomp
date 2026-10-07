@@ -2654,19 +2654,32 @@ DSPADPCM/dspadpcm.c:
 	.sdata2     start:0x8079CF68 end:0x8079CFF0
 
 AX/AXFXReverbHi.c:
-	.text       start:0x80474CB0 end:0x80474F30 align:16
-	.sdata2     start:0x8079CFF0 end:0x8079D000
+	.text       start:0x80474CB0 end:0x80474DD0 align:16
+	.sdata2     start:0x8079CFF0 end:0x8079CFF8
+
+AX/AXFXReverbStd.c:
+	.text       start:0x80474DD0 end:0x80474F30 align:16
+	.sdata2     start:0x8079CFF8 end:0x8079D000
 
 AX/AXFXReverbHiExp.c:
 	.text       start:0x80474F30 end:0x80475E30 align:16
 	.data       start:0x80612980 end:0x80612B20
 	.sdata2     start:0x8079D000 end:0x8079D040
 
-AX/AXFXReverbStd.cpp:
-	.text       start:0x80475E30 end:0x804770E0 align:16
+AX/AXFXReverbStdExp.cpp:
+	.text       start:0x80475E30 end:0x80476DF0 align:16
 	.data       start:0x80612B20 end:0x80612CE0
-	.sdata      start:0x80793D20 end:0x80793D28
 	.sdata2     start:0x8079D040 end:0x8079D080
+
+AX/AXFXChorus.cpp:
+	.text       start:0x80476DF0 end:0x80476F10 align:16
+
+AX/AXFXDelay.cpp:
+	.text       start:0x80476F10 end:0x80477090 align:16
+
+AX/AXFXHooks.cpp:
+	.text       start:0x80477090 end:0x804770E0 align:16
+	.sdata      start:0x80793D20 end:0x80793D28
 
 OS/PPCArch.c:
 	.text       start:0x804770E0 end:0x804772F0 align:16

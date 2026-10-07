@@ -1,21 +1,18 @@
 /*
- * AX/AXFXReverbStd.cpp - the AXFX four-channel reverb body, the line-free helpers of two further effects and the
- *    AXFX allocation hooks.
+ * AX/AXFXReverbStdExp.cpp - the AXFX four-channel reverb body: init, settings rebuild, shutdown, the mix callback,
+ *    the delay-line allocate / clear / free helpers and the settings validator.
  *
- * RANGE. .text 0x80475E30-0x804770E0 (18 functions); .data 0x80612B20-0x80612CE0; .sdata 0x80793D20-0x80793D28;
- *    .sdata2 0x8079D040-0x8079D080.  Left edge: the end of `AX/AXFXReverbHiExp.c`; right edge: the start of
- *    `OS/PPCArch.c`.
+ * RANGE. .text 0x80475E30-0x80476DF0 (8 functions); .data 0x80612B20-0x80612CE0; .sdata2 0x8079D040-0x8079D080.
+ *    Left edge: the end of `AX/AXFXReverbHiExp.c` (pool-proven: 0.0f repeats at 0x8079D044); right edge: the start
+ *    of `AX/AXFXChorus.cpp`, which is NOT pool-proven - the tail owns no pooled data - and rests on the body
+ *    owning every table and constant of the range.
  * FLAGS. the `OS` lib group with the 16-byte function alignment restored below; `#pragma fp_contract off`; loop
  *    counters are `u32`.
- * NAMES. AXFXSetHooks and AXFXGetHooks are the map's names; GUESS: the AXFXReverbStdExp family for the
- *    four-channel body, AXFXChorus3/4Shutdown and AXFXDelay3/4Shutdown/Free for the four small line-free helpers
- *    (3- and 4-line bodies with the flag word at +0x3C / +0x50 / +0x7C / +0x90), AXFXDefaultAlloc/Free for the
- *    heap thunks the hooks start with.  The static tables are named after their rows.
+ * NAMES. GUESS: the AXFXReverbStdExp family for the four-channel body.  The static tables are named after their
+ *    rows.
  * RESIDUALS. AXFXReverbStdExpCallback: register numbering and loop-invariant load order (as in AXFXReverbHiExp);
  *    AXFXReverbStdExpApplySettings: GPR numbering of the table row pointer; `.data` 444 of 448 B (the trailing
- *    4 B word is not emitted); `.sdata2` 56 of 64 B (retail pools 32000.0f before 0.0f and -3.0f before 10.0);
- *    the range is several translation units (reverb body, two line-free helper pairs, hooks): not split here.
- * SHAPES. the chorus/delay helper structs are partial views (leading fields and the flag word only).
+ *    4 B word is not emitted); `.sdata2` 56 of 64 B (retail pools 32000.0f before 0.0f and -3.0f before 10.0).
  */
 
 #pragma function_align 16
@@ -23,17 +20,13 @@
 
 #include "types.h"
 #include "AX/AXCL.h"
-#include "AX/AXFXReverbStd.h"
+#include "AX/AXFXHooks.h"
+#include "AX/AXFXReverbStdExp.h"
 #include "MSL/w_math.h"
-#include "OS/OSAlloc.h"
 #include "OS/OSInterrupt.h"
-#include "OS/s_currentHeap.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
 extern "C" {
-
-AXFXAllocFunc AXFXAlloc = AXFXDefaultAlloc;
-AXFXFreeFunc AXFXFree = AXFXDefaultFree;
 
 /* Per-mode delay-line lengths (taps 0..2 of the early network). */
 static u32 sStdExpModeLength[8][3] = {
@@ -70,8 +63,6 @@ static u32 sStdExpFilterLength[7][9] = {
     {1823, 2357, 2693, 571, 179, 47, 73, 67, 71},
 };
 
-void AXFXDelay3Free(AXFXDelay3* effect);
-void AXFXDelay4Free(AXFXDelay4* effect);
 BOOL AXFXReverbStdExpAllocLines(AXFXReverbStd* reverb);
 void AXFXReverbStdExpClearLines(AXFXReverbStd* reverb);
 void AXFXReverbStdExpFreeLines(AXFXReverbStd* reverb);
@@ -500,112 +491,6 @@ BOOL AXFXReverbStdExpApplySettings(AXFXReverbStd* reverb)
     reverb->coef7[2] = 0.0f;
     reverb->coef7[3] = 0.0f;
     return TRUE;
-}
-
-/* Disables the effect and frees its three delay lines. */
-void AXFXChorus3Shutdown(AXFXChorus3* effect)
-{
-    u32 i;
-    u32 level = OSDisableInterrupts();
-
-    effect->flags |= 1;
-    for (i = 0; i < 3; i++) {
-        if (effect->line[i] != 0) {
-            AXFXFree(effect->line[i]);
-            effect->line[i] = 0;
-        }
-    }
-    OSRestoreInterrupts(level);
-}
-
-/* Disables the effect and frees its four delay lines. */
-void AXFXChorus4Shutdown(AXFXChorus4* effect)
-{
-    u32 i;
-    u32 level = OSDisableInterrupts();
-
-    effect->flags |= 1;
-    for (i = 0; i < 4; i++) {
-        if (effect->line[i] != 0) {
-            AXFXFree(effect->line[i]);
-            effect->line[i] = 0;
-        }
-    }
-    OSRestoreInterrupts(level);
-}
-
-/* Frees the delay lines of a three-channel delay and reports success. */
-BOOL AXFXDelay3Shutdown(AXFXDelay3* effect)
-{
-    AXFXDelay3Free(effect);
-    return TRUE;
-}
-
-/* Frees the delay lines of a four-channel delay and reports success. */
-BOOL AXFXDelay4Shutdown(AXFXDelay4* effect)
-{
-    AXFXDelay4Free(effect);
-    return TRUE;
-}
-
-/* Disables a three-channel delay and frees its delay lines. */
-void AXFXDelay3Free(AXFXDelay3* effect)
-{
-    u32 i;
-    u32 level = OSDisableInterrupts();
-
-    effect->flags |= 1;
-    for (i = 0; i < 3; i++) {
-        if (effect->line[i] != 0) {
-            AXFXFree(effect->line[i]);
-        }
-        effect->line[i] = 0;
-    }
-    OSRestoreInterrupts(level);
-}
-
-/* Disables a four-channel delay and frees its delay lines. */
-void AXFXDelay4Free(AXFXDelay4* effect)
-{
-    u32 i;
-    u32 level = OSDisableInterrupts();
-
-    effect->flags |= 1;
-    for (i = 0; i < 4; i++) {
-        if (effect->line[i] != 0) {
-            AXFXFree(effect->line[i]);
-        }
-        effect->line[i] = 0;
-    }
-    OSRestoreInterrupts(level);
-}
-
-/* The default allocation hook: takes the block from the current heap. */
-/* untyped: raw heap memory */
-void* AXFXDefaultAlloc(u32 size)
-{
-    return OSAllocFromHeap(s_currentHeap, size);
-}
-
-/* The default free hook: returns the block to the current heap. */
-/* untyped: raw heap memory */
-void AXFXDefaultFree(void* block)
-{
-    OSFreeToHeap(s_currentHeap, block);
-}
-
-/* Installs the allocation and free hooks. */
-void AXFXSetHooks(AXFXAllocFunc alloc, AXFXFreeFunc free)
-{
-    AXFXAlloc = alloc;
-    AXFXFree = free;
-}
-
-/* Reads back the installed hooks. */
-void AXFXGetHooks(AXFXAllocFunc* alloc, AXFXFreeFunc* free)
-{
-    *alloc = AXFXAlloc;
-    *free = AXFXFree;
 }
 
 } /* extern "C" */
