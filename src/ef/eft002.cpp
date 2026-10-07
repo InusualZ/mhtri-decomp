@@ -146,7 +146,7 @@ void eft_res_slot_release(void* self);
 void fn_800F8A44(void* p, s32 mode);
 
 void eft_res_models_spawn(void* self, nw4r::ef::Effect** effects, s32 count, s32 mode, void* arg);
-u8 fn_800F9D80(void* self);
+u8 eft_water_state_ck(void* self);
 /* untyped: an opaque handle passed through (the effect record is only handed on) */
 
 void fn_800AA75C(void* dst);
@@ -629,7 +629,7 @@ extern "C" void fn_800FCA54(_EFT* self)
         break;
     case 7:
     case 8:
-        if (fn_800F9D80(self) == 1) {
+        if (eft_water_state_ck(self) == 1) {
             work->color_0x14[0] = 100;
             work->color_0x14[1] = 191;
             work->color_0x14[2] = 255;

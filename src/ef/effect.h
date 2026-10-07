@@ -30,7 +30,7 @@ void fn_800F975C(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
 s32 fn_800F9884(nw4r::ef::Effect* effect);
 /* 0x800F9D80 - the effect's state/frame report the kind-1 state-0 body of `ef/fn_8030681C.cpp` switches on (it
  * compares it against 1). */
-s32 fn_800F9D80(_EFT* self);
+s32 eft_water_state_ck(_EFT* self);
 
 #ifdef __cplusplus
 }

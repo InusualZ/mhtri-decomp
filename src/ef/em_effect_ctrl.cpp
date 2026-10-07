@@ -152,7 +152,7 @@ extern "C" f32 vec3_dot(const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void vec3_normalize_into(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
 extern "C" void vec3_scale(nw4r::math::VEC3* out, const nw4r::math::VEC3* in, f32 scale);
 extern "C" void addVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
-extern "C" void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
+extern "C" void vec3_scale_in_place(nw4r::math::VEC3* v, f32 angle);
 extern "C" void addVec3To(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
 extern "C" void fn_80075258(s32* model, nw4r::math::VEC3* out, const nw4r::math::VEC3* pos);
 extern "C" void fn_800FA3E8(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) */
@@ -301,7 +301,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
         copyVec3(&v10C, &v7C);
         subVec3(&v58, &v10C, &v124);
         copyVec3(&vE8, &v58);
-        fn_800513F0(&vE8, lbl_80796708);
+        vec3_scale_in_place(&vE8, lbl_80796708);
         addVec3(&v4C, &v124, &vE8);
         copyVec3(&v118, &v4C);
         f31 = (f32)(s32)vec3_len(&vE8);

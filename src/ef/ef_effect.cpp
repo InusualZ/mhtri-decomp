@@ -11,7 +11,8 @@
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (the deleting destructor's `extsh` + `cmpwi` flag test).
  * NAMES. The map has only `fn_` stems for the range except `RetireEmitterAll`, `ForeachParticleManager` and
  *   `SetRootMtx`, written as `nw4r::ef::Effect` members.
- *   GUESS (from the body and its callers): `ef_get_life_status`.
+ *   GUESS (from the body and its callers): `ef_get_life_status`, `RetireParticleAll` (0x800A4AF8, the nw4r name of
+ *   the particle-wide sibling of `RetireEmitterAll`).
  *   GUESS: `ef_activity_list_add` (0x800A43E8), `ef_activity_list_clear` (0x800A4428): an activity list's append
  *   and reset.
  *   GUESS: `ef_system_memory_manager` (0x800A4420): the effect system's memory manager (its first word).
@@ -42,7 +43,7 @@
  * SHAPES. The pointer guards are the `NW4R_POINTER_ASSERT` six-BOOL chain; the file argument is the call site's
  *   own string ("ef_effect.cpp", or "activitylist.h"/"res_emitter_ac.h" for the two header asserts).
  * SHAPES. `#line` puts each `Panic`/`Warning` on retail's line (`fn_800A45DC` 134, `fn_800A51D8` 423,
- *   `RetireEmitterAll` 160, `fn_800A4AF8` 180, `fn_800A4BBC` 267/292/312/323).
+ *   `RetireEmitterAll` 160, `RetireParticleAll` 180, `fn_800A4BBC` 267/292/312/323).
  * SHAPES. `fn_800A40F4`'s fourth argument is `u16` (retail adds it with no mask), `EfEffEmitter::mField_0xB4` is
  *   `s32` (`cmpwi`), `ef_effect_set_calc_flag`'s bit is 0x10000, and the effect system's
  *   constructor and destructor are `EfSys` members (`ef/ef_effectsystem.h`).
@@ -249,7 +250,7 @@ void fn_800A49B8(EfEffEmitter* em);
 void fn_800A4A18(void* p);
 void fn_800A4A1C(EfEffActivityList* list, void* node);
 u16 fn_800A4AF0(EfEffList* list);
-u32 fn_800A4AF8(EfEff* self);
+u32 RetireParticleAll(EfEff* self);
 void fn_800A4BBC(EfEff* self, u32 flag);
 u32 fn_800A50EC(EfEff* self);
 u32 fn_800A5104(void* p);
@@ -510,7 +511,7 @@ u32 nw4r::ef::Effect::RetireEmitterAll() {
 }
 
 /* 0x800A4AF8 - retires every particle on every live emitter. */
-extern "C" u32 fn_800A4AF8(EfEff* self) {
+extern "C" u32 RetireParticleAll(EfEff* self) {
     u32 count = 0;
     EfEffEmitter* list[NW4R_EF_MAX_EMITTER];
 

@@ -6,13 +6,14 @@
  * NAMES. The unit name is a GUESS in the siblings' scheme (no `__FILE__` string is reachable; the runtime dump's
  *   `res_eft_*`, `get_eft_res_name` and `push_eft_effect_heap_num` name the `eft` resource layer).  The dump names
  *   seven functions; `eft_res_slot_get`, `eft_res_slot_release`, `eft_res_model_get`, `eft_res_spawn_gate_ck` and
- *   `eft_res_models_spawn` are GUESSes from their bodies; the map has only `fn_` stems for the rest.
+ *   `eft_res_models_spawn` are GUESSes from their bodies, `eft_stage_spawn_flag` (0x800F9380: stage size class to spawn
+ *   flag) too; the map has only `fn_` stems for the rest.
  *   GUESS (from each body and its callers): eft_control_init
  *   GUESS (from each body and its callers): eft_res_release_all
  * RESIDUALS. `fn_800F8634` saves from r27 where retail calls `_savegpr_26` (and ours restores with `_restgpr_27`
  *   where retail's epilogue differs); `eft_res_models_spawn` calls `_savegpr_23`/`_restgpr_23` where retail calls
  *   `_savegpr_24`/`_restgpr_24`;
- *   `push_eft_effect_heap_num` lacks retail's call to `fn_800A4AF8` (+0x40).  9 rows unwritten: 0x800F6710-0x800F6984 (`fn_800F6710`), 0x800F6B6C-0x800F7AA4 (`fn_800F6B6C`,
+ *   `push_eft_effect_heap_num` lacks retail's call to `RetireParticleAll` (+0x40).  9 rows unwritten: 0x800F6710-0x800F6984 (`fn_800F6710`), 0x800F6B6C-0x800F7AA4 (`fn_800F6B6C`,
  *   `fn_800F6DB4`, `fn_800F7778`), 0x800F7F18-0x800F8634 (`fn_800F7F18`, `fn_800F8358`), 0x800F8E68-0x800F91A0
  *   (`res_eft_model_create_light`, `res_eft_UV_model_create`, `res_eft_UV_model_create_name`: they need the
  *   EftModel/g3d mesh chain `fn_8007B878`/`fn_8007BA08`/`fn_8005AB00`/`fn_800D3874`/`fn_800D38F8`).
@@ -200,7 +201,7 @@ void* fn_800F9278(void*, void*, u32, u32);
 void* fn_800F92D4(void*, void*);
 u32 fn_800F92E0(void*);
 u32 eft_res_spawn_gate_ck(void*, u32);
-u32 fn_800F9380(void);
+u32 eft_stage_spawn_flag(void);
 void eft_res_models_spawn(_EFT*, void**, s32, s32, void*);
 void fn_800F95A4(void*);
 u32 fn_800F97F0(u16, void*, void*);
@@ -812,7 +813,7 @@ extern "C" u32 eft_res_spawn_gate_ck(void* self_, u32 mode) {
 }
 
 /* 0x800F9380 - map the stage's effect size class to the spawn flag. */
-extern "C" u32 fn_800F9380(void) {
+extern "C" u32 eft_stage_spawn_flag(void) {
     u32 size = fn_800E3B3C();
 
     switch (size) {

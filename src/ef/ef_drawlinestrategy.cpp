@@ -78,7 +78,7 @@ extern void GXLoadPosMtxImm(void* mtx, u32 id);
 /* The nw4r math/effect helpers retail references by their plain `fn_` names; the ef callees come from
  * the headers included above. */
 extern MTX34* mtx34_get_ptr(MTX34* mtx);                      /* MTX34::Get() */
-extern void fn_800513F0(VEC3* v, f32 scale);                /* VEC3::Scale / rotate helper */
+extern void vec3_scale_in_place(VEC3* v, f32 scale);                /* VEC3::Scale / rotate helper */
 extern void ef_particle_get_move_dir(void* particle, VEC3* out);         /* particle velocity/axis accessor */
 
 /* `nw4r::math::PSVECSubtract` (the map's `PSVECSubtract`, a C symbol). */
@@ -161,7 +161,7 @@ void DrawLineStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
         if (ef_vec3_normalize(&dir) == 0) {
             continue;
         }
-        fn_800513F0(&dir, g);
+        vec3_scale_in_place(&dir, g);
         PSVECSubtract(&dir, &pos, &dir);
         {
             u32 width = (u32)(s32)(widthScale * *ef_min_float(&ef_line_max_width, &t));

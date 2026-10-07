@@ -43,7 +43,7 @@ void* eft_res_slot_get(s32 size);
 void* eft_res_model_get(void);
 void  eft_res_slot_release(_EFT* self);
 void  fn_800F8A44(MHchar** models, s32 count);
-f32   fn_800513F0(VEC3* v, f32 s);
+f32   vec3_scale_in_place(VEC3* v, f32 s);
 u32   userdata_flag_ck(u32 value);
 s32   rand_lcg_step(u32 value);
 s32   lb_panel_close(void);

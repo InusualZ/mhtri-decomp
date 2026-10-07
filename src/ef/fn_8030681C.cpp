@@ -631,8 +631,8 @@ extern "C" void fn_80307AE8(_EFT* self)
     copyVec3(&work->v_0x0C.offset, &offset);
     work->field_0x18 = lbl_8079AE1C;
 
-    if (fn_800F9D80(self) == 1) {
-        fn_800513F0(&work->v_0x0C.offset, lbl_8079ADF4);
+    if (eft_water_state_ck(self) == 1) {
+        vec3_scale_in_place(&work->v_0x0C.offset, lbl_8079ADF4);
         work->field_0x18 *= lbl_8079AE20;
     }
 

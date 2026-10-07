@@ -209,7 +209,7 @@ void fn_80119D9C(_EFT* self);
  * spells `VEC3_ctor`/`setVec3` differently from `mh3_pad.h`, MWCC (10197)), so this
  * copy stays - normalised to the owner's body (`void*` return).  `vec3_normalize_into`/`addVec3` now
  * come from their owner's header, `fn_8004CAD8.h` (included above, rule 2). */
-void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
+void vec3_scale_in_place(nw4r::math::VEC3* v, f32 angle);
 void mtx34_copy(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
 /* eft_res_model_get comes from the owner's header `ef/eft_res.h` (rule 2): this unit's local
  * `void*` copy collided with the owner's `u8*` definition once the header declared it. */
@@ -743,7 +743,7 @@ extern "C" void fn_80118B2C(_EFT* self)
             copyVec3(&v3, &camDir);
         }
         vec3_normalize_into(&v3, &v3);
-        fn_800513F0(&v3, lbl_80796B04);
+        vec3_scale_in_place(&v3, lbl_80796B04);
         addVec3(&v0, &self->pos_0x18, &v3);
         copyVec3(&v2, &v0);
         self->field_0x10++;
@@ -960,7 +960,7 @@ extern "C" void fn_80119450(_EFT* self)
     } else if (self->type_0x02 == 10) {
         v0.z -= lbl_80796B1C;
     }
-    fn_800513F0(&v0, lbl_80796B20);
+    vec3_scale_in_place(&v0, lbl_80796B20);
     self->field_0x10++;
     if (self->field_0x10 > 4) {
         self->field_0x10 = 4;

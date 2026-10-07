@@ -3,41 +3,56 @@
  * RANGE. .text 0x80107250-0x8010BDE4 (58 functions); extab 0x8000C074-0x8000C1F4, extabindex 0x80025F98-0x800261D8,
  *   .data 0x8059EB50-0x8059F518, .sdata 0x807917A0-0x80791820, .sdata2 0x807967A8-0x807967E8.
  * FLAGS. `cflags_main`; `#pragma peephole off` for the whole file except `fn_80107640` (retail keeps the `u8`
- *   argument `clrlwi`s and the loop `cmpwi`s; peephole on costs the setters, and peephole off costs `fn_80107640`).
+ *   argument `clrlwi`s and the loop `cmpwi`s; peephole on costs the setters, and peephole off costs `fn_80107640`);
+ *   `#pragma optimization_level 4` for `fn_80107640`, `eft013_setup_effect`, `eft013_setup_uv_model`, `fn_80108A74`
+ *   and `fn_801093F4` (retail lowers their type switches to `subi` + `cmplwi` range tests, which only that level emits).
  * NAMES. `eft013_set`, `eft013_set_dmeft_pl`, `eft014_set_daihouden` and `eft015_set` are the runtime dump's own
  *   names; the plain C definitions are `extern "C"`.
  *   GUESS (from the bodies and their callers): `eft013_set_from_sel` (0x801073B8), `eft013_set_pl_model`
  *   GUESS: (0x80107BB4), `eft013_setup_effect` (0x80107E5C), `eft013_setup_uv_model` (0x801086C4),
- *   GUESS: `eft013_retire_step` (0x8010A1D4); the data `eft014_effect_ids`, `eft014_type_effect_ids`,
- *   GUESS: `eft014_joint_lists`, `eft014_joint_counts`; the foreign `mtx34_set_trans` (0x800FBB90, `ef/eft001.cpp`).
- *   GUESS: `eft013_guard_pulse` (0x8010A49C), the constants `eft013_f32_one`, `eft013_f32_three_quarters`,
- *   GUESS: `eft013_f32_zero`, `eft013_f32_2_6`, `eft013_f32_0_4`, `eft013_f32_0_16` (by value); the glow tables
+ *   GUESS: `eft013_retire_step` (0x8010A1D4), `eft013_guard_pulse` (0x8010A49C); the data `eft014_effect_ids`,
+ *   GUESS: `eft014_type_effect_ids`, `eft014_joint_lists`, `eft014_joint_counts`, `eft013_effect_ids`,
+ *   GUESS: `eft013_effect_groups`, `eft013_guard_joints`, `eft013_guard_offsets`, `eft013_burst_effect_ids`,
+ *   GUESS: `eft013_color_ramp_9`, `eft013_color_ramp_13_28`, `eft013_color_ramp_29`, `eft013_color_keys_14`,
+ *   GUESS: `eft013_color_keys_16_22`; the constants `eft013_f32_one`, `eft013_f32_three_quarters`, `eft013_f32_zero`,
+ *   GUESS: `eft013_f32_2_6`, `eft013_f32_0_4`, `eft013_f32_0_16`, `eft013_f32_0_5`, `eft013_f32_1_5`,
+ *   GUESS: `eft013_f32_5000`, `eft013_f32_zero_pool`, `eft013_f32_camera_push` (by value); the glow tables
  *   GUESS: `eft014_glow_joints`, `eft014_glow_offset_y`, `eft014_glow_offset_z`, `eft014_glow_scale`,
- *   GUESS: `eft014_glow_alpha_key`; the foreign `em015_damage_level` (0x80182918, `enemy/em015_prog.cpp`); the spark
- *   GUESS: tables `eft014_spark_joint_lists`, `eft014_spark_ids_type0`, `eft014_spark_ids_type7`,
- *   GUESS: `eft014_spark_scales_type7`, `eft014_spark_counts`; the foreign SE requests `se_req_pos_id72`,
- *   GUESS: `se_req_pos_id73` (0x800DC4C4, 0x800DC4D4, `sound/fn_800D7F54.cpp`).
- * RESIDUALS. 5 rows unwritten: 0x80107E5C-0x801089C0 (`eft013_setup_effect`, `eft013_setup_uv_model`),
- *   0x80108A74-0x80109A84 (`fn_80108A74`, `fn_801093F4`), 0x80109D00-0x8010A1D4 (`fn_80109D00`).
- *   7 partial rows:
- *  - `fn_80109A84`: retail keeps the work pointer in r31 and the object in r30 (ours the reverse) and tests the
- *    previous-frame flag against the zero it just stored (`cmplw r0, r3`) where ours compares with `cmpwi 0`;
+ *   GUESS: `eft014_glow_alpha_key`; the spark tables `eft014_spark_joint_lists`, `eft014_spark_ids_type0`,
+ *   GUESS: `eft014_spark_ids_type7`, `eft014_spark_scales_type7`, `eft014_spark_counts`.
+ *   Foreign GUESS names (owners' NAMES lines carry them): `mtx34_set_trans` (0x800FBB90, `ef/eft001.cpp`),
+ *   `em015_damage_level` (0x80182918, `enemy/em015_prog.cpp`), `se_req_pos_id72` / `se_req_pos_id73` /
+ *   `se_req_pos_id53` / `se_req_pos_id74` / `se_req_pos_id228` / `se_req_pos_id250` / `se_req_pos_id63` /
+ *   `se_req_pos_id54` / `se_req_pos_id84` / `se_req_pos_id83` / `se_req_pos_id49` (`sound/fn_800D7F54.cpp`),
+ *   `eft_stage_spawn_flag` (`ef/eft_res.cpp`), `vec3_scale_in_place` (`fn_8004CAD8.cpp`), `RetireParticleAll`,
+ *   `change_color_scale_eff`, `eft_water_state_ck` (`ef/effect.cpp`), `ai_npc_motion_step_ck` (`ai/ai_npc.cpp`).
+ * RESIDUALS. Every row has a body; 8 rows are short of 100 %:
+ *  - `eft013_setup_effect`, `eft013_setup_uv_model`, `fn_801093F4`: register colours only (retail keeps the source
+ *    record and the work pointer in other callee-saved registers than ours); `eft013_setup_effect` also multiplies
+ *    `get_enemy_data(...)->scale * get_em_scale(...)` with the operands swapped; `fn_801093F4` loads the colour-request
+ *    scale before its last two arguments where ours loads it after them;
  *  - `fn_8010B198`: retail keeps the slot flag 1 and the search's trip count 2 in callee-saved registers and colours
  *    the type's tables r20-r23 where ours takes other registers (so ours saves from r21: `_savegpr_21`/`_restgpr_21`
  *    where retail calls `_savegpr_20`/`_restgpr_20`);
  *  - `fn_8010B71C`: the final store of the damage level keeps a `clrlwi` retail does not have (a `u8` level
  *    colours the registers differently and scores lower);
  *  - `fn_80107DDC`, `fn_8010AD00`: the case-0 nested dispatch (docs/ef.md, "The case-0 nested dispatch");
- *  - `fn_80107640`: ours compares the type signed with a compare chain where retail uses `subi` + `cmplwi` range
- *    tests, narrows the type with `clrlwi`, and keeps the hook addresses in the stored register;
- *  - `fn_8010A7D4`: retail keeps explicit compares for the empty cases 2 and 5 (ours folds them into the default).
- * *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text`, extab and extabindex short of the claim; `.sdata2`
- *   0x8 of the claimed 0x40 (the constants are declared, the claim is the pool).
- *   Relocation names that differ from retail (pool constants): `eft013_guard_pulse` takes its four constants as
- *     literals (retail loads `eft013_f32_one`, `eft013_f32_2_6`, `eft013_f32_0_4`, `eft013_f32_0_16` once; the
- *     named externs are reloaded after every store).
+ *  - `fn_80107640`: retail reloads the stored type byte for its switch where ours narrows the argument with `clrlwi`,
+ *    and keeps the hook addresses in r0 where ours uses the `lis` register.
+ *  flipcheck: `.data`/`.sdata` claimed, not emitted (the tables above are declared `extern`, only the jump tables of
+ *    the written switches are emitted); `.text`, extab and extabindex short of the claim; `.sdata2` 0x18 of the
+ *    claimed 0x40 (the constants are declared, the claim is the pool); the jump tables carry the compiler's `@NNNN`
+ *    names where the map has `jumptable_8059F...`.
+ *  Relocation names that differ from retail (pool constants): `eft013_guard_pulse` takes its four constants as
+ *    literals (retail loads `eft013_f32_one`, `eft013_f32_2_6`, `eft013_f32_0_4`, `eft013_f32_0_16` once; the
+ *    named externs are reloaded after every store); `fn_8010A394` reads `lbl_807967C8` as a literal.
+ *  `GameMode_ck`, `ai_npc_motion_step_ck`, `change_color_scale_eff`, `eft_stage_spawn_flag`, `RetireParticleAll` and the
+ *    `rotLocalMat*` triple come from leaf headers named for them (their owners' full headers disagree with this unit's
+ *    signatures or cannot be included beside it).
  * SHAPES. Loop counters are declared before the work pointers (retail's register colours); the type tests that
- *   retail compares `cmpwi` are `switch`es; the small-data tables are declared with their sizes (`@sda21`).
+ *   retail compares `cmpwi` are `switch`es; the small-data tables are declared with their sizes (`@sda21`); empty
+ *   switch arms that retail compares explicitly `return` while the default `break`s (`fn_8010A7D4`); a flag retail
+ *   compares against the zero it just stored is written as a compare with that field (`fn_80109A84`).
  */
 
 #include "types.h"
@@ -76,6 +91,14 @@
 #include "Runtime.PPCEABI.H/memset.h" /* memset (rule 2) */
 #include "g3d/mtx34_inverse.h" /* mtx34_inverse (rule 2) */
 #include "enemy/fn_8012EC74.h" /* get_joint_wmat_em (rule 2) */
+#include "g3d/g3d_calcworld.h" /* addVec3To (rule 2) */
+#include "g3d/g3d_scnroot.h" /* VEC2_ctor (rule 2) */
+#include "ef/GameMode_ck.h" /* GameMode_ck (rule 2) */
+#include "ai/ai_npc_motion_step_ck.h" /* ai_npc_motion_step_ck (rule 2) */
+#include "ef/change_color_scale_eff.h" /* change_color_scale_eff (rule 2) */
+#include "ef/eft_stage_spawn_flag.h" /* eft_stage_spawn_flag (rule 2) */
+#include "ef/RetireParticleAll.h" /* RetireParticleAll (rule 2) */
+#include "rotLocalMatX.h" /* rotLocalMatX/Y/Z (rule 2) */
 
 #pragma peephole off
 
@@ -149,24 +172,41 @@ struct _EFT013_WORK_E {
  * setter state at +0x44. */
 struct _EFT013_WORK_F {
     /* +0x00 */ s32 count;
-    /* +0x04 */ u8 unused_0x04[0x28 - 0x04];
+    /* +0x04 */ nw4r::ef::Effect* effects[3];
+    /* +0x10 */ u8 spawn_arg_0x10[0x28 - 0x10];
     /* +0x28 */ f32 scale_0x28;
     /* +0x2C */ f32 scale_0x2C;
     /* +0x30 */ nw4r::math::VEC3 pos_0x30;
-    /* +0x3C */ u8 unused_0x3C[0x40 - 0x3C];
+    /* +0x3C */ u16 prev_0x3C;
+    /* +0x3E */ u8 unused_0x3E[0x40 - 0x3E];
     /* +0x40 */ u32 field_0x40;
     /* +0x44 */ u8 field_0x44;
-    /* +0x45 */ u8 unused_0x45;
+    /* +0x45 */ u8 flag_0x45;
     /* +0x46 */ u8 option_0x46;
 };
 /* size: 0x48 - lower bound, an approximation. */
 
 /* Work block of the `fn_80107A18` allocator (0x3C bytes): the model, the scale vector and two colours. */
+/* The UV model `res_eft_UV_model_create` returns (a class of the resource layer; only its slot 9 is called here,
+ * through a table the layer's owner emits). size: 0x04 - lower bound, an approximation. */
+class _EFT013_UV_MODEL {
+public:
+    virtual void virtual_0x08();
+    virtual void virtual_0x0C();
+    virtual void virtual_0x10();
+    virtual void virtual_0x14();
+    virtual void virtual_0x18();
+    virtual void virtual_0x1C();
+    virtual void virtual_0x20();
+    virtual void update_0x24();
+};
+
+struct _g3d_work;
 struct _EFT013_WORK_M {
     /* +0x00 */ s32 count;
-    /* +0x04 */ u8 unused_0x04[0x08 - 0x04];
+    /* +0x04 */ nw4r::ef::Effect* effects[1];
     /* +0x08 */ u8* model;
-    /* +0x0C */ u8 unused_0x0C[0x10 - 0x0C];
+    /* +0x0C */ _EFT013_UV_MODEL* uv_0x0C;
     /* +0x10 */ nw4r::math::VEC3 scale_0x10;
     /* +0x1C */ f32 scale_0x1C;
     /* +0x20 */ f32 scale_0x20;
@@ -176,7 +216,7 @@ struct _EFT013_WORK_M {
     /* +0x2D */ _GXColor color1;
     /* +0x31 */ u8 field_0x31;
     /* +0x32 */ u16 field_0x32;
-    /* +0x34 */ u8 handles[0x3C - 0x34];
+    /* +0x34 */ struct _g3d_work* handles[2];
 };
 /* size: 0x3C */
 
@@ -211,7 +251,8 @@ struct _EFT013_PL2 {
 struct _EFT013_ENEMY_VIEW {
     /* +0x000 */ u8 unused_0x000[0x1E1];
     /* +0x1E1 */ u8 act_id;
-    /* +0x1E2 */ u8 unused_0x1E2[0x1E5 - 0x1E2];
+    /* +0x1E2 */ u8 field_0x1E2;
+    /* +0x1E3 */ u8 unused_0x1E3[0x1E5 - 0x1E3];
     /* +0x1E5 */ u8 action_0x1E5;
     /* +0x1E6 */ u8 state_sub;
     /* +0x1E7 */ u8 unused_0x1E7[0x204 - 0x1E7];
@@ -311,6 +352,51 @@ struct _EFT014_POOL_D {
 };
 /* size: 0x74 - lower bound, an approximation. */
 
+/* The player view `fn_80109D00` reads: the action and motion bytes, the area, the position, the physics block and
+ * the sound handle. */
+struct _EFT013_PL4 {
+    /* +0x000 */ u8 unused_0x000;
+    /* +0x001 */ u8 flag_0x01;
+    /* +0x002 */ u8 unused_0x002[0x09 - 0x002];
+    /* +0x009 */ u8 field_0x09;
+    /* +0x00A */ u8 action_0x0A;
+    /* +0x00B */ u8 unused_0x00B;
+    /* +0x00C */ u16 motion_0x0C;
+    /* +0x00E */ u8 unused_0x00E[0x016 - 0x00E];
+    /* +0x016 */ u8 area_0x16;
+    /* +0x017 */ u8 unused_0x017[0x03C - 0x017];
+    /* +0x03C */ nw4r::math::VEC3 pos_0x3C;
+    /* +0x048 */ u8 unused_0x048[0x13C - 0x048];
+    /* +0x13C */ _EFT013_PL_PHYS* phys_0x13C;
+    /* +0x140 */ u8 unused_0x140[0xAF4 - 0x140];
+    /* +0xAF4 */ _se_w* se_0xAF4;
+};
+/* size: 0xAF8 - lower bound, an approximation. */
+
+/* The NPC view `fn_801093F4` reads: the model at +0x08. */
+struct _EFT013_NPC {
+    /* +0x00 */ u8 unused_0x00[0x08];
+    /* +0x08 */ MHchar model_0x08;
+    /* +0x148 */ u8 unused_0x148[0x170 - 0x148];
+    /* +0x170 */ u8 field_0x170;
+    /* +0x171 */ u8 field_0x171;
+    /* +0x172 */ u16 field_0x172;
+};
+/* size: 0x174 - lower bound, an approximation. */
+
+/* Pool block of the `fn_80109D00` guard flash: the effect array at +0x04, the three counters and the hold word. */
+struct _EFT013_WORK_G {
+    /* +0x00 */ s32 count;
+    /* +0x04 */ nw4r::ef::Effect* effects[3];
+    /* +0x10 */ u8 unused_0x10[0x1C - 0x10];
+    /* +0x1C */ s32 hold_0x1C;
+    /* +0x20 */ u8 unused_0x20[0x24 - 0x20];
+    /* +0x24 */ s32 timer_0x24;
+    /* +0x28 */ u8 unused_0x28[0x3C - 0x28];
+    /* +0x3C */ s16 action_0x3C;
+};
+/* size: 0x3E - lower bound, an approximation. */
+
 struct _PLW;
 
 /* mtx34_trans_get comes from its owner's header (rule 2). */
@@ -336,6 +422,21 @@ extern "C" s8 eft014_spark_counts[12];        /* per phase: how many sparks it a
 extern "C" u16 eft014_effect_ids[];      /* the type-1 effect ids, one per pool slot  .data 0x8059F3E8 */
 extern "C" u16 eft014_type_effect_ids[4];/* the effect id of types 3..6               .sdata 0x80791810 */
 
+extern "C" s32 eft013_guard_joints[35];     /* per type: the player joint the guard flash sits on  .data 0x8059EBEC */
+extern "C" Vec eft013_guard_offsets[35];    /* per type: its joint-local offset                    .data 0x8059EC78 */
+extern "C" f32 eft013_f32_camera_push;      /* the camera-direction push length                    .sdata2 0x807967C0 */
+extern "C" _GXColor eft013_color_ramp_9[3];     /* the type-9 colour ramp                         .data 0x8059EE40 */
+extern "C" _GXColor eft013_color_ramp_13_28[3]; /* the type-13 and type-28 colour ramp           .data 0x8059EE4C */
+extern "C" _GXColor eft013_color_ramp_29[4];    /* the type-29 colour ramp                        .data 0x8059EE58 */
+extern "C" f32 eft013_f32_5000;                 /* the scale the colour request carries           .sdata2 0x807967BC */
+extern "C" u16 eft013_burst_effect_ids[6];      /* per variant: the burst effect id of types 8 and 21  .data 0x8059EB98 */
+extern "C" u8 eft013_color_keys_14[12];         /* the type-14 colour keyframes                    .data 0x8059F088 */
+extern "C" u8 eft013_color_keys_16_22[12];      /* the type-16 and type-22 colour keyframes        .data 0x8059F094 */
+extern "C" f32 eft013_f32_zero_pool;            /* the camera-height bound of type 24              .sdata2 0x807967B4 */
+extern "C" f32 eft013_f32_1_5;                  /* the player-setter scale of types 8 and 21       .sdata2 0x807967B8 */
+extern "C" u16 eft013_effect_ids[36];           /* per type: the effect id                         .data 0x8059EB50 */
+extern "C" u16 eft013_effect_groups[36];        /* per type: the effect's resource group           .data 0x8059EBA4 */
+extern "C" f32 eft013_f32_0_5;                  /* the half scale of the follow types              .sdata2 0x807967B0 */
 extern "C" f32 eft013_f32_one;
 extern "C" f32 eft013_f32_three_quarters;
 extern "C" f32 eft013_f32_zero;
@@ -586,8 +687,9 @@ extern "C" void fn_8010A7D4(void* self, u32 type) {
     }
     case 2:
     case 5:
-    default:
         return;
+    default:
+        break;
     }
 }
 
@@ -777,6 +879,7 @@ extern "C" void fn_80107314(_EFT013_PL* self, u32 a, u32 b, f32 scale) {
 }
 
 #pragma peephole on
+#pragma optimization_level 4
 
 /* 0x80107640 - the eft013 allocator: pool a 72-slot object, seed the work block's count/scale from the
  * type and install the fn_80107CA0/fn_80107DDC pair; the type also selects the eft_state_flags_set flags. */
@@ -786,7 +889,7 @@ extern "C" _EFT013* fn_80107640(void* self, u32 a, f32 scale, u32 areano) {
         return NULL;
     }
     _EFT013_WORK_F* work = (_EFT013_WORK_F*)e->work_0x38;
-    if (((u8)a - 26) <= 1) {
+    if ((u32)((u8)a - 26) <= 1) {
         work->count = 0;
     } else {
         work->count = 1;
@@ -820,6 +923,7 @@ extern "C" _EFT013* fn_80107640(void* self, u32 a, f32 scale, u32 areano) {
     return e;
 }
 
+#pragma optimization_level reset
 #pragma peephole off
 
 /* 0x80107914 - the per-variant setter: read the source record the selector names, then spawn the type
@@ -1733,6 +1837,935 @@ extern "C" void fn_8010B198(_EFT013* self) {
     }
 }
 
+#pragma optimization_level 4
+
+/* 0x80107E5C (0x868): state 0 of the model-less effects (the guard, burst, follow and colour types of the player,
+ * enemy and NPC variants): resolves the source joint, picks the effect ids, creates the pooled effects and plays the
+ * start sound. */
+extern "C" void eft013_setup_effect(_EFT013* self) {
+    _EFT013_WORK_F* work;
+    _ENEMY_WORK* src;
+    u16 id;
+    u16 grp;
+    s8 delta;
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 off;
+    work = (_EFT013_WORK_F*)self->work_0x38;
+    VEC3_ctor(&off);
+    MTX34_ctor(&mtx);
+    switch (work->field_0x44) {
+    case 0: {
+        src = self->source_0x30;
+        _EFT013_PL4* pl = (_EFT013_PL4*)src;
+        if (eft_res_spawn_gate_ck((_EFT*)self, 0) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05 = 3;
+            return;
+        }
+        self->flag_0x01 = pl->flag_0x01;
+        work->prev_0x3C = pl->action_0x0A;
+        vec_to_mh_vec3(&off, &eft013_guard_offsets[self->type_0x02]);
+        mhchar_joint_mtx_get(&pl->phys_0x13C->chr_0x04, eft013_guard_joints[self->type_0x02], &mtx);
+        fn_8010A31C(self, &mtx, &off);
+        delta = 0;
+        if (self->area_0x44 == get_now_areano() && self->flag_0x01 != 0) {
+            switch (self->type_0x02) {
+            case 0:
+                se_req_pos_id228(&self->pos_0x18);
+                break;
+            case 2:
+                se_req_pos_id54(&self->pos_0x18);
+                break;
+            case 11:
+                se_req_pos_id250(&self->pos_0x18);
+                break;
+            case 32:
+                se_req_pos_id83(&self->pos_0x18);
+                break;
+            }
+        }
+        id = eft013_effect_ids[self->type_0x02];
+        grp = eft013_effect_groups[self->type_0x02];
+        if (pl->field_0x09 == 3) {
+            work->flag_0x45 = 1;
+        } else {
+            work->flag_0x45 = 0;
+        }
+        break;
+    }
+    case 1: {
+        src = self->source_0x30;
+        _EFT013_ENEMY_VIEW* enemy = (_EFT013_ENEMY_VIEW*)src;
+        if (em_work_die_ck((_ENEMY_WORK*)enemy) != 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05 = 3;
+            return;
+        }
+        work->prev_0x3C = 0;
+        delta = -3;
+        if (enemy->field_0x1E2 == 2) {
+            work->flag_0x45 = 1;
+        } else {
+            work->flag_0x45 = 0;
+        }
+        switch (self->type_0x02) {
+        case 8: {
+            f32 s = get_em_scale((_ENEMY_WORK*)enemy);
+            work->scale_0x28 = s * ((_EFT013_ENEMY_DATA*)get_enemy_data((_ENEMY_WORK*)enemy))->field_0x9C->scale_0x04;
+            if (work->scale_0x28 > eft013_f32_one) {
+                work->scale_0x28 = eft013_f32_one;
+            }
+            work->scale_0x2C = work->scale_0x28;
+            id = eft013_effect_ids[self->type_0x02];
+            grp = eft013_effect_groups[self->type_0x02];
+            break;
+        }
+        case 14:
+            id = 706;
+            grp = 37;
+            copyVec3(&off, &work->pos_0x30);
+            get_joint_wmat_em((_ENEMY_WORK*)enemy, work->field_0x40, &mtx);
+            fn_8010A31C(self, &mtx, &off);
+            break;
+        case 2:
+        case 16:
+        case 18:
+            copyVec3(&off, &work->pos_0x30);
+            get_joint_wmat_em((_ENEMY_WORK*)enemy, work->field_0x40, &mtx);
+            fn_8010A31C(self, &mtx, &off);
+            id = eft013_effect_ids[self->type_0x02];
+            grp = eft013_effect_groups[self->type_0x02];
+            break;
+        case 21: {
+            f32 s = get_em_scale((_ENEMY_WORK*)enemy);
+            work->scale_0x28 = s * ((_EFT013_ENEMY_DATA*)get_enemy_data((_ENEMY_WORK*)enemy))->field_0x9C->scale_0x04;
+            if (work->scale_0x28 > eft013_f32_one) {
+                work->scale_0x28 = eft013_f32_one;
+            }
+            if (work->option_0x46 == 1) {
+                work->scale_0x28 = work->scale_0x28 * eft013_f32_0_5;
+            }
+            work->scale_0x2C = work->scale_0x28;
+            delta = 0;
+            id = eft013_effect_ids[self->type_0x02];
+            grp = eft013_effect_groups[self->type_0x02];
+            break;
+        }
+        case 31:
+            id = eft013_effect_ids[self->type_0x02];
+            grp = eft013_effect_groups[self->type_0x02];
+            copyVec3(&off, &work->pos_0x30);
+            get_joint_wmat_em((_ENEMY_WORK*)enemy, work->field_0x40, &mtx);
+            fn_8010A31C(self, &mtx, &off);
+            break;
+        default:
+            id = eft013_effect_ids[self->type_0x02];
+            grp = eft013_effect_groups[self->type_0x02];
+            break;
+        }
+        if (self->area_0x44 == get_now_areano()) {
+            switch (self->type_0x02) {
+            case 2:
+                se_req_pos_id84(&self->pos_0x18);
+                break;
+            }
+        }
+        break;
+    }
+    case 2: {
+        src = self->source_0x30;
+        _EFT013_NPC* npc = (_EFT013_NPC*)src;
+        if (eft_res_spawn_gate_ck((_EFT*)self, 2) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05 = 3;
+            return;
+        }
+        work->prev_0x3C = 0;
+        delta = -3;
+        id = eft013_effect_ids[self->type_0x02];
+        grp = eft013_effect_groups[self->type_0x02];
+        if (npc->field_0x170 == 3) {
+            work->flag_0x45 = 1;
+        } else {
+            work->flag_0x45 = 0;
+        }
+        switch (self->type_0x02) {
+        case 8:
+            work->scale_0x28 = work->scale_0x2C = eft013_f32_0_5;
+            break;
+        case 21:
+            delta = 0;
+            work->scale_0x28 = work->scale_0x2C = eft013_f32_0_5;
+            break;
+        case 2:
+        case 10:
+        case 14:
+        case 16:
+        case 18:
+        case 33:
+            copyVec3(&off, &work->pos_0x30);
+            mhchar_joint_mtx_get(&npc->model_0x08, work->field_0x40, &mtx);
+            fn_8010A31C(self, &mtx, &off);
+            break;
+        }
+        break;
+    }
+    }
+    switch (self->type_0x02) {
+    case 5:
+        self->timer_0x0C = 300;
+    case 6:
+        delta++;
+        self->field_0x06 = 1;
+        break;
+    case 7:
+        delta++;
+        self->field_0x06 = 2;
+        break;
+    case 8:
+        delta++;
+        self->timer_0x0C = 30;
+        self->field_0x06 = 3;
+        self->field_0x07 = 5;
+        break;
+    case 12:
+        if (--self->field_0x10 > 0) {
+            return;
+        }
+        if (self->area_0x44 == get_now_areano()) {
+            se_req_pos_id63(&self->pos_0x18);
+        }
+        break;
+    case 14:
+    case 16:
+    case 18:
+        if (self->area_0x44 == get_now_areano()) {
+            se_req_pos_id49(&self->pos_0x18);
+        }
+        delta = 0;
+        break;
+    case 21:
+        delta++;
+        self->timer_0x0C = 30;
+        self->field_0x06 = 4;
+        break;
+    case 25:
+        if (GameMode_ck() == 2) {
+            id = 1584;
+            grp = 24;
+        }
+        delta = 0;
+        break;
+    default:
+        delta = 0;
+        break;
+    }
+    self->state_0x05++;
+    if (work->option_0x46 == 1) {
+        if (self->type_0x02 == 8 || self->type_0x02 == 21) {
+            work->effects[0] = res_eft_create(256, 32, 0);
+            if (work->effects[0] == NULL) {
+                fn_8010A318(self);
+                return;
+            }
+            delta = 0;
+        } else {
+            work->effects[0] = res_eft_create((u16)(id - delta), grp, 0);
+            if (work->effects[0] == NULL) {
+                fn_8010A318(self);
+                return;
+            }
+        }
+    } else {
+        work->effects[0] = res_eft_create((u16)(id - delta), grp, 0);
+        if (work->effects[0] == NULL) {
+            fn_8010A318(self);
+            return;
+        }
+    }
+    if (delta == 1) {
+        work->count++;
+        work->effects[1] = res_eft_create(eft013_burst_effect_ids[self->field_0x06], 32, 0);
+        if (work->effects[1] == NULL) {
+            fn_8010A318(self);
+            return;
+        }
+    }
+    if ((u32)(self->type_0x02 - 6) <= 1) {
+        work->count++;
+        work->effects[2] = res_eft_create(eft013_effect_ids[self->type_0x02], eft013_effect_groups[self->type_0x02], 0);
+        if (work->effects[2] == NULL) {
+            fn_8010A318(self);
+            return;
+        }
+    }
+    if (self->type_0x02 == 3 || self->type_0x02 == 11) {
+        copyVec3((nw4r::math::VEC3*)work->spawn_arg_0x10, &self->pos_0x18);
+    }
+    switch (self->type_0x02) {
+    case 2:
+        if (work->flag_0x45 == 1 && self->pos_0x18.y < eft013_f32_zero_pool) {
+            self->field_0x07 = 1;
+        } else {
+            self->field_0x07 = 0;
+        }
+        change_paramscale_eff(work->effects[0], work->scale_0x28);
+        break;
+    case 11:
+        change_paramscale_eff(work->effects[0], work->scale_0x28);
+        break;
+    case 33:
+        SetRootMtxTrans(work->effects[0], &self->pos_0x18);
+        break;
+    }
+    self->flag_0x01 = 1;
+    fn_80108A2C(self);
+}
+#pragma optimization_level reset
+
+#pragma optimization_level 4
+
+/* 0x801086C4 (0x2FC): state 0 of the model effects (types 9, 13, 26-29): creates the pooled effects and the UV
+ * model, seats the effects on the source joint, picks the start timer and plays the start sound. */
+extern "C" void eft013_setup_uv_model(_EFT013* self) {
+    nw4r::math::VEC3 pos;
+    VEC3_ctor(&pos);
+    _EFT013_WORK_M* work = (_EFT013_WORK_M*)self->work_0x38;
+    self->state_0x05++;
+    for (s32 i = 0; i < work->count; i++) {
+        work->effects[0] = res_eft_create(241, 29, 0);
+        if (work->effects[0] == NULL) {
+            fn_8010A318(self);
+            return;
+        }
+    }
+    switch (self->type_0x02) {
+    case 29:
+        work->uv_0x0C = (_EFT013_UV_MODEL*)res_eft_UV_model_create((struct MHchar*)work->model, 34, 336, 0, work->handles, 1, 0);
+        if (work->uv_0x0C == NULL) {
+            fn_8010A318(self);
+            return;
+        }
+        break;
+    default:
+        work->uv_0x0C = (_EFT013_UV_MODEL*)res_eft_UV_model_create((struct MHchar*)work->model, 34, 272, 0, work->handles, 1, 0);
+        if (work->uv_0x0C == NULL) {
+            fn_8010A318(self);
+            return;
+        }
+        break;
+    }
+    self->flag_0x01 = 1;
+    switch (work->state_0x28) {
+    case 0: {
+        _EFT013_PL4* pl = (_EFT013_PL4*)self->source_0x30;
+        if (eft_res_spawn_gate_ck((_EFT*)self, 0) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05 = 3;
+            return;
+        }
+        ((MHchar*)&pl->phys_0x13C->chr_0x04)->get_joint_wpos(work->field_0x24, &pos);
+        break;
+    }
+    case 1: {
+        _ENEMY_WORK* enemy = self->source_0x30;
+        if (em_work_die_ck(enemy) != 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05 = 3;
+            return;
+        }
+        get_joint_wpos_em(enemy, work->field_0x24, &pos);
+        break;
+    }
+    case 2: {
+        _EFT013_NPC* npc = (_EFT013_NPC*)self->source_0x30;
+        if (eft_res_spawn_gate_ck((_EFT*)self, 2) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05 = 3;
+            return;
+        }
+        npc->model_0x08.get_joint_wpos(work->field_0x24, &pos);
+        break;
+    }
+    }
+    switch (self->type_0x02) {
+    case 9:
+    case 13:
+    case 28:
+        self->timer_0x0C = 14;
+        break;
+    case 29:
+        self->timer_0x0C = 14;
+        ((MHchar*)work->model)->setMatAlphaBlendMode(0, GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
+        break;
+    case 26:
+        self->timer_0x0C = 3;
+        break;
+    case 27:
+        self->timer_0x0C = 5;
+        break;
+    }
+    if (self->area_0x44 == get_now_areano()) {
+        switch (self->type_0x02) {
+        case 9:
+        case 13:
+        case 28:
+            se_req_pos_id53(&pos);
+            break;
+        case 29:
+            se_req_pos_id74(&pos);
+            break;
+        case 26:
+        case 27:
+            se_req_pos_ps(self->source_0x30->se_handle_0xB14, 16, 2, &pos);
+            break;
+        }
+    }
+    fn_80108A2C(self);
+}
+#pragma optimization_level reset
+
+#pragma optimization_level 4
+
+/* 0x80108A74 (0x980): per-frame step of the eft013 model-less effects (the player, enemy and NPC variants of the
+ * guard, burst, follow and colour types): resolves the source joint, runs the type's own step, moves the pooled
+ * effects with it, tints them and spawns their models. */
+extern "C" void fn_80108A74(_EFT013* self) {
+    s32 i;
+    s32 kind;
+    s32 sub;
+    s32 dead;
+    _EFT013_PL4* pl;
+    _EFT013_WORK_F* work;
+    u32 master;
+    nw4r::math::VEC2 uv;
+    nw4r::math::VEC3 off;
+    nw4r::math::MTX34 mtx;
+    _GXColor c;
+    dead = 0;
+    work = (_EFT013_WORK_F*)self->work_0x38;
+    VEC2_ctor(&uv);
+    master = 0;
+    VEC3_ctor(&off);
+    MTX34_ctor(&mtx);
+    switch (self->type_0x02) {
+    case 8:
+        if (self->field_0x07 != 0) {
+            self->field_0x07--;
+            return;
+        }
+        break;
+    }
+    switch (work->field_0x44) {
+    case 0:
+        if (eft_res_spawn_gate_ck((_EFT*)self, 0) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        if (event_demo_ck() == 1) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        pl = (_EFT013_PL4*)self->source_0x30;
+        self->flag_0x01 = pl->flag_0x01;
+        kind = pl->action_0x0A;
+        sub = pl->motion_0x0C;
+        vec_to_mh_vec3(&off, &eft013_guard_offsets[self->type_0x02]);
+        mhchar_joint_mtx_get(&pl->phys_0x13C->chr_0x04, eft013_guard_joints[self->type_0x02], &mtx);
+        if (pl->field_0x09 == 3) {
+            work->flag_0x45 = 1;
+        } else {
+            work->flag_0x45 = 0;
+        }
+        if (Pl_master_ck((struct _PLW*)pl) == 1) {
+            master = 1;
+        }
+        break;
+    case 1: {
+        _EFT013_ENEMY_VIEW* enemy = (_EFT013_ENEMY_VIEW*)self->source_0x30;
+        if (em_work_die_ck((_ENEMY_WORK*)enemy) != 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        kind = enemy->action_0x1E5;
+        sub = enemy->state_sub;
+        copyVec3(&off, &work->pos_0x30);
+        get_joint_wmat_em((_ENEMY_WORK*)enemy, work->field_0x40, &mtx);
+        if (enemy->field_0x1E2 == 2) {
+            work->flag_0x45 = 1;
+        } else {
+            work->flag_0x45 = 0;
+        }
+        break;
+    }
+    case 2: {
+        if (eft_res_spawn_gate_ck((_EFT*)self, 2) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        if (event_demo_ck() == 1) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        _EFT013_NPC* npc = (_EFT013_NPC*)self->source_0x30;
+        kind = npc->field_0x171;
+        sub = npc->field_0x172;
+        copyVec3(&off, &work->pos_0x30);
+        mhchar_joint_mtx_get(&npc->model_0x08, work->field_0x40, &mtx);
+        if (npc->field_0x170 == 3) {
+            work->flag_0x45 = 1;
+        } else {
+            work->flag_0x45 = 0;
+        }
+        break;
+    }
+    }
+    switch (self->type_0x02) {
+    case 5:
+        if (work->field_0x44 != 0) {
+            fn_8010A318(self);
+            return;
+        }
+        eft013_guard_pulse(self);
+        if (kind != 1 && sub != 26) {
+            if (kind == 6) {
+                if (work->prev_0x3C != 6) {
+                    self->state_0x05++;
+                    self->field_0x10 = 30;
+                    eft013_retire_step(self);
+                    return;
+                }
+            } else {
+                self->state_0x05++;
+                self->field_0x10 = 30;
+                eft013_retire_step(self);
+                return;
+            }
+        }
+        break;
+    case 8:
+    case 21:
+        if (--self->timer_0x0C < 0) {
+            if (work->field_0x44 != 0) {
+                switch (self->field_0x08) {
+                case 0:
+                    self->field_0x08++;
+                    if (work->count > 1) {
+                        push_eft_effect_heap_num(&work->effects[1], 1);
+                    }
+                    work->effects[1] = work->effects[0];
+                    work->effects[0] = res_eft_create(eft013_burst_effect_ids[self->field_0x06], 32, 0);
+                    if (work->effects[0] == NULL) {
+                        fn_8010A318(self);
+                        return;
+                    }
+                    if (work->count < 2) {
+                        work->count++;
+                    }
+                    work->effects[1]->RetireEmitterAll();
+                    self->timer_0x0C = 15;
+                    break;
+                case 1:
+                    self->state_0x05++;
+                    push_eft_effect_heap_num(&work->effects[1], 1);
+                    work->count--;
+                    self->field_0x10 = 27;
+                    self->field_0x06 = 0;
+                    eft013_retire_step(self);
+                    return;
+                }
+            } else {
+                self->state_0x05++;
+                self->field_0x10 = 27;
+                fn_80107314((_EFT013_PL*)pl, 17, 7, eft013_f32_1_5);
+                self->field_0x06 = 0;
+                eft013_retire_step(self);
+                return;
+            }
+        }
+        for (i = 0; i < work->count; i++) {
+            change_paramscale_eff(work->effects[i], work->scale_0x28);
+        }
+        break;
+    case 2:
+    case 10:
+    case 12:
+    case 14:
+    case 17:
+    case 18:
+    case 19:
+    case 20:
+    case 31:
+    case 33:
+    case 34:
+        change_paramscale_eff(work->effects[0], work->scale_0x28);
+        break;
+    }
+    work->prev_0x3C = kind;
+    fn_8010A31C(self, &mtx, &off);
+    switch (self->type_0x02) {
+    case 0:
+    case 1:
+    case 3:
+    case 4:
+    case 11:
+        if (eft_water_state_ck((_EFT*)self) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+        for (i = 0; i < work->count; i++) {
+            SetRootMtxTrans(work->effects[i], &self->pos_0x18);
+            if (effect_move(work->effects[i]) == 0) {
+                dead++;
+            }
+        }
+        break;
+    case 19:
+        for (i = 0; i < work->count; i++) {
+            mtx34_set_trans(&mtx, &self->pos_0x18);
+            work->effects[i]->SetRootMtx(mtx);
+            if (effect_move(work->effects[i]) == 0) {
+                dead++;
+            }
+        }
+        break;
+    default:
+        for (i = 0; i < work->count; i++) {
+            SetRootMtxTrans(work->effects[i], &self->pos_0x18);
+            if (effect_move(work->effects[i]) == 0) {
+                dead++;
+            }
+        }
+        break;
+    }
+    switch (self->type_0x02) {
+    case 0:
+    case 1:
+    case 3:
+    case 4:
+    case 11:
+    case 34: {
+        u32 col = get_stg_eft_col(self->area_0x44, 1);
+        c.r = (col & 0xFF000000) >> 24;
+        c.g = (col & 0xFF0000) >> 16;
+        c.b = (col & 0xFF00) >> 8;
+        c.a = col;
+        change_color_eff(work->effects[0], &self->pos_0x18, c);
+        break;
+    }
+    case 2:
+        if (self->field_0x07 == 1) {
+            c.r = 0xFF;
+            c.g = 0xAF;
+            c.b = 0xAF;
+            c.a = 0xFF;
+            change_color_eff(work->effects[0], &self->pos_0x18, c);
+        }
+        break;
+    case 8:
+    case 21:
+        if (work->flag_0x45 == 1) {
+            c.r = 0x64;
+            c.g = 0xBF;
+            c.b = 0xFF;
+            c.a = 0xFF;
+            if (self->field_0x08 == 0) {
+                change_color_eff(work->effects[0], &self->pos_0x18, c);
+            } else {
+                change_color_eff(work->effects[1], &self->pos_0x18, c);
+            }
+        }
+        break;
+    case 12:
+        c.r = 0xC8;
+        c.g = 0xC8;
+        c.b = 0xA0;
+        c.a = 0xFF;
+        change_color_eff(work->effects[0], &self->pos_0x18, c);
+        break;
+    case 14:
+        c.a = 0xBF;
+        self->field_0x10++;
+        eftGetKeyRGB(eft013_color_keys_14, self->field_0x10, &c.r, &c.g, &c.b);
+        change_color_eff(work->effects[0], &self->pos_0x18, c);
+        break;
+    case 16:
+        c.a = 0xBF;
+        self->field_0x10++;
+        eftGetKeyRGB(eft013_color_keys_16_22, self->field_0x10, &c.r, &c.g, &c.b);
+        change_color_eff(work->effects[0], &self->pos_0x18, c);
+        break;
+    case 17:
+        c.r = 0x3F;
+        c.g = 0x3F;
+        c.b = 0x3F;
+        c.a = 0xFF;
+        change_color_eff(work->effects[0], &self->pos_0x18, c);
+        break;
+    case 18:
+        c.r = 0xA0;
+        c.g = 0x80;
+        c.b = 0x10;
+        c.a = 0xFF;
+        change_color_eff(work->effects[0], &self->pos_0x18, c);
+        break;
+    case 22:
+        c.a = 0x7F;
+        self->field_0x10++;
+        eftGetKeyRGB(eft013_color_keys_16_22, self->field_0x10, &c.r, &c.g, &c.b);
+        change_color_eff(work->effects[0], &self->pos_0x18, c);
+        break;
+    }
+    s32 total = work->count;
+    if (dead == total) {
+        self->flag_0x01 = 0;
+        self->state_0x05++;
+        return;
+    }
+    switch (self->type_0x02) {
+    case 0:
+    case 2:
+    case 6:
+    case 7:
+    case 11:
+    case 12:
+    case 14:
+    case 16:
+        if (master == 1) {
+            eft_res_models_spawn((_EFT*)self, (void**)work->effects, eft_stage_spawn_flag((struct _PLW*)pl) | 1, total, NULL);
+        } else {
+            eft_res_models_spawn((_EFT*)self, (void**)work->effects, 1, total, NULL);
+        }
+        break;
+    case 3:
+        eft_res_models_spawn((_EFT*)self, (void**)work->effects, 1, total, work->spawn_arg_0x10);
+        break;
+    case 24:
+        if (get_camera_pos().y < eft013_f32_zero_pool) {
+            eft_res_models_spawn((_EFT*)self, (void**)work->effects, 1, work->count, NULL);
+        }
+        break;
+    default:
+        eft_res_models_spawn((_EFT*)self, (void**)work->effects, 1, total, NULL);
+        break;
+    }
+}
+#pragma optimization_level reset
+
+#pragma optimization_level 4
+/* 0x801093F4 (0x690): per-frame step of the model effects (types 9, 13, 26-29): resolves the position of the
+ * player, enemy or NPC joint it follows, keeps the model and its effects there and plays the colour ramp. */
+extern "C" void fn_801093F4(_EFT013* self) {
+    s32 i;
+    s32 spawn_mode;
+    s32 loop_mode;
+    _GXColor* ramp;
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 pos;
+    _GXColor color;
+    VEC3_ctor(&pos);
+    MTX34_ctor(&mtx);
+    _EFT013_WORK_M* work = (_EFT013_WORK_M*)self->work_0x38;
+    if (--self->timer_0x0C < 0) {
+        self->state_0x05++;
+        self->flag_0x01 = 0;
+        return;
+    }
+    switch (self->type_0x02) {
+    case 9:
+    case 28:
+    case 29:
+        switch (work->state_0x28) {
+        case 0: {
+            if (eft_res_spawn_gate_ck((_EFT*)self, 0) == 0) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+            if (event_demo_ck() == 1) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+            _EFT013_PL4* pl = (_EFT013_PL4*)self->source_0x30;
+            switch (self->type_0x02) {
+            case 9:
+                if (Pl_condition_ck((struct _PLW*)pl, 4) == 0) {
+                    self->state_0x05++;
+                    self->flag_0x01 = 0;
+                    return;
+                }
+                break;
+            case 28:
+                if (Pl_dm_condition_ck((struct _PLW*)pl, 0x10) == 0 && Pl_dm_condition_ck((struct _PLW*)pl, 0x20) == 0) {
+                    self->state_0x05++;
+                    self->flag_0x01 = 0;
+                    return;
+                }
+                break;
+            case 29:
+                if (Pl_dm_condition_ck((struct _PLW*)pl, 0x100) == 0 && Pl_dm_condition_ck((struct _PLW*)pl, 0x200) == 0) {
+                    self->state_0x05++;
+                    self->flag_0x01 = 0;
+                    return;
+                }
+                break;
+            }
+            ((MHchar*)&pl->phys_0x13C->chr_0x04)->get_joint_wpos(work->field_0x24, &pos);
+            break;
+        }
+        case 1: {
+            _ENEMY_WORK* enemy = self->source_0x30;
+            if (em_work_die_ck(enemy) != 0) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+            if (em_status_ck(enemy, 4) == 0) {
+                self->state_0x05++;
+                self->flag_0x01 = 0;
+                return;
+            }
+            get_joint_wpos_em(enemy, work->field_0x24, &pos);
+            break;
+        }
+        case 2: {
+            if (eft_res_spawn_gate_ck((_EFT*)self, 2) == 0) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+            if (event_demo_ck() == 1) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+            _EFT013_NPC* npc = (_EFT013_NPC*)self->source_0x30;
+            if (ai_npc_motion_step_ck((struct _AINPC_W*)npc, work->field_0x31, work->field_0x32) == 0) {
+                self->state_0x05++;
+                self->flag_0x01 = 0;
+                return;
+            }
+            npc->model_0x08.get_joint_wpos(work->field_0x24, &pos);
+            break;
+        }
+        }
+        break;
+    case 13:
+    case 26:
+    case 27:
+        switch (work->state_0x28) {
+        case 0: {
+            _EFT013_PL4* pl = (_EFT013_PL4*)self->source_0x30;
+            if (eft_res_spawn_gate_ck((_EFT*)self, 0) == 0) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+            ((MHchar*)&pl->phys_0x13C->chr_0x04)->get_joint_wpos(work->field_0x24, &pos);
+            break;
+        }
+        case 1: {
+            _ENEMY_WORK* enemy = self->source_0x30;
+            if (em_work_die_ck(enemy) != 0) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+            get_joint_wpos_em(enemy, work->field_0x24, &pos);
+            break;
+        }
+        case 2: {
+            _EFT013_NPC* npc = (_EFT013_NPC*)self->source_0x30;
+            if (eft_res_spawn_gate_ck((_EFT*)self, 2) == 0) {
+                self->flag_0x01 = 0;
+                self->state_0x05++;
+                return;
+            }
+            npc->model_0x08.get_joint_wpos(work->field_0x24, &pos);
+            break;
+        }
+        }
+        break;
+    default:
+        self->state_0x05++;
+        self->flag_0x01 = 0;
+        return;
+    }
+    mtx34_identity(&mtx);
+    rotLocalMatY(self->rot_0x24.y, &mtx);
+    rotLocalMatX(self->rot_0x24.x, &mtx);
+    rotLocalMatZ(self->rot_0x24.z, &mtx);
+    self->pos_0x18.x = mtx.m[0][3] = pos.x;
+    self->pos_0x18.y = mtx.m[1][3] = pos.y;
+    self->pos_0x18.z = mtx.m[2][3] = pos.z;
+    color.r = 0;
+    color.g = 0;
+    color.b = 0;
+    color.a = 0xFF;
+    switch (self->type_0x02) {
+    case 9:
+        ramp = eft013_color_ramp_9;
+        break;
+    case 13:
+    case 28:
+        ramp = eft013_color_ramp_13_28;
+        break;
+    case 26:
+    case 27:
+        ramp = NULL;
+        break;
+    case 29:
+        ramp = eft013_color_ramp_29;
+        break;
+    }
+    if (self->field_0x10 <= 2 && ramp != NULL) {
+        work->color1.r = ramp[self->field_0x10].r;
+        work->color1.g = ramp[self->field_0x10].g;
+        work->color1.b = ramp[self->field_0x10].b;
+        work->color1.a = ramp[self->field_0x10].a;
+    }
+    fn_8010A394(self);
+    self->field_0x10++;
+    ((MHchar*)work->model)->setTevKColor(0, GX_KCOLOR3, &work->color0);
+    copyVec3(&((MHchar*)work->model)->pos_0x04, &self->pos_0x18);
+    copyVec3(&((MHchar*)work->model)->scale_0x1C, &work->scale_0x10);
+    ((MHchar*)work->model)->move2(&mtx, 0);
+    work->uv_0x0C->update_0x24();
+    spawn_mode = 2;
+    loop_mode = 1;
+    switch (self->type_0x02) {
+    case 9:
+    case 13:
+    case 28:
+    case 29:
+        if (work->state_0x28 == 0) {
+            _EFT013_PL4* pl = (_EFT013_PL4*)self->source_0x30;
+            if (Pl_master_ck((struct _PLW*)pl) == 1) {
+                spawn_mode = eft_stage_spawn_flag((struct _PLW*)pl) | 2;
+                loop_mode = eft_stage_spawn_flag((struct _PLW*)pl) | 1;
+            }
+        }
+        break;
+    }
+    eft_res_models_spawn((_EFT*)self, (void**)&work->model, spawn_mode, 1, NULL);
+    for (i = 0; i < work->count; i++) {
+        SetRootMtxTrans(work->effects[i], &self->pos_0x18);
+        eft_effect_foreach_pm_scale(work->effects[i], (u32)&work->scale_0x1C, 1);
+        if (effect_move(work->effects[i]) == 1) {
+            change_color_scale_eff(work->effects[0], 1, &work->color1, &color, &self->pos_0x18, 1, eft013_f32_5000);
+            eft_res_models_spawn((_EFT*)self, (void**)&work->effects[i], loop_mode, 1, NULL);
+        }
+    }
+}
+
+#pragma optimization_level reset
 /* 0x80109A84 (0x27C): per-frame step of the player's charge glow: while the player charges (condition 0x100) or
  * holds (0x200) it shows the matching model parts, re-arms the eft013 sparks every 19 frames and seats the model on
  * the player's joint 2; when the charge ends it plays the release effect once. */
@@ -1752,7 +2785,7 @@ extern "C" void fn_80109A84(_EFT013* self) {
     if (Pl_condition_ck((struct _PLW*)pl, 0x100) == 0 && Pl_condition_ck((struct _PLW*)pl, 0x200) == 0) {
         self->field_0x06 = 0;
         self->flag_0x01 = 0;
-        if (self->field_0x08 != 0) {
+        if (self->field_0x08 != self->flag_0x01) {
             if (self->field_0x07 == 0) {
                 if (self->area_0x44 == get_now_areano()) {
                     se_req_pos_id73(&self->pos_0x18);
@@ -1793,9 +2826,130 @@ extern "C" void fn_80109A84(_EFT013* self) {
     mhchar_joint_mtx_get(&((_EFT013_PL_PHYS*)pl->field_0x13C)->chr_0x04, 2, &mtx);
     mtx34_trans_get(&mtx, &self->pos_0x18);
     eft_rot_vec_copy(&self->rot_0x24, &((_EFT013_PL*)pl)->rot_0x54);
-    MHchar* model = (MHchar*)work->effects[0];
-    copyVec3(&model->pos_0x04, &self->pos_0x18);
-    eft_rot_vec_copy((_CP_VECTOR*)&model->field_0x28, &self->rot_0x24);
-    model->move2(&mtx, 0);
+    copyVec3(&((MHchar*)work->effects[0])->pos_0x04, &self->pos_0x18);
+    eft_rot_vec_copy((_CP_VECTOR*)&((MHchar*)work->effects[0])->field_0x28, &self->rot_0x24);
+    ((MHchar*)work->effects[0])->move2(&mtx, 0);
     eft_res_models_spawn((_EFT*)self, (void**)work->effects, 2, work->count, NULL);
+}
+
+/* 0x80109D00 (0x4D4): per-frame step of the player's guard flash (types 6 and 7): on the damage condition it picks
+ * the effect state, seats the effects on the player's joint pushed along the camera direction and moves them. */
+extern "C" void fn_80109D00(_EFT013* self) {
+    s32 i;
+    u32 condition;
+    _EFT013_WORK_G* work = (_EFT013_WORK_G*)self->work_0x38;
+    _EFT013_PL4* pl = (_EFT013_PL4*)self->source_0x30;
+    s32 spawn_mode;
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 joint_pos;
+    nw4r::math::VEC3 push;
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&joint_pos);
+    VEC3_ctor(&push);
+    if (eft_res_spawn_gate_ck((_EFT*)self, 0) == 0) {
+        self->flag_0x01 = 0;
+        self->state_0x05++;
+        return;
+    }
+    if (event_demo_ck() == 1) {
+        return;
+    }
+    switch (self->type_0x02) {
+    case 6:
+        condition = Pl_dm_condition_ck((struct _PLW*)pl, 2);
+        break;
+    case 7:
+        condition = Pl_dm_condition_ck((struct _PLW*)pl, 1);
+        break;
+    }
+    spawn_mode = 1;
+    if (self->field_0x08 == 0 && condition == 1) {
+        if (Pl_master_ck((struct _PLW*)pl) == 1) {
+            self->field_0x08 = 1;
+            spawn_mode = eft_stage_spawn_flag((struct _PLW*)pl) | 1;
+        } else {
+            self->field_0x08 = 4;
+            self->field_0x07 = 3;
+        }
+    }
+    if (self->field_0x08 == 0) {
+        return;
+    }
+    self->area_0x44 = pl->area_0x16;
+    if (self->field_0x08 != 0 && self->field_0x08 != 5 && condition == 0) {
+        self->field_0x10 = 26;
+        ((MHchar*)&pl->phys_0x13C->chr_0x04)->get_joint_wpos(eft013_guard_joints[self->type_0x02], &joint_pos);
+        if (pl->action_0x0A == 0 && (pl->motion_0x0C == 8 || pl->motion_0x0C == 9 || pl->motion_0x0C == 62)) {
+            fn_80107314((_EFT013_PL*)pl, 12, 29, eft013_f32_one);
+        } else {
+            fn_80107314((_EFT013_PL*)pl, 12, 12, eft013_f32_one);
+        }
+        self->field_0x06 = 0;
+        self->field_0x08 = 5;
+    }
+    eft013_guard_pulse(self);
+    if (self->area_0x44 == get_now_areano()) {
+        shell_se_req(pl->se_0xAF4, &pl->pos_0x3C, 3, (u32)self);
+    }
+    work->action_0x3C = pl->action_0x0A;
+    vec_to_mh_vec3(&joint_pos, &eft013_guard_offsets[self->type_0x02]);
+    mhchar_joint_mtx_get(&pl->phys_0x13C->chr_0x04, eft013_guard_joints[self->type_0x02], &mtx);
+    fn_8010A31C(self, &mtx, &joint_pos);
+    copyVec3(&push, &get_camera_direction());
+    vec3_normalize_into(&push, &push);
+    vec3_scale_in_place(&push, eft013_f32_camera_push);
+    addVec3To(&self->pos_0x18, &push);
+    switch (self->field_0x08) {
+    case 1:
+        for (i = 0; i < work->count; i++) {
+            SetRootMtxTrans(work->effects[i], &self->pos_0x18);
+            effect_move(work->effects[i]);
+        }
+        eft_res_models_spawn((_EFT*)self, (void**)&work->effects[0], spawn_mode, 2, NULL);
+        break;
+    case 2:
+        fn_8010A6A0(self, work->effects[0]);
+        fn_8010A6A0(self, work->effects[1]);
+        for (i = 0; i < work->count; i++) {
+            SetRootMtxTrans(work->effects[i], &self->pos_0x18);
+            effect_move(work->effects[i]);
+        }
+        eft_res_models_spawn((_EFT*)self, (void**)&work->effects[0], spawn_mode, 2, NULL);
+        break;
+    case 3:
+        fn_8010A6A0(self, work->effects[1]);
+        for (i = 0; i < work->count; i++) {
+            SetRootMtxTrans(work->effects[i], &self->pos_0x18);
+            effect_move(work->effects[i]);
+        }
+        eft_res_models_spawn((_EFT*)self, (void**)&work->effects[1], spawn_mode, 2, NULL);
+        break;
+    case 4:
+        for (i = 0; i < work->count; i++) {
+            SetRootMtxTrans(work->effects[i], &self->pos_0x18);
+            effect_move(work->effects[i]);
+        }
+        eft_res_models_spawn((_EFT*)self, (void**)&work->effects[2], spawn_mode, 1, NULL);
+        break;
+    case 5:
+        if (--self->field_0x10 < 0) {
+            self->field_0x10 = 0;
+            self->field_0x06 = 0;
+            self->field_0x07 = 0;
+            self->field_0x08 = 0;
+            work->hold_0x1C = 0;
+            work->timer_0x24 = 0;
+            for (i = 0; i < work->count; i++) {
+                RetireParticleAll(work->effects[i]);
+            }
+            break;
+        }
+        fn_8010A6A0(self, work->effects[2]);
+        for (i = 0; i < work->count; i++) {
+            SetRootMtxTrans(work->effects[i], &self->pos_0x18);
+            effect_move(work->effects[i]);
+        }
+        eft_res_models_spawn((_EFT*)self, (void**)&work->effects[2], spawn_mode, 1, NULL);
+        break;
+    }
 }

@@ -248,7 +248,7 @@ struct EftEmitter {
 extern "C" u32 fn_80100330(u32* p);
 extern "C" void* ef_emres_get_name(u32 color);
 extern "C" void* fn_800A60C0(void* self);
-extern "C" void fn_800A4AF8(nw4r::ef::Effect* effect);
+extern "C" void RetireParticleAll(nw4r::ef::Effect* effect);
 extern "C" nw4r::ef::EffectSystem* ef_system_memory_manager(nw4r::ef::EffectSystem* system);
 extern "C" EftEmitter* fn_800A51C8(void* self);
 
@@ -1758,7 +1758,7 @@ extern "C" void fn_800FFF08(Eft004* self, u32 idx)
 
     if (*slot != NULL) {
         fn_800A60C0(*slot);
-        fn_800A4AF8(*slot);
+        RetireParticleAll(*slot);
         (*slot)->RetireEmitterAll();
         system->RetireEffect(*slot);
         ef_system_memory_manager(system)->virtual_0x0C();

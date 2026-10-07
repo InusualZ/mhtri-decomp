@@ -55,7 +55,7 @@
 /* The vector helpers `g3d/g3d_resanmchr.cpp` (the first two) and `fn_8004CAD8.cpp` define. */
 extern "C" void fn_8008E8D0(void* a, void* b);
 extern "C" void fn_8008DA10(void* a, void* b);
-void fn_800513F0(VEC3* v, f32 s);
+void vec3_scale_in_place(VEC3* v, f32 s);
 
 /* The object the aim writer's first argument points at, and the source block its +0x4 member names
  * (`fn_8035EF58`).  Only the two fields the body touches are named. */
@@ -529,7 +529,7 @@ extern "C" void fn_8035EF58(void* a, void* b, void* c, void* d, u32 e, u8* f)
         if (e - 5 <= 1) {
             if (p->field_0x00A == 1) {
                 fn_8008DA10(b, &v);
-                fn_800513F0(&v, lbl_8079B710);
+                vec3_scale_in_place(&v, lbl_8079B710);
                 fn_8008E8D0(b, &v);
             }
         } else if (e == 0x17) {

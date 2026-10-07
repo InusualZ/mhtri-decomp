@@ -78,7 +78,7 @@ extern "C" void eft_res_slot_release(void* self);
 extern "C" void eft_state_flags_set(_EFT* self, u8 a, u8 b);
 
 extern "C" u32 eft_res_spawn_gate_ck(_EFT* self, u32 mode);
-extern "C" u32 fn_800F9380(_PLW* plw);
+extern "C" u32 eft_stage_spawn_flag(_PLW* plw);
 extern "C" void eft_res_models_spawn(void* self, void* list, u32 mode, s32 count, u32 arg);
 
 extern "C" u8 GameMode_ck(void);
@@ -237,7 +237,7 @@ extern "C" void fn_80115100(_EFT* self)
             &((_PLW*)self->source_0x30)->physics_0x13C->chr_0x04, 3, &self->pos_0x18);
         addVec3To(&self->pos_0x18, &v);
         if (Pl_master_ck((_PLW*)self->source_0x30) == 1) {
-            flags = fn_800F9380((_PLW*)self->source_0x30) | 1;
+            flags = eft_stage_spawn_flag((_PLW*)self->source_0x30) | 1;
         }
         break;
     case 1:
