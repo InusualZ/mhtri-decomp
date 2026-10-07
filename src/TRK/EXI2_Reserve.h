@@ -1,8 +1,8 @@
 /*
- * EXI2_Reserve.h - the declaration of `EXI2_Reserve`, owned by `VF/vf.cpp`.
+ * EXI2_Reserve.h - the declaration of `EXI2_Reserve`, owned by `TRK/exi2_comm.c`.
  */
-#ifndef VF_EXI2_RESERVE_H
-#define VF_EXI2_RESERVE_H
+#ifndef TRK_EXI2_RESERVE_H
+#define TRK_EXI2_RESERVE_H
 
 #include "types.h"
 

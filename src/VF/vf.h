@@ -1,8 +1,7 @@
 /*
  * VF/vf.h - declarations of the symbols owned by `VF/vf.cpp` that other units call: the prfile2 file-system
- *   bring-up, the KPR queue peek and two KBD channel calls.  The names are GUESSES (the `VF/vf.cpp`
- *   header): the VF three from the scheme their own callees use (`VFSysInit`, `VFipf2_init_prfile2`), the
- *   KPR/KBD three from their bodies.
+ *   bring-up.  The names are GUESSES (the `VF/vf.cpp` header), from the scheme their own callees use
+ *   (`VFSysInit`, `VFipf2_init_prfile2`).
  */
 #ifndef MHTRI_VF_VF_H
 #define MHTRI_VF_VF_H
@@ -24,19 +23,6 @@ void VFipf2Init(u8* work, u32 size);
 
 /* 0x80521D70 - the matching take-down: finalize the file system and clear the flag. */
 void VFipf2Shutdown(void);
-
-/* 0x80526F00 - copy up to `max` queued u16 characters to `outAddress` under disabled interrupts and return
- * how many the queue holds (the bytes at +0x10/+0x11 summed); `(queue, 0, 0)` only counts. */
-/* untyped: opaque band object, typed by the callers' views */
-u32 KPRLookAhead(void* queue, u32 outAddress, u32 max);
-
-/* 0x80529430 - allocate an LED request for the channel, store the value, the callback and its argument,
- * and hand it to the HID transfer; 7 when the request cannot be queued. */
-/* untyped: opaque band object, typed by the callers' views */
-u32 KBDSetLedsAsync(u32 index, u32 value, void* callback, u32 arg);
-
-/* 0x80529B50 - store the word at +0x258 of the channel's 0x2A8-byte record; returns 0. */
-void KBDSetChannelValue(u8 index, u32 value);
 
 #ifdef __cplusplus
 }

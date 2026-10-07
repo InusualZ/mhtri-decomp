@@ -21,7 +21,7 @@
 #include "AX/AXFXReverbHi.h"
 #include "AX/AXFXReverbHiExp.h"
 #include "AX/AXFXReverbStd.h"
-#include "ARC/arc.h"
+#include "AX/AXCL.h"
 
 /* The .sdata2 float pool the range's relocations point at (auto range 0x8079CFF0-0x8079D01F). */
 extern f32 lbl_8079CFF0; /* 0.0f  */
@@ -91,7 +91,7 @@ void AXFXReverbHiCallback(AXFXBuffer* buffer, AXFXReverbHi* reverb, s32* out0, s
 /* The "Exp" unit's parameter load: only valid when the AX output mode is stereo. */
 BOOL fn_80474DD0(AXFXReverbHi* reverb)
 {
-    if (fn_8046FD80() != 2) {
+    if (AXGetMode() != 2) {
         return FALSE;
     }
     reverb->params.b.exp_mode = 5;

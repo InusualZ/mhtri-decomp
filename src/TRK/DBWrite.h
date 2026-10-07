@@ -1,8 +1,8 @@
 /*
- * DBWrite.h - the declaration of `DBWrite`, owned by `VF/vf.cpp`.
+ * DBWrite.h - the declaration of `DBWrite`, owned by `TRK/exi2_comm.c`.
  */
-#ifndef VF_DBWRITE_H
-#define VF_DBWRITE_H
+#ifndef TRK_DBWRITE_H
+#define TRK_DBWRITE_H
 
 #include "types.h"
 

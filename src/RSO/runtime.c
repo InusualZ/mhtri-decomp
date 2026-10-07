@@ -2,9 +2,12 @@
  * RSO runtime (DOL side) -- Monster Hunter Tri, RMHE08.
  *
  * The DOL-side RSO loader/linker: it relocates a loaded module's symbol tables against the sections
- * that are already in memory.  `.text` 0x804D9B4C..0x804DAE40 (0x12F4), nine functions in retail
+ * that are already in memory.  `.text` 0x804D9B4C..0x804DB050 (0x1504), thirteen functions in retail
  * order: LocateObject, RSOStaticLocateObject, RSOUnLocateObject, RSOLink, RSOUnLink, fn_804DA7E4,
- * FindExportIndex, RSORelocate, RSORelocateSmallDataSection.
+ * FindExportIndex, RSORelocate, RSORelocateSmallDataSection, then the module-list functions
+ * 0x804DAE40..0x804DB050 (unwritten; `.sbss` 0x80795440, an 8 B list head, is read by those four only;
+ * they call LocateObject, RSOStaticLocateObject and RSOLink, and the last two of them start at 4-byte
+ * offsets, unlike the 16-aligned SC library that follows at 0x804DB050).
  *
  * Names and struct layouts come from the shared memory dump (`docs/memory-dump.md`), except
  * fn_804DA7E4 which has no name there.  A rename is always two edits - this file and
