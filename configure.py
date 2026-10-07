@@ -623,7 +623,7 @@ config.libs = [
             Object(NonMatching, "menu/menu_row.cpp"),
             Object(NonMatching, "menu/menu_result.cpp"),
             # Flags: unit header of src/enemy/em029_prog.cpp
-            Object(NonMatching, "enemy/em029_prog.cpp"),
+            Object(Matching, "enemy/em029_prog.cpp"),
             Object(NonMatching, "menu/multi_result.cpp"),
             Object(NonMatching, "menu/get_pop_dat_ptr.cpp"),
             # Flags: unit header of src/lobby/lb_server_sel_trans.cpp

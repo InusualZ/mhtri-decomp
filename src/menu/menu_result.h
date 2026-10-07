@@ -16,6 +16,7 @@
 #include "id_value.h"                  /* IdValue: the (item id, count) pairs of the result's item grids */
 #include "quest/quest_result_work.h"   /* Q_ResultWork: the one view of the 0x438-byte quest result record (rule 1) */
 #include "Pl/plw.h"                    /* _EQUIP: the 12-byte equipment record */
+#include "fn_8004CAD8.h"               /* _vs_user_data: the 0x100-byte VS user block */
 
 struct Q_MoveWork;
 struct _EFT;
@@ -115,10 +116,11 @@ typedef struct QResultScreen {
     /* +0x3070 */ IdValue grid_items[0x30];    /* the items the quest delivered */
     /* +0x3130 */ IdValue grid_kept[0x30];     /* the items the result keeps */
     /* +0x31F0 */ _EQUIP equip_cells[0x28];    /* the equipment the quest delivered */
-    /* +0x33D0 */ u8 pad_0x33D0[0x4];
-    /* +0x33D4 */ s32 box_cursor;              /* the box band's cursor, -1 when off */
-    /* +0x33D8 */ s32 box_frame;
-    /* +0x33DC */ u8 box_records[0x350C - 0x33DC];  /* the box band's player records (`MultiResultRecordArray`) */
+    /* +0x33D0 */ s32 box_result;              /* what the box band's task returns once its closing fade ends */
+    /* +0x33D4 */ s32 box_msg;                 /* the save step's message id, -1 when none (`multi_box_phase_input`) */
+    /* +0x33D8 */ s32 box_player;              /* the player whose box the save step writes, counted up to `field_0x0007` */
+    /* +0x33DC */ u8 box_records[0x340C - 0x33DC];  /* the box band's player records (`MultiResultRecordArray`) */
+    /* +0x340C */ struct _vs_user_data box_vs_user;  /* the VS user block the save step reads back from the remote */
 } QResultScreen; /* size: 0x350C */
 
 /* One 4-byte slot of a box grid: the item id and how many of it are left.  Both fields are read by

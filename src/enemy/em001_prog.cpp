@@ -626,8 +626,8 @@ extern "C" void fn_80147CE0(_ENEMY_WORK* self, s32 arg) {
         em_act_arm_unless_down(self, 0, 3);
     }
     if ((arg & 0xFF) != 0) {
-        em_motion_param_set(self, 0, lbl_80796E1C);
-        em_motion_param_set(self, 10, lbl_80796E20);
+        em_motion_param_set(self, lbl_80796E1C, 0);
+        em_motion_param_set(self, lbl_80796E20, 10);
     }
     if (em_res_user_data_ck(self) == 0) {
         helper = (Helper_80147CE0*)operator new(0xC);
@@ -1030,7 +1030,7 @@ extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
             }
             if (em_frame_check(self, 0, lbl_80796E5C, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E1C, lbl_80796E60);
-                fn_801049D0(self, 26, 47, 0, &v, lbl_80796E64);
+                eft009_spawn_at_pos(self, 26, 47, 0, lbl_80796E64, &v);
             }
             if (em_frame_check(self, 3, lbl_80796E68, lbl_80796E6C) == 1 ||
                 em_frame_check(self, 3, lbl_80796E70, lbl_80796E74) == 1) {
@@ -1047,7 +1047,7 @@ extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
             }
             if (em_frame_check(self, 0, lbl_80796E50, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E1C, lbl_80796E60);
-                fn_801049D0(self, 26, 47, 0, &v, lbl_80796E64);
+                eft009_spawn_at_pos(self, 26, 47, 0, lbl_80796E64, &v);
             }
             if (em_frame_check(self, 3, lbl_80796E88, lbl_80796E8C) == 1 ||
                 em_frame_check(self, 3, lbl_80796E90, lbl_80796E94) == 1) {
@@ -3830,7 +3830,7 @@ void fn_8014FF10(_ENEMY_WORK *self) {
         }
         if (em_frame_check(self, 0, lbl_80796E5C, lbl_80796E1C) == 1U) {
             setVector3(&sp8, lbl_80796E1C, lbl_80796E1C, lbl_80796E60);
-            fn_801049D0(self, 0x1A, 0x2F, 0, &sp8, lbl_80796E64);
+            eft009_spawn_at_pos(self, 0x1A, 0x2F, 0, lbl_80796E64, &sp8);
         }
         if ((em_frame_check(self, 2, lbl_80796E68, lbl_80796E6C) == 1U) && ((s32) (system_w.field_0x0c & 3) == 0)) {
             setVector3(&sp8, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
@@ -3842,7 +3842,7 @@ void fn_8014FF10(_ENEMY_WORK *self) {
         }
         if (em_frame_check(self, 0, lbl_80796E50, lbl_80796E1C) == 1U) {
             setVector3(&sp8, lbl_80796E1C, lbl_80796E1C, lbl_80796E60);
-            fn_801049D0(self, 0x1A, 0x2F, 0, &sp8, lbl_80796E64);
+            eft009_spawn_at_pos(self, 0x1A, 0x2F, 0, lbl_80796E64, &sp8);
         }
         if ((em_frame_check(self, 2, lbl_80796E70, lbl_80796E74) == 1U) && ((s32) (system_w.field_0x0c & 3) == 0)) {
             setVector3(&sp8, lbl_80796E1C, lbl_80796E54, lbl_80796E58);

@@ -1065,7 +1065,7 @@ void fn_80139024(EnemyWork* self) {
     switch (state) {
     case 0:
         self->field_0x005 = (u8)(state + 1);
-        em_motion_param_set(self, 0, lbl_80796D40);
+        em_motion_param_set(self, lbl_80796D40, 0);
         em_mot_set(self, 1, 0, 0);
         self->field_0x001 = 0;
         return;

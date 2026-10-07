@@ -59,6 +59,13 @@ s32 em_action_ret0(void);
 /* The program table's damage slot: 1 when part 0 is undamaged. */
 u32 em_parts_damage0_ck(struct _ENEMY_WORK* self, u8 part);
 
+/* The program table's entry points, in `em029_prog_tbl` order. */
+void em029_init(struct _ENEMY_WORK* self, u8 mode);
+void em029_frame_pre(struct _ENEMY_WORK* self);
+void em029_motion_events(struct _ENEMY_WORK* self);
+s32 em029_condition_ck(struct _ENEMY_WORK* self, u8 kind);
+void em029_setup(struct _ENEMY_WORK* self, s8* speed, s8* far);
+
 #ifdef __cplusplus
 }
 #endif

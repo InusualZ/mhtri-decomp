@@ -23,7 +23,7 @@
  *   writes the 0x328..0x35F block; its stores need the `lis r3,1; subi r0,r3,imm` constant shape first.
  *   25 partial rows, including:
  *  - `fn_80182D5C`, `fn_8018484C`, `fn_8018493C`, `fn_80185D60`, `fn_8018D370`: retail evaluates the float
- *    argument of `em_motion_param_set`/`em_approach_start`/`em_water_check`/`eft009_spawn_at_joint` before the
+ *    argument of `em_approach_start`/`em_water_check`/`eft009_spawn_at_joint` before the
  *    integer one; MWCC follows the declaration's `(self, s32, f32)` order;
  *  - `fn_80183E9C`, `fn_8018493C`: retail keeps `subi r0,rX,1; stw; cmpwi r0,0; bgt`, every spelling tried fuses
  *    `subic.` (4 bytes short);
@@ -277,7 +277,7 @@ void em_demo_enable(_ENEMY_WORK* self);
 void em_demo_key3_apply(_ENEMY_WORK* self, s16 a, const void* tbl, u32 b);
 void em_demo_key_apply(_ENEMY_WORK* self, s16 a, const void* tbl, const void* tbl2, u32 b, u32 c);
 void eft009_spawn_at_joint(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
-void fn_801049D0(_ENEMY_WORK* self, u32 a, u32 b, u32 c, nw4r::math::VEC3* p, f32 d);
+void eft009_spawn_at_pos(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d, nw4r::math::VEC3* p);
 void eft_spawn_type10(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 d);
 void eft_spawn_pos_in_area(nw4r::math::VEC3* p, u8 a, u32 b, u32 c, f32 d);
 void fn_8011D448(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
@@ -618,11 +618,11 @@ void fn_80182D44(_ENEMY_WORK* self, u32 arg) {
 extern "C" void fn_80182D5C(_ENEMY_WORK* self) {
     {
         f32 t = lbl_80797E88;
-        em_motion_param_set(self, 0, t);
+        em_motion_param_set(self, t, 0);
     }
     {
         f32 t = lbl_80797E9C;
-        em_motion_param_set(self, 0x1E, t);
+        em_motion_param_set(self, t, 0x1E);
     }
 
     switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
@@ -2111,7 +2111,7 @@ void fn_8018C370(_ENEMY_WORK* self) {
     case 2:
         if (em_frame_check(self, 0, lbl_80797ED0, lbl_80797E88) == 1U) {
             setVector3(&sp8, lbl_80797E88, lbl_807980FC, lbl_80797F34);
-            fn_801049D0(self, 8, 0x16, 0, &sp8, lbl_80798100);
+            eft009_spawn_at_pos(self, 8, 0x16, 0, lbl_80798100, &sp8);
         }
         if (em_demo_time_ck(0xD2) == 1U) {
             self->state = (u8)(self->state + 1);

@@ -5,7 +5,7 @@
  *   allocator (it installs `fn_80104B94` as the `state_0x05` dispatcher and `fn_80104B54` as the pool release).
  * FLAGS. `cflags_main`; `#pragma peephole off` around every body (playbook 39: with the pass on, the `u8` argument
  *   truncations and byte masks retail keeps are fused away).
- * NAMES. `eft009_set_pos` is the runtime dump's own name; `eft009_spawn_at_joint` is a GUESS from its body; the map
+ * NAMES. `eft009_set_pos` is the runtime dump's own name; `eft009_spawn_at_joint` and `eft009_spawn_at_pos` are GUESSes from their bodies; the map
  *   has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
  * RESIDUALS. 2 partial rows: `fn_80103D28`, `fn_801041BC`: the loop-invariant `lbl_80796750` load (`lfs f31`) sits
  *   one slot early in ours (retail `li r26,0; mr r27,r31; lfs f31`); declaring `neg` in the loop, the `for`-init or a
@@ -165,8 +165,8 @@ extern "C" void fn_801048B0(_EFT* self);
 extern "C" void fn_80104B54(_EFT* self);
 extern "C" void fn_80104B94(_EFT* self);
 extern "C" void eft009_spawn_at_joint(_ENEMY_WORK* self, u32 id, u32 type, s32 joint_delta, f32 scale);
-extern "C" void fn_801049D0(_ENEMY_WORK* self, u32 id, u32 type, s32 joint_delta, nw4r::math::VEC3* pos,
-                             f32 scale);
+extern "C" void eft009_spawn_at_pos(_ENEMY_WORK* self, u32 id, u32 type, s32 joint_delta, f32 scale,
+                             nw4r::math::VEC3* pos);
 extern "C" _EFT* fn_80104A68(u32 id, u8 type, f32 scale, u8 area);
 
 /* The unit's shared pool, referenced but not emitted (see the header). */
@@ -629,8 +629,8 @@ void eft009_set_pos(u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, 
 }
 
 /* Spawns one effect of the given type on the enemy, seeded with the enemy's rotation and a position. */
-extern "C" void fn_801049D0(_ENEMY_WORK* self, u32 id, u32 type, s32 joint_delta, nw4r::math::VEC3* pos,
-                             f32 scale)
+extern "C" void eft009_spawn_at_pos(_ENEMY_WORK* self, u32 id, u32 type, s32 joint_delta, f32 scale,
+                             nw4r::math::VEC3* pos)
 {
     _EFT* effect = fn_80104A68(id, type, scale, self->effect_type_0x1E1);
     if (effect != NULL) {

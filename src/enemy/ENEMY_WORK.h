@@ -894,11 +894,19 @@ struct _ENEMY_WORK {
     /* +0xA17 */ u8 unused_0xA17[0xA34 - 0xA17];
     /* +0xA34 */ _PLW* plw_0xA34;     /* the player work `fn_801B203C` hands `fn_801B0230` */
     /* +0xA38 */ u8 field_0xA38;      /* the third gate `fn_801B203C` tests */
-    /* +0xA39 */ u8 unused_0xA39[0xA69 - 0xA39];
-    /* +0x0A69 */ u8 field_0xA69;       /* fn_80177D54's second gate */
-    /* +0xA6A */ u8 unused_0xA6A[20];
-    /* +0xA7E */ u16 field_0xa7e;
-    /* +0xA80 */ u8 unused_0xA80[105];
+    /* +0xA39 */ u8 unused_0xA39[0xA64 - 0xA39];
+    /* +0xA64 */ union {
+        /* +0xA64 */ u8 hit_0xA64[0x60];  /* the record's own `_HIT_W` (`Pl/hit_w.h`, size 0x60): `enemy/em029_prog.cpp`'s
+                                           * `em_action3_sub0` hands it to `hit_mask_ck`.  A byte view: `_HIT_W` has two
+                                           * definitions (`Pl/hit_w.h`, `ai/ai_npc.h`) and this header includes neither */
+        struct {
+            /* +0xA64 */ u8 unused_0xA64[0xA69 - 0xA64];
+            /* +0xA69 */ u8 field_0xA69;       /* fn_80177D54's second gate (the `_HIT_W`'s +0x05 byte) */
+            /* +0xA6A */ u8 unused_0xA6A[20];
+            /* +0xA7E */ u16 field_0xa7e;      /* the `_HIT_W`'s +0x1A halfword */
+        };
+    };
+    /* +0xAC4 */ u8 unused_0xAC4[0xAE9 - 0xAC4];
     /* +0x0AE9 */ u8 field_0xAE9;       /* the one-shot flag `enemy/em009_act.cpp`'s
                                         * `fn_80389C50` tests (== 1) to choose its motion set */
     /* +0x0AEA */ u16 field_0xAEA;      /* the eighteen-bit flag word `enemy/em007_act.cpp`'s

@@ -343,9 +343,12 @@ struct Q_UserData {
     /* +0x5288 */ u32 note_rewards_0x5288;   /* one bit per route reward won (route * 6 + reward) */
     /* +0x528C */ u8 pad_0x528C[0x52E2 - 0x528C];
     /* +0x52E2 */ u16 event_bits_0x52E2;  /* the event flags the result screen reports as new */
-    /* +0x52E4 */ u8 pad_0x52E4[0x5334 - 0x52E4];
+    /* +0x52E4 */ u32 vs_slot_a_0x52E4[10];  /* the VS user block's `slot_a_0x6C`, copied in before a box save */
+    /* +0x530C */ u32 vs_slot_b_0x530C[10];  /* its `slot_b_0x94` */
     /* +0x5334 */ u32 arena_best_0x5334[12];  /* the arena quests' best times in frames, 0 when unset */
-    /* +0x5364 */ u8 pad_0x5364[0x6000 - 0x5364];
+    /* +0x5364 */ u32 vs_items_0x5364[0x10];  /* the VS user block's 16 item slots (`item_0x2C`) */
+    /* +0x53A4 */ s32 vs_point_0x53A4;       /* its `point_0x18` credit */
+    /* +0x53A8 */ u8 pad_0x53A8[0x6000 - 0x53A8];
 };  /* size: 0x6000 */
 
 struct QuestEntrySlot;

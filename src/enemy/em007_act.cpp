@@ -1886,8 +1886,8 @@ s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
 void* em_res_user_data_ctor(void* self);
 
 /* ef module */
-void fn_801049D0(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, nw4r::math::VEC3* pos,
-                 f32 scale);
+void eft009_spawn_at_pos(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale,
+                 nw4r::math::VEC3* pos);
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
 void fn_801057FC(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, s32 d);
 void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);

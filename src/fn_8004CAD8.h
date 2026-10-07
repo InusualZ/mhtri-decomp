@@ -39,13 +39,23 @@ struct _vs_user_data {
     /* +0xBC */ u16 ready_mask_0xBC; /* the per-player ready bits the phase gate tests against 0x380 */
     /* +0xBE */ u8 pad_0xBE[0xCF - 0xBE];
     /* +0xCF */ u8 player_0xCF;      /* the player's index into `system_w`'s per-player flag runs */
-    /* +0xD0 */ u8 pad_0xD0[0x100 - 0xD0];
+    /* +0xD0 */ u8 option_0xD0[0x1F];  /* the player's copy of `option_w` (31 bytes), restored before a save */
+    /* +0xEF */ u8 pad_0xEF[0xFC - 0xEF];
+    /* +0xFC */ u32 checksum_0xFC;     /* the byte sum of +0x00..+0xFB (`vs_user_checksum_set`) */
 };
 
 /* 0x8004D14C - one of the two 0x100 B VS user slots, or null when the index is out of range (the
  * owner defines it with the same `long` parameter, which is what its mangling `__Fl` asks for).
  * Added with `menu/menu_result.cpp`, its first consumer (rule 2). */
 _vs_user_data* get_vsUser_work(long index);
+/* 0x8004F508 - nonzero when the two VS user blocks belong to the same player (C++ scope, the map's mangling). */
+s32 ck_mydata_vs(_vs_user_data* mine, _vs_user_data* other);
+/* 0x8004F5D8 - starts a remote-memory access for player `a` (both arguments are the player). */
+void wpad_memory_access_init(u8 a, u8 b);
+/* 0x8004F620 - steps the remote-memory write of player `player`'s block: 0 busy, 1 done, negative on failure. */
+s32 write_wpad_memory(u8 player, u8 mode);
+/* 0x8004FA54 - steps the remote-memory read into `dst`: 0 busy, 1 done, negative on failure. */
+s32 read_wpad_memory(_vs_user_data* dst, u8 mode);
 #endif
 
 /* 0x80050A90 - `calcVecAng2`, the two-vector angle helper: it loads the two vectors' x/z floats and
@@ -258,6 +268,8 @@ void fn_8004EAF4(void* dst, const void* src);
  * last.  Added with `menu/menu_row.cpp`, its consumer (rule 2). */
 void fn_8004EA58(const void* entry);
 
+/* 0x8004F3B4 - stores the byte sum of VS user block `index`'s first 0xFC bytes in its `checksum_0xFC` (GUESS name). */
+void vs_user_checksum_set(u8 index);
 /* 0x8004FC80 - packs item-box page `page` (a 0x2DC-byte record) out of the lobby world block (GUESS name: its caller
  * is the network box-page check request). */
 void exportItemBoxPage(u8* record, s32 page);

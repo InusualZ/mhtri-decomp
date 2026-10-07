@@ -66,6 +66,16 @@ s32 game_system_file_create_wait(void);
 #ifdef __cplusplus
 /* 0x80449878 - waits for the game save (C++ scope: `game_save_wait__Fv`). */
 s32 game_save_wait(void);
+/* 0x80449970 - starts creating the save file of player `player` in slot `slot` (C++ scope, `__Flll`); 1 when started. */
+u32 createDataFile_init(long player, long slot, long mode);
+/* 0x8044ACB8 - starts reading player `player`'s save file (`__Fll`). */
+void readDataFile_init(long player, long mode);
+/* 0x8044AFDC - steps the save-file read; nonzero once it has finished. */
+s32 readDataFile(void);
+/* 0x8044B268 - copies save slot `slot`'s player data into the user data. */
+void setPlayerSave2Userdata(u8 slot);
+/* 0x8044BD44 - the message id for the last NAND error. */
+s32 chg_nand_err2msgcode(void);
 #endif
 
 #endif /* MHTRI_MENU_MENU_PLSEARCH_H */

@@ -7,7 +7,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-void em_motion_param_set(struct _ENEMY_WORK* self, s32 index, f32 value);
+/* The value comes first: every caller loads it before the index, and the body stores it (+0x1D8) before the halfword
+ * index (+0x1DC). */
+void em_motion_param_set(struct _ENEMY_WORK* self, f32 value, s16 index);
 #ifdef __cplusplus
 }
 #endif
