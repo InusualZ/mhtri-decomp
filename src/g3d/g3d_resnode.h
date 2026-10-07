@@ -24,7 +24,7 @@ struct ResNodeData {
     /* +0x10 */ u8 pad_0x10[0x4];
     /* +0x14 */ u32 mFlags;   /* the channel flags fn_80099134/9178/9278 set and clear */
     /* +0x18 */ u32 mMtxID;   /* the matrix slot the node was assigned (read by g3d_calcworld.cpp) */
-    /* +0x1C */ u8 pad_0x1C[0x20 - 0x1C];
+    /* +0x1C */ u32 mBillboardRefNodeID; /* the node a billboard reference follows (flag 0x400) */
     /* +0x20 */ f32 mScale[3];
     /* +0x2C */ f32 mRotate[3];
     /* +0x38 */ f32 mTranslate[3];
