@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /* 0x80339790 - sends the lobby's sub-0x16 command: `value` and the element index `flag`. */
-void lb_sub16_send(s32 value, s8 flag);
+void lb_sub16_send(s32 value, u8 flag);
 
 #ifdef __cplusplus
 }

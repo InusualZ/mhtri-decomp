@@ -12,7 +12,7 @@
  *   `lobby_world_block + (i >> 3)` in a register; measured in docs/lobby.md).
  * NAMES. The 79 defined functions are named from their bodies.  GUESSes: the link-gated senders whose caller is
  *   unwritten, after the protocol sub-command they build (`lb_sub0a_send`, ...), and the icon tables (`<table>_area<n>`
- *   is entry n).  GUESS: `lobby_hunter_cards` (.bss 0x806BE340, ten 0x130-byte records keyed by a hunter id at +0x03
+ *   is entry n).  GUESS: `lb_sub16_send` (builds sub-command 0x16).  GUESS: `lobby_hunter_cards` (.bss 0x806BE340, ten 0x130-byte records keyed by a hunter id at +0x03
  *   with the hunter's 0x100-byte card at +0x24, which `updatePeerCardBlock` refreshes).  `hud_key_lookup` (0x8033A0BC)
  *   is the map's.  The dump's `homebutton::MotorCallback(OSAlarm...)` for
  *   0x8033C4D8/0x8033C570 is not adopted: both are 0x24-byte refresh wrappers without an argument.  The game-root
@@ -737,7 +737,7 @@ void lb_sub1c_send(void) {
 }
 
 /* Sends the sub-0x16 command with a word and two signed bytes; act 21 builds the same packet inline. */
-void lb_sub16_send(s32 value, s8 flag) {
+void lb_sub16_send(s32 value, u8 flag) {
     LbCmdSub16 cmd;
 
     if (isServerSelectState() != 0) {

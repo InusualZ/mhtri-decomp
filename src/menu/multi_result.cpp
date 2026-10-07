@@ -33,7 +33,7 @@
  *  - `npc_trade_pick`: retail keeps the list start in a second register (`mr r3,r24` per case);
  *  - `pig_dress_list_build`, `name_menu_page_build`, `pig_dress_list_draw`, `name_menu_list_draw`, `name_menu_open`,
  *    `name_menu_step`, `pig_menu_step` (`toggle_word_step`'s last argument: retail masks it to 16 bits, the shared
- *    declaration takes an `s32`), `npc_gift_roll`: register choice and operand order.
+ *    declaration takes an `s32`): register choice and operand order.
  *  - `npc_gift_roll` stops its walk at a weight of 0xFF (the tables end at 0xFFFF; the weights reach 100 first).
  *   Data: the tables are defined after the bodies (the target relocates each by name, which MWCC only does for an
  *   object not yet defined); `.data`/`.sdata` emission order is not checked against the target.
@@ -947,8 +947,8 @@ extern "C" void pig_dress_list_build(LbPigMenuWork* w) {
 /* 0x803A2CB8 (0x118): draws the costume list and the Poogie's name. */
 extern "C" void pig_dress_list_draw(LbPigMenuWork* w, bool active) {
     _mh_ivec2_ pos;
-    s32 i;
     const u16* row;
+    s32 i;
     bool sel;
     bool cur;
     u32 color;
@@ -1035,8 +1035,8 @@ extern "C" void name_menu_page_build(LbNameMenuWork* w, s32 page) {
     s16 first = (s16)page * 5;
     s16 last = first + 4;
     u8 kind;
-    s16 i;
     s32 ofs;
+    s16 i;
 
     w->rows_0x0A = 0;
     kind = w->npc_0x28->field_0x002;
@@ -1137,8 +1137,8 @@ extern "C" void name_menu_step(void) {
 extern "C" void name_menu_list_draw(LbNameMenuWork* w, bool active) {
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
-    s16 i;
     const u16* row;
+    s16 i;
     bool sel;
     u32 color;
 
@@ -1229,8 +1229,8 @@ extern "C" u8 npc_trade_special_ck(_PLW* me) {
  * it. */
 extern "C" u32 npc_gift_roll(_PLW* me) {
     NpcGift* gift;
-    u16 roll;
     u16 sum;
+    u16 roll;
 
     switch (stage_map_kind_get(get_now_mapno())) {
     case 1:

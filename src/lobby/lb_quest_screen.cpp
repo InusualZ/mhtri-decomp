@@ -49,16 +49,15 @@
  *   GUESS: note_pane_state_9
  * RESIDUALS. Every row is written (95).  Partial: `note_pane_init` (retail keeps `&vec_0x1B4` in a register),
  *   `note_pane_angle_step`, `note_pane_state_1` (`calcVecAng2`'s second argument: retail passes r4 unset),
- *   `note_pane_pos_step`, `note_timer_tick`, `note_value_to_slot`/`note_slot_to_value` (retail reaches
+ *   `note_pane_pos_step`, `note_value_to_slot`/`note_slot_to_value` (retail reaches
  *   `note_slot_flat_table` through `r13`, ours through `lis`/`addi`), `note_trade_open` (the loop counters' `li` pair
  *   sits before the table base), `note_trade_offers_roll`/`note_trade_slots_draw`/`note_trade_route_draw`/
- *   `note_trade_select_step`/`note_trade_bonus_draw`/`note_itembox_row_draw`/`note_trade_voyage_draw`/
+ *   `note_trade_select_step`/`note_itembox_row_draw`/`note_trade_voyage_draw`/
  *   `note_trade_offer_draw` (register choice); in the tail `quest_area_spawn_apply` (the six-kind membership test:
  *   retail compares without an index register), the kill bookkeeping and spawn-list rows (`quest_enemy_kill_record`
- *   saves one register more, `_savegpr_20`/`_restgpr_20` against `_savegpr_21`/`_restgpr_21`), `quest_element_finish` (`lb_sub16_send`'s owner
- *   spells its flag `s8`, retail's caller narrows with `clrlwi`), `quest_net_kill_apply` (retail tests the element
- *   against 3 with two branches), `quest_arena_key_set`, `quest_arena_need_add`, `quest_area_res_load`,
- *   `quest_failed_ck`, `quest_area_entry_collect`, `lobby_res_slots_init`.
+ *   saves one register more, `_savegpr_20`/`_restgpr_20` against `_savegpr_21`/`_restgpr_21`), `quest_net_kill_apply`
+ *   (retail tests the element against 3 with two branches), `quest_arena_key_set`, `quest_arena_need_add` (operand
+ *   order of the shift and the index add).
  *   Data: the note trade's tables are defined after the bodies (the target relocates each by name, which MWCC only
  *   does for an object not yet defined); `.data`/`.sdata` emission order is not checked against the target.
  *   flipcheck: `.text`/extab/extabindex short of the claim (partial rows); the `.sdata`/`.sdata2` pool is shared with
@@ -375,8 +374,8 @@ f32 lb_interior_scale_table[27] = {
  * buffers. */
 extern "C" void lobby_res_slots_init(void) {
     LbLobbyWork* w = &lobby_w;
-    s32 i;
     LbResSlot* slot;
+    s32 i;
     u8* base;
 
     for (i = 0, slot = w->res_slots_0x0CC; i < 8; slot++, i++) {
@@ -602,10 +601,10 @@ extern "C" u32 quest_arena_item_count_get(void) {
  * (continuing the previous list's spawn order), spawns each, and keeps the area's main monster in `main_0x2258`. */
 extern "C" void quest_area_spawn_setup(Q_MoveWork* work, u32* area, u8 count, u8 index) {
     EmGroundRec ground;
-    QuestSpawnRec* main;
     u32* num;
-    QuestSpawnRec* rec;
+    QuestSpawnRec* main;
     s32 i;
+    QuestSpawnRec* rec;
     QuestEntrySlot* slot;
     u32 order;
     QuestBossSpawn* boss;
@@ -670,10 +669,10 @@ extern "C" void quest_area_spawn_setup(Q_MoveWork* work, u32* area, u8 count, u8
  * the new spawns into `out`; returns how many it collected. */
 extern "C" s32 quest_area_entry_collect(Q_MoveWork* work, QuestBossSpawn** out) {
     EmGroundRec ground;
-    s32 count;
     QuestSpawnRec* rec;
-    s32 n;
     s32 i;
+    s32 count;
+    s32 n;
     QuestBossSpawn* boss;
 
     em_ground_rec_clear(&ground);
@@ -845,8 +844,8 @@ extern "C" void quest_screen_enemy_start(Q_MoveWork* work) {
 /* 0x803A86F0 (0xB8): when the quest NPC of (`kind`, `sub`) needs its models, reads every `qnpc_res_table` file
  * back to back into a free enemy resource buffer and loads the NPC's voice banks. */
 extern "C" void quest_area_res_load(u8 map, u8 area) {
-    s32 i = 0;
     u8* buf;
+    s32 i = 0;
     QnpcResEntry* entry;
     u32 ctx;
 
@@ -1307,8 +1306,8 @@ extern "C" void quest_enemy_kill_record(Q_MoveWork* work, _ENEMY_WORK* enemy, u8
 extern "C" void quest_net_kill_apply(u8 area, u16 key, u16 count, s32 how, u8 element) {
     Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
     Q_ItemWork* item;
-    s32 taken;
     u8 kind;
+    s32 taken;
     QuestSpawnRec* entry;
     s32 i;
     s8 first;
@@ -1497,9 +1496,9 @@ extern "C" s32 quest_element_live_ck(QuestWork* work, s32 index) {
 extern "C" u32 quest_failed_ck(QuestWork* work) {
     QuestRecord* record = work->record_0x03C;
     u32 kind;
-    u32 mask;
     s32 i;
     u32 flags;
+    u32 mask;
 
     if (record == NULL) {
         return 0;
@@ -2096,9 +2095,9 @@ extern "C" s32 note_timer_lobby_ready_ck(void) {
 /* 0x803A4ECC (0xB0): one tick of the save block's lobby timer: counts its countdown down and steps its two random
  * words (twice, and fifty times each). */
 extern "C" void note_timer_tick(void) {
-    NoteTimer* timer = &((Q_UserData*)lobby_world_block)->note_timer_0x5270;
-    u32 i;
     u16 j;
+    u32 i;
+    NoteTimer* timer = &((Q_UserData*)lobby_world_block)->note_timer_0x5270;
     u32 k;
 
     if (timer->voyage_0x06 > 0) {
@@ -2748,9 +2747,9 @@ extern "C" void note_trade_slot_draw(LbNoteTradeWork* w, s16 slot, s32 open, s32
 extern "C" void note_trade_slots_draw(LbNoteTradeWork* w, s32 active) {
     _mh_ivec2_ base;
     _mh_ivec2_ pos;
-    s16 i;
-    const u16* row;
     const u16* full_row;
+    const u16* row;
+    s16 i;
     s32 open;
     u32 arrow;
 
@@ -2803,7 +2802,7 @@ extern "C" void note_trade_bonus_draw(u16 panel, LbNoteTradeWork* w) {
     draw_window_frame_style(pos.x, pos.y, spr.width, spr.height, 0);
     draw_sprite_ary(note_bonus_tbl, &pos);
     draw_font_idx(9950, (s8*)LbStr(0, 474), 1, &pos);
-    if (w->bonus_kind_0x02 == 1) {
+    if ((s32)w->bonus_kind_0x02 == 1) {
         route = (s8*)LbStr(0, w->bonus_slot_0x03 + 470);
         sprintf((char*)text, (char*)LbStr(0, w->bonus_kind_0x02 + 475), route);
         draw_font_idx(9951, text, 0, &pos);
@@ -2893,10 +2892,10 @@ extern "C" void note_itembox_cell_pos_get(s32 index, _mh_ivec2_* out) {
 
 /* 0x803A6EF0 (0x2A0): draws the item box's row of ten cells, the cursor and the selection marks. */
 extern "C" void note_itembox_row_draw(Eft052ItemBox* box) {
-    _mh_ivec2_ pos;
-    _mh_ivec2_ sel;
-    _mh_ivec2_ base;
     _mh_ivec2_ cell;
+    _mh_ivec2_ base;
+    _mh_ivec2_ sel;
+    _mh_ivec2_ pos;
     _SPR_DATA_ mark;
     _SPR_DATA_ icon;
     _SPR_DATA_ frame;
