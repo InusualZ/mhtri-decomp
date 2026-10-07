@@ -16,6 +16,9 @@ void DCStoreRangeNoSync(void* start, u32 size); /* untyped: byte range */
 /* 0x804CC670 - write a cached range back to main memory. */
 void DCStoreRange(void* start, u32 size); /* untyped: byte range */
 
+/* 0x804CC730 - invalidates a range of the instruction cache. */
+void ICInvalidateRange(void* start, u32 size); /* untyped: byte range */
+
 #ifdef __cplusplus
 }
 #endif

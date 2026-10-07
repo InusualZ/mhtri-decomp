@@ -3,8 +3,7 @@
  * RANGE. .text 0x804C24C0-0x804C25E0 (4 functions).  Cut from the OS core band 0x804C1760-0x804D9B4C.  Evidence: four
  *    functions with no data and no foreign calls, between the allocator (ends 0x804C24C0) and the first AX call
  *    of `__MIXSetPan` (0x804C25E0); `MEMiInitHeapHead` and the expandable heap call them.
- * FLAGS. `cflags_os` (configure.py), the flags of the unit it was cut from; the bodies written here are measured with
- *    them.
+ * FLAGS. `cflags_base` per object (configure.py): the target's function starts are all 16-aligned.
  * NAMES. GUESS: `MEMInitList`, `MEMAppendListObject`, `MEMRemoveListObject`, `MEMGetNextListObject` (the dump holds only
  *    junk names; the bodies are the list API's init, append, remove and next); the file name is a GUESS.
  * RESIDUALS. none: every body matches.

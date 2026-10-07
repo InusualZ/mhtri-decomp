@@ -18,12 +18,7 @@ void* MEMAllocFromAllocator(MEMAllocator* allocator, u32 size);
 void MEMFreeToAllocator(MEMAllocator* allocator, void* block);
 
 /* 0x804C24A0 - points an allocator record at an expandable heap. */
-/* untyped: opaque handle passed through - the heap MEMCreateExpHeapEx returned */
-void MEMInitAllocatorForExpHeap(MEMAllocator* allocator, void* heap, int align);
-
-/* 0x804C24A0 - points an allocator record at an expandable heap. */
-/* untyped: opaque handle passed through - the heap MEMCreateExpHeapEx returned */
-void MEMInitAllocatorForExpHeap(MEMAllocator* allocator, void* heap, int align);
+void MEMInitAllocatorForExpHeap(MEMAllocator* allocator, MEMiHeapHead* heap, int align);
 
 #ifdef __cplusplus
 }
