@@ -72,7 +72,7 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "homebutton/fn_8054E894.h"
 #include "unsplit/unknown.h"
-#include "VF/vf.h"
+#include "KPR/kpr.h"
 #include "homebutton/hbm_text_panel.h"
 #include "homebutton/hbm_value.h"
 #include "nw4r/fn_805012C4.h"

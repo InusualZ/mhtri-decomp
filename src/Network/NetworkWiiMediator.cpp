@@ -85,7 +85,7 @@
 #include "MSL/strlen.h"
 #include "SC/sc.h"                         /* the parental-control, country and language queries */
 #include "SO/soi.h"                        /* SOGetInterfaceOpt - the link check */
-#include "ARC/arc.h"                       /* the DSP-ADPCM helpers of the voice path */
+#include "DSPADPCM/dspadpcm.h"                       /* the DSP-ADPCM helpers of the voice path */
 
 /* The console's bus clock in Hz (low memory 0x800000F8), spelled exactly as `unsplit/OS.h` defines `OS_BUS_CLOCK`:
    that header clashes with this unit's includes (its thread prototypes), so the one-line spelling is kept locally. */

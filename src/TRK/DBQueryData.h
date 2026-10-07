@@ -1,8 +1,8 @@
 /*
- * DBQueryData.h - the declaration of `DBQueryData`, owned by `VF/vf.cpp`.
+ * DBQueryData.h - the declaration of `DBQueryData`, owned by `TRK/exi2_comm.c`.
  */
-#ifndef VF_DBQUERYDATA_H
-#define VF_DBQUERYDATA_H
+#ifndef TRK_DBQUERYDATA_H
+#define TRK_DBQUERYDATA_H
 
 #include "types.h"
 

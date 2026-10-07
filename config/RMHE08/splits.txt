@@ -2600,13 +2600,58 @@ AI_SDK/ai.c:
 	.sdata      start:0x80793D00 end:0x80793D08
 	.sbss       start:0x80794E88 end:0x80794EC8
 
-ARC/arc.cpp:
-	.text       start:0x8046D9F0 end:0x80474CB0 align:16
-	.data       start:0x8060F868 end:0x80612980
-	.bss        start:0x806F74E0 end:0x8070C414
-	.sdata      start:0x80793D08 end:0x80793D20
-	.sbss       start:0x80794EC8 end:0x80795008
-	.sdata2     start:0x8079CF48 end:0x8079CFF0
+ARC/arc.c:
+	.text       start:0x8046D9F0 end:0x8046E3D0 align:16
+	.data       start:0x8060F868 end:0x8060F8D8
+	.sdata      start:0x80793D08 end:0x80793D10
+
+AX/AX.c:
+	.text       start:0x8046E3D0 end:0x8046E4F0 align:16
+	.data       start:0x8060F8D8 end:0x8060F920
+	.sdata      start:0x80793D10 end:0x80793D18
+	.sbss       start:0x80794EC8 end:0x80794ED0
+
+AX/AXAlloc.c:
+	.text       start:0x8046E4F0 end:0x8046EA90 align:16
+	.bss        start:0x806F74E0 end:0x806F75E0
+	.sbss       start:0x80794ED0 end:0x80794ED8
+
+AX/AXAux.c:
+	.text       start:0x8046EA90 end:0x8046F310 align:16
+	.bss        start:0x806F75E0 end:0x806FA760
+	.sbss       start:0x80794ED8 end:0x80794F20
+
+AX/AXCL.c:
+	.text       start:0x8046F310 end:0x8046FE20 align:16
+	.data       start:0x8060F920 end:0x80610980
+	.bss        start:0x806FA760 end:0x806FA860
+	.sbss       start:0x80794F20 end:0x80794F48
+
+AX/AXOut.c:
+	.text       start:0x8046FE20 end:0x80470570 align:16
+	.data       start:0x80610980 end:0x80612980
+	.bss        start:0x806FA860 end:0x806FB660
+	.sdata      start:0x80793D18 end:0x80793D20
+	.sbss       start:0x80794F48 end:0x80794F88
+
+AX/AXSPB.c:
+	.text       start:0x80470570 end:0x804709B0 align:16
+	.bss        start:0x806FB660 end:0x806FB6E0
+	.sbss       start:0x80794F88 end:0x80794FD8
+
+AX/AXVPB.c:
+	.text       start:0x804709B0 end:0x80471960 align:16
+	.bss        start:0x806FB6E0 end:0x8070C414
+	.sbss       start:0x80794FD8 end:0x80794FF8
+	.sdata2     start:0x8079CF48 end:0x8079CF68
+
+AX/AXProf.c:
+	.text       start:0x80471960 end:0x804719A0 align:16
+	.sbss       start:0x80794FF8 end:0x80795008
+
+DSPADPCM/dspadpcm.c:
+	.text       start:0x804719A0 end:0x80474CB0 align:16
+	.sdata2     start:0x8079CF68 end:0x8079CFF0
 
 AX/AXFXReverbHi.c:
 	.text       start:0x80474CB0 end:0x80474F30 align:16
@@ -3046,17 +3091,66 @@ RSO/rso_notify.c:
 	.text       start:0x804D9B3C end:0x804D9B4C
 
 RSO/runtime.c:
-	.text       start:0x804D9B4C end:0x804DAE40
+	.text       start:0x804D9B4C end:0x804DB050
 	.data       start:0x80629B90 end:0x80629CA8
+	.sbss       start:0x80795440 end:0x80795448
 
-SC/sc.cpp:
-	.text       start:0x804DAE40 end:0x804E45B0 align:16
-	.rodata     start:0x80573B58 end:0x80573C40
-	.data       start:0x80629CA8 end:0x8062AB68
-	.bss        start:0x8074E460 end:0x8075B110
-	.sdata      start:0x80794000 end:0x80794148
-	.sbss       start:0x80795440 end:0x807955C8
-	.sdata2     start:0x8079D330 end:0x8079D3C0
+SC/SCSystemConfig.c:
+	.text       start:0x804DB050 end:0x804DC9E0 align:16
+	.rodata     start:0x80573B58 end:0x80573BB0
+	.data       start:0x80629CA8 end:0x80629E88
+	.bss        start:0x8074E460 end:0x80756600
+	.sdata      start:0x80794000 end:0x80794110
+	.sbss       start:0x80795448 end:0x80795460
+
+SC/SCApi.c:
+	.text       start:0x804DC9E0 end:0x804DD010 align:16
+	.data       start:0x80629E88 end:0x80629EB8
+	.bss        start:0x80756600 end:0x80757608
+
+SC/SCProductInfo.c:
+	.text       start:0x804DD010 end:0x804DD350 align:16
+	.data       start:0x80629EB8 end:0x80629F18
+	.sdata      start:0x80794110 end:0x80794138
+	.sbss       start:0x80795460 end:0x80795468
+
+SEQ/seq.c:
+	.text       start:0x804DD350 end:0x804DD9C0 align:16
+	.data       start:0x80629F18 end:0x80629F98
+	.sbss       start:0x80795468 end:0x80795470
+	.sdata2     start:0x8079D330 end:0x8079D350
+
+SI/SIBios.c:
+	.text       start:0x804DD9C0 end:0x804DF0A0 align:16
+	.data       start:0x80629F98 end:0x8062A0A0
+	.bss        start:0x80757608 end:0x80757828
+	.sdata      start:0x80794138 end:0x80794140
+	.sbss       start:0x80795470 end:0x80795488
+
+SYN/syn.c:
+	.text       start:0x804DF0A0 end:0x804DFC50 align:16
+	.bss        start:0x80757828 end:0x8075AFC0
+	.sbss       start:0x80795488 end:0x807954A0
+	.sdata2     start:0x8079D350 end:0x8079D360
+
+SYN/synenv.c:
+	.text       start:0x804DFC50 end:0x804E01E0 align:16
+	.data       start:0x8062A0A0 end:0x8062A2A0
+	.sdata2     start:0x8079D360 end:0x8079D380
+
+SYN/synvoice.c:
+	.text       start:0x804E01E0 end:0x804E1120 align:16
+	.data       start:0x8062A2A0 end:0x8062AB20
+	.sdata2     start:0x8079D380 end:0x8079D3A0
+
+THP/THPDec.c:
+	.text       start:0x804E1120 end:0x804E45B0 align:16
+	.rodata     start:0x80573BB0 end:0x80573C40
+	.data       start:0x8062AB20 end:0x8062AB68
+	.bss        start:0x8075AFC0 end:0x8075B110
+	.sdata      start:0x80794140 end:0x80794148
+	.sbss       start:0x807954A0 end:0x807955C8
+	.sdata2     start:0x8079D3A0 end:0x8079D3C0
 
 TPL/tpl.cpp:
 	.text       start:0x804E45B0 end:0x804E46F0 align:16
@@ -3246,13 +3340,43 @@ SO/soi.cpp:
 	.sbss       start:0x807958D8 end:0x807958F0
 
 VF/vf.cpp:
-	.text       start:0x80521340 end:0x8052A040 align:16
-	.rodata     start:0x80574E10 end:0x80579450
-	.data       start:0x80631468 end:0x806498C8
-	.bss        start:0x80766C68 end:0x807901C0
-	.sdata      start:0x80794458 end:0x807944B0
-	.sbss       start:0x807958F0 end:0x80795A18
+	.text       start:0x80521340 end:0x80522334 align:16
+	.rodata     start:0x80574E10 end:0x80579088
+	.bss        start:0x80766C68 end:0x8078FA38
+	.sbss       start:0x807958F0 end:0x80795920
+
+TRK/exi2_comm.c:
+	.text       start:0x80522334 end:0x80522E00
+	.sdata      start:0x80794458 end:0x80794460
+	.sbss       start:0x80795920 end:0x80795938
+
+PMIC/pmic.c:
+	.text       start:0x80522E00 end:0x80526C90 align:16
+	.data       start:0x80631468 end:0x806492D8
+	.bss        start:0x8078FA38 end:0x8078FF40
+	.sdata      start:0x80794460 end:0x80794498
+	.sbss       start:0x80795938 end:0x807959F0
 	.sdata2     start:0x8079D528 end:0x8079D550
+
+KPR/kpr.c:
+	.text       start:0x80526C90 end:0x805272B0 align:16
+	.rodata     start:0x80579088 end:0x80579450
+	.data       start:0x806492D8 end:0x80649348
+	.sdata      start:0x80794498 end:0x807944A0
+	.sbss       start:0x807959F0 end:0x80795A00
+
+HID/hid.c:
+	.text       start:0x805272B0 end:0x80528890 align:16
+	.data       start:0x80649348 end:0x806493A0
+	.sdata      start:0x807944A0 end:0x807944A8
+	.sbss       start:0x80795A00 end:0x80795A08
+
+KBD/kbd.c:
+	.text       start:0x80528890 end:0x8052A040 align:16
+	.data       start:0x806493A0 end:0x806498C8
+	.bss        start:0x8078FF40 end:0x807901C0
+	.sdata      start:0x807944A8 end:0x807944B0
+	.sbss       start:0x80795A08 end:0x80795A18
 
 homebutton/fn_8052A040.cpp:
 	.text       start:0x8052A040 end:0x8052B004 align:16

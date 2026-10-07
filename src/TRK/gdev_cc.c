@@ -12,7 +12,7 @@
  *    codes are written as numbers.
  * EVIDENCE. ten consecutive `gdev_cc_*` dump names; `.bss` 0x806F5020 (0x500 B) and 0x806F5520 (0x20 B, the
  *    receive circle buffer) and `.sbss` 0x80794E38 (the 8 B open-state object) are read only here. `DBInitComm` .. `DBInitInterrupts` and the two
- *    4-byte stubs `pre_continue`/`post_stop` call belong to `VF/vf.cpp`.
+ *    4-byte stubs `pre_continue`/`post_stop` call belong to `TRK/exi2_comm.c`.
  * RESIDUALS. link order: the compiler emits the 0x20 B circle buffer before the 0x500 B receive buffer in `.bss` (the target
  *    has the receive buffer first, 0x806F5020), which moves 6 code bytes of relocation words and the DOL hash, so the unit stays
  *    NonMatching although every row is at 100 %. Definition order, `static`, an earlier use of the circle buffer, a local
@@ -20,13 +20,13 @@
  * SHAPES. `read` and `peek` stage the DB bytes in a 0x500 B stack array, then queue them in the circle buffer.
  */
 #include "TRK/CircleBuffer.h"
-#include "VF/DBInitComm.h"
-#include "VF/DBQueryData.h"
-#include "VF/DBRead.h"
-#include "VF/DBWrite.h"
-#include "VF/DBInitInterrupts.h"
-#include "VF/EXI2_Reserve.h"
-#include "VF/EXI2_Unreserve.h"
+#include "TRK/DBInitComm.h"
+#include "TRK/DBQueryData.h"
+#include "TRK/DBRead.h"
+#include "TRK/DBWrite.h"
+#include "TRK/DBInitInterrupts.h"
+#include "TRK/EXI2_Reserve.h"
+#include "TRK/EXI2_Unreserve.h"
 #pragma use_lmw_stmw on
 
 

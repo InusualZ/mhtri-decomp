@@ -1,8 +1,8 @@
 /*
- * ARC/arc.h - declarations of the symbols owned by `ARC/arc.cpp` that other units call or read.
+ * DSPADPCM/dspadpcm.h - declarations of the symbols owned by `DSPADPCM/dspadpcm.c` that other units call.
  */
-#ifndef ARC_ARC_H
-#define ARC_ARC_H
+#ifndef DSPADPCM_DSPADPCM_H
+#define DSPADPCM_DSPADPCM_H
 
 #include "types.h"
 
@@ -10,9 +10,7 @@
 extern "C" {
 #endif
 
-extern u32 fn_8046FD80(void);
-
-/* The DSP-ADPCM helpers the mediator's voice path uses (after `__AXGetCurrentProfile`, 0x80471960):
+/* The DSP-ADPCM helpers the mediator's voice path uses:
  *  - 0x804719A0 - the bytes `samples` PCM samples take once encoded: 8 per 14-sample frame, rounded up
  *    (0 for a negative count) - the dsptool `getBytesForAdpcmSamples` formula, hence the name (a GUESS);
  *  - 0x804719E0 - encodes `samples` 16-bit samples at `sampleRate` into `dst`, filling the 0x60-byte coefficient

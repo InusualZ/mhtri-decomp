@@ -389,7 +389,7 @@ cflags_camellia = [
     "-Cpp_exceptions on",
 ]
 
-# RSO runtime flags (DOL-side RSO loader/linker, src/RSO/runtime.c, retail .text 0x804D9B4C..0x804DAE40).
+# RSO runtime flags (DOL-side RSO loader/linker, src/RSO/runtime.c, retail .text 0x804D9B4C..0x804DB050).
 # This unit is NOT built like Camellia: its retail object contains 9 record-form instructions
 # (srwi. x4, add. x3, extsb., clrrwi.) while the Camellia object contains 0, and MWCC only emits the
 # record forms with the peephole pass ON.  Fingerprinted from the retail object:
@@ -1361,7 +1361,18 @@ config.libs = [
             Object(Matching, "TRK/mslsupp.c"),
             Object(NonMatching, "TRK/targimpl.c"),
             Object(NonMatching, "AI_SDK/ai.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
-            Object(NonMatching, "ARC/arc.cpp"),
+            # The ARC archive and AX audio band 0x8046D9F0..0x80474CB0 recut per library and source file; each unit's header carries
+            # its evidence.  Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
+            Object(NonMatching, "ARC/arc.c", cflags=cflags_base),
+            Object(NonMatching, "AX/AX.c", cflags=cflags_base),
+            Object(NonMatching, "AX/AXAlloc.c", cflags=cflags_base),
+            Object(NonMatching, "AX/AXAux.c", cflags=cflags_base),
+            Object(NonMatching, "AX/AXCL.c", cflags=cflags_base),
+            Object(NonMatching, "AX/AXOut.c", cflags=cflags_base),
+            Object(NonMatching, "AX/AXSPB.c", cflags=cflags_base),
+            Object(NonMatching, "AX/AXVPB.c", cflags=cflags_base),
+            Object(NonMatching, "AX/AXProf.c", cflags=cflags_base),
+            Object(NonMatching, "DSPADPCM/dspadpcm.c", cflags=cflags_base),
             Object(NonMatching, "BTE/gki_buffer.cpp"),
             # The BTE tail 0x804A4AC0..0x804C1760 recut per SDK library; each unit's header carries its evidence.
             # Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
@@ -1398,7 +1409,17 @@ config.libs = [
             Object(NonMatching, "IPC/memory.c", cflags=cflags_base),
             Object(NonMatching, "IPC/ipcProfile.c", cflags=cflags_base),
             Object(NonMatching, "KPAD/kpad.c", cflags=cflags_base),
-            Object(NonMatching, "SC/sc.cpp"),
+            # The SC / SEQ / SI / SYN / THP band 0x804DB050..0x804E45B0 recut per library and source file (unit headers carry the
+            # evidence); its function starts are 16-aligned, so cflags_base.  The 4-packed head 0x804DAE40..0x804DB050 is RSO/runtime.c.
+            Object(NonMatching, "SC/SCSystemConfig.c", cflags=cflags_base),
+            Object(NonMatching, "SC/SCApi.c", cflags=cflags_base),
+            Object(NonMatching, "SC/SCProductInfo.c", cflags=cflags_base),
+            Object(NonMatching, "SEQ/seq.c", cflags=cflags_base),
+            Object(NonMatching, "SI/SIBios.c", cflags=cflags_base),
+            Object(NonMatching, "SYN/syn.c", cflags=cflags_base),
+            Object(NonMatching, "SYN/synenv.c", cflags=cflags_base),
+            Object(NonMatching, "SYN/synvoice.c", cflags=cflags_base),
+            Object(NonMatching, "THP/THPDec.c", cflags=cflags_base),
             # Flags: cflags_base (-O4,p, 16-byte function alignment): 298 of 301 starts in 0x804E45B0..0x80500770 are 16-aligned
             # (WENC is 4-aligned, stays on cflags_os); evidence in the unit headers of src/WPAD/wpad.cpp and .pi/notes/sdk-compiler-survey.md.
             Object(Matching, "TPL/tpl.cpp", cflags=cflags_base),
@@ -1409,7 +1430,14 @@ config.libs = [
             Object(NonMatching, "WENC/wenc.cpp"),
             Object(NonMatching, "WPAD/wpad.cpp", cflags=cflags_base),
             Object(NonMatching, "WUD/wud.cpp", cflags=cflags_base),
-            Object(NonMatching, "VF/vf.cpp"),
+            # The VF / DB-EXI2 / PMIC / KPR / HID / KBD band 0x80521340..0x8052A040 recut per library (unit headers carry the evidence).
+            # Only 0x80522334..0x80522E00 is packed at 4 bytes (cflags_os); every other function start is 16-aligned (cflags_base).
+            Object(NonMatching, "VF/vf.cpp", cflags=cflags_base),
+            Object(NonMatching, "TRK/exi2_comm.c"),
+            Object(NonMatching, "PMIC/pmic.c", cflags=cflags_base),
+            Object(NonMatching, "KPR/kpr.c", cflags=cflags_base),
+            Object(NonMatching, "HID/hid.c", cflags=cflags_base),
+            Object(NonMatching, "KBD/kbd.c", cflags=cflags_base),
         ],
     },
     {

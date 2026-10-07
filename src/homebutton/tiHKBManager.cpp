@@ -94,7 +94,7 @@
 #include "NAND/nand.h"
 #include "MEM/mem_allocator.h"
 #include "MEM/mem_expheap.h"
-#include "VF/vf.h"
+#include "KBD/kbd.h"
 #include "homebutton/hbm_hermite.h"
 #include "nw4r/fn_805012C4.h"
 

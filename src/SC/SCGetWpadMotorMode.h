@@ -1,4 +1,4 @@
-/* SC/SCGetWpadMotorMode.h - the Wii remote settings and Bluetooth sensitivity accessors `SC/sc.cpp` owns
+/* SC/SCGetWpadMotorMode.h - the Wii remote settings and Bluetooth sensitivity accessors `SC/SCApi.c` owns
  *   (docs/plan.md 6.5 rule 2, leaf header). */
 #ifndef MHTRI_SC_SCGETWPADMOTORMODE_H
 #define MHTRI_SC_SCGETWPADMOTORMODE_H
@@ -29,9 +29,6 @@ u8 SCGetBtDpdSensibility(void);
 
 /* 0x804DCCB0 - stores the Bluetooth device table; non-zero on success. */
 s32 SCSetBtDeviceInfoArray(const void* array); /* untyped: the caller-owned device table */
-
-/* 0x804DC480 - writes the pending configuration back; `callback` gets the result (0 = ok). */
-void SCFlushAsync(void (*callback)(s32 result));
 
 #ifdef __cplusplus
 }

@@ -1,8 +1,8 @@
 /*
- * DBInitComm.h - the declaration of `DBInitComm`, owned by `VF/vf.cpp`.
+ * DBInitComm.h - the declaration of `DBInitComm`, owned by `TRK/exi2_comm.c`.
  */
-#ifndef VF_DBINITCOMM_H
-#define VF_DBINITCOMM_H
+#ifndef TRK_DBINITCOMM_H
+#define TRK_DBINITCOMM_H
 
 #include "types.h"
 

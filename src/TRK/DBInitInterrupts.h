@@ -1,8 +1,8 @@
 /*
- * DBInitInterrupts.h - the declaration of `DBInitInterrupts`, owned by `VF/vf.cpp`.
+ * DBInitInterrupts.h - the declaration of `DBInitInterrupts`, owned by `TRK/exi2_comm.c`.
  */
-#ifndef VF_DBINITINTERRUPTS_H
-#define VF_DBINITINTERRUPTS_H
+#ifndef TRK_DBINITINTERRUPTS_H
+#define TRK_DBINITINTERRUPTS_H
 
 #include "types.h"
 

@@ -1,8 +1,8 @@
 /*
- * DBRead.h - the declaration of `DBRead`, owned by `VF/vf.cpp`.
+ * DBRead.h - the declaration of `DBRead`, owned by `TRK/exi2_comm.c`.
  */
-#ifndef VF_DBREAD_H
-#define VF_DBREAD_H
+#ifndef TRK_DBREAD_H
+#define TRK_DBREAD_H
 
 #include "types.h"
 
