@@ -1334,7 +1334,7 @@ config.libs = [
             # accessor) are both non-PPCArch code.  Same lib block as the SDK bands above; the
             # source restores -O4,p's 16-byte function alignment with `#pragma function_align 16`
             # (every start in the range is 16-aligned).
-            Object(NonMatching, "OS/PPCArch.c"),
+            Object(Matching, "OS/PPCArch.c"),
             Object(NonMatching, "EXI/EXIBios.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
             Object(NonMatching, "EXI/ProbeBarnacle.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
             # Phase 4 stubs (window fg): SDK candidate units with no bodies yet.

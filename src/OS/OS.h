@@ -28,6 +28,11 @@ u8 OSGetAppType(void);
 /* 0x804CB390 - the 4-character game code of the running title, copied into a static buffer. */
 char* OSGetAppGamename(void);
 
+/* 0x804CB1E0 / 0x804CB200 - sets / reads the handler for CPU exception `exception`; the setter returns the old one. */
+typedef void (*OSExceptionHandler)(u8 exception, struct OSContext* context);
+OSExceptionHandler __OSSetExceptionHandler(u8 exception, OSExceptionHandler handler);
+OSExceptionHandler __OSGetExceptionHandler(u8 exception);
+
 /* 0x800000F8 - the console's bus clock in Hz, read straight out of the low-memory arena.  The original
  * object carries no relocation for it, i.e. the source spelled the address out (same shape as
  * `NWC24_RTC_USER_ID` in `unsplit/NWC24.h`). */

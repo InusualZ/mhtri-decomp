@@ -28,6 +28,8 @@ typedef struct OSContext {
     /* +0x1C8 */ f64 psf[32];
 } OSContext; /* size: 0x2C8 */
 
+/* 0x804CD0A0 - restores a context and resumes it; does not return. */
+void OSLoadContext(OSContext* context);
 /* 0x804CD1F0 - zeroes a context's state. */
 void OSClearContext(OSContext* context);
 /* 0x804CD2E0 - prints a context's registers through `OSReport`. */
