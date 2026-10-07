@@ -21,7 +21,7 @@ s32 fn_800AB740(struct EfPmManager* self, struct EfPmParticle* target);
 
 /* The ramp helper `ef/ef_animcurve.cpp`'s ef_anim_tex_ramp calls at a ramp's last key (declared with the
  * owner's record tags). */
-s32 fn_800AB880(struct EfPmManager* self, struct EfPmParticle* target);
+s32 ef_pm_retire_particle(struct EfPmManager* self, struct EfPmParticle* target);
 
 /* 0x800AE360 - copies the manager's matrix (rebuilt from its emitter's when dirty) into `out` and returns it. */
 /* untyped: opaque handle - the draw strategies pass the manager through their own record views */

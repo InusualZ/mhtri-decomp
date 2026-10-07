@@ -74,7 +74,7 @@ public:
     /* +0x0004 */ void* mDrawOrder;     /* the draw-order list object */
     /* +0x0008 */ void* mStrategy;      /* the draw-strategy builder */
     /* +0x000C */ void* mLineStrategy;  /* the emitter-form builder */
-    /* +0x0010 */ u8 mCreationQueue[0xC004]; /* the queue the constructor builds (`fn_800A2FA4`) */
+    /* +0x0010 */ u8 mCreationQueue[0xC004]; /* the queue the constructor builds (`ef_creation_queue_reset`) */
     /* +0xC014 */ u32 mMaxGroupID;
     /* +0xC018 */ EfSysActivityList* mActivityList;
     /* +0xC01C */ nw4r::ef::Random mRandom;

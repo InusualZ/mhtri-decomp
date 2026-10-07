@@ -5,7 +5,7 @@
  * RANGE. .text 0x8009B374-0x8009CDBC (17 functions); extab 0x80009A38-0x80009A98, extabindex 0x80022B30-0x80022BC0,
  *   .data 0x80591948-0x80591C68 (the `__FILE__` string "ef_util.cpp" first), .sdata 0x807912D8-0x807912E0,
  *   .sdata2 0x80795F70-0x80795FB8.  Left edge: `g3d/g3d_gpu.cpp`'s bodies cite "g3d_gpu.cpp" (0x80591900) and pool
- *   their own 0.0f (0x80795F6C) apart from this TU's (0x80795F7C).  Right edge: `fn_8009CDBC` cites
+ *   their own 0.0f (0x80795F6C) apart from this TU's (0x80795F7C).  Right edge: `ef_anim_resolve_tick` cites
  *   "ef_animcurve.cpp"; the tail `ef_mtx34_column_length` cites none of this TU's strings or pool, only the `.sdata` pair
  *   {3.0f, 0.5f} at 0x807912D8.
  * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around `fn_8009B374`/`ef_mtx34_from_y_axis`,

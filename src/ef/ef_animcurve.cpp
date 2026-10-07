@@ -10,7 +10,13 @@
  *   and 0x805922AC), .sdata2 0x80795FB8-0x80795FF0.
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps `clrlwi`/`extrwi` + `cmpwi` unfused) and
  *   `#pragma fp_contract off` (retail keeps `fmuls` + `fadds`/`fsubs` apart).
- * NAMES. The map has only `fn_` stems for the range; the parameter names are the source's own, from the pointer
+ * NAMES. GUESS (from the bodies): `ef_anim_resolve_tick`, `ef_anim_resolve_key_index`, `ef_anim_interp_u8`,
+ *   GUESS: `ef_anim_advance_dividers`, `ef_anim_find_bracket_keys`, `ef_anim_split_resource`, `ef_anim_table_lo`,
+ *   GUESS: `ef_anim_table_hi`, `ef_anim_interp_f32`, `ef_anim_key_copy`, `ef_anim_key_search`,
+ *   GUESS: `ef_anim_fire_child_key`, `ef_anim_copy_u8_channels`, `ef_anim_key_tick`, `ef_anim_copy_f32_channels`,
+ *   GUESS: `ef_creation_queue_reset`, `ef_creation_queue_entry_ctor`, the byte tables `ef_anim_table_lo_bytes`/
+ *   GUESS: `ef_anim_table_hi_bytes`, the `ef_anim_*_str` strings by their text and the `ef_anim_f32_*` constants
+ *   GUESS: by their values.  The parameter names are the source's own, from the pointer
  *   messages (`header`, `tick`, `tickF32`, `resDiv`, `final`, `mCmdList`, `target`, `key`, `divL`, `divH`, `pHead`,
  *   `random`, `randomTable`, `nameTable`, `pp`, `ptrFixed`, `ptrBase`). GUESS: the record names (`EfAnimCurveKey`,
  *   `EfAnimChildKey`, `EfAnimRandomRange`, ...) and the particle owner chain's field names (`mManager`,
@@ -29,18 +35,18 @@
  *  - `ef_anim_curve_rotate`, `ef_anim_curve_f32`, `ef_anim_curve_u8`: register colouring only (the mask, the two record strides and
  *    the key pointer take other callee-saved registers; retail reuses one pointer for the key data and the
  *    random range, flags read at -0xA);
- *  - `fn_8009E854`, `fn_800A01C4`: float register colours of the cubic terms;
- *  - `fn_8009EF88`: the exact-key bool is narrowed (`clrlwi`) before its two stores;
- *  - `fn_8009D5C0`, `fn_8009CDBC`, `ef_anim_curve_texture`, `ef_anim_tex_ramp`: register colours only;
+ *  - `ef_anim_interp_u8`, `ef_anim_interp_f32`: float register colours of the cubic terms;
+ *  - `ef_anim_find_bracket_keys`: the exact-key bool is narrowed (`clrlwi`) before its two stores;
+ *  - `ef_anim_resolve_key_index`, `ef_anim_resolve_tick`, `ef_anim_curve_texture`, `ef_anim_tex_ramp`: register colours only;
  *  - `ef_anim_curve_rotate` keeps the key record pointers beside their data pointers, one callee-saved register more than
  *    retail: `_savegpr_20`/`_restgpr_20` where retail calls `_savegpr_21`/`_restgpr_21`.
  *   flipcheck: `.data` claimed, not emitted (the strings would have to come out of literal pools: the
- *   `fn_800A12AC`/`fn_8009EF88` messages each carry their own copy of the file name after the main pool);
+ *   `ef_anim_key_search`/`ef_anim_find_bracket_keys` messages each carry their own copy of the file name after the main pool);
  *   `.sdata2` 0x10 of 0x38 (only the two conversion doubles MWCC re-emits); `.text` 0x6280 of 0x6288.
  * SHAPES. `ef_anim_name_hash` sums `d*K + c*K + (a*K + b*K) + 0x4BF53` in that grouping (retail's add order).
  * SHAPES. The `.sdata2` constants are referenced by name, never spelled as literals (a literal re-pools them).
  *   The kernels take the curve type last (retail evaluates it after the three floats). The key searches read
- *   their u16 keys `stride` bytes apart. `fn_800A2FA4` walks the queue entries with a bottom-tested loop.
+ *   their u16 keys `stride` bytes apart. `ef_creation_queue_reset` walks the queue entries with a bottom-tested loop.
  */
 
 #include "types.h"
@@ -63,48 +69,47 @@ void Panic(const char* file, int line, const char* fmt, ...);
 }  // namespace nw4r
 
 /* This unit's own pooled file-name literal (a copy per region - MWCC emitted three). */
-extern char lbl_80591E68[];
-extern char lbl_80592260[];
-extern char lbl_805922AC[];
+extern char ef_anim_file_str[];
+extern char ef_anim_file_str2[];
+extern char ef_anim_file_str3[];
 
 /* The two 0x100-byte tables the curve's divisor lookups index (this unit's claimed `.data`, declared,
  * never defined). */
-extern u8 lbl_80591C68[];
-extern u8 lbl_80591D68[];
+extern u8 ef_anim_table_lo_bytes[];
+extern u8 ef_anim_table_hi_bytes[];
 
 /* The pointer-error messages, one per guarded parameter name (the source's own spelling). */
-extern char lbl_80591E7C[]; /* header   */
-extern char lbl_80591EB4[]; /* tick     */
-extern char lbl_80591EE8[]; /* tickF32  */
-extern char lbl_80591F20[]; /* resDiv   */
-extern char lbl_80591F58[]; /* final    */
-extern char lbl_80591F8C[]; /* mCmdList */
-extern char lbl_80591FC4[]; /* target   */
-extern char lbl_80591FE0[]; /* (unused here) */
-extern char lbl_80592000[]; /* "NW4R:Failed assertion 0"          */
-extern char lbl_80592018[]; /* key                                */
-extern char lbl_8059204C[]; /* divL                               */
-extern char lbl_80592080[]; /* divH                               */
-extern char lbl_805920B4[]; /* pHead                              */
-extern char lbl_805920E8[]; /* random                             */
-extern char lbl_80592120[]; /* randomTable                        */
-extern char lbl_80592160[]; /* nameTable                          */
-extern char lbl_80592198[]; /* pp                                 */
-extern char lbl_805921CC[]; /* ptrFixed                           */
-extern char lbl_80592204[]; /* "NW4R:Failed assertion div < nextDiv" */
-extern char lbl_80592228[]; /* ptrBase                            */
-extern char lbl_80592274[]; /* ptrBase                            */
+extern char ef_anim_header_assert_str[]; /* header   */
+extern char ef_anim_tick_assert_str[]; /* tick     */
+extern char ef_anim_tick_f32_assert_str[]; /* tickF32  */
+extern char ef_anim_res_div_assert_str[]; /* resDiv   */
+extern char ef_anim_final_assert_str[]; /* final    */
+extern char ef_anim_cmd_list_assert_str[]; /* mCmdList */
+extern char ef_anim_target_assert_str[]; /* target   */
+extern char ef_anim_zero_assert_str[]; /* "NW4R:Failed assertion 0"          */
+extern char ef_anim_key_assert_str[]; /* key                                */
+extern char ef_anim_div_l_assert_str[]; /* divL                               */
+extern char ef_anim_div_h_assert_str[]; /* divH                               */
+extern char ef_anim_head_assert_str[]; /* pHead                              */
+extern char ef_anim_random_assert_str[]; /* random                             */
+extern char ef_anim_random_table_assert_str[]; /* randomTable                        */
+extern char ef_anim_name_table_assert_str[]; /* nameTable                          */
+extern char ef_anim_pp_assert_str[]; /* pp                                 */
+extern char ef_anim_ptr_fixed_assert_str[]; /* ptrFixed                           */
+extern char ef_anim_div_order_assert_str[]; /* "NW4R:Failed assertion div < nextDiv" */
+extern char ef_anim_ptr_base_assert_str[]; /* ptrBase                            */
+extern char ef_anim_ptr_base_assert_str2[]; /* ptrBase                            */
 
 /* The `.sdata2` constants, referenced by name (a float literal would re-pool them in this object). */
-extern f32 lbl_80795FB8; /* 0.0f        */
-extern f32 lbl_80795FD0; /* 1.0f        */
-extern f32 lbl_80795FD4; /* 65536.0f    */
-extern f32 lbl_80795FD8; /* 3.0f        */
-extern f32 lbl_80795FDC; /* 2.0f        */
-extern f32 lbl_80795FE0; /* 1.5f        */
-extern f32 lbl_80795FE4; /* -2.0f       */
-extern f32 lbl_80795FE8; /* 255.0f      */
-extern f32 lbl_80795FEC; /* FLT_EPSILON */
+extern f32 ef_anim_f32_zero; /* 0.0f        */
+extern f32 ef_anim_f32_one; /* 1.0f        */
+extern f32 ef_anim_f32_65536; /* 65536.0f    */
+extern f32 ef_anim_f32_three; /* 3.0f        */
+extern f32 ef_anim_f32_two; /* 2.0f        */
+extern f32 ef_anim_f32_one_and_half; /* 1.5f        */
+extern f32 ef_anim_f32_minus_two; /* -2.0f       */
+extern f32 ef_anim_f32_255; /* 255.0f      */
+extern f32 ef_anim_f32_epsilon; /* FLT_EPSILON */
 
 /* The pointer guard every ef entry point carries: the RVL address-range chain (seven windows, the
  * first `if` carrying two tests - the compiler materialises six BOOLs). */
@@ -121,7 +126,7 @@ extern f32 lbl_80795FEC; /* FLT_EPSILON */
     ((cond) ? (void)0 : nw4r::db::Panic(file, line, msg))
 
 /* The header record the curve readers hold: a flags byte, a divisor count and a key count.  The
- * `key` record fn_8009EA4C walks is the same shape but read through its own `+0x00` count. */
+ * `key` record ef_anim_advance_dividers walks is the same shape but read through its own `+0x00` count. */
 struct EfAnimHeader {
     /* +0x00 */ u8 pad_0x00;
     /* +0x01 */ u8 mTarget;            /* the channel the curve drives: 'h', 'l', 'p', ... */
@@ -312,7 +317,7 @@ struct EfAnimRamp {
 
 /* Fires one child-creation key of ef_anim_curve_child's curve. */
 #define EF_ANIM_FIRE(entry)                                                                        \
-    fn_800A16C4((entry), seed, header, (const EfAnimNameTable*)nameTable,                          \
+    ef_anim_fire_child_key((entry), seed, header, (const EfAnimNameTable*)nameTable,                          \
                 (const EfAnimChildTable*)randomTable, pp, divA)
 
 extern "C" {
@@ -321,56 +326,56 @@ extern "C" {
 f32 fabsf(f32 x);
 
 /* The unit's functions, in retail order (each is defined below in the same order). */
-void fn_8009CDBC(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
+void ef_anim_resolve_tick(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
                  u32* resDiv);
-void fn_8009D5C0(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
+void ef_anim_resolve_key_index(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
                  u32* resDiv, u8* final);
 void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mode);
-u8 fn_8009E854(u32 tick, u8 start, u8 end, u8 type);
-void fn_8009EA4C(const EfAnimHeader* header, const EfAnimKeyRange* key, u32 lo, u32* divL,
+u8 ef_anim_interp_u8(u32 tick, u8 start, u8 end, u8 type);
+void ef_anim_advance_dividers(const EfAnimHeader* header, const EfAnimKeyRange* key, u32 lo, u32* divL,
                  u32* divH);
 u32 ef_anim_rand_next(u32 seed);
 u32 ef_anim_name_hash(u16 a, u16 b, u16 c, u32 d);
-void fn_8009EF88(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
+void ef_anim_find_bracket_keys(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
                  const u16* ptrBase, u32 stride, s32 lo, s32 hi);
-void fn_8009F22C(const u8* pHead, const EfAnimHeader** header, const u8** key, const u8** random,
+void ef_anim_split_resource(const u8* pHead, const EfAnimHeader** header, const u8** key, const u8** random,
                  const u8** randomTable, const u8** nameTable);
-u8 fn_8009F834(u32 index);
-u8 fn_8009F848(u32 index);
+u8 ef_anim_table_lo(u32 index);
+u8 ef_anim_table_hi(u32 index);
 void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode);
-f32 fn_800A01C4(f32 t, f32 a, f32 b, u8 type);
+f32 ef_anim_interp_f32(f32 t, f32 a, f32 b, u8 type);
 void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode);
 void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode,
                  const u8** nameTableOut, u32** target, EfAnimDivider* divider);
-void fn_800A1290(EfAnimKey* dst, const EfAnimKey* src);
-void fn_800A12AC(s32* out, s32 target, const u16* ptrBase, u32 stride, s32 lo, s32 hi, int flag);
+void ef_anim_key_copy(EfAnimKey* dst, const EfAnimKey* src);
+void ef_anim_key_search(s32* out, s32 target, const u16* ptrBase, u32 stride, s32 lo, s32 hi, int flag);
 void ef_anim_latch_tex_type(EfAnimParticle* self, const EfAnimDivider* arg);
 void ef_anim_tex_ramp(EfAnimParticle* self, const EfAnimDivider* divider, const EfAnimRamp* ramp,
                  struct EfPmManager* manager, const EfAnimNameTable* nameTable, u32* target);
-void fn_800A16C4(const EfAnimChildKey* ptrFixed, u16 seed, const EfAnimHeader* header,
+void ef_anim_fire_child_key(const EfAnimChildKey* ptrFixed, u16 seed, const EfAnimHeader* header,
                  const EfAnimNameTable* nameTable, const EfAnimChildTable* randomTable, EfAnimParticle* pp,
                  u32 div);
 void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode);
-void fn_800A2504(const u8* mCmdList, u8* target, u32 step, u32 mode);
-void fn_800A27B4(const EfAnimHeader* header, u32 step, u16* tick, u32 mode);
-void fn_800A2CF0(const u8* mCmdList, f32* target, u32 step, u32 mode);
-CreationQueue* fn_800A2FA4(CreationQueue* queue);
-CreationQueueEntry* fn_800A3008(CreationQueueEntry* slot);
+void ef_anim_copy_u8_channels(const u8* mCmdList, u8* target, u32 step, u32 mode);
+void ef_anim_key_tick(const EfAnimHeader* header, u32 step, u16* tick, u32 mode);
+void ef_anim_copy_f32_channels(const u8* mCmdList, f32* target, u32 step, u32 mode);
+CreationQueue* ef_creation_queue_reset(CreationQueue* queue);
+CreationQueueEntry* ef_creation_queue_entry_ctor(CreationQueueEntry* slot);
 
 /* 0x8009CDBC - resolves the key tick, fractional tick and divisor of position `step` in a curve `mode`
  * steps long (`header` holds the tick count, flags and divisor count); a tick count <= 1 gives tick 0. */
-void fn_8009CDBC(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
+void ef_anim_resolve_tick(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
                  u32* resDiv) {
-    NW4R_POINTER_ASSERT(header, 0x87, lbl_80591E7C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(tick, 0x88, lbl_80591EB4, lbl_80591E68);
-    NW4R_POINTER_ASSERT(tickF32, 0x89, lbl_80591EE8, lbl_80591E68);
-    NW4R_POINTER_ASSERT(resDiv, 0x8A, lbl_80591F20, lbl_80591E68);
+    NW4R_POINTER_ASSERT(header, 0x87, ef_anim_header_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(tick, 0x88, ef_anim_tick_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(tickF32, 0x89, ef_anim_tick_f32_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(resDiv, 0x8A, ef_anim_res_div_assert_str, ef_anim_file_str);
 
     *resDiv = 0;
     u16 count = header->mTickCount;
     if (count <= 1) {
         *tick = 0;
-        *tickF32 = lbl_80795FB8;
+        *tickF32 = ef_anim_f32_zero;
         *resDiv = step;
         return;
     }
@@ -454,16 +459,16 @@ void fn_8009CDBC(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32*
     *tick = *tickF32;
 }
 
-/* 0x8009D5C0 (0x8F0): the key-index twin of fn_8009CDBC: resolves the key slot, its float copy and the
+/* 0x8009D5C0 (0x8F0): the key-index twin of ef_anim_resolve_tick: resolves the key slot, its float copy and the
  * division of position `step` in a curve `mode` steps long; `*final` is set when a ping-pong curve ends on
  * its first key. */
-void fn_8009D5C0(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
+void ef_anim_resolve_key_index(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
                  u32* resDiv, u8* final) {
-    NW4R_POINTER_ASSERT(header, 0x12A, lbl_80591E7C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(tick, 0x12B, lbl_80591EB4, lbl_80591E68);
-    NW4R_POINTER_ASSERT(tickF32, 0x12C, lbl_80591EE8, lbl_80591E68);
-    NW4R_POINTER_ASSERT(resDiv, 0x12D, lbl_80591F20, lbl_80591E68);
-    NW4R_POINTER_ASSERT(final, 0x12E, lbl_80591F58, lbl_80591E68);
+    NW4R_POINTER_ASSERT(header, 0x12A, ef_anim_header_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(tick, 0x12B, ef_anim_tick_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(tickF32, 0x12C, ef_anim_tick_f32_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(resDiv, 0x12D, ef_anim_res_div_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(final, 0x12E, ef_anim_final_assert_str, ef_anim_file_str);
 
     *resDiv = 0;
     *final = 0;
@@ -527,7 +532,7 @@ void fn_8009D5C0(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32*
             *tick = (f32)step * rate - (f32)(div * header->mTickCount);
         } else {
             s32 span = count - 1;
-            f32 rate = (lbl_80795FD0 + (f32)span * (f32)header->mDivCount) / (f32)mode;
+            f32 rate = (ef_anim_f32_one + (f32)span * (f32)header->mDivCount) / (f32)mode;
             u32 pos = (u32)((f32)step * rate);
             u32 div = pos / span;
             *resDiv = div;
@@ -555,11 +560,11 @@ void fn_8009D5C0(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32*
  * key is copied (or drawn from its random byte range) and a key span is interpolated in u16.16 fixed point
  * with each channel's kernel type. */
 void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x31C, lbl_80591F8C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(target, 0x31D, lbl_80591FC4, lbl_80591E68);
+    NW4R_POINTER_ASSERT(mCmdList, 0x31C, ef_anim_cmd_list_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(target, 0x31D, ef_anim_target_assert_str, ef_anim_file_str);
 
     if (mCmdList[0] == 0xAB) {
-        fn_800A2504(mCmdList, target, step, mode);
+        ef_anim_copy_u8_channels(mCmdList, target, step, mode);
         return;
     }
 
@@ -578,20 +583,20 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
     u16 keyHi;
     u8 exact;
 
-    u8 end = fn_8009F848(mask);
-    u32 count = fn_8009F834(mask);
+    u8 end = ef_anim_table_hi(mask);
+    u32 count = ef_anim_table_lo(mask);
     if (count == 0) {
         return;
     }
 
     u32 stride = (count + 0xD) & ~1;
-    fn_8009F22C(mCmdList, &header, &key, &random, &randomTable, &nameTable);
+    ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
     u32 rstride = count * 2;
-    fn_8009CDBC(mode, header, step, &tick, &tickF32, &divL);
+    ef_anim_resolve_tick(mode, header, step, &tick, &tickF32, &divL);
     divH = divL;
 
     const u8* keys = key + 4;
-    fn_8009EF88(&idx, &exact, &keyLo, &keyHi, tick, tickF32, (const u16*)keys, stride, 0,
+    ef_anim_find_bracket_keys(&idx, &exact, &keyLo, &keyHi, tick, tickF32, (const u16*)keys, stride, 0,
                 ((const EfAnimKeyRange*)key)->mKeyCount - 1);
 
     if (exact) {
@@ -639,8 +644,8 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
         return;
     }
 
-    fn_8009EA4C(header, (const EfAnimKeyRange*)key, idx, &divL, &divH);
-    u32 t = (u32)(lbl_80795FD4 * (tickF32 - (f32)keyLo)) / (keyHi - keyLo);
+    ef_anim_advance_dividers(header, (const EfAnimKeyRange*)key, idx, &divL, &divH);
+    u32 t = (u32)(ef_anim_f32_65536 * (tickF32 - (f32)keyLo)) / (keyHi - keyLo);
     const EfAnimCurveKey* recA = (const EfAnimCurveKey*)(keys + idx * stride);
     const u8* srcA = recA->mData.mByte;
     const EfAnimCurveKey* recB = (const EfAnimCurveKey*)(keys + (idx + 1) * stride);
@@ -652,7 +657,7 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
     if (!randA && !randB) {
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
             if ((mask & bit) != 0) {
-                *target = fn_8009E854(t, *srcA, *srcB, *type);
+                *target = ef_anim_interp_u8(t, *srcA, *srcB, *type);
                 srcA++;
                 srcB++;
             }
@@ -685,7 +690,7 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
                 if (vA > 0xFF) {
                     vA = 0xFF;
                 }
-                *target = fn_8009E854(t, vA, *srcB, *type);
+                *target = ef_anim_interp_u8(t, vA, *srcB, *type);
                 srcB++;
             }
             if ((header->mFlags & 4) == 0) {
@@ -720,7 +725,7 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
                 if (vB > 0xFF) {
                     vB = 0xFF;
                 }
-                *target = fn_8009E854(t, *srcA, vB, *type);
+                *target = ef_anim_interp_u8(t, *srcA, vB, *type);
                 srcA++;
             }
             if ((header->mFlags & 4) == 0) {
@@ -780,7 +785,7 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
             if ((header->mFlags & 4) == 0) {
                 hashB = ef_anim_rand_next(hashB);
             }
-            *target = fn_8009E854(t, vA, vB, *type);
+            *target = ef_anim_interp_u8(t, vA, vB, *type);
         } else if ((header->mFlags & 4) == 0) {
             hashA = ef_anim_rand_next(hashA);
             hashB = ef_anim_rand_next(hashB);
@@ -792,7 +797,7 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
 
 /* 0x8009E854 - the u16.16 fixed-point `u8` interpolation kernel: `tick` is t * 65536, the result is
  * clamped to [0, 255]. */
-u8 fn_8009E854(u32 tick, u8 start, u8 end, u8 type) {
+u8 ef_anim_interp_u8(u32 tick, u8 start, u8 end, u8 type) {
     u8 s = start;
     u8 e = end;
 
@@ -803,23 +808,23 @@ u8 fn_8009E854(u32 tick, u8 start, u8 end, u8 type) {
     case 0:
         return (u8)(s + ((tick * (e - s)) >> 16));
     case 1: {
-        f32 t = (f32)tick / lbl_80795FD4;
+        f32 t = (f32)tick / ef_anim_f32_65536;
         if (type == 1) {
             f32 s0 = (f32)s;
-            f32 w = lbl_80795FD8 - lbl_80795FDC * t;
+            f32 w = ef_anim_f32_three - ef_anim_f32_two * t;
             return s0 + t * (t * (w * (f32)(int)(e - s)));
         } else {
-            f32 c1 = ((type >> 2) & 1) == 0 ? lbl_80795FB8 : lbl_80795FE0;
-            f32 c0 = ((type >> 3) & 1) == 0 ? lbl_80795FB8 : lbl_80795FE0;
+            f32 c1 = ((type >> 2) & 1) == 0 ? ef_anim_f32_zero : ef_anim_f32_one_and_half;
+            f32 c0 = ((type >> 3) & 1) == 0 ? ef_anim_f32_zero : ef_anim_f32_one_and_half;
             f32 s0 = (f32)s;
             f32 d = t * (f32)(int)(e - s);
-            f32 u = t * (t * (lbl_80795FDC - (c0 + c1)));
-            f32 v = t * (lbl_80795FD8 + (lbl_80795FE4 * c0 - c1));
+            f32 u = t * (t * (ef_anim_f32_two - (c0 + c1)));
+            f32 v = t * (ef_anim_f32_three + (ef_anim_f32_minus_two * c0 - c1));
             f32 r = s0 + d * (c0 + (u + v));
-            if (r < lbl_80795FB8) {
+            if (r < ef_anim_f32_zero) {
                 return 0;
             }
-            if (r > lbl_80795FE8) {
+            if (r > ef_anim_f32_255) {
                 return 0xFF;
             }
             return r;
@@ -828,19 +833,19 @@ u8 fn_8009E854(u32 tick, u8 start, u8 end, u8 type) {
     case 2:
         return start;
     default:
-        NW4R_ASSERT(0, 0x2C7, lbl_80592000, lbl_80591E68);
+        NW4R_ASSERT(0, 0x2C7, ef_anim_zero_assert_str, ef_anim_file_str);
         return 0;
     }
 }
 
 /* 0x8009EA4C - advances the two divider counters one key step (header flag bit 6 enables it; `divH` moves
  * only at the last key or with bit 5, `divL` also when the step starts at division 0). */
-void fn_8009EA4C(const EfAnimHeader* header, const EfAnimKeyRange* key, u32 lo, u32* divL,
+void ef_anim_advance_dividers(const EfAnimHeader* header, const EfAnimKeyRange* key, u32 lo, u32* divL,
                  u32* divH) {
-    NW4R_POINTER_ASSERT(header, 0x301, lbl_80591E7C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(key, 0x302, lbl_80592018, lbl_80591E68);
-    NW4R_POINTER_ASSERT(divL, 0x303, lbl_8059204C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(divH, 0x304, lbl_80592080, lbl_80591E68);
+    NW4R_POINTER_ASSERT(header, 0x301, ef_anim_header_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(key, 0x302, ef_anim_key_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(divL, 0x303, ef_anim_div_l_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(divH, 0x304, ef_anim_div_h_assert_str, ef_anim_file_str);
 
     *divH = *divL;
 
@@ -880,14 +885,14 @@ u32 ef_anim_name_hash(u16 a, u16 b, u16 c, u32 d) {
     return h.mWord;
 }
 
-/* 0x8009EF88 - binary-searches fn_800A12AC's u16 key table for both bracketing keys (`outLo`/`outHi`);
+/* 0x8009EF88 - binary-searches ef_anim_key_search's u16 key table for both bracketing keys (`outLo`/`outHi`);
  * `*flag` says whether `frac` lands exactly on the found key. */
-void fn_8009EF88(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
+void ef_anim_find_bracket_keys(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
                  const u16* ptrBase, u32 stride, s32 lo, s32 hi) {
-    NW4R_POINTER_ASSERT(ptrBase, 0x1F1, lbl_80592274, lbl_805922AC);
+    NW4R_POINTER_ASSERT(ptrBase, 0x1F1, ef_anim_ptr_base_assert_str2, ef_anim_file_str3);
 
     s32 mid = (lo + hi) / 2;
-    u8 atTarget = fabsf((f32)target - frac) < lbl_80795FEC;
+    u8 atTarget = fabsf((f32)target - frac) < ef_anim_f32_epsilon;
 
     u16 keyLo = EF_ANIM_KEY_AT(ptrBase, stride, lo);
     *outLo = keyLo;
@@ -944,14 +949,14 @@ void fn_8009EF88(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 fra
 
 /* 0x8009F22C (0x608): splits a curve resource into its header, key block, random block, random table and
  * name table; each block starts where the previous one's size (from the header) ends. */
-void fn_8009F22C(const u8* pHead, const EfAnimHeader** header, const u8** key, const u8** random,
+void ef_anim_split_resource(const u8* pHead, const EfAnimHeader** header, const u8** key, const u8** random,
                  const u8** randomTable, const u8** nameTable) {
-    NW4R_POINTER_ASSERT(pHead, 0x70, lbl_805920B4, lbl_80591E68);
-    NW4R_POINTER_ASSERT(header, 0x71, lbl_80591E7C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(key, 0x72, lbl_80592018, lbl_80591E68);
-    NW4R_POINTER_ASSERT(random, 0x73, lbl_805920E8, lbl_80591E68);
-    NW4R_POINTER_ASSERT(randomTable, 0x74, lbl_80592120, lbl_80591E68);
-    NW4R_POINTER_ASSERT(nameTable, 0x75, lbl_80592160, lbl_80591E68);
+    NW4R_POINTER_ASSERT(pHead, 0x70, ef_anim_head_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(header, 0x71, ef_anim_header_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(key, 0x72, ef_anim_key_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(random, 0x73, ef_anim_random_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(randomTable, 0x74, ef_anim_random_table_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(nameTable, 0x75, ef_anim_name_table_assert_str, ef_anim_file_str);
 
     *header = (const EfAnimHeader*)pHead;
     *key = pHead + sizeof(EfAnimHeader);
@@ -961,24 +966,24 @@ void fn_8009F22C(const u8* pHead, const EfAnimHeader** header, const u8** key, c
 }
 
 /* 0x8009F834 - the low 0x100-byte table lookup. */
-u8 fn_8009F834(u32 index) {
-    return lbl_80591C68[index & 0xFF];
+u8 ef_anim_table_lo(u32 index) {
+    return ef_anim_table_lo_bytes[index & 0xFF];
 }
 
 /* 0x8009F848 - the high 0x100-byte table lookup. */
-u8 fn_8009F848(u32 index) {
-    return lbl_80591D68[index & 0xFF];
+u8 ef_anim_table_hi(u32 index) {
+    return ef_anim_table_hi_bytes[index & 0xFF];
 }
 
 /* 0x8009F85C (0x968): evaluates an f32 curve at `step` into the channels its mask selects: a baked curve
  * (0xAB) is a table copy, otherwise an exact key is copied (or drawn from its random range) and a key
  * span is interpolated with each channel's kernel type, either end possibly random. */
 void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x418, lbl_80591F8C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(target, 0x419, lbl_80591FC4, lbl_80591E68);
+    NW4R_POINTER_ASSERT(mCmdList, 0x418, ef_anim_cmd_list_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(target, 0x419, ef_anim_target_assert_str, ef_anim_file_str);
 
     if (mCmdList[0] == 0xAB) {
-        fn_800A2CF0(mCmdList, target, step, mode);
+        ef_anim_copy_f32_channels(mCmdList, target, step, mode);
         return;
     }
 
@@ -997,12 +1002,12 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
     u16 keyHi;
     u8 exact;
 
-    fn_8009F22C(mCmdList, &header, &key, &random, &randomTable, &nameTable);
-    fn_8009CDBC(mode, header, step, &tick, &tickF32, &divL);
+    ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
+    ef_anim_resolve_tick(mode, header, step, &tick, &tickF32, &divL);
     divH = divL;
 
-    u8 end = fn_8009F848(mask);
-    u8 count = fn_8009F834(mask);
+    u8 end = ef_anim_table_hi(mask);
+    u8 count = ef_anim_table_lo(mask);
     if (count == 0) {
         return;
     }
@@ -1010,7 +1015,7 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
     u32 stride = count * 4 + 0xC;
     u32 rstride = count * 8;
     const u8* keys = key + 4;
-    fn_8009EF88(&idx, &exact, &keyLo, &keyHi, tick, tickF32, (const u16*)keys, stride, 0,
+    ef_anim_find_bracket_keys(&idx, &exact, &keyLo, &keyHi, tick, tickF32, (const u16*)keys, stride, 0,
                 ((const EfAnimKeyRange*)key)->mKeyCount - 1);
 
     if (exact) {
@@ -1051,7 +1056,7 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
         return;
     }
 
-    fn_8009EA4C(header, (const EfAnimKeyRange*)key, idx, &divL, &divH);
+    ef_anim_advance_dividers(header, (const EfAnimKeyRange*)key, idx, &divL, &divH);
     f32 t = (tickF32 - (f32)keyLo) / (f32)(keyHi - keyLo);
     const EfAnimCurveKey* recA = (const EfAnimCurveKey*)(keys + idx * stride);
     const f32* srcA = recA->mData.mValue;
@@ -1064,7 +1069,7 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
     if (!randA && !randB) {
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
             if ((mask & bit) != 0) {
-                *target = fn_800A01C4(t, *srcA, *srcB, *type);
+                *target = ef_anim_interp_f32(t, *srcA, *srcB, *type);
                 srcA++;
                 srcB++;
             }
@@ -1094,7 +1099,7 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
                 if ((header->mFlags & 4) == 0) {
                     hash = ef_anim_rand_next(hash);
                 }
-                *target = fn_800A01C4(t, a, *srcB, *type);
+                *target = ef_anim_interp_f32(t, a, *srcB, *type);
                 srcB++;
             }
             type++;
@@ -1123,7 +1128,7 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
                 if ((header->mFlags & 4) == 0) {
                     hash = ef_anim_rand_next(hash);
                 }
-                *target = fn_800A01C4(t, *srcA, b, *type);
+                *target = ef_anim_interp_f32(t, *srcA, b, *type);
                 srcA++;
             }
             type++;
@@ -1168,7 +1173,7 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
             if ((header->mFlags & 4) == 0) {
                 hashB = ef_anim_rand_next(hashB);
             }
-            *target = fn_800A01C4(t, a, b, *type);
+            *target = ef_anim_interp_f32(t, a, b, *type);
         }
         type++;
         target++;
@@ -1177,7 +1182,7 @@ void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 
 
 /* 0x800A01C4 - the f32 interpolation kernel: curve type `type` (bits 0-1) between `a` and `b` at
  * `t` in [0, 1].  Type 1's two inner control terms are switched by bits 2 and 3. */
-f32 fn_800A01C4(f32 t, f32 a, f32 b, u8 type) {
+f32 ef_anim_interp_f32(f32 t, f32 a, f32 b, u8 type) {
     if (a == b) {
         return a;
     }
@@ -1186,29 +1191,29 @@ f32 fn_800A01C4(f32 t, f32 a, f32 b, u8 type) {
         return a + t * (b - a);
     case 1:
         if (type == 1) {
-            f32 w = lbl_80795FD8 - lbl_80795FDC * t;
+            f32 w = ef_anim_f32_three - ef_anim_f32_two * t;
             return a + t * (t * (w * (b - a)));
         } else {
-            f32 c0 = ((type >> 3) & 1) == 0 ? lbl_80795FB8 : lbl_80795FE0;
-            f32 c1 = ((type >> 2) & 1) == 0 ? lbl_80795FB8 : lbl_80795FE0;
+            f32 c0 = ((type >> 3) & 1) == 0 ? ef_anim_f32_zero : ef_anim_f32_one_and_half;
+            f32 c1 = ((type >> 2) & 1) == 0 ? ef_anim_f32_zero : ef_anim_f32_one_and_half;
             f32 s = t * (b - a);
-            f32 u = t * (t * (c0 + c1 - lbl_80795FDC));
-            f32 v = t * (lbl_80795FD8 + (lbl_80795FE4 * c0 - c1));
+            f32 u = t * (t * (c0 + c1 - ef_anim_f32_two));
+            f32 v = t * (ef_anim_f32_three + (ef_anim_f32_minus_two * c0 - c1));
             return a + s * (c0 + (u + v));
         }
     case 2:
         return a;
     default:
-        NW4R_ASSERT(0, 0x2F9, lbl_80592000, lbl_80591E68);
-        return lbl_80795FB8;
+        NW4R_ASSERT(0, 0x2F9, ef_anim_zero_assert_str, ef_anim_file_str);
+        return ef_anim_f32_zero;
     }
 }
 
 /* 0x800A02F8 (0xA0C): the signed twin of ef_anim_curve_f32: a random record carries a sign byte after its
  * pairs, and a set byte negates the drawn values on a coin flip of the hash. */
 void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x51A, lbl_80591F8C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(target, 0x51B, lbl_80591FC4, lbl_80591E68);
+    NW4R_POINTER_ASSERT(mCmdList, 0x51A, ef_anim_cmd_list_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(target, 0x51B, ef_anim_target_assert_str, ef_anim_file_str);
 
     u8 mask = mCmdList[3];
     const EfAnimHeader* header;
@@ -1225,12 +1230,12 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
     u16 keyHi;
     u8 exact;
 
-    fn_8009F22C(mCmdList, &header, &key, &random, &randomTable, &nameTable);
-    fn_8009CDBC(mode, header, step, &tick, &tickF32, &divL);
+    ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
+    ef_anim_resolve_tick(mode, header, step, &tick, &tickF32, &divL);
     divH = divL;
 
-    u8 end = fn_8009F848(mask);
-    u8 count = fn_8009F834(mask);
+    u8 end = ef_anim_table_hi(mask);
+    u8 count = ef_anim_table_lo(mask);
     if (count == 0) {
         return;
     }
@@ -1239,7 +1244,7 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
     u32 pairBytes = count * 8;
     u32 rstride = pairBytes + 4;
     const u8* keys = key + 4;
-    fn_8009EF88(&idx, &exact, &keyLo, &keyHi, tick, tickF32, (const u16*)keys, stride, 0,
+    ef_anim_find_bracket_keys(&idx, &exact, &keyLo, &keyHi, tick, tickF32, (const u16*)keys, stride, 0,
                 ((const EfAnimKeyRange*)key)->mKeyCount - 1);
 
     if (exact) {
@@ -1291,7 +1296,7 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
         return;
     }
 
-    fn_8009EA4C(header, (const EfAnimKeyRange*)key, idx, &divL, &divH);
+    ef_anim_advance_dividers(header, (const EfAnimKeyRange*)key, idx, &divL, &divH);
     f32 t = (tickF32 - (f32)keyLo) / (f32)(keyHi - keyLo);
     const EfAnimCurveKey* recA = (const EfAnimCurveKey*)(keys + idx * stride);
     const f32* srcA = recA->mData.mValue;
@@ -1304,7 +1309,7 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
     if (!randA && !randB) {
         for (u16 bit = 1; bit <= end; bit = (u16)(bit << 1)) {
             if ((mask & bit) != 0) {
-                *target = fn_800A01C4(t, *srcA, *srcB, *type);
+                *target = ef_anim_interp_f32(t, *srcA, *srcB, *type);
                 srcA++;
                 srcB++;
             }
@@ -1341,7 +1346,7 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
                 if (negateA) {
                     vA = -vA;
                 }
-                *target = fn_800A01C4(t, vA, *srcB, *type);
+                *target = ef_anim_interp_f32(t, vA, *srcB, *type);
                 srcB++;
             }
             type++;
@@ -1380,7 +1385,7 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
                 if (negateB) {
                     vB = -vB;
                 }
-                *target = fn_800A01C4(t, *srcA, vB, *type);
+                *target = ef_anim_interp_f32(t, *srcA, vB, *type);
                 srcA++;
             }
             type++;
@@ -1442,7 +1447,7 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
             if (negateB) {
                 vB = -vB;
             }
-            *target = fn_800A01C4(t, vA, vB, *type);
+            *target = ef_anim_interp_f32(t, vA, vB, *type);
         }
         type++;
         target++;
@@ -1458,8 +1463,8 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
  * key's value and type bits. */
 void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode,
                  const u8** nameTableOut, u32** target, EfAnimDivider* divider) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x669, lbl_80591F8C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(pp, 0x66A, lbl_80592198, lbl_80591E68);
+    NW4R_POINTER_ASSERT(mCmdList, 0x669, ef_anim_cmd_list_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(pp, 0x66A, ef_anim_pp_assert_str, ef_anim_file_str);
 
     const EfAnimHeader* header;
     const u8* key;
@@ -1475,8 +1480,8 @@ void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16
     u32 ch;
     u32* channel;
 
-    fn_8009F22C(mCmdList, &header, &key, &random, &randomTable, &nameTable);
-    fn_8009D5C0(mode, header, step, &tick, &tickF32, &resDiv, &final);
+    ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
+    ef_anim_resolve_key_index(mode, header, step, &tick, &tickF32, &resDiv, &final);
 
     switch (header->mTarget) {
     case 'h':
@@ -1496,19 +1501,19 @@ void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16
     }
 
     const EfAnimKeyEntry* entries = ((const EfAnimKeyBlock*)key)->mEntry;
-    fn_800A12AC(&idx, tick, &entries->mTick, sizeof(EfAnimKeyEntry), 0,
+    ef_anim_key_search(&idx, tick, &entries->mTick, sizeof(EfAnimKeyEntry), 0,
                 ((const EfAnimKeyBlock*)key)->mCount - 1, 0);
     divider->mKeyCount = ((const EfAnimKeyBlock*)key)->mCount - 1;
 
     const EfAnimKeyEntry* entry = &entries[idx];
     if (entry->mFlags == 0) {
-        fn_800A1290(&k, &entry->mValue.mKey);
+        ef_anim_key_copy(&k, &entry->mValue.mKey);
     } else {
         u16 r = entry->mValue.mRandomIndex;
         u32 hash = ef_anim_name_hash(seed, header->mNameId, r, resDiv);
         if ((entry->mFlags & 2) == 0) {
             const EfAnimRandomEntry* re = &((const EfAnimRandomBlock*)random)->mEntry[r];
-            fn_800A1290(&k, &re->mKey);
+            ef_anim_key_copy(&k, &re->mKey);
             switch (re->mMode) {
             case 1:
                 k.mType = (k.mType & 2) | ((hash >> 16) & 1);
@@ -1522,12 +1527,12 @@ void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16
             }
         } else {
             const EfAnimRandomTable* table = (const EfAnimRandomTable*)randomTable;
-            fn_800A1290(&k, &table->mKey[(hash >> 16) % table->mCount]);
+            ef_anim_key_copy(&k, &table->mKey[(hash >> 16) % table->mCount]);
         }
     }
 
     *channel = ((const EfAnimNameTable*)nameTable)->mName[k.mTick];
-    NW4R_POINTER_ASSERT(channel, 0x6DC, lbl_80591FC4, lbl_80591E68);
+    NW4R_POINTER_ASSERT(channel, 0x6DC, ef_anim_target_assert_str, ef_anim_file_str);
 
     pp->mKeyValueBits &= (u16)~(0xF << (ch * 4));
     pp->mKeyValueBits |= (u16)((k.mValue & 0xF) << (ch * 4));
@@ -1542,7 +1547,7 @@ void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16
 }
 
 /* 0x800A1290 - copies a 4-byte key record (u8, u8, u16). */
-void fn_800A1290(EfAnimKey* dst, const EfAnimKey* src) {
+void ef_anim_key_copy(EfAnimKey* dst, const EfAnimKey* src) {
     dst->mValue = src->mValue;
     dst->mType = src->mType;
     dst->mTick = src->mTick;
@@ -1550,8 +1555,8 @@ void fn_800A1290(EfAnimKey* dst, const EfAnimKey* src) {
 
 /* 0x800A12AC - binary-searches a table of u16 keys (stride `stride` u16s) for `target` and return the
  * lower bracketing index in `*out`.  `flag` decides which side an exact hit narrows. */
-void fn_800A12AC(s32* out, s32 target, const u16* ptrBase, u32 stride, s32 lo, s32 hi, int flag) {
-    NW4R_POINTER_ASSERT(ptrBase, 0x24C, lbl_80592228, lbl_80592260);
+void ef_anim_key_search(s32* out, s32 target, const u16* ptrBase, u32 stride, s32 lo, s32 hi, int flag) {
+    NW4R_POINTER_ASSERT(ptrBase, 0x24C, ef_anim_ptr_base_assert_str, ef_anim_file_str2);
 
     s32 mid = (lo + hi) / 2;
 
@@ -1602,27 +1607,27 @@ void ef_anim_tex_ramp(EfAnimParticle* self, const EfAnimDivider* divider, const 
 
     if ((ramp->mFlags & 4) != 0) {
         if ((u16)idx == divider->mKeyCount - 1) {
-            fn_800AB880(manager, (struct EfPmParticle*)self);
+            ef_pm_retire_particle(manager, (struct EfPmParticle*)self);
         }
     } else if ((u16)idx >= divider->mKeyCount - 1) {
         idx = (u16)(idx - (u16)(divider->mKeyCount - 1));
     }
 
     *target = nameTable->mName[(u16)idx];
-    NW4R_POINTER_ASSERT(target, 0x70D, lbl_80591FC4, lbl_80591E68);
+    NW4R_POINTER_ASSERT(target, 0x70D, ef_anim_target_assert_str, ef_anim_file_str);
 }
 
 /* 0x800A16C4 (0x5E4): fires one child-creation key: resolves its payload (inline, or drawn from the random
  * table through the seed hash) and queues the named resource's creation on the particle's effect system;
  * the setting's kind picks the queue entry type. */
-void fn_800A16C4(const EfAnimChildKey* ptrFixed, u16 seed, const EfAnimHeader* header,
+void ef_anim_fire_child_key(const EfAnimChildKey* ptrFixed, u16 seed, const EfAnimHeader* header,
                  const EfAnimNameTable* nameTable, const EfAnimChildTable* randomTable, EfAnimParticle* pp,
                  u32 div) {
-    NW4R_POINTER_ASSERT(ptrFixed, 0x71E, lbl_805921CC, lbl_80591E68);
-    NW4R_POINTER_ASSERT(header, 0x71F, lbl_80591E7C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(nameTable, 0x720, lbl_80592160, lbl_80591E68);
-    NW4R_POINTER_ASSERT(randomTable, 0x721, lbl_80592120, lbl_80591E68);
-    NW4R_POINTER_ASSERT(pp, 0x722, lbl_80592198, lbl_80591E68);
+    NW4R_POINTER_ASSERT(ptrFixed, 0x71E, ef_anim_ptr_fixed_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(header, 0x71F, ef_anim_header_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(nameTable, 0x720, ef_anim_name_table_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(randomTable, 0x721, ef_anim_random_table_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(pp, 0x722, ef_anim_pp_assert_str, ef_anim_file_str);
 
     const EfAnimChildSetting* setting;
     if (ptrFixed->mFlags == 0) {
@@ -1630,7 +1635,7 @@ void fn_800A16C4(const EfAnimChildKey* ptrFixed, u16 seed, const EfAnimHeader* h
     } else {
         u32 hash = ef_anim_name_hash(seed, header->mNameId, ptrFixed->mData.mRandomIndex, div);
         if ((ptrFixed->mFlags & 2) == 0) {
-            NW4R_ASSERT(0, 0x744, lbl_80592000, lbl_80591E68);
+            NW4R_ASSERT(0, 0x744, ef_anim_zero_assert_str, ef_anim_file_str);
         } else {
             if (randomTable->mCount == 0) {
                 return;
@@ -1657,8 +1662,8 @@ void fn_800A16C4(const EfAnimChildKey* ptrFixed, u16 seed, const EfAnimHeader* h
  * the divisions in between and the start of the last one; a ping-pong curve (flag bit 6) walks the odd
  * divisions backwards and skips the turning keys. */
 void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x768, lbl_80591F8C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(pp, 0x769, lbl_80592198, lbl_80591E68);
+    NW4R_POINTER_ASSERT(mCmdList, 0x768, ef_anim_cmd_list_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(pp, 0x769, ef_anim_pp_assert_str, ef_anim_file_str);
 
     const EfAnimHeader* header;
     const u8* key;
@@ -1675,9 +1680,9 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
     u8 finalB;
     const EfAnimChildKey* entry;
 
-    fn_8009F22C(mCmdList, &header, &key, &random, &randomTable, &nameTable);
-    fn_8009D5C0(mode, header, step, &tickA, &tickF32, &divA, &finalA);
-    fn_8009D5C0(mode, header, step + 1, &tickB, &tickF32, &divB, &finalB);
+    ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
+    ef_anim_resolve_key_index(mode, header, step, &tickA, &tickF32, &divA, &finalA);
+    ef_anim_resolve_key_index(mode, header, step + 1, &tickB, &tickF32, &divB, &finalB);
 
     const EfAnimChildKey* keys = ((const EfAnimChildKeyBlock*)key)->mEntry;
     u32 div;
@@ -1690,7 +1695,7 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
             tickB = 1;
         }
         if (tickA < tickB) {
-            fn_800A12AC(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
+            ef_anim_key_search(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
                         ((const EfAnimChildKeyBlock*)key)->mCount - 1, 1);
             for (entry = &keys[idx]; idx < ((const EfAnimChildKeyBlock*)key)->mCount; entry++, idx++) {
                 if (entry->mTick >= tickA) {
@@ -1701,7 +1706,7 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
                 }
             }
         } else {
-            fn_800A12AC(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
+            ef_anim_key_search(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
                         ((const EfAnimChildKeyBlock*)key)->mCount - 1, 0);
             for (entry = &keys[idx]; idx >= 0; entry--, idx--) {
                 if (tickA >= entry->mTick) {
@@ -1715,11 +1720,11 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
         return;
     }
 
-    NW4R_ASSERT(divA < divB, 0x7D7, lbl_80592204, lbl_80591E68);
+    NW4R_ASSERT(divA < divB, 0x7D7, ef_anim_div_order_assert_str, ef_anim_file_str);
 
     if ((header->mFlags & 0x40) != 0) {
         if ((divA & 1) == 0) {
-            fn_800A12AC(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
+            ef_anim_key_search(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
                         ((const EfAnimChildKeyBlock*)key)->mCount - 1, 1);
             for (entry = &keys[idx]; idx < ((const EfAnimChildKeyBlock*)key)->mCount; entry++, idx++) {
                 if (entry->mTick >= tickA) {
@@ -1730,7 +1735,7 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
                 }
             }
         } else {
-            fn_800A12AC(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
+            ef_anim_key_search(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
                         ((const EfAnimChildKeyBlock*)key)->mCount - 1, 0);
             for (entry = &keys[idx]; idx >= 0; entry--, idx--) {
                 if (tickA >= entry->mTick) {
@@ -1782,7 +1787,7 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
         return;
     }
 
-    fn_800A12AC(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
+    ef_anim_key_search(&idx, tickA, &keys->mTick, sizeof(EfAnimChildKey), 0,
                 ((const EfAnimChildKeyBlock*)key)->mCount - 1, 1);
     for (entry = &keys[idx]; idx < ((const EfAnimChildKeyBlock*)key)->mCount; entry++, idx++) {
         if (entry->mTick >= tickA) {
@@ -1805,13 +1810,13 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
 }
 
 /* 0x800A2504 - copies the `u8` channels the key's mask selects out of one key record. */
-void fn_800A2504(const u8* mCmdList, u8* target, u32 step, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x92C, lbl_80591F8C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(target, 0x92D, lbl_80591FC4, lbl_80591E68);
+void ef_anim_copy_u8_channels(const u8* mCmdList, u8* target, u32 step, u32 mode) {
+    NW4R_POINTER_ASSERT(mCmdList, 0x92C, ef_anim_cmd_list_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(target, 0x92D, ef_anim_target_assert_str, ef_anim_file_str);
 
     u8 mask = mCmdList[3];
-    u8 end = fn_8009F848(mask);
-    u32 count = fn_8009F834(mask);
+    u8 end = ef_anim_table_hi(mask);
+    u32 count = ef_anim_table_lo(mask);
 
     if (count != 0) {
         const EfAnimHeader* header;
@@ -1821,8 +1826,8 @@ void fn_800A2504(const u8* mCmdList, u8* target, u32 step, u32 mode) {
         const u8* nameTable;
         u16 idx;
 
-        fn_8009F22C(mCmdList, &header, &key, &random, &randomTable, &nameTable);
-        fn_800A27B4(header, step, &idx, mode);
+        ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
+        ef_anim_key_tick(header, step, &idx, mode);
 
         const u8* src = (const u8*)key + count * idx;
         u16 bit;
@@ -1835,11 +1840,11 @@ void fn_800A2504(const u8* mCmdList, u8* target, u32 step, u32 mode) {
     }
 }
 
-/* 0x800A27B4 - the same tick resolution as fn_8009CDBC without the divisor/fraction outputs: the
+/* 0x800A27B4 - the same tick resolution as ef_anim_resolve_tick without the divisor/fraction outputs: the
  * `mode` argument is the curve's step count and the only result is the key tick. */
-void fn_800A27B4(const EfAnimHeader* header, u32 step, u16* tick, u32 mode) {
-    NW4R_POINTER_ASSERT(header, 0x8AB, lbl_80591E7C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(tick, 0x8AC, lbl_80591EB4, lbl_80591E68);
+void ef_anim_key_tick(const EfAnimHeader* header, u32 step, u16* tick, u32 mode) {
+    NW4R_POINTER_ASSERT(header, 0x8AB, ef_anim_header_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(tick, 0x8AC, ef_anim_tick_assert_str, ef_anim_file_str);
 
     u16 count = header->mTickCount;
     if (count <= 1) {
@@ -1923,14 +1928,14 @@ void fn_800A27B4(const EfAnimHeader* header, u32 step, u16* tick, u32 mode) {
     *tick = (f32)span - frac;
 }
 
-/* 0x800A2CF0 - the f32 twin of fn_800A2504: same mask walk, one f32 per selected channel. */
-void fn_800A2CF0(const u8* mCmdList, f32* target, u32 step, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x950, lbl_80591F8C, lbl_80591E68);
-    NW4R_POINTER_ASSERT(target, 0x951, lbl_80591FC4, lbl_80591E68);
+/* 0x800A2CF0 - the f32 twin of ef_anim_copy_u8_channels: same mask walk, one f32 per selected channel. */
+void ef_anim_copy_f32_channels(const u8* mCmdList, f32* target, u32 step, u32 mode) {
+    NW4R_POINTER_ASSERT(mCmdList, 0x950, ef_anim_cmd_list_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(target, 0x951, ef_anim_target_assert_str, ef_anim_file_str);
 
     u8 mask = mCmdList[3];
-    u8 end = fn_8009F848(mask);
-    u32 count = fn_8009F834(mask);
+    u8 end = ef_anim_table_hi(mask);
+    u32 count = ef_anim_table_lo(mask);
 
     if (count != 0) {
         const EfAnimHeader* header;
@@ -1940,8 +1945,8 @@ void fn_800A2CF0(const u8* mCmdList, f32* target, u32 step, u32 mode) {
         const u8* nameTable;
         u16 idx;
 
-        fn_8009F22C(mCmdList, &header, &key, &random, &randomTable, &nameTable);
-        fn_800A27B4(header, step, &idx, mode);
+        ef_anim_split_resource(mCmdList, &header, &key, &random, &randomTable, &nameTable);
+        ef_anim_key_tick(header, step, &idx, mode);
 
         const f32* src = (const f32*)key + count * idx;
         u16 bit;
@@ -1955,10 +1960,10 @@ void fn_800A2CF0(const u8* mCmdList, f32* target, u32 step, u32 mode) {
 }
 
 /* 0x800A2FA4 - resets the whole creation queue: clear every slot's VEC3 tails and the count. */
-CreationQueue* fn_800A2FA4(CreationQueue* queue) {
+CreationQueue* ef_creation_queue_reset(CreationQueue* queue) {
     CreationQueueEntry* slot = &queue->mEntry[0];
     do {
-        fn_800A3008(slot);
+        ef_creation_queue_entry_ctor(slot);
         slot++;
     } while (slot < &queue->mEntry[0x400]);
     queue->mCount = 0;
@@ -1966,7 +1971,7 @@ CreationQueue* fn_800A2FA4(CreationQueue* queue) {
 }
 
 /* 0x800A3008 - initialises a queue slot's two VEC3 tails. */
-CreationQueueEntry* fn_800A3008(CreationQueueEntry* slot) {
+CreationQueueEntry* ef_creation_queue_entry_ctor(CreationQueueEntry* slot) {
     VEC3_ctor(&slot->mPos);
     VEC3_ctor(&slot->mVel);
     return slot;
