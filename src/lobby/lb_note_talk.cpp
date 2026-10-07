@@ -10,9 +10,9 @@
  *   GUESS: `note_talk_step`, `note_turn_step`, `note_idle_set`, `note_talk_init`, `note_talk_frame`,
  *   GUESS: `note_talk_wait_step`, `note_talk_greet_step`, `note_talk_react_step`, `note_talk_mode_step`,
  *   GUESS: `note_talk_noop`, `note_talk_state_step`
- * RESIDUALS. `note_turn_step`: the two field loads (`+0x18C`, `+0x1A8`) issue in the other order; every other row is written
- *   and matches.
- *   flipcheck: `.sdata2` is the unit's own pool (the 1.0f at its own address); `.text`/extab/extabindex short of the claim.
+ * RESIDUALS. None: every row matches and the object is the target's (`.sdata2` is the unit's own pool).
+ * SHAPES. `note_turn_step` declares its three locals first and assigns them after, which issues the `+0x18C` load
+ *   before the `+0x1A8` one.
  */
 
 #pragma pool_data off
@@ -130,9 +130,12 @@ s32 note_talk_step(NoteWork* self) {
 /* 0x8038EEC8 (0x54): Moves the work's 16-bit angle one 1820-step towards its target, snapping when it is inside one
  * step, and wrapping through 0 the way the record's own 16-bit field does. */
 void note_turn_step(NoteWork* self) {
-    u32 target = self->field_0x1A8;
-    u32 cur = self->field_0x18C;
-    u16 diff = (u16)(target - (u16)cur);
+    u32 target;
+    u32 cur;
+    u16 diff;
+    cur = self->field_0x18C;
+    target = self->field_0x1A8;
+    diff = (u16)(target - (u16)cur);
     if ((u16)(diff + 1820) < 3640) {
         self->field_0x18C = target;
     } else if (diff < 0x8000) {

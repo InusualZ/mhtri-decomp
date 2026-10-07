@@ -39,7 +39,7 @@ void lb_sprite_pulse_draw(const u16* ids, const struct _mh_ivec2_* pos);
 /* 0x80215C04 - draws the resource-point total at layout `panel`.  GUESS name. */
 void lb_points_draw(u16 panel);
 /* 0x80215C98 - draws one list row: its frame of `kind`, the cursor when `cursor`, and `text` in `color`.  GUESS. */
-void lb_list_row_draw(s8* text, u8 cursor, struct _mh_ivec2_* pos, u32 color, u8 kind);
+void lb_list_row_draw(s8* text, s32 cursor, struct _mh_ivec2_* pos, u32 color, u8 kind);
 /* 0x802164F0 / 0x80216528 - draw one item cell (`item`, `count`) in the wide (7) / plain (0) frame.  GUESS names. */
 void lb_item_cell_draw_wide(u16 item, s32 count, struct _mh_ivec2_* pos, s32 enabled, s32 cursor, s32 active, u16 width);
 void lb_item_cell_draw(u16 item, s32 count, struct _mh_ivec2_* pos, s32 enabled, s32 cursor, s32 active, u16 width);

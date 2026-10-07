@@ -25,6 +25,7 @@ typedef struct LbQuestBoardEft {
     /* +0x04 */ union {
         nw4r::ef::Effect* effect;          /* kinds 0..7 */
         MHchar* model;                     /* kinds 8 and 9 */
+        MHchar* models[1];                 /* kinds 8 and 9: the `count` pooled models the spawn fills */
     };
     /* +0x08 */ union {
         f32 scale;                         /* kinds 0..7: the effect's parameter scale */

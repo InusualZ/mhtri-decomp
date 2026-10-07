@@ -195,8 +195,8 @@ BOOL getProfileMemberCounts(u8* members, u8* active, u8* capacity);
 
 /* 0x80434AF4..0x80434CC8 - the quest board's party queries (GUESS names from the fields they read). */
 BOOL isPartyCountRead(void);
-u8 getOwnMemberFlag(void);
-u8 getProfileFlag(void);
+u32 getOwnMemberFlag(void);
+u32 getProfileFlag(void);
 u32 isProfileUnselected(void);
 u16 getSelectedQuestId(void);
 

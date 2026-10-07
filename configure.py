@@ -1337,7 +1337,7 @@ config.libs = [
             Object(NonMatching, "lobby/lb_screen_step.cpp"),
             Object(NonMatching, "lobby/lb_menu_page.cpp"),
             Object(NonMatching, "lobby/lb_quest_board.cpp"),
-            Object(NonMatching, "lobby/lb_note_talk.cpp"),
+            Object(Matching, "lobby/lb_note_talk.cpp"),
             Object(NonMatching, "lobby/lb_quest_ui.cpp"),
             Object(NonMatching, "lobby/lb_quest_screen.cpp"),
         ],
