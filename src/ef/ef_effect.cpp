@@ -212,7 +212,7 @@ extern f32 lbl_80795FF0;          /* 0.0f (the three cleared floats)            
 extern void* lbl_807912E0;        /* the version string registered once                      */
 
 /* Callees outside this unit, with C linkage: retail's relocations carry their plain map names. */
-void fn_800A2FA4(void* p);
+void ef_creation_queue_reset(void* p);
 void fn_800A3718(void* p);
 void fn_800A3800(void* p);
 u32 fn_800A5948(EfEffSys* self, EfEff* target);
@@ -807,7 +807,7 @@ extern "C" void* fn_800A5484(void** pp) {
 /* 0x800A559C (0x7C): builds the effect system: its creation queue, the reference position and matrix, and the
  * library version, registered once. */
 EfSys::EfSys() {
-    fn_800A2FA4(mCreationQueue);
+    ef_creation_queue_reset(mCreationQueue);
     VEC3_ctor(&mRefPos);
     MTX34_ctor(&mRefMtx);
     if (ef_system_version_registered == 0) {

@@ -104,23 +104,23 @@ extern "C" {
 
 /* The out-of-line copies of the `EfDrawInfo` accessors and of the particle's texture-layer accessors (`particle.h`),
  * the four particle-list walkers and the ahead-context member constructor. */
-const GXColor* fn_800C68B8(const EfDrawInfo* self);
-const GXColor* fn_800C68C0(const EfDrawInfo* self);
-u32 fn_800C68C8(const EfDrawInfo* self);
-bool fn_800C68D0(const EfDrawInfo* self);
-u32 fn_800C68D8(const EfDrawInfo* self);
-bool fn_800C68E0(const EfDrawInfo* self);
-void fn_800C8674(u32 dst_coord, u32 func, u32 src_param, u32 mtx);
+const GXColor* ef_draw_info_amb_color(const EfDrawInfo* self);
+const GXColor* ef_draw_info_mat_color(const EfDrawInfo* self);
+u32 ef_draw_info_light_mask1(const EfDrawInfo* self);
+bool ef_draw_info_is_spot_light(const EfDrawInfo* self);
+u32 ef_draw_info_light_mask(const EfDrawInfo* self);
+bool ef_draw_info_light_enable(const EfDrawInfo* self);
+void ef_set_tex_coord_gen(u32 dst_coord, u32 func, u32 src_param, u32 mtx);
 s32 ef_particle_tex_offset_t(EfDrawParticle* self, int layer);
 s32 ef_particle_tex_offset_s(EfDrawParticle* self, int layer);
 s32 ef_particle_tex_scale_t(EfDrawParticle* self, int layer);
 s32 ef_particle_tex_scale_s(EfDrawParticle* self, int layer);
 s32 ef_particle_wrap_t(EfDrawParticle* self, int layer);
 s32 ef_particle_wrap_s(EfDrawParticle* self, int layer);
-EfDrawParticle* fn_800C8A80(EfDrawParticleManager* pm);
-EfDrawParticle* fn_800C8B9C(EfDrawParticleManager* pm);
-EfDrawParticle* fn_800C8CB8(EfDrawParticleManager* pm, EfDrawParticle* p);
-EfDrawParticle* fn_800C8DE4(EfDrawParticleManager* pm, EfDrawParticle* p);
+EfDrawParticle* ef_pm_first_eldest(EfDrawParticleManager* pm);
+EfDrawParticle* ef_pm_first_youngest(EfDrawParticleManager* pm);
+EfDrawParticle* ef_pm_next_eldest(EfDrawParticleManager* pm, EfDrawParticle* p);
+EfDrawParticle* ef_pm_next_youngest(EfDrawParticleManager* pm, EfDrawParticle* p);
 
 /* The unit vectors, the zero vector and the identity matrix the unit's static initializer builds. */
 extern VEC3 ef_unit_x_vec;

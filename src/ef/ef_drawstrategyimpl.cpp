@@ -18,7 +18,20 @@
  *   `SetupGP`, `GetGetFirstDrawParticleFunc`) from what they do and the assert text (`mTexmapMap[0] == 0`,
  *   `pp->mParameter.mTexture[texIndex]`, `pm->mManagerEM`); `InitGraphics`, `SetupGPAlpha`/`Color`/`Texture`,
  *   `PrevTexture`, `AheadContext`'s parameters, the `ef_particle_*` texture-layer accessors and the `ef_unit_*_vec`/
- *   `ef_zero_vec`/`ef_identity_mtx` globals are descriptive.  The GX FIFO writers and the walkers keep their map stems.
+ *   `ef_zero_vec`/`ef_identity_mtx` globals are descriptive.
+ *   GUESS: the FIFO writers carry the SDK's GX vertex names, read off the vertex-format switch in `SetupGP`
+ *   GUESS: (attribute, component count and type pick each one; the dump agrees at `GXPosition3f32`):
+ *   GUESS: `GXEnd`, `GXTexCoord1x16`, `GXTexCoord1x8`, `GXTexCoord1f32`, `GXTexCoord1s16`, `GXTexCoord1u16`,
+ *   GUESS: `GXTexCoord1s8`, `GXTexCoord1u8`, `GXTexCoord2f32`, `GXTexCoord2s16`, `GXTexCoord2u16`, `GXTexCoord2s8`,
+ *   GUESS: `GXTexCoord2u8`, `GXColor1x16`, `GXColor1x8`, `GXColor4u8`, `GXColor3u8`, `GXNormal1x16`, `GXNormal1x8`,
+ *   GUESS: `GXNormal3f32`, `GXNormal3s16`, `GXNormal3s8`, `GXPosition1x16`, `GXPosition1x8`, `GXPosition2f32`,
+ *   GUESS: `GXPosition2s16`, `GXPosition2u16`, `GXPosition2s8`, `GXPosition2u8`, `GXPosition3f32`,
+ *   GUESS: `GXPosition3s16`, `GXPosition3u16`, `GXPosition3s8`, `GXPosition3u8`.
+ *   GUESS (from the bodies): `ef_draw_info_get_fog`, `ef_draw_info_amb_color`, `ef_draw_info_mat_color`,
+ *   GUESS: `ef_draw_info_light_mask1`, `ef_draw_info_is_spot_light`, `ef_draw_info_light_mask`,
+ *   GUESS: `ef_draw_info_light_enable`, `ef_set_tex_coord_gen`, `ef_pm_first_eldest`, `ef_pm_first_youngest`,
+ *   GUESS: `ef_pm_next_eldest`, `ef_pm_next_youngest`, `ef_ahead_context_members_ctor`, `ef_strategy_init_basis`
+ *   GUESS: (the unit's static initializer, the `.ctors` entry), and the `ef_strategy_impl_*_str` strings by their text.
  *   GUESS (from the body and its callers): `ef_particle_tex_offset_t`, `ef_particle_tex_offset_s`,
  *   GUESS: `ef_particle_tex_scale_t`, `ef_particle_tex_scale_s`, `ef_particle_wrap_t`, `ef_particle_wrap_s`.
  * RESIDUALS. 4 partial rows:
@@ -81,29 +94,29 @@ extern "C" {
 
 /* This unit's `__FILE__`/assert strings and the `particle.h` assert pairs (its claimed `.data`),
  * declared, never defined. */
-extern char lbl_80594850[]; /* "ef_drawstrategyimpl.cpp"                                    .data 0x80594850 */
-extern char lbl_80594868[]; /* "NW4R:Failed assertion mTexmapMap[0] == 0"                  .data 0x80594868 */
-extern char lbl_80594894[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."         .data 0x80594894 */
-extern char lbl_805948C8[]; /* "...pp->mParameter.mTexture[texIndex](=%p) is not valid..." .data 0x805948C8 */
-extern char lbl_80594918[]; /* "NW4R:Failed assertion false"                              .data 0x80594918 */
-extern char lbl_80594934[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."         .data 0x80594934 */
-extern char lbl_80594968[]; /* "NW4R:Pointer Error\npm->mManagerEM(=%p) is not valid..."  .data 0x80594968 */
-extern char lbl_805949A8[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."    .data 0x805949A8 */
-extern char lbl_805949E4[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."        .data 0x805949E4 */
-extern char lbl_80594A40[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594A40 */
-extern char lbl_80594A70[]; /* "particle.h"                                               .data 0x80594A70 */
-extern char lbl_80594A7C[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594A7C */
-extern char lbl_80594AAC[]; /* "particle.h"                                               .data 0x80594AAC */
-extern char lbl_80594AB8[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594AB8 */
-extern char lbl_80594AE8[]; /* "particle.h"                                               .data 0x80594AE8 */
-extern char lbl_80594AF4[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594AF4 */
-extern char lbl_80594B24[]; /* "particle.h"                                               .data 0x80594B24 */
-extern char lbl_80594B30[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594B30 */
-extern char lbl_80594B60[]; /* "particle.h"                                               .data 0x80594B60 */
-extern char lbl_80594B6C[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594B6C */
-extern char lbl_80594B9C[]; /* "particle.h"                                               .data 0x80594B9C */
+extern char ef_strategy_impl_file_str[]; /* "ef_drawstrategyimpl.cpp"                                    .data 0x80594850 */
+extern char ef_strategy_impl_texmap_assert_str[]; /* "NW4R:Failed assertion mTexmapMap[0] == 0"                  .data 0x80594868 */
+extern char ef_strategy_impl_pp_assert_str[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."         .data 0x80594894 */
+extern char ef_strategy_impl_texture_assert_str[]; /* "...pp->mParameter.mTexture[texIndex](=%p) is not valid..." .data 0x805948C8 */
+extern char ef_strategy_impl_false_assert_str[]; /* "NW4R:Failed assertion false"                              .data 0x80594918 */
+extern char ef_strategy_impl_pm_assert_str[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."         .data 0x80594934 */
+extern char ef_strategy_impl_manager_em_assert_str[]; /* "NW4R:Pointer Error\npm->mManagerEM(=%p) is not valid..."  .data 0x80594968 */
+extern char ef_strategy_impl_resource_assert_str[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."    .data 0x805949A8 */
+extern char ef_strategy_impl_ed_assert_str[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."        .data 0x805949E4 */
+extern char ef_strategy_impl_layer_assert_str0[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594A40 */
+extern char ef_strategy_impl_particle_h_str0[]; /* "particle.h"                                               .data 0x80594A70 */
+extern char ef_strategy_impl_layer_assert_str1[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594A7C */
+extern char ef_strategy_impl_particle_h_str1[]; /* "particle.h"                                               .data 0x80594AAC */
+extern char ef_strategy_impl_layer_assert_str2[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594AB8 */
+extern char ef_strategy_impl_particle_h_str2[]; /* "particle.h"                                               .data 0x80594AE8 */
+extern char ef_strategy_impl_layer_assert_str3[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594AF4 */
+extern char ef_strategy_impl_particle_h_str3[]; /* "particle.h"                                               .data 0x80594B24 */
+extern char ef_strategy_impl_layer_assert_str4[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594B30 */
+extern char ef_strategy_impl_particle_h_str4[]; /* "particle.h"                                               .data 0x80594B60 */
+extern char ef_strategy_impl_layer_assert_str5[]; /* "NW4R:Failed assertion layer >= 0 && layer < 3"             .data 0x80594B6C */
+extern char ef_strategy_impl_particle_h_str5[]; /* "particle.h"                                               .data 0x80594B9C */
 
-EfAheadContext* fn_800C9434(EfAheadContext* self);
+EfAheadContext* ef_ahead_context_members_ctor(EfAheadContext* self);
 
 }  // extern "C"
 
@@ -216,7 +229,7 @@ void DrawStrategyImpl::InitTexture(const EfEmitterDrawSetting& setting) {
 extern "C" {
 
 /* 0x800C64AC (0x38): reads the fog record out of the view state. */
-void fn_800C64AC(const EfDrawInfo* self, s32* type, f32* start_z, f32* end_z, f32* near_z, f32* far_z,
+void ef_draw_info_get_fog(const EfDrawInfo* self, s32* type, f32* start_z, f32* end_z, f32* near_z, f32* far_z,
                  GXColor* color) {
     *type = self->fog_type;
     *start_z = self->fog_start_z;
@@ -253,7 +266,7 @@ void DrawStrategyImpl::InitTev(const EfEmitterDrawSetting& setting, const EfDraw
         GXSetTevSwapMode(i, 0, 0);
         if (setting.tev_texture[i] == 0) {
             if (!(mTexmapMap[0] == 0)) {
-                nw4r::db::Panic(lbl_80594850, 134, lbl_80594868);
+                nw4r::db::Panic(ef_strategy_impl_file_str, 134, ef_strategy_impl_texmap_assert_str);
             }
             GXSetTevOrder(i, 0, 0, 4);
         } else if (setting.tev_texture[i] == 1) {
@@ -295,7 +308,7 @@ void DrawStrategyImpl::InitTev(const EfEmitterDrawSetting& setting, const EfDraw
         f32 far_z;
         GXColor color;
 
-        fn_800C64AC(&info, &type, &start_z, &end_z, &near_z, &far_z, &color);
+        ef_draw_info_get_fog(&info, &type, &start_z, &end_z, &near_z, &far_z, &color);
         GXSetFog(type, start_z, end_z, near_z, far_z, color);
     } else {
         GXColor color = {0, 0, 0, 0};
@@ -341,25 +354,25 @@ void DrawStrategyImpl::InitColor(EfDrawParticleManager* pm, const EfEmitterDrawS
     mPrevAlphaRef0 = -1;
     mPrevAlphaRef1 = -1;
     GXSetNumChans(1);
-    if (!fn_800C68E0(&info)) {
+    if (!ef_draw_info_light_enable(&info)) {
         GXSetChanCtrl(4, 0, 0, 0, 0, 0, 2);
     } else {
         if (setting.color_ras == 1) {
-            GXAttnFn attn = fn_800C68D0(&info) ? GX_AF_SPOT : GX_AF_NONE;
-            GXSetChanCtrl(0, 1, 0, 0, fn_800C68D8(&info), 0, attn);
+            GXAttnFn attn = ef_draw_info_is_spot_light(&info) ? GX_AF_SPOT : GX_AF_NONE;
+            GXSetChanCtrl(0, 1, 0, 0, ef_draw_info_light_mask(&info), 0, attn);
         } else {
             GXSetChanCtrl(0, 0, 0, 0, 0, 0, 2);
         }
         if (setting.alpha_ras == 1) {
-            GXAttnFn attn = fn_800C68D0(&info) ? GX_AF_SPOT : GX_AF_NONE;
-            GXSetChanCtrl(2, 1, 0, 0, fn_800C68C8(&info), 0, attn);
+            GXAttnFn attn = ef_draw_info_is_spot_light(&info) ? GX_AF_SPOT : GX_AF_NONE;
+            GXSetChanCtrl(2, 1, 0, 0, ef_draw_info_light_mask1(&info), 0, attn);
         } else {
             GXSetChanCtrl(2, 0, 0, 0, 0, 0, 2);
         }
     }
     GXSetChanCtrl(5, 0, 0, 0, 0, 0, 2);
-    GXSetChanMatColor(4, *fn_800C68C0(&info));
-    GXSetChanAmbColor(4, *fn_800C68B8(&info));
+    GXSetChanMatColor(4, *ef_draw_info_mat_color(&info));
+    GXSetChanAmbColor(4, *ef_draw_info_amb_color(&info));
 
     mUseColor[0][0] = false;
     mUseColor[0][1] = false;
@@ -384,33 +397,33 @@ void DrawStrategyImpl::InitColor(EfDrawParticleManager* pm, const EfEmitterDrawS
 
 extern "C" {
 
-/* 0x800C68B8 (0x8): the material colour of the view state. */
-const GXColor* fn_800C68B8(const EfDrawInfo* self) {
+/* 0x800C68B8 (0x8): the view state's `amb_color` field. */
+const GXColor* ef_draw_info_amb_color(const EfDrawInfo* self) {
     return &self->amb_color;
 }
 
-/* 0x800C68C0 (0x8): the ambient colour of the view state. */
-const GXColor* fn_800C68C0(const EfDrawInfo* self) {
+/* 0x800C68C0 (0x8): the view state's `mat_color` field. */
+const GXColor* ef_draw_info_mat_color(const EfDrawInfo* self) {
     return &self->mat_color;
 }
 
 /* 0x800C68C8 (0x8): the GX_COLOR1A1 light bitmask of the view state. */
-u32 fn_800C68C8(const EfDrawInfo* self) {
+u32 ef_draw_info_light_mask1(const EfDrawInfo* self) {
     return self->light_mask1;
 }
 
 /* 0x800C68D0 (0x8): whether the light is a spot light. */
-bool fn_800C68D0(const EfDrawInfo* self) {
+bool ef_draw_info_is_spot_light(const EfDrawInfo* self) {
     return self->is_spot_light;
 }
 
 /* 0x800C68D8 (0x8): the GX_COLOR0 light bitmask of the view state. */
-u32 fn_800C68D8(const EfDrawInfo* self) {
+u32 ef_draw_info_light_mask(const EfDrawInfo* self) {
     return self->light_mask;
 }
 
 /* 0x800C68E0 (0x8): whether lighting is on for the draw. */
-bool fn_800C68E0(const EfDrawInfo* self) {
+bool ef_draw_info_light_enable(const EfDrawInfo* self) {
     return self->light_enable;
 }
 
@@ -419,40 +432,40 @@ bool fn_800C68E0(const EfDrawInfo* self) {
 /* The out-of-line GX FIFO writers, 0x800C6F90..0x800C7250: one copy per component count and store width.  The
  * dummy primitive below calls them. */
 extern "C" {
-void fn_800C6F90(void);
-void fn_800C6F94(u16 value);
-void fn_800C6FA4(u8 value);
-void fn_800C6FB4(f32 value);
-void fn_800C6FC0(s16 value);
-void fn_800C6FD0(u16 value);
-void fn_800C6FE0(s8 value);
-void fn_800C6FF0(u8 value);
-void fn_800C7000(f32 x, f32 y);
-void fn_800C7010(s16 x, s16 y);
-void fn_800C7028(u16 x, u16 y);
-void fn_800C7040(s8 x, s8 y);
-void fn_800C7058(u8 x, u8 y);
-void fn_800C7070(u16 value);
-void fn_800C7080(u8 value);
-void fn_800C7090(u8 r, u8 g, u8 b, u8 a);
-void fn_800C70B8(u8 r, u8 g, u8 b);
-void fn_800C70D8(u16 value);
-void fn_800C70E8(u8 value);
-void fn_800C70F8(f32 x, f32 y, f32 z);
-void fn_800C710C(s16 x, s16 y, s16 z);
-void fn_800C712C(s8 x, s8 y, s8 z);
-void fn_800C714C(u16 value);
-void fn_800C715C(u8 value);
-void fn_800C716C(f32 x, f32 y);
-void fn_800C717C(s16 x, s16 y);
-void fn_800C7194(u16 x, u16 y);
-void fn_800C71AC(s8 x, s8 y);
-void fn_800C71C4(u8 x, u8 y);
-void fn_800C71DC(f32 x, f32 y, f32 z);
-void fn_800C71F0(s16 x, s16 y, s16 z);
-void fn_800C7210(u16 x, u16 y, u16 z);
-void fn_800C7230(s8 x, s8 y, s8 z);
-void fn_800C7250(u8 x, u8 y, u8 z);
+void GXEnd(void);
+void GXTexCoord1x16(u16 value);
+void GXTexCoord1x8(u8 value);
+void GXTexCoord1f32(f32 value);
+void GXTexCoord1s16(s16 value);
+void GXTexCoord1u16(u16 value);
+void GXTexCoord1s8(s8 value);
+void GXTexCoord1u8(u8 value);
+void GXTexCoord2f32(f32 x, f32 y);
+void GXTexCoord2s16(s16 x, s16 y);
+void GXTexCoord2u16(u16 x, u16 y);
+void GXTexCoord2s8(s8 x, s8 y);
+void GXTexCoord2u8(u8 x, u8 y);
+void GXColor1x16(u16 value);
+void GXColor1x8(u8 value);
+void GXColor4u8(u8 r, u8 g, u8 b, u8 a);
+void GXColor3u8(u8 r, u8 g, u8 b);
+void GXNormal1x16(u16 value);
+void GXNormal1x8(u8 value);
+void GXNormal3f32(f32 x, f32 y, f32 z);
+void GXNormal3s16(s16 x, s16 y, s16 z);
+void GXNormal3s8(s8 x, s8 y, s8 z);
+void GXPosition1x16(u16 value);
+void GXPosition1x8(u8 value);
+void GXPosition2f32(f32 x, f32 y);
+void GXPosition2s16(s16 x, s16 y);
+void GXPosition2u16(u16 x, u16 y);
+void GXPosition2s8(s8 x, s8 y);
+void GXPosition2u8(u8 x, u8 y);
+void GXPosition3f32(f32 x, f32 y, f32 z);
+void GXPosition3s16(s16 x, s16 y, s16 z);
+void GXPosition3u16(u16 x, u16 y, u16 z);
+void GXPosition3s8(s8 x, s8 y, s8 z);
+void GXPosition3u8(u8 x, u8 y, u8 z);
 }
 
 namespace nw4r {
@@ -476,7 +489,7 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
     bool flush;
 
     if (!IsValidPointer((u32)pp)) {
-        nw4r::db::Panic(lbl_80594850, 368, lbl_80594894, pp);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 368, ef_strategy_impl_pp_assert_str, pp);
     }
 
     alpha_dirty = SetupGPAlpha(pp, setting, first);
@@ -518,48 +531,48 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
                 case 1:
                     switch (pos.comp) {
                     case 0:
-                        fn_800C7250(0, 0, 0);
+                        GXPosition3u8(0, 0, 0);
                         break;
                     case 1:
-                        fn_800C7230(0, 0, 0);
+                        GXPosition3s8(0, 0, 0);
                         break;
                     case 2:
-                        fn_800C7210(0, 0, 0);
+                        GXPosition3u16(0, 0, 0);
                         break;
                     case 3:
-                        fn_800C71F0(0, 0, 0);
+                        GXPosition3s16(0, 0, 0);
                         break;
                     case 4:
-                        fn_800C71DC(0.0f, 0.0f, 0.0f);
+                        GXPosition3f32(0.0f, 0.0f, 0.0f);
                         break;
                     }
                     break;
                 case 0:
                     switch (pos.comp) {
                     case 0:
-                        fn_800C71C4(0, 0);
+                        GXPosition2u8(0, 0);
                         break;
                     case 1:
-                        fn_800C71AC(0, 0);
+                        GXPosition2s8(0, 0);
                         break;
                     case 2:
-                        fn_800C7194(0, 0);
+                        GXPosition2u16(0, 0);
                         break;
                     case 3:
-                        fn_800C717C(0, 0);
+                        GXPosition2s16(0, 0);
                         break;
                     case 4:
-                        fn_800C716C(0.0f, 0.0f);
+                        GXPosition2f32(0.0f, 0.0f);
                         break;
                     }
                     break;
                 }
                 break;
             case 2:
-                fn_800C715C(0);
+                GXPosition1x8(0);
                 break;
             case 3:
-                fn_800C714C(0);
+                GXPosition1x16(0);
                 break;
             }
 
@@ -571,23 +584,23 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
                 case 0:
                     switch (nrm.comp) {
                     case 1:
-                        fn_800C712C(0, 0, 0);
+                        GXNormal3s8(0, 0, 0);
                         break;
                     case 3:
-                        fn_800C710C(0, 0, 0);
+                        GXNormal3s16(0, 0, 0);
                         break;
                     case 4:
-                        fn_800C70F8(0.0f, 0.0f, 0.0f);
+                        GXNormal3f32(0.0f, 0.0f, 0.0f);
                         break;
                     }
                     break;
                 }
                 break;
             case 2:
-                fn_800C70E8(0);
+                GXNormal1x8(0);
                 break;
             case 3:
-                fn_800C70D8(0);
+                GXNormal1x16(0);
                 break;
             }
 
@@ -596,18 +609,18 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
                 case 1:
                     switch (clr[c].cnt) {
                     case 0:
-                        fn_800C70B8(0, 0, 0);
+                        GXColor3u8(0, 0, 0);
                         break;
                     case 1:
-                        fn_800C7090(0, 0, 0, 0);
+                        GXColor4u8(0, 0, 0, 0);
                         break;
                     }
                     break;
                 case 2:
-                    fn_800C7080(0);
+                    GXColor1x8(0);
                     break;
                 case 3:
-                    fn_800C7070(0);
+                    GXColor1x16(0);
                     break;
                 }
             }
@@ -620,52 +633,52 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
                 case 1:
                     switch (tex0.comp) {
                     case 0:
-                        fn_800C7058(0, 0);
+                        GXTexCoord2u8(0, 0);
                         break;
                     case 1:
-                        fn_800C7040(0, 0);
+                        GXTexCoord2s8(0, 0);
                         break;
                     case 2:
-                        fn_800C7028(0, 0);
+                        GXTexCoord2u16(0, 0);
                         break;
                     case 3:
-                        fn_800C7010(0, 0);
+                        GXTexCoord2s16(0, 0);
                         break;
                     case 4:
-                        fn_800C7000(0.0f, 0.0f);
+                        GXTexCoord2f32(0.0f, 0.0f);
                         break;
                     }
                     break;
                 case 0:
                     switch (tex0.comp) {
                     case 0:
-                        fn_800C6FF0(0);
+                        GXTexCoord1u8(0);
                         break;
                     case 1:
-                        fn_800C6FE0(0);
+                        GXTexCoord1s8(0);
                         break;
                     case 2:
-                        fn_800C6FD0(0);
+                        GXTexCoord1u16(0);
                         break;
                     case 3:
-                        fn_800C6FC0(0);
+                        GXTexCoord1s16(0);
                         break;
                     case 4:
-                        fn_800C6FB4(0.0f);
+                        GXTexCoord1f32(0.0f);
                         break;
                     }
                     break;
                 }
                 break;
             case 2:
-                fn_800C6FA4(0);
+                GXTexCoord1x8(0);
                 break;
             case 3:
-                fn_800C6F94(0);
+                GXTexCoord1x16(0);
                 break;
             }
         }
-        fn_800C6F90();
+        GXEnd();
     }
 }
 
@@ -680,85 +693,85 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
 extern "C" {
 
 /* Ends the current FIFO command (the SDK's `GXEnd`, which writes nothing). */
-void fn_800C6F90(void) {}
+void GXEnd(void) {}
 
 /* Writes one u16 to the pipe. */
-void fn_800C6F94(u16 value) {
+void GXTexCoord1x16(u16 value) {
     GXWGFifo.u16 = value;
 }
 
 /* Writes one u8 to the pipe. */
-void fn_800C6FA4(u8 value) {
+void GXTexCoord1x8(u8 value) {
     GXWGFifo.u8 = value;
 }
 
 /* Writes one f32 to the pipe. */
-void fn_800C6FB4(f32 value) {
+void GXTexCoord1f32(f32 value) {
     GXWGFifo.f32 = value;
 }
 
 /* Writes one s16 to the pipe. */
-void fn_800C6FC0(s16 value) {
+void GXTexCoord1s16(s16 value) {
     GXWGFifo.s16 = value;
 }
 
 /* Writes one u16 to the pipe. */
-void fn_800C6FD0(u16 value) {
+void GXTexCoord1u16(u16 value) {
     GXWGFifo.u16 = value;
 }
 
 /* Writes one s8 to the pipe. */
-void fn_800C6FE0(s8 value) {
+void GXTexCoord1s8(s8 value) {
     GXWGFifo.s8 = value;
 }
 
 /* Writes one u8 to the pipe. */
-void fn_800C6FF0(u8 value) {
+void GXTexCoord1u8(u8 value) {
     GXWGFifo.u8 = value;
 }
 
 /* Writes a pair of f32 to the pipe. */
-void fn_800C7000(f32 x, f32 y) {
+void GXTexCoord2f32(f32 x, f32 y) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
 }
 
 /* Writes a pair of s16 to the pipe. */
-void fn_800C7010(s16 x, s16 y) {
+void GXTexCoord2s16(s16 x, s16 y) {
     GXWGFifo.s16 = x;
     GXWGFifo.s16 = y;
 }
 
 /* Writes a pair of u16 to the pipe. */
-void fn_800C7028(u16 x, u16 y) {
+void GXTexCoord2u16(u16 x, u16 y) {
     GXWGFifo.u16 = x;
     GXWGFifo.u16 = y;
 }
 
 /* Writes a pair of s8 to the pipe. */
-void fn_800C7040(s8 x, s8 y) {
+void GXTexCoord2s8(s8 x, s8 y) {
     GXWGFifo.s8 = x;
     GXWGFifo.s8 = y;
 }
 
 /* Writes a pair of u8 to the pipe. */
-void fn_800C7058(u8 x, u8 y) {
+void GXTexCoord2u8(u8 x, u8 y) {
     GXWGFifo.u8 = x;
     GXWGFifo.u8 = y;
 }
 
 /* Writes one u16 to the pipe. */
-void fn_800C7070(u16 value) {
+void GXColor1x16(u16 value) {
     GXWGFifo.u16 = value;
 }
 
 /* Writes one u8 to the pipe. */
-void fn_800C7080(u8 value) {
+void GXColor1x8(u8 value) {
     GXWGFifo.u8 = value;
 }
 
 /* Writes four u8 to the pipe (an RGBA colour). */
-void fn_800C7090(u8 r, u8 g, u8 b, u8 a) {
+void GXColor4u8(u8 r, u8 g, u8 b, u8 a) {
     GXWGFifo.u8 = r;
     GXWGFifo.u8 = g;
     GXWGFifo.u8 = b;
@@ -766,113 +779,113 @@ void fn_800C7090(u8 r, u8 g, u8 b, u8 a) {
 }
 
 /* Writes three u8 to the pipe (an RGB colour). */
-void fn_800C70B8(u8 r, u8 g, u8 b) {
+void GXColor3u8(u8 r, u8 g, u8 b) {
     GXWGFifo.u8 = r;
     GXWGFifo.u8 = g;
     GXWGFifo.u8 = b;
 }
 
 /* Writes one u16 to the pipe. */
-void fn_800C70D8(u16 value) {
+void GXNormal1x16(u16 value) {
     GXWGFifo.u16 = value;
 }
 
 /* Writes one u8 to the pipe. */
-void fn_800C70E8(u8 value) {
+void GXNormal1x8(u8 value) {
     GXWGFifo.u8 = value;
 }
 
 /* Writes three f32 to the pipe. */
-void fn_800C70F8(f32 x, f32 y, f32 z) {
+void GXNormal3f32(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
     GXWGFifo.f32 = z;
 }
 
 /* Writes three s16 to the pipe. */
-void fn_800C710C(s16 x, s16 y, s16 z) {
+void GXNormal3s16(s16 x, s16 y, s16 z) {
     GXWGFifo.s16 = x;
     GXWGFifo.s16 = y;
     GXWGFifo.s16 = z;
 }
 
 /* Writes three s8 to the pipe. */
-void fn_800C712C(s8 x, s8 y, s8 z) {
+void GXNormal3s8(s8 x, s8 y, s8 z) {
     GXWGFifo.s8 = x;
     GXWGFifo.s8 = y;
     GXWGFifo.s8 = z;
 }
 
 /* Writes one u16 to the pipe. */
-void fn_800C714C(u16 value) {
+void GXPosition1x16(u16 value) {
     GXWGFifo.u16 = value;
 }
 
 /* Writes one u8 to the pipe. */
-void fn_800C715C(u8 value) {
+void GXPosition1x8(u8 value) {
     GXWGFifo.u8 = value;
 }
 
 /* Writes a pair of f32 to the pipe. */
-void fn_800C716C(f32 x, f32 y) {
+void GXPosition2f32(f32 x, f32 y) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
 }
 
 /* Writes a pair of s16 to the pipe. */
-void fn_800C717C(s16 x, s16 y) {
+void GXPosition2s16(s16 x, s16 y) {
     GXWGFifo.s16 = x;
     GXWGFifo.s16 = y;
 }
 
 /* Writes a pair of u16 to the pipe. */
-void fn_800C7194(u16 x, u16 y) {
+void GXPosition2u16(u16 x, u16 y) {
     GXWGFifo.u16 = x;
     GXWGFifo.u16 = y;
 }
 
 /* Writes a pair of s8 to the pipe. */
-void fn_800C71AC(s8 x, s8 y) {
+void GXPosition2s8(s8 x, s8 y) {
     GXWGFifo.s8 = x;
     GXWGFifo.s8 = y;
 }
 
 /* Writes a pair of u8 to the pipe. */
-void fn_800C71C4(u8 x, u8 y) {
+void GXPosition2u8(u8 x, u8 y) {
     GXWGFifo.u8 = x;
     GXWGFifo.u8 = y;
 }
 
 /* Writes three f32 to the pipe. */
-void fn_800C71DC(f32 x, f32 y, f32 z) {
+void GXPosition3f32(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = x;
     GXWGFifo.f32 = y;
     GXWGFifo.f32 = z;
 }
 
 /* Writes three s16 to the pipe. */
-void fn_800C71F0(s16 x, s16 y, s16 z) {
+void GXPosition3s16(s16 x, s16 y, s16 z) {
     GXWGFifo.s16 = x;
     GXWGFifo.s16 = y;
     GXWGFifo.s16 = z;
 }
 
 /* Writes three u16 to the pipe. */
-void fn_800C7210(u16 x, u16 y, u16 z) {
+void GXPosition3u16(u16 x, u16 y, u16 z) {
     GXWGFifo.u16 = x;
     GXWGFifo.u16 = y;
     GXWGFifo.u16 = z;
 }
 
 /* Writes three s8 to the pipe. */
-void fn_800C7230(s8 x, s8 y, s8 z) {
+void GXPosition3s8(s8 x, s8 y, s8 z) {
     GXWGFifo.s8 = x;
     GXWGFifo.s8 = y;
     GXWGFifo.s8 = z;
 }
 
 /* Writes three u8 to the pipe. */
-void fn_800C7250(u8 x, u8 y, u8 z) {
+void GXPosition3u8(u8 x, u8 y, u8 z) {
     GXWGFifo.u8 = x;
     GXWGFifo.u8 = y;
     GXWGFifo.u8 = z;
@@ -886,7 +899,7 @@ namespace ef {
 /* 0x800C7270 (0x188): loads the particle's alpha-compare references unless they are already current. */
 bool DrawStrategyImpl::SetupGPAlpha(EfDrawParticle* pp, const EfEmitterDrawSetting& setting, bool force) {
     if (!IsValidPointer((u32)pp)) {
-        nw4r::db::Panic(lbl_80594850, 591, lbl_80594894, pp);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 591, ef_strategy_impl_pp_assert_str, pp);
     }
     if (force || pp->alpha_ref0 != mPrevAlphaRef0) {
         mPrevAlphaRef0 = pp->alpha_ref0;
@@ -920,7 +933,7 @@ bool DrawStrategyImpl::SetupGPColor(EfDrawParticle* pp, const EfEmitterDrawSetti
     int i;
 
     if (!IsValidPointer((u32)pp)) {
-        nw4r::db::Panic(lbl_80594850, 610, lbl_80594894, pp);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 610, ef_strategy_impl_pp_assert_str, pp);
     }
     dirty = false;
 
@@ -1109,14 +1122,14 @@ bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSet
     int layer;
 
     if (!IsValidPointer((u32)pp)) {
-        nw4r::db::Panic(lbl_80594850, 881, lbl_80594894, pp);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 881, ef_strategy_impl_pp_assert_str, pp);
     }
     loaded = false;
     for (layer = 0; layer < 3; layer++) {
         if (mTexmapMap[layer] >= 0) {
             EfTextureData* tex;
 
-            EF_VALID_PTR_ASSERT(lbl_80594850, 890, lbl_805948C8, pp->texture[layer]);
+            EF_VALID_PTR_ASSERT(ef_strategy_impl_file_str, 890, ef_strategy_impl_texture_assert_str, pp->texture[layer]);
             tex = pp->texture[layer];
             if (tex != NULL) {
                 s32 wrap_s = ef_particle_wrap_s(pp, layer);
@@ -1159,7 +1172,7 @@ bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSet
                                      tex->mipmap_count > 1);
                         break;
                     default:
-                        nw4r::db::Panic(lbl_80594850, 954, lbl_80594918);
+                        nw4r::db::Panic(ef_strategy_impl_file_str, 954, ef_strategy_impl_false_assert_str);
                         break;
                     }
                     GXInitTexObjLOD(&tex_obj, tex->min_filter, tex->mag_filter, 0.0f,
@@ -1268,7 +1281,7 @@ bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSet
                     if (((setting.flags >> (layer + 7)) & 1) == 0) {
                         GXLoadTexMtxImm((const f32(*)[4])mtx34_get_ptr(&mtx), mTexmapMap[layer] * 3 + 30, 1);
                         if (force) {
-                            fn_800C8674(mTexmapMap[layer], 1, 4, mTexmapMap[layer] * 3 + 30);
+                            ef_set_tex_coord_gen(mTexmapMap[layer], 1, 4, mTexmapMap[layer] * 3 + 30);
                         }
                     } else {
                         mtx34_concat(&mtx, ef_draw_info_projection(&info), &mtx);
@@ -1294,7 +1307,7 @@ bool DrawStrategyImpl::SetupGPTexture(EfDrawParticle* pp, const EfEmitterDrawSet
 extern "C" {
 
 /* 0x800C8674 (0xC): writes one texture-coordinate generator and leaves the projective matrix at identity. */
-void fn_800C8674(u32 dst_coord, u32 func, u32 src_param, u32 mtx) {
+void ef_set_tex_coord_gen(u32 dst_coord, u32 func, u32 src_param, u32 mtx) {
     GXSetTexCoordGen2(dst_coord, func, src_param, mtx, 0, 125);
 }
 
@@ -1306,7 +1319,7 @@ s32 ef_particle_tex_offset_t(EfDrawParticle* self, int layer) {
 
     ok = (layer >= 0 && layer < 3);
     if (!ok) {
-        nw4r::db::Panic(lbl_80594B9C, 541, lbl_80594B6C);
+        nw4r::db::Panic(ef_strategy_impl_particle_h_str5, 541, ef_strategy_impl_layer_assert_str5);
     }
     value = 0;
     flags = ((s32)self->texture_reverse >> (layer * 2)) & 3;
@@ -1327,7 +1340,7 @@ s32 ef_particle_tex_offset_s(EfDrawParticle* self, int layer) {
 
     ok = (layer >= 0 && layer < 3);
     if (!ok) {
-        nw4r::db::Panic(lbl_80594B60, 512, lbl_80594B30);
+        nw4r::db::Panic(ef_strategy_impl_particle_h_str4, 512, ef_strategy_impl_layer_assert_str4);
     }
     value = 0;
     flags = ((s32)self->texture_reverse >> (layer * 2)) & 3;
@@ -1348,7 +1361,7 @@ s32 ef_particle_tex_scale_t(EfDrawParticle* self, int layer) {
 
     ok = (layer >= 0 && layer < 3);
     if (!ok) {
-        nw4r::db::Panic(lbl_80594B24, 483, lbl_80594AF4);
+        nw4r::db::Panic(ef_strategy_impl_particle_h_str3, 483, ef_strategy_impl_layer_assert_str3);
     }
     value = 1;
     if (ef_particle_wrap_t(self, layer) == 2) {
@@ -1369,7 +1382,7 @@ s32 ef_particle_tex_scale_s(EfDrawParticle* self, int layer) {
 
     ok = (layer >= 0 && layer < 3);
     if (!ok) {
-        nw4r::db::Panic(lbl_80594AE8, 454, lbl_80594AB8);
+        nw4r::db::Panic(ef_strategy_impl_particle_h_str2, 454, ef_strategy_impl_layer_assert_str2);
     }
     value = 1;
     if (ef_particle_wrap_s(self, layer) == 2) {
@@ -1388,7 +1401,7 @@ s32 ef_particle_wrap_t(EfDrawParticle* self, int layer) {
 
     ok = (layer >= 0 && layer < 3);
     if (!ok) {
-        nw4r::db::Panic(lbl_80594AAC, 414, lbl_80594A7C);
+        nw4r::db::Panic(ef_strategy_impl_particle_h_str1, 414, ef_strategy_impl_layer_assert_str1);
     }
     return ((s32)self->texture_wrap >> (layer * 4 + 2)) & 3;
 }
@@ -1399,7 +1412,7 @@ s32 ef_particle_wrap_s(EfDrawParticle* self, int layer) {
 
     ok = (layer >= 0 && layer < 3);
     if (!ok) {
-        nw4r::db::Panic(lbl_80594A70, 375, lbl_80594A40);
+        nw4r::db::Panic(ef_strategy_impl_particle_h_str0, 375, ef_strategy_impl_layer_assert_str0);
     }
     return ((s32)self->texture_wrap >> (layer * 4)) & 3;
 }
@@ -1412,17 +1425,17 @@ namespace ef {
 /* 0x800C8A48 (0x1C): the walker that starts a draw: the younger particles first for draw order 0. */
 DrawStrategyImpl::GetFirstDrawParticleFunc DrawStrategyImpl::GetGetFirstDrawParticleFunc(int draw_order) {
     if (draw_order == 0) {
-        return fn_800C8B9C;
+        return ef_pm_first_youngest;
     }
-    return fn_800C8A80;
+    return ef_pm_first_eldest;
 }
 
 /* 0x800C8A64 (0x1C): the walker that continues a draw in the same order. */
 DrawStrategyImpl::GetNextDrawParticleFunc DrawStrategyImpl::GetGetNextDrawParticleFunc(int draw_order) {
     if (draw_order == 0) {
-        return fn_800C8DE4;
+        return ef_pm_next_youngest;
     }
-    return fn_800C8CB8;
+    return ef_pm_next_eldest;
 }
 
 }  // namespace ef
@@ -1431,33 +1444,33 @@ DrawStrategyImpl::GetNextDrawParticleFunc DrawStrategyImpl::GetGetNextDrawPartic
 extern "C" {
 
 /* 0x800C8A80 (0x11C): the first particle of the manager's list, eldest first. */
-EfDrawParticle* fn_800C8A80(EfDrawParticleManager* pm) {
+EfDrawParticle* ef_pm_first_eldest(EfDrawParticleManager* pm) {
     if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594850, 1190, lbl_80594934, pm);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 1190, ef_strategy_impl_pm_assert_str, pm);
     }
     return (EfDrawParticle*)ef_pm_last_alive((EfParticleState*)pm);
 }
 
 /* 0x800C8B9C (0x11C): the first particle of the manager's list, youngest first. */
-EfDrawParticle* fn_800C8B9C(EfDrawParticleManager* pm) {
+EfDrawParticle* ef_pm_first_youngest(EfDrawParticleManager* pm) {
     if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594850, 1197, lbl_80594934, pm);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 1197, ef_strategy_impl_pm_assert_str, pm);
     }
     return (EfDrawParticle*)ef_pm_first_alive((EfDrawList*)pm);
 }
 
 /* 0x800C8CB8 (0x12C): the particle after `p`, eldest first. */
-EfDrawParticle* fn_800C8CB8(EfDrawParticleManager* pm, EfDrawParticle* p) {
+EfDrawParticle* ef_pm_next_eldest(EfDrawParticleManager* pm, EfDrawParticle* p) {
     if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594850, 1204, lbl_80594934, pm);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 1204, ef_strategy_impl_pm_assert_str, pm);
     }
     return (EfDrawParticle*)ef_pm_prev_alive(pm, p);
 }
 
 /* 0x800C8DE4 (0x12C): the particle after `p`, youngest first. */
-EfDrawParticle* fn_800C8DE4(EfDrawParticleManager* pm, EfDrawParticle* p) {
+EfDrawParticle* ef_pm_next_youngest(EfDrawParticleManager* pm, EfDrawParticle* p) {
     if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594850, 1211, lbl_80594934, pm);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 1211, ef_strategy_impl_pm_assert_str, pm);
     }
     return (EfDrawParticle*)ef_pm_next_alive(pm, p);
 }
@@ -1474,13 +1487,13 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
     VEC3 axis_y;
     VEC3 center;
 
-    fn_800C9434(this);
+    ef_ahead_context_members_ctor(this);
     if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(lbl_80594850, 1219, lbl_80594934, pm);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 1219, ef_strategy_impl_pm_assert_str, pm);
     }
     view_mtx = view;
     particle_manager = pm;
-    EF_VALID_PTR_ASSERT(lbl_80594850, 1224, lbl_80594968, pm->emitter);
+    EF_VALID_PTR_ASSERT(ef_strategy_impl_file_str, 1224, ef_strategy_impl_manager_em_assert_str, pm->emitter);
     ef_emitter_get_mtx(pm->emitter, &emitter_mtx);
     ef_pm_get_mtx(pm, &manager_mtx);
     mtx34_inverse(&manager_mtx_inv, &manager_mtx);
@@ -1497,10 +1510,10 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
     ef_vec3_transform(&center, &manager_mtx_inv, &center);
     copyVec3(&emitter_center, &center);
 
-    EF_VALID_PTR_ASSERT(lbl_80594850, 1250, lbl_805949A8, pm->resource);
+    EF_VALID_PTR_ASSERT(ef_strategy_impl_file_str, 1250, ef_strategy_impl_resource_assert_str, pm->resource);
     ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
     if (!IsValidPointer((u32)ed)) {
-        nw4r::db::Panic(lbl_80594850, 1253, lbl_805949E4, ed);
+        nw4r::db::Panic(ef_strategy_impl_file_str, 1253, ef_strategy_impl_ed_assert_str, ed);
     }
     if ((s32)ed->type_direction == 5 || (s32)ed->type_direction == 7) {
         VEC3 manager_y;
@@ -1520,7 +1533,7 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
 extern "C" {
 
 /* 0x800C9434 (0x54): the ahead context's member constructors (three matrices, two vectors). */
-EfAheadContext* fn_800C9434(EfAheadContext* self) {
+EfAheadContext* ef_ahead_context_members_ctor(EfAheadContext* self) {
     MTX34_ctor(&self->emitter_mtx);
     MTX34_ctor(&self->manager_mtx);
     MTX34_ctor(&self->manager_mtx_inv);
@@ -1530,7 +1543,7 @@ EfAheadContext* fn_800C9434(EfAheadContext* self) {
 }
 
 /* 0x800C9488 (0xB8): builds the four basis vectors and the identity matrix the strategies start from. */
-void fn_800C9488(void) {
+void ef_strategy_init_basis(void) {
     setVec3(&ef_unit_x_vec, 1.0f, 0.0f, 0.0f);
     setVec3(&ef_unit_y_vec, 0.0f, 1.0f, 0.0f);
     setVec3(&ef_unit_z_vec, 0.0f, 0.0f, 1.0f);

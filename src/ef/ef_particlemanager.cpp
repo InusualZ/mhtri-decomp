@@ -27,6 +27,7 @@
  *   creation frame start.
  *   GUESS: `ef_pm_draw` (0x800ADED8): table slot 7, draws the particles through the manager's draw strategy.
  *   GUESS: `ef_pm_calc_emitter_pos` (0x800ADA5C): a position relative to the emitter, from the three matrices.
+ *   GUESS: `ef_pm_retire_particle` (0x800AB880, nw4r's `RetireParticle`): retires a created particle.
  *   GUESS: `ef_pm_particle_mtx` (0x800AE698): the static matrix the colour fade takes a particle's position with.
  *   GUESS: `ef_pm_err_pp`, `ef_pm_err_color_pri`, `ef_pm_err_color_sec`, `ef_pm_f32_epsilon`, `ef_pm_f32_256`
  *   (the colour fade's assert messages and constants, named from their text and value).
@@ -534,7 +535,7 @@ extern "C" s32 fn_800AB740(EfPmManager* self, EfPmParticle* target) {
 }
 
 /* Retire `target` from the manager's list if it is in the created state. */
-extern "C" s32 fn_800AB880(EfPmManager* self, EfPmParticle* target) {
+extern "C" s32 ef_pm_retire_particle(EfPmManager* self, EfPmParticle* target) {
 #line 72
     NW4R_POINTER_ASSERT(lbl_80592F78, target, lbl_80592F90);
 #line 73
@@ -553,7 +554,7 @@ extern "C" s32 fn_800AB9F4(EfPmManager* self) {
     while (node != NULL) {
         EfPmParticle* next = *(EfPmParticle**)((u8*)node + self->list.linkOffset + 4);
         if (node->state == 1)
-            total += fn_800AB880(self, node);
+            total += ef_pm_retire_particle(self, node);
         node = next;
     }
     return total;
@@ -1109,7 +1110,7 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
             copyVec3(&p->prevPos, &p->accel);
             ef_pm_handle(&handle, self);
             if ((ef_emitter_tex_flags(&handle)[3] & 1) == 0 && p->lifeTime <= p->age) {
-                fn_800AB880(self, p);
+                ef_pm_retire_particle(self, p);
             } else {
                 nw4r::math::VEC3 addVel;
                 nw4r::math::VEC3 addPos;
@@ -1307,7 +1308,7 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                                                     (EfPostFieldInfo*)pf, pfEffect, &emMtx, &pmInv, &pos,
                                                     addPos, &newVel, &killed);
                     if (killed != 0) {
-                        fn_800AB880(self, p);
+                        ef_pm_retire_particle(self, p);
                         break;
                     }
                     if (moved != 0) {
