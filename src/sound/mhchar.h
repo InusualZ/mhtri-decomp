@@ -7,4 +7,15 @@
 
 #include "pl.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x800E31E8 - the model's node count (a tail call into `ResMdl::GetResNodeNumEntries`).  GUESS name. */
+int mhchar_node_count(MHchar* self);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_SOUND_MHCHAR_H */

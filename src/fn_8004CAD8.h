@@ -293,6 +293,8 @@ void rotMatrixZ(u32 angle, MTX34* m);
  * `ef/eft053.cpp` and `Pl/pl_act.cpp` (which declared its own copy before this header carried it). */
 struct _CP_VECTOR;
 void cpSetRotMatrixZXY(_CP_VECTOR* rot, MTX34* mtx);
+/* 0x800508B0 - builds an MTX34 from the rotation triple `rot` (`cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34`). */
+void cpSetRotMatrix(_CP_VECTOR* rot, MTX34* mtx);
 
 /* 0x80050F80 - the squared distance between two 3-float vectors (`fn_8004CAD8.cpp`'s range).  The
  * same signature `ai/fn_802D0F34.h` carries, so a TU including both sees one declaration.  Added

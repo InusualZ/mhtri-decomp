@@ -333,7 +333,7 @@ extern u8 lbl_80791C40[2];
 extern u8 lbl_80791C44[5];
 extern u8 lbl_80791C50[8];
 /* The lobby NPC band's own `.sdata2` pool (`src/lobby/fn_802029B4.cpp`'s state machines hand these to
- * `fn_801FE1CC` as its motion speed/base pair).  The run is unclaimed, so the band header is their
+ * `lb_npc_motion_play` as its motion speed/base pair).  The run is unclaimed, so the band header is their
  * home; the names are the map's own. */
 extern f32 lbl_8079999C;
 extern f32 lbl_807999A0;

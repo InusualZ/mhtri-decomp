@@ -58,7 +58,6 @@ s32 Gunner_opt_ok_ck(_EQUIP* equip);
 void fn_800D0754(u8 value);
 void fn_800DCFE4(void);
 const u16* get_menu_lsp_tbl(u16 id);
-void lb_npc_talk_mode_set(void* slot, s32 value);
 s32 lb_menu_step(u8 a, s32 b, s32 c, s32 d);
 
 void fn_8021B94C(void);
@@ -480,13 +479,13 @@ extern "C" void fn_8021D188(LbMenuSlot* slot, s32 id) {
         if ((u16)id != 184) {
             return;
         }
-        lb_npc_talk_mode_set(slot, 2);
+        lb_npc_talk_mode_set((struct _LB_NPC*)slot, 2);
         return;
     case 15:
         if ((u16)id != 208) {
             return;
         }
-        lb_npc_talk_mode_set(slot, 0);
+        lb_npc_talk_mode_set((struct _LB_NPC*)slot, 0);
         return;
     default:
         return;
