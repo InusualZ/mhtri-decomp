@@ -13,6 +13,15 @@ extern "C" {
 /* 0x804CB380 - records a library's version string with the OS. */
 void OSRegisterVersion(const char* version);
 
+/* 0x804CA0A0 - the console type word (the top nibble selects retail / development hardware). */
+u32 OSGetConsoleType(void);
+
+/* 0x804CB370 - the DI configuration byte (0xFF when no drive configuration was reported). */
+u32 __OSGetDIConfig(void);
+
+/* 0x807952C8 - set when the title was started from the IPL. */
+extern BOOL __OSInIPL;
+
 /* 0x804CB420 - which kind of title is running (the SDK's `OS_APP_TYPE_*` values). */
 u8 OSGetAppType(void);
 

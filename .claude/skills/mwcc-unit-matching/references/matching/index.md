@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (99)
+## Ideas that work (101)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -108,6 +108,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 112 | [A table's source position fixes its .data order against the switch tables of the functions that use it](112-data-source-order.md) | works | data, source-shape, sections | A unit's `.data` holds the right tables and the right switch tables but in another order, and the functions that use the tables load them through a section-anchor base where retail loads each by name - the tables were... |
 | 113 | [bss symbol order follows first use in emitted code, so a unit can link to a different DOL while every row is 100 percent](113-bss-symbol-order-follows.md) | works | data, sections, measurement | Every row is 100 percent and flipcheck says READY, yet the flip moves the DOL hash because two .bss objects swapped places |
 | 114 | [A C const global is folded into a pool literal: declare it extern before the bodies and define it after them](114-c-const-global-is.md) | works | data, sections, source-shape | A unit whose asm and C bodies load the same named `.sdata2` constants emits extra anonymous pool entries (`@NNN`) beside the named ones, so .sdata2 grows |
+| 115 | [A hardware register block declared with the absolute-address declarator compiles to lis+add with no relocation](115-hardware-register-block-declared.md) | works | data, source-shape, relocations | Indexed hardware-register access shows `lis rX,hi ; add ; lwz lo(rY)` in the target but `addis rY,rY,hi ; lwz lo(rY)` from a cast constant |
+| 116 | [A flipped unit's statics land in reverse definition order, an unreferenced tail is stripped, and a short .text shifts the unflipped successor](116-flipped-units-statics-land.md) | works | data, linker | A unit at 100 % with flipcheck READY (or only a trailing-pad note) moves the DOL hash when flipped, and the zero-filled .sbss/.bss hides the cause |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

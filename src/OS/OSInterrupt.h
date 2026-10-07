@@ -5,6 +5,7 @@
 #define OS_OSINTERRUPT_H
 
 #include "types.h"
+#include "OS/OSContext.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,6 +14,17 @@ extern "C" {
 BOOL OSDisableInterrupts(void);
 
 void OSRestoreInterrupts(BOOL level);
+
+/* The handler of one interrupt source; `interrupt` is the source index, `context` the interrupted context. */
+typedef void (*__OSInterruptHandler)(s16 interrupt, OSContext* context);
+
+/* 0x804D0CE0 - installs a handler and returns the previous one. */
+__OSInterruptHandler __OSSetInterruptHandler(s16 interrupt, __OSInterruptHandler handler);
+/* 0x804D0D00 - the handler installed for an interrupt source. */
+__OSInterruptHandler __OSGetInterruptHandler(s16 interrupt);
+/* 0x804D1040 / 0x804D10C0 - mask / unmask a set of interrupt sources; return the previous mask. */
+u32 __OSMaskInterrupts(u32 mask);
+u32 __OSUnmaskInterrupts(u32 mask);
 
 #ifdef __cplusplus
 }
