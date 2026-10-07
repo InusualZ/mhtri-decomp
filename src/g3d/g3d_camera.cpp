@@ -4,7 +4,8 @@
  * RANGE. .text 0x800746DC-0x80075DCC (27 functions); extab, extabindex, .data 0x8058E430-0x8058E570 (opens on
  *   "g3d_camera.cpp", read from fn_800746DC on), .sdata2 0x80795DC8-0x80795DF8.  The six accessors
  *   res_mdl_info_num_view_mtx..fn_800746D4 before it (no data references) sit in `g3d/g3d_calcworld.cpp` by the candidate cut.
- * NAMES. Map stems, plus the three `nw4r::g3d::Camera` members the map carries mangled (`SetPosition`, `SetPosture`,
+ * NAMES. camera_init is a GUESS (the evidence follows).
+ *   Map stems, plus the three `nw4r::g3d::Camera` members the map carries mangled (`SetPosition`, `SetPosture`,
  *   `SetPerspective`, `GetCameraMtx`); MTX44_ctor is a GUESS (0x80075390: the empty 4x4 matrix constructor, the MTX34_ctor scheme).
  * RESIDUALS. Partial (15): fn_80074758, `Camera::SetPosition`, `Camera::SetPosture`, 0x80074D78-0x80074FEC (three),
  *   fn_8007507C, fn_80075258, 0x80075394-0x80075844 (six, `Camera::GetCameraMtx` first), fn_80075940.
@@ -119,52 +120,6 @@ struct ProjParams {
     /* +0x18 */ f32 mUnk18;
 }; /* size: 0x1C */
 
-/* The camera payload `Camera::mpData` points at (`g3d_camera.cpp`'s `CameraData`). The 0x70 flag word
- * records which posture/projection branch is current. */
-struct CameraData {
-    /* +0x00 */ f32 mViewMtx[3][4];
-    /* +0x30 */ f32 mProjMtx[3][4];
-    /* +0x60 */ u32 mUnk60[4];
-    /* +0x70 */ u32 mFlags;
-    /* +0x74 */ f32 mPosX;
-    /* +0x78 */ f32 mPosY;
-    /* +0x7C */ f32 mPosZ;
-    /* +0x80 */ f32 mTargetX;
-    /* +0x84 */ f32 mTargetY;
-    /* +0x88 */ f32 mTargetZ;
-    /* +0x8C */ f32 mUpX;
-    /* +0x90 */ f32 mUpY;
-    /* +0x94 */ f32 mUpZ;
-    /* +0x98 */ f32 mUnk98;
-    /* +0x9C */ f32 mUnk9C;
-    /* +0xA0 */ f32 mUnkA0;
-    /* +0xA4 */ f32 mUnkA4;
-    /* +0xA8 */ s32 mProjType;
-    /* +0xAC */ f32 mProjA;
-    /* +0xB0 */ f32 mProjB;
-    /* +0xB4 */ f32 mProjC;
-    /* +0xB8 */ f32 mProjD;
-    /* +0xBC */ f32 mUnkBC;
-    /* +0xC0 */ f32 mUnkC0;
-    /* +0xC4 */ f32 mUnkC4;
-    /* +0xC8 */ f32 mUnkC8;
-    /* +0xCC */ f32 mUnkCC;
-    /* +0xD0 */ f32 mUnkD0;
-    /* +0xD4 */ f32 mUnkD4;
-    /* +0xD8 */ f32 mUnkD8;
-    /* +0xDC */ f32 mViewportX;
-    /* +0xE0 */ f32 mViewportY;
-    /* +0xE4 */ f32 mViewportW;
-    /* +0xE8 */ f32 mViewportH;
-    /* +0xEC */ f32 mViewportNear;
-    /* +0xF0 */ f32 mViewportFar;
-    /* +0xF4 */ s32 mScissorX;
-    /* +0xF8 */ s32 mScissorY;
-    /* +0xFC */ s32 mScissorW;
-    /* +0x100 */ s32 mScissorH;
-    /* +0x104 */ s32 mScissorOffsetX;
-    /* +0x108 */ s32 mScissorOffsetY;
-}; /* size: 0x10C */
 
 /* `nw4r::g3d::Camera` itself lives in `g3d/g3d_camera_types.h` (rule 1: its consumers include the same one). */
 
@@ -176,7 +131,7 @@ extern "C" {
 
 CameraData* fn_800748E4(nw4r::g3d::Camera* pSelf);
 CameraData* fn_80074A54(nw4r::g3d::Camera* pSelf);
-void fn_800746DC(nw4r::g3d::Camera* pSelf);
+void camera_init(nw4r::g3d::Camera* pSelf);
 void fn_80074758(nw4r::g3d::Camera* pSelf, u16 a1, u16 a2, u16 a3, u16 a4, u16 a5, u16 a6);
 void fn_800749C8(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut);
 void fn_80074AA8(nw4r::g3d::Camera* pSelf, f32* pX, f32* pY, f32* pZ);
@@ -219,7 +174,7 @@ CameraData* fn_80074A54(nw4r::g3d::Camera* pSelf) {
 }
 
 /* Reset every camera field from the current render mode. */
-void fn_800746DC(nw4r::g3d::Camera* pSelf) {
+void camera_init(nw4r::g3d::Camera* pSelf) {
     RenderModeObj* pMode = (RenderModeObj*)g3d_state_get_render_mode();
     if (pMode == NULL) {
         nw4r::db::Panic(lbl_8058E430, 50, lbl_8058E440);
