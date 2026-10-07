@@ -2,7 +2,11 @@
  * menu/menu_result.h - `menu/menu_result.cpp`'s records and outbound declarations.  `QResultScreen` is the 0x350C-byte
  *   result-screen work the quest move work's `result_buffer_0x150` points at (`q_result_work_clear` zeroes exactly
  *   that much); `QResultHuntRec` is one row of its hunted-monster size table.  `q_result_msg_adrs` is the unit's own
- *   `.bss`; every callee comes from its owner's header.
+ *   `.bss`; every callee comes from its owner's header.  The box band's records (`_multi_result_work`, the box grids)
+ *   sit after the screen: the screen keeps four of the 0x18-byte `_multi_result_work` records at +0x33DC, and its
+ *   `work` pointer leads back to the screen whose box grids sit at +0x3070/+0x3130 (`MultiResultBoxGrids`; `QResultScreen`
+ *   names them `grid_entries`/`list_entries`).  `_multi_result_work` keeps the original struct name the map's
+ *   `...__FP18_multi_result_work` spells (`18` is its length).
  */
 #ifndef MHTRI_MENU_MENU_RESULT_H
 #define MHTRI_MENU_MENU_RESULT_H
@@ -117,6 +121,58 @@ typedef struct QResultScreen {
     /* +0x33DC */ u8 box_records[0x350C - 0x33DC];  /* the box band's player records (`MultiResultRecordArray`) */
 } QResultScreen; /* size: 0x350C */
 
+/* One 4-byte slot of a box grid: the item id and how many of it are left.  Both fields are read by
+ * `multi_box_rem_exist_ck` (`lhz` + `lha`) and written by `fn_8039D490` (both halves zeroed).
+ * size: 0x4 */
+typedef struct MultiResultBoxItem {
+    /* +0x00 */ u16 item_id;
+    /* +0x02 */ s16 count;
+} MultiResultBoxItem; /* size: 0x4 */
+
+/* The two 16-slot box grids the screen keeps at +0x3070 ("my box") and +0x3130 ("the others"), as
+ * this unit's functions index them.  size: 0x3170 (a *view*: the screen object continues) */
+typedef struct MultiResultBoxGrids {
+    /* +0x0000 */ u8 pad_0x0000[0x3070];
+    /* +0x3070 */ MultiResultBoxItem my_box[0x10];
+    /* +0x30B0 */ u8 pad_0x30B0[0x3130 - 0x30B0];
+    /* +0x3130 */ MultiResultBoxItem other_box[0x10];
+} MultiResultBoxGrids; /* size: 0x3170 (approximate - a view of the screen object's two grids) */
+
+/* One player's box record.  The screen keeps an array of them at +0x33DC of its work buffer and
+ * iterates `player_count` of them (stride 0x18, proven by the +0x18 pointer bump in the loop that
+ * calls `multi_box_records_step`).  Every field named here is one this unit's functions touch.
+ * size: 0x18 */
+typedef struct _multi_result_work {
+    /* +0x00 */ u8 state;             /* 0 = choosing, 1 = confirmed, 0xFF = done */
+    /* +0x01 */ u8 player_no;         /* indexes `Psw` (stride 0x350) and `get_vsUser_work` */
+    /* +0x02 */ u8 field_0x02;        /* the box the cursor was on before the step */
+    /* +0x03 */ u8 field_0x03;        /* the box count the cursor steps through */
+    /* +0x04 */ u8 cursor_x;          /* grid cursor, column */
+    /* +0x05 */ u8 cursor_y;          /* grid cursor, row */
+    /* +0x06 */ u8 box_w;             /* the grid's width  (cursor index = x + y * box_w) */
+    /* +0x07 */ u8 box_h;             /* the grid's height */
+    /* +0x08 */ u8 field_0x08;        /* a counter that saturates at 2 */
+    /* +0x09 */ u8 saved_cursor_x;    /* the cursor latched when the box was confirmed */
+    /* +0x0A */ u8 saved_cursor_y;
+    /* +0x0B */ u8 pad_0x0B;
+    /* +0x0C */ s16 field_0x0C;        /* a timer that wraps at 12 */
+    /* +0x0E */ s16 field_0x0E;        /* a timer that wraps at 40 */
+    /* +0x10 */ u32 field_0x10;
+    /* +0x14 */ MultiResultBoxGrids* work; /* the screen object that owns this record */
+} _multi_result_work; /* size: 0x18 */
+
+/* The screen work buffer's record array, as this unit reaches it (past the
+ * `QResultScreen` view, whose size is an approximation).  size: 0x33DC + 4 * 0x18 */
+typedef struct MultiResultRecordArray {
+    /* +0x0000 */ u8 pad_0x0000[0x33DC];
+    /* +0x33DC */ _multi_result_work records[4];
+} MultiResultRecordArray; /* size: 0x343C (a view of the screen object's record array) */
+
+/* The two box helpers whose map names are the range's own manglings stay C++ (the front-end has to
+ * reproduce `...__FP18_multi_result_work`), so they are declared outside the C block. */
+MultiResultBoxItem* multi_box_cursor_item_get(_multi_result_work* box);
+u32 multi_box_rem_exist_ck(_multi_result_work* box);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -159,6 +215,15 @@ BOOL q_result_phase_ck(QResultScreen* self, u8 mode);
  * helpers `menu/multi_result.cpp` drives its box band through. */
 void q_result_phase_enter(QResultScreen* self, s32 phase);
 void q_result_phase_apply(QResultScreen* self);
+
+/* The box band that follows the screen's own rows: the box cursor, the grid credit and the phase latch the screen's
+ * dispatcher drives (GUESS names). */
+u16 multi_box_cursor_index(_multi_result_work* box);
+u32 multi_box_phase_step(QResultScreen* self, u8 mode);
+void multi_box_phase_apply(QResultScreen* self);
+void multi_box_grid_clear(_multi_result_work* box, struct _vs_user_data* user);
+/* `multi_box_phase_step` asks this one whether the screen is ready for the phase it names. */
+u32 multi_box_phase_ck(QResultScreen* self, u8 mode);
 
 #ifdef __cplusplus
 }

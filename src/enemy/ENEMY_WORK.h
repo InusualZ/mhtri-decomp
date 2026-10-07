@@ -545,7 +545,7 @@ struct _ENEMY_WORK {
             /* +0x33B */ u8 kcolor_b_0x33B;
             /* +0x33C */ u8 unused_0x33Ckc[0x354 - 0x33C];
         } em020_kcolor_0x328;
-        /* the em029 program's hit pair (`menu/multi_result.cpp`'s em029 band): the flag the busy action holds this
+        /* the em029 program's hit pair (`enemy/em029_prog.cpp`): the flag the busy action holds this
          * frame and last frame's copy the per-frame slot shifts into it.  size: 0x2C */
         struct {
             /* +0x328 */ u8 hit_0x328;

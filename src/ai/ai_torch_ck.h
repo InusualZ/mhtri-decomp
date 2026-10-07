@@ -1,4 +1,4 @@
-/* Leaf header (docs/plan.md 6.5 rule 2): the `ai/ai_npc.cpp` symbol `menu/multi_result.cpp` calls.  C++ scope: the map row
+/* Leaf header (docs/plan.md 6.5 rule 2): the `ai/ai_npc.cpp` symbol `enemy/em029_prog.cpp` calls.  C++ scope: the map row
  * is the mangling `ai_torch_ck__FP8_AINPC_W`. */
 #ifndef MHTRI_AI_AI_TORCH_CK_H
 #define MHTRI_AI_AI_TORCH_CK_H
