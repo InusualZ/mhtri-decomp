@@ -1,8 +1,8 @@
 /*
  * g3d/g3d_scnmdl.cpp - nw4r g3d `ScnMdl` scene model: its replaced-material (`mReplacement`) buffers, the node
  *   visibility and option accessors, the constructor and destructor, and the `ScnMdl` name-record cluster.
- * RANGE. .text 0x8007C540-0x8007F0E4 (55 functions); extab, extabindex, .data 0x8058EDA0-0x8058F0A0 (opens on
- *   "g3d_scnmdl.cpp"), .sdata 0x80791208-0x80791210.  The left edge is `g3d/fn_80075DCC.cpp`'s cap, not a proven
+ * RANGE. .text 0x8007C540-0x8007F0E4 (55 functions); extab, extabindex, .rodata 0x8056F678-0x8056F688 (the "ScnMdl" name record), .data
+ *   0x8058EDA0-0x8058F0A0 (opens on "g3d_scnmdl.cpp"), .sdata 0x80791208-0x80791210.  The left edge is `g3d/fn_80075DCC.cpp`'s cap, not a proven
  *   seam; tudiscover proves one TU through 0x8007EF1C, and the 0x8007EF1C-0x8007F0E4 tail is here because its head
  *   GetTypeObj reads the "ScnMdl" name record (scn_typename_ScnMdl), which only the class's own TU registers.
  * NAMES. res_gen_mode_end_edit is a GUESS; res_mat_misc_end_edit is a GUESS; res_mat_pix_end_edit is a GUESS;
@@ -24,8 +24,8 @@
  *   are `g3d/g3d_scnobj.h`'s.
  * RESIDUALS. Partial: RemoveAnmObj(AnmObj*) (the vertex-position loop's counter and destination swap r27/r28; its
  *   extab saved-register byte differs with it).
- *   flipcheck: `.data` and `.sdata` are claimed and not emitted; the
- *   "ScnMdl" name record (`.rodata` 0x8056F678) has no registered owner.
+ *   flipcheck: `.rodata` (the "ScnMdl" name record, declared not defined), `.data` and `.sdata` are claimed and not
+ *   emitted.
  * SHAPES. The handle copies retail calls out of line (res_mat_copy_ctor, res_tex_obj_copy_ctor, ...) are explicit calls
  *   on `ResHandle` locals, declared in Construct/G3dProcCalcMat/InitBuffer order so the stack slots match; a
  *   by-value handle word the callee returns becomes a `HandleTemp` class temporary, whose address is then taken.
@@ -57,7 +57,7 @@
 #include "g3d/g3d_calcmaterial.h" /* res_*_end_edit (rule 2) */
 #include "g3d/g3d_anmtexsrt.h"   /* nw4r::g3d::AnmObjTexSrt (rule 1) */
 #include "g3d/res_mat_chan_copy_ctor.h" /* res_mat_chan_copy_ctor (rule 2: owner fn_80059550.cpp) */
-#include "unsplit/g3d.h"           /* scn_typename_ScnMdl, no registered owner (rule 2) */
+#include "unsplit/g3d.h"
 
 #pragma peephole off
 

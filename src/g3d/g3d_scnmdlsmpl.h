@@ -15,6 +15,9 @@
 extern "C" {
 #endif
 
+/* 0x8056F688 - the "ScnMdlSimple" type-name record (`.rodata`: a length word, then the NUL-terminated name) the
+ * class's run-time type members read. */
+extern u8 scn_typename_ScnMdlSimple[];
 /* The callback-timing setter and the world-callback destructor the game's model users call (C linkage while
  * their consumers spell the stems). */
 void fn_80080B10(void* arg0, u32 arg1);

@@ -60,6 +60,8 @@ void GXLoadTexObj(GXTexObj* obj, u32 id);
  * 0x804BA510, GXLoadPosMtxIndx, GXLoadNrmMtxImm 0x804BA590, GXLoadNrmMtxIndx3x3); `g3d/g3d_state.cpp`'s shape load
  * calls both with (matrix index, 0). */
 void GXLoadPosMtxIndx(u16 mtxIndx, u32 id);
+/* 0x804BA590 - loads a 3x4 matrix into the XF normal-matrix block of slot `id`. */
+void GXLoadNrmMtxImm(const f32 mtx[][4], u32 id);
 void GXLoadNrmMtxIndx3x3(u16 mtxIndx, u32 id);
 /* The fog, blend and TEV setters the nw4r character writer drives. */
 void GXSetFog(u32 type, f32 startz, f32 endz, f32 nearz, f32 farz, GXColor color);

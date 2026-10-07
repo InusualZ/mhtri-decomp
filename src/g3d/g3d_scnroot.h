@@ -22,6 +22,9 @@ public:
 extern "C" {
 #endif
 
+/* 0x8056F6D0 - the "ScnRoot" type-name record (`.rodata`: a length word, then the NUL-terminated name) the class's
+ * run-time type members read. */
+extern const char scn_typename_ScnRoot[];
 void VEC2_ctor(void* p); /* 0x800834F0 - constructs one 8-byte sub-object (ef_particle's parameter record) */
 u16 fn_80082F18(f32 value); /* 0x80082F18 - the frame-round helper (callers: g3d_resanm.c, g3d_resanmchr.cpp) */
 s32 fn_80082BCC(s32 model); /* 0x80082BCC - the camera handle lookup (callers: eft019.cpp, em_effect_ctrl.cpp) */
