@@ -10,9 +10,10 @@
 extern "C" {
 #endif
 
-/* One consumption record of a ticket. size: 0x8 (layout not reconstructed) */
+/* One consumption record of a ticket: what a limit of the same index has used up. size: 0x8 */
 typedef struct ESConsumption {
-    /* +0x0 */ u8 pad_0x0[8];
+    /* +0x0 */ u32 kind;
+    /* +0x4 */ u32 used;
 } ESConsumption;
 
 /* A ticket as the ES keeps it. size: 0x2A4 (layout not reconstructed) */
@@ -20,9 +21,21 @@ typedef struct ESTicket {
     /* +0x000 */ u8 pad_0x00[0x2A4];
 } ESTicket;
 
-/* The part of a ticket a title may inspect. size: 0xD8 (layout not reconstructed) */
+typedef struct ESTicketLimit {
+    /* +0x0 */ u32 kind;  /* 0 unused, 1 play-time seconds, 4 launch count, anything else is unsupported */
+    /* +0x4 */ u32 value;
+} ESTicketLimit; /* size: 0x8 */
+
+/* The part of a ticket a title may inspect. size: 0xD8 (only the fields the OS reads are named) */
 typedef struct ESTicketView {
-    /* +0x00 */ u8 pad_0x00[0xD8];
+    /* +0x00 */ u8 pad_0x00[4];
+    /* +0x04 */ u32 ticketIdHi;
+    /* +0x08 */ u32 ticketIdLo;
+    /* +0x0C */ u8 pad_0x0C[0xC];
+    /* +0x18 */ u8 accessMaskLow;  /* access bits 0-7 (one per content the ticket grants) */
+    /* +0x19 */ u8 accessMaskHigh; /* access bits 8-15 */
+    /* +0x1A */ u8 pad_0x1A[0x7E];
+    /* +0x98 */ ESTicketLimit limits[8];
 } ESTicketView;
 
 s32 ESP_InitLib(void);

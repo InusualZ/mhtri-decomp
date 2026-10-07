@@ -187,7 +187,7 @@ void OSShutdownSystem(void)
 {
     u8 idleMode[2];
     OSStateFlags state;
-    u32 iosRev;
+    OSIOSRev iosRev;
 
     memset(idleMode, 0, 2);
     SCInit();
@@ -298,7 +298,7 @@ void __OSReturnToMenu(u8 returnToMenu)
     if (ESP_DiGetTicketView(NULL, ticketView) == 0 && OSPlayTimeIsLimited()) {
         played = 0;
         remaining = -1;
-        __OSGetPlayTime(ticketView, (s32*)&played, (s32*)&remaining);
+        __OSGetPlayTime(ticketView, (s32*)&played, (u32*)&remaining);
         if (remaining == 0) {
             __OSWriteExpiredFlagIfSet();
         }
