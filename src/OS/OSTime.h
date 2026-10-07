@@ -34,6 +34,9 @@ s64 OSCalendarTimeToTicks(const OSCalendarTime* td);
 
 s64 OSGetTime(void);
 
+/* 0x804D4DF0 - converts a time-base value to the system-time scale. */
+s64 __OSTimeToSystemTime(s64 time);
+
 #ifdef __cplusplus
 }
 #endif

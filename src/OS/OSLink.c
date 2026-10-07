@@ -4,7 +4,8 @@
  *    leaf function that stores zero to 0x800030C8..0x800030D0; no data.
  * FLAGS. `cflags_base` per object (configure.py): the target's function starts are all 16-aligned.
  * NAMES. `__OSModuleInit` is the map's name (GUESS: the dump has a placeholder; the body clears the module queue); the low-memory macros are in `OS/OS.h`.
- * RESIDUALS. none: the body matches; the object's .text ends 8 bytes before the claimed end (alignment padding).
+ * RESIDUALS. none: the body matches; the object's .text ends 8 bytes before the claimed end (alignment padding).  The flip waits for
+ *    flipcheck to accept a short .text whose successor (`OS/OSMessage.c`) is a flipped 16-aligned object; the hash holds with it.
  * SHAPES. none beyond what the body shows.
  */
 

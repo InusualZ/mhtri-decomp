@@ -78,6 +78,12 @@ void OSSleepTicks(u64 ticks);
 /* 0x804D39B0 - stops thread switching; returns the previous suspend count. */
 s32 OSDisableScheduler(void);
 
+/* 0x804D39F0 - allows thread switching again; returns the previous suspend count. */
+s32 OSEnableScheduler(void);
+
+/* 0x804D3F10 - picks the next thread to run if the scheduler is enabled. */
+void __OSReschedule(void);
+
 /* 0x804D3F30 - yields the processor to another ready thread. */
 void OSYieldThread(void);
 
