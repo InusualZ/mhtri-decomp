@@ -43,6 +43,10 @@ s32 NANDOpenAsync(const char* path, NANDFileInfo* info, u8 mode, NANDAsyncCallba
 s32 NANDReadAsync(NANDFileInfo* info, void* buffer, u32 length, NANDAsyncCallback callback, NANDCommandBlock* block); /* untyped: byte range */
 /* 0x804C8680 - close the open file. */
 s32 NANDCloseAsync(NANDFileInfo* info, NANDAsyncCallback callback, NANDCommandBlock* block);
+/* 0x804C78C0 - move the file position of the open file to `offset` according to `whence`. */
+s32 NANDSeekAsync(NANDFileInfo* info, s32 offset, s32 whence, NANDAsyncCallback callback, NANDCommandBlock* block);
+/* 0x804C8E10 - bring the NAND filesystem up; zero on success. */
+s32 NANDInit(void);
 /* 0x804C7840 - write `length` bytes of `buffer` to the open file. */
 s32 NANDWriteAsync(NANDFileInfo* info, const void* buffer, u32 length, NANDAsyncCallback callback, NANDCommandBlock* block); /* untyped: byte range */
 /* 0x804C72F0 / 0x804C8510 / 0x804C7620 - create, open and delete `path` by its absolute name (the private

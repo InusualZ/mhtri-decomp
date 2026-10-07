@@ -10,6 +10,15 @@
 extern "C" {
 #endif
 
+/* size: 0x1C - the block the previous title left for this one in MEM1. */
+typedef struct OSExecParams {
+    /* +0x00 */ u32 valid; /* zero when no block was left */
+    /* +0x04 */ u8 pad_0x04[0x18];
+} OSExecParams; /* size: 0x1C */
+
+/* 0x804CE270 - copies the exec parameter block, or clears `valid`. */
+void __OSGetExecParams(OSExecParams* params);
+
 /* 0x80795330 - the boot-kind word `__OSBootDolSimple` and `__OSLaunchNextFirmware` compare against the one at 0x80003194. NAME: a GUESS. */
 extern u32 __OSBootFlag;
 
