@@ -161,7 +161,8 @@
 #include "NWC24/nwc24_io.h"   /* this unit's own API (rule 2) */
 #include "NWC24/nwc24_msg.h"  /* NWC24iSetScriptMode / NWC24iRegisterVersion (rule 2) */
 #include "IPC/ipcclt.h"
-#include "unsplit/SC.h"       /* SCCheckStatus / SCGetIdleMode / SCGetCounterBias / SCSetIdleMode */
+#include "unsplit/SC.h"       /* SCCheckStatus / SCGetIdleMode / SCGetCounterBias */
+#include "OS/OSStateTM.h"    /* SCSetIdleMode (rule 2) */
 #include "unsplit/NWC24.h"    /* the band's unowned work block and literals (rule 2) */
 #include "unsplit/OS.h"       /* OSDisable(Interrupts) / OSRestoreInterrupts / OSInitMutex /
                                  OSGetTime / OSGetAppType / OSRegisterShutdownFunction */

@@ -34,10 +34,6 @@ typedef struct SCIdleModeInfo {
 /* 0x804DCAC0 - copy the idle-mode record out of the SC configuration. */
 BOOL SCGetIdleMode(SCIdleModeInfo* info);
 
-/* 0x804D5BB0 - hand one idle-mode byte to the SC device (ioctl command 0x6002, 32-byte in/out
- * blocks); -6 when the SC was never initialised.  NAME (a GUESS, same reason as above): its only
- * caller is `NWC24iPrepareShutdown`, which passes `SCIdleModeInfo.subIdle`. */
-s32 SCSetIdleMode(u8 idleMode);
 
 #ifdef __cplusplus
 }

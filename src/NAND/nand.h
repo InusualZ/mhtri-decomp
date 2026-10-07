@@ -23,6 +23,16 @@ extern "C" {
  * record are the SDK's; their layouts stay with the NAND band (only their addresses are passed here). */
 typedef struct NANDCommandBlock NANDCommandBlock;
 typedef struct NANDFileInfo NANDFileInfo;
+/* size: 0x8C - the open-file record (the callers' buffers are 0x8C bytes: `NetworkPool`, `DWCi_Np_CPUCopyFast`); the field split is a GUESS. */
+struct NANDFileInfo {
+    /* +0x00 */ s32 fileDescriptor;
+    /* +0x04 */ s32 originalDescriptor;
+    /* +0x08 */ char originalPath[64];
+    /* +0x48 */ char temporaryPath[64];
+    /* +0x88 */ u8 accessMode;
+    /* +0x89 */ u8 stage;
+    /* +0x8A */ u8 pad_0x8A[2];
+}; /* size: 0x8C */
 typedef void (*NANDAsyncCallback)(s32 result, NANDCommandBlock* block);
 
 /* 0x804C9020 - copy the title's home directory path into `path`. */
@@ -49,6 +59,24 @@ typedef struct NANDStatus {
 } NANDStatus; /* size: 0x08 */
 /* 0x804C8090 - the owner/group/attribute/permission record of `path`. */
 s32 NANDGetStatus(const char* path, NANDStatus* status);
+/* 0x804C8100 - `NANDGetStatus` on an absolute path. */
+s32 NANDPrivateGetStatus(const char* path, NANDStatus* status);
+/* 0x804C70E0 - create `path` by its absolute name with `permission` and `attribute`. */
+s32 NANDPrivateCreate(const char* path, u8 permission, u8 attribute);
+/* 0x804C74A0 - delete `path` by its absolute name. */
+s32 NANDPrivateDelete(const char* path);
+/* 0x804C8370 - open `path` (relative to the title's home directory) with access mode `mode`. */
+s32 NANDOpen(const char* path, NANDFileInfo* info, u8 mode);
+/* 0x804C76E0 - read `length` bytes of the open file into `buffer`; returns the byte count. */
+s32 NANDRead(NANDFileInfo* info, void* buffer, u32 length); /* untyped: byte range */
+/* 0x804C73F0 - delete `path`. */
+s32 NANDDelete(const char* path);
+/* 0x804C8400 - open `path` by its absolute name with access mode `mode`. */
+s32 NANDPrivateOpen(const char* path, NANDFileInfo* info, u8 mode);
+/* 0x804C8610 - close the open file. */
+s32 NANDClose(NANDFileInfo* info);
+/* 0x804C77D0 - write `length` bytes of `buffer` to the open file; returns the byte count. */
+s32 NANDWrite(NANDFileInfo* info, const void* buffer, u32 length); /* untyped: byte range */
 /* 0x804C7540 - delete `path` (`ISFS_DeleteAsync` on the absolute path); the public twin of
  * `NANDPrivateDeleteAsync` 0x804C7620. */
 s32 NANDDeleteAsync(const char* path, NANDAsyncCallback callback, NANDCommandBlock* block);
