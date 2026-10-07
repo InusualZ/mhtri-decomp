@@ -2,7 +2,8 @@
  * ef/ef_emform.h - the emitter-form classes: the abstract `nw4r::ef::EmitterForm` (its table and its implicit
  * constructor come out of `ef/ef_emform.cpp`), the seven shapes deriving from it (each shape's `Emission` is the
  * key function, so each shape unit emits its own table), and `EmitterFormBuilder`, whose `Create` maps a shape id
- * to its registered instance (`ef/ef_emform.cpp`; its constructor is `ef/ef_effectsystem.cpp`'s).
+ * to its registered instance (`ef/ef_emform.cpp`; `ef/ef_effectsystem.cpp` builds the instance, so its implicit
+ * constructor comes out there).
  */
 #ifndef MHTRI_EF_EF_EMFORM_H
 #define MHTRI_EF_EF_EMFORM_H
@@ -78,7 +79,6 @@ public:
  * instance. */
 class EmitterFormBuilder {
 public:
-    EmitterFormBuilder();
     /* +0x00: the vtable pointer */
     virtual EmitterForm* Create(int id);
 }; /* size: 0x4 */
@@ -86,8 +86,5 @@ public:
 } // namespace ef
 } // namespace nw4r
 
-/* `EmitterFormBuilder`'s table, under the map's name: `ef/ef_effectsystem.cpp`'s static initializer still builds
- * its builder instance by storing it (the instance becomes a real static once that unit's statics are classes). */
-extern void* lbl_80594EC4[];
 
 #endif /* MHTRI_EF_EF_EMFORM_H */

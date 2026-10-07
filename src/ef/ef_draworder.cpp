@@ -23,6 +23,7 @@
 #include "nw4r/math.h"
 #include "ef.h" /* the canonical nw4r::ef::Effect declaration (RetireEmitterAll, rule 1) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
+#include "nw4r/fn_805012C4.h" /* nw4r::ut::List_* (rule 2) */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`). */
@@ -51,8 +52,8 @@ extern void* lbl_805925A8[];      /* the root base's vtable: 0, 0, then two meth
  * types
  * ------------------------------------------------------------------------------------------------- */
 
-/* `nw4r::ut::List` as `MEMInitList` builds it: a head and tail pointer, a live count and the offset
- * of the link record inside the element (`fn_80501C60`/`fn_80501C80` read `node + mOffset + 4`). */
+/* `nw4r::ut::List` as `List_Init` builds it: a head and tail pointer, a live count and the offset
+ * of the link record inside the element (`List_GetNext`/`List_GetPrev` read `node + mOffset + 4`). */
 typedef struct EfDrawOrderList {
     /* +0x00 */ void* mHead;
     /* +0x04 */ void* mTail;
@@ -113,14 +114,9 @@ typedef struct EfDrawOrderObject {
 
 extern "C" {
 
-/* Callees outside this unit: two particle-manager functions and the `ut::List` family. */
+/* Callees outside this unit: two particle-manager functions. */
 void fn_800AE628(void* pm);                                    /* particle manager: world matrix */
 void fn_800AE6A4(void* pm);                                    /* particle manager: tail (a `blr`) */
-void fn_80501AD4(void* list, void* before, void* elem);        /* ut::List insert-before/append */
-void* fn_80501C60(void* list, void* node);                     /* ut::List GetNext (head when 0) */
-void* fn_80501C80(void* list, void* node);                     /* ut::List GetPrev (tail when 0) */
-void fn_80501BF4(void* list, void* node);                      /* ut::List unlink */
-void MEMInitList(void* list, u16 offset);                      /* ut::List initialiser */
 
 /* This unit's own forward declarations (address order puts two bodies after their callers). */
 EfDrawOrderGroup* fn_800A3FFC(EfDrawOrderGroup* group, u32 offset);
@@ -151,7 +147,7 @@ void fn_800A39A4(EfDrawOrderObject* self, EfDrawOrderObject* ef, void* arg) {
     (void)self;
     EfDrawOrderList* list = (EfDrawOrderList*)fn_800A388C(ef);
     EfDrawOrderNode* node = NULL;
-    while ((node = (EfDrawOrderNode*)fn_80501C60(list, node)) != NULL) {
+    while ((node = (EfDrawOrderNode*)nw4r::ut::List_GetNext((nw4r::ut::List*)list, node)) != NULL) {
         fn_800AE628(node);
         node->mpVtbl->method_0x1C(node, arg);
         fn_800AE6A4(node);
@@ -167,12 +163,12 @@ void fn_800A3B20(EfDrawOrderObject* self, EfDrawOrderObject* ef, EfDrawOrderNode
     (void)self;
     EfDrawOrderList* list = (EfDrawOrderList*)fn_800A388C(ef);
     EfDrawOrderNode* prev = NULL;
-    while ((prev = (EfDrawOrderNode*)fn_80501C80(list, prev)) != NULL) {
+    while ((prev = (EfDrawOrderNode*)nw4r::ut::List_GetPrev((nw4r::ut::List*)list, prev)) != NULL) {
         if (prev->mDrawOrder <= node->mDrawOrder) {
             break;
         }
     }
-    fn_80501AD4(list, fn_80501C60(list, prev), node);
+    nw4r::ut::List_Insert((nw4r::ut::List*)list, nw4r::ut::List_GetNext((nw4r::ut::List*)list, prev), node);
 }
 
 /* 0x800A3D7C - the vtable's remove slot: unlink one node from the effect's draw list. */
@@ -181,7 +177,7 @@ void fn_800A3D7C(EfDrawOrderObject* self, EfDrawOrderObject* ef, EfDrawOrderNode
     NW4R_POINTER_ASSERT(node, 71, lbl_805923E8);
 
     (void)self;
-    fn_80501BF4(fn_800A388C(ef), node);
+    nw4r::ut::List_Remove((nw4r::ut::List*)fn_800A388C(ef), node);
 }
 
 /* 0x800A3F98 - the constructor: root base vtable, own vtable, group, matrix, vector, draw list. */
@@ -191,7 +187,7 @@ EfDrawOrderObject* fn_800A3F98(EfDrawOrderObject* self) {
     fn_800A3FFC(&self->mGroup, 0x14);
     MTX34_ctor(&self->mMat_0x58);
     VEC3_ctor(&self->mVec_0x88);
-    MEMInitList(&self->mDrawList, 0x30);
+    nw4r::ut::List_Init((nw4r::ut::List*)&self->mDrawList, 0x30);
     return self;
 }
 
@@ -203,8 +199,8 @@ EfDrawOrderGroup* fn_800A3FFC(EfDrawOrderGroup* group, u32 offset) {
 
 /* 0x800A4030 - initialises both of the group's lists and clear its counter. */
 void fn_800A4030(EfDrawOrderGroup* group, u32 offset) {
-    MEMInitList(&group->mListA, (u16)offset);
-    MEMInitList(&group->mListB, (u16)offset);
+    nw4r::ut::List_Init((nw4r::ut::List*)&group->mListA, (u16)offset);
+    nw4r::ut::List_Init((nw4r::ut::List*)&group->mListB, (u16)offset);
     group->mCount = 0;
 }
 

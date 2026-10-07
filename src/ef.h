@@ -304,7 +304,7 @@ struct Effect {
  * `ef/ef_effectsystem.cpp` defines it; the consumers call it as a statement.  The two `virtual_0xN` model the
  * *memory manager* `fn_800A4420` returns (that object's table is [0x08, 0x0C]), which the eft004 per-frame handler
  * calls through, not this class' own layout: the system's first word is a data member, and its real layout is
- * `ef/ef_effectsystem.cpp`'s `EfSys` (size 0xC068, the map's size for lbl_806884D0) - two definitions to fold. */
+ * `ef/ef_effectsystem.h`'s `EfSys` (size 0xC068) - two definitions to fold. */
 class EffectSystem {
 public:
     virtual void virtual_0x08();
