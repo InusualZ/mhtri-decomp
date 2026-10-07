@@ -36,6 +36,12 @@ struct ConsoleHead {
 
 typedef detail::ConsoleHead* ConsoleHandle;
 
+/* Prints to the console (the retail build compiles the body away). */
+void Console_Printf(ConsoleHandle console, const char* format, ...);
+
+/* The number of lines written to the console since it was created. */
+s32 Console_GetTotalLines(ConsoleHandle console);
+
 }  // namespace db
 }  // namespace nw4r
 #endif
