@@ -24,6 +24,11 @@ typedef void (*__OSInterruptHandler)(s16 interrupt, OSContext* context);
 __OSInterruptHandler __OSSetInterruptHandler(s16 interrupt, __OSInterruptHandler handler);
 /* 0x804D0D00 - the handler installed for an interrupt source. */
 __OSInterruptHandler __OSGetInterruptHandler(s16 interrupt);
+/* 0x80795360 / 0x8079535C / 0x80795358 - the time, source and interrupted address of the last external interrupt. */
+extern s64 __OSLastInterruptTime;
+extern s16 __OSLastInterrupt;
+extern u32 __OSLastInterruptSrr0;
+
 /* 0x804D1040 / 0x804D10C0 - mask / unmask a set of interrupt sources; return the previous mask. */
 u32 __OSMaskInterrupts(u32 mask);
 u32 __OSUnmaskInterrupts(u32 mask);

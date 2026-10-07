@@ -36,6 +36,8 @@ void OSClearContext(OSContext* context);
 void OSDumpContext(OSContext* context);
 /* 0x804CCFB0 - makes a context the running thread's current one. */
 void OSSetCurrentContext(OSContext* context);
+/* 0x804CCFA0 - saves the floating-point registers of the context that owns the FPU. */
+void OSSaveFPUContext(OSContext* context);
 /* 0x804CD010 - the running thread's current context. */
 OSContext* OSGetCurrentContext(void);
 /* 0x804CD020 - saves the registers a caller keeps; returns 1 when the context is resumed and 0 on the first return. */

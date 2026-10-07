@@ -9,6 +9,9 @@
 extern "C" {
 #endif
 
+/* 0x804DB050 - starts the SC configuration reader. */
+void SCInit(void);
+
 /* 0x804DB0F0 - the SC state machine: 0 = idle, 1 = busy, 2 = the configuration file was reloaded.
  * The band's compares are unsigned (`cmplwi r3,2` / `cmplwi r3,1`), so the status is `u32`. */
 u32 SCCheckStatus(void);

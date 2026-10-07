@@ -16,7 +16,7 @@ struct OSContext;
 typedef void (*OSErrorHandler)(u8 error, struct OSContext* context, ...);
 
 /* 0x804CD7E0 - installs the handler for processor error `error` and returns the previous one. */
-OSErrorHandler OSSetErrorHandler(u8 error, OSErrorHandler handler);
+OSErrorHandler OSSetErrorHandler(u16 error, OSErrorHandler handler);
 
 /* 0x80793F90 - the FPSCR exception-enable bits a new context starts with. */
 extern u32 __OSFpscrEnableBits;

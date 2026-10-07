@@ -16,6 +16,12 @@ extern u32 __OSBootFlag;
 /* 0x804CF170 - boots the DOL at `bootDol`, passing `resetCode` and the argument vector. */
 void __OSBootDol(u32 bootDol, u32 resetCode, const char** argv);
 
+/* 0x8079533C - set while the OS is rebooting into another DOL. */
+extern BOOL __OSInReboot;
+
+/* 0x804CE940 - launches the system menu; returns only on failure. */
+void __OSLaunchMenu(void);
+
 #ifdef __cplusplus
 }
 #endif

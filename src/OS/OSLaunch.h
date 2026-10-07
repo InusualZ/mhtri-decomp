@@ -16,6 +16,9 @@ extern "C" {
  * `OSLaunchPDChannel` log text beside it); it does not return. */
 void OSLaunchShopChannelHelp(void);
 
+/* 0x804D7750 - relaunches the running title with the given reset code. */
+void __OSRelaunchTitle(u32 resetCode);
+
 #ifdef __cplusplus
 }
 #endif
