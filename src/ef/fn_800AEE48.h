@@ -7,7 +7,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
-#include "ef/ef_postfield.h" /* fn_800B0B90 (its owner's header) */
+#include "ef/ef_postfield.h" /* vec3_sub_assign (its owner's header) */
 #include "ef/ef_resource.h"  /* the resource singleton's entry points (their owner's header) */
 
 #ifdef __cplusplus

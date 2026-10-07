@@ -144,10 +144,10 @@ struct EmProgWork {
 /* This unit's own rows that an earlier row calls - they are defined further down, in address order. */
 extern "C" void fn_801B78F8(EmProgWork* self);
 
-/* `fn_800B0B90` subtracts `b` from `self` in place (`ef/ef_postfield.cpp`, whose header clashes with `mh3_pad.h`'s
+/* `vec3_sub_assign` subtracts `b` from `self` in place (`ef/ef_postfield.cpp`, whose header clashes with `mh3_pad.h`'s
  * `VEC3_ctor`/`setVec3`); `lbl_805B2188` is this unit's 0x60-byte `.data` table `em_key_curve_eval` is handed. */
 extern "C" {
-void fn_800B0B90(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
+void vec3_sub_assign(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
 /* 0x80051EE0 (`fn_8004CAD8.cpp`): r3 `out`, r4 `in`, f1 the scale it keeps in f31 while `VEC3_ctor` zeroes `out`;
  * the tree spells it with three and four arguments, so it is declared here. */
 void vec3_scale(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
@@ -539,7 +539,7 @@ extern "C" void fn_801B7A68(EmProgWork* self, u8 mode) {
         em_move_vec2_clr((struct _ENEMY_WORK*)self);
         copyVec3(&vec, &self->target);
         vec.y += 60.0f;
-        fn_800B0B90(&vec, &self->pos);
+        vec3_sub_assign(&vec, &self->pos);
         if (vec3_length_sq((const f32*)&vec) > 0.001f) {
             vec3_normalize_into(&vec, &vec);
             vec3_scale(&out, &vec, 8.0f);
@@ -650,7 +650,7 @@ extern "C" void fn_801B7E34(EmProgWork* self, u8 mode) {
         em_move_vec2_clr((struct _ENEMY_WORK*)self);
         copyVec3(&vec, &self->target);
         vec.y += 60.0f;
-        fn_800B0B90(&vec, &self->pos);
+        vec3_sub_assign(&vec, &self->pos);
         if (vec3_length_sq((const f32*)&vec) > 0.001f) {
             vec3_normalize_into(&vec, &vec);
             vec3_scale(&out, &vec, 10.0f);
