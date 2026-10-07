@@ -11,6 +11,7 @@
  * NAMES. The file name follows the runtime dump's `em015_prog_tbl`, which opens the TU's `.data`; the map has only
  *   `fn_` stems for the functions.  Callees whose call sites disagree with the owner's header are called through
  *   `<name>_viewN` cast macros (the same direct call).
+ *   GUESS (from the body): `em015_damage_level` (0x80182918), the damage counter's level.
  *   The `.bss` record names (`vec_tbl_80181C88`) are GUESSes.
  * RESIDUALS. 31 rows unwritten: 0x80176C30-0x80176C58, 0x801784D0-0x80178754, 0x8017889C-0x801797F8,
  *   0x80179AC4-0x80179C38, 0x80179E98-0x8017A004, 0x8017A0BC-0x8017B60C, 0x8017B748-0x8017B990,
@@ -286,7 +287,7 @@ u32 fn_8018257C(_ENEMY_WORK* self);
 u32 fn_801825A4(_ENEMY_WORK* self, u32 kind);
 void fn_80182768(_ENEMY_WORK* self, u8* out_a, u8* out_b);
 void fn_80182914(_ENEMY_WORK* self);
-u32 fn_80182918(_ENEMY_WORK* self);
+u32 em015_damage_level(_ENEMY_WORK* self);
 void fn_80182978(_ENEMY_WORK* self);
 void fn_80182AB8(struct EmWorkItem* out, u32 a, s16 b, s16 c);
 void* fn_80182B38(void* p, s16 arg);
@@ -1974,12 +1975,12 @@ f32 fn_80181C88(f32 value, f32 center, f32 step) {
     return center;
 }
 
-/* Drives the colour scalar and the three K-colour bytes toward the mode's targets (`fn_80182918`'s damage
+/* Drives the colour scalar and the three K-colour bytes toward the mode's targets (`em015_damage_level`'s damage
  * level picks the byte targets). */
 void fn_80181CC0(_ENEMY_WORK* self) {
     f32 target = (self->field_0x1E2 == 2) ? lbl_80797B10 : lbl_80797B9C;
     self->color_0x328.field_0x328 = fn_80181C88(self->color_0x328.field_0x328, target, lbl_80797E6C);
-    u8 level = (u8)fn_80182918(self);
+    u8 level = (u8)em015_damage_level(self);
     f32 byte_a;
     f32 byte_b;
     if (level == 1) {
@@ -2236,7 +2237,7 @@ u32 fn_801825A4(_ENEMY_WORK* self, u32 kind) {
         return 0;
     }
     case 1:
-        return fn_80182918(self);
+        return em015_damage_level(self);
     case 2:
         return self->color_0x328.field_0x32F;
     case 3: {
@@ -2260,7 +2261,7 @@ u32 fn_801825A4(_ENEMY_WORK* self, u32 kind) {
         if ((u8)em_parts_damage_level_get(self, 3) >= 3) {
             return 0;
         }
-        return fn_80182918(self) != 0;
+        return em015_damage_level(self) != 0;
     default:
         return 0;
     }
@@ -2317,7 +2318,7 @@ void fn_80182914(_ENEMY_WORK* self) {
 
 /* The 0x1E4 damage counter's level: 0 below 1, 1 below 100, and past that the part-3 damage level maps to 5, 4,
  * 3, ... (retail's branchless `subfc`/`adde` run). */
-u32 fn_80182918(_ENEMY_WORK* self) {
+u32 em015_damage_level(_ENEMY_WORK* self) {
     u8 health = self->field_0x1E4;
     if (health < 1) {
         return 0;

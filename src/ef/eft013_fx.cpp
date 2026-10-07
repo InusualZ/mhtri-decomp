@@ -11,11 +11,15 @@
  *   GUESS: `eft013_retire_step` (0x8010A1D4); the data `eft014_effect_ids`, `eft014_type_effect_ids`,
  *   GUESS: `eft014_joint_lists`, `eft014_joint_counts`; the foreign `mtx34_set_trans` (0x800FBB90, `ef/eft001.cpp`).
  *   GUESS: `eft013_guard_pulse` (0x8010A49C), the constants `eft013_f32_one`, `eft013_f32_three_quarters`,
- *   GUESS: `eft013_f32_zero`, `eft013_f32_2_6`, `eft013_f32_0_4`, `eft013_f32_0_16` (by value).
- * RESIDUALS. 8 rows unwritten: 0x80107E5C-0x801089C0 (`eft013_setup_effect`, `eft013_setup_uv_model`),
+ *   GUESS: `eft013_f32_zero`, `eft013_f32_2_6`, `eft013_f32_0_4`, `eft013_f32_0_16` (by value); the glow tables
+ *   GUESS: `eft014_glow_joints`, `eft014_glow_offset_y`, `eft014_glow_offset_z`, `eft014_glow_scale`,
+ *   GUESS: `eft014_glow_alpha_key`; the foreign `em015_damage_level` (0x80182918, `enemy/em015_prog.cpp`).
+ * RESIDUALS. 7 rows unwritten: 0x80107E5C-0x801089C0 (`eft013_setup_effect`, `eft013_setup_uv_model`),
  *   0x80108A74-0x8010A1D4 (`fn_80108A74`, `fn_801093F4`, `fn_80109A84`, `fn_80109D00`), 0x8010B198-0x8010B504
- *   (`fn_8010B198`), 0x8010B71C-0x8010BA48 (`fn_8010B71C`).
- *   4 partial rows:
+ *   (`fn_8010B198`).
+ *   5 partial rows:
+ *  - `fn_8010B71C`: the final store of the damage level keeps a `clrlwi` retail does not have (a `u8` level
+ *    colours the registers differently and scores lower);
  *  - `fn_80107DDC`, `fn_8010AD00`: the case-0 nested dispatch (docs/ef.md, "The case-0 nested dispatch");
  *  - `fn_80107640`: ours compares the type signed with a compare chain where retail uses `subi` + `cmplwi` range
  *    tests, narrows the type with `clrlwi`, and keeps the hook addresses in the stored register;
@@ -55,6 +59,8 @@
 #include "ef/eft002.h" /* eft_effect_foreach_pm_scale (rule 2) */
 #include "Pl/fn_802693C4.h" /* Get_motion_no (rule 2) */
 #include "camera/camera.h" /* get_camera_pos (rule 2) */
+#include "enemy/em015_damage_level.h" /* em015_damage_level (rule 2) */
+#include "ef/mtx34_trans_add.h" /* mtx34_trans_add (rule 2) */
 #include "fn_8004CAD8.h" /* subVec3 (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h" /* memset (rule 2) */
 #include "g3d/mtx34_inverse.h" /* mtx34_inverse (rule 2) */
@@ -100,6 +106,16 @@ struct _EFT013_WORK_P {
     /* +0x28 */ f32 scale[2];
 };
 /* size: 0x30 - lower bound, an approximation. */
+
+/* Pool block of the `fn_8010B71C` glow: seven effects and the glow mode and alpha. */
+struct _EFT014_POOL_E {
+    /* +0x00 */ s32 count;
+    /* +0x04 */ nw4r::ef::Effect* effects[7];
+    /* +0x20 */ u8 unused_0x20[0x44 - 0x20];
+    /* +0x44 */ u8 mode_0x44;
+    /* +0x45 */ u8 alpha_0x45;
+};
+/* size: 0x48 - lower bound, an approximation. */
 
 /* Pool block of the `fn_80107804` family: the setter state at +0x28 and the two payload bytes. */
 struct _EFT013_WORK_E {
@@ -287,6 +303,11 @@ extern "C" u8 lbl_8059EE1C[];
 extern "C" u8 lbl_80791808[8];
 extern "C" s32* eft014_joint_lists[5];  /* per slot: the joints a trail effect may sit on  .data 0x8059F3C0 */
 extern "C" s32 eft014_joint_counts[5];  /* per slot: the length of its joint list         .data 0x8059F3D4 */
+extern "C" s32 eft014_glow_joints[7];   /* the joint each glow effect sits on            .data 0x8059F384 */
+extern "C" f32 eft014_glow_offset_y[7]; /* its joint-local Y offset                       .data 0x8059F4C4 */
+extern "C" f32 eft014_glow_offset_z[7]; /* its joint-local Z offset                       .data 0x8059F4E0 */
+extern "C" f32 eft014_glow_scale[7];    /* its particle scale                             .data 0x8059F4FC */
+extern "C" u8 eft014_glow_alpha_key[8]; /* the fade-in alpha keyframes                    .sdata 0x80791818 */
 extern "C" u16 eft014_effect_ids[];      /* the type-1 effect ids, one per pool slot  .data 0x8059F3E8 */
 extern "C" u16 eft014_type_effect_ids[4];/* the effect id of types 3..6               .sdata 0x80791810 */
 
@@ -1476,4 +1497,111 @@ extern "C" void fn_8010B504(_EFT013* self) {
         eft_res_models_spawn((_EFT*)self, (void**)pool->effects, 1, pool->count, NULL);
         break;
     }
+}
+
+/* 0x8010B71C (0x32C): per-frame step of the enemy's damage glow: follows the enemy's damage level, fades the glow
+ * in and out, and seats the four head effects (level 2) or the body effects on their joints. */
+extern "C" void fn_8010B71C(_EFT013* self) {
+    nw4r::math::VEC3 off;
+    nw4r::math::VEC3 b;
+    nw4r::math::VEC3 c3;
+    nw4r::math::MTX34 mtx;
+    u32 level;
+    s32 i;
+    s32 end;
+    u32 draw;
+    VEC3_ctor(&off);
+    VEC3_ctor(&b);
+    VEC3_ctor(&c3);
+    MTX34_ctor(&mtx);
+    _ENEMY_WORK* src = self->source_0x30;
+    _EFT014_POOL_E* work = (_EFT014_POOL_E*)self->work_0x38;
+    if (em_work_die_ck(src) != 0) {
+        self->state_0x05++;
+        self->field_0x06 = 0;
+        self->field_0x10 = 20;
+        return;
+    }
+    self->area_0x44 = src->act_id;
+    level = em015_damage_level(src);
+    switch ((u8)level) {
+    case 1:
+        if (self->field_0x08 == 0) {
+            self->field_0x07 = 1;
+        }
+        work->mode_0x44 = 1;
+        break;
+    case 2:
+        work->mode_0x44 = 0;
+        break;
+    default:
+        work->mode_0x44 = 2;
+        if (self->field_0x08 != 0) {
+            self->field_0x07 = 3;
+        }
+        break;
+    }
+    switch (self->field_0x07) {
+    case 0:
+        work->alpha_0x45 = 0;
+        break;
+    case 1:
+        if (++self->field_0x10 > 25) {
+            self->field_0x07 = 2;
+        }
+        work->alpha_0x45 = eftGetKeyAlpha(eft014_glow_alpha_key, self->field_0x10);
+        break;
+    case 3:
+        if (--self->field_0x10 < 0) {
+            self->field_0x07 = 0;
+            self->field_0x10 = 0;
+        }
+        work->alpha_0x45 = eftGetKeyAlpha(eft014_glow_alpha_key, self->field_0x10);
+        break;
+    }
+    switch (work->mode_0x44) {
+    case 0:
+        i = 0;
+        end = 4;
+        draw = 1;
+        break;
+    case 1:
+        i = 4;
+        end = work->count;
+        draw = 1;
+        break;
+    case 2:
+        if (self->field_0x07 != 0) {
+            draw = 1;
+            i = 4;
+            end = work->count;
+        } else {
+            draw = 0;
+        }
+        break;
+    default:
+        draw = 0;
+        break;
+    }
+    if (draw == 1) {
+        _GXColor c;
+        c.r = c.g = c.b = 0xFF;
+        c.a = work->alpha_0x45;
+        get_joint_wpos_em(src, 3, &self->pos_0x18);
+        for (; i < end; i++) {
+            get_joint_wmat_em(src, eft014_glow_joints[i], &mtx);
+            setVector3(&off, eft013_f32_zero, eft014_glow_offset_y[i], eft014_glow_offset_z[i]);
+            mulVecMat(&off, &mtx);
+            mtx34_trans_add(&mtx, &off);
+            work->effects[i]->SetRootMtx(mtx);
+            change_paramscale_eff(work->effects[i], eft014_glow_scale[i]);
+            if (effect_move(work->effects[i]) == 0) {
+                self->flag_0x01 = 0;
+                self->state_0x05 = 2;
+            }
+            change_color_eff(work->effects[i], &self->pos_0x18, c);
+            eft_res_models_spawn((_EFT*)self, (void**)&work->effects[i], 1, 1, NULL);
+        }
+    }
+    self->field_0x08 = level;
 }
