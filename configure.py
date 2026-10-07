@@ -811,7 +811,7 @@ config.libs = [
             Object(NonMatching, "ef/eft001.cpp"),
             Object(NonMatching, "ef/eft_res.cpp"),
             Object(NonMatching, "ef/effect.cpp"),
-            Object(NonMatching, "ef/eft_model_slot.cpp"),
+            Object(Matching, "ef/eft_model_slot.cpp"),
             Object(NonMatching, "ef/eft002.cpp"),
             Object(NonMatching, "ef/fn_800FD520.c"),
             Object(NonMatching, "ef/fn_800FD718.c"),
@@ -888,7 +888,7 @@ config.libs = [
             # Phase 4 stubs: MSL/runtime candidate units with no bodies yet.
             Object(Matching, "MSL/strlen.cpp"),
             Object(NonMatching, "Runtime.PPCEABI.H/__va_arg.cpp"),
-            Object(NonMatching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
+            Object(Matching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
             Object(NonMatching, "Runtime.PPCEABI.H/CPlusLibPPC.cpp"),
             Object(NonMatching, "Runtime.PPCEABI.H/runtime.cpp"),
             # The MSL C library run recut by file (unit headers of src/MSL_C/*.c carry the evidence).
@@ -941,7 +941,7 @@ config.libs = [
             Object(Matching, "MSL/s_ldexp.cpp"),
             Object(Matching, "MSL/s_modf.cpp"),
             Object(Matching, "MSL/s_sin.cpp"),
-            Object(NonMatching, "Runtime.PPCEABI.H/ptmf.c"),
+            Object(Matching, "Runtime.PPCEABI.H/ptmf.c"),
             # Metrowerks' Gecko exception runtime, with the SDK's own extension (.cp, resolved as C++).
             Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
             Object(Matching, "Runtime.PPCEABI.H/__init_cpp_exceptions.cpp"),
@@ -1069,19 +1069,19 @@ config.libs = [
             Object(NonMatching, "Network/NetworkCommunityPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkFetcherBase.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkFetcherBase.cpp",
+            Object(Matching, "Network/NetworkFetcherBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/NetworkFileFetcher.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkFileFetcher.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/NetworkNullFetcher.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkNullFetcher.cpp",
+            Object(Matching, "Network/NetworkNullFetcher.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/NetworkSocketBase.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkSocketBase.cpp",
+            Object(Matching, "Network/NetworkSocketBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/NetworkSocketWii.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkSocketWii.cpp",
+            Object(Matching, "Network/NetworkSocketWii.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/NetworkUniqueId.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkUniqueId.cpp",
@@ -1111,7 +1111,7 @@ config.libs = [
             Object(Matching, "Network/NetworkPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkReflectService.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkReflectService.cpp",
+            Object(Matching, "Network/NetworkReflectService.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkSessionManager.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkSessionManager.cpp",
@@ -1126,13 +1126,13 @@ config.libs = [
             Object(Matching, "Network/NetworkPeerUdp.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             # Flags: unit header of src/Network/NetworkPeerMcs.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkPeerMcs.cpp",
+            Object(Matching, "Network/NetworkPeerMcs.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             # Flags: unit header of src/Network/network_socket_streams.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/network_socket_streams.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             # Flags: unit header of src/Network/NetworkResolverWii.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkResolverWii.cpp",
+            Object(Matching, "Network/NetworkResolverWii.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             # Flags: unit header of src/Network/NetworkSessionBase.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkSessionBase.cpp",
@@ -1263,7 +1263,7 @@ config.libs = [
             # each unit header).  Per-object cflags=cflags_base (default 16-byte function alignment): all 44 units' function starts are 16-aligned in the target (.pi/notes/sdk-compiler-survey.md).
             Object(NonMatching, "MEM/mem_heap.c", cflags=cflags_base),
             Object(NonMatching, "MEM/mem_expheap.c", cflags=cflags_base),
-            Object(NonMatching, "MEM/mem_allocator.c", cflags=cflags_base),
+            Object(Matching, "MEM/mem_allocator.c", cflags=cflags_base),
             Object(Matching, "MEM/mem_list.c", cflags=cflags_base),
             Object(NonMatching, "MIX/mix.c", cflags=cflags_base),
             Object(NonMatching, "MTX/mtx.c", cflags=cflags_base),
@@ -1276,7 +1276,7 @@ config.libs = [
             Object(NonMatching, "OS/OSAlarm.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSAlloc.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSArena.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSAudioSystem.c", cflags=cflags_base),
+            Object(Matching, "OS/OSAudioSystem.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSCache.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSContext.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSError.c", cflags=cflags_base),
@@ -1336,7 +1336,7 @@ config.libs = [
             # (every start in the range is 16-aligned).
             Object(Matching, "OS/PPCArch.c"),
             Object(NonMatching, "EXI/EXIBios.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
-            Object(NonMatching, "EXI/ProbeBarnacle.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
+            Object(Matching, "EXI/ProbeBarnacle.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
             # Phase 4 stubs (window fg): SDK candidate units with no bodies yet.
             # The tan / libm wrapper / MetroTRK / AI run recut by file (unit headers carry the evidence).
             Object(Matching, "MSL/s_tan.cpp"),
