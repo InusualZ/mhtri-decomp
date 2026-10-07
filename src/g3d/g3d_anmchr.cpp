@@ -12,7 +12,8 @@
  *   the other 8 of the run are called only from inside it or from other g3d units (fn_80063964, fn_80063AC4), and
  *   0x80063E60 onward is called by g3d_calcmaterial, g3d_scnmdl and g3d_resfile; the extabindex records of the
  *   run end at 0x8001FBFC, the last record (0x80063E30) with its extab 0x80007764-0x8000776C.
- * NAMES. res_anm_chr_get_node_anm is a GUESS (the evidence follows).
+ * NAMES. g3d_billboard_work_mtx is a GUESS (the evidence follows).
+ *   res_anm_chr_get_node_anm is a GUESS (the evidence follows).
  *   res_dic_is_valid is a GUESS; res_dic_ptr is a GUESS; res_dic_get_class_name is a GUESS;
  *   res_dic_ofs_to_ptr is a GUESS; res_anm_chr_ofs_to_dic is a GUESS; quat_slerp is a GUESS;
  *   quat_from_mtx34 is a GUESS; quat_empty_ctor is a GUESS; mtx34_from_quat is a GUESS; math_fexp is a GUESS;
@@ -87,6 +88,7 @@
 #include "g3d/g3d_anmchr.h" /* this unit's own declarations, and the G3dObj dispatch record (rule 1) */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
+#include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
 #include "g3d/fn_8005AA28.h" /* res_node_is_valid (rule 2) */
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
 #include "fn_8004CAD8.h"   /* mtx34_const_ptr's owner header (docs/plan.md 6.5, rule 2) */
@@ -177,7 +179,7 @@ extern "C" u8* fn_8005CEF8(void)
     return lbl_8066AE80;
 }
 
-extern "C" u8* fn_8005CF04(void)
+extern "C" u8* g3d_billboard_work_mtx(void)
 {
     return lbl_8066AE80;
 }
@@ -623,26 +625,7 @@ extern "C" void **fn_80063C8C(void **out, void *v)
 /* G3dObj, AnmObj and the AnmObjChr base                                                              */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* The nw4r resource pointer assert: `ptr` must fall in one of the seven mapped Wii memory ranges. */
-#define ANMCHR_POINTER_ASSERT(file, ptr, line, msg)                                            \
-    {                                                                                          \
-        BOOL ok1_ = TRUE, ok2_ = TRUE, ok3_ = TRUE, ok4_ = TRUE, ok5_ = TRUE, ok6_ = TRUE;      \
-        u32 top_ = (u32)(ptr) & 0xFF000000u;                                                    \
-        if (!(top_ == 0x80000000u) && !(((u32)(ptr) & 0xFF800000u) == 0x81000000u))             \
-            ok6_ = FALSE;                                                                        \
-        if (!ok6_ && !(((u32)(ptr) & 0xF8000000u) == 0x90000000u))                              \
-            ok5_ = FALSE;                                                                        \
-        if (!ok5_ && !(top_ == 0xC0000000u))                                                    \
-            ok4_ = FALSE;                                                                        \
-        if (!ok4_ && !(((u32)(ptr) & 0xFF800000u) == 0xC1000000u))                              \
-            ok3_ = FALSE;                                                                        \
-        if (!ok3_ && !(((u32)(ptr) & 0xF8000000u) == 0xD0000000u))                              \
-            ok2_ = FALSE;                                                                        \
-        if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))                              \
-            ok1_ = FALSE;                                                                        \
-        if (!ok1_)                                                                              \
-            nw4r::db::Panic(file, line, msg, (ptr));                                             \
-    }
+#define ANMCHR_POINTER_ASSERT G3D_POINTER_ASSERT
 
 extern "C" u32 g3d_round_up(u32 offset, u32 align);
 
