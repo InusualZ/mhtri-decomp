@@ -6,9 +6,7 @@
  * FLAGS. `cflags_base` per object (configure.py).
  * NAMES. map names; GUESS: `YearDays` and `LeapYearDays` (the map had both month tables as `lbl_` rows: the cumulative day
  *    count before each month of a common / leap year).
- * RESIDUALS. `OSCalendarTimeToTicks` (45 % positional): the target saves r20-r31 and interleaves the usec/msec/second 64-bit products with
- *    the leap-year test; ours hoists the year product and saves fewer registers; the source tries (term grouping, evaluation order) did not
- *    reproduce it.  `OSTicksToCalendarTime` (99.8 %): the saved ticks halves take r26/r28 in the target and r28/r27 in ours.
+ * RESIDUALS. `OSTicksToCalendarTime` (99.8 %): the saved ticks halves take r26/r28 in the target and r28/r27 in ours.
  * SHAPES. `OSGetTime` and `OSGetTick` are asm functions (the time-base reads `mftb`/`mftbu` have no C spelling); the rest is C
  *    over 64-bit arithmetic (`__div2i`/`__mod2i` calls).
  */
@@ -112,8 +110,7 @@ void OSTicksToCalendarTime(s64 ticks, OSCalendarTime* td)
     }
     td->usec = (d * 8 / (OS_TIMER_CLOCK / 125000)) % 1000;
     td->msec = (d / (OS_TIMER_CLOCK / 1000)) % 1000;
-    ticks -= d;
-    ticks /= OS_TIMER_CLOCK;
+    ticks = (ticks - d) / OS_TIMER_CLOCK;
 
     days = ticks / SECS_IN_DAY + BIAS;
     secs = ticks % SECS_IN_DAY;
@@ -153,7 +150,7 @@ s64 OSCalendarTimeToTicks(const OSCalendarTime* td)
     const s32* table;
 
     yearAdd = td->mon / 12;
-    mon = td->mon % 12;
+    mon = td->mon - yearAdd * 12;
     if (mon < 0) {
         mon += 12;
         yearAdd--;
@@ -164,8 +161,6 @@ s64 OSCalendarTimeToTicks(const OSCalendarTime* td)
     table = IsLeapYear(year) ? LeapYearDays : YearDays;
     days = td->mday + leapDays + table[mon] - 1;
 
-    secs = (s64)SECS_IN_YEAR * year + (s64)SECS_IN_DAY * days;
-    secs += td->hour * 3600 + td->min * 60 + td->sec;
-    secs -= (s64)BIAS * SECS_IN_DAY;
+    secs = (s64)SECS_IN_YEAR * year + (s64)SECS_IN_DAY * days + ((s64)td->min * 60 + (s64)td->hour * 3600 + td->sec) - (s64)BIAS * SECS_IN_DAY;
     return (s64)td->usec * (OS_TIMER_CLOCK / 125000) / 8 + (secs * OS_TIMER_CLOCK + (s64)td->msec * (OS_TIMER_CLOCK / 1000));
 }

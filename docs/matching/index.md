@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (101)
+## Ideas that work (102)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -110,6 +110,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 114 | [A C const global is folded into a pool literal: declare it extern before the bodies and define it after them](114-c-const-global-is.md) | works | data, sections, source-shape | A unit whose asm and C bodies load the same named `.sdata2` constants emits extra anonymous pool entries (`@NNN`) beside the named ones, so .sdata2 grows |
 | 115 | [A hardware register block declared with the absolute-address declarator compiles to lis+add with no relocation](115-hardware-register-block-declared.md) | works | data, source-shape, relocations | Indexed hardware-register access shows `lis rX,hi ; add ; lwz lo(rY)` in the target but `addis rY,rY,hi ; lwz lo(rY)` from a cast constant |
 | 116 | [A flipped unit's statics land in reverse definition order, an unreferenced tail is stripped, and a short .text shifts the unflipped successor](116-flipped-units-statics-land.md) | works | data, linker | A unit at 100 % with flipcheck READY (or only a trailing-pad note) moves the DOL hash when flipped, and the zero-filled .sbss/.bss hides the cause |
+| 117 | [An unsigned range test keeps its two compares only with the upper bound written constant-first](117-unsigned-range-test-keeps.md) | works | source-shape | Retail tests a u32 against a range with two `cmplwi` + branches and our build emits one `addi`/`subis` + `cmplwi`, shortening the function and shifting every branch after it. |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 
