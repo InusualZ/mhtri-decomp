@@ -11,7 +11,7 @@
  *   `VIGetCurrentLine`, `VIGetTvFormat`, `VIGetDTVStatus`, `__VIDisplayPositionToXY`, `VIEnableDimming`,
  *   `VIResetDimmingCount`, `setFbbRegs`, `setVerticalRegs`); `VISetPreRetraceCallback`/`VISetPostRetraceCallback`
  *   (0x804E70C0/0x804E7110, GUESS: they swap the callbacks the retrace handler calls and return the old one),
- *   `VIGetRetraceCount`, `VIGetScanMode` (GUESS), `__VIResetDimmingControlA` and `__VIResetDimmingControlB` (GUESS: each clears one control word
+ *   `VISetDimmingMode` (GUESS, 0x804E9080), `VIGetRetraceCount`, `VIGetScanMode` (GUESS), `__VIResetDimmingControlA` and `__VIResetDimmingControlB` (GUESS: each clears one control word
  *   the dimming code reads) and the variables `viCurrTiming`, `viPostRetraceCallback`, `viPreRetraceCallback`,
  *   `viRetraceQueue`, `viRetraceCount`, `viHorVer`, `viFrameBufferChanged`, `viDimming`, `viDimmingControlA/B` (GUESSES).
  * RESIDUALS. Flip blockers: .bss object 0x80 vs claimed 0x170 and .sdata 0x20 claimed but not emitted (the unwritten bodies own them);
@@ -19,8 +19,7 @@
  *   `__VIDisplayPositionToXY` and the three reset helpers.  Not attempted (the register-programming bodies):
  *   0x804E6710, 0x804E68B0 (retrace handler), 0x804E7160, 0x804E7280, 0x804E7480, setFbbRegs 0x804E7A30, 0x804E7CE0,
  *   setVerticalRegs 0x804E7DC0, 0x804E7F60, 0x804E8630, VIFlush (needs a 64-bit count-leading-zeros inline the
- *   compiler has no intrinsic for), VIEnableDimming and 0x804E9080 (need `SCGetScreenSaverMode`, which `SC/sc.h` does
- *   not declare yet).  `VIGetTvFormat`: the target switches through a nine-entry jump table whose cases share
+ *   compiler has no intrinsic for), `VISetDimmingMode` is 71% because it inlines `VIGetTvFormat` with its own jump table `jumptable_8062B8FC` (ours: if chain, no table).  `VIGetTvFormat`: the target switches through a nine-entry jump table whose cases share
  *   blocks, ours compiles an if chain.  `VIGetScanMode`: the target normalises the extracted bit with neg/or/srwi.
  *   Register numbering differs in `VIGetNextField`, `VIGetCurrentLine`, `VIWaitForRetrace` (the retrace count load
  *   is scheduled before the interrupt-state move) and `__VIDisplayPositionToXY` (r9/r10 swap).
@@ -32,6 +31,7 @@
 #include "OS/OSRestoreInterrupts.h"
 #include "OS/OSThread.h"
 #include "OS/OSSleepThread.h"
+#include "SC/SCGetScreenSaverMode.h"
 
 /* The video interface registers. */
 #define VI_REG16(offset) (*(volatile u16*)(0xCC002000 + (offset)))
@@ -88,6 +88,9 @@ struct VIDimming {
     /* +0x04 */ u8 pad_0x04[0x24];
 };
 static VIDimming viDimming;
+static u32 viDimmingEnabled;
+static u32 viDimmingTimeout;
+static u32 viDimmingMode;
 
 extern "C" {
 void setFbbRegs(VIHorVer* horVer, u32* tfbb, u32* bfbb, u32* rtfbb, u32* rbfbb);
@@ -368,4 +371,50 @@ void __VIDisplayPositionToXY(u32 hcount, u32 vcount, s16* x, s16* y)
         }
     }
     *x = hcount - 1;
+}
+
+/* Turns screen dimming on or off; it stays off when the console's screen saver setting is off. Returns the previous setting. */
+u32 VIEnableDimming(s32 enable)
+{
+    u32 old = viDimmingEnabled;
+
+    if (enable == 1 && SCGetScreenSaverMode() == 0) {
+        enable = 0;
+    }
+    viDimmingEnabled = enable;
+    return old;
+}
+
+/* Selects the screen-dimming delay class (1, 2 or other) and derives the timeout in frames from the TV format. Returns the previous class. */
+u32 VISetDimmingMode(u32 mode)
+{
+    u32 old = viDimmingMode;
+
+    viDimmingMode = mode;
+    if (VIGetTvFormat() == 1) {
+        switch (viDimmingMode) {
+        case 1:
+            viDimmingTimeout = 30000;
+            break;
+        case 2:
+            viDimmingTimeout = 45000;
+            break;
+        default:
+            viDimmingTimeout = 15000;
+            break;
+        }
+    } else {
+        switch (viDimmingMode) {
+        case 1:
+            viDimmingTimeout = 36000;
+            break;
+        case 2:
+            viDimmingTimeout = 54000;
+            break;
+        default:
+            viDimmingTimeout = 18000;
+            break;
+        }
+    }
+    return old;
 }

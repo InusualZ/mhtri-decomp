@@ -25,6 +25,8 @@ void VISetNextFrameBuffer(void* fb); /* untyped: caller-owned frame buffer */
 void VISetBlack(BOOL black);
 void __VIDisplayPositionToXY(u32 hcount, u32 vcount, s16* x, s16* y);
 u32 VIResetDimmingCount(void);
+u32 VIEnableDimming(s32 enable);
+u32 VISetDimmingMode(u32 mode);
 u32 __VIResetDimmingControlA(void);
 u32 __VIResetDimmingControlB(void);
 
