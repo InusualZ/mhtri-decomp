@@ -11,8 +11,23 @@
 extern "C" {
 #endif
 
+/* 0x8045DB84 (0xCC): prints formatted output on the console. */
+int printf(const char* format, ...);
+
 /* 0x8045DC50 - prints `format` with the arguments in `args` through the console. */
 int vprintf(const char* format, va_list args);
+
+/* 0x8045DCCC (0x88): formats into a buffer of at most `n` characters from a variable argument list. */
+int vsnprintf(char* s, u32 n, const char* format, va_list args);
+
+/* 0x8045DD54 (0x84): formats into an unbounded buffer from a variable argument list. */
+int vsprintf(char* s, const char* format, va_list args);
+
+/* 0x8045DDD8 (0xF4): formats into a buffer of at most `n` characters. */
+int snprintf(char* s, u32 n, const char* format, ...);
+
+/* 0x8045DECC (0xD4): formats into an unbounded buffer. */
+int sprintf(char* s, const char* format, ...);
 
 #ifdef __cplusplus
 }
