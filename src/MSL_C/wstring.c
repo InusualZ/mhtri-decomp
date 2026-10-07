@@ -80,8 +80,8 @@ int wcscmp(const u16* a, const u16* b)
 {
     const u16* p = a - 1;
     const u16* q = b - 1;
-    u32 c;
     u32 d;
+    u32 c;
 
     while ((c = *++p) == (d = *++q)) {
         if (c == 0) {

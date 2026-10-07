@@ -9,7 +9,10 @@
  * RESIDUALS. COARSE: the three siblings have no named caller; signatures are `void`.
  * SHAPES. `nofralloc` `twui r0,0` + `blr`.
  */
-asm void TRKAccessFile(void)
+#include "TRK/TRKAccessFile.h"
+
+/* untyped: byte range */
+asm u8 TRKAccessFile(s32 command, s32 handle, u32* count, void* buffer)
 {
     nofralloc
     twi 31, r0, 0
