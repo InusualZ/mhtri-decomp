@@ -126,6 +126,31 @@ def successor_of(unit: str, section: str) -> tuple[str, str] | None:
     return None if span is None else starts.get((section.split("$")[0], span[1]))
 
 
+def padding_chain_break(stem: str, objsec: str) -> str | None:
+    """Why a run of linked units does not hold its claimed addresses after a short successor, else None.
+
+    A linked successor whose own built section is shorter than its claim leaves the next section to be placed by
+    the linker, not by the claim: that next unit must be linked and 16-aligned too, and so on until a unit that
+    fills its claim (or an unregistered/absent end). Returns the first unit that breaks the run."""
+    own, starts = _range_index()
+    linked = linked_units()
+    seen = set()
+    while (stem, objsec) not in seen:
+        seen.add((stem, objsec))
+        span = own.get((stem, objsec))
+        built = sections(os.path.join(SRC, stem + ".o")).get(objsec)
+        if span is None or built is None or built[0] >= span[1] - span[0]:
+            return None
+        nxt = starts.get((objsec.split("$")[0], span[1]))
+        if nxt is None:
+            return None
+        if nxt[0] not in linked:
+            return "%s (short by 0x%X) is followed by unflipped %s: flip from the tail of the run" % (
+                stem, span[1] - span[0] - built[0], nxt[0])
+        stem, objsec = nxt
+    return None
+
+
 def linked_pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_path: str) -> tuple[str | None, str | None]:
     """`(note, hint)`: the note when the shortfall is link padding before a linked successor (`linked_trailing_pad`),
     else the hint naming the unflipped successor whose flip would make it so (flip from the tail of each run)."""
@@ -142,7 +167,13 @@ def linked_pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_
     if stem in linked_units():
         built = sections(os.path.join(SRC, stem + ".o")).get(objsec)
         aligns = [1 << built[1]] if built else []
-        return objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, aligns), None
+        note = objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, aligns)
+        if note:
+            broken = padding_chain_break(stem, objsec)
+            if broken:
+                return None, ("the shortfall is link padding only while the run after it stays on its claimed addresses, "
+                              "and %s" % broken)
+        return note, None
     if start is not None and objcompare.linked_trailing_pad(name, ours[0], size, body, symbols, start, [16]):
         return None, ("the shortfall is link padding only once its successor %s is flipped (16-aligned); "
                       "flip from the tail of each run" % stem)

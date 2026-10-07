@@ -54,6 +54,16 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   that starts exactly at the claim's end. The note reads `... the 0xK-byte tail is link padding ...`. An unflipped
   successor (its target object aligned to 4) is refused, and when the successor flipped at 16 would excuse the shortfall
   the size line says so: `... only once its successor <unit> is flipped (16-aligned); flip from the tail of each run`.
+* **The padding must hold down the whole run (2026-10-07).** A flipped successor that is itself short hands the next
+  section to the linker again, so the shortfall is accepted only when the chain `flipcheck.padding_chain_break` follows
+  (unit -> successor -> ...) ends on a unit that fills its claim, every link of it being flipped. Measured: OS/OSMemory ->
+  OSMutex (-0xC) -> OSReboot (-0xC) -> OSReset unflipped moved every symbol after OSReboot by 0xC, 64228 `.text` bytes of
+  the DOL (call sites), and READY was printed for OSMemory and OSMutex. It now reads `... and <unit> (short by 0xN) is
+  followed by unflipped <next>: flip from the tail of the run`.
+* **`ninja diff` is not a flip signal.** `dtk dol diff` fails on main itself with `Expected to find symbol @eti_8001E558`:
+  420 `@etb_`/`@eti_` symbols of the already-Matching units (objextab renames them global) are absent from the linked ELF's
+  symbol table although their bytes are present and the DOL hash holds. No dead-strip is involved (`__nwa__FUl`,
+  `fn_8004054C` and the four records are in the flipped ELF); the hash is the check.
 * **A trailing alignment pad is not a size gap (2026-10-06).** dtk gives a unit the zero fill up to the next
   object's aligned start, MWCC's object ends before it, and the link puts the fill back. A section shorter than its
   claim is accepted - a `.` note `<section>: 0xN of 0xM bytes - the 0xK-byte tail is alignment fill (...)` instead of
@@ -87,7 +97,7 @@ the next section's alignment ignored 2.
 `test_linked_successor_pad` (9 more checks, 24 in all): OSLink/OSMessage-shaped objects - a Matching 16-aligned successor and a
 same-batch successor accept, an unflipped one (target aligned to 4, with the hint), a successor our object aligns to 4 and a
 non-zero tail refuse; `.text` is excused, `extab` never, `.sdata` 4 B before an 8-aligned successor is. Mutation: the
-linked-successor test off fails 2.
+linked-successor test off fails 2. `test_padding_chain` (2 more checks): a short OSMessage before an unflipped OSMutex refuses OSLink, a run ending on a full unit accepts; chain check off fails 1.
 Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps
