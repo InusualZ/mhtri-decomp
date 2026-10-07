@@ -22,6 +22,9 @@ typedef struct OSShutdownFunctionInfo {
 /* 0x804D21F0 - add a shutdown-function record to the OS's ordered list. */
 void OSRegisterShutdownFunction(OSShutdownFunctionInfo* info);
 
+/* 0x80795384 - set while a return-to-menu is in progress; the Wii remote driver's shutdown callback reads it for event 5. NAME: a GUESS. */
+extern s32 OSReturnToMenuPending;
+
 #ifdef __cplusplus
 }
 #endif
