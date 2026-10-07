@@ -31,6 +31,9 @@ BOOL SCReplaceByteArrayItem(const void* value, u32 item, u32 size); /* untyped: 
 /* 0x804DC360 - stores a U8 item (value, item); returns non-zero on success. */
 BOOL SCReplaceU8Item(u32 value, u32 item);
 
+/* 0x804DB210 - starts re-reading the SYSCONF and setting.txt files into `buf` (at least 0x4000 bytes); `callback` gets the result. */
+s32 SCReloadConfFileAsync(u8* buf, u32 size, void (*callback)(s32 result));
+
 /* 0x804DC480 - writes the pending configuration back; `callback` gets the result (0 = ok). */
 void SCFlushAsync(void (*callback)(s32 result));
 

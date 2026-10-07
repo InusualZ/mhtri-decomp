@@ -54,6 +54,9 @@ s32 NANDWriteAsync(NANDFileInfo* info, const void* buffer, u32 length, NANDAsync
 s32 NANDPrivateCreateAsync(const char* path, u8 permission, u8 attribute, NANDAsyncCallback callback, NANDCommandBlock* block);
 s32 NANDPrivateOpenAsync(const char* path, NANDFileInfo* info, u8 mode, NANDAsyncCallback callback, NANDCommandBlock* block);
 s32 NANDPrivateDeleteAsync(const char* path, NANDAsyncCallback callback, NANDCommandBlock* block);
+/* 0x804C93A0 / 0x804C7A90 - probe the node type of `path` (1 file, 2 directory) and create the directory `path`. */
+s32 NANDPrivateGetTypeAsync(const char* path, u8* type, NANDAsyncCallback callback, NANDCommandBlock* block);
+s32 NANDPrivateCreateDirAsync(const char* path, u8 permission, u8 attribute, NANDAsyncCallback callback, NANDCommandBlock* block);
 /* The record `NANDGetStatus` fills: owner, group (the maker code), attribute and permission. */
 typedef struct NANDStatus {
     /* +0x00 */ u32 ownerId;
@@ -63,6 +66,8 @@ typedef struct NANDStatus {
 } NANDStatus; /* size: 0x08 */
 /* 0x804C8090 - the owner/group/attribute/permission record of `path`. */
 s32 NANDGetStatus(const char* path, NANDStatus* status);
+/* 0x804C8170 - reads the status record of `path` (an absolute name) asynchronously. */
+s32 NANDPrivateGetStatusAsync(const char* path, NANDStatus* status, NANDAsyncCallback callback, NANDCommandBlock* block);
 /* 0x804C8100 - `NANDGetStatus` on an absolute path. */
 s32 NANDPrivateGetStatus(const char* path, NANDStatus* status);
 /* 0x804C70E0 - create `path` by its absolute name with `permission` and `attribute`. */
