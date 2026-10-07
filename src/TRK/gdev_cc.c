@@ -5,15 +5,18 @@
  * RANGE. .text 0x80468378..0x804685F0 (10 functions in the map, 0x278 B); .bss 0x806F5020..0x806F5540; .sbss
  *    0x80794E38..0x80794E40.
  * FLAGS. the `OS` lib's `cflags_os`.
- * NAMES. function names are the dump's (`gdev_cc_open`, `close`, `read`, `pre_continue`, `post_stop`, `peek`, `initinterrupts` are `gdev_cc_close` is a GUESS (the dump labels the address with a neighbour or a placeholder; the name fits the unit scheme). `gdev_cc_read` is a GUESS (the dump labels the address with a neighbour or a placeholder; the name fits the unit scheme). `gdev_cc_pre_continue` is a GUESS (the dump labels the address with a neighbour or a placeholder; the name fits the unit scheme). `gdev_cc_post_stop` is a GUESS (the dump labels the address with a neighbour or a placeholder; the name fits the unit scheme). `gdev_cc_peek` is a GUESS (the dump labels the address with a neighbour or a placeholder; the name fits the unit scheme). `gdev_cc_initinterrupts` is a GUESS (the dump labels the address with a neighbour or a placeholder; the name fits the unit scheme).
- *    the map's and GUESS where the dump's neighbours disagree); `gdev_cc_buffer`, `gdev_cc_circle_buffer`, `gdev_cc_open_flag` are
- *    GUESS (the bytes the bodies fill, queue through and test); the return codes are written as numbers.
+ * NAMES. the `gdev_cc_*` function names are the dump's where it labels the address; `gdev_cc_close`, `gdev_cc_read`,
+ *    `gdev_cc_pre_continue`, `gdev_cc_post_stop`, `gdev_cc_peek` and `gdev_cc_initinterrupts` are GUESS (the dump labels the
+ *    address with a neighbour or a placeholder; the names fit the unit scheme). `gdev_cc_buffer`, `gdev_cc_circle_buffer`,
+ *    `gdev_cc_open_state` and `GdevCcOpenState` are GUESS (the bytes the bodies fill, queue through and test); the return
+ *    codes are written as numbers.
  * EVIDENCE. ten consecutive `gdev_cc_*` dump names; `.bss` 0x806F5020 (0x500 B) and 0x806F5520 (0x20 B, the
- *    receive circle buffer) and `.sbss` 0x80794E38 are read only here. `DBInitComm` .. `DBInitInterrupts` and the two
+ *    receive circle buffer) and `.sbss` 0x80794E38 (the 8 B open-state object) are read only here. `DBInitComm` .. `DBInitInterrupts` and the two
  *    4-byte stubs `pre_continue`/`post_stop` call belong to `VF/vf.cpp`.
- * RESIDUALS. link order: the compiler emits the 0x20 B circle buffer before the 0x500 B receive buffer in `.bss`
- *    (the target has the receive buffer first, 0x806F5020), which shifts the DOL hash, so the unit stays NonMatching
- *    although every row is at 100 %; the open flag map row is 8 B, the source emits a 4 B word.
+ * RESIDUALS. link order: the compiler emits the 0x20 B circle buffer before the 0x500 B receive buffer in `.bss` (the target
+ *    has the receive buffer first, 0x806F5020), which moves 6 code bytes of relocation words and the DOL hash, so the unit stays
+ *    NonMatching although every row is at 100 %. Definition order, `static`, an earlier use of the circle buffer, a local
+ *    alias and one enclosing struct (which changes the code, 97 %) were all measured without moving the order.
  * SHAPES. `read` and `peek` stage the DB bytes in a 0x500 B stack array, then queue them in the circle buffer.
  */
 #include "TRK/CircleBuffer.h"
@@ -29,9 +32,14 @@
 
 #define GDEV_CC_BUFFER_SIZE 0x500
 
+typedef struct GdevCcOpenState {
+    /* +0x00 */ s32 is_open;       /* nonzero once gdev_cc_open ran */
+    /* +0x04 */ s32 unused_0x04;   /* never read or written */
+} GdevCcOpenState; /* size: 0x8 */
+
 u8 gdev_cc_buffer[GDEV_CC_BUFFER_SIZE];
 CircleBuffer gdev_cc_circle_buffer;
-s32 gdev_cc_open_flag;
+GdevCcOpenState gdev_cc_open_state;
 
 s32 gdev_cc_initialize(u32* inputPendingPtrRef, void (*handler)(void))
 {
@@ -47,10 +55,10 @@ s32 gdev_cc_shutdown(void)
 
 s32 gdev_cc_open(void)
 {
-    if (gdev_cc_open_flag != 0) {
+    if (gdev_cc_open_state.is_open != 0) {
         return -10005;
     }
-    gdev_cc_open_flag = 1;
+    gdev_cc_open_state.is_open = 1;
     return 0;
 }
 
@@ -65,7 +73,7 @@ s32 gdev_cc_read(u8* dst, s32 len)
     s32 err = 0;
     s32 avail;
 
-    if (gdev_cc_open_flag == 0) {
+    if (gdev_cc_open_state.is_open == 0) {
         return -10001;
     }
     while (CBGetBytesAvailableForRead(&gdev_cc_circle_buffer) < len) {
@@ -88,7 +96,7 @@ s32 gdev_cc_write(const u8* src, s32 len)
 {
     s32 written;
 
-    if (gdev_cc_open_flag == 0) {
+    if (gdev_cc_open_state.is_open == 0) {
         return -10001;
     }
     while (len > 0) {
