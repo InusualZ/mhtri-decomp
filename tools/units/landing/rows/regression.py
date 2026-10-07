@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import os
 
+from tools.lib import project as _project
 from tools.lib import report as _report
 from tools.units.landing.base import report_snapshot
-from tools.units.landing.common import Batch, KIND_BOOKKEEPING
+from tools.units.landing.common import Batch, KIND_BOOKKEEPING, run
 
 
 def regression_rows(changes_json: str) -> list[tuple[str, str, float, float]]:
@@ -45,6 +46,27 @@ def report_regressions(before: dict, after: dict, allow: list[str]) -> tuple[lis
     return _report.regression(before, after, allow)
 
 
+def seam_moves_of(before_text: str, after_text: str) -> tuple[list[tuple[str, str, int, int]], set[str]]:
+    """(`.text` moves, touched units) of a `splits.txt` diff, under the report's unit names (`main/<stem>`)."""
+    before, after = _project.Splits.parse(before_text), _project.Splits.parse(after_text)
+    name = lambda unit: "main/" + _project.splits.stem(unit)
+    return ([(name(a), name(b), lo, hi) for a, b, lo, hi in _project.splits.range_moves(before, after)],
+            {name(u) for u in _project.splits.touched_units(before, after)})
+
+
+def batch_seam_moves(b: Batch) -> tuple[list[tuple[str, str, int, int]], set[str]]:
+    """`seam_moves_of` the batch base's `splits.txt` and the working tree's; ([], set()) when either is unreadable."""
+    if not b.base:
+        return [], set()
+    shown = run(["git", "show", "%s:config/RMHE08/splits.txt" % b.base], b.main)
+    try:
+        with open(os.path.join(b.main, "config", "RMHE08", "splits.txt"), encoding="utf-8", errors="replace") as fh:
+            now = fh.read()
+    except OSError:
+        return [], set()
+    return seam_moves_of(shown.stdout or "", now) if shown.returncode == 0 else ([], set())
+
+
 # --- the rows -------------------------------------------------------------------------------------------------
 
 def regression_check_rows(b: Batch) -> None:
@@ -54,11 +76,22 @@ def regression_check_rows(b: Batch) -> None:
     before_report = b.recorded.get("report") or {}
     after_report = report_snapshot(b.main)
     unauthorised, authorised = report_regressions(before_report, after_report, b.allow_regression)
+    seams, why_not = [], ""
+    if unauthorised:
+        moves, touched = batch_seam_moves(b)
+        unauthorised, seams, why_not = _report.seam_exempt(before_report, after_report, moves, touched, unauthorised)
+        for seam in seams:
+            b.seam_moves.append("%s -> %s (%d functions)" % (seam["from"], seam["to"], seam["functions"]))
+        if why_not:
+            print("note: seam move not credited: " + why_not)
     for row in authorised:
         print("note: regression ALLOWED by --allow-regression: %s %s %.2f -> %.2f" % row)
     b.check("no symbol or unit regressed", not unauthorised,
             "; ".join("%s %s %.2f -> %.2f" % r for r in unauthorised[:5]),
-            info=("%d authorised regression(s)" % len(authorised)) if authorised else "")
+            info="; ".join(filter(None, [
+                ("%d authorised regression(s)" % len(authorised)) if authorised else "",
+                "; ".join("seam move: %s -> %s, %d functions, none worse" % (s["from"], s["to"], s["functions"])
+                          for s in seams)])))
     used = {a for a in b.allow_regression if any(a in row[0] for row in authorised)}
     stale_allow = [a for a in b.allow_regression if a not in used]
     b.warn("every --allow-regression was actually needed",

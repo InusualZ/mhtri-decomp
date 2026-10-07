@@ -308,6 +308,7 @@ class Batch:
     paths: list[str] = field(default_factory=list)
     scratch: list[str] = field(default_factory=list)
     band_warnings: list[str] = field(default_factory=list)
+    seam_moves: list[str] = field(default_factory=list)  # the regression row's credited seam moves (the land log)
     warnings: list[str] = field(default_factory=list)   # `warn` rows' findings: the gate log, the message, the land log
     subject: str = ""
     extra: dict = field(default_factory=dict)

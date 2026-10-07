@@ -32,7 +32,7 @@ def _attempt(allow: dict | None = None) -> dict:
     """What one attempt records while it runs; an exception leaves the outcome `error`. `allow` is the invocation's
     allowances (`state.allowances`), recorded whatever the outcome."""
     return {"outcome": "error", "row": None, "conflicts": [], "units": [], "commit": None, "allow": dict(allow or {}),
-            "warnings": []}
+            "warnings": [], "seam_moves": []}
 
 
 def _refused(rec: dict, line: str, row: str, outcome: str = "refused") -> int:
@@ -96,6 +96,7 @@ def _log(main: str, branch: str, rec: dict, t0: float) -> None:
                                              units=tuple(rec["units"]), commit=rec["commit"],
                                              allow=rec.get("allow") or {},
                                              warnings=tuple(rec.get("warnings") or ()),
+                                             seam_moves=tuple(rec.get("seam_moves") or ()),
                                              extra=dict(rec.get("extra") or {}), manifest=state.MANIFEST))
     except OSError as exc:                         # the log is evidence; it never changes a landing's answer
         print("WARNING: the landing log was not written (%s)" % exc, file=sys.stderr)
@@ -254,7 +255,8 @@ def _land(main: str, units: list[str], rec: dict, base: str | None, no_build: bo
         gate_ok = gate.verify(main, norm_units, base, dry_run=False, no_build=no_build,
                               allow_regression=allow_regression, check_outbox=check_outbox,
                               release_claims=False, problems=gate_failures, branch=branch,
-                              no_selftests=no_selftests, warnings=rec.setdefault("warnings", [])) == 0
+                              no_selftests=no_selftests, warnings=rec.setdefault("warnings", []),
+                              seam_moves=rec.setdefault("seam_moves", [])) == 0
     rows = changed_status(main)
     outside = outside_batch([path for _code, path in rows], main=main)
     scratch = scratch_paths(outside)

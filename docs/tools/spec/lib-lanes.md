@@ -65,7 +65,8 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   `regression` (units), `rule10` (keys), `rule12` (tokens), `orphan` (addresses), `unit_renames` (`OLD=NEW`) as
   lists, `no_outbox`/`no_selftests` as `true`; an unused class is absent and an unknown one is refused. Readers accept
   `SCHEMAS` = 1 and 2 (a schema-1 line carries no allowance). Schema 2 also carries `warnings` (the gate's WARNING
-  rows' findings, `<row>: <finding>`). An optional `manifest` (2026-10-06) is the lane manifest id `land --manifest`
+  rows' findings, `<row>: <finding>`). An optional `seam_moves` (2026-10-07; `"A -> B (N functions)"` per pure seam move the regression row credited) is
+  absent when none. An optional `manifest` (2026-10-06) is the lane manifest id `land --manifest`
   named; the key is absent when none, so the schema stays 2 and `summary` counts the attempts that named one
   (`manifests`).
 

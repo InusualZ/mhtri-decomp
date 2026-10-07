@@ -48,7 +48,7 @@ def fake_verify_with(write, gate_code=0, gate_problems=()):
     """A `verify` stand-in: `write(main)` is "the build", then the gate's verdict and its problems."""
 
     def fake_verify(main, units, base, dry_run, no_build, allow_regression=None, check_outbox=True,
-                    release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None):
+                    release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None, seam_moves=None):
         write(main)
         if problems is not None:
             problems.extend(gate_problems)
@@ -198,7 +198,7 @@ def _conflicted_worktree(tmp, branch="worker/x", name="scratch"):
 
 def _land_verify_ok(main, units, base, dry_run, no_build, allow_regression=None,
                     check_outbox=True, release_claims=True, problems=None, branch=None,
-                    no_selftests=False, warnings=None):
+                    no_selftests=False, warnings=None, seam_moves=None):
     L.write_land_message(main, "land: %s\n\nledger: (fixture)\n" % ",".join(units))
     return 0
 

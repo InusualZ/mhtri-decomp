@@ -374,7 +374,8 @@ def compare(before: "Report | dict", after: "Report | dict", eps: float = DEFAUL
 
 
 def snapshot(report: "Report | dict | None") -> dict:
-    """`{unit: {"fuzzy", "matched_code", "symbols": {name: score}, "all": True}}` - what a batch is judged against.
+    """`{unit: {"fuzzy", "matched_code", "total_code", "symbols": {name: score}, "addrs": {name: address}, "all": True}}`
+    - what a batch is judged against (`addrs` and `total_code` let `seam_exempt` pair functions across a re-home).
 
     Every function is listed under the 0 % rule (an unscored one at 0.0), so a symbol at 100 % that falls - or loses
     its score - is visible to `regression`; `"all"` marks the row (a snapshot written before WP4 listed only the
@@ -384,15 +385,19 @@ def snapshot(report: "Report | dict | None") -> dict:
     out = {}
     for unit in Report.coerce(report).units():
         measures = unit.get("measures") or {}
-        symbols = {}
+        symbols, addrs = {}, {}
         for fn in unit.get("functions") or []:
             pct = fn.get(SCORE_KEY, fn.get("match_percent"))
             pct = float(pct) if isinstance(pct, (int, float)) and not isinstance(pct, bool) else 0.0
             if fn.get("name"):
                 symbols[fn["name"]] = round(pct, 4)
+                addr = num((fn.get("metadata") or {}).get("virtual_address"))
+                if addr is not None:
+                    addrs[fn["name"]] = int(addr)
         if measures or symbols:
             out[unit["name"]] = {"fuzzy": measures.get(SCORE_KEY), "matched_code": measures.get("matched_code"),
-                                 "symbols": symbols, "all": True}
+                                 "total_code": measures.get("total_code"), "symbols": symbols, "addrs": addrs,
+                                 "all": True}
     return out
 
 
@@ -442,6 +447,74 @@ def regression(before: dict, after: dict, allow: list[str] | tuple = (),
                 rows.append((unit, "unit fuzzy", bf, af))
         (authorised if any(a in unit for a in allow) else unauthorised).extend(rows)
     return unauthorised, authorised
+
+
+def whole_fuzzy(snap: dict) -> float | None:
+    """The code-weighted fuzzy of a `snapshot` (its units' `total_code` as weights); None when it holds no weight."""
+    total = score = 0.0
+    for row in snap.values():
+        w, f = num(row.get("total_code")), row.get("fuzzy")
+        if w and isinstance(f, (int, float)):
+            total, score = total + w, score + w * f
+    return score / total if total else None
+
+
+def seam_exempt(before: dict, after: dict, moves: list[tuple[str, str, int, int]], touched: set[str],
+                unauthorised: list[tuple], eps: float = DEFAULT_EPS) -> tuple[list[tuple], list[dict], str]:
+    """-> (still unauthorised, seam moves, why not) for a batch whose `splits.txt` moved `.text` between units.
+
+    `moves` are `(from_unit, to_unit, start, end)` over snapshot unit names, `touched` every unit the splits diff
+    changed. A *unit average* row of a unit a move names is a pure seam effect, and is lifted, only when ALL hold:
+    (1) every function present in both snapshots, paired by address, scores at least what it did; (2) every
+    function that left a unit lies inside a move *from* that unit and is held by the move's target afterwards, and
+    every function a unit gained from another lies inside a move to it; (3) the matched code summed over the
+    touched units and the whole-report fuzzy did not fall; (4) a lifted unit really lost or gained a function. A
+    per-symbol row is never lifted. Either snapshot lacking addresses (taken before they were recorded) lifts
+    nothing: `why not` says so. Each seam move is `{"from", "to", "functions"}`."""
+    avg = [r for r in unauthorised if r[1] == "unit fuzzy"]
+    if not moves or not avg:
+        return list(unauthorised), [], ""
+    names = {u for m in moves for u in m[:2]}
+
+    def addrs(snap: dict, unit: str) -> dict[int, float] | None:
+        row = snap.get(unit) or {}
+        a, sym = row.get("addrs"), row.get("symbols") or {}
+        if a is None:
+            return None if row else {}
+        return {int(addr): sym.get(name, 0.0) for name, addr in a.items()}
+    old = {u: addrs(before, u) for u in touched | names}
+    new = {u: addrs(after, u) for u in touched | names}
+    if any(v is None for v in (*old.values(), *new.values())):
+        return list(unauthorised), [], "a snapshot carries no function addresses (re-record the base)"
+    every_old = {a: (u, p) for u, fn in ((u, addrs(before, u)) for u in before) if fn for a, p in fn.items()}
+    every_new = {a: (u, p) for u, fn in ((u, addrs(after, u)) for u in after) if fn for a, p in fn.items()}
+    worse = [a for a, (_u, p) in every_old.items() if a in every_new and every_new[a][1] < p - eps]
+    if worse:
+        return list(unauthorised), [], "function at 0x%X got worse" % worse[0]
+    inside = lambda a, lo, hi: lo <= a < hi
+    gone = [a for a in every_old if a not in every_new]
+    if gone:
+        return list(unauthorised), [], "function at 0x%X is in no unit after the batch" % gone[0]
+    moved: dict[tuple[str, str], set[int]] = {}
+    for a, (u_old, _p) in every_old.items():
+        u_new = every_new[a][0]
+        if u_new == u_old:
+            continue
+        hit = next((m for m in moves if m[0] == u_old and m[1] == u_new and inside(a, m[2], m[3])), None)
+        if hit is None:
+            return list(unauthorised), [], "function at 0x%X moved %s -> %s outside the splits diff" % (a, u_old, u_new)
+        moved.setdefault((u_old, u_new), set()).add(a)
+    sums = [sum(num((snap.get(u) or {}).get("matched_code")) or 0 for u in touched | names) for snap in (before, after)]
+    if sums[1] < sums[0] - eps:
+        return list(unauthorised), [], "matched code of the touched units fell %d -> %d" % tuple(sums)
+    wb, wa = whole_fuzzy(before), whole_fuzzy(after)
+    if wb is not None and wa is not None and wa < wb - 1e-3:
+        return list(unauthorised), [], "whole-report fuzzy fell %.4f -> %.4f" % (wb, wa)
+    involved = {u for pair in moved for u in pair}
+    lifted = [r for r in avg if r[0] in involved]
+    rest = [r for r in unauthorised if r not in lifted]
+    seams = [{"from": a, "to": b, "functions": len(fns)} for (a, b), fns in sorted(moved.items())]
+    return rest, (seams if lifted else []), ""
 
 
 # --------------------------------------------------------------------------------------------------

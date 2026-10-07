@@ -23,7 +23,7 @@ def fixture() -> testing.GitFixture:
 def gate(code=0, failed=()):
     """A `verify` stand-in: exit `code`, the failed rows `failed` in its `problems` out-parameter."""
     def fake_verify(main, units, base, dry_run, no_build, allow_regression=None, check_outbox=True,
-                    release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None):
+                    release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None, seam_moves=None):
         if problems is not None:
             problems.extend(failed)
         L.write_land_message(main, "land: batch\n\nledger: (fixture)\n")
@@ -81,7 +81,7 @@ ALL_ALLOW = {"regression": ["Net/a", "Net/b"], "rule10": ["run:.data:805FB0F8", 
 def body_gate():
     """A `verify` stand-in that writes the REAL commit body (`gate.message_body`) from the arguments it was given."""
     def fake_verify(main, units, base, dry_run, no_build, allow_regression=None, check_outbox=True,
-                    release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None):
+                    release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None, seam_moves=None):
         b = L.Batch(main=main, units=units, unit_units=units, base="0" * 40, recorded={}, branch=branch,
                     check_outbox=check_outbox, no_selftests=no_selftests, allow_regression=list(allow_regression or []))
         b.subject = "land: batch"
@@ -157,7 +157,7 @@ def test_warnings_reach_the_log_and_the_body(c):
     fx = fixture()
 
     def warning_gate(main, units, base, dry_run, no_build, allow_regression=None, check_outbox=True,
-                     release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None):
+                     release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None, seam_moves=None):
         b = L.Batch(main=main, units=units, unit_units=units, base="0" * 40, recorded={})
         with contextlib.redirect_stdout(io.StringIO()):
             b.warn("every unit's outbox validates", ["Pl/pl_act: no outbox at x"])

@@ -396,7 +396,7 @@ refuses a batch, names the row that refused, and the landing either passes every
 * **Build and post-build (10-21):** 10 configure / compile gate / `ok` exit codes, 11 registration on three axes,
   12 undefined references, 13 flips `flipcheck` READY, 14 rule 10 (`vtableaudit.diff_rows`: a run shifted by at
   most one word at each end pairs with its removed run, anything else is added), 15 data closure, 16 target-object
-  drift, 17 per-symbol re-measure, 18 regressions (a stale `--allow-regression` is a **warning**), 19 `ok` fresh,
+  drift, 17 per-symbol re-measure, 18 regressions (a stale `--allow-regression` is a **warning**; a pure `splits.txt` seam move that only lowers a unit average passes as `seam move: A -> B, N functions, none worse`, section 11 2026-10-07), 19 `ok` fresh,
   21 claim release.
 * **Rows 8 and 20 are gone** (the `rule 7 deferred` escape growth, the knowledge delta): numbers are kept, not
   reused. **A post-build refusal is named**: `land` receives the failing post-build rows too, so its REFUSED line
@@ -410,7 +410,8 @@ refuses a batch, names the row that refused, and the landing either passes every
   re-range a neighbour - `verifyunit.target_object_fingerprint` drops names by design; the row's test is not the
   fingerprint alone, so do not guess at renames). A deliberate neighbour re-range needs `--units <neighbour>`
   **and** `--allow-regression <neighbour>` when a function legitimately leaves it (a stale `--allow-regression` is
-  a printed and logged warning since 2026-10-05, no longer a refusal).
+  a printed and logged warning since 2026-10-05, no longer a refusal). Since 2026-10-07 a re-range whose only
+  effect is a lower unit *average* needs no allowance (the seam-move credit, section 11); a function that got worse still does.
 * **A path is not a unit.** `is_batch_path` says "path" on a file extension *or* something in the tree at that
   exact path; a unit's bare name is never a file. A tools-only/docs-only/comment-only batch names its paths (or,
   for a sweep with no registration diff, every unit) in `--units`; a tooling file left staged after a fixer batch
@@ -1050,6 +1051,7 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-10-05 | **Leaf headers are folded into their owner's header** (strictly header = source stem), as later lane work, measured per fold (a declaration set is a codegen input, playbook 060). |
 | 2026-10-05 | **Rule 7 is a ratchet with no exemptions**: every generated identifier and every generated file or directory name counts, in every `.c`/`.cpp`/`.h` - address-named identifiers (`Panel805482CC`, `s_80276B58`, `Helper_80147CE0`) included; the gate refuses any new finding (add-only by identity, `lib.findings`), counts only fall, and no comment, path or category is exempt. **A new unit registered with a generated stem is refused** (a GUESS name is allowed). |
 | 2026-10-05 | **Order of the header program**: the lint (this rule set) -> the vtableaudit `referenced` window fix -> the quiesced header move (a separate batch) -> the renames, as lane work. The full body rule set on headers (rules 3, 4, 5, 6, 8, 9) is the orchestrator's recommendation, switchable in one place (`lint.HEADER_BODY_RULES_ON`). |
+| 2026-10-07 | **A pure `splits.txt` seam move is not a regression** (owner: "modify the rule so this case does not need my authorization"). Two batches (the g3d re-range `cf085cde5`, pre-pass 3 `472beb588`) were refused only because functions moved between units through a `splits.txt` diff and the shrinking unit's average fell. The regression row now lifts a *unit-average* row of a unit the diff's `.text` moves name when ALL hold: every function present in both reports (paired by address) scores at least what it did; every function that changed unit lies inside a move between exactly those two units; the matched code of the touched units and the whole-report fuzzy did not fall; the unit really lost or gained a function. A per-symbol drop, a move outside the diffed range, or a unit regression with no splits move refuses as before; `--allow-regression` stays for deliberate cases. The PASS row reads `seam move: A -> B, N functions, none worse` and the landing log carries `seam_moves`. |
 | standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
 
 ---

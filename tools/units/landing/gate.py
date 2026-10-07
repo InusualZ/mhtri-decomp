@@ -41,7 +41,8 @@ DRY_RUN_PLAN = ("\nwould then: delete build/RMHE08/ok%s, run configure.py -> reg
 def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_build: bool,
            allow_regression: list[str] | None = None, check_outbox: bool = True,
            release_claims: bool = True, problems: list[str] | None = None,
-           branch: str | None = None, no_selftests: bool = False, warnings: list[str] | None = None) -> int:
+           branch: str | None = None, no_selftests: bool = False, warnings: list[str] | None = None,
+           seam_moves: list[str] | None = None) -> int:
     """Run every row; 0 when every row passed, 1 otherwise.
 
     `problems` is the out-parameter an automated caller (`land`) reads: `"<failing check> [<KIND>]: <what it
@@ -49,7 +50,8 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     extension (`norm_unit`), and a `--units` entry that is a batch PATH (`is_batch_path`) stays out of the
     unit-shaped rows (`unit_rows`). `--dry-run` runs the pre-build rows only and touches nothing; a pre-build
     failure refuses before the build. Only an all-green run writes the commit message (`.git/land_msg.txt`).
-    `warnings`, the second out-parameter, receives every WARNING row's findings (`Batch.warn`) whatever the verdict."""
+    `warnings`, the second out-parameter, receives every WARNING row's findings (`Batch.warn`) whatever the verdict;
+    `seam_moves` the pure seam moves the regression row credited (`"A -> B (N functions)"`)."""
     units = [naming.norm_unit(u.strip("/")) for u in units]
     recorded = read_base(main)
     b = Batch(main=main, units=units, unit_units=unit_rows(main, units, base or recorded.get("base")),
@@ -61,6 +63,8 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     finally:
         if warnings is not None:
             warnings.extend(b.warnings)
+        if seam_moves is not None:
+            seam_moves.extend(b.seam_moves)
 
 
 def _verify(b: Batch, main: str, recorded: dict, dry_run: bool, no_build: bool, problems: list[str] | None) -> int:
