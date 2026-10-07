@@ -45,7 +45,7 @@ extern "C" {
 void mtx34_identity(MTX34* pMtx);                               /* owner: src/fn_8004CAD8.cpp */
 s32 res_node_is_valid(const ResHandle* pSelf);                     /* owner: src/g3d/fn_8005AA28.cpp */
 void* fn_8005AAE4(const ResHandle* pSelf);                   /* owner: src/g3d/fn_8005AA28.cpp */
-ResNodeData* fn_8005D0C4(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
+ResNodeData* res_node_ptr(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
 ResNodeData* fn_8005D218(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
 VEC3* vec3_copy_construct(VEC3* pOut, const VEC3* pIn);              /* owner: src/g3d/fn_80063888.cpp */
 void fn_8008C484(f32* pOut, f32 x, f32 y, f32 z);            /* owner: src/g3d/g3d_resanmchr.cpp */
@@ -77,7 +77,7 @@ void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
     }
     if (res_node_is_valid(pSelf) != 0) {
         u32 flags = pResult->flags;
-        ResNodeData* pData = fn_8005D0C4(pSelf);
+        ResNodeData* pData = res_node_ptr(pSelf);
         if ((flags & 0x80) != 0) {
             u32 dataFlags = pData->mFlags;
             if ((dataFlags & 0x8) != 0) {
@@ -141,7 +141,7 @@ void fn_80098F6C(ResHandle* pSelf, AnmResult* pResult) {
         nw4r::db::Panic(lbl_805915C0, 0x7F, lbl_805915F8);
     }
     if (res_node_is_valid(pSelf) != 0) {
-        ResNodeData* pData = fn_8005D0C4(pSelf);
+        ResNodeData* pData = res_node_ptr(pSelf);
         u32 flags = 0;
         u32 dataFlags = pData->mFlags;
         if ((dataFlags & 0x8) != 0) {

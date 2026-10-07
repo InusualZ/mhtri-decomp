@@ -12,7 +12,12 @@
  *   the other 8 of the run are called only from inside it or from other g3d units (fn_80063964, fn_80063AC4), and
  *   0x80063E60 onward is called by g3d_calcmaterial, g3d_scnmdl and g3d_resfile; the extabindex records of the
  *   run end at 0x8001FBFC, the last record (0x80063E30) with its extab 0x80007764-0x8000776C.
- * NAMES. res_node_common_copy_ctor is a GUESS; res_node_copy_ctor is a GUESS; ut_add_offset_to_ptr is a GUESS;
+ * NAMES. res_mdl_node_subtree_end is a GUESS (the evidence follows).
+ *   res_name_common_copy_ctor is a GUESS; res_node_ref is a GUESS; res_node_get_res_name is a GUESS;
+ *   res_anm_chr_get_node_index is a GUESS (the evidence follows).
+ *   res_name_copy_ctor is a GUESS; res_node_get_class_name is a GUESS;
+ *   res_node_ptr is a GUESS (the evidence follows).
+ *   res_node_common_copy_ctor is a GUESS; res_node_copy_ctor is a GUESS; ut_add_offset_to_ptr is a GUESS;
  *   ut_get_int_ptr is a GUESS (the evidence follows).
  *   The map's own names and stems, the stems defined `extern "C"`.  The members of G3dObj, G3dObj::TypeObj,
  *   AnmObj, AnmObjChr, AnmObjChrNode, AnmObjChrBlend and AnmObjChrRes are nw4r's: the assert and warning strings name
@@ -34,9 +39,11 @@
  *   is a GUESS; anmchr_ref_name is a GUESS (the strings ResAnmChr::ref passes to Panic).
  *   type_obj_set_name_anmchr is a GUESS (0x8005DCD0: the type-name store copy the AnmObjChr, AnmObjMatClr,
  *   AnmObjTexPat and ScnMdlSimple type members call).
- * RESIDUALS. 19 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
- *   lists them), the largest GetResult__Q34nw4r3g3d14AnmObjChrBlendFPQ34nw4r3g3d12ChrAnmResultUl (0x8D0), the
- *   AnmObjChrRes members Bind(ResMdl, u32, BindOption) (0x384) and Release(ResMdl, u32, BindOption) (0x320).
+ * RESIDUALS. 17 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
+ *   lists them), the largest GetResult__Q34nw4r3g3d14AnmObjChrBlendFPQ34nw4r3g3d12ChrAnmResultUl (0x8D0) and
+ *   res_mdl_node_subtree_end (0x140).
+ *   Partial: AnmObjChrRes::Release(ResMdl, u32, BindOption) (the unrolled clear loop schedules its `subf` one slot
+ *   early).
  *   GetAnmPlayPolicy (0x80061C70) is unwritten: its policy table (.sdata 0x80790E70) sits in `mh3_pad.cpp`'s claim.
  *   FrameCtrl::smBaseUpdateRate (.sdata 0x80791168) is `g3d/fn_80063888.cpp`'s claim, declared in the class only.
  *   Partial: fn_8005D27C, g3d_round_up (retail materialises `~(align - 1)` with `nor` + `and` where MWCC folds it
@@ -101,6 +108,12 @@ const nw4r::g3d::ResAnmChrNodeData* res_anm_chr_get_node_anm(const nw4r::g3d::Re
 u32 res_node_get_id(const ResHandle* pSelf);
 void* res_node_copy_ctor(void* self, u32* src);
 u32 ut_add_offset_to_ptr(u32 a, u32 b);
+/* 0x80062D94 (0x58): the node's name. */
+nw4r::g3d::ResName res_node_get_res_name(const ResHandle* pNode);
+/* 0x80062D04 (0x54): the index of the animated node called `name`, -1 when the resource has none. */
+int res_anm_chr_get_node_index(const nw4r::g3d::ResAnmChr* pSelf, nw4r::g3d::ResName name);
+/* 0x8005CF10 (0x140): one past the last node of node `idx`'s subtree, in the model's node order. */
+u32 res_mdl_node_subtree_end(nw4r::g3d::ResMdl mdl, u32 idx);
 }
 extern const char anmchr_resnode_align_assert_msg[]; /* the ResNode alignment assertion */
 extern const char anmchr_resnode_ac_file[]; /* "g3d_resnode_ac.h" */
@@ -138,7 +151,7 @@ extern "C" u8* fn_8005CF04(void)
     return lbl_8066AE80;
 }
 
-extern "C" u32* fn_8005D0C4(u32** pp)
+extern "C" u32* res_node_ptr(u32** pp)
 {
     return *pp;
 }
@@ -165,7 +178,7 @@ nw4r::g3d::ResNode::ResNode(void* pData) : ResCommon<ResNodeData>(pData) {
     }
 }
 
-extern "C" u8* fn_8005D27C(void)
+extern "C" u8* res_node_get_class_name(void)
 {
     return lbl_80791148;
 }
@@ -347,7 +360,7 @@ extern "C" u8* fn_800628AC(void)
 /* 0x80062978 (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResDicData)
 
-extern "C" void fn_80062D88(u32* dst, u32* src)
+extern "C" void res_name_common_copy_ctor(u32* dst, u32* src)
 {
     *dst = *src;
 }
@@ -365,9 +378,9 @@ extern "C" nw4r::g3d::ResAnmChr* res_anm_chr_copy_ctor(nw4r::g3d::ResAnmChr* pDs
     return pDst;
 }
 
-extern "C" void* fn_80062D58(void* self, u32* src)
+extern "C" void* res_name_copy_ctor(void* self, u32* src)
 {
-    fn_80062D88((u32*)self, src);
+    res_name_common_copy_ctor((u32*)self, src);
     return self;
 }
 
@@ -1130,6 +1143,109 @@ bool nw4r::g3d::AnmObjChrRes::Bind(ResMdl mdl)
     }
     SetAnmFlag(ANMFLAG_ISBOUND, true);
     return bSuccess;
+}
+
+/* 0x80062980 (0x384): binds node `target` (BIND_ONE) or its whole subtree (BIND_PARTIAL) to the animated nodes of
+ * the same names; returns whether any matched. */
+bool nw4r::g3d::AnmObjChrRes::Bind(ResMdl mdl, u32 target, BindOption option)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x47F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x480, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    if ((int)mdl.GetResNodeNumEntries() > mNumBinding) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x481,
+                        "NW4R:Failed assertion int(resMdl.GetResNodeNumEntries()) <= mNumBinding");
+    }
+    bool bSuccess = false;
+    switch (option) {
+    case BIND_PARTIAL: {
+        u32 bindIdEnd = res_mdl_node_subtree_end(mdl, target);
+        if ((int)bindIdEnd > mNumBinding) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x48F, "NW4R:Failed assertion int(bindIdEnd) <= mNumBinding");
+        }
+        for (u32 i = target; i < bindIdEnd; i++) {
+            ResHandle node;
+            ResHandle name;
+            res_node_copy_ctor(&node, (u32*)&mdl.GetResNode(i));
+            res_name_copy_ctor(&name, (u32*)&res_node_get_res_name(&node));
+            int animId = res_anm_chr_get_node_index(&mRes, *reinterpret_cast<ResName*>(&name));
+            if (animId != -1) {
+                bool inRange = false;
+                if (animId >= 0 && animId <= 0xFFFF) {
+                    inRange = true;
+                }
+                if (!inRange) {
+                    nw4r::db::Panic("g3d_anmchr.cpp", 0x49D,
+                                    "animId is out of bounds(%d)\n%d <= animId <= %d not satisfied.", animId, 0,
+                                    0xFFFF);
+                }
+                mpBinding[i] = animId;
+                bSuccess = true;
+            }
+        }
+        break;
+    }
+    case BIND_ONE: {
+        ResHandle node;
+        ResHandle name;
+        res_node_copy_ctor(&node, (u32*)&mdl.GetResNode(target));
+        res_name_copy_ctor(&name, (u32*)&res_node_get_res_name(&node));
+        int animId = res_anm_chr_get_node_index(&mRes, *reinterpret_cast<ResName*>(&name));
+        if (animId != -1) {
+            bool inRange = false;
+            if (animId >= 0 && animId <= 0xFFFF) {
+                inRange = true;
+            }
+            if (!inRange) {
+                nw4r::db::Panic("g3d_anmchr.cpp", 0x4B2,
+                                "animId is out of bounds(%d)\n%d <= animId <= %d not satisfied.", animId, 0, 0xFFFF);
+            }
+            mpBinding[target] = animId;
+            bSuccess = true;
+        }
+        break;
+    }
+    default:
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x4BC, "NW4R:Fatal Error\nUnknown bind-option (=%d)", option);
+        break;
+    }
+    SetAnmFlag(ANMFLAG_ISBOUND, true);
+    return bSuccess;
+}
+
+/* 0x80062E50 (0x320): unbinds node `target` (BIND_ONE) or its whole subtree (BIND_PARTIAL). */
+void nw4r::g3d::AnmObjChrRes::Release(ResMdl mdl, u32 target, BindOption option)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x4CD, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x4CE, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    if ((int)mdl.GetResNodeNumEntries() > mNumBinding) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x4CF,
+                        "NW4R:Failed assertion int(resMdl.GetResNodeNumEntries()) <= mNumBinding");
+    }
+    switch (option) {
+    case BIND_PARTIAL: {
+        u32 bindIdEnd = res_mdl_node_subtree_end(mdl, target);
+        if ((int)bindIdEnd > mNumBinding) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x4D9, "NW4R:Failed assertion int(bindIdEnd) <= mNumBinding");
+        }
+        for (u32 i = target; i < bindIdEnd; i++) {
+            mpBinding[i] = 0x8000;
+        }
+        break;
+    }
+    case BIND_ONE:
+        if ((int)target >= mNumBinding) {
+            nw4r::db::Panic("g3d_anmchr.cpp", 0x4E8, "NW4R:Failed assertion int(target) < mNumBinding");
+        }
+        mpBinding[target] = 0x8000;
+        break;
+    default:
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x4F3, "NW4R:Fatal Error\nUnknown bind-option (=%d)", option);
+        break;
+    }
 }
 
 /* 0x8005F054 (0x1C4): sets every child's frame. */
