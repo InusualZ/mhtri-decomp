@@ -21,6 +21,15 @@ u32 fn_800FD2B0(struct _PLW* self);
 
 #ifdef __cplusplus
 }
+
+namespace nw4r {
+namespace ef {
+struct Effect;
+}
+}
+
+/* 0x800FCEB0 - walks the effect's particle managers with the scale callback (`arg` is the scale pair). */
+extern "C" void eft_effect_foreach_pm_scale(nw4r::ef::Effect* self, u32 arg, bool flag);
 #endif
 
 #endif /* MHTRI_EF_EFT002_H */
