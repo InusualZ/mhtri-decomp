@@ -17,7 +17,7 @@ extern "C" {
  * callers hold the block under their own view (`get_userdata()`, `lobby_world_block`), so the parameter is
  * the block by address.  GUESS name. */
 /* untyped: the save block, seen by each caller through its own record view */
-s32 userdata_gunner_ck(void* userdata);
+u32 userdata_gunner_ck(void* userdata);
 
 #ifdef __cplusplus
 }

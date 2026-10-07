@@ -920,9 +920,9 @@ extern "C" void pig_menu_step(void) {
 /* 0x803A2BB8 (0x100): builds the costume list: every costume whose unlock flag is up (or that needs none), with the
  * one the Poogie wears greyed out. */
 extern "C" void pig_dress_list_build(LbPigMenuWork* w) {
-    u8 count;
     u16 worn;
     u8 i;
+    u8 count;
 
     memset(w->dress_ids_0x4C, 0xFF, sizeof(w->dress_ids_0x4C));
     count = 0;
