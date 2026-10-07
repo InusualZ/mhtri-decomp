@@ -194,8 +194,8 @@ extern "C" void mtx34_copy(void* dst, void* src);
 extern "C" void fn_80059374(s32 a);
 extern "C" void fn_80059420(void);
 extern "C" void fn_8005D0CC(void* ctx, void* val);
-extern "C" s32 fn_8005D050(void* ctx);
-extern "C" u32 fn_8005AAEC(void* ctx);
+extern "C" s32 res_node_get_id(void* ctx);
+extern "C" u32 res_node_is_valid(void* ctx);
 extern "C" void fn_8050131C(void* a);
 extern "C" f32 fn_80463EE0(s16 a, f32 b);
 extern "C" void fn_80051894(void* a, void* b, void* c, s32 d, f32 e, f32 f);
@@ -373,8 +373,8 @@ extern "C" void fn_80115FB4(_EFT_MODEL_OBJ* obj)
         fn_80080B10((void*)handle, 4);   /* the declaration takes void*, as its C sibling unit casts */
         id = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(&work->models[i]->field_0x114)->GetResNode((const char*)lbl_80791930).mpData;
         fn_8005D0CC(&h, &id);
-        if (fn_8005AAEC(&h) == 1U) {
-            fn_800E3264((void*)handle, fn_8005D050(&h));
+        if (res_node_is_valid(&h) == 1U) {
+            fn_800E3264((void*)handle, res_node_get_id(&h));
         }
     }
 }

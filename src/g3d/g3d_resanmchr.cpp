@@ -148,12 +148,6 @@ typedef struct {
     /* +0x08 */ u8 values[];
 } ResAnmChrU8Channel; /* size: 0x8, values follow */
 
-/* The per-node animation data: a type-select word at +0x0 and the option/ScaleType flags at +0x4. */
-typedef struct {
-    /* +0x00 */ u32 type;
-    /* +0x04 */ u32 flags;
-} ResAnmChrNodeData; /* size: 0x8, lower bound (only these two words are evidenced) */
-
 /* The `AnmObjChr`/`ResAnmChr` runtime object the frame/dirty-state walkers operate on.  +0x00 is the
  * state/flags word, +0x04 a 3-float scale, +0x10 a 3-float position and +0x1C a 12-float (3x4) matrix
  * whose last column (+0x28/+0x38/+0x48) holds the evaluated row.  Only the words the walkers touch are

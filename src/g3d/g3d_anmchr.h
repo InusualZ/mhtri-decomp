@@ -82,6 +82,13 @@ struct ResAnmChrData {
     /* +0x24 */ AnmPolicy policy;
 };
 
+/* One animated node's record in a character-animation resource: the offset (from the record, plus 4) of its
+ * node name, then the option/ScaleType flags.  size: 0x8 (a lower bound: only these two words are evidenced) */
+struct ResAnmChrNodeData {
+    /* +0x00 */ s32 toResName;
+    /* +0x04 */ u32 flags;
+};
+
 /* The one-word handle on a character-animation resource.  size: 0x4 */
 class ResAnmChr : public ResCommon<ResAnmChrData> {
 public:

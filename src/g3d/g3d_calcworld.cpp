@@ -55,12 +55,12 @@ struct G3DWorkObj;
 /* ------------------------------------------------------------------------------------------------ */
 
 extern "C" void vec3_add_ps(void* pOut, const void* pIn);
-extern "C" s32 fn_8005AAEC(const void* p);
+extern "C" s32 res_node_is_valid(const void* p);
 extern "C" f32* fn_8005CED0(void);
 extern "C" u32* fn_8005CEDC(void);
-extern "C" void* fn_8005D050(const void* p);
+extern "C" void* res_node_get_id(const void* p);
 extern "C" ResNodeData* fn_8005D0C4(const void* p);
-extern "C" void fn_8005D2C0(void* pOut, const void* pIn);
+extern "C" void res_node_copy_ctor(void* pOut, const void* pIn);
 extern "C" void fn_80061068(void* pOut);
 extern "C" void* fn_8008E1C0(void* pOut, const void* pIn);
 extern "C" void fn_8008F148(void* pOut, const void* pIn);
@@ -267,7 +267,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                 u32 nodeID = (pCode[1] << 8) + pCode[2];
                 u32 targetID = (pCode[3] << 8) + pCode[4];
                 s14 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->GetResNode(nodeID).mpData;
-                fn_8005D2C0(&s1C, &s14);
+                res_node_copy_ctor(&s1C, &s14);
                 u32 mtxID = fn_8006FDCC(&s1C);
                 if (numMtx >= 0x800) {
                     nw4r::db::Panic(lbl_8058E184, 137, lbl_8058E198);
@@ -281,7 +281,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                 if (pNodeCallback != NULL) {
                     void* (*pGetRec)(void*, NodeMtxRec*, void*) =
                         (void* (*)(void*, NodeMtxRec*, void*))pNodeCallback->mpVtbl[14];
-                    pRec = (NodeMtxRec*)pGetRec(pNodeCallback, &rec, fn_8005D050(&s1C));
+                    pRec = (NodeMtxRec*)pGetRec(pNodeCallback, &rec, res_node_get_id(&s1C));
                 }
                 s32 reset;
                 if (pNodeCallback == NULL || pRec->mUnk00 == 0) {
@@ -416,10 +416,10 @@ u32 fn_80073E80(u32 value, u32 low) {
 }
 
 u32 fn_80073E8C(void* pSelf) {
-    if (!fn_8005AAEC(pSelf)) {
+    if (!res_node_is_valid(pSelf)) {
         nw4r::db::Panic(lbl_8058E340, 90, lbl_8058E320);
     }
-    if (fn_8005AAEC(pSelf)) {
+    if (res_node_is_valid(pSelf)) {
         return ((ResNodeData*)fn_8005D0C4(pSelf))->mMtxID;
     }
     return 0;
