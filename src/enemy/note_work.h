@@ -21,6 +21,14 @@ struct NoteModelView {
     /* +0x110 */ u8 pad_0x110[0x164 - 0x110];
 };
 
+/* The rest position and the two talk bytes after it, as `note_pane_init` resets them through one pointer. */
+struct NoteRestBlock {
+    /* +0x00 */ nw4r::math::VEC3 pos_0x00;
+    /* +0x0C */ u8 talk_step_0x0C;
+    /* +0x0D */ u8 field_0x0D;
+    /* +0x0E */ u8 pad_0x0E[0x2];
+}; /* size: 0x10 */
+
 /* The note-pane object set (the 0x80385xxx half of the band).  Every body at 0x80385A54..0x80385CA0
  * works on ONE 0x1F8-byte record; `lbl_806C4A88` is the retail 5-record array of them and
  * `lbl_806C5460` a 3-record slot set.
@@ -60,16 +68,22 @@ struct NoteWork {
     /* +0x1AD */ u8 pad_0x1AD[0x1B0 - 0x1AD];
     /* +0x1B0 */ f32 field_0x1B0;   /* the per-state step `fn_80386028`/`fn_803863C8` set */
     /* +0x1B4 */ union {
-        nw4r::math::VEC3 vec_0x1B4;   /* the rest position `note_pane_init` copies from +0x170 */
-        struct {   /* the NPC talk program's view of the same 0x0C bytes */
-            /* +0x1B4 */ u8 pad_0x1B4;
-            /* +0x1B5 */ u8 talk_step_0x1B5;   /* 0 opens the talk, 1/2 wait for the window (`lobby/lb_quest_ui.cpp`) */
-            /* +0x1B6 */ u8 pad_0x1B6[0x1C0 - 0x1B6];
-        }; /* size: 0x0C */
+        struct {
+            /* +0x1B4 */ union {
+                nw4r::math::VEC3 vec_0x1B4;   /* the rest position `note_pane_init` copies from +0x170 */
+                struct {   /* the NPC talk program's view of the same 0x0C bytes */
+                    /* +0x1B4 */ u8 pad_0x1B4;
+                    /* +0x1B5 */ u8 talk_step_0x1B5;   /* 0 opens the talk, 1/2 wait for the window (`lobby/lb_quest_ui.cpp`) */
+                    /* +0x1B6 */ u8 pad_0x1B6[0x1C0 - 0x1B6];
+                }; /* size: 0x0C */
+            };
+            /* +0x1C0 */ u8 field_0x1C0;    /* the talk step `npc_talk_step` switches on */
+            /* +0x1C1 */ u8 field_0x1C1;
+            /* +0x1C2 */ u8 pad_0x1C2[0x2];
+        }; /* size: 0x10 */
+        NoteRestBlock rest_0x1B4;   /* the same 0x0E bytes as one block: `note_pane_init` resets it through one pointer */
     };
-    /* +0x1C0 */ u8 field_0x1C0;    /* the talk step `npc_talk_step` switches on */
-    /* +0x1C1 */ u8 field_0x1C1;
-    /* +0x1C2 */ u8 pad_0x1C2[0x1F4 - 0x1C2];
+    /* +0x1C4 */ u8 pad_0x1C4[0x1F4 - 0x1C4];
     /* +0x1F4 */ s32 field_0x1F4;  /* the voice handle `fn_8038541C` stores */
 };
 
