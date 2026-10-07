@@ -20,21 +20,23 @@
  *   GUESS (from the body and its callers): `ef_draw_info_projection`.
  *   GUESS: `sDrawOrder`, `sDrawStrategyBuilder`, `sEmitterFormBuilder`, `sDrawInfo` (the statics, named for their
  *   class), `ef_system_version_registered` (the once-flag the system's constructor tests).
- * RESIDUALS. 5 partial rows:
+ * RESIDUALS. 4 partial rows:
  *  - `fn_800A56B0` (ours 0x24C of 0x250): the two allocation sizes share the `maxGroupID * 0x1C` product, which
  *    MWCC computes once into a callee-saved register where retail has one `mulli` per call;
- *  - `fn_800A5A90`: the three table calls load the table and the slot through an intermediate where retail reuses
- *    r12 (`lwz r12, 0(r3); lwz r12, 0x10(r12)`);
  *  - `fn_800A5D8C`, `fn_800A5E6C`, `fn_800A5F4C` (ours 0xE8 of 0xE0 each): retail keeps `groupID * 0x1C` in a
  *    callee-saved register across the `Panic` and reuses it, ours re-materialises the `mulli` per use; a group
  *    pointer local and a scaled index local both score lower.
- *   flipcheck: `.data` and `.sdata2` declared, not emitted; `.text` differs in the rows above.
+ *   flipcheck: `.data` and `.sdata2` are byte-identical; `.text` differs in the rows above (0xBBC of 0xBA8).
  * SHAPES. `#line` puts each assert on retail's line (0x4F, 0x50, 0x67, 0x7B, 0x83, 0x9F, 0xA0, 0xB2, 0xC9, 0xDD).
  * SHAPES. The group table uses the compiler's array form: the allocator call, the shim and
  *   `__construct_new_array(block, fn_800A590C, NULL, 0x1C, maxGroupID)` inside one try/catch whose handler calls
  *   the empty `fn_800A5908` and rethrows with `__throw(0, 0, 0)` declared `noreturn` (a source `throw;` adds the
  *   `__end__catch` bookkeeping and an extab action word).
- * SHAPES. The effect object's +0x1C is a table whose every entry takes the effect as its first argument.
+ * SHAPES. The effect object and the memory manager are classes with virtual tables (the effect's after a 0x1C-byte
+ *   head, at +0x1C): `CreateEffect` calls `GetEffect`/`ReleaseEffect`/`Create` as virtual members, dispatching
+ *   through r3/r12 as retail does.
+ * SHAPES. The strings are global definitions and `DrawInfo`'s constants literals, so the unit emits its `.data` and
+ *   `.sdata2` as retail lays them out; each assert sits on one source line (the macro takes `__LINE__` at its end).
  * SHAPES. The statics are defined in retail's construction order; the compiler's static initializer builds them and
  *   registers the instance's destructor, and the implicit constructors come out after it in the reverse order of
  *   use.  `DrawInfo`'s constructor declares its second constant after the first is stored and stores the colour
@@ -63,29 +65,31 @@ void Warning(const char* file, int line, const char* fmt, ...);
  * =================================================================================================== */
 
 
-/* The table the effect object carries at +0x1C.  Every entry is called with the *effect* as its first
- * argument, so the field is the table itself. */
-typedef struct EfSysEffectVtbl {
-    /* +0x00 */ u8 pad_0x00[0x08];
-    /* +0x08 */ void (*destroy)(void* effect);
-    /* +0x0C */ void (*retire)(void* effect);
-    /* +0x10 */ u32 (*create)(void* effect, void* manager, void* emitter, u16 flag);
-    /* +0x14 */ void (*release)(void* effect);
-} EfSysEffectVtbl; /* size: 0x18 */
-
-/* The effect object the memory manager's pool hands out (`RetireEffect` asserts `mManagerES == this` on
- * it, `CreateEffect` puts it on a group list).  +0x24..+0x3F is present in the object but untouched by
- * this range's bodies, hence the padding. size: 0x44 (lower bound) */
-typedef struct EfSysEffect {
+/* The effect object's non-polymorphic head: MWCC places the vtable pointer after it, at +0x1C. */
+struct EfSysEffectHead {
     /* +0x00 */ u8 pad_0x00[0x0C];
     /* +0x0C */ s32 state; /* 1 = active, 2 = created, 3 = retired */
     /* +0x10 */ void* field_0x10;
     /* +0x14 */ u8 pad_0x14[0x08];
-    /* +0x1C */ EfSysEffectVtbl* vtable;
-    /* +0x20 */ void* mManagerES; /* the system that owns it - RetireEffect compares it with `this` */
+}; /* size: 0x1C */
+
+struct EfEmitterResource; /* the emitter resource `CreateEffect` is handed (opaque here) */
+
+/* The effect object the memory manager's pool hands out (`RetireEffect` asserts `mManagerES == this` on
+ * it, `CreateEffect` puts it on a group list).  +0x24..+0x3F is present in the object but untouched by
+ * this range's bodies, hence the padding.  Its table (+0x1C) is declared only. */
+class EfSysEffect : public EfSysEffectHead {
+public:
+    /* +0x1C: the vtable pointer */
+    virtual void Destroy();
+    virtual void Retire();
+    virtual u32 Create(EfSys* system, EfEmitterResource* emitter, u16 flag);
+    virtual void Release();
+
+    /* +0x20 */ EfSys* mManagerES; /* the system that owns it - RetireEffect compares it with `this` */
     /* +0x24 */ u8 pad_0x24[0x1C];
     /* +0x40 */ u32 mGroupID; /* the index into `mActivityList` */
-} EfSysEffect; /* size: 0x44 (lower bound: +0x40 is the highest field any body touches) */
+}; /* size: 0x44 (lower bound: +0x40 is the highest field any body touches) */
 
 
 /* The record `ef_res_emitter_desc` hands back for an emitter: the relocation flag `CreateEffect` tests at +0x00
@@ -107,19 +111,17 @@ typedef struct EfSysAccessObj {
 } EfSysAccessObj; /* size: 0x88 (lower bound: +0x58 is the highest field returned) */
 
 
-/* This unit's `.data`: the `__FILE__` string, the assert messages and the class table the last
- * constructor stores (`lbl_8059283C`), declared, never defined. */
-extern const char lbl_80592698[];
-extern const char lbl_805926AC[];
-extern const char lbl_805926EC[];
-extern const char lbl_80592714[];
-extern const char lbl_8059274C[];
-extern const char lbl_80592788[];
-extern const char lbl_805927AC[];
-extern const char lbl_805927E0[];
+/* This unit's `.data` strings, in retail order: the `__FILE__` string and the assert messages (`DrawOrderBase`'s
+ * table follows them). */
+char ef_effectsystem_file_name[] = "ef_effectsystem.cpp";
+char ef_effectsystem_err_memory_manager[] = "NW4R:Pointer Error\nmMemoryManager(=%p) is not valid pointer.";
+char ef_effectsystem_err_max_group[] = "NW4R:Failed assertion maxGroupID > 0";
+char ef_effectsystem_err_target[] = "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.";
+char ef_effectsystem_err_group_id[] = "NW4R:Failed assertion groupID >= 0 && groupID < mMaxGroupID";
+char ef_effectsystem_warn_relocation[] = "incomplete relocation (emitter:%s)";
+char ef_effectsystem_err_manager[] = "NW4R:Failed assertion target->mManagerES == this";
+char ef_effectsystem_err_list_size[] = "NW4R:Failed assertion UtlistSize(&mActivityList[group].mActiveList) < NW4R_EF_MAX_EFFECT";
 
-extern f32 lbl_80795FF8;
-extern f32 lbl_80795FFC;
 
 /* ===================================================================================================
  * Declarations, with C linkage (retail's relocations carry plain map names): this unit's own symbols in
@@ -172,7 +174,7 @@ void PSMTXCopy(const void* src, void* dst);
  * `__LINE__` value comes from a `#line` directive at the call site. */
 #define NW4R_ASSERT(expr, msg)                                                                     \
     if (!(expr))                                                                                   \
-    nw4r::db::Panic(lbl_80592698, __LINE__, msg)
+    nw4r::db::Panic(ef_effectsystem_file_name, __LINE__, msg)
 
 /* `NW4R_POINTER_ASSERT`'s RVL address-range check (six materialised BOOLs), shared verbatim with the
  * sibling ef units; the message differs by call site. */
@@ -193,7 +195,7 @@ void PSMTXCopy(const void* src, void* dst);
         if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))                                 \
             ok1_ = FALSE;                                                                          \
         if (!ok1_)                                                                                 \
-            nw4r::db::Panic(lbl_80592698, __LINE__, msg, (ptr));                                   \
+            nw4r::db::Panic(ef_effectsystem_file_name, __LINE__, msg, (ptr));                                   \
     }
 
 #define NW4R_EF_MAX_EFFECT 0x200
@@ -202,7 +204,7 @@ namespace nw4r {
 namespace ef {
 
 /* The default draw info the system draws with: `nw4r::ef::DrawInfo`'s constructor sets both matrices to the
- * identity, lighting and fog off, unit scales and a white material over a black ambient colour. */
+ * identity, lighting and fog off, a zero depth offset and origin and a white material over a black ambient colour. */
 class DrawInfo : public EfDrawInfo {
 public:
     DrawInfo() {
@@ -216,18 +218,18 @@ public:
         light_mask1 = 0;
         is_spot_light = true;
         fog_type = 0;
-        f32 zero;
-        f32 one = lbl_80795FF8;
+        f32 one;
+        f32 zero = 0.0f;
 
-        fog_start_z = one;
-        zero = lbl_80795FFC;
-        fog_end_z = zero;
-        fog_near_z = one;
-        fog_far_z = zero;
-        depth_offset = one;
-        depth_origin.x = one;
-        depth_origin.y = one;
-        depth_origin.z = one;
+        fog_start_z = zero;
+        one = 1.0f;
+        fog_end_z = one;
+        fog_near_z = zero;
+        fog_far_z = one;
+        depth_offset = zero;
+        depth_origin.x = zero;
+        depth_origin.y = zero;
+        depth_origin.z = zero;
         mat_color.b = 0xFF;
         mat_color.g = 0xFF;
         mat_color.r = 0xFF;
@@ -271,11 +273,11 @@ extern "C" u32 fn_800A56B0(EfSys* self, u32 maxGroupID) {
     void* block;
 
 #line 79
-    NW4R_POINTER_ASSERT(self->mMemoryManager, lbl_805926AC);
+    NW4R_POINTER_ASSERT(self->mMemoryManager, ef_effectsystem_err_memory_manager);
 #line 80
-    NW4R_ASSERT(maxGroupID > 0, lbl_805926EC);
+    NW4R_ASSERT(maxGroupID > 0, ef_effectsystem_err_max_group);
     self->mMaxGroupID = maxGroupID;
-    block = self->mMemoryManager->vtable->alloc(self->mMemoryManager, maxGroupID * 0x1C + 0x20);
+    block = self->mMemoryManager->Alloc(maxGroupID * 0x1C + 0x20);
     list = (EfSysActivityList*)fn_800A5940(maxGroupID * sizeof(EfSysActivityList) + 0x10, block);
     if (list != NULL) {
         try {
@@ -324,7 +326,7 @@ extern "C" void* fn_800A5940(u32 size, void* block) {
 /* 0x800A5948 - retires one effect on the spot: move it to its group's retiring list and mark it done. */
 extern "C" u32 fn_800A5948(EfSys* self, EfSysEffect* target) {
 #line 103
-    NW4R_POINTER_ASSERT(target, lbl_80592714);
+    NW4R_POINTER_ASSERT(target, ef_effectsystem_err_target);
     fn_800A45DC(&self->mActivityList[target->mGroupID], target);
     target->state = 3;
     return 1;
@@ -334,27 +336,27 @@ extern "C" u32 fn_800A5948(EfSys* self, EfSysEffect* target) {
 extern "C" EfSysEffect* fn_800A5A90(EfSys* self, void* emitter, u32 groupID, u16 flag) {
     if (groupID >= self->mMaxGroupID) {
 #line 123
-        nw4r::db::Panic(lbl_80592698, __LINE__, lbl_8059274C);
+        nw4r::db::Panic(ef_effectsystem_file_name, __LINE__, ef_effectsystem_err_group_id);
     }
     if (emitter == NULL) {
         return NULL;
     }
     if ((((EfSysEmitterWork*)ef_res_emitter_desc(emitter))->flags & 0x40000000u) == 0) {
 #line 131
-        nw4r::db::Warning(lbl_80592698, __LINE__, lbl_80592788, ef_emres_get_name(emitter));
+        nw4r::db::Warning(ef_effectsystem_file_name, __LINE__, ef_effectsystem_warn_relocation, ef_emres_get_name(emitter));
         return NULL;
     }
     EfSysEffect* effect;
     {
         EfSysMemoryManager* mm = EfGetMemoryManager(self);
-        effect = (EfSysEffect*)mm->vtable->getEffect(mm);
+        effect = mm->GetEffect();
     }
     if (effect == NULL) {
         return NULL;
     }
-    if (effect->vtable->create(effect, self, emitter, flag) == 0) {
+    if (effect->Create(self, (EfEmitterResource*)emitter, flag) == 0) {
         EfSysMemoryManager* mm = EfGetMemoryManager(self);
-        mm->vtable->releaseEffect(mm, effect);
+        mm->ReleaseEffect(effect);
         return NULL;
     }
     effect->mGroupID = groupID;
@@ -372,10 +374,10 @@ u32 nw4r::ef::EffectSystem::RetireEffect(Effect* target_) {
     EfSysEffect* target = (EfSysEffect*)target_;
 
 #line 159
-    NW4R_POINTER_ASSERT(target, lbl_80592714);
+    NW4R_POINTER_ASSERT(target, ef_effectsystem_err_target);
     if (target->mManagerES != self) {
 #line 160
-        nw4r::db::Panic(lbl_80592698, __LINE__, lbl_805927AC);
+        nw4r::db::Panic(ef_effectsystem_file_name, __LINE__, ef_effectsystem_err_manager);
     }
     if (target->state != 1) {
         return 0;
@@ -391,8 +393,7 @@ extern "C" u32 fn_800A5D8C(EfSys* self, u32 groupID) {
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
 
 #line 178
-    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT,
-                lbl_805927E0);
+    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT, ef_effectsystem_err_list_size);
     u16 num = fn_8009B374(&self->mActivityList[groupID].mActiveList, (void**)list,
                           (u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList));
     for (u16 i = 0; i < num; i++) {
@@ -409,8 +410,7 @@ extern "C" u32 fn_800A5E6C(EfSys* self, u32 groupID) {
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
 
 #line 201
-    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT,
-                lbl_805927E0);
+    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT, ef_effectsystem_err_list_size);
     u16 num = fn_8009B374(&self->mActivityList[groupID].mActiveList, (void**)list,
                           (u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList));
     for (u16 i = 0; i < num; i++) {
@@ -425,8 +425,7 @@ extern "C" u32 fn_800A5F4C(EfSys* self, u32 groupID) {
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
 
 #line 221
-    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT,
-                lbl_805927E0);
+    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT, ef_effectsystem_err_list_size);
     u16 num = fn_8009B374(&self->mActivityList[groupID].mActiveList, (void**)list,
                           (u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList));
     for (u16 i = 0; i < num; i++) {

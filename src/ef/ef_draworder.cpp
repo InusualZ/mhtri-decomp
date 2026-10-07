@@ -1,20 +1,19 @@
 /*
- * ef/ef_draworder.cpp - the nw4r::ef draw-order list: the effect's list head accessor, the list class's three
- *   virtual slots (ordered insert by the node's draw order at +0x89, removal, a walk), the object constructor,
- *   the `{two ut::Lists + counter}` sub-object constructors and the deleting destructor.
+ * ef/ef_draworder.cpp - the nw4r::ef draw-order list: the effect's list head accessor, `DrawOrder`'s three virtuals
+ *   (`Add`: ordered insert by the manager's draw order at +0x89; `Remove`; `Draw`: the walk), the effect object's
+ *   constructor, the `{two ut::Lists + counter}` sub-object constructors and the deleting destructor.
  * RANGE. .text 0x800A388C-0x800A40F4 (9 functions); extab 0x80009B60-0x80009BA0, extabindex 0x80022CEC-0x80022D4C,
- *   .data 0x805923A0-0x80592430 (the `__FILE__` string "ef_draworder.cpp" first, then the list class's table
- *   `lbl_8059241C` = [0, 0, fn_800A3B20, fn_800A3D7C, fn_800A39A4]).
- * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps `lis` + `addi r0` + `stw r0` for the three
- *   table stores and `extsh` + `cmpwi` for the deleting destructor's flag test).
- * NAMES. The map has only `fn_` stems for the range; the types and fields are GUESSes from the bodies.
- * RESIDUALS. 1 partial row:
- *  - `fn_800A39A4`: the virtual dispatch loads the node's table through the node's home register (`lwz r5,
- *    28(r29); lwz r12, 28(r5)`) where retail reuses r3 (`lwz r12, 28(r3); lwz r12, 28(r12)`); retail's shape is a
- *    virtual member call on the node.
- *   flipcheck: `.data` claimed, not emitted.
- * SHAPES. The list class's slots take the class's `this` in r3 (unused) and the real arguments in r4/r5; the
- *   class's constructor is in `ef/ef_effectsystem.cpp` (`fn_800A620C` stores `lbl_8059241C`).
+ *   .data 0x805923A0-0x80592430 (the `__FILE__` string "ef_draworder.cpp", the two assert messages, then
+ *   `DrawOrder`'s table, emitted here because `Add` is its key function).
+ * FLAGS. `cflags_main` plus `-pool off` (configure.py: one `lis`/`addi` per string); file-wide `#pragma peephole
+ *   off` (retail keeps `lis` + `addi r0` + `stw r0` for the table stores and `extsh` + `cmpwi` for the deleting
+ *   destructor's flag test).
+ * NAMES. `DrawOrder` and its members are nw4r's; the other functions keep `fn_` stems; the types and fields are
+ *   GUESSes from the bodies.
+ *   GUESS: `ef_draworder_file_name`, `ef_draworder_err_ef`, `ef_draworder_err_pm` (their text).
+ * RESIDUALS. none known: every section is byte-identical to the target object.
+ * SHAPES. `Draw` calls the particle manager's virtual `Draw` (slot +0x1C), so the dispatch goes through r3 as in
+ *   retail; the class's constructor is `ef/ef_effectsystem.cpp`'s (it builds the instance).
  * SHAPES. The pointer guards are the `NW4R_POINTER_ASSERT` RVL address-range chain the ef units share (seven
  *   ranges, the first `if` carrying two tests), with this unit's own file string.
  */
@@ -24,6 +23,8 @@
 #include "ef.h" /* the canonical nw4r::ef::Effect declaration (RetireEmitterAll, rule 1) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "nw4r/fn_805012C4.h" /* nw4r::ut::List_* (rule 2) */
+#include "ef/ef_draworder.h" /* nw4r::ef::DrawOrder, the unit's own header */
+#include "ef/ef_particlemanager.h" /* ParticleManager (rule 1) */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`). */
@@ -38,15 +39,17 @@ void operator delete(void* ptr) throw();
 
 extern "C" {
 
-/* The strings of this unit's `.data` (claimed, not emitted) and the two class tables of
- * `ef/ef_effect.cpp`'s `.data`. */
-extern const char lbl_805923A0[]; /* "ef_draworder.cpp"                                      */
-extern const char lbl_805923B4[]; /* "NW4R:Pointer Error\nef(=%p) is not valid pointer."     */
-extern const char lbl_805923E8[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."     */
+/* The two class tables of `ef/ef_effect.cpp`'s `.data`. */
 extern void* lbl_80592588[];      /* ef_effect's Effect table: 0, 0, then six method words   */
 extern void* lbl_805925A8[];      /* the root base's vtable: 0, 0, then two method words     */
 
 } /* extern "C" */
+
+/* The unit's `.data` strings, in retail order: the file name and one message per checked pointer (the
+ * `DrawOrder` table follows them). */
+char ef_draworder_file_name[] = "ef_draworder.cpp";
+char ef_draworder_err_ef[] = "NW4R:Pointer Error\nef(=%p) is not valid pointer.";
+char ef_draworder_err_pm[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
 
 /* -------------------------------------------------------------------------------------------------
  * types
@@ -110,7 +113,7 @@ typedef struct EfDrawOrderObject {
      ((u32)(p) & 0xFFFFC000) == 0xE0000000)
 
 #define NW4R_POINTER_ASSERT(p, line, msg)                                                          \
-    (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(lbl_805923A0, line, msg, (p)))
+    (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(ef_draworder_file_name, line, msg, (p)))
 
 extern "C" {
 
@@ -135,50 +138,51 @@ extern "C" {
 
 /* 0x800A388C - the effect's draw-order list head (the list at +0x94). */
 void* fn_800A388C(EfDrawOrderObject* ef) {
-    NW4R_POINTER_ASSERT(ef, 27, lbl_805923B4);
+    NW4R_POINTER_ASSERT(ef, 27, ef_draworder_err_ef);
     return &ef->mDrawList;
 }
 
 /* 0x800A39A4 - the walk slot: head to tail, rebuilding each node's world matrix before the node's
  * own slot +0x1C runs. */
-void fn_800A39A4(EfDrawOrderObject* self, EfDrawOrderObject* ef, void* arg) {
-    NW4R_POINTER_ASSERT(ef, 35, lbl_805923B4);
+} /* extern "C" */
 
-    (void)self;
-    EfDrawOrderList* list = (EfDrawOrderList*)fn_800A388C(ef);
+void nw4r::ef::DrawOrder::Draw(Effect* effect, const EfDrawInfo* info) {
+    NW4R_POINTER_ASSERT(effect, 35, ef_draworder_err_ef);
+
+    EfDrawOrderList* list = (EfDrawOrderList*)fn_800A388C((EfDrawOrderObject*)effect);
     EfDrawOrderNode* node = NULL;
     while ((node = (EfDrawOrderNode*)nw4r::ut::List_GetNext((nw4r::ut::List*)list, node)) != NULL) {
         fn_800AE628(node);
-        node->mpVtbl->method_0x1C(node, arg);
+        ((ParticleManager*)node)->Draw(info);
         fn_800AE6A4(node);
     }
 }
 
 /* 0x800A3B20 - the insert slot: links the node in behind the last element whose draw order (+0x89)
  * is not greater than its own (the head when there is none). */
-void fn_800A3B20(EfDrawOrderObject* self, EfDrawOrderObject* ef, EfDrawOrderNode* node) {
-    NW4R_POINTER_ASSERT(ef, 49, lbl_805923B4);
-    NW4R_POINTER_ASSERT(node, 50, lbl_805923E8);
+void nw4r::ef::DrawOrder::Add(Effect* effect, ParticleManager* pm) {
+    NW4R_POINTER_ASSERT(effect, 49, ef_draworder_err_ef);
+    NW4R_POINTER_ASSERT(pm, 50, ef_draworder_err_pm);
 
-    (void)self;
-    EfDrawOrderList* list = (EfDrawOrderList*)fn_800A388C(ef);
+    EfDrawOrderList* list = (EfDrawOrderList*)fn_800A388C((EfDrawOrderObject*)effect);
     EfDrawOrderNode* prev = NULL;
     while ((prev = (EfDrawOrderNode*)nw4r::ut::List_GetPrev((nw4r::ut::List*)list, prev)) != NULL) {
-        if (prev->mDrawOrder <= node->mDrawOrder) {
+        if (prev->mDrawOrder <= ((EfDrawOrderNode*)pm)->mDrawOrder) {
             break;
         }
     }
-    nw4r::ut::List_Insert((nw4r::ut::List*)list, nw4r::ut::List_GetNext((nw4r::ut::List*)list, prev), node);
+    nw4r::ut::List_Insert((nw4r::ut::List*)list, nw4r::ut::List_GetNext((nw4r::ut::List*)list, prev), pm);
 }
 
 /* 0x800A3D7C - the vtable's remove slot: unlink one node from the effect's draw list. */
-void fn_800A3D7C(EfDrawOrderObject* self, EfDrawOrderObject* ef, EfDrawOrderNode* node) {
-    NW4R_POINTER_ASSERT(ef, 70, lbl_805923B4);
-    NW4R_POINTER_ASSERT(node, 71, lbl_805923E8);
+void nw4r::ef::DrawOrder::Remove(Effect* effect, ParticleManager* pm) {
+    NW4R_POINTER_ASSERT(effect, 70, ef_draworder_err_ef);
+    NW4R_POINTER_ASSERT(pm, 71, ef_draworder_err_pm);
 
-    (void)self;
-    nw4r::ut::List_Remove((nw4r::ut::List*)fn_800A388C(ef), node);
+    nw4r::ut::List_Remove((nw4r::ut::List*)fn_800A388C((EfDrawOrderObject*)effect), pm);
 }
+
+extern "C" {
 
 /* 0x800A3F98 - the constructor: root base vtable, own vtable, group, matrix, vector, draw list. */
 EfDrawOrderObject* fn_800A3F98(EfDrawOrderObject* self) {

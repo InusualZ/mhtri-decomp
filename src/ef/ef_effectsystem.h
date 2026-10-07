@@ -26,19 +26,39 @@ typedef struct EfSysActivityList {
     /* +0x1A */ u16 pad_0x1A;
 } EfSysActivityList; /* size: 0x1C */
 
-/* `mMemoryManager`'s table: the effect pool at +0x10/+0x14 and the byte allocator at +0x60. */
-typedef struct EfSysMemoryManagerVtbl {
-    /* +0x00 */ u8 pad_0x00[0x10];
-    /* +0x10 */ void* (*getEffect)(void* self);
-    /* +0x14 */ void (*releaseEffect)(void* self, void* effect);
-    /* +0x18 */ u8 pad_0x18[0x48];
-    /* +0x60 */ void* (*alloc)(void* self, u32 size);
-} EfSysMemoryManagerVtbl; /* size: 0x64 */
+class EfSysEffect;
 
-/* The allocator/pool object the system was handed (`fn_800D3D48` stores it into the system's +0x00). */
-typedef struct EfSysMemoryManager {
-    /* +0x00 */ EfSysMemoryManagerVtbl* vtable;
-} EfSysMemoryManager; /* size: 0x04 (lower bound: the manager's own state is not this unit's) */
+/* The allocator/pool object the system was handed (`fn_800D3D48` stores it into the system's +0x00): the
+ * effect pool at table slots +0x10/+0x14 and the byte allocator at +0x60; the slots between are declared only
+ * to place it.  Declared only, so no unit emits its table. */
+class EfSysMemoryManager {
+public:
+    /* +0x00: the vtable pointer */
+    virtual void slot_0x08();
+    virtual void slot_0x0C();
+    virtual EfSysEffect* GetEffect();
+    virtual void ReleaseEffect(EfSysEffect* effect);
+    virtual void slot_0x18();
+    virtual void slot_0x1C();
+    virtual void slot_0x20();
+    virtual void slot_0x24();
+    virtual void slot_0x28();
+    virtual void slot_0x2C();
+    virtual void slot_0x30();
+    virtual void slot_0x34();
+    virtual void slot_0x38();
+    virtual void slot_0x3C();
+    virtual void slot_0x40();
+    virtual void slot_0x44();
+    virtual void slot_0x48();
+    virtual void slot_0x4C();
+    virtual void slot_0x50();
+    virtual void slot_0x54();
+    virtual void slot_0x58();
+    virtual void slot_0x5C();
+    /* untyped: byte range - the allocator hands out raw storage */
+    virtual void* Alloc(u32 size);
+}; /* size: 0x04 (lower bound: the manager's own state is not this unit's) */
 
 /* The effect system.  Only the fields the bodies touch are named; the size is the symbol map's own for the
  * instance. */
