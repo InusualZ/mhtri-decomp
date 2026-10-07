@@ -5,6 +5,7 @@
  * FLAGS. `cflags_main`; `#pragma peephole off` from `fn_800FCED4` to the end of the file.
  * NAMES. `eft001_set_pos`, `eft002_set` and `eft002_set_shell` are the runtime dump's own names; `eft_rot_vec_copy`
  *   is a GUESS from its body; the map has only `fn_` stems for the rest, so plain definitions are `extern "C"`.
+ *   GUESS (from the body): `eft_effect_foreach_pm_scale` (0x800FCEB0) walks the particle managers with the scale callback.
  * RESIDUALS. 2 rows unwritten (empty stubs): 0x800FBE64-0x800FC0D4 (`fn_800FBE64`) and 0x800FC484-0x800FC7EC
  *   (`fn_800FC484`).
  *   10 partial rows, all above the `#pragma peephole off` line:
@@ -448,7 +449,7 @@ extern "C" void fn_800FCEC8(void* entry, u32 index)
 }
 
 /* Walks the effect's particle-manager pool through `ForeachParticleManager`. */
-extern "C" void fn_800FCEB0(nw4r::ef::Effect* self, u32 arg, bool flag)
+extern "C" void eft_effect_foreach_pm_scale(nw4r::ef::Effect* self, u32 arg, bool flag)
 {
     self->ForeachParticleManager(fn_800FCEC8, arg, flag);
 }
@@ -593,7 +594,7 @@ extern "C" void fn_800FCA54(_EFT* self)
     if (self->type_0x02 == 7) {
         ((nw4r::math::VEC3*)buf)->x = lbl_80796640;
         ((nw4r::math::VEC3*)buf)->y = lbl_80796640;
-        fn_800FCEB0(work->effect_0x04, (u32)buf, true);
+        eft_effect_foreach_pm_scale(work->effect_0x04, (u32)buf, true);
     }
 
     if (self->type_0x02 <= 5 || (u8)(self->type_0x02 - 9) <= 1 ||

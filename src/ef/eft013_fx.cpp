@@ -10,9 +10,11 @@
  *   GUESS: (0x80107BB4), `eft013_setup_effect` (0x80107E5C), `eft013_setup_uv_model` (0x801086C4),
  *   GUESS: `eft013_retire_step` (0x8010A1D4); the data `eft014_effect_ids`, `eft014_type_effect_ids`,
  *   GUESS: `eft014_joint_lists`, `eft014_joint_counts`; the foreign `mtx34_set_trans` (0x800FBB90, `ef/eft001.cpp`).
- * RESIDUALS. 10 rows unwritten: 0x80107E5C-0x801089C0 (`eft013_setup_effect`, `eft013_setup_uv_model`),
- *   0x80108A74-0x8010A1D4 (`fn_80108A74`, `fn_801093F4`, `fn_80109A84`, `fn_80109D00`), 0x8010A49C-0x8010A6A0
- *   (`fn_8010A49C`), 0x8010B198-0x8010BA48 (`fn_8010B198`, `fn_8010B504`, `fn_8010B71C`).
+ *   GUESS: `eft013_guard_pulse` (0x8010A49C), the constants `eft013_f32_one`, `eft013_f32_three_quarters`,
+ *   GUESS: `eft013_f32_zero`, `eft013_f32_2_6`, `eft013_f32_0_4`, `eft013_f32_0_16` (by value).
+ * RESIDUALS. 8 rows unwritten: 0x80107E5C-0x801089C0 (`eft013_setup_effect`, `eft013_setup_uv_model`),
+ *   0x80108A74-0x8010A1D4 (`fn_80108A74`, `fn_801093F4`, `fn_80109A84`, `fn_80109D00`), 0x8010B198-0x8010B504
+ *   (`fn_8010B198`), 0x8010B71C-0x8010BA48 (`fn_8010B71C`).
  *   4 partial rows:
  *  - `fn_80107DDC`, `fn_8010AD00`: the case-0 nested dispatch (docs/ef.md, "The case-0 nested dispatch");
  *  - `fn_80107640`: ours compares the type signed with a compare chain where retail uses `subi` + `cmplwi` range
@@ -20,6 +22,9 @@
  *  - `fn_8010A7D4`: retail keeps explicit compares for the empty cases 2 and 5 (ours folds them into the default).
  * *   flipcheck: `.data`/`.sdata` claimed, not emitted; `.text`, extab and extabindex short of the claim; `.sdata2`
  *   0x8 of the claimed 0x40 (the constants are declared, the claim is the pool).
+ *   Relocation names that differ from retail (pool constants): `eft013_guard_pulse` takes its four constants as
+ *     literals (retail loads `eft013_f32_one`, `eft013_f32_2_6`, `eft013_f32_0_4`, `eft013_f32_0_16` once; the
+ *     named externs are reloaded after every store).
  * SHAPES. Loop counters are declared before the work pointers (retail's register colours); the type tests that
  *   retail compares `cmpwi` are `switch`es; the small-data tables are declared with their sizes (`@sda21`).
  */
@@ -47,6 +52,9 @@
 #include "ef/eft001.h" /* mtx34_set_trans (rule 2) */
 #include "enemy/fn_8012BDF4.h" /* em_work_die_ck (rule 2) */
 #include "menu/get_pop_dat_ptr.h" /* get_option_21 (rule 2) */
+#include "ef/eft002.h" /* eft_effect_foreach_pm_scale (rule 2) */
+#include "Pl/fn_802693C4.h" /* Get_motion_no (rule 2) */
+#include "camera/camera.h" /* get_camera_pos (rule 2) */
 #include "fn_8004CAD8.h" /* subVec3 (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h" /* memset (rule 2) */
 #include "g3d/mtx34_inverse.h" /* mtx34_inverse (rule 2) */
@@ -71,6 +79,27 @@ struct _EFT013_PL {
     /* +0x1A4 */ u8 field_0x1A4;
 };
 /* size: 0x1A5 - lower bound, an approximation. */
+
+/* The player view `eft013_guard_pulse` reads: the action byte and the guard counter. */
+struct _EFT013_PL3 {
+    /* +0x000 */ u8 unused_0x000[0x0A];
+    /* +0x00A */ u8 action_0x0A;
+    /* +0x00B */ u8 unused_0x00B[0x442 - 0x00B];
+    /* +0x442 */ s16 guard_0x442;
+};
+/* size: 0x444 - lower bound, an approximation. */
+
+/* Work block of the `eft013_guard_pulse` pulse: the effect, three counters and the scale pair it feeds the effect. */
+struct _EFT013_WORK_P {
+    /* +0x00 */ u8 unused_0x00[0x0C];
+    /* +0x0C */ nw4r::ef::Effect* effect;
+    /* +0x10 */ u8 unused_0x10[0x1C - 0x10];
+    /* +0x1C */ s32 hold_0x1C;
+    /* +0x20 */ s32 delay_0x20;
+    /* +0x24 */ s32 timer_0x24;
+    /* +0x28 */ f32 scale[2];
+};
+/* size: 0x30 - lower bound, an approximation. */
 
 /* Pool block of the `fn_80107804` family: the setter state at +0x28 and the two payload bytes. */
 struct _EFT013_WORK_E {
@@ -261,8 +290,9 @@ extern "C" s32 eft014_joint_counts[5];  /* per slot: the length of its joint lis
 extern "C" u16 eft014_effect_ids[];      /* the type-1 effect ids, one per pool slot  .data 0x8059F3E8 */
 extern "C" u16 eft014_type_effect_ids[4];/* the effect id of types 3..6               .sdata 0x80791810 */
 
-extern "C" f32 lbl_807967A8;
-extern "C" f32 lbl_807967AC;
+extern "C" f32 eft013_f32_one;
+extern "C" f32 eft013_f32_three_quarters;
+extern "C" f32 eft013_f32_zero;
 
 extern "C" f32 lbl_8059EE68[];
 extern "C" f32 lbl_8059EEE8[];
@@ -763,7 +793,7 @@ extern "C" void fn_80107914(_EFT013_SEL* self) {
         areano = p->area_0x16;
         v16 = p->field_0x00C;
         v8 = p->field_0x00A;
-        scale = lbl_807967A8;
+        scale = eft013_f32_one;
         b = 3;
         break;
     }
@@ -785,7 +815,7 @@ extern "C" void fn_80107914(_EFT013_SEL* self) {
         areano = p->field_0x1A4;
         v16 = p->field_0x172;
         v8 = p->field_0x171;
-        scale = lbl_807967AC;
+        scale = eft013_f32_three_quarters;
         b = 2;
         break;
     }
@@ -899,7 +929,7 @@ void eft013_set(struct _PLW* plw, u8 type) {
         }
         break;
     }
-    _EFT013* e = fn_80107640(plw, type, lbl_807967A8, self->area_0x16);
+    _EFT013* e = fn_80107640(plw, type, eft013_f32_one, self->area_0x16);
     if (e != NULL) {
         ((_EFT013_WORK_F*)e->work_0x38)->field_0x44 = 0;
     }
@@ -1111,7 +1141,7 @@ extern "C" void eft013_set_from_sel(_EFT013_SEL* self, nw4r::math::VEC3* pos, u8
     if (areano != get_now_areano()) {
         return;
     }
-    _EFT013* e = fn_80107640(self->field_0x2C, type, lbl_807967A8, areano);
+    _EFT013* e = fn_80107640(self->field_0x2C, type, eft013_f32_one, areano);
     if (e == NULL) {
         return;
     }
@@ -1343,4 +1373,107 @@ void eft015_set(_SHELL_W* shell, u8 type, nw4r::math::VEC3* pos, nw4r::math::VEC
     e->flag_0x01 = 1;
     e->source_0x30 = (_ENEMY_WORK*)shell;
     eft_state_flags_set((_EFT*)e, 0, 4);
+}
+
+/* 0x8010A49C (0x204): the guard pulse on the player: arms when the player stops guarding (or plays one of the
+ * motions 0xCF/0xD8/0xE5), then swells the effect's particle scale to 2.6 and shrinks it back. */
+extern "C" void eft013_guard_pulse(_EFT013* self) {
+    _EFT013_PL3* pl = (_EFT013_PL3*)self->source_0x30;
+    _EFT013_WORK_P* work = (_EFT013_WORK_P*)self->work_0x38;
+    u16 motion = Get_motion_no((struct _PLW*)pl);
+    work->timer_0x24--;
+    work->hold_0x1C--;
+    if (work->hold_0x1C < 0 && self->field_0x08 == 3) {
+        self->field_0x08 = 4;
+    }
+    switch (self->field_0x07) {
+    case 0:
+        if (self->field_0x08 != 5 &&
+            (pl->action_0x0A != 6 || pl->guard_0x442 > 0 || motion == 0xCF || motion == 0xD8 || motion == 0xE5) &&
+            work->hold_0x1C < 0) {
+            work->delay_0x20 = 11;
+            work->hold_0x1C = 27;
+            self->field_0x08 = 2;
+        }
+        work->delay_0x20--;
+        if (work->delay_0x20 < 0 && self->field_0x08 == 2) {
+            self->field_0x08 = 3;
+            self->field_0x07++;
+            work->timer_0x24 = 4;
+            work->scale[1] = 1.0f;
+            work->scale[0] = 1.0f;
+        }
+        return;
+    case 1:
+        if (work->timer_0x24 < 0) {
+            work->timer_0x24 = 10;
+            self->field_0x07++;
+            work->scale[0] = 2.6f;
+            work->scale[1] = 2.6f;
+        } else {
+            work->scale[0] += 0.4f;
+            work->scale[1] += 0.4f;
+        }
+        eft_effect_foreach_pm_scale(work->effect, (u32)work->scale, false);
+        return;
+    case 2:
+        if (work->timer_0x24 < 0) {
+            self->field_0x07++;
+            work->scale[0] = 1.0f;
+            work->scale[1] = 1.0f;
+        } else {
+            work->scale[0] -= 0.16f;
+            work->scale[1] -= 0.16f;
+        }
+        eft_effect_foreach_pm_scale(work->effect, (u32)work->scale, false);
+        break;
+    }
+}
+
+/* 0x8010B504 (0x218): per-frame step of the scaled effect pool: ends outside the object's area or when an
+ * effect stops; types 3 and 4 tint their effect with the stage colour while the camera is below the water line. */
+extern "C" void fn_8010B504(_EFT013* self) {
+    s32 i;
+    _GXColor c;
+    _EFT013_POOL* pool = (_EFT013_POOL*)self->work_0x38;
+    if (self->area_0x44 != get_now_areano()) {
+        self->state_0x05++;
+        return;
+    }
+    for (i = 0; i < pool->count; i++) {
+        change_paramscale_eff(pool->effects[i], pool->scale_0x08);
+        if (effect_move(pool->effects[i]) == 0) {
+            self->flag_0x01 = 0;
+            self->state_0x05++;
+            return;
+        }
+    }
+    switch (self->type_0x02) {
+    case 3:
+        if (get_camera_pos().y < eft013_f32_zero) {
+            u32 col = get_stg_eft_col(self->area_0x44, 1);
+            c.r = (col & 0xFF000000) >> 24;
+            c.g = (col & 0xFF0000) >> 16;
+            c.b = (col & 0xFF00) >> 8;
+            c.a = 0xFF;
+            change_color_eff(pool->effects[0], &self->pos_0x18, c);
+            eft_res_models_spawn((_EFT*)self, (void**)pool->effects, 1, pool->count, NULL);
+        }
+        return;
+    case 4:
+        if (get_camera_pos().y < eft013_f32_zero) {
+            u32 col = get_stg_eft_col(self->area_0x44, 1);
+            c.r = (col & 0xFF000000) >> 24;
+            c.g = (col & 0xFF0000) >> 16;
+            c.b = (col & 0xFF00) >> 8;
+            c.a = 0xFF;
+            change_color_eff(pool->effects[0], &self->pos_0x18, c);
+            eft_res_models_spawn((_EFT*)self, (void**)pool->effects, 1, 1, NULL);
+        }
+        eft_res_models_spawn((_EFT*)self, (void**)&pool->effects[1], 1, 1, NULL);
+        return;
+    default:
+        eft_res_models_spawn((_EFT*)self, (void**)pool->effects, 1, pool->count, NULL);
+        break;
+    }
 }
