@@ -43,7 +43,7 @@ extern const f32 lbl_80795F4C;          /* 0.0f                                 
 /* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
 void mtx34_identity(MTX34* pMtx);                               /* owner: src/fn_8004CAD8.cpp */
-s32 fn_8005AAEC(const ResHandle* pSelf);                     /* owner: src/g3d/fn_8005AA28.cpp */
+s32 res_node_is_valid(const ResHandle* pSelf);                     /* owner: src/g3d/fn_8005AA28.cpp */
 void* fn_8005AAE4(const ResHandle* pSelf);                   /* owner: src/g3d/fn_8005AA28.cpp */
 ResNodeData* fn_8005D0C4(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
 ResNodeData* fn_8005D218(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
@@ -72,10 +72,10 @@ void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
     if (pResult == NULL) {
         nw4r::db::Panic(lbl_805915C0, 0x20, lbl_805915D0);
     }
-    if (fn_8005AAEC(pSelf) == 0) {
+    if (res_node_is_valid(pSelf) == 0) {
         nw4r::db::Panic(lbl_805915C0, 0x21, lbl_805915F8);
     }
-    if (fn_8005AAEC(pSelf) != 0) {
+    if (res_node_is_valid(pSelf) != 0) {
         u32 flags = pResult->flags;
         ResNodeData* pData = fn_8005D0C4(pSelf);
         if ((flags & 0x80) != 0) {
@@ -137,10 +137,10 @@ void fn_80098F6C(ResHandle* pSelf, AnmResult* pResult) {
     if (pResult == NULL) {
         nw4r::db::Panic(lbl_805915C0, 0x7E, lbl_805915D0);
     }
-    if (fn_8005AAEC(pSelf) == 0) {
+    if (res_node_is_valid(pSelf) == 0) {
         nw4r::db::Panic(lbl_805915C0, 0x7F, lbl_805915F8);
     }
-    if (fn_8005AAEC(pSelf) != 0) {
+    if (res_node_is_valid(pSelf) != 0) {
         ResNodeData* pData = fn_8005D0C4(pSelf);
         u32 flags = 0;
         u32 dataFlags = pData->mFlags;
@@ -201,10 +201,10 @@ void fn_80099134(ResNodeData* pSelf) {
 
 /* Store the translate triple, setting the channel bit when the triple is zeroed. */
 void fn_80099178(ResHandle* pSelf, f32 x, f32 y, f32 z) {
-    if (fn_8005AAEC(pSelf) == 0) {
+    if (res_node_is_valid(pSelf) == 0) {
         nw4r::db::Panic(lbl_805915C0, 0xEF, lbl_805915F8);
     }
-    if (fn_8005AAEC(pSelf) != 0) {
+    if (res_node_is_valid(pSelf) != 0) {
         ResNodeData* pData = (ResNodeData*)fn_8005AAE4(pSelf);
         if (lbl_80795F4C == x && lbl_80795F4C == y && lbl_80795F4C == z) {
             pData->mFlags |= 0x2;
@@ -220,10 +220,10 @@ void fn_80099178(ResHandle* pSelf, f32 x, f32 y, f32 z) {
 
 /* Store the rotate triple, setting the channel bit when the triple is zeroed. */
 void fn_80099278(ResHandle* pSelf, f32 x, f32 y, f32 z) {
-    if (fn_8005AAEC(pSelf) == 0) {
+    if (res_node_is_valid(pSelf) == 0) {
         nw4r::db::Panic(lbl_805915C0, 0x103, lbl_805915F8);
     }
-    if (fn_8005AAEC(pSelf) != 0) {
+    if (res_node_is_valid(pSelf) != 0) {
         ResNodeData* pData = (ResNodeData*)fn_8005AAE4(pSelf);
         if (lbl_80795F4C == x && lbl_80795F4C == y && lbl_80795F4C == z) {
             pData->mFlags |= 0x4;

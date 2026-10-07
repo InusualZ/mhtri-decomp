@@ -182,12 +182,12 @@ u32 mtx34_identity(s32);
 u32 vec3_normalize_into(void*, void*, f32, f32);
 u32 mtx34_mult_vec3(void*, s32, void*);
 u32 res_mat_chan_copy_ctor(void*, void*);
-s32 fn_8005AAEC(s32);
+s32 res_node_is_valid(s32);
 void* fn_8005CEEC(void);
-s32 fn_8005D050(void*);
+s32 res_node_get_id(void*);
 u32 fn_8005D0CC(void*, void*);
 s32 fn_8005D218(void*);
-u32 fn_8005D2C0(void*, void*);
+u32 res_node_copy_ctor(void*, void*);
 void* fn_80062DEC(s32);
 s32 fn_8006405C(void*);
 u32 fn_80064BD4(void*);
@@ -1281,7 +1281,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                             nw4r::db::Panic((const char*)&lbl_8058E880, 0x64, (const char*)&lbl_8058E890);
                         }
                         sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMdl*>(&sp2C)->GetResNode((int)temp_r3_3).mpData;
-                        fn_8005D2C0((void*)(&sp28), (void*)(&sp18));
+                        res_node_copy_ctor((void*)(&sp28), (void*)(&sp18));
                         temp_r20_2 = fn_8005D218((void*)(arg1));
                         mtx34_concat((void*)(&spC8), (void*)(fn_8005D218((void*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
                         temp_r3_4 = (void *)(g3d_state_get_nrm_mtx((u32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx)));
@@ -1818,10 +1818,10 @@ typedef struct {
     /* +0x14 */ u32 field_0x14;
 } RawView_25; /* size: 0x18 */
 s32 fn_80078904(s32 arg0) {
-    if (fn_8005AAEC(0) == 0) {
+    if (res_node_is_valid(0) == 0) {
         nw4r::db::Panic((const char*)&lbl_8058EA50, 0xA5, (const char*)&lbl_8058EA30);
     }
-    if (fn_8005AAEC((s32)(arg0)) != 0) {
+    if (res_node_is_valid((s32)(arg0)) != 0) {
         return (((RawView_25*)fn_80062DEC((s32)(arg0)))->field_0x14 & 0x100) != 0;
     }
     return 0;

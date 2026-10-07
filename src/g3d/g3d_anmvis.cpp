@@ -81,8 +81,8 @@ extern "C" {
 /* callees (module-ambiguous unsplit addresses: rule 2's documented gap, so they are declared here)  */
 /* ------------------------------------------------------------------------------------------------ */
 
-u32 fn_8005D050(const void* pSelf);
-void fn_8005D2C0(void* pOut, const void* pIn);
+u32 res_node_get_id(const void* pSelf);
+void res_node_copy_ctor(void* pOut, const void* pIn);
 u32* fn_8005DC60(u32* pOut, const void* value);
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -154,8 +154,8 @@ void g3d_apply_vis_anm_result(void* pModel, AnmObjVis* pSelf)
             s32 node;
 
             node = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(pModel)->GetResNode(i).mpData;
-            fn_8005D2C0(&handle, &node);
-            if ((u32)fn_8005D050(&handle) != i) {
+            res_node_copy_ctor(&handle, &node);
+            if ((u32)res_node_get_id(&handle) != i) {
                 nw4r::db::Panic(lbl_8058D6C0, 733, lbl_8058D748);
             }
             fn_8005AA44(&handle, pSelf->GetNodeFlag(i));

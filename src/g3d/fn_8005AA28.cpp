@@ -3,7 +3,8 @@
  * RANGE. .text 0x8005AA28-0x8005ABD8 (8 functions); extab, extabindex, .ctors 0x8056F2D0-0x8056F2D4 (fn_8005AB78's
  *   word), .data 0x8058B350-0x8058B388, .bss 0x8066AE48-0x8066AE60, .sdata 0x80791124-0x80791130, .sdata2
  *   0x80795CF0-0x80795CF8.
- * NAMES. The file keeps the map's stem: the range's only `__FILE__` string is the accessor header
+ * NAMES. res_node_is_valid is a GUESS (the evidence follows).
+ *   The file keeps the map's stem: the range's only `__FILE__` string is the accessor header
  *   "g3d_resnode_ac.h" (lbl_8058B370, fn_8005AA44's assert).  Module `g3d` from the callers
  *   (`nw4r::g3d::ScnMdl::CopiedMatAccess`, `g3d/g3d_calcworld.cpp`'s fn_80073E8C; mtx34_trans_apply's twin is
  *   `g3d/g3d_basic.cpp`'s fn_800D7ED0).
@@ -68,7 +69,7 @@ extern "C" {
 
 /* Forward declarations for the two `_ac.h` accessors fn_8005AA44 re-checks after its assert. */
 void* fn_8005AAE4(const ResMatHandle* pSelf);
-u32 fn_8005AAEC(const ResMatHandle* pSelf);
+u32 res_node_is_valid(const ResMatHandle* pSelf);
 
 } /* extern "C" */
 
@@ -86,10 +87,10 @@ extern "C" {
 
 /* The `_ac.h` flag setter: assert the handle is valid, then set or clear the mat's 0x100 flag. */
 void fn_8005AA44(ResMatHandle* pSelf, u32 enable) {
-    if (!fn_8005AAEC(pSelf)) {
+    if (!res_node_is_valid(pSelf)) {
         nw4r::db::Panic(lbl_8058B370, 0xAF, lbl_8058B350);
     }
-    if (fn_8005AAEC(pSelf)) {
+    if (res_node_is_valid(pSelf)) {
         if (enable != 0) {
             ((ResMatData*)fn_8005AAE4(pSelf))->mFlags |= 0x100;
         } else {
@@ -104,7 +105,7 @@ void* fn_8005AAE4(const ResMatHandle* pSelf) {
 }
 
 /* A second `IsValid()` out-of-line copy, byte-identical to fn_8005AA30 (a different `_ac.h` inline). */
-u32 fn_8005AAEC(const ResMatHandle* pSelf) {
+u32 res_node_is_valid(const ResMatHandle* pSelf) {
     return pSelf->mpRes != NULL;
 }
 
