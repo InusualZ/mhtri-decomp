@@ -127,9 +127,6 @@ extern char*** q_result_msg_adrs[12];
 
 /* This unit's own entry points (named for what they do; see the unit header - every name is a
  * GUESS recorded there). */
-void q_result_effect_follow_npc(struct _EFT* self);
-void q_result_anim_counter_inc(struct _EFT* self);
-void q_result_release_effect(struct _EFT* self);
 char** q_result_msg_table(u8 id);
 char* q_result_msg_entry(u8 id, u8 index);
 char** q_result_msg_table_alt(u8 id);

@@ -1832,29 +1832,29 @@ enemy/em009_act.cpp:
 	.sdata2     start:0x8079BFF8 end:0x8079C298
 
 lobby/lb_quest_ui.cpp:
-	extab       start:0x800181C4 end:0x8001833C
-	extabindex  start:0x8003810C end:0x80038340
-	.text       start:0x8038EC44 end:0x80394038
-	.data       start:0x805F0CB8 end:0x805F13D0
+	extab       start:0x800181C4 end:0x80018344
+	extabindex  start:0x8003810C end:0x8003834C
+	.text       start:0x8038EC44 end:0x80394158
+	.data       start:0x805F0CB8 end:0x805F1400
 	.sdata      start:0x807933D8 end:0x80793470
-	.sdata2     start:0x8079C298 end:0x8079C2B0
+	.sdata2     start:0x8079C298 end:0x8079C2D0
 
 lobby/lb_quest_board.cpp:
-	extab       start:0x8001833C end:0x8001843C
-	extabindex  start:0x80038340 end:0x800384C0
-	.text       start:0x80394038 end:0x803967F0
-	.data       start:0x805F13D0 end:0x805F1500
+	extab       start:0x80018344 end:0x80018444
+	extabindex  start:0x8003834C end:0x800384CC
+	.text       start:0x80394158 end:0x80396948
+	.data       start:0x805F1400 end:0x805F1500
 	.sdata      start:0x80793470 end:0x80793488
-	.sdata2     start:0x8079C2B0 end:0x8079C2E8
+	.sdata2     start:0x8079C2D0 end:0x8079C300
 
 menu/menu_result.cpp:
-	extab       start:0x8001843C end:0x8001863C
-	extabindex  start:0x800384C0 end:0x800387C0
-	.text       start:0x803967F0 end:0x8039D278
+	extab       start:0x80018444 end:0x8001863C
+	extabindex  start:0x800384CC end:0x800387C0
+	.text       start:0x80396948 end:0x8039D278
 	.data       start:0x805F1500 end:0x805F1704
 	.bss        start:0x806C5528 end:0x806C5558
 	.sdata      start:0x80793488 end:0x80793520
-	.sdata2     start:0x8079C2E8 end:0x8079C330
+	.sdata2     start:0x8079C300 end:0x8079C330
 
 menu/multi_result.cpp:
 	extab       start:0x8001863C end:0x8001882C

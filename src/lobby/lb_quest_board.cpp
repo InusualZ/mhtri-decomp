@@ -1,19 +1,17 @@
 /* lobby/lb_quest_board.cpp - the lobby's quest-board screen: its step machine, its cursor, the panel frame it draws
  *   into and the effects it spawns.
- * RANGE. .text 0x80394038-0x803967F0 (42 functions); .data 0x805F13D0-0x805F1500 (the camera key table,
- *   `jumptable_805F1400` and the sprite-id tables), .sdata 0x80793470-0x80793488, .sdata2 0x8079C2B0-0x8079C2E8, extab,
- *   extabindex.  The range holds three TUs' worth of code: `lb_scene_model_slide` (0x80394038, called only from
- *   `lobby/lb_quest_ui.cpp`'s `lb_scene_eft_move`, with the key table and the `.sdata2` run 0x8079C2B0-0x8079C2D0) and
- *   the two helpers after it (called from `lb_scene_eft_step`) close `lobby/lb_quest_ui.cpp`'s TU; the board screen runs
- *   0x80394158-0x80395D04 (its own int->float double at 0x8079C2D8); the `_EFT` effect band from 0x80395D04 continues
- *   into `menu/menu_result.cpp`'s first three rows (seam requests filed).
+ * RANGE. .text 0x80394158-0x80396948 (42 functions); .data 0x805F1400-0x805F1500 (`jumptable_805F1400` and the
+ *   sprite-id tables), .sdata 0x80793470-0x80793488, .sdata2 0x8079C2D0-0x8079C300, extab, extabindex.  The board screen
+ *   runs 0x80394158-0x80395D04 (its own int->float double at 0x8079C2D8); the `_EFT` effect band from 0x80395D04 ends
+ *   with the board effect's three helpers `q_result_effect_follow_npc`, `q_result_anim_counter_inc` and
+ *   `q_result_release_effect` (0x803967F0-0x80396948, called only from here; the follow-npc row reads
+ *   0x8079C2EC-0x8079C300 and owns the one extab/extabindex record after `lb_quest_board_flash_move`'s).
  * FLAGS. `cflags_lobby`; `#pragma pool_data off` (retail materialises each table with its own `lis`/`addi`);
  *   `#pragma peephole off` file-wide (retail keeps `and`/`subi`/`extsb` + `cmpwi` unfused; playbook 39) except
  *   `lb_quest_board_step_screen` and `lb_quest_board_effect_spawn`, which measure better with it on.
  * NAMES. `lb_quest_board` is a GUESS from the range's one real map name, `draw_quest_board` (0x80394DA4), in the
  *   module's `lb_*` scheme; every other name is a GUESS from its body.  Module `lobby`: 42 `lobby_w` reads, `LbStr`,
  *   `lb_npc_Get_motion_no`, `get_now_areano`, `get_move_work_adrs`, `get_option_cfg` and the lobby/HUD 2D layer.
- *   GUESS: `lb_scene_model_slide`, `lb_quest_board_state_next`, `lb_quest_board_effect_retire`,
  *   GUESS: `lb_quest_board_step_screen`, `lb_quest_board_list_input`, `lb_quest_board_detail_input`,
  *   GUESS: `lb_quest_board_accept_input`, `lb_quest_board_name_input`, `lb_quest_board_enter_step`,
  *   GUESS: `lb_quest_board_summary_draw`, `lb_quest_board_detail_draw`, `lb_quest_board_panel_draw`,
@@ -23,8 +21,10 @@
  *   GUESS: `lb_quest_board_effect_release`, `lb_quest_board_effect_push_models`,
  *   GUESS: `lb_quest_board_effect_retire_list`, `lb_quest_board_step`, `lb_quest_board_step_kind`,
  *   GUESS: `lb_quest_board_flash_init`, `lb_quest_board_follow_init`, `lb_quest_board_effect_update`,
- *   GUESS: `lb_quest_board_flash_move`
- * RESIDUALS. Unwritten: `lb_quest_board_effect_init` (0x80396070, 0x1D8: `SetRootMtxTrans` has no declaration in its
+ *   GUESS: `lb_quest_board_flash_move`, `q_result_effect_follow_npc`, `q_result_anim_counter_inc`,
+ *   GUESS: `q_result_release_effect` (the three keep their `menu_result` scheme names)
+ * RESIDUALS. Unwritten: `q_result_effect_follow_npc` (0x803967F0, 0x144: its `MTX34` translation store is
+ *   `ef/eft001.cpp`'s `fn_800FBB90`, rename requested; the ef lanes own it),`lb_quest_board_effect_init` (0x80396070, 0x1D8: `SetRootMtxTrans` has no declaration in its
  *   owner's header) and `lb_quest_board_effect_move` (0x803963F4, 0x260: it calls `ef/effect.cpp`'s `effect_retire`,
  *   which the ef lanes own).  flipcheck: `.data`/`.sdata`/`.sdata2` claimed, not emitted; `.text`/extab/extabindex short
  *   of the claim; the pools are three TUs' (see RANGE).  Unwritten: `lb_quest_board_party_step` (0x80395A4C, 0x238):
@@ -42,7 +42,6 @@
 #include "lobby/lb_quest_board.h"
 #include "quest/quest_entry.h"   /* `quest_record_find` (the owner's header, rule 2) */
 #include "Network/net_session_close.h"   /* `getProfileQuestRecord` (the owner's header, rule 2) */
-#include "menu/menu_result.h"   /* `q_result_*` (the owner's header, rule 2) */
 #include "enemy/em_pop.h"   /* `quest_ex_condition_ck` (the owner's header, rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
@@ -77,10 +76,6 @@
 
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
 
-/* The camera model's key-frame table `lb_scene_model_slide` reads: six (frame, value) pairs. */
-f32 lb_quest_detail_camera_keys[12] = {
-    0.0f, -3160.0f, 82.0f, -3080.9f, 144.0f, -3035.2f, 212.0f, -2965.3f, 310.0f, -2960.0f, -1.0f, -2960.0f,
-};
 u16 lb_quest_board_frame_ids[14] = {
     0x1646, 0x1647, 0x1640, 0x1641, 0x1642, 0x1643, 0x1644, 0x1645, 0x163E, 0x163F, 0xFFFF, 0x0000, 0x0000, 0x0000,
 };
@@ -102,18 +97,9 @@ u16 lb_quest_board_empty_ids[2] = {0x1659, 0xFFFF};
 u16 lb_quest_board_label_ids[4] = {0x1692, 0x1693, 0x1694, 0xFFFF};
 u16 lb_quest_board_label_lsp[4] = {0x1695, 0x1696, 0x1697, 0x1697};
 
-/* The model record `lb_scene_eft_move` hands `lb_scene_model_slide`: its step byte and the position the
- * camera keys drive.  size: 0x10 (a view: the model continues) */
-typedef struct LbQuestDetailModel {
-    /* +0x00 */ u8 step;
-    /* +0x01 */ u8 pad_0x01[0x3];
-    /* +0x04 */ VEC3 pos;
-} LbQuestDetailModel; /* size: 0x10 */
-
 /* Declarations of this range's own symbols, so the bodies can stay in address order.  They are `extern "C"`
  * because the map spells them unmangled (playbook 42). */
 extern "C" {
-u8 lb_scene_model_slide(_EFT* self, LbQuestDetailModel* model, u8 index);
 void lb_quest_board_close(void);
 s32 lb_quest_board_cursor_step(s32 index, s32 count, u32 current, u32 next, u32 prev);
 void lb_quest_board_cursor_reset(LbQuestBoardWork* work);
@@ -144,43 +130,9 @@ void lb_quest_board_effect_update(_EFT* self);
 void lb_quest_board_effect_move(_EFT* self);
 void lb_quest_board_flash_move(_EFT* self);
 void lb_quest_board_effect_release(_EFT* self);
-}
-
-/* 0x80394038 (0x10C): Steps one of the scene effect's models: it waits for the lobby's camera mode 2, slides back when
- * the camera work stops, and for model 3 follows the key table by the camera's frame; 1 for model 4. */
-extern "C" u8 lb_scene_model_slide(_EFT* self, LbQuestDetailModel* model, u8 index) {
-    switch (model->step) {
-    case 0:
-        if (lobby_w.unused_0x001[2] == 2) {
-            model->step++;
-            setVector3(&model->pos, -3160.0f, -40.0f, 370.0f);
-        }
-        /* fall through */
-    case 1:
-        if (camera_work_ck() == 0) {
-            setVector3(&model->pos, -2960.0f, -40.0f, 370.0f);
-            model->step = 0;
-            return 0;
-        }
-        if (index == 3) {
-            model->pos.x = getKeyData(lb_quest_detail_camera_keys, (f32)(camera_frame_get(1) * 2));
-        } else if (index == 4) {
-            return 1;
-        }
-        break;
-    }
-    return 0;
-}
-
-/* 0x80394144 (0x10): Advances the work's step byte.  GUESS: the step is what the two dispatchers below switch on, but
- * nothing in the range calls this body, so the caller that owns its meaning is outside the unit. */
-extern "C" void lb_quest_board_state_next(_EFT* self) {
-    self->state_0x05++;
-}
-
-/* 0x80394154 (0x4): Retires one pooled effect runtime record. */
-extern "C" void lb_quest_board_effect_retire(_EFT* self) {
-    eft_res_slot_release(self);
+void q_result_effect_follow_npc(_EFT* self);
+void q_result_anim_counter_inc(_EFT* self);
+void q_result_release_effect(_EFT* self);
 }
 
 /* 0x80394158 (0x90): Opens the board screen: clears the whole screen block, files the payload it was opened with and
@@ -1238,4 +1190,14 @@ extern "C" void lb_quest_board_flash_move(_EFT* self) {
     eft_rot_vec_copy(&work->model->rot_0x54, &self->rot_0x24);
     work->model->move(0);
     eft_res_models_spawn(self, (void**)&work->model, 2, work->count, NULL);
+}
+
+/* 0x80396934 (0x10): Bumps the quest board effect's state byte. */
+extern "C" void q_result_anim_counter_inc(_EFT* self) {
+    self->state_0x05 += 1;
+}
+
+/* 0x80396944 (0x4): Hands the quest board effect to the effect system's release. */
+extern "C" void q_result_release_effect(_EFT* self) {
+    eft_res_slot_release(self);
 }
