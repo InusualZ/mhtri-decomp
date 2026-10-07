@@ -13,11 +13,15 @@
  *   GUESS: `eft013_guard_pulse` (0x8010A49C), the constants `eft013_f32_one`, `eft013_f32_three_quarters`,
  *   GUESS: `eft013_f32_zero`, `eft013_f32_2_6`, `eft013_f32_0_4`, `eft013_f32_0_16` (by value); the glow tables
  *   GUESS: `eft014_glow_joints`, `eft014_glow_offset_y`, `eft014_glow_offset_z`, `eft014_glow_scale`,
- *   GUESS: `eft014_glow_alpha_key`; the foreign `em015_damage_level` (0x80182918, `enemy/em015_prog.cpp`).
- * RESIDUALS. 7 rows unwritten: 0x80107E5C-0x801089C0 (`eft013_setup_effect`, `eft013_setup_uv_model`),
- *   0x80108A74-0x8010A1D4 (`fn_80108A74`, `fn_801093F4`, `fn_80109A84`, `fn_80109D00`), 0x8010B198-0x8010B504
- *   (`fn_8010B198`).
- *   5 partial rows:
+ *   GUESS: `eft014_glow_alpha_key`; the foreign `em015_damage_level` (0x80182918, `enemy/em015_prog.cpp`); the spark
+ *   GUESS: tables `eft014_spark_joint_lists`, `eft014_spark_ids_type0`, `eft014_spark_ids_type7`,
+ *   GUESS: `eft014_spark_scales_type7`, `eft014_spark_counts`.
+ * RESIDUALS. 6 rows unwritten: 0x80107E5C-0x801089C0 (`eft013_setup_effect`, `eft013_setup_uv_model`),
+ *   0x80108A74-0x8010A1D4 (`fn_80108A74`, `fn_801093F4`, `fn_80109A84`, `fn_80109D00`).
+ *   6 partial rows:
+ *  - `fn_8010B198`: retail keeps the slot flag 1 and the search's trip count 2 in callee-saved registers and colours
+ *    the type's tables r20-r23 where ours takes other registers (so ours saves from r21: `_savegpr_21`/`_restgpr_21`
+ *    where retail calls `_savegpr_20`/`_restgpr_20`);
  *  - `fn_8010B71C`: the final store of the damage level keeps a `clrlwi` retail does not have (a `u8` level
  *    colours the registers differently and scores lower);
  *  - `fn_80107DDC`, `fn_8010AD00`: the case-0 nested dispatch (docs/ef.md, "The case-0 nested dispatch");
@@ -242,7 +246,9 @@ struct _EFT013_WORK_K {
 /* size: 0x0C - lower bound, an approximation. */
 struct _EFT014_SLOT_A {
     /* +0x00 */ nw4r::ef::Effect* effect;
-    /* +0x04 */ u8 pad_0x04[0x0C - 0x04];
+    /* +0x04 */ u8 active;
+    /* +0x05 */ u8 pad_0x05[0x08 - 0x05];
+    /* +0x08 */ s32 joint;
 };
 /* size: 0xD4 - lower bound, an approximation. */
 struct _EFT014_POOL_A {
@@ -308,6 +314,11 @@ extern "C" f32 eft014_glow_offset_y[7]; /* its joint-local Y offset             
 extern "C" f32 eft014_glow_offset_z[7]; /* its joint-local Z offset                       .data 0x8059F4E0 */
 extern "C" f32 eft014_glow_scale[7];    /* its particle scale                             .data 0x8059F4FC */
 extern "C" u8 eft014_glow_alpha_key[8]; /* the fade-in alpha keyframes                    .sdata 0x80791818 */
+extern "C" s32* eft014_spark_joint_lists[11]; /* per phase: the joints its sparks sit on        .data 0x8059F358 */
+extern "C" u16* eft014_spark_ids_type0[11];   /* per phase: the type-0 spark effect ids          .data 0x8059F3F8 */
+extern "C" u16* eft014_spark_ids_type7[11];   /* per phase: the type-7 spark effect ids          .data 0x8059F424 */
+extern "C" f32* eft014_spark_scales_type7[11]; /* per phase: the type-7 spark scales             .data 0x8059F48C */
+extern "C" s8 eft014_spark_counts[12];        /* per phase: how many sparks it adds              .data 0x8059F4B8 */
 extern "C" u16 eft014_effect_ids[];      /* the type-1 effect ids, one per pool slot  .data 0x8059F3E8 */
 extern "C" u16 eft014_type_effect_ids[4];/* the effect id of types 3..6               .sdata 0x80791810 */
 
@@ -1604,4 +1615,106 @@ extern "C" void fn_8010B71C(_EFT013* self) {
         }
     }
     self->field_0x08 = level;
+}
+
+/* 0x8010B198 (0x36C): per-frame step of the enemy's electric sparks: every two or three frames adds the next
+ * phase's sparks to free slots of the 16-slot pool (with their SE), then keeps each live spark on its joint. */
+extern "C" void fn_8010B198(_EFT013* self) {
+    s32 i;
+    s32 slot;
+    s32 n;
+    _EFT014_POOL_A* work = (_EFT014_POOL_A*)self->work_0x38;
+    _ENEMY_WORK* src = self->source_0x30;
+    nw4r::math::MTX34 mtx;
+    nw4r::math::VEC3 v;
+    f32** scales;
+    s32** joints;
+    u32 phases;
+    u16** ids;
+    s8* counts;
+    s32 max_time;
+    MTX34_ctor(&mtx);
+    VEC3_ctor(&v);
+    switch (self->type_0x02) {
+    case 0:
+        counts = eft014_spark_counts;
+        ids = eft014_spark_ids_type0;
+        joints = eft014_spark_joint_lists;
+        phases = 11;
+        scales = NULL;
+        max_time = 50;
+        break;
+    case 7:
+        counts = eft014_spark_counts;
+        ids = eft014_spark_ids_type7;
+        joints = eft014_spark_joint_lists;
+        scales = eft014_spark_scales_type7;
+        phases = 11;
+        max_time = 50;
+        break;
+    default:
+        fn_8010BBDC(self);
+        return;
+    }
+    if (++self->timer_0x0C > max_time || em_work_die_ck(src) != 0) {
+        self->flag_0x01 = 0;
+        self->state_0x05++;
+        return;
+    }
+    if (self->field_0x10 <= 0) {
+        if (work->phase_0xCF < phases) {
+            n = counts[work->phase_0xCF];
+            u16* id = ids[work->phase_0xCF];
+            s32* joint = joints[work->phase_0xCF];
+            for (i = 0; i < n; i++) {
+                for (slot = 0; slot < 16; slot++) {
+                    if (work->slots[slot].active == 0) {
+                        break;
+                    }
+                }
+                if (slot >= 16) {
+                    break;
+                }
+                _EFT014_SLOT_A* s = &work->slots[slot];
+                s->effect = res_eft_create(*id, 38, 0);
+                if (s->effect == NULL) {
+                    fn_8010BBDC(self);
+                    return;
+                }
+                s->active = 1;
+                s->joint = *joint;
+                get_joint_wpos_em(src, s->joint, &v);
+                em015_denki_eft_se_req(src->se_handle_0xB14, &v, 1);
+                id++;
+                joint++;
+            }
+            if (scales != NULL) {
+                f32* sc = scales[work->phase_0xCF];
+                for (i = 0; i < n; i++) {
+                    change_paramscale_eff(work->slots[slot].effect, *sc);
+                    sc++;
+                }
+            }
+            work->count_0xD0 += i;
+            work->phase_0xCF++;
+            self->field_0x10 = 2;
+            self->field_0x10 += (u16)ran_suu(0) & 1;
+        }
+    } else {
+        self->field_0x10--;
+    }
+    for (i = 0; i < 16; i++) {
+        if (work->slots[i].active != 0) {
+            get_joint_wmat_em(src, work->slots[i].joint, &mtx);
+            work->slots[i].effect->SetRootMtx(mtx);
+            if (effect_move(work->slots[i].effect) == 0) {
+                push_eft_effect_heap_num(&work->slots[i].effect, 1);
+                work->slots[i].active = 0;
+                work->slots[i].joint = 0;
+                work->count_0xD0--;
+            } else {
+                eft_res_models_spawn((_EFT*)self, (void**)&work->slots[i].effect, 1, 1, NULL);
+            }
+        }
+    }
 }
