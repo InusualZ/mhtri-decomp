@@ -5,7 +5,7 @@
  * RANGE. .text 0x8008A664-0x8008F6E8 (101 functions); extab, extabindex, .rodata 0x8056F710-0x8056F730, .data
  *   0x80590010-0x805903F0 (opens on "g3d_resanmchr.cpp"), .sdata2 0x80795ED0-0x80795F08.
  * NAMES. Map stems (the dump answers `zz_` placeholders).
- * RESIDUALS. Unwritten (objdiff scores them zero): the per-node dispatchers fn_8008C038, fn_8008CF2C, fn_8008D5FC.
+ * RESIDUALS. Unwritten (objdiff scores them zero): the per-node dispatchers fn_8008C038, fn_8008CF2C, GetAnmResult__Q34nw4r3g3d9ResAnmChrCFPQ34nw4r3g3d12ChrAnmResultUlf.
  *   fn_8008A664: the `ScaleType` compare chain holds the masked word in r7 in retail, r3 here.
  *   fn_8008AA8C, fn_8008B200, fn_8008B95C: swapped `fcmpo` operand order, `fmr`/`fmuls` scheduling, 12 bytes short.
  *   fn_8008C600, fn_8008C968, fn_8008CD00: retail's ordered compare (`fcmpo` + `cror`) is `fcmpu` here, and the float

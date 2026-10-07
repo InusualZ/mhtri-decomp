@@ -52,7 +52,13 @@ namespace nw4r {
 namespace g3d {
 
 class AnmObjChrRes;
-struct ChrAnmResult;
+
+/* One node's evaluated character-animation result: the flag word (0: nothing animated) and the transform the
+ * blend and the world pass read.  size: 0x4C (the cache's per-node stride) */
+struct ChrAnmResult {
+    /* +0x00 */ u32 flags;
+    /* +0x04 */ u8 pad_0x04[0x48];
+};
 
 /* The animation's play policy: what a frame past the end folds back to. */
 enum AnmPolicy {
@@ -85,6 +91,7 @@ public:
     u32 GetNumNode() const;
     AnmPolicy GetAnmPolicy() const;
     int GetNumFrame() const;
+    void GetAnmResult(ChrAnmResult* pResult, u32 id, f32 frame) const;
 };
 
 /* The character animation interface: one binding word per model node (bit 15: no animation, bit 14: undefined)

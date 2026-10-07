@@ -207,6 +207,14 @@ class FrameCtrl {
 public:
     FrameCtrl(f32 startFrame, f32 endFrame, PlayPolicyFunc pPolicy);
 
+    f32 GetFrm() const;
+    void SetFrm(f32 frame);
+    f32 GetRate() const;
+    void SetRate(f32 rate);
+    void UpdateFrm();
+
+    static f32 smBaseUpdateRate; /* 0x80791168 (.sdata, a static): the frames one step advances at rate 1 */
+
     /* +0x00 */ f32 mFrame;
     /* +0x04 */ f32 mUpdateRate;
     /* +0x08 */ f32 mStartFrame;
