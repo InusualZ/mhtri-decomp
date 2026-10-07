@@ -118,11 +118,12 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 90 | [Absorb `dw` / `CAMELLIA_RL1` IR shape](090-absorb-rl1-ir-shape.md) | ruled-out | source-shape, allocator | With the level-4 pragma the frame is right and only a window in the key-schedule absorb chain differs (register choice plus where `CAMELLIA_RL1` is computed); source rewrites of that chain were the highest-probability... |
 | 91 | [Pragma combination search](091-pragma-combination-search.md) | ruled-out | pragma, flags | With the level-4 pragma the frame is correct and only a short window differs; a per-function pragma (or a combination) that suppresses the level-4 reassociation while keeping the frame would finish the job. |
 
-## Not tried yet (1)
+## Not tried yet (2)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
 | 93 | [A Type_name(Type* self) free function is a member: define Type::name and rename the map row to the mangling](093-type-name-type-self.md) | todo | source-shape, symbols | A function is spelled Type_name(Type* self, ...) and its map row is the unmangled Type_name - the compiler will mangle the real member (name__<len>Type...), so the retail symbol reads as a member the source never... |
+| 107 | [Retail calls an implicit copy constructor out of line: dont_inline at end of TU](107-implicit-copy-ctor-out-of-line.md) | todo | flags, source-shape | Retail calls a two-level out-of-line handle copy (`bl Derived copy` -> `bl ResCommon copy`) where our build copies the word inline |
 
 ## Superseded (2)
 

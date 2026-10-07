@@ -36,7 +36,7 @@
 #include "nw4r/g3d/res_common.h" /* IS_VALID_PTR (rule 1) */
 #include "g3d/g3d_calcview.h" /* mtx34_copy_ps (rule 2) */
 #include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
-#include "g3d/g3d_anmchr.h"      /* fn_800610AC, fn_800618BC, fn_800628C8 (rule 2) */
+#include "g3d/g3d_anmchr.h"      /* math_reciprocal, ResAnmChr, fn_800628C8 (rule 2) */
 #include "g3d/g3d_rescommon.h"   /* nw4r::g3d::ResDic (rule 2) */
 #include "g3d/fn_80063888.h"     /* fn_8006497C (rule 2) */
 #include "fn_8004CAD8.h"         /* anim_tick_angle, mtx34_identity, sqrt_f32 (rule 2) */
@@ -1282,7 +1282,7 @@ void fn_8008D528(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
 /* The resource-table step (no pointer guard). */
 void fn_8008D9B8(u32 self, u32* out)
 {
-    u32 tmp = fn_800628C8((void*)self, (s32)*((u32*)fn_800618BC((void*)self) + 4));
+    u32 tmp = fn_800628C8((void*)self, reinterpret_cast<const nw4r::g3d::ResAnmChr*>(self)->ref().toChrDataDic);
 
     (*reinterpret_cast<nw4r::g3d::ResDic*>(&tmp))[(int)out];
 }

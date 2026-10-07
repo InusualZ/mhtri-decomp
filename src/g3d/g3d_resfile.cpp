@@ -25,7 +25,7 @@
 #include "g3d/fn_80063888.h"     /* fn_8006584C/0x80063FD0 (rule 2) */
 #include "g3d/g3d_calcmaterial.h" /* fn_8006F158/0x8006F298 (rule 2) */
 #include "g3d/g3d_anmvis.h"      /* fn_8006EC3C (rule 2) */
-#include "g3d/g3d_anmchr.h"      /* fn_800618BC (rule 2) */
+#include "g3d/g3d_anmchr.h"      /* nw4r::g3d::ResAnmChr (rule 2) */
 #include "g3d/g3d_calcview.h"    /* fn_800700C0 (rule 2) */
 #include "g3d/g3d_state.h"
 #include "g3d/g3d_resvtx.h"
@@ -341,7 +341,7 @@ extern "C" u32 fn_80093FF4(ResHandle* p) {
 }
 
 extern "C" u32 fn_80094020(ResHandle* p) {
-    return ((ResRevisionWord*)fn_800618BC(p))->revision;
+    return reinterpret_cast<const nw4r::g3d::ResAnmChr*>(p)->ref().revision;
 }
 
 extern "C" u32 fn_80094044(ResHandle* p) {
