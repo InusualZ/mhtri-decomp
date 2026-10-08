@@ -20,6 +20,7 @@
 #include "sound/snd_bank_select_pending.h" /* snd_bank_select_pending (rule 2: the owner's header) */
 #include "sound/snd_handle_store.h" /* snd_handle_store (rule 2: the owner's header) */
 #include "types.h"
+#include "MIX/mix.h"
 #include "Runtime.PPCEABI.H/memset.h" /* memset (rule 2: its owner's header) */
 #include "sound/fn_800E46E8_types.h"
 
@@ -85,7 +86,6 @@ void clearReverbWorkArea(void);
 void advanceReverbClock(void);
 void fn_800E8E3C(s16* p);
 
-u32 fn_804C2830(void);
 void AXFXSetHooks(void* alloc, void* free);
 
 
@@ -126,7 +126,6 @@ void fn_804C40D0(void);
 void AXSetMasterVolume(u16 id);
 u32 OSEnableInterrupts(void);
 void AXQuit(void* obj);
-void fn_804C2800(void);
 void __register_global_object(void* obj, void* dtor, void* ref);
 
 void* fn_800E8888(void);
@@ -135,14 +134,12 @@ void fn_800E87E4(u32 mode);
 
 void AIInit(u32 mode);
 void AXInitEx(u32 v);
-void fn_804C26E0(void);
 
 
 void AXRegisterCallback(void* cb);
 void AXSetCompressor(u32 v);
 void* AIRegisterDMACallback(void* cb);
 void AXSetMode(u32 v);
-void fn_804C2820(u32 mode);
 
 
 }
@@ -279,7 +276,7 @@ extern "C" void fn_800E87E0(void* alloc, void* free)
 /* The current sound handle. */
 extern "C" u32 snd_handle_get(void)
 {
-    return fn_804C2830();
+    return MIXGetSoundMode();
 }
 
 /* The global level setting's level word. */
@@ -598,7 +595,7 @@ extern "C" void* fn_800E8DE0(void* obj, s32 flags)
 {
     if (obj != 0) {
         AXQuit(obj);
-        fn_804C2800();
+        MIXQuit();
         if ((s16)flags > 0) {
             __dl__FPv(obj);
         }
@@ -613,7 +610,7 @@ extern "C" void fn_800E8730(void)
 
     AIInit(0);
     AXInitEx(1);
-    fn_804C26E0();
+    MIXInit();
     SYNInit();
     SEQInit();
     AXRegisterCallback((void*)fn_800E8698);
@@ -641,6 +638,6 @@ extern "C" void fn_800E87E4(u32 mode)
     case 2: AXSetMode(1); break;
     case 3: AXSetMode(2); break;
     }
-    fn_804C2820(mode);
+    MIXSetSoundMode(mode);
     snd_handle_store((u32*)fn_800E66D0());
 }

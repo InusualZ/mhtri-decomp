@@ -10,6 +10,6 @@
  *    with bodies yet.
  * NAMES. `PADOriginUpdateCallback`, `SamplingHandler` and `__PADDisableRecalibration` are the map's names; the file
  *    name is a GUESS.
- * RESIDUALS. every body is unwritten.
+ * RESIDUALS. not attempted: all 16 functions (0x186C B) are unwritten.
  * SHAPES. none yet.
  */

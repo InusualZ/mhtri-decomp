@@ -29,6 +29,42 @@ typedef struct DVDDiskID {
     /* +0x08 */ u8 pad_0x08[0x18];
 } DVDDiskID;
 
+/* size: 0x20 - what the drive reports about itself (only the device code is read). */
+typedef struct DVDDriveInfo {
+    /* +0x00 */ u16 revisionLevel;
+    /* +0x02 */ u16 deviceCode;
+    /* +0x04 */ u32 releaseDate;
+    /* +0x08 */ u8 pad_0x08[0x18];
+} DVDDriveInfo;
+
+/* Called when a queued drive command finishes. */
+typedef void (*DVDCBCallback)(s32 result, DVDCommandBlock* block);
+
+/* 0x804A64E0 - initialises the DVD library and the drive. */
+void DVDInit(void);
+
+/* 0x804AA560 - queues a drive inquiry that fills `info`; `callback` runs when it finishes. */
+s32 DVDInquiryAsync(DVDCommandBlock* block, DVDDriveInfo* info, DVDCBCallback callback);
+
+/* 0x804AA470 - queues an asynchronous read of `length` bytes at `offset` (in 4-byte units) into `addr`. */
+/* untyped: byte range the read fills */
+s32 DVDReadAbsAsyncPrio(DVDCommandBlock* block, void* addr, s32 length, s32 offset, DVDCBCallback callback, s32 prio);
+
+/* 0x804AA640 - the state of a queued command: 0 when finished, 1 and 2 while it waits or runs, negative on failure. */
+s32 DVDGetCommandBlockStatus(const DVDCommandBlock* block);
+
+/* 0x804AA7B0 - turns the cache invalidation after reads on or off. */
+void DVDSetAutoInvalidation(BOOL enable);
+
+/* 0x804AA7C0 - resumes the drive queue. */
+void DVDResume(void);
+
+/* 0x804AAD90 - quiesces the drive and calls `callback` when it is done. */
+void __DVDPrepareResetAsync(void (*callback)(void));
+
+/* 0x807950D8 - the disc layout format: the shift that turns a byte offset into the drive's address unit. */
+extern s32 __DVDLayoutFormat;
+
 /* 0x804AAC50 - the disc header at 0x80000000. */
 DVDDiskID* DVDGetCurrentDiskID(void);
 

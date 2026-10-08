@@ -47,6 +47,9 @@ u32 OSGetStackPointer(void);
 /* 0x804CD220 - makes `context` run `pc` on stack `sp` when loaded. */
 void OSInitContext(OSContext* context, u32 pc, u32 sp);
 
+/* 0x804CD5D0 - installs the FPU-unavailable handler and clears the FPU owner. */
+void __OSContextInit(void);
+
 #ifdef __cplusplus
 }
 #endif

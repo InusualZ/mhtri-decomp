@@ -10,6 +10,15 @@
 extern "C" {
 #endif
 
+/* 0x804CB2B0 - the exception handler no one replaced; it saves the registers the vector left and reports the exception. */
+void OSDefaultExceptionHandler(u8 exception, struct OSContext* context);
+
+/* 0x804CA9C0 - initialises the OS: arenas, exception vectors, interrupts, caches and devices. */
+void OSInit(void);
+
+/* 0x804CAF20 - installs the exception vectors and points the handler table at the default handler. */
+void OSExceptionInit(void);
+
 /* 0x804CB380 - records a library's version string with the OS. */
 void OSRegisterVersion(const char* version);
 
@@ -50,6 +59,12 @@ typedef struct OSModuleQueue {
 #define OS_IPC_BUFFER_LO (*(void**)0x80003130)
 #define OS_IPC_BUFFER_HI (*(void**)0x80003134)
 
+/* The MEM2 layout words in low memory: the base and end of the area the IOS hands the title, and the arena bounds saved for the OS. */
+#define OS_MEM2_AREA_BASE (*(u32*)0x8000311C)
+#define OS_MEM2_AREA_END (*(u32*)0x80003120)
+#define OS_SAVED_MEM2_ARENA_LO (*(void**)0x80003124)
+#define OS_SAVED_MEM2_ARENA_HI (*(void**)0x80003128)
+
 /* size: 0x1C - the reboot request the previous title left in low memory */
 typedef struct OSRebootParams {
     /* +0x00 */ u32 valid;       /* non-zero when a reboot was requested */
@@ -62,6 +77,15 @@ typedef struct OSRebootParams {
 
 /* 0x8074D280 - the pending reboot request. */
 extern OSRebootParams __OSRebootParams;
+
+/* 0x807952D0 - set on arcade (GCAM) hardware. */
+extern BOOL __OSIsGcam;
+
+/* 0x80795308 - the system time at which OSInit started. */
+extern s64 __OSStartTime;
+
+/* 0x80793F50 - the SDK build string registered with the OS. */
+extern const char* __OSVersion;
 
 /* 0x807952CC - set when the title was started from the NAND boot path. */
 extern BOOL __OSInNandBoot;

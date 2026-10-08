@@ -23,6 +23,7 @@ extern "C" {
  * record are the SDK's; their layouts stay with the NAND band (only their addresses are passed here). */
 typedef struct NANDCommandBlock NANDCommandBlock;
 typedef struct NANDFileInfo NANDFileInfo;
+typedef void (*NANDAsyncCallback)(s32 result, NANDCommandBlock* block);
 /* size: 0x8C - the open-file record (the callers' buffers are 0x8C bytes: `NetworkPool`, `DWCi_Np_CPUCopyFast`); the field split is a GUESS. */
 struct NANDFileInfo {
     /* +0x00 */ s32 fileDescriptor;
@@ -31,10 +32,21 @@ struct NANDFileInfo {
     /* +0x48 */ char temporaryPath[64];
     /* +0x88 */ u8 accessMode;
     /* +0x89 */ u8 stage;
-    /* +0x8A */ u8 pad_0x8A[2];
+    /* +0x8A */ u8 mark; /* 1 while the file is open, 2 once it has been closed */
+    /* +0x8B */ u8 pad_0x8B;
 }; /* size: 0x8C */
-typedef void (*NANDAsyncCallback)(s32 result, NANDCommandBlock* block);
 
+/* size: 0xC (cut at the last field) - what the async calls keep for their completion. */
+struct NANDCommandBlock {
+    /* +0x00 */ u8 pad_0x00[4];
+    /* +0x04 */ NANDAsyncCallback callback; /* the caller's completion */
+    /* +0x08 */ NANDFileInfo* info;         /* the file record of an async close */
+};
+
+/* 0x804C76E0 / 0x804C77D0 / 0x804C8610 - read, write and close the open file. */
+s32 NANDRead(NANDFileInfo* info, void* buffer, u32 length); /* untyped: byte range */
+s32 NANDWrite(NANDFileInfo* info, const void* buffer, u32 length); /* untyped: byte range */
+s32 NANDClose(NANDFileInfo* info);
 /* 0x804C9020 - copy the title's home directory path into `path`. */
 s32 NANDGetHomeDir(char* path);
 /* 0x804C8490 - open `path` with access mode `mode`; the public twin of `NANDPrivateOpenAsync` 0x804C8510. */
