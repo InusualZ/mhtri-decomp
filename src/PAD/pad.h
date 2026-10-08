@@ -13,6 +13,9 @@ extern "C" {
 /* 0x804D9AE0 - turns controller recalibration off (returns the previous setting) or restores it. */
 BOOL __PADDisableRecalibration(BOOL disable);
 
+/* 0x80795418 - the pad specification word the boot information block supplies. */
+extern s32 __PADSpec;
+
 #ifdef __cplusplus
 }
 #endif

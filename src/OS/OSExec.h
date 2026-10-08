@@ -10,10 +10,17 @@
 extern "C" {
 #endif
 
+struct OSExecArgPage;
+
 /* size: 0x1C - the block the previous title left for this one in MEM1. */
 typedef struct OSExecParams {
-    /* +0x00 */ u32 valid; /* zero when no block was left */
-    /* +0x04 */ u8 pad_0x04[0x18];
+    /* +0x00 */ u32 valid;                 /* zero when no block was left */
+    /* +0x04 */ u32 resetCode;
+    /* +0x08 */ u32 dolOffset;             /* where the booted DOL starts on the disc (in 4-byte units) */
+    /* +0x0C */ u8* saveStart;             /* start of the region the next title must not clear */
+    /* +0x10 */ u8* saveEnd;
+    /* +0x14 */ u32 flags;                 /* zero when the arguments were packed into `argPage` */
+    /* +0x18 */ struct OSExecArgPage* argPage;
 } OSExecParams; /* size: 0x1C */
 
 /* 0x804CE270 - copies the exec parameter block, or clears `valid`. */

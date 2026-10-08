@@ -33,6 +33,9 @@ extern u32 __OSLastInterruptSrr0;
 u32 __OSMaskInterrupts(u32 mask);
 u32 __OSUnmaskInterrupts(u32 mask);
 
+/* 0x804D0D10 - installs the external interrupt vector handler and masks every interrupt source. */
+void __OSInterruptInit(void);
+
 #ifdef __cplusplus
 }
 #endif

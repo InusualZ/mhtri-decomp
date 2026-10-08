@@ -30,6 +30,9 @@ void ICFlashInvalidate(void);
 /* 0x804CC730 - invalidates a range of the instruction cache. */
 void ICInvalidateRange(void* start, u32 size); /* untyped: byte range */
 
+/* 0x804CCC00 - enables the caches and the locked-cache DMA error handler. */
+void __OSCacheInit(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -13,6 +13,9 @@ extern "C" {
 /* 0x804D6330 - stops the play-time recording. */
 void __OSStopPlayRecord(void);
 
+/* 0x804D62D0 - starts the periodic play-record save alarm. */
+void __OSStartPlayRecord(void);
+
 #ifdef __cplusplus
 }
 #endif
