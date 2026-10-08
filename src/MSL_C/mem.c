@@ -107,8 +107,8 @@ int memcmp(const void* a, const void* b, u32 n)
 
     q = b;
     p = a;
-    q--;
     p--;
+    q--;
     for (n++; --n != 0;) {
         c = *++p;
         d = *++q;

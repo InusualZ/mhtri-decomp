@@ -14,12 +14,12 @@
  *    `0.0` at `.sdata2` 0x8079C9F8 are all read here; the pool value `0.0` repeats at 0x8079C9A8 (floating-point
  *    conversion unit) and 0x8079CA10 (string-to-float unit), which makes this a TU of its own. `vsprintf` and
  *    `sprintf` are `vsnprintf` with an unbounded count (inlined).
- * RESIDUALS. `__pformatter` 87: the bad-conversion tail is shared through a null test after the switch where the
+ * RESIDUALS. `__pformatter` 87.5: the bad-conversion tail is shared through a null test after the switch where the
  *    target jumps to one block, the integer fetch is an if chain where the target keeps one body per option, and the
- *    callee-saved assignment differs; `float2str` 92 and `double2hex` 89: the `isupper` test is folded for a `u8`
+ *    callee-saved assignment differs; `float2str` 92.1 and `double2hex` 89.5: the `isupper` test is folded for a `u8`
  *    argument where the target keeps the range compare, block order of the inf/nan cases, register names;
- *    `round_decimal` 89.6: the target shares one zero-length block between the early and the final return;
- *    `longlong2str` 97.7: register names; `__FileWrite` 95: the target keeps an empty then-branch jump; `.sdata` /
+ *    `round_decimal` 90.2: the target shares one zero-length block between the early and the final return;
+ *    `longlong2str` 98.4: register names; `__FileWrite` 95: the target keeps an empty then-branch jump; `.sdata` /
  *    `.rodata` 2 B / 3 B short of the map rows (padding).
  * SHAPES. the format record is built in a local and copied out; by-value `print_format` arguments are copied by the
  *    caller; the writers are reached through the `WriteProc` pointer.
@@ -279,9 +279,9 @@ static char* long2str(long num, char* buff, print_format format)
 {
     u32 unsigned_num;
     u32 base;
-    int digit;
-    int ch;
     char* p;
+    int ch;
+    int digit;
     int n;
     int minus;
 
@@ -372,12 +372,12 @@ static char* long2str(long num, char* buff, print_format format)
 /* 0x8045C2D8 (0x2B0): renders a signed or unsigned long long as digits, filling backwards from the end of `buff`. */
 static char* longlong2str(long long num, char* buff, print_format format)
 {
-    u64 unsigned_num;
-    u64 base;
     int digit;
     int ch;
     char* p;
+    u64 unsigned_num;
     int n;
+    u64 base;
     int minus;
 
     minus = 0;
@@ -597,10 +597,10 @@ static char* double2hex(f64 num, char* buff, print_format format)
 static void round_decimal(decimal* dec, int new_length)
 {
     char c;
-    char* p;
     char* q;
-    int carry;
     int length;
+    char* p;
+    int carry;
 
     if (new_length < 0) {
         dec->exp = 0;
@@ -662,9 +662,9 @@ static char* float2str(f64 num, char* buff, print_format format)
     decimal dec;
     decform form;
     char* p;
+    int exp;
     char* q;
     int n;
-    int exp;
     int sign_char;
     int int_digits;
     int frac_digits;
@@ -872,13 +872,13 @@ static char* float2str(f64 num, char* buff, print_format format)
 /* 0x8045D214 (0x8AC): formats `format_str` through `write`, fetching the arguments from `args`; returns the character count or -1. */
 static int __pformatter(WriteProc write, WriteArg* write_arg, const char* format_str, va_list args, int is_secure)
 {
+    long long_num;
     int num_chars;
     int chars_written;
     int field_width;
     const char* format_ptr;
     const char* curr_format;
     print_format format;
-    long long_num;
     long long long_long_num;
     f64 double_num;
     char buff[512];

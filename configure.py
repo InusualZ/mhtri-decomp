@@ -899,7 +899,7 @@ config.libs = [
             Object(NonMatching, "MSL_C/ansi_fp.c"),
             Object(NonMatching, "MSL_C/file_io.c"),
             Object(Matching, "MSL_C/errno.c"),
-            Object(NonMatching, "MSL_C/locale.c"),
+            Object(Matching, "MSL_C/locale.c", mw_version="GC/2.7", extra_cflags=["-str reuse,nopool,readonly"]),  # string layout: unit header
             Object(Matching, "MSL_C/mbstring.c"),
             Object(NonMatching, "MSL_C/mem.c"),
             Object(Matching, "MSL_C/misc_io.c"),
@@ -911,7 +911,7 @@ config.libs = [
             Object(Matching, "MSL_C/float.c"),
             Object(NonMatching, "MSL_C/strtold.c"),
             Object(NonMatching, "MSL_C/strtoul.c"),
-            Object(NonMatching, "MSL_C/wctype.c"),
+            Object(Matching, "MSL_C/wctype.c"),
             Object(Matching, "MSL_C/wmem.c"),
             Object(NonMatching, "MSL_C/wprintf.c"),
             Object(Matching, "MSL_C/wstring.c"),

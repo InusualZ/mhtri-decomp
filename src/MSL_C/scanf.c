@@ -12,7 +12,7 @@
  *    0x80572B50 are read only here; the string reader is also called by `strtol` / `atoi` through a function
  *    pointer.
  * RESIDUALS. `parse_scan_format` 88: the struct copy-out keeps all ten words in registers where the target copies
- *    pairwise, and the float option test is laid out conversion-first in the target; `__sformatter` 88.8: the
+ *    pairwise, and the float option test is laid out conversion-first in the target; `__sformatter` 89.0: the
  *    callee-saved assignment differs (the target holds `read` in r26 and the format character in r22, ours r29 and
  *    r15), the `d`/`i` and `o`/`u`/`x` base selection is a ternary where the target jumps into shared code after a
  *    `li` per case, and the unget argument is `(char)(u8)c` in the target; `__StringRead` 99.1: cursor and
@@ -228,12 +228,12 @@ static const char* parse_scan_format(const char* format_string, scan_format* for
 /* 0x8045E65C (0xC98): scans `format_str` against the characters supplied by `read`, storing through the variadic list; returns the item count. */
 static int __sformatter(ReadProc read, ReadArg* read_arg, const char* format_str, va_list arg, int is_secure)
 {
-    const char* format = format_str;
     scan_format fmt;
-    int chars_read = 0;
-    int items_assigned = 0;
+    const char* format = format_str;
     int conversions = 0;
     int terminate = 0;
+    int items_assigned = 0;
+    int chars_read = 0;
     int scanned;
     int negative;
     int overflow;

@@ -7,7 +7,7 @@
  *    generated label; GUESS: it differs only in the `__div2u` / carry arithmetic); the state names are GUESSes.
  * EVIDENCE. both `__strtoul` variants take the string reader of the scanner unit by pointer and read the locale
  *    class table; `strtol` / `atoi` call `__strtoul`; `errno` is the only data they write.
- * RESIDUALS. COARSE: no data separates `atoi` from `strtol`; `__strtoul` 96.3 and `__strtoull` 93.4: the target
+ * RESIDUALS. COARSE: no data separates `atoi` from `strtol`; `__strtoul` 96.3 and `__strtoull` 96.7: the target
  *    shares one failure tail between the non-alphanumeric and the out-of-base paths where ours duplicates it, sets
  *    the width counter after the argument registers of the first read, and `__strtoull` keeps a zero in r14 (a
  *    sign-extended 64-bit compare against it) and spills `chars_scanned` to the stack.
@@ -217,7 +217,7 @@ u64 __strtoull(int base, int max_width, ReadProc read, ReadArg* read_arg, int* c
             if (base == 0) {
                 base = 10;
             }
-            if (limit == 0) {
+            if (!limit) {
                 limit = 0xFFFFFFFFFFFFFFFFULL / (u64)base;
             }
             if (IS_CLASS(c, CTYPE_DIGIT)) {

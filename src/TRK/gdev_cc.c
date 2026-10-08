@@ -16,7 +16,9 @@
  * RESIDUALS. link order: the compiler emits the 0x20 B circle buffer before the 0x500 B receive buffer in `.bss` (the target
  *    has the receive buffer first, 0x806F5020), which moves 6 code bytes of relocation words and the DOL hash, so the unit stays
  *    NonMatching although every row is at 100 %. Definition order, `static`, an earlier use of the circle buffer, a local
- *    alias and one enclosing struct (which changes the code, 97 %) were all measured without moving the order.
+ *    alias, a `(void)` read, a `static inline` helper that reads the buffer, a function-local `static` buffer and one
+ *    enclosing struct (which changes the code, 97 %) were all measured without moving the order. The order does follow
+ *    the first PCode reference: a real earlier function reading `gdev_cc_buffer` puts it first, but it adds 0x10 B of text.
  * SHAPES. `read` and `peek` stage the DB bytes in a 0x500 B stack array, then queue them in the circle buffer.
  */
 #include "TRK/CircleBuffer.h"

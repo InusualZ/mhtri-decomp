@@ -395,9 +395,9 @@ s32 TRKDoStep(TRKBuffer* message)
 {
     TRKRequestHeader* request = (TRKRequestHeader*)message->data;
     u8 kind;
+    u32 count;
     u32 range_start;
     u32 range_end;
-    u32 count;
     u32 pc;
 
     TRK_SetBufferPosition(message, 0);
