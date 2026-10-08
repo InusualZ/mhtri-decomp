@@ -26,8 +26,8 @@ extern "C" f64 __ieee754_fmod(f64 x, f64 y)
     s32 iy;
     s32 sx;
     s32 i;
-    s32 k;
     u32 lyk;
+    s32 k;
     u32 lx;
     u32 ly;
     u32 lz;

@@ -70,12 +70,12 @@ s32 __flush_buffer(FILE* file, u32* bytes_flushed)
 /* untyped: byte range */
 u32 __fwrite(const void* buffer, u32 size, u32 count, FILE* file)
 {
-    u32 bytes_to_go;
-    u32 bytes_written;
     u32 chunk;
     u32 saved_buffer_size;
-    u8* saved_buffer;
     u8* newline;
+    u32 bytes_to_go;
+    u8* saved_buffer;
+    u32 bytes_written;
     s32 use_buffer;
     s32 unbuffered_io;
 

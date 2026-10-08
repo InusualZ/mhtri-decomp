@@ -17,10 +17,9 @@
  *    state, `gTRKState`, `gTRKCPUState`), `.sbss` 0x80794E78 / 0x80794E80 and `.rodata` 0x805734A8..0x80573530
  *    are read by functions on both sides of every internal candidate boundary, so the run is one TU unless a
  *    boundary moves the globals.
- * RESIDUALS. 29 of 36 rows at 100. TRKTargetAccessPairedSingle 66 (the 10-word template copy takes r29..r31 in the target while the
- *    opcode stays in r0/r4; ours parks the shift in r29); TRKTargetAddStopInfo 84 (message/cpu-pointer swap r29/r31);
- *    TRKTargetAccessDefault 88 (the target keeps the register count in r31); TRKTargetCheckMemoryRange 89 (the prologue
- *    computes `address + length` into r4 before `- 1`); TRKTargetAccessFPRegister 96 (first template copy scheduling);
+ * RESIDUALS. 32 of 36 rows at 100. TRKTargetAccessDefault 88 (the target keeps the register count in r31 and the
+ *    `last - first` difference in r4; a `u16` register count scores 94 but changes the arithmetic, not applied);
+ *    TRKTargetAccessFPRegister 96 (first template copy scheduling);
  *    TRKTargetCopyBytes 97 (param registers r26..r30 in a different order); TRKTargetAccessExtended1 99 (`slwi` of the second
  *    flag test is recomputed, ours reuses the stored byte count). `.rodata`: the target pools the second template of
  *    TRKTargetAccessFPRegister with the first one of TRKTargetAccessSPR, ours emits four copies. `.bss` order: the target
@@ -134,10 +133,12 @@ asm void __TRK_set_MSR(u32 msr)
 /* Checks that `length` bytes at `address` lie in readable (`is_write` 0) or writable memory; returns 0 or 0x700. */
 static s32 TRKTargetCheckMemoryRange(u32 address, u32 length, s32 is_write)
 {
-    u32 end = address + length;
-    u32 last = end - 1;
+    u32 last;
     s32 err = 0x700;
     s32 i;
+
+    length += address;
+    last = length - 1;
 
     if (last < address) {
         return 0x700;
@@ -651,9 +652,9 @@ s32 TRKTargetAddStopInfo(TRKBuffer* message)
     u32 length;
     TRKStopInfo info;
     u32 page[0x100];
-    s32 err;
-    s32 index;
     u32* reg;
+    s32 index;
+    s32 err;
 
     TRK_memset(&info, 0, sizeof(info));
     info.length = 0x4E8;
@@ -680,11 +681,18 @@ s32 TRKTargetAddStopInfo(TRKBuffer* message)
         err = TRKAppendBuffer1_ui32(message, gTRKCPUState.xer);
     }
     if (err == 0) {
-        TRKAppendBuffer1_ui32(message, *ConvertAddress(0xD4));
-        TRKAppendBuffer1_ui32(message, *ConvertAddress(0xD8));
-        TRKAppendBuffer1_ui32(message, *ConvertAddress(0xDC));
-        TRKAppendBuffer1_ui32(message, *ConvertAddress(0xE0));
-        err = TRKAppendBuffer1_ui32(message, *ConvertAddress(0xE4));
+        u32 word;
+
+        word = *ConvertAddress(0xD4);
+        TRKAppendBuffer1_ui32(message, word);
+        word = *ConvertAddress(0xD8);
+        TRKAppendBuffer1_ui32(message, word);
+        word = *ConvertAddress(0xDC);
+        TRKAppendBuffer1_ui32(message, word);
+        word = *ConvertAddress(0xE0);
+        TRKAppendBuffer1_ui32(message, word);
+        word = *ConvertAddress(0xE4);
+        err = TRKAppendBuffer1_ui32(message, word);
     }
     if (err == 0) {
         page_length = 0x400;
@@ -875,10 +883,7 @@ static s32 TRKTargetAccessPairedSingle(u64* data, u32 reg, s32 is_read)
         0x60000000, 0x60000000, 0x60000000, 0x60000000, 0x60000000,
     };
 
-    instructions[0] = (reg << 21) | 0xE0030000;
-    if (is_read != 0) {
-        instructions[0] = (reg << 21) | 0xF0030000;
-    }
+    instructions[0] = is_read != 0 ? ((reg << 21) | 0xF0030000) : ((reg << 21) | 0xE0030000);
     return TRKPPCAccessSpecialReg((u32*)data, instructions, is_read);
 }
 

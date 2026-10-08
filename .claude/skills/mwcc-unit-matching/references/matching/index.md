@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (102)
+## Ideas that work (104)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -111,6 +111,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 115 | [A hardware register block declared with the absolute-address declarator compiles to lis+add with no relocation](115-hardware-register-block-declared.md) | works | data, source-shape, relocations | Indexed hardware-register access shows `lis rX,hi ; add ; lwz lo(rY)` in the target but `addis rY,rY,hi ; lwz lo(rY)` from a cast constant |
 | 116 | [A flipped unit's statics land in reverse definition order, an unreferenced tail is stripped, and a short .text shifts the unflipped successor](116-flipped-units-statics-land.md) | works | data, linker | A unit at 100 % with flipcheck READY (or only a trailing-pad note) moves the DOL hash when flipped, and the zero-filled .sbss/.bss hides the cause |
 | 117 | [An unsigned range test keeps its two compares only with the upper bound written constant-first](117-unsigned-range-test-keeps.md) | works | source-shape | Retail tests a u32 against a range with two `cmplwi` + branches and our build emits one `addi`/`subis` + `cmplwi`, shortening the function and shifting every branch after it. |
+| 118 | [Unpooled readonly strings (.sdata2 and 4-aligned .rodata) are an older GC compiler, not a flag](118-older-gc-compiler-readonly-strings.md) | works | flags, data | The target keeps every string literal as its own object (small ones in .sdata2, the rest 4-aligned in .rodata) but Wii/1.3 always pools them into one @stringBase0, whatever -str says |
+| 119 | [Select the conditional store value with a ternary, accumulate into a parameter, order non-leading locals](119-ternary-select-param-accumulate.md) | works | source-shape, allocator | A function is instruction-equal but the target stores a conditionally chosen word once and keeps a parameter register as the scratch, where ours stores twice or spends a callee-saved register |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

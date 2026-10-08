@@ -11,8 +11,8 @@
  * EVIDENCE. `.rodata` 0x80572528 (fixed pool size table) is read only by the free path; `.bss` 0x806F4CC8 and
  *    `.sbss` 0x80794E00 are read only by its last function; every callee is inside the unit or `__sys_free` (the
  *    unit before it); `__close_all` (next unit) calls its free entry.
- * RESIDUALS. `free` 88.8: the target keeps the block pointer and the argument in one saved register (r31) and the pool
- *    address in r30 where ours takes three, and orders the fixed-pool path first; `SubBlock_merge_next` 93.5: the
+ * RESIDUALS. `free` 92.9: the target keeps the block pointer and the argument in one saved register (r31) and the pool
+ *    address in r30 where ours takes three, and orders the fixed-pool path first; `SubBlock_merge_next` 93.6: the
  *    target builds the flag word before the merged size; `.bss` ours 52 B vs 56 B and `.sbss` 1 B vs 8 B (map rows pad).
  * SHAPES. a sub-block header is `{size|flags, owner, prev, next}` with the size repeated in the last word of a free
  *    block; bit 1 of the size word marks a block in use, bit 2 a free predecessor.
@@ -139,10 +139,10 @@ static void Block_link(Block* ths, SubBlock* sb)
 /* free: retail C linkage, the unmangled map name */
 static void SubBlock_merge_next(SubBlock* ths, SubBlock** start)
 {
+    u32 merged_size;
     u32 word = ths->size;
     u32 size = word & ~7;
     SubBlock* next_sb = (SubBlock*)((char*)ths + size);
-    u32 merged_size;
 
     if (!(next_sb->size & 2)) {
         merged_size = size + SubBlock_size(next_sb);
@@ -169,12 +169,12 @@ static void SubBlock_merge_next(SubBlock* ths, SubBlock** start)
 /* 0x80458E8C (0x1EC): returns a chunk to its fixed-size block and gives the block back when it is empty. */
 static void deallocate_from_fixed_pools(PoolObj* pool, FixedChunk** client, u32 size)
 {
-    u32 i = 0;
     const u32* sizes = fixed_pool_sizes;
-    FixedChunk* chunk;
-    FixedSizeBlock* fsb;
+    u32 i = 0;
     FixedPool* fp;
     Block* block;
+    FixedSizeBlock* fsb;
+    FixedChunk* chunk;
     SubBlock* sb;
     int empty;
 
@@ -256,11 +256,11 @@ static void deallocate_from_fixed_pools(PoolObj* pool, FixedChunk** client, u32 
 /* untyped: caller-owned heap block */
 void free(void* ptr)
 {
-    PoolObj* pool;
     u32 size;
     Block* block;
     SubBlock* sb;
     int empty;
+    PoolObj* pool;
 
     if (!initialized) {
         memset(&protopool, 0, sizeof(PoolObj));
