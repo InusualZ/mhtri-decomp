@@ -179,6 +179,10 @@ def drift_row(b: Batch) -> None:
     if names_only:
         print("NOTE: %d unit(s) the batch does not name changed by names only (not drift; name them in --units): %s"
               % (len(names_only), ", ".join(names_only)), file=sys.stderr)
+    if drift:
+        # the row detail keeps the first four; the whole list is what a re-run needs in --units
+        print("DRIFT: %d unit(s) the batch does not name moved under it: %s"
+              % (len(drift), ",".join(d.split(":", 1)[0] for d in drift)), file=sys.stderr)
     b.check("no unit's split target object moved under the batch (a neighbour re-ranged)", not drift,
             "; ".join(drift[:4]),
             info=("names only, not drift (name them in --units): %d - %s"
