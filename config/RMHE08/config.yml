@@ -126,3 +126,7 @@ block_relocations:
 # (lbl_80778272, __AXAuxBufferA+0xF0E, em_action_finish_fall+0x34, hid_device_build+0x198, ...); they are plain data.
 - source: .rodata:0x80574E10
   end: .rodata:0x80579088
+# PMIC/pmic.c's .data firmware image (0x80631468..0x80649130) is device firmware: dtk reads 23 of its words as addresses
+# (lbl_805867BF, fn_8013D310+0x38, __AXVPBData+0x7D34, ...); they are plain data.
+- source: .data:0x80631468
+  end: .data:0x80649130

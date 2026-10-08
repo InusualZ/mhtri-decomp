@@ -81,6 +81,7 @@
 #include "quest/arenatask.h" /* arena_task: the arena-select task ArenaSelExec installs (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
 #include "g3d/fn_80075DCC.h" /* fn_8007A510 (rule 2) */
+#include "PMIC/pmic.h"        /* PMICStop (rule 2) */
 
 /* ------------------------------------------------------------------ *
  * Local types
@@ -172,7 +173,6 @@ extern void* MEMCreateExpHeapEx(void* base, u32 size, u16 attr);
 extern void* MEMAllocFromAllocator(void* allocator, u32 size);
 extern void MEMFreeToAllocator(void* allocator, void* block);
 extern char* strrchr(const char* s, int c);
-extern void fn_80523490(void);
 
 /* task-entry bodies referenced by address from the mode dispatchers (.text, other units) */
 extern s32 task_func;
@@ -411,7 +411,7 @@ extern "C" char* fn_80041404(char* s, int c)
 
 extern "C" void fn_80041408(void)
 {
-    fn_80523490();
+    PMICStop();
 }
 
 extern "C" void fn_80041640(void)
