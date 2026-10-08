@@ -7,6 +7,7 @@
 
 #include "OS/OSDisableInterrupts.h" /* OSDisableInterrupts (rule 2: the owner's header) */
 #include "SEQ/seq.h" /* SEQInit, SEQRunAudioFrame (rule 2: the owner's header) */
+#include "SYN/syn.h" /* SYNInit, SYNRunAudio (rule 2: the owner's header) */
 #include "OS/OSRestoreInterrupts.h" /* OSRestoreInterrupts (rule 2: the owner's header) */
 #include "sound/snd_reloc_state_rebase.h" /* snd_reloc_state_rebase (rule 2: the owner's header) */
 #include "sound/snd_reverb_state_advance.h" /* snd_reverb_state_advance (rule 2: the owner's header) */
@@ -120,7 +121,7 @@ void fn_800E8DA4(void);
 void* fn_800E8DE0(void* obj, s32 flags);
 
 
-void fn_804DF140(void);
+
 void fn_804C40D0(void);
 void AXSetMasterVolume(u16 id);
 u32 OSEnableInterrupts(void);
@@ -135,7 +136,7 @@ void fn_800E87E4(u32 mode);
 void AIInit(u32 mode);
 void AXInitEx(u32 v);
 void fn_804C26E0(void);
-void fn_804DF0A0(void);
+
 
 void AXRegisterCallback(void* cb);
 void AXSetCompressor(u32 v);
@@ -546,7 +547,7 @@ extern "C" void fn_800E8698(void)
     u32 level = OSEnableInterrupts();
 
     SEQRunAudioFrame();
-    fn_804DF140();
+    SYNRunAudio();
     fn_804C40D0();
     fn_800EDB74(snd_bank_table_get());
     fn_800E7D34();
@@ -613,7 +614,7 @@ extern "C" void fn_800E8730(void)
     AIInit(0);
     AXInitEx(1);
     fn_804C26E0();
-    fn_804DF0A0();
+    SYNInit();
     SEQInit();
     AXRegisterCallback((void*)fn_800E8698);
     AXSetCompressor(0);
