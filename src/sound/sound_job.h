@@ -30,6 +30,9 @@ u32 split_screen_size_class(struct _PLW* self);
 u32 split_screen_size_class(void);
 #endif
 
+/* 0x800E3C1C - takes the next free record of list `list` and clears it; returns null when the list is full. */
+struct PrimRec* prim_rec_alloc(u8 list);
+
 /* 0x800E3C90 - clears a record's state, handle, flags and callback and seeds its two cull bounds. */
 void prim_rec_init(struct PrimRec* rec);
 
