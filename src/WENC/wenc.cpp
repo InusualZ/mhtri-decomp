@@ -5,8 +5,14 @@
  *   whose starts are all 16-aligned).
  * FLAGS. the `OS` lib block of configure.py (`cflags_os`).
  * NAMES. `WENCGetEncodeData` is the map's name; the state record `WENCInfo` and its field names are read from the algorithm.
- * RESIDUALS. The unit's data is not claimed: the step scale table (.rodata 0x80573C40, copied to the stack by the body) and the
- *   int-to-float constant (.sdata2 0x8079D3C0) are emitted by this source.
+ * RESIDUALS. The loop tail: retail shares only `bit2 * 4` and `bit1 * 2` between the step-table index and the output nibble and
+ *   truncates the nibble to a byte before the shift (728 bytes); this source shares the whole sum and truncates after it (720).
+ *   Retail's tail keeps `bit2 * 4` in r18, which also shifts the registers of the prologue's 16-word `stepScale` copy.
+ *   The .rodata table and .sdata2 literal match byte for byte but are emitted as the compiler-local `@18`/`@72`, where the map
+ *   names them `lbl_80573C40`/`lbl_8079D3C0`. The target .text carries 12 bytes of tail padding up to WPAD's 16-aligned start
+ *   (0x2E4) that this 4-aligned object does not emit.
+ * SHAPES. The allocator follows the declaration order (`i`, `sign`, `bit2`..`bit0`, then the state); the bits are cleared
+ *   `bit0` first; the absolute difference is `__abs`; the nibble shift is `(i & 1) == 0 ? 4 : 0`.
  */
 
 #include "types.h"
@@ -17,13 +23,17 @@
 s32 WENCGetEncodeData(WENCInfo* info, u32 flags, const s16* samples, s32 sampleCount, u8* out)
 {
     const f64 stepScale[8] = { 0.8984375, 0.8984375, 0.8984375, 0.8984375, 1.19921875, 1.59765625, 2.0, 2.3984375 };
+    s32 i;
+    s32 sign;
+    s32 bit2;
+    s32 bit1;
+    s32 bit0;
     s32 predictor;
     s32 step;
     s32 delta;
     s32 remainder;
     s32 half;
     s32 quarter;
-    s32 i;
 
     memset(out, 0, (sampleCount + 1) / 2);
     if ((flags & 1) == 0) {
@@ -42,19 +52,16 @@ s32 WENCGetEncodeData(WENCInfo* info, u32 flags, const s16* samples, s32 sampleC
         quarter = info->quarter;
     }
     for (i = 0; i < sampleCount; i++) {
-        s16 sample = samples[i];
-        s32 sign = 0;
-        s32 bit2 = 0;
-        s32 bit1 = 0;
-        s32 bit0 = 0;
-        s32 diff;
-        s32 code;
+        s16 sample = *samples++;
 
+        bit0 = 0;
+        bit1 = 0;
+        bit2 = 0;
+        sign = 0;
         if (sample < predictor) {
             sign = 1;
         }
-        diff = sample - predictor;
-        remainder = (diff < 0) ? -diff : diff;
+        remainder = __abs(sample - predictor);
         if (remainder >= step) {
             bit2 = 1;
             remainder -= step;
@@ -69,7 +76,7 @@ s32 WENCGetEncodeData(WENCInfo* info, u32 flags, const s16* samples, s32 sampleC
             bit0 = 1;
             remainder -= quarter;
         }
-        delta = (1 - sign * 2) * (quarter * bit0 + step * bit2 + (quarter / 2 + half * bit1));
+        delta = (1 - sign * 2) * (step * bit2 + half * bit1 + quarter * bit0 + quarter / 2);
         if (delta > 0xFFFF) {
             delta = 0xFFFF;
         }
@@ -83,9 +90,8 @@ s32 WENCGetEncodeData(WENCInfo* info, u32 flags, const s16* samples, s32 sampleC
         if (predictor < -0x8000) {
             predictor = -0x8000;
         }
-        code = bit2 * 4 + bit1 * 2 + bit0;
-        out[i / 2] |= (u8)(sign * 8 + code) << (((i & 1) - 1) & 4);
-        step = (s32)((f64)step * stepScale[code]);
+        out[i / 2] |= (sign * 8 + bit2 * 4 + bit1 * 2 + bit0) << ((i & 1) == 0 ? 4 : 0);
+        step = (s32)((f64)step * stepScale[bit1 * 2 + bit0 + bit2 * 4]);
         if (step <= 0x7F) {
             step = 0x7F;
         }
