@@ -312,7 +312,7 @@ void fn_802235A4(u32* base)
 /* The player actor's per-model SE/motion rig update (0x80224AC4-0x80229ECC). */
 #pragma peephole off
 
-#define MHTRI_FN_800E3B3C_TAKES_ACTOR 1
+#define MHTRI_SPLIT_SCREEN_SIZE_CLASS_TAKES_ACTOR 1
 
 #include "types.h"
 #include "pl.h"
@@ -321,6 +321,7 @@ void fn_802235A4(u32* base)
 #include "fn_8004CAD8.h"
 #include "enemy/fn_80138074.h"
 #include "sound/fn_800DD1F0.h"
+#include "sound/sound_job.h" /* split_screen_size_class (rule 2) */
 #include "sound/fn_800D7F54.h"
 #include "sound/se_w.h"
 #include "unsplit/Pl.h"
@@ -402,7 +403,7 @@ extern "C" void fn_80224AC4(PlSeRig* rig)
     }
 
     if (Pl_master_ck(rig->plw) == 1) {
-        v = fn_800E3B3C(rig->plw) | 0x200;
+        v = split_screen_size_class(rig->plw) | 0x200;
     } else {
         v = 0;
     }

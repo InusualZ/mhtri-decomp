@@ -2741,7 +2741,7 @@ DVD/dvdidutils.c:
 DVD/dvdFatal.c:
 	.text       start:0x804ABDD0 end:0x804ABF40 align:16
 	.rodata     start:0x805739A8 end:0x805739E0
-	.data       start:0x80618C40 end:0x806195A0
+	.data       start:0x80618C40 end:0x80619408
 	.sdata      start:0x80793DF8 end:0x80793E00
 	.sbss       start:0x80795148 end:0x80795150
 	.sdata2     start:0x8079D0D8 end:0x8079D0E0
@@ -2749,6 +2749,7 @@ DVD/dvdFatal.c:
 DVD/dvddevice.c:
 	.text       start:0x804ABF40 end:0x804AC1D0 align:16
 	.rodata     start:0x805739E0 end:0x80573A00
+	.data       start:0x80619408 end:0x806195A0
 	.bss        start:0x80746980 end:0x807469A0
 	.sdata      start:0x80793E00 end:0x80793E08
 	.sbss       start:0x80795150 end:0x80795158

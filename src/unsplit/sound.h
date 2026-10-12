@@ -34,6 +34,9 @@ int fn_800E2994(void* handle);
 void fn_800E3B2C(void);
 /* Merged 2026-09-24: the 0x800EF7D8 proposal's consumer needed this one. */
 void* sound_job_request(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void));
+/* .sdata 0x80791460 - the two primitive-record lists' capacities, read by `sound/sound_job.cpp` and
+ * `sound/fn_800E3CBC.cpp`; no registered range covers it.  GUESS name. */
+extern u16 prim_rec_capacity[2];
 #ifdef __cplusplus
 }
 #endif

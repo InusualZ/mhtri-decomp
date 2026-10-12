@@ -13,6 +13,9 @@ extern "C" {
 
 /* 0x800E31E8 - the model's node count (a tail call into `ResMdl::GetResNodeNumEntries`).  GUESS name. */
 int mhchar_node_count(MHchar* self);
+/* 0x800E0560 - resets the model object `self` points at (the shell pool runs it over a fresh
+ * `shell_chara_heap_tbl` slot). */
+void mhchar_reset(MHchar* self);
 
 #ifdef __cplusplus
 }

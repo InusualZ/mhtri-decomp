@@ -47,6 +47,7 @@
 #include "ef/fn_800CDB2C.h"
 #include "nw_resource.h"
 #include "sound/fn_800DD1F0.h"
+#include "sound/sound_job.h" /* split_screen_size_class (rule 2) */
 #include "ef/pRoot.h"
 #include "ef/fn_800D3C0C.h"
 
@@ -814,7 +815,7 @@ extern "C" u32 eft_res_spawn_gate_ck(void* self_, u32 mode) {
 
 /* 0x800F9380 - map the stage's effect size class to the spawn flag. */
 extern "C" u32 eft_stage_spawn_flag(void) {
-    u32 size = fn_800E3B3C();
+    u32 size = split_screen_size_class();
 
     switch (size) {
     case 0x400:

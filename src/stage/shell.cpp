@@ -59,6 +59,7 @@
 #include "menu/hit_flags_clear.h"
 #include "mh3_pad/vec3.h"
 #include "pl.h"
+#include "sound/mhchar.h" /* mhchar_reset (rule 2) */
 #include "sound/sound_job_request.h"
 #include "stage/shell.h"
 #include "stage/stg_w.h"

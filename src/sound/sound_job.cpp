@@ -3,38 +3,26 @@
  *
  * Phase 4: the tail of the old `sound/fn_800DD1F0.cpp`; the reconciled candidate cuts it at 0x800E3B3C (its own extab group, and the
  * `.sdata2` pair the bodies read).  Name: `sound_job` after the map's `sound_job_request`; no `__FILE__` string names the TU.
- * The old unit's functions here are moved unchanged; only `fn_800E3C90` has a body.
+ * The old unit's functions here are moved unchanged; only `prim_rec_init` has a body.
+ * NAMES. `split_screen_size_class`, `prim_rec_alloc` and `prim_rec_init` are GUESS names (from the bodies).
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "sound/se.h" /* the pool constants this unit reads (lbl_80796450/54) */
+#include "sound/fn_800E3CBC.h" /* PrimRec (rule 1) */
+#include "sound/sound_job.h"
 
 #pragma peephole off
 
-/* One 0x34-byte motion record of the model's motion table. size: 0x34 */
-struct MhMotionEntry {
-    /* +0x00 */ u8 pad_0x00[8];
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-    /* +0x0A */ u8 pad_0x0A[0x0E];
-    /* +0x18 */ u32 field_0x18;
-    /* +0x1C */ u8 pad_0x1C[2];
-    /* +0x1E */ u16 field_0x1E;
-    /* +0x20 */ u32 field_0x20;
-    /* +0x24 */ f32 field_0x24;
-    /* +0x28 */ f32 field_0x28;
-    /* +0x2C */ u8 pad_0x2C[8];
-};
-
-/* Clear a motion record and seed its two rate constants. */
-extern "C" void fn_800E3C90(MhMotionEntry* entry)
+/* Clear a record's state, handle, flags and callback and seed its two cull bounds. */
+extern "C" void prim_rec_init(PrimRec* rec)
 {
-    entry->field_0x18 = 0;
-    entry->field_0x20 = 0;
-    entry->field_0x1E = 0;
-    entry->field_0x08 = 0;
-    entry->field_0x09 = 0;
-    entry->field_0x24 = lbl_80796450;
-    entry->field_0x28 = lbl_80796454;
+    rec->handle = 0;
+    rec->callback = 0;
+    rec->flags = 0;
+    rec->state = 0;
+    rec->started = 0;
+    rec->limit_lo = lbl_80796450;
+    rec->limit_hi = lbl_80796454;
 }

@@ -23,19 +23,6 @@ void mhchar_mat_tev_set(MHchar* self, s32 mat, s32 mode, u8 a, s32 b, s32 c, u8 
 #endif
 
 
-/* The stage's effect size class (0x400 / 0x800 / 0x8 - see eft_stage_spawn_flag).
- *
- * Two consumers spell this differently, and both are right for their own call site: `ef/eft_res.cpp`'s
- * `eft_stage_spawn_flag` calls it with no argument at all (retail performs no `r3` setup there, so the actor
- * pointer is not live), while `Pl/fn_80224AC4.cpp` passes the actor (`lwz r3,0(r29)` before the `bl`).
- * The two spellings cannot coexist, and changing the no-argument one would cost `eft_stage_spawn_flag` its
- * match, so the parameterised view is behind this switch, set by the unit that needs it. */
-#ifdef MHTRI_FN_800E3B3C_TAKES_ACTOR
-struct _PLW;
-u32 fn_800E3B3C(struct _PLW* self);
-#else
-u32 fn_800E3B3C(void);
-#endif
 
 /* The model's base initialiser: stores the initial joint table's address at +0x00 of `self`
  * (`src/sound/fn_800DD1F0.cpp` defines it as `void fn_800E3B2C(MHchar* self)`; the parameter is

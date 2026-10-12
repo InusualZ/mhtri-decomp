@@ -18,8 +18,8 @@
  *
  * What the range is, read off the disassembly:
  *   * `fn_800E3CBC` / `prim_init_all` / `fn_800E3D7C` / `fn_800E3DE0` reset and rebuild the two record
- *     pools (`.sbss` bases `lbl_807949A0`, counts `lbl_807949A8`, capacities `lbl_80791460`) and the six
- *     pointer free-lists (`.data` bases `lbl_80597D20`, counts `lbl_80597D38`).
+ *     pools (`.sbss` bases `prim_rec_pool`, counts `prim_rec_count`, capacities `prim_rec_capacity`, all three
+ *     GUESS names) and the six pointer free-lists (`.data` bases `lbl_80597D20`, counts `lbl_80597D38`).
  *   * `fn_800E3E1C` walks both record lists and drives per-record visibility, callbacks and state.
  *   * `fn_800E4148` / `fn_800E4284` / `fn_800E4390` / `fn_800E440C` / `fn_800E444C` are the draw queue:
  *     a depth metric, a sorted insertion and the per-bucket draw dispatch.
@@ -50,6 +50,9 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "sound/fn_800E3CBC.h" /* PrimRec, prim_rec_pool / prim_rec_count (rule 1, rule 2) */
+#include "sound/sound_job.h" /* prim_rec_init (rule 2) */
+#include "unsplit/sound.h" /* prim_rec_capacity (rule 2: the band) */
 #include "sound/fn_800E46E8.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
@@ -62,28 +65,6 @@
 #pragma peephole off
 
 /* ------------------------------------------------------------------ types */
-
-/* The 0x34-byte primitive record both record lists hold.  Layout from the field accesses in this range
- * (`+0x04` sort key, `+0x18` handle, `+0x1C` kind, `+0x1D` layer, `+0x1E` flags, `+0x20` callback).
- * size: 0x34 */
-typedef struct PrimRec PrimRec;
-struct PrimRec {
-    /* 0x00 */ u32 next;                       /* free-list / sorted-list link */
-    /* 0x04 */ f32 key;                        /* depth metric (fn_800E4284 sorts on it) */
-    /* 0x08 */ u8 state;                       /* 0 idle, 1/2 the two drawn states */
-    /* 0x09 */ u8 started;                     /* the "callback already fired" latch */
-    /* 0x0A */ u8 pad_0x0A[2];
-    /* 0x0C */ VEC3 pos;                       /* +0x0C..+0x17; pos.y is read at +0x10 */
-    /* 0x18 */ void* handle;                   /* engine object the record wraps */
-    /* 0x1C */ u8 kind;                        /* 0/1/2: the three draw kinds */
-    /* 0x1D */ u8 layer;                       /* 0..5: which free-list / sort direction */
-    /* 0x1E */ u16 flags;                      /* bit field; see the masks below */
-    /* 0x20 */ void (*callback)(PrimRec*);
-    /* 0x24 */ f32 limit_lo;                   /* lower cull bound (fnegated) */
-    /* 0x28 */ f32 limit_hi;                   /* upper cull bound */
-    /* 0x2C */ f32 f_0x2C;
-    /* 0x30 */ u8 pad_0x30[4];
-};
 
 /* The working buffer `MTX34_ctor` initialises; fn_800E4148 reads +0x20..+0x2C, fn_800E3E1C reads +0x1C.
  * Only the read fields are named; the rest is untouched padding.  size: 0x30 (approximate) */
@@ -137,9 +118,6 @@ typedef struct PrimMgr {
 /* Not-yet-reconstructed `sound`-band symbols (the bracketing registered units both name `sound`); the
  * declarations belong in `unsplit/sound.h` and are requested there in the outbox. */
 extern "C" {
-extern u32 lbl_807949A0[2];     /* .sbss record-list bases */
-extern u32 lbl_807949A8[2];     /* .sbss record-list counts */
-extern u16 lbl_80791460[2];     /* .sdata record-list capacities */
 extern void* lbl_80597D20[6];   /* .data free-list bases */
 extern u16 lbl_80597D38[6];     /* .data free-list counts */
 extern f32 lbl_80796458;
@@ -148,7 +126,6 @@ extern f32 lbl_80796460;
 extern f32 lbl_80796464;
 extern f32 lbl_80796468;
 extern f64 lbl_80796470;
-void fn_800E3C90(void* p);
 void* fn_80047234(void* a);
 s32 stage_water_enabled_ck(void);
 void fn_80074AA8(void* a, u32 b, f32* out, u32 d);
@@ -178,11 +155,11 @@ extern "C" u32 fn_800E440C(u32* p);
 /* Reset record list `idx`: clear its count and run the per-slot destructor over the whole capacity. */
 extern "C" void fn_800E3CBC(u8 idx)
 {
-    PrimRec* p = (PrimRec*)lbl_807949A0[idx];
+    PrimRec* p = (PrimRec*)prim_rec_pool[idx];
 
-    lbl_807949A8[idx] = 0;
-    for (u32 i = 0; i < lbl_80791460[idx]; i++) {
-        fn_800E3C90(p);
+    prim_rec_count[idx] = 0;
+    for (u32 i = 0; i < prim_rec_capacity[idx]; i++) {
+        prim_rec_init(p);
         p++;
     }
 }
@@ -240,8 +217,8 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
     }
     s32 sub = fn_802AFF58();
     for (u32 i = 0; i < 2; i++) {
-        PrimRec* p = (PrimRec*)lbl_807949A0[i];
-        for (u32 j = 0; j < lbl_807949A8[i]; j++, p++) {
+        PrimRec* p = (PrimRec*)prim_rec_pool[i];
+        for (u32 j = 0; j < prim_rec_count[i]; j++, p++) {
             if (!(p->flags & 0x200)) {
                 if (fn_800D0724()) {
                     continue;
