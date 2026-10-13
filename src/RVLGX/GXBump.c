@@ -6,15 +6,15 @@
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (-O4,p, -enum int).
  * NAMES. SDK names (Revolution SDK `GXBump.c`). `GXTevIndirectReg` and `GXIndTexMtxReg` are local bitfield views of
  *   the BP words the two setters build from zero; the words `GXData` keeps use the unions of `RVLGX/GXInit.h`.
- * SHAPES. retail reads `__GXData` as a constant pointer (its load is scheduled across the FIFO stores), while
- *   `RVLGX/GXInit.h` declares it non-const; a `gx` local assigned at the point retail loads it reproduces that.
- * RESIDUALS. 7 of 9 functions match; all 9 bodies are written.
- *   - `GXSetTevIndirect`: same instructions and size; retail computes `tev_stage + 0x10` into r4 before the inserts and
- *     loads `__GXData` into r3, ours computes it in place in r3 and loads the pointer into r4 (scheduling/allocation)
+ * SHAPES. `RVLGX/GXInit.h` declares `__GXData` `GXData* const` (it lives in `.sdata2`), so MWCC schedules its load
+ *   across the FIFO stores as retail does. `GXSetIndTexMtx` converts the six matrix entries column by column
+ *   (`[0][0]`, `[1][0]`, `[0][1]`, ...), the order of retail's conversion slots.
+ * RESIDUALS. 8 of 9 functions match; all 9 bodies are written.
  *   - `GXSetIndTexMtx`: retail adds 0x11 to `scale_exp` with no `extsb` and inserts bits 2..3/4..5 by rotation; the
  *     s8 `+=` adds one `extsb` and two `srawi` (0x14C vs 0x140, +0xC), which moves the seven later functions by 0x10.
- *     `(scale_exp >> n) & 3` drops them but moves `id` off r6 and scores lower; the six matrix products are written
- *     in row order because that order scores best
+ *     `(scale_exp >> n) & 3` gives retail's size and its three `rlwimi`s but moves `id` off r6 and reorders the
+ *     float conversions, and scores lower; a `u32`/`s32`/`u8` exponent local and per-register `ma`/`mb` locals
+ *     score lower too
  *   - flipcheck: `.text` 0x464 vs the claimed 0x460 (the +0xC above net of the 0xC tail padding; most of the
  *     differing bytes are the 0x10 shift of the later functions); `.sdata2` claim is 8 B (1024.0f + link padding)
  *     while the object emits 4 B, and the pool tool lists the literal as shared with the other `RVLGX/` units
@@ -53,16 +53,6 @@ typedef union GXIndTexMtxReg {
         /* +0x0, bits 10..0 */ u32 ma: 11;
     } f; /* +0x0 */
 } GXIndTexMtxReg;
-
-#define GX_ITM_0 1
-#define GX_ITM_1 2
-#define GX_ITM_2 3
-#define GX_ITM_S0 5
-#define GX_ITM_S1 6
-#define GX_ITM_S2 7
-#define GX_ITM_T0 9
-#define GX_ITM_T1 10
-#define GX_ITM_T2 11
 
 #define GX_TEXMAP_NULL 0xFF
 #define GX_TEXCOORD_NULL 0xFF
@@ -121,10 +111,10 @@ void GXSetIndTexMtx(u32 mtx_id, const f32 offset[2][3], s8 scale_exp)
     }
 
     mtx[0] = (s32)(1024.0f * offset[0][0]);
-    mtx[1] = (s32)(1024.0f * offset[0][1]);
-    mtx[2] = (s32)(1024.0f * offset[0][2]);
     mtx[3] = (s32)(1024.0f * offset[1][0]);
+    mtx[1] = (s32)(1024.0f * offset[0][1]);
     mtx[4] = (s32)(1024.0f * offset[1][1]);
+    mtx[2] = (s32)(1024.0f * offset[0][2]);
     mtx[5] = (s32)(1024.0f * offset[1][2]);
     scale_exp += 0x11;
 

@@ -99,7 +99,9 @@ typedef enum _GXTlut {
 } _GXTlut;
 
 typedef enum _GXIndTexMtxID {
-    GX_ITM_OFF, GX_ITM_0, GX_ITM_1, GX_ITM_2
+    GX_ITM_OFF, GX_ITM_0, GX_ITM_1, GX_ITM_2,
+    GX_ITM_S0 = 5, GX_ITM_S1, GX_ITM_S2,
+    GX_ITM_T0 = 9, GX_ITM_T1, GX_ITM_T2
 } _GXIndTexMtxID;
 
 typedef enum _GXTevRegID {

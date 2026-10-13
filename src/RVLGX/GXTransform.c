@@ -10,9 +10,8 @@
  *   its fields (`RVLGX/GXInit.h`) are named from their use here.
  * RESIDUALS. flipcheck: `.text` is 0x2B8 of 0x7C0 and `.sdata2` 0x4 of 0x10 (the pool entries of the unwritten bodies). Not written: the paired-single bodies (`GXGetProjectionv`, `GXSetProjectionv`, `GXLoadPosMtxImm`,
  *   `GXLoadNrmMtxImm`, `GXLoadTexMtxImm`, `GXGetViewportv`, `__GXSetProjection`, `__GXSetViewport`), the index loads
- *   (`GXLoadPosMtxIndx`, `GXLoadNrmMtxIndx3x3`) and the 0x804BA230 projection helper. Partial: `GXSetClipMode`,
- *   `GXSetScissorBoxOffset`, `__GXSetMatrixIndex` (the target loads `__GXData` between the FIFO byte stores; the
- *   register-field words are plain `u32` here).
+ *   (`GXLoadPosMtxIndx`, `GXLoadNrmMtxIndx3x3`) and the 0x804BA230 projection helper. Partial:
+ *   `GXSetScissorBoxOffset` (the register-field words are plain `u32` here).
  */
 
 #include "RVLGX/GXInit.h"

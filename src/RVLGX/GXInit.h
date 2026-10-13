@@ -296,7 +296,7 @@ extern "C" {
 #endif
 
 /* The pointer to the state record (`.sdata2` 0x8079D0F0, defined by `GXInit.c`). */
-extern GXData* __GXData;
+extern GXData* const __GXData;
 
 #ifdef __cplusplus
 }

@@ -10,13 +10,10 @@
  *   names after the SDK's own spellings; the split follows the four 5-word runs. The local register unions
  *   (`GXTevColorRegA`/`B`, `GXTevColorS10RegA`/`B`, `GXAlphaCompareReg`, `GXZTexBiasReg`, `GXZTexModeReg`) and
  *   `GXColorWord`/`GXColorS10Words` are named from the BP register they build and the word they read.
- * RESIDUALS. 6 of 16 functions match (496 of 1656 B); `.data` 120 of 120 B. The other ten wait on one declaration
- *   outside this unit: `RVLGX/GXInit.h` declares `GXData* __GXData`, and the SDK's pointer is `GXData* const` (it lives
- *   in `.sdata2`). With the const declaration all 16 functions match and the flip links a byte-identical DOL; without
- *   it MWCC cannot move or repeat the pointer load across the FIFO's volatile stores. flipcheck: `.text` bytes (that
- *   declaration) and row 36 for `TEVCOpTableST1`/`TEVAOpTableST0`/`TEVAOpTableST1`, a false positive - the flipped
- *   link keeps them (they are reached through the `.data` section symbol). relocdiff: `GXSetTevOp`'s table base is
- *   `.data`+0 where the target names `TEVCOpTableST0`, the same address.
+ * RESIDUALS. 16 of 16 functions match; `.data` 120 of 120 B. flipcheck: row 36 for `TEVCOpTableST1`/`TEVAOpTableST0`/
+ *   `TEVAOpTableST1` only, a false positive - the flipped link keeps them (they are reached through the `.data`
+ *   section symbol) and links a byte-identical DOL. relocdiff: `GXSetTevOp`'s table base is `.data`+0 where the
+ *   target names `TEVCOpTableST0`, the same address.
  * SHAPES. `GXSetTevColorOp`/`GXSetTevAlphaOp`/`GXSetNumTevStages` insert with `GX_SET_REG` (`__rlwimi`) into a scalar
  *   local: a union local is promoted late and colours after the address temporaries. `GXSetTevOrder` stores its
  *   copy back after each field and sends the word from memory. The colour setters read the colour as words.
