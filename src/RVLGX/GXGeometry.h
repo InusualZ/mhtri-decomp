@@ -20,6 +20,7 @@ void GXSetCullMode(u32 mode);
 void GXSetCoPlanar(u8 enable);
 void __GXSetDirtyState(void);
 void __GXSendFlushPrim(void);
+void __GXSetGenMode(void);
 
 #ifdef __cplusplus
 }
