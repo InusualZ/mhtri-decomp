@@ -130,3 +130,8 @@ block_relocations:
 # (lbl_805867BF, fn_8013D310+0x38, __AXVPBData+0x7D34, ...); they are plain data.
 - source: .data:0x80631468
   end: .data:0x80649130
+# mh3_pad.cpp's .data table lbl_8057CED0 (0x8057CED0..0x80580058) is packed byte data: dtk reads 43 of its words as
+# addresses (VFsys+0x23DDC at 0x8057F8CC, memcpy at 0x8057D564, fn_800CFF60+0xA8, stage_dcm_file_table+0xE3,
+# lbl_80582EE3, lbl_80634417, lbl_8060C021, @etb_80007000, @etb_8000CEFC+0x3, ...); they are plain data.
+- source: .data:0x8057CED0
+  end: .data:0x80580058

@@ -7,7 +7,7 @@
 #include "AX/AXFXReverbHi.h"
 
 BOOL AXFXReverbHiExpInit(AXFXReverbHi* reverb);
-void DVDCancel(AXFXReverbHi* reverb);
+void AXFXReverbHiExpShutdown(AXFXReverbHi* reverb);
 BOOL AXFXReverbHiExpSettings(AXFXReverbHi* reverb);
 void AXFXReverbHiExpCallback(AXFXBuffer* buffer, AXFXReverbHi* reverb);
 BOOL AXFXReverbHiExpAllocLines(AXFXReverbHi* reverb);

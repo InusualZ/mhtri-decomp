@@ -43,7 +43,7 @@ BOOL AXFXReverbHiInit(AXFXReverbHi* reverb)
 /* Releases the reverb unit. */
 BOOL AXFXReverbHiShutdown(AXFXReverbHi* reverb)
 {
-    DVDCancel(reverb);
+    AXFXReverbHiExpShutdown(reverb);
     return TRUE;
 }
 

@@ -8,9 +8,10 @@
  * FLAGS. the `OS` lib group with the 16-byte function alignment restored below (every start is 16-aligned);
  *    `#pragma fp_contract off` (retail keeps `fmuls`+`fadds` in the mix kernel); loop counters are `u32`
  *    (retail compares with `cmplwi`).
- * NAMES. `DVDCancel` (0x804751A0) is the map's name for the shutdown helper whose body frees the delay lines (kept:
- *    the map is the authority); the Alloc/Clear/Free/ApplySettings rows are GUESSES from what each body does; the
- *    three tables are file statics named after their rows (sHiExpModeLength / sHiExpModeGain / sHiExpFilterLength).
+ * NAMES. AXFXReverbHiExpShutdown (0x804751A0) is a GUESS by analogy with AXFXReverbStdExpShutdown (the map's
+ *    analyzer name DVDCancel was a mislabel: the body sets the shutdown flag and frees the delay lines, and the only
+ *    caller is AXFXReverbHiShutdown); the Alloc/Clear/Free/ApplySettings rows are GUESSES from what each body does;
+ *    the three tables are file statics named after their rows (sHiExpModeLength / sHiExpModeGain / sHiExpFilterLength).
  * RESIDUALS. AXFXReverbHiExpCallback: constant-register numbering and the position of the `0.0f` load of the comb
  *    accumulator differ (r7..r12 vs r5..r10, loop-invariant `lfs` order); AXFXReverbHiExpApplySettings: GPR
  *    numbering of the mode-table row pointer (r6/r7/r9); `.sdata2` 56 of 64 B: retail orders the pool 32000.0f
@@ -143,8 +144,8 @@ BOOL AXFXReverbHiExpSettings(AXFXReverbHi* reverb)
     return TRUE;
 }
 
-/* The effect's shutdown helper (the map calls it DVDCancel; see the header note). */
-void DVDCancel(AXFXReverbHi* reverb)
+/* Marks the effect shut down and frees its delay lines. */
+void AXFXReverbHiExpShutdown(AXFXReverbHi* reverb)
 {
     u32 level = OSDisableInterrupts();
 

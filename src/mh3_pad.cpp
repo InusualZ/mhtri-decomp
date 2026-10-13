@@ -56,6 +56,11 @@
  * `src/RSO/runtime.c`, and the unsplit externs this unit needs.  See the outbox.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_807947C8`,
  *     `lbl_80790E30`, `lbl_80790E28`.
+ *   config/RMHE08/config.yml `block_relocations`: the `.data` table `lbl_8057CED0` (0x8057CED0..0x80580058, 0x3188 B,
+ *     the base `fn_80041138` hands to the byte-stream decoder `fn_80040FEC`) is packed byte data; dtk read 43 of its
+ *     words as addresses (0x8057F8CC as `VFsys+0x23DDC`, 0x8057D564 as `memcpy`, `fn_800CFF60+0xA8`,
+ *     `stage_dcm_file_table+0xE3`, ...), so the whole table is blocked and the target object carries no relocation
+ *     inside it.
  *   flipcheck: `.sbss` claimed, not emitted.
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: `.sdata2` claimed, not emitted.
