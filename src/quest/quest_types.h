@@ -26,11 +26,13 @@ struct Q_ItemCount {
 };  /* size: 0x4 */
 
 /* A record/count block of the save data and of the item work: `count` entries followed by the four
- * per-group totals an index of 0x24..0x27 sums. */
+ * per-group totals an index of 0x24..0x27 sums, then the run's last entry.  The run is 0x29 `u16`s:
+ * `result_hunt_rank_get` weighs all 0x29, and `enemy/em_set_work.h` overlays it on a `u16[0x29]`. */
 struct Q_CountSet {
     /* +0x00 */ u16 count[0x24];
     /* +0x48 */ u16 total[4];
-};  /* size: 0x50 */
+    /* +0x50 */ u16 count_last;
+};  /* size: 0x52 */
 
 /* One 4-byte entry of the weighted lot tables the pick helpers walk (`u16` key, one payload byte and
  * one weight byte); an entry whose key is 0 ends the table. */
@@ -197,9 +199,7 @@ struct Q_ItemWork {
         };
     };
     /* +0x0490 */ Q_CountSet set_c;
-    /* +0x04E0 */ u8 pad_0x04E0[0x2];
     /* +0x04E2 */ Q_CountSet set_d;
-    /* +0x0532 */ u8 pad_0x0532[0x2];
     /* +0x0534 */ Q_SizePair size_0x534[0x24];  /* the smallest/largest size of each monster kind slain or captured */
     /* +0x05C4 */ u8 pad_0x05C4[0x14];
     /* +0x05D8 */ u16 score_0x5D8;  /* the run's point score */
@@ -311,13 +311,12 @@ struct Q_UserData {
     /* +0x0180 */ IdValue box_0x180[0x18];  /* the item box's first page */
     /* +0x01E0 */ u8 pad_0x01E0[0x490 - 0x1E0];
     /* +0x0490 */ Q_CountSet set_c;
-    /* +0x04E0 */ u8 pad_0x04E0[0x2];
     /* +0x04E2 */ Q_CountSet set_d;
-    /* +0x0532 */ u8 pad_0x0532[0x348E];
+    /* +0x0534 */ u8 pad_0x0534[0x39C0 - 0x534];
     /* +0x39C0 */ Q_CountSet set_a;
-    /* +0x3A10 */ u8 pad_0x3A10[0xB0];
+    /* +0x3A12 */ u8 pad_0x3A12[0x3AC0 - 0x3A12];
     /* +0x3AC0 */ Q_CountSet set_b;
-    /* +0x3B10 */ u8 pad_0x3B10[0x3BC0 - 0x3B10];
+    /* +0x3B12 */ u8 pad_0x3B12[0x3BC0 - 0x3B12];
     /* +0x3BC0 */ Q_SizeRecord sizes_0x3BC0[0x29];  /* the best monster sizes, by monster index */
     /* +0x3C64 */ u8 pad_0x3C64[0x3DE0 - 0x3C64];
     /* +0x3DE0 */ s32 hunter_points_0x3DE0;  /* the hunter points total */

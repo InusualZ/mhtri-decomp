@@ -71,8 +71,8 @@ struct Q_ResultWork {
     /* +0x3A4 */ u8 present_0x3A4;     /* a "records present" flag */
     /* +0x3A5 */ u8 pad_0x3A5;
     /* +0x3A6 */ s16 rank_0x3A6;       /* the run's rank from the two count sets */
-    /* +0x3A8 */ s16 time_rank_0x3A8;  /* the rank of the elapsed minutes */
-    /* +0x3AA */ u8 rank_rows_0x3AA[0x30];  /* the rank breakdown the result screen lists */
+    /* +0x3A8 */ u16 time_rank_0x3A8;  /* the rank of the elapsed minutes */
+    /* +0x3AA */ IdValue rank_rows_0x3AA[12];  /* the rank breakdown the result screen lists */
     /* +0x3DA */ u8 pad_0x3DA[0x2];
     /* +0x3DC */ s32 rank_points_0x3DC;  /* the points the two count sets are worth */
     /* +0x3E0 */ Q_QuestStat stat_0x3E0;

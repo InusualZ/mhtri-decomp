@@ -30,6 +30,7 @@
  *   pl_act_true_ck, pl_act_no_68_71_ck, pl_chr_set_motion_default, pl_model_set_value, pl_rig_get_motion_frame,
  *   pl_act_gauge_step_unlatched, pl_act_gauge_step_signed, pl_act_held_ck, pl_ground_probe_ahead,
  *   pl_stg_weapon_near_find
+ *   GUESS (field, from its menu reader `fn_80316978`): `PlSkillRec::slot_count` (`Pl/fn_8027D684.h`)
  * RESIDUALS. 122 functions unwritten (objdiff scores them 0) in 18 runs: 0x802695A4-0x80269998, 0x80269AC4-0x8026A00C,
  *   0x8026A0D4-0x8026A224, 0x8026A248-0x8026A2BC, 0x8026A3A8-0x8026A4E4, 0x8026A5A4-0x8026A618, 0x8026A738-0x8026BA04,
  *   0x80274B20-0x80274B5C, 0x8027D7EC-0x8027D874, 0x8027D8A0-0x8027DC64, 0x8027E120-0x8027E1B8, 0x8027E404-0x8027E918,
@@ -3921,25 +3922,17 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
 
 /* 0x8045F554 - the runtime string copy `fn_8027552C` uses to arm a hunter name (owner: `MSL_C/alloc.cpp`, rule 2). */
 #include "MSL_C/alloc.h"
+#include "Pl/fn_8027D684.h" /* PlSkillRec, fn_8027ECAC (this unit's equipment-section header) */
 
 /* 0x80335CE8 - the act-message sender `pl_act_enter_raw`'s tail calls (owner `hud/net_char_sync.cpp`, leaf header
  * `hud/Pl_net_send.h`).  The owner takes a third `u16`; this band's call sites pass two arguments (`mr r3, r30;
  * li r4, X; bl`), so they call it through this two-parameter view. */
 typedef void (*PlNetSend2)(struct _PLW* plw, s32 kind);
 
-/* The three equipment-slot records `fn_8027ECAC`/`fn_8027ED18`/`fn_8027E344` hand back.  Only this
- * unit reads them, so they live here (rule 1); each offset/width is the one its readers narrow to.
+/* The two equipment-slot records `fn_8027ED18`/`fn_8027E344` hand back.  Only this unit reads them, so they live
+ * here (rule 1); each offset/width is the one its readers narrow to.  The `fn_8027ECAC` row, `PlSkillRec`, is
+ * shared with `menu/menu_infomation.cpp` and lives in `Pl/fn_8027D684.h`.
  */
-
-/* The skill record an equipment slot resolves to. size: 0x18 */
-typedef struct PlSkillRec {
-    /* +0x00 */ u8 pad_0x00[0x8];
-    /* +0x08 */ u8 level_a;  /* scaled by 0x32 and biased by 0x96 into `+0x56E` (`fn_802740F4`) */
-    /* +0x09 */ u8 level_b;  /* the sibling level the same function scales */
-    /* +0x0A */ u8 pad_0x0A[0x3];
-    /* +0x0D */ s8 value;    /* the value `fn_802744A0` stores into `+0x570` */
-    /* +0x0E */ u8 pad_0x0E[0xA];
-} PlSkillRec; /* size: 0x18 */
 
 /* The weapon/skill record an equipment slot resolves to (the 0x24-byte sibling table). size: 0x24 */
 typedef struct PlWeaponRec {
@@ -4207,7 +4200,7 @@ extern "C" void fn_802740EC(struct _PLW* plw)
 /* Re-reads the player's armed weapon record into the level/attack bytes at +0x56A/+0x56E. */
 extern "C" void fn_802740F4(struct _PLW* plw, struct _EQUIP* equip)
 {
-    PlSkillRec* rec = (PlSkillRec*)fn_8027ECAC(equip);
+    PlSkillRec* rec = fn_8027ECAC(equip);
 
     plw->field_0x56A = rec->level_a;
     plw->field_0x56E = (s16)(rec->level_b * 0x32 + 0x96);
@@ -4298,7 +4291,7 @@ extern "C" s32 fn_80274370(struct _PLW* plw, struct _EQUIP* equip0, struct _EQUI
     case 10:
     case 14:
     case 15:
-        value = ((PlSkillRec*)fn_8027ECAC(equip0))->value;
+        value = fn_8027ECAC(equip0)->value;
         break;
     case 12:
     case 13:
@@ -4332,7 +4325,7 @@ extern "C" void fn_802744A0(struct _PLW* plw)
     case 10:
     case 14:
     case 15:
-        plw->field_0x570 = ((PlSkillRec*)fn_8027ECAC(&plw->equipB))->value;
+        plw->field_0x570 = fn_8027ECAC(&plw->equipB)->value;
         break;
     case 11:
         plw->field_0x570 = ((PlWeaponRec*)fn_8027ED18(&plw->equipB))->bonus_0x12;
@@ -4843,7 +4836,7 @@ extern "C" f32 fn_802751B4(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out
 
 /* True when the item/act id is one the player may still use.  `mode` is dead in retail - every call
  * site sets r4, the body never reads it (see the owner's header, which marks the name a GUESS). */
-extern "C" s32 Pl_item_id_usable_ck(u16 id, s32 mode)
+extern "C" u32 Pl_item_id_usable_ck(u16 id, s32 mode)
 {
     if (item_category_ck(id, 1) != 0) {
         return 0;
@@ -9642,8 +9635,8 @@ extern "C" void* fn_8027E3F4(_EQUIP* equip) {
 }
 
 /* The `_EQUIP` -> data-row lookup the table helper and the sound unit share. */
-extern "C" void* fn_8027ECAC(_EQUIP* equip) {
-    return fn_8027EC50(equip->kind, equip->item_id);
+extern "C" PlSkillRec* fn_8027ECAC(_EQUIP* equip) {
+    return (PlSkillRec*)fn_8027EC50(equip->kind, equip->item_id);
 }
 
 /* The `_EQUIP` -> item lookup the four Pl consumers share. */

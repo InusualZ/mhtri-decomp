@@ -9,6 +9,24 @@
 
 struct _PLW;
 
+/* The blademaster weapon row `fn_8027ECAC` hands back (the 0x18-byte stride `fn_8027EC50` indexes kinds 7-11/14-15
+ * with).  The element pairs are read by `menu/menu_infomation.cpp` (`fn_8031622C`, `fn_803164D0`): the type is
+ * shown as `type + 6`, a negative value only under skill 201.  `slot_count` is a GUESS: the byte `fn_80316978`
+ * hands to the 2061-sprite putter.  size: 0x18 (the row stride) */
+typedef struct PlSkillRec {
+    /* +0x00 */ u8 pad_0x00[0x8];
+    /* +0x08 */ u8 level_a;          /* scaled by 0x32 and biased by 0x96 into `+0x56E` (`fn_802740F4`) */
+    /* +0x09 */ u8 level_b;          /* the sibling level the same function scales */
+    /* +0x0A */ u8 pad_0x0A[0x2];
+    /* +0x0C */ u8 slot_count;       /* non-zero for the pieces `fn_80316978` reports */
+    /* +0x0D */ s8 value;            /* the value `fn_802744A0` stores into `+0x570` */
+    /* +0x0E */ u8 element_a_type;   /* 0 = none */
+    /* +0x0F */ s8 element_a_value;  /* negative = hidden */
+    /* +0x10 */ u8 element_b_type;   /* 0 = none */
+    /* +0x11 */ s8 element_b_value;  /* negative = hidden */
+    /* +0x12 */ u8 pad_0x12[0x6];
+} PlSkillRec; /* size: 0x18 */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -34,7 +52,7 @@ u8 fn_8027FF88(u32 equip);
  * and the piece's "filled" flag. */
 struct _EQUIP;
 u8 fn_8027F11C(void* equip);
-void* fn_8027ECAC(struct _EQUIP* equip);
+PlSkillRec* fn_8027ECAC(struct _EQUIP* equip);
 u32 fn_8027FFFC(struct _EQUIP* equip);
 
 /* 0x8027DC64 - the player's slot-occupied flag (the first byte of the record at 0x806BB7A0), read as a boolean;

@@ -11,6 +11,8 @@ struct DemoWork;
 
 /* 0x803C4814 - non-zero while the demo work is playing the demo the game asks about. */
 u32 event_demo_ck(void);
+/* 0x803C4850 - the number of the demo the demo work is playing (its byte at +0x02). */
+u8 get_demo_no(void);
 
 #ifdef __cplusplus
 extern "C" {

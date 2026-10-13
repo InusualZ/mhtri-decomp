@@ -142,8 +142,8 @@ struct FqResultWork {
     /* +0x240 */ s8 end_kind_0x240;
     /* +0x241 */ u8 unused_0x241;
     /* +0x242 */ s16 hunt_rank_0x242;
-    /* +0x244 */ s16 time_rank_0x244;
-    /* +0x246 */ u8 rank_rows_0x246[0x30];
+    /* +0x244 */ u16 time_rank_0x244;
+    /* +0x246 */ IdValue rank_rows_0x246[12];
     /* +0x276 */ u8 unused_0x276[2];
     /* +0x278 */ s32 rank_points_0x278;
 };

@@ -83,7 +83,6 @@ void* fn_8027E344(struct _EQUIP* equip);
 s32 fn_8027E510(void* slot);
 s16 fn_8027E5E4(struct _EQUIP* equip);
 s32 fn_8027E708(struct _EQUIP* equip);
-void* fn_8027ECAC(struct _EQUIP* equip);
 void* fn_8027ED18(void* equip);
 void fn_8027ED28(struct _EQUIP* equip);
 void* fn_8027EE08(struct _EQUIP* equip, u32 arg2, u32 arg3);
@@ -132,7 +131,7 @@ f32 fn_802751B4(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
  * argument is never read by its body, but every retail call site passes it (0 in `quest/quest_entry.cpp`, 1 in
  * `enemy/em_pop.cpp`, 2 in `ai/fn_802D44F4.cpp`), so the declaration carries it.  The parameter's NAME is a GUESS:
  * the sites' 0/1/2 are the only evidence for it, and the body's own masks are 1/2/0x10. */
-s32 Pl_item_id_usable_ck(u16 id, s32 mode);
+u32 Pl_item_id_usable_ck(u16 id, s32 mode);
 s32 fn_80275394(struct _PLW* plw);
 
 /* 0x8027403C / 0x8027408C / 0x802740EC / 0x80274174 / 0x80274370 / 0x80274570 / 0x80274584 /

@@ -15,6 +15,7 @@
  *   `put_equip_panel_kind5`.
  *   GUESS: `equip_detail_melee_draw`, `equip_detail_bowgun_draw`, `equip_detail_kind6_draw`,
  *   GUESS: `equip_detail_slots_draw`
+ *   GUESS (from its reader `fn_80313E24`): `equip_panel_row_layout`
  * RESIDUALS. 59 rows unwritten (objdiff scores them zero): 0x80309098-0x8030A1D0, 0x8030A1DC-0x8030A30C,
  *   0x8030A328-0x8030B790, 0x8030B868-0x8030BACC, 0x8030BAF4-0x8030CA50, 0x8030CA68-0x8030D338,
  *   0x8030D798-0x8030D808, 0x8030D980-0x8030E784, 0x8030E79C-0x8030F374, 0x8030F38C-0x8030F7B0,

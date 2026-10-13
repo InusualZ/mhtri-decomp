@@ -131,6 +131,7 @@
 #include "enemy/em_model.h" /* em_roster_area_hit_find (rule 2) */
 #include "ef/cp_vector.h" /* `_CP_VECTOR`, the rotation `em_roster_area_hit_find` writes out (the type's shared header) */
 #include "ai/ai_npc.h" /* ai_npc_player_in_reach_ck (rule 2) */
+#include "ai/ainpc_move.h" /* ai_npc_item_give (rule 2) */
 #include "ef/eft019.h" /* ef_inst_spawn (rule 2) */
 /* fn_802DE578_view1: the call sites disagree on this callee's parameters; each keeps its own view through a cast (same direct call). */
 #define fn_802DE578_view1 ((void (*)(_PLW*, u16*))fn_802DE578)
@@ -920,7 +921,7 @@ void fn_8024963C(_PLW* self, s32 arg1, s32 arg2) {
             Pl_chr_set_attr_default(self, 0x214, 4, 0);
         }
         if (arg2 == 1) {
-            fn_802D884C(&item, &value);
+            ai_npc_item_give(&item, &value);
             if (Pl_motion_input_ck(1) == 0 && value > 0) {
                 pl_item_add(self, item, value);
             }

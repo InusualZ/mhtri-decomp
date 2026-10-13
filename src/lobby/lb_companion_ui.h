@@ -464,7 +464,6 @@ s8 fn_800CF384(void);
  * header declares yet; the sibling units declare it the same way). */
 int memcmp(const void* a, const void* b, u32 n);
 void fn_802BC000(u8 index, u8 value);
-s32 fn_802D8F84(s32 a);
 s32 fn_802D7B5C(u16 id);
 s32 fn_802D7C6C(u16 id);
 void lb_panel_close(void);

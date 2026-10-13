@@ -187,6 +187,7 @@ u16 cockpit_flash_anim_ids[] = { 0x0BCF, 0x0BD0, 0x0BD1, 0x0BD3, 0x0BD4, 0xFFFF 
 #include "lobby/lb_quest_screen.h"   /* quest_time_limit_set, quest_element_done_mark (rule 2) */
 #include "enemy/em_pop.h"            /* quest_score_deduct (rule 2) */
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
+#include "ai/ainpc_move.h"           /* ai_skill_mask_get (rule 2) */
 
 extern "C" {
 
@@ -1134,10 +1135,10 @@ void lb_entry_publish(void) {
     lb_param_w.sub_0x2E = lobby_world_block->word_0x51A2;
 }
 
-/* Recomputes the block's page flags: ORs `fn_802D8F84(fn_802D7B5C(word_0x51A0))` into `flags_0x519C`. */
+/* Recomputes the block's page flags: ORs `ai_skill_mask_get(fn_802D7B5C(word_0x51A0))` into `flags_0x519C`. */
 void lb_page_flags_update(void) {
-    lobby_world_block->flags_0x519C =
-        lobby_world_block->flags_0x519C | fn_802D8F84(fn_802D7B5C(lobby_world_block->word_0x51A0));
+    u32 mask = ai_skill_mask_get(fn_802D7B5C(lobby_world_block->word_0x51A0));
+    lobby_world_block->flags_0x519C = lobby_world_block->flags_0x519C | mask;
 }
 
 /* Publishes the selected entry's model id (`fn_802D7C6C(ids_0x51A6[entry])`) into the block's id table. */

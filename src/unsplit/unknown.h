@@ -55,13 +55,13 @@ void eft_em_spawn_param(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s, 
  * a declaration here of a symbol a registered unit owns is rule 2's finding.  Their consumers
  * include that header. */
 
-/* 0x802D884C / 0x802DE578 / 0x8042CB9C - helpers `Pl/fn_802489D4.cpp`
+/* 0x802DE578 / 0x8042CB9C - helpers `Pl/fn_802489D4.cpp`
  * (0x802489D4-0x8024F200) calls whose address bands have no registered range at all, so no
  * `<module>.h` is sound for them (this file's own note, above).  Their map names are bare
  * `fn_XXXXXXXX`, so they keep C linkage like everything else in this block.  `fn_802B8DF8`
  * (0x802B8DF8) left this group when `camera/fn_802B5C58.cpp` registered that range - its owner's
- * header carries it now (rule 2). */
-void fn_802D884C(u16* a, s16* b);
+ * header carries it now (rule 2).  `ai_npc_item_give` (0x802D884C) is declared by its owner's leaf header,
+ * `ai/ainpc_move.h`. */
 void fn_802DE578(struct _PLW* self, void* work);
 s32 fn_80331104(void);
 /* Added with `Pl/fn_80273B14.cpp`: 0x80335CE8 (hud below, enemy above) names different modules, so its

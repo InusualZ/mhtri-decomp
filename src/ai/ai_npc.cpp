@@ -16,11 +16,15 @@
  *   `ai_npc_arrived_ck` are GUESSes from their bodies (the dump has only `zz_` names); `ai_npc_motion_step_ck` is a GUESS
  *   (it matches the NPC motion byte at +0x171 and step half-word at +0x172 against a pair).
  *   GUESS (from the body): ai_npc_player_in_reach_ck
+ *   GUESS (from the body): ai_npc_motion_dispatch, ainpc_move, ai_npc_hand_reach_ck, ai_npc_item_give,
+ *   ai_npc_formation_roll, ai_behaviour_scaled_get, ai_skill_mask_get; the data tables from their readers:
+ *   ai_npc_time_left_chance_tbl, ai_npc_motion_variant_tbl, result_hunt_rank_tbl, result_time_rank_tbl,
+ *   result_rank_points_tbl, ai_npc_spawn_pos_tbl, ai_npc_hand_reach_dist_sq (250 squared), ai_npc_f32_0_7
  * RESIDUALS. 153 rows unwritten (objdiff scores them zero): 0x802C2700-0x802C2F08, 0x802C2F2C-0x802C474C,
  *   0x802C6908-0x802C6BE0, 0x802C75F4-0x802CCD90, 0x802CCE18-0x802CD20C, 0x802CD348-0x802CD588,
  *   0x802CD770-0x802CDAB8, 0x802CDB10-0x802CDDC4, 0x802CE698-0x802CF390, 0x802CF588-0x802CF704,
  *   0x802CF808-0x802CF8E4, 0x802CF9E8-0x802CFABC, 0x802CFAF0-0x802CFBC8, 0x802D0C9C-0x802D0DCC,
- *   0x802D44F4-0x802D6534 (`fn_802D44F4`, a 2064-instruction compare tree on `ai_get_motion_no()`),
+ *   0x802D44F4-0x802D6534 (`ai_npc_motion_dispatch`, a 2064-instruction compare tree on `ai_get_motion_no()`),
  *   0x802D6BB0-0x802D7464, 0x802D79A4-0x802D7A50, 0x802D7EB0-0x802D7F10, 0x802D7F58-0x802D84D0,
  *   0x802D84D8-0x802D948C, 0x802D94C4-0x802D9A40, 0x802D9A78-0x802D9EA4.  93 rows partial, including:
  *  - `fn_802D7B5C`, `fn_802D7C04` (zero), `fn_802D7C6C`: the search loop stays a loop in retail, MWCC unrolls the
