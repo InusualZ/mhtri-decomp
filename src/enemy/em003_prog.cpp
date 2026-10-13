@@ -1761,7 +1761,7 @@ extern "C" void fn_8015941C(_ENEMY_WORK* self) {
         em_mot_set(self, 0x36, 2, 0);
         em_hit_window_set_default(self, 0, 5);
         em_move_vec_clr(self);
-        temp_f1 = fn_80050EF4(&self->pos, &self->target);
+        temp_f1 = vec3_distance(&self->pos, &self->target);
         if (temp_f1 > lbl_8079717C) {
             self->v_0x310.z = (f32) lbl_807971F4;
             return;

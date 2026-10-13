@@ -3229,7 +3229,7 @@ s32 fn_80262688(_PLW* self) {
             (work->field_0x655 == self->chunk_ofs || work->field_0x655 == 0xFF) &&
             (Pl_act_ck(work, 0, 20) != 0 || Pl_act_ck(work, 0, 158) != 0) &&
             self->area_0x16 == work->area_0x16 &&
-            fn_80050EF4(&self->vec_0x03C, &work->vec_0x03C) >= pl_float_300 &&
+            vec3_distance(&self->vec_0x03C, &work->vec_0x03C) >= pl_float_300 &&
             ((PlItemData*)GetItemData(work->field_0x650))->field_0x01 < 3) {
             self->field_0x658 = 90;
             if (pl_item_room_get(self, work->field_0x650, work->field_0x652) < work->field_0x652) {

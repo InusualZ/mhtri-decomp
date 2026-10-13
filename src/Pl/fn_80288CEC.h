@@ -1,6 +1,6 @@
 /*
  * The records and declarations shared by `Pl/pl_motion.cpp`, `Pl/pl_hit_sphere.cpp` and `Pl/pl_coll.cpp` (rule 1):
- * the box record the box builders (`fn_8028F44C`/`fn_8028F4B4`) fill and `Pl/pl_coll.cpp`'s point-vs-box tests read,
+ * the box record the box builders (`pl_box_set`/`pl_segment_box_set`) fill and `Pl/pl_coll.cpp`'s point-vs-box tests read,
  * and the player-mode root work.
  */
 #ifndef MHTRI_PL_FN_80288CEC_H
@@ -98,9 +98,6 @@ u32 root_mode2_ck(void);
 }
 #endif
 
-
-/* 0x8028F558 - a box builder of `Pl/pl_hit_sphere.cpp`, called by `enemy/em_action.cpp`. */
-void fn_8028F558(void* a, void* b);
 
 /* 0x8028D0EC - starts a player warp to `pos` facing `angle`: stores the destination in the move work,
  * arms the transfer mode and the fade; `mode` 0xFF warps the current player only.  C linkage (the map

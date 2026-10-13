@@ -283,10 +283,7 @@ public:
         mTextColor.gradationMode = mode;
         UpdateVertexColor();
     }
-    void SetTextColor(Color color) {
-        mTextColor.start = color;
-        UpdateVertexColor();
-    }
+    void SetTextColor(Color color);
     void SetScale(f32 hScale, f32 vScale) {
         mScale.x = hScale;
         mScale.y = vScale;

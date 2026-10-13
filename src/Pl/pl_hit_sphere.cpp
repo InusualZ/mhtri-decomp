@@ -1,13 +1,15 @@
 /*
  * Pl/pl_hit_sphere.cpp - the player actor's box and sphere hit helpers: the box builders and `hit_point_sphr`.
  * RANGE. .text 0x8028F44C-0x8028F66C (4 functions); .sdata2 0x8079A310-0x8079A318, extab, extabindex.
- * NAMES. The file name is a GUESS from `hit_point_sphr`, the range's one map name.
- * RESIDUALS. `fn_8028F4B4` and `fn_8028F558` (the remaining box builders, 0x8028F4B4-0x8028F61C) are unwritten;
+ * NAMES. The file name is a GUESS from `hit_point_sphr`, the range's one map name.  GUESS: `pl_box_set` (0x8028F44C),
+ *   `pl_segment_box_set` (0x8028F4B4) and `pl_capsule_box_set` (0x8028F558), from the records each fills
+ *   (`PlBox`, `PlSegmentBox`, `PlCapsuleBox`).
+ * RESIDUALS. `pl_segment_box_set` and `pl_capsule_box_set` (the remaining box builders, 0x8028F4B4-0x8028F61C) are unwritten;
  *   `hit_point_sphr` is partial, with no recorded cause.
  *  - flipcheck: the object emits no `.sdata2` (0x8 claimed); `.text` 0xB0, extab 0x8 and extabindex 0xC against the
  *    claims 0x220, 0x18 and 0x24; every compared section differs.  The `.sdata2` pool shares a literal with
  *    `Pl/pl_coll.cpp`, whose `.text` follows: the two may be one TU (a fold candidate).
- * SHAPES. `fn_8028F44C` takes typed `PlBox*` parameters (`&b->vec_0x0C`), which MWCC emits as immediate offsets; a
+ * SHAPES. `pl_box_set` takes typed `PlBox*` parameters (`&b->vec_0x0C`), which MWCC emits as immediate offsets; a
  *   `void*`-plus-cast form CSEs the three reaches into a saved register.
  */
 
@@ -35,7 +37,7 @@ f32 subVec3(void* dst, void* a, void* b);
 extern "C" {
 
 /* 0x8028F44C - build the first 0x24 bytes of a box from two vectors and their cross product. */
-void fn_8028F44C(PlBox* a, PlBox* b) {
+void pl_box_set(PlBox* a, PlBox* b) {
     f32 cross[3];
 
     copyVec3(&b->vec_0x00, &a->vec_0x00);

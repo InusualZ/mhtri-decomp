@@ -3385,7 +3385,7 @@ s32 fn_801D66BC(u8 arg0, void* target) {
     }
     entry = (EmGrowTable801CCBC4*)lbl_805B6950 + arg0;
     fn_8004FFC8(entry->rec_a, entry->rec_b, &scratchA, entry->scale);
-    fn_8028F558(&scratchA, &scratchB);
+    pl_capsule_box_set((const PlCapsule*)&scratchA, (PlCapsuleBox*)&scratchB);
     return fn_802907BC((s32)target, &scratchB) - 1 == 0;
 }
 

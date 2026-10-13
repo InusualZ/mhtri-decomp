@@ -2706,7 +2706,7 @@ void fn_802D0F34(struct _AINPC_W* self)
         }
         if (fn_802D3DE8(self) != 1) {
             if (self->variant == 2) {
-                self->field_0x1C0 = fn_80050EF4(&self->pos_0x1B0, &self->pos_0x178);
+                self->field_0x1C0 = vec3_distance(&self->pos_0x1B0, &self->pos_0x178);
             } else {
                 self->field_0x1C0 = calcVecDistXZ(&self->pos_0x1B0, &self->pos_0x178);
             }
@@ -4503,7 +4503,7 @@ void ai_npc_hold_item_arm(void)
         return;
     }
     ainpc_w.field_0x43D = 1;
-    if (fn_80050EF4(&ainpc_w.vec_0x178,
+    if (vec3_distance(&ainpc_w.vec_0x178,
                     (nw4r::math::VEC3*)&ainpc_w.plw_0x16C->motion_pos_0x3C) >= lbl_8079A770) {
         ainpc_w.field_0x43E = 0x258;
     } else {

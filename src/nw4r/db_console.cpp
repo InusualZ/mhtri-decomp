@@ -7,9 +7,10 @@
  * NAMES. this file name is a GUESS (the console record `nw4r::db::detail::ConsoleHead` of `nw4r/db_console.h` is its
  *   context); `Console_Printf` and `Console_GetTotalLines` are GUESSES from what the two bodies do and who calls them
  *   (`nw4r/db_assert.cpp`).
- * RESIDUALS. Flip blocker: .text object 0xD4 vs claimed 0xF8 (the unwritten 0x24-byte function below).  `fn_80500844` (0x80500844, 0x24 B) is not written: it is the out-of-line copy of the inline
- *   `ut::CharWriter::SetTextColor` (`nw4r/fn_80502828.h`), a weak function emitted by a caller that is not in the
- *   image, so no source in this range references it; the grouping of the three into one TU is unproven.
+ * NAMES. `ut::CharWriter::SetTextColor` (0x80500844, 0x24 B) is the colour setter the `nw4r/fn_80502828.h` class
+ *   declares out of line; `nw4r/fn_80502828.cpp`'s CharWriter constructor and the homebutton callers branch to it here.
+ * RESIDUALS. Flip blocker: .text object 0xD4 vs claimed 0xF8: `SetTextColor` (0x80500844, 0x24 B) is unwritten; the
+ *   grouping of the three into one TU is unproven.
  */
 #include "nw4r/db_console.h"
 #include "OS/OSInterrupt.h"

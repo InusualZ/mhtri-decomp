@@ -248,7 +248,7 @@ u32 fn_801E0058(struct _ENEMY_WORK* self, u8 a);
  * `enemy/em001_prog.cpp`, `stage/stg_w.cpp`, `camera/camera_main.cpp`, `lobby/fn_8030121C.cpp` and
  * `enemy/em_model.cpp`. */
 void subVec3(void* out, void* a, void* b);
-f32 fn_80050EF4(void* a, void* b);
+f32 vec3_distance(void* a, void* b);
 f32 calcVecDistXZ(void* a, void* b);
 f32 vec3_dist_sq(void* a, void* b);
 void addVec3(void* out, void* a, void* b);
@@ -438,7 +438,7 @@ extern "C" void fn_801D8688(struct _ENEMY_WORK* self, u8 arg1) {
         em_mot_set_ck(self, 0xA, 4, 0);
         switch (arg1) {
         case 0:
-            var_f1 = lbl_80799554 * fn_80050EF4(&self->pos, &self->vec_0x36C);
+            var_f1 = lbl_80799554 * vec3_distance(&self->pos, &self->vec_0x36C);
             break;
         case 1:
             var_f1 = lbl_80799558 + (lbl_8079955C * get_em_chg_scale(self));
@@ -2516,7 +2516,7 @@ void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 
 /* Runtime helpers. */
-f32 fn_80050EF4(void* a, void* b);
+f32 vec3_distance(void* a, void* b);
 void res_node_assign(void* out, void* src);
 void fn_8006FDCC(void* a);
 void fn_800810DC(void* self, u32 a);
@@ -3032,7 +3032,7 @@ void fn_801DFD3C(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
     delta = (u16)(ang - self->field_0x1C0);
     scale = scale * get_em_chg_scale(self);
     if ((u16)(delta + 0xbfff) > 0x7ffe) {
-        f32 base = fn_80050EF4(&dir, &self->pos);
+        f32 base = vec3_distance(&dir, &self->pos);
         setVector3(&rot, lbl_807994FC, lbl_807994FC, base - scale);
         rotVecY(&rot, *angleOut);
         addVec3(&tmp, &self->pos, &rot);

@@ -245,7 +245,7 @@ extern s32 strcmp(const char* a, const char* b);
 
 extern void mtx34_identity(void* mtx);
 extern void subVec3(Vec3* out, const Vec3* a, const Vec3* b);
-extern f32 fn_80050EF4(const Vec3* a, const Vec3* b);
+extern f32 vec3_distance(const Vec3* a, const Vec3* b);
 extern f32 calcVecDistXZ(const Vec3* a, const Vec3* b);
 extern void addVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern void MTX33_ctor(Mtx34* mtx);
@@ -1044,7 +1044,7 @@ void fn_80138F3C(EnemyWork* self) {
             if (fn_8012D0B4(self, &move[i]) == 0) {
                 self->field_0x454[i] = sentinel;
             } else {
-                self->field_0x454[i] = fn_80050EF4(&self->field_0x188, &move[i].field_0x3C);
+                self->field_0x454[i] = vec3_distance(&self->field_0x188, &move[i].field_0x3C);
                 all_blocked = 0;
             }
         } else {

@@ -463,7 +463,7 @@ extern "C" void fn_801027D0(EmEffectWork* work) {
     copyVec3(&seg, &unit->world_pos);
     get_camera_pos_c1(&eye);
     copyVec3(&cam, &eye);
-    hit = fn_8028F4B4((EmEffectSegment*)&seg, &quad);
+    pl_segment_box_set((const PlSegment*)&seg, (PlSegmentBox*)&quad);
     zero = lbl_807966F4;
     for (i = 0; unit->probes[i].scale > zero; i++) {
         vec_to_mh_vec3(&point.pos, (Vec*)&unit->probes[i].pos);

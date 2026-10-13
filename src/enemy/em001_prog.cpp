@@ -165,7 +165,7 @@
 #define fn_8012A204_view1 ((s32 (*)(struct _ENEMY_WORK*))fn_8012A204)
 #define fn_8012A014_view1 ((u32 (*)(struct _ENEMY_WORK*, s32, s32, u16, void*, void*))fn_8012A014)
 #define fn_80128A70_view1 ((void (*)(_ENEMY_WORK*, u8, u8))fn_80128A70)
-#define fn_80050EF4_view1 ((f32 (*)(const void*, const void*))fn_80050EF4)
+#define vec3_distance_view1 ((f32 (*)(const void*, const void*))vec3_distance)
 #define em_mot_set_blend_view1 ((void (*)(struct _ENEMY_WORK*, s32, s32, s32, s32))em_mot_set_blend)
 #define em_magma_check_view1 ((u8 (*)(struct _ENEMY_WORK*))em_magma_check)
 #define em_hit_window_set_default_view1 ((void (*)(struct _ENEMY_WORK*, s32, s32))em_hit_window_set_default)
@@ -493,7 +493,7 @@ extern f32 lbl_80796F54;
 extern f32 lbl_80796F58;
 extern f32 lbl_80796F64;
 extern f32 lbl_80796F68;
-extern f32 fn_80050EF4(void *a, void *b);
+extern f32 vec3_distance(void *a, void *b);
 
 /* Callees declared with the signatures their call sites use. */
 
@@ -2898,7 +2898,7 @@ void fn_8014CC98(_ENEMY_WORK *self) {
         em_mot_set(self, 0x36, 2, 0);
         em_hit_window_set_default_c1(self, 0, 0xC);
         em_move_vec_clr(self);
-        temp_f1 = fn_80050EF4(&self->pos, &self->vec_0x36C);
+        temp_f1 = vec3_distance(&self->pos, &self->vec_0x36C);
         if (temp_f1 > lbl_80796EF8) {
             self->offset_0x30C.vec_0x310.z = lbl_80796EA0;
             return;
@@ -5451,7 +5451,7 @@ void fn_80154B04(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
     delta = (u16)(angle - self->field_0x1C0);
     scale = farg0 * get_em_chg_scale(self);
     if ((u16)(delta + 0xBFFF) > 0x7FFE) {
-        setVector3(&b, lbl_80796E1C, lbl_80796E1C, fn_80050EF4_view1(&a, &self->pos) - scale);
+        setVector3(&b, lbl_80796E1C, lbl_80796E1C, vec3_distance_view1(&a, &self->pos) - scale);
         rotVecY(&b, *angleOut);
         addVec3_view2(&v, &self->pos, &b);
         copyVec3(out, &v);

@@ -221,7 +221,7 @@ s32 fn_800F6B6C(u32 a, u32 b, u8 idx, u32 c, u8 d);
 void* fn_802B0420(void);
 u32 stage_water_area_ck(void);
 u32 stage_water_enabled_ck(void);
-void fn_8028F558(void* a, void* b);
+void pl_capsule_box_set(void* a, void* b);
 u32 fn_802907BC(void* a, void* b);
 f32 vec3_length_sq(void* v);
 
@@ -604,7 +604,7 @@ extern "C" u32 fn_800FA208(nw4r::math::VEC3* pos, EftEmitterRecord* rec) {
         break;
     case 2:
         fn_800FA318(&box, (const EftBox*)rec->box_0x14);
-        fn_8028F558(&box, &box2);
+        pl_capsule_box_set(&box, &box2);
         if (fn_802907BC(pos, &box2) == 1) {
             result = 1;
         }

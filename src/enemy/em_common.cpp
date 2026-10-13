@@ -158,7 +158,7 @@
 #define fn_8012BA00_view1 ((s32 (*)(struct _ENEMY_WORK*, struct EnemyActionTable*, void*, s32, u16))fn_8012BA00)
 #define fn_8012B9BC_view1 ((void (*)(_ENEMY_WORK*, u8, s32))fn_8012B9BC)
 #define fn_8012B944_view1 ((s32 (*)(_ENEMY_WORK*, u8, s32))fn_8012B944)
-#define fn_80050EF4_view1 ((f32 (*)(const VEC3*, const VEC3*))fn_80050EF4)
+#define vec3_distance_view1 ((f32 (*)(const VEC3*, const VEC3*))vec3_distance)
 #define em_status_ck_view1 ((u32 (*)(_ENEMY_WORK*, u32))em_status_ck)
 #define em_area_ck_view5 ((u32 (*)(struct _ENEMY_WORK*))em_area_ck)
 #define em_area_ck_view3 ((u32 (*)(struct _ENEMY_WORK*))em_area_ck)
@@ -276,7 +276,7 @@ extern "C" f32 vec3_dist_sq(void* ref, nw4r::math::VEC3* pos);
 extern "C" u8 fn_80133BCC(void);
 extern "C" void* quest_spawn_rec_find(u16 id);
 
-extern "C" f32 fn_80050EF4(void* ref, nw4r::math::VEC3* pos);
+extern "C" f32 vec3_distance(void* ref, nw4r::math::VEC3* pos);
 extern "C" f32 calcVecDistXZ(void* ref, nw4r::math::VEC3* pos);
 extern "C" s32 quest_time_limit_get(void);
 extern "C" s32 quest_time_elapsed_get(void);
@@ -843,7 +843,7 @@ s32 fn_8012BA00(_ENEMY_WORK* enemy, const MOTION_SET* motion, _ENEMY_WORK* other
         if ((u8)type == 1) {
             dist = enemy->frames_0x454[(u16)part];
         } else {
-            dist = fn_80050EF4_view1(&enemy->pos, &vec);
+            dist = vec3_distance_view1(&enemy->pos, &vec);
         }
 
         if (dist < lbl_80796C58) {
@@ -1525,7 +1525,7 @@ extern "C" u32 shibire_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(
         return 0;
     }
     if (enemy->field_0x1E2 == 2) {
-        if (fn_80050EF4(pos, &enemy->pos) <= radius) {
+        if (vec3_distance(pos, &enemy->pos) <= radius) {
             return 1;
         }
     } else if (calcVecDistXZ(pos, &enemy->pos) <= radius) {

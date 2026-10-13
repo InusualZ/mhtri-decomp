@@ -173,7 +173,7 @@ void* mtx34_get_ptr(void* pOut);
  * pointers and returns the float.  Moved here from `enemy/fn_801550FC.cpp` on landing (rule 2):
  * this unit owns the address, and the three-argument form the consumer used was wrong
  * (`enemy/fn_8015941C` sets only r3/r4). */
-f32 fn_80050EF4(void* a, void* b);
+f32 vec3_distance(void* a, void* b);
 /* 0x80050CA0 / 0x80050F80 - the vector difference and the distance between two positions, both owned here.
  * Signatures are the CALLEES' OWN BODIES, not the callers' guesses: `subVec3(out, a, b)` is
  * `VEC3_ctor(out); PSVECSubtract(out, a, b)`, and `calcVecDistXZ(a, b)` calls `subVec3(&local, b, a)`

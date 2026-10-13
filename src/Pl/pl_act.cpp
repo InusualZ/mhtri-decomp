@@ -5636,7 +5636,7 @@ namespace s_80276B58 {
 
 
 extern "C" void eft_rot_vec_copy(_CP_VECTOR*, void*);
-extern "C" f32 fn_80050EF4(void*, void*);
+extern "C" f32 vec3_distance(void*, void*);
 extern "C" u32 ef_inst_spawn(_PLW*, s32);
 extern "C" u32 stage_map_kind_get(u8);
 extern "C" u32 fn_802753E4(_PLW*, s32);
@@ -6775,7 +6775,7 @@ namespace s_80276B58 {
  * number of frames. */
 extern "C" void pl_pos_blend_start(_PLW* self, s32 arg1)
 {
-    if (fn_80050EF4((u8*)self + 60, (u8*)self + 144) >= lbl_8079A0F4 || (s16)arg1 == 0) {
+    if (vec3_distance((u8*)self + 60, (u8*)self + 144) >= lbl_8079A0F4 || (s16)arg1 == 0) {
         self->unk0B4 = 0;
         self->motion_pos_0x3C = self->target_pos_0x090.x;
         self->motion_pos_0x40 = self->target_pos_0x090.y;

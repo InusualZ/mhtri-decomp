@@ -132,7 +132,7 @@ typedef struct _EFT28_WORK {
     /* +0x09 */ u8 col_g;
     /* +0x0A */ u8 col_b;
     /* +0x0B */ u8 col_a;
-    /* +0x0C */ u8 param_0x0C[0x10 - 0x0C]; /* fn_8028F558's output */
+    /* +0x0C */ u8 param_0x0C[0x10 - 0x0C]; /* pl_capsule_box_set's output */
     /* +0x10 */ f32 field_0x10;             /* eft028_set_scaled's scale */
     /* +0x14 */ u8 key_0x14;                /* fn_80119970's colour keys */
     /* +0x15 */ u8 key_0x15;
@@ -140,7 +140,7 @@ typedef struct _EFT28_WORK {
     /* +0x17 */ u8 key_0x17;
 } _EFT28_WORK;
 
-/* The 0x1C-byte parameter record `fn_800FA3B8` builds and `fn_8028F558` reads in fn_80119AA8. */
+/* The 0x1C-byte parameter record `fn_800FA3B8` builds and `pl_capsule_box_set` reads in fn_80119AA8. */
 typedef struct _EFT28_PARAM {
     /* +0x00 */ VEC3 a;
     /* +0x0C */ VEC3 b;
@@ -215,7 +215,7 @@ void mtx34_copy(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
  * `void*` copy collided with the owner's `u8*` definition once the header declared it. */
 
 void eft_em_spawn(struct _ENEMY_WORK* em, s32 a, s32 b, nw4r::math::VEC3* v, f32 c);
-void fn_8028F558(_EFT28_PARAM* param, void* out);
+void pl_capsule_box_set(_EFT28_PARAM* param, void* out);
 void fn_800FA3B8(_EFT28_PARAM* param);
 u32 fn_8007BE2C(nw4r::g3d::ScnMdl::CopiedMatAccess* access, u32 arg);
 void res_mat_tev_color_copy_ctor(_EFT26_MATOBJ* out, void* in);
@@ -1125,7 +1125,7 @@ extern "C" _EFT* fn_80119AA8(u8 area)
     copyVec3(&param.a, &lbl_806A4548[0]);
     copyVec3(&param.b, &lbl_806A4548[1]);
     param.c = lbl_80796B28;
-    fn_8028F558(&param, &work->param_0x0C[0]);
+    pl_capsule_box_set(&param, &work->param_0x0C[0]);
     work->col_r = 0xff;
     work->col_g = 0xff;
     work->col_b = 0xff;

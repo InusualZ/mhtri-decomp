@@ -804,7 +804,7 @@ namespace s_802029B4 {
  * names are C linkage; the mangled callees are declared at C++ scope (rule 9).
  */
 extern "C" {
-f32 fn_80050EF4(VEC3* a, VEC3* b);
+f32 vec3_distance(VEC3* a, VEC3* b);
 void addVec3(VEC3* out, const VEC3* a, const VEC3* b);
 void fn_801FDD9C(_LB_NPC* self, f32 duration);
 s32 fn_801FDE3C(_LB_NPC* self, VEC3* target);
@@ -1071,7 +1071,7 @@ __declspec(noinline) void fn_80202F00(_LB_NPC* self)
     case 3:
         self->field_0x1D4 = (s16)(u16)fn_801FDE3C(self, &self->field_0x214->vec_0x3C) / 10;
         self->field_0x02C += self->field_0x1D4;
-        if (fn_80050EF4(&self->pos_0x10, &self->field_0x214->vec_0x3C) < lbl_807999CC) {
+        if (vec3_distance(&self->pos_0x10, &self->field_0x214->vec_0x3C) < lbl_807999CC) {
             setVector3(&offset, lbl_807999A0, lbl_807999A0, lbl_807999CC);
             rotVecY(&offset, calcVecAng2(&self->field_0x214->vec_0x3C, &self->pos_0x10));
             addVec3(&delta, &self->field_0x214->vec_0x3C, &offset);

@@ -41,7 +41,7 @@ extern const f32 pl_float_2250000;	/* 0x80799FD0: 2250000 - initial nearest-dist
                                      * (`fn_802607C4`) */
 extern const f32 pl_float_1000;	/* 0x80799FD4: 1000 - second argument of the `fn_802D7804` call
                                  * (`fn_80261770`) */
-extern const f32 pl_float_300;	/* 0x80799FD8: 300 - distance test on `fn_80050EF4`'s result
+extern const f32 pl_float_300;	/* 0x80799FD8: 300 - distance test on `vec3_distance`'s result
                                  * (`fn_80262688`) */
 
 #ifdef __cplusplus

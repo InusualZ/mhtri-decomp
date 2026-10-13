@@ -1058,7 +1058,7 @@ extern "C" void fn_8015EFAC(_ENEMY_WORK* self) {
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xA, 6, 0);
-        temp_f1 = fn_80050EF4(&self->pos, &self->vec_0x36C);
+        temp_f1 = vec3_distance(&self->pos, &self->vec_0x36C);
         temp_f1 = lbl_807973A4 * temp_f1;
         temp_f0 = -temp_r31[1];
         if (temp_f1 > temp_f0) {

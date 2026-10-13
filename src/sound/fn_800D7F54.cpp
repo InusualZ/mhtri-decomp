@@ -2463,7 +2463,7 @@ extern "C" void fn_800DC0A8(_ENEMY_WORK* enemy, PlWorkView* plw, SeReqParamView*
  *     first). This part carries `SeSlotView`, which extends the prelude's copy over those bytes.
  *   - `SeSysWork` (b.cpp) needs a `VEC3` at +0x04, a `VEC3` at +0x1C and a `u8` at +0x2927D - this part
  *     carries `SeSysWorkVol` for them (same object; b.cpp's copy pads those offsets).
- *   - `_se_w` needs `VEC3`s at +0x18 and +0x24 (`fn_80050EF4`'s distance vectors); this part carries
+ *   - `_se_w` needs `VEC3`s at +0x18 and +0x24 (`vec3_distance`'s distance vectors); this part carries
  *     `SeWorkVol`.
  *   - `fn_800F2680` is declared `u8` in part c and `u32` in part b (and here): that is a hard
  *     redeclaration conflict in the merged TU. b.cpp's header says `u32` is the measured one.
@@ -2546,7 +2546,7 @@ extern "C" void fn_8027C064(_PLW* plw, nw4r::math::VEC3* pos);
 extern "C" void fn_80385B20(_PLW* plw, u32 joint, nw4r::math::VEC3* pos);
 
 /* The sound-system work object `lbl_80794978` points at, as `fn_800D92E4` reads it (b.cpp calls the same
- * object `SeSysWork`): the two distance vectors `fn_80050EF4` is handed and the byte at +0x2927D.
+ * object `SeSysWork`): the two distance vectors `vec3_distance` is handed and the byte at +0x2927D.
  * size: 0x2927E (at least) */
 struct SeSysWorkVol {
     /* +0x00000 */ u8 pad_0x00000[4];
@@ -2583,7 +2583,7 @@ extern "C" u32 fn_802BE088(void);
 extern "C" void fn_800F2714(s32 handle, u32 id, s32 which, u32 value);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
 extern "C" void fn_800F2540(s32 handle, u32 id, u16* out);
-extern "C" f32 fn_80050EF4(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+extern "C" f32 vec3_distance(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 u8 PlayMode_ck(void);
 extern "C" u32 event_demo_ck__Fv(void);
 extern "C" f32 lbl_807963D8;
@@ -2882,21 +2882,21 @@ extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot) {
         f32 dist;
 
         if (PlayMode_ck() == 2) {
-            dist = fn_80050EF4(&w->field_0x018, &s->pos);
-            f32 other = fn_80050EF4(&w->field_0x024, &s->pos);
+            dist = vec3_distance(&w->field_0x018, &s->pos);
+            f32 other = vec3_distance(&w->field_0x024, &s->pos);
             if (other < dist) {
                 dist = other;
             }
         } else if (work == NULL) {
-            dist = fn_80050EF4(&sys->field_0x00004, &s->pos);
+            dist = vec3_distance(&sys->field_0x00004, &s->pos);
         } else if (GameMode_ck() == 2 && event_demo_ck__Fv() == 0) {
             if (w->field_0x008 == 12 || w->field_0x008 == 8) {
-                dist = fn_80050EF4(&sys->field_0x0001C, &s->pos);
+                dist = vec3_distance(&sys->field_0x0001C, &s->pos);
             } else {
-                dist = fn_80050EF4(&w->field_0x018, &s->pos);
+                dist = vec3_distance(&w->field_0x018, &s->pos);
             }
         } else {
-            dist = fn_80050EF4(&w->field_0x018, &s->pos);
+            dist = vec3_distance(&w->field_0x018, &s->pos);
         }
         if (dist > near) {
             s->field_0x1C = lbl_807963E0;

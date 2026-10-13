@@ -152,12 +152,12 @@ void assignVec3(void* out, void* in);
 void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
 void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
-f32 fn_80050EF4(void* a, void* b);
+f32 vec3_distance(void* a, void* b);
 f32 calcVecDistXZ(void* a, void* b);
 void fn_800FA378(void* out);
 u32 move_work_state_ck(void);
 void mhchar_mat_tev_set(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f);
-s32 fn_8028F558(void* a, void* b);
+s32 pl_capsule_box_set(void* a, void* b);
 s32 fn_802907BC(void* a, void* b);
 void eft_spawn_pos_in_area(void* pos, u8 area, u8 kind, s32 mode, f32 scale);
 void eft009_spawn_at_joint(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale);
@@ -317,7 +317,7 @@ extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
             vec_to_mh_vec3(&a, (Vec*)list->vec_0x04);
             copyVec3(&mid, &a);
         }
-        dist = fn_80050EF4(&self->pos, &mid);
+        dist = vec3_distance(&self->pos, &mid);
         if (i == 0 || bestDist > dist) {
             bestDist = dist;
             best = i;
@@ -343,14 +343,14 @@ extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
         vec_to_mh_vec3(&a, (Vec*)rec->vec_0x04);
         vec_to_mh_vec3(&b, (Vec*)rec->vec_0x10);
         fn_8004FFC8(&a, &b, box, radius);
-        fn_8028F558(box, box);
+        pl_capsule_box_set(box, box);
         if (fn_802907BC(point, box) == 1) {
             return 1;
         }
         return 0;
     }
     vec_to_mh_vec3(&a, (Vec*)rec->vec_0x04);
-    if (fn_80050EF4(point, &a) < radius) {
+    if (vec3_distance(point, &a) < radius) {
         return 1;
     }
     return 0;
