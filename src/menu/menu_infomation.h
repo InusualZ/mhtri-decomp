@@ -8,6 +8,9 @@
 
 #include "types.h"
 
+struct _PLW;
+struct _EQUIP;
+
 /* The status screen's own work record (`fn_80308EC0`/`fn_80308F1C` below the seam, `fn_8030BACC`/
  * `equip_list_page_count`/`fn_8030A1D0` above it).  Only the fields those bodies reach are named, so the size
  * is the extent they prove, not the record's own.
@@ -22,7 +25,7 @@ typedef struct StatusScreenWork {
     u8    pad_0x015[0x1C - 0x15];  /* +0x015 */
     u8    field_0x1C;              /* +0x01C  the cursor row `fn_8030BACC` clears */
     u8    pad_0x01D[0x190 - 0x1D]; /* +0x01D */
-    void* equip;                   /* +0x190  the record `fn_8030A1D0` walks */
+    struct _PLW* equip;            /* +0x190  the player work `fn_8030A1D0` walks */
     u8    pad_0x194[0x19E - 0x194];/* +0x194 */
     u16   field_0x19E;             /* +0x19E  the page count `equip_list_page_count` counts into */
     u8    field_0x1A0;             /* +0x1A0  one visible-row flag per row */
@@ -54,7 +57,7 @@ extern "C" {
 
 /* 0x8030A1D0 - the equip page count with the default column arrangement (the owner defines it).  The
  * owner's `fn_80308EC0` (the screen's entry, below the seam) arms the screen's page bytes from it. */
-s32 fn_8030A1D0(void* equip, s32 mode);
+s32 fn_8030A1D0(struct _PLW* equip, s32 mode);
 
 /* 0x8030B790 - the number of six-row pages the equip list record fills (never below one). */
 s32 equip_list_page_count(EquipListWork* list);
@@ -62,14 +65,10 @@ s32 equip_list_page_count(EquipListWork* list);
 /* 0x8030CA50 / 0x8030D6A8 / 0x8030F374 / 0x8030F814 - the equipment detail page's per-kind stat blocks (the
  * blade weapons, the bowgun parts, kind 6) and its decoration-slot row, for the player work and the equipment
  * record the caller hands in.  GUESS names, from the kinds the quest-result screen picks them by. */
-/* untyped: opaque handle passed through - the owner forwards the player work and the record untouched to its variant resolver */
-s32 equip_detail_melee_draw(void* plw, void* equip, u32 row, u32 sel);
-/* untyped: opaque handle passed through - the owner forwards the player work and the record untouched to its variant resolver */
-void equip_detail_bowgun_draw(void* plw, void* equip, u16 row, u8 sel);
-/* untyped: opaque handle passed through - the owner forwards the player work and the record untouched to its variant resolver */
-void equip_detail_kind6_draw(void* plw, void* equip, u16 row, u8 sel);
-/* untyped: opaque handle passed through - the owner forwards the player work and the record untouched to its variant resolver */
-void equip_detail_slots_draw(void* plw, void* equip, u16 row, u8 sel);
+s32 equip_detail_melee_draw(struct _PLW* plw, struct _EQUIP* equip, u32 row, u32 sel);
+void equip_detail_bowgun_draw(struct _PLW* plw, struct _EQUIP* equip, u16 row, u8 sel);
+void equip_detail_kind6_draw(struct _PLW* plw, struct _EQUIP* equip, u16 row, u8 sel);
+void equip_detail_slots_draw(struct _PLW* plw, struct _EQUIP* equip, u16 row, u8 sel);
 
 #ifdef __cplusplus
 }
