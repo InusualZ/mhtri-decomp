@@ -4849,16 +4849,16 @@ s32 fn_802D7A74(struct _AINPC_W* self)
     if (self->field_0x1CC != 0 && self->field_0x1CC != 5) {
         return 0;
     }
-    if (self->hold_id_0x3B0 == 0x1D && self->field_0x424 == 0) {
+    if (self->item_slots[8].id == 0x1D && self->field_0x424 == 0) {
         return 1;
     }
-    if (self->hold_id_0x3B4 == 0x1D && self->field_0x424 == 0) {
+    if (self->item_slots[9].id == 0x1D && self->field_0x424 == 0) {
         return 1;
     }
-    if (self->hold_id_0x3B8 == 0x1D && self->field_0x424 == 0) {
+    if (self->item_slots[10].id == 0x1D && self->field_0x424 == 0) {
         return 1;
     }
-    if (self->hold_id_0x3BC == 0x1D && self->field_0x424 == 0) {
+    if (self->item_slots[11].id == 0x1D && self->field_0x424 == 0) {
         return 1;
     }
     return 0;

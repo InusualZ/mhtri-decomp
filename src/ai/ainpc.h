@@ -9,6 +9,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "id_value.h"                 /* IdValue: the twelve (item id, count) slots at +0x390 */
 
 /* The player work the record targets; only pointed at and forwarded by the band's own layout - a unit
  * that reads its fields includes `pl.h`. */
@@ -17,15 +18,18 @@ struct _PLW;
 /* The sound work `+0x498` holds, forwarded to `fn_800DCC24` (the SE request layer's entry). */
 struct _se_w;
 
-/* The 0x10-byte record `+0x41C` points at; only its float at +0xC (the frame-budget factor) is
- * evidenced.  size: 0x10 (approximate, evidenced to +0xC) */
+/* The record `+0x41C` points at: the frame-budget factor at +0xC and the percentage at +0x11.
+ * size: 0x14 (approximate, evidenced to +0x11; the f32 makes it 4-aligned) */
 struct AINPCFormation {
-    /* +0x0 */ u8 unused_0x00[0xC];
-    /* +0xC */ f32 budget_0x0C;
+    /* +0x00 */ u8 unused_0x00[0xC];
+    /* +0x0C */ f32 budget_0x0C;
+    /* +0x10 */ u8 unused_0x10;
+    /* +0x11 */ u8 roll_percent;        /* `fn_802D895C` clears +0x384 when a 0-99 roll is below it */
+    /* +0x12 */ u8 unused_0x12[0x14 - 0x12];
 };
 
 struct _AINPC_W {
-    /* +0x000 */ u8 active;            /* non-zero while the record is in use: the 0x802D44F4 band's
+    /* +0x000 */ u8 active;            /* non-zero while the record is in use */
     /* +0x001 */ u8 unused_0x001[0x002 - 0x001];
     /* +0x002 */ u8 field_0x002;
     /* +0x003 */ u8 team;              /* read by `get_enemy_data` as its first argument */
@@ -43,13 +47,15 @@ struct _AINPC_W {
     /* +0x16C */ struct _PLW* plw_0x16C;  /* the player work it targets (its +0x3C is a VEC3) */
     /* +0x170 */ u8 variant;            /* 1 or 2 - selects the odd/even arm of the dispatchers */
     /* +0x171 */ u8 field_0x171;
-    /* +0x172 */ u16 field_0x172;      /* the reaction sub-state (`field_0x171 == 4`, and the
+    /* +0x172 */ u16 field_0x172;      /* the reaction sub-state, read while `field_0x171 == 4` */
     /* +0x174 */ u8 unused_0x174[0x178 - 0x174];
     /* +0x178 */ nw4r::math::VEC3 vec_0x178;
-    /* +0x184 */ u8 unused_0x184[0x190 - 0x184];
+    /* +0x184 */ nw4r::math::VEC3 prev_pos;  /* the previous frame's position; `fn_802D9400` seeds it,
+                                        * and +0x178 from it, with the start point */
     /* +0x190 */ u32 field_0x190;       /* the effect/sound handle: only its low 16 bits are used */
     /* +0x194 */ u32 field_0x194;       /* the yaw the effect pass advances (`rotVecY`'s angle) */
-    /* +0x198 */ u8 unused_0x198[0x19C - 0x198];
+    /* +0x198 */ u32 rot_z;             /* the third word of the +0x190 rotation `fn_802D1FFC` copies to
+                                        * the model; cleared by `ainpc_init` and `fn_802D9400` */
     /* +0x19C */ f32 field_0x19C;       /* the aim's travelled distance */
     /* +0x1A0 */ u8 unused_0x1A0[0x1A4 - 0x1A0];
     /* +0x1A4 */ u8 field_0x1A4;
@@ -77,8 +83,8 @@ struct _AINPC_W {
     /* +0x1E6 */ u8 unused_0x1E6[0x1EC - 0x1E6];
     /* +0x1EC */ u16 field_0x1EC;       /* the SE id `fn_802D2ABC` is armed with */
     /* +0x1EE */ u8 unused_0x1EE[0x1F0 - 0x1EE];
-    /* +0x1F0 */ u32 field_0x1F0;
-    /* +0x1F4 */ u32 field_0x1F4;
+    /* +0x1F0 */ s32 field_0x1F0;
+    /* +0x1F4 */ s32 field_0x1F4;
     /* +0x1F8 */ u8 unused_0x1F8[0x20C - 0x1F8];
     /* +0x20C */ u32 field_0x20C;       /* the behaviour flag word `fn_802D6888` assembles */
     /* +0x210 */ u8 unused_0x210[0x21C - 0x210];
@@ -98,8 +104,13 @@ struct _AINPC_W {
     /* +0x30F */ u8 unused_0x30F[0x326 - 0x30F];
     /* +0x326 */ u8 field_0x326;
     /* +0x327 */ u8 unused_0x327[0x33A - 0x327];
-    /* +0x33A */ u8 field_0x33A;        /* the per-record index into the 0x805D5354/5360/5378/5390
-    /* +0x33B */ u8 unused_0x33B[0x349 - 0x33B];
+    /* +0x33A */ u8 field_0x33A;        /* the per-record index into the 0x805D5354/5360/5378/5390 tables */
+    /* +0x33B */ u8 unused_0x33B[0x344 - 0x33B];
+    /* +0x344 */ u16 hunt_bonus;        /* the hunt-rank bonus `fn_802D9C84` adds up to 100;
+                                        * `result_hunt_rank_get` reads it */
+    /* +0x346 */ u16 time_bonus;        /* the time-rank bonus `fn_802D9C84` adds up to 10;
+                                        * `result_time_rank_get` adds it to the rank */
+    /* +0x348 */ u8 unused_0x348;
     /* +0x349 */ u8 field_0x349;
     /* +0x34A */ u8 field_0x34A;
     /* +0x34B */ u8 field_0x34B;
@@ -132,15 +143,11 @@ struct _AINPC_W {
     /* +0x389 */ u8 field_0x389;
     /* +0x38A */ u8 unused_0x38A[0x38E - 0x38A];
     /* +0x38E */ u8 field_0x38E;
-    /* +0x38F */ u8 unused_0x38F[0x3B0 - 0x38F];
-    /* +0x3B0 */ u16 hold_id_0x3B0;    /* the four held-item slot ids (0x1D = the live-chain item
-    /* +0x3B2 */ u8 unused_0x3B2[0x3B4 - 0x3B2];
-    /* +0x3B4 */ u16 hold_id_0x3B4;
-    /* +0x3B6 */ u8 unused_0x3B6[0x3B8 - 0x3B6];
-    /* +0x3B8 */ u16 hold_id_0x3B8;
-    /* +0x3BA */ u8 unused_0x3BA[0x3BC - 0x3BA];
-    /* +0x3BC */ u16 hold_id_0x3BC;
-    /* +0x3BE */ u8 unused_0x3BE[0x3C2 - 0x3BE];
+    /* +0x38F */ u8 unused_0x38F;
+    /* +0x390 */ IdValue item_slots[12]; /* (item id, count): 0-7 the ring, 8-11 the four held slots
+                                        * (0x1D = the live-chain item); `result_rank_rows_fill`
+                                        * copies all twelve */
+    /* +0x3C0 */ u8 unused_0x3C0[0x3C2 - 0x3C0];
     /* +0x3C2 */ u16 field_0x3C2;       /* the motion the finish-out branch leaves the target in */
     /* +0x3C4 */ u8 unused_0x3C4[0x3C6 - 0x3C4];
     /* +0x3C6 */ u16 field_0x3C6;       /* cleared when the aim's second stage starts */
@@ -173,7 +180,8 @@ struct _AINPC_W {
     /* +0x421 */ u8 unused_0x421;
     /* +0x422 */ s16 field_0x422;
     /* +0x424 */ s16 field_0x424;       /* the hold-item frame budget */
-    /* +0x426 */ u8 unused_0x426[0x427 - 0x426];
+    /* +0x426 */ u8 weak_point_index;  /* the index `fn_802D1AFC` rolls; selects the row of the
+                                        * 0x805D4628 tables `fn_802D89D4` reads */
     /* +0x427 */ u8 field_0x427;        /* the five per-skill counters the finish-out clears */
     /* +0x428 */ u8 field_0x428;
     /* +0x429 */ u8 field_0x429;
