@@ -456,10 +456,10 @@ void __GXSetMatrixIndex(s32 index)
         GXWGFifo.u8 = 8;
         gx = __GXData;
         GXWGFifo.u8 = 0x40;
-        GXWGFifo.u32 = gx->matrixIndexHi;
+        GXWGFifo.u32 = gx->matrixIndexHi.word;
         GXWGFifo.u8 = 0x10;
         GXWGFifo.u32 = 0x1019;
-        GXWGFifo.u32 = gx->matrixIndexHi;
+        GXWGFifo.u32 = gx->matrixIndexHi.word;
     }
     gx->xfWritePending = 1;
 }

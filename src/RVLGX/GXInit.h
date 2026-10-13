@@ -27,14 +27,165 @@ typedef union GXScissorReg {
     } f; /* +0x0 */
 } GXScissorReg;
 
-/* A vertex-matrix index word: the position-matrix id sits in the low six bits. size: 0x4 */
+/* The first vertex-matrix index word: the position matrix id plus the texture matrix ids of coordinates 0..3. size: 0x4 */
 typedef union GXMatrixIndexReg {
     u32 word; /* +0x0 */
     struct {
-        /* +0x0, bits 31..6 */ u32 pad_0: 26;
+        /* +0x0, bits 31..30 */ u32 pad_0: 2;
+        /* +0x0, bits 29..24 */ u32 tex3Mtx: 6;
+        /* +0x0, bits 23..18 */ u32 tex2Mtx: 6;
+        /* +0x0, bits 17..12 */ u32 tex1Mtx: 6;
+        /* +0x0, bits 11..6 */ u32 tex0Mtx: 6;
         /* +0x0, bits 5..0 */ u32 posMtx: 6;
     } f; /* +0x0 */
 } GXMatrixIndexReg;
+
+/* The second vertex-matrix index word: the texture matrix ids of coordinates 4..7. size: 0x4 */
+typedef union GXMatrixIndexHiReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..24 */ u32 pad_0: 8;
+        /* +0x0, bits 23..18 */ u32 tex7Mtx: 6;
+        /* +0x0, bits 17..12 */ u32 tex6Mtx: 6;
+        /* +0x0, bits 11..6 */ u32 tex5Mtx: 6;
+        /* +0x0, bits 5..0 */ u32 tex4Mtx: 6;
+    } f; /* +0x0 */
+} GXMatrixIndexHiReg;
+
+/* The CP vertex descriptor, low word (CP 0x50). size: 0x4 */
+typedef union GXVcdLoReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..17 */ u32 pad_0: 15;
+        /* +0x0, bits 16..15 */ u32 color1: 2;
+        /* +0x0, bits 14..13 */ u32 color0: 2;
+        /* +0x0, bits 12..11 */ u32 normal: 2;
+        /* +0x0, bits 10..9 */ u32 position: 2;
+        /* +0x0, bit 8 */ u32 tex7MtxIdx: 1;
+        /* +0x0, bit 7 */ u32 tex6MtxIdx: 1;
+        /* +0x0, bit 6 */ u32 tex5MtxIdx: 1;
+        /* +0x0, bit 5 */ u32 tex4MtxIdx: 1;
+        /* +0x0, bit 4 */ u32 tex3MtxIdx: 1;
+        /* +0x0, bit 3 */ u32 tex2MtxIdx: 1;
+        /* +0x0, bit 2 */ u32 tex1MtxIdx: 1;
+        /* +0x0, bit 1 */ u32 tex0MtxIdx: 1;
+        /* +0x0, bit 0 */ u32 posMtxIdx: 1;
+    } f; /* +0x0 */
+} GXVcdLoReg;
+
+/* The CP vertex descriptor, high word (CP 0x60): texture coordinates 0..7. size: 0x4 */
+typedef union GXVcdHiReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..16 */ u32 pad_0: 16;
+        /* +0x0, bits 15..14 */ u32 tex7: 2;
+        /* +0x0, bits 13..12 */ u32 tex6: 2;
+        /* +0x0, bits 11..10 */ u32 tex5: 2;
+        /* +0x0, bits 9..8 */ u32 tex4: 2;
+        /* +0x0, bits 7..6 */ u32 tex3: 2;
+        /* +0x0, bits 5..4 */ u32 tex2: 2;
+        /* +0x0, bits 3..2 */ u32 tex1: 2;
+        /* +0x0, bits 1..0 */ u32 tex0: 2;
+    } f; /* +0x0 */
+} GXVcdHiReg;
+
+/* A CP vertex attribute table word A (CP 0x70 + format). size: 0x4 */
+typedef union GXVatAReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bit 31 */ u32 normalIndex3: 1;
+        /* +0x0, bit 30 */ u32 byteDequant: 1;
+        /* +0x0, bits 29..25 */ u32 tex0Frac: 5;
+        /* +0x0, bits 24..22 */ u32 tex0Type: 3;
+        /* +0x0, bit 21 */ u32 tex0Cnt: 1;
+        /* +0x0, bits 20..18 */ u32 color1Type: 3;
+        /* +0x0, bit 17 */ u32 color1Cnt: 1;
+        /* +0x0, bits 16..14 */ u32 color0Type: 3;
+        /* +0x0, bit 13 */ u32 color0Cnt: 1;
+        /* +0x0, bits 12..10 */ u32 normalType: 3;
+        /* +0x0, bit 9 */ u32 normalCnt: 1;
+        /* +0x0, bits 8..4 */ u32 posFrac: 5;
+        /* +0x0, bits 3..1 */ u32 posType: 3;
+        /* +0x0, bit 0 */ u32 posCnt: 1;
+    } f; /* +0x0 */
+} GXVatAReg;
+
+/* A CP vertex attribute table word B (CP 0x80 + format). size: 0x4 */
+typedef union GXVatBReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bit 31 */ u32 vcacheEnhance: 1;
+        /* +0x0, bits 30..28 */ u32 tex4Type: 3;
+        /* +0x0, bit 27 */ u32 tex4Cnt: 1;
+        /* +0x0, bits 26..22 */ u32 tex3Frac: 5;
+        /* +0x0, bits 21..19 */ u32 tex3Type: 3;
+        /* +0x0, bit 18 */ u32 tex3Cnt: 1;
+        /* +0x0, bits 17..13 */ u32 tex2Frac: 5;
+        /* +0x0, bits 12..10 */ u32 tex2Type: 3;
+        /* +0x0, bit 9 */ u32 tex2Cnt: 1;
+        /* +0x0, bits 8..4 */ u32 tex1Frac: 5;
+        /* +0x0, bits 3..1 */ u32 tex1Type: 3;
+        /* +0x0, bit 0 */ u32 tex1Cnt: 1;
+    } f; /* +0x0 */
+} GXVatBReg;
+
+/* A CP vertex attribute table word C (CP 0x90 + format). size: 0x4 */
+typedef union GXVatCReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..27 */ u32 tex7Frac: 5;
+        /* +0x0, bits 26..24 */ u32 tex7Type: 3;
+        /* +0x0, bit 23 */ u32 tex7Cnt: 1;
+        /* +0x0, bits 22..18 */ u32 tex6Frac: 5;
+        /* +0x0, bits 17..15 */ u32 tex6Type: 3;
+        /* +0x0, bit 14 */ u32 tex6Cnt: 1;
+        /* +0x0, bits 13..9 */ u32 tex5Frac: 5;
+        /* +0x0, bits 8..6 */ u32 tex5Type: 3;
+        /* +0x0, bit 5 */ u32 tex5Cnt: 1;
+        /* +0x0, bits 4..0 */ u32 tex4Frac: 5;
+    } f; /* +0x0 */
+} GXVatCReg;
+
+/* An XF texture-coordinate generation register (XF 0x1040 + coordinate). size: 0x4 */
+typedef union GXTexGenCtrlReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..18 */ u32 pad_0: 14;
+        /* +0x0, bits 17..15 */ u32 embossLight: 3;
+        /* +0x0, bits 14..12 */ u32 embossSource: 3;
+        /* +0x0, bits 11..7 */ u32 sourceRow: 5;
+        /* +0x0, bits 6..4 */ u32 texGenType: 3;
+        /* +0x0, bit 3 */ u32 pad_1: 1;
+        /* +0x0, bit 2 */ u32 inputForm: 1;
+        /* +0x0, bit 1 */ u32 projection: 1;
+        /* +0x0, bit 0 */ u32 pad_2: 1;
+    } f; /* +0x0 */
+} GXTexGenCtrlReg;
+
+/* An XF post-transform texture register (XF 0x1050 + coordinate). size: 0x4 */
+typedef union GXPostTexGenReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..9 */ u32 pad_0: 23;
+        /* +0x0, bit 8 */ u32 normalize: 1;
+        /* +0x0, bits 7..6 */ u32 pad_1: 2;
+        /* +0x0, bits 5..0 */ u32 postMtx: 6;
+    } f; /* +0x0 */
+} GXPostTexGenReg;
+
+/* A BP setup-unit texture-coordinate scale register (BP 0x30 + 2 * coordinate). size: 0x4 */
+typedef union GXSuTsReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bits 23..20 */ u32 pad_0: 4;
+        /* +0x0, bit 19 */ u32 pointOffset: 1;
+        /* +0x0, bit 18 */ u32 lineOffset: 1;
+        /* +0x0, bit 17 */ u32 cylWrap: 1;
+        /* +0x0, bit 16 */ u32 rangeBias: 1;
+        /* +0x0, bits 15..0 */ u32 scaleMinus1: 16;
+    } f; /* +0x0 */
+} GXSuTsReg;
 
 /* The BP color-mode register (blend, logic, dither and write masks). size: 0x4 */
 typedef union GXColorModeReg {
@@ -252,9 +403,10 @@ typedef union GXGenModeReg {
     u32 word; /* +0x0 */
     struct {
         /* +0x0, bits 31..24 */ u32 opcode: 8;
-        /* +0x0, bits 23..19 */ u32 pad_0: 5;
+        /* +0x0, bits 23..20 */ u32 pad_0: 4;
+        /* +0x0, bit 19 */ u32 coPlanar: 1;
         /* +0x0, bits 18..16 */ u32 numIndStages: 3;
-        /* +0x0, bits 15..14 */ u32 pad_1: 2;
+        /* +0x0, bits 15..14 */ u32 cullMode: 2;
         /* +0x0, bits 13..10 */ u32 numTevStagesMinus1: 4;
         /* +0x0, bit 9 */ u32 multisample: 1;
         /* +0x0, bits 8..7 */ u32 pad_2: 2;
@@ -332,15 +484,25 @@ typedef struct GXData {
             /* +0x002 */ u16 xfWritePending; /* 0 after a BP write, 1 after a CP/XF write */
         };
     };
-    /* +0x004 */ u8 pad_0x004[0x78];
+    /* +0x004 */ u16 vNum;
+    /* +0x006 */ u16 vLim;
+    /* +0x008 */ u8 pad_0x008[0xC];
+    /* +0x014 */ GXVcdLoReg vcdLo;
+    /* +0x018 */ GXVcdHiReg vcdHi;
+    /* +0x01C */ GXVatAReg vatA[8];
+    /* +0x03C */ GXVatBReg vatB[8];
+    /* +0x05C */ GXVatCReg vatC[8];
     /* +0x07C */ GXLinePtSizeReg lpSize;
-    /* +0x080 */ GXMatrixIndexReg matrixIndexLo; /* the first four vertex-matrix index words (current position matrix id in bits 0..5) */
-    /* +0x084 */ u32 matrixIndexHi;
+    /* +0x080 */ GXMatrixIndexReg matrixIndexLo; /* position matrix id plus the texture matrix ids of coordinates 0..3 */
+    /* +0x084 */ GXMatrixIndexHiReg matrixIndexHi;
     /* +0x088 */ u8 pad_0x088[0x20];
     /* +0x0A8 */ GXColorWord ambColor[2];
     /* +0x0B0 */ GXColorWord matColor[2];
     /* +0x0B8 */ GXChanCtrlReg chanCtrl[4];
-    /* +0x0C8 */ u8 pad_0x0C8[0x80];
+    /* +0x0C8 */ GXTexGenCtrlReg texGenCtrl[8];
+    /* +0x0E8 */ GXPostTexGenReg postTexGen[8];
+    /* +0x108 */ GXSuTsReg suTs0[8];
+    /* +0x128 */ u8 pad_0x128[0x20];
     /* +0x148 */ GXScissorReg scissorTopLeft;
     /* +0x14C */ GXScissorReg scissorBottomRight;
     /* +0x150 */ GXTevOrderReg tref[8];
@@ -366,7 +528,11 @@ typedef struct GXData {
     /* +0x250 */ u8 cpTexZ;
     /* +0x251 */ u8 pad_0x251[3];
     /* +0x254 */ GXGenModeReg genMode;
-    /* +0x258 */ u8 pad_0x258[0x2D0];
+    /* +0x258 */ u8 pad_0x258[0x2C8];
+    /* +0x520 */ u32 nrmType;
+    /* +0x524 */ u8 hasNrms;
+    /* +0x525 */ u8 hasBiNrms;
+    /* +0x526 */ u8 pad_0x526[2];
     /* +0x528 */ u32 projectionType; /* 0 perspective, 1 orthographic */
     /* +0x52C */ f32 projection[6];
     /* +0x544 */ f32 viewportLeft;
@@ -381,7 +547,8 @@ typedef struct GXData {
     /* +0x5A4 */ u32 texmapId[16]; /* the texture map each TEV stage reads */
     /* +0x5E4 */ u8 pad_0x5E4[0x4];
     /* +0x5E8 */ u32 tevTcEnab; /* one bit per TEV stage with a texture coordinate enabled */
-    /* +0x5EC */ u8 pad_0x5EC[0x10];
+    /* +0x5EC */ u8 pad_0x5EC[0xF];
+    /* +0x5FB */ u8 dirtyVAT;
     /* +0x5FC */ u32 dirtyState;
 } GXData;
 
