@@ -101,7 +101,8 @@ struct MenuTables {
 /* One 0x0C-byte record of the `.data:0x805DBFB8` table (132 of them): the `+0x08` byte is what
  * `fn_8029F680` passes on. */
 struct ItemSpeciesRecord {
-    /* +0x000 */ u32 unused_0x000;
+    /* +0x000 */ u8 slot_size;        /* GUESS: the decoration slots the item takes; the readers compare it to 1/2/3 */
+    /* +0x001 */ u8 unused_0x001[3];
     /* +0x004 */ u32 unused_0x004;
     /* +0x008 */ u8 kind;
     /* +0x009 */ u8 unused_0x009[0x00C - 0x009];

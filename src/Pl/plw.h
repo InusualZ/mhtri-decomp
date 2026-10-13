@@ -22,7 +22,11 @@ typedef struct _EQUIP {
     u8 kind;         /* +0x0 */  /* equipment kind; picks which skill fields apply (1-5, 6, 7-15) */
     u8 deco_count;   /* +0x1 */  /* number of decoration skill ids in skill_id */
     u16 item_id;     /* +0x2 */  /* 0 when the slot is empty */
-    u16 deco_level;  /* +0x4 */  /* two decoration skill levels, low byte first */
+    union {          /* +0x4 */  /* the same 2 bytes, read two ways by kind (rule 5) */
+        u16 deco_level;   /* +0x4 */  /* two decoration skill levels, low byte first */
+        u16 color_rgb565; /* +0x4 */  /* the piece's dye colour, RGB565 (`Pl/pl_act.cpp`'s colour getters read it,
+                                       * `quest/arenatask.cpp` packs it) */
+    };
     u16 skill_id[3]; /* +0x6 */  /* the decoration skill ids */
 } _EQUIP;
 
