@@ -9,16 +9,6 @@
 #include "nw4r/math.h"
 #include "g3d/g3d_rescommon.h"
 
-/* The SDK signed colour.  size: 0x8 */
-struct GXColorS10 {
-    /* +0x0 */ s16 r;
-    /* +0x2 */ s16 g;
-    /* +0x4 */ s16 b;
-    /* +0x6 */ s16 a;
-
-    GXColorS10& operator=(const GXColorS10& rhs);
-};
-
 namespace nw4r {
 namespace g3d {
 

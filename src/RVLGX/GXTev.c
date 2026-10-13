@@ -6,6 +6,9 @@
  *     here
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`, `cflags_os`), the block of the unit this range was cut
  *   from; unmeasured until bodies exist.
+ * NAMES. `TEVCOpTableST0`/`TEVCOpTableST1`/`TEVAOpTableST0`/`TEVAOpTableST1` (the four 0x14-byte `GXSetTevOp` mode
+ *   tables at 0x8061AC20) and `c2r` (the 0x28-byte `GXSetTevOrder` channel-to-rasterizer table at 0x8061AC70) are GUESS
+ *   names after the SDK's own spellings; the split follows the four 5-word runs.
  * RESIDUALS. the right edge (0x804B9A30, `GXSetFog`) is the first `.sdata2` reader of `GXPixel`; `GXSetNumTevStages`
  *   is placed here by the SDK function order. No body is written (16 functions), the largest `GXSetTevOrder`
  *   at 0x804B98A0 (0x15C B); `python tools/units/sweepcomments.py --unit RVLGX/GXTev.c` lists them.

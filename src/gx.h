@@ -39,6 +39,18 @@ typedef struct _GXColor {
     u8 a; /* +0x3 */
 } GXColor;
 
+/* The SDK signed (10-bit) colour; the member exists because retail g3d carries the out-of-line
+ * `__as__10GXColorS10FRC10GXColorS10`. size: 0x8 */
+typedef struct GXColorS10 {
+    s16 r; /* +0x0 */
+    s16 g; /* +0x2 */
+    s16 b; /* +0x4 */
+    s16 a; /* +0x6 */
+#ifdef __cplusplus
+    GXColorS10& operator=(const GXColorS10& rhs);
+#endif
+} GXColorS10;
+
 /* The TEV/blend selectors the `MHchar` material setters encode (`setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor`,
  * `setMatAlphaBlendMode__6MHcharFUl12_GXBlendMode14_GXBlendFactor14_GXBlendFactor10_GXLogicOp`).  The
  * mangling names the type, so these are the SDK's own tag names; only the names matter for the map, the
