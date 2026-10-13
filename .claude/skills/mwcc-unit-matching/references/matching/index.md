@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (104)
+## Ideas that work (105)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -113,6 +113,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 117 | [An unsigned range test keeps its two compares only with the upper bound written constant-first](117-unsigned-range-test-keeps.md) | works | source-shape | Retail tests a u32 against a range with two `cmplwi` + branches and our build emits one `addi`/`subis` + `cmplwi`, shortening the function and shifting every branch after it. |
 | 118 | [Unpooled readonly strings (.sdata2 and 4-aligned .rodata) are an older GC compiler, not a flag](118-older-gc-compiler-readonly-strings.md) | works | flags, data | The target keeps every string literal as its own object (small ones in .sdata2, the rest 4-aligned in .rodata) but Wii/1.3 always pools them into one @stringBase0, whatever -str says |
 | 119 | [Select the conditional store value with a ternary, accumulate into a parameter, order non-leading locals](119-ternary-select-param-accumulate.md) | works | source-shape, allocator | A function is instruction-equal but the target stores a conditionally chosen word once and keeps a parameter register as the scratch, where ours stores twice or spends a callee-saved register |
+| 120 | [Scope `#pragma global_optimizer off` to one function](120-global-optimizer-off-scoped.md) | works | pragma, source-shape | A function's residual is a frontend-optimizer move - an `else` value computed above the branch, a loop-invariant hoisted, a load reused by CSE instead of reloaded, two loads scheduled in the other order - and turning... |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

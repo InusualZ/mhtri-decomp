@@ -1027,6 +1027,8 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-10-07 | **A pure `splits.txt` seam move is not a regression** (owner: "modify the rule so this case does not need my authorization"). Two batches (the g3d re-range `cf085cde5`, pre-pass 3 `472beb588`) were refused only because functions moved between units through a `splits.txt` diff and the shrinking unit's average fell. The regression row now lifts a *unit-average* row of a unit the diff's `.text` moves name when ALL hold: every function present in both reports (paired by address) scores at least what it did; every function that changed unit lies inside a move between exactly those two units; the matched code of the touched units and the whole-report fuzzy did not fall; the unit really lost or gained a function. A per-symbol drop, a move outside the diffed range, or a unit regression with no splits move refuses as before; `--allow-regression` stays for deliberate cases. The PASS row reads `seam move: A -> B, N functions, none worse` and the landing log carries `seam_moves`. |
 | 2026-10-07 | **A lane never merges `main`; it restarts from a fresh branch off main's tip** (owner: "make it a rule"). Landing re-applies a branch's content as a new commit, so a landed branch stays ahead of main and a later `git merge main` conflicts on every file main has since renamed or built on (QUEST-Q3, 30 files, 2026-10-07; the lane could not resolve it, because taking main's side is a bulk overwrite the permission system refuses). Rule: after a checkpoint lands, a lane that continues cuts a NEW branch from main's tip in its own worktree (`git switch -c worker/<slug>-<n> main`, then `python configure.py`), carrying forward only work that has not landed (cherry-pick the unlanded commits, or re-apply them); the old branch is left alone and removed once landed. Stale landed branches are cleaned with the content-based test of 13.1, never reset. |
 | 2026-10-13 | **Proven flips may land as one batch** (owner: "Allow batches"). Several units may flip to `Matching` in one commit when each is `flipcheck.py` READY and passes the reverse-reference check (§15.3), and the batch is proven by `ninja build/RMHE08/ok` (the `main.dol` hash). Each flip is still applied and hash-checked one unit at a time before the batch commits. |
+| 2026-10-13 | **A flipcheck false positive may be overridden, once proven** (owner). A `flipcheck.py` finding that is a tool false positive (first case: row 36 force-active on tables reached through MWCC's section anchor) may be overridden when the reverse-reference check passes (§15.3) and a trial flip proves a byte-identical `main.dol`; every other flipcheck finding still blocks. **Follow-up the same day**: the owner had flipcheck fixed instead (`1a72a433c`: alignment-padded pools count as matching in `pool_group_problems`; sections reached through MWCC's section anchor are kept whole for row 36), so the fix is the norm and the override is the fallback. |
+| 2026-10-13 | **Scout the next pair while the current one runs** (owner). Scout and scout-review the NEXT pair while the current pair's pre-pass and lanes run, so its lanes start right after each landing; a scout item touching a header still in flight gets a delta re-check after that landing (§15.1). |
 | standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
 
 ---
@@ -1317,6 +1319,9 @@ inside it runs the review loop of section 1.
    and "no regression" judged against a baseline report snapshotted at claim time (main moves under a lane).
 6. **Land** each with `land.py land --branch <b> --units <u> --manifest <path>`, one at a time from main.
 
+* **Overlap the next pair** (owner ruling 2026-10-13, §11): steps 2-3 for the NEXT pair run while this pair's pre-pass
+  and lanes do; after each landing, re-check every scout item that touches a header the landing changed (a delta check).
+
 ### 15.2 When the list missed something
 
 A dependency found mid-lane is never edited by the lane: it files an integrator request and uses a `STOPGAP` block
@@ -1329,6 +1334,12 @@ the claimed ranges: every symbol another unit's target object points at must be 
 then flip one unit at a time, prove each with `ok` (the `main.dol` hash), and land the batch as one `config/flags`
 commit (owner ruling 2026-10-13, §11). Function-count 100 % is not flip-readiness: `OS/OSCache.c` (21/21 functions, 1744/2312 bytes) and
 `nw4r/fn_80502828.cpp` were refused by flipcheck (trial 6).
+
+* A flipcheck finding that is a tool false positive is fixed in `flipcheck.py`; overriding it (reverse-reference check
+  plus a trial flip with a byte-identical `main.dol`) is the fallback, and every other finding blocks (§11, 2026-10-13).
+* A unit whose lane does not own `configure.py` is flipped by the orchestrator after the lane lands, as its own
+  `config/flags: flip ...` commit. Two lanes never both own `configure.py`: adjacent `configure.py` rows are where
+  `mergebranch.py resolve` mis-merged (2026-10-13), so such lanes land one at a time and flip after.
 
 ### 15.4 What the trials measured
 
