@@ -20,13 +20,15 @@
  *   ai_npc_formation_roll, ai_behaviour_scaled_get, ai_skill_mask_get; the data tables from their readers:
  *   ai_npc_time_left_chance_tbl, ai_npc_motion_variant_tbl, result_hunt_rank_tbl, result_time_rank_tbl,
  *   result_rank_points_tbl, ai_npc_spawn_pos_tbl, ai_npc_hand_reach_dist_sq (250 squared), ai_npc_f32_0_7
- * RESIDUALS. 153 rows unwritten (objdiff scores them zero): 0x802C2700-0x802C2F08, 0x802C2F2C-0x802C474C,
+ *   GUESS (from `ainpc_move` and `fn_802D3B34`): the view's +0x470 `drift_vel` / +0x47E `drift_active`; GUESS (from
+ *   their readers): the record types AINPCBehaviour, AINPCTimeChance, AINPCSpawnPos, ResultRankPoints
+ * RESIDUALS. 134 rows unwritten (objdiff scores them zero): 0x802C2700-0x802C2F08, 0x802C2F2C-0x802C474C,
  *   0x802C6908-0x802C6BE0, 0x802C75F4-0x802CCD90, 0x802CCE18-0x802CD20C, 0x802CD348-0x802CD588,
  *   0x802CD770-0x802CDAB8, 0x802CDB10-0x802CDDC4, 0x802CE698-0x802CF390, 0x802CF588-0x802CF704,
  *   0x802CF808-0x802CF8E4, 0x802CF9E8-0x802CFABC, 0x802CFAF0-0x802CFBC8, 0x802D0C9C-0x802D0DCC,
  *   0x802D44F4-0x802D6534 (`ai_npc_motion_dispatch`, a 2064-instruction compare tree on `ai_get_motion_no()`),
- *   0x802D6BB0-0x802D7464, 0x802D79A4-0x802D7A50, 0x802D7EB0-0x802D7F10, 0x802D7F58-0x802D84D0,
- *   0x802D84D8-0x802D948C, 0x802D94C4-0x802D9A40, 0x802D9A78-0x802D9EA4.  93 rows partial, including:
+ *   0x802D6BB0-0x802D7464, 0x802D79A4-0x802D7A50, 0x802D7F58-0x802D8414, 0x802D8478-0x802D84D0,
+ *   0x802D9004-0x802D92F8, 0x802D93B8-0x802D9400, 0x802D94C4-0x802D9A40, 0x802D9A78-0x802D9EA4.  95 rows partial, including:
  *  - `fn_802D7B5C`, `fn_802D7C04` (zero), `fn_802D7C6C`: the search loop stays a loop in retail, MWCC unrolls the
  *    constant trip count of `for (i = 0; i < N; i++) if (x < table[i+1]) break;`;
  *  - `fn_802D7B24`: the range tests want the raw `subi` result in a 32-bit `cmplwi`; MWCC inserts `subfic`/`orc`;
@@ -50,16 +52,25 @@
  *  - `fn_802D2264`, `fn_802D282C`, `fn_802D30F8`, `fn_802D15DC`, `fn_802D3184`, `fn_802D2F7C`,
  *    `fn_802D6B2C`, `fn_802D77DC`, `fn_802D7A50`, `fn_802D7CE4`, `fn_802D7688`, `fn_802D6A00`: register allocation and
  *    argument width; the instruction streams agree;
+ *  - `ai_taru_move_ck`: retail loads +0x450 into r0 before `extsb r3,r0`; an `s8` return, a local and the inverted
+ *    branch all load into r3 (or drop the `extsb`);
+ *  - `result_hunt_rank_get`: the leaf header's `s16` return adds `extsh r3,r31` where retail returns the sum as is;
+ *  - `fn_802D1AFC`: retail keeps `clrlwi r0,r0,24` before each +0x426 store, stages the `fn_802D89D4` result through
+ *    r0, and tests +0x420 == 3 with a signed `cmpwi`; `fn_802D7F10`: the value and the loaded byte swap r0/r4;
  *  - `.data`: the jump tables are emitted byte-identical but anonymous, so objdiff leaves the map's
  *    `jumptable_805D4E80`/`jumptable_805D4EA8`/`jumptable_805D4F3C` unpaired (playbook 23).
- *   flipcheck: `.ctors` (0x4), `.sdata` (0x98) and `.sbss` (0x8) claimed but not emitted; short `.text` 0x944C of
- *   0x177A4, extab 0x360 of 0x770, extabindex 0x510 of 0xB28, `.data` 0x1B8 of 0x1A18, `.sdata2` 0x50 of 0x208; the
+ *   flipcheck: `.ctors` (0x4), `.sdata` (0x98) and `.sbss` (0x8) claimed but not emitted; short `.text` 0xA18C of
+ *   0x177A4, extab 0x3E8 of 0x770, extabindex 0x5DC of 0xB28, `.data` 0x1B8 of 0x1A18, `.sdata2` 0x50 of 0x208; the
  *   bytes of all five differ.
  * SHAPES. Record views: the 0x802D0F34-0x802D44F4 bodies sit in `namespace view_fn_802D0F34` with `ai/ai_npc.h` and
  *   `ai/fn_802D0F34.h`, whose `_AINPC_W` is a second partial view of `ai/ainpc.h`'s (extern "C" keeps their symbols);
  *   its three C++-mangled `ai_*` functions stay global and cast to the view.  Unifying the views removes the namespace.
  *  - Of the eight shared functions the pieces declare differently, each keeps its best-scoring prototype
  *    (`fn_802D30F8` the sub-state view's); the call of `fn_802D66B8` keeps its `(s16)` narrowing as a cast.
+ *    `ai_npc_motion_step_ck` returns `u32` everywhere; the definition and the view take `(s32, s32)` narrowed by casts
+ *    (retail's `clrlwi` of both arguments; `u8`/`u16` parameters drop them), the global callers `(u8, u16)`.
+ *  - The result helpers index `Q_CountSet` as one `u16` run (`((u16*)counts_c)[i]`): `quest/quest_types.h` splits the
+ *    0x29 counts into `count`/`total`/`count_last`, and the whole-run array view belongs to that header.
  *  - The four motion tables (`lbl_805D4784`..`lbl_805D48D8`) are `u16` word arrays indexed `arg * 5`/`arg * 7`: a
  *    10/14-byte row struct folds the index into one `mulli`.
  *  - State steps are `self->state++`/`self->sub_step--`/`field += 1`, never `x = x + 1` (a `clrlwi` retail lacks,
@@ -187,7 +198,7 @@ extern "C" {
 #endif
 
 /* More of the motion band's helpers this band dispatches into (this unit's own), declared ahead of
- * their definitions with the callees' own signatures; `fn_802D9400` is not written yet. */
+ * their definitions with the callees' own signatures. */
 void fn_802D3A2C(struct _AINPC_W* self, u32 a);
 void fn_802D3CCC(struct _AINPC_W* self, u32 a);
 void fn_802D3CD4(struct _AINPC_W* self, u32 a);
@@ -228,7 +239,7 @@ struct _PLW;
 
 /* The C++-spelled entry points this unit defines below: their map names carry argument lists, so
  * declaring them at global C++ scope reproduces the target's mangling (rule 9). */
-s32 ai_torch_ck(struct _AINPC_W* self);
+#include "ai/ai_torch_ck.h"
 u32 ai_skill_ck(struct _AINPC_W* self, u8 skill);
 
 extern "C" {
@@ -295,7 +306,7 @@ extern u8 lbl_805D4190[0x10];
 extern u8 lbl_805D41A0[0x10];
 extern u16 lbl_805D41B0[0x10];
 extern char* lbl_805D4390[4];
-extern u32 lbl_805D4358[7];
+extern struct AINPCBehaviour* lbl_805D4358[7];
 extern u16 lbl_805D4560[6];
 
 /* The per-monster hold-slot table at 0x805D43A0: 31 records of four u16 (size 0xF8).  Field 0 of a
@@ -312,7 +323,7 @@ void fn_800DCCF8(void* state, nw4r::math::VEC3* pos, s32 enable);
 s32 fn_802D77A0(u8 value);
 void fn_802D9544(void);
 s32 fn_802D77DC(u8 slot);
-s32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 a, s32 b);
+u32 ai_npc_motion_step_ck(struct _AINPC_W* self, u8 motion, u16 step);
 s32 fn_802D66B8(struct _AINPC_W* self);
 void fn_802D84D0(struct _AINPC_W* self, s16 value);
 }
@@ -3027,24 +3038,20 @@ void fn_802D1AFC(struct _AINPC_W* self)
     s16 count;
 
     if (self->field_0x420 == 3) {
-        if (fn_802D86D4(&id, &count) == 1) {
+        if (fn_802D86D4(self, &id, &count) == 1) {
             if (self->field_0x422 <= 0 && self->field_0x461 == 0) {
-                u8 slot;
-
                 self->field_0x422 = 0x384;
-                slot = ::ran_suu(1) % 5;
-                self->field_0x426 = slot;
-                if (::ran_suu(1) % 100 < self->weak_point_0x427[slot]) {
-                    slot = ::ran_suu(1) % 5;
-                    self->field_0x426 = slot;
+                self->field_0x426 = ::ran_suu(1) % 5;
+                if (::ran_suu(1) % 100 < self->weak_point_0x427[self->field_0x426]) {
+                    self->field_0x426 = ::ran_suu(1) % 5;
                 }
-                self->weak_point_0x427[slot] = self->weak_point_0x427[slot] + 0x0A;
-                if (self->weak_point_0x427[slot] >= 0x64) {
-                    self->weak_point_0x427[slot] = 0x64;
+                self->weak_point_0x427[self->field_0x426] = self->weak_point_0x427[self->field_0x426] + 0x0A;
+                if (self->weak_point_0x427[self->field_0x426] >= 0x64) {
+                    self->weak_point_0x427[self->field_0x426] = 0x64;
                 }
-                fn_802D40EC(self, id, -count);
+                fn_802D40EC(self, id, (s16)-count);
                 if (self->field_0x42C != 0) {
-                    fn_802D40EC(self, fn_802D89D4(self), count);
+                    fn_802D40EC(self, fn_802D89D4(self, self->field_0x42C), count);
                 }
             }
         } else {
@@ -3551,7 +3558,7 @@ void fn_802D2AD4(struct _AINPC_W* self, u8 variant)
 }
 
 /* 0x802D2B38 - whether the record is already on the given motion and sub-step. */
-s32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 motion, s32 step)
+u32 ai_npc_motion_step_ck(struct _AINPC_W* self, s32 motion, s32 step)
 {
     if (self->motion == (u8)motion && self->motion_step == (u16)step) {
         return 1;
@@ -4104,7 +4111,7 @@ s32 fn_802D3B34(struct _AINPC_W* self, u16 limit, u8 copy)
     } else {
         self->field_0x3CC = 0;
     }
-    if (self->field_0x47E != 0) {
+    if (self->drift_active != 0) {
         self->field_0x480 = self->field_0x480 + 1;
         if (self->field_0x480 >= (s32)limit) {
             self->field_0x480 = limit;
@@ -4487,6 +4494,16 @@ void get_joint_wpos_ai(struct _AINPC_W* self, u32 joint, nw4r::math::VEC3* out)
 }
 
 
+#include "ai/ainpc_move.h"           /* this unit's own leaf header */
+#include "ai/result_hunt_rank_get.h" /* this unit's own leaf header */
+#include "lobby/lb_quest_screen.h"   /* quest_time_limit_get, quest_time_elapsed_get (rule 2) */
+#include "lobby/lb_server_sel_trans.h" /* event_demo_ck, get_demo_no (rule 2) */
+#include "menu/menu_item.h"          /* GetItemData, ItemDataRecord (rule 2) */
+#include "mh3_pad/Screen_w.h"        /* Screen_w (rule 2) */
+#include "Pl/pl_act.h"               /* pl_item_room_get (rule 2) */
+#include "Pl/fn_80262940.h"          /* pl_model_state_set (rule 2) */
+#include "Pl/fn_80273B14.h"          /* Pl_item_id_usable_ck (rule 2) */
+
 #pragma peephole off
 
 extern "C" {
@@ -4780,10 +4797,21 @@ s32 fn_802D7688(u8 value)
     return 3;
 }
 
+}
+
+/* One behaviour record the 0x805D4358 table points at: the byte rows `ef/eft050.cpp` reads, then the scale
+ * `ai_behaviour_scaled_get` multiplies by.  size: 0x18 (approximate, evidenced to +0x14) */
+struct AINPCBehaviour {
+    /* +0x00 */ u8 rows[0x14];
+    /* +0x14 */ f32 scale;
+};
+
+extern "C" {
+
 /* 0x802D773C - the behaviour-list record for the given index. */
-u32 fn_802D773C(u8 index)
+struct AINPCBehaviour* fn_802D773C(u8 index)
 {
-    return ((u32*)lbl_805D4358)[index];
+    return lbl_805D4358[index];
 }
 
 /* 0x802D7754 - the four hold-countdown tuning values for the two 0/1 rolls at +0x3F6/+0x3F7. */
@@ -5054,7 +5082,7 @@ void fn_802D84D0(struct _AINPC_W* self, s16 value)
 }
 
 /* 0x802D948C - whether the item page at +0x483 is the first one. */
-s32 fn_802D948C(struct _AINPC_W* self)
+u32 fn_802D948C(struct _AINPC_W* self)
 {
     return self->field_0x483 == 1;
 }
@@ -5142,6 +5170,277 @@ s32 ai_npc_player_in_reach_ck(void)
            lbl_8079A870;
 }
 
+/* The tables and constants the companion and result helpers below read, in this unit's `.data` / `.sdata2`:
+ * declared, never defined (playbook 29). */
+
+/* One entry of `ai_npc_time_left_chance_tbl`.  size: 0x4 */
+struct AINPCTimeChance {
+    /* +0x0 */ s16 time_left;   /* the quest time left the entry needs (scaled by the frame rate); 0 ends the table */
+    /* +0x2 */ s16 chance;      /* the percentage the entry grants */
+};
+
+/* One entry of `ai_npc_spawn_pos_tbl`, indexed by +0x484.  size: 0x14 */
+struct AINPCSpawnPos {
+    /* +0x00 */ u8 area;
+    /* +0x01 */ u8 pad_0x01[3];
+    /* +0x04 */ Vec pos;
+    /* +0x10 */ u32 yaw;
+};
+
+/* One entry of `result_rank_points_tbl`.  size: 0x8 */
+struct ResultRankPoints {
+    /* +0x0 */ u16 count_index;  /* the count both runs are tested at; 0xFF ends the table */
+    /* +0x2 */ u8 pad_0x2[2];
+    /* +0x4 */ u16* bits;        /* the point bits the entry sets, 0xFF-terminated */
+};
+
+extern struct AINPCTimeChance ai_npc_time_left_chance_tbl[6];
+extern u16* ai_npc_motion_variant_tbl[6];
+extern u16 result_hunt_rank_tbl[0x2A];
+extern s16 result_time_rank_tbl[0x10];
+extern struct ResultRankPoints result_rank_points_tbl[0x10];
+extern struct AINPCSpawnPos ai_npc_spawn_pos_tbl[4];
+extern const f32 ai_npc_hand_reach_dist_sq;
+
+/* 0x802D8550 (0x13C): rolls whether the companion uses its time-left skill, with the chance of the last
+ * table entry the quest time left exceeds. */
+u32 fn_802D8550(struct _AINPC_W* self)
+{
+    struct AINPCTimeChance* entry = ai_npc_time_left_chance_tbl;
+    s32 left = quest_time_limit_get() - quest_time_elapsed_get();
+    u8 chance;
+
+    if (ai_skill_ck(self, 1) == 0) {
+        return 0;
+    }
+    if (self->field_0x446 != 0) {
+        return 0;
+    }
+    chance = entry->chance;
+    for (; entry->time_left > 0; entry++) {
+        if ((f32)left > (f32)entry->time_left * (lbl_8079A688 * Screen_w.frame_scale)) {
+            chance = entry->chance;
+        }
+    }
+    return ran_suu(1) % 100 < chance;
+}
+
+/* 0x802D86D4 (0xB4): reports the first held slot (8-11) carrying a giveable item. */
+u32 fn_802D86D4(struct _AINPC_W* self, u16* id, s16* count)
+{
+    if (self->item_slots[8].id != 0 && self->item_slots[8].id != 0x1D) {
+        *id = self->item_slots[8].id;
+        *count = self->item_slots[8].value;
+        return 1;
+    }
+    if (self->item_slots[9].id != 0 && self->item_slots[9].id != 0x1D) {
+        *id = self->item_slots[9].id;
+        *count = self->item_slots[9].value;
+        return 1;
+    }
+    if (self->item_slots[10].id != 0 && self->item_slots[10].id != 0x1D) {
+        *id = self->item_slots[10].id;
+        *count = self->item_slots[10].value;
+        return 1;
+    }
+    if (self->item_slots[11].id != 0 && self->item_slots[11].id != 0x1D) {
+        *id = self->item_slots[11].id;
+        *count = self->item_slots[11].value;
+        return 1;
+    }
+    *id = 0;
+    *count = 0;
+    return 0;
+}
+
+/* 0x802D8788 (0xC4): returns 1 while the companion's hand-over motion is within reach of its partner. */
+s32 ai_npc_hand_reach_ck(void)
+{
+    struct _AINPC_W* self = &ainpc_w;
+    _PLW* plw;
+
+    if (ainpc_w.active == 0) {
+        return 0;
+    }
+    plw = self->plw_0x16C;
+    if (plw == 0) {
+        return 0;
+    }
+    if (self->field_0x1A4 != plw->area_0x16) {
+        return 0;
+    }
+    if (ai_npc_motion_step_ck(self, 1, 0x58) == 1 || ai_npc_motion_step_ck(self, 1, 0x59) == 1) {
+        if (vec3_dist_sq(&self->vec_0x178, (nw4r::math::VEC3*)&self->plw_0x16C->motion_pos_0x3C) <
+            ai_npc_hand_reach_dist_sq) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* 0x802D895C (0x78): rolls the companion's formation choice against its formation record's percentage. */
+void ai_npc_formation_roll(struct _AINPC_W* self)
+{
+    if (ran_suu(1) % 100 < self->formation_0x41C->roll_percent) {
+        self->field_0x384 = 0;
+    } else {
+        self->field_0x384 = 1;
+    }
+}
+
+/* 0x802D89D4 (0xE8): picks a random weak-point variant of the motion from the first table rows that list it. */
+u16 fn_802D89D4(struct _AINPC_W* self, u16 motion)
+{
+    u8 count = self->field_0x33A + 1;
+    u8 i;
+
+    if (count > 4) {
+        count = 4;
+    }
+    for (i = 0; i <= count; i++) {
+        u16* p;
+
+        for (p = ai_npc_motion_variant_tbl[i]; *p != 0xFF; p++) {
+            if (*p == motion) {
+                u16* row = ai_npc_motion_variant_tbl[i + 1];
+
+                return row[self->weak_point_index * 2 + ran_suu(1) % 2];
+            }
+        }
+    }
+    return 0;
+}
+
+/* 0x802D8ABC (0x20C): the quest's hunt rank: both count runs weighed by the rank table, plus the bonus. */
+s16 result_hunt_rank_get(struct Q_CountSet* counts_c, struct Q_CountSet* counts_d)
+{
+    s32 sum = 0;
+    struct _AINPC_W* self = &ainpc_w;
+    u8 i;
+
+    if (quest_move_state_valid_ck() == 0) {
+        return 0;
+    }
+    if (fn_802D948C(self) == 1) {
+        return 0;
+    }
+    for (i = 0; i < 0x29; i++) {
+        sum += (u16)(result_hunt_rank_tbl[i] * ((u16*)counts_c)[i]);
+        sum += (u16)(result_hunt_rank_tbl[i] * ((u16*)counts_d)[i]);
+    }
+    sum += self->hunt_bonus;
+    return sum;
+}
+
+/* 0x802D8CC8 (0xCC): the rank of the elapsed minutes, plus the time bonus. */
+u16 result_time_rank_get(u16 minutes)
+{
+    u8 i = 0;
+    u8 rank = 0;
+    struct _AINPC_W* self = &ainpc_w;
+
+    if (quest_move_state_valid_ck() == 0) {
+        return 0;
+    }
+    if (fn_802D948C(self) == 1) {
+        return 0;
+    }
+    for (; result_time_rank_tbl[i] >= 0; i += 2) {
+        if (minutes >= result_time_rank_tbl[i]) {
+            rank = i;
+        }
+    }
+    return self->time_bonus + result_time_rank_tbl[rank + 1];
+}
+
+/* 0x802D8D94 (0x60): returns a value scaled by the behaviour record of the given index. */
+u16 ai_behaviour_scaled_get(u16 value, u8 index)
+{
+    struct AINPCBehaviour* record = fn_802D773C(index);
+
+    return (f32)value * record->scale;
+}
+
+/* 0x802D8DF4 (0xB4): copies the twelve item slots into the result rows, blanking those not usable. */
+void result_rank_rows_fill(struct IdValue* rows)
+{
+    s32 i;
+    s32 locked = 0;
+    struct _AINPC_W* self = &ainpc_w;
+
+    if (quest_move_state_valid_ck() == 0) {
+        locked = 1;
+    }
+    if (fn_802D948C(self) == 1) {
+        locked = 1;
+    }
+    for (i = 0; i < 12; i++, rows++) {
+        if (Pl_item_id_usable_ck(self->item_slots[i].id, 2) == 1 && locked == 0) {
+            rows->id = self->item_slots[i].id;
+            rows->value = self->item_slots[i].value;
+        } else {
+            rows->id = 0;
+            rows->value = 0;
+        }
+    }
+}
+
+/* 0x802D8EA8 (0xDC): the OR of the point bits of every table entry either count run reached. */
+u32 result_rank_points_get(struct Q_CountSet* counts_c, struct Q_CountSet* counts_d)
+{
+    u32 mask = 0;
+    struct _AINPC_W* self = &ainpc_w;
+    struct ResultRankPoints* entry;
+
+    if (quest_move_state_valid_ck() == 0) {
+        return 0;
+    }
+    if (fn_802D948C(self) == 1) {
+        return 0;
+    }
+    for (entry = result_rank_points_tbl; entry->count_index != 0xFF; entry++) {
+        if (((u16*)counts_c)[entry->count_index] != 0 || ((u16*)counts_d)[entry->count_index] != 0) {
+            u16* bit;
+
+            for (bit = entry->bits; *bit != 0xFF; bit++) {
+                mask |= 1 << *bit;
+            }
+        }
+    }
+    return mask;
+}
+
+/* 0x802D8F84 (0x80): returns the OR of `1 << n` over the non-zero skill numbers of slots 1..count. */
+u32 ai_skill_mask_get(u8 count)
+{
+    u8 i;
+    u32 mask = 0;
+
+    for (i = 1; i <= count; i++) {
+        u16 skill = fn_802D7BE4(i);
+
+        if (skill != 0) {
+            mask |= 1 << skill;
+        }
+    }
+    return mask;
+}
+
+/* 0x802D9400 (0x8C): places the companion at the spawn point of its +0x484 index. */
+void fn_802D9400(struct _AINPC_W* self)
+{
+    struct AINPCSpawnPos* spawn = &ai_npc_spawn_pos_tbl[self->field_0x484];
+    nw4r::math::VEC3 pos;
+
+    VEC3_ctor(&pos);
+    self->field_0x1A4 = spawn->area;
+    vec_to_mh_vec3(&pos, &spawn->pos);
+    copyVec3(&self->vec_0x178, copyVec3(&self->prev_pos, &pos));
+    self->field_0x190 = 0;
+    self->field_0x194 = spawn->yaw;
+    self->rot_z = 0;
+}
+
 #ifdef __cplusplus
 }
 #endif
@@ -5158,6 +5457,122 @@ u32 ai_skill_ck(struct _AINPC_W* self, u8 skill)
     }
     return 0;
 }
+
+/* 0x802D7EB0 (0x20): the barrel state while the companion is in its barrel motion (3), -1 otherwise. */
+s32 ai_taru_move_ck(struct _AINPC_W* self)
+{
+    if (self->field_0x171 != 3) {
+        return -1;
+    }
+    return self->field_0x450;
+}
+
+/* 0x802D7ED0 (0x40): whether the companion is within the barrel reach of its last move target. */
+u8 ai_taru_range_ck(struct _AINPC_W* self)
+{
+    return vec3_dist_sq(&self->vec_0x178, &self->vec_0x1B0) < lbl_8079A870;
+}
+
+/* 0x802D8414 (0x64): whether the AI companion is carrying a lit torch. */
+u32 ai_torch_ck(struct _AINPC_W* self)
+{
+    if (self->field_0x420 != 1) {
+        return 0;
+    }
+    if (fn_802D2B78(self, 2) != 0) {
+        return 0;
+    }
+    return self->field_0x422 > 0;
+}
+
+/* 0x802D868C (0x48): whether an event demo other than 26 is running, which stops the companion. */
+u32 ai_demo_stop_ck(void)
+{
+    if (event_demo_ck() == 0) {
+        return 0;
+    }
+    return get_demo_no() != 26;
+}
+
+namespace view_fn_802D0F34 {
+
+extern "C" {
+
+extern const f32 ai_npc_f32_0_7;
+
+/* 0x802D84D8 (0x78): the companion's per-frame move step - drift, sub-states, model and motion. */
+void ainpc_move(void)
+{
+    _AINPC_W* self = (_AINPC_W*)&::ainpc_w;
+
+    if (::ai_demo_stop_ck() == 1) {
+        return;
+    }
+    if (self->drift_active != 0) {
+        addVec3To(&self->pos_0x178, &self->drift_vel);
+        fn_802D15DC(self);
+        fn_802D1710(self);
+        fn_802D1FFC(self);
+        fn_800E0914(&self->model);
+    }
+    ::ai_npc_motion_dispatch((::_AINPC_W*)self);
+}
+
+/* 0x802D884C (0x110): hands the companion's held item to its partner and reports the item and count given. */
+void ai_npc_item_give(u16* item, s16* count)
+{
+    _AINPC_W* self = (_AINPC_W*)&::ainpc_w;
+
+    if (::ainpc_w.active == 0) {
+        return;
+    }
+    if (self->plw_0x16C == 0) {
+        return;
+    }
+    if (self->area != self->plw_0x16C->area_0x16) {
+        return;
+    }
+    self->field_0x461 = 0;
+    self->field_0x464 = ::pl_item_room_get(self->plw_0x16C, self->field_0x462, self->field_0x464);
+    if (self->field_0x464 == 0) {
+        ::pl_model_state_set(self->plw_0x16C, 2, 0x11, self->field_0x462);
+        *item = 0;
+        *count = 0;
+    } else {
+        ::ItemDataRecord* data;
+
+        ::pl_model_state_set(self->plw_0x16C, 2, 8, self->field_0x462);
+        *item = self->field_0x462;
+        data = ::GetItemData(self->field_0x462);
+        if (self->field_0x464 > data->max_num_0x003) {
+            self->field_0x464 = data->max_num_0x003;
+        }
+        *count = self->field_0x464;
+        fn_802D40EC(self, self->field_0x462, (s16)-self->field_0x464);
+    }
+}
+
+/* 0x802D92F8 (0xC0): books the gauge-ratio message (high, middle or low) on item page 2. */
+void fn_802D92F8(struct _AINPC_W* self)
+{
+    f32 ratio;
+
+    if (self->field_0x485 != 2) {
+        return;
+    }
+    ratio = (f32)self->gauge_0x1F0 / (f32)self->gauge_max_0x1F4;
+    if (ratio > ai_npc_f32_0_7) {
+        fn_802D9D30(self, 9, 6, 0, 2);
+    } else if (ratio > lbl_8079A7B4) {
+        fn_802D9D30(self, 9, 7, 0, 2);
+    } else {
+        fn_802D9D30(self, 9, 8, 0, 2);
+    }
+}
+
+}
+
+}  /* namespace view_fn_802D0F34 */
 
 /* One 0x20-byte entry of `ainpc_entry_tbl`: `ai_slots_clear` clears the sixteen of them with `fn_802DA200`. */
 struct AinpcEntry {

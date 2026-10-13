@@ -69,7 +69,7 @@ struct HitSlot {
 };
 
 struct _AINPC_W {
-    /* +0x000 */ u8 unused_0x000;
+    /* +0x000 */ u8 active;            /* non-zero while the record is in use */
     /* +0x001 */ u8 in_area;           /* set from `area_0x1A4 == get_now_areano()` */
     /* +0x002 */ u8 field_0x002;       /* set to 1 by the state setter; zero suppresses +0x3C */
     /* +0x003 */ u8 unused_0x003[0x004 - 0x003];
@@ -259,9 +259,10 @@ struct _AINPC_W {
     /* +0x469 */ u8 unused_0x469;
     /* +0x46A */ s16 field_0x46A;
     /* +0x46C */ u8 field_0x46C;
-    /* +0x46D */ u8 unused_0x46D[0x47C - 0x46D];
+    /* +0x46D */ u8 unused_0x46D[0x470 - 0x46D];
+    /* +0x470 */ nw4r::math::VEC3 drift_vel;  /* added to the position each frame while `drift_active` is set */
     /* +0x47C */ s16 field_0x47C;
-    /* +0x47E */ u8 field_0x47E;       /* non-zero arms +0x480 */
+    /* +0x47E */ u8 drift_active;      /* non-zero applies `drift_vel` (`ainpc_move`) and arms +0x480 */
     /* +0x47F */ u8 unused_0x47F;
     /* +0x480 */ s16 field_0x480;
     /* +0x482 */ u8 field_0x482;
