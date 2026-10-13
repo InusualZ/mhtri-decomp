@@ -413,6 +413,15 @@ def selftest() -> int:
                fc.pool_group_problems("U/u", {".sdata2": (16, 4)}, {".sdata2": (16, 4)}, pool_tgt, pool_tgt, fold), [])
         expect("a section the unit does not claim adds no line",
                fc.pool_group_problems("U/u", {".data": (16, 4)}, {".sdata2": (8, 4)}, pool_ours, pool_tgt, fold), [])
+        expect("a pool short only by alignment fill whose bytes equal the target's prefix adds no line",
+               fc.pool_group_problems("U/u", {".sdata2": (16, 4)}, {".sdata2": (8, 4)}, pool_ours, pool_tgt, fold,
+                                      padded={".sdata2": 8}), [])
+        pool_diff = write(tmp, "pool_diff.o", build_obj(
+            [(".sdata2", b"\1" * 8)], [("@1", 4, ".sdata2", 0x01, 0), ("@2", 4, ".sdata2", 0x01, 4)]))
+        got = fc.pool_group_problems("U/u", {".sdata2": (16, 4)}, {".sdata2": (8, 4)}, pool_diff, pool_tgt, fold,
+                                     padded={".sdata2": 8})
+        expect("a padded pool whose bytes differ from the target's prefix still gets the fold line",
+               (len(got), fold in got[0]), (1, True))
         seam_other = write(tmp, "seam_other.o", build_obj(
             [(".data", st)], [("lbl_str", 8, ".data", 0x11, 0)]))
         got = fc.data_seam_problems("U/u", ".data", seam_other, seam_tgt, seams, (0x1000, 0x1200))

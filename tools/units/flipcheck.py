@@ -284,22 +284,28 @@ def data_seam_problems(unit: str, name: str, ours_path: str, obj_path: str, seam
 
 
 def pool_group_problems(unit: str, claim: dict, ours: dict, src_path: str, obj_path: str,
-                        note: str | None = None) -> list[str]:
+                        note: str | None = None, padded: dict[str, int] | None = None) -> list[str]:
     """The pool-sharing explanation for a differing `.sdata2`/`.sdata`: our object holds a partial pool of a TU.
 
     MWCC emits one literal pool per TU and the linker does not merge pools (docs/pool-seams.md), so when the
     unit's pooled literals are also read by other registered units the target's pool is shared with them and ours
     can only be a part of it - the flip is blocked by the seam, not by the source.  `note` is `poolseams`' fold line
-    (None = look it up; nothing when the unit is in no group).  One line per differing pool section.
+    (None = look it up; nothing when the unit is in no group).  `padded` is `check`'s section -> our size where the
+    shortfall was judged alignment fill: such a section matches when our bytes equal the target's prefix.  One line
+    per differing pool section.
     """
     out = []
+    padded = padded or {}
     for name in (".sdata2", ".sdata"):
         if name not in claim:
             continue
         got = ours.get(name)
         mine, tgt = raw_section(src_path, name), raw_section(obj_path, name)
-        if got is not None and got[0] == claim[name][0] and mine is not None and tgt is not None and mine == tgt:
-            continue
+        if mine is not None and tgt is not None:
+            if got is not None and got[0] == claim[name][0] and mine == tgt:
+                continue
+            if name in padded and mine == tgt[:padded[name]]:
+                continue
         if note is None:
             note = poolseams.note_for_unit(MAIN, unit) or ""
         if note:
@@ -548,6 +554,26 @@ def row36_lines(unit: str, risks: list[tuple[str, int]], verbose: bool = False) 
     return out
 
 
+def anchored_sections(src_path: str) -> set[str]:
+    """The sections our object's own code/data reaches through MWCC's section anchor (`...data.0`: a local, 0-size
+    symbol at offset 0 that a relocation names with an addend; the code then indexes past it). The linker cannot
+    tell which bytes behind an anchor are used, so it keeps the whole section: no symbol in it can be deadstripped."""
+    elf = _elf(src_path)
+    if elf is None:
+        return set()
+    anchors = {s.name: s.section for s in elf.symbols
+               if s.name and s.name.startswith("...") and s.size == 0 and s.value == 0 and s.section}
+    if not anchors:
+        return set()
+    rows, _ = objcompare.reloc_rows(src_path)
+    out = set()
+    for section, relocs in (rows or {}).items():
+        if section.startswith(BOOKKEEPING_SECTIONS):
+            continue
+        out.update(anchors[sym] for _, sym, _, _ in relocs if sym in anchors)
+    return out
+
+
 def comment_trim_candidates(obj_path: str, src_path: str,
                             refs: set[str]) -> tuple[list[tuple[str, int]], int, bool]:
     """Row 36's judgement: `([(name, size)], exported symbols examined, both `.comment`s readable)`."""
@@ -555,6 +581,7 @@ def comment_trim_candidates(obj_path: str, src_path: str,
     ours = comment_symbols(src_path)
     if target is None or ours is None:
         return [], 0, False
+    anchored = anchored_sections(src_path)
     mine: dict[str, list[int]] = {}
     for entry in ours:
         mine.setdefault(entry["name"], []).append(entry["active_flags"])
@@ -576,6 +603,8 @@ def comment_trim_candidates(obj_path: str, src_path: str,
             continue                     # already exported
         if name in refs:
             continue                     # referenced from code/data somewhere: the linker keeps it
+        if entry["section"] in anchored:
+            continue                     # our own code reaches its section through the anchor: kept whole
         problems.append((name, entry["size"]))
     return problems, checked, True
 
@@ -630,7 +659,7 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
             problems += section_byte_problems(name, mine, tgt, src_path, obj_path)
             problems += data_seam_problems(unit, name, src_path, obj_path)
 
-    problems += pool_group_problems(unit, claim, ours, src_path, obj_path)
+    problems += pool_group_problems(unit, claim, ours, src_path, obj_path, padded=padded)
     problems += positioned_symbol_problems(claim, ours, src_path, obj_path)
 
     # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function
