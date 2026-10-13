@@ -262,7 +262,7 @@ extern s32 lbl_80792188[2]; /* 0x80792188 - the 8-byte id list (two zero-initial
                               * address it through r13 (`@sda21`, the target's form) instead of
                               * `lis`/`addi` (playbook: the absolute form comes from an unsized one) */
 extern s32 lbl_80792190[1]; /* 0x80792190 - the single-id sibling list `fn_8028738C` passes */
-extern s32 lbl_807921A8[2]; /* 0x807921A8 - the sibling list `fn_80288B98` passes */
+extern s32 lbl_807921A8[2]; /* 0x807921A8 - the sibling list `pl_act_attack_set` passes */
 
 /* One 18-byte per-shell-kind attack row: `mode` selects which half of the motion/parameter fields
  * applies. size: 0x12 */
@@ -272,7 +272,7 @@ typedef struct ShellAtkRow {
     /* +0x02 */ s16 value_0x02; /* second set: the motion's first argument */
     /* +0x04 */ s16 value_0x04; /* second set: the motion's second argument */
     /* +0x06 */ u16 add_0x06;   /* second set: frames added to the actor's own frame counters */
-    /* +0x08 */ s16 gate_0x08;  /* > 0 arms the motion gate (`fn_80277C50`) with this value */
+    /* +0x08 */ s16 gate_0x08;  /* > 0 arms the motion gate (`pl_act_set_motion_gate`) with this value */
     /* +0x0A */ u16 motion_0x0A;  /* first set: the motion `Pl_chr_set_attr_default` sets */
     /* +0x0C */ s16 param_0x0C;   /* first set: the motion's first argument */
     /* +0x0E */ s16 param_0x0E;   /* first set: the motion's second argument */
@@ -297,7 +297,7 @@ extern u8 lbl_805C9E4C[];
 extern u8 lbl_805C9EBC[];
 extern u8 lbl_805CA938[];
 extern u8 lbl_805CACC4[];
-/* The further attack tables of the band's single-shot entries (`fn_8028738C`, `fn_80288B98`). */
+/* The further attack tables of the band's single-shot entries (`fn_8028738C`, `pl_act_attack_set`). */
 extern u8 lbl_805CB0B0[];
 extern u8 lbl_805CBC80[];
 

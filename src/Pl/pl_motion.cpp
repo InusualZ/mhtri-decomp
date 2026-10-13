@@ -4,12 +4,16 @@
  * RANGE. .text 0x80288CEC-0x8028F44C (74 functions); .ctors 0x8056F36C, .data 0x805CBFC0-0x805CDC44, .bss
  *   0x806AB830-0x806AB848, .sdata 0x807921B0-0x80792270, .sbss 0x80794B38-0x80794B58, .sdata2 0x8079A270-0x8079A310,
  *   extab, extabindex.  Left seam: the unit's `.sdata2` run starts with `fn_80288CEC`'s first constant
- *   (`lbl_8079A270` = 0.0f) where the preceding unit's run ends.  `Pl/pl_hit_sphere.cpp` follows it.
+ *   (`pl_motion_f32_zero` = 0.0f) where the preceding unit's run ends.  `Pl/pl_hit_sphere.cpp` follows it.
  * NAMES. The file name is a GUESS from the motion-step entry points (`fn_80288CEC` steps the player's motion,
  *   `pl_motion_set` loads the motion resources); `pl_motion_set` and `get_gm_daynight` are the map's names.  The root
  *   work `get_move_work_adrs(0)` hands back is `_PL_ROOT` (`Pl/fn_80288CEC.h`), the record `enemy/em_common.cpp`
  *   defines again as `_PLAYER_ROOT` (rule 1).
  *   GUESS (from each body and its callers): quest_spawn_rec_find, quest_spawn_rec_find_in, quest_move_sub_flag_get
+ *   GUESS (from the dispatch chain, `Pl/pl_act_class3.cpp`'s scheme): pl_act_class7_dispatch (0x8028B330, the
+ *   `field_0x002` class-7 dispatcher on `act_no`) and pl_act_class7_handler_00..26 (0x80288E68-0x8028B298, address
+ *   order); pl_act_class7_handler_NN_rows (`PlMotionRow` tables) and pl_act_class7_handler_NN_steps (step tables)
+ *   name the handler that reads them; pl_motion_f32_<value> the `.sdata2` constants
  * RESIDUALS. 53 functions unwritten (objdiff scores them 0) in 6 runs: 0x80288E68-0x8028BCF4, 0x8028BD98-0x8028C570,
  *   0x8028C5B4-0x8028D574, 0x8028D5F4-0x8028DF24, 0x8028DF58-0x8028E4F0, 0x8028E528-0x8028EF30; most are jump-table
  *   state machines of 100-450 instructions, and `pl_motion_set` needs the local string-object shape.  4 partial,

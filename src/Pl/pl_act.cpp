@@ -31,6 +31,11 @@
  *   pl_act_gauge_step_unlatched, pl_act_gauge_step_signed, pl_act_held_ck, pl_ground_probe_ahead,
  *   pl_stg_weapon_near_find
  *   GUESS (field, from its menu reader `fn_80316978`): `PlSkillRec::slot_count` (`Pl/fn_8027D684.h`)
+ *   GUESS (from each body and its menu/lobby callers): item_kind_name_get, skill_name_get (the system string
+ *   table's +0x94/+0x90 lists), item_species_class_get, armor_color_rgba_get and armor_color_table (the 3-byte
+ *   palette the armour colour index picks), equip_color_table, equip_custom_color_rgba_get (the piece's own RGB565
+ *   word at +0x04), equip_level_max_ck, pl_act_set_motion_gate (+0x45A), pl_act_add_class7_gauge (+0x384, class 7
+ *   only), pl_act_timer_step (+0x445)
  * RESIDUALS. 122 functions unwritten (objdiff scores them 0) in 18 runs: 0x802695A4-0x80269998, 0x80269AC4-0x8026A00C,
  *   0x8026A0D4-0x8026A224, 0x8026A248-0x8026A2BC, 0x8026A3A8-0x8026A4E4, 0x8026A5A4-0x8026A618, 0x8026A738-0x8026BA04,
  *   0x80274B20-0x80274B5C, 0x8027D7EC-0x8027D874, 0x8027D8A0-0x8027DC64, 0x8027E120-0x8027E1B8, 0x8027E404-0x8027E918,
@@ -118,7 +123,7 @@
  *  - a 32-bit accumulator that retail sign-extends only at each compare is an `s32` with `b = (s16)(b + N)` on the
  *    arms that convert and `a -= b` for the difference (`fn_80279490`, `fn_802791FC`, `pl_carry_item_get`);
  *  - equality on a `u16`/`u8` value pairs as `cmpwi` through a signed local or cast (`s32 id = self->act_no`,
- *    `(s32)(u8)x`, `(s32)arg0 == N`) and `(u32)` on an `s32` helper gives `cmplwi` (`fn_8027C8B4`, `fn_802789EC`);
+ *    `(s32)(u8)x`, `(s32)arg0 == N`) and `(u32)` on an `s32` helper gives `cmplwi` (`pl_act_add_class7_gauge`, `fn_802789EC`);
  *  - `x <= N ? 1 : 2` gives retail's `xoris/subfic/addc/subfe/addi` and `x == N ? a : b` its `addi/subfic/nor/srawi`
  *    (`Get_Shell_bure_type`, `fn_802791FC`, `fn_80279490`); a constant before the index (`lbl + k + idx * 4`) makes
  *    MWCC form the base first;
@@ -5895,7 +5900,7 @@ extern "C" void pl_act_set_step_time(_PLW* self, s16 arg1)
 }
 
 /* 0x80277C50 */
-extern "C" void fn_80277C50(_PLW* self, s16 arg1)
+extern "C" void pl_act_set_motion_gate(_PLW* self, s16 arg1)
 {
     self->field_0x45A = arg1;
 }
@@ -6790,7 +6795,7 @@ extern "C" void pl_pos_blend_start(_PLW* self, s32 arg1)
 
 /* 0x8027C8B4: applies a signed charge delta to the actor's attack-range counter, with the two
  * charge skills scaling a positive delta. */
-extern "C" void fn_8027C8B4(_PLW* self, s32 arg1)
+extern "C" void pl_act_add_class7_gauge(_PLW* self, s32 arg1)
 {
     if (self->field_0x002 != 7) {
         return;
@@ -9403,7 +9408,7 @@ extern "C" s32 Pl_timer_0x460_ck(_PLW* self) {
 }
 
 /* Advances the 0-100 counter at +0x445 and saturates it. */
-extern "C" void fn_8027E048(_PLW* self) {
+extern "C" void pl_act_timer_step(_PLW* self) {
     if (++self->field_0x445 >= 0x64U) {
         self->field_0x445 = 0x64U;
     }

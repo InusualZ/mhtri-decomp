@@ -33,6 +33,26 @@ void fn_80283E80(struct _PLW* self);
 void fn_80283F24(struct _PLW* self);
 void fn_80283FC8(struct _PLW* self, u32 arg);
 
+/* One row of a class-7 handler's motion-row table (`pl_act_class7_handler_04_rows` and its siblings): a plain
+ * motion with its two set-up values, then the motion the step table drives with its two values and the attack
+ * entry it arms.  size: 0xE (the handlers index the table with `mulli r6,r31,14`; every field is 2-byte
+ * aligned). */
+typedef struct PlMotionRow {
+    /* +0x0 */ u16 motion;       /* 0xFFFF: no plain motion, the row goes straight to its step half */
+    /* +0x2 */ s16 motion_a;
+    /* +0x4 */ s16 motion_b;
+    /* +0x6 */ u16 step_motion;
+    /* +0x8 */ s16 step_motion_a;
+    /* +0xA */ s16 step_motion_b;
+    /* +0xC */ s16 attack;       /* the attack value `pl_act_attack_set` arms (0: none) */
+} PlMotionRow;
+
+/* 0x80288B98 (0x94): builds the actor's own attack entry from a signed attack value; `kind` picks the flag pair. */
+void pl_act_attack_set(struct _PLW* self, s16 value, u8 kind);
+/* 0x80288C2C (0xC0): applies one motion row: its plain motion, or (`mode` 1, or a row without one) its step motion
+ * with `step_table` and its attack entry; `mode` 0 on the step half also advances the act step byte (+0x05). */
+void pl_act_motion_row_apply(struct _PLW* self, u8 mode, const PlMotionRow* row, u32 step_table);
+
 #ifdef __cplusplus
 }
 #endif

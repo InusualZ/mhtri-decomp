@@ -20,6 +20,10 @@ u16 rand_lcg_step(u16 value);
 
 /* 0x800D2EA4 - the string table's course-name entry `id` (its +0xFC list; GUESS name). */
 u32 str_tbl_course_get(u32 id);
+/* 0x800D2E68 / 0x800D2EE0 - the string table's skill-name entry `id` (its +0x90 list) and item-kind-name entry
+ * `id` (its +0x94 list; GUESS names). */
+u32 str_tbl_skill_get(u32 id);
+u32 str_tbl_item_kind_get(u32 id);
 
 /* 0x800D2F1C - steps the system's two stream counters (GUESS name). */
 void system_stream_count_step(void);

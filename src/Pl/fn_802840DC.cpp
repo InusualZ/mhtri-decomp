@@ -5,6 +5,8 @@
  *   .sdata2 0x8079A1D8-0x8079A270, extab, extabindex.
  * NAMES. The file and functions keep the map's stems (no `__FILE__` string covers the band; the runtime dump answers
  *   placeholders).
+ *   GUESS (from each body and its class-7 callers): pl_act_attack_set, pl_act_motion_row_apply and its row type
+ *   PlMotionRow (`Pl/fn_802840DC.h`)
  * RESIDUALS. 41 functions unwritten (objdiff scores them 0) in 5 runs: 0x802844B0-0x80284780, 0x802849F0-0x80286BF0,
  *   0x80286DF8-0x8028732C, 0x802873D4-0x80288B98, 0x80288C2C-0x80288CEC.  `fn_802872E4` waits for its two `_PLW`
  *   fields (`unk269`/`unk276`), whose meaning the band does not establish.
@@ -200,7 +202,7 @@ void fn_802842D4(_PLW* self, u8 kind, ShellAtkRow* row, u32 table)
         fn_80284204(self, attack, 0);
     }
     if (row->gate_0x08 > 0) {
-        fn_80277C50(self, row->gate_0x08);
+        pl_act_set_motion_gate(self, row->gate_0x08);
     }
 }
 
@@ -396,7 +398,7 @@ void fn_80286CF4(_PLW* self, s32 kind)
 
 /* Builds the actor's own attack entry from a signed attack value and the row's flag pair, the kind
  * selecting which pair (`fn_80284204`'s shape with the row's own flag set). */
-void fn_80288B98(_PLW* self, s16 value, u8 kind)
+void pl_act_attack_set(_PLW* self, s16 value, u8 kind)
 {
     u16 index;
     u16 flags;

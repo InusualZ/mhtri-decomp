@@ -24,7 +24,10 @@ u8 fn_802738B8(u8 idx);
 void fn_802738E8(struct _PLW* plw, u8* rec);
 void fn_80273998(struct _PLW* plw, u8 idx, s32 val);
 void fn_802754B4(struct _PLW* plw);
-void fn_8027EB18(u8 kind);
+/* 0x8027EB18 (0x18): the string-table name of item kind `kind` (kind 85 and up read as 0). */
+u32 item_kind_name_get(u8 kind);
+/* 0x8027F0F4 (0x28): the class byte (+0x00) of the species record `id` selects. */
+u8 item_species_class_get(u16 id);
 u32 fn_8027E120(struct _PLW* worker);
 /* untyped: the equipment-slot record the caller casts to its own view */
 void* fn_8027E354(u8 kind, u16 index);
@@ -71,7 +74,7 @@ s32 fn_8027A340(struct _PLW* self);
 void fn_8027A57C(struct _PLW* self, u16 a, u8 b);
 void pl_act_clear_mode5c4(struct _PLW* self);
 void fn_80277BC4(struct _PLW* self, u8 flag);
-void fn_80277C50(struct _PLW* self, s16 value);
+void pl_act_set_motion_gate(struct _PLW* self, s16 value);
 void pl_act_arm_flags(struct _PLW* self, u32 value);
 void fn_80276CE8(struct _PLW* self, s16 value);
 
@@ -107,8 +110,18 @@ void fn_8027B0BC(struct _PLW* self);
 void fn_8027B358(struct _PLW* self);
 void fn_8027B918(struct _PLW* self);
 
+/* 0x8027C8B4 (0x150): adds a signed delta to the class-7 actor's 0..100 gauge (+0x384), the two charge skills
+ * scaling a positive delta. */
+void pl_act_add_class7_gauge(struct _PLW* self, s32 delta);
+/* 0x8027E048 (0x24): advances the act timer byte (+0x445), saturating at 100. */
+void pl_act_timer_step(struct _PLW* self);
+
 #ifdef __cplusplus
 }
+
+/* 0x8027CF78 (0x48): starts an afterimage trail on the actor's current motion; defined at C++ scope, so this is
+ * the callable spelling of the map name `Pl_zanzo_set__FP4_PLWlUc` (rule 9). */
+void Pl_zanzo_set(struct _PLW* self, s32 duration, u8 kind);
 
 u32 Pl_condition_ck(struct _PLW* work, u32 condition);    /* -> Pl_condition_ck__FP4_PLWUl */
 u32 Pl_dm_condition_ck(struct _PLW* work, u32 condition); /* -> Pl_dm_condition_ck__FP4_PLWUl */

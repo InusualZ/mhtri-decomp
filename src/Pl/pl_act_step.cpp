@@ -1205,7 +1205,7 @@ void fn_8024A248(_PLW* self, s32 arg1) {
         } else {
             fn_80277BC4(self, 1);
         }
-        fn_80277C50(self, 0);
+        pl_act_set_motion_gate(self, 0);
         fn_80276B58(self, -0x96);
         fn_8027A17C(self);
         pl_act_set_flag(self, 0x1000);

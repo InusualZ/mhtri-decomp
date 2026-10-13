@@ -6,7 +6,7 @@
  *   `fn_8034EE18` (0x320 B) switches on `_PLW::act_no` (`act_no <= 0x43`, `jumptable_805E9AD8`) and tail-calls the
  *   handlers with a (variant, arg) pair; its only caller is `Pl/pl_act_step.cpp`'s `fn_8025DE38` (`b fn_8034EE18` at
  *   0x8025DEB0), whose `jumptable_805C5648` picks one dispatcher per `field_0x002`: 0 `fn_802829B4`, 1 `fn_802840DC`,
- *   2 `fn_80286DF8`, 3 `fn_8034EE18`, 4-6 `fn_80288848`, 7 `fn_8028B330`, 8 `Pl_act_frame_dispatch`.
+ *   2 `fn_80286DF8`, 3 `fn_8034EE18`, 4-6 `fn_80288848`, 7 `pl_act_class7_dispatch`, 8 `Pl_act_frame_dispatch`.
  *   Left seam 0x8034D2B0: the `extabindex` run (`fn_8034CDDC` is the menu unit's last record), the `.sdata2` run
  *   (0x8079B3A0 is the menu unit's last word) and the callee set all break there.  Right seam 0x8034F138:
  *   `em024_action11_state5_ck` reads `_ENEMY_WORK` and its only caller (`camera/camera_main.cpp`'s `camera_kill_cut_start`)

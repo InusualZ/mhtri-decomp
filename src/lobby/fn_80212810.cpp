@@ -49,7 +49,7 @@ u8 equip_kind_table_class(u8 id);
 void* fn_8027EC50(u8 id, u16 sel);
 void* fn_8027E2A8(u8 id, u16 sel);
 void* fn_8027E344(u8 id);
-u8 fn_8027F0F4(u16 id);
+u8 item_species_class_get(u16 id);
 }
 
 /* The record `fn_8027EC50` returns: the item-kind byte the table is compared against and its signed
@@ -212,17 +212,17 @@ s32 fn_80212A2C(s32 kind, s32 arg)
     case 0:
         return 1;
     case 11:
-        if (fn_8027F0F4((u16)arg) == 1) {
+        if (item_species_class_get((u16)arg) == 1) {
             return 1;
         }
         break;
     case 12:
-        if (fn_8027F0F4((u16)arg) == 2) {
+        if (item_species_class_get((u16)arg) == 2) {
             return 1;
         }
         break;
     case 13:
-        if (fn_8027F0F4((u16)arg) == 3) {
+        if (item_species_class_get((u16)arg) == 3) {
             return 1;
         }
         break;

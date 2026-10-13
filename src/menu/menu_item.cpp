@@ -1176,7 +1176,7 @@ u32 ItemExp(u16 id)
 /* 0x8029F680: reports an item's species kind to the caller, through the species table's +0x08 byte. */
 extern "C" void fn_8029F680(u16 id)
 {
-    fn_8027EB18(fn_8029F6B4(GetItemData(id)->species)->kind);
+    item_kind_name_get(fn_8029F6B4(GetItemData(id)->species)->kind);
 }
 
 /* 0x8029F6B4: the species record an item's +0x00A id selects; entry 0 when out of the 132-entry table. */

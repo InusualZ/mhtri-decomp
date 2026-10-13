@@ -19,6 +19,8 @@
  *   `BTM_IsDeviceUp` at four of these addresses contradict the one-byte bodies).
  *   GUESS (from each body and its callers): rand_lcg_step
  *   GUESS (from its body and its kitchen caller): str_tbl_course_get
+ *   GUESS (from each body and its menu callers): str_tbl_skill_get (+0x90, read by the skill-status page),
+ *   str_tbl_item_kind_get (+0x94, read through Pl's item_kind_name_get)
  *   GUESS (from each body and its callers): system_stream_count_step, system_scene_reset, system_full_reset
  *   GUESS: `monster_size_value_get` (0x800CEE74, from its body and its quest-result caller).
  * RESIDUALS. 54 rows unwritten in 23 runs (and `TPLtexLoad`, written, at 0 %: ours emits the plain `TPLtexLoad`
@@ -302,7 +304,7 @@ void fn_800D2D44(void) {
 }
 
 /* 0x800D2E68/0x800D2EA4/0x800D2EE0 - the three message-table lookups. */
-u32 fn_800D2E68(u32 id) {
+u32 str_tbl_skill_get(u32 id) {
     return ((StrTbl*)get_str_tbl_ptr())->field_0x90[(u16)id];
 }
 
@@ -310,7 +312,7 @@ u32 str_tbl_course_get(u32 id) {
     return ((StrTbl*)get_str_tbl_ptr())->field_0xfc[(u16)id];
 }
 
-u32 fn_800D2EE0(u32 id) {
+u32 str_tbl_item_kind_get(u32 id) {
     return ((StrTbl*)get_str_tbl_ptr())->field_0x94[(u16)id];
 }
 
