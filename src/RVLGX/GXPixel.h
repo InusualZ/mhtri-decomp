@@ -18,7 +18,10 @@ typedef struct GXFogAdjTable {
     /* +0x00 */ u16 r[10];
 } GXFogAdjTable;
 
+void GXInitFogAdjTable(GXFogAdjTable* table, u16 width, const f32 projmtx[4][4]);
 void GXSetFogRangeAdj(u8 enable, u16 center, const GXFogAdjTable* table);
+void GXSetPixelFmt(s32 pix_fmt, s32 z_fmt);
+void GXSetFieldMode(u8 field_mode, u8 half_aspect);
 void GXSetFieldMask(u32 odd_mask, u32 even_mask);
 void GXSetBlendMode(u32 type, u32 src_factor, u32 dst_factor, u32 op);
 void GXSetZMode(u8 compare_enable, u32 func, u8 update_enable);
