@@ -255,9 +255,9 @@ extern void* lbl_80794A20;
 extern u8 lbl_80790E20;
 extern char lbl_8057C82C[];
 extern char lbl_8057C850[];
-extern GXRenderModeObj lbl_8061A9C0;
-extern GXRenderModeObj lbl_8061A9FC;
-extern GXRenderModeObj lbl_8061AA74;
+extern GXRenderModeObj GXNtsc480IntDf;
+extern GXRenderModeObj GXNtsc480ProgSoft;
+extern GXRenderModeObj GXPal528IntDf;
 
 /* --- the SDK and runtime entry points this unit's init/video helpers call --- */
 extern "C" void* OSGetMEM1ArenaLo(void);
@@ -274,7 +274,7 @@ extern "C" void fn_804E8D40(void);
 extern "C" u32 VIGetTvFormat(void);
 extern "C" void OSPanic(const char* file, int line, const char* msg, ...);
 extern "C" void OSReport(const char* fmt, ...);
-extern "C" void fn_804B6C00(void* src, void* dst, u32 offset, u32 size);
+extern "C" void GXAdjustForOverscan(void* src, void* dst, u32 offset, u32 size);
 extern "C" void render_mode_copy(GXRenderModeObj* dst, GXRenderModeObj* src);
 extern "C" u32 GXInit(void* base, u32 size);
 extern "C" void GXSetViewportJitter(f32, f32, f32, f32, f32, f32);
@@ -284,12 +284,12 @@ extern "C" void GXSetScissor(u32, u32, u32, u32);
 extern "C" void GXSetCopyClear(GXColor clr, u32 mask);
 extern "C" void GXSetDispCopySrc(u32, u32, u32, u32);
 extern "C" void GXSetDispCopyDst(u32, u32);
-extern "C" void fn_804B6F70(u32, u32);
+extern "C" void GXGetYScaleFactor(u32, u32);
 extern "C" void GXSetDispCopyYScale(void);
 extern "C" void GXSetCopyFilter(u8 aa, u8* pattern, u32 enable, u8* filter);
 extern "C" void GXSetDispCopyGamma(u32);
 extern "C" void GXSetPixelFmt(u32, u32);
-extern "C" void fn_804B7500(void* fb, u32);
+extern "C" void GXCopyDisp(void* fb, u32);
 extern "C" void GXDrawDone(void);
 extern "C" void fn_804B64B0(void*);
 extern "C" void VIConfigure(void*);
@@ -607,8 +607,8 @@ extern "C" void fn_8003F730(s32 arg)
         Rmode = (GXRenderModeObj*)_f_bss;
     } else if (lbl_80794780 == 1 && lbl_80794785 == 1) {
         lbl_80794784 = 0;
-        Rmode = &lbl_8061A9FC;
-        fn_804B6C00(&lbl_8061A9FC, _f_bss, 0, 16);
+        Rmode = &GXNtsc480ProgSoft;
+        GXAdjustForOverscan(&GXNtsc480ProgSoft, _f_bss, 0, 16);
         if (lbl_80794783 != 0) {
             *(u32*)_f_bss = 22;
         }
@@ -616,22 +616,22 @@ extern "C" void fn_8003F730(s32 arg)
         switch (lbl_80794783) {
         case 0:
             lbl_80794784 = 0;
-            Rmode = &lbl_8061A9C0;
-            fn_804B6C00(&lbl_8061A9C0, _f_bss, 0, 16);
+            Rmode = &GXNtsc480IntDf;
+            GXAdjustForOverscan(&GXNtsc480IntDf, _f_bss, 0, 16);
             break;
         case 5:
             lbl_80794784 = 0;
-            Rmode = &lbl_8061A9C0;
-            fn_804B6C00(&lbl_8061A9C0, _f_bss, 0, 16);
+            Rmode = &GXNtsc480IntDf;
+            GXAdjustForOverscan(&GXNtsc480IntDf, _f_bss, 0, 16);
             *(u32*)_f_bss = 20;
             break;
         case 1:
             lbl_80794784 = 1;
-            Rmode = &lbl_8061AA74;
-            fn_804B6C00(&lbl_8061AA74, _f_bss, 0, 40);
-            ((GXRenderModeObj*)_f_bss)->xfbHeight = lbl_8061AA74.xfbHeight;
-            ((GXRenderModeObj*)_f_bss)->viYOrigin = lbl_8061AA74.viYOrigin;
-            ((GXRenderModeObj*)_f_bss)->viHeight = lbl_8061AA74.viHeight;
+            Rmode = &GXPal528IntDf;
+            GXAdjustForOverscan(&GXPal528IntDf, _f_bss, 0, 40);
+            ((GXRenderModeObj*)_f_bss)->xfbHeight = GXPal528IntDf.xfbHeight;
+            ((GXRenderModeObj*)_f_bss)->viYOrigin = GXPal528IntDf.viYOrigin;
+            ((GXRenderModeObj*)_f_bss)->viHeight = GXPal528IntDf.viHeight;
             break;
         default:
             OSPanic(_f_data, 749, lbl_8057C82C);
@@ -665,24 +665,24 @@ extern "C" void fn_8003F9E4(u32 arg)
         return;
     }
     if (lbl_80794780 == 1) {
-        fn_804B6C00(&lbl_8061A9FC, &mode, 0, 16);
+        GXAdjustForOverscan(&GXNtsc480ProgSoft, &mode, 0, 16);
         if (lbl_80794783 != 0) {
             *(u32*)&mode = 22;
         }
     } else {
         switch (lbl_80794783) {
         case 0:
-            fn_804B6C00(&lbl_8061A9C0, &mode, 0, 16);
+            GXAdjustForOverscan(&GXNtsc480IntDf, &mode, 0, 16);
             break;
         case 5:
-            fn_804B6C00(&lbl_8061A9C0, &mode, 0, 16);
+            GXAdjustForOverscan(&GXNtsc480IntDf, &mode, 0, 16);
             *(u32*)&mode = 20;
             break;
         case 1:
-            fn_804B6C00(&lbl_8061AA74, &mode, 0, 40);
-            mode.xfbHeight = lbl_8061AA74.xfbHeight;
-            mode.viYOrigin = lbl_8061AA74.viYOrigin;
-            mode.viHeight = lbl_8061AA74.viHeight;
+            GXAdjustForOverscan(&GXPal528IntDf, &mode, 0, 40);
+            mode.xfbHeight = GXPal528IntDf.xfbHeight;
+            mode.viYOrigin = GXPal528IntDf.viYOrigin;
+            mode.viHeight = GXPal528IntDf.viHeight;
             break;
         default:
             return;
@@ -823,9 +823,9 @@ extern "C" void fn_8003FCCC(void)
     } else {
         GXSetPixelFmt(0, 0);
     }
-    fn_804B7500(lbl_80794770[0], 1);
-    fn_804B7500(lbl_80794770[0], 0);
-    fn_804B7500(lbl_80794770[1], 0);
+    GXCopyDisp(lbl_80794770[0], 1);
+    GXCopyDisp(lbl_80794770[0], 0);
+    GXCopyDisp(lbl_80794770[1], 0);
     GXDrawDone();
 }
 
@@ -846,7 +846,7 @@ extern "C" void fn_8003FE24(void)
  * field if the mode is interlaced. */
 extern "C" void fn_8003FE30(void)
 {
-    fn_804B6F70(Rmode->efbHeight, Rmode->xfbHeight);
+    GXGetYScaleFactor(Rmode->efbHeight, Rmode->xfbHeight);
     GXSetDispCopyYScale();
     VIConfigure(Rmode);
     VISetNextFrameBuffer(lbl_80794770[lbl_8079477C]);
@@ -894,7 +894,7 @@ extern "C" void fn_8003FF98(void)
     }
     GXSetCopyFilter(Rmode->aa, Rmode->sample_pattern[0], 1, filter);
 
-    fn_804B7500(lbl_80794778, 1);
+    GXCopyDisp(lbl_80794778, 1);
     GXSetCopyFilter(Rmode->aa, Rmode->sample_pattern[0], 1, Rmode->vfilter);
     GXDrawDone();
 }

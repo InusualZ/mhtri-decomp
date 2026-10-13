@@ -42,7 +42,7 @@
  *     `__cvt_fp2unsigned`, `lbl_8058E8E8`, `lbl_8058E91C`, `lbl_8058EA90`, `lbl_8058EA64`, `lbl_8058EA50`,
  *     `lbl_8058EA30`, `lbl_8058EA20`, `lbl_8058E9F4`, `lbl_8058EAC8`, `lbl_8058EAA0`, `lbl_8058EAD8`,
  *     `lbl_80795E28`, `lbl_8058EAE8`, `lbl_8058EB08`, `fn_80502678`, `Enable__Q34nw4r2ut2LCFv`, `fn_805026D8`,
- *     `Disable__Q34nw4r2ut2LCFv`, `lbl_8061A9C0`, `lbl_8061AA74`, `lbl_8058ED90`, `lbl_8058ED64`, `lbl_8058ED38`.
+ *     `Disable__Q34nw4r2ut2LCFv`, `GXNtsc480IntDf`, `GXPal528IntDf`, `lbl_8058ED90`, `lbl_8058ED64`, `lbl_8058ED38`.
  *   ScnLeaf's destructor is complete with an empty body (the compiler emits the base call and the deleting tail).
  * SHAPES. The CopiedMatResources constructor is complete: its work is the member initialisers.  The material
  *   resource constructors keep `#pragma peephole off` (retail keeps `clrlwi` + `cmpwi` for the alignment test).
@@ -135,8 +135,8 @@ extern const char lbl_8058ECF8[];
 extern u32 lbl_8058ED38;
 extern const char lbl_8058ED64[];
 extern const char lbl_8058ED90[];
-extern u32 lbl_8061A9C0;
-extern u32 lbl_8061AA74;
+extern u32 GXNtsc480IntDf;
+extern u32 GXPal528IntDf;
 extern u32 lbl_807911E0;
 extern u32 lbl_807911E4;
 extern u32 lbl_807911E8;
@@ -219,16 +219,16 @@ s32 fn_80099BB0(void*);
 u32 fn_8009AB48(u32);
 s32 fn_800D79B4(s32, s32, s32, s32);
 f32 powf(f32 x, f32 y);
-u32 fn_804B7800(s32);
-u32 fn_804B7810(s32);
-u32 fn_804B7820(s32);
-u32 fn_804B79C0(s32);
-u32 fn_804B7A90(s32);
-u32 fn_804B7AA0(s32, s32, s32);
-u32 fn_804B7AE0(s32, s32, s32);
-u32 fn_804B7B10(void*, f32, f32, f32);
-u32 fn_804B7C20(s32, void*);
-u32 fn_804B7C30(s32);
+u32 GXInitLightAttnA(s32);
+u32 GXInitLightAttnK(s32);
+u32 GXInitLightSpot(s32);
+u32 GXInitLightDistAttn(s32);
+u32 GXInitLightPos(s32);
+u32 GXGetLightPos(s32, s32, s32);
+u32 GXGetLightDir(s32, s32, s32);
+u32 GXInitSpecularDir(void*, f32, f32, f32);
+u32 GXInitLightColor(s32, void*);
+u32 GXGetLightColor(s32);
 u32 GXInitFogAdjTable(void*, u16, s32);
 u32 fn_804C6900(f32, f32, f32, f32, f32, f32);
 u32 fn_804C69A0(f32, f32, f32, f32);
@@ -2358,9 +2358,9 @@ void fn_8007A400(s32 arg0) {
         nw4r::ut::LC::Disable();
     }
     fn_8007A468(0);
-    var_r3 = (u32 *)(&lbl_8061A9C0);
+    var_r3 = (u32 *)(&GXNtsc480IntDf);
     if (VIGetTvFormat() == 1U) {
-        var_r3 = (u32 *)(&lbl_8061AA74);
+        var_r3 = (u32 *)(&GXPal528IntDf);
     }
     fn_80088574((void*)(var_r3));
 }
@@ -2412,11 +2412,11 @@ u32 fn_8007A578(s32 arg0, s32 *arg1) {
     s32 sp8;
 
     sp8 = *arg1;
-    fn_804B7C20((s32)(arg0 + 4), (void*)(&sp8));
+    GXInitLightColor((s32)(arg0 + 4), (void*)(&sp8));
 }
 
 u32 fn_8007A5A8(s32 *arg0, void* a1, void* a2, void* a3) {
-    fn_804B7A90((s32)(arg0 + 4));
+    GXInitLightPos((s32)(arg0 + 4));
     *arg0 &= 0xFFFFFFFD;
 }
 
@@ -2426,22 +2426,22 @@ u32 fn_8007A5E4(s32 *arg0, void* a1, void* a2, void* a3) {
 }
 
 u32 fn_8007A624(s32 *arg0, void* a1, void* a2) {
-    fn_804B7820((s32)(arg0 + 4));
+    GXInitLightSpot((s32)(arg0 + 4));
     *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
 }
 
 void fn_8007A664(s32 *arg0) {
-    fn_804B7800((s32)(arg0 + 4));
+    GXInitLightAttnA((s32)(arg0 + 4));
     *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
 }
 
 u32 fn_8007A6A4(s32 *arg0, void* a1, void* a2, void* a3) {
-    fn_804B79C0((s32)(arg0 + 4));
+    GXInitLightDistAttn((s32)(arg0 + 4));
     *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
 }
 
 void fn_8007A6E4(s32 *arg0) {
-    fn_804B7810((s32)(arg0 + 4));
+    GXInitLightAttnK((s32)(arg0 + 4));
     *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
 }
 
@@ -2460,19 +2460,19 @@ u32 fn_8007A768(s32 *arg0, f32 farg0) {
 
 u32 fn_8007A7C8(s32 arg0, s32 arg1) {
     if (arg1 != 0) {
-        fn_804B7AA0((s32)(arg0 + 4), (s32)(arg1 + 4), (s32)(arg1 + 8));
+        GXGetLightPos((s32)(arg0 + 4), (s32)(arg1 + 4), (s32)(arg1 + 8));
     }
 }
 
 u32 fn_8007A7E4(s32 arg0, s32 arg1) {
     if (arg1 != 0) {
-        fn_804B7AE0((s32)(arg0 + 4), (s32)(arg1 + 4), (s32)(arg1 + 8));
+        GXGetLightDir((s32)(arg0 + 4), (s32)(arg1 + 4), (s32)(arg1 + 8));
     }
 }
 
 void fn_8007A800(s32 arg0, s32 arg1) {
     if (arg1 != 0) {
-        fn_804B7C30((s32)(arg0 + 4));
+        GXGetLightColor((s32)(arg0 + 4));
     }
 }
 

@@ -28,6 +28,8 @@ void GXLoadTexObj(const GXTexObj* obj, u32 id);
 /* untyped: byte range - the lookup table's entries */
 void GXInitTlutObj(GXTlutObj* obj, void* lut, u32 format, u16 entries);
 void GXLoadTlut(const GXTlutObj* obj, u32 id);
+/* 0x804B7F60 - computes the row, column and total tile counts of a `wd` x `ht` image in format `fmt`. */
+void __GetImageTileCount(s32 fmt, u16 wd, u16 ht, u32* rowTiles, u32* colTiles, u32* cmpTiles);
 
 #ifdef __cplusplus
 }

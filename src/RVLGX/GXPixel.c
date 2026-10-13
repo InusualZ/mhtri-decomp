@@ -29,9 +29,6 @@
 #define GX_BM_LOGIC 2
 #define GX_BM_SUBTRACT 3
 
-/* Inserts `value` into bits `first`..`last` (bit 0 is the most significant) of the register word `word`. */
-#define GX_SET_REG(word, value, first, last) ((word) = __rlwimi((word), (value), 31 - (last), (first), (last)))
-
 /* The pixel-engine format each `GXPixelFmt` selects; the three multisample formats share format 4. */
 u32 p2f[8] = {0, 1, 2, 3, 4, 4, 4, 5};
 

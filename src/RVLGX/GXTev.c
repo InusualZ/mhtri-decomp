@@ -23,9 +23,6 @@
 #include "RVLGX/GXTev.h"
 #include "RVLGX/GXInit.h"
 
-/* Inserts `value` into bits `first`..`last` of `word` (bit 0 is the most significant), as one `rlwimi`. */
-#define GX_SET_REG(word, value, first, last) ((word) = __rlwimi((word), (value), 31 - (last), (first), (last)))
-
 /* The TEV colour register's red/alpha word (BP 0xE0 + 2 * id). size: 0x4 */
 typedef union GXTevColorRegA {
     u32 word; /* +0x0 */

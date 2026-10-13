@@ -7,6 +7,9 @@
 #include "types.h"
 #include "gx.h"
 
+/* Inserts `value` into bits `first`..`last` of `word` (bit 0 is the most significant), as one `rlwimi`. */
+#define GX_SET_REG(word, value, first, last) ((word) = __rlwimi((word), (value), 31 - (last), (first), (last)))
+
 /* A `GXColor` read as one word: red in bits 31..24, green 23..16, blue 15..8, alpha 7..0. size: 0x4 */
 typedef union GXColorWord {
     GXColor color; /* +0x0 */
@@ -254,9 +257,70 @@ typedef union GXGenModeReg {
         /* +0x0, bits 15..14 */ u32 pad_1: 2;
         /* +0x0, bits 13..10 */ u32 numTevStagesMinus1: 4;
         /* +0x0, bit 9 */ u32 multisample: 1;
-        /* +0x0, bits 8..0 */ u32 pad_2: 9;
+        /* +0x0, bits 8..7 */ u32 pad_2: 2;
+        /* +0x0, bits 6..4 */ u32 numColorChans: 3;
+        /* +0x0, bits 3..0 */ u32 numTexGens: 4;
     } f; /* +0x0 */
 } GXGenModeReg;
+
+
+/* XF channel control (0x100E..0x1011). size: 0x4 */
+typedef union GXChanCtrlReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..15 */ u32 pad_0: 17;
+        /* +0x0, bits 14..11 */ u32 lightMaskHi: 4;
+        /* +0x0, bit 10 */ u32 attnSelect: 1;
+        /* +0x0, bit 9 */ u32 attnEnable: 1;
+        /* +0x0, bits 8..7 */ u32 diffuseFn: 2;
+        /* +0x0, bit 6 */ u32 ambSrc: 1;
+        /* +0x0, bits 5..2 */ u32 lightMaskLo: 4;
+        /* +0x0, bit 1 */ u32 enable: 1;
+        /* +0x0, bit 0 */ u32 matSrc: 1;
+    } f; /* +0x0 */
+} GXChanCtrlReg;
+
+/* BP copy source corner / size. size: 0x4 */
+typedef union GXCopyRectReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bits 23..20 */ u32 pad_0: 4;
+        /* +0x0, bits 19..10 */ u32 y: 10;
+        /* +0x0, bits 9..0 */ u32 x: 10;
+    } f; /* +0x0 */
+} GXCopyRectReg;
+
+/* BP copy stride. size: 0x4 */
+typedef union GXCopyStrideReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bits 23..10 */ u32 pad_0: 14;
+        /* +0x0, bits 9..0 */ u32 stride: 10;
+    } f; /* +0x0 */
+} GXCopyStrideReg;
+
+/* BP copy control (0x52). size: 0x4 */
+typedef union GXCopyCtrlReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bits 23..17 */ u32 pad_0: 7;
+        /* +0x0, bits 16..15 */ u32 intensityFmt: 2;
+        /* +0x0, bit 14 */ u32 toXfb: 1;
+        /* +0x0, bits 13..12 */ u32 frame2Field: 2;
+        /* +0x0, bit 11 */ u32 clear: 1;
+        /* +0x0, bit 10 */ u32 scaleY: 1;
+        /* +0x0, bit 9 */ u32 mipmap: 1;
+        /* +0x0, bits 8..7 */ u32 gamma: 2;
+        /* +0x0, bits 6..4 */ u32 texFmt: 3;
+        /* +0x0, bit 3 */ u32 texFmtH: 1;
+        /* +0x0, bit 2 */ u32 pad_1: 1;
+        /* +0x0, bit 1 */ u32 clampBottom: 1;
+        /* +0x0, bit 0 */ u32 clampTop: 1;
+    } f; /* +0x0 */
+} GXCopyCtrlReg;
 
 /* The GX state record the library keeps in `.bss` (the 0x600-byte object at 0x80746CA0). Only the words the written GX
  * units use are named; the rest is `pad_0x..` and keeps its offset. size: 0x600 */
@@ -272,7 +336,11 @@ typedef struct GXData {
     /* +0x07C */ GXLinePtSizeReg lpSize;
     /* +0x080 */ GXMatrixIndexReg matrixIndexLo; /* the first four vertex-matrix index words (current position matrix id in bits 0..5) */
     /* +0x084 */ u32 matrixIndexHi;
-    /* +0x088 */ u8 pad_0x088[0xC0];
+    /* +0x088 */ u8 pad_0x088[0x20];
+    /* +0x0A8 */ GXColorWord ambColor[2];
+    /* +0x0B0 */ GXColorWord matColor[2];
+    /* +0x0B8 */ GXChanCtrlReg chanCtrl[4];
+    /* +0x0C8 */ u8 pad_0x0C8[0x80];
     /* +0x148 */ GXScissorReg scissorTopLeft;
     /* +0x14C */ GXScissorReg scissorBottomRight;
     /* +0x150 */ GXTevOrderReg tref[8];
@@ -287,7 +355,16 @@ typedef struct GXData {
     /* +0x224 */ GXDstAlphaReg dstAlpha;
     /* +0x228 */ GXZModeReg zMode;
     /* +0x22C */ GXPixelCtrlReg pixelCtrl;
-    /* +0x230 */ u8 pad_0x230[0x24];
+    /* +0x230 */ GXCopyRectReg cpDispSrc;
+    /* +0x234 */ GXCopyRectReg cpDispSize;
+    /* +0x238 */ GXCopyStrideReg cpDispStride;
+    /* +0x23C */ GXCopyCtrlReg cpDisp;
+    /* +0x240 */ GXCopyRectReg cpTexSrc;
+    /* +0x244 */ GXCopyRectReg cpTexSize;
+    /* +0x248 */ GXCopyStrideReg cpTexStride;
+    /* +0x24C */ GXCopyCtrlReg cpTex;
+    /* +0x250 */ u8 cpTexZ;
+    /* +0x251 */ u8 pad_0x251[3];
     /* +0x254 */ GXGenModeReg genMode;
     /* +0x258 */ u8 pad_0x258[0x2D0];
     /* +0x528 */ u32 projectionType; /* 0 perspective, 1 orthographic */

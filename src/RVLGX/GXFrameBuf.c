@@ -8,6 +8,6 @@
  *     `GXSetDispCopyYScale` and its helper
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`, `cflags_os`), the block of the unit this range was cut
  *   from; unmeasured until bodies exist.
- * RESIDUALS. No body is written (15 functions), the largest `fn_804B6F70` at 0x804B6F70 (0x230 B); `python
+ * RESIDUALS. No body is written (15 functions), the largest `GXGetYScaleFactor` at 0x804B6F70 (0x230 B); `python
  *   tools/units/sweepcomments.py --unit RVLGX/GXFrameBuf.c` lists them.
  */
