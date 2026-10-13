@@ -31,22 +31,35 @@
  *   pl_act_gauge_step_unlatched, pl_act_gauge_step_signed, pl_act_held_ck, pl_ground_probe_ahead,
  *   pl_stg_weapon_near_find
  *   GUESS (field, from its menu reader `fn_80316978`): `PlSkillRec::slot_count` (`Pl/fn_8027D684.h`)
- *   GUESS (from each body and its menu/lobby callers): item_kind_name_get, skill_name_get (the system string
- *   table's +0x94/+0x90 lists), item_species_class_get, armor_color_rgba_get and armor_color_table (the 3-byte
+ *   GUESS (from each body and its menu/lobby callers): equip_color_rgba_get and equip_color_index_get (the
+ *   equipment colour table's RGBA row and the kind row's +0x05 index), item_kind_name_get, skill_name_get (the
+ *   system string table's +0x94/+0x90 lists), item_species_class_get, armor_color_rgba_get and armor_color_table (the 3-byte
  *   palette the armour colour index picks), equip_color_table, equip_custom_color_rgba_get (the piece's own RGB565
  *   word at +0x04), equip_level_max_ck, pl_act_set_motion_gate (+0x45A), pl_act_add_class7_gauge (+0x384, class 7
  *   only), pl_act_timer_step (+0x445)
- * RESIDUALS. 122 functions unwritten (objdiff scores them 0) in 18 runs: 0x802695A4-0x80269998, 0x80269AC4-0x8026A00C,
- *   0x8026A0D4-0x8026A224, 0x8026A248-0x8026A2BC, 0x8026A3A8-0x8026A4E4, 0x8026A5A4-0x8026A618, 0x8026A738-0x8026BA04,
- *   0x80274B20-0x80274B5C, 0x8027D7EC-0x8027D874, 0x8027D8A0-0x8027DC64, 0x8027E120-0x8027E1B8, 0x8027E404-0x8027E918,
- *   0x8027E98C-0x8027EC50, 0x8027ED28-0x8027EE08, 0x8027EE24-0x8027EFB4, 0x8027F008-0x8027FC70, 0x8027FC84-0x8027FF20,
- *   0x8027FF30-0x802840DC.  Known blockers among them: the rig at 0x80269AC4-0x80269F88 (`new` of 0x1560 bytes) needs
- *   its 0x90/0x110-byte element types (vtables 0x805BAB58/0x805BAB74); `Pl_chr_set_attr`/0x8026A178/`Pl_chr_setX`
+ *   GUESS (fields, from their readers): `PlWeaponRec::bonus_0x06` (`fn_8027E708`), `PlWeaponRec::bonus_flag_0x15`
+ *   (`fn_8027FFFC`), `PlSlotRec::dye_mode` (`EnableChangeColor` tests 2), `PlSlotRec::color_index`
+ *   (`equip_color_index_get`); `PlRgba` (the stack word the colour getters assemble)
+ * RESIDUALS. 110 functions unwritten (objdiff scores them 0) in 21 runs; the largest is 0x80280050-0x802840DC, and
+ *   `sweepcomments.py --unit Pl/pl_act` lists every run.  Known blockers among them: the rig at
+ *   0x80269AC4-0x80269F88 (`new` of 0x1560 bytes) needs its 0x90/0x110-byte element types (vtables
+ *   0x805BAB58/0x805BAB74); `Pl_chr_set_attr`/0x8026A178/`Pl_chr_setX`
  *   funnel into `fn_800E12CC`, whose argument order is open; `fn_8027D8A0`, `pl_stg_weapon_near_find`, `fn_8027E5E4` and
  *   `fn_8027F3CC` carry paired-single / `cror` instructions the front end cannot emit.
  *  - flipcheck's undefined reference `get_ControlType` (the map's `get_ControlType__Fl` needs C++ scope): a linkage
  *    item for a fixer.
- *  - 90 functions partial in 51 runs (`sweepcomments.py --unit Pl/pl_act` lists them), including:
+ *  - 90 functions partial in 53 runs (`sweepcomments.py --unit Pl/pl_act` lists them), including:
+ *  - `equip_color_rgba_get`/`armor_color_rgba_get`: retail forms the row address `add r3,r4,r3` (offset first), ours
+ *    `add r3,r3,r4`; a row-pointer local is worse;
+ *  - `fn_80276E08`: retail's `self->unk37C -= v` subtracts the unextended `v` (r31) after the `extsh r0` compare;
+ *    `-= (s16)v` reuses the extended copy (r3), and `-= v` moves the `extsh` ahead of the `sth`;
+ *  - `pl_pos_blend_start`: retail stores the raw `arg1` (r31) to +0xB4 where ours reuses the `(s16)arg1` the
+ *    condition extended (r0); the header's `s32` parameter fixes the spelling, and a `(u16)` store is worse;
+ *  - `fn_80278674`: a `clrlwi` before the `stb` of `m` into +0x56B (peephole is off; a `u8` local is worse);
+ *  - `fn_80278D1C`: retail branches every id range test forward to its block (8, then 2, then 4) with a fall-through
+ *    `b`; the nested if, the else-if chain and a `switch` all lay the blocks out differently;
+ *  - `fn_802693C4`/`fn_80269508`: retail adds the record offset into the base register (`add r4,r4,r0` /
+ *    `add r5,r5,r0`), ours into a fresh one; `fn_8027AF88`: one `extsb` target register (r4 against r0);
  *  - `fn_80270F50`: the implicit int->float conversion constant rows (compiler-synthesised, playbook 29);
  *  - `fn_80271BD4`/`fn_80271E0C`: MWCC's `switch` decision tree against retail's three linear `subi`/`cmplwi` range
  *    tests, and in `fn_80271E0C` the `deco_count` bound retail re-masks from r0; the label-chain shape that rule 8
@@ -74,7 +87,7 @@
  *    folds it (20 B short); `fn_8027D40C`: the 32-bit scan's two induction variables sit in r5/r6 swapped;
  *  - `fn_8027CFC0`: two extra `extsh` before its clamp stores (+8 B);
  *  - `fn_80277FF8`: the `t`-vs-`arg1` test polarity - about a dozen rows around an inlined `li r3,0; blr` (+12 B);
- *  - the other 63 partial rows have no recorded cause.
+ *  - the other 54 partial rows have no recorded cause.
  *  - `fn_8026CC7C` is byte-identical; its switch table relocation goes through MWCC's local `@NNNN` where the target
  *    names `jumptable_805C5FA0` (same address).  The extab record names agree (`@etb_800126CC` is in both objects).
  *  - the action and equipment sections are not in `.text` order (`Pl_attack_set_sub` and `fn_80277974`.. sit after
@@ -84,8 +97,10 @@
  *    table that MWCC does not emit (it puts a zero-initialised variable in `.bss`/`.sdata`), so the pick table sits 4
  *    bytes early.
  *  - flipcheck: the object emits no `.bss` (0x20 claimed), `.rodata` (0x40), `.sbss` (0x8) or `.sdata` (0x48);
- *    `.text` 0x12E5C, `.data` 0x174, `.sdata2` 0x10, extab 0x548 and extabindex 0x7EC against the claims 0x1AD18,
+ *    `.text` 0x130B8, `.data` 0x174, `.sdata2` 0x10, extab 0x588 and extabindex 0x84C against the claims 0x1AD18,
  *    0x2178, 0x1D8, 0x928 and 0xD50; every compared section differs in bytes.
+ *  - `equip_color_table`/`armor_color_table` (0x805C6238/0x805C6278) are this unit's `.data`, read through `extern`
+ *    declarations until the section is emitted.
  * SHAPES. A `switch` on an unsigned value puts the case blocks out of line with a forward `b` to the default
  *   (`fn_8027176C`, `fn_80271674`, `fn_80271A18`); `switch (u8)` promotes to a signed `cmpwi` chain.
  *  - the pool floats are `extern` declarations used as load operands, never definitions (playbook 29), and a multiply
@@ -139,7 +154,10 @@
  *  - `fn_80278590` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `fn_8027993C` casts its `u16` index to
  *    `s16` each iteration; `fn_8027C064`'s local declaration order fixes its stack slots; `pl_ground_probe_ahead` spells its
  *    constant `-0x1006`; `fn_80279414`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
- *  - `fn_8027D0D4`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`).
+ *  - `fn_8027D0D4`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`);
+ *  - `Get_Shell_rate_adj` converts both shell values through one `s16 raw` local (one conversion slot, as retail);
+ *    `fn_8027D050` declares its loop index before `v` (the r8/r9 order); `fn_80274B20` is `while (row[0] != 0)` with
+ *    `id == row[0]` (the rotated loop); `fn_8027FFFC` opens with the `return 0` guard for non-gun kinds.
  */
 
 /* ==== 0x802693C4-0x8026BA1C: the part/motion cluster ==== */
@@ -3941,14 +3959,17 @@ typedef void (*PlNetSend2)(struct _PLW* plw, s32 kind);
 
 /* The weapon/skill record an equipment slot resolves to (the 0x24-byte sibling table). size: 0x24 */
 typedef struct PlWeaponRec {
-    /* +0x00 */ u8 pad_0x00[0x7];
+    /* +0x00 */ u8 pad_0x00[0x6];
+    /* +0x06 */ u8 bonus_0x06;   /* the mode-0 points `fn_80273B14` reads through `fn_8027E708` */
     /* +0x07 */ s8 bonus_0x07;   /* the points `fn_80274E6C` accumulates */
     /* +0x08 */ u8 pad_0x08[0x1];
     /* +0x09 */ s8 bonus_0x09;   /* the points `fn_80275014` accumulates */
     /* +0x0A */ s16 bonus_0x0A;  /* the bonus `fn_802751B4` scales by 1/100 */
     /* +0x0C */ u8 pad_0x0C[0x6];
     /* +0x12 */ s8 bonus_0x12;   /* the points `fn_80274370`/`fn_802744A0` add up */
-    /* +0x13 */ u8 pad_0x13[0x11];
+    /* +0x13 */ u8 pad_0x13[0x2];
+    /* +0x15 */ u8 bonus_flag_0x15; /* non-zero: a gun slot's bonus applies (`fn_8027FFFC`) */
+    /* +0x16 */ u8 pad_0x16[0xE];
 } PlWeaponRec; /* size: 0x24 */
 
 /* The per-slot record `fn_8027EE08` hands back through its second argument; `fn_80273B14` reads one
@@ -3969,7 +3990,10 @@ typedef struct PlEquipSlot {
 /* The per-slot record `fn_8027E344` hands back; `fn_80273ED8` sums one signed byte per act kind out
  * of it. size: 0x10 */
 typedef struct PlSlotRec {
-    /* +0x00 */ u8 pad_0x00[0x8];
+    /* +0x00 */ u8 pad_0x00[0x4];
+    /* +0x04 */ u8 dye_mode;      /* 2: the piece can always be recoloured (`EnableChangeColor`) */
+    /* +0x05 */ u8 color_index;   /* the colour-table row `equip_color_index_get` hands back */
+    /* +0x06 */ u8 pad_0x06[0x2];
     /* +0x08 */ s8 value_0x08;
     /* +0x09 */ s8 value_0x09;
     /* +0x0A */ s8 value_0x0A;
@@ -3977,6 +4001,12 @@ typedef struct PlSlotRec {
     /* +0x0C */ s8 value_0x0C;
     /* +0x0D */ u8 pad_0x0D[0x3];
 } PlSlotRec; /* size: 0x10 */
+
+/* An RGBA colour built byte by byte (red first, alpha last) and handed back as one register word. size: 0x4 */
+typedef union PlRgba {
+    /* +0x0 */ u8 channel[4];
+    /* +0x0 */ u32 word;
+} PlRgba; /* size: 0x4 */
 
 /* One 8-byte row of the act/motion pick table `Pl_decide_mot_get` walks (0x805C60A8, 11 rows: the
  * motion, its parameter and the two control words the row is gated on). size: 0x8 */
@@ -4601,18 +4631,13 @@ extern "C" s32 fn_80274AEC(u8 kind)
 extern "C" u8 fn_80274B20(u16 id)
 {
     const u16* row = lbl_805BF490;
-
-    for (;;) {
-        u16 key = row[0];
-
-        if (key == 0) {
-            return 0xFF;
-        }
-        if ((u16)id == key) {
+    while (row[0] != 0) {
+        if (id == row[0]) {
             return (u8)row[1];
         }
         row += 2;
     }
+    return 0xFF;
 }
 
 /* Sums the weapon/skill bonus records of the player's three weapon slots for the given act kind. */
@@ -6598,12 +6623,13 @@ extern "C" void fn_8027CFC0(_PLW* self)
 /* 0x8027D050: the actor's stored carve value, scanned out of the item table. */
 extern "C" u8 fn_8027D050(_PLW* self)
 {
+    s32 i;
     u8 v = 0;
     if (self->unk369 == 0) {
         return 0;
     }
     if ((self->unk364 & 0xE0000007) != 0) {
-        for (s32 i = 0; i < 10; i++) {
+        for (i = 0; i < 10; i++) {
             if (pl_move_work[self->chunk_ofs][i].carve_0x14 != 0) {
                 v = pl_move_work[self->chunk_ofs][i].carve_0x14;
                 break;
@@ -6995,9 +7021,11 @@ extern "C" u32 pl_carry_item_get(_PLW* self)
 f32 Get_Shell_rate_adj(_PLW* self, u8 arg1)
 {
     using s_80276B58::fn_8027ED18; using s_80276B58::lbl_8079A0D0;
-    f32 v = (f32)*(s16*)(fn_8027ED18((u8*)self + 464) + 10);
+    s16 raw = ((PlWeaponRec*)fn_8027ED18(&self->equipB))->bonus_0x0A;
+    f32 v = (f32)raw;
     if (((u8*)&self->equipC)[0] == 12) {
-        v = v * (f32)*(s16*)(fn_8027ED18((&self->equipC)) + 10) / lbl_8079A0D0;
+        raw = ((PlWeaponRec*)fn_8027ED18(&self->equipC))->bonus_0x0A;
+        v = v * (f32)raw / lbl_8079A0D0;
     }
     return v / lbl_8079A0D0;
 }
@@ -9263,6 +9291,15 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
 #include "unsplit/unknown.h"
 #include "Pl/Pl_master_ck.h"
 #include "Pl/pl_skill.h"
+#include "ef/system_core.h" /* str_tbl_skill_get, str_tbl_item_kind_get (rule 2: the owner is `ef/system_core.cpp`) */
+
+/* 0x8027FCE0 - whether the piece is at its kind's level cap (`EnableChangeColor`'s fallback; this unit's, its
+ * body not yet written).  0x805C6238 / 0x805C6278 - the equipment and armour colour palettes, one 3-byte RGB row
+ * per colour index (this unit's `.data`, not yet emitted by this source). */
+extern "C" u32 equip_level_max_ck(_EQUIP* equip);
+extern "C" u8 equip_color_table[][3];
+extern "C" u8 armor_color_table[][3];
+
 namespace s_8027D684 {
 
 
@@ -9665,6 +9702,88 @@ extern "C" void* fn_8027FF20(_EQUIP* equip) {
     return fn_8027FE50(equip->kind, equip->item_id);
 }
 
+/* 0x8027E708 (0x24): the +0x06 bonus byte of the weapon record the slot resolves to. */
+extern "C" s32 fn_8027E708(_EQUIP* equip) {
+    return ((PlWeaponRec*)fn_8027ED18(equip))->bonus_0x06;
+}
+
+/* 0x8027E72C (0x48): the `index`-th 3-byte row of the equipment colour table as an opaque RGBA word. */
+extern "C" s32 equip_color_rgba_get(u8 index) {
+    PlRgba color;
+
+    color.channel[3] = 0xFF;
+    color.channel[0] = equip_color_table[index][0];
+    color.channel[1] = equip_color_table[index][1];
+    color.channel[2] = equip_color_table[index][2];
+    return color.word;
+}
+
+/* 0x8027E774 (0x48): the `index`-th 3-byte row of the armour colour table as an opaque RGBA word. */
+extern "C" s32 armor_color_rgba_get(u8 index) {
+    PlRgba color;
+
+    color.channel[3] = 0xFF;
+    color.channel[0] = armor_color_table[index][0];
+    color.channel[1] = armor_color_table[index][1];
+    color.channel[2] = armor_color_table[index][2];
+    return color.word;
+}
+
+/* 0x8027E7BC (0x34): the colour-table index the slot's kind row stores (0 when the row is absent). */
+extern "C" u8 equip_color_index_get(_EQUIP* equip) {
+    PlSlotRec* rec = (PlSlotRec*)fn_8027E344(equip);
+
+    if (rec != NULL) {
+        return rec->color_index;
+    }
+    return 0;
+}
+
+/* 0x8027E840 (0x4C): the piece's own RGB565 dye colour widened to an opaque RGBA word. */
+extern "C" s32 equip_custom_color_rgba_get(_EQUIP* equip) {
+    PlRgba color;
+    u16 rgb565;
+
+    color.channel[3] = 0xFF;
+    rgb565 = equip->color_rgb565;
+    color.channel[0] = (u8)((rgb565 & 0xF800) >> 8);
+    color.channel[1] = (u8)((rgb565 & 0x07E0) >> 3);
+    color.channel[2] = (u8)((rgb565 & 0x001F) << 3);
+    return color.word;
+}
+
+/* 0x8027EB18 (0x18): the string-table name of item kind `kind` (kind 85 and up read as 0). */
+extern "C" u32 item_kind_name_get(u8 kind) {
+    if (kind >= 85) {
+        kind = 0;
+    }
+    return str_tbl_item_kind_get(kind);
+}
+
+/* 0x8027EB30 (0x18): the string-table name of skill `id` (id 206 and up read as 0). */
+extern "C" u32 skill_name_get(u16 id) {
+    if (id >= 206) {
+        id = 0;
+    }
+    return str_tbl_skill_get(id);
+}
+
+/* 0x8027F0F4 (0x28): the first byte of the species record `id` selects. */
+extern "C" u8 item_species_class_get(u16 id) {
+    return fn_8029F6B4(id)->slot_size;
+}
+
+/* 0x8027FFFC (0x54): whether a gun slot (kind 11 or 12) resolves to a weapon record with its +0x15 flag set. */
+extern "C" u32 fn_8027FFFC(_EQUIP* equip) {
+    if (equip->kind != 11 && equip->kind != 12) {
+        return 0;
+    }
+    if (((PlWeaponRec*)fn_8027ED18(equip))->bonus_flag_0x15 != 0) {
+        return 1;
+    }
+    return 0;
+}
+
 
 /* The equipment kind's row-table class: 0 for kinds 1-6, 1 for 7-11 and 14-15, 2 for 12-13, 0xFF for
  * anything else. */
@@ -9706,6 +9825,23 @@ extern "C" s32 fn_8027E918(u8 kind) {
 }
 } /* namespace s_8027D684 */
 
+/* 0x8027E7F0 (0x50): whether the piece may be recoloured - its kind row's dye mode 2, otherwise the level-cap test. */
+u32 EnableChangeColor(_EQUIP* equip) {
+    PlSlotRec* rec = (PlSlotRec*)s_8027D684::fn_8027E344(equip);
+
+    if (rec != NULL && rec->dye_mode == 2) {
+        return 1;
+    }
+    return equip_level_max_ck(equip);
+}
+
+/* 0x8027F0C4 (0x30): whether a bowgun (kind 11) piece takes options - every id but 17-19. */
+u32 Gunner_opt_ok_ck(_EQUIP* equip) {
+    if (equip->kind != 11) {
+        return 0;
+    }
+    return (u32)(equip->item_id - 17) > 2U;
+}
 
 /* The address of the eight per-kind equipment table pointers at 0x806AB810. */
 u8*** get_eq_data_ptr(void) {

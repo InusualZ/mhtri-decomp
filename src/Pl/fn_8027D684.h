@@ -49,7 +49,7 @@ u8 fn_8027FF88(u32 equip);
 /* 0x8027F11C - the equipment "category weight" of one piece: `lbz` of its first byte, then a
  * 0/1/6/0xB..0xF switch (`NULL` maps to 0).  `fn_8027ECAC` / `fn_8027FFFC` are the two sub-record
  * accessors the same screen reads to classify a piece: the `_EQUIP` sub-record (NULL when absent)
- * and the piece's "filled" flag. */
+ * and, for a kind-11/12 gun piece, the +0x15 flag of the weapon record it resolves to (1 when set). */
 struct _EQUIP;
 u8 fn_8027F11C(void* equip);
 PlSkillRec* fn_8027ECAC(struct _EQUIP* equip);
@@ -84,6 +84,9 @@ u32 GetEquipName(u8 kind, u16 id);
 /* 0x8027E7F0 - whether the piece's kind allows recolouring (1 when it does); the arena's colour pack
  * gates on it. */
 u32 EnableChangeColor(struct _EQUIP* equip);
+
+/* 0x8027F0C4 - whether a bowgun piece takes options (the map spells it `Gunner_opt_ok_ck__FP6_EQUIP`). */
+u32 Gunner_opt_ok_ck(struct _EQUIP* equip);
 #endif
 
 #endif /* MHTRI_PL_FN_8027D684_H */
