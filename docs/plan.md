@@ -19,7 +19,8 @@ its final home, by the worker that works it (§12).
 > registered units (354) with no unclaimed `.text`, and the bulk tiler (`attribute.py`), its proposal queue and the
 > `.pi/bin/*` landing scripts are retired (`docs/tools/retired.md`). Passages below that name `attribute.py`, a
 > "proposal" or the "attribute" step are the history of how units were first registered; today the queue is the registered
-> units that are not `Matching` (`queue.py list`) and the only landing path is `land.py land --branch`.
+> units that are not `Matching` (`queue.py list`) and the only landing path is `land.py land --branch`. How a unit is
+> worked - the pair run, or a wave, its multi-lane form - is `docs/pipeline.md` §15, §1.3 and §14.
 
 ---
 
@@ -56,30 +57,29 @@ proven per `objdiff-verify` before it is flipped. Gecko's object is not a candid
 
 The campaign is not one loop; it is four phases with different economics, and confusing them is how a plan misallocates its effort:
 
-| phase | what it does | cost per unit of progress | measured so far |
-| --- | --- | --- | --- |
-| **A. attribute** | (retired 2026-10-03: done by the splits program) propose ranges, seams and evidence; registration happened when a worker took a proposal (§12) | ~1 min per proposal, no source work | 19 units, 295 functions |
-| **B. decompile** | write bodies to >= 80 % | a worker round (10-40 functions) per 12 workers | 60 functions from a 7-worker round, before the 4-worker cap existed |
-| **C. second pass** | push the 80-99.9 % band to 100 % | the playbook's idea list, per unit | 67 symbols sit in that band today, ~26 % of each batch's output |
-| **D. flip** | prove byte-identity per object, link it, keep `ok` green | minutes per object, but the DOL hash starts depending on us | 0 objects flipped |
+| phase | what it does | cost per unit of progress |
+| --- | --- | --- |
+| **A. attribute** | (retired 2026-10-03: done by the splits program) propose ranges, seams and evidence; registration happened when a worker took a proposal (§12) | ~1 min per proposal, no source work |
+| **B. decompile** | write bodies to >= 80 % | a bounded slice per lane (~20 functions or ~60 minutes, `docs/pipeline.md` §15.1) |
+| **C. second pass** | push the 80-99.9 % band to 100 % | the playbook's idea list, per unit |
+| **D. flip** | prove byte-identity per object, link it, keep `ok` green | minutes per object, but the DOL hash starts depending on us (`docs/pipeline.md` §15.3) |
 
-**The honest arithmetic.** Clause (1)'s proposal backlog is 20 224 functions; at 10-40 functions per 12-worker round that is **500-2 000 worker-rounds**; the 284 closed so far are the *easiest* 1.2 % of the bytes. The plan's job is therefore not to promise a date - it is to keep each round cheap (the protocol), to keep the method compounding (the knowledge delta) and to make attribution, which is mechanical, run at machine speed. **Phases C and D are on the critical path for the DOL**, not optional polish: a unit with any residual cannot flip, and the DOL cannot be byte-identical until every unit can.
+**The honest arithmetic.** The plan's job is not to promise a date - it is to keep each round cheap (the protocol), to keep the method compounding (the knowledge delta) and to keep the queue measured (`ledger.py`, §2). **Phases C and D are on the critical path for the DOL**, not optional polish: a unit with any residual cannot flip, and the DOL cannot be byte-identical until every unit can.
 
-## 2. Where we are (measured, 2026-09-22, commit `9d6b351`)
+## 2. Where we are
 
-| | |
-| --- | --- |
-| symbol map | **20 519 functions**, 45 176 data symbols (22 418 of them `extab`/`extabindex`/`.ctors`/`.dtors` fragments that travel with their code unit) |
-| attributed | **295 functions in 19 registered units** (19 configured, 13 584 split objects) |
-| closed | **284 ≥ 80 %** (objdiff counts **217 matched**), 65 128 of 5 437 392 `.text` bytes (1.2 %) |
-| unclaimed (proposal backlog, §1) | **20 224 functions** |
-| per module | `Runtime.PPCEABI.H` 19 of 20 symbols at 100 % (`__register_fragment` 93.68 %); `Pl` 3 units, 150+ of 189 closed (`pl_master` 99.99 %, `pl_skill` 96.07 %, `pl_act` 93.75 %); `main.cpp` 47 functions, 37 at 100 %; `sys_mem.cpp` complete; the `auto/` unit `80040598_fn_80040598` 97.19 % (its home is now `src/fn_80040598.cpp`, §12); `Camellia` 99.97 % and `RSO` 99.71 % (both with named residuals), `g3d`, `OS`, `Network` at 100 % |
-| flags landed | `cflags_main` (`-O3 -inline noauto`), `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`), `cflags_ppceabi` (`cflags_runtime` + `-func_align 4`) — each with its instruction-level evidence in `configure.py`. **The flag *set* is under audit (2026-09-28) and this plan asserts no default set**: see §8.2 and `.pi/notes/flags-audit-645d.md` |
-| tooling that exists | `ledger.py`, `symbolpreflight.py`, `tudiscover.py`, `dump_asm.py`, `m2cinput.py` (+ selftest), `symedit.py`, `symdiff.py`, `mt.py`, `prepcommit.py`, `tools/m2c` (submodule) - plus the **analysis tier** a residual leads to: `tools/mwcc-debugger/` (the compiler's own IR - the PCode after each optimizer pass, gated by `locate/verify_pcode.py`), `tools/mwlink_debugger.py` (the linker's own run: `trace`/`diagnose`/`verify`/`align`/`order`, the link step is **Wii/1.0**), `tools/units/callers.py` (who calls this / who reads this, whole-DOL and address-keyed) and `tools/units/flipcheck.py` (is this object flip-ready) |
+No totals are kept here: they are *derived*, never remembered.
 
-Everything above is *derived*, never remembered: `python tools/units/ledger.py` reads `symbols.txt` (through
-`symedit.py`), `splits.txt`, `configure.py` and `build/RMHE08/report.json`. A stale `report.json` lies — the
-ledger warns when it predates `splits.txt`/`configure.py`, and regenerating costs 1.5–3.5 s.
+* **The numbers**: `python tools/units/ledger.py` (covered / closed / matched, the `.text` denominator of §6.3) reads
+  `symbols.txt` (through `symedit.py`), `splits.txt`, `configure.py` and `build/RMHE08/report.json`. A stale
+  `report.json` lies — the ledger warns when it predates `splits.txt`/`configure.py`, and regenerating costs 1.5–3.5 s.
+* **The queue**: the registered units that are not `Matching` (`python tools/units/queue.py list`); the flipped set is
+  `configure.py`'s `Object(Matching, ...)` entries.
+* **The flags**: per library in `configure.py`, each with a one-line pointer to its unit header's evidence; this plan
+  asserts no default set (§8.2).
+* **The tools**: `docs/tools/README.md`.
+* **What is in flight** (claims, open pairs and waves, parked decisions): `.pi/state.md`; how to re-measure:
+  Appendix B.
 
 ## 3. What a batch costs — and the batching law
 
@@ -100,7 +100,7 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 | term | what it is | size |
 | --- | --- | --- |
 | **registration batch** | the ranges and `configure.py` entries claimed in one go (one split, one ledger check) | **≤ 0.5 MB of `.text`** (owner's call) — ≈ 2 000 functions, a blast-radius ceiling, not a target |
-| **work round** | what one group of ≤ 12 workers does in parallel | 10–40 functions, bounded by worker throughput |
+| **work round** | what the lanes in flight do in parallel (at most six; a pair run is two, `docs/pipeline.md` §15) | a slice of ~20 functions per lane |
 | **land batch** | everything that goes into one commit on `main` (one split, one link, one `ok`) | one or more work rounds, plus the renames/merges that ride them |
 
 **The law, in five clauses:**
@@ -110,15 +110,10 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 2. **Cap a registration batch at 0.5 MB of `.text`** (owner's call) — it binds the *attribution* pass, where one
    command can claim a whole region. The tiler that this cap bound is retired (2026-10-03); a window of `splits.txt` edits is
    now capped by the lane that makes it.
-3. **A round is the pool's six slots wide** (the 2026-09-23 decision raised the *coordination* cap from four
-   to twelve; the cap that binds today is the environment, and the environment is a slot). A lane's tree is a
-   reusable slot (§5.1), the pool has **six**, and `queue.py next` refuses while all six are taken - naming the
-   holders - instead of constructing a seventh. What that cap bounds is *coordination*, not CPU: the shared
-   resource is the build tree, and only the orchestrator ever runs `configure.py`/`ninja`/the link (§5.1),
-   while a worker measures its own object with `recompile.py` (no ninja) inside its own slot. No-build workers
-   therefore contend for nothing but the provider, which is why the cap can be this high; a round that needs
-   builds still serialises behind the orchestrator.
-   what it lacks without §5 is an interface. My verification time, not the machine's, is the scarce resource.
+3. **A round is the pool's six slots wide** (owner, 2026-09-24: six lanes at most, refilled one per completion;
+   `docs/pipeline.md` §2.1, §13.1). What that cap bounds is *coordination*, not CPU: only the orchestrator runs
+   `configure.py`/`ninja`/the link, while a lane measures its own object with `recompile.py` inside its own slot
+   (`docs/pipeline.md` §10.4). The orchestrator's verification time, not the machine's, is the scarce resource.
 4. **Renames, phantom merges and range claims ride the same batch** as the source work, because each is a split
    dirty-check input. `symedit.py rename-batch <file>` collects renames; verify every renamed symbol *after* the
    batch's split, before the commit.
@@ -135,22 +130,23 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 **The four shared files (`config/RMHE08/splits.txt`, `configure.py`, `config/RMHE08/symbols.txt`, `CLAUDE.md`)
 have exactly one writer: the orchestrator.**
 
-| responsibility | orchestrator (me) | worker (external `pi` agent) | owner | tooling |
+| responsibility | orchestrator (me) | worker (a lane in its slot) | owner | tooling |
 | --- | --- | --- | --- | --- |
-| pick the batch (§12), order, size cap | **owns** | — | — | `ledger.py next` |
+| pick the work (§12): a pair or a wave (`docs/pipeline.md` §1.3) | **owns** | — | — | `queue.py next --count 2`, `ledger.py` |
+| a pair's dependency list and pre-pass (`docs/pipeline.md` §15) | **owns**: launches the read-only scout and scout review, lands each pre-pass batch alone | after the pre-pass, edits only its manifest's `owns`; a missed dependency is an integrator request | — | `docs/pair-briefs.md`, `land.py land --manifest` |
 | register a unit: range, module/name, `configure.py` entry | **applies it on `main`** (one writer for the shared files) | **writes the registration in its own worktree**, for the unit it works | — | `symbolpreflight.py`, `tudiscover.py` |
 | write a unit's source | reviews, integrates | **owns one unit, one file, one worktree** | — | `m2cinput.py`+`m2c`, Ghidra dump, `DumpSymbols.map` |
 | measure a symbol | **re-measures every claim** | measures its own unit | — | `recompile.py`, `mt.py diff/info`, `symdiff.py` |
 | land a compiler flag | **owns** — decides, and the decision needs §8.2's evidence | probes, reports numbers; may put a **one-unit** deviation in the source as a pragma (it owns that file) | — | the `configure.py` comment is the evidence; the pragma is the exception |
 | claim a data range | **owns**, measured before/after | proposes with numbers | — | `dataclaim.py`, playbook 23 |
 | run `ninja` / the split / the link / `ok` | **sole runner** | **never** (uses `recompile.py`) | — | `land.py verify` |
-| git: branches, merges, conflicts | **owns** (cherry-pick to `main`) | commits only on its branch | — | `git worktree`, `git cherry-pick` |
+| git: branches, merges, conflicts | **owns** (`land.py land`, one unit per commit) | commits only on its branch; never merges `main` (`docs/pipeline.md` §11, 2026-10-07) | — | `land.py`, `mergebranch.py` |
 | commit on `main` | **owns** | never | grants standing approval | `prepcommit.py` |
 | knowledge delta (playbook row, skill line, unit header) | **owns the gate** | reports what it learned | — | `sync_reference.py --check` |
 | type and naming discipline (§6.5) | **owns the gate**: lints every branch at the land step and refuses one that adds a violation | **writes to the rules** — its brief embeds them verbatim | — | `stylelint.py` (7.21) |
 | decisions only the owner can make | escalates, does not guess | — | **owns** | §10 |
 | DOL hash safety | **owns** | cannot touch it (branch, no `Matching`) | — | `prepcommit.py`, `land.py` |
-| keep `main` free of worker commits | **owns**: the batch records `main`'s HEAD as its base, and a moved HEAD before the land step aborts the batch and resets `main` to that base (nothing was pushed) | must not commit, rebase or amend on `main` | — | the base sha in the brief, `land.py verify` |
+| keep `main` free of worker commits | **owns**: the batch records `main`'s HEAD as its base (`land.py record-base`), and the gate refuses a batch whose base moved | must not commit, rebase or amend on `main` | — | `land.py` |
 
 **What the orchestrator must not do:** read source files and disassembly as its default mode. It reads the
 ledger, worker digests, `git diff --stat` and numbers; every read-heavy question is cheaper as a worker's answer.
@@ -158,295 +154,55 @@ It is the *librarian* of the compounding asset (§9), not the fastest decompiler
 
 ## 5. The coordinator protocol (worktrees, branches, briefs, outbox)
 
-> **Superseded — the operational prose that used to stand here is now `docs/pipeline.md`.** This file remains
-> the authority for *what* is worked and in what order; `docs/pipeline.md` is the authority for *how* a batch
-> is run. The protocol's still-true content **moved there rather than being deleted**:
->
-> * the **slot pool**, the `.used` sentinel and the enforcement E1–E3 — `docs/pipeline.md` §2;
-> * the **brief** as the one generated input, the **outbox** contract, the **final-message handoff**, who runs
->   bare `ninja`, the **failure-mode table**, **fan-out**, **ack / heartbeat / timeout** and **teardown** —
->   `docs/pipeline.md` §10;
-> * the **gate and the landing**, the **merge procedure**, the **feedback loop**, the **measurement discipline**
->   and the **flip discipline** — `docs/pipeline.md` §4–§8;
-> * the **agent profiles** and when each is used — `docs/pipeline.md` §2.4;
-> * the **tool roster** — `docs/tools/README.md` ("Use it when: the roster").
->
-> Two things this section described are **superseded outright**: the manual merge procedure (now
-> `tools/units/mergebranch.py resolve`) and per-claim worktree construction (now the slot pool, with
-> `--no-slots` as the documented fallback for a one-off lane). The pi harness, its herdr panes and the
-> `subagent_done` tool are gone (2026-09-29, removed from the tools in WP3e); the handoff is the worker's **final message**. For the queue itself — which unit is
-> worked next, and the batching law — see §3, §6 and §12 below.
->
-> **In-line references to `§5.1`–`§5.6` elsewhere in this file now resolve to `docs/pipeline.md`** — §2 for the
-> slot and worktree layer, and §10 for the brief, the outbox, the failure-mode table, fan-out and ack/timeout.
-Workers are separate processes in a tmux window (max 4). They inherit nothing from my context and I inherit
-nothing from theirs, so **everything that used to be a prompt or a habit becomes a file with a format.**
+**Moved to `docs/pipeline.md`, which is the authority for *how* a batch is run**; this file stays the authority for
+*what* is worked and in what order (§3, §6, §12). The subsection numbers stay so old citations resolve:
+
+* **How a unit is worked** - the pair run, and the wave as its multi-lane form: `docs/pipeline.md` §15, §1.3 and §14.
+* Superseded outright: the manual merge (now `tools/units/mergebranch.py resolve`, and a lane never merges `main`:
+  `docs/pipeline.md` §11, 2026-10-07), per-claim worktree construction (now the slot pool), cherry-pick landing (now
+  `land.py land`), and the pi harness with its panes and `subagent_done` tool (the handoff is the final message).
 
 ### 5.1 The worktree layer — the branch *is* the claim
-A lane's environment is a **reusable slot** from a fixed pool (`tools/units/slots.py`), never something the
-orchestrator constructs by hand. The pool is six sibling directories at **stable paths**
-(`../mhtri-dtk.slot1` … `../mhtri-dtk.slot6`), each holding a warm `build/RMHE08`, `orig/`, the toolchain and
-its initialised `tools/m2c` submodule across rounds. A stable path is the point: the depfile's absolute
-header paths stay valid across a reset, so the per-seed rewrite is a one-time cost per slot instead of a
-per-claim one. **A slot holds a directory, never a branch.**
-```sh
-# orchestrator, once: create the pool (siblings of MAIN - gitignored territory)
-python tools/units/slots.py init                 # six slots, each seeded from MAIN once
-# orchestrator: a claim takes a free slot and cuts a FRESH branch off main's CURRENT tip
-python tools/units/queue.py next                 # -> reset, checkout -B worker/<slug> <tip>, verify, lock
-#   (or directly: python tools/units/claims.py claim Pl/pl_act  # uses a slot when a pool exists)
-#   --no-slots still constructs a throwaway worktree, so nothing in flight breaks
-# worker, inside its slot: source only, commits on its own branch
-tools/units/recompile.py main/Pl/pl_act        # direct compiler, no ninja, mtime asserted
-python .claude/skills/mwcc-unit-matching/scripts/mt.py diff -u main/Pl/pl_act fn_8027C208
-git commit --amend -am "Pl/pl_act: fn_8027C208 body"   # ONE commit per unit, on worker/pl-act-13
-# orchestrator, on main: integrate one unit at a time, then verify the whole batch
-git cherry-pick --no-commit worker/pl-act-13   # or <merge-base>..worker/pl-act-13 if it left several
-python tools/units/land.py verify              # split + link + ok + regressions + ledger + delta
-git commit -F .git/land_msg.txt                # only after verify passes; --abort otherwise
-# orchestrator: the teardown RETURNS the slot (it is never removed); the branch still goes
-python tools/units/claims.py release Pl/pl_act # slot back to main's tip, branch deleted, warm trees kept
-#   ... and the rescue ref it parked the un-merged commits at is audited on the spot: `redundant` is pruned,
-#   drift is reported, `unlanded`/`unknown` are named loudly and kept (see "A branch is never the only copy")
-```
-**A free slot is the concurrency cap.** With the pool in use, `queue.py next` refuses while all six slots are
-taken (naming each holder) instead of constructing a seventh environment; `slots.py status` shows the pool and
-`slots.py verify` proves every kept tree current. **A slot is never trusted on faith:** `acquire` validates
-the kept `build/RMHE08` against MAIN's current map/DOL with the same staleness guard the seeder already uses
-(`config.json` vs `symbols.txt`/`splits.txt`/`main.dol`, plus a byte comparison of `report.json`) and
-**re-seeds if it cannot be proven current** - a stale build tree is the most expensive failure this campaign
-has hit.
-**A slot is occupied by one sentinel file, `.used`, read from two sources that must agree.** `acquire`
-creates `.used` in the slot's worktree root **atomically** (`O_CREAT | O_EXCL`), so two racing acquires cannot
-both take one slot; `release` removes it; `status` reports `used`/`free` from it. The sentinel records its
-**OWNER label** (the claim's worker label, else its branch slug), so a marker left by a different claim is
-visible in `status` and refused at launch (`acquire` will not reset a slot under somebody else's sentinel - it
-names the owner and asks for `--force`; an *ownerless* marker, i.e. a legacy body or a crash before the owner
-was written, is still reclaimed, so a crashed acquire can never wedge a slot). The second source is the
-worktree itself: a slot whose worktree still has a branch checked out is **in use**, whatever any file says -
-the lock record is a convenience, the worktree is the truth. On 2026-09-27 the two disagreed - `status` called
-slot 2 `free` while its worktree held `worker/rule10-fix-14f8` - and that disagreement *was* the bug, so both
-readings are kept. A `.used` marker on a *detached* worktree with no live claim is a crash remnant, named
-reclaimable rather than a permanent wedge. The JSON record at `MAIN/.pi/slots/<n>.json` (the claim, worker and
-time) is still written and a stale one is reclaimed.
-**`release` fails closed, and the live lane is read from the harness, not inferred.** A release detaches the
-slot, runs `clean -ffdx` and deletes the branch, so it refuses (printing every reason and offering `--force`)
-when a **live Claude session's `cwd` resolves into the slot**, when the tree is dirty (`git status
---porcelain`, `CLAUDE.md` included), or when HEAD holds
-**commits no branch reaches**. The run record is the only live-lane signal there is: a lock cannot see a lane
-(the project proved it twice - the lane that worked in MAIN and left no slot file, and the 2026-09-28 release
-that ran while another lane was still working in the slot and detached HEAD under the live process), so
-`release` reads Claude Code's session registry (`~/.claude/sessions/<pid>.json`, or `$CLAUDE_CONFIG_DIR`; each
-record carries `pid`, `sessionId`, `cwd` and `status`, and counts only while its pid is alive) and names the
-session it is protecting. A host without a registry
-gets no signal from it at all - the dirty tree and the orphaned commits are then the backstops, and the
-docstring says so rather than reading "no registry" as "no lane". `claims.release` forwards `--force` and
-waives only the *dirty* guard, because it has already refused un-merged, un-recorded work before it gets
-there; `status` shows the owner and any live run per slot.
-**The marker only works because the launch pattern is structural: acquire first, then launch with the slot as
-`cwd`.** A file-based signal cannot catch a lane that never entered a slot at all (the lane that worked in
-MAIN and left `.tmp-mwcc/` behind wrote no slot file - nothing could have), so `queue.py next` and
-`claims.py claim` print the paste-ready spawn line with **the claim's own worktree as `cwd`**, and a spawn line
-whose `cwd` resolves to MAIN is refused outright rather than discouraged. `acquire` also **falls through**: an
-occupied slot is skipped for the next genuinely free one, while an explicitly named `--slot N` still refuses
-when it holds an unlanded branch. Every brief opens with a **"your tree"** block naming the cwd and the
-one-line self-check (`git rev-parse --show-toplevel` must equal the tree; if it does not, stop and report), so
-a mis-launched lane detects it in its first turn.
-* **A slot keeps its build tree warm; the branch is what is fresh.** The pool directory holds the toolchain,
-  `orig/`, `tools/m2c` and `build/RMHE08/` across rounds, so a lane starts without a per-claim copy - only the
-  branch and the checkout are new. A **throwaway** worktree (`--no-slots`) still has **no** `build.ninja`,
-  `objdiff.json` or `build/RMHE08/` of its own, so `recompile.py` resolves `MAIN` with
-  `git worktree list --porcelain` (first entry) and takes the toolchain from `MAIN/build/{tools,binutils,
-  compilers}` and the **target** object from `MAIN/build/RMHE08/obj/<unit>.o`; `mt.py` is handed the target
-  object and cflags explicitly (`--target`, `--flags`). Roadmap 7.1 + 7.15 owns that path.
-* **The worker's object path is its own.** A worker writes `<slot>/build/RMHE08/src/<unit>.o` and never
-  anything under `MAIN/build/` — otherwise an unverified branch object could be read as `main`'s and a green `ok`
-  would be meaningless. `recompile.py` prints the path it wrote and the target it compared against.
-* **A worker's diff is never committed to `main` before it is verified.** `git cherry-pick --no-commit` stages it,
-  `land.py verify` runs, and only then is the commit written; if verify fails, `git cherry-pick --abort` or
-  `git reset --hard` restores `main` untouched (this is not "rewriting history": nothing was published).
-  Verify-then-commit, never commit-then-verify.
-* **`main` does not move while a batch is open.** The batch records `main`'s HEAD as its base; if HEAD has moved
-  before the land step (a worker committed to `main` instead of its branch, or another stream landed), the batch
-  aborts and `main` is reset to that base — recovery, not history rewriting, because nothing was pushed.
-  `land.py verify` checks the base before it does anything else.
-* **One commit per unit.** The brief requires a single commit for the unit (`git commit --amend` while
-  iterating), because `git cherry-pick worker/<slug>` lands only the tip. If a worker leaves several commits,
-  the orchestrator picks the range (`git cherry-pick <merge-base>..worker/<slug>`) rather than silently
-  dropping all but the last.
-* **Evidence lives in `MAIN`, not in the worktree.** `.pi/` is a directory inside each worktree, so an outbox or
-  notes file written there is destroyed by `git worktree remove` (or blocks it as untracked). A worktree lane
-  writes its own `.pi/outbox/<slug>.json` and `.pi/notes/<slug>.md` (MAIN is read-only to it) and the orchestrator
-  copies them into `MAIN/.pi/` with `slots.py collect --path <worktree>` before the worktree goes, so the evidence
-  outlives the worktree. **`<slug>` is the claim's branch minus `worker/`** (`claims.slug_of_branch`), the one rule
-  `brief.py`, `handoff.py`, `land.py` and `claims.py` all read: a unit's *path* is not its *name* (`Pl/pl_act` vs
-  `pl-act-09c6`), and the two drifted for three commits before the branch-derived form settled it.
-* **The handoff is the worker's final message.** A worker is a headless `claude --agent <profile> -p` process
-  run with its cwd at the slot (`tools/units/lanecmd.py` builds the command): when it exits, its last assistant
-  message is what the orchestrator reads from the run's output; an in-session subagent (the worktree-hook route
-  below) returns it as the Agent tool's result. Either way there is no completion *tool* to call, so a brief that asked for one would name a tool the
-  worker does not have. `brief.py` emits the final-message
-  instruction in part 4, and a hand-written brief must carry it too.
-* **`tools/m2c` is a submodule, and a slot keeps it initialised.** A slot is never removed, so the `git
-  worktree remove` refusal around a checked-out submodule ("working trees containing submodules cannot be moved
-  or removed") never applies to it: `slots.py init` initialises `tools/m2c` once from MAIN's already-cloned
-  `.git/modules` (no network), and every round inherits it. A **throwaway** worktree (`--no-slots`) must still
-  not initialise it, which is why `release` keeps the `git worktree remove --force --force` path for that case;
-  a cherry-picked branch is *not* "merged" to git, so the delete is `-D`, not `-d`.
-* **A worker resolves the unit from its own tree, the toolchain from `MAIN`.** `recompile.py` reads the source and
-  writes the object in the **current worktree** (its `cwd`) and takes only the compiler, binutils and the *target*
-  object from `MAIN`. Running `MAIN/tools/units/recompile.py` from a worktree must not silently compile
-  `MAIN`'s source - the tool prints the source path it compiled and the object path it wrote, and they
-  must both be inside the worktree.
-* **A conflict is a protocol violation.** A worker edits only its unit's source; I own the shared files. So a
-  conflict means someone touched what they must not: resolve by hand, **re-measure the unit**, record it.
-* **A crashed worker is visible in git** — a stale worktree, a branch never merged, an uncommitted tree. That is
-  a better failure signal than a timestamp in a claim file: I can inspect exactly what it had.
-* **Batch shape is unchanged**: all four units land on `main` before `land.py` runs, so there is still one split
-  and one link per land batch, and the merge step is where my verification gate sits.
-* **Absolute paths:** the compiler and source paths in `build.ninja` are relative, but the file does name the
-  Python interpreter absolutely (`C:\…\Python312\python.exe`) — which is why `MAIN` resolution matters and why
-  `configure.py` is re-run only in `MAIN`.
-**Spawning a worker.** `queue.py next` claims the unit and prints the paste-ready command - a headless Claude
-Code session whose cwd is the worker's worktree (the Agent tool has no `cwd` parameter, so a lane is its own
-process, not an in-session subagent). Run it in the background and capture the output:
-```bash
-cd <the worker's worktree> && claude --agent worker --name worker-<slug> --session-id <uuid> \
-  --permission-mode acceptEdits --allowedTools Bash -p 'Read <brief> in MAIN and do exactly what it says. Ack \
-  first: python tools/units/claims.py ack <unit> --agent worker-<slug>. End your turn with your report: your \
-  final message is the result the orchestrator receives.'
-The worker has its own context window and its final message is the run's output. `cwd` is what makes the rest
-work: the worker's `recompile.py` resolves that worktree from its cwd and MAIN's toolchain and target object
-from git - no junction, no environment variable. The printed `--session-id` is how a lane's question is
-answered: `claude --resume <session-id> -p "<ruling>"` in the same cwd (`lanecmd.resume_call`).
-**The current flow** (the herdr manual-pane route was deleted with the pi harness; WP3e removed its code):
-* **Claim:** `queue.py next` (a unit) or `slots.py spawn --kind <unit|fix|merge|tooling|docs|review|scout|plan>`
-  takes a pooled slot, cuts the branch and prints the launch line with the right profile.
-* **Launch, headless:** the printed `claude --agent <profile> ... -p` line, run in the background with its cwd at the slot.
-* **Launch, in-session:** `worktreehook.py arm --slot N`, then one Agent-tool call with `isolation: "worktree"`; the
-  `WorktreeCreate` hook hands that lane the armed slot (one bound slot per arm; `CLAUDE.md`, "Agent harness").
-* **Collect:** `slots.py collect --path <worktree> --release` copies the outbox and notes into MAIN.
-**Teardown is part of the round.** A live lane is a Claude Code session (`~/.claude/sessions/<pid>.json`) whose cwd
-is the slot; Windows refuses to delete a directory a process is sitting in, so `release`/`reclaim` refuse a slot a
-live session is working in - let the lane exit first. If a worktree cannot be removed, ask who is sitting in it.
-Then `claims.py release <unit>` returns the slot to main's tip (keeping the warm trees), deletes the branch and
-clears the slot lock; for a **throwaway** worktree (`--no-slots`) it removes the worktree instead. Nothing
-in a round constructs a worktree by hand.
+
+The slot pool, the `.used` sentinel, E1-E3 and slot hygiene: `docs/pipeline.md` §2. The launch line and in-session
+lanes: `docs/pipeline.md` §13.2. Evidence collection (`slots.py collect`): `docs/pipeline.md` §10.2 and §12.
+
 ### 5.2 The worker's input — one generated file, nothing else
-**A brief ends by requiring the report as the final message.** The orchestrator is handed a headless
-worker's result from the `claude` process's output when it exits, and an in-session subagent's as the Agent
-tool's result. Neither path needs a completion tool, and neither survives the worker
-ending on a tool call or saying nothing - so the brief's part 4 makes the ≤ 15-line digest the last thing the
-worker writes. `brief.py`
-emits the instruction, and a hand-written brief must carry it too.
-`tools/units/brief.py <unit>` writes `tools/units/briefs/<unit>.md`, containing:
-1. the **unit**: path, lib, `mw_version`, the real cflags, object and target paths, the `.text` range;
-2. the **inventory**: every symbol it owns, with size and current measured %;
-3. the **residuals**: the unit header's existing table (what differs and why) — so a re-brief never re-derives
-   settled work;
-4. the **decided items**: flags landed for this lib, seams already settled, data ranges deliberately not claimed
-   (§10) — so a worker does not re-litigate them;
-5. the **task**: the functions to write, in address order;
-6. the **rules**: the hard rules, the measurement loop, the evidence order, the flag policy (§8), and what it may
-   not touch.
-The brief's rule text (part 6) is **copied verbatim from §8 of this file** plus the skill that owns the step,
-so there is one canonical source and no drift.
-**If the brief does not say it, it is not a rule.** Spawning a worker is then one line: *read this brief, do it,
-write your report.*
+
+`docs/pipeline.md` §10.1 (the brief) and §10.3 (the final-message handoff).
+
 ### 5.3 The worker's output — data, not prose
-| # | artefact | consumed by |
-| --- | --- | --- |
-| 1 | the source it owns, compiled and measured, committed on its branch (one commit) | the build, the merge |
-| 2 | `MAIN/.pi/outbox/<slug>.json` (branch minus `worker/`) - per-symbol %, unit %, residual, **config requests** (range/seam/rename/flag/shared-file with evidence), **flag probes** (numbers + verdict), blockers, and the command it measured with | me and `land.py`, which can refuse a batch from it alone |
-| 3 | `MAIN/.pi/notes/<slug>.md` — the full evidence trail | a later session, or a re-brief of the same unit |
-| 4 | a ≤ 15-line digest in the reply | human review |
-| 5 | the claim released (slot returned to main's tip, branch deleted after the merge) | other workers |
-Why JSON and not prose: four workers writing four prose reports is exactly how the orchestrator ends up
-reconciling numbers by hand — the failure mode this plan exists to remove.
+
+`docs/pipeline.md` §10.2.
+
 ### 5.4 Who runs what, and the failure modes
-**Only the orchestrator runs bare `ninja`, the split, the link and `ok`.** Workers compile their own object
-through `recompile.py` (direct compiler invocation, mtime asserted, section sizes printed) and measure with
-`mt.py`. Otherwise four processes fight over one build tree, and a green `ok` can come from a stale link.
-**A lane never builds its own environment.** The orchestrator claims through `queue.py next` (or
-`claims.py claim`), which takes a free slot from the pool, resets it, cuts a fresh branch off main's current
-tip and verifies the kept build tree; the worker starts in the directory it is handed. A free slot is the
-concurrency cap: with all six taken, `queue.py next` refuses and names the holders rather than constructing a
-seventh worktree. The printed spawn line carries **the claim's worktree as `cwd`** (the slot, never MAIN) -
-the orchestrator pastes it, it does not assemble the cwd by hand - and every brief's "your tree" block makes
-the lane itself verify that cwd before it works.
-**The land gate pre-flights MAIN before it builds.** `land` reports foreign/untracked paths already in the
-tree **before** the expensive gate runs, naming a likely cause when they look like lane scratch (`.tmp-*`,
-`.ws-*`, a leftover `upstream/` clone) - the same information the post-build refusal prints, delivered before
-a 5-minute build instead of after it. The refusal is unchanged (a path that appears *during* the build is
-still refused); only the delivery is earlier, because a refusal that arrives after the build is the same
-information, late.
-| failure | detected by | handling |
-| two workers, one unit | the branch already exists (`claims`) or the slot is locked (`slots`) | the loser takes the next unclaimed unit or the next free slot |
-| a slot's kept build tree is stale | `slots.py verify`, or `acquire`'s guard (`config.json` vs `symbols`/`splits`/DOL, plus `report.json`) | **re-seed from MAIN before handing over**; refuse if it still cannot be proven current — never hand a lane a doubt |
-| a worker dies mid-unit | stale worktree / branch never merged / no outbox entry | inspect its tree, re-issue the brief; brief step 1 is "compile and measure the unit first", so a half-written source is caught |
-| a worker edits a shared file | `land.py verify` diffs the tree against the expected file set | reject the merge, restore the file, re-brief; its other work survives |
-| a worker measures a stale object | `recompile.py` asserts the mtime advanced | rerun; discard the numbers (this bit two workers before the helper existed) |
-| a worker's number disagrees with the report | I re-measure every symbol I claim | my measurement wins; the difference is investigated, never averaged |
-| a worker wants a flag nobody else agrees with | the flag rule (§8.2) | it stays a *probe* in the outbox until a second unit or a source pragma backs it |
-| a merge conflict | `git cherry-pick` stops | protocol violation: resolve, re-measure, record |
-| a worktree cannot resolve the toolchain/target | `recompile.py` fails with the missing path | fail loudly — never let a worker silently compile nothing |
-| the unit is only partially matched | the outbox says so and its score is below `main`'s | **measure before merging**: worse than `main` → drop the branch and re-brief; better → merge, record the residual in the header, mark the unit `partial` in the ledger |
-| `main` moved while the worker ran | the cherry-pick conflicts, or the worker's base is old | the worker rebases on `main` before handoff (`git rebase main`); the orchestrator re-measures after the cherry-pick regardless |
-| a claim cannot be released | `git worktree remove` fails with `Permission denied`, or the directory gives "Device or resource busy" | a live Claude Code session is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory a process is in. Teardown is part of the round: let the lane exit (`release` refuses while `~/.claude/sessions` lists it), then `claims.py release <unit>` - and if the session is the owner's, ask first, because a stale claim blocks the unit rather than losing anything. A **slot** claim never removes the directory anyway: release detaches the slot at main's tip, deletes the branch and clears the lock |
-| a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
+
+`docs/pipeline.md` §10.4 and the failure-mode table §10.5.
+
 ### 5.4.1 The agent profiles
-The campaign runs each lane under the profile that matches its job (owner's instruction, 2026-09-26). Four of
-them are **project** profiles, tracked in `.claude/agents/`; the rest are the global set.
-| profile | job | launched when |
-| **`decompiler`** | unit work: register a proposal range at its final `src/<module>/<name>.<ext>` home, reconstruct its bodies, measure, commit on its branch | **the default lane** - a proposal or a body-completion lane. `queue.py next` emits `agent: "decompiler"` |
-| **`fixer`** | a *refused gate*: a measured regression, a lint failure, a claim or branch that must be repaired | a `land.py verify` refusal, a `ninja changes` regression, a stale claim |
-| **`merger`** | a *refused apply*: two lanes' divergent views of one record/type/header, a fold | `land.py land --branch` refusing a branch (its `git apply -3` or the resolver), the `recordmerge.py` class |
-| **`codereviewer`** | a *style/convention review* of decompiled code: the match claim's honesty, naming (rule 7), placement (rule 2), types (rules 3-6/9/11), comments, codegen-adjacent hygiene. Read-only by construction - its tool list has no `write`/`edit` - and it reports ranked, evidence-backed findings instead of diffs | after a module's pass, before a flip campaign, or when a band's debt needs a scope statement |
-| `worker` | the generic lane: anything that is none of the above | the fallback, and the only profile the older rounds used |
-| `scout`, `planner`, `reviewer` | read-only recon, planning, independent review | before a batch, or when a plan/review is the deliverable |
-python tools/units/queue.py next --count 6            # six lanes, no two sharing an owner header or a module
-python tools/units/queue.py next --cluster Network    # one lane for every ready unit of a module (or a header)
-python tools/units/queue.py next --profile fixer      # a repair lane
-The profile decides which rules the lane is held to (its isolation, its evidence file, the style rules it
-knows), so this is not a cosmetic choice - and the orchestrator, not the worker, chooses it.
+
+`docs/pipeline.md` §2.4 (which profile each leg runs, and `slots.py spawn --kind`).
+
 ### 5.5 A worker does not fan out subagents
-A lane is one agent in one worktree: **no profile carries the `Agent` tool**, so a worker cannot spawn
-subagents, and a brief must not tell it to. A unit that is too big for one lane is split by the orchestrator
-into more claims (more slots), each with its own branch, brief and commit - never inside a lane. That keeps the
-one-branch, one-commit, one-writer-per-file rules true by construction, and keeps every score in the handoff
-the lane's own measurement rather than a claim it would have to re-verify.
+
+`docs/pipeline.md` §10.6.
+
 ### 5.6 Acknowledgement, heartbeats and timeouts
-A terminal multiplexer cannot tell "finished" from "never started": both read as *idle*. In the first round with
-four external workers that ambiguity cost forty minutes - one agent sat idle while the other ground through its
-unit, and the orchestrator had no cheap way to see which was which. Three mechanisms remove it:
-* **Acknowledge first.** A worker's first action, before it reads the target disassembly, is
-  `python tools/units/claims.py ack <unit> --agent <name>`, which writes
-  `MAIN/.pi/ack/<slug>.json`: the branch, the agent and a timestamp. Spawning a worker and seeing no
-  ack within two minutes is an unambiguous failure, and the claim can be reclaimed immediately.
-* **Heartbeat per iteration.** The same command with `--progress <symbol>` after every function the worker
-  measures. The `progress` list is the difference between "quiet because it is thinking" and "quiet because it
-  stopped", and it costs one second per function.
-* **Status and timeout.** `claims.py status` reports `unacked` / `stalled` / `working` / `done` per claim,
-  combining the ack file with what cannot lie - the commits on the branch (`rev-list --count <base>..<branch>`)
-  and the outbox's existence - and exits non-zero when anything is unhealthy. `claims.py timeout [<unit>]
-  [--apply]` reclaims the unhealthy ones: **it copies the branch to `refs/rescue/<slug>` first**, then removes
-  the worktree, deletes the branch and drops the claim, so a timed-out worker loses the lock but never its work.
-  The unit is then free to be re-briefed, and the rescue ref is printed for whoever picks it up.
-The orchestrator's rule of thumb: **an ack or an artefact, never a hunch.** A worker is progressing if its ack
-says so or its branch has commits; if neither is true and the grace period has passed, it is timed out - not
-asked again.
+
+`docs/pipeline.md` §10.7; teardown §10.8.
 
 ## 6. The loop - four steps, one gate each
 
 > **A worker never runs `ninja`, the split, the link or `ok`** (§5.4). In this section the `ninja` commands are
-> the orchestrator's; a worker's equivalent is `tools/units/recompile.py` (7.1).
+> the orchestrator's; a worker's equivalent is `tools/units/recompile.py` (7.1). How the steps are run - claim,
+> scout, pre-pass, lanes, review, landing - is `docs/pipeline.md` §15 (the pair run) and §1.3.
 
 | # | step | tool | gate before moving on | left behind |
 | --- | --- | --- | --- | --- |
 | 1 | **attribute** | `symbolpreflight.py`, `tudiscover.py` | the verdict is `proceed`, or `approve` with a written proposal the owner accepted (§10) | the unit's range, seams and evidence (now already in `splits.txt`, §12) |
 | 2 | **decompile** | the Ghidra dump (`docs/memory-dump.md`), `DumpSymbols.map`, `m2cinput.py` → `tools/m2c` | it compiles, and the disassembly agrees with every instruction-level decision | `src/<Dir>/<file>.c` (+ header beside it) |
 | 3 | **match** | `recompile.py`, `mt.py diff/info`, `ninja changes`, `report.json` | the symbol's own score ≥ 80, nothing else regressed, `ok` green | the residual in the unit's file header |
-| 4 | **commit** | `land.py verify` + `prepcommit.py` | the batch's knowledge delta is written and `sync_reference.py --check` is clean | one commit per unit, the ledger moves |
+| 4 | **commit** | `land.py land` (its gate is `land.py verify`) | the batch's knowledge delta is written and `sync_reference.py --check` is clean | one commit per unit, the ledger moves |
 
 ### 6.1 Attribute
 
@@ -530,8 +286,10 @@ the residual in the header — the `CLAUDE.md` playbook rows are that second pas
 
 ### 6.4 Commit
 
-One commit per unit (or per batch registered together), area-prefixed and imperative, carrying the sources, the
-registration, the flags it proved and the knowledge delta. `prepcommit.py` stages explicit paths only, refuses
+One commit per unit, landed by `land.py land --branch <b> [--manifest <path>]` (`docs/pipeline.md` §4, §15.1 step
+6); a pre-pass batch is its own commit, landed alone before its lanes. The subject follows `CLAUDE.md`'s
+`<category>: <message>` convention; the commit carries the sources, the registration, the flags it proved and the
+knowledge delta. `prepcommit.py` stages explicit paths only, refuses
 build/original/scratch output, and verifies the DOL SHA-1. Live working state is kept in `.pi/state.md`, not in `CLAUDE.md`
 (non-negotiable 8). History is
 never rewritten; nothing is ever pushed.
@@ -980,7 +738,7 @@ queue over as a list with numbers.
 
 ## 11. Verification, handover, and the stop conditions
 
-**`land.py verify` is the land-batch gate** (once built; until then, its commands by hand): `python configure.py`
+**`land.py verify` is the land-batch gate** (`docs/pipeline.md` §4 lists its rows): `python configure.py`
 → `ninja` → `ninja build/RMHE08/report.json` → the regression scan (`ninja changes`, no measure down) →
 `ninja build/RMHE08/ok` → `ledger.py` (the ledger delta, reported).  On top of that it runs the **cheap rows**
 before the build: the ground-truth hash, the batch base, the scope/outbox/branch guards, the style lint, and
@@ -1022,13 +780,11 @@ hide every new one. The lane's fast loop and the recipe:
 
 ```sh
 python tools/selftest.py --changed     # only the selftests of the tools THIS diff touches (fast)
-python tools/selftest.py               # the whole suite: 51 entries / 3,345 checks / ~29 s wall
+python tools/selftest.py               # the whole suite
 python tools/selftest.py --json        # machine-readable inventory (pass/fail/checks/duration per tool)
 ```
 
-Measured cost 2026-09-27: **~29 s wall** (8 workers) on a current build tree, dominated by `land.py --selftest`
-(27 s) and `claims.py --selftest` (20 s) which run concurrently - so the added gate row costs well under a minute,
-and `land.py verify --no-selftests` skips it outright if a landing must be fast.
+`land.py verify --no-selftests` skips the row outright if a landing must be fast.
 
 **Handover.** Before a compaction or the end of a session: `.pi/state.md` says which batch is open, the
 ledger is the state, and anything worth keeping is in `docs/`, a skill, `CLAUDE.md` or a unit header. A finding
@@ -1059,37 +815,12 @@ and when a slot frees, prefer a new unit, a new symbol or the next attribution b
 | `Pl/pl_act.cpp` | 97.87 % | `Pl_bari_ck` has retail's out-of-line first-arm body; `fn_8027C208`'s 16-byte frame is locals retail never touches and is not source-reachable | a shape for the out-of-line arm |
 | `Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp` | 93.68 % | the exception/rename work landed; what remains is the long tail | a round per function |
 
-The 11 units that *are* flipped: `Runtime.PPCEABI.H/{__start,__ppc_eabi_init,global_destructor_chain,__init_cpp_exceptions,memcpy,memset}`,
-`g3d/g3d_resanmamblight`, `Network/NetworkWiiMediator`, `OS/OSAlarm`, `lobby/lobby_scene`, `Pl/pl_master`.
+The flipped units are `configure.py`'s `Object(Matching, ...)` entries (§2); the flip path is `docs/pipeline.md`
+§15.3.
 
 **The breadth queue is the pool** (§12, "Register once, at the final home"): the registered units that are not
 `Matching` and that no worker has taken (`queue.py list`; until 2026-10-04 only the body-less ones). They have no score, so they are not parked rows - a unit joins this
 table only once a worker has measured it.
-
-### The breadth blocker: rule 7 versus a unit with no bodies yet (owner, 2026-09-24)
-
-Registration happens **before measurement**: a worker needs the unit in the build graph to measure it, so it
-registers the unit at its final home and measures there (§12, "Register once, at the final home"). While a unit
-has no bodies, its file carries only the symbol map's spellings - `fn_XXXXXXXX` / `unk*` - and §6.5's rule 7
-cannot be satisfied yet. `stylelint --diff` counted that as a new violation, so `land.py` refused the batch that
-registered the unit.
-
-**Decided: rule 7 is not enforced for a unit with no bodies yet.** The exemption is keyed on the unit's own
-source, not on its path (the old `src/auto/` bucket no longer exists). Once a unit carries
-reconstructed bodies, rule 7 applies to it: the bodies' names come from the evidence the worker has (§12), so
-the exemption is a starting gate, not a standing one.
-
-* **What it covers**: rule 7's findings on a registered unit **while it has no bodies** - its tentative
-  `fn_XXXXXXXX`/`unk*` spellings.
-* **What it deliberately does not**: rules 1-6 and 8 still apply to a unit whether it has bodies or not; rule 5
-  in particular still catches an `unk*` *field* anywhere.
-* **Where it is implemented**: a **separate workstream** owns the change in `tools/units/stylelint.py` (this plan
-  records only the condition). Until it lands the lint still keys on the old prefix and the land gate is the
-  arbiter; when it lands, `stylelint --diff` and the gate follow the unit's body count.
-
-The claim-lock spelling lesson from the same round still holds: the claim's key was the unit's *spelling*, so
-`auto/X` and `auto/X.c` defeated the lock and two workers took one unit. `claims.norm_unit` now strips the source
-extension at claim and release (commit `c36ab86f`), so a unit has one key whatever it is named.
 
 ### The binary is the ground truth, and compilation is lossy (owner's principle, 2026-09-23)
 
@@ -1118,6 +849,8 @@ different place.
 
 ### Paste the queue's spawn line verbatim (2026-09-23)
 
+The profile each leg runs is `docs/pipeline.md` §2.4; a pair run's legs are listed in `docs/pipeline.md` §15.1.
+
 Two mistakes this session had one cause: **the orchestrator retyped what `queue.py next` had already produced.**
 
 * it grepped the spawn line for the `cwd` to get the worktree path, dropped the `agent:` line, and spawned six
@@ -1134,25 +867,9 @@ wrong agent and an impossible closing instruction. Adding hints to a pasted task
 
 ### Which agent to spawn (2026-09-23)
 
-The project defines three agents for this campaign, and the orchestrator must spawn the *matching* one - the difference is
-the prompt, the skills the harness loads, and the acceptance role, not just a label:
-
-* **`decompiler`** - reconstructs one translation unit so its object matches, measuring
-  each function with objdiff, honouring the section 6.5 rules, and committing. **This is the agent for every unit
-  round**, and it is what `queue.py` emits: `claude --agent decompiler ...` (see `tools/units/lanecmd.py`), asserted in its selftest.
-* **`fixer`** - takes a branch the landing gate **REFUSED** and clears exactly the
-  items it listed (stylelint findings, a compile clash, a measured regression) without moving any score down, then
-  re-verifies and commits.
-* **`merger`** - merges main into a held branch whose unit cannot land because main moved through
-  a shared header it also touched, resolving by class and proving the shared header moved zero rows.
-
-A `worker` is the *general-purpose* agent and is right for tooling, probes and investigations - it is **not** the right
-agent for a unit round, and using it there loses the decompiler's prompt and its skill set.
-
-**Process note, learned the hard way**: when `queue.py next` prints its spawn line, paste it **whole**. Its output has
-`agent:`, `name:`, `cwd:` and `task:` lines; grepping only for the `cwd` (which is what the orchestrator did once,
-spawning six general-purpose `worker`s instead of `decompiler`s) silently drops the agent and loses exactly what the
-queue exists to provide.
+The profile table and the kind -> profile map are `docs/pipeline.md` §2.4. A `worker` is the *general-purpose* agent
+and is right for tooling, probes and investigations - it is **not** the right agent for a unit lane, and using it
+there loses the unit profile's prompt and its skill set.
 
 ### The two tools that changed how a round is worked (2026-09-23)
 
@@ -1244,8 +961,8 @@ stub -> later promotion to a real name and location) touched every unit twice an
   forbidden** - a module comes from the `__FILE__` string, the dump or the subsystem, never from a guess.
 * **Registration before measurement is the constraint.** A worker cannot score a unit that is not in the build
   graph, so it makes the registration - `splits.txt` range, `configure.py` entry, source file - **inside its own
-  worktree** and measures there. The orchestrator applies that registration on `main` (§5.1's cherry-pick), so
-  the shared files keep one writer.
+  worktree** and measures there. The orchestrator applies that registration on `main` (the landing,
+  `docs/pipeline.md` §4), so the shared files keep one writer.
 * **One re-split per batch.** Registration and a rename both dirty the split, so registrations ride a batch the
   way renames do - **one re-split per batch**, the same cost the old attribution batch paid; the ledger and the
   brief pool follow the unit to its real path.
@@ -1256,6 +973,9 @@ stub -> later promotion to a real name and location) touched every unit twice an
   satisfied and no bullet here has to schedule a move. A unit that still drifts under a placeholder path is a
   defect to fix **in place** - rename, extension and `-lang` in one change, one re-split - never a second
   registration.
+* **A claim has one key.** The claim's key was once the unit's *spelling*, so
+  `auto/X` and `auto/X.c` defeated the lock and two workers took one unit. `claims.norm_unit` now strips the source
+  extension at claim and release (commit `c36ab86f`), so a unit has one key whatever it is named.
 
 ### A branch is never the only copy of work (2026-09-23)
 
@@ -1334,66 +1054,35 @@ The flow calls it, so nobody has to remember: `land.py` releases the claim of th
 
 ### Production mode (owner, 2026-09-23)
 
-The campaign now runs continuously and the orchestrator manages it: **the worker slots stay full and the queue is
-worked without per-batch approval.** The loop is one unit of work wide and the same for every kind of work:
+The campaign runs continuously and the orchestrator manages it: **the worker slots stay full and the queue is
+worked without per-batch approval.** The loop is `docs/pipeline.md`'s: the pair run (§15: scout, scout
+review, pre-pass, lanes, land), or a wave where its §1.3 says so; one unit per landing, one slot refilled
+per completion (its §13.1). Renames, phantom merges, range claims and source work ride the same split (§3, item 4 of
+the law); in a pair run every own-row `symbols.txt` rename rides the shared pre-pass batch (`docs/pipeline.md` §15.1).
 
-1. **Prepare** (a worker, no build): a proposal's registration and its paste-ready shared-file edits, a tooling fix, a
-   read-only investigation, or a matching round on one unit in its own worktree.
-2. **Apply** (the orchestrator, owns the build): the `splits.txt`/`configure.py` edits or the cherry-pick, then
-   **one re-split and one `land.py` gate** per batch - renames, phantom merges, range claims and source work ride
-   the same split (item 4 of the constraints above).
-3. **Land** one unit at a time: cherry-pick, gate, commit, `claims.py release` (which returns the slot for the
-   next lane and deletes the branch; it refuses while a live session holds the slot's cwd on Windows).
-4. **Refill**: as soon as a slot frees, launch the next item, so the round never drains.
+Work is chosen by the ledger: the next residual unit by the per-module table, the next flip by `flipcheck.py` and
+the reverse-reference check (`docs/pipeline.md` §15.3). The gates stay on (they have caught real regressions,
+protocol bugs and a wrong premise); what the owner has removed is the *approval*, not the verification. A stop is
+only for the plan's own conditions: the target closed, a check that will not pass after three attempts, or the
+budget.
 
-Work is chosen by the ledger: the next attribution run by the block view, the next residual unit by the per-module
-table, the next flip by `flipcheck.py`. The gates stay on (they have caught real regressions, protocol bugs and a
-wrong premise this session); what the owner has removed is the *approval*, not the verification. A stop is only
-for the plan's own conditions: the target closed, a check that will not pass after three attempts, or the budget.
-
-**Today there are no workers**, and that is the normal case: the orchestrator does everything itself. The §5.2
-brief is then a *file it writes for itself* too, so a later worker can pick the unit up, and the compile is
-`ninja build/RMHE08/src/<unit>.o` instead of `recompile.py`. Nothing in the protocol waits for workers to exist.
-
-1. **The ground-truth guard** (7.18) - `prepcommit.py` refuses `build.sha1`/`config.yml`, the tracked
-   `tools/git/hooks/pre-commit` is added and `core.hooksPath` pointed at it. First, because it is the only hole
-   that can invalidate the campaign's evidence, and it is ~40 lines.
-2. **The protocol tools** (7.1 + 7.15, 7.2 -> 7.5, 7.17, 7.20) - **7.1/7.15, 7.2-7.5, 7.17, 7.20 and 7.21 all done 2026-09-23** - `recompile.py` (worktree-safe),
-   `claims.py`, `brief.py`, `handoff.py`, `land.py`, the data queue (`dataqueue.py`, 3728 runs / 2.27 MB),
-   transactional `apply` + `--max-total-bytes`, and `stylelint.py` (79 checks, wired into the gate). The first *worker* round does not
-   start before 7.1/7.15 and 7.2 exist; the first *land batch* does not start before 7.5 does.
-3. **The first `Matching` flip** (7.6) - **done 2026-09-23, and past its first**: nine objects are linked from
-   `src/` with `main.dol` byte-identical throughout (`memset`, `NetworkWiiMediator`, `OSAlarm`, `memcpy`,
-   `lobby_scene`, `global_destructor_chain`, `__ppc_eabi_init`, `g3d_resanmamblight`, `__start`). The round's
-   lessons are in the flip-campaign paragraph above; the one open blocker is the `.ctors`/`_reference`
-   question, and `flipcheck.py` reports 10 of 19 registered units ready.
-4. **`dumpmap.py` + one batched rename pass** (7.7) - **`dumpmap.py` done 2026-09-23** (203d975, 66 checks):
-   30 991 of the map's 65 695 symbols have a dump entry, giving **2 692 rename candidates** (1 685 high
-   confidence, 1 007 review, 64 flagged), 27 134 confirmations and 1 165 conflicts (a conflict is never
-   auto-renamed). **The batched rename pass itself is the next step.** `dataclaim.py` (7.8, 737a5ce) and
-   `phantom.py` (7.9, 4629ae1) are done too - the latter finds 16 `fn_*` that are really a previous function's
-   dead epilogue, and reproduces the earlier hand-made merge byte-for-byte.
-**(History: the attribution pass, retired 2026-10-03.)** `attribute.py plan 0x80280000 0x80410000` proposed a
-batch inside the largest untouched run the ledger reports (25 blocks, 0x80280000-0x80410000) - 52 functions /
-17 312 B in the first unit, then 31 / 10 760, and so on, each with its `.data`/`.sdata`/`.sdata2`/`extabindex`
-proposals and a flag: `pinned` for a jump-table seam, `no evidence - one run` or `capped at --max-bytes` for the
-guesses. Those flagged units are exactly what `dataclaim.py` (7.8) classifies before anyone edits `splits.txt`.
+**The build order so far** (done, or retired): the ground-truth guard (7.18), the protocol tools (7.1-7.5, 7.15,
+7.17, 7.20, 7.21), the first `Matching` flip (7.6), `dumpmap.py`, `dataclaim.py` and `phantom.py` (7.7-7.9), and
+the attribution pass (retired 2026-10-03; the splits program did it).
 
 **Follow-ups the tool work named:** migrate `tools/symbols/symedit.py::rewrite` to `lib.text` (`Transaction`; `sharedfiles.py` was retired in WP6) - it writes
 `symbols.txt` with its own temp+replace and no anchor/overlap/idempotency gate, the highest-risk shared file -
 and `tools/units/dataqueue.py::write_queue`, which duplicates the same primitive.
 
-5. **The attribution pass, scaled** (retired 2026-10-03; the splits program did it) - each
-   range was registered at its final home by the worker that takes it (registration batches capped at 0.5 MB),
-   and its seam is re-checked the moment its functions match.
-6. **Phase C, the residual sweep** - the 80-99.9 % band is on the critical path for the DOL (a unit with any
-   residual cannot flip): `pl_act`'s near-misses, `pl_skill`'s two allocator-shaped residuals, `pl_master`'s
-   9 bytes, then `Camellia` 99.97 %, `RSO` 99.71 % and `Gecko` 93.68 %. **The type and naming conformance of §6.5
-   rides this pass** - the same units, the same order - so a unit leaves phase C byte-identical *and* conformant.
-7. **The data second pass** (7.8 + 7.17) - measured, one batch at a time, driven by the data queue rather than
+**What remains on the critical path:**
+
+1. **Phase C, the residual sweep** - the 80-99.9 % band (a unit with any residual cannot flip; the parked list
+   above names the measured ones). **The type and naming conformance of §6.5 rides this pass** - the same units,
+   the same order - so a unit leaves phase C byte-identical *and* conformant.
+2. **The data second pass** (7.8 + 7.17) - measured, one batch at a time, driven by the data queue rather than
    by comments in `splits.txt`.
-8. **Phase D, the flip campaign** (7.19) - as units reach byte-identity, flip them in batches with a link-order
-   audit, until `ok` passes from a clean tree (S1).
+3. **Phase D, the flip campaign** (7.19) - as units reach byte-identity, flip them (the flip path is
+   `docs/pipeline.md` §15.3) with a link-order audit, until `ok` passes from a clean tree (S1).
 
 
 ## 13. Risks, and where each is handled
@@ -1401,15 +1090,15 @@ and `tools/units/dataqueue.py::write_queue`, which duplicates the same primitive
 | risk | handled by |
 | --- | --- |
 | reaching for flags to fix what is really source shape or liveness | playbook 13, `mwcc-unit-matching` |
-| a `Matching` flag on a wrong object | non-negotiable 4, `objdiff-verify`, one flip per commit, §1's per-object rule |
+| a `Matching` flag on a wrong object | non-negotiable 4, `objdiff-verify`, each flip hash-checked alone (batches allowed, `docs/pipeline.md` §11 2026-10-13), §1's per-object rule |
 | claiming a data range that lowers a function | playbook 23, §8.4, `dataclaim.py` |
 | a rename that splits the map and the source | `symbol-map-editing` (two edits, one change), `symedit.py rename-batch` |
 | a stale report or a hand-written compile | `recompile.py` (7.1), §8.5 |
-| four agents editing one file | worktrees + branches (§5.1), one writer per unit, `land.py`'s file-set check |
+| four agents editing one file | worktrees + branches (§5.1), one writer per unit, `land.py`'s file-set check; a pair run's pre-pass and the manifest row (`docs/pipeline.md` §14.4, §15) |
 | a worker in a worktree cannot measure (no `build/`, no `build.ninja`) | 7.15 — `MAIN` resolution, explicit `--target`/`--flags`, the submodule init; the first worktree round does not start without it |
-| a worker's commits silently dropped by a tip-only cherry-pick | §5.1's one-commit rule, or a range cherry-pick |
+| a worker's commits silently dropped by a tip-only cherry-pick | `land.py land --branch` applies the branch's merge-base diff (`docs/pipeline.md` §4) |
 | rewriting the DOL's ground truth (`build.sha1`) | 7.18's refusal + the sha1 cross-check against `orig/RMHE08/sys/main.dol` |
-| a worker's diff landing on `main` before verification | `git cherry-pick --no-commit` → verify → commit (§5.1) |
+| a worker's diff landing on `main` before verification | `land.py land` gates before it commits; a refusal leaves the tree as it was (`docs/pipeline.md` §4) |
 | a worktree that cannot be removed (submodule, untracked evidence) | no submodule in worktrees; evidence in `MAIN/.pi/`; `remove --force` + `branch -D` + `prune` (7.2) |
 | overlapping or half-written registrations | `apply` transactional + the overlap check (§6.1) |
 | a residual unit silently blocking the DOL | §1.1: phases C and D are on the critical path, and the residual class is scheduled, not hoped for |
@@ -1434,7 +1123,7 @@ The fourteen incidents in `docs/process-review.md`, and the rule that now preven
 | 8 a size cap cutting inside a must-link anchor | `attribute_selftest.py` (23 checks) |
 | 9 the wrong zip member | 7.7 `dumpmap.py` + `docs/memory-dump.md` |
 | 10 an unsupported seam claim | §8.3 seam policy |
-| 11 concurrent writers | §5.1 worktrees + branches |
+| 11 concurrent writers | §5.1 worktrees + branches; the pair pre-pass and manifest (`docs/pipeline.md` §15) |
 | 12 manual verification | 7.5 `land.py` |
 | 13 the knowledge delta by memory | 7.10 the machine check |
 | 14 an out-of-band flag | §8.2 flag policy |

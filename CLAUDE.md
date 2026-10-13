@@ -19,8 +19,7 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
   translation units with no unclaimed `.text` (`docs/splits-program.md`). A unit is registered **once**, at its final home
   `src/<module>/<name>.<ext>` (no `src/auto/` bucket); most are `NonMatching` shells being reconstructed. The work queue is
   `splits.txt` itself: the pool is the registered units that are not `Matching` (`python tools/units/queue.py list`). The measured
-  totals and the live in-flight state are not kept here: `docs/plan.md` section 2, `python tools/units/ledger.py`, and
-  `.pi/state.md`.
+  totals and the live in-flight state are not kept here: `python tools/units/ledger.py` and `.pi/state.md`.
 
 ## Where the state and the lessons live
 
@@ -76,15 +75,15 @@ The *how* is the playbook index in `docs/matching/index.md` (see "Matching playb
 
 The full policy, with its dated reasons, is `docs/pipeline.md` 13.1 and the rulings in section 11. The rules a lane needs:
 
-* **Six lanes at most**, unit workers and tool fixes together; **refill one slot per completion**, not in waves.
+* **Six lanes at most**, unit workers and tool fixes together (a wave included); **refill one slot per completion**.
 * **A slot is not filled while finished work sits unlanded** (`queue.py next` refuses; `--allow-unlanded <branch>` parks one),
   and **a slot goes to a problem before a new unit** (a gate refusal, a blocked lane, a tool that cannot express the work).
-* **Claim a wave with `queue.py next --cluster MODULE|HEADER`** (one lane per module or owner-header closure) or `--count N` (lanes that share no owner header or module): two concurrent lanes never share a hot header.
-* **Land one unit per commit, one at a time, from `main`** (`git rev-parse --abbrev-ref HEAD` prints `main`; `land.py` refuses
+* **Claim a wave with `queue.py next --cluster MODULE|HEADER`** (one lane per module or owner-header closure) or `--count N` (lanes that share no owner header or module; `--count 2` for a pair): two concurrent lanes never share a hot header.
+* **Land one unit per commit (proven flips may batch, `docs/pipeline.md` 11), one at a time, from `main`** (`git rev-parse --abbrev-ref HEAD` prints `main`; `land.py` refuses
   otherwise). Land the orchestrator-side tools/docs batch first (`land.py land --already-applied`), then the lanes.
 * **A lane gets the profile that matches its job** - `.claude/agents/` (tracked): `decompiler` (unit work), `fixer` (a refused
   gate or measured regression), `merger` (a refused apply / a fold), `codereviewer` (read-only review), `worker` (tooling and
-  docs; the fallback), `surveyor` (the first leg of a unit claim), plus the read-only globals `scout`/`planner`/`reviewer`.
+  docs; the fallback), `surveyor` (a claim survey on request; not a leg of the loop), plus the read-only globals `scout`/`planner`/`reviewer`.
   `python tools/units/slots.py spawn --kind KIND [--slot N]` decides and prints the launch line (`unit`->`surveyor`, `fix`,
   `merge`, `tooling`/`docs`, `review`, `scout`/`recon`/`plan`; an unknown kind is refused). No kind maps to `decompiler`: its legs
   take `queue.py next --profile decompiler`, or the in-session route on the claim's slot (`worktreehook.py arm --slot N`). When a prompt and the profile disagree, **the profile wins**. A profile edit is not live until
@@ -98,20 +97,20 @@ The full policy, with its dated reasons, is `docs/pipeline.md` 13.1 and the ruli
   commits (`docs/pipeline.md` 11, 2026-10-07).
 * Keep `ninja build/RMHE08/ok` green and `orig/RMHE08/**` untouched as the invariant of every step.
 
-The steady loop, per unit:
+The steady loop is the **pair run** (`docs/pipeline.md` 15; a wave is its multi-lane form). A unit with no foreign edits
+is a pair-run unit whose scout list is empty and skips the pre-pass.
 
-1. `queue.py next` claims one registered `NonMatching` unit (or a cluster) - one worktree, one branch, one brief - and prints the paste-ready spawn.
-2. The worker reconstructs the bodies and commits them on its branch, measured.
-3. **Review before landing**: a read-only `codereviewer` lane judges the branch's own diff (`git diff main...<branch>`,
-   `python tools/units/stylelint.py --ref <branch>`, per-function objdiff) for honesty of the match claim, naming, placement,
-   types, comments and codegen hygiene; findings come back itemised and are cleared on the same branch by a `fixer` (or the
-   decompiler lane). A review that finds nothing says so. This is `decomp -> review -> decomp` (`docs/pipeline.md` 1).
-4. Land with the one landing path, `python tools/units/land.py land --branch worker/<slug> [--units <claim>] [--message SUBJECT]`:
-   it refuses a dirty tree, records the base, applies the branch's merge-base diff three-way, resolves a `configure.py` /
-   `splits.txt` registration conflict with its own scoped union (`land.py resolve`), runs the gate, commits with a pathspec
-   and releases the claim; a refusal leaves the tree as it was. A conflict it refuses (a shared header, a `src/**` file) is
-   resolved first with `python tools/units/mergebranch.py resolve`. The gate and the merge procedure: `docs/pipeline.md` 4-5.
-5. `ninja build/RMHE08/ok` green, then refill exactly that one slot.
+1. **Pick** with `queue.py next --count 2` (two units sharing no owner header or module).
+2. **Scout** each unit's dependencies read-only, then a read-only `codereviewer` **scout review** (`docs/pipeline.md` 15.1).
+3. **Pre-pass**: every file both units need changed (shared headers, own-row `symbols.txt` renames) lands alone first.
+4. **Per unit** `decompiler -> codereviewer -> decompiler` on a branch cut after its pre-pass, editing only its manifest's
+   `owns`; review judges the branch's own diff and a review that finds nothing says so (`docs/pipeline.md` 1).
+5. **Land** each with `python tools/units/land.py land --branch <branch> --units <unit> --manifest <path>`: it refuses a
+   dirty tree, records the base, applies the branch's merge-base diff three-way, resolves a `configure.py`/`splits.txt`
+   registration conflict with its own scoped union, runs the gate, commits with a pathspec and releases the claim; a
+   refusal leaves the tree as it was. A conflict it refuses is resolved first with `python tools/units/mergebranch.py
+   resolve` (`docs/pipeline.md` 4-5).
+6. `ninja build/RMHE08/ok` green, then refill exactly that one slot.
 
 ## Matching playbook
 
@@ -218,7 +217,8 @@ Verifying a unit, function or symbol is its own procedure (per-symbol objdiff pl
    `.ctors`/`.dtors`/`.sdata` fragments runtime units own (`.ctors$10`, `.dtors$10`, `.dtors$15`).
 5. **Compile and diff:** `python configure.py && ninja build/RMHE08/src/Dir/file.o`, then inspect the unit's per-function diff.
    When it does not match, work the playbook ideas one at a time instead of guessing at flags.
-6. **Flip to `Object(Matching, ...)`** only once the unit matches (bytes/instructions + relocations), one unit per commit.
+6. **Flip to `Object(Matching, ...)`** only once the unit matches (bytes/instructions + relocations); proven flips may share one commit
+   (`docs/pipeline.md` 11, 2026-10-13).
 7. **Prove it end-to-end:** `ninja build/RMHE08/ok` must finish green.
 
 Keep changes small and verified. A micro-optimization for a function that already matched is a regression if the hash goes red.

@@ -1,6 +1,6 @@
 ---
 name: surveyor
-description: Surveys one claim before anyone writes code - measures whether the claimed range can support the unit's bodies, and extends the claim (or records exactly why it cannot) with the paste-ready splits.txt / configure.py / symbols.txt lines. Use as the first leg of a lane (surveyor -> decompiler -> codereviewer -> decompiler) when a unit's bodies will need data, tables, unwind sections or symbols from outside its claimed range.
+description: Surveys one claim before anyone writes code - measures whether the claimed range can support the unit's bodies, and extends the claim (or records exactly why it cannot) with the paste-ready splits.txt / configure.py / symbols.txt lines. Use before a unit's decompiler leg when its bodies will need data, tables, unwind sections or symbols from outside its claimed range.
 tools: Read, Bash, Write, Edit, Grep, Glob
 skills:
   - tu-boundary-discovery
@@ -10,8 +10,8 @@ skills:
 ---
 
 You survey **one claim** of the mhtri-dtk matching decompilation (Monster Hunter Tri, Wii, `RMHE08`) and answer
-one question **by measurement**: *can this claimed range support the work the unit is about to do?* You are the
-first leg of the lane loop - `surveyor -> decompiler -> codereviewer -> decompiler` - so the decompiler that
+one question **by measurement**: *can this claimed range support the work the unit is about to do?* You run before
+the unit's `decompiler` leg (the loop is the pair run, `docs/pipeline.md` 15), so the decompiler that
 follows you must be able to write bodies without discovering, mid-pass, that it needs data it does not own.
 
 Why this profile exists: four lanes in one day each lost a round to a claim that was too small. One could not

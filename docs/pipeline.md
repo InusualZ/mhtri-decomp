@@ -3,6 +3,9 @@
 **This file is the authority for *how* a batch is run. `docs/plan.md` remains the authority for *what* is
 worked and in what order.** When the two disagree, this file owns the mechanics and `plan.md` owns the queue.
 
+**The steady procedure is the pair run (section 15)**: scout, scout review, pre-pass, lanes, land. A wave (section 14)
+is its multi-lane form (section 1.3); section 1 is the review loop every unit lane runs inside both.
+
 The pipeline is the process by which one claim becomes one landed unit: a decompile pass, an independent
 review pass, a bounded fix pass, a gate, and a landing. It exists because **a decompile pass cannot audit its
 own work** — the author of a unit writes the residual list, the flag evidence and the prose in the unit header,
@@ -21,13 +24,12 @@ F31–F43). Numbers are quoted from those artifacts; where something is unmeasur
 ### 1.1 The loop
 
 ```
-claim (opt-in --pipeline) -> PHASE 1 decompile -> PHASE 2 review -> PHASE 3 fix -> [one re-review] -> land
+claim -> PHASE 1 decompile -> PHASE 2 review -> PHASE 3 fix -> [one re-review] -> land
 ```
 
-* **Phase 0 — claim.** One claim, one slot, one branch: `claims.py claim <unit> --pipeline --slot <n>`. The
-  claim holds the slot for the **whole loop**, because phase 2 must read the branch where it lives — a slot is
-  a *directory*, never a branch (see §1.3). `--pipeline` is opt-in: the loop cannot gate the rest of the fleet,
-  and everything that does not opt in behaves exactly as it did before.
+* **Phase 0 — claim.** One claim, one slot, one branch: the unit's branch is cut after its pre-pass lands (§15.1
+  step 5). The claim holds the slot for the **whole loop**,
+  because phase 2 must read the branch where it lives — a slot is a *directory*, never a branch (§2.1).
 * **Phase 1 — decompile.** An ordinary `decompiler` lane works the unit as normal, with one changed
   expectation: **"done" means "reviewable"**, not "finished". The normal bar is unchanged — best-scoring
   variant, no regression, residuals in the header, `ninja build/RMHE08/ok` green — but the unit header's
@@ -55,80 +57,52 @@ relocation-level defect was the one that mattered, and it was buried in a list o
 brief must therefore be ordered: **byte-moving findings first, record-only findings after**, so that if the
 lane runs out of wall it has committed the change that affects the artifact.
 
-### 1.3 When to use the loop — and when not to
+### 1.3 Which flow to use
 
-The loop is **opt-in per claim** (`--pipeline`). It is worth its cost when the flip is live and the claim is
-high-stakes: a first flip of a unit, a unit whose work is doubtful (new bodies, a deliberate rule deviation, a
-modelled layout), or a record that downstream lanes will read and trust. It is **not** worth it for a
-documentation-only change, a mechanical rename sweep, or a tooling fix whose own selftest is the check — for
-those the ordinary lane plus its gate is sufficient, and the loop's supervision cost is pure overhead.
+| flow | use it for | where |
+| --- | --- | --- |
+| **pair run** (the default) | two units at once; every file both need changed lands first as a pre-pass | §15 |
+| **wave** | several multi-unit lanes over several lane groups; the multi-lane form of the same recon / pre-pass / manifest idea | §14 |
 
-The honest state of the evidence is in §1.4. **Do not quote the loop as "it catches wrong code" on the strength
-of run 1** — run 1 caught wrong *records*, and run 2 (a doubtful unit) is what shows it catching real defects.
+* A unit with no foreign edits is a pair-run unit whose scout list is empty: it skips the pre-pass.
+* Every unit lane, in both, runs this loop: `decomp -> review -> decomp` is the standing procedure (§11,
+  2026-09-28).
+* The loop is not run for a documentation-only change, a mechanical rename sweep or a tooling fix whose own
+  selftest is the check: the ordinary lane plus its gate is the check there.
+* **Do not quote the loop as "it catches wrong code" on the strength of run 1** — run 1 caught wrong *records*,
+  and run 2 (a doubtful unit) is what shows it catching real defects (§1.4).
 
 ### 1.4 The measured verdict
 
-The experiment has two complete runs, and they answer different questions.
+The experiment has two complete runs, and they answer different questions (full report:
+`.pi/notes/pipeline-experiment-report.md`).
 
-**Run 1 — `Network/initNetworkSessionStable` (a correct flip).** The review found **five defects; all five were
-in the record, zero in the code**, and the code was already byte-identical. Its value was **the honesty of the
-record**, not the correctness of the artifact. That is a real, repeatable value — the code was verified
-independently, from a fresh compile, before anyone trusted it — but it is a different value from "catches wrong
-code". The run's own numbers:
-
-* Phase 1 (`1b2b64038`): 99.92424 → **100.00000 %**; the manual `operator new` + null check became a real
-  `new` expression, and `extab` became byte-identical including the `__dl__FPv` relocation at +0x14. It also
-  found a **second defect the earlier review had not seen** — byte +0x79 (`lz r12,0(r31)` against retail's
-  `r12,0(r3)`), which is **not source-shaped** (six spellings give the identical byte) and yielded to the
-  optimizer pass: `#pragma peephole off` at file scope, with no new flag deviation.
-* Phase 2 (`1223dc58`): verified the flip **from a fresh compile of the committed source** — three sections
-  byte-identical, the relocation offsets *inside* `extab` checked, the claim sizes, `undefined_reference_problems`
-  re-run by hand, and the DOL hash — then reproduced the header's own numbers.
-* Phase 3 (`1d867c03f`): closed all five findings, each **re-measured rather than quoted**, and cleared the
-  naming debt the review handed over as data (five vtable slot targets; four string-confirmed, one derived from
-  use alone and recorded as such). Zero byte movement.
-* The landing (`2e9a85e4c`): gate green, `ok` OK at the DOL hash, **34th flip on main**; ledger matched
-  5,089 → 5,090, `.text` 580,752 → **581,016**. The flip count only moved on *landing* — the branch held it
-  earlier, and quoting it before the landing would have been wrong.
-
-**Run 2 — the DWCi band (`worker/dwci-band-9050`, doubtful work).** Two units, 19 new bodies,
-`DWCi_NatNeg` 1.19 → 19.58 %, `DWCi_Np_CPUCopyFast` 2.60 → 6.20, no regression. The review returned **six
-defects**, one of them **invisible to every score the project has**:
-
-* **A relocation-level defect.** `DWCi_natNegTickIdleSockets` calls `DWCi_natNegPollReplies` where the target
-  calls `DWCi_natNegPollRepliesOnce` — MWCC auto-inlined the 4-byte thunk, so the linked bytes differ while the
-  instruction count agrees. It was found by a **per-symbol reloc-name multiset comparison** (six lines of
-  Python). The header had attributed the row to register colouring, so a fixer following it would have hunted
-  colouring forever. The fix is playbook 61 (`dont_inline` scoped to **one** function).
-* **False evidence with the conclusion still right.** The deliberate rule-1 deviation (one `.sdata` symbol, two
-  declarations, because a sizedness is a codegen input) is justified — but its written proof was wrong: the
-  review measured the negotiator's own object as **ten** SDA21 relocations plus two ADDR16_HA/LO, not SDA21
-  throughout. It also probed the mechanism and measured how rare the target's mixing is (**4 of 2970** target
-  objects). So the deviation stands and the residual for the next pass is now named.
-* Plus stale residual numbers from before the second commit; a naming paragraph that missed five renamed rows;
-  a dead `fn_` row name and a "no placeholder survives" claim its own file falsifies; and three evidence
-  sentences with addresses that point into other units or at instructions that do not exist.
-* The "checked and clean" half is as valuable: **no regression independently (2296 units, 0 regressions, exactly
-  2 advances)**, the four claimed byte-identical bodies verified as **byte *and* reloc identical**, and every
-  modelled layout offset spot-checked against the target disassembly.
-
-**The verdict, in the form it should be quoted:** *run 1 showed the loop polices the record; run 2 shows it
-finds real defects.* Neither run alone is the claim.
-
-**Later reviews (2026-09-28): 6 reviews, 6 material catches, none visible to any gate row.** A false 100 % (a
-`bl` to the wrong symbol *name* - objdiff scores a reloc-name mismatch as equal); a gate hole (the rule-11 row
-is COUNT-based, so an added `void*` hid behind nine removals); a struct that scored 100 % while `0xC` wrong for
-17 rows (an overflowed pad); a regression in a function the branch never touched (`NWC24iSetRtcCounter`
-44.17 -> 40.50, fixed to 92.24 by `dont_inline` scoped to one function); `stylelint --ref`'s vacuous clean.
-Review judges the branch's own diff: `stylelint --diff main` **from MAIN**, per-function objdiff, and the
-**relocation** view. A recorded residual is a landed win, not a finding; a review that finds nothing says so.
+* **Run 1 — `Network/initNetworkSessionStable` (a correct flip).** Five defects, all in the record, zero in the
+  code: the code was already byte-identical. Its value was **the honesty of the record**. Phase 2 verified the
+  flip **from a fresh compile of the committed source** (three sections byte-identical, the relocation offsets
+  inside `extab`, the claim sizes, the DOL hash); phase 3 closed all five, each re-measured rather than quoted.
+  The flip count moved only on *landing*.
+* **Run 2 — the DWCi band (doubtful work, 19 new bodies).** Six defects, one **invisible to every score**: a
+  `bl` to `DWCi_natNegPollReplies` where the target calls `DWCi_natNegPollRepliesOnce` (MWCC auto-inlined the
+  4-byte thunk), found by a **per-symbol reloc-name multiset comparison** and fixed by playbook 61. Also a
+  justified rule-1 deviation whose written proof was wrong, stale residual numbers and evidence addresses that
+  pointed into other units. The "checked and clean" half (no regression over 2296 units, four byte-identical
+  bodies byte *and* reloc identical) is as valuable.
+* **The verdict, in the form it should be quoted:** *run 1 showed the loop polices the record; run 2 shows it
+  finds real defects.* Neither run alone is the claim.
+* **Later reviews (2026-09-28): 6 reviews, 6 material catches, none visible to any gate row.** A false 100 % (a
+  `bl` to the wrong symbol *name* - objdiff scores a reloc-name mismatch as equal); a gate hole (the rule-11 row
+  was COUNT-based, so an added `void*` hid behind nine removals); a struct that scored 100 % while `0xC` wrong for
+  17 rows (an overflowed pad); a regression in a function the branch never touched (`NWC24iSetRtcCounter`, fixed
+  by `dont_inline` scoped to one function); `stylelint --ref`'s vacuous clean.
+* Review judges the branch's own diff: `stylelint --diff main` **from MAIN**, per-function objdiff, and the
+  **relocation** view. A recorded residual is a landed win, not a finding; a review that finds nothing says so.
+* A pair run adds a second read-only review before any body is written: the scout review of the dependency list
+  (§15.1 step 3), which removed the mid-lane misses (§15.4).
 
 ### 1.5 The honest limits (unmeasured, and not to be implied away)
 
-* **Cost per phase is unmeasured.** Phase 1 and 3 are ordinary decompiler lanes; phase 2's report was 87 lines
-  and its hand-rolled harness cost it ~15 minutes (its own filing). Wall-clock and token cost per phase are
-  **not** recorded — the trial's tables are where they should accumulate, and until then no cost claim is
-  supportable beyond "phase 2 is one review lane".
+* **Cost per phase** is measured only for the pair trials (§15.4: lanes ~10-25 min each, the scout review ~16-20 min).
 * **Whether a branch-only review suffices is untested.** Both runs gave the reviewer the decompile lane's own
   summary *and* the branch. A cheaper variant — hand the reviewer the branch alone — has never been run.
 * **One re-review has never been exercised.** Run 1 skipped it legitimately (all findings were
@@ -204,19 +178,17 @@ one-line self-check (`git rev-parse --show-toplevel` must equal the tree; if it 
 
 | profile | used when |
 | --- | --- |
-| `surveyor` | a claim is surveyed **first**: what the unit needs and owns, and the ready-to-paste claim extension |
-| `decompiler` | unit work: the body pass after a survey, and the phase-1 and phase-3 legs of the pipeline |
+| `surveyor` | a tool, not a flow leg: a claim's sections, owners and ready-to-paste claim extension, measured; `slots.py spawn --kind unit` and `queue.py next` still print it |
+| `decompiler` | unit work: the body pass after a pre-pass, and the phase-1 and phase-3 legs of the pipeline |
 | `fixer` | a **refused gate**, or a measured regression — it fixes the named failure, not the neighbourhood |
 | `merger` | a refused apply — but prefer `mergebranch.py` (§5) |
-| `codereviewer` | the phase-2 review; **read-only by construction** (its tool list has no write/edit) |
+| `codereviewer` | the phase-2 review, and a pair run's scout review (§15.1 step 3); **read-only by construction** (its tool list has no write/edit) |
 | `worker` | anything else, and tooling |
-| `scout` / `planner` / `reviewer` | read-only recon, planning, and review outside the pipeline |
+| `scout` / `planner` / `reviewer` | read-only recon (a wave's recon, §14.1; a pair run's dependency scout, §15.1 step 2), planning, and review outside the pipeline |
 
-A unit claim runs **four legs**: `surveyor` -> `decompiler` -> `codereviewer` -> `decompiler`. The surveyor goes
-first because four lanes in one day each lost a round to a claim that was too small - an unowned pool, an unowned
-table, a range that was two translation units, a seam re-cut done by hand - and each of those is cheaper to answer
-before the body pass than during it. `queue.py next` emits the `surveyor` leg for a fresh claim; the decompiler and
-the review are launched once the survey lands.
+A unit's legs are the pair run's: the dependency scout and its review (§15.1 steps 2-3) come first, then the pre-pass,
+then per unit `decompiler` -> `codereviewer` -> `decompiler`. There is no surveyor leg; the scout answers its
+questions (an unowned pool or table, a range that is two translation units, a seam re-cut) before the body pass.
 
 The rule-text blocks in these profiles are **machine-generated** from `docs/plan.md` §6.5 and the matching
 skill: run `python tools/agents/sync_profiles.py --check` and never hand-edit between the markers.
@@ -252,7 +224,7 @@ skill: run `python tools/agents/sync_profiles.py --check` and never hand-edit be
 * **Check the brief slug against the worktree slug** when pasting several `queue.py next` launches: one was
   launched with the `80394038` task in the `803967f0` tree. `briefs/<slug>.md` in the task must equal the cwd's
   slug.
-* **Launching in-session lanes into claimed slots is sequential.** `worktreehook.py arm --slot N`, launch that
+* **Launching in-session lanes into claimed slots is sequential** (the harness side: §13.2). `worktreehook.py arm --slot N`, launch that
   one Agent (`isolation: "worktree"`), confirm its `pwd` is slot N, then arm the next. Measured 2026-09-29:
   three lanes launched in one message after `arm --slot 2 --slot 3 --slot 4` received slots in token-claim
   order, so the slot-4 brief got slot 3. The create-hook payload has only `name` (`agent-<agentId>`, generated
@@ -306,7 +278,8 @@ The failure: two lanes touching the same shared file (or a worker committing to 
 base invalid and the merge ambiguous. A worker edits only its unit's source and commits only on its branch; the
 orchestrator owns the shared files and lands one unit per commit. A conflict is a **protocol violation**, not a
 merge to resolve blindly. `main` does not move while a batch is open; if HEAD has moved before the land step the
-batch aborts.
+batch aborts. A pair run makes one writer per file hold by construction: every shared edit lands first as a
+pre-pass, and the manifest row refuses a lane's path outside its own files (§14.4, §15.1).
 
 **R6 — `NonMatching` units are not linked, so `ok` stays green while an object fails to compile.**
 The failure: a green `ninja build/RMHE08/ok` was read as "the batch builds", but `ok` links only the units that
@@ -382,7 +355,7 @@ refuses a batch, names the row that refused, and the landing either passes every
 * **One unit per commit.** The landing is one commit per unit, so a later bisect or revert names a unit, not a
   batch. Cherry-pick is the mechanism; a worker that left several commits is landed as its range rather than
   only its tip.
-* **A whole branch lands in one command.** `python tools/units/land.py land --branch worker/<slug>` runs record-base, applies the branch with the registration union, gates it, commits and releases - the landing path when the branch is whole. Reach for `--units` only when the batch's paths are not the branch's registration diff.
+* **A whole branch lands in one command.** `python tools/units/land.py land --branch worker/<slug>` runs record-base, applies the branch with the registration union, gates it, commits and releases - the landing path when the branch is whole. Reach for `--units` only when the batch's paths are not the branch's registration diff. A pair or wave lane adds `--manifest <path>` (§14.4; §15.1 step 6).
 * **The bootstrap exception.** A change **to the gate itself** cannot be gated by the gate it is changing, so
   it is committed **directly, path-limited** (the gate's own files and nothing else). This is the only landing
   that skips the gate, and its path-limit is what keeps the exception from becoming a habit.
@@ -552,7 +525,9 @@ landing's verification against the DOL hash is the arbiter that a `Matching` fli
 
 **`tools/units/mergebranch.py resolve` brings `main` into a stale branch.** It is proven on three lanes and is
 now the tool — the manual merge is superseded. Reach for it whenever a branch was cut before `main` moved and
-must be brought current before landing.
+must be brought current before landing - a refused landing (a shared header, a `src/**` file), worked by the
+orchestrator or a `merger`. **A lane never merges `main` itself**: it continues on a fresh branch off main's tip
+(§11, 2026-10-07; 13.1). A pair run has no merge conflict by construction (§15).
 
 * **`git apply --3way` is the wrong primitive.** It merges text; this repository's conflicts are almost never
   text-local. A `symbols.txt` row, a `splits.txt` range and a `configure.py` entry are *facts with an owner*,
@@ -688,7 +663,8 @@ A flip is the highest-stakes claim in this repository — a wrong one links the 
 it is verified, not asserted.
 
 * **`flipcheck.py` READY is necessary, not sufficient.** READY is the *entry* condition: it says the unit is a
-  candidate. It does not say the unit is correct, and it must not be quoted as if it did.
+  candidate. It does not say the unit is correct, and it must not be quoted as if it did. The flip path - READY plus
+  the reverse-reference check, each unit proven alone with `ok` - is §15.3.
 * **Where `flipcheck` runs (2026-09-29).** Three places, cheapest first: the **lane** runs it on any unit that
   reaches ~100 % (the `decompiler` profile's verification list) so a section defect is found while the source is
   still open; the **reviewer** runs it per unit (dimension 1); and the **landing gate** runs it as a refusing row
@@ -824,7 +800,8 @@ format.**
 
 Part 6 is copied **verbatim** from the plan's rules (§8) plus the skill that owns the step, so there is one
 canonical source and no drift. **If the brief does not say it, it is not a rule.** Spawning a worker is then
-one line: *read this brief, do it, write your report.*
+one line: *read this brief, do it, write your report.* In a pair run the lane's task is its unit's slice and its
+manifest, both from the reviewed deps JSON (§15.1 steps 2-3).
 
 ### 10.2 The worker's output is data, not prose
 
@@ -868,14 +845,14 @@ appears during the build is still refused), only delivered earlier.
 | two workers, one unit | the branch already exists (`claims`) or the slot is locked (`slots`) | the loser takes the next unclaimed unit or the next free slot |
 | a slot's kept build tree is stale | `slots.py verify`, or `acquire`'s guard | **re-seed from MAIN before handing over**; refuse if it still cannot be proven current |
 | a worker dies mid-unit | stale worktree / branch never merged / no outbox entry | inspect its tree, re-issue the brief (brief step 1 compiles and measures first, so a half-written source is caught) |
-| a worker edits a shared file | `land.py verify` diffs the tree against the expected file set | reject the merge, restore the file, re-brief; its other work survives |
+| a worker edits a shared file | `land.py verify` diffs the tree against the expected file set; with `--manifest`, the manifest row (§14.4) | reject the merge, restore the file, re-brief; its other work survives. In a pair run the edit becomes an integrator request and a follow-up pre-pass (§15.2) |
 | a worker measures a stale object | `recompile.py` asserts the mtime advanced | rerun; discard the numbers |
 | a worker's number disagrees with the report | the orchestrator re-measures every symbol it claims | the orchestrator's measurement wins; the difference is investigated, never averaged |
 | a worker wants a flag nobody else agrees with | the flag rule | it stays a *probe* in the outbox until a second unit or a source pragma backs it |
-| a merge conflict | `git cherry-pick` stops | protocol violation: resolve, re-measure, record |
+| a merge conflict | `land.py land` refuses the apply | protocol violation: resolve (`mergebranch.py resolve`, §5), re-measure, record |
 | a worktree cannot resolve the toolchain/target | `recompile.py` fails with the missing path | fail loudly — never silently compile nothing |
 | the unit is only partially matched | the outbox says so and its score is below `main`'s | **measure before merging**: worse → drop and re-brief; better → merge, record the residual, mark `partial` |
-| `main` moved while the worker ran | the cherry-pick conflicts, the worker's base is old, or `land.py` refuses to union the batch's header | the worker runs **`tools/units/mergebranch.py resolve` inside its own worktree** - main is merged into the held branch there, resolved by class, proven and committed, so the lane keeps working and one branch still lands - and the orchestrator re-measures after the apply regardless. The by-hand dance is no longer the path: `git apply --3way` refuses as soon as the working tree differs from the index, and inferring "already resolved" from the absence of markers once skipped a file left from main and silently dropped **157 header lines and a registration** |
+| `main` moved while the worker ran | the apply conflicts, the worker's base is old, or `land.py` refuses to union the batch's header | the lane never merges `main`: it continues on a fresh branch off main's tip, carrying its unlanded commits (§11, 2026-10-07); a refused landing on a shared file goes to `mergebranch.py resolve` (§5), and the orchestrator re-measures after the apply regardless. The by-hand dance is no longer the path: `git apply --3way` refuses as soon as the working tree differs from the index, and inferring "already resolved" from the absence of markers once skipped a file left from main and silently dropped **157 header lines and a registration** |
 | a claim cannot be released | `git worktree remove` fails (`Permission denied` / "Device or resource busy") | a live pane is sitting in the worktree; teardown first (§10.8) |
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
 
@@ -922,15 +899,13 @@ audited on the spot: `redundant` is pruned, drift is reported, `unlanded`/`unkno
   headless launch (`tools/units/lanecmd.py`).
 * **A lane that needs a ruling ends its turn with the request** and is resumed by `claude --resume <session-id>
   -p "<ruling>"`.
-* **A slot goes to a problem before a new unit; a refused slot is refilled with a `fixer`, not a claim** (the
-  queue refuses while a branch holds unlanded work). `queue.py next --count N` claims lanes that share no owner
-  header or module, and `queue.py next --cluster <module|header>` gives header-sharing units one lane (WP3e).
+* **A slot goes to a problem before a new unit; a refused slot is refilled with a `fixer`, not a claim** (13.1).
 * **`attribute.py` and the proposal queue are retired** (`docs/tools/retired.md`); the queue is the registered
   units that are not `Matching` (2026-10-04; it was the body-less units only).
 * **`tools/splits/tudiscover.py` needs the asm dump** (`python tools/splits/dump_asm.py`; `write_asm: false` by
   default; `dol split` is then 200-400 s instead of ~18 s).
-* **A `Matching` flip is one unit per commit, byte-identical, with a green `ok`** (§8); a lane on an exhausted
-  row records the residual with both measurements and does not use `goto` (rule 8).
+* **A `Matching` flip is proven one unit at a time, byte-identical, with a green `ok`; proven flips may land as one
+  batch** (§8, §11 2026-10-13; the flip path is §15.3); a lane on an exhausted row records the residual with both measurements and does not use `goto` (rule 8).
 
 ### 10.10 Integrator requests (the network pilot, 2026-10-03/04)
 
@@ -1030,11 +1005,10 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-09-27 | **Inventing a context-derived name is sanctioned**: nothing is unnameable; the honest part is the **mark** (in the owner unit's header, else the file that uses it most), not refusing to name. A rename propagates to every referrer in one batch. |
 | 2026-09-27 | **Rule 11: `void *` is banned** in parameter and return types; the exemption is a per-DECLARATION `/* untyped: <reason> */` (byte range, opaque handle, caller-owned payload), never a per-file key; never a cast; locals out of scope. Heterogeneous call sites mean the *sites* are wrong: settle the type once and let the compiler enumerate mismatches. A map name is the linkage contract, but a helper's **type** is not constrained by the binary. |
 | 2026-09-27 | **Rule 7 covers data; rule 2 covers unowned symbols** (a local `extern` of an unowned symbol belongs in an `include/unsplit/` band header; rule 12 later made an unowned *data* extern a claim instead). A lane that needs an unnamed neighbour renames it, sweeps every reference and re-measures - naming, not deferral. |
-| 2026-09-29 | **Leaf headers are owned by symbol** (rule 2): `include/<module>/<symbol>.h` declaring only symbols one registered unit defines counts as that unit's header (`stylelint.leaf_header_owner`); use one when the owner's full header redefines shared types and cannot be included beside the consumer. Mixed or unowned symbols make it foreign; no per-file exemption. |
 | 2026-09-28 | **`decomp -> review -> decomp` is the standing procedure** (§1): a branch is reviewed read-only before it lands and findings are cleared on the same branch. |
 | 2026-09-27 | **Every tool section in a profile carries a feedback loop**: a gaps note as a register source, check it before filing (a repeat is a vote), the report's tooling line, and a tool that *misled* is the most valuable report. A novel row ranks only with two distinct filers (§6). |
 | 2026-09-27 | The `@etb_`/`@eti_` post-compile build step (`objextab.py`) was owner-approved; changing compiler flags, `mw_version` or tool tags still needs concrete evidence and an explicit call-out (rule 3). |
-| 2026-09-28 | The `.init` TRK-image request was landed; the residual 164 B is closed as unclaimable (§8). Parked decisions still standing: `memcpy.c`/`memset.c` stay separate; `-func_align 4` waits for `Runtime.PPCEABI.H`'s next pass; one `Matching` flip per commit. |
+| 2026-09-28 | The `.init` TRK-image request was landed; the residual 164 B is closed as unclaimable (§8). Parked decisions still standing: `memcpy.c`/`memset.c` stay separate; `-func_align 4` waits for `Runtime.PPCEABI.H`'s next pass. |
 | 2026-09-29 | **No `--allow-rule12` (and no `--no-outbox` for a code row) unless the owner rules.** `land.py --allow-rule12 <token>` is a recorded allowance (the land log's `allow` field and an `allow:` commit-body line since 2026-10-05, §4) and using it is the owner's call, not a lane's. The owner ruled once, for `DWCi_natProbeStatus` (`.sbss` 0x80795818, landed with `DWCi/DWCi_NatNeg`); its claim is scheduled in `.pi/data-requests.json` until the unregistered `fn_8050C770` band, which writes the word, becomes a unit. For `network_transport` the owner chose the real fix (peer classes + a `.data` claim) over an exemption. |
 | 2026-09-29 | **"Touched" is a real change, not an edited file** (owner: "Only real changes"): the strict data-closure row demands a unit's sole-owned orphans only when the batch registers it, recuts it, or changes its compiled object (name-insensitive, relocations by address); a rename sweep does not touch. The add-only half defers NEW pairs by the same classes the strict half uses; `isolated-run` stays as landed. See the gate list. |
 | 2026-09-30 | **Claim-exposed pairs are deferred, not refused** (owner: "defer them as a claim-exposed class"): claiming data exposes new orphan pairs through its own relocations, and refusing them forced claim after claim without end. A NEW pair only the batch's own newly claimed data references is reported `deferred (claim-exposed)` (gate log and `datagap.py --row`), earns no `--allow-orphan`, and becomes a `data-claim` backlog item per (unit, pair-run); every other new pair keeps refusing. Definition and tools: section 4 data-closure row (`datagap.claim_exposed_pairs`, `backlog.collect_dataclaim_items`). |
@@ -1044,7 +1018,6 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-10-03 | **One landing path:** `python tools/units/land.py land --branch worker/<slug>`; the `.pi/bin/*` scripts (`applybranch`, `landbranch`, `mergelane`, `union`) are deleted. |
 | 2026-10-03 | **Tools framework (`docs/tools/design.md`):** a selftest is a fixture (builds its tree with `lib.testing`, cannot see the live tree) or smoke (may read it, tolerant, own tier); `docs/tools/questions.md` items 3-14 stay open and the design assumes each recommendation until the owner rules. |
 | 2026-10-03 | **Network pilot:** the stack (`src/Network/*`, 25 units) is worked by four lane groups (L1 transport, L2 session core, L3 game control, L4 mediator + GameSpy) after an X3 header-prep step. |
-| 2026-10-03 | **Pilot naming exception:** a pilot lane may leave a foreign-owned `fn_`/`lbl_` name and file an outbox request; the orchestrator is the integrator (a batch after every 3-5 landings). |
 | 2026-10-03 | **`mpMediator__15sNetworkLibrary` (`.sbss` 0x80794CC4) keeps its split**; the L4 lane decides from the bodies (it did: a static of the base class, no move), files the sound-side `getInstance` as an ownership request and records the residual in the unit header. |
 | 2026-10-04 | **Build the integrator** (`tools/units/integrate.py`, `tools/lib/requests.py`). Trial rule: a lane may apply a `rename` or `decl-move` itself when the owner unit has no live claim, the confidence is certain/evidence and `integrate` proves names-only drift for the other units; GUESS names, record unification and seams stay with the integrator. |
 | 2026-10-05 | **Headers live beside their sources.** Hub/type headers and band headers mirror their paths under `src/` after the move (`src/types.h`, `src/mh3_pad/*.h`, `src/nw4r/...`, `src/unsplit/<module>.h`); the lint never hard-codes `include/`: a header is a `.h` anywhere and the band root is one constant (`lib.project.ownership.BAND_ROOT`). |
@@ -1053,6 +1026,7 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-10-05 | **Order of the header program**: the lint (this rule set) -> the vtableaudit `referenced` window fix -> the quiesced header move (a separate batch) -> the renames, as lane work. The full body rule set on headers (rules 3, 4, 5, 6, 8, 9) is the orchestrator's recommendation, switchable in one place (`lint.HEADER_BODY_RULES_ON`). |
 | 2026-10-07 | **A pure `splits.txt` seam move is not a regression** (owner: "modify the rule so this case does not need my authorization"). Two batches (the g3d re-range `cf085cde5`, pre-pass 3 `472beb588`) were refused only because functions moved between units through a `splits.txt` diff and the shrinking unit's average fell. The regression row now lifts a *unit-average* row of a unit the diff's `.text` moves name when ALL hold: every function present in both reports (paired by address) scores at least what it did; every function that changed unit lies inside a move between exactly those two units; the matched code of the touched units and the whole-report fuzzy did not fall; the unit really lost or gained a function. A per-symbol drop, a move outside the diffed range, or a unit regression with no splits move refuses as before; `--allow-regression` stays for deliberate cases. The PASS row reads `seam move: A -> B, N functions, none worse` and the landing log carries `seam_moves`. |
 | 2026-10-07 | **A lane never merges `main`; it restarts from a fresh branch off main's tip** (owner: "make it a rule"). Landing re-applies a branch's content as a new commit, so a landed branch stays ahead of main and a later `git merge main` conflicts on every file main has since renamed or built on (QUEST-Q3, 30 files, 2026-10-07; the lane could not resolve it, because taking main's side is a bulk overwrite the permission system refuses). Rule: after a checkpoint lands, a lane that continues cuts a NEW branch from main's tip in its own worktree (`git switch -c worker/<slug>-<n> main`, then `python configure.py`), carrying forward only work that has not landed (cherry-pick the unlanded commits, or re-apply them); the old branch is left alone and removed once landed. Stale landed branches are cleaned with the content-based test of 13.1, never reset. |
+| 2026-10-13 | **Proven flips may land as one batch** (owner: "Allow batches"). Several units may flip to `Matching` in one commit when each is `flipcheck.py` READY and passes the reverse-reference check (§15.3), and the batch is proven by `ninja build/RMHE08/ok` (the `main.dol` hash). Each flip is still applied and hash-checked one unit at a time before the batch commits. |
 | standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
 
 ---
@@ -1179,9 +1153,10 @@ Grouped by cause; each cost a lane ~30 min the first time.
 
 ### 13.1 Production runs
 
+* **The flow** is the pair run (section 15); a wave (section 14) is its form for several lane groups at once (1.3).
 * **Steady, not maximum, throughput** (owner, 2026-09-24): six lanes at most, unit workers and tool fixes together; refill
-  one slot per completion, never in waves (the 12-13 lane waves produced the repair work this prevents: unions mangling
-  struct bodies, declarations whose owner registered mid-wave, an empty `--message`).
+  one slot per completion, never in waves of more lanes than that (the 12-13 lane waves produced the repair work this
+  prevents: unions mangling struct bodies, declarations whose owner registered mid-wave, an empty `--message`).
 * **A slot is not filled while finished work sits unlanded** (2026-09-26): `queue.py next` refuses while a local branch holds
   content `main` lacks. The test is content-based (a file counts only when main's copy is a strict subset of the branch's),
   because landing cherry-picks content, so every landed branch stays ahead of main by commits. Remedy: land it, or once the
@@ -1191,17 +1166,17 @@ Grouped by cause; each cost a lane ~30 min the first time.
   cherry-picked across, landed ones are dropped.
 * **A slot goes to a problem before a new unit** (gate refusal, blocked lane, tool that cannot express the work, MAIN's HEAD on
   the wrong branch, a hole in the queue).
-* **Waves are claimed with `queue.py next --count N`** (no two lanes share an owner header or a module) or one lane per
-  header/module with `--cluster`: header-sharing neighbours in concurrent lanes put two workers on one TU
-  (`g3d_calcvtx.cpp`) and produced rule-2 boundary artefacts (the old address stride did not prevent it).
+* **Claim with `queue.py next --count N`** (no two lanes share an owner header or a module; a pair is `--count 2`,
+  15.1 step 1) or one lane per header/module with `--cluster`: header-sharing neighbours in concurrent lanes put two
+  workers on one TU (`g3d_calcvtx.cpp`) and produced rule-2 boundary artefacts (the old address stride did not
+  prevent it). A pair may share a module on purpose once every shared-header edit goes to the pre-pass (15.1).
 * **Land one unit per commit, one at a time, from `main`** (`land.py` refuses off `main`: a batch landed elsewhere slides the
-  merge-base the gate resolves against).
+  merge-base the gate resolves against). A pre-pass batch lands alone before the lanes it serves (14.3, 15.1 step 4).
 * **Land the orchestrator-side tools/docs batch first** with `land.py land --already-applied`: an uncommitted `CLAUDE.md` +
   `docs/plan.md` pair rode the `OS/FindContainHeap_.c` unit commit (`4fad00522`, 2026-09-26), because the commit-sweep guard
   protects a path only when the base's `dirty_at_base` snapshot recorded it and the batch does not name it.
-* **Profiles are not cosmetic** (2026-09-26): `slots.py spawn --kind` maps `unit`->`surveyor` (was `decompiler` until the four-leg loop), `fix`->`fixer`,
-  `merge`->`merger`, `tooling`/`docs`->`worker`, `review`->`codereviewer`, `scout`/`recon`/`plan` to the read-only globals; an unknown
-  kind is refused. A tooling lane launched as `decompiler` gets unit policy it cannot satisfy.
+* **Profiles are not cosmetic** (2026-09-26): the kind -> profile map is 2.4. A tooling lane launched as `decompiler` gets
+  unit policy it cannot satisfy.
 * **Known bug (2026-09-24, status unverified):** `queue.py next` re-offered an already-claimed proposal and refused each time
   ("branch ... already exists"). Check `claims.py list` first if it refuses at random. The proposal queue itself is retired.
 
@@ -1211,8 +1186,7 @@ Grouped by cause; each cost a lane ~30 min the first time.
   and `--session-id` is what `claude --resume <id> -p "<ruling>"` answers. `CLAUDE_BIN`, `LANE_PERMISSION_MODE` (default
   `acceptEdits`) and `LANE_ALLOWED_TOOLS` (default `Bash`) override it. A live lane is read from `~/.claude/sessions/<pid>.json`.
 * In-session subagents in slots are a prototype: `.claude/settings.json` points `WorktreeCreate`/`WorktreeRemove` at
-  `tools/units/worktreehook.py`; arm ONE slot (`worktreehook.py arm --slot N`), launch that lane, arm the next (the hook payload
-  cannot identify the lane, so parallel launches got slots in token-claim order). Claude Code did not call the remove hook:
+  `tools/units/worktreehook.py`; arm ONE slot, launch that lane, arm the next (2.5). Claude Code did not call the remove hook:
   the orchestrator runs `slots.py collect --path <worktreePath> --release` when a lane's result arrives.
 * A lane cannot block on a question: it ends its turn with the request and is resumed.
 
@@ -1242,9 +1216,9 @@ Grouped by cause; each cost a lane ~30 min the first time.
 ## 14. Waves: recon, pre-pass, lanes, review (owner, 2026-10-06)
 
 A **wave** is a set of concurrent lanes over several lane groups (wave 1: the network stack, the quest system, the nw4r
-library). The steady loop (section 1) claims one unit at a time; a wave launches several multi-unit lanes at once, so
-their file ownership is decided *before* launch instead of discovered at landing. The record of each wave is
-`docs/waves.md`.
+library). It is the multi-lane form of the pair run's recon / pre-pass / manifest idea (section 15; 1.3
+says when to use which): several multi-unit lanes launch at once, so their file ownership is decided *before* launch
+instead of discovered at landing. The record of each wave is `docs/waves.md`.
 
 ### 14.1 The stage order
 
@@ -1287,7 +1261,8 @@ The brief is `lib.lanes.recon.QUESTIONS`; condensed:
 * A **merged unit** (a fold, a recut, one TU over two registered units) that two lanes would both touch: the recut lands
   first, and the merged unit belongs to exactly one lane.
 * Each pre-pass batch is measured and landed alone, before any lane starts, so every lane is cut from a base that
-  already carries it.
+  already carries it. The pair form (15.1 step 4) pipelines it per unit and puts every own-row `symbols.txt` rename in
+  the shared batch.
 
 ### 14.4 The lane manifest
 
@@ -1295,7 +1270,8 @@ A lane without a queue claim declares `{lane, base, owns, read_only, units}` und
 (`.pi/outbox/<slug>.json`, collected by `slots.py collect`). `land.py land --branch B --manifest <slug|path>` adds the
 gate row "the batch touches only the lane's manifest": a changed path outside `owns`, or inside `read_only`, refuses -
 the remedy is an integrator request, or a manifest extended with the orchestrator's approval. Without `--manifest` the
-gate is unchanged. Format and rules: `docs/tools/spec/lane-manifest.md`.
+gate is unchanged. Format and rules: `docs/tools/spec/lane-manifest.md`. A pair run's manifests come from its deps
+JSON (`docs/pair-briefs.md`; 15.1 step 2).
 
 ### 14.5 The wave retro
 
@@ -1303,3 +1279,69 @@ Each wave gets one entry in `docs/waves.md` (newest first), written after its la
 `python tools/units/landlog.py` and the review findings. The template is in that file: the predicted conflict surface
 against the collisions that happened, the refused landings by row, the merger rounds, and the rule or tool request each
 surprise produced.
+
+## 15. Pairs: scout, review, pre-pass, lanes (trials 2026-10-12/13)
+
+A **pair run** works two units at once with no merge conflict by construction: every file both units need changed lands
+on main before either lane starts, so each lane edits only its own files and the manifest row (14.4) refuses anything
+else. Six trials (2026-10-12/13): 19 landings, every one READY on the first try, zero conflicts. Paste-ready briefs and
+the deps JSON shape: `docs/pair-briefs.md`. It is the unit flow; a wave is its multi-lane form (1.3), and every lane
+inside it runs the review loop of section 1.
+
+### 15.1 The steps
+
+1. **Pick a pair**: `python tools/units/queue.py next --count 2` (no shared owner header or module), or a same-module
+   pair on purpose (trial 5: works once every shared-header edit goes to the pre-pass).
+2. **Dependency scout** (read-only, `scout`/`Explore`), one unit at a time, writes `.pi/outbox/deps-<pair>.json`.
+   * First: is the claim one TU (`tu-boundary-discovery`)? If not, the recut is item 1 and lands first (BTE: one stub
+     over ~55 files; `Pl/pl_motion`: two TUs).
+   * A **slice** of about 20 functions per unit; every callee, datum and struct offset the slice touches.
+   * Per item: `kind` (one `backlog.py` reads), `file`, `what`, `fix`, `evidence` (the command), `prepass` true/false.
+   * Checks: every header the unit includes for conflicting declarations of its own symbols (incl. `src/unsplit/*.h`);
+     every struct offset against a named field (rule 7 refuses `unkNN`/address names, not `field_0xNNN`); types
+     defined twice in the include closure; new rule-7 tokens a body would add.
+   * A manifest per unit: `owns` = its own `.cpp`/`.h` and leaf headers (+ `configure.py` only when a flip is likely),
+     `read_only` = every header both closures read.
+3. **Scout review (2b)** (read-only `codereviewer`, fresh context): compile-probe the unit with each needed owner header
+   (a type redefinition = a leaf-header item); pair every rename with an owner-header declaration; derive return
+   types from every retail caller's next use of r3 and parameter widths from the callee's **own** body (one caller's
+   narrowing can be a cast at that site); `callers.py <sym> --pointers` for foreign pointers into the unit's ranges;
+   confirm leaf headers owned and shared headers read-only. Corrections (added, dropped, re-kinded items, the pre-pass
+   plan) are appended to the deps JSON under `review`; the pre-pass works only from the reviewed list.
+4. **Pre-pass**, measured and landed alone, per unit and **pipelined** (a unit's lane starts as soon as its own
+   pre-pass lands). Edits to a header both units include, and **all own-row `symbols.txt` renames**, go in one shared
+   batch, so no lane writes a shared header or `symbols.txt`.
+5. **Lanes**: per unit `decompiler -> codereviewer -> decompiler` on a branch cut after its pre-pass; a bounded slice
+   (~20 functions or ~60 minutes); partial gains with no regression land. Before review the lane runs a **closing
+   header refresh**: `flipcheck.py <unit>` into RESIDUALS, every count from a fresh `unitscore.py <unit> --measure`,
+   and "no regression" judged against a baseline report snapshotted at claim time (main moves under a lane).
+6. **Land** each with `land.py land --branch <b> --units <u> --manifest <path>`, one at a time from main.
+
+### 15.2 When the list missed something
+
+A dependency found mid-lane is never edited by the lane: it files an integrator request and uses a `STOPGAP` block
+(10.10); the fix lands as a small follow-up pre-pass before that unit lands.
+
+### 15.3 The flip path
+
+Candidates by `flipcheck.py` READY **plus** a reverse-reference check (`callers.py <sym> --pointers` for every symbol in
+the claimed ranges: every symbol another unit's target object points at must be defined by ours, same name and binding),
+then flip one unit at a time, prove each with `ok` (the `main.dol` hash), and land the batch as one `config/flags`
+commit (owner ruling 2026-10-13, §11). Function-count 100 % is not flip-readiness: `OS/OSCache.c` (21/21 functions, 1744/2312 bytes) and
+`nw4r/fn_80502828.cpp` were refused by flipcheck (trial 6).
+
+### 15.4 What the trials measured
+
+* Cost per pair of slices: scout ~16-19 min, review ~16-20, pre-pass ~20 plus its landing, lanes ~10-25 min each,
+  ~4 min per landing; 80-110 min per pair.
+* The review step removed the mid-lane misses: trial 3 (no review) hit 5 blocked functions; trials 4 and 5 hit none.
+* The header refresh removed the stale-count review findings that every trial before it produced.
+* Recurring misses the checks above now name: a band header's conflicting declaration of the unit's own function
+  (trial 1), a callee with no owner-header declaration (trial 3), a caller-side cast read as a parameter type
+  (trial 3), unnamed struct fields and duplicate structs (trial 3), foreign pointers into a unit's `.bss` (trial 3).
+
+### 15.5 Open tool asks (not built)
+
+`report.json` goes stale after an object rebuild (every lane deleted it by hand); lanes start with their cwd in MAIN,
+not the slot; a `fieldcheck` for struct offsets with no named field; `symbols.txt` row-range ownership in manifests; a
+reverse-reference row in `flipcheck.py`; `deps`/`prepass` lane kinds and the standard briefs in `slots.py spawn`.
