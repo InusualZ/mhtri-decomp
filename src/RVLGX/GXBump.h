@@ -14,10 +14,13 @@ extern "C" {
 void GXSetTevIndirect(u32 tev_stage, u32 ind_stage, u32 format, u32 bias_sel, u32 matrix_sel, u32 wrap_s,
                       u32 wrap_t, u8 add_prev, u8 ind_lod, u32 alpha_sel);
 void GXSetIndTexMtx(u32 mtx_id, const f32 offset[2][3], s8 scale_exp);
-void GXSetIndTexCoordScale(u32 ind_stage, u32 scale_s, u32 scale_t);
-void GXSetIndTexOrder(u32 ind_stage, u32 tex_coord, u32 tex_map);
+void GXSetIndTexCoordScale(s32 ind_stage, u32 scale_s, u32 scale_t);
+void GXSetIndTexOrder(s32 ind_stage, s32 tex_coord, s32 tex_map);
 void GXSetNumIndStages(u8 nIndStages);
 void GXSetTevDirect(u32 tev_stage);
+void __GXUpdateBPMask(void);
+void __GXSetIndirectMask(u32 mask);
+void __GXFlushTextureState(void);
 
 #ifdef __cplusplus
 }
