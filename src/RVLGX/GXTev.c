@@ -9,7 +9,8 @@
  *   tables at 0x8061AC20) and `c2r` (the 0x28-byte `GXSetTevOrder` channel-to-rasterizer table at 0x8061AC70) are GUESS
  *   names after the SDK's own spellings; the split follows the four 5-word runs. The local register unions
  *   (`GXTevColorRegA`/`B`, `GXTevColorS10RegA`/`B`, `GXAlphaCompareReg`, `GXZTexBiasReg`, `GXZTexModeReg`) and
- *   `GXColorWord`/`GXColorS10Words` are named from the BP register they build and the word they read.
+ *   `GXColorS10Words` are named from the BP register they build and the word they read; `GXColorWord` is shared from
+ *   `RVLGX/GXInit.h`.
  * RESIDUALS. 16 of 16 functions match; `.data` 120 of 120 B. flipcheck: row 36 for `TEVCOpTableST1`/`TEVAOpTableST0`/
  *   `TEVAOpTableST1` only, a false positive - the flipped link keeps them (they are reached through the `.data`
  *   section symbol) and links a byte-identical DOL. relocdiff: `GXSetTevOp`'s table base is `.data`+0 where the
@@ -105,12 +106,6 @@ typedef union GXZTexModeReg {
         /* +0x0, bits 1..0 */ u32 type: 2;
     } f; /* +0x0 */
 } GXZTexModeReg;
-
-/* A `GXColor` read as one word: red in bits 31..24, green 23..16, blue 15..8, alpha 7..0. size: 0x4 */
-typedef union GXColorWord {
-    GXColor color; /* +0x0 */
-    u32 word;      /* +0x0 */
-} GXColorWord;
 
 /* A `GXColorS10` read as two words: red and green, then blue and alpha. size: 0x8 */
 typedef union GXColorS10Words {

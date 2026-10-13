@@ -5,6 +5,13 @@
 #define MHTRI_RVLGX_GXINIT_H
 
 #include "types.h"
+#include "gx.h"
+
+/* A `GXColor` read as one word: red in bits 31..24, green 23..16, blue 15..8, alpha 7..0. size: 0x4 */
+typedef union GXColorWord {
+    GXColor color; /* +0x0 */
+    u32 word;      /* +0x0 */
+} GXColorWord;
 
 /* A scissor corner register: the BP word `0x20`/`0x21` carries the x and y of one corner. size: 0x4 */
 typedef union GXScissorReg {
@@ -78,15 +85,19 @@ typedef union GXPixelCtrlReg {
     } f; /* +0x0 */
 } GXPixelCtrlReg;
 
-/* The BP field-mode register. size: 0x4 */
-typedef union GXFieldModeReg {
+/* The BP line/point size register (BP 0x22). size: 0x4 */
+typedef union GXLinePtSizeReg {
     u32 word; /* +0x0 */
     struct {
-        /* +0x0, bits 31..23 */ u32 pad_0: 9;
-        /* +0x0, bit 22 */ u32 fieldMode: 1;
-        /* +0x0, bits 21..0 */ u32 pad_1: 22;
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bit 23 */ u32 pad_0: 1;
+        /* +0x0, bit 22 */ u32 halfAspect: 1;
+        /* +0x0, bits 21..19 */ u32 pointTexOffset: 3;
+        /* +0x0, bits 18..16 */ u32 lineTexOffset: 3;
+        /* +0x0, bits 15..8 */ u32 pointSize: 8;
+        /* +0x0, bits 7..0 */ u32 lineWidth: 8;
     } f; /* +0x0 */
-} GXFieldModeReg;
+} GXLinePtSizeReg;
 
 /* A BP fog range-adjust table word: two 12-bit entries. size: 0x4 */
 typedef union GXFogAdjReg {
@@ -242,17 +253,23 @@ typedef union GXGenModeReg {
         /* +0x0, bits 18..16 */ u32 numIndStages: 3;
         /* +0x0, bits 15..14 */ u32 pad_1: 2;
         /* +0x0, bits 13..10 */ u32 numTevStagesMinus1: 4;
-        /* +0x0, bits 9..0 */ u32 pad_2: 10;
+        /* +0x0, bit 9 */ u32 multisample: 1;
+        /* +0x0, bits 8..0 */ u32 pad_2: 9;
     } f; /* +0x0 */
 } GXGenModeReg;
 
 /* The GX state record the library keeps in `.bss` (the 0x600-byte object at 0x80746CA0). Only the words the written GX
  * units use are named; the rest is `pad_0x..` and keeps its offset. size: 0x600 */
 typedef struct GXData {
-    /* +0x000 */ u8 pad_0x000[0x2];
-    /* +0x002 */ u16 xfWritePending; /* 0 after a BP write, 1 after a CP/XF write */
+    /* +0x000 */ union { /* size: 0x4 */
+        /* +0x000 */ u32 vtxSentWord; /* both halves read as one word */
+        /* +0x000 */ struct { /* size: 0x4 */
+            /* +0x000 */ u16 vNumNot;
+            /* +0x002 */ u16 xfWritePending; /* 0 after a BP write, 1 after a CP/XF write */
+        };
+    };
     /* +0x004 */ u8 pad_0x004[0x78];
-    /* +0x07C */ GXFieldModeReg fieldMode;
+    /* +0x07C */ GXLinePtSizeReg lpSize;
     /* +0x080 */ GXMatrixIndexReg matrixIndexLo; /* the first four vertex-matrix index words (current position matrix id in bits 0..5) */
     /* +0x084 */ u32 matrixIndexHi;
     /* +0x088 */ u8 pad_0x088[0xC0];

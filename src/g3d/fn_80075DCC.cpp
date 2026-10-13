@@ -229,7 +229,7 @@ u32 fn_804B7AE0(s32, s32, s32);
 u32 fn_804B7B10(void*, f32, f32, f32);
 u32 fn_804B7C20(s32, void*);
 u32 fn_804B7C30(s32);
-u32 fn_804B9C60(void*, u16, s32);
+u32 GXInitFogAdjTable(void*, u16, s32);
 u32 fn_804C6900(f32, f32, f32, f32, f32, f32);
 u32 fn_804C69A0(f32, f32, f32, f32);
 u32 math_sincos_idx(f32);
@@ -2308,7 +2308,7 @@ void fn_8007A2A8(s32 arg0, u16 arg1, s16 arg2, s32 arg3) {
     if (fn_800659C4((s32)(arg0)) != 0) {
         temp_r3 = (void *)(fn_80067A54((s32)(arg0)));
         ((RawView_46*)temp_r3)->field_0x1A = arg2;
-        fn_804B9C60((void*)(&((RawView_46*)temp_r3)->field_0x1C), (u16)(arg1), (s32)(fn_80075844((s32)(arg3))));
+        GXInitFogAdjTable((void*)(&((RawView_46*)temp_r3)->field_0x1C), (u16)(arg1), (s32)(fn_80075844((s32)(arg3))));
     }
 }
 #pragma peephole off

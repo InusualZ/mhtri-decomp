@@ -18,6 +18,8 @@ void GXSetPointSize(u8 size, u32 tex_offsets);
 void GXEnableTexOffsets(u32 coord, u8 line_enable, u8 point_enable);
 void GXSetCullMode(u32 mode);
 void GXSetCoPlanar(u8 enable);
+void __GXSetDirtyState(void);
+void __GXSendFlushPrim(void);
 
 #ifdef __cplusplus
 }

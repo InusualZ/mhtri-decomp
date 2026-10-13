@@ -63,8 +63,8 @@ extern "C" void vec3_normalize_into(void* pOut, const void* pIn);
 extern "C" s32 fn_800508A8(const void* pIn);
 extern "C" void vec3_cross(void* pOut, const void* pA, const void* pB);
 extern "C" f32 vec3_dot(const void* pA, const void* pB);
-extern "C" void fn_804BA230(const f32* pViewMtx, const f32* pParams, const f32* pFrustum, void* pA,
-                            void* pB, void* pC, f32 x, f32 y, f32 z);
+extern "C" void GXProject(const f32* pViewMtx, const f32* pParams, const f32* pFrustum, void* pA,
+                          void* pB, void* pC, f32 x, f32 y, f32 z);
 extern "C" void GXSetViewportJitter(s32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g);
 extern "C" void fn_804C64E0(s32 a, s32 b, s32 c);
 extern "C" void fn_804C6660(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h, f32 i);
@@ -109,7 +109,7 @@ struct ScissorSize {
     /* +0x2 */ u16 mHeight;
 }; /* size: 0x4 */
 
-/* The seven-float projection parameter block `fn_804BA230` reads at its second argument. */
+/* The seven-float projection parameter block `GXProject` reads at its second argument. */
 struct ProjParams {
     /* +0x00 */ f32 mProjType;
     /* +0x04 */ f32 mUnk04;
@@ -397,8 +397,8 @@ void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVe
     }
     fn_80075170(pSelf, &frustum[0], &frustum[1], &frustum[2], &frustum[3], &frustum[4], &frustum[5]);
     mtx34_get_ptr(viewMtx);
-    fn_804BA230(viewMtx, &params.mProjType, frustum, pOut, pOut + 4, pOut + 8, pVec->x, pVec->y,
-                pVec->z);
+    GXProject(viewMtx, &params.mProjType, frustum, pOut, pOut + 4, pOut + 8, pVec->x, pVec->y,
+              pVec->z);
 }
 
 /* 0x80075390 (0x4): constructs a 4x4 matrix (nothing to initialise). */

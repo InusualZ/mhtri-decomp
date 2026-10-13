@@ -7,12 +7,12 @@
  *     only here
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (-O4,p, default alignment 16).
  * NAMES. the BP register unions (`GXColorModeReg`, `GXDstAlphaReg`, `GXZModeReg`, `GXPixelCtrlReg`, `GXFogAdjReg`,
- *   `GXFogAdjCenterReg`, `GXFieldModeReg` in `RVLGX/GXInit.h`) are bitfield views of the words `GXData` keeps: a
+ *   `GXFogAdjCenterReg`, `GXLinePtSizeReg` in `RVLGX/GXInit.h`) are bitfield views of the words `GXData` keeps: a
  *   bitfield member store is the only spelling that gives the target's bare `rlwimi` inserts.
  * RESIDUALS. flipcheck: `.sdata2` 0x50 is claimed but not emitted until the fog bodies are written. `GXSetFogRangeAdj`: the target builds each table word in a scratch register and copies it (`mr`) before
- *   the opcode insert, and orders the loads differently. Not written: `GXSetFog`, the fog-range helper at 0x804B9C60,
- *   `GXSetPixelFmt` (reads the `.data` table at 0x8061AC98), `GXSetFieldMode`,
- *   `GXCallDisplayList` (calls `__GXSetDirtyState` and `__GXSendFlushPrim`, unnamed in other units).
+ *   the opcode insert, and orders the loads differently. Not written: `GXSetFog`, `GXInitFogAdjTable`,
+ *   `GXSetPixelFmt` (reads the `.data` table `p2f`), `GXSetFieldMode`,
+ *   `GXCallDisplayList` (calls `__GXSetDirtyState` and `__GXSendFlushPrim`, declared in `RVLGX/GXGeometry.h`).
  */
 
 #include "RVLGX/GXPixel.h"
