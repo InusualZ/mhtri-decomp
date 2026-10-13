@@ -1308,13 +1308,13 @@ config.libs = [
             Object(NonMatching, "PAD/pad.c", cflags=cflags_base),
             Object(NonMatching, "RSO/rso_notify.c"),
             # AXFX reverb run (lib OS flags, function_align 16): ranges, names and seams in the unit headers under src/AX/AXFX*.
-            Object(NonMatching, "AX/AXFXReverbHi.c"),
-            Object(NonMatching, "AX/AXFXReverbStd.c"),
+            Object(Matching, "AX/AXFXReverbHi.c"),
+            Object(Matching, "AX/AXFXReverbStd.c"),
             Object(NonMatching, "AX/AXFXReverbHiExp.c"),
             Object(NonMatching, "AX/AXFXReverbStdExp.cpp"),
-            Object(NonMatching, "AX/AXFXChorus.cpp"),
-            Object(NonMatching, "AX/AXFXDelay.cpp"),
-            Object(NonMatching, "AX/AXFXHooks.cpp"),
+            Object(Matching, "AX/AXFXChorus.cpp"),
+            Object(Matching, "AX/AXFXDelay.cpp"),
+            Object(Matching, "AX/AXFXHooks.cpp"),
             # Registered by the BTE-region survey (`worker/bte-survey-846f`, notes
             # `.pi/notes/bte-survey-846f.md`): `OS/PPCArch.c` (`.text` 0x804770E0..0x804772F0,
             # 22 functions / 528 B, plus its `.data` string at 0x80612CE0).  Module `OS`, lib `OS`:
@@ -1376,7 +1376,7 @@ config.libs = [
             Object(Matching, "DVD/dvdqueue.c", cflags=cflags_base),
             Object(NonMatching, "DVD/dvderror.c", cflags=cflags_base),
             Object(Matching, "DVD/dvdidutils.c", cflags=cflags_base),
-            Object(NonMatching, "DVD/dvdFatal.c", cflags=cflags_base),
+            Object(Matching, "DVD/dvdFatal.c", cflags=cflags_base),
             Object(NonMatching, "DVD/dvddevice.c", cflags=cflags_base),
             Object(NonMatching, "DVD/dvd_broadway.c", cflags=cflags_base),
             Object(NonMatching, "ENC/enc.c", cflags=cflags_base),
