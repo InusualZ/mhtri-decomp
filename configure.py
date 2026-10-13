@@ -309,13 +309,15 @@ cflags_lobby = [
 # GXRenderModeObj copy, and `off` makes MWCC emit a call to the implicit copy-assignment operator (99.02 %)
 # where `noauto` inlines it (100.00 %) - nothing else in the unit moves between the two.
 
-# cflags_pl (src/Pl/*.cpp): -O3 -inline noauto -opt nopeephole -Cpp_exceptions on; measurements in docs/pl.md.
+# cflags_pl (src/Pl/*.cpp): -O3 -inline noauto -opt nopeephole -Cpp_exceptions on -fp_contract off; measurements in docs/pl.md.
 cflags_pl = [
-    *[f for f in cflags_base if f not in ("-O4,p", "-inline auto", "-Cpp_exceptions off")],
+    *[f for f in cflags_base if f not in ("-O4,p", "-inline auto", "-Cpp_exceptions off", "-fp_contract on")],
     "-O3",
     "-inline noauto",
     "-opt nopeephole",
     "-Cpp_exceptions on",
+    # -fp_contract off: evidence (fused-op counts over the Pl targets) in src/Pl/pl_hit_sphere.cpp's FLAGS line.
+    "-fp_contract off",
 ]
 
 # cflags_pl_skill: cflags_pl at `-opt nopeephole,level=4`; no object uses it (src/Pl/pl_act.cpp states the level

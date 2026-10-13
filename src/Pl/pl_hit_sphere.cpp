@@ -4,8 +4,10 @@
  * NAMES. The file name is a GUESS from `hit_point_sphr`, the range's one map name.  GUESS: `pl_box_set` (0x8028F44C),
  *   `pl_segment_box_set` (0x8028F4B4) and `pl_capsule_box_set` (0x8028F558), from the records each fills
  *   (`PlBox`, `PlSegmentBox`, `PlCapsuleBox`).
- * FLAGS. The Pl block's flags plus a file-scoped `#pragma fp_contract off`: retail's `hit_point_sphr` keeps three
- *   `fmuls` and two `fadds` where the block's `-fp_contract on` fuses them into two `fmadds`.
+ * FLAGS. The Pl block's flags, `-fp_contract off` included (the library-wide evidence): the fifteen Pl target
+ *   objects carry 0 fused ops (`fmadds`/`fmsubs`/`fnmadds`/`fnmsubs`) against 233 `fmuls` and 457 `fadds`/`fsubs`.
+ *   Under `-fp_contract on` `hit_point_sphr` fuses retail's three `fmuls` and two `fadds` into two `fmadds`; under
+ *   `off` it emits retail's sequence.
  * RESIDUALS.
  *  - `pl_capsule_box_set`: retail stores the `vec3_distance` result to `reach` (+0x34) before adding the radius
  *    (`stfs f1,0x34(r31)` then `frsp f1,f1`); ours drops that first store.  The mwcc-debugger dump names the
@@ -28,8 +30,6 @@
 #include "fn_8004CAD8.h"    /* subVec3 / PSVECSubtract / addVec3 / vec3_scale / vec3_distance (rule 2) */
 #include "Pl/fn_80288CEC.h" /* `PlBox`, shared with `Pl/pl_motion.cpp` and `Pl/pl_coll.cpp` (rule 1) */
 #include "Pl/pl_hit_sphere.h"
-
-#pragma fp_contract off
 
 /* The box builders' map names are plain, so the definitions carry C linkage; `hit_point_sphr` is mangled. */
 extern "C" {
