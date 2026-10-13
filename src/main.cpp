@@ -291,7 +291,7 @@ extern "C" void GXSetDispCopyGamma(u32);
 extern "C" void GXSetPixelFmt(u32, u32);
 extern "C" void GXCopyDisp(void* fb, u32);
 extern "C" void GXDrawDone(void);
-extern "C" void fn_804B64B0(void*);
+extern "C" void GXSetDrawDoneCallback(void*);
 extern "C" void VIConfigure(void*);
 extern "C" void VISetNextFrameBuffer(void*);
 extern "C" void VIGetNextField(void);
@@ -837,7 +837,7 @@ extern "C" void fn_8003FE20(void)
 /* Installs the empty callback above as the GX draw-done handler. */
 extern "C" void fn_8003FE24(void)
 {
-    fn_804B64B0((void*)fn_8003FE20);
+    GXSetDrawDoneCallback((void*)fn_8003FE20);
 }
 
 #pragma peephole off

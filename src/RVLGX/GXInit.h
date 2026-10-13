@@ -398,6 +398,35 @@ typedef union GXTevKSelReg {
     } f; /* +0x0 */
 } GXTevKSelReg;
 
+/* BP TX_SETIMAGE0 (0x88..0x8B, 0xA8..0xAB): the texture size less one and its format. size: 0x4 */
+typedef union GXTexImage0Reg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bits 23..20 */ u32 format: 4;
+        /* +0x0, bits 19..10 */ u32 heightMinus1: 10;
+        /* +0x0, bits 9..0 */ u32 widthMinus1: 10;
+    } f; /* +0x0 */
+} GXTexImage0Reg;
+
+/* BP TX_SETMODE0 (0x80..0x83, 0xA0..0xA3): wrap, filters, LOD bias and anisotropy. size: 0x4 */
+typedef union GXTexMode0Reg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bits 23..22 */ u32 pad_0: 2;
+        /* +0x0, bit 21 */ u32 biasClamp: 1;
+        /* +0x0, bits 20..19 */ u32 maxAniso: 2;
+        /* +0x0, bits 18..17 */ u32 lodReserved: 2;
+        /* +0x0, bits 16..9 */ u32 lodBias: 8;
+        /* +0x0, bit 8 */ u32 diagLod: 1;
+        /* +0x0, bits 7..5 */ u32 minFilter: 3;
+        /* +0x0, bit 4 */ u32 magFilter: 1;
+        /* +0x0, bits 3..2 */ u32 wrapT: 2;
+        /* +0x0, bits 1..0 */ u32 wrapS: 2;
+    } f; /* +0x0 */
+} GXTexMode0Reg;
+
 /* The BP generation-mode register (BP 0x00): the indirect stage count and the TEV stage count less one. size: 0x4 */
 typedef union GXGenModeReg {
     u32 word; /* +0x0 */
@@ -502,7 +531,7 @@ typedef struct GXData {
     /* +0x0C8 */ GXTexGenCtrlReg texGenCtrl[8];
     /* +0x0E8 */ GXPostTexGenReg postTexGen[8];
     /* +0x108 */ GXSuTsReg suTs0[8];
-    /* +0x128 */ u8 pad_0x128[0x20];
+    /* +0x128 */ GXSuTsReg suTs1[8];
     /* +0x148 */ GXScissorReg scissorTopLeft;
     /* +0x14C */ GXScissorReg scissorBottomRight;
     /* +0x150 */ GXTevOrderReg tref[8];
@@ -528,7 +557,9 @@ typedef struct GXData {
     /* +0x250 */ u8 cpTexZ;
     /* +0x251 */ u8 pad_0x251[3];
     /* +0x254 */ GXGenModeReg genMode;
-    /* +0x258 */ u8 pad_0x258[0x2C8];
+    /* +0x258 */ u8 pad_0x258[0x2C0];
+    /* +0x518 */ GXTexRegionCallback texRegionCallback;
+    /* +0x51C */ GXTlutRegionCallback tlutRegionCallback;
     /* +0x520 */ u32 nrmType;
     /* +0x524 */ u8 hasNrms;
     /* +0x525 */ u8 hasBiNrms;
@@ -543,11 +574,14 @@ typedef struct GXData {
     /* +0x558 */ f32 viewportFarZ;
     /* +0x55C */ f32 viewportZOffset;
     /* +0x560 */ f32 viewportZScale;
-    /* +0x564 */ u8 pad_0x564[0x40];
+    /* +0x564 */ GXTexImage0Reg tImage0[8]; /* the last image0 word loaded per texture map */
+    /* +0x584 */ GXTexMode0Reg tMode0[8]; /* the last mode0 word loaded per texture map */
     /* +0x5A4 */ u32 texmapId[16]; /* the texture map each TEV stage reads */
-    /* +0x5E4 */ u8 pad_0x5E4[0x4];
+    /* +0x5E4 */ u32 tcsManEnab; /* one bit per texture coordinate whose scale is set by hand */
     /* +0x5E8 */ u32 tevTcEnab; /* one bit per TEV stage with a texture coordinate enabled */
-    /* +0x5EC */ u8 pad_0x5EC[0xF];
+    /* +0x5EC */ u8 pad_0x5EC[0xD];
+    /* +0x5F9 */ u8 dlSaveContext;
+    /* +0x5FA */ u8 abtWaitPECopy;
     /* +0x5FB */ u8 dirtyVAT;
     /* +0x5FC */ u32 dirtyState;
 } GXData;
@@ -558,6 +592,13 @@ extern "C" {
 
 /* The pointer to the state record (`.sdata2` 0x8079D0F0, defined by `GXInit.c`). */
 extern GXData* const __GXData;
+
+/* The pixel-engine and memory-interface register windows (`.sbss` 0x807951D0 / 0x807951D4, set by `GXInit`). */
+extern volatile u16* __peReg;
+extern volatile u16* __memReg;
+
+/* 0x804B3560 (0x130): reloads the revision-dependent bits of the vertex attribute formats. */
+void __GXInitRevisionBits(void);
 
 #ifdef __cplusplus
 }

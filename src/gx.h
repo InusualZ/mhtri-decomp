@@ -89,6 +89,20 @@ typedef struct _GXTlutObj {
     u32 dummy[3]; /* +0x0 */
 } GXTlutObj;
 
+/* The SDK's opaque texture-cache and TLUT region records (`GXInitTexCacheRegion`, `GXInitTlutRegion`). size: 0x10 */
+typedef struct _GXTexRegion {
+    u32 dummy[4]; /* +0x0 */
+} GXTexRegion;
+
+/* size: 0x10 */
+typedef struct _GXTlutRegion {
+    u32 dummy[4]; /* +0x0 */
+} GXTlutRegion;
+
+/* The region allocators `GXLoadTexObj` / `GXLoadTlut` call (`GXSetTexRegionCallback`, `GXSetTlutRegionCallback`). */
+typedef GXTexRegion* (*GXTexRegionCallback)(const GXTexObj* obj, u32 id);
+typedef GXTlutRegion* (*GXTlutRegionCallback)(u32 idx);
+
 /* The selectors the nw4r g3d material accessors take (their manglings encode the names). */
 typedef enum _GXTexMapID {
     GX_TEXMAP0, GX_TEXMAP1, GX_TEXMAP2, GX_TEXMAP3, GX_TEXMAP4, GX_TEXMAP5, GX_TEXMAP6, GX_TEXMAP7

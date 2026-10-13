@@ -7,8 +7,8 @@
  *     0x807472A0 / 0x807472C4 and `.sbss` 0x807951F0..0x80795210 are read by the setters and the clean-up function
  *   - the run starts at the CP interrupt handler (0x804B4460: its statics 0x807951F4/0x807951FC/0x80795200/0x80795204
  *     continue the FIFO run) and ends at `GXSetVtxDesc`
- * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`, `cflags_os`), the block of the unit this range was cut
- *   from; unmeasured until bodies exist.
+ * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (-O4,p) on this object; unmeasured until
+ *   the other bodies exist.
  * RESIDUALS. `.data` (0x30), `.bss` (0x60) and `.sbss` (0x20) are claimed and not emitted (their readers are
  *   unwritten). `__GXIsGPFifoReady` written (byte-identical). The other 8 functions are unwritten, the
  *   largest `GXSetGPFifo` at 0x804B4930 (0x290 B); `python tools/units/sweepcomments.py --unit
@@ -18,12 +18,13 @@
 #pragma function_align 16
 
 #include "types.h"
+#include "RVLGX/GXFifo.h"
 
 /* The GP FIFO ready flag (`.sbss` 0x807951F1): this unit's own byte, declared and never defined. */
 extern u8 lbl_807951F1;
 
 /* Returns whether the GP FIFO is ready (the byte flag the FIFO setup leaves set). */
-BOOL __GXIsGPFifoReady(void)
+u8 __GXIsGPFifoReady(void)
 {
     return lbl_807951F1;
 }
