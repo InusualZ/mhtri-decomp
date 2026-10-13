@@ -1364,7 +1364,8 @@ config.libs = [
             Object(NonMatching, "AX/AXVPB.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXProf.c", cflags=cflags_base),
             Object(NonMatching, "DSPADPCM/dspadpcm.c", cflags=cflags_base),
-            Object(NonMatching, "BTE/gki_buffer.cpp"),
+            Object(NonMatching, "BTE/gki_buffer.c", cflags=cflags_base),  # 16-aligned starts, default alignment: unit header
+            Object(NonMatching, "BTE/gki_time.c"),  # mixed band, 4-aligned starts from 0x8047ABC4, lib default: unit header
             # The BTE tail 0x804A4AC0..0x804C1760 recut per SDK library; each unit's header carries its evidence.
             # Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
             Object(Matching, "DB/db.c", cflags=cflags_base),

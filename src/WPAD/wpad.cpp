@@ -67,6 +67,7 @@
 #include "WPAD/wpad.h"
 #include "WUD/wud.h"
 #include "BTE/gki_buffer.h"
+#include "BTE/gki_time.h"
 #include "SC/SCGetWpadMotorMode.h"
 #include "SC/sc.h"
 #include "VI/vi.h"
