@@ -1,4 +1,5 @@
-/* nw4r/db_console.cpp - nw4r::db console helpers that sat at the end of the WPAD stack range: an empty varargs printer and the console ring-buffer line count.
+/* nw4r/db_console.cpp - nw4r::db console helpers at the end of the WPAD stack range: an empty varargs printer, the console
+ *   ring-buffer line count and `ut::CharWriter`'s text-colour setter.
  * RANGE. .text 0x80500770-0x80500868 (3 functions); no data.
  *   Edges: the left edge 0x80500770 follows the WUD print helper (`WUD/wud.cpp`); the right edge is the
  *   first function of `nw4r/db_assert.cpp`, whose Panic/Warning call the printer and the line count; the colour
@@ -9,10 +10,11 @@
  *   (`nw4r/db_assert.cpp`).
  * NAMES. `ut::CharWriter::SetTextColor` (0x80500844, 0x24 B) is the colour setter the `nw4r/fn_80502828.h` class
  *   declares out of line; `nw4r/fn_80502828.cpp`'s CharWriter constructor and the homebutton callers branch to it here.
- * RESIDUALS. Flip blocker: .text object 0xD4 vs claimed 0xF8: `SetTextColor` (0x80500844, 0x24 B) is unwritten; the
- *   grouping of the three into one TU is unproven.
+ * RESIDUALS. none in the bytes; the grouping of the three into one TU is unproven (no pool, string or unwind record ties them).
+ * SHAPES. `SetTextColor` assigns the whole `Color` (four byte loads, then four byte stores) and tail-calls `UpdateVertexColor`.
  */
 #include "nw4r/db_console.h"
+#include "nw4r/fn_80502828.h"
 #include "OS/OSInterrupt.h"
 #include "stdarg.h"
 
@@ -48,4 +50,14 @@ s32 Console_GetTotalLines(ConsoleHandle console) {
 }
 
 }  // namespace db
+
+namespace ut {
+
+/* 0x80500844 (0x24): sets the text colour (the gradation start) and recomputes the vertex colours. */
+void CharWriter::SetTextColor(Color color) {
+    mTextColor.start = color;
+    UpdateVertexColor();
+}
+
+}  // namespace ut
 }  // namespace nw4r

@@ -1438,7 +1438,7 @@ config.libs = [
         "cflags": cflags_nw4r,
         "host": False,
         "objects": [
-            Object(NonMatching, "nw4r/db_console.cpp"),
+            Object(Matching, "nw4r/db_console.cpp"),
             Object(NonMatching, "nw4r/db_assert.cpp"),
             Object(NonMatching, "nw4r/math_arithmetic.cpp"),
             Object(NonMatching, "nw4r/math_triangular.cpp"),
