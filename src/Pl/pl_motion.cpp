@@ -1,6 +1,7 @@
 /*
- * Pl/pl_motion.cpp - the player actor's motion layer: the act-style `_PLW` state handlers (0x80288CEC-0x8028B330),
- *   the player scene/quest/move-work driver (0x8028B330-0x8028EF30) and the root-work accessors (0x8028EF30 on).
+ * Pl/pl_motion.cpp - the player actor's motion layer: the act-style `_PLW` state handlers and their class-7
+ *   dispatcher (0x80288CEC-0x8028B524), the player scene/quest/move-work driver (0x8028B524-0x8028EF30) and the
+ *   root-work accessors (0x8028EF30 on).
  * RANGE. .text 0x80288CEC-0x8028F44C (74 functions); .ctors 0x8056F36C, .data 0x805CBFC0-0x805CDC44, .bss
  *   0x806AB830-0x806AB848, .sdata 0x807921B0-0x80792270, .sbss 0x80794B38-0x80794B58, .sdata2 0x8079A270-0x8079A310,
  *   extab, extabindex.  Left seam: the unit's `.sdata2` run starts with `fn_80288CEC`'s first constant
@@ -14,13 +15,20 @@
  *   `field_0x002` class-7 dispatcher on `act_no`) and pl_act_class7_handler_00..26 (0x80288E68-0x8028B298, address
  *   order); pl_act_class7_handler_NN_rows (`PlMotionRow` tables) and pl_act_class7_handler_NN_steps (step tables)
  *   name the handler that reads them; pl_motion_f32_<value> the `.sdata2` constants
- * RESIDUALS. 53 functions unwritten (objdiff scores them 0) in 6 runs: 0x80288E68-0x8028BCF4, 0x8028BD98-0x8028C570,
+ * RESIDUALS. 34 functions unwritten (objdiff scores them 0) in 14 runs: 0x80288E68-0x8028912C, 0x8028921C-0x802893D4,
+ *   0x802896F8-0x8028992C, 0x80289CD4-0x80289FF0, 0x8028A400-0x8028A62C, 0x8028A760-0x8028A8D8,
+ *   0x8028A9D4-0x8028ADB8, 0x8028AF50-0x8028B0F4, 0x8028B524-0x8028BCF4, 0x8028BD98-0x8028C570,
  *   0x8028C5B4-0x8028D574, 0x8028D5F4-0x8028DF24, 0x8028DF58-0x8028E4F0, 0x8028E528-0x8028EF30; most are jump-table
- *   state machines of 100-450 instructions, and `pl_motion_set` needs the local string-object shape.  4 partial,
- *   none with a recorded cause: `fn_80288CEC`, `fn_8028DF24`, `fn_8028EF7C`..`quest_spawn_rec_find_in`.
+ *   state machines of 100-450 instructions, and `pl_motion_set` needs the local string-object shape.  3 partial,
+ *   none with a recorded cause: `fn_8028DF24`, `quest_spawn_rec_find`, `quest_spawn_rec_find_in`.
+ *  - the class-7 step/row tables (`pl_act_class7_handler_NN_steps`/`_rows`) and the `pl_motion_f32_*` constants are
+ *    loaded as `extern` map symbols: the object emits none of them, and dtk's split of the TU's `.data` carries
+ *    relocations into `fn_8015FD84` inside some tables, so `.data` is not matched.  The two jump tables are
+ *    compiler-local (`@NNNN`) against the map's `jumptable_805CBFC0`/`jumptable_805CC278`.
  *  - flipcheck: the object emits no `.bss` (0x18 claimed), `.ctors` (0x4), `.sbss` (0x20) or `.sdata` (0xC0); `.text`
- *    0x868, `.data` 0xAC, `.sdata2` 0x1C, extab 0x88 and extabindex 0xCC against the claims 0x6760, 0x1C84, 0xA0,
- *    0x228 and 0x33C; every compared section differs.
+ *    0x1C44, `.data` 0x1A0, `.sdata2` 0x18, extab 0x118 and extabindex 0x1A4 against the claims 0x6760, 0x1C84, 0xA0,
+ *    0x228 and 0x33C; every compared section differs, and the `.sdata2` layout lacks the seven `pl_motion_f32_*`
+ *    symbols.
  * SHAPES. The two 0xC-byte records `fn_8028F400` fills stay `lbl_806AB830`/`lbl_806AB83C`: a `VEC3[]` view folds the
  *   second into `lbl_806AB830 + 0xC` and loses its relocation.
  */
@@ -33,6 +41,9 @@
 #include "Pl/fn_802693C4.h"
 #include "Pl/pl_motion.h"
 #include "Pl/fn_80288CEC.h" /* `PlBox` and `_PL_ROOT`, shared with `Pl/pl_hit_sphere.cpp` and `Pl/pl_coll.cpp` (rule 1) */
+#include "Pl/fn_80262940.h" /* player_init_data_load (the owner's header, rule 2) */
+#include "Pl/fn_802840DC.h" /* PlMotionRow, pl_act_attack_set, pl_act_motion_row_apply (rule 2) */
+#include "ef/eft029_fx.h" /* eft029_set_scale (rule 2) */
 #include "ef/fn_800CDB2C.h"
 #include "enemy/em_pop.h" /* quest_flag_8_ck, quest_flag_80_ck (the owner's header, rule 2) */
 #include "fn_80047398.h" /* `arena_userdata_apply` (rule 2) */
@@ -64,9 +75,8 @@ void* get_move_work_adrs(u8 index);
 /* `Pl_zanzo_set` and `Pl_act_ck` are `Pl/pl_act.cpp`'s (`Pl/pl_act.h`, `Pl/Pl_master_ck.h`). */
 
 
-/* No registered unit covers these addresses; declared with the view this unit's call sites take. */
-u32 Pl_frame_check(_PLW* plw, u32 frame, f32 a, f32 b);
-void player_init_data_load(void);
+/* `Pl_frame_check` is `Pl/pl_act.cpp`'s (`Pl/fn_802693C4.h`); `player_init_data_load` is `Pl/player_control.cpp`'s
+ * (`Pl/fn_80262940.h`). */
 
 extern "C" {
 
@@ -89,6 +99,49 @@ void em_pop_res_load(u8 idx);
 extern u8 lbl_806AB830[];
 extern u8 lbl_806AB83C[];
 
+/* This unit's own `.data` step and row tables and `.sdata2` constants: the object does not emit them yet, so the
+ * bodies load the map's symbols (see the unit header). */
+extern "C" {
+extern PlMotionRow pl_act_class7_handler_04_rows[];
+extern PlMotionRow pl_act_class7_handler_08_rows[];
+extern PlMotionRow pl_act_class7_handler_11_rows[];
+extern PlMotionRow pl_act_class7_handler_13_rows[];
+extern u32 pl_act_class7_handler_01_steps[];
+extern u32 pl_act_class7_handler_03_steps[];
+extern u32 pl_act_class7_handler_04_steps[];
+extern u32 pl_act_class7_handler_05_steps[];
+extern u32 pl_act_class7_handler_07_steps[];
+extern u32 pl_act_class7_handler_08_steps[];
+extern u32 pl_act_class7_handler_09_steps[];
+extern u32 pl_act_class7_handler_11_steps[];
+extern u32 pl_act_class7_handler_12_steps[];
+extern u32 pl_act_class7_handler_13_steps[];
+extern u32 pl_act_class7_handler_14_steps[];
+extern u32 pl_act_class7_handler_16_steps[];
+extern u32 pl_act_class7_handler_18_steps[];
+extern u32 pl_act_class7_handler_24_steps[];
+extern const f32 pl_motion_f32_zero;
+extern const f32 pl_motion_f32_minus_one;
+extern const f32 pl_motion_f32_18;
+extern const f32 pl_motion_f32_22;
+extern const f32 pl_motion_f32_one;
+extern const f32 pl_motion_f32_28;
+extern const f32 pl_motion_f32_128;
+}
+
+/* The class-7 handlers whose bodies are not written yet, with the arguments `pl_act_class7_dispatch` passes. */
+extern "C" {
+void pl_act_class7_handler_00(_PLW* self, s32 kind, s32 variant);
+void pl_act_class7_handler_02(_PLW* self, s32 kind);
+void pl_act_class7_handler_06(_PLW* self, s32 kind);
+void pl_act_class7_handler_10(_PLW* self, s32 kind);
+void pl_act_class7_handler_15(_PLW* self, s32 kind);
+void pl_act_class7_handler_17(_PLW* self, s32 kind);
+void pl_act_class7_handler_19(_PLW* self, s32 kind);
+void pl_act_class7_handler_20(_PLW* self, s32 kind);
+void pl_act_class7_handler_23(_PLW* self, s32 kind);
+}
+
 /* ------------------------------------------------------------------------------------------------ *
  * Bodies, in address order.
  * ------------------------------------------------------------------------------------------------ */
@@ -101,7 +154,7 @@ extern "C" {
  * `fn_8027CB1C` latches `+0x565` and `Pl_frame_check` arms `+0x566` and hands the player to `fn_802BE568` once. */
 void fn_80288CEC(_PLW* self, u32 sub, f32 dt) {
     u32 primary = 0;
-    u32 result;
+    s32 result;
 
     if (self->field_0x565 == 0) {
         switch (self->act_no) {
@@ -129,9 +182,17 @@ void fn_80288CEC(_PLW* self, u32 sub, f32 dt) {
         }
 
         result = (u8)fn_8027CB1C(self);
-        if (result == 2 || result == 3 || result == 4) {
+        switch (result) {
+        case 2:
             self->field_0x565 = 1;
-        } else if (result <= 1 || result == 5) {
+            break;
+        case 3:
+        case 4:
+            self->field_0x565 = 1;
+            break;
+        case 0:
+        case 1:
+        case 5:
             self->field_0x565 = 1;
             if (primary == 0) {
                 if (self->kind_0x09 == 3) {
@@ -140,11 +201,12 @@ void fn_80288CEC(_PLW* self, u32 sub, f32 dt) {
                     pl_act_enter(self, 4, 0xF, 0x4000);
                 }
             }
+            break;
         }
     }
 
-    if (self->field_0x566 == 0 && self->field_0x565 == 0 && dt > 0.0f &&
-        Pl_frame_check(self, 0, dt, 0.0f) == 1) {
+    if (self->field_0x566 == 0 && self->field_0x565 == 0 && dt > pl_motion_f32_zero &&
+        Pl_frame_check(self, 0, dt, pl_motion_f32_zero) == 1) {
         self->field_0x566 = 1;
         fn_802BE568(self, 0);
     }
@@ -157,6 +219,660 @@ void fn_80288E58(_PLW* self, f32 dt) {
 
 void fn_80288E60(_PLW* self, f32 dt) {
     fn_80288CEC(self, 1, dt);
+}
+
+/* 0x8028912C (0xF0): runs the class-7 act whose step table is `pl_act_class7_handler_01_steps`: arms the motion and
+ * its attack, then trails an afterimage at frame 18 and hands over at the motion's end. */
+void pl_act_class7_handler_01(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_chr_set_attr_default(self, 0x451, 4, 0);
+        pl_act_set_frame_timer(self);
+        pl_act_attack_set(self, 2, 0);
+        pl_act_set_motion_gate(self, 60);
+        Pl_act_set_step_table(self, (u32)pl_act_class7_handler_01_steps, 0);
+        break;
+    case 1:
+        if (Pl_frame_check(self, 0, pl_motion_f32_18, pl_motion_f32_zero) == 1) {
+            Pl_zanzo_set(self, 9, 3);
+        }
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+        }
+        break;
+    }
+}
+
+/* 0x802893D4 (0x144): runs the two-motion class-7 act whose step table is `pl_act_class7_handler_03_steps`, trailing
+ * an afterimage at frame 22 of the second motion. */
+void pl_act_class7_handler_03(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 0, 1, 0);
+        Pl_chr_set_attr_default(self, 0x45C, 2, 0);
+        pl_act_set_frame_timer(self);
+        pl_act_set_motion_gate(self, 40);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            self->act_step_0x05++;
+            Pl_chr_set_attr_default(self, 0x453, 0, 20);
+            pl_act_set_frame_timer(self);
+            pl_act_attack_set(self, 5, 0);
+            Pl_act_set_step_table(self, (u32)pl_act_class7_handler_03_steps, 0);
+        }
+        break;
+    case 2:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+            if (Pl_frame_check(self, 0, pl_motion_f32_22, pl_motion_f32_zero) == 1) {
+                Pl_zanzo_set(self, 5, 3);
+            }
+        }
+        break;
+    }
+}
+
+/* 0x80289518 (0x13C): runs the class-7 act for row `kind` of `pl_act_class7_handler_04_rows`, trailing an afterimage
+ * at frame 22 of the step motion. */
+void pl_act_class7_handler_04(_PLW* self, s32 kind) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 0, 1, 0);
+        pl_act_motion_row_apply(self, 0, &pl_act_class7_handler_04_rows[kind], (u32)pl_act_class7_handler_04_steps);
+        pl_act_set_motion_gate(self, 40);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            self->act_step_0x05++;
+            pl_act_motion_row_apply(self, 1, &pl_act_class7_handler_04_rows[kind],
+                                    (u32)pl_act_class7_handler_04_steps);
+        }
+        break;
+    case 2:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+            if (Pl_frame_check(self, 0, pl_motion_f32_22, pl_motion_f32_zero) == 1) {
+                Pl_zanzo_set(self, 17, 3);
+            }
+        }
+        break;
+    }
+}
+
+/* 0x80289654 (0xA4): runs the class-7 act whose step table is `pl_act_class7_handler_05_steps`, handing over at the
+ * motion's end. */
+void pl_act_class7_handler_05(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 0, 0, 0);
+        Pl_chr_set_attr_default(self, 0x4C5, 0, 0);
+        Pl_act_set_step_table(self, (u32)pl_act_class7_handler_05_steps, 0);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 10, 0);
+        }
+        break;
+    }
+}
+
+/* 0x8028992C (0x134): runs the two-motion class-7 act whose step table is `pl_act_class7_handler_07_steps`, trailing
+ * an afterimage at frame 18 of the second motion. */
+void pl_act_class7_handler_07(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 0, 1, 0);
+        Pl_chr_set_attr_default(self, 0x463, 2, 0);
+        pl_act_set_motion_gate(self, 60);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            self->act_step_0x05++;
+            Pl_chr_set_attr_default(self, 0x451, 0, 16);
+            pl_act_attack_set(self, 3, 0);
+            Pl_act_set_step_table(self, (u32)pl_act_class7_handler_07_steps, 0);
+        }
+        break;
+    case 2:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
+        } else {
+            if (Pl_frame_check(self, 0, pl_motion_f32_18, pl_motion_f32_zero) == 1) {
+                Pl_zanzo_set(self, 9, 3);
+            }
+            fn_80288E58(self, pl_motion_f32_minus_one);
+        }
+        break;
+    }
+}
+
+/* 0x80289A60 (0x178): runs the class-7 act for row `kind` of `pl_act_class7_handler_08_rows`: drains the gauge by 20
+ * and resets the three eft029 effect scales, then trails an afterimage at frame 28 of the step motion. */
+void pl_act_class7_handler_08(_PLW* self, s32 kind) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 0, 1, 0);
+        pl_act_motion_row_apply(self, 0, &pl_act_class7_handler_08_rows[kind], (u32)pl_act_class7_handler_08_steps);
+        pl_act_add_class7_gauge(self, -20);
+        pl_act_set_motion_gate(self, 60);
+        eft029_set_scale(self, 11, pl_motion_f32_one);
+        eft029_set_scale(self, 12, pl_motion_f32_one);
+        eft029_set_scale(self, 13, pl_motion_f32_one);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            self->act_step_0x05++;
+            pl_act_motion_row_apply(self, 1, &pl_act_class7_handler_08_rows[kind],
+                                    (u32)pl_act_class7_handler_08_steps);
+        }
+        break;
+    case 2:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+            if (Pl_frame_check(self, 0, pl_motion_f32_28, pl_motion_f32_zero) == 1) {
+                Pl_zanzo_set(self, 8, 4);
+            }
+        }
+        break;
+    }
+}
+
+/* 0x80289BD8 (0xFC): runs the class-7 act whose step table is `pl_act_class7_handler_09_steps`, trailing an
+ * afterimage at frame 22. */
+void pl_act_class7_handler_09(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 0, 1, 0);
+        Pl_chr_set_attr_default(self, 0x453, 4, 0);
+        pl_act_attack_set(self, 6, 0);
+        pl_act_set_motion_gate(self, 60);
+        Pl_act_set_step_table(self, (u32)pl_act_class7_handler_09_steps, 0);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+            if (Pl_frame_check(self, 0, pl_motion_f32_22, pl_motion_f32_zero) == 1) {
+                Pl_zanzo_set(self, 5, 3);
+            }
+        }
+        break;
+    }
+}
+
+/* 0x80289FF0 (0x128): runs the class-7 act for row `kind` of `pl_act_class7_handler_11_rows`; row 3 also steps the
+ * act timer. */
+void pl_act_class7_handler_11(_PLW* self, s32 kind) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 1, 0);
+        self->field_0x018 = 1;
+        pl_act_motion_row_apply(self, 0, &pl_act_class7_handler_11_rows[kind], (u32)pl_act_class7_handler_11_steps);
+        pl_act_set_motion_gate(self, 60);
+        if (kind == 3) {
+            pl_act_timer_step(self);
+        }
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            self->act_step_0x05++;
+            pl_act_motion_row_apply(self, 1, &pl_act_class7_handler_11_rows[kind],
+                                    (u32)pl_act_class7_handler_11_steps);
+        }
+        break;
+    case 2:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+        }
+        break;
+    }
+}
+
+/* 0x8028A118 (0xD0): runs the class-7 act whose step table is `pl_act_class7_handler_12_steps`. */
+void pl_act_class7_handler_12(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 1, 0);
+        Pl_chr_set_attr_default(self, 0x482, 4, 0);
+        pl_act_attack_set(self, 15, 0);
+        pl_act_set_motion_gate(self, 60);
+        Pl_act_set_step_table(self, (u32)pl_act_class7_handler_12_steps, 0);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+        }
+        break;
+    }
+}
+
+/* 0x8028A1E8 (0x110): runs the class-7 act for row `kind` of `pl_act_class7_handler_13_rows`. */
+void pl_act_class7_handler_13(_PLW* self, s32 kind) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 1, 0);
+        pl_act_motion_row_apply(self, 0, &pl_act_class7_handler_13_rows[kind], (u32)pl_act_class7_handler_13_steps);
+        pl_act_set_motion_gate(self, 60);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            self->act_step_0x05++;
+            pl_act_motion_row_apply(self, 1, &pl_act_class7_handler_13_rows[kind],
+                                    (u32)pl_act_class7_handler_13_steps);
+        }
+        break;
+    case 2:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+        }
+        break;
+    }
+}
+
+/* 0x8028A2F8 (0x108): runs the two-motion class-7 act whose step table is `pl_act_class7_handler_14_steps`. */
+void pl_act_class7_handler_14(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 1, 0);
+        Pl_chr_set_attr_default(self, 0x48A, 4, 0);
+        pl_act_set_motion_gate(self, 60);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            self->act_step_0x05++;
+            Pl_chr_set_attr_default(self, 0x484, 0, 10);
+            pl_act_attack_set(self, 17, 0);
+            Pl_act_set_step_table(self, (u32)pl_act_class7_handler_14_steps, 0);
+        }
+        break;
+    case 2:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+        }
+        break;
+    }
+}
+
+/* 0x8028A62C (0x134): runs the two-motion class-7 act whose step table is `pl_act_class7_handler_16_steps`, trailing
+ * an afterimage at frame 18 of the second motion. */
+void pl_act_class7_handler_16(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 1, 0);
+        Pl_chr_set_attr_default(self, 0x491, 4, 0);
+        pl_act_set_motion_gate(self, 60);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            self->act_step_0x05++;
+            Pl_chr_set_attr_default(self, 0x482, 0, 16);
+            pl_act_attack_set(self, 20, 0);
+            Pl_act_set_step_table(self, (u32)pl_act_class7_handler_16_steps, 0);
+        }
+        break;
+    case 2:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 4, 0);
+        } else {
+            if (Pl_frame_check(self, 0, pl_motion_f32_18, pl_motion_f32_zero) == 1) {
+                Pl_zanzo_set(self, 9, 3);
+            }
+            fn_80288E58(self, pl_motion_f32_minus_one);
+        }
+        break;
+    }
+}
+
+/* 0x8028A8D8 (0xFC): runs the class-7 act whose step table is `pl_act_class7_handler_18_steps`, trailing an
+ * afterimage at frame 22. */
+void pl_act_class7_handler_18(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 1, 0);
+        Pl_chr_set_attr_default(self, 0x484, 4, 0);
+        pl_act_attack_set(self, 22, 0);
+        Pl_act_set_step_table(self, (u32)pl_act_class7_handler_18_steps, 0);
+        pl_act_set_motion_gate(self, 60);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 4, 0);
+        } else {
+            fn_80288E58(self, pl_motion_f32_minus_one);
+            if (Pl_frame_check(self, 0, pl_motion_f32_22, pl_motion_f32_zero) == 1) {
+                Pl_zanzo_set(self, 5, 3);
+            }
+        }
+        break;
+    }
+}
+
+/* 0x8028ADB8 (0x100): runs the gauge-spending class-7 act on motion 0x467 (attack 30, gauge -100) and enters act 0x30
+ * at frame 128. */
+void pl_act_class7_handler_21(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 0, 1, 0);
+        Pl_chr_set_attr_default(self, 0x467, 4, 0);
+        pl_act_attack_set(self, 30, 2);
+        pl_act_set_motion_gate(self, 60);
+        pl_act_add_class7_gauge(self, -100);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
+        } else {
+            fn_80288E60(self, pl_motion_f32_minus_one);
+            if (Pl_frame_check(self, 0, pl_motion_f32_128, pl_motion_f32_zero) == 1) {
+                self->field_0x018 = 0;
+                pl_act_enter(self, 4, 0x30, 2);
+            }
+        }
+        break;
+    }
+}
+
+/* 0x8028AEB8 (0x98): runs the one-motion class-7 act on motion 0x467, handing over at the motion's end. */
+void pl_act_class7_handler_22(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 0, 1, 0);
+        Pl_chr_set_attr_default(self, 0x467, 0, 0x80);
+        self->field_0x018 = 0;
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 0, 4, 0);
+        }
+        break;
+    }
+}
+
+/* 0x8028B0F4 (0xA4): runs the class-7 act whose step table is `pl_act_class7_handler_24_steps`, handing over at the
+ * motion's end. */
+void pl_act_class7_handler_24(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 0, 0);
+        Pl_chr_set_attr_default(self, 0x4F7, 0, 0);
+        Pl_act_set_step_table(self, (u32)pl_act_class7_handler_24_steps, 0);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 10, 0);
+        }
+        break;
+    }
+}
+
+/* 0x8028B198 (0x100): runs the gauge-spending class-7 act on motion 0x495 (attack 31, gauge -100) and enters act 0x3B
+ * at frame 128. */
+void pl_act_class7_handler_25(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 1, 0);
+        Pl_chr_set_attr_default(self, 0x495, 4, 0);
+        pl_act_attack_set(self, 31, 2);
+        pl_act_set_motion_gate(self, 60);
+        pl_act_add_class7_gauge(self, -100);
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 4, 0);
+        } else {
+            fn_80288E60(self, pl_motion_f32_minus_one);
+            if (Pl_frame_check(self, 0, pl_motion_f32_128, pl_motion_f32_zero) == 1) {
+                self->field_0x018 = 0;
+                pl_act_enter(self, 4, 0x3B, 2);
+            }
+        }
+        break;
+    }
+}
+
+/* 0x8028B298 (0x98): runs the one-motion class-7 act on motion 0x495, handing over at the motion's end. */
+void pl_act_class7_handler_26(_PLW* self) {
+    switch (self->act_step_0x05) {
+    case 0:
+        self->act_step_0x05++;
+        Pl_act_set_motion(self, 3, 1, 0);
+        Pl_chr_set_attr_default(self, 0x495, 0, 0x80);
+        self->field_0x018 = 0;
+        break;
+    case 1:
+        if (Pl_motion_end_ck(self) == 1) {
+            Pl_act_set_motion_slot(self, 3, 4, 0);
+        }
+        break;
+    }
+}
+
+/* 0x8028B330 (0x1F4): runs the class-7 act handler `act_no` selects, with the variant the act number implies; an
+ * act number past the table hands the motion slot over. */
+void pl_act_class7_dispatch(_PLW* self) {
+    switch (self->act_no) {
+    case 0:
+        pl_act_class7_handler_00(self, 0, 0);
+        break;
+    case 1:
+        pl_act_class7_handler_00(self, 0, 1);
+        break;
+    case 2:
+        pl_act_class7_handler_00(self, 1, 0);
+        break;
+    case 3:
+        pl_act_class7_handler_00(self, 2, 0);
+        break;
+    case 4:
+        pl_act_class7_handler_01(self);
+        break;
+    case 5:
+        pl_act_class7_handler_02(self, 0);
+        break;
+    case 6:
+        pl_act_class7_handler_02(self, 1);
+        break;
+    case 7:
+        pl_act_class7_handler_03(self);
+        break;
+    case 8:
+        pl_act_class7_handler_04(self, 0);
+        break;
+    case 9:
+        pl_act_class7_handler_04(self, 1);
+        break;
+    case 10:
+        pl_act_class7_handler_04(self, 2);
+        break;
+    case 11:
+        pl_act_class7_handler_04(self, 3);
+        break;
+    case 12:
+        pl_act_class7_handler_04(self, 4);
+        break;
+    case 13:
+        pl_act_class7_handler_04(self, 5);
+        break;
+    case 14:
+        pl_act_class7_handler_04(self, 6);
+        break;
+    case 15:
+        pl_act_class7_handler_05(self);
+        break;
+    case 16:
+        pl_act_class7_handler_06(self, 0);
+        break;
+    case 17:
+        pl_act_class7_handler_06(self, 1);
+        break;
+    case 18:
+        pl_act_class7_handler_06(self, 2);
+        break;
+    case 19:
+        pl_act_class7_handler_06(self, 3);
+        break;
+    case 20:
+        pl_act_class7_handler_06(self, 4);
+        break;
+    case 21:
+        pl_act_class7_handler_06(self, 5);
+        break;
+    case 22:
+        pl_act_class7_handler_07(self);
+        break;
+    case 23:
+        pl_act_class7_handler_08(self, 0);
+        break;
+    case 24:
+        pl_act_class7_handler_08(self, 1);
+        break;
+    case 25:
+        pl_act_class7_handler_09(self);
+        break;
+    case 26:
+        pl_act_class7_handler_10(self, 0);
+        break;
+    case 27:
+        pl_act_class7_handler_10(self, 1);
+        break;
+    case 28:
+        pl_act_class7_handler_11(self, 0);
+        break;
+    case 29:
+        pl_act_class7_handler_12(self);
+        break;
+    case 30:
+        pl_act_class7_handler_13(self, 0);
+        break;
+    case 31:
+        pl_act_class7_handler_14(self);
+        break;
+    case 32:
+        pl_act_class7_handler_11(self, 1);
+        break;
+    case 33:
+        pl_act_class7_handler_15(self, 0);
+        break;
+    case 34:
+        pl_act_class7_handler_15(self, 1);
+        break;
+    case 35:
+        pl_act_class7_handler_15(self, 2);
+        break;
+    case 36:
+        pl_act_class7_handler_15(self, 3);
+        break;
+    case 37:
+        pl_act_class7_handler_15(self, 4);
+        break;
+    case 38:
+        pl_act_class7_handler_15(self, 5);
+        break;
+    case 39:
+        pl_act_class7_handler_16(self);
+        break;
+    case 40:
+        pl_act_class7_handler_17(self, 0);
+        break;
+    case 41:
+        pl_act_class7_handler_17(self, 1);
+        break;
+    case 42:
+        pl_act_class7_handler_18(self);
+        break;
+    case 43:
+        pl_act_class7_handler_19(self, 0);
+        break;
+    case 44:
+        pl_act_class7_handler_19(self, 1);
+        break;
+    case 45:
+        pl_act_class7_handler_20(self, 0);
+        break;
+    case 46:
+        pl_act_class7_handler_20(self, 1);
+        break;
+    case 47:
+        pl_act_class7_handler_21(self);
+        break;
+    case 48:
+        pl_act_class7_handler_22(self);
+        break;
+    case 49:
+        pl_act_class7_handler_13(self, 1);
+        break;
+    case 50:
+        pl_act_class7_handler_13(self, 2);
+        break;
+    case 51:
+        pl_act_class7_handler_13(self, 3);
+        break;
+    case 52:
+        pl_act_class7_handler_13(self, 4);
+        break;
+    case 53:
+        pl_act_class7_handler_13(self, 5);
+        break;
+    case 54:
+        pl_act_class7_handler_11(self, 2);
+        break;
+    case 55:
+        pl_act_class7_handler_23(self, 0);
+        break;
+    case 56:
+        pl_act_class7_handler_23(self, 1);
+        break;
+    case 57:
+        pl_act_class7_handler_24(self);
+        break;
+    case 58:
+        pl_act_class7_handler_25(self);
+        break;
+    case 59:
+        pl_act_class7_handler_26(self);
+        break;
+    case 60:
+        pl_act_class7_handler_11(self, 3);
+        break;
+    default:
+        Pl_act_set_motion_slot(self, 0, 4, 0);
+        break;
+    }
 }
 
 /* 0x8028BCF4 - release the three `se_handle_clear` handles the mode object carries. */
