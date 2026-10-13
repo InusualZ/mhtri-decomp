@@ -1,4 +1,4 @@
-/* The per-frame control cluster of `Pl/pl_act_step.cpp` (0x8025F088-0x80262940): its entry points, then the callees
+/* The entry points of `Pl/pl_act_step.cpp` (0x802430E8-0x802673A4) its per-frame control cluster calls, then the callees
  * it calls whose owner's header does not declare them (or declares a different signature; the shapes here are the
  * call sites').  Moving each to its owner's header is open rule-2 work.
  */
@@ -23,7 +23,7 @@ void fn_8025F088(struct _PLW* self);
 void fn_8025F478(struct _PLW* self);
 s32 fn_8025F588(struct _PLW* self);
 void fn_8025FA00(struct _PLW* self);
-void fn_8025FF0C(struct _PLW* self, u8 mode);
+s32 fn_8025FF0C(struct _PLW* self, u8 mode);
 s32 fn_80260198(struct _PLW* self);
 void fn_80260248(struct _PLW* self, s32 mode, s16 delta);
 void fn_802602A0(struct _PLW* self);
@@ -36,15 +36,16 @@ void fn_80260B38(struct _PLW* self);
 void fn_80261770(struct _PLW* self);
 void fn_802621B0(struct _PLW* self);
 s32 fn_80262688(struct _PLW* self);
-
-/* ---- Pl-band callees with no registered owner (`unsplit/Pl.h`'s home) ---- */
+void fn_8025E0C8(struct _PLW* self);
+void fn_8025E448(struct _PLW* self);
+void fn_8025EC58(struct _PLW* self);
+void fn_8025ED00(struct _PLW* self);
+void fn_802642D0(struct _PLW* self);
 u32 fn_8024676C(void);
 u32 fn_8025DE38(struct _PLW* self);
-u32 fn_8025E0C8(struct _PLW* self);
 u32 fn_8025E298(struct _PLW* self, s32 a, s32 b);
-u32 fn_8025E448(struct _PLW* self);
-u32 fn_8025EC58(struct _PLW* self);
-u32 fn_8025ED00(struct _PLW* self);
+
+/* ---- Pl-band callees with no registered owner (`unsplit/Pl.h`'s home) ---- */
 u32 fn_80276800(struct _PLW* self, s32 v);
 u32 fn_80278C7C(struct _PLW* self);
 u32 fn_80278CD0(struct _PLW* self);
@@ -59,7 +60,6 @@ u32 fn_8012A624(void* out);
 u32 fn_80131934(u8 index);
 u32 fn_80224AC4(void* physics);
 u32 fn_80262940(struct _PLW* self);
-u32 fn_802642D0(struct _PLW* self);
 u32 fn_802657F8(struct _PLW* self);
 u32 fn_8026F7B4(void);
 u32 fn_8026FE44(struct _PLW* self);
