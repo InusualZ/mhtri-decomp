@@ -33,6 +33,9 @@ extern u8 lbl_805BF538[];
 extern u8 lbl_805BFCD8[];
 extern u8 lbl_805BFFCC[];
 
+/* 0x805BEBEC (0x152) - the step table pl_act_step_arm_table hands Pl_act_set_step_table. */
+extern u32 pl_act_step_table_247[];
+
 #ifdef __cplusplus
 }
 #endif

@@ -26,13 +26,17 @@
  *   body's 1/2/0x10 masks).
  *   GUESS (from each body and the NPC swap callers): pl_carry_item_get, pl_item_room_get
  *   GUESS (from each body and its callers): pl_act_name_row_get
+ *   GUESS (from each body): pl_id_bit_ck, pl_part_flag2_ck (the +0xDC word and the second 128-id set), pl_act_add_stagger,
+ *   pl_act_true_ck, pl_act_no_68_71_ck, pl_chr_set_motion_default, pl_model_set_value, pl_rig_get_motion_frame,
+ *   pl_act_gauge_step_unlatched, pl_act_gauge_step_signed, pl_act_held_ck, pl_ground_probe_ahead,
+ *   pl_stg_weapon_near_find
  * RESIDUALS. 122 functions unwritten (objdiff scores them 0) in 18 runs: 0x802695A4-0x80269998, 0x80269AC4-0x8026A00C,
  *   0x8026A0D4-0x8026A224, 0x8026A248-0x8026A2BC, 0x8026A3A8-0x8026A4E4, 0x8026A5A4-0x8026A618, 0x8026A738-0x8026BA04,
  *   0x80274B20-0x80274B5C, 0x8027D7EC-0x8027D874, 0x8027D8A0-0x8027DC64, 0x8027E120-0x8027E1B8, 0x8027E404-0x8027E918,
  *   0x8027E98C-0x8027EC50, 0x8027ED28-0x8027EE08, 0x8027EE24-0x8027EFB4, 0x8027F008-0x8027FC70, 0x8027FC84-0x8027FF20,
  *   0x8027FF30-0x802840DC.  Known blockers among them: the rig at 0x80269AC4-0x80269F88 (`new` of 0x1560 bytes) needs
  *   its 0x90/0x110-byte element types (vtables 0x805BAB58/0x805BAB74); `Pl_chr_set_attr`/0x8026A178/`Pl_chr_setX`
- *   funnel into `fn_800E12CC`, whose argument order is open; `fn_8027D8A0`, `fn_8027D968`, `fn_8027E5E4` and
+ *   funnel into `fn_800E12CC`, whose argument order is open; `fn_8027D8A0`, `pl_stg_weapon_near_find`, `fn_8027E5E4` and
  *   `fn_8027F3CC` carry paired-single / `cror` instructions the front end cannot emit.
  *  - flipcheck's undefined reference `get_ControlType` (the map's `get_ControlType__Fl` needs C++ scope): a linkage
  *    item for a fixer.
@@ -127,7 +131,7 @@
  *    store, which reproduces retail's `blelr ... sth ... bltlr`;
  *  - `pl_pos_blend_start` writes `(f32)(s16)arg1` inline at each division (retail recomputes the conversion);
  *  - `fn_80278590` writes `* 14` as `(x * 7) << 1` (strength reduction kept); `fn_8027993C` casts its `u16` index to
- *    `s16` each iteration; `fn_8027C064`'s local declaration order fixes its stack slots; `fn_80277C94` spells its
+ *    `s16` each iteration; `fn_8027C064`'s local declaration order fixes its stack slots; `pl_ground_probe_ahead` spells its
  *    constant `-0x1006`; `fn_80279414`/`Get_Shell_rate_adj` read `((u8*)&self->equipC)[0]` before forming the pointer;
  *  - `fn_8027D0D4`'s 15-case `switch` is a jump table and one arm assigns the loop counter (`i = 5`).
  */
@@ -346,13 +350,13 @@ void Pl_chr_set_attr_default(_PLW* self, u16 motion, s32 a, s32 b)
 }
 
 /* The character motion setter's argument shuffle (`fn_8026A178` takes a sixth, always-0 argument). */
-void fn_8026A230(_PLW* self, s32 a, u16 motion, s32 b, s32 c)
+void pl_chr_set_motion_default(_PLW* self, s32 a, u16 motion, s32 b, s32 c)
 {
     fn_8026A178(self, a, motion, b, c, 0);
 }
 
 /* The model block's per-index value setter. */
-void fn_8026A23C(_PLW* self, s32 index, f32 value)
+void pl_model_set_value(_PLW* self, s32 index, f32 value)
 {
     fn_800E26B4(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, index, value);
 }
@@ -395,7 +399,7 @@ u32 Pl_motion_end_ck(_PLW* self)
     return fn_800E2198(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, 0);
 }
 
-f32 fn_8026A34C(_PLW* self)
+f32 pl_rig_get_motion_frame(_PLW* self)
 {
     return ((PlSeRig*)self->physics_0x13C)->models_0x004[0].model.field_0x74;
 }
@@ -475,7 +479,7 @@ void fn_8026A678(_PLW* self, s32 id)
     self->id_flags_0xF0[id / 32] |= 1 << (id & 31);
 }
 
-s32 fn_8026A6A4(_PLW* self, s32 id)
+s32 pl_part_flag2_ck(_PLW* self, s32 id)
 {
     return (self->id_flags_0xF0[id / 32] & (1 << (id & 31))) != 0;
 }
@@ -485,7 +489,7 @@ void fn_8026A6D8(_PLW* self, s32 id)
     self->id_flags_0xDC |= 1 << (id & 31);
 }
 
-s32 fn_8026A6F4(_PLW* self, s32 id)
+s32 pl_id_bit_ck(_PLW* self, s32 id)
 {
     return (self->id_flags_0xDC & (1 << (id & 31))) != 0;
 }
@@ -549,7 +553,7 @@ extern "C" {
 void fn_8026A618(_PLW* self, u32 id);
 u32 pl_part_flag_ck(_PLW* self, u32 id);
 void fn_8026A678(_PLW* self, u32 id);
-u32 fn_8026A6F4(_PLW* self, u32 id);
+u32 pl_id_bit_ck(_PLW* self, u32 id);
 u32 fn_8026B99C(_PLW* self);
 u32 fn_8026B934(_PLW* self);
 u32 fn_8026BA04(_PLW* self);
@@ -1404,12 +1408,12 @@ extern "C" void fn_8026CC7C(_PLW* self)
             if (fn_8026CBE4(self, 0, 0, 4) == 1U) {
                 fn_8026A618(self, 0x11);
             }
-            if ((fn_8026A6F4(self, 0xB) == 0) && ((s32) (st->flagsBC & 0x200) != 0)) {
+            if ((pl_id_bit_ck(self, 0xB) == 0) && ((s32) (st->flagsBC & 0x200) != 0)) {
                 if (st->unk58 <= lbl_8079A020) {
                     fn_8026A678(self, 7);
                 }
             }
-            if (((s32) (st->flagsBC & 0x200) != 0) && (fn_8026A6F4(self, 0xB) == 0)) {
+            if (((s32) (st->flagsBC & 0x200) != 0) && (pl_id_bit_ck(self, 0xB) == 0)) {
                 if (st->unk54 <= lbl_8079A024) {
                     fn_8026A678(self, 2);
                 } else {
@@ -1434,7 +1438,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 fn_8026A678(self, 0x12);
                 fn_8026A678(self, 9);
             }
-            if (((s32) (st->flagsBC & 0x200) != 0) && (fn_8026A6F4(self, 0xB) == 0)) {
+            if (((s32) (st->flagsBC & 0x200) != 0) && (pl_id_bit_ck(self, 0xB) == 0)) {
                 if (st->unk54 <= lbl_8079A024) {
                     fn_8026A678(self, 0xB);
                 } else {
@@ -1577,7 +1581,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
             if (fn_8026CBE4(self, 0, 0, 4) == 1U) {
                 fn_8026A618(self, 0x11);
             }
-            if (((s32) (st->flagsBC & 0x200) != 0) && (fn_8026A6F4(self, 0xB) == 0)) {
+            if (((s32) (st->flagsBC & 0x200) != 0) && (pl_id_bit_ck(self, 0xB) == 0)) {
                 fn_8026A678(self, 0x11);
                 if (st->unk54 <= lbl_8079A024) {
                     fn_8026A678(self, 5);
@@ -1605,7 +1609,7 @@ extern "C" void fn_8026CC7C(_PLW* self)
                 fn_8026A678(self, 0x12);
                 fn_8026A678(self, 4);
             }
-            if (((s32) (st->flagsBC & 0x200) != 0) && (fn_8026A6F4(self, 0xB) == 0)) {
+            if (((s32) (st->flagsBC & 0x200) != 0) && (pl_id_bit_ck(self, 0xB) == 0)) {
                 if (st->unk54 <= lbl_8079A024) {
                     fn_8026A678(self, 5);
                     fn_8026A678(self, 6);
@@ -2365,6 +2369,7 @@ extern "C" BOOL fn_8026FFBC(_PLW* self)
 
 /* ==== 0x80270018-0x80273B14: the skill and item layer (optimization level 4) ==== */
 #include "Pl/pl_act.h"
+#include "Pl/pl_act_step.h" /* pl_item_slot_cycle (the owner's header, rule 2) */
 #pragma optimization_level 4
 
 #include "types.h"
@@ -2435,7 +2440,6 @@ void* fn_8027E344(void);
 u32 fn_80274AEC(u8*, u32, u8);
 
 s16 item_take(u16, s16, void*, int, int, int);
-u16 fn_8025DF78(_PLW*, u16, int);
 u32 fn_80269394(void*);
 u32 fn_802693C4(u8, int, s32);
 u32 fn_80269474(u8, int, s32);
@@ -3392,7 +3396,7 @@ extern "C" s16 pl_item_add(_PLW* plw, u16 item, s16 value) {
             u8* d = GetItemData__FUs(plw->slot_id[plw->field_0x304].item_id);
 
             if ((d[2] & 8) == 0 || d[0] == 1) {
-                plw->field_0x304 = fn_8025DF78(plw, plw->field_0x304, 0);
+                plw->field_0x304 = pl_item_slot_cycle(plw, plw->field_0x304, 0);
             }
         }
         fn_80272B10(plw, slot);
@@ -3912,6 +3916,7 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
 #include "stage/stg_w.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "enemy/em_pop.h"   /* quest_flag_80_ck, em_work_slot_pair_get, quest_element_remaining_get (rule 2) */
+#include "enemy/em_model.h" /* em_roster_area_hit_find (the owner header, rule 2) */
 #include "quest/quest_entry.h"   /* quest_element_supply_state_get, quest_element_item_use (rule 2) */
 
 /* 0x8045F554 - the runtime string copy `fn_8027552C` uses to arm a hunter name (owner: `MSL_C/alloc.cpp`, rule 2). */
@@ -5386,7 +5391,7 @@ extern "C" s32 fn_8027633C(struct _PLW* plw, s16 delta, s8* out)
 }
 
 /* The same step, suppressed while the shell/ammo latch is latched. */
-extern "C" s32 fn_802764B0(struct _PLW* plw, s16 delta, s8* out)
+extern "C" s32 pl_act_gauge_step_unlatched(struct _PLW* plw, s16 delta, s8* out)
 {
     if (fn_8027E1E4(plw) == 1U) {
         return 0;
@@ -5395,7 +5400,7 @@ extern "C" s32 fn_802764B0(struct _PLW* plw, s16 delta, s8* out)
 }
 
 /* The same step for a signed gauge delta (a negative one also moves the stagger gauge). */
-extern "C" s32 fn_80276514(struct _PLW* plw, s16 delta, s8* out)
+extern "C" s32 pl_act_gauge_step_signed(struct _PLW* plw, s16 delta, s8* out)
 {
     s16 value;
 
@@ -5474,11 +5479,11 @@ extern "C" void fn_80276778(struct _PLW* plw, s16 amount)
     if (plw->field_0x380 >= 0x96) {
         plw->field_0x380 = 0x96;
     }
-    fn_802767B4(plw, 0x96);
+    pl_act_add_stagger(plw, 0x96);
 }
 
 /* Adds to the act's current stagger value, clamped to 0..`+0x380`. */
-extern "C" void fn_802767B4(struct _PLW* plw, s16 amount)
+extern "C" void pl_act_add_stagger(struct _PLW* plw, s16 amount)
 {
     if (amount > 0) {
         plw->field_0x382 = 0;
@@ -5594,6 +5599,7 @@ extern "C" void fn_80276A3C(struct _PLW* plw)
 #include "Pl/pl_coll.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers */
 #include "quest/quest_item_slot.h" /* quest_item_work_notify (rule 2: its owner) */
+#include "ef/eft019.h" /* ef_inst_spawn (rule 2: its owner) */
 
 /* The actors this unit calls into; the mangling of the source names reproduces the map's spellings. */
 u32 Pl_Skill_ck(_PLW*, u16);
@@ -5627,7 +5633,6 @@ u32 Pl_dm_condition_ck(_PLW*, u32);
 
 
 u32 Pl_act_ck(_PLW*, u8, u16);
-u32 Pl_bari_ck(_PLW*, s32);
 void Pl_get_gunner_vec(_PLW*, _CP_VECTOR*);
 void Pl_get_gunner_pos(_PLW*, nw4r::math::VEC3*, s32);
 void cpSetRotMatrixZXY(_CP_VECTOR*, nw4r::math::MTX34*);
@@ -5637,7 +5642,6 @@ namespace s_80276B58 {
 
 extern "C" void eft_rot_vec_copy(_CP_VECTOR*, void*);
 extern "C" f32 vec3_distance(void*, void*);
-extern "C" u32 ef_inst_spawn(_PLW*, s32);
 extern "C" u32 stage_map_kind_get(u8);
 extern "C" u32 fn_802753E4(_PLW*, s32);
 extern "C" void fn_80278D1C(_PLW*);
@@ -6028,13 +6032,13 @@ extern "C" void fn_8027A17C(_PLW* self)
 }
 
 /* 0x8027A190 */
-extern "C" s32 fn_8027A190(_PLW* self)
+extern "C" s32 pl_act_true_ck(_PLW* self)
 {
     return 1;
 }
 
 /* 0x8027A198 */
-extern "C" s32 fn_8027A198(_PLW* self)
+extern "C" s32 pl_act_no_68_71_ck(_PLW* self)
 {
     if (self->field_0x00A == 0) {
         s32 id = self->act_no;
@@ -7004,7 +7008,7 @@ namespace s_80276B58 {
 
 /* 0x80277C94: ground-height probe along the actor's facing, returning whether the probe hit
  * inside the requested band. */
-extern "C" s32 fn_80277C94(_PLW* self, nw4r::math::VEC3* out, f32 arg2, f32 arg3)
+extern "C" s32 pl_ground_probe_ahead(_PLW* self, nw4r::math::VEC3* out, f32 arg2, f32 arg3)
 {
     nw4r::math::VEC3 v;
     u8 hit;
@@ -7152,7 +7156,7 @@ extern "C" void fn_80278D1C(_PLW* self)
     }
 }
 
-extern "C" s32 fn_8026A6F4(_PLW*, s32);
+extern "C" s32 pl_id_bit_ck(_PLW*, s32);
 } /* namespace s_80276B58 */
 
 void sysSE_req(s32);
@@ -7190,12 +7194,12 @@ extern "C" void fn_8027B918(_PLW* self)
         if (*(s16*)((u8*)self + 0x5C2) != 0) {
             break;
         }
-        if ((u32)fn_8026A6F4(self, 0x17) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x17) == 1) {
             sysSE_req(1);
             *(u8*)((u8*)self + 0x5BD) = 0;
             return;
         }
-        if ((u32)fn_8026A6F4(self, 0x16) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x16) == 1) {
             switch (*(u8*)((u8*)self + 0x5BF)) {
             case 0:
                 sysSE_req(0);
@@ -7220,7 +7224,7 @@ extern "C" void fn_8027B918(_PLW* self)
                 return;
             }
         } else {
-            if ((u32)fn_8026A6F4(self, 0x12) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x12) == 1) {
                 sysSE_req(6);
                 if (*(u8*)((u8*)self + 0x5BF) == 0) {
                     *(u8*)((u8*)self + 0x5BF) = 1;
@@ -7228,7 +7232,7 @@ extern "C" void fn_8027B918(_PLW* self)
                     (*(u8*)((u8*)self + 0x5BF))--;
                 }
             }
-            if ((u32)fn_8026A6F4(self, 0x13) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x13) == 1) {
                 sysSE_req(6);
                 if (*(u8*)((u8*)self + 0x5BF) >= 1) {
                     *(u8*)((u8*)self + 0x5BF) = 0;
@@ -7242,29 +7246,29 @@ extern "C" void fn_8027B918(_PLW* self)
     }
     case 2:
         if (*(s8*)(q + 0x68D) == 0) {
-            if ((u32)fn_8026A6F4(self, 0x17) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x17) == 1) {
                 *(u8*)(q + 0x68D) = 1;
                 sysSE_req(1);
                 return;
             }
-            if ((u32)fn_8026A6F4(self, 0x16) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x16) == 1) {
                 if ((s32)*(u8*)((u8*)self + 0x5BF) == 1 && (u32)Pl_motion_input_ck(0) != 1) {
                     sysSE_req(0);
                     *(u8*)((u8*)self + 0x5BD) = 1;
                     return;
                 }
-            } else if ((u32)fn_8026A6F4(self, 0x15) == 1) {
+            } else if ((u32)pl_id_bit_ck(self, 0x15) == 1) {
                 *(u8*)(q + 0x68D) = 1;
                 sysSE_req(3);
                 return;
             }
         } else {
-            if ((u32)fn_8026A6F4(self, 0x16) == 1 || (u32)fn_8026A6F4(self, 0x17) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x16) == 1 || (u32)pl_id_bit_ck(self, 0x17) == 1) {
                 *(u8*)((u8*)self + 0x5C0) = 1;
                 sysSE_req(1);
                 return;
             }
-            if ((u32)fn_8026A6F4(self, 0x14) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x14) == 1) {
                 *(u8*)(q + 0x68D) = 0;
                 sysSE_req(3);
             }
@@ -7308,7 +7312,7 @@ extern "C" void fn_8027B358(_PLW* self)
         *(u8*)((u8*)self + 0x5C0) = 1;
         return;
     case 1:
-        if ((u32)fn_8026A6F4(self, 0x13) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x13) == 1) {
             (*(u8*)(q + 0x68C))++;
             if (*(s8*)(q + 0x68C) >= 3) {
                 *(u8*)(q + 0x68C) = 2;
@@ -7317,7 +7321,7 @@ extern "C" void fn_8027B358(_PLW* self)
             sysSE_req(6);
             return;
         }
-        if ((u32)fn_8026A6F4(self, 0x12) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x12) == 1) {
             (*(u8*)(q + 0x68C))--;
             if (*(s8*)(q + 0x68C) < 0) {
                 *(u8*)(q + 0x68C) = 0;
@@ -7326,7 +7330,7 @@ extern "C" void fn_8027B358(_PLW* self)
             sysSE_req(6);
             return;
         }
-        if ((u32)fn_8026A6F4(self, 0x16) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x16) == 1) {
             switch (quest_element_supply_state_get(*(s8*)(q + 0x68C))) {
             case 0:
                 sysSE_req(2);
@@ -7344,7 +7348,7 @@ extern "C" void fn_8027B358(_PLW* self)
                 sysSE_req(0);
                 return;
             }
-        } else if ((u32)fn_8026A6F4(self, 0x17) == 1) {
+        } else if ((u32)pl_id_bit_ck(self, 0x17) == 1) {
             sysSE_req(1);
             *(u8*)((u8*)self + 0x5C0) = 1;
             *(u8*)((u8*)self + 0x5BE) = 0;
@@ -7362,7 +7366,7 @@ extern "C" void fn_8027B358(_PLW* self)
             *(s8*)(q + 0x68E) = r28;
             return;
         }
-        if ((u32)fn_8026A6F4(self, 0x13) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x13) == 1) {
             if (*(s8*)(q + 0x68E) > 1) {
                 sysSE_req(6);
                 *(u16*)(q + 0x696) |= 2;
@@ -7372,7 +7376,7 @@ extern "C" void fn_8027B358(_PLW* self)
             *(u8*)(q + 0x68E) = 1;
             return;
         }
-        if ((u32)fn_8026A6F4(self, 0x12) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x12) == 1) {
             u8 t31 = *(u8*)(q + 0x68E);
             if ((s8)t31 < Pl_item_timer_get(self, sp8)) {
                 if ((s8)t31 < r28) {
@@ -7384,7 +7388,7 @@ extern "C" void fn_8027B358(_PLW* self)
                 *(s8*)(q + 0x68E) = r28;
                 return;
             }
-        } else if ((u32)fn_8026A6F4(self, 0x15) == 1) {
+        } else if ((u32)pl_id_bit_ck(self, 0x15) == 1) {
             u8 t31b = *(u8*)(q + 0x68E);
             if (r28 < Pl_item_timer_get(self, sp8)) {
                 *(s8*)(q + 0x68E) = r28;
@@ -7397,7 +7401,7 @@ extern "C" void fn_8027B358(_PLW* self)
                 return;
             }
         } else {
-            if ((u32)fn_8026A6F4(self, 0x14) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x14) == 1) {
                 if (*(s8*)(q + 0x68E) != 1) {
                     sysSE_req(6);
                     *(u16*)(q + 0x696) |= 2;
@@ -7405,13 +7409,13 @@ extern "C" void fn_8027B358(_PLW* self)
                 *(u8*)(q + 0x68E) = 1;
                 return;
             }
-            if ((u32)fn_8026A6F4(self, 0x16) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x16) == 1) {
                 sysSE_req(0);
                 *(u8*)((u8*)self + 0x5C0) = 3;
                 *(u8*)(q + 0x68D) = 0;
                 return;
             }
-            if ((u32)fn_8026A6F4(self, 0x17) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x17) == 1) {
                 sysSE_req(1);
                 *(u8*)((u8*)self + 0x5C0) = 1;
                 return;
@@ -7428,7 +7432,7 @@ extern "C" void fn_8027B358(_PLW* self)
             *(s8*)(q + 0x68E) = r28;
             return;
         }
-        if ((u32)fn_8026A6F4(self, 0x13) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x13) == 1) {
             if (*(s8*)(q + 0x68D) < 1) {
                 sysSE_req(6);
                 (*(u8*)(q + 0x68D))++;
@@ -7437,7 +7441,7 @@ extern "C" void fn_8027B358(_PLW* self)
             *(u8*)(q + 0x68D) = 1;
             return;
         }
-        if ((u32)fn_8026A6F4(self, 0x12) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x12) == 1) {
             if (*(s8*)(q + 0x68D) > 0) {
                 sysSE_req(6);
                 (*(u8*)(q + 0x68D))--;
@@ -7446,7 +7450,7 @@ extern "C" void fn_8027B358(_PLW* self)
             *(u8*)(q + 0x68D) = 0;
             return;
         }
-        if ((u32)fn_8026A6F4(self, 0x16) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x16) == 1) {
             if (*(s8*)(q + 0x68D) == 1) {
                 sysSE_req(1);
                 *(u8*)((u8*)self + 0x5C0) = 2;
@@ -7458,7 +7462,7 @@ extern "C" void fn_8027B358(_PLW* self)
             quest_element_item_use(self, sp8, *(s8*)(q + 0x68E));
             return;
         }
-        if ((u32)fn_8026A6F4(self, 0x17) == 1) {
+        if ((u32)pl_id_bit_ck(self, 0x17) == 1) {
             sysSE_req(1);
             *(u8*)((u8*)self + 0x5C0) = 2;
             return;
@@ -7505,12 +7509,12 @@ extern "C" void fn_8027B0BC(_PLW* self)
     if (*(s16*)((u8*)self + 0x5C2) != 0) {
         return;
     }
-    if ((u32)fn_8026A6F4(self, 0x17) == 1) {
+    if ((u32)pl_id_bit_ck(self, 0x17) == 1) {
         *(u8*)((u8*)self + 0x5BC) = 0;
         sysSE_req(1);
         return;
     }
-    if ((u32)fn_8026A6F4(self, 0x14) == 1) {
+    if ((u32)pl_id_bit_ck(self, 0x14) == 1) {
         sysSE_req(3);
         s32 v = *(u8*)(q + 0x5E1);
         if ((s32)((s8)v & 7) != 0) {
@@ -7518,7 +7522,7 @@ extern "C" void fn_8027B0BC(_PLW* self)
         } else {
             (*(u8*)(q + 0x5E1)) += 7;
         }
-    } else if ((u32)fn_8026A6F4(self, 0x15) == 1) {
+    } else if ((u32)pl_id_bit_ck(self, 0x15) == 1) {
         sysSE_req(3);
         s32 v = *(u8*)(q + 0x5E1);
         if ((s32)((s8)v & 7) != 7) {
@@ -7527,14 +7531,14 @@ extern "C" void fn_8027B0BC(_PLW* self)
             (*(u8*)(q + 0x5E1)) -= 7;
         }
     }
-    if ((u32)fn_8026A6F4(self, 0x13) == 1) {
+    if ((u32)pl_id_bit_ck(self, 0x13) == 1) {
         sysSE_req(3);
         (*(u8*)(q + 0x5E1)) += 8;
         s32 w = *(u8*)(q + 0x5E1);
         if ((s8)w >= 40) {
             (*(u8*)(q + 0x5E1)) -= 40;
         }
-    } else if ((u32)fn_8026A6F4(self, 0x12) == 1) {
+    } else if ((u32)pl_id_bit_ck(self, 0x12) == 1) {
         sysSE_req(3);
         (*(u8*)(q + 0x5E1)) -= 8;
         s32 w = *(u8*)(q + 0x5E1);
@@ -7545,7 +7549,7 @@ extern "C" void fn_8027B0BC(_PLW* self)
     u8 dir = *(u8*)(q + 0x5E1);
     if (((1 << ((s8)dir & 0x1F)) & *(u32*)(q + 0x684 + ((s8)dir >> 5) * 4)) == 0) {
         if ((u32)fn_8027AF80(*(u8*)(q + 0x5E1)) == 1) {
-            if ((u32)fn_8026A6F4(self, 0x16) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0x16) == 1) {
                 u16 item = *(u16*)(q + 0x5E2 + (s8)*(u8*)(q + 0x5E1) * 4);
                 if ((s32)item != 0) {
                     s16 val = *(s16*)(q + 0x5E4 + (s8)*(u8*)(q + 0x5E1) * 4);
@@ -8151,7 +8155,7 @@ extern "C" s32 fn_80279490(_PLW* self, u8 arg1)
     return r3;
 }
 
-extern "C" s32 fn_8026A6A4(_PLW*, s32);
+extern "C" s32 pl_part_flag2_ck(_PLW*, s32);
 extern "C" void fn_80279EBC(_PLW*, u16, u16);
 extern "C" s32 fn_8027A340(_PLW*);
 extern "C" u32 fn_80287244(_PLW*, s32);
@@ -8194,7 +8198,7 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
     }
     for (;;) {
         if ((s32)self->unk5E5 == 0 && (s32)self->unk5E6 == 0) {
-            if ((u32)fn_8026A6F4(self, 0xB) == 1) {
+            if ((u32)pl_id_bit_ck(self, 0xB) == 1) {
                 break;
             }
             if (arg2 == 0) {
@@ -8213,14 +8217,14 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
                 ((s32)self->unk5E6 == 0 && (u32)fn_80287244(self, 0) == 1)) {
                 u8 c;
                 u8 r;
-                if (fn_8026A6A4(self, 0) != 0) {
+                if (pl_part_flag2_ck(self, 0) != 0) {
                     f25 = 1;
-                } else if (fn_8026A6A4(self, 1) != 0) {
+                } else if (pl_part_flag2_ck(self, 1) != 0) {
                     f24 = 1;
                 }
-                if (fn_8026A6A4(self, 2) != 0) {
+                if (pl_part_flag2_ck(self, 2) != 0) {
                     f27 = 1;
-                } else if (fn_8026A6A4(self, 3) != 0) {
+                } else if (pl_part_flag2_ck(self, 3) != 0) {
                     f26 = 1;
                 }
                 r = get_cfg(self->chunk_ofs, 2);
@@ -8383,7 +8387,6 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
 }
 
 /* The callees of the bodies below, under the map's spellings. */
-extern "C" u16 fn_803BA9B0(u8, u8, u8*, s16*, void*, void*, void*);
 extern "C" void hit_flag_set__FP6_HIT_WUl(void*, u32);
 extern "C" void hit_flags_clear(void*);
 extern "C" void hud_item_msg_push(s32, s32, s32);
@@ -8391,7 +8394,6 @@ extern "C" void lb_event_request(s32);
 extern "C" u16 ran_suu__Fl(s32);
 extern "C" void item_pair_copy(void*, void*);
 extern "C" u32 fn_80274DCC(_PLW*, u8);
-extern "C" s32 fn_8027D968(_PLW*, void*, void*, void*);
 extern "C" s32 fn_8027DC90(void);
 extern "C" u32 fn_802D7804(s32, f32);
 extern "C" void mtx34_identity(void*);
@@ -8399,9 +8401,9 @@ extern "C" void fn_8008C484(void*, f32, f32, f32);
 extern "C" void mtx34_concat_assign(void*, void*);
 extern "C" u8 fn_80224E28(_PLW*, u8);
 extern "C" void fn_8026A394(_PLW*, s32, void*);
-extern "C" void fn_8026A230(_PLW*, s32, u16, s32, s32);
-extern "C" void fn_8026A23C(_PLW*, s32, f32);
-extern "C" f32 fn_8026A34C(_PLW*);
+extern "C" void pl_chr_set_motion_default(_PLW*, s32, u16, s32, s32);
+extern "C" void pl_model_set_value(_PLW*, s32, f32);
+extern "C" f32 pl_rig_get_motion_frame(_PLW*);
 } /* namespace s_80276B58 */
 
 
@@ -8817,8 +8819,8 @@ extern "C" void fn_80279C20(_PLW* self)
         *(u8*)((u8*)self + 0x275) = *(u8*)((u8*)self + 0x26A);
         *(u8*)((u8*)self + 0x274) = self->unk269;
     }
-    if (fn_8026A6F4(self, 0xB) == 1U) {
-        if (fn_8026A6F4(self, 0xD) == 1U) {
+    if (pl_id_bit_ck(self, 0xB) == 1U) {
+        if (pl_id_bit_ck(self, 0xD) == 1U) {
             if (self->unk26E == 0xFF) {
                 self->unk26E = fn_8027993C(self, 0, 3);
             } else {
@@ -8829,7 +8831,7 @@ extern "C" void fn_80279C20(_PLW* self)
                 *(u8*)((u8*)self + 0x309) = (u8)(*(u8*)((u8*)self + 0x309) | 8);
                 sysSE_req(6);
             }
-        } else if (fn_8026A6F4(self, 0xC) == 1U) {
+        } else if (pl_id_bit_ck(self, 0xC) == 1U) {
             if (self->unk26E == 0xFF) {
                 self->unk26E = fn_8027993C(self, 0, 2);
             } else {
@@ -8863,8 +8865,8 @@ extern "C" void fn_80279EBC(_PLW* self, u16 arg1, u16 arg2)
 {
     s32 v = *(s8*)((u8*)self + 0x64F);
     if (v == 0) {
-        fn_8026A23C(self, 0, lbl_8079A080);
-        fn_8026A23C(self, 1, lbl_8079A084);
+        pl_model_set_value(self, 0, lbl_8079A080);
+        pl_model_set_value(self, 1, lbl_8079A084);
         return;
     }
     f32 f = (f32)v;
@@ -8886,10 +8888,10 @@ extern "C" void fn_80279EBC(_PLW* self, u16 arg1, u16 arg2)
         }
         f = f * lbl_8079A0D4;
     }
-    fn_8026A230(self, 1, m, 0, (s32)(lbl_8079A0C0 + fn_8026A34C(self)));
+    pl_chr_set_motion_default(self, 1, m, 0, (s32)(lbl_8079A0C0 + pl_rig_get_motion_frame(self)));
     f32 t = f * lbl_8079A0D8;
-    fn_8026A23C(self, 0, lbl_8079A080 - t);
-    fn_8026A23C(self, 1, t);
+    pl_model_set_value(self, 0, lbl_8079A080 - t);
+    pl_model_set_value(self, 1, t);
 }
 
 /* 0x8027A340: whether the actor may act at all this frame - master/bari state, the stun flag and the
@@ -9084,7 +9086,8 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
     case 0x22:
     case 0x23:
     case 0x24:
-        if (fn_803BA9B0(self->chunk_ofs, self->area_0x16, (u8*)self + 0x3C, &sp8, &sp24, &sp18, &sp14) != 0xFFFFU &&
+        if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, (nw4r::math::VEC3*)&self->motion_pos_0x3C,
+                                    &sp8, &sp24, (_CP_VECTOR*)&sp18, &sp14) != 0xFFFFU &&
             sp8 == 3) {
             return 1;
         }
@@ -9095,7 +9098,8 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (self->kind_0x09 == 3) {
             return 0;
         }
-        if (fn_803BA9B0(self->chunk_ofs, self->area_0x16, (u8*)self + 0x3C, &sp8, &sp24, &sp18, &sp14) != 0xFFFFU &&
+        if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, (nw4r::math::VEC3*)&self->motion_pos_0x3C,
+                                    &sp8, &sp24, (_CP_VECTOR*)&sp18, &sp14) != 0xFFFFU &&
             sp8 == 4) {
             return 1;
         }
@@ -9113,7 +9117,8 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (self->kind_0x09 == 3) {
             return 0;
         }
-        if (fn_803BA9B0(self->chunk_ofs, self->area_0x16, (u8*)self + 0x3C, &sp8, &sp24, &sp18, &sp14) != 0xFFFFU &&
+        if (em_roster_area_hit_find(self->chunk_ofs, self->area_0x16, (nw4r::math::VEC3*)&self->motion_pos_0x3C,
+                                    &sp8, &sp24, (_CP_VECTOR*)&sp18, &sp14) != 0xFFFFU &&
             sp8 == 5) {
             return 1;
         }
@@ -9235,12 +9240,12 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
             return 0;
         }
     case 0x17C:
-        if (fn_8027D968(self, &sp24, &sp10, &spC) == 1) {
+        if (pl_stg_weapon_near_find(self, &sp24, &sp10, &spC) == 1) {
             return 1;
         }
         break;
     case 0x247:
-        if (fn_8027D968(self, &sp24, &sp10, &spC) == 5) {
+        if (pl_stg_weapon_near_find(self, &sp24, &sp10, &spC) == 5) {
             return 1;
         }
         break;
@@ -9606,7 +9611,7 @@ extern "C" s32 fn_8027E1E4(_PLW* self) {
 }
 
 /* Reports the +0x396 timer, or the live player work through the hold test. */
-extern "C" u32 fn_8027E220(_PLW* self, s32 unused) {
+extern "C" u32 pl_act_held_ck(_PLW* self, s32 unused) {
     if (self->field_0x396 > 0) {
         return 1;
     }

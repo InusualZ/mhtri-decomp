@@ -279,6 +279,7 @@
 #include "enemy/fn_80382310.h"
 #include "unsplit/Pl.h"
 #include "enemy/em_pop.h"
+#include "Pl/pl_motion.h" /* quest_move_sub_flag_get (the owner header, rule 2) */
 #include "fn_80047398.h"
 
 extern "C" {
@@ -3328,7 +3329,7 @@ s32 fn_802EF62C(_PLW* plw)
 }
 
 /* 0x802EF6B0 (0x80).  Arm/decay the blink record after the two quest work records: zero it when
- * the quest gate `fn_802EF62C` is closed, else reload a 10-frame countdown from `fn_8028E4F0` and
+ * the quest gate `fn_802EF62C` is closed, else reload a 10-frame countdown from `quest_move_sub_flag_get` and
  * tick it down. */
 void fn_802EF6B0(void)
 {
@@ -3339,7 +3340,7 @@ void fn_802EF6B0(void)
         return;
     }
 
-    u8 v = fn_8028E4F0();
+    u8 v = quest_move_sub_flag_get();
     if (v != 0) {
         blink->timer = 10;
         blink->flag = v;

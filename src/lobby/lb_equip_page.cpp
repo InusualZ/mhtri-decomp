@@ -629,7 +629,7 @@ extern "C" PlSeVecPair* fn_80226A0C(void* ctx, s32 index, u8 mode)
 /* Returns the animation key frame at the motion layer's current frame. */
 extern "C" f32 fn_802292D0(_PLW* self, f32* out)
 {
-    return getKeyData(out, fn_8026A34C(self));
+    return getKeyData(out, pl_rig_get_motion_frame(self));
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -638,7 +638,7 @@ extern "C" f32 fn_802292D0(_PLW* self, f32* out)
 /* Reads three key-frame channels at the motion layer's current frame. */
 extern "C" f32 fn_80229304(_PLW* self, f32* a, f32* b, f32* c)
 {
-    return fn_80052370(a, b, c, fn_8026A34C(self));
+    return fn_80052370(a, b, c, pl_rig_get_motion_frame(self));
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -647,7 +647,7 @@ extern "C" f32 fn_80229304(_PLW* self, f32* a, f32* b, f32* c)
 /* Reads four key-frame channels at the motion layer's current frame. */
 extern "C" void fn_80229358(_PLW* self, f32* a, f32* b, f32* c, f32* d)
 {
-    getKeyData3(a, fn_8026A34C(self), b, c, d);
+    getKeyData3(a, pl_rig_get_motion_frame(self), b, c, d);
 }
 
 /* ------------------------------------------------------------------------------------------------ */

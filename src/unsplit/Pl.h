@@ -43,12 +43,12 @@ s32 fn_802748C8(void* a);
 u32 fn_802745DC(struct _PLW* self, s16 kind);
 s32 fn_80274AB8(struct _PLW* self);  /* the owner's own definition (fn_80273B14.cpp) */
 s32 fn_80276254(struct _PLW* self, s32 v);
-s32 fn_802764B0(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
-s32 fn_80276514(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
+s32 pl_act_gauge_step_unlatched(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
+s32 pl_act_gauge_step_signed(struct _PLW* self, s16 delta, s8* out);  /* the owner's own definition */
 void pl_act_enter(struct _PLW* self, s32 a, u16 b, u16 c);
 s32 fn_8027D7EC(struct _PLW* self, u8 flag);
 s32 fn_8027E1E4(struct _PLW* self);
-u32 fn_8027E220(struct _PLW* self, s32 v);
+u32 pl_act_held_ck(struct _PLW* self, s32 v);
 /* 0x80260198 is NOT declared here: it sits inside the registered unit `Pl/fn_8025F088.cpp`
  * (0x8025F088-0x80262940), so that unit's header `Pl/fn_8025F088.h` is its owner's
  * declaration (`s32 (_PLW*)`) and a second, differently-typed copy here is the `illegal
@@ -97,7 +97,7 @@ extern u32 lbl_805E2048[]; /* 0x805E2048 - the sibling table for the third actor
 extern f32 lbl_805C4898[];
 
 /* Pl-band callees with no registered owner (`Pl/fn_80224AC4.cpp`, `.text` 0x80224AC4-0x80229ECC).
- * The 0x8026A3xx trio (`fn_8026A328`/`fn_8026A34C`/`fn_8026A3A0`) sits inside the range
+ * The 0x8026A3xx trio (`fn_8026A328`/`pl_rig_get_motion_frame`/`fn_8026A3A0`) sits inside the range
  * `Pl/fn_802693C4.cpp` now owns (`.text` 0x802693C4-0x8026BA1C), so it is declared in
  * `Pl/fn_802693C4.h`; 0x8025EFF4 is owned by `Pl/fn_80258FCC.cpp` and is declared in
  * `Pl/fn_80258FCC.h`; the two 0x8027Exxx helpers sit in the runs the header above already

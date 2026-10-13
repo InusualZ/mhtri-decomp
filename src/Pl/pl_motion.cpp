@@ -9,7 +9,7 @@
  *   `pl_motion_set` loads the motion resources); `pl_motion_set` and `get_gm_daynight` are the map's names.  The root
  *   work `get_move_work_adrs(0)` hands back is `_PL_ROOT` (`Pl/fn_80288CEC.h`), the record `enemy/em_common.cpp`
  *   defines again as `_PLAYER_ROOT` (rule 1).
- *   GUESS (from each body and its callers): quest_spawn_rec_find, quest_spawn_rec_find_in
+ *   GUESS (from each body and its callers): quest_spawn_rec_find, quest_spawn_rec_find_in, quest_move_sub_flag_get
  * RESIDUALS. 53 functions unwritten (objdiff scores them 0) in 6 runs: 0x80288E68-0x8028BCF4, 0x8028BD98-0x8028C570,
  *   0x8028C5B4-0x8028D574, 0x8028D5F4-0x8028DF24, 0x8028DF58-0x8028E4F0, 0x8028E528-0x8028EF30; most are jump-table
  *   state machines of 100-450 instructions, and `pl_motion_set` needs the local string-object shape.  4 partial,
@@ -27,6 +27,7 @@
 #include "Pl/pl_act.h"
 #include "Pl/Pl_master_ck.h"
 #include "Pl/fn_802693C4.h"
+#include "Pl/pl_motion.h"
 #include "Pl/fn_80288CEC.h" /* `PlBox` and `_PL_ROOT`, shared with `Pl/pl_hit_sphere.cpp` and `Pl/pl_coll.cpp` (rule 1) */
 #include "ef/fn_800CDB2C.h"
 #include "enemy/em_pop.h" /* quest_flag_8_ck, quest_flag_80_ck (the owner's header, rule 2) */
@@ -218,7 +219,7 @@ void fn_8028DF24(_PL_ROOT* self) {
 }
 
 /* 0x8028E4F0 - the root work's `+0x22D9` byte. */
-u8 fn_8028E4F0(void) {
+u8 quest_move_sub_flag_get(void) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     if (root == 0) {
         return 0;

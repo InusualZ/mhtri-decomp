@@ -19,6 +19,8 @@
  *   motion), `pl_act_countdown_step` (arms attribute 26 with a 40/80-frame countdown), `pl_act_step_timer_wait` (arms
  *   and counts down the act's 15-frame `+0x028` timer), `pl_act_gauge_gate_by_skill` (picks the guard gauge band from
  *   cat skill 20); the runtime dump answers placeholders for both.
+ *   GUESS (from each body): pl_item_usable_ck (any of the 26 pouch slots holds a usable item), pl_item_slot_cycle (the
+ *   next or previous such slot), pl_act_stagger_fill (raises the stagger flag and refills the stagger value).
  * RESIDUALS. 182 functions unwritten (objdiff scores them 0) in 49 runs, `sweepcomments.py --unit Pl/pl_act_step` lists
  *   them; the largest is 0x8025B0F8-0x8025E244 (41 functions).  32 functions partial in 15 runs, including:
  *  - `pl_act_step_offhand_gesture`: `.text`, extab and extabindex are byte-identical; the target's extabindex

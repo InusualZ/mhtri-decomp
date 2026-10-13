@@ -15,6 +15,7 @@
  *   as `AinpcEntry`/`AinpcPageState`) are GUESSes from their users; `ai_npc_hold_item_arm`, `ai_npc_hold_ck` and
  *   `ai_npc_arrived_ck` are GUESSes from their bodies (the dump has only `zz_` names); `ai_npc_motion_step_ck` is a GUESS
  *   (it matches the NPC motion byte at +0x171 and step half-word at +0x172 against a pair).
+ *   GUESS (from the body): ai_npc_player_in_reach_ck
  * RESIDUALS. 153 rows unwritten (objdiff scores them zero): 0x802C2700-0x802C2F08, 0x802C2F2C-0x802C474C,
  *   0x802C6908-0x802C6BE0, 0x802C75F4-0x802CCD90, 0x802CCE18-0x802CD20C, 0x802CD348-0x802CD588,
  *   0x802CD770-0x802CDAB8, 0x802CDB10-0x802CDDC4, 0x802CE698-0x802CF390, 0x802CF588-0x802CF704,
@@ -5113,7 +5114,7 @@ s32 fn_802D7804(u8 index, f32 distance)
 }
 
 /* 0x802D78FC - whether the player is inside the AI NPC's current attack reach. */
-s32 fn_802D78FC(void)
+s32 ai_npc_player_in_reach_ck(void)
 {
     _PLW* plw;
 

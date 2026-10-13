@@ -51,14 +51,14 @@ void pl_act_add_hold_gauge(struct _PLW* plw, s16 delta);
 
 /* 0x8027633C and its two wrappers - the act's frame step. */
 s32 fn_8027633C(struct _PLW* plw, s16 delta, s8* out);
-s32 fn_802764B0(struct _PLW* plw, s16 delta, s8* out);
-s32 fn_80276514(struct _PLW* plw, s16 delta, s8* out);
+s32 pl_act_gauge_step_unlatched(struct _PLW* plw, s16 delta, s8* out);
+s32 pl_act_gauge_step_signed(struct _PLW* plw, s16 delta, s8* out);
 
 /* 0x802765B4 / 0x80276690 / 0x80276778 / 0x802767B4 - the gauge and stagger setters. */
 void fn_802765B4(struct _PLW* plw, s16 amount);
 void fn_80276690(struct _PLW* plw, s32 amount, u8 a);
 void fn_80276778(struct _PLW* plw, s16 amount);
-void fn_802767B4(struct _PLW* plw, s16 amount);
+void pl_act_add_stagger(struct _PLW* plw, s16 amount);
 
 /* 0x80276800 / 0x8027681C - the two act-state predicates. */
 u32 fn_80276800(struct _PLW* self, s32 v);

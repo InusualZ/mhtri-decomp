@@ -32,6 +32,10 @@ void pl_act_clear_wait(struct _PLW* self, u8 a);
 /* 0x80246654 - places the local player at an area entry (GUESS name). */
 void pl_area_entry_set(nw4r::math::VEC3* pos, u16 angle, u8 map, u8 area);
 
+/* 0x8025DF78 - the next (`backward` 0) or previous pouch slot after `cur` whose item is usable, or 0 when none is
+ * (GUESS name).  `u8 backward`: the body narrows it with `clrlwi r0,r5,24`. */
+u16 pl_item_slot_cycle(struct _PLW* self, u16 cur, u8 backward);
+
 #ifdef __cplusplus
 }
 #endif

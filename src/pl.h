@@ -98,7 +98,7 @@ typedef struct MHchar {
     /* +0x060 */ u8 pad_0x60[0x4];
     /* +0x064 */ f32 field_0x64;
     /* +0x068 */ u8 pad_0x68[0xC];
-    /* +0x074 */ f32 field_0x74;   /* read by `fn_8026A34C` (0x8026A34C) */
+    /* +0x074 */ f32 field_0x74;   /* read by `pl_rig_get_motion_frame` (0x8026A34C) */
     /* +0x078 */ u8 pad_0x78[0x2C];
     /* +0x0A4 */ f32 field_0xA4;   /* read by `pl_rig_get_float_a4` (0x8026A358) */
     /* +0x0A8 */ u8 pad_0xA8[0x14];

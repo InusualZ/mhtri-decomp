@@ -290,10 +290,10 @@ struct _PLW {
     /* +0x0D0 */ union {   /* 0x0D0-0x10F: the id bit sets as u32 words, and the master band's two per-part u16 tables over the same bytes */
         struct {
             /* +0x0D0 */ u8 pad_0xD0[0xC];
-            /* +0x0DC */ u32 id_flags_0xDC;  /* the id bit set/tested/cleared by fn_8026A6D8 / fn_8026A6F4 /
+            /* +0x0DC */ u32 id_flags_0xDC;  /* the id bit set/tested/cleared by fn_8026A6D8 / pl_id_bit_ck /
                                               * fn_8026A718 (bit `id & 31`) */
             /* +0x0E0 */ u32 id_flags_0xE0[4];  /* 128 ids, set/tested by fn_8026A618 / pl_part_flag_ck */
-            /* +0x0F0 */ u32 id_flags_0xF0[4];  /* 128 ids, set/tested by fn_8026A678 / fn_8026A6A4 */
+            /* +0x0F0 */ u32 id_flags_0xF0[4];  /* 128 ids, set/tested by fn_8026A678 / pl_part_flag2_ck */
             /* +0x100 */ u8 pad_0x100[0x10];
         };
         struct {
@@ -568,7 +568,7 @@ struct _PLW {
     };
     /* +0x37E */ union {
         /* +0x37E */ u8 pad_0x37E[0x2];
-        /* +0x37E */ s16 field_0x37E;  /* the act's stagger value `fn_802767B4` steps */
+        /* +0x37E */ s16 field_0x37E;  /* the act's stagger value `pl_act_add_stagger` steps */
     };
     /* +0x380 */ union {
         /* +0x380 */ s16 unk380;
@@ -576,7 +576,7 @@ struct _PLW {
     };
     /* +0x382 */ union {
         /* +0x382 */ u8 pad_0x382[0x2];
-        /* +0x382 */ s16 field_0x382;  /* the re-arm flag `fn_80276778`/`fn_802767B4` clear */
+        /* +0x382 */ s16 field_0x382;  /* the re-arm flag `fn_80276778`/`pl_act_add_stagger` clear */
     };
     /* +0x384 */ s16 field_0x384;
     /* +0x386 */ union {

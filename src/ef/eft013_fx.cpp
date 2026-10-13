@@ -86,6 +86,7 @@
 #include "Pl/pl_act.h" /* Pl_condition_ck (rule 2) */
 #include "lobby/lb_server_sel_trans.h" /* event_demo_ck (rule 2) */
 #include "ef/eft019.h" /* eft019_set / eft019_set_vec (rule 2) */
+#include "ef/eft013_fx.h" /* eft013_set (this unit's own header) */
 #include "sound/fn_800DD1F0.h" /* mhchar_joint_mtx_get (rule 2) */
 #include "fn_8004CAD8.h" /* subVec3 (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h" /* memset (rule 2) */

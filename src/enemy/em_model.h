@@ -50,6 +50,13 @@ s32 em_roster_kind_field5_get(u8 index, u8 kind);
 void em_pop_work_step(void);
 void em_pop_res_load(u8 map);
 
+/* 0x803BA9B0 - the last live roster record of `area` whose cylinder (`+0x1D0` centre, `+0x1F0` radius, `+0x1F4`
+ * height) holds `pos`: its id, or 0xFFFF when none does; the kind, centre, rotation and the `+0x1EC` word go out
+ * through the pointers (GUESS name).  The `u16` return is what retail's callers compare (`clrlwi r0,r3,16`). */
+struct _CP_VECTOR;
+u16 em_roster_area_hit_find(u8 player, u8 area, nw4r::math::VEC3* pos, s16* out_kind, nw4r::math::VEC3* out_pos,
+                            struct _CP_VECTOR* out_rot, s32* out_word);
+
 #ifdef __cplusplus
 }
 #endif

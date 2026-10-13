@@ -29,6 +29,11 @@ void fn_80100088(void* effect, s32 flag);
 void fn_80101594(void* self);
 #ifdef __cplusplus
 }
+
+/* 0x80100598 - the player-owned eft004 setter with the extra word; defined at C++ scope in `ef/eft004_fx.cpp`, so
+ * this is the callable spelling of the map name `eft004_set_pl2__FP4_PLWUcUlfffUl` (rule 9). */
+struct _PLW;
+void eft004_set_pl2(struct _PLW* self, u8 type, u32 param, f32 a, f32 b, f32 c, u32 extra);
 #endif
 
 #endif /* MHTRI_EF_EFT004_H */

@@ -27,7 +27,7 @@ extern const f32 pl_frame_window_114;	/* 0x80799FB0: 114 - `Pl_frame_check` wind
                                          * `fn_8025D250`) */
 extern const f32 pl_float_neg70;	/* 0x80799FB4: -70 - compared against `_PLW`+0x110 (`fn_8025E448`) */
 extern const f32 pl_float_240;	/* 0x80799FB8: 240 - added to `pl_frame_window_60` for the
-                                 * `fn_80277C94` offset (`fn_8025E448`) */
+                                 * `pl_ground_probe_ahead` offset (`fn_8025E448`) */
 extern const f32 pl_float_10000;	/* 0x80799FBC: 10000 - range test on `vec3_dist_sq`'s distance
                                      * (`fn_8025EFF4`) */
 

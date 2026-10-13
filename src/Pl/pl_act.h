@@ -45,9 +45,16 @@ s32 fn_80277DAC(struct _PLW* self, s32 a, f32 b, f32 c);
  * `pl_act_set_gauge_arm_skilled` at 0x80277B4C scales it by the cat-skill arms 28/29); `Pl/pl_act_step.cpp`'s
  * act-175/act-89 handlers call them. */
 void pl_act_set_gauge_arm(struct _PLW* self, s16 value);
-u32 fn_8027A198(struct _PLW* self);
+u32 pl_act_no_68_71_ck(struct _PLW* self);
 void fn_8027A17C(struct _PLW* self);
-void fn_8027A190(struct _PLW* self, s32 a);
+/* 0x8027A190 - the always-true act predicate (`li r3,1; blr`); its consumer tests the result. */
+s32 pl_act_true_ck(struct _PLW* self);
+/* 0x80277C94 - the ground-height probe along the actor's facing: 1 and the height in `out->x` when it hits inside
+ * the band `arg2`..`arg2 + arg3` above the actor. */
+s32 pl_ground_probe_ahead(struct _PLW* self, nw4r::math::VEC3* out, f32 arg2, f32 arg3);
+/* 0x8027D968 - the stage weapon whose reach covers the actor: its kind word, or 0; the position, id and second word
+ * of the record go out through the three pointers. */
+s32 pl_stg_weapon_near_find(struct _PLW* self, nw4r::math::VEC3* out_pos, s32* out_id, s32* out_word);
 u32 fn_802790E4(struct _PLW* self, u32 mask);
 u32 pl_carry_item_get(struct _PLW* self);
 /* 0x802731B4 - how many of item `id` the actor carries (pouch and box run). */
@@ -109,6 +116,10 @@ u32 Pl_dm_condition_ck(struct _PLW* work, u32 condition); /* -> Pl_dm_condition_
 /* 0x80278814 - the gunner predicate `Pl/pl_act_step.cpp` gates a motion on; defined at C++ scope, so this is the
  * callable spelling of the map name `Pl_suimen_ck__FP4_PLW` (rule 9). */
 u32 Pl_suimen_ck(struct _PLW* work);
+
+/* 0x8027A1CC - whether the actor's bari (rage) state covers the action class `arg1`; defined at C++ scope, so this
+ * is the callable spelling of the map name `Pl_bari_ck__FP4_PLWl` (rule 9). */
+u32 Pl_bari_ck(struct _PLW* self, s32 arg1);
 
 /* 0x8027CC44 / 0x8027CDF0 - the gunner's aim position and origin the shell band reads; this unit
  * (`Pl/pl_act.cpp`) defines both at C++ scope, so these are the callable spellings of the map names

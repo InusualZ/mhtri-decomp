@@ -274,4 +274,16 @@ struct _AINPC_W {
     /* +0x498 */ u32 sound_handle_0x498;  /* the sound handler the attack drivers take */
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x802D78FC - whether the player is inside the AI NPC's current attack reach; C linkage (the map row is
+ * unmangled). */
+s32 ai_npc_player_in_reach_ck(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

@@ -52,7 +52,7 @@ typedef struct Pos12 {
 typedef struct QuestBlink {
     /* +0x00 */ u8 pad_0x00[0x74];
     /* +0x74 */ u8 timer;   /* the 0/10 countdown `fn_802EF6B0` runs */
-    /* +0x75 */ u8 flag;    /* the value `fn_8028E4F0` reports while the timer is armed */
+    /* +0x75 */ u8 flag;    /* the value `quest_move_sub_flag_get` reports while the timer is armed */
     /* +0x76 */ u8 pad_0x76[0x100 - 0x76];
 } QuestBlink;
 
@@ -85,7 +85,6 @@ void eft053_shell_pos_project(void* a, void* b); /* 0x80366618 */
 u8 fn_803311A0(void);                       /* 0x803311A0 */
 void drawshape_copy_vec2(void* a, const f32* b);    /* 0x80053CF8 */
 u32 fn_802BE39C(void);                      /* 0x802BE39C */
-u8 fn_8028E4F0(void);                       /* 0x8028E4F0 */
 u8 get_now_areano(void);                    /* 0x802AFC84 -> get_now_areano__Fv */
 
 /* The quest work block `.bss` 0x806BDCC8 (two `CockpitWork` records, 0x328 B) and the blink record

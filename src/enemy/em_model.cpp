@@ -8,6 +8,7 @@
  * FLAGS. `cflags_menu`, like `enemy/em_pop.cpp`.
  * NAMES. `em_model` is a GUESS from the model-handle table and the 0x803BA6F0-0x803BE30C model helpers; the
  *   function names are `enemy/em_pop.cpp`'s scheme (its header).
+ *   GUESS (from the body): em_roster_area_hit_find
  * RESIDUALS. 40 rows unwritten: 0x803B936C-0x803B9450, 0x803B9508-0x803B993C, 0x803B99C0-0x803B9A40,
  *   0x803B9A84-0x803B9E50, 0x803B9E90-0x803BA0A0, 0x803BA1B4-0x803BA69C, 0x803BA6F0-0x803BAE80, 0x803BAF44-0x803BCF70,
  *   0x803BD058-0x803BD99C, 0x803BD9F8-0x803BDECC, 0x803BE128-0x803BE30C.

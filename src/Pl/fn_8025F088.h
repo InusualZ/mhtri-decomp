@@ -81,7 +81,6 @@ u32 fn_800E0914(void* p);
 u32 event_demo_running_ck(void);
 u32 se_slot_req(s32 value);
 u32 fn_8033112C(void* p);
-u32 fn_803BA9B0(void* p);
 
 /* ---- mangled callees at C++ scope, so the front-end reproduces the map's spelling (rule 9) ---- */
 #ifdef __cplusplus
