@@ -7,10 +7,6 @@
  * NAMES. the SDK's names. __DSP_add_task is the SDK's name for the function whose message survives at .data
  *   0x80618698; its body is the SDK's append, a GUESS (no target bytes).
  * RESIDUALS.
- *   - the map names .sbss 0x80795058 __DSP_rude_task and 0x8079505C __DSP_rude_task_pending; the code reads
- *     0x80795058 as the flag and 0x8079505C as the task pointer, so the two rows are swapped (map request
- *     dsp-slice1#1/#2). Until it is applied flipcheck reports the .sbss layout and relocdiff the handler's and
- *     DSPAssertTask's SDA21 names.
  *   - __DSP_add_task is dead-stripped in the target; our object carries it (+0x58 .text with alignment), so flipcheck
  *     refuses on the .text size. A trial link with the three DSP units flipped strips it and hashes OK.
  *   - the .data tail (0x5 B) is alignment fill; the map's string lump lbl_80618588 pairs against the anonymous pool,
