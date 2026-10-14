@@ -1359,7 +1359,7 @@ config.libs = [
             Object(NonMatching, "AI_SDK/ai.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
             # The ARC archive and AX audio band 0x8046D9F0..0x80474CB0 recut per library and source file; each unit's header carries
             # its evidence.  Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
-            Object(NonMatching, "ARC/arc.c", cflags=cflags_base),
+            Object(Matching, "ARC/arc.c", cflags=cflags_base),
             Object(Matching, "AX/AX.c", cflags=cflags_base),
             Object(Matching, "AX/AXAlloc.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXAux.c", cflags=cflags_base),
