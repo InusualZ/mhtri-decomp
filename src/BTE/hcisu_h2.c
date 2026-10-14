@@ -18,10 +18,7 @@
  *   (their BTU events).
  * RESIDUALS. the .bss object is 0x40 bytes in the map while the code reaches only 0x21 bytes of it, so the
  *   control block's tail 0x21..0x40 is an unused approximation. The two "HCIS:" messages are string literals; the
- *   map labels them lbl_80612E60 / lbl_80612E9C. hcisu_h2_send_msg_now: the continuation packet's payload pointer is
- *   spelled as a sizeof computation, which leaves one `add` with its operands swapped; retail's shape is
- *   `(u8*)(p_msg + 1) + offset` (all 107 instructions), which section 6.5 rule 6 refuses, and the BT_BUF `data`
- *   spelling hoists the payload base into an extra saved register (26 of 107).
+ *   map labels them lbl_80612E60 / lbl_80612E9C.
  * SHAPES. plain C; the receive path keeps one reassembly state per USB pipe (event, ACL, SCO), indexed by the pipe
  *   below the port number, and falls from the message type state into the preamble state as the BTE source does.
  */
@@ -258,7 +255,7 @@ void hcisu_h2_send_msg_now(tHCISU_H2_CB* p_cb, BT_HDR* p_msg) {
             p_msg->offset += btu_cb.hcit_acl_data_size;
             p_msg->len -= btu_cb.hcit_acl_data_size;
 
-            p = (u8*)p_msg + (sizeof(BT_HDR) + p_msg->offset);
+            p = (u8*)(p_msg + 1) + p_msg->offset;
             *p++ = (u8)handle;
             *p++ = (u8)(handle >> 8);
 
