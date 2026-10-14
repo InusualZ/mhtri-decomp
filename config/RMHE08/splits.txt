@@ -2939,12 +2939,28 @@ MTX/quat.c:
 	.sdata2     start:0x8079D2C0 end:0x8079D2D0
 
 NAND/nand.c:
-	.text       start:0x804C70E0 end:0x804C9F00 align:16
+	.text       start:0x804C70E0 end:0x804C8770 align:16
+	.sdata      start:0x80793F08 end:0x80793F10
+
+NAND/NANDCore.c:
+	.text       start:0x804C8770 end:0x804C9480 align:16
 	.rodata     start:0x80573A10 end:0x80573B58
-	.data       start:0x8061B9A0 end:0x8061BC20
-	.bss        start:0x8074CF40 end:0x8074D280
-	.sdata      start:0x80793F08 end:0x80793F50
-	.sbss       start:0x807952B8 end:0x807952C8
+	.data       start:0x8061B9A0 end:0x8061BAF0
+	.bss        start:0x8074CF40 end:0x8074CF80
+	.sdata      start:0x80793F10 end:0x80793F30
+	.sbss       start:0x807952B8 end:0x807952C0
+
+NAND/NANDCheck.c:
+	.text       start:0x804C9480 end:0x804C9910 align:16
+	.data       start:0x8061BAF0 end:0x8061BBD8
+	.sdata      start:0x80793F30 end:0x80793F48
+
+NAND/NANDLogging.c:
+	.text       start:0x804C9910 end:0x804C9F00 align:16
+	.data       start:0x8061BBD8 end:0x8061BC20
+	.bss        start:0x8074CF80 end:0x8074D280
+	.sdata      start:0x80793F48 end:0x80793F50
+	.sbss       start:0x807952C0 end:0x807952C8
 
 OS/OS.c:
 	.text       start:0x804C9F00 end:0x804CB440 align:16

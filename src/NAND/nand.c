@@ -1,27 +1,21 @@
 /*
- * NAND/nand.c - the Revolution SDK NAND library: create/delete/read/write/seek/open/close/status, path conversion,
- *    home directory, check and the error log.
- * RANGE. .text 0x804C70E0-0x804C9F00 (58 functions); .rodata 0x80573A10-0x80573B58; .data 0x8061B9A0-0x8061BC20; .bss
- *    0x8074CF40-0x8074D280; .sdata 0x80793F08-0x80793F50; .sbss 0x807952B8-0x807952C8.  Cut from the OS core band
- *    0x804C1760-0x804D9B4C.  Evidence: the build string "<< RVL_SDK - NAND ... (0x4302_145) >>" opens .data at
- *    0x8061B9A0 and the OS one opens the next library at 0x8061BC20; every NAND function reads only .data
- *    0x8061B9A0..0x8061BC20, .bss 0x8074CF40.., .sdata 0x80793F08..0x80793F50 and .sbss 0x807952B8..0x807952C8;
- *    `__OSFPRInit` (0x804C9F00) is the first function that reads OS-owned data (.sbss `ZeroPS`/`ZeroF`).
- * FLAGS. `cflags_os` (configure.py), the flags of the unit it was cut from; `nandOpen` is under `dont_inline` (the target calls it
- *    from the four open wrappers; the compiler inlines it otherwise).
- * NAMES. the `NAND*`/`nand*` names are the map's (dump); the SDK splits the library over several source files (nand,
- *    NANDOpenClose, NANDCore, NANDCheck, NANDLogging) but the image carries no `__FILE__` string for it and its
- *    `.data` strings are ordered by first use across the whole run, so no seam inside is proven and the library
- *    is one unit.  GUESS: `nandAsyncCallback` (the shared async completion: converts the result and calls the caller's
- *    callback), `nandCloseCallback` (the close completion) and `nandSetDoneFlag` (the map said
- *    `EmissionControllerFinished`, a name from an unrelated library; the body stores 1 into the first word of the command
- *    block), renamed from their map stems; `s_fileSlot` and `nandLibReady` are GUESSes; the ISFS prototypes are in FS/fs.h.
- * RESIDUALS. written (21 at 100 %): the read/write/seek/close calls, `nandOpen` and its four wrappers and callback,
- *    `nandComposePerm`, the path predicates, the home-directory getters and `reserveFileDescriptor`.  `NANDSeekAsync`
- *    (90 %) schedules the descriptor load after the switch; `NANDGetHomeDir` (75 %) keeps the inlined readiness test as a
- *    0/1 variable the source shape does not reproduce.  Not attempted (37 functions): create/delete/status/move, path
- *    conversion, error conversion (a 41-entry table copied to the stack), init, usage, check and logging; the .data,
- *    .rodata, .sdata and .bss objects are emitted only as far as the written bodies use them.
+ * NAND/nand.c - the Revolution SDK NAND library's file calls: create/delete, read/write/seek, create-directory,
+ *    move, status, open/close and their completions.
+ * RANGE. .text 0x804C70E0-0x804C8770 (33 functions); .sdata 0x80793F08-0x80793F10 (the "/" and "/%s" literals of the
+ *    move).  Cut from the NAND library 0x804C70E0-0x804C9F00: the build string "<< RVL_SDK - NAND ... (0x4302_145) >>"
+ *    opens .data at 0x8061B9A0 and the OS one opens the next library at 0x8061BC20.  The seam with NAND/NANDCore.c at
+ *    0x804C8770 is proven by the string literals: .sdata carries "/" twice (0x80793F08 read by the move, 0x80793F14 by
+ *    nandGetRelativeName/nandConvertPath) and "/%s" twice (0x80793F0C, 0x80793F24), and under -str reuse one
+ *    translation unit emits each literal once.  The open/close run 0x804C8260-0x804C8770 reads no data, so no seam
+ *    inside this range is evidenced.
+ * FLAGS. cflags_base in the `OS` lib block of configure.py (Wii/1.3); `nandOpen` is under `dont_inline` (the target
+ *    calls it from the four open wrappers; the compiler inlines it otherwise); no float code.
+ * NAMES. the `NAND*`/`nand*` names are the map's (dump).  GUESS: `nandCloseCallback` (the close completion), renamed
+ *    from its map stem; the ISFS prototypes are in FS/fs.h and the NAND/NANDCore.c helpers in NAND/NANDCore.h.
+ * RESIDUALS. written (15 functions, 14 at 100 %): the read/write/seek/close calls, `nandOpen` and its four wrappers
+ *    and callback, and `nandComposePerm`.  `NANDSeekAsync` (90 %) schedules the descriptor load after the switch.  Not attempted
+ *    (18 functions): create/delete, create-directory, move, status and the usage query; the .sdata literals are
+ *    emitted only as far as the written bodies use them.
  * SHAPES. none yet.
  */
 
@@ -30,29 +24,16 @@
 #include "MSL_C/string.h"
 #include "MSL_C/strstr.h"
 #include "NAND/nand.h"
+#include "NAND/NANDCore.h"
 
-#define NAND_RESULT_NOT_INITIALIZED (-128)
-#define NAND_RESULT_INVALID_STATE (-8)
-#define NAND_LIB_STATE_READY 2
 #define NAND_FILE_OPEN 1
 #define NAND_FILE_CLOSED 2
-#define NAND_FILE_SLOT_FREE (-255)
-#define NAND_FILE_SLOT_TAKEN (-254)
 #define NAND_SEEK_START 0
 #define NAND_SEEK_CURRENT 1
 #define NAND_SEEK_END 2
 
-s32 nandConvertErrorCode(s32 result);
-BOOL nandIsInitialized(void);
-void nandAsyncCallback(s32 result, NANDCommandBlock* block);
 void nandCloseCallback(s32 result, NANDCommandBlock* block);
 void nandOpenCallback(s32 result, NANDCommandBlock* block);
-void nandGenerateAbsPath(char* absPath, const char* path);
-BOOL nandIsPrivatePath(const char* path);
-
-static char s_homeDir[64];
-static s32 s_libState;
-static s32 s_fileSlot[2] = { NAND_FILE_SLOT_FREE, 0 };
 
 /* 0x804C76E0 (0x68): reads `length` bytes of the open file into `buffer`. */
 /* untyped: byte range */
@@ -286,79 +267,4 @@ void nandCloseCallback(s32 result, NANDCommandBlock* block)
         block->info->mark = NAND_FILE_CLOSED;
     }
     block->callback(nandConvertErrorCode(result), block);
-}
-
-/* 0x804C8B10 (0x34): whether `path` is the private directory itself. */
-BOOL nandIsPrivatePath(const char* path)
-{
-    return strncmp(path, "/shared2", 8) == 0;
-}
-
-/* 0x804C8B50 (0x58): whether `path` names something below the private directory. */
-BOOL nandIsUnderPrivatePath(const char* path)
-{
-    if (strncmp(path, "/shared2/", 9) == 0 && path[9] != 0) {
-        return TRUE;
-    }
-    return FALSE;
-}
-
-/* 0x804C8BB0 (0x14): whether the library has been brought up. */
-BOOL nandIsInitialized(void)
-{
-    return s_libState == NAND_LIB_STATE_READY;
-}
-
-/* Whether the library has been brought up, as the later callers inline it. */
-static inline BOOL nandLibReady(void)
-{
-    if (s_libState == NAND_LIB_STATE_READY) {
-        return TRUE;
-    }
-    return FALSE;
-}
-
-/* 0x804C9010 (0xC): marks a synchronous wait as done by setting the first word of the command block. */
-void nandSetDoneFlag(s32 result, NANDCommandBlock* block)
-{
-    *(s32*)block = 1;
-}
-
-/* 0x804C9020 (0x54): copies the title's home directory path into `path`. */
-s32 NANDGetHomeDir(char* path)
-{
-    if (!nandLibReady()) {
-        return NAND_RESULT_NOT_INITIALIZED;
-    }
-    strcpy(path, s_homeDir);
-    return 0;
-}
-
-/* 0x804C9080 (0x3C): finishes an asynchronous call: converts the ISFS result and calls the caller's callback. */
-void nandAsyncCallback(s32 result, NANDCommandBlock* block)
-{
-    block->callback(nandConvertErrorCode(result), block);
-}
-
-/* 0x804C9470 (0xC): returns the title's home directory path. */
-char* nandGetHomeDir(void)
-{
-    return s_homeDir;
-}
-
-/* 0x804C9910 (0x54): takes the file descriptor slot; FALSE when it is already taken. */
-BOOL reserveFileDescriptor(void)
-{
-    BOOL level;
-    BOOL taken;
-
-    level = OSDisableInterrupts();
-    if (s_fileSlot[0] == NAND_FILE_SLOT_FREE) {
-        s_fileSlot[0] = NAND_FILE_SLOT_TAKEN;
-        taken = FALSE;
-    } else {
-        taken = TRUE;
-    }
-    OSRestoreInterrupts(level);
-    return taken == FALSE;
 }
