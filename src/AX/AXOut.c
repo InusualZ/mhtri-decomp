@@ -520,13 +520,13 @@ static void __AXOutAIDmaCallback(void)
 }
 
 /* 0x80470130 (0xC): flags that the DSP task has started. */
-static void __AXOutInitCallback(void)
+static void __AXOutInitCallback(DSPTask* task)
 {
     __AXOutDspReady = 1;
 }
 
 /* 0x80470140 (0x54): runs the next frame when the DSP task resumes after the AI DMA callback. */
-static void __AXOutResumeCallback(void)
+static void __AXOutResumeCallback(DSPTask* task)
 {
     if (__AXOutDspState == 2) {
         __AXOutDspState = 0;
@@ -540,14 +540,14 @@ static void __AXOutResumeCallback(void)
 }
 
 /* 0x804701A0 (0x10): flags that the DSP task is done and wakes the waiting thread. */
-static void __AXOutDoneCallback(void)
+static void __AXOutDoneCallback(DSPTask* task)
 {
     __AXOutTaskDone = 1;
     OSWakeupThread(&__AXOutThreadQueue);
 }
 
 /* 0x804701B0 (0x4): has nothing to do. */
-static void __AXOutRequestCallback(void)
+static void __AXOutRequestCallback(DSPTask* task)
 {
 }
 

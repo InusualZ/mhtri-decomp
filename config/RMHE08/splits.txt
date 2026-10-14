@@ -2712,10 +2712,18 @@ mh3_pad/rc_record.c:
 	.sbss       start:0x80795048 end:0x80795050
 
 DSP/dsp.c:
-	.text       start:0x804A4F20 end:0x804A5AB0 align:16
-	.data       start:0x80618508 end:0x806186C8
+	.text       start:0x804A4F20 end:0x804A51C0 align:16
+	.data       start:0x80618508 end:0x80618588
 	.sdata      start:0x80793DC8 end:0x80793DD0
-	.sbss       start:0x80795050 end:0x80795070
+	.sbss       start:0x80795050 end:0x80795058
+
+DSP/dsp_debug.c:
+	.text       start:0x804A51C0 end:0x804A5210 align:16
+
+DSP/dsp_task.c:
+	.text       start:0x804A5210 end:0x804A5AB0 align:16
+	.data       start:0x80618588 end:0x806186C8
+	.sbss       start:0x80795058 end:0x80795070
 
 DVD/dvdfs.c:
 	.text       start:0x804A5AB0 end:0x804A6410 align:16

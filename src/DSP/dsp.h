@@ -10,7 +10,8 @@
 extern "C" {
 #endif
 
-typedef void (*DSPTaskCallback)(void);
+struct DSPTask;
+typedef void (*DSPTaskCallback)(struct DSPTask* task);
 
 /* size: 0x60; the DSP task descriptor, only the fields the AX output stage sets are named. */
 typedef struct DSPTask {
