@@ -8,19 +8,25 @@
  * NAMES. `ESP_DiGetTmd` is a GUESS (the DI-side twin of the TMD getter); the unit name is a GUESS (the library's first source file); `ESP_GetTmdView` is a GUESS for the map's former
  *   placeholder (ioctls 0x14 / 0x15, the sibling of `ESP_GetTicketViews`); the record types `ESTicket` / `ESTicketView`
  *   state only their sizes; `ESIoctlvFrame` is a GUESS at the shape of the wrappers' stack frame (see SHAPES).
- * RESIDUALS. `ESP_GetTmdView` 74 %, `ESP_GetTicketViews` 77 %, `ESP_DiGetTmd` 77 %, `ESP_GetConsumption` 82 %,
- *   `ESP_DiGetTicketView` 88 %: the target compares every pointer against a shared zero register (`li rN,0` + `cmplw`)
- *   where this source gets `cmpwi rN,0`, and it hoists the three buffer / vector address computations to the top;
- *   `ESP_GetDataDir` / `ESP_GetTitleId` differ only in that compare.  `ESP_LaunchTitle` takes its buffer and vector
- *   addresses through the local pointers `vec` and `tid`, which is what places the hoisted `addi`s.
- * SHAPES. every wrapper's frame has its buffers at +0x20 / +0x40 and its vector list at +0xF0 with a 0x120 / 0x140
+ * RESIDUALS. code none.  The map row of the `/dev/es` literal is `lbl_80793E28` where this object emits `@134`, so
+ *   one `ESP_InitLib` relocation differs by name only (bytes equal).
+ * SHAPES. every wrapper takes its vector list and buffers through local pointers (`vec`, `tid`, `num` / `len`)
+ *   initialised at the declaration, which is what hoists their `addi`s to the top.  The two-mode wrappers fill
+ *   `vec[0]` inside each branch and test the caller's count before copying it.  `ESP_DiGetTicketView` sets the
+ *   ticket length with an `if` / `else`, not `?:`, so each arm keeps its own store.
+ *   Every wrapper's frame has its buffers at +0x20 / +0x40 and its vector list at +0xF0 with a 0x120 / 0x140
  *   frame: a single 32-byte-aligned local struct whose buffer area is padded to 0xD0 bytes reproduces all of it
- *   (separate aligned locals put the vectors at +0x40).
+ *   (separate aligned locals put the vectors at +0x40).  `NULL` is redefined as `((void*)0)` after the includes
+ *   (`types.h` spells it `0`): the target compares every pointer against a pointer-typed zero (`li rN,0` + `cmplw`),
+ *   which an integer `0` turns into `cmpwi rN,0`.
  */
 
 #include "types.h"
 #include "ESP/esp.h"
 #include "IPC/ipcclt.h"
+
+#undef NULL
+#define NULL ((void*)0)
 
 #define ES_ERR_INVALID (-1017)
 
@@ -114,6 +120,8 @@ s32 ESP_GetTicketViews(u64 titleId, ESTicketView* views, u32* count)
     s32 rc;
     ESIoctlvFrame f;
     IPCIOVector* vec = f.vec;
+    u64* tid = &f.first.titleId;
+    u32* num = &f.count;
 
     if (__esFd < 0 || count == NULL) {
         return ES_ERR_INVALID;
@@ -122,28 +130,30 @@ s32 ESP_GetTicketViews(u64 titleId, ESTicketView* views, u32* count)
         return ES_ERR_INVALID;
     }
 
-    f.first.titleId = titleId;
-    vec[0].base = &f.first.titleId;
-    vec[0].length = sizeof(f.first.titleId);
+    *tid = titleId;
 
     if (views == NULL) {
-        vec[1].base = &f.count;
-        vec[1].length = sizeof(f.count);
+        vec[0].base = tid;
+        vec[0].length = sizeof(*tid);
+        vec[1].base = num;
+        vec[1].length = sizeof(*num);
         rc = IOS_Ioctlv(__esFd, ES_IOCTL_GET_NUM_TICKET_VIEWS, 1, 1, vec);
         if (rc == 0) {
-            *count = f.count;
+            *count = *num;
         }
         return rc;
     }
 
-    f.count = *count;
-    if (f.count == 0) {
+    if (*count == 0) {
         return ES_ERR_INVALID;
     }
-    vec[1].base = &f.count;
-    vec[1].length = sizeof(f.count);
+    *num = *count;
+    vec[0].base = tid;
+    vec[0].length = sizeof(*tid);
+    vec[1].base = num;
+    vec[1].length = sizeof(*num);
     vec[2].base = views;
-    vec[2].length = f.count * sizeof(ESTicketView);
+    vec[2].length = *count * sizeof(ESTicketView);
     return IOS_Ioctlv(__esFd, ES_IOCTL_GET_TICKET_VIEWS, 2, 1, vec);
 }
 
@@ -161,7 +171,11 @@ s32 ESP_DiGetTicketView(const ESTicket* ticket, ESTicketView* view)
     }
 
     vec[0].base = (void*)ticket;
-    vec[0].length = (ticket == NULL) ? 0 : sizeof(ESTicket);
+    if (ticket == NULL) {
+        vec[0].length = 0;
+    } else {
+        vec[0].length = sizeof(ESTicket);
+    }
     vec[1].base = view;
     vec[1].length = sizeof(ESTicketView);
     return IOS_Ioctlv(__esFd, ES_IOCTL_DI_GET_TICKET_VIEW, 1, 1, vec);
@@ -173,6 +187,8 @@ s32 ESP_DiGetTmd(void* tmd, u32* size)
 {
     s32 rc;
     ESIoctlvFrame f;
+    IPCIOVector* vec = f.vec;
+    u32* len = &f.first.size;
 
     if (__esFd < 0 || size == NULL) {
         return ES_ERR_INVALID;
@@ -182,24 +198,24 @@ s32 ESP_DiGetTmd(void* tmd, u32* size)
     }
 
     if (tmd == NULL) {
-        f.vec[0].base = &f.first.size;
-        f.vec[0].length = sizeof(f.first.size);
-        rc = IOS_Ioctlv(__esFd, ES_IOCTL_DI_GET_TMD_SIZE, 0, 1, f.vec);
+        vec[0].base = len;
+        vec[0].length = sizeof(*len);
+        rc = IOS_Ioctlv(__esFd, ES_IOCTL_DI_GET_TMD_SIZE, 0, 1, vec);
         if (rc == 0) {
-            *size = f.first.size;
+            *size = *len;
         }
         return rc;
     }
 
-    f.first.size = *size;
-    if (f.first.size == 0) {
+    if (*size == 0) {
         return ES_ERR_INVALID;
     }
-    f.vec[0].base = &f.first.size;
-    f.vec[0].length = sizeof(f.first.size);
-    f.vec[1].base = tmd;
-    f.vec[1].length = f.first.size;
-    return IOS_Ioctlv(__esFd, ES_IOCTL_DI_GET_TMD, 1, 1, f.vec);
+    *len = *size;
+    vec[0].base = len;
+    vec[0].length = sizeof(*len);
+    vec[1].base = tmd;
+    vec[1].length = *size;
+    return IOS_Ioctlv(__esFd, ES_IOCTL_DI_GET_TMD, 1, 1, vec);
 }
 
 /* Reads the title metadata view of a title, or its size when `tmdView` is NULL. */
@@ -208,6 +224,9 @@ s32 ESP_GetTmdView(u64 titleId, void* tmdView, u32* size)
 {
     s32 rc;
     ESIoctlvFrame f;
+    IPCIOVector* vec = f.vec;
+    u64* tid = &f.first.titleId;
+    u32* len = &f.count;
 
     if (__esFd < 0 || size == NULL) {
         return ES_ERR_INVALID;
@@ -216,29 +235,31 @@ s32 ESP_GetTmdView(u64 titleId, void* tmdView, u32* size)
         return ES_ERR_INVALID;
     }
 
-    f.first.titleId = titleId;
-    f.vec[0].base = &f.first.titleId;
-    f.vec[0].length = sizeof(f.first.titleId);
+    *tid = titleId;
 
     if (tmdView == NULL) {
-        f.vec[1].base = &f.count;
-        f.vec[1].length = sizeof(f.count);
-        rc = IOS_Ioctlv(__esFd, ES_IOCTL_GET_TMD_VIEW_SIZE, 1, 1, f.vec);
+        vec[0].base = tid;
+        vec[0].length = sizeof(*tid);
+        vec[1].base = len;
+        vec[1].length = sizeof(*len);
+        rc = IOS_Ioctlv(__esFd, ES_IOCTL_GET_TMD_VIEW_SIZE, 1, 1, vec);
         if (rc == 0) {
-            *size = f.count;
+            *size = *len;
         }
         return rc;
     }
 
-    f.count = *size;
-    if (f.count == 0) {
+    if (*size == 0) {
         return ES_ERR_INVALID;
     }
-    f.vec[1].base = &f.count;
-    f.vec[1].length = sizeof(f.count);
-    f.vec[2].base = tmdView;
-    f.vec[2].length = f.count;
-    return IOS_Ioctlv(__esFd, ES_IOCTL_GET_TMD_VIEW, 2, 1, f.vec);
+    *len = *size;
+    vec[0].base = tid;
+    vec[0].length = sizeof(*tid);
+    vec[1].base = len;
+    vec[1].length = sizeof(*len);
+    vec[2].base = tmdView;
+    vec[2].length = *size;
+    return IOS_Ioctlv(__esFd, ES_IOCTL_GET_TMD_VIEW, 2, 1, vec);
 }
 
 /* Reads the data directory path of a title. */
@@ -288,6 +309,9 @@ s32 ESP_GetConsumption(u64 ticketId, ESConsumption* consumptions, u32* count)
 {
     s32 rc;
     ESIoctlvFrame f;
+    IPCIOVector* vec = f.vec;
+    u64* tid = &f.first.titleId;
+    u32* num = &f.count;
 
     if (__esFd < 0) {
         return ES_ERR_INVALID;
@@ -296,20 +320,20 @@ s32 ESP_GetConsumption(u64 ticketId, ESConsumption* consumptions, u32* count)
         return ES_ERR_INVALID;
     }
 
-    f.first.titleId = ticketId;
-    f.vec[0].base = &f.first.titleId;
-    f.vec[0].length = sizeof(f.first.titleId);
+    *tid = ticketId;
+    vec[0].base = tid;
+    vec[0].length = sizeof(*tid);
     if (consumptions == NULL) {
-        f.vec[1].base = NULL;
-        f.vec[1].length = 0;
+        vec[1].base = NULL;
+        vec[1].length = 0;
     } else {
-        f.vec[1].base = consumptions;
-        f.count = *count;
-        f.vec[1].length = f.count * sizeof(ESConsumption);
+        vec[1].base = consumptions;
+        *num = *count;
+        vec[1].length = *num * sizeof(ESConsumption);
     }
-    f.vec[2].base = &f.count;
-    f.vec[2].length = sizeof(f.count);
-    rc = IOS_Ioctlv(__esFd, ES_IOCTL_GET_CONSUMPTION, 1, 2, f.vec);
-    *count = f.count;
+    vec[2].base = num;
+    vec[2].length = sizeof(*num);
+    rc = IOS_Ioctlv(__esFd, ES_IOCTL_GET_CONSUMPTION, 1, 2, vec);
+    *count = *num;
     return rc;
 }
