@@ -2691,14 +2691,59 @@ BTE/gki_buffer.c:
 	.bss        start:0x8070CDE0 end:0x807358C0
 
 BTE/gki_time.c:
-	.text       start:0x80478790 end:0x8048AEE0 align:16
-	.rodata     start:0x80573530 end:0x80573860
-	.data       start:0x80612E60 end:0x80615140
-	.bss        start:0x807358C0 end:0x8073BE60
-	.sdata      start:0x80793D28 end:0x80793DA0
+	.text       start:0x80478790 end:0x80480A90 align:16
+	.rodata     start:0x80573530 end:0x80573840
+	.data       start:0x80612E60 end:0x80613B60
+	.bss        start:0x807358C0 end:0x80739698
+	.sdata      start:0x80793D28 end:0x80793D88
 	.sbss       start:0x80795008 end:0x80795040
-	.sdata2     start:0x8079D080 end:0x8079D0D8
+	.sdata2     start:0x8079D080 end:0x8079D0B8
 	.sbss2      start:0x8079D7E0 end:0x8079D7F0
+
+BTE/btm_acl.c:
+	.text       start:0x80480A90 end:0x804827D4
+	.data       start:0x80613B60 end:0x80613F80
+
+BTE/btm_dev.c:
+	.text       start:0x804827D4 end:0x80482EA0
+
+BTE/btm_devctl.c:
+	.text       start:0x80482EA0 end:0x80484224
+	.data       start:0x80613F80 end:0x806140E0
+	.sdata      start:0x80793D88 end:0x80793D8C
+
+BTE/btm_link_key.c:
+	.text       start:0x80484224 end:0x80484828
+	.data       start:0x806140E0 end:0x806141E0
+	.sdata      start:0x80793D8C end:0x80793DA0
+
+BTE/btm_discovery.c:
+	.text       start:0x80484828 end:0x8048495C
+
+BTE/btm_inq.c:
+	.text       start:0x8048495C end:0x804863F4
+	.data       start:0x806141E0 end:0x806143F0
+	.sdata2     start:0x8079D0B8 end:0x8079D0C0
+
+BTE/btm_main.c:
+	.text       start:0x804863F4 end:0x80486450
+	.bss        start:0x80739698 end:0x8073BE60
+
+BTE/btm_pm.c:
+	.text       start:0x80486450 end:0x804870E4
+	.rodata     start:0x80573840 end:0x80573850
+	.data       start:0x806143F0 end:0x80614430
+	.sdata2     start:0x8079D0C0 end:0x8079D0C8
+
+BTE/btm_sco.c:
+	.text       start:0x804870E4 end:0x80487F1C
+	.rodata     start:0x80573850 end:0x80573860
+	.data       start:0x80614430 end:0x80614730
+
+BTE/btm_sec.c:
+	.text       start:0x80487F1C end:0x8048AEE0
+	.data       start:0x80614730 end:0x80615140
+	.sdata2     start:0x8079D0C8 end:0x8079D0D8
 
 BTE/btu_hcif.c:
 	.text       start:0x8048AEE0 end:0x8048C13C

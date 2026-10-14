@@ -1371,6 +1371,17 @@ config.libs = [
             Object(NonMatching, "DSPADPCM/dspadpcm.c", cflags=cflags_base),
             Object(NonMatching, "BTE/gki_buffer.c", cflags=cflags_base),  # 16-aligned starts, default alignment: unit header
             Object(NonMatching, "BTE/gki_time.c"),  # mixed band, 4-aligned starts from 0x8047ABC4, lib default: unit header
+            # The BTE btm band 0x80480A90..0x8048AEE0 recut per BTE source file; each unit's header carries its evidence.
+            Object(NonMatching, "BTE/btm_acl.c"),
+            Object(NonMatching, "BTE/btm_dev.c"),
+            Object(NonMatching, "BTE/btm_devctl.c"),
+            Object(NonMatching, "BTE/btm_link_key.c"),
+            Object(NonMatching, "BTE/btm_discovery.c"),
+            Object(NonMatching, "BTE/btm_inq.c"),
+            Object(NonMatching, "BTE/btm_main.c"),
+            Object(NonMatching, "BTE/btm_pm.c"),
+            Object(NonMatching, "BTE/btm_sco.c"),
+            Object(NonMatching, "BTE/btm_sec.c"),
             # The BTE btu/gap/hci/hid/l2c band 0x8048AEE0..0x80498FBC recut per BTE source file; each unit's header carries its evidence.
             Object(NonMatching, "BTE/btu_hcif.c"),
             Object(NonMatching, "BTE/btu_init.c"),
