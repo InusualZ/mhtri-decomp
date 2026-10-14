@@ -17,7 +17,17 @@ typedef struct FLOW_SPEC {
     /* +0x14 */ u32 delay_variation;
 } FLOW_SPEC; /* size: 0x18 */
 
-/* size: 0x3C - an L2CAP channel configuration (the fields after flush_to are not reconstructed). */
+/* size: 0x0A - the retransmission and flow control option of an L2CAP configuration. */
+typedef struct tL2CAP_FCR_OPTS {
+    /* +0x00 */ u8 mode;
+    /* +0x01 */ u8 tx_win_sz;
+    /* +0x02 */ u8 max_transmit;
+    /* +0x04 */ u16 rtrans_tout;
+    /* +0x06 */ u16 mon_tout;
+    /* +0x08 */ u16 mps;
+} tL2CAP_FCR_OPTS; /* size: 0x0A */
+
+/* size: 0x3C - an L2CAP channel configuration and the continuation flags of its command. */
 typedef struct tL2CAP_CFG_INFO {
     /* +0x00 */ u16 result;
     /* +0x02 */ u8 mtu_present;
@@ -26,7 +36,11 @@ typedef struct tL2CAP_CFG_INFO {
     /* +0x08 */ FLOW_SPEC qos;
     /* +0x20 */ u8 flush_to_present;
     /* +0x22 */ u16 flush_to;
-    /* +0x24 */ u8 unused_0x24[0x18];
+    /* +0x24 */ u8 fcr_present;
+    /* +0x26 */ tL2CAP_FCR_OPTS fcr;
+    /* +0x30 */ u8 unused_0x30[8];
+    /* +0x38 */ u16 flags;
+    /* +0x3A */ u8 pad_0x3A[2];
 } tL2CAP_CFG_INFO; /* size: 0x3C */
 
 /* The callbacks an L2CAP client registers for its PSM. */
@@ -69,8 +83,8 @@ u8 L2CA_DisconnectReq(u16 cid);
 u8 L2CA_DisconnectRsp(u16 cid);
 u8 L2CA_DataWrite(u16 cid, BT_HDR* p_data);
 
-/* 0x80493A40 - sets the L2CAP trace level. */
-void L2CA_SetTraceLevel(u8 level);
+/* 0x80493A40 - sets the L2CAP trace level (0xFF keeps it); returns the level. */
+u8 L2CA_SetTraceLevel(u8 new_level);
 
 #ifdef __cplusplus
 }

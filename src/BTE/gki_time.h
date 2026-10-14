@@ -71,6 +71,14 @@ typedef struct TIMER_LIST_ENT {
     /* +0x17 */ u8 pad_0x17;
 } TIMER_LIST_ENT; /* size: 0x18 */
 
+/* size: 0x88 - the BTU control block; only the ACL sizes the L2CAP layer reads are named. */
+typedef struct tBTU_CB {
+    /* +0x00 */ u8 unused_0x00[0x7C];
+    /* +0x7C */ u16 hcit_acl_data_size;
+    /* +0x7E */ u16 hcit_acl_pkt_size;
+    /* +0x80 */ u8 unused_0x80[8];
+} tBTU_CB; /* size: 0x88 */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -182,6 +190,16 @@ void LogMsg_1(u32 trace_set_mask, const char* fmt_str, u32 p1);
 void LogMsg_2(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2);
 void LogMsg_3(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3);
 void LogMsg_4(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3, u32 p4);
+
+/* 0x8047A5D0 / 0x8047A5F0 - print a trace message with 5 or 6 arguments. */
+void LogMsg_5(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5);
+void LogMsg_6(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6);
+
+/* 0x8047A370 - hands the message `p_msg` with the event `event` to the HCI transport. */
+void bte_hcisu_send(BT_HDR* p_msg, u16 event);
+
+/* .bss 0x80739170 - the BTU control block. */
+extern tBTU_CB btu_cb;
 
 /* 0x8047AB40 / 0x8047ABB0 - start the timer entry with `timeout` seconds of type `type`, or stop it. */
 void btu_start_timer(TIMER_LIST_ENT* p_tle, u16 type, u32 timeout);
