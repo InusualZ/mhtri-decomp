@@ -11,6 +11,6 @@
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`, `cflags_os`), the block of the unit this range was cut
  *   from; unmeasured until bodies exist.
  * NAMES. the unit name is a GUESS (named for the error file the strings name).
- * RESIDUALS. No body is written (14 functions), the largest `fn_804AB450` at 0x804AB450 (0x154 B); `python
+ * RESIDUALS. No body is written (14 functions), the largest `cbForNandWriteIndex` at 0x804AB450 (0x154 B); `python
  *   tools/units/sweepcomments.py --unit DVD/dvderror.c` lists them.
  */

@@ -64,8 +64,20 @@ BOOL DVDLowSetMaximumRotation(u32 subcmd, DVDLowCallback callback);
 /* 0x804AE250 - the cover register value the last cover-register read stored. */
 u32 DVDLowGetCoverRegister(void);
 
+/* 0x804AE260 (0xC): Returns the status register value the last status-register read stored. */
+u32 DVDLowGetStatusRegister(void);
+
+/* 0x804AE270 (0xC): Returns the control register value the last control-register read stored. */
+u32 DVDLowGetControlRegister(void);
+
 /* 0x804AE280 - reads the cover register into the driver's copy. */
 BOOL DVDLowPrepareCoverRegister(DVDLowCallback callback);
+
+/* 0x804AE3F0 (0x16C): Reads the status register into the driver's copy. */
+BOOL DVDLowPrepareStatusRegister(DVDLowCallback callback);
+
+/* 0x804AE560 (0x16C): Reads the control register into the driver's copy. */
+BOOL DVDLowPrepareControlRegister(DVDLowCallback callback);
 
 /* 0x804AE6D0 - the immediate buffer register value the last command stored. */
 u32 DVDLowGetImmBufferReg(void);
