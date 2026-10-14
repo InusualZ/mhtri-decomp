@@ -1372,9 +1372,9 @@ config.libs = [
             # Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
             Object(Matching, "DB/db.c", cflags=cflags_base),
             Object(NonMatching, "mh3_pad/rc_record.c", cflags=cflags_base),
-            Object(NonMatching, "DSP/dsp.c", cflags=cflags_base),
-            Object(NonMatching, "DSP/dsp_debug.c", cflags=cflags_base),
-            Object(NonMatching, "DSP/dsp_task.c", cflags=cflags_base),
+            Object(Matching, "DSP/dsp.c", cflags=cflags_base),
+            Object(Matching, "DSP/dsp_debug.c", cflags=cflags_base),
+            Object(Matching, "DSP/dsp_task.c", cflags=cflags_base),
             Object(NonMatching, "DVD/dvdfs.c", cflags=cflags_base),
             Object(NonMatching, "DVD/dvd.c", cflags=cflags_base),
             Object(Matching, "DVD/dvdqueue.c", cflags=cflags_base),
