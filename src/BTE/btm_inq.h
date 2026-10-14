@@ -77,6 +77,14 @@ tBTM_INQ_INFO* BTM_InqDbFirst(void);
 tBTM_INQ_INFO* BTM_InqDbNext(tBTM_INQ_INFO* p_cur);
 u8 BTM_ClearInqDb(u8* p_bda);
 
+/* 0x80484BE0 / 0x80484C90 / 0x80484D40 - set the inquiry scan type, the page scan type and the inquiry mode. */
+u8 BTM_SetInquiryScanType(u16 scan_type);
+u8 BTM_SetPageScanType(u16 scan_type);
+u8 BTM_SetInquiryMode(u8 mode);
+
+/* 0x80485710 - clears the inquiry database. */
+void btm_inq_db_reset(void);
+
 #ifdef __cplusplus
 }
 #endif

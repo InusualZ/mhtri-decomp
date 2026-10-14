@@ -16,6 +16,10 @@ void btm_pm_proc_cmd_status(u8 status);
 /* 0x80486EBC */
 void btm_pm_proc_mode_change(u8 hci_status, u16 hci_handle, u8 mode, u16 interval);
 
+/* 0x80486794 / 0x8048680C - reset the power manager, and set up the power state of the ACL entry `ind`. */
+void btm_pm_reset(void);
+void btm_pm_sm_alloc(u8 ind);
+
 #ifdef __cplusplus
 }
 #endif

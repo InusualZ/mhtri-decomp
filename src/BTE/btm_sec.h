@@ -89,6 +89,10 @@ u8 BTM_SecBond(u8* bd_addr, u8 pin_len, u8* p_pin, u32* trusted_mask);
 /* 0x8048AEAC - the trusted service mask of the device at `bd_addr`, or NULL. */
 u32* btm_read_trusted_mask(u8* bd_addr);
 
+/* 0x80488038 / 0x804891C4 - set the PIN type and fixed PIN, and reset the security state. */
+void BTM_SetPinType(u8 pin_type, u8* pin_code, u8 pin_code_len);
+void btm_sec_dev_reset(void);
+
 #ifdef __cplusplus
 }
 #endif

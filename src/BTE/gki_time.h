@@ -132,19 +132,20 @@ void BTA_DmSetDeviceName(const char* name);
 /* 0x80482FF0 / 0x80483FEC - resets the controller, or sends the vendor specific HCI command `opcode` with `length` parameter bytes;
  * `callback` runs when the controller answered. */
 void BTM_DeviceReset(void (*callback)(void));
-void BTM_VendorSpecificCommand(u16 opcode, u8 length, const u8* params, void (*callback)(s32 result));
+u8 BTM_VendorSpecificCommand(u16 opcode, u8 length, const u8* params, void (*callback)(s32 result));
 
 /* 0x80483F34 / 0x80484224 / 0x804814E8 / 0x804818B4 - class of device, page timeout and the default link policy and supervision timeout. */
-void BTM_SetDeviceClass(const u8* deviceClass);
-void BTM_WritePageTimeout(u16 timeout);
+u8 BTM_SetDeviceClass(const u8* deviceClass);
+u8 BTM_WritePageTimeout(u16 timeout);
 void BTM_SetDefaultLinkPolicy(u16 policy);
 void BTM_SetDefaultLinkSuperTout(u16 timeout);
 
 /* 0x80484154 / 0x80483FD4 / 0x80486450 - register the vendor event, device status and power mode callbacks. */
 typedef void (*BtmVsEventCallback)(u8 length, u8* data);
 typedef void (*BtmPmCallback)(const u8* bdAddr, u32 status, u16 value, u8 hciStatus);
-void BTM_RegisterForVSEvents(BtmVsEventCallback callback);
-void BTM_RegisterForDeviceStatusNotif(void (*callback)(u32 event));
+typedef void (*BtmDevStatusCallback)(u32 status);
+u8 BTM_RegisterForVSEvents(BtmVsEventCallback callback);
+BtmDevStatusCallback BTM_RegisterForDeviceStatusNotif(BtmDevStatusCallback callback);
 u8 BTM_PmRegister(u8 mask, u8* pmId, BtmPmCallback callback);
 
 /* 0x8047FE80 - closes the HID connection of `handle`. */
@@ -163,7 +164,7 @@ u8 BTM_SetAfhChannels(u8 first, u8 last);
 u8 BTM_SetPowerMode(u8 pmId, const u8* bdAddr, BtmPmPwrMode* mode);
 
 /* 0x804824F8 - drops the ACL link to the device at `bdAddr`. */
-void btm_remove_acl(u8* bdAddr);
+u8 btm_remove_acl(u8* bdAddr);
 
 /* 0x8047D690 / 0x8047D718 - start the device manager with its security callback, or stop it; the start returns the status. */
 u8 BTA_EnableBluetooth(BtaDmSecCallback callback);

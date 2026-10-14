@@ -155,7 +155,7 @@ u8 BTA_DmAddDevice(const u8* bd_addr, const u8* link_key, u32 trusted_mask, u8 i
     }
 
     GKI_sched_lock();
-    status = BTM_SecAddDevice(bd_addr, NULL, NULL, NULL, trusted_services_mask, link_key);
+    status = BTM_SecAddDevice((u8*)bd_addr, NULL, NULL, NULL, trusted_services_mask, (u8*)link_key);
     GKI_sched_unlock();
 
     return status == FALSE;
@@ -166,7 +166,7 @@ u8 BTA_DmRemoveDevice(const u8* bd_addr) {
     u8 status;
 
     GKI_sched_lock();
-    status = BTM_SecDeleteDevice(bd_addr);
+    status = BTM_SecDeleteDevice((u8*)bd_addr);
     GKI_sched_unlock();
 
     return status == FALSE;

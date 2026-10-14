@@ -826,7 +826,7 @@ static void btu_hcif_return_link_keys_evt(u8* p) {
 
     p[-1] = BTM_CB_EVT_RETURN_LINK_KEYS;
 
-    btm_return_link_keys_evt(p - 1);
+    btm_return_link_keys_evt((tBTM_RETURN_LINK_KEYS_EVT*)(p - 1));
 }
 
 /* Passes a PIN code request to L2CAP and the security manager. */
