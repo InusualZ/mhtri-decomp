@@ -16,11 +16,12 @@
  *    `KPRInitQueue`, followed by the `kpr_lib.c` / `KPRPutChar: Overflow` panic strings; `.rodata` 0x80579088
  *    (0x288 B) and 0x80579310/0x80579350 are the tables of `kpr_convert_pending` and `kpr_compose_char`; `.sbss`
  *    0x807959F0..0x80795A00 is read here only; `KPRLookAhead` is called by `homebutton/hbm_text_panel.cpp`.
- * RESIDUALS. all 9 rows have a body (4 at 100 %); `KPRGetChar` 95 % and `KPRLookAhead` 96 % (register numbering of the
- *    copy loops), `KPRPutChar` 98.5 %, `kpr_convert_pending` 99.5 % and `kpr_compose_char` 99.8 % (register
- *    numbering); flipcheck blockers: the .text differences above and trailing .data/.sbss/.sdata padding.
+ * RESIDUALS. none in .text (9 of 9 rows match); the .data/.sbss/.sdata claims end in alignment fill.
  * SHAPES. `kpr_convert_pending` leaves the first dead-key index uninitialised on purpose (the target reads an unset
- *    register on the no-match path); `.sbss` objects are defined in reverse address order.
+ *    register on the no-match path) and re-reads `queue->chars[queue->ready]` at each use (a local copy swaps r9/r10);
+ *    `KPRGetChar`/`KPRLookAhead` pass the `OSDisableInterrupts` result to `OSRestoreInterrupts`; `KPRPutChar` keeps
+ *    the incremented pending count in a `u32` declared before `enabled`; `.sbss` objects are defined in reverse
+ *    address order.
  */
 #include "types.h"
 #include "KPR/kpr.h"
@@ -217,8 +218,8 @@ void KPRSetQueueMode(KPRQueue* queue, u32 mode)
 u8 KPRPutChar(KPRQueue* queue, u16 ch)
 {
     u32 mode;
+    u32 count;
     BOOL enabled;
-    u8 count;
 
     if (queue->ready + queue->pending + 1 >= 5) {
         OSPanic("kpr_lib.c", 0xD7, "KPRPutChar: Overflow");
@@ -250,17 +251,18 @@ u16 KPRGetChar(KPRQueue* queue)
 {
     u16 ch;
     u32 i;
+    BOOL enabled;
 
     if (queue->ready == 0) {
         return 0;
     }
-    OSDisableInterrupts();
+    enabled = OSDisableInterrupts();
     ch = queue->chars[0];
     for (i = 1; i < queue->pending + queue->ready; i++) {
         queue->chars[i - 1] = queue->chars[i];
     }
     queue->ready--;
-    OSRestoreInterrupts(TRUE);
+    OSRestoreInterrupts(enabled);
     return ch;
 }
 
@@ -271,18 +273,19 @@ u32 KPRLookAhead(void* queueAddress, u32 outAddress, u32 max)
     KPRQueue* queue = queueAddress;
     u16* out = (u16*)outAddress;
     u8 i;
+    BOOL enabled;
 
     if (out == NULL || max == 0) {
         return (u8)(queue->pending + queue->ready);
     }
-    OSDisableInterrupts();
+    enabled = OSDisableInterrupts();
     for (i = 0; i < queue->pending + queue->ready && i < max; i++) {
         out[i] = queue->chars[i];
     }
     if (i < max) {
         out[i] = 0;
     }
-    OSRestoreInterrupts(TRUE);
+    OSRestoreInterrupts(enabled);
     return (u8)(queue->pending + queue->ready);
 }
 
@@ -325,8 +328,8 @@ BOOL kpr_compose_char(KPRQueue* queue, u16 ch)
             queue->chars[i] = queue->chars[i - 1];
         }
         queue->chars[queue->ready] = value;
-        queue->altCode = 0;
         queue->ready++;
+        queue->altCode = 0;
         return ch == 0;
     }
     if ((u16)(ch + 0xED0) <= 9) {
@@ -344,7 +347,6 @@ BOOL kpr_compose_char(KPRQueue* queue, u16 ch)
 void kpr_convert_pending(KPRQueue* queue)
 {
     u32 i;
-    u16 a;
     u32 firstDead;
     u32 secondDead;
     u16 b;
@@ -361,14 +363,14 @@ void kpr_convert_pending(KPRQueue* queue)
     }
     secondDead = 107;
     for (i = 0; i < 107; i++) {
-        a = queue->chars[queue->ready];
-        if (a == kpr_compose_table[i][0] && queue->chars[queue->ready + 1] == kpr_compose_table[i][1]) {
+        if (queue->chars[queue->ready] == kpr_compose_table[i][0] && queue->chars[queue->ready + 1] == kpr_compose_table[i][1]) {
             queue->chars[queue->ready] = kpr_compose_table[i][2];
             queue->pending = 0;
             queue->ready++;
             return;
         }
-        if (a == kpr_compose_table[i][0] && a == kpr_compose_table[i][1]) {
+        if (queue->chars[queue->ready] == kpr_compose_table[i][0] &&
+            queue->chars[queue->ready] == kpr_compose_table[i][1]) {
             firstDead = i;
         }
         b = queue->chars[queue->ready + 1];

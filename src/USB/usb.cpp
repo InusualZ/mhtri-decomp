@@ -8,18 +8,28 @@
  * FLAGS. `cflags_base` (-O4,p).  `__sthbrx` is the byte-reversed halfword store intrinsic.
  * NAMES. `IUSB_OpenLib`, `IUSB_CloseLib`, `IUSB_OpenDeviceIds`, `IUSB_CloseDeviceAsync`, `__LongBlkMsgInt` and
  *   `__IntrBlkMsgInt` are the map's names; the log strings name `IUSB_OpenDeviceIdsAsync`, `IUSB_CloseDevice`,
- *   `IUSB_IsoMsgAsync` and `__CtrlMsgInt`.  GUESS names: `IUSB_Log`, `IUSB_LogError` (the "USB: " and "USB ERR: " printers),
- *   `IUSB_RequestDone` (the completion of every request), `IUSB_ReadCtrlMsgAsync` / `IUSB_WriteCtrlMsgAsync` (the
- *   invalidate / flush wrappers of `__CtrlMsgInt`), `usbIsoPacketTotal` (the packet size check of the iso request),
- *   `IUSB_RegisterInsertionNotifyAsync` (ioctl 0x1B with a path, the log strings name a device list / insertion notify).
- * RESIDUALS. All 22 rows have a body.  Data: the target .data holds the strings of functions the link dropped (0x8062B0CC..
- *   0x8062B290, 750 B), so every string offset after them differs and the object's .data is 1346 B against 2096 B; .sbss and
- *   .sdata are 9/14 B against 16/16 B (end padding).  `__CtrlMsgInt`: the target stores the three `sthbrx` operands without
- *   the `clrlwi` the intrinsic's u16 parameter adds.  `usbIsoPacketTotal` keeps the result in r31 and rotates the loop
- *   (the `return result` spelling lets the compiler fold `result`).  `IUSB_RegisterInsertionNotifyAsync` zeroes the request
- *   twice (two memset calls in the target).  `IUSB_RequestDone`: loop pointer, index and block swap r28..r30.
+ *   `IUSB_IsoMsgAsync`, `__CtrlMsgInt`, `_GetStrCb`, `_GetDescrCb` and `IUSB_RegisterInsertionNotifyWithIdAsync`.
+ *   GUESS names: `IUSB_Log`, `IUSB_LogError` (the "USB: " and "USB ERR: " printers), `IUSB_RequestDone` (the completion
+ *   of every request), `IUSB_ReadCtrlMsgAsync` / `IUSB_WriteCtrlMsgAsync` (the invalidate / flush wrappers of
+ *   `__CtrlMsgInt`), `usbIsoPacketTotal` (the packet size check of the iso request), `IUSB_RegisterInsertionNotifyAsync`
+ *   (ioctl 0x1B with a path), and the stripped `IUSB_OpenDevice`, `IUSB_GetDeviceList`, `IUSB_ReadBlkMsg`,
+ *   `IUSB_WriteBlkMsg`, `IUSB_GetAsciiStr`, `IUSB_GetAsciiStrAsync`, `IUSB_GetDevDescr`, `IUSB_GetDevDescrAsync` and
+ *   `IUSB_RegisterInsertionNotify` (named from their log strings).
+ * EVIDENCE. The target .data holds the log strings of library functions the link stripped (openDevice, getDeviceList,
+ *   the short/long bulk logs, the GetStr/GetDescr family, the insertion-notify-with-id texts); the stripped functions
+ *   are written in their string positions so the object's .data is the target's byte for byte.  Their bodies are
+ *   GUESSES beyond the strings and their order (no code of theirs is in the DOL).
+ * RESIDUALS. All 22 linked rows have a body.  `__CtrlMsgInt` (0x804E57C0): retail schedules the stage-byte set-up
+ *   (`li r6,0`/`li r5,1`/`li r0,2`) ahead of the request byte and stores the three `sthbrx` after it.
+ *   `usbIsoPacketTotal` (0x804E5F30): retail keeps the result in r31 across the oversize log and branches to one
+ *   epilogue (a `return result` inside the loop is constant-folded; a `for (;;)` with two breaks rotates the loop).
+ *   `IUSB_RequestDone` (0x804E4960): the clean-list walk pointer and the block swap r29/r30.
+ *   flipcheck blockers: the rows above, and .text carries the stripped functions (+0xFB8 B); .data/.sbss/.sdata end in
+ *   alignment fill.
  * SHAPES. A single exit through `do { ... break; ... } while (0)` reproduces the target's one shared epilogue (a `return`
- *   in the middle or a flag measured worse); the transfer helpers take `s32` parameters so callers do not re-extend them.
+ *   in the middle or a flag measured worse); the bulk helpers take `s32` parameters so callers do not re-extend them,
+ *   while the control-transfer set takes the SDK's `u8`/`u16` setup fields (no `clrlwi` before `sthbrx`); the transfer
+ *   helpers name themselves through `__FUNCTION__`, which MWCC pools at the function's start.
  */
 
 #include "types.h"
@@ -276,6 +286,53 @@ static inline void* usbAlloc(u32 size) /* untyped: caller-owned block */
     return block;
 }
 
+/* Opens the device node `path` into `fd`; no caller in the DOL, so the linker strips it. */
+s32 IUSB_OpenDevice(const char* path, s32* fd)
+{
+    char* name;
+    s32 i;
+
+    name = (char*)usbAlloc(0x40);
+    if (name == NULL) {
+        IUSB_LogError("openDevice: Not enough memory\n");
+        return -22;
+    }
+    for (i = 0; i < 0x3F && path[i] != '\0'; i++) {
+        name[i] = path[i];
+    }
+    name[i] = '\0';
+    *fd = IOS_Open(name, 0);
+    usbFree(name);
+    return *fd < 0 ? *fd : 0;
+}
+
+/* Reads up to `size` bytes of the device list of the node `path` into `list`; the linker strips it. */
+s32 IUSB_GetDeviceList(const char* path, u8* list, s32 size)
+{
+    u8* buffer;
+    s32 handle;
+    s32 result;
+    s32 i;
+
+    handle = IOS_Open(path, 0);
+    if (handle < 0) {
+        return handle;
+    }
+    buffer = (u8*)usbAlloc(size);
+    if (buffer == NULL) {
+        IUSB_LogError("getDeviceList: Not enough memory\n");
+        IOS_Close(handle);
+        return -22;
+    }
+    result = IOS_Ioctl(handle, 0xC, NULL, 0, buffer, size);
+    for (i = 0; i < size; i++) {
+        list[i] = buffer[i];
+    }
+    usbFree(buffer);
+    IOS_Close(handle);
+    return result;
+}
+
 /* Runs a long bulk transfer on `endpoint` of device `fd`; blocks unless `async` is set, then `callback` runs on completion. */
 s32 __LongBlkMsgInt(s32 fd, s32 endpoint, u32 length, void* data, USBCallback callback, void* callbackArg, s32 async) /* untyped: caller-owned payload */
 {
@@ -324,7 +381,7 @@ s32 __LongBlkMsgInt(s32 fd, s32 endpoint, u32 length, void* data, USBCallback ca
                                     break;
                                 }
                                 if (result == -22) {
-                                    OSReport("%s: IoctlvAsync returned error %d\n", "__LongBlkMsgInt", result);
+                                    OSReport("%s: IoctlvAsync returned error %d\n", __FUNCTION__, result);
                                 }
                                 usbFree(request);
                             }
@@ -385,7 +442,7 @@ s32 __IntrBlkMsgInt(s32 fd, s32 endpoint, s32 length, void* data, s32 ioctl, USB
                                 break;
                             }
                             if (result == -22) {
-                                OSReport("%s: IoctlvAsync returned error %d\n", "__IntrBlkMsgInt", result);
+                                OSReport("%s: IoctlvAsync returned error %d\n", __FUNCTION__, result);
                             }
                             usbFree(request);
                         }
@@ -425,8 +482,32 @@ s32 IUSB_WriteBlkMsgAsync(s32 fd, s32 endpoint, u32 length, void* data, USBCallb
     return __LongBlkMsgInt(fd, endpoint, length, data, callback, callbackArg, 1);
 }
 
+/* Runs a blocking bulk read into `data`, sized like the asynchronous one; the linker strips it. */
+s32 IUSB_ReadBlkMsg(s32 fd, s32 endpoint, u32 length, void* data) /* untyped: caller-owned payload */
+{
+    DCInvalidateRange(data, length);
+    if (length <= 0xFFFF) {
+        IUSB_Log("calling short blk transfer fn: buflen = %u limit = %u\n", length, 0xFFFF);
+        return __IntrBlkMsgInt(fd, endpoint, length, data, 1, NULL, NULL, 0);
+    }
+    IUSB_Log("calling long blk transfer fn: buflen = %u limit = %u\n", length, 0xFFFF);
+    return __LongBlkMsgInt(fd, endpoint, length, data, NULL, NULL, 0);
+}
+
+/* Runs a blocking bulk write from `data`, sized like the read; the linker strips it. */
+s32 IUSB_WriteBlkMsg(s32 fd, s32 endpoint, u32 length, void* data) /* untyped: caller-owned payload */
+{
+    DCFlushRange(data, length);
+    if (length <= 0xFFFF) {
+        IUSB_Log("calling short blk transfer fn: buflen = %u limit = %u\n", length, 0xFFFF);
+        return __IntrBlkMsgInt(fd, endpoint, length, data, 1, NULL, NULL, 0);
+    }
+    IUSB_Log("calling long blk transfer fn: buflen = %u limit = %u\n", length, 0xFFFF);
+    return __LongBlkMsgInt(fd, endpoint, length, data, NULL, NULL, 0);
+}
+
 /* Runs a control transfer (`requestType`/`request`/`value`/`index`/`length`) with an optional data stage; blocks unless `async` is set. */
-s32 __CtrlMsgInt(s32 fd, s32 requestType, s32 request, s32 value, s32 index, s32 length, void* data, USBCallback callback, void* callbackArg, u8 async) /* untyped: caller-owned payload */
+s32 __CtrlMsgInt(s32 fd, u8 requestType, u8 request, u16 value, u16 index, u16 length, void* data, USBCallback callback, void* callbackArg, u8 async) /* untyped: caller-owned payload */
 {
     s32 result;
     IPCIOVector* vectors;
@@ -525,17 +606,142 @@ s32 __CtrlMsgInt(s32 fd, s32 requestType, s32 request, s32 value, s32 index, s32
 }
 
 /* Starts a control transfer whose data stage reads into `data` (the cache range is invalidated first). */
-s32 IUSB_ReadCtrlMsgAsync(s32 fd, s32 requestType, s32 request, s32 value, s32 index, s32 length, void* data, USBCallback callback, void* callbackArg) /* untyped: caller-owned payload */
+s32 IUSB_ReadCtrlMsgAsync(s32 fd, u8 requestType, u8 request, u16 value, u16 index, u16 length, void* data, USBCallback callback, void* callbackArg) /* untyped: caller-owned payload */
 {
     DCInvalidateRange(data, length);
     return __CtrlMsgInt(fd, requestType, request, value, index, length, data, callback, callbackArg, 1);
 }
 
 /* Starts a control transfer whose data stage writes from `data` (the cache range is flushed first). */
-s32 IUSB_WriteCtrlMsgAsync(s32 fd, s32 requestType, s32 request, s32 value, s32 index, s32 length, void* data, USBCallback callback, void* callbackArg) /* untyped: caller-owned payload */
+s32 IUSB_WriteCtrlMsgAsync(s32 fd, u8 requestType, u8 request, u16 value, u16 index, u16 length, void* data, USBCallback callback, void* callbackArg) /* untyped: caller-owned payload */
 {
     DCFlushRange(data, length);
     return __CtrlMsgInt(fd, requestType, request, value, index, length, data, callback, callbackArg, 1);
+}
+
+/* Turns a UTF-16LE string descriptor in `buffer` into ASCII in place; returns 0, or -1 when a unit is not ASCII. */
+static inline s32 usbUnicodeToAscii(u8* buffer, u32 length)
+{
+    u32 i;
+
+    for (i = 2; i + 1 < length; i += 2) {
+        if (buffer[i + 1] != 0) {
+            return -1;
+        }
+        buffer[i / 2 - 1] = buffer[i];
+    }
+    buffer[length / 2 - 1] = 0;
+    return 0;
+}
+
+/* Completes a string descriptor read: converts it to ASCII and runs the caller's callback; the linker strips it. */
+static void _GetStrCb(s32 result, USBRequest* request)
+{
+    u8* buffer = (u8*)request->transfer.data;
+
+    IUSB_Log("GetStrCb returned: %d\n", result);
+    IUSB_Log("GetStrCb: buf = 0x%x buflen = %u\n", buffer, request->transfer.length);
+    if (result >= 0 && usbUnicodeToAscii(buffer, request->transfer.length) < 0) {
+        IUSB_LogError("Failed to convert buffer from unicode 2 ascii\n");
+        result = -4;
+    }
+    IUSB_Log("calling cb 0x%x with arg 0x%x\n", request->callback, request->callbackArg);
+    if (request->callback != NULL) {
+        request->callback(result, request->callbackArg);
+    }
+    usbFree(request);
+}
+
+/* Reads string descriptor `index` in language `lang` into `buffer` as ASCII, blocking; the linker strips it. */
+s32 IUSB_GetAsciiStr(s32 fd, u8 index, u16 lang, u8* buffer, u16 length)
+{
+    s32 result = __CtrlMsgInt(fd, 0x80, 6, 0x300 | index, lang, length, buffer, NULL, NULL, 0);
+
+    if (result < 0) {
+        IUSB_LogError("Failed __CtrlMsg: %d", result);
+        return result;
+    }
+    if (usbUnicodeToAscii(buffer, length) < 0) {
+        IUSB_LogError("Failed to convert unicode 2 ascii\n");
+        return -4;
+    }
+    return result;
+}
+
+/* Starts a string descriptor read that `_GetStrCb` completes; the linker strips it. */
+s32 IUSB_GetAsciiStrAsync(s32 fd, u8 index, u16 lang, u8* buffer, u16 length, USBCallback callback, void* callbackArg) /* untyped: caller-owned payload */
+{
+    USBRequest* request;
+    s32 result;
+
+    IUSB_Log("GetStr - _GetStrCb\n");
+    request = (USBRequest*)usbAlloc(sizeof(USBRequest));
+    if (request == NULL) {
+        IUSB_LogError(" GetAsciiStrAsync: Not enough memory\n");
+        return -22;
+    }
+    memset(request, 0, sizeof(USBRequest));
+    request->callback = callback;
+    request->callbackArg = callbackArg;
+    request->transfer.data = buffer;
+    request->transfer.length = length;
+    result = __CtrlMsgInt(fd, 0x80, 6, 0x300 | index, lang, length, buffer, (USBCallback)_GetStrCb, request, 1);
+    if (result < 0) {
+        IUSB_LogError("__CtrlMsgInt failed %d\n", result);
+        usbFree(request);
+    }
+    return result;
+}
+
+/* Completes a device descriptor read and runs the caller's callback; the linker strips it. */
+static void _GetDescrCb(s32 result, USBRequest* request)
+{
+    IUSB_Log("GetDescrCb returned: %d\n", result);
+    if (request->callback != NULL) {
+        request->callback(result, request->callbackArg);
+    }
+    usbFree(request);
+}
+
+/* Reads the 18-byte device descriptor into `descriptor`, blocking; the linker strips it. */
+s32 IUSB_GetDevDescr(s32 fd, u8* descriptor)
+{
+    u8* buffer;
+    s32 result;
+    s32 i;
+
+    IUSB_Log("GetDevDescr\n");
+    buffer = (u8*)usbAlloc(0x20);
+    if (buffer == NULL) {
+        IUSB_LogError("GetDevDescr: Not enough memory\n");
+        return -22;
+    }
+    result = __CtrlMsgInt(fd, 0x80, 6, 0x100, 0, 0x12, buffer, NULL, NULL, 0);
+    IUSB_Log("GetDevDescr: %d\n", result);
+    if (result >= 0) {
+        for (i = 0; i < 0x12; i++) {
+            descriptor[i] = buffer[i];
+        }
+    }
+    usbFree(buffer);
+    return result;
+}
+
+/* Starts a device descriptor read into `descriptor` that `_GetDescrCb` completes; the linker strips it. */
+s32 IUSB_GetDevDescrAsync(s32 fd, u8* descriptor, USBCallback callback, void* callbackArg) /* untyped: caller-owned payload */
+{
+    USBRequest* request;
+
+    IUSB_Log("GetDevDescr - _GetDescrCb\n");
+    request = (USBRequest*)usbAlloc(sizeof(USBRequest));
+    if (request == NULL) {
+        IUSB_LogError("GetDevDescrAsync: Not enough memory\n");
+        return -22;
+    }
+    memset(request, 0, sizeof(USBRequest));
+    request->callback = callback;
+    request->callbackArg = callbackArg;
+    return __CtrlMsgInt(fd, 0x80, 6, 0x100, 0, 0x12, descriptor, (USBCallback)_GetDescrCb, request, 1);
 }
 
 /* Issues the driver's ioctl 0x1D on `fd`, which takes no payload. */
@@ -701,5 +907,76 @@ s32 IUSB_RegisterInsertionNotifyAsync(const char* path, s16 classId, s16 subId, 
         usbFree(vectors);
         usbFree(request);
     } while (0);
+    return result;
+}
+
+/* Waits for the insertion of a device matching `classId` and `subId` under `path`, blocking; the linker strips it. */
+s32 IUSB_RegisterInsertionNotify(const char* path, s16 classId, s16 subId)
+{
+    s32 handle;
+    s32 result;
+    s16* ids;
+
+    if (path == NULL || classId == 0 || subId == 0) {
+        IUSB_LogError("Invalid path or devClass in insertion notification call\n");
+        return -4;
+    }
+    handle = IOS_OpenTimed(path, 0);
+    if (handle < 0) {
+        IUSB_LogError("Open(%s) failed\n", path);
+        return handle;
+    }
+    ids = (s16*)usbAlloc(0x20);
+    if (ids == NULL) {
+        IOS_CloseTimed(handle);
+        return -22;
+    }
+    ids[0] = classId;
+    ids[1] = subId;
+    result = IOS_Ioctl(handle, 0x1B, ids, 4, NULL, 0);
+    usbFree(ids);
+    IOS_CloseTimed(handle);
+    return result;
+}
+
+/* Registers `callback` for the insertion of a device with `vendor`/`product` and class `classId` under `path`; the
+ * linker strips it. */
+s32 IUSB_RegisterInsertionNotifyWithIdAsync(const char* path, s16 classId, u16 vendor, u16 product, USBCallback callback, void* callbackArg) /* untyped: caller-owned payload */
+{
+    USBRequest* request;
+    u16* ids;
+    s32 handle;
+    s32 result;
+
+    if (path == NULL || classId == 0) {
+        IUSB_LogError("Invalid path or devClass in insertion notification call\n");
+        return -4;
+    }
+    request = (USBRequest*)usbAlloc(sizeof(USBRequest));
+    ids = (u16*)usbAlloc(0x20);
+    if (request == NULL || ids == NULL) {
+        IUSB_LogError("%s: Not enough memory\n", __FUNCTION__);
+        usbFree(ids);
+        usbFree(request);
+        return -22;
+    }
+    handle = IOS_OpenTimed(path, 0);
+    if (handle < 0) {
+        IUSB_LogError("Failed to open %s: %d\n", path, handle);
+        usbFree(ids);
+        usbFree(request);
+        return handle;
+    }
+    memset(request, 0, sizeof(USBRequest));
+    ids[0] = vendor;
+    ids[1] = product;
+    ids[2] = classId;
+    DCFlushRange(ids, 0x20);
+    request->callback = callback;
+    request->callbackArg = callbackArg;
+    request->cleanCount = 1;
+    request->clean[0] = ids;
+    result = IOS_IoctlAsync(handle, 0x1E, ids, 6, NULL, 0, (void*)IUSB_RequestDone, request);
+    IOS_CloseTimed(handle);
     return result;
 }

@@ -17,15 +17,11 @@
  *    device error string; `.sbss` 0x80795938..0x807959F0 (the state word 0x80795938 is read by 35 functions) and
  *    `.bss` 0x8078FA38..0x8078FF40 are read here only; the entries at 0x80526890 and 0x80526980 are called by
  *    `menu/menu_plsearch.cpp`.
- * RESIDUALS. register numbering only, no instruction differences: `PMICSetBuffers` (the copy of `size` and the
- *    aligned base swap r28/r29; declaration order and statement order were measured), `PMICSetGain` and
- *    `PMICGetParam` (the callback and argument copies swap r30/r31), `PMICInit` (the stack and register order of the
- *    buffer carving chain; the request pool loop and the state tests match), `PMICWrite`, `PMICPopPlay` and
- *    `PMICPushCapture` (the ring base register), `PMICOnQueryDone`, `PMICStartAsync`.  `PMICFilterSamples` keeps explicit
- *    `frsp` roundings of the two level followers where this source emits none (`f64` locals measured worse), and
- *    `fp_contract off` is needed for its unfused `fmuls`+`fadds`.  flipcheck blockers: the .text differences above
- *    (the object is 16 B short of the split); `.data` and `.sdata` end 4 B short of the split (trailing alignment
- *    pad the compiler does not emit, as in KPR/kpr.c).
+ * RESIDUALS. register numbering only, no instruction differences: `PMICInit` (0x80522E00: the registers and fold
+ *    bases of the buffer carving chain; the request pool loop and the state tests match) and `PMICFilterSamples`
+ *    (0x80526980: the FPR numbers of the hoisted constants and temporaries; local declaration orders were measured).
+ *    flipcheck blockers: the two rows above; `.data` and `.sdata` end 4 B short of the split (trailing alignment pad
+ *    the compiler does not emit, as in KPR/kpr.c).
  * SHAPES. the request helpers `PMICPopFree`, `PMICPushQueue` and `PMICPushFree` are `static inline` and expand into
  *    their callers, while the real entries (`PMICRequestAlloc`, `PMICRequestDone`, `PMICRequestEnqueue`,
  *    `PMICGetState` and the ring helpers) are defined under `#pragma dont_inline on` with hand-written bodies;
@@ -33,6 +29,13 @@
  *    loops hoist the capacity and buffer into locals; the isochronous callbacks need the loop and flag locals
  *    declared in the order `i`, `offset`, `word`, `length`, `status`, flags; a state switch of one or two cases is an
  *    if chain, a polling `if (state == n)` ladder rather than a `switch` (`PMICPollRequests`).
+ *    `PMICFilterSamples` reads each follower global into a local before the branch that uses it, stores it back,
+ *    and re-reads the global afterwards (the re-read is the `frsp` retail keeps), under `fp_contract off`.
+ *    Register order follows declaration order: `level` is declared first in `PMICSetGain`/`PMICGetParam`, `n` before
+ *    `write` in `PMICPushCapture`, `capacity` before `write` in `PMICWrite`, `second` after `capacity` in
+ *    `PMICPopPlay`; `PMICSetBuffers` carves both rings from the `area` parameter itself.
+ *    Functions are defined in address order (forward declarations above `PMICInit`), so the .text layout is the
+ *    target's; the shared macros and `PMICPopQueue` are defined ahead of the first body.
  */
 
 #include "types.h"
@@ -284,6 +287,40 @@ void PMICOnRecordStart1(s32 result, PMICRequest* request);
 void PMICOnRecordStop1(s32 result, PMICRequest* request);
 void PMICOnQueryDone(s32 result, PMICRequest* request);
 void PMICOnQueryRetry(s32 result, PMICRequest* request);
+/* untyped: caller-owned payload (unused) */
+void PMICOnPacketSent(s32 result, void* arg);
+/* untyped: caller-owned payload (unused) */
+void PMICOnPacketRead(s32 result, void* arg);
+s32 PMICPushCapture(s16* src, s32 bytes);
+s32 PMICPopPlay(s16* dst, s32 bytes);
+
+/* Cancels the operation alarm once the pending operation has answered. */
+#define PMIC_CLEAR_OP_PENDING()                                                                                        \
+    do {                                                                                                               \
+        if (PMICOpPending != NULL) {                                                                                   \
+            OSCancelAlarm(&PMICOpAlarm);                                                                               \
+            PMICOpPending = NULL;                                                                                      \
+        }                                                                                                              \
+    } while (0)
+
+/* Reports a result to the iso callback. */
+#define PMIC_REPORT_ISO(result)                                                                                        \
+    do {                                                                                                               \
+        if (PMICIsoDone != NULL) {                                                                                     \
+            PMICIsoDone((result), PMICIsoCallbackArg);                                                                 \
+        }                                                                                                              \
+    } while (0)
+
+/* Pops the oldest request from the queue. */
+static inline PMICRequest* PMICPopQueue(void)
+{
+    PMICRequest* request = NULL;
+    if (PMICQueue != NULL) {
+        request = PMICQueue;
+        PMICQueue = PMICQueue->next;
+    }
+    return request;
+}
 
 /* 0x80522E00 (0x310): brings the library up once, laying its transfer buffers out in the caller's work area. */
 s32 PMICInit(u8* work, s32 size)
@@ -480,8 +517,8 @@ s32 PMICStartAsync(PMICUserCallback callback, s32 arg)
     } else if (PMICState != 5) {
         result = -4;
     } else {
-        PMICOpCallbackArg = arg;
         PMICOpCallback = callback;
+        PMICOpCallbackArg = arg;
         if (IUSB_WriteCtrlMsgAsync(PMICDevice, 0x41, 0, 0, 0, 0, NULL, PMICOnStartAck, NULL) < 0) {
             PMICOpCallback = NULL;
             result = -6;
@@ -816,162 +853,6 @@ void PMICOnDeviceClosed(s32 result, void* arg)
     }
 }
 
-/* 0x80524AD0 (0xC): stores the stop result and wakes the thread waiting in the synchronous call. */
-void PMICWakeSync(s32 result, s32 arg)
-{
-    PMICSyncResult = result;
-    OSWakeupThread(&PMICSyncQueue);
-}
-
-/* 0x80526010 (0x30): fails the library when the pending operation does not answer in time. */
-void PMICOnOpTimeout(OSAlarm* alarm, OSContext* context)
-{
-    USBCallback pending = PMICOpPending;
-    PMICState = -3;
-    if (pending == NULL) {
-        return;
-    }
-    PMICOpPending = NULL;
-    pending(0, NULL);
-}
-
-/* 0x80526040 (0x30): fails the library when the pending request does not answer in time. */
-void PMICOnRequestTimeout(OSAlarm* alarm, OSContext* context)
-{
-    USBCallback pending = PMICRequestPending;
-    PMICState = -3;
-    if (pending == NULL) {
-        return;
-    }
-    PMICRequestPending = NULL;
-    pending(0, NULL);
-}
-
-/* 0x80526070 (0x8C): reports a failed operation after the retry delay. */
-void PMICOnOpRetryTimeout(OSAlarm* alarm, OSContext* context)
-{
-    if (alarm == NULL) {
-        OSCancelAlarm(&PMICOpAlarm);
-    }
-    if (PMICState == 3) {
-        if (PMICOpCallback != NULL) {
-            PMICOpCallback(-2, PMICOpCallbackArg);
-        }
-    } else {
-        if (PMICOpCallback != NULL) {
-            PMICOpCallback(-100, PMICOpCallbackArg);
-        }
-        PMICState = -3;
-    }
-    PMICOpCallback = NULL;
-    PMICOpCallbackArg = 0;
-}
-
-/* 0x80526100 (0x80): reports a failed request after the retry delay. */
-void PMICOnRequestRetryTimeout(OSAlarm* alarm, OSContext* context)
-{
-    if (alarm == NULL) {
-        OSCancelAlarm(&PMICRequestAlarm);
-    }
-    if (PMICRequestState == 5) {
-        if (PMICState == 3 || (u32)(PMICState - 5) <= 1) {
-            PMICRequestState = -1;
-            PMICRequestResult = -2;
-            return;
-        }
-        PMICRequestState = -1;
-        PMICRequestResult = -100;
-        PMICState = -3;
-    }
-}
-
-#pragma dont_inline on
-
-/* 0x805263B0 (0x10C): lays the capture ring, the playback ring and the scratch areas out in `area`. */
-u8* PMICSetBuffers(u8* area, u32 size)
-{
-    u8* capture;
-    u8* play;
-    capture = (u8*)(((u32)area + 0x1F) & ~0x1F);
-    PMICRingState.captureCapacity = size >> 1;
-    PMICRingState.captureCount = 0;
-    PMICRingState.captureWrite = 0;
-    PMICRingState.captureRead = 0;
-    PMICRingState.captureOverflow = 0;
-    PMICRingState.captureBuffer = (s16*)capture;
-    memset(capture, 0, size);
-    PMICRingState.playCapacity = 0x600;
-    play = capture + ((size + 0x1F) & ~0x1F);
-    PMICRingState.playCount = 0;
-    PMICRingState.playWrite = 0;
-    PMICRingState.playRead = 0;
-    PMICRingState.playPrimed = 0;
-    PMICRingState.playUnderrun = 0;
-    PMICRingState.playOverrun = 0;
-    PMICRingState.playFault = 0;
-    PMICRingState.playBuffer = (s16*)play;
-    memset(play, 0, 0xC00);
-    PMICScratchState.unused_0x00 = 0;
-    PMICScratchState.mask = 0x3F;
-    PMICScratchState.areaA = play + 0xC00;
-    memset(play + 0xC00, 0, 0x80);
-    PMICScratchState.areaB = play + 0x1E80;
-    memset(play + 0x1E80, 0, 0x80);
-    PMICBuffersReady[0] = 1;
-    return play + 0x3100;
-}
-
-/* 0x805264C0 (0xC): marks the rings as unusable. */
-void PMICDisableBuffers(void)
-{
-    PMICBuffersReady[0] = 0;
-}
-
-/* 0x805264D0 (0x30): empties the capture ring. */
-void PMICResetCaptureRing(void)
-{
-    PMICRingState.captureCount = 0;
-    PMICRingState.captureWrite = 0;
-    PMICRingState.captureRead = 0;
-    PMICRingState.captureOverflow = 0;
-    memset(PMICRingState.captureBuffer, 0, PMICRingState.captureCapacity * 2);
-}
-
-/* 0x80526500 (0x30): empties the playback ring. */
-void PMICResetPlayRing(void)
-{
-    PMICRingState.playCount = 0;
-    PMICRingState.playWrite = 0;
-    PMICRingState.playRead = 0;
-    PMICRingState.playPrimed = 0;
-    PMICRingState.playFault = 0;
-    memset(PMICRingState.playBuffer, 0, 0xC00);
-}
-
-/* 0x80526530 (0x64): empties the playback ring and clears its error counters. */
-void PMICResetPlayRingAndCounters(void)
-{
-    PMICRingState.playCount = 0;
-    PMICRingState.playWrite = 0;
-    PMICRingState.playRead = 0;
-    PMICRingState.playPrimed = 0;
-    PMICRingState.playFault = 0;
-    memset(PMICRingState.playBuffer, 0, 0xC00);
-    PMICRingState.playUnderrun = 0;
-    PMICRingState.playOverrun = 0;
-}
-
-#pragma dont_inline reset
-
-/* Cancels the operation alarm once the pending operation has answered. */
-#define PMIC_CLEAR_OP_PENDING()                                                                                        \
-    do {                                                                                                               \
-        if (PMICOpPending != NULL) {                                                                                   \
-            OSCancelAlarm(&PMICOpAlarm);                                                                               \
-            PMICOpPending = NULL;                                                                                      \
-        }                                                                                                              \
-    } while (0)
-
 /* 0x80523E80 (0x1B8): reads the device status after the start command was acknowledged. */
 /* untyped: caller-owned payload (unused) */
 void PMICOnStartAck(s32 result, void* arg)
@@ -1168,6 +1049,13 @@ s32 PMICStartIso(void)
     return ok;
 }
 
+/* 0x80524AD0 (0xC): stores the stop result and wakes the thread waiting in the synchronous call. */
+void PMICWakeSync(s32 result, s32 arg)
+{
+    PMICSyncResult = result;
+    OSWakeupThread(&PMICSyncQueue);
+}
+
 /* 0x80524AE0 (0x160): clears the rings after the streams stopped and sends the stop command. */
 void PMICOnIsoStopped(s32 result)
 {
@@ -1210,376 +1098,6 @@ void PMICOnStopAck(s32 result, void* arg)
     PMIC_REPORT_OP(0);
     PMICState = 5;
 }
-
-/* 0x80525A00 (0x100): chains the second command of the recording start, or reports the failure. */
-void PMICOnRecordStart0(s32 result, PMICRequest* request)
-{
-    PMICUserCallback callback;
-    if (result == 0) {
-        request->command = 0x9A0C;
-        request->value0 = 0;
-        request->done = PMICOnRecordStart1;
-        PMICPushQueue(request);
-        return;
-    }
-    callback = request->callback;
-    if (callback != NULL) {
-        callback(result, request->callbackArg);
-    }
-    if (request->keep == 0) {
-        PMICPushFree(request);
-    }
-    if (PMICState == 8) {
-        PMICState = 7;
-    }
-}
-
-/* 0x80525B00 (0xC0): finishes the recording start and clears the capture ring. */
-void PMICOnRecordStart1(s32 result, PMICRequest* request)
-{
-    PMICUserCallback callback = request->callback;
-    if (callback != NULL) {
-        callback(result, request->callbackArg);
-    }
-    if (request->keep == 0) {
-        PMICPushFree(request);
-    }
-    if (PMICState == 8) {
-        if (result == 0) {
-            PMICResetCaptureRing();
-            PMICState = 9;
-            return;
-        }
-        PMICState = 7;
-    }
-}
-
-/* 0x80525BC0 (0x100): chains the second command of the recording stop, or reports the failure. */
-void PMICOnRecordStop0(s32 result, PMICRequest* request)
-{
-    PMICUserCallback callback;
-    if (result == 0) {
-        request->command = 0x9A00;
-        request->value0 = 0;
-        request->done = PMICOnRecordStop1;
-        PMICPushQueue(request);
-        return;
-    }
-    callback = request->callback;
-    if (callback != NULL) {
-        callback(result, request->callbackArg);
-    }
-    if (request->keep == 0) {
-        PMICPushFree(request);
-    }
-    if (PMICState == 8) {
-        PMICState = 9;
-    }
-}
-
-/* 0x80525CC0 (0xB4): finishes the recording stop. */
-void PMICOnRecordStop1(s32 result, PMICRequest* request)
-{
-    PMICUserCallback callback = request->callback;
-    if (callback != NULL) {
-        callback(result, request->callbackArg);
-    }
-    if (request->keep == 0) {
-        PMICPushFree(request);
-    }
-    if (PMICState == 8) {
-        s32 next = 9;
-        if (result == 0) {
-            next = 7;
-        }
-        PMICState = next;
-    }
-}
-
-/* 0x80525D80 (0x178): issues the follow-up query command, retrying a busy device up to 100 times. */
-void PMICOnQueryDone(s32 result, PMICRequest* request)
-{
-    if (result == 0) {
-        request->value0 = 0;
-        request->command = 0x9A14;
-        request->done = PMICOnQueryRetry;
-        request->keep = 0;
-        request->retries = 0;
-        PMICPushQueue(request);
-        return;
-    }
-    if (result == -6) {
-        s32 retries = request->retries;
-        if (retries > 100) {
-            PMICPushFree(request);
-            PMICState = -3;
-            return;
-        }
-        request->command = 0x9A14;
-        request->value0 = 1;
-        request->done = PMICOnQueryDone;
-        request->keep = 0;
-        request->retries = retries + 1;
-        PMICPushQueue(request);
-        return;
-    }
-    PMICPushFree(request);
-}
-
-/* 0x80525F00 (0x108): repeats the query command while the device is busy. */
-void PMICOnQueryRetry(s32 result, PMICRequest* request)
-{
-    if (result == -6) {
-        s32 retries = request->retries;
-        if (retries > 100) {
-            PMICPushFree(request);
-            PMICState = -3;
-            return;
-        }
-        request->command = 0x9A14;
-        request->value0 = 0;
-        request->done = PMICOnQueryRetry;
-        request->keep = 0;
-        request->retries = retries + 1;
-        PMICPushQueue(request);
-        return;
-    }
-    PMICPushFree(request);
-}
-
-/* 0x80526180 (0xE8): copies up to `count` captured samples out of the capture ring. */
-s32 PMICRead(s16* dst, s32 count)
-{
-    u32 level;
-    s32 n;
-    s32 read;
-    s32 capacity;
-    s16* buffer;
-    s32 i;
-    if (PMICBuffersReady[0] == 0) {
-        return -1;
-    }
-    if (dst == NULL || count < 0) {
-        return -1;
-    }
-    level = OSDisableInterrupts();
-    n = PMICRingState.captureCount;
-    if (n >= count) {
-        n = count;
-    }
-    capacity = PMICRingState.captureCapacity;
-    read = PMICRingState.captureRead;
-    buffer = PMICRingState.captureBuffer;
-    for (i = n; i > 0; i--) {
-        *dst++ = buffer[read++];
-        if (read >= capacity) {
-            read = 0;
-        }
-    }
-    PMICRingState.captureRead = read;
-    PMICRingState.captureCount -= n;
-    OSRestoreInterrupts(level);
-    return n;
-}
-
-/* 0x80526270 (0x140): appends `count` samples to the playback ring. */
-s32 PMICWrite(s16* src, s32 count)
-{
-    u32 level;
-    s32 overflow = 0;
-    s32 write;
-    s32 capacity;
-    s16* buffer;
-    s32 i;
-    if (PMICBuffersReady[0] == 0) {
-        return -1;
-    }
-    if (src == NULL || count < 0 || count > PMICRingState.playCapacity) {
-        return -1;
-    }
-    if (PMICGetState() < 7) {
-        return 0;
-    }
-    level = OSDisableInterrupts();
-    capacity = PMICRingState.playCapacity;
-    write = PMICRingState.playWrite;
-    buffer = PMICRingState.playBuffer;
-    if (count > capacity - PMICRingState.playCount) {
-        overflow = 1;
-    }
-    for (i = count; i > 0; i--) {
-        buffer[write++] = *src++;
-        if (write >= capacity) {
-            write = 0;
-        }
-    }
-    if (overflow != 0) {
-        PMICRingState.playCount = capacity;
-        PMICRingState.playWrite = write;
-        PMICRingState.playRead = write;
-        PMICRingState.playUnderrun = 1;
-        PMICRingState.playFault = 1;
-    } else {
-        PMICRingState.playWrite = write;
-        PMICRingState.playCount += count;
-    }
-    OSRestoreInterrupts(level);
-    return count;
-}
-
-/* 0x805265A0 (0xFC): appends captured samples to the capture ring while recording. */
-s32 PMICPushCapture(s16* src, s32 bytes)
-{
-    s32 overflow = 0;
-    s32 write;
-    s32 n;
-    s32 capacity;
-    s16* buffer;
-    s32 i;
-    if (PMICGetState() != 9) {
-        return 1;
-    }
-    n = bytes / 2;
-    capacity = PMICRingState.captureCapacity;
-    write = PMICRingState.captureWrite;
-    buffer = PMICRingState.captureBuffer;
-    if (n > capacity - PMICRingState.captureCount) {
-        overflow = 1;
-    }
-    for (i = n; i > 0; i--) {
-        buffer[write++] = *src++;
-        if (write >= capacity) {
-            write = 0;
-        }
-    }
-    if (overflow != 0) {
-        PMICRingState.captureCount = capacity;
-        PMICRingState.captureWrite = write;
-        PMICRingState.captureRead = write;
-        PMICRingState.captureOverflow = 1;
-    } else {
-        PMICRingState.captureWrite = write;
-        PMICRingState.captureCount += n;
-    }
-    return 1;
-}
-
-/* 0x805266A0 (0x10C): moves playback samples into an isochronous packet, swapping each pair. */
-s32 PMICPopPlay(s16* dst, s32 bytes)
-{
-    s32 n = bytes / 2;
-    s16* first;
-    s16* second;
-    s32 read;
-    s32 capacity;
-    s16* buffer;
-    s32 i;
-    if (PMICRingState.playCount >= n) {
-        second = dst + 1;
-        first = dst;
-        read = PMICRingState.playRead;
-        capacity = PMICRingState.playCapacity;
-        buffer = PMICRingState.playBuffer;
-        for (i = n / 2; i > 0; i--) {
-            *second = buffer[read++];
-            *first = buffer[read++];
-            second += 2;
-            first += 2;
-            if (read >= capacity) {
-                read = 0;
-            }
-        }
-        PMICRingState.playRead = read;
-        PMICRingState.playCount -= n;
-        if (PMICRingState.playPrimed < 0x10) {
-            PMICRingState.playPrimed++;
-        }
-    } else {
-        if (PMICRingState.playPrimed < 0x10) {
-            PMICRingState.playPrimed = 0;
-        } else {
-            PMICRingState.playOverrun = 1;
-            PMICRingState.playFault = 1;
-        }
-        memset(dst, 0, bytes);
-    }
-    return PMICRingState.playFault == 0;
-}
-
-/* 0x805267B0 (0xD8): queues the command that selects one of four gain steps. */
-s32 PMICSetGain(u16 unit, PMICUserCallback callback, s32 arg)
-{
-    PMICRequest* request;
-    s32 state;
-    s32 result;
-    u32 level = OSDisableInterrupts();
-    state = PMICGetState();
-    if (state == -3) {
-        result = -100;
-    } else if (unit > 3) {
-        result = -1;
-    } else if (state < 7) {
-        result = -4;
-    } else {
-        request = PMICRequestAlloc();
-        if (request == NULL) {
-            result = -5;
-        } else {
-            request->command = 0x9A02;
-            request->value0 = unit;
-            request->done = PMICRequestDone;
-            request->callback = callback;
-            request->callbackArg = arg;
-            request->keep = 0;
-            result = PMICRequestEnqueue(request);
-        }
-    }
-    OSRestoreInterrupts(level);
-    return result;
-}
-
-/* 0x80526890 (0xEC): queues the command that reads one device parameter into `reply`. */
-s32 PMICGetParam(u32 index, u32* reply, PMICUserCallback callback, s32 arg)
-{
-    PMICRequest* request;
-    s32 state;
-    s32 result;
-    u32 level = OSDisableInterrupts();
-    state = PMICGetState();
-    if (state == -3) {
-        result = -100;
-    } else if (index > 2) {
-        result = -1;
-    } else if (reply == NULL) {
-        result = -1;
-    } else if (state < 7) {
-        result = -4;
-    } else {
-        request = PMICRequestAlloc();
-        if (request == NULL) {
-            result = -5;
-        } else {
-            request->command = 0x9A39;
-            request->value0 = PMICParamTable[index];
-            request->reply = reply;
-            request->done = PMICRequestDone;
-            request->callback = callback;
-            request->callbackArg = arg;
-            request->keep = 0;
-            result = PMICRequestEnqueue(request);
-        }
-    }
-    OSRestoreInterrupts(level);
-    return result;
-}
-
-/* Reports a result to the iso callback. */
-#define PMIC_REPORT_ISO(result)                                                                                        \
-    do {                                                                                                               \
-        if (PMICIsoDone != NULL) {                                                                                     \
-            PMICIsoDone((result), PMICIsoCallbackArg);                                                                 \
-        }                                                                                                              \
-    } while (0)
 
 /* 0x80524D70 (0x2AC): takes the captured packets of one transfer, resubmits it and tracks the stream errors. */
 /* untyped: caller-owned payload (unused) */
@@ -1750,69 +1268,6 @@ void PMICOnPlayIso(s32 result, USBIsoRequest* iso, void* arg)
     PMICIsoCount += 8;
 }
 
-/* 0x80525840 (0xE0): moves the request machine on once the command packet was written. */
-/* untyped: caller-owned payload (unused) */
-void PMICOnPacketSent(s32 result, void* arg)
-{
-    if (PMICRequestPending != NULL) {
-        OSCancelAlarm(&PMICRequestAlarm);
-        PMICRequestPending = NULL;
-    }
-    if (PMICState == -3) {
-        PMICRequestState = -1;
-        PMICRequestResult = -100;
-        return;
-    }
-    if (PMICState == 3 || result == -6) {
-        PMICRequestState = -1;
-        PMICRequestResult = -2;
-        return;
-    }
-    if (result < 0) {
-        OSSetAlarm(&PMICRequestAlarm, (OS_BUS_CLOCK / 4 / 1000) * 2000, PMICOnRequestRetryTimeout);
-        PMICRequestState = 5;
-        return;
-    }
-    PMICRequestState = 2;
-}
-
-/* 0x80525920 (0xE0): moves the request machine on once the answer packet was read. */
-/* untyped: caller-owned payload (unused) */
-void PMICOnPacketRead(s32 result, void* arg)
-{
-    if (PMICRequestPending != NULL) {
-        OSCancelAlarm(&PMICRequestAlarm);
-        PMICRequestPending = NULL;
-    }
-    if (PMICState == -3) {
-        PMICRequestState = -1;
-        PMICRequestResult = -100;
-        return;
-    }
-    if (PMICState == 3 || result == -6) {
-        PMICRequestState = -1;
-        PMICRequestResult = -2;
-        return;
-    }
-    if (result < 0) {
-        OSSetAlarm(&PMICRequestAlarm, (OS_BUS_CLOCK / 4 / 1000) * 2000, PMICOnRequestRetryTimeout);
-        PMICRequestState = 5;
-        return;
-    }
-    PMICRequestState = 4;
-}
-
-/* Pops the oldest request from the queue. */
-static inline PMICRequest* PMICPopQueue(void)
-{
-    PMICRequest* request = NULL;
-    if (PMICQueue != NULL) {
-        request = PMICQueue;
-        PMICQueue = PMICQueue->next;
-    }
-    return request;
-}
-
 /* 0x80525380 (0x4B8): the periodic task that runs the request machine: sends a queued request, reads its answer and
  * completes it. */
 void PMICPollRequests(OSAlarm* alarm, OSContext* context)
@@ -1940,6 +1395,560 @@ void PMICPollRequests(OSAlarm* alarm, OSContext* context)
     OSSetAlarm(alarm, (PMIC_TICKS_PER_MICROSECOND * 1050) / 8, PMICPollRequests);
 }
 
+/* 0x80525840 (0xE0): moves the request machine on once the command packet was written. */
+/* untyped: caller-owned payload (unused) */
+void PMICOnPacketSent(s32 result, void* arg)
+{
+    if (PMICRequestPending != NULL) {
+        OSCancelAlarm(&PMICRequestAlarm);
+        PMICRequestPending = NULL;
+    }
+    if (PMICState == -3) {
+        PMICRequestState = -1;
+        PMICRequestResult = -100;
+        return;
+    }
+    if (PMICState == 3 || result == -6) {
+        PMICRequestState = -1;
+        PMICRequestResult = -2;
+        return;
+    }
+    if (result < 0) {
+        OSSetAlarm(&PMICRequestAlarm, (OS_BUS_CLOCK / 4 / 1000) * 2000, PMICOnRequestRetryTimeout);
+        PMICRequestState = 5;
+        return;
+    }
+    PMICRequestState = 2;
+}
+
+/* 0x80525920 (0xE0): moves the request machine on once the answer packet was read. */
+/* untyped: caller-owned payload (unused) */
+void PMICOnPacketRead(s32 result, void* arg)
+{
+    if (PMICRequestPending != NULL) {
+        OSCancelAlarm(&PMICRequestAlarm);
+        PMICRequestPending = NULL;
+    }
+    if (PMICState == -3) {
+        PMICRequestState = -1;
+        PMICRequestResult = -100;
+        return;
+    }
+    if (PMICState == 3 || result == -6) {
+        PMICRequestState = -1;
+        PMICRequestResult = -2;
+        return;
+    }
+    if (result < 0) {
+        OSSetAlarm(&PMICRequestAlarm, (OS_BUS_CLOCK / 4 / 1000) * 2000, PMICOnRequestRetryTimeout);
+        PMICRequestState = 5;
+        return;
+    }
+    PMICRequestState = 4;
+}
+
+/* 0x80525A00 (0x100): chains the second command of the recording start, or reports the failure. */
+void PMICOnRecordStart0(s32 result, PMICRequest* request)
+{
+    PMICUserCallback callback;
+    if (result == 0) {
+        request->command = 0x9A0C;
+        request->value0 = 0;
+        request->done = PMICOnRecordStart1;
+        PMICPushQueue(request);
+        return;
+    }
+    callback = request->callback;
+    if (callback != NULL) {
+        callback(result, request->callbackArg);
+    }
+    if (request->keep == 0) {
+        PMICPushFree(request);
+    }
+    if (PMICState == 8) {
+        PMICState = 7;
+    }
+}
+
+/* 0x80525B00 (0xC0): finishes the recording start and clears the capture ring. */
+void PMICOnRecordStart1(s32 result, PMICRequest* request)
+{
+    PMICUserCallback callback = request->callback;
+    if (callback != NULL) {
+        callback(result, request->callbackArg);
+    }
+    if (request->keep == 0) {
+        PMICPushFree(request);
+    }
+    if (PMICState == 8) {
+        if (result == 0) {
+            PMICResetCaptureRing();
+            PMICState = 9;
+            return;
+        }
+        PMICState = 7;
+    }
+}
+
+/* 0x80525BC0 (0x100): chains the second command of the recording stop, or reports the failure. */
+void PMICOnRecordStop0(s32 result, PMICRequest* request)
+{
+    PMICUserCallback callback;
+    if (result == 0) {
+        request->command = 0x9A00;
+        request->value0 = 0;
+        request->done = PMICOnRecordStop1;
+        PMICPushQueue(request);
+        return;
+    }
+    callback = request->callback;
+    if (callback != NULL) {
+        callback(result, request->callbackArg);
+    }
+    if (request->keep == 0) {
+        PMICPushFree(request);
+    }
+    if (PMICState == 8) {
+        PMICState = 9;
+    }
+}
+
+/* 0x80525CC0 (0xB4): finishes the recording stop. */
+void PMICOnRecordStop1(s32 result, PMICRequest* request)
+{
+    PMICUserCallback callback = request->callback;
+    if (callback != NULL) {
+        callback(result, request->callbackArg);
+    }
+    if (request->keep == 0) {
+        PMICPushFree(request);
+    }
+    if (PMICState == 8) {
+        s32 next = 9;
+        if (result == 0) {
+            next = 7;
+        }
+        PMICState = next;
+    }
+}
+
+/* 0x80525D80 (0x178): issues the follow-up query command, retrying a busy device up to 100 times. */
+void PMICOnQueryDone(s32 result, PMICRequest* request)
+{
+    if (result == 0) {
+        request->command = 0x9A14;
+        request->value0 = 0;
+        request->done = PMICOnQueryRetry;
+        request->keep = 0;
+        request->retries = 0;
+        PMICPushQueue(request);
+        return;
+    }
+    if (result == -6) {
+        s32 retries = request->retries;
+        if (retries > 100) {
+            PMICPushFree(request);
+            PMICState = -3;
+            return;
+        }
+        request->command = 0x9A14;
+        request->value0 = 1;
+        request->done = PMICOnQueryDone;
+        request->keep = 0;
+        request->retries = retries + 1;
+        PMICPushQueue(request);
+        return;
+    }
+    PMICPushFree(request);
+}
+
+/* 0x80525F00 (0x108): repeats the query command while the device is busy. */
+void PMICOnQueryRetry(s32 result, PMICRequest* request)
+{
+    if (result == -6) {
+        s32 retries = request->retries;
+        if (retries > 100) {
+            PMICPushFree(request);
+            PMICState = -3;
+            return;
+        }
+        request->command = 0x9A14;
+        request->value0 = 0;
+        request->done = PMICOnQueryRetry;
+        request->keep = 0;
+        request->retries = retries + 1;
+        PMICPushQueue(request);
+        return;
+    }
+    PMICPushFree(request);
+}
+
+/* 0x80526010 (0x30): fails the library when the pending operation does not answer in time. */
+void PMICOnOpTimeout(OSAlarm* alarm, OSContext* context)
+{
+    USBCallback pending = PMICOpPending;
+    PMICState = -3;
+    if (pending == NULL) {
+        return;
+    }
+    PMICOpPending = NULL;
+    pending(0, NULL);
+}
+
+/* 0x80526040 (0x30): fails the library when the pending request does not answer in time. */
+void PMICOnRequestTimeout(OSAlarm* alarm, OSContext* context)
+{
+    USBCallback pending = PMICRequestPending;
+    PMICState = -3;
+    if (pending == NULL) {
+        return;
+    }
+    PMICRequestPending = NULL;
+    pending(0, NULL);
+}
+
+/* 0x80526070 (0x8C): reports a failed operation after the retry delay. */
+void PMICOnOpRetryTimeout(OSAlarm* alarm, OSContext* context)
+{
+    if (alarm == NULL) {
+        OSCancelAlarm(&PMICOpAlarm);
+    }
+    if (PMICState == 3) {
+        if (PMICOpCallback != NULL) {
+            PMICOpCallback(-2, PMICOpCallbackArg);
+        }
+    } else {
+        if (PMICOpCallback != NULL) {
+            PMICOpCallback(-100, PMICOpCallbackArg);
+        }
+        PMICState = -3;
+    }
+    PMICOpCallback = NULL;
+    PMICOpCallbackArg = 0;
+}
+
+/* 0x80526100 (0x80): reports a failed request after the retry delay. */
+void PMICOnRequestRetryTimeout(OSAlarm* alarm, OSContext* context)
+{
+    if (alarm == NULL) {
+        OSCancelAlarm(&PMICRequestAlarm);
+    }
+    if (PMICRequestState == 5) {
+        if (PMICState == 3 || (u32)(PMICState - 5) <= 1) {
+            PMICRequestState = -1;
+            PMICRequestResult = -2;
+            return;
+        }
+        PMICRequestState = -1;
+        PMICRequestResult = -100;
+        PMICState = -3;
+    }
+}
+
+/* 0x80526180 (0xE8): copies up to `count` captured samples out of the capture ring. */
+s32 PMICRead(s16* dst, s32 count)
+{
+    u32 level;
+    s32 n;
+    s32 read;
+    s32 capacity;
+    s16* buffer;
+    s32 i;
+    if (PMICBuffersReady[0] == 0) {
+        return -1;
+    }
+    if (dst == NULL || count < 0) {
+        return -1;
+    }
+    level = OSDisableInterrupts();
+    n = PMICRingState.captureCount;
+    if (n >= count) {
+        n = count;
+    }
+    capacity = PMICRingState.captureCapacity;
+    read = PMICRingState.captureRead;
+    buffer = PMICRingState.captureBuffer;
+    for (i = n; i > 0; i--) {
+        *dst++ = buffer[read++];
+        if (read >= capacity) {
+            read = 0;
+        }
+    }
+    PMICRingState.captureRead = read;
+    PMICRingState.captureCount -= n;
+    OSRestoreInterrupts(level);
+    return n;
+}
+
+/* 0x80526270 (0x140): appends `count` samples to the playback ring. */
+s32 PMICWrite(s16* src, s32 count)
+{
+    u32 level;
+    s32 overflow = 0;
+    s32 capacity;
+    s32 write;
+    s16* buffer;
+    s32 i;
+    if (PMICBuffersReady[0] == 0) {
+        return -1;
+    }
+    if (src == NULL || count < 0 || count > PMICRingState.playCapacity) {
+        return -1;
+    }
+    if (PMICGetState() < 7) {
+        return 0;
+    }
+    level = OSDisableInterrupts();
+    capacity = PMICRingState.playCapacity;
+    write = PMICRingState.playWrite;
+    buffer = PMICRingState.playBuffer;
+    if (count > capacity - PMICRingState.playCount) {
+        overflow = 1;
+    }
+    for (i = count; i > 0; i--) {
+        buffer[write++] = *src++;
+        if (write >= capacity) {
+            write = 0;
+        }
+    }
+    if (overflow != 0) {
+        PMICRingState.playCount = capacity;
+        PMICRingState.playWrite = write;
+        PMICRingState.playRead = write;
+        PMICRingState.playUnderrun = 1;
+        PMICRingState.playFault = 1;
+    } else {
+        PMICRingState.playWrite = write;
+        PMICRingState.playCount += count;
+    }
+    OSRestoreInterrupts(level);
+    return count;
+}
+
+#pragma dont_inline on
+
+/* 0x805263B0 (0x10C): lays the capture ring, the playback ring and the scratch areas out in `area`. */
+u8* PMICSetBuffers(u8* area, u32 size)
+{
+    area = (u8*)(((u32)area + 0x1F) & ~0x1F);
+    PMICRingState.captureCapacity = size >> 1;
+    PMICRingState.captureCount = 0;
+    PMICRingState.captureWrite = 0;
+    PMICRingState.captureRead = 0;
+    PMICRingState.captureOverflow = 0;
+    PMICRingState.captureBuffer = (s16*)area;
+    memset(area, 0, size);
+    area += (size + 0x1F) & ~0x1F;
+    PMICRingState.playCapacity = 0x600;
+    PMICRingState.playCount = 0;
+    PMICRingState.playWrite = 0;
+    PMICRingState.playRead = 0;
+    PMICRingState.playPrimed = 0;
+    PMICRingState.playUnderrun = 0;
+    PMICRingState.playOverrun = 0;
+    PMICRingState.playFault = 0;
+    PMICRingState.playBuffer = (s16*)area;
+    memset(area, 0, 0xC00);
+    PMICScratchState.unused_0x00 = 0;
+    PMICScratchState.mask = 0x3F;
+    PMICScratchState.areaA = area + 0xC00;
+    memset(area + 0xC00, 0, 0x80);
+    PMICScratchState.areaB = area + 0x1E80;
+    memset(area + 0x1E80, 0, 0x80);
+    PMICBuffersReady[0] = 1;
+    return area + 0x3100;
+}
+
+/* 0x805264C0 (0xC): marks the rings as unusable. */
+void PMICDisableBuffers(void)
+{
+    PMICBuffersReady[0] = 0;
+}
+
+/* 0x805264D0 (0x30): empties the capture ring. */
+void PMICResetCaptureRing(void)
+{
+    PMICRingState.captureCount = 0;
+    PMICRingState.captureWrite = 0;
+    PMICRingState.captureRead = 0;
+    PMICRingState.captureOverflow = 0;
+    memset(PMICRingState.captureBuffer, 0, PMICRingState.captureCapacity * 2);
+}
+
+/* 0x80526500 (0x30): empties the playback ring. */
+void PMICResetPlayRing(void)
+{
+    PMICRingState.playCount = 0;
+    PMICRingState.playWrite = 0;
+    PMICRingState.playRead = 0;
+    PMICRingState.playPrimed = 0;
+    PMICRingState.playFault = 0;
+    memset(PMICRingState.playBuffer, 0, 0xC00);
+}
+
+/* 0x80526530 (0x64): empties the playback ring and clears its error counters. */
+void PMICResetPlayRingAndCounters(void)
+{
+    PMICRingState.playCount = 0;
+    PMICRingState.playWrite = 0;
+    PMICRingState.playRead = 0;
+    PMICRingState.playPrimed = 0;
+    PMICRingState.playFault = 0;
+    memset(PMICRingState.playBuffer, 0, 0xC00);
+    PMICRingState.playUnderrun = 0;
+    PMICRingState.playOverrun = 0;
+}
+
+#pragma dont_inline reset
+
+/* 0x805265A0 (0xFC): appends captured samples to the capture ring while recording. */
+s32 PMICPushCapture(s16* src, s32 bytes)
+{
+    s32 overflow = 0;
+    s32 n;
+    s32 write;
+    s32 capacity;
+    s16* buffer;
+    s32 i;
+    if (PMICGetState() != 9) {
+        return 1;
+    }
+    n = bytes / 2;
+    capacity = PMICRingState.captureCapacity;
+    write = PMICRingState.captureWrite;
+    buffer = PMICRingState.captureBuffer;
+    if (n > capacity - PMICRingState.captureCount) {
+        overflow = 1;
+    }
+    for (i = n; i > 0; i--) {
+        buffer[write++] = *src++;
+        if (write >= capacity) {
+            write = 0;
+        }
+    }
+    if (overflow != 0) {
+        PMICRingState.captureCount = capacity;
+        PMICRingState.captureWrite = write;
+        PMICRingState.captureRead = write;
+        PMICRingState.captureOverflow = 1;
+    } else {
+        PMICRingState.captureWrite = write;
+        PMICRingState.captureCount += n;
+    }
+    return 1;
+}
+
+/* 0x805266A0 (0x10C): moves playback samples into an isochronous packet, swapping each pair. */
+s32 PMICPopPlay(s16* dst, s32 bytes)
+{
+    s32 n = bytes / 2;
+    s16* first;
+    s32 read;
+    s32 capacity;
+    s16* second;
+    s16* buffer;
+    s32 i;
+    if (PMICRingState.playCount >= n) {
+        second = dst + 1;
+        first = dst;
+        read = PMICRingState.playRead;
+        capacity = PMICRingState.playCapacity;
+        buffer = PMICRingState.playBuffer;
+        for (i = n / 2; i > 0; i--) {
+            *second = buffer[read++];
+            *first = buffer[read++];
+            second += 2;
+            first += 2;
+            if (read >= capacity) {
+                read = 0;
+            }
+        }
+        PMICRingState.playRead = read;
+        PMICRingState.playCount -= n;
+        if (PMICRingState.playPrimed < 0x10) {
+            PMICRingState.playPrimed++;
+        }
+    } else {
+        if (PMICRingState.playPrimed < 0x10) {
+            PMICRingState.playPrimed = 0;
+        } else {
+            PMICRingState.playOverrun = 1;
+            PMICRingState.playFault = 1;
+        }
+        memset(dst, 0, bytes);
+    }
+    return PMICRingState.playFault == 0;
+}
+
+/* 0x805267B0 (0xD8): queues the command that selects one of four gain steps. */
+s32 PMICSetGain(u16 unit, PMICUserCallback callback, s32 arg)
+{
+    u32 level;
+    PMICRequest* request;
+    s32 state;
+    s32 result;
+    level = OSDisableInterrupts();
+    state = PMICGetState();
+    if (state == -3) {
+        result = -100;
+    } else if (unit > 3) {
+        result = -1;
+    } else if (state < 7) {
+        result = -4;
+    } else {
+        request = PMICRequestAlloc();
+        if (request == NULL) {
+            result = -5;
+        } else {
+            request->command = 0x9A02;
+            request->value0 = unit;
+            request->done = PMICRequestDone;
+            request->callback = callback;
+            request->callbackArg = arg;
+            request->keep = 0;
+            result = PMICRequestEnqueue(request);
+        }
+    }
+    OSRestoreInterrupts(level);
+    return result;
+}
+
+/* 0x80526890 (0xEC): queues the command that reads one device parameter into `reply`. */
+s32 PMICGetParam(u32 index, u32* reply, PMICUserCallback callback, s32 arg)
+{
+    u32 level;
+    PMICRequest* request;
+    s32 state;
+    s32 result;
+    level = OSDisableInterrupts();
+    state = PMICGetState();
+    if (state == -3) {
+        result = -100;
+    } else if (index > 2) {
+        result = -1;
+    } else if (reply == NULL) {
+        result = -1;
+    } else if (state < 7) {
+        result = -4;
+    } else {
+        request = PMICRequestAlloc();
+        if (request == NULL) {
+            result = -5;
+        } else {
+            request->command = 0x9A39;
+            request->value0 = PMICParamTable[(u16)index];
+            request->reply = reply;
+            request->done = PMICRequestDone;
+            request->callback = callback;
+            request->callbackArg = arg;
+            request->keep = 0;
+            result = PMICRequestEnqueue(request);
+        }
+    }
+    OSRestoreInterrupts(level);
+    return result;
+}
+
 #pragma fp_contract off
 
 /* 0x80526980 (0x30C): runs the two-channel level follower over `count` sample pairs, scaling each channel by its
@@ -1972,28 +1981,30 @@ s32 PMICFilterSamples(s16* left, s16* right, s32 count, s32 reset, s32* silent)
     }
     gated = 0;
     for (i = count; i > 0; i--) {
+        levelA = PMICFilterLevelA;
         inputL = (f32)*left;
         magL = inputL / 32768.0f;
         inputR = (f32)*right;
         if (magL < 0.0f) {
             magL *= -1.0f;
         }
-        levelA = PMICFilterLevelA + 0.0078125f * (magL - PMICFilterLevelA);
+        levelA = levelA + 0.0078125f * (magL - levelA);
         if (levelA > 1.0f) {
             levelA = 1.0f;
         } else if (levelA < 0.0f) {
             levelA = 0.0f;
         }
         magR = inputR / 32768.0f;
+        levelB = PMICFilterLevelB;
         PMICFilterLevelA = levelA;
         if (magR < 0.0f) {
             magR *= -1.0f;
         }
-        diff = magR - PMICFilterLevelB;
+        diff = magR - levelB;
         if (diff > 0.0f) {
-            levelB = PMICFilterLevelB + 0.0078125f * diff;
+            levelB = levelB + 0.0078125f * diff;
         } else {
-            levelB = PMICFilterLevelB + 0.00048828125f * diff;
+            levelB = levelB + 0.00048828125f * diff;
         }
         if (levelB > 1.0f) {
             levelB = 1.0f;
@@ -2001,8 +2012,8 @@ s32 PMICFilterSamples(s16* left, s16* right, s32 count, s32 reset, s32* silent)
             levelB = 0.0f;
         }
         PMICFilterLevelB = levelB;
-        if (levelB >= PMICSilenceLevel) {
-            if (levelB * PMICSilenceRatio > levelA) {
+        if (PMICFilterLevelB >= PMICSilenceLevel) {
+            if (PMICFilterLevelB * PMICSilenceRatio > PMICFilterLevelA) {
                 attack = 1;
                 PMICFilterFlagB = 1;
             } else {
@@ -2013,19 +2024,20 @@ s32 PMICFilterSamples(s16* left, s16* right, s32 count, s32 reset, s32* silent)
             attack = 0;
             PMICFilterFlagB = 0;
         }
+        gainB = PMICFilterGainB;
         if (attack == 1) {
-            gainB = PMICFilterGainB - PMICGainDownA;
+            gainB = gainB - PMICGainDownA;
             if (gainB <= PMICGainMinA) {
                 gainB = PMICGainMinA;
             }
         } else {
-            gainB = PMICFilterGainB + PMICGainUpA;
+            gainB = gainB + PMICGainUpA;
             if (gainB >= 1.0f) {
                 gainB = 1.0f;
             }
         }
         PMICFilterGainB = gainB;
-        target = PMICGainTarget / gainB;
+        target = PMICGainTarget / PMICFilterGainB;
         if (target > 1.0f) {
             target = 1.0f;
         } else if (target < 0.0f) {
@@ -2039,21 +2051,22 @@ s32 PMICFilterSamples(s16* left, s16* right, s32 count, s32 reset, s32* silent)
             attack = 1;
             PMICFilterFlagA = 1;
         }
+        gainA = PMICFilterGainA;
         if (attack == 1) {
-            gainA = PMICFilterGainA - PMICGainDownB;
+            gainA = gainA - PMICGainDownB;
             if (gainA <= PMICGainMinB) {
                 gainA = PMICGainMinB;
             }
         } else {
-            gainA = PMICFilterGainA + PMICGainUpB;
+            gainA = gainA + PMICGainUpB;
             if (gainA >= 1.0f) {
                 gainA = 1.0f;
             }
         }
         PMICFilterGainA = gainA;
-        *left = (s16)(0.5f + inputL * gainB);
+        *left = (s16)(0.5f + inputL * PMICFilterGainB);
         left++;
-        *right = (s16)(0.5f + inputR * gainA);
+        *right = (s16)(0.5f + inputR * PMICFilterGainA);
         right++;
     }
     if (silent != NULL) {

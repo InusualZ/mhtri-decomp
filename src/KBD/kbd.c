@@ -18,14 +18,19 @@
  *    0x80529820, followed by the key map tables (0x806493E8, 0x806497D0) and two jump tables; `.sbss`
  *    0x80795A08..0x80795A18 and `.bss` 0x8078FF40 (0x200 B), 0x80790140 (0x80 B) are read here only;
  *    `KBDSetLedsAsync` and `KBDSetChannelValue` are called by `homebutton/tiHKBManager.cpp`.
- * RESIDUALS. all 28 rows have a body (22 at 100 %); `kbd_initialize_led_module` 69 % (the target walks the pool by
- *    base + offset, every source spelling tried folds to a pointer induction variable), `kbd_client_attach` 97 %
- *    (the two callback stack slots sit 4 bytes apart in the target), `KBDSetLedsAsync` 98 % (return-path layout),
- *    `kbd_lookup_key` 98 % and `kbd_update_lock_state` / `KBDSetChannelLeds` 99+ % (register numbering); flipcheck
- *    blockers: the .text differences above and .sdata/.sbss trailing padding the object does not emit (8 B / 4 B).
+ * RESIDUALS. all 28 rows have a body; `kbd_client_attach` (0x80528890): the connect callback's byte sits at
+ *    sp+0xC where ours packs it at sp+0x9, and the detach loop swaps r3/r5 (base vs walk pointer).
+ *    `kbd_store_lock_state` expanded in `KBDSetChannelLeds` (0x80529B70) and `kbd_update_lock_state` (0x80528F80):
+ *    retail writes the channel address into the offset register (r4) where ours reuses the state register (r5);
+ *    pointer, index and cast spellings were measured.  `kbd_lookup_key` (0x80529BF0): `entry` and `kind` swap r9/r11.
+ *    flipcheck blockers: the rows above and .sdata/.sbss trailing padding the object does not emit (8 B / 4 B).
  * SHAPES. `kbd_store_lock_state` is a `static inline` expanded into `kbd_update_lock_state` and `KBDSetChannelLeds`
  *    (the value is copied before `|= 0x1000` so the 0x1000 test is not folded); member stores through
  *    `kbd_state->...` are not hoisted; `.sbss` objects are defined in reverse address order.
+ *    `kbd_initialize_led_module` is bracketed by `#pragma global_optimizer off` (retail walks the pool by base +
+ *    offset); `KBDSetLedsAsync` returns through `result = 7; if (status == 0) result = 0;`; `kbd_client_attach`
+ *    shares one `return 0` between both arms; `kbd_lookup_key` writes the modifier range test as
+ *    `usage >= 0xE0 && 0xE7 >= usage` and indexes `table[variant + base + column]`.
  */
 #include "types.h"
 #include "HID/hid.h"
@@ -329,20 +334,20 @@ s32 kbd_client_attach(HIDClient* client, HIDDeviceInfo* info, s32 attached)
                 }
             }
         }
-        return 0;
-    }
-    probe = kbd_state->channels;
-    for (channel = 0; channel < KBD_CHANNELS; probe++, channel++) {
-        if (probe->device == info) {
-            kbd_state->channels[channel].device = NULL;
-            kbd_state->channels[channel].state |= 1;
-            if (kbd_state->onDisconnect != NULL) {
-                u8 disconnected = channel;
+    } else {
+        probe = kbd_state->channels;
+        for (channel = 0; channel < KBD_CHANNELS; probe++, channel++) {
+            if (probe->device == info) {
+                kbd_state->channels[channel].device = NULL;
+                kbd_state->channels[channel].state |= 1;
+                if (kbd_state->onDisconnect != NULL) {
+                    u8 disconnected = channel;
 
-                kbd_state->onDisconnect(&disconnected);
+                    kbd_state->onDisconnect(&disconnected);
+                }
+                KBDResetChannel(channel);
+                return 1;
             }
-            KBDResetChannel(channel);
-            return 1;
         }
     }
     return 0;
@@ -696,10 +701,11 @@ u32 KBDSetLedsAsync(u32 channel, u32 value, void* callback, u32 arg)
         if (status != 0) {
             kbd_free_led(request);
         }
+        result = 7;
         if (status == 0) {
-            return 0;
+            result = 0;
         }
-        return 7;
+        return result;
     }
     return 7;
 }
@@ -921,11 +927,11 @@ u16 kbd_lookup_key(u8 usage, s32 lockState, s32 mapIndex)
     u8 row;
     int base;
     u16 entry;
+    u16 mask;
     int kind;
     int column;
     int shift;
     int variant;
-    u16 mask;
     u8 stride;
 
     if (mapIndex >= KBD_MAPS) {
@@ -942,10 +948,7 @@ u16 kbd_lookup_key(u8 usage, s32 lockState, s32 mapIndex)
     if (usage < map->keyCount + 4) {
         table = map->keys;
         row = usage - 4;
-    } else if (usage >= 0xE0) {
-        if (usage > 0xE7) {
-            return 0;
-        }
+    } else if (usage >= 0xE0 && 0xE7 >= usage) {
         table = map->modifiers;
         row = usage - 0xE0;
     } else {
@@ -1011,7 +1014,7 @@ u16 kbd_lookup_key(u8 usage, s32 lockState, s32 mapIndex)
             }
         }
     }
-    return table[base + column + variant];
+    return table[variant + base + column];
 }
 
 /* Pushes an LED request record back onto the free list. */
@@ -1037,6 +1040,9 @@ KBDLedRequest* kbd_alloc_led(void)
     return request;
 }
 
+#pragma push
+#pragma global_optimizer off
+
 /* Builds the free list of LED request records. */
 void kbd_initialize_led_module(void)
 {
@@ -1047,6 +1053,7 @@ void kbd_initialize_led_module(void)
         kbd_free_led(&kbd_led_request_pool[i]);
     }
 }
+#pragma pop
 
 /* Interrupt-read completion: hands a good report to the parser and issues the next read. */
 /* untyped: caller-owned buffer */

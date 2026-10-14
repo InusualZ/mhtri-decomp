@@ -72,11 +72,11 @@ s32 IUSB_ReadBlkMsgAsync(s32 fd, s32 endpoint, u32 length, void* data, USBCallba
 s32 IUSB_WriteBlkMsgAsync(s32 fd, s32 endpoint, u32 length, void* data, USBCallback callback, void* callbackArg); /* untyped: caller-owned payload */
 
 /* 0x804E57C0 - runs a control transfer with an optional data stage; blocks unless `async` is set. */
-s32 __CtrlMsgInt(s32 fd, s32 requestType, s32 request, s32 value, s32 index, s32 length, void* data, USBCallback callback, void* callbackArg, u8 async); /* untyped: caller-owned payload */
+s32 __CtrlMsgInt(s32 fd, u8 requestType, u8 request, u16 value, u16 index, u16 length, void* data, USBCallback callback, void* callbackArg, u8 async); /* untyped: caller-owned payload */
 
 /* 0x804E5D70 / 0x804E5E00 - asynchronous control transfers that read into or write from `data`. */
-s32 IUSB_ReadCtrlMsgAsync(s32 fd, s32 requestType, s32 request, s32 value, s32 index, s32 length, void* data, USBCallback callback, void* callbackArg); /* untyped: caller-owned payload */
-s32 IUSB_WriteCtrlMsgAsync(s32 fd, s32 requestType, s32 request, s32 value, s32 index, s32 length, void* data, USBCallback callback, void* callbackArg); /* untyped: caller-owned payload */
+s32 IUSB_ReadCtrlMsgAsync(s32 fd, u8 requestType, u8 request, u16 value, u16 index, u16 length, void* data, USBCallback callback, void* callbackArg); /* untyped: caller-owned payload */
+s32 IUSB_WriteCtrlMsgAsync(s32 fd, u8 requestType, u8 request, u16 value, u16 index, u16 length, void* data, USBCallback callback, void* callbackArg); /* untyped: caller-owned payload */
 
 /* 0x804E6000 / 0x804E63E0 - the isochronous transfer and the insertion notification registration. */
 s32 IUSB_IsoMsgAsync(s32 fd, s32 endpoint, USBIsoRequest* iso, USBCallbackEx callback, void* callbackArg); /* untyped: caller-owned payload */
@@ -89,6 +89,18 @@ s32 IUSB_DeviceRemovalNotifyAsync(s32 fd, USBCallback callback, void* callbackAr
 /* 0x804E4DB0 / 0x804E4E10 - closes the device descriptor `fd`. */
 s32 IUSB_CloseDevice(s32 fd);
 s32 IUSB_CloseDeviceAsync(s32 fd, USBCallback callback, void* callbackArg); /* untyped: caller-owned payload */
+
+/* Library functions with no caller in the DOL: the linker strips them, and only their log strings survive in .data. */
+s32 IUSB_OpenDevice(const char* path, s32* fd);
+s32 IUSB_GetDeviceList(const char* path, u8* list, s32 size);
+s32 IUSB_ReadBlkMsg(s32 fd, s32 endpoint, u32 length, void* data); /* untyped: caller-owned payload */
+s32 IUSB_WriteBlkMsg(s32 fd, s32 endpoint, u32 length, void* data); /* untyped: caller-owned payload */
+s32 IUSB_GetAsciiStr(s32 fd, u8 index, u16 lang, u8* buffer, u16 length);
+s32 IUSB_GetAsciiStrAsync(s32 fd, u8 index, u16 lang, u8* buffer, u16 length, USBCallback callback, void* callbackArg); /* untyped: caller-owned payload */
+s32 IUSB_GetDevDescr(s32 fd, u8* descriptor);
+s32 IUSB_GetDevDescrAsync(s32 fd, u8* descriptor, USBCallback callback, void* callbackArg); /* untyped: caller-owned payload */
+s32 IUSB_RegisterInsertionNotify(const char* path, s16 classId, s16 subId);
+s32 IUSB_RegisterInsertionNotifyWithIdAsync(const char* path, s16 classId, u16 vendor, u16 product, USBCallback callback, void* callbackArg); /* untyped: caller-owned payload */
 
 #ifdef __cplusplus
 }

@@ -16,15 +16,18 @@
  *    them); `.data` 0x80649348 is the build string `<< RVL_SDK - HID ... >>` read through `.sdata` 0x807944A0
  *    by 0x80528510 (reached from the first thunk); `.sbss` 0x80795A00 (8 B) is read by 29 of the range's
  *    functions; the keyboard unit's state starts at 0x80795A08, first read by 0x80528890.
- * RESIDUALS. all 44 rows have a body (39 at 100 %); `hid_interface_pool_init` 64 % (the target walks the pool with
- *    update-form stores, the unrolled copy here precomputes the addresses), `hid_request_pool_init` 92 % and
- *    `hid_set_suspend` 95 % (instruction order of the argument set-up), `hid_device_manage_change` 97 % and
- *    `hid_device_build` 97 % (register numbering); flipcheck blockers: the .text differences above and trailing
- *    .data/.sbss/.sdata padding the object does not emit.
+ * RESIDUALS. all 44 rows have a body; `hid_set_suspend` (0x805273E0): retail schedules the `li r4,1` ioctl number
+ *    before the callback's `addi r9` in both calls (argument types, casts and `sizeof` were measured).
+ *    `hid_device_manage_change` (0x80528080): the unrolled stale-marking loop keeps the counter in r4 and the device
+ *    pointer in r5 where ours swaps them (declaration order, index/pointer walks and the counter type were measured).
+ *    flipcheck blockers: the two rows above and trailing .data/.sbss/.sdata padding the object does not emit.
  * SHAPES. `#pragma dont_inline on` brackets the rows from `hid_set_suspend` to `hid_end` (the target calls them
  *    where the compiler would otherwise expand them) and is reset before `hid_interface_free`, which the pool
  *    initialisers do expand; the init and end callbacks are called with (result, arg) and the error mapping is the
  *    branch-free `(status == -8) ? -5 : -4`; thunks forward with `s32` parameters (no `extsh`).
+ *    The pool initialisers pass `iface++`/`request++` to the free helper (retail's update-form `stwu` walk);
+ *    `hid_device_build` counts the `length` parameter down in place and `hid_device_manage_change` reads the entry
+ *    length as `u32` (`addis`+`cmplwi 0xffff` for the -1 terminator).
  */
 #include "types.h"
 #include "HID/hid.h"
@@ -655,13 +658,12 @@ void hid_device_build(HIDDevice* device, HIDChangeEntry* entry, u32 length)
     u8* cursor = (u8*)entry + sizeof(HIDChangeEntry);
     HIDInterface* iface;
     u8* endpoints;
-    s32 remaining;
 
     device->users = 0;
     memcpy(&device->descriptor, &entry->descriptor, 0x20);
     device->interfaces = NULL;
-    remaining = length - 0x28;
-    while (remaining != 0) {
+    length -= 0x28;
+    while (length != 0) {
         iface = hid_interface_alloc();
         iface->next = device->interfaces;
         device->interfaces = iface;
@@ -682,8 +684,8 @@ void hid_device_build(HIDDevice* device, HIDChangeEntry* entry, u32 length)
         memcpy(iface->inEndpoint, endpoints, 8);
         memcpy(iface->outEndpoint, endpoints, 8);
         iface->info.inEndpoint = iface->inEndpoint[2];
+        length -= 0x14;
         cursor += 0x14;
-        remaining -= 0x14;
         iface->info.inEndpointDescriptor = iface->inEndpoint;
         iface->info.outEndpoint = iface->inEndpoint[2];
         iface->info.outEndpointDescriptor = iface->inEndpoint;
@@ -692,7 +694,7 @@ void hid_device_build(HIDDevice* device, HIDChangeEntry* entry, u32 length)
             cursor += 8;
             iface->info.outEndpointDescriptor = iface->outEndpoint;
             if (endpoints[10] & 0x80) {
-                memcpy(iface->outEndpoint, endpoints + 8, 8);
+                memcpy(iface->inEndpoint, endpoints + 8, 8);
                 iface->info.inEndpoint = iface->inEndpoint[2];
                 iface->info.inEndpointDescriptor = iface->inEndpoint;
             } else {
@@ -700,7 +702,7 @@ void hid_device_build(HIDDevice* device, HIDChangeEntry* entry, u32 length)
                 iface->info.outEndpoint = iface->outEndpoint[2];
                 iface->info.outEndpointDescriptor = iface->outEndpoint;
             }
-            remaining -= 8;
+            length -= 8;
         } else {
             iface->info.outEndpoint = 0xFF;
             iface->info.outEndpointDescriptor = NULL;
@@ -713,7 +715,7 @@ void hid_device_build(HIDDevice* device, HIDChangeEntry* entry, u32 length)
 void hid_device_manage_change(HIDChangeEntry* entry)
 {
     HIDDevice* devices = hid_state->devices;
-    s32 length = entry->length;
+    u32 length = entry->length;
     HIDDevice* device;
     int i;
 
@@ -779,10 +781,7 @@ void hid_interface_pool_init(void)
 
     hid_state->freeInterfaces = NULL;
     for (i = 0; i < HID_INTERFACES; i++) {
-        HIDInterface* next = iface;
-
-        iface++;
-        hid_interface_free(next);
+        hid_interface_free(iface++);
     }
 }
 
@@ -929,13 +928,10 @@ HIDRequest* hid_request_alloc(void)
 /* Builds the free list of request records. */
 void hid_request_pool_init(void)
 {
-    int i;
     HIDRequest* request = hid_state->requests;
+    int i;
 
     for (i = 0; i < HID_REQUESTS; i++) {
-        HIDRequest* next = request;
-
-        request++;
-        hid_request_free(next);
+        hid_request_free(request++);
     }
 }
