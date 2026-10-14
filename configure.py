@@ -1463,7 +1463,7 @@ config.libs = [
             Object(NonMatching, "VF/vf.cpp", cflags=cflags_base),
             Object(NonMatching, "TRK/exi2_comm.c"),
             Object(NonMatching, "PMIC/pmic.c", cflags=cflags_base),
-            Object(NonMatching, "KPR/kpr.c", cflags=cflags_base),
+            Object(Matching, "KPR/kpr.c", cflags=cflags_base),
             Object(NonMatching, "HID/hid.c", cflags=cflags_base),
             Object(NonMatching, "KBD/kbd.c", cflags=cflags_base),
         ],
