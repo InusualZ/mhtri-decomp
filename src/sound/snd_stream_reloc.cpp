@@ -122,7 +122,6 @@ void* fn_800E8DE0(void* obj, s32 flags);
 
 
 
-void fn_804C40D0(void);
 void AXSetMasterVolume(u16 id);
 u32 OSEnableInterrupts(void);
 void AXQuit(void* obj);
@@ -545,7 +544,7 @@ extern "C" void fn_800E8698(void)
 
     SEQRunAudioFrame();
     SYNRunAudio();
-    fn_804C40D0();
+    MIXUpdateSettings();
     fn_800EDB74(snd_bank_table_get());
     fn_800E7D34();
     snd_bank_select_pending();

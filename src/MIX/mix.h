@@ -77,6 +77,9 @@ void MIXSetFader(AXVPB* voice, s32 tenthsDb);
 /* 0x804C5BB0 - resets the aux ramp state of voice `index`. */
 void __MIXResetAux(u32 index);
 
+/* 0x804C40D0 - applies every channel's pending level and pan changes to its AX voice; runs once per audio frame. */
+void MIXUpdateSettings(void);
+
 #ifdef __cplusplus
 }
 #endif

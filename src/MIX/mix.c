@@ -10,11 +10,13 @@
  *    them.
  * NAMES. `__MIXSetPan` is the dump's name; the file name `mix.c` is a GUESS.  GUESS (mix.h): `MIXInit`, `MIXQuit`,
  *    `MIXSetSoundMode`, `MIXGetSoundMode`, `MIXReleaseChannel`, `MIXSetInput`, `MIXSetAuxA`, `MIXSetAuxB`, `MIXSetPan`,
- *    `MIXSetSPan`, `MIXSetFader`, `__MIXGetVolume`, `__MIXResetAux`, the arrays `MIXChannelArray`/`MIXAuxArray` and the
- *    table `MIXTable` (the layout is traced from the bodies; the 128-entry rows are the pan curves).
- * RESIDUALS. not attempted: `fn_804C2840` (0x16C4 B, 9 arguments, the channel set-up), `fn_804C40D0` (0x1694 B, the update
- *    over all channels) and `fn_804C5770` (0x43C B, the ramp fill of one voice's parameter block).  The .sbss word pair at
- *    0x807952B0 and the 8 bytes after the aux array are claimed but their use is not traced.
+ *    `MIXSetSPan`, `MIXSetFader`, `__MIXGetVolume`, `__MIXResetAux`, `MIXUpdateSettings`, `__MIXUpdateAuxVolumes`, the
+ *    arrays `MIXChannelArray`/`MIXAuxArray` and the table `MIXTable` (the layout is traced from the bodies; the
+ *    128-entry rows are the pan curves).
+ * RESIDUALS. not attempted: `fn_804C2840` (0x16C4 B, 9 arguments, the channel set-up), `MIXUpdateSettings` (0x1694 B,
+ *    the update over all channels) and `__MIXUpdateAuxVolumes` (0x43C B, the ramp fill of one voice's parameter block).
+ *    `MIXAuxStates` (.sbss 0x807952B0) is one 4-byte pointer and `MIXAuxArray` is 96 x 0x44 bytes; the word at
+ *    0x807952B4 and the 8 bytes after the aux array are unreferenced alignment fill inside this unit's ranges.
  * SHAPES. none beyond what the bodies show.
  */
 
