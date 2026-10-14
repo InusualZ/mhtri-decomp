@@ -1263,7 +1263,7 @@ config.libs = [
         "objects": [
             # The OS core band 0x804C1760..0x804D9B4C, cut per SDK library and source file (evidence: the RANGE line of
             # each unit header).  Per-object cflags=cflags_base (default 16-byte function alignment): all 44 units' function starts are 16-aligned in the target (.pi/notes/sdk-compiler-survey.md).
-            Object(NonMatching, "MEM/mem_heap.c", cflags=cflags_base),
+            Object(Matching, "MEM/mem_heap.c", cflags=cflags_base),
             Object(NonMatching, "MEM/mem_expheap.c", cflags=cflags_base),
             Object(Matching, "MEM/mem_allocator.c", cflags=cflags_base),
             Object(Matching, "MEM/mem_list.c", cflags=cflags_base),
@@ -1311,7 +1311,7 @@ config.libs = [
             Object(Matching, "Runtime.PPCEABI.H/__init_user.c", cflags=cflags_base),
             Object(Matching, "PAD/PADClamp.c", cflags=cflags_base),
             Object(NonMatching, "PAD/pad.c", cflags=cflags_base),
-            Object(NonMatching, "RSO/rso_notify.c"),
+            Object(Matching, "RSO/rso_notify.c"),
             # AXFX reverb run (lib OS flags, function_align 16): ranges, names and seams in the unit headers under src/AX/AXFX*.
             Object(Matching, "AX/AXFXReverbHi.c"),
             Object(Matching, "AX/AXFXReverbStd.c"),
@@ -1387,7 +1387,7 @@ config.libs = [
             Object(NonMatching, "DVD/dvddevice.c", cflags=cflags_base),
             Object(Matching, "DVD/dvd_broadway.c", cflags=cflags_base),
             Object(NonMatching, "ENC/enc.c", cflags=cflags_base),
-            Object(NonMatching, "ESP/esp.c", cflags=cflags_base),
+            Object(Matching, "ESP/esp.c", cflags=cflags_base),
             Object(Matching, "EUART/EUART.c", cflags=cflags_base),
             Object(Matching, "FS/fs.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
             Object(Matching, "RVLGX/GXInit.c", cflags=cflags_base),
