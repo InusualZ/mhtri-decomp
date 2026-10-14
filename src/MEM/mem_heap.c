@@ -5,17 +5,20 @@
  *    from the OS core band 0x804C1760-0x804D9B4C.  Evidence: the only readers of the heap list (.bss 0x80748B90
  *    and its OSMutex 0x80748BA0) and of the "list initialised" flag (.sbss 0x80795298) are `MEMiInitHeapHead` and
  *    the finaliser; the expandable-heap functions after 0x804C1BD0 read none of them.
- * FLAGS. `cflags_base` per object (configure.py): the target's function starts are all 16-aligned.
- * NAMES. GUESS: `MEMiRootHeapList`, `MEMiRootHeapMutex`, `MEMiRootHeapListReady` (the heap-list data).`FindContainHeap_` and `MEMiInitHeapHead` are the map's (dump) names; GUESS: `MEMiFinalizeHeap` (the counterpart of
- *    `MEMiInitHeapHead` that `MEMDestroyExpHeap` calls) and the file name.
- * RESIDUALS. `MEMiInitHeapHead` and `MEMiFinalizeHeap`: the target holds three inlined search levels plus the call; ours
- *    holds one level plus the call, whatever the inline depth (2 or 3) or the pragma position; the saves differ with it.
- *    Relocation difference: each of the two lacks the target's `_savegpr_27`/`_restgpr_27` pair and two
- *    `MEMGetNextListObject` calls (the inlined search levels).
- *    .sbss: the target holds 8 B at 0x80795298 (flag + a word nothing here reads), ours 4 B.
- *    `FindContainHeap_` needs `inline_depth(2)` (three loops) and the `inline` keyword to be inlined into its callers.
- * SHAPES. none yet.
+ * FLAGS. `cflags_base` per object (configure.py); `#pragma ipa file` in this TU: file-level IPA inlines the plain
+ *    global `FindContainHeap_` three levels deep into each caller (plus the call) and still emits it first, global.
+ * NAMES. GUESS: `MEMiRootHeapList`, `MEMiRootHeapMutex`, `MEMiRootHeapListReady` (the heap-list data; the RVL SDK
+ *    statics are believed to be sRootList/sRootMutex/sRootListInitialized). `FindContainHeap_` and `MEMiInitHeapHead`
+ *    are the map's (dump) names; GUESS: `MEMiFinalizeHeap` (the counterpart of `MEMiInitHeapHead` that
+ *    `MEMDestroyExpHeap` calls), `FindListContainHeap_` (RVL SDK helper name; fully inlined, no symbol) and the file name.
+ * RESIDUALS. none in .text (3/3 functions byte-identical, relocations identical). .sbss: the claim's 0x8079529C word
+ *    and .text's 0x804C1BCC word are alignment fill, not data.
+ * SHAPES. The list choice is the helper `FindListContainHeap_` passed straight into `MEMAppendListObject`/
+ *    `MEMRemoveListObject`; spelled inline in each caller it rotates the three inlined loop registers (r29/r30/r31).
+ *    `FindContainHeap_` declares its child result inside the range test.
  */
+
+#pragma ipa file
 
 #include "types.h"
 
@@ -28,33 +31,37 @@ static MEMList MEMiRootHeapList;      /* .bss 0x80748B90: list of the top-level 
 static OSMutex MEMiRootHeapMutex;     /* .bss 0x80748BA0: guards the heap list */
 static u32 MEMiRootHeapListReady;     /* .sbss 0x80795298 */
 
-#pragma inline_depth(2)
-
 /* Returns the innermost heap of `list` whose range holds `block`, or NULL. */
 /* untyped: byte range - the address searched for */
-inline MEMiHeapHead* FindContainHeap_(MEMList* list, const void* block)
+MEMiHeapHead* FindContainHeap_(MEMList* list, const void* block)
 {
-    MEMiHeapHead* container = NULL;
     MEMiHeapHead* heap = NULL;
 
     while ((heap = (MEMiHeapHead*)MEMGetNextListObject(list, heap)) != NULL) {
         if ((u32)heap->start <= (u32)block && (u32)block < (u32)heap->end) {
-            container = FindContainHeap_(&heap->children, block);
-            if (container != NULL)
-                return container;
+            MEMiHeapHead* child = FindContainHeap_(&heap->children, block);
+            if (child != NULL)
+                return child;
             return heap;
         }
     }
     return NULL;
 }
 
+/* Returns the list a heap head belongs in: its container's child list, or the root list. */
+static MEMList* FindListContainHeap_(MEMiHeapHead* heap)
+{
+    MEMList* list = &MEMiRootHeapList;
+    MEMiHeapHead* parent = FindContainHeap_(&MEMiRootHeapList, heap);
+    if (parent != NULL)
+        list = &parent->children;
+    return list;
+}
+
 /* Initialises a heap head and links it into the heap list of the heap that contains it. */
 /* untyped: byte range - the heap's start and end addresses */
 void MEMiInitHeapHead(MEMiHeapHead* heap, u32 signature, void* start, void* end, u16 attribute)
 {
-    MEMList* list;
-    MEMiHeapHead* parent;
-
     heap->signature = signature;
     heap->start = start;
     heap->end = end;
@@ -70,26 +77,15 @@ void MEMiInitHeapHead(MEMiHeapHead* heap, u32 signature, void* start, void* end,
 
     OSInitMutex(heap->mutex);
     OSLockMutex(&MEMiRootHeapMutex);
-    list = &MEMiRootHeapList;
-    parent = FindContainHeap_(&MEMiRootHeapList, heap);
-    if (parent != NULL)
-        list = &parent->children;
-    MEMAppendListObject(list, heap);
+    MEMAppendListObject(FindListContainHeap_(heap), heap);
     OSUnlockMutex(&MEMiRootHeapMutex);
 }
 
 /* Unlinks a heap head from its parent's list and clears its signature. */
 void MEMiFinalizeHeap(MEMiHeapHead* heap)
 {
-    MEMList* list;
-    MEMiHeapHead* parent;
-
     OSLockMutex(&MEMiRootHeapMutex);
-    list = &MEMiRootHeapList;
-    parent = FindContainHeap_(&MEMiRootHeapList, heap);
-    if (parent != NULL)
-        list = &parent->children;
-    MEMRemoveListObject(list, heap);
+    MEMRemoveListObject(FindListContainHeap_(heap), heap);
     OSUnlockMutex(&MEMiRootHeapMutex);
     heap->signature = 0;
 }

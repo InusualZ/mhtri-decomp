@@ -8,13 +8,16 @@
  * FLAGS. `cflags_base` per object (configure.py): the target's function starts are all 16-aligned.
  * NAMES. `MEMCreateExpHeapEx`, `MEMDestroyExpHeap`, `MEMFreeToExpHeap`, `RecycleRegion_` are the map's names; GUESS
  *    (the dump holds junk names at the addresses): `MEMAllocFromExpHeapEx`, `MEMGetAllocatableSizeForExpHeapEx`,
- *    `AllocUsedBlockFromFreeBlock_`, `AllocFromHead_`, `AllocFromTail_`, and the file name.
- * RESIDUALS. `AllocUsedBlockFromFreeBlock_` (91 %): the used-header bit-field stores are scheduled one slot earlier than the
- *    target's and the local registers are numbered differently; `AllocFromHead_`/`AllocFromTail_`: the best-fit locals take
- *    volatile registers where the target saves them; `RecycleRegion_`: two local registers swapped;
- *    `MEMGetAllocatableSizeForExpHeapEx`: the saved registers are numbered heap/best/align where the target has
- *    align/heap/best (no declaration order found).
- * SHAPES. the bit-field region header (direction, alignment, group id) is stored in two halfword writes by the target.
+ *    `AllocUsedBlockFromFreeBlock_`, `AllocFromHead_`, `AllocFromTail_`, the inlined helpers (no symbols) and the file name.
+ * RESIDUALS. `AllocUsedBlockFromFreeBlock_`: the `back.start` add is scheduled after the free-region unlink loads where the
+ *    target issues it first, so the volatile temporaries r5/r6 (front start, back end) are swapped and the used-list
+ *    append takes r3/r4 the other way round; tried: statement order of the four range bounds (six orders), local
+ *    declaration order, an append helper, a region-extent helper.  The other eight functions are byte-identical.
+ * SHAPES. The RVL SDK helper structure decides the allocation: `RegionBody_`/`RegionEnd_`, `RemoveRegion_` (returns the
+ *    predecessor), `InsertRegionAfter_` (returns the region), `InitRegion_`, `FillAllocMemory_`, inlined into each
+ *    caller; best-fit locals initialised at their declarations; `__abs` for the allocatable-size alignment;
+ *    `RecycleRegion_` compares the predecessor's end as a region pointer.  The bit-field region header (direction,
+ *    alignment, group id) is stored in two halfword writes by the target.
  */
 
 #include "types.h"
@@ -28,8 +31,20 @@
 #define EXP_HEAP_ATTR_LOCK 4
 #define EXP_HEAP_ATTR_ZERO_FILL 1
 
-/* Links `region` into `list` directly after `prev` (NULL: at the head). */
-static inline void InsertRegionAfter_(MEMiRegionList* list, MEMiHeapRegion* prev, MEMiHeapRegion* region)
+/* Returns the user memory after a region header. */
+static inline u32 RegionBody_(MEMiHeapRegion* region)
+{
+    return (u32)region + 16;
+}
+
+/* Returns the end of a region's user memory. */
+static inline u32 RegionEnd_(MEMiHeapRegion* region)
+{
+    return RegionBody_(region) + region->size;
+}
+
+/* Links `region` into `list` directly after `prev` (NULL: at the head) and returns it. */
+static inline MEMiHeapRegion* InsertRegionAfter_(MEMiRegionList* list, MEMiHeapRegion* prev, MEMiHeapRegion* region)
 {
     MEMiHeapRegion* next;
 
@@ -46,6 +61,24 @@ static inline void InsertRegionAfter_(MEMiRegionList* list, MEMiHeapRegion* prev
         next->prev = region;
     else
         list->tail = region;
+    return region;
+}
+
+/* Unlinks `region` from `list` and returns the region that preceded it. */
+static inline MEMiHeapRegion* RemoveRegion_(MEMiRegionList* list, MEMiHeapRegion* region)
+{
+    MEMiHeapRegion* prev = region->prev;
+    MEMiHeapRegion* next = region->next;
+
+    if (prev != NULL)
+        prev->next = next;
+    else
+        list->head = next;
+    if (next != NULL)
+        next->prev = prev;
+    else
+        list->tail = prev;
+    return prev;
 }
 
 /* Makes a free region header at `start` covering [start, end) and links it after `prev`. */
@@ -58,54 +91,66 @@ static inline void MakeFreeRegion_(MEMiRegionList* list, MEMiHeapRegion* prev, M
     InsertRegionAfter_(list, prev, start);
 }
 
+/* Zero-fills a fresh block when the heap was created with the zero-fill attribute. */
+static inline void FillAllocMemory_(MEMiHeapHead* heap, u32 address, u32 size)
+{
+    if (heap->attribute.value & EXP_HEAP_ATTR_ZERO_FILL)
+        memset((void*)address, 0, size);
+}
+
+/* Makes a region header with `signature` at `range->start` covering the range; the header is unlinked. */
+static inline MEMiHeapRegion* InitRegion_(MEMRegion* range, u16 signature)
+{
+    MEMiHeapRegion* region = (MEMiHeapRegion*)range->start;
+
+    region->signature = signature;
+    region->attribute.value = 0;
+    region->size = range->end - RegionBody_(region);
+    region->prev = NULL;
+    region->next = NULL;
+    return region;
+}
+
 /* Carves a used block for `size` bytes at `memory` out of the free region `block` and returns `memory`. */
 /* untyped: byte range - the user memory handed out */
 static void* AllocUsedBlockFromFreeBlock_(MEMiExpHeapHead* exp, MEMiHeapRegion* block, void* memory, u32 size,
                                           u16 direction)
 {
-    MEMiHeapRegion* prev = block->prev;
-    MEMiHeapRegion* next = block->next;
-    u32 allocStart = (u32)memory - 16;
-    u32 allocEnd = (u32)memory + size;
-    u32 freeStart = (u32)block - block->attribute.bits.alignment;
-    u32 freeEnd = (u32)block + block->size + 16;
-    u32 front = allocStart;
-    MEMiHeapRegion* used;
+    MEMRegion front;
+    MEMRegion back;
+    MEMiHeapRegion* prev;
 
-    if (prev != NULL)
-        prev->next = next;
-    else
-        exp->freeList.head = next;
-    if (next != NULL)
-        next->prev = prev;
-    else
-        exp->freeList.tail = prev;
+    front.end = (u32)memory - 16;
+    back.start = size + (u32)memory;
+    front.start = (u32)block - block->attribute.bits.alignment;
+    back.end = RegionEnd_(block);
 
-    if (allocStart - freeStart < 20 || (direction == 0 && !exp->features.bits.reuseMargins)) {
-        front = freeStart;
-    } else {
-        MakeFreeRegion_(&exp->freeList, prev, (MEMiHeapRegion*)freeStart, allocStart);
-        prev = (MEMiHeapRegion*)freeStart;
+    prev = RemoveRegion_(&exp->freeList, block);
+
+    if (front.end - front.start < 20 || (direction == 0 && !exp->features.bits.reuseMargins))
+        front.end = front.start;
+    else
+        prev = InsertRegionAfter_(&exp->freeList, prev, InitRegion_(&front, 0x4652)); /* 'RF' */
+
+    if (back.end - back.start < 20 || (direction == 1 && !exp->features.bits.reuseMargins))
+        back.start = back.end;
+    else
+        InsertRegionAfter_(&exp->freeList, prev, InitRegion_(&back, 0x4652)); /* 'RF' */
+
+    FillAllocMemory_(&((MEMiHeapHead*)exp)[-1], front.end, back.start - front.end);
+
+    {
+        MEMRegion range;
+        MEMiHeapRegion* used;
+
+        range.start = (u32)memory - 16;
+        range.end = back.start;
+        used = InitRegion_(&range, 0x5544); /* 'UD' */
+        used->attribute.bits.allocDirection = direction;
+        used->attribute.bits.alignment = (u32)used - front.end;
+        used->attribute.bits.groupID = exp->groupID;
+        InsertRegionAfter_(&exp->usedList, exp->usedList.tail, used);
     }
-
-    if (freeEnd - allocEnd < 20 || (direction == 1 && !exp->features.bits.reuseMargins))
-        allocEnd = freeEnd;
-    else
-        MakeFreeRegion_(&exp->freeList, prev, (MEMiHeapRegion*)allocEnd, freeEnd);
-
-    if (((MEMiHeapHead*)exp)[-1].attribute.value & EXP_HEAP_ATTR_ZERO_FILL)
-        memset((void*)front, 0, allocEnd - front);
-
-    used = (MEMiHeapRegion*)allocStart;
-    used->signature = 0x5544; /* 'UD' */
-    used->attribute.value = 0;
-    used->attribute.bits.allocDirection = direction;
-    used->attribute.bits.alignment = allocStart - front;
-    used->size = allocEnd - (allocStart + 16);
-    used->prev = NULL;
-    used->next = NULL;
-    used->attribute.bits.groupID = exp->groupID;
-    InsertRegionAfter_(&exp->usedList, exp->usedList.tail, used);
     return memory;
 }
 
@@ -113,30 +158,24 @@ static void* AllocUsedBlockFromFreeBlock_(MEMiExpHeapHead* exp, MEMiHeapRegion* 
 static void* AllocFromHead_(MEMiHeapHead* heap, u32 size, s32 align)
 {
     MEMiExpHeapHead* exp = &((MEMiExpHeap*)heap)->exp;
-    u32 bestStart;
-    int firstFit;
-    MEMiHeapRegion* region;
-    MEMiHeapRegion* best;
-    u32 bestSize;
-
-    best = NULL;
-    bestSize = 0xFFFFFFFF;
-    bestStart = 0;
-    firstFit = exp->features.bits.bestFit == 0;
+    const int firstFit = exp->features.bits.bestFit == 0;
+    MEMiHeapRegion* region = NULL;
+    MEMiHeapRegion* best = NULL;
+    u32 bestSize = 0xFFFFFFFF;
+    u32 bestStart = 0;
 
     for (region = exp->freeList.head; region != NULL; region = region->next) {
-        u32 body = (u32)region + 16;
-        u32 start = (body + align - 1) & ~(align - 1);
+        u32 body = RegionBody_(region);
+        u32 start = (align + body - 1) & ~(align - 1);
+        u32 offset = start - body;
 
-        if (region->size < size + (start - body))
-            continue;
-        if (bestSize <= region->size)
-            continue;
-        best = region;
-        bestSize = region->size;
-        bestStart = start;
-        if (firstFit || region->size == size)
-            break;
+        if (region->size >= size + offset && bestSize > region->size) {
+            best = region;
+            bestSize = region->size;
+            bestStart = start;
+            if (firstFit || bestSize == size)
+                break;
+        }
     }
 
     if (best != NULL)
@@ -148,30 +187,23 @@ static void* AllocFromHead_(MEMiHeapHead* heap, u32 size, s32 align)
 static void* AllocFromTail_(MEMiHeapHead* heap, u32 size, s32 align)
 {
     MEMiExpHeapHead* exp = &((MEMiExpHeap*)heap)->exp;
-    u32 bestSize;
-    u32 bestStart;
-    int firstFit;
-    MEMiHeapRegion* region;
-    MEMiHeapRegion* best;
-
-    best = NULL;
-    bestSize = 0xFFFFFFFF;
-    bestStart = 0;
-    firstFit = exp->features.bits.bestFit == 0;
+    const int firstFit = exp->features.bits.bestFit == 0;
+    MEMiHeapRegion* region = NULL;
+    MEMiHeapRegion* best = NULL;
+    u32 bestSize = 0xFFFFFFFF;
+    u32 bestStart = 0;
 
     for (region = exp->freeList.tail; region != NULL; region = region->prev) {
-        u32 body = (u32)region + 16;
+        u32 body = RegionBody_(region);
         u32 start = (region->size + body - size) & ~(align - 1);
 
-        if ((s32)(start - body) < 0)
-            continue;
-        if (bestSize <= region->size)
-            continue;
-        best = region;
-        bestSize = region->size;
-        bestStart = start;
-        if (firstFit || region->size == size)
-            break;
+        if ((s32)(start - body) >= 0 && bestSize > region->size) {
+            best = region;
+            bestSize = region->size;
+            bestStart = start;
+            if (firstFit || bestSize == size)
+                break;
+        }
     }
 
     if (best != NULL)
@@ -182,48 +214,28 @@ static void* AllocFromTail_(MEMiHeapHead* heap, u32 size, s32 align)
 /* Returns [range.start, range.end) to the free list, merging with the free regions on both sides. */
 static int RecycleRegion_(MEMiRegionList* list, MEMRegion* range)
 {
-    MEMiHeapRegion* region;
-    MEMRegion merged = *range;
     MEMiHeapRegion* before = NULL;
+    MEMRegion merged = *range;
 
-    for (region = list->head; region != NULL; region = region->next) {
-        if ((u32)region < range->start) {
-            before = region;
-            continue;
-        }
-        if ((u32)region == range->end) {
-            MEMiHeapRegion* rprev;
-            MEMiHeapRegion* rnext;
+    {
+        MEMiHeapRegion* region;
 
-            merged.end = (u32)region + region->size + 16;
-            rprev = region->prev;
-            rnext = region->next;
-            if (rprev != NULL)
-                rprev->next = rnext;
-            else
-                list->head = rnext;
-            if (rnext != NULL)
-                rnext->prev = rprev;
-            else
-                list->tail = rprev;
+        for (region = list->head; region != NULL; region = region->next) {
+            if ((u32)region < range->start) {
+                before = region;
+                continue;
+            }
+            if ((u32)region == range->end) {
+                merged.end = RegionEnd_(region);
+                RemoveRegion_(list, region);
+            }
+            break;
         }
-        break;
     }
 
-    if (before != NULL && (u32)before + before->size + 16 == range->start) {
-        MEMiHeapRegion* bprev = before->prev;
-        MEMiHeapRegion* bnext = before->next;
-
+    if (before != NULL && (MEMiHeapRegion*)RegionEnd_(before) == (MEMiHeapRegion*)range->start) {
         merged.start = (u32)before;
-        if (bprev != NULL)
-            bprev->next = bnext;
-        else
-            list->head = bnext;
-        if (bnext != NULL)
-            bnext->prev = bprev;
-        else
-            list->tail = bprev;
-        before = bprev;
+        before = RemoveRegion_(list, before);
     }
 
     if (merged.end - merged.start < 16)
@@ -339,12 +351,11 @@ void MEMFreeToExpHeap(MEMiHeapHead* heap, void* block)
 u32 MEMGetAllocatableSizeForExpHeapEx(MEMiHeapHead* heap, s32 align)
 {
     MEMiExpHeapHead* exp = &((MEMiExpHeap*)heap)->exp;
+    MEMiHeapRegion* region;
     u32 best;
     u32 bestOffset;
-    MEMiHeapRegion* region;
 
-    if (align < 0)
-        align = -align;
+    align = __abs(align);
 
     if (heap->attribute.value & EXP_HEAP_ATTR_LOCK)
         OSLockMutex(heap->mutex);
@@ -352,13 +363,11 @@ u32 MEMGetAllocatableSizeForExpHeapEx(MEMiHeapHead* heap, s32 align)
     best = 0;
     bestOffset = 0xFFFFFFFF;
     for (region = exp->freeList.head; region != NULL; region = region->next) {
-        u32 body = (u32)region + 16;
-        u32 end = region->size + body;
-        u32 start = (align + body - 1) & ~(align - 1);
+        u32 start = (RegionBody_(region) + align - 1) & ~(align - 1);
 
-        if (start < end) {
-            u32 room = end - start;
-            u32 offset = start - body;
+        if (start < RegionEnd_(region)) {
+            u32 room = RegionEnd_(region) - start;
+            u32 offset = start - RegionBody_(region);
 
             if (best < room || (best == room && bestOffset > offset)) {
                 best = room;
