@@ -15,7 +15,7 @@
  *            (start a cursor on key word 0/1/3), hkbManagerDelete (the singleton's deleting destructor entry).
  * SHAPES.    The view classes are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,N(r12)` dispatch;
  *            nothing is defined or constructed through them, so no table is emitted here.
- * SHAPES.    fn_8056BEBC/BF58/BFF4 compare against `&lbl_80790D64.sentinel` itself: a named sentinel local is
+ * SHAPES.    fn_8056BEBC/BF58/BFF4 compare against `&hkbManager.sentinel` itself: a named sentinel local is
  *            coloured r4 where retail keeps it in r0.
  * SHAPES.    Local declaration order decides the callee-saved colouring (the first declared takes the highest
  *            register): fn_8056A638 declares `idx` before `result`, fn_8056BD38 declares `mgr` first.
@@ -27,7 +27,7 @@
  *            swaps the two `subf` operands, every other spelling loads `*a` first.
  * RESIDUALS. fn_8056BE2C: retail holds the manager in r0 and the scaled index in r6 (ours r6/r0).
  * RESIDUALS. The unit's own `.data` (the vtables lbl_806582FC/lbl_80658358/lbl_80658440, the strings lbl_80658408/
- *            lbl_8065841C) and `.bss` (lbl_80790D64) are referenced as externs: their classes are not reconstructed.
+ *            lbl_8065841C) and `.bss` (hkbManager) are referenced as externs: their classes are not reconstructed.
  * RESIDUALS. datagap: the claimed `.data` 0x80658290..0x80658458 spans at least 3 TUs (emission-order seams at
  *            0x806583A0 and in [0x80658408, 0x80658440)) - a seam question for the registration.
  * RESIDUALS. fn_8056C2A4 (0x70) is not written: it calls KBDSetChannelMap, which KBD/kbd.h does not declare yet.
@@ -171,7 +171,7 @@ extern "C" char lbl_8065841C[]; /* "specified listener not found!" */
 
 extern "C" void* lbl_80658440[]; /* .data vtable */
 
-extern "C" HkbManager lbl_80790D64;
+extern "C" HkbManager hkbManager;
 
 /* The polymorphic view of a gui component the manager bodies call through: the slots are named by their offset
  * in the table (+0x08 is the deleting destructor), so MWCC emits the canonical `lwz r12,0(r3); lwz r12,N(r12)`
@@ -584,7 +584,7 @@ void fn_8056BC5C(HkbRecord* rec)
     if (rec->w08 != 7) {
         return;
     }
-    lbl_80790D64.channels[rec->index].b30 = 1;
+    hkbManager.channels[rec->index].b30 = 1;
 }
 
 /* 0x8056BC88: clear the channel's pending bit, re-issue the LED request, and re-set the bit while it stays busy. */
@@ -605,10 +605,10 @@ void fn_8056BC88(HkbRecord* rec)
 
         saved = OSDisableInterrupts();
         bit = 1u << index;
-        lbl_80790D64.pendingMask &= ~bit;
+        hkbManager.pendingMask &= ~bit;
         result = KBDSetLedsAsync(index, 0, (void*)fn_8056BC88, *(u32*)&msg);
         if ((s32)result == 7) {
-            lbl_80790D64.pendingMask |= bit;
+            hkbManager.pendingMask |= bit;
         }
         OSRestoreInterrupts(saved);
     }
@@ -690,10 +690,10 @@ void fn_8056BE84(HkbNode* self, HkbArg* arg)
  * the vtable slot +0x0C / +0x10 / +0x14.  Each is a separate body (the retail object has three copies). */
 #define HKB_NOTIFY(method)                                                     \
     HkbNode* first;                                                            \
-    HkbNode* n = &lbl_80790D64.sentinel;                                       \
+    HkbNode* n = &hkbManager.sentinel;                                         \
     while (n->prev != 0) {                                                     \
         n = n->prev;                                                           \
-        if (n->prev == &lbl_80790D64.sentinel) {                               \
+        if (n->prev == &hkbManager.sentinel) {                                 \
             break;                                                             \
         }                                                                      \
     }                                                                          \

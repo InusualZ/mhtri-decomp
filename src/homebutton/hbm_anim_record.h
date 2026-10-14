@@ -30,6 +30,10 @@ void fn_80557E8C(void* self);
 
 extern const u8 lbl_8057BD60[];  /* the animation-record table of fn_80556FC4 */
 
+/* The sign keys' editable texts: 12 phrases of 45 wide characters and 12 gestures of 11. */
+extern wchar_t hkb_sign_phrase_text[12][45];
+extern wchar_t hkb_sign_gesture_text[12][11];
+
 #ifdef __cplusplus
 }
 #endif
