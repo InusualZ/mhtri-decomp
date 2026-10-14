@@ -1439,7 +1439,7 @@ config.libs = [
             Object(Matching, "RVLGX/GXInit.c", cflags=cflags_base),
             Object(Matching, "RVLGX/GXFifo.c", cflags=cflags_base),
             Object(NonMatching, "RVLGX/GXAttr.c", cflags=cflags_base),
-            Object(NonMatching, "RVLGX/GXMisc.c", cflags=cflags_base),
+            Object(Matching, "RVLGX/GXMisc.c", cflags=cflags_base),
             Object(NonMatching, "RVLGX/GXGeometry.c", cflags=cflags_base),
             Object(Matching, "RVLGX/GXFrameBuf.c", cflags=cflags_base),
             # -fp_contract off: fmuls+fadds evidence on the FLAGS line of src/RVLGX/GXLight.c
