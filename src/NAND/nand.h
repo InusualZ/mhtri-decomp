@@ -112,8 +112,8 @@ s32 NANDPrivateCreateDirAsync(const char* path, u8 permission, u8 attribute, NAN
  * twins of `NANDPrivateCreateAsync` and `NANDPrivateCreateDirAsync`, which refuse the private directory. */
 s32 NANDCreateAsync(const char* path, u8 permission, u8 attribute, NANDAsyncCallback callback, NANDCommandBlock* block);
 s32 NANDCreateDirAsync(const char* path, u8 permission, u8 attribute, NANDAsyncCallback callback, NANDCommandBlock* block);
-/* 0x804C7D40 - move `path` into the directory `destDir`. */
-s32 NANDMove(const char* path, const char* destDir);
+/* 0x804C7D40 (0x80): starts moving `path` into the directory `destDir`; `callback` receives the result. */
+s32 NANDMoveAsync(const char* path, const char* destDir, NANDAsyncCallback callback, NANDCommandBlock* block);
 /* 0x804C8200 - the blocks and inodes the title's home directory uses (`ISFS_GetUsage` on the home directory). */
 s32 NANDGetHomeUsage(u32* blocks, u32* inodes);
 /* 0x804C8090 - the owner/group/attribute/permission record of `path`. */

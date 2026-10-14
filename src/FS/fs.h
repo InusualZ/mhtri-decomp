@@ -11,6 +11,12 @@
 extern "C" {
 #endif
 
+/* The ISFS result codes the NAND library tests. */
+#define ISFS_ERROR_INVALID (-101)
+#define ISFS_ERROR_ACCESS (-102)
+#define ISFS_ERROR_NOEXISTS (-106)
+#define ISFS_ERROR_UNKNOWN (-117)
+
 struct NANDCommandBlock;
 
 /* Called when an asynchronous ISFS call finishes; `result` is the ISFS result code. */

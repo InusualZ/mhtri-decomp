@@ -12,17 +12,14 @@
  *    the run from `nandMove` to `nandGetStatus` (`nandMove`, `nandComposePerm`, `nandSplitPerm`, `nandGetStatus`) and
  *    `nandOpen` (the target calls each out of line from the callers that follow it; the compiler inlines them
  *    otherwise).
- * NAMES. the `NAND*`/`nand*` names are the map's (dump).  GUESS: `nandCloseCallback` (the close completion);
+ * NAMES. the `NAND*`/`nand*` names are the map's (dump); `NANDMoveAsync` is the SDK spelling, evidenced by the
+ *    callback store and the async=1 call of `nandMove`.  GUESS: `nandCloseCallback` (the close completion);
  *    `NANDCreateAsync`, `NANDCreateDirAsync` (the public twins that refuse the private directory), `nandMove`
- *    (`ISFS_Rename`/`ISFS_RenameAsync`), `NANDMove` (its asynchronous public caller: it stores the callback and passes
- *    async=1; the SDK spelling is `NANDMoveAsync`), `nandSplitPerm` (permission byte to access words), `nandGetStatus`
+ *    (`ISFS_Rename`/`ISFS_RenameAsync`), `nandSplitPerm` (permission byte to access words), `nandGetStatus`
  *    (`ISFS_GetAttr`/`ISFS_GetAttrAsync`), `nandGetStatusCallback` and `NANDGetHomeUsage` (`ISFS_GetUsage` on the home
  *    directory), in the SDK's scheme; the inline helpers `nandCreate`, `nandDelete`, `nandCreateDirAsync` and
  *    `nandSeekAsync` (no map row: every call is inlined).
- * RESIDUALS. `NANDMove` 0x804C7D40-0x804C7DC0 (0x80) is not written: NAND/nand.h declares it with two parameters
- *    while the target and its caller (`menu/menu_plsearch.cpp` 0x80448E64) pass four (path, destDir, callback,
- *    block); the body is `block->callback = callback; return nandConvertErrorCode(nandMove(path, destDir, block,
- *    TRUE, FALSE));` behind the readiness test.  Every other function matches.
+ * RESIDUALS. none: every function matches.
  * SHAPES. the create/delete/create-directory/seek bodies are static inline helpers taking constant async/privileged
  *    flags, which is what puts the descriptor load of `NANDSeekAsync` before the switch and the callback store before
  *    the path clear.
@@ -40,8 +37,6 @@
 #define NAND_SEEK_CURRENT 1
 #define NAND_SEEK_END 2
 #define NAND_PERM_OWNER_READ 0x10
-#define ISFS_ERROR_ACCESS (-102)
-#define ISFS_ERROR_INVALID (-101)
 
 void nandCloseCallback(s32 result, NANDCommandBlock* block);
 static void nandOpenCallback(s32 result, NANDCommandBlock* block);
@@ -293,6 +288,16 @@ s32 nandMove(const char* path, const char* destDir, NANDCommandBlock* block, BOO
         return ISFS_RenameAsync(absOldPath, absNewPath, nandAsyncCallback, block);
     }
     return ISFS_Rename(absOldPath, absNewPath);
+}
+
+/* 0x804C7D40 (0x80): starts moving `path` into the directory `destDir`; `callback` receives the result. */
+s32 NANDMoveAsync(const char* path, const char* destDir, NANDAsyncCallback callback, NANDCommandBlock* block)
+{
+    if (!nandIsInitialized()) {
+        return NAND_RESULT_NOT_INITIALIZED;
+    }
+    block->callback = callback;
+    return nandConvertErrorCode(nandMove(path, destDir, block, TRUE, FALSE));
 }
 
 /* 0x804C7DC0 (0x54): packs the owner, group and other access bits into one permission byte. */

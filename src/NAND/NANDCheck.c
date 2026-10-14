@@ -12,11 +12,7 @@
  *    function-name string at 0x8061BB9C.  GUESS: the unit name (SDK spelling), `NANDInitBanner` (SDK spelling),
  *    `s_userDirList` (the pointer table of the user-area directories), `nandCheckQuota` (the inline answer-bit test)
  *    and the `NANDBanner` field names (SDK layout).
- * RESIDUALS. `NANDInitBanner` 0x804C9480-0x804C955C (0xDC) is not written: it calls `wcscmp`, which no header
- *    declares (MSL_C/wstring.h, the owner's header, lists `wcslen`/`wcscpy`/`wcschr` only); with that declaration the
- *    body (memset, 'WIBN' signature, flags, two `wcscmp`/`wcsncpy` comment copies) matches, and it emits the L""/L" "
- *    .sdata literals ahead of "/meta"/"/ticket", which this object places at 0x0 until then.
- *    `nandUserAreaCallback`: the argument setup of the follow-on `ISFS_GetUsageAsync` computes `&workInodes` before
+ * RESIDUALS. `nandUserAreaCallback`: the argument setup of the follow-on `ISFS_GetUsageAsync` computes `&workInodes` before
  *    `&workBlocks` (the target computes `&workBlocks` from r4 first and `&workInodes` from r31).
  * SHAPES. `nandCheckQuota` takes the six counts by value so their loads are hoisted ahead of the compares, as in the
  *    target.
@@ -24,13 +20,13 @@
 
 #include "types.h"
 #include "FS/fs.h"
+#include "MSL_C/wstring.h"
 #include "OS/OSError.h"
 #include "NAND/NANDCheck.h"
+#include "Runtime.PPCEABI.H/memset.h"
 
 #define NAND_CHECK_STATE_QUOTA 20
 #define NAND_CHECK_STATE_AVAILABLE 21
-#define ISFS_ERROR_NOEXISTS (-106)
-#define ISFS_ERROR_UNKNOWN (-117)
 #define NAND_HOME_MAX_BLOCKS 1024
 #define NAND_HOME_MAX_INODES 33
 #define NAND_USER_MAX_BLOCKS 17408
@@ -40,6 +36,7 @@
 #define NAND_CHECK_USER_BLOCKS 0x4
 #define NAND_CHECK_USER_INODES 0x8
 
+#define NAND_BANNER_SIGNATURE 0x5749424E /* 'WIBN' */
 #define NAND_BANNER_COMMENT_LENGTH 32
 
 /* size: 0xF0A0 - the save banner a title writes as banner.bin: its signature, flags, two comment lines and the
@@ -55,6 +52,25 @@ struct NANDBanner {
 }; /* size: 0xF0A0 */
 
 static void nandUserAreaCallback(s32 result, NANDCommandBlock* block);
+
+/* 0x804C9480 (0xDC): clears `banner`, stamps its signature and `flags`, and copies `title` and `comment` (an empty
+ * string becomes a single space). */
+void NANDInitBanner(NANDBanner* banner, u32 flags, const u16* title, const u16* comment)
+{
+    memset(banner, 0, sizeof(NANDBanner));
+    banner->signature = NAND_BANNER_SIGNATURE;
+    banner->flags = flags;
+    if (wcscmp(title, L"") == 0) {
+        wcsncpy(banner->comment[0], L" ", NAND_BANNER_COMMENT_LENGTH);
+    } else {
+        wcsncpy(banner->comment[0], title, NAND_BANNER_COMMENT_LENGTH);
+    }
+    if (wcscmp(comment, L"") == 0) {
+        wcsncpy(banner->comment[1], L" ", NAND_BANNER_COMMENT_LENGTH);
+    } else {
+        wcsncpy(banner->comment[1], comment, NAND_BANNER_COMMENT_LENGTH);
+    }
+}
 
 /* 0x804C9560 (0xB8): reads the blocks and inodes the files below `path` use. */
 s32 NANDGetUsage(const char* path, u32* blockCount, u32* inodeCount)
