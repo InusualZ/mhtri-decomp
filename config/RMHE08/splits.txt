@@ -2810,7 +2810,7 @@ RVLGX/GXInit.c:
 RVLGX/GXFifo.c:
 	.text       start:0x804B4460 end:0x804B4E40 align:16
 	.data       start:0x8061A7A0 end:0x8061A7D0
-	.bss        start:0x807472A0 end:0x80747300
+	.bss        start:0x807472A0 end:0x807472E8
 	.sbss       start:0x807951F0 end:0x80795210
 
 RVLGX/GXAttr.c:
@@ -2867,7 +2867,7 @@ IPC/ipcMain.c:
 
 IPC/ipcclt.c:
 	.text       start:0x804BB310 end:0x804BD070 align:16
-	.bss        start:0x80747300 end:0x807473C0
+	.bss        start:0x80747300 end:0x807473C0 align:32
 	.sdata      start:0x80793EA8 end:0x80793EB0
 	.sbss       start:0x80795240 end:0x80795258
 
