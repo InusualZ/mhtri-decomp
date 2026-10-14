@@ -1371,6 +1371,22 @@ config.libs = [
             Object(NonMatching, "DSPADPCM/dspadpcm.c", cflags=cflags_base),
             Object(NonMatching, "BTE/gki_buffer.c", cflags=cflags_base),  # 16-aligned starts, default alignment: unit header
             Object(NonMatching, "BTE/gki_time.c"),  # mixed band, 4-aligned starts from 0x8047ABC4, lib default: unit header
+            # The BTE RFCOMM/SDP tail 0x80498FBC..0x804A4AC0 recut per BTE source file; each unit's header carries its evidence.
+            Object(NonMatching, "BTE/port_api.c"),
+            Object(NonMatching, "BTE/port_rfc.c"),
+            Object(NonMatching, "BTE/port_utils.c"),
+            Object(NonMatching, "BTE/rfc_l2cap_if.c"),
+            Object(NonMatching, "BTE/rfc_mx_fsm.c"),
+            Object(NonMatching, "BTE/rfc_port_fsm.c"),
+            Object(NonMatching, "BTE/rfc_port_if.c"),
+            Object(NonMatching, "BTE/rfc_ts_frames.c"),
+            Object(NonMatching, "BTE/rfc_utils.c"),
+            Object(NonMatching, "BTE/sdp_api.c"),
+            Object(NonMatching, "BTE/sdp_db.c"),
+            Object(NonMatching, "BTE/sdp_discovery.c"),
+            Object(NonMatching, "BTE/sdp_main.c"),
+            Object(NonMatching, "BTE/sdp_server.c"),
+            Object(NonMatching, "BTE/sdp_utils.c"),
             # The BTE tail 0x804A4AC0..0x804C1760 recut per SDK library; each unit's header carries its evidence.
             # Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
             Object(Matching, "DB/db.c", cflags=cflags_base),
