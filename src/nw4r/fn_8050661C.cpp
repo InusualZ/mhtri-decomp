@@ -11,13 +11,15 @@
  *   one virtual of its own after GetEncoding (ClearGlyphCache, fn_80506C74); FindCodeIndex is fn_80506D1C.  The
  *   statics are named for what Load stores in them.  The only caller is `menu/menu_sysmsg.cpp` (fn_804518E8).
  * RESIDUALS. RomFont's destructor has an empty body by design (nw4r's empty destructor; the delete is the compiler's).
- *   HasGlyph 95.9 % (retail materialises both Shift-JIS range tests and shares `li r3,1` between them).
  *   Load returns an uninitialised local, as retail does (its `return` reads whatever r4 holds after InitReaderFunc).
  *   Data: the claimed `.data`/`.sdata` runs end with DWCi's base64 alphabet and its pointer (a second TU); this
  *   object also emits a weak copy of Font's vtable, which the link folds (`.data` 0xCC against the 0xB8 claim; `.sdata`
  *   0x2 against 0x10).
  * SHAPES. FindCodeIndex returns int and the callers keep the index as that int, narrowing it at each use (retail's
- *   `clrlwi` per use); the code table is read as u16 pairs and walked with a pointer.
+ *   `clrlwi` per use); the code table is read as u16 pairs and walked with a pointer.  HasGlyph's Shift-JIS case is
+ *   one `||` of the half-width and full-width tests (an if-chain or a flag local hoists `li r3,1`).
+ * RESIDUALS. DWCi_Base64Encode/Decode (0x80507050-0x805073C0) are unwritten: they open a second TU (the base64
+ *   alphabet follows RomFont's vtable in `.data`, a vtable->string seam) and are filed as a seam re-draw.
  */
 
 #include "nw4r/RomFont.h"
@@ -311,14 +313,8 @@ bool RomFont::HasGlyph(u16 c) const {
     switch (sEncoding) {
     case 0:
         return c >= 0x20 && c <= 0xFF;
-    case 1: {
-        bool result = true;
-
-        if (!IsHalfWidthSJIS(c) && !IsFullWidthSJIS(c)) {
-            result = false;
-        }
-        return result;
-    }
+    case 1:
+        return IsHalfWidthSJIS(c) || IsFullWidthSJIS(c);
     default:
         return false;
     }

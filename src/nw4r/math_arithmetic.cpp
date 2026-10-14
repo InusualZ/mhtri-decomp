@@ -6,11 +6,10 @@
  * FLAGS. the `nw4r` lib block: GC/3.0a5.2 with `cflags_nw4r` (`cflags_os` + `-fp_contract off`); evidence in docs/nw4r.md.
  * NAMES. `detail::FExp`/`detail::FLog` are a GUESS from the nw4r source, read off the bodies (a 2^n exponent split
  *   for exp, the float's exponent field for log); the tables `sExpTbl`/`sLogTbl` are a GUESS too.
- * RESIDUALS. FLog: retail's stack slots are exponent pun
- *   0x18, mantissa 0x14, mantissa pun 0x10; ours swap the last two (and the register colouring that follows).
- *   `.sdata2`: the claim ends on a 4-byte pad after 3.0f that the object does not emit.
+ * RESIDUALS. `.sdata2`: the claim ends on a 4-byte pad after 3.0f that the object does not emit.
  * SHAPES. The stack temporaries are laid out in inline-creation order, shallowest first, so the helper depth is
  *   load-bearing: FExp puns through F32AsU32/U32AsF32, FLog through the header's FGetExpPart/FGetMantPart.
+ *   FLog sums the table interpolation into a local before adding the exponent term (the register colouring).
  */
 
 #include "nw4r/math_arithmetic.h"
@@ -352,7 +351,9 @@ f32 FLog(f32 x) {
     u16 idx = F32ToU16(fidx);
     f32 r = fidx - U16ToF32(idx);
 
-    return sLogTbl[idx].log_val + r * sLogTbl[idx].log_delta + 0.6931472f * fexp;
+    f32 v = sLogTbl[idx].log_val + r * sLogTbl[idx].log_delta;
+
+    return v + 0.6931472f * fexp;
 }
 
 }  // namespace detail

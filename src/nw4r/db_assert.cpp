@@ -14,18 +14,18 @@
  *   `Assertion_Printf_` (fn_80500868), `ShowStack_` (fn_80500900), `VPanic` (fn_805009AC), `WarningAlarmFunc_`
  *   (fn_80500CE0), and the statics `sWarningAlarm`, `sWarningTime`, `sAssertionConsole`, `sDispWarningAuto`,
  *   `sAlarmInitialized`.
- * RESIDUALS. Left out of the bodies until their names are settled: VPanic's two calls 0x804E70C0(NULL) and
- *   0x804E7110(NULL) (filed as the VI retrace-callback setters; the runtime dump calls 0x804E7110
- *   AIRegisterDMACallback) and, in VPanic and Warning, the console print 0x80500770 (console, "%s:%d Panic:" /
- *   "%s:%d Warning:", file, line), 0x80500770 (console, "\n") and the scroll to the latest line through the line count
- *   0x805007D8 (console->viewTopLine = max(0, count - console->viewLines)); all four sit in `nw4r/db_console.cpp`.  With
- *   them written, VPanic and Panic were 100 % and Warning 99.3 % (r30/r31 swap in the scroll).  The relocation targets
- *   missing from ours are `fn_804E70C0` and `fn_804E7110` (`VI/vi.cpp`), `fn_80500770` and `fn_805007D8`
- *   (`nw4r/db_console.cpp`), `sAssertionConsole`, `lbl_8062F090`, `lbl_8062F0A0` and `lbl_807941E4` (this unit's data).
+ * RESIDUALS. Warning: the scroll keeps the console in r30 and its view height in r31 where retail has r31/r30 (6 bytes);
+ *   the other spellings tried swap the warning time and the alarm pointer instead (the time read through a local
+ *   is the closer of the two).
+ * RESIDUALS. The string pools are `@` symbols in ours where the map names them `lbl_8062F030`, `lbl_8062F090`,
+ *   `lbl_8062F0A0` and `lbl_807941E4`.
  * RESIDUALS. The `.sdata`/`.sbss` claims end on alignment pad the object does not emit.
- * SHAPES. ShowStack_ and VPanic are kept out of line by a scoped `#pragma dont_inline` (retail calls both).
- *   `Assertion_ShowConsole` and `GetWarningAlarm_` are nw4r's helpers: the first is unreferenced (the link drops it)
- *   and inlined into Warning, which is what loads sWarningTime before the console test and keeps &sWarningAlarm in r31.
+ * SHAPES. ShowStack_ is kept out of line by a `#pragma dont_inline` scoped to its own definition (retail calls it);
+ *   VPanic stays out of line by size and must sit outside that scope, or the console scroll is called, not inlined.
+ *   `Assertion_ShowConsole` and `GetWarningAlarm_` are nw4r's helpers, `inline` so the object carries no unreferenced
+ *   copy; Warning inlines them, which is what loads sWarningTime before the console test.  WarningAlarmFunc_ is
+ *   forward-declared and defined last (retail emits it after Warning).  The console scroll and visibility are
+ *   nw4r's db_console inlines (GetViewHeight, SetViewBaseLine, ShowLatestLine, SetVisible, an empty VPrintf).
  */
 
 #include "nw4r/db_assert.h"
@@ -36,6 +36,7 @@
 #include "OS/OSVReport.h"
 #include "OS/OSThread.h"
 #include "OS/PPCHalt.h"
+#include "VI/vi.h"
 #include "stdarg.h"
 
 
@@ -47,6 +48,27 @@ static u32 sWarningTime;
 static ConsoleHandle sAssertionConsole;
 static bool sDispWarningAuto = true;
 static bool sAlarmInitialized;
+
+/* The number of lines the console window shows. */
+static inline u16 Console_GetViewHeight(ConsoleHandle console) {
+    return console->viewLines;
+}
+
+/* Sets the first line the console window shows. */
+static inline void Console_SetViewBaseLine(ConsoleHandle console, s32 line) {
+    console->viewTopLine = line;
+}
+
+/* Scrolls the console so its latest line is the last one shown. */
+static inline s32 Console_ShowLatestLine(ConsoleHandle console) {
+    s32 baseLine = Console_GetTotalLines(console) - Console_GetViewHeight(console);
+
+    if (baseLine < 0) {
+        baseLine = 0;
+    }
+    Console_SetViewBaseLine(console, baseLine);
+    return baseLine;
+}
 
 /* Prints to the OS report when no assert console is attached. */
 static void Assertion_Printf_(const char* fmt, ...) {
@@ -78,8 +100,7 @@ static void ShowStack_(u32 sp) {
         p = reinterpret_cast<u32*>(*p);
     }
 }
-
-
+#pragma dont_inline reset
 
 /* Stops the system and reports the failure with a stack trace; halts when `halt` is set. */
 static void VPanic(const char* file, int line, const char* fmt, va_list vlist, bool halt) {
@@ -89,9 +110,14 @@ static void VPanic(const char* file, int line, const char* fmt, va_list vlist, b
 
     OSDisableInterrupts();
     OSDisableScheduler();
+    VISetPreRetraceCallback(NULL);
+    VISetPostRetraceCallback(NULL);
     ShowStack_(stackPointer);
 
     if (sAssertionConsole) {
+        Console_Printf(sAssertionConsole, "%s:%d Panic:", file, line);
+        Console_Printf(sAssertionConsole, "\n");
+        Console_ShowLatestLine(sAssertionConsole);
         sAssertionConsole->isVisible = true;
     } else {
         OSReport("%s:%d Panic:", file, line);
@@ -103,7 +129,6 @@ static void VPanic(const char* file, int line, const char* fmt, va_list vlist, b
         PPCHalt();
     }
 }
-#pragma dont_inline reset
 
 /* 0x80500AB0 (0x94): reports an assert failure and halts. */
 void Panic(const char* file, int line, const char* fmt, ...) {
@@ -115,11 +140,14 @@ void Panic(const char* file, int line, const char* fmt, ...) {
     PPCHalt();
 }
 
-/* Hides the assert console when the warning display time runs out. */
-static void WarningAlarmFunc_(OSAlarm*, OSContext*) {
-    if (sAssertionConsole) {
-        sAssertionConsole->isVisible = false;
-    }
+static void WarningAlarmFunc_(OSAlarm*, OSContext*);
+
+/* Prints a va_list to the console (the retail build compiles the body away). */
+static inline void Console_VPrintf(ConsoleHandle, const char*, va_list) {}
+
+/* Shows or hides the console window. */
+static inline void Console_SetVisible(ConsoleHandle console, bool visible) {
+    console->isVisible = visible;
 }
 
 /* The warning alarm, created on first use. */
@@ -131,13 +159,13 @@ static inline OSAlarm* GetWarningAlarm_(void) {
     return &sWarningAlarm;
 }
 
-/* Shows the assert console for `time` ticks; nothing calls it out of line, so the link drops that copy. */
-void Assertion_ShowConsole(u32 time) {
+/* Shows the assert console for `time` ticks. */
+inline void Assertion_ShowConsole(u32 time) {
     if (sAssertionConsole) {
         OSAlarm* alarm = GetWarningAlarm_();
 
         OSCancelAlarm(alarm);
-        sAssertionConsole->isVisible = true;
+        Console_SetVisible(sAssertionConsole, true);
         if (time != 0) {
             OSSetAlarm(alarm, time, WarningAlarmFunc_);
         }
@@ -150,8 +178,13 @@ void Warning(const char* file, int line, const char* fmt, ...) {
 
     va_start(vlist, fmt);
     if (sAssertionConsole) {
+        Console_Printf(sAssertionConsole, "%s:%d Warning:", file, line);
+        Console_VPrintf(sAssertionConsole, fmt, vlist);
+        Console_Printf(sAssertionConsole, "\n");
+        Console_ShowLatestLine(sAssertionConsole);
         if (sDispWarningAuto) {
-            Assertion_ShowConsole(sWarningTime);
+            u32 time = sWarningTime;
+            Assertion_ShowConsole(time);
         }
     } else {
         OSReport("%s:%d Warning:", file, line);
@@ -159,6 +192,13 @@ void Warning(const char* file, int line, const char* fmt, ...) {
         OSReport("\n");
     }
     va_end(vlist);
+}
+
+/* 0x80500CE0 (0x18): hides the assert console when the warning display time runs out. */
+static void WarningAlarmFunc_(OSAlarm*, OSContext*) {
+    if (sAssertionConsole) {
+        Console_SetVisible(sAssertionConsole, false);
+    }
 }
 
 }  // namespace db
