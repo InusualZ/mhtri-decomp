@@ -74,14 +74,6 @@
 #define OS_INQUIRY_RESULT (*(volatile u16*)0x800030E6)
 #define OS_DI_CONFIG_REGISTER (*(volatile u32*)0xCD006024)
 
-/* size: 0x38 (cut at the last field) - the boot information block at 0x80000000. */
-typedef struct OSBootInfo {
-    /* +0x00 */ u8 pad_0x00[0x2C];
-    /* +0x2C */ u32 consoleType; /* zero on a console that reported none */
-    /* +0x30 */ void* arenaLo; /* low bound of the MEM1 arena the loader chose, zero for none */
-    /* +0x34 */ void* arenaHi; /* high bound of the MEM1 arena the loader chose, zero for none */
-} OSBootInfo;
-
 /* size: 0x28 - the second boot information block (BI2); only the debug flag and the pad specification are read. */
 typedef struct OSBootInfo2 {
     /* +0x00 */ u8 pad_0x00[0x0C];

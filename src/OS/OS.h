@@ -107,6 +107,16 @@ void __OSGetIOSRev(OSIOSRev* rev);
 /* 0x807952D8 - the exception handler table the vectors dispatch through. */
 extern OSExceptionHandler* OSExceptionTable;
 
+/* size: 0x38 (cut at the last field) - the boot information block at 0x80000000. */
+typedef struct OSBootInfo {
+    /* +0x00 */ u8 pad_0x00[0x20];
+    /* +0x20 */ u32 magic;
+    /* +0x24 */ u8 pad_0x24[0x8];
+    /* +0x2C */ u32 consoleType; /* zero on a console that reported none */
+    /* +0x30 */ void* arenaLo; /* low bound of the MEM1 arena the loader chose, zero for none */
+    /* +0x34 */ void* arenaHi; /* high bound of the MEM1 arena the loader chose, zero for none */
+} OSBootInfo;
+
 #ifdef __cplusplus
 }
 #endif
