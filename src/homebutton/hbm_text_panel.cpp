@@ -1,8 +1,8 @@
-/* homebutton/hbm_text_panel.cpp - HOME-button (HBM) software-keyboard code, `.text` 0x805425E4..0x8054F7BC (236 functions, 106 reconstructed).
+/* homebutton/hbm_text_panel.cpp - software-keyboard code (the tiHKBManager band), `.text` 0x805425E4..0x8054F7BC (236 functions, 106 reconstructed).
  *
  * Phase 4 fold: the whole former registered unit `fn_805482CC.cpp` (0x805482CC..0x8054E894, 36 functions, its header below) plus
  * 70 function(s) of 0x8054E894..0x8054F7BC from the former `homebutton/fn_8054E894.cpp` (appended after the panel bodies, inside the
- * same `extern "C"` block).  Name: GUESS - `hbm_` (the HOME-button menu library) + the text-position panel the first source reconstructs;
+ * same `extern "C"` block).  Name: GUESS - `hbm_` (the band's file prefix) + the text-position panel the first source reconstructs;
  * the band has no `__FILE__` string and the dump names no function, so every function keeps its `fn_<addr>` placeholder.
  * The evidence and residuals of the second source are in docs/splits/phase4/homebutton-carried-notes.md.
  */
@@ -70,7 +70,7 @@
 
 #include "fn_805482CC.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
-#include "homebutton/fn_8054E894.h"
+#include "homebutton/hkb_widget.h"
 #include "unsplit/unknown.h"
 #include "KPR/kpr.h"
 #include "homebutton/hbm_text_panel.h"

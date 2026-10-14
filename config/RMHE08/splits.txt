@@ -3527,14 +3527,14 @@ homebutton/fn_8052A040.cpp:
 	.sbss       start:0x80795A18 end:0x80795A28
 	.sdata2     start:0x8079D550 end:0x8079D570
 
-homebutton/fn_8052B004.cpp:
+homebutton/hkb_layout.cpp:
 	.text       start:0x8052B004 end:0x8052C880
 	.ctors      start:0x8056F3E4 end:0x8056F3E8
 	.data       start:0x8064A5E8 end:0x8064A6B0
 	.sbss       start:0x80795A28 end:0x80795A30
 	.sdata2     start:0x8079D570 end:0x8079D580
 
-homebutton/fn_8052C880.cpp:
+homebutton/hkb_textbox.cpp:
 	.text       start:0x8052C880 end:0x8052E0CC align:16
 	.ctors      start:0x8056F3E8 end:0x8056F3EC
 	.data       start:0x8064A6B0 end:0x8064A738
@@ -3542,36 +3542,59 @@ homebutton/fn_8052C880.cpp:
 	.sbss       start:0x80795A30 end:0x80795A38
 	.sdata2     start:0x8079D580 end:0x8079D598
 
-homebutton/fn_8052E0CC.cpp:
+homebutton/hkb_window.cpp:
 	.text       start:0x8052E0CC end:0x80530680
 	.ctors      start:0x8056F3EC end:0x8056F3F0
 	.data       start:0x8064A738 end:0x8064A800
 	.sbss       start:0x80795A38 end:0x80795A40
 	.sdata2     start:0x8079D598 end:0x8079D5B0
 
-homebutton/fn_80530680.cpp:
+homebutton/hkb_bounding.cpp:
 	.text       start:0x80530680 end:0x8053072C align:16
 	.ctors      start:0x8056F3F0 end:0x8056F3F4
 	.data       start:0x8064A800 end:0x8064A878
 	.sbss       start:0x80795A40 end:0x80795A48
 
-homebutton/fn_8053072C.cpp:
+homebutton/hkb_material.cpp:
 	.text       start:0x8053072C end:0x80533474
 	.data       start:0x8064A878 end:0x8064A8E8
 	.sdata2     start:0x8079D5B0 end:0x8079D5D0
 	.sbss2      start:0x8079D7F0 end:0x8079D7F8
 
-homebutton/fn_80533474.cpp:
-	.text       start:0x80533474 end:0x8053E808
+homebutton/hkb_texmap.cpp:
+	.text       start:0x80533474 end:0x805337A0
+	.sdata2     start:0x8079D5D0 end:0x8079D5E8
+
+homebutton/hkb_drawinfo.cpp:
+	.text       start:0x805337A0 end:0x80533854 align:16
+	.data       start:0x8064A8E8 end:0x8064A8F8
+	.sdata2     start:0x8079D5E8 end:0x8079D5F0
+
+homebutton/hkb_animation.cpp:
+	.text       start:0x80533854 end:0x80534D68
+	.data       start:0x8064A8F8 end:0x8064A920
+	.sdata2     start:0x8079D5F0 end:0x8079D610
+
+homebutton/hkb_resource_accessor.cpp:
+	.text       start:0x80534D68 end:0x80534DC0
+	.data       start:0x8064A920 end:0x8064A938
+
+homebutton/hkb_arc_resource_accessor.cpp:
+	.text       start:0x80534DC0 end:0x805352DC align:16
+	.data       start:0x8064A938 end:0x8064A950
+	.sdata      start:0x807944B8 end:0x807944C0
+
+homebutton/hkb_keyboard.cpp:
+	.text       start:0x805352DC end:0x8053E808
 	.ctors      start:0x8056F3F4 end:0x8056F3F8
 	.rodata     start:0x80579450 end:0x8057AB98
-	.data       start:0x8064A8E8 end:0x8064DE88
+	.data       start:0x8064A950 end:0x8064DE88
 	.bss        start:0x807901C0 end:0x807901F0
-	.sdata      start:0x807944B8 end:0x80794568
+	.sdata      start:0x807944C0 end:0x80794568
 	.sbss       start:0x80795A48 end:0x80795A50
-	.sdata2     start:0x8079D5D0 end:0x8079D620
+	.sdata2     start:0x8079D610 end:0x8079D620
 
-homebutton/fn_8053E808.cpp:
+homebutton/hkb_cellphone.cpp:
 	.text       start:0x8053E808 end:0x805425E4
 	.ctors      start:0x8056F3F8 end:0x8056F3FC
 	.rodata     start:0x8057AB98 end:0x8057B098
@@ -3633,22 +3656,22 @@ homebutton/hbm_hermite.cpp:
 	.sbss       start:0x80795A78 end:0x80795A90
 	.sdata2     start:0x8079D718 end:0x8079D738
 
-homebutton/fn_8055F728.cpp:
+homebutton/hkb_cellphone_keys.cpp:
 	.text       start:0x8055F728 end:0x8055FB70
 	.ctors      start:0x8056F418 end:0x8056F41C
-	.rodata     start:0x8057BDB0 end:0x8057C1FC
-	.data       start:0x80652530 end:0x806553C0
+	.rodata     start:0x8057BDB0 end:0x8057C228
+	.data       start:0x80652530 end:0x80655630
 
-homebutton/fn_8055FB70.cpp:
+homebutton/hkb_sign_keys.cpp:
 	.text       start:0x8055FB70 end:0x8055FD58 align:16
 	.ctors      start:0x8056F41C end:0x8056F420
 	.data       start:0x80655630 end:0x80655BD8
-	.sdata      start:0x80794660 end:0x80794668
+	.sdata      start:0x80794658 end:0x80794668
 
-homebutton/fn_8055FD58.cpp:
+homebutton/hkb_qwerty_keys.cpp:
 	.text       start:0x8055FD58 end:0x8056083C
 	.ctors      start:0x8056F420 end:0x8056F424
-	.data       start:0x80655BD8 end:0x80655F50
+	.data       start:0x80655BD8 end:0x80657210
 
 homebutton/hbm_kb_event.cpp:
 	.text       start:0x8056083C end:0x80566440
@@ -3669,6 +3692,7 @@ homebutton/hbm_kb_cursor.cpp:
 
 homebutton/gui.cpp:
 	.text       start:0x80569DAC end:0x8056A478
+	.data       start:0x80658200 end:0x80658290
 	.sdata2     start:0x8079D788 end:0x8079D7A0
 
 homebutton/tiHKBManager.cpp:
@@ -3678,7 +3702,7 @@ homebutton/tiHKBManager.cpp:
 	.bss        start:0x80790D58 end:0x80790DF8
 	.sdata2     start:0x8079D7A0 end:0x8079D7B0
 
-homebutton/fn_8056D814.cpp:
+homebutton/hkb_widget_tail.cpp:
 	.text       start:0x8056D814 end:0x8056F2B4
 	.rodata     start:0x8057C760 end:0x8057C808
 	.data       start:0x80658458 end:0x806584E4

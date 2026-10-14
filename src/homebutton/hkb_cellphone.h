@@ -1,8 +1,8 @@
 /*
- * homebutton/fn_8053E808.h - declarations of the symbols owned by `homebutton/fn_8053E808.cpp` that other units call or read.
+ * homebutton/hkb_cellphone.h - declarations of the symbols owned by `homebutton/hkb_cellphone.cpp` that other units call or read.
  */
-#ifndef HOMEBUTTON_FN_8053E808_H
-#define HOMEBUTTON_FN_8053E808_H
+#ifndef HOMEBUTTON_HKB_CELLPHONE_H
+#define HOMEBUTTON_HKB_CELLPHONE_H
 
 #include "types.h"
 

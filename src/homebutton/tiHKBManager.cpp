@@ -1,5 +1,5 @@
 /*
- * homebutton/tiHKBManager.cpp - HOME-button (HBM) software-keyboard code, `.text` 0x8056A478..0x8056D814 (79 functions, 50 reconstructed).
+ * homebutton/tiHKBManager.cpp - software-keyboard code (the tiHKBManager band), `.text` 0x8056A478..0x8056D814 (79 functions, 50 reconstructed).
  *
  * Phase 4 fold: 36 function(s) of 0x8056A478..0x8056BBF0 from the former registered unit `homebutton/gui.cpp`.
  * Phase 4 fold: 14 function(s) of 0x8056BBF0..0x8056D814 from the former registered unit `tiHKBManager.cpp`.
@@ -9,7 +9,7 @@
  *
  * Residuals: partial reconstruction - the functions not defined below keep the target object's bytes; the evidence, type views and
  * per-function residuals of the absorbed sources are in docs/splits/phase4/homebutton-carried-notes.md; the type views are in
- * `homebutton/fn_8054E894.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
+ * `homebutton/hkb_widget.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
  *
  * Notes carried from the former registered unit `tiHKBManager.cpp` (0x8056BBF0..0x8056F2B4):
  *

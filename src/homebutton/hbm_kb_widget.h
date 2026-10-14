@@ -5,7 +5,7 @@
 #define HOMEBUTTON_HBM_KB_WIDGET_H
 
 #include "types.h"
-#include "homebutton/fn_8054E894.h"
+#include "homebutton/hkb_widget.h"
 
 #ifdef __cplusplus
 extern "C" {

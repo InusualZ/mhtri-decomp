@@ -1,8 +1,8 @@
 /*
- * homebutton/fn_8052B004.h - declarations of the symbols owned by `homebutton/fn_8052B004.cpp` that other units call or read.
+ * homebutton/hkb_layout.h - declarations of the symbols owned by `homebutton/hkb_layout.cpp` that other units call or read.
  */
-#ifndef HOMEBUTTON_FN_8052B004_H
-#define HOMEBUTTON_FN_8052B004_H
+#ifndef HOMEBUTTON_HKB_LAYOUT_H
+#define HOMEBUTTON_HKB_LAYOUT_H
 
 #include "types.h"
 

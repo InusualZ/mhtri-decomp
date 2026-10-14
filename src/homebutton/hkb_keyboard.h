@@ -1,8 +1,8 @@
 /*
- * homebutton/fn_80533474.h - declarations of the symbols owned by `homebutton/fn_80533474.cpp` that other units call or read.
+ * homebutton/hkb_keyboard.h - declarations of the symbols owned by `homebutton/hkb_keyboard.cpp` that other units call or read.
  */
-#ifndef HOMEBUTTON_FN_80533474_H
-#define HOMEBUTTON_FN_80533474_H
+#ifndef HOMEBUTTON_HKB_KEYBOARD_H
+#define HOMEBUTTON_HKB_KEYBOARD_H
 
 #include "types.h"
 

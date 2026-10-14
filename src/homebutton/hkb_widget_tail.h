@@ -1,8 +1,8 @@
 /*
- * homebutton/fn_8056D814.h - declarations of the symbols owned by `homebutton/fn_8056D814.cpp` that other units call or read.
+ * homebutton/hkb_widget_tail.h - declarations of the symbols owned by `homebutton/hkb_widget_tail.cpp` that other units call or read.
  */
-#ifndef HOMEBUTTON_FN_8056D814_H
-#define HOMEBUTTON_FN_8056D814_H
+#ifndef HOMEBUTTON_HKB_WIDGET_TAIL_H
+#define HOMEBUTTON_HKB_WIDGET_TAIL_H
 
 #include "types.h"
 

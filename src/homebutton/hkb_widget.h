@@ -1,9 +1,5 @@
-/* The types and declarations `src/homebutton/fn_8054E894.cpp` owns (docs/plan.md 6.5, rules 1-5).
- *
- * The unit is the 0x8054E894-0x80555374 slice of the home-button (Wii HOME overlay) software-keyboard
- * block.  It keeps the map's `fn_8054E894` stem (no `__FILE__` string covers the range and the shared
- * runtime dump answers only `zz_054e894_`), so `fn_XXXXXXXX` names are the map's own placeholders and
- * stay legal under rule 7's per-file deferral - see the source header.
+/* homebutton/hkb_widget.h - the software-keyboard widget views shared by homebutton/hbm_text_panel.cpp,
+ * homebutton/hbm_kb_widget.cpp and homebutton/hbm_kb_list.cpp, whose ranges cover 0x8054E894-0x80555374.
  *
  * The types here are *views*: the band spans several classes and the retail objects' layouts are only
  * partly recoverable, so each view declares the fields the bodies below prove and fills the rest with
@@ -17,8 +13,8 @@
  * `homebutton` modules, so there is no sound `unsplit/<module>.h`) is declared here with the
  * signature its call site shows.
  */
-#ifndef MHTRI_HOMEBUTTON_FN_8054E894_H
-#define MHTRI_HOMEBUTTON_FN_8054E894_H
+#ifndef MHTRI_HOMEBUTTON_HKB_WIDGET_H
+#define MHTRI_HOMEBUTTON_HKB_WIDGET_H
 
 #include "types.h"
 

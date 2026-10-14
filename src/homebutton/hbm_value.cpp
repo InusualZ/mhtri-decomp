@@ -1,17 +1,17 @@
 /*
- * homebutton/hbm_value.cpp - HOME-button (HBM) software-keyboard code, `.text` 0x80558EB4..0x8055EAF0 (176 functions, 77 reconstructed).
+ * homebutton/hbm_value.cpp - software-keyboard code (the tiHKBManager band), `.text` 0x80558EB4..0x8055EAF0 (176 functions, 77 reconstructed).
  *
  * Phase 4 fold: 34 function(s) of 0x80558EB4..0x8055C894 from the former registered unit `homebutton/fn_80555374.cpp`.
  * Phase 4 fold: 43 function(s) of 0x8055C894..0x8055EAF0 from the former registered unit `homebutton/keyboard_ui.cpp`.
  *
- * Name: GUESS - `hbm_` (the HOME-button menu library, keyboard part) + the shown-value / dirty / timer helpers, the u16 array and the observer interface callbacks, from the dominant function descriptions
+ * Name: GUESS - `hbm_` (the band's file prefix) + the shown-value / dirty / timer helpers, the u16 array and the observer interface callbacks, from the dominant function descriptions
  * below; the band has no `__FILE__` string and the runtime dump names no function, so every function keeps its `fn_<addr>`
  * placeholder.  The band was built with C++ exceptions off (no extab/extabindex in the target objects), so the scoped
  * `#pragma exceptions off` below is carried from the absorbed sources and applied to every piece.
  *
  * Residuals: partial reconstruction - the functions not defined below keep the target object's bytes; the evidence, type views and
  * per-function residuals of the absorbed sources are in docs/splits/phase4/homebutton-carried-notes.md; the type views are in
- * `homebutton/fn_8054E894.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
+ * `homebutton/hkb_widget.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
  */
 
 #include "types.h"
@@ -24,10 +24,10 @@
 #include "homebutton/hbm_vu_object.h"
 #include "MEM/mem_allocator.h"
 #include "MEM/mem_expheap.h"
-#include "homebutton/fn_8052B004.h"
-#include "homebutton/fn_80533474.h"
-#include "homebutton/fn_8053E808.h"
-#include "homebutton/fn_8056D814.h"
+#include "homebutton/hkb_layout.h"
+#include "homebutton/hkb_keyboard.h"
+#include "homebutton/hkb_cellphone.h"
+#include "homebutton/hkb_widget_tail.h"
 #include "homebutton/hbm_anim_record.h"
 #include "homebutton/hbm_kb_child.h"
 #include "homebutton/hbm_kb_list.h"

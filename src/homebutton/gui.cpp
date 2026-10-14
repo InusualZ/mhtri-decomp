@@ -1,5 +1,12 @@
 /*
- * homebutton/gui.cpp - HOME-button (HBM) software-keyboard code, `.text` 0x80569DAC..0x8056A478 (7 functions, 2 reconstructed).
+ * homebutton/gui.cpp - software-keyboard code, `.text` 0x80569DAC..0x8056A478 (7 functions, 2 reconstructed).
+ *
+ * RANGE. .text 0x80569DAC-0x8056A478; .data 0x80658200-0x80658290; .sdata2 0x8079D788-0x8079D7A0.  The .data object
+ * 0x80658200 is a class table whose own slots are this unit's 0x80569DAC, 0x80569DF4, 0x80569E5C, 0x80569E54 and
+ * 0x80569E4C (the other slots are homebutton/hbm_value.cpp's, homebutton/hkb_keyboard.cpp's and
+ * homebutton/hbm_kb_event.cpp's); it sits between homebutton/hbm_kb_cursor.cpp's .data and homebutton/tiHKBManager.cpp's,
+ * as this unit's .text does, and homebutton/hbm_kb_event.cpp (0x805615F8) is its one reader.  The table is not emitted
+ * yet (rule 10).
  *
  * Phase 4 recut: 2 function(s) of 0x80569DAC..0x8056A478 from the former registered unit `homebutton/gui.cpp`.
  *
@@ -8,7 +15,7 @@
  *
  * Residuals: partial reconstruction - the functions not defined below keep the target object's bytes; the evidence, type views and
  * per-function residuals of the absorbed sources are in docs/splits/phase4/homebutton-carried-notes.md; the type views are in
- * `homebutton/fn_8054E894.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
+ * `homebutton/hkb_widget.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
  */
 
 #include "types.h"

@@ -3,7 +3,7 @@
  *
  * `.text` 0x8052A040..0x8052B004.  Sections of the candidate unit: .text 0x8052A040..0x8052B004; .ctors 0x8056F3E0..0x8056F3E4; .data 0x806498C8..0x8064A5E8; .sbss 0x80795A18..0x80795A20; .sdata2 0x8079D550..0x8079D570.
  *
- * WHAT IT IS. a unit of the HOME-button menu code (HBM, the Wii HOME overlay): layout panel/controller classes of the C++ run that ends in the software keyboard; every function is a `fn_<addr>` placeholder in the map and the `.data` is class vtables and layout vocabulary.
+ * WHAT IT IS. a unit of the software keyboard's layout engine (the tiHKBManager band; main.dol carries no HOME Button Menu code): layout panel/controller classes of the C++ run that ends in the keyboard; every function is a `fn_<addr>` placeholder in the map and the `.data` is class vtables and layout vocabulary.
  *
  * WHY IT SITS HERE. phase 1 grade medium, class vtable-owner: unnamed C++ run after kbd_init_keyboard.
  *
