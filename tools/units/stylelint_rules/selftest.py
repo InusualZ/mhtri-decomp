@@ -188,6 +188,18 @@ def selftest() -> int:
     check("rule7 bodyless: rule 8 still fires without a body",
           lines_of("goto out;\n", 8, pl), [1])
 
+    # --- rule 6: the owner's BT_HDR payload exemption covers only src/BTE/ and the exact idiom ------
+    bte = "src/BTE/hcisu_h2.c"
+    hdr = "void f(BT_HDR* p_buf) {\n    u8* p = (u8*)(p_buf + 1) + p_buf->offset;\n}\n"
+    check("rule6 exempt: the BT_HDR payload idiom in BTE passes", lines_of(hdr, 6, bte), [])
+    check("rule6 exempt: the same idiom outside BTE fires", lines_of(hdr, 6, "src/WUD/wud.c"), [2])
+    check("rule6 exempt: a different pointer on the offset side fires",
+          lines_of(hdr.replace("p_buf->offset", "p_msg->offset"), 6, bte), [2])
+    check("rule6 exempt: a non-1 header step fires",
+          lines_of(hdr.replace("p_buf + 1", "p_buf + 2"), 6, bte), [2])
+    check("rule6 exempt: a plain field poke in BTE still fires",
+          lines_of("void f(void* p) {\n    *(u32*)((u8*)p + 4) = 0;\n}\n", 6, bte), [2])
+
     # --- rule 8: the owner's one exemption covers only its function and its count ----------------
     arc = "src/ARC/arc.c"
     ex = "s32 ARCConvertPathToEntrynum(ARCHandle* h, const char* p) {\n    goto a;\na:\n    goto b;\nb:\n    return 0;\n}\n"
