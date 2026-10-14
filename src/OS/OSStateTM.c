@@ -10,11 +10,14 @@
  *    `__OSSetVIForceDimming` and `VIForceDimmingDone` are GUESSes (ioctl 0x5001 of /dev/stm/immediate, packed as
  *    enable<<7 | step<<3 | level; the callback only clears `StmVdInUse`); `StmImInBuf`, `StmImOutBuf`, `StmVdInBuf` and
  *    `StmVdOutBuf` are GUESSes (the 32-byte in/out blocks of the immediate channel and of the dimming request).
- * RESIDUALS. flipcheck: .sbss claims 0x28 but the object emits 0x20 (the byte at 0x807953C8 is `Debug_BBA`, defined by
- *    `Runtime.PPCEABI.H/__start.c`; the tail of the claim is link padding); .text 0x744 vs the claimed 0x750 pads only once the
- *    successor `OS/OSPlayRecord` is flipped; the string literals are pooled `@NNN` labels where the target names `lbl_80629540` etc.
- *    The .sbss and .bss variables are defined in reverse order of the target's layout because the compiler emits them reversed.
+ * RESIDUALS. none in code; the string literals are pooled `@NNN` labels where the map names them `lbl_80629540` etc.
+ *    (link-neutral); `Runtime.PPCEABI.H/__start.c` still declares `Debug_BBA` itself (its owner is this unit).
+ *    The object's .text ends 0xC bytes and its .sbss 0x7 bytes before the claimed ends (alignment fill).
  * SHAPES. plain C; the event-hook registration is a static inline helper the compiler expands in place.
+ *    `Debug_BBA` (.sbss 0x807953C8, read by `__start.c`) is defined here, above the `static` .sbss words; the .sbss
+ *    and .bss variables are defined in reverse order of the target's layout because the compiler emits them reversed;
+ *    the bindings follow the map (`StmEhInBuf`/`StmEhOutBuf`, the callbacks and the `Stm*` words `static`,
+ *    `VIForceDimmingDone` global).
  */
 
 #include "types.h"
@@ -43,23 +46,24 @@
 static void __OSDefaultResetCallback(void);
 static void __OSDefaultPowerCallback(void);
 static s32 __OSStateEventHandler(s32 result);
-static s32 VIForceDimmingDone(s32 result);
+s32 VIForceDimmingDone(s32 result);
 
-__declspec(align(32)) u32 StmEhInBuf[8];
-__declspec(align(32)) u32 StmEhOutBuf[8];
+static __declspec(align(32)) u32 StmEhInBuf[8];
+static __declspec(align(32)) u32 StmEhOutBuf[8];
 __declspec(align(32)) u32 StmImInBuf[8];
 __declspec(align(32)) u32 StmImOutBuf[8];
 __declspec(align(32)) u32 StmVdInBuf[8];
 __declspec(align(32)) u32 StmVdOutBuf[8];
 
-OSResetCallback ResetCallback;
-OSPowerCallback PowerCallback;
-s32 StmVdInUse;
-s32 StmEhRegistered;
-s32 StmEhDesc;
-s32 StmImDesc;
-s32 StmReady;
-s32 ResetDown;
+u8 Debug_BBA;
+static OSResetCallback ResetCallback;
+static OSPowerCallback PowerCallback;
+static s32 StmVdInUse;
+static s32 StmEhRegistered;
+static s32 StmEhDesc;
+static s32 StmImDesc;
+static s32 StmReady;
+static s32 ResetDown;
 
 /* Posts the asynchronous state-event request; the handler re-posts it on every event. */
 static inline void RegisterStateEvent(void)
@@ -233,7 +237,7 @@ s32 __OSUnRegisterStateEvent(void)
 }
 
 /* Completion of the dimming request: the next one may be posted. */
-static s32 VIForceDimmingDone(s32 result)
+s32 VIForceDimmingDone(s32 result)
 {
     StmVdInUse = FALSE;
     return 0;

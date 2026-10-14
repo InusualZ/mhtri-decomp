@@ -7,19 +7,20 @@
  * NAMES. map names throughout; GUESS: the `OSGetMEM1ArenaHi`, `OSGetMEM1ArenaLo`, `OSSetMEM1ArenaHi`, `OSSetMEM2ArenaHi`, `OSSetMEM1ArenaLo`,
  *    `OSSetMEM2ArenaLo` rows (the dump names the
  *    IPC buffer accessors at those addresses; the bodies read and write the arena words).  (`s_mem2ArenaLo`/`s_mem2ArenaHi` are the map's GUESSes).
- * RESIDUALS. `OSAllocFromMEM1ArenaLo` (97.3 %): the pointer takes r5 where the target holds it in r0 and two adds take their
- *    operands in the other order.  The object's .text ends 12 bytes before the claimed end (alignment padding).
- * SHAPES. none beyond what the bodies show.
+ * RESIDUALS. none in code.  The object's .text ends 12 bytes before the claimed end (alignment padding).
+ * SHAPES. `OSAllocFromMEM1ArenaLo` rounds the arena pointer into both `ptr` and `arenaLo` in one chained assignment,
+ *    then advances and re-rounds `arenaLo` in separate statements (the one-expression form puts the pointer in r5 and
+ *    swaps two add operands); `__OSArenaLo`/`__OSArenaHi` are `static` (map `scope:local`).
  */
 
 #include "types.h"
 
 #include "OS/OSArena.h"
 
-void* __OSArenaLo = (void*)0xFFFFFFFF;
+static void* __OSArenaLo = (void*)0xFFFFFFFF;
 static void* s_mem2ArenaLo = (void*)0xFFFFFFFF;
 static void* s_mem2ArenaHi;
-void* __OSArenaHi;
+static void* __OSArenaHi;
 
 /* Returns the upper arena bound. */
 /* untyped: raw arena address */
@@ -109,9 +110,13 @@ void OSSetArenaLo(void* newBound)
 /* untyped: raw arena address */
 void* OSAllocFromMEM1ArenaLo(u32 size, u32 align)
 {
-    u8* arenaLo = (u8*)__OSArenaLo;
-    u8* ptr = (u8*)(((u32)arenaLo + align - 1) & ~(align - 1));
+    void* ptr;
+    u8* arenaLo;
 
-    __OSArenaLo = (void*)(((u32)ptr + size + align - 1) & ~(align - 1));
+    ptr = __OSArenaLo;
+    arenaLo = ptr = (void*)(((u32)ptr + align - 1) & ~(align - 1));
+    arenaLo += size;
+    arenaLo = (u8*)(((u32)arenaLo + align - 1) & ~(align - 1));
+    __OSArenaLo = arenaLo;
     return ptr;
 }

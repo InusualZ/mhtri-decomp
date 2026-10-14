@@ -3,13 +3,15 @@
  * RANGE. .text 0x804D6520-0x804D6740 (2 functions); .data 0x80629628-0x80629650; .bss 0x8074E360-0x8074E380.  Cut
  *    from the OS core band 0x804C1760-0x804D9B4C.  Evidence: the state.dat path (.data 0x80629628) and the
  *    0x20-byte buffer (.bss 0x8074E360) are read only by these two functions.
- * FLAGS. `cflags_base` per object (configure.py).
+ * FLAGS. `cflags_base` per object (configure.py); both functions sit under a scoped `#pragma global_optimizer off`
+ *    (playbook 120): with it on, the checksum loop hoists two loads ahead and the close result folds into
+ *    `cntlzw`/`srwi`, where the target keeps a load/add pair per word and a `beq`/`li` return.
  * NAMES. map names; `StateFlagsBuffer` is a GUESS (the 0x20-byte staging record both functions fill); `NANDOpen`, `NANDRead`
  *    and `NANDDelete` replace the NAND band's placeholders (each sits beside its `...Async` twin).
- * RESIDUALS. both rows: the target sums the seven words with a plain load/add pair per word where the unrolled loop hoists two loads
- *    ahead (`__OSReadStateFlags`); `__OSWriteStateFlags` returns through `beq`/`li` where the compiler folds the close result into
- *    `cntlzw`/`srwi` (the same fold the NANDBOOTINFO writer's target does contain). .data: the path literal is emitted once.
- * SHAPES. plain C; the checksum is the word sum of the record after its first word.
+ * RESIDUALS. none in code; the path literal is the pooled `@NNN` label where the map names it `lbl_80629628`
+ *    (link-neutral).  The object's .text ends 8 bytes before the claimed end (alignment fill).
+ * SHAPES. plain C; the checksum is the word sum of the record after its first word; `__OSWriteStateFlags` returns FALSE
+ *    from the failed-open `else` and TRUE from the common tail; `StateFlagsBuffer` is global (map binding).
  */
 
 #include "types.h"
@@ -21,7 +23,10 @@
 
 #define STATE_FLAGS_PATH "/title/00000001/00000002/data/state.dat"
 
-static OSStateFlags StateFlagsBuffer;
+OSStateFlags StateFlagsBuffer;
+
+#pragma push
+#pragma global_optimizer off
 
 /* Stores the record with its checksum into the state file. */
 BOOL __OSWriteStateFlags(OSStateFlags* flags)
@@ -44,9 +49,10 @@ BOOL __OSWriteStateFlags(OSStateFlags* flags)
         if (NANDClose(&file) != 0) {
             return FALSE;
         }
-        return TRUE;
+    } else {
+        return FALSE;
     }
-    return FALSE;
+    return TRUE;
 }
 
 /* Loads the record from the state file; clears `flags` and returns FALSE when the file is missing, short or corrupt. */
@@ -80,3 +86,5 @@ BOOL __OSReadStateFlags(OSStateFlags* flags)
     memcpy(flags, &StateFlagsBuffer, sizeof(OSStateFlags));
     return TRUE;
 }
+
+#pragma pop

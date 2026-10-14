@@ -6,13 +6,16 @@
  *    static) is read by `__OSInitAlarm`, `InsertAlarm`, `OSCancelAlarm`, the decrementer callback, the shutdown
  *    hook and `__OSCancelInternalAlarms`, and by nothing outside the range; its `ShutdownFunctionInfo` (.data
  *    0x8061C0C8) is address-taken by `__OSInitAlarm`.
- * FLAGS. `cflags_base` per object (configure.py): the target's function starts are all 16-aligned.
+ * FLAGS. `cflags_base` per object (configure.py): the target's function starts are all 16-aligned; `InsertAlarm` is
+ *    compiled under a scoped `#pragma optimization_level 3` (at the base level its saved registers are permuted:
+ *    alarm r28/handler r29 instead of the target's r30/r31).
  * NAMES. map names throughout (GUESS: `__OSInitAlarm`, which the dump has as a placeholder); `cPhs_Set` (0x804CBC50) is the map's name for a 16-byte alarm accessor (it stores the
  *    user data at +0x28 and -1 at +0x04) and is kept; GUESS: `OSAlarmShutdownFunction` (the shutdown hook that cancels every queued alarm but the DVD driver's), `InsertAlarm`/`DecrementerExceptionCallback`/`DecrementerExceptionHandler` are the map's names.
- * RESIDUALS. `InsertAlarm` (98.5 %): the saved registers are permuted (alarm r28/handler r29 in ours, r30/r31 in the target); no
- *    declaration order or temporary placement changed it.  The object's .text ends 8 bytes before the claimed end (alignment fill).
+ * RESIDUALS. none in code.  The object's .text ends 8 bytes before the claimed end (alignment fill before the
+ *    16-aligned successor).
  * SHAPES. the timer reprogramming (`SetTimer`) is an inline helper expanded in four bodies; the decrementer handler is an
- *    asm function with `nofralloc` that saves the interrupted registers and branches to the callback.
+ *    asm function with `nofralloc` that saves the interrupted registers and branches to the callback; it is `static`
+ *    (map `scope:local`).
  */
 
 #include "types.h"
@@ -36,7 +39,7 @@ typedef struct OSAlarmQueue {
     /* +0x04 */ OSAlarm* tail;
 } OSAlarmQueue;
 
-void DecrementerExceptionHandler(u8 exception, OSContext* context);
+static void DecrementerExceptionHandler(u8 exception, OSContext* context);
 BOOL OSAlarmShutdownFunction(BOOL final, u32 event);
 
 static OSShutdownFunctionInfo ShutdownFunctionInfo = {OSAlarmShutdownFunction, 0xFFFFFFFF, NULL, NULL};
@@ -75,6 +78,8 @@ void OSCreateAlarm(OSAlarm* alarm)
 }
 
 /* Puts `alarm` into the fire-time ordered queue and reprograms the timer when it becomes the head. */
+#pragma push
+#pragma optimization_level 3
 static void InsertAlarm(OSAlarm* alarm, s64 fire, OSAlarmHandler handler)
 {
     OSAlarm* next;
@@ -120,6 +125,7 @@ static void InsertAlarm(OSAlarm* alarm, s64 fire, OSAlarmHandler handler)
         SetTimer(alarm);
     }
 }
+#pragma pop
 
 /* Arms `alarm` to run `handler` after `tick` ticks. */
 void OSSetAlarm(OSAlarm* alarm, s64 tick, OSAlarmHandler handler)
@@ -216,7 +222,7 @@ static void DecrementerExceptionCallback(u8 exception, OSContext* context)
 }
 
 /* Saves the interrupted registers into `context` and branches to the alarm callback on a fresh frame. */
-asm void DecrementerExceptionHandler(u8 exception, OSContext* context)
+static asm void DecrementerExceptionHandler(u8 exception, OSContext* context)
 {
     nofralloc
     stw r0, 0(r4)
