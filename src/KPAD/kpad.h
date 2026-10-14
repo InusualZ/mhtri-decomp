@@ -72,6 +72,17 @@ typedef struct KPADStatus {
     /* +0x60 */ KPADEXStatus ex_status;
 } KPADStatus; /* size: 0xB0 */
 
+/* size: 0x2E - the core record followed by the train controller's buttons, brake and throttle levers. */
+typedef struct KPADTrainStatus {
+    /* +0x00 */ WPADStatus core;
+    /* +0x2A */ u16 trButton;
+    /* +0x2C */ u8 brake;
+    /* +0x2D */ u8 mascon;
+} KPADTrainStatus; /* size: 0x2E */
+
+/* Maps a stick reading to `stick` with a dead zone of `min` and full scale at `max`. */
+typedef void (*KPADClampStick)(Vec2* stick, s32 sx, s32 sy, s32 min, s32 max);
+
 /* size: 0x38 - one raw WPAD sample in the per-channel ring, with the data format it was read in. */
 typedef struct KPADUnifiedWpadStatus {
     /* +0x00 */ union {
@@ -79,6 +90,7 @@ typedef struct KPADUnifiedWpadStatus {
         WPADFSStatus fs;
         WPADCLStatus cl;
         WPADBLStatus bl;
+        KPADTrainStatus tr;
     } u; /* size: 0x36 */
     /* +0x36 */ u8 fmt;
     /* +0x37 */ u8 pad_0x37;
@@ -173,6 +185,7 @@ typedef struct KPADInsideStatus {
 void KPADInit(void);
 void KPADInitEx(KPADUnifiedWpadStatus* uniRingBufs, u32 length);
 void KPADShutdown(void);
+void KPADSetBtnRepeat(s32 chan, f32 delay_sec, f32 pulse_sec);
 s32 KPADRead(s32 chan, KPADStatus* samplingBufs, u32 length);
 
 #ifdef __cplusplus

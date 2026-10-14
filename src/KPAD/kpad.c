@@ -6,28 +6,39 @@
  *   B). One TU: one version string `<< RVL_SDK - KPAD ... >>` (`.data` 0x8061ADA0, registered through `.sdata`
  *   0x80793EB0), one contiguous run per section; the run ends at `MEM/mem_heap.c` (0x804C1760). The tunables the
  *   bodies read live in `mh3_pad.cpp`'s `.sdata` (0x80790EA0..0x80790ED3) and `.sbss` 0x80794800, declared in
- *   `mh3_pad.h`.
+ *   `mh3_pad.h`. The last 4 bytes of the `.sdata` and `.sbss` claims are zero alignment fill (no symbol).
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` and `-fp_contract off` on this object:
  *   the target has 0 fused ops across 406 fadd/fsub/fmul; a calc_acc probe gives 42 insns with 3 fmadds under
- *   `-fp_contract on` and 45 insns with 0 fused under `off`, the target's opcode sequence.
+ *   `-fp_contract on` and 45 insns with 0 fused under `off`, the target's opcode sequence. `#pragma auto_inline off`:
+ *   under `cflags_base`'s `-inline auto` MWCC defers code generation and emits callees ahead of their callers
+ *   (KPADiRead before KPADRead, KPADInitEx before KPADInit, the callbacks ahead of KPADShutdown); with auto-inlining
+ *   off (or `-inline on` on the command line) the functions come out in the target's source order, every row scores
+ *   the same, and the explicitly `inline` helpers are still inlined.
  * NAMES. functions: the map's SDK-style names (GUESS by shape: reset_kpad ... KPADiSamplingCallback; KPADRead is
- *   the map's). Types: `KPADStatus`/`KPADEXStatus`/`Vec2` follow the SDK's public header; `KPADInsideStatus`,
- *   `KPADObj`, `KPADUnifiedWpadStatus` field names are GUESS from use (offsets/sizes from the code: 0x578 stride,
- *   0xB0 copy loop, 0x38 ring stride). Inline helpers reset_wbc, clear_wpad_ring, calc_dpd2pos_scale,
- *   set_obj_interval, request_reset_all are GUESS names for code repeated in KPADInitEx/KPADiConnectCallback.
- *   KP_DEV_TRAIN (16) / KP_DEV_GUITAR (17) are GUESS names for the two extra classic-button device types. Data
- *   statics: `__KPADVersion` is the SDK's; the rest are the map's GUESS SDK-style names (idist_org,
- *   iaccXY_nrm_hori, isec_nrm11, icenter_org, kp_mode_table, kp_fs_fstick_*, kp_cl_stick_*, kp_cl_trigger_*,
- *   kp_rm_acc_max, kp_fs_acc_max, kp_ex_trigger_*, kp_ex_analog_*, kp_stick_clamp_mode, kp_dpd_center_init,
- *   kp_initialized, kp_init_angle, kp_dist_init, kp_acc_mtx, inside_kpads, kp_wbc_*).
+ *   the map's). KPADSetBtnRepeat is the SDK API name; its body (the 200.0f samples-per-second scale) is a GUESS.
+ *   Inline helpers clamp_acc, reset_wbc, clear_wpad_ring, calc_dpd2pos_scale, set_obj_interval, request_reset_all,
+ *   calc_ex_analog, clear_wbc_weights, reset_cl_status, finish_control_dpd and get_ring_sample are GUESS
+ *   names for code the target repeats or inlines. Types: `KPADStatus`/`KPADEXStatus`/`Vec2` follow the SDK's
+ *   public header; `KPADInsideStatus`, `KPADObj`, `KPADUnifiedWpadStatus`, `KPADTrainStatus` (brake/mascon) and
+ *   `KPADClampStick` are GUESS from use (offsets/sizes from the code: 0x578 stride, 0xB0 copy loop, 0x38 ring
+ *   stride). Device ids KP_DEV_* (0 core, 1 Nunchuk, 2 classic, 3 balance board, 16 train, 17 guitar, 251/252/255
+ *   future/unsupported/unknown), data formats KP_FMT_* (3..12), WPAD sample errors KP_WPAD_ERR_* (-2/-4/-7) and the
+ *   KPADRead codes KPAD_READ_ERR_* (0..-5) are GUESS names for the values the code tests. Data statics:
+ *   `__KPADVersion` is the SDK's; the rest are the map's GUESS SDK-style names (idist_org, iaccXY_nrm_hori,
+ *   isec_nrm11, icenter_org, kp_mode_table, kp_fs_fstick_*, kp_cl_stick_*, kp_cl_trigger_*, kp_rm_acc_max,
+ *   kp_fs_acc_max, kp_ex_trigger_*, kp_ex_analog_*, kp_stick_clamp_mode, kp_dpd_center_init, kp_initialized,
+ *   kp_init_angle, kp_dist_init, kp_acc_mtx, inside_kpads, kp_wbc_*).
  * RESIDUALS.
- *   - unwritten: calc_dpd_variable 0x804BEAE0 (0x5CC), read_kpad_dpd 0x804BF0B0 (0x47C), read_kpad_ext 0x804BF890
- *     (0x8D0), KPADiRead 0x804C0170 (0x72C), KPADiSamplingCallback 0x804C0FF0 (0x768); declared only.
- *   - `.bss` order: MWCC lays `.bss` out in first-reference order (measured with a probe), so `kp_acc_mtx`
- *     (first read in read_kpad_acc) lands before `inside_kpads`; the target has `inside_kpads` at +0. Inference,
- *     not proven: the original referenced `inside_kpads` ahead of reset_kpad in public setters the link
- *     dead-stripped (the `DVD/dvd_broadway.c` precedent); `.sdata2` order (0.0f, 0.5f first) points the same way.
- *     KPADInitEx and KPADiConnectCallback keep the `...bss.0+0x30` vs `inside_kpads` operand difference.
+ *   - KPADSetBtnRepeat has no target bytes: mwld strips it (no caller). It is what puts 0.0f/0.5f at the head of
+ *     `.sdata2` and `inside_kpads` at `.bss`+0 (MWCC orders both by first use). Our object carries it (+0x88
+ *     `.text`) and its 200.0f literal (`.sdata2`+0x8, 9 differing bytes); a flip needs a trial link proving both
+ *     are stripped.
+ *   - KPADiRead: `&samplingBufs[count]` is CSE'd into r27 across the ring copy loop (target recomputes it after
+ *     OSRestoreInterrupts), the u16 `count` argument of read_kpad_button gets a `clrlwi` the target lacks, and
+ *     kp/chan/length take r24/r26/r25 (target r26/r25/r24).
+ *   - calc_dpd_variable: the pointer-position block schedules `-sec_nrm.y * sec_nrm11.x` after
+ *     `sec_nrm.x * sec_nrm11.x` and loads `dpd_valid_fg` late (target: early); temps at block or function scope
+ *     and declaration order do not move it.
  *   - KPADInitEx: `lis KPADiSamplingCallback@ha` is scheduled after `lis KPADiConnectCallback@ha` (target: before).
  *   - select_2obj_first: the hoisted constants 1.0f/0.0f and `max` take f29..f31 in a different order.
  *   - `mh3_pad.cpp` still declares KPADInit/KPADShutdown locally instead of including `kpad.h`.
@@ -36,8 +47,11 @@
  *   before reading the old hold; select_2obj_continue reuses `dist` for the reciprocal length. A chained
  *   `a = b = x` stores right to left (`kp_dist_init = kp_err_dist_min = ...` writes kp_err_dist_min first), so the
  *   relocation order depends on the chain's order; the WBC flags are separate statements for that reason.
- *   KPADiRead and KPADiSamplingCallback are non-static because slice-1 code references them before their
- *   definitions exist, and their map rows are global.
+ *   read_kpad_dpd's object selection is a `for (;;)` with one shared `valid = 0` fall-through; its pair loops share
+ *   one `last` end pointer. KPADiSamplingCallback leaves its device-mode block for an unknown device through a
+ *   `continue` of a `do { } while (0)`, and declares `kp` ahead of `uwp` (the other order swaps r29/r30).
+ *   KPADiRead's probe-failure path inlines finish_control_dpd, which KPADiControlDpdCallback also calls (a later
+ *   definition is not inlined).
  */
 #include "KPAD/kpad.h"
 #include "MSL/s_cos.h"
@@ -49,20 +63,44 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "mh3_pad.h"
 
+#pragma auto_inline off
+
 /* WPAD device types and data formats the library tests. */
+#define KP_DEV_CORE 0
 #define KP_DEV_FREESTYLE 1
 #define KP_DEV_CLASSIC 2
+#define KP_DEV_BALANCE 3
 #define KP_DEV_TRAIN 16
 #define KP_DEV_GUITAR 17
+#define KP_DEV_FUTURE 251
+#define KP_DEV_NOT_SUPPORTED 252
 #define KP_DEV_NOT_FOUND 253
+#define KP_DEV_UNKNOWN 255
 
 #define KP_FMT_CORE_ACC 1
 #define KP_FMT_CORE_ACC_DPD 2
+#define KP_FMT_FS 3
 #define KP_FMT_FS_ACC 4
 #define KP_FMT_FS_ACC_DPD 5
+#define KP_FMT_CLASSIC 6
 #define KP_FMT_CLASSIC_ACC 7
 #define KP_FMT_CLASSIC_ACC_DPD 8
-#define KP_FMT_CORE_ACC_DPD_FULL 11
+#define KP_FMT_TRAIN 10
+#define KP_FMT_GUITAR 11
+#define KP_FMT_BALANCE 12
+
+/* WPAD sample errors the library tests. */
+#define KP_WPAD_ERR_BUSY -2
+#define KP_WPAD_ERR_INVALID -4
+#define KP_WPAD_ERR_CORRUPTED -7
+
+/* KPADRead error codes. */
+#define KPAD_READ_ERR_NONE 0
+#define KPAD_READ_ERR_NO_DATA -1
+#define KPAD_READ_ERR_NO_CONTROLLER -2
+#define KPAD_READ_ERR_SETUP -3
+#define KPAD_READ_ERR_LOCKED -4
+#define KPAD_READ_ERR_INIT -5
 
 #define KPAD_BUTTON_RPT 0x80000000
 #define KPAD_RING_BUFS 16
@@ -112,12 +150,27 @@ static u8 kp_mode_table[12][2] = {
     { 0, 11 }, { 1, 11 }, { 0, 12 }, { 0, 12 }, { 0, 10 }, { 0, 10 },
 };
 
-static void calc_dpd_variable(KPADInsideStatus* kp, s8 valid);
-static void read_kpad_dpd(KPADInsideStatus* kp, KPADUnifiedWpadStatus* uwp);
-static void read_kpad_ext(KPADInsideStatus* kp, KPADUnifiedWpadStatus* uwp);
 s32 KPADiRead(s32 chan, KPADStatus* samplingBufs, u32 length, s32* err, BOOL readEx);
-static void KPADiConnectCallback(s32 chan, s32 reason);
 void KPADiSamplingCallback(s32 chan);
+static void KPADiConnectCallback(s32 chan, s32 reason);
+
+/* Sets the button auto-repeat delay and interval of channel `chan` in seconds; a zero interval turns repeat off. */
+void KPADSetBtnRepeat(s32 chan, f32 delay_sec, f32 pulse_sec)
+{
+    KPADInsideStatus* kp = &inside_kpads[chan];
+
+    if (pulse_sec != 0.0f) {
+        kp->btn_repeat_delay = (u16)(s32)(delay_sec * 200.0f + 0.5f);
+        kp->btn_repeat_pulse = (u16)(s32)(pulse_sec * 200.0f + 0.5f);
+    } else {
+        kp->btn_repeat_delay = 40000;
+        kp->btn_repeat_pulse = 0;
+    }
+    kp->btn_repeat_time = 0;
+    kp->btn_repeat_next = kp->btn_repeat_delay;
+    kp->btn_cl_repeat_time = 0;
+    kp->btn_cl_repeat_next = kp->btn_repeat_delay;
+}
 
 /* 0x804BD780 (0x1D0): Clears the processed state of one channel back to its resting values. */
 static void reset_kpad(KPADInsideStatus* kp)
@@ -382,7 +435,7 @@ static void read_kpad_acc(KPADInsideStatus* kp, KPADUnifiedWpadStatus* uwp)
     case KP_FMT_FS_ACC_DPD:
     case KP_FMT_CLASSIC_ACC:
     case KP_FMT_CLASSIC_ACC_DPD:
-    case KP_FMT_CORE_ACC_DPD_FULL:
+    case KP_FMT_GUITAR:
         break;
     default:
         return;
@@ -654,6 +707,281 @@ static s8 select_1obj_continue(KPADInsideStatus* kp)
     return 1;
 }
 
+/* 0x804BEAE0 (0x5CC): Derives the pointer's horizon, distance and screen position from the tracked object pair. */
+static void calc_dpd_variable(KPADInsideStatus* kp, s8 valid)
+{
+    f32 f1, f2;
+    Vec2 pos, vec;
+
+    if (valid == 0) {
+        kp->status.dpd_valid_fg = 0;
+        return;
+    }
+
+    pos.x = kp->sec_nrm11.x * kp->sec_nrm.x + kp->sec_nrm11.y * kp->sec_nrm.y;
+    pos.y = kp->sec_nrm11.y * kp->sec_nrm.x - kp->sec_nrm11.x * kp->sec_nrm.y;
+    if (kp->status.dpd_valid_fg == 0) {
+        kp->status.horizon = pos;
+        kp->status.hori_vec = icenter_org;
+        kp->status.hori_speed = 0.0f;
+    } else {
+        vec.x = pos.x - kp->status.horizon.x;
+        vec.y = pos.y - kp->status.horizon.y;
+        f1 = (f32)sqrt(vec.x * vec.x + vec.y * vec.y);
+        if (kp->hori_play_mode == 0) {
+            if (f1 >= kp->hori_play_radius) {
+                f2 = 1.0f;
+            } else {
+                f2 = f1 / kp->hori_play_radius;
+                f2 *= f2;
+                f2 *= f2;
+            }
+            f2 *= kp->hori_sensitivity;
+            vec.x = kp->status.horizon.x + f2 * vec.x;
+            vec.y = kp->status.horizon.y + f2 * vec.y;
+            f1 = (f32)sqrt(vec.x * vec.x + vec.y * vec.y);
+            vec.x /= f1;
+            vec.y /= f1;
+            kp->status.hori_vec.x = vec.x - kp->status.horizon.x;
+            kp->status.hori_vec.y = vec.y - kp->status.horizon.y;
+            kp->status.hori_speed = (f32)sqrt(kp->status.hori_vec.x * kp->status.hori_vec.x
+                                              + kp->status.hori_vec.y * kp->status.hori_vec.y);
+            kp->status.horizon = vec;
+        } else if (f1 > kp->hori_play_radius) {
+            f2 = kp->hori_sensitivity * ((f1 - kp->hori_play_radius) / f1);
+            vec.x = kp->status.horizon.x + vec.x * f2;
+            vec.y = kp->status.horizon.y + vec.y * f2;
+            f1 = (f32)sqrt(vec.x * vec.x + vec.y * vec.y);
+            vec.x /= f1;
+            vec.y /= f1;
+            kp->status.hori_vec.x = vec.x - kp->status.horizon.x;
+            kp->status.hori_vec.y = vec.y - kp->status.horizon.y;
+            kp->status.hori_speed = (f32)sqrt(kp->status.hori_vec.x * kp->status.hori_vec.x
+                                              + kp->status.hori_vec.y * kp->status.hori_vec.y);
+            kp->status.horizon = vec;
+        } else {
+            kp->status.hori_vec = icenter_org;
+            kp->status.hori_speed = 0.0f;
+        }
+    }
+
+    f1 = kp->dist_scale / kp->sec_dist;
+    if (kp->status.dpd_valid_fg == 0) {
+        kp->status.dist = f1;
+        kp->status.dist_vec = 0.0f;
+        kp->status.dist_speed = 0.0f;
+    } else {
+        f2 = f1 - kp->status.dist;
+        if (f2 < 0.0f) {
+            f1 = -f2;
+        } else {
+            f1 = f2;
+        }
+        if (kp->dist_play_mode == 0) {
+            if (f1 >= kp->dist_play_radius) {
+                f1 = 1.0f;
+            } else {
+                f1 /= kp->dist_play_radius;
+                f1 *= f1;
+                f1 *= f1;
+            }
+            f1 *= kp->dist_sensitivity;
+            kp->status.dist_vec = f1 * f2;
+            if (kp->status.dist_vec < 0.0f) {
+                kp->status.dist_speed = -kp->status.dist_vec;
+            } else {
+                kp->status.dist_speed = kp->status.dist_vec;
+            }
+            kp->status.dist += kp->status.dist_vec;
+        } else if (f1 > kp->dist_play_radius) {
+            f1 = kp->dist_sensitivity * ((f1 - kp->dist_play_radius) / f1);
+            kp->status.dist_vec = f1 * f2;
+            if (kp->status.dist_vec < 0.0f) {
+                kp->status.dist_speed = -kp->status.dist_vec;
+            } else {
+                kp->status.dist_speed = kp->status.dist_vec;
+            }
+            kp->status.dist += kp->status.dist_vec;
+        } else {
+            kp->status.dist_vec = 0.0f;
+            kp->status.dist_speed = 0.0f;
+        }
+    }
+
+    {
+        f32 nx = kp->sec_nrm.x * kp->sec_nrm11.x + kp->sec_nrm.y * kp->sec_nrm11.y;
+        f32 ny = -kp->sec_nrm.y * kp->sec_nrm11.x + kp->sec_nrm.x * kp->sec_nrm11.y;
+        f32 mx = 0.5f * (kp->kobj_regular[0].center.x + kp->kobj_regular[1].center.x);
+        f32 my = 0.5f * (kp->kobj_regular[0].center.y + kp->kobj_regular[1].center.y);
+
+        vec.x = kp->dpd2pos_scale * (kp->center_org.x - (nx * mx - ny * my));
+        vec.y = kp->dpd2pos_scale * (kp->center_org.y - (ny * mx + nx * my));
+    }
+    pos.x = -kp->accXY_nrm_hori.y * vec.x + kp->accXY_nrm_hori.x * vec.y;
+    pos.y = -kp->accXY_nrm_hori.x * vec.x - kp->accXY_nrm_hori.y * vec.y;
+    if (kp->status.dpd_valid_fg == 0) {
+        kp->status.pos = pos;
+        kp->status.vec = icenter_org;
+        kp->status.speed = 0.0f;
+    } else {
+        vec.x = pos.x - kp->status.pos.x;
+        vec.y = pos.y - kp->status.pos.y;
+        f1 = (f32)sqrt(vec.x * vec.x + vec.y * vec.y);
+        if (kp->pos_play_mode == 0) {
+            if (f1 >= kp->pos_play_radius) {
+                f2 = 1.0f;
+            } else {
+                f2 = f1 / kp->pos_play_radius;
+                f2 *= f2;
+                f2 *= f2;
+            }
+            f2 *= kp->pos_sensitivity;
+            kp->status.vec.x = f2 * vec.x;
+            kp->status.vec.y = f2 * vec.y;
+            kp->status.speed = (f32)sqrt(kp->status.vec.x * kp->status.vec.x + kp->status.vec.y * kp->status.vec.y);
+            kp->status.pos.x += kp->status.vec.x;
+            kp->status.pos.y += kp->status.vec.y;
+        } else if (f1 > kp->pos_play_radius) {
+            f2 = kp->pos_sensitivity * ((f1 - kp->pos_play_radius) / f1);
+            kp->status.vec.x = f2 * vec.x;
+            kp->status.vec.y = f2 * vec.y;
+            kp->status.speed = (f32)sqrt(kp->status.vec.x * kp->status.vec.x + kp->status.vec.y * kp->status.vec.y);
+            kp->status.pos.x += kp->status.vec.x;
+            kp->status.pos.y += kp->status.vec.y;
+        } else {
+            kp->status.vec = icenter_org;
+            kp->status.speed = 0.0f;
+        }
+    }
+
+    kp->status.dpd_valid_fg = valid;
+}
+
+/* 0x804BF0B0 (0x47C): Converts the pointer objects of one sample, picks the tracked pair and updates the pointer
+ * state. */
+static void read_kpad_dpd(KPADInsideStatus* kp, KPADUnifiedWpadStatus* uwp)
+{
+    WPADDpdObject* wp;
+    KPADObj *op1, *op2, *last;
+    f32 vy, vx, f1;
+    s8 valid;
+
+    if (uwp->fmt == KP_FMT_CORE_ACC_DPD || uwp->fmt == KP_FMT_FS_ACC_DPD || uwp->fmt == KP_FMT_CLASSIC_ACC_DPD
+        || (uwp->fmt == KP_FMT_GUITAR && kp->dpd_enabled)) {
+        wp = &uwp->u.core.obj[3];
+        op1 = &kp->kobj_sample[3];
+        do {
+            if ((u16)wp->size != 0) {
+                op1->center.x = 0.001953125f * (f32)wp->x - 0.99902344f;
+                op1->center.y = 0.001953125f * (f32)wp->y - 0.74902344f;
+                op1->error_fg = 0;
+                op1->state_fg = 0;
+            } else {
+                op1->error_fg = -1;
+            }
+            --wp;
+        } while (--op1 >= kp->kobj_sample);
+    } else {
+        op1 = &kp->kobj_sample[3];
+        do {
+            op1->error_fg = -1;
+        } while (--op1 >= kp->kobj_sample);
+    }
+
+    last = &kp->kobj_sample[3];
+    op1 = last;
+    do {
+        if (op1->error_fg < 0) {
+            continue;
+        }
+        if (op1->center.x <= kp->frame_min.x || op1->center.x >= kp->frame_max.x || op1->center.y <= kp->frame_min.y
+            || op1->center.y >= kp->frame_max.y) {
+            op1->error_fg |= 1;
+        }
+    } while (--op1 >= kp->kobj_sample);
+
+    op2 = kp->kobj_sample;
+    do {
+        if (op2->error_fg != 0) {
+            continue;
+        }
+        op1 = op2 + 1;
+        do {
+            if (op1->error_fg == 0 && op2->center.x == op1->center.x && op2->center.y == op1->center.y) {
+                op1->error_fg |= 2;
+            }
+        } while (++op1 <= last);
+    } while (++op2 < last);
+
+    kp->valid_objs = 0;
+    op1 = &kp->kobj_sample[3];
+    do {
+        if (op1->error_fg == 0) {
+            ++kp->valid_objs;
+        }
+    } while (--op1 >= kp->kobj_sample);
+
+    for (;;) {
+        if (!(kp->status.acc_vertical.x <= kp_err_up_inpr)) {
+            if (kp->status.dpd_valid_fg == 2 || kp->status.dpd_valid_fg == -2) {
+                if (kp->valid_objs >= 2 && (valid = select_2obj_continue(kp)) != 0) {
+                    break;
+                }
+                if (kp->valid_objs >= 1 && (valid = select_1obj_continue(kp)) != 0) {
+                    break;
+                }
+            } else if (kp->status.dpd_valid_fg == 1 || kp->status.dpd_valid_fg == -1) {
+                if (kp->valid_objs >= 2 && (valid = select_2obj_first(kp)) != 0) {
+                    break;
+                }
+                if (kp->valid_objs >= 1 && (valid = select_1obj_continue(kp)) != 0) {
+                    break;
+                }
+            } else {
+                if (kp->valid_objs >= 2 && (valid = select_2obj_first(kp)) != 0) {
+                    break;
+                }
+                if (kp->valid_objs == 1 && (valid = select_1obj_first(kp)) != 0) {
+                    break;
+                }
+            }
+        }
+        valid = 0;
+        break;
+    }
+
+    if (valid != 0) {
+        vx = kp->kobj_regular[1].center.x - kp->kobj_regular[0].center.x;
+        vy = kp->kobj_regular[1].center.y - kp->kobj_regular[0].center.y;
+        f1 = (f32)sqrt(vx * vx + vy * vy);
+        kp->sec_dist = f1;
+        f1 = 1.0f / f1;
+        kp->sec_nrm.x = vx *= f1;
+        kp->dist_last = kp->dist_scale * f1;
+        kp->sec_nrm.y = vy *= f1;
+        kp->dpd_horizon.x = kp->sec_nrm11.x * vx + kp->sec_nrm11.y * vy;
+        kp->dpd_horizon.y = kp->sec_nrm11.y * vx - kp->sec_nrm11.x * vy;
+        if (kp->ah_circle_ct == 0
+            && kp->dpd_horizon.x * kp->acc_horizon.x + kp->dpd_horizon.y * kp->acc_horizon.y <= kp_err_acc_inpr) {
+            kp->kobj_regular[0].error_fg = kp->kobj_regular[1].error_fg = 1;
+            valid = 0;
+        }
+        if (kp->status.dpd_valid_fg == 2 && valid == 2) {
+            if (kp->trust_sec_ct == 200) {
+                kp->trust_sec_dist = kp->sec_dist;
+            } else {
+                ++kp->trust_sec_ct;
+            }
+        } else {
+            kp->trust_sec_ct = 0;
+        }
+    } else {
+        kp->trust_sec_ct = 0;
+    }
+
+    calc_dpd_variable(kp, valid);
+}
+
 /* 0x804BF530 (0x128): Maps a stick reading to the unit circle with a dead zone of `min` and full scale at `max`. */
 static void clamp_stick_circle(Vec2* stick, s32 sx, s32 sy, s32 min, s32 max)
 {
@@ -726,10 +1054,402 @@ static void clamp_stick_cross(Vec2* stick, s32 sx, s32 sy, s32 min, s32 max)
     }
 }
 
+/* Maps an analog extension reading to 0..1 with a dead zone below `min` and full scale at `max`. */
+static inline void calc_ex_analog(f32* dst, s32 value, s32 min, s32 max)
+{
+    if (value <= min) {
+        *dst = 0.0f;
+    } else if (value >= max) {
+        *dst = 1.0f;
+    } else {
+        *dst = (f32)(value - min) / (f32)(max - min);
+    }
+}
+
+/* Restarts the balance-board zero-point calibration and clears its weight buffers. */
+static inline void clear_wbc_weights(void)
+{
+    s32 i;
+
+    kp_wbc_state = 0;
+    kp_wbc_wait_count = 0;
+    kp_wbc_zero_pending = 0;
+    for (i = 0; i < 4; i++) {
+        kp_wbc_weight[i] = 0.0;
+        kp_wbc_zero[i] = 0.0;
+    }
+}
+
+/* Clears the classic-style extension state after a device change. */
+static inline void reset_cl_status(KPADInsideStatus* kp, KPADEXStatus* ex)
+{
+    if (kp->dev_changed) {
+        kp->dev_changed = 0;
+        ex->cl.lstick = icenter_org;
+        ex->cl.rstick = icenter_org;
+        ex->cl.ltrigger = ex->cl.rtrigger = 0.0f;
+        ex->cl.hold = ex->cl.trig = ex->cl.release = 0;
+        kp->btn_cl_repeat_time = 0;
+        kp->btn_cl_repeat_next = kp->btn_repeat_delay;
+    }
+}
+
+/* 0x804BF890 (0x8D0): Converts the attached extension's sticks, triggers or load cells of one sample. */
+static void read_kpad_ext(KPADInsideStatus* kp, KPADUnifiedWpadStatus* uwp)
+{
+    KPADClampStick clamp = clamp_stick_circle;
+    KPADEXStatus* ex = &kp->status.ex_status;
+    s32 i;
+
+    if (kp_stick_clamp_mode != 0) {
+        clamp = clamp_stick_cross;
+    }
+
+    if (uwp->u.core.dev == KP_DEV_FREESTYLE && uwp->fmt >= KP_FMT_FS && uwp->fmt <= KP_FMT_FS_ACC_DPD) {
+        if (kp->dev_changed) {
+            kp->dev_changed = 0;
+            ex->fs.stick = icenter_org;
+            ex->fs.acc.x = ex->fs.acc.z = 0.0f;
+            ex->fs.acc.y = -1.0f;
+            ex->fs.acc_value = 1.0f;
+            ex->fs.acc_speed = 0.0f;
+        }
+        clamp(&ex->fs.stick, uwp->u.fs.fsStickX, uwp->u.fs.fsStickY, kp_fs_fstick_min, kp_fs_fstick_max);
+    } else if (uwp->u.core.dev == KP_DEV_CLASSIC && uwp->fmt >= KP_FMT_CLASSIC && uwp->fmt <= KP_FMT_CLASSIC_ACC_DPD) {
+        reset_cl_status(kp, ex);
+        clamp(&ex->cl.lstick, uwp->u.cl.clLStickX, uwp->u.cl.clLStickY, kp_cl_stick_min, kp_cl_stick_max);
+        clamp(&ex->cl.rstick, uwp->u.cl.clRStickX, uwp->u.cl.clRStickY, kp_cl_stick_min, kp_cl_stick_max);
+        calc_ex_analog(&ex->cl.ltrigger, uwp->u.cl.clTriggerL, kp_cl_trigger_min, kp_cl_trigger_max);
+        calc_ex_analog(&ex->cl.rtrigger, uwp->u.cl.clTriggerR, kp_cl_trigger_min, kp_cl_trigger_max);
+    } else if (uwp->u.core.dev == KP_DEV_GUITAR && uwp->fmt == KP_FMT_GUITAR) {
+        reset_cl_status(kp, ex);
+        clamp(&ex->cl.lstick, uwp->u.cl.clLStickX, uwp->u.cl.clLStickY, kp_cl_stick_min, kp_cl_stick_max);
+        calc_ex_analog(&ex->cl.rstick.x, uwp->u.cl.clRStickX, kp_ex_analog_min, kp_ex_analog_max);
+        calc_ex_analog(&ex->cl.rstick.y, uwp->u.cl.clRStickY, kp_ex_analog_min, kp_ex_analog_max);
+        calc_ex_analog(&ex->cl.ltrigger, uwp->u.cl.clTriggerL, kp_ex_trigger_min, kp_ex_trigger_max);
+        calc_ex_analog(&ex->cl.rtrigger, uwp->u.cl.clTriggerR, kp_ex_trigger_min, kp_ex_trigger_max);
+    } else if (uwp->u.core.dev == KP_DEV_TRAIN && uwp->fmt == KP_FMT_TRAIN) {
+        reset_cl_status(kp, ex);
+        ex->cl.lstick.x = ex->cl.lstick.y = 0.0f;
+        ex->cl.rstick.x = ex->cl.rstick.y = 0.0f;
+        calc_ex_analog(&ex->cl.ltrigger, uwp->u.tr.brake, kp_ex_trigger_min, kp_ex_trigger_max);
+        calc_ex_analog(&ex->cl.rtrigger, uwp->u.tr.mascon, kp_ex_trigger_min, kp_ex_trigger_max);
+    } else if (uwp->u.core.dev == KP_DEV_BALANCE && uwp->fmt == KP_FMT_BALANCE) {
+        if (kp->dev_changed) {
+            kp->dev_changed = 0;
+            clear_wbc_weights();
+        }
+        if (WPADiReturnZeroC(uwp->u.bl.battery) == 0) {
+            ex->bl.weight_err = -1;
+        } else if (kp_wbc_state < 3) {
+            ex->bl.weight_err = -2;
+        } else if (uwp->u.bl.temp == 127 || uwp->u.bl.temp == -128) {
+            ex->bl.weight_err = -3;
+        } else {
+            ex->bl.weight_err = WBCReadDummy(&uwp->u.bl, ex->bl.weight, 4);
+            if (ex->bl.weight_err >= 0) {
+                for (i = 0; i < 4; i++) {
+                    kp_wbc_zero[i] = (kp_wbc_weight_max * kp_wbc_zero[i] + ex->bl.weight[i])
+                                     / (1.0f + kp_wbc_weight_max);
+                }
+                if (kp_wbc_zero_pending) {
+                    kp_wbc_wait_count++;
+                    for (i = 0; i < 4; i++) {
+                        kp_wbc_weight[i] = ((kp_wbc_wait_count - 1) * kp_wbc_weight[i] + ex->bl.weight[i])
+                                           / kp_wbc_wait_count;
+                    }
+                    if (kp_wbc_wait_count == kp_wbc_weight_max) {
+                        kp_wbc_zero_pending = 0;
+                        ex->bl.weight_err = WBCGetTGCWeightDummy(kp_wbc_weight[0] + kp_wbc_weight[1]
+                                                                     + kp_wbc_weight[2] + kp_wbc_weight[3],
+                                                                 &kp_wbc_tgc_weight, &uwp->u.bl);
+                        if (kp_wbc_tgc_weight < -0.5) {
+                            ex->bl.weight_err = -4;
+                        }
+                    }
+                }
+            }
+            for (i = 0; i < 4; i++) {
+                ex->bl.weight_ave[i] = kp_wbc_zero[i];
+            }
+            ex->bl.tgc_weight = kp_wbc_tgc_weight;
+            ex->bl.tgc_weight_err = kp_wbc_zero_pending;
+        }
+    }
+}
+
 /* 0x804C0160 (0xC): Reads up to `length` processed samples of channel `chan`, newest first. */
 s32 KPADRead(s32 chan, KPADStatus* samplingBufs, u32 length)
 {
     return KPADiRead(chan, samplingBufs, length, NULL, FALSE);
+}
+
+/* Notifies the pointer-enable callback once the pointer is on and latches WPAD's pointer state. */
+static inline void finish_control_dpd(KPADInsideStatus* kp, s32 chan, s32 result)
+{
+    if (result == 0 && kp->control_dpd_cb != NULL && !kp->dpd_on_notified) {
+        kp->dpd_on_notified = 1;
+        kp->control_dpd_cb(chan, 1);
+        kp->dpd_off_notified = 0;
+    }
+    kp->dpd_enabled = WPADIsDpdEnabled(chan);
+    kp->dpd_ctrl_busy = 0;
+}
+
+/* Returns raw sample `idx` of the channel's ring: the work record's own ring first, then the caller's. */
+static inline KPADUnifiedWpadStatus* get_ring_sample(KPADInsideStatus* kp, s32 idx)
+{
+    if (idx >= KPAD_RING_BUFS) {
+        return &kp->uni_ring_bf[idx - KPAD_RING_BUFS];
+    }
+    return &kp->wpad_ring_bf[idx];
+}
+
+/* 0x804C0170 (0x72C): Moves channel `chan`'s raw samples out of its ring and processes them into `samplingBufs`,
+ * newest first; returns the sample count and the read state through `err`. */
+s32 KPADiRead(s32 chan, KPADStatus* samplingBufs, u32 length, s32* err, BOOL readEx)
+{
+    KPADInsideStatus* kp = &inside_kpads[chan];
+    KPADUnifiedWpadStatus* uwp;
+    KPADStatus* sp;
+    KPADStatus saved;
+    BOOL enabled;
+    s32 read_err = KPAD_READ_ERR_NONE;
+    s32 count = 0;
+    s32 idx, i;
+    u32 n;
+    s32 corrupt, dev_mismatch;
+    u32 dev_type;
+    u32 core_btn, fs_btn, cl_btn;
+
+    if (!kp_initialized) {
+        read_err = KPAD_READ_ERR_INIT;
+    } else if (WPADGetStatus() != 3) {
+        read_err = KPAD_READ_ERR_SETUP;
+    } else {
+        enabled = OSDisableInterrupts();
+        if (kp->read_busy) {
+            OSRestoreInterrupts(enabled);
+            read_err = KPAD_READ_ERR_LOCKED;
+        } else {
+            kp->read_busy = 1;
+            if (WPADProbe(chan, NULL) == -1) {
+                reset_kpad(kp);
+                if (kp->control_dpd_cb != NULL && kp->dpd_off_notified && !kp->dpd_on_notified) {
+                    finish_control_dpd(kp, chan, 0);
+                }
+                kp->read_busy = 0;
+                OSRestoreInterrupts(enabled);
+                read_err = KPAD_READ_ERR_NO_CONTROLLER;
+            } else {
+                OSRestoreInterrupts(enabled);
+                if (kp->reset_req) {
+                    kp->status.wpad_err = KP_WPAD_ERR_INVALID;
+                    reset_kpad(kp);
+                }
+                saved = *samplingBufs;
+                if (kp->wpad_ring_lvl > 1 && samplingBufs != NULL && length != 0) {
+                    enabled = OSDisableInterrupts();
+                    n = kp->wpad_ring_lvl;
+                    if (n > length) {
+                        n = length;
+                    }
+                    i = n;
+                    corrupt = 0;
+                    dev_mismatch = 0;
+                    idx = kp->wpad_ring_idx - 1;
+                    if (idx < 0) {
+                        idx = idx + kp->uni_ring_len + KPAD_RING_BUFS;
+                    }
+                    uwp = get_ring_sample(kp, idx);
+                    do {
+                        if (corrupt) {
+                            if (uwp->u.core.err == 0) {
+                                uwp->u.core.err = KP_WPAD_ERR_CORRUPTED;
+                                corrupt = 0;
+                            } else if (uwp->u.core.err == KP_WPAD_ERR_BUSY) {
+                                corrupt = 0;
+                            }
+                        } else if (uwp->u.core.err == KP_WPAD_ERR_CORRUPTED) {
+                            corrupt = 1;
+                        }
+                        if (kp->status.dev_type != uwp->u.core.dev) {
+                            dev_mismatch = 1;
+                        }
+                        if (dev_mismatch) {
+                            uwp->u.core.err = KP_WPAD_ERR_INVALID;
+                        }
+                        if (--idx < 0) {
+                            idx = idx + kp->uni_ring_len + KPAD_RING_BUFS;
+                        }
+                        uwp = get_ring_sample(kp, idx);
+                    } while (--i > 0);
+
+                    kp->wpad_ring_lvl = 1;
+                    if (n > 1) {
+                        count = n - 1;
+                    } else {
+                        count = 1;
+                    }
+                    i = count;
+                    idx = kp->wpad_ring_idx - count - 1;
+                    sp = &samplingBufs[count];
+                    if (idx < 0) {
+                        idx = idx + kp->uni_ring_len + KPAD_RING_BUFS;
+                    }
+                    do {
+                        uwp = get_ring_sample(kp, idx);
+                        ++idx;
+                        *(KPADUnifiedWpadStatus*)--sp = *uwp;
+                        if (idx >= kp->uni_ring_len + KPAD_RING_BUFS) {
+                            idx = 0;
+                        }
+                    } while (--i > 0);
+                    OSRestoreInterrupts(enabled);
+
+                    i = count;
+                    sp = &samplingBufs[count];
+                    if (kp->btn_proc_mode == 1) {
+                        do {
+                            uwp = (KPADUnifiedWpadStatus*)--sp;
+                            if (kp->status.dev_type != uwp->u.core.dev) {
+                                kp->status.dev_type = uwp->u.core.dev;
+                                kp->dev_changed = 1;
+                            }
+                            kp->status.wpad_err = uwp->u.core.err;
+                            core_btn = fs_btn = cl_btn = 0xFFFF;
+                            kp->status.data_format = uwp->fmt;
+                            dev_type = kp->status.dev_type;
+                            switch (kp->status.wpad_err) {
+                            case 0:
+                                if (dev_type == KP_DEV_FREESTYLE) {
+                                    fs_btn = uwp->u.core.button;
+                                    cl_btn = 0;
+                                } else if (dev_type == KP_DEV_CLASSIC || dev_type == KP_DEV_TRAIN
+                                           || dev_type == KP_DEV_GUITAR) {
+                                    cl_btn = uwp->u.cl.clButton;
+                                    fs_btn = 0;
+                                } else {
+                                    cl_btn = 0;
+                                    fs_btn = 0;
+                                }
+                                core_btn = uwp->u.core.button & 0x9F1F;
+                                break;
+                            case KP_WPAD_ERR_CORRUPTED:
+                                cl_btn = 0;
+                                fs_btn = 0;
+                            case KP_WPAD_ERR_BUSY:
+                                core_btn = uwp->u.core.button & 0x9F1F;
+                                break;
+                            }
+                            if (core_btn == 0xFFFF) {
+                                core_btn = kp->status.hold & 0x9F1F;
+                            }
+                            if (fs_btn == 0xFFFF) {
+                                fs_btn = kp->status.hold;
+                            }
+                            if (cl_btn == 0xFFFF) {
+                                cl_btn = kp->status.ex_status.cl.hold;
+                            }
+                            read_kpad_button(kp, dev_type, 1, core_btn, fs_btn, cl_btn);
+                            switch (uwp->u.core.err) {
+                            case 0:
+                                read_kpad_ext(kp, uwp);
+                            case KP_WPAD_ERR_CORRUPTED:
+                                read_kpad_acc(kp, uwp);
+                                read_kpad_dpd(kp, uwp);
+                                break;
+                            default:
+                                if (!readEx) {
+                                    kp->status.dpd_valid_fg = 0;
+                                }
+                                break;
+                            }
+                            *sp = kp->status;
+                        } while (--i > 0);
+                    } else {
+                        core_btn = fs_btn = cl_btn = 0xFFFF;
+                        do {
+                            uwp = (KPADUnifiedWpadStatus*)--sp;
+                            if (kp->status.dev_type != uwp->u.core.dev) {
+                                kp->status.dev_type = uwp->u.core.dev;
+                                kp->dev_changed = 1;
+                            }
+                            dev_type = uwp->u.core.dev;
+                            switch (uwp->u.core.err) {
+                            case 0:
+                                if (dev_type == KP_DEV_FREESTYLE) {
+                                    fs_btn = uwp->u.core.button;
+                                    cl_btn = 0;
+                                } else if (dev_type == KP_DEV_CLASSIC || dev_type == KP_DEV_TRAIN
+                                           || dev_type == KP_DEV_GUITAR) {
+                                    cl_btn = uwp->u.cl.clButton;
+                                    fs_btn = 0;
+                                } else {
+                                    cl_btn = 0;
+                                    fs_btn = 0;
+                                }
+                            case KP_WPAD_ERR_CORRUPTED:
+                            case KP_WPAD_ERR_BUSY:
+                                core_btn = uwp->u.core.button & 0x9F1F;
+                                break;
+                            }
+                        } while (--i > 0);
+                        if (core_btn == 0xFFFF) {
+                            core_btn = kp->status.hold & 0x9F1F;
+                        }
+                        if (fs_btn == 0xFFFF) {
+                            fs_btn = kp->status.hold;
+                        }
+                        if (cl_btn == 0xFFFF) {
+                            cl_btn = kp->status.ex_status.cl.hold;
+                        }
+                        read_kpad_button(kp, dev_type, count, core_btn, fs_btn, cl_btn);
+
+                        i = count;
+                        sp = &samplingBufs[count];
+                        do {
+                            uwp = (KPADUnifiedWpadStatus*)--sp;
+                            kp->status.wpad_err = uwp->u.core.err;
+                            kp->status.data_format = uwp->fmt;
+                            switch (kp->status.wpad_err) {
+                            case 0:
+                                read_kpad_ext(kp, uwp);
+                            case KP_WPAD_ERR_CORRUPTED:
+                                read_kpad_acc(kp, uwp);
+                                read_kpad_dpd(kp, uwp);
+                                break;
+                            default:
+                                if (!readEx) {
+                                    kp->status.dpd_valid_fg = 0;
+                                }
+                                break;
+                            }
+                            *sp = kp->status;
+                        } while (--i > 0);
+                    }
+                }
+                kp->read_busy = 0;
+            }
+        }
+    }
+
+    if (count == 0) {
+        if (read_err == KPAD_READ_ERR_NONE) {
+            if (readEx) {
+                *samplingBufs = saved;
+            }
+            read_err = KPAD_READ_ERR_NO_DATA;
+        } else if (read_err == KPAD_READ_ERR_NO_CONTROLLER && readEx) {
+            samplingBufs->dev_type = KP_DEV_NOT_FOUND;
+            samplingBufs->data_format = 0;
+            samplingBufs->wpad_err = -1;
+        }
+    }
+    if (err != NULL) {
+        *err = read_err;
+    }
+    return count;
 }
 
 /* 0x804C08A0 (0xC): Initialises the library without a caller-supplied sample ring. */
@@ -952,11 +1672,185 @@ static void KPADiControlDpdCallback(s32 chan, s32 result)
 {
     KPADInsideStatus* kp = &inside_kpads[chan];
 
-    if (result == 0 && kp->control_dpd_cb != NULL && !kp->dpd_on_notified) {
-        kp->dpd_on_notified = 1;
-        kp->control_dpd_cb(chan, 1);
-        kp->dpd_off_notified = 0;
+    finish_control_dpd(kp, chan, result);
+}
+
+/* 0x804C0FF0 (0x768): Latches each WPAD sample into the channel's ring, keeps the remote's scales, pointer centre,
+ * pointer mode and data format in step with the attached device, then calls the caller's sampling callback. */
+void KPADiSamplingCallback(s32 chan)
+{
+    KPADInsideStatus* kp = &inside_kpads[chan];
+    KPADUnifiedWpadStatus* uwp;
+    u32 type;
+    WPADAccGravityUnit acc = { 1, 1, 1 };
+    u32 idx;
+    s32 mode;
+    u32 dpd_command;
+    u8* ent;
+    s32 i;
+
+    if (WPADProbe(chan, &type) != -1) {
+        idx = kp->wpad_ring_idx;
+        if (idx >= kp->uni_ring_len + KPAD_RING_BUFS) {
+            idx = 0;
+        }
+        if (idx >= KPAD_RING_BUFS) {
+            uwp = &kp->uni_ring_bf[idx - KPAD_RING_BUFS];
+        } else {
+            uwp = &kp->wpad_ring_bf[idx];
+        }
+        wpadCopyCurrentSample(chan, uwp);
+        uwp->fmt = WPADGetDataFormat(chan);
+        kp->wpad_ring_idx = idx + 1;
+        if (kp->wpad_ring_lvl < kp->uni_ring_len + KPAD_RING_BUFS) {
+            kp->wpad_ring_lvl++;
+        }
+
+        if (type != kp->dev_type_last && type == KP_DEV_FREESTYLE) {
+            kp->acc_scale_update = 1;
+        }
+        if (kp->acc_scale_update) {
+            WPADGetAccGravityUnit(chan, 0, &acc);
+            if (acc.x * acc.y * acc.z != 0) {
+                kp->acc_scale.x = 1.0f / (f32)acc.x;
+                kp->acc_scale.y = 1.0f / (f32)acc.y;
+                kp->acc_scale.z = 1.0f / (f32)acc.z;
+            } else {
+                kp->acc_scale.x = 0.01f;
+                kp->acc_scale.y = 0.01f;
+                kp->acc_scale.z = 0.01f;
+            }
+            WPADGetAccGravityUnit(chan, 1, &acc);
+            if (acc.x * acc.y * acc.z != 0) {
+                kp->fs_acc_scale.x = 1.0f / (f32)acc.x;
+                kp->fs_acc_scale.y = 1.0f / (f32)acc.y;
+                kp->fs_acc_scale.z = 1.0f / (f32)acc.z;
+            } else {
+                kp->fs_acc_scale.x = 0.005f;
+                kp->fs_acc_scale.y = 0.005f;
+                kp->fs_acc_scale.z = 0.005f;
+            }
+            kp->acc_scale_update = 0;
+        }
+
+        if (kp->center_update) {
+            f32 ofs;
+
+            if (kp->use_sensor_bar) {
+                if (WPADGetSensorBarPosition() == 1) {
+                    ofs = 0.2f;
+                } else {
+                    ofs = -0.2f;
+                }
+            } else {
+                ofs = 0.0f;
+            }
+            kp->center_org.x = 0.0f;
+            kp->center_org.y = -ofs;
+            calc_dpd2pos_scale(kp);
+            kp->center_update = 0;
+        }
+
+        do {
+            switch (type) {
+            case KP_DEV_CORE:
+            case KP_DEV_FUTURE:
+            case KP_DEV_NOT_SUPPORTED:
+            case KP_DEV_UNKNOWN:
+                mode = 0;
+                break;
+            case KP_DEV_FREESTYLE:
+                mode = 2;
+                break;
+            case KP_DEV_CLASSIC:
+                mode = 4;
+                break;
+            case KP_DEV_GUITAR:
+                mode = 6;
+                break;
+            case KP_DEV_BALANCE:
+                mode = 8;
+                break;
+            case KP_DEV_TRAIN:
+                mode = 10;
+                break;
+            default:
+                continue;
+            }
+            if (kp->dpd_request) {
+                mode++;
+            }
+
+            if (WPADIsDpdEnabled(chan)) {
+                dpd_command = kp->dpd_command;
+            } else {
+                dpd_command = 0;
+            }
+            ent = kp_mode_table[mode];
+            if (dpd_command != ent[0]) {
+                if (kp->control_dpd_cb != NULL && !kp->dpd_off_notified) {
+                    kp->dpd_off_notified = 1;
+                    kp->control_dpd_cb(chan, 0);
+                    kp->dpd_on_notified = 0;
+                }
+                if (!kp->dpd_ctrl_busy) {
+                    kp->dpd_ctrl_busy = 1;
+                    if (WPADControlDpd(chan, ent[0], KPADiControlDpdCallback) == 0) {
+                        kp->dpd_command = ent[0];
+                    }
+                }
+            } else if (uwp->fmt != ent[1]) {
+                WPADSetDataFormat(chan, ent[1]);
+            }
+
+            if (type == KP_DEV_BALANCE) {
+                if (!kp_wbc_busy && !kp_wbc_setup_done) {
+                    if (wpadSendWbcCommand(chan, 0xAA, KPADiWbcSetupCallback) == 0) {
+                        kp_wbc_busy = 1;
+                    }
+                } else if (kp_wbc_setup_done && !kp_wbc_setup_busy) {
+                    if (!kp_wbc_busy) {
+                        if (WPADiReturnZeroA() == 0) {
+                            kp_wbc_busy = 1;
+                        }
+                    } else {
+                        kp_wbc_setup_busy = WPADiReturnZeroB();
+                        kp_wbc_busy = !kp_wbc_setup_busy;
+                    }
+                } else if (!kp_wbc_busy && kp_wbc_setup_busy && kp_wbc_state < 3) {
+                    switch (kp_wbc_state) {
+                    case 0:
+                        if (wpadSendWbcCommand(chan, 0, KPADiWbcZeroCallback) == 0) {
+                            kp_wbc_busy = 1;
+                        }
+                        break;
+                    case 1:
+                        if (uwp->u.bl.temp == 127 || uwp->u.bl.temp == -128) {
+                            clear_wbc_weights();
+                        } else if (++kp_wbc_wait_count > kp_wbc_setup_retry) {
+                            kp_wbc_state = 2;
+                            kp_wbc_wait_count = 0;
+                        }
+                        break;
+                    case 2:
+                        if (uwp->u.core.err == 0) {
+                            kp_wbc_wait_count++;
+                            for (i = 0; i < 4; i++) {
+                                kp_wbc_weight[i] = ((kp_wbc_wait_count - 1) * kp_wbc_weight[i] + uwp->u.bl.press[i])
+                                                   / kp_wbc_wait_count;
+                            }
+                            if (kp_wbc_wait_count > kp_wbc_weight_max) {
+                                kp_wbc_state = 3;
+                                WBCSetZEROPointDummy(kp_wbc_weight, 4);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        } while (0);
     }
-    kp->dpd_enabled = WPADIsDpdEnabled(chan);
-    kp->dpd_ctrl_busy = 0;
+    if (kp->sampling_cb != NULL) {
+        kp->sampling_cb(chan);
+    }
 }
