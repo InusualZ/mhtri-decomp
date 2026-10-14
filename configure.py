@@ -1416,15 +1416,15 @@ config.libs = [
             Object(NonMatching, "BTE/l2c_utils.c"),
             # The BTE RFCOMM/SDP tail 0x80498FBC..0x804A4AC0 recut per BTE source file; each unit's header carries its evidence.
             # GC/3.0a5.2 + cflags_nw4r: equal .text sizes and -ipa file inlining, evidence on the FLAGS line of src/BTE/port_api.c
-            Object(NonMatching, "BTE/port_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/port_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/port_rfc.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/port_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/rfc_l2cap_if.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/rfc_mx_fsm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/rfc_port_fsm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/rfc_port_if.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/port_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/rfc_l2cap_if.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/rfc_mx_fsm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/rfc_port_fsm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/rfc_port_if.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/rfc_ts_frames.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/rfc_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/rfc_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # GC/3.0a5.2 + cflags_nw4r: jump tables, -ipa file inlining and sizes measured per object in src/BTE/sdp_utils.c FLAGS
             Object(Matching, "BTE/sdp_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/sdp_db.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
