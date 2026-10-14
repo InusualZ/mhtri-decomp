@@ -9,18 +9,16 @@
  *    16-aligned (`-O4,p` default alignment), not the 4-byte packing `cflags_os` gives.
  * NAMES. the ARC* names are the map's (the dump agrees); `entryToPath` (0x8046E010, static) and the inlined statics
  *    `isSame`, `myStrncpy`, `ARCConvertEntrynumToPath` and `ARCGetCurrentDir` are GUESSes after the SDK's `dvdfs.c`
- *    spellings of the same helpers; `findEntry` is a GUESS from what it does; the file name `arc.c` is a GUESS from
- *    the library.
+ *    spellings of the same helpers; the file name `arc.c` is a GUESS from the library.
  * EVIDENCE. `.data` 0x8060F868 (0x22 B) and 0x8060F88C (0x46 B) are the message strings of `ARCInitHandle` and
  *    `ARCOpen`; `.sdata` 0x80793D08 (6 B) is read by `ARCInitHandle` only; the twelve ARC* rows are contiguous
  *    in the map and call only each other, and the next reader of a new data object is `AXInit` (the AX build
  *    string).
- * RESIDUALS. ARCConvertPathToEntrynum 0x8046DD90: the target is the SDK's `goto` shape (a "." entry re-enters the
- *    search below its bound check, a match jumps out of the search to the path loop); rule 8 forbids it, and the
- *    `findEntry` helper that replaces it leaves `li r9,-1; cmpwi r9,0; bge` for the inlined `return -1`, a `bne`+`b`
- *    pair where the target has `beq` to the match, and r28-r31 permuted (652 B vs 636 B; the goto shape measures 636 B
- *    and byte-identical code).
- * SHAPES. `#pragma ipa file` (it must precede every declaration) compiles the file as a whole: `ARCOpen` keeps its
+ * RESIDUALS. the map rows `@61`/`@60`/`@300` name the compiler's string objects `@597`/`@596`/`@647` here (the `ipa file`
+ *    numbering); objdiff pairs the data, only the names differ.
+ * SHAPES. goto: owner exemption 2026-10-14, docs/pipeline.md 11 - `ARCConvertPathToEntrynum` keeps the SDK's two
+ *    `goto`s (a "." entry re-enters the search below its bound check, a match leaves the search for the path loop).
+ *    `#pragma ipa file` (it must precede every declaration) compiles the file as a whole: `ARCOpen` keeps its
  *    source position before `ARCFastOpen` and still inlines `ARCGetCurrentDir` -> `ARCConvertEntrynumToPath` ->
  *    `entryToPath`, which is defined after it, three levels deep before its own `bl entryToPath`; the out-of-line
  *    `entryToPath` is itself plus two inlined levels. `ARCConvertEntrynumToPath` reads `fstStart` into a local before
@@ -126,31 +124,6 @@ static BOOL isSame(const char* path, const char* string)
     return FALSE;
 }
 
-/* Returns the entry named by the first component of `ptr` inside directory `dirLookAt`, skipping "." entries, or -1. */
-static s32 findEntry(ARCHandle* handle, ARCEntry* fst, u32 dirLookAt, const char* ptr, BOOL isDir)
-{
-    u32 i;
-    char* stringPtr;
-
-    for (i = dirLookAt + 1; i < fst[dirLookAt].lengthOrNext; i = ARC_ENTRY_IS_DIR(&fst[i]) ? fst[i].lengthOrNext : i + 1) {
-        for (;;) {
-            if (ARC_ENTRY_IS_DIR(&fst[i]) == FALSE && isDir == TRUE) {
-                break;
-            }
-            stringPtr = handle->fstStringStart + ARC_ENTRY_NAME_OFFSET(&fst[i]);
-            if (stringPtr[0] == '.' && stringPtr[1] == '\0') {
-                i++;
-                continue;
-            }
-            if (isSame(ptr, stringPtr) == TRUE) {
-                return (s32)i;
-            }
-            break;
-        }
-    }
-    return -1;
-}
-
 /* 0x8046DD90 (0x27C): resolves a path, relative to the current directory unless it starts with '/', to an entry number. */
 s32 ARCConvertPathToEntrynum(ARCHandle* handle, const char* pathPtr)
 {
@@ -159,6 +132,7 @@ s32 ARCConvertPathToEntrynum(ARCHandle* handle, const char* pathPtr)
     u32 length;
     u32 dirLookAt;
     u32 i;
+    char* stringPtr;
     ARCEntry* fst;
 
     dirLookAt = handle->currDir;
@@ -191,10 +165,24 @@ s32 ARCConvertPathToEntrynum(ARCHandle* handle, const char* pathPtr)
         }
         isDir = (*ptr == '\0') ? FALSE : TRUE;
         length = (u32)(ptr - pathPtr);
-        i = (u32)findEntry(handle, fst, dirLookAt, pathPtr, isDir);
-        if ((s32)i < 0) {
-            return -1;
+        for (i = dirLookAt + 1; i < fst[dirLookAt].lengthOrNext;
+             i = ARC_ENTRY_IS_DIR(&fst[i]) ? fst[i].lengthOrNext : i + 1) {
+        nextEntry:
+            if (ARC_ENTRY_IS_DIR(&fst[i]) == FALSE && isDir == TRUE) {
+                continue;
+            }
+            stringPtr = handle->fstStringStart + ARC_ENTRY_NAME_OFFSET(&fst[i]);
+            if (stringPtr[0] == '.' && stringPtr[1] == '\0') {
+                i++;
+                goto nextEntry;
+            }
+            if (isSame(pathPtr, stringPtr) == TRUE) {
+                goto nextHierarchy;
+            }
         }
+        return -1;
+
+    nextHierarchy:
         if (!isDir) {
             return (s32)i;
         }
