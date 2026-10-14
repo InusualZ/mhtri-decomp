@@ -21,10 +21,10 @@
 #include "RVLGX/GXFifo.h"
 
 /* The GP FIFO ready flag (`.sbss` 0x807951F1): this unit's own byte, declared and never defined. */
-extern u8 lbl_807951F1;
+extern u8 GPFifoReady;
 
 /* Returns whether the GP FIFO is ready (the byte flag the FIFO setup leaves set). */
 u8 __GXIsGPFifoReady(void)
 {
-    return lbl_807951F1;
+    return GPFifoReady;
 }

@@ -100,7 +100,7 @@ typedef struct _GXTlutRegion {
 } GXTlutRegion;
 
 /* The region allocators `GXLoadTexObj` / `GXLoadTlut` call (`GXSetTexRegionCallback`, `GXSetTlutRegionCallback`). */
-typedef GXTexRegion* (*GXTexRegionCallback)(const GXTexObj* obj, u32 id);
+typedef GXTexRegion* (*GXTexRegionCallback)(const GXTexObj* obj, s32 id);
 typedef GXTlutRegion* (*GXTlutRegionCallback)(u32 idx);
 
 /* The selectors the nw4r g3d material accessors take (their manglings encode the names). */

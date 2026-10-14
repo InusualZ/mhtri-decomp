@@ -25,6 +25,10 @@ void GXSetFieldMode(u8 field_mode, u8 half_aspect);
 void GXSetFieldMask(u32 odd_mask, u32 even_mask);
 void GXSetBlendMode(u32 type, u32 src_factor, u32 dst_factor, u32 op);
 void GXSetZMode(u8 compare_enable, u32 func, u8 update_enable);
+void GXSetColorUpdate(u32 enable);
+void GXSetAlphaUpdate(u32 enable);
+void GXSetDither(u32 enable);
+void GXSetDstAlpha(u32 enable, u32 alpha);
 void GXCallDisplayList(const void* list, u32 size); /* untyped: byte range */
 
 #ifdef __cplusplus

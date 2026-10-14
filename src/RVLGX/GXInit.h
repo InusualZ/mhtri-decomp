@@ -20,7 +20,8 @@ typedef union GXColorWord {
 typedef union GXScissorReg {
     u32 word; /* +0x0 */
     struct {
-        /* +0x0, bits 31..23 */ u32 pad_0: 9;
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bit 23 */ u32 pad_0: 1;
         /* +0x0, bits 22..12 */ u32 x: 11;
         /* +0x0, bit 11 */ u32 pad_1: 1;
         /* +0x0, bits 10..0 */ u32 y: 11;
@@ -221,7 +222,8 @@ typedef union GXDstAlphaReg {
 typedef union GXZModeReg {
     u32 word; /* +0x0 */
     struct {
-        /* +0x0, bits 31..5 */ u32 pad_0: 27;
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bits 23..5 */ u32 pad_0: 19;
         /* +0x0, bit 4 */ u32 update: 1;
         /* +0x0, bits 3..1 */ u32 func: 3;
         /* +0x0, bit 0 */ u32 enable: 1;
@@ -232,7 +234,8 @@ typedef union GXZModeReg {
 typedef union GXPixelCtrlReg {
     u32 word; /* +0x0 */
     struct {
-        /* +0x0, bits 31..7 */ u32 pad_0: 25;
+        /* +0x0, bits 31..24 */ u32 opcode: 8;
+        /* +0x0, bits 23..7 */ u32 pad_0: 17;
         /* +0x0, bit 6 */ u32 zCompLoc: 1;
         /* +0x0, bits 5..3 */ u32 zFormat: 3;
         /* +0x0, bits 2..0 */ u32 pixelFormat: 3;
@@ -503,6 +506,53 @@ typedef union GXCopyCtrlReg {
     } f; /* +0x0 */
 } GXCopyCtrlReg;
 
+/* The CP control register (CP 0x02): FIFO read, breakpoint and watermark interrupt enables, GP link. size: 0x4 */
+typedef union GXCPEnableReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..6 */ u32 pad_0: 26;
+        /* +0x0, bit 5 */ u32 bpIntEnable: 1;
+        /* +0x0, bit 4 */ u32 gpLinkEnable: 1;
+        /* +0x0, bit 3 */ u32 underflowIntEnable: 1;
+        /* +0x0, bit 2 */ u32 overflowIntEnable: 1;
+        /* +0x0, bit 1 */ u32 bpEnable: 1;
+        /* +0x0, bit 0 */ u32 fifoReadEnable: 1;
+    } f; /* +0x0 */
+} GXCPEnableReg;
+
+/* The CP status register (CP 0x00): watermark, idle and breakpoint flags. size: 0x4 */
+typedef union GXCPStatusReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..5 */ u32 pad_0: 27;
+        /* +0x0, bit 4 */ u32 bpInterrupt: 1;
+        /* +0x0, bit 3 */ u32 commandIdle: 1;
+        /* +0x0, bit 2 */ u32 readIdle: 1;
+        /* +0x0, bit 1 */ u32 underflow: 1;
+        /* +0x0, bit 0 */ u32 overflow: 1;
+    } f; /* +0x0 */
+} GXCPStatusReg;
+
+/* The CP clear register (CP 0x04): acknowledges the overflow and underflow interrupts. size: 0x4 */
+typedef union GXCPClearReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..2 */ u32 pad_0: 30;
+        /* +0x0, bit 1 */ u32 clearUnderflow: 1;
+        /* +0x0, bit 0 */ u32 clearOverflow: 1;
+    } f; /* +0x0 */
+} GXCPClearReg;
+
+/* The CP performance-select word (CP 0x20) `GXSetGPMetric` keeps. size: 0x4 */
+typedef union GXCPPerfSelReg {
+    u32 word; /* +0x0 */
+    struct {
+        /* +0x0, bits 31..8 */ u32 pad_0: 24;
+        /* +0x0, bits 7..4 */ u32 counterSel: 4;
+        /* +0x0, bits 3..0 */ u32 pad_1: 4;
+    } f; /* +0x0 */
+} GXCPPerfSelReg;
+
 /* The GX state record the library keeps in `.bss` (the 0x600-byte object at 0x80746CA0). Only the words the written GX
  * units use are named; the rest is `pad_0x..` and keeps its offset. size: 0x600 */
 typedef struct GXData {
@@ -515,7 +565,9 @@ typedef struct GXData {
     };
     /* +0x004 */ u16 vNum;
     /* +0x006 */ u16 vLim;
-    /* +0x008 */ u8 pad_0x008[0xC];
+    /* +0x008 */ GXCPEnableReg cpEnable;
+    /* +0x00C */ GXCPStatusReg cpStatus;
+    /* +0x010 */ GXCPClearReg cpClr;
     /* +0x014 */ GXVcdLoReg vcdLo;
     /* +0x018 */ GXVcdHiReg vcdHi;
     /* +0x01C */ GXVatAReg vatA[8];
@@ -557,7 +609,10 @@ typedef struct GXData {
     /* +0x250 */ u8 cpTexZ;
     /* +0x251 */ u8 pad_0x251[3];
     /* +0x254 */ GXGenModeReg genMode;
-    /* +0x258 */ u8 pad_0x258[0x2C0];
+    /* +0x258 */ GXTexRegion texRegions0[8]; /* the default regions of CI and non-mipmapped textures */
+    /* +0x2D8 */ GXTexRegion texRegions1[8]; /* the default regions of mipmapped textures and non-mipmapped RGBA8 */
+    /* +0x358 */ GXTexRegion texRegions2[8]; /* the default 32-bit mipmap regions (mipmapped RGBA8) */
+    /* +0x3D8 */ GXTlutRegion tlutRegions[20];
     /* +0x518 */ GXTexRegionCallback texRegionCallback;
     /* +0x51C */ GXTlutRegionCallback tlutRegionCallback;
     /* +0x520 */ u32 nrmType;
@@ -579,7 +634,10 @@ typedef struct GXData {
     /* +0x5A4 */ u32 texmapId[16]; /* the texture map each TEV stage reads */
     /* +0x5E4 */ u32 tcsManEnab; /* one bit per texture coordinate whose scale is set by hand */
     /* +0x5E8 */ u32 tevTcEnab; /* one bit per TEV stage with a texture coordinate enabled */
-    /* +0x5EC */ u8 pad_0x5EC[0xD];
+    /* +0x5EC */ s32 perf0; /* the GP metric of counter 0 (GXSetGPMetric) */
+    /* +0x5F0 */ s32 perf1;
+    /* +0x5F4 */ GXCPPerfSelReg perfSel;
+    /* +0x5F8 */ u8 inDispList;
     /* +0x5F9 */ u8 dlSaveContext;
     /* +0x5FA */ u8 abtWaitPECopy;
     /* +0x5FB */ u8 dirtyVAT;
@@ -596,6 +654,9 @@ extern GXData* const __GXData;
 /* The pixel-engine and memory-interface register windows (`.sbss` 0x807951D0 / 0x807951D4, set by `GXInit`). */
 extern volatile u16* __peReg;
 extern volatile u16* __memReg;
+/* The processor-interface and command-processor register windows (`.sbss` 0x807951C8 / 0x807951CC, set by `GXInit`). */
+extern volatile u32* __piReg;
+extern volatile u16* __cpReg;
 
 /* 0x804B3560 (0x130): reloads the revision-dependent bits of the vertex attribute formats. */
 void __GXInitRevisionBits(void);
