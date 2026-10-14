@@ -3,7 +3,10 @@
  * and state dispatchers of the keyboard objects, plus the deleting destructors of the animation-widget classes.
  *
  * RANGE.     .text 0x8056083C..0x80566440 (97 functions; the ones not defined below keep the target object's bytes).
- * FLAGS.     The library's -O3 C++ flags; the retail object has no extab/extabindex, so `#pragma exceptions off`.
+ * FLAGS.     GC/3.0a5.2 + cflags_hkb (cflags_nw4r with -inline noauto) for the whole band; the retail object has no
+ *            extab/extabindex, so `#pragma exceptions off`. Band census against the main lib's -O3 flags: 302 -> 381 of 932
+ *            rows at 100, this unit 62 -> 67 with scheduling held equal; -inline auto inlines the callee into 14
+ *            adjustor thunks (`subi r3,r3,N; b callee`) the retail objects keep.
  * FLAGS.     `#pragma scheduling on` for the whole unit: retail restores r0 before r31 after a trailing call and hoists the
  *            `cmpwi r3,0` of the deleting destructors; with it nine more rows match and none drops.
  * FLAGS.     Scoped `global_optimizer off` (playbook 120) on the four `switch` dispatchers: retail keeps the compare tree

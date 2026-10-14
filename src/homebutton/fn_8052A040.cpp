@@ -9,7 +9,7 @@
  *
  * UNKNOWN. every body and, for a merged block, the file boundaries between its pieces.
  *
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  *
  * The unit's `.data`/`.sdata`/`.sbss` claims are the candidate's (config/RMHE08/splits.txt); the symbols they hold are
  * in the map (`ledger.py unit homebutton/fn_8052A040.cpp`), and the pass that writes the bodies defines them.

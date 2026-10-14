@@ -8,6 +8,10 @@
  * placeholder.  The band was built with C++ exceptions off (no extab/extabindex in the target objects), so the scoped
  * `#pragma exceptions off` below is carried from the absorbed sources and applied to every piece.
  *
+ * Flags: GC/3.0a5.2 + cflags_hkb (configure.py); fn_80556154 keeps its stores in source order only under a scoped
+ * `#pragma scheduling off` (scheduled, the child load is hoisted above the `stb` and copied with an extra `mr`).
+ *
+ * Residuals: fn_80556154 loads the vtable through r4 where retail uses r12 (a virtual call through a polymorphic class).
  * Residuals: partial reconstruction - the functions not defined below keep the target object's bytes; the evidence, type views and
  * per-function residuals of the absorbed sources are in docs/splits/phase4/homebutton-carried-notes.md; the type views are in
  * `homebutton/hkb_widget.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
@@ -60,6 +64,8 @@ extern "C" void fn_8055614C(HbmWidget* self, HbmWidget* child) {
     self->child = child;
 }
 
+#pragma push
+#pragma scheduling off
 /* Flags the widget and updates the child it is dispatching to. */
 extern "C" void fn_80556154(HbmWidget* self) {
     HbmWidget* child;
@@ -67,6 +73,7 @@ extern "C" void fn_80556154(HbmWidget* self) {
     child = self->mode.current;
     child->vtable->update(child);
 }
+#pragma pop
 
 /* Whether the widget is flagged. */
 extern "C" u8 fn_80556A5C(HbmWidget* self) {

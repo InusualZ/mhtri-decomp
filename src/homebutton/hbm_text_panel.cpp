@@ -24,7 +24,7 @@
  *
  * Language C++ and lib, from the range's own structure: vptr dispatch, adjustor thunks
  * (`subi r3, r3, 0x10`), deleting destructors calling `__dl__FPv`, and the target object's flags.
- * It takes the game-root `main` lib with cflags_main, the same as its link neighbours
+ * It is built with GC/3.0a5.2 + cflags_hkb, the same as its link neighbours
  * `homebutton/keyboard_ui.cpp` above and `homebutton/fn_80555374.cpp` below.
  *
  * What the range is: the panel class whose constructor is `fn_80542D8C` (0x80542D8C, in the band
@@ -77,9 +77,8 @@
 #include "homebutton/hbm_value.h"
 #include "nw4r/fn_805012C4.h"
 
-/* The lib's cflags turn C++ exceptions on (`cflags_main`), but this unit's target object carries no
- * `extab`/`extabindex` at all, so the original translation unit was built with them off - the scoped
- * pragma pair puts our object back on the target's section list (playbook 30). */
+/* This unit's target object carries no `extab`/`extabindex` at all, so the original translation unit was
+ * built with C++ exceptions off; cflags_hkb already passes -Cpp_exceptions off, and the pragma states it. */
 #pragma exceptions off
 
 /* This unit's own later entry point, called by fn_805486B0 before its definition. */

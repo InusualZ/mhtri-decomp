@@ -10,7 +10,7 @@
  *   0x8053F65C..0x8053F7BC) is contradicted by three private objects read on both sides of it - .rodata 0x8057AFA8
  *   (0x8053E808, 0x8053E8B8, 0x8053FCA8), .rodata 0x8057AB98 (0x8053E968, 0x8053F7BC, 0x805404D8) and the .sdata2
  *   byte 0x8079D620 (0x8053F22C, 0x80540684).
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from the B_CPkey_* tables; every function keeps the map's generated name.
  * RESIDUALS. every body unwritten (stub).
  */

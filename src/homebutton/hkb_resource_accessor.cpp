@@ -5,7 +5,7 @@
  *   constructor 0x80534DA8; it sits between the tables of homebutton/hkb_animation.cpp (0x8064A8F8) and
  *   homebutton/hkb_arc_resource_accessor.cpp (0x8064A938), whose owners are lower and higher (two zigzag seams).
  *   The right edge 0x80534DC0 is the archive name lookup, reached only from the archive accessor's methods.
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from the table shape (destructor, pure resource getter, font getter); every
  *   function keeps the map's generated name.
  * RESIDUALS. every body unwritten (stub).

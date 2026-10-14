@@ -11,7 +11,7 @@
  *   0x8056F3F4) and its thunks to 0x8053E808.  The jump tables .data 0x8064D9D4..0x8064DB18 are one run: the class
  *   tables 0x8064DB54..0x8064DBD8 after them hold 0x8053DF20, 0x8053DD64, 0x8053D8D4 and 0x8053D64C in reverse
  *   order, so no seam sits at 0x8053D8A0.
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from the key tables; every function keeps the map's generated name.
  * RESIDUALS. every body unwritten (stub).  0x805352DC..0x80535E3C (layout helpers called from the pane, text box and
  *   window units) may be a TU of its own: no data object, pool duplicate or class table separates it from the key

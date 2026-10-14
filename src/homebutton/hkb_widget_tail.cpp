@@ -11,7 +11,7 @@
  *   bytes 0x80794750/0x80794751 are one byte apart.  0x8056F02C is not proven: the class tables 0x80658458 ->
  *   0x80658480 rise (a zigzag, so a TU may start in 0x8056E93C..0x8056F02C), but no pool duplicate, string or
  *   private object confirms it, so the range stays one unit.
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from its place after tiHKBManager.cpp; every function keeps the map's generated name.
  * RESIDUALS. every body unwritten (stub); the possible TU start in 0x8056E93C..0x8056F02C.
  */

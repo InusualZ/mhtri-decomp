@@ -9,6 +9,10 @@
  * placeholder.  The band was built with C++ exceptions off (no extab/extabindex in the target objects), so the scoped
  * `#pragma exceptions off` below is carried from the absorbed sources and applied to every piece.
  *
+ * Flags: GC/3.0a5.2 + cflags_hkb (configure.py). fn_8055DCD0 takes an `int` it narrows to u8: retail masks the argument
+ * (`clrlwi r0,r4,24`) and compares the masked copy, which a `u8` parameter does not emit under the GC compiler.
+ *
+ * Residuals: fn_8055DCD0 loads the vtable through r4 where retail uses r12 (a virtual call through a polymorphic class).
  * Residuals: partial reconstruction - the functions not defined below keep the target object's bytes; the evidence, type views and
  * per-function residuals of the absorbed sources are in docs/splits/phase4/homebutton-carried-notes.md; the type views are in
  * `homebutton/hkb_widget.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
@@ -370,10 +374,10 @@ void fn_8055DBCC(VuObject* self) { ((void (*)(VuSub*))self->sub_0x1C->vt->slot_1
 void fn_8055DBE0(VuObject* self) { ((void (*)(VuSub*))self->sub_0x1C->vt->slot_104)(self->sub_0x1C); }
 
 /* A byte-flag setter that dispatches on the new value. */
-void fn_8055DCD0(VuObject* self, u8 flag)
+void fn_8055DCD0(VuObject* self, int flag)
 {
     self->field_0x3C = flag;
-    if (flag == 1)
+    if ((u8)flag == 1)
         ((void (*)(VuObject*))self->vt->slot_0D0)(self);
     else
         ((void (*)(VuObject*))self->vt->slot_0CC)(self);

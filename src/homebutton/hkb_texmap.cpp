@@ -5,7 +5,7 @@
  *   homebutton/hkb_material.cpp, 0x8079D5D8 read by 0x80533474).  The right edge: the pool word 0x8079D5E4 is the
  *   zero pad after the float at 0x8079D5E0 (a TU's `.sdata2` contribution ends 8-aligned), and the next float 0.0
  *   at 0x8079D5E8 belongs to homebutton/hkb_drawinfo.cpp.
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from the GX texture and TPL calls; every function keeps the map's generated name.
  * RESIDUALS. every body unwritten (stub).
  */

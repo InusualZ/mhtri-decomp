@@ -7,7 +7,7 @@
  *   0x80533B38..0x805341FC and is stored by 0x80533B04; the next table 0x8064A920 belongs to
  *   homebutton/hkb_resource_accessor.cpp, whose three functions start at 0x80534D68.  The float 0.0 is pooled
  *   again at 0x8079D610 (read by 0x80535454), so the pool ends here.
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from the Hermite pool constants (-0.001, 0.001, 2, 3, -2) and the bind callees;
  *   every function keeps the map's generated name.
  * RESIDUALS. every body unwritten (stub).

@@ -274,6 +274,9 @@ cflags_network = [*cflags_base, "-func_align", "4", "-Cpp_exceptions", "on"]
 cflags_os = [*cflags_base, "-func_align", "4"]
 # cflags_nw4r: cflags_os + -fp_contract off + -ipa file, compiled with GC/3.0a5.2 (the nw4r lib block); evidence in docs/nw4r.md.
 cflags_nw4r = [*cflags_os, "-fp_contract", "off", "-ipa", "file"]
+# cflags_hkb: cflags_nw4r with -inline noauto, compiled with GC/3.0a5.2 (the homebutton keyboard band); evidence on
+# the FLAGS line of src/homebutton/hbm_kb_event.cpp.
+cflags_hkb = [*[f for f in cflags_nw4r if f != "-inline auto"], "-inline noauto"]
 # DWCi (the Wii Wi-Fi Connection SDK library the retail link places between the game's own SDK uses
 # and NHTTP).  Same shape as the sibling SDK groups above: the retail .text packs the band's
 # functions back to back with 4-byte gaps, so `-func_align 4`.  Evidence: DWCi/fn_805113B0.c.
@@ -1649,34 +1652,35 @@ config.libs = [
             # Flags: unit header of src/Network/NetworkLayer.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkLayer.cpp", extra_cflags=["-pool off"]),
             # The tiHKBManager software keyboard and its layout engine, in link order; evidence in each unit header.
-            Object(NonMatching, "homebutton/fn_8052A040.cpp"),
-            Object(NonMatching, "homebutton/hkb_layout.cpp"),
-            Object(NonMatching, "homebutton/hkb_textbox.cpp"),
-            Object(NonMatching, "homebutton/hkb_window.cpp"),
-            Object(NonMatching, "homebutton/hkb_bounding.cpp"),
-            Object(NonMatching, "homebutton/hkb_material.cpp"),
-            Object(NonMatching, "homebutton/hkb_texmap.cpp"),
-            Object(NonMatching, "homebutton/hkb_drawinfo.cpp"),
-            Object(NonMatching, "homebutton/hkb_animation.cpp"),
-            Object(NonMatching, "homebutton/hkb_resource_accessor.cpp"),
-            Object(NonMatching, "homebutton/hkb_arc_resource_accessor.cpp"),
-            Object(NonMatching, "homebutton/hkb_keyboard.cpp"),
-            Object(NonMatching, "homebutton/hkb_cellphone.cpp"),
-            Object(NonMatching, "homebutton/hbm_text_panel.cpp"),
-            Object(NonMatching, "homebutton/hbm_kb_widget.cpp"),
-            Object(NonMatching, "homebutton/hbm_kb_list.cpp"),
-            Object(NonMatching, "homebutton/hbm_kb_child.cpp"),
-            Object(NonMatching, "homebutton/hbm_anim_record.cpp"),
-            Object(NonMatching, "homebutton/hbm_value.cpp"),
-            Object(NonMatching, "homebutton/hbm_hermite.cpp"),
-            Object(NonMatching, "homebutton/hkb_cellphone_keys.cpp"),
-            Object(NonMatching, "homebutton/hkb_sign_keys.cpp"),
-            Object(NonMatching, "homebutton/hkb_qwerty_keys.cpp"),
-            Object(NonMatching, "homebutton/hbm_kb_event.cpp"),
-            Object(NonMatching, "homebutton/hbm_kb_cursor.cpp"),
-            Object(NonMatching, "homebutton/gui.cpp"),
-            Object(NonMatching, "homebutton/tiHKBManager.cpp"),
-            Object(NonMatching, "homebutton/hkb_widget_tail.cpp"),
+            # GC/3.0a5.2 + cflags_hkb: evidence on the FLAGS line of src/homebutton/hbm_kb_event.cpp.
+            Object(NonMatching, "homebutton/fn_8052A040.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_layout.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_textbox.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_window.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_bounding.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_material.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_texmap.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_drawinfo.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_animation.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_resource_accessor.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_arc_resource_accessor.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_keyboard.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_cellphone.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_text_panel.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_kb_widget.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_kb_list.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_kb_child.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_anim_record.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_value.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_hermite.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_cellphone_keys.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_sign_keys.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_qwerty_keys.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_kb_event.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_kb_cursor.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/gui.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/tiHKBManager.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_widget_tail.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
         ],
     },
 ]

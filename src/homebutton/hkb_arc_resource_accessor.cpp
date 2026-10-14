@@ -7,7 +7,7 @@
  *   which calls the base constructor 0x80534DA8.  The next `.data` object (0x8064A950) is a pointer table read from
  *   0x80536F08 on (a table followed by data, the V->S seam), so the archive class ends the TU; the cut sits after
  *   its last method 0x8053526C, and nothing in 0x805352DC..0x80535454 reads data that places it more exactly.
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from the ARC calls and the "."/".." strings; every function keeps the map's
  *   generated name.
  * RESIDUALS. every body unwritten (stub).

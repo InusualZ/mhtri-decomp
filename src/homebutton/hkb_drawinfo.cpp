@@ -5,7 +5,7 @@
  *   constructor 0x805337A0; the next table (0x8064A8F8, homebutton/hkb_animation.cpp) holds higher addresses, a
  *   zigzag `.data` seam.  The float 1.0 is pooled twice (0x8079D5EC here, 0x8079D5F8 read by 0x8053393C), so
  *   0x80533854 starts the next TU.
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from the class shape; both functions keep the map's generated names.
  * RESIDUALS. every body unwritten (stub).
  */

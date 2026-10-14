@@ -4,7 +4,7 @@
  *   .sbss 0x80795A40-0x80795A48.
  *   Edges: the left edge follows homebutton/hkb_window.cpp's static initialiser 0x80530674; the right edge is this
  *   unit's static initialiser 0x80530720 (.ctors word 0x8056F3F0).
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from a pane subclass that adds no slot; every function keeps the map's generated name.
  * RESIDUALS. every body unwritten (stub).
  */

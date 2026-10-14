@@ -7,7 +7,7 @@
  *   last 0x270-byte key map .data 0x806553C0 and is read by homebutton/hkb_cellphone.cpp (0x8053E968) through the
  *   same descriptor table (.rodata 0x8057AFA8) that names 0x8057C14C..0x8057C1D0, so both runs end with this unit's
  *   claim, before homebutton/hbm_kb_event.cpp's .rodata 0x8057C228 and homebutton/hkb_sign_keys.cpp's .data 0x80655630.
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from the B_CPkey_* strings; the function keeps the map's generated name.
  * RESIDUALS. the body unwritten (stub).
  */

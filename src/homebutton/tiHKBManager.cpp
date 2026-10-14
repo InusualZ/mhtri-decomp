@@ -80,8 +80,8 @@
  *   - the 0x8056C164..0x8056F274 tail has no body (0 %, unpaired).
  * /
  *
- * /* The target object carries no extab/extabindex, so this unit was built with exceptions off; the `main`
- * lib's cflags_main turns them on, so the deviation is scoped to this file.
+ * /* The target object carries no extab/extabindex, so this unit was built with exceptions off; cflags_hkb
+ * passes -Cpp_exceptions off, and the pragma states it.
  */
 
 #include "types.h"

@@ -4,7 +4,7 @@
  *   .sbss 0x80795A28-0x80795A30; .sdata2 0x8079D570-0x8079D580.
  *   Edges: the left edge follows homebutton/fn_8052A040.cpp's static initialiser 0x8052AFF8 (.ctors word 0x8056F3E0);
  *   the right edge is this unit's static initialiser 0x8052C874 (.ctors word 0x8056F3E4).
- * FLAGS. the `main` lib's `cflags_main` (unmeasured until bodies exist).
+ * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS; unmeasured here until bodies exist).
  * NAMES. GUESS: the file name, from the block magics; every function keeps the map's generated name.
  * RESIDUALS. every body unwritten (stub).
  */
