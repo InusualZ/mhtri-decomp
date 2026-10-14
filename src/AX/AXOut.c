@@ -19,14 +19,17 @@
  *    for the profile, `addi rX,base,0x8E0` held for the output buffers); 0x806FB5C0 (the DSP task) and
  *    0x806FB620 (its DRAM buffer) by `__AXOutInitDSP` and `__AXOutQuit`; `.sdata` 0x80793D18 holds the DSP init
  *    and resume vectors and the program size.
- * RESIDUALS. __AXOutNewFrame 0x8046FE20: the profile copy's base takes r31 (target r29); __AXOutInitDSP 0x804701C0:
- *    the zero takes saved r29 (target r12) and the task field stores schedule differently; `.text` is 0x744 of the
- *    claimed 0x750 B, the 0xC B tail being link padding.
+ * RESIDUALS. __AXOutInitDSP 0x804701C0: the DSP image address, its size and the task address take r3/r31/r30 where
+ *    retail has r30/r3/r31, so the lis/addi pairs schedule differently, and retail issues the priority and
+ *    ready-flag stores first (writing them first in the source loses the allocation instead); `.text` is 0x744 of
+ *    the claimed 0x750 B, the 0xC B tail being link padding.
  * SHAPES. the DSP task type and entry points come from `DSP/dsp.h`; the four task callbacks are static functions whose
  *    addresses fill the task.  `__AXOutDmaFrame` is volatile: the target re-reads it after every store.  The
  *    frame writes the profile fields by name rather than through a pointer (the target re-forms the address).
  *    __AXOutInitDSP writes `__AXDspTask` by name under a scoped `optimization_level 2` (the target re-forms the
- *    task address for DSPAddTask); __AXOutInit's clear loops keep their pointer and count in block scope; the DMA
+ *    task address for DSPAddTask), the descriptor fields first and the ready flag, priority and done flag after
+ *    them; __AXOutNewFrame copies the profile with a `*dst++ = *src++` byte walk (retail's fresh r29 copy of the
+ *    base); __AXOutInit's clear loops keep their pointer and count in block scope; the DMA
  *    callback's next read index is incremented and reduced in two steps.
  */
 
@@ -491,7 +494,7 @@ s32 __AXOutNewFrame(void)
         src = (u8*)&__AXOutProfile;
         dst = (u8*)profile;
         for (i = 0; i < sizeof(AXProfile); i++) {
-            dst[i] = src[i];
+            *dst++ = *src++;
         }
     }
     return cycles;
@@ -558,8 +561,6 @@ static void __AXOutRequestCallback(DSPTask* task)
 /* 0x804701C0 (0xEC): describes the AX DSP task, registers it and waits until the DSP has started it. */
 void __AXOutInitDSP(void)
 {
-    __AXDspTask.priority = 0;
-    __AXOutDspReady = 0;
     __AXDspTask.iramMmemAddr = __AXDspImage;
     __AXDspTask.iramLength = __AXDspImageSize;
     __AXDspTask.iramAddr = 0;
@@ -572,6 +573,8 @@ void __AXOutInitDSP(void)
     __AXDspTask.resumeCallback = __AXOutResumeCallback;
     __AXDspTask.doneCallback = __AXOutDoneCallback;
     __AXDspTask.requestCallback = __AXOutRequestCallback;
+    __AXOutDspReady = 0;
+    __AXDspTask.priority = 0;
     __AXOutTaskDone = 0;
     OSInitThreadQueue(&__AXOutThreadQueue);
     if (DSPCheckInit() == 0) {

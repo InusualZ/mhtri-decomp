@@ -27,7 +27,7 @@ void __VISetCGMS(void);
 void __VISetWSS(void);
 void __VISetClosedCaption(void);
 void __VISendEncoderRegs(void);
-void __VISetGammaCoef(const struct VIGammaEntry* gamma);
+void __VISetGammaCoef(struct VIGammaEntry* gamma);
 void __VISetLinearGamma(void);
 void __VISetGamma(void);
 void __VISetTrapFilter(void);

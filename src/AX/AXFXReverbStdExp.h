@@ -18,9 +18,7 @@ typedef struct AXFXBufferStd {
  */
 typedef struct AXFXReverbStd {
     /* +0x000 */ void* delay0[4];        /* per-channel buffers, size0 words each */
-    /* +0x010 */ u32 idx0;
-    /* +0x014 */ u32 idx1;
-    /* +0x018 */ u32 idx2;
+    /* +0x010 */ u32 early_idx[3];     /* early-reflection taps into delay0 */
     /* +0x01C */ u32 length0;
     /* +0x020 */ u32 size0;
     /* +0x024 */ f32 coef0;

@@ -13,17 +13,18 @@
  *   from the register images they send (CGMS 0x05, WSS 0x08, closed caption 0x7A, gamma 0x10, trap filter 0x03).
  * RESIDUALS. Flip blockers: .sbss object 0x1C vs claimed 0x18 (`viEncoderFormat`, below); row 36: `vi3in1FileName` and
  *   `viCgmsApsMessage` are force-active in retail .comment and unreferenced in the link (not marked `__declspec(export)`).
- *   `__VISetGammaCoef` (0x804EAA80): the target interleaves loads and stores in source order (the compiler
- *   assumes the byte stores alias the entry), ours needs `#pragma scheduling off` for the same order and still differs in
- *   the prologue and the last pairs.  `__VISendEncoderRegs` (0x804E9D00): the target keeps each block's source pointer in
- *   a register (`addi r30,r3,0x420` then `lbz 0(r30)`) and the 0x40 register number in r31, ours folds the offset into
- *   the displacement and builds 0x40 in r0.  `__VIInitEncoder` (0x804EAD80): the same 0x40/base allocation in its
- *   `viSendRegBlock` (the target saves r28-r31); storing `data[0]` before the copy loop gains it 0.8 points and costs
- *   `__VISendEncoderRegs` 0.07, so the block helper stores it after the loop.
+ *   `__VISendEncoderRegs` (0x804E9D00): retail forms the table base once ahead of the switch (`lis/addi r3`) and
+ *   copies each block through a kept pointer (`addi r30,r3,0x420` then `lbz 0(r30)`); naming `viEncoderTables`
+ *   directly (the closest shape) re-forms the base in every case and folds the offset into the displacement, 0x28 B
+ *   longer, and a `tables` local folds the offset too.  `__VIInitEncoder` (0x804EAD80): the block copy's source
+ *   pointer and its 0x40 register number swap saved r28/r29 with retail, and the shared constant register follows.
  *   Data: `viEncoderFormat` (0x80794188, value 0) is in .sdata in the target and cannot be emitted there (a zero
  *   initialiser lands in .sbss); the two assert strings belong to the public `VISetCGMS`, which the retail image does not
  *   carry, so they are kept as arrays; the target object's one .rela.data entry (a table word that looks like an address)
  *   is dtk's.
+ * SHAPES. `__VISetGammaCoef` takes a non-const entry pointer and keeps scheduling on (a `const` source lets MWCC
+ *   move every load ahead of the byte stores; non-const keeps retail's load/store interleave); `viSendRegBlock`
+ *   stores the 0x40 register number before its copy loop; `__VISendEncoderRegs` names `viEncoderTables` directly.
  */
 #include "types.h"
 #include "VI/vi3in1.h"
@@ -142,10 +143,10 @@ static inline void viSendRegBlock(const u8* src)
     u8 data[27];
     s32 i;
 
+    data[0] = 0x40;
     for (i = 1; i < 27; i++) {
         data[i] = *src++;
     }
-    data[0] = 0x40;
     __VISendI2CData(VI_ENCODER_ADDR, data, 27);
     WaitMicroTime(2);
 }
@@ -164,54 +165,52 @@ static inline void viWriteReg(u8 reg, u8 value)
 /* Sends the register block of the current mode and video format to the encoder. */
 void __VISendEncoderRegs(void)
 {
-    VIEncoderTables* tables = &viEncoderTables;
-
     switch (viEncoderRegSet) {
     case 2:
         switch (viEncoderFormat) {
         case 0:
-            viSendRegBlock(tables->regs[0][0].regs);
+            viSendRegBlock(viEncoderTables.regs[0][0].regs);
             break;
         case 1:
-            viSendRegBlock(tables->regs[1][0].regs);
+            viSendRegBlock(viEncoderTables.regs[1][0].regs);
             break;
         case 2:
-            viSendRegBlock(tables->regs[3][0].regs);
+            viSendRegBlock(viEncoderTables.regs[3][0].regs);
             break;
         case 5:
-            viSendRegBlock(tables->regs[2][0].regs);
+            viSendRegBlock(viEncoderTables.regs[2][0].regs);
             break;
         }
         break;
     case 3:
         switch (viEncoderFormat) {
         case 0:
-            viSendRegBlock(tables->regs[0][1].regs);
+            viSendRegBlock(viEncoderTables.regs[0][1].regs);
             break;
         case 1:
-            viSendRegBlock(tables->regs[1][1].regs);
+            viSendRegBlock(viEncoderTables.regs[1][1].regs);
             break;
         case 2:
-            viSendRegBlock(tables->regs[3][1].regs);
+            viSendRegBlock(viEncoderTables.regs[3][1].regs);
             break;
         case 5:
-            viSendRegBlock(tables->regs[2][1].regs);
+            viSendRegBlock(viEncoderTables.regs[2][1].regs);
             break;
         }
         break;
     case 4:
         switch (viEncoderFormat) {
         case 0:
-            viSendRegBlock(tables->regs[0][2].regs);
+            viSendRegBlock(viEncoderTables.regs[0][2].regs);
             break;
         case 1:
-            viSendRegBlock(tables->regs[1][2].regs);
+            viSendRegBlock(viEncoderTables.regs[1][2].regs);
             break;
         case 2:
-            viSendRegBlock(tables->regs[3][2].regs);
+            viSendRegBlock(viEncoderTables.regs[3][2].regs);
             break;
         case 5:
-            viSendRegBlock(tables->regs[2][2].regs);
+            viSendRegBlock(viEncoderTables.regs[2][2].regs);
             break;
         }
         break;
@@ -293,8 +292,7 @@ void __VISetClosedCaption(void)
 }
 
 /* Sends one gamma curve to the encoder (register 0x10, 34 bytes). */
-#pragma scheduling off
-void __VISetGammaCoef(const VIGammaEntry* gamma)
+void __VISetGammaCoef(VIGammaEntry* gamma)
 {
     u8 data[34];
 
@@ -318,60 +316,23 @@ void __VISetGammaCoef(const VIGammaEntry* gamma)
     data[17] = gamma->mid[4];
     data[18] = gamma->mid[5];
     data[19] = gamma->mid[6];
-    {
-        u16 v = gamma->high[0];
-        u8 hi = v >> 8 & 0xFF;
-        u8 lo = v & 0xC0;
-        data[20] = hi;
-        data[21] = lo;
-    }
-    {
-        u16 v = gamma->high[1];
-        u8 hi = v >> 8 & 0xFF;
-        u8 lo = v & 0xC0;
-        data[22] = hi;
-        data[23] = lo;
-    }
-    {
-        u16 v = gamma->high[2];
-        u8 hi = v >> 8 & 0xFF;
-        u8 lo = v & 0xC0;
-        data[24] = hi;
-        data[25] = lo;
-    }
-    {
-        u16 v = gamma->high[3];
-        u8 hi = v >> 8 & 0xFF;
-        u8 lo = v & 0xC0;
-        data[26] = hi;
-        data[27] = lo;
-    }
-    {
-        u16 v = gamma->high[4];
-        u8 hi = v >> 8 & 0xFF;
-        u8 lo = v & 0xC0;
-        data[28] = hi;
-        data[29] = lo;
-    }
-    {
-        u16 v = gamma->high[5];
-        u8 hi = v >> 8 & 0xFF;
-        u8 lo = v & 0xC0;
-        data[30] = hi;
-        data[31] = lo;
-    }
-    {
-        u16 v = gamma->high[6];
-        u8 hi = v >> 8 & 0xFF;
-        u8 lo = v & 0xC0;
-        data[32] = hi;
-        data[33] = lo;
-    }
+    data[20] = gamma->high[0] >> 8 & 0xFF;
+    data[21] = gamma->high[0] & 0xC0;
+    data[22] = gamma->high[1] >> 8 & 0xFF;
+    data[23] = gamma->high[1] & 0xC0;
+    data[24] = gamma->high[2] >> 8 & 0xFF;
+    data[25] = gamma->high[2] & 0xC0;
+    data[26] = gamma->high[3] >> 8 & 0xFF;
+    data[27] = gamma->high[3] & 0xC0;
+    data[28] = gamma->high[4] >> 8 & 0xFF;
+    data[29] = gamma->high[4] & 0xC0;
+    data[30] = gamma->high[5] >> 8 & 0xFF;
+    data[31] = gamma->high[5] & 0xC0;
+    data[32] = gamma->high[6] >> 8 & 0xFF;
+    data[33] = gamma->high[6] & 0xC0;
     __VISendI2CData(VI_ENCODER_ADDR, data, 34);
     WaitMicroTime(2);
 }
-
-#pragma scheduling reset
 
 void __VISetLinearGamma(void)
 {

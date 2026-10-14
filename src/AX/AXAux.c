@@ -14,9 +14,10 @@
  *    C) are addressed from one base by `__AXProcessAux`; `.sbss` 0x80794ED8..0x80794F20 are the frame indices,
  *    buffer pointers, callbacks and clear flags, first written by `__AXAuxInit`. 0x80794F38 (the mode word) is defined
  *    in `AX/AXCL.c` and read here.
- * RESIDUALS. __AXProcessAux 0x8046EDF0: the aux A frame base and the two frame indices are coloured r7/r8/r9 where the
- *    target has r8/r9/r7 (11 operand-only differences in the head and the aux A frame adds); reordering the six
- *    stores, locals for the indices or the buffer base, and the address spelling do not move it.
+ * RESIDUALS. __AXProcessAux 0x8046EDF0: the aux A frame base and the frame-out index are coloured r7/r8 where the
+ *    target has r8/r7 (operand-only differences in the head and the aux A frame adds); of the 720 orders of the six
+ *    buffer-pointer stores the A-in, B-out, B-in, A-out, C-out, C-in order is the best, and locals for the indices or
+ *    the buffer base and the address spelling do not move it.
  * SHAPES. three frame arrays; each aux has a callback, a context word and three clear flags (one per frame).
  *    The aux C clear test re-reads `__AXAuxCCallback` through a `volatile` lvalue (a GUESS from the codegen): the
  *    target reloads it after the callback branch, a plain read is CSEd into one load, and a `volatile` declaration
@@ -201,11 +202,11 @@ void __AXGetAuxCOutput(u32* address)
 void __AXProcessAux(void)
 {
     __AXAuxAInput = __AXAuxBufferA[__AXAuxFrameIn][0];
-    __AXAuxAOutput = __AXAuxBufferA[__AXAuxFrameOut][0];
-    __AXAuxBInput = __AXAuxBufferB[__AXAuxFrameIn][0];
     __AXAuxBOutput = __AXAuxBufferB[__AXAuxFrameOut][0];
-    __AXAuxCInput = __AXAuxBufferC[__AXAuxFrameIn][0];
+    __AXAuxBInput = __AXAuxBufferB[__AXAuxFrameIn][0];
+    __AXAuxAOutput = __AXAuxBufferA[__AXAuxFrameOut][0];
     __AXAuxCOutput = __AXAuxBufferC[__AXAuxFrameOut][0];
+    __AXAuxCInput = __AXAuxBufferC[__AXAuxFrameIn][0];
     if (__AXAuxACallback != NULL) {
         if (__AXOutputMode == 2) {
             s32* buffers[4];

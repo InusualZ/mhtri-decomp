@@ -13,11 +13,17 @@
  *    caller is AXFXReverbHiShutdown); the Alloc/Clear/Free/ApplySettings rows are GUESSES from what each body does;
  *    the three tables are file statics named after their rows (sHiExpModeLength / sHiExpModeGain / sHiExpFilterLength);
  *    AXFXReverbHiExpGetMemSize is the SDK API name, its body a GUESS (no target bytes).
- * RESIDUALS. AXFXReverbHiExpCallback: constant-register numbering and the position of the `0.0f` load of the comb
- *    accumulator differ (r7..r12 vs r5..r10, loop-invariant `lfs` order); AXFXReverbHiExpApplySettings: the
- *    mode*12 offset and the table base take r9/r8 (target r8/r9); the dead AXFXReverbHiExpGetMemSize adds `.text`
- *    the target does not carry (mwld strips it, as in `DVD/dvd_broadway.c`); `.text` pads are linker-added.
- * SHAPES. the comb accumulator is a loop over j (retail unrolls it); the early/fused buffers are `AXFXBuffer`
+ * RESIDUALS. AXFXReverbHiExpCallback: register numbering (the fused pointers take r10-r12 where retail has r3/r5/r6,
+ *    the loop pointers r3/r5..r9 where retail has r7..r12, the float invariants f2..f5 where retail has f3..f6);
+ *    the three early-tap index wraps want a loop over an index array, which needs `idx0`..`idx2` of
+ *    AX/AXFXReverbHi.h retyped as one `u32[3]` (request sdk-ax-vi#1, measured as a gain on this row); the dead
+ *    AXFXReverbHiExpGetMemSize adds `.text` the target does not carry (mwld strips it, as in `DVD/dvd_broadway.c`);
+ *    `.text` pads are linker-added.
+ * SHAPES. the comb accumulator is a loop over j with `comb += a` (the `+=` keeps retail's per-sample `0.0f` load
+ *    inside the loop) and the filter index wraps are a loop over j (retail's `addi r9,r4,8` base for the third
+ *    wrap); the early taps are one sum expression; ApplySettings indexes the mode tables through `reverb->mode`
+ *    rather than its validated local (retail's r8/r9 pair); the float invariants are declared mixRate, dry, lpkInv,
+ *    damp, lpk; the early/fused buffers are `AXFXBuffer`
  *    pointer triples copied to locals before the sample loop.  AXFXReverbHiExpGetMemSize sits ahead of the init so
  *    32000.0f leads `.sdata2` (MWCC pools literals as each function is generated); the decay exponent is a named
  *    temporary so -3.0f is pooled before 10.0.
@@ -178,11 +184,11 @@ void AXFXReverbHiExpCallback(AXFXBuffer* buffer, AXFXReverbHi* reverb)
     s32* fused0;
     s32* fused1;
     s32* fused2;
-    f32 dry;
     f32 mixRate;
+    f32 dry;
+    f32 lpkInv;
     f32 damp;
     f32 lpk;
-    f32 lpkInv;
     u32 i;
     u32 c;
     u32 j;
@@ -228,10 +234,8 @@ void AXFXReverbHiExpCallback(AXFXBuffer* buffer, AXFXReverbHi* reverb)
                 in = (f32)*chan[c];
             }
             line = (f32*)reverb->delay0[c];
-            early_sum = reverb->coef0 * line[reverb->idx0] + reverb->coef1 * line[reverb->idx1];
-            a = line[reverb->idx2];
+            early_sum = reverb->coef0 * line[reverb->idx0] + reverb->coef1 * line[reverb->idx1] + reverb->coef2 * line[reverb->idx2];
             line[reverb->idx2] = in;
-            early_sum = reverb->coef2 * a + early_sum;
             if (reverb->length1 != 0) {
                 line = (f32*)reverb->delay1[c];
                 delayed = line[reverb->idx3];
@@ -243,7 +247,7 @@ void AXFXReverbHiExpCallback(AXFXBuffer* buffer, AXFXReverbHi* reverb)
             for (j = 0; j < 3; j++) {
                 line = (f32*)reverb->delay2[c][j];
                 a = line[reverb->filter_idx[j]];
-                comb = comb + a;
+                comb += a;
                 line[reverb->filter_idx[j]] = delayed + a * reverb->filter_gain[j];
             }
             line = (f32*)reverb->delay3[c][0];
@@ -303,14 +307,10 @@ void AXFXReverbHiExpCallback(AXFXBuffer* buffer, AXFXReverbHi* reverb)
                 reverb->idx3 = 0;
             }
         }
-        if (++reverb->filter_idx[0] >= reverb->filter_len[0]) {
-            reverb->filter_idx[0] = 0;
-        }
-        if (++reverb->filter_idx[1] >= reverb->filter_len[1]) {
-            reverb->filter_idx[1] = 0;
-        }
-        if (++reverb->filter_idx[2] >= reverb->filter_len[2]) {
-            reverb->filter_idx[2] = 0;
+        for (j = 0; j < 3; j++) {
+            if (++reverb->filter_idx[j] >= reverb->filter_len[j]) {
+                reverb->filter_idx[j] = 0;
+            }
         }
         if (++reverb->idx7 >= reverb->length5) {
             reverb->idx7 = 0;
@@ -470,14 +470,14 @@ BOOL AXFXReverbHiExpApplySettings(AXFXReverbHi* reverb)
     if (reverb->params.a.early_gain < 0.0f || reverb->params.a.early_gain > 1.0f) {
         return FALSE;
     }
-    reverb->length0 = sHiExpModeLength[mode][2];
+    reverb->length0 = sHiExpModeLength[reverb->mode][2];
     len = reverb->length0;
-    reverb->idx0 = len - sHiExpModeLength[mode][0];
-    reverb->coef0 = reverb->out_gain * sHiExpModeGain[mode][0] * 0.6f;
-    reverb->idx1 = len - sHiExpModeLength[mode][1];
-    reverb->coef1 = reverb->out_gain * sHiExpModeGain[mode][1] * 0.6f;
-    reverb->idx2 = len - sHiExpModeLength[mode][2];
-    reverb->coef2 = reverb->out_gain * sHiExpModeGain[mode][2] * 0.6f;
+    reverb->idx0 = len - sHiExpModeLength[reverb->mode][0];
+    reverb->coef0 = reverb->out_gain * sHiExpModeGain[reverb->mode][0] * 0.6f;
+    reverb->idx1 = len - sHiExpModeLength[reverb->mode][1];
+    reverb->coef1 = reverb->out_gain * sHiExpModeGain[reverb->mode][1] * 0.6f;
+    reverb->idx2 = len - sHiExpModeLength[reverb->mode][2];
+    reverb->coef2 = reverb->out_gain * sHiExpModeGain[reverb->mode][2] * 0.6f;
     reverb->idx3 = 0;
     reverb->length1 = (u32)(32000.0f * preDelay);
     for (i = 0; i < 3; i++) {

@@ -14,8 +14,8 @@
  * RESIDUALS. `__VIShutdown`: the target returns its `final` argument (0) for an unknown event and keeps the event 1..3
  *   retrace-count compare as two return blocks ahead of the gamma case; written with one shared `return FALSE`, the
  *   compare is inverted and the FALSE block sits after the gamma case (the explicit-return shape turns it branchless).
- *   `VIConfigure`: the clock-select word is a `u16` (the target keeps it in r10 but masks it as a 32-bit value; the
- *   `u32` spelling allocates r0), 4 bytes longer.
+ *   `VIConfigure`: the clock-select word is a `u16` cleared with `& 0xFFFE` (same length as retail); retail clears
+ *   bit 0 with `clrrwi` where ours masks to 16 bits (`rlwinm 16,30`), and the `u32`/`int` spellings allocate r0.
  * SHAPES. The SDK's inline helpers are written above their first caller; `VIGetTvFormat`, `VIGetScanMode` and
  *   `VIGetDTVStatus` are expanded through `getTvFormat`/`getScanMode`/`getDTVStatus`.  `VIInit` expands the copy
  *   `enableDimming`; `VIEnableDimming` keeps its own body (as a wrapper its two saved registers swap).
@@ -1267,13 +1267,13 @@ void VIConfigure(const GXRenderModeObj* rm)
     if (viHorVer.scanMode == 2 || viHorVer.scanMode == 3) {
         regDspCfg = (regDspCfg & ~4) | 4;
         if (viHorVer.tvFormat == 8) {
-            regClksel = regClksel & ~1;
+            regClksel = regClksel & 0xFFFE;
         } else {
-            regClksel = (regClksel & ~1) | 1;
+            regClksel = (regClksel & 0xFFFE) | 1;
         }
     } else {
         regDspCfg = (regDspCfg & ~4) | ((viHorVer.scanMode & 1) << 2);
-        regClksel = regClksel & ~1;
+        regClksel = regClksel & 0xFFFE;
     }
     regDspCfg = (regDspCfg & ~8) | (viHorVer.threeD << 3);
     regDspCfg = regDspCfg & ~0x300;
