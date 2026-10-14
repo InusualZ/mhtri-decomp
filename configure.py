@@ -1395,10 +1395,11 @@ config.libs = [
             Object(NonMatching, "BTE/bta_dm_api.c"),
             Object(NonMatching, "BTE/bta_dm_main.c"),
             Object(NonMatching, "BTE/bta_dm_pm.c"),
-            Object(NonMatching, "BTE/bta_hh_act.c"),
-            Object(NonMatching, "BTE/bta_hh_api.c"),
-            Object(NonMatching, "BTE/bta_hh_main.c"),
-            Object(NonMatching, "BTE/bta_hh_utils.c"),
+            # GC/3.0a5.2 + cflags_nw4r for the bta_hh_* rows: evidence on the FLAGS line of src/BTE/bta_hh_main.c
+            Object(NonMatching, "BTE/bta_hh_act.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/bta_hh_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/bta_hh_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/bta_hh_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE btm band 0x80480A90..0x8048AEE0 recut per BTE source file; each unit's header carries its evidence.
             Object(NonMatching, "BTE/btm_acl.c"),
             Object(NonMatching, "BTE/btm_dev.c"),

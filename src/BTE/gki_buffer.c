@@ -13,10 +13,7 @@
  *   0x8070CDE0, read by 81 sites across the band) is a GUESS from the BTE source's control block. gki_chk_buf_damage,
  *   GKI_get_buf_start, gki_add_to_pool_list, GKI_set_pool_permission and gki_remove_from_pool_list are GUESS names from
  *   the BTE source for bodies the target only carries inlined (or, for GKI_get_buf_start, only its message). The rest are the map's names.
- * RESIDUALS. GKI_getbuf: its parameter is u16 in retail (GKI_getpoolbuf passes the pool's u16 size untruncated and the
- *   size compare is cmplw), but BTE/gki_buffer.h declares u8 because WPAD/wpad.cpp's caller relies on it for its
- *   clrlwi 24; so GKI_getbuf keeps a cmpw for cmplw and GKI_getpoolbuf an extra clrlwi before its tail call.
- *   GKI_get_buf_start is dead-stripped in the target: only its "bad addr" message survives in .data, so its body and
+ * RESIDUALS. GKI_get_buf_start is dead-stripped in the target: only its "bad addr" message survives in .data, so its body and
  *   error code are the BTE reference's, unmeasured. The object carries the out-of-line copies of the helpers
  *   (gki_chk_buf_damage, GKI_get_buf_start, gki_add_to_pool_list, GKI_set_pool_permission, gki_remove_from_pool_list,
  *   0x3F8 B with alignment), which the linker is expected to dead-strip (unmeasured; flipcheck refuses on the +0x3F8
@@ -146,7 +143,7 @@ void GKI_init_q(BUFFER_Q* p_q)
 }
 
 /* 0x804777E0 (0x1A0): takes a buffer from the smallest public pool that fits `size` and has one free. */
-BT_HDR* GKI_getbuf(u8 size)
+BT_HDR* GKI_getbuf(u16 size)
 {
     u8 i;
     FREE_QUEUE_T* Q;

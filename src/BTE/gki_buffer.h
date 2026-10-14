@@ -92,7 +92,7 @@ void gki_buffer_init(void);
 void GKI_init_q(BUFFER_Q* p_q);
 
 /* 0x804777E0 - takes a buffer of at least `size` bytes from the stack's pools. */
-BT_HDR* GKI_getbuf(u8 size);
+BT_HDR* GKI_getbuf(u16 size);
 
 /* 0x80477980 - takes a buffer from pool `pool_id`, or from the public pools when it is empty. */
 /* untyped: a caller-owned payload - a GKI buffer carries any message */

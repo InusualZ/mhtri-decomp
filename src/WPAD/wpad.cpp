@@ -518,7 +518,7 @@ void wpadSendCommand(s32 chan, WPADCommand cmd)
     }
     OSRestoreInterrupts(level);
     WPADiDebugPrint("handle = %d, repid = %02x\n", handle, reportId);
-    buf = GKI_getbuf(length + 0x12);
+    buf = GKI_getbuf((u8)(length + 0x12));
     buf->len = (u8)(length + 1);
     buf->offset = 10;
     payload = ((BT_BUF*)buf)->data + buf->offset;

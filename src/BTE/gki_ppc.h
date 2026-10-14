@@ -26,6 +26,11 @@ void* GKI_os_malloc(u32 size);
 /* untyped: a byte range - raw pool memory carved into buffers */
 void GKI_os_free(void* memory);
 
+/* 0x80478E70 */
+void GKI_sched_lock(void);
+/* 0x80478E80 */
+void GKI_sched_unlock(void);
+
 #ifdef __cplusplus
 }
 #endif

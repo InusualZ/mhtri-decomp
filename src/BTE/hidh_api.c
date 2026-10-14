@@ -105,8 +105,8 @@ void hidh_search_callback(u16 sdp_result) {
         return;
     }
 
-    if ((p_nvi->dscp_info.dl_len = SDP_DISC_ATTR_LEN(p_repdesc->attr_len_type)) != 0) {
-        p_nvi->dscp_info.dsc_list = (u8*)&p_repdesc->attr_value;
+    if ((p_nvi->dscp_info.length = SDP_DISC_ATTR_LEN(p_repdesc->attr_len_type)) != 0) {
+        p_nvi->dscp_info.descriptor = (u8*)&p_repdesc->attr_value;
     }
 
     if ((p_attr = SDP_FindAttributeInRec(p_rec, ATTR_ID_HID_VIRTUAL_CABLE)) != NULL && p_attr->attr_value.uint8) {

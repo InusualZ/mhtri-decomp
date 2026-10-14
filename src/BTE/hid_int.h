@@ -260,11 +260,9 @@ typedef struct tHID_HOST_DEV_CTB {
     /* +0x10 */ tHID_CONN conn;
 } tHID_HOST_DEV_CTB; /* size: 0x34 */
 
-/* size: 0x08 - the report descriptor list of a HID record. */
-typedef struct tHID_DEV_DSCP_INFO {
-    /* +0x00 */ u16 dl_len;
-    /* +0x04 */ u8* dsc_list;
-} tHID_DEV_DSCP_INFO; /* size: 0x08 */
+/* size: 0x08 - the report descriptor list of a HID record: BTE/gki_time.h's descriptor, which the BTA HID host
+ * copies as it is. */
+typedef BtaHhDscpInfo tHID_DEV_DSCP_INFO;
 
 /* size: 0x74 - the HID record the record query reads out of a device. */
 typedef struct tHID_DEV_SDP_INFO {

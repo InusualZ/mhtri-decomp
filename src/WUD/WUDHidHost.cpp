@@ -230,13 +230,13 @@ void bta_hh_co_data(u8 handle, u8* report, u16 length, u8 mode, u8 subClass, u8 
 }
 
 /* Logs a HID host open. */
-void bta_hh_co_open(void)
+void bta_hh_co_open(u8 dev_handle, u8 sub_class, u16 attr_mask, u8 app_id)
 {
     WUDiDebugPrint("bta_hh_co_open()\n");
 }
 
 /* Logs a HID host close. */
-void bta_hh_co_close(void)
+void bta_hh_co_close(u8 dev_handle, u8 app_id)
 {
     WUDiDebugPrint("bta_hh_co_close()\n");
 }
