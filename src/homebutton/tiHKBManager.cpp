@@ -1,87 +1,39 @@
 /*
- * homebutton/tiHKBManager.cpp - software-keyboard code (the tiHKBManager band), `.text` 0x8056A478..0x8056D814 (79 functions, 50 reconstructed).
+ * homebutton/tiHKBManager.cpp - the tiHKBManager software keyboard: the gui component/pane managers, the keyboard
+ * manager singleton (its channels, LED requests and observer list) and the channel state machine.
  *
- * Phase 4 fold: 36 function(s) of 0x8056A478..0x8056BBF0 from the former registered unit `homebutton/gui.cpp`.
- * Phase 4 fold: 14 function(s) of 0x8056BBF0..0x8056D814 from the former registered unit `tiHKBManager.cpp`.
- *
- * Name: the tiHKBManager listener manager (its `__FILE__` string names it) after the homebutton::gui classes; most functions keep their `fn_<addr>` placeholders.  The band was built with C++ exceptions off (no
- * extab/extabindex in the target objects), so the scoped `#pragma exceptions off` below is carried from the absorbed sources.
- *
- * Residuals: partial reconstruction - the functions not defined below keep the target object's bytes; the evidence, type views and
- * per-function residuals of the absorbed sources are in docs/splits/phase4/homebutton-carried-notes.md; the type views are in
- * `homebutton/hkb_widget.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
- *
- * Notes carried from the former registered unit `tiHKBManager.cpp` (0x8056BBF0..0x8056F2B4):
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` for every fn_8056 address in the range, which answers
- * only a bare `zz_<addr>_` placeholder; the runtime dump carries no real name for any of the 51 symbols).
- *
- * `tiHKBManager.cpp` - a C++ manager.  `.text` 0x8056BBF0-0x8056F2B4 (51 functions, 14020 B) plus the
- * `.ctors` word 0x8056F428-0x8056F42C (dtk assigned it to this unit on the split; it holds fn_8056D78C).
- *
- * Name evidence (docs/plan.md 12, evidence class 1): the unit's own fn_8056BBF0 reaches an OSPanic whose
- * file argument is the bare source name string `"tiHKBManager.cpp"` at .data:0x80658408 (the neighbouring
- * string at 0x8065841C is the panic message `"specified listener not found!"`); the two are referenced
- * nowhere else in the image.  The language is therefore C++ (attribution: `cxx=true`, high confidence,
- * `source-cpp` + the mangled-undefined `__dl__FPv`).  The module directory is not encoded in the file name
- * and no registered sibling exists in the address band, so the file is top-level `src/tiHKBManager.cpp`,
- * beside the other un-moduled game files (`nw_resource.cpp`, `mh3_pad.cpp`), in the `main` lib.
- *
- * Sections claimed: .text 0x8056BBF0-0x8056F2B4 and .ctors 0x8056F428-0x8056F42C.  The unit's `.data`
- * vtables (0x80658440/0x80658458/0x80658480/0x806584C0), the `.rodata` tables (0x8057C760..) and the
- * global manager `lbl_80790D64` all live in OTHER splits, so the target object has only `.text` + `.ctors`
- * and every one of them is referenced here as an extern `lbl_` symbol (rule 10: a table outside our ranges
- * is another TU's - we call through its `lbl_` symbol, never declare the class with virtuals).
- *
- * This is the tail of the game's `.text`: the immediately preceding proposal (0x80569DAC-0x8056BBF0) is the
- * same subsystem and is unclaimed, so the left seam is a guess (brief sec.1).
- *
- * Reconstruction status: this session reconstructed the head of the unit (the listener list unlink, the
- * record/channel accessors and the three observer-notify loops) and measured each against the target
- * object with `recompile.py --measure`.  Of the 51 functions, 5 reached the 80 % bar (fn_8056C148 and
- * fn_8056C5E8 byte-identical, fn_8056BBF0 92.59 %, fn_8056BE2C 87.73 %, fn_8056C108 87.5 %); six more
- * have bodies at 54-74 % (fn_8056BC88 73.98, fn_8056C3D8 71.43, fn_8056BC5C 63.64, fn_8056C090 58.63,
- * fn_8056BEBC/BF58/BFF4 55.77, fn_8056BE84 55.36).  The 37 functions from fn_8056C164 to fn_8056F274 (the
- * channel state machine, the event-bit scanners and the 0x2A8-byte work-item dispatch, including the
- * 3804 B fn_8056DA60) have no body yet.
- *
- * Spelling notes - three bodies were re-measured under a different (typed) spelling of the same logic,
- * because the retail object's own address computation decides the form.  All three improved, none
- * regressed, and the figures are the same `recompile.py --measure` report metric as above:
- *   - fn_8056BC5C reaches the record through the modelled singleton's own record array
- *     (`(&lbl_80790D64.rec0)[rec->index]`) instead of re-deriving it from a cast
- *     (`((HkbRecord*)&lbl_80790D64)[index]`); dropping the two temporaries and the cast is what moves it
- *     from 44.55 to 63.64 %.
- *   - fn_8056BE84 keeps the argument's flag word and value word in locals before the two guards, so the
- *     record index keeps its own register (the retail object loads `lwz r6,4(r4)` and never copies the
- *     argument pointer); 49.29 -> 55.36 %, and the body now reaches the target's 56 B.
- *   - fn_8056C090 indexes the record array by the index the constructor has just written
- *     (`&((HkbRecord*)self)[self->rec0.index]`) rather than by the literal 0; that is what makes MWCC keep
- *     the retail `mulli r4,r6,0x6C; add r4,r3,r4` record-base pair instead of folding it away - 26.73 ->
- *     58.63 % at the target's 120 B.
- *   - fn_8056BD38 hands KBDSetLedsAsync the built message word (`*(u32*)&msg`), matching the retail
- *     `lwz r6,8(r1)`; the earlier spelling passed the message's address (`(u32)&msg` -> `addi r6,r1,8`).
- *     The report metric is unchanged for this one row, but the instruction itself is now the target's.
- *
- * Residuals (measured against the target object, symbol by symbol; the per-symbol numbers are in the
- * outbox .pi/outbox/8056bbf0-fn-8056bbf0-8919.json):
- *   - fn_8056C3D8 / fn_8056BE2C / fn_8056C5E8 / fn_8056C108 / fn_8056BC5C / fn_8056C090: sizes exact; the
- *     shortfall is MWCC register colouring and the order the paired loads/`andc` are scheduled, not logic.
- *   - fn_8056BC88 / fn_8056BD38: the interrupt-guarded dispatch path; the target keeps the argument struct
- *     word in r6 and interleaves the small-data materialization with the shift - a source-shape residual.
- *   - fn_8056BEBC/BF58/BFF4: the circular-list notification loops reproduce the target's structure
- *     (walk `prev` to the head, then `next` once around), but the sentinel is coloured r3 where the retail
- *     object uses r0; the three bodies are otherwise identical.  Naming the sentinel twice (a second local
- *     alias for the same node), calling through the vtable slot as an expression, and reordering the loop
- *     were all measured and produce the same object.
- *   - fn_8056C090: the register that holds the record base differs (r6 vs the retail r4); the `li r0,9` is
- *     scheduled next to its store here and early in the retail object.
- *   - the 0x8056C164..0x8056F274 tail has no body (0 %, unpaired).
- * /
- *
- * /* The target object carries no extab/extabindex, so this unit was built with exceptions off; cflags_hkb
- * passes -Cpp_exceptions off, and the pragma states it.
+ * RANGE.     .text 0x8056A478..0x8056D814 (79 functions), .ctors 0x8056F428..0x8056F42C, .data 0x80658290..0x80658458,
+ *            .bss 0x80790D58..0x80790DF8; the functions not defined below keep the target object's bytes.
+ * FLAGS.     GC/3.0a5.2 + cflags_hkb (see src/homebutton/hbm_kb_event.cpp); no extab/extabindex in the target, so
+ *            `#pragma exceptions off`.
+ * NAMES.     File name from the `__FILE__` string "tiHKBManager.cpp" (lbl_80658408) that fn_8056BBF0's OSPanic cites.
+ * NAMES.     GUESS view classes HkbGuiComponent, HkbGuiEventTarget and HkbListener (slots named by offset) and the
+ *            types HkbManager, HkbChannel, HkbNode, HkbRecord, HkbArg, HkbSlotMsg, HkbKeyIter, HkbStageEventArgs: named
+ *            from the bodies that use them.
+ * NAMES.     GUESS function names (map rows renamed): hkbGuiUpdateStageFromArgs (builds a stage event and runs the
+ *            stage update), hkbKeyIterSeek (scans a channel key word for the next set bit), hkbKeyIterBeginWord0/1/3
+ *            (start a cursor on key word 0/1/3), hkbManagerDelete (the singleton's deleting destructor entry).
+ * SHAPES.    The view classes are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,N(r12)` dispatch;
+ *            nothing is defined or constructed through them, so no table is emitted here.
+ * SHAPES.    fn_8056BEBC/BF58/BFF4 compare against `&lbl_80790D64.sentinel` itself: a named sentinel local is
+ *            coloured r4 where retail keeps it in r0.
+ * SHAPES.    Local declaration order decides the callee-saved colouring (the first declared takes the highest
+ *            register): fn_8056A638 declares `idx` before `result`, fn_8056BD38 declares `mgr` first.
+ * SHAPES.    fn_8056C090 initialises its one channel in a `u8` counter loop: retail scales the zero counter
+ *            (`mulli r4,r6,0x6c`), which an `int` counter or a literal index folds away.
+ * RESIDUALS. fn_8056A638: retail schedules `lfs f31,4(r4)` before `mr r28,r4`; every declaration order tried keeps the
+ *            move first.
+ * RESIDUALS. fn_8056B424: retail loads `*b` into r4 and subtracts `*b - *a` first; `*b != *a` matches the loads but
+ *            swaps the two `subf` operands, every other spelling loads `*a` first.
+ * RESIDUALS. fn_8056BE2C: retail holds the manager in r0 and the scaled index in r6 (ours r6/r0).
+ * RESIDUALS. The unit's own `.data` (the vtables lbl_806582FC/lbl_80658358/lbl_80658440, the strings lbl_80658408/
+ *            lbl_8065841C) and `.bss` (lbl_80790D64) are referenced as externs: their classes are not reconstructed.
+ * RESIDUALS. datagap: the claimed `.data` 0x80658290..0x80658458 spans at least 3 TUs (emission-order seams at
+ *            0x806583A0 and in [0x80658408, 0x80658440)) - a seam question for the registration.
+ * RESIDUALS. fn_8056C2A4 (0x70) is not written: it calls KBDSetChannelMap, which KBD/kbd.h does not declare yet.
+ * RESIDUALS. 24 functions are unwritten: 0x8056A478-0x8056A638, 0x8056AAC4-0x8056AD7C, 0x8056B23C-0x8056B41C,
+ *            0x8056B440-0x8056B6C8, 0x8056B7D8-0x8056B9D4, 0x8056B9DC-0x8056BB7C, 0x8056C164-0x8056C3D8,
+ *            0x8056C3F4-0x8056C5E8, 0x8056C5F4-0x8056C6C0, 0x8056C788-0x8056D7D4.
  */
 
 #include "types.h"
@@ -98,12 +50,7 @@
 #include "homebutton/hbm_hermite.h"
 #include "nw4r/fn_805012C4.h"
 
-/* The unowned helpers this band dispatches into.  They sit in the unsplit `main` band before this
- * unit (fn_80501xxx / fn_8055xxxx), so rule 2 leaves them a counted gap (tools/units/stylelint.py,
- * "address band interleaves modules"); MEMAlloc-from / MEMFree-to are the same. */
-
-/* The `.data` vtables this unit's objects point at (they live outside the claimed .text range).
- * They are the map's `lbl_` objects; referencing them keeps MWCC from emitting a table of its own. */
+/* The vtables this unit's managers store (the unit's own `.data`; their classes are not reconstructed). */
 extern "C" {
 
 extern char lbl_806582FC[];
@@ -114,19 +61,21 @@ extern char lbl_80658358[];
 
 /* ---- types -------------------------------------------------------------------------------------- */
 
-/* A node on the manager's circular observer list: vtable, prev, next. */
-/* size: 0x0C */
+struct HkbManager;
+
+/* A node on the manager's circular observer list: vtable, prev, next and the manager it reports to (the
+ * manager's own sentinel node points back at the manager, fn_8056C090). */
+/* size: 0x10 */
 struct HkbNode {
     /* +0x00 */ void** vtable;
     /* +0x04 */ HkbNode* prev;
     /* +0x08 */ HkbNode* next;
+    /* +0x0C */ HkbManager* manager;
 };
 
-/*
- * A listener record is 0x6C bytes.  Bytes +0x14..+0x6B are its "channel" sub-object (see HkbChannel);
- * the record head holds the index (+0x00), a flag (+0x01) and the state words (+0x04/+0x08/+0x0C/+0x10).
- */
-/* size: 0x58 */
+/* One keyboard channel of the manager: its state words, the LED request flag (+0x30) and the packed key words
+ * (+0x20/+0x24/+0x28) the blend helper reads. */
+/* size: 0x6C */
 struct HkbChannel {
     /* +0x00 */ u8 b00;
     /* +0x01 */ u8 b01;
@@ -150,30 +99,33 @@ struct HkbChannel {
     /* +0x4C */ u32 w4C;
     /* +0x50 */ u32 w50;
     /* +0x54 */ u32 w54;
+    /* +0x58 */ u8 pad_58[0x14];
 };
 
-/* size: 0x6C */
+/* The status record KBDSetLedsAsync hands its callback (fn_8056BC88) and fn_8056BC5C reads: the channel index and
+ * the result code (7 = busy).
+ * size: 0x0C (approximation: only +0x00 and +0x08 are touched) */
 struct HkbRecord {
     /* +0x00 */ u8 index;
-    /* +0x01 */ u8 flag;
-    /* +0x02 */ u8 pad_02[2];
-    /* +0x04 */ u32 w04;
+    /* +0x01 */ u8 pad_01[3];
+    /* +0x04 */ u32 pad_04;
     /* +0x08 */ s32 w08; /* signed: retail compares with cmpwi */
-    union {
-        /* +0x0C */ HkbRecord* records;
-        /* +0x0C */ u8* slotFlags;
-    };
-    /* +0x10 */ u32 w10;
-    /* +0x14 */ HkbChannel channel;
 };
 
+/* The keyboard manager singleton: per-channel active flags, the pending-LED bit mask, one channel and the
+ * sentinel of the observer list. */
 /* size: 0x94 */
 struct HkbManager {
-    /* +0x00 */ HkbRecord rec0; /* the manager's own record */
-    /* +0x6C */ u8 pad_6C[0x14];
+    /* +0x00 */ u8 b00;
+    /* +0x01 */ u8 active[1];
+    /* +0x02 */ u8 pad_02[2];
+    /* +0x04 */ u32 w04;
+    /* +0x08 */ u32 pendingMask;
+    /* +0x0C */ u32 w0C;
+    /* +0x10 */ u32 w10;
+    /* +0x14 */ HkbChannel channels[1];
     /* +0x80 */ HkbNode sentinel; /* circular observer list header */
-    /* +0x8C */ HkbManager* owner;
-    /* +0x90 */ void* field_90;
+    /* +0x90 */ u32 field_90;
 };
 
 /* size: 0x08 */
@@ -196,44 +148,104 @@ struct HkbSlotMsg {
     /* +0x04 */ u32 value;
 };
 
+/* The polymorphic view of an observer on the manager's list (an HkbNode): slots +0x0C/+0x10/+0x14 receive the
+ * notification argument, so MWCC emits the canonical dispatch; nothing is defined here, so no table is emitted.
+ * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
+class HkbListener {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* untyped: opaque handle passed through */
+    /* slot +0x00C */ virtual void v_0x00C(void* arg);
+    /* untyped: opaque handle passed through */
+    /* slot +0x010 */ virtual void v_0x010(void* arg);
+    /* untyped: opaque handle passed through */
+    /* slot +0x014 */ virtual void v_0x014(void* arg);
+};
+
 void operator delete(void* ptr) throw();
 
-/* the unit's own data lives in other splits; reference it, never redefine it (rule 10 / rule 2 gap). */
+/* The unit's own `.data` strings and vtable and its `.bss` singleton (see RESIDUALS). */
 extern "C" char lbl_80658408[]; /* "tiHKBManager.cpp" */
 
 extern "C" char lbl_8065841C[]; /* "specified listener not found!" */
 
 extern "C" void* lbl_80658440[]; /* .data vtable */
 
-/* the global manager singleton (unsplit - an extern declared where the model lives; rule 2 gap) */
 extern "C" HkbManager lbl_80790D64;
 
-extern "C" void fn_80529430_dummy(void);
+/* The polymorphic view of a gui component the manager bodies call through: the slots are named by their offset
+ * in the table (+0x08 is the deleting destructor), so MWCC emits the canonical `lwz r12,0(r3); lwz r12,N(r12)`
+ * dispatch. Nothing is defined or constructed here, so no table is emitted (rule 10).
+ * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
+class HkbGuiComponent {
+public:
+    /* slot +0x008 */ virtual void v_0x008(int flag);
+    /* untyped: opaque handles passed through */
+    /* slot +0x00C */ virtual void v_0x00C(void* a, void* b, void* c);
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual Pane* v_0x020(); /* the pane the manager keys the component by */
+    /* slot +0x024 */ virtual u32 v_0x024(u32 idx);
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C(u32 idx, u32 on);
+    /* slot +0x030 */ virtual void v_0x030(u32 idx);
+    /* slot +0x034 */ virtual void v_0x034(u32 idx);
+    /* slot +0x038 */ virtual void v_0x038(f32 dx, f32 dy);
+    /* slot +0x03C */ virtual void v_0x03C(u32 idx, f32 x, f32 y);
+    /* slot +0x040 */ virtual void v_0x040();
+    /* untyped: opaque handle passed through */
+    /* slot +0x044 */ virtual void v_0x044(void* arg);
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* untyped: opaque handle passed through */
+    /* slot +0x054 */ virtual void v_0x054(void* arg);
+    /* slot +0x058 */ virtual u32 v_0x058(StageEvent* event);
+    /* slot +0x05C */ virtual void v_0x05C();
+    /* slot +0x060 */ virtual void v_0x060();
+    /* slot +0x064 */ virtual u32 v_0x064(f32 x, f32 y);
+};
+
+/* The event target a component forwards to (its +0x04 and +0x98 members): slot +0x10 takes the event's third
+ * word, slot +0x0C the whole event.
+ * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
+class HkbGuiEventTarget {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* untyped: opaque handles passed through */
+    /* slot +0x00C */ virtual void v_0x00C(Component* source, void* b, void* d);
+    /* untyped: opaque handle passed through */
+    /* slot +0x010 */ virtual void v_0x010(void* c);
+};
 
 /* --- 0x8056A638: per-stage update dispatcher - returns 0/1/2/3 by which transition fired. --- */
 extern "C" u32 fn_8056A638(Component* self, StageEvent* p) {
-    u32 result = 0;
-    u32 idx = p->idx;
+    HkbGuiComponent* view = (HkbGuiComponent*)self;
+    u32 idx;
     f32 x = p->x;
+    u32 result = 0;
     f32 y = p->y;
-    if (((u32 (*)(Component*, StageEvent*))self->vtable->slot_58)(self, p) != 0) {
-        if (((u32 (*)(Component*, f32, f32))self->vtable->slot_64)(self, x, y) != 0) {
-            if (((u32 (*)(Component*, u32))self->vtable->slot_24)(self, idx) != 0) {
-                ((void (*)(Component*, u32, f32, f32))self->vtable->slot_3C)(self, idx, x, y);
+    idx = p->idx;
+    if (view->v_0x058(p) != 0) {
+        if (view->v_0x064(x, y) != 0) {
+            if (view->v_0x024(idx) != 0) {
+                view->v_0x03C(idx, x, y);
                 result = 3;
             } else {
-                ((void (*)(Component*, u32, u32))self->vtable->slot_2C)(self, idx, 1);
-                ((void (*)(Component*, u32))self->vtable->slot_30)(self, idx);
+                view->v_0x02C(idx, 1);
+                view->v_0x030(idx);
                 result = 1;
             }
-        } else if (((u32 (*)(Component*, u32))self->vtable->slot_24)(self, idx) != 0) {
-            ((void (*)(Component*, u32, u32))self->vtable->slot_2C)(self, idx, 0);
-            ((void (*)(Component*, u32))self->vtable->slot_34)(self, idx);
+        } else if (view->v_0x024(idx) != 0) {
+            view->v_0x02C(idx, 0);
+            view->v_0x034(idx);
             result = 2;
         }
         if (self->flags_0x0D[idx] != 0) {
             StageRec* r = &self->recs_0x18[idx];
-            ((void (*)(Component*, f32, f32))self->vtable->slot_38)(self, x - r->x, y - r->y);
+            view->v_0x038(x - r->x, y - r->y);
             r->x = x;
             r->y = y;
         }
@@ -278,15 +290,15 @@ extern "C" void fn_8056A884(void) {}
 extern "C" Manager* fn_8056A888(Manager* self, int flag) {
     if (self != 0) {
         self->vtable = (VTable*)lbl_80658358;
-        Node* n = (Node*)fn_80501C60(&self->list_0x0C, 0);
+        Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0);
         while (n != 0) {
-            fn_80501BF4(&self->list_0x0C, n);
+            nw4r::ut::List_Remove((nw4r::ut::List*)&self->list_0x0C, n);
             if (self->allocator != 0) {
                 MEMFreeToAllocator((MEMAllocator*)self->allocator, n);
             } else {
                 operator delete(n);
             }
-            n = (Node*)fn_80501C60(&self->list_0x0C, 0);
+            n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0);
         }
         if (flag > 0) {
             operator delete(self);
@@ -297,17 +309,17 @@ extern "C" Manager* fn_8056A888(Manager* self, int flag) {
 
 /* --- 0x8056A944: run virtual slot 4 over every component. --- */
 extern "C" void fn_8056A944(Manager* self) {
-    Node* n = (Node*)fn_80501C60(&self->list_0x0C, 0);
+    Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0);
     while (n != 0) {
-        Component* c = (Component*)n->mValue;
-        ((void (*)(Component*))c->vtable->slot_10)(c);
-        n = (Node*)fn_80501C60(&self->list_0x0C, n);
+        HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
+        c->v_0x010();
+        n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, n);
     }
 }
 
 /* --- 0x8056A9B4: append `comp` to the manager's list, keyed by its virtual slot 8 result. --- */
 extern "C" void fn_8056A9B4(Manager* self, Component* comp) {
-    void* key = ((void* (*)(Component*))comp->vtable->slot_20)(comp);
+    Pane* key = ((HkbGuiComponent*)comp)->v_0x020();
     comp->field_0x94 = (Component*)self;
     if (self->allocator != 0) {
         Node* node = (Node*)MEMAllocFromAllocator((MEMAllocator*)self->allocator, sizeof(Node));
@@ -315,14 +327,14 @@ extern "C" void fn_8056A9B4(Manager* self, Component* comp) {
             node->mKey = key;
             node->mValue = comp;
         }
-        fn_80501A64(&self->list_0x0C, node);
+        nw4r::ut::List_Append((nw4r::ut::List*)&self->list_0x0C, node);
     } else {
         Node* node = (Node*)operator new(sizeof(Node));
         if (node != 0) {
             node->mKey = key;
             node->mValue = comp;
         }
-        fn_80501A64(&self->list_0x0C, node);
+        nw4r::ut::List_Append((nw4r::ut::List*)&self->list_0x0C, node);
     }
 }
 
@@ -331,24 +343,44 @@ extern "C" u32 fn_8056AA64(Component* self) { return self->field_0x7C; }
 
 /* --- 0x8056AA6C / 0x8056AA98: indexed component lookup (Manager::getComponent). --- */
 extern "C" Component* fn_8056AA6C(Manager* self, u32 index) {
-    return (Component*)((Node*)fn_80501C9C(&self->list_0x0C, (u16)index))->mValue;
+    return (Component*)((Node*)nw4r::ut::List_GetNth((nw4r::ut::List*)&self->list_0x0C, (u16)index))->mValue;
 }
 
 extern "C" Component* fn_8056AA98(Manager* self, u32 index) {
-    return (Component*)((Node*)fn_80501C9C(&self->list_0x0C, (u16)index))->mValue;
+    return (Component*)((Node*)nw4r::ut::List_GetNth((nw4r::ut::List*)&self->list_0x0C, (u16)index))->mValue;
 }
 
-/* --- 0x8056ADB8: forward a 3-arg event to the +4 handler and the +0x98 handler. --- */
-extern "C" void fn_8056ADB8(Component* self, void* a, void* b, void* c) {
-    Manager* h = (Manager*)self->field_0x04;
+/* The argument block hkbGuiUpdateStageFromArgs builds for the stage update: the event and one trailing word.
+ * size: 0x18 */
+struct HkbStageEventArgs {
+    /* +0x00 */ StageEvent event;
+    /* +0x14 */ u32 extra_14;
+};
+
+/* --- 0x8056AD7C: build a stage event from the arguments and run the stage update on it. --- */
+extern "C" u32 hkbGuiUpdateStageFromArgs(Component* self, u32 idx, f32 x, f32 y, u32 word_0C, u32 mask, u32 extra) {
+    HkbStageEventArgs args;
+    args.event.idx = idx;
+    args.event.x = x;
+    args.event.y = y;
+    args.event.field_0x0C = word_0C;
+    args.event.field_0x10 = mask;
+    args.extra_14 = extra;
+    return fn_8056A638(self, &args.event);
+}
+
+/* --- 0x8056ADB8: forward an event from `source` to the +4 handler and to the source's +0x98 handler. --- */
+/* untyped: opaque handles passed through */
+extern "C" void fn_8056ADB8(Component* self, Component* source, void* b, void* c, void* d) {
+    HkbGuiEventTarget* h = (HkbGuiEventTarget*)self->field_0x04;
     if (h != 0) {
-        ((void (*)(Manager*, void*))h->vtable->slot_10)(h, c);
-        h = (Manager*)self->field_0x04;
-        ((void (*)(Manager*, void*, void*, void*))h->vtable->slot_0C)(h, a, b, c);
+        h->v_0x010(c);
+        h = (HkbGuiEventTarget*)self->field_0x04;
+        h->v_0x00C(source, b, d);
     }
-    h = (Manager*)self->field_0x98;
+    h = (HkbGuiEventTarget*)source->field_0x98;
     if (h != 0) {
-        ((void (*)(Manager*, void*, void*, void*))h->vtable->slot_0C)(h, a, b, c);
+        h->v_0x00C(source, b, d);
     }
 }
 
@@ -366,40 +398,40 @@ extern "C" void fn_8056AE78(Component* self, u32 idx, u32 mask, StageRec* v) {
 
 /* --- 0x8056AEC4 / 0x8056AF34: run virtual slot 5 / slot 7 over every component. --- */
 extern "C" void fn_8056AEC4(Manager* self) {
-    Node* n = (Node*)fn_80501C60(&self->list_0x0C, 0);
+    Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0);
     while (n != 0) {
-        Component* c = (Component*)n->mValue;
-        ((void (*)(Component*))c->vtable->slot_14)(c);
-        n = (Node*)fn_80501C60(&self->list_0x0C, n);
+        HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
+        c->v_0x014();
+        n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, n);
     }
 }
 
 extern "C" void fn_8056AF34(Manager* self) {
-    Node* n = (Node*)fn_80501C60(&self->list_0x0C, 0);
+    Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0);
     while (n != 0) {
-        Component* c = (Component*)n->mValue;
-        ((void (*)(Component*))c->vtable->slot_1C)(c);
-        n = (Node*)fn_80501C60(&self->list_0x0C, n);
+        HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
+        c->v_0x01C();
+        n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, n);
     }
 }
 
 /* --- 0x8056AFA4: forward an argument to virtual slot 21 of every component. --- */
 extern "C" void fn_8056AFA4(Manager* self, void* arg) {
-    Node* n = (Node*)fn_80501C60(&self->list_0x0C, 0);
+    Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0);
     while (n != 0) {
-        Component* c = (Component*)n->mValue;
-        ((void (*)(Component*, void*))c->vtable->slot_54)(c, arg);
-        n = (Node*)fn_80501C60(&self->list_0x0C, n);
+        HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
+        c->v_0x054(arg);
+        n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, n);
     }
 }
 
 /* --- 0x8056B024: forward an argument to virtual slot 17 of every component. --- */
 extern "C" void fn_8056B024(Manager* self, void* arg) {
-    Node* n = (Node*)fn_80501C60(&self->list_0x0C, 0);
+    Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, 0);
     while (n != 0) {
-        Component* c = (Component*)n->mValue;
-        ((void (*)(Component*, void*))c->vtable->slot_44)(c, arg);
-        n = (Node*)fn_80501C60(&self->list_0x0C, n);
+        HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
+        c->v_0x044(arg);
+        n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x0C, n);
     }
 }
 
@@ -410,22 +442,22 @@ extern "C" void fn_8056B0A4(Component* self, u32 v) { self->field_0x78 = v; }
 extern "C" PaneManager* fn_8056B0AC(PaneManager* self, int flag) {
     if (self != 0) {
         self->vtable = (VTable*)lbl_806582FC;
-        Node* n = (Node*)fn_80501C60(&self->list_0x24, 0);
+        Node* n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x24, 0);
         while (n != 0) {
-            fn_80501BF4(&self->list_0x24, n);
+            nw4r::ut::List_Remove((nw4r::ut::List*)&self->list_0x24, n);
             if (self->allocator != 0) {
-                Component* c = (Component*)n->mValue;
-                ((void (*)(Component*, int))c->vtable->slot_08)(c, -1);
+                HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
+                c->v_0x008(-1);
                 MEMFreeToAllocator((MEMAllocator*)self->allocator, n->mValue);
                 MEMFreeToAllocator((MEMAllocator*)self->allocator, n);
             } else {
-                Component* c = (Component*)n->mValue;
+                HkbGuiComponent* c = (HkbGuiComponent*)n->mValue;
                 if (c != 0) {
-                    ((void (*)(Component*, int))c->vtable->slot_08)(c, 1);
+                    c->v_0x008(1);
                 }
                 operator delete(n);
             }
-            n = (Node*)fn_80501C60(&self->list_0x24, 0);
+            n = (Node*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x24, 0);
         }
         fn_8056A888(self, 0);
         if (flag > 0) {
@@ -454,7 +486,7 @@ extern "C" void* fn_8056B1FC(void* self, int flag) {
 extern "C" void* fn_8056B41C(Node* n) { return n->mValue; }
 
 /* --- 0x8056B424: `*a != *b`. --- */
-extern "C" u32 fn_8056B424(u32* a, u32* b) { return *a != *b; }
+extern "C" u32 fn_8056B424(u32* a, u32* b) { return *b != *a; }
 
 /* --- 0x8056B6C8: PaneComponent::setPane. --- */
 extern "C" void fn_8056B6C8(Component* self, void* pane) { self->field_0x9C = pane; }
@@ -462,7 +494,7 @@ extern "C" void fn_8056B6C8(Component* self, void* pane) { self->field_0x9C = pa
 /* --- 0x8056B6D0: getPaneComponentByName - find the component whose pane's name matches `name`. --- */
 extern "C" Component* fn_8056B6D0(PaneManager* self, const char* name) {
     for (u32 i = 0; i < self->list_0x24.mSize; i++) {
-        Node* n = (Node*)fn_80501C9C(&self->list_0x24, (u16)i);
+        Node* n = (Node*)nw4r::ut::List_GetNth((nw4r::ut::List*)&self->list_0x24, (u16)i);
         Pane* pane = (Pane*)n->mKey;
         if (fn_8055F580(pane->name_0xBC, name)) {
             return (Component*)n->mValue;
@@ -474,7 +506,7 @@ extern "C" Component* fn_8056B6D0(PaneManager* self, const char* name) {
 /* --- 0x8056B760: PaneManager::getPaneComponentByPane - find the component keyed by `pane`. --- */
 extern "C" Component* fn_8056B760(PaneManager* self, void* pane) {
     for (u32 i = 0; i < self->list_0x24.mSize; i++) {
-        Node* n = (Node*)fn_80501C9C(&self->list_0x24, (u16)i);
+        Node* n = (Node*)nw4r::ut::List_GetNth((nw4r::ut::List*)&self->list_0x24, (u16)i);
         if (n->mKey == pane) {
             return (Component*)n->mValue;
         }
@@ -546,16 +578,16 @@ void fn_8056BBF0(HkbNode* list, HkbNode* node)
     OSPanic(lbl_80658408, 0xB3, lbl_8065841C);
 }
 
-/* 0x8056BC5C: mark the record at the manager's slot as pending. */
+/* 0x8056BC5C: mark the channel of a busy LED request as pending. */
 void fn_8056BC5C(HkbRecord* rec)
 {
     if (rec->w08 != 7) {
         return;
     }
-    (&lbl_80790D64.rec0)[rec->index].channel.b30 = 1;
+    lbl_80790D64.channels[rec->index].b30 = 1;
 }
 
-/* 0x8056BC88: clear the slot's bit, dispatch, and re-set it when the dispatch found the record. */
+/* 0x8056BC88: clear the channel's pending bit, re-issue the LED request, and re-set the bit while it stays busy. */
 void fn_8056BC88(HkbRecord* rec)
 {
     if (rec->w08 != 7) {
@@ -573,111 +605,101 @@ void fn_8056BC88(HkbRecord* rec)
 
         saved = OSDisableInterrupts();
         bit = 1u << index;
-        ((HkbManager*)&lbl_80790D64)->rec0.w08 &= ~bit; /* the global's +0x08 word (record head) */
+        lbl_80790D64.pendingMask &= ~bit;
         result = KBDSetLedsAsync(index, 0, (void*)fn_8056BC88, *(u32*)&msg);
         if ((s32)result == 7) {
-            ((HkbManager*)&lbl_80790D64)->rec0.w08 |= bit;
+            lbl_80790D64.pendingMask |= bit;
         }
         OSRestoreInterrupts(saved);
     }
 }
 
-/* 0x8056BDD8 helper for fn_8056BD38: second half. */
-
-/* 0x8056BD38: (de)register a slot; the branch depends on the record index. */
-void fn_8056BD38(HkbManager* self, HkbArg* arg)
+/* 0x8056BD38: (de)activate a channel; channels past the first issue an LED request instead. */
+void fn_8056BD38(HkbNode* self, HkbArg* arg)
 {
-    u32 index = arg->index;
-    if (index >= 1) {
+    if (arg->index >= 1) {
+        HkbManager* mgr;
+        u8 index;
         u32 saved;
         u32 bit;
         u32 result;
-        HkbRecord* records;
-        u32 value;
         HkbSlotMsg msg;
 
-        KBDSetChannelValue((u8)index, 0);
+        KBDSetChannelValue(arg->index, 0);
+        index = arg->index;
         msg.value = 0;
-        msg.index = (u8)index;
-        records = self->rec0.records;
+        mgr = self->manager;
+        msg.index = index;
         saved = OSDisableInterrupts();
         bit = 1u << index;
-        value = records->w08 & ~bit;
-        records->w08 = value;
-        result = KBDSetLedsAsync((u8)index, 0, (void*)fn_8056BC88, *(u32*)&msg);
-        if (result == 7) {
-            records->w08 |= bit;
+        mgr->pendingMask &= ~bit;
+        result = KBDSetLedsAsync(index, 0, (void*)fn_8056BC88, *(u32*)&msg);
+        if ((s32)result == 7) {
+            mgr->pendingMask |= bit;
         }
         OSRestoreInterrupts(saved);
     } else {
-        HkbRecord* records = self->rec0.records;
-        records[index].flag = 1;
-        KBDSetChannelValue((u8)index, 0);
-        records[index].channel.b30 = 1;
+        self->manager->active[arg->index] = 1;
+        KBDSetChannelValue(arg->index, 0);
+        self->manager->channels[arg->index].b30 = 1;
     }
 }
 
-/* 0x8056BE2C: reset one record's channel state. */
-void fn_8056BE2C(HkbManager* self, HkbArg* arg)
+/* 0x8056BE2C: reset one channel's state. */
+void fn_8056BE2C(HkbNode* self, HkbArg* arg)
 {
     u32 index = arg->index;
-    HkbRecord* records;
-    HkbRecord* rec;
+    HkbManager* mgr;
+    HkbChannel* ch;
     if (index >= 1) {
         return;
     }
-    records = self->rec0.records;
-    rec = &records[index];
-    self->rec0.slotFlags[index + 1] = 0;
-    rec->channel.w04 = 0;
-    rec->channel.w08 = 0;
-    rec->channel.w0C = 0;
-    rec->channel.w10 = 0;
-    rec->channel.w18 = 0;
-    rec->channel.w1C = 0;
-    rec->channel.w20 &= 0x00000700;
-    rec->channel.w28 = 0;
-    rec->channel.w24 = 0;
-    rec->channel.b30 = 0;
+    mgr = self->manager;
+    mgr->active[index] = 0;
+    ch = &mgr->channels[index];
+    ch->w04 = 0;
+    ch->w08 = 0;
+    ch->w0C = 0;
+    ch->w10 = 0;
+    ch->w18 = 0;
+    ch->w1C = 0;
+    ch->w20 &= 0x00000700;
+    ch->w28 = 0;
+    ch->w24 = 0;
+    ch->b30 = 0;
 }
 
-/* 0x8056BE84: forward a slot update into the channel. */
+/* 0x8056BE84: forward a channel update. */
 void fn_8056C788(HkbChannel* channel, u32 mode, u32 value);
 
-void fn_8056BE84(HkbManager* self, HkbArg* arg)
+void fn_8056BE84(HkbNode* self, HkbArg* arg)
 {
     u32 index = arg->index;
     u32 flags;
-    u32 value;
     if (index >= 1) {
         return;
     }
     flags = arg->flags;
-    value = arg->value;
     if (flags & 2) {
         return;
     }
-    fn_8056C788(&self->rec0.records[index].channel, flags & 1, value);
+    fn_8056C788(&self->manager->channels[index], flags & 1, arg->value);
 }
 
 /* 0x8056BEBC / 0x8056BF58 / 0x8056BFF4: notify every observer on the global manager's list by calling
  * the vtable slot +0x0C / +0x10 / +0x14.  Each is a separate body (the retail object has three copies). */
-#define HKB_NOTIFY(slot)                                                       \
-    HkbManager* mgr = (HkbManager*)&lbl_80790D64;                              \
-    HkbNode* sentinel = &mgr->sentinel;                                        \
-    HkbNode* first = sentinel;                                                 \
-    HkbNode* n = sentinel->prev;                                               \
-    while (n != 0) {                                                           \
-        first = n;                                                             \
-        if (n->prev == sentinel) {                                             \
+#define HKB_NOTIFY(method)                                                     \
+    HkbNode* first;                                                            \
+    HkbNode* n = &lbl_80790D64.sentinel;                                       \
+    while (n->prev != 0) {                                                     \
+        n = n->prev;                                                           \
+        if (n->prev == &lbl_80790D64.sentinel) {                               \
             break;                                                             \
         }                                                                      \
-        n = first->prev;                                                       \
     }                                                                          \
-    n = first;                                                                 \
+    first = n;                                                                 \
     while (n != 0) {                                                           \
-        void (*fn)(HkbNode*, void*) = (void (*)(HkbNode*, void*))n->vtable[slot]; \
-        fn(n, arg);                                                            \
+        ((HkbListener*)n)->method(arg);                                        \
         n = n->next;                                                           \
         if (n == first) {                                                      \
             break;                                                             \
@@ -686,47 +708,50 @@ void fn_8056BE84(HkbManager* self, HkbArg* arg)
 
 void fn_8056BEBC(void* arg)
 {
-    HKB_NOTIFY(3)
+    HKB_NOTIFY(v_0x00C)
 }
 
 void fn_8056BF58(void* arg)
 {
-    HKB_NOTIFY(4)
+    HKB_NOTIFY(v_0x010)
 }
 
 void fn_8056BFF4(void* arg)
 {
-    HKB_NOTIFY(5)
+    HKB_NOTIFY(v_0x014)
 }
 
 /* 0x8056C090: constructor of the manager singleton. */
 void fn_8056C090(HkbManager* self)
 {
-    HkbRecord* rec;
-    self->rec0.index = 0;
-    rec = &((HkbRecord*)self)[self->rec0.index];
-    self->rec0.w04 = 0;
-    self->rec0.w08 = 0;
-    self->rec0.records = 0;
-    self->rec0.w10 = 0;
+    u8 i;
+    self->b00 = 0;
+    self->w04 = 0;
+    self->pendingMask = 0;
+    self->w0C = 0;
+    self->w10 = 0;
     self->sentinel.prev = 0;
     self->sentinel.next = 0;
     self->sentinel.vtable = lbl_80658440;
-    self->owner = self;
+    self->sentinel.manager = self;
     self->field_90 = 0;
-    self->rec0.flag = 0;
-    rec->channel.w04 = 0;
-    rec->channel.w08 = 0;
-    rec->channel.w0C = 0;
-    rec->channel.w10 = 0;
-    rec->channel.w18 = 0;
-    rec->channel.w1C = 0;
-    rec->channel.w28 = 0;
-    rec->channel.w24 = 0;
-    rec->channel.b30 = 0;
-    rec->channel.b00 = 0;
-    rec->channel.w2C = 9;
-    rec->channel.w20 = 0;
+    for (i = 0; i < 1; i++) {
+        HkbChannel* ch;
+        self->active[i] = 0;
+        ch = &self->channels[i];
+        ch->w04 = 0;
+        ch->w08 = 0;
+        ch->w0C = 0;
+        ch->w10 = 0;
+        ch->w18 = 0;
+        ch->w1C = 0;
+        ch->w28 = 0;
+        ch->w24 = 0;
+        ch->b30 = 0;
+        ch->b00 = 0;
+        ch->w2C = 9;
+        ch->w20 = 0;
+    }
 }
 
 /* 0x8056C108: operator delete wrapper. */
@@ -749,20 +774,80 @@ void fn_8056C148(u32 value, u32* out)
     *out = value;
 }
 
+/* A cursor over the set key bits of the manager's channels: the word it scans (`kind` 0..3 selects channel
+ * word +0x04..+0x10), the bit and channel it stands on and the number of bits it has passed.
+ * size: 0x0C */
+struct HkbKeyIter {
+    /* +0x00 */ HkbManager* manager;
+    /* +0x04 */ u8 kind;
+    /* +0x05 */ s8 bit;
+    /* +0x06 */ u8 channel;
+    /* +0x07 */ u8 pad_07;
+    /* +0x08 */ u16 count;
+    /* +0x0A */ u8 pad_0A[2];
+};
+
+HkbKeyIter hkbKeyIterSeek(const HkbKeyIter* start);
+
 /* 0x8056C3D8: blend the two packed words +0x34 / +0x38 through the mask +0x3C. */
-u32 fn_8056C3D8(HkbRecord* rec)
+u32 fn_8056C3D8(HkbManager* self)
 {
-    u32 v = rec->channel.w20;
-    u32 b = rec->channel.w28;
+    u32 v = self->channels[0].w20;
+    u32 b = self->channels[0].w28;
     v &= ~b;
-    v |= rec->channel.w24 & b;
+    v |= self->channels[0].w24 & b;
     return v;
 }
 
-/* 0x8056C5E8: set the two words +0x38 / +0x3C. */
-void fn_8056C5E8(HkbRecord* rec, u32 a, u32 b)
+/* 0x8056C6C0: the first set bit of the manager's key word 0. */
+HkbKeyIter hkbKeyIterBeginWord0(HkbManager* manager)
 {
-    rec->channel.w24 = a;
-    rec->channel.w28 = b;
+    HkbKeyIter it;
+    it.manager = manager;
+    it.kind = 0;
+    it.bit = -1;
+    it.channel = 0;
+    it.count = 0;
+    return hkbKeyIterSeek(&it);
+}
+
+/* 0x8056C700: the first set bit of the manager's key word 1. */
+HkbKeyIter hkbKeyIterBeginWord1(HkbManager* manager)
+{
+    HkbKeyIter it;
+    it.manager = manager;
+    it.kind = 1;
+    it.bit = -1;
+    it.channel = 0;
+    it.count = 0;
+    return hkbKeyIterSeek(&it);
+}
+
+/* 0x8056C744: the first set bit of the manager's key word 3. */
+HkbKeyIter hkbKeyIterBeginWord3(HkbManager* manager)
+{
+    HkbKeyIter it;
+    it.manager = manager;
+    it.kind = 3;
+    it.bit = -1;
+    it.channel = 0;
+    it.count = 0;
+    return hkbKeyIterSeek(&it);
+}
+
+/* 0x8056C5E8: set the two words +0x38 / +0x3C. */
+void fn_8056C5E8(HkbManager* self, u32 a, u32 b)
+{
+    self->channels[0].w24 = a;
+    self->channels[0].w28 = b;
+}
+
+/* 0x8056D7D4: deleting destructor of the manager singleton (registered by the unit's static initializer). */
+HkbManager* hkbManagerDelete(HkbManager* self, int flag)
+{
+    if (self != 0 && flag > 0) {
+        operator delete(self);
+    }
+    return self;
 }
 }

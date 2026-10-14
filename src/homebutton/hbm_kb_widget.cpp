@@ -1,16 +1,32 @@
 /*
- * homebutton/hbm_kb_widget.cpp - software-keyboard code (the tiHKBManager band), `.text` 0x8054F7BC..0x805546B4 (102 functions, 59 reconstructed).
+ * homebutton/hbm_kb_widget.cpp - software-keyboard code of the tiHKBManager band: the keyboard widget's state
+ * selector, property handlers, page stepping, flag accessors, deleting destructors and adjustor thunks.
  *
- * Phase 4 recut: 59 function(s) of 0x8054F7BC..0x805546B4 from the former registered unit `homebutton/fn_8054E894.cpp`.
- *
- * Name: GUESS - `hbm_` (the band's file prefix) + the keyboard widget class (state selector, layout-block copy, flag accessors, deleting destructors), from the dominant function descriptions
- * below; the band has no `__FILE__` string and the runtime dump names no function, so every function keeps its `fn_<addr>`
- * placeholder.  The band was built with C++ exceptions off (no extab/extabindex in the target objects), so the scoped
- * `#pragma exceptions off` below is carried from the absorbed sources and applied to every piece.
- *
- * Residuals: partial reconstruction - the functions not defined below keep the target object's bytes; the evidence, type views and
- * per-function residuals of the absorbed sources are in docs/splits/phase4/homebutton-carried-notes.md; the type views are in
- * `homebutton/hkb_widget.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
+ * RANGE.     .text 0x8054F7BC..0x805546B4 (102 functions), .ctors 0x8056F400..0x8056F404, .rodata 0x8057B2F0..0x8057B668,
+ *            .data 0x8064F360..0x80650160; the functions not defined below keep the target object's bytes.
+ * FLAGS.     GC/3.0a5.2 + cflags_hkb (see src/homebutton/hbm_kb_event.cpp); no extab/extabindex in the target, so
+ *            `#pragma exceptions off`.
+ * NAMES.     GUESS file name: the band's `hbm_` prefix + the keyboard widget class; no `__FILE__` string and no
+ *            runtime-dump name.
+ * NAMES.     GUESS type HkbWidgetProperty (the record the widget's slot +0x18 fills and applies).
+ * NAMES.     GUESS function names (map rows renamed): hkbKbWidgetSetPropertyFlag (stores +0x17E8 and applies it as
+ *            property 0x1D), hkbKbWidgetHandleByteProperty (property ids 0x22/0x23 through slots +0x40/+0x44).
+ * SHAPES.    Signed compares (`cmpwi`, `ble`) read the widget's words as `s32`: fn_80551314 casts +0x1A90,
+ *            fn_80551E5C switches on `(s32)state`, fn_80553F84 takes its selector as `s32`.
+ * RESIDUALS. The constructors (fn_80553F50, fn_80553FC8, fn_80554278) store the unit's own `.data` vtables at +0x00
+ *            and +0x14: they need their classes reconstructed (rule 10), not hand-written stores.
+ * RESIDUALS. fn_80551404, fn_8055136C, fn_80550BA4, fn_80550C30 and fn_80550CCC read widget words (+0x17F0, +0x18F0,
+ *            +0x1A94) that the shared view in homebutton/hkb_widget.h does not name yet.
+ * RESIDUALS. fn_805542BC is declared `(HkbWidget*)` in homebutton/hbm_kb_widget.h; its body takes
+ *            (self, s32, u32 id, HkbFlagRecord*), so it waits for the declaration.
+ * RESIDUALS. datagap: the claimed `.data` 0x8064F360..0x80650160 spans at least 7 TUs (emission-order seams at
+ *            0x8064FFC4, 0x8064FFF0, 0x8065001C, 0x80650038, 0x80650080, 0x806500A0) - a seam question for the
+ *            registration.
+ * RESIDUALS. 41 functions are unwritten: 0x8054F90C-0x8054F9F4, 0x8054FBB4-0x80550124, 0x80550128-0x80550488,
+ *            0x805504EC-0x80550768, 0x80550770-0x805508F4, 0x80550910-0x80550ACC, 0x80550BA4-0x80550CBC,
+ *            0x80550CCC-0x805512B4, 0x8055136C-0x8055148C, 0x805514E0-0x80551680, 0x805516E4-0x80551964,
+ *            0x80551970-0x80551E5C, 0x80551F4C-0x80553670, 0x80553680-0x80553F84, 0x80553FC8-0x80554268,
+ *            0x80554278-0x805544C0, 0x80554600-0x80554664.
  */
 
 #include "types.h"
@@ -40,6 +56,33 @@ extern "C" void fn_8054F800(void) {
 /* Copies the caller's keyboard-layout block over the record's own. */
 extern "C" void fn_8054F804(HkbLayoutRecord* self, void* source) {
     memcpy(self->buffer_10, source, 0x17D8);
+}
+
+/* The property record the widget's slot +0x18 fills (id 0x1F) and applies (id 0x1D): a flag byte at +0x04.
+ * size: 0x08 */
+struct HkbWidgetProperty {
+    /* +0x00 */ u32 pad_00;
+    /* +0x04 */ u8 flag_04;
+    /* +0x05 */ u8 pad_05[3];
+};
+
+/* Stores the +0x17E8 flag, then reads property 0x1F, sets its flag and applies it as property 0x1D. */
+extern "C" void hkbKbWidgetSetPropertyFlag(HkbWidget* self, u8 flag) {
+    HkbWidgetProperty prop;
+    self->flag_17E8 = flag;
+    self->v_0x018(0x1F, &prop);
+    prop.flag_04 = flag;
+    self->v_0x018(0x1D, &prop);
+}
+
+/* Property handler: id 0x22 sets the widget's byte through slot +0x40, id 0x23 reads it back through slot +0x44. */
+extern "C" void hkbKbWidgetHandleByteProperty(HkbWidget* self, s32 id, u8* value) {
+    if (id == 0x22) {
+        self->v_0x040(*value);
+    }
+    if (id == 0x23) {
+        *value = self->v_0x044();
+    }
 }
 
 /* Stores the widget's +0x17E9 flag. */
@@ -192,7 +235,7 @@ extern "C" void fn_805512B4(HkbWidget* self) {
 
 /* Steps the widget's page back and re-targets it. */
 extern "C" void fn_80551314(HkbWidget* self) {
-    if (self->value_1A90 > 0) {
+    if ((s32)self->value_1A90 > 0) {
         fn_80553074(self->sub_18B8, -1);
         self->child_1808->v_0x014(11);
     }
@@ -248,24 +291,19 @@ extern "C" void fn_8055196C(void) {
 }
 
 /* Steps the widget's page one way or the other for the caller's event. */
-extern "C" void fn_80551E5C(HkbWidget* self, u32 event) {
-    if (self->state == 12) {
-        if (event != 4) {
-            return;
+extern "C" void fn_80551E5C(HkbWidget* self, s32 event) {
+    switch ((s32)self->state) {
+    case 11:
+        if (event == 4) {
+            self->v_0x014(10);
         }
-        self->v_0x014(0);
-        return;
+        break;
+    case 12:
+        if (event == 4) {
+            self->v_0x014(0);
+        }
+        break;
     }
-    if (self->state < 11) {
-        return;
-    }
-    if (self->state > 12) {
-        return;
-    }
-    if (event != 4) {
-        return;
-    }
-    self->v_0x014(10);
 }
 
 /* Virtual slot +0x10 on base #5, then the widget's own +0x110 slot. */
@@ -291,7 +329,7 @@ extern "C" void fn_80553670(HkbWidget* self, u32 arg) {
 }
 
 /* Whether the sub-object's +0x10 child is set, then its +0x08 slot. */
-extern "C" void fn_80553F84(void* self, u32 arg1, u32 arg2, HkbFlagRecord* rec) {
+extern "C" void fn_80553F84(void* self, s32 arg1, u32 arg2, HkbFlagRecord* rec) {
     HkbWidget* child;
     (void)arg2;
     if (rec->flag_04 != 0) {
@@ -388,7 +426,7 @@ extern "C" void fn_8055466C(HkbWidget* self) {
 }
 
 /* Adjustor thunk: base #3 -> fn_80553F84. */
-extern "C" void fn_80554674(HkbWidget* self, u32 arg1, u32 arg2, HkbFlagRecord* rec) {
+extern "C" void fn_80554674(HkbWidget* self, s32 arg1, u32 arg2, HkbFlagRecord* rec) {
     fn_80553F84((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_14)), arg1, arg2, rec);
 }
 
