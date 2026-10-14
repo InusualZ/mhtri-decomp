@@ -38,8 +38,7 @@ void __OSDoHotReset(void);
 /* 0x804D2640 - restarts the title with `resetCode`. */
 void OSRestart(u32 resetCode);
 
-/* 0x804D2720 / 0x804D29B0 / 0x804D29F0 / 0x804D2A30 - return to the system menu / the data manager / after an error. */
-void __OSReturnToMenu(u8 returnToMenu);
+/* 0x804D29B0 / 0x804D29F0 / 0x804D2A30 - return to the system menu / the data manager / after an error. */
 void OSReturnToMenu(void);
 void OSReturnToDataManager(void);
 void __OSReturnToMenuForError(void);

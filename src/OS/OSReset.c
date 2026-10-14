@@ -1,6 +1,6 @@
 /*
  * OS/OSReset.c - the OS reset: shutdown functions, `OSRestart`, the return-to-menu family and `OSGetResetCode`.
- * RANGE. .text 0x804D21F0-0x804D2B90 (13 functions); .data 0x8061D410-0x8061D678; .sbss 0x80795380-0x80795390.  Cut
+ * RANGE. .text 0x804D21F0-0x804D2B90 (13 linked functions, 2 stripped); .data 0x8061D410-0x8061D678; .sbss 0x80795380-0x80795390.  Cut
  *    from the OS core band 0x804C1760-0x804D9B4C.  Evidence: the `__FILE__` anchor "OSReset.c" at .data
  *    0x8061D410 opens its strings (read by `OSRestart`, `__OSReturnToMenu`, ...); `ShutdownFunctionQueue` (.sbss
  *    0x80795388) is read by the register/call/shutdown trio; `WriteSramCallback` (OSRtc) reads the RTC control block and opens
@@ -10,9 +10,10 @@
  *    `OSReturnToDataManager` (names the "OSReturnToDataManager()" failure text), `__OSDoHotReset` (the hot-reset tail
  *    `OSRestart` and the menu launchers share), `__OSGetDiscState` (the 1/2/3 disc state the state-flags record keeps; it has no
  *    caller in the DOL's OS core but `fn_804D7A80`), `BootDol` (0x80795380: the DOL offset `OSRestart` hands `__OSReboot`).
- * RESIDUALS. data: the object's string pool also holds the texts of the obsolete functions the linker stripped
- *    (`OSReturnToSetting` and the data-manager page names, `OSSetBootDol`); no function of this source references them, so
- *    the pool is shorter than the target's.
+ * RESIDUALS. .text: `OSReturnToSetting` and `OSSetBootDol` have no caller and the linker strips them, so the object's
+ *    .text is 0xBC longer than the claim and `flipcheck` reads NOT READY on .text; the linked DOL is byte-identical.
+ *    Their bodies are GUESSES beyond the string order: only their pooled texts survive in the DOL (the seven settings
+ *    page paths, the two failure texts), and the `OSPanic` line numbers and the `OSReport` hand-off are unknown.
  * SHAPES. plain C; the shutdown-function walk is an inline helper expanded in `__OSCallShutdownFunctions` and
  *    `__OSShutdownDevices`.
  */
@@ -58,7 +59,7 @@ typedef struct ShutdownQueue {
 
 static ShutdownQueue ShutdownFunctionQueue;
 s32 OSReturnToMenuPending;
-static u32 BootDol;
+u32 BootDol;
 
 /* Inserts `info` into the shutdown list ahead of the first entry of higher priority number. */
 void OSRegisterShutdownFunction(OSShutdownFunctionInfo* info)
@@ -269,7 +270,7 @@ static inline void ReturnToMenuForError(void)
 }
 
 /* Returns to the system menu with `returnToMenu` recorded in the state flags; does not return. */
-void __OSReturnToMenu(u8 returnToMenu)
+static void __OSReturnToMenu(u8 returnToMenu)
 {
     OSStateFlags state;
     u32 played;
@@ -330,6 +331,40 @@ void OSReturnToDataManager(void)
     OSPanic("OSReset.c", 913, "OSReturnToDataManager(): Falied to boot system menu.\n");
 }
 
+/* Selects the system-settings page path for `page`; an unknown page is fatal.  The linker strips it. */
+void OSReturnToSetting(u8 page)
+{
+    const char* path;
+
+    switch (page) {
+    case 0:
+        path = "Calendar/Calendar_index.html";
+        break;
+    case 1:
+        path = "Display/Display_index.html";
+        break;
+    case 2:
+        path = "Sound/Sound_index.html";
+        break;
+    case 3:
+        path = "Parental_Control/Parental_Control_index.html";
+        break;
+    case 4:
+        path = "Internet/Internet_index.html";
+        break;
+    case 5:
+        path = "WiiConnect24/Wiiconnect24_index.html";
+        break;
+    case 6:
+        path = "Update/Update_index.html";
+        break;
+    default:
+        OSPanic("OSReset.c", 1000, "OSReturnToSetting(): You can't specify %d.  \n", page);
+        return;
+    }
+    OSReport(path);
+}
+
 /* Records an error exit in the state flags and launches the system menu; does not return. */
 void __OSReturnToMenuForError(void)
 {
@@ -359,4 +394,10 @@ u32 OSGetResetCode(void)
 void OSResetSystem(s32 reset, u32 resetCode, s32 forceMenu)
 {
     OSPanic("OSReset.c", 1185, "OSResetSystem() is obsoleted. It doesn't work any longer.\n");
+}
+
+/* Obsolete; always fails.  The linker strips it. */
+void OSSetBootDol(u32 dol)
+{
+    OSPanic("OSReset.c", 1200, "OSSetBootDol() is obsoleted. It doesn't work any longer.\n");
 }
