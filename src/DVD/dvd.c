@@ -11,6 +11,6 @@
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`, `cflags_os`), the block of the unit this range was cut
  *   from; unmeasured until bodies exist.
  * RESIDUALS. `__ErrorInfo` (.bss 0x80746880) is read here but sits in `DVD/dvderror.c`'s run. No body is written (53
- *   functions), the largest `fn_804A9A90` at 0x804A9A90 (0x9E0 B); `python tools/units/sweepcomments.py
+ *   functions), the largest `cbForStateBusy` at 0x804A9A90 (0x9E0 B); `python tools/units/sweepcomments.py
  *   --unit DVD/dvd.c` lists them.
  */

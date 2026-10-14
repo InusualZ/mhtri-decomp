@@ -10,6 +10,6 @@
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`, `cflags_os`), the block of the unit this range was cut
  *   from; unmeasured until bodies exist.
  * NAMES. the unit name is a GUESS (the driver's file name in the SDK scheme).
- * RESIDUALS. No body is written (32 functions), the largest `fn_804ACE90` at 0x804ACE90 (0x298 B); `python
+ * RESIDUALS. No body is written (32 functions), the largest `DVDLowGetNoDiscOpenPartitionParams` at 0x804ACE90 (0x298 B); `python
  *   tools/units/sweepcomments.py --unit DVD/dvd_broadway.c` lists them.
  */

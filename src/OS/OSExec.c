@@ -198,7 +198,7 @@ void OSExecJump(register u32 entry)
 }
 
 /* 0x804CE260 (0xC): marks the exec state ready. */
-void OSExecSetReady(void)
+void OSExecSetReady(s32 result, DVDCommandBlock* block)
 {
     OSExecReady = 1;
 }
@@ -370,7 +370,7 @@ void __OSLaunchNextFirmware(void)
         OSReport("\nOSExec(): Failed to exec %d in %d\n", result, 1042);
         __OSDoHotReset();
     }
-    DVDLowClose();
+    DVDLowFinish();
     mem2Base = OS_MEM2_AREA_BASE;
     mem2End = OS_MEM2_AREA_END;
     DCStoreRange(OS_LOW_MEMORY_BLOCK, OS_LOW_MEMORY_BLOCK_SIZE);

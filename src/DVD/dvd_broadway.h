@@ -8,6 +8,7 @@
 #include "types.h"
 #include "DVD/dvd.h"
 #include "ESP/esp.h"
+#include "OS/OSAlarm.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,10 +18,10 @@ extern "C" {
 typedef void (*DVDLowCallback)(u32 result);
 
 /* 0x804AC350 - closes the DI device; FALSE when the close failed. */
-BOOL DVDLowClose(void);
+BOOL DVDLowFinish(void);
 
-/* 0x804AC3A0 - opens the DI device and starts its callbacks. */
-void DVDLowInit(void);
+/* 0x804AC3A0 - opens the DI device and starts its callbacks; FALSE when the device could not be set up. */
+BOOL DVDLowInit(void);
 
 /* 0x804AC610 - reads the disc id into `diskId`. */
 BOOL DVDLowReadDiskID(DVDDiskID* diskId, DVDLowCallback callback);
@@ -35,11 +36,51 @@ BOOL DVDLowOpenPartitionWithTmdAndTicketView(u32 offset, ESTicketView* view, u32
                                              DVDLowCallback callback);
 
 /* 0x804AD130 - closes the open partition. */
-void DVDLowClosePartition(DVDLowCallback callback);
+BOOL DVDLowClosePartition(DVDLowCallback callback);
 
 /* 0x804AD2A0 - reads `length` bytes at `offset` (in 4-byte units) without decryption. */
 /* untyped: byte range the read fills */
 BOOL DVDLowUnencryptedRead(void* buffer, u32 length, u32 offset, DVDLowCallback callback);
+
+/* 0x804AD440 - stops the drive motor; `eject` and `saving` select the stop mode. */
+BOOL DVDLowStopMotor(u32 eject, u32 saving, DVDLowCallback callback);
+
+/* 0x804AD750 - asks the drive for its error code. */
+BOOL DVDLowRequestError(DVDLowCallback callback);
+
+/* 0x804AD8C0 - records whether the next reset spins the disc up. */
+BOOL DVDLowSetSpinupFlag(u32 spinUp);
+
+/* 0x804AD8D0 - resets the drive, spinning up when the spin-up flag is set. */
+BOOL DVDLowReset(DVDLowCallback callback);
+
+/* 0x804ADBF0 - reads the 0x20-byte key report of `format` at sector `lsn` into `reportKey`. */
+/* untyped: byte range the report fills */
+BOOL DVDLowReportKey(void* reportKey, u32 format, u32 lsn, DVDLowCallback callback);
+
+/* 0x804ADD90 - limits the drive's rotation speed to `subcmd`. */
+BOOL DVDLowSetMaximumRotation(u32 subcmd, DVDLowCallback callback);
+
+/* 0x804AE250 - the cover register value the last cover-register read stored. */
+u32 DVDLowGetCoverRegister(void);
+
+/* 0x804AE280 - reads the cover register into the driver's copy. */
+BOOL DVDLowPrepareCoverRegister(DVDLowCallback callback);
+
+/* 0x804AE6D0 - the immediate buffer register value the last command stored. */
+u32 DVDLowGetImmBufferReg(void);
+
+/* 0x804AE6E0 - unmasks the status interrupts; always TRUE in this driver. */
+BOOL DVDLowUnmaskStatusInterrupts(void);
+
+/* 0x804AE6F0 - masks the cover interrupt; always TRUE in this driver. */
+BOOL DVDLowMaskCoverInterrupt(void);
+
+/* 0x804AE700 - acknowledges a cover interrupt. */
+BOOL DVDLowClearCoverInterrupt(DVDLowCallback callback);
+
+/* 0x804AE870 - whether `alarm` belongs to the DI driver; always FALSE in this driver. */
+BOOL DVDLowTestAlarm(const OSAlarm* alarm);
 
 #ifdef __cplusplus
 }
