@@ -1346,7 +1346,7 @@ config.libs = [
             Object(Matching, "TRK/CircleBuffer.c"),
             Object(Matching, "TRK/TRK_flush_cache.cpp"),
             Object(Matching, "TRK/main_TRK.c"),
-            Object(NonMatching, "TRK/mem_TRK.c"),
+            Object(Matching, "TRK/mem_TRK.c"),
             Object(Matching, "TRK/dispatch.c"),
             Object(NonMatching, "TRK/dolphin_trk.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/nubevent.c"),
@@ -1355,7 +1355,7 @@ config.libs = [
             Object(NonMatching, "TRK/support.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/targcont.c"),
             Object(Matching, "TRK/msg.c"),
-            Object(NonMatching, "TRK/msgbuf.c"),
+            Object(Matching, "TRK/msgbuf.c"),
             Object(NonMatching, "TRK/msghndlr.c", extra_cflags=["-str reuse,pool"]),  # pooled strings: unit header
             Object(Matching, "TRK/mslsupp.c"),
             Object(NonMatching, "TRK/targimpl.c"),
