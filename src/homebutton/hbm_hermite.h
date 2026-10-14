@@ -10,13 +10,29 @@
 extern "C" {
 #endif
 
-s32 fn_8055F580(const char* a, const char* b);
+s32 hbmNameMatches(const char* a, const char* b);
 
-extern u32 lbl_80795A78[2];  /* small-data records whose word at +4 is the search base */
+void hbmNameCopyWithChar(char* dst, u32 n, const char* src, u32 idx, char ch);
 
-extern u32 lbl_80795A80[2];
+/* A pair of kana tables indexed alike: the plain forms and one modified form (voiced, semi-voiced or small).  The
+ * toggles search either table and answer the same index of the other.  size: 0x8 */
+typedef struct HbmKanaPair {
+    /* +0x0 */ const u16* table[2];
+} HbmKanaPair; /* size: 0x8 */
 
-extern u32 lbl_80795A88[2];
+extern HbmKanaPair hbmKanaDakuten;
+
+extern HbmKanaPair hbmKanaHandakuten;
+
+extern HbmKanaPair hbmKanaSmall;
+
+u16 hbmKanaToggleDakuten(u16 c);
+
+u16 hbmKanaToggleHandakuten(u16 c);
+
+u16 hbmKanaToggleSmall(u16 c);
+
+u16 hbmKanaCycle(u16 c);
 
 extern f32 lbl_8079D720;
 

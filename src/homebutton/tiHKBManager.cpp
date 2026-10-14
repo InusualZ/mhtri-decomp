@@ -496,7 +496,7 @@ extern "C" Component* fn_8056B6D0(PaneManager* self, const char* name) {
     for (u32 i = 0; i < self->list_0x24.mSize; i++) {
         Node* n = (Node*)nw4r::ut::List_GetNth((nw4r::ut::List*)&self->list_0x24, (u16)i);
         Pane* pane = (Pane*)n->mKey;
-        if (fn_8055F580(pane->name_0xBC, name)) {
+        if (hbmNameMatches(pane->name_0xBC, name)) {
             return (Component*)n->mValue;
         }
     }

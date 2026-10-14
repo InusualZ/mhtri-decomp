@@ -181,7 +181,7 @@ struct HkbWidget {
     /* +0x0014 */ void* vtable_14;           /* base #3 (adjustor thunk `subi 0x14`) */
     /* +0x0018 */ HkbWidget* table_18;     /* base #4: `lwzu r12, 24(r3)`, slot +0x14 */
     /* +0x001C */ u8 pad_001C[0x8];
-    /* +0x0024 */ HkbWidget* pane_24;       /* the pane fn_80554F18/fn_80555014 dispatch to */
+    /* +0x0024 */ HkbWidget* pane_24;       /* the pane hbmKbListResetShown/hbmKbListResetHidden dispatch to */
     /* +0x0028 */ HkbWidget* pane_28;       /* the pane fn_80550D5C/fn_8055512C dispatch to */
     /* +0x002C */ u32 state;                 /* the selector fn_8054F120 re-sorts after */
     /* +0x0030 */ void* current;             /* the child the accessors hand back */

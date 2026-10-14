@@ -24,6 +24,13 @@ extern f32 lbl_8079D774;
 
 extern f32 lbl_8079D784;
 
+/* The unit's .sdata2 pool entries the scroll handlers read (declared, never defined: playbook 29). */
+extern f32 hbmKbCursorScrollFrames;    /* 0x8079D760: 15.0, the scroll animation length */
+
+extern f32 hbmKbCursorScrollRows;      /* 0x8079D764: 3.0, the rows one arrow press scrolls */
+
+extern f32 hbmKbCursorTwoRows;         /* 0x8079D770: 2.0 */
+
 #ifdef __cplusplus
 }
 #endif
