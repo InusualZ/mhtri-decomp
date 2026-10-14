@@ -14,15 +14,14 @@
  *   name `entryToPath`; `isSame`, `myStrncpy`, `DVDConvertEntrynumToPath`, `DVDGetCurrentDir` are the inlined SDK
  *   helpers. The map rows of the three `.data` literals and `dvdfs.c` keep their generated `lbl_` names (the source
  *   spells them as literals).
- * RESIDUALS. `DVDConvertPathToEntrynum`: the SDK leaves the entry search with `goto next_hier` past its `return -1`;
- *   the goto-free `break` re-tests the bound after the loop (`cmplw`+`blt`, 2 extra instructions; the SDK goto shape
- *   matches byte for byte, rule 8 has no exemption for it).
+ * RESIDUALS. none in code.
  *   `.sbss` 0x80795090..0x807950A0 is the padding before `DVD/dvd.c`'s 32-aligned `.sbss` (its `__DVDNumTmdBytes`
  *   is `aligned(32)`); a flip of this unit needs `align:32` on that unit's `.sbss` split line while `DVD/dvd.c` is
  *   not linked from source. 0x80795074 is the hole before the 8-aligned `__DVDThreadQueue`.
  *   `fsLowerChar` is MSL's inline `tolower` (`MSL_C/ctype.h` has no `tolower` yet).
  * SHAPES. `DVDEntryToPath` inlines into itself and into `DVDOpen` two levels deep (the third level is the `bl`).
- *   The search bound is read once into `end` (the re-test then reuses it).
+ *   goto: owner exemption 2026-10-14, docs/pipeline.md 11 - `DVDConvertPathToEntrynum` keeps the SDK's one
+ *   `goto next_hier` past its `return -1`; the search bound is re-read through `nextDir` on every iteration.
  */
 #pragma ipa file
 #include "DVD/dvdfs.h"
@@ -99,7 +98,6 @@ s32 DVDConvertPathToEntrynum(const char* pathPtr) {
     u32 length;
     u32 dirLookAt;
     u32 i;
-    u32 end;
     const char* origPathPtr = pathPtr;
     const char* extentionStart;
     BOOL illegal;
@@ -168,22 +166,20 @@ s32 DVDConvertPathToEntrynum(const char* pathPtr) {
         length = (u32)(ptr - pathPtr);
         ptr = pathPtr;
 
-        end = nextDir(dirLookAt);
-        for (i = dirLookAt + 1; i < end; i = entryIsDir(i) ? nextDir(i) : (i + 1)) {
+        for (i = dirLookAt + 1; i < nextDir(dirLookAt); i = entryIsDir(i) ? nextDir(i) : (i + 1)) {
             if (entryIsDir(i) == FALSE && isDir == TRUE) {
                 continue;
             }
 
             stringPtr = FstStringStart + stringOff(i);
             if (isSame(ptr, stringPtr) == TRUE) {
-                break;
+                goto next_hier;
             }
         }
 
-        if (i >= end) {
-            return -1;
-        }
+        return -1;
 
+    next_hier:
         if (!isDir) {
             return (s32)i;
         }

@@ -10,11 +10,10 @@
  * NAMES. the unit name is a GUESS (named for `__DVDCheckDevice`); `DVD_DISC_LAYER_FLAG` (low memory 0x8000319C, 0x81
  *   selects the second read offset) is a GUESS. The map rows of the seven `.data` literals keep their generated `lbl_`
  *   names (the source spells them as literals).
- * RESIDUALS. `__DVDCheckDevice`: the two "error code has a high byte" exits return FALSE inline (`beq`+`li`+`b`)
- *   where the SDK jumps to one shared `return FALSE` after the fatal block (a `goto`; that shape matches byte for byte,
- *   rule 8 has no exemption for it, and no loop/switch nesting reaches a block between the fatal block and
- *   `__DVDShowFatalMessage`).
- * SHAPES. the low-level result is read through `switch`es (case 2 = error, case 1 = completed, default = a failed
+ * RESIDUALS. none in code.
+ * SHAPES. goto: owner exemption 2026-10-14, docs/pipeline.md 11 - the two "error code has a high byte" exits of
+ *   `__DVDCheckDevice` `goto error`, the SDK's shared `return FALSE` after the unauthorized-device return.
+ *   The low-level result is read through `switch`es (case 2 = error, case 1 = completed, default = a failed
  *   request; the single-case `switch (lowIntType)` and `switch (code)` keep the target's `beq`+`b`); a
  *   `do { } while (0)` gives the failed-request paths (`continue`) the shared `__DVDShowFatalMessage` tail; the
  *   unauthorized-device screen is the `static inline` `ShowDeviceErrorMessage` (as a block in place its colours swap
@@ -124,7 +123,7 @@ BOOL __DVDCheckDevice(void) {
                 continue;
             }
             if (DVDLowGetImmBufferReg() & 0xFF000000) {
-                return FALSE;
+                goto error;
             }
             switch ((s32)(DVDLowGetImmBufferReg() & 0xFFFFFF)) {
             case 0x52100:
@@ -147,7 +146,7 @@ BOOL __DVDCheckDevice(void) {
                         continue;
                     }
                     if (DVDLowGetImmBufferReg() & 0xFF000000) {
-                        return FALSE;
+                        goto error;
                     }
                     switch ((s32)(DVDLowGetImmBufferReg() & 0xFFFFFF)) {
                     case 0x53100:
@@ -170,6 +169,8 @@ BOOL __DVDCheckDevice(void) {
         }
 
         ShowDeviceErrorMessage();
+        return FALSE;
+    error:
         return FALSE;
     } while (0);
 
