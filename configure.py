@@ -1406,7 +1406,8 @@ config.libs = [
             Object(NonMatching, "IPC/ipcclt.c", cflags=cflags_base),
             Object(NonMatching, "IPC/memory.c", cflags=cflags_base),
             Object(NonMatching, "IPC/ipcProfile.c", cflags=cflags_base),
-            Object(NonMatching, "KPAD/kpad.c", cflags=cflags_base),
+            # -fp_contract off: fused-op evidence on the FLAGS line of src/KPAD/kpad.c
+            Object(NonMatching, "KPAD/kpad.c", cflags=cflags_base, extra_cflags=["-fp_contract off"]),
             # The SC / SEQ / SI / SYN / THP band 0x804DB050..0x804E45B0 recut per library and source file (unit headers carry the
             # evidence); its function starts are 16-aligned, so cflags_base.  The 4-packed head 0x804DAE40..0x804DB050 is RSO/runtime.c.
             Object(NonMatching, "SC/SCSystemConfig.c", cflags=cflags_base),

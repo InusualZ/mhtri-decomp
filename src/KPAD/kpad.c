@@ -7,8 +7,9 @@
  *   - version string `<< RVL_SDK - KPAD ... >>` at `.data` 0x8061ADA0 is registered by the init function through
  *     `.sdata` 0x80793EB0; `.bss` 0x80747540 (channel work) and `.sdata2` 0x8079D200..0x8079D270 are read only here
  *   - the run ends at the next registered unit `MEM/mem_heap.c` (0x804C1760)
- * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`, `cflags_os`), the block of the unit this range was cut
- *   from; unmeasured until bodies exist.
+ * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` and `-fp_contract off` on this object:
+ *   the target has 0 fused ops across 406 fadd/fsub/fmul; a calc_acc probe gives 42 insns with 3 fmadds under
+ *   `-fp_contract on` and 45 insns with 0 fused under `off`, the target's opcode sequence.
  * RESIDUALS. the functions read tunables in `mh3_pad.cpp`'s `.sdata` run (0x80790EA0..0x80790ED4) and `.sbss`
  *   0x80794800 and write them from `KPADInit`: an extern pair the registered claims place in the
  *   neighbouring unit. No body is written (26 functions), the largest `fn_804BF890` at 0x804BF890 (0x8D0 B);
