@@ -1402,7 +1402,7 @@ config.libs = [
             Object(Matching, "BTE/bta_hh_act.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/bta_hh_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/bta_hh_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/bta_hh_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/bta_hh_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE btm band 0x80480A90..0x8048AEE0 recut per BTE source file; each unit's header carries its evidence.
             # GC/3.0a5.2 + cflags_nw4r for btm_acl/dev/devctl/link_key/discovery: evidence on the FLAGS line of src/BTE/btm_dev.c
             Object(NonMatching, "BTE/btm_acl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
@@ -1414,8 +1414,8 @@ config.libs = [
             Object(NonMatching, "BTE/btm_inq.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/btm_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/btm_pm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/btm_sco.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/btm_sec.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/btm_sco.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/btm_sec.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE btu/gap/hci/hid/l2c band 0x8048AEE0..0x80498FBC recut per BTE source file; each unit's header carries its evidence.
             # GC/3.0a5.2 + cflags_nw4r: per-object scores on the FLAGS line of src/BTE/btu_hcif.c
             Object(Matching, "BTE/btu_hcif.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
@@ -1424,7 +1424,7 @@ config.libs = [
             # GC/3.0a5.2 + cflags_nw4r for the gap_*/hidd_*/hidh_* rows: evidence on the FLAGS line of src/BTE/hidd_pm.c
             Object(Matching, "BTE/gap_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/gap_conn.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/gap_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/gap_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/hcicmds.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/hidd_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/hidd_conn.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
