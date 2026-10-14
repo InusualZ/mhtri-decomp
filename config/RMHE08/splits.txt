@@ -2636,12 +2636,12 @@ AX/AXOut.c:
 
 AX/AXSPB.c:
 	.text       start:0x80470570 end:0x804709B0 align:16
-	.bss        start:0x806FB660 end:0x806FB6E0
+	.bss        start:0x806FB660 end:0x806FB6D8
 	.sbss       start:0x80794F88 end:0x80794FD8
 
 AX/AXVPB.c:
 	.text       start:0x804709B0 end:0x80471960 align:16
-	.bss        start:0x806FB6E0 end:0x8070CDE0
+	.bss        start:0x806FB6D8 end:0x8070CDE0 align:32
 	.sbss       start:0x80794FD8 end:0x80794FF8
 	.sdata2     start:0x8079CF48 end:0x8079CF68
 
@@ -3000,13 +3000,13 @@ OS/OSContext.c:
 OS/OSError.c:
 	.text       start:0x804CD620 end:0x804CDD70 align:16
 	.data       start:0x8061C570 end:0x8061C850
-	.bss        start:0x8074D2F0 end:0x8074D340
+	.bss        start:0x8074D2F0 end:0x8074D334
 	.sdata      start:0x80793F90 end:0x80793F98
 
 OS/OSExec.c:
 	.text       start:0x804CDD70 end:0x804CF350 align:16
 	.data       start:0x8061C850 end:0x8061C8C0
-	.bss        start:0x8074D340 end:0x8074D360
+	.bss        start:0x8074D334 end:0x8074D360 align:32
 	.sdata      start:0x80793F98 end:0x80793FA8
 	.sbss       start:0x80795330 end:0x80795348
 

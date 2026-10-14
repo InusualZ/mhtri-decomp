@@ -1284,7 +1284,7 @@ config.libs = [
             Object(Matching, "OS/OSAudioSystem.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSCache.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSContext.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSError.c", cflags=cflags_base),
+            Object(Matching, "OS/OSError.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSExec.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSFatal.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSFont.c", cflags=cflags_base),
@@ -1365,7 +1365,7 @@ config.libs = [
             Object(NonMatching, "AX/AXAux.c", cflags=cflags_base),
             Object(Matching, "AX/AXCL.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXOut.c", cflags=cflags_base),
-            Object(NonMatching, "AX/AXSPB.c", cflags=cflags_base),
+            Object(Matching, "AX/AXSPB.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXVPB.c", cflags=cflags_base),
             Object(NonMatching, "AX/AXProf.c", cflags=cflags_base),
             Object(NonMatching, "DSPADPCM/dspadpcm.c", cflags=cflags_base),
@@ -1433,7 +1433,7 @@ config.libs = [
             Object(NonMatching, "WPAD/wpad.cpp", cflags=cflags_base),
             Object(NonMatching, "WUD/wud.cpp", cflags=cflags_base),
             Object(NonMatching, "WUD/WUDHidHost.cpp", cflags=cflags_base),
-            Object(NonMatching, "WUD/debug_msg.cpp", cflags=cflags_base),
+            Object(Matching, "WUD/debug_msg.cpp", cflags=cflags_base),
             # The VF / DB-EXI2 / PMIC / KPR / HID / KBD band 0x80521340..0x8052A040 recut per library (unit headers carry the evidence).
             # Only 0x80522334..0x80522E00 is packed at 4 bytes (cflags_os); every other function start is 16-aligned (cflags_base).
             Object(NonMatching, "VF/vf.cpp", cflags=cflags_base),
