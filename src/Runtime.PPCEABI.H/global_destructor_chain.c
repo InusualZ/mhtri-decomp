@@ -3,7 +3,7 @@
  * `__destroy_global_chain` (0x48), with the chain head itself in `.sbss` below.
  *
  * .text 0x804566A4-0x80456704, exactly the two named functions (the map has them: `__register_global_object`
- * at 0x804566A4, `__destroy_global_chain` at 0x804566BC, and the next symbol `fn_80456704` starts where the
+ * at 0x804566A4, `__destroy_global_chain` at 0x804566BC, and the next symbol `dthandler__3stdFv` starts where the
  * second one ends). Attribution: the SDK's `global_destructor_chain.c` (the same file exists in pikmin2's tree
  * with precisely these three functions - `__register_atexit` is marked UNUSED there and this build has no
  * symbol for it, so it is not claimed here - and its listing is the source shape below), plus the map's own

@@ -19,4 +19,17 @@ void __construct_array(void* array, void* ctor, void* dtor, u32 size, u32 count)
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x80456724 - compares a thrown type string with a catch type string; non-zero on a match, with the base
+ * class offset written to `offset_result`. C linkage: the map's name is unmangled. */
+extern "C" char __throw_catch_compare(const char* throwtype, const char* catchtype, s32* offset_result);
+
+namespace std {
+/* 0x8045670C - calls the installed terminate handler. */
+void terminate();
+/* 0x80456718 - calls the installed unexpected handler. */
+void unexpected();
+}
+#endif
+
 #endif /* MHTRI_RUNTIME_PPCEABI_H_CPLUSLIBPPC_H */

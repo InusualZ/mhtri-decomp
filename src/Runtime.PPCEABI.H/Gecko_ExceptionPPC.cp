@@ -16,14 +16,12 @@
  * `__save_fpr`/`__save_gpr`/`__div2u`/`__mod2u` family and the unnamed `fn_*` between them). The right edge
  * stands: the `.data` jump-table boundary `jumptable_8060E8A0` (0x44) -> `jumptable_8060E8E4` at 0x804578FC.
  *
- * Attribution: MSL's `Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp`. pikmin2's and prime's copies are the older
- * GCN revision (one-slot `fragmentinfo`, plus the out-of-line `__throw`/`__end__catch`/`__unexpected`/
- * `ExPPC_ThrowHandler`/`ExPPC_UnwindStack` machinery and the `ExPPC_Destroy*`/`Delete*` helpers). This build
- * is the newer Wii revision, whose whole file is the five functions above: the throw path is emitted inline
- * by the compiler at each throw site, so those symbols do not exist in this DOL at all (`symedit.py find
- * __throw|__end__catch|ExPPC_UnwindStack` -> nothing) and `fragmentinfo` is the 32-slot table
- * (`.bss:0x806F4B48`, size 0x180 = 32 * sizeof(ProcessInfo)) the `mtctr` registration loop walks. The
- * struct/macro vocabulary and the function bodies are the ones the same revision carries in
+ * Attribution: MSL's `Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp`, the Wii revision: `fragmentinfo` is the
+ * 32-slot table (`.bss:0x806F4B48`, size 0x180 = 32 * sizeof(ProcessInfo)) the `mtctr` registration loop
+ * walks, where pikmin2's and prime's GCN copies have one slot. The out-of-line throw machinery (`__throw` at
+ * 0x80458A60, `__unexpected`, `ExPPC_ThrowHandler`) is not in this object: it is the adjacent
+ * `ExceptionPPC.cp` (`.text` 0x804578FC-0x80458BDC), whose target object calls this file's static walkers.
+ * The struct/macro vocabulary and the function bodies are the ones the same revision carries in
  * `mariopartyrd/partyboard`'s `src/Runtime.PPCEABI.H/Gecko_ExceptionPPC.cpp`.
  *
  * Load-bearing source shapes, all read off the target's own instructions:
@@ -78,20 +76,17 @@
  *     loop itself. `-opt nopeephole` scores 99.37 % here, but it is the same two-row swap with `li r0,32` and
  *     `li r6,0` transposed - the number moves, the code does not - so it is a metric artifact and is
  *     deliberately **not** landed (a scoped pragma would also be a per-function flag, playbook 33).
- *   - Do **not** claim `.bss 0x806F4B48-0x806F4CC8`: it would add a 0x180 `.bss` this object does not have and
- *     drop the unit's `matched_data` (same decision as the lib's unclaimed `__global_destructor_chain`,
- *     `.sbss` 0x80794DF8). The `.data` jump table `0x8060E8A0-0x8060E8E4` *is* claimed in `splits.txt`, which
- *     is what pairs our `@204` with `jumptable_8060E8A0` and takes `ExPPC_NextAction` to 100 %; this object
+ *   - `fragmentinfo` is defined here and its `.bss 0x806F4B48-0x806F4CC8` (0x180) is claimed in `splits.txt`,
+ *     which pairs the unit's `.bss` with the target's. The `.data` jump table `0x8060E8A0-0x8060E8E4` is
+ *     claimed too, which is what pairs our `@204` with `jumptable_8060E8A0`; this object
  *     loads no `.sdata2`/`.sdata` constant (no such section, no pool relocation).
  *   - The three walkers are `static`; the map's `fn_80457504`, `fn_8045759C` and `fn_8045774C` were renamed to
  *     this file's mangled names and all three measure 100 %. `fragmentinfo` used to be spelled
  *     `fragmentinfo_806F4B48` in the target object (the map marked it `scope:local`, and dtk spells a local
  *     symbol `<name>_<address>`); declaring it `scope:global` makes both sides say `fragmentinfo`. Neither
  *     rename moved the score - both were latent pairing traps, not the residual.
- *   - `fn_8045670C` (0xC: `lwz r12,-20832(r13); mtctr r12; bctr`) is MSL's `terminate`, tail-calling the SDA
- *     terminate handler; it is the unit's only `stylelint` rule-7 finding (3 references). It cannot be renamed
- *     from this file alone - a rename is `symbols.txt` + this file together, and a source-only rename would
- *     stop the `bl` relocation from pairing - so it is an outbox `config_requests` item.
+ *   - `ExPPC_NextAction` calls `std::terminate` (`terminate__3stdFv`, 0x8045670C, owned by `CPlusLibPPC.cpp`
+ *     and declared in `CPlusLibPPC.h`) when the unwind cannot continue.
  */
 
 /* The target object carries its own extab/extabindex (0x10 + 0x18) and the lib's flags say
@@ -100,6 +95,7 @@
 #pragma exceptions on
 
 #include "types.h"
+#include "Runtime.PPCEABI.H/CPlusLibPPC.h"
 
 #define RETURN_ADDRESS 4
 #define MAXFRAGMENTS   32
@@ -342,12 +338,8 @@ typedef struct ex_specification {
     char* spec[];         /* +0x0C */
 } ex_specification;
 
-/* The 32-slot fragment table is `.bss:0x806F4B48`, owned by the linker's own scaffolding, not by this
- * object: the target declares it undefined and so do we (same shape as `__global_destructor_chain`). */
-extern ProcessInfo fragmentinfo[MAXFRAGMENTS];
-
-/* MSL's `terminate`; the map still calls it `fn_8045670C`, so the reference uses the map's name. */
-extern "C" void fn_8045670C(void);
+/* The 32-slot fragment table (`.bss:0x806F4B48`, 0x180) the registration functions fill and the walkers search. */
+ProcessInfo fragmentinfo[MAXFRAGMENTS];
 
 /* The two registration entry points have C linkage: the DOL's own symbol table carries them unmangled
  * (MSL declares them in the `extern "C"` block of `NMWException.h`). */
@@ -522,7 +514,7 @@ static exaction_type ExPPC_NextAction(ActionIterator* iter)
             ExPPC_FindExceptionRecord(return_addr, &iter->info);
 
             if (iter->info.exception_record == 0) {
-                fn_8045670C();
+                std::terminate();
             }
 
             iter->current_SP = callers_SP;
@@ -575,7 +567,7 @@ static exaction_type ExPPC_NextAction(ActionIterator* iter)
                     += sizeof(ex_specification) + ((ex_specification*)iter->info.action_pointer)->specs * sizeof(void*);
                 break;
             default:
-                fn_8045670C();
+                std::terminate();
             }
         }
 
