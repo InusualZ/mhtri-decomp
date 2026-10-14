@@ -12,6 +12,8 @@ RULE8_RE = re.compile(r"\bgoto\b")
 # A `goto` outside the named function, or past the count, still fires.
 EXEMPT = {
     "src/ARC/arc.c": ("ARCConvertPathToEntrynum", 2),  # owner ruling 2026-10-14: the SDK's goto shape, one function
+    "src/DVD/dvdfs.c": ("DVDConvertPathToEntrynum", 1),  # owner ruling 2026-10-14: the SDK's `goto next_hier`
+    "src/DVD/dvddevice.c": ("__DVDCheckDevice", 2),  # owner ruling 2026-10-14: the SDK's shared `error` exit
 }
 
 FUNC_HEAD_RE = r"\b{name}\s*\([^;{{}}]*\)\s*\{{"

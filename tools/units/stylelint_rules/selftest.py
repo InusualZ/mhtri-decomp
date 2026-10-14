@@ -207,6 +207,13 @@ def selftest() -> int:
     check("rule8 exempt: the same body in another file fires", lines_of(ex, 8, "src/ARC/other.c"), [2, 4])
     check("rule8 exempt: a goto past the count fires",
           lines_of(ex.replace("    return 0;", "    goto c;\nc:\n    return 0;"), 8, arc), [6])
+    fs = "s32 DVDConvertPathToEntrynum(const char* p) {\n    goto next_hier;\nnext_hier:\n    return 0;\n}\n"
+    check("rule8 exempt: DVDConvertPathToEntrynum's one goto passes", lines_of(fs, 8, "src/DVD/dvdfs.c"), [])
+    check("rule8 exempt: a second goto in DVDConvertPathToEntrynum fires",
+          lines_of(fs.replace("    return 0;", "    goto x;\nx:\n    return 0;"), 8, "src/DVD/dvdfs.c"), [4])
+    dv = "BOOL __DVDCheckDevice(void) {\n    goto error;\n    goto error;\nerror:\n    return 0;\n}\n"
+    check("rule8 exempt: __DVDCheckDevice's two gotos pass", lines_of(dv, 8, "src/DVD/dvddevice.c"), [])
+    check("rule8 exempt: the DVD exemptions do not cross files", lines_of(dv, 8, "src/DVD/dvdfs.c"), [2, 3])
     check("rule8 exempt: a goto in another function of the file fires",
           lines_of(ex + "void f(void) {\n    goto z;\nz:\n    return;\n}\n", 8, arc), [9])
 
