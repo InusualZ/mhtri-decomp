@@ -1399,12 +1399,13 @@ config.libs = [
             Object(NonMatching, "BTE/rfc_port_if.c"),
             Object(NonMatching, "BTE/rfc_ts_frames.c"),
             Object(NonMatching, "BTE/rfc_utils.c"),
-            Object(NonMatching, "BTE/sdp_api.c"),
-            Object(NonMatching, "BTE/sdp_db.c"),
-            Object(NonMatching, "BTE/sdp_discovery.c"),
-            Object(NonMatching, "BTE/sdp_main.c"),
-            Object(NonMatching, "BTE/sdp_server.c"),
-            Object(NonMatching, "BTE/sdp_utils.c"),
+            # GC/3.0a5.2 + cflags_nw4r: jump tables, -ipa file inlining and sizes measured per object in src/BTE/sdp_utils.c FLAGS
+            Object(NonMatching, "BTE/sdp_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/sdp_db.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/sdp_discovery.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/sdp_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/sdp_server.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/sdp_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE tail 0x804A4AC0..0x804C1760 recut per SDK library; each unit's header carries its evidence.
             # Every function start of this band is 16-aligned: cflags_base (-O4,p default alignment), not cflags_os.
             Object(Matching, "DB/db.c", cflags=cflags_base),
