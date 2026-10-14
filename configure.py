@@ -1371,6 +1371,24 @@ config.libs = [
             Object(NonMatching, "DSPADPCM/dspadpcm.c", cflags=cflags_base),
             Object(NonMatching, "BTE/gki_buffer.c", cflags=cflags_base),  # 16-aligned starts, default alignment: unit header
             Object(NonMatching, "BTE/gki_time.c"),  # mixed band, 4-aligned starts from 0x8047ABC4, lib default: unit header
+            # The BTE btu/gap/hci/hid/l2c band 0x8048AEE0..0x80498FBC recut per BTE source file; each unit's header carries its evidence.
+            Object(NonMatching, "BTE/btu_hcif.c"),
+            Object(NonMatching, "BTE/btu_init.c"),
+            Object(NonMatching, "BTE/wbt_ext.c"),
+            Object(NonMatching, "BTE/gap_api.c"),
+            Object(NonMatching, "BTE/gap_conn.c"),
+            Object(NonMatching, "BTE/gap_utils.c"),
+            Object(NonMatching, "BTE/hcicmds.c"),
+            Object(NonMatching, "BTE/hidd_api.c"),
+            Object(NonMatching, "BTE/hidd_conn.c"),
+            Object(NonMatching, "BTE/hidd_pm.c"),
+            Object(NonMatching, "BTE/hidh_api.c"),
+            Object(NonMatching, "BTE/hidh_conn.c"),
+            Object(NonMatching, "BTE/l2c_api.c"),
+            Object(NonMatching, "BTE/l2c_csm.c"),
+            Object(NonMatching, "BTE/l2c_link.c"),
+            Object(NonMatching, "BTE/l2c_main.c"),
+            Object(NonMatching, "BTE/l2c_utils.c"),
             # The BTE RFCOMM/SDP tail 0x80498FBC..0x804A4AC0 recut per BTE source file; each unit's header carries its evidence.
             Object(NonMatching, "BTE/port_api.c"),
             Object(NonMatching, "BTE/port_rfc.c"),

@@ -2691,14 +2691,84 @@ BTE/gki_buffer.c:
 	.bss        start:0x8070CDE0 end:0x807358C0
 
 BTE/gki_time.c:
-	.text       start:0x80478790 end:0x80498FBC align:16
-	.rodata     start:0x80573530 end:0x80573898
-	.data       start:0x80612E60 end:0x80617100
-	.bss        start:0x807358C0 end:0x8073CF48
-	.sdata      start:0x80793D28 end:0x80793DB8
+	.text       start:0x80478790 end:0x8048AEE0 align:16
+	.rodata     start:0x80573530 end:0x80573860
+	.data       start:0x80612E60 end:0x80615140
+	.bss        start:0x807358C0 end:0x8073BE60
+	.sdata      start:0x80793D28 end:0x80793DA0
 	.sbss       start:0x80795008 end:0x80795040
 	.sdata2     start:0x8079D080 end:0x8079D0D8
 	.sbss2      start:0x8079D7E0 end:0x8079D7F0
+
+BTE/btu_hcif.c:
+	.text       start:0x8048AEE0 end:0x8048C13C
+	.data       start:0x80615140 end:0x806151D0
+
+BTE/btu_init.c:
+	.text       start:0x8048C13C end:0x8048C1B4
+
+BTE/wbt_ext.c:
+	.text       start:0x8048C1B4 end:0x8048C294
+
+BTE/gap_api.c:
+	.text       start:0x8048C294 end:0x8048C2F4
+	.bss        start:0x8073BE60 end:0x8073C210
+
+BTE/gap_conn.c:
+	.text       start:0x8048C2F4 end:0x8048CE30
+	.data       start:0x806151D0 end:0x806152A0
+	.sdata      start:0x80793DA0 end:0x80793DA8
+
+BTE/gap_utils.c:
+	.text       start:0x8048CE30 end:0x8048D44C
+	.data       start:0x806152A0 end:0x80615590
+
+BTE/hcicmds.c:
+	.text       start:0x8048D44C end:0x8048FB68
+	.rodata     start:0x80573860 end:0x80573870
+
+BTE/hidd_api.c:
+	.text       start:0x8048FB68 end:0x8048FBD0
+	.bss        start:0x8073C210 end:0x8073C358
+
+BTE/hidd_conn.c:
+	.text       start:0x8048FBD0 end:0x8048FD58
+	.data       start:0x80615590 end:0x806155E0
+
+BTE/hidd_pm.c:
+	.text       start:0x8048FD58 end:0x804900D4
+
+BTE/hidh_api.c:
+	.text       start:0x804900D4 end:0x80490E54
+	.data       start:0x806155E0 end:0x806156F8
+	.bss        start:0x8073C358 end:0x8073C760
+
+BTE/hidh_conn.c:
+	.text       start:0x80490E54 end:0x80492E94
+	.rodata     start:0x80573870 end:0x80573898
+	.data       start:0x806156F8 end:0x80615AE0
+
+BTE/l2c_api.c:
+	.text       start:0x80492E94 end:0x80493A60
+	.data       start:0x80615AE0 end:0x80616270
+
+BTE/l2c_csm.c:
+	.text       start:0x80493A60 end:0x80494F3C
+	.data       start:0x80616270 end:0x80616AA8
+
+BTE/l2c_link.c:
+	.text       start:0x80494F3C end:0x804960C8
+	.data       start:0x80616AA8 end:0x80616D18
+
+BTE/l2c_main.c:
+	.text       start:0x804960C8 end:0x804970F8
+	.data       start:0x80616D18 end:0x80617018
+	.bss        start:0x8073C760 end:0x8073CF48
+
+BTE/l2c_utils.c:
+	.text       start:0x804970F8 end:0x80498FBC
+	.data       start:0x80617018 end:0x80617100
+	.sdata      start:0x80793DA8 end:0x80793DB8
 
 BTE/port_api.c:
 	.text       start:0x80498FBC end:0x8049900C
