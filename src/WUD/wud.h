@@ -16,9 +16,10 @@ typedef struct WUDDevice {
     /* +0x57 */ u8 subClass;
     /* +0x58 */ u8 appId;
     /* +0x59 */ u8 linkState;
-    /* +0x5A */ u8 pad_0x5A;
+    /* +0x5A */ u8 pinPending; /* GUESS: set when the PIN request is answered */
     /* +0x5B */ u8 type;
-    /* +0x5C */ u8 pad_0x5C[2];
+    /* +0x5C */ u8 linkKeyState; /* GUESS: 1 delete from the controller, 2 loaded, 3 kept */
+    /* +0x5D */ u8 pad_0x5D;
     /* +0x5E */ u16 attrMask;
 } WUDDevice; /* size: 0x60 */
 
@@ -65,7 +66,7 @@ s32 WUDSetDisableChannel(s32 channel);
 /* 0x804FD840 / 0x804FD8A0 - install the HID receive and connection callbacks; return the old one. */
 typedef void (*WUDHidRecvCallback)(u8 handle, u8* report, u16 length);
 WUDHidRecvCallback WUDSetHidRecvCallback(WUDHidRecvCallback callback);
-typedef void (*WUDHidConnCallback)(u8 handle, s32 event);
+typedef void (*WUDHidConnCallback)(WUDDevice* device, u8 open);
 WUDHidConnCallback WUDSetHidConnCallback(WUDHidConnCallback callback);
 /* 0x804FD900 - makes the host visible and connectable. */
 void WUDSetVisibility(u8 discoverable, u8 connectable);
@@ -91,10 +92,10 @@ void DeleteFlushCallback(s32 result);
 void InitFlushCallback(s32 result);
 void ShutdownFlushCallback(s32 result);
 /* 0x804FA3F0 .. 0x804FA580 - the NAND open, seek, write and close callbacks of the stored-device file. */
-void WUDiNandOpenCallback(s32 result);
-void WUDiNandSeekCallback(s32 result);
-void WUDiNandWriteCallback(s32 result);
-void WUDiNandCloseCallback(s32 result);
+void WUDiNandOpenCallback(s32 result, struct NANDCommandBlock* block);
+void WUDiNandSeekCallback(s32 result, struct NANDCommandBlock* block);
+void WUDiNandWriteCallback(s32 result, struct NANDCommandBlock* block);
+void WUDiNandCloseCallback(s32 result, struct NANDCommandBlock* block);
 /* 0x804FB240 / 0x804FB8C0 / 0x804FBB40 / 0x804FC8E0 / 0x804FCA10 - the alarm handlers that switch to the state machine fibers; the fibers are 0x804FA750 / 0x804FB570 / 0x804FB9F0 / 0x804FC7C0 / 0x804FC950. */
 void WUDiSyncAlarmHandler(OSAlarm* alarm, OSContext* context);
 void WUDiClearAlarmHandler(OSAlarm* alarm, OSContext* context);
@@ -109,8 +110,8 @@ void WUDiShutdownFiber(void);
 /* 0x804FB2C0 - drops the link of every connected device. */
 s32 WUDiTerminateDevice(void);
 /* 0x804FC1F0 / 0x804FC270 - the firmware patch sequence's step callbacks. */
-void WUDiPatchCallback(s32 result);
-void WUDiPatchStepDone(void);
+void WUDiPatchCallback(s32 result, struct NANDCommandBlock* block);
+void WUDiPatchStepDone(s32 result);
 /* 0x804FD990 .. 0x804FDF00 - the firmware patch download: record and code write callbacks, the patch removal and peek-poke callbacks and the start. */
 void WUDiPatchRecordCallback(s32 result);
 void WUDiPatchWriteCallback(s32 result);
@@ -169,12 +170,12 @@ typedef struct WUDCB {
     /* +0x008 */ WUDResultCallback clearCallback;
     /* +0x00C */ u8 syncState;
     /* +0x00D */ u8 clearState;
-    /* +0x00E */ u8 stateE;
-    /* +0x00F */ u8 stateF;
-    /* +0x010 */ u8 state10;
-    /* +0x011 */ u8 state11;
+    /* +0x00E */ u8 linkKeyState;
+    /* +0x00F */ u8 initFlushState;
+    /* +0x010 */ u8 initState;
+    /* +0x011 */ u8 shutdownState;
     /* +0x012 */ u8 remoteCount; /* GUESS: devices of the remote types in the table */
-    /* +0x013 */ u8 otherCount;
+    /* +0x013 */ u8 wbcCount;
     /* +0x014 */ WUDDeviceNode* wbcHead;
     /* +0x018 */ WUDDeviceNode* wbcTail;
     /* +0x01C */ WUDDeviceNode wbcNodes[6];
@@ -196,7 +197,7 @@ typedef struct WUDCB {
     /* +0x6F4 */ void* (*alloc)(u32 size); /* untyped: caller-owned block */
     /* +0x6F8 */ s32 (*dealloc)(void* block); /* untyped: the caller-owned block */
     /* +0x6FC */ u8 linkKeyAddr[6]; /* GUESS: the address the link-key event logs */
-    /* +0x702 */ u8 authAddr[6]; /* GUESS: the address the security event logs */
+    /* +0x702 */ u8 hostAddr[6]; /* GUESS: the host address BTA_ENABLE_EVT reports */
     /* +0x708 */ s8 status;
     /* +0x709 */ u8 vendorEventStatus; /* GUESS: byte 1 of vendor event 0x0A */
     /* +0x70A */ u8 hciHandle;

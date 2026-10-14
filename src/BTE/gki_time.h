@@ -16,11 +16,13 @@ typedef struct BtmPmPwrMode {
     /* +0x09 */ u8 pad_0x09;
 } BtmPmPwrMode; /* size: 0x0A */
 
-/* size: 0x0A - the controller's version block `BTM_ReadLocalVersion` copies out (five halfwords; GUESS names, BTE order). */
+/* size: 0x0A - the controller's version block `BTM_ReadLocalVersion` copies out (BTE `tBTM_VERSION_INFO`). */
 typedef struct BtmVersionInfo {
-    /* +0x00 */ u16 hciVersion;
+    /* +0x00 */ u8 hciVersion;
+    /* +0x01 */ u8 pad_0x01;
     /* +0x02 */ u16 hciRevision;
-    /* +0x04 */ u16 lmpVersion;
+    /* +0x04 */ u8 lmpVersion;
+    /* +0x05 */ u8 pad_0x05;
     /* +0x06 */ u16 manufacturer;
     /* +0x08 */ u16 lmpSubversion;
 } BtmVersionInfo; /* size: 0x0A */
@@ -34,7 +36,7 @@ typedef struct BtaDmInq {
     /* +0x04 */ u8 filterCond[6];
 } BtaDmInq; /* size: 0x0A */
 
-/* The event payloads of the HID host and the device manager security callbacks: per-event layouts, not reconstructed yet. */
+/* The event payloads of the HID host and the device manager security callbacks; WUD/WUDHidHost.cpp and WUD/wud.cpp define them. */
 union BtaHhEventData;
 union BtaDmSecEventData;
 
