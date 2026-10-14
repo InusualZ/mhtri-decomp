@@ -1,29 +1,36 @@
 /*
- * MIX/mix.c - the MIX audio mixer: per-voice channel levels, the pan/volume coefficient tables and the AX mix update.
+ * MIX/mix.c - the MIX audio mixer: per-voice channel levels, the volume/pan tables and the AX mix update.
  * RANGE. .text 0x804C25E0-0x804C5C10 (17 functions); .data 0x8061AE00-0x8061B9A0; .bss 0x80748BB8-0x8074CF40; .sbss
- *    0x807952A0-0x807952B8.  Cut from the OS core band 0x804C1760-0x804D9B4C.  Evidence: `__MIXSetPan` is the
- *    dump's name for the first function; every function in the range reads the 0xBA0-byte coefficient table
- *    (.data 0x8061AE00), the 0x2A00/0x1988-byte channel arrays (.bss 0x80748BB8, 0x8074B5B8) or the mix state
- *    (.sbss 0x807952A0..0x807952B4), and it calls AX (0x8046E4E0, 0x80471950); nothing outside the range reads
- *    them.
- * FLAGS. `cflags_os` (configure.py), the flags of the unit it was cut from; the bodies written here are measured with
- *    them.
+ *    0x807952A0-0x807952B8.  Cut from the OS core band 0x804C1760-0x804D9B4C; one TU: every function reads the
+ *    0xBA0-byte table (.data 0x8061AE00), the channel arrays (.bss 0x80748BB8, 0x8074B5B8) or the mix state (.sbss
+ *    0x807952A0..0x807952B4), and nothing outside the range reads them.
+ * FLAGS. the `OS` lib block of configure.py (Wii/1.3) with per-object `cflags_base` (-O4,p -inline auto).
+ *    `__MIXUpdateAuxVolumes` sits in `#pragma dont_inline on`: the target calls `__MIXGetVolume` out of line 12 times
+ *    there while `MIXInitChannel` and `MIXUpdateSettings` inline it.
  * NAMES. `__MIXSetPan` is the dump's name; the file name `mix.c` is a GUESS.  GUESS (mix.h): `MIXInit`, `MIXQuit`,
- *    `MIXSetSoundMode`, `MIXGetSoundMode`, `MIXReleaseChannel`, `MIXSetInput`, `MIXSetAuxA`, `MIXSetAuxB`, `MIXSetPan`,
- *    `MIXSetSPan`, `MIXSetFader`, `__MIXGetVolume`, `__MIXResetAux`, `MIXUpdateSettings`, `__MIXUpdateAuxVolumes`, the
- *    arrays `MIXChannelArray`/`MIXAuxArray` and the table `MIXTable` (the layout is traced from the bodies; the
- *    128-entry rows are the pan curves).
- * RESIDUALS. not attempted: `fn_804C2840` (0x16C4 B, 9 arguments, the channel set-up), `MIXUpdateSettings` (0x1694 B,
- *    the update over all channels) and `__MIXUpdateAuxVolumes` (0x43C B, the ramp fill of one voice's parameter block).
+ *    `MIXSetSoundMode`, `MIXGetSoundMode`, `MIXInitChannel`, `MIXReleaseChannel`, `MIXSetInput`, `MIXSetAuxA`,
+ *    `MIXSetAuxB`, `MIXSetPan`, `MIXSetSPan`, `MIXSetFader`, `__MIXGetVolume`, `__MIXResetAux`, `MIXUpdateSettings`,
+ *    `__MIXUpdateAuxVolumes`, the arrays `MIXChannelArray`/`MIXAuxArray`, the table `MIXTable`, the MIX_MODE_*,
+ *    MIX_AUX_*, AX_MIXCTRL_* and AX_SYNC_* bit names and the MIXChannel/MIXAuxState field names (the layout is traced
+ *    from the bodies: the mixer-control bit set per AXPB mix word, the sync bits OR-ed after each write).
+ * RESIDUALS. `__MIXSetPan`: the target materialises the table base once and adds 0x990/0xA90/0x790 inside each branch
+ *    (`addi` + `lhax`), the codegen of four file-static arrays pooled into one anonymous .data object; written as
+ *    `static` arrays the function is byte-identical (relocations then name the pool, not `MIXTable`), but the map's
+ *    single `MIXTable` row (0xBA0, global) stops pairing, so the source keeps the struct and its hoisted pointers.
  *    `MIXAuxStates` (.sbss 0x807952B0) is one 4-byte pointer and `MIXAuxArray` is 96 x 0x44 bytes; the word at
  *    0x807952B4 and the 8 bytes after the aux array are unreferenced alignment fill inside this unit's ranges.
- * SHAPES. none beyond what the bodies show.
+ * SHAPES. the AXPB mix and remote-mix words are written through a post-incremented `u16*` (`*mix++`), which gives
+ *    the target's `&mix[1]` base register; the level sums are spelled fader + aux + pan + surround, left to right;
+ *    the locals of `MIXInitChannel` (`enabled` before `c`) and `MIXUpdateSettings` (`setMix` before `setInput`,
+ *    initialised in the opposite order) are declared in the order that gives the target's registers.
  */
 
 #include "types.h"
 #include "AX/AX.h"
 #include "AX/AXVPB.h"
 #include "MIX/mix.h"
+#include "OS/OSInterrupt.h"
+#include "Runtime.PPCEABI.H/memset.h"
 
 /* size: 0xBA0 - the dB-to-volume curve and the pan curves of the mixer. */
 typedef struct MIXTables {
@@ -31,14 +38,60 @@ typedef struct MIXTables {
     /* +0x790 */ s32 pan[128];      /* stereo pan curve */
     /* +0x990 */ s16 panFront[128]; /* surround pan curve, front pair */
     /* +0xA90 */ s16 panRear[128];  /* surround pan curve, rear pair */
-    /* +0xB90 */ u32 tail[4];
+    /* +0xB90 */ u32 pad_0xB90[4];
 } MIXTables;
 
-#define MIX_SOUND_MODE_SURROUND 3
+#define MIX_SOUND_MODE_MONO 0
+#define MIX_SOUND_MODE_STEREO 1
+#define MIX_SOUND_MODE_SURROUND 2
+#define MIX_SOUND_MODE_DPL2 3
 #define MIX_CHANNEL_COUNT 96
 #define MIX_LEVEL_FLOOR (-960)
-#define MIX_UPDATE_INPUT 0x10000000
-#define MIX_UPDATE_LEVELS 0x40000000
+
+/* MIXChannel.mode: the option bits MIXInitChannel takes and the pending-update flags of MIXUpdateSettings. */
+#define MIX_MODE_AUXA_PREFADER 0x00000001
+#define MIX_MODE_AUXB_PREFADER 0x00000002
+#define MIX_MODE_AUXC_PREFADER 0x00000004
+#define MIX_MODE_MUTE 0x00000008
+#define MIX_MODE_OPTIONS 0x0000000F
+#define MIX_MODE_UPDATE_INPUT 0x10000000
+#define MIX_MODE_UPDATE_INPUT1 0x20000000
+#define MIX_MODE_UPDATE_MIX 0x40000000
+#define MIX_MODE_UPDATE_MIX1 0x80000000
+
+/* MIXAuxState.flags: recompute the targets, then move the volumes to them. */
+#define MIX_AUX_UPDATE 0x40000000
+#define MIX_AUX_UPDATE1 0x80000000
+
+/* The AXPB mixer-control bits, the AXVPB sync bits and the samples of one audio frame. */
+#define AX_MIXCTRL_L 0x00000001
+#define AX_MIXCTRL_R 0x00000002
+#define AX_MIXCTRL_LR_RAMP 0x00000004
+#define AX_MIXCTRL_S 0x00000008
+#define AX_MIXCTRL_S_RAMP 0x00000010
+#define AX_MIXCTRL_AL 0x00010000
+#define AX_MIXCTRL_AR 0x00020000
+#define AX_MIXCTRL_ALR_RAMP 0x00040000
+#define AX_MIXCTRL_AS 0x00080000
+#define AX_MIXCTRL_AS_RAMP 0x00100000
+#define AX_MIXCTRL_BL 0x00200000
+#define AX_MIXCTRL_BR 0x00400000
+#define AX_MIXCTRL_BLR_RAMP 0x00800000
+#define AX_MIXCTRL_BS 0x01000000
+#define AX_MIXCTRL_BS_RAMP 0x02000000
+#define AX_MIXCTRL_CL 0x04000000
+#define AX_MIXCTRL_CR 0x08000000
+#define AX_MIXCTRL_CLR_RAMP 0x10000000
+#define AX_MIXCTRL_CS 0x20000000
+#define AX_MIXCTRL_CS_RAMP 0x40000000
+#define AX_MIXCTRL_DPL2 0x80000000
+#define AX_SYNC_MIXCTRL 0x00000002
+#define AX_SYNC_MIX 0x00000010
+#define AX_SYNC_VE 0x00000100
+#define AX_SYNC_RMTMIXCTRL 0x01000000
+#define AX_SYNC_RMTMIX 0x02000000
+#define AX_FRAME_SAMPLES 96
+#define AX_RMT_FRAME_SAMPLES 18
 
 MIXTables MIXTable = {
     {
@@ -146,31 +199,33 @@ MIXChannel* MIXChannels;
 MIXChannel MIXChannelArray[MIX_CHANNEL_COUNT];
 MIXAuxState MIXAuxArray[MIX_CHANNEL_COUNT];
 
-/* 0x804C25E0 (0xB4): fills `channel`'s gain row from the pan tables for the current sound mode. */
-void __MIXSetPan(MIXChannel* channel)
+void __MIXUpdateAuxVolumes(u32 index, AXVPB* axvpb);
+
+/* 0x804C25E0 (0xB4): fills `c`'s pan attenuations from the pan tables for the current sound mode. */
+void __MIXSetPan(MIXChannel* c)
 {
-    s32 pan = channel->pan;
-    s32 span = channel->span;
-    s32 panInv = 127 - pan;
-    s32 spanInv = 127 - span;
+    s32 pan = c->pan;
+    s32 span = c->span;
+    s32 ipan = 127 - pan;
+    s32 ispan = 127 - span;
     s16* front = MIXTable.panFront;
     s16* rear = MIXTable.panRear;
     s32* stereo = MIXTable.pan;
 
-    if (MIXSoundMode == MIX_SOUND_MODE_SURROUND) {
-        channel->gain[0] = front[pan];
-        channel->gain[1] = front[panInv];
-        channel->gain[2] = front[spanInv];
-        channel->gain[3] = front[span];
-        channel->gain[4] = rear[panInv];
-        channel->gain[5] = rear[pan];
+    if (MIXSoundMode == MIX_SOUND_MODE_DPL2) {
+        c->l = front[pan];
+        c->r = front[ipan];
+        c->f = front[ispan];
+        c->b = front[span];
+        c->l1 = rear[ipan];
+        c->r1 = rear[pan];
     } else {
-        channel->gain[0] = stereo[pan];
-        channel->gain[1] = stereo[panInv];
-        channel->gain[2] = stereo[spanInv];
-        channel->gain[3] = stereo[span];
-        channel->gain[4] = 0;
-        channel->gain[5] = 0;
+        c->l = stereo[pan];
+        c->r = stereo[ipan];
+        c->f = stereo[ispan];
+        c->b = stereo[span];
+        c->l1 = 0;
+        c->r1 = 0;
     }
 }
 
@@ -203,9 +258,9 @@ void MIXInit(void)
         for (i = 0; i < MIXMaxVoices; i++) {
             MIXChannel* channel;
 
-            MIXChannels[i].mode = 0;
+            MIXChannels[i].axvpb = NULL;
             channel = &MIXChannels[i];
-            channel->update = 0x50000000;
+            channel->mode = MIX_MODE_UPDATE_INPUT | MIX_MODE_UPDATE_MIX;
             channel->input = 0;
             channel->auxA = MIX_LEVEL_FLOOR;
             channel->auxB = MIX_LEVEL_FLOOR;
@@ -213,23 +268,23 @@ void MIXInit(void)
             channel->fader = 0;
             channel->pan = 64;
             channel->span = 127;
-            channel->ramp[12].current = 0;
-            channel->ramp[11].current = 0;
-            channel->ramp[10].current = 0;
-            channel->ramp[9].current = 0;
-            channel->ramp[8].current = 0;
-            channel->ramp[7].current = 0;
-            channel->ramp[6].current = 0;
-            channel->ramp[5].current = 0;
-            channel->ramp[4].current = 0;
-            channel->ramp[3].current = 0;
-            channel->ramp[2].current = 0;
-            channel->ramp[1].current = 0;
-            channel->ramp[0].current = 0;
+            channel->vCS.current = 0;
+            channel->vCR.current = 0;
+            channel->vCL.current = 0;
+            channel->vBS.current = 0;
+            channel->vBR.current = 0;
+            channel->vBL.current = 0;
+            channel->vAS.current = 0;
+            channel->vAR.current = 0;
+            channel->vAL.current = 0;
+            channel->vS.current = 0;
+            channel->vR.current = 0;
+            channel->vL.current = 0;
+            channel->v.current = 0;
             __MIXSetPan(channel);
             __MIXResetAux(i);
         }
-        MIXSoundMode = 1;
+        MIXSoundMode = MIX_SOUND_MODE_STEREO;
         MIXInitialized = 1;
     }
 }
@@ -254,10 +309,195 @@ u32 MIXGetSoundMode(void)
     return MIXSoundMode;
 }
 
+/* 0x804C2840 (0x16C4): attaches the channel of `axvpb` to it with the given levels and writes its mix to the voice. */
+void MIXInitChannel(AXVPB* axvpb, u32 mode, s32 input, s32 auxA, s32 auxB, s32 auxC, s32 pan, s32 span, s32 fader)
+{
+    BOOL enabled;
+    MIXChannel* c;
+    u32 mixerCtrl;
+    u16* mix;
+
+    c = &MIXChannels[axvpb->index];
+    c->axvpb = axvpb;
+    c->mode = mode & MIX_MODE_OPTIONS;
+    c->input = input;
+    c->auxA = auxA;
+    c->auxB = auxB;
+    c->auxC = auxC;
+    c->pan = pan;
+    c->span = span;
+    c->fader = fader;
+    __MIXSetPan(c);
+
+    if (c->mode & MIX_MODE_MUTE) {
+        c->v.current = 0;
+    } else {
+        c->v.current = __MIXGetVolume(input);
+    }
+
+    mixerCtrl = 0;
+    switch (MIXSoundMode) {
+    case MIX_SOUND_MODE_MONO:
+        c->vL.current = __MIXGetVolume(c->fader + c->f);
+        c->vR.current = __MIXGetVolume(c->fader + c->f);
+        c->vS.current = __MIXGetVolume(c->fader + c->b - 30);
+        if (c->mode & MIX_MODE_AUXA_PREFADER) {
+            c->vAL.current = __MIXGetVolume(c->auxA + c->f);
+            c->vAR.current = __MIXGetVolume(c->auxA + c->f);
+            c->vAS.current = __MIXGetVolume(c->auxA + c->b - 30);
+        } else {
+            c->vAL.current = __MIXGetVolume(c->fader + c->auxA + c->f);
+            c->vAR.current = __MIXGetVolume(c->fader + c->auxA + c->f);
+            c->vAS.current = __MIXGetVolume(c->fader + c->auxA + c->b - 30);
+        }
+        if (c->mode & MIX_MODE_AUXB_PREFADER) {
+            c->vBL.current = __MIXGetVolume(c->auxB + c->f);
+            c->vBR.current = __MIXGetVolume(c->auxB + c->f);
+            c->vBS.current = __MIXGetVolume(c->auxB + c->b - 30);
+        } else {
+            c->vBL.current = __MIXGetVolume(c->fader + c->auxB + c->f);
+            c->vBR.current = __MIXGetVolume(c->fader + c->auxB + c->f);
+            c->vBS.current = __MIXGetVolume(c->fader + c->auxB + c->b - 30);
+        }
+        if (c->mode & MIX_MODE_AUXC_PREFADER) {
+            c->vCL.current = __MIXGetVolume(c->auxC + c->f);
+            c->vCR.current = __MIXGetVolume(c->auxC + c->f);
+            c->vCS.current = __MIXGetVolume(c->auxC + c->b - 30);
+        } else {
+            c->vCL.current = __MIXGetVolume(c->fader + c->auxC + c->f);
+            c->vCR.current = __MIXGetVolume(c->fader + c->auxC + c->f);
+            c->vCS.current = __MIXGetVolume(c->fader + c->auxC + c->b - 30);
+        }
+        break;
+    case MIX_SOUND_MODE_STEREO:
+    case MIX_SOUND_MODE_SURROUND:
+        c->vL.current = __MIXGetVolume(c->fader + c->l + c->f);
+        c->vR.current = __MIXGetVolume(c->fader + c->r + c->f);
+        c->vS.current = __MIXGetVolume(c->fader + c->b - 30);
+        if (c->mode & MIX_MODE_AUXA_PREFADER) {
+            c->vAL.current = __MIXGetVolume(c->auxA + c->l + c->f);
+            c->vAR.current = __MIXGetVolume(c->auxA + c->r + c->f);
+            c->vAS.current = __MIXGetVolume(c->auxA + c->b - 30);
+        } else {
+            c->vAL.current = __MIXGetVolume(c->fader + c->auxA + c->l + c->f);
+            c->vAR.current = __MIXGetVolume(c->fader + c->auxA + c->r + c->f);
+            c->vAS.current = __MIXGetVolume(c->fader + c->auxA + c->b - 30);
+        }
+        if (c->mode & MIX_MODE_AUXB_PREFADER) {
+            c->vBL.current = __MIXGetVolume(c->auxB + c->l + c->f);
+            c->vBR.current = __MIXGetVolume(c->auxB + c->r + c->f);
+            c->vBS.current = __MIXGetVolume(c->auxB + c->b - 30);
+        } else {
+            c->vBL.current = __MIXGetVolume(c->fader + c->auxB + c->l + c->f);
+            c->vBR.current = __MIXGetVolume(c->fader + c->auxB + c->r + c->f);
+            c->vBS.current = __MIXGetVolume(c->fader + c->auxB + c->b - 30);
+        }
+        if (c->mode & MIX_MODE_AUXC_PREFADER) {
+            c->vCL.current = __MIXGetVolume(c->auxC + c->l + c->f);
+            c->vCR.current = __MIXGetVolume(c->auxC + c->r + c->f);
+            c->vCS.current = __MIXGetVolume(c->auxC + c->b - 30);
+        } else {
+            c->vCL.current = __MIXGetVolume(c->fader + c->auxC + c->l + c->f);
+            c->vCR.current = __MIXGetVolume(c->fader + c->auxC + c->r + c->f);
+            c->vCS.current = __MIXGetVolume(c->fader + c->auxC + c->b - 30);
+        }
+        break;
+    case MIX_SOUND_MODE_DPL2:
+        c->vL.current = __MIXGetVolume(c->fader + c->l + c->f);
+        c->vR.current = __MIXGetVolume(c->fader + c->r + c->f);
+        c->vS.current = __MIXGetVolume(c->fader + c->l1 + c->b);
+        c->vCL.current = __MIXGetVolume(c->fader + c->r1 + c->b);
+        if (c->mode & MIX_MODE_AUXA_PREFADER) {
+            c->vAL.current = __MIXGetVolume(c->auxA + c->l + c->f);
+            c->vAR.current = __MIXGetVolume(c->auxA + c->r + c->f);
+            c->vAS.current = __MIXGetVolume(c->auxA + c->l1 + c->b);
+            c->vCR.current = __MIXGetVolume(c->auxA + c->r1 + c->b);
+        } else {
+            c->vAL.current = __MIXGetVolume(c->fader + c->auxA + c->l + c->f);
+            c->vAR.current = __MIXGetVolume(c->fader + c->auxA + c->r + c->f);
+            c->vAS.current = __MIXGetVolume(c->fader + c->auxA + c->l1 + c->b);
+            c->vCR.current = __MIXGetVolume(c->fader + c->auxA + c->r1 + c->b);
+        }
+        if (c->mode & MIX_MODE_AUXB_PREFADER) {
+            c->vBL.current = __MIXGetVolume(c->auxB + c->l + c->f);
+            c->vBR.current = __MIXGetVolume(c->auxB + c->r + c->f);
+            c->vBS.current = __MIXGetVolume(c->auxB + c->l1 + c->b);
+            c->vCS.current = __MIXGetVolume(c->auxB + c->r1 + c->b);
+        } else {
+            c->vBL.current = __MIXGetVolume(c->fader + c->auxB + c->l + c->f);
+            c->vBR.current = __MIXGetVolume(c->fader + c->auxB + c->r + c->f);
+            c->vBS.current = __MIXGetVolume(c->fader + c->auxB + c->l1 + c->b);
+            c->vCS.current = __MIXGetVolume(c->fader + c->auxB + c->r1 + c->b);
+        }
+        mixerCtrl |= AX_MIXCTRL_DPL2;
+        break;
+    }
+
+    __MIXResetAux(axvpb->index);
+    enabled = OSDisableInterrupts();
+    axvpb->pb.veVolume = c->v.current;
+    axvpb->pb.veDelta = 0;
+    mix = axvpb->pb.mix;
+    if ((*mix++ = c->vL.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_L;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vR.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_R;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vAL.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_AL;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vAR.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_AR;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vBL.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_BL;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vBR.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_BR;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vCL.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_CL;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vCR.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_CR;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vS.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_S;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vAS.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_AS;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vBS.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_BS;
+    }
+    *mix++ = 0;
+    if ((*mix++ = c->vCS.current) != 0) {
+        mixerCtrl |= AX_MIXCTRL_CS;
+    }
+    *mix++ = 0;
+    axvpb->pb.stateWord = mixerCtrl;
+    axvpb->sync |= AX_SYNC_MIXCTRL | AX_SYNC_MIX | AX_SYNC_VE;
+    memset(axvpb->pb.rmtMix, 0, sizeof(axvpb->pb.rmtMix));
+    axvpb->pb.rmtSelect = 0;
+    axvpb->sync |= AX_SYNC_RMTMIXCTRL | AX_SYNC_RMTMIX;
+    OSRestoreInterrupts(enabled);
+}
+
 /* 0x804C3F10 (0x18): frees the channel of `voice`. */
 void MIXReleaseChannel(AXVPB* voice)
 {
-    MIXChannels[voice->index].mode = 0;
+    MIXChannels[voice->index].axvpb = NULL;
 }
 
 /* 0x804C3F30 (0x24): sets the input level of the voice's channel. */
@@ -266,7 +506,7 @@ void MIXSetInput(AXVPB* voice, s32 tenthsDb)
     MIXChannel* channel = &MIXChannels[voice->index];
 
     channel->input = tenthsDb;
-    channel->update |= MIX_UPDATE_INPUT;
+    channel->mode |= MIX_MODE_UPDATE_INPUT;
 }
 
 /* 0x804C3F60 (0x24): sets the auxiliary send A level of the voice's channel. */
@@ -275,7 +515,7 @@ void MIXSetAuxA(AXVPB* voice, s32 tenthsDb)
     MIXChannel* channel = &MIXChannels[voice->index];
 
     channel->auxA = tenthsDb;
-    channel->update |= MIX_UPDATE_LEVELS;
+    channel->mode |= MIX_MODE_UPDATE_MIX;
 }
 
 /* 0x804C3F90 (0x24): sets the auxiliary send B level of the voice's channel. */
@@ -284,7 +524,7 @@ void MIXSetAuxB(AXVPB* voice, s32 tenthsDb)
     MIXChannel* channel = &MIXChannels[voice->index];
 
     channel->auxB = tenthsDb;
-    channel->update |= MIX_UPDATE_LEVELS;
+    channel->mode |= MIX_MODE_UPDATE_MIX;
 }
 
 /* 0x804C3FC0 (0x6C): sets the pan of the voice's channel, clamped to 0..127, and refreshes its gains. */
@@ -303,7 +543,7 @@ void MIXSetPan(AXVPB* voice, s32 pan)
     }
     channel->pan = clamped;
     __MIXSetPan(channel);
-    channel->update |= MIX_UPDATE_LEVELS;
+    channel->mode |= MIX_MODE_UPDATE_MIX;
 }
 
 /* 0x804C4030 (0x6C): sets the surround pan of the voice's channel, clamped to 0..127, and refreshes its gains. */
@@ -322,7 +562,7 @@ void MIXSetSPan(AXVPB* voice, s32 span)
     }
     channel->span = clamped;
     __MIXSetPan(channel);
-    channel->update |= MIX_UPDATE_LEVELS;
+    channel->mode |= MIX_MODE_UPDATE_MIX;
 }
 
 /* 0x804C40A0 (0x24): sets the fader level of the voice's channel. */
@@ -331,8 +571,356 @@ void MIXSetFader(AXVPB* voice, s32 tenthsDb)
     MIXChannel* channel = &MIXChannels[voice->index];
 
     channel->fader = tenthsDb;
-    channel->update |= MIX_UPDATE_LEVELS;
+    channel->mode |= MIX_MODE_UPDATE_MIX;
 }
+
+/* 0x804C40D0 (0x1694): moves every channel's volumes towards the levels set since the last frame and writes them to its voice. */
+void MIXUpdateSettings(void)
+{
+    u32 i;
+
+    if (MIXInitialized == 0) {
+        return;
+    }
+    for (i = 0; i < MIXMaxVoices; i++) {
+        BOOL setMix;
+        BOOL setInput;
+        MIXChannel* c;
+        AXVPB* axvpb;
+        u32 mixerCtrl;
+        u16* mix;
+
+        setInput = FALSE;
+        setMix = FALSE;
+        c = &MIXChannels[i];
+        axvpb = c->axvpb;
+        if (axvpb == NULL) {
+            continue;
+        }
+        mixerCtrl = 0;
+        if (c->mode & MIX_MODE_UPDATE_INPUT1) {
+            c->v.current = c->v.target;
+            c->mode &= ~MIX_MODE_UPDATE_INPUT1;
+            setInput = TRUE;
+        }
+        if (c->mode & MIX_MODE_UPDATE_INPUT) {
+            if (c->mode & MIX_MODE_MUTE) {
+                c->v.target = 0;
+            } else {
+                c->v.target = __MIXGetVolume(c->input);
+            }
+            c->mode &= ~MIX_MODE_UPDATE_INPUT;
+            c->mode |= MIX_MODE_UPDATE_INPUT1;
+            setInput = TRUE;
+        }
+        if (c->mode & MIX_MODE_UPDATE_MIX1) {
+            c->vL.current = c->vL.target;
+            c->vR.current = c->vR.target;
+            c->vS.current = c->vS.target;
+            c->vAL.current = c->vAL.target;
+            c->vAR.current = c->vAR.target;
+            c->vAS.current = c->vAS.target;
+            c->vBL.current = c->vBL.target;
+            c->vBR.current = c->vBR.target;
+            c->vBS.current = c->vBS.target;
+            c->vCL.current = c->vCL.target;
+            c->vCR.current = c->vCR.target;
+            c->vCS.current = c->vCS.target;
+            c->mode &= ~MIX_MODE_UPDATE_MIX1;
+            setMix = TRUE;
+        }
+        if (c->mode & MIX_MODE_UPDATE_MIX) {
+            switch (MIXSoundMode) {
+            case MIX_SOUND_MODE_MONO:
+                c->vL.target = __MIXGetVolume(c->fader + c->f);
+                c->vR.target = __MIXGetVolume(c->fader + c->f);
+                c->vS.target = __MIXGetVolume(c->fader + c->b - 30);
+                if (c->mode & MIX_MODE_AUXA_PREFADER) {
+                    c->vAL.target = __MIXGetVolume(c->auxA + c->f);
+                    c->vAR.target = __MIXGetVolume(c->auxA + c->f);
+                    c->vAS.target = __MIXGetVolume(c->auxA + c->b - 30);
+                } else {
+                    c->vAL.target = __MIXGetVolume(c->fader + c->auxA + c->f);
+                    c->vAR.target = __MIXGetVolume(c->fader + c->auxA + c->f);
+                    c->vAS.target = __MIXGetVolume(c->fader + c->auxA + c->b - 30);
+                }
+                if (c->mode & MIX_MODE_AUXB_PREFADER) {
+                    c->vBL.target = __MIXGetVolume(c->auxB + c->f);
+                    c->vBR.target = __MIXGetVolume(c->auxB + c->f);
+                    c->vBS.target = __MIXGetVolume(c->auxB + c->b - 30);
+                } else {
+                    c->vBL.target = __MIXGetVolume(c->fader + c->auxB + c->f);
+                    c->vBR.target = __MIXGetVolume(c->fader + c->auxB + c->f);
+                    c->vBS.target = __MIXGetVolume(c->fader + c->auxB + c->b - 30);
+                }
+                if (c->mode & MIX_MODE_AUXC_PREFADER) {
+                    c->vCL.target = __MIXGetVolume(c->auxC + c->f);
+                    c->vCR.target = __MIXGetVolume(c->auxC + c->f);
+                    c->vCS.target = __MIXGetVolume(c->auxC + c->b - 30);
+                } else {
+                    c->vCL.target = __MIXGetVolume(c->fader + c->auxC + c->f);
+                    c->vCR.target = __MIXGetVolume(c->fader + c->auxC + c->f);
+                    c->vCS.target = __MIXGetVolume(c->fader + c->auxC + c->b - 30);
+                }
+                break;
+            case MIX_SOUND_MODE_STEREO:
+            case MIX_SOUND_MODE_SURROUND:
+                c->vL.target = __MIXGetVolume(c->fader + c->l + c->f);
+                c->vR.target = __MIXGetVolume(c->fader + c->r + c->f);
+                c->vS.target = __MIXGetVolume(c->fader + c->b - 30);
+                if (c->mode & MIX_MODE_AUXA_PREFADER) {
+                    c->vAL.target = __MIXGetVolume(c->auxA + c->l + c->f);
+                    c->vAR.target = __MIXGetVolume(c->auxA + c->r + c->f);
+                    c->vAS.target = __MIXGetVolume(c->auxA + c->b - 30);
+                } else {
+                    c->vAL.target = __MIXGetVolume(c->fader + c->auxA + c->l + c->f);
+                    c->vAR.target = __MIXGetVolume(c->fader + c->auxA + c->r + c->f);
+                    c->vAS.target = __MIXGetVolume(c->fader + c->auxA + c->b - 30);
+                }
+                if (c->mode & MIX_MODE_AUXB_PREFADER) {
+                    c->vBL.target = __MIXGetVolume(c->auxB + c->l + c->f);
+                    c->vBR.target = __MIXGetVolume(c->auxB + c->r + c->f);
+                    c->vBS.target = __MIXGetVolume(c->auxB + c->b - 30);
+                } else {
+                    c->vBL.target = __MIXGetVolume(c->fader + c->auxB + c->l + c->f);
+                    c->vBR.target = __MIXGetVolume(c->fader + c->auxB + c->r + c->f);
+                    c->vBS.target = __MIXGetVolume(c->fader + c->auxB + c->b - 30);
+                }
+                if (c->mode & MIX_MODE_AUXC_PREFADER) {
+                    c->vCL.target = __MIXGetVolume(c->auxC + c->l + c->f);
+                    c->vCR.target = __MIXGetVolume(c->auxC + c->r + c->f);
+                    c->vCS.target = __MIXGetVolume(c->auxC + c->b - 30);
+                } else {
+                    c->vCL.target = __MIXGetVolume(c->fader + c->auxC + c->l + c->f);
+                    c->vCR.target = __MIXGetVolume(c->fader + c->auxC + c->r + c->f);
+                    c->vCS.target = __MIXGetVolume(c->fader + c->auxC + c->b - 30);
+                }
+                break;
+            case MIX_SOUND_MODE_DPL2:
+                c->vL.target = __MIXGetVolume(c->fader + c->l + c->f);
+                c->vR.target = __MIXGetVolume(c->fader + c->r + c->f);
+                c->vS.target = __MIXGetVolume(c->fader + c->l1 + c->b);
+                c->vCL.target = __MIXGetVolume(c->fader + c->r1 + c->b);
+                if (c->mode & MIX_MODE_AUXA_PREFADER) {
+                    c->vAL.target = __MIXGetVolume(c->auxA + c->l + c->f);
+                    c->vAR.target = __MIXGetVolume(c->auxA + c->r + c->f);
+                    c->vAS.target = __MIXGetVolume(c->auxA + c->l1 + c->b);
+                    c->vCR.target = __MIXGetVolume(c->auxA + c->r1 + c->b);
+                } else {
+                    c->vAL.target = __MIXGetVolume(c->fader + c->auxA + c->l + c->f);
+                    c->vAR.target = __MIXGetVolume(c->fader + c->auxA + c->r + c->f);
+                    c->vAS.target = __MIXGetVolume(c->fader + c->auxA + c->l1 + c->b);
+                    c->vCR.target = __MIXGetVolume(c->fader + c->auxA + c->r1 + c->b);
+                }
+                if (c->mode & MIX_MODE_AUXB_PREFADER) {
+                    c->vBL.target = __MIXGetVolume(c->auxB + c->l + c->f);
+                    c->vBR.target = __MIXGetVolume(c->auxB + c->r + c->f);
+                    c->vBS.target = __MIXGetVolume(c->auxB + c->l1 + c->b);
+                    c->vCS.target = __MIXGetVolume(c->auxB + c->r1 + c->b);
+                } else {
+                    c->vBL.target = __MIXGetVolume(c->fader + c->auxB + c->l + c->f);
+                    c->vBR.target = __MIXGetVolume(c->fader + c->auxB + c->r + c->f);
+                    c->vBS.target = __MIXGetVolume(c->fader + c->auxB + c->l1 + c->b);
+                    c->vCS.target = __MIXGetVolume(c->fader + c->auxB + c->r1 + c->b);
+                }
+                mixerCtrl |= AX_MIXCTRL_DPL2;
+                break;
+            }
+            c->mode &= ~MIX_MODE_UPDATE_MIX;
+            c->mode |= MIX_MODE_UPDATE_MIX1;
+            setMix = TRUE;
+        }
+        if (setInput) {
+            axvpb->pb.veVolume = c->v.current;
+            axvpb->pb.veDelta = (c->v.target - c->v.current) / AX_FRAME_SAMPLES;
+            axvpb->sync |= AX_SYNC_VE;
+        }
+        if (setMix) {
+            mix = axvpb->pb.mix;
+            if ((*mix++ = c->vL.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_L;
+            }
+            if ((*mix++ = (c->vL.target - c->vL.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_LR_RAMP;
+            }
+            if ((*mix++ = c->vR.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_R;
+            }
+            if ((*mix++ = (c->vR.target - c->vR.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_LR_RAMP;
+            }
+            if ((*mix++ = c->vAL.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_AL;
+            }
+            if ((*mix++ = (c->vAL.target - c->vAL.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_ALR_RAMP;
+            }
+            if ((*mix++ = c->vAR.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_AR;
+            }
+            if ((*mix++ = (c->vAR.target - c->vAR.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_ALR_RAMP;
+            }
+            if ((*mix++ = c->vBL.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_BL;
+            }
+            if ((*mix++ = (c->vBL.target - c->vBL.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_BLR_RAMP;
+            }
+            if ((*mix++ = c->vBR.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_BR;
+            }
+            if ((*mix++ = (c->vBR.target - c->vBR.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_BLR_RAMP;
+            }
+            if ((*mix++ = c->vCL.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_CL;
+            }
+            if ((*mix++ = (c->vCL.target - c->vCL.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_CLR_RAMP;
+            }
+            if ((*mix++ = c->vCR.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_CR;
+            }
+            if ((*mix++ = (c->vCR.target - c->vCR.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_CLR_RAMP;
+            }
+            if ((*mix++ = c->vS.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_S;
+            }
+            if ((*mix++ = (c->vS.target - c->vS.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_S_RAMP;
+            }
+            if ((*mix++ = c->vAS.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_AS;
+            }
+            if ((*mix++ = (c->vAS.target - c->vAS.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_AS_RAMP;
+            }
+            if ((*mix++ = c->vBS.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_BS;
+            }
+            if ((*mix++ = (c->vBS.target - c->vBS.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_BS_RAMP;
+            }
+            if ((*mix++ = c->vCS.current) != 0) {
+                mixerCtrl |= AX_MIXCTRL_CS;
+            }
+            if ((*mix++ = (c->vCS.target - c->vCS.current) / AX_FRAME_SAMPLES) != 0) {
+                mixerCtrl |= AX_MIXCTRL_CS_RAMP;
+            }
+            axvpb->pb.stateWord = mixerCtrl;
+            axvpb->sync |= AX_SYNC_MIXCTRL | AX_SYNC_MIX;
+        }
+        __MIXUpdateAuxVolumes(i, axvpb);
+    }
+}
+
+/* 0x804C5770 (0x43C): moves the remote-speaker volumes of voice `index` towards its levels and writes them to `axvpb`. */
+#pragma push
+#pragma dont_inline on
+void __MIXUpdateAuxVolumes(u32 index, AXVPB* axvpb)
+{
+    MIXAuxState* aux = &MIXAuxStates[index];
+    u16 mixerCtrl;
+    u16* mix;
+
+    if ((aux->flags & (MIX_AUX_UPDATE | MIX_AUX_UPDATE1)) == 0) {
+        return;
+    }
+    if (aux->flags & MIX_AUX_UPDATE1) {
+        aux->ramp[0].current = aux->ramp[0].target;
+        aux->ramp[1].current = aux->ramp[1].target;
+        aux->ramp[2].current = aux->ramp[2].target;
+        aux->ramp[3].current = aux->ramp[3].target;
+        aux->ramp[4].current = aux->ramp[4].target;
+        aux->ramp[5].current = aux->ramp[5].target;
+        aux->ramp[6].current = aux->ramp[6].target;
+        aux->ramp[7].current = aux->ramp[7].target;
+        aux->flags &= ~MIX_AUX_UPDATE1;
+    }
+    if (aux->flags & MIX_AUX_UPDATE) {
+        aux->ramp[0].target = __MIXGetVolume(aux->level[0]);
+        aux->ramp[2].target = __MIXGetVolume(aux->level[1]);
+        aux->ramp[4].target = __MIXGetVolume(aux->level[2]);
+        aux->ramp[6].target = __MIXGetVolume(aux->level[3]);
+        if (aux->flags & 1) {
+            aux->ramp[1].target = __MIXGetVolume(aux->offset[0]);
+        } else {
+            aux->ramp[1].target = __MIXGetVolume(aux->level[0] + aux->offset[0]);
+        }
+        if (aux->flags & 2) {
+            aux->ramp[3].target = __MIXGetVolume(aux->offset[1]);
+        } else {
+            aux->ramp[3].target = __MIXGetVolume(aux->level[1] + aux->offset[1]);
+        }
+        if (aux->flags & 4) {
+            aux->ramp[5].target = __MIXGetVolume(aux->offset[2]);
+        } else {
+            aux->ramp[5].target = __MIXGetVolume(aux->level[2] + aux->offset[2]);
+        }
+        if (aux->flags & 8) {
+            aux->ramp[7].target = __MIXGetVolume(aux->offset[3]);
+        } else {
+            aux->ramp[7].target = __MIXGetVolume(aux->level[3] + aux->offset[3]);
+        }
+        aux->flags &= ~MIX_AUX_UPDATE;
+        aux->flags |= MIX_AUX_UPDATE1;
+    }
+    mixerCtrl = 0;
+    mix = axvpb->pb.rmtMix;
+    if ((*mix++ = aux->ramp[0].current) != 0) {
+        mixerCtrl |= 0x1;
+    }
+    if ((*mix++ = (aux->ramp[0].target - aux->ramp[0].current) / AX_RMT_FRAME_SAMPLES) != 0) {
+        mixerCtrl |= 0x2;
+    }
+    if ((*mix++ = aux->ramp[1].current) != 0) {
+        mixerCtrl |= 0x4;
+    }
+    if ((*mix++ = (aux->ramp[1].target - aux->ramp[1].current) / AX_RMT_FRAME_SAMPLES) != 0) {
+        mixerCtrl |= 0x8;
+    }
+    if ((*mix++ = aux->ramp[2].current) != 0) {
+        mixerCtrl |= 0x10;
+    }
+    if ((*mix++ = (aux->ramp[2].target - aux->ramp[2].current) / AX_RMT_FRAME_SAMPLES) != 0) {
+        mixerCtrl |= 0x20;
+    }
+    if ((*mix++ = aux->ramp[3].current) != 0) {
+        mixerCtrl |= 0x40;
+    }
+    if ((*mix++ = (aux->ramp[3].target - aux->ramp[3].current) / AX_RMT_FRAME_SAMPLES) != 0) {
+        mixerCtrl |= 0x80;
+    }
+    if ((*mix++ = aux->ramp[4].current) != 0) {
+        mixerCtrl |= 0x100;
+    }
+    if ((*mix++ = (aux->ramp[4].target - aux->ramp[4].current) / AX_RMT_FRAME_SAMPLES) != 0) {
+        mixerCtrl |= 0x200;
+    }
+    if ((*mix++ = aux->ramp[5].current) != 0) {
+        mixerCtrl |= 0x400;
+    }
+    if ((*mix++ = (aux->ramp[5].target - aux->ramp[5].current) / AX_RMT_FRAME_SAMPLES) != 0) {
+        mixerCtrl |= 0x800;
+    }
+    if ((*mix++ = aux->ramp[6].current) != 0) {
+        mixerCtrl |= 0x1000;
+    }
+    if ((*mix++ = (aux->ramp[6].target - aux->ramp[6].current) / AX_RMT_FRAME_SAMPLES) != 0) {
+        mixerCtrl |= 0x2000;
+    }
+    if ((*mix++ = aux->ramp[7].current) != 0) {
+        mixerCtrl |= 0x4000;
+    }
+    if ((*mix++ = (aux->ramp[7].target - aux->ramp[7].current) / AX_RMT_FRAME_SAMPLES) != 0) {
+        mixerCtrl |= 0x8000;
+    }
+    axvpb->pb.rmtSelect = mixerCtrl;
+    axvpb->sync |= AX_SYNC_RMTMIXCTRL | AX_SYNC_RMTMIX;
+}
+#pragma pop
 
 /* 0x804C5BB0 (0x58): resets the aux ramp state of voice `index`. */
 void __MIXResetAux(u32 index)

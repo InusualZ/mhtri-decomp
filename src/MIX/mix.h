@@ -13,16 +13,16 @@
 extern "C" {
 #endif
 
-/* A volume that moves from `current` to `target`. size: 0x4 */
+/* A linear volume that moves from `current` to `target` over one audio frame. size: 0x4 */
 typedef struct MIXRamp {
-    /* +0x0 */ u16 current;
-    /* +0x2 */ u16 target;
+    /* +0x0 */ u16 current; /* the volume the voice is mixed with now */
+    /* +0x2 */ u16 target;  /* the volume computed from the levels, applied on the next update */
 } MIXRamp;
 
-/* One mixing channel: the levels a voice is mixed with and the coefficients derived from them. size: 0x70 */
+/* One mixing channel: the levels a voice is mixed with and the volumes derived from them. size: 0x70 */
 typedef struct MIXChannel {
-    /* +0x00 */ u32 mode;      /* zero when the channel is free */
-    /* +0x04 */ u32 update;    /* pending-change flags: 0x10000000 input, 0x40000000 levels/pan, 0x80000000 applied */
+    /* +0x00 */ AXVPB* axvpb;  /* the voice, NULL when the channel is free */
+    /* +0x04 */ u32 mode;      /* MIX_MODE_* option bits (low nibble) and pending-update flags (top nibble) */
     /* +0x08 */ s32 input;     /* input level, in tenths of a decibel */
     /* +0x0C */ s32 auxA;      /* auxiliary send A level, in tenths of a decibel */
     /* +0x10 */ s32 auxB;      /* auxiliary send B level, in tenths of a decibel */
@@ -30,20 +30,37 @@ typedef struct MIXChannel {
     /* +0x18 */ s32 pan;       /* 0..127, 64 is the centre */
     /* +0x1C */ s32 span;      /* surround pan, 0..127 */
     /* +0x20 */ s32 fader;     /* channel fader, in tenths of a decibel */
-    /* +0x24 */ s32 gain[6];   /* left, right, surround left/right and the rear pair, from the pan tables */
-    /* +0x3C */ MIXRamp ramp[13]; /* running mix state, `current` cleared when the channel is set up */
+    /* +0x24 */ s32 l;         /* left attenuation from the pan tables */
+    /* +0x28 */ s32 r;         /* right attenuation */
+    /* +0x2C */ s32 f;         /* front attenuation from the surround pan */
+    /* +0x30 */ s32 b;         /* back attenuation from the surround pan */
+    /* +0x34 */ s32 l1;        /* rear-left attenuation (Dolby Pro Logic II only) */
+    /* +0x38 */ s32 r1;        /* rear-right attenuation (Dolby Pro Logic II only) */
+    /* +0x3C */ MIXRamp v;     /* input volume */
+    /* +0x40 */ MIXRamp vL;    /* main left */
+    /* +0x44 */ MIXRamp vR;    /* main right */
+    /* +0x48 */ MIXRamp vS;    /* main surround (rear left under Pro Logic II) */
+    /* +0x4C */ MIXRamp vAL;   /* aux A left */
+    /* +0x50 */ MIXRamp vAR;   /* aux A right */
+    /* +0x54 */ MIXRamp vAS;   /* aux A surround */
+    /* +0x58 */ MIXRamp vBL;   /* aux B left */
+    /* +0x5C */ MIXRamp vBR;   /* aux B right */
+    /* +0x60 */ MIXRamp vBS;   /* aux B surround */
+    /* +0x64 */ MIXRamp vCL;   /* aux C left (main rear right under Pro Logic II) */
+    /* +0x68 */ MIXRamp vCR;   /* aux C right (aux A rear right under Pro Logic II) */
+    /* +0x6C */ MIXRamp vCS;   /* aux C surround (aux B rear right under Pro Logic II) */
 } MIXChannel;
 
-/* The ramped volumes of one voice's four buses: for each bus a direct and an offset value. size: 0x44 */
+/* The remote-speaker mix of one voice: a main and an aux level for each of the four remotes. size: 0x44 */
 typedef struct MIXAuxState {
-    /* +0x00 */ u32 flags;        /* 0x80000000 applied, 0x40000000 changed, 1/2/4/8 the offset of bus n is absolute */
-    /* +0x04 */ s32 level[4];     /* bus levels in tenths of a decibel */
-    /* +0x14 */ s32 offset[4];    /* per-bus offsets in tenths of a decibel */
-    /* +0x24 */ MIXRamp ramp[8];
+    /* +0x00 */ u32 flags;        /* 0x80000000 apply targets, 0x40000000 recompute, 1/2/4/8 the aux of remote n is pre-fader */
+    /* +0x04 */ s32 level[4];     /* main level of each remote, in tenths of a decibel */
+    /* +0x14 */ s32 offset[4];    /* aux level of each remote, in tenths of a decibel */
+    /* +0x24 */ MIXRamp ramp[8];  /* per remote: [2n] the main volume, [2n+1] the aux volume */
 } MIXAuxState;
 
 /* 0x804C2840 - attaches a mixer channel to an AX voice with its initial levels. */
-void MIXInitChannel(AXVPB* axVoice, u32 mode, s32 input, s32 auxA, s32 auxB, s32 auxC, s32 pan, s32 span, s32 fader);
+void MIXInitChannel(AXVPB* axvpb, u32 mode, s32 input, s32 auxA, s32 auxB, s32 auxC, s32 pan, s32 span, s32 fader);
 
 /* 0x804C25E0 - fills `channel`'s gain row from the pan tables for the current sound mode. */
 void __MIXSetPan(MIXChannel* channel);
