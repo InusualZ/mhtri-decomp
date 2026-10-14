@@ -9,10 +9,10 @@
  *    placeholders; their bodies are the FPU save, the context restore, the FPU-unavailable handler and the handler installer)
  *    except GUESS: `OSGetCurrentContext` (reads the current-context word of the low-memory arena at
  *    0x800000D4) and `OSInitContext` (zeroes a context and stores the entry point and stack pointer it is given).
- * RESIDUALS. `OSDumpContext` (98.9 %): the saved registers are permuted (context r29, string base r27 in ours; r30, r28 in the
- *    target) and the string pool base is `...data.0` where the target names it `lbl_8061C390`; no declaration order changed it.
+ * RESIDUALS. .text matches; the string pool base relocates against `...data.0` where the target names it `lbl_8061C390`.
  * SHAPES. the register save/restore bodies are asm functions with `nofralloc` (playbook 104) and use numbered SPRs where
- *    this compiler's name differs; `OSDumpContext` and `__OSContextInit` are C.
+ *    this compiler's name differs; `OSDumpContext` and `__OSContextInit` are C.  `OSDumpContext` reads the current context
+ *    through the inline `ReadCurrentContext` (the bare macro read permutes its saved registers).
  */
 
 #include "types.h"
@@ -448,6 +448,12 @@ asm void OSInitContext(OSContext* context, u32 pc, u32 sp)
     b OSClearContext
 }
 
+/* Reads the current-context word of the low-memory arena. */
+static inline OSContext* ReadCurrentContext(void)
+{
+    return OS_CURRENT_CONTEXT;
+}
+
 /* Prints the integer, special, graphics-quantisation, floating-point and paired-single registers of `context`, then walks its stack. */
 void OSDumpContext(OSContext* context)
 {
@@ -470,7 +476,7 @@ void OSDumpContext(OSContext* context)
     }
     if (context->state & 1) {
         enabled = OSDisableInterrupts();
-        current = OS_CURRENT_CONTEXT;
+        current = ReadCurrentContext();
         OSClearContext(&fpContext);
         OSSetCurrentContext(&fpContext);
         OSReport("\n\nFPRs----------\n");

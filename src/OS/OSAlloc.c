@@ -7,11 +7,11 @@
  * NAMES. `DLInsert` and `OSFreeToHeap` are the map's names; GUESS: `OSAllocFromHeap`, `OSSetCurrentHeap`, `OSInitAlloc`,
  *    `OSCreateHeap` (the allocator's entry points by what they do and by their sibling `OSFreeToHeap`), and the statics
  *    `s_currentHeap`, `s_arenaEnd`, `s_arenaStart`, `s_heapCount`, `s_heapTable` (what each word holds).
- * RESIDUALS. `OSInitAlloc` (91.4 %): the end-address rounding is held in r0 across the stores in the target and in r4 in ours
- *    (register allocation of the three tail stores, same instruction set); the object's .text ends 16 bytes and its .sdata 4
+ * RESIDUALS. .text matches; the object's .text ends 16 bytes and its .sdata 4
  *    bytes before the claimed ends (alignment fill the link puts back only when the next unit is linked at the same alignment).
  * SHAPES. the heap descriptor table is 12-byte records of {size, free list, allocated list}; the cells are doubly linked
- *    with a 32-byte header.
+ *    with a 32-byte header.  `OSInitAlloc` forms the arena start in two statements (table end, then the 32-byte round-up) and
+ *    stores it before the rounded arena end, which keeps the target's register order.
  */
 
 #include "types.h"
@@ -182,9 +182,10 @@ void* OSInitAlloc(void* arenaStart, void* arenaEnd, int maxHeaps)
         desc->free = desc->allocated = NULL;
     }
     s_currentHeap = -1;
-    s_arenaEnd = (void*)((u32)arenaEnd & ~31);
-    arenaStart = (void*)((tableSize + (u32)s_heapTable + 31) & ~31);
+    arenaStart = (u8*)s_heapTable + tableSize;
+    arenaStart = (void*)(((u32)arenaStart + 32 - 1) & ~(32 - 1));
     s_arenaStart = arenaStart;
+    s_arenaEnd = (void*)((u32)arenaEnd & ~(32 - 1));
     return arenaStart;
 }
 

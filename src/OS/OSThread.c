@@ -10,12 +10,11 @@
  *    `IdleContext` and `IdleThread` (the 0x5F0 bytes the map had as one object) and `SleepAlarmHandler` (the alarm
  *    callback `OSSleepTicks` arms); `__OSFpscrEnableBits` (0x80793F90, owned by OSError) is named for its use as the FPSCR
  *    enable mask of a new context.
- * RESIDUALS. `OSWakeupThread` (98.5 %): the woken thread and the run-queue tail temporary swap r7/r8; no declaration order fixed it.
- *    The seam: `SwitchThreadCallback`'s initial value is `DBClose` (0x804D36C0, the 4-byte `blr` the map puts in
+ * RESIDUALS. none in .text.  The seam: `SwitchThreadCallback`'s initial value is `DBClose` (0x804D36C0, the 4-byte `blr` the map puts in
  *    OSSync); it is this unit's default switch callback, so the OSThread range probably starts at 0x804D36C0.
  * SHAPES. `UnsetRun` needs `#pragma dont_inline` (the target calls it); the scheduler words are `volatile` (the target re-reads
- *    them after storing); `UpdatePriority` spells the effective-priority loop itself. The list operations are macros expanded in place (`AddTail`/`AddPrio`/`RemoveItem`/`DequeueHead`); the effective
- *    priority loop and the priority-inheritance walk are inline helpers.
+ *    them after storing); `UpdatePriority` spells the effective-priority loop itself. The list operations are macros expanded in place (`AddTail`/`AddPrio`/`RemoveItem`/`DequeueHead`); `SetRun`, the effective
+ *    priority loop and the priority-inheritance walk are inline helpers (`SetRun` as a macro swaps r7/r8 in `OSWakeupThread`).
  */
 
 #define OS_THREAD_TYPED_API
@@ -125,13 +124,13 @@ static volatile s32 Reschedule;
     } while (0)
 
 /* Puts `thread` on the run queue of its priority. */
-#define SetRun(thread)                                                                                                 \
-    do {                                                                                                               \
-        (thread)->queue = &RunQueue[(thread)->priority];                                                               \
-        AddTail((thread)->queue, thread, link);                                                                        \
-        RunQueueBits |= 1u << (OS_PRIORITY_MAX - (thread)->priority);                                                  \
-        RunQueueHint = TRUE;                                                                                           \
-    } while (0)
+static inline void SetRun(OSThread* thread)
+{
+    thread->queue = &RunQueue[thread->priority];
+    AddTail(thread->queue, thread, link);
+    RunQueueBits |= 1u << (OS_PRIORITY_MAX - thread->priority);
+    RunQueueHint = TRUE;
+}
 
 /* Reschedules when a thread became runnable. */
 #define RescheduleIfHinted()                                                                                           \

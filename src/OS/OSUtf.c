@@ -8,10 +8,10 @@
  *    placeholder converts a code point to a byte of the Windows-1252 0x80..0x9F block, 0x152 .. 0x2122, and `OSFont`
  *    calls it); `UTF32toANSITable`, `SJISPage*` (the page is the code point's upper byte) and `UTF32toSJISPageTable`
  *    are GUESS names for the three table families, read straight from the conversion code.
- * RESIDUALS. `OSUTF16to32` (76 %): the target keeps `result = ch` as its own register (`mr r6,r5`) and shares one `li r3,0; blr` per
- *    failure at the tail; every source order measured either merges `result` into `ch` or inlines the returns.
+ * RESIDUALS. none in .text.
  * SHAPES. plain C; the tables are initialised data, so the compiler emits them in definition order.  A range test keeps its two
  *    compares only with the upper bound constant-first (`0xDFFF >= ch`); the plain `ch <= 0xDFFF` folds to one `subis`/`cmplwi`.
+ *    `OSUTF16to32` tests the plain-unit case first and adds 0x10000 as its own statement, which keeps `result` apart from `ch`.
  */
 
 #include "types.h"
@@ -3416,18 +3416,18 @@ u16* OSUTF16to32(u16* src, u32* out)
     if (ch != 0) {
         src++;
     }
-    if (ch >= 0xD800 && 0xDFFF >= ch) {
-        if (ch > 0xDBFF) {
-            return NULL;
-        }
+    if (ch < 0xD800 || 0xDFFF < ch) {
+        result = ch;
+    } else if (ch <= 0xDBFF) {
         low = *src++;
         if (low >= 0xDC00 && 0xDFFF >= low) {
-            result = (((ch << 10) & 0x000FFC00) | (low & 0x3FF)) + 0x10000;
+            result = ((ch << 10) & 0x000FFC00) | (low & 0x3FF);
+            result += 0x10000;
         } else {
             return NULL;
         }
     } else {
-        result = ch;
+        return NULL;
     }
     *out = result;
     return src;

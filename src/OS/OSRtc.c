@@ -7,12 +7,12 @@
  * FLAGS. `cflags_base` per object (configure.py).
  * NAMES. `__OSInitSram`, `UnlockSram`, `__OSSyncSram`, `OSGetWirelessID`, ... are the map's names; GUESS: `WriteSramCallback`
  *    (the write-back retry the EXI lock runs), `__OSReadROM` (the boot-ROM read `OSFont` calls), `statusBits` (the SRAM word
- *    at +0x3C that `__OSInitSram` repairs).
- * RESIDUALS. `__OSInitSram` (99.0 %): the target keeps `clrlwi r3,r30,16` before comparing the repaired status with the stored one and the
- *    second LockSram result takes r5; the compiler drops the redundant mask and uses r3 (u16/s32/cast spellings and `peephole off` tried).
+ *    at +0x3C that `__OSInitSram` repairs), `GetStatusBits`/`SetStatusBits` (the inline read and repair-and-store of that word).
+ * RESIDUALS. none in .text.
  * SHAPES. the checksum loop reads `Scb.sram` directly for its bound and writes `sum = inv = 0` as a chain; `sram` is declared inside the
  *    `offset == 0` block (hoisting it above the test moves the branch).  The EXI write sequence is an inline helper expanded in `WriteSramCallback` and `UnlockSram`; lock/unlock of the
- *    control block are inline helpers.
+ *    control block are inline helpers.  `__OSInitSram` passes the status word through a `u16` parameter of an inline helper, which keeps
+ *    the `clrlwi` before the compare.  `Scb` is 0x54 bytes in the map; `unused_0x50` keeps the object's .bss at that size.
  */
 
 #include "types.h"
@@ -47,14 +47,15 @@ typedef struct OSSramEx {
     /* +0x2A */ u8 pad_0x2A[2];
 } OSSramEx; /* size: 0x2C */
 
-/* size: 0x50 - the SRAM image and its lock state */
+/* size: 0x54 - the SRAM image and its lock state */
 typedef struct SramControl {
     /* +0x00 */ u8 sram[0x40];
     /* +0x40 */ u32 offset;   /* first byte not yet written back */
     /* +0x44 */ BOOL enabled; /* the interrupt state to restore on unlock */
     /* +0x48 */ BOOL locked;
     /* +0x4C */ BOOL sync;    /* the last write-back's result */
-} SramControl;
+    /* +0x50 */ u32 unused_0x50;
+} SramControl; /* size: 0x54 */
 
 static SramControl Scb __attribute__((aligned(32)));
 
@@ -138,30 +139,42 @@ static inline BOOL ReadSram(void* buffer)
 
 static BOOL UnlockSram(BOOL commit, u32 offset);
 
-/* Reads the SRAM and repairs an invalid status word. */
-void __OSInitSram(void)
+/* Returns the SRAM status bits. */
+static inline u16 GetStatusBits(void)
+{
+    OSSramEx* ex = (OSSramEx*)LockSram(SRAM_EX_OFFSET);
+    u16 status = ex->statusBits;
+
+    UnlockSram(FALSE, SRAM_EX_OFFSET);
+    return status;
+}
+
+/* Stores `status` as the SRAM status bits, clearing an invalid combination first. */
+static inline void SetStatusBits(u16 status)
 {
     OSSramEx* ex;
-    u32 status;
 
-    Scb.enabled = FALSE;
-    Scb.locked = FALSE;
-    Scb.sync = ReadSram(Scb.sram);
-    Scb.offset = 0x40;
-
-    ex = (OSSramEx*)LockSram(SRAM_EX_OFFSET);
-    status = ex->statusBits;
-    UnlockSram(FALSE, SRAM_EX_OFFSET);
     if ((u32)(status & 0x7C00) == 0x5000 || (u32)(status & 0xC0) == 0xC0) {
         status = 0;
     }
     ex = (OSSramEx*)LockSram(SRAM_EX_OFFSET);
-    if ((u16)status == ex->statusBits) {
+    if (status == ex->statusBits) {
         UnlockSram(FALSE, SRAM_EX_OFFSET);
         return;
     }
     ex->statusBits = status;
     UnlockSram(TRUE, SRAM_EX_OFFSET);
+}
+
+/* Reads the SRAM and repairs an invalid status word. */
+void __OSInitSram(void)
+{
+    Scb.enabled = FALSE;
+    Scb.locked = FALSE;
+    Scb.sync = ReadSram(Scb.sram);
+    Scb.offset = 0x40;
+
+    SetStatusBits(GetStatusBits());
 }
 
 /* Recomputes the checksums when `commit` is set, writes the changed bytes back and releases the control block. */

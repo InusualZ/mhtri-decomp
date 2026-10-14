@@ -6,9 +6,10 @@
  * FLAGS. `cflags_base` per object (configure.py).
  * NAMES. map names; GUESS: `YearDays` and `LeapYearDays` (the map had both month tables as `lbl_` rows: the cumulative day
  *    count before each month of a common / leap year).
- * RESIDUALS. `OSTicksToCalendarTime` (99.8 %): the saved ticks halves take r26/r28 in the target and r28/r27 in ours.
+ * RESIDUALS. none in .text.
  * SHAPES. `OSGetTime` and `OSGetTick` are asm functions (the time-base reads `mftb`/`mftbu` have no C spelling); the rest is C
- *    over 64-bit arithmetic (`__div2i`/`__mod2i` calls).
+ *    over 64-bit arithmetic (`__div2i`/`__mod2i` calls).  `OSTicksToCalendarTime` divides the whole-second ticks by the clock
+ *    once per use (the compiler shares the quotient); one stored quotient moves its saved registers.
  */
 
 #include "types.h"
@@ -110,10 +111,9 @@ void OSTicksToCalendarTime(s64 ticks, OSCalendarTime* td)
     }
     td->usec = (d * 8 / (OS_TIMER_CLOCK / 125000)) % 1000;
     td->msec = (d / (OS_TIMER_CLOCK / 1000)) % 1000;
-    ticks = (ticks - d) / OS_TIMER_CLOCK;
-
-    days = ticks / SECS_IN_DAY + BIAS;
-    secs = ticks % SECS_IN_DAY;
+    ticks -= d;
+    days = (ticks / OS_TIMER_CLOCK) / SECS_IN_DAY + BIAS;
+    secs = (ticks / OS_TIMER_CLOCK) % SECS_IN_DAY;
     if (secs < 0) {
         days -= 1;
         secs += SECS_IN_DAY;
