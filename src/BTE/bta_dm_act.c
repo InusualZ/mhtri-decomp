@@ -22,13 +22,14 @@
  *   0x8047D084, bta_dm_rssi_cback 0x8047D0A0, bta_dm_reset_cmpl_cback 0x8047D63C (the empty callback
  *   bta_dm_send_hci_reset passes to BTM_SendHciReset).
  * RESIDUALS. L2CA_RegisterCompression is declared with a void(void) callback (BTE/l2c_api.c's type), so
- *   bta_dm_enable casts its callback. bta_dm_sdp_result's failure
- *   branch swaps r29/r30 for the message and the name; bta_dm_rm_cback compares pref_role and the configured role
- *   in the other operand order (cmplw/bge for cmplw/ble). String relocations name the compiler's pool where the map
- *   has lbl_80612F08..lbl_80613008.
+ *   bta_dm_enable casts its callback. String relocations name the compiler's pool where the map has
+ *   lbl_80612F08..lbl_80613008.
  * SHAPES. plain C. The callbacks are static; bta_dm_find_services and bta_dm_discover_next_device are defined after
  *   their first callers, as retail orders them. inq_cmpl walks the inquiry database with a for loop (the
- *   BTM_InqDbNext call sits at the loop bottom), rmt_name with a while that advances first.
+ *   BTM_InqDbNext call sits at the loop bottom), rmt_name with a while that advances first. The three discovery
+ *   results take the peer name through Broadcom's static bta_dm_get_remname (inlined, no retail copy), which places
+ *   the message and the name in retail's registers; bta_dm_rm_cback reads the configured role into Broadcom's `role`
+ *   local, which gives retail's cmplw/ble operand order.
  */
 
 #include "BTE/bta_dm_act.h"
@@ -439,6 +440,20 @@ void bta_dm_disc_rmt_name(tBTA_DM_MSG* p_data) {
     bta_dm_search_cb.p_search_cback(BTA_DM_DISC_RES_EVT, &p_data->rem_name.result);
 }
 
+/* Returns the peer's stored name, or the name BTM holds for it when none is stored. */
+static char* bta_dm_get_remname(void) {
+    char* p_name = bta_dm_search_cb.peer_name;
+    char* p_temp;
+
+    if (*p_name == '\0') {
+        if ((p_temp = BTM_SecReadDevName(bta_dm_search_cb.peer_bdaddr)) != NULL) {
+            p_name = p_temp;
+        }
+    }
+
+    return p_name;
+}
+
 /* 0x8047BDEC (0x268): Records the service found by the last SDP search and searches the next one, or posts the
  * discovery result of the device. */
 void bta_dm_sdp_result(tBTA_DM_MSG* p_data) {
@@ -446,8 +461,6 @@ void bta_dm_sdp_result(tBTA_DM_MSG* p_data) {
     tBTA_DM_MSG* p_msg;
     u8 service_found = FALSE;
     u16 service;
-    char* p_name;
-    char* p_tmp;
 
     if (p_data->sdp_event.sdp_result == SDP_SUCCESS || p_data->sdp_event.sdp_result == SDP_NO_RECS_MATCH ||
         p_data->sdp_event.sdp_result == SDP_DB_FULL) {
@@ -481,13 +494,7 @@ void bta_dm_sdp_result(tBTA_DM_MSG* p_data) {
             p_msg->disc_result.result.disc_res.result = BTA_SUCCESS;
             p_msg->disc_result.result.disc_res.services = bta_dm_search_cb.services_found;
             bdcpy(p_msg->disc_result.result.disc_res.bd_addr, bta_dm_search_cb.peer_bdaddr);
-            p_name = bta_dm_search_cb.peer_name;
-            if (bta_dm_search_cb.peer_name[0] == 0) {
-                if ((p_tmp = BTM_SecReadDevName(bta_dm_search_cb.peer_bdaddr)) != NULL) {
-                    p_name = p_tmp;
-                }
-            }
-            strncpy(p_msg->disc_result.result.disc_res.bd_name, p_name, 32);
+            strncpy(p_msg->disc_result.result.disc_res.bd_name, bta_dm_get_remname(), 32);
             bta_sys_sendmsg(&p_msg->hdr);
         }
     } else {
@@ -505,13 +512,7 @@ void bta_dm_sdp_result(tBTA_DM_MSG* p_data) {
             p_msg->disc_result.result.disc_res.result = BTA_FAILURE;
             p_msg->disc_result.result.disc_res.services = bta_dm_search_cb.services_found;
             bdcpy(p_msg->disc_result.result.disc_res.bd_addr, bta_dm_search_cb.peer_bdaddr);
-            p_name = bta_dm_search_cb.peer_name;
-            if (bta_dm_search_cb.peer_name[0] == 0) {
-                if ((p_tmp = BTM_SecReadDevName(bta_dm_search_cb.peer_bdaddr)) != NULL) {
-                    p_name = p_tmp;
-                }
-            }
-            strncpy(p_msg->disc_result.result.disc_res.bd_name, p_name, 32);
+            strncpy(p_msg->disc_result.result.disc_res.bd_name, bta_dm_get_remname(), 32);
             bta_sys_sendmsg(&p_msg->hdr);
         }
     }
@@ -614,8 +615,6 @@ static void bta_dm_find_services(u8* bd_addr) {
     tSDP_UUID uuid;
     u16 attr_list[] = {ATTR_ID_SERVICE_CLASS_ID_LIST, ATTR_ID_EXT_PNP_VERSION};
     u16 num_attrs = 1;
-    char* p_name;
-    char* p_tmp;
     tBTA_DM_MSG* p_msg;
 
     while (bta_dm_search_cb.service_index < BTA_MAX_SERVICE_ID) {
@@ -649,13 +648,7 @@ static void bta_dm_find_services(u8* bd_addr) {
             p_msg->hdr.event = BTA_DM_DISCOVERY_RESULT_EVT;
             p_msg->disc_result.result.disc_res.services = bta_dm_search_cb.services_found;
             bdcpy(p_msg->disc_result.result.disc_res.bd_addr, bta_dm_search_cb.peer_bdaddr);
-            p_name = bta_dm_search_cb.peer_name;
-            if (bta_dm_search_cb.peer_name[0] == 0) {
-                if ((p_tmp = BTM_SecReadDevName(bta_dm_search_cb.peer_bdaddr)) != NULL) {
-                    p_name = p_tmp;
-                }
-            }
-            strncpy(p_msg->disc_result.result.disc_res.bd_name, p_name, 32);
+            strncpy(p_msg->disc_result.result.disc_res.bd_name, bta_dm_get_remname(), 32);
             bta_sys_sendmsg(&p_msg->hdr);
         }
     }
@@ -1087,6 +1080,7 @@ static void bta_dm_compress_cback(u8 status, u8 id, u8 app_id, u8* peer_addr) {
 /* 0x8047D494 (0x108): Marks the device connected and raises its preferred role to the service's configured one. */
 static void bta_dm_rm_cback(u8 status, u8 id, u8 app_id, u8* peer_addr) {
     u8 i, j;
+    u8 role;
 
     if (status == BTA_SYS_CONN_OPEN) {
         for (j = 0; j < bta_dm_cb.device_list.count; j++) {
@@ -1095,8 +1089,9 @@ static void bta_dm_rm_cback(u8 status, u8 id, u8 app_id, u8* peer_addr) {
                 for (i = 1; i <= p_bta_dm_rm_cfg[0].app_id; i++) {
                     if ((app_id == p_bta_dm_rm_cfg[i].app_id || p_bta_dm_rm_cfg[i].app_id == BTA_ALL_APP_ID) &&
                         id == p_bta_dm_rm_cfg[i].id) {
-                        if (bta_dm_cb.device_list.peer_device[j].pref_role < p_bta_dm_rm_cfg[i].cfg) {
-                            bta_dm_cb.device_list.peer_device[j].pref_role = p_bta_dm_rm_cfg[i].cfg;
+                        role = p_bta_dm_rm_cfg[i].cfg;
+                        if (role > bta_dm_cb.device_list.peer_device[j].pref_role) {
+                            bta_dm_cb.device_list.peer_device[j].pref_role = role;
                         }
                         break;
                     }

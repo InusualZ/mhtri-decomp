@@ -14,9 +14,10 @@
  *   (0x8047DCDC, the connection-status callback bta_dm_init_pm registers), bta_dm_pm_timer (0x8047E66C, the action of
  *   BTA_DM_PM_TIMER_EVT).
  * RESIDUALS. bta_dm_pm_set_mode colors the volatile registers of the configuration search and the spec lookup
- *   differently (r7/r8/r3/r6 for the table, entry, app id and count where we use r3/r7/r4/r8); operand order and a
- *   pointer-free spelling do not move it. String relocations name the compiler's pool where the map has
- *   lbl_80613048 / lbl_80613074.
+ *   differently (r7/r8/r3/r6 for the table, entry, app id and count where we use r3/r7/r4/r8); a p_pm_cfg local, the
+ *   declaration order and a fully pointer-free spelling do not move it. The search reads the service id and app id
+ *   from bta_dm_conn_srvcs directly with the configuration on the left (retail's cmplw operand order).
+ *   String relocations name the compiler's pool where the map has lbl_80613048 / lbl_80613074.
  * SHAPES. plain C. The pm_cback timer stop loop uses its own block-scoped index (the register order of an inlined
  *   helper); bta_dm_pm_park, bta_dm_pm_sniff and bta_dm_pm_active are static helpers
  *   the compiler inlines into their callers (retail has no out-of-line copy).
@@ -201,8 +202,9 @@ static void bta_dm_pm_set_mode(u8* peer_addr, u8 timed_out) {
         if (!bdcmp(bta_dm_conn_srvcs.conn_srvc[i].peer_bdaddr, peer_addr)) {
             p_srvcs = &bta_dm_conn_srvcs.conn_srvc[i];
             for (j = 1; j <= p_bta_dm_pm_cfg[0].app_id; j++) {
-                if (p_srvcs->id == p_bta_dm_pm_cfg[j].id &&
-                    (p_bta_dm_pm_cfg[j].app_id == BTA_ALL_APP_ID || p_srvcs->app_id == p_bta_dm_pm_cfg[j].app_id)) {
+                if (p_bta_dm_pm_cfg[j].id == bta_dm_conn_srvcs.conn_srvc[i].id &&
+                    (p_bta_dm_pm_cfg[j].app_id == BTA_ALL_APP_ID ||
+                     p_bta_dm_pm_cfg[j].app_id == bta_dm_conn_srvcs.conn_srvc[i].app_id)) {
                     break;
                 }
             }

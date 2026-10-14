@@ -15,13 +15,14 @@
  * NAMES. the map's, which are the BTE source's; 0x80483FB4 BTM_ReadDeviceClass is a GUESS (returns the address of the
  *   btm_cb device class, at its BTE source position).
  * RESIDUALS. btm_read_local_features_complete: the target keeps the control block pointer in r31 and the string base
- *   in r30, this source the other way round (every order of the six declarations measured the same). btm_vsc_complete:
- *   the target moves `p` to r7 and forms the param_buf address before the callback test, this source after it (an
- *   element address and a split declaration measured the same). BTM_SetLocalDeviceName: p_buf and the name pointer take
+ *   in r30, this source the other way round (every order of the six declarations, a source without p_devcb and one
+ *   with p_devcb everywhere measured the same or worse). BTM_SetLocalDeviceName: p_buf and the name pointer take
  *   r31/r30 swapped; the other declaration order fixes it and costs its two inlined copies (btm_reset_complete,
  *   btm_dev_timeout).
  * SHAPES. plain C; the device control block is flattened into btm_cb (BTE/btm_main.h). Each reset-sequence step
  *   decrements the retry count itself, so a caller that starts a step stores one more than the target's folded value.
+ *   btm_vsc_complete copies `p` and the param_buf address into locals before the callback test (retail's mr r7 and
+ *   hoisted addi).
  */
 
 #include "BTE/btm_devctl.h"
@@ -687,6 +688,8 @@ u8 BTM_VendorSpecificCommand(u16 opcode, u8 param_len, const u8* p_param_buf, vo
 void btm_vsc_complete(u8* p, u16 opcode, u16 evt_len) {
     BtmCompleteCallback p_cb = btm_cb.p_vsc_cmpl_cb;
     tBTM_VSC_CMPL vcs_cplt_params;
+    u8* p_src = p;
+    u8* p_dst = vcs_cplt_params.param_buf;
 
     btm_cb.vsc_busy = FALSE;
     btm_cb.p_vsc_cmpl_cb = NULL;
@@ -694,7 +697,7 @@ void btm_vsc_complete(u8* p, u16 opcode, u16 evt_len) {
     if (p_cb) {
         vcs_cplt_params.opcode = opcode;
         vcs_cplt_params.param_len = evt_len;
-        memcpy(vcs_cplt_params.param_buf, p, evt_len);
+        memcpy(p_dst, p_src, evt_len);
         (*p_cb)(&vcs_cplt_params);
     }
 }

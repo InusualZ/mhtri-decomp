@@ -17,7 +17,8 @@
  *   the .data order.
  * RESIDUALS. btm_acl_created, btm_read_remote_features_complete: in the inlined BTM_SetLinkSuperTout the target puts
  *   the loop counter, the timeout and the entry in r29/r28/r30 (r30/r28/r29), this source in r30/r29/r28 (r29/r30/r28);
- *   every declaration order of btm_acl_created and both orders in btm_bda_to_acl measured the same or worse.
+ *   every declaration order of btm_acl_created and both orders in btm_bda_to_acl measured the same or worse, as did a
+ *   for-initialised entry pointer, a split declaration of the entry, and Broadcom's `if (bda)` guard (+0x80 B).
  * SHAPES. plain C; the table is btm_cb.acl_db (BTE/btm_main.h), the entry type is BTE/btm_acl.h's. btm_bda_to_acl,
  *   btm_set_packet_types and BTM_SetLinkSuperTout are static here: every retail call inlines them and no copy survives.
  */

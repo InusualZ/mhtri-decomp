@@ -16,8 +16,10 @@
  *   write_cur_iac_lap 0x0C3A, read_bd_addr 0x1009, get_link_quality 0x1403, write_inqscan_type 0x0C43,
  *   vendor_spec_cmd (OGF 0x3F).
  * RESIDUALS. btsnd_hcic_change_name allocates p_buf to r30 and p_name to r31 (retail: the reverse); four declaration
- *   orders, a char* name and a local copy of p_buf left it. Wii/1.3 schedules the builders differently. The .rodata channel map is emitted as a 10-byte @-pool object (retail label
- *   0x80573860, 0x10 B with the pad).
+ *   orders, a char* name, a local copy of p_buf or of the name, `register` on either parameter, pp from the BT_HDR
+ *   idiom, the length computed later, and a scoped scheduling/propagation/common-subs/global-optimizer/level 2-3
+ *   pragma left it. Wii/1.3 schedules the builders differently. The .rodata channel map is emitted as a 10-byte
+ *   @-pool object (retail label 0x80573860, 0x10 B with the pad).
  * SHAPES. plain C; the builders that take a caller's buffer return nothing and tail-call btu_hcif_send_cmd.
  */
 

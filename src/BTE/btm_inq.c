@@ -14,13 +14,14 @@
  *   inquiry scan type builder, the second the page scan ones), general_inq_lap/limited_inq_lap for the two .sdata2
  *   access codes. btm_clr_inq_db, btm_clr_inq_result_flt, btm_inq_db_find and btm_initiate_inquiry are static helpers
  *   the compiler inlines into their callers.
- * RESIDUALS. BTM_StartInquiry: retail materialises the
- *   CLR_FILT state constant 1 with the copy's zero ahead of the parameter copy. btm_inq_db_reset and BTM_ClearInqDb:
- *   the inlined database clear schedules its pointer and counter set-up one instruction apart from retail.
- *   btm_process_inq_results: register assignment of the result fields (the declaration order is the best of a
- *   search).
+ * RESIDUALS. BTM_StartInquiry: retail materialises the CLR_FILT state constant 1 with the copy's zero ahead of the
+ *   parameter copy (the case order, an if chain and the store order measured the same or worse).
+ *   btm_process_inq_results: register assignment of the result fields (the declaration order is the best of a search;
+ *   btm_cb's inquiry variables read directly measured the same).
  * SHAPES. plain C; the HCI command buffer is taken success-first (`if ((p_buf = GKI_getpoolbuf(..)) != NULL) {..}
- *   else return BTM_NO_RESOURCES;`), as every scan setting's branch layout shows.
+ *   else return BTM_NO_RESOURCES;`), as every scan setting's branch layout shows. btm_clr_inq_db reads btm_cb's
+ *   inquiry variables directly (no p_inq local), which gives retail's counter/pointer order and the separate
+ *   lis/addi of the btm_cb base in its two inlined copies.
  */
 
 #include "BTE/btm_inq.h"
@@ -566,16 +567,15 @@ tBTM_INQ_INFO* BTM_InqDbNext(tBTM_INQ_INFO* p_cur) {
 
 /* Forgets the inquiry database entry of `p_bda` (every entry for NULL), telling the change callback. */
 static void btm_clr_inq_db(u8* p_bda) {
-    tBTM_INQUIRY_VAR_ST* p_inq = &btm_cb.btm_inq_vars;
-    tINQ_DB_ENT* p_ent = p_inq->inq_db;
+    tINQ_DB_ENT* p_ent = btm_cb.btm_inq_vars.inq_db;
     u16 xx;
 
     for (xx = 0; xx < BTM_INQ_DB_SIZE; xx++, p_ent++) {
         if (p_ent->in_use) {
             if (p_bda == NULL || !memcmp(p_ent->inq_info.remote_bd_addr, p_bda, 6)) {
                 p_ent->in_use = FALSE;
-                if (p_inq->p_inq_change_cb != NULL) {
-                    (*p_inq->p_inq_change_cb)(&p_ent->inq_info, FALSE);
+                if (btm_cb.btm_inq_vars.p_inq_change_cb != NULL) {
+                    (*btm_cb.btm_inq_vars.p_inq_change_cb)(&p_ent->inq_info, FALSE);
                 }
             }
         }
