@@ -1412,11 +1412,12 @@ config.libs = [
             Object(NonMatching, "BTE/hidd_pm.c"),
             Object(NonMatching, "BTE/hidh_api.c"),
             Object(NonMatching, "BTE/hidh_conn.c"),
-            Object(NonMatching, "BTE/l2c_api.c"),
-            Object(NonMatching, "BTE/l2c_csm.c"),
-            Object(NonMatching, "BTE/l2c_link.c"),
-            Object(NonMatching, "BTE/l2c_main.c"),
-            Object(NonMatching, "BTE/l2c_utils.c"),
+            # GC/3.0a5.2 + cflags_nw4r: l2c_csm jump tables and per-unit scores, evidence on the FLAGS line of src/BTE/l2c_utils.c
+            Object(NonMatching, "BTE/l2c_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/l2c_csm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/l2c_link.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/l2c_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/l2c_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE RFCOMM/SDP tail 0x80498FBC..0x804A4AC0 recut per BTE source file; each unit's header carries its evidence.
             # GC/3.0a5.2 + cflags_nw4r: equal .text sizes and -ipa file inlining, evidence on the FLAGS line of src/BTE/port_api.c
             Object(Matching, "BTE/port_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
