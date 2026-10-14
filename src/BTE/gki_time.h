@@ -5,6 +5,8 @@
 
 #include "types.h"
 #include "BTE/gki_buffer.h"
+#include "BTE/l2c_api.h"
+#include "BTE/sdp_api.h"
 
 /* size: 0x0A - the sniff-mode parameters `BTM_SetPowerMode` takes. */
 typedef struct BtmPmPwrMode {
@@ -57,6 +59,18 @@ typedef struct BtaHhDscpInfo {
     /* +0x04 */ const u8* descriptor;
 } BtaHhDscpInfo; /* size: 0x08 */
 
+/* size: 0x18 - a BTU timer list entry `btu_start_timer` links into its list. */
+typedef struct TIMER_LIST_ENT {
+    /* +0x00 */ struct TIMER_LIST_ENT* p_next;
+    /* +0x04 */ struct TIMER_LIST_ENT* p_prev;
+    /* +0x08 */ u32 ticks;
+    /* +0x0C */ u32 unused_0x0C;
+    /* +0x10 */ u32 param;
+    /* +0x14 */ u16 event;
+    /* +0x16 */ u8 in_use;
+    /* +0x17 */ u8 pad_0x17;
+} TIMER_LIST_ENT; /* size: 0x18 */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -92,11 +106,10 @@ void BTA_HhRemoveDev(u8 handle);
 /* 0x8047FEE4 - opens the HID connection to the device at `bdAddr` (`mode` and `security` are the stack's). */
 void BTA_HhOpen(const u8* bdAddr, u8 mode, u8 security);
 
-/* 0x8047A630 / 0x8047B128 / 0x80493A40 / 0x804A0290 - initialise the application layer and set the trace levels of the layers. */
+/* 0x8047A630 / 0x8047B128 - initialise the application layer and set the trace levels of the layers (the L2CAP
+ * and SDP layers' are BTE/l2c_api.h's and BTE/sdp_api.h's). */
 void BTA_Init(void);
 void bta_sys_set_trace_level(u8 level);
-void L2CA_SetTraceLevel(u8 level);
-void SDP_SetTraceLevel(u8 level);
 
 /* 0x8047D788 - sets the host's device name (a NUL-terminated string). */
 void BTA_DmSetDeviceName(const char* name);
@@ -161,6 +174,21 @@ u8 BTM_ReadLocalVersion(BtmVersionInfo* version);
 u8 BTM_ReadStoredLinkKey(const u8* bdAddr, BtmCompleteCallback callback);
 u8 BTM_WriteStoredLinkKey(u8 numKeys, const u8* bdAddrs, const u8* linkKeys, BtmCompleteCallback callback);
 u8 BTM_DeleteStoredLinkKey(const u8* bdAddr, BtmCompleteCallback callback);
+
+/* 0x8047A530 / 0x8047A550 / 0x8047A570 / 0x8047A5B0 - print a trace message with 0, 1, 2 or 4 arguments; the mask
+ * carries the layer (bits 16-23) and the type. */
+void LogMsg_0(u32 trace_set_mask, const char* fmt_str);
+void LogMsg_1(u32 trace_set_mask, const char* fmt_str, u32 p1);
+void LogMsg_2(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2);
+void LogMsg_4(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3, u32 p4);
+
+/* 0x8047AB40 / 0x8047ABB0 - start the timer entry with `timeout` seconds of type `type`, or stop it. */
+void btu_start_timer(TIMER_LIST_ENT* p_tle, u16 type, u32 timeout);
+void btu_stop_timer(TIMER_LIST_ENT* p_tle);
+
+/* 0x804880E8 - registers the security level of a service on `psm`; returns whether it was stored. */
+u8 BTM_SetSecurityLevel(u8 is_originator, char* p_name, u8 service_id, u8 sec_level, u16 psm, u32 mx_proto_id,
+                        u32 mx_chan_id);
 
 #ifdef __cplusplus
 }
