@@ -1406,10 +1406,10 @@ config.libs = [
             # The BTE btm band 0x80480A90..0x8048AEE0 recut per BTE source file; each unit's header carries its evidence.
             # GC/3.0a5.2 + cflags_nw4r for btm_acl/dev/devctl/link_key/discovery: evidence on the FLAGS line of src/BTE/btm_dev.c
             Object(NonMatching, "BTE/btm_acl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/btm_dev.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/btm_dev.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/btm_devctl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/btm_link_key.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/btm_discovery.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/btm_discovery.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/btm_inq.c"),
             Object(NonMatching, "BTE/btm_main.c"),
             Object(NonMatching, "BTE/btm_pm.c"),
@@ -1534,7 +1534,7 @@ config.libs = [
             Object(NonMatching, "HID/hid.c", cflags=cflags_base),
             Object(NonMatching, "KBD/kbd.c", cflags=cflags_base),
             # Wii/1.3 + cflags_base, not the homebutton band's GC/3.0a5.2: evidence on the FLAGS line of src/KBD/kbd_region_us.c.
-            Object(NonMatching, "KBD/kbd_region_us.c", cflags=cflags_base),
+            Object(Matching, "KBD/kbd_region_us.c", cflags=cflags_base),
         ],
     },
     {
