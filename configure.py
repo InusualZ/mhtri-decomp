@@ -1395,8 +1395,8 @@ config.libs = [
             Object(Matching, "BTE/utl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # GC/3.0a5.2 + cflags_nw4r for the bta_dm_* rows: evidence on the FLAGS line of src/BTE/bta_dm_act.c
             Object(NonMatching, "BTE/bta_dm_act.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/bta_dm_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/bta_dm_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/bta_dm_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/bta_dm_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/bta_dm_pm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # GC/3.0a5.2 + cflags_nw4r for the bta_hh_* rows: evidence on the FLAGS line of src/BTE/bta_hh_main.c
             Object(Matching, "BTE/bta_hh_act.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
