@@ -16,6 +16,39 @@ typedef struct BtmPmPwrMode {
     /* +0x09 */ u8 pad_0x09;
 } BtmPmPwrMode; /* size: 0x0A */
 
+/* size: 0x0A - the controller's version block `BTM_ReadLocalVersion` copies out (five halfwords; GUESS names, BTE order). */
+typedef struct BtmVersionInfo {
+    /* +0x00 */ u16 hciVersion;
+    /* +0x02 */ u16 hciRevision;
+    /* +0x04 */ u16 lmpVersion;
+    /* +0x06 */ u16 manufacturer;
+    /* +0x08 */ u16 lmpSubversion;
+} BtmVersionInfo; /* size: 0x0A */
+
+/* size: 0x0A - the inquiry parameters `BTA_DmSearch` copies into its message (GUESS names, BTE order). */
+typedef struct BtaDmInq {
+    /* +0x00 */ u8 mode;
+    /* +0x01 */ u8 duration;
+    /* +0x02 */ u8 maxResponses;
+    /* +0x03 */ u8 filterType;
+    /* +0x04 */ u8 filterCond[6];
+} BtaDmInq; /* size: 0x0A */
+
+/* The event payloads of the HID host and the device manager security callbacks: per-event layouts, not reconstructed yet. */
+union BtaHhEventData;
+union BtaDmSecEventData;
+
+/* The HID host event callback `BTA_HhEnable` installs. */
+typedef void (*BtaHhCallback)(u8 event, union BtaHhEventData* data);
+/* The device manager security event callback `BTA_EnableBluetooth` installs. */
+typedef void (*BtaDmSecCallback)(u8 event, union BtaDmSecEventData* data);
+/* The device search event callback `BTA_DmSearch` installs. */
+typedef void (*BtaDmSearchCallback)(s32 event, const u8* data);
+/* The completion callback of a BTM command; the payload's type depends on the command. */
+typedef void (*BtmCompleteCallback)(void* result); /* untyped: caller-owned payload, one type per command */
+/* The completion callback of `BTA_CleanUp`. */
+typedef void (*BtaCleanUpCallback)(s32 result);
+
 /* size: 0x08 - the HID report descriptor `BTA_HhAddDev` registers with a device. */
 typedef struct BtaHhDscpInfo {
     /* +0x00 */ u16 length;
@@ -101,6 +134,31 @@ u8 BTM_SetPowerMode(u8 pmId, const u8* bdAddr, BtmPmPwrMode* mode);
 
 /* 0x804824F8 - drops the ACL link to the device at `bdAddr`. */
 void btm_remove_acl(u8* bdAddr);
+
+/* 0x8047A710 - stores `callback` and closes the transport; the callback reports when the stack is down. */
+void BTA_CleanUp(BtaCleanUpCallback callback);
+
+/* 0x8047D690 / 0x8047D718 - start the device manager with its security callback, or stop it; the start returns the status. */
+u8 BTA_EnableBluetooth(BtaDmSecCallback callback);
+void BTA_DisableBluetooth(void);
+
+/* 0x8047D844 - starts a device search with the inquiry `inquiry` for the services `services`. */
+void BTA_DmSearch(const BtaDmInq* inquiry, u32 services, BtaDmSearchCallback callback);
+
+/* 0x8047D900 - answers a PIN request of the device at `bdAddr`; the PIN is copied only when `accept` is non-zero. */
+void BTA_DmPinReply(const u8* bdAddr, u8 accept, u8 pinLength, const u8* pin);
+
+/* 0x8047FDC0 - enables the HID host with the security mask `secMask` and its event callback. */
+void BTA_HhEnable(u8 secMask, BtaHhCallback callback);
+
+/* 0x80483EE8 - copies the controller's version block to `version`; returns the stack's status. */
+u8 BTM_ReadLocalVersion(BtmVersionInfo* version);
+
+/* 0x804842C4 / 0x8048439C / 0x8048446C - read, write or delete the link keys the controller stores (`bdAddr` NULL = every
+ * key); `numKeys` addresses and keys are written; each returns the stack's status. */
+u8 BTM_ReadStoredLinkKey(const u8* bdAddr, BtmCompleteCallback callback);
+u8 BTM_WriteStoredLinkKey(u8 numKeys, const u8* bdAddrs, const u8* linkKeys, BtmCompleteCallback callback);
+u8 BTM_DeleteStoredLinkKey(const u8* bdAddr, BtmCompleteCallback callback);
 
 #ifdef __cplusplus
 }

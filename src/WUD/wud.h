@@ -82,8 +82,6 @@ void WUDSetDeviceHistory(s32 chan, const u8* bdAddr);
 s32 WUDIsHistoryAddr(s32 chan, const u8* bdAddr);
 /* 0x804F9B30 - whether the balance board is linked. */
 s32 WUDIsLinkedWBC(void);
-/* 0x80500720 - takes a log line and discards it. */
-void WUDiDebugPrint(const char* format, ...);
 /* 0x804F9B40 / 0x804F9B90 - the stack's memory callbacks. */
 void* App_MEMalloc(u32 size); /* untyped: caller-owned block */
 void App_MEMfree(void* block); /* untyped: the caller-owned block */
@@ -142,6 +140,10 @@ void WUDiMoveWbcToHead(WUDDevice* device);
 void WUDiMoveWbcToTail(WUDDevice* device);
 void WUDiMoveDeviceToHead(WUDDevice* device);
 void WUDiMoveDeviceToTail(WUDDevice* device);
+/* 0x804FE770 / 0x804FEB20 / 0x804FECB0 - insert a device's list entry into the balance board list or the remote list. */
+void WUDiInsertWbcNode(WUDDevice* device);
+void WUDiInsertDeviceNode(WUDDevice* device);
+void WUDiInsertDeviceNodeTail(WUDDevice* device);
 /* 0x804FEED0 - the stack shutdown callback. */
 void CleanupCallback(s32 result);
 /* 0x804FD380 - starts the pairing state machine. */
@@ -159,11 +161,58 @@ void _WUDSetDevAddr(u8 handle, u8* addr);
 u8* _WUDGetDevAddrUnchecked(u8 handle);
 void _WUDSetQueuedSize(u8 handle, u16 size);
 void _WUDSetNotAckedSize(u8 handle, u16 size);
-/* 0x805006F0 / 0x80500700 / 0x80500710 - HID host open and close logging, and a constant zero. */
-void bta_hh_co_data(u8 handle, u8* report, u16 length, u8 mode, u8 subClass, u8 appId);
-void bta_hh_co_open(void);
-void bta_hh_co_close(void);
-s32 WUDiReturnZero(void);
+
+/* size: 0x750 - the device manager's state: the pairing and clear state machines, the stack state and the callbacks. */
+typedef struct WUDCB {
+    /* +0x000 */ WUDResultCallback syncCallback;
+    /* +0x004 */ WUDResultCallback simpleCallback;
+    /* +0x008 */ WUDResultCallback clearCallback;
+    /* +0x00C */ u8 syncState;
+    /* +0x00D */ u8 clearState;
+    /* +0x00E */ u8 stateE;
+    /* +0x00F */ u8 stateF;
+    /* +0x010 */ u8 state10;
+    /* +0x011 */ u8 state11;
+    /* +0x012 */ u8 remoteCount; /* GUESS: devices of the remote types in the table */
+    /* +0x013 */ u8 otherCount;
+    /* +0x014 */ WUDDeviceNode* wbcHead;
+    /* +0x018 */ WUDDeviceNode* wbcTail;
+    /* +0x01C */ WUDDeviceNode wbcNodes[6];
+    /* +0x064 */ WUDDeviceNode* deviceHead;
+    /* +0x068 */ WUDDeviceNode* deviceTail;
+    /* +0x06C */ WUDDeviceNode deviceNodes[10];
+    /* +0x0E4 */ WUDDevice devices[10];
+    /* +0x4A4 */ WUDDevice wbcDevices[6];
+    /* +0x6E4 */ u8 wbcLinkNumber; /* GUESS */
+    /* +0x6E5 */ u8 linkNumber;
+    /* +0x6E6 */ u8 syncRetries;
+    /* +0x6E7 */ s8 quickSearch;
+    /* +0x6E8 */ s8 searching;
+    /* +0x6E9 */ s8 simple;
+    /* +0x6EA */ u8 connectable;
+    /* +0x6EB */ u8 discoverable;
+    /* +0x6EC */ WUDHidRecvCallback hidRecvCallback;
+    /* +0x6F0 */ WUDHidConnCallback hidConnCallback;
+    /* +0x6F4 */ void* (*alloc)(u32 size); /* untyped: caller-owned block */
+    /* +0x6F8 */ s32 (*dealloc)(void* block); /* untyped: the caller-owned block */
+    /* +0x6FC */ u8 linkKeyAddr[6]; /* GUESS: the address the link-key event logs */
+    /* +0x702 */ u8 authAddr[6]; /* GUESS: the address the security event logs */
+    /* +0x708 */ s8 status;
+    /* +0x709 */ u8 vendorEventStatus; /* GUESS: byte 1 of vendor event 0x0A */
+    /* +0x70A */ u8 hciHandle;
+    /* +0x70B */ s8 syncRssiThreshold; /* GUESS: the pairing search compares the inquiry RSSI against it */
+    /* +0x70C */ u8 pad_0x70C[4];
+    /* +0x710 */ OSAlarm alarm;
+    /* +0x740 */ u32 enabledProfiles; /* GUESS: bit 0 set by the HID host enable event */
+    /* +0x744 */ u16 bufferHead;
+    /* +0x746 */ u16 bufferTail;
+    /* +0x748 */ u16 searchTime;
+    /* +0x74A */ u16 searchTimeMax;
+    /* +0x74C */ u8 pad_0x74C[4];
+} WUDCB; /* size: 0x750 */
+
+/* 0x8075EAA0 - the device manager's state; read by `WUD/WUDHidHost.cpp`. */
+extern WUDCB wudCB;
 
 #ifdef __cplusplus
 }

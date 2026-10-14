@@ -168,8 +168,8 @@ extern void DCFlushRange(void* addr, u32 size);
 extern void fn_804DAF94(void* module);
 extern void KPADInit(void);
 extern void KPADShutdown(void);
-extern void fn_804ED5A0(void);
-extern void fn_804ED5D0(void);
+extern void WPADStartSyncDevice(void);
+extern void WPADStartClearDevice(void);
 extern void fn_80043728(void);
 extern void WPADSetExtensionCallback(int chan, void* callback);
 extern void WPADSetSamplingCallback(int chan, void* callback);
@@ -630,14 +630,14 @@ extern "C" void fn_800438A4(void)
 extern "C" void fn_800438A8(s32 arg0)
 {
     if (arg0 == 0) {
-        fn_804ED5A0();
+        WPADStartSyncDevice();
     }
 }
 
 extern "C" void fn_800438B8(s32 arg0)
 {
     if (arg0 == 0) {
-        fn_804ED5D0();
+        WPADStartClearDevice();
     }
 }
 

@@ -3240,12 +3240,19 @@ WPAD/wpad.cpp:
 	.sdata2     start:0x8079D3C8 end:0x8079D478
 
 WUD/wud.cpp:
-	.text       start:0x804F9B30 end:0x80500770 align:16
-	.data       start:0x8062DBF0 end:0x8062F030
+	.text       start:0x804F9B30 end:0x80500130 align:16
+	.data       start:0x8062DBF0 end:0x8062ED98
 	.bss        start:0x8075EAA0 end:0x80760C48
 	.sdata      start:0x807941C8 end:0x807941E0
 	.sbss       start:0x80795720 end:0x80795758
 	.sdata2     start:0x8079D478 end:0x8079D480
+
+WUD/WUDHidHost.cpp:
+	.text       start:0x80500130 end:0x80500720 align:16
+	.data       start:0x8062ED98 end:0x8062F030
+
+WUD/debug_msg.cpp:
+	.text       start:0x80500720 end:0x80500770 align:16
 
 nw4r/db_console.cpp:
 	.text       start:0x80500770 end:0x80500868 align:16

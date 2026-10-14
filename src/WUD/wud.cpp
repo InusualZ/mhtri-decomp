@@ -1,39 +1,46 @@
-/* WUD/wud.cpp - the Wii remote device manager over the Bluetooth stack: device table, pairing/sync and the HID host callbacks.
- * RANGE. .text 0x804F9B30-0x80500770 (96 functions); .data 0x8062DBF0-0x8062F030; .bss 0x8075EAA0-0x80760C48;
+/* WUD/wud.cpp - the Wii remote device manager over the Bluetooth stack: device table, pairing/sync and the stack callbacks.
+ * RANGE. .text 0x804F9B30-0x80500130 (90 functions); .data 0x8062DBF0-0x8062ED98; .bss 0x8075EAA0-0x80760C48;
  *   .sdata 0x807941C8-0x807941E0; .sbss 0x80795720-0x80795758; .sdata2 0x8079D478-0x8079D480.
  *   Edges: the left edge 0x804F9B30 (`WUDIsLinkedWBC`) is the first reader of .sbss 0x80795738 and the first .data
- *   object (0x8062DBF0) is read from 0x804F9DC0; the `WUD.c` __FILE__ string (.sdata 0x807941D8) and the " %s\n" string
- *   (0x807941C8) are one copy each read from 0x804FA750 to 0x804FF980; the right edge 0x80500770 is the first of
- *   three nw4r functions (`nw4r/db_console.cpp`).  The last function 0x80500720 is the print helper called from
- *   0x804F9B60 onward.
- * FLAGS. `cflags_base` (-O4,p); the print helper `WUDiDebugPrint` is defined after its callers so that the empty body is not inlined.
+ *   object (0x8062DBF0) is read from 0x804F9DC0; the `WUD.c` __FILE__ string (.sdata 0x807941D8) and the " %s
+" string
+ *   (0x807941C8) are one copy each read from 0x804FA750 to 0x804FF980.  The right edge 0x80500130 / .data 0x8062ED98 is the
+ *   seam with WUD/WUDHidHost.cpp (that header carries the evidence: the `-str reuse` duplicate "Nintendo RVL-CNT" and the
+ *   out-of-line calls of this unit's small functions).
+ * FLAGS. `cflags_base` (-O4,p); the print helper `WUDiDebugPrint` is WUD/debug_msg.cpp's, so every log call is out of line.
  * NAMES. the map's names (`WUDGetBufferStatus`, `WUDSetSniffMode`, `WUDSetVisibility`, `WUDiGetDevInfo`,
  *   `WUDDeviceStatusCallback`, `WUDSetDeviceHistory`, `_WUDGetDevAddr`, `_WUDGetQueuedSize`, `_WUDGetNotAckedSize`,
- *   `_WUDGetLinkNumber`, `App_MEMalloc`, `App_MEMfree`, `bta_hh_co_data`, `bta_hh_co_open`, `bta_hh_co_close`, ...);
+ *   `_WUDGetLinkNumber`, `App_MEMalloc`, `App_MEMfree`, ...);
  *   the log strings name `SyncFlushCallback`, `DeleteFlushCallback`, `InitFlushCallback`, `ShutdownFlushCallback`, `CleanupCallback`,
  *   `__wudInitSub`, `__wudAppendRuntimePatch`, `RemovePatchCallback`, `SuperPeekPokeCallback`, `WUDiRemoveDevice`,
- *   `__wudPowerMangeEventStackCallback` and the NAND callbacks `WUDiNand{Open,Seek,Write,Close}Callback`.  GUESS names:
- *   `WUDiDebugPrint` (the print helper), `WUDiGetStoredDeviceInfo`, `WUDiFlushDeviceInfo`, `_WUDSetDevAddr`, `_WUDGetDevAddrUnchecked`,
- *   `_WUDSetQueuedSize`, `_WUDSetNotAckedSize`, `WUDiReturnZero`, the alarm handlers `WUDi{Sync,Clear,InitFlush,Init,Shutdown}AlarmHandler`
+ *   `__wudPowerMangeEventStackCallback`, `__wudClearControlBlock` and the NAND callbacks `WUDiNand{Open,Seek,Write,Close}Callback`.
+ *   GUESS names: `WUDiGetStoredDeviceInfo`, `WUDiFlushDeviceInfo`, `_WUDSetDevAddr`, `_WUDGetDevAddrUnchecked`,
+ *   `_WUDSetQueuedSize`, `_WUDSetNotAckedSize`, the alarm handlers `WUDi{Sync,Clear,InitFlush,Init,Shutdown}AlarmHandler`
  *   and their fibers `WUDi{Sync,Clear,InitFlush,Init,Shutdown}Fiber`, `WUDiPatchCallback`, `WUDiPatchStepDone`, `WUDiFirmwareDoneCallback`,
  *   `WUDiStartSync`, `WUDiAddDevice` (BTA_DmAddDevice and BTA_HhAddDev), `WUDiMove{Wbc,Device}To{Head,Tail}` (the recently-used list
  *   moves), `WUDiSyncCheckInquiry`, `WUDiSyncCheckSearch`, `WUDiSyncDone`, `WUDiSearchCallback` (the five search event strings),
- *   `WUDiPatchRecordCallback`, `WUDiPatchWriteCallback`, `WUDiVendorEventCallback`; the BTE entry points `BTA_Init`, `bta_sys_set_trace_level`,
- *   `BTM_SetDefaultLinkPolicy`, `BTM_SetDefaultLinkSuperTout` (16-byte setters of one u16 each, the dump name is stale), and the variables
- *   `wudInquiryResult`, `wudFirmwareData`, `wudStackReady`, `wudTraceLevel`, `wudWbcInitCallback`, `wudInquiryRssi`, `wudInquiryCount` and
- *   the `wudPatch*` state; the other functions still carry generated names.
- * RESIDUALS. Written: 76 of 96 rows have a body (58 at 100 %).  Partial rows: `WUDiSyncDone` (device pointer strength reduction and
+ *   `WUDiPatchRecordCallback`, `WUDiPatchWriteCallback`, `WUDiVendorEventCallback`, `__wudSecurityEventStackCallback` (BTA_DM_*
+ *   strings), `__wudLinkKeyEventStackCallback` (BTM_CB_EVT_* strings), `WUDiDeleteAllLinkKeys`, `WUDiUpdateWiiFitSaveData` (the
+ *   checksum over the 0xA0-byte `wudWiiFitSaveData`, seeded from `wudWiiFitCrc`), `WUDiStoreDeviceInfoToSC`, `WUDiSyncRegisterDevice`,
+ *   `WUDiInsertWbcNode`, `WUDiInsertDeviceNode`, `WUDiInsertDeviceNodeTail`; the BTE entry points `BTA_Init`, `bta_sys_set_trace_level`,
+ *   `BTM_SetDefaultLinkPolicy`, `BTM_SetDefaultLinkSuperTout` (16-byte setters of one u16 each, the dump name is stale) and
+ *   `BTA_DisableBluetooth` (0x8047D718, after `BTA_EnableBluetooth` in the bta_dm_api order); the variables `wudInquiryResult`,
+ *   `wudFirmwareData`, `wudStackReady`, `wudTraceLevel`, `wudWbcInitCallback`, `wudInquiryRssi`, `wudInquiryCount` and the
+ *   `wudPatch*` state; the `WUDCB` fields `linkKeyAddr`, `authAddr`, `vendorEventStatus`, `syncRssiThreshold` and
+ *   `enabledProfiles` (WUD/wud.h).  0x804FBBB0 and 0x804FC290 still carry generated names.
+ * RESIDUALS. Written: 71 of 90 rows have a body (53 at 100 %).  Partial rows: `WUDiSyncDone` (device pointer strength reduction and
  *   a smaller register save), `WUDiSearchCallback`, `RemovePatchCallback`, `WUDiPatchWriteCallback`, `WUDiPatchRecordCallback`
  *   (u8 clamp and unrolled copy register numbering), `WUDiMove*` (cb/device/i register order) and `WUDiAddDevice` (level/device
- *   registers); the data-relative string offsets differ until the unit's .data matches.  Not attempted (20 rows): 0x804F9F30,
- *   0x804FA2B0 (the SC device array writers), `WUDiSyncFiber` 0x804FA750, 0x804FB360, `WUDiClearFiber` 0x804FB570, 0x804FB8E0,
- *   `WUDiInitFlushFiber` 0x804FB9F0, 0x804FBBB0, 0x804FC290, `WUDiInitFiber` 0x804FC7C0, `WUDiShutdownFiber` 0x804FC950, 0x804FCA30,
- *   `WUDShutdown` 0x804FCF40 (it fills the SC arrays in .bss 0x80760A00..), 0x804FE770, 0x804FEB20, 0x804FECB0 (list inserts with
- *   shared tails), 0x804FEF10, `WUDiVendorEventCallback` 0x804FF680, 0x804FF980 and 0x80500130.  The unit's .data holds the strings and
- *   tables of those rows, the .sdata flags and the remaining .sbss/.bss objects, so its data sections do not compare yet;
- *   `wudCB` names only the fields the written bodies read.  The file order of the functions is not the address order.  The HID host
- *   callbacks (0x80500130..0x80500720: "BTA_HH_ENABLE_EVT", `bta_hh_co_*`, jump table 0x8062EFB0) are probably a second file; no data
- *   seam separates them from the rest (one .bss object 0x8075EAA0 is read on both sides), so the unit is kept whole.
+ *   registers); the data-relative string offsets differ until the unit's .data matches.  Not attempted (19 rows):
+ *   `WUDiSyncRegisterDevice` 0x804F9F30, `WUDiStoreDeviceInfoToSC` 0x804FA2B0 (the SC device array writers), `WUDiSyncFiber`
+ *   0x804FA750, `WUDiUpdateWiiFitSaveData` 0x804FB360, `WUDiClearFiber` 0x804FB570, `WUDiDeleteAllLinkKeys` 0x804FB8E0,
+ *   `WUDiInitFlushFiber` 0x804FB9F0, 0x804FBBB0, 0x804FC290, `WUDiInitFiber` 0x804FC7C0, `WUDiShutdownFiber` 0x804FC950,
+ *   `__wudClearControlBlock` 0x804FCA30, `WUDShutdown` 0x804FCF40 (it fills the SC arrays in .bss 0x80760A00..),
+ *   `WUDiInsertWbcNode` 0x804FE770, `WUDiInsertDeviceNode` 0x804FEB20, `WUDiInsertDeviceNodeTail` 0x804FECB0 (list inserts with
+ *   shared tails), `__wudSecurityEventStackCallback` 0x804FEF10, `WUDiVendorEventCallback` 0x804FF680 and
+ *   `__wudLinkKeyEventStackCallback` 0x804FF980.  The unit's .data holds the strings and tables of those rows, the .sdata flags and
+ *   the remaining .sbss/.bss objects, so its data sections do not compare yet.  The file order of the functions is not the address
+ *   order.
  * SHAPES. `wudFirmwareData` is one 0x21C-byte initialised object: the HID report descriptor, the patch address and length words
  *   followed by the patch code, and the 13-byte record table whose first byte is the record count; the patch writers index
  *   `patchImage[8 + n]` and `patchTable[n * 0xD + 1]` as the target does.  The vendor command buffers are stack arrays.
@@ -41,6 +48,8 @@
 
 #include "types.h"
 #include "WUD/wud.h"
+#include "WUD/WUDHidHost.h"
+#include "WUD/debug_msg.h"
 #include "BTE/gki_time.h"
 #include "SC/SCGetWpadMotorMode.h"
 #include "SC/sc.h"
@@ -57,53 +66,6 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL_C/alloc.h"
 
-/* size: 0x750 - the device manager's state: the pairing and clear state machines, the stack state and the callbacks. */
-typedef struct WUDCB {
-    /* +0x000 */ WUDResultCallback syncCallback;
-    /* +0x004 */ WUDResultCallback simpleCallback;
-    /* +0x008 */ WUDResultCallback clearCallback;
-    /* +0x00C */ u8 syncState;
-    /* +0x00D */ u8 clearState;
-    /* +0x00E */ u8 stateE;
-    /* +0x00F */ u8 stateF;
-    /* +0x010 */ u8 state10;
-    /* +0x011 */ u8 state11;
-    /* +0x012 */ u8 remoteCount; /* GUESS: devices of the remote types in the table */
-    /* +0x013 */ u8 otherCount;
-    /* +0x014 */ WUDDeviceNode* wbcHead;
-    /* +0x018 */ WUDDeviceNode* wbcTail;
-    /* +0x01C */ WUDDeviceNode wbcNodes[6];
-    /* +0x064 */ WUDDeviceNode* deviceHead;
-    /* +0x068 */ WUDDeviceNode* deviceTail;
-    /* +0x06C */ WUDDeviceNode deviceNodes[10];
-    /* +0x0E4 */ WUDDevice devices[10];
-    /* +0x4A4 */ WUDDevice wbcDevices[6];
-    /* +0x6E4 */ u8 wbcLinkNumber; /* GUESS */
-    /* +0x6E5 */ u8 linkNumber;
-    /* +0x6E6 */ u8 syncRetries;
-    /* +0x6E7 */ s8 quickSearch;
-    /* +0x6E8 */ s8 searching;
-    /* +0x6E9 */ s8 simple;
-    /* +0x6EA */ u8 connectable;
-    /* +0x6EB */ u8 discoverable;
-    /* +0x6EC */ WUDHidRecvCallback hidRecvCallback;
-    /* +0x6F0 */ WUDHidConnCallback hidConnCallback;
-    /* +0x6F4 */ void* (*alloc)(u32 size); /* untyped: caller-owned block */
-    /* +0x6F8 */ s32 (*dealloc)(void* block); /* untyped: the caller-owned block */
-    /* +0x6FC */ u8 pad_0x6FC[0xC];
-    /* +0x708 */ s8 status;
-    /* +0x709 */ u8 pad_0x709;
-    /* +0x70A */ u8 hciHandle;
-    /* +0x70B */ u8 pad_0x70B[5];
-    /* +0x710 */ OSAlarm alarm;
-    /* +0x740 */ u8 pad_0x740[4];
-    /* +0x744 */ u16 bufferHead;
-    /* +0x746 */ u16 bufferTail;
-    /* +0x748 */ u16 searchTime;
-    /* +0x74A */ u16 searchTimeMax;
-    /* +0x74C */ u8 pad_0x74C[4];
-} WUDCB; /* size: 0x750 */
-
 /* size: 0x108 - the last inquiry result: the device's address and its name. */
 typedef struct WUDInquiryResult {
     /* +0x000 */ u8 bdAddr[6];
@@ -114,7 +76,7 @@ typedef struct WUDInquiryResult {
 } WUDInquiryResult; /* size: 0x108 */
 
 /* .bss */
-static WUDCB wudCB;
+WUDCB wudCB;
 static WUDInquiryResult wudInquiryResult;
 static WUDDevice wudStoredDeviceInfo;
 static u8 wudBtDeviceInfo[0x468];
@@ -1523,41 +1485,4 @@ void _WUDSetQueuedSize(u8 handle, u16 size)
 void _WUDSetNotAckedSize(u8 handle, u16 size)
 {
     wudNotAckedSize[handle] = size;
-}
-
-/* Passes a HID data report to the receive callback when the application id is the Wii remote's; logs any other id. */
-void bta_hh_co_data(u8 handle, u8* report, u16 length, u8 mode, u8 subClass, u8 appId)
-{
-    WUDCB* cb = &wudCB;
-
-    if (appId == 3) {
-        if (cb->hidRecvCallback != NULL) {
-            cb->hidRecvCallback(handle, report, length);
-        }
-    } else {
-        WUDiDebugPrint("Invalid app_id [%d]\n", appId);
-    }
-}
-
-/* Logs a HID host open. */
-void bta_hh_co_open(void)
-{
-    WUDiDebugPrint("bta_hh_co_open()\n");
-}
-
-/* Logs a HID host close. */
-void bta_hh_co_close(void)
-{
-    WUDiDebugPrint("bta_hh_co_close()\n");
-}
-
-/* Returns zero. */
-s32 WUDiReturnZero(void)
-{
-    return 0;
-}
-
-/* Takes a log line and discards it; every WUD log call goes through here. */
-void WUDiDebugPrint(const char* format, ...)
-{
 }

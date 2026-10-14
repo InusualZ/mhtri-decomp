@@ -18,22 +18,27 @@
  *   `wpadUpdateRadioSensitivity`, `wpadCountIdleReports`, `wpadPollSample`, `wpadAlarmHandler`, `wpadResetChannel`, `wpadStart`,
  *   `wpadInitDoneCallback`, `wpadAbortCallback`, `wpadHidDataCallback`, `wpadAssignChannel`, `wpadHidOpenCallback`,
  *   `wpadCloseLinkCallback`, `wpadInfoCallback`, `wpadApplyDpdFormat`, `wpadSendWriteByte`, `wpadSendReadMemory`, `wpadQueueHasRoom`,
- *   `wpadWriteMemory`, `wpadReadMemory`, `wpadReadMemoryGuarded`, `wpadBulkDoneCallback`, `wpadCopyCurrentSample`,
+ *   `wpadWriteMemory`, `wpadReadMemory`, `wpadBulkDoneCallback`, `wpadCopyCurrentSample`,
  *   `wpadFilterButtons`, `wpadStoreSample`, `wpadReportButtons`, `wpadReportButtonsAccel`, `wpadDecryptExtension`,
- *   `wpadGetDpdCalibration`, `wpadSetDpdStatusA/B`, `wpadResetSpeakerState`, `wpadGetAppType`, `wpadGetGameName`,
+ *   `wpadGetDpdCalibration`, `wpadSetDpdStatusA/B`, `wpadGetAppType`, `wpadGetGameName`,
  *   `wpadDispatchReport`, `wpadReportStatus/ReadData/Ack/Ignored`, `wpadReportButtonsExt8`, `wpadReportButtonsAccelDpd12`,
  *   `wpadReportExt19`, `wpadReportButtonsAccelExt16`, `wpadReportButtonsDpd10Ext9`, `wpadReportButtonsAccelDpd10Ext6`,
  *   `wpadReportExt21`, `wpadReportInterleavedA/B` (the report ids are 0x20..0x3F; the names read the payload layout),
  *   `wpadDecodeDpd`, `wpadDecodeDpdInterleaved`, `wpadDecodeExtDualStick`, `wpadDecodeExtBoard` (the extension layouts are
  *   GUESSes from the decode: Nunchuk-style, Classic-style, a byte-stick type and a balance-board-like 21-byte type),
- *   `wpadExtInitCallback`, `wpadDpdCalibrationReadDone`, `wpadSendWbcCommand`, `wpadBulkWrite`, `wpadBulkWriteNext`,
+ *   `wpadExtInitCallback`, `wpadDpdCalibrationReadDone`, `wpadSendWbcCommand`, `wpadBulkWriteNext`,
  *   `wpadBulkWriteFirst`, `wpadCopyTitleString` (the title string copy); named but unwritten: `wpadSampleChanged` (0x804EBAF0),
  *   `wpadSamplingFiber` (0x804EC650), `wpadInitSequence` (0x804ED880), `wpadAccCalibrationReadDone` (0x804F3150),
  *   `wpadExtCalibrationReadDone` (0x804F3C40), `wpadExtIdReadDone` (0x804F4180).  GUESS names `wpadStickDeadzoneSquare`, `wpadStickDeadzoneCircle`
  *   (the dead zone of a stick pair on 8-bit or 16-bit axes) and `wpadClampAxes` (the accelerometer axes against a full-scale limit).
  *   GUESS `WPADControlDpd` (0x804F14A0, unwritten: the SDK name by shape - KPAD's sampling callback passes a channel, a dpd command
- *   byte and a callback, and the body reads the dpd-enabled flag and the wanted format).  `fn_` names remain on the
- *   0x804F72C0, 0x804F79B0, 0x804F8380 and 0x804F84E0 rows.  Struct fields
+ *   byte and a callback, and the body reads the dpd-enabled flag and the wanted format).  GUESS SDK names `WPADiCreateKey`,
+ *   `WPADiCreateKeyFor3rd` (0x804F72C0, 0x804F79B0: the extension key generators), `WPADClampStick`, `WPADClampAcc`
+ *   (0x804F8380, 0x804F84E0: game code calls them after `WPADRead`), `WPADiClearMemBlock` (the memory-block reset
+ *   `wpadResetChannel` calls), `WPADWriteGameData`, `WPADReadGameData` (the title-checked game-data write and read; game code
+ *   calls the write) and their completion `wpadGameDataCallback`; GUESS data names `wpadExtType`, `wpadExtSubType`,
+ *   `wpadRandModulus/Increment/Multiplier/Seed` (the key generator's OSGetTick-seeded LCG), `wpadKeyAnsTable`, `wpadKeySBox`,
+ *   `wpadKey3rdAnsTable`, `wpadKey3rdSBox` (the key generators' tables, read through one base); GUESS field `WPADCB::extStatus`.  Struct fields
  *   are named from use; a `unused_0xNN` field is written but never read by a written body.  Statics are named from use; the
  *   `.sbss` rows `wpadChanStateA/B` and the `.bss` rows at 0x8075EA00.. are not understood yet.  Foreign names given here:
  *   WUD (`WUDInit`, `WUDShutdown`, `WUDGetStatus`, `WUDRegisterAllocator`, `WUDSet*Callback`, `WUDStart*`, `WUDStop*`,
@@ -44,7 +49,7 @@
  *   `wpadStickDeadzoneSquare` keeps r31 for the sign copy where the target does not, and `wpadClampAxes` differs in the float register
  *   numbering and in the .sdata2 constant names.  The new report decoders re-read the sample pointer per statement in the original
  *   (`wpadDecodeExtBoard` 2 %, `wpadDecodeDpdInterleaved` 53 %: the source's statement order differs and the original keeps no
- *   stack frame); `wpadReportReadData`, `wpadReportStatus` and `wpadBulkWrite*` differ in register numbering and one reload.
+ *   stack frame); `wpadReportReadData`, `wpadReportStatus` and `WPADWriteGameData`/`wpadBulkWrite*` differ in register numbering and one reload.
  *   Register-numbering differences only (the variable order) remain in `WPADDisconnect`, `wpadAssignChannel`,
  *   `wpadHidOpenCallback`, `wpadUpdateRadioSensitivity`, `wpadReportButtonsAccel` (the original reloads the control block
  *   pointer) and `wpadDecryptExtension` (loop unrolling); `WPADSetAutoSamplingBuf` strength-reduces the index multiply the
@@ -594,13 +599,13 @@ void wpadResetChannel(s32 chan)
     cb->reportOnChange = 0;
     cb->extBatteryLevel = 4;
     cb->extensionResult = 0xFD;
-    cb->unused_0x991 = 0;
+    cb->extStatus = 0;
     cb->unused_0x992 = 0;
     memset(&cb->flags, 0, sizeof(cb->flags));
     memset(cb->extId, 0, 0x40);
     memset(&cb->calA, 0, sizeof(cb->calA));
     memset(&cb->calB, 0, sizeof(cb->calB));
-    memset(cb->pad_0x914, 0, 0x10);
+    memset(cb->key, 0, 0x10);
     memset(cb->keyAdd, 0, 8);
     memset(cb->keyXor, 0, 8);
     memset(cb, 0, 0x38);
@@ -617,7 +622,7 @@ void wpadResetChannel(s32 chan)
     cb->auxQueue.capacity = 0xC;
     wpadQueueClear(&cb->cmdQueue);
     wpadQueueClear(&cb->auxQueue);
-    wpadResetSpeakerState(chan);
+    WPADiClearMemBlock(chan);
     wpadChanStateA[chan] = 0;
     wpadChanStateB[chan] = 0;
 }
@@ -1933,7 +1938,7 @@ void wpadClampAxes(s16* x, s16* y, s16* z, WPADAxisScale* scale, f32 limit)
 }
 
 /* Clears the speaker state words of a channel. */
-void wpadResetSpeakerState(s32 chan)
+void WPADiClearMemBlock(s32 chan)
 {
     WPADCB* cb = wpadCBTable[chan];
 
@@ -1993,7 +1998,7 @@ void wpadExtInitCallback(s32 chan, s32 result)
     }
     cb->deviceType = error;
     cb->extensionResult = error;
-    cb->unused_0x991 = 0;
+    cb->extStatus = 0;
     callback = cb->extensionCallback;
     if (callback != NULL) {
         callback(chan, error);
@@ -2094,7 +2099,7 @@ void wpadReportStatus(u8 chan, u8* report, WPADSample* sample)
         WPADiClearQueue(&cb->auxQueue);
         WPADiSendSetReportType(&cb->auxQueue, cb->dataFormat, cb->reportOnChange, NULL);
         if (wasAttached != 0) {
-            cb->unused_0x991 = 1;
+            cb->extStatus = 1;
             cb->unused_0x992 = 0x12C;
             callback = cb->extensionCallback;
             if (callback != NULL) {
@@ -2950,7 +2955,7 @@ void wpadBulkWriteFirst(s32 chan, s32 result)
 
 #pragma dont_inline on
 /* Stores the calibration block with the title code and checksum, then writes it to the remote followed by the bulk data. */
-s32 wpadBulkWrite(s32 chan, const void* src, u16 size, u32 addr, WPADCallback callback) /* untyped: byte range */
+s32 WPADWriteGameData(s32 chan, const void* src, u16 size, u32 addr, WPADCallback callback) /* untyped: byte range */
 {
     WPADCB* cb = wpadCBTable[chan];
     s32 status = cb->status;
@@ -3067,7 +3072,7 @@ void wpadDecryptExtension(s32 chan, u8* data, u16 length, s32 offset)
 }
 
 /* Runs the callback the bulk transfer stored. */
-void wpadSpeakerDoneCallback(s32 chan, s32 result)
+void wpadGameDataCallback(s32 chan, s32 result)
 {
     WPADCB* cb = wpadCBTable[chan];
     WPADCallback callback;
@@ -3122,7 +3127,7 @@ s32 wpadGetDpdCalibration(s32 chan, u8** out)
 
 #pragma dont_inline on
 /* Starts a guarded read of the remote's memory once the extension signature matches the title's game code. */
-s32 wpadReadMemoryGuarded(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callback) /* untyped: caller-owned byte buffer */
+s32 WPADReadGameData(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callback) /* untyped: caller-owned byte buffer */
 {
     WPADCB* cb = wpadCBTable[chan];
     s32 status = cb->status;
@@ -3142,7 +3147,7 @@ s32 wpadReadMemoryGuarded(s32 chan, void* dest, u16 size, u32 addr, WPADCallback
                     cb->speakerStateA = 1;
                     cb->bulkDoneCallback = callback;
                     OSRestoreInterrupts(level);
-                    return wpadReadMemory(chan, dest, size, addr + 0x9A, wpadSpeakerDoneCallback);
+                    return wpadReadMemory(chan, dest, size, addr + 0x9A, wpadGameDataCallback);
                 }
                 status = -5;
             }

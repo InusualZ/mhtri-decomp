@@ -13,7 +13,8 @@
  *   0x8047ABC4 is a seam: the 16-aligned head moves to `cflags_base` when it is cut out.
  * NAMES. the map's; GKI_send_event (0x80478EA0, sets an event bit of a task below 8 and returns 1 for a bad task),
  *   GKI_exception (0x80478FE0) and GKI_os_free (0x80479020, called by GKI_delete_pool) are the BTE source's names read
- *   from the bodies and their callers in BTE/gki_buffer.c.
+ *   from the bodies and their callers in BTE/gki_buffer.c. GUESS BTA_DisableBluetooth (0x8047D718: the bta_dm_api entry after
+ *   BTA_EnableBluetooth, called from the WUD shutdown fiber).
  * RESIDUALS. every body is unwritten: 0x80478790-0x804A4AC0 (712 functions, the largest the BTA/BTM state machines).
  * SHAPES. seams measured so far: 0x80478790 (gki_timers_init, the first function after GKI_delete_pool) and
  *   0x8047ABC4 (the first 4-aligned start).

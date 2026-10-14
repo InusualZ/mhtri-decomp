@@ -224,7 +224,7 @@ typedef struct WPADCB {
     /* +0x910 */ u8 unused_0x910;
     /* +0x911 */ u8 centerValid;
     /* +0x912 */ u16 idleCount;
-    /* +0x914 */ u8 pad_0x914[0x10];
+    /* +0x914 */ u8 key[0x10]; /* the extension key the key generators write */
     /* +0x924 */ u8 keyAdd[8];
     /* +0x92C */ u8 keyXor[8];
     /* +0x934 */ u8 extId[6];
@@ -244,7 +244,7 @@ typedef struct WPADCB {
     /* +0x98E */ u8 reportOnChange;
     /* +0x98F */ u8 extBatteryLevel;
     /* +0x990 */ u8 extensionResult;
-    /* +0x991 */ u8 unused_0x991;
+    /* +0x991 */ u8 extStatus; /* GUESS: set with the extension result and on detach */
     /* +0x992 */ s16 unused_0x992;
     /* +0x994 */ u8 dpdBlocked;
     /* +0x995 */ u8 pad_0x995[3];
@@ -365,7 +365,7 @@ void WPADSetCallbackByKPAD(s32 owned);
 u8 wpadGetAppType(void);
 char* wpadGetGameName(void);
 s32 wpadDispatchReport(s32 chan, u8* report);
-void wpadResetSpeakerState(s32 chan);
+void WPADiClearMemBlock(s32 chan);
 
 /* One stick axis as the extension report stores it: a byte or a halfword, selected by the caller's `wide` flag. size: 0x02 */
 typedef union WPADStickAxis {
@@ -413,7 +413,7 @@ void wpadCopyTitleString(const u16* title);
 s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback);
 void wpadBulkWriteNext(s32 chan, s32 result);
 void wpadBulkWriteFirst(s32 chan, s32 result);
-s32 wpadBulkWrite(s32 chan, const void* src, u16 size, u32 addr, WPADCallback callback); /* untyped: byte range */
+s32 WPADWriteGameData(s32 chan, const void* src, u16 size, u32 addr, WPADCallback callback); /* untyped: byte range */
 void wpadReportButtonsAccel(u8 chan, u8* report, WPADSample* sample);
 void wpadDecryptExtension(s32 chan, u8* data, u16 length, s32 offset);
 s32 wpadGetDpdCalibration(s32 chan, u8** out);
@@ -428,8 +428,8 @@ s32 wpadSendWriteByte(WPADCmdQueue* queue, s8 value, u32 addr, WPADCallback call
 s32 WPADiSendWriteData(WPADCmdQueue* queue, const void* src, s32 size, u32 addr, WPADCallback callback); /* untyped: byte range */
 s32 wpadSendReadMemory(WPADCmdQueue* queue, void* dest, u16 size, u32 addr, WPADCallback callback); /* untyped: caller-owned byte buffer */
 s32 wpadQueueHasRoom(WPADCmdQueue* queue, s8 count);
-void wpadSpeakerDoneCallback(s32 chan, s32 result);
-s32 wpadReadMemoryGuarded(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callback); /* untyped: caller-owned byte buffer */
+void wpadGameDataCallback(s32 chan, s32 result);
+s32 WPADReadGameData(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callback); /* untyped: caller-owned byte buffer */
 s32 wpadReadMemory(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callback); /* untyped: caller-owned byte buffer */
 s32 wpadWriteMemory(s32 chan, const void* src, s32 size, u32 addr, WPADCallback callback); /* untyped: byte range */
 s32 WPADWriteExtReg(s32 chan, const void* src, s32 size, u32 addr, WPADCallback callback); /* untyped: byte range */
