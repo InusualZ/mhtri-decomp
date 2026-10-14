@@ -2691,14 +2691,58 @@ BTE/gki_buffer.c:
 	.bss        start:0x8070CDE0 end:0x807358C0
 
 BTE/gki_time.c:
-	.text       start:0x80478790 end:0x8047ABC4 align:16
-	.rodata     start:0x80573530 end:0x805735E8
+	.text       start:0x80478790 end:0x80478D20 align:16
+
+BTE/gki_ppc.c:
+	.text       start:0x80478D20 end:0x80479030 align:16
+
+BTE/hcisu_h2.c:
+	.text       start:0x80479030 end:0x804796F0 align:16
+	.rodata     start:0x80573530 end:0x80573548
 	.data       start:0x80612E60 end:0x80612ED0
-	.bss        start:0x807358C0 end:0x807391F8
-	.sdata      start:0x80793D28 end:0x80793D80
-	.sbss       start:0x80795008 end:0x80795038
-	.sdata2     start:0x8079D080 end:0x8079D098
+	.bss        start:0x807358C0 end:0x80735900
+	.sdata2     start:0x8079D080 end:0x8079D090
+
+BTE/uusb_ppc.c:
+	.text       start:0x804796F0 end:0x8047A370 align:16
+	.bss        start:0x80735900 end:0x80737960
+	.sdata      start:0x80793D28 end:0x80793D38
+	.sbss       start:0x80795008 end:0x80795020
+
+BTE/bta_dm_cfg.c:
+	.rodata     start:0x80573548 end:0x805735D8
+	.sdata      start:0x80793D38 end:0x80793D50
 	.sbss2      start:0x8079D7E0 end:0x8079D7E8
+
+BTE/bta_hh_cfg.c:
+	.rodata     start:0x805735D8 end:0x805735E8
+	.sdata      start:0x80793D50 end:0x80793D60
+
+BTE/bta_sys_cfg.c:
+	.sdata      start:0x80793D60 end:0x80793D68
+	.sdata2     start:0x8079D090 end:0x8079D098
+
+BTE/bte_hcisu.c:
+	.text       start:0x8047A370 end:0x8047A470 align:16
+	.sbss       start:0x80795020 end:0x80795028
+
+BTE/bte_logmsg.c:
+	.text       start:0x8047A470 end:0x8047A610 align:16
+	.bss        start:0x80737960 end:0x80738140
+	.sdata      start:0x80793D68 end:0x80793D70
+	.sbss       start:0x80795028 end:0x8079502C
+
+BTE/bta_init.c:
+	.text       start:0x8047A610 end:0x8047A780 align:16
+	.bss        start:0x80738140 end:0x80739170
+	.sdata      start:0x80793D70 end:0x80793D78
+	.sbss       start:0x8079502C end:0x80795030
+
+BTE/btu_task1.c:
+	.text       start:0x8047A780 end:0x8047ABC4 align:16
+	.bss        start:0x80739170 end:0x807391F8
+	.sdata      start:0x80793D78 end:0x80793D80
+	.sbss       start:0x80795030 end:0x80795038
 
 BTE/bd.c:
 	.text       start:0x8047ABC4 end:0x8047AC98

@@ -1,5 +1,5 @@
-/* BTE/gki_time.h - the Bluetooth host stack entry points `BTE/gki_time.c` owns: the GKI OS glue the buffer pools call and
- *   the BTA/BTM/L2CAP/SDP calls of the Wii remote driver (docs/plan.md 6.5 rule 2). */
+/* BTE/gki_time.h - the GKI timer list type `BTE/gki_time.c` owns and the BTA/BTM calls of the Wii remote driver; it
+ *   includes the headers of the files cut from the BTE head (docs/plan.md 6.5 rule 2). */
 #ifndef MHTRI_BTE_GKI_TIME_H
 #define MHTRI_BTE_GKI_TIME_H
 
@@ -7,6 +7,11 @@
 #include "BTE/gki_buffer.h"
 #include "BTE/l2c_api.h"
 #include "BTE/sdp_api.h"
+#include "BTE/gki_ppc.h"
+#include "BTE/bte_hcisu.h"
+#include "BTE/bte_logmsg.h"
+#include "BTE/bta_init.h"
+#include "BTE/btu_task1.h"
 
 /* size: 0x0A - the sniff-mode parameters `BTM_SetPowerMode` takes. */
 typedef struct BtmPmPwrMode {
@@ -50,8 +55,6 @@ typedef void (*BtaDmSecCallback)(u8 event, union BtaDmSecEventData* data);
 typedef void (*BtaDmSearchCallback)(s32 event, const u8* data);
 /* The completion callback of a BTM command; the payload's type depends on the command. */
 typedef void (*BtmCompleteCallback)(void* result); /* untyped: caller-owned payload, one type per command */
-/* The completion callback of `BTA_CleanUp`. */
-typedef void (*BtaCleanUpCallback)(s32 result);
 
 /* size: 0x08 - the HID report descriptor `BTA_HhAddDev` registers with a device. */
 typedef struct BtaHhDscpInfo {
@@ -71,34 +74,9 @@ typedef struct TIMER_LIST_ENT {
     /* +0x17 */ u8 pad_0x17;
 } TIMER_LIST_ENT; /* size: 0x18 */
 
-/* size: 0x88 - the BTU control block; only the ACL sizes the L2CAP layer reads are named. */
-typedef struct tBTU_CB {
-    /* +0x00 */ u8 unused_0x00[0x7C];
-    /* +0x7C */ u16 hcit_acl_data_size;
-    /* +0x7E */ u16 hcit_acl_pkt_size;
-    /* +0x80 */ u8 unused_0x80[8];
-} tBTU_CB; /* size: 0x88 */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* 0x80478EA0 - sets `event` in the wait mask of the task `taskId`; returns 1 for a task id of 8 or more, else 0. */
-u8 GKI_send_event(u8 taskId, u16 event);
-
-/* 0x80478F50 / 0x80478F60 / 0x80478F90 - the current task id and the nested interrupt disable/enable pair. */
-u8 GKI_get_taskid(void);
-void GKI_enable(void);
-void GKI_disable(void);
-
-/* 0x80478FE0 - reports the stack error `code` with the message `msg` (empty in retail). */
-void GKI_exception(u16 code, char* msg);
-
-/* 0x80478FF0 / 0x80479020 - allocate and free the memory of a buffer pool. */
-/* untyped: a byte range - raw pool memory carved into buffers */
-void* GKI_os_malloc(u32 size);
-/* untyped: a byte range - raw pool memory carved into buffers */
-void GKI_os_free(void* memory);
 
 /* 0x8047FF98 - sends the output report in `buf` to the HID device `handle`. */
 void BTA_HhSendData(u8 handle, BT_HDR* buf);
@@ -114,9 +92,8 @@ void BTA_HhRemoveDev(u8 handle);
 /* 0x8047FEE4 - opens the HID connection to the device at `bdAddr` (`mode` and `security` are the stack's). */
 void BTA_HhOpen(const u8* bdAddr, u8 mode, u8 security);
 
-/* 0x8047A630 / 0x8047B128 - initialise the application layer and set the trace levels of the layers (the L2CAP
- * and SDP layers' are BTE/l2c_api.h's and BTE/sdp_api.h's). */
-void BTA_Init(void);
+/* 0x8047B128 - sets the trace levels of the layers (the L2CAP and SDP layers' are BTE/l2c_api.h's and
+ * BTE/sdp_api.h's). */
 void bta_sys_set_trace_level(u8 level);
 
 /* 0x8047D788 - sets the host's device name (a NUL-terminated string). */
@@ -158,9 +135,6 @@ u8 BTM_SetPowerMode(u8 pmId, const u8* bdAddr, BtmPmPwrMode* mode);
 /* 0x804824F8 - drops the ACL link to the device at `bdAddr`. */
 void btm_remove_acl(u8* bdAddr);
 
-/* 0x8047A710 - stores `callback` and closes the transport; the callback reports when the stack is down. */
-void BTA_CleanUp(BtaCleanUpCallback callback);
-
 /* 0x8047D690 / 0x8047D718 - start the device manager with its security callback, or stop it; the start returns the status. */
 u8 BTA_EnableBluetooth(BtaDmSecCallback callback);
 void BTA_DisableBluetooth(void);
@@ -182,28 +156,6 @@ u8 BTM_ReadLocalVersion(BtmVersionInfo* version);
 u8 BTM_ReadStoredLinkKey(const u8* bdAddr, BtmCompleteCallback callback);
 u8 BTM_WriteStoredLinkKey(u8 numKeys, const u8* bdAddrs, const u8* linkKeys, BtmCompleteCallback callback);
 u8 BTM_DeleteStoredLinkKey(const u8* bdAddr, BtmCompleteCallback callback);
-
-/* 0x8047A530 / 0x8047A550 / 0x8047A570 / 0x8047A590 / 0x8047A5B0 - print a trace message with 0, 1, 2, 3 or 4
- * arguments; the mask carries the layer (bits 16-23) and the type. */
-void LogMsg_0(u32 trace_set_mask, const char* fmt_str);
-void LogMsg_1(u32 trace_set_mask, const char* fmt_str, u32 p1);
-void LogMsg_2(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2);
-void LogMsg_3(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3);
-void LogMsg_4(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3, u32 p4);
-
-/* 0x8047A5D0 / 0x8047A5F0 - print a trace message with 5 or 6 arguments. */
-void LogMsg_5(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5);
-void LogMsg_6(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6);
-
-/* 0x8047A370 - hands the message `p_msg` with the event `event` to the HCI transport. */
-void bte_hcisu_send(BT_HDR* p_msg, u16 event);
-
-/* .bss 0x80739170 - the BTU control block. */
-extern tBTU_CB btu_cb;
-
-/* 0x8047AB40 / 0x8047ABB0 - start the timer entry with `timeout` seconds of type `type`, or stop it. */
-void btu_start_timer(TIMER_LIST_ENT* p_tle, u16 type, u32 timeout);
-void btu_stop_timer(TIMER_LIST_ENT* p_tle);
 
 /* 0x804880E8 - registers the security level of a service on `psm`; returns whether it was stored. */
 u8 BTM_SetSecurityLevel(u8 is_originator, char* p_name, u8 service_id, u8 sec_level, u16 psm, u32 mx_proto_id,
