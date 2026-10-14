@@ -1548,7 +1548,7 @@ config.libs = [
         "objects": [
             Object(Matching, "nw4r/db_console.cpp"),
             Object(NonMatching, "nw4r/db_assert.cpp"),
-            Object(NonMatching, "nw4r/math_arithmetic.cpp"),
+            Object(Matching, "nw4r/math_arithmetic.cpp"),
             Object(NonMatching, "nw4r/math_triangular.cpp"),
             Object(NonMatching, "nw4r/fn_805012C4.cpp"),
             Object(NonMatching, "nw4r/fn_80502828.cpp"),
