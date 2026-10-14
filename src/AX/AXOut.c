@@ -10,19 +10,25 @@
  * NAMES. the `__AXOut*` and `AXRegisterCallback` names are the map's; the file name `AXOut.c` is a GUESS; the DSP
  *    task callbacks `__AXOutAIDmaCallback` (0x80470080), `__AXOutInitCallback` (0x80470130),
  *    `__AXOutResumeCallback` (0x80470140), `__AXOutDoneCallback` (0x804701A0), `__AXOutRequestCallback`
- *    (0x804701B0), `__AXOutData` (.bss 0x806FA860), `__AXDspTask`, `__AXDspDramBuffer`, `__AXDspImage` and the
- *    `__AXOut*` / `__AXDsp*` state words are GUESSes named from how the code uses them.
+ *    (0x804701B0), the `.bss` statics `__AXOutProfile`, `__AXOutRing`, `__AXOutSurround` and `__AXOutBuffer`,
+ *    `__AXDspTask`, `__AXDspDramBuffer`, `__AXDspImage` and the `__AXOut*` / `__AXDsp*` state words are GUESSes
+ *    named from how the code uses them.
  * EVIDENCE. `.data` 0x80610980 (0x2000 B, the last object of the old block's `.data`) is the AX DSP program the
- *    task points at; `.bss` 0x806FA860 (0xD60 B: profile, ring buffers, command buffer, output buffers) is addressed
- *    by `__AXOutNewFrame`, `__AXOutInit` and `__AXOutAIDmaCallback` from one base; 0x806FB5C0 (the DSP task) and
+ *    task points at; `.bss` 0x806FA860 (0xD60 B) is four 32-aligned statics - profile +0x0, rings +0x40, surround
+ *    buffer +0x5E0, output buffers +0x8E0 - that the code reaches from the first one's address (`addi rX,base,0`
+ *    for the profile, `addi rX,base,0x8E0` held for the output buffers); 0x806FB5C0 (the DSP task) and
  *    0x806FB620 (its DRAM buffer) by `__AXOutInitDSP` and `__AXOutQuit`; `.sdata` 0x80793D18 holds the DSP init
  *    and resume vectors and the program size.
- * RESIDUALS. __AXOutNewFrame 0x8046FE20, __AXOutInit 0x804702B0, __AXOutInitDSP 0x804701C0 and __AXOutAIDmaCallback
- *    0x80470080 are short of 100 %: the target addresses the output buffers as a second base register
- *    (base+0x8E0) and keeps the profile pointer live, and the DmaFrame store is not forwarded; InitDSP differs in register
- *    colouring and scheduling of the task field stores.
+ * RESIDUALS. the map still names the four statics as one `__AXOutData` row (0xD60), so our relocations name
+ *    `...bss.0` / `__AXOutBuffer` where the target names `__AXOutData`; __AXOutNewFrame 0x8046FE20: the profile
+ *    copy's base takes r31 (target r29); __AXOutInitDSP 0x804701C0: the zero takes saved r29 (target r12) and the
+ *    task field stores schedule differently; `.text` 0x744 of 0x750 B.
  * SHAPES. the DSP task type and entry points come from `DSP/dsp.h`; the four task callbacks are static functions whose
- *    addresses fill the task.
+ *    addresses fill the task.  `__AXOutDmaFrame` is volatile: the target re-reads it after every store.  The
+ *    frame writes the profile fields by name rather than through a pointer (the target re-forms the address).
+ *    __AXOutInitDSP writes `__AXDspTask` by name under a scoped `optimization_level 2` (the target re-forms the
+ *    task address for DSPAddTask); __AXOutInit's clear loops keep their pointer and count in block scope; the DMA
+ *    callback's next read index is incremented and reduced in two steps.
  */
 
 #include "types.h"
@@ -47,15 +53,6 @@
 #define AX_OUT_RING_SAMPLES 180
 #define AX_OUT_FRAME_SAMPLES 18
 #define AX_OUT_FRAME_BYTES 0x180
-
-/* size: 0xD60; the output stage's working memory, addressed from one base. */
-typedef struct AXOutData {
-    /* +0x000 */ AXProfile profile;
-    /* +0x038 */ u8 pad_0x38[8];
-    /* +0x040 */ s16 ring[4][AX_OUT_RING_SAMPLES];
-    /* +0x5E0 */ u32 surroundBuffer[0xC0];
-    /* +0x8E0 */ u32 output[3][AX_OUT_FRAME_BYTES / 4];
-} AXOutData;
 
 /* The DSP program the output task runs, 0x2000 bytes of DSP words. */
 u16 __AXDspImage[0x1000] = {
@@ -407,7 +404,7 @@ u16 __AXDspInitVector = 0x10;
 u16 __AXDspResumeVector = 0x37;
 u16 __AXDspImageSize = 0x2000;
 
-u32 __AXOutDmaFrame;
+volatile u32 __AXOutDmaFrame;
 u32 __AXOutDmaRead;
 u32 __AXOutDspState;
 AXUserCallback __AXOutUserCallback;
@@ -423,13 +420,18 @@ AXUserCallback __AXOutFrameEndCallback;
 
 u8 __AXDspDramBuffer[0x40];
 DSPTask __AXDspTask;
-AXOutData __AXOutData;
+/* The profile of the frame being built, copied out to the caller's profile ring at the end of the frame. */
+static AXProfile __AXOutProfile;
+/* The four 180-sample rings the frame output is mixed into. */
+static s16 __AXOutRing[4][AX_OUT_RING_SAMPLES] __attribute__((aligned(32)));
+/* The surround output buffer the DSP writes. */
+static u32 __AXOutSurround[0xC0] __attribute__((aligned(32)));
+/* The three DMA output buffers the AI plays in turn. */
+static u32 __AXOutBuffer[3][AX_OUT_FRAME_BYTES / 4] __attribute__((aligned(32)));
 
 /* 0x8046FE20 (0x260): builds the next output frame and returns the DMA cycle estimate. */
 s32 __AXOutNewFrame(void)
 {
-    AXOutData* out = &__AXOutData;
-    AXProfile* prof = &out->profile;
     s16* buffers[4];
     s32 cycles;
     s32 next;
@@ -439,7 +441,7 @@ s32 __AXOutNewFrame(void)
     u8* dst;
     s32 i;
 
-    prof->frameStart = OSGetTime();
+    __AXOutProfile.frameStart = OSGetTime();
     cycles = (96 - (AIGetDMABytesLeft() >> 2)) * 3797;
     if (__AXOutMode == 1) {
         __AXSyncPBs(0);
@@ -455,18 +457,18 @@ s32 __AXOutNewFrame(void)
     while (DSPCheckMailToDSP() != 0) {
     }
     __AXServiceCallbackStack();
-    prof->auxStart = OSGetTime();
+    __AXOutProfile.auxStart = OSGetTime();
     __AXProcessAux();
-    prof->auxEnd = OSGetTime();
-    prof->userCallbackStart = OSGetTime();
+    __AXOutProfile.auxEnd = OSGetTime();
+    __AXOutProfile.userCallbackStart = OSGetTime();
     if (__AXOutUserCallback != NULL) {
         __AXOutUserCallback();
     }
-    prof->userCallbackEnd = OSGetTime();
-    buffers[0] = &out->ring[0][__AXOutWritePos];
-    buffers[1] = &out->ring[1][__AXOutWritePos];
-    buffers[2] = &out->ring[2][__AXOutWritePos];
-    buffers[3] = &out->ring[3][__AXOutWritePos];
+    __AXOutProfile.userCallbackEnd = OSGetTime();
+    buffers[0] = &__AXOutRing[0][__AXOutWritePos];
+    buffers[1] = &__AXOutRing[1][__AXOutWritePos];
+    buffers[2] = &__AXOutRing[2][__AXOutWritePos];
+    buffers[3] = &__AXOutRing[3][__AXOutWritePos];
     next = __AXOutWritePos + AX_OUT_FRAME_SAMPLES;
     if (next >= __AXOutRingSize) {
         next = 0;
@@ -475,19 +477,19 @@ s32 __AXOutNewFrame(void)
         __AXOutReadPos = next;
     }
     __AXOutWritePos = next;
-    __AXNextFrame((u32)out->surroundBuffer, (u32)out->output[__AXOutDmaFrame], buffers);
+    __AXNextFrame((u32)__AXOutSurround, (u32)__AXOutBuffer[__AXOutDmaFrame], buffers);
     __AXOutDmaFrame++;
     if (__AXOutMode == 1) {
         __AXOutDmaFrame = __AXOutDmaFrame % 3;
     } else {
         __AXOutDmaFrame &= 1;
-        AIInitDMA((u32)out->output[__AXOutDmaFrame], AX_OUT_FRAME_BYTES);
+        AIInitDMA((u32)__AXOutBuffer[__AXOutDmaFrame], AX_OUT_FRAME_BYTES);
     }
-    prof->frameEnd = OSGetTime();
-    prof->numVoices = __AXGetNumVoices();
+    __AXOutProfile.frameEnd = OSGetTime();
+    __AXOutProfile.numVoices = __AXGetNumVoices();
     profile = __AXGetCurrentProfile();
     if (profile != NULL) {
-        src = (u8*)&out->profile;
+        src = (u8*)&__AXOutProfile;
         dst = (u8*)profile;
         for (i = 0; i < sizeof(AXProfile); i++) {
             dst[i] = src[i];
@@ -510,8 +512,9 @@ static void __AXOutAIDmaCallback(void)
         if (__AXOutMode == 1) {
             u32 next;
 
-            AIInitDMA((u32)__AXOutData.output[__AXOutDmaRead], AX_OUT_FRAME_BYTES);
-            next = (__AXOutDmaRead + 1) % 3;
+            AIInitDMA((u32)__AXOutBuffer[__AXOutDmaRead], AX_OUT_FRAME_BYTES);
+            next = __AXOutDmaRead + 1;
+            next %= 3;
             if (next != __AXOutDmaFrame) {
                 __AXOutDmaRead = next;
             }
@@ -551,86 +554,94 @@ static void __AXOutRequestCallback(DSPTask* task)
 {
 }
 
+#pragma push
+#pragma optimization_level 2
 /* 0x804701C0 (0xEC): describes the AX DSP task, registers it and waits until the DSP has started it. */
 void __AXOutInitDSP(void)
 {
-    DSPTask* task = &__AXDspTask;
-
-    task->priority = 0;
+    __AXDspTask.priority = 0;
     __AXOutDspReady = 0;
-    task->iramMmemAddr = __AXDspImage;
-    task->iramLength = __AXDspImageSize;
-    task->iramAddr = 0;
-    task->dramMmemAddr = __AXDspDramBuffer;
-    task->dramLength = 0x40;
-    task->dramAddr = 0xCD2;
-    task->initVector = __AXDspInitVector;
-    task->resumeVector = __AXDspResumeVector;
-    task->initCallback = __AXOutInitCallback;
-    task->resumeCallback = __AXOutResumeCallback;
-    task->doneCallback = __AXOutDoneCallback;
-    task->requestCallback = __AXOutRequestCallback;
+    __AXDspTask.iramMmemAddr = __AXDspImage;
+    __AXDspTask.iramLength = __AXDspImageSize;
+    __AXDspTask.iramAddr = 0;
+    __AXDspTask.dramMmemAddr = __AXDspDramBuffer;
+    __AXDspTask.dramLength = 0x40;
+    __AXDspTask.dramAddr = 0xCD2;
+    __AXDspTask.initVector = __AXDspInitVector;
+    __AXDspTask.resumeVector = __AXDspResumeVector;
+    __AXDspTask.initCallback = __AXOutInitCallback;
+    __AXDspTask.resumeCallback = __AXOutResumeCallback;
+    __AXDspTask.doneCallback = __AXOutDoneCallback;
+    __AXDspTask.requestCallback = __AXOutRequestCallback;
     __AXOutTaskDone = 0;
     OSInitThreadQueue(&__AXOutThreadQueue);
     if (DSPCheckInit() == 0) {
         DSPInit();
     }
-    DSPAddTask(task);
+    DSPAddTask(&__AXDspTask);
     while (__AXOutDspReady == 0) {
     }
 }
 
+#pragma pop
+
 /* 0x804702B0 (0x1F8): clears the working buffers, starts the DSP task and the first DMA. */
 void __AXOutInit(u32 mode)
 {
-    AXOutData* out = &__AXOutData;
     s16* buffers[4];
-    u32* words;
-    s32 i;
 
     __AXOutDmaFrame = 0;
     __AXOutDmaRead = 0;
     __AXOutMode = mode;
     __AXOutReserved = 0;
-    words = &out->output[0][0];
-    i = 288;
-    while (i--) {
-        *words++ = 0;
+    {
+        u32* word = &__AXOutBuffer[0][0];
+        s32 count = 288;
+
+        while (count--) {
+            *word++ = 0;
+        }
     }
-    DCFlushRange(out->output, sizeof(out->output));
-    words = out->surroundBuffer;
-    i = 192;
-    while (i--) {
-        *words++ = 0;
+    DCFlushRange(__AXOutBuffer, sizeof(__AXOutBuffer));
+    {
+        u32* word = __AXOutSurround;
+        s32 count = 192;
+
+        while (count--) {
+            *word++ = 0;
+        }
     }
-    DCFlushRange(out->surroundBuffer, sizeof(out->surroundBuffer));
-    words = (u32*)out->ring;
-    i = 360;
-    while (i--) {
-        *words++ = 0;
+    DCFlushRange(__AXOutSurround, sizeof(__AXOutSurround));
+    {
+        u32* word = (u32*)__AXOutRing;
+        s32 count = 360;
+
+        while (count--) {
+            *word++ = 0;
+        }
     }
-    DCFlushRange(out->ring, sizeof(out->ring));
+    DCFlushRange(__AXOutRing, sizeof(__AXOutRing));
     __AXOutInitDSP();
     AIRegisterDMACallback(__AXOutAIDmaCallback);
-    buffers[0] = out->ring[0];
-    buffers[1] = out->ring[1];
-    buffers[2] = out->ring[2];
-    buffers[3] = out->ring[3];
+    buffers[0] = __AXOutRing[0];
+    buffers[1] = __AXOutRing[1];
+    buffers[2] = __AXOutRing[2];
+    buffers[3] = __AXOutRing[3];
     __AXOutReadPos = AX_OUT_FRAME_SAMPLES;
     __AXOutWritePos = AX_OUT_FRAME_SAMPLES;
     __AXOutRingSize = AX_OUT_RING_SAMPLES;
     if (__AXOutMode == 1) {
-        __AXNextFrame((u32)out->surroundBuffer, (u32)out->output[2], buffers);
+        __AXNextFrame((u32)__AXOutSurround, (u32)__AXOutBuffer[2], buffers);
     } else {
-        __AXNextFrame((u32)out->surroundBuffer, (u32)out->output[1], buffers);
+        __AXNextFrame((u32)__AXOutSurround, (u32)__AXOutBuffer[1], buffers);
     }
     __AXOutDspState = 1;
     __AXOutUserCallback = NULL;
     if (__AXOutMode == 1) {
-        AIInitDMA((u32)out->output[__AXOutDmaRead], AX_OUT_FRAME_BYTES);
+        AIInitDMA((u32)__AXOutBuffer[__AXOutDmaRead], AX_OUT_FRAME_BYTES);
         __AXOutDmaRead++;
     } else {
-        AIInitDMA((u32)out->output[__AXOutDmaFrame], AX_OUT_FRAME_BYTES);
+        AIInitDMA((u32)__AXOutBuffer[__AXOutDmaFrame], AX_OUT_FRAME_BYTES);
     }
     AIStartDMA();
     __AXOutFrameEndCallback = NULL;

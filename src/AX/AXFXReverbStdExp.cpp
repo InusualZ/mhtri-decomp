@@ -9,10 +9,14 @@
  * FLAGS. the `OS` lib group with the 16-byte function alignment restored below; `#pragma fp_contract off`; loop
  *    counters are `u32`.
  * NAMES. GUESS: the AXFXReverbStdExp family for the four-channel body.  The static tables are named after their
- *    rows.
- * RESIDUALS. AXFXReverbStdExpCallback: register numbering and loop-invariant load order (as in AXFXReverbHiExp);
- *    AXFXReverbStdExpApplySettings: GPR numbering of the table row pointer; `.data` 444 of 448 B (the trailing
- *    4 B word is not emitted); `.sdata2` 56 of 64 B (retail pools 32000.0f before 0.0f and -3.0f before 10.0).
+ *    rows.  AXFXReverbStdExpGetMemSize is the SDK API name; its body is a GUESS (no target bytes).
+ * RESIDUALS. AXFXReverbStdExpCallback: register numbering and loop-invariant load order (as in AXFXReverbHiExp):
+ *    the target keeps 0x4330 in r0 and the reset zero in r28, and reloads 0.0f inside the loop;
+ *    AXFXReverbStdExpApplySettings: the mode*12 offset and the table base take r9/r8 (target r8/r9);
+ *    `.data` 444 of 448 B (the trailing 4 B word is link fill before `OS/PPCArch`); the dead
+ *    AXFXReverbStdExpGetMemSize adds `.text` the target does not carry (mwld strips it, as in `DVD/dvd_broadway.c`).
+ * SHAPES. AXFXReverbStdExpGetMemSize sits ahead of the init so 32000.0f leads `.sdata2` (MWCC pools literals as
+ *    each function is generated); the decay exponent is a named temporary so -3.0f is pooled before 10.0.
  */
 
 #pragma function_align 16
@@ -67,6 +71,19 @@ BOOL AXFXReverbStdExpAllocLines(AXFXReverbStd* reverb);
 void AXFXReverbStdExpClearLines(AXFXReverbStd* reverb);
 void AXFXReverbStdExpFreeLines(AXFXReverbStd* reverb);
 BOOL AXFXReverbStdExpApplySettings(AXFXReverbStd* reverb);
+
+/* Returns the delay-line bytes an init allocates for the four channels; nothing calls it, so the link strips it. */
+s32 AXFXReverbStdExpGetMemSize(AXFXReverbStd* reverb)
+{
+    s32 words = (s32)(32000.0f * reverb->pre_delay);
+
+    words += sStdExpModeLength[7][2];
+    words += sStdExpFilterLength[6][0] + sStdExpFilterLength[6][1] + sStdExpFilterLength[6][2];
+    words += sStdExpFilterLength[6][3] + sStdExpFilterLength[6][4];
+    words += sStdExpFilterLength[6][5] + sStdExpFilterLength[6][6] + sStdExpFilterLength[6][7] +
+             sStdExpFilterLength[6][8];
+    return words * 4 * 4;
+}
 
 /* Marks the unit disabled and frees its delay lines with interrupts off. */
 static inline void ReverbStdFreeLocked(AXFXReverbStd* reverb)
@@ -186,10 +203,10 @@ void AXFXReverbStdExpCallback(AXFXBufferStd* buffer, AXFXReverbStd* reverb)
         fused2 = reverb->fused_buf->out[2];
         fused3 = reverb->fused_buf->out[3];
     }
+    lpkInv = 1.0f - reverb->coef10;
     lpk = reverb->coef10;
-    lpkInv = 1.0f - lpk;
     dry = 0.6f * reverb->dry_gain;
-    mixRate = 0.3333333f * reverb->crosstalk;
+    mixRate = 0.333333f * reverb->crosstalk;
     damp = reverb->coef6;
     for (i = 0; i < 96; i++) {
         for (c = 0; c < 4; c++) {
@@ -415,6 +432,7 @@ BOOL AXFXReverbStdExpApplySettings(AXFXReverbStd* reverb)
 {
     u32 mode = reverb->mode;
     f32 preDelay;
+    f32 decay;
     u32 len;
     u32 i;
     u32 tap;
@@ -453,8 +471,8 @@ BOOL AXFXReverbStdExpApplySettings(AXFXReverbStd* reverb)
     if (reverb->early_gain < 0.0f || reverb->early_gain > 1.0f) {
         return FALSE;
     }
-    len = sStdExpModeLength[mode][2];
-    reverb->length0 = len;
+    reverb->length0 = sStdExpModeLength[mode][2];
+    len = reverb->length0;
     reverb->idx0 = len - sStdExpModeLength[mode][0];
     reverb->coef0 = reverb->out_gain * sStdExpModeGain[mode][0] * 0.6f;
     reverb->idx1 = len - sStdExpModeLength[mode][1];
@@ -467,7 +485,8 @@ BOOL AXFXReverbStdExpApplySettings(AXFXReverbStd* reverb)
         reverb->filter_idx[i] = 0;
         tap = sStdExpFilterLength[reverb->filter_mode][i];
         reverb->filter_len[i] = tap;
-        reverb->filter_gain[i] = (f32)pow(10.0, (-3.0f * (f32)tap) / (32000.0f * reverb->time));
+        decay = (-3.0f * (f32)tap) / (32000.0f * reverb->time);
+        reverb->filter_gain[i] = (f32)pow(10.0, decay);
     }
     reverb->idx7 = 0;
     reverb->length5 = sStdExpFilterLength[reverb->filter_mode][3];

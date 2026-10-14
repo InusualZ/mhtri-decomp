@@ -16,9 +16,15 @@
  *    are reached through the `.sbss` pointers 0x80794FD8..0x80794FE0 that `__AXVPBInit` fills; `.sdata2`
  *    0x8079CF48..0x8079CF68 holds the float constants of `AXSetVoiceSrcRatio` and `AXGetLpfCoefs`.
  * RESIDUALS. AXSetVoiceLpf 0x804717C0 and AXSetVoiceAdpcmLoop 0x80471760: the target stores the first halfword before
- *    it loads `sync`, ours hoists the load; __AXSyncPBs 0x80470F10: add association and register colouring of the cycle
- *    sums; __AXVPBInitVoices 0x804712A0:
- *    register colouring; __AXServiceVPB 0x804709C0: ITD copy temporaries take r3/r0 swapped.
+ *    it loads `sync`, ours hoists the load: MWCC lets a load through the `const` source pointer that `AX/AXVPB.h`
+ *    declares pass the stores (a non-const parameter and field-wise copies match both rows);
+ *    __AXServiceVPB 0x804709C0: ITD copy temporaries take r3/r0 swapped.
+ * SHAPES. AXGetLpfCoefs folds `2.0f - cos(...)` into one expression and names the square root, which pools the
+ *    literals in the target's order (2.0f before 2pi, 1.0f before 32768.0f); `__AXPBData` is 32-byte aligned.
+ *    __AXSyncPBs sums the cycle tables left to right in field order (MWCC reassociates them into the target's
+ *    order), writes the start count as one sum, and walks the priority-0 stack with a block-scoped pointer.
+ *    __AXVPBInitVoices sets the cycle limit before the cycle count, clears the PB table with an open loop whose
+ *    count is declared before its pointer, and takes the PB, ITD and voice pointers in that order.
  */
 
 #include "types.h"
@@ -76,7 +82,7 @@
 
 AXVPB __AXVPBData[AX_MAX_VOICES];
 u32 __AXItdData[AX_MAX_VOICES][0x10];
-AXPB __AXPBData[AX_MAX_VOICES];
+AXPB __AXPBData[AX_MAX_VOICES] __attribute__((aligned(32)));
 
 u32 __AXCycleLimit;
 u32 __AXCycles;
@@ -272,8 +278,7 @@ void __AXSyncPBs(u32 baseCycles)
     __AXNumVoices = 0;
     DCInvalidateRange(__AXPBs, __AXMaxVoices * sizeof(AXPB));
     DCInvalidateRange(__AXItdBuffers, __AXMaxVoices << 6);
-    cycles = __AXGetCommandListCycles() + __AXMaxVoices * 600;
-    cycles = cycles + baseCycles + 32;
+    cycles = __AXGetCommandListCycles() + 32 + __AXMaxVoices * 600 + baseCycles;
     for (priority = 31; priority != 0; priority--) {
         for (vpb = __AXGetStackHead(priority); vpb != NULL; vpb = vpb->next) {
             if (vpb->pb.itdOn == 1) {
@@ -309,9 +314,8 @@ void __AXSyncPBs(u32 baseCycles)
                 }
                 cycles += srcCycles;
                 stateWord = vpb->pb.stateWord;
-                cycles = cycles + __AXCycleTableA[(stateWord >> 26) & 0x1F]
-                         + (__AXCycleTableA[(stateWord >> 16) & 0x1F]
-                            + (__AXCycleTableA[(stateWord >> 21) & 0x1F] + __AXCycleTableA[stateWord & 0x1F]));
+                cycles += __AXCycleTableA[stateWord & 0x1F] + __AXCycleTableA[(stateWord >> 16) & 0x1F]
+                          + __AXCycleTableA[(stateWord >> 21) & 0x1F] + __AXCycleTableA[(stateWord >> 26) & 0x1F];
                 if (vpb->pb.rmtOn == 1) {
                     cycles += 613;
                     if (vpb->pb.rmtIir[0] == 1) {
@@ -320,10 +324,9 @@ void __AXSyncPBs(u32 baseCycles)
                         cycles += 834;
                     }
                     select = vpb->pb.rmtSelect;
-                    cycles = (AX_RMT_FIELD(select, 14) + AX_RMT_FIELD(select, 12))
-                             + (cycles + AX_RMT_FIELD(select, 10))
-                             + (AX_RMT_FIELD(select, 8) + AX_RMT_FIELD(select, 6)
-                                + (AX_RMT_FIELD(select, 2) + (AX_RMT_FIELD(select, 4) + AX_RMT_FIELD(select, 0))));
+                    cycles += AX_RMT_FIELD(select, 0) + AX_RMT_FIELD(select, 2) + AX_RMT_FIELD(select, 4) + AX_RMT_FIELD(select, 6)
+                              + AX_RMT_FIELD(select, 8) + AX_RMT_FIELD(select, 10) + AX_RMT_FIELD(select, 12)
+                              + AX_RMT_FIELD(select, 14);
                 }
                 if (__AXCycleLimit > cycles) {
                     __AXServiceVPB(vpb);
@@ -344,12 +347,16 @@ void __AXSyncPBs(u32 baseCycles)
         }
     }
     __AXCycles = cycles;
-    for (vpb = __AXGetStackHead(0); vpb != NULL; vpb = vpb->next) {
-        if (vpb->depop != 0) {
-            __AXDepopVoice(&__AXPBs[vpb->index]);
+    {
+        AXVPB* idle;
+
+        for (idle = __AXGetStackHead(0); idle != NULL; idle = idle->next) {
+            if (idle->depop != 0) {
+                __AXDepopVoice(&__AXPBs[idle->index]);
+            }
+            idle->depop = 0;
+            __AXPBs[idle->index].running = 0;
         }
-        vpb->depop = 0;
-        __AXPBs[vpb->index].running = 0;
     }
     DCFlushRange(__AXPBs, __AXMaxVoices * sizeof(AXPB));
     DCFlushRange(__AXItdBuffers, __AXMaxVoices << 6);
@@ -406,15 +413,22 @@ void __AXVPBInitVoices(void)
     AXVPB* vpb;
     u32* itd;
 
-    __AXCycles = 0;
     __AXCycleLimit = OS_BUS_CLOCK / 667;
-    __AXClearWords((u32*)__AXPBs, __AXMaxVoices * 0x50);
+    __AXCycles = 0;
+    {
+        u32 words = __AXMaxVoices * 0x50;
+        u32* word = (u32*)__AXPBs;
+
+        while (words--) {
+            *word++ = 0;
+        }
+    }
     __AXClearWords(__AXItdBuffers, __AXMaxVoices * 0x10);
     __AXClearWords((u32*)__AXVPBs, __AXMaxVoices * 0x5A);
     for (i = 0; i < __AXMaxVoices; i++) {
-        vpb = &__AXVPBs[i];
         dsp = &__AXPBs[i];
         itd = &__AXItdBuffers[i * 0x10];
+        vpb = &__AXVPBs[i];
         vpb->index = i;
         vpb->itdBufferData = itd;
         __AXSetPBDefault(vpb);
@@ -424,12 +438,10 @@ void __AXVPBInitVoices(void)
             vpb->pb.next.lo = 0;
             vpb->pb.next.hi = 0;
         } else {
-            u32 next = (u32)(dsp + 1);
-
-            vpb->pb.next.hi = next >> 16;
-            vpb->pb.next.lo = next;
-            dsp->next.hi = next >> 16;
-            dsp->next.lo = next;
+            vpb->pb.next.hi = (u32)(dsp + 1) >> 16;
+            vpb->pb.next.lo = (u32)(dsp + 1);
+            dsp->next.hi = (u32)(dsp + 1) >> 16;
+            dsp->next.lo = (u32)(dsp + 1);
         }
         vpb->pb.self.hi = (u32)dsp >> 16;
         vpb->pb.self.lo = (u32)dsp;
@@ -562,9 +574,9 @@ void AXSetVoiceLpfCoefs(AXVPB* vpb, u16 a0, u16 b0)
 /* 0x80471890 (0xBC): computes the one-pole low-pass coefficients for a cutoff frequency in Hz. */
 void AXGetLpfCoefs(u16 frequency, u16* a0, u16* b0)
 {
-    f32 cosine = (f32)cos(6.2831855f * (f32)frequency / 32000.0f);
-    f32 c = 2.0f - cosine;
-    s16 coef = (s16)(32768.0f * -((f32)sqrt(c * c - 1.0f) - c));
+    f32 c = 2.0f - (f32)cos(6.2831855f * (f32)frequency / 32000.0f);
+    f32 root = (f32)sqrt(c * c - 1.0f);
+    s16 coef = (s16)(32768.0f * -(root - c));
 
     *b0 = coef;
     *a0 = 0x7FFF - (u16)coef;

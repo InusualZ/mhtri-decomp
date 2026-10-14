@@ -11,14 +11,16 @@
  * NAMES. AXFXReverbHiExpShutdown (0x804751A0) is a GUESS by analogy with AXFXReverbStdExpShutdown (the map's
  *    analyzer name DVDCancel was a mislabel: the body sets the shutdown flag and frees the delay lines, and the only
  *    caller is AXFXReverbHiShutdown); the Alloc/Clear/Free/ApplySettings rows are GUESSES from what each body does;
- *    the three tables are file statics named after their rows (sHiExpModeLength / sHiExpModeGain / sHiExpFilterLength).
+ *    the three tables are file statics named after their rows (sHiExpModeLength / sHiExpModeGain / sHiExpFilterLength);
+ *    AXFXReverbHiExpGetMemSize is the SDK API name, its body a GUESS (no target bytes).
  * RESIDUALS. AXFXReverbHiExpCallback: constant-register numbering and the position of the `0.0f` load of the comb
- *    accumulator differ (r7..r12 vs r5..r10, loop-invariant `lfs` order); AXFXReverbHiExpApplySettings: GPR
- *    numbering of the mode-table row pointer (r6/r7/r9); `.sdata2` 56 of 64 B: retail orders the pool 32000.0f
- *    before 0.0f and -3.0f before 10.0 (the unit's literal order cannot be reached from the source order tried);
- *    `.text` pads are linker-added.
+ *    accumulator differ (r7..r12 vs r5..r10, loop-invariant `lfs` order); AXFXReverbHiExpApplySettings: the
+ *    mode*12 offset and the table base take r9/r8 (target r8/r9); the dead AXFXReverbHiExpGetMemSize adds `.text`
+ *    the target does not carry (mwld strips it, as in `DVD/dvd_broadway.c`); `.text` pads are linker-added.
  * SHAPES. the comb accumulator is a loop over j (retail unrolls it); the early/fused buffers are `AXFXBuffer`
- *    pointer triples copied to locals before the sample loop.
+ *    pointer triples copied to locals before the sample loop.  AXFXReverbHiExpGetMemSize sits ahead of the init so
+ *    32000.0f leads `.sdata2` (MWCC pools literals as each function is generated); the decay exponent is a named
+ *    temporary so -3.0f is pooled before 10.0.
  */
 
 /* -O4,p is this lib section's default function alignment (16); cflags_os overrides it to 4 for the OS units,
@@ -68,6 +70,18 @@ static u32 sHiExpFilterLength[7][8] = {
     {1823, 2357, 2693, 571, 137, 47, 73, 67},
     {1823, 2357, 2693, 571, 179, 47, 73, 67},
 };
+
+/* Returns the delay-line bytes an init allocates for the three channels; nothing calls it, so the link strips it. */
+s32 AXFXReverbHiExpGetMemSize(AXFXReverbHi* reverb)
+{
+    s32 words = (s32)(32000.0f * reverb->pre_delay);
+
+    words += sHiExpModeLength[7][2];
+    words += sHiExpFilterLength[6][0] + sHiExpFilterLength[6][1] + sHiExpFilterLength[6][2];
+    words += sHiExpFilterLength[6][3] + sHiExpFilterLength[6][4];
+    words += sHiExpFilterLength[6][5] + sHiExpFilterLength[6][6] + sHiExpFilterLength[6][7];
+    return words * 4 * 3;
+}
 
 /* Marks the unit disabled and frees its delay lines with interrupts off. */
 static inline void ReverbHiExpFreeLocked(AXFXReverbHi* reverb)
@@ -190,8 +204,8 @@ void AXFXReverbHiExpCallback(AXFXBuffer* buffer, AXFXReverbHi* reverb)
         fused1 = reverb->fused_buf->out1;
         fused2 = reverb->fused_buf->out2;
     }
+    lpkInv = 1.0f - reverb->coef10;
     lpk = reverb->coef10;
-    lpkInv = 1.0f - lpk;
     dry = 0.6f * reverb->dry_gain;
     mixRate = 0.5f * reverb->crosstalk;
     damp = reverb->coef6;
@@ -417,6 +431,7 @@ BOOL AXFXReverbHiExpApplySettings(AXFXReverbHi* reverb)
 {
     u32 mode = reverb->mode;
     f32 preDelay;
+    f32 decay;
     u32 len;
     u32 i;
     u32 tap;
@@ -455,8 +470,8 @@ BOOL AXFXReverbHiExpApplySettings(AXFXReverbHi* reverb)
     if (reverb->params.a.early_gain < 0.0f || reverb->params.a.early_gain > 1.0f) {
         return FALSE;
     }
-    len = sHiExpModeLength[mode][2];
-    reverb->length0 = len;
+    reverb->length0 = sHiExpModeLength[mode][2];
+    len = reverb->length0;
     reverb->idx0 = len - sHiExpModeLength[mode][0];
     reverb->coef0 = reverb->out_gain * sHiExpModeGain[mode][0] * 0.6f;
     reverb->idx1 = len - sHiExpModeLength[mode][1];
@@ -469,7 +484,8 @@ BOOL AXFXReverbHiExpApplySettings(AXFXReverbHi* reverb)
         reverb->filter_idx[i] = 0;
         tap = sHiExpFilterLength[reverb->filter_mode][i];
         reverb->filter_len[i] = tap;
-        reverb->filter_gain[i] = (f32)pow(10.0, (-3.0f * (f32)tap) / (32000.0f * reverb->time));
+        decay = (-3.0f * (f32)tap) / (32000.0f * reverb->time);
+        reverb->filter_gain[i] = (f32)pow(10.0, decay);
     }
     reverb->idx7 = 0;
     reverb->length5 = sHiExpFilterLength[reverb->filter_mode][3];
