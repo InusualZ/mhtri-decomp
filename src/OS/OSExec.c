@@ -17,16 +17,24 @@
  *    word 0x80795334 the partition-offset helper caches), `OSExecPartition*`/`OSExecTmd`/`OSAppLoaderHeader` and their
  *    fields, the `OS_*` low-memory macros, the DVDLow* names in `DVD/dvd_broadway.h` (from the DI command shapes: open
  *    partition takes offset, ticket, certs, TMD and callback; the ticket-view variant takes seven arguments).
- * RESIDUALS. register numbering of the six pointers of `__OSLaunchNextFirmware` (99.2 %, bytes and sizes equal); in
- *    `__OSBootDolSimple` (96.9 %) the offset helper keeps its value in r4 where the target uses r6, and params/header take
- *    swapped r30/r31; `OSExecWideToHex` (82.7 %): the target keeps the constant 4 in a register for its `4 & ~mask` shift and
- *    reloads the byte after the nibble test; `OSExecPackArgs`/`OSExecPackArgsWide` register numbering of locals;
- *    `__OSLaunchMenu` (95.8 %): the target branches `beq`+`b` over the result test where the source gives one `bne`;
- *    `OSExecJump` swaps two epilogue loads after the `bctr`.  Flip: not READY (the rows above; .data/.sdata/.sbss contents
- *    equal, only tail padding differs).
- * SHAPES. `OSExecJump` flushes the instruction cache and branches with inline asm; the empty `(void)0` bodies keep the
- *    target's branch shape; the eight disc-read command blocks are locals of `__OSBootDolSimple` declared in the reverse of
- *    their address order (the first declared sits highest); `titleId` is 32-aligned (the frame aligns dynamically).
+ * RESIDUALS. register numbering of the six pointers of `__OSLaunchNextFirmware` (bytes and sizes equal); in
+ *    `__OSBootDolSimple` the inlined partition-offset helper keeps its value in r4/r8 where the target uses r6 (and r6 for
+ *    the first disc-info load where the target uses r4), and the boot jump keeps the 0x80000000 base and the entry in
+ *    saved r27/r28 where the target uses volatile r5 and reloads the base (0x750 vs 0x754);
+ *    `OSExecPackArgs`/`OSExecPackArgsWide`: the page and `argv` take r29/r30 swapped (and the wide packer's
+ *    argc/cursor/argument pointer other saved registers), declaration order measured without effect.  The .sbss word
+ *    0x80795334 is `OSExecDataOffset` here and `lbl_80795334` in the map (rename filed).  Flip: not READY (the rows above;
+ *    .data/.sdata/.sbss contents equal, only tail padding differs).
+ * SHAPES. `OSExecJump` flushes the instruction cache and branches with inline asm, under a scoped `#pragma scheduling off`
+ *    (the target keeps the epilogue's `lwz r31` ahead of `lwz r0`); the empty `(void)0` bodies keep the target's branch
+ *    shape; the eight disc-read command blocks are locals of `__OSBootDolSimple` declared in the reverse of their address
+ *    order (the first declared sits highest); `titleId` is 32-aligned (the frame aligns dynamically); the packers copy the
+ *    count inside the `argc != 0` branch; `OSExecWideToHex` picks its nibble shift with `odd ? 0 : 4` (the compiler's
+ *    branch-free form keeps the 4 in a register) and declares `odd` before `nibble`; `__OSLaunchMenu` leaves through one
+ *    `viewCount != 1 || result != 0` test (the target's `beq` + `b` pair); `OSExecJump` is `never_inline` (the target
+ *    calls it from `__OSBootDolSimple`); the partition-offset helper loads the disc info's offset into `dataOffset` before
+ *    adding the base word; the apploader callbacks and their out-parameters are declared in the reverse of their stack
+ *    order.
  */
 
 #include "types.h"
@@ -85,13 +93,14 @@ BOOL OSExecPackArgs(OSExecArgPage* page, s32 argc, char** argv)
     char** arg;
     char* str;
     u8* cursor;
-    u32 count = argc;
+    u32 count;
     u32 j;
 
     memset(page, 0, sizeof(OSExecArgPage));
     if (argc == 0) {
         page->argsOffset = 0;
     } else {
+        count = argc;
         cursor = base + sizeof(OSExecArgPage);
         arg = argv + argc;
         while (arg--, --argc >= 0) {
@@ -113,8 +122,8 @@ BOOL OSExecPackArgs(OSExecArgPage* page, s32 argc, char** argv)
 /* 0x804CDEF0 (0x158): writes the wide string `src` to `dst` as lower-case hex digits, four per character; returns FALSE on a bad digit. */
 BOOL OSExecWideToHex(char* dst, const char* src)
 {
-    s32 nibble;
     s32 odd;
+    s32 nibble;
     s32 mask;
     s32 digit;
     u8 shift;
@@ -124,7 +133,7 @@ BOOL OSExecWideToHex(char* dst, const char* src)
             for (nibble = 0; nibble < 4; nibble++) {
                 odd = nibble & 1;
                 mask = odd ? 0x0F : 0xF0;
-                shift = 4 & ~((-odd | odd) >> 31);
+                shift = odd ? 0 : 4;
                 digit = (*src & mask) >> shift;
                 if (digit >= 0 && 10 > digit) {
                     *dst = (char)(digit + '0');
@@ -153,13 +162,14 @@ BOOL OSExecPackArgsWide(OSExecArgPage* page, s32 argc, char** argv)
     char** arg;
     char* str;
     u8* cursor;
-    u32 count = argc;
+    u32 count;
     u32 j;
 
     memset(page, 0, sizeof(OSExecArgPage));
     if (argc == 0) {
         page->argsOffset = 0;
     } else {
+        count = argc;
         cursor = base + sizeof(OSExecArgPage);
         arg = argv + argc;
         while (arg--, --argc >= 0) {
@@ -185,8 +195,10 @@ BOOL OSExecPackArgsWide(OSExecArgPage* page, s32 argc, char** argv)
     return TRUE;
 }
 
+#pragma push
+#pragma scheduling off
 /* 0x804CE220 (0x3C): flushes the instruction cache and jumps to `entry`. */
-void OSExecJump(register u32 entry)
+void __attribute__((never_inline)) OSExecJump(register u32 entry)
 {
     ICFlashInvalidate();
     asm {
@@ -196,6 +208,7 @@ void OSExecJump(register u32 entry)
         bctr
     }
 }
+#pragma pop
 
 /* 0x804CE260 (0xC): marks the exec state ready. */
 void OSExecSetReady(s32 result, DVDCommandBlock* block)
@@ -418,15 +431,13 @@ void __OSLaunchMenu(void)
     OSSetArenaHi((void*)0x812F0000);
     if (ESP_InitLib() == 0) {
         result = ESP_GetTicketViews(0x0000000100000002ULL, NULL, &viewCount);
-        if (viewCount == 1) {
-            if (result != 0) {
-                return;
-            }
-            views = (ESTicketView*)OSAllocFromMEM1ArenaLo((viewCount * sizeof(ESTicketView) + 31) & ~31, 32);
-            if (ESP_GetTicketViews(0x0000000100000002ULL, views, &viewCount) == 0) {
-                if (ESP_LaunchTitle(0x0000000100000002ULL, views) == 0) {
-                    for (;;) {
-                    }
+        if (viewCount != 1 || result != 0) {
+            return;
+        }
+        views = (ESTicketView*)OSAllocFromMEM1ArenaLo((viewCount * sizeof(ESTicketView) + 31) & ~31, 32);
+        if (ESP_GetTicketViews(0x0000000100000002ULL, views, &viewCount) == 0) {
+            if (ESP_LaunchTitle(0x0000000100000002ULL, views) == 0) {
+                for (;;) {
                 }
             }
         }
@@ -491,7 +502,8 @@ static inline s32 GetPartitionDataOffset(DVDCommandBlock* block)
     } else if (OS_DISC_PARTITION_BASE_WORD != 0) {
         info = OSAllocFromMEM1ArenaLo(0x40, 0x20);
         ReadDiscBlocking(block, info, 0x40, OS_DISC_PARTITION_BASE_WORD >> 2);
-        dataOffset = (OS_DISC_PARTITION_BASE_WORD + info->dataOffset) >> 2;
+        dataOffset = info->dataOffset;
+        dataOffset = (OS_DISC_PARTITION_BASE_WORD + dataOffset) >> 2;
         OSExecDataOffset = dataOffset;
     } else {
         dataOffset = OS_DISC_PARTITION_DEFAULT_OFFSET;
@@ -506,12 +518,12 @@ void __OSBootDolSimple(u32 dolOffset, u32 resetCode, u8* saveStart, u8* saveEnd,
     OSAppLoaderHeader* header;
     OSExecParams* params;
     OSExecParams* paramsCopy;
-    OSAppLoaderInit appInit;
-    OSAppLoaderMain appMain;
-    OSAppLoaderClose appClose;
-    u8* dst;
-    u32 size;
     u32 offset;
+    u32 size;
+    u8* dst;
+    OSAppLoaderClose appClose;
+    OSAppLoaderMain appMain;
+    OSAppLoaderInit appInit;
     u64 titleId __attribute__((aligned(32)));
     BOOL newerAppLoader;
     u32 entry;

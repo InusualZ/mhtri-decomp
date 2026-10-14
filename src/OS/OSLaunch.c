@@ -12,16 +12,23 @@
  *    `OSLaunchTitleDirect`, `OSLaunchTitleWithArgs` (its log text says "OSLaunchTitle()"), `OSLaunchShopChannelHelp`,
  *    `OSLaunchSystemMode`, `NANDGetUsage` (calls `ISFS_GetUsage`); `ESTmdView` is a local record.  The foreign DVD function
  *    `DVDResetDriveSync` is a GUESS (a blocking drive-command wrapper that waits on a flag a callback sets).
- * RESIDUALS. `OSTitleHasContent` (84.7 %): the target loads the title id after the three count stores and holds
- *    it in r30/r31 swapped; `__OSRelaunchTitle` and `OSLaunchTitleWithArgs`: the target compares the allocation result
- *    with `li r0,0` + `cmplw` where the source compare gives `cmpwi`; `OSLaunchTitleWithArgs` also swaps r28/r29 (tmd
- *    view / check flag) and the argv copy loop; `OSLaunchPackArgs` register numbering of two locals; `OSLaunchShopChannelHelp`
- *    r30/r31 swap.  Flip blockers: .data holds 0x118 bytes of strings (0x118..0x31C: the `__OSLaunchTitlevForSystem`,
- *    `OSLaunchManualViewer` and `OSLaunchPDChannel` texts) that no function of the unit or the DOL references (code the
- *    linker dropped), .sdata/.sbss are emitted but unclaimed bytes differ, and .text claims 0x180 more than the object.
- * SHAPES. the argument packer walks `argv` from the end with `while (arg--, --argc >= 0)` and keeps the count in a copy;
- *    the buffers the ES calls fill are `aligned(32)` locals; the path buffers of `OSCheckTitleMakerCode` are 76 and 68 bytes
- *    (the frame size says so); the ticket-view buffer is one view rounded up to 32 bytes.
+ * RESIDUALS. `OSLaunchTitleWithArgs`: the tmd view and the check flag take r28/r29 swapped, the stack slot of `flags` is 8 bytes
+ *    higher (0x80 vs 0x78), and the unrolled argv copy loop schedules its index and pointer increments in another order;
+ *    `OSLaunchPackArgs`: the page and `argv` take r29/r30 swapped and the table-size temporaries other volatile registers
+ *    (declaration order measured without effect).  Flip blockers: .data holds 0x118 bytes of strings (0x118..0x31C: the
+ *    `__OSLaunchTitlevForSystem`, `OSLaunchManualViewer` and `OSLaunchPDChannel` texts) that no function of the unit or the
+ *    DOL references (code the linker dropped), .sdata/.sbss are emitted but unclaimed bytes differ, and .text claims 0x180
+ *    more than the object.
+ * SHAPES. the argument packer walks `argv` from the end with `while (arg--, --argc >= 0)` and copies the count inside the
+ *    `argc != 0` branch; the buffers the ES calls fill are `aligned(32)` locals; the path buffers of `OSCheckTitleMakerCode`
+ *    are 76 and 68 bytes (the frame size says so); the ticket-view buffer is one view rounded up to 32 bytes; the
+ *    allocation results of `__OSRelaunchTitle` and `OSLaunchTitleWithArgs` are compared with `(void*)0` (the SDK's
+ *    `NULL`, a pointer: `li r0,0` + `cmplw`; this project's integer `NULL` gives `cmpwi`); the boot title id is split into
+ *    block-scope `hi`/`lo` locals and stored low word first; the region is a block-scope local (kept in a saved register
+ *    across `SCGetProductGameRegion`); `OSLaunchTitleWithArgs`'s `argc`/`i` are signed and `argc` is post-incremented in
+ *    the table allocation; `OSTitleHasContent` takes a non-const view and reads the title id as one `u64` (with a const
+ *    view the scheduler hoists the loads above the count stores); in `OSLaunchShopChannelHelp` `argv` is declared before
+ *    `url`.
  */
 
 #include "types.h"
@@ -51,8 +58,7 @@ static u32 OSLaunchSystemMode[2];
 #pragma pack(push, 1)
 typedef struct ESTmdView {
     /* +0x00 */ u8 pad_0x00[4];
-    /* +0x04 */ u32 titleIdHi;
-    /* +0x08 */ u32 titleIdLo;
+    /* +0x04 */ u64 titleId;
     /* +0x0C */ u8 pad_0x0C[0x0E];
     /* +0x1A */ u32 region; /* 3 for every region, else the product game region */
     /* +0x1E */ u8 pad_0x1E[0x14];
@@ -77,13 +83,14 @@ BOOL OSLaunchPackArgs(OSLaunchArgPage* page, s32 argc, char** argv)
     char** arg;
     char* str;
     u8* cursor;
-    u32 count = argc;
+    u32 count;
     u32 j;
 
     memset(page, 0, sizeof(OSLaunchArgPage));
     if (argc == 0) {
         page->argsOffset = 0;
     } else {
+        count = argc;
         cursor = base + sizeof(OSLaunchArgPage);
         arg = argv + argc;
         while (arg--, --argc >= 0) {
@@ -136,7 +143,7 @@ BOOL OSCheckTitleMakerCode(u64 titleId, BOOL useDisc)
 }
 
 /* 0x804D7490 (0xD4): checks that the title has one ticket and more than two files below its content directory. */
-BOOL OSTitleHasContent(const ESTmdView* tmdView)
+BOOL OSTitleHasContent(ESTmdView* tmdView)
 {
     u32 ticketCount = 0;
     u32 blockCount = 0;
@@ -144,7 +151,7 @@ BOOL OSTitleHasContent(const ESTmdView* tmdView)
     char path[96] __attribute__((aligned(32)));
     u64 titleId;
 
-    titleId = ((u64)tmdView->titleIdHi << 32) | tmdView->titleIdLo;
+    titleId = tmdView->titleId;
     if (ESP_GetTicketViews(titleId, NULL, &ticketCount) != 0 || ticketCount != 1) {
         return FALSE;
     }
@@ -244,7 +251,7 @@ void __OSRelaunchTitle(u32 launchCode)
         __OSReturnToMenuForError();
     }
     ticketView = (ESTicketView*)OSAllocFromMEM1ArenaLo(TICKET_VIEW_BUFFER_SIZE, 32);
-    if (!ticketView) {
+    if (ticketView == (void*)0) {
         __OSReturnToMenuForError();
     }
     memset(ticketView, 0, TICKET_VIEW_BUFFER_SIZE);
@@ -254,7 +261,7 @@ void __OSRelaunchTitle(u32 launchCode)
             __OSReturnToMenuForError();
         }
         views = (ESTicketView*)OSAllocFromMEM1ArenaLo((viewCount * sizeof(ESTicketView) + 31) & ~31, 32);
-        if (!views) {
+        if (views == (void*)0) {
             __OSReturnToMenuForError();
         }
         if (ESP_GetTicketViews(titleId, views, &viewCount) != 0) {
@@ -275,8 +282,13 @@ void __OSRelaunchTitle(u32 launchCode)
     page = (OSLaunchArgPage*)OSAllocFromMEM1ArenaLo(sizeof(OSLaunchArgPage), 64);
     info = &page->bootInfo;
     memset(page, 0, sizeof(OSLaunchArgPage));
-    info->body.fields.titleIdHi = (u32)(titleId >> 32);
-    info->body.fields.titleIdLo = (u32)titleId;
+    {
+        u32 hi = (u32)(titleId >> 32);
+        u32 lo = (u32)titleId;
+
+        info->body.fields.titleIdLo = lo;
+        info->body.fields.titleIdHi = hi;
+    }
     info->body.fields.appType = OSGetAppType();
     info->body.fields.launchKind = 1;
     info->body.fields.launchCode = launchCode | 0x80000000;
@@ -334,15 +346,15 @@ void OSLaunchTitleWithArgs(u64 titleId, u32 launchCode, char** argv, BOOL checkT
 {
     ESTmdView* tmdView = NULL;
     u32 tmdSize = 0;
-    OSLaunchArgPage* page;
     OSNandbootInfo* info;
+    OSLaunchArgPage* page;
     char** table;
     OSStateFlags flags;
     char name[24] __attribute__((aligned(32)));
     u64 bootTitleId __attribute__((aligned(32)));
     BOOL ok;
-    u32 argc;
-    u32 i;
+    s32 argc;
+    s32 i;
     s32 result;
 
     if (ESP_InitLib() != 0) {
@@ -352,7 +364,7 @@ void OSLaunchTitleWithArgs(u64 titleId, u32 launchCode, char** argv, BOOL checkT
         __OSReturnToMenuForError();
     }
     tmdView = (ESTmdView*)OSAllocFromMEM1ArenaLo((tmdSize + 31) & ~31, 64);
-    if (tmdView == NULL) {
+    if (tmdView == (void*)0) {
         __OSReturnToMenuForError();
     }
     if (ESP_GetTmdView(titleId, tmdView, &tmdSize) != 0) {
@@ -367,12 +379,16 @@ void OSLaunchTitleWithArgs(u64 titleId, u32 launchCode, char** argv, BOOL checkT
             OSReport("OSLaunchTitle(): Company code is not correct\n");
             __OSReturnToMenuForError();
         }
-        if (tmdView->region == 3) {
-            ok = TRUE;
-        } else if (tmdView->region == SCGetProductGameRegion()) {
-            ok = TRUE;
-        } else {
-            ok = FALSE;
+        {
+            u32 region = tmdView->region;
+
+            if (region == 3) {
+                ok = TRUE;
+            } else if (region == SCGetProductGameRegion()) {
+                ok = TRUE;
+            } else {
+                ok = FALSE;
+            }
         }
         if (!ok) {
             OSReport("OSLaunchTitle(): Country code is not correct\n");
@@ -393,8 +409,7 @@ void OSLaunchTitleWithArgs(u64 titleId, u32 launchCode, char** argv, BOOL checkT
                 argc++;
             }
         }
-        table = (char**)OSAllocFromMEM1ArenaLo((argc + 2) * sizeof(char*), 1);
-        argc++;
+        table = (char**)OSAllocFromMEM1ArenaLo((argc++ + 2) * sizeof(char*), 1);
         table[0] = name;
         for (i = 1; i < argc; i++) {
             table[i] = argv[i - 1];
@@ -414,8 +429,13 @@ void OSLaunchTitleWithArgs(u64 titleId, u32 launchCode, char** argv, BOOL checkT
                 __OSDoHotReset();
             }
         }
-        info->body.fields.titleIdHi = (u32)(bootTitleId >> 32);
-        info->body.fields.titleIdLo = (u32)bootTitleId;
+        {
+            u32 hi = (u32)(bootTitleId >> 32);
+            u32 lo = (u32)bootTitleId;
+
+            info->body.fields.titleIdLo = lo;
+            info->body.fields.titleIdHi = hi;
+        }
         info->body.fields.argsOffset = page->argsOffset;
         info->body.fields.appType = OSGetAppType();
         if (titleId == 0x0000000100000002ULL) {
@@ -444,8 +464,8 @@ void OSLaunchTitleWithArgs(u64 titleId, u32 launchCode, char** argv, BOOL checkT
 /* 0x804D7ED0 (0x118): launches the Shop Channel help page of the console's region and returns only on failure. */
 void OSLaunchShopChannelHelp(void)
 {
-    char* url;
     char** argv;
+    char* url;
     u64 helpTitleId;
 
     OSGetAppType();

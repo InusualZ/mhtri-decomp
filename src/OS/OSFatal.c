@@ -13,14 +13,17 @@
  *    `FatalScreenFiber` is a GUESS (the screen task `OSFatal` switches to), `s_fatalContext`, `s_fatalParam` and `s_fatalFormat`
  *    are GUESS names; `VIInit` (0x804E7480), `VIConfigure` (0x804E7F60), `VIConfigurePan` (0x804E8630) and `GXAbortFrame`
  *    (0x804B5FA0) are GUESS names taken from their bodies and from the arguments this unit passes.
- * RESIDUALS. `DrawFatalText` (90 %): the glyph loop is a `for(;;)` with the end-of-string test on top (the target tests at the
- *    bottom and leaves by fall-through), the pixel store is `stbux` where the target uses `stbx` plus a separate pointer, and the
- *    multiplies are scheduled in the other order. `FatalScreenFiber` (98.6 %): same instructions, `param`/`len`/`font` take
- *    r31/r29/r30 where the target has r29/r30/r31. The .bss run is 0xC short of the claim (link padding) and the format string
- *    is an anonymous .sdata word here, not `s_fatalFormat`.
+ * RESIDUALS. `DrawFatalText`: the target's line break and line-full paths jump straight back to the line test (a jump into
+ *    the loop head, the shape of a `goto`), while the conformant `for(;;)` + `while` + after-loop `*str == 0` re-test costs
+ *    8 bytes (0x330 vs 0x328); the pixel store is `stbux` where the target uses `stbx` plus a separate pointer, the
+ *    `color.r * texel * 239` multiplies are scheduled in the other order (any association measures the same), and the pixel
+ *    loop's counters take other volatile registers. The .bss run is 0xC short of the claim (link padding) and the format
+ *    string is an anonymous .sdata word here, not `s_fatalFormat`.
  * SHAPES. the RGB to YCbCr conversion (ITU-R BT.601 coefficients) is an inline helper expanded for the background and
- *    the text colour; the glyph buffer is zeroed through a local row index and read through a row pointer (both
- *    measurably better than inline index expressions).
+ *    the text colour, and its results are passed straight to the frame fill and the text drawer (named `GXColor` locals
+ *    swap the two argument-copy stack slots); the frame fill is the inline helper `FillFrame` (written in place, its
+ *    pointer and counters take other volatile registers); the glyph buffer is zeroed through a local row index and
+ *    read through a row pointer (both measurably better than inline index expressions); `dst` is declared before `cx`.
  */
 
 #pragma fp_contract off
@@ -90,17 +93,19 @@ static void DrawFatalText(u8* fb, s32 width, s32 height, GXColor color, s32 x, s
     s32 glyphWidth;
     s32 limit = height - 24;
 
-    while (limit >= y) {
-        s32 cx = x;
-        u8* dst = fb + (x + y * width) * 2;
+    for (;;) {
+        u8* dst;
+        s32 cx;
 
-        for (;;) {
+        if (limit < y) {
+            return;
+        }
+        cx = x;
+        dst = fb + (x + y * width) * 2;
+        while (*str != 0) {
             u32 row;
             u32 col;
 
-            if (*str == 0) {
-                return;
-            }
             if (*str == '\n') {
                 y += leading;
                 str++;
@@ -140,6 +145,9 @@ static void DrawFatalText(u8* fb, s32 width, s32 height, GXColor color, s32 x, s
             }
             cx += glyphWidth;
             dst += glyphWidth * 2;
+        }
+        if (*str == 0) {
+            return;
         }
     }
 }
@@ -241,18 +249,29 @@ void OSFatal(GXColor fg, GXColor bg, const char* message) {
     OSSwitchFiber(FatalScreenFiber, OSGetArenaHi());
 }
 
+/* Fills the 640x480 YCbCr frame buffer `fb` with `color`. */
+static inline void FillFrame(u8* fb, GXColor color) {
+    s32 y;
+    s32 x;
+
+    for (y = 0; y < 480; y++) {
+        for (x = 0; x < 320; x++) {
+            fb[0] = color.r;
+            fb[1] = color.g;
+            fb[2] = color.r;
+            fb[3] = color.b;
+            fb += 4;
+        }
+    }
+}
+
 /* 0x804CF990 (0x5E8): draws the fatal screen (fills the frame buffer, prints the message) and halts. */
 static void FatalScreenFiber(void) {
-    GXColor background;
-    GXColor foreground;
     OSFontHeader* font;
     u8* frameBuffer;
     FatalParam* param;
     const char* message;
-    s32 y;
-    s32 x;
     u32 len;
-    u8* p;
 
     OSEnableInterrupts();
     param = &s_fatalParam;
@@ -262,23 +281,12 @@ static void FatalScreenFiber(void) {
     font = OSAllocFromMEM1ArenaLo(0xA1004, 32);
     OSInitFont(font, OSGetArenaLo());
     frameBuffer = OSAllocFromMEM1ArenaLo(0x96000, 32);
-    background = RGBToYCbCr(param->bg);
-    p = frameBuffer;
-    for (y = 0; y < 480; y++) {
-        for (x = 0; x < 320; x++) {
-            p[0] = background.r;
-            p[1] = background.g;
-            p[2] = background.r;
-            p[3] = background.b;
-            p += 4;
-        }
-    }
+    FillFrame(frameBuffer, RGBToYCbCr(param->bg));
     VISetNextFrameBuffer(frameBuffer);
     ConfigureFatalVideo(640, 480);
     VIFlush();
     WaitRetraces(2);
-    foreground = RGBToYCbCr(param->fg);
-    DrawFatalText(frameBuffer, 640, 480, foreground, 48, 100, font->leading, param->message);
+    DrawFatalText(frameBuffer, 640, 480, RGBToYCbCr(param->fg), 48, 100, font->leading, param->message);
     DCFlushRange(frameBuffer, 0x96000);
     VISetBlack(FALSE);
     VIFlush();

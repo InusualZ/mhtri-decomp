@@ -9,13 +9,18 @@
  * NAMES. `OSPlayTimeIsLimited`, `__OSWriteExpiredFlag`, `__OSGetPlayTime`, `__OSInitPlayTime` are the map's names.  GUESS:
  *    `__OSPlayTimeFadeCallback`, `__OSPlayTimeExpiryThread` (the fade-out DMA callback and the thread the expiry alarm starts),
  *    `__OSPlayTimeFadeState` (the pointer to the thread's stack state), `PlayTimeFadeState`.
- * RESIDUALS. `__OSInitPlayTime`: the target tests the two switch results as a compare chain (-1017 first) where the source
- *    switch gives a tree, and adds the 20 s margin with `li`+`addc` where the source gives `addic`; `__OSPlayTimeAlarmExpired`:
- *    one `mr` scheduled earlier; `__OSGetPlayTime`: the empty-branch shape of the consumption test and a limit
- *    reload; `__OSPlayTimeFadeCallback`: a callee-saved swap and the order of the two float constants; `__OSWriteExpiredFlag`:
- *    `li` pair order.  The .sdata2 claim (float 0.995 and the int-to-float bias) is not emitted by name; .sbss differs by
+ * RESIDUALS. `__OSInitPlayTime`: the target tests the `ESP_DiGetTicketView` result as `== -1017` then `beq` + `b` to the
+ *    `__OSGetPlayTime` call, and the second result switch as a linear `0`, `-1017` chain, where the source gives one `bne`
+ *    and a compare tree (`bge`) - every switch/if spelling and every Wii compiler measured the same; `__OSPlayTimeAlarmExpired`:
+ *    one `mr` scheduled earlier; `__OSGetPlayTime`: the empty-branch shape of the consumption test and a limit reload;
+ *    `__OSPlayTimeFadeCallback`: a callee-saved swap and the order of the two float constants; `__OSWriteExpiredFlag`:
+ *    the `li r4,0x3F` / `li r5,0` pair order (declaration order, the permission spelling and pragma probes measured
+ *    without effect).  The .sdata2 claim (float 0.995 and the int-to-float bias) is not emitted by name; .sbss differs by
  *    the 64-bit alignment pad.
  * SHAPES. the expiry thread's state and the ticket-view copy are `aligned(32)` locals (the ES and DMA calls need aligned buffers).
+ *    `__OSInitPlayTime` takes `ESP_InitLib`'s result as a one-case `switch` (the target's `beq` + `b` over the body), runs
+ *    `__OSGetPlayTime` under `result != -1017 && result == 0`, and computes the alarm ticks as
+ *    `((s64)limitValue + 20) * (OS_BUS_CLOCK / 4)` (signed: `li` + `addc`/`adde`).
  */
 
 #define OS_THREAD_TYPED_API
@@ -275,21 +280,16 @@ void __OSInitPlayTime(void)
     u32 limitValue;
     s32 limitKind;
     s32 result;
-    u32 busClock;
     u64 ticks;
 
     __OSExpireTime = 0;
     __OSExpireCallback = NULL;
     __OSExpireSetExpiredFlag = TRUE;
-    if (ESP_InitLib() != 0) {
-    } else {
+    switch (ESP_InitLib()) {
+    case 0:
         result = ESP_DiGetTicketView(NULL, &ticketView);
-        switch (result) {
-        case 0:
+        if (result != -1017 && result == 0) {
             result = __OSGetPlayTime(&ticketView, &limitKind, &limitValue);
-            break;
-        case -1017:
-            break;
         }
         switch (result) {
         case 0:
@@ -298,17 +298,16 @@ void __OSInitPlayTime(void)
                     OSPanic("OSPlayTime.c", 737, "Expired");
                 }
                 OSCreateAlarm(&__OSExpireAlarm);
-                busClock = OS_BUS_CLOCK / 4;
-                ticks = (limitValue + 20ULL) * busClock;
+                ticks = ((s64)limitValue + 20) * (OS_BUS_CLOCK / 4);
                 OSSetAlarm(&__OSExpireAlarm, ticks, __OSPlayTimeAlarmExpired);
                 __OSExpireTime = __OSExpireAlarm.fire;
-                OSReport("PlayTime: %d seconds left
-", limitValue);
+                OSReport("PlayTime: %d seconds left\n", limitValue);
             }
             break;
         case -1017:
             break;
         }
+        break;
     }
     ESP_CloseLib();
 }

@@ -14,17 +14,19 @@
  *    `__OSGetIOSRev` fills), `InquiryDriveInfo`/`InquiryCommandBlock` (the two halves of the former 0x50-byte .bss row),
  *    `AppGamename`, `DefaultGamename`, `OSBootInfo`/`OSBootInfo2` (the blocks at 0x80000000 and *0x800000F4),
  *    `OSRebootParams.arenaLimit`/`arenaResume`, `BI2DebugFlagHolder`, `AreWeInitialized`, the `OS_*` low-memory macros.
- * RESIDUALS. `OSInit` (0x554 B): register numbering of the BI2 pointer (r5 in the target, r3 here) and of the IOS
- *    date/version pair (swapped), the two firmware-record colours land in swapped stack slots, and the arena-low default
- *    0x80004000 is a plain constant here where the target's disassembly names it `_f_init` (the same bits).  `OSExceptionInit`
- *    (99.1 %): one callee-saved register offset in the whole function (the target keeps one more value live).
- *    `ClearArena`/`ClearMEM2Arena` (98.9 %): the size/flush-start register pair is swapped.  Flip: not READY, the above.
+ * RESIDUALS. `OSInit` (0x554 B): register numbering of the inlined `__OSGetIOSRev`'s
+ *    date/version pair (swapped; swapping its declarations fixes `OSInit` and breaks the standalone row), the two firmware-record colours land in swapped stack slots, and the arena-low default
+ *    0x80004000 is a plain constant here where the target's disassembly names it `_f_init` (the same bits).
+ *    `OSExceptionInit`: the integrator size and the jump size share r21 in the target (compiler temporaries coloured
+ *    last); here they are locals coloured among the others (one shared local, inline expressions and declaration order
+ *    measured no better).  Flip: not READY, the above.
  * SHAPES. the exception vector, FPR/PS init, default handler and debugger entries are `asm` functions with `nofralloc`;
- *    `ClearRange` is an inline helper whose arguments evaluate right to left; `ClearArena`/`ClearMEM2Arena` are
+ *    `ClearRange` is an inline helper whose arguments evaluate right to left and which picks its flush start with a
+ *    ternary (an if/else swaps the size and flush-start registers); `ClearArena`/`ClearMEM2Arena` are
  *    `never_inline` (the target calls them); the target's `.bss` and `.sbss` order is the order the compiler first meets
  *    the definitions, so the definitions sit ahead of the functions in that order; the empty `(void)0` bodies keep the
  *    target's branch shape; `inquiry` is signed (the compare tree is the signed one) and the inquiry word is volatile
- *    (the target reads it twice).
+ *    (the target reads it twice); `OSInit` copies the BI2 debug flag through `*BI2DebugFlag`.
  */
 
 #include "types.h"
@@ -290,13 +292,8 @@ u32 OSGetConsoleType(void)
 /* Zeroes `size` bytes at `start` and flushes the last 256 KiB of them. */
 static inline void ClearRange(u8* start, u32 size)
 {
-    u8* flushStart;
+    u8* flushStart = size > OS_CLEAR_FLUSH_SIZE ? start + size - OS_CLEAR_FLUSH_SIZE : start;
 
-    if (size > OS_CLEAR_FLUSH_SIZE) {
-        flushStart = start + size - OS_CLEAR_FLUSH_SIZE;
-    } else {
-        flushStart = start;
-    }
     DCZeroRange(start, size);
     DCFlushRange(flushStart, OS_CLEAR_FLUSH_SIZE);
 }
@@ -490,7 +487,7 @@ void OSInit(void)
     if (bi2 != NULL) {
         BI2DebugFlag = &bi2->debugFlag;
         __PADSpec = bi2->padSpec;
-        OS_DEBUG_FLAG_BYTE = bi2->debugFlag;
+        OS_DEBUG_FLAG_BYTE = *BI2DebugFlag;
         OS_PAD_SPEC_BYTE = __PADSpec;
     } else if (BootInfo->arenaHi != NULL) {
         BI2DebugFlagHolder = OS_DEBUG_FLAG_BYTE;

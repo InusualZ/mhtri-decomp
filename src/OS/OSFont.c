@@ -11,13 +11,18 @@
  *    them), `ParseStringNarrow` and `ParseStringWide` are GUESS names (the `s_parseString` targets), `OSGetFontTexel` is a GUESS
  *    (renders one glyph into a 4-bit texture), and `sjisSingleCode`, `sjisDoubleCode`, `s_ansiFont`, `s_sjisFont`,
  *    `s_sjisForAscii`, `s_parseString` and `s_fontEncode` are GUESS names.
- * RESIDUALS. `DecodeYay0` (95.9 %): the target keeps `codes`/`chunk` in r30/r29 and `outPos`/`linkOffset`/`bitsLeft`/`bits` in
- *    r8/r9/r11/r12, ours r7/r6/r9/r8/r10/r11 (declaration order permuted, no change). `ReadFont` (64 %): the glyph-patch arithmetic
- *    schedules differently and the two ReadRom expansions swap r26/r31. `OSGetFontTexel` (72.5 %): the target saves r17-r31 and
- *    keeps `font->c` in a register across the texel loop (a `shade` local made it worse), ours saves r19-r31. The .sdata word
- *    `s_fontEncode` is 2 bytes here, the target object carries 8 (the alignment pad to the next unit).
- * SHAPES. the ROM read is an inline helper expanded in both `ReadFont` arms; the Shift-JIS lead/trail tests are inline
- *    helpers.
+ * RESIDUALS. `DecodeYay0`: the target keeps `codes`/`chunk` in r30/r29 and `outPos`/`linkOffset`/`bitsLeft`/`bits` in
+ *    r8/r9/r11/r12, ours r7/r6/r9/r8/r10/r11 (declaration order permuted, no change). `ReadFont`: the first ROM-read expansion
+ *    swaps the buffer/offset pair (r31/r26 in the target, r26/r31 here; the second expansion matches), and the glyph patch
+ *    computes the cell row's `y` before the column and keeps one register fewer (r25..r31 saved, ours r24..r31).
+ *    `OSGetFontTexel`: the target saves r17-r31, hoists `&font->c` into r23 and loads the destination byte before the table
+ *    lookup, ours saves r19-r31 (a hoisted table local, the SDK step-by-step address, if/else stores and pragma probes all
+ *    measured lower). The .sdata word `s_fontEncode` is 2 bytes here, the target object carries 8 (the alignment pad to the
+ *    next unit).
+ * SHAPES. the ROM read is an inline helper expanded in both `ReadFont` arms; it subtracts the chunk from the length before
+ *    the read and advances the offset, then the buffer, after it; the glyph patch walks rows 4..7 of the cell with the
+ *    SDK's step-by-step sheet address (`sheet + rowWords * (y / 8)`, `+ (x / 8) * 16`, `+ (y % 8) * 2`, `+ (x % 8) / 4`)
+ *    and the cell index reduced by subtraction; the Shift-JIS lead/trail tests are inline helpers.
  */
 
 #include "types.h"
@@ -285,10 +290,13 @@ u16 OSSetFontEncode(u16 encode) {
 
 static inline void ReadRom(u8* buf, s32 length, s32 offset) {
     s32 n;
-    for (; length > 0; length -= n, offset += n, buf += n) {
+    while (length > 0) {
         n = length > 256 ? 256 : length;
+        length -= n;
         while (!__OSReadROM(buf, n, offset)) {
         }
+        offset += n;
+        buf += n;
     }
 }
 
@@ -319,25 +327,32 @@ static u32 ReadFont(u8* src, u16 encode, OSFontHeader* dst) {
         u16 rows[4] = {0x2ABE, 0x003D, 0x003D, 0x003D};
         s32 index;
         s32 sheetIndex;
-        s32 inSheet;
+        s32 numChars;
         s32 cellRow;
         s32 cellCol;
         s32 x;
         s32 y;
+        s32 i;
         u8* sheet;
+        u8* row;
 
         index = GetFontCode(encode, 0x54);
-        sheetIndex = index / (dst->sheetColumn * dst->sheetRow);
-        inSheet = index % (dst->sheetColumn * dst->sheetRow);
-        cellRow = inSheet / dst->sheetColumn;
-        cellCol = inSheet % dst->sheetColumn;
-        y = cellRow * dst->cellHeight;
+        numChars = dst->sheetColumn * dst->sheetRow;
+        sheetIndex = index / numChars;
+        index -= sheetIndex * numChars;
+        cellRow = index / dst->sheetColumn;
+        cellCol = index - cellRow * dst->sheetColumn;
         x = cellCol * dst->cellWidth;
-        sheet = (u8*)dst + dst->sheetImage + ((u32)(sheetIndex * dst->sheetSize) >> 1);
-        *(u16*)SheetRow(dst, sheet, x, y + 4) = rows[0];
-        *(u16*)SheetRow(dst, sheet, x, y + 5) = rows[1];
-        *(u16*)SheetRow(dst, sheet, x, y + 6) = rows[2];
-        *(u16*)SheetRow(dst, sheet, x, y + 7) = rows[3];
+        y = cellRow * dst->cellHeight;
+        sheet = (u8*)dst + dst->sheetImage;
+        sheet += sheetIndex * dst->sheetSize / 2;
+        for (i = 4; i < 8; i++) {
+            row = sheet + ((dst->sheetWidth / 8) * 32) / 2 * ((y + i) / 8);
+            row += (x / 8) * 16;
+            row += ((y + i) % 8) * 2;
+            row += (x % 8) / 4;
+            *(u16*)row = rows[i - 4];
+        }
     }
     return size;
 }
