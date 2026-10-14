@@ -643,12 +643,14 @@ STRIPPED_CODE = ".text"
 
 
 def deadstrip_roots(unit: str, target_rel: str, link_ctx: dict) -> set[str]:
-    """What keeps a symbol of `unit`'s object alive once it is flipped: every name another link input references (the
-    target object leaves the link, so its own references do not count), what the batch's own objects reference, the
-    linker script's FORCEACTIVE block and the entry symbol."""
+    """What keeps a symbol of `unit`'s object alive once it is flipped: every name another link input references,
+    what the batch's own objects reference, the linker script's FORCEACTIVE block and the entry symbol. The unit's own
+    objects are never "another input", so the answer is the same before the flip (the target object is the input) and
+    after it (our object is): their references are what `dead_symbols` follows from the live symbols."""
+    own = {target_rel, os.path.normpath(os.path.join("build", "RMHE08", "src", unit + ".o"))}
     roots: set[str] = set()
     for rel, names in link_ctx["refs"].items():
-        if rel != target_rel:
+        if rel not in own:
             roots |= names
     for other in BATCH - {unit}:
         roots |= code_references_in(os.path.join(SRC, other + ".o"))
@@ -668,7 +670,7 @@ def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path:
     byte like any other. A data symbol the same strip takes with it (a string only a stripped function read) is a
     problem: our object counts its bytes, the link drops them. `(None, [], [])` when there is nothing to strip or no
     link context; the first element is None too when the strip cannot be modelled (a note says why)."""
-    if link_ctx is None or target_rel not in link_ctx["refs"] or STRIPPED_CODE not in ours:
+    if link_ctx is None or STRIPPED_CODE not in ours:
         return None, [], []
     dead = objcompare.dead_symbols(src_path, deadstrip_roots(unit, target_rel, link_ctx)) or []
     target_names = set(object_symbols(obj_path)[1])

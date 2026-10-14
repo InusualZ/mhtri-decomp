@@ -71,8 +71,8 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   retail linker stripped (written so its strings land in the pool): our `.text` is longer than the claim, and a trial flip
   links byte-identical because mwld strips it again. `flipcheck.deadstrip_model` takes such a function out before the size
   and byte comparison when all of these hold: `lib.objcompare.dead_symbols` finds it dead with the roots `deadstrip_roots`
-  gives (every name another link input references - the target object's own references do not count, it leaves the link -
-  what the batch's objects reference, FORCEACTIVE, the entry; plus our `.comment` force-active flags and every symbol a live
+  gives (every name another link input references - the unit's own objects never count: the target object before the
+  flip, ours after it - what the batch's objects reference, FORCEACTIVE, the entry; plus our `.comment` force-active flags and every symbol a live
   range relocates); no target symbol and no `symbols.txt` row has its name; and `lib.objcompare.strip_section` can lay out
   the rest (each function at its `.comment` alignment after the previous one, zero gaps, as the object itself already is).
   The note reads `.text: 0xN of the object's 0xM bytes are dead-stripped function(s) ...; the 0xK bytes the link keeps are
@@ -84,6 +84,13 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   (BTE/bta_hh_utils, btm_sco, btm_sec, gap_utils, gki_buffer), no unit lost READY, 24 refused units changed refusal text
   only; the reverse-reference row below then refuses gki_buffer. A trial flip of the other four together links
   `main.dol: OK`.
+* **The verdict is the same after the flip (2026-10-14).** The model runs whether the unit's link input is the target
+  object (NonMatching) or our object (`Object(Matching)`, the state the gate checks), and our object's own references
+  root nothing in either state. Before this, a flipped unit skipped the model and the gate refused the flip batch of
+  BTE/bta_hh_utils, btm_sco, btm_sec and gap_utils that a NonMatching tree called READY. Measured at `cafb12d1b`: the
+  four READY with configure.py flipped (`main.dol: OK`); on the unflipped tree READY 237 -> 244, the seven gains all
+  already `Object(Matching)` with the DOL hash green (BTE/l2c_api, BTE/port_rfc, DSP/dsp_task, DVD/dvd_broadway,
+  OS/OSCache, OS/OSNet, OS/OSReset), no other verdict or refusal changed.
 * **The reverse-reference row (2026-10-14).** A global the target object defines that another link input relocates, and
   that neither our object (global or weak) nor any other input defines, makes the flip's link fail: `<unit>: N symbol(s)
   the target object defines and another link input references are not defined by our object - <names> (referenced from
@@ -129,14 +136,15 @@ the next section's alignment ignored 2.
 same-batch successor accept, an unflipped one (target aligned to 4, with the hint), a successor our object aligns to 4 and a
 non-zero tail refuse; `.text` is excused, `extab` never, `.sdata` 4 B before an 8-aligned successor is. Mutation: the
 linked-successor test off fails 2. `test_padding_chain` (2 more checks): a short OSMessage before an unflipped OSMutex refuses OSLink, a run ending on a full unit accepts; chain check off fails 1.
-The dead-strip model and the reverse-reference row: `tools/tests/units/test_flipcheck_deadstrip.py` (21 checks, objects
+The dead-strip model and the reverse-reference row: `tools/tests/units/test_flipcheck_deadstrip.py` (24 checks, objects
 shaped like gap_utils, btm_link_key and gki_buffer): accepted - a stripped function between two kept ones, the 16-aligned
 zero-gap layout, a function only another stripped one calls; refused - another input references it, a map row names it, a
 kept function calls it, FORCEACTIVE names it, the kept bytes differ, a non-zero gap, functions packed tighter than their
 `.comment` alignment, a string only the stripped function reads; the liveness rules (`.comment` 0x08, `extabindex`,
 `.ctors`, a section-symbol reference, an unreadable object); the reverse-reference row refused, silent when ours or another
-input defines the name. Mutations: model off fails 5, data-strip refusal off 1, map-row guard off 1, reverse-reference off
-1, `strip_section`'s zero-gap check off 1, its alignment check off 1.
+input defines the name; the same READY before and after the flip (our object as the link input, its own call from one
+stripped function to another rooting nothing), and a called function still refused after it. Mutations: model off fails 5, data-strip refusal off 1, map-row guard off 1, reverse-reference off
+1, `strip_section`'s zero-gap check off 1, its alignment check off 1, the model skipped for a linked unit 1, the unit's own object counted as another input 1.
 Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

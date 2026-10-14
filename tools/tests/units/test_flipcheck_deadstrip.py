@@ -16,6 +16,7 @@ TIER = "fixture"
 UNIT = "BTE/gap_utils"
 TARGET_REL = os.path.normpath("build/RMHE08/obj/%s.o" % UNIT)
 OTHER_REL = os.path.normpath("build/RMHE08/obj/BTE/gap_api.o")
+SRC_REL = os.path.normpath("build/RMHE08/src/%s.o" % UNIT)
 NOP = b"\x60\x00\x00\x00"
 
 
@@ -61,8 +62,9 @@ def object_with(funcs, align=4, comment_align=None, gap=b"", relocs=(), data=Non
 KEPT_REFS = ("gap_find_free_ccb", "gap_convert_btm_status", "gap_short")
 
 
-def setup(t, ours, target, claim_size, map_rows=(), other_refs=KEPT_REFS, providers=None):
-    """Write our object and the target, and return `(claim, link_ctx, map_rows)` for `flipcheck.check`."""
+def setup(t, ours, target, claim_size, map_rows=(), other_refs=KEPT_REFS, providers=None, flipped=False):
+    """Write our object and the target, and return `(claim, link_ctx, map_rows)` for `flipcheck.check`. `flipped`: the
+    unit is already `Object(Matching)`, so the link input is our object (with its own references), not the target."""
     t.write("build/RMHE08/src/%s.o" % UNIT, ours)
     t.write("build/RMHE08/obj/%s.o" % UNIT, target)
     t.write("config/RMHE08/splits.txt", "%s.c:\n\t.text       start:0x80480000 end:0x%08X\n"
@@ -71,6 +73,9 @@ def setup(t, ours, target, claim_size, map_rows=(), other_refs=KEPT_REFS, provid
     flipcheck.set_root(str(t.root))
     flipcheck.BATCH.clear()
     refs = {TARGET_REL: set(), OTHER_REL: set(other_refs)}
+    if flipped:
+        del refs[TARGET_REL]
+        refs[SRC_REL] = objcompare.reloc_facts(ours)["refs"]
     count = {}
     for names in refs.values():
         for n in names:
@@ -115,6 +120,25 @@ def test_accepted(c):
         claim, ctx, rows = setup(t, ours, target_obj(), 0x24)
         problems, _notes = run(claim, ctx, rows)
         c.check("a function only another stripped function calls is stripped with it", problems, [])
+
+
+def test_post_flip(c):
+    """The verdict is the same once the unit is `Object(Matching)` (the gate checks the flipped tree): our object is
+    then the link input, and its own references - a stripped function calling another - root nothing. Mutation: with
+    the unit's own object counted as another input, or the model skipped for a linked unit, this fails."""
+    dead2 = ("gap_dead_caller", code(4, 2))
+    ours = object_with([LIVE_A, DEAD, dead2, LIVE_B], relocs=[(".text", 0x1C, DEAD[0], "R_PPC_REL24")])
+    for flipped in (False, True):
+        with testing.FixtureTree() as t:
+            claim, ctx, rows = setup(t, ours, target_obj(), 0x24, flipped=flipped)
+            problems, notes = run(claim, ctx, rows)
+            c.check("%s: READY with the dead-strip note" % ("after the flip" if flipped else "before the flip"),
+                    (problems, any("dead-stripped function(s)" in n for n in notes)), ([], True))
+    called = object_with([LIVE_A, DEAD, LIVE_B], relocs=[(".text", 0x4, DEAD[0], "R_PPC_REL24")])
+    with testing.FixtureTree() as t:
+        claim, ctx, rows = setup(t, called, target_obj(), 0x24, flipped=True)
+        c.check("after the flip, a function a kept one calls is still kept: refused",
+                bool(run(claim, ctx, rows)[0]), True)
 
 
 def test_refused(c):
