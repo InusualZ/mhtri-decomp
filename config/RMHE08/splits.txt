@@ -3018,7 +3018,7 @@ DVD/dvd.c:
 	.data       start:0x80618800 end:0x80618C10
 	.bss        start:0x80741A40 end:0x807466F0
 	.sdata      start:0x80793DE0 end:0x80793DF8
-	.sbss       start:0x807950A0 end:0x80795138
+	.sbss       start:0x807950A0 end:0x80795138 align:32
 
 DVD/dvdqueue.c:
 	.text       start:0x804AB040 end:0x804AB2C0 align:16

@@ -10,8 +10,8 @@
 extern "C" {
 #endif
 
-/* 0x804ABF50 - checks that the drive on this console is the expected device; zero when it is. */
-s32 __DVDCheckDevice(void);
+/* 0x804ABF50 - checks that the drive on this console is an authorized device; FALSE (after a fatal screen) when not. */
+BOOL __DVDCheckDevice(void);
 
 #ifdef __cplusplus
 }
