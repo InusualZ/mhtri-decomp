@@ -1399,7 +1399,7 @@ config.libs = [
             Object(Matching, "RVLGX/GXPixel.c", cflags=cflags_base),
             # -fp_contract off: fmuls+fadds evidence on the FLAGS line of src/RVLGX/GXTransform.c
             Object(Matching, "RVLGX/GXTransform.c", cflags=cflags_base, extra_cflags=["-fp_contract off"]),
-            Object(NonMatching, "RVLGX/GXPerf.c", cflags=cflags_base),
+            Object(Matching, "RVLGX/GXPerf.c", cflags=cflags_base),
             Object(Matching, "IPC/ipcMain.c", cflags=cflags_base),
             Object(NonMatching, "IPC/ipcclt.c", cflags=cflags_base),
             Object(NonMatching, "IPC/memory.c", cflags=cflags_base),
