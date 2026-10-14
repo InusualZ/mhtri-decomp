@@ -71,6 +71,96 @@ u8 btsnd_hcic_set_afh_channels(u8 first, u8 last);
 /* 0x8048FA74 - sends the vendor specific command `opcode` with `len` parameter bytes, in `p_buf`. */
 void btsnd_hcic_vendor_spec_cmd(BT_HDR* p_buf, u16 opcode, u8 len, u8* p_data);
 
+/* 0x8048D44C - starts an inquiry on the access code `inq_lap`. */
+u8 btsnd_hcic_inquiry(const u8* inq_lap, u8 duration, u8 response_cnt);
+
+/* 0x8048D4F4 - cancels the running inquiry. */
+u8 btsnd_hcic_inq_cancel(void);
+
+/* 0x8048D554 - starts periodic inquiries every `min_period`..`max_period` (1.28 s units). */
+u8 btsnd_hcic_per_inq_mode(u16 max_period, u16 min_period, const u8* inq_lap, u8 duration, u8 response_cnt);
+
+/* 0x8048D77C - adds an SCO link with `packet_types` to the ACL link `handle`. */
+u8 btsnd_hcic_add_SCO_conn(u16 handle, u16 packet_types);
+
+/* 0x8048D8C4 - answers a link key request of `bd_addr` with `link_key`. */
+u8 btsnd_hcic_link_key_req_reply(u8* bd_addr, u8* link_key);
+
+/* 0x8048DA64 - answers a link key request of `bd_addr` with no key. */
+u8 btsnd_hcic_link_key_neg_reply(u8* bd_addr);
+
+/* 0x8048DB04 - answers a PIN request of `bd_addr` with the `pin_code_len` bytes of `p_pin_code`, zero-padded. */
+u8 btsnd_hcic_pin_code_req_reply(u8* bd_addr, u8 pin_code_len, u8* p_pin_code);
+
+/* 0x8048DCE8 - refuses a PIN request of `bd_addr`. */
+u8 btsnd_hcic_pin_code_neg_reply(u8* bd_addr);
+
+/* 0x8048DE18 - starts the authentication of the link `handle`. */
+u8 btsnd_hcic_auth_request(u16 handle);
+
+/* 0x8048DF20 - requests the name of the device at `bd_addr`. */
+u8 btsnd_hcic_rmt_name_req(u8* bd_addr, u8 page_scan_rep_mode, u8 page_scan_mode, u16 clock_offset);
+
+/* 0x8048DFF8 - cancels the name request to `bd_addr`. */
+u8 btsnd_hcic_rmt_name_req_cancel(u8* bd_addr);
+
+/* 0x8048E20C - sets up an eSCO link on the ACL link `handle`. */
+u8 btsnd_hcic_setup_esco_conn(u16 handle, u32 tx_bw, u32 rx_bw, u16 max_latency, u16 voice, u8 retrans_effort,
+                              u16 packet_types);
+
+/* 0x8048E308 - accepts the incoming eSCO connection from `bd_addr`, in `p_buf`. */
+void btsnd_hcic_accept_esco_conn(BT_HDR* p_buf, u8* bd_addr, u32 tx_bw, u32 rx_bw, u16 max_latency, u16 content_fmt,
+                                 u8 retrans_effort, u16 packet_types);
+
+/* 0x8048E3F0 - rejects the incoming eSCO connection from `bd_addr` with `reason`, in `p_buf`. */
+void btsnd_hcic_reject_esco_conn(BT_HDR* p_buf, u8* bd_addr, u8 reason);
+
+/* 0x8048E450 - puts the link `handle` in hold mode, in `p` or a new buffer. */
+u8 btsnd_hcic_hold_mode(BT_HDR* p_buf, u16 handle, u16 max_hold_period, u16 min_hold_period);
+
+/* 0x8048E504 - puts the link `handle` in sniff mode, in `p` or a new buffer. */
+u8 btsnd_hcic_sniff_mode(BT_HDR* p_buf, u16 handle, u16 max_sniff_period, u16 min_sniff_period, u16 sniff_attempt,
+                         u16 sniff_timeout);
+
+/* 0x8048E5D0 - takes the link `handle` out of sniff mode, in `p` or a new buffer. */
+u8 btsnd_hcic_exit_sniff_mode(BT_HDR* p_buf, u16 handle);
+
+/* 0x8048E654 - puts the link `handle` in park mode, in `p` or a new buffer. */
+u8 btsnd_hcic_park_mode(BT_HDR* p_buf, u16 handle, u16 beacon_max_interval, u16 beacon_min_interval);
+
+/* 0x8048E708 - takes the link `handle` out of park mode, in `p` or a new buffer. */
+u8 btsnd_hcic_exit_park_mode(BT_HDR* p_buf, u16 handle);
+
+/* 0x8048E92C - sets the event filter `filt_type` with the `filt_cond_len`-byte condition `filt_cond`, in `p_buf`. */
+void btsnd_hcic_set_event_filter(BT_HDR* p_buf, u8 filt_type, u8 filt_cond_type, u8* filt_cond, u8 filt_cond_len);
+
+/* 0x8048EAE8 - sets whether the host's PIN is fixed or variable. */
+u8 btsnd_hcic_write_pin_type(u8 type);
+
+/* 0x8048EFD4 - sets the page scan interval and window, in `p_buf`. */
+void btsnd_hcic_write_pagescan_cfg(BT_HDR* p_buf, u16 interval, u16 window);
+
+/* 0x8048F018 - sets the inquiry scan interval and window, in `p_buf`. */
+void btsnd_hcic_write_inqscan_cfg(BT_HDR* p_buf, u16 interval, u16 window);
+
+/* 0x8048F05C - turns authentication of every connection on or off. */
+u8 btsnd_hcic_write_auth_enable(u8 flag);
+
+/* 0x8048F0D0 - sets the encryption mode of every connection. */
+u8 btsnd_hcic_write_encr_mode(u8 mode);
+
+/* 0x8048F31C - sets the `num_cur_iac` inquiry access codes the host scans for, in `p_buf`. */
+void btsnd_hcic_write_cur_iac_lap(BT_HDR* p_buf, u8 num_cur_iac, u8 (*iac_lap)[3]);
+
+/* 0x8048F9E4 - sets the inquiry scan type, in `p_buf`. */
+void btsnd_hcic_write_inqscan_type(BT_HDR* p_buf, u8 type);
+
+/* 0x8048FA14 - sets the inquiry result format, in `p_buf`. */
+void btsnd_hcic_write_inquiry_mode(BT_HDR* p_buf, u8 mode);
+
+/* 0x8048FA44 - sets the page scan type, in `p_buf`. */
+void btsnd_hcic_write_pagescan_type(BT_HDR* p_buf, u8 type);
+
 #ifdef __cplusplus
 }
 #endif

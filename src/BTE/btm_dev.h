@@ -4,6 +4,7 @@
 #define MHTRI_BTE_BTM_DEV_H
 
 #include "types.h"
+#include "BTE/btm_sec.h"
 
 /* The number of security device records btm_cb keeps (the BTE source's BTM_SEC_MAX_DEVICE_RECORDS). */
 #define BTM_SEC_MAX_DEVICE_RECORDS 16
@@ -17,10 +18,15 @@
 #define BTM_SEC_LINK_KEY_KNOWN 0x10
 #define BTM_SEC_IN_USE 0x80
 
-/* size: 0x88 - a security device record: the device's address, class, link key, name and features, its trusted
- * services and the state of its pairing. */
+struct tBTM_SEC_SERV_REC;
+
+/* size: 0x88 - a security device record: the service being checked and its completion callback, the trusted
+ * services, the link, the device's address, class, link key, name and features, and the state of its pairing
+ * (layout traced from BTE/btm_dev.c, BTE/btm_acl.c, BTE/btm_sec.c and BTE/btm_pm.c). */
 typedef struct tBTM_SEC_DEV_REC {
-    /* +0x00 */ u8 unused_0x00[0x0C];
+    /* +0x00 */ struct tBTM_SEC_SERV_REC* p_cur_service;
+    /* +0x04 */ tBTM_SEC_CALLBACK* p_callback;
+    /* +0x08 */ void* p_ref_data;
     /* +0x0C */ u32 timestamp;
     /* +0x10 */ u32 trusted_mask[2];
     /* +0x18 */ u16 hci_handle;
@@ -31,9 +37,14 @@ typedef struct tBTM_SEC_DEV_REC {
     /* +0x35 */ u8 sec_bd_name[BTM_MAX_REM_BD_NAME_LEN + 1];
     /* +0x76 */ u8 sec_flags;
     /* +0x77 */ u8 features[8];
-    /* +0x7F */ u8 unused_0x7F[6];
-    /* +0x85 */ u8 link_key_type;
-    /* +0x86 */ u8 unused_0x86[2];
+    /* +0x7F */ u8 sec_state;
+    /* +0x80 */ u8 is_originator;
+    /* +0x81 */ u8 security_required;
+    /* +0x82 */ u8 link_key_not_sent;
+    /* +0x83 */ u8 link_key_type;
+    /* +0x84 */ u8 link_key_changed;
+    /* +0x85 */ u8 acl_connected;
+    /* +0x86 */ u8 pad_0x86[2];
 } tBTM_SEC_DEV_REC; /* size: 0x88 */
 
 #ifdef __cplusplus

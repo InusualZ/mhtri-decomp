@@ -328,12 +328,12 @@ void btm_reset_complete(void) {
     } else if (btm_cb.devcb_state == BTM_DEV_STATE_WAIT_RESET_CMPLT) {
         l2cu_device_reset();
 
-        btm_cb.page_scan_window = HCI_DEF_PAGESCAN_WINDOW;
-        btm_cb.page_scan_period = HCI_DEF_PAGESCAN_INTERVAL;
-        btm_cb.page_scan_type = HCI_DEF_SCAN_TYPE;
-        btm_cb.inq_scan_window = HCI_DEF_INQUIRYSCAN_WINDOW;
-        btm_cb.inq_scan_period = HCI_DEF_INQUIRYSCAN_INTERVAL;
-        btm_cb.inq_scan_type = HCI_DEF_SCAN_TYPE;
+        btm_cb.btm_inq_vars.inq_scan_window = HCI_DEF_INQUIRYSCAN_WINDOW;
+        btm_cb.btm_inq_vars.inq_scan_period = HCI_DEF_INQUIRYSCAN_INTERVAL;
+        btm_cb.btm_inq_vars.inq_scan_type = HCI_DEF_SCAN_TYPE;
+        btm_cb.btm_inq_vars.page_scan_window = HCI_DEF_PAGESCAN_WINDOW;
+        btm_cb.btm_inq_vars.page_scan_period = HCI_DEF_PAGESCAN_INTERVAL;
+        btm_cb.btm_inq_vars.page_scan_type = HCI_DEF_SCAN_TYPE;
 
         btm_after_reset_hold_complete();
     }
@@ -443,7 +443,7 @@ void btm_read_local_features_complete(u8* p, u16 evt_len) {
         BTM_TRACE_DEBUG1("Local supported ACL packet types: 0x%04x", btm_cb.btm_acl_pkt_types_supported);
 
         btm_cb.btm_sco_pkt_types_supported = 0;
-        btm_cb.esco_supported = FALSE;
+        btm_cb.sco_cb.esco_supported = FALSE;
 
         if (p_devcb->local_features[1] & 0x08) {
             btm_cb.btm_sco_pkt_types_supported = BTM_SCO_PKT_TYPES_MASK_HV1;
@@ -470,7 +470,7 @@ void btm_read_local_features_complete(u8* p, u16 evt_len) {
         }
 
         if (btm_cb.btm_sco_pkt_types_supported & BTM_ESCO_LINK_ONLY_MASK) {
-            btm_cb.esco_supported = TRUE;
+            btm_cb.sco_cb.esco_supported = TRUE;
 
             if (p_devcb->local_features[5] & 0x20) {
                 if (!(p_devcb->local_features[5] & 0x80)) {

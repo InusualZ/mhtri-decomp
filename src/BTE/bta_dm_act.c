@@ -75,12 +75,12 @@ static void bta_dm_service_search_remname_cback(u8* bd_addr, u8* dc, u8* bd_name
 static void bta_dm_remname_cback(tBTM_REMOTE_DEV_NAME* p_remote_name);
 static void bta_dm_disc_remname_cback(tBTM_REMOTE_DEV_NAME* p_remote_name);
 static void bta_dm_search_timer_cback(TIMER_LIST_ENT* p_tle);
-static u8 bta_dm_authorize_cback(u8* bd_addr, u8* dev_class, u8* bd_name, u8* service_name, u8 service_id,
+static u8 bta_dm_authorize_cback(u8* bd_addr, u8* dev_class, u8* bd_name, char* service_name, u8 service_id,
                                  u8 is_originator);
 static u8 bta_dm_pin_cback(u8* bd_addr, u8* dev_class, u8* bd_name);
 static u8 bta_dm_link_key_request_cback(u8* bd_addr, u8* key);
-static u8 bta_dm_new_link_key_cback(u8* bd_addr, u8* dev_class, u8* bd_name, u8* key);
-static u8 bta_dm_authentication_complete_cback(u8* bd_addr, u8* dev_class, u8* bd_name, s32 result);
+static u8 bta_dm_new_link_key_cback(u8* bd_addr, u8* dev_class, u8* bd_name, u8* key, u8 key_type);
+static u8 bta_dm_authentication_complete_cback(u8* bd_addr, u8* dev_class, u8* bd_name, int result);
 static void bta_dm_local_addr_cback(u8* bd_addr);
 static void bta_dm_signal_strength_timer_cback(TIMER_LIST_ENT* p_tle);
 static void bta_dm_acl_change_cback(u8* p_bda, u8* dc, u8* bdn, u8* features, u8 is_new);
@@ -128,7 +128,7 @@ void bta_dm_enable(tBTA_DM_MSG* p_data) {
     BTM_SetDeviceClass(dev_class);
 
     bta_dm_cb.p_sec_cback = p_data->enable.p_sec_cback;
-    BTM_SecRegister(&bta_security);
+    BTM_SecRegister((tBTM_APPL_INFO*)&bta_security);
     BTM_SetDefaultLinkSuperTout(bta_dm_cfg.link_timeout);
     BTM_WritePageTimeout(bta_dm_cfg.page_timeout);
     BTM_SetDefaultLinkPolicy(bta_dm_cfg.policy_settings);
@@ -257,7 +257,8 @@ void bta_dm_search_start(tBTA_DM_MSG* p_data) {
     bta_dm_search_cb.p_search_cback = p_data->search.p_cback;
     bta_dm_search_cb.services = p_data->search.services;
 
-    BTM_StartInquiry(&p_data->search.inq_params, bta_dm_inq_results_cb, bta_dm_inq_cmpl_cb);
+    BTM_StartInquiry((tBTM_INQ_PARMS*)&p_data->search.inq_params, bta_dm_inq_results_cb,
+                     (BtmCompleteCallback)bta_dm_inq_cmpl_cb);
 }
 
 /* 0x8047B860 (0x84): Cancels the running inquiry, or the remote name request of a name-only search. */
@@ -769,7 +770,7 @@ void bta_dm_cancel_rmt_name(tBTA_DM_MSG* p_data) {
 }
 
 /* 0x8047C85C (0xC8): Asks the application to authorize the BTM service `service_id` for the device. */
-static u8 bta_dm_authorize_cback(u8* bd_addr, u8* dev_class, u8* bd_name, u8* service_name, u8 service_id,
+static u8 bta_dm_authorize_cback(u8* bd_addr, u8* dev_class, u8* bd_name, char* service_name, u8 service_id,
                                  u8 is_originator) {
     tBTA_DM_SEC sec_event;
     u8 index = 1;
@@ -846,7 +847,7 @@ static u8 bta_dm_link_key_request_cback(u8* bd_addr, u8* key) {
 }
 
 /* 0x8047CB1C (0x9C): Reports a completed authentication with its new link key. */
-static u8 bta_dm_new_link_key_cback(u8* bd_addr, u8* dev_class, u8* bd_name, u8* key) {
+static u8 bta_dm_new_link_key_cback(u8* bd_addr, u8* dev_class, u8* bd_name, u8* key, u8 key_type) {
     tBTA_DM_SEC sec_event;
 
     bdcpy(sec_event.auth_cmpl.bd_addr, bd_addr);
@@ -863,7 +864,7 @@ static u8 bta_dm_new_link_key_cback(u8* bd_addr, u8* dev_class, u8* bd_name, u8*
 }
 
 /* 0x8047CBB8 (0x84): Reports a failed authentication. */
-static u8 bta_dm_authentication_complete_cback(u8* bd_addr, u8* dev_class, u8* bd_name, s32 result) {
+static u8 bta_dm_authentication_complete_cback(u8* bd_addr, u8* dev_class, u8* bd_name, int result) {
     tBTA_DM_SEC sec_event;
 
     if (result != BTM_SUCCESS) {

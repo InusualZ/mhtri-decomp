@@ -1410,11 +1410,12 @@ config.libs = [
             Object(NonMatching, "BTE/btm_devctl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/btm_link_key.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/btm_discovery.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/btm_inq.c"),
-            Object(NonMatching, "BTE/btm_main.c"),
-            Object(NonMatching, "BTE/btm_pm.c"),
-            Object(NonMatching, "BTE/btm_sco.c"),
-            Object(NonMatching, "BTE/btm_sec.c"),
+            # GC/3.0a5.2 + cflags_nw4r for btm_inq/main/pm/sco/sec: evidence on the FLAGS line of src/BTE/btm_pm.c
+            Object(NonMatching, "BTE/btm_inq.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/btm_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/btm_pm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/btm_sco.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(NonMatching, "BTE/btm_sec.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE btu/gap/hci/hid/l2c band 0x8048AEE0..0x80498FBC recut per BTE source file; each unit's header carries its evidence.
             # GC/3.0a5.2 + cflags_nw4r: per-object scores on the FLAGS line of src/BTE/btu_hcif.c
             Object(Matching, "BTE/btu_hcif.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),

@@ -5,14 +5,23 @@
 
 #include "types.h"
 #include "BTE/gki_time.h"
+#include "BTE/bd.h"
 #include "BTE/btm_acl.h"
 #include "BTE/btm_dev.h"
 #include "BTE/btm_devctl.h"
 #include "BTE/btm_discovery.h"
+#include "BTE/btm_inq.h"
+#include "BTE/btm_pm.h"
+#include "BTE/btm_sco.h"
+#include "BTE/btm_sec.h"
 
-/* size: 0x27C8 - the BTM control block: the local configuration, the ACL table, the device control state (the BTE
- * source's devcb, flattened), the discovery state, the security device records and the trace level. The ranges the
- * btm_inq/btm_pm/btm_sco/btm_sec units own are named only where the units above touch them. */
+/* The longest PIN code. */
+#define BTM_MAX_PIN_LEN 16
+
+/* size: 0x27C4 - the BTM control block (btm_init clears 0x27C4 bytes; the .bss row's 0x27C8 is the 8-byte alignment
+ * of the next object): the local configuration, the ACL table, the power manager, the device control state (the BTE
+ * source's devcb, flattened), the discovery and inquiry state, the SCO links, the security callbacks, service and
+ * device records and the trace level. */
 typedef struct tBTM_CB {
     /* +0x0000 */ char bd_name[BTM_MAX_LOC_BD_NAME_LEN + 1];
     /* +0x0020 */ u8 pin_type;
@@ -24,7 +33,11 @@ typedef struct tBTM_CB {
     /* +0x04C4 */ u16 btm_def_link_policy;
     /* +0x04C6 */ u16 btm_def_link_super_tout;
     /* +0x04C8 */ tBTM_ACL_DB_CHANGE_CB* p_acl_changed_cb;
-    /* +0x04CC */ u8 unused_0x04CC[0x9C];
+    /* +0x04CC */ tBTM_PM_MCB pm_mode_db[BTM_MAX_ACL_LINKS];
+    /* +0x0554 */ tBTM_PM_RCB pm_reg_db[BTM_MAX_PM_RECORDS];
+    /* +0x0564 */ u8 pm_pend_link;
+    /* +0x0565 */ u8 pm_pend_id;
+    /* +0x0566 */ u8 pad_0x0566[2];
     /* +0x0568 */ BtmDevStatusCallback p_dev_status_cb;
     /* +0x056C */ BtmVsEventCallback p_vend_spec_cb;
     /* +0x0570 */ BtmCompleteCallback p_stored_link_key_cmpl_cb;
@@ -58,28 +71,38 @@ typedef struct tBTM_CB {
     /* +0x0656 */ u16 btm_sco_pkt_types_supported;
     /* +0x0658 */ tBTM_DISC_VAR disc_var;
     /* +0x1678 */ tSDP_DISCOVERY_DB* p_disc_db;
-    /* +0x167C */ u8 unused_0x167C[0x20];
-    /* +0x169C */ u16 inq_scan_window;
-    /* +0x169E */ u16 inq_scan_period;
-    /* +0x16A0 */ u16 page_scan_window;
-    /* +0x16A2 */ u16 page_scan_period;
-    /* +0x16A4 */ u16 page_scan_type;
-    /* +0x16A6 */ u16 inq_scan_type;
-    /* +0x16A8 */ u8 unused_0x16A8[0x260];
-    /* +0x1908 */ u8 esco_supported;
-    /* +0x1909 */ u8 unused_0x1909[0x6B];
+    /* +0x167C */ tBTM_INQUIRY_VAR_ST btm_inq_vars;
+    /* +0x1850 */ tSCO_CB sco_cb;
+    /* +0x190C */ tBTM_APPL_INFO api;
+    /* +0x1924 */ tBTM_LINK_KEY_CALLBACK* p_link_key_notify_cb[BTM_SEC_MAX_CALLBACKS];
+    /* +0x192C */ tBTM_RMT_NAME_CALLBACK* p_rmt_name_callback[BTM_SEC_MAX_CALLBACKS];
+    /* +0x1934 */ tBTM_FILTER_CB* p_conn_filter_cb;
+    /* +0x1938 */ tBTM_SEC_DEV_REC* p_collided_dev_rec;
+    /* +0x193C */ TIMER_LIST_ENT pin_code_req_tle;
+    /* +0x1954 */ u8 pin_code_req_bda[6];
+    /* +0x195A */ u8 pad_0x195A[2];
+    /* +0x195C */ TIMER_LIST_ENT sec_collision_tle;
     /* +0x1974 */ u32 dev_rec_count;
-    /* +0x1978 */ u8 unused_0x1978[0x5B8];
+    /* +0x1978 */ u8 security_mode;
+    /* +0x1979 */ u8 pairing_disabled;
+    /* +0x197A */ u8 connect_only_paired;
+    /* +0x197B */ u8 security_mode_changed;
+    /* +0x197C */ u8 pin_type_changed;
+    /* +0x197D */ u8 bond_created_connection;
+    /* +0x197E */ u8 bond_disc_reason;
+    /* +0x197F */ u8 sec_pin_code_len;
+    /* +0x1980 */ u8 sec_pin_code[BTM_MAX_PIN_LEN];
+    /* +0x1990 */ tBTM_SEC_SERV_REC sec_serv_rec[BTM_SEC_MAX_SERVICE_RECORDS];
     /* +0x1F30 */ tBTM_SEC_DEV_REC sec_dev_rec[BTM_SEC_MAX_DEVICE_RECORDS];
-    /* +0x27B0 */ u8 unused_0x27B0[4];
+    /* +0x27B0 */ tBTM_MKEY_CALLBACK* mkey_cback;
     /* +0x27B4 */ u8 connecting_bda[6];
     /* +0x27BA */ u8 connecting_dc[3];
     /* +0x27BD */ u8 first_disabled_channel;
     /* +0x27BE */ u8 last_disabled_channel;
     /* +0x27BF */ u8 acl_disc_reason;
     /* +0x27C0 */ u8 trace_level;
-    /* +0x27C1 */ u8 unused_0x27C1[7];
-} tBTM_CB; /* size: 0x27C8 */
+    /* +0x27C1 */ u8 pad_0x27C1[3];
+} tBTM_CB; /* size: 0x27C4 */
 
 /* The little-endian stream readers of the HCI event parsers; each advances `p`. */
 #ifndef STREAM_TO_UINT8
@@ -135,7 +158,7 @@ extern "C" {
 /* .bss 0x80739698 - the BTM control block. */
 extern tBTM_CB btm_cb;
 
-/* 0x804863F4 */
+/* 0x804863F4 - clears the control block and initialises the inquiry, ACL, security, SCO and device modules. */
 void btm_init(void);
 
 #ifdef __cplusplus

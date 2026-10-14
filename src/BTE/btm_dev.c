@@ -111,7 +111,7 @@ tBTM_SEC_DEV_REC* btm_sec_alloc_dev(u8* bd_addr) {
     memset(p_dev_rec, 0, sizeof(tBTM_SEC_DEV_REC));
 
     p_dev_rec->sec_flags = BTM_SEC_IN_USE;
-    p_dev_rec->link_key_type = 0;
+    p_dev_rec->acl_connected = 0;
 
     if ((p_inq_info = BTM_InqDbRead(bd_addr)) != NULL) {
         memcpy(p_dev_rec->dev_class, p_inq_info->dev_class, 3);
