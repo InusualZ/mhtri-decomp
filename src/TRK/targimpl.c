@@ -17,11 +17,11 @@
  *    state, `gTRKState`, `gTRKCPUState`), `.sbss` 0x80794E78 / 0x80794E80 and `.rodata` 0x805734A8..0x80573530
  *    are read by functions on both sides of every internal candidate boundary, so the run is one TU unless a
  *    boundary moves the globals.
- * RESIDUALS. 32 of 36 rows at 100. TRKTargetAccessDefault 88 (the target keeps the register count in r31 and the
- *    `last - first` difference in r4; a `u16` register count scores 94 but changes the arithmetic, not applied);
- *    TRKTargetAccessFPRegister 96 (first template copy scheduling);
- *    TRKTargetCopyBytes 97 (param registers r26..r30 in a different order); TRKTargetAccessExtended1 99 (`slwi` of the second
- *    flag test is recomputed, ours reuses the stored byte count). `.rodata`: the target pools the second template of
+ * RESIDUALS. TRKTargetAccessFPRegister: the target stores the first template word right after its `lwzu` (first template
+ *    copy scheduling; declaration order of the locals has no effect). TRKTargetCopyBytes: the destination merge numbers its
+ *    temporaries r3..r6 differently (inner declaration order and an early `old` read measured). TRKTargetAccessExtended1:
+ *    the second flag test recomputes `slwi` of the count, ours reuses the stored byte count (`+=`, statement order, signed
+ *    count and index spellings measured). `.rodata`: the target pools the second template of
  *    TRKTargetAccessFPRegister with the first one of TRKTargetAccessSPR, ours emits four copies. `.bss` order: the target
  *    lays gTRKRestoreFlags, gTRKStepState, gTRKSaveState, gTRKSpecialRegBuffer, gTRKState, gTRKCPUState in that address
  *    order; MWCC emits them in first-use order (gTRKCPUState first), so the object does not match and the unit cannot flip.
@@ -168,25 +168,33 @@ __declspec(section ".rodata") TRKMemoryRange gTRKMemoryRange[1] = {{0, 0xFFFFFFF
 /* Copies `length` bytes one at a time through aligned word accesses, switching the MSR around each read and write. */
 static void TRKTargetCopyBytes(u8* dst, const u8* src, u32 length, u32 dst_msr, u32 src_msr)
 {
-    u32 saved_msr = __TRK_get_MSR();
+    u32 saved_msr;
+    const u8* s_;
+    u8* d_;
+
+    d_ = dst;
+    s_ = src;
+    saved_msr = __TRK_get_MSR();
 
     while (length != 0) {
         u32* src_word;
         u32* dst_word;
         u32 value;
         u32 mask;
+        u32 old;
 
         __TRK_set_MSR(src_msr);
-        src_word = (u32*)((u32)src & ~3);
-        value = (u8)(*src_word >> ((3 - ((u32)src - (u32)src_word)) * 8));
+        src_word = (u32*)((u32)s_ & ~3);
+        value = (u8)(*src_word >> ((3 - ((u32)s_ - (u32)src_word)) * 8));
         asm { sync }
         __TRK_set_MSR(dst_msr);
-        dst_word = (u32*)((u32)dst & ~3);
-        mask = 0xFF << ((3 - ((u32)dst - (u32)dst_word)) * 8);
-        *dst_word = (*dst_word & ~mask) | ((value << ((3 - ((s32)dst - (s32)dst_word)) * 8)) & mask);
+        dst_word = (u32*)((u32)d_ & ~3);
+        old = *dst_word;
+        mask = 0xFF << ((3 - ((u32)d_ - (u32)dst_word)) * 8);
+        *dst_word = (old & ~mask) | ((value << ((3 - ((s32)d_ - (s32)dst_word)) * 8)) & mask);
         asm { sync }
-        src++;
-        dst++;
+        s_++;
+        d_++;
         length--;
     }
     __TRK_set_MSR(saved_msr);
@@ -239,8 +247,8 @@ s32 TRKTargetAccessDefault(u32 first, u32 last, TRKBuffer* message, u32* count, 
     }
     saved = gTRKExceptionStatus;
     gTRKExceptionStatus.exception_occurred = 0;
-    registers_count = last - first + 1;
     registers = &gTRKCPUState.gpr[first];
+    registers_count = last - first + 1;
     *count = registers_count * 4;
     if (is_read != 0) {
         err = TRKAppendBuffer_ui32(message, registers, registers_count);

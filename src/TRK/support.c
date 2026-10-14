@@ -12,10 +12,11 @@
  *    `TRKSupportReply` and their fields are GUESS from the offsets the bodies fill and read.
  * EVIDENCE. `.data` 0x8060F710 (`bad reply size`, `failed in RequestSend`) is read only by `TRK_RequestSend`; the four
  *    request builders are called only from `TRKTargetSupportRequest`.
- * RESIDUALS. register allocation only, same opcodes: `TRK_RequestSend` keeps one saved register more than the target (the
- *    constant -1 and the status variable do not share r31, 95 %); `TRKSuppAccessFile` numbers its parameter copies r26..r31
- *    where the target uses r24..r29 (98 %); `TRKSuppCloseFile` swaps r30/r31 (99 %).
- * SHAPES. every request fills a 0x40 B packet, appends it (and any payload) to a free buffer and sends it; a reply is
+ * RESIDUALS. `TRKSuppAccessFile` keeps the error code in r20 and the reply's file status in r23 where the target has r23/r20
+ *    (register allocation only; a hill-climb over the local declaration order and `u8`/`u16` reply locals did not swap them).
+ * SHAPES. the local declaration order is the register order the target allocates (`TRK_RequestSend`, `TRKSuppCloseFile`,
+ *    `TRKSuppAccessFile`); `TRK_RequestSend` leaves its status uninitialised, so the -1 the loop stores shares r31 with it.
+ *    Every request fills a 0x40 B packet, appends it (and any payload) to a free buffer and sends it; a reply is
  *    a buffer whose command byte is 0x80 or more, anything below is a debugger command and is forwarded as input.
  */
 #include "TRK/support.h"
@@ -84,17 +85,17 @@ s32 TRKStringLength(const char* text)
 
 s32 TRKSuppAccessFile(s32 handle, u8* data, u32* count, u32* io_result, s32 need_reply, s32 is_read)
 {
+    TRKBuffer* reply;
+    u32 chunk;
+    s32 err;
+    u32 reply_io;
+    u32 reply_count;
+    u32 offset;
+    s32 done;
     TRKSupportPacket packet;
     s32 reply_id;
     s32 buffer_id;
     TRKBuffer* buffer;
-    TRKBuffer* reply;
-    s32 err;
-    s32 done;
-    u32 offset;
-    u32 chunk;
-    u32 reply_count;
-    u32 reply_io;
     u8 command;
     u32 length;
 
@@ -163,15 +164,14 @@ s32 TRKSuppAccessFile(s32 handle, u8* data, u32* count, u32* io_result, s32 need
 s32 TRK_RequestSend(TRKBuffer* message, s32* reply_id)
 {
     s32 err;
-    s32 bad_reply;
-    s32 status;
-    s32 command;
     TRKBuffer* reply;
+    s32 command;
+    s32 status;
+    s32 bad_reply;
 
     err = TRK_MessageSend(message);
     if (err == 0) {
         bad_reply = 0;
-        status = -1;
         for (;;) {
             *reply_id = TRKTestForPacket();
             if (*reply_id == -1) {
@@ -246,12 +246,12 @@ s32 TRKSuppOpenFile(const char* path, u8 mode, u32* handle, u32* io_result)
 
 s32 TRKSuppCloseFile(s32 handle, u32* io_result)
 {
+    s32 err;
+    TRKBuffer* reply;
     TRKSupportPacket packet;
     s32 reply_id;
     s32 buffer_id;
     TRKBuffer* buffer;
-    TRKBuffer* reply;
-    s32 err;
 
     TRK_memset(&packet, 0, TRK_PACKET_SIZE);
     packet.command = TRK_CMD_SUPP_CLOSE_FILE;

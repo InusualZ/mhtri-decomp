@@ -41,11 +41,11 @@ s32 TRK_SetBufferPosition(TRKBuffer* buffer, u32 position);
 
 /* 0x8046A430 (0xA4): appends `size` bytes at the end of the buffer; returns 0 or 0x301 when the data was cut short. */
 /* untyped: byte range */
-s32 TRK_AppendBuffer(TRKBuffer* buffer, const void* data, s32 size);
+s32 TRK_AppendBuffer(TRKBuffer* buffer, const void* data, u32 size);
 
 /* 0x8046A4D4 (0x90): copies `size` bytes from the cursor into `data`; returns 0 or 0x302 when the data was cut short. */
 /* untyped: byte range */
-s32 TRK_ReadBuffer(TRKBuffer* buffer, void* data, s32 size);
+s32 TRK_ReadBuffer(TRKBuffer* buffer, void* data, u32 size);
 
 /* 0x8046A564 (0xD0): appends one u32 in wire (big-endian) order. */
 s32 TRKAppendBuffer1_ui32(TRKBuffer* buffer, u32 value);

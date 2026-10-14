@@ -6,7 +6,9 @@
  *    0x80795920-0x80795938.  Cut from the old VF block between `VF/vf.cpp` (0x80522334) and `PMIC/pmic.c`
  *    (0x80522E00).
  * FLAGS. the `OS` lib's `cflags_os` (4-byte function alignment): the run's function starts are packed at 4, unlike
- *    the rest of the old VF block.
+ *    the rest of the old VF block. Compiler: GC/3.0a3 (GC/3.0a3..3.0a5 measure the same; Wii/1.3 leaves `__DBIntrHandler`,
+ *    `DBInitComm`, `DBRead` and the register-order rows open, GC/3.0a5.2 opens `DBInitInterrupts`); the registration still
+ *    names the lib's Wii/1.3 until the configure.py request (`sdk-trk#1`) is applied.
  * NAMES. the `DB*` and `__DB*` names are the map's; `EXI2_Reserve` and `EXI2_Unreserve` are GUESSES (4-byte stubs
  *    called around a continue/stop); the file name `exi2_comm.c` is a GUESS.
  * EVIDENCE. this is the only 4-byte-packed run of the old block (ten of its 174 function starts are not 16-aligned
@@ -14,13 +16,16 @@
  *    (`DBInitComm`, `DBQueryData`, `DBRead`, `DBWrite`, `DBInitInterrupts`, the reserve stubs); `.sdata`
  *    0x80794458 (8 B) is read by `DBWrite` and `.sbss` 0x80795920..0x80795938 by the two handlers and the DB
  *    calls; the leaf headers of the exported rows sit beside `TRK/gdev_cc.c`.
- * RESIDUALS. all 15 rows have a body (6 at 100 %); `__DBIntrHandler` 78 % (the target loads the register base after the
- *    constant), `DBInitComm` 78 % (callee-saved register order), `__DBEXIReadReg` 93 %, `__EXI2Imm` 93 %,
- *    `DBRead` 94 %, `__DBEXIWriteRam` 96 %, `__DBEXIWriteReg` 96 %, `DBWrite` 97 % and `__DBEXIReadRam` 99.6 % (register
- *    numbering and switch layout); flipcheck blockers: the .text differences above and trailing .sdata/.sbss
- *    padding.
- * SHAPES. the register accesses are spelled as absolute volatile words; `__EXI2Imm` walks the buffer with a copied
- *    pointer on the write path and the parameter itself on the read path.
+ * RESIDUALS. under GC/3.0a3 every row but `__EXI2Imm` matches; `__EXI2Imm` copies the buffer pointer for the unrolled
+ *    write loop at the loop entry (target: inside the unrolled preheader, the remainder loop indexing `buffer + i`), and
+ *    the index spellings that move it (`buffer[i]`, `buffer + i` temporaries) break the rest of the unroll. Under the
+ *    registered Wii/1.3 `__DBIntrHandler`, `DBInitComm`, `DBRead`, `DBWrite`, `__EXI2Imm`, the register rows and
+ *    `__DBEXIWriteRam` stay open (scheduling and register numbering). Flipcheck blockers: the .text above and the
+ *    trailing .sdata/.sbss padding.
+ * SHAPES. the register accesses are spelled as absolute volatile words; the EXI2 select/deselect are inline helpers
+ *    that stage the control word in a local; the transfer status starts `FALSE` and accumulates with `|=`; the byte
+ *    swaps are written low byte first; `__EXI2Imm` walks the buffer with a copied pointer on the write path and the
+ *    parameter itself on the read path.
  */
 #include "types.h"
 #include "OS/OSContext.h"
@@ -64,6 +69,25 @@ BOOL __DBEXIWriteReg(u32 command, void* buffer, s32 size);
 BOOL __DBEXIReadRam(u32 command, void* buffer, s32 length);
 /* untyped: a byte range of the caller */
 BOOL __DBEXIWriteRam(u32 command, void* buffer, s32 length);
+
+/* Deselects the EXI2 device, keeping the interrupt mask bits. */
+static inline void exi2_deselect(void)
+{
+    u32 csr = EXI2_CSR;
+
+    csr &= 0x405;
+    EXI2_CSR = csr;
+}
+
+/* Selects EXI2 device 0 at the debugger clock, keeping the interrupt mask bits. */
+static inline void exi2_select(void)
+{
+    u32 csr = EXI2_CSR;
+
+    csr &= 0x405;
+    csr |= 0xC0;
+    EXI2_CSR = csr;
+}
 
 /* Debugger-channel monitor interrupt: flags pending input and forwards to the registered callback. */
 void __DBMtrHandler(s16 interrupt, OSContext* context)
@@ -164,7 +188,7 @@ s32 DBWrite(const u8* source, s32 length)
     do {
         __DBEXIReadReg(DB_STATUS_READ, &statusAfterRam, 1);
     } while (statusAfterRam & DB_STATUS_BUSY);
-    header = (((length & 0x1FFF) | 0x1F000000) & ~0xFF0000) | ((exi2_send_count << 16) & 0xFF0000);
+    header = ((exi2_send_count << 16) & 0xFF0000) | (((length & 0x1FFF) | 0x1F000000) & ~0xFF0000);
     do {
         mailbox = header;
     } while (__DBEXIWriteReg(DB_MAILBOX_WRITE, &mailbox, 4) == 0);
@@ -186,12 +210,13 @@ void EXI2_Unreserve(void)
 /* Runs one immediate EXI2 transfer of up to four bytes, packing the bytes big-endian into the data register. */
 BOOL __EXI2Imm(u8* buffer, s32 length, s32 write)
 {
-    u32 data = 0;
+    u32 data;
     u8* p;
     s32 i;
 
     if (write != 0) {
         p = buffer;
+        data = 0;
         for (i = 0; i < length; i++) {
             data |= *p++ << ((3 - i) * 8);
         }
@@ -221,41 +246,41 @@ void __DBEXIInit(void)
     EXI2_CSR = 0;
     attention1 = 0xB4000000;
     attention2 = 0xD4000000;
-    EXI2_CSR = (EXI2_CSR & 0x405) | 0xC0;
+    exi2_select();
     __EXI2Imm((u8*)&attention1, 4, 1);
     while (EXI2_CR & 1) {
     }
     __EXI2Imm((u8*)&attention2, 4, 1);
     while (EXI2_CR & 1) {
     }
-    EXI2_CSR &= 0x405;
+    exi2_deselect();
 }
 
 /* Reads a debugger register of 1, 2 or 4 bytes; returns nonzero when the transfer succeeded. */
 /* untyped: a byte range of the caller */
 BOOL __DBEXIReadReg(u32 command, void* buffer, s32 size)
 {
+    BOOL failed = FALSE;
     u32 value = 0;
     u32 request = command;
-    BOOL failed;
 
-    EXI2_CSR = (EXI2_CSR & 0x405) | 0xC0;
-    failed = __EXI2Imm((u8*)&request, 4, 1) == 0;
+    exi2_select();
+    failed |= __EXI2Imm((u8*)&request, 4, 1) == 0;
     while (EXI2_CR & 1) {
     }
     failed |= __EXI2Imm((u8*)&value, 4, 0) == 0;
     while (EXI2_CR & 1) {
     }
-    EXI2_CSR &= 0x405;
+    exi2_deselect();
     switch (size) {
     case 1:
         *(u8*)buffer = value >> 24;
         break;
     case 2:
-        *(u16*)buffer = ((value >> 8) & 0xFF00) | (value >> 24);
+        *(u16*)buffer = (value >> 24) | ((value >> 8) & 0xFF00);
         break;
     default:
-        *(u32*)buffer = (value << 24) | ((value << 8) & 0xFF0000) | ((value >> 8) & 0xFF00) | (value >> 24);
+        *(u32*)buffer = (value >> 24) | ((value >> 8) & 0xFF00) | ((value << 8) & 0xFF0000) | (value << 24);
         break;
     }
     return failed == 0;
@@ -267,7 +292,7 @@ BOOL __DBEXIWriteReg(u32 command, void* buffer, s32 size)
 {
     u32 value;
     u32 request = command;
-    BOOL failed;
+    BOOL failed = FALSE;
 
     switch (size) {
     case 1:
@@ -282,18 +307,18 @@ BOOL __DBEXIWriteReg(u32 command, void* buffer, s32 size)
     default: {
         u32 word = *(u32*)buffer;
 
-        value = (word << 24) | ((word << 8) & 0xFF0000) | ((word >> 8) & 0xFF00) | (word >> 24);
+        value = (word >> 24) | ((word >> 8) & 0xFF00) | ((word << 8) & 0xFF0000) | (word << 24);
         break;
     }
     }
-    EXI2_CSR = (EXI2_CSR & 0x405) | 0xC0;
-    failed = __EXI2Imm((u8*)&request, 4, 1) == 0;
+    exi2_select();
+    failed |= __EXI2Imm((u8*)&request, 4, 1) == 0;
     while (EXI2_CR & 1) {
     }
     failed |= __EXI2Imm((u8*)&value, 4, 1) == 0;
     while (EXI2_CR & 1) {
     }
-    EXI2_CSR &= 0x405;
+    exi2_deselect();
     return failed == 0;
 }
 
@@ -303,11 +328,11 @@ BOOL __DBEXIReadRam(u32 command, void* buffer, s32 length)
 {
     u32 word;
     u32 request = command;
-    BOOL failed;
+    BOOL failed = FALSE;
     u32* out = buffer;
 
-    EXI2_CSR = (EXI2_CSR & 0x405) | 0xC0;
-    failed = __EXI2Imm((u8*)&request, 4, 1) == 0;
+    exi2_select();
+    failed |= __EXI2Imm((u8*)&request, 4, 1) == 0;
     while (EXI2_CR & 1) {
     }
     while (length > 0) {
@@ -317,7 +342,7 @@ BOOL __DBEXIReadRam(u32 command, void* buffer, s32 length)
         length -= 4;
         *out++ = word;
     }
-    EXI2_CSR &= 0x405;
+    exi2_deselect();
     return failed == 0;
 }
 
@@ -327,11 +352,11 @@ BOOL __DBEXIWriteRam(u32 command, void* buffer, s32 length)
 {
     u32 word;
     u32 request = command;
-    BOOL failed;
+    BOOL failed = FALSE;
     u32* in = buffer;
 
-    EXI2_CSR = (EXI2_CSR & 0x405) | 0xC0;
-    failed = __EXI2Imm((u8*)&request, 4, 1) == 0;
+    exi2_select();
+    failed |= __EXI2Imm((u8*)&request, 4, 1) == 0;
     while (EXI2_CR & 1) {
     }
     while (length > 0) {
@@ -342,6 +367,6 @@ BOOL __DBEXIWriteRam(u32 command, void* buffer, s32 length)
         }
         length -= 4;
     }
-    EXI2_CSR &= 0x405;
+    exi2_deselect();
     return failed == 0;
 }

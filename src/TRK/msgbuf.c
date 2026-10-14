@@ -12,10 +12,10 @@
  * EVIDENCE. `.bss` 0x806F5590 (the three-buffer pool) and `.data` 0x8060F780 (`No buffer available`) are read only here.
  *    Every typed helper moves its value through `TRK_AppendBuffer`/`TRK_ReadBuffer`, which the compiler inlines, and
  *    byte-swaps through a stack copy when `gTRKByteOrder` says the target is little-endian.
- * RESIDUALS. register allocation only, same opcodes: `TRKReadBuffer_ui32` and `TRKAppendBuffer_ui32` keep the data pointer and
- *    the count in r28/r29 where the target uses r31/r28; the other typed helpers (and `TRKAppendBuffer_ui8`,
- *    `TRKReadBuffer_ui8`) swap the `li` of the inlined count and error registers (99.4 to 99.8).
- * SHAPES. append clamps to the room left (0x301) and read clamps to the bytes left (0x302); both advance the cursor.
+ * RESIDUALS. none known.
+ * SHAPES. append clamps to the room left (0x301) and read clamps to the bytes left (0x302) by shrinking the `u32` size
+ *    parameter itself; both advance the cursor. The array helpers start `for (i = 0, err = 0; ...)` and move one value per
+ *    iteration through an inlined one-value helper (`TRKReadBuffer1_ui32` is inline only).
  */
 #include "TRK/msgbuf.h"
 #include "TRK/mem_TRK.h"
@@ -105,10 +105,9 @@ s32 TRK_SetBufferPosition(TRKBuffer* buffer, u32 position)
 }
 
 /* untyped: byte range */
-s32 TRK_AppendBuffer(TRKBuffer* buffer, const void* data, s32 size)
+s32 TRK_AppendBuffer(TRKBuffer* buffer, const void* data, u32 size)
 {
     s32 err = 0;
-    u32 count = size;
     u32 room;
 
     if (size == 0) {
@@ -117,14 +116,14 @@ s32 TRK_AppendBuffer(TRKBuffer* buffer, const void* data, s32 size)
     room = TRK_MSG_BUFFER_DATA_SIZE - buffer->position;
     if (room < size) {
         err = TRK_ERR_BUFFER_FULL;
-        count = room;
+        size = room;
     }
-    if (count == 1) {
+    if (size == 1) {
         buffer->data[buffer->position] = *(const u8*)data;
     } else {
-        TRK_memcpy(&buffer->data[buffer->position], data, count);
+        TRK_memcpy(&buffer->data[buffer->position], data, size);
     }
-    buffer->position += count;
+    buffer->position += size;
     buffer->length = buffer->position;
     return err;
 }
@@ -140,10 +139,9 @@ static inline s32 TRKAppendBuffer1_ui8(TRKBuffer* buffer, u8 value)
 }
 
 /* untyped: byte range */
-s32 TRK_ReadBuffer(TRKBuffer* buffer, void* data, s32 size)
+s32 TRK_ReadBuffer(TRKBuffer* buffer, void* data, u32 size)
 {
     s32 err = 0;
-    s32 count = size;
     u32 left;
 
     if (size == 0) {
@@ -152,10 +150,10 @@ s32 TRK_ReadBuffer(TRKBuffer* buffer, void* data, s32 size)
     left = buffer->length - buffer->position;
     if (size > left) {
         err = TRK_ERR_BUFFER_EMPTY;
-        count = left;
+        size = left;
     }
-    TRK_memcpy(data, &buffer->data[buffer->position], count);
-    buffer->position += count;
+    TRK_memcpy(data, &buffer->data[buffer->position], size);
+    buffer->position += size;
     return err;
 }
 
@@ -201,10 +199,10 @@ s32 TRKAppendBuffer1_ui64(TRKBuffer* buffer, u64 value)
 s32 TRKAppendBuffer_ui8(TRKBuffer* buffer, const void* data, s32 size)
 {
     const u8* bytes = (const u8*)data;
-    s32 err = 0;
+    s32 err;
     s32 i;
 
-    for (i = 0; err == 0 && i < size; i++, bytes++) {
+    for (i = 0, err = 0; err == 0 && i < size; i++, bytes++) {
         err = TRKAppendBuffer1_ui8(buffer, *bytes);
     }
     return err;
@@ -212,12 +210,11 @@ s32 TRKAppendBuffer_ui8(TRKBuffer* buffer, const void* data, s32 size)
 
 s32 TRKAppendBuffer_ui32(TRKBuffer* buffer, const u32* data, s32 count)
 {
-    s32 err = 0;
+    s32 err;
     s32 i;
 
-    for (i = 0; err == 0 && i < count; i++) {
-        err = TRKAppendBuffer1_ui32(buffer, *data);
-        data++;
+    for (i = 0, err = 0; err == 0 && i < count; i++) {
+        err = TRKAppendBuffer1_ui32(buffer, data[i]);
     }
     return err;
 }
@@ -249,36 +246,44 @@ s32 TRKReadBuffer1_ui64(TRKBuffer* buffer, u64* value)
 
 s32 TRKReadBuffer_ui8(TRKBuffer* buffer, u8* data, s32 count)
 {
-    s32 err = 0;
+    s32 err;
     s32 i;
 
-    for (i = 0; err == 0 && i < count; i++) {
+    for (i = 0, err = 0; err == 0 && i < count; i++) {
         err = TRK_ReadBuffer(buffer, data + i, 1);
+    }
+    return err;
+}
+
+/* Reads one u32 from wire order. */
+static inline s32 TRKReadBuffer1_ui32(TRKBuffer* buffer, u32* value)
+{
+    u8 swapped[4];
+    u8* destination;
+    s32 err;
+
+    if (gTRKByteOrder.big_endian) {
+        destination = (u8*)value;
+    } else {
+        destination = swapped;
+    }
+    err = TRK_ReadBuffer(buffer, destination, 4);
+    if (!gTRKByteOrder.big_endian && err == 0) {
+        ((u8*)value)[0] = destination[3];
+        ((u8*)value)[1] = destination[2];
+        ((u8*)value)[2] = destination[1];
+        ((u8*)value)[3] = destination[0];
     }
     return err;
 }
 
 s32 TRKReadBuffer_ui32(TRKBuffer* buffer, u32* data, s32 count)
 {
-    u8 swapped[4];
-    u8* destination;
+    s32 err;
     s32 i;
-    s32 err = 0;
 
-    for (i = 0; err == 0 && i < count; i++) {
-        if (gTRKByteOrder.big_endian) {
-            destination = (u8*)data;
-        } else {
-            destination = swapped;
-        }
-        err = TRK_ReadBuffer(buffer, destination, 4);
-        if (!gTRKByteOrder.big_endian && err == 0) {
-            ((u8*)data)[0] = destination[3];
-            ((u8*)data)[1] = destination[2];
-            ((u8*)data)[2] = destination[1];
-            ((u8*)data)[3] = destination[0];
-        }
-        data++;
+    for (i = 0, err = 0; err == 0 && i < count; i++) {
+        err = TRKReadBuffer1_ui32(buffer, &data[i]);
     }
     return err;
 }

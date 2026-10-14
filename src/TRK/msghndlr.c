@@ -12,15 +12,13 @@
  *    (the 0x40 B header every message starts with: length, command, status or options, then command arguments).
  * EVIDENCE. jump tables `.data` 0x8060F7A8 / 0x8060F7C4 (error-code switches of the two memory handlers), the option strings
  *    0x8060F7E0 and `.sbss` 0x80794E70 / 0x80794E74 are read only by this run.
- * RESIDUALS. every status reply (`trk_send_status`) keeps the sequence number in r5 and the constant status in r6, the target
- *    the other way round (one register-pair swap per reply, 12 rows at 95.7..99.8); `TRKDoStep` and `TRKDoWriteRegisters`
- *    also number their saved registers differently (message/start/end in r28..r30 against r30..r28; the error code in r29
- *    against r31) and `TRKDoWriteRegisters` places the `TRK_MessageSend` tail after the compare tree (4 B longer in
- *    `TRKDoStep`: the `li r3,0` return sits after the `b`); `trk_option_strings` is `@stringBase0` in our object. Measured
- *    without effect on the swap: reply field store order (6 permutations), `++`/`+ 1` spelling, `u8`/`s32` status
- *    parameter, macro against inline.
+ * RESIDUALS. `TRKDoDisconnect`: the target loads the sequence number into r4 and the 0x40 length into r3 (ours r3/r4) and
+ *    places `addi r3` for the UART write after the second `li r4,0x40`; measured without effect: an explicit reply body in
+ *    the handler (24 field-order and declaration permutations), a block-scoped event, a status variable.
+ *    `trk_option_strings` is `@stringBase0` in our object.
  * SHAPES. every handler answers with a 0x40 B reply header built in its own stack slot (status code mapped from the
- *    internal error), then returns 0; the register and memory handlers append the payload to the request buffer and send it
+ *    internal error), then returns 0; the status reply stages the next sequence number in a local (the target's r5/r6
+ *    order); `TRKDoWriteRegisters` wraps its error switch in `error != 0`, which folds the zero test into the compare tree; the register and memory handlers append the payload to the request buffer and send it
  *    with `TRK_MessageSend` instead.
  */
 #include "TRK/msghndlr.h"
@@ -81,13 +79,15 @@ u32 gTRKSequence;
 static inline void trk_send_status(s32 status)
 {
     TRKReplyHeader reply;
+    u32 seq;
 
     TRK_memset(&reply, 0, sizeof(reply));
     reply.command = TRK_COMMAND_REPLY;
     reply.length = TRK_HEADER_SIZE;
     reply.status = status;
-    reply.sequence = gTRKSequence + 1;
-    gTRKSequence = reply.sequence + 1;
+    seq = gTRKSequence + 1;
+    reply.sequence = seq;
+    gTRKSequence = seq + 1;
     TRK_WriteUARTN(&reply, TRK_HEADER_SIZE);
 }
 
@@ -260,8 +260,8 @@ s32 TRKDoReadRegisters(TRKBuffer* message)
         trk_send_status(0x14);
         return 0;
     }
-    reply.length = TRK_REGISTER_REPLY_SIZE;
     reply.command = TRK_COMMAND_REPLY;
+    reply.length = TRK_REGISTER_REPLY_SIZE;
     reply.sequence = gTRKSequence;
     gTRKSequence = reply.sequence + 1;
     TRKResetBuffer(message, 0);
@@ -309,13 +309,16 @@ s32 TRKDoReadRegisters(TRKBuffer* message)
 s32 TRKDoWriteRegisters(TRKBuffer* message)
 {
     TRKRequestHeader* request = (TRKRequestHeader*)message->data;
-    u8 kind = request->options;
-    u16 first = request->arg0.first_register;
-    u16 last = request->arg1.last_register;
+    s32 error;
+    u8 kind;
+    u16 first;
+    u16 last;
     TRKReplyHeader reply;
     u32 count;
-    s32 error;
 
+    kind = request->options;
+    first = request->arg0.first_register;
+    last = request->arg1.last_register;
     TRK_SetBufferPosition(message, 0);
     if (first > last) {
         trk_send_status(0x14);
@@ -349,36 +352,37 @@ s32 TRKDoWriteRegisters(TRKBuffer* message)
         gTRKSequence = reply.sequence + 1;
         error = TRK_AppendBuffer(message, &reply, TRK_HEADER_SIZE);
     }
-    switch (error) {
-    case 0x703:
-        error = 0x12;
-        break;
-    case 0x701:
-        error = 0x14;
-        break;
-    case 0x302:
-        error = 2;
-        break;
-    case 0x702:
-        error = 0x15;
-        break;
-    case 0x704:
-        error = 0x21;
-        break;
-    case 0x705:
-        error = 0x22;
-        break;
-    case 0x706:
-        error = 0x20;
-        break;
-    case 0:
-        return TRK_MessageSend(message);
-    default:
-        error = 3;
-        break;
+    if (error != 0) {
+        switch (error) {
+        case 0x703:
+            error = 0x12;
+            break;
+        case 0x701:
+            error = 0x14;
+            break;
+        case 0x302:
+            error = 2;
+            break;
+        case 0x702:
+            error = 0x15;
+            break;
+        case 0x704:
+            error = 0x21;
+            break;
+        case 0x705:
+            error = 0x22;
+            break;
+        case 0x706:
+            error = 0x20;
+            break;
+        default:
+            error = 3;
+            break;
+        }
+        trk_send_status(error);
+        return 0;
     }
-    trk_send_status(error);
-    return 0;
+    return TRK_MessageSend(message);
 }
 
 s32 TRKDoContinue(TRKBuffer* message)
@@ -399,6 +403,7 @@ s32 TRKDoStep(TRKBuffer* message)
     u32 range_start;
     u32 range_end;
     u32 pc;
+    s32 result;
 
     TRK_SetBufferPosition(message, 0);
     kind = request->options;
@@ -430,16 +435,18 @@ s32 TRKDoStep(TRKBuffer* message)
         return 0;
     }
     trk_send_status(0);
+    result = 0;
     switch (kind) {
     case 0:
     case 0x10:
-        return TRKTargetSingleStep(count, kind == 0x10);
+        result = TRKTargetSingleStep(count, kind == 0x10);
+        break;
     case 1:
     case 0x11:
-        return TRKTargetStepOutOfRange(range_start, range_end, kind == 0x11);
-    default:
-        return 0;
+        result = TRKTargetStepOutOfRange(range_start, range_end, kind == 0x11);
+        break;
     }
+    return result;
 }
 
 s32 TRKDoStop(TRKBuffer* message)

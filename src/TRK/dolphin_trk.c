@@ -18,12 +18,14 @@
  *    `InitMetroTRKCommTable` and `TRK_board_display`), `.sbss` 0x80794E48 / 0x80794E50 and `.bss` 0x806F5540
  *    (`gDBCommTable`, read by the whole run); `.sdata2` 0x8079CF40 is read only by the program-end trap, closing
  *    the pool.
- * RESIDUALS. `InitMetroTRK` reads 97.3: the trailing `blr` the asm functions end with is a 4 B gap row in the target, inside the
- *    row here (bytes and section size match). `TRKTranslateAddress` 85.5 and `TRKOverrideInterruptVectors` 92.0: the
- *    target tests `>= 0x10000000` and `< 0x1C000000` as two compares; every spelling measured (`&&`, `||`, nested, sequential
- *    returns, `<= 0x1BFFFFFF`) either merges them into the `subis`/`subi` range check or hoists the conversion above the
- *    second compare (sequential returns: Translate 76.5, Override 95.0).
- * SHAPES. `InitMetroTRK`, `InitMetroTRK_BBA` and `TRKLoadContext` are `nofralloc` assembly (the register image is
+ * RESIDUALS. `InitMetroTRK`: the trailing `blr` the asm functions end with is a 4 B gap row in the target, inside the row
+ *    here (bytes and section size match). `TRKOverrideInterruptVectors` inlines `TRKTranslateAddress` under the global
+ *    optimizer: the `0x1C000000` constant is hoisted before `0x3000000` and the out-of-range path keeps its own
+ *    `mr r22,r4; b` where the target shares one (ten return/else shapes measured; `optimization_level`, `opt_*` pragmas no
+ *    effect, `global_optimizer off` breaks the loop).
+ * SHAPES. `TRKTranslateAddress` is compiled under a scoped `#pragma global_optimizer off`: with it on, the two MEM2 compares
+ *    (`>= 0x10000000`, `< 0x1C000000`) merge into one `subis`/`subi` range check the target does not have.
+ *    `InitMetroTRK`, `InitMetroTRK_BBA` and `TRKLoadContext` are `nofralloc` assembly (the register image is
  *    stored and reloaded by hand); the rest is C.
  */
 #include "TRK/dolphin_trk.h"
@@ -178,6 +180,8 @@ void EnableMetroTRKInterrupts(void)
     EnableEXI2Interrupts();
 }
 
+#pragma push
+#pragma global_optimizer off
 u32 TRKTranslateAddress(u32 address)
 {
     if (address >= gTRKLockedCache.base && address < gTRKLockedCache.base + 0x4000
@@ -187,11 +191,16 @@ u32 TRKTranslateAddress(u32 address)
     if (address < 0x3000000) {
         return (address & 0x3FFFFFFF) | 0x80000000;
     }
-    if (address >= 0x10000000 && address < 0x1C000000) {
+    if (address >= 0x10000000) {
+        if (address >= 0x1C000000) {
+            return address;
+        }
         return (address & 0x3FFFFFFF) | 0x90000000;
     }
     return address;
 }
+
+#pragma pop
 
 void TRKOverrideInterruptVectors(void)
 {
