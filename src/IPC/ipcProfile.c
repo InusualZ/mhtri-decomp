@@ -10,7 +10,8 @@
  * RESIDUALS. `IPCiProfQueueReq`: the index and the two walking pointers take r9/r7/r8 where the target has r7/r8/r9 (same
  *   instructions; declaration order, `u32` index, `i = 0` initialiser, statement order, nested `if`s, `while`, local
  *   array pointers and scoped `optimization_level 3` / `opt_loop_invariants off` / `opt_common_subs off` were
- *   measured).  `.bss`: the target has `IpcFdArray` at +0 and `IpcReqPtrArray` at +0x80, this object the reverse;
+ *   measured; `break`, `!ptr`, constant-left compares, the counter update order and spelling and `u32` counters
+ *   are neutral too).  `.bss`: the target has `IpcFdArray` at +0 and `IpcReqPtrArray` at +0x80, this object the reverse;
  *   the order follows the first emitted reference (`IPCiProfInit`'s first store), and the array definition order,
  *   global linkage and an unused inline reader do not move it.  flipcheck: `.text` is 4 B short of the claim (the pad
  *   before `KPAD/kpad.c`).

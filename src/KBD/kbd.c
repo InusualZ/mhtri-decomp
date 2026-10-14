@@ -22,7 +22,8 @@
  *    sp+0xC where ours packs it at sp+0x9, and the detach loop swaps r3/r5 (base vs walk pointer).
  *    `kbd_store_lock_state` expanded in `KBDSetChannelLeds` (0x80529B70) and `kbd_update_lock_state` (0x80528F80):
  *    retail writes the channel address into the offset register (r4) where ours reuses the state register (r5);
- *    pointer, index and cast spellings were measured.  `kbd_lookup_key` (0x80529BF0): `entry` and `kind` swap r9/r11.
+ *    pointer, index and cast spellings, operand order, a named high/low temporary and the channel pointer taken
+ *    before `OSDisableInterrupts` were measured.  `kbd_lookup_key` (0x80529BF0): `entry` and `kind` swap r9/r11.
  *    flipcheck blockers: the rows above and .sdata/.sbss trailing padding the object does not emit (8 B / 4 B).
  * SHAPES. `kbd_store_lock_state` is a `static inline` expanded into `kbd_update_lock_state` and `KBDSetChannelLeds`
  *    (the value is copied before `|= 0x1000` so the 0x1000 test is not folded); member stores through

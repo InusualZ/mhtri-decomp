@@ -6,9 +6,11 @@
  * FLAGS. the `Runtime.PPCEABI.H` lib's `cflags_ppceabi`; compiled as C++ with `extern "C"` linkage.
  * NAMES. `__ieee754_fmod` is the map's name; `fmod_zero` (the signed-zero table) is a GUESS. `__ieee754_fmod` is a GUESS (the dump labels the address with a neighbour or a placeholder; the name fits the unit scheme).
  * EVIDENCE. the 16-byte `.rodata` run is two doubles, +0.0 and -0.0, indexed by the sign of `x`.
- * RESIDUALS. register allocation only (the shift count and the shifted `ly` live in r10/r11 in the target; same opcodes).
- *    The early-out `hz == 0 && (lx >> k) == (ly >> k)` before each subtract is read from the target's instructions.
- * SHAPES. the scalar constant 1.0 is a literal so the compiler pools it itself.
+ * RESIDUALS. none in `.text`.
+ * SHAPES. the early-out `hz == 0 && (lx >> k) == (ly >> k)` before each subtract is read from the target's
+ *    instructions; `ly >> k` is spelled in place (the loop-invariant pass hoists it), which colours the final `hy`
+ *    into the shift count's register as retail (a named `lyk` local swaps the two).
+ *    The scalar constant 1.0 is a literal so the compiler pools it itself.
  */
 #pragma fp_contract off
 #include "MSL/e_fmod.h"
@@ -26,7 +28,6 @@ extern "C" f64 __ieee754_fmod(f64 x, f64 y)
     s32 iy;
     s32 sx;
     s32 i;
-    u32 lyk;
     s32 k;
     u32 lx;
     u32 ly;
@@ -102,11 +103,10 @@ extern "C" f64 __ieee754_fmod(f64 x, f64 y)
     }
     n = ix - iy;
     k = n + 2;
-    lyk = ly >> k;
     while (n--) {
         hz = hx - hy;
         lz = lx - ly;
-        if (hz == 0 && (lx >> k) == lyk) {
+        if (hz == 0 && (lx >> k) == (ly >> k)) {
             return fmod_zero[(u32)sx >> 31];
         }
         if (lx < ly) {
@@ -125,7 +125,7 @@ extern "C" f64 __ieee754_fmod(f64 x, f64 y)
     }
     hz = hx - hy;
     lz = lx - ly;
-    if (hz == 0 && (lx >> k) == lyk) {
+    if (hz == 0 && (lx >> k) == (ly >> k)) {
         return fmod_zero[(u32)sx >> 31];
     }
     if (lx < ly) {

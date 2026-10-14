@@ -5,9 +5,13 @@
  * that are already in memory.  `.text` 0x804D9B4C..0x804DB050 (0x1504), thirteen functions in retail
  * order: LocateObject, RSOStaticLocateObject, RSOUnLocateObject, RSOLink, RSOUnLink, fn_804DA7E4,
  * FindExportIndex, RSORelocate, RSORelocateSmallDataSection, then the module-list functions
- * 0x804DAE40..0x804DB050 (unwritten; `.sbss` 0x80795440, an 8 B list head, is read by those four only;
- * they call LocateObject, RSOStaticLocateObject and RSOLink, and the last two of them start at 4-byte
- * offsets, unlike the 16-aligned SC library that follows at 0x804DB050).
+ * RSOListInit, RSOLinkListFix, RSOLinkList and RSOUnLinkList (0x804DAE40..0x804DB050; `.sbss`
+ * 0x80795440, the 8 B queue head/tail `RSOModuleList`, is read by those four only; the last two start at
+ * 4-byte offsets, unlike the 16-aligned SC library that follows at 0x804DB050).
+ * NAMES. RSOListInit, RSOLinkListFix, RSOLinkList, RSOUnLinkList and RSOModuleList are GUESSes from the RVL
+ * SDK RSO API (the dump has placeholders there): the queue reset plus static locate, the locate-and-link
+ * with a fix level (level >= 2 clears the bss buffer and drops the relocation/import table sizes), its
+ * level-0 tail call, and the dequeue-unlink-unlocate.
  *
  * Names and struct layouts come from the shared memory dump (`docs/memory-dump.md`), except
  * fn_804DA7E4 which has no name there.  A rename is always two edits - this file and
@@ -826,4 +830,100 @@ void RSORelocateSmallDataSection(RSOModule* pObject, u32 importSymbolIndex, RSOR
         }
         reloc++;
     }
+}
+
+/* The queue of linked modules the list functions below maintain, head and tail. */
+/* size: 0x8 */
+typedef struct RSOModuleQueue {
+    RSOModule* head; /* +0x00 */
+    RSOModule* tail; /* +0x04 */
+} RSOModuleQueue;
+
+static RSOModuleQueue RSOModuleList;
+
+/* Appends a module to the tail of the linked-module queue. */
+static inline void EnqueueModule_(RSOModule* module)
+{
+    RSOModule* prev = RSOModuleList.tail;
+
+    if (prev == NULL) {
+        RSOModuleList.head = module;
+    } else {
+        prev->next_module_link = module;
+    }
+    module->prev_module_link = prev;
+    module->next_module_link = NULL;
+    RSOModuleList.tail = module;
+}
+
+/* Resets the queue, locates the static module and makes it the queue's only entry; returns the locate result. */
+BOOL RSOListInit(RSOModule* staticRso)
+{
+    BOOL result;
+
+    RSOModuleList.tail = NULL;
+    RSOModuleList.head = NULL;
+    result = RSOStaticLocateObject(staticRso);
+    EnqueueModule_(staticRso);
+    return result;
+}
+
+/* Locates a module, links it both ways with every queued module and queues it; from fix level 2 on
+ * the work buffer is cleared and the relocation and import tables are dropped. */
+/* untyped: byte range (the module's bss buffer, cleared with memset) */
+BOOL RSOLinkListFix(RSOModule* newRso, void* bss, int fixLevel)
+{
+    RSOModule* module;
+
+    if (!LocateObject((RSOHdr*)newRso, bss, fixLevel)) {
+        return FALSE;
+    }
+    for (module = RSOModuleList.head; module != NULL; module = module->next_module_link) {
+        RSOLink(newRso, (RSORelTable*)module);
+        RSOLink(module, (RSORelTable*)newRso);
+    }
+    EnqueueModule_(newRso);
+    if (fixLevel >= 2) {
+        memset(bss, 0, newRso->bss_size);
+        newRso->external_relocation_table_size = 0;
+        newRso->import_symbol_table_size = 0;
+    }
+    return TRUE;
+}
+
+/* Locates and links a module with no fix level. */
+/* untyped: byte range (the module's bss buffer) */
+BOOL RSOLinkList(RSOModule* newRso, void* bss)
+{
+    return RSOLinkListFix(newRso, bss, 0);
+}
+
+/* Removes a queued module, unlinks it both ways from every remaining module and un-locates it. */
+BOOL RSOUnLinkList(RSOModule* oldRso)
+{
+    RSOModule* next;
+    RSOModule* prev;
+    RSOModule* module;
+
+    if (oldRso->next_module_link == NULL && oldRso->prev_module_link == NULL) {
+        return FALSE;
+    }
+    next = oldRso->next_module_link;
+    prev = oldRso->prev_module_link;
+    if (next == NULL) {
+        RSOModuleList.tail = prev;
+    } else {
+        next->prev_module_link = prev;
+    }
+    if (prev == NULL) {
+        RSOModuleList.head = next;
+    } else {
+        prev->next_module_link = next;
+    }
+    for (module = RSOModuleList.head; module != NULL; module = module->next_module_link) {
+        RSOUnLink(module, (RSORelTable*)oldRso);
+        RSOUnLink(oldRso, (RSORelTable*)module);
+    }
+    RSOUnLocateObject(oldRso);
+    return TRUE;
 }

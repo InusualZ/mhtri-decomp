@@ -8,9 +8,10 @@
  * NAMES. `__ieee754_log` is the map's name; `e_log_zero` (the static zero the divisions use) is a GUESS.
  * EVIDENCE. the `.sdata2` pool is in order of use (the t1 coefficients Lg2, Lg4, Lg6 precede Lg1, Lg3, Lg5, Lg7); the
  *    negative-input path stores 33 (EDOM) into `errno` before the NaN division.
- * RESIDUALS. one `fadd` pair in the last two returns takes its operands in the other order (register allocation, 2 words).
+ * RESIDUALS. none in `.text`.
  * SHAPES. the scalar constants are literals so the compiler pools them itself; `zero` is a zero-initialised static
- *    so the divisions by zero stay run-time.
+ *    so the divisions by zero stay run-time.  The `i > 0`, `k != 0` return takes `dk * ln2_hi` into `khi` before
+ *    `R = s * (hfsq + R)`: that order colours `hfsq + R` into R's own register and `ln2_hi` into the next one, as retail.
  */
 #pragma fp_contract off
 #include "MSL/e_log.h"
@@ -90,7 +91,9 @@ extern "C" f64 __ieee754_log(f64 x)
         if (k == 0) {
             return f - (hfsq - s * (hfsq + R));
         }
-        return dk * 6.93147180369123816490e-01 - ((hfsq - (s * (hfsq + R) + dk * 1.90821492927058770002e-10)) - f);
+        f64 khi = dk * 6.93147180369123816490e-01;
+        R = s * (hfsq + R);
+        return khi - ((hfsq - (R + dk * 1.90821492927058770002e-10)) - f);
     }
     if (k == 0) {
         return f - s * (f - R);

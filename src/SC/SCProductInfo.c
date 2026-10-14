@@ -17,7 +17,8 @@
  *    key=value text at 0x80003800 with a rotating key and returns the value of the tag.
  * RESIDUALS. `__SCF1` 0x804DD010: the value copy's `c ^= key` emits one extra `clrlwi` of the key (372 B against
  *    368 B) while every register matches the target; the spelling `c = c ^ key` drops it but then colours the count
- *    r8 where the target has r6 (all 120 declaration orders of that form measured, best below this one).  flipcheck:
+ *    r8 where the target has r6 (all 120 declaration orders of that form measured, best below this one; `c` as
+ *    int/u32/s32/char, a local block pointer, `*buf++`, a `for` copy loop and a shared `c` are neutral or worse).  flipcheck:
  *    .text, and the .rodata/.sdata strings carry `@NN` names where the target has labels (relocation names only).
  * SHAPES. the tag scan is a `for` over the 256-byte block and the value copy a `while` that rotates the key before it
  *    reads the byte; the scan decodes into a second byte `d`.

@@ -23,7 +23,8 @@
  *   between the reboot and the timeout words, this object puts it at +0 (definition position, linkage and the
  *   initialiser measured, no effect).  The `__ios_*` statics are out-of-line in the target and the other helpers
  *   are inlined: they are `static inline` here. The ring check expressions are kept as the explicit
- *   `a < b ? a - b : ...` forms that reproduce the target's branchy compare.
+ *   `a < b ? a - b : ...` forms that reproduce the target's branchy compare; `queued + (0xFFFFFFFF - issued) + 1`,
+ *   `(0 - issued) + queued` and five more spellings of the shared ring count compile identically to `queued - issued`.
  * SHAPES. `strnlen` counts down a copy of `maxlen`, which is what keeps the inlined copies' path pointer in r3 and
  *   the count in r4; `IOS_IoctlvReboot` sends through `IPCSendReboot`, whose parameter is the saved-register copy of
  *   `req` the target reuses after the `memcpy`.

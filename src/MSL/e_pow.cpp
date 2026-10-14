@@ -7,8 +7,12 @@
  * NAMES. `__ieee754_pow` is the map's name; the table names are the algorithm's own.
  * EVIDENCE. the three 2-entry tables are {1.0, 1.5}, {0, log2(1.5) high} and {0, log2(1.5) low}; the pooled infinity is
  *    the folded `huge * huge`; the calls are `sqrt` (the thunk) and `scalbn`.
- * RESIDUALS. same 541 instructions as the target; the target keeps six doubles in f26..f31 across the body where ours uses seven
- *    (f25..f31), so the frame is 0x10 larger and the FP registers differ; the cause is not isolated.
+ * EVIDENCE. the source is the fdlibm 5.2 shape: `(x<0)**(non-int)` stores 33 (EDOM) into `errno` and returns `__float_nan`,
+ *    the |y|-huge path computes `t = x - 1` and returns the folded `huge * huge` / `tiny * tiny` unsigned, and the sign
+ *    `s` is set after the log2 split from `(hx >> 31) + 1`.
+ * RESIDUALS. register allocation only: `v = s_l * t_h + t_l * ss` takes f7 where the target reuses f4, and `p_h = y1 * t1`
+ *    f4 where the target reuses f3, which shifts the final exp2 block's temporaries (operand orders and declaration scope
+ *    of the log2 block's locals measured, no effect).
  * SHAPES. the scalar constants are literals so the compiler pools them itself.
  */
 #pragma fp_contract off
@@ -16,6 +20,8 @@
 #include "MSL/sqrt.h"
 #include "MSL/scalbn.h"
 #include "MSL/fdlibm.h"
+#include "MSL_C/errno.h"
+#include "MSL_C/float.h"
 
 static const f64 bp[2] = {1.0, 1.5};
 static const f64 dp_h[2] = {0.0, 5.84962487220764160156e-01};
@@ -123,13 +129,9 @@ extern "C" f64 __ieee754_pow(f64 x, f64 y)
             return z;
         }
     }
-    n = ((u32)hx >> 31) - 1;
-    if ((n | yisint) == 0) {
-        return (x - x) / (x - x);
-    }
-    s = 1.0;
-    if ((n | (yisint - 1)) == 0) {
-        s = -1.0;
+    if ((((hx >> 31) + 1) | yisint) == 0) {
+        errno = 33;
+        return *(f32*)__float_nan;
     }
     if (iy > 0x41E00000) {
         if (iy > 0x43F00000) {
@@ -141,12 +143,12 @@ extern "C" f64 __ieee754_pow(f64 x, f64 y)
             }
         }
         if (ix < 0x3FEFFFFF) {
-            return (hy < 0) ? s * 1.0e300 * 1.0e300 : s * 1.0e-300 * 1.0e-300;
+            return (hy < 0) ? 1.0e300 * 1.0e300 : 1.0e-300 * 1.0e-300;
         }
         if (ix > 0x3FF00000) {
-            return (hy > 0) ? s * 1.0e300 * 1.0e300 : s * 1.0e-300 * 1.0e-300;
+            return (hy > 0) ? 1.0e300 * 1.0e300 : 1.0e-300 * 1.0e-300;
         }
-        t = ax - 1.0;
+        t = x - 1.0;
         w = (t * t) * (0.5 - t * (0.3333333333333333333333 - t * 0.25));
         u = 1.44269502162933349609e+00 * t;
         v = t * 1.92596299112661746887e-08 - w * 1.44269504088896338700e+00;
@@ -202,11 +204,15 @@ extern "C" f64 __ieee754_pow(f64 x, f64 y)
         F64_LO(p_h) = 0;
         p_l = v - (p_h - u);
         z_h = 9.61796700954437255859e-01 * p_h;
-        z_l = -7.02846165095275826516e-09 * p_h + p_l * 9.61796693925975554329e-01 + dp_l[k];
+        z_l = dp_l[k] + (-7.02846165095275826516e-09 * p_h + p_l * 9.61796693925975554329e-01);
         t = (f64)n;
         t1 = (((z_h + z_l) + dp_h[k]) + t);
         F64_LO(t1) = 0;
         t2 = z_l - (((t1 - t) - dp_h[k]) - z_h);
+    }
+    s = 1.0;
+    if ((((hx >> 31) + 1) | (yisint - 1)) == 0) {
+        s = -1.0;
     }
     y1 = y;
     F64_LO(y1) = 0;
