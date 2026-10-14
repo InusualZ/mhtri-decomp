@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (106)
+## Ideas that work (108)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -115,6 +115,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 119 | [Select the conditional store value with a ternary, accumulate into a parameter, order non-leading locals](119-ternary-select-param-accumulate.md) | works | source-shape, allocator | A function is instruction-equal but the target stores a conditionally chosen word once and keeps a parameter register as the scratch, where ours stores twice or spends a callee-saved register |
 | 120 | [Scope `#pragma global_optimizer off` to one function](120-global-optimizer-off-scoped.md) | works | pragma, source-shape | A function's residual is a frontend-optimizer move - an `else` value computed above the branch, a loop-invariant hoisted, a load reused by CSE instead of reloaded, two loads scheduled in the other order - and turning... |
 | 121 | [A u8 loop counter over a one-element array keeps retail's unfolded index multiply](121-u8-loop-counter-over.md) | works | source-shape | Retail keeps `li rZ,0` ... `mulli rX,rZ,<stride>; add rX,base,rX` for an element at index 0 that our code folds into a plain offset |
+| 122 | [Swapped epilogue loads after an inline-asm bctr: scope scheduling off to the function](122-scheduling-off-asm-epilogue.md) | works | pragma, flags | A small function that ends in an inline `asm { ... bctr }` matches except the epilogue - the target restores `lwz r31` before `lwz r0` (the reverse of MWCC's scheduled order). |
+| 123 | [A fill loop and by-value struct temps written in place colour differently from an inline helper fed the call result](123-inline-helper-direct-struct-arg.md) | works | source-shape, allocator | Same instructions, but a loop's pointer/counter/value registers are permuted among r4-r7 and two by-value struct copies sit in swapped stack slots. |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 
