@@ -8,12 +8,16 @@
  *    8-aligned start.  Seam with NAND/NANDCheck.c: data order only (no shared statics).
  * FLAGS. cflags_base in the `OS` lib block of configure.py (Wii/1.3); no float code.  `#pragma dont_inline` covers
  *    `reserveFileDescriptor` (the target calls it out of line).  The three buffers are 32-byte aligned (ISFS DMA).
+ *    `asyncRoutine` is under a scoped `#pragma optimization_level 2` (push/pop), the better-scoring level for it.
  * NAMES. `reserveFileDescriptor`, `NANDLoggingAddMessageAsync` and `asyncRoutine` are the map's (dump).  GUESS: the
  *    unit name (SDK spelling), `s_fd`, `s_readBuffer` and `s_writeBuffer` (`asyncRoutine`'s buffers after
  *    `s_message`), and the `NAND_LOG_STAGE_*` step names.
- * RESIDUALS. `asyncRoutine`: in the header-write step the zero stored to `s_readBuffer[255]` is kept in r29 across
- *    the calls and reused for the title-id terminator, which costs a third saved register; the target rematerializes
- *    the zero (`li r0,0` then `li r4,0`).
+ * RESIDUALS. `asyncRoutine`: in the header-write step the backend common-subexpression-elimination pass (mwcc-debugger:
+ *    the second CSE at level 4, the first at level 2) turns the title-id terminator's `li 0` into a copy of the
+ *    `s_readBuffer[255]` zero, which the allocator then keeps in r29 across five calls (a third saved register and a
+ *    shifted schedule); the target materializes each zero (`li r0,0`, later `li r4,0`).  A stored value that is not
+ *    a literal escapes the merge (`= result` or `= s_stage - 5` leave one instruction apart) but is not plausible
+ *    source; literal, cast, volatile, pointer, inline-helper, order and switch spellings all keep the merge.
  * SHAPES. the step dispatch is an `if`/`else if` chain on `s_stage` after the increment (the target compares the
  *    incremented value in r0 against 2..9 in order); the line-seek step reads the line count into a local first (the
  *    target copies the `atoi` result to r0 before the shift).
@@ -93,6 +97,9 @@ BOOL NANDLoggingAddMessageAsync(NANDLoggingCallback callback, const char* format
     }
     return FALSE;
 }
+
+#pragma push
+#pragma optimization_level 2
 
 /* 0x804C9A70 (0x484): steps the log append: read the line counter, stamp and write the new line, then close. */
 static void asyncRoutine(s32 result, NANDCommandBlock* block)
@@ -202,3 +209,5 @@ static void asyncRoutine(s32 result, NANDCommandBlock* block)
         }
     }
 }
+
+#pragma pop

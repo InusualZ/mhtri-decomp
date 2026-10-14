@@ -7,13 +7,16 @@
  *    NAND/NANDCore.c at 0x804C9480: `NANDGetUsage` (0x804C9584) and `NANDCheckAsync` (0x804C9648) call
  *    `nandIsInitialized` out of line while NAND/NANDCore.c inlines it.  Seam with NAND/NANDLogging.c: data order only
  *    (no shared statics).  The banner initializer 0x804C9480 has no proven side and is kept at this unit's head.
- * FLAGS. cflags_base in the `OS` lib block of configure.py (Wii/1.3); no pragma; no float code.
+ * FLAGS. cflags_base in the `OS` lib block of configure.py (Wii/1.3); no float code.  `nandUserAreaCallback` is under a
+ *    scoped `#pragma optimization_level 2` (push/pop): at the unit's -O4,p the backend peephole-forward pass sinks the
+ *    `&workBlocks` `addi r4,r4,0xac` below the `&workInodes` setup and copy propagation then rebases that one on r4
+ *    (mwcc-debugger dumps), while the target keeps `&workBlocks` first and `&workInodes` from r31; level 3 and the
+ *    `opt_*`/`global_optimizer` pragmas do not.  Every function of the unit also matches at level 2.
  * NAMES. `NANDGetUsage` and `NANDCheckAsync` are the map's (dump); `nandUserAreaCallback` is evidenced by its own
  *    function-name string at 0x8061BB9C.  GUESS: the unit name (SDK spelling), `NANDInitBanner` (SDK spelling),
  *    `s_userDirList` (the pointer table of the user-area directories), `nandCheckQuota` (the inline answer-bit test)
  *    and the `NANDBanner` field names (SDK layout).
- * RESIDUALS. `nandUserAreaCallback`: the argument setup of the follow-on `ISFS_GetUsageAsync` computes `&workInodes` before
- *    `&workBlocks` (the target computes `&workBlocks` from r4 first and `&workInodes` from r31).
+ * RESIDUALS. none in .text.
  * SHAPES. `nandCheckQuota` takes the six counts by value so their loads are hoisted ahead of the compares, as in the
  *    target.
  */
@@ -141,6 +144,9 @@ static inline u32 nandCheckQuota(u32 fsBlock, u32 inode, u32 homeBlocks, u32 hom
     return answer;
 }
 
+#pragma push
+#pragma optimization_level 2
+
 /* 0x804C96D0 (0x234): sums the usage of each user-area directory in turn, then answers the quota check. */
 static void nandUserAreaCallback(s32 result, NANDCommandBlock* block)
 {
@@ -180,3 +186,5 @@ static void nandUserAreaCallback(s32 result, NANDCommandBlock* block)
         block->callback(nandConvertErrorCode(result), block);
     }
 }
+
+#pragma pop
