@@ -88,7 +88,7 @@ s32 DVDCancel(DVDCommandBlock* block);
 void __DVDPrepareResetAsync(DVDCBCallback callback);
 
 /* 0x807950D8 - the disc layout format: the shift that turns a byte offset into the drive's address unit. */
-extern s32 __DVDLayoutFormat;
+extern volatile s32 __DVDLayoutFormat;
 
 /* 0x804AAC50 - the disc header at 0x80000000. */
 DVDDiskID* DVDGetCurrentDiskID(void);
