@@ -1377,7 +1377,7 @@ config.libs = [
             # cflags_base for the BTE head code rows (16-aligned starts): evidence on the FLAGS line of src/BTE/gki_time.c
             Object(Matching, "BTE/gki_time.c", cflags=cflags_base),
             Object(Matching, "BTE/gki_ppc.c", cflags=cflags_base),
-            Object(NonMatching, "BTE/hcisu_h2.c", cflags=cflags_base),
+            Object(Matching, "BTE/hcisu_h2.c", cflags=cflags_base),
             Object(NonMatching, "BTE/uusb_ppc.c", cflags=cflags_base),
             Object(Matching, "BTE/bta_dm_cfg.c"),
             Object(Matching, "BTE/bta_hh_cfg.c"),
@@ -1412,8 +1412,8 @@ config.libs = [
             Object(Matching, "BTE/btm_discovery.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # GC/3.0a5.2 + cflags_nw4r for btm_inq/main/pm/sco/sec: evidence on the FLAGS line of src/BTE/btm_pm.c
             Object(NonMatching, "BTE/btm_inq.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/btm_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/btm_pm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/btm_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/btm_pm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/btm_sco.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/btm_sec.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE btu/gap/hci/hid/l2c band 0x8048AEE0..0x80498FBC recut per BTE source file; each unit's header carries its evidence.
