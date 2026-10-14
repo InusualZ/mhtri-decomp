@@ -11,9 +11,12 @@
  * NAMES. SDK names throughout, including the `static inline` helpers `__GXXfVtxSpecs` and `SetVAT` (the SDK's
  *   `SETVAT`); the VLim size tables `tbl1`/`tbl2`/`tbl3` keep the SDK's own (function-local in the SDK source) names.
  * RESIDUALS. `__GXSetVCD`: the instruction sequence is the target's, the register allocation is not - the target
- *   composes the XF word as `or r5,r5,r7` (`nTex << 4` first operand, `nCols` second) into r5/r4 with the second pipe
- *   base in r6, ours `or r6,r7,r6` with the base in r4 (`global_optimizer off` makes it worse). flipcheck names
- *   that function's 15 bytes as the `.text` blocker. Jump tables are emitted as compiler-local `@NNN` while the target object names them
+ *   gives the second pipe base r6 and `nCols` r7 and composes `or r5,r5,r7` then `or r4,r5,r4`; ours swaps r6/r7 and
+ *   keeps the word in r5 (`or r5,r6,r5`, `or r5,r5,r4`). The allocator assigns virtual registers from the highest
+ *   number down, and ours numbers the `nCols / 2` shift after the pipe base. Tried without a gain: the other `reg`
+ *   compositions and splits, local declaration orders, an inline XF writer, the word or-ed at the store, the `0x10`
+ *   store at other points; `global_optimizer off`, `scheduling off` and `peephole off` are worse. flipcheck names
+ *   that function's bytes as the `.text` blocker. Jump tables are emitted as compiler-local `@NNN` while the target object names them
  *   `jumptable_8061A7D0`..`jumptable_8061A96C` (relocdiff reports only that naming). The map sizes `tbl3` 0x8 (a
  *   4-byte table plus 4 bytes of tail pad): the target `.sdata` is 0x10 while ours is 0xC; the `GXTexture` `.sdata`
  *   that follows is 8-aligned, so a flip that refuses on that size resizes `tbl3` to 0x4 in a separate map change.
@@ -29,8 +32,9 @@
  *   reads `__GXData` again, as the target reloads it. The two format setters share one `static inline` setter.
  *   `__GXCalculateVLim` and `GXSetVtxAttrFmtv` sit in a `#pragma global_optimizer off` scope: with it on, the VLim
  *   schedule loads `tbl3[position]` before `tbl3[normal]` and the format loop reuses the loop test's `list->attr`
- *   instead of reloading it (the whole file off loses five other functions). `__GXSetVCD` builds the XF word as
- *   `nCols | nTex << 4` then `|= nNrm << 2`; `GXGetVtxAttrFmt` collects the normal fraction in a local so the three
+ *   instead of reloading it (the whole file off loses five other functions). `__GXSetVCD` stores the XF command byte before
+ *   it builds the word as `nCols | nTex << 4` then `|= nNrm << 2` (the earlier store numbers the pipe base before
+ *   the word's shifts); `GXGetVtxAttrFmt` collects the normal fraction in a local so the three
  *   arms share one `stb`.
  */
 
@@ -44,10 +48,6 @@
 /* Writes `value` to the CP register `addr` through the write-gather pipe. */
 #define GX_WRITE_CP_REG(addr, value) \
     (GXWGFifo.u8 = 0x08, GXWGFifo.u8 = (u8)(addr), GXWGFifo.u32 = (u32)(value))
-
-/* Writes `value` to the XF register `addr` through the write-gather pipe. */
-#define GX_WRITE_XF_REG(addr, value) \
-    (GXWGFifo.u8 = 0x10, GXWGFifo.u32 = (u32)(addr), GXWGFifo.u32 = (u32)(value))
 
 /* 0x804B4E40 (0x264): Sets how vertex attribute `attr` is sent (none, direct, 8- or 16-bit index). */
 void GXSetVtxDesc(s32 attr, s32 type)
@@ -113,9 +113,11 @@ static inline void __GXXfVtxSpecs(void)
     nCols /= 2;
     nTex = 33 - __cntlzw(__GXData->vcdHi.word & 0xFFFF);
     nTex /= 2;
+    GXWGFifo.u8 = 0x10;
     reg = nCols | (nTex << 4);
     reg |= nNrm << 2;
-    GX_WRITE_XF_REG(0x1008, reg);
+    GXWGFifo.u32 = 0x1008;
+    GXWGFifo.u32 = reg;
     __GXData->xfWritePending = 1;
 }
 

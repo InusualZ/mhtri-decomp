@@ -12,7 +12,12 @@
  * RESIDUALS. `__GXSetDirtyState` only: the chan loop emits `addi r5,r31,0xB8` + `lwz 0(r5)` where the target has
  *   `mr r5,r31` + `lwz 0xB8(r5)` (the indexed `chanCtrl[i]` spelling gives that pair but scores lower); the texgen
  *   loop colours `bits`/the walk r7/r8 where the target has r8/r7. Register colouring; the indexed walk is numbered
- *   last in the front end.
+ *   last in the front end. The SDK spelling with both loops written out in the body (one `dStateLocal`-style mask
+ *   reused as the loop bits, an address counter and an index) gives every target instruction but colours the mask
+ *   and the address counter r6/r7 where the target has r7/r6. Tried without a gain: helper parameter and local
+ *   declaration orders, function-scope declaration orders, the loop counters as `int`, `__GXData` read directly,
+ *   and scoped `optimization_level`, `global_optimizer`, `opt_strength_reduction`, `opt_propagation`,
+ *   `opt_dead_assignments`, `opt_lifetimes`, `opt_loop_invariants`, `inline_bottom_up` and `peephole` pragmas.
  * SHAPES. The target inlines the genMode write into `__GXSetDirtyState` and the flush-primitive body into `GXBegin`
  *   though both are defined later; `-inline auto` only inlines an earlier definition, so the bodies are static inline
  *   helpers above their callers. `__GXSendFlushPrim` keeps its own copy of the body (a call to the helper inlines into

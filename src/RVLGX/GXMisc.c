@@ -5,15 +5,18 @@
  * RANGE. `.text` 0x804B5DB0-0x804B65F0 (20 functions / 0x798 B); `.sbss` 0x80795210-0x80795228 (FinishQueue +0x0,
  *   DrawDone +0x8, DrawDoneCB +0xC, TokenCB +0x10; only this unit reads them).
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (`-O4,p`); no float operations.
- * NAMES. SDK names: the RVL SDK GXMisc.c function set and order; the two interrupt handlers are file statics.
- * RESIDUALS. `__GXAbort` (0x804B5E30): the PE-copy counter loop colours the hi/hi-copy pair mirrored (r0/r3,
- *   r0/r4); the inlined copy in `GXAbortFrame` shares the allocation, so any shape that matches `__GXAbort`
- *   mismatches `GXAbortFrame` (measured); the `GXAbortFrame`-matching order is kept.
+ * NAMES. SDK names: the RVL SDK GXMisc.c function set and order; the two interrupt handlers are file statics. GUESS:
+ *   `FrameAbort`, `FrameAbortWaitPECopyDone` and `FrameReadMEMCounterU32` are local inline copies of the `__GXAbort`
+ *   chain (absent from the DOL).
+ * RESIDUALS. none in `.text`.
  * SHAPES. `GXFlush`, `GXSetDrawDone`, `GXWaitDrawDone`, `__GXAbortWait`, `__GXReadMEMCounterU32` and
  *   `__GXAbortWaitPECopyDone` are absent from the DOL: static inline helpers. The `.sbss` statics are declared in
  *   SDK order TokenCB, DrawDoneCB, DrawDone, FinishQueue (MWCC emits them reversed); `.sbss` is 0x14 B against the
  *   target's 0x18 B, the tail being the next object's 8-byte alignment. PI reset and EFB access use absolute
- *   addresses (0xCC003018, 0xC8000000 with `GX_SET_REG` x/y inserts).
+ *   addresses (0xCC003018, 0xC8000000 with `GX_SET_REG` x/y inserts). The PE-copy counter reader's local
+ *   declaration order decides how its hi/hi-copy pair is coloured, and the target's two copies differ: `__GXAbort`
+ *   wants `lo, hi1, hi0`, the copy inlined in `GXAbortFrame` wants `hi0, hi1, lo` (each order mirrors the other
+ *   function's r0/r3 pair), so `GXAbortFrame` expands its own `FrameAbort` chain instead of inlining `__GXAbort`.
  */
 #include "types.h"
 #include "gx.h"
@@ -65,9 +68,9 @@ static inline void __GXAbortWait(u32 clocks)
 
 static inline u32 __GXReadMEMCounterU32(void)
 {
-    u32 hi0;
-    u32 hi1;
     u32 lo;
+    u32 hi1;
+    u32 hi0;
     hi0 = __memReg[39];
     do {
         hi1 = hi0;
@@ -110,9 +113,49 @@ static inline void GXFlush(void)
     PPCSync();
 }
 
+/* Reads the 32-bit PE copy counter for `GXAbortFrame`'s reset, its locals declared high word first. */
+static inline u32 FrameReadMEMCounterU32(void)
+{
+    u32 hi0;
+    u32 hi1;
+    u32 lo;
+    hi0 = __memReg[39];
+    do {
+        hi1 = hi0;
+        lo = __memReg[40];
+        hi0 = __memReg[39];
+    } while (hi0 != hi1);
+    return (hi0 << 16) | lo;
+}
+
+/* Waits until the PE copy counter stops moving, for `GXAbortFrame`'s reset. */
+static inline void FrameAbortWaitPECopyDone(void)
+{
+    u32 cnt0;
+    u32 cnt1;
+    cnt0 = FrameReadMEMCounterU32();
+    do {
+        cnt1 = cnt0;
+        __GXAbortWait(32);
+        cnt0 = FrameReadMEMCounterU32();
+    } while (cnt0 != cnt1);
+}
+
+/* Resets the graphics processor through the PI, as `__GXAbort` does, inside `GXAbortFrame`. */
+static inline void FrameAbort(void)
+{
+    if (__GXData->abtWaitPECopy && __GXIsGPFifoReady()) {
+        FrameAbortWaitPECopyDone();
+    }
+    *(volatile u32*)0xCC003018 = 1;
+    __GXAbortWait(200);
+    *(volatile u32*)0xCC003018 = 0;
+    __GXAbortWait(20);
+}
+
 void GXAbortFrame(void)
 {
-    __GXAbort();
+    FrameAbort();
     if (__GXIsGPFifoReady()) {
         __GXCleanGPFifo();
         __GXInitRevisionBits();

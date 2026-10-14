@@ -7,18 +7,18 @@
  * NAMES. SDK names (Revolution SDK `GXBump.c`). `GXTevIndirectReg` and `GXIndTexMtxReg` are local bitfield views of
  *   the BP words the two setters build from zero; the words `GXData` keeps use the unions of `RVLGX/GXInit.h`.
  * SHAPES. `RVLGX/GXInit.h` declares `__GXData` `GXData* const` (it lives in `.sdata2`), so MWCC schedules its load
- *   across the FIFO stores as retail does. `GXSetIndTexMtx` converts the six matrix entries column by column
- *   (`[0][0]`, `[1][0]`, `[0][1]`, ...), the order of retail's conversion slots.
+ *   across the FIFO stores as retail does. `GXSetIndTexMtx` follows the SDK shape: two entries converted and masked
+ *   to 11 bits per register, the s8 `scale_exp += 0x11` and `(scale_exp >> n) & 3` per register, which gives
+ *   retail's size and its three rotated `rlwimi` inserts with no `extsb`.
  * RESIDUALS. 8 of 9 functions match; all 9 bodies are written.
- *   - `GXSetIndTexMtx`: retail adds 0x11 to `scale_exp` with no `extsb` and inserts bits 2..3/4..5 by rotation; the
- *     s8 `+=` adds one `extsb` and two `srawi` (0x14C vs 0x140, +0xC), which moves the seven later functions by 0x10.
- *     `(scale_exp >> n) & 3` gives retail's size and its three `rlwimi`s but moves `id` off r6 and reorders the
- *     float conversions, and scores lower; a `u32`/`s32`/`u8` exponent local and per-register `ma`/`mb` locals
- *     score lower too
- *   - flipcheck: `.text` 0x464 vs the claimed 0x460 (the +0xC above net of the 0xC tail padding; most of the
- *     differing bytes are the 0x10 shift of the later functions); `.sdata2` claim is 8 B (1024.0f + link padding)
- *     while the object emits 4 B, and the pool tool lists the literal as shared with the other `RVLGX/` units
- *     (candidate fold, medium confidence)
+ *   - `GXSetIndTexMtx`: the instruction set is retail's; the scheduler places the second conversion's `stfd` and
+ *     the first register's inserts earlier than retail, and `id * 3`/`scale_exp + 0x11` take r9/r10 where retail
+ *     has r10/r9. Tried without a change: `scale_exp += 0x11` before, between or after the first two conversions,
+ *     local declaration orders, an `int` cast, a `u32` word with `GX_SET_REG`, a `GXData` local for the last store;
+ *     scoring lower: the SDK's mask-and-or `SET_REG_FIELD` (0x134 B), an `s8`/`s32` exponent local, the switch after
+ *     the add, all six conversions first (retail's size needs the per-register interleave and the masks).
+ *   - `.sdata2` claim is 8 B (1024.0f + link padding) while the object emits 4 B, and the pool tool lists the literal
+ *     as shared with the other `RVLGX/` units (candidate fold, medium confidence)
  */
 
 #include "RVLGX/GXBump.h"
@@ -87,7 +87,6 @@ void GXSetIndTexMtx(u32 mtx_id, const f32 offset[2][3], s8 scale_exp)
     s32 mtx[6];
     GXIndTexMtxReg reg;
     u32 id;
-    GXData* gx;
 
     switch (mtx_id) {
     case GX_ITM_0:
@@ -110,39 +109,38 @@ void GXSetIndTexMtx(u32 mtx_id, const f32 offset[2][3], s8 scale_exp)
         break;
     }
 
-    mtx[0] = (s32)(1024.0f * offset[0][0]);
-    mtx[3] = (s32)(1024.0f * offset[1][0]);
-    mtx[1] = (s32)(1024.0f * offset[0][1]);
-    mtx[4] = (s32)(1024.0f * offset[1][1]);
-    mtx[2] = (s32)(1024.0f * offset[0][2]);
-    mtx[5] = (s32)(1024.0f * offset[1][2]);
+    mtx[0] = (s32)(1024.0f * offset[0][0]) & 0x7FF;
+    mtx[1] = (s32)(1024.0f * offset[1][0]) & 0x7FF;
     scale_exp += 0x11;
 
     reg.word = 0;
     reg.f.ma = mtx[0];
-    reg.f.mb = mtx[3];
-    reg.f.scaleExp = scale_exp;
+    reg.f.mb = mtx[1];
+    reg.f.scaleExp = scale_exp & 3;
     reg.f.opcode = id * 3 + 6;
     GXWGFifo.u8 = 0x61;
     GXWGFifo.u32 = reg.word;
 
+    mtx[2] = (s32)(1024.0f * offset[0][1]) & 0x7FF;
+    mtx[3] = (s32)(1024.0f * offset[1][1]) & 0x7FF;
     reg.word = 0;
-    reg.f.ma = mtx[1];
-    reg.f.mb = mtx[4];
-    reg.f.scaleExp = scale_exp >> 2;
+    reg.f.ma = mtx[2];
+    reg.f.mb = mtx[3];
+    reg.f.scaleExp = (scale_exp >> 2) & 3;
     reg.f.opcode = id * 3 + 7;
     GXWGFifo.u8 = 0x61;
     GXWGFifo.u32 = reg.word;
 
+    mtx[4] = (s32)(1024.0f * offset[0][2]) & 0x7FF;
+    mtx[5] = (s32)(1024.0f * offset[1][2]) & 0x7FF;
     reg.word = 0;
-    reg.f.ma = mtx[2];
+    reg.f.ma = mtx[4];
     reg.f.mb = mtx[5];
-    reg.f.scaleExp = scale_exp >> 4;
+    reg.f.scaleExp = (scale_exp >> 4) & 3;
     reg.f.opcode = id * 3 + 8;
     GXWGFifo.u8 = 0x61;
-    gx = __GXData;
     GXWGFifo.u32 = reg.word;
-    gx->xfWritePending = 0;
+    __GXData->xfWritePending = 0;
 }
 
 /* 0x804B90B0 (0x100): Sets the texture coordinate scale of one indirect stage. */
