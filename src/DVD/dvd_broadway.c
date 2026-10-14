@@ -495,19 +495,19 @@ BOOL DVDLowGetNoDiscBufferSizes(u32 offset, u32* numTmdBytes, u32* numCertBytes,
     return TRUE;
 }
 
-/* 0x804ACE90 (0x298): reads the ticket, certificates, TMD, data offset and H3 table of the partition at `offset`. */
-BOOL DVDLowGetNoDiscOpenPartitionParams(u32 offset, ESTicket* ticket, u32* numCertBytes, u8* certs, u32* numTmdBytes,
-                                        u8* tmd, u32* dataWordOffset, u8* h3Table, DVDLowCallback callback) {
+/* 0x804ACE90 (0x298): reads the ticket, TMD, certificates, data offset and H3 table of the partition at `offset`. */
+BOOL DVDLowGetNoDiscOpenPartitionParams(u32 offset, ESTicket* ticket, u32* numTmdBytes, u8* tmd, u32* numCertBytes,
+                                        u8* certs, u32* dataWordOffset, u8* h3Table, DVDLowCallback callback) {
     DVDContext* context;
     s32 result;
 
-    if (ticket == NULL || numCertBytes == NULL || certs == NULL || numTmdBytes == NULL || tmd == NULL ||
+    if (ticket == NULL || numTmdBytes == NULL || tmd == NULL || numCertBytes == NULL || certs == NULL ||
         dataWordOffset == NULL || h3Table == NULL) {
         OSReport("(%s) Error: NULL pointer argument\n", __func__);
         return FALSE;
     }
-    if (((u32)ticket & 31) || ((u32)numCertBytes & 31) || ((u32)certs & 31) || ((u32)numTmdBytes & 31) ||
-        ((u32)tmd & 31) || ((u32)dataWordOffset & 31) || ((u32)h3Table & 31)) {
+    if (((u32)ticket & 31) || ((u32)numTmdBytes & 31) || ((u32)tmd & 31) || ((u32)numCertBytes & 31) ||
+        ((u32)certs & 31) || ((u32)dataWordOffset & 31) || ((u32)h3Table & 31)) {
         OSReport("(%s) pointer argument is unaligned\n", __func__);
         return FALSE;
     }
@@ -517,20 +517,20 @@ BOOL DVDLowGetNoDiscOpenPartitionParams(u32 offset, ESTicket* ticket, u32* numCe
     diCommand[commandBufIndex].args[0] = offset;
     ioVec[0].base = &diCommand[commandBufIndex];
     ioVec[0].length = sizeof(DICommand);
-    ioVec[1].base = numCertBytes;
+    ioVec[1].base = numTmdBytes;
     ioVec[1].length = sizeof(u32);
-    ioVec[2].base = numTmdBytes;
+    ioVec[2].base = numCertBytes;
     ioVec[2].length = sizeof(u32);
     ioVec[3].base = ticket;
     ioVec[3].length = sizeof(ESTicket);
-    ioVec[4].base = numCertBytes;
+    ioVec[4].base = numTmdBytes;
     ioVec[4].length = sizeof(u32);
-    ioVec[5].base = certs;
-    ioVec[5].length = *numCertBytes;
-    ioVec[6].base = numTmdBytes;
+    ioVec[5].base = tmd;
+    ioVec[5].length = *numTmdBytes;
+    ioVec[6].base = numCertBytes;
     ioVec[6].length = sizeof(u32);
-    ioVec[7].base = tmd;
-    ioVec[7].length = *numTmdBytes;
+    ioVec[7].base = certs;
+    ioVec[7].length = *numCertBytes;
     ioVec[8].base = dataWordOffset;
     ioVec[8].length = sizeof(u32);
     ioVec[9].base = h3Table;

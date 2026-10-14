@@ -35,6 +35,13 @@ BOOL DVDLowOpenPartition(u32 offset, void* ticket, u32 certsLength, void* certs,
 BOOL DVDLowOpenPartitionWithTmdAndTicketView(u32 offset, ESTicketView* view, u32 tmdSize, void* tmd, u32 certsLength, void* certs,
                                              DVDLowCallback callback);
 
+/* 0x804ACC80 (0x210): Asks the drive for the TMD and certificate sizes of the partition at `offset`. */
+BOOL DVDLowGetNoDiscBufferSizes(u32 offset, u32* numTmdBytes, u32* numCertBytes, DVDLowCallback callback);
+
+/* 0x804ACE90 (0x298): Reads the ticket, TMD, certificates, data offset and H3 table of the partition at `offset`. */
+BOOL DVDLowGetNoDiscOpenPartitionParams(u32 offset, ESTicket* ticket, u32* numTmdBytes, u8* tmd, u32* numCertBytes,
+                                        u8* certs, u32* dataWordOffset, u8* h3Table, DVDLowCallback callback);
+
 /* 0x804AD130 - closes the open partition. */
 BOOL DVDLowClosePartition(DVDLowCallback callback);
 
@@ -45,6 +52,9 @@ BOOL DVDLowUnencryptedRead(void* buffer, u32 length, u32 offset, DVDLowCallback 
 /* 0x804AD440 - stops the drive motor; `eject` and `saving` select the stop mode. */
 BOOL DVDLowStopMotor(u32 eject, u32 saving, DVDLowCallback callback);
 
+/* 0x804AD5E0 (0x16C): Reads the drive's inquiry record into `info`. */
+BOOL DVDLowInquiry(DVDDriveInfo* info, DVDLowCallback callback);
+
 /* 0x804AD750 - asks the drive for its error code. */
 BOOL DVDLowRequestError(DVDLowCallback callback);
 
@@ -54,12 +64,22 @@ BOOL DVDLowSetSpinupFlag(u32 spinUp);
 /* 0x804AD8D0 - resets the drive, spinning up when the spin-up flag is set. */
 BOOL DVDLowReset(DVDLowCallback callback);
 
+/* 0x804ADA50 (0x198): Configures the drive's audio streaming buffer. */
+BOOL DVDLowAudioBufferConfig(u32 enable, u32 size, DVDLowCallback callback);
+
 /* 0x804ADBF0 - reads the 0x20-byte key report of `format` at sector `lsn` into `reportKey`. */
 /* untyped: byte range the report fills */
 BOOL DVDLowReportKey(void* reportKey, u32 format, u32 lsn, DVDLowCallback callback);
 
 /* 0x804ADD90 - limits the drive's rotation speed to `subcmd`. */
 BOOL DVDLowSetMaximumRotation(u32 subcmd, DVDLowCallback callback);
+
+/* 0x804ADF20 (0x1B0): Reads `length` bytes at `offset` (in 4-byte units) into the 32-byte aligned `buffer`. */
+/* untyped: byte range the read fills */
+BOOL DVDLowRead(void* buffer, u32 length, u32 offset, DVDLowCallback callback);
+
+/* 0x804AE0D0 (0x180): Moves the drive head to `offset` (in 4-byte units). */
+BOOL DVDLowSeek(u32 offset, DVDLowCallback callback);
 
 /* 0x804AE250 - the cover register value the last cover-register read stored. */
 u32 DVDLowGetCoverRegister(void);
