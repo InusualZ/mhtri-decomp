@@ -4,6 +4,27 @@
 #define MHTRI_BTE_GKI_TIME_H
 
 #include "types.h"
+
+/* size: 0x18 - a timer list entry `GKI_add_to_timer_list` links into a list; `ticks` counts from the entry before
+ *   it, and `param` is the owner's context (or, for a user function timer, the function to call). */
+typedef struct TIMER_LIST_ENT {
+    /* +0x00 */ struct TIMER_LIST_ENT* p_next;
+    /* +0x04 */ struct TIMER_LIST_ENT* p_prev;
+    /* +0x08 */ void (*p_cback)(struct TIMER_LIST_ENT* p_tle);
+    /* +0x0C */ s32 ticks;
+    /* +0x10 */ u32 param;
+    /* +0x14 */ u16 event;
+    /* +0x16 */ u8 in_use;
+    /* +0x17 */ u8 pad_0x17;
+} TIMER_LIST_ENT; /* size: 0x18 */
+
+/* size: 0x0C - a timer list: the first and last entries and the ticks up to the last entry's expiry. */
+typedef struct TIMER_LIST_Q {
+    /* +0x00 */ TIMER_LIST_ENT* p_first;
+    /* +0x04 */ TIMER_LIST_ENT* p_last;
+    /* +0x08 */ s32 last_ticks;
+} TIMER_LIST_Q; /* size: 0x0C */
+
 #include "BTE/gki_buffer.h"
 #include "BTE/l2c_api.h"
 #include "BTE/sdp_api.h"
@@ -62,21 +83,30 @@ typedef struct BtaHhDscpInfo {
     /* +0x04 */ const u8* descriptor;
 } BtaHhDscpInfo; /* size: 0x08 */
 
-/* size: 0x18 - a BTU timer list entry `btu_start_timer` links into its list. */
-typedef struct TIMER_LIST_ENT {
-    /* +0x00 */ struct TIMER_LIST_ENT* p_next;
-    /* +0x04 */ struct TIMER_LIST_ENT* p_prev;
-    /* +0x08 */ u32 ticks;
-    /* +0x0C */ u32 unused_0x0C;
-    /* +0x10 */ u32 param;
-    /* +0x14 */ u16 event;
-    /* +0x16 */ u8 in_use;
-    /* +0x17 */ u8 pad_0x17;
-} TIMER_LIST_ENT; /* size: 0x18 */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 0x80478790 - clears the task timers and the tick bookkeeping. */
+void gki_timers_init(void);
+
+/* 0x80478850 - the tick count since GKI started. */
+u32 GKI_get_tick_count(void);
+
+/* 0x80478870 / 0x804789C0 - start task timer `tnum` of the calling task for `ticks` ticks (reloaded when
+ * `is_continuous`), or stop it. */
+void GKI_start_timer(u8 tnum, s32 ticks, u8 is_continuous);
+void GKI_stop_timer(u8 tnum);
+
+/* 0x80478A50 - empties a timer list. */
+void GKI_init_timer_list(TIMER_LIST_Q* p_timer_listq);
+
+/* 0x80478A70 - counts `num_units_since_last_update` ticks off a timer list; returns the number of expired entries. */
+s32 GKI_update_timer_list(TIMER_LIST_Q* p_timer_listq, s32 num_units_since_last_update);
+
+/* 0x80478B00 / 0x80478BF0 - link an entry into a timer list in expiry order, or unlink it. */
+void GKI_add_to_timer_list(TIMER_LIST_Q* p_timer_listq, TIMER_LIST_ENT* p_tle);
+void GKI_remove_from_timer_list(TIMER_LIST_Q* p_timer_listq, TIMER_LIST_ENT* p_tle);
 
 /* 0x8047FF98 - sends the output report in `buf` to the HID device `handle`. */
 void BTA_HhSendData(u8 handle, BT_HDR* buf);

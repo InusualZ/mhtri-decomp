@@ -32,6 +32,9 @@ tBTM_INQ_INFO* BTM_InqDbNext(tBTM_INQ_INFO* p_cur);
 /* 0x8048522C - requests the name of the device at `remote_bda`; `p_cb` reports it. */
 u8 BTM_ReadRemoteDeviceName(u8* remote_bda, BtmCompleteCallback p_cb);
 
+/* 0x804863B4 - ends a remote name request that timed out. */
+void btm_inq_rmt_name_failed(void);
+
 #ifdef __cplusplus
 }
 #endif

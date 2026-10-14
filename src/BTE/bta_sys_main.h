@@ -26,6 +26,13 @@ void bta_sys_register(u8 id, const tBTA_SYS_REG* p_reg);
 /* untyped: a caller-owned payload - any BTA message behind its BT_HDR */
 void bta_sys_sendmsg(void* p_msg);
 
+/* 0x8047AEEC */
+void bta_sys_init(void);
+/* 0x8047AF50 */
+void bta_sys_event(BT_HDR* p_msg);
+/* 0x8047B03C */
+void bta_sys_timer_update(void);
+
 #ifdef __cplusplus
 }
 #endif

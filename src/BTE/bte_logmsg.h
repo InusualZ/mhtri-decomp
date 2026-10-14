@@ -8,6 +8,9 @@
 extern "C" {
 #endif
 
+/* 0x8047A470 - formats a trace message, appends a newline and prints it. */
+void LogMsg(u32 trace_set_mask, const char* fmt_str, ...);
+
 /* 0x8047A530 / 0x8047A550 / 0x8047A570 / 0x8047A590 / 0x8047A5B0 - print a trace message with 0, 1, 2, 3 or 4
  * arguments; the mask carries the layer (bits 16-23) and the type. */
 void LogMsg_0(u32 trace_set_mask, const char* fmt_str);

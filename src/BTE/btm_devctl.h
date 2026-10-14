@@ -15,6 +15,10 @@ u8 BTM_IsDeviceUp(void);
 /* 0x80483FC4 - the controller's local feature bytes. */
 u8* BTM_ReadLocalFeatures(void);
 
+struct TIMER_LIST_ENT;
+/* 0x80483240 - handles the expiry of the device control timer `p_tle`. */
+void btm_dev_timeout(struct TIMER_LIST_ENT* p_tle);
+
 #ifdef __cplusplus
 }
 #endif

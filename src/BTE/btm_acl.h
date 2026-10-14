@@ -8,6 +8,10 @@
 extern "C" {
 #endif
 
+struct TIMER_LIST_ENT;
+/* 0x80481D34 - handles the expiry of the ACL timer `p_tle`. */
+void btm_acl_timeout(struct TIMER_LIST_ENT* p_tle);
+
 /* 0x80481D90 - the largest ACL packet the link to `bd_addr` carries, 0 when there is no link. */
 u16 btm_get_max_packet_size(u8* bd_addr);
 

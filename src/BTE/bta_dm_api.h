@@ -12,6 +12,9 @@ extern "C" {
  * `bta_dm_send_hci_reset`). */
 void BTA_DmSendHciReset(void);
 
+/* 0x8047D750 - whether the controller is up. */
+u8 BTA_DmIsDeviceUp(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -15,6 +15,10 @@ void btm_sco_acl_removed(u8* bda);
 /* 0x80487E94 - whether a SCO link to `remote_bda` is up. */
 u8 btm_is_sco_active_by_bdaddr(u8* remote_bda);
 
+struct BT_HDR;
+/* 0x80487B14 - routes the received SCO data message `p_msg` to its link. */
+void btm_route_sco_data(struct BT_HDR* p_msg);
+
 #ifdef __cplusplus
 }
 #endif

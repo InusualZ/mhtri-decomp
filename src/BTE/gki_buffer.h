@@ -56,9 +56,25 @@ typedef struct tGKI_COM_CB {
     /* +0x01C78 */ u8 bufpool2[45 * (660 + 12)];
     /* +0x09298 */ u8 bufpool3[30 * (1800 + 12)];
     /* +0x166F0 */ u8 bufpool4[9 * (8192 + 12)];
-    /* +0x2875C */ u8 pad_0x2875C[0x50];
+    /* +0x2875C */ u8* OSStack[GKI_MAX_TASKS];
+    /* +0x2877C */ u16 OSStackSize[GKI_MAX_TASKS];
+    /* +0x2878C */ s8* OSTName[GKI_MAX_TASKS];
     /* +0x287AC */ u8 OSRdyTbl[GKI_MAX_TASKS];
-    /* +0x287B4 */ u8 pad_0x287B4[0xD8];
+    /* +0x287B4 */ u16 OSWaitEvt[GKI_MAX_TASKS];
+    /* +0x287C4 */ u16 OSWaitForEvt[GKI_MAX_TASKS];
+    /* +0x287D4 */ u32 OSTicks;
+    /* +0x287D8 */ u32 OSIdleCnt;
+    /* +0x287DC */ s16 OSDisableNesting;
+    /* +0x287DE */ s16 OSLockNesting;
+    /* +0x287E0 */ s16 OSIntNesting;
+    /* +0x287E2 */ u8 pad_0x287E2[2];
+    /* +0x287E4 */ s32 OSTicksTilExp;
+    /* +0x287E8 */ s32 OSNumOrigTicks;
+    /* +0x287EC */ s32 OSWaitTmr[GKI_MAX_TASKS];
+    /* +0x2880C */ s32 OSTaskTmr0[GKI_MAX_TASKS];
+    /* +0x2882C */ s32 OSTaskTmr0R[GKI_MAX_TASKS];
+    /* +0x2884C */ s32 OSTaskTmr1[GKI_MAX_TASKS];
+    /* +0x2886C */ s32 OSTaskTmr1R[GKI_MAX_TASKS];
     /* +0x2888C */ BUFFER_HDR_T* OSTaskQFirst[GKI_MAX_TASKS][NUM_TASK_MBOX];
     /* +0x2890C */ BUFFER_HDR_T* OSTaskQLast[GKI_MAX_TASKS][NUM_TASK_MBOX];
     /* +0x2898C */ FREE_QUEUE_T freeq[GKI_NUM_TOTAL_BUF_POOLS];
@@ -72,9 +88,17 @@ typedef struct tGKI_COM_CB {
     /* +0x28A88 */ u8 pad_0x28A88[4];
 } tGKI_COM_CB; /* size: 0x28A8C */
 
+/* size: 0x54 - the OS glue's part of the GKI control block: the nesting depth of GKI_disable and the interrupt level
+ *   each depth saved (the array length is an approximation: the 0x50 bytes up to the common part are its bound). */
+typedef struct tGKI_OS {
+    /* +0x00 */ u8 int_nest;
+    /* +0x01 */ u8 pad_0x01[3];
+    /* +0x04 */ BOOL int_level[20];
+} tGKI_OS; /* size: 0x54 */
+
 /* size: 0x28AE0 - the GKI control block: the OS glue's part, then the common part. */
 typedef struct tGKI_CB {
-    /* +0x00 */ u8 pad_0x00[0x54];
+    /* +0x00 */ tGKI_OS os;
     /* +0x54 */ tGKI_COM_CB com;
 } tGKI_CB; /* size: 0x28AE0 */
 
