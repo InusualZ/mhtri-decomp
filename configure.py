@@ -1414,10 +1414,10 @@ config.libs = [
             Object(NonMatching, "BTE/hidh_conn.c"),
             # GC/3.0a5.2 + cflags_nw4r: l2c_csm jump tables and per-unit scores, evidence on the FLAGS line of src/BTE/l2c_utils.c
             Object(NonMatching, "BTE/l2c_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/l2c_csm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/l2c_csm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/l2c_link.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/l2c_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
-            Object(NonMatching, "BTE/l2c_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/l2c_utils.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # The BTE RFCOMM/SDP tail 0x80498FBC..0x804A4AC0 recut per BTE source file; each unit's header carries its evidence.
             # GC/3.0a5.2 + cflags_nw4r: equal .text sizes and -ipa file inlining, evidence on the FLAGS line of src/BTE/port_api.c
             Object(Matching, "BTE/port_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
@@ -1502,7 +1502,7 @@ config.libs = [
             Object(NonMatching, "WPAD/WPADEncrypt.cpp", cflags=cflags_base),
             # -fp_contract off: fused-op evidence on the FLAGS line of src/WPAD/WPADClamp.cpp
             Object(NonMatching, "WPAD/WPADClamp.cpp", cflags=cflags_base, extra_cflags=["-fp_contract off"]),
-            Object(NonMatching, "WPAD/WPADMem.cpp", cflags=cflags_base),
+            Object(Matching, "WPAD/WPADMem.cpp", cflags=cflags_base),
             Object(Matching, "WPAD/debug_msg.cpp", cflags=cflags_base),
             Object(NonMatching, "WUD/wud.cpp", cflags=cflags_base),
             Object(Matching, "WUD/WUDHidHost.cpp", cflags=cflags_base),
