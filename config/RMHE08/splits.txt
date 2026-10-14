@@ -3164,11 +3164,16 @@ SEQ/seq.c:
 	.sdata2     start:0x8079D330 end:0x8079D350
 
 SI/SIBios.c:
-	.text       start:0x804DD9C0 end:0x804DF0A0 align:16
-	.data       start:0x80629F98 end:0x8062A0A0
+	.text       start:0x804DD9C0 end:0x804DEFB0 align:16
+	.data       start:0x80629F98 end:0x8062A008
 	.bss        start:0x80757608 end:0x80757828
 	.sdata      start:0x80794138 end:0x80794140
-	.sbss       start:0x80795470 end:0x80795488
+	.sbss       start:0x80795470 end:0x80795480
+
+SI/SISamplingRate.c:
+	.text       start:0x804DEFB0 end:0x804DF0A0 align:16
+	.data       start:0x8062A008 end:0x8062A0A0
+	.sbss       start:0x80795480 end:0x80795488
 
 SYN/syn.c:
 	.text       start:0x804DF0A0 end:0x804DFC50 align:16

@@ -1418,6 +1418,7 @@ config.libs = [
             Object(NonMatching, "SC/SCProductInfo.c", cflags=cflags_base),
             Object(NonMatching, "SEQ/seq.c", cflags=cflags_base),
             Object(NonMatching, "SI/SIBios.c", cflags=cflags_base),
+            Object(NonMatching, "SI/SISamplingRate.c", cflags=cflags_base),
             Object(NonMatching, "SYN/syn.c", cflags=cflags_base),
             Object(NonMatching, "SYN/synenv.c", cflags=cflags_base),
             Object(NonMatching, "SYN/synvoice.c", cflags=cflags_base),

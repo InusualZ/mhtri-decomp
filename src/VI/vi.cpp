@@ -43,6 +43,7 @@
 #include "SC/SCApi.h"
 #include "SC/SCGetScreenSaverMode.h"
 #include "SI/SIBios.h"
+#include "SI/SISamplingRate.h"
 #include "DVD/dvd.h"
 
 /* The video interface registers, as 16-bit words. */

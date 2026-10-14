@@ -1,31 +1,22 @@
 /*
- * SI/SIBios.c - the SI (serial interface) library: controller polling, transfers, the type probe and the sampling
- *    rate.
+ * SI/SIBios.c - the SI (serial interface) library: controller polling, transfers and the type probe.
  *
- * RANGE. .text 0x804DD9C0-0x804DF0A0 (21 functions, 0x16E0 B); .data 0x80629F98-0x8062A0A0; .bss
- *    0x80757608-0x80757828; .sdata 0x80794138-0x80794140; .sbss 0x80795470-0x80795488.  Cut from the old SC block
- *    between `SEQ/seq.c` (0x804DD9C0) and `SYN/syn.c` (0x804DF0A0).
+ * RANGE. .text 0x804DD9C0-0x804DEFB0 (19 functions); .data 0x80629F98-0x8062A008; .bss 0x80757608-0x80757828;
+ *    .sdata 0x80794138-0x80794140; .sbss 0x80795470-0x80795480.  Between `SEQ/seq.c` (0x804DD9C0) and
+ *    `SI/SISamplingRate.c` (0x804DEFB0).
  * FLAGS. the `OS` lib's group with `cflags_base` (configure.py `cflags=`): every function start of the band is
  *    16-aligned (`-O4,p` default alignment), not the 4-byte packing `cflags_os` gives.
- * NAMES. `SIBusy`, `SIInit`, `SITransfer`, `SIGetType`, `SISetSamplingRate`, ... are the map's names; the file name
- *    `SIBios.c` is a GUESS.  `CompleteTransfer`, `SIEnablePollingInterrupt`, `SIUnregisterPollingHandler`,
- *    `SIGetResponse`, `SIRefreshSamplingRate` and the statics `XferTime`, `Alarm`, `InputBuffer`, `InputBufferValid`,
- *    `InputBufferVcount`, `RDSTHandler`, `cmdFixedDevice`, `TypeCallback` are GUESSes derived from what each does;
- *    `__PADFixBits` is the SDK name (PAD/pad reads it in `PADInit`).
+ * NAMES. `SIBusy`, `SIInit`, `SITransfer`, `SIGetType`, ... are the map's names; the file name `SIBios.c` is a GUESS.
+ *    `CompleteTransfer`, `SIEnablePollingInterrupt`, `SIUnregisterPollingHandler`, `SIGetResponse` and the statics
+ *    `XferTime`, `Alarm`, `InputBuffer`, `InputBufferValid`, `InputBufferVcount`, `RDSTHandler`, `cmdFixedDevice`,
+ *    `TypeCallback` are GUESSes derived from what each does; `__PADFixBits` is the SDK name (PAD/pad reads it in
+ *    `PADInit`).
  * EVIDENCE. `.data` 0x80629F98 is the build string `<< RVL_SDK - SI release build ... (0x4302_145) >>` read through
- *    `.sdata` 0x80794138 by `SIInit`; `Si`, `Type`, the 0x30 B `XYNTSC` table and the 0x30 B table after it
- *    with the `SISetSamplingRate: unknown TV format` string follow (0x8062A008, 0x8062A038).  The two status helpers
- *    are `static inline` and defined after `CompleteTransfer`: the statics are allocated in first-use order, and
- *    the target inlines them into `SIInterruptHandler`, `SIGetStatus` and `SIGetResponse` without emitting them.
- *    `InputBufferVcount` is volatile (the target reloads it between the zero test and the sum).
- * RESIDUALS. Seam: `SISetSamplingRate`, `SIRefreshSamplingRate`, `XYNTSC`, `XYPAL`, their string and `SamplingRate`
- *    are the SDK's `SISamplingRate.c` (.text 0x804DEFB0-0x804DF0A0, .data 0x8062A008-0x8062A0A0, .sbss
- *    0x80795480-0x80795488): the target addresses the two tables and the string off a base equal to `XYNTSC`, which
- *    is `...data.0` only when `XYNTSC` opens its TU's .data; here the base is the build string (+0x70/+0xA0/+0xD0),
- *    and those six DOL bytes are all that a flip of this unit moves.
- *    flipcheck: the tail padding of `.data`/`.sdata`/`.sbss`, the `...bss.0`/`...data.0` relocation names, and the
- *    map row `cmdFixedDevice`, which our object names `@LOCAL@GetTypeCallback__FlUlP9OSContext@cmdFixedDevice`
- *    (the row is force-active in the target's `.comment`).
+ *    `.sdata` 0x80794138 by `SIInit`; `Si` and `Type` follow.  The two status helpers are `static inline` and defined
+ *    after `CompleteTransfer`: the statics are allocated in first-use order, and the target inlines them into
+ *    `SIInterruptHandler`, `SIGetStatus` and `SIGetResponse` without emitting them.  `InputBufferVcount` is volatile
+ *    (the target reloads it between the zero test and the sum).
+ * RESIDUALS. none; every function and data section matches.
  * SHAPES. the SI registers are the absolute array `__SIRegs : 0xCD006400`; COMCSR is a bitfield union so the
  *    transfer start composes with bare `rlwimi`s; the tick conversions are 32-bit (`OS_USEC_TO_TICKS(65)`).
  *    `__SITransfer` clears the status bits through a local `sr` (read, mask, write back): the compound `&=` on the
@@ -40,6 +31,7 @@
 #include "types.h"
 
 #include "SI/SIBios.h"
+#include "SI/SISamplingRate.h"
 #include "OS/OS.h"
 #include "OS/OSAlarm.h"
 #include "OS/OSInterrupt.h"
@@ -111,29 +103,11 @@ typedef struct SIControl {
     /* +0x10 */ SICallback callback;
 } SIControl; /* size: 0x14 */
 
-/* One sampling-rate row: the polling line and the sample count. */
-typedef struct SISamplingXY {
-    /* +0x00 */ u16 line;
-    /* +0x02 */ u8 count;
-    /* +0x03 */ u8 pad_0x03;
-} SISamplingXY; /* size: 0x04 */
-
-
 const char* __SIVersion = "<< RVL_SDK - SI \trelease build: Feb 27 2009 10:04:44 (0x4302_145) >>";
 
 static SIControl Si = {-1, 0, 0, 0, 0};
 static u32 Type[SI_MAX_CHAN] = {SI_ERROR_NO_RESPONSE, SI_ERROR_NO_RESPONSE, SI_ERROR_NO_RESPONSE, SI_ERROR_NO_RESPONSE};
 
-static SISamplingXY XYNTSC[12] = {
-    {0x00F6, 2, 0}, {0x000E, 19, 0}, {0x001E, 9, 0}, {0x002C, 6, 0}, {0x0034, 5, 0}, {0x0041, 4, 0},
-    {0x0057, 3, 0}, {0x0057, 3, 0}, {0x0057, 3, 0}, {0x0083, 2, 0}, {0x0083, 2, 0}, {0x0083, 2, 0},
-};
-static SISamplingXY XYPAL[12] = {
-    {0x0128, 2, 0}, {0x000F, 21, 0}, {0x001D, 11, 0}, {0x002D, 7, 0}, {0x0034, 6, 0}, {0x003F, 5, 0},
-    {0x004E, 4, 0}, {0x0068, 3, 0}, {0x0068, 3, 0}, {0x0068, 3, 0}, {0x0068, 3, 0}, {0x009C, 2, 0},
-};
-
-static s32 SamplingRate;
 u32 __PADFixBits;
 
 static SITypeCallback TypeCallback[SI_MAX_CHAN][SI_MAX_CHAN];
@@ -704,41 +678,4 @@ u32 SIGetTypeAsync(s32 chan, SITypeCallback callback)
     }
     OSRestoreInterrupts(enabled);
     return type;
-}
-
-#pragma dont_inline on
-void SISetSamplingRate(u32 msec)
-{
-    BOOL enabled;
-    SISamplingXY* xy;
-
-    if (msec > 11) {
-        msec = 11;
-    }
-    enabled = OSDisableInterrupts();
-    SamplingRate = msec;
-    switch (VIGetTvFormat()) {
-    case 0:
-    case 2:
-    case 5:
-        xy = XYNTSC;
-        break;
-    case 1:
-        xy = XYPAL;
-        break;
-    default:
-        OSReport("SISetSamplingRate: unknown TV format. Use default.");
-        msec = 0;
-        xy = XYNTSC;
-        break;
-    }
-    SISetXY(((*(volatile u16*)0xCC00206C & 1) + 1) * xy[msec].line, xy[msec].count);
-    OSRestoreInterrupts(enabled);
-}
-
-#pragma dont_inline reset
-
-void SIRefreshSamplingRate(void)
-{
-    SISetSamplingRate(SamplingRate);
 }

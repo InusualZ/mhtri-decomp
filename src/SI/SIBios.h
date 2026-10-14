@@ -67,10 +67,6 @@ BOOL SITransfer(s32 chan, void* output, u32 outBytes, void* input, u32 inBytes, 
 u32 SIGetType(s32 chan);
 u32 SIGetTypeAsync(s32 chan, SITypeCallback callback);
 
-/* 0x804DEFB0 / 0x804DF090 - selects the polling rate (0..11 ms) and reapplies the current one. */
-void SISetSamplingRate(u32 msec);
-void SIRefreshSamplingRate(void);
-
 /* 0x8079547C - the channels whose fixed-device bit the next type probe takes over (PAD/pad reads it in PADInit). */
 extern u32 __PADFixBits;
 

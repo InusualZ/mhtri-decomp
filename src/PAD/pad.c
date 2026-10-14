@@ -33,6 +33,7 @@
 #include "OS/OSRtc.h"
 #include "OS/OSTime.h"
 #include "SI/SIBios.h"
+#include "SI/SISamplingRate.h"
 #include "VI/vi.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
