@@ -8,9 +8,9 @@
  *   former placeholder (the body `iosAllocAligned` forwards to); the heap and block record fields are named from
  *   their use.
  * RESIDUALS. relocdiff by name: the heap table is `heaps` here and `lbl_807473C0` in the map (name only, same address).
- *   `__iosAlloc` (96 %): the target keeps `alignedSize` in a saved register across the whole body where this
- *   source lets it die early (same instructions otherwise; declaration orders were measured).  `iosFree` (99.7 %): two
- *   operand-order swaps in the free-block merge sums.
+ * SHAPES. `__iosAlloc` rounds `size` in place (the saved register the whole body uses), reads `best->next` once into a
+ *   local for the split tail, and spells the block sums `size + pad` / `best + pad + header`; `iosFree` merges with
+ *   `size += next->size + header`.
  */
 
 #include "types.h"
@@ -84,9 +84,8 @@ void* __iosAlloc(s32 handle, u32 size, u32 align)
     IOSHeapBlock* block;
     IOSHeap* heap;
     IOSHeapBlock* best;
-    u32 used;
     IOSHeapBlock* tail;
-    u32 alignedSize;
+    IOSHeapBlock* next;
     void* result;
     u32 pad;
     BOOL enabled;
@@ -97,7 +96,7 @@ void* __iosAlloc(s32 handle, u32 size, u32 align)
         if (align < 0x20) {
             align = 0x20;
         }
-        alignedSize = (size + 0x1F) & ~0x1F;
+        size = (size + 0x1F) & ~0x1F;
 
         if ((u32)handle > IOS_MAX_HEAPS - 1 || heaps[handle].base == NULL) {
             result = NULL;
@@ -106,28 +105,28 @@ void* __iosAlloc(s32 handle, u32 size, u32 align)
             best = NULL;
             for (block = heap->freeList; block != NULL; block = block->next) {
                 pad = (align - ((u32)(block + 1) & (align - 1))) & (align - 1);
-                if (block->size == alignedSize && pad == 0) {
+                if (block->size == size && pad == 0) {
                     best = block;
                     break;
                 }
-                if (block->size >= alignedSize + pad && (best == NULL || block->size < best->size)) {
+                if (block->size >= size + pad && (best == NULL || block->size < best->size)) {
                     best = block;
                 }
             }
 
             if (best != NULL) {
                 pad = (align - ((u32)(best + 1) & (align - 1))) & (align - 1);
-                used = alignedSize + pad;
-                if (best->size > used + sizeof(IOSHeapBlock)) {
-                    tail = (IOSHeapBlock*)((u8*)best + used);
-                    tail[1].magic = IOS_BLOCK_FREE;
-                    tail[1].size = best->size - alignedSize - pad - sizeof(IOSHeapBlock);
-                    tail[1].next = best->next;
-                    if (best->next != NULL) {
-                        best->next->prev = &tail[1];
+                if (best->size > size + pad + sizeof(IOSHeapBlock)) {
+                    tail = (IOSHeapBlock*)((u8*)best + size + pad) + 1;
+                    tail->magic = IOS_BLOCK_FREE;
+                    tail->size = best->size - size - pad - sizeof(IOSHeapBlock);
+                    next = best->next;
+                    tail->next = next;
+                    if (next != NULL) {
+                        next->prev = tail;
                     }
-                    best->next = &tail[1];
-                    best->size = used;
+                    best->next = tail;
+                    best->size = size + pad;
                 }
                 best->magic = IOS_BLOCK_USED;
                 if (best->prev != NULL) {
@@ -140,7 +139,7 @@ void* __iosAlloc(s32 handle, u32 size, u32 align)
                 }
                 best->next = NULL;
                 best->prev = NULL;
-                result = (u8*)best + sizeof(IOSHeapBlock) + pad;
+                result = (u8*)best + pad + sizeof(IOSHeapBlock);
                 if (pad != 0) {
                     ((IOSHeapBlock*)result)[-1].magic = IOS_BLOCK_ALIGN_PAD;
                     ((IOSHeapBlock*)result)[-1].prev = best;
@@ -219,7 +218,7 @@ s32 iosFree(s32 handle, void* ptr)
                             if (nn != NULL) {
                                 nn->prev = block;
                             }
-                            block->size = next->size + block->size + sizeof(IOSHeapBlock);
+                            block->size += next->size + sizeof(IOSHeapBlock);
                         }
                     }
                     cursor = block->prev;
@@ -231,7 +230,7 @@ s32 iosFree(s32 handle, void* ptr)
                             if (nn != NULL) {
                                 nn->prev = cursor;
                             }
-                            cursor->size = next->size + cursor->size + sizeof(IOSHeapBlock);
+                            cursor->size += next->size + sizeof(IOSHeapBlock);
                         }
                     }
                     rc = 0;

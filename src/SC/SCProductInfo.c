@@ -15,11 +15,12 @@
  *    0x80629F00 (the region table `JP`, `US`, `EU`, `KR`, `CN`) are read by `SCGetProductArea` and
  *    `SCGetProductGameRegion`; `.sbss` 0x80795460 (8 B) by `SCGetProductCode`.  `__SCF1` decodes the scrambled
  *    key=value text at 0x80003800 with a rotating key and returns the value of the tag.
- * RESIDUALS. `__SCF1` 0x804DD010 is 95.1 %: identical instruction stream, five loop registers numbered differently
- *    (target key r11 / found r9 / tag r12 / count r6, ours r8 / r12 / r9 / r11); `mt.py permdecl` over all 119
- *    declaration orders reaches 95.05 % at best (applied).  flipcheck: .text, and the .rodata/.sdata strings carry
- *    `@NN` names where the target has labels (relocation names only).
- * SHAPES. the tag scan and the value copy are two loops over the 256-byte block, the key rotated in place.
+ * RESIDUALS. `__SCF1` 0x804DD010: the value copy's `c ^= key` emits one extra `clrlwi` of the key (372 B against
+ *    368 B) while every register matches the target; the spelling `c = c ^ key` drops it but then colours the count
+ *    r8 where the target has r6 (all 120 declaration orders of that form measured, best below this one).  flipcheck:
+ *    .text, and the .rodata/.sdata strings carry `@NN` names where the target has labels (relocation names only).
+ * SHAPES. the tag scan is a `for` over the 256-byte block and the value copy a `while` that rotates the key before it
+ *    reads the byte; the scan decodes into a second byte `d`.
  */
 
 #include "types.h"
@@ -55,11 +56,11 @@ static char ProductCode[8];
 
 BOOL __SCF1(const char* tag, char* buf, u32 size)
 {
-    u32 n = 0;
     BOOL found = FALSE;
-    u32 i = 0;
+    u32 i;
     u32 key = 0x73B5DBFA;
     u32 tagIndex = 0;
+    u32 n = 0;
 
     for (i = 0; i < 256; i++) {
         u8 c = ProductInfoBlock[i];
@@ -75,11 +76,13 @@ BOOL __SCF1(const char* tag, char* buf, u32 size)
     }
 
     if (found) {
-        for (i++; i < 256 && n < size; i++) {
-            u8 c = ProductInfoBlock[i];
+        i++;
+        while (i < 256 && n < size) {
+            u8 c;
             key = (key >> 31) | (key << 1);
+            c = ProductInfoBlock[i];
             if (c != 0) {
-                c = c ^ key;
+                c ^= key;
                 if (c == '\r' || c == '\n') {
                     c = 0;
                 }
@@ -88,6 +91,7 @@ BOOL __SCF1(const char* tag, char* buf, u32 size)
             if (c == 0) {
                 return TRUE;
             }
+            i++;
         }
     }
     return FALSE;

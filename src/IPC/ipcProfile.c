@@ -8,8 +8,12 @@
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (-O4,p, default alignment 16).
  * NAMES. `IPCiProfAck` is a GUESS and `IPCiProfInit` is a GUESS for the map's former placeholders (`IPCiProfAck` retires one un-issued request).
  * RESIDUALS. `IPCiProfQueueReq`: the index and the two walking pointers take r9/r7/r8 where the target has r7/r8/r9 (same
- *   instructions; declaration order, `u32` index, `i = 0` initialiser and statement order were measured).  flipcheck:
- *   `.text` is 4 B short of the claim (the pad before `KPAD/kpad.c`).
+ *   instructions; declaration order, `u32` index, `i = 0` initialiser, statement order, nested `if`s, `while`, local
+ *   array pointers and scoped `optimization_level 3` / `opt_loop_invariants off` / `opt_common_subs off` were
+ *   measured).  `.bss`: the target has `IpcFdArray` at +0 and `IpcReqPtrArray` at +0x80, this object the reverse;
+ *   the order follows the first emitted reference (`IPCiProfInit`'s first store), and the array definition order,
+ *   global linkage and an unused inline reader do not move it.  flipcheck: `.text` is 4 B short of the claim (the pad
+ *   before `KPAD/kpad.c`).
  */
 
 #include "types.h"

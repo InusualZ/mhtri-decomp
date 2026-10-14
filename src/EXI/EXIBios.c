@@ -16,14 +16,15 @@
  * NAMES. the SDK's own names for every symbol; the `EXIControl` fields (`exiCallback` .. `queue`), the `EXI_STATE_*`
  *   bits, `EXI_PROBE_TIME` (low memory 0x800030C0, two words) and `EXIAttachDevice` (the inline body shared by
  *   `EXIAttach` and `EXIGetID`) are GUESSes from their use.
- * RESIDUALS. `EXISync` and `EXISelect` differ only in register choice (`exi` / the hoisted `chan * 0x14` swap in
- *   `EXISync`; the `regs` temp and the address temp swap in `EXISelect`); locals order, one-expression and
- *   declaration-with-initialiser forms were measured.  flipcheck: `.text` is 8 B short of the claim (the pad after
- *   `EXIGetID`, where `ProbeBarnacle` starts 16-aligned) and the 0x48 B `.data` claim holds the 0x46 B banner.
+ * RESIDUALS. none in `.text`.  flipcheck: `.text` is 8 B short of the claim (the pad after `EXIGetID`, where
+ *   `ProbeBarnacle` starts 16-aligned) and the 0x48 B `.data` claim holds the 0x46 B banner; both tails are fill.
  * SHAPES. the byte pack/unpack loops of `EXIImm` / `EXISync` / `TCIntrruptHandler` are plain `for` loops over a
  *   local length and a walking pointer; `__EXIRegs[3][5]` and `EXI_PROBE_TIME[2]` are placed at their hardware
  *   addresses with the `: address` declarator, which is what makes the compiler emit `lis` + `add` with no
- *   relocation (a cast constant folds to `addis`).
+ *   relocation (a cast constant folds to `addis`).  `EXISync`'s transfer completion is a nested block with its own
+ *   `&Ecb[chan]` (the shape of the SDK's inlined `CompleteTransfer`): it is what colours `exi` r31 and the hoisted
+ *   `chan * 0x14` r30; a `static inline` helper colours those right but swaps `len`/`buf`.  `EXISelect` ORs the
+ *   frequency and the device bit in one statement, which keeps the value in r3 and the address in r4.
  */
 
 #pragma scheduling off
@@ -212,15 +213,20 @@ BOOL EXISync(EXIChannel chan)
         if (!(__EXIRegs[chan][3] & 0x01)) {
             enabled = OSDisableInterrupts();
             if (exi->state & EXI_STATE_SELECTED) {
-                if (exi->state & EXI_STATE_BUSY) {
-                    if ((exi->state & EXI_STATE_IMM) && (len = exi->immLen)) {
-                        buf = exi->immBuf;
-                        data = __EXIRegs[chan][4];
-                        for (i = 0; i < len; i++) {
-                            *buf++ = (u8)(data >> ((3 - i) * 8));
+                /* The transfer completion, with its own view of the channel record. */
+                {
+                    EXIControl* xfer = &Ecb[chan];
+
+                    if (xfer->state & EXI_STATE_BUSY) {
+                        if ((xfer->state & EXI_STATE_IMM) && (len = xfer->immLen)) {
+                            buf = xfer->immBuf;
+                            data = __EXIRegs[chan][4];
+                            for (i = 0; i < len; i++) {
+                                *buf++ = (u8)(data >> ((3 - i) * 8));
+                            }
                         }
+                        xfer->state &= ~EXI_STATE_BUSY;
                     }
-                    exi->state &= ~EXI_STATE_BUSY;
                 }
                 if (__OSGetDIConfig() != 0xFF || (OSGetConsoleType() & 0xF0000000) == 0x20000000 ||
                     exi->immLen != 4 || (__EXIRegs[chan][0] & 0x70) ||
@@ -384,8 +390,7 @@ BOOL EXISelect(EXIChannel chan, u32 dev, u32 freq)
 
     regs = __EXIRegs[chan][0];
     regs &= 0x405;
-    regs |= (freq << 4);
-    regs |= (1 << dev) << 7;
+    regs |= (freq << 4) | ((1 << dev) << 7);
     __EXIRegs[chan][0] = regs;
 
     if (exi->state & EXI_STATE_ATTACHED) {

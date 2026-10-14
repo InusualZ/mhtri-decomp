@@ -6,19 +6,27 @@
  *   - `.sdata` `__mailboxAck` / `hid` (0x80793EA8 / 0x80793EAC), `.bss` `__responses`, `__timeout_alarm` and the
  *     reboot buffer (0x80747300..0x807473C0) and `.sbss` 0x80795240..0x80795258 are read only here
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (-O4,p, default alignment 16).
- * NAMES. `__ios_ReplyHandler` is a GUESS, `IPCInterruptHandler` is a GUESS, `IPCCltInitSmallHeap` is a GUESS, `__ios_IpcTimed` is a GUESS, `__ios_TimeoutHandler` is a GUESS, `IOS_OpenTimed` is a GUESS, `IOS_CloseTimed` is a GUESS, `IOS_Read` is a GUESS, `IOS_Write` is a GUESS (from the use: the reply half of the
- *   interrupt handler, the open and close that sleep under a 2 s alarm, the 0x800-byte twin of `IPCCltInit`, the
- *   synchronous twins of the async transfers); the `.sbss` words `__rebootPending`, `__rebootReplyPtr`,
+ * NAMES. `__ios_ReplyHandler`, `IPCInterruptHandler`, `IPCCltInitSmallHeap`, `__ios_IpcTimed`, `__ios_TimeoutHandler`,
+ *   `IOS_OpenTimed`, `IOS_CloseTimed`, `IOS_Read`, `IOS_Write` and the inline `IPCSendReboot` are GUESSes (from the
+ *   use: the reply half of the interrupt handler, the open and close that sleep under a 2 s alarm, the 0x800-byte
+ *   twin of `IPCCltInit`, the synchronous twins of the async transfers, the reboot send-and-sleep); the `.sbss` words `__rebootPending`, `__rebootReplyPtr`,
  *   `__rebootRequest`, `__timeoutRequest`, `__timedOut` and the reboot buffer `__rebootBuffer` are GUESSes too;
  *   `IPCRequest` fields are named from the commands that fill them.
- * RESIDUALS. `IOS_IoctlvReboot`: the target forms the ring checks as `(0 - issued) + queued` (`subfic`+`add`) where
- *   `queued - issued` gives `subf`, and it reloads `req` from the stack into a shared saved register (8 B short in
- *   `.text`: flipcheck blocker); `__ios_ReplyHandler`: the target dispatches `{3, 6, 7}` through a pivot tree
- *   (`cmpwi 6; beq; bge`) where the switch here is a linear chain, and keeps a separate vector byte offset;
- *   `IOS_Open` / `IOS_OpenAsync` / `IOS_OpenTimed`: the inlined `strnlen` takes r3/r4 swapped (path pointer and
- *   count). The `__ios_*` statics are out-of-line in the target and the other helpers are inlined: they are
- *   `static inline` here. The ring check expressions are kept as the explicit `a < b ? a - b : ...` forms that
- *   reproduce the target's branchy compare.
+ * RESIDUALS. `IOS_IoctlvReboot`: the target forms the two inlined ring checks as `(0 - issued) + queued`
+ *   (`subfic`+`add`) where `queued - issued` gives `subf` (8 B short in `.text`: flipcheck blocker), and colours
+ *   `ret` r31 / `outCount` r30 / `vectors` and the reloaded `req` r29 where this source has r29 / r31 / r30
+ *   (local declaration orders measured, no effect); `__ios_ReplyHandler` (12 B short in `.text`: flipcheck
+ *   blocker): the target dispatches `{3, 6, 7}` through a
+ *   pivot tree (`cmpwi 6; beq; bge`) where the switch here is a linear chain (case order, empty cases, `default`
+ *   placement, a `u32` selector and scoped `optimization_level 1-3` / `global_optimizer off` measured), and reloads
+ *   the vector array around the ternary store.  `.sbss`: the target has `IPCCltInit`'s `initialized` at +0xC
+ *   between the reboot and the timeout words, this object puts it at +0 (definition position, linkage and the
+ *   initialiser measured, no effect).  The `__ios_*` statics are out-of-line in the target and the other helpers
+ *   are inlined: they are `static inline` here. The ring check expressions are kept as the explicit
+ *   `a < b ? a - b : ...` forms that reproduce the target's branchy compare.
+ * SHAPES. `strnlen` counts down a copy of `maxlen`, which is what keeps the inlined copies' path pointer in r3 and
+ *   the count in r4; `IOS_IoctlvReboot` sends through `IPCSendReboot`, whose parameter is the saved-register copy of
+ *   `req` the target reuses after the `memcpy`.
  */
 
 #include "types.h"
@@ -66,9 +74,10 @@ static s32 __rebootPending;
 
 u32 strnlen(const char* str, u32 maxlen)
 {
+    u32 remaining = maxlen;
     const u8* p = (const u8*)str;
 
-    while (*p != 0 && maxlen-- != 0) {
+    while (*p != 0 && remaining-- != 0) {
         p++;
     }
     return p - (const u8*)str;
@@ -705,13 +714,35 @@ s32 IOS_Ioctlv(s32 fd, s32 type, s32 inCount, s32 outCount, IPCIOVector* vectors
     return ret;
 }
 
+/* Sends the reboot request and sleeps until its reply lands in the reboot buffer. */
+static inline s32 IPCSendReboot(IPCRequest* req)
+{
+    s32 ret;
+    s32 level;
+
+    OSInitThreadQueue(&__rebootReplyPtr->waiters);
+    DCFlushRange(req, 0x20);
+    level = OSDisableInterrupts();
+    ret = IPCEnqueue(req);
+    if (ret != 0) {
+        OSRestoreInterrupts(level);
+    } else {
+        if (__mailboxAck > 0) {
+            IPCSubmitNext();
+        }
+        OSSleepThread(&__rebootReplyPtr->waiters);
+        OSRestoreInterrupts(level);
+        ret = __rebootReplyPtr->result;
+    }
+    return ret;
+}
+
 /* Sends the reboot ioctlv: the request is copied into a static buffer so the reply survives the heap teardown. */
 s32 IOS_IoctlvReboot(s32 fd, s32 type, s32 inCount, s32 outCount, IPCIOVector* vectors)
 {
     s32 ret;
     IPCRequest* req;
     s32 level;
-    s32 level2;
 
     level = OSDisableInterrupts();
     if (__rebootPending != 0) {
@@ -728,20 +759,7 @@ s32 IOS_IoctlvReboot(s32 fd, s32 type, s32 inCount, s32 outCount, IPCIOVector* v
             if (ret == 0) {
                 memcpy(&__rebootBuffer, req, IPC_REQUEST_SIZE);
                 __rebootReplyPtr = &__rebootBuffer;
-                OSInitThreadQueue(&__rebootBuffer.waiters);
-                DCFlushRange(req, 0x20);
-                level2 = OSDisableInterrupts();
-                ret = IPCEnqueue(req);
-                if (ret != 0) {
-                    OSRestoreInterrupts(level2);
-                } else {
-                    if (__mailboxAck > 0) {
-                        IPCSubmitNext();
-                    }
-                    OSSleepThread(&__rebootReplyPtr->waiters);
-                    OSRestoreInterrupts(level2);
-                    ret = __rebootReplyPtr->result;
-                }
+                ret = IPCSendReboot(req);
             }
         }
         __rebootPending = 0;

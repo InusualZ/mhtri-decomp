@@ -11,9 +11,10 @@
  * NAMES. `SCInit`, `SCCheckStatus`, `SCReloadConfFileAsync`, `SCFlushAsync`, `SCFind*Item`, `SCReplaceByteArrayItem`
  *    and the *CallbackFromReload names are the map's; the file name `SCSystemConfig.c` is a GUESS.  The helpers
  *    `SCReloadNextFile`, `SCReloadNextFileCallback`, `SCParseConfBuffer`, `SCParseItem`, `SCDeleteItem`, `SCAddItem`,
- *    `SCFlushWakeup`, `SCFlushStep`, `SCReplaceU8Item` and the statics `ItemNames`, `ItemNumMax`, `ConfDirty`, `FlushBuf`,
- *    `SysDirName` are GUESSes from what each does; `NANDPrivateGetTypeAsync` (0x804C93A0) and
- *    `NANDPrivateCreateDirAsync` (0x804C7A90) are GUESS names for the two NAND leaves the flush machine calls.
+ *    `SCFlushWakeup`, `SCFlushStep`, `SCReplaceU8Item`, the inline `ReadBigEndian16` and the statics `ItemNames`,
+ *    `ItemNumMax`, `ConfDirty`, `FlushBuf`, `SysDirName` are GUESSes from what each does;
+ *    `NANDPrivateGetTypeAsync` (0x804C93A0) and `NANDPrivateCreateDirAsync` (0x804C7A90) are GUESS names for the
+ *    two NAND leaves the flush machine calls.
  * EVIDENCE. `.rodata` 0x80573B58..0x80573BB0 holds `/shared2/sys`, `/shared2/sys/SYSCONF` and
  *    `/title/00000001/00000002/data/setting.txt`, read by `SCReloadConfFileAsync`, `SCFlushAsync` and the
  *    0x804DC6A0 flush; `.data` 0x80629CA8 is the build string `<< RVL_SDK - SC release build ... (0x4302_145)
@@ -22,17 +23,24 @@
  *    only; `.sbss` 0x80795448..0x80795460 is the job state.  The image is `SCv0`, a u16 item count, a u16 offset
  *    table, the items (type|name-length byte, name, value) and `SCed`; the item-id table is built downwards from
  *    the `SCed` marker.
- * RESIDUALS. 12 of 21 rows match the target.  `SCParseConfBuffer` 0x804DB6C0, `SCFlushStep` 0x804DC6A0,
- *    `SCAddItem` 0x804DBC30, `SCFlushAsync` 0x804DC480 and `SCDeleteItem` 0x804DBA90 differ in the
- *    shared failure exits (the target branches to one block from inside nested loops and from every NAND call,
- *    which needs `goto`), `SCAddItem`'s six-way `switch` (the target emits a binary search, the compiler emits a
- *    linear chain for the same cases) and register numbering; `SCFindByteArrayItem` and `SCCheckStatus` differ in
- *    register numbering only.  flipcheck: `.text` (the five rows above), the `@NN` relocation names of `SCv0`/`SCed`,
- *    and the tail padding of `.rodata`/`.sdata`/`.sbss`.
+ * RESIDUALS. 18 of 21 rows match the target.  `SCParseConfBuffer` 0x804DB6C0 and `SCFlushStep` 0x804DC6A0 differ
+ *    in the shared failure exits (the target branches to one block from inside the item loop and from every NAND
+ *    call, which needs `goto`: four `li r3, 2; b` pairs in the item loop, the delete/open blocks duplicated per
+ *    step) and register numbering; `SCAddItem` keeps a scheduling and colouring residual around
+ *    its `memmove` and the closing counter updates (same size).  flipcheck: `.text` (+0x74: `SCParseConfBuffer`
+ *    +32 B and `SCFlushStep` +92 B; `SCAddItem` same size), the `@NN` relocation names of `SCv0`/`SCed`, and the
+ *    tail padding of `.rodata`/`.sdata`/`.sbss`.
  * SHAPES. `NULL` is redefined as `((void*)0)` for the pointer compares that the target emits as `li`+`cmplw`; the
  *    item lookup and the add/replace paths run inside `do { ... } while (0)` so every failure shares one exit; the
  *    buffers are `__attribute__((aligned(32)))`; the flush state machine is one `switch` whose cases fall through
- *    into the shared error tail.
+ *    into the shared error tail.  `SCDeleteItem`'s locals are declared in the target's colouring order (position,
+ *    size, table, entry, end) and its first `memmove` takes `conf + position` byte addresses.
+ *    `FinishFlush` and `SCFlushAsync` reach `Control` through a local `SCControl*` (the target's second base
+ *    register); `SCFlushAsync` stores the job fields and starts the type probe through `ctrl` but leaves the
+ *    error path on `Control.` (routing all of it through `ctrl` scores lower); it passes the busy status itself to a
+ *    caller's callback.
+ *    `SCParseConfBuffer` runs its straight-line checks inside `do { ... } while (0)` (one failure exit) and reads
+ *    the item count through `ReadBigEndian16`, whose flag the target tests after inlining.
  */
 
 #include "types.h"
@@ -195,10 +203,11 @@ void SCInit(void)
 
 u32 SCCheckStatus(void)
 {
-    BOOL enabled;
-    u32 status;
     u8* buf;
+    BOOL enabled;
     u32 size;
+    BOOL level;
+    u32 status;
 
     enabled = OSDisableInterrupts();
     status = BgJobStatus;
@@ -206,14 +215,14 @@ u32 SCCheckStatus(void)
         BgJobStatus = SC_STATUS_BUSY;
         OSRestoreInterrupts(enabled);
         if (SCParseConfBuffer(Control.buffer[0], Control.readSize[0]) == 0) {
-            enabled = OSDisableInterrupts();
+            level = OSDisableInterrupts();
             if (ConfBuf != Control.buffer[0]) {
                 memcpy(ConfBuf, Control.buffer[0], SC_CONF_SIZE);
             }
             ConfDirty = FALSE;
-            OSRestoreInterrupts(enabled);
+            OSRestoreInterrupts(level);
         } else {
-            enabled = OSDisableInterrupts();
+            level = OSDisableInterrupts();
             buf = Control.buffer[0];
             size = SC_CONF_SIZE;
             memset(buf, 0, size);
@@ -223,7 +232,7 @@ u32 SCCheckStatus(void)
                 CONF_HEADER(buf)->offsets[0] = 8;
             }
             ConfDirty = FALSE;
-            OSRestoreInterrupts(enabled);
+            OSRestoreInterrupts(level);
         }
         status = 0;
         BgJobStatus = status;
@@ -363,97 +372,109 @@ static void SCReloadNextFileCallback(s32 result, NANDCommandBlock* block)
     SCReloadNextFile();
 }
 
+/* Reads the big-endian 16-bit word at `p` when it lies before `end`. */
+static inline BOOL ReadBigEndian16(const u8* p, const u8* end, u32* value)
+{
+    if (p + 2 > end) {
+        return FALSE;
+    }
+    *value = (p[0] << 8) | p[1];
+    return TRUE;
+}
+
 /* Validates the configuration image in `buf` (`size` bytes) and builds the item-id table behind its offset table;
  * returns 0 on success and 2 when the image is malformed. */
 static u32 SCParseConfBuffer(u8* buf, u32 size)
 {
     u8* end;
+    u32 count;
     u16* offsets;
+    u32 offset;
+    const SCItemName* entry = ItemNames;
+    const SCItemName* entryEnd;
+    u16* cursor;
+    u32 i;
+    u32 pad;
+    const char* name;
+    u32 nameLength;
     u16* idTable;
     u16* tail;
-    const SCItemName* entry;
-    const SCItemName* entryEnd;
-    SCItem item;
-    u32 count;
-    u32 offset;
-    u32 i;
-    u32 nameLength;
-    u32 pad;
     u8* tableStart;
-    u16* cursor;
+    SCItem item;
 
-    if (size - 12 > 0x3FF4) {
-        return 2;
-    }
-    ItemNumMax = SC_ITEM_MAX;
-    end = buf + size - 4;
-    if (memcmp(buf, "SCv0", 4) != 0) {
-        return 2;
-    }
-    if (memcmp(end, "SCed", 4) != 0) {
-        return 2;
-    }
-    if (size < SC_CONF_SIZE) {
-        pad = SC_CONF_SIZE - size;
-        memset(end, 0, pad);
-        end += pad;
-        memcpy(end, "SCed", 4);
-    }
-    if (buf + 6 > end) {
-        return 2;
-    }
-    count = (buf[4] << 8) | buf[5];
-    offsets = CONF_HEADER(buf)->offsets;
-    offset = (u8*)(offsets + count + 1) - buf;
-    cursor = offsets;
-    for (i = 0; i < count; i++) {
-        if (offset > size) {
-            return 2;
+    do {
+        if (size - 12 > 0x3FF4) {
+            break;
         }
-        if ((u8*)cursor - buf > size) {
-            return 2;
+        ItemNumMax = SC_ITEM_MAX;
+        end = buf + size - 4;
+        if (memcmp(buf, "SCv0", 4) != 0) {
+            break;
         }
-        if (*cursor != offset) {
-            return 2;
+        if (memcmp(end, "SCed", 4) != 0) {
+            break;
         }
-        if (!SCParseItem(buf + offset, &item)) {
-            return 2;
+        if (size < SC_CONF_SIZE) {
+            pad = SC_CONF_SIZE - size;
+            memset(end, 0, pad);
+            end += pad;
+            memcpy(end, "SCed", 4);
         }
-        cursor++;
-        offset += item.totalLength;
-    }
-    if (offset > size) {
-        return 2;
-    }
-    if (offset != offsets[i]) {
-        return 2;
-    }
-    tableStart = end - 72;
-    if (buf + offset > tableStart) {
-        return 2;
-    }
-    offset = tableStart - (buf + offset);
-    memset(tableStart, 0, end - tableStart);
-    tail = (u16*)end;
-    idTable = tail - 1;
-    entry = ItemNames;
-    entryEnd = ItemNames + ItemNumMax;
-    for (; entry < entryEnd && entry->name != NULL; entry++) {
-        nameLength = strlen(entry->name);
+        if (!ReadBigEndian16(buf + 4, end, &count)) {
+            break;
+        }
+        offsets = CONF_HEADER(buf)->offsets;
+        offset = (u8*)(offsets + count + 1) - buf;
         cursor = offsets;
         for (i = 0; i < count; i++) {
-            const u8* header = buf + *cursor;
-            if (nameLength == (header[0] & 0x1F) + 1u && memcmp(entry->name, header + 1, nameLength) == 0) {
-                idTable[-entry->id] = (u8*)(offsets + i) - buf;
-                break;
+            if (offset > size) {
+                return 2;
+            }
+            if ((u8*)cursor - buf > size) {
+                return 2;
+            }
+            if (*cursor != offset) {
+                return 2;
+            }
+            if (!SCParseItem(buf + offset, &item)) {
+                return 2;
             }
             cursor++;
+            offset += item.totalLength;
         }
-    }
-    ItemIDOffsetTblOffset = (u8*)idTable - buf;
-    ItemNumTotal = count;
-    ItemRestSize = offset;
-    return 0;
+        if (offset > size) {
+            break;
+        }
+        if (offset != offsets[i]) {
+            break;
+        }
+        tableStart = end - 72;
+        if (buf + offset > tableStart) {
+            break;
+        }
+        offset = tableStart - (buf + offset);
+        memset(tableStart, 0, end - tableStart);
+        tail = (u16*)end;
+        idTable = tail - 1;
+        entryEnd = entry + ItemNumMax;
+        for (; entry < entryEnd && (name = entry->name) != NULL; entry++) {
+            nameLength = strlen(name);
+            cursor = offsets;
+            for (i = 0; i < count; i++) {
+                const u8* header = buf + *cursor;
+                if (nameLength == (header[0] & 0x1F) + 1u && memcmp(name, header + 1, nameLength) == 0) {
+                    idTable[-entry->id] = (u8*)(offsets + i) - buf;
+                    break;
+                }
+                cursor++;
+            }
+        }
+        ItemIDOffsetTblOffset = (u8*)idTable - buf;
+        ItemNumTotal = count;
+        ItemRestSize = offset;
+        return 0;
+    } while (0);
+    return 2;
 }
 
 /* Decodes the item at `p` into `item`; returns whether it has a known type. */
@@ -502,7 +523,7 @@ static BOOL SCParseItem(const u8* p, SCItem* item)
             item->type = type;
             memcpy(item->value, item->data, item->dataLength);
         }
-        item->totalLength = item->nameLength + item->dataLength + item->totalLength + 1;
+        item->totalLength += item->nameLength + item->dataLength + 1;
     } while (0);
     return item->dataLength != 0;
 }
@@ -528,15 +549,15 @@ static inline BOOL FindItem(u32 id, SCItem* item)
 static void SCDeleteItem(u32 id)
 {
     u8* conf = ConfBuf;
+    u32 position;
+    u32 itemSize;
     u16* idTable;
+    u16* entry;
+    u32 end;
     u16* offsets;
     u16* last;
-    u16* entry;
     u16* p;
-    u32 position;
     u32 itemOffset;
-    u32 itemSize;
-    u32 end;
     u32 i;
 
     if (id < ItemNumMax && ItemIDOffsetTblOffset != 0) {
@@ -549,21 +570,20 @@ static void SCDeleteItem(u32 id)
             itemOffset = *(u16*)(conf + position);
             itemSize = entry[1] - itemOffset + 2;
             end = *last;
-            memmove(entry, entry + 1, itemOffset - (position + 2));
+            memmove(conf + position, conf + position + 2, itemOffset - (position + 2));
             for (p = last - 1; p >= offsets; p--) {
                 if (p < entry) {
                     *p -= 2;
                 } else {
-                    *p -= itemSize;
+                    *p = *p - itemSize;
                 }
             }
-            memmove(conf + *entry, conf + *entry + itemSize, end - (*entry + itemSize));
-            memset(conf + end - itemSize, 0, itemSize);
+            memmove(conf + *entry, conf + itemSize + *entry, end - (*entry + itemSize));
+            memset(conf + (end - itemSize), 0, itemSize);
             for (i = 0; i < ItemNumMax; i++) {
-                u32 v = idTable[-i];
-                if (v >= position) {
-                    if (v > position) {
-                        idTable[-i] = v - 2;
+                if (idTable[-i] >= position) {
+                    if (idTable[-i] > position) {
+                        idTable[-i] -= 2;
                     } else {
                         idTable[-i] = 0;
                     }
@@ -581,15 +601,15 @@ static void SCDeleteItem(u32 id)
 /* untyped: the byte range of an item */
 static BOOL SCAddItem(u32 id, s32 type, const void* value, u32 size)
 {
-    u32 total = 1;
-    const SCItemName* entry = ItemNames;
     u8* conf = ConfBuf;
-    const char* name;
     u32 nameLength;
-    u16* offsets;
+    u32 total = 1;
+    const char* name;
     u16* last;
-    u16* p;
     u8* dst;
+    const SCItemName* entry = ItemNames;
+    u16* offsets;
+    u16* p;
     u32 count;
     u32 first;
 
@@ -626,9 +646,8 @@ static BOOL SCAddItem(u32 id, s32 type, const void* value, u32 size)
             continue;
         }
         total += size;
-        for (;;) {
-            name = entry->name;
-            if (name == NULL || entry->id == id) {
+        while ((name = entry->name) != NULL) {
+            if (entry->id == (s32)id) {
                 break;
             }
             entry++;
@@ -647,27 +666,27 @@ static BOOL SCAddItem(u32 id, s32 type, const void* value, u32 size)
         offsets = CONF_HEADER(conf)->offsets;
         first = *offsets;
         last = offsets + ItemNumTotal;
-        memmove(conf + first + 2, conf + first, *last - first);
+        memmove(conf + (first + 2), conf + first, *last - first);
         p = offsets;
         do {
             *p += 2;
             p++;
-        } while (p <= offsets + ItemNumTotal);
+        } while (p <= last);
         dst = conf + *last;
         *dst = type | (nameLength - 1);
         memcpy(dst + 1, name, nameLength);
         dst += nameLength + 1;
-        if (type == SC_TYPE_ARRAY) {
+        if ((u32)type == SC_TYPE_ARRAY) {
             *dst = size - 1;
             dst += 1;
-        } else if (type == SC_TYPE_BIGARRAY) {
+        } else if ((u32)type == SC_TYPE_BIGARRAY) {
             dst[0] = (size - 1) >> 8;
             dst[1] = size - 1;
             dst += 2;
         }
         memcpy(dst, value, size);
-        ((u16*)(conf + ItemIDOffsetTblOffset))[-id] = (u8*)last - conf;
         count = ItemNumTotal + 1;
+        ((u16*)(conf + ItemIDOffsetTblOffset))[-id] = (u8*)last - conf;
         ItemRestSize -= total + 2;
         last[1] = *last + total;
         ItemNumTotal = count;
@@ -679,10 +698,10 @@ static BOOL SCAddItem(u32 id, s32 type, const void* value, u32 size)
 }
 
 /* untyped: the byte range of an item */
-BOOL SCFindByteArrayItem(void* value, u32 id, u32 size)
+BOOL SCFindByteArrayItem(void* value, u32 size, u32 id)
 {
-    BOOL enabled;
     BOOL found = FALSE;
+    BOOL enabled;
     SCItem item;
 
     enabled = OSDisableInterrupts();
@@ -697,7 +716,7 @@ BOOL SCFindByteArrayItem(void* value, u32 id, u32 size)
 }
 
 /* untyped: the byte range of an item */
-BOOL SCReplaceByteArrayItem(const void* value, u32 id, u32 size)
+BOOL SCReplaceByteArrayItem(const void* value, u32 size, u32 id)
 {
     BOOL result = FALSE;
     BOOL enabled;
@@ -804,26 +823,28 @@ static void SCFlushWakeup(s32 result)
 /* Ends the flush job: runs the caller's callback with the result, wakes the waiting threads and publishes the status. */
 static inline void FinishFlush(void)
 {
+    SCControl* ctrl = &Control;
     void (*callback)(s32 result);
 
-    if (Control.flushResult != 0) {
+    if (ctrl->flushResult != 0) {
         ConfDirty = TRUE;
     }
-    callback = Control.flushCallback;
+    callback = ctrl->flushCallback;
     if (callback != 0) {
-        Control.flushCallback = NULL;
-        callback(Control.flushResult);
-        if (Control.queue.head != NULL) {
-            OSWakeupThread(&Control.queue);
+        ctrl->flushCallback = NULL;
+        callback(ctrl->flushResult);
+        if (ctrl->queue.head != NULL) {
+            OSWakeupThread(&ctrl->queue);
         }
     }
-    BgJobStatus = Control.flushResult;
+    BgJobStatus = ctrl->flushResult;
 }
 
 void SCFlushAsync(void (*callback)(s32 result))
 {
     BOOL enabled;
     BOOL dirty;
+    SCControl* ctrl = &Control;
 
     enabled = OSDisableInterrupts();
     if (BgJobStatus == SC_STATUS_IDLE) {
@@ -831,10 +852,10 @@ void SCFlushAsync(void (*callback)(s32 result))
         if (callback == NULL) {
             callback = SCFlushWakeup;
         }
-        Control.flushCallback = callback;
-        Control.flushResult = 0;
-        Control.fileOpen = FALSE;
-        Control.flushSize = SC_CONF_SIZE;
+        ctrl->flushCallback = callback;
+        ctrl->flushResult = 0;
+        ctrl->fileOpen = FALSE;
+        ctrl->flushSize = SC_CONF_SIZE;
         dirty = ConfDirty ? TRUE : FALSE;
         if (!dirty) {
             OSRestoreInterrupts(enabled);
@@ -843,8 +864,9 @@ void SCFlushAsync(void (*callback)(s32 result))
             ConfDirty = FALSE;
             memcpy(FlushBuf, ConfBuf, SC_CONF_SIZE);
             OSRestoreInterrupts(enabled);
-            Control.step = 0;
-            if (NANDPrivateGetTypeAsync(ConfFileName, &Control.scratch.type, SCFlushStep, COMMAND_BLOCK()) != 0) {
+            ctrl->step = 0;
+            if (NANDPrivateGetTypeAsync(ConfFileName, &ctrl->scratch.type, SCFlushStep,
+                                        (NANDCommandBlock*)ctrl->commandBlock) != 0) {
                 Control.flushResult = SC_STATUS_ERROR;
                 if (Control.fileOpen) {
                     Control.step = 9;
@@ -856,8 +878,8 @@ void SCFlushAsync(void (*callback)(s32 result))
             }
         }
     } else {
-        if (callback != NULL) {
-            callback(BgJobStatus == SC_STATUS_BUSY ? SC_STATUS_BUSY : SC_STATUS_ERROR);
+        if (callback) {
+            callback(BgJobStatus == SC_STATUS_BUSY ? BgJobStatus : SC_STATUS_ERROR);
         }
         OSRestoreInterrupts(enabled);
     }
@@ -866,57 +888,59 @@ void SCFlushAsync(void (*callback)(s32 result))
 /* Advances the flush job: each step runs once the NAND operation the previous step started has completed. */
 static void SCFlushStep(s32 result, NANDCommandBlock* block)
 {
-    switch (Control.step) {
+    SCControl* ctrl = &Control;
+
+    switch (ctrl->step) {
     case 0:
-        if (result == 0 && Control.scratch.type == 1) {
-            Control.step = 1;
-            if (NANDPrivateGetStatusAsync(ConfFileName, &Control.scratch.status, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        if (result == 0 && ctrl->scratch.type == 1) {
+            ctrl->step = 1;
+            if (NANDPrivateGetStatusAsync(ConfFileName, &ctrl->scratch.status, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
                 return;
             }
             break;
         }
-        Control.step = 2;
-        if (NANDPrivateDeleteAsync(ConfFileName, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        ctrl->step = 2;
+        if (NANDPrivateDeleteAsync(ConfFileName, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
             return;
         }
         break;
     case 1:
-        if (result == 0 && Control.scratch.status.permission == 0x3F) {
-            Control.step = 6;
-            if (NANDPrivateOpenAsync(ConfFileName, &Control.fileInfo, 2, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        if (result == 0 && ctrl->scratch.status.permission == 0x3F) {
+            ctrl->step = 6;
+            if (NANDPrivateOpenAsync(ConfFileName, &ctrl->fileInfo, 2, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
                 return;
             }
             break;
         }
-        Control.step = 2;
-        if (NANDPrivateDeleteAsync(ConfFileName, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        ctrl->step = 2;
+        if (NANDPrivateDeleteAsync(ConfFileName, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
             return;
         }
         break;
     case 2:
-        Control.step = 3;
-        if (NANDPrivateGetTypeAsync(SysDirName, &Control.scratch.type, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        ctrl->step = 3;
+        if (NANDPrivateGetTypeAsync(SysDirName, &ctrl->scratch.type, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
             return;
         }
         break;
     case 3:
-        if (result != 0 || Control.scratch.type != 2) {
-            Control.step = 4;
-            if (NANDPrivateCreateDirAsync(SysDirName, 0x3F, 0, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        if (result != 0 || ctrl->scratch.type != 2) {
+            ctrl->step = 4;
+            if (NANDPrivateCreateDirAsync(SysDirName, 0x3F, 0, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
                 return;
             }
             break;
         }
         /* fall through */
     case 4:
-        Control.step = 5;
-        if (NANDPrivateCreateAsync(ConfFileName, 0x3F, 0, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        ctrl->step = 5;
+        if (NANDPrivateCreateAsync(ConfFileName, 0x3F, 0, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
             return;
         }
         break;
     case 5:
-        Control.step = 6;
-        if (NANDPrivateOpenAsync(ConfFileName, &Control.fileInfo, 2, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        ctrl->step = 6;
+        if (NANDPrivateOpenAsync(ConfFileName, &ctrl->fileInfo, 2, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
             return;
         }
         break;
@@ -924,19 +948,19 @@ static void SCFlushStep(s32 result, NANDCommandBlock* block)
         if (result != 0) {
             break;
         }
-        Control.fileOpen = TRUE;
-        Control.step = 7;
-        if (NANDWriteAsync(&Control.fileInfo, FlushBuf, Control.flushSize, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        ctrl->fileOpen = TRUE;
+        ctrl->step = 7;
+        if (NANDWriteAsync(&ctrl->fileInfo, FlushBuf, ctrl->flushSize, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
             return;
         }
         break;
     case 7:
-        if (result != (s32)Control.flushSize) {
+        if (result != (s32)ctrl->flushSize) {
             break;
         }
-        Control.fileOpen = FALSE;
-        Control.step = 8;
-        if (NANDCloseAsync(&Control.fileInfo, SCFlushStep, COMMAND_BLOCK()) == 0) {
+        ctrl->fileOpen = FALSE;
+        ctrl->step = 8;
+        if (NANDCloseAsync(&ctrl->fileInfo, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
             return;
         }
         break;
@@ -951,10 +975,10 @@ static void SCFlushStep(s32 result, NANDCommandBlock* block)
     default:
         return;
     }
-    Control.flushResult = SC_STATUS_ERROR;
-    if (Control.fileOpen) {
-        Control.step = 9;
-        if (NANDCloseAsync(&Control.fileInfo, SCFlushStep, COMMAND_BLOCK()) == 0) {
+    ctrl->flushResult = SC_STATUS_ERROR;
+    if (ctrl->fileOpen) {
+        ctrl->step = 9;
+        if (NANDCloseAsync(&ctrl->fileInfo, SCFlushStep, (NANDCommandBlock*)ctrl->commandBlock) == 0) {
             return;
         }
     }
