@@ -31,7 +31,7 @@ typedef struct DVDErrorInfo {
     /* +0x0C */ u32 dateTime;                   /* the time of the error in seconds */
     /* +0x10 */ u32 status;                     /* the status register at the error */
     /* +0x14 */ u32 control;                    /* the control register at the error */
-    /* +0x18 */ u32 unused_0x18;
+    /* +0x18 */ u32 nextOffset;                 /* the ring slot the next record goes to */
     /* +0x1C */ DVDCommandInfo lastCommand[5];  /* ring of the most recent commands */
 } DVDErrorInfo; /* size: 0x80 */
 
