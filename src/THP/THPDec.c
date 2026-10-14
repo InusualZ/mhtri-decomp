@@ -15,13 +15,19 @@
  *    AAN scale factors read as doubles; `.sdata2` 0x8079D3A8..0x8079D3BC are the inverse-DCT constants of the
  *    paired-single routines; the decoder uses the locked cache (`LCStoreData`, `LCQueueWait`, `PPCMfhid2`).
  *    `.bss` 0x8075AFC0 .. 0x8075B110 and `.sbss` 0x807954A0..0x807955C8 are read here only.
- * RESIDUALS. `THPBuildLookupTables` 0x804E1DC0 (62 %): register numbering of the nested lookup loops (the target keeps the
- *    prefix in r30 and the length in r31); `THPVideoDecode` 0x804E1120 (77 %): the marker switch is compiled with signed
- *    compares and a different tree where the target uses unsigned compares; `THPParseHuffmanTable` 0x804E19F0 (82 %),
- *    `THPDecodeFrameAnySize` 0x804E2EF0 (90 %), `THPDecodeFrame` 0x804E2010 (94 %): register numbering, and the GQR
- *    reads/writes (the target interleaves the constant set-up with the saves); `THPDecodeFrame512x448`,
- *    `THPParseFrameHeader`, `THPParseQuantTable`, `THPDecodeFrame640x480` (96-99 %): register numbering only.
+ * RESIDUALS. `THPBuildLookupTables` 0x804E1DC0: register numbering of the nested lookup loops (the target keeps the
+ *    prefix in r30 and the length in r31); `THPVideoDecode` 0x804E1120: the marker switch is compiled with signed
+ *    compares where the target uses unsigned ones (a `u8`, `u32` or cast switch value changes nothing), the target tests
+ *    0xD9 explicitly, and its error exits are shared tails at the end of the function (`li r3,N; b exit` in the order
+ *    25, 27, 26, 11, 3, the parse status, 28, 29), the layout of jumps to labelled exits that the nested-`if` form
+ *    without `goto` does not reach (an explicit `case 0xD9` scores lower); `THPDecodeFrame` 0x804E2010: each row loop
+ *    keeps the unextended `row + 16` in r31 where the target keeps the `clrlwi` result (`row = row + 16`,
+ *    `(u16)(row + 16)` and `0x10` change nothing); `THPParseHuffmanTable` 0x804E19F0, `THPDecodeFrameAnySize`
+ *    0x804E2EF0, `THPDecodeFrame512x448`, `THPParseFrameHeader`, `THPParseQuantTable`: register numbering.
  *    flipcheck: .text 0x346C vs 0x3490.
+ * SHAPES. the marker switch lists its case bodies in the target's block order (0xC4, 0xC0, 0xDD, 0xDB, 0xDA, APPn/COM,
+ *    0xD8); `THPDecodeFrame` declares `savedGqr6` before `savedGqr5` and builds the GQR values in the physical r3, which
+ *    keeps r3 out of the function's other allocations as in the target.
  */
 
 #include "types.h"
@@ -113,29 +119,14 @@ u8 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
                                 }
                                 marker = *THPState->cursor++;
                                 switch (marker) {
-                                case 0xC0:
-                                    result = THPParseFrameHeader();
-                                    if (result != 0) {
-                                        return result;
-                                    }
-                                    break;
                                 case 0xC4:
                                     result = THPParseHuffmanTable();
                                     if (result != 0) {
                                         return result;
                                     }
                                     break;
-                                case 0xD8:
-                                    break;
-                                case 0xDA:
-                                    result = THPParseScanHeader();
-                                    if (result != 0) {
-                                        return result;
-                                    }
-                                    done = 1;
-                                    break;
-                                case 0xDB:
-                                    result = THPParseQuantTable();
+                                case 0xC0:
+                                    result = THPParseFrameHeader();
                                     if (result != 0) {
                                         return result;
                                     }
@@ -146,6 +137,19 @@ u8 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
                                     THPState->restartInterval = THP_READ_U16(THPState->cursor);
                                     THPState->cursor += 2;
                                     THPState->restartCounter = THPState->restartInterval;
+                                    break;
+                                case 0xDB:
+                                    result = THPParseQuantTable();
+                                    if (result != 0) {
+                                        return result;
+                                    }
+                                    break;
+                                case 0xDA:
+                                    result = THPParseScanHeader();
+                                    if (result != 0) {
+                                        return result;
+                                    }
+                                    done = 1;
                                     break;
                                 case 0xE0:
                                 case 0xE1:
@@ -165,6 +169,8 @@ u8 THPVideoDecode(u8* data, u8* planeY, u8* planeU, u8* planeV, u8* work)
                                 case 0xEF:
                                 case 0xFE:
                                     THPState->cursor += THP_READ_U16(THPState->cursor);
+                                    break;
+                                case 0xD8:
                                     break;
                                 default:
                                     return 0xB;
@@ -443,8 +449,8 @@ void THPDecodeFrame(u8* planeY, u8* planeU, u8* planeV)
     u16 width;
     u16 row;
     u16 height;
-    register u32 savedGqr5;
     register u32 savedGqr6;
+    register u32 savedGqr5;
 
     THPState->outputY = planeY;
     THPState->outputU = planeU;
@@ -458,12 +464,12 @@ void THPDecodeFrame(u8* planeY, u8* planeU, u8* planeV)
     THPSavedGqr5 = savedGqr5;
     THPSavedGqr6 = savedGqr6;
     asm {
-        li savedGqr5, 7
-        oris savedGqr5, savedGqr5, 7
-        mtspr GQR5, savedGqr5
-        li savedGqr5, 15620
-        oris savedGqr5, savedGqr5, 15620
-        mtspr GQR6, savedGqr5
+        li r3, 7
+        oris r3, r3, 7
+        mtspr GQR5, r3
+        li r3, 15620
+        oris r3, r3, 15620
+        mtspr GQR6, r3
     }
     THPBuildLookupTables();
     width = THPState->width;

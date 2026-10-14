@@ -5,12 +5,10 @@
  *    read only by the three projection bodies; `tan` is called by the perspective body.
  * FLAGS. `cflags_base` per object (configure.py): the target's function starts are all 16-aligned.
  * NAMES. `C_MTXOrtho` and `PSVECAdd` are the map's names; GUESS: `C_MTXFrustum`, `C_MTXPerspective` (the SDK entries
- *    the bodies implement), `sMtx44One`, `sMtx44Two`, `sMtx44Zero`, `sMtx44MinusOne`, `sMtx44Half`, `sMtx44DegToRad` (the
- *    constants by value).
- * RESIDUALS. `C_MTXFrustum` (99.5 %): the two `(2 * n) * tmp` scale multiplies take their operands in the opposite order
- *    whichever way the source writes them.
- * SHAPES. `PSVECAdd` is a paired-single asm function with `nofralloc` (playbook 104); the pool constants are globals
- *    declared before the bodies and defined after them so the compiler loads them instead of folding.
+ *    the bodies implement).
+ * RESIDUALS. none.
+ * SHAPES. `PSVECAdd` is a paired-single asm function with `nofralloc` (playbook 104); every constant is a literal, so
+ *    the compiler pools them in first-use order (1, 2, 0, -1, 0.5, deg-to-rad), the target's .sdata2 order.
  */
 
 
@@ -22,37 +20,31 @@
 
 #pragma fp_contract off
 
-extern const f32 sMtx44One;
-extern const f32 sMtx44Two;
-extern const f32 sMtx44Zero;
-extern const f32 sMtx44MinusOne;
-extern const f32 sMtx44Half;
-extern const f32 sMtx44DegToRad;
 
 /* Builds the perspective projection of a view frustum. */
 void C_MTXFrustum(Mtx44 m, f32 t, f32 b, f32 l, f32 r, f32 n, f32 f)
 {
     f32 tmp;
 
-    tmp = sMtx44One / (r - l);
-    m[0][0] = (sMtx44Two * n) * tmp;
-    m[0][1] = sMtx44Zero;
+    tmp = 1.0f / (r - l);
+    m[0][0] = (2.0f * n) * tmp;
+    m[0][1] = 0.0f;
     m[0][2] = (r + l) * tmp;
-    m[0][3] = sMtx44Zero;
-    tmp = sMtx44One / (t - b);
-    m[1][0] = sMtx44Zero;
-    m[1][1] = (sMtx44Two * n) * tmp;
+    m[0][3] = 0.0f;
+    tmp = 1.0f / (t - b);
+    m[1][0] = 0.0f;
+    m[1][1] = (2.0f * n) * tmp;
     m[1][2] = (t + b) * tmp;
-    m[1][3] = sMtx44Zero;
-    m[2][0] = sMtx44Zero;
-    m[2][1] = sMtx44Zero;
-    tmp = sMtx44One / (f - n);
+    m[1][3] = 0.0f;
+    m[2][0] = 0.0f;
+    m[2][1] = 0.0f;
+    tmp = 1.0f / (f - n);
     m[2][2] = -n * tmp;
     m[2][3] = tmp * -(f * n);
-    m[3][0] = sMtx44Zero;
-    m[3][1] = sMtx44Zero;
-    m[3][2] = sMtx44MinusOne;
-    m[3][3] = sMtx44Zero;
+    m[3][0] = 0.0f;
+    m[3][1] = 0.0f;
+    m[3][2] = -1.0f;
+    m[3][3] = 0.0f;
 }
 
 /* Builds the perspective projection of a vertical field of view (degrees) and an aspect ratio. */
@@ -62,26 +54,26 @@ void C_MTXPerspective(Mtx44 m, f32 fovY, f32 aspect, f32 n, f32 f)
     f32 cot;
     f32 tmp;
 
-    angle = sMtx44Half * fovY;
-    angle = sMtx44DegToRad * angle;
-    cot = sMtx44One / (f32)tan(angle);
+    angle = 0.5f * fovY;
+    angle = 0.017453292f * angle;
+    cot = 1.0f / (f32)tan(angle);
     m[0][0] = cot / aspect;
-    m[0][1] = sMtx44Zero;
-    m[0][2] = sMtx44Zero;
-    m[0][3] = sMtx44Zero;
-    m[1][0] = sMtx44Zero;
+    m[0][1] = 0.0f;
+    m[0][2] = 0.0f;
+    m[0][3] = 0.0f;
+    m[1][0] = 0.0f;
     m[1][1] = cot;
-    m[1][2] = sMtx44Zero;
-    m[1][3] = sMtx44Zero;
-    m[2][0] = sMtx44Zero;
-    m[2][1] = sMtx44Zero;
-    tmp = sMtx44One / (f - n);
+    m[1][2] = 0.0f;
+    m[1][3] = 0.0f;
+    m[2][0] = 0.0f;
+    m[2][1] = 0.0f;
+    tmp = 1.0f / (f - n);
     m[2][2] = -n * tmp;
     m[2][3] = tmp * -(f * n);
-    m[3][0] = sMtx44Zero;
-    m[3][1] = sMtx44Zero;
-    m[3][2] = sMtx44MinusOne;
-    m[3][3] = sMtx44Zero;
+    m[3][0] = 0.0f;
+    m[3][1] = 0.0f;
+    m[3][2] = -1.0f;
+    m[3][3] = 0.0f;
 }
 
 /* Builds the orthographic projection of a view box. */
@@ -89,25 +81,25 @@ void C_MTXOrtho(Mtx44 m, f32 t, f32 b, f32 l, f32 r, f32 n, f32 f)
 {
     f32 tmp;
 
-    tmp = sMtx44One / (r - l);
-    m[0][0] = sMtx44Two * tmp;
-    m[0][1] = sMtx44Zero;
-    m[0][2] = sMtx44Zero;
+    tmp = 1.0f / (r - l);
+    m[0][0] = 2.0f * tmp;
+    m[0][1] = 0.0f;
+    m[0][2] = 0.0f;
     m[0][3] = tmp * -(r + l);
-    tmp = sMtx44One / (t - b);
-    m[1][0] = sMtx44Zero;
-    m[1][1] = sMtx44Two * tmp;
-    m[1][2] = sMtx44Zero;
+    tmp = 1.0f / (t - b);
+    m[1][0] = 0.0f;
+    m[1][1] = 2.0f * tmp;
+    m[1][2] = 0.0f;
     m[1][3] = tmp * -(t + b);
-    m[2][0] = sMtx44Zero;
-    m[2][1] = sMtx44Zero;
-    tmp = sMtx44One / (f - n);
-    m[2][2] = sMtx44MinusOne * tmp;
+    m[2][0] = 0.0f;
+    m[2][1] = 0.0f;
+    tmp = 1.0f / (f - n);
+    m[2][2] = -1.0f * tmp;
     m[2][3] = -f * tmp;
-    m[3][0] = sMtx44Zero;
-    m[3][1] = sMtx44Zero;
-    m[3][2] = sMtx44Zero;
-    m[3][3] = sMtx44One;
+    m[3][0] = 0.0f;
+    m[3][1] = 0.0f;
+    m[3][2] = 0.0f;
+    m[3][3] = 1.0f;
 }
 
 /* Adds two vectors. */
@@ -126,9 +118,3 @@ asm void PSVECAdd(register const Vec* a, register const Vec* b, register Vec* ab
 }
 
 
-const f32 sMtx44One = 1.0f;              /* .sdata2 0x8079D298 */
-const f32 sMtx44Two = 2.0f;              /* .sdata2 0x8079D29C */
-const f32 sMtx44Zero = 0.0f;             /* .sdata2 0x8079D2A0 */
-const f32 sMtx44MinusOne = -1.0f;        /* .sdata2 0x8079D2A4 */
-const f32 sMtx44Half = 0.5f;             /* .sdata2 0x8079D2A8 */
-const f32 sMtx44DegToRad = 0.017453292f; /* .sdata2 0x8079D2AC */

@@ -9,14 +9,14 @@
  * FLAGS. `cflags_base` per object (configure.py): the target's function starts are all 16-aligned.
  * NAMES. the `PSMTX*`/`PSVEC*` rows are the map's names; GUESS: `PSMTXInvXpose`, `__PSMTXRotAxisRadInternal`,
  *    `C_MTXLookAt`, `C_MTXLightFrustum`, `C_MTXLightPerspective`, `C_MTXLightOrtho` (the SDK entry each body implements),
- *    `sMtxZeroOnePair`, `sMtxOne`, `sMtxZero`, `sMtxHalf`, `sMtxThree`, `sMtxTwo`, `sMtxMinusOne`, `sMtxDegToRad` (the constants
- *    by value); GUESS: `PSMTXConcatArray`, `PSMTXRotAxisRad`, `PSMTXQuat` (the map's rows: the dump has a placeholder at
- *    those addresses; the bodies are the SDK matrix-concat, axis-angle and quaternion-to-matrix routines).
- * RESIDUALS. `C_MTXLightFrustum` and `C_MTXLightOrtho` (99.5 %, 99.4 %): the operands of the two commutative scale
- *    multiplies (`m[0][0]`, `m[1][1]`) come out in the opposite order whichever way the source writes them; the unit's
- *    .text ends 8 bytes before the claimed end (the link pads to the next unit's 16-byte start).
- * SHAPES. the paired-single bodies (`psq_l`/`ps_*`) are asm functions with `nofralloc` (playbook 104); the constants are
- *    globals the asm and the C bodies both load, so the pool is the file's own definitions.
+ *    `sMtxZeroOnePair` (the .sdata pair by value); GUESS: `PSMTXConcatArray`, `PSMTXRotAxisRad`, `PSMTXQuat` (the map's
+ *    rows: the dump has a placeholder at those addresses; the bodies are the SDK matrix-concat, axis-angle and
+ *    quaternion-to-matrix routines).
+ * RESIDUALS. none in .text; the unit's .text ends 8 bytes and its .sdata2 4 bytes before the claimed ends (link alignment fill).
+ * SHAPES. the paired-single bodies that need no constant are asm functions with `nofralloc` (playbook 104); the ones
+ *    that load one are C functions whose `register` locals are set from literals and feed an `asm` block, so the
+ *    compiler schedules the pool loads into the block and pools the literals in first-use order (1, 0, 0.5, 3, 2, -1,
+ *    deg-to-rad), the target's .sdata2 order; the variable declaration order picks the registers.
  */
 
 
@@ -32,29 +32,27 @@
 #pragma fp_contract off
 
 extern f32 sMtxZeroOnePair[2];
-extern const f32 sMtxOne;
-extern const f32 sMtxZero;
-extern const f32 sMtxHalf;
-extern const f32 sMtxThree;
-extern const f32 sMtxTwo;
-extern const f32 sMtxMinusOne;
-extern const f32 sMtxDegToRad;
 
 /* Sets `m` to the identity. */
-asm void PSMTXIdentity(register Mtx m)
+void PSMTXIdentity(register Mtx m)
 {
-    nofralloc
-    lfs       f0,sMtxZero(r0)
-    lfs       f1,sMtxOne(r0)
-    psq_st    f0,8(r3),0,0
-    ps_merge10 f2,f1,f0
-    ps_merge01 f1,f0,f1
-    psq_st    f0,24(r3),0,0
-    psq_st    f0,32(r3),0,0
-    psq_st    f1,16(r3),0,0
-    psq_st    f2,0(r3),0,0
-    psq_st    f2,40(r3),0,0
-    blr       
+    register f32 zero;
+    register f32 one;
+    register f32 c10;
+
+    one = 1.0f;
+    zero = 0.0f;
+
+    asm {
+        psq_st    zero,8(m),0,0
+        ps_merge10 c10,one,zero
+        ps_merge01 one,zero,one
+        psq_st    zero,24(m),0,0
+        psq_st    zero,32(m),0,0
+        psq_st    one,16(m),0,0
+        psq_st    c10,0(m),0,0
+        psq_st    c10,40(m),0,0
+    }
 }
 
 /* Copies a 3x4 matrix. */
@@ -374,106 +372,125 @@ void PSMTXRotRad(Mtx m, char axis, f32 rad)
 }
 
 /* Builds the rotation about an axis from its sine and cosine. */
-asm void PSMTXRotTrig(register Mtx m, register char axis, register f32 sinA, register f32 cosA)
+void PSMTXRotTrig(register Mtx m, register char axis, register f32 sinA, register f32 cosA)
 {
-    nofralloc
-    frsp      f5,f1
-    ori       r0,r4,32
-    frsp      f4,f2
-    cmplwi    r0,120
-    lfs       f0,sMtxZero(r0)
-    ps_neg    f2,f5
-    lfs       f1,sMtxOne(r0)
-    beq       L_554
-    cmplwi    r0,121
-    beq       L_57c
-    cmplwi    r0,122
-    beq       L_5a8
-    blr       
-L_554:
-    ps_merge00 f3,f5,f4
-    psq_st    f1,0(r3),1,0
-    ps_merge00 f1,f4,f2
-    psq_st    f0,4(r3),0,0
-    psq_st    f0,12(r3),0,0
-    psq_st    f0,28(r3),0,0
-    psq_st    f0,44(r3),1,0
-    psq_st    f3,36(r3),0,0
-    psq_st    f1,20(r3),0,0
-    blr       
-L_57c:
-    ps_merge00 f3,f4,f0
-    psq_st    f0,24(r3),0,0
-    ps_merge00 f1,f0,f1
-    ps_merge00 f2,f2,f0
-    psq_st    f3,0(r3),0,0
-    ps_merge00 f0,f5,f0
-    psq_st    f3,40(r3),0,0
-    psq_st    f1,16(r3),0,0
-    psq_st    f0,8(r3),0,0
-    psq_st    f2,32(r3),0,0
-    blr       
-L_5a8:
-    ps_merge00 f3,f5,f4
-    psq_st    f0,8(r3),0,0
-    ps_merge00 f2,f4,f2
-    ps_merge00 f1,f1,f0
-    psq_st    f0,24(r3),0,0
-    psq_st    f0,32(r3),0,0
-    psq_st    f3,16(r3),0,0
-    psq_st    f2,0(r3),0,0
-    psq_st    f1,40(r3),0,0
-    blr       
+    register f32 fc0;
+    register f32 fc1;
+    register f32 nsinA;
+    register f32 fw0;
+
+    fc0 = 0.0f;
+    fc1 = 1.0f;
+    asm {
+        frsp      sinA,sinA
+        ori       axis,axis,32
+        frsp      cosA,cosA
+        cmplwi    axis,120
+        ps_neg    nsinA,sinA
+        beq       L_x
+        cmplwi    axis,121
+        beq       L_y
+        cmplwi    axis,122
+        beq       L_z
+        b         L_end
+    L_x:
+        ps_merge00 fw0,sinA,cosA
+        psq_st    fc1,0(m),1,0
+        ps_merge00 fc1,cosA,nsinA
+        psq_st    fc0,4(m),0,0
+        psq_st    fc0,12(m),0,0
+        psq_st    fc0,28(m),0,0
+        psq_st    fc0,44(m),1,0
+        psq_st    fw0,36(m),0,0
+        psq_st    fc1,20(m),0,0
+        b         L_end
+    L_y:
+        ps_merge00 fw0,cosA,fc0
+        psq_st    fc0,24(m),0,0
+        ps_merge00 fc1,fc0,fc1
+        ps_merge00 nsinA,nsinA,fc0
+        psq_st    fw0,0(m),0,0
+        ps_merge00 fc0,sinA,fc0
+        psq_st    fw0,40(m),0,0
+        psq_st    fc1,16(m),0,0
+        psq_st    fc0,8(m),0,0
+        psq_st    nsinA,32(m),0,0
+        b         L_end
+    L_z:
+        ps_merge00 fw0,sinA,cosA
+        psq_st    fc0,8(m),0,0
+        ps_merge00 nsinA,cosA,nsinA
+        ps_merge00 fc1,fc1,fc0
+        psq_st    fc0,24(m),0,0
+        psq_st    fc0,32(m),0,0
+        psq_st    fw0,16(m),0,0
+        psq_st    nsinA,0(m),0,0
+        psq_st    fc1,40(m),0,0
+    L_end:
+    }
 }
 
 /* Builds the rotation about an arbitrary axis from its sine and cosine. */
-asm void __PSMTXRotAxisRadInternal(register Mtx m, register const Vec* axis, register f32 sinA, register f32 cosA)
+void __PSMTXRotAxisRadInternal(register Mtx m, register const Vec* axis, register f32 sT, register f32 cT)
 {
-    nofralloc
-    psq_l     f3,0(r4),0,0
-    frsp      f11,f2
-    lfs       f10,sMtxHalf(r0)
-    frsp      f12,f1
-    ps_mul    f4,f3,f3
-    lfs       f2,8(r4)
-    fadds     f8,f10,f10
-    lfs       f9,sMtxThree(r0)
-    fsubs     f1,f10,f10
-    ps_madd   f5,f2,f2,f4
-    fsubs     f0,f8,f11
-    ps_merge00 f11,f11,f11
-    ps_sum0   f6,f5,f2,f4
-    frsqrte   f7,f6
-    fmuls     f4,f7,f7
-    fmuls     f5,f7,f10
-    fnmsubs   f4,f4,f6,f9
-    fmuls     f7,f4,f5
-    ps_muls0  f3,f3,f7
-    ps_muls0  f2,f2,f7
-    ps_muls0  f6,f3,f0
-    ps_muls0  f7,f2,f0
-    ps_muls0  f10,f3,f12
-    ps_muls1  f5,f6,f3
-    ps_muls0  f4,f6,f3
-    ps_muls0  f6,f6,f2
-    fnmsubs   f0,f2,f12,f5
-    ps_neg    f3,f10
-    fmadds    f8,f2,f12,f5
-    ps_sum0   f4,f4,f0,f11
-    ps_sum0   f0,f3,f1,f6
-    ps_muls0  f7,f7,f2
-    psq_st    f4,0(r3),0,0
-    ps_sum0   f9,f6,f1,f10
-    ps_sum0   f3,f6,f6,f3
-    psq_st    f0,24(r3),0,0
-    ps_sum1   f5,f11,f8,f5
-    ps_sum0   f7,f7,f1,f11
-    psq_st    f9,8(r3),0,0
-    ps_sum1   f6,f10,f3,f6
-    psq_st    f5,16(r3),0,0
-    psq_st    f6,32(r3),0,0
-    psq_st    f7,40(r3),0,0
-    blr       
+    register f32 tT;
+    register f32 fc0;
+    register f32 tmp0;
+    register f32 tmp1;
+    register f32 tmp2;
+    register f32 tmp3;
+    register f32 tmp4;
+    register f32 tmp5;
+    register f32 tmp6;
+    register f32 tmp7;
+    register f32 tmp8;
+    register f32 tmp9;
+
+    tmp9 = 0.5f;
+    tmp8 = 3.0f;
+    asm {
+        psq_l     tmp0,0(axis),0,0
+        frsp      cT,cT
+        frsp      sT,sT
+        ps_mul    tmp2,tmp0,tmp0
+        lfs       tmp1,8(axis)
+        fadds     tmp7,tmp9,tmp9
+        fsubs     fc0,tmp9,tmp9
+        ps_madd   tmp3,tmp1,tmp1,tmp2
+        fsubs     tT,tmp7,cT
+        ps_merge00 cT,cT,cT
+        ps_sum0   tmp4,tmp3,tmp1,tmp2
+        frsqrte   tmp5,tmp4
+        fmuls     tmp2,tmp5,tmp5
+        fmuls     tmp3,tmp5,tmp9
+        fnmsubs   tmp2,tmp2,tmp4,tmp8
+        fmuls     tmp5,tmp2,tmp3
+        ps_muls0  tmp0,tmp0,tmp5
+        ps_muls0  tmp1,tmp1,tmp5
+        ps_muls0  tmp4,tmp0,tT
+        ps_muls0  tmp5,tmp1,tT
+        ps_muls0  tmp9,tmp0,sT
+        ps_muls1  tmp3,tmp4,tmp0
+        ps_muls0  tmp2,tmp4,tmp0
+        ps_muls0  tmp4,tmp4,tmp1
+        fnmsubs   tmp6,tmp1,sT,tmp3
+        ps_neg    tmp0,tmp9
+        fmadds    tmp7,tmp1,sT,tmp3
+        ps_sum0   tmp2,tmp2,tmp6,cT
+        ps_sum0   tmp6,tmp0,fc0,tmp4
+        ps_muls0  tmp5,tmp5,tmp1
+        psq_st    tmp2,0(m),0,0
+        ps_sum0   tmp8,tmp4,fc0,tmp9
+        ps_sum0   tmp0,tmp4,tmp4,tmp0
+        psq_st    tmp6,24(m),0,0
+        ps_sum1   tmp3,cT,tmp7,tmp3
+        ps_sum0   tmp5,tmp5,fc0,cT
+        psq_st    tmp8,8(m),0,0
+        ps_sum1   tmp4,tmp9,tmp0,tmp4
+        psq_st    tmp3,16(m),0,0
+        psq_st    tmp4,32(m),0,0
+        psq_st    tmp5,40(m),0,0
+    }
 }
 
 /* Builds the rotation about an arbitrary axis for an angle in radians. */
@@ -486,22 +503,25 @@ void PSMTXRotAxisRad(Mtx m, const Vec* axis, f32 rad)
 }
 
 /* Builds a translation matrix. */
-asm void PSMTXTrans(register Mtx m, register f32 xT, register f32 yT, register f32 zT)
+void PSMTXTrans(register Mtx m, register f32 xT, register f32 yT, register f32 zT)
 {
-    nofralloc
-    lfs       f0,sMtxZero(r0)
-    lfs       f4,sMtxOne(r0)
-    stfs      f1,12(r3)
-    stfs      f2,28(r3)
-    psq_st    f0,4(r3),0,0
-    psq_st    f0,32(r3),0,0
-    stfs      f0,16(r3)
-    stfs      f4,20(r3)
-    stfs      f0,24(r3)
-    stfs      f4,40(r3)
-    stfs      f3,44(r3)
-    stfs      f4,0(r3)
-    blr       
+    register f32 c_zero;
+    register f32 c_one;
+
+    c_zero = 0.0f;
+    c_one = 1.0f;
+    asm {
+        stfs      xT,12(m)
+        stfs      yT,28(m)
+        psq_st    c_zero,4(m),0,0
+        psq_st    c_zero,32(m),0,0
+        stfs      c_zero,16(m)
+        stfs      c_one,20(m)
+        stfs      c_zero,24(m)
+        stfs      c_one,40(m)
+        stfs      zT,44(m)
+        stfs      c_one,0(m)
+    }
 }
 
 /* Applies a translation to a matrix. */
@@ -530,19 +550,21 @@ asm void PSMTXTransApply(register const Mtx src, register Mtx dst, register f32 
 }
 
 /* Builds a scale matrix. */
-asm void PSMTXScale(register Mtx m, register f32 xS, register f32 yS, register f32 zS)
+void PSMTXScale(register Mtx m, register f32 xS, register f32 yS, register f32 zS)
 {
-    nofralloc
-    lfs       f0,sMtxZero(r0)
-    stfs      f1,0(r3)
-    psq_st    f0,4(r3),0,0
-    psq_st    f0,12(r3),0,0
-    stfs      f2,20(r3)
-    psq_st    f0,24(r3),0,0
-    psq_st    f0,32(r3),0,0
-    stfs      f3,40(r3)
-    stfs      f0,44(r3)
-    blr       
+    register f32 c_zero;
+
+    c_zero = 0.0f;
+    asm {
+        stfs      xS,0(m)
+        psq_st    c_zero,4(m),0,0
+        psq_st    c_zero,12(m),0,0
+        stfs      yS,20(m)
+        psq_st    c_zero,24(m),0,0
+        psq_st    c_zero,32(m),0,0
+        stfs      zS,40(m)
+        stfs      c_zero,44(m)
+    }
 }
 
 /* Applies a scale to a matrix. */
@@ -574,50 +596,65 @@ asm void PSMTXScaleApply(register const Mtx src, register Mtx dst, register f32 
 }
 
 /* Builds the rotation matrix of a quaternion. */
-asm void PSMTXQuat(register Mtx m, register const Quaternion* q)
+void PSMTXQuat(register Mtx m, register const Quaternion* q)
 {
-    nofralloc
-    psq_l     f4,0(r4),0,0
-    psq_l     f5,8(r4),0,0
-    ps_mul    f6,f4,f4
-    lfs       f1,sMtxOne(r0)
-    ps_merge10 f9,f4,f4
-    fsubs     f0,f1,f1
-    ps_madd   f8,f5,f5,f6
-    ps_muls1  f10,f5,f5
-    psq_st    f0,12(r3),1,0
-    fadds     f2,f1,f1
-    ps_sum0   f3,f8,f8,f8
-    psq_st    f0,44(r3),1,0
-    ps_mul    f7,f5,f5
-    ps_madd   f12,f4,f9,f10
-    fres      f13,f3
-    ps_nmsub  f3,f3,f13,f2
-    ps_muls1  f11,f9,f5
-    ps_msub   f10,f4,f9,f10
-    ps_mul    f3,f13,f3
-    ps_madds0 f9,f4,f5,f11
-    ps_sum1   f8,f7,f8,f6
-    fmuls     f3,f3,f2
-    ps_nmsub  f11,f11,f2,f9
-    ps_sum0   f6,f6,f6,f6
-    ps_mul    f9,f9,f3
-    ps_mul    f11,f11,f3
-    ps_nmsub  f8,f8,f3,f1
-    psq_st    f9,8(r3),1,0
-    ps_mul    f12,f12,f3
-    ps_mul    f10,f10,f3
-    ps_merge10 f7,f11,f0
-    ps_merge00 f5,f12,f8
-    ps_merge10 f4,f8,f10
-    psq_st    f7,24(r3),0,0
-    ps_merge01 f13,f11,f9
-    ps_nmsub  f6,f6,f3,f1
-    psq_st    f5,16(r3),0,0
-    psq_st    f6,40(r3),1,0
-    psq_st    f4,0(r3),0,0
-    psq_st    f13,32(r3),0,0
-    blr       
+    register f32 c_zero;
+    register f32 c_one;
+    register f32 c_two;
+    register f32 tmp3;
+    register f32 tmp4;
+    register f32 tmp5;
+    register f32 tmp6;
+    register f32 tmp7;
+    register f32 tmp8;
+    register f32 tmp9;
+    register f32 tmp10;
+    register f32 tmp11;
+    register f32 tmp12;
+    register f32 tmp13;
+
+    c_one = 1.0f;
+    asm {
+        psq_l     tmp4,0(q),0,0
+        psq_l     tmp5,8(q),0,0
+        ps_mul    tmp6,tmp4,tmp4
+        ps_merge10 tmp9,tmp4,tmp4
+        fsubs     c_zero,c_one,c_one
+        ps_madd   tmp8,tmp5,tmp5,tmp6
+        ps_muls1  tmp10,tmp5,tmp5
+        psq_st    c_zero,12(m),1,0
+        fadds     c_two,c_one,c_one
+        ps_sum0   tmp3,tmp8,tmp8,tmp8
+        psq_st    c_zero,44(m),1,0
+        ps_mul    tmp7,tmp5,tmp5
+        ps_madd   tmp12,tmp4,tmp9,tmp10
+        fres      tmp13,tmp3
+        ps_nmsub  tmp3,tmp3,tmp13,c_two
+        ps_muls1  tmp11,tmp9,tmp5
+        ps_msub   tmp10,tmp4,tmp9,tmp10
+        ps_mul    tmp3,tmp13,tmp3
+        ps_madds0 tmp9,tmp4,tmp5,tmp11
+        ps_sum1   tmp8,tmp7,tmp8,tmp6
+        fmuls     tmp3,tmp3,c_two
+        ps_nmsub  tmp11,tmp11,c_two,tmp9
+        ps_sum0   tmp6,tmp6,tmp6,tmp6
+        ps_mul    tmp9,tmp9,tmp3
+        ps_mul    tmp11,tmp11,tmp3
+        ps_nmsub  tmp8,tmp8,tmp3,c_one
+        psq_st    tmp9,8(m),1,0
+        ps_mul    tmp12,tmp12,tmp3
+        ps_mul    tmp10,tmp10,tmp3
+        ps_merge10 tmp7,tmp11,c_zero
+        ps_merge00 tmp5,tmp12,tmp8
+        ps_merge10 tmp4,tmp8,tmp10
+        psq_st    tmp7,24(m),0,0
+        ps_merge01 tmp13,tmp11,tmp9
+        ps_nmsub  tmp6,tmp6,tmp3,c_one
+        psq_st    tmp5,16(m),0,0
+        psq_st    tmp6,40(m),1,0
+        psq_st    tmp4,0(m),0,0
+        psq_st    tmp13,32(m),0,0
+    }
 }
 
 /* Builds the view matrix looking from `camPos` toward `target` with `camUp` as the up hint. */
@@ -654,20 +691,20 @@ void C_MTXLightFrustum(Mtx m, f32 t, f32 b, f32 l, f32 r, f32 n, f32 scaleS, f32
 {
     f32 tmp;
 
-    tmp = sMtxOne / (r - l);
-    m[0][0] = (tmp * (sMtxTwo * n)) * scaleS;
-    m[0][1] = sMtxZero;
+    tmp = 1.0f / (r - l);
+    m[0][0] = ((2.0f * n) * tmp) * scaleS;
+    m[0][1] = 0.0f;
     m[0][2] = (((r + l) * tmp) * scaleS) - transS;
-    m[0][3] = sMtxZero;
-    tmp = sMtxOne / (t - b);
-    m[1][0] = sMtxZero;
-    m[1][1] = (tmp * (sMtxTwo * n)) * scaleT;
+    m[0][3] = 0.0f;
+    tmp = 1.0f / (t - b);
+    m[1][0] = 0.0f;
+    m[1][1] = ((2.0f * n) * tmp) * scaleT;
     m[1][2] = (((t + b) * tmp) * scaleT) - transT;
-    m[1][3] = sMtxZero;
-    m[2][0] = sMtxZero;
-    m[2][1] = sMtxZero;
-    m[2][2] = sMtxMinusOne;
-    m[2][3] = sMtxZero;
+    m[1][3] = 0.0f;
+    m[2][0] = 0.0f;
+    m[2][1] = 0.0f;
+    m[2][2] = -1.0f;
+    m[2][3] = 0.0f;
 }
 
 /* Builds the texture-projection matrix of a perspective view (field of view in degrees). */
@@ -676,21 +713,21 @@ void C_MTXLightPerspective(Mtx m, f32 fovY, f32 aspect, f32 scaleS, f32 scaleT, 
     f32 angle;
     f32 cot;
 
-    angle = sMtxHalf * fovY;
-    angle = sMtxDegToRad * angle;
-    cot = sMtxOne / (f32)tan(angle);
+    angle = 0.5f * fovY;
+    angle = 0.017453292f * angle;
+    cot = 1.0f / (f32)tan(angle);
     m[0][0] = (cot / aspect) * scaleS;
-    m[0][1] = sMtxZero;
+    m[0][1] = 0.0f;
     m[0][2] = -transS;
-    m[0][3] = sMtxZero;
-    m[1][0] = sMtxZero;
+    m[0][3] = 0.0f;
+    m[1][0] = 0.0f;
     m[1][1] = cot * scaleT;
     m[1][2] = -transT;
-    m[1][3] = sMtxZero;
-    m[2][0] = sMtxZero;
-    m[2][1] = sMtxZero;
-    m[2][2] = sMtxMinusOne;
-    m[2][3] = sMtxZero;
+    m[1][3] = 0.0f;
+    m[2][0] = 0.0f;
+    m[2][1] = 0.0f;
+    m[2][2] = -1.0f;
+    m[2][3] = 0.0f;
 }
 
 /* Builds the texture-projection matrix of an orthographic view. */
@@ -698,29 +735,22 @@ void C_MTXLightOrtho(Mtx m, f32 t, f32 b, f32 l, f32 r, f32 scaleS, f32 scaleT, 
 {
     f32 tmp;
 
-    tmp = sMtxOne / (r - l);
-    m[0][0] = scaleS * (sMtxTwo * tmp);
-    m[0][1] = sMtxZero;
-    m[0][2] = sMtxZero;
+    tmp = 1.0f / (r - l);
+    m[0][0] = (2.0f * tmp) * scaleS;
+    m[0][1] = 0.0f;
+    m[0][2] = 0.0f;
     m[0][3] = ((-(r + l) * tmp) * scaleS) + transS;
-    tmp = sMtxOne / (t - b);
-    m[1][0] = sMtxZero;
-    m[1][1] = scaleT * (sMtxTwo * tmp);
-    m[1][2] = sMtxZero;
+    tmp = 1.0f / (t - b);
+    m[1][0] = 0.0f;
+    m[1][1] = (2.0f * tmp) * scaleT;
+    m[1][2] = 0.0f;
     m[1][3] = ((-(t + b) * tmp) * scaleT) + transT;
-    m[2][0] = sMtxZero;
-    m[2][1] = sMtxZero;
-    m[2][2] = sMtxZero;
-    m[2][3] = sMtxOne;
+    m[2][0] = 0.0f;
+    m[2][1] = 0.0f;
+    m[2][2] = 0.0f;
+    m[2][3] = 1.0f;
 }
 
 
 f32 sMtxZeroOnePair[2] = { 0.0f, 1.0f }; /* .sdata 0x80793F00 */
 
-const f32 sMtxOne = 1.0f;            /* .sdata2 0x8079D278 */
-const f32 sMtxZero = 0.0f;           /* .sdata2 0x8079D27C */
-const f32 sMtxHalf = 0.5f;           /* .sdata2 0x8079D280 */
-const f32 sMtxThree = 3.0f;          /* .sdata2 0x8079D284 */
-const f32 sMtxTwo = 2.0f;            /* .sdata2 0x8079D288 */
-const f32 sMtxMinusOne = -1.0f;      /* .sdata2 0x8079D28C */
-const f32 sMtxDegToRad = 0.017453292f; /* .sdata2 0x8079D290 */

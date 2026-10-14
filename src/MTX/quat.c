@@ -7,12 +7,12 @@
  * FLAGS. `cflags_base` per object (configure.py): the target's function starts are all 16-aligned.
  * NAMES. GUESS: `QUATMtx` (convert a 3x4 matrix to a quaternion) and `QUATSlerp` (spherical interpolation), named from the
  *    bodies; `sQuatOne`, `sQuatZero`, `sQuatHalf`, `sQuatSlerpEpsilon`, `sQuatNextAxis` (the constants by value and role).
- * RESIDUALS. `QUATMtx` (97.7 %): the float temporaries of both branches take one register more than the target's (f7/f8, f4/f5)
- *    and the three index registers rotate; `QUATSlerp` (99.6 %): the product of the sign and the scale lands in a
- *    volatile register where the target keeps it in the sign's saved register.  The 12-byte {1, 2, 0} table is the compiler's
- *    own local-array copy source (`@N`), so the map row `sQuatNextAxis` differs by name in relocdiff.
+ * RESIDUALS. none in .text.  The 12-byte {1, 2, 0} table is the compiler's own local-array copy source (`@N`), so the
+ *    map row `sQuatNextAxis` differs by name in relocdiff.
  * SHAPES. both bodies are C; the pool constants are globals declared before the bodies and defined after them so the
- *    compiler loads them instead of folding.
+ *    compiler loads them instead of folding (an all-literal pool orders 0 before 1).  The register choices follow the
+ *    source's variable reuse: `QUATMtx` takes the square root into `tr` and computes `r->w` before `q[j]`/`q[k]`;
+ *    `QUATSlerp` scales the sign in place (`scaleQ *=`) and forms `1 - t` in `scaleP` before the `sin` argument.
  */
 
 #include "types.h"
@@ -41,9 +41,9 @@ void QUATMtx(Quaternion* r, const Mtx m)
 
     tr = m[2][2] + (m[0][0] + m[1][1]);
     if (tr > sQuatZero) {
-        s = (f32)sqrt(sQuatOne + tr);
-        r->w = sQuatHalf * s;
-        s = sQuatHalf / s;
+        tr = (f32)sqrt(sQuatOne + tr);
+        r->w = sQuatHalf * tr;
+        s = sQuatHalf / tr;
         r->x = (m[2][1] - m[1][2]) * s;
         r->y = (m[0][2] - m[2][0]) * s;
         r->z = (m[1][0] - m[0][1]) * s;
@@ -57,11 +57,11 @@ void QUATMtx(Quaternion* r, const Mtx m)
         k = next[j];
         s = (f32)sqrt(sQuatOne + (m[i][i] - (m[j][j] + m[k][k])));
         q[i] = sQuatHalf * s;
-        if (s != sQuatZero)
+        if (sQuatZero != s)
             s = sQuatHalf / s;
+        r->w = (m[k][j] - m[j][k]) * s;
         q[j] = (m[i][j] + m[j][i]) * s;
         q[k] = (m[i][k] + m[k][i]) * s;
-        r->w = (m[k][j] - m[j][k]) * s;
         r->x = q[0];
         r->y = q[1];
         r->z = q[2];
@@ -72,31 +72,31 @@ void QUATMtx(Quaternion* r, const Mtx m)
 void QUATSlerp(const Quaternion* p, const Quaternion* q, Quaternion* r, f32 t)
 {
     f32 cosTheta;
-    f32 scale0;
-    f32 sign;
+    f32 scaleP;
+    f32 scaleQ;
     f32 theta;
     f32 sinTheta;
-    f32 scale1;
 
-    sign = sQuatOne;
+    scaleQ = sQuatOne;
     cosTheta = p->x * q->x + p->y * q->y + p->z * q->z + p->w * q->w;
     if (cosTheta < sQuatZero) {
         cosTheta = -cosTheta;
-        sign = -sign;
+        scaleQ = -scaleQ;
     }
     if (cosTheta <= sQuatSlerpEpsilon) {
         theta = (f32)acos(cosTheta);
         sinTheta = (f32)sin(theta);
-        scale0 = (f32)sin((sQuatOne - t) * theta) / sinTheta;
-        scale1 = sign * ((f32)sin(t * theta) / sinTheta);
+        scaleP = sQuatOne - t;
+        scaleP = (f32)sin(scaleP * theta) / sinTheta;
+        scaleQ *= (f32)sin(t * theta) / sinTheta;
     } else {
-        scale1 = sign * t;
-        scale0 = sQuatOne - t;
+        scaleQ *= t;
+        scaleP = sQuatOne - t;
     }
-    r->x = scale0 * p->x + scale1 * q->x;
-    r->y = scale0 * p->y + scale1 * q->y;
-    r->z = scale0 * p->z + scale1 * q->z;
-    r->w = scale0 * p->w + scale1 * q->w;
+    r->x = scaleP * p->x + scaleQ * q->x;
+    r->y = scaleP * p->y + scaleQ * q->y;
+    r->z = scaleP * p->z + scaleQ * q->z;
+    r->w = scaleP * p->w + scaleQ * q->w;
 }
 
 const f32 sQuatOne = 1.0f;                /* .sdata2 0x8079D2C0 */

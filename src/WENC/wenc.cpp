@@ -5,14 +5,16 @@
  *   whose starts are all 16-aligned).
  * FLAGS. the `OS` lib block of configure.py (`cflags_os`).
  * NAMES. `WENCGetEncodeData` is the map's name; the state record `WENCInfo` and its field names are read from the algorithm.
- * RESIDUALS. The loop tail: retail shares only `bit2 * 4` and `bit1 * 2` between the step-table index and the output nibble and
- *   truncates the nibble to a byte before the shift (728 bytes); this source shares the whole sum and truncates after it (720).
- *   Retail's tail keeps `bit2 * 4` in r18, which also shifts the registers of the prologue's 16-word `stepScale` copy.
+ * RESIDUALS. The loop tail: retail shares only `bit2 * 4` and `bit1 * 2` between the step-table index and the output nibble
+ *   (728 bytes, `bit2 * 4` kept in r18); this source shares `bit1 * 2 + bit2 * 4` and the index sum (720), and every spelling
+ *   that reaches 728 bytes (`stepScale[bit1 * 2 + (bit0 + bit2 * 4)]` and five others) swaps r18 to `bit1 * 2` and scores lower.
+ *   The prologue's 16-word `stepScale` copy registers shift with r18.
  *   The .rodata table and .sdata2 literal match byte for byte but are emitted as the compiler-local `@18`/`@72`, where the map
  *   names them `lbl_80573C40`/`lbl_8079D3C0`. The target .text carries 12 bytes of tail padding up to WPAD's 16-aligned start
  *   (0x2E4) that this 4-aligned object does not emit.
  * SHAPES. The allocator follows the declaration order (`i`, `sign`, `bit2`..`bit0`, then the state); the bits are cleared
- *   `bit0` first; the absolute difference is `__abs`; the nibble shift is `(i & 1) == 0 ? 4 : 0`.
+ *   `bit0` first; the absolute difference is `__abs`; the nibble is truncated to `u8` before the shift and OR-ed back
+ *   as `out[i / 2] = out[i / 2] | ...`; the shift is `(i & 1) == 0 ? 4 : 0`.
  */
 
 #include "types.h"
@@ -90,8 +92,8 @@ s32 WENCGetEncodeData(WENCInfo* info, u32 flags, const s16* samples, s32 sampleC
         if (predictor < -0x8000) {
             predictor = -0x8000;
         }
-        out[i / 2] |= (sign * 8 + bit2 * 4 + bit1 * 2 + bit0) << ((i & 1) == 0 ? 4 : 0);
-        step = (s32)((f64)step * stepScale[bit1 * 2 + bit0 + bit2 * 4]);
+        out[i / 2] = out[i / 2] | (u8)(sign * 8 + bit2 * 4 + bit1 * 2 + bit0) << ((i & 1) == 0 ? 4 : 0);
+        step = (s32)((f64)step * stepScale[bit0 + bit2 * 4 + bit1 * 2]);
         if (step <= 0x7F) {
             step = 0x7F;
         }
