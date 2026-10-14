@@ -1341,7 +1341,8 @@ A dependency found mid-lane is never edited by the lane: it files an integrator 
 ### 15.3 The flip path
 
 Candidates by `flipcheck.py` READY **plus** a reverse-reference check (`callers.py <sym> --pointers` for every symbol in
-the claimed ranges: every symbol another unit's target object points at must be defined by ours, same name and binding),
+the claimed ranges: every symbol another unit's target object points at must be defined by ours, same name and binding;
+`flipcheck.py` runs it as its reverse-reference row since 2026-10-14),
 then flip one unit at a time, prove each with `ok` (the `main.dol` hash), and land the batch as one `config/flags`
 commit (owner ruling 2026-10-13, §11). Function-count 100 % is not flip-readiness: `OS/OSCache.c` (21/21 functions, 1744/2312 bytes) and
 `nw4r/fn_80502828.cpp` were refused by flipcheck (trial 6).
@@ -1365,5 +1366,5 @@ commit (owner ruling 2026-10-13, §11). Function-count 100 % is not flip-readine
 ### 15.5 Open tool asks (not built)
 
 `report.json` goes stale after an object rebuild (every lane deleted it by hand); lanes start with their cwd in MAIN,
-not the slot; a `fieldcheck` for struct offsets with no named field; `symbols.txt` row-range ownership in manifests; a
-reverse-reference row in `flipcheck.py`; `deps`/`prepass` lane kinds and the standard briefs in `slots.py spawn`.
+not the slot; a `fieldcheck` for struct offsets with no named field; `symbols.txt` row-range ownership in manifests;
+`deps`/`prepass` lane kinds and the standard briefs in `slots.py spawn`.

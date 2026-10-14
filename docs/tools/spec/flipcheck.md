@@ -67,6 +67,30 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   alignment and `padding_chain_break` ends the chain there. Measured on 201 `.text` splits that start 16-aligned: 9 units
   became READY (IPC/ipcMain, MTX/mtxvec, MTX/vec, OS/OSIpc, OS/OSMemory, OS/OSMutex, OS/OSNandbootInfo, OS/OSReboot,
   OS/OSSync), none lost it, and flipping all nine together keeps the DOL hash.
+* **A function the link dead-strips is not compared (2026-10-14).** A unit may carry a GUESS body of a function the
+  retail linker stripped (written so its strings land in the pool): our `.text` is longer than the claim, and a trial flip
+  links byte-identical because mwld strips it again. `flipcheck.deadstrip_model` takes such a function out before the size
+  and byte comparison when all of these hold: `lib.objcompare.dead_symbols` finds it dead with the roots `deadstrip_roots`
+  gives (every name another link input references - the target object's own references do not count, it leaves the link -
+  what the batch's objects reference, FORCEACTIVE, the entry; plus our `.comment` force-active flags and every symbol a live
+  range relocates); no target symbol and no `symbols.txt` row has its name; and `lib.objcompare.strip_section` can lay out
+  the rest (each function at its `.comment` alignment after the previous one, zero gaps, as the object itself already is).
+  The note reads `.text: 0xN of the object's 0xM bytes are dead-stripped function(s) ...; the 0xK bytes the link keeps are
+  compared`, and a size line that still fails ends `... - after the link dead-strips 0xN B of function(s) from the object's
+  0xM`. **A data symbol the same strip takes with it is a refusal**: `<unit>: the link dead-strips N data symbol(s) with the
+  stripped function(s) ... - <name> 0xS B of <section>, ... - which our object counts and the link drops, ...`
+  (BTE/btm_link_key: `@867`/`@871`, the 0x40 B its trial flip lost from `.data`; a unit whose stripped functions read only
+  strings a kept function also reaches keeps them). Measured on all 613 registered units at `72145208a`: READY 229 -> 234
+  (BTE/bta_hh_utils, btm_sco, btm_sec, gap_utils, gki_buffer), no unit lost READY, 24 refused units changed refusal text
+  only; the reverse-reference row below then refuses gki_buffer. A trial flip of the other four together links
+  `main.dol: OK`.
+* **The reverse-reference row (2026-10-14).** A global the target object defines that another link input relocates, and
+  that neither our object (global or weak) nor any other input defines, makes the flip's link fail: `<unit>: N symbol(s)
+  the target object defines and another link input references are not defined by our object - <names> (referenced from
+  <objects>) - so a flip fails with `undefined: '<name>'`; ...` (`reverse_reference_problems`, docs/pipeline.md 15.3; the
+  `@etb_`/`@eti_` fragments stay `external_map_symbol_notes`' note). Measured: BTE/gki_buffer (its `.bss` label
+  `lbl_8070DF3E`, read by `mh3_pad.o`; its trial flip failed with exactly that `undefined:`) goes READY -> NOT READY; the
+  143 other units the row names were NOT READY already; READY 234 -> 233.
 * **`ninja diff` is not a flip signal.** `dtk dol diff` fails on main itself with `Expected to find symbol @eti_8001E558`:
   420 `@etb_`/`@eti_` symbols of the already-Matching units (objextab renames them global) are absent from the linked ELF's
   symbol table although their bytes are present and the DOL hash holds. No dead-strip is involved (`__nwa__FUl`,
@@ -105,6 +129,14 @@ the next section's alignment ignored 2.
 same-batch successor accept, an unflipped one (target aligned to 4, with the hint), a successor our object aligns to 4 and a
 non-zero tail refuse; `.text` is excused, `extab` never, `.sdata` 4 B before an 8-aligned successor is. Mutation: the
 linked-successor test off fails 2. `test_padding_chain` (2 more checks): a short OSMessage before an unflipped OSMutex refuses OSLink, a run ending on a full unit accepts; chain check off fails 1.
+The dead-strip model and the reverse-reference row: `tools/tests/units/test_flipcheck_deadstrip.py` (21 checks, objects
+shaped like gap_utils, btm_link_key and gki_buffer): accepted - a stripped function between two kept ones, the 16-aligned
+zero-gap layout, a function only another stripped one calls; refused - another input references it, a map row names it, a
+kept function calls it, FORCEACTIVE names it, the kept bytes differ, a non-zero gap, functions packed tighter than their
+`.comment` alignment, a string only the stripped function reads; the liveness rules (`.comment` 0x08, `extabindex`,
+`.ctors`, a section-symbol reference, an unreadable object); the reverse-reference row refused, silent when ours or another
+input defines the name. Mutations: model off fails 5, data-strip refusal off 1, map-row guard off 1, reverse-reference off
+1, `strip_section`'s zero-gap check off 1, its alignment check off 1.
 Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

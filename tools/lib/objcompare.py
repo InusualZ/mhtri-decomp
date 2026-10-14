@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from tools.lib import cache as _cache
 from tools.lib import names as _names
-from tools.lib.binary.elf import (SHN_UNDEF, SHT_NULL, SHT_RELA, SHT_STRTAB, SHT_SYMTAB, STB_GLOBAL,
+from tools.lib.binary.elf import (SHN_UNDEF, SHT_NULL, SHT_RELA, SHT_STRTAB, SHT_SYMTAB, STB_GLOBAL, STT_SECTION,
                                   STB_WEAK, STT_FILE, Elf, ElfError, reloc_name)
 
 #: Bookkeeping tables, not a unit's code or data: they move with the symbol table and the compiler version.
@@ -866,6 +866,123 @@ def reloc_facts(obj) -> dict | None:
 def provides_global(entry) -> bool:
     """Whether a `defined` entry (`(section, st_info)`) has a binding the linker resolves across objects."""
     return bool(entry) and entry[1] >> 4 in (STB_GLOBAL, STB_WEAK)
+
+
+# --- dead-stripping ---------------------------------------------------------------------------------------------
+
+#: Sections whose symbols mwld may dead-strip one by one; every other section is kept whole.
+STRIPPABLE_SECTIONS = (".text", ".data", ".rodata", ".sdata", ".sdata2", ".bss", ".sbss", ".sbss2")
+#: Relocation targets whose references keep nothing alive: an extabindex entry points at the function it covers.
+NON_ROOTING_SECTIONS = ("extabindex",)
+#: `.comment`'s force-active (export) flag: the linker keeps such a symbol whatever references it.
+FORCE_ACTIVE_FLAG = 0x08
+
+
+def dead_symbols(obj, roots: set[str]) -> list | None:
+    """The defined symbols of one object that mwld's dead-strip removes, judged conservatively; None when unreadable.
+
+    Live: a global/weak symbol named in `roots` (what the rest of the link references, FORCEACTIVE, the entry), a
+    symbol `.comment` marks force-active, every byte of a section outside `STRIPPABLE_SECTIONS`, and - transitively -
+    every symbol a live byte range relocates (an `extabindex` entry roots nothing). A relocation naming a section
+    symbol, a 0-size label or a symbol that is not itself a strip candidate keeps its whole section, because the
+    linker cannot tell which bytes behind it are used. Only a symbol of size > 0 in a strippable section can be dead.
+    Every doubt resolves to live: a wrong "live" refuses a flip, a wrong "dead" would pass a broken one."""
+    elf = be32(obj)
+    if elf is None or elf.symtab is None:
+        return None
+    syms = elf.symbols
+    nsec = len(elf.sections)
+    strippable = {s.index for s in elf.sections if s.name in STRIPPABLE_SECTIONS}
+    cand = {s.index for s in syms
+            if s.name and s.size > 0 and 0 < s.shndx < nsec and s.shndx in strippable and s.type != STT_SECTION}
+    by_section: dict[int, list[int]] = {}
+    for i in cand:
+        by_section.setdefault(syms[i].shndx, []).append(i)
+    relocs: dict[int, list[tuple[int, int]]] = {}
+    all_relocs = elf.relocs()
+    for rela, target in elf.rela_sections():
+        if target.startswith(NON_ROOTING_SECTIONS) or not 0 < rela.info < nsec:
+            continue
+        relocs.setdefault(rela.info, []).extend((r.offset, r.symbol) for r in all_relocs if r.rela_index == rela.index)
+    live: set[int] = set()
+    whole: set[int] = set()
+    work: list[tuple[int, int, int]] = []
+
+    def keep_section(shndx: int) -> None:
+        if shndx in whole:
+            return
+        whole.add(shndx)
+        work.append((shndx, 0, elf.sections[shndx].size))
+        live.update(by_section.get(shndx, ()))
+
+    def keep(i: int) -> None:
+        if i in live or not 0 <= i < len(syms):
+            return
+        s = syms[i]
+        if i in cand:
+            live.add(i)
+            work.append((s.shndx, s.value, s.value + s.size))
+        elif 0 < s.shndx < nsec:
+            keep_section(s.shndx)
+
+    for s in elf.sections:
+        if s.index and s.index not in strippable and s.type != SHT_RELA:
+            work.append((s.index, 0, s.size))
+    for s in syms:
+        if s.name in roots and s.bind in (STB_GLOBAL, STB_WEAK) and s.defined:
+            keep(s.index)
+    comment = elf.comment
+    for i, entry in enumerate(comment.entries if comment is not None else ()):
+        if entry.active_flags & FORCE_ACTIVE_FLAG and i < len(syms) and syms[i].defined:
+            keep(i)
+    while work:
+        shndx, lo, hi = work.pop()
+        for off, sym in relocs.get(shndx, ()):
+            if lo <= off < hi:
+                keep(sym)
+    return sorted((syms[i] for i in cand - live), key=lambda s: (s.shndx, s.value))
+
+
+def _align_up(value: int, align: int) -> int:
+    return (value + align - 1) // align * align
+
+
+def strip_section(obj, section: str, dead: list) -> bytes | None:
+    """Section `section` of `obj` as the linker lays it out once the `dead` symbols are stripped, or None when that
+    cannot be modelled.
+
+    Each kept symbol is placed at its alignment (its `.comment` entry's, else the section's) after the previous kept
+    one, the gap zero-filled. The model is accepted only where the object itself already obeys it - the symbols of
+    size > 0 do not overlap, the first starts at 0, each next one starts exactly at the previous end rounded up to its
+    own alignment, every gap byte is zero, and the last one ends at the section's end - so the kept layout differs
+    from the object's only by the stripped symbols."""
+    elf = be32(obj)
+    sec = elf.section(section) if elf is not None else None
+    if sec is None or sec.is_nobits:
+        return None
+    data = sec.data
+    comment = elf.comment
+    entries = comment.entries if comment is not None else ()
+    gone = {s.index for s in dead}
+    spans: dict[tuple[int, int], dict] = {}
+    for s in elf.symbols:
+        if s.shndx == sec.index and s.size > 0 and s.type != STT_SECTION:
+            align = entries[s.index].align if s.index < len(entries) and entries[s.index].align else sec.align
+            span = spans.setdefault((s.value, s.value + s.size), {"align": 1, "kept": False})
+            span["align"] = max(span["align"], align, 1)
+            span["kept"] = span["kept"] or s.index not in gone
+    pos = 0
+    for (lo, hi), span in sorted(spans.items()):
+        if lo != (_align_up(pos, span["align"]) if pos else 0) or any(data[pos:lo]):
+            return None
+        pos = hi
+    if pos != len(data):
+        return None
+    out = bytearray()
+    for (lo, hi), span in sorted(spans.items()):
+        if span["kept"]:
+            out += bytes(_align_up(len(out), span["align"]) - len(out)) + data[lo:hi]
+    return bytes(out)
 
 
 def link_inputs(ninja: str) -> list[str] | None:

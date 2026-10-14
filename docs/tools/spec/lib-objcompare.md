@@ -13,7 +13,7 @@ object for drift and for "touched". Every function takes a path, the bytes of an
 `touch_fingerprint`, `fingerprints_equal`), `sectiongap` (`object_sections`, `sections`, `reloc_reasons`), `pairgap`
 (`defined_symbols`, `symbols`, `section_kind`), `relocdiff` (`reloc_rows`, `reloc_classes`, `owner_groups`, `by_owner`),
 `flipcheck` (`object_sizes`, `section_data`, `section_symbols`, the layout classes, `reloc_facts`, `link_inputs`, `link_index`,
-`undefined`), `undefrefs` (`reloc_facts`, `link_index`, `undefined`, `linkage_sets`, `linkage_audit`), `verifyunit`
+`undefined`, `dead_symbols`, `strip_section`), `undefrefs` (`reloc_facts`, `link_index`, `undefined`, `linkage_sets`, `linkage_audit`), `verifyunit`
 (`fingerprint`, `symbol_locations`, `symbol_rows`). `dataclaim` reaches `reloc_facts` through `undefrefs.load_object`.
 
 ## Public API
@@ -47,12 +47,19 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   `linker_assigned(ldscript)`, `link_index(root, inputs, cache_path, rebuild) -> {providers, ref_count, inputs, refs}`,
   `external_candidates(ours, known)`, `spelling_hint(section, offset, name, target)`, `undefined(ours, target, *, map_set,
   providers, ref_count, target_rel, linker_set) -> [(name, hint)]`.
+* Dead-stripping: `dead_symbols(obj, roots) -> [Symbol] | None` (mwld's dead-strip on one object, judged
+  conservatively: live are the global/weak symbols `roots` names, the `.comment` force-active ones, every byte of a section
+  outside `STRIPPABLE_SECTIONS`, and transitively whatever a live byte range relocates; an `extabindex` entry roots nothing;
+  a relocation naming a section symbol, a 0-size label or a non-candidate keeps its whole section; every doubt is live),
+  `strip_section(obj, section, dead) -> bytes | None` (the section as the link lays it out without `dead`: each kept symbol
+  at its `.comment` alignment, gaps zero; None unless the object already obeys that layout - no overlap, each symbol at the
+  previous end rounded up to its alignment, zero gaps, the last ending at the section's end).
 * Linkage: `linkage_sets(obj) -> (global defined, undefined) | None`, `linkage_audit(our_def, our_undef, tgt_def, tgt_undef)`.
 * Fingerprints: `fingerprint(path) -> str` (target drift), `touch_fingerprint(path, symbols) -> {body, ext} | None`,
   `fingerprints_equal(a, b)` (TOUCHED), `file_sha256(path)` (the raw half the gate pairs with `fingerprint`:
   `verifyunit.target_object_hashes` / `names_only_changes`, WP4).
 * Constants: `META_SECTIONS`, `DATA_SECTIONS`, `FLIP_DATA_SECTIONS`, `BOOKKEEPING_SECTIONS`, `EABI_LINKER_SYMBOLS`,
-  `ENTRY_SYMBOLS`, `LINKER_SYMBOLS`, `LINK_INDEX_REL`, `RENAME_FREE_SECTIONS`, `UNSTABLE_SECTIONS`, `OBJDIFF_SIZE_GAP`.
+  `ENTRY_SYMBOLS`, `LINKER_SYMBOLS`, `STRIPPABLE_SECTIONS`, `NON_ROOTING_SECTIONS`, `FORCE_ACTIVE_FLAG`, `LINK_INDEX_REL`, `RENAME_FREE_SECTIONS`, `UNSTABLE_SECTIONS`, `OBJDIFF_SIZE_GAP`.
 
 ## Invariants and rules
 

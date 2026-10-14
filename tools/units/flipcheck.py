@@ -476,6 +476,35 @@ def undefined_reference_problems(unit: str, target_rel: str, obj_path: str, src_
     return [line]
 
 
+def reverse_reference_problems(unit: str, target_rel: str, obj_path: str, src_path: str,
+                               link_ctx: dict) -> list[str]:
+    """The reverse-reference check (docs/pipeline.md 15.3): global names the target object defines, another link
+    input relocates, and nothing a flip leaves in the link defines - our object does not provide them (global or
+    weak) and no other input does - so the link answers `undefined: '<name>'` (gki_buffer's `.bss` label
+    `lbl_8070DF3E`, read by `mh3_pad.o`). The `@etb_`/`@eti_` fragments stay `external_map_symbol_notes`' note."""
+    target = object_symbols(obj_path)[1]
+    ours = object_symbols(src_path)[1]
+    self_refs = link_ctx["refs"].get(target_rel, set())
+    hits = []
+    for name in sorted(target):
+        if not provides_global(target, name) or name.startswith(MAP_FRAGMENT_PREFIXES):
+            continue
+        if link_ctx["ref_count"].get(name, 0) - (1 if name in self_refs else 0) <= 0:
+            continue                          # no other linked object references it
+        if provides_global(ours, name) or link_ctx["providers"].get(name, set()) - {target_rel}:
+            continue                          # our object, or another input, still defines it
+        hits.append(name)
+    if not hits:
+        return []
+    users = sorted({rel.replace(os.sep, "/").rsplit("/", 1)[-1] for rel, names in link_ctx["refs"].items()
+                    if rel != target_rel and names & set(hits)})
+    return ["%s: %d symbol(s) the target object defines and another link input references are not defined by our "
+            "object - %s (referenced from %s) - so a flip fails with `undefined: '%s'`; define them (same name, "
+            "global) or keep the unit unflipped (reverse-reference check, docs/pipeline.md 15.3)"
+            % (unit, len(hits), ", ".join(hits), ", ".join(users[:6]) + (", ..." if len(users) > 6 else ""),
+               hits[0])]
+
+
 def external_map_symbol_notes(unit: str, target_rel: str, src_path: str, self_refs: set[str],
                               ref_count: dict[str, int], providers: dict[str, set[str]]) -> list[str]:
     """Map symbols another *linked* object references that only the target object and the map name.
@@ -609,6 +638,63 @@ def comment_trim_candidates(obj_path: str, src_path: str,
     return problems, checked, True
 
 
+#: The section whose dead-stripped functions `deadstrip_model` takes out before the comparison.
+STRIPPED_CODE = ".text"
+
+
+def deadstrip_roots(unit: str, target_rel: str, link_ctx: dict) -> set[str]:
+    """What keeps a symbol of `unit`'s object alive once it is flipped: every name another link input references (the
+    target object leaves the link, so its own references do not count), what the batch's own objects reference, the
+    linker script's FORCEACTIVE block and the entry symbol."""
+    roots: set[str] = set()
+    for rel, names in link_ctx["refs"].items():
+        if rel != target_rel:
+            roots |= names
+    for other in BATCH - {unit}:
+        roots |= code_references_in(os.path.join(SRC, other + ".o"))
+    return roots | forced_active() | set(ENTRY_SYMBOLS)
+
+
+def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path: str, target_rel: str,
+                    link_ctx: dict | None, map_rows: set[str] | None) -> tuple[bytes | None, list[str], list[str]]:
+    """`(our .text as the link keeps it, problems, notes)` when our object carries functions the link dead-strips.
+
+    A unit may define a function the retail linker stripped (a GUESS body written so its strings land in the pool):
+    our object carries it, the target and `symbols.txt` do not, and mwld strips it again at link. Such a function is
+    excluded when `lib.objcompare.dead_symbols` finds it dead (nothing another link input, the batch, FORCEACTIVE or a
+    `.comment` export flag keeps, directly or through a live symbol's relocations), no target symbol and no map row
+    carries its name, and `strip_section` can lay out the rest (the object already places each function at its
+    alignment after the previous one, zero-filled). The remaining `.text` then has to match the target byte for
+    byte like any other. A data symbol the same strip takes with it (a string only a stripped function read) is a
+    problem: our object counts its bytes, the link drops them. `(None, [], [])` when there is nothing to strip or no
+    link context; the first element is None too when the strip cannot be modelled (a note says why)."""
+    if link_ctx is None or target_rel not in link_ctx["refs"] or STRIPPED_CODE not in ours:
+        return None, [], []
+    dead = objcompare.dead_symbols(src_path, deadstrip_roots(unit, target_rel, link_ctx)) or []
+    target_names = set(object_symbols(obj_path)[1])
+    rows = map_symbols() if map_rows is None else map_rows
+    code = [s for s in dead if s.section == STRIPPED_CODE and s.name not in target_names and s.name not in rows]
+    if not code:
+        return None, [], []
+    names = ", ".join(s.name for s in code)
+    problems = []
+    data = [s for s in dead if s.section != STRIPPED_CODE and s.section in claim]
+    if data:
+        problems.append("%s: the link dead-strips %d data symbol(s) with the stripped function(s) %s - %s - which our "
+                        "object counts and the link drops, so the linked section(s) fall short of the claim"
+                        % (unit, len(data), names, ", ".join("%s 0x%X B of %s" % (s.name, s.size, s.section)
+                                                             for s in data)))
+    kept = objcompare.strip_section(src_path, STRIPPED_CODE, code)
+    if kept is None:
+        return None, problems, ["%s: %s would be dead-stripped (no symbols.txt row, not in the target, nothing in the "
+                                "link references them) but the section is not laid out as aligned functions with "
+                                "zero gaps, so the stripped layout is not modelled" % (STRIPPED_CODE, names)]
+    return kept, problems, ["%s: 0x%X of the object's 0x%X bytes are dead-stripped function(s) %s (no symbols.txt row, "
+                            "not in the target, nothing in the link references them); the 0x%X bytes the link keeps "
+                            "are compared" % (STRIPPED_CODE, ours[STRIPPED_CODE][0] - len(kept), ours[STRIPPED_CODE][0],
+                                              names, len(kept))]
+
+
 def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
           link_ctx: dict | None = None, map_rows: set[str] | None = None,
           verbose: bool = False) -> tuple[list[str], list[str]]:
@@ -618,8 +704,13 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
     ours = sections(src_path)
     if not ours:
         return missing_or_empty_object(unit, src_path, claim), []
-    problems = []
-    notes: list[str] = []
+    kept, problems, notes = deadstrip_model(unit, claim, ours, src_path, obj_path, target_rel, link_ctx, map_rows)
+    stripped = ""
+    if kept is not None:
+        stripped = "0x%X B of function(s) from the object's 0x%X" % (ours[STRIPPED_CODE][0] - len(kept),
+                                                                     ours[STRIPPED_CODE][0])
+        ours = dict(ours)
+        ours[STRIPPED_CODE] = (len(kept), ours[STRIPPED_CODE][1])
     padded: dict[str, int] = {}             # section -> our size, where the shortfall is only alignment fill
     for name, (size, _) in sorted(claim.items()):
         got = ours.get(name)
@@ -636,6 +727,8 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
                 padded[name] = got[0]
                 notes.append(pad)
                 continue
+            if name == STRIPPED_CODE and kept is not None:
+                hint = "; ".join(filter(None, [hint, "after the link dead-strips %s" % stripped]))
             problems.append("%s: object is 0x%X, splits.txt claims 0x%X (%+d)%s"
                             % (name, got[0], size, got[0] - size, " - " + hint if hint else ""))
     for name in sorted(set(ours) - set(claim)):
@@ -649,7 +742,7 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
 
     # sizes and alignment matching is not enough: the bytes have to be the original's too.
     for name in sorted(set(ours) & set(claim)):
-        mine = raw_section(src_path, name)
+        mine = kept if name == STRIPPED_CODE and kept is not None else raw_section(src_path, name)
         tgt = raw_section(obj_path, name)
         if mine is None or tgt is None:
             continue
@@ -686,6 +779,7 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
             problems += undefined_reference_problems(
                 unit, target_rel, obj_path, src_path, link_ctx,
                 map_symbols() if map_rows is None else map_rows)
+            problems += reverse_reference_problems(unit, target_rel, obj_path, src_path, link_ctx)
         else:
             notes.append("already Object(Matching) - %s is not a link input, so there is no flip to check"
                          % target_rel.replace(os.sep, "/"))
