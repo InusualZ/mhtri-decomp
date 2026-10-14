@@ -5,7 +5,7 @@
  * (the debug manager, the DWC/GameSpy socket layer, the OS thread API and the neighbouring `fn_`
  * helpers) all live in address bands that are still unsplit, so per brief section 6.5 rule 2 this is
  * their legitimate home.  A symbol a registered unit owns is declared in that unit's header and
- * included from here instead (`DWCi/DWCi_NatNeg.h` is the first such case).
+ * included from here instead (`DWCi/natneg.h` is the first such case).
  */
 
 #ifndef UNSPLIT_NETWORK_H
@@ -115,9 +115,9 @@ owner's header and is included here.  The singleton's callback/reference/error a
  * `DWCi/dwc_nasfunc.h` (included at the top of this band). */
 
 /* The DWCi NATNEG / transport-tail unit (`.text` 0x80512490..0x805145B8) is registered as
- * `src/DWCi/DWCi_NatNeg.c`, so its five entry points now live in its owner header; including
+ * `src/DWCi/natneg.c`, so its five entry points now live in its owner header; including
  * it keeps the callers below compiling without redeclaring an owned symbol (rule 2). */
-#include "DWCi/DWCi_NatNeg.h"
+#include "DWCi/natneg.h"
 
 /* OS / runtime helpers.  `SOHtoNs` is an SO-library symbol whose one home is the SO band header,
  * which is C-linkage-safe and so reachable from the DWCi `.c` units as well; the OS mutex and thread
@@ -127,7 +127,7 @@ owner's header and is included here.  The singleton's callback/reference/error a
 
 /* 0x80794380 `natNegMessageMagic` - the NATNEG message signature this unit compares the head of a
  * received datagram against - is deliberately *not* declared here: the bytes belong to the NATNEG
- * unit, so rule 2 puts the declaration in `DWCi/DWCi_NatNeg.h` (included above), and that
+ * unit, so rule 2 puts the declaration in `DWCi/natneg.h` (included above), and that
  * is the *unsized* spelling this unit needs.  It addresses the symbol with `lis`/`addi`
  * (ADDR16_HA/LO, the target's relocation kind), while the owner's own source re-declares it sized
  * for the SDA21 form its ten sites use (playbook row 12 - the reloc kind is a codegen input). */
@@ -136,8 +136,8 @@ owner's header and is included here.  The singleton's callback/reference/error a
  * reached through this band by including it (section 6.5 rule 2): `sGameSpySocket` and
  * `sGameSpyInterfaceThread` by `Network/GameSpyInterfaceThread.cpp`, whose `splits.txt` claims
  * `.sbss:0x80794CE0..0x80794CE8` - they are declared in `Network/GameSpyInterfaceThread.h`, the header of
- * the unit that defines them - and `natNegMessageMagic` by `DWCi/DWCi_NatNeg.c`, whose `.sdata` run
- * 0x80794368..0x807943A0 covers it (declared in `DWCi/DWCi_NatNeg.h`, included at the top of
+ * the unit that defines them - and `natNegMessageMagic` by `DWCi/natneg.c`, whose `.sdata` run
+ * 0x80794368..0x807943A0 covers it (declared in `DWCi/natneg.h`, included at the top of
  * this band).  A band header that still declared them would collide with the owners' definitions.
  */
 

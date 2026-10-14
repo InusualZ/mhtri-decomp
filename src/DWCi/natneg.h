@@ -1,5 +1,5 @@
 /*
- * DWCi/DWCi_NatNeg.h - the DWCi NATNEG / transport-tail unit (`src/DWCi/DWCi_NatNeg.c`,
+ * DWCi/natneg.h - the DWCi NATNEG / transport-tail unit (`src/DWCi/natneg.c`,
  * `.text` 0x80512490..0x805145B8).
  *
  * Rule 2: this unit owns these symbols, so their declarations live here and every consumer includes
@@ -19,8 +19,8 @@
  * header says so too.  All 17 functions have bodies (see the unit's own header for the measured
  * list).
  */
-#ifndef MHTRI_DWCI_DWCI_NATNEG_H
-#define MHTRI_DWCI_DWCI_NATNEG_H
+#ifndef MHTRI_DWCI_NATNEG_H
+#define MHTRI_DWCI_NATNEG_H
 
 #include "types.h"
 #include "SO/soi.h"
@@ -53,7 +53,7 @@ void DWCi_NatNegEndSession(u32 session);
 void DWCi_NatNegProcess(void);
 void DWCi_NatNegSendPacket(void* data, u32 size, void* header);
 
-/* 0x80512490: lazy string/length accessor (the seam function; body in DWCi_NatNeg.c). */
+/* 0x80512490: lazy string/length accessor (the seam function; body in natneg.c). */
 void DWCi_GetStringLength(void** buf, int* len);
 
 /* ---- the data the unit's claimed runs own (splits.txt) ---------------------------- */
@@ -122,7 +122,7 @@ extern u8 DWCi_addressRing[];
 
 /* 0x80762900 (two 0x16-byte strings) - the second address-string ring, the one the NATNEG unit
  * formats its peer addresses into; `DWCi_natNegFormatAddress` swaps the index - and 0x80762940
- * (0xE0) the negotiator's session record, whose own layout is completed in `src/DWCi/DWCi_NatNeg.c`
+ * (0xE0) the negotiator's session record, whose own layout is completed in `src/DWCi/natneg.c`
  * (struct DWCiNatNegSession). */
 extern u8 DWCi_natNegAddressRing[];
 
@@ -175,4 +175,4 @@ extern void (*DWCi_natNegPollCallback)(u32, struct DWCiNatNegSession*);
 }
 #endif
 
-#endif /* MHTRI_DWCI_DWCI_NATNEG_H */
+#endif /* MHTRI_DWCI_NATNEG_H */

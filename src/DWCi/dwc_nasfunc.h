@@ -3,9 +3,9 @@
 #define MHTRI_DWCI_DWC_NASFUNC_H
 
 #include "types.h"
-#include "DWCi/DWCi_NatNeg.h"            /* the NATNEG half's own data (rule 2: the owner declares it) */
+#include "DWCi/natneg.h"            /* the NATNEG half's own data (rule 2: the owner declares it) */
 #include "SO/soi.h"
-#include "DWCi/DWCi_Np_CPUCopyFast.h"    /* the Np unit's own data (rule 2) */
+#include "DWCi/dwc_auth_interface.h"    /* the Np unit's own data (rule 2) */
 
 /* Declarations moved here from `unsplit/DWCi.h, Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct GTI2Buffer;
@@ -92,13 +92,15 @@ int DWCi_requestBlockState(struct DWCiReq* req, u32 a, u32 b, u32* out);
 int DWCi_requestFlush(struct DWCiReq* req, u8* message, s32 len);
 
 /* GameSpy socket layer (DWC / GameSpyInterface) */
-/* 0x80509DB0 - the completion callback of the auth request: parses the server's answer into the state block.
- * GUESS on the name. */
-struct NHTTPResponse;
-void DWCi_Auth_RequestCallback(s32 result, struct NHTTPResponse* response, s32 size);
 /* 0x8050A710 - the NHTTP teardown callback: reports, tells the host the auth session is over and parks the
  * state machine in its terminal state. */
 void DWCi_Auth_EndProcess(void);
+/* 0x805113B0 - sends the GT2 closed message; 0x80511470 - re-sends a buffered reliable message;
+ * 0x80511530 - sends a message (reliable through the outgoing buffer). */
+u32 DWCi_sendControlFrame(DWCiReq* req);
+struct DWCiXfer;
+u32 DWCi_appendTransfer(DWCiReq* req, struct DWCiXfer* xfer);
+u32 DWCi_flushRequest(DWCiReq* req, u32 a, u32 b, u32 flag);
 /* 0x8050A770 - moves the auth state machine on after a NAND call: `success` when the result is 0, `retry` while the
  * NAND layer is busy (up to five times), `noExist`/`access` for those two errors (27 = none), and a fatal end
  * otherwise. GUESS on the name. */

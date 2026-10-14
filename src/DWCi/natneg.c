@@ -1,5 +1,5 @@
 /*
- * DWCi_NatNeg.c - the DWCi band's tail, `.text` 0x80512490..0x805145B8 (17 functions, 8488 B): the
+ * DWCi/natneg.c - the DWCi band's tail, `.text` 0x80512490..0x805145B8 (17 functions, 8488 B): the
  * GameSpy NAT-negotiation client (the `natneg.c` of the SDK, in Nintendo's DWC build) and the address
  * helpers it shares with the transport.
  *
@@ -12,8 +12,8 @@
  * Module `DWCi`, not NHTTP: the range calls only the DWCi transport helpers at 0x8050A..-0x8050E.. and
  * carries the negotiator's own pool ("natneg1/2/3.gs.nintendowifi.net", the log lines).
  *
- * NAME.  `DWCi_NatNeg.c` is an evidence call, not a map name (`dumpmap.py lookup` answers only
- * `zz_0512xxx_`); rename if the SDK's real file name is recovered.
+ * NAME.  `natneg.c` is the GameSpy SDK's file name for the NAT-negotiation client (GUESS: the image
+ * carries no `__FILE__` string and `dumpmap.py lookup` answers only `zz_0512xxx_`).
  *
  * WHAT THE BODIES ARE.  The packet layout (`DWCiNatNegPacket`: magic FD FC 1E 66 6A B2, version 3, type,
  * cookie, then the INIT / CONNECT / REPORT bodies), the 0x54-byte socket record and the NAT-type verdict
@@ -94,7 +94,7 @@
  */
 
 #include "types.h"
-#include "DWCi/DWCi_NatNeg.h"            /* the owner's own header: the entry points and the data */
+#include "DWCi/natneg.h"            /* the owner's own header: the entry points and the data */
 #include "unsplit/DWCi.h"                /* the band's unowned data and helpers (rule 2) */
 #include "SO/soi.h"
 #include "unsplit/SO.h"                  /* SOAddressToString / SOAddressToHostPort / SOHtoNs */

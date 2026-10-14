@@ -1176,13 +1176,11 @@ config.libs = [
         "cflags": cflags_dwc,
         "host": False,
         "objects": [
-            # The DWCi SDK band head: the named `DWCi_Np_CPUCopyFast` (0x80507C40) and its 14
-            # neighbours (.text 0x80507C40..0x80509DB0, 15 functions / 8560 B).  Right edge is the
-            # strong `.sdata` run-jump cut at 0x80509DB0 (`tudiscover.py at 0x80507C40`); the left
-            # edge is the named symbol's own start.  Claims .text only.  See the file header.
-            # dwc_error / DWCi_Np_CPUCopyFast / dwc_nasfunc: cflags_base (-func_align 16, the retail 16-byte packing); docs/network.md.
+            # The DWC auth interface (.text 0x80507C40..0x8050A710, 16 functions); its seam evidence is
+            # the RANGE line of src/DWCi/dwc_auth_interface.c.
+            # dwc_error / dwc_auth_interface / dwc_nasfunc: cflags_base (-func_align 16, the retail 16-byte packing); docs/network.md.
             Object(NonMatching, "DWCi/dwc_error.cpp", cflags=cflags_base),
-            Object(NonMatching, "DWCi/DWCi_Np_CPUCopyFast.c", cflags=cflags_base),
+            Object(NonMatching, "DWCi/dwc_auth_interface.c", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_nasfunc.c", cflags=cflags_base),
             Object(NonMatching, "DWCi/fn_805113B0.c"),
             # The DWCi band tail (.text 0x80512490..0x805145B8, 17 functions / 8488 B).  The left
@@ -1196,7 +1194,7 @@ config.libs = [
             # rest of the lib), and with 4 our object misses the `nop` MWCC inserts to align
             # `DWCi_natNegTickIdleSockets`'s struct-copy loop (98.48 -> 100.00, the only row that moved for
             # this reason).  `-O4,p` implies `-func_align 16`.
-            Object(NonMatching, "DWCi/DWCi_NatNeg.c", cflags=cflags_base),
+            Object(NonMatching, "DWCi/natneg.c", cflags=cflags_base),
         ],
     },
     {

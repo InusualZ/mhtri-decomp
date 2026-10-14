@@ -1,21 +1,21 @@
 /*
- * DWCi/fn_805113B0.c - the GameSpy GT2 socket core: the closed / resend / send message tail, the connection table
+ * DWCi/fn_805113B0.c - the GameSpy GT2 socket core: the connection table
  * of a GT2 socket (hash, compare, lookup), socket and connection creation and teardown, the raw send, the
  * per-socket connection timers, and the address text helpers.
  *
- * RANGE. `.text` 0x805113B0..0x80512490 (20 functions); `.data` 0x806308A8..0x806308E8 (the stats host buffer);
+ * RANGE. `.text` 0x80511620..0x80512490 (17 functions); the left edge ends the GT2 message file, whose last
+ *   three functions `DWCi/dwc_nasfunc.c` ends with (they address its `.sdata` `DWCi_protocolMagic`); `.data` 0x806308A8..0x806308E8 (the stats host buffer);
  *   `.sdata` 0x80794358..0x80794368; `.sbss` 0x80795820..0x80795828.
  * FLAGS. the `DWCi` lib's `cflags_dwc` (the retail functions are 16-byte aligned; per-row scores are unaffected).
- * NAMES. GUESSes from the bodies, kept from before the GT2 identification (`DWCi_sendControlFrame` = gti2SendClosed,
- *   `DWCi_appendTransfer` = gti2ResendMessage, `DWCi_flushRequest` = gti2Send, `DWCi_createConnection` =
+ * NAMES. GUESSes from the bodies, kept from before the GT2 identification (`DWCi_createConnection` =
  *   gti2CreateSocket, `DWCi_createRequest` = gti2NewSocketConnection, ...). The GT2 records (`DWCiConn` = GTI2Socket,
  *   `DWCiReq` = GTI2Connection, `GTI2Buffer`) live in `DWCi/dwc_nasfunc.h` with the SDK's field names.
  * SHAPES. `DWCi_parseAddress` keeps nested ifs where retail jumps to shared exits (rule 8): 87.10 against an
  *   earlier flat shape's 82.30.
  * RESIDUALS. `DWCi_createRequest`/`DWCi_findRequest` keep smaller frames than retail (0x30/0x20 against 0x170/0xB0);
- *   the other open rows differ in register colouring and block order; `DWCi_appendTransfer` writes the header bytes
- *   with `srawi`+`stb` where retail uses `extrwi`+`stbx`. The first three rows are the tail of the GT2 message file
- *   that `DWCi/dwc_nasfunc.c` ends with (request net-c#13).
+ *   the other open rows differ in register colouring and block order. The range is two GameSpy files (gt2Socket,
+ *   then gt2Utility's address helpers from 0x80512200 or 0x80512210: `tudiscover.py` sees one `.sdata` run jump
+ *   and cannot place that edge), so the file keeps the map's stem until the split.
  *   `DWCi_createRequest` keeps no saved-register frame (retail `_savegpr_27`); `DWCi_parseAddress` saves from r27
  *   (retail r26). Flip blockers: `splits.txt` claims `.sbss` (0x8) and `.sdata` (0x10) the object does not emit.
  *   `DWCi_createRequest`: retail `_savegpr_27`/`_restgpr_27`, ours no frame; `DWCi_parseAddress`: ours
@@ -23,7 +23,7 @@
  */
 
 #include "types.h"
-#include "DWCi/DWCi_NatNeg.h"            /* DWCi_GetStringLength: the owner's header (rule 2) */
+#include "DWCi/natneg.h"            /* DWCi_GetStringLength: the owner's header (rule 2) */
 #include "DWCi/fn_805113B0.h"            /* this unit's own exported entry points */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -46,7 +46,7 @@ char DWCi_statsServerHostname[64] = "gamestats.gs.nintendowifi.net";
 /* The band data this unit loads.  It is owned by nobody and the registered ranges bracketing it   */
 /* name different modules, so it is declared in `unsplit/DWCi.h` (rule 2) and never        */
 /* defined here (playbook 29) - apart from `DWCi_addressRing`, which the NATNEG unit's `.bss` run   */
-/* covers and whose declaration therefore lives in `DWCi/DWCi_NatNeg.h`.  The private       */
+/* covers and whose declaration therefore lives in `DWCi/natneg.h`.  The private       */
 /* records those declarations reach stay below, next to the code that uses them.                   */
 /* --------------------------------------------------------------------------------------------- */
 
@@ -67,9 +67,6 @@ typedef struct DWCiCType {
 
 
 /* The unit's own entry points, in address order. */
-u32 DWCi_sendControlFrame(DWCiReq* req);
-u32 DWCi_appendTransfer(DWCiReq* req, DWCiXfer* xfer);
-u32 DWCi_flushRequest(DWCiReq* req, u32 a, u32 b, u32 flag);
 u32 DWCi_requestTableHash(DWCiAddrKey** key, u32 bucket);
 u32 DWCi_requestTableCompare(DWCiAddrKey** a, DWCiAddrKey** b);
 void DWCi_requestListRelease(DWCiReq** slot);
@@ -86,88 +83,6 @@ void DWCi_connectionShutdown(DWCiConn* conn);
 u16 DWCi_htons(u16 port);
 char* DWCi_formatAddress(u32 addr, u16 port, char* buf);
 u32 DWCi_parseAddress(char* str, u32* outAddr, u16* outPort);
-
-/* 0x805113B0 - the handshake write: { 0x0003 } when the connection is in mode 2, then the shared
- * 0xFEFE constant and the 0x68 terminator, handed to the send path. */
-u32 DWCi_sendControlFrame(DWCiReq* req)
-{
-    DWCiConn* conn;
-    u16 port;
-    u32 addr;
-    u8 buf[32];
-    u16 word;
-    int n;
-
-    conn = req->conn;
-    port = req->port;
-    addr = req->addr;
-    n = 0;
-    if (conn->protocolType == 2) {
-        word = 3;
-        memcpy(buf, &word, 2);
-        n = 2;
-    }
-    memcpy(buf + n, &DWCi_protocolMagic, 2);
-    n += 2;
-    buf[n] = 0x68;
-    return DWCi_sendTo(conn, addr, port, buf, n + 1) != 0;
-}
-
-/* 0x80511470 - the send-buffer append: stamp the two header bytes at the connection's header offset,
- * hand the payload to the framer, then stamp the transfer's timestamp and, for a mode-2 request,
- * the "stamped" mark. */
-u32 DWCi_appendTransfer(DWCiReq* req, DWCiXfer* xfer)
-{
-    DWCiConn* conn;
-    u16 value;
-    u8* buf;
-    u32 off;
-
-    conn = req->conn;
-    value = req->expectedSerialNumber;
-    buf = req->outgoingBuffer.buffer;
-    off = xfer->offset + conn->protocolOffset;
-    buf[off + 5] = (u8)(value >> 8);
-    buf[off + 6] = (u8)value;
-    if (DWCi_requestFrame(req, req->outgoingBuffer.buffer + xfer->offset, xfer->length) == 0) {
-        return 0;
-    }
-    xfer->stamp = req->lastSend;
-    if (req->outgoingBuffer.buffer[xfer->offset + req->conn->protocolOffset + 2] == 2) {
-        req->challengeTime = req->lastSend;
-    }
-    return 1;
-}
-
-/* 0x80511530 - the flush path: when the flag is clear, hand the request to DWCi_requestFlush; otherwise
- * look the block up by the size byte, and if it is not already complete, append it and re-frame the
- * last queue entry. */
-u32 DWCi_flushRequest(DWCiReq* req, u32 a, u32 b, u32 flag)
-{
-    u32 out;
-    u32 count;
-    u32* item;
-    u32 ret;
-
-    if (flag != 0) {
-        if (DWCi_requestBlockState(req, 0, b + 7, &out) == 0) {
-            return 0;
-        }
-        if (out != 0) {
-            return 1;
-        }
-        DWCi_bufferFrame(&req->outgoingBuffer, (const u8*)a, b);
-        count = ArrayLength(req->outgoingBufferMessages);
-        item = ArrayNth(req->outgoingBufferMessages, count - 1);
-        ret = DWCi_requestFrame(req, req->outgoingBuffer.buffer + item[0], item[1]);
-        if (ret == 0) {
-            return 0;
-        }
-        req->pendingAck = 0;
-        return 1;
-    }
-    return DWCi_requestFlush(req, (u8*)a, b);
-}
 
 /* 0x80511620 - the request table's hash: (key.addr * key.port) modulo the bucket count. */
 u32 DWCi_requestTableHash(DWCiAddrKey** key, u32 bucket)
@@ -687,5 +602,5 @@ u32 DWCi_parseAddress(char* str, u32* outAddr, u16* outPort)
     return 1;
 }
 
-/* 0x80512490 moved to `DWCi/DWCi_NatNeg.c` with the seam (see the header): the body was
+/* 0x80512490 moved to `DWCi/natneg.c` with the seam (see the header): the body was
  * byte-identical here and is kept there verbatim, so this unit now ends at 0x80512490. */

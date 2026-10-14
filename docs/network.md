@@ -210,9 +210,9 @@ Under GC/3.0a5.2 two `d_nhttp` rows first came out lower (`NHTTPi_findHeaderFiel
 as `*s > '7'` and initialises its accumulator after the range checks (100.00), `findHeaderField` declares `colon`
 before `flag` and `line` before `next` (95.39).
 
-DWCi function packing: the retail `dwc_error`, `DWCi_Np_CPUCopyFast` and `dwc_nasfunc` objects start every function on
+DWCi function packing: the retail `dwc_error`, `dwc_auth_interface` and `dwc_nasfunc` objects start every function on
 16 bytes (`gap_*` words between them). Measured `cflags_base` (`-func_align 16`) against the lib's `cflags_dwc`
-(`-func_align 4`): `dwc_error` and `DWCi_Np_CPUCopyFast` move no row (0 better / 0 worse; `dwc_error`'s `.text` is
+(`-func_align 4`): `dwc_error` and `dwc_auth_interface` move no row (0 better / 0 worse; `dwc_error`'s `.text` is
 then 2168 of 2176 B, the rest the object's tail pad), so both take `cflags_base`; `dwc_nasfunc` scores 2 rows
 better (`gti2CheckResponse` 98.00 -> 100, `DWCi_socketLookupHost` 83.74 -> 84.54) and 1 worse (`DWC_SVLProcess`
 78.69 -> 77.28, its member-wise copy loop gains an alignment `nop`), so it stayed on `cflags_dwc` until the unit

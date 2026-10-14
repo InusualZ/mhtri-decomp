@@ -1,14 +1,18 @@
 /*
- * DWCi/DWCi_Np_CPUCopyFast.c - the DWC auth interface (`dwc_auth_interface.c`): the fast copy, the console friend
- * code, the auth state machine over the NAND auth-data file and the NAS request builder.
+ * DWCi/dwc_auth_interface.c - the DWC auth interface: the fast copy, the console friend code, the auth state
+ * machine over the NAND auth-data file, the NAS request builder and the request's completion callback.
  *
- * RANGE. `.text` 0x80507C40..0x80509DB0 (15 functions); `.data` 0x8062FF90..0x806302C8; `.bss`
- *   0x80760F00..0x807613B8; `.sdata` 0x80794200..0x807942FC; `.sbss` 0x807957D0..0x807957F8.
+ * RANGE. `.text` 0x80507C40..0x8050A710 (16 functions); `.data` 0x8062FF90..0x806307F0; `.bss`
+ *   0x80760F00..0x807613B8; `.sdata` 0x80794200..0x80794330; `.sbss` 0x807957D0..0x807957F8. The right edges are
+ *   the TU's own: `DWCi_Auth_RequestCallback` addresses this pool (`DWCi_authDataPath`), the `.data` run
+ *   0x806302C8..0x806307F0 is the request and callback strings, and `.sdata` 0x807942FC..0x80794330 is referenced
+ *   only by the callback (`callers.py`).
  * FLAGS. `cflags_base` (the retail functions start 16-byte aligned, `gap_*` words between them; the lib's
  *   `cflags_dwc` packs on 4); measurement in docs/network.md.
  * NAMES. `DWCi_Np_CPUCopyFast` is the map's; `DWCi_Auth_*` follow the SDK's own `DWCi_Auth_EndProcess` string
  *   (`dwc_nasfunc.c`'s `.data`); the rest are GUESSes from the bodies (`DWCi_authDataTask`, `DWCi_npStart`,
- *   `DWCi_initRuntime`, `DWCi_npSetup`, the status accessors, the `.bss`/`.sbss` object names).
+ *   `DWCi_initRuntime`, `DWCi_npSetup`, the status accessors, the `.bss`/`.sbss` object names,
+ *   `DWCi_Auth_RequestCallback`). The file name is the SDK's `dwc_auth_interface.c` (GUESS: no `__FILE__` string).
  * SHAPES. `DWCi_Np_CPUCopyFast` is a goto-free dispatch on the copy width (rule 8): the retail jumps share the
  *   `memcpy` tail and the three copy loops (93.82 with gotos, 91.11 without). Each POST field of
  *   `DWCi_Auth_StartRequest` is `DWCI_AUTH_ADD_POST` (the next-field pointer is stepped before the add call).
@@ -17,10 +21,11 @@
  * RESIDUALS. `DWCi_Np_CPUCopyFast` 91.11 (the shared tails above); `DWCi_npStart` 95.15 (`mr r3,r31` against retail's
  *   `addi r3,r31,0`); `DWCi_authDataTask` 98.63 (retail keeps NULL in r30 for the response test and store);
  *   `DWCi_Auth_StartRequest` 99.65 (one `li r31,0` scheduled earlier); `DWCi_initRuntime` 99.96. Relocations
- *   name the section where retail names `DWCi_authDataPath`. Seam: the retail TU extends to 0x8050A710 -
- *   `DWCi_Auth_RequestCallback` (0x80509DB0, registered in `DWCi/dwc_nasfunc.c`) addresses the same string pool,
- *   and `.data` 0x806302C8..0x806307F0 holds the request and callback strings; the registration is not re-cut, so
- *   the object's `.data` runs past the claim. `.sdata` ends 1 byte short of the claim (the tail pad).
+ *   name the section where retail names `DWCi_authDataPath`. `DWCi_Auth_RequestCallback` saves from r23 (retail
+ *   r19) and bases its strings on `DWCi_reportHttpDestroy` (retail `DWCi_authDataPath`). String order: retail
+ *   emits " no return code.\n" last in `.data` and "&\r\n" ahead of " %s\n" in `.sdata` (the `if/else` spelling
+ *   of the return-code test leaves the order as it is and costs the callback). Section tails: `.text` 8 B,
+ *   `.data` 4 B and `.sdata` 3 B short of the claim.
  *   `DWCi_npStart` takes its base register from the first-defined static where retail names `DWCi_stateBlock`
  *   (same bytes; MWCC addresses the four objects this file defines from one base).
  *   Relocation names that differ: ours forms `DWCi_npCopyFastTailTable`, `DWCi_npEmptyFriendCode`,
@@ -789,4 +794,155 @@ void DWCi_npSetValue(u32 value) {
 /* 0x80509230 (0x1C): the three-argument form of that same command. */
 void DWCi_npSetValueEx(u32 value) {
     DWCi_runtime->commandCallback(13, value, 0);
+}
+
+/* Base64-decodes the value after `key` in `token` into `value` (NUL-terminated); answers the decoded length. */
+#define DWCI_AUTH_DECODE(key)                                                                     \
+    (decoded = DWCi_Base64Decode(&token[strlen(key)], strlen(token) - strlen(key), value, 0x100), \
+     value[decoded] = 0, decoded)
+
+/* 0x80509DB0 (0x960): the completion callback of the NAS request: keeps the response, then parses the
+ * "key=value" lines (each value base64) into the state block and sets the request status. */
+void DWCi_Auth_RequestCallback(s32 result, struct NHTTPResponse* response, s32 size) {
+    DWCiStateBlock* state = (DWCiStateBlock*)DWCi_stateBlock;
+    char returnCode[8];
+    char* body;
+    char* token;
+    OSCalendarTime calendar;
+    char value[0x100];
+    s32 decoded;
+    s32 haveReturnCode;
+    s64 serverTime;
+    s32 code;
+
+    if (state->response != NULL) {
+        DWC_Printf(0x1000000, DWCi_reportHttpDestroy);
+        NHTTPDestroyResponse(state->response);
+    }
+    state->response = response;
+    DWC_Printf(0x1000000, " request_callback = %d\n", result);
+    if (result == 8) {
+        DWC_Printf(0x1000000, " nhttp canceled(%d)\n", result);
+        state->status = 2;
+        return;
+    }
+    if (result != 0) {
+        if (result == 14) {
+            DWC_Printf(0x1000000, " ssl error(%d)\n", NHTTPGetSSLError());
+        }
+        DWC_Printf(0x1000000, " nhttp error(%d)\n", result);
+        state->status = -20100;
+        state->saveImage.requestFailed = 1;
+        return;
+    }
+    code = NHTTPGetResultCode(response);
+    if (code != 200) {
+        DWC_Printf(0x1000000, " status code is not 200, but %d\n", code);
+        state->status = -23000 - code;
+        if (NHTTPGetBodyAll(response, (u32*)&body) > 0) {
+            DWC_Printf(0x1000000, "%s\n", body);
+        } else {
+            DWC_Printf(0x1000000, "no body\n", body);
+        }
+        return;
+    }
+    haveReturnCode = 0;
+    if (NHTTPGetBodyAll(response, (u32*)&body) > 0) {
+        DWC_Printf(0x1000000, " %s\n", body);
+        for (token = strtok(body, "&\r\n"); token != NULL; token = strtok(NULL, "&\r\n")) {
+            if (strncmp(token, "retry=", strlen("retry=")) == 0) {
+                DWC_Printf(0x1000000, " (%d) retry=%s\n", DWCI_AUTH_DECODE("retry="), value);
+            } else if (strncmp(token, "returncd=", strlen("returncd=")) == 0) {
+                decoded = DWCI_AUTH_DECODE("returncd=");
+                strcpy(returnCode, value);
+                DWC_Printf(0x1000000, " (%d) returncd=%s\n", decoded, value);
+                haveReturnCode = 1;
+            } else if (strncmp(token, "datetime=", strlen("datetime=")) == 0) {
+                decoded = DWCI_AUTH_DECODE("datetime=");
+                if (sscanf(value, "%04d%02d%02d%02d%02d%02d", &calendar.year, &calendar.mon, &calendar.mday,
+                           &calendar.hour, &calendar.min, &calendar.sec) != 6) {
+                    DWC_Printf(0x1000000, " cannot parse datetime: %s\n", value);
+                    serverTime = 0;
+                } else {
+                    calendar.mon -= 1;
+                    calendar.wday = 0;
+                    calendar.yday = 0;
+                    calendar.msec = 0;
+                    calendar.usec = 0;
+                    serverTime = OSCalendarTimeToTicks(&calendar);
+                }
+                state->serverTimeOffset = serverTime - OSGetTime();
+                DWC_Printf(0x1000000, " (%d) datetime=%s\n", decoded, value);
+            } else if (strncmp(token, "locator=", strlen("locator=")) == 0) {
+                decoded = DWCI_AUTH_DECODE("locator=");
+                strcpy(state->locator, value);
+                DWC_Printf(0x1000000, " (%d) locator=%s\n", decoded, value);
+            } else if (strncmp(token, "token=", strlen("token=")) == 0) {
+                decoded = DWCI_AUTH_DECODE("token=");
+                strcpy(state->token, value);
+                DWC_Printf(0x1000000, " (%d) token=%s\n", decoded, value);
+            } else if (strncmp(token, "challenge=", strlen("challenge=")) == 0) {
+                decoded = DWCI_AUTH_DECODE("challenge=");
+                strcpy(state->challenge, value);
+                DWC_Printf(0x1000000, " (%d) challenge=%s\n", decoded, value);
+            } else if (strncmp(token, "userid=", strlen("userid=")) == 0) {
+                decoded = DWCI_AUTH_DECODE("userid=");
+                sscanf(value, "%llu", &state->userId);
+                DWC_Printf(0x1000000, " (%d) userid=%llu\n", decoded);
+                state->saveImage.userId = state->userId;
+            } else if (strncmp(token, "svchost=", strlen("svchost=")) == 0) {
+                decoded = DWCI_AUTH_DECODE("svchost=");
+                strcpy(state->svl.svlhost, value);
+                DWC_Printf(0x1000000, " (%d) svlhost=%s\n", decoded, value);
+            } else if (strncmp(token, "servicetoken=", strlen("servicetoken=")) == 0) {
+                decoded = DWCI_AUTH_DECODE("servicetoken=");
+                strcpy(state->svl.svltoken, value);
+                DWC_Printf(0x1000000, " (%d) servicetoken=%s\n", decoded, value);
+            } else if (strncmp(token, "statusdata=", strlen("statusdata=")) == 0) {
+                decoded = DWCI_AUTH_DECODE("statusdata=");
+                if (value[0] == 'Y') {
+                    state->svl.status = 1;
+                } else {
+                    state->svl.status = 0;
+                }
+                DWC_Printf(0x1000000, " (%d) statusdata=%s\n", decoded, value);
+            } else if (strncmp(token, "prwords=", strlen("prwords=")) == 0) {
+                DWCI_AUTH_DECODE("prwords=");
+                strcpy(state->saveImage.profileWords, value);
+            } else {
+                DWC_Printf(0x1000000, " unknown token : %s\n", token);
+            }
+        }
+    }
+    if (!haveReturnCode) {
+        DWC_Printf(0x1000000, " no return code.\n");
+        state->status = -20101;
+        return;
+    }
+    code = strtol(returnCode, NULL, 10);
+    if (code == 0 && DWCi_runtime->mode_0x59C8 != 3) {
+        DWC_Printf(0x1000000, " cannot parse returncd(%s)\n", returnCode);
+        state->status = -20101;
+        return;
+    }
+    if (code == 1 && DWCi_runtime->mode_0x59C8 == 3) {
+        DWC_Printf(0x1000000, " prof server maintenance(%s)\n", returnCode);
+        state->status = -33001;
+        return;
+    }
+    if (code >= 100) {
+        if (DWCi_runtime->mode_0x59C8 == 3) {
+            DWC_Printf(0x1000000, " prof server retruns error (%d) but ignored by DWC library\n", code);
+        } else {
+            DWC_Printf(0x1000000, " server retruns error (%d)\n", code);
+            state->status = -20000 - code;
+            return;
+        }
+    }
+    if (code == 40) {
+        state->loginKind = 2;
+    } else {
+        state->loginKind = 1;
+    }
+    state->status = 1;
 }

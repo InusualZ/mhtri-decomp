@@ -20,7 +20,7 @@
  */
 #include "DWCi/dwc_error.h"
 #include "DWCi/dwc_nasfunc.h"
-#include "DWCi/DWCi_NatNeg.h"
+#include "DWCi/natneg.h"
 #include "DWCi/fn_805113B0.h"
 #include "NAND/nand.h"
 #include "OS/OSVReport.h"

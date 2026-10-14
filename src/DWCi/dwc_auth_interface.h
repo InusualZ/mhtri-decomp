@@ -1,9 +1,9 @@
 /*
- * DWCi/DWCi_Np_CPUCopyFast.h - the declarations `src/DWCi/DWCi_Np_CPUCopyFast.c` (the DWC auth interface) owns
+ * DWCi/dwc_auth_interface.h - the declarations `src/DWCi/dwc_auth_interface.c` (the DWC auth interface) owns
  * that other units use (docs/plan.md 6.5 rule 2): its data runs and its entry points.
  */
-#ifndef MHTRI_DWCI_DWCI_NP_CPUCOPYFAST_H
-#define MHTRI_DWCI_DWCI_NP_CPUCOPYFAST_H
+#ifndef MHTRI_DWCI_DWC_AUTH_INTERFACE_H
+#define MHTRI_DWCI_DWC_AUTH_INTERFACE_H
 
 #include "types.h"
 #include "NHTTP/d_nhttp.h"
@@ -30,7 +30,7 @@ typedef struct DWCSvlResult {
 } DWCSvlResult; /* size: 0x174 (two bytes of tail padding) */
 
 /* The DWCi runtime block `DWCi_runtime` (this unit's own object, declared in
- * `DWCi/DWCi_Np_CPUCopyFast.h`) points at.  Only the fields this unit's bodies read or
+ * `DWCi/dwc_auth_interface.h`) points at.  Only the fields this unit's bodies read or
  * write are named; every other offset is an unmodelled run of the original's own layout.
  * size: 0x5B30 - the size DWCi_initRuntime asks the host allocator for, which is also where its
  * last named field ends. */
@@ -155,6 +155,9 @@ u64 DWCi_GetConsoleFriendCode(void);
  * (`DWC_Init` treats 0 as failure). */
 u32 DWCi_FreeList(void);
 u32 DWCi_npStart(u32 arg);
+/* 0x80509DB0 - the completion callback of the auth request: parses the server's answer into the state block.
+ * GUESS on the name. */
+void DWCi_Auth_RequestCallback(s32 result, NHTTPResponse* response, s32 size);
 
 /* The `.data` run 0x8062FF90..0x806302C8, defined by the unit in address order. */
 extern char DWCi_reportFriendCodeFormat[];
@@ -184,4 +187,4 @@ extern char DWCi_reportLoginTimeout[];
 }
 #endif
 
-#endif /* MHTRI_DWCI_DWCI_NP_CPUCOPYFAST_H */
+#endif /* MHTRI_DWCI_DWC_AUTH_INTERFACE_H */

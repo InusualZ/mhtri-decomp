@@ -16,9 +16,6 @@ extern "C" {
 
 /* The GT2 socket / connection core the `DWCi/dwc_nasfunc.c` GT2 entry points call (types in
  * `DWCi/dwc_nasfunc.h`). */
-u32 DWCi_sendControlFrame(DWCiReq* req);
-u32 DWCi_appendTransfer(DWCiReq* req, DWCiXfer* xfer);
-u32 DWCi_flushRequest(DWCiReq* req, u32 a, u32 b, u32 flag);
 void DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize2, u32 arg5, u32 mode);
 void DWCi_destroyConnection(DWCiConn* conn);
 void DWCi_setConnectionUserValue(DWCiConn* conn, u32 value);

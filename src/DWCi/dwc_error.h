@@ -3,8 +3,8 @@
 #define MHTRI_DWCI_DWC_ERROR_H
 
 #include "types.h"
-#include "DWCi/DWCi_NatNeg.h"            /* the NATNEG half's own data (rule 2: the owner declares it) */
-#include "DWCi/DWCi_Np_CPUCopyFast.h"    /* the Np unit's own data (rule 2) */
+#include "DWCi/natneg.h"            /* the NATNEG half's own data (rule 2: the owner declares it) */
+#include "DWCi/dwc_auth_interface.h"    /* the Np unit's own data (rule 2) */
 
 #ifdef __cplusplus
 extern "C" {

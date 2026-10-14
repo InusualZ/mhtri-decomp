@@ -1,18 +1,18 @@
 /*
  * DWCi/dwc_nasfunc.c - the DWC NAS login / service locator front end and the GameSpy common code the DWC library
- * links behind it: the auth request callback, the dynamic array and hash table, the socket and platform wrappers,
+ * links behind it: the dynamic array and hash table, the socket and platform wrappers,
  * the memory hooks, the availability probe, the GT2 transport (API, connection, callbacks, buffer, messages).
  *
- * RANGE. `.text` 0x80509DB0..0x805113B0 (117 functions); `.data` 0x806307F0..0x806308A8; `.bss`
- *   0x807613B8..0x807614D8; `.sdata` 0x807942FC..0x80794358; `.sbss` 0x807957F8..0x80795820.
+ * RANGE. `.text` 0x8050A710..0x80511620 (119 functions); `.data` 0x806307F0..0x806308A8; `.bss`
+ *   0x807613B8..0x807614D8; `.sdata` 0x80794330..0x80794358; `.sbss` 0x807957F8..0x80795820.
  * FLAGS. `cflags_base`: the retail functions start 16-byte aligned (`gap_*` words between them, and
  *   `gti2CheckResponse`'s loop-alignment `nop`); measurement in docs/network.md.
  * NAMES. GameSpy SDK names where the body is the SDK's (darray `Array*`, hashtable `Table*`, gsMemory `gsi*`,
  *   gsPlatform `current_time`/`msleep`/`SocketStartUp`/`SocketShutDown`, GT2 `gt2*`/`gti2*`); `DWCi_Auth_EndProcess`
  *   is the function's own report string; the remaining `DWCi_*` names (socket wrappers, request/buffer rows named
- *   before the GT2 identification, the auth callback, `DWCi_Auth_CheckNandResult`) are GUESSes from their bodies.
+ *   before the GT2 identification, `DWCi_Auth_CheckNandResult`) are GUESSes from their bodies.
  *   GUESS (map name; the runtime dump has only a placeholder or another name at the address):
- *   GUESS: `DWCi_Auth_RequestCallback`, `strtok`, `gt2CreateSocket`, `gt2CloseSocket`, `gt2Think`, `gt2Listen`
+ *   GUESS: `strtok`, `gt2CreateSocket`, `gt2CloseSocket`, `gt2Think`, `gt2Listen`
  *   GUESS: `gt2Accept`, `gt2Reject`, `gt2Connect`, `gt2Send`, `gt2CloseConnection`, `gti2CloseAllConnectionsHardMap`
  *   GUESS: `DWCi_socketShutdown`, `gt2GetSocketSOCKET`, `gt2SetUnrecognizedMessageCallback`
  *   GUESS: `gti2NewOutgoingConnection`, `gti2StartConnectionAttempt`, `gti2AcceptConnection`, `gti2RejectConnection`
@@ -37,31 +37,29 @@
  *   GUESS: `DWCi_socketResolveAddress`, `DWCi_socketGetLastError`, `DWCi_socketSelect`, `DWCi_socketLookupHost`
  *   GUESS: `DWCi_socketHasData`, `DWCi_socketIsUsable`, `DWCi_socketGetLocalHostEntry`, `DWCi_hostAddressIsPrivate`
  *   GUESS: `SocketStartUp`, `SocketShutDown`, `current_time`, `msleep`, `gsiMemoryCallbacksSet`, `gsimalloc`
- *   GUESS: `gsirealloc`, `gsifree`
+ *   GUESS: `gsirealloc`, `gsifree`, `DWCi_sendControlFrame` (gti2SendClosed), `DWCi_appendTransfer`
+ *   GUESS: (gti2ResendMessage), `DWCi_flushRequest` (gti2Send)
  * SHAPES. GT2 message handling runs through 0/1 static inlines (one per message type, the keep-alive / resend /
  *   ack think steps, the delivery step) tested again by their callers (playbook idea 101); the dispatchers are
  *   if-chains, not switches; a 0/1 tail is spelled `return f(...) != 0;` where retail shows `neg/or/srwi`.
- *   The retail object is twelve SDK files (auth callback | nas | svl | darray | hashtable | socket | platform
+ *   The retail object is eleven SDK files (nas | svl | darray | hashtable | socket | platform
  *   | memory | available | gt2 auth | gt2 callback/connection/main/message | buffer). MWCC inlines any function
- *   defined earlier in one TU, so the source is ordered callers-first across those file boundaries (the auth
- *   callback, then GT2 main, connection, message, the exported `gti2ConnectionClosed`/`gti2ConnectionSendData`
+ *   defined earlier in one TU, so the source is ordered callers-first across those file boundaries (GT2 main,
+ *   connection, message, the exported `gti2ConnectionClosed`/`gti2ConnectionSendData`
  *   shapes, callbacks, buffer; the availability probe ahead of the socket layer) and the hashtable sits in a
  *   `dont_inline` block; same-file helpers the retail inlines are `static inline` (`ArrayNthInline`,
  *   `gti2ConnectionError`, `gti2SendClosedInline`, `gti2EndReliableMessageInline`, ...). Socket results go through
- *   `DWCi_socketResult`; POST/answer fields through `DWCI_AUTH_DECODE`.
- * RESIDUALS. `DWCi_Auth_RequestCallback` addresses `DWCi/DWCi_Np_CPUCopyFast.c`'s string pool: the retail auth TU
- *   extends to 0x8050A710, so this unit's first row belongs to it (not re-cut) and its strings land in this object's
- *   `.data`. The availability probe's three objects
- *   live in `DWCi/DWCi_NatNeg.c`'s `.bss`, so `DWCi_natProbeStart` cannot share one base register for them.
+ *   `DWCi_socketResult`. The GT2 message file's last three functions sit in a `dont_inline` block (retail calls
+ *   `DWCi_requestFrame` and the other message helpers out of line there).
+ * RESIDUALS. `DWCi_appendTransfer` writes the header bytes with `srawi`+`stb` where retail uses `extrwi`+`stbx`.
+ *   The availability probe's three objects
+ *   live in `DWCi/natneg.c`'s `.bss`, so `DWCi_natProbeStart` cannot share one base register for them.
  *   Register colouring and block order remain in the larger GT2 message handlers and the socket resolver.
- *   Relocation names that differ (relocdiff --callees): `DWCi_Auth_RequestCallback` saves from r23 (retail r19) and
- *   bases its strings on `DWCi_reportHttpDestroy` (retail `DWCi_authDataPath`, the Np pool - request net-c#6);
- *   `ArraySearch`, `DWCi_socketLookupHost`, `gti2GetResponse`, `gti2HandleReliablePacket`, `DWCi_requestFlush` save
+ *   Relocation names that differ (relocdiff --callees): `ArraySearch`, `DWCi_socketLookupHost`, `gti2GetResponse`, `gti2HandleReliablePacket`, `DWCi_requestFlush` save
  *   one register more or fewer than retail; `DWCi_socketLookupHost`, `DWCi_socketGetLocalHostEntry` and
  *   `DWCi_natProbeStart` address their statics from other bases (`DWCi_hostCache` / `DWCi_localAddresses` /
- *   `DWCi_availableCheck`) than retail. Flip blockers: `.sbss` 0x14 of 0x28 and `.sdata` 0x4A of 0x5C claimed.
- *   Saved-register helpers that differ (register pressure, not wrong callees): `DWCi_Auth_RequestCallback`
- *   `_savegpr_23`/`_restgpr_23` (retail `_savegpr_19`/`_restgpr_19`); `ArraySearch` and `DWCi_socketLookupHost`
+ *   `DWCi_availableCheck`) than retail. Flip blockers: `.sbss` 0x14 of 0x28 and `.sdata` 0x1A of 0x28 claimed.
+ *   Saved-register helpers that differ (register pressure, not wrong callees): `ArraySearch` and `DWCi_socketLookupHost`
  *   `_savegpr_22`/`_restgpr_22` (retail `_savegpr_23`/`_restgpr_23`); `gti2GetResponse` `_savegpr_24`/`_restgpr_24`
  *   (retail `_savegpr_23`/`_restgpr_23`); `gti2HandleReliablePacket` `_savegpr_25`/`_restgpr_25` (retail
  *   `_savegpr_26`/`_restgpr_26`); `DWCi_requestFlush` has no frame where retail calls `_savegpr_27`/`_restgpr_27`.
@@ -71,7 +69,7 @@
  */
 #include "DWCi/dwc_nasfunc.h"
 #include "DWCi/dwc_error.h"
-#include "DWCi/DWCi_Np_CPUCopyFast.h"
+#include "DWCi/dwc_auth_interface.h"
 #include "NAND/nand.h"
 #include "unsplit/OS.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
@@ -162,159 +160,6 @@ u8 DWCi_localAddresses[16][12];
 
 /* The GT2 challenge secret `gti2GetResponse` mixes into every response. */
 char DWCi_gt2SecretKey[] = "3b8dd8995f7c40a9a5c5b7dd5b481341";
-
-/* ---- the auth request callback (retail: the auth interface's TU, see the unit header) --------------- */
-
-/* Base64-decodes the value after `key` in `token` into `value` (NUL-terminated); answers the decoded length. */
-#define DWCI_AUTH_DECODE(key)                                                                     \
-    (decoded = DWCi_Base64Decode(&token[strlen(key)], strlen(token) - strlen(key), value, 0x100), \
-     value[decoded] = 0, decoded)
-
-/* 0x80509DB0 (0x960): the completion callback of the NAS request: keeps the response, then parses the
- * "key=value" lines (each value base64) into the state block and sets the request status. */
-void DWCi_Auth_RequestCallback(s32 result, struct NHTTPResponse* response, s32 size) {
-    DWCiStateBlock* state = (DWCiStateBlock*)DWCi_stateBlock;
-    char returnCode[8];
-    char* body;
-    char* token;
-    OSCalendarTime calendar;
-    char value[0x100];
-    s32 decoded;
-    s32 haveReturnCode;
-    s64 serverTime;
-    s32 code;
-
-    if (state->response != NULL) {
-        DWC_Printf(0x1000000, DWCi_reportHttpDestroy);
-        NHTTPDestroyResponse(state->response);
-    }
-    state->response = response;
-    DWC_Printf(0x1000000, " request_callback = %d\n", result);
-    if (result == 8) {
-        DWC_Printf(0x1000000, " nhttp canceled(%d)\n", result);
-        state->status = 2;
-        return;
-    }
-    if (result != 0) {
-        if (result == 14) {
-            DWC_Printf(0x1000000, " ssl error(%d)\n", NHTTPGetSSLError());
-        }
-        DWC_Printf(0x1000000, " nhttp error(%d)\n", result);
-        state->status = -20100;
-        state->saveImage.requestFailed = 1;
-        return;
-    }
-    code = NHTTPGetResultCode(response);
-    if (code != 200) {
-        DWC_Printf(0x1000000, " status code is not 200, but %d\n", code);
-        state->status = -23000 - code;
-        if (NHTTPGetBodyAll(response, (u32*)&body) > 0) {
-            DWC_Printf(0x1000000, "%s\n", body);
-        } else {
-            DWC_Printf(0x1000000, "no body\n", body);
-        }
-        return;
-    }
-    haveReturnCode = 0;
-    if (NHTTPGetBodyAll(response, (u32*)&body) > 0) {
-        DWC_Printf(0x1000000, " %s\n", body);
-        for (token = strtok(body, "&\r\n"); token != NULL; token = strtok(NULL, "&\r\n")) {
-            if (strncmp(token, "retry=", strlen("retry=")) == 0) {
-                DWC_Printf(0x1000000, " (%d) retry=%s\n", DWCI_AUTH_DECODE("retry="), value);
-            } else if (strncmp(token, "returncd=", strlen("returncd=")) == 0) {
-                decoded = DWCI_AUTH_DECODE("returncd=");
-                strcpy(returnCode, value);
-                DWC_Printf(0x1000000, " (%d) returncd=%s\n", decoded, value);
-                haveReturnCode = 1;
-            } else if (strncmp(token, "datetime=", strlen("datetime=")) == 0) {
-                decoded = DWCI_AUTH_DECODE("datetime=");
-                if (sscanf(value, "%04d%02d%02d%02d%02d%02d", &calendar.year, &calendar.mon, &calendar.mday,
-                           &calendar.hour, &calendar.min, &calendar.sec) != 6) {
-                    DWC_Printf(0x1000000, " cannot parse datetime: %s\n", value);
-                    serverTime = 0;
-                } else {
-                    calendar.mon -= 1;
-                    calendar.wday = 0;
-                    calendar.yday = 0;
-                    calendar.msec = 0;
-                    calendar.usec = 0;
-                    serverTime = OSCalendarTimeToTicks(&calendar);
-                }
-                state->serverTimeOffset = serverTime - OSGetTime();
-                DWC_Printf(0x1000000, " (%d) datetime=%s\n", decoded, value);
-            } else if (strncmp(token, "locator=", strlen("locator=")) == 0) {
-                decoded = DWCI_AUTH_DECODE("locator=");
-                strcpy(state->locator, value);
-                DWC_Printf(0x1000000, " (%d) locator=%s\n", decoded, value);
-            } else if (strncmp(token, "token=", strlen("token=")) == 0) {
-                decoded = DWCI_AUTH_DECODE("token=");
-                strcpy(state->token, value);
-                DWC_Printf(0x1000000, " (%d) token=%s\n", decoded, value);
-            } else if (strncmp(token, "challenge=", strlen("challenge=")) == 0) {
-                decoded = DWCI_AUTH_DECODE("challenge=");
-                strcpy(state->challenge, value);
-                DWC_Printf(0x1000000, " (%d) challenge=%s\n", decoded, value);
-            } else if (strncmp(token, "userid=", strlen("userid=")) == 0) {
-                decoded = DWCI_AUTH_DECODE("userid=");
-                sscanf(value, "%llu", &state->userId);
-                DWC_Printf(0x1000000, " (%d) userid=%llu\n", decoded);
-                state->saveImage.userId = state->userId;
-            } else if (strncmp(token, "svchost=", strlen("svchost=")) == 0) {
-                decoded = DWCI_AUTH_DECODE("svchost=");
-                strcpy(state->svl.svlhost, value);
-                DWC_Printf(0x1000000, " (%d) svlhost=%s\n", decoded, value);
-            } else if (strncmp(token, "servicetoken=", strlen("servicetoken=")) == 0) {
-                decoded = DWCI_AUTH_DECODE("servicetoken=");
-                strcpy(state->svl.svltoken, value);
-                DWC_Printf(0x1000000, " (%d) servicetoken=%s\n", decoded, value);
-            } else if (strncmp(token, "statusdata=", strlen("statusdata=")) == 0) {
-                decoded = DWCI_AUTH_DECODE("statusdata=");
-                if (value[0] == 'Y') {
-                    state->svl.status = 1;
-                } else {
-                    state->svl.status = 0;
-                }
-                DWC_Printf(0x1000000, " (%d) statusdata=%s\n", decoded, value);
-            } else if (strncmp(token, "prwords=", strlen("prwords=")) == 0) {
-                DWCI_AUTH_DECODE("prwords=");
-                strcpy(state->saveImage.profileWords, value);
-            } else {
-                DWC_Printf(0x1000000, " unknown token : %s\n", token);
-            }
-        }
-    }
-    if (!haveReturnCode) {
-        DWC_Printf(0x1000000, " no return code.\n");
-        state->status = -20101;
-        return;
-    }
-    code = strtol(returnCode, NULL, 10);
-    if (code == 0 && DWCi_runtime->mode_0x59C8 != 3) {
-        DWC_Printf(0x1000000, " cannot parse returncd(%s)\n", returnCode);
-        state->status = -20101;
-        return;
-    }
-    if (code == 1 && DWCi_runtime->mode_0x59C8 == 3) {
-        DWC_Printf(0x1000000, " prof server maintenance(%s)\n", returnCode);
-        state->status = -33001;
-        return;
-    }
-    if (code >= 100) {
-        if (DWCi_runtime->mode_0x59C8 == 3) {
-            DWC_Printf(0x1000000, " prof server retruns error (%d) but ignored by DWC library\n", code);
-        } else {
-            DWC_Printf(0x1000000, " server retruns error (%d)\n", code);
-            state->status = -20000 - code;
-            return;
-        }
-    }
-    if (code == 40) {
-        state->loginKind = 2;
-    } else {
-        state->loginKind = 1;
-    }
-    state->status = 1;
-}
 
 /* ---- GT2 (the GameSpy reliable UDP transport): the public API, the connection, the callbacks, the buffer -- */
 /* The retail GT2 files are separate TUs that call each other and the darray/challenge code; they are defined
@@ -1667,6 +1512,92 @@ int DWCi_requestFrame(DWCiReq* req, void* p, u32 len) {
 void gti2ConnectionClosed(DWCiReq* connection) {
     gti2ConnectionClosedInline(connection);
 }
+
+/* The GT2 message file's last three functions: retail calls the earlier message helpers out of line. */
+#pragma push
+#pragma dont_inline on
+/* 0x805113B0 - the handshake write: { 0x0003 } when the connection is in mode 2, then the shared
+ * 0xFEFE constant and the 0x68 terminator, handed to the send path. */
+u32 DWCi_sendControlFrame(DWCiReq* req)
+{
+    DWCiConn* conn;
+    u16 port;
+    u32 addr;
+    u8 buf[32];
+    u16 word;
+    int n;
+
+    conn = req->conn;
+    port = req->port;
+    addr = req->addr;
+    n = 0;
+    if (conn->protocolType == 2) {
+        word = 3;
+        memcpy(buf, &word, 2);
+        n = 2;
+    }
+    memcpy(buf + n, &DWCi_protocolMagic, 2);
+    n += 2;
+    buf[n] = 0x68;
+    return DWCi_sendTo(conn, addr, port, buf, n + 1) != 0;
+}
+
+/* 0x80511470 - the send-buffer append: stamp the two header bytes at the connection's header offset,
+ * hand the payload to the framer, then stamp the transfer's timestamp and, for a mode-2 request,
+ * the "stamped" mark. */
+u32 DWCi_appendTransfer(DWCiReq* req, DWCiXfer* xfer)
+{
+    DWCiConn* conn;
+    u16 value;
+    u8* buf;
+    u32 off;
+
+    conn = req->conn;
+    value = req->expectedSerialNumber;
+    buf = req->outgoingBuffer.buffer;
+    off = xfer->offset + conn->protocolOffset;
+    buf[off + 5] = (u8)(value >> 8);
+    buf[off + 6] = (u8)value;
+    if (DWCi_requestFrame(req, req->outgoingBuffer.buffer + xfer->offset, xfer->length) == 0) {
+        return 0;
+    }
+    xfer->stamp = req->lastSend;
+    if (req->outgoingBuffer.buffer[xfer->offset + req->conn->protocolOffset + 2] == 2) {
+        req->challengeTime = req->lastSend;
+    }
+    return 1;
+}
+
+/* 0x80511530 - the flush path: when the flag is clear, hand the request to DWCi_requestFlush; otherwise
+ * look the block up by the size byte, and if it is not already complete, append it and re-frame the
+ * last queue entry. */
+u32 DWCi_flushRequest(DWCiReq* req, u32 a, u32 b, u32 flag)
+{
+    u32 out;
+    u32 count;
+    u32* item;
+    u32 ret;
+
+    if (flag != 0) {
+        if (DWCi_requestBlockState(req, 0, b + 7, &out) == 0) {
+            return 0;
+        }
+        if (out != 0) {
+            return 1;
+        }
+        DWCi_bufferFrame(&req->outgoingBuffer, (const u8*)a, b);
+        count = ArrayLength(req->outgoingBufferMessages);
+        item = ArrayNth(req->outgoingBufferMessages, count - 1);
+        ret = DWCi_requestFrame(req, req->outgoingBuffer.buffer + item[0], item[1]);
+        if (ret == 0) {
+            return 0;
+        }
+        req->pendingAck = 0;
+        return 1;
+    }
+    return DWCi_requestFlush(req, (u8*)a, b);
+}
+#pragma pop
 
 /* ---- gt2Callback: every callback runs with the nesting levels raised; a socket closed meanwhile is freed -- */
 
