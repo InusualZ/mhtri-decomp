@@ -11,7 +11,9 @@
  *   line. The function starts of this band are packed to 4 bytes.
  * NAMES. the BTE source's.
  * RESIDUALS. l2c_link_sec_comp: the target keeps -(status == 0) in r31 and adds 8 inside the loop; this source
- *   folds the whole event out of the loop (an event local and an inline ternary measured the same).
+ *   folds the whole event out of the loop (an event local of any width, an inline ternary, a while loop, scoped
+ *   opt_loop_invariants/opt_strength_reduction/opt_propagation off measured the same; two calls or a switch are
+ *   worse).
  *   l2c_link_adjust_allocation: yy and p_lcb take r28/r29 swapped against the target (every declaration
  *   order, a combined for-init and a separate first-loop counter measured the same). flipcheck also
  *   refuses on LogMsg_6, btm_acl_created, btm_cb, btsnd_hcic_accept_conn and btu_cb: the map rows the source names are

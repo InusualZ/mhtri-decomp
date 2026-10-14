@@ -12,8 +12,9 @@
  * NAMES. the map's, which are the BTE source's; sdp_cb (.bss 0x8073D360) is a GUESS from the BTE source's control
  *   block name (every SDP unit reads its trace level at +0x4630).
  * RESIDUALS. sdp_init: the target stores the three NULL callbacks from the r29 zero it keeps for the trace level; this
- *   source stores them from a rematerialised `li r0,0` (0x1A4 B for 0x1A0 B), and a u32 zero that covers the pointers
- *   too swaps r30/r31 (string base and sdp_cb). flipcheck refuses on that 4 B .text gap. String relocations name the
+ *   source stores them from a rematerialised `li r0,0` (0x1A4 B for 0x1A0 B), and a 32-bit zero (int/u32/s32) that covers the pointers
+ *   too stores them from r29 but swaps r30/r31 (string base and sdp_cb) at every placement of its assignment; a
+ *   u8/u16 zero cast to the pointers and a separate NULL local keep or worsen the gap. flipcheck refuses on that 4 B .text gap. String relocations name the
  *   compiler's local pool where the map has lbl_ labels.
  * SHAPES. plain C; the L2CAP callbacks are static and reach L2CAP only through the registration in sdp_init.
  *   sdp_init: the trace level is a u8 local set before the security registrations under a scoped

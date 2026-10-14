@@ -13,7 +13,8 @@
  * RESIDUALS. rfc_send_msc: the target schedules the command byte, the length and the DLCI byte in another order and
  *   with other registers (same instructions); moving the length decision before the buffer setup or after the command
  *   byte measures worse. rfc_send_test: the target reuses r4 (is_command, dead after the CR bit) for offset - 2 where
- *   this source takes r6. The rest of .text, the .data and the .sdata are byte-identical to the target.
+ *   this source takes r6. Neither moves with the BT_HDR payload spelling, local
+ *   declaration order or a scoped optimization_level/scheduling/opt_* pragma. The rest of .text, the .data and the .sdata are byte-identical to the target.
  * SHAPES. plain C; rfc_send_nsc is static and inlined into rfc_process_mx_message, its only caller. The frame bytes
  *   are reached through BT_BUF's data, except in rfc_send_buf_uih, which spells the payload `(u8*)&p_buf[1]` (the
  *   byte after the header): there the data[] spelling precomputes the +8 and stores with stbux, where the target adds

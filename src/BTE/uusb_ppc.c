@@ -19,15 +19,18 @@
  *   0x80793D28 uusb_open_pending, 0x80793D2C uusb_fd, 0x80795008 uusb_dev_open, 0x80795009 uusb_initialised,
  *   0x8079500C uusb_bus_index, 0x80795010 uusb_use_bus_index, 0x80795014 uusb_use_custom_ids, 0x80795018 /
  *   0x8079501C uusb_custom_vid / uusb_custom_pid (the .sbss switches nothing in the DOL sets).
- * RESIDUALS. uusb_evt_read_cback / uusb_acl_read_cback: retail tests the buffer against NULL as `li r0,0` +
- *   `cmplw`, one instruction more than the `cmpwi` every spelling tried gives (13 forms: casts, `0u`, `(u32)`, a
- *   NULL local, a const, an inline helper, the C++ front end). UUSB_Open: the vendor id lands in r0 and the bus
+ * RESIDUALS. uusb_evt_read_cback: retail tests the buffer against a pointer-typed NULL (`cmplw` on a register
+ *   zero, the `(BT_HDR*)NULL` spelling); retail rematerialises that zero with `li r0,0` where ours reuses the r5 zero
+ *   of the evt_read_pending store (scoped opt_common_subs/opt_propagation/global_optimizer/opt_lifetimes off and a
+ *   NULL local do not split it). UUSB_Open: the vendor id lands in r0 and the bus
  *   index in r3 where ours swaps them (r4 / r0). UUSB_Write: the result, the copy target and the buffer take r28 /
  *   r27 / r26 where ours takes r26 / r28 / r27 (declaration order and an if/else chain do not move it). The
  *   control block is 0x4C bytes (UUSB_Open clears that much) while the map's object is 0x60, the gap being the
  *   32-byte alignment of the receive stacks.
  * SHAPES. plain C; the receive pipes are re-armed by the static inline helpers uusb_start_evt_read and
- *   uusb_start_acl_read, which the read callbacks and UUSB_Register inline.
+ *   uusb_start_acl_read, which the read callbacks and UUSB_Register inline. The read callbacks test their buffers
+ *   against `(BT_HDR*)NULL`: retail's unsigned `cmplw` comes from a pointer-typed null, while types.h's int NULL
+ *   gives `cmpwi`.
  */
 
 #include "BTE/uusb_ppc.h"
@@ -197,7 +200,7 @@ void uusb_evt_read_cback(s32 result, BT_HDR* p_msg) {
         return;
     }
 
-    if (p_msg != NULL) {
+    if (p_msg != (BT_HDR*)NULL) {
         if (result <= 0) {
             GKI_freebuf(p_msg);
         } else {
@@ -240,7 +243,7 @@ void uusb_acl_read_cback(s32 result, BT_HDR* p_msg) {
         } else {
             memcpy(p_new, p_msg, ((p_msg->len + p_msg->offset + sizeof(BT_HDR)) & ~3) + 4);
             p_new = l2cap_link_chk_pkt_start(p_new);
-            if (p_new != NULL && l2cap_link_chk_pkt_end()) {
+            if (p_new != (BT_HDR*)NULL && l2cap_link_chk_pkt_end()) {
                 OSSwitchFiberEx((u32)p_new, 0, 0, 0, (void (*)(void))bte_hcisu_rcv_msg,
                                 uusb_acl_stack + UUSB_FIBER_STACK_SIZE);
             }

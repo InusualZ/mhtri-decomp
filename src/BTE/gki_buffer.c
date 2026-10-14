@@ -16,12 +16,13 @@
  * RESIDUALS. GKI_get_buf_start is dead-stripped in the target: only its "bad addr" message survives in .data, so its body and
  *   error code are the BTE reference's, unmeasured. The object carries the out-of-line copies of the helpers
  *   (gki_chk_buf_damage, GKI_get_buf_start, gki_add_to_pool_list, GKI_set_pool_permission, gki_remove_from_pool_list,
- *   0x3F8 B with alignment), which the linker is expected to dead-strip (unmeasured; flipcheck refuses on the +0x3F8
- *   .text size); the "GKI_get_buf_start:: bad addr" string retail keeps must survive that strip. String relocations
- *   name the anonymous pool where the map has lbl_80612D18/lbl_80612D30/... labels. gki_cb is one 0x28AE0 B object
- *   where the map splits the range into four labels; three of them, lbl_8070DF3E, lbl_8072703E and lbl_80731C74, are
- *   referenced by .data R_PPC_ADDR32 relocations from mh3_pad.cpp (0x8057CDF0) and PMIC/pmic.c (0x8063871C,
- *   0x80644670), likely false pointer words, and block a flip until they are suppressed or defined.
+ *   0x3F8 B with alignment), which the link dead-strips while keeping the "GKI_get_buf_start:: bad addr" string.
+ *   String relocations name the anonymous pool where the map has lbl_80612D18/lbl_80612D30/... labels. gki_cb is one
+ *   0x28AE0 B object where the map splits the range into four labels. One of them, lbl_8070DF3E (gki_cb+0x115E), is
+ *   the target of a false R_PPC_ADDR32 that dtk reads in mh3_pad.cpp's .data image bytes (0x8057CDF0, value
+ *   0x8070DF3E); it blocks a flip (the link reports lbl_8070DF3E undefined) until
+ *   config.yml's block_relocations covers that word (request bte-res-b#1); with that block and this unit Matching the
+ *   link gives the retail DOL hash.
  * SHAPES. plain C; the callees GKI_disable, GKI_enable, GKI_get_taskid, GKI_os_malloc, GKI_os_free, GKI_send_event and
  *   GKI_exception are declared in BTE/gki_time.h. gki_chk_buf_damage sits before GKI_freebuf and spells the size lookup
  *   out itself (calling GKI_get_buf_size, defined after GKI_freebuf, leaves it un-inlined there); it,

@@ -3,20 +3,22 @@
  *   stored link key requests and their completions, the returned link keys event and the device status report.
  *
  * RANGE. .text 0x80484224-0x80484828 (9 functions, 0x604 B); .data 0x806140E0-0x806141E0; .sdata
- *   0x80793D8C-0x80793DA0. Strong start: the .data starts after a 4-byte pad beyond 4-byte alignment (0x806140DC ->
- *   0x806140E0) and BTM_WritePageTimeout is its first reader, the first function after btm_devctl.c's last .data
- *   reader. The end is weak: the next .data pad seam (0x806141E0, BTM_SetDiscoverability) allows any cut in
- *   [0x8048453C, 0x8048495C]; it is placed after btm_report_device_status, before the btm_discovery_db_* family. The
+ *   0x80793D8C-0x80793DA0. The start is not a seam: the 4-byte pad at 0x806140DC is emitted inside one TU (see
+ *   RESIDUALS), so this range continues btm_devctl.c. The end is weak: the next .data pad seam (0x806141E0,
+ *   BTM_SetDiscoverability) allows any cut in [0x8048453C, 0x8048495C]; it is placed after btm_report_device_status, before the btm_discovery_db_* family. The
  *   .sdata strings "TRUE"/"FALSE" (0x80793D8C, 0x80793D94) are read only by BTM_ReadStoredLinkKey and
  *   BTM_DeleteStoredLinkKey.
  * FLAGS. GC/3.0a5.2 with `cflags_nw4r`, as the matched BTE units (see BTE/l2c_utils.c).
- * NAMES. the map's, which are the BTE source's. The file name is a GUESS from its functions: the later BTE source keeps
- *   them in btm_devctl.c, but the .data pad seam puts them in a separate file whose name the binary does not carry.
- * RESIDUALS. the code matches; a trial flip links the .data 0x40 B
- *   short: mwld strips the string objects of the stripped BTM_WriteVoiceSettings/BTM_EnableTestMode, while retail keeps
- *   them. The objects are reached by @N relocations only (no kept function forms a section-relative string base), so
- *   nothing keeps them; the retail shape that does is unknown. BTM_WriteVoiceSettings and BTM_EnableTestMode are GUESS
- *   bodies around their trace strings.
+ * NAMES. the map's, which are the BTE source's. The file name is a GUESS from its functions; the BTE source keeps
+ *   them in btm_devctl.c.
+ * RESIDUALS. the code matches; a flip links the .data 0x40 B short: mwld strips the @N string objects of the stripped
+ *   BTM_WriteVoiceSettings/BTM_EnableTestMode, since every kept function here reads one string through its own @N
+ *   symbol. This range is a fragment of BTE/btm_devctl.c (the BTE source keeps these functions there, in this order
+ *   after btm_vendor_specific_evt): the two files compiled as one TU emit .data and .sdata byte-identical to the
+ *   target's btm_devctl+btm_link_key ranges (0x25A of 0x260 B, the rest alignment; the 4-byte gap at 0x806140DC is
+ *   the compiler's own), and btm_devctl's multi-string functions address the pool section-relative, which keeps
+ *   every string of the TU. The fix is the fold, not a source shape. BTM_WriteVoiceSettings and BTM_EnableTestMode
+ *   are GUESS bodies around their trace strings.
  * SHAPES. plain C; the callback is btm_cb.p_stored_link_key_cmpl_cb (BTE/btm_main.h).
  */
 
