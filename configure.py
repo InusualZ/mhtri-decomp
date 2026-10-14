@@ -889,10 +889,10 @@ config.libs = [
         "objects": [
             # Phase 4 stubs: MSL/runtime candidate units with no bodies yet.
             Object(Matching, "MSL/strlen.cpp"),
-            Object(NonMatching, "Runtime.PPCEABI.H/__va_arg.cpp"),
+            Object(Matching, "Runtime.PPCEABI.H/__va_arg.cpp"),
             Object(Matching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
-            Object(NonMatching, "Runtime.PPCEABI.H/CPlusLibPPC.cpp"),
-            Object(NonMatching, "Runtime.PPCEABI.H/runtime.cpp"),
+            Object(Matching, "Runtime.PPCEABI.H/CPlusLibPPC.cpp"),
+            Object(Matching, "Runtime.PPCEABI.H/runtime.cpp"),
             # The MSL C library run recut by file (unit headers of src/MSL_C/*.c carry the evidence).
             Object(NonMatching, "Runtime.PPCEABI.H/ExceptionPPC.cp"),
             Object(NonMatching, "MSL_C/GCN_Mem_Alloc.c"),
@@ -1273,7 +1273,7 @@ config.libs = [
             Object(NonMatching, "MTX/mtx44.c", cflags=cflags_base),
             Object(Matching, "MTX/vec.c", cflags=cflags_base),
             Object(NonMatching, "MTX/quat.c", cflags=cflags_base),
-            Object(NonMatching, "NAND/nand.c", cflags=cflags_base),
+            Object(Matching, "NAND/nand.c", cflags=cflags_base),
             Object(Matching, "NAND/NANDCore.c", cflags=cflags_base),
             Object(NonMatching, "NAND/NANDCheck.c", cflags=cflags_base),
             Object(NonMatching, "NAND/NANDLogging.c", cflags=cflags_base),
@@ -1308,7 +1308,7 @@ config.libs = [
             Object(Matching, "OS/OSNandbootInfo.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSPlayTime.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSLaunch.c", cflags=cflags_base),
-            Object(NonMatching, "Runtime.PPCEABI.H/__init_user.c", cflags=cflags_base),
+            Object(Matching, "Runtime.PPCEABI.H/__init_user.c", cflags=cflags_base),
             Object(Matching, "PAD/PADClamp.c", cflags=cflags_base),
             Object(NonMatching, "PAD/pad.c", cflags=cflags_base),
             Object(NonMatching, "RSO/rso_notify.c"),
