@@ -257,6 +257,47 @@ typedef struct WPADCB {
     /* +0x9AC */ u8 pad_0x9AC[0x14];
 } WPADCB; /* size: 0x9C0 */
 
+/* size: 0x2A - the core status record WPADRead copies out: the buttons, the accelerometer and the four pointer objects. */
+typedef struct WPADStatus {
+    /* +0x00 */ u16 button;
+    /* +0x02 */ s16 accX;
+    /* +0x04 */ s16 accY;
+    /* +0x06 */ s16 accZ;
+    /* +0x08 */ WPADDpdObject obj[4];
+    /* +0x28 */ u8 dev;
+    /* +0x29 */ s8 err;
+} WPADStatus; /* size: 0x2A */
+
+/* size: 0x32 - the core record followed by the Nunchuk-style extension's accelerometer and stick. */
+typedef struct WPADFSStatus {
+    /* +0x00 */ WPADStatus core;
+    /* +0x2A */ s16 fsAccX;
+    /* +0x2C */ s16 fsAccY;
+    /* +0x2E */ s16 fsAccZ;
+    /* +0x30 */ s8 fsStickX;
+    /* +0x31 */ s8 fsStickY;
+} WPADFSStatus; /* size: 0x32 */
+
+/* size: 0x36 - the core record followed by the Classic-style extension's buttons, sticks and triggers. */
+typedef struct WPADCLStatus {
+    /* +0x00 */ WPADStatus core;
+    /* +0x2A */ u16 clButton;
+    /* +0x2C */ s16 clLStickX;
+    /* +0x2E */ s16 clLStickY;
+    /* +0x30 */ s16 clRStickX;
+    /* +0x32 */ s16 clRStickY;
+    /* +0x34 */ u8 clTriggerL;
+    /* +0x35 */ u8 clTriggerR;
+} WPADCLStatus; /* size: 0x36 */
+
+/* size: 0x34 - the core record followed by the balance board's four load cells, temperature and battery. */
+typedef struct WPADBLStatus {
+    /* +0x00 */ WPADStatus core;
+    /* +0x2A */ u16 press[4];
+    /* +0x32 */ s8 temp;
+    /* +0x33 */ u8 battery;
+} WPADBLStatus; /* size: 0x34 */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -316,6 +357,7 @@ void WPADSetSpeakerVolume(u8 volume);
 u8 WPADGetDpdSensitivity(void);
 s32 WPADIsDpdEnabled(s32 chan);
 u8 WPADGetDpdFormat(s32 chan);
+s32 WPADControlDpd(s32 chan, u32 command, WPADCallback callback);
 void wpadApplyDpdFormat(s32 chan);
 s32 WPADiSendSetReportType(WPADCmdQueue* queue, u32 type, s32 onChangeOnly, WPADCallback callback);
 void WPADiClearQueue(WPADCmdQueue* queue);
@@ -368,7 +410,7 @@ void wpadExtCalibrationReadDone(s32 chan, s32 result);
 void wpadExtIdReadDone(s32 chan, s32 result);
 void wpadDpdCalibrationReadDone(s32 chan, s32 error, s32 which);
 void wpadCopyTitleString(const u16* title);
-s32 wpadSendWbcCommand(s32 chan, s8 command, WPADCallback callback);
+s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback);
 void wpadBulkWriteNext(s32 chan, s32 result);
 void wpadBulkWriteFirst(s32 chan, s32 result);
 s32 wpadBulkWrite(s32 chan, const void* src, u16 size, u32 addr, WPADCallback callback); /* untyped: byte range */
@@ -400,10 +442,10 @@ u32 WPADiGetReserved2(void);
 u32 WPADiGetReserved3(void);
 s32 WPADiReturnZeroA(void);
 s32 WPADiReturnZeroB(void);
-s32 WPADiReturnZeroC(void);
-s32 WBCReadDummy(void);
-s32 WBCSetZEROPointDummy(void);
-s32 WBCGetTGCWeightDummy(void);
+s32 WPADiReturnZeroC(u8 battery);
+s32 WBCReadDummy(WPADBLStatus* status, f64* weight, s32 count);
+s32 WBCSetZEROPointDummy(f64* zero, s32 count);
+s32 WBCGetTGCWeightDummy(f64 weight, f64* corrected, WPADBLStatus* status);
 
 #ifdef __cplusplus
 }

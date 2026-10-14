@@ -12,6 +12,6 @@
  *   `-fp_contract on` and 45 insns with 0 fused under `off`, the target's opcode sequence.
  * RESIDUALS. the functions read tunables in `mh3_pad.cpp`'s `.sdata` run (0x80790EA0..0x80790ED4) and `.sbss`
  *   0x80794800 and write them from `KPADInit`: an extern pair the registered claims place in the
- *   neighbouring unit. No body is written (26 functions), the largest `fn_804BF890` at 0x804BF890 (0x8D0 B);
+ *   neighbouring unit. No body is written (26 functions), the largest `read_kpad_ext` at 0x804BF890 (0x8D0 B);
  *   `python tools/units/sweepcomments.py --unit KPAD/kpad.c` lists them.
  */

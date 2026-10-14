@@ -51,6 +51,24 @@ void* word_copy_return_dst(void *out /* untyped: a raw word the callee copies by
  * (rule 2: this range owns the address), whose `fn_802BECD0` gates the second light work on it. */
 s32 screen_split_mode_ck(void);
 
+/* The KPAD tunables in this unit's .sdata (0x80790EA0..0x80790ED3) and .sbss (0x80794800): KPAD/kpad.c reads them
+ * and KPADInitEx writes kp_obj_interval, kp_err_dist_max and kp_err_dist_min.  SDK names by value pattern; the
+ * order of kp_ah_circle_pw and kp_ah_circle_radius is a GUESS. */
+extern f32 kp_obj_interval;      /* 0x80790EA0: 0.2 */
+extern f32 kp_acc_horizon_pw;    /* 0x80790EA4: 0.05 */
+extern f32 kp_ah_circle_pw;      /* 0x80790EA8: 0.06 */
+extern u16 kp_ah_circle_ct;      /* 0x80790EAC: 100 */
+extern f32 kp_ah_circle_radius;  /* 0x80790EB0: 0.07 */
+extern f32 kp_err_outside_frame; /* 0x80790EB4: 0.05 */
+extern f32 kp_err_dist_max;      /* 0x80790EB8: 3.0 */
+extern f32 kp_err_dist_speed;    /* 0x80790EBC: 0.04 */
+extern f32 kp_err_first_inpr;    /* 0x80790EC0: 0.9 */
+extern f32 kp_err_next_inpr;     /* 0x80790EC4: 0.9 */
+extern f32 kp_err_acc_inpr;      /* 0x80790EC8: 0.9 */
+extern f32 kp_err_up_inpr;       /* 0x80790ECC: 0.7 */
+extern f32 kp_err_near_pos;      /* 0x80790ED0: 0.1 */
+extern f32 kp_err_dist_min;      /* 0x80794800 (.sbss) */
+
 #ifdef __cplusplus
 /* 0x80040954 - releases every loaded sub-overlay and resets the loader state (GUESS name). */
 void rso_overlay_release_all(void);

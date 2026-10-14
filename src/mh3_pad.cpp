@@ -166,8 +166,8 @@ extern f32 lbl_80795AE4;
 /* --- helpers owned by other units (rule 2 headers included above) --- */
 extern void DCFlushRange(void* addr, u32 size);
 extern void fn_804DAF94(void* module);
-extern void fn_804C08A0(void);
-extern void fn_804C0D00(void);
+extern void KPADInit(void);
+extern void KPADShutdown(void);
 extern void fn_804ED5A0(void);
 extern void fn_804ED5D0(void);
 extern void fn_80043728(void);
@@ -737,7 +737,7 @@ void set_menu_key_ad_flag(u8 chan, bool flag)
 void initKPAD(void)
 {
     if (lbl_807947F0 == 0) {
-        fn_804C08A0();
+        KPADInit();
         lbl_807947F0 = 1;
     }
 }
@@ -745,7 +745,7 @@ void initKPAD(void)
 void shutdownKPAD(void)
 {
     if (lbl_807947F0 != 0) {
-        fn_804C0D00();
+        KPADShutdown();
         lbl_807947F0 = 0;
     }
 }

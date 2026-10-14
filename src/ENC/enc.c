@@ -11,6 +11,6 @@
  *   from; unmeasured until bodies exist.
  * NAMES. the unit name is a GUESS (the library's first source file); the two converters and the validator keep `fn_`
  *   names in the map.
- * RESIDUALS. No body is written (9 functions), the largest `fn_804AEDF0` at 0x804AEDF0 (0x314 B); `python
+ * RESIDUALS. No body is written (9 functions), the largest `ENCiConvertUtf8ToUtf16` at 0x804AEDF0 (0x314 B); `python
  *   tools/units/sweepcomments.py --unit ENC/enc.c` lists them.
  */

@@ -31,7 +31,8 @@
  *   `wpadSamplingFiber` (0x804EC650), `wpadInitSequence` (0x804ED880), `wpadAccCalibrationReadDone` (0x804F3150),
  *   `wpadExtCalibrationReadDone` (0x804F3C40), `wpadExtIdReadDone` (0x804F4180).  GUESS names `wpadStickDeadzoneSquare`, `wpadStickDeadzoneCircle`
  *   (the dead zone of a stick pair on 8-bit or 16-bit axes) and `wpadClampAxes` (the accelerometer axes against a full-scale limit).
- *   `fn_` names remain on the 0x804F14A0,
+ *   GUESS `WPADControlDpd` (0x804F14A0, unwritten: the SDK name by shape - KPAD's sampling callback passes a channel, a dpd command
+ *   byte and a callback, and the body reads the dpd-enabled flag and the wanted format).  `fn_` names remain on the
  *   0x804F72C0, 0x804F79B0, 0x804F8380 and 0x804F84E0 rows.  Struct fields
  *   are named from use; a `unused_0xNN` field is written but never read by a written body.  Statics are named from use; the
  *   `.sbss` rows `wpadChanStateA/B` and the `.bss` rows at 0x8075EA00.. are not understood yet.  Foreign names given here:
@@ -39,7 +40,7 @@
  *   `WUDSetHidRecvCallback`, `WUDSetHidConnCallback`, `WUDIsSyncing`, `WUDIsHistoryAddr`, from the `WUD...()` log strings
  *   where one exists), SC (`SCGetWpadMotorMode`, `SCGetWpadSensorBarPosition`, `SCGetWpadSpeakerVolume`), `OSReturnToMenuPending`.
  * RESIDUALS. Written: 119 of 131 rows, 59 at 100 %; 12 rows are not attempted (0x804EBAF0, 0x804EC650, 0x804ED880, 0x804EF900
- *   `WPADControlSpeaker`, 0x804F14A0, 0x804F3150, 0x804F3C40, 0x804F4180, 0x804F72C0, 0x804F79B0, 0x804F8380, 0x804F84E0).
+ *   `WPADControlSpeaker`, 0x804F14A0 `WPADControlDpd`, 0x804F3150, 0x804F3C40, 0x804F4180, 0x804F72C0, 0x804F79B0, 0x804F8380, 0x804F84E0).
  *   `wpadStickDeadzoneSquare` keeps r31 for the sign copy where the target does not, and `wpadClampAxes` differs in the float register
  *   numbering and in the .sdata2 constant names.  The new report decoders re-read the sample pointer per statement in the original
  *   (`wpadDecodeExtBoard` 2 %, `wpadDecodeDpdInterleaved` 53 %: the source's statement order differs and the original keeps no
@@ -211,25 +212,25 @@ s32 WPADiReturnZeroB(void)
     return 0;
 }
 
-s32 WPADiReturnZeroC(void)
+s32 WPADiReturnZeroC(u8 battery)
 {
     return 0;
 }
 
 /* The balance board read stub: logs and fails. */
-s32 WBCReadDummy(void)
+s32 WBCReadDummy(WPADBLStatus* status, f64* weight, s32 count)
 {
     WPADiDebugPrint("WBCReadDummy\n");
     return -1;
 }
 
-s32 WBCSetZEROPointDummy(void)
+s32 WBCSetZEROPointDummy(f64* zero, s32 count)
 {
     WPADiDebugPrint("WBCSetZEROPointDummy\n");
     return -1;
 }
 
-s32 WBCGetTGCWeightDummy(void)
+s32 WBCGetTGCWeightDummy(f64 weight, f64* corrected, WPADBLStatus* status)
 {
     WPADiDebugPrint("WBCGetTGCWeightDummy\n");
     return -1;
@@ -2809,7 +2810,7 @@ void wpadReportInterleavedB(u8 chan, u8* report, WPADSample* sample)
 }
 
 /* Sends the balance-board handshake bytes to the extension register through the write queue. */
-s32 wpadSendWbcCommand(s32 chan, s8 command, WPADCallback callback)
+s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback)
 {
     WPADCB* cb = wpadCBTable[chan];
     u32 level = OSDisableInterrupts();
