@@ -234,8 +234,8 @@ void AXFXReverbHiExpCallback(AXFXBuffer* buffer, AXFXReverbHi* reverb)
                 in = (f32)*chan[c];
             }
             line = (f32*)reverb->delay0[c];
-            early_sum = reverb->coef0 * line[reverb->idx0] + reverb->coef1 * line[reverb->idx1] + reverb->coef2 * line[reverb->idx2];
-            line[reverb->idx2] = in;
+            early_sum = reverb->coef0 * line[reverb->early_idx[0]] + reverb->coef1 * line[reverb->early_idx[1]] + reverb->coef2 * line[reverb->early_idx[2]];
+            line[reverb->early_idx[2]] = in;
             if (reverb->length1 != 0) {
                 line = (f32*)reverb->delay1[c];
                 delayed = line[reverb->idx3];
@@ -293,14 +293,10 @@ void AXFXReverbHiExpCallback(AXFXBuffer* buffer, AXFXReverbHi* reverb)
                 *fused2++ = (s32)(res[2] * reverb->params.a.early_gain);
             }
         }
-        if (++reverb->idx0 >= reverb->length0) {
-            reverb->idx0 = 0;
-        }
-        if (++reverb->idx1 >= reverb->length0) {
-            reverb->idx1 = 0;
-        }
-        if (++reverb->idx2 >= reverb->length0) {
-            reverb->idx2 = 0;
+        for (j = 0; j < 3; j++) {
+            if (++reverb->early_idx[j] >= reverb->length0) {
+                reverb->early_idx[j] = 0;
+            }
         }
         if (reverb->length1 != 0) {
             if (++reverb->idx3 >= reverb->length1) {
@@ -472,11 +468,11 @@ BOOL AXFXReverbHiExpApplySettings(AXFXReverbHi* reverb)
     }
     reverb->length0 = sHiExpModeLength[reverb->mode][2];
     len = reverb->length0;
-    reverb->idx0 = len - sHiExpModeLength[reverb->mode][0];
+    reverb->early_idx[0] = len - sHiExpModeLength[reverb->mode][0];
     reverb->coef0 = reverb->out_gain * sHiExpModeGain[reverb->mode][0] * 0.6f;
-    reverb->idx1 = len - sHiExpModeLength[reverb->mode][1];
+    reverb->early_idx[1] = len - sHiExpModeLength[reverb->mode][1];
     reverb->coef1 = reverb->out_gain * sHiExpModeGain[reverb->mode][1] * 0.6f;
-    reverb->idx2 = len - sHiExpModeLength[reverb->mode][2];
+    reverb->early_idx[2] = len - sHiExpModeLength[reverb->mode][2];
     reverb->coef2 = reverb->out_gain * sHiExpModeGain[reverb->mode][2] * 0.6f;
     reverb->idx3 = 0;
     reverb->length1 = (u32)(32000.0f * preDelay);

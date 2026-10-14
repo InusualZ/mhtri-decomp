@@ -7,8 +7,7 @@
  *    (0x80522E00).
  * FLAGS. the `OS` lib's `cflags_os` (4-byte function alignment): the run's function starts are packed at 4, unlike
  *    the rest of the old VF block. Compiler: GC/3.0a3 (GC/3.0a3..3.0a5 measure the same; Wii/1.3 leaves `__DBIntrHandler`,
- *    `DBInitComm`, `DBRead` and the register-order rows open, GC/3.0a5.2 opens `DBInitInterrupts`); the registration still
- *    names the lib's Wii/1.3 until the configure.py request (`sdk-trk#1`) is applied.
+ *    `DBInitComm`, `DBRead` and the register-order rows open, GC/3.0a5.2 opens `DBInitInterrupts`); configure.py registers it with GC/3.0a3.
  * NAMES. the `DB*` and `__DB*` names are the map's; `EXI2_Reserve` and `EXI2_Unreserve` are GUESSES (4-byte stubs
  *    called around a continue/stop); the file name `exi2_comm.c` is a GUESS.
  * EVIDENCE. this is the only 4-byte-packed run of the old block (ten of its 174 function starts are not 16-aligned

@@ -1529,7 +1529,8 @@ config.libs = [
             # The VF / DB-EXI2 / PMIC / KPR / HID / KBD band 0x80521340..0x8052A040 recut per library (unit headers carry the evidence).
             # Only 0x80522334..0x80522E00 is packed at 4 bytes (cflags_os); every other function start is 16-aligned (cflags_base).
             Object(NonMatching, "VF/vf.cpp", cflags=cflags_base),
-            Object(NonMatching, "TRK/exi2_comm.c"),
+            # GC/3.0a3 for exi2_comm: evidence on the FLAGS line of src/TRK/exi2_comm.c
+            Object(NonMatching, "TRK/exi2_comm.c", mw_version="GC/3.0a3"),
             Object(NonMatching, "PMIC/pmic.c", cflags=cflags_base),
             Object(Matching, "KPR/kpr.c", cflags=cflags_base),
             Object(NonMatching, "HID/hid.c", cflags=cflags_base),
