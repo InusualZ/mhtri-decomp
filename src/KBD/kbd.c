@@ -4,7 +4,7 @@
  *
  * RANGE. .text 0x80528890-0x8052A040 (28 functions, 0x17B0 B); .data 0x806493A0-0x806498C8; .bss
  *    0x8078FF40-0x807901C0; .sdata 0x807944A8-0x807944B0; .sbss 0x80795A08-0x80795A18.  Cut from the old VF block
- *    at 0x80528890; the right edge is `homebutton/fn_8052A040.cpp`.
+ *    at 0x80528890; the right edge is `KBD/kbd_region_us.c`.
  * FLAGS. the `OS` lib's group with `cflags_base` (configure.py `cflags=`): every function start of the band is
  *    16-aligned (`-O4,p` default alignment), not the 4-byte packing `cflags_os` gives.
  * NAMES. `kbdProcKey`, `KBDResetChannel`, `kbdInitMap`, `kbdInitMapIntl`, `kbd_free_led`, `kbd_alloc_led`,

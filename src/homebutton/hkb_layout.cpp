@@ -2,13 +2,13 @@
  *   layout (nw4r::lyt::Layout: it walks an `RLYT` resource's blocks and builds the pane tree, the groups and the
  *   animations) and the picture pane (nw4r::lyt::Picture).
  * RANGE. .text 0x8052B004-0x8052C880 (34 functions); .ctors 0x8056F3E4-0x8056F3E8; .data 0x8064A5E8-0x8064A6B0;
- *   .sbss 0x80795A28-0x80795A30; .sdata2 0x8079D570-0x8079D580.
- *   Edges: the left edge follows homebutton/fn_8052A040.cpp's static initialiser 0x8052AFF8 (.ctors word 0x8056F3E0);
+ *   .sbss 0x80795A20-0x80795A30; .sdata2 0x8079D570-0x8079D580.
+ *   Edges: the left edge follows homebutton/hkb_pane.cpp's static initialiser 0x8052AFF8 (.ctors word 0x8056F3E0);
  *   the right edge is this unit's static initialiser 0x8052C874 (.ctors word 0x8056F3E4).
  *   The range is three retail objects: the class tables rise (Group 0x8064A5E8, Layout 0x8064A5F8, Picture
  *   0x8064A638 - one object emits its tables in descending order), the `.sdata2` pool holds 0.0 twice (0x8079D570
- *   for the layout, 0x8079D578 for the picture) and Layout::mspAllocator (0x80795A20) sits between the pane's and
- *   the picture's run-time type records; the seams are 0x8052B344 (lyt_group | lyt_layout) and 0x8052C330
+ *   for the layout, 0x8079D578 for the picture) and Layout::mspAllocator (0x80795A20, this unit's) sits between the
+ *   pane's and the picture's run-time type records; the seams are 0x8052B344 (lyt_group | lyt_layout) and 0x8052C330
  *   (lyt_layout | lyt_picture).
  * FLAGS. GC/3.0a5.2 + cflags_hkb, the band's flags (evidence: src/homebutton/hbm_kb_event.cpp FLAGS).
  * NAMES. GUESS: nw4r::lyt::Group, GroupContainer, Layout and Picture and their members, from the runtime dump
@@ -21,7 +21,8 @@
  * SHAPES. BuildPaneObj casts the block in each case; Picture::Append sets the coordinate generator through a by-value
  *   helper (retail's Material::SetTexCoordGen, which homebutton/hkb_material.h does not declare: request hkb-b#4).
  * RESIDUALS. the range is three objects (seam request hkb-b#3): the class tables, the 0.0 pool word and the
- *   SetTagProcessorImpl position cannot match as one object.
+ *   SetTagProcessorImpl position cannot match as one object; retail fills Layout::mspAllocator's `.sbss` slot to 8
+ *   bytes (the end of the lyt_layout object), ours packs Picture::typeInfo at +0x4.
  * RESIDUALS. Layout / Group / GroupContainer constructors and Build's GroupContainer: retail keeps LinkListNode's two
  *   zero stores before the list initialisation; that happens when LinkListNode derives from ut::NonCopyable
  *   (measured on a probe), which src/nw4r/fn_805012C4.h does not declare (request hkb-b#4).
@@ -168,6 +169,8 @@ inline bool TestFileVersion(const ut::BinaryFileHeader& fileHeader) {
 }
 
 }  // namespace
+
+MEMAllocator* Layout::mspAllocator;
 
 /* 0x8052B5B8 (0x40): Builds an empty layout. */
 Layout::Layout() : mpRootPane(NULL), mpGroupContainer(NULL), mLayoutSize(0.0f, 0.0f) {}

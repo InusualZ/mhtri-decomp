@@ -2,7 +2,7 @@
  * homebutton/hkb_layout.h - the keyboard layout engine's layout (nw4r::lyt::Layout), its groups (Group,
  *   GroupContainer) and its picture pane (Picture), which homebutton/hkb_layout.cpp defines; the run-time type check
  *   and the binary resource records the builders read; and the pane base class (nw4r::lyt::Pane, whose members
- *   homebutton/fn_8052A040.cpp defines) the pane units derive from.
+ *   homebutton/hkb_pane.cpp defines) the pane units derive from.
  */
 #ifndef HOMEBUTTON_HKB_LAYOUT_H
 #define HOMEBUTTON_HKB_LAYOUT_H
@@ -151,6 +151,7 @@ public:
     void AppendChild(Pane* pChild);
     void AddAnimationLink(AnimationLink* pAnimationLink);
     const math::VEC2 GetVtxPos() const;
+    const ut::Rect GetPaneRect(const DrawInfo& drawInfo) const;
 
     const char* GetName() const { return mName; }
     void SetSRTElement(u32 idx, f32 value) { reinterpret_cast<f32*>(&mTranslate)[idx] = value; }
@@ -187,6 +188,13 @@ public:
     /* +0xD6 */ bool mbUserAllocated;
     /* +0xD7 */ u8 pad_0xD7;
 };
+
+namespace detail {
+
+/* Returns the pane's rectangle from its base point and size (homebutton/hkb_pane.cpp). */
+const ut::Rect CalcPaneRect(const Pane* pPane);
+
+}  // namespace detail
 
 namespace res {
 

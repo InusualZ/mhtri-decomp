@@ -3739,18 +3739,22 @@ KBD/kbd.c:
 	.sdata      start:0x807944A8 end:0x807944B0
 	.sbss       start:0x80795A08 end:0x80795A18
 
-homebutton/fn_8052A040.cpp:
-	.text       start:0x8052A040 end:0x8052B004 align:16
+KBD/kbd_region_us.c:
+	.text       start:0x8052A040 end:0x8052A13C align:16
+	.data       start:0x806498C8 end:0x8064A570
+
+homebutton/hkb_pane.cpp:
+	.text       start:0x8052A13C end:0x8052B004
 	.ctors      start:0x8056F3E0 end:0x8056F3E4
-	.data       start:0x806498C8 end:0x8064A5E8
-	.sbss       start:0x80795A18 end:0x80795A28
+	.data       start:0x8064A570 end:0x8064A5E8
+	.sbss       start:0x80795A18 end:0x80795A20
 	.sdata2     start:0x8079D550 end:0x8079D570
 
 homebutton/hkb_layout.cpp:
 	.text       start:0x8052B004 end:0x8052C880
 	.ctors      start:0x8056F3E4 end:0x8056F3E8
 	.data       start:0x8064A5E8 end:0x8064A6B0
-	.sbss       start:0x80795A28 end:0x80795A30
+	.sbss       start:0x80795A20 end:0x80795A30
 	.sdata2     start:0x8079D570 end:0x8079D580
 
 homebutton/hkb_textbox.cpp:

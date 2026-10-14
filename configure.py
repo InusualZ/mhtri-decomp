@@ -1533,6 +1533,8 @@ config.libs = [
             Object(Matching, "KPR/kpr.c", cflags=cflags_base),
             Object(NonMatching, "HID/hid.c", cflags=cflags_base),
             Object(NonMatching, "KBD/kbd.c", cflags=cflags_base),
+            # Wii/1.3 + cflags_base, not the homebutton band's GC/3.0a5.2: evidence on the FLAGS line of src/KBD/kbd_region_us.c.
+            Object(NonMatching, "KBD/kbd_region_us.c", cflags=cflags_base),
         ],
     },
     {
@@ -1672,7 +1674,7 @@ config.libs = [
             Object(NonMatching, "Network/NetworkLayer.cpp", extra_cflags=["-pool off"]),
             # The tiHKBManager software keyboard and its layout engine, in link order; evidence in each unit header.
             # GC/3.0a5.2 + cflags_hkb: evidence on the FLAGS line of src/homebutton/hbm_kb_event.cpp.
-            Object(NonMatching, "homebutton/fn_8052A040.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hkb_pane.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hkb_layout.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hkb_textbox.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hkb_window.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
