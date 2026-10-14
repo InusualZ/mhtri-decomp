@@ -12,9 +12,11 @@
  *    (`nandConvertErrorCode`, `NANDInit`) make .data 0x8061B9A0-0x8061BAF0 one unit.
  * FLAGS. cflags_base in the `OS` lib block of configure.py (Wii/1.3); no pragma; no float code.
  * NAMES. the `NAND*`/`nand*` names are the map's (dump).  GUESS: the unit name (SDK spelling); `nandAsyncCallback`
- *    (the shared async completion), `nandSetDoneFlag` (the map said `EmissionControllerFinished`, a name from an
- *    unrelated library) and `nandLibReady`.
- * RESIDUALS. written (8 functions, 7 at 100 %): the private-path tests, `nandIsInitialized`, `nandSetDoneFlag`,
+ *    (the shared async completion), `nandOnShutdown` (the shutdown function `NANDInit` registers), `nandGetType` and
+ *    `nandGetTypeCallback` (the node-type probe and its completion), `nandShutdownCallback` (the ISFS completion of the
+ *    shutdown wait; the map said `EmissionControllerFinished`, a name from an unrelated library), `nandLibReady` and
+ *    `s_shutdownFuncInfo` (the shutdown-function record `NANDInit` registers).
+ * RESIDUALS. written (8 functions, 7 at 100 %): the private-path tests, `nandIsInitialized`, `nandShutdownCallback`,
  *    `NANDGetHomeDir`, `nandAsyncCallback` and `nandGetHomeDir`.  `NANDGetHomeDir` (75 %) keeps the inlined readiness
  *    test as a 0/1 variable the source shape does not reproduce.  Not attempted (10 functions): path tokenising and
  *    conversion, result conversion (a 41-entry table copied to the stack), `nandGenerateAbsPath`, `NANDInit` and its
@@ -63,7 +65,7 @@ static inline BOOL nandLibReady(void)
 }
 
 /* 0x804C9010 (0xC): the ISFS completion of a synchronous wait: sets the caller's s32 done flag to 1. */
-void nandSetDoneFlag(s32 result, NANDCommandBlock* block)
+void nandShutdownCallback(s32 result, NANDCommandBlock* block)
 {
     *(s32*)block = 1;
 }

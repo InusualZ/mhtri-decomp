@@ -11,7 +11,11 @@
  * FLAGS. cflags_base in the `OS` lib block of configure.py (Wii/1.3); `nandOpen` is under `dont_inline` (the target
  *    calls it from the four open wrappers; the compiler inlines it otherwise); no float code.
  * NAMES. the `NAND*`/`nand*` names are the map's (dump).  GUESS: `nandCloseCallback` (the close completion), renamed
- *    from its map stem; the ISFS prototypes are in FS/fs.h and the NAND/NANDCore.c helpers in NAND/NANDCore.h.
+ *    from its map stem; `NANDCreateAsync`, `NANDCreateDirAsync` (the public twins that refuse the private directory),
+ *    `nandMove` (`ISFS_Rename`/`ISFS_RenameAsync`), `NANDMove` (its synchronous caller), `nandSplitPerm` (permission
+ *    byte to access words), `nandGetStatus` (`ISFS_GetAttr`/`ISFS_GetAttrAsync`; the map's `nandMove` was this
+ *    function), `nandGetStatusCallback` and `NANDGetHomeUsage` (`ISFS_GetUsage` on the home directory), in the SDK's
+ *    scheme; the ISFS prototypes are in FS/fs.h and the NAND/NANDCore.c helpers in NAND/NANDCore.h.
  * RESIDUALS. written (15 functions, 14 at 100 %): the read/write/seek/close calls, `nandOpen` and its four wrappers
  *    and callback, and `nandComposePerm`.  `NANDSeekAsync` (90 %) schedules the descriptor load after the switch.  Not attempted
  *    (18 functions): create/delete, create-directory, move, status and the usage query; the .sdata literals are

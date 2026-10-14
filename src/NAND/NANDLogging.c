@@ -8,7 +8,8 @@
  *    NAND/NANDCheck.c: data order only (no shared statics).
  * FLAGS. cflags_base in the `OS` lib block of configure.py (Wii/1.3); no pragma; no float code.
  * NAMES. `reserveFileDescriptor`, `NANDLoggingAddMessageAsync` and `asyncRoutine` are the map's (dump).  GUESS: the
- *    unit name (SDK spelling) and `s_fd`.
+ *    unit name (SDK spelling), `s_fd`, `s_readBuffer` and `s_writeBuffer` (`asyncRoutine`'s buffers after
+ *    `s_message`).
  * RESIDUALS. written (1 function at 100 %): `reserveFileDescriptor`.  Not attempted (2 functions):
  *    `NANDLoggingAddMessageAsync` and `asyncRoutine`; the .data, .bss and .sbss objects are not emitted.
  * SHAPES. none yet.

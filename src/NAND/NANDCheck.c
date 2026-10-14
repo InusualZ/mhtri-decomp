@@ -8,8 +8,10 @@
  *    NAND/NANDCore.c inlines it.  Seam with NAND/NANDLogging.c: data order only (no shared statics).  The banner
  *    initializer 0x804C9480 has no proven side and is kept at this unit's head.
  * FLAGS. cflags_base in the `OS` lib block of configure.py (Wii/1.3); no pragma; no float code.
- * NAMES. `NANDGetUsage` and `NANDCheckAsync` are the map's (dump).  GUESS: the unit name (SDK spelling).
- * RESIDUALS. no body written (4 functions): the banner initializer 0x804C9480-0x804C9560, `NANDGetUsage`
+ * NAMES. `NANDGetUsage` and `NANDCheckAsync` are the map's (dump); `nandUserAreaCallback` is evidenced by its own
+ *    function-name string at 0x8061BB9C.  GUESS: the unit name (SDK spelling), `NANDInitBanner` (SDK spelling) and
+ *    `s_userDirList` (the pointer table of the user-area directories).
+ * RESIDUALS. no body written (4 functions): `NANDInitBanner` 0x804C9480-0x804C9560, `NANDGetUsage`
  *    0x804C9560-0x804C9618, `NANDCheckAsync` 0x804C9620-0x804C96CC and the user-area completion 0x804C96D0-0x804C9904;
  *    no data is emitted.  Evidence: `python tools/units/ledger.py unit NAND/NANDCheck.c`, the map, splits.txt.
  * SHAPES. none yet.

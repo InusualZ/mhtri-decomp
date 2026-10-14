@@ -10,6 +10,12 @@
 extern "C" {
 #endif
 
+/* The save banner record `NANDInitBanner` fills (0xF0A0 bytes: its clear); its layout stays with NAND/NANDCheck.c. */
+typedef struct NANDBanner NANDBanner;
+
+/* 0x804C9480 - clears `banner`, stamps its signature and `flags`, and copies `title` and `comment` (an empty string
+ * becomes a single space). */
+void NANDInitBanner(NANDBanner* banner, u32 flags, const u16* title, const u16* comment);
 /* 0x804C9560 - the blocks and inodes the files below `path` use (`ISFS_GetUsage` on the absolute path). */
 s32 NANDGetUsage(const char* path, u32* blockCount, u32* inodeCount);
 /* 0x804C9620 - whether `fsBlock` blocks and `inode` inodes still fit the home directory's quota (the answer
