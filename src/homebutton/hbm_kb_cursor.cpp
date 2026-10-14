@@ -31,6 +31,8 @@
  *            fn_80567E70, fn_8056802C, fn_80568CAC, fn_80568E08, fn_80568EBC, fn_80568FF0, fn_805690F0, fn_8056977C,
  *            fn_805698BC, fn_8056999C, and the thunks fn_80569D4C, fn_80569D74, fn_80569D7C, fn_80569D8C..fn_80569DA4
  *            whose targets are among them.
+ * NAMES.     GUESS classes HbmKbCursorPart, its kinds HbmKbCursorPartA/B and HbmKbCursorKey (band keys with a state
+ *            word; members reset, setState, getResource, getState).
  */
 
 #include "types.h"
@@ -43,6 +45,44 @@
 #include "homebutton/hbm_widget.h"
 #include "homebutton/hbm_text_panel.h"
 #include "homebutton/hbm_value.h"
+
+/* A cursor part: a band key with its state word; its class table (0x80657EC0) and the out-of-line copy of its inline destructor (0x80567204) are
+ * this unit's.  size: 0x34 */
+class HbmKbCursorPart : public HbmKey {
+public:
+    virtual void reset();
+    virtual void setState(u32 state);
+    virtual ~HbmKbCursorPart() {}
+    /* untyped: opaque handle passed through */
+    virtual void* getResource();
+    virtual u32 getState();
+
+    /* +0x30 */ void* mpResource;
+}; /* size: 0x34 */
+
+/* A HbmKbCursorPart kind (class table 0x80657E68): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbCursorPartA : public HbmKbCursorPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbCursorPartA();
+};
+
+/* A HbmKbCursorPart kind (class table 0x80657E94): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbCursorPartB : public HbmKbCursorPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbCursorPartB();
+};
+
+/* A cursor key: a band key whose reset and state setter are defined above as C functions (class table
+ * 0x80657E2C).  size: 0x30 */
+class HbmKbCursorKey : public HbmKey {
+public:
+    virtual void reset();
+    virtual void setState(u32 state);
+    virtual ~HbmKbCursorKey();
+}; /* size: 0x30 */
+
 
 
 /* The compiler's own operator delete: the retail object jumps to `__dl__FPv`. */
@@ -486,17 +526,6 @@ void* fn_80567004(KbObject* self, void* value)
     return old;
 }
 
-/* 0x80567204 (0x58): deleting destructor of a cursor part (base destructor, then the storage). */
-HbmWidget* hbmKbCursorPartDelete(HbmWidget* self, s32 flag)
-{
-    if (self != 0) {
-        fn_8055C494(self, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
-}
-
 /* 0x805674C4 (0x58): updates the nine parts at +0x10. */
 void hbmKbCursorUpdateParts(HbmCursorInput* self)
 {
@@ -659,7 +688,7 @@ void fn_805677C0(KbObject* self)
     ((HbmCursorPartView*)self->tail_0x1A04.field_0x1DC)->v_0x014(1, 7);
 }
 
-void fn_80567D3C(void* p) { fn_8054E05C(p); }
+void fn_80567D3C(void* p, HkbManager* manager) { fn_8054E05C(p, manager); }
 
 /* ---------------------------------------------------------------------------------------------------
  * the 0x1B04.. key-frame block
@@ -861,49 +890,49 @@ void fn_80569970(KbObject* self)
 
 void fn_80569998(KbObject* self) { (void)self; }
 
-void fn_80569B98(void* p) { fn_8055C638(p); }
+void fn_80569B98(HbmKey* key, u32 state) { key->HbmKey::setState(state); }
 
 void fn_80569B9C(KbObject* self) { (void)self; }
 
 void fn_80569BA0(KbObject* self) { (void)self; }
 
-void* fn_80569BA4(KbObject* self) { return self->field_0x2C; }
-
-void fn_80569BAC(KbObject* self, void* value)
-{
-    self->field_0x2C = value;
-    fn_8055C638(self);
+/* Returns the part's state. */
+u32 HbmKbCursorPart::getState() {
+    return mState;
 }
 
-void* fn_80569BB4(KbObject* self) { return self->field_0x30; }
 
-void  fn_80569BBC(KbObject* self) { self->field_0x2C = 0; }
-
-/* The two file-input-stream destructors: the inner check is the class's own non-deleting destructor,
- * which the retail object keeps as a second `if (this != 0)`. */
-void* fn_80569BC8(void* self, s32 flag)
-{
-    if (self != 0) {
-        if (self != 0)
-            fn_8055C494(self, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
+/* Stores the state, then hands it to the band key. */
+void HbmKbCursorPart::setState(u32 state) {
+    mState = state;
+    HbmKey::setState(state);
 }
+
+
+/* Returns the part's resource word. */
+/* untyped: opaque handle passed through */
+void* HbmKbCursorPart::getResource() {
+    return mpResource;
+}
+
+
+/* Clears the part's state. */
+void HbmKbCursorPart::reset() {
+    mState = 0;
+}
+
+
+/* Destroys the part (the inline base destructors run here). */
+HbmKbCursorPartA::~HbmKbCursorPartA() {
+}
+
 
 void fn_80569C24(KbObject* self) { (void)self; }
 
-void* fn_80569C28(void* self, s32 flag)
-{
-    if (self != 0) {
-        if (self != 0)
-            fn_8055C494(self, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
+/* Destroys the part (the inline base destructors run here). */
+HbmKbCursorPartB::~HbmKbCursorPartB() {
 }
+
 
 /* 0x80569C84 (0x10): forwards to the scroll part's slot 0x14. */
 void hbmKbCursorScroll(HbmCursorInput* self, s32 index, s32 mode)
@@ -923,16 +952,10 @@ HbmWidget* hbmKbCursorRecordDelete(HbmWidget* self, s32 flag)
     return self;
 }
 
-/* 0x80569CE4 (0x58): deleting destructor of a second cursor part (base destructor, then the storage). */
-HbmWidget* hbmKbCursorPartDeleteB(HbmWidget* self, s32 flag)
-{
-    if (self != 0) {
-        fn_8055C494(self, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
+/* Destroys the cursor key. */
+HbmKbCursorKey::~HbmKbCursorKey() {
 }
+
 
 /* ---------------------------------------------------------------------------------------------------
  * adjustor thunks: the retail body is `addi r3,r3,-N; b <method>` (the arguments pass through untouched)
@@ -956,5 +979,5 @@ Vec2f hbmKbCursorAdj10Anchor(u8* base) { return fn_80568DD0((KbObject*)(base - 0
 void hbmKbCursorAdj10Clamp(u8* base) { fn_80568C60((KbObject*)(base - 0x10)); }
 
 /* 0x80569D84 (0x8): +0x1A04 base -> fn_80567D3C. */
-void hbmKbCursorAdj1A04Close(u8* base) { fn_80567D3C(base - 0x1A04); }
+void hbmKbCursorAdj1A04Close(u8* base, HkbManager* manager) { fn_80567D3C(base - 0x1A04, manager); }
 }

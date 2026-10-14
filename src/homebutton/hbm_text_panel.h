@@ -59,7 +59,7 @@ void fn_8054D9F0(void* self);
 void fn_8054DDD8(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_8054E05C(void* panel);
+void fn_8054E05C(void* panel, struct HkbManager* manager);
 
 /* untyped: opaque band object, typed by the callers' views */
 void fn_8054E180(void* self);

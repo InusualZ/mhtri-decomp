@@ -27,6 +27,8 @@
  *            0x80550CCC-0x805512B4, 0x8055136C-0x8055148C, 0x805514E0-0x80551680, 0x805516E4-0x80551964,
  *            0x80551970-0x80551E5C, 0x80551F4C-0x80553670, 0x80553680-0x80553F84, 0x80553FC8-0x80554268,
  *            0x80554278-0x805544C0, 0x80554600-0x80554664.
+ * NAMES.     GUESS classes HbmKbWidgetPart and its kinds HbmKbWidgetPartA/B/C (band keys with a state word; members
+ *            reset, setAnim, setState, getState, getResource).
  */
 
 #include "types.h"
@@ -35,6 +37,44 @@
 #include "homebutton/hbm_kb_event.h"
 #include "homebutton/hbm_kb_widget.h"
 #include "homebutton/hbm_value.h"
+#include "homebutton/hkb_keyboard.h"
+
+/* A widget part: a band key with its state word; its class table (0x8064FE74) and the out-of-line copy of its inline destructor (0x80550494) are
+ * this unit's.  size: 0x34 */
+class HbmKbWidgetPart : public HbmKey {
+public:
+    virtual void reset();
+    virtual void setAnim(s32 anim);
+    virtual void setState(u32 state);
+    virtual ~HbmKbWidgetPart() {}
+    virtual u32 getState();
+    /* untyped: opaque handle passed through */
+    virtual void* getResource();
+
+    /* +0x30 */ void* mpResource;
+}; /* size: 0x34 */
+
+/* A HbmKbWidgetPart kind (class table 0x8064FE48): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbWidgetPartA : public HbmKbWidgetPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbWidgetPartA();
+};
+
+/* A HbmKbWidgetPart kind (class table 0x8064FE1C): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbWidgetPartB : public HbmKbWidgetPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbWidgetPartB();
+};
+
+/* A HbmKbWidgetPart kind (class table 0x8064FDF0): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbWidgetPartC : public HbmKbWidgetPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbWidgetPartC();
+};
+
 
 /* The retail object has no extab/extabindex: exceptions are off for this band. */
 #pragma exceptions off
@@ -44,8 +84,8 @@ extern "C" void fn_8054F7BC(void) {
 }
 
 /* The widget's own update, then the +0x10 virtual slot. */
-extern "C" void fn_8054F7C0(HkbWidget* self) {
-    ((void (*)(HkbWidget*))fn_8056083C)(self);
+extern "C" void fn_8054F7C0(HkbWidget* self, HkbEventSink* sink) {
+    ((HkbInputWidget*)self)->HkbInputWidget::setEventSink(sink);
     self->v_0x010();
 }
 
@@ -169,21 +209,11 @@ extern "C" void* fn_8054FB74(void* self, int flag) {
 extern "C" void fn_80550124(void) {
 }
 
-/* Clears the widget's state selector. */
-extern "C" void fn_80550488(HkbWidget* self) {
-    self->state = 0;
+/* Clears the part's state. */
+void HbmKbWidgetPart::reset() {
+    mState = 0;
 }
 
-/* Runs the destructor entry, then releases the storage, and returns the pointer. */
-extern "C" void* fn_80550494(void* self, int flag) {
-    if (self != 0) {
-        fn_8055C494(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
 
 /* Stores the keyboard widget's +0x1B88 byte. */
 extern "C" void fn_80550768(HkbWidget* self, u8 flag) {
@@ -252,21 +282,25 @@ extern "C" void fn_8055148C(HkbWidget* self) {
 extern "C" void fn_805514DC(void) {
 }
 
-/* The keyboard widget's +0x30 child. */
-extern "C" void* fn_80551680(HkbWidget* self) {
-    return self->current;
+/* Returns the part's resource word. */
+/* untyped: opaque handle passed through */
+void* HbmKbWidgetPart::getResource() {
+    return mpResource;
 }
 
-/* The keyboard widget's state selector. */
-extern "C" u32 fn_80551688(HkbWidget* self) {
-    return self->state;
+
+/* Returns the part's state. */
+u32 HbmKbWidgetPart::getState() {
+    return mState;
 }
 
-/* Stores the state selector and re-sorts the widget's list. */
-extern "C" void fn_80551690(HkbWidget* self, u32 state) {
-    self->state = state;
-    fn_8055C638(self);
+
+/* Stores the state, then hands it to the band key. */
+void HbmKbWidgetPart::setState(u32 state) {
+    mState = state;
+    HbmKey::setState(state);
 }
+
 
 /* Stores the +0x17E9 flag and re-targets the pane it selects. */
 extern "C" void fn_80551698(HkbWidget* self, u8 flag) {
@@ -308,7 +342,7 @@ extern "C" void fn_80551E5C(HkbWidget* self, s32 event) {
 
 /* Virtual slot +0x10 on base #5, then the widget's own +0x110 slot. */
 extern "C" void fn_80551EB0(HkbWidget* self) {
-    fn_8055C1D4(&self->vtable_17F4);
+    ((HbmPaneManager*)&self->vtable_17F4)->HbmPaneManager::v_0x03C();
     self->v_0x110();
 }
 
@@ -319,7 +353,7 @@ extern "C" void fn_80551EF4(HkbWidget* self) {
 
 /* Virtual slot +0x10 on base #5, then the widget's own +0x110 slot. */
 extern "C" void fn_80551F08(HkbWidget* self) {
-    fn_8055C2CC(&self->vtable_17F4);
+    ((HbmPaneManager*)&self->vtable_17F4)->HbmPaneManager::v_0x040();
     self->v_0x110();
 }
 
@@ -376,44 +410,20 @@ extern "C" void fn_805544E4(void) {
 extern "C" void fn_805544E8(void) {
 }
 
-/* Runs the destructor entry, then releases the storage, and returns the pointer. */
-extern "C" void* fn_805544EC(void* self, int flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* Destroys the part (the inline base destructors run here). */
+HbmKbWidgetPartA::~HbmKbWidgetPartA() {
 }
 
-/* Runs the destructor entry, then releases the storage, and returns the pointer. */
-extern "C" void* fn_80554548(void* self, int flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmKbWidgetPartB::~HbmKbWidgetPartB() {
 }
 
-/* Runs the destructor entry, then releases the storage, and returns the pointer. */
-extern "C" void* fn_805545A4(void* self, int flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmKbWidgetPartC::~HbmKbWidgetPartC() {
 }
+
 
 /* Adjustor thunk: base #3 -> fn_805536FC. */
 extern "C" void fn_80554664(HkbWidget* self) {

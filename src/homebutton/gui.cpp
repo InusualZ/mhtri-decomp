@@ -36,7 +36,7 @@
 
 /* --- 0x80569DAC: re-init the object at +4 with `a`, then run its virtual slot 3. --- */
 extern "C" void fn_80569DAC(Manager* self, void* a) {
-    fn_8055B8F0(&self->field_0x04, a, 0);
+    ((HbmPaneManager*)&self->field_0x04)->HbmPaneManager::create((MEMAllocator*)a, NULL);
     ((void (*)(Manager*))self->vtable->slot_0C)(self);
 }
 

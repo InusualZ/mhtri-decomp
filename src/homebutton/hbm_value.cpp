@@ -39,6 +39,8 @@
  *            homebutton/hbm_value`.
  * RESIDUALS. .data 0x80651568..0x80652340 spans at least 10 TUs (datagap.py emission-order seams), so the data cannot match
  *            until the range is re-cut.
+ * NAMES.     GUESS classes HbmPaneManager and HbmKey (homebutton/hbm_value.h) and their members; the slots named
+ *            v_0xNNN are not understood.
  */
 
 #include "types.h"
@@ -67,32 +69,11 @@
 #include "nw4r/fn_805012C4.h"
 #include "nw4r/fn_80502828.h"
 
-extern "C" void fn_8055C638(void* self);
-
-extern "C" void fn_8055BBAC(void* node);
-
-extern "C" u32 fn_8055BEDC(void* current);
-
-extern "C" u32 fn_8055BEF0(void* self);
-
 extern "C" void wmemset(void* dst, int value, u16 size);
-
-extern "C" void* fn_8055C494(void* self, int flag);
 
 extern "C" void* fn_8055B898(void* self, int flag);
 
 extern f32 lbl_8079D700;
-
-/* ---------------------------------------------------------------------------------------------------
- * helpers that live in other splits.  They sit in the unsplit `main` band (fn_80501xxx / fn_8054xxx /
- * fn_8053xxx), so no registered unit owns them - rule 2 leaves them a counted gap (tools/units/stylelint.py,
- * "address band interleaves modules"), the same way the neighbouring `homebutton/gui.cpp` declares them.
- * ------------------------------------------------------------------------------------------------ */
-extern "C" {
-
-void  fn_8055B7D4(void* sub, s32 flag);
-
-}
 
 /* ---------------------------------------------------------------------------------------------------
  * the unit's own `.sdata2` float pool and `.sdata` globals: other splits own them, so they are
@@ -867,14 +848,14 @@ extern "C" void fn_8055BAE4(HbmWidget* self, const void* name) {
     self->owner = (HbmWidget*)name;
 }
 
-/* Virtual slot at +0x14: hides the widget. */
-extern "C" void fn_8055BB88(HbmWidget* self) {
-    ((HbmWidgetView*)self)->hide();
+/* Runs the manager's own slot 0x14. */
+void HbmPaneManager::init() {
+    v_0x014();
 }
 
-/* Virtual slot at +0x10 on the widget's active child. */
-extern "C" void fn_8055BB98(HbmWidget* self) {
-    ((HbmWidgetView*)self->child)->update();
+/* Runs the scene's slot 0x10. */
+void HbmPaneManager::v_0x014() {
+    mpRoot->v_0x010();
 }
 
 /* The widget's collection entry at an index. */
@@ -887,31 +868,24 @@ extern "C" u32 fn_8055BE58(void) {
     return 5;
 }
 
-/* Whether the widget's active child is finished. */
-extern "C" u32 fn_8055BEDC(void* current) {
-    return ((HbmWidgetView*)((HbmWidget*)current)->child)->isDone();
+/* Returns the scene's slot 0x30 result. */
+u32 HbmPaneManager::updateComponents() {
+    return mpRoot->v_0x030();
 }
 
-/* A null slot. */
-extern "C" u32 fn_8055BEF0(void* self) {
-    (void)self;
+/* Takes no key release: returns 0. */
+s32 HbmPaneManager::onKeyRelease(HkbManager* manager) {
+    (void)manager;
     return 0;
 }
 
-/* Re-targets the widget's collection entry with a layout name. */
-extern "C" void fn_8055C0E8(HbmWidget* self, const char* text) {
-    HbmWidget* entry = (HbmWidget*)self->items[0];
-    ((HbmWidgetView*)entry->child)->setText(text, 1);
+/* Returns the layout's pane called `name`, searching the whole tree. */
+nw4r::lyt::TextBox* HbmPaneManager::findTextBox(const char* name) {
+    return (nw4r::lyt::TextBox*)mpLayout->mpRootPane->FindPaneByName(name, true);
 }
 
-/* Releases the widget, then the storage, and returns it. */
-extern "C" void* fn_8055C494(void* self, int flag) {
-    if (self != 0) {
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* Destroys the band key (its animations are released by destroy). */
+HbmKey::~HbmKey() {
 }
 
 /* Reads the list node's id and value out, or the empty pair. */
@@ -940,7 +914,8 @@ void fn_8055CAB8(VuObject* self) { (void)self; }
 
 void fn_8055CABC(VuObject* self) { (void)self; }
 
-void fn_8055CAC0(VuObject* self) { (void)self; }
+/* Resets nothing. */
+void HbmKey::reset() {}
 
 void fn_8055CAC4(VuObject* self) { (void)self; }
 

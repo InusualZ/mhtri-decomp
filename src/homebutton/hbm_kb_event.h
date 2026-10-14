@@ -11,8 +11,6 @@
 extern "C" {
 #endif
 
-void fn_8056083C(VuObject* self, VuSub* arg);
-
 /* The two dispatchers of the registered neighbour `homebutton/keyboard.cpp` that fn_8056329C tail-calls. */
 /* untyped: opaque band object, typed by the callers' views */
 void fn_805632BC(void* self);

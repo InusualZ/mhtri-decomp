@@ -23,6 +23,8 @@
  *            0x806574D8), fn_80555798 (hbm_hermite.cpp's hbmNameMatches/hbmNameCopyWithChar).
  * RESIDUALS. .data 0x80650160..0x80650500 starts with four strings ("P_BT_cancel", "P_kyChng_QWERTY", ...) that
  *            duplicate this unit's own literals, so the range holds more than one TU's data.
+ * NAMES.     GUESS classes HbmKbListPart and its kinds HbmKbListPartA/B (band keys with a state word; members reset,
+ *            setState, getResource, getState).
  */
 
 #include "types.h"
@@ -35,6 +37,35 @@
 #include "homebutton/hbm_widget.h"
 #include "homebutton/hbm_text_panel.h"
 #include "homebutton/hbm_value.h"
+
+/* A list part: a band key with its state word; its class table (0x806503A8) and the out-of-line copy of its inline destructor (0x80554AE0) are
+ * this unit's.  size: 0x34 */
+class HbmKbListPart : public HbmKey {
+public:
+    virtual void reset();
+    virtual void setState(u32 state);
+    virtual ~HbmKbListPart() {}
+    /* untyped: opaque handle passed through */
+    virtual void* getResource();
+    virtual u32 getState();
+
+    /* +0x30 */ void* mpResource;
+}; /* size: 0x34 */
+
+/* A HbmKbListPart kind (class table 0x80650350): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbListPartA : public HbmKbListPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbListPartA();
+};
+
+/* A HbmKbListPart kind (class table 0x8065037C): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbListPartB : public HbmKbListPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbListPartB();
+};
+
 
 extern "C" void fn_80554714(void* self);
 
@@ -177,17 +208,6 @@ extern "C" void fn_80554AD8(HkbWidget* self, u32 value) {
     self->value_0C = value;
 }
 
-/* Runs the destructor entry, then releases the storage, and returns the pointer. */
-extern "C" void* fn_80554AE0(void* self, int flag) {
-    if (self != 0) {
-        fn_8055C494(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
-
 /* 0x80554B38 (0x1C): binds the confirm button's pane animation. */
 extern "C" void hbmKbListAnimConfirmButton(HkbWidget* self, s32 mode) {
     ((HbmListPaneView*)&self->vtable_14)->v_0x050("P_BT_confirm", mode);
@@ -251,21 +271,25 @@ extern "C" void hbmKbListRefreshKeys(HkbWidget* self) {
     }
 }
 
-/* The keyboard widget's state selector. */
-extern "C" u32 fn_80554F00(HkbWidget* self) {
-    return self->state;
+/* Returns the part's state. */
+u32 HbmKbListPart::getState() {
+    return mState;
 }
 
-/* Stores the state selector and re-sorts the widget's list. */
-extern "C" void fn_80554F08(HkbWidget* self, u32 state) {
-    self->state = state;
-    fn_8055C638(self);
+
+/* Stores the state, then hands it to the band key. */
+void HbmKbListPart::setState(u32 state) {
+    mState = state;
+    HbmKey::setState(state);
 }
 
-/* The child the widget is currently dispatching to. */
-extern "C" void* fn_80554F10(HkbWidget* self) {
-    return self->current;
+
+/* Returns the part's resource word. */
+/* untyped: opaque handle passed through */
+void* HbmKbListPart::getResource() {
+    return mpResource;
 }
+
 
 /* 0x80554F18 (0xFC): shows the second pane, then resets the widget's panes and parts. */
 extern "C" void hbmKbListResetShown(HkbWidget* self) {
@@ -451,41 +475,26 @@ extern "C" void hbmKbListStepStateEx(HkbWidget* self, s32 event) {
     }
 }
 
-/* Adjustor thunk: base #1 -> fn_8055BBAC. */
+/* Adjustor thunk: base #1 -> HbmPaneManager::calcComponents. */
 extern "C" void fn_80555A0C(HbmWidget* self) {
-    fn_8055BBAC(&self->vtable_14);
+    ((HbmPaneManager*)&self->vtable_14)->HbmPaneManager::calcComponents();
 }
 
-/* Clears the widget's state selector. */
-extern "C" void fn_80555A14(HbmWidget* self) {
-    self->mode.state = 0;
+/* Clears the part's state. */
+void HbmKbListPart::reset() {
+    mState = 0;
 }
 
-/* 0x80555A20 (0x5C): deleting destructor of a list part (base destructor, then the storage). */
-extern "C" HbmWidget* hbmKbListPartDeleteA(HbmWidget* self, s32 flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmKbListPartA::~HbmKbListPartA() {
 }
 
-/* 0x80555A7C (0x5C): deleting destructor of a second list part (base destructor, then the storage). */
-extern "C" HbmWidget* hbmKbListPartDeleteB(HbmWidget* self, s32 flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmKbListPartB::~HbmKbListPartB() {
 }
+
 
 /* .ctors: copies the static widget's own layout strings into its instance. */
 extern "C" void fn_80555AD8(void) {

@@ -36,6 +36,8 @@
  * RESIDUALS. .data 0x8064E760..0x8064F360 spans at least 3 TUs (datagap.py emission-order seams at 0x8064F0BC and
  *            0x8064F338), so the data cannot match until the range is re-cut; hbmPanelSetTextBoxString's two text-box names are
  *            string literals here (retail lbl_8064EC08/lbl_8064EC18 in the claimed .data).
+ * NAMES.     GUESS classes HbmPanelPart and its kind HbmPanelPartA (band keys with a state word; members reset,
+ *            setState, getResource, getState).
  */
 
 #include "types.h"
@@ -49,6 +51,28 @@
 #include "homebutton/hbm_value.h"
 #include "MSL_C/wstring.h"
 #include "nw4r/fn_805012C4.h"
+
+/* A panel part: a band key with its state word; its class table (0x8064EC70) and the out-of-line copy of its inline destructor (0x8054D5DC) are
+ * this unit's.  size: 0x34 */
+class HbmPanelPart : public HbmKey {
+public:
+    virtual void reset();
+    virtual void setState(u32 state);
+    virtual ~HbmPanelPart() {}
+    /* untyped: opaque handle passed through */
+    virtual void* getResource();
+    virtual u32 getState();
+
+    /* +0x30 */ void* mpResource;
+}; /* size: 0x34 */
+
+/* A HbmPanelPart kind (class table 0x8064EC44): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmPanelPartA : public HbmPanelPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmPanelPartA();
+};
+
 
 /* This unit's target object carries no `extab`/`extabindex` at all, so the original translation unit was
  * built with C++ exceptions off; cflags_hkb already passes -Cpp_exceptions off, and the pragma states it. */
@@ -1093,18 +1117,6 @@ u8* hbmPanelHelperDeletingDtor(u8* self, s32 flag)
     return self;
 }
 
-/* 0x8054D5DC (0x58): Deleting destructor that runs fn_8055C494 as the base destructor first. */
-u8* hbmPanelChildDeletingDtor(u8* self, s32 flag)
-{
-    if (self != NULL) {
-        fn_8055C494(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
-
 /* Store the incoming byte into the panel's +0x1AB6 field. */
 void fn_8054D810(Panel805482CC* self, u8 value)
 {
@@ -1180,11 +1192,11 @@ void hbmPanelUpdateButtonRepeat(Panel805482CC* self, s32 pressed, s32 held)
     }
 }
 
-/* Forward the +0x1A04 record to 0x8055BEF0 (a tail call in retail). */
-void fn_8054E05C(void* panel)
+/* Forwards the key release to the +0x1A04 pane manager (a tail call in retail). */
+void fn_8054E05C(void* panel, HkbManager* manager)
 {
     Panel805482CC* self = (Panel805482CC*)panel;
-    fn_8055BEF0(&self->field_0x1A04);
+    ((HbmPaneManager*)&self->field_0x1A04)->HbmPaneManager::onKeyRelease(manager);
 }
 
 /* The u16 at +0x008. */
@@ -1205,7 +1217,7 @@ void fn_8054E808(Panel805482CC* self)
 void fn_8054E81C(void* panel)
 {
     Panel805482CC* self = (Panel805482CC*)panel;
-    fn_8055C1D4(&self->field_0x1A04);
+    ((HbmPaneManager*)&self->field_0x1A04)->HbmPaneManager::v_0x03C();
     fn_8055A3E0(&self->sub, 0);
 }
 
@@ -1213,7 +1225,7 @@ void fn_8054E81C(void* panel)
 void fn_8054E858(void* panel)
 {
     Panel805482CC* self = (Panel805482CC*)panel;
-    fn_8055C2CC(&self->field_0x1A04);
+    ((HbmPaneManager*)&self->field_0x1A04)->HbmPaneManager::v_0x040();
     fn_8055A3E0(&self->sub, 1);
 }
 
@@ -1231,16 +1243,18 @@ extern "C" u8 fn_8054EEC4(HkbWidget* self) {
     return self->flag_1AB5;
 }
 
-/* The keyboard widget's state selector. */
-extern "C" u32 fn_8054EECC(HkbWidget* self) {
-    return self->state;
+/* Returns the part's state. */
+u32 HbmPanelPart::getState() {
+    return mState;
 }
 
-/* Stores the state selector and re-sorts the widget's list. */
-extern "C" void fn_8054F120(HkbWidget* self, u32 state) {
-    self->state = state;
-    fn_8055C638(self);
+
+/* Stores the state, then hands it to the band key. */
+void HbmPanelPart::setState(u32 state) {
+    mState = state;
+    HbmKey::setState(state);
 }
+
 
 /* Empty virtual slot. */
 extern "C" void fn_8054F128(void* self) {
@@ -1327,28 +1341,23 @@ extern "C" void fn_8054F424(HkbWidget* self) {
     child->v_0x048();
 }
 
-/* The child the widget is currently dispatching to. */
-extern "C" void* fn_8054F438(HkbWidget* self) {
-    return self->current;
+/* Returns the part's resource word. */
+/* untyped: opaque handle passed through */
+void* HbmPanelPart::getResource() {
+    return mpResource;
 }
 
-/* Clears the widget's state selector. */
-extern "C" void fn_8054F440(HkbWidget* self) {
-    self->state = 0;
+
+/* Clears the part's state. */
+void HbmPanelPart::reset() {
+    mState = 0;
 }
 
-/* Runs the destructor entry, then releases the storage, and returns the pointer. */
-extern "C" void* fn_8054F44C(void* self, int flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmPanelPartA::~HbmPanelPartA() {
 }
+
 
 /* Whether the widget's node list is empty. */
 extern "C" u32 fn_8054F4A8(HkbWidget* self) {
@@ -1540,8 +1549,8 @@ extern "C" void fn_8054F734(HkbWidget* self) {
 }
 
 /* Adjustor thunk: base #7 -> fn_8054E05C. */
-extern "C" void fn_8054F73C(HkbWidget* self) {
-    fn_8054E05C((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_1A04)));
+extern "C" void fn_8054F73C(HkbWidget* self, HkbManager* manager) {
+    fn_8054E05C((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_1A04)), manager);
 }
 
 /* Adjustor thunk: base #7 -> fn_8054D9F0. */

@@ -26,6 +26,8 @@
  *            fn_805580F0, fn_805581C0, fn_805583B4, fn_80558670, fn_805586D4, fn_80558E18 (the static initialiser).
  * RESIDUALS. Unwritten, call hbm_hermite.cpp's hbmNameMatches or
  *            hbm_text_panel.cpp's fn_80549D74: fn_80557004, fn_80557910, fn_80557E8C.
+ * NAMES.     GUESS classes HbmAnimPart and its kinds HbmAnimPartA/B/C (band keys with a state word; their
+ *            members reset, setState, show, getResource).
  */
 
 #include "types.h"
@@ -40,6 +42,45 @@
 #include "MSL/strlen.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
+/* An animated part: a band key with its state word; its class table (0x806513FC) and the out-of-line copy of its inline destructor (0x805576EC) are
+ * this unit's.  size: 0x34 */
+class HbmAnimPart : public HbmKey {
+public:
+    virtual void reset();
+    virtual void setState(u32 state);
+    virtual ~HbmAnimPart() {}
+    virtual void show();
+    /* untyped: opaque handle passed through */
+    virtual void* getResource();
+
+    /* +0x30 */ void* mpResource;
+}; /* size: 0x34 */
+
+/* A HbmAnimPart kind (class table 0x80651378): its own slot 0x10 and reset are defined above as C functions.  size: 0x34 */
+class HbmAnimPartA : public HbmAnimPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual void reset();
+    virtual ~HbmAnimPartA();
+};
+
+/* A HbmAnimPart kind (class table 0x806513D0): its own slot 0x10 and reset are defined above as C functions.  size: 0x34 */
+class HbmAnimPartB : public HbmAnimPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual void reset();
+    virtual ~HbmAnimPartB();
+};
+
+/* A HbmAnimPart kind (class table 0x806513A4): its own slot 0x10 and reset are defined above as C functions.  size: 0x34 */
+class HbmAnimPartC : public HbmAnimPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual void reset();
+    virtual ~HbmAnimPartC();
+};
+
+
 extern "C" void fn_80557228(void* self);
 
 extern "C" void fn_80557744(void* self);
@@ -47,8 +88,6 @@ extern "C" void fn_80557744(void* self);
 extern "C" void fn_80557E8C(void* self);
 
 extern "C" void wmemset(void* dst, int value, u16 size);
-
-extern "C" void* fn_805576EC(void* self, int flag);
 
 extern "C" void* fn_80557310(void* self, int flag);
 
@@ -382,17 +421,6 @@ extern "C" void* fn_80557350(void* self, int flag) {
     return self;
 }
 
-/* Runs the widget's own destructor, then releases its storage. */
-extern "C" void* fn_805576EC(void* self, int flag) {
-    if (self != 0) {
-        fn_8055C494(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
-
 /* 0x80557AA8 (0x1AC): opens the widget for an owner at a mode and entry: resets the parts, selects the entry, moves
  * the key-top pane onto the owner's pane and plays the part's opening animation. */
 extern "C" void hbmAnimOpen(HbmAnimWidget* self, HbmAnimOwnerView* owner, u8 mode, u8 index) {
@@ -472,20 +500,24 @@ extern "C" void hbmAnimArmParts(HbmAnimWidget* self) {
     }
 }
 
-/* The widget's resource word (+0x30). */
-extern "C" void* fn_8055805C(HbmWidget* self) {
-    return self->resource;
+/* Returns the part's resource word. */
+/* untyped: opaque handle passed through */
+void* HbmAnimPart::getResource() {
+    return mpResource;
 }
 
-/* Clears the widget's state selector. */
-extern "C" void fn_805580E4(HbmWidget* self) {
-    self->mode.state = 0;
+
+/* Clears the part's state. */
+void HbmAnimPart::reset() {
+    mState = 0;
 }
 
-/* Sets the widget's state selector to its "showing" state. */
-extern "C" void fn_805581B4(HbmWidget* self) {
-    self->mode.state = 6;
+
+/* Puts the part into its showing state. */
+void HbmAnimPart::show() {
+    mState = 6;
 }
+
 
 /* 0x80558434 (0xBC): steps the record back (stopping at the first entry) and shows the new entry. */
 extern "C" void hbmAnimStepBack(HbmAnimWidget* self) {
@@ -529,15 +561,15 @@ extern "C" void hbmAnimKeysMode9(HbmAnimWidget* self) {
 /* The widget's completion test, when it has one. */
 extern "C" u32 fn_80558638(HbmWidget* self) {
     if (self->tail.bytes.flag_D1 != 0) {
-        return fn_8055BEDC(&self->vtable_24);
+        return ((HbmPaneManager*)&self->vtable_24)->HbmPaneManager::updateComponents();
     }
     return 0;
 }
 
 /* The widget's completion test, when it has one. */
-extern "C" u32 fn_80558654(HbmWidget* self) {
+extern "C" u32 fn_80558654(HbmWidget* self, HkbManager* manager) {
     if (self->tail.bytes.flag_D1 != 0) {
-        return fn_8055BEF0(&self->vtable_24);
+        return ((HbmPaneManager*)&self->vtable_24)->HbmPaneManager::onKeyRelease(manager);
     }
     return 0;
 }
@@ -629,11 +661,12 @@ extern "C" void hbmAnimHandleEvent(HbmAnimWidget* self, s32 event) {
     }
 }
 
-/* Stores the child the widget dispatches to and re-sorts its list. */
-extern "C" void fn_80558A44(HbmWidget* self, HbmWidget* current) {
-    self->mode.current = current;
-    fn_8055C638(self);
+/* Stores the state, then hands it to the band key. */
+void HbmAnimPart::setState(u32 state) {
+    mState = state;
+    HbmKey::setState(state);
 }
+
 
 /* 0x80558A4C (0xBC): steps the idle (0) and closing (5, 7) states on an input event. */
 extern "C" void hbmAnimStepIdle(HbmAnimWidget* self, s32 event) {
@@ -700,7 +733,7 @@ extern "C" void hbmAnimStepState(HbmAnimWidget* self, s32 event) {
 
 /* Walks the widget's child pane. */
 extern "C" void fn_80558C8C(HbmWidget* self) {
-    fn_8055BBAC(&self->vtable_24);
+    ((HbmPaneManager*)&self->vtable_24)->HbmPaneManager::calcComponents();
 }
 
 /* Empty virtual slot. */
@@ -747,44 +780,20 @@ extern "C" void fn_80558DB0(HbmWidget* self) {
     self->mode.state = 0;
 }
 
-/* 0x80558CE0 (0x5C): deleting destructor of an animated part (base destructor, then the storage). */
-extern "C" HbmWidget* hbmAnimPartDeleteA(HbmWidget* self, s32 flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* Destroys the part (the inline base destructors run here). */
+HbmAnimPartA::~HbmAnimPartA() {
 }
 
-/* 0x80558D54 (0x5C): deleting destructor of an animated part (base destructor, then the storage). */
-extern "C" HbmWidget* hbmAnimPartDeleteB(HbmWidget* self, s32 flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmAnimPartB::~HbmAnimPartB() {
 }
 
-/* 0x80558DBC (0x5C): deleting destructor of an animated part (base destructor, then the storage). */
-extern "C" HbmWidget* hbmAnimPartDeleteC(HbmWidget* self, s32 flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmAnimPartC::~HbmAnimPartC() {
 }
+
 
 /* Adjustor thunk: base #3 -> fn_80557228. */
 extern "C" void fn_80558E84(void* base) {
@@ -797,8 +806,8 @@ extern "C" void fn_80558E8C(void* base) {
 }
 
 /* Adjustor thunk: base #3 -> fn_80558654. */
-extern "C" void fn_80558E94(void* base) {
-    fn_80558654((HbmWidget*)((u8*)base - HBM_OFFSET_OF(HbmWidget, vtable_24)));
+extern "C" void fn_80558E94(void* base, HkbManager* manager) {
+    fn_80558654((HbmWidget*)((u8*)base - HBM_OFFSET_OF(HbmWidget, vtable_24)), manager);
 }
 
 /* Adjustor thunk: base #3 -> fn_80558C8C. */

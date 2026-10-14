@@ -20,9 +20,6 @@ void* fn_80557310(void* self, int flag);
 void* fn_80557350(void* self, int flag);
 
 /* untyped: opaque band object, typed by the callers' views */
-void* fn_805576EC(void* self, int flag);
-
-/* untyped: opaque band object, typed by the callers' views */
 void fn_80557744(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */

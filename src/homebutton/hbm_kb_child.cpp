@@ -22,6 +22,8 @@
  *            static initialiser).
  * RESIDUALS. Unwritten, call hbm_hermite.cpp's hbmNameMatches:
  *            fn_805563D0, fn_805564B4, fn_80556840.
+ * NAMES.     GUESS classes HbmKbChildPart and its kinds HbmKbChildPartA/B/C (band keys with a state word; members
+ *            reset, setState, getResource).
  */
 
 #include "types.h"
@@ -32,15 +34,47 @@
 #include "homebutton/hbm_widget.h"
 #include "homebutton/hbm_value.h"
 
+/* A child part: a band key with its state word; its class table (0x80650A00) and the out-of-line copy of its inline destructor (0x80555F5C) are
+ * this unit's.  size: 0x34 */
+class HbmKbChildPart : public HbmKey {
+public:
+    virtual void reset();
+    virtual void setState(u32 state);
+    virtual ~HbmKbChildPart() {}
+    /* untyped: opaque handle passed through */
+    virtual void* getResource();
+
+    /* +0x30 */ void* mpResource;
+}; /* size: 0x34 */
+
+/* A HbmKbChildPart kind (class table 0x80650988): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbChildPartA : public HbmKbChildPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbChildPartA();
+};
+
+/* A HbmKbChildPart kind (class table 0x806509B0): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbChildPartB : public HbmKbChildPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbChildPartB();
+};
+
+/* A HbmKbChildPart kind (class table 0x806509D8): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+class HbmKbChildPartC : public HbmKbChildPart {
+public:
+    virtual void setAnim(s32 anim);
+    virtual ~HbmKbChildPartC();
+};
+
+
 /* Callees inside the band, declared ahead of their bodies (address order). */
 extern "C" void fn_80555B0C(HbmWidget* self, int flag);
-
 
 extern "C" void fn_805563D0(HbmWidget* self, int flag);
 
 extern "C" void wmemset(void* dst, int value, u16 size);
-
-extern "C" void* fn_80555F5C(void* self, int flag);
 
 extern "C" void* fn_80555BF4(void* self, int flag);
 
@@ -201,17 +235,6 @@ extern "C" void* fn_80555BF4(void* self, int flag) {
     return self;
 }
 
-/* Runs the widget's own destructor, then releases its storage. */
-extern "C" void* fn_80555F5C(void* self, int flag) {
-    if (self != 0) {
-        fn_8055C494(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
-
 /* 0x80555FB4 (0xAC): resets the key-top pane and rebinds the widget base's entry to its value block. */
 extern "C" void hbmKbChildUpdate(HbmChildWidget* self) {
     ((HbmChildBaseView*)&self->base_1C)->v_0x05C("N_PRDCkeytop_all")->v_0x014(0);
@@ -300,11 +323,12 @@ extern "C" void hbmKbChildStepFinished(HbmChildWidget* self, s32 event) {
     }
 }
 
-/* Stores the child the widget dispatches to and re-sorts its list. */
-extern "C" void fn_80556A90(HbmWidget* self, HbmWidget* current) {
-    self->mode.current = current;
-    fn_8055C638(self);
+/* Stores the state, then hands it to the band key. */
+void HbmKbChildPart::setState(u32 state) {
+    mState = state;
+    HbmKey::setState(state);
 }
+
 
 /* 0x80556A98 (0x170): steps the five-state selector on an input event (0 also forces state 4). */
 extern "C" void hbmKbChildStepState(HbmChildWidget* self, s32 event) {
@@ -398,9 +422,9 @@ extern "C" void hbmKbChildStepStateEx(HbmChildWidget* self, s32 event) {
 extern "C" void fn_80556DBC(void) {
 }
 
-/* Adjustor thunk: base #2 -> fn_8055BBAC. */
+/* Adjustor thunk: base #2 -> HbmPaneManager::calcComponents. */
 extern "C" void fn_80556DC0(HbmWidget* self) {
-    fn_8055BBAC(&self->vtable_1C);
+    ((HbmPaneManager*)&self->vtable_1C)->HbmPaneManager::calcComponents();
 }
 
 /* Virtual slot at +0xD4: the widget's per-frame tick, handed the region. */
@@ -413,54 +437,33 @@ extern "C" u8 fn_80556DD8(HbmWidget* self) {
     return self->flag_C8;
 }
 
-/* The widget's resource word (+0x30). */
-extern "C" void* fn_80556DE0(HbmWidget* self) {
-    return self->resource;
+/* Returns the part's resource word. */
+/* untyped: opaque handle passed through */
+void* HbmKbChildPart::getResource() {
+    return mpResource;
 }
 
-/* Clears the widget's state selector. */
-extern "C" void fn_80556DE8(HbmWidget* self) {
-    self->mode.state = 0;
+
+/* Clears the part's state. */
+void HbmKbChildPart::reset() {
+    mState = 0;
 }
 
-/* 0x80556DF4 (0x5C): deleting destructor of a child part (base destructor, then the storage). */
-extern "C" HbmWidget* hbmKbChildPartDeleteA(HbmWidget* self, s32 flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmKbChildPartA::~HbmKbChildPartA() {
 }
 
-/* 0x80556E50 (0x5C): deleting destructor of a child part (base destructor, then the storage). */
-extern "C" HbmWidget* hbmKbChildPartDeleteB(HbmWidget* self, s32 flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmKbChildPartB::~HbmKbChildPartB() {
 }
 
-/* 0x80556EAC (0x5C): deleting destructor of a child part (base destructor, then the storage). */
-extern "C" HbmWidget* hbmKbChildPartDeleteC(HbmWidget* self, s32 flag) {
-    if (self != 0) {
-        if (self != 0) {
-            fn_8055C494(self, 0);
-        }
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+
+/* Destroys the part (the inline base destructors run here). */
+HbmKbChildPartC::~HbmKbChildPartC() {
 }
+
 
 /* Adjustor thunk: base #3 -> fn_80555B0C. */
 extern "C" void fn_80556FA4(void* base, int flag) {

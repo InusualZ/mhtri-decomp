@@ -79,4 +79,60 @@ void BindAnimation(Group* pGroup, AnimTransform* pAnimTrans, bool bRecursive, bo
 }  // namespace nw4r
 #endif
 
+#ifdef __cplusplus
+struct MEMAllocator;
+class HbmPaneManager;
+class HkbInputWidget;
+
+/* The band's event handler: the pane manager it reports to (class table 0x8064DE70 in this unit's .data).
+ * size: 0x8 */
+class HbmEventHandler {
+public:
+    /* slot +0x008 */ virtual ~HbmEventHandler();
+    /* untyped: caller-owned payload - the argument record of the event */
+    /* slot +0x00C */ virtual void onEvent(u32 id, u32 event, void* data);
+    /* slot +0x010 */ virtual void setManager(HbmPaneManager* manager);
+    /* slot +0x014 */ virtual HbmPaneManager* getManager();
+
+    /* +0x04 */ HbmPaneManager* mpManager;
+}; /* size: 0x8 */
+
+/* The receiver of an input widget's notifications (the widget's +0x0C): the slots the band calls.
+ * size: 0x4 (approximation: only the vptr is touched) */
+class HkbEventSink {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* untyped: caller-owned payload - the argument record of event `id` */
+    /* slot +0x018 */ virtual void onEvent(u32 id, void* data);
+    /* slot +0x01C */ virtual void setOwner(HkbInputWidget* owner);
+}; /* size: 0x4 */
+
+/* The root of the band's input widgets (the software keyboard, the cellphone keypad input and the band's widgets
+ * derive from it): its notification sink and its layout type; the slots 0x08..0x30 are the ones every derived
+ * class table shares.  size: 0x14 (approximation: the fields the shared members read) */
+class HkbInputWidget {
+public:
+    /* slot +0x008 */ virtual ~HkbInputWidget();
+    /* slot +0x00C */ virtual void create(MEMAllocator* allocator);
+    /* slot +0x010 */ virtual void init();
+    /* slot +0x014 */ virtual void setEventSink(HkbEventSink* sink);
+    /* untyped: caller-owned payload - the argument record of event `id` */
+    /* slot +0x018 */ virtual void sendEvent(u32 id, void* data);
+    /* slot +0x01C */ virtual void onCommand(u32 command, u32 arg);
+    /* slot +0x020 */ virtual void onPaneEvent(u32 event, const char* paneName);
+    /* slot +0x024 */ virtual s32 isBusy();
+    /* slot +0x028 */ virtual void setLayoutType(s32 type);
+    /* slot +0x02C */ virtual s32 getLayoutType();
+    /* slot +0x030 */ virtual void calc();
+
+    /* +0x04 */ u32 unused_0x04;
+    /* +0x08 */ u32 unused_0x08;
+    /* +0x0C */ HkbEventSink* mpEventSink;
+    /* +0x10 */ s32 mLayoutType;
+}; /* size: 0x14 */
+#endif
+
 #endif

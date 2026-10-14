@@ -37,6 +37,8 @@
  *            0x80564780-0x805647F4, 0x805655C4-0x805661C8, 0x80566340-0x80566440. They call unnamed functions of
  *            hbm_text_panel, hbm_value, hbm_hermite, hbm_kb_cursor and tiHKBManager, or read the unit's own `.sbss`
  *            global objects / `.sdata` records, which need their classes (vtables) and names first.
+ * NAMES.     GUESS HkbInputWidget::setEventSink and HbmGuiPaneWidget's destructor and calcComponents (their
+ *            classes are homebutton/hkb_keyboard.h's and homebutton/gui.h's).
  */
 
 #include "types.h"
@@ -52,10 +54,12 @@
 #include "homebutton/hbm_kb_object.h"
 #include "homebutton/hbm_kb_event.h"
 #include "homebutton/hbm_value.h"
+#include "homebutton/hkb_keyboard.h"
+#include "homebutton/gui.h"
 #include "nw4r/fn_805012C4.h"
 #include "RVLGX/GXPixel.h"
 
-/* The controller handed to fn_8056083C: it is stored at +0x0C and told its owner through slot 0x1C.
+/* The controller handed to HkbInputWidget::setEventSink: it is stored at +0x0C and told its owner through slot 0x1C.
  * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 are touched) */
 class HkbVuController {
 public:
@@ -963,10 +967,11 @@ extern "C" {
 /* ---------------------------------------------------------------------------------------------------
  * chained-sub-object calls
  * ------------------------------------------------------------------------------------------------ */
-void fn_8056083C(VuObject* self, VuSub* arg)
+/* Stores the notification sink and tells it its owner. */
+void HkbInputWidget::setEventSink(HkbEventSink* sink)
 {
-    self->field_0x0C = arg;
-    ((HkbVuController*)arg)->v_0x01C(self);
+    mpEventSink = sink;
+    sink->setOwner(this);
 }
 
 void fn_8056085C(VuObject* self, void* a, void* b)
@@ -981,15 +986,9 @@ void fn_8056085C(VuObject* self, void* a, void* b)
 
 void fn_805608EC(VuObject* self) { nw4r::ut::List_Init((nw4r::ut::List*)&self->list_0x04, 4); }
 
-/* A deleting destructor whose base sub-object sits at +4 of the object. */
-void* fn_80560B68(VuObject* self, s32 flag)
+/* Destroys the pane widget's pane manager (at +4). */
+HbmGuiPaneWidget::~HbmGuiPaneWidget()
 {
-    if (self != 0) {
-        fn_8055B7D4((void*)&self->list_0x04, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
 }
 
 void fn_80560FB4(VuObject* self) { ((HkbVuContent*)self->sub_0x40)->v_0x020(); }
@@ -1224,7 +1223,8 @@ void hkbKbPreDrawZAlways(KbObject* self)
 /* ---------------------------------------------------------------------------------------------------
  * tail-call thunks: the retail body is `b <victim>` (the arguments pass through untouched)
  * ------------------------------------------------------------------------------------------------ */
-void fn_805646E4(KbObject* self) { fn_8055BBAC(&self->sub_0x04); }
+/* Runs the pane manager's calcComponents. */
+void HbmGuiPaneWidget::calcComponents() { HbmPaneManager::calcComponents(); }
 
 /* 0x805646EC (0x84): Forwards slot 0x148 of the wrapped object while its state is 1 or 2. */
 void hkbKbForward148WhileActiveB(KbObject* self)
