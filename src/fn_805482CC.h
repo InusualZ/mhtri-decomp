@@ -355,7 +355,7 @@ typedef struct Panel805482CC {
     /* +0x118 */ Panel805482CC_Sub118 field_0x118;           /* size: 0x24 */
     /* +0x13C */ u8 pad_0x13C[0x177C];
     /* +0x18B8 */ Panel805482CC_Sub18B8 field_0x18B8;        /* size: 0x40 */
-    /* +0x18F8 */ u8 pad_0x18F8[0x40];
+    /* +0x18F8 */ u8 pad_0x18F8[0x44];
     /* +0x193C */ Panel805482CC_Item* field_0x193C;
     /* +0x1940 */ Panel805482CC_Item* field_0x1940;
     /* +0x1944 */ Panel805482CC_Item* field_0x1944;
@@ -388,7 +388,14 @@ typedef struct Panel805482CC {
     /* +0x1A18 */ Panel805482CC_Item* field_0x1A18;
     /* +0x1A1C */ u8 pad_0x1A1C[0x9A];
     /* +0x1AB6 */ u8 field_0x1AB6;
-    /* +0x1AB7 */ u8 pad_0x1AB7[0x3D];
+    /* +0x1AB7 */ u8 pad_0x1AB7[0x21];
+    /* +0x1AD8 */ s32 field_0x1AD8;                           /* repeat countdown of button bit 0x0001 */
+    /* +0x1ADC */ s32 field_0x1ADC;                           /* repeat countdown of button bit 0x4000 */
+    /* +0x1AE0 */ s32 field_0x1AE0;                           /* repeat countdown of button bit 0x0002 */
+    /* +0x1AE4 */ s32 field_0x1AE4;                           /* repeat countdown of button bit 0x8000 */
+    /* +0x1AE8 */ s32 field_0x1AE8;                           /* repeat countdown of button bit 0x1000 */
+    /* +0x1AEC */ u8 pad_0x1AEC[0x4];
+    /* +0x1AF0 */ u32 field_0x1AF0;                           /* the pressed buttons plus the auto-repeated ones */
 } Panel805482CC; /* size: 0x1AF4 - a lower bound (the band reads the object through +0x1AF0) */
 
 #endif /* MHTRI_FN_805482CC_H */
