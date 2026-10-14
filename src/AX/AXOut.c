@@ -14,15 +14,14 @@
  *    `__AXDspTask`, `__AXDspDramBuffer`, `__AXDspImage` and the `__AXOut*` / `__AXDsp*` state words are GUESSes
  *    named from how the code uses them.
  * EVIDENCE. `.data` 0x80610980 (0x2000 B, the last object of the old block's `.data`) is the AX DSP program the
- *    task points at; `.bss` 0x806FA860 (0xD60 B) is four 32-aligned statics - profile +0x0, rings +0x40, surround
+ *    task points at; `.bss` 0x806FA860 (0xD60 B) is four statics (the last three 32-aligned) - profile +0x0, rings +0x40, surround
  *    buffer +0x5E0, output buffers +0x8E0 - that the code reaches from the first one's address (`addi rX,base,0`
  *    for the profile, `addi rX,base,0x8E0` held for the output buffers); 0x806FB5C0 (the DSP task) and
  *    0x806FB620 (its DRAM buffer) by `__AXOutInitDSP` and `__AXOutQuit`; `.sdata` 0x80793D18 holds the DSP init
  *    and resume vectors and the program size.
- * RESIDUALS. the map still names the four statics as one `__AXOutData` row (0xD60), so our relocations name
- *    `...bss.0` / `__AXOutBuffer` where the target names `__AXOutData`; __AXOutNewFrame 0x8046FE20: the profile
- *    copy's base takes r31 (target r29); __AXOutInitDSP 0x804701C0: the zero takes saved r29 (target r12) and the
- *    task field stores schedule differently; `.text` 0x744 of 0x750 B.
+ * RESIDUALS. __AXOutNewFrame 0x8046FE20: the profile copy's base takes r31 (target r29); __AXOutInitDSP 0x804701C0:
+ *    the zero takes saved r29 (target r12) and the task field stores schedule differently; `.text` is 0x744 of the
+ *    claimed 0x750 B, the 0xC B tail being link padding.
  * SHAPES. the DSP task type and entry points come from `DSP/dsp.h`; the four task callbacks are static functions whose
  *    addresses fill the task.  `__AXOutDmaFrame` is volatile: the target re-reads it after every store.  The
  *    frame writes the profile fields by name rather than through a pointer (the target re-forms the address).

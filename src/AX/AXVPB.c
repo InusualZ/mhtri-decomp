@@ -2,7 +2,7 @@
  * AX/AXVPB.c - the AX voice parameter blocks: the voice table, the per-frame voice service and PB sync, and the
  *    AXSetVoice* setters.
  *
- * RANGE. .text 0x804709B0-0x80471960 (17 functions, 0xFB0 B); .bss 0x806FB6E0-0x8070CDE0; .sbss
+ * RANGE. .text 0x804709B0-0x80471960 (17 functions, 0xFB0 B); .bss 0x806FB6D8-0x8070CDE0 (align:32); .sbss
  *    0x80794FD8-0x80794FF8; .sdata2 0x8079CF48-0x8079CF68.  Cut from the old ARC/AX block between `AX/AXSPB.c`
  *    (0x804709B0) and `AX/AXProf.c` (0x80471960).
  * FLAGS. the `OS` lib's group with `cflags_base` (configure.py `cflags=`): every function start of the band is
@@ -15,16 +15,17 @@
  * EVIDENCE. `.bss` 0x806FB6E0 (0x7800 B: 96 PBs), 0x80702EE0 (0x1800 B: 96 ITD buffers) and 0x807046E0 (0x8700 B: 96 voices)
  *    are reached through the `.sbss` pointers 0x80794FD8..0x80794FE0 that `__AXVPBInit` fills; `.sdata2`
  *    0x8079CF48..0x8079CF68 holds the float constants of `AXSetVoiceSrcRatio` and `AXGetLpfCoefs`.
- * RESIDUALS. AXSetVoiceLpf 0x804717C0 and AXSetVoiceAdpcmLoop 0x80471760: the target stores the first halfword before
- *    it loads `sync`, ours hoists the load: MWCC lets a load through the `const` source pointer that `AX/AXVPB.h`
- *    declares pass the stores (a non-const parameter and field-wise copies match both rows);
- *    __AXServiceVPB 0x804709C0: ITD copy temporaries take r3/r0 swapped.
+ * RESIDUALS. __AXServiceVPB 0x804709C0: ITD copy temporaries take r3/r0 swapped.
+ *    `.bss` opens with AXSPB's 8 B fill (claim align:32); flipcheck reads it as a layout difference, and it is link
+ *    padding once the 32-aligned object links.
  * SHAPES. AXGetLpfCoefs folds `2.0f - cos(...)` into one expression and names the square root, which pools the
  *    literals in the target's order (2.0f before 2pi, 1.0f before 32768.0f); `__AXPBData` is 32-byte aligned.
  *    __AXSyncPBs sums the cycle tables left to right in field order (MWCC reassociates them into the target's
  *    order), writes the start count as one sum, and walks the priority-0 stack with a block-scoped pointer.
  *    __AXVPBInitVoices sets the cycle limit before the cycle count, clears the PB table with an open loop whose
  *    count is declared before its pointer, and takes the PB, ITD and voice pointers in that order.
+ *    AXSetVoiceLpf and AXSetVoiceAdpcmLoop: field-wise copy, non-const source (the first store then precedes the
+ *    `sync` load).
  */
 
 #include "types.h"
@@ -536,17 +537,19 @@ void AXSetVoiceSrcRatio(AXVPB* vpb, f32 ratio)
 }
 
 /* 0x80471760 (0x60): sets the ADPCM loop context of a voice. */
-void AXSetVoiceAdpcmLoop(AXVPB* vpb, const AXPBAdpcmLoop* loop)
+void AXSetVoiceAdpcmLoop(AXVPB* vpb, AXPBAdpcmLoop* loop)
 {
     BOOL level = OSDisableInterrupts();
 
-    vpb->pb.adpcmLoop = *loop;
+    vpb->pb.adpcmLoop.predScale = loop->predScale;
+    vpb->pb.adpcmLoop.yn1 = loop->yn1;
+    vpb->pb.adpcmLoop.yn2 = loop->yn2;
     vpb->sync |= AX_SYNC_ADPCM_LOOP;
     OSRestoreInterrupts(level);
 }
 
 /* 0x804717C0 (0x68): sets the low-pass filter state of a voice. */
-void AXSetVoiceLpf(AXVPB* vpb, const AXPBLpf* lpf)
+void AXSetVoiceLpf(AXVPB* vpb, AXPBLpf* lpf)
 {
     BOOL level = OSDisableInterrupts();
 
