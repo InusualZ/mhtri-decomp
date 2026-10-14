@@ -928,8 +928,8 @@ config.libs = [
             # Phase 4 stubs (window fg): the MSL libm (fdlibm) units after MSL_C/alloc.
             Object(Matching, "MSL/e_asin.cpp"),
             Object(Matching, "MSL/e_atan2.cpp"),
-            Object(NonMatching, "MSL/e_fmod.cpp"),
-            Object(NonMatching, "MSL/e_log.cpp"),
+            Object(Matching, "MSL/e_fmod.cpp"),
+            Object(Matching, "MSL/e_log.cpp"),
             Object(Matching, "MSL/e_log10.cpp"),
             Object(NonMatching, "MSL/e_pow.cpp"),
             Object(Matching, "MSL/e_rem_pio2.cpp"),
@@ -1370,7 +1370,7 @@ config.libs = [
             Object(NonMatching, "AX/AXVPB.c", cflags=cflags_base),
             Object(Matching, "AX/AXProf.c", cflags=cflags_base),
             Object(NonMatching, "DSPADPCM/dspadpcm.c", cflags=cflags_base),
-            Object(NonMatching, "BTE/gki_buffer.c", cflags=cflags_base),  # 16-aligned starts, default alignment: unit header
+            Object(Matching, "BTE/gki_buffer.c", cflags=cflags_base),  # 16-aligned starts, default alignment: unit header
             # The BTE head 0x80478790..0x8047ABC4 recut per BTE source file (16-aligned starts, lib default); each unit's header carries its evidence.
             # cflags_base for the BTE head code rows (16-aligned starts): evidence on the FLAGS line of src/BTE/gki_time.c
             Object(Matching, "BTE/gki_time.c", cflags=cflags_base),
@@ -1392,7 +1392,7 @@ config.libs = [
             Object(Matching, "BTE/ptim.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/utl.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             # GC/3.0a5.2 + cflags_nw4r for the bta_dm_* rows: evidence on the FLAGS line of src/BTE/bta_dm_act.c
-            Object(NonMatching, "BTE/bta_dm_act.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
+            Object(Matching, "BTE/bta_dm_act.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/bta_dm_api.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(Matching, "BTE/bta_dm_main.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
             Object(NonMatching, "BTE/bta_dm_pm.c", mw_version="GC/3.0a5.2", cflags=cflags_nw4r),
