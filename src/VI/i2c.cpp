@@ -5,10 +5,10 @@
  * FLAGS. `cflags_base` (-O4,p, 16-byte function alignment): every start is 16-aligned.
  * NAMES. all three functions are the map's names; `i2cSdaActiveHigh` and `i2cStarted` are GUESSES (the former selects
  *   which output level a logical 1 is driven with and starts at 1, the latter is set by the first send); both are
- *   two-word arrays because the target objects are 8 bytes (the second word is never read).
+ *   two-word arrays because the target objects are 8 bytes (the second word is never read).  `i2cSdaActiveHigh` is
+ *   volatile: `sendSlaveAddr` reloads it after the acknowledge check.
  * RESIDUALS. Relocations: the two-word state arrays carry offset 0 of `i2cSdaActiveHigh` where retail names the word itself.
- *   Flip blocker: .text object 0x910 vs claimed 0x920 (the two register-numbering rows below).  `sendSlaveAddr` (0x804E9250): the target loads the polarity word twice after the ack check, ours once
- *   (one lwz/cmp pair). `__VISendI2CData` (0x804E95A0): register numbering only - the target keeps the arguments in
+ *   `__VISendI2CData` (0x804E95A0): register numbering only - the target keeps the arguments in
  *   r29/r26/r27 and the interrupt level in r28, ours in r24-r26; `permdecl` over the two locals does not move it.
  */
 #include "types.h"
@@ -25,7 +25,7 @@
 #define I2C_SCL 0x4000
 #define I2C_SDA 0x8000
 
-static u32 i2cSdaActiveHigh[2] = {1, 0};
+static volatile u32 i2cSdaActiveHigh[2] = {1, 0};
 static u32 i2cStarted[2];
 
 void WaitMicroTime(s32 us)

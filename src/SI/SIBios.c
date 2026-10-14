@@ -18,15 +18,23 @@
  *    are `static inline` and defined after `CompleteTransfer`: the statics are allocated in first-use order, and
  *    the target inlines them into `SIInterruptHandler`, `SIGetStatus` and `SIGetResponse` without emitting them.
  *    `InputBufferVcount` is volatile (the target reloads it between the zero test and the sum).
- * RESIDUALS. `__SITransfer` 0x804DE340: identical instruction stream, the six parameter copies are numbered
- *    r26..r31 in another order.  `GetTypeCallback` 0x804DEA20 (callback-loop registers, relocation names against
- *    `Packet`), `SIInterruptHandler` 0x804DDD20 (register numbering, one `lwzx` scheduled later in the target) and
- *    `SISetSamplingRate` (relocations name `XYNTSC` in the target, the section in ours) are all 94..99.9 %.
- *    flipcheck: `.bss` order (`cmdFixedDevice` precedes `TypeCallback` in the target, the first reference decides
- *    ours), the tail padding of `.data`/`.sdata`/`.sbss`, the `...bss.0`/`...data.0` relocation names, and
- *    `cmdFixedDevice` force-active in the target's `.comment`.
+ * RESIDUALS. Seam: `SISetSamplingRate`, `SIRefreshSamplingRate`, `XYNTSC`, `XYPAL`, their string and `SamplingRate`
+ *    are the SDK's `SISamplingRate.c` (.text 0x804DEFB0-0x804DF0A0, .data 0x8062A008-0x8062A0A0, .sbss
+ *    0x80795480-0x80795488): the target addresses the two tables and the string off a base equal to `XYNTSC`, which
+ *    is `...data.0` only when `XYNTSC` opens its TU's .data; here the base is the build string (+0x70/+0xA0/+0xD0),
+ *    and those six DOL bytes are all that a flip of this unit moves.
+ *    flipcheck: the tail padding of `.data`/`.sdata`/`.sbss`, the `...bss.0`/`...data.0` relocation names, and the
+ *    map row `cmdFixedDevice`, which our object names `@LOCAL@GetTypeCallback__FlUlP9OSContext@cmdFixedDevice`
+ *    (the row is force-active in the target's `.comment`).
  * SHAPES. the SI registers are the absolute array `__SIRegs : 0xCD006400`; COMCSR is a bitfield union so the
  *    transfer start composes with bare `rlwimi`s; the tick conversions are 32-bit (`OS_USEC_TO_TICKS(65)`).
+ *    `__SITransfer` clears the status bits through a local `sr` (read, mask, write back): the compound `&=` on the
+ *    register numbers the six parameter copies in another order.  `cmdFixedDevice` is a function-local static of
+ *    `GetTypeCallback`: as a file static it is laid out after `TypeCallback` (target: before it).  `RunTypeCallbacks`
+ *    declares `i` before `type`, and `GetTypeCallback` builds the wireless ID in two statements (`id = ...; id |= ...`);
+ *    both pick the target's registers.  `SIInterruptHandler` starts the next queued transfer through the inline
+ *    `SITransferNext` (SDK shape: `chan` advanced in place, a `packet` pointer), clears the status bits through
+ *    `sr` like `__SITransfer`, and declares `curr` before `vcount`.
  */
 
 #include "types.h"
@@ -129,7 +137,6 @@ static s32 SamplingRate;
 u32 __PADFixBits;
 
 static SITypeCallback TypeCallback[SI_MAX_CHAN][SI_MAX_CHAN];
-static u32 cmdFixedDevice[SI_MAX_CHAN];
 static SIPollingHandler RDSTHandler[SI_MAX_CHAN];
 static volatile u32 InputBufferVcount[SI_MAX_CHAN];
 static u32 InputBufferValid[SI_MAX_CHAN];
@@ -226,6 +233,27 @@ static inline BOOL GetResponseRaw(s32 chan)
     return FALSE;
 }
 
+/* Starts the first queued transfer after `chan` whose time has come. */
+static inline void SITransferNext(s32 chan)
+{
+    s32 i;
+    SIPacket* packet;
+
+    for (i = 0; i < SI_MAX_CHAN; i++) {
+        chan++;
+        chan %= SI_MAX_CHAN;
+        packet = &Packet[chan];
+        if (packet->chan != -1 && packet->fire <= __OSGetSystemTime()) {
+            if (__SITransfer(packet->chan, packet->output, packet->outBytes, packet->input, packet->inBytes,
+                             packet->callback)) {
+                OSCancelAlarm(&Alarm[chan]);
+                packet->chan = -1;
+            }
+            break;
+        }
+    }
+}
+
 /* Handles the transfer-complete and read-data interrupts: completes the transfer, starts the next queued one and
  * runs the polling handlers. */
 void SIInterruptHandler(s16 interrupt, OSContext* context)
@@ -238,33 +266,21 @@ void SIInterruptHandler(s16 interrupt, OSContext* context)
         s32 chan;
         u32 sr;
         SICallback callback;
-        s32 i;
-        s32 next;
 
         chan = Si.chan;
         sr = CompleteTransfer();
         callback = Si.callback;
         Si.callback = NULL;
 
-        next = chan;
-        for (i = 0; i < SI_MAX_CHAN; i++) {
-            next++;
-            next %= SI_MAX_CHAN;
-            if (Packet[next].chan != -1 && Packet[next].fire <= __OSGetSystemTime()) {
-                if (__SITransfer(Packet[next].chan, Packet[next].output, Packet[next].outBytes, Packet[next].input,
-                                 Packet[next].inBytes, Packet[next].callback)) {
-                    OSCancelAlarm(&Alarm[next]);
-                    Packet[next].chan = -1;
-                }
-                break;
-            }
-        }
+        SITransferNext(chan);
 
         if (callback) {
             callback(chan, sr, context);
         }
 
-        SI_REGS[SI_SR] &= 0x0F000000 >> (chan * 8);
+        sr = SI_REGS[SI_SR];
+        sr &= 0x0F000000 >> (chan * 8);
+        SI_REGS[SI_SR] = sr;
         if (Type[chan] == SI_ERROR_BUSY && !SIIsChanBusy(chan)) {
             SITransfer(chan, &cmdTypeAndStatus, 1, &Type[chan], 3, GetTypeCallback, OS_USEC_TO_TICKS(65));
         }
@@ -272,8 +288,8 @@ void SIInterruptHandler(s16 interrupt, OSContext* context)
 
     if ((reg & 0x18000000) == 0x18000000) {
         s32 i;
-        u32 vcount;
         u32 curr;
+        u32 vcount;
 
         curr = VIGetCurrentLine() + 1;
         vcount = (Si.poll >> 16) & 0x3FF;
@@ -386,6 +402,7 @@ BOOL __SITransfer(s32 chan, void* output, u32 outBytes, void* input, u32 inBytes
     BOOL enabled;
     SICommControl comcsr;
     u32 i;
+    u32 sr;
 
     enabled = OSDisableInterrupts();
     if (Si.chan != -1) {
@@ -393,7 +410,9 @@ BOOL __SITransfer(s32 chan, void* output, u32 outBytes, void* input, u32 inBytes
         return FALSE;
     }
 
-    SI_REGS[SI_SR] &= 0x0F000000 >> (chan * 8);
+    sr = SI_REGS[SI_SR];
+    sr &= 0x0F000000 >> (chan * 8);
+    SI_REGS[SI_SR] = sr;
 
     Si.chan = chan;
     Si.callback = callback;
@@ -558,8 +577,8 @@ BOOL SITransfer(s32 chan, void* output, u32 outBytes, void* input, u32 inBytes, 
  * callbacks. */
 static inline void RunTypeCallbacks(s32 chan)
 {
-    u32 type;
     s32 i;
+    u32 type;
 
     type = Type[chan];
     for (i = 0; i < SI_MAX_CHAN; i++) {
@@ -573,6 +592,7 @@ static inline void RunTypeCallbacks(s32 chan)
 
 static void GetTypeCallback(s32 chan, u32 error, OSContext* context)
 {
+    static u32 cmdFixedDevice[SI_MAX_CHAN];
     u32 type;
     u32 id;
     u32 fixed;
@@ -613,7 +633,8 @@ static void GetTypeCallback(s32 chan, u32 error, OSContext* context)
             return;
         }
     } else if (type & 0x40000000) {
-        id = (type & 0x00CFFF00) | 0x00100000;
+        id = type & 0x00CFFF00;
+        id |= 0x00100000;
         OSSetWirelessID(chan, (id >> 8) & 0xFFFF);
         cmdFixedDevice[chan] = id | 0x4E000000;
         Type[chan] = SI_ERROR_BUSY;

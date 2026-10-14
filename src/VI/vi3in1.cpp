@@ -16,8 +16,10 @@
  *   `__VISetGammaCoef` (0x804EAA80): the target interleaves loads and stores in source order (the compiler
  *   assumes the byte stores alias the entry), ours needs `#pragma scheduling off` for the same order and still differs in
  *   the prologue and the last pairs.  `__VISendEncoderRegs` (0x804E9D00): the target keeps each block's source pointer in
- *   a register (`addi r30,r3,0x420` then `lbz 0(r30)`), ours folds the offset into the displacement.
- *   `__VIInitEncoder` (0x804EAD80): register numbering (the target saves r28-r31).
+ *   a register (`addi r30,r3,0x420` then `lbz 0(r30)`) and the 0x40 register number in r31, ours folds the offset into
+ *   the displacement and builds 0x40 in r0.  `__VIInitEncoder` (0x804EAD80): the same 0x40/base allocation in its
+ *   `viSendRegBlock` (the target saves r28-r31); storing `data[0]` before the copy loop gains it 0.8 points and costs
+ *   `__VISendEncoderRegs` 0.07, so the block helper stores it after the loop.
  *   Data: `viEncoderFormat` (0x80794188, value 0) is in .sdata in the target and cannot be emitted there (a zero
  *   initialiser lands in .sbss); the two assert strings belong to the public `VISetCGMS`, which the retail image does not
  *   carry, so they are kept as arrays; the target object's one .rela.data entry (a table word that looks like an address)
@@ -135,7 +137,18 @@ static s32 viEncoderMode;
 static u8 viEncoderBuf[0x20];
 
 /* Sends one register block (register number 0x40 followed by 26 image bytes) and waits for the encoder. */
-#define VI_SEND_REG_BLOCK(block)                             {                                                            u8 data[27];                                             const u8* src = (block);                                 s32 i;                                                   data[0] = 0x40;                                          for (i = 0; i < 26; i++) {                                   data[i + 1] = src[i];                                }                                                        __VISendI2CData(VI_ENCODER_ADDR, data, 27);              WaitMicroTime(2);                                    }
+static inline void viSendRegBlock(const u8* src)
+{
+    u8 data[27];
+    s32 i;
+
+    for (i = 1; i < 27; i++) {
+        data[i] = *src++;
+    }
+    data[0] = 0x40;
+    __VISendI2CData(VI_ENCODER_ADDR, data, 27);
+    WaitMicroTime(2);
+}
 
 /* Writes one encoder register. */
 static inline void viWriteReg(u8 reg, u8 value)
@@ -157,53 +170,53 @@ void __VISendEncoderRegs(void)
     case 2:
         switch (viEncoderFormat) {
         case 0:
-            VI_SEND_REG_BLOCK(tables->regs[0][0].regs);
+            viSendRegBlock(tables->regs[0][0].regs);
             break;
         case 1:
-            VI_SEND_REG_BLOCK(tables->regs[1][0].regs);
+            viSendRegBlock(tables->regs[1][0].regs);
             break;
         case 2:
-            VI_SEND_REG_BLOCK(tables->regs[3][0].regs);
+            viSendRegBlock(tables->regs[3][0].regs);
             break;
         case 5:
-            VI_SEND_REG_BLOCK(tables->regs[2][0].regs);
+            viSendRegBlock(tables->regs[2][0].regs);
             break;
         }
         break;
     case 3:
         switch (viEncoderFormat) {
         case 0:
-            VI_SEND_REG_BLOCK(tables->regs[0][1].regs);
+            viSendRegBlock(tables->regs[0][1].regs);
             break;
         case 1:
-            VI_SEND_REG_BLOCK(tables->regs[1][1].regs);
+            viSendRegBlock(tables->regs[1][1].regs);
             break;
         case 2:
-            VI_SEND_REG_BLOCK(tables->regs[3][1].regs);
+            viSendRegBlock(tables->regs[3][1].regs);
             break;
         case 5:
-            VI_SEND_REG_BLOCK(tables->regs[2][1].regs);
+            viSendRegBlock(tables->regs[2][1].regs);
             break;
         }
         break;
     case 4:
         switch (viEncoderFormat) {
         case 0:
-            VI_SEND_REG_BLOCK(tables->regs[0][2].regs);
+            viSendRegBlock(tables->regs[0][2].regs);
             break;
         case 1:
-            VI_SEND_REG_BLOCK(tables->regs[1][2].regs);
+            viSendRegBlock(tables->regs[1][2].regs);
             break;
         case 2:
-            VI_SEND_REG_BLOCK(tables->regs[3][2].regs);
+            viSendRegBlock(tables->regs[3][2].regs);
             break;
         case 5:
-            VI_SEND_REG_BLOCK(tables->regs[2][2].regs);
+            viSendRegBlock(tables->regs[2][2].regs);
             break;
         }
         break;
     case 1:
-        VI_SEND_REG_BLOCK(viEncoderBuf);
+        viSendRegBlock(viEncoderBuf);
         break;
     }
 }
@@ -462,7 +475,7 @@ void __VIInitEncoder(void)
         viEncoderDirtyFlags |= 4;
     }
     __VISetClosedCaption();
-    VI_SEND_REG_BLOCK(viEncoderBuf);
+    viSendRegBlock(viEncoderBuf);
     if (viEncoderGain != 0) {
         viEncoderGain = 0;
         viEncoderDirtyFlags |= 0x40;

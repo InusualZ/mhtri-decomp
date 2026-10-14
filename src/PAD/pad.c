@@ -10,19 +10,19 @@
  *    `PADTypes` its `Type`, `PADInitialized` its `Initialized` (GUESS spellings forced by taken map names);
  *    `PADUnusedStatus` (GUESS) is a 0x30 .bss block no kept function references; `__OSWirelessPadFixMode` (GUESS,
  *    SDK spelling) is the low-memory word 0x800030E0.
- * RESIDUALS. __PADDisableRecalibration: the `lis r5,0x8000` / `lbz r4` pair is allocated r4/r5 swapped (only
- *    `volatile` gives the target's registers, at the cost of a second load).
- *    .bss: PADUnusedStatus sits at +0x80 and PrevStatus at +0x50 (target +0x50/+0x80): an unreferenced block sorts
- *    last (playbook 113); the target's referencer was dead-stripped from the DOL.
- *    Relocation names only: PADTypeAndStatusCallback's .bss base is `...bss.0` (target `Origin`, same offset 0);
+ * RESIDUALS. Relocation names only: PADTypeAndStatusCallback's .bss base is `...bss.0` (target `Origin`, same offset 0);
  *    __PADVersion points at `@143` (map `lbl_80629B38`).
  * SHAPES. PADEnable/PADDisable/DoReset/PADSetSpec/PADSync/PADClearSamplingCallback/ClampS8/ClampU8 are static inline
  *    helpers. An s8 recentre is `+= -128` (`-= 128` emits `addi +0x80`, the target `subi 0x80`). A cleared bit is
  *    `x = x & ~m` (`x &= ~m` on a narrow field emits `andi.`, the target `rlwinm`). The fix-mode word is an
  *    absolute-address variable (`u16 v : addr`): one load feeds the four unrolled CmdProbeDevice stores, where a
  *    pointer-cast define reloads per store. PrevStatus is declared `extern` and defined `static` after PADRead,
- *    which keeps PADRead addressing PADTypes/PrevStatus/Origin by symbol instead of a pooled `...bss.0` base.
+ *    which keeps PADRead addressing PADTypes/PrevStatus/Origin by symbol instead of a pooled `...bss.0` base;
+ *    PADUnusedStatus is defined after it, which gives .bss the target's order (PADUnusedStatus +0x50, PrevStatus
+ *    +0x80).
  *    PADInitialized is an 8-byte record (playbook 116.4), which gives .sbss the target's 0x30 bytes.
+ *    __PADDisableRecalibration sits in a scoped `global_optimizer off` (playbook 120): with the global optimizer on
+ *    the `lis 0x8000` base and the flag byte take r4/r5 swapped; `opt_common_subs off` gives the same bytes.
  */
 #include "PAD/pad.h"
 #include "PAD/PADClamp.h"
@@ -127,7 +127,6 @@ static u32 PADTypes[4];
 static u32 CmdReadOrigin = 0x41 << 24;
 static u32 CmdCalibrate = 0x42 << 24;
 static u32 CmdProbeDevice[4];
-static PADStatus PADUnusedStatus[4];
 extern PADStatus PrevStatus[4];
 
 static OSShutdownFunctionInfo padShutdownFunctionInfo = {__PADShutdown, 127, NULL, NULL};
@@ -585,6 +584,7 @@ u32 PADRead(PADStatus* status)
 }
 
 static PADStatus PrevStatus[4];
+static PADStatus PADUnusedStatus[4];
 
 /* 0x804D9360 (0x118): decodes a specification-0 response. */
 static void SPEC0_MakeStatus(s32 chan, PADStatus* status, u32 data[2])
@@ -774,6 +774,8 @@ static void SamplingHandler(s16 interrupt, OSContext* context)
     }
 }
 
+#pragma push
+#pragma global_optimizer off
 BOOL __PADDisableRecalibration(BOOL disable)
 {
     BOOL enabled;
@@ -788,3 +790,4 @@ BOOL __PADDisableRecalibration(BOOL disable)
     OSRestoreInterrupts(enabled);
     return prev;
 }
+#pragma pop
