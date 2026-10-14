@@ -2691,14 +2691,74 @@ BTE/gki_buffer.c:
 	.bss        start:0x8070CDE0 end:0x807358C0
 
 BTE/gki_time.c:
-	.text       start:0x80478790 end:0x80480A90 align:16
-	.rodata     start:0x80573530 end:0x80573840
-	.data       start:0x80612E60 end:0x80613B60
-	.bss        start:0x807358C0 end:0x80739698
-	.sdata      start:0x80793D28 end:0x80793D88
-	.sbss       start:0x80795008 end:0x80795040
-	.sdata2     start:0x8079D080 end:0x8079D0B8
-	.sbss2      start:0x8079D7E0 end:0x8079D7F0
+	.text       start:0x80478790 end:0x8047ABC4 align:16
+	.rodata     start:0x80573530 end:0x805735E8
+	.data       start:0x80612E60 end:0x80612ED0
+	.bss        start:0x807358C0 end:0x807391F8
+	.sdata      start:0x80793D28 end:0x80793D80
+	.sbss       start:0x80795008 end:0x80795038
+	.sdata2     start:0x8079D080 end:0x8079D098
+	.sbss2      start:0x8079D7E0 end:0x8079D7E8
+
+BTE/bd.c:
+	.text       start:0x8047ABC4 end:0x8047AC98
+
+BTE/bta_sys_conn.c:
+	.text       start:0x8047AC98 end:0x8047AEEC
+
+BTE/bta_sys_main.c:
+	.text       start:0x8047AEEC end:0x8047B130
+	.data       start:0x80612ED0 end:0x80612F08
+	.bss        start:0x807391F8 end:0x80739288
+	.sbss       start:0x80795038 end:0x80795040
+
+BTE/ptim.c:
+	.text       start:0x8047B130 end:0x8047B310
+
+BTE/utl.c:
+	.text       start:0x8047B310 end:0x8047B354
+
+BTE/bta_dm_act.c:
+	.text       start:0x8047B354 end:0x8047D690
+	.rodata     start:0x805735E8 end:0x80573690
+	.data       start:0x80612F08 end:0x80613048
+	.bss        start:0x80739288 end:0x807392B8
+	.sdata2     start:0x8079D098 end:0x8079D0A0
+
+BTE/bta_dm_api.c:
+	.text       start:0x8047D690 end:0x8047DAFC
+	.sdata2     start:0x8079D0A0 end:0x8079D0B0
+
+BTE/bta_dm_main.c:
+	.text       start:0x8047DAFC end:0x8047DC5C
+	.rodata     start:0x80573690 end:0x805737B8
+	.bss        start:0x807392B8 end:0x80739438
+
+BTE/bta_dm_pm.c:
+	.text       start:0x8047DC5C end:0x8047E678
+	.data       start:0x80613048 end:0x80613098
+	.bss        start:0x80739438 end:0x80739468
+
+BTE/bta_hh_act.c:
+	.text       start:0x8047E678 end:0x8047FDC0
+	.data       start:0x80613098 end:0x80613590
+	.sdata      start:0x80793D80 end:0x80793D88
+
+BTE/bta_hh_api.c:
+	.text       start:0x8047FDC0 end:0x80480190
+	.data       start:0x80613590 end:0x806135C0
+	.sdata2     start:0x8079D0B0 end:0x8079D0B8
+
+BTE/bta_hh_main.c:
+	.text       start:0x80480190 end:0x804806E4
+	.rodata     start:0x805737B8 end:0x80573840
+	.data       start:0x806135C0 end:0x806138A0
+	.bss        start:0x80739468 end:0x80739698
+
+BTE/bta_hh_utils.c:
+	.text       start:0x804806E4 end:0x80480A90
+	.data       start:0x806138A0 end:0x80613B60
+	.sbss2      start:0x8079D7E8 end:0x8079D7F0
 
 BTE/btm_acl.c:
 	.text       start:0x80480A90 end:0x804827D4

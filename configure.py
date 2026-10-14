@@ -1370,7 +1370,21 @@ config.libs = [
             Object(Matching, "AX/AXProf.c", cflags=cflags_base),
             Object(NonMatching, "DSPADPCM/dspadpcm.c", cflags=cflags_base),
             Object(NonMatching, "BTE/gki_buffer.c", cflags=cflags_base),  # 16-aligned starts, default alignment: unit header
-            Object(NonMatching, "BTE/gki_time.c"),  # mixed band, 4-aligned starts from 0x8047ABC4, lib default: unit header
+            Object(NonMatching, "BTE/gki_time.c"),  # 16-aligned head, lib default: unit header
+            # The BTE bta band 0x8047ABC4..0x80480A90 recut per BTE source file; each unit's header carries its evidence.
+            Object(NonMatching, "BTE/bd.c"),
+            Object(NonMatching, "BTE/bta_sys_conn.c"),
+            Object(NonMatching, "BTE/bta_sys_main.c"),
+            Object(NonMatching, "BTE/ptim.c"),
+            Object(NonMatching, "BTE/utl.c"),
+            Object(NonMatching, "BTE/bta_dm_act.c"),
+            Object(NonMatching, "BTE/bta_dm_api.c"),
+            Object(NonMatching, "BTE/bta_dm_main.c"),
+            Object(NonMatching, "BTE/bta_dm_pm.c"),
+            Object(NonMatching, "BTE/bta_hh_act.c"),
+            Object(NonMatching, "BTE/bta_hh_api.c"),
+            Object(NonMatching, "BTE/bta_hh_main.c"),
+            Object(NonMatching, "BTE/bta_hh_utils.c"),
             # The BTE btm band 0x80480A90..0x8048AEE0 recut per BTE source file; each unit's header carries its evidence.
             Object(NonMatching, "BTE/btm_acl.c"),
             Object(NonMatching, "BTE/btm_dev.c"),
