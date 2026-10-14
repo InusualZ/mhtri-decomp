@@ -10,9 +10,11 @@
  *   `wpadResetChannel` calls), `WPADWriteGameData`, `WPADReadGameData` (the title-checked game-data write and read; game code
  *   calls the write) and their completion `wpadGameDataCallback`, `wpadBulkWriteNext`, `wpadBulkWriteFirst`,
  *   `wpadSetDpdStatusA/B`, `wpadGetDpdCalibration`, `wpadReadMemory`, `wpadWriteMemory`, `wpadCopyTitleString`.
- * RESIDUALS. Written: 13 of 13 rows, 6 of them match.  `WPADWriteGameData` and `wpadBulkWriteNext/First` differ in register
- *   numbering and one reload; `WPADReadGameData` schedules its two control-block loads differently; `wpadReadMemory`,
- *   `wpadWriteMemory` and `WPADWriteExtReg` swap r29/r30.  Flip blocker: .text (7 partial rows).
+ * RESIDUALS. None; no flip blocker.
+ * SHAPES. The definitions follow the address order (the object's layout is the source order).  The status/ready pair is
+ *   read after `OSDisableInterrupts` with `ready` declared first (register order r29/r30); a bulk-write chunk goes through
+ *   `wpadBulkWriteChunk` (its own `level`); the game-data record is written in
+ *   `WPADMemChunk` steps from its first byte (an indexed `calBytes` spelling stops CSE-ing the chunk addresses).
  */
 
 #include "types.h"
@@ -23,6 +25,9 @@
 #include "OS/OSRestoreInterrupts.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "MSL_C/alloc.h"
+
+/* One 16-byte chunk of a remote memory transfer. */
+typedef u8 WPADMemChunk[0x10];
 
 /* .bss */
 static u16 wpadTitleBuf[0x1C];
@@ -39,13 +44,34 @@ void WPADiClearMemBlock(s32 chan)
     cb->bulkDoneCallback = NULL;
 }
 
+/* Runs the callback the bulk transfer stored. */
+void wpadGameDataCallback(s32 chan, s32 result)
+{
+    WPADCB* cb = wpadCBTable[chan];
+    WPADCallback callback;
+
+    cb->speakerStateA = 0;
+    callback = cb->bulkDoneCallback;
+    cb->bulkDoneCallback = NULL;
+    if (callback != NULL) {
+        callback(chan, result);
+    }
+}
+
 /* Continues a bulk write: sends the next 16-byte chunk, or reports completion when the data is spent or a chunk fails. */
+/* Sends the next chunk of a bulk write with interrupts off. */
+static inline void wpadBulkWriteChunk(s32 chan, WPADCB* cb, u16 chunk)
+{
+    u32 level = OSDisableInterrupts();
+    wpadWriteMemory(chan, (const void*)cb->speakerStateB, chunk, cb->speakerStateD, wpadBulkWriteNext);
+    OSRestoreInterrupts(level);
+}
+
 void wpadBulkWriteNext(s32 chan, s32 result)
 {
     WPADCB* cb = wpadCBTable[chan];
     u16 remaining = cb->speakerStateC;
     u16 chunk;
-    u32 level;
     WPADCallback done;
 
     if (remaining == 0) {
@@ -58,17 +84,12 @@ void wpadBulkWriteNext(s32 chan, s32 result)
     } else {
         chunk = (remaining <= 0x10) ? remaining : 0x10;
         if (result == 0) {
-            cb->speakerStateC = cb->speakerStateC - chunk;
+            cb->speakerStateC -= chunk;
             cb->speakerStateD = cb->speakerStateD + 0x10;
             cb->speakerStateB = cb->speakerStateB + 0x10;
-            cb = wpadCBTable[chan];
-            level = OSDisableInterrupts();
-            wpadWriteMemory(chan, (const void*)cb->speakerStateB, chunk, cb->speakerStateD, wpadBulkWriteNext);
-            OSRestoreInterrupts(level);
+            wpadBulkWriteChunk(chan, wpadCBTable[chan], chunk);
         } else if (result == -2) {
-            level = OSDisableInterrupts();
-            wpadWriteMemory(chan, (const void*)cb->speakerStateB, chunk, cb->speakerStateD, wpadBulkWriteNext);
-            OSRestoreInterrupts(level);
+            wpadBulkWriteChunk(chan, cb, chunk);
         } else {
             cb->speakerStateA = 0;
             done = cb->bulkDoneCallback;
@@ -85,109 +106,23 @@ void wpadBulkWriteFirst(s32 chan, s32 result)
 {
     WPADCB* cb = wpadCBTable[chan];
     u16 chunk;
-    u16 remaining;
-    u32 level;
-    WPADCB* again;
 
     if (cb->dpdStatusB == 0) {
         cb->dpdStatusB = (result == 0) ? 0 : -3;
     }
-    if (result == 0 && (cb->dpdStatusA == 0 || cb->dpdStatusB == 0)) {
-        remaining = cb->speakerStateC;
-        chunk = (remaining <= 0x10) ? remaining : 0x10;
-        cb->speakerStateC = cb->speakerStateC - chunk;
-        again = wpadCBTable[chan];
-        level = OSDisableInterrupts();
-        wpadWriteMemory(chan, (const void*)again->speakerStateB, chunk, again->speakerStateD, wpadBulkWriteNext);
-        OSRestoreInterrupts(level);
-        return;
+    if (result == 0) {
+        if (cb->dpdStatusA == 0 || cb->dpdStatusB == 0) {
+            chunk = (cb->speakerStateC <= 0x10) ? cb->speakerStateC : 0x10;
+            cb->speakerStateC -= chunk;
+            wpadBulkWriteChunk(chan, wpadCBTable[chan], chunk);
+            return;
+        }
+        result = -3;
     }
     if (cb->bulkDoneCallback != NULL) {
         cb->speakerStateA = 0;
         cb->bulkDoneCallback(chan, result);
         cb->bulkDoneCallback = NULL;
-    }
-}
-
-/* Stores the calibration block with the title code and checksum, then writes it to the remote followed by the bulk data. */
-s32 WPADWriteGameData(s32 chan, const void* src, u16 size, u32 addr, WPADCallback callback) /* untyped: byte range */
-{
-    WPADCB* cb = wpadCBTable[chan];
-    s32 status = cb->status;
-    u32 level = OSDisableInterrupts();
-
-    if (status != -1) {
-        if (cb->ready == 0) {
-            status = -2;
-        } else if (cb->speakerStateA == 0) {
-            if (wpadQueueHasRoom(&cb->cmdQueue, 9) == 0) {
-                status = -2;
-            } else {
-                u8 sum;
-                u8 i;
-                cb->speakerStateA = 1;
-                cb->bulkDoneCallback = callback;
-                cb->speakerStateC = size;
-                cb->speakerStateD = addr + 0x9A;
-                cb->speakerStateB = (u32)src;
-                memcpy(cb->cal.titleCode, wpadGetGameName(), 4);
-                memcpy(cb->cal.dpdCalibration, wpadTitleBuf, 0x22);
-                cb->cal.timestamp = OSGetTime();
-                cb->cal.appType = wpadGetAppType();
-                cb->cal.checksum = 0;
-                for (i = 0; i < 0x2F; i++) {
-                    cb->cal.checksum = cb->cal.checksum + cb->calBytes[i];
-                }
-                cb->cal.checksum = cb->cal.checksum + 0x55;
-                cb->dpdStatusA = 0;
-                cb->dpdStatusB = 0;
-                wpadWriteMemory(chan, cb->calBytes, 0x10, 0x2A, wpadSetDpdStatusA);
-                wpadWriteMemory(chan, &cb->calBytes[0x10], 0x10, 0x3A, wpadSetDpdStatusA);
-                wpadWriteMemory(chan, &cb->calBytes[0x20], 0x10, 0x4A, wpadSetDpdStatusA);
-                wpadWriteMemory(chan, &cb->calBytes[0x30], 8, 0x5A, wpadSetDpdStatusA);
-                wpadWriteMemory(chan, cb->calBytes, 0x10, 0x62, wpadSetDpdStatusB);
-                wpadWriteMemory(chan, &cb->calBytes[0x10], 0x10, 0x72, wpadSetDpdStatusB);
-                wpadWriteMemory(chan, &cb->calBytes[0x20], 0x10, 0x82, wpadSetDpdStatusB);
-                wpadWriteMemory(chan, &cb->calBytes[0x30], 8, 0x92, wpadBulkWriteFirst);
-                OSRestoreInterrupts(level);
-                return 0;
-            }
-        } else {
-            status = -2;
-        }
-    }
-    OSRestoreInterrupts(level);
-    if (callback != NULL) {
-        callback(chan, status);
-    }
-    return status;
-}
-
-/* Copies the title string (at most 16 wide characters, zero terminated) into the title buffer. */
-void wpadCopyTitleString(const u16* title)
-{
-    s32 i;
-
-    for (i = 0; i < 0x10; i++) {
-        wpadTitleBuf[i] = title[i];
-        if (title[i] == 0) {
-            break;
-        }
-    }
-    wpadTitleBuf[0x10] = 0;
-}
-
-/* Runs the callback the bulk transfer stored. */
-void wpadGameDataCallback(s32 chan, s32 result)
-{
-    WPADCB* cb = wpadCBTable[chan];
-    WPADCallback callback;
-
-    cb->speakerStateA = 0;
-    callback = cb->bulkDoneCallback;
-    cb->bulkDoneCallback = NULL;
-    if (callback != NULL) {
-        callback(chan, result);
     }
 }
 
@@ -210,24 +145,60 @@ void wpadSetDpdStatusB(s32 chan, s32 error)
     }
 }
 
-/* Hands out the pointer-calibration block once both calibration reads have finished; returns 0 or a negative error. */
-s32 wpadGetDpdCalibration(s32 chan, u8** out)
+/* Stores the calibration block with the title code and checksum, then writes it to the remote followed by the bulk data. */
+s32 WPADWriteGameData(s32 chan, const void* src, u16 size, u32 addr, WPADCallback callback) /* untyped: byte range */
 {
+    u32 level;
     WPADCB* cb = wpadCBTable[chan];
-    u32 level = OSDisableInterrupts();
-    s32 missing = 0;
     s32 status;
+    s32 ready;
 
-    if (cb->dpdStatusA == 0 || cb->dpdStatusB == 0) {
-        missing = 1;
-    }
-    status = missing != 0 ? 0 : -4;
-    if (status == 0) {
-        *out = cb->cal.dpdCalibration;
-    } else {
-        *out = NULL;
+    level = OSDisableInterrupts();
+    status = cb->status;
+    ready = cb->ready;
+    if (status != -1) {
+        if (ready == 0) {
+            status = -2;
+        } else if (cb->speakerStateA == 0) {
+            if (wpadQueueHasRoom(&cb->cmdQueue, 9) == 0) {
+                status = -2;
+            } else {
+                u8 i;
+                cb->speakerStateA = 1;
+                cb->bulkDoneCallback = callback;
+                cb->speakerStateC = size;
+                cb->speakerStateD = addr + 0x9A;
+                cb->speakerStateB = (u32)src;
+                memcpy(cb->cal.titleCode, wpadGetGameName(), 4);
+                memcpy(cb->cal.dpdCalibration, wpadTitleBuf, 0x22);
+                cb->cal.timestamp = OSGetTime();
+                cb->cal.appType = wpadGetAppType();
+                cb->cal.checksum = 0;
+                for (i = 0; i < 0x2F; i++) {
+                    cb->cal.checksum = cb->cal.checksum + cb->calBytes[i];
+                }
+                cb->cal.checksum = cb->cal.checksum + 0x55;
+                cb->dpdStatusA = 0;
+                cb->dpdStatusB = 0;
+                wpadWriteMemory(chan, (u8*)&cb->cal, 0x10, 0x2A, wpadSetDpdStatusA);
+                wpadWriteMemory(chan, (u8*)&cb->cal + sizeof(WPADMemChunk), 0x10, 0x3A, wpadSetDpdStatusA);
+                wpadWriteMemory(chan, (u8*)&cb->cal + sizeof(WPADMemChunk) * 2, 0x10, 0x4A, wpadSetDpdStatusA);
+                wpadWriteMemory(chan, (u8*)&cb->cal + sizeof(WPADMemChunk) * 3, 8, 0x5A, wpadSetDpdStatusA);
+                wpadWriteMemory(chan, (u8*)&cb->cal, 0x10, 0x62, wpadSetDpdStatusB);
+                wpadWriteMemory(chan, (u8*)&cb->cal + sizeof(WPADMemChunk), 0x10, 0x72, wpadSetDpdStatusB);
+                wpadWriteMemory(chan, (u8*)&cb->cal + sizeof(WPADMemChunk) * 2, 0x10, 0x82, wpadSetDpdStatusB);
+                wpadWriteMemory(chan, (u8*)&cb->cal + sizeof(WPADMemChunk) * 3, 8, 0x92, wpadBulkWriteFirst);
+                OSRestoreInterrupts(level);
+                return 0;
+            }
+        } else {
+            status = -2;
+        }
     }
     OSRestoreInterrupts(level);
+    if (callback != NULL) {
+        callback(chan, status);
+    }
     return status;
 }
 
@@ -235,11 +206,14 @@ s32 wpadGetDpdCalibration(s32 chan, u8** out)
 s32 WPADReadGameData(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callback) /* untyped: caller-owned byte buffer */
 {
     WPADCB* cb = wpadCBTable[chan];
-    s32 status = cb->status;
+    s32 ready;
+    s32 status;
     u32 level = OSDisableInterrupts();
 
+    status = cb->status;
+    ready = cb->ready;
     if (status != -1) {
-        if (cb->ready == 0) {
+        if (ready == 0) {
             status = -2;
         } else if (cb->speakerStateA == 0) {
             s32 missing = 0;
@@ -271,9 +245,11 @@ s32 WPADReadGameData(s32 chan, void* dest, u16 size, u32 addr, WPADCallback call
 s32 wpadReadMemory(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callback) /* untyped: caller-owned byte buffer */
 {
     WPADCB* cb = wpadCBTable[chan];
+    s32 ready;
+    s32 status;
     u32 level = OSDisableInterrupts();
-    s32 status = cb->status;
-    s32 ready = cb->ready;
+    status = cb->status;
+    ready = cb->ready;
     OSRestoreInterrupts(level);
     if (status != -1) {
         if (ready == 0) {
@@ -292,9 +268,11 @@ s32 wpadReadMemory(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callba
 s32 wpadWriteMemory(s32 chan, const void* src, s32 size, u32 addr, WPADCallback callback) /* untyped: byte range */
 {
     WPADCB* cb = wpadCBTable[chan];
+    s32 ready;
+    s32 status;
     u32 level = OSDisableInterrupts();
-    s32 status = cb->status;
-    s32 ready = cb->ready;
+    status = cb->status;
+    ready = cb->ready;
     OSRestoreInterrupts(level);
     if (status != -1) {
         if (ready == 0) {
@@ -309,13 +287,50 @@ s32 wpadWriteMemory(s32 chan, const void* src, s32 size, u32 addr, WPADCallback 
     return status;
 }
 
+/* Hands out the pointer-calibration block once both calibration reads have finished; returns 0 or a negative error. */
+s32 wpadGetDpdCalibration(s32 chan, u8** out)
+{
+    WPADCB* cb = wpadCBTable[chan];
+    u32 level = OSDisableInterrupts();
+    s32 missing = 0;
+    s32 status;
+
+    if (cb->dpdStatusA == 0 || cb->dpdStatusB == 0) {
+        missing = 1;
+    }
+    status = missing != 0 ? 0 : -4;
+    if (status == 0) {
+        *out = cb->cal.dpdCalibration;
+    } else {
+        *out = NULL;
+    }
+    OSRestoreInterrupts(level);
+    return status;
+}
+
+/* Copies the title string (at most 16 wide characters, zero terminated) into the title buffer. */
+void wpadCopyTitleString(const u16* title)
+{
+    s32 i;
+
+    for (i = 0; i < 0x10; i++) {
+        wpadTitleBuf[i] = title[i];
+        if (title[i] == 0) {
+            break;
+        }
+    }
+    wpadTitleBuf[0x10] = 0;
+}
+
 /* Writes to the extension register space (the remote adds the 0x04A4 prefix). */
 s32 WPADWriteExtReg(s32 chan, const void* src, s32 size, u32 addr, WPADCallback callback) /* untyped: byte range */
 {
     WPADCB* cb = wpadCBTable[chan];
+    s32 ready;
+    s32 status;
     u32 level = OSDisableInterrupts();
-    s32 status = cb->status;
-    s32 ready = cb->ready;
+    status = cb->status;
+    ready = cb->ready;
     OSRestoreInterrupts(level);
     if (status != -1) {
         if (ready == 0) {

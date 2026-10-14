@@ -120,12 +120,24 @@ typedef struct WPADFlags {
     /* +0x17 */ s8 statusFlags;
 } WPADFlags; /* size: 0x18 */
 
-/* size: 0x2E - the remote's own calibration block: the accelerometer zero and one-G readings. */
+/* size: 0x08 - one pointer calibration point as the remote's calibration block stores it: the position, the size and
+ * the slot it was read for. */
+typedef struct WPADDpdCalPoint {
+    /* +0x00 */ s16 x;
+    /* +0x02 */ s16 y;
+    /* +0x04 */ u16 size;
+    /* +0x06 */ u8 index;
+    /* +0x07 */ u8 pad_0x07;
+} WPADDpdCalPoint; /* size: 0x08 */
+
+/* size: 0x2E - the remote's own calibration block: the four pointer calibration points, the accelerometer zero and
+ * one-G readings, and the motor and speaker-volume bytes. */
 typedef struct WPADCalA {
-    /* +0x00 */ u8 raw[0x20];
+    /* +0x00 */ WPADDpdCalPoint dpdPoint[4];
     /* +0x20 */ s16 accZero[3];
     /* +0x26 */ s16 accOne[3];
-    /* +0x2C */ u8 pad_0x2C[2];
+    /* +0x2C */ u8 motor; /* GUESS: bit 7 of the calibration byte */
+    /* +0x2D */ u8 volume; /* GUESS: bits 0-6 of the calibration byte */
 } WPADCalA; /* size: 0x2E */
 
 /* size: 0x1A - the attached extension's calibration block; the layout depends on the extension type. */
@@ -211,14 +223,15 @@ typedef struct WPADCB {
     /* +0x8CE */ u8 weakRadioHysteresis;
     /* +0x8CF */ u8 pendingStreamPackets;
     /* +0x8D0 */ u32 motorDirty;
-    /* +0x8D4 */ u32 motorOn;
-    /* +0x8D8 */ u32 unused_0x8D8;
+    /* +0x8D4 */ s32 motorOn;
+    /* +0x8D8 */ u32 used; /* GUESS: set when the channel is taken, cleared on reset */
     /* +0x8DC */ s32 ready;
     /* +0x8E0 */ u32 calibrationPhase;
     /* +0x8E4 */ OSThreadQueue threadQueue;
     /* +0x8EC */ u8 pad_0x8EC[4];
     /* +0x8F0 */ s64 lastReportTime;
-    /* +0x8F8 */ u16 unused_0x8F8[6];
+    /* +0x8F8 */ u16 moveCount[3]; /* per input group: consecutive changed samples (wpadSampleChanged) */
+    /* +0x8FE */ u16 moveDecay[3]; /* per input group: the decay counter of moveCount */
     /* +0x904 */ u8 pad_0x904[4];
     /* +0x908 */ s64 reconnectTime;
     /* +0x910 */ u8 unused_0x910;
@@ -245,7 +258,7 @@ typedef struct WPADCB {
     /* +0x98F */ u8 extBatteryLevel;
     /* +0x990 */ u8 extensionResult;
     /* +0x991 */ u8 extStatus; /* GUESS: set with the extension result and on detach */
-    /* +0x992 */ s16 unused_0x992;
+    /* +0x992 */ s16 extStatusTimer; /* GUESS: the countdown that clears extStatus */
     /* +0x994 */ u8 dpdBlocked;
     /* +0x995 */ u8 pad_0x995[3];
     /* +0x998 */ u32 speakerStateA;
@@ -313,7 +326,7 @@ extern WPADCB* wpadCBTable[4];
 
 /* The driver's own functions, in address order. */
 BOOL wpadShutdownCallback(BOOL final, u32 event);
-void wpadSendCommand(s32 chan, WPADCommand* cmd);
+void wpadSendCommand(s32 chan, WPADCommand cmd);
 void wpadUpdateRadioSensitivity(s32 chan);
 BOOL wpadSampleChanged(WPADCB* cb, WPADSample* sample, WPADSample* last);
 void wpadCountIdleReports(s32 chan, WPADSample* sample);
@@ -340,7 +353,7 @@ void wpadHidDataCallback(u8 handle, u8* report, u16 length);
 s32 wpadAssignChannel(WPADDeviceInfo* info);
 void wpadHidOpenCallback(WPADDeviceInfo* info, s32 connected);
 void wpadInitSequence(s32 chan, s32 result);
-void WPADGetAccGravityUnit(s32 chan, s32 type, WPADAccGravityUnit* unit);
+void WPADGetAccGravityUnit(s32 chan, u32 type, WPADAccGravityUnit* unit);
 void wpadCloseLinkCallback(s32 chan, s32 result);
 void WPADDisconnect(s32 chan);
 void WPADSetAutoSleepTime(s8 minutes);
@@ -359,6 +372,7 @@ s32 WPADControlLed(s32 chan, u8 leds, WPADCallback callback);
 BOOL WPADSaveConfig(void (*callback)(s32 result));
 s32 WPADGetLatestIndexInBuf(s32 chan);
 s32 WPADIsSpeakerEnabled(s32 chan);
+s32 WPADControlSpeaker(s32 chan, u32 command, WPADCallback callback);
 u8 WPADGetSpeakerVolume(void);
 void WPADSetSpeakerVolume(u8 volume);
 u8 WPADGetDpdSensitivity(void);
@@ -380,7 +394,7 @@ void wpadStoreSample(s32 chan);
 BOOL __wpadIsBusyStream(s32 chan);
 BOOL WPADCanSendStreamData(s32 chan);
 s32 WPADSendStreamData(s32 chan, const void* data, u32 length); /* untyped: byte range */
-s32 wpadSendWriteByte(WPADCmdQueue* queue, s8 value, u32 addr, WPADCallback callback);
+s32 wpadSendWriteByte(WPADCmdQueue* queue, u8 value, u32 addr, WPADCallback callback);
 s32 WPADiSendWriteData(WPADCmdQueue* queue, const void* src, s32 size, u32 addr, WPADCallback callback); /* untyped: byte range */
 s32 wpadSendReadMemory(WPADCmdQueue* queue, void* dest, u16 size, u32 addr, WPADCallback callback); /* untyped: caller-owned byte buffer */
 s32 wpadQueueHasRoom(WPADCmdQueue* queue, s8 count);
