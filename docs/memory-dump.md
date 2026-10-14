@@ -4,6 +4,12 @@ This game is also being reverse-engineered in a separate Ghidra project on this 
 **runtime memory dump of the game** - not the static DOL - and it is a useful oracle for this
 decompilation **for names, signatures and data**, never for codegen.
 
+**A hint, never the source of truth (owner, 2026-10-14).** The project's function and field names, struct layouts,
+types and symbols come from the owner's own reverse engineering. Use them as leads; every fact that lands in this
+repo (a name, an offset, a size, a signature) is proven from the retail bytes, the SDK or a measurement, and a name
+taken from Ghidra without such proof is marked GUESS. The memory dump's *bytes* are the game's own; the
+annotations on them are not.
+
 ## Where it is
 
 * Ghidra project `MH3Shared` (`<dump-dir>\Decompilation\MH3Shared`), program

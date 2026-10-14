@@ -1031,6 +1031,9 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-10-13 | **Scout the next pair while the current one runs** (owner). Scout and scout-review the NEXT pair while the current pair's pre-pass and lanes run, so its lanes start right after each landing; a scout item touching a header still in flight gets a delta re-check after that landing (§15.1). |
 | 2026-10-14 | **More than six lanes when the scouts show no clash** (owner: "run more concurrent lanes if their scout determine that doesn't clash"). The six-lane cap gives way to clash analysis: a lane starts when its scout shows its owned files and include closure disjoint from every lane in flight; the slot pool grew to nine (`slots.py init --count 9`). |
 | 2026-10-14 | **One `goto` exemption: `ARCConvertPathToEntrynum`** (owner: "Grant one exemption"). The SDK's goto shape matches it byte for byte; the best goto-free shapes measure 96.3 % and below, and the review found no other shape. Rule 8 exempts that one function in `src/ARC/arc.c` (at most two `goto`s, `stylelint_rules/r08_goto.py` `EXEMPT`); every other `goto` still fails the gate, and a new exemption needs its own ruling. |
+| 2026-10-14 | **Nothing outside the checkout is ever deleted, moved or overwritten** (owner: "Hard rule from now on"). A path outside the repo checkout (or a lane's slot) is listed and reported, never removed - even when it looks like scratch. Scratch resolves to a Windows-native folder inside the checkout, `<checkout>\.pi\tmp\<slug>\`, never `/c/Users/...`, `/tmp` or `$TEMP` from Python. Every agent profile (`.claude/agents/`) and every brief (`docs/pair-briefs.md`, the orchestrator's prompts) carries it. Incident: a worker wrote to `/c/Users/...` from Windows Python, which resolved to `C:\c\Users\...`, then `rm -rf`'d `C:\c` unlisted (§12). |
+| 2026-10-14 | **Ghidra is a hint, never the source of truth** (owner). Names, field names, struct layouts, types and symbols in the shared Ghidra project come from the owner's own reverse engineering; a lane uses them as leads and proves each fact from the retail bytes, the SDK or a measurement (`docs/memory-dump.md`). |
+| 2026-10-14 | **Land recut work, flip later** (owner: "Rather than parking the WPAD branch, just land the work on main and then flip when the work that needs to be done also lands"). A recut or pre-pass that is green except for a finding that resolves only when later work lands (first case: the WPAD recut's jump-table run at `.data:8062C278`, offset-shifted by unwritten WPAD.c data) lands on main with the finding allowed and recorded; its units stay `NonMatching` and flip when that work lands. |
 | standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
 
 ---
@@ -1039,6 +1042,11 @@ These are decisions, not lessons. Do not relax one without the owner.
 
 Grouped by cause; each cost a lane ~30 min the first time.
 
+* **`/c/Users/...` from Windows Python is `C:\c\Users\...` (2026-10-14).** A git-bash path handed to a native
+  Python `open()` resolves against the drive root, so `/c/Users/x` names `C:\c\Users\x`, a directory outside the
+  repo. A worker wrote scratch there, found the tree from earlier sessions' same mistake, and `rm -rf`'d `C:\c`
+  without listing it. Since then: scratch is `<checkout>\.pi\tmp\<slug>\` spelled as a Windows path, and nothing
+  outside the checkout is ever deleted, moved or overwritten - it is listed and reported (§11, 2026-10-14).
 * **git-bash / MSYS.** `recompile.py --measure` and `measure.py` are unusable from git-bash: `absolutize()` turns
   cmd's `/c` into `C:\c`, an interactive cmd runs and no object is written (the "`-o` is a DIRECTORY" message
   misattributes it; `MSYS_NO_PATHCONV` / `MSYS2_ARG_CONV_EXCL` do not help). Use PowerShell/cmd, or `ninja` +

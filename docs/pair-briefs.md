@@ -4,6 +4,12 @@ Paste-ready briefs for the two read-only legs of a pair run (`docs/pipeline.md` 
 (step 2) and the scout review (step 2b), and the deps JSON shape both write. Replace `<A>`, `<B>`, `<pair>` and
 `<base>`; everything else is used as written.
 
+
+## Every brief carries these two rules
+
+* **Nothing outside the checkout is ever deleted, moved or overwritten** (owner, 2026-10-14; `docs/pipeline.md` 11). Your writes stay inside your checkout (your slot, or MAIN's `.pi/` where a brief says so). A path outside it - a stray directory, a temp tree, anything under `C:\` that is not the checkout - is **listed and reported**, never removed, even when it looks like your own scratch. Scratch goes in `<checkout>\.pi\tmp\<slug>\`, written as a Windows path (`C:\Users\...\mhtri-dtk.slotN\.pi\tmp\...`); never `/c/Users/...`, `/tmp` or `$TEMP` from Python or a script - Windows Python resolves `/c/Users/x` to `C:\c\Users\x`, a directory outside the repo (the 2026-10-14 incident that deleted `C:\c`).
+* **Ghidra is a hint, never the source of truth** (owner, 2026-10-14). Names, field names, struct layouts, types and symbols in the shared Ghidra project come from the owner's own reverse engineering; use them as leads and prove every fact from the retail bytes, the SDK or a measurement (`docs/memory-dump.md`).
+
 ## The dependency scout (step 2)
 
 Launch: a read-only `scout` (or `Explore`) lane in MAIN.

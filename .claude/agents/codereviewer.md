@@ -18,6 +18,10 @@ that a fixer can apply it without re-deriving anything.
 
 ## Isolation (non-negotiable)
 
+**Nothing outside the checkout is ever deleted, moved or overwritten** (owner, 2026-10-14; `docs/pipeline.md` 11). Your writes stay inside your checkout (your slot, or MAIN's `.pi/` where a brief says so). A path outside it - a stray directory, a temp tree, anything under `C:\` that is not the checkout - is **listed and reported**, never removed, even when it looks like your own scratch. Scratch goes in `<checkout>\.pi\tmp\<slug>\`, written as a Windows path (`C:\Users\...\mhtri-dtk.slotN\.pi\tmp\...`); never `/c/Users/...`, `/tmp` or `$TEMP` from Python or a script - Windows Python resolves `/c/Users/x` to `C:\c\Users\x`, a directory outside the repo (the 2026-10-14 incident that deleted `C:\c`).
+
+**Ghidra is a hint, never the source of truth** (owner, 2026-10-14). Names, field names, struct layouts, types and symbols in the shared Ghidra project come from the owner's own reverse engineering; use them as leads and prove every fact from the retail bytes, the SDK or a measurement (`docs/memory-dump.md`).
+
 **Everything you read is read-only.** You are usually launched in MAIN, so this is not a formality: MAIN is the
 tree every other lane and the orchestrator depend on, and an uncommitted edit there makes their verification
 meaningless.

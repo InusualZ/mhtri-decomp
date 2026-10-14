@@ -54,6 +54,9 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
    `symedit.py` / `dtk` / objdiff.
 8. **`CLAUDE.md` holds no live working state.** Session state, dated snapshots and incident logs go in `.pi/state.md`,
    `.pi/notes/` or `docs/pipeline.md`, never here.
+9. **Nothing outside the checkout is ever deleted, moved or overwritten.** A path outside the repo (or a lane's slot) is
+   listed and reported, never removed. Scratch is `<checkout>\.pi\tmp\<slug>\` spelled as a Windows path - never
+   `/c/Users/...` (Windows Python reads it as `C:\c\Users\...`), `/tmp` or `$TEMP` (owner, 2026-10-14; `docs/pipeline.md` 11, 12).
 
 ## Matching policy: flags and source variants
 
@@ -170,8 +173,10 @@ docs/                     All documentation, ours and dtk-template's; short bull
 ### External oracles
 
 * **Shared Ghidra project `MH3Shared` / runtime memory dump `/DolphinDump85.raw.keep`** (via the `ghidra` MCP server) turns a
-  region of `fn_XXXX` into named SDK functions, gives a function's real signature, confirms struct offsets and reads data this
-  repo does not own yet (details and recipes: `docs/memory-dump.md`). Three rules: it is **not** codegen evidence (flags still
+  region of `fn_XXXX` into candidate SDK names, suggests a function's signature and struct offsets and reads data this
+  repo does not own yet (details and recipes: `docs/memory-dump.md`). Its names, field names, layouts and symbols are the
+  owner's own reverse engineering - **hints, never the source of truth**: prove each from the retail bytes, the SDK or a
+  measurement (owner, 2026-10-14). Three more rules: it is **not** codegen evidence (flags still
   come from diffing the retail bytes, playbook 17); a `splits.txt` range derived from it is **measured before and after**; and it
   is **read-only** - the project is shared, so no renames, types, comments, imports or saves, and our names go in `symbols.txt`
   through `symedit.py`, never into Ghidra.
