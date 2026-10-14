@@ -8,15 +8,16 @@
  * FLAGS. the `OS` lib's group with `cflags_base` (configure.py `cflags=`): every function start of the band is
  *    16-aligned (`-O4,p` default alignment), not the 4-byte packing `cflags_os` gives.
  * NAMES. the `__AX*` and `AX*` names are the map's; `__AXAllocInit` (0x8046E5C0, the map's `PatInterface_VTable`),
- *    `__AXPushFreeStack` (0x8046E720), `AXSetVoicePriority` (0x8046E9F0), `__AXStackHead`, `__AXStackTail` and
- *    `__AXCallbackStack` are GUESSes named from what the code does; the file name `AXAlloc.c` is a GUESS from the
- *    library's naming.
+ *    `__AXPushFreeStack` (0x8046E720), `AXSetVoicePriority` (0x8046E9F0), `__AXStackHead`, `__AXStackTail`,
+ *    `__AXCallbackStack` and the inline `__AXPopStackFromBottom` are GUESSes named from what the code does; the
+ *    file name `AXAlloc.c` is a GUESS from the library's naming.
  * EVIDENCE. `.bss` 0x806F74E0 and 0x806F7560 (0x80 B each: head and tail of 32 priority lists, list 0 is the free
  *    list) are read only by the list helpers, `AXFreeVoice` and `AXAcquireVoice`; `.sbss` 0x80794ED0 (the callback
  *    stack head) is read by the same functions; the next `.bss` object (0x806F75E0) is `__AXAuxInit`'s.
- * RESIDUALS. none recorded yet.
+ * RESIDUALS. none.
  * SHAPES. doubly linked lists per priority; the list insert is a static inline expanded in `AXAcquireVoice` and
- *    `AXSetVoicePriority`.
+ *    `AXSetVoicePriority`, and the tail pop is a static inline expanded in `AXAcquireVoice` (written in place it
+ *    colours r4/r6/r7 differently).
  */
 
 #include "types.h"
@@ -164,6 +165,24 @@ static inline void __AXAddToStack(AXVPB* vpb, u32 priority)
     }
 }
 
+/* Pops the tail voice of a priority list, or returns NULL when the list is empty. */
+static inline AXVPB* __AXPopStackFromBottom(u32 priority)
+{
+    AXVPB* vpb = NULL;
+
+    if (__AXStackHead[priority] != NULL) {
+        if (__AXStackHead[priority] == __AXStackTail[priority]) {
+            vpb = __AXStackHead[priority];
+            __AXStackHead[priority] = __AXStackTail[priority] = NULL;
+        } else if (__AXStackTail[priority] != NULL) {
+            vpb = __AXStackTail[priority];
+            __AXStackTail[priority] = vpb->prev;
+            __AXStackTail[priority]->next = NULL;
+        }
+    }
+    return vpb;
+}
+
 /* 0x8046E860 (0x184): takes a free voice, or steals the tail voice of a lower priority list, and installs it. */
 AXVPB* AXAcquireVoice(u32 priority, AXVPBCallback callback, u32 userContext)
 {
@@ -176,22 +195,7 @@ AXVPB* AXAcquireVoice(u32 priority, AXVPBCallback callback, u32 userContext)
     }
     if (vpb == NULL) {
         for (i = 1; i < priority; i++) {
-            vpb = NULL;
-            if (__AXStackHead[i] != NULL) {
-                AXVPB* tail = __AXStackTail[i];
-
-                if (__AXStackHead[i] == tail) {
-                    __AXStackTail[i] = NULL;
-                    vpb = __AXStackHead[i];
-                    __AXStackHead[i] = NULL;
-                } else if (tail != NULL) {
-                    AXVPB* prev = tail->prev;
-
-                    vpb = tail;
-                    __AXStackTail[i] = prev;
-                    prev->next = NULL;
-                }
-            }
+            vpb = __AXPopStackFromBottom(i);
             if (vpb != NULL) {
                 if (vpb->pb.running == 1) {
                     vpb->depop = 1;

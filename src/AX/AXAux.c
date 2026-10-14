@@ -14,10 +14,13 @@
  *    C) are addressed from one base by `__AXProcessAux`; `.sbss` 0x80794ED8..0x80794F20 are the frame indices,
  *    buffer pointers, callbacks and clear flags, first written by `__AXAuxInit`. 0x80794F38 (the mode word) is defined
  *    in `AX/AXCL.c` and read here.
- * RESIDUALS. __AXProcessAux 0x8046EDF0: the frame index loads take swapped registers (r8/r9 vs r7/r9), the C callback test
- *    reloads the pointer; register colouring only.
- * SHAPES. three frame arrays; each aux has a callback, a context word and three clear
- *    flags (one per frame).
+ * RESIDUALS. __AXProcessAux 0x8046EDF0: the aux A frame base and the two frame indices are coloured r7/r8/r9 where the
+ *    target has r8/r9/r7 (11 operand-only differences in the head and the aux A frame adds); reordering the six
+ *    stores, locals for the indices or the buffer base, and the address spelling do not move it.
+ * SHAPES. three frame arrays; each aux has a callback, a context word and three clear flags (one per frame).
+ *    The aux C clear test re-reads `__AXAuxCCallback` through a `volatile` lvalue (a GUESS from the codegen): the
+ *    target reloads it after the callback branch, a plain read is CSEd into one load, and a `volatile` declaration
+ *    reorders the stores of `__AXAuxInit`. `__AXAuxInit` and `__AXAuxQuit` clear the callbacks in A, B, C order.
  */
 
 #include "types.h"
@@ -67,15 +70,15 @@ void __AXAuxInit(void)
     s32* b;
     s32* c;
 
-    __AXAuxCCallback = NULL;
+    __AXAuxACallback = NULL;
     a = &__AXAuxBufferA[0][0][0];
     b = &__AXAuxBufferB[0][0][0];
     __AXAuxBCallback = NULL;
     c = &__AXAuxBufferC[0][0][0];
-    __AXAuxACallback = NULL;
-    __AXAuxCContext = NULL;
-    __AXAuxBContext = NULL;
+    __AXAuxCCallback = NULL;
     __AXAuxAContext = NULL;
+    __AXAuxBContext = NULL;
+    __AXAuxCContext = NULL;
     __AXAuxFrameIn = 0;
     __AXAuxFrameOut = 1;
     __AXAuxFrameProc = 2;
@@ -93,9 +96,9 @@ void __AXAuxInit(void)
 /* 0x8046EBB0 (0x14): drops the callbacks. */
 void __AXAuxQuit(void)
 {
-    __AXAuxCCallback = NULL;
-    __AXAuxBCallback = NULL;
     __AXAuxACallback = NULL;
+    __AXAuxBCallback = NULL;
+    __AXAuxCCallback = NULL;
 }
 
 /* 0x8046EBD0 (0x34): returns the aux A input frame, or 0 while no callback is registered. */
@@ -268,7 +271,7 @@ void __AXProcessAux(void)
         DCInvalidateRange(buffers[0], AX_AUX_FRAME_BYTES_C);
         __AXAuxCCallback(buffers, __AXAuxCContext);
         DCFlushRangeNoSync(buffers[0], AX_AUX_FRAME_BYTES_C);
-    } else if (__AXAuxCCallback == NULL && __AXAuxCClear[__AXAuxFrameProc] != 0) {
+    } else if (*(volatile AXAuxCallback*)&__AXAuxCCallback == NULL && __AXAuxCClear[__AXAuxFrameProc] != 0) {
         s32* frame = __AXAuxBufferC[__AXAuxFrameProc][0];
 
         memset(frame, 0, AX_AUX_FRAME_BYTES_C);

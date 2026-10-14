@@ -9,8 +9,9 @@
  *    `__AXProfileNext`, `__AXProfileCount` and `__AXProfileBuffer` are GUESSes named from how the accessor uses each word.
  * EVIDENCE. `.sbss` 0x80794FF8..0x80795008 (four words) is read by `__AXGetCurrentProfile` alone; it is the last
  *    `.sbss` of the old block.
- * RESIDUALS. __AXGetCurrentProfile 0x80471960: the ring index and the buffer pointer take swapped registers (r5/r6), 5 operand-only differences.
- * SHAPES. plain C: a ring of 56-byte profile records advanced modulo the record count.
+ * RESIDUALS. none.
+ * SHAPES. plain C: a ring of 56-byte profile records; the advance is an increment then a separate `%=` (the one
+ *    expression `(next + 1) % count` swaps the r5/r6 colouring).
  */
 
 #include "types.h"
@@ -29,7 +30,8 @@ AXProfile* __AXGetCurrentProfile(void)
 
     if (__AXProfileActive != 0) {
         profile = &__AXProfileBuffer[__AXProfileNext];
-        __AXProfileNext = (__AXProfileNext + 1) % __AXProfileCount;
+        __AXProfileNext++;
+        __AXProfileNext %= __AXProfileCount;
         return profile;
     }
     return NULL;
