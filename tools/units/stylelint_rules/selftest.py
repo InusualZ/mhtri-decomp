@@ -188,6 +188,16 @@ def selftest() -> int:
     check("rule7 bodyless: rule 8 still fires without a body",
           lines_of("goto out;\n", 8, pl), [1])
 
+    # --- rule 8: the owner's one exemption covers only its function and its count ----------------
+    arc = "src/ARC/arc.c"
+    ex = "s32 ARCConvertPathToEntrynum(ARCHandle* h, const char* p) {\n    goto a;\na:\n    goto b;\nb:\n    return 0;\n}\n"
+    check("rule8 exempt: the named function's gotos pass", lines_of(ex, 8, arc), [])
+    check("rule8 exempt: the same body in another file fires", lines_of(ex, 8, "src/ARC/other.c"), [2, 4])
+    check("rule8 exempt: a goto past the count fires",
+          lines_of(ex.replace("    return 0;", "    goto c;\nc:\n    return 0;"), 8, arc), [6])
+    check("rule8 exempt: a goto in another function of the file fires",
+          lines_of(ex + "void f(void) {\n    goto z;\nz:\n    return;\n}\n", 8, arc), [9])
+
     # --- rule 7 key 3 is gone: no comment exempts anything ----------------------------------------
     defer = "/* rule 7 deferred: the map has only fn_XXXXXXXX for this range */\n"
     check("rule7 deferred: the comment does not hide a fn_ definition",
