@@ -2,7 +2,7 @@
  * MIX/mix.c - the MIX audio mixer: per-voice channel levels, the volume/pan tables and the AX mix update.
  * RANGE. .text 0x804C25E0-0x804C5C10 (17 functions); .data 0x8061AE00-0x8061B9A0; .bss 0x80748BB8-0x8074CF40; .sbss
  *    0x807952A0-0x807952B8.  Cut from the OS core band 0x804C1760-0x804D9B4C; one TU: every function reads the
- *    0xBA0-byte table (.data 0x8061AE00), the channel arrays (.bss 0x80748BB8, 0x8074B5B8) or the mix state (.sbss
+ *    volume/pan tables (.data 0x8061AE00), the channel arrays (.bss 0x80748BB8, 0x8074B5B8) or the mix state (.sbss
  *    0x807952A0..0x807952B4), and nothing outside the range reads them.
  * FLAGS. the `OS` lib block of configure.py (Wii/1.3) with per-object `cflags_base` (-O4,p -inline auto).
  *    `__MIXUpdateAuxVolumes` sits in `#pragma dont_inline on`: the target calls `__MIXGetVolume` out of line 12 times
@@ -10,13 +10,14 @@
  * NAMES. `__MIXSetPan` is the dump's name; the file name `mix.c` is a GUESS.  GUESS (mix.h): `MIXInit`, `MIXQuit`,
  *    `MIXSetSoundMode`, `MIXGetSoundMode`, `MIXInitChannel`, `MIXReleaseChannel`, `MIXSetInput`, `MIXSetAuxA`,
  *    `MIXSetAuxB`, `MIXSetPan`, `MIXSetSPan`, `MIXSetFader`, `__MIXGetVolume`, `__MIXResetAux`, `MIXUpdateSettings`,
- *    `__MIXUpdateAuxVolumes`, the arrays `MIXChannelArray`/`MIXAuxArray`, the table `MIXTable`, the MIX_MODE_*,
- *    MIX_AUX_*, AX_MIXCTRL_* and AX_SYNC_* bit names and the MIXChannel/MIXAuxState field names (the layout is traced
- *    from the bodies: the mixer-control bit set per AXPB mix word, the sync bits OR-ed after each write).
- * RESIDUALS. `__MIXSetPan`: the target materialises the table base once and adds 0x990/0xA90/0x790 inside each branch
- *    (`addi` + `lhax`), the codegen of four file-static arrays pooled into one anonymous .data object; written as
- *    `static` arrays the function is byte-identical (relocations then name the pool, not `MIXTable`), but the map's
- *    single `MIXTable` row (0xBA0, global) stops pairing, so the source keeps the struct and its hoisted pointers.
+ *    `__MIXUpdateAuxVolumes`, the arrays `MIXChannelArray`/`MIXAuxArray`, the file-static tables `__MIXVolumeTable`,
+ *    `__MIXPanTable`, `__MIX_DPL2_front` and `__MIX_DPL2_rear` (GUESS, after the SDK's MIX table names; the target's
+ *    `__MIXSetPan` reaches all four from one base plus 0x790/0x990/0xA90, the codegen of file-static arrays MWCC packs
+ *    into one anonymous .data object), the MIX_MODE_*, MIX_AUX_* and AX_MIXCTRL_* bit names (the AX_SYNC_* names are
+ *    AX/AXVPB.c's) and the MIXChannel/MIXAuxState field names (the layout is traced from the bodies: the mixer-control
+ *    bit set per AXPB mix word, the sync bits OR-ed after each write).
+ * RESIDUALS. our .data is 0xB90 against the 0xBA0 claim: the 16 zero bytes at .data 0x8061B990 are fill before
+ *    NAND/nand's 32-aligned .data and have no map row, the same shape as the .bss tail below.
  *    `MIXAuxStates` (.sbss 0x807952B0) is one 4-byte pointer and `MIXAuxArray` is 96 x 0x44 bytes; the word at
  *    0x807952B4 and the 8 bytes after the aux array are unreferenced alignment fill inside this unit's ranges.
  * SHAPES. the AXPB mix and remote-mix words are written through a post-incremented `u16*` (`*mix++`), which gives
@@ -31,15 +32,6 @@
 #include "MIX/mix.h"
 #include "OS/OSInterrupt.h"
 #include "Runtime.PPCEABI.H/memset.h"
-
-/* size: 0xBA0 - the dB-to-volume curve and the pan curves of the mixer. */
-typedef struct MIXTables {
-    /* +0x000 */ u16 volume[968];   /* indexed by tenths of a decibel + 904 */
-    /* +0x790 */ s32 pan[128];      /* stereo pan curve */
-    /* +0x990 */ s16 panFront[128]; /* surround pan curve, front pair */
-    /* +0xA90 */ s16 panRear[128];  /* surround pan curve, rear pair */
-    /* +0xB90 */ u32 pad_0xB90[4];
-} MIXTables;
 
 #define MIX_SOUND_MODE_MONO 0
 #define MIX_SOUND_MODE_STEREO 1
@@ -85,16 +77,16 @@ typedef struct MIXTables {
 #define AX_MIXCTRL_CS 0x20000000
 #define AX_MIXCTRL_CS_RAMP 0x40000000
 #define AX_MIXCTRL_DPL2 0x80000000
-#define AX_SYNC_MIXCTRL 0x00000002
+#define AX_SYNC_STATE_WORD 0x00000002
 #define AX_SYNC_MIX 0x00000010
 #define AX_SYNC_VE 0x00000100
-#define AX_SYNC_RMTMIXCTRL 0x01000000
-#define AX_SYNC_RMTMIX 0x02000000
+#define AX_SYNC_RMT_SELECT 0x01000000
+#define AX_SYNC_RMT_MIX 0x02000000
 #define AX_FRAME_SAMPLES 96
 #define AX_RMT_FRAME_SAMPLES 18
 
-MIXTables MIXTable = {
-    {
+/* size: 0x78A - the dB-to-volume curve, indexed by tenths of a decibel + 904. */
+static u16 __MIXVolumeTable[965] = {
         0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -155,9 +147,11 @@ MIXTables MIXTable = {
         35929, 36345, 36766, 37192, 37622, 38058, 38499, 38944, 39395, 39851, 40313, 40780, 41252, 41730, 42213, 42702,
         43196, 43696, 44202, 44714, 45232, 45756, 46286, 46821, 47364, 47912, 48467, 49028, 49596, 50170, 50751, 51339,
         51933, 52535, 53143, 53758, 54381, 55011, 55648, 56292, 56944, 57603, 58270, 58945, 59627, 60318, 61016, 61723,
-        62438, 63161, 63892, 64632, 65380, 0, 0, 0,
-    },
-    {
+        62438, 63161, 63892, 64632, 65380,
+};
+
+/* size: 0x200 - the stereo pan curve. */
+static s32 __MIXPanTable[128] = {
         0, 0, -1, -1, -1, -2, -2, -2, -3, -3, -4, -4, -4, -5, -5, -5,
         -6, -6, -7, -7, -7, -8, -8, -9, -9, -10, -10, -10, -11, -11, -12, -12,
         -13, -13, -14, -14, -14, -15, -15, -16, -16, -17, -17, -18, -18, -19, -20, -20,
@@ -166,8 +160,10 @@ MIXTables MIXTable = {
         -43, -44, -45, -46, -47, -48, -49, -50, -51, -52, -54, -55, -56, -57, -59, -60,
         -61, -63, -64, -66, -67, -69, -71, -72, -74, -76, -78, -80, -83, -85, -87, -90,
         -93, -96, -99, -102, -106, -110, -115, -120, -126, -133, -140, -150, -163, -180, -210, -904,
-    },
-    {
+};
+
+/* size: 0x100 - the Dolby Pro Logic II pan curve of the front pair. */
+static s16 __MIX_DPL2_front[128] = {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1,
         -1, -1, -2, -2, -2, -2, -3, -3, -3, -4, -4, -4, -5, -5, -6, -6,
         -6, -7, -7, -8, -8, -9, -9, -10, -11, -11, -12, -12, -13, -14, -14, -15,
@@ -176,8 +172,10 @@ MIXTables MIXTable = {
         -52, -53, -55, -57, -58, -60, -62, -64, -66, -68, -70, -73, -75, -77, -80, -82,
         -85, -88, -90, -93, -96, -100, -103, -106, -110, -114, -118, -122, -126, -131, -136, -141,
         -146, -152, -159, -166, -173, -181, -190, -201, -212, -225, -241, -261, -286, -321, -381, -960,
-    },
-    {
+};
+
+/* size: 0x100 - the Dolby Pro Logic II pan curve of the rear pair. */
+static s16 __MIX_DPL2_rear[128] = {
         -61, -61, -60, -59, -59, -58, -58, -57, -56, -56, -55, -55, -54, -53, -53, -52,
         -52, -51, -50, -50, -49, -49, -48, -48, -47, -47, -46, -46, -45, -45, -44, -44,
         -43, -43, -42, -42, -41, -41, -40, -40, -39, -39, -38, -38, -38, -37, -37, -36,
@@ -186,8 +184,6 @@ MIXTables MIXTable = {
         -24, -24, -23, -23, -23, -22, -22, -22, -21, -21, -21, -20, -20, -20, -20, -19,
         -19, -19, -18, -18, -18, -18, -17, -17, -17, -17, -16, -16, -16, -16, -15, -15,
         -15, -15, -14, -14, -14, -14, -13, -13, -13, -13, -13, -12, -12, -12, -12, -11,
-    },
-    { 0, 0, 0, 0 },
 };
 
 MIXAuxState* MIXAuxStates;
@@ -208,22 +204,19 @@ void __MIXSetPan(MIXChannel* c)
     s32 span = c->span;
     s32 ipan = 127 - pan;
     s32 ispan = 127 - span;
-    s16* front = MIXTable.panFront;
-    s16* rear = MIXTable.panRear;
-    s32* stereo = MIXTable.pan;
 
     if (MIXSoundMode == MIX_SOUND_MODE_DPL2) {
-        c->l = front[pan];
-        c->r = front[ipan];
-        c->f = front[ispan];
-        c->b = front[span];
-        c->l1 = rear[ipan];
-        c->r1 = rear[pan];
+        c->l = __MIX_DPL2_front[pan];
+        c->r = __MIX_DPL2_front[ipan];
+        c->f = __MIX_DPL2_front[ispan];
+        c->b = __MIX_DPL2_front[span];
+        c->l1 = __MIX_DPL2_rear[ipan];
+        c->r1 = __MIX_DPL2_rear[pan];
     } else {
-        c->l = stereo[pan];
-        c->r = stereo[ipan];
-        c->f = stereo[ispan];
-        c->b = stereo[span];
+        c->l = __MIXPanTable[pan];
+        c->r = __MIXPanTable[ipan];
+        c->f = __MIXPanTable[ispan];
+        c->b = __MIXPanTable[span];
         c->l1 = 0;
         c->r1 = 0;
     }
@@ -232,7 +225,6 @@ void __MIXSetPan(MIXChannel* c)
 /* 0x804C26A0 (0x3C): turns tenths of a decibel into the table's 16-bit linear volume. */
 u16 __MIXGetVolume(s32 tenthsDb)
 {
-    u16* volume;
     s32 index;
 
     if (tenthsDb <= -904) {
@@ -242,8 +234,7 @@ u16 __MIXGetVolume(s32 tenthsDb)
         return 0xFF64;
     }
     index = tenthsDb + 904;
-    volume = MIXTable.volume;
-    return volume[index];
+    return __MIXVolumeTable[index];
 }
 
 /* 0x804C26E0 (0x114): sets up the channel arrays for every AX voice; does nothing before AX is initialised. */
@@ -487,10 +478,10 @@ void MIXInitChannel(AXVPB* axvpb, u32 mode, s32 input, s32 auxA, s32 auxB, s32 a
     }
     *mix++ = 0;
     axvpb->pb.stateWord = mixerCtrl;
-    axvpb->sync |= AX_SYNC_MIXCTRL | AX_SYNC_MIX | AX_SYNC_VE;
+    axvpb->sync |= AX_SYNC_STATE_WORD | AX_SYNC_MIX | AX_SYNC_VE;
     memset(axvpb->pb.rmtMix, 0, sizeof(axvpb->pb.rmtMix));
     axvpb->pb.rmtSelect = 0;
-    axvpb->sync |= AX_SYNC_RMTMIXCTRL | AX_SYNC_RMTMIX;
+    axvpb->sync |= AX_SYNC_RMT_SELECT | AX_SYNC_RMT_MIX;
     OSRestoreInterrupts(enabled);
 }
 
@@ -527,7 +518,7 @@ void MIXSetAuxB(AXVPB* voice, s32 tenthsDb)
     channel->mode |= MIX_MODE_UPDATE_MIX;
 }
 
-/* 0x804C3FC0 (0x6C): sets the pan of the voice's channel, clamped to 0..127, and refreshes its gains. */
+/* 0x804C3FC0 (0x6C): sets the pan of the voice's channel, clamped to 0..127, and refreshes its pan attenuations. */
 void MIXSetPan(AXVPB* voice, s32 pan)
 {
     MIXChannel* channel = &MIXChannels[voice->index];
@@ -546,7 +537,7 @@ void MIXSetPan(AXVPB* voice, s32 pan)
     channel->mode |= MIX_MODE_UPDATE_MIX;
 }
 
-/* 0x804C4030 (0x6C): sets the surround pan of the voice's channel, clamped to 0..127, and refreshes its gains. */
+/* 0x804C4030 (0x6C): sets the surround pan of the voice's channel, clamped to 0..127, and refreshes its pan attenuations. */
 void MIXSetSPan(AXVPB* voice, s32 span)
 {
     MIXChannel* channel = &MIXChannels[voice->index];
@@ -810,15 +801,15 @@ void MIXUpdateSettings(void)
                 mixerCtrl |= AX_MIXCTRL_CS_RAMP;
             }
             axvpb->pb.stateWord = mixerCtrl;
-            axvpb->sync |= AX_SYNC_MIXCTRL | AX_SYNC_MIX;
+            axvpb->sync |= AX_SYNC_STATE_WORD | AX_SYNC_MIX;
         }
         __MIXUpdateAuxVolumes(i, axvpb);
     }
 }
 
-/* 0x804C5770 (0x43C): moves the remote-speaker volumes of voice `index` towards its levels and writes them to `axvpb`. */
 #pragma push
 #pragma dont_inline on
+/* 0x804C5770 (0x43C): moves the remote-speaker volumes of voice `index` towards its levels and writes them to `axvpb`. */
 void __MIXUpdateAuxVolumes(u32 index, AXVPB* axvpb)
 {
     MIXAuxState* aux = &MIXAuxStates[index];
@@ -918,7 +909,7 @@ void __MIXUpdateAuxVolumes(u32 index, AXVPB* axvpb)
         mixerCtrl |= 0x8000;
     }
     axvpb->pb.rmtSelect = mixerCtrl;
-    axvpb->sync |= AX_SYNC_RMTMIXCTRL | AX_SYNC_RMTMIX;
+    axvpb->sync |= AX_SYNC_RMT_SELECT | AX_SYNC_RMT_MIX;
 }
 #pragma pop
 

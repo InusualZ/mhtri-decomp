@@ -62,7 +62,7 @@ typedef struct MIXAuxState {
 /* 0x804C2840 - attaches a mixer channel to an AX voice with its initial levels. */
 void MIXInitChannel(AXVPB* axvpb, u32 mode, s32 input, s32 auxA, s32 auxB, s32 auxC, s32 pan, s32 span, s32 fader);
 
-/* 0x804C25E0 - fills `channel`'s gain row from the pan tables for the current sound mode. */
+/* 0x804C25E0 - fills `channel`'s pan attenuations from the pan tables for the current sound mode. */
 void __MIXSetPan(MIXChannel* channel);
 
 /* 0x804C26A0 - turns tenths of a decibel into the table's 16-bit linear volume (0 below -90.4 dB, 0xFF64 above +6 dB). */
