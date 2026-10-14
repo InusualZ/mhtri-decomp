@@ -62,6 +62,15 @@ fill_gaps: true
 # addresses and relocates them against extabindex labels; they are plain constants.
 # Measured (network pilot, L1): 21 functions up, 0 down, main.dol unchanged.
 block_relocations:
+# The WPADEncrypt S-boxes (.data 0x8062C8F8..0x8062DB28) are byte tables, not pointers.
+- source: .data:0x8062C99C
+  end: .data:0x8062C9A0
+- source: .data:0x8062CBE4
+  end: .data:0x8062CBE8
+- source: .data:0x8062CE10
+  end: .data:0x8062CE14
+- source: .data:0x8062CF90
+  end: .data:0x8062CF94
 # The BCM2045 patch code word 0x80010138 inside WUD's wudFirmwareData.patchImage is Thumb code, not a pointer.
 - source: .data:0x8062DD34
   end: .data:0x8062DD38
