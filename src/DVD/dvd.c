@@ -31,7 +31,10 @@
  *   measured and fix only the standalone copy or break it.
  *   `.sbss` is 0x88 B vs the target's 0x98: 12 unreferenced bytes at 0x807950F4..0x80795100 (between `PartitionInfo`
  *   and `__DVDNumTmdBytes`, no reader in the DOL) are not defined, so every later `.sbss` symbol sits 0xC lower
- *   (0x10 from the 8-aligned `LastResetEnd` on).
+ *   (0x10 from the 8-aligned `LastResetEnd` on). Three unreferenced `.sbss` words and an unreferenced 0x30 `.bss`
+ *   block close both gaps in the object, but a trial link with this unit Matching strips them and repacks `.sbss`
+ *   (`__DVDNumTmdBytes` lands at 0x807950F4), so the retail bytes belong to a referenced object (the map rows
+ *   `PartitionInfo` 0x10 and `__DVDStopMotorCommandBlock` 0x60 are the candidates).
  *   `__DVDStopMotorCommandBlock` is a 0x60 map row; the block is 0x30 and the trailing 0x30 is unreferenced (`.bss`
  *   0x4C80 vs 0x4CB0). `__ErrorInfo` (.bss 0x80746880) sits in `DVD/dvderror.c`'s run.
  *   Relocation names only (bytes identical): the jump tables, the two strings and the `.bss` base (`...bss.0` for

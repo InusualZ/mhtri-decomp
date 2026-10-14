@@ -8,11 +8,12 @@
  *   referrers change (every object is read only by this range's functions).
  * FLAGS. see BTE/port_api.c.
  * NAMES. the map's, which are the BTE source's.
- * RESIDUALS. .data: the target opens with the two port_open_continue trace strings (0x38 B); port_open_continue is the
- *   file's first function, dead-stripped in retail (its only caller is the stripped PORT_* API), and its body is not
- *   reconstructed, so this object's string pool starts at "PORT_StartCnf result:%d". That shift also moves
- *   PORT_PortNegCnf's two pool-relative string offsets (+0x150/+0x178 in the target, 0x38 less here: 3 .text bytes);
- *   every other .text byte matches.
+ * RESIDUALS. port_open_continue (0xE4 B in this object) is dead-stripped in retail (its only caller is the stripped
+ *   PORT_* API); its body is a GUESS from the BTE source with the IDLE-state RFCOMM_StartReq branch left out (that
+ *   callee is stripped too and has no declaration here). It is written for its two trace strings, which open the
+ *   target's .data pool (0x38 B) and set PORT_PortNegCnf's pool-relative string offsets (+0x150/+0x178).
+ *   flipcheck refuses on the .text size (0x14E0 vs 0x13FC); a trial link with this unit Matching gives the retail DOL
+ *   hash, so mwld strips the function.
  * SHAPES. plain C; PORT_PortNegInd stores the peer's parameters before answering even when no port takes the DLCI
  *   (the retail body writes them through the NULL port).
  */
@@ -34,6 +35,35 @@
 /* The line status error bits a line status indication carries. */
 #define PORT_ERR_BREAK 0x01
 #define PORT_ERR_OVERRUN 0x02
+
+/* The result port_open_continue returns when no multiplexer can be allocated. */
+#define PORT_NO_RESOURCES 6
+
+/* Attaches a port to its device's multiplexer and starts the parameter negotiation once the multiplexer is up. */
+int port_open_continue(tPORT* p_port);
+
+int port_open_continue(tPORT* p_port) {
+    tRFC_MCB* p_mcb;
+
+    RFCOMM_TRACE_EVENT0("port_open_continue");
+
+    p_mcb = rfc_alloc_multiplexer_channel(p_port->bd_addr, TRUE);
+    if (p_mcb == NULL) {
+        RFCOMM_TRACE_WARNING0("port_open_continue no mx channel");
+        port_release_port(p_port);
+        return PORT_NO_RESOURCES;
+    }
+
+    p_port->rfc.p_mcb = p_mcb;
+    p_mcb->port_inx[p_port->dlci] = p_port->inx;
+
+    port_select_mtu(p_port);
+
+    if (p_mcb->state == RFC_MX_STATE_CONNECTED) {
+        RFCOMM_ParNegReq(p_mcb, p_port->dlci, p_port->mtu);
+    }
+    return PORT_SUCCESS;
+}
 
 /* 0x8049900C (0x160): Starts the parameter negotiation of every port of the multiplexer, or fails them. */
 void PORT_StartCnf(tRFC_MCB* p_mcb, u16 result) {

@@ -6,12 +6,10 @@
  * FLAGS. `cflags_base` per object (configure.py).
  * NAMES. map name; `OSIOSRev` (OS/OS.h) is the record `__OSGetIOSRev` fills.  GUESS: `NetPrepareShutdown`, `NetSuspendScheduler`,
  *    `NetResumeScheduler`, `NetRequestShutdown`, `NetShutdownGiveUp` and `NetSetRtcCounter` (named for the tag string each pools).
- * RESIDUALS. `__OSInitNet`: the target tests the revision with `bne` plus an unconditional `b` to the epilogue where the
- *    compiler folds both into one `beq`; no source spelling kept the pair.
- *    .text: the six helpers after `__OSInitNet` have no caller and the linker strips them, so the object's .text is 0xCC longer
+ * RESIDUALS. .text: the six helpers after `__OSInitNet` have no caller and the linker strips them, so the object's .text is 0xCC longer
  *    than the claim.  Their bodies are GUESSES beyond the string order: only their pooled name tags and /dev/net/kd paths
  *    (.data 0x806296F8..0x80629761) survive in the DOL, referenced by no function of the image.
- * SHAPES. plain C.
+ * SHAPES. plain C; `__OSInitNet` returns early on an old or excluded revision (the `bne`/`b` pair; a guarding `if` around the body folds it to `beq`).
  */
 
 #include "types.h"
@@ -28,22 +26,24 @@ void __OSInitNet(void)
     int result;
 
     __OSGetIOSRev(&revision);
-    if (revision.major > 4 && revision.major != 9) {
-        result = NWC24iPrepareShutdown();
-        if (result != 0) {
-            if (result < 0) {
-                OSReport("Failed to register network shutdown function. %d\n", result);
-            }
-            result = NWC24SuspendScheduler();
-            if (result < 0) {
-                OSReport("Failed to suspend the WiiConnect24 scheduler. %d\n", result);
-            }
+    if (revision.major <= 4 || revision.major == 9) {
+        return;
+    }
+
+    result = NWC24iPrepareShutdown();
+    if (result != 0) {
+        if (result < 0) {
+            OSReport("Failed to register network shutdown function. %d\n", result);
         }
-        if (!__OSInIPL) {
-            result = NWC24iSynchronizeRtcCounter(0);
-            if (result != 0) {
-                OSReport("Failed to synchronize time with network resource managers. %d\n", result);
-            }
+        result = NWC24SuspendScheduler();
+        if (result < 0) {
+            OSReport("Failed to suspend the WiiConnect24 scheduler. %d\n", result);
+        }
+    }
+    if (!__OSInIPL) {
+        result = NWC24iSynchronizeRtcCounter(0);
+        if (result != 0) {
+            OSReport("Failed to synchronize time with network resource managers. %d\n", result);
         }
     }
 }

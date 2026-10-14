@@ -31,16 +31,16 @@
  * RESIDUALS.
  *   - KPADSetBtnRepeat has no target bytes: mwld strips it (no caller). It is what puts 0.0f/0.5f at the head of
  *     `.sdata2` and `inside_kpads` at `.bss`+0 (MWCC orders both by first use). Our object carries it (+0x88
- *     `.text`) and its 200.0f literal (`.sdata2`+0x8, 9 differing bytes); a flip needs a trial link proving both
- *     are stripped.
- *   - KPADiRead: `&samplingBufs[count]` is CSE'd into r27 across the ring copy loop (target recomputes it after
- *     OSRestoreInterrupts), the u16 `count` argument of read_kpad_button gets a `clrlwi` the target lacks, and
- *     kp/chan/length take r24/r26/r25 (target r26/r25/r24).
- *   - calc_dpd_variable: the pointer-position block schedules `-sec_nrm.y * sec_nrm11.x` after
- *     `sec_nrm.x * sec_nrm11.x` and loads `dpd_valid_fg` late (target: early); temps at block or function scope
- *     and declaration order do not move it.
+ *     `.text`) and its 200.0f literal (`.sdata2`+0x8); a trial link with this unit Matching differs from the retail
+ *     DOL only inside the open rows' bytes, so mwld strips both.
+ *   - KPADiRead: `&samplingBufs[count]` is CSE'd into a saved register across the ring copy loop (target
+ *     recomputes it after OSRestoreInterrupts; scoped opt pragmas do not split it), the u16 `count` argument of
+ *     read_kpad_button gets a `clrlwi` the target lacks (a wider parameter costs read_kpad_button its match), and
+ *     kp/samplingBufs/err/readEx take r31/r28/r29/r30 (target r26/r29/r30/r31; declaration order moves them as a block).
+ *   - calc_dpd_variable: the pointer-position block loads `sec_nrm11.x` and `sec_nrm.x` in the other order and
+ *     its products take other float registers; temps at block or function scope, declaration order and operand
+ *     order do not move it (the `sec_nrm11`-first operand order loads `dpd_valid_fg` early, as the target does).
  *   - KPADInitEx: `lis KPADiSamplingCallback@ha` is scheduled after `lis KPADiConnectCallback@ha` (target: before).
- *   - select_2obj_first: the hoisted constants 1.0f/0.0f and `max` take f29..f31 in a different order.
  *   - `mh3_pad.cpp` still declares KPADInit/KPADShutdown locally instead of including `kpad.h`.
  * SHAPES. `.sbss` statics are defined in reverse of their target order (MWCC emits `.sbss` reversed); loops over
  *   `kobj_*` are do-while with the end compare at the bottom; read_kpad_button stages the classic word in a local
@@ -48,9 +48,10 @@
  *   `a = b = x` stores right to left (`kp_dist_init = kp_err_dist_min = ...` writes kp_err_dist_min first), so the
  *   relocation order depends on the chain's order; the WBC flags are separate statements for that reason.
  *   read_kpad_dpd's object selection is a `for (;;)` with one shared `valid = 0` fall-through; its pair loops share
- *   one `last` end pointer. KPADiSamplingCallback leaves its device-mode block for an unknown device through a
+ *   one `last` end pointer. select_2obj_first compares and keeps `-f1` for a negative product without negating `f1`
+ *   in place (an in-place negate gives `max` and the hoisted 1.0f/0.0f other float registers). KPADiSamplingCallback leaves its device-mode block for an unknown device through a
  *   `continue` of a `do { } while (0)`, and declares `kp` ahead of `uwp` (the other order swaps r29/r30).
- *   KPADiRead's probe-failure path inlines finish_control_dpd, which KPADiControlDpdCallback also calls (a later
+ *   KPADiRead declares `kp` last and sets the copy pointer before the copy count. KPADiRead's probe-failure path inlines finish_control_dpd, which KPADiControlDpdCallback also calls (a later
  *   definition is not inlined).
  */
 #include "KPAD/kpad.h"
@@ -515,9 +516,8 @@ static s8 select_2obj_first(KPADInsideStatus* kp)
             }
             f1 = kp->acc_horizon.x * nrm.x + kp->acc_horizon.y * nrm.y;
             if (f1 < 0.0f) {
-                f1 = -f1;
-                if (f1 > max) {
-                    max = f1;
+                if (-f1 > max) {
+                    max = -f1;
                     rp1 = op2;
                     rp2 = op1;
                 }
@@ -809,13 +809,13 @@ static void calc_dpd_variable(KPADInsideStatus* kp, s8 valid)
     }
 
     {
-        f32 nx = kp->sec_nrm.x * kp->sec_nrm11.x + kp->sec_nrm.y * kp->sec_nrm11.y;
-        f32 ny = -kp->sec_nrm.y * kp->sec_nrm11.x + kp->sec_nrm.x * kp->sec_nrm11.y;
+        f32 nx = kp->sec_nrm11.x * kp->sec_nrm.x + kp->sec_nrm11.y * kp->sec_nrm.y;
+        f32 ny = -kp->sec_nrm.y * kp->sec_nrm11.x + kp->sec_nrm11.y * kp->sec_nrm.x;
         f32 mx = 0.5f * (kp->kobj_regular[0].center.x + kp->kobj_regular[1].center.x);
         f32 my = 0.5f * (kp->kobj_regular[0].center.y + kp->kobj_regular[1].center.y);
 
-        vec.x = kp->dpd2pos_scale * (kp->center_org.x - (nx * mx - ny * my));
-        vec.y = kp->dpd2pos_scale * (kp->center_org.y - (ny * mx + nx * my));
+        vec.x = kp->dpd2pos_scale * (kp->center_org.x - (mx * nx - my * ny));
+        vec.y = kp->dpd2pos_scale * (kp->center_org.y - (mx * ny + my * nx));
     }
     pos.x = -kp->accXY_nrm_hori.y * vec.x + kp->accXY_nrm_hori.x * vec.y;
     pos.y = -kp->accXY_nrm_hori.x * vec.x - kp->accXY_nrm_hori.y * vec.y;
@@ -1209,7 +1209,6 @@ static inline KPADUnifiedWpadStatus* get_ring_sample(KPADInsideStatus* kp, s32 i
  * newest first; returns the sample count and the read state through `err`. */
 s32 KPADiRead(s32 chan, KPADStatus* samplingBufs, u32 length, s32* err, BOOL readEx)
 {
-    KPADInsideStatus* kp = &inside_kpads[chan];
     KPADUnifiedWpadStatus* uwp;
     KPADStatus* sp;
     KPADStatus saved;
@@ -1221,6 +1220,7 @@ s32 KPADiRead(s32 chan, KPADStatus* samplingBufs, u32 length, s32* err, BOOL rea
     s32 corrupt, dev_mismatch;
     u32 dev_type;
     u32 core_btn, fs_btn, cl_btn;
+    KPADInsideStatus* kp = &inside_kpads[chan];
 
     if (!kp_initialized) {
         read_err = KPAD_READ_ERR_INIT;
@@ -1291,9 +1291,9 @@ s32 KPADiRead(s32 chan, KPADStatus* samplingBufs, u32 length, s32* err, BOOL rea
                     } else {
                         count = 1;
                     }
+                    sp = &samplingBufs[count];
                     i = count;
                     idx = kp->wpad_ring_idx - count - 1;
-                    sp = &samplingBufs[count];
                     if (idx < 0) {
                         idx = idx + kp->uni_ring_len + KPAD_RING_BUFS;
                     }

@@ -11,11 +11,13 @@
  *   the evidence is in BTE/sdp_utils.c's header. The function starts of this band are packed to 4 bytes.
  * NAMES. the map's, which are the BTE source's; sdp_cb (.bss 0x8073D360) is a GUESS from the BTE source's control
  *   block name (every SDP unit reads its trace level at +0x4630).
- * RESIDUALS. sdp_init: the target keeps the constant 0 in r29 across both BTM_SetSecurityLevel calls for the trace level
- *   and the three NULL callbacks (a 0x20 B frame saving r29-r31), where this source rematerialises it after the calls
- *   (0x10 B frame, 0x198 B for 0x1A0 B); flipcheck refuses on that 8 B .text gap. String relocations name the
+ * RESIDUALS. sdp_init: the target stores the three NULL callbacks from the r29 zero it keeps for the trace level; this
+ *   source stores them from a rematerialised `li r0,0` (0x1A4 B for 0x1A0 B), and a u32 zero that covers the pointers
+ *   too swaps r30/r31 (string base and sdp_cb). flipcheck refuses on that 4 B .text gap. String relocations name the
  *   compiler's local pool where the map has lbl_ labels.
  * SHAPES. plain C; the L2CAP callbacks are static and reach L2CAP only through the registration in sdp_init.
+ *   sdp_init: the trace level is a u8 local set before the security registrations under a scoped
+ *   `opt_propagation off` (it holds the zero in r29 across the calls); L2CA_Register's result is tested as a u8.
  */
 
 #include "BTE/sdp_main.h"
@@ -50,7 +52,11 @@ static void sdp_data_ind(u16 l2cap_cid, BT_HDR* p_msg);
 static void sdp_disconnect_cfm(u16 l2cap_cid, u16 result);
 
 /* 0x804A21F8 (0x1A0): Clears the control block, registers SDP's security levels and its L2CAP PSM. */
+#pragma push
+#pragma opt_propagation off
 void sdp_init(void) {
+    u8 trace_level;
+
     memset(&sdp_cb, 0, sizeof(tSDP_CB));
 
     sdp_cb.l2cap_my_cfg.mtu_present = TRUE;
@@ -60,6 +66,7 @@ void sdp_init(void) {
 
     sdp_cb.max_attr_list_size = SDP_MTU_SIZE - 16;
     sdp_cb.max_recs_per_search = SDP_MAX_DISC_SERVER_RECS;
+    trace_level = 0; /* no traces */
 
     if (!BTM_SetSecurityLevel(FALSE, "Service Discovery", BTM_SEC_SERVICE_SDP_SERVER, BTM_SEC_NONE, SDP_PSM,
                               SDP_PROTOCOL_ID, 0)) {
@@ -73,7 +80,7 @@ void sdp_init(void) {
         return;
     }
 
-    sdp_cb.trace_level = 0;
+    sdp_cb.trace_level = trace_level;
 
     sdp_cb.reg_info.pL2CA_ConnectInd_Cb = sdp_connect_ind;
     sdp_cb.reg_info.pL2CA_ConnectCfm_Cb = sdp_connect_cfm;
@@ -86,10 +93,11 @@ void sdp_init(void) {
     sdp_cb.reg_info.pL2CA_DataInd_Cb = sdp_data_ind;
     sdp_cb.reg_info.pL2CA_CongestionStatus_Cb = NULL;
 
-    if (!L2CA_Register(SDP_PSM, &sdp_cb.reg_info)) {
+    if (!(u8)L2CA_Register(SDP_PSM, &sdp_cb.reg_info)) {
         SDP_TRACE_ERROR0("SDP Registration failed");
     }
 }
+#pragma pop
 
 /* 0x804A2398 (0xC4): Accepts an incoming L2CAP connection on a new server CCB and sends our configuration. */
 static void sdp_connect_ind(u8* bd_addr, u16 l2cap_cid, u16 psm, u8 l2cap_id) {
