@@ -15,7 +15,10 @@
  *   comparison or `u32` locals colour the registers differently). `__GXSetSUTexRegs` reads `tref` through a
  *   `ptref` computed before the odd/even test and re-reads `__GXData` for the TEV-stage loop. `GXInitTexObjCI`
  *   clears the colour-index flag with `flags = flags & ~2` (a compound `&=` truncates through `andi.`).
- *   `__GetImageTileCount` has no case 0x3D (the jump table ends at 0x3C). `GXGetTexObjLODAll` sign-extends the
+ *   `__GetImageTileCount`'s case grouping is load-bearing: the
+ *   formats sit in the arm the 61-entry `.data` jump table sends them to (8x8: 0, 8, 0xE, 0x20, 0x30; 8x4: 1, 2, 9,
+ *   0x11, 0x22, 0x27..0x2A, 0x39, 0x3A; 4x4: 3..6, 10, 0x13, 0x16, 0x23, 0x2B, 0x2C, 0x3C), which `.text` alone
+ *   cannot show; the table's relocation addends are the check. `GXGetTexObjLODAll` sign-extends the
  *   LOD bias as `(s8)(s16)`; `GXLoadTexObjPreLoaded` copies `tImage0`/`tMode0` as whole words.
  */
 
@@ -82,11 +85,9 @@ void __GetImageTileCount(s32 fmt, u16 wd, u16 ht, u32* rowTiles, u32* colTiles, 
     switch (fmt) {
     case 0:
     case 8:
+    case 0xE:
+    case 0x20:
     case 0x30:
-    case 0x31:
-    case 0x38:
-    case 0x39:
-    case 0x3A:
         texRowShift = 3;
         texColShift = 3;
         break;
@@ -99,7 +100,8 @@ void __GetImageTileCount(s32 fmt, u16 wd, u16 ht, u32* rowTiles, u32* colTiles, 
     case 0x28:
     case 0x29:
     case 0x2A:
-    case 0x3C:
+    case 0x39:
+    case 0x3A:
         texRowShift = 3;
         texColShift = 2;
         break;
@@ -109,13 +111,11 @@ void __GetImageTileCount(s32 fmt, u16 wd, u16 ht, u32* rowTiles, u32* colTiles, 
     case 6:
     case 10:
     case 0x13:
-    case 0x14:
     case 0x16:
-    case 0x20:
-    case 0x21:
+    case 0x23:
     case 0x2B:
     case 0x2C:
-    case 0x3B:
+    case 0x3C:
         texRowShift = 2;
         texColShift = 2;
         break;
