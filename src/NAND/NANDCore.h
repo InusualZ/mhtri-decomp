@@ -28,6 +28,12 @@ void nandAsyncCallback(s32 result, NANDCommandBlock* block);
 void nandGenerateAbsPath(char* absPath, const char* path);
 /* 0x804C8B10 - whether `path` is the private directory. */
 BOOL nandIsPrivatePath(const char* path);
+/* 0x804C8B50 - whether `path` names something below the private directory. */
+BOOL nandIsUnderPrivatePath(const char* path);
+/* 0x804C8930 - the last component of the absolute `path` (empty for the root). */
+void nandGetRelativeName(char* name, const char* path);
+/* 0x804C9470 - the title's home directory path. */
+char* nandGetHomeDir(void);
 
 #ifdef __cplusplus
 }
