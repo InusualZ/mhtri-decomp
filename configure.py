@@ -1279,11 +1279,11 @@ config.libs = [
             Object(NonMatching, "NAND/NANDLogging.c", cflags=cflags_base),
             Object(NonMatching, "OS/OS.c", cflags=cflags_base),
             Object(Matching, "OS/OSAlarm.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSAlloc.c", cflags=cflags_base),
+            Object(Matching, "OS/OSAlloc.c", cflags=cflags_base),
             Object(Matching, "OS/OSArena.c", cflags=cflags_base),
             Object(Matching, "OS/OSAudioSystem.c", cflags=cflags_base),
             Object(Matching, "OS/OSCache.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSContext.c", cflags=cflags_base),
+            Object(Matching, "OS/OSContext.c", cflags=cflags_base),
             Object(Matching, "OS/OSError.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSExec.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSFatal.c", cflags=cflags_base),
@@ -1295,11 +1295,11 @@ config.libs = [
             Object(Matching, "OS/OSMutex.c", cflags=cflags_base),
             Object(Matching, "OS/OSReboot.c", cflags=cflags_base),
             Object(Matching, "OS/OSReset.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSRtc.c", cflags=cflags_base),
+            Object(Matching, "OS/OSRtc.c", cflags=cflags_base),
             Object(Matching, "OS/OSSync.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSThread.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSTime.c", cflags=cflags_base),
-            Object(NonMatching, "OS/OSUtf.c", cflags=cflags_base),
+            Object(Matching, "OS/OSThread.c", cflags=cflags_base),
+            Object(Matching, "OS/OSTime.c", cflags=cflags_base),
+            Object(Matching, "OS/OSUtf.c", cflags=cflags_base),
             Object(Matching, "OS/OSIpc.c", cflags=cflags_base),
             Object(Matching, "OS/OSStateTM.c", cflags=cflags_base),
             Object(NonMatching, "OS/OSPlayRecord.c", cflags=cflags_base, mw_version="GC/3.0a5.2"),
@@ -1331,7 +1331,7 @@ config.libs = [
             # source restores -O4,p's 16-byte function alignment with `#pragma function_align 16`
             # (every start in the range is 16-aligned).
             Object(Matching, "OS/PPCArch.c"),
-            Object(NonMatching, "EXI/EXIBios.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
+            Object(Matching, "EXI/EXIBios.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
             Object(Matching, "EXI/ProbeBarnacle.c", cflags=cflags_base),  # 16-aligned band, default alignment: unit header
             # Phase 4 stubs (window fg): SDK candidate units with no bodies yet.
             # The tan / libm wrapper / MetroTRK / AI run recut by file (unit headers carry the evidence).
@@ -1407,7 +1407,7 @@ config.libs = [
             Object(Matching, "RVLGX/GXPerf.c", cflags=cflags_base),
             Object(Matching, "IPC/ipcMain.c", cflags=cflags_base),
             Object(NonMatching, "IPC/ipcclt.c", cflags=cflags_base),
-            Object(NonMatching, "IPC/memory.c", cflags=cflags_base),
+            Object(Matching, "IPC/memory.c", cflags=cflags_base),
             Object(NonMatching, "IPC/ipcProfile.c", cflags=cflags_base),
             # -fp_contract off: fused-op evidence on the FLAGS line of src/KPAD/kpad.c
             Object(NonMatching, "KPAD/kpad.c", cflags=cflags_base, extra_cflags=["-fp_contract off"]),
@@ -1417,8 +1417,8 @@ config.libs = [
             Object(Matching, "SC/SCApi.c", cflags=cflags_base),
             Object(NonMatching, "SC/SCProductInfo.c", cflags=cflags_base),
             Object(NonMatching, "SEQ/seq.c", cflags=cflags_base),
-            Object(NonMatching, "SI/SIBios.c", cflags=cflags_base),
-            Object(NonMatching, "SI/SISamplingRate.c", cflags=cflags_base),
+            Object(Matching, "SI/SIBios.c", cflags=cflags_base),
+            Object(Matching, "SI/SISamplingRate.c", cflags=cflags_base),
             Object(NonMatching, "SYN/syn.c", cflags=cflags_base),
             Object(NonMatching, "SYN/synenv.c", cflags=cflags_base),
             Object(NonMatching, "SYN/synvoice.c", cflags=cflags_base),
@@ -1438,7 +1438,7 @@ config.libs = [
             # -fp_contract off: fused-op evidence on the FLAGS line of src/WPAD/WPADClamp.cpp
             Object(NonMatching, "WPAD/WPADClamp.cpp", cflags=cflags_base, extra_cflags=["-fp_contract off"]),
             Object(NonMatching, "WPAD/WPADMem.cpp", cflags=cflags_base),
-            Object(NonMatching, "WPAD/debug_msg.cpp", cflags=cflags_base),
+            Object(Matching, "WPAD/debug_msg.cpp", cflags=cflags_base),
             Object(NonMatching, "WUD/wud.cpp", cflags=cflags_base),
             Object(NonMatching, "WUD/WUDHidHost.cpp", cflags=cflags_base),
             Object(Matching, "WUD/debug_msg.cpp", cflags=cflags_base),

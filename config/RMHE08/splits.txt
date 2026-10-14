@@ -3060,7 +3060,7 @@ OS/OSSync.c:
 
 OS/OSThread.c:
 	.text       start:0x804D36D0 end:0x804D4D50 align:16
-	.bss        start:0x8074D698 end:0x8074E0A0
+	.bss        start:0x8074D698 end:0x8074E090
 	.sdata      start:0x80793FB8 end:0x80793FC0
 	.sbss       start:0x80795390 end:0x807953A0
 
@@ -3080,7 +3080,7 @@ OS/OSIpc.c:
 OS/OSStateTM.c:
 	.text       start:0x804D56B0 end:0x804D5E00 align:16
 	.data       start:0x80629518 end:0x806295E0
-	.bss        start:0x8074E0A0 end:0x8074E160
+	.bss        start:0x8074E090 end:0x8074E160 align:32
 	.sbss       start:0x807953A8 end:0x807953D0
 
 OS/OSPlayRecord.c:
