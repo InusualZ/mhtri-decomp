@@ -4,6 +4,7 @@
 #define MHTRI_BTE_BTM_INQ_H
 
 #include "types.h"
+#include "BTE/gki_time.h"
 
 /* size: 0x0E - the head of an inquiry database entry; only the paging fields the L2CAP layer reads are named
  * (approximation: the entry continues past the paging modes). */
@@ -22,6 +23,14 @@ extern "C" {
 
 /* 0x8048538C - the inquiry database entry of the device at `p_bda`, or NULL. */
 tBTM_INQ_INFO* BTM_InqDbRead(u8* p_bda);
+
+/* 0x8048544C */
+tBTM_INQ_INFO* BTM_InqDbFirst(void);
+/* 0x80485504 */
+tBTM_INQ_INFO* BTM_InqDbNext(tBTM_INQ_INFO* p_cur);
+
+/* 0x8048522C - requests the name of the device at `remote_bda`; `p_cb` reports it. */
+u8 BTM_ReadRemoteDeviceName(u8* remote_bda, BtmCompleteCallback p_cb);
 
 #ifdef __cplusplus
 }

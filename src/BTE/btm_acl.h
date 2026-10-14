@@ -18,6 +18,9 @@ void btm_acl_removed(u8* bda);
 /* 0x80480F6C - asks for the role `new_role` on the link to `remote_bd_addr`; `p_cb` reports the result. */
 u8 BTM_SwitchRole(u8* remote_bd_addr, u8 new_role, void (*p_cb)(void));
 
+/* 0x804819F8 */
+u16 btm_get_acl_disc_reason_code(void);
+
 #ifdef __cplusplus
 }
 #endif

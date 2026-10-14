@@ -7,9 +7,26 @@
  *   The .bss is the GAP control block (0x3B0 B, read by GAP_Init and the gap_conn/gap_utils functions, after the BTM
  *   control block and before the HID device one); its owner is a GUESS from the BTE source (gap_api.c defines it) - any
  *   GAP unit gives the same .bss order.
- * FLAGS. the `OS` lib default `cflags_os`, as BTE/gki_time.c: the function starts of this band are packed to 4 bytes
- *   (the alignment scan of the map's function rows).
- * NAMES. the map's.
- * RESIDUALS. every body is unwritten: 0x8048C294-0x8048C2F4 (1 function).
- * SHAPES. plain C; the BTE declarations the bodies need live in BTE/gki_time.h until the per-owner headers are split.
+ * FLAGS. GC/3.0a5.2 with `cflags_nw4r`, as BTE/sdp_utils.c: every row of the eight gap/hid units compiles to the
+ *   target under it; under the lib default (Wii/1.3 `cflags_os`) GAP_Init does not match.
+ * NAMES. the map's. GUESS gap_cb (gap_cb, the BTE source's name for the GAP control block).
+ * RESIDUALS. none.
+ * SHAPES. plain C.
  */
+
+#include "BTE/gap_api.h"
+#include "BTE/gap_conn.h"
+#include "BTE/gap_utils.h"
+#include "Runtime.PPCEABI.H/memset.h"
+
+tGAP_CB gap_cb;
+
+/* 0x8048C294 (0x60): Clears the control block, installs the two BTM completion callbacks and starts the connection
+ * layer. */
+void GAP_Init(void) {
+    memset(&gap_cb, 0, sizeof(tGAP_CB));
+    gap_cb.btm_cback[0] = gap_btm_cback0;
+    gap_cb.btm_cback[1] = gap_btm_cback1;
+    gap_cb.trace_level = BT_TRACE_LEVEL_DEBUG;
+    gap_conn_init();
+}

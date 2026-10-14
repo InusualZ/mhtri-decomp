@@ -86,6 +86,9 @@ u8 L2CA_DataWrite(u16 cid, BT_HDR* p_data);
 /* 0x80493A40 - sets the L2CAP trace level (0xFF keeps it); returns the level. */
 u8 L2CA_SetTraceLevel(u8 new_level);
 
+/* 0x80493030 */
+void L2CA_Deregister(u16 psm);
+
 #ifdef __cplusplus
 }
 #endif
