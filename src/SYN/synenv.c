@@ -15,11 +15,13 @@
  *    `.sdata2` 0x8079D360..0x8079D380 are the constants of the two functions. The cut after 0x804DFF10 is
  *    placed at the first function that reads a table only the next unit's data order can own (0x804E01E0 reads
  *    0x8062A5A0, which follows 0x8062A2A0 in `.data`; the pool window is 0x804E01E0..0x804E0470).
- * RESIDUALS. `SYNSetupVolumeEnvelope` 0x804DFC50 (98.4 %) and `SYNSetupModulationEnvelope` 0x804DFF10 (98.0 %): identical
- *    instruction stream except the .sdata2 pool entries (relocation names `@NN` vs the target's labels) and, in the second,
- *    the callee-saved registers of `voice`/`peak` swapped (r31/r30 vs r30/r31); flipcheck: .sdata2 byte order.
+ * RESIDUALS. `SYNSetupVolumeEnvelope` 0x804DFC50: the attack-rate quotient is coloured r0 (target r3) and the
+ *    `0xFC400000` load is scheduled one store earlier; `SYNSetupModulationEnvelope` 0x804DFF10: `voice`/`peak` take r30/r31
+ *    (target r31/r30) and the attack-rate quotient is coloured r0 (target r3); the local declaration order leaves it.
  * SHAPES. the timecent-to-time conversion is a static inline helper expanded in place (two pow call sites per
- *    function).
+ *    function); the pow result goes through an `f32` local before the `* 1000` scale, which is what puts 1000.0f
+ *    after 78643200.0f in the .sdata2 pool and lets both `fctiwz` temps share one stack slot; the decay rate divides
+ *    a signed `0xFC400000` (`divw`).
  */
 
 #include "types.h"
@@ -55,13 +57,16 @@ f32 SYNKeyScaleTable[128] = {
 static inline s32 SYNEnvelopeTime(s32 base, s32 scale, u8 key)
 {
     s32 value;
+    f32 ratio;
 
     if (base == SYN_ENV_UNSET) {
         value = 0;
     } else if (scale == SYN_ENV_UNSET) {
-        value = (s32)(1000.0f * (f32)pow(2.0, (f32)base / 78643200.0f));
+        ratio = (f32)pow(2.0, (f32)base / 78643200.0f);
+        value = (s32)(1000.0f * ratio);
     } else {
-        value = (s32)(1000.0f * (f32)pow(2.0, ((f32)base + (f32)scale * SYNKeyScaleTable[key]) / 78642000.0f));
+        ratio = (f32)pow(2.0, ((f32)base + (f32)scale * SYNKeyScaleTable[key]) / 78642000.0f);
+        value = (s32)(1000.0f * ratio);
     }
     return value / 3;
 }
@@ -94,7 +99,7 @@ void SYNSetupVolumeEnvelope(SYNVoice* voice)
     if (voice->volPhase < 2) {
         time = SYNEnvelopeTime(voice->region->volDecay, voice->region->volDecayKeyScale, voice->key);
         if (time != 0) {
-            voice->volDecayRate = 0xFC400000 / time;
+            voice->volDecayRate = (s32)0xFC400000 / time;
         } else {
             voice->volDecayRate = 0xFC400000;
         }

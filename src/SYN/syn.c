@@ -18,14 +18,17 @@
  *    `0x4330000080000000` int-to-double constant, held again at 0x8079D378 (`SYN/synenv.c`) and 0x8079D380
  *    (`SYN/synvoice.c`): one TU pools a value once, so the three are separate TUs; the callers are
  *    `sound/snd_stream_reloc.cpp` (init and per frame) and the sequencer (`SYNMIDIInput`).
- * RESIDUALS. `SYNControlChange` 0x804DF200 (97.8 %): the controller-value store is `stbx` where the target adds the
- *    channel row and the controller index first and folds 0x78 into the displacement (one instruction pair);
- *    `SYNHandleMessage` 0x804DFA60 (99.7 %): `status` and `type` swap r0/r6.  flipcheck: `SYNVolumeTable` is defined by
- *    `SYN/synvoice.c` (not flipped); .bss/.sbss shortfalls are link padding before the next unit.
+ * RESIDUALS. `SYNControlChange` 0x804DF200: in the three 128-key release loops the key counter and the strength-reduced
+ *    slot pointer swap r28/r29 (r29/r27 beside the voice in the pedal-release loop); the counter's type leaves it.
+ *    flipcheck: `SYNVolumeTable` is defined by `SYN/synvoice.c` (not flipped); .bss/.sbss shortfalls are link padding
+ *    before the next unit.
  * SHAPES. the note-off, all-notes-off and bend-range steps are static inline helpers expanded in place (two copies each
  *    in the target); `SYNMIDIInput` and `SYNHandleMessage` take a non-const `u8*` (a const message lets the scheduler hoist
  *    the loads above the queue stores); the controller reset loops index `synth->controller[channel][i]` directly (a
- *    hoisted row pointer changes the unroll).
+ *    hoisted row pointer changes the unroll); the bend-range helper and the release loops also index
+ *    `synth->controller[channel][n]` / `synth->noteVoice[channel][key]` directly (a row or slot pointer hoists an
+ *    `addi` of the field offset and costs 12 B); `SYNHandleMessage` reads `message[0]` twice for the channel and the
+ *    type (a `status` local swaps r0/r6).
  */
 
 #include "types.h"
@@ -54,12 +57,11 @@ void SYNHandleMessage(SYNSynth* synth, u8* message);
 static inline void SYNReleaseChannelNotes(SYNSynth* synth, u8 channel)
 {
     s32 key;
-    SYNVoice** slot = synth->noteVoice[channel];
 
-    for (key = 0; key < 128; key++, slot++) {
-        if (*slot != NULL) {
-            SYNVoiceRelease(*slot, synth->releasePriority);
-            *slot = NULL;
+    for (key = 0; key < 128; key++) {
+        if (synth->noteVoice[channel][key] != NULL) {
+            SYNVoiceRelease(synth->noteVoice[channel][key], synth->releasePriority);
+            synth->noteVoice[channel][key] = NULL;
         }
     }
 }
@@ -82,10 +84,9 @@ static inline void SYNNoteOff(SYNSynth* synth, u8 channel, u8 key)
 /* Sets a channel's pitch-bend range from its data-entry controllers when an RPN 0 is selected. */
 static inline void SYNSetBendRange(SYNSynth* synth, u8 channel)
 {
-    u8* controller = synth->controller[channel];
-
-    if (synth->rpnSelected[channel] != 0 && (u16)((controller[101] << 8) + controller[100]) == 0) {
-        synth->pitchBendRange[channel] = (controller[38] + controller[6] * 100) << 16;
+    if (synth->rpnSelected[channel] != 0
+        && (u16)((synth->controller[channel][101] << 8) + synth->controller[channel][100]) == 0) {
+        synth->pitchBendRange[channel] = (synth->controller[channel][38] + synth->controller[channel][6] * 100) << 16;
     }
 }
 
@@ -155,10 +156,9 @@ void SYNControlChange(SYNSynth* synth, u8 channel, u8 controller, u8 value)
     case 64:
         if (value < 64) {
             s32 key;
-            SYNVoice** slot = synth->noteVoice[channel];
 
-            for (key = 0; key < 128; key++, slot++) {
-                SYNVoice* voice = *slot;
+            for (key = 0; key < 128; key++) {
+                SYNVoice* voice = synth->noteVoice[channel][key];
                 if (voice != NULL && voice->releasePending != 0) {
                     SYNVoiceRelease(voice, synth->releasePriority);
                     voice->synth->noteVoice[voice->channel][voice->key] = NULL;
@@ -308,9 +308,8 @@ void SYNNote(SYNSynth* synth, u8 channel, u8 key, u8 velocity)
 
 void SYNHandleMessage(SYNSynth* synth, u8* message)
 {
-    u8 status = message[0];
-    u8 channel = status & 0xF;
-    s32 type = status >> 4;
+    u8 channel = message[0] & 0xF;
+    s32 type = message[0] >> 4;
     u8 data1;
     SYNKeyMap** program;
     s32 bend;

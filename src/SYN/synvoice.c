@@ -14,16 +14,18 @@
  *    0x8079D380..0x8079D3A0 its float constants (the first is the int-to-double constant again, see
  *    `SYN/syn.c`); the last pool value `0x4330000000000000` (0x8079D390) is held again at 0x8079D3A0 by
  *    `THP/THPDec.c`.
- * RESIDUALS. `SYNVoicePitchRatio` 0x804E0750 (66 %): the target materialises the table base at entry and three derived
- *    pointers (+0x190, +0x1C0, +0x000) before the table loads, we fold the offsets into the displacements and order the
- *    sum loads differently; `SYNVoiceSetupAdpcm` 0x804E09F0 (81.5 %), `SYNVoiceSetupPcm16` 0x804E0C10 and
- *    `SYNVoiceSetupPcm8` 0x804E0D20 (89 %): register numbering and the order of the address computations only;
- *    `SYNVoiceUpdateMix` 0x804E0650 (99.8 %): pool relocation names only.  flipcheck: .sdata2 pool order.
+ * RESIDUALS. `SYNVoicePitchRatio` 0x804E0750: the target materialises the table base and three derived pointers
+ *    (+0x190, +0x1C0, +0x1F0) before the loads; one-TU spellings (struct, four statics) leave it.
+ *    `SYNVoiceSetupAdpcm` 0x804E09F0: the loop-start/length loads and the ADPCM address sums take other registers;
+ *    macro spellings leave it.  `SYNVoiceUpdateMix` 0x804E0650: the target passes the synth in r4 to the frame
+ *    callback, which `SYNFrameCallback` in `SYN/syn.h` declares with two parameters.  flipcheck: .sdata2 pool order.
  * SHAPES. `#pragma dont_inline on` for the file with a window of `dont_inline off` around `SYNVoiceVolume`,
  *    `SYNVoiceChannelVolume` and `SYNVoiceUpdateMix` (the target expands the two level helpers in the mixer update and
  *    calls every other function); the DSP block words are stored as words through a macro (`SYNStoreWord`), not as
  *    halfword pairs; the four pitch tables are one struct (`SYNPitchTables`, 0x3F0 B); the sample set-up functions
- *    repeat the zero stores in both branches.
+ *    repeat the zero stores in both branches, compute the end address before the first block store (a store between
+ *    the two `voice->sample` loads forces a reload), write the `sync` word through an `axVoice` local and copy the
+ *    ADPCM loop context field by field (a struct copy is a word and a halfword).
  */
 
 #include "types.h"
@@ -160,7 +162,7 @@ SYNPitchTables SYNPitchTable = {
 #define SYNStoreWord(firstHalf, value) (*(u32*)(firstHalf) = (value))
 
 /* The ADPCM nibble address of a sample offset: 14 samples per 16-nibble frame behind a two-nibble header. */
-#define SYNAdpcmAddress(base, offset) ((base) + (offset) % 14 + (offset) / 14 * 16 + 2)
+#define SYNAdpcmAddress(base, offset) ((base) + 2 + (offset) / 14 * 16 + (offset) % 14)
 
 void SYNVoiceStepVolumeEnvelope(SYNVoice* voice)
 {
@@ -387,7 +389,8 @@ void SYNVoiceUpdatePitch(SYNVoice* voice)
 void SYNVoiceSetupAdpcm(SYNVoice* voice)
 {
     SYNLayer* layer = voice->layer;
-    AXPB* pb = &voice->axVoice->pb;
+    AXVPB* axVoice = voice->axVoice;
+    AXPB* pb = &axVoice->pb;
     SYNAdpcm* adpcm;
     u32 base;
     u32 loopAddress;
@@ -407,27 +410,31 @@ void SYNVoiceSetupAdpcm(SYNVoice* voice)
         for (i = 0; i < 10; i++) {
             pb->adpcm[i] = adpcm->coef[i];
         }
-        pb->adpcmLoop = adpcm->loop;
-        voice->axVoice->sync = (voice->axVoice->sync & 0xFFFF87FF) | 0x40000 | 0x8400;
+        pb->adpcmLoop.predScale = adpcm->loop.predScale;
+        pb->adpcmLoop.yn1 = adpcm->loop.yn1;
+        pb->adpcmLoop.yn2 = adpcm->loop.yn2;
+        axVoice->sync = (axVoice->sync & 0xFFFF87FF) | 0x40000 | 0x8400;
     } else {
         voice->looped = 0;
         base = voice->synth->sampleBaseAdpcm + voice->sample->dataOffset;
         adpcm = voice->adpcm;
+        endAddress = SYNAdpcmAddress(base, voice->sample->length - 1);
         SYNStoreWord(&pb->addrFormat.first, 0);
         SYNStoreWord(&pb->addrLoop.hi, base);
-        SYNStoreWord(&pb->addrEnd.hi, SYNAdpcmAddress(base, voice->sample->length - 1));
+        SYNStoreWord(&pb->addrEnd.hi, endAddress);
         SYNStoreWord(&pb->addrCurrent.hi, base + 2);
         for (i = 0; i < 10; i++) {
             pb->adpcm[i] = adpcm->coef[i];
         }
-        voice->axVoice->sync = (voice->axVoice->sync & 0xFFFF87FF) | 0x8400;
+        axVoice->sync = (axVoice->sync & 0xFFFF87FF) | 0x8400;
     }
 }
 
 void SYNVoiceSetupPcm16(SYNVoice* voice)
 {
     SYNLayer* layer = voice->layer;
-    AXPB* pb = &voice->axVoice->pb;
+    AXVPB* axVoice = voice->axVoice;
+    AXPB* pb = &axVoice->pb;
     u32 base;
     u32 loopStart;
     u32 loopEnd;
@@ -454,9 +461,10 @@ void SYNVoiceSetupPcm16(SYNVoice* voice)
     } else {
         voice->looped = 0;
         base = voice->synth->sampleBasePcm16 + voice->sample->dataOffset;
+        loopEnd = base + voice->sample->length - 1;
         SYNStoreWord(&pb->addrFormat.first, 0xA);
         SYNStoreWord(&pb->addrLoop.hi, base);
-        SYNStoreWord(&pb->addrEnd.hi, base + voice->sample->length - 1);
+        SYNStoreWord(&pb->addrEnd.hi, loopEnd);
         SYNStoreWord(&pb->addrCurrent.hi, base);
         SYNStoreWord(&pb->adpcm[0].first, 0);
         SYNStoreWord(&pb->adpcm[1].first, 0);
@@ -469,13 +477,14 @@ void SYNVoiceSetupPcm16(SYNVoice* voice)
         SYNStoreWord(&pb->adpcm[8].first, 0x08000000);
         SYNStoreWord(&pb->adpcm[9].first, 0);
     }
-    voice->axVoice->sync = (voice->axVoice->sync & 0xFFFF87FF) | 0x8400;
+    axVoice->sync = (axVoice->sync & 0xFFFF87FF) | 0x8400;
 }
 
 void SYNVoiceSetupPcm8(SYNVoice* voice)
 {
     SYNLayer* layer = voice->layer;
-    AXPB* pb = &voice->axVoice->pb;
+    AXVPB* axVoice = voice->axVoice;
+    AXPB* pb = &axVoice->pb;
     u32 base;
     u32 loopStart;
     u32 loopEnd;
@@ -502,9 +511,10 @@ void SYNVoiceSetupPcm8(SYNVoice* voice)
     } else {
         voice->looped = 0;
         base = voice->synth->sampleBasePcm8 + voice->sample->dataOffset;
+        loopEnd = base + voice->sample->length - 1;
         SYNStoreWord(&pb->addrFormat.first, 0x19);
         SYNStoreWord(&pb->addrLoop.hi, base);
-        SYNStoreWord(&pb->addrEnd.hi, base + voice->sample->length - 1);
+        SYNStoreWord(&pb->addrEnd.hi, loopEnd);
         SYNStoreWord(&pb->addrCurrent.hi, base);
         SYNStoreWord(&pb->adpcm[0].first, 0);
         SYNStoreWord(&pb->adpcm[1].first, 0);
@@ -517,7 +527,7 @@ void SYNVoiceSetupPcm8(SYNVoice* voice)
         SYNStoreWord(&pb->adpcm[8].first, 0x01000000);
         SYNStoreWord(&pb->adpcm[9].first, 0);
     }
-    voice->axVoice->sync = (voice->axVoice->sync & 0xFFFF87FF) | 0x8400;
+    axVoice->sync = (axVoice->sync & 0xFFFF87FF) | 0x8400;
 }
 
 void SYNVoiceSetupSample(SYNVoice* voice)

@@ -14,13 +14,15 @@
  *    0x80795468/0x8079546C is the init flag and the sequence list head read by 0x804DD430, 0x804DD450 and
  *    0x804DD460; `.sdata2` 0x8079D330..0x8079D350 are the tempo/tick constants of the per-frame runner; the
  *    callers are `sound/snd_stream_reloc.cpp` (init at 0x804DD430, per frame at 0x804DD460).
- * RESIDUALS. `SEQRunAudioFrame` 0x804DD460 (96.5 %): the .sdata2 pool is created in a different order (target 65536, 96,
- *    signed-int double, 1e6, 32000, unsigned-int double; ours 1e6, 65536, 96, 32000, ...), so seven pool relocations name other
- *    constants; the tempo case's variable-length-quantity value is dead in ours and kept in the target (24 B shorter);
- *    `SEQSetState` 0x804DD870 (98.9 %): track pointer r8 where the target uses r7; `SEQHandleEvent` 0x804DD350 (98.6 %): the
- *    cursor loads use r3/r5/r0 where the target uses r5/r3/r0. flipcheck: .text 0x654 vs 0x670, .sdata2 order.
+ * RESIDUALS. `SEQRunAudioFrame` 0x804DD460: the .sdata2 pool is created in a different order (target 65536, 96,
+ *    signed-int double, 1e6, 32000, unsigned-int double; ours 1e6, 65536, 96, 32000, ...), so seven pool relocations name
+ *    other constants; an inline tempo-scale helper leaves it.  The tempo case's variable-length-quantity value is dead
+ *    in ours and kept in the target (24 B shorter); a named `length` local leaves it.  `SEQSetState` 0x804DD870: track
+ *    pointer r8 and VLQ byte r7 where the target uses r7/r8; declaration order leaves it.  flipcheck: .text 0x654 vs
+ *    0x670, .sdata2 order.
  * SHAPES. the track cursor lives in the track record and is re-read after every byte (a variable-length quantity
- *    reader expanded in place).
+ *    reader expanded in place); `SEQHandleEvent` reads each message byte and advances the cursor as two
+ *    statements (a post-increment `*track->cursor++` swaps the r3/r5 colouring).
  */
 
 #include "types.h"
@@ -118,11 +120,14 @@ void SEQHandleEvent(SYNSynth* synth, SEQTrack* track)
 
     switch ((u32)MidiMessageLengthTable[message[0] - 0x80]) {
     case 1:
-        message[1] = *track->cursor++;
+        message[1] = *track->cursor;
+        track->cursor++;
         break;
     case 2:
-        message[1] = *track->cursor++;
-        message[2] = *track->cursor++;
+        message[1] = *track->cursor;
+        track->cursor++;
+        message[2] = *track->cursor;
+        track->cursor++;
         break;
     }
 
