@@ -7,10 +7,33 @@
  *   the bta_sys control block. The all-zero address 0x8079D7E8 (.sbss2), passed by address to 0x8047ABF8 by
  *   bta_hh_find_cb, sits with its only reader in BTE/bta_hh_utils.c; Broadcom's bd.c defines a bd_addr_null of that
  *   shape, and placing it here instead gives the same layout.
- * FLAGS. the `OS` lib default `cflags_os`, as BTE/gki_time.c (registered flags; codegen evidence in BTE/sdp_* points to
- *   GC/3.0a5.2 + cflags_nw4r (unmeasured here)).
- * NAMES. the map's. Unnamed rows (GUESS, not applied): 0x8047ABC4 bdcpy (copies 6 bytes from r4 to r3), 0x8047ABF8
- *   bdcmp (compares 6 bytes, returns 0 or -1), the Broadcom bd.c names.
- * RESIDUALS. every body is unwritten: 0x8047ABC4-0x8047AC98 (2 functions).
- * SHAPES. plain C; the BTE declarations the bodies need live in BTE/gki_time.h until the per-owner headers are split.
+ * FLAGS. GC/3.0a5.2 with `cflags_nw4r`, the compiler of every measured BTE unit (BTE/l2c_utils.c FLAGS line).
+ * NAMES. bdcpy and bdcmp, the Broadcom bd.c names (the runtime dump has both at these addresses; bdcpy copies 6 bytes
+ *   from r4 to r3, bdcmp compares 6 bytes and returns 0 or -1).
+ * RESIDUALS. none known.
+ * SHAPES. plain C.
  */
+
+#include "BTE/bd.h"
+
+/* 0x8047ABC4 (0x34): Copies the device address `b` to `a`. */
+void bdcpy(BD_ADDR a, const BD_ADDR b) {
+    int i;
+
+    for (i = BD_ADDR_LEN; i != 0; i--) {
+        *a++ = *b++;
+    }
+}
+
+/* 0x8047ABF8 (0xA0): Compares the device addresses `a` and `b`; returns 0 when they are equal, else -1. */
+int bdcmp(const BD_ADDR a, const BD_ADDR b) {
+    int i;
+
+    for (i = BD_ADDR_LEN; i != 0; i--) {
+        if (*a++ != *b++) {
+            return -1;
+        }
+    }
+
+    return 0;
+}

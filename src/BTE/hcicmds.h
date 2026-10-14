@@ -14,11 +14,11 @@ u8 btsnd_hcic_create_conn(u8* dest, u16 packet_types, u8 page_scan_rep_mode, u8 
                           u8 allow_switch);
 
 /* 0x8048D808 / 0x8048D868 - accept (with `role`) or reject (with `reason`) an incoming connection, in `p_buf`. */
-u8 btsnd_hcic_accept_conn(BT_HDR* p_buf, u8* dest, u8 role);
-u8 btsnd_hcic_reject_conn(BT_HDR* p_buf, u8* dest, u8 reason);
+void btsnd_hcic_accept_conn(BT_HDR* p_buf, u8* dest, u8 role);
+void btsnd_hcic_reject_conn(BT_HDR* p_buf, u8* dest, u8 reason);
 
 /* 0x8048F188 - sets the automatic flush timeout (0.625 ms slots) of the link `handle`, in `p_buf`. */
-u8 btsnd_hcic_write_auto_flush_tout(BT_HDR* p_buf, u16 handle, u16 timeout);
+void btsnd_hcic_write_auto_flush_tout(BT_HDR* p_buf, u16 handle, u16 timeout);
 
 #ifdef __cplusplus
 }

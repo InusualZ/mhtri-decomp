@@ -19,6 +19,23 @@ struct TIMER_LIST_ENT;
 /* 0x80483240 - handles the expiry of the device control timer `p_tle`. */
 void btm_dev_timeout(struct TIMER_LIST_ENT* p_tle);
 
+/* 0x804834D8 */
+void btm_reset_complete(void);
+/* 0x8048369C */
+void btm_read_hci_buf_size_complete(u8* p, u16 evt_len);
+/* 0x80483764 */
+void btm_read_local_version_complete(u8* p, u16 evt_len);
+/* 0x80483820 */
+void btm_read_local_features_complete(u8* p, u16 evt_len);
+/* 0x80483DD4 */
+void btm_read_local_name_complete(u8* p, u16 evt_len);
+/* 0x80483EA0 */
+void btm_read_local_addr_complete(u8* p, u16 evt_len);
+/* 0x804840E8 */
+void btm_vsc_complete(u8* p, u16 opcode, u16 evt_len);
+/* 0x8048418C */
+void btm_vendor_specific_evt(u8* p, u8 evt_len);
+
 #ifdef __cplusplus
 }
 #endif

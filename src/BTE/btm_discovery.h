@@ -13,6 +13,9 @@ extern "C" {
 /* 0x80484958 */
 void btm_discovery_timeout(void);
 
+/* 0x80484828 */
+void btm_discovery_db_init(void);
+
 #ifdef __cplusplus
 }
 #endif

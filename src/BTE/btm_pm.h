@@ -11,6 +11,11 @@ extern "C" {
 /* 0x804866DC - writes the power mode of the link to `remote_bda` to `p_mode`; returns the BTM status. */
 u8 BTM_ReadPowerMode(u8* remote_bda, u8* p_mode);
 
+/* 0x80486E0C */
+void btm_pm_proc_cmd_status(u8 status);
+/* 0x80486EBC */
+void btm_pm_proc_mode_change(u8 hci_status, u16 hci_handle, u8 mode, u16 interval);
+
 #ifdef __cplusplus
 }
 #endif

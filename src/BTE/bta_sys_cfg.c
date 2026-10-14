@@ -12,16 +12,7 @@
  * SHAPES. plain C, a const config and a pointer to it.
  */
 
-#include "types.h"
-
-/* size: 0x06 - the BTA system configuration: the BTU task mailbox and timer BTA uses and its initial trace level. */
-typedef struct tBTA_SYS_CFG {
-    /* +0x00 */ u16 mbox_evt;
-    /* +0x02 */ u8 mbox;
-    /* +0x03 */ u8 timer;
-    /* +0x04 */ u8 trace_level;
-    /* +0x05 */ u8 pad_0x05;
-} tBTA_SYS_CFG; /* size: 0x06 */
+#include "BTE/bta_sys_cfg.h"
 
 /* .sdata2 0x8079D090 - the BTA system configuration. */
 const tBTA_SYS_CFG bta_sys_cfg = {0x0004, 2, 1, 0};

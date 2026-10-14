@@ -9,6 +9,8 @@ struct tSDP_UUID;
 struct tSDP_DISC_ATTR;
 struct tSDP_DISC_REC;
 struct tSDP_DISCOVERY_DB;
+struct tSDP_DI_RECORD;
+struct tSDP_DI_GET_RECORD;
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,6 +29,10 @@ struct tSDP_DISC_ATTR* SDP_FindAttributeInRec(struct tSDP_DISC_REC* p_rec, u16 a
 /* 0x8049F978 - the next record after `p_start_rec` in `p_db` carrying the service UUID `p_uuid`, or NULL. */
 struct tSDP_DISC_REC* SDP_FindServiceUUIDInDb(struct tSDP_DISCOVERY_DB* p_db, struct tSDP_UUID* p_uuid,
                                               struct tSDP_DISC_REC* p_start_rec);
+
+/* 0x8049FA80 / 0x8049FDE0 - register the local device identification record, or read it back. */
+u16 SDP_SetLocalDiRecord(struct tSDP_DI_RECORD* p_device_info, u32* p_handle);
+u16 SDP_GetLocalDiRecord(struct tSDP_DI_GET_RECORD* p_device_info, u32* p_handle);
 
 /* 0x804A0290 - sets the SDP trace level (0xFF only reads it); returns the level. */
 u8 SDP_SetTraceLevel(u8 new_level);

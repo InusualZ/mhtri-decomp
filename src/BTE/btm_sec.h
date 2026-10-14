@@ -31,6 +31,29 @@ u8 btm_sec_l2cap_access_req(u8* bd_addr, u16 psm, u16 handle, u8 is_originator, 
 u8 btm_sec_is_bonding(u16 handle);
 u8 btm_sec_disconnect(u16 handle, u8 reason);
 
+/* 0x8048907C */
+void btm_sec_conn_req(u8* bda, u8* dc);
+/* 0x804892B8 */
+void btm_sec_rmt_name_request_complete(u8* p_bd_addr, u8* p_bd_name, u8 status);
+/* 0x804895A0 */
+void btm_sec_auth_complete(u16 handle, u8 status);
+/* 0x804898E4 */
+void btm_sec_mkey_comp_event(u16 handle, u8 status, u8 key_flg);
+/* 0x804899E0 */
+void btm_sec_encrypt_change(u16 handle, u8 status, u8 encr_enable);
+/* 0x80489B5C */
+void btm_sec_connected(u8* bda, u16 handle, u8 status, u8 enc_mode);
+/* 0x8048A098 */
+void btm_sec_disconnected(u16 handle, u8 reason);
+/* 0x8048A1D4 */
+void btm_sec_link_key_notification(u8* p_bda, u8* p_link_key, u8 key_type);
+/* 0x8048A380 */
+void btm_sec_link_key_request(u8* p_bda);
+/* 0x8048A524 */
+void btm_sec_pin_code_request(u8* p_bda);
+/* 0x8048A880 */
+void btm_sec_update_clock_offset(u16 handle, u16 clock_offset);
+
 #ifdef __cplusplus
 }
 #endif

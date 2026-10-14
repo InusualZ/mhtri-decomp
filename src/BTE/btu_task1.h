@@ -23,17 +23,21 @@ typedef struct tBTU_EVENT_REG {
     /* +0x04 */ void (*event_cb)(BT_HDR* p_msg);
 } tBTU_EVENT_REG; /* size: 0x08 */
 
-/* size: 0x88 - the BTU control block: the registered timers and message ranges, the timer list and the ACL sizes
- *   the L2CAP layer and the HCI transport read. */
+/* size: 0x84 - the BTU control block (BTE_Init clears 0x84 bytes; the .bss row's 0x88 is the 8-byte alignment of
+ *   the next object): the registered timers and message ranges, the timer list, the HCI command timer and queues, the
+ *   ACL sizes the L2CAP layer and the HCI transport read and the command window. */
 typedef struct tBTU_CB {
     /* +0x00 */ tBTU_TIMER_REG timer_reg[BTU_MAX_REG_TIMER];
     /* +0x10 */ tBTU_EVENT_REG event_reg[BTU_MAX_REG_EVENT];
     /* +0x40 */ TIMER_LIST_Q timer_queue;
-    /* +0x4C */ u8 unused_0x4C[0x30];
+    /* +0x4C */ TIMER_LIST_ENT cmd_cmpl_timer;
+    /* +0x64 */ BUFFER_Q cmd_xmit_q;
+    /* +0x70 */ BUFFER_Q cmd_cmpl_q;
     /* +0x7C */ u16 hcit_acl_data_size;
     /* +0x7E */ u16 hcit_acl_pkt_size;
-    /* +0x80 */ u8 unused_0x80[8];
-} tBTU_CB; /* size: 0x88 */
+    /* +0x80 */ u16 hci_cmd_window;
+    /* +0x82 */ u8 pad_0x82[2];
+} tBTU_CB; /* size: 0x84 */
 
 #ifdef __cplusplus
 extern "C" {

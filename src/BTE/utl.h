@@ -1,4 +1,4 @@
-/* BTE/utl.h - the utility entry points `BTE/utl.c` owns that other units call (docs/plan.md 6.5 rule 2). */
+/* BTE/utl.h - the BTA utility functions `BTE/utl.c` owns (docs/plan.md 6.5 rule 2). */
 #ifndef MHTRI_BTE_UTL_H
 #define MHTRI_BTE_UTL_H
 
@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 
-/* 0x8047B310 - frees the GKI buffer `*p` points at and clears the pointer. */
-/* untyped: a caller-owned payload - the address of any GKI buffer pointer */
+/* 0x8047B310 - frees the GKI buffer `*p` holds, if any, and clears the pointer. */
+/* untyped: a caller-owned payload - the slot holds any GKI buffer */
 void utl_freebuf(void** p);
 
 #ifdef __cplusplus

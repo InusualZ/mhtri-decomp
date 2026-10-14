@@ -35,6 +35,15 @@ u8 BTM_ReadRemoteDeviceName(u8* remote_bda, BtmCompleteCallback p_cb);
 /* 0x804863B4 - ends a remote name request that timed out. */
 void btm_inq_rmt_name_failed(void);
 
+/* 0x80485B70 */
+void btm_event_filter_complete(u8* p);
+/* 0x80485D90 */
+void btm_process_inq_results(u8* p, u8 inq_res_mode);
+/* 0x80486008 */
+void btm_process_inq_complete(u8 status);
+/* 0x8048625C */
+void btm_process_remote_name(u8* bda, u8* bdn, u16 evt_len, u8 hci_status);
+
 #ifdef __cplusplus
 }
 #endif
