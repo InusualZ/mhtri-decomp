@@ -62,6 +62,9 @@ fill_gaps: true
 # addresses and relocates them against extabindex labels; they are plain constants.
 # Measured (network pilot, L1): 21 functions up, 0 down, main.dol unchanged.
 block_relocations:
+# The BCM2045 patch code word 0x80010138 inside WUD's wudFirmwareData.patchImage is Thumb code, not a pointer.
+- source: .data:0x8062DD34
+  end: .data:0x8062DD38
 - target: extabindex:0x80020000
   end: extabindex:0x80020010
 - target: extabindex:0x80030000

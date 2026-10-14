@@ -1474,7 +1474,7 @@ config.libs = [
             Object(NonMatching, "WPAD/WPADMem.cpp", cflags=cflags_base),
             Object(Matching, "WPAD/debug_msg.cpp", cflags=cflags_base),
             Object(NonMatching, "WUD/wud.cpp", cflags=cflags_base),
-            Object(NonMatching, "WUD/WUDHidHost.cpp", cflags=cflags_base),
+            Object(Matching, "WUD/WUDHidHost.cpp", cflags=cflags_base),
             Object(Matching, "WUD/debug_msg.cpp", cflags=cflags_base),
             # The VF / DB-EXI2 / PMIC / KPR / HID / KBD band 0x80521340..0x8052A040 recut per library (unit headers carry the evidence).
             # Only 0x80522334..0x80522E00 is packed at 4 bytes (cflags_os); every other function start is 16-aligned (cflags_base).
