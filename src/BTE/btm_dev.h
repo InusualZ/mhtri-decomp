@@ -21,6 +21,13 @@ extern "C" {
 /* 0x80482C80 - the security record of the device at `bd_addr`, or NULL. */
 tBTM_SEC_DEV_REC* btm_find_dev(u8* bd_addr);
 
+/* 0x804827D4 / 0x8048295C - add a device with its link key and trusted services, or delete one; TRUE on success. */
+u8 BTM_SecAddDevice(const u8* bd_addr, u8* dev_class, u8* bd_name, u8* features, u32* trusted_mask, const u8* link_key);
+u8 BTM_SecDeleteDevice(const u8* bd_addr);
+
+/* 0x80482A08 - the stored name of the device at `bd_addr`, or NULL. */
+char* BTM_SecReadDevName(u8* bd_addr);
+
 #ifdef __cplusplus
 }
 #endif

@@ -82,20 +82,6 @@ typedef void (tGAP_CALLBACK)(u16 event, void* p_data);
 /* The callback of a GAP connection: the connection's handle and the event. */
 typedef void (tGAP_CONN_CALLBACK)(u16 gap_handle, u16 event);
 
-/* size: 0x02 - the outcome of an inquiry, as a BTM inquiry reports it. */
-typedef struct tBTM_INQUIRY_CMPL {
-    /* +0x00 */ u8 status;
-    /* +0x01 */ u8 num_resp;
-} tBTM_INQUIRY_CMPL; /* size: 0x02 */
-
-/* size: 0x04 - the outcome of a remote name request, as BTM reports it; the name follows (approximation: the head
- * only). */
-typedef struct tBTM_REMOTE_DEV_NAME {
-    /* +0x00 */ u16 status;
-    /* +0x02 */ u16 length;
-    /* +0x04 */ u8 remote_bd_name[1];
-} tBTM_REMOTE_DEV_NAME; /* size: 0x06 - approximation: the name runs on */
-
 /* size: 0x04 - the outcome of an inquiry, as a GAP request reports it. */
 typedef struct tGAP_INQ_CMPL {
     /* +0x00 */ u16 status;

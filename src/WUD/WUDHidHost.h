@@ -17,7 +17,7 @@ void bta_hh_co_data(u8 handle, u8* report, u16 length, u8 mode, u8 subClass, u8 
 void bta_hh_co_open(u8 dev_handle, u8 sub_class, u16 attr_mask, u8 app_id);
 void bta_hh_co_close(u8 dev_handle, u8 app_id);
 /* 0x80500710 - the BTE compression memory callout; returns zero (no memory). */
-s32 bta_dm_co_get_compress_memory(void);
+u8 bta_dm_co_get_compress_memory(u8 id, u8** memory_p, u32* memory_size);
 
 #ifdef __cplusplus
 }

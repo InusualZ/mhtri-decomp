@@ -89,6 +89,14 @@ u8 L2CA_SetTraceLevel(u8 new_level);
 /* 0x80493030 */
 void L2CA_Deregister(u16 psm);
 
+/* 0x80493878 / 0x80493940 - set the idle timeout of the channel `cid` (or every channel), or of the links to
+ * `bd_addr`. */
+u8 L2CA_SetIdleTimeout(u16 cid, u16 timeout, u8 is_global);
+u8 L2CA_SetIdleTimeoutByBdAddr(u8* bd_addr, u16 timeout);
+
+/* 0x80493A5C - takes the compression callback of a server (this build has no compression). */
+void L2CA_RegisterCompression(void (*p_cb)(void), u8 enable);
+
 #ifdef __cplusplus
 }
 #endif

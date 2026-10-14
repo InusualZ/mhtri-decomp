@@ -242,7 +242,7 @@ void bta_hh_co_close(u8 dev_handle, u8 app_id)
 }
 
 /* Returns zero. */
-s32 bta_dm_co_get_compress_memory(void)
+u8 bta_dm_co_get_compress_memory(u8 id, u8** memory_p, u32* memory_size)
 {
     return 0;
 }

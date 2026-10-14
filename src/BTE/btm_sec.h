@@ -54,6 +54,41 @@ void btm_sec_pin_code_request(u8* p_bda);
 /* 0x8048A880 */
 void btm_sec_update_clock_offset(u16 handle, u16 clock_offset);
 
+/* The security callbacks an application registers with BTM_SecRegister. */
+typedef u8 (*tBTM_AUTHORIZE_CALLBACK)(u8* bd_addr, u8* dev_class, u8* bd_name, u8* service_name, u8 service_id,
+                                      u8 is_originator);
+typedef u8 (*tBTM_PIN_CALLBACK)(u8* bd_addr, u8* dev_class, u8* bd_name);
+typedef u8 (*tBTM_LINK_KEY_CALLBACK)(u8* bd_addr, u8* dev_class, u8* bd_name, u8* key);
+typedef u8 (*tBTM_LINK_KEY_REQ_CALLBACK)(u8* bd_addr, u8* key);
+typedef u8 (*tBTM_AUTH_COMPLETE_CALLBACK)(u8* bd_addr, u8* dev_class, u8* bd_name, s32 result);
+typedef void (*tBTM_RMT_NAME_CALLBACK)(u8* bd_addr, u8* dev_class, u8* bd_name);
+
+/* size: 0x18 - the security callbacks of an application. */
+typedef struct tBTM_APPL_INFO {
+    /* +0x00 */ tBTM_AUTHORIZE_CALLBACK p_authorize_callback;
+    /* +0x04 */ tBTM_PIN_CALLBACK p_pin_callback;
+    /* +0x08 */ tBTM_LINK_KEY_CALLBACK p_link_key_callback;
+    /* +0x0C */ tBTM_LINK_KEY_REQ_CALLBACK p_link_key_req_callback;
+    /* +0x10 */ tBTM_AUTH_COMPLETE_CALLBACK p_auth_complete_callback;
+    /* +0x14 */ void (*p_abort_callback)(void);
+} tBTM_APPL_INFO; /* size: 0x18 */
+
+/* 0x80487F1C - registers the security callbacks of the application. */
+u8 BTM_SecRegister(const tBTM_APPL_INFO* p_cb_info);
+
+/* 0x80487F94 / 0x80487FE4 - add or remove a remote name notification callback. */
+u8 BTM_SecAddRmtNameNotifyCallback(tBTM_RMT_NAME_CALLBACK p_callback);
+u8 BTM_SecDeleteRmtNameNotifyCallback(tBTM_RMT_NAME_CALLBACK p_callback);
+
+/* 0x80488310 / 0x804883D4 / 0x804885B0 - answer a PIN request or an authorization, start a bonding; `trusted_mask`
+ * is the device's two-word trusted service mask. */
+void BTM_PINCodeReply(u8* bd_addr, u8 res, u8 pin_len, u8* p_pin, u32* trusted_mask);
+void BTM_DeviceAuthorized(u8* bd_addr, u8 res, u32* trusted_mask);
+u8 BTM_SecBond(u8* bd_addr, u8 pin_len, u8* p_pin, u32* trusted_mask);
+
+/* 0x8048AEAC - the trusted service mask of the device at `bd_addr`, or NULL. */
+u32* btm_read_trusted_mask(u8* bd_addr);
+
 #ifdef __cplusplus
 }
 #endif

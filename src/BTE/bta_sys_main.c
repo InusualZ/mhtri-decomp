@@ -27,14 +27,11 @@
 /* The period (ms) of the BTA protocol timer. */
 #define BTA_SYS_TIMER_PERIOD 1000
 
-/* The device manager's disable event, the one event handled while events are disabled. */
-#define BTA_DM_API_DISABLE_EVT 0x0101
-
 /* The trace levels and the BTA layer's trace masks. */
 #define BT_TRACE_LEVEL_WARNING 2
 #define BT_TRACE_LEVEL_EVENT 4
-#define TRACE_APPL_WARNING 0x0501
-#define TRACE_APPL_EVENT 0x0503
+#define TRACE_APPL_WARNING 0x00000501
+#define TRACE_APPL_EVENT 0x00000503
 
 tBTA_SYS_CB bta_sys_cb;
 u8 appl_trace_level;

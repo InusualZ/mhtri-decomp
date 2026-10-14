@@ -20,6 +20,9 @@ void btsnd_hcic_reject_conn(BT_HDR* p_buf, u8* dest, u8 reason);
 /* 0x8048F188 - sets the automatic flush timeout (0.625 ms slots) of the link `handle`, in `p_buf`. */
 void btsnd_hcic_write_auto_flush_tout(BT_HDR* p_buf, u16 handle, u16 timeout);
 
+/* 0x8048EFA4 - writes HCI Write_Scan_Enable with `flag` into `p_buf` and sends it. */
+void btsnd_hcic_write_scan_enable(BT_HDR* p_buf, u8 flag);
+
 #ifdef __cplusplus
 }
 #endif

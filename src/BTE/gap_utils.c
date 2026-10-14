@@ -118,7 +118,7 @@ void gap_find_addr_name_cb(tBTM_REMOTE_DEV_NAME* p) {
                 memcpy(p_results->bd_addr, p_cb->p_cur_inq->remote_bd_addr, 6);
                 p_results->status = BT_PASS;
             } else if ((p_cb->p_cur_inq = BTM_InqDbNext(p_cb->p_cur_inq)) != NULL) {
-                if (BTM_ReadRemoteDeviceName(p_cb->p_cur_inq->remote_bd_addr, (BtmCompleteCallback)gap_find_addr_name_cb)
+                if (BTM_ReadRemoteDeviceName(p_cb->p_cur_inq->remote_bd_addr, gap_find_addr_name_cb)
                     == BTM_CMD_STARTED) {
                     return;
                 }
@@ -151,7 +151,7 @@ void gap_find_addr_inq_cb(tBTM_INQUIRY_CMPL* p) {
         if (p->status == BTM_SUCCESS) {
             p_results->status = GAP_EOINQDB;
             if ((p_cb->p_cur_inq = BTM_InqDbFirst()) != NULL) {
-                if (BTM_ReadRemoteDeviceName(p_cb->p_cur_inq->remote_bd_addr, (BtmCompleteCallback)gap_find_addr_name_cb)
+                if (BTM_ReadRemoteDeviceName(p_cb->p_cur_inq->remote_bd_addr, gap_find_addr_name_cb)
                     == BTM_CMD_STARTED) {
                     return;
                 }
