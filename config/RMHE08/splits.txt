@@ -3231,13 +3231,37 @@ WENC/wenc.cpp:
 	.sdata2     start:0x8079D3C0 end:0x8079D3C8
 
 WPAD/wpad.cpp:
-	.text       start:0x804EB510 end:0x804F9B30 align:16
-	.rodata     start:0x80573C80 end:0x80573CD8
-	.data       start:0x8062BF30 end:0x8062DBF0
-	.bss        start:0x8075B2A0 end:0x8075EAA0
+	.text       start:0x804EB510 end:0x804F2FF0 align:16
+	.rodata     start:0x80573C80 end:0x80573CC0
+	.data       start:0x8062BF30 end:0x8062C358
+	.bss        start:0x8075B2A0 end:0x8075EA00
 	.sdata      start:0x80794198 end:0x807941C8
-	.sbss       start:0x807956A8 end:0x80795720
-	.sdata2     start:0x8079D3C8 end:0x8079D478
+	.sbss       start:0x807956A8 end:0x80795700
+	.sdata2     start:0x8079D3C8 end:0x8079D3D0
+
+WPAD/WPADHIDParser.cpp:
+	.text       start:0x804F2FF0 end:0x804F72C0 align:16
+	.rodata     start:0x80573CC0 end:0x80573CD8
+	.data       start:0x8062C358 end:0x8062C8C8
+	.bss        start:0x8075EA00 end:0x8075EA68
+	.sbss       start:0x80795700 end:0x80795718
+	.sdata2     start:0x8079D3D0 end:0x8079D430
+
+WPAD/WPADEncrypt.cpp:
+	.text       start:0x804F72C0 end:0x804F8380 align:16
+	.data       start:0x8062C8C8 end:0x8062DBF0
+	.sbss       start:0x80795718 end:0x80795720
+
+WPAD/WPADClamp.cpp:
+	.text       start:0x804F8380 end:0x804F8EC0 align:16
+	.sdata2     start:0x8079D430 end:0x8079D478
+
+WPAD/WPADMem.cpp:
+	.text       start:0x804F8EC0 end:0x804F9AE0 align:16
+	.bss        start:0x8075EA68 end:0x8075EAA0
+
+WPAD/debug_msg.cpp:
+	.text       start:0x804F9AE0 end:0x804F9B30 align:16
 
 WUD/wud.cpp:
 	.text       start:0x804F9B30 end:0x80500130 align:16

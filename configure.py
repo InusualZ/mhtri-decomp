@@ -1431,6 +1431,13 @@ config.libs = [
             Object(NonMatching, "VI/vi3in1.cpp", cflags=cflags_base),
             Object(NonMatching, "WENC/wenc.cpp"),
             Object(NonMatching, "WPAD/wpad.cpp", cflags=cflags_base),
+            # -fp_contract off: fused-op evidence on the FLAGS line of src/WPAD/WPADHIDParser.cpp
+            Object(NonMatching, "WPAD/WPADHIDParser.cpp", cflags=cflags_base, extra_cflags=["-fp_contract off"]),
+            Object(NonMatching, "WPAD/WPADEncrypt.cpp", cflags=cflags_base),
+            # -fp_contract off: fused-op evidence on the FLAGS line of src/WPAD/WPADClamp.cpp
+            Object(NonMatching, "WPAD/WPADClamp.cpp", cflags=cflags_base, extra_cflags=["-fp_contract off"]),
+            Object(NonMatching, "WPAD/WPADMem.cpp", cflags=cflags_base),
+            Object(NonMatching, "WPAD/debug_msg.cpp", cflags=cflags_base),
             Object(NonMatching, "WUD/wud.cpp", cflags=cflags_base),
             Object(NonMatching, "WUD/WUDHidHost.cpp", cflags=cflags_base),
             Object(Matching, "WUD/debug_msg.cpp", cflags=cflags_base),

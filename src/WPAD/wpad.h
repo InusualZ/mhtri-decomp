@@ -298,11 +298,18 @@ typedef struct WPADBLStatus {
     /* +0x33 */ u8 battery;
 } WPADBLStatus; /* size: 0x34 */
 
+/* Returns the sample the next report fills (the one not currently published). */
+static inline WPADSample* wpadSpareSample(WPADCB* cb)
+{
+    return &cb->samples[(u8)(cb->sampleIndex == 0)];
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void WPADiDebugPrint(const char* format, ...);
+/* .bss 0x8075B2D0 - the control block of each channel; the report parser, the key generator and the memory transfers read it. */
+extern WPADCB* wpadCBTable[4];
 
 /* The driver's own functions, in address order. */
 BOOL wpadShutdownCallback(BOOL final, u32 event);
@@ -364,59 +371,8 @@ void WPADiClearQueue(WPADCmdQueue* queue);
 void WPADSetCallbackByKPAD(s32 owned);
 u8 wpadGetAppType(void);
 char* wpadGetGameName(void);
-s32 wpadDispatchReport(s32 chan, u8* report);
-void WPADiClearMemBlock(s32 chan);
 
-/* One stick axis as the extension report stores it: a byte or a halfword, selected by the caller's `wide` flag. size: 0x02 */
-typedef union WPADStickAxis {
-    /* +0x00 */ s8 narrow;
-    /* +0x00 */ s16 wide;
-} WPADStickAxis;
-
-/* The full-scale value of each accelerometer axis. size: 0x06 */
-typedef struct WPADAxisScale {
-    /* +0x00 */ s16 x;
-    /* +0x02 */ s16 y;
-    /* +0x04 */ s16 z;
-} WPADAxisScale;
-
-/* 0x804F8A40 / 0x804F8C00 - dead zone and range limit of a stick pair; 0x804F8D30 - clamps the accelerometer axes. */
-void wpadStickDeadzoneSquare(WPADStickAxis* x, WPADStickAxis* y, s32 outer, s32 scale, s32 dead, s32 wide);
-void wpadStickDeadzoneCircle(WPADStickAxis* x, WPADStickAxis* y, s32 limit, s32 dead, s32 wide);
-void wpadClampAxes(s16* x, s16* y, s16* z, WPADAxisScale* scale, f32 limit);
-void wpadSetDpdStatusA(s32 chan, s32 error);
-void wpadSetDpdStatusB(s32 chan, s32 error);
-void wpadReportButtons(u8 chan, u8* report, WPADSample* sample);
-void wpadReportStatus(u8 chan, u8* report, WPADSample* sample);
-void wpadReportReadData(u8 chan, u8* report, WPADSample* sample);
-void wpadReportAck(u8 chan, u8* report, WPADSample* sample);
-void wpadReportIgnored(u8 chan, u8* report, WPADSample* sample);
-void wpadReportButtonsExt8(u8 chan, u8* report, WPADSample* sample);
-void wpadReportButtonsAccelDpd12(u8 chan, u8* report, WPADSample* sample);
-void wpadReportExt19(u8 chan, u8* report, WPADSample* sample);
-void wpadReportButtonsAccelExt16(u8 chan, u8* report, WPADSample* sample);
-void wpadReportButtonsDpd10Ext9(u8 chan, u8* report, WPADSample* sample);
-void wpadReportButtonsAccelDpd10Ext6(u8 chan, u8* report, WPADSample* sample);
-void wpadReportExt21(u8 chan, u8* report, WPADSample* sample);
-void wpadReportInterleavedA(u8 chan, u8* report, WPADSample* sample);
-void wpadReportInterleavedB(u8 chan, u8* report, WPADSample* sample);
-void wpadDecodeDpd(s32 chan, WPADSample** sample, u32 format, const u8* data, s32 length);
-void wpadDecodeDpdInterleaved(s32 chan, WPADSample** sample, u8 slot, const u8* data, s32 reserved);
-void wpadDecodeExtDualStick(s32 chan, WPADSample** sample, u8 variant, const u8* data, u32 length);
-void wpadDecodeExtBoard(s32 chan, WPADSample** sample, u8 format, const u8* data, u32 length);
-void wpadExtInitCallback(s32 chan, s32 result);
-void wpadAccCalibrationReadDone(s32 chan, s32 result);
-void wpadExtCalibrationReadDone(s32 chan, s32 result);
-void wpadExtIdReadDone(s32 chan, s32 result);
-void wpadDpdCalibrationReadDone(s32 chan, s32 error, s32 which);
-void wpadCopyTitleString(const u16* title);
 s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback);
-void wpadBulkWriteNext(s32 chan, s32 result);
-void wpadBulkWriteFirst(s32 chan, s32 result);
-s32 WPADWriteGameData(s32 chan, const void* src, u16 size, u32 addr, WPADCallback callback); /* untyped: byte range */
-void wpadReportButtonsAccel(u8 chan, u8* report, WPADSample* sample);
-void wpadDecryptExtension(s32 chan, u8* data, u16 length, s32 offset);
-s32 wpadGetDpdCalibration(s32 chan, u8** out);
 void wpadCopyCurrentSample(s32 chan, void* dest); /* untyped: caller-owned sample record */
 void WPADSetAutoSamplingBuf(s32 chan, void* buf, u32 count); /* untyped: caller-owned ring of samples */
 void wpadFilterButtons(s32 chan);
@@ -428,11 +384,6 @@ s32 wpadSendWriteByte(WPADCmdQueue* queue, s8 value, u32 addr, WPADCallback call
 s32 WPADiSendWriteData(WPADCmdQueue* queue, const void* src, s32 size, u32 addr, WPADCallback callback); /* untyped: byte range */
 s32 wpadSendReadMemory(WPADCmdQueue* queue, void* dest, u16 size, u32 addr, WPADCallback callback); /* untyped: caller-owned byte buffer */
 s32 wpadQueueHasRoom(WPADCmdQueue* queue, s8 count);
-void wpadGameDataCallback(s32 chan, s32 result);
-s32 WPADReadGameData(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callback); /* untyped: caller-owned byte buffer */
-s32 wpadReadMemory(s32 chan, void* dest, u16 size, u32 addr, WPADCallback callback); /* untyped: caller-owned byte buffer */
-s32 wpadWriteMemory(s32 chan, const void* src, s32 size, u32 addr, WPADCallback callback); /* untyped: byte range */
-s32 WPADWriteExtReg(s32 chan, const void* src, s32 size, u32 addr, WPADCallback callback); /* untyped: byte range */
 
 void* WPADiNullCallbackA(u32 size); /* untyped: caller-owned block */
 s32 WPADiNullCallbackB(void* block); /* untyped: the caller-owned block */
