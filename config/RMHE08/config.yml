@@ -74,6 +74,9 @@ block_relocations:
 # The BCM2045 patch code word 0x80010138 inside WUD's wudFirmwareData.patchImage is Thumb code, not a pointer.
 - source: .data:0x8062DD34
   end: .data:0x8062DD38
+# The word 0x8070DF3E inside mh3_pad's image bytes (.data 0x8057CDF0) is pixel data, not a pointer into gki_cb.
+- source: .data:0x8057CDF0
+  end: .data:0x8057CDF4
 - target: extabindex:0x80020000
   end: extabindex:0x80020010
 - target: extabindex:0x80030000
