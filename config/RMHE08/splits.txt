@@ -2913,8 +2913,8 @@ MEM/mem_list.c:
 
 MIX/mix.c:
 	.text       start:0x804C25E0 end:0x804C5C10 align:16
-	.data       start:0x8061AE00 end:0x8061B9A0
-	.bss        start:0x80748BB8 end:0x8074CF40
+	.data       start:0x8061AE00 end:0x8061B990
+	.bss        start:0x80748BB8 end:0x8074CF38
 	.sbss       start:0x807952A0 end:0x807952B8
 
 MTX/mtx.c:
@@ -2945,8 +2945,8 @@ NAND/nand.c:
 NAND/NANDCore.c:
 	.text       start:0x804C8770 end:0x804C9480 align:16
 	.rodata     start:0x80573A10 end:0x80573B58
-	.data       start:0x8061B9A0 end:0x8061BAF0
-	.bss        start:0x8074CF40 end:0x8074CF80
+	.data       start:0x8061B990 end:0x8061BAF0 align:32
+	.bss        start:0x8074CF38 end:0x8074CF80 align:32
 	.sdata      start:0x80793F10 end:0x80793F30
 	.sbss       start:0x807952B8 end:0x807952C0
 
