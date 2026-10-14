@@ -32,6 +32,7 @@
 #pragma auto_inline on
 
 #include "homebutton/hkb_material.h"
+#include "homebutton/hkb_layout_decl.h"
 
 #include "MSL_C/string.h"
 #include "MEM/MEMAllocFromAllocator.h"
@@ -47,21 +48,7 @@
 namespace nw4r {
 namespace lyt {
 
-/* STOPGAP-BEGIN(hbm-material#2) */
-/* A layout: its pane tree and resources; only the shared allocator is used here. size: 0x1 (approximation: no
- * instance field is read) */
-struct Layout {
-    /* The allocator every layout object and material record block comes from. */
-    static MEMAllocator* mspAllocator; /* 0x80795A20 */
-};
-/* STOPGAP-END(hbm-material#2) */
-
 namespace detail {
-/* STOPGAP-BEGIN(hbm-material#3) */
-AnimationLink* FindAnimationLink(AnimationLinkList* pAnimList, AnimTransform* pAnimTrans);
-AnimationLink* FindAnimationLink(AnimationLinkList* pAnimList, const AnimResource& animRes);
-void UnbindAnimationLink(AnimationLinkList* pAnimList, AnimTransform* pAnimTrans);
-/* STOPGAP-END(hbm-material#3) */
 /* STOPGAP-BEGIN(hbm-material#4) */
 const ut::Color MultipleAlpha(const ut::Color col, u8 alpha);
 /* STOPGAP-END(hbm-material#4) */

@@ -10,7 +10,9 @@
 
 /* size: 0x24 (the image header fields the loader touches; the rest is GX texture data) */
 struct TPLImageHeader {
-    /* +0x00 */ u8 pad_0x00[8];
+    /* +0x00 */ u16 height;
+    /* +0x02 */ u16 width;
+    /* +0x04 */ u32 format; /* the GX texel format */
     /* +0x08 */ void* data; /* image data offset, relocated to a pointer on bind */
     /* +0x0C */ u8 pad_0x0C[0x17];
     /* +0x23 */ u8 unpacked; /* set once the data offset has been relocated */
@@ -18,9 +20,10 @@ struct TPLImageHeader {
 
 /* size: 0x0C (the palette header fields the loader touches) */
 struct TPLClutHeader {
-    /* +0x00 */ u8 pad_0x00[2];
+    /* +0x00 */ u16 numEntries;
     /* +0x02 */ u8 unpacked; /* set once the data offset has been relocated */
-    /* +0x03 */ u8 pad_0x03[5];
+    /* +0x03 */ u8 pad_0x03;
+    /* +0x04 */ u32 format; /* the GX TLUT format */
     /* +0x08 */ void* data; /* palette data offset, relocated to a pointer on bind */
 };
 

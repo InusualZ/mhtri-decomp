@@ -12,9 +12,11 @@
 #include "nw4r/math.h"
 #include "nw4r/fn_805012C4.h"
 #include "nw4r/fn_80502828.h"
+#include "homebutton/hkb_animation.h"
+#include "homebutton/hkb_resource_accessor.h"
+#include "homebutton/hkb_texmap.h"
 
 struct MEMAllocator;
-struct TPLPalette;
 
 /* STOPGAP-BEGIN(hbm-material#1) */
 /* The scalar placement form of MSL's `<new>`; returns the caller's block unchanged. */
@@ -50,9 +52,15 @@ public:
         Iterator(detail::LinkListNode* node) : mIterator(node) {}
 
         T* operator->() const { return reinterpret_cast<T*>(reinterpret_cast<u8*>(mIterator.mPointer) - Ofs); }
+        T& operator*() const { return *operator->(); }
         Iterator& operator++() {
             mIterator.mPointer = mIterator.mPointer->mNext;
             return *this;
+        }
+        Iterator operator++(int) {
+            Iterator it(*this);
+            ++*this;
+            return it;
         }
         friend bool operator==(Iterator it1, Iterator it2) { return it1.mIterator.mPointer == it2.mIterator.mPointer; }
         friend bool operator!=(Iterator it1, Iterator it2) { return !(it1 == it2); }
@@ -82,7 +90,7 @@ namespace lyt {
 class Material;
 class AnimTransform;
 class ResourceAccessor;
-struct AnimResource;
+class AnimResource;
 
 /* A width and a height in layout units. size: 0x8 */
 struct Size {
@@ -165,84 +173,6 @@ struct ResBlockSet {
     /* +0x4 */ const void* pFontList; /* untyped: the fnl1 block, unread here */
     /* +0x8 */ const void* pMaterialList; /* untyped: the mat1 block, unread here */
     /* +0xC */ ResourceAccessor* pResAccessor;
-};
-
-/* STOPGAP-BEGIN(hbm-material#82) */
-/* A source of named resources (the layout's archive accessor). size: 0x4 */
-class ResourceAccessor {
-public:
-    virtual ~ResourceAccessor();
-    /* untyped: the resource bytes, typed by the caller */
-    virtual void* GetResource(u32 resType, const char* name, u32* pSize) = 0;
-};
-/* STOPGAP-END(hbm-material#82) */
-
-/* A texture bound to GX: the image, its palette, the sampling state. size: 0x1C */
-class TexMap {
-public:
-    TexMap() {
-        mpImage = NULL;
-        mWidth = 0;
-        mHeight = 0;
-        mBits.textureFormat = 0;
-        mBits.mipmap = false;
-        mBits.wrapS = 0;
-        mBits.wrapT = 0;
-        mBits.minFilter = 1;
-        mBits.magFilter = 1;
-        mMinLOD = 0.0f;
-        mMaxLOD = 0.0f;
-        mLODBias = 0;
-        mBits.biasClampEnable = false;
-        mBits.edgeLODEnable = false;
-        mBits.anisotropy = 0;
-        mpPalette = NULL;
-        mBits.paletteFormat = 0;
-        mPaletteEntryNum = 0;
-    }
-
-    /* STOPGAP-BEGIN(hbm-material#81) */
-    void Get(GXTexObj* pTexObj) const;
-    void Get(GXTlutObj* pTlutObj) const;
-    void ReplaceImage(TPLPalette* pTplRes, u32 id);
-    /* STOPGAP-END(hbm-material#81) */
-
-    s32 GetTexelFormat() const { return mBits.textureFormat; }
-    u16 GetWidth() const { return mWidth; }
-    u16 GetHeight() const { return mHeight; }
-
-    void SetWrapMode(s32 wrapS, s32 wrapT) {
-        mBits.wrapS = wrapS;
-        mBits.wrapT = wrapT;
-    }
-    void SetFilter(s32 minFlt, s32 magFlt) {
-        mBits.minFilter = minFlt;
-        mBits.magFilter = magFlt;
-    }
-
-    /* The packed sampling state. */
-    struct Bits { /* size: 0x4 */
-        u32 textureFormat : 4;   /* +0x0 */
-        u32 mipmap : 1;          /* +0x0 */
-        u32 wrapS : 2;           /* +0x0 */
-        u32 wrapT : 2;           /* +0x0 */
-        u32 minFilter : 3;       /* +0x0 */
-        u32 magFilter : 1;       /* +0x0 */
-        u32 biasClampEnable : 1; /* +0x0 */
-        u32 edgeLODEnable : 1;   /* +0x0 */
-        u32 anisotropy : 2;      /* +0x0 */
-        u32 paletteFormat : 2;   /* +0x0 */
-    };
-
-    /* +0x00 */ void* mpImage; /* untyped: the texel bytes */
-    /* +0x04 */ void* mpPalette; /* untyped: the TLUT bytes */
-    /* +0x08 */ u16 mWidth;
-    /* +0x0A */ u16 mHeight;
-    /* +0x0C */ f32 mMinLOD;
-    /* +0x10 */ f32 mMaxLOD;
-    /* +0x14 */ u16 mLODBias;
-    /* +0x16 */ u16 mPaletteEntryNum;
-    /* +0x18 */ Bits mBits;
 };
 
 /* A texture scale/rotate/translate. size: 0x14 */
@@ -417,6 +347,14 @@ struct TevStage {
 /* One animation bound to a pane or material: the transform, the target index and the enable flag. size: 0x10 */
 class AnimationLink {
 public:
+    AnimationLink() : mbDisable(false) { Reset(); }
+
+    void Reset() { Set(NULL, 0, false); }
+    void Set(AnimTransform* pAnimTrans, u16 idx, bool bDisable) {
+        mAnimTrans = pAnimTrans;
+        mIdx = idx;
+        mbDisable = bDisable;
+    }
     AnimTransform* GetAnimTransform() const { return mAnimTrans; }
     u16 GetIndex() const { return mIdx; }
     bool IsEnable() const { return !mbDisable; }
@@ -429,21 +367,6 @@ public:
 };
 
 typedef ut::LinkList<AnimationLink, 0> AnimationLinkList;
-
-/* STOPGAP-BEGIN(hbm-material#83) */
-/* An animation that can be bound to panes and materials and applied per frame. size: 0x4 (approximation: the
- * fields past the vtable pointer are not read here) */
-class AnimTransform {
-public:
-    virtual ~AnimTransform();
-    virtual void SetResource(const void* pRes, ResourceAccessor* pResAccessor) = 0; /* untyped: the animation block */
-    virtual void SetResource(const void* pRes, ResourceAccessor* pResAccessor, u16 animNum) = 0; /* untyped: the animation block */
-    virtual void Bind(void* pPane, bool bRecursive, bool bDisable) = 0; /* untyped: the pane, unread here */
-    virtual void Bind(Material* pMaterial, bool bDisable) = 0;
-    virtual void Animate(u32 idx, void* pPane) = 0; /* untyped: the pane, unread here */
-    virtual void Animate(u32 idx, Material* pMaterial) = 0;
-};
-/* STOPGAP-END(hbm-material#83) */
 
 /* The record counts a material has room for (mGXMemCap) or uses (mGXMemNum), bit-packed. size: 0x4 */
 struct BitGXNums {

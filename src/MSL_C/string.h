@@ -16,6 +16,9 @@ char* strcpy(char* dst, const char* src);
 /* 0x8045F614 (0x44): copies at most `n` bytes of `src` to `dst`, padding with zeros. */
 char* strncpy(char* dst, const char* src, u32 n);
 
+/* 0x8045F684 (0x11C): compares two strings; returns <0, 0 or >0. */
+int strcmp(const char* a, const char* b);
+
 /* 0x8045F7E0 (0x30): returns the first occurrence of `c` in `s`, or NULL. */
 char* strchr(const char* s, int c);
 
