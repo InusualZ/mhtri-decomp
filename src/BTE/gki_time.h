@@ -175,11 +175,12 @@ u8 BTM_ReadStoredLinkKey(const u8* bdAddr, BtmCompleteCallback callback);
 u8 BTM_WriteStoredLinkKey(u8 numKeys, const u8* bdAddrs, const u8* linkKeys, BtmCompleteCallback callback);
 u8 BTM_DeleteStoredLinkKey(const u8* bdAddr, BtmCompleteCallback callback);
 
-/* 0x8047A530 / 0x8047A550 / 0x8047A570 / 0x8047A5B0 - print a trace message with 0, 1, 2 or 4 arguments; the mask
- * carries the layer (bits 16-23) and the type. */
+/* 0x8047A530 / 0x8047A550 / 0x8047A570 / 0x8047A590 / 0x8047A5B0 - print a trace message with 0, 1, 2, 3 or 4
+ * arguments; the mask carries the layer (bits 16-23) and the type. */
 void LogMsg_0(u32 trace_set_mask, const char* fmt_str);
 void LogMsg_1(u32 trace_set_mask, const char* fmt_str, u32 p1);
 void LogMsg_2(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2);
+void LogMsg_3(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3);
 void LogMsg_4(u32 trace_set_mask, const char* fmt_str, u32 p1, u32 p2, u32 p3, u32 p4);
 
 /* 0x8047AB40 / 0x8047ABB0 - start the timer entry with `timeout` seconds of type `type`, or stop it. */
