@@ -71,6 +71,9 @@ u32 SIGetTypeAsync(s32 chan, SITypeCallback callback);
 void SISetSamplingRate(u32 msec);
 void SIRefreshSamplingRate(void);
 
+/* 0x8079547C - the channels whose fixed-device bit the next type probe takes over (PAD/pad reads it in PADInit). */
+extern u32 __PADFixBits;
+
 #ifdef __cplusplus
 }
 #endif

@@ -77,6 +77,15 @@ u32 __DVDGetCoverStatus(void);
 /* 0x804AAEC0 - quiesces the drive ahead of a reset. */
 void __DVDPrepareReset(void);
 
+/* 0x804AB020 - stops the drive motor; a stub in this build that reports success without queuing `block`. */
+BOOL __DVDStopMotorAsync(DVDCommandBlock* block, DVDCBCallback callback);
+
+/* 0x804AB030 - restarts the drive motor; a stub in this build. */
+void __DVDRestartMotor(void);
+
+/* 0x80746690 - the command block the motor-stop request runs on (DVDGetCommandBlockStatus tests it). */
+extern DVDCommandBlock __DVDStopMotorCommandBlock;
+
 #ifdef __cplusplus
 }
 #endif

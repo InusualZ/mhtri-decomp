@@ -10,8 +10,8 @@
  * NAMES. `SIBusy`, `SIInit`, `SITransfer`, `SIGetType`, `SISetSamplingRate`, ... are the map's names; the file name
  *    `SIBios.c` is a GUESS.  `CompleteTransfer`, `SIEnablePollingInterrupt`, `SIUnregisterPollingHandler`,
  *    `SIGetResponse`, `SIRefreshSamplingRate` and the statics `XferTime`, `Alarm`, `InputBuffer`, `InputBufferValid`,
- *    `InputBufferVcount`, `RDSTHandler`, `cmdFixedDevice`, `TypeCallback`, `FixedDeviceMask` are GUESSes derived from
- *    what each does.
+ *    `InputBufferVcount`, `RDSTHandler`, `cmdFixedDevice`, `TypeCallback` are GUESSes derived from what each does;
+ *    `__PADFixBits` is the SDK name (PAD/pad reads it in `PADInit`).
  * EVIDENCE. `.data` 0x80629F98 is the build string `<< RVL_SDK - SI release build ... (0x4302_145) >>` read through
  *    `.sdata` 0x80794138 by `SIInit`; `Si`, `Type`, the 0x30 B `XYNTSC` table and the 0x30 B table after it
  *    with the `SISetSamplingRate: unknown TV format` string follow (0x8062A008, 0x8062A038).  The two status helpers
@@ -126,7 +126,7 @@ static SISamplingXY XYPAL[12] = {
 };
 
 static s32 SamplingRate;
-static u32 FixedDeviceMask;
+u32 __PADFixBits;
 
 static SITypeCallback TypeCallback[SI_MAX_CHAN][SI_MAX_CHAN];
 static u32 cmdFixedDevice[SI_MAX_CHAN];
@@ -584,8 +584,8 @@ static void GetTypeCallback(s32 chan, u32 error, OSContext* context)
     type = Type[chan];
 
     mask = 0x80000000 >> chan;
-    fixed = FixedDeviceMask & mask;
-    FixedDeviceMask &= ~mask;
+    fixed = __PADFixBits & mask;
+    __PADFixBits &= ~mask;
 
     if ((error & 0xF) || (type & 0x18000000) != 0x08000000 || !(type & 0x80000000) || (type & 0x04000000)) {
         OSSetWirelessID(chan, 0);
