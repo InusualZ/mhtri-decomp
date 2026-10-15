@@ -777,12 +777,12 @@ config.libs = [
             Object(NonMatching, "ef/eft052.cpp"),
             Object(NonMatching, "ef/ef_util.cpp"),
             Object(NonMatching, "ef/ef_animcurve.cpp"),
-            Object(NonMatching, "ef/ef_creationqueue.cpp"),
+            Object(Matching, "ef/ef_creationqueue.cpp"),
             # Flags: unit header of src/ef/ef_draworder.cpp (`-pool off`: one `lis`/`addi` per string).
             Object(Matching, "ef/ef_draworder.cpp", extra_cflags=["-pool off"]),
             Object(NonMatching, "ef/ef_effect.cpp"),
             # Flags: unit header of src/ef/ef_effectsystem.cpp (`-pool off`: one `lis`/`addi` per static).
-            Object(NonMatching, "ef/ef_effectsystem.cpp", extra_cflags=["-pool off"]),
+            Object(Matching, "ef/ef_effectsystem.cpp", extra_cflags=["-pool off"]),
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
             Object(NonMatching, "ef/ef_postfield.cpp"),
