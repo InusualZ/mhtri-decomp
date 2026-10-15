@@ -7,6 +7,7 @@ from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
+import bisect
 import json
 import os
 import re
@@ -676,6 +677,7 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
     # -- (a)+(b) the owned runs and their verdict ------------------------------------------------
     target_bases, our_bases, layout = range_layout(own)
     object_symbols = tree.get("object_symbols", tree["symbols"])
+    pending = []
     for rng, target_key, our_offset in layout:
         section, object_section = rng["section"], rng["object"]
         start, end = rng["start"], rng["end"]
@@ -699,12 +701,11 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
                    "symbol": symbol_at(tree["symbols"], object_section, address),
                    "targets": [resolved[first + i][1] for i in range(words)],
                    "verdict": None, "emitted": None, "referenced": None, "values_match": None,
-                   "our_section": None}
-            # the run's own address, not the range start: `referenced` is "a relocation of ours lands INSIDE the
-            # run", and the range start made it "inside the first 4*words bytes of the range" (2026-10-05)
-            _verdict_run(run, object_section, our_offset // 4 + first, words, address, our, our_bases,
-                         object_symbols, tree["text_ranges"])
+                   "our_section": None, "table": None, "credit": None}
+            pending.append((run, target_key, 4 * first, our_offset + 4 * first))
             rec["runs"].append(run)
+    _verdict_runs(pending, target, our, target_bases, our_bases, object_symbols, tree["text_ranges"],
+                  code_names(tree))
 
     rec["order"] = emission_order(our, class_order(main, path))
     rec["verdicts"] = {v: sum(1 for r in rec["runs"] if r["verdict"] == v)
@@ -825,44 +826,246 @@ def class_order(main: str, path: str) -> list:
     return class_order_from_texts(text_of, path)
 
 
-def _verdict_run(run, section, first, words, address, our, our_bases, symbols_by_name, text_ranges):
-    """Fill in whether OUR object emits or references this target-side run.
+STT_SECTION, STT_FILE = 3, 4
 
-    `emitted` = our object carries the same section, covers the run, and every word of it is a code
-    pointer (so MWCC/the splitter put a table there). `values_match` says whether the entries are the
-    *same* code in the same order - a difference there is a matching defect the score already owns, not a
-    rule-10 one, so it is recorded rather than flagged. `referenced` = some relocation anywhere in our
-    object resolves to an address inside the run (a store of the table's address is the usual shape).
+
+def code_names(tree: dict) -> dict:
+    """`{"starts": [address], "rows": [(address, size, name)]}` for the map's code rows - what a word with no named
+    relocation points into.
+
+    Built once per tree (cached on it); on an alias address the lexically first name wins, so both sides of a
+    comparison spell the same address the same way.
     """
-    sec = our["sections"].get(section)
-    run["our_section"] = sec["size"] if sec else 0
-    emitted, values_match = False, False
-    if sec and sec["size"] >= 4 * (first + words):
-        mine = [read_word(our, section, 4 * (first + i), our_bases, symbols_by_name)
-                for i in range(words)]
-        emitted = all(is_code_pointer(k, v, s, text_ranges) for k, v, s in mine)
-        their = run["targets"]
-        values_match = emitted and [m[1] for m in mine] == their
-    start, end = address, address + 4 * words
-    referenced = any(start <= value < end
-                     for other_sec, rows in our["relocs"].items()
-                     for offset in rows
-                     for _k, value, _s in [read_word(our, other_sec, offset, our_bases, symbols_by_name)]
-                     if value is not None)
-    run["emitted"], run["referenced"] = emitted, referenced
-    run["values_match"] = bool(values_match)
-    if run["kind"] != "table":
-        # An initializer (`.ctors`/`.dtors`) or exception (`extab`/`extabindex`) run is not a vtable and cannot
-        # be one - it is a run of code pointers the linker/compiler puts there. Its absence from our object is
-        # real, but it belongs to form (c), section completeness, so it is not a rule-10 violation here (the
-        # by-hand audit called exactly these its detector's "honest false positives").
-        run["verdict"] = "n/a"
-    elif emitted:
-        run["verdict"] = "emitted"
-    elif referenced:
-        run["verdict"] = "referenced"
-    else:
-        run["verdict"] = "violation"
+    got = tree.get("code_names")
+    if got is None:
+        first: dict = {}
+        for name, row in sorted(tree.get("object_symbols", tree["symbols"]).items()):
+            if row[0] in CODE_SECTIONS:
+                first.setdefault(row[1], (row[1], row[2] or 0, name))
+        rows = sorted(first.values())
+        got = {"starts": [r[0] for r in rows], "rows": rows}
+        tree["code_names"] = got
+    return got
+
+
+def code_name(names: dict, address: int) -> str:
+    """`name` or `name+0xN` for the code row of `names` (`code_names`) holding `address`; the address otherwise."""
+    i = bisect.bisect_right(names["starts"], address) - 1
+    if i >= 0:
+        start, size, name = names["rows"][i]
+        if address < start + max(size, 1):
+            return name if address == start else "%s+0x%X" % (name, address - start)
+    return "0x%08X" % address
+
+
+def slot_name(obj: dict, key: str, offset: int, bases: dict, symbols_by_name: dict, names: dict):
+    """The name of what the word at `offset` of section `key` points at: `symbol` or `symbol+0xN`.
+
+    A relocation to a named symbol is that name (and its addend): it does not depend on where either object put
+    anything. A relocation to a section symbol, or a word with no relocation, is resolved to an address and named
+    through the map's code rows (`code_name`), falling back to the address itself.
+    """
+    rows = obj["relocs"].get(key) or {}
+    if offset in rows:
+        _type, sym_index, addend = rows[offset]
+        sym = obj["symbols"][sym_index] if sym_index < len(obj["symbols"]) else None
+        if sym and sym["name"] and sym["type"] != STT_SECTION:
+            return sym["name"] if not addend else "%s+0x%X" % (sym["name"], addend)
+    _kind, value, _sec = read_word(obj, key, offset, bases, symbols_by_name)
+    return None if value is None else code_name(names, value)
+
+
+def slot_identity(name):
+    """What a slot is matched by: the symbol it points into, without the offset (`f+0x24` -> `f`).
+
+    A switch table's entries are labels inside one function, and their offsets move with every codegen difference
+    the score already owns; a vtable's entries carry no offset at all. `values_match` keeps the full names.
+    """
+    return name.split("+0x")[0] if name else name
+
+
+def object_tables(obj: dict) -> dict:
+    """`{"cover": {key: [(value, size, name)]}, "defined": {name: (key, value, size)}}` for one object.
+
+    Only named, defined, non-section, non-file symbols count: they are what a table is called on each side.
+    """
+    cover, defined = {}, {}
+    for sym in obj["symbols"]:
+        shndx = sym["shndx"]
+        if not sym["name"] or sym["type"] in (STT_SECTION, STT_FILE) or not 0 < shndx < len(obj["order"]):
+            continue
+        key = obj["order"][shndx]
+        cover.setdefault(key, []).append((sym["value"], sym["size"], sym["name"]))
+        defined.setdefault(sym["name"], (key, sym["value"], sym["size"]))
+    for rows in cover.values():
+        rows.sort()
+    return {"cover": cover, "defined": defined}
+
+
+def covering(tables: dict, key: str, offset: int):
+    """`(name, value)` of the named symbol of section `key` that holds `offset`, or None (an unnamed run)."""
+    best = None
+    for value, size, name in tables["cover"].get(key, ()):
+        if value > offset:
+            break
+        if offset < value + max(size, 4) and (best is None or value >= best[1]):
+            best = (name, value)
+    return best
+
+
+def _verdict_runs(pending, target, our, target_bases, our_bases, symbols_by_name, text_ranges, names):
+    """Fill in whether OUR object emits or references each target-side run of one unit.
+
+    A run is matched to **our table by identity, never by byte offset**: a `NonMatching` unit's `.data` moves
+    whenever a string literal or a table is added, and the offset alone credited a run on whatever table now
+    sat there (and dropped one that had moved). In order, a run is `emitted` when:
+
+    1. **by name** - our object defines the symbol the target object names the run's table with, and the words at
+       the run's offset inside it are code pointers (`credit` `name`). When our object defines that name the
+       verdict is decided there: a different table with the same slots does not stand in for it;
+    2. **by slots** - otherwise, our object carries a code-pointer window in a table section whose ordered slot
+       names (`slot_name`, through the relocations) equal the run's by `slot_identity` (the symbol a slot points
+       into, not the offset inside it), not already credited to another run and not
+       inside a symbol the target object defines under another name (`credit` `slots`);
+    3. **by position** - only for a run no target symbol names and no relocation covers, when our words at the
+       same offset are likewise unnamed and unrelocated: the old rule (`credit` `position`).
+
+    `values_match` says whether the credited window has the same slots in the same order. `referenced` = a
+    relocation of ours names the run's table, or names an undefined symbol whose map address lies inside the run
+    (both independent of our layout); a relocation to an anonymous section symbol counts by position only for an
+    unnamed run.
+    """
+    if not pending:
+        return
+    tt, ot = object_tables(target), object_tables(our)
+    cells, idents = {}, {}
+
+    def our_cells(key):
+        got = cells.get(key)
+        if got is None:
+            size = our["sections"][key]["size"]
+            got = []
+            for off in range(0, size - 3, 4):
+                k, v, s = read_word(our, key, off, our_bases, symbols_by_name)
+                code = is_code_pointer(k, v, s, text_ranges)
+                got.append(slot_name(our, key, off, our_bases, symbols_by_name, names) if code else None)
+            cells[key] = got
+            idents[key] = [slot_identity(x) for x in got]
+        return got
+
+    def our_ids(key):
+        our_cells(key)
+        return idents[key]
+
+    # what our relocations name: symbol names, and the map addresses of the undefined ones
+    reloc_names, extern_addresses, anonymous = set(), [], []
+    for key, rows in our["relocs"].items():
+        for offset, (_type, sym_index, addend) in rows.items():
+            sym = our["symbols"][sym_index] if sym_index < len(our["symbols"]) else None
+            if sym is None:
+                continue
+            if sym["name"] and sym["type"] != STT_SECTION:
+                reloc_names.add(sym["name"])
+            if sym["shndx"] == 0 or sym["type"] == STT_SECTION or not sym["name"]:
+                _k, value, _s = read_word(our, key, offset, our_bases, symbols_by_name)
+                if value is not None:
+                    (extern_addresses if sym["shndx"] == 0 else anonymous).append(value)
+
+    used: set = set()
+    table_sections = [k for k in our["order"]
+                      if section_name(k) in DATA_SECTIONS and section_name(k) not in RUN_KIND
+                      and k in our["sections"] and our["sections"][k]["data"]]
+    infos = []
+    for run, tkey, toff, our_off in pending:
+        words = run["words"]
+        slots = [slot_name(target, tkey, toff + 4 * i, target_bases, symbols_by_name, names) for i in range(words)]
+        trel = target["relocs"].get(tkey) or {}
+        cover = covering(tt, tkey, toff)
+        run["table"] = cover[0] if cover else None
+        sec = our["sections"].get(run["section"])
+        run["our_section"] = sec["size"] if sec else 0
+        infos.append({"run": run, "slots": slots, "ids": [slot_identity(x) for x in slots],
+                      "toff": toff, "our_off": our_off,
+                      "cover": cover, "relocated": any(toff + 4 * i in trel for i in range(words))})
+
+    def credit(info, how, key, off):
+        run, words = info["run"], info["run"]["words"]
+        mine = our_cells(key)[off // 4: off // 4 + words]
+        run["emitted"], run["credit"] = True, how
+        run["values_match"] = mine == info["slots"]
+        used.update((key, off + 4 * i) for i in range(words))
+
+    # 1. by name
+    for info in infos:
+        cover, run = info["cover"], info["run"]
+        if not cover or cover[0] not in ot["defined"]:
+            continue
+        info["named_ours"] = True
+        key, value, _size = ot["defined"][cover[0]]
+        if key not in our["sections"] or section_name(key) in CODE_SECTIONS:
+            continue
+        off = value + info["toff"] - cover[1]
+        window = our_cells(key)[off // 4: off // 4 + run["words"]] if off >= 0 and off % 4 == 0 else []
+        if len(window) == run["words"] and all(w is not None for w in window):
+            credit(info, "name", key, off)
+
+    # 2. by slots
+    for info in infos:
+        run = info["run"]
+        if run["emitted"] or info.get("named_ours") or None in info["ids"]:
+            continue
+        own_name = info["cover"][0] if info["cover"] else None
+        found = None
+        for key in table_sections:
+            cell = our_ids(key)
+            n = run["words"]
+            for i in range(0, len(cell) - n + 1):
+                if cell[i:i + n] != info["ids"] or any((key, 4 * (i + j)) in used for j in range(n)):
+                    continue
+                holder = covering(ot, key, 4 * i)
+                if holder and holder[0] != own_name and holder[0] in tt["defined"]:
+                    continue                                   # a different table the target names elsewhere
+                found = (key, 4 * i)
+                break
+            if found:
+                break
+        if found:
+            credit(info, "slots", *found)
+
+    # 3. by position: both sides unnamed, no relocation data
+    for info in infos:
+        run = info["run"]
+        if run["emitted"] or info["cover"] or info["relocated"]:
+            continue
+        key, off = run["section"], info["our_off"]
+        if key not in our["sections"] or covering(ot, key, off) or \
+                any(off + 4 * i in (our["relocs"].get(key) or {}) for i in range(run["words"])):
+            continue
+        window = our_cells(key)[off // 4: off // 4 + run["words"]]
+        if len(window) == run["words"] and all(w is not None for w in window):
+            credit(info, "position", key, off)
+
+    for info in infos:
+        run = info["run"]
+        start, end = run["address"], run["address"] + 4 * run["words"]
+        referenced = bool(info["cover"] and info["cover"][0] in reloc_names) or \
+            any(start <= v < end for v in extern_addresses) or \
+            (not info["cover"] and any(start <= v < end for v in anonymous))
+        run["emitted"] = bool(run["emitted"])
+        run["values_match"] = bool(run["values_match"])
+        run["referenced"] = referenced
+        if run["kind"] != "table":
+            # An initializer (`.ctors`/`.dtors`) or exception (`extab`/`extabindex`) run is not a vtable and cannot
+            # be one - it is a run of code pointers the linker/compiler puts there. Its absence from our object is
+            # real, but it belongs to form (c), section completeness, so it is not a rule-10 violation here (the
+            # by-hand audit called exactly these its detector's "honest false positives").
+            run["verdict"] = "n/a"
+        elif run["emitted"]:
+            run["verdict"] = "emitted"
+        elif referenced:
+            run["verdict"] = "referenced"
+        else:
+            run["verdict"] = "violation"
 
 
 def sweep(main: str, only: str | None = None, text_ref: str | None = None) -> dict:

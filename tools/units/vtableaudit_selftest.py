@@ -824,11 +824,12 @@ def selftest() -> int:
         # each in its own `.data` section (section 2 and 3) with its own relocations
         target = (ElfBuilder().section(TEXT, b"\x00" * 0x100).section(DATA, b"\x00" * 0x10)
                   .section(DATA, b"\x00" * 0x20)
-                  .symbol("fn_80004000", TEXT, 0, 16, type="func").symbol("fn_80004010", TEXT, 0x10, 16, type="func"))
+                  .symbol("fn_80004000", TEXT, 0, 16, type="func").symbol("fn_80004010", TEXT, 0x10, 16, type="func")
+                  .symbol("tblB", None, 8, 12, type="object", shndx=3))
         for section, offset in ((2, 4), (2, 8), (3, 8), (3, 12), (3, 16)):
             target.reloc(section, offset, "fn_80004000", R_PPC_ADDR32)
-        # ours: ONE `.data` with both blocks back to back; block A's run is emitted, block B's words are zero
-        # and `.text` stores the address of `tblB` (block B's run, +0x18 into our `.data`) - referenced
+        # ours: ONE `.data` with both blocks back to back; block A's run is emitted (its slots), block B's words are
+        # zero and `.text` stores the address of `tblB` (the name the target gives block B's run) - referenced
         ours = (ElfBuilder().section(TEXT, b"\x00" * 0x100).section(DATA, b"\x00" * 0x30)
                 .symbol("fn_80004000", TEXT, 0, 16, type="func").symbol("tblB", DATA, 0x18, 12, type="object"))
         ours.reloc(DATA, 4, "fn_80004000", R_PPC_ADDR32).reloc(DATA, 8, "fn_80004000", R_PPC_ADDR32)
@@ -852,7 +853,7 @@ def selftest() -> int:
     # -- 'referenced' means a relocation INSIDE the run, not inside the range's first bytes (2026-10-05) ----------
     # `audit_unit` passed the range start to `_verdict_run`, so a store of the range's first object's address marked
     # a later, abandoned run `referenced` (168 of MAIN's 185 `referenced` runs were that, measured 2026-10-05).
-    def window_case(ref_offset: int) -> str:
+    def window_case(ref_name: str) -> str:
         with tempfile.TemporaryDirectory() as tmp:
             files = {
                 os.path.join("config", "RMHE08", "splits.txt"):
@@ -867,24 +868,123 @@ def selftest() -> int:
                 with open(os.path.join(tmp, rel), "w", encoding="utf-8") as fh:
                     fh.write(text)
             write_elf(os.path.join(tmp, "orig", "RMHE08", "sys", "main.dol"), dol_header())
-            # the target: a 2-word run at .data+0x10, after 0x10 bytes of plain data
+            # the target: a 2-word run at .data+0x10 (`tbl`), after 0x10 bytes of plain data (`head`)
             target = (ElfBuilder().section(TEXT, b"\x00" * 0x100).section(DATA, b"\x00" * 0x20)
-                      .symbol("fn_80004000", TEXT, 0, 16, type="func"))
+                      .symbol("fn_80004000", TEXT, 0, 16, type="func")
+                      .symbol("head", DATA, 0, 0x10, type="object").symbol("tbl", DATA, 0x10, 0x10, type="object"))
             target.reloc(2, 0x10, "fn_80004000", R_PPC_ADDR32).reloc(2, 0x14, "fn_80004000", R_PPC_ADDR32)
-            # ours: the same .data with no table, and `.text` storing the address of `.data+ref_offset`
+            # ours: the same .data with no table, and `.text` storing the address of `ref_name`
             ours = (ElfBuilder().section(TEXT, b"\x00" * 0x100).section(DATA, b"\x00" * 0x20)
                     .symbol("fn_80004000", TEXT, 0, 16, type="func")
-                    .symbol("obj", DATA, ref_offset, 4, type="object"))
-            ours.reloc(TEXT, 0x20, "obj", R_PPC_ADDR32)
+                    .symbol("head", DATA, 0, 0x10, type="object").symbol("tbl", DATA, 0x10, 0x10, type="object"))
+            ours.reloc(TEXT, 0x20, ref_name, R_PPC_ADDR32)
             write_elf(os.path.join(tmp, "build", "RMHE08", "obj", "t", "win.o"), target.build())
             write_elf(os.path.join(tmp, "build", "RMHE08", "src", "t", "win.o"), ours.build())
             runs = va.sweep(tmp)["runs"]
             return [(r["address"], r["verdict"]) for r in runs]
 
     check("referenced window: a relocation to the range's first word does not reach a later run (violation)",
-          window_case(0), [(0x80050010, "violation")])
+          window_case("head"), [(0x80050010, "violation")])
     check("referenced window: a relocation into the run itself still marks it referenced",
-          window_case(0x10), [(0x80050010, "referenced")])
+          window_case("tbl"), [(0x80050010, "referenced")])
+
+    # -- a run is matched to our table by identity, never by byte offset (2026-10-15) ----------------------------
+    # A NonMatching unit's `.data` shifts whenever a string or a table is added; the offset rule credited a run on
+    # whatever table then sat there (hbm_value: 3 runs read as added, 2 as removed, and its own `__vt__14HbmPaneManager`
+    # stayed a violation because it had moved).
+    FNS = ("fn_80004000", "fn_80004010", "fn_80004020", "fn_80004030")
+
+    def name_case(target_tables, our_tables, our_size, text_refs=()):
+        """Sweep one unit: `[(address, verdict, credit, values_match)]` per run.
+
+        A table is `(name, offset, size, [slot])`, a slot a function name or `(name, addend)`; the target's `.data`
+        is 0x20 bytes at 0x80050000. `text_refs` are symbols our `.text` stores the address of.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            files = {
+                os.path.join("config", "RMHE08", "splits.txt"):
+                    "t/n.cpp:\n\t.text       start:0x80004000 end:0x80004100\n"
+                    "\t.data       start:0x80050000 end:0x80050020\n",
+                os.path.join("config", "RMHE08", "symbols.txt"):
+                    "".join("%s = .text:0x%s; // type:function size:0x10\n" % (f, f[3:]) for f in FNS),
+                "configure.py": 'config.libs = [\n    Object(NonMatching, "t/n.cpp"),\n]\n',
+            }
+            for rel, text in files.items():
+                os.makedirs(os.path.dirname(os.path.join(tmp, rel)) or tmp, exist_ok=True)
+                with open(os.path.join(tmp, rel), "w", encoding="utf-8") as fh:
+                    fh.write(text)
+            write_elf(os.path.join(tmp, "orig", "RMHE08", "sys", "main.dol"), dol_header())
+
+            def obj(tables, size):
+                b = ElfBuilder().section(TEXT, b"\x00" * 0x100).section(DATA, b"\x00" * size)
+                for i, f in enumerate(FNS):
+                    b.symbol(f, TEXT, 0x10 * i, 0x10, type="func")
+                for name, offset, tsize, slots in tables:
+                    b.symbol(name, DATA, offset, tsize, type="object")
+                    for i, slot in enumerate(slots):
+                        if slot is not None:
+                            fn, addend = slot if isinstance(slot, tuple) else (slot, 0)
+                            b.reloc(DATA, offset + 8 + 4 * i, fn, R_PPC_ADDR32, addend)
+                return b
+
+            ours = obj(our_tables, our_size)
+            for name in text_refs:
+                if name not in {t[0] for t in our_tables}:
+                    ours.symbol(name)                          # undefined: another object's (or nobody's) table
+            for i, name in enumerate(text_refs):
+                ours.reloc(TEXT, 0x40 + 4 * i, name, R_PPC_ADDR32)
+            write_elf(os.path.join(tmp, "build", "RMHE08", "obj", "t", "n.o"), obj(target_tables, 0x20).build())
+            write_elf(os.path.join(tmp, "build", "RMHE08", "src", "t", "n.o"), ours.build())
+            s = va.sweep(tmp)
+            return [(r["address"], r["verdict"], r.get("credit"), r["values_match"]) for r in s["runs"]], s
+
+    TARGET = [("__vt__1A", 0, 0x10, ["fn_80004000", "fn_80004010"]),
+              ("__vt__1B", 0x10, 0x10, ["fn_80004020", "fn_80004030"])]
+    # the same two tables, emitted after an 8-byte string and in the other order: every offset moved
+    shifted, s_shifted = name_case(TARGET, [("@1", 0, 8, []), ("__vt__1B", 8, 0x10, ["fn_80004020", "fn_80004030"]),
+                                            ("__vt__1A", 0x18, 0x10, ["fn_80004000", "fn_80004010"])], 0x28)
+    check("identity: a shifted layout still emits both tables, credited by name (the offset rule: 2 violations)",
+          shifted, [(0x80050008, "emitted", "name", True), (0x80050018, "emitted", "name", True)])
+    same, s_same = name_case(TARGET, TARGET, 0x20)
+    check("identity: the target's own layout is emitted by name", [r[1:3] for r in same],
+          [("emitted", "name")] * 2)
+    check("identity: same layout -> shifted layout adds no rule-10 key (the gate's before/after objects)",
+          va.diff_rows(va.violation_rows(s_same), va.violation_rows(s_shifted))["added"], [])
+    # a table the map calls `lbl_` that our source emits as a class's vtable, somewhere else: its slots credit it
+    renamed, _ = name_case([("__vt__1A", 0, 0x10, ["fn_80004000", "fn_80004010"]),
+                            ("lbl_80050010", 0x10, 0x10, ["fn_80004020", "fn_80004030"])],
+                           [("__vt__1A", 0, 0x10, ["fn_80004000", "fn_80004010"]), ("@9", 0x10, 8, []),
+                            ("__vt__1R", 0x18, 0x10, ["fn_80004020", "fn_80004030"])], 0x28)
+    check("identity: a renamed, moved table is credited by its slots", renamed,
+          [(0x80050008, "emitted", "name", True), (0x80050018, "emitted", "slots", True)])
+    # a switch table: the slots are labels inside one function; their offsets are codegen the score owns
+    switch, _ = name_case([("jumptable_80050000", 0, 0x10, [("fn_80004000", 4), ("fn_80004000", 8)])],
+                          [("@5", 4, 0x10, [("fn_80004000", 0xC), ("fn_80004000", 0xC)])], 0x20)
+    check("identity: a switch table into the same function is credited by its slots, its offsets recorded",
+          switch, [(0x80050008, "emitted", "slots", False)])
+    # near misses: what we do not emit stays a violation
+    other, _ = name_case(TARGET, [("__vt__1A", 0, 0x10, ["fn_80004000", "fn_80004010"]),
+                                  ("__vt__1C", 0x10, 0x10, ["fn_80004030", "fn_80004020"])], 0x20)
+    check("near miss: a different table at B's offset does not emit B (the offset rule: emitted)",
+          [r[:2] for r in other], [(0x80050008, "emitted"), (0x80050018, "violation")])
+    hollow, _ = name_case(TARGET, [("__vt__1A", 0, 0x10, ["fn_80004000", "fn_80004010"]),
+                                   ("__vt__1B", 0x10, 0x10, [None, None]),
+                                   ("__vt__1C", 0x20, 0x10, ["fn_80004020", "fn_80004030"])], 0x30)
+    check("near miss: our B with no entries is not rescued by another table's equal slots",
+          [r[:2] for r in hollow], [(0x80050008, "emitted"), (0x80050018, "violation")])
+    twin, _ = name_case([("__vt__1A", 0, 0x10, ["fn_80004000", "fn_80004010"]),
+                         ("__vt__1B", 0x10, 0x10, ["fn_80004000", "fn_80004010"])],
+                        [("__vt__1A", 0, 0x10, ["fn_80004000", "fn_80004010"])], 0x20)
+    check("near miss: two equal tables, one emitted - the other is not credited on the same window",
+          [r[:3] for r in twin], [(0x80050008, "emitted", "name"), (0x80050018, "violation", None)])
+    stored, _ = name_case(TARGET, [("__vt__1A", 0, 0x10, ["fn_80004000", "fn_80004010"]),
+                                   ("blob", 0x18, 8, [])], 0x20, text_refs=("blob",))
+    check("near miss: storing a different object that sits at B's offset does not reference B (offset rule: did)",
+          [r[:2] for r in stored], [(0x80050008, "emitted"), (0x80050018, "violation")])
+    named_ref, _ = name_case(TARGET, [("@1", 0, 8, []), ("__vt__1B", 8, 0x10, [None, None])], 0x18,
+                             text_refs=("__vt__1A",))
+    check("identity: a store of the table's own name references it wherever our layout put things",
+          [r[:2] for r in named_ref], [(0x80050008, "referenced"), (0x80050018, "violation")])
 
     # -- (d) the .data emission order ----------------------------------------------------------
     def order_obj(names):
