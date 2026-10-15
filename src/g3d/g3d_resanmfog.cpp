@@ -6,10 +6,8 @@
  *   "g3d_resanmfog.cpp").  The left edge is the discovery cap; the right edge is `g3d/g3d_resanmlight.cpp`'s first
  *   body, a proven seam.
  * NAMES. Map stems, defined `extern "C"` (the dump answers `zz_` placeholders).
- * RESIDUALS. fn_8008F8C8: retail keeps the base word in r0 (`lwz r0,0(r3); add r3,r0,r4`), ours in r3, the C++
- *   front-end's choice for the one named temporary; a plain-expression return, a result temporary and an inverted
- *   branch all score lower.
- *   flipcheck: `.data` byte-identical.
+ * RESIDUALS. none; flipcheck: `.data` byte-identical.  fn_8008F8C8 is compiled with `#pragma peephole on`
+ *   (retail keeps the base word in r0).
  * SHAPES. `#pragma pool_data off`; the two strings are literals.  The channel evaluators take `(self, f32 frame, s32 flag)`: retail schedules the float argument first, and
  *   the ABI-identical `(self, s32 flag, f32 frame)` changes fn_8008F6E8's codegen.
  */
@@ -80,6 +78,8 @@ extern "C" void fn_8008F6E8(void *arg0, ResAnmFogResult *pResult, f32 frame)
     pResult->far = fn_8008A644(&res->farValue, frame, (flags & 0x40000000) != 0);
     fn_8005B1E4(&pResult->color, fn_8008A188(&res->colorValue, clamped, (flags & 0x80000000) != 0));
 }
+
+#pragma peephole on
 
 /* Resolves a sub-resource offset against the object base; a zero offset means "no sub-resource". */
 extern "C" s32 fn_8008F8C8(u32 *self, s32 offset)

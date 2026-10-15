@@ -1,22 +1,19 @@
 /*
- * g3d/g3d_resanmlight.cpp - nw4r g3d light-animation channel evaluator (fn_8008F8E4) and the `ResAnmScn` light
- *   channel accessors and resolvers.
- * RANGE. .text 0x8008F8E4-0x800908FC (31 functions); extab, extabindex.  Both seams are proven: fn_8008F8E4
- *   passes "g3d_resanmlight.cpp" (.data 0x80590440) and fn_800908FC opens `g3d/g3d_resanmscn.cpp`.
+ * g3d/g3d_resanmlight.cpp - nw4r g3d light-animation channel evaluator (fn_8008F8E4), its `g3d_resanm_ac.h`
+ *   bool-channel accessors and the frame and offset helpers.
+ * RANGE. .text 0x8008F8E4-0x8009001C (5 functions); extab, extabindex, .data 0x80590440-0x80590660.  The left seam
+ *   is "g3d_resanmlight.cpp" (.data 0x80590440); the right one is `g3d/g3d_resanmscn.cpp`'s: fn_8009001C onward
+ *   read that TU's `ResName` records (0x80590660) and `_ac.h` strings, and extabindex 0x80021D8C opens it.
  * NAMES. Map stems, defined `extern "C"` (the dump answers `zz_` placeholders).
- * RESIDUALS. The nine channel resolvers fn_80090110/2E4/4B8/68C/860 (0x9C) and fn_80090218/3EC/5C0/794 (0xC8) are
- *   each one instruction short: retail keeps `&key` in r31 (saving r30 too) and lays key/resolved/obj ascending at
- *   0x10/0x14/0x18; ours rematerialises `&key` and lays them descending (tried: a named key pointer, a
- *   `key = *(u32*)fn_8006268C(...)` initialiser, reordered locals).
- *   fn_8008F8E4: one register choice in the channel-evaluation block.
- *   fn_8008FE88: one instruction short - retail's `li r7,0x0` is missing.
- *   fn_80090000: retail keeps `base` in r0 (`lwz r0,0(r3); add r3,r0,r4`), ours in r3.
- *   fn_80090058: retail's two branch arms use the stack slots 0xC and 0x8, ours share one.
- *   flipcheck: `.text` 0xFF0 of 0x1018 (the ten short functions); `.data`: the strings are literals, but
- *   the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
- *   instance, after the TU's own strings, playbook 80), and the run's last 0xA0 bytes (0x80590660-0x80590700, the
- *   `ResName` records `g3d/g3d_resanmscn.cpp`'s getters read) belong to that unit's TU (a data seam).
- * SHAPES. `base += offset` in fn_80090000 keeps the branch (a plain `if`/`return` if-converts to branchless code).
+ * RESIDUALS. fn_8008F8E4: register colouring only - retail holds the resource in r30, the flags in r29, the light
+ *   kind in r28 and the second-colour flag in r27; ours r29/r28/r27/r30 (declaration permutations reach no closer
+ *   than one more instruction).
+ *   flipcheck: `.text` is the one row above; `.data` byte-identical to the 0x208 bytes the object emits (the
+ *   0x18-byte tail is fill before `g3d/g3d_resanmscn.cpp`'s 32-aligned name records).
+ * SHAPES. fn_8008FE88/fn_8008FD04 are `inline` under `#pragma dont_inline on`, defined in that order: their asserts'
+ *   strings are the inline tail (weak `@STRING@` copies, reversed), and their weak copies follow fn_8008F8E4.
+ *   `base += offset` in fn_80090000 keeps the branch (a plain `if`/`return` if-converts to branchless code), and
+ *   `#pragma peephole on` keeps its base word in r0.
  */
 
 #include "types.h"
@@ -46,23 +43,6 @@ void Panic(const char *file, int line, const char *message, ...);
 } /* namespace db */
 } /* namespace nw4r */
 
-/* The `.data` `__FILE__`/assert strings the retail bodies pass by address (unsplit `.data`). */
-extern u8 lbl_80590660[]; /* the light-set channel name record */
-extern u8 lbl_80590680[]; /* the unknown channel name record */
-extern u8 lbl_805906A0[]; /* the unknown channel name record */
-extern u8 lbl_805906C0[]; /* the unknown channel name record */
-extern u8 lbl_805906E0[]; /* the unknown channel name record */
-extern u8 lbl_80590770[]; /* "NW4R:...IsValid()" (g3d_resanmcamera_ac.h msg) */
-extern u8 lbl_80590798[]; /* "g3d_resanmcamera_ac.h" */
-extern u8 lbl_805907B0[]; /* assert message (g3d_resanmfog_ac.h) */
-extern u8 lbl_805907D8[]; /* "g3d_resanmfog_ac.h" */
-extern u8 lbl_805907EC[]; /* assert message (g3d_reslightset_ac.h) */
-extern u8 lbl_80590814[]; /* "g3d_reslightset_ac.h" */
-extern u8 lbl_8059082C[]; /* assert message (g3d_resanmlight_ac.h) */
-extern u8 lbl_80590854[]; /* "g3d_resanmlight_ac.h" */
-extern u8 lbl_8059086C[]; /* assert message (g3d_resanmamblight_ac.h) */
-extern u8 lbl_80590898[]; /* "g3d_resanmamblight_ac.h" */
-
 /* The result record the light evaluator fills in (only the words this unit writes are named). */
 typedef struct {
     /* +0x00 */ u32 typeWord;
@@ -85,30 +65,45 @@ typedef struct {
 
 /* Forward declarations for the unit's own functions (defined below in address order). */
 extern "C" f32 fn_8008FFFC(void);
-extern "C" s32 fn_8008FD04(u32 *self, s32 index);
-extern "C" s32 fn_8008FE88(u32 *self, s32 index);
 extern "C" u32 fn_80090000(u32 *self, s32 offset);
-extern "C" u32 *fn_8009001C(u32 *self, u32 *src);
-extern "C" void fn_8009004C(u32 *self, u32 *src);
-extern "C" u32 fn_80090058(u32 *self, s32 offset);
-extern "C" void fn_80090108(u32 *self, u32 value);
-extern "C" u32 *fn_800900A4(u32 *self, u32 value);
-extern "C" void fn_80090210(u32 *self, u32 value);
-extern "C" u32 *fn_800901AC(u32 *self, u32 value);
-extern "C" u32 fn_80090218(u32 *self, u32 key);
-extern "C" s32 fn_800902E4(u32 *self);
-extern "C" void fn_800903E4(u32 *self, u32 value);
-extern "C" u32 *fn_80090380(u32 *self, u32 value);
-extern "C" u32 fn_800903EC(u32 *self, u32 key);
-extern "C" s32 fn_800904B8(u32 *self);
-extern "C" void fn_800905B8(u32 *self, u32 value);
-extern "C" u32 *fn_80090554(u32 *self, u32 value);
-extern "C" u32 fn_800905C0(u32 *self, u32 key);
-extern "C" s32 fn_8009068C(u32 *self);
-extern "C" void fn_8009078C(u32 *self, u32 value);
-extern "C" u32 *fn_80090728(u32 *self, u32 value);
-extern "C" u32 fn_80090794(u32 *self, u32 key);
-extern "C" s32 fn_80090860(u32 *self);
+
+/* The `g3d_resanm_ac.h` bool-channel accessors: `inline`, called out of line (`dont_inline`), defined in the
+ * order their strings are created (the inline tail is emitted in reverse). */
+#pragma dont_inline on
+
+/* Tests one bit of the packed word array `self` at index `index`. */
+extern "C" inline s32 fn_8008FE88(u32 *self, s32 index)
+{
+    u32 valid = IS_VALID_PTR(self);
+
+    if (!valid) {
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x45, "NW4R:Pointer Error\npData(=%p) is not valid pointer.", self);
+    }
+    if (index < 0) {
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x46, "iframeOffset is out of bounds(%d)\n%d <= iframeOffset not satisfied.", index, 0);
+    }
+    u32 word = self[((u32)index) >> 5];
+    u32 bit = 0x80000000u >> (((u32)index) & 31);
+
+    return (word & bit) != 0;
+}
+
+/* Tests one bit of the packed channel array `*self` at index `index`. */
+extern "C" inline s32 fn_8008FD04(u32 *self, s32 index)
+{
+    u32 valid = IS_VALID_PTR(self);
+
+    if (!valid) {
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x55, "NW4R:Pointer Error\npData(=%p) is not valid pointer.", self);
+    }
+    if (*self == 0) {
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x56, "NW4R:Failed assertion pData->toResBoolAnmFramesData != 0");
+    }
+    if (index < 0) {
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x57, "iframeOffset is out of bounds(%d)\n%d <= iframeOffset not satisfied.", index, 0);
+    }
+    return fn_8008FE88((u32 *)((u8 *)self + *self), index);
+}
 
 /* Evaluates the light animation at `frame` into `pResult`. */
 extern "C" void fn_8008F8E4(void *arg0, ResAnmLightResult *pResult, f32 frame)
@@ -175,46 +170,13 @@ extern "C" void fn_8008F8E4(void *arg0, ResAnmLightResult *pResult, f32 frame)
     }
 }
 
-/* Tests one bit of the packed channel array `*self` at index `index`. */
-extern "C" s32 fn_8008FD04(u32 *self, s32 index)
-{
-    u32 valid = IS_VALID_PTR(self);
-
-    if (!valid) {
-        nw4r::db::Panic("g3d_resanm_ac.h", 0x55, "NW4R:Pointer Error\npData(=%p) is not valid pointer.", self);
-    }
-    if (*self == 0) {
-        nw4r::db::Panic("g3d_resanm_ac.h", 0x56, "NW4R:Failed assertion pData->toResBoolAnmFramesData != 0");
-    }
-    if (index < 0) {
-        nw4r::db::Panic("g3d_resanm_ac.h", 0x57, "iframeOffset is out of bounds(%d)\n%d <= iframeOffset not satisfied.", index, 0);
-    }
-    return fn_8008FE88((u32 *)((u8 *)self + *self), index);
-}
-
-/* Tests one bit of the packed word array `self` at index `index`. */
-extern "C" s32 fn_8008FE88(u32 *self, s32 index)
-{
-    u32 valid = IS_VALID_PTR(self);
-
-    if (!valid) {
-        nw4r::db::Panic("g3d_resanm_ac.h", 0x45, "NW4R:Pointer Error\npData(=%p) is not valid pointer.", self);
-    }
-    if (index < 0) {
-        nw4r::db::Panic("g3d_resanm_ac.h", 0x46, "iframeOffset is out of bounds(%d)\n%d <= iframeOffset not satisfied.", index);
-    }
-    u32 word = self[((u32)index) >> 5];
-    u32 bit = 0x80000000u >> (((u32)index) & 31);
-
-    return (word & bit) != 0;
-}
-
 /* The global frame thunk (a tail call into the shared frame getter). */
 extern "C" f32 fn_8008FFFC(void)
 {
     return floorf();
 }
 
+#pragma peephole on
 /* Resolves a sub-resource offset against the object base; a zero offset means "none". */
 extern "C" u32 fn_80090000(u32 *self, s32 offset)
 {
@@ -226,274 +188,4 @@ extern "C" u32 fn_80090000(u32 *self, s32 offset)
     }
     return 0;
 }
-
-/* Copies one word through `self` and returns `self` (nw4r's fluent setter). */
-extern "C" u32 *fn_8009001C(u32 *self, u32 *src)
-{
-    fn_8009004C(self, src);
-    return self;
-}
-
-/* Copies one word. */
-extern "C" void fn_8009004C(u32 *self, u32 *src)
-{
-    *self = *src;
-}
-
-/* Resolves a sub-resource offset and dereferences it. */
-extern "C" u32 fn_80090058(u32 *self, s32 offset)
-{
-    u32 base = *self;
-
-    if (offset != 0) {
-        return (u32)nw4r::g3d::ResDic((void*)(base + offset)).mpData;
-    }
-    return (u32)nw4r::g3d::ResDic((void*)(0)).mpData;
-}
-
-/* Stores the resolved light-set pointer and asserts its 4-byte alignment. */
-extern "C" u32 *fn_800900A4(u32 *self, u32 value)
-{
-    fn_80090108(self, value);
-    if (value & 3) {
-        nw4r::db::Panic((const char *)lbl_80590814, 0x27, (const char *)lbl_805907EC);
-    }
-    return self;
-}
-
-/* Stores a word. */
-extern "C" void fn_80090108(u32 *self, u32 value)
-{
-    *self = value;
-}
-
-/* Resolves the `lbl_80590660` channel record through the scene dictionary. */
-extern "C" s32 fn_80090110(u32 *self)
-{
-    u32 resolved;
-    u32 obj;
-    s32 found;
-
-    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
-                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_80590660)];
-    if (found != 0) {
-        return nw4r::g3d::ResDic((void*)found).GetNumData();
-    }
-    return 0;
-}
-
-/* Stores the resolved ambient-light pointer and asserts its 4-byte alignment. */
-extern "C" u32 *fn_800901AC(u32 *self, u32 value)
-{
-    fn_80090210(self, value);
-    if (value & 3) {
-        nw4r::db::Panic((const char *)lbl_80590898, 0x25, (const char *)lbl_8059086C);
-    }
-    return self;
-}
-
-/* Stores a word. */
-extern "C" void fn_80090210(u32 *self, u32 value)
-{
-    *self = value;
-}
-
-/* Resolves the `lbl_80590680` channel record and reads the entry for `key`. */
-extern "C" u32 fn_80090218(u32 *self, u32 key)
-{
-    u32 resolved;
-    u32 obj;
-    s32 found;
-
-    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
-                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_80590680)];
-    if (found != 0) {
-        u32 light;
-        return *(u32 *)fn_800901AC(&light, (u32)nw4r::g3d::ResDic((void*)found)[(int)key]);
-    }
-    u32 none;
-    return *(u32 *)fn_800901AC(&none, 0);
-}
-
-/* Tail thunk to fn_80090218. */
-extern "C" u32 fn_800902E0(u32 *self, u32 key)
-{
-    return fn_80090218(self, key);
-}
-
-/* Resolves the `lbl_80590680` channel record through the scene dictionary. */
-extern "C" s32 fn_800902E4(u32 *self)
-{
-    u32 resolved;
-    u32 obj;
-    s32 found;
-
-    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
-                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_80590680)];
-    if (found != 0) {
-        return nw4r::g3d::ResDic((void*)found).GetNumData();
-    }
-    return 0;
-}
-
-/* Stores the resolved light pointer and asserts its 4-byte alignment. */
-extern "C" u32 *fn_80090380(u32 *self, u32 value)
-{
-    fn_800903E4(self, value);
-    if (value & 3) {
-        nw4r::db::Panic((const char *)lbl_80590854, 0x8F, (const char *)lbl_8059082C);
-    }
-    return self;
-}
-
-/* Stores a word. */
-extern "C" void fn_800903E4(u32 *self, u32 value)
-{
-    *self = value;
-}
-
-/* Resolves the `lbl_805906A0` channel record and reads the entry for `key`. */
-extern "C" u32 fn_800903EC(u32 *self, u32 key)
-{
-    u32 resolved;
-    u32 obj;
-    s32 found;
-
-    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
-                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906A0)];
-    if (found != 0) {
-        u32 light;
-        return *(u32 *)fn_80090380(&light, (u32)nw4r::g3d::ResDic((void*)found)[(int)key]);
-    }
-    u32 none;
-    return *(u32 *)fn_80090380(&none, 0);
-}
-
-/* Tail thunk to fn_800903EC. */
-extern "C" u32 fn_800904B4(u32 *self, u32 key)
-{
-    return fn_800903EC(self, key);
-}
-
-/* Resolves the `lbl_805906A0` channel record through the scene dictionary. */
-extern "C" s32 fn_800904B8(u32 *self)
-{
-    u32 resolved;
-    u32 obj;
-    s32 found;
-
-    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
-                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906A0)];
-    if (found != 0) {
-        return nw4r::g3d::ResDic((void*)found).GetNumData();
-    }
-    return 0;
-}
-
-/* Stores the resolved fog pointer and asserts its 4-byte alignment. */
-extern "C" u32 *fn_80090554(u32 *self, u32 value)
-{
-    fn_800905B8(self, value);
-    if (value & 3) {
-        nw4r::db::Panic((const char *)lbl_805907D8, 0x3E, (const char *)lbl_805907B0);
-    }
-    return self;
-}
-
-/* Stores a word. */
-extern "C" void fn_800905B8(u32 *self, u32 value)
-{
-    *self = value;
-}
-
-/* Resolves the `lbl_805906C0` channel record and reads the entry for `key`. */
-extern "C" u32 fn_800905C0(u32 *self, u32 key)
-{
-    u32 resolved;
-    u32 obj;
-    s32 found;
-
-    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
-                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906C0)];
-    if (found != 0) {
-        u32 light;
-        return *(u32 *)fn_80090554(&light, (u32)nw4r::g3d::ResDic((void*)found)[(int)key]);
-    }
-    u32 none;
-    return *(u32 *)fn_80090554(&none, 0);
-}
-
-/* Tail thunk to fn_800905C0. */
-extern "C" u32 fn_80090688(u32 *self, u32 key)
-{
-    return fn_800905C0(self, key);
-}
-
-/* Resolves the `lbl_805906C0` channel record through the scene dictionary. */
-extern "C" s32 fn_8009068C(u32 *self)
-{
-    u32 resolved;
-    u32 obj;
-    s32 found;
-
-    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
-                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906C0)];
-    if (found != 0) {
-        return nw4r::g3d::ResDic((void*)found).GetNumData();
-    }
-    return 0;
-}
-
-/* Stores the resolved camera pointer and asserts its 4-byte alignment. */
-extern "C" u32 *fn_80090728(u32 *self, u32 value)
-{
-    fn_8009078C(self, value);
-    if (value & 3) {
-        nw4r::db::Panic((const char *)lbl_80590798, 0x7D, (const char *)lbl_80590770);
-    }
-    return self;
-}
-
-/* Stores a word. */
-extern "C" void fn_8009078C(u32 *self, u32 value)
-{
-    *self = value;
-}
-
-/* Resolves the `lbl_805906E0` channel record and reads the entry for `key`. */
-extern "C" u32 fn_80090794(u32 *self, u32 key)
-{
-    u32 resolved;
-    u32 obj;
-    s32 found;
-
-    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
-                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906E0)];
-    if (found != 0) {
-        u32 light;
-        return *(u32 *)fn_80090728(&light, (u32)nw4r::g3d::ResDic((void*)found)[(int)key]);
-    }
-    u32 none;
-    return *(u32 *)fn_80090728(&none, 0);
-}
-
-/* Tail thunk to fn_80090794. */
-extern "C" u32 fn_8009085C(u32 *self, u32 key)
-{
-    return fn_80090794(self, key);
-}
-
-/* Resolves the `lbl_805906E0` channel record through the scene dictionary. */
-extern "C" s32 fn_80090860(u32 *self)
-{
-    u32 resolved;
-    u32 obj;
-    s32 found;
-
-    found = (s32)(resolved = fn_80090058(self, fn_8006584C(self)->field_0x10), fn_8009001C(&obj, &resolved),
-                  *reinterpret_cast<nw4r::g3d::ResDic*>(&obj))[nw4r::g3d::ResName((void*)lbl_805906E0)];
-    if (found != 0) {
-        return nw4r::g3d::ResDic((void*)found).GetNumData();
-    }
-    return 0;
-}
+#pragma peephole off

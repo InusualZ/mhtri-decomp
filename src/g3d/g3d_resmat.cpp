@@ -9,19 +9,28 @@
  * RESIDUALS. the ResMdl accessors from 0x80097D40 are `g3d_resmdl.cpp`'s code (a seam candidate: their strings
  *   follow the material's and cite only `g3d_resvtx_ac.h`).
  *   ResTexPlttInfo::Bind: retail copy-constructs the two names and the found texture/palette out of line.
- *   ResMdl::Bind: saves r25 where retail saves from r26 (`_savegpr_25`/`_restgpr_25`).
+ *   ResTexPlttInfo::BindTex: retail's frame is 0x10 larger and lays the seven out-parameters in another order.
+ *   ResMatIndMtxAndScale::GXSetIndTexMtx: the first command's word is ORed in a different order (one
+ *   instruction); ResTexPlttInfo::BindPltt: register colouring (retail r29/r28/r30/r31, ours r31/r30/r29/r28).
  *   relocdiff --callees: the asserts pass literal strings where retail names this unit's `.data` labels (the
  *   TLUT range assertion `resmat_tlut_id_range_assert_msg` in the five ResTlutObj accessors); ResMatMisc::
  *   GetIndirectMethod calls `ptr() const` where retail calls the non-const copy; ResMatTevColor::CallDisplayList
- *   and the three ResMatIndMtxAndScale matrix accessors reach `ref()` through a different copy than retail;
+ *   reaches `ref()` through a different copy than retail;
  *   ResTexPlttInfo::Bind copy-constructs the names and the found handles inline (retail calls fn_80062D58,
  *   fn_80069C14 and fn_80069BD8; `res_name_copy_ctor` is the retail call at +0x38 and +0x120 that ours omits).
  *   flipcheck: `.data` 0x4A8 of 0x508 and `.sdata2` 0x2C of 0x38 (the accessor copies' strings and pool sit
  *   elsewhere), `.sdata` 0x4 emitted and not claimed.
  * SHAPES. every accessor copy another unit keeps is called through its class (g3d/g3d_rescommon.h); the copies
  *   this TU keeps are defined here in retail's order.
- *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except GetIndirectMethod, ResMatMiscData's assignment and the first GXGetIndTexMtx,
- *   which measure better with the pass on.
+ *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except
+ *   GetIndirectMethod and ResMatMiscData's assignment, which measure better with the pass on.
+ *   The three ResMatIndMtxAndScale matrix accessors read `ref()` once before the id switch; GXGetIndTexMtx folds
+ *   the scale with `s8` exponent loops that decrement before multiplying (`while (exp != 0) { exp--; ... }`).
+ *   ResTexPlttInfo::BindPltt/Release materialise the range check as a bool set in an `if`; BindPltt truncates
+ *   the entry count first.  The display-list words OR their fields right-nested in retail's evaluation order
+ *   (GXSetBlendMode, GXSetAlphaCompare); a loop index, or the pointers a copy loop walks, are declared before the
+ *   values they are compared with (ResMdl::Bind, ResMat::Bind, the two CopyTo); the tev constant colour
+ *   accessors add the colour's offset before the block's.
  */
 
 #include "types.h"
@@ -115,11 +124,13 @@ ResTexObj ResTexObj::CopyTo(void* pDst) const {
     RESMAT_ASSERT(!((u32)pDst & 0x3), 458, "!((u32)p & 0x3)");
     const ResTexObjData* pSrc = ptr();
     ResTexObjData* pData = static_cast<ResTexObjData*>(pDst);
+    const GXTexObj* pSrcObj;
+    GXTexObj* pDstObj;
     u32 flag = pSrc->flagUsedTexMapID;
     pData->flagUsedTexMapID = flag;
     RESMAT_ASSERT(!(flag & 0xffffff00), 467, "!(flag & 0xffffff00)");
-    const GXTexObj* pSrcObj = &pSrc->texObj[0];
-    GXTexObj* pDstObj = &pData->texObj[0];
+    pSrcObj = &pSrc->texObj[0];
+    pDstObj = &pData->texObj[0];
     for (; flag != 0; flag >>= 1, pSrcObj++, pDstObj++) {
         if (flag & 1) {
             detail::Copy32ByteBlocks(pDstObj, pSrcObj, sizeof(GXTexObj));
@@ -210,13 +221,17 @@ ResTexSrt ResTexSrt::CopyTo(void* pDst) const {
     RESMAT_ASSERT(!((u32)pDst & 0x3), 602, "!((u32)p & 0x3)");
     const ResTexSrtData& r = ref();
     ResTexSrtData* pData = static_cast<ResTexSrtData*>(pDst);
+    const TexSrt* pSrcSrt;
+    const TexMtxEffect* pSrcEffect;
+    TexSrt* pDstSrt;
+    TexMtxEffect* pDstEffect;
     u32 flag = r.flagTexSrt;
     pData->flagTexSrt = flag;
     pData->texMtxMode = r.texMtxMode;
-    const TexSrt* pSrcSrt = &r.texSrt[0];
-    const TexMtxEffect* pSrcEffect = &r.effect[0];
-    TexSrt* pDstSrt = &pData->texSrt[0];
-    TexMtxEffect* pDstEffect = &pData->effect[0];
+    pSrcSrt = &r.texSrt[0];
+    pSrcEffect = &r.effect[0];
+    pDstSrt = &pData->texSrt[0];
+    pDstEffect = &pData->effect[0];
     for (; flag != 0; flag >>= 4, pSrcSrt++, pSrcEffect++, pDstSrt++, pDstEffect++) {
         if (flag & 0xf) {
             *pDstSrt = *pSrcSrt;
@@ -260,9 +275,9 @@ bool ResTexSrt::SetMapMode(u32 id, u32 mapMode, int refCamera, int refLight) {
     if (id < 8 && mapMode < 256) {
         TexMtxEffect* pEffect = &ref().effect[id];
         pEffect->map_mode = mapMode;
-        bool validCamera = (u32)refCamera <= 31;
+        bool validCamera = refCamera >= 0 && refCamera <= 31;
         pEffect->ref_camera = validCamera ? (s8)refCamera : (s8)-1;
-        bool validLight = (u32)refLight <= 127;
+        bool validLight = refLight >= 0 && refLight <= 127;
         pEffect->ref_light = validLight ? (s8)refLight : (s8)-1;
         return true;
     }
@@ -475,7 +490,7 @@ bool ResMatPix::GXGetAlphaCompare(_GXCompare* pComp0, u8* pRef0, _GXAlphaOp* pOp
 /* Writes the alpha compare state into the display list. */
 void ResMatPix::GXSetAlphaCompare(_GXCompare comp0, u8 ref0, _GXAlphaOp op, _GXCompare comp1, u8 ref1) {
     u8* pDL = reinterpret_cast<u8*>(&ref());
-    detail::ResWriteBPCmd(pDL, (comp0 << 16 | ref0 | ref1 << 8) | (op << 22 | comp1 << 19 | 0xf3000000));
+    detail::ResWriteBPCmd(pDL, (comp0 << 16 | (ref0 | ref1 << 8)) | (op << 22 | comp1 << 19 | 0xf3000000));
 }
 
 /* 0x80095FA4 (0xF8): reads the blend state from the display list; false when it carries none. */
@@ -505,7 +520,7 @@ bool ResMatPix::GXGetBlendMode(_GXBlendMode* pType, _GXBlendFactor* pSrcFactor, 
         *pDstFactor = static_cast<_GXBlendFactor>((reg >> 5) & 7);
     }
     if (pOp != NULL) {
-        *pOp = static_cast<_GXLogicOp>((reg >> 12) & 0xf);
+        *pOp = static_cast<_GXLogicOp>((reg >> 12) & 0xfff);
     }
     return true;
 }
@@ -515,8 +530,8 @@ void ResMatPix::GXSetBlendMode(_GXBlendMode type, _GXBlendFactor srcFactor, _GXB
                                _GXLogicOp op) {
     u8* pDL = reinterpret_cast<u8*>(&ref()) + 10;
     detail::ResWriteSSMask(pDL, 0xffe3);
-    detail::ResWriteBPCmd(pDL + 5, op << 12 | (type == 3) << 11 | srcFactor << 8 | dstFactor << 5 |
-                                       (type == 2) << 1 | (type == 1 || type == 3) | 0x41000000);
+    detail::ResWriteBPCmd(pDL + 5, (op << 12 | ((type == 3) << 11 | (srcFactor << 8 | (dstFactor << 5 |
+                                       ((type == 2) << 1 | (type == 1 || type == 3)))))) | 0x41000000);
 }
 
 /* 0x8009627C (0x20): packs four components into a colour. */
@@ -589,7 +604,8 @@ bool ResMatTevColor::GXGetTevKColor(_GXTevKColorID id, GXColor* pColor) const {
     if (!inRange) {
         nw4r::db::Panic(RESMAT_FILE, 1621, "id is out of bounds(%d)\n%d <= id <= %d not satisfied.", id, 0, 3);
     }
-    const u8* pDL = reinterpret_cast<const u8*>(&ref()) + id * 10 + 64;
+    const u8* pBase = reinterpret_cast<const u8*>(&ref()) + id * 10;
+    const u8* pDL = pBase + 64;
     if (pDL[0] == 0) {
         return false;
     }
@@ -608,7 +624,8 @@ void ResMatTevColor::GXSetTevKColor(_GXTevKColorID id, GXColor color) {
     if (!inRange) {
         nw4r::db::Panic(RESMAT_FILE, 1656, "id is out of bounds(%d)\n%d <= id <= %d not satisfied.", id, 0, 3);
     }
-    u8* pDL = reinterpret_cast<u8*>(&ref()) + id * 10 + 64;
+    u8* pBase = reinterpret_cast<u8*>(&ref()) + id * 10;
+    u8* pDL = pBase + 64;
     u32 bg = color.g << 12 | (color.b | 0x800000) | (id * 2 + 0xe1) << 24;
     detail::ResWriteBPCmd(pDL, color.a << 12 | (color.r | 0x800000) | (id * 2 + 0xe0) << 24);
     detail::ResWriteBPCmd(pDL + 5, bg);
@@ -627,18 +644,18 @@ void ResMatIndMtxAndScale::CallDisplayList(u8 indNum, bool bSync) const {
 }
 
 /* 0x80096624 (0x344): reads indirect matrix `id` (1..3) from the display list, the scale folded in. */
-#pragma peephole on
 bool ResMatIndMtxAndScale::GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx) const {
     const u8* pDL;
+    const u8* pBase = reinterpret_cast<const u8*>(&ref());
     switch (id) {
     case 1:
-        pDL = reinterpret_cast<const u8*>(&ref()) + 10;
+        pDL = pBase + 10;
         break;
     case 2:
-        pDL = reinterpret_cast<const u8*>(&ref()) + 32;
+        pDL = pBase + 32;
         break;
     case 3:
-        pDL = reinterpret_cast<const u8*>(&ref()) + 47;
+        pDL = pBase + 47;
         break;
     default:
         nw4r::db::Panic(RESMAT_FILE, 1814, "NW4R:Fatal Error\nGXGetIndTexMtx: Invalid matrix id");
@@ -656,11 +673,13 @@ bool ResMatIndMtxAndScale::GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx) 
     s8 scaleExp = (s8)((((reg2 >> 22) & 3) << 4 | (((reg0 >> 22) & 3) | ((reg1 >> 22) & 3) << 2)) - 17);
     f32 scale = 1.0f;
     if (scaleExp > 0) {
-        for (; scaleExp > 0; scaleExp--) {
+        while (scaleExp != 0) {
+            scaleExp--;
             scale *= 2.0f;
         }
     } else if (scaleExp < 0) {
-        for (; scaleExp < 0; scaleExp++) {
+        while (scaleExp != 0) {
+            scaleExp++;
             scale *= 0.5f;
         }
     }
@@ -685,15 +704,16 @@ bool ResMatIndMtxAndScale::GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx) 
 /* 0x80096968 (0x244): reads indirect matrix `id` (1..3) and its scale exponent from the display list. */
 bool ResMatIndMtxAndScale::GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx, s8* pScaleExp) const {
     const u8* pDL;
+    const u8* pBase = reinterpret_cast<const u8*>(&ref());
     switch (id) {
     case 1:
-        pDL = reinterpret_cast<const u8*>(&ref()) + 10;
+        pDL = pBase + 10;
         break;
     case 2:
-        pDL = reinterpret_cast<const u8*>(&ref()) + 32;
+        pDL = pBase + 32;
         break;
     case 3:
-        pDL = reinterpret_cast<const u8*>(&ref()) + 47;
+        pDL = pBase + 47;
         break;
     default:
         nw4r::db::Panic(RESMAT_FILE, 1910, "NW4R:Fatal Error\nGXGetIndTexMtx: Invalid matrix id");
@@ -731,19 +751,20 @@ bool ResMatIndMtxAndScale::GXGetIndTexMtx(_GXIndTexMtxID id, math::MTX34* pMtx, 
 
 /* Writes indirect matrix `id` (1..3) and its scale exponent into the display list. */
 void ResMatIndMtxAndScale::GXSetIndTexMtx(_GXIndTexMtxID id, const math::MTX34& mtx, s8 scaleExp) {
-    u8* pDL;
     u32 reg;
+    u8* pDL;
+    u8* pBase = reinterpret_cast<u8*>(&ref());
     switch (id) {
     case 1:
-        pDL = reinterpret_cast<u8*>(&ref()) + 10;
+        pDL = pBase + 10;
         reg = 0;
         break;
     case 2:
-        pDL = reinterpret_cast<u8*>(&ref()) + 32;
+        pDL = pBase + 32;
         reg = 3;
         break;
     case 3:
-        pDL = reinterpret_cast<u8*>(&ref()) + 47;
+        pDL = pBase + 47;
         reg = 6;
         break;
     default:
@@ -751,8 +772,9 @@ void ResMatIndMtxAndScale::GXSetIndTexMtx(_GXIndTexMtxID id, const math::MTX34& 
         return;
     }
     scaleExp += 17;
-    detail::ResWriteBPCmd(pDL, (reg + 6) << 24 | ((scaleExp & 3) << 22 | ((s32)(1024.0f * mtx.m[0][0]) & 0x7ff) |
-                                                  ((s32)(1024.0f * mtx.m[1][0]) & 0x7ff) << 11));
+    detail::ResWriteBPCmd(pDL, (reg + 6) << 24 | (scaleExp & 3) << 22 |
+                                   (((s32)(1024.0f * mtx.m[0][0]) & 0x7ff) |
+                                    ((s32)(1024.0f * mtx.m[1][0]) & 0x7ff) << 11));
     detail::ResWriteBPCmd(pDL + 5, (reg + 7) << 24 | ((scaleExp >> 2) & 3) << 22 |
                                        (((s32)(1024.0f * mtx.m[0][1]) & 0x7ff) |
                                         ((s32)(1024.0f * mtx.m[1][1]) & 0x7ff) << 11));
@@ -821,11 +843,7 @@ bool ResMatChan::GXGetChanCtrl(u32 chan, u8* pEnable, u32* pAmbSrc, u32* pMatSrc
     }
     const ResChanEntry* pEntry = &ref().chan[chan & 1];
     u32 param;
-    if (!(chan & 2)) {
-        param = pEntry->paramChanCtrlC;
-    } else {
-        param = pEntry->paramChanCtrlA;
-    }
+    param = !(chan & 2) ? pEntry->paramChanCtrlC : pEntry->paramChanCtrlA;
     if (pEnable != NULL) {
         *pEnable = (param >> 1) & 1;
     }
@@ -840,8 +858,8 @@ bool ResMatChan::GXGetChanCtrl(u32 chan, u8* pEnable, u32* pAmbSrc, u32* pMatSrc
     if (pLightMask != NULL) {
         *pLightMask = maskLo | maskHi << 4;
     }
-    u32 attnFn;
     u32 diffFn;
+    u32 attnFn;
     if (!((param >> 10) & 1)) {
         attnFn = 0;
         diffFn = 0;
@@ -909,9 +927,10 @@ void ResMatTexCoordGen::CallDisplayList(u8 numGens, bool bSync) const {
 
 /* 0x8009728C (0xB0): binds every texture and palette of the material from `file`; true when all were found. */
 bool ResMat::Bind(ResFile file) {
+    u32 i;
     u32 num = GetNumResTexPlttInfo();
     u32 numBound = 0;
-    for (u32 i = 0; i < num; i++) {
+    for (i = 0; i < num; i++) {
         if (GetResTexPlttInfo(i).Bind(file, GetResTexObj(), GetResTlutObj())) {
             numBound++;
         }
@@ -1006,15 +1025,17 @@ NW4R_G3D_RESOURCE_PTR(ResTexPlttInfo)
 void ResTexPlttInfo::BindPltt(ResPltt pltt, ResTlutObj tlutObj) {
     ResTexPlttInfoData& r = ref();
     r.pPlttData = const_cast<ResPlttData*>(&static_cast<const ResPltt&>(pltt).ref());
-    bool inRange = r.mapID >= 0 && r.mapID <= 7;
+    bool inRange = false;
+    if (r.mapID >= 0 && r.mapID <= 7) {
+        inRange = true;
+    }
     if (!inRange) {
         nw4r::db::Panic(RESMAT_FILE, 3028, "r.mapID is out of bounds(%d)\n%d <= r.mapID <= %d not satisfied.",
                         r.mapID, 0, 7);
     }
     GXTlutObj* pTlut = tlutObj.GetTlut(static_cast<_GXTlut>(r.mapID));
-    u16 numEntries = pltt.GetNumEntries();
-    u32 format = pltt.GetFmt();
-    GXInitTlutObj(pTlut, static_cast<const ResPltt&>(pltt).GetPlttData(), format, numEntries);
+    u32 numEntries = (u16)pltt.GetNumEntries();
+    GXInitTlutObj(pTlut, static_cast<const ResPltt&>(pltt).GetPlttData(), pltt.GetFmt(), numEntries);
     tlutObj.Validate(static_cast<_GXTlut>(r.mapID));
 }
 
@@ -1075,7 +1096,10 @@ void ResTexPlttInfo::Release(ResTexObj texObj, ResTlutObj tlutObj) {
     ResTexPlttInfoData& r = ref();
     r.pTexData = NULL;
     r.pPlttData = NULL;
-    bool inRange = r.mapID >= 0 && r.mapID <= 7;
+    bool inRange = false;
+    if (r.mapID >= 0 && r.mapID <= 7) {
+        inRange = true;
+    }
     if (!inRange) {
         nw4r::db::Panic(RESMAT_FILE, 3116, "r.mapID is out of bounds(%d)\n%d <= r.mapID <= %d not satisfied.",
                         r.mapID, 0, 7);
@@ -1245,14 +1269,11 @@ u32 ResMdl::GetResShpNumEntries() const {
 
 /* 0x800989C8 (0x98): binds every material's textures from `file`; true when all were found. */
 bool ResMdl::Bind(const ResFile& file) {
+    u32 i;
     bool success = true;
     u32 num = GetResMatNumEntries();
-    for (u32 i = 0; i < num; i++) {
-        bool ok = false;
-        if (GetResMat(i).Bind(file) && success) {
-            ok = true;
-        }
-        success = ok;
+    for (i = 0; i < num; i++) {
+        success = GetResMat(i).Bind(file) && success;
     }
     return success;
 }

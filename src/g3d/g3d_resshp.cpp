@@ -13,19 +13,20 @@
  *   ResTex::ref/GetTexObjParam/GetTexObjCIParam/GetTexData (named by the retail `_ac.h` accessor set).  The `ResTagDLData` fields (`mPrePrimOfs` at +0x08,
  *   `mSize`/`mDlSize`) and the `ResTevData`/`ResTexBlock` fields are GUESSes; the `ResShpData` `id*` fields are
  *   spelled by res_shp_get_vtx_pos's assert (`ref().idVtxPosition >= 0`).
- * RESIDUALS. fn_80099724: the base word loads into r3 where retail uses r0.
- *   fn_800997E0: `fn_80099640(...) + (attr - 9) * 0xC` accumulates in the local's register; retail uses r3, then +0x32.
- *   fn_80099C20: stack-slot order of the three `ResXxx` copies' destination handles and value temporaries.
- *   fn_8009A1E0: retail keeps `lbl_8056F730` in r31 across the `fn_800866FC` call (frame 0x20, r29-r31); ours
- *     rematerialises it after the call (frame 0x10, 8 bytes shorter); every spelling of the table read emits the same.
+ * RESIDUALS. fn_80099C20: stack-slot order of the three `ResXxx` copies' destination handles and value temporaries.
+ *   fn_8009A1E0: retail keeps `tev_display_list_size` in r31 across the `fn_800866FC` call (frame 0x20,
+ *     r29-r31); ours rematerialises it after the call (frame 0x10, 8 bytes shorter); every spelling of the table
+ *     read emits the same, a defined table included.
  *   res_tev_copy_to: the final `subf`'s destination register (r0 in retail, r4 here).
- *   flipcheck: `.text` 0x1340 of 0x1348; `.rodata` (the pre-prim size table) is declared, not emitted; `.data`/
+ *   flipcheck: `.text` 0x1340 of 0x1348; `.rodata` is the defined `tev_display_list_size` (a GUESS name for the
+ *   map's lbl_8056F730); `.data`/
  *   `.sdata`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
  *   instance, after the TU's own strings, playbook 80).
  * SHAPES. File-scope `#pragma peephole off`: the `rlwinm` flag extracts keep retail's `cmpwi`, and fn_800997E0/
  *   fn_800998CC materialise their range check (`li r3, 0` / `li r3, 1` + `cmpwi`).
  *   `#pragma pool_data off`; the strings are literals ("ref", 4 bytes, goes to `.sdata` and loads with
- *   `li r7, @sda21`).
+ *   `li r7, @sda21`).  fn_80099724 is compiled with `#pragma peephole on` (base word in r0); fn_800997E0 adds the
+ *   record's index before its +0x32 offset.
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -236,6 +237,7 @@ u32 fn_800996E8(ResHandle* pSelf) {
     return fn_80099724(pSelf, pTag->mPrePrimOfs);
 }
 
+#pragma peephole on
 /* `base + ofs` for a boxed base, 0 for a null offset. */
 u32 fn_80099724(const ResHandle* pSelf, u32 ofs) {
     u32 base = (u32)pSelf->mpData;
@@ -245,6 +247,7 @@ u32 fn_80099724(const ResHandle* pSelf, u32 ofs) {
     }
     return 0;
 }
+#pragma peephole off
 
 /* `ResTagDL::ref` with the `g3d_rescommon_ac.h` assert (the second out-of-line copy). */
 ResTagDLData* fn_80099740(ResHandle* pSelf) {
@@ -276,9 +279,11 @@ u32 fn_800997AC(ResHandle* pSelf) {
 /* The `"ref"` member-name strings of the `ResTev`/`ResTex` asserts, declared as *sized* 4-byte arrays
  * so MWCC's small-data heuristic emits the target's `li rN, @sda21` form (the lever the head records). */
 
-/* The pre-prim display-list size table `ResTev`'s draw path indexes by the block's primitive count
- * (`lbl_8056F730[0..15]` = 0xA0, 0xA0, 0xC0, 0xC0, 0x100, ..., 0x1E0).  `.data`, so not small data. */
-extern u32 lbl_8056F730[];
+/* The tev display-list sizes `ResTev::CallDisplayList` indexes by the block's stage count less one
+ * (`.rodata`, 16 words). */
+static const u32 tev_display_list_size[16] = {
+    0xA0, 0xA0, 0xC0, 0xC0, 0x100, 0x100, 0x120, 0x120, 0x160, 0x160, 0x180, 0x180, 0x1C0, 0x1C0, 0x1E0, 0x1E0,
+};
 
 /* The neighbours this half calls (plain map stems), each owner named beside it. */
 extern "C" {
@@ -340,7 +345,8 @@ extern "C" void fn_800997E0(ResHandle* pSelf, s32 attr, u32 pData, u32 size) {
     }
 
     u32 prePrim = fn_800996AC(pSelf);
-    u8* pRecord = (u8*)fn_80099640((ResHandle*)&prePrim) + (attr - 9) * 0xC + 0x32;
+    u8* pBase = (u8*)fn_80099640((ResHandle*)&prePrim) + (attr - 9) * 0xC;
+    u8* pRecord = pBase + 0x32;
     u32 count = (attr == 25) ? 1 : (attr - 9);
 
     fn_80091F70(pRecord, (u8)(count + 0xA0), pData + 0x80000000);
@@ -627,7 +633,7 @@ extern "C" u32 fn_8009A1D8(ResHandle* pSelf) {
 }
 
 /* 0x8009A1E0 - call the block's display list with the size its primitive count names: `PPCSync` first
- * when the caller asks for it, then `lbl_8056F730[count - 1]` bytes at the block's +0x20. */
+ * when the caller asks for it, then `tev_display_list_size[count - 1]` bytes at the block's +0x20. */
 void nw4r::g3d::ResTev::CallDisplayList(bool flag) const {
     if (flag) {
         PPCSync();
@@ -635,7 +641,7 @@ void nw4r::g3d::ResTev::CallDisplayList(bool flag) const {
 
     u32 prim = (u8)fn_8009A254((ResHandle*)this) - 1;
 
-    GXCallDisplayList((void*)((u32)&ref() + 0x20), lbl_8056F730[prim]);
+    GXCallDisplayList((void*)((u32)&ref() + 0x20), tev_display_list_size[prim]);
 }
 
 /* 0x8009A254 - the block's primitive count (its +0x0C byte). */

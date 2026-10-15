@@ -125,7 +125,7 @@ struct ResMatChanData {
 struct ResMatFurData {
     /* +0x0 */ u32 pad_0x0;
     /* +0x4 */ u32 numLayer;
-    /* +0x8 */ u32 layerRatioMode;   /* 0: linear, 1: a power curve */
+    /* +0x8 */ s32 layerRatioMode;   /* 0: linear, 1: a power curve */
 };
 
 /* One texture of a material and how it is sampled.  size: 0x34 */

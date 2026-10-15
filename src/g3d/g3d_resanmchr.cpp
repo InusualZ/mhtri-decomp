@@ -6,19 +6,17 @@
  *   0x80590010-0x805903F0 (opens on "g3d_resanmchr.cpp"), .sdata2 0x80795ED0-0x80795F08.
  * NAMES. Map stems (the dump answers `zz_` placeholders).
  * RESIDUALS. Unwritten (objdiff scores them zero): the per-node dispatchers fn_8008C038, fn_8008CF2C, GetAnmResult__Q34nw4r3g3d9ResAnmChrCFPQ34nw4r3g3d12ChrAnmResultUlf.
- *   fn_8008A664: the `ScaleType` compare chain holds the masked word in r7 in retail, r3 here.
- *   fn_8008AA8C, fn_8008B200, fn_8008B95C: swapped `fcmpo` operand order, `fmr`/`fmuls` scheduling, 12 bytes short.
- *   fn_8008C600, fn_8008C968, fn_8008CD00: retail's ordered compare (`fcmpo` + `cror`) is `fcmpu` here, and the float
- *     registers colour differently.
+ *   fn_8008A664: the `ScaleType` compare chain holds the masked word in r7 in retail, r3 here; retail moves `frame`
+ *     into f1 before the flag test of each call and reads the plain keys through an unfolded `p++`.
+ *   fn_8008C600, fn_8008C968, fn_8008CD00: the interpolation result is formed in f31 and moved to f1 (retail forms
+ *     it in f1).
  *   fn_8008D30C, fn_8008D3DC, fn_8008D47C, fn_8008D528: the argument shaping for the missing fn_8008C038/fn_8008CF2C
  *     (their declared parameters are approximations) and register colouring.
- *   fn_8008E8D0, fn_8008EB68, fn_8008EE68, fn_8008F148: register colouring and load order of the compare operands.
+ *   fn_8008E8D0, fn_8008F148: register colouring and load order of the compare operands.
  *   fn_8008DC4C: one `fcmpu` operand.
- *   fn_8008B650, fn_8008AFE4, fn_8008B78C, fn_8008BFBC: retail loads a scalar float with `psq_l fN,0(rN),1,qrN`
- *     where our compiler emits `lfs`; no source shape or flag reproduces it.
- *   fn_8008B704, fn_8008BEF0: retail truncates float to short/byte with `psq_st ...,1,qrN` + `lha`/`lbz`; a
- *     `union` pun, a two-step temporary and a plain cast all emit `fctiwz`/`stfd`.
- *   fn_8008F6C4: two loads ordered 0x10-then-0x00 here, 0x00-then-0x10 in retail.
+ *   fn_8008B650: the map row (0x14) covers two functions - fn_8008B650 itself (0xC, a tail call) and the GQR7
+ *     load at 0x8008B65C that it branches to (res_anm_chr_load_qr7 here, a GUESS name); the row pairs once the
+ *     map is split there.
  *   flipcheck: `.text` 0x4590 of 0x5084; `.rodata` is declared, not emitted; `.data`: the strings are literals,
  *   the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
  *   instance, after the TU's own strings, playbook 80); `.sdata2`: the float constants are literals, the pool is 0x30 of 0x38.
@@ -30,7 +28,12 @@
  *     `MTX33ToMTX34__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX33`.
  *   flipcheck: referenced but defined by nothing a flip can use: `fn_80500F60`, `fn_805012C4`, `fn_805012E8`,
  *     `fn_8050133C`, `fn_80501434`, `fn_80501594`.
- * SHAPES. File-scope `#pragma peephole off`: retail keeps the split `clrlwi`+`slwi`/`cmpwi` forms.  `fp_contract`
+ * SHAPES. File-scope `#pragma peephole off`: retail keeps the split `clrlwi`+`slwi`/`cmpwi` forms.
+ *   The quantized loads and stores (fn_8008AFE4, fn_8008B78C, fn_8008BFBC, res_anm_chr_load_qr7, fn_8008B704,
+ *   fn_8008BEF0) are inline `psq_l`/`psq_st` through GQR2/3/6/7.
+ *   The key evaluators test `frame <= first`, `last <= frame` and `frame >= lo`, and hold the interval's
+ *   reciprocal in a local before the Hermite call; the linear evaluators test `frame <= 0.0f`, declare `v0`
+ *   before `delta` and load the next key into a local; the node setters declare `flags` before `mask`.  `fp_contract`
  *   stays on (fn_8008AED0 uses fused `fmadds`/`fmsubs`).
  */
 
@@ -165,6 +168,7 @@ void fn_8008B6E4(u32* p, u32 unused);
 void fn_8008BE5C(u32* p, u32 unused);
 void fn_8008BE6C(u32* p, u32 unused);
 f32 fn_8008B650(u32* iter);
+f32 res_anm_chr_load_qr7(const f32* p);
 f32 fn_8008BF08(u32* iter, const f32* self);
 f32 fn_8008DF64(f32 a, f32 b);
 f32 fn_8008F6C4(u32 self, s32 index);
@@ -276,9 +280,14 @@ f32 fn_8008AF08(u32* p)
 }
 
 /* Loads the float at `p`. */
-f32 fn_8008AFE4(const f32* p)
+f32 fn_8008AFE4(register const f32* p)
 {
-    return *p;
+    register f32 result;
+
+    asm {
+        psq_l result, 0(p), 1, 3
+    }
+    return result;
 }
 
 /* Loads the float at `addr` into `out`. */
@@ -405,9 +414,14 @@ u32 fn_8008B7D0(u32 self, u32 index)
 }
 
 /* The float at `addr`. */
-f32 fn_8008B78C(u32 addr)
+f32 fn_8008B78C(register u32 addr)
 {
-    return *(const f32*)addr;
+    register f32 result;
+
+    asm {
+        psq_l result, 0(addr), 1, 6
+    }
+    return result;
 }
 
 /* The s16 key's high halfword as a float. */
@@ -520,9 +534,14 @@ u32* fn_8008B794(u32* out, u32* src)
 }
 
 /* The float at `addr` for the byte channel. */
-f32 fn_8008BFBC(u32 addr)
+f32 fn_8008BFBC(register u32 addr)
 {
-    return *(const f32*)addr;
+    register f32 result;
+
+    asm {
+        psq_l result, 0(addr), 1, 2
+    }
+    return result;
 }
 
 void fn_8008BF8C(u32 addr, f32* out)
@@ -544,15 +563,17 @@ f32 fn_8008BF5C(u32* iter)
 }
 
 /* Truncates a float to a short by reading the stored word's high halfword. */
-s16 fn_8008B704(f32 value)
+s16 fn_8008B704(register f32 value)
 {
-    union {
-        f32 f;
-        s16 s[2];
-    } u;
+    f32 buffer;
+    register f32* pBuffer = &buffer;
+    register s16 result;
 
-    u.f = value;
-    return u.s[0];
+    asm {
+        psq_st value, 0(pBuffer), 1, 6
+        lha result, 0(pBuffer)
+    }
+    return result;
 }
 
 s16 fn_8008B700(f32 value)
@@ -561,15 +582,17 @@ s16 fn_8008B700(f32 value)
 }
 
 /* Truncates a float to a byte by reading the stored word's high byte. */
-u8 fn_8008BEF0(f32 value)
+u8 fn_8008BEF0(register f32 value)
 {
-    union {
-        f32 f;
-        u8 b[4];
-    } u;
+    f32 buffer;
+    register f32* pBuffer = &buffer;
+    register u8 result;
 
-    u.f = value;
-    return u.b[0];
+    asm {
+        psq_st value, 0(pBuffer), 1, 2
+        lbz result, 0(pBuffer)
+    }
+    return result;
 }
 
 void fn_8008BEBC(const f32* value, u8* out)
@@ -637,7 +660,7 @@ f32 fn_8008F6C4(u32 self, s32 index)
 {
     const f32* p = (const f32*)self + index;
 
-    return sqrt_f32(p[4] * p[4] + p[0] * p[0] + p[8] * p[8]);
+    return sqrt_f32(p[0] * p[0] + p[4] * p[4] + p[8] * p[8]);
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -749,8 +772,8 @@ f32 fn_8008CBA0(u32 self, u32* p, u16 index, s32 isConst, f32 frame)
 f32 fn_8008C600(u32 self, u16 index, f32 frame)
 {
     u16 pos;
-    f32 delta;
     f32 v0;
+    f32 delta;
     u32 valid;
 
     valid = IS_VALID_PTR(self);
@@ -758,7 +781,7 @@ f32 fn_8008C600(u32 self, u16 index, f32 frame)
         nw4r::db::Panic("g3d_resanmchr.cpp", 0x16C, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", self);
     }
     pos = math_f32_to_u16(frame);
-    if (frame == 0.0f) {
+    if (frame <= 0.0f) {
         return fn_8008C7F0(self, 0);
     }
     if (index <= pos) {
@@ -769,14 +792,15 @@ f32 fn_8008C600(u32 self, u16 index, f32 frame)
     if (0.0f == delta) {
         return v0;
     }
-    return (delta * (fn_8008C7F0(self, (u16)(pos + 1)) - v0)) + v0;
+    f32 v1 = fn_8008C7F0(self, (u16)(pos + 1));
+    return delta * (v1 - v0) + v0;
 }
 
 f32 fn_8008C968(u32 self, u16 index, f32 frame)
 {
     u16 pos;
-    f32 delta;
     f32 v0;
+    f32 delta;
     u32 valid;
 
     valid = IS_VALID_PTR(self);
@@ -784,7 +808,7 @@ f32 fn_8008C968(u32 self, u16 index, f32 frame)
         nw4r::db::Panic("g3d_resanmchr.cpp", 0x16C, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", self);
     }
     pos = math_f32_to_u16(frame);
-    if (frame == 0.0f) {
+    if (frame <= 0.0f) {
         return fn_8008CB58((const ResAnmChrU16Channel*)self, 0);
     }
     if (index <= pos) {
@@ -795,14 +819,15 @@ f32 fn_8008C968(u32 self, u16 index, f32 frame)
     if (0.0f == delta) {
         return v0;
     }
-    return (delta * (fn_8008CB58((const ResAnmChrU16Channel*)self, (u16)(pos + 1)) - v0)) + v0;
+    f32 v1 = fn_8008CB58((const ResAnmChrU16Channel*)self, (u16)(pos + 1));
+    return delta * (v1 - v0) + v0;
 }
 
 f32 fn_8008CD00(u32 self, u16 index, f32 frame)
 {
     u16 pos;
-    f32 delta;
     f32 v0;
+    f32 delta;
     u32 valid;
 
     valid = IS_VALID_PTR(self);
@@ -810,7 +835,7 @@ f32 fn_8008CD00(u32 self, u16 index, f32 frame)
         nw4r::db::Panic("g3d_resanmchr.cpp", 0x16C, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", self);
     }
     pos = math_f32_to_u16(frame);
-    if (frame == 0.0f) {
+    if (frame <= 0.0f) {
         return fn_8008CEF0((const ResAnmChrU8Channel*)self, 0);
     }
     if (index <= pos) {
@@ -821,7 +846,8 @@ f32 fn_8008CD00(u32 self, u16 index, f32 frame)
     if (0.0f == delta) {
         return v0;
     }
-    return (delta * (fn_8008CEF0((const ResAnmChrU8Channel*)self, (u16)(pos + 1)) - v0)) + v0;
+    f32 v1 = fn_8008CEF0((const ResAnmChrU8Channel*)self, (u16)(pos + 1));
+    return delta * (v1 - v0) + v0;
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -860,10 +886,10 @@ f32 fn_8008AA8C(u32 self, f32 frame)
     fn_8008B004(&first, &firstIdx);
     lastIdx = fn_8008B040(self, ch->count - 1);
     fn_8008B004(&last, &lastIdx);
-    if (frame == fn_8008AFF8(&first)) {
+    if (frame <= fn_8008AFF8(&first)) {
         return fn_8008AFEC(&first, self);
     }
-    if (fn_8008AFF8(&last) == frame) {
+    if (fn_8008AFF8(&last) <= frame) {
         return fn_8008AFEC(&last, self);
     }
     delta = frame - fn_8008AFF8(&first);
@@ -895,19 +921,31 @@ f32 fn_8008AA8C(u32 self, f32 frame)
     nextTan = fn_8008AF08(&next);
     loFrame = fn_8008AFF8(&key);
     hiFrame = fn_8008AFF8(&next);
-    frameValid = (loFrame <= frame) && (frame <= hiFrame);
+    frameValid = (frame >= loFrame) && (frame <= hiFrame);
     if (!frameValid) {
         nw4r::db::Panic("g3d_resanmchr.cpp", 0x150, "frame is out of bounds(%f)\n%f <= frame <= %f not satisfied.", frame, loFrame, hiFrame);
     }
     span = frame - loFrame;
-    return fn_8008AED0(curVal, curTan, nextVal, nextTan,
-                       span * math_reciprocal(hiFrame - loFrame), span);
+    f32 invRange = math_reciprocal(hiFrame - loFrame);
+    return fn_8008AED0(curVal, curTan, nextVal, nextTan, span * invRange, span);
 }
 
 /* The s16 key's value halfword read as a float (target keeps the paired-single load; see residuals). */
 f32 fn_8008B650(u32* iter)
 {
-    return ((const ResAnmChrKeyF32*)*iter)->value;
+    return res_anm_chr_load_qr7(&((const ResAnmChrKeyF32*)*iter)->value);
+}
+
+/* Loads the quantized scalar at `p` through GQR7 (a paired-single load, so the key's packed form converts on
+ * the way in). */
+f32 res_anm_chr_load_qr7(register const f32* p)
+{
+    register f32 result;
+
+    asm {
+        psq_l result, 0(p), 1, 7
+    }
+    return result;
 }
 
 /* Extracts the packed 12-bit value of the byte channel's key and evaluates it, scaled and biased. */
@@ -955,10 +993,10 @@ f32 fn_8008B200(u32 self, f32 frame)
     fn_8008B794(&first, &firstIdx);
     lastIdx = fn_8008B7D0(self, ch->count - 1);
     fn_8008B794(&last, &lastIdx);
-    if (frame == fn_8008B784(&first)) {
+    if (frame <= fn_8008B784(&first)) {
         return fn_8008B71C(&first, (const f32*)self);
     }
-    if (fn_8008B784(&last) == frame) {
+    if (fn_8008B784(&last) <= frame) {
         return fn_8008B71C(&last, (const f32*)self);
     }
     delta = frame - fn_8008B784(&first);
@@ -990,13 +1028,13 @@ f32 fn_8008B200(u32 self, f32 frame)
     nextTan = fn_8008B650(&next);
     loFrame = fn_8008B784(&key);
     hiFrame = fn_8008B784(&next);
-    frameValid = (loFrame <= frame) && (frame <= hiFrame);
+    frameValid = (frame >= loFrame) && (frame <= hiFrame);
     if (!frameValid) {
         nw4r::db::Panic("g3d_resanmchr.cpp", 0x150, "frame is out of bounds(%f)\n%f <= frame <= %f not satisfied.", frame, loFrame, hiFrame);
     }
     span = frame - loFrame;
-    return fn_8008AED0(curVal, curTan, nextVal, nextTan,
-                       span * math_reciprocal(hiFrame - loFrame), span);
+    f32 invRange = math_reciprocal(hiFrame - loFrame);
+    return fn_8008AED0(curVal, curTan, nextVal, nextTan, span * invRange, span);
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -1035,10 +1073,10 @@ f32 fn_8008B95C(u32 self, f32 frame)
     fn_8008BFC4(&first, &firstIdx);
     lastIdx = fn_8008C000(self, ch->count - 1);
     fn_8008BFC4(&last, &lastIdx);
-    if (frame == fn_8008BF5C(&first)) {
+    if (frame <= fn_8008BF5C(&first)) {
         return fn_8008BF08(&first, (const f32*)self);
     }
-    if (fn_8008BF5C(&last) == frame) {
+    if (fn_8008BF5C(&last) <= frame) {
         return fn_8008BF08(&last, (const f32*)self);
     }
     delta = frame - fn_8008BF5C(&first);
@@ -1070,13 +1108,13 @@ f32 fn_8008B95C(u32 self, f32 frame)
     nextTan = fn_8008BDAC(&next);
     loFrame = fn_8008BF5C(&key);
     hiFrame = fn_8008BF5C(&next);
-    frameValid = (loFrame <= frame) && (frame <= hiFrame);
+    frameValid = (frame >= loFrame) && (frame <= hiFrame);
     if (!frameValid) {
         nw4r::db::Panic("g3d_resanmchr.cpp", 0x150, "frame is out of bounds(%f)\n%f <= frame <= %f not satisfied.", frame, loFrame, hiFrame);
     }
     span = frame - loFrame;
-    return fn_8008AED0(curVal, curTan, nextVal, nextTan,
-                       span * math_reciprocal(hiFrame - loFrame), span);
+    f32 invRange = math_reciprocal(hiFrame - loFrame);
+    return fn_8008AED0(curVal, curTan, nextVal, nextTan, span * invRange, span);
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -1106,42 +1144,33 @@ u32* fn_8008A664(f32* out, u32* self, f32* keys, f32 frame)
         }
         break;
     case 0x02000000:
-        v0 = fn_8008B808((u32*)self, (u32*)p, (flags & 0x2000) != 0, frame);
-        p++;
+        v0 = fn_8008B808((u32*)self, (u32*)p++, (flags & 0x2000) != 0, frame);
         if (flags & 0x10) {
             v1 = v0;
             v2 = v0;
         } else {
-            v1 = fn_8008B808((u32*)self, (u32*)p, (flags & 0x4000) != 0, frame);
-            p++;
-            v2 = fn_8008B808((u32*)self, (u32*)p, (flags & 0x8000) != 0, frame);
-            p++;
+            v1 = fn_8008B808((u32*)self, (u32*)p++, (flags & 0x4000) != 0, frame);
+            v2 = fn_8008B808((u32*)self, (u32*)p++, (flags & 0x8000) != 0, frame);
         }
         break;
     case 0x04000000:
-        v0 = fn_8008B0AC((u32*)self, (u32*)p, (flags & 0x2000) != 0, frame);
-        p++;
+        v0 = fn_8008B0AC((u32*)self, (u32*)p++, (flags & 0x2000) != 0, frame);
         if (flags & 0x10) {
             v1 = v0;
             v2 = v0;
         } else {
-            v1 = fn_8008B0AC((u32*)self, (u32*)p, (flags & 0x4000) != 0, frame);
-            p++;
-            v2 = fn_8008B0AC((u32*)self, (u32*)p, (flags & 0x8000) != 0, frame);
-            p++;
+            v1 = fn_8008B0AC((u32*)self, (u32*)p++, (flags & 0x4000) != 0, frame);
+            v2 = fn_8008B0AC((u32*)self, (u32*)p++, (flags & 0x8000) != 0, frame);
         }
         break;
     case 0x06000000:
-        v0 = fn_8008A938((u32*)self, (u32*)p, (flags & 0x2000) != 0, frame);
-        p++;
+        v0 = fn_8008A938((u32*)self, (u32*)p++, (flags & 0x2000) != 0, frame);
         if (flags & 0x10) {
             v1 = v0;
             v2 = v0;
         } else {
-            v1 = fn_8008A938((u32*)self, (u32*)p, (flags & 0x4000) != 0, frame);
-            p++;
-            v2 = fn_8008A938((u32*)self, (u32*)p, (flags & 0x8000) != 0, frame);
-            p++;
+            v1 = fn_8008A938((u32*)self, (u32*)p++, (flags & 0x4000) != 0, frame);
+            v2 = fn_8008A938((u32*)self, (u32*)p++, (flags & 0x8000) != 0, frame);
         }
         break;
     default:
@@ -1437,8 +1466,8 @@ void fn_8008E8D0(ResAnmChrObj* self, const f32* out)
 void fn_8008EB68(ResAnmChrObj* self, const f32* out)
 {
     u32 valid;
-    u32 mask;
     u32 flags;
+    u32 mask;
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
@@ -1484,8 +1513,8 @@ void fn_8008EB68(ResAnmChrObj* self, const f32* out)
 void fn_8008EE68(ResAnmChrObj* self, const f32* out)
 {
     u32 valid;
-    u32 mask;
     u32 flags;
+    u32 mask;
 
     valid = IS_VALID_PTR(self);
     if (!valid) {

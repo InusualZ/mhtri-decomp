@@ -8,10 +8,9 @@
  * NAMES. Map stems.  The retail TU is C++; the source stays `.c` because it is C-idiom (fn_80089F94 passes a
  *   `void*` to a `u32*` parameter), so `fn_80066C8C__FPv` and the `Panic` mangling are spelled verbatim.
  *   res_anm_scn_offset_init is a GUESS (the dead-stripped caller of the `_ac.h` constructor).
- * RESIDUALS. fn_8008A000: one `fmr f1,f31` more than retail (index 87).
- *   fn_8008A204: retail keeps the base word in r0 (`lwz r0,0(r3); add r3,r0,r4`), ours in r3.
- *   flipcheck: `.text` is 4 bytes long (fn_8008A000) plus the dead-stripped res_anm_scn_offset_init; data
- *   sections byte-identical.
+ * RESIDUALS. none; flipcheck: the dead-stripped res_anm_scn_offset_init is object-only, data sections
+ *   byte-identical.  fn_8008A000 passes the clamped frame on to fn_8008A188; fn_8008A204 is compiled with
+ *   `#pragma peephole on` (retail keeps the base word in r0).
  * SHAPES. fn_80089F94/fn_80089FF8 are `g3d_resanmscn_ac.h` inline accessors: `inline`, referenced by the
  *   dead-stripped res_anm_scn_offset_init at the head of the file, so MWCC emits their weak copies first and
  *   their strings as weak `@STRING@` objects after the out-of-line ones (the inline tail, playbook 80).
@@ -84,6 +83,7 @@ void fn_8008A000(void *arg0, ResAnmAmbLightResult *pResult, f32 frame)
 {
     ResAnmAmbLightData *res;
     u32 flags;
+    f32 clamped;
 
     u32 valid = IS_VALID_PTR(pResult);
     if (!valid) {
@@ -92,9 +92,9 @@ void fn_8008A000(void *arg0, ResAnmAmbLightResult *pResult, f32 frame)
     }
     res = (ResAnmAmbLightData *)fn_80066C8C__FPv(arg0);
     flags = res->field_0x14;
-    fn_8008A1A8((u16 *)(fn_8008A204((u32 *)arg0, res->field_0x04) + 0x34), frame);
+    clamped = fn_8008A1A8((u16 *)(fn_8008A204((u32 *)arg0, res->field_0x04) + 0x34), frame);
     pResult->field_0x00 = flags & 3;
-    pResult->field_0x04 = fn_8008A188(&res->field_0x18, (flags & 0x80000000) != 0, frame);
+    pResult->field_0x04 = fn_8008A188(&res->field_0x18, (flags & 0x80000000) != 0, clamped);
 }
 
 /* Returns a sub-resource pointer, or evaluates it when it has no own data. */
@@ -118,6 +118,7 @@ f32 fn_8008A1A8(u16 *count, f32 frame)
     return frame;
 }
 
+#pragma peephole on
 /* Returns a resource offset pointer, or null when the offset is zero. */
 s32 fn_8008A204(u32 *self, s32 offset)
 {
@@ -129,3 +130,4 @@ s32 fn_8008A204(u32 *self, s32 offset)
     }
     return 0;
 }
+#pragma peephole off

@@ -6,20 +6,20 @@
  *   data reference, so 0x80089E9C is an alternative right edge.
  * NAMES. Map stems.  The retail TU is C++; the source stays `.c` because it is C-idiom and does not compile as C++
  *   without casts, so the `Panic` mangling is spelled verbatim.
- * RESIDUALS. fn_800898B0: the panic strings share a pooled base (`lis r4,...data.0@ha; addi r31`), so ours saves r29
- *   too and takes a 0x50 frame where retail's is 0x40 (0x2D0 of retail's 0x2D8 bytes).
- *   fn_80089C6C: the key-index addressing (`slwi`/`lwzx`) is scheduled and allocated differently.
- *   fn_80089F78: retail truncates float to short with `psq_st f1,0(r3),1,qr5` + `lha`; no source shape or flag
- *   reproduces it.
- *   flipcheck: `.text` 0x6C4 of 0x6E4; `.data` and `.sdata2` byte-identical (the strings are literals under
- *   `#pragma pool_data off`).
+ * RESIDUALS. fn_80089C6C: the key-index addressing (`slwi`/`lwzx`) is scheduled and allocated differently, and
+ *   retail destroys its `nw4r::ut::Color` temporary (`__dt__Q34nw4r2ut5ColorFv`) - a C++ object this C source
+ *   cannot express.
+ *   flipcheck: `.data` and `.sdata2` byte-identical (the strings are literals under `#pragma pool_data off`).
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `dtor_8005B228`.
  * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`: retail has no record-form instruction and
- *   no fused multiply-add.
+ *   no fused multiply-add.  fn_80089F78 is the OS fast cast (`psq_st` through GQR5, then `lha`) in inline asm.
+ *   fn_800898B0 passes the estimate bounds to Panic as doubles, compares `pKey->frame == frame` and
+ *   `frame >= pKey->frame`, and computes the two Hermite intervals before the call.
  */
 
 
 #include "types.h"
+#include "OS/OSFastCast.h" /* OS_FASTCAST_S16 (rule 1) */
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
 #include "g3d/g3d_anmscn.h" /* fn_800651BC, owned by g3d/g3d_anmscn.cpp (rule 2) */
@@ -100,7 +100,7 @@ f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)
     if (pos > pData->count - 1) {
         Panic__Q24nw4r2dbFPCciPCce("g3d_resanm.cpp", 135,
             "estimatePos is out of bounds(%f)\nestimatePos <= %f not satisfied.",
-            (f32)pos, (f32)(pData->count - 1));
+            (f64)pos, (f64)(pData->count - 1));
     }
     pKey = &pData->keys[pos];
     if (frame < pKey->frame) {
@@ -113,11 +113,11 @@ f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)
         } while (pKey->frame <= frame);
         pKey--;
     }
-    if (frame == pKey->frame) {
+    if (pKey->frame == frame) {
         return pKey->value;
     }
     {
-        u32 frameValid = pKey->frame <= frame && frame <= pKey[1].frame;
+        u32 frameValid = frame >= pKey->frame && frame <= pKey[1].frame;
 
         if (!frameValid) {
             Panic__Q24nw4r2dbFPCciPCce("g3d_resanm.cpp", 176,
@@ -125,8 +125,12 @@ f32 fn_800898B0(ResAnmChrChannel *pData, f32 frame)
                 pKey->frame, pKey[1].frame);
         }
     }
-    return fn_80089B88(pKey->value, pKey->tangent, pKey[1].value, pKey[1].tangent,
-                       frame - pKey->frame, pKey[1].frame - pKey->frame);
+    {
+        f32 t = frame - pKey->frame;
+        f32 d = pKey[1].frame - pKey->frame;
+
+        return fn_80089B88(pKey->value, pKey->tangent, pKey[1].value, pKey[1].tangent, t, d);
+    }
 }
 
 /* Hermite-interpolates between two keys over a span. */
@@ -210,9 +214,17 @@ void fn_80089F44(f32 *value, s16 *out)
 }
 
 /* Truncates a float to a signed short. */
-s16 fn_80089F78(f32 value)
+s16 fn_80089F78(register f32 value)
 {
-    return (s16)value;
+    f32 buffer;
+    register f32 *pBuffer = &buffer;
+    register s16 result;
+
+    asm {
+        psq_st value, 0(pBuffer), 1, OS_FASTCAST_S16
+        lha result, 0(pBuffer)
+    }
+    return result;
 }
 
 /* Tail call into the frame-index helper. */

@@ -43,8 +43,9 @@ ResCommon<T>& ResCommon<T>::operator=(const ResCommon<T>& rhs) {
 template <typename T>
 template <typename U>
 U ResCommon<T>::ofs_to_obj(s32 ofs) const {
+    u8* p = reinterpret_cast<u8*>(mpData);
     if (ofs != 0) {
-        return U(reinterpret_cast<u8*>(mpData) + ofs);
+        return U(p + ofs);
     }
     return U(NULL);
 }

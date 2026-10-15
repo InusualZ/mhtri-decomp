@@ -5,8 +5,7 @@
  *   (fn_8005D218), fn_80099400 calls `ResShp::ref` (fn_80077674).
  * NAMES. Map stems; `mSubResOfs` is a GUESS (its target class is evidenced only by fn_8008A220's
  *   `g3d_resuser_ac.h`).
- * RESIDUALS. fn_80098D5C: register naming only (retail keeps the flag word in r31 and `flags & ~0x10` in r29,
- *   ours in r29/r28).  flipcheck: `.data` and `.sdata2` byte-identical.
+ * RESIDUALS. none; flipcheck: `.data` and `.sdata2` byte-identical.
  * SHAPES. File-scope `#pragma peephole off`: every `rlwinm` flag extract keeps retail's `cmpwi` (fn_80099134).
  *   `#pragma pool_data off`; the strings and the 1.0f/0.0f pool are literals, emitted in first-use order.
  */
@@ -79,12 +78,13 @@ void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
                 pResult->scale[0] = 1.0f;
                 flags |= 0x18;
             } else {
-                u32 newFlags = flags & ~0x10;
                 if ((dataFlags & 0x10) != 0) {
-                    newFlags = flags | 0x10;
+                    flags |= 0x10;
+                } else {
+                    flags &= ~0x10;
                 }
                 copyVec3((VEC3*)pResult->scale, (const VEC3*)pData->mScale);
-                flags = newFlags & ~0xA;
+                flags &= ~0xA;
             }
         }
         if ((flags & 0x100) != 0) {

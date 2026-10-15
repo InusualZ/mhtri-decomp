@@ -9,15 +9,23 @@
  *   `GetResPltt`/`GetResTex`.
  * RESIDUALS. Unwritten (objdiff scores them zero): 0x800916FC-0x80091CEC (fn_800916FC, the `GetAnmResult`
  *   dispatcher, and fn_80091B50), 0x80092020-0x80092234 (fn_80092020, fn_8009213C).
- *   Partial (32): fn_80091D78, fn_80091E44, fn_80091EE8, fn_80091FD0, fn_80092234, fn_800924CC,
- *   0x80092588-0x80092848 and 0x8009284C-0x80092B0C (four each), fn_80092B10, fn_80092C08, fn_80092CC4,
- *   fn_80092DBC, fn_80092E78, fn_80092F70, fn_8009302C, fn_80093124, fn_800931E0, fn_800932D8, fn_80093394,
- *   fn_8009348C, 0x80093548-0x8009368C (two), 0x80093690-0x800938EC (four).
+ *   Partial: fn_8009380C (the `ResFile`/`ResMdl` handle temporaries at 0x10/0x14 swap, and `count` takes r30
+ *   where retail takes r31); the two
+ *   `GetResPltt`/`GetResTex(ResName)` lookups; and the twelve 0xB8 element lookups (fn_800924CC ... fn_800935D4,
+ *   `GetResPltt`/`GetResTex(const char*)`), stack slots only - retail's element handles are class temporaries
+ *   (allocated in reverse creation order among the `ResName`/`ResDic` temporaries), ours named locals.
+ *   Seam: 0x80092444-0x80093990 (fn_80092444 `ResFile::ref`, whose asserts pass "g3d_resfile_ac.h" at
+ *   0x80590D64, and every lookup that reads the 0x80590A60 `ResName` records) is `g3d/g3d_resfile.cpp`'s TU,
+ *   and so is `.data` 0x80590A60-0x80590D78 (the records open that TU's run, before "g3d_resfile.cpp").
  *   flipcheck: `.text` 0x19A0 of 0x2294; `.data`/`.sdata`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
  *   instance, after the TU's own strings, playbook 80);
  *   the `ResName` records stay externs, and the run also holds "g3d_resfile.cpp"'s strings (a data seam with
  *   `g3d/g3d_resfile.cpp`); `.sdata2` is not emitted.
  * SHAPES. File-scope `#pragma peephole off`: the constructor guards keep retail's split `clrlwi` + `cmpwi`.
+ *   The `ResName` record externs are declared `__attribute__((aligned(32)))` (retail's records are 32-aligned):
+ *   the lookups then hold the key copy's address in r31 as retail does.  The element lookups return the
+ *   constructor's result word (`*(u32*)ctor(&handle, ...)`), one handle per path.  The byte readers and writers
+ *   walk `p++`; fn_80092234 is compiled with `#pragma peephole on` (its base word stays in r0).
  */
 
 #include "types.h"
@@ -49,16 +57,16 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 extern "C" {
 
 /* The `ResName` categories of the `ResFile` root dictionary (length-prefixed records). */
-extern const u8 lbl_80590A60[]; /* "3DModels(NW4R)" */
-extern const u8 lbl_80590A80[]; /* "Palettes(NW4R)" */
-extern const u8 lbl_80590AA0[]; /* "Textures(NW4R)" */
-extern const u8 lbl_80590AC0[]; /* "AnmChr(NW4R)" */
-extern const u8 lbl_80590AE0[]; /* "AnmVis(NW4R)" */
-extern const u8 lbl_80590B00[]; /* "AnmClr(NW4R)" */
-extern const u8 lbl_80590B20[]; /* "AnmTexPat(NW4R)" */
-extern const u8 lbl_80590B40[]; /* "AnmTexSrt(NW4R)" */
-extern const u8 lbl_80590B60[]; /* "AnmShp(NW4R)" */
-extern const u8 lbl_80590B80[]; /* "AnmScn(NW4R)" */
+extern const u8 lbl_80590A60[] __attribute__((aligned(32))); /* "3DModels(NW4R)" */
+extern const u8 lbl_80590A80[] __attribute__((aligned(32))); /* "Palettes(NW4R)" */
+extern const u8 lbl_80590AA0[] __attribute__((aligned(32))); /* "Textures(NW4R)" */
+extern const u8 lbl_80590AC0[] __attribute__((aligned(32))); /* "AnmChr(NW4R)" */
+extern const u8 lbl_80590AE0[] __attribute__((aligned(32))); /* "AnmVis(NW4R)" */
+extern const u8 lbl_80590B00[] __attribute__((aligned(32))); /* "AnmClr(NW4R)" */
+extern const u8 lbl_80590B20[] __attribute__((aligned(32))); /* "AnmTexPat(NW4R)" */
+extern const u8 lbl_80590B40[] __attribute__((aligned(32))); /* "AnmTexSrt(NW4R)" */
+extern const u8 lbl_80590B60[] __attribute__((aligned(32))); /* "AnmShp(NW4R)" */
+extern const u8 lbl_80590B80[] __attribute__((aligned(32))); /* "AnmScn(NW4R)" */
 
 } // extern "C"
 
@@ -87,10 +95,10 @@ extern "C" u32 fn_80091CEC(u32 self, u32 ofs) {
 }
 
 extern "C" void fn_80091E44(u8* p, u32 value) {
-    fn_80091EAC(p, value >> 24);
-    fn_80091EAC(p + 1, (value >> 16) & 0xFF);
-    fn_80091EAC(p + 2, (value >> 8) & 0xFF);
-    fn_80091EAC(p + 3, value & 0xFF);
+    fn_80091EAC(p++, value >> 24);
+    fn_80091EAC(p++, (value >> 16) & 0xFF);
+    fn_80091EAC(p++, (value >> 8) & 0xFF);
+    fn_80091EAC(p, value & 0xFF);
 }
 
 /* 0x80091DFC (0x48): writes a BP command: the 0x61 opcode, then the register word. */
@@ -100,10 +108,10 @@ void nw4r::g3d::detail::ResWriteBPCmd(u8* p, u32 value) {
 }
 
 extern "C" u32 fn_80091EE8(const u8* p) {
-    u32 value = ((u32)fn_80091F68(p) & 0xFF) << 24;
-    value |= ((u32)fn_80091F68(p + 1) & 0xFF) << 16;
-    value |= ((u32)fn_80091F68(p + 2) & 0xFF) << 8;
-    value |= (u32)fn_80091F68(p + 3) & 0xFF;
+    u32 value = ((u32)fn_80091F68(p++) & 0xFF) << 24;
+    value |= ((u32)fn_80091F68(p++) & 0xFF) << 16;
+    value |= ((u32)fn_80091F68(p++) & 0xFF) << 8;
+    value |= (u32)fn_80091F68(p) & 0xFF;
     return value;
 }
 
@@ -120,19 +128,23 @@ extern "C" void fn_80091F70(u8* p, u32 tag, u32 value) {
 
 /* 0x80091FD0 (0x50): ORs `value` into a BP command's word and rewrites it as a mask command. */
 void nw4r::g3d::detail::ResWriteSSMask(u8* p, u32 value) {
-    u32 word = fn_80091EE8(p + 1) | value;
-    ResWriteBPCmd(p, word | 0xFE000000);
+    u32 word = fn_80091EE8(p + 1);
+    ResWriteBPCmd(p, (word | value) | 0xFE000000);
 }
 
 /* ============================== 0x80092234-0x800924B8: the ResFile helpers ===================== */
 
+#pragma peephole on
 extern "C" u32* fn_80092234(u32* self, u32 ofs) {
     u32 base = *self;
-    if (ofs == 0) {
-        return 0;
+
+    if (ofs != 0) {
+        base += ofs;
+        return (u32*)base;
     }
-    return (u32*)(base + ofs);
+    return 0;
 }
+#pragma peephole off
 
 extern "C" u32 fn_800924A8(u32* p) {
     return *p;
@@ -365,63 +377,58 @@ extern "C" void* fn_8009326C(u32* self, u32 ptr);
 extern "C" void* fn_80093420(u32* self, u32 ptr);
 
 extern "C" u32 fn_80092DBC(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AE0)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        fn_80092D50(&obj, key);
-        return obj;
+        return *(u32*)fn_80092D50(&obj, key);
     }
-    fn_80092D50(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)fn_80092D50(&none, 0);
 }
 
 extern "C" u32 fn_80092F70(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B00)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        fn_80092F04(&obj, key);
-        return obj;
+        return *(u32*)fn_80092F04(&obj, key);
     }
-    fn_80092F04(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)fn_80092F04(&none, 0);
 }
 
 extern "C" u32 fn_80093124(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B20)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        fn_800930B8(&obj, key);
-        return obj;
+        return *(u32*)fn_800930B8(&obj, key);
     }
-    fn_800930B8(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)fn_800930B8(&none, 0);
 }
 
 extern "C" u32 fn_800932D8(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B40)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        fn_8009326C(&obj, key);
-        return obj;
+        return *(u32*)fn_8009326C(&obj, key);
     }
-    fn_8009326C(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)fn_8009326C(&none, 0);
 }
 
 extern "C" u32 fn_8009348C(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B60)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        fn_80093420(&obj, key);
-        return obj;
+        return *(u32*)fn_80093420(&obj, key);
     }
-    fn_80093420(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)fn_80093420(&none, 0);
 }
 
 /* ==================== the Mdl/Pltt/Tex/Scn keyed accessors (0xB8) ==================== */
@@ -438,63 +445,58 @@ extern "C" u32 fn_8009348C(void* self, u32 arg) {
 extern "C" void* fn_80092B9C(u32* self, u32 ptr);
 
 extern "C" u32 fn_800924CC(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590A60)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        fn_8007B878((s32)&obj, (s32)key);
-        return obj;
+        return *(u32*)fn_8007B878((s32)&obj, (s32)key);
     }
-    fn_8007B878((s32)&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)fn_8007B878((s32)&none, 0);
 }
 
 extern "C" u32 fn_80092790(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590A80)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        res_pltt_ctor(&obj, key);
-        return obj;
+        return *(u32*)res_pltt_ctor(&obj, key);
     }
-    res_pltt_ctor(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)res_pltt_ctor(&none, 0);
 }
 
 extern "C" u32 fn_80092A54(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AA0)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        res_tex_ctor(&obj, key);
-        return obj;
+        return *(u32*)res_tex_ctor(&obj, key);
     }
-    res_tex_ctor(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)res_tex_ctor(&none, 0);
 }
 
 extern "C" u32 fn_80092C08(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590AC0)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        fn_80092B9C(&obj, key);
-        return obj;
+        return *(u32*)fn_80092B9C(&obj, key);
     }
-    fn_80092B9C(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)fn_80092B9C(&none, 0);
 }
 
 extern "C" u32 fn_800935D4(void* self, u32 arg) {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)lbl_80590B80)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg];
-        fn_80089F94(&obj, key);
-        return obj;
+        return *(u32*)fn_80089F94(&obj, key);
     }
-    fn_80089F94(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)fn_80089F94(&none, 0);
 }
 
 /* ==================== the two real-named `ResFile` accessors ==================== */
@@ -507,27 +509,25 @@ namespace nw4r {
 namespace g3d {
 
 u32 ResFile::GetResPltt(const char* pName) const {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444((void*)this) + 24))[nw4r::g3d::ResName((void*)lbl_80590A80)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[pName];
-        res_pltt_ctor(&obj, key);
-        return obj;
+        return *(u32*)res_pltt_ctor(&obj, key);
     }
-    res_pltt_ctor(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)res_pltt_ctor(&none, 0);
 }
 
 u32 ResFile::GetResTex(const char* pName) const {
-    u32 obj;
     u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444((void*)this) + 24))[nw4r::g3d::ResName((void*)lbl_80590AA0)];
     if (entry != 0) {
+        u32 obj;
         u32 key = (u32)nw4r::g3d::ResDic((void*)entry)[pName];
-        res_tex_ctor(&obj, key);
-        return obj;
+        return *(u32*)res_tex_ctor(&obj, key);
     }
-    res_tex_ctor(&obj, 0);
-    return obj;
+    u32 none;
+    return *(u32*)res_tex_ctor(&none, 0);
 }
 
 } // namespace g3d
@@ -606,10 +606,10 @@ int nw4r::g3d::ResDic::GetIndex(const ResName name) const {
 /* ==================== 0x80091D78: the ResName equality test ==================== */
 
 extern "C" u32 fn_80091D78(void* a, void* b) {
-    if (fn_800912D4(a) != fn_800912D4(b)) {
-        return 0;
+    if (fn_800912D4(a) == fn_800912D4(b)) {
+        return strcmp(fn_8009125C(a), fn_8009125C(b)) == 0;
     }
-    return strcmp(fn_8009125C(a), fn_8009125C(b)) == 0;
+    return 0;
 }
 
 /* ==================== 0x8009371C/0x80093794: the category-present predicates ==================== */
@@ -668,21 +668,18 @@ extern "C" void CleanUpTracks(void* self) {
 }
 
 extern "C" u32 fn_8009380C(void* self, u32* arg) {
+    u32 i;
     u32 present = 1;
     u32 count = fn_80092588(self);
-    for (u32 i = 0; i < count; i++) {
+    for (i = 0; i < count; i++) {
         u32 key = *arg;
         void* value = fn_80092584(self, i);
-        u32 flag = 0;
-        if (reinterpret_cast<nw4r::g3d::ResMdl*>(&value)->Bind(reinterpret_cast<const nw4r::g3d::ResFile&>(key)) &&
-            present != 0) {
-            flag = 1;
-        }
-        present = flag;
+        present = reinterpret_cast<nw4r::g3d::ResMdl*>(&value)->Bind(reinterpret_cast<const nw4r::g3d::ResFile&>(key)) &&
+                  present;
     }
 
     u32 count2 = fn_800931E0(self);
-    for (u32 i = 0; i < count2; i++) {
+    for (i = 0; i < count2; i++) {
         u32 key = *arg;
         void* value = fn_800931DC(self, i);
         present = fn_800913A0(&value, &key);
