@@ -394,6 +394,11 @@ public:
     void setNoChargeBuffer(s8* buffer, u32 size);
     void setPatchMessageBuffer(s8* buffer, u32 size);
 
+    /* 0x803FD2D8 - unbinds the first and third session handlers unless the singleton is still referenced. */
+    void clear();
+    /* 0x803FD644 - whether the singleton is referenced (its +0x60D4 count). */
+    s32 isReady();
+
     /* .sbss 0x80794CB0 - the live singleton (the constructor publishes it, the destructor clears it, `getInstance_` reads it) */
     static PatInterface* mpInstance;
 };   /* size: 0xD640 (the allocation `initializeNetworkMediator` makes) */
@@ -404,11 +409,6 @@ typedef PatInterface NetworkStateMachine;
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* 0x803FD2D8 / 0x803FD644 - resets the singleton's callbacks unless it is still busy; whether it is
- * idle (both bodies read the singleton in r3). */
-void  PatInterface_clear(PatInterface* self);
-s32   PatInterface_isReady(PatInterface* self);
 
 /* 0x803FD324 - the singleton's per-frame step the Pat holder's drive calls (GUESS from the caller). */
 void stepPatInterface(NetworkInstance* self);

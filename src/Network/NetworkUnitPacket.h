@@ -100,9 +100,6 @@ u16 networkStreamReader_getCrc(NetworkStreamWriterDefault* self);
 u8 networkStreamReader_getKeyA(NetworkStreamWriterDefault* self);
 u8 networkStreamReader_getKeyB(NetworkStreamWriterDefault* self);
 
-/* 0x803FA0E8 - the length field of the leading packet (its payload size plus the 22-byte header). */
-u16 read_size_from_buffer(NetworkStreamWriterDefault* self);
-
 /* 0x803F89CC - the packet's flush override (empty). */
 void networkPacket_flush(NetworkStreamWriter* self);
 

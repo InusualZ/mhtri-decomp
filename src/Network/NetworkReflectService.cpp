@@ -94,8 +94,8 @@ void resetReflectServiceTask(NetworkReflectService* service)
 void finalizeReflectService(NetworkReflectService* service)
 {
     if (getInstance_() != NULL) {
-        PatInterface_clear((PatInterface*)getInstance_());
-        if (!PatInterface_isReady((PatInterface*)getInstance_())) {
+        getInstance_()->clear();
+        if (!getInstance_()->isReady()) {
             PatInterface* pat = (PatInterface*)getInstance_();
 
             delete pat;

@@ -938,7 +938,7 @@ void onCircleListReceived(s32 status, s32* values)
         profile->capacity_0x03C = circle->limitB_174;
         strcpy(profile->name_0x008, circle->name_008);
         profile->address_0x01C.copyFrom((const u8*)&circle->smallObject_108);
-        NetworkRequest_copyRecord((NetworkSessionRecordBlock*)&profile->options_0x044,
+        NetworkRequest::copyRecord((NetworkSessionRecordBlock*)&profile->options_0x044,
                                   (const NetworkSessionRecordBlock*)&circle->options_128);
         profile->rank_0x08C = circle->flag_180;
         profile->quest_id_0x190 = profile->options_0x044.slots_08[1].value_04;
@@ -1030,7 +1030,7 @@ void copyCircleToProfile(s32 index, s32 unused)
     profile->capacity_0x03C = circle->limitB_174;
     strcpy(profile->name_0x008, circle->name_008);
     profile->address_0x01C.copyFrom((const u8*)&circle->smallObject_108);
-    NetworkRequest_copyRecord((NetworkSessionRecordBlock*)&profile->options_0x044,
+    NetworkRequest::copyRecord((NetworkSessionRecordBlock*)&profile->options_0x044,
                               (const NetworkSessionRecordBlock*)&circle->options_128);
     profile->rank_0x08C = circle->flag_180;
     profile->flag_0x08D = circle->active_319;

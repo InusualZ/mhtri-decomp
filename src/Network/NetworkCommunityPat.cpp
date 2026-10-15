@@ -228,8 +228,8 @@ void NetworkCommunityPat::release()
     PatInterface* pat;
 
     if (getInstance_() != NULL) {
-        PatInterface_clear((PatInterface*)getInstance_());
-        if (PatInterface_isReady((PatInterface*)getInstance_()) == 0) {
+        getInstance_()->clear();
+        if (getInstance_()->isReady() == 0) {
             pat = (PatInterface*)getInstance_();
             delete pat;
         }

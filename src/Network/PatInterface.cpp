@@ -32,8 +32,8 @@
  *   ("PatInterface::move()") and `chooseServerAddress` ("setCurrentServer").  Data rows from their content:
  *   `sessionTimeoutParam`/`Param2` (0x8079C7D8/DDA, the bytes {1,2,3}), `requestHeaderWord0`/`1` (0x8079C7E0/E4),
  *   `maskedUserName` (0x80793968, "******").  GUESSes named by the mediator band for the field or slot each touches:
- *   `setPatReflectPageRange` (the body installs handler 0 and resets the login state), `PatInterface_clear`,
- *   `PatInterface_isReady`, `getPatServerTime`, `setPatBuffer`, `setPatRange`, `getPatAccountName`,
+ *   `setPatReflectPageRange` (the body installs handler 0 and resets the login state), `PatInterface::clear`,
+ *   `PatInterface::isReady`, `getPatServerTime`, `setPatBuffer`, `setPatRange`, `getPatAccountName`,
  *   `setPatReflectField30/34/38`, `setPatReflectName3C/5C`, `setPatField854/860`.
  * RESIDUALS. Every row has a body; the open ones, in address order:
  *  - signature-bound (the declarations other units call through; a retype measured at 100 % is filed as a request):
@@ -301,16 +301,14 @@ void decrement60d4(NetworkInstance* self)
 }
 
 /* Unbinds the first and third session handlers unless the singleton is still referenced. */
-/* free: retail C linkage - the map names it unmangled */
-void PatInterface_clear(PatInterface* self)
+void PatInterface::clear()
 {
-    if (PatInterface_isReady(self) == 0) {
-        resetCallback((NetworkInstance*)self, 0);
-        resetCallback((NetworkInstance*)self, 2);
+    if (isReady() == 0) {
+        resetCallback((NetworkInstance*)this, 0);
+        resetCallback((NetworkInstance*)this, 2);
     }
 }
 
-/* Whether the singleton is referenced. */
 /* One frame of the session ("PatInterface::move()" in its log): the clock, then the close or open step while armed,
  * else the connection: wait for the mediator link, pump receive/dispatch/send while connected (posting a lost link or
  * a 90-second receive silence), and after a close reconnect to the OPN or the next FMP server or report the error. */
@@ -329,7 +327,7 @@ void stepPatInterface(NetworkInstance* self)
     }
     switch (self->binaryState_6134) {
     case 0:
-        if (PatInterface_isReady(self) != 0) {
+        if (self->isReady() != 0) {
             if (checkMediatorLink(getInstance(), &error) == 0 && self->pendingError_654C.code_00 == 0) {
                 self->postError(error);
             }
@@ -391,10 +389,10 @@ void stepPatInterface(NetworkInstance* self)
     }
 }
 
-/* free: retail C linkage - the map names it unmangled */
-s32 PatInterface_isReady(PatInterface* self)
+/* Whether the singleton is referenced. */
+s32 PatInterface::isReady()
 {
-    return self->refCount_60D4 > 0;
+    return this->refCount_60D4 > 0;
 }
 
 /* Whether the singleton holds more than one reference. */

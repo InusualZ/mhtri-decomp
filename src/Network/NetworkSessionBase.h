@@ -75,7 +75,6 @@ void LockMutex(void* mutex);
 void UnlockMutex(void* mutex);
 /* untyped: opaque handle passed through - the peer the caller already holds */
 u32 getNetworkBinaryState(void* self);
-void NetworkSessionStable_setNotifyValue(u32 value);
 }
 
 #endif /* NETWORK_NETWORK_SESSION_BASE_H */

@@ -19,7 +19,7 @@
 #include "Network/network_shared_data.h"
 #include "Runtime.PPCEABI.H/ptmf.h"
 
-/* The 0x60-byte record block `NetworkRequest_copyRecord` moves.  Only its size (24 words) is
+/* The 0x60-byte record block `NetworkRequest::copyRecord` moves.  Only its size (24 words) is
    evidenced - the two leading scalars are how MWCC splits the copy, not a field the range reads. */
 typedef struct NetworkSessionRecordPair {
     u32 lo_00;         /* +0x00 */
@@ -190,6 +190,13 @@ struct NetworkRequest : public NetworkRequestHead {
     s32 getArgument(u32 idx);                /* the starter's word argument `idx` (0 past the count) */
     s32 isTimedOut();                        /* waiting longer than `interval_4C` (never while idle) */
     void restartTimer(f32 interval);         /* the clock becomes the baseline, the interval is replaced */
+    void reset();                            /* empties the record (the timer reads the zero constant) */
+    void clear();                            /* empties the record, out of line */
+    s32 isOwned();                           /* a manager is running it */
+    void begin(NetworkSessionManager* owner, NetworkRequestDesc desc, u32 count, ...);   /* starts it: id, clock, handler and up to 8 word arguments */
+    void cancel();                           /* sets the cancel flag */
+    s32 isCancelled();                       /* the cancel flag */
+    static void copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src);   /* moves the 0x60-byte record block */
 };   /* size: 0xA4 */
 
 /* The Pat layer's own request record: the same 0xA4-byte layout with a constructor, a destructor and a reset of its
@@ -360,6 +367,9 @@ public:
     virtual s32 handleCircleMatchEnd(NetworkRequest* request) = 0; /* +0x1BC */
     virtual s8 mapId_1C0(s32 value) = 0;                   /* +0x1C0 */
     virtual s32 slot_1C4(s8 value) = 0;                   /* +0x1C4 */
+
+    NetworkRequest* allocRequest();                   /* the first pooled request no one owns, else 0 */
+    void deleteRequest(NetworkRequest** slot);        /* empties and detaches the slot's request */
 
     u32 unused_04;                             /* +0x04 */
     u32 unused_08;                             /* +0x08 */
@@ -716,8 +726,7 @@ void networkSessionReflectCallback(void* a0, void* a1, s8 a2, void* a3, void* a4
 /* untyped: caller-owned payload - the six arguments are forwarded unchanged */
 void networkSessionReflectCallbackEx(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5);
 
-/* this unit's own record/stream helpers, defined in the tail of the range */
-void NetworkRequest_copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src);
+/* this unit's own stream helpers */
 /* untyped: caller-owned payload - the array constructors take raw element pointers */
 void __construct_array(void* ptr, void* ctor, void* dtor, u32 size, u32 count);
 /* untyped: caller-owned payload - the array destructors take raw element pointers */

@@ -238,7 +238,7 @@ NetworkMediator::NetworkMediator()
 NetworkWiiMediator::~NetworkWiiMediator()
 {
     if (getInstance_() != NULL) {
-        PatInterface_clear(getInstance_());
+        getInstance_()->clear();
         delete getInstance_();
     }
     if (getReflectService() != NULL) {
@@ -760,8 +760,8 @@ void loadPatInterfaceBuffers()
     setPatBuffer(getPatInstance(), 1, NULL, 0);
     setPatRange(getPatInstance(), 1, 0, 0);
     setPatRange(getPatInstance(), 2, 0, 0);
-    PatInterface_clear(getPatInstance());
-    if (PatInterface_isReady(getPatInstance()) != 0) {
+    getPatInstance()->clear();
+    if (getPatInstance()->isReady() != 0) {
         return;
     }
     PatInterface* instance = getPatInstance();

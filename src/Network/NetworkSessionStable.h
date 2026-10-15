@@ -300,6 +300,8 @@ public:
 
     /* the connection's event callback: `event` as in `NetworkSessionCallback`, the session as the user pointer */
     static void onConnectionEvent(s32 event, s8 index, u32 arg, s32 size, const u8* data, NetworkSessionStable* self);
+    /* 0x803CF66C - publishes the value the put path consults (`Network/NetworkSessionBase.cpp` defines it) */
+    static void setNotifyValue(u32 value);
     void setNetworkConnectionEvent(s32 event, s8 index, u32 arg, s32 size, const u8* data);
     void setSubhostIndex(s8 index);
     void clearSubhostIndex();

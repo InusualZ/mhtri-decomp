@@ -62,7 +62,7 @@ u32 getNetworkBinaryState(void* self)
 }
 
 /* Publishes the value the session's put path consults. */
-void NetworkSessionStable_setNotifyValue(u32 value)
+void NetworkSessionStable::setNotifyValue(u32 value)
 {
     networkSessionNotifyValue = value;
 }

@@ -589,7 +589,7 @@ void networkStreamWriter_commit(NetworkStreamWriterDefault* self)
     networkStreamWriter_setCrc(self, 0);
     networkStreamWriter_setKeyA(self, 0);
     networkStreamWriter_setKeyB(self, 0);
-    networkStreamWriter_setCrc(self, self->checksum(read_size_from_buffer(self)));
+    networkStreamWriter_setCrc(self, self->checksum(self->readSizeFromBuffer()));
 }
 
 /* Stores the frame's CRC (+0x12). */
@@ -626,7 +626,7 @@ s32 make_sure_enough_space(NetworkStreamWriterDefault* self)
     if (self->used_0C - (self->message_10 - self->data_04) < 22) {
         return 0;
     }
-    return self->used_0C - (self->message_10 - self->data_04) >= read_size_from_buffer(self);
+    return self->used_0C - (self->message_10 - self->data_04) >= self->readSizeFromBuffer();
 }
 
 /* Copies the current frame into `out`; its size, 0 when no whole frame is there, -1 when `capacity` is too
@@ -638,7 +638,7 @@ s32 copy_from_buffer(NetworkStreamWriterDefault* self, u8* out, u32 capacity)
     if (self->used_0C - (self->message_10 - self->data_04) < 22) {
         return 0;
     }
-    size = read_size_from_buffer(self);
+    size = self->readSizeFromBuffer();
     if (self->used_0C - (self->message_10 - self->data_04) < size) {
         return 0;
     }
@@ -657,7 +657,7 @@ s32 networkStreamReader_consumePacket(NetworkStreamWriterDefault* self)
     if (self->used_0C - (self->message_10 - self->data_04) < 22) {
         return 0;
     }
-    size = read_size_from_buffer(self);
+    size = self->readSizeFromBuffer();
     if (self->used_0C - (self->message_10 - self->data_04) < size) {
         return 0;
     }
@@ -676,7 +676,7 @@ u8* networkStreamReader_getPayload(NetworkStreamWriterDefault* self)
     if (self->used_0C - (frame - self->data_04) < 22) {
         return NULL;
     }
-    if (self->used_0C - (frame - self->data_04) < read_size_from_buffer(self)) {
+    if (self->used_0C - (frame - self->data_04) < self->readSizeFromBuffer()) {
         return NULL;
     }
     return frame + 22;
@@ -698,9 +698,9 @@ u16 networkStreamReader_getVersion(NetworkStreamWriterDefault* self)
 }
 
 /* The current frame's size: its payload length plus the 22-byte header. */
-u16 read_size_from_buffer(NetworkStreamWriterDefault* self)
+u16 NetworkStreamWriterDefault::readSizeFromBuffer()
 {
-    return networkStreamReader_getPayloadSize(self) + 22;
+    return networkStreamReader_getPayloadSize(this) + 22;
 }
 
 /* The current frame's payload length (+0x02). */
@@ -848,7 +848,7 @@ s32 networkStreamReader_test(NetworkStreamWriterDefault* self)
     networkStreamWriter_setCrc(self, 0);
     networkStreamWriter_setKeyA(self, 0);
     networkStreamWriter_setKeyB(self, 0);
-    computed = self->checksum(read_size_from_buffer(self));
+    computed = self->checksum(self->readSizeFromBuffer());
     if (crc != computed) {
         getNetworkLogger()->warn_10("NetworkUnitPacket::test: CRC error %04x:%04x\n", crc, computed);
         self->flush();

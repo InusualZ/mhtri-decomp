@@ -71,6 +71,10 @@ public:
     /* +0x08 */ virtual ~NetworkStreamWriterDefault();
 
     /* +0x10 */ u8* message_10;   /* the frame the writer stands at */
+
+    /* 0x803FA0E8 - the current frame's size: its payload length plus the 22-byte header (`Network/NetworkUnitPacket.cpp`
+       defines it) */
+    u16 readSizeFromBuffer();
 };   /* size: 0x14 */
 
 /* ---------------- the stream buffer (its table 0x805F9150 is this unit's .data) ------------- */

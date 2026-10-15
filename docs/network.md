@@ -115,8 +115,8 @@ bullet per row (function `match_percent` over the same source, flag against flag
   addresses the second off the first's base (`addi r28,r5,<first>` then `addi r4,r28,<delta>`).  It moved one row
   (`NetworkMultipleUdp_receive`, now `NetworkMultipleUdp::receive`, 89.53 -> 94.06) and lowered none; it is a no-op
   on the other seven objects, which are TUs of the same retail family, so all eight rows carry it.
-* **`NetworkSessionManager`**: `-O3` (`-func_align 4` kept: the 4-byte `NetworkRequest_clear` 0x803D4B5C and
-  `NetworkRequest_isCancelled` 0x803D5D64).  Every framed function is `-O3` scheduling: `request376` (0x803D53B0)
+* **`NetworkSessionManager`**: `-O3` (`-func_align 4` kept: the 4-byte `NetworkRequest::clear` 0x803D4B5C and
+  `NetworkRequest::isCancelled` 0x803D5D64).  Every framed function is `-O3` scheduling: `request376` (0x803D53B0)
   opens `stw r31,28; stw r30,24; mr r30,r3; mr r31,r4` and copies the global descriptor with a plain `lwz/stw`
   block, both of which `-O4,p` destroys (it interleaves the saves and folds the copy into `lwzu`).  Measured:
   0x803D53B0 59.79 -> 95.15, the constructor 0x803D4904 70.42 -> 93.24, `NetworkSessionManager` 81.63 -> 92.23.

@@ -82,7 +82,7 @@ s32 NetworkPeerBuffer::receive(u8* out, s32* size, u8* out2, s32* size2, u8* kin
     if (make_sure_enough_space(&stream) == 0) {
         return 0;
     }
-    if (capacity < read_size_from_buffer(&stream)) {
+    if (capacity < stream.readSizeFromBuffer()) {
         return 0;
     }
     length = copy_from_buffer(&stream, out, capacity);

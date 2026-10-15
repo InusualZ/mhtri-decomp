@@ -27,7 +27,7 @@
  *   `.text` 0x2714 against 0x27B4; `extab` 0x428 against 0x40C; `.data` (flip blocker) 0x3B8 against 0x3C0 (-8; 225 of 960
  *   bytes differ), written but out of order (the base table last, see RANGE); `.sbss` emits the 4 B word of the 8 B
  *   claim.
- *  - `NetworkRequest_copyRecord`: retail copies the 96-byte record as two words then eleven word pairs, `*dst = *src`
+ *  - `NetworkRequest::copyRecord`: retail copies the 96-byte record as two words then eleven word pairs, `*dst = *src`
  *    emits `lmw`/`stmw` (`-use_lmw_stmw off` changes nothing), so `copyRecord` is 96 B short; it is referenced only from
  *    this object's `extab`;
  *  - `slot_144`, `sendBatch_138`, `slot_13C`, `slot_140`: the staging order of the mapped byte array, and the `clrlwi`
@@ -36,7 +36,7 @@
  *    ours does the minimal four-move rotation;
  *  - `~NetworkRequest`: retail's unfused `extsh` of the deleting flag;
  *  - the constructor, `release`: the loop counter and element pointer take swapped registers (r30/r31);
- *    `NetworkSessionManager_allocRequest`: the pointer steps after the counter (a pointer loop costs it the saved `self`);
+ *    `NetworkSessionManager::allocRequest`: the pointer steps after the counter (a pointer loop costs it the saved `self`);
  *    `clear`, `move`: not characterised one by one (the objdiff rows).
  * SHAPES. Both tables are compiler output (rule 10): the base table 0x805FA908..0x805FAAD0 (456 B) is emitted here;
  *   `NetworkSessionManagerPat` declares `move` FIRST so it is the key function (its body opens the next unit), so the
@@ -51,7 +51,7 @@
  *    unfused `extsh`+`cmpwi` of the deleting flag);
  *  - `NetworkSessionSlot` is 0x924 B (the target's `mulli` stride); `NetworkStreamWriter` is 0x20 B (`send8`'s frame is
  *    0x30 with the writer at +0x10);
- *  - `NetworkRequest_begin`'s inlined `va_list` setup is `__builtin_va_info(&ap)` (the `net_va_start` macro, not the
+ *  - `NetworkRequest::begin`'s inlined `va_list` setup is `__builtin_va_info(&ap)` (the `net_va_start` macro, not the
  *    `__va_start` call `va_start` would give); the request handler is a real pointer-to-member (`NetworkRequestDesc`):
  *    the resets copy `__ptmf_null` (0x80572428, owned by `Runtime.PPCEABI.H/ptmf.c`), `NetworkRequest::run` is MWCC's
  *    `__ptmf_scall`; `release`'s close loop is a `do {} while`.
@@ -84,19 +84,6 @@
    `extab` 1260 B and `extabindex` 912 B (the C++ unwind records of the class below); the pragma turns the
    front-end's exceptions back on and moves no `.text` byte. */
 
-/* ---- this unit's own forward declarations ---- */
-extern "C" {
-
-void NetworkRequest_reset(NetworkRequest*);
-void NetworkRequest_clear(NetworkRequest*);
-s32 NetworkRequest_isOwned(NetworkRequest*);
-void NetworkRequest_begin(NetworkRequest*, NetworkSessionManager*, NetworkRequestDesc, u32, ...);
-void NetworkRequest_cancel(NetworkRequest*);
-s32 NetworkRequest_isCancelled(NetworkRequest*);
-NetworkRequest* NetworkSessionManager_allocRequest(NetworkSessionManager*);
-void NetworkSessionManager_deleteRequest(NetworkSessionManager*, NetworkRequest**);
-}
-
 /* ---- extra neighbouring globals ---- */
 /* The four addresses themselves are declared in the band's data header (rule 2). */
 
@@ -120,65 +107,65 @@ NetworkSessionManager::NetworkSessionManager()
     this->unused_79 = 1;
     this->unused_7A = 1;
     for (i = 0, request = this->pool_7C; i < 2; i++, request++) {
-        NetworkRequest_reset(request);
+        request->reset();
     }
 }
 
 #pragma peephole off
-extern "C" void NetworkRequest_reset(NetworkRequest* self)
+void NetworkRequest::reset()
 {
-    self->state_00 = 0;
-    self->interval_4C = networkRequestZero;
-    self->timeout_50 = networkRequestZero;
-    self->requestId_70 = 0;
-    self->unused_24 = 0;
-    self->cancelled_74 = 0;
-    self->owner_94 = 0;
-    self->handler_98 = 0;
-    self->count_28 = 0;
-    self->record_54 = 0;
-    self->record_58 = 0;
-    self->record_5C = 0;
-    self->unused_60 = 0;
-    self->unused_64 = 0;
-    self->unused_68 = 0;
-    self->unused_6C = 0;
-    self->unused_04 = 0;
-    self->unused_08 = 0;
-    self->buffer = 0;
-    self->unused_10 = 0;
-    self->unused_14 = 0;
-    self->unused_18 = 0;
-    self->unused_1C = 0;
-    self->unused_20 = 0;
-    self->args_2C[0] = 0;
-    self->args_2C[1] = 0;
-    self->args_2C[2] = 0;
-    self->args_2C[3] = 0;
-    self->args_2C[4] = 0;
-    self->args_2C[5] = 0;
-    self->args_2C[6] = 0;
-    self->args_2C[7] = 0;
+    this->state_00 = 0;
+    this->interval_4C = networkRequestZero;
+    this->timeout_50 = networkRequestZero;
+    this->requestId_70 = 0;
+    this->unused_24 = 0;
+    this->cancelled_74 = 0;
+    this->owner_94 = 0;
+    this->handler_98 = 0;
+    this->count_28 = 0;
+    this->record_54 = 0;
+    this->record_58 = 0;
+    this->record_5C = 0;
+    this->unused_60 = 0;
+    this->unused_64 = 0;
+    this->unused_68 = 0;
+    this->unused_6C = 0;
+    this->unused_04 = 0;
+    this->unused_08 = 0;
+    this->buffer = 0;
+    this->unused_10 = 0;
+    this->unused_14 = 0;
+    this->unused_18 = 0;
+    this->unused_1C = 0;
+    this->unused_20 = 0;
+    this->args_2C[0] = 0;
+    this->args_2C[1] = 0;
+    this->args_2C[2] = 0;
+    this->args_2C[3] = 0;
+    this->args_2C[4] = 0;
+    this->args_2C[5] = 0;
+    this->args_2C[6] = 0;
+    this->args_2C[7] = 0;
 }
 
 /* Empties the pooled request; its mutex goes with the member. */
 NetworkRequest::~NetworkRequest()
 {
-    NetworkRequest_clear(this);
+    this->clear();
 }
 #pragma peephole on
 
 #pragma dont_inline on
-extern "C" void NetworkRequest_clear(NetworkRequest* self)
+void NetworkRequest::clear()
 {
-    NetworkRequest_reset(self);
+    this->reset();
 }
 #pragma dont_inline off
 
 /* Builds the pooled request: its mutex (the member), then an empty record. */
 NetworkRequest::NetworkRequest()
 {
-    NetworkRequest_reset(this);
+    this->reset();
 }
 
 #pragma peephole off
@@ -206,7 +193,7 @@ void NetworkSessionManager::clear()
         this->request_state_64[i] = 0;
     }
     for (i = 0; i < 2; i++) {
-        NetworkRequest_reset(&this->pool_7C[i]);
+        this->pool_7C[i].reset();
     }
 }
 
@@ -229,10 +216,10 @@ void NetworkSessionManager::release()
         }
     }
     for (i = 0, slot = this->requests_10; i < 0x15; i++, slot++) {
-        NetworkSessionManager_deleteRequest(this, slot);
+        this->deleteRequest(slot);
     }
     for (i = 0, request = this->pool_7C; i < 2; i++, request++) {
-        NetworkRequest_clear(request);
+        request->clear();
     }
 }
 
@@ -307,8 +294,8 @@ void NetworkSessionManager::move()
         }
         if (req != 0 && this->request_state_64[i] != 0) {
             req->run();
-            if (NetworkRequest_isOwned(req) == 0) {
-                NetworkSessionManager_deleteRequest(this, &this->requests_10[i]);
+            if (req->isOwned() == 0) {
+                this->deleteRequest(&this->requests_10[i]);
                 this->request_state_64[i] = 0;
             }
         }
@@ -316,16 +303,16 @@ void NetworkSessionManager::move()
 }
 
 #pragma dont_inline on
-extern "C" s32 NetworkRequest_isOwned(NetworkRequest* self)
+s32 NetworkRequest::isOwned()
 {
-    return self->owner_94 != 0;
+    return this->owner_94 != 0;
 }
 #pragma dont_inline off
 
 void NetworkRequest::run()
 {
     if (this->owner_94 != 0 && (this->owner_94->*this->handler_98)(this) != 0) {
-        NetworkRequest_clear(this);
+        this->clear();
     }
 }
 
@@ -353,7 +340,7 @@ NetworkRequestDesc networkRequestDesc396 = &NetworkSessionManager::handleServerT
 NetworkRequestDesc networkRequestDesc400 = &NetworkSessionManager::slot_190;
 NetworkRequestDesc networkRequestDesc428 = &NetworkSessionManager::handleCircleMatchOptionSet;
 
-/* The request-id source `NetworkRequest_begin` post-increments. */
+/* The request-id source `NetworkRequest::begin` post-increments. */
 u32 NetworkRequest_idCounter;
 
 #pragma peephole off
@@ -362,33 +349,32 @@ void NetworkSessionManager::request364()
     NetworkRequest* req;
 
     if (this->requests_10[1] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[1] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc364, 0);
+            req->begin(this, networkRequestDesc364, 0);
         }
     }
 }
 #pragma peephole on
 
-extern "C" void NetworkRequest_begin(NetworkRequest* req, NetworkSessionManager* owner,
-                            NetworkRequestDesc desc, u32 count, ...)
+void NetworkRequest::begin(NetworkSessionManager* owner, NetworkRequestDesc desc, u32 count, ...)
 {
     NetworkVaState args;
     NetworkLogger* log;
     u32 i;
 
-    NetworkRequest_reset(req);
+    this->reset();
     log = getNetworkLogger();
-    req->timeout_50 = log->getTime_60();
-    req->requestId_70 = NetworkRequest_idCounter;
-    NetworkRequest_idCounter = req->requestId_70 + 1;
-    req->owner_94 = owner;
-    req->handler_98 = desc;
-    req->count_28 = count > 8 ? 8 : count;
+    this->timeout_50 = log->getTime_60();
+    this->requestId_70 = NetworkRequest_idCounter;
+    NetworkRequest_idCounter = this->requestId_70 + 1;
+    this->owner_94 = owner;
+    this->handler_98 = desc;
+    this->count_28 = count > 8 ? 8 : count;
     net_va_start(args);
-    for (i = 0; i < req->count_28; i++) {
-        req->args_2C[i] = net_va_arg(args, u32);
+    for (i = 0; i < this->count_28; i++) {
+        this->args_2C[i] = net_va_arg(args, u32);
     }
 }
 
@@ -402,10 +388,10 @@ void NetworkSessionManager::request368()
     NetworkRequest* req;
 
     if (this->requests_10[2] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[2] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc368, 0);
+            req->begin(this, networkRequestDesc368, 0);
         }
     }
 }
@@ -420,10 +406,10 @@ void NetworkSessionManager::request372(u32 a, u32 b)
     NetworkRequest* req;
 
     if (this->requests_10[3] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[3] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc372, 2, a, b);
+            req->begin(this, networkRequestDesc372, 2, a, b);
         }
     }
 }
@@ -433,10 +419,10 @@ void NetworkSessionManager::request376(u32 a)
     NetworkRequest* req;
 
     if (this->requests_10[4] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[4] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc376, 1, a);
+            req->begin(this, networkRequestDesc376, 1, a);
         }
     }
 }
@@ -446,10 +432,10 @@ void NetworkSessionManager::request380(u32 a)
     NetworkRequest* req;
 
     if (this->requests_10[5] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[5] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc380, 1, a);
+            req->begin(this, networkRequestDesc380, 1, a);
         }
     }
 }
@@ -459,10 +445,10 @@ void NetworkSessionManager::request384(u32 a)
     NetworkRequest* req;
 
     if (this->requests_10[6] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[6] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc384, 1, a);
+            req->begin(this, networkRequestDesc384, 1, a);
         }
     }
 }
@@ -472,10 +458,10 @@ void NetworkSessionManager::request388(u32 a)
     NetworkRequest* req;
 
     if (this->requests_10[6] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[6] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc388, 1, a);
+            req->begin(this, networkRequestDesc388, 1, a);
         }
     }
 }
@@ -485,10 +471,10 @@ void NetworkSessionManager::request432()
     NetworkRequest* req;
 
     if (this->requests_10[7] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[7] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc432, 0);
+            req->begin(this, networkRequestDesc432, 0);
         }
     }
 }
@@ -498,10 +484,10 @@ void NetworkSessionManager::request416(u32 a)
     NetworkRequest* req;
 
     if (this->requests_10[16] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[16] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc416, 1, a);
+            req->begin(this, networkRequestDesc416, 1, a);
         }
     }
 }
@@ -511,10 +497,10 @@ void NetworkSessionManager::request420(s8 a)
     NetworkRequest* req;
 
     if (this->requests_10[17] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[17] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc420, 1, (u32)a);
+            req->begin(this, networkRequestDesc420, 1, (u32)a);
         }
     }
 }
@@ -524,10 +510,10 @@ void NetworkSessionManager::request424()
     NetworkRequest* req;
 
     if (this->requests_10[20] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[20] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc424, 0);
+            req->begin(this, networkRequestDesc424, 0);
         }
     }
 }
@@ -537,10 +523,10 @@ void NetworkSessionManager::request404(u32 a)
     NetworkRequest* req;
 
     if (this->requests_10[8] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[8] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc404, 1, a);
+            req->begin(this, networkRequestDesc404, 1, a);
         }
     }
 }
@@ -550,10 +536,10 @@ void NetworkSessionManager::request436()
     NetworkRequest* req;
 
     if (this->requests_10[9] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[9] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc436, 0);
+            req->begin(this, networkRequestDesc436, 0);
         }
     }
 }
@@ -563,10 +549,10 @@ void NetworkSessionManager::request440()
     NetworkRequest* req;
 
     if (this->requests_10[19] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[19] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc440, 0);
+            req->begin(this, networkRequestDesc440, 0);
         }
     }
 }
@@ -576,10 +562,10 @@ void NetworkSessionManager::request444()
     NetworkRequest* req;
 
     if (this->requests_10[10] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[10] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc444, 0);
+            req->begin(this, networkRequestDesc444, 0);
         }
     }
 }
@@ -589,10 +575,10 @@ void NetworkSessionManager::request408()
     NetworkRequest* req;
 
     if (this->requests_10[11] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[11] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc408, 0);
+            req->begin(this, networkRequestDesc408, 0);
         }
     }
 }
@@ -602,10 +588,10 @@ void NetworkSessionManager::request412(u32 a, u32 b, s8 c)
     NetworkRequest* req;
 
     if (this->requests_10[15] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[15] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc412, 3, a, b, (u32)c);
+            req->begin(this, networkRequestDesc412, 3, a, b, (u32)c);
         }
     }
 }
@@ -615,10 +601,10 @@ void NetworkSessionManager::request392()
     NetworkRequest* req;
 
     if (this->requests_10[12] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[12] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc392, 0);
+            req->begin(this, networkRequestDesc392, 0);
         }
     }
 }
@@ -628,10 +614,10 @@ void NetworkSessionManager::request396(u32 a, u32 b)
     NetworkRequest* req;
 
     if (this->requests_10[13] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[13] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc396, 2, a, b);
+            req->begin(this, networkRequestDesc396, 2, a, b);
         }
     }
 }
@@ -641,10 +627,10 @@ void NetworkSessionManager::request400(u32 a, u32 b)
     NetworkRequest* req;
 
     if (this->requests_10[14] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[14] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc400, 2, a, b);
+            req->begin(this, networkRequestDesc400, 2, a, b);
         }
     }
 }
@@ -654,10 +640,10 @@ void NetworkSessionManager::request428(u32 a)
     NetworkRequest* req;
 
     if (this->requests_10[18] == 0) {
-        req = NetworkSessionManager_allocRequest(this);
+        req = this->allocRequest();
         if (req != 0) {
             this->requests_10[18] = req;
-            NetworkRequest_begin(req, this, networkRequestDesc428, 1, a);
+            req->begin(this, networkRequestDesc428, 1, a);
         }
     }
 }
@@ -669,27 +655,27 @@ void NetworkSessionManager::request428(u32 a)
 
 void NetworkSessionManager::abortRequest4()
 {
-    if (this->requests_10[4] != 0 && NetworkRequest_isCancelled(this->requests_10[4]) == 0) {
-        NetworkRequest_cancel(this->requests_10[4]);
+    if (this->requests_10[4] != 0 && this->requests_10[4]->isCancelled() == 0) {
+        this->requests_10[4]->cancel();
     }
 }
 
 #pragma dont_inline on
-extern "C" void NetworkRequest_cancel(NetworkRequest* self)
+void NetworkRequest::cancel()
 {
-    self->cancelled_74 = 1;
+    this->cancelled_74 = 1;
 }
 
-extern "C" s32 NetworkRequest_isCancelled(NetworkRequest* self)
+s32 NetworkRequest::isCancelled()
 {
-    return self->cancelled_74;
+    return this->cancelled_74;
 }
 #pragma dont_inline off
 
 void NetworkSessionManager::abortRequest14()
 {
-    if (this->requests_10[14] != 0 && NetworkRequest_isCancelled(this->requests_10[14]) == 0) {
-        NetworkRequest_cancel(this->requests_10[14]);
+    if (this->requests_10[14] != 0 && this->requests_10[14]->isCancelled() == 0) {
+        this->requests_10[14]->cancel();
     }
 }
 
@@ -700,7 +686,7 @@ void NetworkSessionManager::setFlag79(s8 value)
 
 void NetworkSessionManager::notify(s32 value)
 {
-    NetworkSessionStable_setNotifyValue(value);
+    NetworkSessionStable::setNotifyValue(value);
 }
 
 void NetworkSessionManager::setFlag7A(s8 value)
@@ -914,26 +900,26 @@ void NetworkSessionManager::slot_168()
 /* NetworkSessionManager - pool + mutex helpers                                               */
 /* ----------------------------------------------------------------------------------------- */
 
-extern "C" NetworkRequest* NetworkSessionManager_allocRequest(NetworkSessionManager* self)
+NetworkRequest* NetworkSessionManager::allocRequest()
 {
     s32 i;
 
     for (i = 0; i < 2; i++) {
-        if (NetworkRequest_isOwned(&self->pool_7C[i]) == 0) {
-            return &self->pool_7C[i];
+        if (this->pool_7C[i].isOwned() == 0) {
+            return &this->pool_7C[i];
         }
     }
     return 0;
 }
 
-extern "C" void NetworkSessionManager_deleteRequest(NetworkSessionManager* self, NetworkRequest** slot)
+void NetworkSessionManager::deleteRequest(NetworkRequest** slot)
 {
     if (*slot != 0) {
-        if (NetworkRequest_isOwned(*slot) != 0) {
+        if ((*slot)->isOwned() != 0) {
             NetworkLogger* log = getNetworkLogger();
             log->log_14("NetworkSessionManager::deleteRequest: request is moving.\n");
         }
-        NetworkRequest_clear(*slot);
+        (*slot)->clear();
     }
     *slot = 0;
 }
@@ -1015,7 +1001,7 @@ void NetworkRequest::restartTimer(f32 interval)
 }
 
 /* Moves the 0x60-byte record block an out-of-band request carries. */
-extern "C" void NetworkRequest_copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src)
+void NetworkRequest::copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src)
 {
     *dst = *src;
 }
@@ -1234,8 +1220,8 @@ void NetworkSessionManagerPat::release()
 
     networkPatReleaseBuffer(this);
     if (getInstance_() != 0) {
-        PatInterface_clear((PatInterface*)getInstance_());
-        if (PatInterface_isReady((PatInterface*)getInstance_()) == 0) {
+        getInstance_()->clear();
+        if (getInstance_()->isReady() == 0) {
             pat = (PatInterface*)getInstance_();
             delete pat;
         }

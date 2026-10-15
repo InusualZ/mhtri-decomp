@@ -535,7 +535,7 @@ void networkStreamWriter_attach(NetworkConnectionStable* connection, NetworkStre
 {
     s32 size;
 
-    size = read_size_from_buffer(stream);
+    size = stream->readSizeFromBuffer();
     if ((u32)(connection->rawSize_101C + size) > 0x400
         || connection->getMaxPacketSize() < (s32)(connection->rawSize_101C + size)) {
         networkStreamWriter_reserve(connection, NULL, 0, 0);
@@ -608,8 +608,8 @@ void NetworkConnectionStable::receivePackets()
                 if (outOfBand == 0) {
                     if (networkPacket_getFlag04(&reader) != 0) {
                         mtuReply_223F = 1;
-                        if (mtuSeen_2240 < read_size_from_buffer(&reader)) {
-                            mtuSeen_2240 = read_size_from_buffer(&reader);
+                        if (mtuSeen_2240 < reader.readSizeFromBuffer()) {
+                            mtuSeen_2240 = reader.readSizeFromBuffer();
                         }
                     } else if (channel == 0) {
                         filed = putTopPacket(&queues_1024.receive_30[channel], &reader);
