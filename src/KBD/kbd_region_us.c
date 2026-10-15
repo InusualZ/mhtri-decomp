@@ -15,6 +15,7 @@
  */
 #include "types.h"
 #include "KBD/kbd.h"
+#include "KBD/kbd_region_us.h"
 
 /* The US layouts' key tables (one row of shift columns per key, 4 columns for maps 1/2/10, 3 for map 17) and their
  * modifier-key tables, in map order. */

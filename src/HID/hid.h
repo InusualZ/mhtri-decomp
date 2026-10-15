@@ -53,6 +53,13 @@ typedef struct HIDDeviceInfo {
 /* 0x805272D0 - registers `client` and offers it every interface that is already attached. */
 s32 HIDRegisterClient(HIDClient* client, HIDAttachCallback attach);
 
+/* Starts the HID library in `memory`; `done` is told the result. */
+/* untyped: byte range - the driver's work area */
+s32 HIDInit(void* memory, HIDDoneCallback done, u32 arg);
+
+/* Stops the HID library; `done` is told the result. */
+s32 HIDEnd(HIDDoneCallback done, u32 arg);
+
 /* 0x805272E0 - unregisters `client`, detaching its interfaces; `done` runs when none were attached. */
 s32 HIDUnregisterClient(HIDClient* client, HIDDoneCallback done, u32 arg);
 

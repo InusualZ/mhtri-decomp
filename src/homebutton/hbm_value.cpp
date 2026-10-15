@@ -994,7 +994,7 @@ void fn_8055DF88(VuOwner* self)
     void* obj = MEMAllocFromAllocator((MEMAllocator*)self->allocator, 0x28);
 
     if (obj != 0)
-        fn_8056D814(obj, self);
+        hkbKbdInputConstruct(obj, self);
 }
 
 /* A plain deleting destructor with no base-destructor call. */

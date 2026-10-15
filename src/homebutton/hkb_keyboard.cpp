@@ -2503,7 +2503,7 @@ u32 HkbKeyboard::updateComponents() {
     HkbKbdState& kbd = hkbGetKbdState();
     bool bShiftHeld = kbd.isShiftHeld();
     kbd.mbRightShift = 0;
-    hkbSetKeyRepeat(&hkbManager, 0, 0);
+    hkbSetModifierOverride(&hkbManager, 0, 0);
     if (bShiftHeld && !kbd.isShiftHeld()) {
         setShiftOff();
     }

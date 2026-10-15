@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 /* untyped: opaque band object, typed by the callers' views */
-void  fn_8056D814(void* obj, void* owner);
+void  hkbKbdInputConstruct(void* obj, void* owner);
 
 #ifdef __cplusplus
 }

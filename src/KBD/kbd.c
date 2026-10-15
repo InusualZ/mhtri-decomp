@@ -82,10 +82,6 @@ typedef struct KBDKeyMap {
     /* +0x19 */ u8 pad_0x19[0x3];
 } KBDKeyMap; /* size: 0x1C */
 
-struct KBDState;
-typedef void (*KBDChannelCallback)(const u8* channel, struct KBDState* state);
-typedef void (*KBDDisconnectCallback)(const u8* channel);
-typedef void (*KBDKeyEventCallback)(void);
 typedef void (*KBDLedCallback)(const u8* channel, u32 arg);
 
 /* size: 0x4 - the first word of an LED request: the report byte while queued, the free-list link otherwise. */
