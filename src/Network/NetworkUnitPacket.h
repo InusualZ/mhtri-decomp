@@ -153,7 +153,7 @@ s32 networkPacket_takeU16(NetworkStreamWriter* self, u16* out);
 s32 networkPacket_takeByte(NetworkStreamWriter* self, u8* out);
 
 /* 0x803F9608 - the size of the front message under the field mask `mask`. */
-u32 networkPacket_getMessageSize(NetworkStreamWriter* self, u32 mask);
+u16 networkPacket_getMessageSize(NetworkStreamWriter* self, u32 mask);
 
 /* 0x803F96C8 - the front message's payload length. */
 u16 networkPacket_getPayloadSize(NetworkStreamWriter* self);

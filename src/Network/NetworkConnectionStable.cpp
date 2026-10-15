@@ -6,8 +6,9 @@
  *   .data 0x805F91F0-0x805F94E0 (the log strings and the class's table 0x805F9490).  Left edge: the V->S seam at
  *   0x805F91F0 and the constructor's extabindex record (`Network/NetworkConnection.cpp`).  Right edge:
  *   `Network/NetworkPeerBase.cpp` at 0x803CCDF8.
- * FLAGS. the library's flags plus `#pragma peephole off` (kept `clrlwi`/`extsb` forms) and `#pragma fp_contract off`
- *   (`updateRoundTrip` keeps `fmuls`+`fadds`).
+ * FLAGS. the library's flags plus `#pragma peephole off` (kept `clrlwi`/`extsb` forms), `#pragma fp_contract off`
+ *   (`updateRoundTrip` keeps `fmuls`+`fadds`) and `#pragma optimization_level 4` (`sendChannel`'s register assignment;
+ *   no row moves down against the command line's `-O3`).
  * NAMES. The file and class names are the log strings'.  The method names are GUESSes read off what each one does:
  *   GUESS: open, reset, clear, update, start, begin, end, stop, clearPending, sendChannel, clearSendPending,
  *   GUESS: getSendRoom, networkStreamWriter_attach, networkStreamWriter_reserve, receivePackets, getIndex,
@@ -18,7 +19,8 @@
  *   0x803CC00C (`GoalOverlay::SceneCreated`, `J3DColorBlockLightOff::setColorChanNum`, `nw4hbm::ut::TextWriterBase`'s
  *   char-space accessors) are folded one-store bodies, not evidence.
  * RESIDUALS. The constructor calls `NetworkConnection(s32)`, which is unwritten in `Network/NetworkConnection.cpp`.
- *   `sendChannel`: the frame's sequence copy is kept 32-bit where retail keeps it (`mr`, the `u16` return unextended).
+ *   `sendChannel`: size, overhead and the send-queue pointer take r23/r22/r24 against retail's r22/r23/r22 (the local
+ *   declaration order is the best of the permutations measured).
  *   `open`: `rand() + base` adds in the other operand
  *   order (`(s32)`/`(u16)` spellings tried).  `sendClose`: the 0x84/0x85
  *   select computes in r4 directly (a `u8` local tried).
@@ -43,6 +45,10 @@
 
 /* Retail keeps `fmuls`+`fadds` where `-fp_contract on` would fuse a `fmadds` (`updateRoundTrip`). */
 #pragma fp_contract off
+
+/* The command line's `-O3` with the global optimizer's level-4 passes on: the rows with loops (``sendChannel``) keep retail's
+   register assignment only at level 4, and no row of the unit moves the other way. */
+#pragma optimization_level 4
 
 /* Builds the connection on the base's peer of `kind`, with its queues and the idle state. */
 NetworkConnectionStable::NetworkConnectionStable(s32 kind) : NetworkConnection(kind)
@@ -403,9 +409,9 @@ void NetworkConnectionStable::sendChannel(s32 channel)
     NetworkStreamWriter packet;
     NetworkSlotQueues* queues;
     s32 sent;
-    u32 sequence;
-    u16 size;
+    u16 sequence;
     u16 overhead;
+    s32 size;
     s32 result;
 
     if (checkChannel(channel) != 0) {

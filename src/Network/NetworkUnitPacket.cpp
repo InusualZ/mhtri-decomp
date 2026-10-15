@@ -4,8 +4,9 @@
  *   0x14-byte `NetworkStreamWriterDefault`) and the queue of framed messages (`networkStreamQueue_*`).
  * RANGE. .text 0x803F89CC-0x803FAE9C (98 functions); .data 0x805FCC98-0x805FCE50, .sdata 0x80793958-0x80793960, .sdata2
  *   0x8079C7C0-0x8079C7D0, extab, extabindex.
- * FLAGS. `-O3` (configure.py) like the transport siblings; file-scope `#pragma peephole off` and `#pragma dont_inline
- *   on` (retail calls every helper).
+ * FLAGS. `-O3` (configure.py) like the transport siblings; file-scope `#pragma peephole off`, `#pragma dont_inline
+ *   on` (retail calls every helper) and `#pragma optimization_level 4` (`networkStreamQueue_acknowledge`'s operand
+ *   order; no row moves down against `-O3`).
  * NAMES. The log strings name `NetworkUnitPacket` ("::test: CRC error", "Invalid version") and `NetworkUnitPacketPool`
  *   (`putTopPacket`/`putLowPacket`/`putAllPacket`); the project keeps the names every caller uses
  *   (`NetworkStreamWriter`/`NetworkStreamWriterDefault`/`NetworkStreamQueue`).  GUESSes: the sink's +0x30/+0x34/+0x38
@@ -16,14 +17,14 @@
  *   GUESS: networkPacket_getFlag04, networkPacket_isHandshake, networkStreamQueue_putNextPacket,
  *   GUESS: networkStreamQueue_acknowledge, networkStreamWriter_size (the queue's sequence number; the runtime dump's
  *   `J3DShapeMtxMulti::getUseMtxNum` there is a folded one-load body).
- * RESIDUALS. `networkPacket_getMessageSize`: retail returns a u16, but `Network/NetworkSessionStable.cpp`'s `send` is
- *   worse with a u16 declaration, so the header keeps u32 and the callers here cast.  `networkPacket_copyMessage`: the
- *   same u16 return and operand order in two address sums.  The `networkPacket_*` rows `beginMessage`, `getHeaderSize`,
- *   `takeByte`, `putTopPacket` and `networkStreamQueue_acknowledge`: operand order / one register. `.data`: the two
+ * RESIDUALS. `networkPacket_beginMessage`: the 0x80/0x40 flag bits are computed into r3/r4 the other way round, and the value
+ *   block's `stamp + offset` sum swaps its operands.  `networkPacket_takeByte`: the cursor is loaded before the block
+ *   pointer (local and member spellings, `scheduling off` and level 2 tried).  `.data`: the two
  *   writer tables `__vt__26NetworkStreamWriterDefault`/`__vt__19NetworkStreamWriter` (0x805FCDD4/0x805FCE10) stay
  *   unemitted while their flush overrides (the key functions the classes declare first) are the free functions
  *   `networkStreamWriter_onFlush`/`networkPacket_onFlush`; their constructors and destructors are
- *   `Network/NetworkConnectionStable.cpp`'s.  `extab`:
+ *   `Network/NetworkConnectionStable.cpp`'s.  The emission-order seam `dataorder.py` reports at 0x805FCE10 is those
+ *   constructors referring to the tables, not a TU edge: every slot of both tables is a function of this range.  `extab`:
  *   `networkStreamQueue_discard`'s cleanup range ends at the `hasMessage` call in retail (0x11 words) and at `memmove`
  *   in ours (0x1B) - a `throw()` on the declaration does not move it.  `.sdata`: 2 of 8 B (the frame version).
  * SHAPES. A message is a big-endian u16 payload size, a flag byte (0x80 user data, 0x40 a timestamp follows, 0x3F the
@@ -44,6 +45,10 @@
 
 #pragma peephole off
 #pragma dont_inline on
+
+/* The command line's `-O3` with the global optimizer's level-4 passes on: the rows with loops (``networkStreamQueue_acknowledge``) keep retail's
+   register assignment only at level 4, and no row of the unit moves the other way. */
+#pragma optimization_level 4
 
 /* The frame version every frame header carries and `NetworkUnitPacket::test` checks (1.1). */
 u16 networkFrameVersion = 0x0101;
@@ -93,10 +98,10 @@ s32 networkPacket_beginMessage(NetworkStreamWriter* self, s32 userData, s32 time
     networkPacket_setTimestamp(self, 0.0f);
     if (count != 0) {
         word = getNetworkLogger()->encode_54(base);
-        memcpy(self->message_10 + (timestamp ? 4 : 0) + 3, &word, 4);
-        for (offset = 0, i = 0; i < flags; i++, offset += 4) {
+        memcpy(&self->message_10[(timestamp ? 4 : 0) + 3], &word, 4);
+        for (i = 0, offset = 0; i < flags; i++, offset += 4) {
             word = getNetworkLogger()->encode_54(*values);
-            memcpy((timestamp ? 4 : 0) + offset + self->message_10 + 7, &word, 4);
+            memcpy(&self->message_10[(timestamp ? 4 : 0) + offset + 7], &word, 4);
             values++;
         }
     }
@@ -216,15 +221,15 @@ s32 networkPacket_hasMessage(NetworkStreamWriter* self)
     if (self->used_0C - (self->message_10 - self->data_04) < networkPacket_getHeaderSize(self)) {
         return 0;
     }
-    return self->used_0C - (self->message_10 - self->data_04) >= (u16)networkPacket_getMessageSize(self, 0xFF);
+    return self->used_0C - (self->message_10 - self->data_04) >= networkPacket_getMessageSize(self, 0xFF);
 }
 
 /* Steps to the next message when a whole one is at the current position, and moves the cursor to its payload. */
 void networkPacket_nextMessage(NetworkStreamWriter* self)
 {
     if (self->used_0C - (self->message_10 - self->data_04) >= networkPacket_getHeaderSize(self) &&
-        self->used_0C - (self->message_10 - self->data_04) >= (u16)networkPacket_getMessageSize(self, 0xFF)) {
-        self->message_10 += (u16)networkPacket_getMessageSize(self, 0xFF);
+        self->used_0C - (self->message_10 - self->data_04) >= networkPacket_getMessageSize(self, 0xFF)) {
+        self->message_10 += networkPacket_getMessageSize(self, 0xFF);
         self->cursor_14 = networkPacket_getPayload(self);
     }
 }
@@ -241,7 +246,7 @@ s32 networkPacket_copyMessage(NetworkStreamWriter* self, u8* out, u32 capacity, 
     if (self->used_0C - (self->message_10 - self->data_04) < 3) {
         return 0;
     }
-    size = (u16)networkPacket_getMessageSize(self, mask);
+    size = networkPacket_getMessageSize(self, mask);
     if (self->used_0C - (self->message_10 - self->data_04) < size) {
         return 0;
     }
@@ -264,9 +269,9 @@ s32 networkPacket_copyMessage(NetworkStreamWriter* self, u8* out, u32 capacity, 
     } else {
         count = networkPacket_getValueCount(self);
         if (count > 0) {
-            memcpy(out + n, self->message_10 + (networkPacket_hasTimestamp(self) ? 4 : 0) + 3, 4);
+            memcpy(out + n, &self->message_10[(networkPacket_hasTimestamp(self) ? 4 : 0) + 3], 4);
             n += 4;
-            memcpy(out + n, self->message_10 + (networkPacket_hasTimestamp(self) ? 4 : 0) + 7, count * 4);
+            memcpy(out + n, &self->message_10[(networkPacket_hasTimestamp(self) ? 4 : 0) + 7], count * 4);
             n += (u16)(count * 4);
         }
     }
@@ -275,7 +280,8 @@ s32 networkPacket_copyMessage(NetworkStreamWriter* self, u8* out, u32 capacity, 
         return 0;
     }
     memcpy(out + n, payload, networkPacket_getPayloadSize(self));
-    return (u16)(n + networkPacket_getPayloadSize(self));
+    n += networkPacket_getPayloadSize(self);
+    return n;
 }
 
 /* The current message's payload, or NULL when no whole message is there. */
@@ -284,7 +290,7 @@ u8* networkPacket_getPayload(NetworkStreamWriter* self)
     if (self->used_0C - (self->message_10 - self->data_04) < networkPacket_getHeaderSize(self)) {
         return NULL;
     }
-    if (self->used_0C - (self->message_10 - self->data_04) < (u16)networkPacket_getMessageSize(self, 0xFF)) {
+    if (self->used_0C - (self->message_10 - self->data_04) < networkPacket_getMessageSize(self, 0xFF)) {
         return NULL;
     }
     return self->message_10 + networkPacket_getHeaderSize(self);
@@ -362,7 +368,7 @@ s32 networkPacket_takeByte(NetworkStreamWriter* self, u8* out)
 }
 
 /* The size of the current message counting only the parts `mask` selects. */
-u32 networkPacket_getMessageSize(NetworkStreamWriter* self, u32 mask)
+u16 networkPacket_getMessageSize(NetworkStreamWriter* self, u32 mask)
 {
     u16 size;
 
@@ -391,7 +397,7 @@ u16 networkPacket_getHeaderSize(NetworkStreamWriter* self)
     s32 block = networkPacket_getValueCount(self) ? 4 : 0;
     s32 stamp = networkPacket_hasTimestamp(self) ? 4 : 0;
 
-    return stamp + block + networkPacket_getValueCount(self) * 4 + 3;
+    return stamp + block + (networkPacket_getValueCount(self) * 4 + 3);
 }
 
 /* True when the current message carries user data. */
@@ -927,8 +933,8 @@ void networkStreamQueue_discard(NetworkStreamQueue* self, s32 bytes, u8 mask)
     removed = 0;
     networkPacket_bind(&packet, self->data_04, self->used_0C);
     while (networkPacket_hasMessage(&packet) != 0) {
-        bytes -= (u16)networkPacket_getMessageSize(&packet, mask);
-        removed += (u16)networkPacket_getMessageSize(&packet, 0xFF);
+        bytes -= networkPacket_getMessageSize(&packet, mask);
+        removed += networkPacket_getMessageSize(&packet, 0xFF);
         if (bytes <= 0) {
             break;
         }
@@ -968,8 +974,8 @@ u32 putTopPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame)
     s32 first;
     s32 expected;
     s32 size;
-    s32 skip;
     u32 result;
+    s32 skip;
 
     size = networkStreamReader_getPayloadSize(frame);
     networkStreamQueue_unwrapSequence(self, self->sequence_10, networkPacket_getSequenceA(frame), &expected, &first);
@@ -1085,7 +1091,7 @@ void networkStreamQueue_skipMessage(NetworkStreamQueue* self)
     if (networkPacket_hasMessage(&packet) == 0) {
         return;
     }
-    self->cursor_14 += (u16)networkPacket_getMessageSize(&packet, 0xFF);
+    self->cursor_14 += networkPacket_getMessageSize(&packet, 0xFF);
 }
 
 /* Binds `packet` to the bytes from the read cursor on. */

@@ -316,7 +316,7 @@ public:
     void writeOp2();
     void writeOp6(s8 value);
     void writeOp10(s8 index);
-    void writeOp11(s8 index, const NetworkUniqueId* address, u32 nonce, s8 kind, f32 delay);
+    void writeOp11(s8 index, const NetworkUniqueId* address, u32 nonce, f32 delay, u8 kind);
     void writeOp8or9(u32 hasExtra, s8 index);
     void writeOp3(const NetworkSessionSlot* slot);
     void writeOp5(s8 index);
