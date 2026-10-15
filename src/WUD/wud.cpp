@@ -36,8 +36,7 @@
  *   dump name is stale) and `BTA_DisableBluetooth` (0x8047D718, after `BTA_EnableBluetooth` in the bta_dm_api order); the
  *   variables `wudInquiryResult`, `wudStackReady`, `wudTraceLevel`, `wudWbcInitCallback`, `wudInquiryRssi`, `wudInquiryCount`,
  *   `wudWbcWorkArea` (the 0x4B000-byte, 32-aligned save file buffer) and the `wudPatch*` state; the .data arrays
- *   `wudHidDescriptor`, `wudSetupCommand`, `wudPatchImage`, `wudPatchTable` and `wudSearchCancelCommand` (the map still has
- *   one 0x21C-byte `wudFirmwareData` row over them, request sdk-wud#1); the `WUDCB` fields `linkKeyAddr`, `hostAddr`,
+ *   `wudHidDescriptor`, `wudSetupCommand`, `wudPatchImage`, `wudPatchTable` and `wudSearchCancelCommand`; the `WUDCB` fields `linkKeyAddr`, `hostAddr`,
  *   `vendorEventStatus`, `syncRssiThreshold`, `enabledProfiles`, `linkKeyState`, `initFlushState`, `initState`, `shutdownState`,
  *   `wbcCount` and the `WUDDevice` fields `pinPending` and `linkKeyState` (WUD/wud.h); the .bss objects `wudBtCmpDeviceInfo`,
  *   `wudNandFileInfo`, `wudNandBlock` and the file-local types `WUDSc*`, `WUDWiiFitSaveData`, `WUDWiiFitFile`, `WUDPatchTable`,
