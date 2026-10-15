@@ -230,7 +230,7 @@ that predicts the DOL. The ledger should print both, plus a coarse spatial burn-
 
 ## 7. Addendum: relocating the tree (2026-09-22, D: -> C:)
 
-The repo was moved from `<dump-dir>\mhtri-dtk` to
+The repo was moved from `<old-checkout>` to
 `<home>\Documents\Development\mhtri-dtk` while this campaign was running, which turned out to be a
 useful stress test of the build - and produced three facts worth keeping.
 

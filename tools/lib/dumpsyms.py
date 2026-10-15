@@ -7,7 +7,8 @@ import os
 import re
 import zipfile
 
-DEFAULT_DUMP = os.environ.get("MHTRI_DUMP_SYMBOLS", "<dump-dir>/DumpSymbols.zip")
+# The dump zip comes only from the environment (owner, 2026-10-15): no machine path is hard-coded.
+DEFAULT_DUMP = os.environ.get("MHTRI_DUMP_SYMBOLS")
 
 # `NAME ADDR FLAG`, the flag glued to the next entry's name when the dumper lost a newline.
 ENTRY_RE = re.compile(r"(?P<name>\S.*?)\s+(?P<addr>[0-9a-fA-F]{8})\s+(?P<flag>[fl])")
@@ -82,8 +83,10 @@ def index_by_address(entries: list[dict]) -> dict[int, list[dict]]:
     return index
 
 
-def load_dump(path: str = DEFAULT_DUMP, member: str | None = None) -> tuple[dict[int, list[dict]], str]:
+def load_dump(path: str | None = DEFAULT_DUMP, member: str | None = None) -> tuple[dict[int, list[dict]], str]:
     """Read the dump's `.map` member into an address index.  Raises SystemExit on a bad path."""
+    if not path:
+        raise SystemExit("dump not configured: set $MHTRI_DUMP_SYMBOLS or pass --dump (see docs/memory-dump.md)")
     if not os.path.exists(path):
         raise SystemExit("dump not found: %s (see docs/memory-dump.md; override with --dump)" % path)
     with zipfile.ZipFile(path) as z:

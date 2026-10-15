@@ -14,7 +14,7 @@
  *
  * Evidence classes: the runtime dump's own local names (`arena_work`, `arena_draw_func`, `que_info`,
  * `arena_lsp_data_adrs`, `multi_arena_clr_time` and the `arena_multi_*` tables) come from
- * `<dump-dir>/Dump_Loading85.raw.map`; every field name is derived from the body that reads it,
+ * `$MHTRI_DUMP_MAP (Dump_Loading85.raw.map)`; every field name is derived from the body that reads it,
  * and the two `.bss` vector names are marked a GUESS in the unit header (`NAMES`).
  */
 #ifndef MHTRI_UNSPLIT_ARENA_H

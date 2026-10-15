@@ -25,7 +25,8 @@ from tools.lib.project import SymbolMap  # the one map parser - never read symbo
 HERE = os.path.dirname(os.path.abspath(__file__))
 SYMBOLS_REL = os.path.join("config", "RMHE08", "symbols.txt")
 DOL_REL = os.path.join("orig", "RMHE08", "sys", "main.dol")
-DUMP_PATHS = ("<dump-dir>/DumpSymbols.zip", "<dump-dir>/Dump_Loading85.raw.map")
+# The dump comes only from the environment (owner, 2026-10-15): no machine path is hard-coded.
+DUMP_PATHS = tuple(p for p in (os.environ.get("MHTRI_DUMP_SYMBOLS"), os.environ.get("MHTRI_DUMP_MAP")) if p)
 DUMP_MEMBER = "Dump_Loading85.raw.map"
 UNNAMED = re.compile(r"^fn_[0-9A-Fa-f]{8}$")
 MAX_SIZE = 8
@@ -145,7 +146,7 @@ class DumpMap:
 
 
 def find_dump(path: str | None = None) -> str | None:
-    """Resolve `--dump`: an explicit path, `$MH3_DUMP_MAP`, then the known 2021 dump locations."""
+    """Resolve `--dump`: an explicit path, `$MH3_DUMP_MAP`, then `$MHTRI_DUMP_SYMBOLS` / `$MHTRI_DUMP_MAP`."""
     if path and path != "auto":
         return path if os.path.exists(path) else None
     candidates = [os.environ.get("MH3_DUMP_MAP")] + list(DUMP_PATHS)

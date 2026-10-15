@@ -12,7 +12,7 @@ annotations on them are not.
 
 ## Where it is
 
-* Ghidra project `MH3Shared` (`<dump-dir>\Decompilation\MH3Shared`), program
+* Ghidra project `MH3Shared` (`<ghidra-projects>/MH3Shared`), program
   `/DolphinDump85.raw.keep` - a raw binary, language `PowerPC:BE:32:Gekko_Broadway`.
 * Dumped from `<dump-dir>/Dump_Loading85.raw`, i.e. a *loading-state* dump: it
   holds the DOL image and whatever the game had resident at that moment.
@@ -32,7 +32,7 @@ annotations on them are not.
 
 ## The symbol map of the same dump (`DumpSymbols.zip`)
 
-A second, cheaper oracle sits next to the dump: `<dump-dir>/DumpSymbols.zip` holds
+A second, cheaper oracle sits next to the dump: `$MHTRI_DUMP_SYMBOLS (DumpSymbols.zip)` holds
 `Dump_Loading85.raw.h` and `Dump_Loading85.raw.map` - **48 367 symbol lines** for the same
 loading-state dump, in Dolphin's map format:
 
@@ -55,7 +55,7 @@ epilogue MWCC emits after a `mtctr`/`bctr` tail-call dispatcher: merging each in
 (map sizes +4, symbols deleted) closed four of them outright;
 * **a signature**, since the argument list is demangled (`kbd_init(unsigned`, `set_kbd_param(char`).
 
-Read it with `python -c "import zipfile;z=zipfile.ZipFile('<dump-dir>/DumpSymbols.zip');
+Read it with `python -c "import zipfile;z=zipfile.ZipFile(__import__('os').environ['MHTRI_DUMP_SYMBOLS']);
 print(z.read('Dump_Loading85.raw.map').decode('latin-1'))"` - or grep the `.map` member without extracting
 it. It is **not** codegen evidence (same rule as the dump itself), and a name it does not have is not
 proof of anything: `zz_` means "unnamed", not "absent".

@@ -26,7 +26,8 @@ GAME = "RMHE08"
 DOL_REL = os.path.join("orig", GAME, "sys", "main.dol")
 # The shared runtime dump's symbol map is the cheap name oracle (docs/memory-dump.md). Overridable so
 # the tool degrades to "no names" instead of failing on a machine that does not have it.
-DUMP_ZIP = os.environ.get("MH3_DUMP_SYMBOLS", r"<dump-dir>/DumpSymbols.zip")
+# The dump zip comes only from the environment (owner, 2026-10-15): no machine path is hard-coded.
+DUMP_ZIP = os.environ.get("MHTRI_DUMP_SYMBOLS") or os.environ.get("MH3_DUMP_SYMBOLS")
 
 # The relocation types MWCC emits in these objects. Type 109 (0x6D) is the EABI SDA21 form the
 # compiler uses for small-data/pool accesses; the rest are the standard PPC EABI names.
@@ -195,14 +196,14 @@ def dol_bytes(blob: bytes, sections: list[tuple[int, int, int]], address: int, l
     return None
 
 
-def dump_names(path: str = DUMP_ZIP) -> dict:
+def dump_names(path: str | None = DUMP_ZIP) -> dict:
     """`{address: name}` from the shared dump's Dolphin map - the cheap name oracle.
 
     Lines look like `RSOStaticLocateObject 804d9ec4 f` or `kbd_open(unsigned 80040798 f`: the name is
     the first token (demangled arguments stripped), the address is the one 8-hex token. `zz_<addr>_`
     is the dumper's own placeholder for an unnamed function and is treated as no name at all.
     """
-    if not os.path.exists(path):
+    if not path or not os.path.exists(path):
         return {}
     key = (path, os.path.getmtime(path))
     cached = _DUMP_CACHE.get(key)

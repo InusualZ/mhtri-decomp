@@ -29,7 +29,7 @@ Inputs -> outputs: symbols.txt + DumpSymbols.zip -> rows.
 
 ## Invariants and rules
 
-* docs/plan.md 7.7. `<dump-dir>/DumpSymbols.zip` holds `Dump_Loading85.raw.map` - the loading-state dump's symbol table, 48 476 entries in Dolphin's map format (docs/memory-dump.md):
+* docs/plan.md 7.7. `$MHTRI_DUMP_SYMBOLS (DumpSymbols.zip)` holds `Dump_Loading85.raw.map` - the loading-state dump's symbol table, 48 476 entries in Dolphin's map format (docs/memory-dump.md):
 ```
 CntSdRsoTerminate 800406ac f     # name [demangled argument list] address flags; `f` = function
 kbd_open(unsigned 80040798 f     # the demangled argument list is truncated at the first comma

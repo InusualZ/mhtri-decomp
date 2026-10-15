@@ -16,7 +16,7 @@ None (library).
 
 ## Inputs and outputs
 
-`load_dump(path=DEFAULT_DUMP, member=None)` reads the zip (`$MHTRI_DUMP_SYMBOLS` or `<dump-dir>/DumpSymbols.zip`)
+`load_dump(path=DEFAULT_DUMP, member=None)` reads the zip (`$MHTRI_DUMP_SYMBOLS` or `$MHTRI_DUMP_SYMBOLS (DumpSymbols.zip)`)
 and returns `(index, member)`; it raises SystemExit naming the path or the member when either is missing. Writes nothing.
 
 ## Invariants and rules

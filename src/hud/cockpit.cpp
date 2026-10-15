@@ -17,7 +17,7 @@
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py lookup + the Dolphin dump map at
- * <dump-dir>/DumpSymbols.zip: every defined symbol in the range is a bare `fn_`/`zz_`
+ * $MHTRI_DUMP_SYMBOLS (DumpSymbols.zip): every defined symbol in the range is a bare `fn_`/`zz_`
  * entry, and no `__FILE__` string covers it), so the file keeps the map's stem.
  *
  * Seam, module and language:

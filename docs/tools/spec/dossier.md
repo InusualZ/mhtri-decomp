@@ -37,7 +37,7 @@ Inputs -> outputs: target .o, DOL, map, dump -> page/JSON.
 | jump tables | dense 4-byte `.data`/`.rodata` relocations | the switch structure, including the case count |
 | section layout | the object's section headers | the exception/constructor structure and the unit's extent |
 | blanks | what is *not* there | a name with no dump entry, a signature with no callers, a type with no size evidence |
-* The other oracle (`<dump-dir>/DumpSymbols.zip`, `docs/memory-dump.md`) is consulted for names only - never for codegen. A name it does not have is reported in the blanks section, not guessed.
+* The other oracle (`$MHTRI_DUMP_SYMBOLS (DumpSymbols.zip)`, `docs/memory-dump.md`) is consulted for names only - never for codegen. A name it does not have is reported in the blanks section, not guessed.
 * Read-only: no `ninja`, no compile, no link, no write to any shared file.
 
 ## Lib dependencies

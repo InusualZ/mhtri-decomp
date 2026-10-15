@@ -37,7 +37,7 @@
  * definition, in the owner's header (rule 1). */
 
 /* The enemy work object.  Only the bytes this unit reads are named; the full 0x300-byte record is the
- * enemy units' (`<dump-dir>/MH3Disassembly/_ENEMY_WORK.h` gives the size, from the memset at
+ * enemy units' (`<disassembly>/_ENEMY_WORK.h` gives the size, from the memset at
  * 0x802FFD98).  size: 0x300 */
 typedef struct _ENEMY_WORK {
     /* +0x000 */ u8 pad_0x000[0x188];
