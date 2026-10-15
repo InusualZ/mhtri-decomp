@@ -36,17 +36,8 @@ typedef struct NetUserProfile {
     /* +0xFA */ u8 pad_0xFA[0x6];
 } NetUserProfile; /* size: 0x100 */
 
-/* One kind/value pair of the presence record the layer is sent. */
-typedef struct NetStatusPair {
-    /* +0x00 */ s32 kind_0x00;
-    /* +0x04 */ s32 value_0x04;
-} NetStatusPair; /* size: 0x8 */
-
-/* The presence record (`.bss` 0x806E1870): the pair count and four pairs.  size: 0x24 */
-typedef struct NetStatusRecord {
-    /* +0x00 */ s32 count_0x00;
-    /* +0x04 */ NetStatusPair pairs_0x04[4];
-} NetStatusRecord; /* size: 0x24 */
+/* The presence record (`.bss` 0x806E1870) is the layer's `NetLayerSettings` (`Network/NetworkLayerPat.h`). */
+struct NetLayerSettings;
 
 /* The peer card `copyPeerProfileCard` fills from the community peer record (the menu units' hunter card): the name,
  * the id text, the profile's id, rank and level bytes, its nine equipment records in card order, its comment, the
@@ -69,26 +60,14 @@ typedef struct NetPeerCard {
     /* +0x211 */ u8 status_0x211;
 } NetPeerCard; /* size: 0x212 */
 
-/* The community layer's state block (`.bss` 0x806E18A0, 0x26C B): community command 17 delivers it whole.  It is
- * the `NetworkCommunityPeer` record (`Network/NetworkCommunityPat.h`) viewed with this player's profile bytes typed
- * (+0x28); the static initialiser 0x80437204 builds it with that record's constructor.  size: 0x26C */
-typedef struct NetCommunityState {
-    /* +0x000 */ u8 pad_0x000[0x28];
-    /* +0x028 */ NetUserProfile profile_0x028;
-    /* +0x128 */ u8 block_0x128[0x44];
-    /* +0x16C */ u8 members_0x16C[3][0x40];   /* three names of at most 63 characters */
-    /* +0x22C */ u8 is_remote_0x22C;
-    /* +0x22D */ char title_0x22D[0x20];
-    /* +0x24D */ char name_0x24D[0x14];
-    /* +0x261 */ char tag_0x261[1];
-    /* +0x262 */ u8 pad_0x262[0x2];
-    /* +0x264 */ u32 value_0x264;
-    /* +0x268 */ u32 value_0x268;
-} NetCommunityState; /* size: 0x26C */
+/* The community layer's state block (`.bss` 0x806E18A0, 0x26C B): the `NetworkCommunityPeer` record
+ * (`Network/NetworkCommunityPat.h`) community command 17 delivers whole; its profile bytes (+0x28) are this player's
+ * `NetUserProfile`.  The static initialiser 0x80437204 builds it with the record's implicit constructor. */
+struct NetworkCommunityPeer;
 
 extern NetUserProfile net_user_profile;
-extern NetStatusRecord net_presence_record;
-extern NetCommunityState net_community_state;
+extern struct NetLayerSettings net_presence_record;
+extern struct NetworkCommunityPeer net_community_state;
 /* 0x806E1B18 - the unique id the peer-profile and peer-message requests import their id text into (the static
  * initialiser constructs it). */
 extern NetworkUniqueId net_peer_address;
