@@ -121,11 +121,13 @@ struct ResMatChanData {
     ResMatChanData& operator=(const ResMatChanData& rhs);
 };
 
-/* The fur parameters of a material.  size: 0xC (a lower bound: only the words below are reached) */
+/* The fur parameters of a material.  size: 0x14 (a lower bound: only the words below are reached) */
 struct ResMatFurData {
-    /* +0x0 */ u32 pad_0x0;
-    /* +0x4 */ u32 numLayer;
-    /* +0x8 */ s32 layerRatioMode;   /* 0: linear, 1: a power curve */
+    /* +0x00 */ u32 pad_0x0;
+    /* +0x04 */ u32 numLayer;
+    /* +0x08 */ s32 layerRatioMode;   /* 0: linear, 1: a power curve */
+    /* +0x0C */ f32 alphaPowExp;      /* the layer ratio's exponent for the fur colour's alpha blend */
+    /* +0x10 */ f32 colorPowExp;      /* the layer ratio's exponent for the channel colour's attenuation */
 };
 
 /* One texture of a material and how it is sampled.  size: 0x34 */
@@ -397,6 +399,8 @@ public:
     ResMatTevColor GetResMatTevColor();
     ResMatIndMtxAndScale GetResMatIndMtxAndScale();
     ResMatTexCoordGen GetResMatTexCoordGen();
+    /* Whether both handles name the same block; `g3d/g3d_draw.cpp` keeps the copy. */
+    bool operator==(const ResMat& rhs) const;
 };
 
 /* size: 0x4 */

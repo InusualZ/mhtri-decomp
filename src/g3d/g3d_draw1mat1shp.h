@@ -14,8 +14,6 @@ extern "C" {
 void GDWriteXFCmd(u16 addr, u32 value);
 /* 0x8007740C - writes a colour channel's material colour (caller: g3d/g3d_state.cpp). */
 void g3d_gd_set_chan_mat_color(u32 chan, GXColor color);
-/* 0x80077590 (0x30): copy-constructs the material's misc block handle (`g3d/g3d_draw.cpp`'s fn_800777B0 calls it). */
-s32 res_mat_misc_copy_ctor(s32 pDst, const s32* pSrc);
 
 #ifdef __cplusplus
 }
@@ -27,6 +25,45 @@ namespace math {
 f32 FPow(f32 x, f32 y);
 
 }  // namespace math
+}  // namespace nw4r
+
+#include "g3d/g3d_resmat.h"
+#include "g3d/g3d_resshp.h"
+#include "g3d/g3d_resvtx.h"
+
+class G3dIndMtxCallback;
+
+namespace nw4r {
+namespace g3d {
+
+/* The material handles a replacement block swaps in for one draw (`g3d/g3d_draw.cpp` builds it, 0x80078DC0, and
+ * refills it per material, 0x80077E70): one handle per resource kind, then the three vertex-table arrays the
+ * replacement carries.  size: 0x38 */
+struct Draw1Mat1ShpSwap {
+    /* +0x00 */ ResTexObj texObj;
+    /* +0x04 */ ResTlutObj tlutObj;
+    /* +0x08 */ ResGenMode genMode;
+    /* +0x0C */ ResTev tev;
+    /* +0x10 */ ResMatPix pix;
+    /* +0x14 */ ResMatTevColor tevColor;
+    /* +0x18 */ ResMatIndMtxAndScale indMtxAndScale;
+    /* +0x1C */ ResMatChan chan;
+    /* +0x20 */ ResMatTexCoordGen texCoordGen;
+    /* +0x24 */ ResMatMisc misc;
+    /* +0x28 */ ResTexSrt texSrt;
+    /* +0x2C */ ResVtxPosData** vtxPosTable;   /* per vertex-position id; NULL = the model's own */
+    /* +0x30 */ ResVtxNrmData** vtxNrmTable;
+    /* +0x34 */ ResVtxClrData** vtxClrTable;
+
+    Draw1Mat1ShpSwap();
+};
+
+/* 0x800769F4 - draws one shape with one material: loads the material state (or the swap's replacements), the
+ * matrices and the indirect matrices, then the shape's display lists. */
+void Draw1Mat1ShpDirectly(ResMat mat, ResShp shp, const math::MTX34* pViewPos, const math::MTX34* pViewNrm, u32 ctrl,
+                          Draw1Mat1ShpSwap* pSwap, G3dIndMtxCallback* pIndMtxOp);
+
+}  // namespace g3d
 }  // namespace nw4r
 #endif
 

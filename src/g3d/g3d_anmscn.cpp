@@ -108,15 +108,12 @@ extern "C" u32 fn_80090860(const ResHandle *p);
 
 /* This unit's own accessor copies, declared ahead of the definitions (which follow retail's address order). */
 extern "C" {
-void fn_80064BD4(LightObj *p);
 void fn_80064BE4(LightObj *p);
 void fn_80064BF4(LightObj *p);
 void fn_80064C04(LightObj *self, const math::VEC3 *v);
 void fn_80064CE0(LightObj *self, const math::VEC3 *v);
-void fn_800651A4(LightObj *p);
 u32 *fn_800651E8(const LightSetting *p);
 void fn_800651F0(LightSet *dst, const LightSet *src);
-s32 fn_80065204(const LightSet *p);
 void fn_8006522C(LightSet *out, LightSetting *self, s32 index);
 u32 fn_8006527C(const LightSetting *p);
 LightSet *obj_delete_flagged(LightSet *pSelf, s16 flag);
@@ -207,13 +204,13 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
 {
     s32 type = pResult->flags & LightAnmResult::FLAG_LIGHT_TYPE_MASK;
 
-    light_obj_clear(pObj);
+    pObj->Clear();
     switch (type) {
     case 0:
-        light_obj_init_light_color(pObj, pResult->color);
+        pObj->InitLightColor(pResult->color);
         fn_80064C14(pObj, &pResult->pos.x);
-        light_obj_init_light_spot(pObj, 0.0f, 0);
-        light_obj_init_light_dist_attn(pObj, pResult->refDistance, pResult->refBrightness, pResult->distFunc);
+        pObj->InitLightSpot(0.0f, 0);
+        pObj->InitLightDistAttn(pResult->refDistance, pResult->refBrightness, pResult->distFunc);
         fn_8007A5E4(pObj, 0.0f, 0.0f, 0.0f);
         break;
     case 1: {
@@ -222,10 +219,10 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
 
         subVec3(&dir, &pResult->aim, &pResult->pos);
         vec3_scale(&pos, &dir, -1.0e10f);
-        light_obj_init_light_color(pObj, pResult->color);
+        pObj->InitLightColor(pResult->color);
         fn_80064C14(pObj, &pos.x);
-        light_obj_init_light_attn_a(pObj, 1.0f, 0.0f, 0.0f);
-        light_obj_init_light_attn_k(pObj, 1.0f, 0.0f, 0.0f);
+        pObj->InitLightAttnA(1.0f, 0.0f, 0.0f);
+        pObj->InitLightAttnK(1.0f, 0.0f, 0.0f);
         fn_8007A5E4(pObj, 0.0f, 0.0f, 0.0f);
         break;
     }
@@ -234,10 +231,10 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
 
         subVec3(&dir, &pResult->aim, &pResult->pos);
         vec3_normalize_into(&dir, &dir);
-        light_obj_init_light_color(pObj, pResult->color);
+        pObj->InitLightColor(pResult->color);
         fn_80064C14(pObj, &pResult->pos.x);
-        light_obj_init_light_spot(pObj, pResult->cutoff, pResult->spotFunc);
-        light_obj_init_light_dist_attn(pObj, pResult->refDistance, pResult->refBrightness, pResult->distFunc);
+        pObj->InitLightSpot(pResult->cutoff, pResult->spotFunc);
+        pObj->InitLightDistAttn(pResult->refDistance, pResult->refBrightness, pResult->distFunc);
         fn_80064C04(pObj, &dir);
         break;
     }
@@ -251,7 +248,7 @@ void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
     if (!(pResult->flags & LightAnmResult::FLAG_ALPHA_ENABLE)) {
         fn_80064BE4(pObj);
     }
-    fn_80064BD4(pObj);
+    light_obj_enable(pObj);
 }
 
 /* 0x80064C24 (0xBC): builds the specular light object from a light animation result. */
@@ -261,17 +258,17 @@ void MakeSpecularLightObj(LightObj *pObj, const LightAnmResult *pResult)
 
     subVec3(&dir, &pResult->aim, &pResult->pos);
     vec3_normalize_into(&dir, &dir);
-    light_obj_clear(pObj);
-    light_obj_init_light_color(pObj, pResult->specColor);
+    pObj->Clear();
+    pObj->InitLightColor(pResult->specColor);
     fn_80064CE0(pObj, &dir);
-    light_obj_init_light_shininess(pObj, pResult->shininess);
+    pObj->InitLightShininess(pResult->shininess);
     if (!(pResult->flags & LightAnmResult::FLAG_COLOR_ENABLE)) {
         fn_80064BF4(pObj);
     }
     if (!(pResult->flags & LightAnmResult::FLAG_ALPHA_ENABLE)) {
         fn_80064BE4(pObj);
     }
-    fn_80064BD4(pObj);
+    light_obj_enable(pObj);
 }
 
 }  // namespace
@@ -279,19 +276,19 @@ void MakeSpecularLightObj(LightObj *pObj, const LightAnmResult *pResult)
 }  // namespace nw4r
 
 /* Sets the light object's enable bit. */
-extern "C" void fn_80064BD4(LightObj *p)
+extern "C" void light_obj_enable(LightObj *p)
 {
-    p->mFlags |= 4;
+    p->mFlag |= 4;
 }
 
 extern "C" void fn_80064BE4(LightObj *p)
 {
-    p->mFlags |= 0x20;
+    p->mFlag |= 0x20;
 }
 
 extern "C" void fn_80064BF4(LightObj *p)
 {
-    p->mFlags |= 0x10;
+    p->mFlag |= 0x10;
 }
 
 /* The three-float setter forwarders. */
@@ -335,7 +332,7 @@ void AnmScn::GetLightSetting(LightSetting *pSetting)
             LightSet arg;
 
             fn_8006522C(&set, pSetting, i);
-            NW4R_ASSERT(fn_80065204(&set), ANMSCN_FILE, 198, "NW4R:Failed assertion lightSet.IsValid()");
+            NW4R_ASSERT(light_set_is_valid(&set), ANMSCN_FILE, 198, "NW4R:Failed assertion lightSet.IsValid()");
             fn_800651F0(&arg, &set);
             GetLightSet(arg, i);
             obj_delete_flagged(&arg, -1);
@@ -363,7 +360,7 @@ void AnmScn::GetLightSetting(LightSetting *pSetting)
         u32 i;
 
         for (i = 0; i < numDiffuse; i++) {
-            fn_800651A4(&pLightObj[i]);
+            light_obj_disable(&pLightObj[i]);
         }
         for (i = 0; i < numDiffuse; i++) {
             LightObj *pSpec = NULL;
@@ -385,14 +382,14 @@ void AnmScn::GetLightSetting(LightSetting *pSetting)
 /* Whether the light object is enabled. */
 extern "C" s32 light_obj_is_enable(const LightObj *p)
 {
-    u32 masked = p->mFlags & 4;
+    u32 masked = p->mFlag & 4;
     return masked != 0;
 }
 
 /* Clears the light object's enable bit. */
-extern "C" void fn_800651A4(LightObj *p)
+extern "C" void light_obj_disable(LightObj *p)
 {
-    p->mFlags &= ~0x4u;
+    p->mFlag &= ~0x4u;
 }
 
 extern "C" LightObj *light_setting_get_light_obj_array(const LightSetting *p)
@@ -408,12 +405,12 @@ extern "C" u32 fn_800651BC(void *self)
 
 extern "C" u32 light_setting_get_num_light_obj(const LightSetting *p)
 {
-    return p->mNumLightObj;
+    return p->mNumLight;
 }
 
 extern "C" u32 *fn_800651E8(const LightSetting *p)
 {
-    return p->mpAmbLightColorArray;
+    return (u32 *)p->mpAmbLightObjArray;
 }
 
 /* Copies a light set view. */
@@ -424,7 +421,7 @@ extern "C" void fn_800651F0(LightSet *dst, const LightSet *src)
 }
 
 /* Whether the light set view names a setting and a record. */
-extern "C" s32 fn_80065204(const LightSet *p)
+extern "C" s32 light_set_is_valid(const LightSet *p)
 {
     s32 ret = 0;
     if (p->mpSetting != 0 && p->mpLightSetData != 0)
@@ -877,25 +874,25 @@ bool AnmScnRes::GetLightSet(LightSet &set, u32 refNumber)
             ResHandle resLight;
             fn_80066F64(&resLight, res_anm_scn_get_res_anm_light(&mRes, lightID));
             NW4R_ASSERT(fn_80066F50(&resLight), ANMSCN_FILE, 1329, "NW4R:Failed assertion resLight.IsValid()");
-            light_set_select_light_obj(&set, i, fn_80066F2C(&resLight));
+            set.SelectLightObj(i, fn_80066F2C(&resLight));
             if (res_anm_light_config_test_flag8(&resLight)) {
-                light_set_select_light_obj(&set, specIdx--, fn_80066E5C(&resLight));
+                set.SelectLightObj(specIdx--, fn_80066E5C(&resLight));
             }
         } else {
-            light_set_select_light_obj(&set, i, -1);
+            set.SelectLightObj(i, -1);
         }
     }
     for (; numLight <= specIdx; numLight++) {
-        light_set_select_light_obj(&set, numLight, -1);
+        set.SelectLightObj(numLight, -1);
     }
 
     if (fn_80066E2C(&resLightSet)) {
         ResHandle resAmb;
         fn_80066D18(&resAmb, res_anm_scn_get_res_anm_amb_light(&mRes, fn_80066D54(&resLightSet)));
         NW4R_ASSERT(fn_80066D04(&resAmb), ANMSCN_FILE, 1364, "NW4R:Failed assertion resAmb.IsValid()");
-        light_set_select_amb_light_obj(&set, fn_80066C68(&resAmb));
+        set.SelectAmbLightObj(fn_80066C68(&resAmb));
     } else {
-        light_set_select_amb_light_obj(&set, -1);
+        set.SelectAmbLightObj(-1);
     }
     return true;
 }
@@ -1109,17 +1106,17 @@ void AnmScnRes::GetLight(LightObj *pDiff, LightObj *pSpec, u32 refNumber)
             if (pResult->flags & LightAnmResult::FLAG_SPECULAR_ENABLE) {
                 MakeSpecularLightObj(pSpec, pResult);
             } else {
-                fn_800651A4(pSpec);
+                light_obj_disable(pSpec);
             }
         }
     } else {
         if (pDiff != NULL) {
             G3D_POINTER_ASSERT(ANMSCN_FILE, pDiff, 1439, "NW4R:Pointer Error\ndiff(=%p) is not valid pointer.");
-            fn_800651A4(pDiff);
+            light_obj_disable(pDiff);
         }
         if (pSpec != NULL) {
             G3D_POINTER_ASSERT(ANMSCN_FILE, pSpec, 1444, "NW4R:Pointer Error\nspec(=%p) is not valid pointer.");
-            fn_800651A4(pSpec);
+            light_obj_disable(pSpec);
         }
     }
 }
@@ -1157,9 +1154,9 @@ extern "C" void fog_set_color(Fog *self, GXColor color)
         color_rgba_copy((u8 *)fog_ptr(self) + 20, (const u8 *)&color);
 }
 
-extern "C" u32 fog_ptr(const Fog *p)
+extern "C" FogData *fog_ptr(const Fog *p)
 {
-    return (u32)p->mpFogData;
+    return p->mpFogData;
 }
 
 /* The fog record's z range. */

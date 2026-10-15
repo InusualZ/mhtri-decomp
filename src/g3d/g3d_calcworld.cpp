@@ -63,7 +63,6 @@ extern "C" void vec3_add_ps(void* pOut, const void* pIn);
 extern "C" s32 res_node_is_valid(const void* p);
 extern "C" f32* fn_8005CED0(void);
 extern "C" u32* fn_8005CEDC(void);
-extern "C" void* res_node_get_id(const void* p);
 extern "C" ResNodeData* res_node_ptr(const void* p);
 extern "C" void chr_anm_result_init(void* pOut);
 extern "C" void* fn_8008E1C0(void* pOut, const void* pIn);
@@ -251,7 +250,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                 if (pNodeCallback != NULL) {
                     void* (*pGetRec)(void*, NodeMtxRec*, void*) =
                         (void* (*)(void*, NodeMtxRec*, void*))pNodeCallback->mpVtbl[14];
-                    pRec = (NodeMtxRec*)pGetRec(pNodeCallback, &rec, res_node_get_id(&s1C));
+                    pRec = (NodeMtxRec*)pGetRec(pNodeCallback, &rec, (void*)res_node_get_id((const ResHandle*)&s1C));
                 }
                 s32 reset;
                 if (pNodeCallback == NULL || pRec->mUnk00 == 0) {

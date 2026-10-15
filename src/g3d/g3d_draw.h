@@ -1,4 +1,4 @@
-/* g3d/g3d_draw.h - the cross-unit declarations of `g3d/g3d_draw.cpp` (C linkage, plain map stems). */
+/* g3d/g3d_draw.h - the cross-unit declarations of `g3d/g3d_draw.cpp` (C linkage, the names its consumers call). */
 #ifndef MHTRI_G3D_G3D_DRAW_H
 #define MHTRI_G3D_G3D_DRAW_H
 
@@ -16,12 +16,9 @@ void mtx34_set(Mtx34* dst, f32 m00, f32 m01, f32 m02, f32 m03,
                  f32 m10, f32 m11, f32 m12, f32 m13,
                  f32 m20, f32 m21, f32 m22, f32 m23);
 
-/* The ScnMdl/ScnMdlSimple material and draw-buffer helpers `g3d/g3d_scnmdl.cpp` calls. */
-s32 fn_80077E34(s32 pOut, void* pIn);  /* 0x80077E34 - builds the model view the node walks read */
-
-s32 fn_80078904(s32 pNode);            /* 0x80078904 - the node's visibility test */
-
-
+/* The ResMdl copy constructor and ResNode::IsVisible copies `g3d/g3d_scnmdl.cpp` calls. */
+s32 fn_80077E34(s32 pOut, void* pIn); /* 0x80077E34 */ /* untyped: opaque handle - the source ResMdl */
+bool fn_80078904(s32 pNode);          /* 0x80078904 */
 
 #ifdef __cplusplus
 }
@@ -41,8 +38,8 @@ struct G3dLightObj;
 
 /* 0x80077D4C/0x80077D64 - whether the light object is a specular light / a point light (caller:
  * g3d/g3d_state.cpp). */
-extern "C" BOOL light_obj_is_specular_light(const G3dLightObj* pSelf);
-extern "C" BOOL light_obj_is_point_light(const G3dLightObj* pSelf);
+extern "C" s32 light_obj_is_specular_light(const G3dLightObj* pSelf);
+extern "C" s32 light_obj_is_point_light(const G3dLightObj* pSelf);
 /* 0x80077DBC - writes the negation of `pIn` to `pOut`. */
 extern "C" void vec3_negate(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
 #endif

@@ -46,11 +46,16 @@ class ResMatIndMtxAndScale;
 class ResMatTexCoordGen;
 class ResMatTevColor;
 class ResMatChan;
+class ResShp;
 }  // namespace g3d
 }  // namespace nw4r
 
 struct G3dIndMtxOp;
 class G3dIndMtxCallback;
+
+/* 0x80087AD0 - loads the shape's primitives with the view position and normal matrices. */
+extern "C" void g3d_state_load_shp_prim(nw4r::g3d::ResShp shp, const nw4r::math::MTX34* pViewPos,
+                                        const nw4r::math::MTX34* pViewNrm);
 struct Mat33;
 
 /* The material loaders `g3d/g3d_draw1mat1shp.cpp`'s draw path calls (C linkage: the map's names are plain). */
@@ -77,6 +82,11 @@ void g3d_state_load_tex_coord_gen(nw4r::g3d::ResMatTexCoordGen texCoordGen);
 Mat33* g3d_state_get_nrm_mtx(u32 idx);
 G3dIndMtxCallback* g3d_state_get_ind_mtx_hook(void);
 nw4r::math::MTX34* g3d_state_get_camera_mtx(void);
+/* 0x80087DF8 - points the indexed matrix loads at the three view matrix arrays (`g3d/g3d_draw.cpp` sets and clears
+ * them around a draw). */
+void g3d_state_set_view_mtx_arrays(nw4r::math::MTX34* pPos, Mat33* pNrm, nw4r::math::MTX34* pTex);
+/* 0x80087978 - loads a shape's pre-primitive display list (`g3d/g3d_draw1mat1shp.cpp` calls it per draw). */
+void g3d_state_load_shp_pre_prim(const nw4r::g3d::ResShp shp);
 }
 
 /* The light, camera and fog setters `g3d/g3d_scnroot.cpp`'s SetGlbSettings calls (C linkage: plain map names). */

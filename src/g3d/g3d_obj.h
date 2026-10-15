@@ -20,7 +20,7 @@ struct MEMAllocator;
 
 /* 0x8056F668 - the "G3dObj" type-name record (`.rodata`: a length word, then the NUL-terminated name) GetTypeObj
  * and `g3d/g3d_anmchr.cpp` read. */
-extern "C" u8 anm_typename_G3dObj[];
+extern "C" const u8 anm_typename_G3dObj[];
 
 namespace nw4r {
 namespace ut {

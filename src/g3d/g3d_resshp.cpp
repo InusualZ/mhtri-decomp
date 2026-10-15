@@ -303,7 +303,7 @@ u32 res_shp_get_vtx_pos(ResHandle* pSelf);
 u32 res_shp_get_vtx_nrm(ResHandle* pSelf);
 u32 res_shp_get_vtx_clr(ResHandle* pSelf, u32 idx);
 u32 fn_80099B10(ResHandle* pSelf, u32 idx);
-u32 fn_80099BB0(ResHandle* pSelf);
+u32 res_shp_get_vtx_fur_pos(ResHandle* pSelf);
 u32 fn_80099DD4(ResHandle* pSelf);
 u32 fn_80099DF8(ResHandle* pSelf);
 ResHandle* fn_80099E2C(ResHandle* pSelf, const ResHandle* pRhs);
@@ -429,7 +429,7 @@ extern "C" u32 fn_80099B10(ResHandle* pSelf, u32 idx) {
 }
 
 /* 0x80099BB0 - the shape's texture, or a null handle when it has none (`idTex == -1`). */
-extern "C" u32 fn_80099BB0(ResHandle* pSelf) {
+extern "C" u32 res_shp_get_vtx_fur_pos(ResHandle* pSelf) {
     const ResShpData* pData = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref();
 
     if (pData->idTex != -1) {

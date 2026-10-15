@@ -126,6 +126,7 @@
 #include "g3d/g3d_scnobj.h"     /* nw4r::g3d::ScnGroup, owned by g3d/g3d_scnobj.cpp (rule 2) */
 #include "g3d/g3d_resshp.h"     /* nw4r::g3d::ResTev (rule 2) */
 #include "g3d/g3d_state.h"
+#include "g3d/g3d_ind_mtx_callback.h" /* G3dIndMtxOp, G3dIndMtxCallback (rule 1) */
 #include "gx/fn_8009AA78.h"     /* GDSetTexCoordScale2, GDSetGenMode2 (rule 2) */
 #include "gx/GDSetIndTexMtx.h"  /* GDSetIndTexMtx, GDResetCurrentMtx (rule 2) */
 #include "draw_shape/mtx34_copy.h" /* mtx34_copy (rule 2) */
@@ -291,19 +292,6 @@ struct G3dTlutObjCache {
     /* +0x62 */ u8 pad_0x62[2];
 };
 
-/* The callback the material's indirect matrices are offered to before they load: `Exec` adds the callback's
- * matrices to the operation, `Reset` drops them and `SetNrmMapMtx` builds one from a light.  size: 0x4 */
-class G3dIndMtxCallback {
-public:
-    G3dIndMtxCallback();
-    virtual void Exec(struct G3dIndMtxOp* pOp) = 0;
-    virtual ~G3dIndMtxCallback();
-    virtual void Reset() = 0;
-    virtual void SetNrmMapMtx(_GXIndTexMtxID id, const nw4r::math::VEC3* pLightDir,
-                              const nw4r::math::MTX34* pNrmMtx,
-                              nw4r::g3d::ResMatMiscData::IndirectMethod method) = 0;
-};
-
 /* The state object's flag word carrier, read by `fn_800856A4`/`fn_800856B8`. */
 struct StateFlags {
     /* +0x00 */ u32 mFlags;
@@ -454,13 +442,14 @@ G3dLightTable::G3dLightTable() {
 /* 0x800854B8 (0x1E4): copies `pSetting` into the table, moves its lights into view space and loads the first eight
  * enabled lights into the GX light slots. */
 void g3d_light_table_set_setting(G3dLightTable* pSelf, const G3dLightSetting* pSetting) {
-    BOOL bResult = light_setting_import(&pSelf->setting, pSetting);
+    BOOL bResult = ((nw4r::g3d::LightSetting*)&pSelf->setting)->Import(*(const nw4r::g3d::LightSetting*)pSetting);
     if (!bResult) {
         nw4r::db::Panic("g3d_state.cpp", 0x501, "NW4R:Failed assertion bResult");
     }
     nw4r::math::MTX34* pCamera = g3d_state_get_camera_mtx();
     G3D_STATE_POINTER_ASSERT(pCamera, 0x504, "NW4R:Pointer Error\npCamera(=%p) is not valid pointer.");
-    light_setting_apply_view_mtx(&pSelf->setting, pCamera, light_setting_get_num_light_obj((const nw4r::g3d::LightSetting*)pSetting));
+    ((nw4r::g3d::LightSetting*)&pSelf->setting)
+        ->ApplyViewMtx(*pCamera, light_setting_get_num_light_obj((const nw4r::g3d::LightSetting*)pSetting));
     fn_80085478(pSelf);
     u32 numLightObj = light_setting_get_num_light_obj((const nw4r::g3d::LightSetting*)&pSelf->setting);
     u32 slot = 0;
@@ -474,6 +463,10 @@ void g3d_light_table_set_setting(G3dLightTable* pSelf, const G3dLightSetting* pS
         }
     }
 }
+
+/* The ambient colour copy is AmbLightObj's assignment, called out of line as retail does. */
+#pragma push
+#pragma dont_inline on
 
 /* 0x800856F4 (0x3D8): loads light set `idx` into the GX light slots (keeping lights already loaded) and returns its
  * four light masks and its ambient colour; past the table, no lights and a white ambient. */
@@ -502,7 +495,7 @@ void g3d_light_table_load_light_set(G3dLightTable* pSelf, s32 idx, u32* pMaskDif
         if (idxAmb < 0) {
             pAmb->r = pAmb->g = pAmb->b = pAmb->a = 0xFF;
         } else {
-            amb_light_obj_copy(pAmb, &pSelf->ambLight[idxAmb]);
+            *(nw4r::g3d::AmbLightObj*)pAmb = *(const nw4r::g3d::AmbLightObj*)&pSelf->ambLight[idxAmb];
         }
     }
     if (pSelf->loadedLightSet == idx) {
@@ -586,6 +579,7 @@ void g3d_light_table_load_light_set(G3dLightTable* pSelf, s32 idx, u32* pMaskDif
         *pMaskSpecAlpha = pSelf->maskSpecAlpha;
     }
 }
+#pragma pop
 
 /* 0x80085ACC (0x2C): returns the number of bytes from `first` to `last`. */
 s32 g3d_distance(const s8* first, const s8* last) {
@@ -779,13 +773,6 @@ void fn_800868A0(u32 value) {
 /* The material-state caches: the indirect matrices, the z-compare location, the texture/TLUT object  */
 /* caches, the generation mode and the TEV/pixel/indirect display lists                              */
 /* ------------------------------------------------------------------------------------------------ */
-
-/* The indirect-matrix operation a material's `ResMatIndMtxAndScale` fills: a flag bit per matrix that is set,
- * and the three matrices.  size: 0x94 */
-struct G3dIndMtxOp {
-    /* +0x00 */ u32 flags;
-    /* +0x04 */ nw4r::math::MTX34 mtx[3];
-};
 
 /* The cached TEV (`g3d_state_cached_tev`): the TEV block last loaded.  size: 0x4 */
 struct G3dTevCache {
@@ -2016,10 +2003,10 @@ void g3d_tex_proj_env(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
             VEC3_ctor(&xAxis);
             VEC3_ctor(&yAxis);
             G3dLightObj* pLight = g3d_state_get_light_obj(lightIdx);
-            light_obj_get_light_dir((s32)pLight, (s32)&dir);
+            light_obj_get_light_dir((const nw4r::g3d::LightObj*)pLight, &dir);
             nw4r::math::MTX34* pInvCamera = g3d_state_get_inv_camera_mtx();
             if (light_obj_is_point_light(pLight) || (0.0f == dir.x && 0.0f == dir.y && 0.0f == dir.z)) {
-                light_obj_get_light_pos((s32)pLight, (s32)&dir);
+                light_obj_get_light_pos((const nw4r::g3d::LightObj*)pLight, &dir);
                 mtx34_rotate_vec3(&dir, pInvCamera, &dir);
                 nw4r::math::VEC3 neg;
                 vec3_negate(&neg, &dir);
@@ -2104,9 +2091,9 @@ void g3d_tex_proj_env_spec(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
         if ((u8)lightIdx <= 127 && light_obj_is_enable((const nw4r::g3d::LightObj*)g3d_state_get_light_obj(lightIdx))) {
             VEC3_ctor(&dir);
             G3dLightObj* pLight = g3d_state_get_light_obj(lightIdx);
-            light_obj_get_light_dir((s32)pLight, (s32)&dir);
+            light_obj_get_light_dir((const nw4r::g3d::LightObj*)pLight, &dir);
             if (light_obj_is_point_light(pLight) || (0.0f == dir.x && 0.0f == dir.y && 0.0f == dir.z)) {
-                light_obj_get_light_pos((s32)pLight, (s32)&dir);
+                light_obj_get_light_pos((const nw4r::g3d::LightObj*)pLight, &dir);
                 mtx34_rotate_vec3(&dir, pInvCamera, &dir);
                 vec3_negate(&negPos, &dir);
                 copyVec3(&dir, &negPos);
@@ -2293,7 +2280,7 @@ void g3d_fog_table_set_fog(G3dFogTable* pSelf, G3dFog fog, u32 idx) {
             }
             g3d_fog_table_invalidate(pSelf);
         }
-        fog_copy_to(&fog, &pSelf->fog[idx]);
+        ((const nw4r::g3d::Fog*)&fog)->CopyTo(&pSelf->fog[idx]);
     }
 }
 
@@ -2308,7 +2295,7 @@ void g3d_fog_table_load(G3dFogTable* pSelf, s32 idx) {
         GXColor color = {0, 0, 0, 0};
         GXSetFog(0, 0.0f, 0.0f, 0.0f, 0.0f, color);
     } else {
-        fog_set_gp((G3dFog*)fog_ctor((s32)&fog, &pSelf->fog[idx]));
+        ((const nw4r::g3d::Fog*)fog_ctor((s32)&fog, &pSelf->fog[idx]))->SetGP();
     }
     pSelf->flags |= 3;
     pSelf->fogIdx = idx;

@@ -171,7 +171,7 @@ extern "C" u8* fn_8005CEDC(void)
     return lbl_8066AE80 + 0x6000;
 }
 
-extern "C" u8* fn_8005CEEC(void)
+extern "C" u8* workmem_get_mdl_z_temporary(void)
 {
     return lbl_8066AE80;
 }

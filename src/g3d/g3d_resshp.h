@@ -73,6 +73,8 @@ public:
     bool IsVtxAttrEnabled(u32 attr) const;
     void CallPrePrimitiveDisplayList(bool bSync, bool bSkipHeader) const;
     void CallPrimitiveDisplayList(bool bSync) const;
+    /* Whether the shape is drawn (flag bit 2 clear); `g3d/g3d_draw1mat1shp.cpp` keeps the copy. */
+    bool IsVisible() const;
 };
 
 /* size: 0x4 */
@@ -121,6 +123,7 @@ extern "C" {
 /* The shape's vertex resources (a null handle when the shape has none) and the tev block's copy and range
  * store; each takes the resource's one-word handle. */
 u32 res_shp_get_vtx_pos(struct ResHandle* pSelf);
+u32 res_shp_get_vtx_fur_pos(struct ResHandle* pSelf); /* 0x80099BB0 */
 u32 res_shp_get_vtx_nrm(struct ResHandle* pSelf);
 u32 res_shp_get_vtx_clr(struct ResHandle* pSelf, u32 idx);
 u32 res_tev_copy_to(struct ResHandle* pSelf, void* pDst); /* untyped: byte range */

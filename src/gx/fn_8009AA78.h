@@ -24,6 +24,8 @@ void fn_8009AC98(u8 a, u32 b);
 /* 0x8009AA78 - writes the generation mode: the texgen, channel, TEV and indirect stage counts and the cull mode
  * (caller: g3d/g3d_state.cpp). */
 void GDSetGenMode2(u8 nTexGens, u8 nChans, u8 nTevs, u8 nInds, int cullMode);
+/* 0x8009AB48 - writes the cull mode (caller: g3d/g3d_draw1mat1shp.cpp). */
+void GDSetCullMode(int e);
 /* 0x8009AB8C - writes texture coordinate `coord`'s scale, bias and wrap pair (caller: g3d/g3d_state.cpp). */
 void GDSetTexCoordScale2(u32 coord, u16 sScale, u8 sBias, u8 sWrap, u16 tScale, u8 tBias, u8 tWrap);
 

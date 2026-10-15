@@ -11,22 +11,29 @@
 #ifdef __cplusplus
 namespace nw4r {
 namespace g3d {
-struct LightObj;
-struct LightSetting;
-struct Fog;
+class LightObj;
+class LightSetting;
+class LightSet;
+class Fog;
+struct FogData;
 }  // namespace g3d
 }  // namespace nw4r
 
-/* 0x8006518C - whether the light object is enabled. */
+/* 0x80064BD4 / 0x800651A4 / 0x8006518C - enable, disable and test the light object (LightObj::Enable, Disable,
+ * IsEnable). */
+extern "C" void light_obj_enable(nw4r::g3d::LightObj* p);
+extern "C" void light_obj_disable(nw4r::g3d::LightObj* p);
 extern "C" s32 light_obj_is_enable(const nw4r::g3d::LightObj* p);
 /* 0x800651B4/0x800651E0 - the light setting's light-object array and its length. */
 extern "C" nw4r::g3d::LightObj* light_setting_get_light_obj_array(const nw4r::g3d::LightSetting* p);
 extern "C" u32 light_setting_get_num_light_obj(const nw4r::g3d::LightSetting* p);
+/* 0x80065204 - whether the light set names a setting and its record (LightSet::IsValid). */
+extern "C" s32 light_set_is_valid(const nw4r::g3d::LightSet* p);
 /* 0x80065264 - the smaller of the two words (`std::min<u32>`). */
 extern "C" const u32* g3d_min_u32(const u32* a, const u32* b);
 /* 0x800659C4 / 0x80067A54 - whether the fog handle names a record, and that record's address. */
 extern "C" s32 fog_is_valid(const nw4r::g3d::Fog* p);
-extern "C" u32 fog_ptr(const nw4r::g3d::Fog* p);
+extern "C" nw4r::g3d::FogData* fog_ptr(const nw4r::g3d::Fog* p);
 #endif
 
 #endif /* MHTRI_G3D_LIGHT_OBJ_IS_ENABLE_H */

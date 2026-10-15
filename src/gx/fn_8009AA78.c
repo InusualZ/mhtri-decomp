@@ -72,7 +72,7 @@ void fn_8009AB38(u8 value) {
 }
 
 /* Writes one table byte as a command word. */
-void fn_8009AB48(int e) {
+void GDSetCullMode(int e) {
     fn_800868A0(0xFE00C000);
     fn_800868A0((u32)lbl_80795F58[e] << 14);
 }

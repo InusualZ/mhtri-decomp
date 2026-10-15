@@ -193,6 +193,8 @@ public:
     NW4R_G3D_RESOURCE_FUNC_DECL(ResVtxFurPos)
 
     void Init();
+    /* The number of fur layers; `g3d/g3d_draw1mat1shp.cpp` keeps the copy. */
+    u32 GetNumLayer() const;
 
     void* GetData(u16 layer); /* untyped: byte range */
     void SetArray(u32 layer);

@@ -45,7 +45,7 @@
 #include "g3d/g3d_anmchr.h"  /* TypeObj::GetTypeName and operator==, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_anmscn.h" /* placement delete */
 #include "g3d/light_obj_is_enable.h" /* fog_is_valid / fog_ptr / g3d_min_u32, owned by g3d/g3d_anmscn.cpp (rule 2) */
-#include "g3d/g3d_fog.h" /* fog_ctor / fog_init / fog_ptr_const / fog_set_range_adj_param (rule 2) */
+#include "g3d/g3d_fog.h" /* fog_ctor / fog_init, nw4r::g3d::Fog (rule 2) */
 #include "g3d/g3d_light.h" /* light_setting_ctor (rule 2) */
 #include "g3d/g3d_scninline.h" /* the scene inline copies, placement new (rule 2) */
 #include "g3d/g3d_scnobj.h"  /* nw4r::g3d::ScnGroup, owned by g3d/g3d_scnobj.cpp (rule 2) */
@@ -251,7 +251,7 @@ extern "C" inline s32 fog_is_range_adj_enable(const ResHandle* pFog)
         nw4r::db::Panic("g3d_fog.h", 0x7F, "NW4R:Failed assertion IsValid()");
     }
     bool enable = false;
-    if (fog_is_valid((const nw4r::g3d::Fog*)pFog) && fog_ptr_const(pFog)->adjEnable == 1) {
+    if (fog_is_valid((const nw4r::g3d::Fog*)pFog) && ((const nw4r::g3d::Fog*)pFog)->ptr()->adjEnable == 1) {
         enable = true;
     }
     return enable;
@@ -329,7 +329,7 @@ void ScnRoot::SetGlbSettings()
                 center = math_f32_to_u16(x + 0.5f * w);
                 calculated = true;
             }
-            fog_set_range_adj_param(&fog, width, center, &projMtx);
+            ((nw4r::g3d::Fog*)&fog)->SetFogRangeAdjParam(width, center, projMtx);
         }
         g3d_state_set_fog(*(G3dFog*)&fog, i);
     }

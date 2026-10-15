@@ -1,346 +1,217 @@
 /*
- * g3d/g3d_draw1mat1shp.cpp - nw4r g3d's one-material/one-shape draw: the material state loader fn_800761BC, the
- *   draw itself (fn_800769F4) and the ResMat/ResShp/ResVtxFurPos/ResMatFur handle members it pulls in, the GD XF writer
- *   and FPow.
+ * g3d/g3d_draw1mat1shp.cpp - nw4r g3d's one-material/one-shape draw: the material state loader (SetupMaterial),
+ *   Draw1Mat1ShpDirectly (the plain and the fur-layer draw of one shape) and the ResMat/ResShp/ResVtxFurPos/ResMatFur
+ *   handle members it pulls in, the GD XF writer and FPow.
  * RANGE. .text 0x800761BC-0x800777B0 (55 functions); extab 0x80008210-0x800082C8, extabindex 0x80020940-0x80020A54,
- *   .rodata 0x8056F658-0x8056F668 (fn_800769F4's index table), .data 0x8058E608-0x8058E880 (opens on
- *   "g3d_draw1mat1shp.cpp", read from fn_800769F4; the handle members' `_ac.h` asserts follow), .sdata
- *   0x807911E0-0x807911F8 (the "ref"/"ResShp" names the handle asserts print), .sdata2 0x80795E00-0x80795E18 (a 1.0
- *   pooled again after `g3d/g3d_camera.cpp`'s 0x80795DD0).  fn_800761BC and fn_8007663C are called only from
- *   fn_800769F4's chain, and the handle members before fn_800769F4 read this unit's strings (0x8058E730..0x8058E870),
- *   so the TU opens at 0x800761BC; `g3d/g3d_draw.cpp` opens on "g3d_draw.cpp" and a second pooled 1.0 at 0x800777B0.
- * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` (playbook idea 106) except fn_800761BC, which measures
- *   better with the pass on.
- * NAMES. res_mat_misc_copy_ctor is a GUESS (the copy constructor of the material's misc block handle, the
- *   res_mat_chan_copy_ctor scheme).  g3d_gd_set_chan_mat_color is a GUESS (XF 0x100C plus the channel); GDWriteXFCmd is a GUESS (the SDK's GD
- *   inline that writes one XF register).  The handle members are nw4r's `g3d_resmat_ac.h`/`g3d_resshp_ac.h`.
- * RESIDUALS. Unwritten (empty stub): fn_800769F4.  Partial: fn_800761BC, fn_8007663C, fn_80077480, fn_80077490,
- *   fn_80077554, res_mat_misc_copy_ctor, fn_800775CC, fn_80077708 (m2c views).
- *   flipcheck: `.rodata`, `.data`, `.sdata` and `.sdata2` are claimed and not emitted (declared).
+ *   .rodata 0x8056F658-0x8056F668 (the fur pass's channel table), .data 0x8058E608-0x8058E880 (opens on
+ *   "g3d_draw1mat1shp.cpp"; the handle members' `_ac.h` asserts follow), .sdata 0x807911E0-0x807911F8 (the
+ *   "ref"/"ResShp" names the handle asserts print), .sdata2 0x80795E00-0x80795E18 (a 1.0 pooled again after
+ *   `g3d/g3d_camera.cpp`'s 0x80795DD0).  SetupMaterial and the indirect-matrix operation's constructor are called
+ *   only from Draw1Mat1ShpDirectly's chain, so the TU opens at 0x800761BC; `g3d/g3d_draw.cpp` opens on
+ *   "g3d_draw.cpp" and a second pooled 1.0 at 0x800777B0.
+ * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` (playbook idea 106) except SetupMaterial, which measures
+ *   better with the pass on; `#pragma dont_inline on` (the accessors and the compiler-generated copies are called
+ *   out of line, as retail does).
+ * NAMES. nw4r's where the map, the asserts or the SDK carry them (Draw1Mat1ShpDirectly, Draw1Mat1ShpSwap's
+ *   vtx*Table fields, GDWrite_u8/u16/u32, GDSetCullMode).  GUESS: SetupMaterial (0x800761BC),
+ *   g3d_ind_mtx_op_ctor (0x8007663C), g3d_gd_set_chan_mat_color (XF 0x100C plus the channel), GDWriteXFCmd,
+ *   ResVtxFurPos::GetNumLayer (0x800774A4), ResMatFurData's alphaPowExp/colorPowExp.
+ * RESIDUALS. SetupMaterial: the parameters' register colouring and the ambient colour copy (retail copies it byte
+ *   by byte) differ.  Draw1Mat1ShpDirectly: register colouring and stack slots.  The copy constructors of the swap's
+ *   handles are this TU's own (retail calls other units' kept copies): relocation names only.  The indirect-matrix
+ *   callback and its operation are `g3d/g3d_state.cpp`'s types, declared here until that unit's header carries
+ *   them (g3d-draw#3); STOPGAPs g3d-draw#4..#6.  Data: literals emitted, order and the inline copies' separate
+ *   strings not yet retail's; flipcheck is not ready.
  */
 
 #include "types.h"
-
-
-#include "sys_mem.h" /* operator delete (rule 9: call through the owner) */
-#include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
-#include "g3d/g3d_xsi.h" /* g3d_calc_tex_mtx_xsi (rule 2) */
-#include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 2) */
-#include "MEM/MEMAllocFromAllocator.h" /* MEMFreeToAllocator (rule 2) */
-#include "g3d/g3d_anmchr.h" /* type_obj_set_name (rule 2) */
-#include "g3d/g3d_cpu.h"
+#include "gx.h"
+#include "OS/PPCArch.h"            /* PPCSync (rule 2) */
+#include "RVLGX/GXTev.h"           /* GXSetTevKColor (rule 2) */
+#include "RVLGX/GXBump.h"          /* GXSetIndTexMtx (rule 2) */
+#include "fn_8004CAD8/mtx.h"       /* MTX34_ctor (rule 2) */
+#include "nw4r/db_assert.h"        /* nw4r::db::Panic (rule 2) */
+#include "g3d/g3d_calcview.h"      /* g3d_lc_queue_wait (rule 2) */
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resmat.h"
-#include "g3d/g3d_resnode.h"
 #include "g3d/g3d_resshp.h"
-#include "g3d/g3d_state.h"     /* the material loaders (rule 2) */
-#include "nw4r/fn_805012C4.h"
-#include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
-#include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple (rule 1) */
-#include "MSL/algorithm.h"     /* std::find / std::distance */
-#include "unsplit/g3d.h"      /* the scene objects' type-name records no unit owns (rule 2) */
+#include "g3d/g3d_state.h"         /* the material loaders (rule 2) */
+#include "g3d/g3d_ind_mtx_callback.h" /* G3dIndMtxOp, G3dIndMtxCallback (rule 1) */
+#include "gx/fn_8009AA78.h"       /* GDSetCullMode (rule 2) */
+#include "g3d/g3d_draw1mat1shp.h"
 
 #pragma peephole off
-
-#define M2C_ERROR(x) /* unknown instruction */
-
-
-namespace nw4r { namespace db {
-void Panic(const char* file, int line, const char* fmt, ...);
-}}
-
-extern const char lbl_8058E694[];
-extern const char lbl_8058E6A4[];
-extern const char lbl_8058E6C0[];
-extern const char lbl_8058E6D0[];
-extern const char lbl_8058E6F0[];
-extern const char lbl_8058E700[];
-extern const char lbl_8058E720[];
-extern const char lbl_8058E730[];
-extern const char lbl_8058E758[];
-extern const char lbl_8058E768[];
-extern const char lbl_8058E790[];
-extern const char lbl_8058E7A0[];
-extern const char lbl_8058E7C8[];
-extern const char lbl_8058E7D8[];
-extern const char lbl_8058E7E4[];
-extern const char lbl_8058E800[];
-extern const char lbl_8058E810[];
-extern const char lbl_8058E838[];
-extern const char lbl_8058E848[];
-extern const char lbl_8058E870[];
-extern u32 lbl_807911E0;
-extern u32 lbl_807911E4;
-extern u32 lbl_807911E8;
-extern u32 lbl_807911EC;
-extern u32 lbl_807911F0;
+#pragma dont_inline on
 
 extern "C" {
-u32 g3d_state_load_tex_srt(void*);
+u32 g3d_state_load_tex_srt(nw4r::g3d::ResTexSrt texSrt);
 f32 powf(f32 x, f32 y);
-/* internal */ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4);
-/* internal */ void* fn_8007663C(s32 *arg0);
-/* internal */ u32 fn_800769F4(s32 *arg0, s32 *arg1, s32 arg2, s32 arg3, s32 arg4, void *arg5, s32 arg6);
-/* internal */ u32 GDWriteXFCmd(u16 arg0, s32 arg1);
-/* internal */ u32 fn_80077474(s32 arg0);
-/* internal */ u32 fn_80077480(u16 arg0);
-/* internal */ u32 fn_80077490(u8 arg0);
-/* internal */ s32 fn_800774A4(void* a0);
-/* internal */ s32 fn_80077554(s32 arg0, void* a1);
-/* internal */ u32 fn_80077584(s32 *arg0, s32 *arg1);
-/* internal */ s32 res_mat_misc_copy_ctor(s32 arg0, const s32* a1);
-/* internal */ u32 fn_800775C0(s32 *arg0, s32 *arg1);
-/* internal */ void* fn_800775CC(s32 arg0);
-/* internal */ s32 fn_80077630(s32 *arg0);
-/* internal */ s32 fn_80077644(void* a0);
-/* internal */ s32 fn_80077708(s32 arg0, void* a1);
-/* internal */ u32 fn_80077738(s32 *arg0, s32 *arg1);
-} /* extern "C" */
+
+}
+
 
 extern "C" {
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x8];
-    /* +0x08 */ u32 (*field_0x08)(...);
-} RawView_3; /* size: 0xC */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-    /* +0x0C */ u32 field_0x0C;
-    /* +0x10 */ u32 field_0x10;
-    /* +0x14 */ u32 field_0x14;
-    /* +0x18 */ u32 field_0x18;
-    /* +0x1C */ u32 field_0x1C;
-    /* +0x20 */ u32 field_0x20;
-    /* +0x24 */ s32 field_0x24;
-    /* +0x28 */ u32 field_0x28;
-} RawView_2; /* size: 0x2C */
+G3dIndMtxOp* g3d_ind_mtx_op_ctor(G3dIndMtxOp* pOp);
+const nw4r::g3d::ResMatFurData* res_mat_fur_ref(const nw4r::g3d::ResMatFur* pFur);
+const nw4r::g3d::ResMatFurData* res_mat_fur_ptr(const nw4r::g3d::ResMatFur* pFur);
+void GDWrite_u32(u32 value);
+void GDWrite_u16(u16 value);
+void GDWrite_u8(u8 value);
+}
+
+namespace nw4r {
+namespace g3d {
+
 #pragma peephole on
-u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
-
-    u32 sp90;
-    u32 sp88;
-    u32 sp84;
-    u32 sp80;
-    u32 sp7C;
-    GXColor sp78;
-    GXColor sp74;
-    s32 sp70;
-    s32 sp6C;
-    s32 sp68;
-    s32 sp64;
-    s32 sp60;
-    s32 sp5C;
-    s32 sp58;
-    s32 sp54;
-    s32 sp50;
-    s32 sp4C;
-    s32 sp48;
-    s32 sp44;
-    s32 sp40;
-    s32 sp3C;
-    s32 sp38;
-    s32 sp34;
-    s32 sp30;
-    s32 sp2C;
-    s32 sp18;
-    s32 sp14;
-    s32 sp10;
-    s32 spC;
-    s32 sp8;
-
-    if (arg4 == 0) {
-        nw4r::g3d::ResMatMisc misc((void*)NULL);
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatMisc*>((s32 *)(&((RawView_2*)arg2)->field_0x24))->IsValid() == 0)) {
-            sp70 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatMisc().mpData;
-            misc = *reinterpret_cast<const nw4r::g3d::ResMatMisc*>(&sp70);
+/* 0x800761BC (0x480): loads the material's state (or the swap's replacements) unless the material is skipped, in
+ * which case only the indirect matrices are offered to the callback. */
+static void SetupMaterial(ResMat mat, u32 ctrl, Draw1Mat1ShpSwap* pSwap, G3dIndMtxCallback* pIndMtxOp,
+                          bool bIgnoreMaterial) {
+    if (!bIgnoreMaterial) {
+        ResMatMisc misc(NULL);
+        if (pSwap == NULL || !pSwap->misc.IsValid()) {
+            misc = mat.GetResMatMisc();
         } else {
-            misc = *reinterpret_cast<const nw4r::g3d::ResMatMisc*>(&((RawView_2*)arg2)->field_0x24);
+            misc = pSwap->misc;
         }
         g3d_state_load_fog(misc.GetFogIdx());
-        sp6C = (s32)misc.mpData;
-        g3d_state_set_mat_misc(*reinterpret_cast<nw4r::g3d::ResMatMisc*>((void*)(&sp6C)));
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTlutObj*>((s32 *)(&((RawView_2*)arg2)->field_0x04))->IsValid() == 0)) {
-            sp68 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTlutObj().mpData;
-            g3d_state_load_tlut_obj(*reinterpret_cast<nw4r::g3d::ResTlutObj*>((void*)(&sp68)));
+        g3d_state_set_mat_misc(misc);
+
+        if (pSwap == NULL || !pSwap->tlutObj.IsValid()) {
+            g3d_state_load_tlut_obj(mat.GetResTlutObj());
         } else {
-            sp64 = ((RawView_2*)arg2)->field_0x04;
-            g3d_state_load_tlut_obj(*reinterpret_cast<nw4r::g3d::ResTlutObj*>((void*)(&sp64)));
+            g3d_state_load_tlut_obj(pSwap->tlutObj);
         }
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTexObj*>((s32 *)(arg2))->IsValid() == 0)) {
-            sp60 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTexObj().mpData;
-            g3d_state_load_tex_obj(*reinterpret_cast<nw4r::g3d::ResTexObj*>((void*)(&sp60)));
+        if (pSwap == NULL || !pSwap->texObj.IsValid()) {
+            g3d_state_load_tex_obj(mat.GetResTexObj());
         } else {
-            sp5C = ((RawView_2*)arg2)->field_0x00;
-            g3d_state_load_tex_obj(*reinterpret_cast<nw4r::g3d::ResTexObj*>((void*)(&sp5C)));
+            g3d_state_load_tex_obj(pSwap->texObj);
         }
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResGenMode*>((s32 *)(&((RawView_2*)arg2)->field_0x08))->IsValid() == 0)) {
-            sp58 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResGenMode().mpData;
-            g3d_state_set_gen_mode(*reinterpret_cast<nw4r::g3d::ResGenMode*>((void*)(&sp58)));
+        if (pSwap == NULL || !pSwap->genMode.IsValid()) {
+            g3d_state_set_gen_mode(mat.GetResGenMode());
         } else {
-            sp54 = ((RawView_2*)arg2)->field_0x08;
-            g3d_state_set_gen_mode(*reinterpret_cast<nw4r::g3d::ResGenMode*>((void*)(&sp54)));
+            g3d_state_set_gen_mode(pSwap->genMode);
         }
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTev*>((s32 *)(&((RawView_2*)arg2)->field_0x0C))->IsValid() == 0)) {
-            sp50 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>(arg0)->GetResTev().mpData;
-            g3d_state_load_tev(*reinterpret_cast<nw4r::g3d::ResTev*>((void*)(&sp50)));
+        if (pSwap == NULL || !pSwap->tev.IsValid()) {
+            g3d_state_load_tev(mat.GetResTev());
         } else {
-            sp4C = ((RawView_2*)arg2)->field_0x0C;
-            g3d_state_load_tev(*reinterpret_cast<nw4r::g3d::ResTev*>((void*)(&sp4C)));
+            g3d_state_load_tev(pSwap->tev);
         }
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatPix*>((s32 *)(&((RawView_2*)arg2)->field_0x10))->IsValid() == 0)) {
-            sp48 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatPix().mpData;
-            g3d_state_load_mat_pix(*reinterpret_cast<nw4r::g3d::ResMatPix*>((void*)(&sp48)));
+        if (pSwap == NULL || !pSwap->pix.IsValid()) {
+            g3d_state_load_mat_pix(mat.GetResMatPix());
         } else {
-            sp44 = ((RawView_2*)arg2)->field_0x10;
-            g3d_state_load_mat_pix(*reinterpret_cast<nw4r::g3d::ResMatPix*>((void*)(&sp44)));
+            g3d_state_load_mat_pix(pSwap->pix);
         }
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>((void*)(&((RawView_2*)arg2)->field_0x14))->IsValid() == 0)) {
-            sp40 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatTevColor().mpData;
-            g3d_state_load_mat_tev_color(*reinterpret_cast<nw4r::g3d::ResMatTevColor*>((void*)(&sp40)));
+        if (pSwap == NULL || !pSwap->tevColor.IsValid()) {
+            g3d_state_load_mat_tev_color(mat.GetResMatTevColor());
         } else {
-            sp3C = ((RawView_2*)arg2)->field_0x14;
-            g3d_state_load_mat_tev_color(*reinterpret_cast<nw4r::g3d::ResMatTevColor*>((void*)(&sp3C)));
+            g3d_state_load_mat_tev_color(pSwap->tevColor);
         }
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&((RawView_2*)arg2)->field_0x18))->IsValid() == 0)) {
-            if (arg3 != NULL) {
-                sp38 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatIndMtxAndScale().mpData;
-                g3d_state_load_mat_ind_mtx(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp38)), (G3dIndMtxCallback*)((void*)(arg3)));
+        if (pSwap == NULL || !pSwap->indMtxAndScale.IsValid()) {
+            if (pIndMtxOp != NULL) {
+                g3d_state_load_mat_ind_mtx(mat.GetResMatIndMtxAndScale(), pIndMtxOp);
             } else {
-                sp34 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatIndMtxAndScale().mpData;
-                g3d_state_load_mat_ind_mtx_dl(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp34)));
+                g3d_state_load_mat_ind_mtx_dl(mat.GetResMatIndMtxAndScale());
             }
-        } else if (arg3 != NULL) {
-            sp30 = ((RawView_2*)arg2)->field_0x18;
-            g3d_state_load_mat_ind_mtx(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp30)), (G3dIndMtxCallback*)((void*)(arg3)));
+        } else if (pIndMtxOp != NULL) {
+            g3d_state_load_mat_ind_mtx(pSwap->indMtxAndScale, pIndMtxOp);
         } else {
-            sp2C = ((RawView_2*)arg2)->field_0x18;
-            g3d_state_load_mat_ind_mtx_dl(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp2C)));
+            g3d_state_load_mat_ind_mtx_dl(pSwap->indMtxAndScale);
         }
-        g3d_state_load_light_set(misc.GetLightSetIdx(), &sp88, &sp84, &sp80, &sp7C, &sp74);
-        sp78 = sp74;
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatChan*>((void*)(&((RawView_2*)arg2)->field_0x1C))->IsValid() == 0)) {
-            g3d_state_load_mat_chan(reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatChan(), sp88, sp84, sp80,
-                                    sp7C, sp78, (arg1 & 8) != 0);
+
+        u32 maskDiffColor;
+        u32 maskDiffAlpha;
+        u32 maskSpecColor;
+        u32 maskSpecAlpha;
+        GXColor ambLoaded;
+        g3d_state_load_light_set(misc.GetLightSetIdx(), &maskDiffColor, &maskDiffAlpha, &maskSpecColor,
+                                 &maskSpecAlpha, &ambLoaded);
+        GXColor amb = ambLoaded;
+        if (pSwap == NULL || !pSwap->chan.IsValid()) {
+            g3d_state_load_mat_chan(mat.GetResMatChan(), maskDiffColor, maskDiffAlpha, maskSpecColor, maskSpecAlpha,
+                                    amb, (ctrl & 8) != 0);
         } else {
-            g3d_state_load_mat_chan(*reinterpret_cast<nw4r::g3d::ResMatChan*>((void*)(&((RawView_2*)arg2)->field_0x1C)),
-                                    sp88, sp84, sp80, sp7C, sp78, (arg1 & 8) != 0);
+            g3d_state_load_mat_chan(pSwap->chan, maskDiffColor, maskDiffAlpha, maskSpecColor, maskSpecAlpha, amb,
+                                    (ctrl & 8) != 0);
         }
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatTexCoordGen*>((void*)(&((RawView_2*)arg2)->field_0x20))->IsValid() == 0)) {
-            sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatTexCoordGen().mpData;
-            g3d_state_load_tex_coord_gen(*reinterpret_cast<nw4r::g3d::ResMatTexCoordGen*>((void*)(&sp18)));
+        if (pSwap == NULL || !pSwap->texCoordGen.IsValid()) {
+            g3d_state_load_tex_coord_gen(mat.GetResMatTexCoordGen());
         } else {
-            sp14 = ((RawView_2*)arg2)->field_0x20;
-            g3d_state_load_tex_coord_gen(*reinterpret_cast<nw4r::g3d::ResMatTexCoordGen*>((void*)(&sp14)));
+            g3d_state_load_tex_coord_gen(pSwap->texCoordGen);
         }
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTexSrt*>((void*)(&((RawView_2*)arg2)->field_0x28))->IsValid() == 0)) {
-            sp10 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTexSrt().mpData;
-            g3d_state_load_tex_srt((void*)(&sp10));
-            return;
+        if (pSwap == NULL || !pSwap->texSrt.IsValid()) {
+            g3d_state_load_tex_srt(mat.GetResTexSrt());
+        } else {
+            g3d_state_load_tex_srt(pSwap->texSrt);
         }
-        spC = ((RawView_2*)arg2)->field_0x28;
-        g3d_state_load_tex_srt((void*)(&spC));
-        return;
-    }
-    if (arg3 != NULL) {
-        if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&((RawView_2*)arg2)->field_0x18))->IsValid() == 0)) {
-            fn_8007663C((s32 *)(&sp90));
-            ((RawView_3*)(*arg3))->field_0x08(arg3, &sp90);
-            g3d_ind_mtx_op_load((G3dIndMtxOp*)((void*)(&sp90)));
-            return;
+    } else if (pIndMtxOp != NULL) {
+        if (pSwap == NULL || !pSwap->indMtxAndScale.IsValid()) {
+            G3dIndMtxOp op;
+            g3d_ind_mtx_op_ctor(&op);
+            pIndMtxOp->Exec(&op);
+            g3d_ind_mtx_op_load(&op);
+        } else {
+            g3d_state_load_mat_ind_mtx(pSwap->indMtxAndScale, pIndMtxOp);
         }
-        sp8 = ((RawView_2*)arg2)->field_0x18;
-        g3d_state_load_mat_ind_mtx(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp8)), (G3dIndMtxCallback*)((void*)(arg3)));
     }
 }
 #pragma peephole off
 
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x30];
-    /* +0x30 */ u8 field_0x30;
-} RawView_4; /* size: 0x31 */
-void* fn_8007663C(s32 *arg0) {
-    void *var_r30;
+}  // namespace g3d
+}  // namespace nw4r
 
-    *arg0 = 0;
-    var_r30 = arg0 + 4;
+/* 0x8007663C (0x60): clears the operation's flags and constructs its three matrices. */
+G3dIndMtxOp* g3d_ind_mtx_op_ctor(G3dIndMtxOp* pOp) {
+    pOp->flags = 0;
+    nw4r::math::MTX34* pMtx = pOp->mtx;
     do {
-        MTX34_ctor((nw4r::math::MTX34*)(var_r30));
-        var_r30 = &((RawView_4*)var_r30)->field_0x30;
-    } while ((u32)var_r30 < (u32)(arg0 + 0x94));
-    return arg0;
+        MTX34_ctor(pMtx);
+        pMtx++;
+    } while (pMtx < pOp->mtx + 3);
+    return pOp;
 }
-
-} /* extern "C" */
 
 /* 0x8007669C (0x34): returns the material's MatTexCoordGen block. */
 nw4r::g3d::ResMatTexCoordGen nw4r::g3d::ResMat::GetResMatTexCoordGen() {
     return ResMatTexCoordGen((u8*)GetResMatDLData() + 0xE0);
 }
 
-extern "C" {
-
-} /* extern "C" */
-
 /* 0x800766D0 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatTexCoordGen::ResMatTexCoordGen(void* pData) : ResCommon<ResMatTexCoordGenData>(pData) {
     if ((u32)pData & 0x1F) {
-        nw4r::db::Panic((const char*)&lbl_8058E758, 0x201, (const char*)&lbl_8058E730);
+        nw4r::db::Panic("g3d_resmat_ac.h", 0x201, "NW4R:Failed assertion !((u32)p & 0x1f)");
     }
 }
 
-extern "C" {
-
-} /* extern "C" */
-
 /* 0x80076734 (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatTexCoordGenData)
-
-/* 0x80076750 (0x14): whether the handle is set. */
-bool nw4r::g3d::ResMatTevColor::IsValid() const {
-    return mpData != NULL;
-}
 
 /* 0x8007673C (0x14): whether the handle is set. */
 bool nw4r::g3d::ResMatTexCoordGen::IsValid() const {
     return mpData != NULL;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
+/* 0x80076750 (0x14): whether the handle is set. */
+bool nw4r::g3d::ResMatTevColor::IsValid() const {
+    return mpData != NULL;
+}
 
 /* 0x80076764 (0x30): returns the material's MatPix block. */
 nw4r::g3d::ResMatPix nw4r::g3d::ResMat::GetResMatPix() {
     return ResMatPix(GetResMatDLData());
 }
 
-extern "C" {
-
-} /* extern "C" */
-
 /* 0x80076794 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatPix::ResMatPix(void* pData) : ResCommon<ResMatPixData>(pData) {
     if ((u32)pData & 0x1F) {
-        nw4r::db::Panic((const char*)&lbl_8058E790, 0x154, (const char*)&lbl_8058E768);
+        nw4r::db::Panic("g3d_resmat_ac.h", 0x154, "NW4R:Failed assertion !((u32)p & 0x1f)");
     }
 }
 
-extern "C" {
-
-} /* extern "C" */
-
 /* 0x800767F8 (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatPixData)
-
-extern "C" {
-
-} /* extern "C" */
 
 /* 0x80076800 (0x14): tells whether the handle is set. */
 bool nw4r::g3d::ResMatPix::IsValid() const {
@@ -352,67 +223,36 @@ bool nw4r::g3d::ResTev::IsValid() const {
     return mpData != NULL;
 }
 
-extern "C" {
-
-} /* extern "C" */
-
 /* 0x80076828 (0x34): returns the material's GenMode block. */
 nw4r::g3d::ResGenMode nw4r::g3d::ResMat::GetResGenMode() {
     return ResGenMode((u8*)&ref() + 0x14);
 }
 
-extern "C" {
-
-} /* extern "C" */
-
 /* 0x8007685C (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResGenMode::ResGenMode(void* pData) : ResCommon<ResGenModeData>(pData) {
     if ((u32)pData & 3) {
-        nw4r::db::Panic((const char*)&lbl_8058E870, 0xAF, (const char*)&lbl_8058E848);
+        nw4r::db::Panic("g3d_resmat_ac.h", 0xAF, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
 }
 
-extern "C" {
-
-} /* extern "C" */
-
 /* 0x800768C0 (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResGenModeData)
-
-extern "C" {
-
-} /* extern "C" */
 
 /* 0x800768C8 (0x14): tells whether the handle is set. */
 bool nw4r::g3d::ResGenMode::IsValid() const {
     return mpData != NULL;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
-
 /* 0x800768DC (0x14): tells whether the handle is set. */
 bool nw4r::g3d::ResTexObj::IsValid() const {
     return mpData != NULL;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
-
 /* 0x800768F0 (0x14): tells whether the handle is set. */
 bool nw4r::g3d::ResTlutObj::IsValid() const {
     return mpData != NULL;
 }
-
-extern "C" {
-
-
-} /* extern "C" */
 
 /* 0x80076904 (0x30): copies the handle. */
 nw4r::g3d::ResMatMisc& nw4r::g3d::ResMatMisc::operator=(const ResMatMisc& rhs) {
@@ -420,123 +260,222 @@ nw4r::g3d::ResMatMisc& nw4r::g3d::ResMatMisc::operator=(const ResMatMisc& rhs) {
     return *this;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
-
 /* 0x80076940 (0x34): returns the material's MatMisc block. */
 nw4r::g3d::ResMatMisc nw4r::g3d::ResMat::GetResMatMisc() {
     return ResMatMisc((u8*)&ref() + 0x1C);
 }
-
-extern "C" {
-
-} /* extern "C" */
 
 /* 0x80076974 (0x14): tells whether the handle is set. */
 bool nw4r::g3d::ResMatMisc::IsValid() const {
     return mpData != NULL;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
-
 /* 0x80076988 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatMisc::ResMatMisc(void* pData) : ResCommon<ResMatMiscData>(pData) {
     if ((u32)pData & 3) {
-        nw4r::db::Panic((const char*)&lbl_8058E838, 0xF3, (const char*)&lbl_8058E810);
+        nw4r::db::Panic("g3d_resmat_ac.h", 0xF3, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
 }
-
-extern "C" {
-
-} /* extern "C" */
 
 /* 0x800769EC (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatMiscData)
 
-extern "C" {
+/* 0x800769F4 (0x9A4): draws one shape with one material: the material state first, then either every fur layer
+ * (each with its layer ratio's colours and indirect matrices) or the shape once, through the swap's vertex tables
+ * when it has them. */
+void nw4r::g3d::Draw1Mat1ShpDirectly(ResMat mat, ResShp shp, const math::MTX34* pViewPos, const math::MTX34* pViewNrm,
+                                     u32 ctrl, Draw1Mat1ShpSwap* pSwap, G3dIndMtxCallback* pIndMtxOp) {
+    if (!(ctrl & 1)) {
+        g3d_lc_queue_wait(0);
+        PPCSync();
+    }
 
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x3];
-    /* +0x03 */ u32 field_0x03;
-} RawView_11; /* size: 0x7 */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ u32 field_0x04;
-} RawView_10; /* size: 0x8 */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ u32 field_0x04;
-} RawView_8; /* size: 0x8 */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x14];
-    /* +0x14 */ s32 field_0x14;
-    /* +0x18 */ s32 field_0x18;
-    /* +0x1C */ s32 field_0x1C;
-    /* +0x20 */ u8 pad_0x20[0x4];
-    /* +0x24 */ s32 field_0x24;
-    /* +0x28 */ u8 pad_0x28[0x4];
-    /* +0x2C */ u8* field_0x2C;
-    /* +0x30 */ u8* field_0x30;
-    /* +0x34 */ u8* field_0x34;
-} RawView_12; /* size: 0x38 */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x48];
-    /* +0x48 */ u8 field_0x48;
-    /* +0x49 */ u8 field_0x49;
-    /* +0x4A */ u8 field_0x4A;
-    /* +0x4B */ u8 field_0x4B;
-    /* +0x4C */ u8 field_0x4C;
-    /* +0x4D */ u8 field_0x4D;
-    /* +0x4E */ u8 field_0x4E;
-    /* +0x4F */ u8 field_0x4F;
-    /* +0x50 */ u8 field_0x50;
-    /* +0x51 */ u8 field_0x51;
-} RawView_13; /* size: 0x52 */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0xC];
-    /* +0x0C */ u32 field_0x0C;
-    /* +0x10 */ u32 field_0x10;
-} RawView_5; /* size: 0x14 */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-    /* +0x0C */ u32 field_0x0C;
-} RawView_6; /* size: 0x10 */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-    /* +0x0C */ u8 pad_0x0C[0x4];
-    /* +0x10 */ u32 field_0x10;
-    /* +0x14 */ u32 field_0x14;
-    /* +0x18 */ u32 field_0x18;
-} RawView_7; /* size: 0x1C */
-typedef struct {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-} RawView_9; /* size: 0x6 */
-u32 fn_800769F4(s32 *arg0, s32 *arg1, s32 arg2, s32 arg3, s32 arg4, void *arg5, s32 arg6) {
+    bool bIgnoreMaterial = false;
+    bool bFur = false;
+    ResMatFur fur(NULL);
+    if (mat.IsValid()) {
+        if (ctrl & 0x10) {
+            bIgnoreMaterial = true;
+        }
+        fur = mat.GetResMatFur();
+        if (fur.IsValid()) {
+            bFur = true;
+        }
+    } else {
+        bIgnoreMaterial = true;
+    }
+    SetupMaterial(mat, ctrl, pSwap, pIndMtxOp, bIgnoreMaterial);
+
+    if (!shp.IsValid() || !shp.IsVisible()) {
+        return;
+    }
+
+    if (bFur) {
+        f32 alphaPowExp = res_mat_fur_ref(&fur)->alphaPowExp;
+        f32 colorPowExp = res_mat_fur_ref(&fur)->colorPowExp;
+        math::MTX34 indMtx[3];
+        MTX34_ctor(&indMtx[0]);
+        MTX34_ctor(&indMtx[1]);
+        MTX34_ctor(&indMtx[2]);
+        /* The channel order the colour controls are read in: colour 0, alpha 0, colour 1, alpha 1. */
+        const u32 chanID[4] = {0, 2, 1, 3};
+
+        bool noSwap = pSwap == NULL;
+        bool useMat = true;
+        if (!noSwap && pSwap->tevColor.IsValid()) {
+            useMat = false;
+        }
+        ResMatTevColor tevColor(useMat ? mat.GetResMatTevColor() : pSwap->tevColor);
+        GXColor kcolor0;
+        GXColor kcolor1;
+        GXColor kcolor2;
+        tevColor.GXGetTevKColor(GX_KCOLOR0, &kcolor0);
+        tevColor.GXGetTevKColor(GX_KCOLOR1, &kcolor1);
+        tevColor.GXGetTevKColor(GX_KCOLOR2, &kcolor2);
+        u8 kcolor2G = kcolor2.g;
+
+        useMat = false;
+        if (noSwap || !pSwap->chan.IsValid()) {
+            useMat = true;
+        }
+        ResMatChan chan(useMat ? mat.GetResMatChan() : pSwap->chan);
+        GXColor matColor[2];
+        chan.GXGetChanMatColor(0, &matColor[0]);
+        chan.GXGetChanMatColor(1, &matColor[1]);
+        u32 matSrc[4];
+        u32 attnFn[4];
+        for (u8 i = 0; i < 4; i++) {
+            chan.GXGetChanCtrl(chanID[i], NULL, NULL, &matSrc[i], NULL, NULL, &attnFn[i]);
+        }
+
+        useMat = false;
+        if (noSwap || !pSwap->misc.IsValid()) {
+            useMat = true;
+        }
+        ResMatMisc misc(useMat ? mat.GetResMatMisc() : pSwap->misc);
+        useMat = false;
+        if (noSwap || !pSwap->indMtxAndScale.IsValid()) {
+            useMat = true;
+        }
+        ResMatIndMtxAndScale ind(useMat ? mat.GetResMatIndMtxAndScale() : pSwap->indMtxAndScale);
+
+        u8 furInd[3];
+        s8 indScaleExp[3];
+        for (u32 i = 0; i < 3; i++) {
+            ResMatMiscData::IndirectMethod method;
+            s8 normalMapRef;
+            misc.GetIndirectMethod((_GXIndTexMtxID)(i + 1), &method, &normalMapRef);
+            if (method == ResMatMiscData::FUR) {
+                furInd[i] = 1;
+                ind.GXGetIndTexMtx((_GXIndTexMtxID)(i + 1), &indMtx[i], &indScaleExp[i]);
+            } else {
+                furInd[i] = 0;
+            }
+        }
+
+        g3d_state_load_shp_pre_prim(shp);
+        if (ctrl & 4) {
+            GDSetCullMode(GX_CULL_FRONT);
+            g3d_state_invalidate(0x10);
+        }
+
+        u32 furPosData = res_shp_get_vtx_fur_pos((ResHandle*)&shp);
+        ResVtxFurPos furPos(*(const ResVtxFurPos*)&furPosData);
+        u32 numLayer = furPos.GetNumLayer();
+        for (u16 layer = 0; layer < numLayer; layer++) {
+            f32 ratio = fur.GetLayerRatio(layer);
+            f32 invRatio = 1.0f - ratio;
+            f32 alphaRatio = math::FPow(ratio, alphaPowExp);
+            f32 colorRatio = math::FPow(ratio, colorPowExp);
+            f32 kRatio = math::FPow(ratio, 4.0f);
+            kcolor2.r = 255.0f * ratio;
+            kcolor2.g = kcolor2G * kRatio;
+            GXSetTevKColor(GX_KCOLOR2, kcolor2);
+
+            for (u8 i = 0; i < 3; i++) {
+                if (furInd[i]) {
+                    f32 m[2][3];
+                    m[0][0] = ratio * indMtx[i].m[0][0];
+                    m[0][1] = ratio * indMtx[i].m[0][1];
+                    m[0][2] = indMtx[i].m[0][2];
+                    m[1][0] = ratio * indMtx[i].m[1][0];
+                    m[1][1] = ratio * indMtx[i].m[1][1];
+                    m[1][2] = indMtx[i].m[1][2];
+                    GXSetIndTexMtx(i + 1, m, indScaleExp[i]);
+                }
+            }
+
+            u8 furR = kcolor0.r * invRatio + kcolor1.r * ratio;
+            u8 furG = kcolor0.g * invRatio + kcolor1.g * ratio;
+            u8 furB = kcolor0.b * invRatio + kcolor1.b * ratio;
+            u8 furA = kcolor0.a * (1.0f - alphaRatio) + kcolor1.a * alphaRatio;
+            for (u8 i = 0; i < 2; i++) {
+                u8 c = i * 2;
+                if (matSrc[c] == 0 || matSrc[c + 1] == 0) {
+                    GXColor color;
+                    if (attnFn[c] == 0) {
+                        color.r = colorRatio * matColor[i].r;
+                        color.g = colorRatio * matColor[i].g;
+                        color.b = colorRatio * matColor[i].b;
+                    } else {
+                        color.r = furR;
+                        color.g = furG;
+                        color.b = furB;
+                    }
+                    color.a = attnFn[c + 1] == 0 ? matColor[i].a : furA;
+                    g3d_gd_set_chan_mat_color(chanID[c], color);
+                }
+            }
+
+            furPos.SetArray(layer);
+            g3d_state_load_shp_prim(shp, pViewPos, pViewNrm);
+        }
+        return;
+    }
+
+    if (!(ctrl & 2)) {
+        g3d_state_load_shp_pre_prim(shp);
+        if (pSwap != NULL) {
+            if (pSwap->vtxPosTable != NULL) {
+                u32 shpPos = res_shp_get_vtx_pos((ResHandle*)&shp);
+                if (((ResVtxPos*)&shpPos)->GetID() !=
+                    ResVtxPos(pSwap->vtxPosTable[shp.ref().idVtxPosition]).GetID()) {
+                    nw4r::db::Panic("g3d_draw1mat1shp.cpp", 0x19D,
+                                    "NW4R:Failed assertion shp.GetResVtxPos().GetID() == "
+                                    "ResVtxPos(pSwap->vtxPosTable[shp.ref().idVtxPosition]).GetID()");
+                }
+                ResVtxPos(pSwap->vtxPosTable[shp.ref().idVtxPosition]).SetArray();
+            }
+            if (pSwap->vtxNrmTable != NULL) {
+                s16 idx = shp.ref().idVtxNrm;
+                if (idx >= 0) {
+                    ResVtxNrm(pSwap->vtxNrmTable[idx]).SetArray();
+                }
+            }
+            if (pSwap->vtxClrTable != NULL) {
+                s16 idx = shp.ref().idVtxClr[0];
+                if (idx >= 0) {
+                    ResVtxClr(pSwap->vtxClrTable[idx]).SetArray(11);
+                }
+                idx = shp.ref().idVtxClr[1];
+                if (idx >= 0) {
+                    ResVtxClr(pSwap->vtxClrTable[idx]).SetArray(12);
+                }
+            }
+        }
+    }
+    if (ctrl & 4) {
+        GDSetCullMode(GX_CULL_FRONT);
+        g3d_state_invalidate(0x10);
+    }
+    g3d_state_load_shp_prim(shp, pViewPos, pViewNrm);
 }
-
-
-} /* extern "C" */
 
 /* 0x80077398 (0x64): returns the shape block, panicking on a NULL handle. */
 nw4r::g3d::ResShpData& nw4r::g3d::ResShp::ref() {
     if (!IsValid()) {
-        nw4r::db::Panic((const char*)&lbl_8058E6F0, 0x3A, (const char*)&lbl_8058E6D0, GetClassName(),
-                        (const char*)&lbl_807911E8);
+        nw4r::db::Panic("g3d_resshp_ac.h", 0x3A, "%s::%s: Object not valid.", GetClassName(), "ref");
     }
     return *ptr();
 }
@@ -548,7 +487,7 @@ nw4r::g3d::ResShpData* nw4r::g3d::ResShp::ptr() {
 
 /* 0x80077404 (0x8): returns the class name. */
 const char* nw4r::g3d::ResShp::GetClassName() {
-    return (const char*)&lbl_807911F0;
+    return "ResShp";
 }
 
 extern "C" {
@@ -558,55 +497,45 @@ void g3d_gd_set_chan_mat_color(u32 chan, GXColor color) {
     GDWriteXFCmd((chan & 1) + 0x100C, *(const u32*)&color);
 }
 
-u32 GDWriteXFCmd(u16 arg0, s32 arg1) {
-    fn_80077490((u8)(0x10));
-    fn_80077480((u16)(0U));
-    fn_80077480((u16)(arg0));
-    fn_80077474((s32)(arg1));
+/* 0x80077420 (0x54): writes one XF register through the pipe. */
+void GDWriteXFCmd(u16 addr, u32 value) {
+    GDWrite_u8(0x10);
+    GDWrite_u16(0);
+    GDWrite_u16(addr);
+    GDWrite_u32(value);
 }
 
-u32 fn_80077474(s32 arg0) {
-    *(s32 *)0xCC008000 = arg0;
+/* 0x80077474 (0xC): writes a word to the pipe. */
+void GDWrite_u32(u32 value) {
+    *(volatile u32*)0xCC008000 = value;
 }
 
-u32 fn_80077480(u16 arg0) {
-    *(u16 *)0xCC008000 = arg0;
+/* 0x80077480 (0x10): writes a halfword to the pipe. */
+void GDWrite_u16(u16 value) {
+    *(volatile u16*)0xCC008000 = value;
 }
 
-u32 fn_80077490(u8 arg0) {
-    *(u8 *)0xCC008000 = arg0;
+/* 0x80077490 (0x10): writes a byte to the pipe. */
+void GDWrite_u8(u8 value) {
+    *(volatile u8*)0xCC008000 = value;
 }
 
-} /* extern "C" */
+}
 
 /* 0x800774A0 (0x4): raises `x` to the power `y` through the C library. */
-namespace nw4r {
-namespace math {
-f32 FPow(f32 x, f32 y) {
+f32 nw4r::math::FPow(f32 x, f32 y) {
     return powf(x, y);
 }
-}  // namespace math
-}  // namespace nw4r
 
-extern "C" {
-
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x20];
-    /* +0x20 */ u32 field_0x20;
-} RawView_14; /* size: 0x24 */
-/* untyped: opaque handle */
-s32 fn_800774A4(void* a0) {
-    return ((const RawView_14*)&reinterpret_cast<const nw4r::g3d::ResVtxFurPos*>(a0)->ref())->field_0x20;
+/* 0x800774A4 (0x24): returns the number of fur layers. */
+u32 nw4r::g3d::ResVtxFurPos::GetNumLayer() const {
+    return ref().numLayer;
 }
-
-} /* extern "C" */
 
 /* 0x800774C8 (0x64): returns the fur-position block, panicking on a NULL handle. */
 const nw4r::g3d::ResVtxFurPosData& nw4r::g3d::ResVtxFurPos::ref() const {
     if (!IsValid()) {
-        nw4r::db::Panic((const char*)&lbl_8058E6C0, 0x13E, (const char*)&lbl_8058E6A4, GetClassName(),
-                        (const char*)&lbl_807911EC);
+        nw4r::db::Panic("g3d_resvtx_ac.h", 0x13E, "%s::%s: Object not valid.", GetClassName(), "ref");
     }
     return *ptr();
 }
@@ -618,7 +547,7 @@ const nw4r::g3d::ResVtxFurPosData* nw4r::g3d::ResVtxFurPos::ptr() const {
 
 /* 0x80077534 (0xC): returns the class name. */
 const char* nw4r::g3d::ResVtxFurPos::GetClassName() {
-    return (const char*)&lbl_8058E694;
+    return "ResVtxFurPos";
 }
 
 /* 0x80077540 (0x14): tells whether the handle is set. */
@@ -628,60 +557,36 @@ bool nw4r::g3d::ResVtxFurPos::IsValid() const {
 
 extern "C" {
 
-s32 fn_80077554(s32 arg0, void* a1) {
-    fn_80077584(0, 0);
-    return arg0;
-}
-
-u32 fn_80077584(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
-
-s32 res_mat_misc_copy_ctor(s32 arg0, const s32* a1) {
-    fn_800775C0(0, 0);
-    return arg0;
-}
-
-u32 fn_800775C0(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
-
-void* fn_800775CC(s32 arg0) {
-    if (reinterpret_cast<const nw4r::g3d::ResMatFur*>(0)->IsValid() == 0) {
-        nw4r::db::Panic((const char*)&lbl_8058E800, 0x11F, (const char*)&lbl_8058E7E4, nw4r::g3d::ResMatFur::GetClassName(), &lbl_807911E0);
+/* 0x800775CC (0x64): returns the fur block, panicking on a NULL handle (this unit's copy of ResMatFur::ref). */
+const nw4r::g3d::ResMatFurData* res_mat_fur_ref(const nw4r::g3d::ResMatFur* pFur) {
+    if (!pFur->IsValid()) {
+        nw4r::db::Panic("g3d_resmat_ac.h", 0x11F, "%s::%s: Object not valid.", nw4r::g3d::ResMatFur::GetClassName(),
+                        "ref");
     }
-    fn_80077630((s32 *)(arg0));
+    return res_mat_fur_ptr(pFur);
 }
 
-s32 fn_80077630(s32 *arg0) {
-    return *arg0;
+/* 0x80077630 (0x8): returns the fur block (this unit's copy of ResMatFur::ptr). */
+const nw4r::g3d::ResMatFurData* res_mat_fur_ptr(const nw4r::g3d::ResMatFur* pFur) {
+    return pFur->mpData;
 }
 
-} /* extern "C" */
+}
 
 /* 0x80077638 (0xC): returns the class name. */
 const char* nw4r::g3d::ResMatFur::GetClassName() {
-    return (const char*)&lbl_8058E7D8;
+    return "ResMatFur";
 }
 
-extern "C" {
-
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x34];
-    /* +0x34 */ u32 field_0x34;
-} RawView_15; /* size: 0x38 */
-s32 fn_80077644(void* a0) {
-    return (reinterpret_cast<const nw4r::g3d::ResShp*>(a0)->ref().flag & 2) == 0;
+/* 0x80077644 (0x30): whether the shape is drawn (its invisible flag is clear). */
+bool nw4r::g3d::ResShp::IsVisible() const {
+    return (ref().flag & 2) == 0;
 }
-
-} /* extern "C" */
 
 /* 0x80077674 (0x64): returns the shape block, panicking on a NULL handle. */
 const nw4r::g3d::ResShpData& nw4r::g3d::ResShp::ref() const {
     if (!IsValid()) {
-        nw4r::db::Panic((const char*)&lbl_8058E720, 0x3A, (const char*)&lbl_8058E700, GetClassName(),
-                        (const char*)&lbl_807911E4);
+        nw4r::db::Panic("g3d_resshp_ac.h", 0x3A, "%s::%s: Object not valid.", GetClassName(), "ref");
     }
     return *ptr();
 }
@@ -696,40 +601,18 @@ bool nw4r::g3d::ResShp::IsValid() const {
     return mpData != NULL;
 }
 
-extern "C" {
-
-} /* extern "C" */
-
 /* 0x800776F4 (0x14): tells whether the handle is set. */
 bool nw4r::g3d::ResMatFur::IsValid() const {
     return mpData != NULL;
 }
 
-extern "C" {
-
-
-s32 fn_80077708(s32 arg0, void* a1) {
-    fn_80077738(0, 0);
-    return arg0;
-}
-
-u32 fn_80077738(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
-
-} /* extern "C" */
-
 /* 0x80077744 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatFur::ResMatFur(void* pData) : ResCommon<ResMatFurData>(pData) {
     if ((u32)pData & 3) {
-        nw4r::db::Panic((const char*)&lbl_8058E7C8, 0x11F, (const char*)&lbl_8058E7A0);
+        nw4r::db::Panic("g3d_resmat_ac.h", 0x11F, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
 }
-
-extern "C" {
-
-} /* extern "C" */
 
 /* 0x800777A8 (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatFurData)

@@ -1,653 +1,393 @@
 /*
- * g3d/g3d_draw.cpp - nw4r g3d's model draw: the per-shape setup (fn_800777B0: the matrix, light and specular
- *   state), the material-resource refill (fn_80077E70 with `CopiedMatResources`), the byte-code draw passes over a
- *   ResMdl (fn_8007868C..fn_800791D8), g3d_draw_res_mdl_directly, and the opaque/translucent sort and its helpers.
+ * g3d/g3d_draw.cpp - nw4r g3d's model draw: the indirect-matrix set-up per shape (PrepareIndMtxOp: the normal
+ *   matrix and the light direction each normal-mapped indirect stage needs), the replacement material refill
+ *   (SetupDraw1Mat1ShpSwap), the byte-code and depth-sorted draw passes over a ResMdl, g3d_draw_res_mdl_directly,
+ *   and the sort that orders the depth records.
  * RANGE. .text 0x800777B0-0x80079FB4 (58 functions); extab 0x800082C8-0x800083D8, extabindex 0x80020A54-0x80020BEC,
- *   .data 0x8058E880-0x8058EAD8 (opens on "g3d_draw.cpp", read from fn_800777B0, fn_80077E70, fn_8007868C,
- *   fn_80078A9C, fn_800791D8 and g3d_draw_res_mdl_directly), .sdata 0x807911F8-0x80791200, .sdata2
- *   0x80795E18-0x80795E28 (a 1.0 pooled again after `g3d/g3d_draw1mat1shp.cpp`'s 0x80795E00, so a new TU at
- *   0x800777B0).  The sort helpers 0x80079E6C-0x80079FB4 are called or address-taken only by this unit's sort
- *   passes; `g3d/g3d_fog.cpp` follows ("g3d_fog.cpp", a 0.0 pooled again at 0x80795E28).
- * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` (playbook idea 106) except fn_800777B0, which measures
- *   better with the pass on.
- * NAMES. mtx34_set is a GUESS (it assembles an MTX34 from twelve floats); g3d_draw_res_mdl_directly is a GUESS
- *   (0x800793A4: draws a model's opaque or translucent byte code over its view matrices; ScnMdlSimple's draw passes
- *   call it); `CopiedMatResources` is a GUESS (the 0x38-byte set of material handles fn_80077E70 refills and
- *   0x80078DC0 constructs).  The ResTev, ResMatXxx, ResTexSrt, ResShp and ResMat handle members are nw4r's `_ac.h` members.
- *   The bodies are m2c's output, typed mechanically: each `RawView_N` struct's `field_0xNN` states an offset and a
- *   size, not a meaning.
- * RESIDUALS. Unwritten (empty stubs): fn_8007868C, fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8,
- *   g3d_draw_res_mdl_directly, fn_80079604, fn_80079938, fn_800799BC, fn_80079A48, fn_80079B38.
- *   Scored zero with a body: fn_80077DBC, mtx34_set, fn_80079EE4.  Partial: fn_800777B0, fn_80077D64, fn_80077E34,
- *   fn_80077E70, fn_80078878, fn_800788C8, fn_80078904, fn_80078988, fn_80079E6C, fn_80079F14, fn_80079F78.
- *   flipcheck: `.data`, `.sdata` and `.sdata2` are claimed and not emitted (declared).
- * SHAPES. The CopiedMatResources constructor is complete: its work is the member initialisers.  The material
- *   resource constructors keep `#pragma peephole off` (retail keeps `clrlwi` + `cmpwi` for the alignment test).
+ *   .data 0x8058E880-0x8058EAD8 (opens on "g3d_draw.cpp"; the `_ac.h` asserts of the handle members follow), .sdata
+ *   0x807911F8-0x80791200 (the two sort jitter counters), .sdata2 0x80795E18-0x80795E28 (0.0, -2.0, 1.0: a 1.0
+ *   pooled again after `g3d/g3d_draw1mat1shp.cpp`'s 0x80795E00, so a new TU at 0x800777B0).  The sort family
+ *   0x80079604-0x80079F78 is used only by this unit's depth-sorted passes; `g3d/g3d_fog.cpp` follows ("g3d_fog.cpp",
+ *   a 0.0 pooled again at 0x80795E28).
+ * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` (playbook idea 106) and `#pragma pool_data off` (each
+ *   literal its own `lis`/`addi`).
+ * NAMES. nw4r's where the map or the asserts carry them (Draw1Mat1ShpDirectly, ResByteCodeData::DRAW, MdlZ,
+ *   WORKMEM_NUMMDLZ).  GUESS: PrepareIndMtxOp (0x800777B0), SetupDraw1Mat1ShpSwap (0x80077E70), DrawByteCode
+ *   (0x8007868C), DrawByteCodeReplacement (0x80078A9C), DrawMdlZ (0x80078E7C), DrawMdlZReplacement (0x80079018),
+ *   GatherMdlZ (0x800791D8), CompareMdlZXlu/CompareMdlZOpa (0x80079F14/0x80079F78), the light-object tests
+ *   light_obj_is_specular_light/light_obj_is_point_light/light_obj_is_directional (0x80077D4C/0x80077D64/
+ *   0x80077DD8), vec3_negate (0x80077DBC),
+ *   mtx34_set (0x80077DF0, MTX34's twelve-float constructor), g3d_draw_res_mdl_directly (0x800793A4, nw4r's
+ *   DrawResMdlDirectly; its consumers call the C name) and DrawResMdlReplacement's field names.  fn_80077E34,
+ *   fn_80077E64 and fn_80078904 (ResMdl's copy constructor and ResNode::IsVisible) keep their stems because
+ *   `g3d/g3d_scnmdl.cpp` calls them by those names (g3d-draw#14).
+ * RESIDUALS. PrepareIndMtxOp: the model-info word is a named local (retail: a temporary), so three stack slots
+ *   shift.  The sort and __sort: registers of the outer copy differ and the second pivot's index is scaled twice
+ *   (retail: once).  The handle assignments call this TU's own copies where retail calls other units' (res_node_assign,
+ *   res_mat_misc_copy_ctor): relocation names only.  The ResCommon<T>::operator= instances come out at the end of
+ *   the object (retail: after each class's operator=).  Data: the literals are emitted but not yet in retail's
+ *   order, and the inline copies' strings are merged; flipcheck is not ready.  STOPGAPs: g3d-draw#1, #3, #9.
+ * SHAPES. `#pragma dont_inline on` reproduces retail's out-of-line accessors and compiler-generated assignments;
+ *   the loop counters declared first (DrawMdlZ*, PrepareIndMtxOp) and the record pointer declared before the count
+ *   (GatherMdlZ) give retail's register colouring; the specular half vector is written without a named scale and
+ *   under `fp_contract off`.
  */
 
 #include "types.h"
-
-
-#include "sys_mem.h" /* operator delete (rule 9: call through the owner) */
-#include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
-#include "g3d/g3d_xsi.h" /* g3d_calc_tex_mtx_xsi (rule 2) */
-#include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 2) */
-#include "MEM/MEMAllocFromAllocator.h" /* MEMFreeToAllocator (rule 2) */
-#include "g3d/g3d_anmchr.h" /* type_obj_set_name (rule 2) */
-#include "g3d/g3d_cpu.h"
-#include "g3d/g3d_resvtx.h"
+#include "mh3_pad.h"               /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "fn_8004CAD8/mtx.h"       /* MTX34_ctor (rule 2) */
+#include "g3d/g3d_obj.h"
+#include "g3d/g3d_anmchr.h"        /* res_node_ref / res_node_ref_nonconst / res_node_copy_ctor / res_node_assign (rule 2) */
+#include "g3d/fn_8005AA28.h"       /* res_node_is_valid (rule 2) */
+#include "g3d/g3d_anmclr.h"        /* res_mat_get_id (rule 2) */
+#include "g3d/g3d_calcview.h"      /* mtx34_concat / mtx34_copy_ps / res_mdl_info_handle (rule 2) */
+#include "g3d/g3d_calcworld.h"     /* res_mdl_get_info / res_mdl_info_num_view_mtx (rule 2) */
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_resnode.h"
 #include "g3d/g3d_resshp.h"
-#include "g3d/g3d_state.h"     /* the material loaders (rule 2) */
-#include "nw4r/fn_805012C4.h"
-#include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
-#include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple (rule 1) */
-#include "MSL/algorithm.h"     /* std::find / std::distance */
-#include "unsplit/g3d.h"      /* the scene objects' type-name records no unit owns (rule 2) */
-#include "g3d/g3d_light.h"     /* light_obj_get_light_pos / light_obj_get_light_dir (rule 2) */
-#include "g3d/g3d_draw1mat1shp.h" /* res_mat_misc_copy_ctor (rule 2) */
+#include "g3d/g3d_state.h"         /* the G3D state accessors (rule 2) */
+#include "g3d/g3d_ind_mtx_callback.h" /* G3dIndMtxOp, G3dIndMtxCallback (rule 1) */
+#include "g3d/light_obj_is_enable.h" /* light_obj_is_enable, owner g3d/g3d_anmscn.cpp (rule 2) */
+#include "g3d/g3d_gpu.h"           /* Mat33 (rule 1) */
+#include "g3d/g3d_pointer_assert.h"
+#include "g3d/g3d_light.h"         /* light_obj_get_light_pos / light_obj_get_light_dir (rule 2) */
+#include "g3d/g3d_draw1mat1shp.h"  /* Draw1Mat1ShpDirectly, Draw1Mat1ShpSwap, res_mat_misc_copy_ctor (rule 2) */
+#include "g3d/g3d_draw.h"
+#include "OS/PPCArch.h"            /* PPCSync (rule 2) */
+#include "nw4r/db_assert.h"        /* nw4r::db::Panic (rule 2) */
+#include "MSL/algorithm.h"         /* std::sort */
 
 #pragma peephole off
-
-#define M2C_ERROR(x) /* unknown instruction */
-
-
-/* Data objects the range references (unsplit, address-only). */
-extern const char lbl_8058E880[];
-extern u32 lbl_8058E890;
-extern u32 lbl_8058E8B8;
-extern const char lbl_8058E8E8[];
-extern const char lbl_8058E91C[];
-extern const char lbl_8058E9F4[];
-extern const char lbl_8058EA20[];
-extern const char lbl_8058EA30[];
-extern const char lbl_8058EA50[];
-extern const char lbl_8058EA64[];
-extern const char lbl_8058EA90[];
-extern const char lbl_8058EAA0[];
-extern const char lbl_8058EAC8[];
-extern f32 lbl_80795E18;
-extern f32 lbl_80795E1C;
-extern f32 lbl_80795E20;
-
-namespace nw4r { namespace db {
-void Panic(const char* file, int line, const char* fmt, ...);
-}}
+#pragma pool_data off
+#pragma dont_inline on
 
 extern "C" {
-u32 vec3_normalize_into(void*, void*, f32, f32);
-s32 res_node_is_valid(s32);
-s32 light_obj_is_enable(void);
+u32 vec3_normalize_into(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
 u32 fn_8006E2A8(s32, s32);
-u32 fn_8006FDCC(void*);
-s32 res_mdl_info_get_node_of_pos_nrm_mtx(void*, s32);
-u32 mtx34_copy_ps(void*, s32);
-u32 mtx34_concat(void*, void*, void*);
-s32 res_mdl_get_info(void*);
-s32 fn_80094094(s32);
-/* internal */ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2);
-/* internal */ s32 light_obj_is_specular_light(s32 *arg0);
-/* internal */ s32 light_obj_is_point_light(s32 arg0);
-/* internal */ u32 vec3_negate(void *arg1, void* a1);
-/* internal */ s32 fn_80077DD8(s32 *arg0);
-/* internal */ u32 mtx34_set(void *arg0, f32 farg0, f32 farg1, f32 farg2, f32 farg3, f32 farg4, f32 farg5, f32 farg6, f32 farg7, f32 arg_sp8, f32 arg_spC, f32 arg_sp10, f32 arg_sp14);
-/* internal */ s32 fn_80077E34(s32 arg0, void* a1);
-/* internal */ u32 fn_80077E64(s32 *arg0, s32 *arg1);
-/* internal */ u32 fn_80077E70(s32 arg0, s32 arg1, s32 arg2);
-/* internal */ u32 fn_80078608(s32 *arg0, s32 *arg1);
-/* internal */ u32 fn_8007868C(s32 arg0, void *arg1, s32 arg2, u32 arg_sp0);
-/* internal */ s32 fn_80078878(s32 arg0, s32 arg1);
-/* internal */ s32 fn_800788C8(s32 arg0, void* a1);
-/* internal */ u32 fn_800788F8(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_80078904(s32 arg0);
-/* internal */ s32 fn_80078988(s32 arg0, void* a1);
-/* internal */ u32 fn_800789B8(s32 *arg0, s32 *arg1);
-/* internal */ u32 fn_80078A9C(s32 arg0, void *arg1, s32 arg2, s32 arg3, u32 arg_sp0);
-/* internal */ u32 fn_80078E7C(s32 arg0, void *arg1, u32 arg2, s32 arg3, u32 arg_sp0);
-/* internal */ u32 fn_80079018(s32 arg0, void *arg1, u32 arg2, s32 arg3, s32 arg4, u32 arg_sp0);
-/* internal */ void* fn_800791D8(u32 *arg0, s32 arg1, s32 arg2, void *arg3, void *arg4);
-/* internal */ void g3d_draw_res_mdl_directly(s32 *arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7, u32 arg_sp0);
-/* internal */ u32 fn_80079604(u32 arg0, u32 arg1, s32 (*arg2)(u32, u32), u32 arg_sp0);
-/* internal */ u32 fn_80079938(u32 arg0, u32 arg1, s32 arg2);
-/* internal */ u32 fn_800799BC(u32 arg0, u32 arg1, s32 (**arg2)(u32, u32));
-/* internal */ u32 fn_80079A48(s32 arg0, s32 arg1, s32 arg2, s32 (**arg3)(s32, s32), u32 arg_sp0);
-/* internal */ u32 fn_80079B38(u32 arg0, u32 arg1, s32 (**arg2)(u32, u32), u32 arg_sp0);
-/* internal */ u32 fn_80079E6C(s32 *arg0, s32 *arg1);
-/* internal */ u32 fn_80079EE4(void *arg0, void *arg1);
-/* internal */ void* fn_80079F10(void* a0, void* a1);
-/* internal */ s32 fn_80079F14(void *arg0, void *arg1);
-/* internal */ s32 fn_80079F78(void *arg0, void *arg1);
-
-
-
-} /* extern "C" */
-extern "C" {
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x10];
-    /* +0x10 */ u32 (*field_0x10)(...);
-    /* +0x14 */ u32 (*field_0x14)(...);
-} RawView_16; /* size: 0x18 */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x8];
-    /* +0x08 */ u32 field_0x08;
-} RawView_17; /* size: 0xC */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-    /* +0x0C */ u32 field_0x0C;
-    /* +0x10 */ u32 field_0x10;
-    /* +0x14 */ u32 field_0x14;
-    /* +0x18 */ u32 field_0x18;
-    /* +0x1C */ u32 field_0x1C;
-    /* +0x20 */ u32 field_0x20;
-} RawView_18; /* size: 0x24 */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-    /* +0x0C */ u32 field_0x0C;
-    /* +0x10 */ u32 field_0x10;
-    /* +0x14 */ u32 field_0x14;
-    /* +0x18 */ u32 field_0x18;
-    /* +0x1C */ u32 field_0x1C;
-    /* +0x20 */ u32 field_0x20;
-} RawView_19; /* size: 0x24 */
-#pragma peephole on
-void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
-    u32 sp54;
-    u32 sp58;
-    u32 sp6C;
-    u32 sp70;
-    u32 sp78;
-    u32 sp7C;
-    u32 sp84;
-    u32 sp88;
-
-    f32 spF4;
-    f32 spF0;
-    f32 spEC;
-    f32 spE8;
-    f32 spE4;
-    f32 spE0;
-    f32 spDC;
-    f32 spD8;
-    f32 spD4;
-    f32 spD0;
-    f32 spCC;
-    f32 spC8;
-    u32 sp98;
-    s32 sp94;
-    s32 sp90;
-    s32 sp8C;
-    f32 sp80;
-    f32 sp74;
-    f32 sp68;
-    f32 sp64;
-    f32 sp60;
-    f32 sp5C;
-    f32 sp50;
-    u32 sp44;
-    u32 sp38;
-    u32 sp34;
-    u8 sp32;
-    u8 sp31;
-    u8 sp30;
-    u32 sp2C;
-    u32 sp28;
-    s32 sp24;
-    s32 sp20;
-    s32 sp1C;
-    s32 sp18;
-    f32 sp14;
-    f32 sp10;
-    f32 spC;
-    f32 sp8;
-    f32 temp_f1;
-    f32 temp_f29;
-    f32 temp_f30;
-    f32 temp_f31;
-    s32 *var_r31;
-    s32 temp_r20_2;
-    s32 temp_r26;
-    s32 temp_r3_3;
-    s32 temp_r3_5;
-    s32 var_r29;
-    u32 temp_r20;
-    u32 var_r28;
-    u8 *var_r30;
-    void **temp_r3;
-    void *temp_r3_2;
-    void *temp_r3_4;
-
-    M2C_ERROR(/* unknown instruction: xsmaddmdp vs30, vs1, vs0 */);
-    M2C_ERROR(/* unknown instruction: xxsel vs29, vs1, vs0, vs36 */);
-    if ((reinterpret_cast<const nw4r::g3d::ResMat*>(0)->IsValid() == 0) || (reinterpret_cast<const nw4r::g3d::ResShp*>(arg2)->IsValid() == 0)) {
-        M2C_ERROR(/* unknown instruction: vmrghb v31, v1, v0 */);
-        M2C_ERROR(/* unknown instruction: vmrghb v30, v1, v0 */);
-        M2C_ERROR(/* unknown instruction: vmrghb v29, v1, v0 */);
-        return NULL;
-    }
-    sp24 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatMisc().mpData;
-    res_mat_misc_copy_ctor((s32)(&sp34), (const s32*)(&sp24));
-    reinterpret_cast<nw4r::g3d::ResMatMisc*>(&sp34)->GetIndirectMethod(GX_ITM_0, (nw4r::g3d::ResMatMiscData::IndirectMethod*)&sp8C, (s8*)&sp30);
-    reinterpret_cast<nw4r::g3d::ResMatMisc*>(&sp34)->GetIndirectMethod(GX_ITM_1, (nw4r::g3d::ResMatMiscData::IndirectMethod*)&sp90, (s8*)&sp31);
-    reinterpret_cast<nw4r::g3d::ResMatMisc*>(&sp34)->GetIndirectMethod(GX_ITM_2, (nw4r::g3d::ResMatMiscData::IndirectMethod*)&sp94, (s8*)&sp32);
-    if ((sp8C == 0) && (sp90 == 0) && (sp94 == 0)) {
-        M2C_ERROR(/* unknown instruction: vmrghb v31, v1, v0 */);
-        M2C_ERROR(/* unknown instruction: vmrghb v30, v1, v0 */);
-        M2C_ERROR(/* unknown instruction: vmrghb v29, v1, v0 */);
-        return NULL;
-    }
-    var_r29 = 0;
-    MTX34_ctor((nw4r::math::MTX34*)&spC8);
-    temp_r3 = (void **)(g3d_state_get_ind_mtx_hook());
-    ((RawView_16*)(*temp_r3))->field_0x10();
-    var_r28 = 0U;
-    var_r31 = (s32 *)(&sp8C);
-    var_r30 = (u8 *)(&sp30);
-    temp_f29 = lbl_80795E1C;
-    temp_f30 = lbl_80795E20;
-    temp_f31 = lbl_80795E18;
-    do {
-        temp_r26 = var_r28 + 1;
-        if ((s32) *var_r31 != 0) {
-            if (var_r29 == 0) {
-                var_r29 = 1;
-                if ((s32) reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx >= 0) {
-                    temp_r20 = fn_8006FDCC((void*)(arg1));
-                    if ((u32) reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx == temp_r20) {
-                        temp_r3_2 = (void *)(g3d_state_get_nrm_mtx((u32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx)));
-                        spC8 = ((RawView_18*)temp_r3_2)->field_0x00;
-                        spCC = ((RawView_18*)temp_r3_2)->field_0x04;
-                        spD0 = ((RawView_18*)temp_r3_2)->field_0x08;
-                        spD8 = ((RawView_18*)temp_r3_2)->field_0x0C;
-                        spDC = ((RawView_18*)temp_r3_2)->field_0x10;
-                        spE0 = ((RawView_18*)temp_r3_2)->field_0x14;
-                        spE8 = ((RawView_18*)temp_r3_2)->field_0x18;
-                        spEC = ((RawView_18*)temp_r3_2)->field_0x1C;
-                        spF0 = ((RawView_18*)temp_r3_2)->field_0x20;
-                    } else {
-                        sp20 = fn_80094094((s32)(arg0));
-                        fn_80077E34((s32)(&sp2C), (void*)(&sp20));
-                        sp1C = res_mdl_get_info((void*)(&sp2C));
-                        temp_r3_3 = res_mdl_info_get_node_of_pos_nrm_mtx((void*)(&sp1C), (s32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx));
-                        if (temp_r3_3 < 0) {
-                            nw4r::db::Panic((const char*)&lbl_8058E880, 0x64, (const char*)&lbl_8058E890);
-                        }
-                        sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMdl*>(&sp2C)->GetResNode((int)temp_r3_3).mpData;
-                        res_node_copy_ctor((void*)(&sp28), (u32*)(&sp18));
-                        temp_r20_2 = (s32)res_node_ref_nonconst((ResHandle*)(arg1));
-                        mtx34_concat((void*)(&spC8), (void*)((u32)res_node_ref_nonconst((ResHandle*)(&sp28)) + 0xA0), (void*)(u32)(temp_r20_2 + 0x70));
-                        temp_r3_4 = (void *)(g3d_state_get_nrm_mtx((u32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx)));
-                        sp8 = ((RawView_19*)temp_r3_4)->field_0x18;
-                        spC = ((RawView_19*)temp_r3_4)->field_0x1C;
-                        sp10 = ((RawView_19*)temp_r3_4)->field_0x20;
-                        sp14 = temp_f31;
-                        mtx34_set((void *)(&sp98), (*(f32*)&temp_r3_4), (f32)(((RawView_19*)temp_r3_4)->field_0x00), (f32)(((RawView_19*)temp_r3_4)->field_0x04), (f32)(((RawView_19*)temp_r3_4)->field_0x08), (f32)(temp_f31), (f32)(((RawView_19*)temp_r3_4)->field_0x0C), (f32)(((RawView_19*)temp_r3_4)->field_0x10), (f32)(((RawView_19*)temp_r3_4)->field_0x14), (f32)(temp_f31), 0, 0, 0);
-                        mtx34_concat((void*)(&spC8), (void*)(&sp98), (void*)(&spC8));
-                    }
-                    spF4 = temp_f31;
-                    spE4 = temp_f31;
-                    spD4 = temp_f31;
-                    setVec3((nw4r::math::VEC3*)&sp80, (f32)(spC8), (f32)(spD8), (f32)(spE8));
-                    vec3_normalize_into((void*)(&sp80), (void*)(&sp80), 0, 0);
-                    spC8 = sp80;
-                    spD8 = sp84;
-                    spE8 = sp88;
-                    setVec3((nw4r::math::VEC3*)&sp74, (f32)(spCC), (f32)(spDC), (f32)(spEC));
-                    vec3_normalize_into((void*)(&sp74), (void*)(&sp74), 0, 0);
-                    spCC = sp74;
-                    spDC = sp78;
-                    spEC = sp7C;
-                    setVec3((nw4r::math::VEC3*)&sp68, (f32)(spD0), (f32)(spE0), (f32)(spF0));
-                    vec3_normalize_into((void*)(&sp68), (void*)(&sp68), 0, 0);
-                    spD0 = sp68;
-                    spE0 = sp6C;
-                    spF0 = sp70;
-                } else {
-                    mtx34_copy_ps((void*)(&spC8), (s32)(g3d_state_get_camera_mtx()));
-                }
-            }
-            temp_r3_5 = (s32)g3d_state_get_light_obj(g3d_state_get_light_set_entry((s8)*var_r30));
-            if ((temp_r3_5 != 0) && (light_obj_is_enable() != 0)) {
-                VEC3_ctor((nw4r::math::VEC3*)&sp5C);
-                if (fn_80077DD8((s32 *)(temp_r3_5)) != 0) {
-                    light_obj_get_light_dir((s32)(temp_r3_5), (s32)(&sp5C));
-                    if ((temp_f31 == sp5C) && (temp_f31 == sp60) && (temp_f31 == sp64)) {
-                        light_obj_get_light_pos((s32)(temp_r3_5), (s32)(&sp5C));
-                        vec3_negate((void *)(&sp44), (void*)(&sp5C));
-                        copyVec3((nw4r::math::VEC3*)&sp5C, (const nw4r::math::VEC3*)&sp44);
-                        vec3_normalize_into((void*)(&sp5C), (void*)(&sp5C), 0, 0);
-                    }
-                } else if (light_obj_is_point_light((s32)(temp_r3_5)) != 0) {
-                    light_obj_get_light_pos((s32)(temp_r3_5), (s32)(&sp5C));
-                    vec3_negate((void *)(&sp38), (void*)(&sp5C));
-                    copyVec3((nw4r::math::VEC3*)&sp5C, (const nw4r::math::VEC3*)&sp38);
-                    vec3_normalize_into((void*)(&sp5C), (void*)(&sp5C), 0, 0);
-                } else {
-                    VEC3_ctor((nw4r::math::VEC3*)&sp50);
-                    if (light_obj_is_specular_light((s32 *)(temp_r3_5)) == 0) {
-                        nw4r::db::Panic((const char*)&lbl_8058E880, 0xAB, (const char*)&lbl_8058E8B8);
-                    }
-                    light_obj_get_light_dir((s32)(temp_r3_5), (s32)(&sp50));
-                    temp_f1 = temp_f29 * sp58;
-                    sp5C = temp_f1 * sp50;
-                    sp60 = temp_f1 * sp54;
-                    sp64 = temp_f30 + (temp_f1 * sp58);
-                    vec3_normalize_into((void*)(&sp5C), (void*)(&sp5C), (f32)(temp_f1), (f32)(sp58));
-                }
-                ((RawView_16*)(*temp_r3))->field_0x14(temp_r3, temp_r26, &sp5C, &spC8, *var_r31);
-            } else {
-                ((RawView_16*)(*temp_r3))->field_0x14(temp_r3, temp_r26, 0, &spC8, *var_r31);
-            }
-        }
-        var_r31 += 4;
-        var_r30 += 1;
-        var_r28 += 1;
-    } while (var_r28 < 3U);
-    M2C_ERROR(/* unknown instruction: vmrghb v31, v1, v0 */);
-    M2C_ERROR(/* unknown instruction: vmrghb v30, v1, v0 */);
-    M2C_ERROR(/* unknown instruction: vmrghb v29, v1, v0 */);
-    return temp_r3;
-}
-#pragma peephole off
-
-s32 light_obj_is_specular_light(s32 *arg0) {
-    return (*arg0 & 2) != 0;
+nw4r::g3d::ResMdl fn_80094094(const nw4r::g3d::ResMat* pMat);
 }
 
-s32 light_obj_is_point_light(s32 arg0) {
-    s32 var_r31;
 
-    var_r31 = 0;
-    if ((fn_80077DD8(0) == 0) && (light_obj_is_specular_light((s32 *)(arg0)) == 0)) {
-        var_r31 = 1;
-    }
-    return var_r31;
-}
 
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-} RawView_20; /* size: 0xC */
-u32 vec3_negate(void *arg1, void* a1) {
-    setVec3((nw4r::math::VEC3*)(-((RawView_20*)arg1)->field_0x00), (f32)(-((RawView_20*)arg1)->field_0x04), (f32)(-((RawView_20*)arg1)->field_0x08), 0);
-}
+namespace nw4r {
+namespace g3d {
 
-s32 fn_80077DD8(s32 *arg0) {
-    return (*arg0 & 1) != 0;
-}
-
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-    /* +0x0C */ u32 field_0x0C;
-    /* +0x10 */ u32 field_0x10;
-    /* +0x14 */ u32 field_0x14;
-    /* +0x18 */ u32 field_0x18;
-    /* +0x1C */ u32 field_0x1C;
-    /* +0x20 */ u32 field_0x20;
-    /* +0x24 */ u32 field_0x24;
-    /* +0x28 */ u32 field_0x28;
-    /* +0x2C */ u32 field_0x2C;
-} RawView_21; /* size: 0x30 */
-u32 mtx34_set(void *arg0, f32 farg0, f32 farg1, f32 farg2, f32 farg3, f32 farg4, f32 farg5, f32 farg6, f32 farg7, f32 arg_sp8, f32 arg_spC, f32 arg_sp10, f32 arg_sp14) {
-    ((RawView_21*)arg0)->field_0x00 = farg0;
-    ((RawView_21*)arg0)->field_0x04 = farg1;
-    ((RawView_21*)arg0)->field_0x08 = farg2;
-    ((RawView_21*)arg0)->field_0x0C = farg3;
-    ((RawView_21*)arg0)->field_0x10 = farg4;
-    ((RawView_21*)arg0)->field_0x14 = farg5;
-    ((RawView_21*)arg0)->field_0x18 = farg6;
-    ((RawView_21*)arg0)->field_0x1C = farg7;
-    ((RawView_21*)arg0)->field_0x20 = arg_sp8;
-    ((RawView_21*)arg0)->field_0x24 = arg_spC;
-    ((RawView_21*)arg0)->field_0x28 = arg_sp10;
-    ((RawView_21*)arg0)->field_0x2C = arg_sp14;
-}
-
-s32 fn_80077E34(s32 arg0, void* a1) {
-    fn_80077E64(0, 0);
-    return arg0;
-}
-
-u32 fn_80077E64(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
-
-} /* extern "C" */
-
-/* The material resource set fn_80077E70 refills from a ScnMdl's copied-material buffers: one handle per
- * resource kind and three trailing words.  size: 0x38 */
-struct CopiedMatResources {
-    /* +0x00 */ nw4r::g3d::ResTexObj texObj;
-    /* +0x04 */ nw4r::g3d::ResTlutObj tlutObj;
-    /* +0x08 */ nw4r::g3d::ResGenMode genMode;
-    /* +0x0C */ nw4r::g3d::ResTev tev;
-    /* +0x10 */ nw4r::g3d::ResMatPix pix;
-    /* +0x14 */ nw4r::g3d::ResMatTevColor tevColor;
-    /* +0x18 */ nw4r::g3d::ResMatIndMtxAndScale indMtxAndScale;
-    /* +0x1C */ nw4r::g3d::ResMatChan chan;
-    /* +0x20 */ nw4r::g3d::ResMatTexCoordGen texCoordGen;
-    /* +0x24 */ nw4r::g3d::ResMatMisc misc;
-    /* +0x28 */ nw4r::g3d::ResTexSrt texSrt;
-    /* +0x2C */ u32 word_0x2C;
-    /* +0x30 */ u32 word_0x30;
-    /* +0x34 */ u32 word_0x34;
-
-    CopiedMatResources();
+/* One depth-sort record the sorted passes gather per visible DRAW command.  size: 0xC */
+struct MdlZ {
+    /* +0x0 */ f32 Z;          /* the view-space depth of the node's matrix */
+    /* +0x4 */ u16 priority;   /* the command's draw priority */
+    /* +0x6 */ u16 nodeID;
+    /* +0x8 */ u16 matID;
+    /* +0xA */ u16 shpID;
 };
 
+/* The capacity of the work-memory depth-record array. */
+enum {
+    WORKMEM_NUMMDLZ = 0x800
+};
+
+/* One material's display-list blocks as a replacement block carries them (the sizes the refill strides by). */
+struct ReplPixDL { /* +0x0 */ u8 data[0x20]; };              /* size: 0x20 */
+struct ReplTevColorDL { /* +0x0 */ u8 data[0x80]; };         /* size: 0x80 */
+struct ReplIndMtxAndScaleDL { /* +0x0 */ u8 data[0x40]; };   /* size: 0x40 */
+struct ReplTexCoordGenDL { /* +0x0 */ u8 data[0xA0]; };      /* size: 0xA0 */
+struct ReplTevDL { /* +0x0 */ u8 data[0x200]; };             /* size: 0x200 */
+
+/* The per-model replacement a draw can use instead of the model's own resources: a node visibility array and one
+ * array per material resource kind, indexed by the material's id.  size: 0x40 */
+struct DrawResMdlReplacement {
+    /* +0x00 */ u32 flag;                            /* bit 0: keep the swap's vertex tables clear */
+    /* +0x04 */ u8* visArray;                        /* per node: drawn when non-zero; NULL = the nodes' own flags */
+    /* +0x08 */ ResTexObjData* texObjDataArray;
+    /* +0x0C */ ResTlutObjData* tlutObjDataArray;
+    /* +0x10 */ ResTexSrtData* texSrtDataArray;
+    /* +0x14 */ ResMatChanData* chanDataArray;
+    /* +0x18 */ ResGenModeData* genModeDataArray;
+    /* +0x1C */ ResMatMiscData* matMiscDataArray;
+    /* +0x20 */ ReplPixDL* pixDLArray;
+    /* +0x24 */ ReplTevColorDL* tevColorDLArray;
+    /* +0x28 */ ReplIndMtxAndScaleDL* indMtxAndScaleDLArray;
+    /* +0x2C */ ReplTexCoordGenDL* texCoordGenDLArray;
+    /* +0x30 */ ReplTevDL* tevDataArray;
+    /* +0x34 */ ResVtxPosData** vtxPosTable;     /* per vertex-position id; NULL = the model's own */
+    /* +0x38 */ ResVtxNrmData** vtxNrmTable;
+    /* +0x3C */ ResVtxClrData** vtxClrTable;
+};
+
+static G3dIndMtxCallback* PrepareIndMtxOp(ResMat mat, ResNode node, ResShp shp);
+static bool CompareMdlZXlu(const MdlZ& lhs, const MdlZ& rhs);
+static bool CompareMdlZOpa(const MdlZ& lhs, const MdlZ& rhs);
+
+}  // namespace g3d
+}  // namespace nw4r
+
 extern "C" {
-
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u8 pad_0x04[0x4];
-    /* +0x08 */ u32 field_0x08;
-    /* +0x0C */ u32 field_0x0C;
-    /* +0x10 */ u32 field_0x10;
-    /* +0x14 */ u32 field_0x14;
-    /* +0x18 */ u32 field_0x18;
-    /* +0x1C */ u32 field_0x1C;
-    /* +0x20 */ u32 field_0x20;
-    /* +0x24 */ u32 field_0x24;
-    /* +0x28 */ u32 field_0x28;
-    /* +0x2C */ u32 field_0x2C;
-    /* +0x30 */ u32 field_0x30;
-    /* +0x34 */ u32 field_0x34;
-    /* +0x38 */ u32 field_0x38;
-    /* +0x3C */ u32 field_0x3C;
-} RawView_22; /* size: 0x40 */
-u32 fn_80077E70(s32 arg0, s32 arg1, s32 arg2) {
-    u32 sp5C;
-    u32 sp58;
-    u32 sp54;
-    u32 sp50;
-    u32 sp4C;
-    u32 sp48;
-    u32 sp44;
-    u32 sp40;
-    u32 sp3C;
-    u32 sp38;
-    u32 sp34;
-    u32 sp30;
-    u32 sp2C;
-    u32 sp28;
-    u32 sp24;
-    u32 sp20;
-    u32 sp1C;
-    u32 sp18;
-    u32 sp14;
-    u32 sp10;
-    u32 spC;
-    u32 sp8;
-    s32 temp_r10;
-    s32 temp_r11;
-    s32 temp_r4;
-    s32 temp_r4_10;
-    s32 temp_r4_11;
-    s32 temp_r4_2;
-    s32 temp_r4_3;
-    s32 temp_r4_4;
-    s32 temp_r4_5;
-    s32 temp_r4_6;
-    s32 temp_r4_7;
-    s32 temp_r4_8;
-    s32 temp_r4_9;
-    s32 var_r10;
-    s32 var_r4;
-    s32 var_r5;
-    s32 var_r5_2;
-    s32 var_r6;
-    s32 var_r6_2;
-    s32 var_r7;
-    s32 var_r7_2;
-    s32 var_r8;
-    s32 var_r8_2;
-    s32 var_r9;
-    s32 var_r9_2;
-
-    var_r5 = 1;
-    var_r6 = 1;
-    var_r7 = 1;
-    var_r8 = 1;
-    var_r9 = 1;
-    var_r10 = 1;
-    temp_r11 = arg0 & 0xFF000000;
-    if (((u32) (temp_r11 + 0x80000000) != 0U) && ((u32) ((arg0 & 0xFF800000) + 0x7F000000) != 0U)) {
-        var_r10 = 0;
-    }
-    if ((var_r10 == 0) && ((u32) ((arg0 & 0xF8000000) + 0x70000000) != 0U)) {
-        var_r9 = 0;
-    }
-    if ((var_r9 == 0) && ((u32) (temp_r11 + 0x40000000) != 0U)) {
-        var_r8 = 0;
-    }
-    if ((var_r8 == 0) && ((u32) ((arg0 & 0xFF800000) + 0x3F000000) != 0U)) {
-        var_r7 = 0;
-    }
-    if ((var_r7 == 0) && ((u32) ((arg0 & 0xF8000000) + 0x30000000) != 0U)) {
-        var_r6 = 0;
-    }
-    if ((var_r6 == 0) && ((u32) ((arg0 & 0xFFFFC000) + 0x20000000) != 0U)) {
-        var_r5 = 0;
-    }
-    if (var_r5 == 0) {
-        nw4r::db::Panic((const char*)&lbl_8058E880, 0xCD, (const char*)&lbl_8058E8E8, arg0);
-    }
-    var_r4 = 1;
-    var_r5_2 = 1;
-    var_r6_2 = 1;
-    var_r7_2 = 1;
-    var_r8_2 = 1;
-    var_r9_2 = 1;
-    temp_r10 = arg1 & 0xFF000000;
-    if (((u32) (temp_r10 + 0x80000000) != 0U) && ((u32) ((arg1 & 0xFF800000) + 0x7F000000) != 0U)) {
-        var_r9_2 = 0;
-    }
-    if ((var_r9_2 == 0) && ((u32) ((arg1 & 0xF8000000) + 0x70000000) != 0U)) {
-        var_r8_2 = 0;
-    }
-    if ((var_r8_2 == 0) && ((u32) (temp_r10 + 0x40000000) != 0U)) {
-        var_r7_2 = 0;
-    }
-    if ((var_r7_2 == 0) && ((u32) ((arg1 & 0xFF800000) + 0x3F000000) != 0U)) {
-        var_r6_2 = 0;
-    }
-    if ((var_r6_2 == 0) && ((u32) ((arg1 & 0xF8000000) + 0x30000000) != 0U)) {
-        var_r5_2 = 0;
-    }
-    if ((var_r5_2 == 0) && ((u32) ((arg1 & 0xFFFFC000) + 0x20000000) != 0U)) {
-        var_r4 = 0;
-    }
-    if (var_r4 == 0) {
-        nw4r::db::Panic((const char*)&lbl_8058E880, 0xCE, (const char*)&lbl_8058E91C, arg1);
-    }
-    temp_r4 = ((RawView_22*)arg1)->field_0x08;
-    if (temp_r4 != 0) {
-        ((CopiedMatResources*)arg0)->texObj = nw4r::g3d::ResTexObj((void*)(temp_r4 + (arg2 * 0x104)));
-    } else {
-        ((CopiedMatResources*)arg0)->texObj = nw4r::g3d::ResTexObj((void*)(0));
-    }
-    temp_r4_2 = ((RawView_22*)arg1)->field_0x0C;
-    if (temp_r4_2 != 0) {
-        ((CopiedMatResources*)arg0)->tlutObj = nw4r::g3d::ResTlutObj((void*)(temp_r4_2 + (arg2 * 0x64)));
-    } else {
-        ((CopiedMatResources*)arg0)->tlutObj = nw4r::g3d::ResTlutObj((void*)(0));
-    }
-    temp_r4_3 = ((RawView_22*)arg1)->field_0x10;
-    if (temp_r4_3 != 0) {
-        ((CopiedMatResources*)arg0)->texSrt = nw4r::g3d::ResTexSrt((void*)(temp_r4_3 + (arg2 * 0x248)));
-    } else {
-        ((CopiedMatResources*)arg0)->texSrt = nw4r::g3d::ResTexSrt((void*)NULL);
-    }
-    temp_r4_4 = ((RawView_22*)arg1)->field_0x14;
-    if (temp_r4_4 != 0) {
-        ((CopiedMatResources*)arg0)->chan = nw4r::g3d::ResMatChan((void*)(temp_r4_4 + (arg2 * 0x28)));
-    } else {
-        ((CopiedMatResources*)arg0)->chan = nw4r::g3d::ResMatChan((void*)(0));
-    }
-    temp_r4_5 = ((RawView_22*)arg1)->field_0x18;
-    if (temp_r4_5 != 0) {
-        ((CopiedMatResources*)arg0)->genMode = nw4r::g3d::ResGenMode((void*)(temp_r4_5 + (arg2 * 8)));
-    } else {
-        ((CopiedMatResources*)arg0)->genMode = nw4r::g3d::ResGenMode((void*)(0));
-    }
-    temp_r4_6 = ((RawView_22*)arg1)->field_0x1C;
-    if (temp_r4_6 != 0) {
-        ((CopiedMatResources*)arg0)->misc = nw4r::g3d::ResMatMisc((void*)(temp_r4_6 + (arg2 * 0xC)));
-    } else {
-        ((CopiedMatResources*)arg0)->misc = nw4r::g3d::ResMatMisc((void*)(0));
-    }
-    temp_r4_7 = ((RawView_22*)arg1)->field_0x20;
-    if (temp_r4_7 != 0) {
-        ((CopiedMatResources*)arg0)->pix = nw4r::g3d::ResMatPix((void*)(temp_r4_7 + (arg2 << 5)));
-    } else {
-        ((CopiedMatResources*)arg0)->pix = nw4r::g3d::ResMatPix((void*)(0));
-    }
-    temp_r4_8 = ((RawView_22*)arg1)->field_0x24;
-    if (temp_r4_8 != 0) {
-        ((CopiedMatResources*)arg0)->tevColor = nw4r::g3d::ResMatTevColor((void*)(temp_r4_8 + (arg2 << 7)));
-    } else {
-        ((CopiedMatResources*)arg0)->tevColor = nw4r::g3d::ResMatTevColor((void*)(0));
-    }
-    temp_r4_9 = ((RawView_22*)arg1)->field_0x28;
-    if (temp_r4_9 != 0) {
-        ((CopiedMatResources*)arg0)->indMtxAndScale = nw4r::g3d::ResMatIndMtxAndScale((void*)(temp_r4_9 + (arg2 << 6)));
-    } else {
-        ((CopiedMatResources*)arg0)->indMtxAndScale = nw4r::g3d::ResMatIndMtxAndScale((void*)(0));
-    }
-    temp_r4_10 = ((RawView_22*)arg1)->field_0x2C;
-    if (temp_r4_10 != 0) {
-        ((CopiedMatResources*)arg0)->texCoordGen = nw4r::g3d::ResMatTexCoordGen((void*)(temp_r4_10 + (arg2 * 0xA0)));
-    } else {
-        ((CopiedMatResources*)arg0)->texCoordGen = nw4r::g3d::ResMatTexCoordGen((void*)(0));
-    }
-    temp_r4_11 = ((RawView_22*)arg1)->field_0x30;
-    if (temp_r4_11 != 0) {
-        ((CopiedMatResources*)arg0)->tev = nw4r::g3d::ResTev((void*)(temp_r4_11 + (arg2 << 9)));
-    } else {
-        ((CopiedMatResources*)arg0)->tev = nw4r::g3d::ResTev((void*)(0));
-    }
-    if ((s32) (((RawView_22*)arg1)->field_0x00 & 1) != 0) {
-        ((CopiedMatResources*)arg0)->word_0x2C = 0;
-        ((CopiedMatResources*)arg0)->word_0x30 = 0;
-        ((CopiedMatResources*)arg0)->word_0x34 = 0;
-        return;
-    }
-    ((CopiedMatResources*)arg0)->word_0x2C = (s32) ((RawView_22*)arg1)->field_0x34;
-    ((CopiedMatResources*)arg0)->word_0x30 = (s32) ((RawView_22*)arg1)->field_0x38;
-    ((CopiedMatResources*)arg0)->word_0x34 = (s32) ((RawView_22*)arg1)->field_0x3C;
+s32 light_obj_is_specular_light(const G3dLightObj* pLObj);
+s32 light_obj_is_point_light(const G3dLightObj* pLObj);
+s32 light_obj_is_directional(const G3dLightObj* pLObj);
+void vec3_negate(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
+void fn_80077E64(s32* pDst, s32* pSrc);
+void SetupDraw1Mat1ShpSwap(nw4r::g3d::Draw1Mat1ShpSwap* pSwap, nw4r::g3d::DrawResMdlReplacement* pRep, u32 idx);
+u32 fn_80078608(s32* pDst, s32* pSrc);
 }
 
-} /* extern "C" */
+namespace nw4r {
+namespace g3d {
+
+#pragma fp_contract off
+/* 0x800777B0 (0x59C): resets the indirect-matrix callback and offers it, per normal-mapped indirect stage of the
+ * material, the shape's normal matrix and the stage's light direction. */
+static G3dIndMtxCallback* PrepareIndMtxOp(ResMat mat, ResNode node, ResShp shp) {
+    if (!mat.IsValid() || !shp.IsValid()) {
+        return NULL;
+    }
+    ResMatMisc misc(mat.GetResMatMisc());
+    ResMatMiscData::IndirectMethod method[3];
+    s8 lightRef[3];
+    misc.GetIndirectMethod(GX_ITM_0, &method[0], &lightRef[0]);
+    misc.GetIndirectMethod(GX_ITM_1, &method[1], &lightRef[1]);
+    misc.GetIndirectMethod(GX_ITM_2, &method[2], &lightRef[2]);
+    if (method[0] == ResMatMiscData::WARP && method[1] == ResMatMiscData::WARP && method[2] == ResMatMiscData::WARP) {
+        return NULL;
+    }
+
+    bool nrmMtxReady = false;
+    math::MTX34 nrmMtx;
+    MTX34_ctor(&nrmMtx);
+    u32 i;
+    G3dIndMtxCallback* pOp = g3d_state_get_ind_mtx_hook();
+    pOp->Reset();
+    for (i = 0; i < 3; i++) {
+        u32 id = i + 1;
+        if (method[i] == ResMatMiscData::WARP) {
+            continue;
+        }
+        if (!nrmMtxReady) {
+            nrmMtxReady = true;
+            if (shp.ptr()->curMtxIdx >= 0) {
+                if (shp.ptr()->curMtxIdx == fn_8006FDCC(&node)) {
+                    const Mat33* pNrm = g3d_state_get_nrm_mtx(shp.ptr()->curMtxIdx);
+                    nrmMtx.m[0][0] = pNrm->m[0][0];
+                    nrmMtx.m[0][1] = pNrm->m[0][1];
+                    nrmMtx.m[0][2] = pNrm->m[0][2];
+                    nrmMtx.m[1][0] = pNrm->m[1][0];
+                    nrmMtx.m[1][1] = pNrm->m[1][1];
+                    nrmMtx.m[1][2] = pNrm->m[1][2];
+                    nrmMtx.m[2][0] = pNrm->m[2][0];
+                    nrmMtx.m[2][1] = pNrm->m[2][1];
+                    nrmMtx.m[2][2] = pNrm->m[2][2];
+                } else {
+                    ResMdl mdl(fn_80094094(&mat));
+                    u32 info = res_mdl_get_info(&mdl);
+                    int shpNodeID = res_mdl_info_get_node_of_pos_nrm_mtx(&info, shp.ptr()->curMtxIdx);
+                    if (shpNodeID < 0) {
+                        nw4r::db::Panic("g3d_draw.cpp", 0x64, "NW4R:Failed assertion shpNodeID >= 0");
+                    }
+                    ResNode shpNode(mdl.GetResNode(shpNodeID));
+                    ResNodeData* pNodeData = res_node_ref_nonconst((ResHandle*)&node);
+                    mtx34_concat(&nrmMtx, (const math::MTX34*)res_node_ref_nonconst((ResHandle*)&shpNode)->mInvModelMtx,
+                                 (const math::MTX34*)pNodeData->mModelMtx);
+                    const Mat33* pNrm = g3d_state_get_nrm_mtx(shp.ptr()->curMtxIdx);
+                    math::MTX34 shpNrmMtx;
+                    mtx34_set(&shpNrmMtx, pNrm->m[0][0], pNrm->m[0][1], pNrm->m[0][2], 0.0f, pNrm->m[1][0], pNrm->m[1][1], pNrm->m[1][2],
+                              0.0f, pNrm->m[2][0], pNrm->m[2][1], pNrm->m[2][2], 0.0f);
+                    mtx34_concat(&nrmMtx, &shpNrmMtx, &nrmMtx);
+                }
+                nrmMtx.m[0][3] = nrmMtx.m[1][3] = nrmMtx.m[2][3] = 0.0f;
+
+                math::VEC3 axisX;
+                setVec3(&axisX, nrmMtx.m[0][0], nrmMtx.m[1][0], nrmMtx.m[2][0]);
+                vec3_normalize_into(&axisX, &axisX);
+                nrmMtx.m[0][0] = axisX.x;
+                nrmMtx.m[1][0] = axisX.y;
+                nrmMtx.m[2][0] = axisX.z;
+                math::VEC3 axisY;
+                setVec3(&axisY, nrmMtx.m[0][1], nrmMtx.m[1][1], nrmMtx.m[2][1]);
+                vec3_normalize_into(&axisY, &axisY);
+                nrmMtx.m[0][1] = axisY.x;
+                nrmMtx.m[1][1] = axisY.y;
+                nrmMtx.m[2][1] = axisY.z;
+                math::VEC3 axisZ;
+                setVec3(&axisZ, nrmMtx.m[0][2], nrmMtx.m[1][2], nrmMtx.m[2][2]);
+                vec3_normalize_into(&axisZ, &axisZ);
+                nrmMtx.m[0][2] = axisZ.x;
+                nrmMtx.m[1][2] = axisZ.y;
+                nrmMtx.m[2][2] = axisZ.z;
+            } else {
+                mtx34_copy_ps(&nrmMtx, g3d_state_get_camera_mtx());
+            }
+        }
+
+        G3dLightObj* pLObj = g3d_state_get_light_obj(g3d_state_get_light_set_entry(lightRef[i]));
+        if (pLObj != NULL && light_obj_is_enable((LightObj*)pLObj)) {
+            math::VEC3 lightDir;
+            math::VEC3 specDir;
+            math::VEC3 negDir;
+            math::VEC3 negPos;
+            VEC3_ctor(&lightDir);
+            if (light_obj_is_directional(pLObj)) {
+                light_obj_get_light_dir((LightObj*)pLObj, &lightDir);
+                if (0.0f == lightDir.x && 0.0f == lightDir.y && 0.0f == lightDir.z) {
+                    light_obj_get_light_pos((LightObj*)pLObj, &lightDir);
+                    vec3_negate(&negDir, &lightDir);
+                    copyVec3(&lightDir, &negDir);
+                    vec3_normalize_into(&lightDir, &lightDir);
+                }
+            } else if (light_obj_is_point_light(pLObj)) {
+                light_obj_get_light_pos((LightObj*)pLObj, &lightDir);
+                vec3_negate(&negPos, &lightDir);
+                copyVec3(&lightDir, &negPos);
+                vec3_normalize_into(&lightDir, &lightDir);
+            } else {
+                VEC3_ctor(&specDir);
+                if (!light_obj_is_specular_light(pLObj)) {
+                    nw4r::db::Panic("g3d_draw.cpp", 0xAB, "NW4R:Failed assertion pLObj->IsSpecularLight()");
+                }
+                light_obj_get_light_dir((LightObj*)pLObj, &specDir);
+                lightDir.x = -2.0f * specDir.z * specDir.x;
+                lightDir.y = -2.0f * specDir.z * specDir.y;
+                lightDir.z = 1.0f + -2.0f * specDir.z * specDir.z;
+                vec3_normalize_into(&lightDir, &lightDir);
+            }
+            pOp->SetNrmMapMtx((_GXIndTexMtxID)id, &lightDir, &nrmMtx, method[i]);
+        } else {
+            pOp->SetNrmMapMtx((_GXIndTexMtxID)id, NULL, &nrmMtx, method[i]);
+        }
+    }
+    return pOp;
+}
+#pragma fp_contract reset
+
+}  // namespace g3d
+}  // namespace nw4r
+
+extern "C" {
+
+/* 0x80077D4C (0x18): whether the light object is a specular light (flag bit 1). */
+s32 light_obj_is_specular_light(const G3dLightObj* pLObj) {
+    return (*(const u32*)pLObj & 2) != 0;
+}
+
+/* 0x80077D64 (0x58): whether the light object is neither directional nor specular. */
+s32 light_obj_is_point_light(const G3dLightObj* pLObj) {
+    s32 isPoint = 0;
+    if (!light_obj_is_directional(pLObj) && !light_obj_is_specular_light(pLObj)) {
+        isPoint = 1;
+    }
+    return isPoint;
+}
+
+/* 0x80077DBC (0x1C): stores the negated vector. */
+void vec3_negate(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn) {
+    setVec3(pOut, -pIn->x, -pIn->y, -pIn->z);
+}
+
+/* 0x80077DD8 (0x18): whether the light object is directional (flag bit 0). */
+s32 light_obj_is_directional(const G3dLightObj* pLObj) {
+    return (*(const u32*)pLObj & 1) != 0;
+}
+
+/* 0x80077DF0 (0x44): fills a matrix from twelve values, row by row. */
+void mtx34_set(Mtx34* dst, f32 m00, f32 m01, f32 m02, f32 m03, f32 m10, f32 m11, f32 m12, f32 m13, f32 m20, f32 m21,
+               f32 m22, f32 m23) {
+    dst->m[0][0] = m00;
+    dst->m[0][1] = m01;
+    dst->m[0][2] = m02;
+    dst->m[0][3] = m03;
+    dst->m[1][0] = m10;
+    dst->m[1][1] = m11;
+    dst->m[1][2] = m12;
+    dst->m[1][3] = m13;
+    dst->m[2][0] = m20;
+    dst->m[2][1] = m21;
+    dst->m[2][2] = m22;
+    dst->m[2][3] = m23;
+}
+
+/* 0x80077E34 (0x30): copy-constructs a model handle (this unit's copy, which `g3d/g3d_scnmdl.cpp` calls too). */
+s32 fn_80077E34(s32 pOut, void* pIn) { /* untyped: opaque handle - the source ResMdl */
+    fn_80077E64((s32*)pOut, (s32*)pIn);
+    return pOut;
+}
+
+/* 0x80077E64 (0xC): copies the handle word. */
+void fn_80077E64(s32* pDst, s32* pSrc) {
+    *pDst = *pSrc;
+}
+
+/* 0x80077E70 (0x540): points the swap's handles at the replacement's blocks for material `idx` (a null handle where
+ * the replacement has no array), and takes its vertex tables unless the replacement's flag says not to. */
+void SetupDraw1Mat1ShpSwap(nw4r::g3d::Draw1Mat1ShpSwap* pSwap, nw4r::g3d::DrawResMdlReplacement* pRep, u32 idx) {
+    using namespace nw4r::g3d;
+    G3D_POINTER_ASSERT("g3d_draw.cpp", pSwap, 0xCD, "NW4R:Pointer Error\npSwap(=%p) is not valid pointer.");
+    G3D_POINTER_ASSERT("g3d_draw.cpp", pRep, 0xCE, "NW4R:Pointer Error\npRep(=%p) is not valid pointer.");
+    if (pRep->texObjDataArray != NULL) {
+        pSwap->texObj = ResTexObj(&pRep->texObjDataArray[idx]);
+    } else {
+        pSwap->texObj = ResTexObj(NULL);
+    }
+    if (pRep->tlutObjDataArray != NULL) {
+        pSwap->tlutObj = ResTlutObj(&pRep->tlutObjDataArray[idx]);
+    } else {
+        pSwap->tlutObj = ResTlutObj(NULL);
+    }
+    if (pRep->texSrtDataArray != NULL) {
+        pSwap->texSrt = ResTexSrt(&pRep->texSrtDataArray[idx]);
+    } else {
+        pSwap->texSrt = ResTexSrt(NULL);
+    }
+    if (pRep->chanDataArray != NULL) {
+        pSwap->chan = ResMatChan(&pRep->chanDataArray[idx]);
+    } else {
+        pSwap->chan = ResMatChan(NULL);
+    }
+    if (pRep->genModeDataArray != NULL) {
+        pSwap->genMode = ResGenMode(&pRep->genModeDataArray[idx]);
+    } else {
+        pSwap->genMode = ResGenMode(NULL);
+    }
+    if (pRep->matMiscDataArray != NULL) {
+        pSwap->misc = ResMatMisc(&pRep->matMiscDataArray[idx]);
+    } else {
+        pSwap->misc = ResMatMisc(NULL);
+    }
+    if (pRep->pixDLArray != NULL) {
+        pSwap->pix = ResMatPix(&pRep->pixDLArray[idx]);
+    } else {
+        pSwap->pix = ResMatPix(NULL);
+    }
+    if (pRep->tevColorDLArray != NULL) {
+        pSwap->tevColor = ResMatTevColor(&pRep->tevColorDLArray[idx]);
+    } else {
+        pSwap->tevColor = ResMatTevColor(NULL);
+    }
+    if (pRep->indMtxAndScaleDLArray != NULL) {
+        pSwap->indMtxAndScale = ResMatIndMtxAndScale(&pRep->indMtxAndScaleDLArray[idx]);
+    } else {
+        pSwap->indMtxAndScale = ResMatIndMtxAndScale(NULL);
+    }
+    if (pRep->texCoordGenDLArray != NULL) {
+        pSwap->texCoordGen = ResMatTexCoordGen(&pRep->texCoordGenDLArray[idx]);
+    } else {
+        pSwap->texCoordGen = ResMatTexCoordGen(NULL);
+    }
+    if (pRep->tevDataArray != NULL) {
+        pSwap->tev = ResTev(&pRep->tevDataArray[idx]);
+    } else {
+        pSwap->tev = ResTev(NULL);
+    }
+    if (pRep->flag & 1) {
+        pSwap->vtxPosTable = NULL;
+        pSwap->vtxNrmTable = NULL;
+        pSwap->vtxClrTable = NULL;
+        return;
+    }
+    pSwap->vtxPosTable = pRep->vtxPosTable;
+    pSwap->vtxNrmTable = pRep->vtxNrmTable;
+    pSwap->vtxClrTable = pRep->vtxClrTable;
+}
+
+}
 
 /* 0x800783B0 (0x30): copies the handle. */
 nw4r::g3d::ResTev& nw4r::g3d::ResTev::operator=(const ResTev& rhs) {
@@ -655,29 +395,16 @@ nw4r::g3d::ResTev& nw4r::g3d::ResTev::operator=(const ResTev& rhs) {
     return *this;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
-
 /* 0x800783EC (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResTev::ResTev(void* pData) : ResCommon<ResTevData>(pData) {
     if ((u32)pData & 0x1F) {
-        nw4r::db::Panic((const char*)&lbl_8058EA90, 0x25, (const char*)&lbl_8058EA64);
+        nw4r::db::Panic("g3d_restev_ac.h", 0x25, "NW4R:Failed assertion !((u32)p & 0x1f)");
     }
 }
 
-extern "C" {
-
-} /* extern "C" */
-
 /* 0x80078450 (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResTevData)
-
-extern "C" {
-
-} /* extern "C" */
 
 /* 0x80078458 (0x30): copies the handle. */
 nw4r::g3d::ResMatTexCoordGen& nw4r::g3d::ResMatTexCoordGen::operator=(const ResMatTexCoordGen& rhs) {
@@ -685,21 +412,11 @@ nw4r::g3d::ResMatTexCoordGen& nw4r::g3d::ResMatTexCoordGen::operator=(const ResM
     return *this;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
-
 /* 0x80078494 (0x30): copies the handle. */
 nw4r::g3d::ResMatIndMtxAndScale& nw4r::g3d::ResMatIndMtxAndScale::operator=(const ResMatIndMtxAndScale& rhs) {
     ResCommon<ResMatIndMtxAndScaleData>::operator=(rhs);
     return *this;
 }
-
-extern "C" {
-
-
-} /* extern "C" */
 
 /* 0x800784D0 (0x30): copies the handle. */
 nw4r::g3d::ResMatTevColor& nw4r::g3d::ResMatTevColor::operator=(const ResMatTevColor& rhs) {
@@ -707,21 +424,11 @@ nw4r::g3d::ResMatTevColor& nw4r::g3d::ResMatTevColor::operator=(const ResMatTevC
     return *this;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
-
 /* 0x8007850C (0x30): copies the handle. */
 nw4r::g3d::ResMatPix& nw4r::g3d::ResMatPix::operator=(const ResMatPix& rhs) {
     ResCommon<ResMatPixData>::operator=(rhs);
     return *this;
 }
-
-extern "C" {
-
-
-} /* extern "C" */
 
 /* 0x80078548 (0x30): copies the handle. */
 nw4r::g3d::ResGenMode& nw4r::g3d::ResGenMode::operator=(const ResGenMode& rhs) {
@@ -729,21 +436,11 @@ nw4r::g3d::ResGenMode& nw4r::g3d::ResGenMode::operator=(const ResGenMode& rhs) {
     return *this;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
-
 /* 0x80078584 (0x30): copies the handle. */
 nw4r::g3d::ResMatChan& nw4r::g3d::ResMatChan::operator=(const ResMatChan& rhs) {
     ResCommon<ResMatChanData>::operator=(rhs);
     return *this;
 }
-
-extern "C" {
-
-
-} /* extern "C" */
 
 /* 0x800785C0 (0x48): copies the handle word and the word after it. */
 nw4r::g3d::ResTexSrt& nw4r::g3d::ResTexSrt::operator=(const ResTexSrt& rhs) {
@@ -752,13 +449,10 @@ nw4r::g3d::ResTexSrt& nw4r::g3d::ResTexSrt::operator=(const ResTexSrt& rhs) {
     return *this;
 }
 
-extern "C" {
-
-u32 fn_80078608(s32 *arg0, s32 *arg1) {
+/* 0x80078608 (0xC): copies the handle word. */
+extern "C" u32 fn_80078608(s32 *arg0, s32 *arg1) {
     *arg0 = *arg1;
 }
-
-} /* extern "C" */
 
 /* 0x80078614 (0x30): copies the handle. */
 nw4r::g3d::ResTlutObj& nw4r::g3d::ResTlutObj::operator=(const ResTlutObj& rhs) {
@@ -766,359 +460,349 @@ nw4r::g3d::ResTlutObj& nw4r::g3d::ResTlutObj::operator=(const ResTlutObj& rhs) {
     return *this;
 }
 
-extern "C" {
-
-
-} /* extern "C" */
-
 /* 0x80078650 (0x30): copies the handle. */
 nw4r::g3d::ResTexObj& nw4r::g3d::ResTexObj::operator=(const ResTexObj& rhs) {
     ResCommon<ResTexObjData>::operator=(rhs);
     return *this;
 }
 
-extern "C" {
+namespace nw4r {
+namespace g3d {
 
+/* The byte-code commands the draw passes read: END closes the list, DRAW is
+ * {4, matIdx(2), shpIdx(2), nodeIdx(2), priority(1)}. */
+enum ResByteCodeCommand {
+    RESBYTECODE_END = 1,
+    RESBYTECODE_DRAW = 4
+};
 
-typedef struct {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u8 field_0x06;
-    /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-} RawView_24; /* size: 0xA */
-u32 fn_8007868C(s32 arg0, void *arg1, s32 arg2, u32 arg_sp0) {
-}
-
-
-s32 fn_80078878(s32 arg0, s32 arg1) {
-    s32 temp_r31;
-
-    temp_r31 = (s32)reinterpret_cast<const nw4r::g3d::ResMat*>((s32)(arg1))->ptr();
-    return (s32)reinterpret_cast<const nw4r::g3d::ResMat*>((s32)(arg0))->ptr() == temp_r31;
-}
-
-s32 fn_800788C8(s32 arg0, void* a1) {
-    fn_800788F8(0, 0);
-    return arg0;
-}
-
-u32 fn_800788F8(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
-}
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x14];
-    /* +0x14 */ u32 field_0x14;
-} RawView_25; /* size: 0x18 */
-s32 fn_80078904(s32 arg0) {
-    if (res_node_is_valid(0) == 0) {
-        nw4r::db::Panic((const char*)&lbl_8058EA50, 0xA5, (const char*)&lbl_8058EA30);
+/* Draws a model's DRAW commands in byte-code order. */
+static void DrawByteCode(ResMdl mdl, const u8* pByteCode, u32 drawMode) {
+    ResMat mat(NULL);
+    ResMat matPrev(NULL);
+    ResShp shp(NULL);
+    ResNode node(NULL);
+    u32 ctrl = 1;
+    if (drawMode & 8) {
+        ctrl |= 8;
     }
-    if (res_node_is_valid((s32)(arg0)) != 0) {
-        return (((RawView_25*)res_node_ref((const ResHandle*)(arg0)))->field_0x14 & 0x100) != 0;
+    if (drawMode & 4) {
+        ctrl |= 0x10;
     }
-    return 0;
+
+    while (*pByteCode != RESBYTECODE_END) {
+        if (*pByteCode != RESBYTECODE_DRAW) {
+            nw4r::db::Panic("g3d_draw.cpp", 0x128, "NW4R:Failed assertion c == ResByteCodeData::DRAW");
+        }
+        node = mdl.GetResNode((pByteCode[5] << 8) | pByteCode[6]);
+        shp = mdl.GetResShp((pByteCode[3] << 8) | pByteCode[4]);
+        if (fn_80078904((s32)&node) && shp.IsVisible()) {
+            mat = mdl.GetResMat((pByteCode[1] << 8) | pByteCode[2]);
+            Draw1Mat1ShpDirectly(mat, shp, NULL, NULL, (mat == matPrev) ? (ctrl | 0x10) : ctrl, NULL,
+                                 PrepareIndMtxOp(mat, node, shp));
+            matPrev = mat;
+        }
+        pByteCode += 8;
+    }
 }
 
-s32 fn_80078988(s32 arg0, void* a1) {
-    fn_800789B8(0, 0);
-    return arg0;
+/* 0x80078878 (0x50): whether both handles name the same block. */
+bool ResMat::operator==(const ResMat& rhs) const {
+    return ptr() == rhs.ptr();
 }
 
-u32 fn_800789B8(s32 *arg0, s32 *arg1) {
-    *arg0 = *arg1;
+}  // namespace g3d
+}  // namespace nw4r
+
+/* 0x80078904 (0x84): whether the node is drawn (this unit's copy of ResNode::IsVisible, which
+ * `g3d/g3d_scnmdl.cpp` calls too). */
+bool fn_80078904(s32 pNode) {
+    const ResHandle* pHandle = (const ResHandle*)pNode;
+    if (!res_node_is_valid(pHandle)) {
+        nw4r::db::Panic("g3d_resnode_ac.h", 0xA5, "NW4R:Failed assertion IsValid()");
+    }
+    if (res_node_is_valid(pHandle)) {
+        return (res_node_ref(pHandle)->mFlags & 0x100) != 0;
+    }
+    return false;
 }
 
-} /* extern "C" */
+namespace nw4r {
+namespace g3d {
 
 /* 0x800789C4 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
-nw4r::g3d::ResShp::ResShp(void* pData) : ResCommon<ResShpData>(pData) {
+ResShp::ResShp(void* pData) : ResCommon<ResShpData>(pData) {
     if ((u32)pData & 3) {
-        nw4r::db::Panic((const char*)&lbl_8058EA20, 0x3A, (const char*)&lbl_8058E9F4);
+        nw4r::db::Panic("g3d_resshp_ac.h", 0x3A, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
 }
 
-extern "C" {
-
-} /* extern "C" */
+}  // namespace g3d
+}  // namespace nw4r
 
 /* 0x80078A28 (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResShpData)
-
-extern "C" {
-
-} /* extern "C" */
 
 /* 0x80078A30 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMat::ResMat(void* pData) : ResCommon<ResMatData>(pData) {
     if ((u32)pData & 3) {
-        nw4r::db::Panic((const char*)&lbl_8058EAC8, 0x26D, (const char*)&lbl_8058EAA0);
+        nw4r::db::Panic("g3d_resmat_ac.h", 0x26D, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
 }
-
-extern "C" {
-
-} /* extern "C" */
 
 /* 0x80078A94 (0x8): stores the block address. */
 NW4R_G3D_RESCOMMON_CTOR(nw4r::g3d::ResMatData)
 
-extern "C" {
+namespace nw4r {
+namespace g3d {
 
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ u32 field_0x04;
-} RawView_27; /* size: 0x8 */
-typedef struct {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u8 field_0x06;
-    /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-} RawView_26; /* size: 0xA */
-u32 fn_80078A9C(s32 arg0, void *arg1, s32 arg2, s32 arg3, u32 arg_sp0) {
+/* Draws a model's DRAW commands in byte-code order, with the replacement block's visibility and materials. */
+static void DrawByteCodeReplacement(ResMdl mdl, const u8* pByteCode, DrawResMdlReplacement* pRep, u32 drawMode) {
+    ResMat mat(NULL);
+    ResMat matPrev(NULL);
+    ResShp shp(NULL);
+    ResNode node(NULL);
+    Draw1Mat1ShpSwap swap;
+    G3D_POINTER_ASSERT("g3d_draw.cpp", pRep, 0x14A, "NW4R:Pointer Error\npRep(=%p) is not valid pointer.");
+    u32 ctrl = 1;
+    if (drawMode & 8) {
+        ctrl |= 8;
+    }
+    if (drawMode & 4) {
+        ctrl |= 0x10;
+    }
+
+    while (*pByteCode != RESBYTECODE_END) {
+        if (*pByteCode != RESBYTECODE_DRAW) {
+            nw4r::db::Panic("g3d_draw.cpp", 0x154, "NW4R:Failed assertion c == ResByteCodeData::DRAW");
+        }
+        node = mdl.GetResNode((pByteCode[5] << 8) | pByteCode[6]);
+        shp = mdl.GetResShp((pByteCode[3] << 8) | pByteCode[4]);
+        bool visible;
+        if (pRep->visArray != NULL) {
+            visible = pRep->visArray[res_node_get_id((const ResHandle*)&node)] != 0;
+        } else {
+            visible = fn_80078904((s32)&node);
+        }
+        if (visible && shp.IsVisible()) {
+            mat = mdl.GetResMat((pByteCode[1] << 8) | pByteCode[2]);
+            SetupDraw1Mat1ShpSwap(&swap, pRep, res_mat_get_id((const ResHandle*)&mat));
+            Draw1Mat1ShpDirectly(mat, shp, NULL, NULL, (mat == matPrev) ? (ctrl | 0x10) : ctrl, &swap,
+                                 PrepareIndMtxOp(mat, node, shp));
+            matPrev = mat;
+        }
+        pByteCode += 8;
+    }
 }
 
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ s32 field_0x04;
-    /* +0x08 */ s32 field_0x08;
-    /* +0x0C */ s32 field_0x0C;
-    /* +0x10 */ s32 field_0x10;
-    /* +0x14 */ s32 field_0x14;
-    /* +0x18 */ s32 field_0x18;
-    /* +0x1C */ s32 field_0x1C;
-    /* +0x20 */ s32 field_0x20;
-    /* +0x24 */ s32 field_0x24;
-    /* +0x28 */ s32 field_0x28;
-    /* +0x2C */ u32 field_0x2C;
-    /* +0x30 */ u32 field_0x30;
-    /* +0x34 */ u32 field_0x34;
-} RawView_28; /* size: 0x38 */
-} /* extern "C" */
-
+}  // namespace g3d
+}  // namespace nw4r
 
 /* 0x80078DC0 (0xBC): constructs every handle empty and clears the trailing words. */
-CopiedMatResources::CopiedMatResources()
+nw4r::g3d::Draw1Mat1ShpSwap::Draw1Mat1ShpSwap()
     : texObj(NULL), tlutObj(NULL), genMode(NULL), tev(NULL), pix(NULL), tevColor(NULL), indMtxAndScale(NULL),
-      chan(NULL), texCoordGen(NULL), misc(NULL), texSrt(NULL), word_0x2C(0), word_0x30(0), word_0x34(0) {}
+      chan(NULL), texCoordGen(NULL), misc(NULL), texSrt(NULL), vtxPosTable(NULL), vtxNrmTable(NULL),
+      vtxClrTable(NULL) {}
 
-extern "C" {
+namespace nw4r {
+namespace g3d {
 
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x6];
-    /* +0x06 */ u8 field_0x06;
-    /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-    /* +0x0A */ u8 field_0x0A;
-    /* +0x0B */ u8 field_0x0B;
-    /* +0x0C */ u8 field_0x0C;
-    /* +0x0D */ u8 field_0x0D;
-} RawView_29; /* size: 0xE */
-u32 fn_80078E7C(s32 arg0, void *arg1, u32 arg2, s32 arg3, u32 arg_sp0) {
-}
-
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x6];
-    /* +0x06 */ u8 field_0x06;
-    /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-    /* +0x0A */ u8 field_0x0A;
-    /* +0x0B */ u8 field_0x0B;
-    /* +0x0C */ u8 field_0x0C;
-    /* +0x0D */ u8 field_0x0D;
-} RawView_30; /* size: 0xE */
-u32 fn_80079018(s32 arg0, void *arg1, u32 arg2, s32 arg3, s32 arg4, u32 arg_sp0) {
-}
-
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x2C];
-    /* +0x2C */ u32 field_0x2C;
-} RawView_34; /* size: 0x30 */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ u32 field_0x04;
-} RawView_32; /* size: 0x8 */
-typedef struct {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u8 field_0x06;
-    /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-} RawView_31; /* size: 0xA */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u8 field_0x06;
-    /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-    /* +0x0A */ u8 field_0x0A;
-    /* +0x0B */ u8 field_0x0B;
-    /* +0x0C */ u8 field_0x0C;
-    /* +0x0D */ u8 field_0x0D;
-} RawView_33; /* size: 0xE */
-void* fn_800791D8(u32 *arg0, s32 arg1, s32 arg2, void *arg3, void *arg4) {
-}
-
-
-void g3d_draw_res_mdl_directly(s32 *arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7, u32 arg_sp0) {
-}
-
-
-u32 fn_80079604(u32 arg0, u32 arg1, s32 (*arg2)(u32, u32), u32 arg_sp0) {
-}
-
-
-u32 fn_80079938(u32 arg0, u32 arg1, s32 arg2) {
-}
-
-
-u32 fn_800799BC(u32 arg0, u32 arg1, s32 (**arg2)(u32, u32)) {
-}
-
-
-u32 fn_80079A48(s32 arg0, s32 arg1, s32 arg2, s32 (**arg3)(s32, s32), u32 arg_sp0) {
-}
-
-
-u32 fn_80079B38(u32 arg0, u32 arg1, s32 (**arg2)(u32, u32), u32 arg_sp0) {
-}
-
-
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-} RawView_35; /* size: 0xC */
-u32 fn_80079E6C(s32 *arg0, s32 *arg1) {
-    s32 sp10;
-    s32 spC;
-    s32 sp8;
-    s32 temp_r4;
-    void *temp_r3;
-
-    temp_r3 = (void *)(fn_80079F10(0, 0));
-    temp_r4 = ((RawView_35*)temp_r3)->field_0x00;
-    sp8 = temp_r4;
-    spC = ((RawView_35*)temp_r3)->field_0x04;
-    sp10 = ((RawView_35*)temp_r3)->field_0x08;
-    fn_80079EE4((void *)(arg0), (void *)(fn_80079F10((void*)(arg1), (void*)(temp_r4))));
-    fn_80079EE4((void *)(arg1), (void *)(fn_80079F10((void*)(&sp8), 0)));
-}
-
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u8 field_0x06;
-    /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-    /* +0x0A */ u8 field_0x0A;
-    /* +0x0B */ u8 field_0x0B;
-    /* +0x0C */ u8 field_0x0C;
-    /* +0x0D */ u8 field_0x0D;
-} RawView_36; /* size: 0xE */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u16 field_0x04;
-    /* +0x06 */ u16 field_0x06;
-    /* +0x08 */ u16 field_0x08;
-    /* +0x0A */ u16 field_0x0A;
-} RawView_37; /* size: 0xC */
-u32 fn_80079EE4(void *arg0, void *arg1) {
-    ((RawView_36*)arg0)->field_0x00 = (f32) ((RawView_37*)arg1)->field_0x00;
-    ((RawView_36*)arg0)->field_0x04 = (u16) ((RawView_37*)arg1)->field_0x04;
-    ((RawView_36*)arg0)->field_0x06 = (u16) ((RawView_37*)arg1)->field_0x06;
-    ((RawView_36*)arg0)->field_0x08 = (u16) ((RawView_37*)arg1)->field_0x08;
-    ((RawView_36*)arg0)->field_0x0A = (u16) ((RawView_37*)arg1)->field_0x0A;
-}
-
-void* fn_80079F10(void* a0, void* a1) {
-
-}
-
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u16 field_0x08;
-} RawView_39; /* size: 0xA */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u16 field_0x08;
-} RawView_38; /* size: 0xA */
-s32 fn_80079F14(void *arg0, void *arg1) {
-    f32 temp_f0;
-    f32 temp_f1;
-    u16 temp_r0;
-    u16 temp_r5;
-
-    temp_r0 = ((RawView_38*)arg1)->field_0x04;
-    temp_r5 = ((RawView_39*)arg0)->field_0x04;
-    if (temp_r5 < temp_r0) {
-        return 1;
+/* Draws gathered depth-sort records in their sorted order. */
+static void DrawMdlZ(ResMdl mdl, const MdlZ* pMdlZ, u32 numMdlZ, u32 drawMode) {
+    u32 i;
+    ResMat mat(NULL);
+    ResMat matPrev(NULL);
+    ResShp shp(NULL);
+    ResNode node(NULL);
+    u32 ctrl = 1;
+    if (drawMode & 8) {
+        ctrl |= 8;
     }
-    if (temp_r5 > temp_r0) {
-        return 0;
+    if (drawMode & 4) {
+        ctrl |= 0x10;
     }
-    temp_f1 = ((RawView_39*)arg0)->field_0x00;
-    temp_f0 = ((RawView_38*)arg1)->field_0x00;
-    if (temp_f1 < temp_f0) {
-        return 1;
+
+    for (i = 0; i < numMdlZ; i++) {
+        shp = mdl.GetResShp((int)pMdlZ->shpID);
+        if (shp.IsVisible()) {
+            mat = mdl.GetResMat((int)pMdlZ->matID);
+            node = mdl.GetResNode((int)pMdlZ->nodeID);
+            Draw1Mat1ShpDirectly(mat, shp, NULL, NULL, (mat == matPrev) ? (ctrl | 0x10) : ctrl, NULL,
+                                 PrepareIndMtxOp(mat, node, shp));
+            matPrev = mat;
+        }
+        pMdlZ++;
     }
-    if ((temp_f1 == temp_f0) && ((u16) ((RawView_39*)arg0)->field_0x08 < (u16) ((RawView_38*)arg1)->field_0x08)) {
-        return 1;
-    }
-    return 0;
 }
 
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-} RawView_41; /* size: 0x8 */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-} RawView_40; /* size: 0x8 */
-s32 fn_80079F78(void *arg0, void *arg1) {
-    u16 temp_r0;
-    u16 temp_r5;
+/* Draws gathered depth-sort records in their sorted order, with the replacement block's materials. */
+static void DrawMdlZReplacement(ResMdl mdl, const MdlZ* pMdlZ, u32 numMdlZ, DrawResMdlReplacement* pRep,
+                                u32 drawMode) {
+    u32 i;
+    ResMat mat(NULL);
+    ResMat matPrev(NULL);
+    ResShp shp(NULL);
+    ResNode node(NULL);
+    Draw1Mat1ShpSwap swap;
+    u32 ctrl = 1;
+    if (drawMode & 8) {
+        ctrl |= 8;
+    }
+    if (drawMode & 4) {
+        ctrl |= 0x10;
+    }
 
-    temp_r0 = ((RawView_40*)arg1)->field_0x04;
-    temp_r5 = ((RawView_41*)arg0)->field_0x04;
-    if (temp_r5 < temp_r0) {
-        return 1;
+    for (i = 0; i < numMdlZ; i++) {
+        shp = mdl.GetResShp((int)pMdlZ->shpID);
+        if (shp.IsVisible()) {
+            mat = mdl.GetResMat((int)pMdlZ->matID);
+            node = mdl.GetResNode((int)pMdlZ->nodeID);
+            SetupDraw1Mat1ShpSwap(&swap, pRep, res_mat_get_id((const ResHandle*)&mat));
+            Draw1Mat1ShpDirectly(mat, shp, NULL, NULL, (mat == matPrev) ? (ctrl | 0x10) : ctrl, &swap,
+                                 PrepareIndMtxOp(mat, node, shp));
+            matPrev = mat;
+        }
+        pMdlZ++;
     }
-    if (temp_r5 > temp_r0) {
-        return 0;
-    }
-    return ((RawView_41*)arg0)->field_0x00 > ((RawView_40*)arg1)->field_0x00;
 }
 
-} /* extern "C" */
+/* Gathers a depth-sort record for every visible DRAW command: its view depth, priority and indices. */
+static MdlZ* GatherMdlZ(u32* pNumMdlZ, ResMdl mdl, const math::MTX34* pViewPosMtxArray, const u8* pByteCode,
+                        DrawResMdlReplacement* pRep) {
+    MdlZ* pMdlZ;
+    u32 numMdlZ = 0;
+    ResNode node(NULL);
+    u32 info = res_mdl_info_handle(&mdl);
+    u32 numViewMtx = res_mdl_info_num_view_mtx(&info);
+    MdlZ* pMdlZArray = (MdlZ*)workmem_get_mdl_z_temporary();
+    pMdlZ = pMdlZArray;
+
+    while (*pByteCode != RESBYTECODE_END) {
+        if (*pByteCode != RESBYTECODE_DRAW) {
+            nw4r::db::Panic("g3d_draw.cpp", 0x1D7, "NW4R:Failed assertion c == ResByteCodeData::DRAW");
+        }
+        u16 nodeID = (pByteCode[5] << 8) | pByteCode[6];
+        node = mdl.GetResNode((int)nodeID);
+        bool visible;
+        if (pRep == NULL || pRep->visArray == NULL) {
+            visible = fn_80078904((s32)&node);
+        } else {
+            visible = pRep->visArray[res_node_get_id((const ResHandle*)&node)] != 0;
+        }
+        if (visible) {
+            pMdlZ->nodeID = nodeID;
+            pMdlZ->matID = (pByteCode[1] << 8) | pByteCode[2];
+            pMdlZ->shpID = (pByteCode[3] << 8) | pByteCode[4];
+            u32 mtxID = fn_8006FDCC(&node);
+            if (mtxID < numViewMtx) {
+                pMdlZ->Z = pViewPosMtxArray[mtxID].m[2][3];
+            } else {
+                pMdlZ->Z = 0.0f;
+            }
+            pMdlZ->priority = pByteCode[7];
+            pMdlZ++;
+            numMdlZ++;
+        }
+        pByteCode += 8;
+    }
+    if (numMdlZ >= WORKMEM_NUMMDLZ) {
+        nw4r::db::Panic("g3d_draw.cpp", 0x1F3, "NW4R:Failed assertion numMdlZ < detail::workmem::WORKMEM_NUMMDLZ");
+    }
+    *pNumMdlZ = numMdlZ;
+    return pMdlZArray;
+}
+
+}  // namespace g3d
+}  // namespace nw4r
+
+/* 0x800793A4 (0x260): draws the model's opaque and translucent byte code over the view matrices, sorted by depth or
+ * in byte-code order, through the replacement block when one is given. */
+/* untyped: caller-owned payload - the replacement block */
+void g3d_draw_res_mdl_directly(const nw4r::g3d::ResMdl* pMdl, const nw4r::math::MTX34* pViewPosMtxArray,
+                               const nw4r::math::MTX33* pViewNrmMtxArray, const nw4r::math::MTX34* pViewTexMtxArray,
+                               const u8* pByteCodeOpa, const u8* pByteCodeXlu, const void* pReplacement,
+                               u32 drawMode) {
+    using namespace nw4r::g3d;
+    DrawResMdlReplacement* pRep = (DrawResMdlReplacement*)pReplacement;
+    if (pViewPosMtxArray == NULL) {
+        nw4r::db::Panic("g3d_draw.cpp", 0x21E, "NW4R:Pointer must not be NULL (pViewPos)");
+    }
+    g3d_state_set_view_mtx_arrays((nw4r::math::MTX34*)pViewPosMtxArray, (Mat33*)pViewNrmMtxArray,
+                                  (nw4r::math::MTX34*)pViewTexMtxArray);
+    if (!(drawMode & 0x10)) {
+        g3d_lc_queue_wait(0);
+        PPCSync();
+    }
+
+    if (pByteCodeOpa != NULL) {
+        if (drawMode & 1) {
+            u32 numMdlZ;
+            MdlZ* pMdlZ = GatherMdlZ(&numMdlZ, *pMdl, pViewPosMtxArray, pByteCodeOpa, pRep);
+            std::sort(pMdlZ, pMdlZ + numMdlZ, CompareMdlZOpa);
+            if (pRep != NULL) {
+                DrawMdlZReplacement(*pMdl, pMdlZ, numMdlZ, pRep, drawMode);
+            } else {
+                DrawMdlZ(*pMdl, pMdlZ, numMdlZ, drawMode);
+            }
+        } else if (pRep != NULL) {
+            DrawByteCodeReplacement(*pMdl, pByteCodeOpa, pRep, drawMode);
+        } else {
+            DrawByteCode(*pMdl, pByteCodeOpa, drawMode);
+        }
+    }
+
+    if (pByteCodeXlu != NULL) {
+        if (drawMode & 2) {
+            u32 numMdlZ;
+            MdlZ* pMdlZ = GatherMdlZ(&numMdlZ, *pMdl, pViewPosMtxArray, pByteCodeXlu, pRep);
+            std::sort(pMdlZ, pMdlZ + numMdlZ, CompareMdlZXlu);
+            if (pRep != NULL) {
+                DrawMdlZReplacement(*pMdl, pMdlZ, numMdlZ, pRep, drawMode);
+            } else {
+                DrawMdlZ(*pMdl, pMdlZ, numMdlZ, drawMode);
+            }
+        } else if (pRep != NULL) {
+            DrawByteCodeReplacement(*pMdl, pByteCodeXlu, pRep, drawMode);
+        } else {
+            DrawByteCode(*pMdl, pByteCodeXlu, drawMode);
+        }
+    }
+
+    g3d_state_set_view_mtx_arrays(NULL, NULL, NULL);
+}
+
+namespace nw4r {
+namespace g3d {
+
+/* Orders translucent records by priority, then front to back, then by material. */
+static bool CompareMdlZXlu(const MdlZ& lhs, const MdlZ& rhs) {
+    if (lhs.priority < rhs.priority) {
+        return true;
+    }
+    if (lhs.priority > rhs.priority) {
+        return false;
+    }
+    if (lhs.Z < rhs.Z) {
+        return true;
+    }
+    if (lhs.Z == rhs.Z && lhs.matID < rhs.matID) {
+        return true;
+    }
+    return false;
+}
+
+/* Orders opaque records by priority, then back to front. */
+static bool CompareMdlZOpa(const MdlZ& lhs, const MdlZ& rhs) {
+    if (lhs.priority < rhs.priority) {
+        return true;
+    }
+    if (lhs.priority > rhs.priority) {
+        return false;
+    }
+    return lhs.Z > rhs.Z;
+}
+
+}  // namespace g3d
+}  // namespace nw4r

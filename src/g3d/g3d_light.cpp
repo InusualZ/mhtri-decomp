@@ -1,310 +1,385 @@
 /*
- * g3d/g3d_light.cpp - nw4r g3d's lights: the LightObj copy, clear and GX light initialisers, LightSet, and the
- *   LightSetting constructor, copy and selection over its light-object, light-animation and ambient buffers.
+ * g3d/g3d_light.cpp - nw4r g3d's lights: the LightObj copy, clear, GX light initialisers and view transform, the
+ *   LightSetting constructor, import and view transform over its light-object, ambient-light and light-set buffers,
+ *   and LightSet's light selection.
  * RANGE. .text 0x8007A518-0x8007B2D4 (25 functions); extab 0x80008418-0x800084A0, extabindex 0x80020C4C-0x80020D18,
- *   .data 0x8058EB80-0x8058ED18 (opens on "g3d_light.cpp", read from light_setting_ctor, fn_8007B160 and
- *   fn_8007B224), .sdata2 0x80795E30-0x80795E58 (a 0.0 pooled again after `g3d/g3d_fog.cpp`'s 0x80795E28; read from
- *   fn_8007A768 on).  `g3d/g3d_init.cpp` precedes it; `g3d/g3d_obj.cpp`'s vtable (0x8058ED18) follows the last
- *   string, and the ScnLeaf constructor's second pooled 1.0 (0x80795E58 against this unit's 0x80795E34) puts the
- *   scene inlines after 0x8007B2D4 in another TU.
- * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` throughout (playbook idea 106).
- * NAMES. light_obj_get_light_pos and light_obj_get_light_dir are GUESSES (nw4r's LightObj::GetLightPos/GetLightDir:
- *   tail calls to GXGetLightPos/GXGetLightDir on the object's GXLightObj).  light_setting_ctor is a GUESS (the LightSetting constructor: it asserts the light and light-set counts and
- *   the three buffers by name).
- * RESIDUALS. Unwritten (empty stubs): light_setting_ctor, dtor_8007AF28, fn_8007AF6C, fn_8007B074, fn_8007B0A0,
- *   fn_8007A814, fn_8007B160, fn_8007B224.  Partial: fn_8007A518..fn_8007A800 (m2c views).
- *   flipcheck: `.data` and `.sdata2` are claimed and not emitted.
+ *   .data 0x8058EB80-0x8058ED18 (opens on "g3d_light.cpp", read from the LightSetting constructor and LightSet's
+ *   selectors), .sdata2 0x80795E30-0x80795E58 (a 0.0 pooled again after `g3d/g3d_fog.cpp`'s 0x80795E28).
+ *   `g3d/g3d_init.cpp` precedes it; `g3d/g3d_obj.cpp`'s vtable (0x8058ED18) follows the last string.
+ * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` (playbook idea 106) and `#pragma dont_inline on` (the
+ *   inline members and the compiler-generated copies are called out of line, as retail does).
+ * NAMES. nw4r's classes and members (LightObj, AmbLightObj, LightSetData, LightSetting, LightSet; the asserts name
+ *   G3DState::NUM_LIGHT and the three buffers).  light_obj_get_light_pos/light_obj_get_light_dir, fn_8007A5A8,
+ *   fn_8007A5E4, fn_8007A724 and light_setting_ctor keep C names because `g3d/g3d_draw.cpp`, `g3d/g3d_anmscn.cpp` and
+ *   `g3d/g3d_scnroot.cpp` call them by those names (nw4r's GetLightPos, GetLightDir, InitLightPos, InitLightDir,
+ *   InitSpecularDir and the LightSetting constructor).  GUESS: light_obj_enable, light_obj_disable,
+ *   light_obj_is_enable, light_set_is_valid, light_setting_get_num_light_obj (`g3d/g3d_anmscn.cpp`'s kept copies of
+ *   LightObj::Enable/Disable/IsEnable, LightSet::IsValid and LightSetting::GetNumLightObj).
+ * RESIDUALS. The anmscn copies above are declared here until their owner names them (g3d-draw#7..#11).
  */
 
 #include "types.h"
-
-
-#include "sys_mem.h" /* operator delete (rule 9: call through the owner) */
-#include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
-#include "g3d/g3d_xsi.h" /* g3d_calc_tex_mtx_xsi (rule 2) */
-#include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 2) */
-#include "MEM/MEMAllocFromAllocator.h" /* MEMFreeToAllocator (rule 2) */
-#include "g3d/g3d_anmchr.h" /* type_obj_set_name (rule 2) */
-#include "g3d/g3d_cpu.h"
-#include "g3d/g3d_resvtx.h"
-#include "g3d/g3d_resmat.h"
-#include "g3d/g3d_resnode.h"
-#include "g3d/g3d_resshp.h"
-#include "g3d/g3d_state.h"     /* the material loaders (rule 2) */
-#include "nw4r/fn_805012C4.h"
-#include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
-#include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple (rule 1) */
-#include "MSL/algorithm.h"     /* std::find / std::distance */
-#include "unsplit/g3d.h"      /* the scene objects' type-name records no unit owns (rule 2) */
+#include "gx.h"
+#include "RVLGX/GXLight.h"         /* the GX light initialisers (rule 2) */
+#include "mh3_pad.h"               /* VEC3_ctor (rule 2) */
+#include "nw4r/math_types.h"       /* mtx34_rotate_vec3 (rule 2) */
+#include "nw4r/mtx34_mult_vec3.h"  /* mtx34_mult_vec3 (rule 2) */
+#include "nw4r/db_assert.h"        /* nw4r::db::Panic (rule 2) */
+#include "g3d/g3d_cpu.h"           /* Copy32ByteBlocks / ZeroMemory32ByteBlocks (rule 2) */
+#include "g3d/g3d_pointer_assert.h"
+#include "g3d/g3d_light.h"
+#include "g3d/light_obj_is_enable.h" /* light_obj_enable/disable/is_enable, light_set_is_valid, light_setting_get_num_light_obj, owner g3d/g3d_anmscn.cpp (rule 2) */
+#include "MSL/algorithm.h"         /* std::max */
+#include "sys_mem.h"                /* operator delete (rule 2) */
 
 #pragma peephole off
+#pragma pool_data off
+#pragma dont_inline on
 
-#define M2C_ERROR(x) /* unknown instruction */
 
+namespace nw4r {
+namespace g3d {
 
-extern f32 lbl_80795E30;
-extern f32 lbl_80795E34;
-extern f32 lbl_80795E38;
+/* 0x8007A518 (0x4C): copies the flags and the GX light. */
+LightObj& LightObj::operator=(const LightObj& rhs) {
+    if (this != &rhs) {
+        mFlag = rhs.mFlag;
+        detail::Copy32ByteBlocks(&mObj, &rhs.mObj, sizeof(GXLightObj));
+    }
+    return *this;
+}
+
+/* 0x8007A564 (0x14): clears the flags and the GX light. */
+void LightObj::Clear() {
+    mFlag = 0;
+    detail::ZeroMemory32ByteBlocks(&mObj, sizeof(GXLightObj));
+}
+
+/* 0x8007A578 (0x30): sets the light's colour. */
+void LightObj::InitLightColor(GXColor color) {
+    GXInitLightColor(&mObj, color);
+}
+
+}  // namespace g3d
+}  // namespace nw4r
 
 extern "C" {
-u32 GXInitLightAttn(s32, f32, f32, f32, f32, f32, f32);
-u32 GXInitLightDir(s32);
-u32 GXInitLightAttnA(s32);
-u32 GXInitLightAttnK(s32);
-u32 GXInitLightSpot(s32);
-u32 GXInitLightDistAttn(s32);
-u32 GXInitLightPos(s32);
-u32 GXGetLightPos(s32, s32, s32);
-u32 GXGetLightDir(s32, s32, s32);
-u32 GXInitLightColor(s32, void*);
-u32 GXGetLightColor(s32);
-/* internal */ void* fn_8007A518(s32 *arg0, s32 *arg1);
-/* internal */ u32 light_obj_clear(s32 *arg0);
-/* internal */ u32 light_obj_init_light_color(s32 arg0, s32 *arg1);
-/* internal */ u32 fn_8007A5A8(s32 *arg0, void* a1, void* a2, void* a3);
-/* internal */ u32 fn_8007A5E4(s32 *arg0, void* a1, void* a2, void* a3);
-/* internal */ u32 light_obj_init_light_spot(s32 *arg0, void* a1, void* a2);
-/* internal */ void light_obj_init_light_attn_a(s32 *arg0);
-/* internal */ u32 light_obj_init_light_dist_attn(s32 *arg0, void* a1, void* a2, void* a3);
-/* internal */ void light_obj_init_light_attn_k(s32 *arg0);
-/* internal */ u32 fn_8007A724(s32 *arg0, void* a1, void* a2, void* a3);
-/* internal */ u32 light_obj_init_light_shininess(s32 *arg0, f32 farg0);
-/* internal */ u32 light_obj_get_light_pos(s32 arg0, s32 arg1);
-/* internal */ u32 light_obj_get_light_dir(s32 arg0, s32 arg1);
-/* internal */ void fn_8007A800(s32 arg0, s32 arg1);
-/* internal */ u32 fn_8007A814(s32 *arg0, s32 arg1);
-/* internal */ void* light_setting_ctor(void *arg0, s32 arg1, s32 arg2, u32 arg3, s32 arg4, u32 arg5);
-/* internal */ u32 amb_light_obj_copy(void *arg0, void *arg1);
-/* internal */ u32 light_obj_ctor(s32 *arg0);
-/* internal */ s32 light_obj_dtor(s32 arg0, s16 arg1);
-/* internal */ s32 light_setting_import(void *arg0, void *arg1, u32 arg_sp0);
-/* internal */ u32 fn_8007B074(void *arg0, void *arg1);
-/* internal */ void light_setting_apply_view_mtx(void *arg0, s32 arg1, u32 arg2);
-/* internal */ void* fn_8007B148(u32 *arg0, u32 *arg1);
-/* internal */ s32 light_set_select_light_obj(void *arg0, u32 arg1, s8 arg2);
-/* internal */ s32 light_set_select_amb_light_obj(void *arg0, s8 arg1);
-} /* extern "C" */
+
+/* 0x8007A5A8 (0x3C): sets the light's position and makes it a non-specular light. */
+void fn_8007A5A8(void* self, f32 x, f32 y, f32 z) { /* untyped: opaque handle - the LightObj */
+    nw4r::g3d::LightObj* pLightObj = (nw4r::g3d::LightObj*)self;
+    GXInitLightPos(&pLightObj->mObj, x, y, z);
+    pLightObj->mFlag &= ~2;
+}
+
+/* 0x8007A5E4 (0x40): sets the light's direction and makes it a directional light. */
+void fn_8007A5E4(void* self, f32 x, f32 y, f32 z) { /* untyped: opaque handle - the LightObj */
+    nw4r::g3d::LightObj* pLightObj = (nw4r::g3d::LightObj*)self;
+    GXInitLightDir(&pLightObj->mObj, x, y, z);
+    pLightObj->mFlag = (pLightObj->mFlag & ~2) | 1;
+}
+
+}
+
+namespace nw4r {
+namespace g3d {
+
+/* 0x8007A624 (0x40): sets the spot cut-off and makes the light directional. */
+void LightObj::InitLightSpot(f32 cutoff, u32 spotFn) {
+    GXInitLightSpot(&mObj, cutoff, spotFn);
+    mFlag = (mFlag & ~2) | 1;
+}
+
+/* 0x8007A664 (0x40): sets the angle attenuation and makes the light directional. */
+void LightObj::InitLightAttnA(f32 a0, f32 a1, f32 a2) {
+    GXInitLightAttnA(&mObj, a0, a1, a2);
+    mFlag = (mFlag & ~2) | 1;
+}
+
+/* 0x8007A6A4 (0x40): sets the distance attenuation and makes the light directional. */
+void LightObj::InitLightDistAttn(f32 refDist, f32 refBright, u32 distAttnFn) {
+    GXInitLightDistAttn(&mObj, refDist, refBright, distAttnFn);
+    mFlag = (mFlag & ~2) | 1;
+}
+
+/* 0x8007A6E4 (0x40): sets the distance attenuation factors and makes the light directional. */
+void LightObj::InitLightAttnK(f32 k0, f32 k1, f32 k2) {
+    GXInitLightAttnK(&mObj, k0, k1, k2);
+    mFlag = (mFlag & ~2) | 1;
+}
+
+}  // namespace g3d
+}  // namespace nw4r
 
 extern "C" {
-void* fn_8007A518(s32 *arg0, s32 *arg1) {
-    if (arg0 != arg1) {
-        *arg0 = *arg1;
-        nw4r::g3d::detail::Copy32ByteBlocks((arg0 + 4), (arg1 + 4), (u32)(0x40));
-    }
-    return arg0;
+
+/* 0x8007A724 (0x44): sets the specular direction and makes the light specular. */
+void fn_8007A724(void* self, f32 x, f32 y, f32 z) { /* untyped: opaque handle - the LightObj */
+    nw4r::g3d::LightObj* pLightObj = (nw4r::g3d::LightObj*)self;
+    GXInitLightDir(&pLightObj->mObj, x, y, z);
+    pLightObj->mFlag = (pLightObj->mFlag & ~1) | 2;
+    pLightObj->mFlag |= 8;
 }
 
-u32 light_obj_clear(s32 *arg0) {
-    *arg0 = 0;
-    nw4r::g3d::detail::ZeroMemory32ByteBlocks((arg0 + 4), (u32)(0x40));
 }
 
-u32 light_obj_init_light_color(s32 arg0, s32 *arg1) {
-    s32 sp8;
+namespace nw4r {
+namespace g3d {
 
-    sp8 = *arg1;
-    GXInitLightColor((s32)(arg0 + 4), (void*)(&sp8));
+#pragma fp_contract off
+/* 0x8007A768 (0x60): sets the specular shininess and makes the light specular. */
+void LightObj::InitLightShininess(f32 shininess) {
+    GXInitLightAttn(&mObj, 0.0f, 0.0f, 1.0f, shininess * 0.5f, 0.0f, 1.0f - shininess * 0.5f);
+    mFlag = (mFlag & ~1) | 2;
 }
+#pragma fp_contract reset
 
-u32 fn_8007A5A8(s32 *arg0, void* a1, void* a2, void* a3) {
-    GXInitLightPos((s32)(arg0 + 4));
-    *arg0 &= 0xFFFFFFFD;
-}
+}  // namespace g3d
+}  // namespace nw4r
 
-u32 fn_8007A5E4(s32 *arg0, void* a1, void* a2, void* a3) {
-    GXInitLightDir((s32)(arg0 + 4));
-    *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
-}
+extern "C" {
 
-u32 light_obj_init_light_spot(s32 *arg0, void* a1, void* a2) {
-    GXInitLightSpot((s32)(arg0 + 4));
-    *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
-}
-
-void light_obj_init_light_attn_a(s32 *arg0) {
-    GXInitLightAttnA((s32)(arg0 + 4));
-    *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
-}
-
-u32 light_obj_init_light_dist_attn(s32 *arg0, void* a1, void* a2, void* a3) {
-    GXInitLightDistAttn((s32)(arg0 + 4));
-    *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
-}
-
-void light_obj_init_light_attn_k(s32 *arg0) {
-    GXInitLightAttnK((s32)(arg0 + 4));
-    *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
-}
-
-u32 fn_8007A724(s32 *arg0, void* a1, void* a2, void* a3) {
-    GXInitLightDir((s32)(arg0 + 4));
-    *arg0 = (*arg0 & 0xFFFFFFFE) | 2 | 8;
-}
-
-u32 light_obj_init_light_shininess(s32 *arg0, f32 farg0) {
-    f32 temp_f4;
-
-    temp_f4 = farg0 * lbl_80795E38;
-    GXInitLightAttn((s32)(arg0 + 4), (f32)(lbl_80795E30), (f32)(lbl_80795E30), (f32)(lbl_80795E34), (f32)(temp_f4), (f32)(lbl_80795E30), (f32)(lbl_80795E34 - temp_f4));
-    *arg0 = (*arg0 & 0xFFFFFFFE) | 2;
-}
-
-u32 light_obj_get_light_pos(s32 arg0, s32 arg1) {
-    if (arg1 != 0) {
-        GXGetLightPos((s32)(arg0 + 4), (s32)(arg1 + 4), (s32)(arg1 + 8));
+/* 0x8007A7C8 (0x1C): reads the light's position into `pOut` when it is given. */
+void light_obj_get_light_pos(const nw4r::g3d::LightObj* pLightObj, nw4r::math::VEC3* pOut) {
+    if (pOut != NULL) {
+        GXGetLightPos(&pLightObj->mObj, &pOut->x, &pOut->y, &pOut->z);
     }
 }
 
-u32 light_obj_get_light_dir(s32 arg0, s32 arg1) {
-    if (arg1 != 0) {
-        GXGetLightDir((s32)(arg0 + 4), (s32)(arg1 + 4), (s32)(arg1 + 8));
+/* 0x8007A7E4 (0x1C): reads the light's direction into `pOut` when it is given. */
+void light_obj_get_light_dir(const nw4r::g3d::LightObj* pLightObj, nw4r::math::VEC3* pOut) {
+    if (pOut != NULL) {
+        GXGetLightDir(&pLightObj->mObj, &pOut->x, &pOut->y, &pOut->z);
     }
 }
 
-void fn_8007A800(s32 arg0, s32 arg1) {
-    if (arg1 != 0) {
-        GXGetLightColor((s32)(arg0 + 4));
+}
+
+namespace nw4r {
+namespace g3d {
+
+/* 0x8007A800 (0x14): reads the light's colour into `pColor` when it is given. */
+void LightObj::GetLightColor(GXColor* pColor) const {
+    if (pColor != NULL) {
+        GXGetLightColor(&mObj, pColor);
     }
 }
 
-u32 fn_8007A814(s32 *arg0, s32 arg1) {
-}
-
-
-typedef struct {
-    /* +0x00 */ u16 field_0x00;
-    /* +0x02 */ u16 field_0x02;
-    /* +0x04 */ u8* field_0x04;
-    /* +0x08 */ u8* field_0x08;
-    /* +0x0C */ u8* field_0x0C;
-} RawView_48; /* size: 0x10 */
-typedef struct {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u8 field_0x06;
-    /* +0x07 */ u8 field_0x07;
-    /* +0x08 */ u8 field_0x08;
-    /* +0x09 */ u8 field_0x09;
-    /* +0x0A */ u8 field_0x0A;
-    /* +0x0B */ u8 field_0x0B;
-} RawView_49; /* size: 0xC */
-typedef struct {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 pad_0x05[0x3];
-    /* +0x08 */ u32 field_0x08;
-} RawView_50; /* size: 0xC */
-void* light_setting_ctor(void *arg0, s32 arg1, s32 arg2, u32 arg3, s32 arg4, u32 arg5) {
-}
-
-
-typedef struct {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u8 field_0x06;
-} RawView_51; /* size: 0x7 */
-typedef struct {
-    /* +0x00 */ u8 field_0x00;
-    /* +0x01 */ u8 field_0x01;
-    /* +0x02 */ u8 field_0x02;
-    /* +0x03 */ u8 field_0x03;
-} RawView_52; /* size: 0x4 */
-u32 amb_light_obj_copy(void *arg0, void *arg1) {
-    ((RawView_51*)arg0)->field_0x00 = (u8) ((RawView_52*)arg1)->field_0x00;
-    ((RawView_51*)arg0)->field_0x01 = (u8) ((RawView_52*)arg1)->field_0x01;
-    ((RawView_51*)arg0)->field_0x02 = (u8) ((RawView_52*)arg1)->field_0x02;
-    ((RawView_51*)arg0)->field_0x03 = (u8) ((RawView_52*)arg1)->field_0x03;
-}
-
-u32 light_obj_ctor(s32 *arg0) {
-    *arg0 = 0;
-}
-
-s32 light_obj_dtor(s32 arg0, s16 arg1) {
-}
-
-
-typedef struct {
-    /* +0x00 */ u16 field_0x00;
-    /* +0x02 */ u16 field_0x02;
-    /* +0x04 */ u8* field_0x04;
-    /* +0x08 */ u8* field_0x08;
-    /* +0x0C */ u8* field_0x0C;
-} RawView_53; /* size: 0x10 */
-typedef struct {
-    /* +0x00 */ u16 field_0x00;
-    /* +0x02 */ u16 field_0x02;
-    /* +0x04 */ u8* field_0x04;
-    /* +0x08 */ u8* field_0x08;
-    /* +0x0C */ u8* field_0x0C;
-} RawView_54; /* size: 0x10 */
-s32 light_setting_import(void *arg0, void *arg1, u32 arg_sp0) {
-}
-
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x9];
-    /* +0x09 */ u8 field_0x09;
-    /* +0x0A */ u8 field_0x0A;
-    /* +0x0B */ u8 field_0x0B;
-    /* +0x0C */ u8 field_0x0C;
-    /* +0x0D */ u8 field_0x0D;
-    /* +0x0E */ u8 field_0x0E;
-} RawView_55; /* size: 0xF */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x9];
-    /* +0x09 */ u16 field_0x09;
-    /* +0x0B */ u8 field_0x0B;
-} RawView_56; /* size: 0xC */
-u32 fn_8007B074(void *arg0, void *arg1) {
-}
-
-
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u8* field_0x04;
-} RawView_57; /* size: 0x8 */
-void light_setting_apply_view_mtx(void *arg0, s32 arg1, u32 arg2) {
-}
-
-
-void* fn_8007B148(u32 *arg0, u32 *arg1) {
-    if ((u32) *arg0 < (u32) *arg1) {
-        return arg1;
+/* 0x8007A814 (0xCC): moves the light into view space: the specular direction alone, or the position and the
+ * direction. */
+void LightObj::ApplyViewMtx(const math::MTX34& camMtx) {
+    math::VEC3 dir;
+    VEC3_ctor(&dir);
+    light_obj_get_light_dir(this, &dir);
+    mtx34_rotate_vec3(&dir, &camMtx, &dir);
+    if (mFlag & 8) {
+        GXInitSpecularDir(&mObj, dir.x, dir.y, dir.z);
+    } else {
+        math::VEC3 pos;
+        VEC3_ctor(&pos);
+        light_obj_get_light_pos(this, &pos);
+        mtx34_mult_vec3(&pos, &camMtx, &pos);
+        GXInitLightPos(&mObj, pos.x, pos.y, pos.z);
+        GXInitLightDir(&mObj, dir.x, dir.y, dir.z);
     }
-    return arg0;
 }
 
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u8* field_0x04;
-} RawView_58; /* size: 0x8 */
-s32 light_set_select_light_obj(void *arg0, u32 arg1, s8 arg2) {
+}  // namespace g3d
+}  // namespace nw4r
+
+extern "C" {
+
+/* 0x8007A8E0 (0x618): stores the buffers and counts, clears every light set, selects the first two lights in light
+ * set 0, and fills the lights with the defaults: a spot light, a point light, a specular light, then disabled
+ * lights, each with a white ambient light. */
+void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 numLightObj, s32 pAmbLightObjBuf,
+                         u32 numAmbLightObj) { /* untyped: opaque handle - the LightSetting record */
+    using namespace nw4r::g3d;
+    LightSetting* pSetting = (LightSetting*)pSelf;
+    LightObj* pLightObjArray = (LightObj*)pLightObjBuf;
+    AmbLightObj* pAmbLightObjArray = (AmbLightObj*)pLightAnmBuf;
+    LightSetData* pLightSetDataArray = (LightSetData*)pAmbLightObjBuf;
+
+    pSetting->mNumLight = numLightObj;
+    pSetting->mNumLightSet = numAmbLightObj;
+    pSetting->mpLightObjArray = pLightObjArray;
+    pSetting->mpAmbLightObjArray = pAmbLightObjArray;
+    pSetting->mpLightSetDataArray = pLightSetDataArray;
+    bool countsFit = (u16)numLightObj <= 128 && (u16)numAmbLightObj <= 128;
+    if (!countsFit) {
+        nw4r::db::Panic("g3d_light.cpp", 0x134,
+                        "NW4R:Failed assertion mNumLight <= G3DState::NUM_LIGHT && mNumLightSet <= "
+                        "G3DState::NUM_LIGHT_SET");
+    }
+    bool countsSet = pSetting->mNumLight > 0 && pSetting->mNumLightSet > 0;
+    if (!countsSet) {
+        nw4r::db::Panic("g3d_light.cpp", 0x135, "NW4R:Failed assertion mNumLight > 0 && mNumLightSet > 0");
+    }
+    G3D_POINTER_ASSERT("g3d_light.cpp", pLightObjArray, 0x137,
+                       "NW4R:Pointer Error\npLightObjArray(=%p) is not valid pointer.");
+    G3D_POINTER_ASSERT("g3d_light.cpp", pAmbLightObjArray, 0x138,
+                       "NW4R:Pointer Error\npAmbLightObjArray(=%p) is not valid pointer.");
+    G3D_POINTER_ASSERT("g3d_light.cpp", pLightSetDataArray, 0x139,
+                       "NW4R:Pointer Error\npLightSetDataArray(=%p) is not valid pointer.");
+
+    for (u32 i = 0; i < pSetting->mNumLightSet; i++) {
+        LightSetData& data = pSetting->mpLightSetDataArray[i];
+        data.idxAmbLight = -1;
+        data.idxLight[0] = -1;
+        data.idxLight[1] = -1;
+        data.idxLight[2] = -1;
+        data.idxLight[3] = -1;
+        data.idxLight[4] = -1;
+        data.idxLight[5] = -1;
+        data.idxLight[6] = -1;
+        data.idxLight[7] = -1;
+    }
+    pSetting->mpLightSetDataArray[0].idxLight[0] = 0;
+    pSetting->mpLightSetDataArray[0].idxLight[1] = 2;
+    pSetting->mpLightSetDataArray[0].idxAmbLight = -1;
+
+    AmbLightObj amb = {0xFF, 0xFF, 0xFF, 0xFF};
+    LightObj spotLight;
+    LightObj pointLight;
+    LightObj specLight;
+    LightObj offLight;
+    light_obj_ctor(&spotLight);
+    light_obj_ctor(&pointLight);
+    light_obj_ctor(&specLight);
+    light_obj_ctor(&offLight);
+    spotLight.Clear();
+    pointLight.Clear();
+    specLight.Clear();
+    offLight.Clear();
+
+    GXColor white = {0xFF, 0xFF, 0xFF, 0xFF};
+    spotLight.InitLightColor(white);
+    fn_8007A5A8(&spotLight, 4000000.0f, 4000000.0f, 4000000.0f);
+    fn_8007A5E4(&spotLight, 0.0f, -1.0f, 0.0f);
+    spotLight.InitLightSpot(90.0f, 0);
+    spotLight.InitLightDistAttn(10.0f, 0.5f, 0);
+    light_obj_enable(&spotLight);
+
+    pointLight.InitLightColor(white);
+    fn_8007A5A8(&pointLight, 4000000.0f, 4000000.0f, 4000000.0f);
+    light_obj_enable(&pointLight);
+
+    specLight.InitLightColor(white);
+    fn_8007A5A8(&specLight, 4000000.0f, 4000000.0f, 4000000.0f);
+    fn_8007A724(&specLight, 0.0f, -1.0f, 0.0f);
+    specLight.InitLightShininess(16.0f);
+    light_obj_enable(&specLight);
+
+    light_obj_disable(&offLight);
+
+    if (pSetting->mNumLight > 0) {
+        pSetting->mpLightObjArray[0] = spotLight;
+        pSetting->mpAmbLightObjArray[0] = amb;
+    }
+    if (pSetting->mNumLight > 1) {
+        pSetting->mpLightObjArray[1] = pointLight;
+        pSetting->mpAmbLightObjArray[1] = amb;
+    }
+    if (pSetting->mNumLight > 2) {
+        pSetting->mpLightObjArray[2] = specLight;
+        pSetting->mpAmbLightObjArray[2] = amb;
+    }
+    for (u32 i = 3; i < pSetting->mNumLight; i++) {
+        pSetting->mpLightObjArray[i] = offLight;
+        pSetting->mpAmbLightObjArray[i] = amb;
+    }
+    return pSetting;
 }
 
-
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u8* field_0x04;
-} RawView_59; /* size: 0x8 */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x8];
-    /* +0x08 */ u32 field_0x08;
-} RawView_60; /* size: 0xC */
-s32 light_set_select_amb_light_obj(void *arg0, s8 arg1) {
 }
 
-} /* extern "C" */
+namespace nw4r {
+namespace g3d {
+
+}  // namespace g3d
+}  // namespace nw4r
+
+/* 0x8007AF1C (0xC): starts the light object with no flags. */
+extern "C" nw4r::g3d::LightObj* light_obj_ctor(nw4r::g3d::LightObj* pSelf) {
+    pSelf->mFlag = 0;
+    return pSelf;
+}
+
+/* 0x8007AF28 (0x44): destroys a light object, freeing it when `bDelete` is positive. */
+extern "C" nw4r::g3d::LightObj* light_obj_dtor(nw4r::g3d::LightObj* pSelf, s16 bDelete) {
+    if (pSelf != NULL && bDelete > 0) {
+        operator delete(pSelf);
+    }
+    return pSelf;
+}
+
+namespace nw4r {
+namespace g3d {
+
+/* 0x8007AF6C (0x108): copies another setting's lights, ambient lights and light sets when they fit; a disabled
+ * light disables this setting's light instead of being copied. */
+bool LightSetting::Import(const LightSetting& rhs) {
+    if (mNumLight < rhs.mNumLight || mNumLightSet < rhs.mNumLightSet) {
+        return false;
+    }
+    u32 i;
+    for (i = 0; i < rhs.mNumLight; i++) {
+        if (light_obj_is_enable(&rhs.mpLightObjArray[i])) {
+            mpLightObjArray[i] = rhs.mpLightObjArray[i];
+        } else {
+            light_obj_disable(&mpLightObjArray[i]);
+        }
+        mpAmbLightObjArray[i] = rhs.mpAmbLightObjArray[i];
+    }
+    for (i = 0; i < rhs.mNumLightSet; i++) {
+        mpLightSetDataArray[i] = rhs.mpLightSetDataArray[i];
+    }
+    return true;
+}
+
+/* 0x8007B0A0 (0xA8): moves the first `numLight` enabled lights into view space. */
+void LightSetting::ApplyViewMtx(const math::MTX34& camMtx, u32 numLight) {
+    numLight = std::max(numLight, (u32)mNumLight);
+    for (u32 i = 0; i < numLight; i++) {
+        if (light_obj_is_enable(&mpLightObjArray[i])) {
+            mpLightObjArray[i].ApplyViewMtx(camMtx);
+        }
+    }
+}
+
+/* 0x8007B160 (0xC4): selects light object `lightObjIdx` (-1: none) for slot `lightIdxInSet` of the set. */
+bool LightSet::SelectLightObj(u32 lightIdxInSet, int lightObjIdx) {
+    if (!light_set_is_valid(this)) {
+        nw4r::db::Panic("g3d_light.cpp", 0x1DC, "NW4R:Failed assertion IsValid()");
+    }
+    if (light_set_is_valid(this) && lightIdxInSet < 8) {
+        if (lightObjIdx < 0) {
+            mpLightSetData->idxLight[lightIdxInSet] = -1;
+            return true;
+        } else if (lightObjIdx < (int)light_setting_get_num_light_obj(mpSetting)) {
+            mpLightSetData->idxLight[lightIdxInSet] = lightObjIdx;
+            return true;
+        }
+    }
+    return false;
+}
+
+/* 0x8007B224 (0xB0): selects ambient light `ambLightObjIdx` (-1: none) for the set. */
+bool LightSet::SelectAmbLightObj(int ambLightObjIdx) {
+    if (!light_set_is_valid(this)) {
+        nw4r::db::Panic("g3d_light.cpp", 0x1F2, "NW4R:Failed assertion IsValid()");
+    }
+    if (light_set_is_valid(this)) {
+        if (ambLightObjIdx < 0) {
+            mpLightSetData->idxAmbLight = -1;
+            return true;
+        } else if (ambLightObjIdx < (int)light_setting_get_num_light_obj(mpSetting)) {
+            mpLightSetData->idxAmbLight = ambLightObjIdx;
+            return true;
+        }
+    }
+    return false;
+}
+
+}  // namespace g3d
+}  // namespace nw4r

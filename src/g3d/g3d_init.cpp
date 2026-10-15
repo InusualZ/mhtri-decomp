@@ -3,108 +3,116 @@
  *   locked cache, sets the fast-cast quantisers, picks the render mode) and G3dReset (invalidates the G3D state).
  * RANGE. .text 0x8007A400-0x8007A518 (7 functions); extab 0x80008408-0x80008418, extabindex 0x80020C34-0x80020C4C,
  *   .data 0x8058EB38-0x8058EB80 (the "<< NW4R    - G3D ... >>" version string), .sdata 0x80791200-0x80791208 (its
- *   pointer, which fn_8007A400 hands to OSRegisterVersion).  The string sits between `g3d/g3d_fog.cpp`'s last
- *   string and "g3d_light.cpp"; the GQR setters fn_8007A46C..OSInitFastCast are the inline InitFastCast the start-up
- *   calls, and fn_8007A510 (`g3d_state_invalidate(0x7FF)`) is G3dReset.
+ *   pointer, which G3dInit hands to OSRegisterVersion).  The string sits between `g3d/g3d_fog.cpp`'s last
+ *   string and "g3d_light.cpp"; the GQR setters 0x8007A46C..OSInitFastCast are the fast-cast set-up the start-up
+ *   calls, and 0x8007A510 (`g3d_state_invalidate(0x7FF)`) is G3dReset.
  * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` throughout (playbook idea 106).
- * NAMES. Map stems; fn_8007A400 is nw4r's G3dInit and fn_8007A510 its G3dReset (by the body and the version string).
- * RESIDUALS. Unwritten (empty stub): fn_8007A468.  Partial: fn_8007A400, fn_8007A46C, fn_8007A494, fn_8007A4B8,
- *   OSInitFastCast (the `mtspr` GQR writes m2c could not express).
- *   flipcheck: `.data` and `.sdata` are claimed and not emitted.
+ * NAMES. G3dInit (0x8007A400) and NW4R_G3D_Version_ are nw4r's (the body and the version string); fn_8007A510 keeps
+ *   its stem until its consumer `pad_connect.cpp` is swept to G3dReset.  GUESS: g3d_init_fast_cast (0x8007A468, the
+ *   one-call wrapper), g3d_init_fast_cast_gqrs (0x8007A46C), g3d_set_gqr6_s16_5 (0x8007A4B8) and
+ *   g3d_set_gqr7_s16_8 (0x8007A494) - named for the quantiser each writes.
+ * RESIDUALS. g3d_state_set_render_mode (G3DState's render-mode setter, `g3d/g3d_state.cpp`) is declared here until its owner names
+ *   it.  The `.sdata` claim is 8 bytes; the object emits the 4-byte pointer (the rest is link fill).
+ * SHAPES. The GQR setters are SDK-style `static inline` functions with an `asm` block; MWCC inlines them behind a
+ *   `b` to the next instruction.  OSInitFastCast is an `asm` function, so it stays out of line.
  */
 
 #include "types.h"
-
-
-#include "sys_mem.h" /* operator delete (rule 9: call through the owner) */
-#include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
-#include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
-#include "g3d/g3d_xsi.h" /* g3d_calc_tex_mtx_xsi (rule 2) */
-#include "g3d/g3d_obj.h" /* nw4r::g3d::G3dObj (rule 2) */
-#include "MEM/MEMAllocFromAllocator.h" /* MEMFreeToAllocator (rule 2) */
-#include "g3d/g3d_anmchr.h" /* type_obj_set_name (rule 2) */
-#include "g3d/g3d_cpu.h"
-#include "g3d/g3d_resvtx.h"
-#include "g3d/g3d_resmat.h"
-#include "g3d/g3d_resnode.h"
-#include "g3d/g3d_resshp.h"
-#include "g3d/g3d_state.h"     /* the material loaders (rule 2) */
-#include "nw4r/fn_805012C4.h"
-#include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
-#include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple (rule 1) */
-#include "MSL/algorithm.h"     /* std::find / std::distance */
-#include "unsplit/g3d.h"      /* the scene objects' type-name records no unit owns (rule 2) */
+#include "OS/OS.h"                 /* OSRegisterVersion (rule 2) */
+#include "VI/vi.h"                 /* VIGetTvFormat (rule 2) */
+#include "RVLGX/GXFrameBuf.h"      /* GXNtsc480IntDf / GXPal528IntDf (rule 2) */
+#include "nw4r/ut_LockedCache.h"   /* nw4r::ut::LC (rule 2) */
+#include "g3d/g3d_state.h"         /* g3d_state_invalidate (rule 2) */
+#include "g3d/g3d_init.h"
 
 #pragma peephole off
 
-#define M2C_ERROR(x) /* unknown instruction */
-
-
-extern u32 GXNtsc480IntDf;
-extern u32 GXPal528IntDf;
-extern u32 lbl_80791200;
-
 extern "C" {
-u32 OSRegisterVersion(s32);
-u32 VIGetTvFormat(void);
-u32 g3d_state_set_render_mode(void*);
-/* internal */ void fn_8007A400(s32 arg0);
-/* internal */ u32 fn_8007A468(void* a0);
-/* internal */ u32 fn_8007A46C(void* a0);
-/* internal */ u32 fn_8007A494(void* a0);
-/* internal */ u32 fn_8007A4B8(void* a0);
-/* internal */ s32 OSInitFastCast(void* a0);
-/* internal */ void fn_8007A510(void* a0);
-} /* extern "C" */
+u32 g3d_state_set_render_mode(const GXRenderModeObj* pMode);
 
-extern "C" {
-void fn_8007A400(s32 arg0) {
-    u32 *var_r3;
+void OSInitFastCast(void);
+void g3d_init_fast_cast(void);
+void g3d_init_fast_cast_gqrs(void);
+void g3d_set_gqr6_s16_5(void);
+void g3d_set_gqr7_s16_8(void);
+}
 
-    OSRegisterVersion((s32)(lbl_80791200));
-    if (arg0 != 0) {
-        nw4r::ut::LC::Enable();
+/* The version string the start-up registers with the OS. */
+const char* NW4R_G3D_Version_ = "<< NW4R    - G3D \tfinal   build: Jan 30 2010 10:51:46 (0x4302_158) >>";
+
+/* Writes GQR6 (both halves) from a type and a scale. */
+static inline void OSSetGQR6(register u32 type, register u32 scale) {
+    register u32 val = (((scale << 8) | type) << 16) | ((scale << 8) | type);
+    asm { mtspr 918, val }
+}
+
+/* Writes GQR7 (both halves) from a type and a scale. */
+static inline void OSSetGQR7(register u32 type, register u32 scale) {
+    register u32 val = (((scale << 8) | type) << 16) | ((scale << 8) | type);
+    asm { mtspr 919, val }
+}
+
+namespace nw4r { namespace g3d {
+
+/* 0x8007A400 (0x68): registers the version, sets the locked cache, the fast-cast quantisers and the render mode. */
+void G3dInit(bool enableLockedCache) {
+    OSRegisterVersion(NW4R_G3D_Version_);
+    if (enableLockedCache) {
+        ut::LC::Enable();
     } else {
-        nw4r::ut::LC::Disable();
+        ut::LC::Disable();
     }
-    fn_8007A468(0);
-    var_r3 = (u32 *)(&GXNtsc480IntDf);
-    if (VIGetTvFormat() == 1U) {
-        var_r3 = (u32 *)(&GXPal528IntDf);
-    }
-    g3d_state_set_render_mode((void*)(var_r3));
+    g3d_init_fast_cast();
+    g3d_state_set_render_mode(VIGetTvFormat() == 1 ? &GXPal528IntDf : &GXNtsc480IntDf);
 }
 
-u32 fn_8007A468(void* a0) {
-    fn_8007A46C(0);
+}}
+
+extern "C" {
+
+/* 0x8007A468 (0x4): sets every fast-cast quantiser. */
+void g3d_init_fast_cast(void) {
+    g3d_init_fast_cast_gqrs();
 }
 
-u32 fn_8007A46C(void* a0) {
-    OSInitFastCast(0);
-    fn_8007A4B8(0);
-    fn_8007A494(0);
+/* 0x8007A46C (0x28): sets GQR2..GQR7. */
+void g3d_init_fast_cast_gqrs(void) {
+    OSInitFastCast();
+    g3d_set_gqr6_s16_5();
+    g3d_set_gqr7_s16_8();
 }
 
-u32 fn_8007A494(void* a0) {
-    M2C_ERROR(/* unknown instruction: mtspr 0x397, $r0 */);
+/* 0x8007A494 (0x24): sets GQR7 to s16 with scale 8. */
+void g3d_set_gqr7_s16_8(void) {
+    OSSetGQR7(7, 8);
 }
 
-u32 fn_8007A4B8(void* a0) {
-    M2C_ERROR(/* unknown instruction: mtspr 0x396, $r0 */);
+/* 0x8007A4B8 (0x24): sets GQR6 to s16 with scale 5. */
+void g3d_set_gqr6_s16_5(void) {
+    OSSetGQR6(7, 5);
 }
 
-s32 OSInitFastCast(void* a0) {
-    M2C_ERROR(/* unknown instruction: mtspr 0x392, $r3 */);
-    M2C_ERROR(/* unknown instruction: mtspr 0x393, $r3 */);
-    M2C_ERROR(/* unknown instruction: mtspr 0x394, $r3 */);
-    M2C_ERROR(/* unknown instruction: mtspr 0x395, $r3 */);
-    return 0x70007;
+/* 0x8007A4DC (0x34): sets GQR2..GQR5 to the u8/u16/s8/s16 fast-cast pairs. */
+asm void OSInitFastCast(void) {
+    nofralloc
+    li r3, 4
+    oris r3, r3, 4
+    mtspr 914, r3
+    li r3, 5
+    oris r3, r3, 5
+    mtspr 915, r3
+    li r3, 6
+    oris r3, r3, 6
+    mtspr 916, r3
+    li r3, 7
+    oris r3, r3, 7
+    mtspr 917, r3
+    blr
 }
 
-void fn_8007A510(void* a0) {
+/* 0x8007A510 (0x8): invalidates the whole G3D state. */
+void fn_8007A510(void) {
     g3d_state_invalidate(0x7FF);
 }
 
-
-} /* extern "C" */
+}

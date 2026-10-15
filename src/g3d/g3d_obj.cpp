@@ -23,6 +23,9 @@
 
 #pragma peephole off
 
+/* The "G3dObj" run-time type-name record: the name's size with its NUL, then the name. */
+extern "C" const u8 anm_typename_G3dObj[] = {0, 0, 0, sizeof("G3dObj"), 'G', '3', 'd', 'O', 'b', 'j', 0};
+
 /* 0x8007B2D4 (0x6C): returns the object's memory to the heap it came from. */
 nw4r::g3d::G3dObj::~G3dObj() {
     Dealloc(mpHeap, this);
