@@ -2812,14 +2812,9 @@ BTE/btm_dev.c:
 	.text       start:0x804827D4 end:0x80482EA0
 
 BTE/btm_devctl.c:
-	.text       start:0x80482EA0 end:0x80484224
-	.data       start:0x80613F80 end:0x806140E0
-	.sdata      start:0x80793D88 end:0x80793D8C
-
-BTE/btm_link_key.c:
-	.text       start:0x80484224 end:0x80484828
-	.data       start:0x806140E0 end:0x806141E0
-	.sdata      start:0x80793D8C end:0x80793DA0
+	.text       start:0x80482EA0 end:0x80484828
+	.data       start:0x80613F80 end:0x806141E0
+	.sdata      start:0x80793D88 end:0x80793DA0
 
 BTE/btm_discovery.c:
 	.text       start:0x80484828 end:0x8048495C

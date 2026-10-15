@@ -27,7 +27,6 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "BTE/hidd_pm.h"   /* hidd_pm_proc_mode_change */
-#include "BTE/btm_link_key.h"   /* btm_return_link_keys_evt, btm_read_stored_link_key_complete, btm_write_stored_link_key_complete, btm_delete_stored_link_key_complete, btm_report_device_status */
 
 #define DEV_CLASS_LEN 3
 #define LINK_KEY_LEN 16

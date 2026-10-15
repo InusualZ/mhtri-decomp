@@ -1,28 +1,34 @@
 /*
  * BTE/btm_devctl.c - the BTM device control: device init and reset, the HCI reset sequence and its completions, AFH
- *   channels, local name/address/version/features/class, the device status notification and the vendor-specific
- *   commands and events.
+ *   channels, local name/address/version/features/class, the device status notification, the vendor-specific
+ *   commands and events, the page timeout and the stored link key commands and their completions.
  *
- * RANGE. .text 0x80482EA0-0x80484224 (24 functions, 0x1384 B); .data 0x80613F80-0x806140E0; .sdata
- *   0x80793D88-0x80793D8C. The start is medium: btm_dev_init after btm_dev.c in the BTE source order; the .data start
+ * RANGE. .text 0x80482EA0-0x80484828 (33 functions, 0x1988 B); .data 0x80613F80-0x806141E0; .sdata
+ *   0x80793D88-0x80793DA0. The start is medium: btm_dev_init after btm_dev.c in the BTE source order; the .data start
  *   0x80613F80 is 8-aligned with no pad (first readers BTM_SetAfhChannels and btm_read_local_features_complete). The
- *   end is strong: the next .data object starts after a 4-byte pad beyond 4-byte alignment (0x806140DC ->
- *   0x806140E0), and its first reader BTM_WritePageTimeout is the first function after btm_vendor_specific_evt, the
- *   last reader of this range's .data - the cut is pinned exactly at 0x80484224. The .sdata word 0x80793D88 is the
- *   default class literal btm_dev_init copies.
+ *   4-byte .data pad at 0x806140DC is the compiler's own inside this TU: the stored link key functions compiled
+ *   after btm_vendor_specific_evt emit .data and .sdata byte-identical to the target's. The end is weak: the next
+ *   .data pad seam (0x806141E0, BTM_SetDiscoverability) allows any cut in [0x8048453C, 0x8048495C]; it is placed
+ *   after btm_report_device_status, before the btm_discovery_db_* family. The .sdata word 0x80793D88 is the default
+ *   class literal btm_dev_init copies; "TRUE"/"FALSE" (0x80793D8C, 0x80793D94) are read only by
+ *   BTM_ReadStoredLinkKey and BTM_DeleteStoredLinkKey.
  * FLAGS. GC/3.0a5.2 with `cflags_nw4r`, as the matched BTE units (see BTE/l2c_utils.c); the static reset-sequence
  *   steps and BTM_SetDeviceClass/BTM_SetLocalDeviceName inline into their callers (`-ipa file`).
  * NAMES. the map's, which are the BTE source's; 0x80483FB4 BTM_ReadDeviceClass is a GUESS (returns the address of the
- *   btm_cb device class, at its BTE source position).
- * RESIDUALS. btm_read_local_features_complete: the target keeps the control block pointer in r31 and the string base
- *   in r30, this source the other way round (every order of the six declarations, a source without p_devcb and one
- *   with p_devcb everywhere measured the same or worse). BTM_SetLocalDeviceName: p_buf and the name pointer take
- *   r31/r30 swapped; the other declaration order fixes it and costs its two inlined copies (btm_reset_complete,
- *   btm_dev_timeout).
+ *   btm_cb device class, at its BTE source position). BTM_WriteVoiceSettings and BTM_EnableTestMode are GUESS bodies
+ *   around their trace strings (the link strips both; their strings stay in .data because the multi-string
+ *   functions address the pool section-relative).
+ * RESIDUALS. BTM_SetLocalDeviceName: p_buf and the name pointer take r31/r30 swapped; the other declaration order
+ *   fixes it and costs its two inlined copies (btm_reset_complete, btm_dev_timeout), which want this order. Measured
+ *   without a win: the name pointer assigned at the top/after either test/inside the branch, memset/strncpy through
+ *   `p`, either compare spelling, an early return, a char* `p`, the helper moved anywhere in the file, an argument
+ *   local in the caller, and scoped scheduling/optimization_level/global_optimizer/peephole/opt_* pragmas.
  * SHAPES. plain C; the device control block is flattened into btm_cb (BTE/btm_main.h). Each reset-sequence step
  *   decrements the retry count itself, so a caller that starts a step stores one more than the target's folded value.
  *   btm_vsc_complete copies `p` and the param_buf address into locals before the callback test (retail's mr r7 and
- *   hoisted addi).
+ *   hoisted addi). btm_read_local_features_complete reads p_cb from btm_cb before it declares p_devcb (idea 124: the
+ *   earlier-born p_devcb would take r29 instead of retail's r31). The stored link key callback is
+ *   btm_cb.p_stored_link_key_cmpl_cb (BTE/btm_main.h).
  */
 
 #include "BTE/btm_devctl.h"
@@ -35,6 +41,11 @@
 
 /* The GKI pool the HCI commands are built in. */
 #define HCI_CMD_POOL_ID 2
+
+/* Copy `len` bytes from the stream `p` into the array `a` reversed, and back into the stream in order. */
+#define REVERSE_STREAM_TO_ARRAY(a, p, len) {register int ijk; register u8* _pa = (u8*)(a) + (len) - 1; \
+    for (ijk = 0; ijk < (len); ijk++) *_pa-- = *(p)++;}
+#define ARRAY_TO_STREAM(p, a, len) {register int ijk; for (ijk = 0; ijk < (len); ijk++) *(p)++ = (u8)(a)[ijk];}
 
 /* The BTU timer type of the device control timers and their timeouts in seconds. */
 #define BTU_TTYPE_BTM_DEV_CTL 1
@@ -387,15 +398,13 @@ void btm_read_local_version_complete(u8* p, u16 evt_len) {
 /* 0x80483820 (0x4FC): Stores the controller's features, derives the supported packet types and link policy, and
  * reports the device up. */
 void btm_read_local_features_complete(u8* p, u16 evt_len) {
-    tBTM_CB* p_devcb;
-    BtmCompleteCallback p_cb;
+    BtmCompleteCallback p_cb = btm_cb.p_reset_cmpl_cb;
+    tBTM_CB* p_devcb = &btm_cb;
     u8 status;
     u16 xx;
     u8 last;
     u8 first;
 
-    p_devcb = &btm_cb;
-    p_cb = p_devcb->p_reset_cmpl_cb;
     p_devcb->p_reset_cmpl_cb = NULL;
 
     STREAM_TO_UINT8(status, p);
@@ -725,5 +734,197 @@ void btm_vendor_specific_evt(u8* p, u8 evt_len) {
 
     if (p_devcb->p_vend_spec_cb) {
         (*p_devcb->p_vend_spec_cb)(evt_len, p);
+    }
+}
+
+/* 0x80484224 (0xA0): Stores the page timeout `timeout` (in slots) and sends it to the controller. */
+u8 BTM_WritePageTimeout(u16 timeout) {
+    BT_HDR* p_buf;
+
+    BTM_TRACE_EVENT1("BTM: BTM_WritePageTimeout: Timeout: %d.", timeout);
+
+    btm_cb.page_timeout = (timeout * 625) / 1000;
+
+    if ((p_buf = (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID)) != NULL) {
+        btsnd_hcic_write_page_tout(p_buf, timeout);
+        return BTM_SUCCESS;
+    }
+    return BTM_NO_RESOURCES;
+}
+
+/* Sends the voice setting `settings`; the linker strips it (no caller), only its trace string survives. */
+u8 BTM_WriteVoiceSettings(u16 settings) {
+    BTM_TRACE_EVENT1("BTM: BTM_WriteVoiceSettings: Settings: 0x%04x.", settings);
+
+    if (GKI_getpoolbuf(HCI_CMD_POOL_ID) != NULL) {
+        return BTM_SUCCESS;
+    }
+    return BTM_NO_RESOURCES;
+}
+
+/* Puts the controller in test mode; the linker strips it (no caller), only its trace string survives. */
+u8 BTM_EnableTestMode(void) {
+    BTM_TRACE_EVENT0("BTM: BTM_EnableTestMode");
+
+    if (GKI_getpoolbuf(HCI_CMD_POOL_ID) != NULL) {
+        return BTM_SUCCESS;
+    }
+    return BTM_NO_RESOURCES;
+}
+
+/* 0x804842C4 (0xD8): Reads the link key the controller stores for `bd_addr` (NULL: every key); `p_cb` gets the
+ * result. */
+u8 BTM_ReadStoredLinkKey(const u8* bd_addr, BtmCompleteCallback p_cb) {
+    u8 local_bd_addr[6];
+    u8 read_all_flag = FALSE;
+    BT_HDR* p_buf;
+
+    if (btm_cb.p_stored_link_key_cmpl_cb) {
+        return BTM_BUSY;
+    }
+
+    if (!bd_addr) {
+        read_all_flag = TRUE;
+        bd_addr = local_bd_addr;
+    }
+
+    BTM_TRACE_EVENT1("BTM: BTM_ReadStoredLinkKey: Read_All: %s", read_all_flag ? "TRUE" : "FALSE");
+
+    if ((p_buf = (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID)) != NULL) {
+        btm_cb.p_stored_link_key_cmpl_cb = p_cb;
+        btsnd_hcic_read_stored_key(p_buf, (u8*)bd_addr, read_all_flag);
+        return BTM_SUCCESS;
+    }
+    return BTM_NO_RESOURCES;
+}
+
+/* 0x8048439C (0xD0): Writes up to 11 addresses and link keys to the controller; `p_cb` gets the result. */
+u8 BTM_WriteStoredLinkKey(u8 num_keys, const u8* bd_addr, const u8* link_key, BtmCompleteCallback p_cb) {
+    BT_HDR* p_buf;
+
+    if (btm_cb.p_stored_link_key_cmpl_cb) {
+        return BTM_BUSY;
+    }
+
+    BTM_TRACE_EVENT1("BTM: BTM_WriteStoredLinkKey: num_keys: %d", num_keys);
+
+    if (num_keys > BTM_MAX_WRITE_LINK_KEYS) {
+        num_keys = BTM_MAX_WRITE_LINK_KEYS;
+    }
+
+    if ((p_buf = (BT_HDR*)GKI_getpoolbuf(HCI_CMD_POOL_ID)) != NULL) {
+        btm_cb.p_stored_link_key_cmpl_cb = p_cb;
+        btsnd_hcic_write_stored_key(p_buf, num_keys, (u8 (*)[6])bd_addr, (u8 (*)[16])link_key);
+        return BTM_SUCCESS;
+    }
+    return BTM_NO_RESOURCES;
+}
+
+/* 0x8048446C (0xD0): Deletes the link key the controller stores for `bd_addr` (NULL: every key); `p_cb` gets the
+ * result. */
+u8 BTM_DeleteStoredLinkKey(const u8* bd_addr, BtmCompleteCallback p_cb) {
+    u8 local_bd_addr[6];
+    u8 delete_all_flag = FALSE;
+
+    if (btm_cb.p_stored_link_key_cmpl_cb) {
+        return BTM_BUSY;
+    }
+
+    if (!bd_addr) {
+        delete_all_flag = TRUE;
+        bd_addr = local_bd_addr;
+    }
+
+    BTM_TRACE_EVENT1("BTM: BTM_DeleteStoredLinkKey: delete_all_flag: %s", delete_all_flag ? "TRUE" : "FALSE");
+
+    btm_cb.p_stored_link_key_cmpl_cb = p_cb;
+    if (!btsnd_hcic_delete_stored_key((u8*)bd_addr, delete_all_flag)) {
+        return BTM_NO_RESOURCES;
+    }
+    return BTM_SUCCESS;
+}
+
+/* 0x8048453C (0x7C): Reports the stored link key read result to the waiting callback. */
+void btm_read_stored_link_key_complete(u8* p) {
+    BtmCompleteCallback p_cb = btm_cb.p_stored_link_key_cmpl_cb;
+    tBTM_READ_STORED_LINK_KEY_COMPLETE result;
+
+    btm_cb.p_stored_link_key_cmpl_cb = NULL;
+
+    if (p_cb) {
+        result.event = BTM_CB_EVT_READ_STORED_LINK_KEYS;
+
+        STREAM_TO_UINT8(result.status, p);
+        STREAM_TO_UINT16(result.max_keys, p);
+        STREAM_TO_UINT16(result.read_keys, p);
+
+        (*p_cb)(&result);
+    }
+}
+
+/* 0x804845B8 (0x5C): Reports the stored link key write result to the waiting callback. */
+void btm_write_stored_link_key_complete(u8* p) {
+    BtmCompleteCallback p_cb = btm_cb.p_stored_link_key_cmpl_cb;
+    tBTM_WRITE_STORED_LINK_KEY_COMPLETE result;
+
+    btm_cb.p_stored_link_key_cmpl_cb = NULL;
+
+    if (p_cb) {
+        result.event = BTM_CB_EVT_WRITE_STORED_LINK_KEYS;
+
+        STREAM_TO_UINT8(result.status, p);
+        STREAM_TO_UINT8(result.num_keys, p);
+
+        (*p_cb)(&result);
+    }
+}
+
+/* 0x80484614 (0x68): Reports the stored link key delete result to the waiting callback. */
+void btm_delete_stored_link_key_complete(u8* p) {
+    BtmCompleteCallback p_cb = btm_cb.p_stored_link_key_cmpl_cb;
+    tBTM_DELETE_STORED_LINK_KEY_COMPLETE result;
+
+    btm_cb.p_stored_link_key_cmpl_cb = NULL;
+
+    if (p_cb) {
+        result.event = BTM_CB_EVT_DELETE_STORED_LINK_KEYS;
+
+        STREAM_TO_UINT8(result.status, p);
+        STREAM_TO_UINT16(result.num_keys, p);
+
+        (*p_cb)(&result);
+    }
+}
+
+/* 0x8048467C (0x18C): Reverses each returned address and link key in place and hands the event to the waiting
+ * callback. */
+void btm_return_link_keys_evt(tBTM_RETURN_LINK_KEYS_EVT* result) {
+    u8 i;
+    u8* p;
+    u8* p1;
+    u8 bd_addr[6];
+    u8 link_key[16];
+    BtmCompleteCallback p_cb = btm_cb.p_stored_link_key_cmpl_cb;
+
+    if (p_cb) {
+        p = result->key_data;
+        for (i = 0; i < result->num_keys; i++) {
+            p1 = p;
+
+            REVERSE_STREAM_TO_ARRAY(bd_addr, p1, 6);
+            REVERSE_STREAM_TO_ARRAY(link_key, p1, 16);
+
+            ARRAY_TO_STREAM(p, bd_addr, 6);
+            ARRAY_TO_STREAM(p, link_key, 16);
+        }
+
+        (*p_cb)(result);
+    }
+}
+
+/* 0x80484808 (0x20): Reports the device status `status` to the registered status callback. */
+void btm_report_device_status(u32 status) {
+    if (btm_cb.p_dev_status_cb) {
+        (*btm_cb.p_dev_status_cb)(status);
     }
 }
