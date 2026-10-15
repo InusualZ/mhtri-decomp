@@ -1250,7 +1250,7 @@ config.libs = [
             Object(NonMatching, "NWC24/nwc24_msg.c"),  # 0x8051D710-0x8051E068
             Object(NonMatching, "NWC24/nwc24_io.c"),   # 0x8051E068-0x8051E864
             # SO/soi: same SDK build (0x4199_60831); GC/3.0a5.2 measured 19 better / 0 worse (docs/network.md).
-            Object(NonMatching, "SO/soi.cpp"),
+            Object(Matching, "SO/soi.cpp"),
             Object(NonMatching, "SO/socket.cpp"),  # the SOCKET half of the SO band: src/SO/socket.cpp header
             # SSL/ssl and NCD/ncdsystem: same SDK build; GC/3.0a5.2 measured 5 / 5 better, 0 worse (docs/network.md).
             Object(NonMatching, "SSL/ssl.cpp"),
@@ -1266,7 +1266,7 @@ config.libs = [
             # The OS core band 0x804C1760..0x804D9B4C, cut per SDK library and source file (evidence: the RANGE line of
             # each unit header).  Per-object cflags=cflags_base (default 16-byte function alignment): all 44 units' function starts are 16-aligned in the target (.pi/notes/sdk-compiler-survey.md).
             Object(Matching, "MEM/mem_heap.c", cflags=cflags_base),
-            Object(NonMatching, "MEM/mem_expheap.c", cflags=cflags_base),
+            Object(Matching, "MEM/mem_expheap.c", cflags=cflags_base),
             Object(Matching, "MEM/mem_allocator.c", cflags=cflags_base),
             Object(Matching, "MEM/mem_list.c", cflags=cflags_base),
             Object(Matching, "MIX/mix.c", cflags=cflags_base),
@@ -1460,7 +1460,7 @@ config.libs = [
             Object(Matching, "DSP/dsp.c", cflags=cflags_base),
             Object(Matching, "DSP/dsp_debug.c", cflags=cflags_base),
             Object(Matching, "DSP/dsp_task.c", cflags=cflags_base),
-            Object(NonMatching, "DVD/dvdfs.c", cflags=cflags_base),
+            Object(Matching, "DVD/dvdfs.c", cflags=cflags_base),
             Object(NonMatching, "DVD/dvd.c", cflags=cflags_base),
             Object(Matching, "DVD/dvdqueue.c", cflags=cflags_base),
             Object(Matching, "DVD/dvderror.c", cflags=cflags_base),
@@ -1550,12 +1550,12 @@ config.libs = [
             Object(NonMatching, "nw4r/math_triangular.cpp"),
             Object(NonMatching, "nw4r/math_types.cpp"),
             Object(NonMatching, "nw4r/math_geometry.cpp"),
-            Object(NonMatching, "nw4r/ut_list.cpp"),
-            Object(NonMatching, "nw4r/ut_LinkList.cpp"),
-            Object(NonMatching, "nw4r/ut_binaryFileFormat.cpp"),
-            Object(NonMatching, "nw4r/ut_CharStrmReader.cpp"),
-            Object(NonMatching, "nw4r/ut_TagProcessorBase.cpp"),
-            Object(NonMatching, "nw4r/ut_LockedCache.cpp"),
+            Object(Matching, "nw4r/ut_list.cpp"),
+            Object(Matching, "nw4r/ut_LinkList.cpp"),
+            Object(Matching, "nw4r/ut_binaryFileFormat.cpp"),
+            Object(Matching, "nw4r/ut_CharStrmReader.cpp"),
+            Object(Matching, "nw4r/ut_TagProcessorBase.cpp"),
+            Object(Matching, "nw4r/ut_LockedCache.cpp"),
             Object(NonMatching, "nw4r/fn_80502828.cpp"),
             Object(NonMatching, "nw4r/ut_TextWriterBase.cpp"),
             Object(NonMatching, "nw4r/fn_8050661C.cpp"),
@@ -1706,7 +1706,7 @@ config.libs = [
             Object(Matching, "homebutton/hkb_qwerty_keys.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hbm_kb_event.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hbm_kb_cursor.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
-            Object(NonMatching, "homebutton/gui.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(Matching, "homebutton/gui.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hbm_gui_draw.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/tiHKBManager.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hkb_widget_tail.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
