@@ -675,8 +675,9 @@ def _object_defines(path: str, name: str) -> bool:
 
 
 def weak_duplicate_symbols(unit: str, src_path: str, obj_path: str, target_rel: str,
-                           link_ctx: dict | None) -> tuple[list, list[str]]:
-    """`([our symbols the link drops], notes)`: weak definitions in our object that an EARLIER link input defines too.
+                           link_ctx: dict | None) -> tuple[list, list[tuple[str, str]]]:
+    """`([our symbols the link drops], [(name, note)])`: weak definitions in our object that an EARLIER link input
+    defines too.
 
     MWCC emits an inline function or an implicit vtable as a weak copy in every TU that uses it (`nw4r/ut_ResFontBase`
     carries `ut::Font`'s dtor and vtable, `nw4r/ut_CharWriter` `ut::Color`'s dtor); mwld keeps the first definition
@@ -715,12 +716,12 @@ def weak_duplicate_symbols(unit: str, src_path: str, obj_path: str, target_rel: 
         if earlier:
             dropped.append(s)
         elif later:
-            notes.append("%s: weak %s is defined again only by %s, which the link places after this unit - the "
-                         "first definition wins, so the link keeps our copy and it is counted"
-                         % (s.section, s.name, ", ".join(r.replace(os.sep, "/") for r in later)))
+            notes.append((s.name, "%s: weak %s is defined again only by %s, which the link places after this "
+                          "unit - the first definition wins, so the link keeps our copy and it is counted"
+                         % (s.section, s.name, ", ".join(r.replace(os.sep, "/") for r in later))))
         else:
-            notes.append("%s: weak %s is defined by no other link input, so the link keeps our copy and it is "
-                         "counted" % (s.section, s.name))
+            notes.append((s.name, "%s: weak %s is defined by no other link input, so the link keeps our copy and it "
+                          "is counted" % (s.section, s.name)))
     return dropped, notes
 
 
@@ -735,14 +736,17 @@ def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path:
     `.comment` export flag keeps, directly or through a live symbol's relocations), no target symbol and no map row
     carries its name, and `strip_section` can lay out the rest (the object already places each symbol at its
     alignment after the previous one, zero-filled). The remaining bytes then have to match the target byte for
-    byte like any other. A data symbol the same strip takes with it (a string only a stripped function read) is a
-    problem: our object counts its bytes, the link drops them. A section absent from the result is compared as the
-    object carries it; a note says why when a removal cannot be modelled. `({}, [], [])` without link context."""
+    byte like any other. A dead WEAK data symbol with no target symbol and no map row (a base class's implicit
+    vtable only its stripped weak dtor read - `homebutton/hkb_pane`) is one retail stripped too and leaves the layout
+    the same way; any other data symbol the strip takes with it (a string or an object the target carries, only a
+    stripped function read) is a problem: our object counts its bytes, the link drops them. A section absent from
+    the result is compared as the object carries it; a note says why when a removal cannot be modelled.
+    `({}, [], [])` without link context."""
     if link_ctx is None:
         return {}, [], []
-    weak, notes = weak_duplicate_symbols(unit, src_path, obj_path, target_rel, link_ctx)
+    weak, kept_copies = weak_duplicate_symbols(unit, src_path, obj_path, target_rel, link_ctx)
     weak_names = {s.name for s in weak}
-    code, problems = [], []
+    code, problems, weak_dead = [], [], []
     if STRIPPED_CODE in ours:
         dead = objcompare.dead_symbols(src_path, deadstrip_roots(unit, target_rel, link_ctx)) or []
         target_names = set(object_symbols(obj_path)[1])
@@ -750,23 +754,35 @@ def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path:
         code = [s for s in dead if s.section == STRIPPED_CODE and s.name not in target_names and s.name not in rows
                 and s.name not in weak_names]
         data = [s for s in dead if s.section != STRIPPED_CODE and s.section in claim and s.name not in weak_names]
+        # a weak copy (an implicit vtable, an inline's object) that is dead, absent from the target and the map is
+        # one retail stripped too: it leaves the layout like a stripped function; anything else stays a refusal
+        weak_dead = [s for s in data if s.bind == objcompare.STB_WEAK and s.name not in target_names
+                     and s.name not in rows]
+        data = [s for s in data if s.index not in {w.index for w in weak_dead}]
         if code and data:
             problems.append("%s: the link dead-strips %d data symbol(s) with the stripped function(s) %s - %s - which "
                             "our object counts and the link drops, so the linked section(s) fall short of the claim"
                             % (unit, len(data), ", ".join(s.name for s in code),
                                ", ".join("%s 0x%X B of %s" % (s.name, s.size, s.section) for s in data)))
-    by_section: dict[str, tuple[list, list]] = {}
+    # a kept weak copy's note ("the link keeps our copy") is wrong once the dead-strip takes the copy anyway
+    gone = {s.name for s in code} | {s.name for s in weak_dead}
+    notes = [text for name, text in kept_copies if name not in gone]
+    by_section: dict[str, tuple[list, list, list]] = {}
     for s in code:
-        by_section.setdefault(s.section, ([], []))[0].append(s)
+        by_section.setdefault(s.section, ([], [], []))[0].append(s)
     for s in weak:
-        by_section.setdefault(s.section, ([], []))[1].append(s)
+        by_section.setdefault(s.section, ([], [], []))[1].append(s)
+    for s in weak_dead:
+        by_section.setdefault(s.section, ([], [], []))[2].append(s)
     kept: dict[str, bytes] = {}
-    for section, (stripped, copies) in sorted(by_section.items()):
+    for section, (stripped, copies, dead_data) in sorted(by_section.items()):
         dead_txt = ("dead-stripped function(s) %s (no symbols.txt row, not in the target, nothing in the link "
                     "references them)" % ", ".join(s.name for s in stripped)) if stripped else ""
         weak_txt = ("weak copies %s that an earlier link input also defines (the link keeps the first definition)"
                     % ", ".join(s.name for s in copies)) if copies else ""
-        got = objcompare.strip_section(src_path, section, stripped + copies)
+        data_txt = ("dead-stripped weak data %s (no symbols.txt row, not in the target, nothing the link keeps "
+                    "references them)" % ", ".join(s.name for s in dead_data)) if dead_data else ""
+        got = objcompare.strip_section(src_path, section, stripped + copies + dead_data)
         if got is None:
             if stripped and not copies:
                 notes.append("%s: %s would be dead-stripped (no symbols.txt row, not in the target, nothing in the "
@@ -776,12 +792,12 @@ def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path:
             else:
                 notes.append("%s: the link removes %s but the section is not laid out as aligned symbols with zero "
                              "gaps, so the stripped layout is not modelled"
-                             % (section, " and ".join(filter(None, [dead_txt, weak_txt]))))
+                             % (section, " and ".join(filter(None, [dead_txt, weak_txt, data_txt]))))
             continue
         kept[section] = got
         notes.append("%s: 0x%X of the object's 0x%X bytes are %s; the 0x%X bytes the link keeps are compared"
                      % (section, ours[section][0] - len(got), ours[section][0],
-                        " and ".join(filter(None, [dead_txt, weak_txt])), len(got)))
+                        " and ".join(filter(None, [dead_txt, weak_txt, data_txt])), len(got)))
     return kept, problems, notes
 
 

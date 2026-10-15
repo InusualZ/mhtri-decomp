@@ -84,6 +84,17 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   (BTE/bta_hh_utils, btm_sco, btm_sec, gap_utils, gki_buffer), no unit lost READY, 24 refused units changed refusal text
   only; the reverse-reference row below then refuses gki_buffer. A trial flip of the other four together links
   `main.dol: OK`.
+* **A dead weak data copy is stripped too (2026-10-14).** MWCC emits a base class's implicit vtable as a weak copy;
+  when only a weak dtor reads it, the link dead-strips both. A dead data symbol that is weak, defined by no target
+  symbol and named by no `symbols.txt` row leaves the layout through the same `strip_section` (note `<section>: 0xN
+  of the object's 0xM bytes are dead-stripped weak data <name> (...); the 0xK bytes the link keeps are compared`), and
+  the rest is compared in order with the trailing-fill rules as before. Every other dead data symbol - local (the
+  btm_link_key strings), global, a name the target defines or a map row names - keeps the refusal. A weak copy the
+  strip removes no longer also carries the "the link keeps our copy" note. Measured on all 629 units at `29194d15`:
+  READY 270 -> 271 (homebutton/hkb_pane: `__vt__Q44nw4r3lyt6detail8PaneBase` 0xC B, `.data` 0x80 -> 0x74 of 0x78,
+  the 4-byte tail fill), homebutton/hkb_animation's `.data` refusal goes (`__vt__Q34nw4r3lyt13AnimTransform`; it
+  stays refused on 12 `.text` bytes), no unit lost READY, 15 contradictory kept-copy notes gone. A trial flip of
+  hkb_pane links `main.dol: OK` and reads READY flipped as well.
 * **The verdict is the same after the flip (2026-10-14).** The model runs whether the unit's link input is the target
   object (NonMatching) or our object (`Object(Matching)`, the state the gate checks), and our object's own references
   root nothing in either state. Before this, a flipped unit skipped the model and the gate refused the flip batch of
@@ -168,15 +179,18 @@ the next section's alignment ignored 2.
 same-batch successor accept, an unflipped one (target aligned to 4, with the hint), a successor our object aligns to 4 and a
 non-zero tail refuse; `.text` is excused, `extab` never, `.sdata` 4 B before an 8-aligned successor is. Mutation: the
 linked-successor test off fails 2. `test_padding_chain` (2 more checks): a short OSMessage before an unflipped OSMutex refuses OSLink, a run ending on a full unit accepts; chain check off fails 1.
-The dead-strip model and the reverse-reference row: `tools/tests/units/test_flipcheck_deadstrip.py` (24 checks, objects
+The dead-strip model and the reverse-reference row: `tools/tests/units/test_flipcheck_deadstrip.py` (32 checks, objects
 shaped like gap_utils, btm_link_key and gki_buffer): accepted - a stripped function between two kept ones, the 16-aligned
 zero-gap layout, a function only another stripped one calls; refused - another input references it, a map row names it, a
 kept function calls it, FORCEACTIVE names it, the kept bytes differ, a non-zero gap, functions packed tighter than their
 `.comment` alignment, a string only the stripped function reads; the liveness rules (`.comment` 0x08, `extabindex`,
-`.ctors`, a section-symbol reference, an unreadable object); the reverse-reference row refused, silent when ours or another
-input defines the name; the same READY before and after the flip (our object as the link input, its own call from one
-stripped function to another rooting nothing), and a called function still refused after it. Mutations: model off fails 5, data-strip refusal off 1, map-row guard off 1, reverse-reference off
-1, `strip_section`'s zero-gap check off 1, its alignment check off 1, the model skipped for a linked unit 1, the unit's own object counted as another input 1.
+`.ctors`, a section-symbol reference, an unreadable object); hkb_pane's weak dead vtable accepted (read only by a
+stripped function, or by nothing), refused when a kept function reads it, a map row names it, the target defines it
+(the btm_link_key near miss, weak and global) or it is a global absent from the target; the reverse-reference row
+refused, silent when ours or another input defines the name; the same READY before and after the flip (our object as
+the link input, its own call from one stripped function to another rooting nothing), and a called function still
+refused after it. Mutations: model off fails 5, data-strip refusal off 1, map-row guard off 1, reverse-reference off 1,
+weak-data strip off 3, its weak-bind guard off 2, its target-name guard off 1, its map-row guard off 1, `strip_section`'s zero-gap check off 1, its alignment check off 1, the model skipped for a linked unit 1, the unit's own object counted as another input 1.
 The weak-copy and leading-fill rules: `tools/tests/units/test_flipcheck_weak_lead.py` (28 checks, objects shaped like
 ut_ResFontBase, hkb_window and DVD/dvd): accepted - weak `.text` and `.data` copies an earlier input defines, a dead
 one, an earlier batch unit's built object; refused - no other definer, only a later one, a global copy, no link order,

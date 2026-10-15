@@ -183,6 +183,80 @@ def test_refused(c):
             any("dead-strips 1 data symbol(s)" in p and "@11 0xA B of .data" in p for p in got), True)
 
 
+#: hkb_pane's `.data`: the class's own vtable (global, in the target) and a base class's implicit vtable that MWCC
+#: emits as a weak copy, read only by the base's weak dtor - which the link dead-strips, and the vtable with it.
+VT_OWN = ("__vt__Q34nw4r3lyt4Pane", bytes(range(1, 17)))
+VT_BASE = ("__vt__Q44nw4r3lyt6detail8PaneBase", bytes(range(40, 52)))
+
+
+def data_object(funcs, data, weak=(), reader=None, reads=None):
+    """`.text` [(name, bytes)] and `.data` [(name, bytes)] back to back (`.data` 8-aligned, each symbol 4-aligned);
+    a name in `weak` is bound weak, the function `reader` loads the data symbol `reads` and `LIVE_B` loads `VT_OWN`."""
+    b = ElfBuilder()
+    b.section(".text", b"".join(blob for _n, blob in funcs), align=4)
+    if data:
+        b.section(".data", b"".join(blob for _n, blob in data), align=8)
+    offsets = {}
+    for sec, items in ((".text", funcs), (".data", data)):
+        off = 0
+        for name, blob in items:
+            offsets[name] = off
+            b.symbol(name, sec, off, len(blob), bind="weak" if name in weak else "global",
+                     type="func" if sec == ".text" else "object", comment=(4, 0, 0))
+            off += len(blob)
+    if reader is not None:
+        b.reloc(".text", offsets[reader] + 2, reads, "R_PPC_ADDR16_HA")
+    if VT_OWN[0] in offsets:        # the class's ctor (kept) stores its own vtable
+        b.reloc(".text", offsets[LIVE_B[0]] + 6, VT_OWN[0], "R_PPC_ADDR16_HA")
+    b.comment()
+    return b.build()
+
+
+def test_weak_dead_data(c):
+    """The hkb_pane shape: a weak data copy (a base class's implicit vtable) that is dead, absent from the target and
+    from the map is stripped like a dead function - its bytes leave `.data` and the rest is compared - while the
+    btm_link_key class (a data object the target does define, a global, a map row, a kept reader) is still refused.
+    Mutations: the rule off fails the accepted checks; the bind, target-name and map-row guards off each fail one."""
+    target = data_object([LIVE_A, LIVE_B], [VT_OWN])
+
+    def run_data(ours, target=target, claim_data=len(VT_OWN[1]), map_rows=()):
+        with testing.FixtureTree() as t:
+            claim, ctx, rows = setup(t, ours, target, 0x24, map_rows=map_rows)
+            claim[".data"] = (claim_data, 3)
+            return run(claim, ctx, rows)
+
+    problems, notes = run_data(data_object([LIVE_A, DEAD, LIVE_B], [VT_OWN, VT_BASE], weak=(VT_BASE[0],),
+                                           reader=DEAD[0], reads=VT_BASE[0]))
+    c.check("a weak vtable only a stripped function reads goes with it: READY", problems, [])
+    c.check("... and the note names it and the kept size",
+            any("dead-stripped weak data %s" % VT_BASE[0] in n and "0x10 bytes the link keeps" in n for n in notes),
+            True)
+    problems, _notes = run_data(data_object([LIVE_A, LIVE_B], [VT_OWN, VT_BASE], weak=(VT_BASE[0],)))
+    c.check("a weak vtable nothing reads, no function stripped: READY", problems, [])
+
+    got = run_data(data_object([LIVE_A, DEAD, LIVE_B], [VT_OWN, VT_BASE], weak=(VT_BASE[0],),
+                               reader=LIVE_A[0], reads=VT_BASE[0]))[0]
+    c.check("a kept function reads the weak vtable: it is kept, the .data size line stays",
+            any(p.startswith(".data: object is 0x1C, splits.txt claims 0x10") for p in got), True)
+    got = run_data(data_object([LIVE_A, DEAD, LIVE_B], [VT_OWN, VT_BASE], weak=(VT_BASE[0],),
+                               reader=DEAD[0], reads=VT_BASE[0]), map_rows=(VT_BASE[0],))[0]
+    c.check("a symbols.txt row names the weak vtable: not stripped, refused, named",
+            any("dead-strips 1 data symbol(s)" in p and VT_BASE[0] in p for p in got), True)
+    both = data_object([LIVE_A, LIVE_B], [VT_OWN, VT_BASE], weak=(VT_BASE[0],))
+    got = run_data(data_object([LIVE_A, DEAD, LIVE_B], [VT_OWN, VT_BASE], weak=(VT_BASE[0],),
+                               reader=DEAD[0], reads=VT_BASE[0]), target=both, claim_data=0x1C)[0]
+    c.check("the btm_link_key near miss, weak: the target defines the object a stripped function reads - refused",
+            any("dead-strips 1 data symbol(s)" in p and "%s 0xC B of .data" % VT_BASE[0] in p for p in got), True)
+    table = ("btm_key_table", VT_BASE[1])
+    got = run_data(data_object([LIVE_A, DEAD, LIVE_B], [VT_OWN, table], reader=DEAD[0], reads=table[0]),
+                   target=data_object([LIVE_A, LIVE_B], [VT_OWN, table]), claim_data=0x1C)[0]
+    c.check("the btm_link_key near miss, global: the target's object read only by a stripped function - refused",
+            any("dead-strips 1 data symbol(s)" in p and "btm_key_table 0xC B of .data" in p for p in got), True)
+    got = run_data(data_object([LIVE_A, DEAD, LIVE_B], [VT_OWN, table], reader=DEAD[0], reads=table[0]))[0]
+    c.check("a global (not weak) object absent from the target, read only by a stripped function - refused",
+            any("dead-strips 1 data symbol(s)" in p and "btm_key_table" in p for p in got), True)
+
+
 def test_dead_symbols(c):
     """The liveness rules at the library level."""
     def dead(ours, roots=("gap_find_free_ccb", "gap_convert_btm_status")):
