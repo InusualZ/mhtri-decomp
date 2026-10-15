@@ -1,10 +1,10 @@
 /*
  * nw4r/fn_8050661C.cpp - a fixed-cell bitmap font for the system messages: nw4r::ut::RomFont's interface over a
  *   caller-supplied code table and glyph sheet (24x24 cells, half-width codes 12 wide).
- * RANGE. .text 0x8050661C-0x80507050 (25 functions; DWCi_Base64Encode/Decode follow to 0x805073C0 and are the DWCi
- *   lane's); .data 0x8062FC48-0x8062FCB8 (the reader member pointer and the vtable; the base64 alphabet after it is
- *   DWCi's); .bss 0x80760CD0-0x80760F00 (the glyph cache table and the synthetic font header); .sdata 0x807941E8
- *   (the encoding); .sbss 0x80795780-0x807957B0 (the code table, the sheet and the sheet metrics).
+ * RANGE. .text 0x8050661C-0x80507050 (25 functions; DWCi/dwc_base64.c follows); .data 0x8062FC48-0x8062FCB8 (the
+ *   reader member pointer and the vtable); .bss 0x80760CD0-0x80760F00 (the glyph cache table and the synthetic font
+ *   header); .sdata 0x807941E8-0x807941F0 (the encoding); .sbss 0x80795780-0x807957B0 (the code table, the sheet and
+ *   the sheet metrics).
  * FLAGS. the `nw4r` lib block: GC/3.0a5.2 with `cflags_nw4r`; evidence in docs/nw4r.md.
  * NAMES. GUESS: the class is nw4r::ut::RomFont by its slot-for-slot match with nw4r's (constructor, destructor, Load,
  *   the Font getters, SetAlternateChar's prev/0xFFFF/restore shape), with Load building the font header itself and
@@ -12,14 +12,11 @@
  *   statics are named for what Load stores in them.  The only caller is `menu/menu_sysmsg.cpp` (fn_804518E8).
  * RESIDUALS. RomFont's destructor has an empty body by design (nw4r's empty destructor; the delete is the compiler's).
  *   Load returns an uninitialised local, as retail does (its `return` reads whatever r4 holds after InitReaderFunc).
- *   Data: the claimed `.data`/`.sdata` runs end with DWCi's base64 alphabet and its pointer (a second TU); this
- *   object also emits a weak copy of Font's vtable, which the link folds (`.data` 0xCC against the 0xB8 claim; `.sdata`
- *   0x2 against 0x10).
+ *   Data: this object also emits a weak copy of Font's vtable, which the link folds (`.data` 0xCC against the 0x70
+ *   claim; `.sdata` 0x2 against 0x8).
  * SHAPES. FindCodeIndex returns int and the callers keep the index as that int, narrowing it at each use (retail's
  *   `clrlwi` per use); the code table is read as u16 pairs and walked with a pointer.  HasGlyph's Shift-JIS case is
  *   one `||` of the half-width and full-width tests (an if-chain or a flag local hoists `li r3,1`).
- * RESIDUALS. DWCi_Base64Encode/Decode (0x80507050-0x805073C0) are unwritten: they open a second TU (the base64
- *   alphabet follows RomFont's vtable in `.data`, a vtable->string seam) and are filed as a seam re-draw.
  */
 
 #include "nw4r/RomFont.h"

@@ -4,7 +4,7 @@
  * the memory hooks, the availability probe, the GT2 transport (API, connection, callbacks, buffer, messages).
  *
  * RANGE. `.text` 0x8050A710..0x80511620 (119 functions); `.data` 0x806307F0..0x806308A8; `.bss`
- *   0x807613B8..0x807614D8; `.sdata` 0x80794330..0x80794358; `.sbss` 0x807957F8..0x80795820.
+ *   0x807613B8..0x807625C0 (to the end of gt2Main's datagram buffer); `.sdata` 0x80794330..0x80794358; `.sbss` 0x807957F8..0x80795820.
  * FLAGS. `cflags_base`: the retail functions start 16-byte aligned (`gap_*` words between them, and
  *   `gti2CheckResponse`'s loop-alignment `nop`); measurement in docs/network.md.
  * NAMES. GameSpy SDK names where the body is the SDK's (darray `Array*`, hashtable `Table*`, gsMemory `gsi*`,
@@ -52,20 +52,21 @@
  *   `DWCi_socketResult`. The GT2 message file's last three functions sit in a `dont_inline` block (retail calls
  *   `DWCi_requestFrame` and the other message helpers out of line there).
  * RESIDUALS. `DWCi_appendTransfer` writes the header bytes with `srawi`+`stb` where retail uses `extrwi`+`stbx`.
- *   The availability probe's three objects
- *   live in `DWCi/natneg.c`'s `.bss`, so `DWCi_natProbeStart` cannot share one base register for them.
+ *   The availability probe's three objects (game name, host override, probe state) are defined here and
+ *   `DWCi_natProbeStart` shares one base for them, but MWCC lays this merged `.bss` out in its own order, so the
+ *   offsets differ from retail's (game name at the section start of a separate gsAvailable object).
  *   Register colouring and block order remain in the larger GT2 message handlers and the socket resolver.
  *   Relocation names that differ (relocdiff --callees): `ArraySearch`, `DWCi_socketLookupHost`, `gti2GetResponse`, `gti2HandleReliablePacket`, `DWCi_requestFlush` save
  *   one register more or fewer than retail; `DWCi_socketLookupHost`, `DWCi_socketGetLocalHostEntry` and
  *   `DWCi_natProbeStart` address their statics from other bases (`DWCi_hostCache` / `DWCi_localAddresses` /
- *   `DWCi_availableCheck`) than retail. Flip blockers: `.sbss` 0x14 of 0x28 and `.sdata` 0x1A of 0x28 claimed.
+ *   the section base) than retail. Flip blockers: `.sbss` 0x14 of 0x28 and `.sdata` 0x1A of 0x28 claimed.
  *   Saved-register helpers that differ (register pressure, not wrong callees): `ArraySearch` and `DWCi_socketLookupHost`
  *   `_savegpr_22`/`_restgpr_22` (retail `_savegpr_23`/`_restgpr_23`); `gti2GetResponse` `_savegpr_24`/`_restgpr_24`
  *   (retail `_savegpr_23`/`_restgpr_23`); `gti2HandleReliablePacket` `_savegpr_25`/`_restgpr_25` (retail
  *   `_savegpr_26`/`_restgpr_26`); `DWCi_requestFlush` has no frame where retail calls `_savegpr_27`/`_restgpr_27`.
  *   Static bases that differ: `DWCi_socketGetLocalHostEntry` reaches `DWCi_localHostEntry` and `DWCi_localAddressList`
- *   from another static's base; `DWCi_natProbeStart` names `DWCi_availableNames` where retail addresses it from the
- *   `DWCi_availableCheck` base.
+ *   from another static's base; `DWCi_natProbeStart` reaches the probe objects from `.bss`+0x1000 where retail's
+ *   base is `DWCi_availableNames` (its own object's section start).
  */
 #include "DWCi/dwc_nasfunc.h"
 #include "DWCi/dwc_error.h"
@@ -77,8 +78,9 @@
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "MSL_C/alloc.h"
 #include "MSL_C/strstr.h"
-#include "nw4r/DWCi_Base64Encode.h"
-#include "DWCi/fn_805113B0.h"
+#include "DWCi/dwc_base64.h"
+#include "DWCi/gt2Socket.h"
+#include "DWCi/gt2Utility.h"
 
 
 
@@ -157,6 +159,12 @@ s32 gsiSocketError;
 DWCiHostEntry DWCi_localHostEntry;
 DWCiHostAddr* DWCi_localAddressList[16];
 u8 DWCi_localAddresses[16][12];
+
+/* gsAvailable's probe names and probe state, and gt2Main's datagram buffer. */
+char DWCi_availableGameName[0x40];
+char DWCi_availableHostName[0x40];
+DWCiAvailableCheck DWCi_availableCheck;
+u8 DWCi_gt2ReceiveBuffer[0x1000];
 
 /* The GT2 challenge secret `gti2GetResponse` mixes into every response. */
 char DWCi_gt2SecretKey[] = "3b8dd8995f7c40a9a5c5b7dd5b481341";
@@ -2324,14 +2332,14 @@ void DWCi_natProbeStart(const char* gameName) {
     char overrideHost;
     int length;
 
-    strcpy(DWCi_availableNames.gameName, gameName);
+    strcpy(DWCi_availableGameName, gameName);
     DWCi_availableCheck.sock = -1;
     SocketStartUp();
-    overrideHost = DWCi_availableNames.hostName[0];
+    overrideHost = DWCi_availableHostName[0];
     if (overrideHost == 0) {
         sprintf(hostName, "%s.available.gs.nintendowifi.net", gameName);
     }
-    if (DWCi_getSockAddrIn(overrideHost != 0 ? DWCi_availableNames.hostName : hostName, 27900,
+    if (DWCi_getSockAddrIn(overrideHost != 0 ? DWCi_availableHostName : hostName, 27900,
                            &DWCi_availableCheck.address)) {
         DWCi_availableCheck.sock = DWCi_socketCreate(2, 2, 17);
         if (DWCi_availableCheck.sock != -1) {

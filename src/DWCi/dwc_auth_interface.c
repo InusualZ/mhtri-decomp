@@ -50,7 +50,7 @@
 #include "SC/sc.h"                       /* SCGetLanguage, SCGetProductArea */
 #include "MSL_C/alloc.h"                 /* sprintf, strcpy */
 #include "MSL_C/strstr.h"                /* strstr, wcslen */
-#include "nw4r/DWCi_Base64Encode.h"       /* DWCi_Base64Encode */
+#include "DWCi/dwc_base64.h"              /* DWCi_Base64Encode/Decode */
 
 
 

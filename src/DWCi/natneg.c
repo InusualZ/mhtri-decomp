@@ -26,7 +26,7 @@
  * `DWCi_NatNegStartSession` takes SIX arguments - the game socket is `r3` and the Network caller reaches it
  * through `gt2GetSocketSOCKET`'s result - which the old 5-argument declaration hid.  The shared
  * `.bss`/`.sbss`/`.sdata` objects were renamed from what the code stores there
- * (`DWCi_natNegNatType`/`MappingScheme` are the words the report carries, `DWCi_availableNames.gameName` the
+ * (`DWCi_natNegNatType`/`MappingScheme` are the words the report carries, `DWCi_availableGameName` the
  * `%s.%s` prefix and the report's game name).
  *
  * FLAGS.  `cflags_base` without the lib's `-func_align 4` (see `configure.py`): the 16-byte function
@@ -85,8 +85,8 @@
  *     5040 orders sampled).
  *
  * DATA.  Claimed by the data pass and still only declared: `.sdata` 0x80794368..0x807943A0,
- * `.sbss` 0x80795828..0x80795878, `.bss` 0x807614D8..0x80762A20 (`datagap.py --mode both`: target-extra
- * .bss 5448 B, .sbss 80 B, .sdata 56 B; ours 0 - unchanged by this pass).  Two ranges the bodies now
+ * `.sbss` 0x80795828..0x80795878, `.bss` 0x807625F0..0x80762C20 (`datagap.py --mode both`: target-extra
+ * .bss 1584 B, .sbss 80 B, .sdata 56 B; ours 0).  Two ranges the bodies now
  * need are filed in the outbox: `.bss` 0x80762A20 (0x200 B, the socket receive buffer, sole referencer
  * `DWCi_natNegTickSocket`) and `.data` 0x806308E8 (0x120 B, the negotiator's string pool, sole referencer
  * `DWCi_NatNegStartSession`, dead-stripped emitters); `DWCi_natProbeStatus` (0x80795818) is written by the
@@ -528,8 +528,8 @@ static inline void DWCi_natNegSendReport(DWCiNatNegSocket* node) {
     pkt.body.report.negResult = (node->result == 0);
     pkt.body.report.natType = DWCi_natNegNatType;
     pkt.body.report.mappingScheme = DWCi_natNegMappingScheme;
-    if (strlen(DWCi_availableNames.gameName) != 0) {
-        memcpy(pkt.body.report.gameName, DWCi_availableNames.gameName, 50);
+    if (strlen(DWCi_availableGameName) != 0) {
+        memcpy(pkt.body.report.gameName, DWCi_availableGameName, 50);
     }
     addr = DWCi_natNegServerAddr0;
     SOAddressToString(&addr);
@@ -614,8 +614,8 @@ void DWCi_natNegSendInit(DWCiNatNegSocket* node) {
     pkt.body.wireInit.localAddr[3] = wire;
     pkt.body.wireInit.localPort[0] = 0;
     pkt.body.wireInit.localPort[1] = 0;
-    strcpy(pkt.body.wireInit.gameName, DWCi_availableNames.gameName);
-    len = strlen(DWCi_availableNames.gameName) + 22;
+    strcpy(pkt.body.wireInit.gameName, DWCi_availableGameName);
+    len = strlen(DWCi_availableGameName) + 22;
     if (pkt.body.wireInit.useGamePort != 0 && node->initAck[0] == 0) {
         DWCiSockAddrIn sa;
         s32 dstSock;
@@ -758,7 +758,7 @@ s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallbac
         name = DWCi_natNegServerName0;
         fallback = hostNames[0];
         if (name == 0) {
-            snprintf(hostBuf0, 64, DWCi_natNegHostFormat, DWCi_availableNames.gameName, fallback);
+            snprintf(hostBuf0, 64, DWCi_natNegHostFormat, DWCi_availableGameName, fallback);
             name = hostBuf0;
         }
         addr = DWCi_socketResolveAddress(name);
@@ -776,7 +776,7 @@ s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallbac
         name = DWCi_natNegServerName1;
         fallback = hostNames[1];
         if (name == 0) {
-            snprintf(hostBuf1, 64, DWCi_natNegHostFormat, DWCi_availableNames.gameName, fallback);
+            snprintf(hostBuf1, 64, DWCi_natNegHostFormat, DWCi_availableGameName, fallback);
             name = hostBuf1;
         }
         addr = DWCi_socketResolveAddress(name);
@@ -794,7 +794,7 @@ s32 DWCi_NatNegStartSession(s32 gameFd, s32 cookie, s32 clientIndex, DWCiCallbac
         name = DWCi_natNegServerName2;
         fallback = hostNames[2];
         if (name == 0) {
-            snprintf(hostBuf2, 64, DWCi_natNegHostFormat, DWCi_availableNames.gameName, fallback);
+            snprintf(hostBuf2, 64, DWCi_natNegHostFormat, DWCi_availableGameName, fallback);
             name = hostBuf2;
         }
         addr = DWCi_socketResolveAddress(name);

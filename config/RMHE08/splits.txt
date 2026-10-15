@@ -3627,17 +3627,32 @@ nw4r/ut_TextWriterBase.cpp:
 	.sdata2     start:0x8079D510 end:0x8079D528
 
 nw4r/fn_8050661C.cpp:
-	.text       start:0x8050661C end:0x805073C0
-	.data       start:0x8062FC48 end:0x8062FD00
+	.text       start:0x8050661C end:0x80507050
+	.data       start:0x8062FC48 end:0x8062FCB8
 	.bss        start:0x80760CD0 end:0x80760F00
-	.sdata      start:0x807941E8 end:0x807941F8
+	.sdata      start:0x807941E8 end:0x807941F0
 	.sbss       start:0x80795780 end:0x807957B0
 
+DWCi/dwc_base64.c:
+	.text       start:0x80507050 end:0x805073C0 align:16
+	.data       start:0x8062FCB8 end:0x8062FD00
+	.sdata      start:0x807941F0 end:0x807941F8
+
 DWCi/dwc_error.cpp:
-	.text       start:0x805073C0 end:0x80507C40 align:16
-	.data       start:0x8062FD00 end:0x8062FF90
+	.text       start:0x805073C0 end:0x805074B0 align:16
+	.data       start:0x8062FD00 end:0x8062FD68
+	.sbss       start:0x807957B0 end:0x807957B8
+
+DWCi/dwc_init.cpp:
+	.text       start:0x805074B0 end:0x805078F0 align:16
+	.data       start:0x8062FD68 end:0x8062FE10
 	.sdata      start:0x807941F8 end:0x80794200
-	.sbss       start:0x807957B0 end:0x807957D0
+	.sbss       start:0x807957B8 end:0x807957C8
+
+DWCi/dwc_report.cpp:
+	.text       start:0x805078F0 end:0x80507C40 align:16
+	.data       start:0x8062FE10 end:0x8062FF90
+	.sbss       start:0x807957C8 end:0x807957D0
 
 DWCi/dwc_auth_interface.c:
 	.text       start:0x80507C40 end:0x8050A710 align:16
@@ -3649,20 +3664,24 @@ DWCi/dwc_auth_interface.c:
 DWCi/dwc_nasfunc.c:
 	.text       start:0x8050A710 end:0x80511620 align:16
 	.data       start:0x806307F0 end:0x806308A8
-	.bss        start:0x807613B8 end:0x807614D8
+	.bss        start:0x807613B8 end:0x807625C0
 	.sdata      start:0x80794330 end:0x80794358
 	.sbss       start:0x807957F8 end:0x80795820
 
-DWCi/fn_805113B0.c:
-	.text       start:0x80511620 end:0x80512490 align:16
+DWCi/gt2Socket.c:
+	.text       start:0x80511620 end:0x80512200 align:16
+
+DWCi/gt2Utility.c:
+	.text       start:0x80512200 end:0x80512490 align:16
 	.data       start:0x806308A8 end:0x806308E8
+	.bss        start:0x807625C0 end:0x807625F0
 	.sdata      start:0x80794358 end:0x80794368
 	.sbss       start:0x80795820 end:0x80795828
 
 DWCi/natneg.c:
 	.text       start:0x80512490 end:0x805145B8 align:16
 	.data       start:0x806308E8 end:0x80630A08
-	.bss        start:0x807614D8 end:0x80762C20
+	.bss        start:0x807625F0 end:0x80762C20
 	.sdata      start:0x80794368 end:0x807943A0
 	.sbss       start:0x80795828 end:0x80795878
 

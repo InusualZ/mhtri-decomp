@@ -279,7 +279,8 @@ cflags_nw4r = [*cflags_os, "-fp_contract", "off", "-ipa", "file"]
 cflags_hkb = [*[f for f in cflags_nw4r if f != "-inline auto"], "-inline noauto"]
 # DWCi (the Wii Wi-Fi Connection SDK library the retail link places between the game's own SDK uses
 # and NHTTP).  Same shape as the sibling SDK groups above: the retail .text packs the band's
-# functions back to back with 4-byte gaps, so `-func_align 4`.  Evidence: DWCi/fn_805113B0.c.
+# functions back to back with 4-byte gaps, so `-func_align 4`.  Every registered DWCi unit overrides it with
+# cflags_base (16-byte packing); see the FLAGS line of src/DWCi/gt2Utility.c.
 cflags_dwc = [*cflags_base, "-func_align", "4"]
 # NWC24 (the WiiConnect24 library: `NWC24IsMsgLibOpened` .. `NWC24iPrepareShutdown`,
 # src/NWC24/fn_8051D710.c + src/NWC24/fn_8051E068.c).  Same shape as the sibling SDK groups above -
@@ -1164,13 +1165,7 @@ config.libs = [
     {
         # The Nintendo Wi-Fi Connection (DWCi) SDK block of the retail link order: the only named
         # symbol of the block is `DWCi_Np_CPUCopyFast` (0x80507C40) and the next block up is the
-        # NHTTP library (`NHTTPi_alloc`, 0x805145E8).  Registered once, at its final home (docs/plan.md 12):
-        # proposal `805113B0_fn_805113B0.c` (`.text` 0x805113B0..0x805124F4, 21 functions / 4420 B).
-        # Module `DWCi` from the library block the range's every callee lives in (0x8050A..0x8050E);
-        # no `__FILE__` string covers the range and the dump answers only `zz_` placeholders, so the
-        # file keeps the map's stem (brief section 2, class 3+4; see the unit header).  Sections: .text
-        # only - the `.data`/`.bss` objects the range loads (lbl_8060EDB0, lbl_80795820, lbl_807625C0)
-        # are not claimed here.
+        # NHTTP library (`NHTTPi_alloc`, 0x805145E8).  Each unit's evidence is its own header's RANGE line.
         "lib": "DWCi",
         "mw_version": "Wii/1.3",
         "cflags": cflags_dwc,
@@ -1179,13 +1174,17 @@ config.libs = [
             # The DWC auth interface (.text 0x80507C40..0x8050A710, 16 functions); its seam evidence is
             # the RANGE line of src/DWCi/dwc_auth_interface.c.
             # dwc_error / dwc_auth_interface / dwc_nasfunc: cflags_base (-func_align 16, the retail 16-byte packing); docs/network.md.
+            Object(NonMatching, "DWCi/dwc_base64.c", cflags=cflags_base),  # src/DWCi/dwc_base64.c header
             Object(NonMatching, "DWCi/dwc_error.cpp", cflags=cflags_base),
+            Object(NonMatching, "DWCi/dwc_init.cpp", cflags=cflags_base),
+            Object(NonMatching, "DWCi/dwc_report.cpp", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_auth_interface.c", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_nasfunc.c", cflags=cflags_base),
-            Object(NonMatching, "DWCi/fn_805113B0.c"),
+            Object(NonMatching, "DWCi/gt2Socket.c", cflags=cflags_base),
+            Object(NonMatching, "DWCi/gt2Utility.c", cflags=cflags_base),
             # The DWCi band tail (.text 0x80512490..0x805145B8, 17 functions / 8488 B).  The left
             # edge is the seam the recon resolved: `tudiscover.py at 0x80512490` pins `strong x2`
-            # at 0x80512490, so the registered `DWCi/fn_805113B0.c` right edge was moved down from
+            # at 0x80512490, so the registered `DWCi/gt2Utility.c` right edge was moved down from
             # 0x805124F4.  The right edge 0x805145B8 is the 16->4 byte function-packing change - the
             # DWCi/NHTTP library boundary.  `DWCi`, not NHTTP: the range calls only the DWCi
             # transport helpers and carries the GameSpy NATNEG pool.  Claims .text only.

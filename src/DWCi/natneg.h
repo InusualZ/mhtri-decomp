@@ -5,8 +5,8 @@
  * Rule 2: this unit owns these symbols, so their declarations live here and every consumer includes
  * this header - the GameSpy interface unit reaches them through `unsplit/Network.h`, which
  * includes this header, and the band header `unsplit/DWCi.h` includes it too (that is how
- * `src/DWCi/fn_805113B0.c` and this unit itself see the data).  The data ranges
- * (`.sdata` 0x80794368..0x807943A0, `.sbss` 0x80795828..0x80795878, `.bss` 0x807614D8..0x80762A20)
+ * `src/DWCi/gt2Socket.c`/`gt2Utility.c` and this unit itself see the data).  The data ranges
+ * (`.sdata` 0x80794368..0x807943A0, `.sbss` 0x80795828..0x80795878, `.bss` 0x807625F0..0x80762C20)
  * were claimed by the data pass on 2026-09-28; nothing here is defined (playbook 29 - the bytes are
  * the target object's).
  *
@@ -60,7 +60,7 @@ void DWCi_GetStringLength(void** buf, int* len);
 
 /* 0x80794368 (.sdata) - the empty string `DWCi_GetStringLength` defaults a NULL buffer to, and
  * 0x80794370/78/7C the unit's own "%s:%d" / "%s" / ":%d" trio.  A second copy of the trio at
- * 0x80794358 (referenced by `DWCi_formatAddress`, `src/DWCi/fn_805113B0.c`) is a *different* TU's:
+ * 0x80794358 (referenced by `DWCi_formatAddress`, `src/DWCi/gt2Utility.c`) is a *different* TU's:
  * `-str reuse` merges identical literals inside one TU, never across two. */
 extern u8 DWCi_emptyString[8];
 extern char DWCi_natNegAddressFormat[6];
@@ -86,39 +86,6 @@ extern const u8 natNegMessageMagic[];
 extern s32 DWCi_natNegIdleSocketA;
 extern s32 DWCi_natNegIdleSocketB;
 extern u32 DWCi_natNegNatType;
-
-/* 0x807614D8 (.bss, 0x80 B) - the game name `DWCi_natProbeStart` stores (the NATNEG announce and host names read
- * it) and the availability-probe host override behind it (empty: "<game>.available.gs.nintendowifi.net"). */
-typedef struct DWCiAvailableNames {
-    /* +0x00 */ char gameName[0x40];
-    /* +0x40 */ char hostName[0x40];
-} DWCiAvailableNames; /* size: 0x80 */
-extern DWCiAvailableNames DWCi_availableNames;
-
-/* 0x80761558 (.bss) - the availability probe `DWCi_natProbeStart` sends and `DWCi_natProbePoll` waits on: its
- * socket, the server address, the query packet and its length, the send time and the resend count. */
-typedef struct DWCiAvailableCheck {
-    /* +0x00 */ s32 sock;
-    /* +0x04 */ SOSockAddrIn address;
-    /* +0x0C */ u8 packet[0x40];
-    /* +0x4C */ s32 packetLength;
-    /* +0x50 */ u32 sendTime;
-    /* +0x54 */ s32 resendCount;
-    /* +0x58 */ u8 pad_0x58[0x10];
-} DWCiAvailableCheck; /* size: 0x68 (the map row's extent; the bodies use 0x58) */
-extern DWCiAvailableCheck DWCi_availableCheck;
-
-/* 0x807615C0 (.bss, 0x1000 B) - the datagram buffer `gti2ReceiveMessages` reads into. */
-extern u8 DWCi_gt2ReceiveBuffer[0x1000];
-
-/* 0x807625C0 (.bss) - the two-buffer address-string ring `DWCi_formatAddress` /
- * `DWCi_natNegFormatAddress` write into, `DWCi_addressRingIndex` (declared unowned in
- * `unsplit/DWCi.h`) selecting the half.  It is declared here because it falls inside this
- * unit's `.bss` run 0x807614D8..0x80762A20 - which is the claim's own documented residual: the word
- * belongs to `src/DWCi/fn_805113B0.c` on the reloc evidence, but the run cannot be drawn thin enough
- * to leave it out without a link-order cycle (playbook 53).  When 0x80509DB0..0x805113B0 is
- * registered, re-draw the run and move this declaration with it. */
-extern u8 DWCi_addressRing[];
 
 /* 0x80762900 (two 0x16-byte strings) - the second address-string ring, the one the NATNEG unit
  * formats its peer addresses into; `DWCi_natNegFormatAddress` swaps the index - and 0x80762940

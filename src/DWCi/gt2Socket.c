@@ -1,30 +1,26 @@
 /*
- * DWCi/fn_805113B0.c - the GameSpy GT2 socket core: the connection table
- * of a GT2 socket (hash, compare, lookup), socket and connection creation and teardown, the raw send, the
- * per-socket connection timers, and the address text helpers.
+ * DWCi/gt2Socket.c - the GameSpy GT2 socket core: the connection table of a GT2 socket (hash, compare, lookup),
+ * socket and connection creation and teardown, the raw send and the per-socket connection timers.
  *
- * RANGE. `.text` 0x80511620..0x80512490 (17 functions); the left edge ends the GT2 message file, whose last
- *   three functions `DWCi/dwc_nasfunc.c` ends with (they address its `.sdata` `DWCi_protocolMagic`); `.data` 0x806308A8..0x806308E8 (the stats host buffer);
- *   `.sdata` 0x80794358..0x80794368; `.sbss` 0x80795820..0x80795828.
- * FLAGS. the `DWCi` lib's `cflags_dwc` (the retail functions are 16-byte aligned; per-row scores are unaffected).
+ * RANGE. `.text` 0x80511620..0x80512200 (14 functions); no data of its own. The left edge ends the GT2 message
+ *   file, whose last three functions `DWCi/dwc_nasfunc.c` ends with (they address its `.sdata`
+ *   `DWCi_protocolMagic`); the right edge is gt2Utility's first function (`DWCi/gt2Utility.c`). The GT2 files link
+ *   in name order (gt2Auth .. gt2Message in `dwc_nasfunc.c`, then gt2Socket, gt2Utility).
+ * FLAGS. `cflags_base` (-func_align 16): the retail functions start 16-byte aligned; per-row scores are unaffected
+ *   by the lib's `cflags_dwc` (-func_align 4), the object layout is not.
  * NAMES. GUESSes from the bodies, kept from before the GT2 identification (`DWCi_createConnection` =
  *   gti2CreateSocket, `DWCi_createRequest` = gti2NewSocketConnection, ...). The GT2 records (`DWCiConn` = GTI2Socket,
- *   `DWCiReq` = GTI2Connection, `GTI2Buffer`) live in `DWCi/dwc_nasfunc.h` with the SDK's field names.
- * SHAPES. `DWCi_parseAddress` keeps nested ifs where retail jumps to shared exits (rule 8): 87.10 against an
- *   earlier flat shape's 82.30.
+ *   `DWCiReq` = GTI2Connection, `GTI2Buffer`) live in `DWCi/dwc_nasfunc.h` with the SDK's field names. The file name
+ *   is the GameSpy SDK's `gt2Socket.c` (no `__FILE__` string).
  * RESIDUALS. `DWCi_createRequest`/`DWCi_findRequest` keep smaller frames than retail (0x30/0x20 against 0x170/0xB0);
- *   the other open rows differ in register colouring and block order. The range is two GameSpy files (gt2Socket,
- *   then gt2Utility's address helpers from 0x80512200 or 0x80512210: `tudiscover.py` sees one `.sdata` run jump
- *   and cannot place that edge), so the file keeps the map's stem until the split.
- *   `DWCi_createRequest` keeps no saved-register frame (retail `_savegpr_27`); `DWCi_parseAddress` saves from r27
- *   (retail r26). Flip blockers: `splits.txt` claims `.sbss` (0x8) and `.sdata` (0x10) the object does not emit.
- *   `DWCi_createRequest`: retail `_savegpr_27`/`_restgpr_27`, ours no frame; `DWCi_parseAddress`: ours
- *   `_savegpr_27`/`_restgpr_27`, retail `_savegpr_26`/`_restgpr_26`.
+ *   `DWCi_createRequest` keeps no saved-register frame (retail `_savegpr_27`/`_restgpr_27`); the other open rows
+ *   differ in register colouring and block order.
  */
 
 #include "types.h"
 #include "DWCi/natneg.h"            /* DWCi_GetStringLength: the owner's header (rule 2) */
-#include "DWCi/fn_805113B0.h"            /* this unit's own exported entry points */
+#include "DWCi/gt2Socket.h"              /* this unit's own exported entry points */
+#include "DWCi/gt2Utility.h"             /* DWCi_parseAddress */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/DWCi.h"                /* the band's unowned data and helpers (rule 2) */
@@ -32,39 +28,6 @@
 #include "unsplit/SO.h"                  /* SOAddressToString / SOAddressToHostPort / SOHtoNs */
 #include "SO/soi.h"
 #include "unsplit/Runtime.PPCEABI.H.h"   /* sprintf / strchr / strlen / atoi */
-
-/* The GameSpy stats server host name, the unit's `.data` run; `DWC_Init` rewrites it for the server type. */
-char DWCi_statsServerHostname[64] = "gamestats.gs.nintendowifi.net";
-
-/* --------------------------------------------------------------------------------------------- */
-/* Types                                                                                          */
-/* --------------------------------------------------------------------------------------------- */
-
- /* size: 0x10 */
-
-/* --------------------------------------------------------------------------------------------- */
-/* The band data this unit loads.  It is owned by nobody and the registered ranges bracketing it   */
-/* name different modules, so it is declared in `unsplit/DWCi.h` (rule 2) and never        */
-/* defined here (playbook 29) - apart from `DWCi_addressRing`, which the NATNEG unit's `.bss` run   */
-/* covers and whose declaration therefore lives in `DWCi/natneg.h`.  The private       */
-/* records those declarations reach stay below, next to the code that uses them.                   */
-/* --------------------------------------------------------------------------------------------- */
-
-/* The character-class record DWCi_parseAddress validates the port digits against: a header whose +0x38
- * pointer reaches the per-character u16 flags, bit 3 marking a decimal digit.  Declared, never
- * defined - the `.data` run belongs to the split (playbook 29). */
-typedef struct DWCiCharClass {
-    /* +0x00 */ u8 pad_0x00[0x8];
-    /* +0x08 */ u16 bits[0x80];
-} DWCiCharClass; /* size: 0x108 */
-
-typedef struct DWCiCType {
-    /* +0x00 */ u8 pad_0x00[0x38];
-    /* +0x38 */ DWCiCharClass* cls;
-    /* +0x3C */ u8 pad_0x3c[0xC];
-} DWCiCType; /* size: 0x48 */
-
-
 
 /* The unit's own entry points, in address order. */
 u32 DWCi_requestTableHash(DWCiAddrKey** key, u32 bucket);
@@ -80,9 +43,6 @@ u32 DWCi_requestTick(void** slot, u32* now);
 u32 DWCi_connectionTick(DWCiConn* conn);
 void DWCi_connectionFlushRequests(DWCiConn* conn);
 void DWCi_connectionShutdown(DWCiConn* conn);
-u16 DWCi_htons(u16 port);
-char* DWCi_formatAddress(u32 addr, u16 port, char* buf);
-u32 DWCi_parseAddress(char* str, u32* outAddr, u16* outPort);
 
 /* 0x80511620 - the request table's hash: (key.addr * key.port) modulo the bucket count. */
 u32 DWCi_requestTableHash(DWCiAddrKey** key, u32 bucket)
@@ -504,103 +464,3 @@ void DWCi_connectionShutdown(DWCiConn* conn)
     gsifree(conn);
     SocketShutDown();
 }
-
-/* 0x80512200 - the host-to-network short wrapper the transport clients call. */
-u16 DWCi_htons(u16 port)
-{
-    return SOAddressToHostPort(port);
-}
-
-/* 0x80512210 - format an address for the log/text layer: "addr:port", "addr", ":port" or the empty
- * string, into the caller's buffer or into the two-buffer ring when the caller passes none. */
-char* DWCi_formatAddress(u32 addr, u16 port, char* buf)
-{
-    if (buf == 0) {
-        DWCi_addressRingIndex ^= 1;
-        buf = (char*)(DWCi_addressRing + DWCi_addressRingIndex * 0x16);
-    }
-    if (addr != 0) {
-        u32 withPort;
-        u32 withoutPort;
-
-        if (port != 0) {
-            withPort = addr;
-            sprintf(buf, DWCi_addressFormat, SOAddressToString(&withPort), port);
-        } else {
-            withoutPort = addr;
-            sprintf(buf, DWCi_addressFormatHost, SOAddressToString(&withoutPort));
-        }
-    } else {
-        if (port != 0) {
-            sprintf(buf, DWCi_addressFormatPort, port);
-        } else {
-            *buf = 0;
-        }
-    }
-    return buf;
-}
-
-/* 0x80512300 - parse "host:port": split at the colon, validate the port digits against the band's
- * character-class table, convert with atoi, resolve the host name and hand both halves back. */
-u32 DWCi_parseAddress(char* str, u32* outAddr, u16* outPort)
-{
-    char buf[0x108];
-    char* colon;
-    char* p;
-    u32 addr;
-    u16 port;
-    u32 value;
-
-    if (str == 0 || *str == 0) {
-        addr = 0;
-        port = 0;
-    } else {
-        colon = strchr(str, ':');
-        if (colon == 0) {
-            port = 0;
-        } else {
-            if (colon == str) {
-                str = 0;
-                addr = 0;
-            } else {
-                memcpy(buf, str, colon - str);
-                buf[colon - str] = 0;
-                str = buf;
-            }
-            p = colon + 1;
-            while (*p != 0) {
-                if ((u32)(s8)*p > 0xFFu ||
-                    (_current_locale.cls->bits[(u8)*p] & 8) == 0) {
-                    return 0;
-                }
-                p++;
-            }
-            value = atoi(colon + 1);
-            if (value > 0xFFFF) {
-                return 0;
-            }
-            port = (u16)value;
-        }
-        if (str != 0) {
-            addr = DWCi_socketResolveAddress(str);
-            if (addr == (u32)-1) {
-                DWCiHostEntry* entry = DWCi_socketLookupHost(str);
-
-                if (entry == 0) {
-                    return 0;
-                }
-                addr = (*entry->hosts)->addr;
-            }
-        }
-    }
-    if (outAddr != 0) {
-        *outAddr = addr;
-    }
-    if (outPort != 0) {
-        *outPort = port;
-    }
-    return 1;
-}
-
-/* 0x80512490 moved to `DWCi/natneg.c` with the seam (see the header): the body was
- * byte-identical here and is kept there verbatim, so this unit now ends at 0x80512490. */
