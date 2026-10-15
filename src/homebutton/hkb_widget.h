@@ -243,7 +243,7 @@ struct HkbWidget {
     /* +0x1B88 */ u8 flag_1B88;              /* the byte fn_80550768 stores */
 };
 
-/* The (target, argument) node fn_8054F75C and fn_8054F788 drive.  size: 0x0C (approximate - the
+/* The (target, argument) node hbmNodeNotify and fn_8054F788 drive.  size: 0x0C (approximate - the
  * band never reads past +0x08). */
 struct HkbNode {
     /* +0x00 */ u32 pad_00;

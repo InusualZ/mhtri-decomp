@@ -210,6 +210,13 @@ struct Color : public _GXColor {
         *reinterpret_cast<u32*>(this) = rgba;
     }
 
+    Color(u8 red, u8 green, u8 blue, u8 alpha) {
+        r = red;
+        g = green;
+        b = blue;
+        a = alpha;
+    }
+
     ~Color() {}
 
     u32 ToU32() const {

@@ -12,6 +12,18 @@ extern "C" {
 
 s32 hbmNameMatches(const char* a, const char* b);
 
+/* Cubic Hermite interpolation of `t` between (t0, v0, slope0) and (t1, v1, slope1). */
+f32 hbmHermite(f32 t, f32 t0, f32 v0, f32 slope0, f32 t1, f32 v1, f32 slope1);
+
+/* Returns whether a line may break before `c` (always). */
+s32 hbmCanBreakBefore(u16 c);
+
+/* Returns the full-width form of `c`. */
+u16 hbmToFullWidth(u16 c);
+
+/* Returns the wide character of the code `c`. */
+u16 hbmToWideChar(u16 c);
+
 void hbmNameCopyWithChar(char* dst, u32 n, const char* src, u32 idx, char ch);
 
 /* A pair of kana tables indexed alike: the plain forms and one modified form (voiced, semi-voiced or small).  The

@@ -26,6 +26,17 @@ typedef struct KPRQueue {
 /* untyped: opaque band object, typed by the callers' views */
 u32 KPRLookAhead(void* queue, u32 outAddress, u32 max);
 
+/* Empties the queue and clears its mode. */
+void KPRInitQueue(KPRQueue* queue);
+/* Empties the queue. */
+void KPRClearQueue(KPRQueue* queue);
+/* Sets the queue's composition mode bits. */
+void KPRSetQueueMode(KPRQueue* queue, u32 mode);
+/* Queues one character; returns whether it was taken. */
+u8 KPRPutChar(KPRQueue* queue, u16 ch);
+/* Takes the oldest complete character, or 0. */
+u16 KPRGetChar(KPRQueue* queue);
+
 #ifdef __cplusplus
 }
 #endif

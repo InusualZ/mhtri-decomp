@@ -36,6 +36,10 @@ void hbmKbCandScrollBy(HbmKbCandidateList* self, s32 delta);
 
 void hbmKbCandOnScrolled(HbmKbCandidateList* self, s32 kind, s32 delta);
 
+void hbmKbCandSelect(HbmKbCandidateList* self, s32 index);
+
+void hbmKbCandShowSelected(HbmKbCandidateList* self);
+
 void hbmKbSwitchOnPartEvent(HbmKbSwitchHandler* self, s32 kind, HbmKbPartView* sender, const HbmKbInputEvent* input);
 
 #ifdef __cplusplus

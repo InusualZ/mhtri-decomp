@@ -189,7 +189,7 @@ extern "C" void fn_805546B4(HkbFlagChild* self, u8 flag) {
     self->flag_04 = flag;
     value = self->child_10->v_0x068();
     if (value != 0) {
-        fn_8054CDCC(self->child_10->v_0x068());
+        hbmPanelCloseCandidates(self->child_10->v_0x068());
     }
 }
 
@@ -362,7 +362,7 @@ extern "C" void hbmKbListSelectKeyLayout(HbmListModeView* self, u8 cellphone) {
     }
     self->mode = cellphone;
     if (self->child->v_0x068() != 0) {
-        fn_8054CDCC(self->child->v_0x068());
+        hbmPanelCloseCandidates(self->child->v_0x068());
     }
 }
 

@@ -23,6 +23,30 @@ void* fn_8055B174(void* a, void* b);
 
 extern f32 lbl_8079D700;
 
+/* The text writer (the panel's +0x10 sub-object) and the band's text buffer, as the callers name them. */
+struct HbmTextWriter;
+#ifdef __cplusplus
+class HbmTextBuffer;
+#endif
+
+/* Refreshes the text writer. */
+void hbmTextWriterRefresh(struct HbmTextWriter* writer);
+/* Hands the text writer the characters [start, end) of `text`. */
+void hbmTextWriterSetText(struct HbmTextWriter* writer, const u16* text, u32 start, u32 end);
+/* Draws the writer's line at the panel's draw position. */
+void hbmTextWriterDrawLine(struct HbmTextWriter* writer);
+/* Draws the writer's text, the caret at `cursor`. */
+void hbmTextWriterDraw(struct HbmTextWriter* writer, u32* cursor);
+/* Initialises the text writer. */
+void hbmTextWriterInit(struct HbmTextWriter* writer);
+#ifdef __cplusplus
+/* The text buffer's setters: replace the text, clear it, type `text` under input mode `mode`, set the mode. */
+void hbmTextSet(HbmTextBuffer* self, const u16* text);
+void hbmTextClear(HbmTextBuffer* self);
+void hbmTextPutInMode(HbmTextBuffer* self, const u16* text, s32 mode);
+void hbmTextSetInputMode(HbmTextBuffer* self, s32 mode);
+#endif
+
 /* Reads the animation's current node out as an (id, frame) pair, or the empty pair. */
 void hbmAnimSaveState(HbmWidgetNodeView* anim, HbmIdValue* out);
 

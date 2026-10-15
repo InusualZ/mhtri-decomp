@@ -17,10 +17,10 @@
  * SHAPES.    hbmVec4Set takes (y, w, z, x): the parameter order that reproduces retail's register assignment.
  * RESIDUALS. hbmKanaToggleDakuten: r30/r31 swapped between the parameter and the inlined toggle's result (281
  *            instructions, 81 words differ); local declaration order, a parameter copy and return forms do not move it.
- * RESIDUALS. fn_8055F650: same 20-instruction sequence, but retail keeps the quotient in f1 (`fdivs f1,f8,f0`) where
+ * RESIDUALS. hbmHermite: same 20-instruction sequence, but retail keeps the quotient in f1 (`fdivs f1,f8,f0`) where
  *            ours uses f0, which recolours every temporary after it; operand orders and local spellings do not move it.
- * RESIDUALS. Unwritten: fn_8055EAF0 reads the unclaimed .sdata pair 0x80794638 (8 bytes, only it reads it; request
- *            hbm-misc#93 for the claim); fn_8055EB68 builds its local table pair from .sdata2 0x8079D718, which points at
+ * RESIDUALS. Unwritten: hbmToWideChar reads the unclaimed .sdata pair 0x80794638 (8 bytes, only it reads it; request
+ *            hbm-misc#93 for the claim); hbmToFullWidth builds its local table pair from .sdata2 0x8079D718, which points at
  *            0x80652310/0x80652328 inside homebutton/hbm_value.cpp's .data claim (seam, request hbm-misc#92).
  * RESIDUALS. Seam: this unit's .sdata2 pair points at 0x80652310/0x80652328, so this TU's .data starts at 0x80652310,
  *            not at the registered 0x80652340 (homebutton/hbm_value.cpp's claim ends there).
@@ -287,10 +287,10 @@ void hbmNameCopyWithChar(char* dst, u32 n, const char* src, u32 idx, char ch)
 /* ---------------------------------------------------------------------------------------------------
  * constant returns
  * ------------------------------------------------------------------------------------------------ */
-s32 fn_8055F648(VuObject* self) { (void)self; return 1; }
+s32 hbmCanBreakBefore(u16 c) { (void)c; return 1; }
 
 /* Cubic Hermite interpolation of the band's shaped-value helpers. */
-f32 fn_8055F650(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g)
+f32 hbmHermite(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g)
 {
     f32 dt = a - b;
     f32 de = e - b;

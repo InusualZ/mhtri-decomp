@@ -11,58 +11,58 @@ extern "C" {
 #endif
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_80545C44(void* self);
+void hbmPanelLayoutText(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_80545DAC(void* self);
+void hbmPanelGetTextScale(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_80545DCC(void* self);
+void hbmPanelDrawLineAt(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_80546658(void* self);
+void hbmPanelWriterRefresh(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void* fn_80546660(void* p);
+void* hbmPanelClearText(void* p);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_80546BCC(void* self, void* arg);
+void hbmPanelSetDrawPosition(void* self, void* arg);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_80547114(void* self);
+void hbmPanelPrepareGlyph(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_805472C4(void* self);
+void hbmPanelNewLine(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_8054734C(void* self);
+void hbmPanelDrawComposition(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_80547BE8(void* self);
+void hbmPanelDrawCaret(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_8054CDCC(void* self);
+void hbmPanelCloseCandidates(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
 void fn_8054CF38(void* self, s32 flag);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_8054D634(void* self);
+void hbmKbWidgetReset(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_8054D818(void* self);
+void hbmKbWidgetCalc(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_8054D9F0(void* self);
+void hbmKbWidgetUpdate(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_8054DDD8(void* self);
+void hbmKbWidgetInput(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
 void fn_8054E05C(void* panel, struct HkbManager* manager);
 
 /* untyped: opaque band object, typed by the callers' views */
-void fn_8054E180(void* self);
+void hbmPanelGetTextBoxScale(void* self);
 
 /* untyped: opaque band object, typed by the callers' views */
 void fn_8054E81C(void* panel);

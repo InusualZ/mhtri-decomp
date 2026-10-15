@@ -748,7 +748,7 @@ void fn_80568C60(KbObject* self)
 void fn_80568DBC(KbObject* self)
 {
     if (self->tail_0x1A04.field_0x1E4 != 1)
-        fn_80547BE8(self);
+        hbmPanelDrawCaret(self);
 }
 
 /* The 2D anchored position of the keyboard's cursor: the object's own pair when one is attached, the
@@ -871,7 +871,7 @@ void fn_8056985C(KbObject* self, void* arg)
 {
     if (self->tail_0x1A04.field_0x1E4 == 1)
         ((HbmCursorPartView*)self->tail_0x1A04.field_0x1D0)->v_0x018();
-    fn_80546BCC(self, arg);
+    hbmPanelSetDrawPosition(self, arg);
 }
 
 void fn_80569910(KbObject* self, void* arg)

@@ -71,7 +71,7 @@ public:
     /* slot +0x01C */ virtual void v_0x01C(VuObject* owner);
 };
 
-/* An element of the owner's child list at +0x04: slot 0x1C receives the two words fn_8056085C broadcasts.
+/* An element of the owner's child list at +0x04: slot 0x1C receives the two words hbmKbEventBroadcast broadcasts.
  * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 are touched) */
 class HkbVuChild {
 public:
@@ -81,7 +81,7 @@ public:
     /* slot +0x014 */ virtual void v_0x014();
     /* slot +0x018 */ virtual void v_0x018();
     /* untyped: opaque handles passed through */
-    /* slot +0x01C */ virtual void v_0x01C(void* first, void* second);
+    /* slot +0x01C */ virtual void v_0x01C(u32 id, u32* arg);
 };
 
 /* The content object at +0x40: slot 0x0C returns the value fn_80561018 hands on, 0x18..0x28 are forwarded.
@@ -974,12 +974,12 @@ void HkbInputWidget::setEventSink(HkbEventSink* sink)
     sink->setOwner(this);
 }
 
-void fn_8056085C(VuObject* self, void* a, void* b)
+void hbmKbEventBroadcast(VuObject* self, u32 id, u32* arg)
 {
     HkbVuChild* node = (HkbVuChild*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x04, 0);
 
     while (node != 0) {
-        node->v_0x01C(a, b);
+        node->v_0x01C(id, arg);
         node = (HkbVuChild*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x04, node);
     }
 }

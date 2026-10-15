@@ -18,6 +18,9 @@ void fn_805632BC(void* self);
 /* untyped: opaque band object, typed by the callers' views */
 void fn_805634A4(void* self);
 
+/* Hands (id, arg) to every child in the object's list at +0x04. */
+void hbmKbEventBroadcast(VuObject* self, u32 id, u32* arg);
+
 extern f32 lbl_807946D8[2];  /* a small-data record whose float at +4 is written by fn_8056167C */
 
 /* The label strings per layout type (.data 0x806574D8): thirteen rows of eight layouts. */

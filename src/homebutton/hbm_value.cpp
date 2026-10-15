@@ -28,14 +28,14 @@
  *            fn_8055A224 (KPRPutChar/KPRGetChar/KPRInitQueue/KPRSetQueueMode, not declared in KPR/kpr.h), fn_80559E74,
  *            fn_80559EB4, fn_80559F10, fn_80559F50, fn_80559FAC, fn_8055A008, fn_8055A048 and fn_8055A3E0 (character
  *            converters of homebutton/hbm_hermite.cpp not declared in its header).
- * RESIDUALS. Unwritten, need the unowned .bss table 0x80790250 (0x580 bytes, read only by fn_8055A338 and fn_8055AE40)
+ * RESIDUALS. Unwritten, need the unowned .bss table 0x80790250 (0x580 bytes, read only by hbmTextWriterInit and hbmTextWriterRefresh)
  *            claimed first; its link slot (between hbm_text_panel's and hbm_anim_record's .bss) leaves the owner
- *            ambiguous (request hbm-value#70): fn_8055A338, fn_8055AE40.
+ *            ambiguous (request hbm-value#70): hbmTextWriterInit, hbmTextWriterRefresh.
  * RESIDUALS. Unwritten, store a vtable whose class this unit would have to emit (rule 10): fn_80558F38, fn_8055CAD0.
  * RESIDUALS. Unwritten: fn_8055EAA8, the unit's static initialiser (its .ctors entry), which stores lbl_8060E748 into the
  *            .sbss word lbl_80795A70.
- * RESIDUALS. 69 functions (17560 bytes) are unwritten in 28 runs, the largest fn_8055A8A0 (1272), fn_8055D594 (888),
- *            fn_8055CFC8 (824) and fn_8055A59C (724); the list is `python tools/units/sweepcomments.py --unit
+ * RESIDUALS. 69 functions (17560 bytes) are unwritten in 28 runs, the largest hbmTextWriterDraw (1272), fn_8055D594 (888),
+ *            fn_8055CFC8 (824) and hbmTextWriterDrawLine (724); the list is `python tools/units/sweepcomments.py --unit
  *            homebutton/hbm_value`.
  * RESIDUALS. .data 0x80651568..0x80652340 spans at least 10 TUs (datagap.py emission-order seams), so the data cannot match
  *            until the range is re-cut.
@@ -280,7 +280,7 @@ public:
     /* slot +0x054 */ virtual s32 v_0x054();
     /* slot +0x058 */ virtual void v_0x058();
     /* slot +0x05C */ virtual void v_0x05C(u16 ch);
-    /* slot +0x060 */ virtual void v_0x060(u16 ch);
+    /* slot +0x060 */ virtual void v_0x060(const u16* text);
     /* slot +0x064 */ virtual void v_0x064();
     /* slot +0x068 */ virtual void v_0x068();
     /* slot +0x06C */ virtual void v_0x06C();
@@ -495,11 +495,11 @@ extern "C" void hbmTextPutString(HbmTextBuffer* self, const u16* text) {
     }
 }
 
-/* 0x8055988C (0x144): Puts one character through slot 0x60 under a temporary input mode. */
-extern "C" void hbmTextPutInMode(HbmTextBuffer* self, u16 ch, s32 mode) {
+/* 0x8055988C (0x144): Puts a string through slot 0x60 under a temporary input mode. */
+extern "C" void hbmTextPutInMode(HbmTextBuffer* self, const u16* text, s32 mode) {
     s32 previous = self->inputMode;
     hbmTextSetInputMode(self, mode);
-    self->v_0x060(ch);
+    self->v_0x060(text);
     hbmTextSetInputMode(self, previous);
 }
 
@@ -753,11 +753,13 @@ extern "C" void hbmTextTruncateClamped(HbmTextBuffer* self, u16 length) {
     }
 }
 
-/* Stores the callback cluster of the band's observer interface. */
-extern "C" void fn_8055A3FC(HbmWidget* self, u32 a, void* b, void* c) {
-    self->arg_50 = a;
-    self->ptr_BC = b;
-    self->ptr_C0 = c;
+/* Hands the text writer the characters [start, end) of `text`. */
+extern "C" void hbmTextWriterSetText(HbmTextWriter* writer, const u16* text, u32 start, u32 end) {
+    HbmWidget* self = (HbmWidget*)writer;
+
+    self->arg_50 = (u32)text;
+    self->ptr_BC = (void*)start;
+    self->ptr_C0 = (void*)end;
 }
 
 /* Loads a timer from its two key positions. */
@@ -951,7 +953,7 @@ void fn_8055DB78(VuObject* self) { ((HbmVuView*)self->sub_0x1C)->v_0x0DC(); }
 
 void fn_8055DB8C(VuObject* self) { ((HbmVuView*)self->sub_0x1C)->v_0x240(); }
 
-void fn_8055DBA0(VuObject* self) { fn_80546660(self->sub_0x1C); }
+void fn_8055DBA0(VuObject* self) { hbmPanelClearText(self->sub_0x1C); }
 
 void fn_8055DBA8(VuObject* self, void* value) { self->field_0x38 = value; }
 
