@@ -18,14 +18,14 @@
  *   'RLTP'/'RLIM' animation kinds, the Hermite constants); the three detail:: rows keep the map's manglings and the
  *   other rows take the compiler's.  Pane, Group and Layout come from homebutton/hkb_layout_decl.h, the two detail::
  *   callees from homebutton/hkb_keyboard.h.
- * RESIDUALS. Bind(Pane*, bool, bool) 0x80533D34 and Bind(Material*, bool) 0x80533EFC: instruction-identical, the
- *   register assignment differs (retail keeps the running link in r31 and the content-offset table in r30, here
- *   they swap; Bind(Material*) shifts this/pMaterial/bDisable/i one register up); declaration order, a separate
- *   local in the inline Bind template, `if (T* p = ...)` and a pointer-then-reference content all measured the same.
- *   AnimPaneTree::Set 0x80534830: the second inlined FindAnimContent holds name/index/offsets in r27/r26/r24 where
- *   retail has r24/r27/r26.
+ * RESIDUALS. AnimPaneTree::Set 0x80534830: the second inlined FindAnimContent holds name/index/offsets in
+ *   r27/r26/r24 where retail has r24/r27/r26 (CONVERT_OFFS_TO_PTR inside FindAnimContent, a name, material or
+ *   index local measured the same or lower).
  *   The object also emits a weak AnimTransform table (0x24 B .data) and ~AnimTransform (0x40 B) that no retail
  *   object carries: nothing references them, so the link dead-strips them.
+ * SHAPES. the two Bind overloads read the content-offset table through CONVERT_OFFS_TO_PTR
+ *   (homebutton/hkb_material.h): the inline ConvertOffsToPtr call created the table's register first and swapped it
+ *   with the running link.
  * SHAPES. `#pragma auto_inline on` is scoped to AnimResource::Init: retail inlines it into Set and nothing else
  *   (unit-wide it also inlines CalcAnimationNum(Pane*) into the Group overload).  TestFileVersion returns the
  *   comparison expression (a bool local spills it to a second register).  The texture SRT and pattern setters are
@@ -335,7 +335,7 @@ void AnimTransformBasic::SetResource(const res::AnimationBlock* pRes, ResourceAc
 /* 0x80533D34 (0x1C8): Binds the contents that name `pPane`'s panes and materials (below it when `bRecursive`). */
 void AnimTransformBasic::Bind(Pane* pPane, bool bRecursive, bool bDisable) {
     AnimationLink* pCrAnimLink = NULL;
-    const u32* animContOffsets = detail::ConvertOffsToPtr<u32>(mpRes, mpRes->animContOffsetsOffset);
+    const u32* animContOffsets = CONVERT_OFFS_TO_PTR(u32, mpRes, mpRes->animContOffsetsOffset);
 
     for (u16 i = 0; i < mpRes->animContNum; ++i) {
         const res::AnimationContent& animCont =
@@ -363,7 +363,7 @@ void AnimTransformBasic::Bind(Pane* pPane, bool bRecursive, bool bDisable) {
 /* 0x80533EFC (0x114): Binds the material contents whose name is `pMaterial`'s. */
 void AnimTransformBasic::Bind(Material* pMaterial, bool bDisable) {
     AnimationLink* pCrAnimLink = NULL;
-    const u32* animContOffsets = detail::ConvertOffsToPtr<u32>(mpRes, mpRes->animContOffsetsOffset);
+    const u32* animContOffsets = CONVERT_OFFS_TO_PTR(u32, mpRes, mpRes->animContOffsetsOffset);
 
     for (u16 i = 0; i < mpRes->animContNum; ++i) {
         const res::AnimationContent& animCont =

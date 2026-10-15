@@ -11,18 +11,18 @@
  *   AnimateSelf, UnbindAnimationSelf, GetFrameSize at their addresses; the dump's namespace is the HOME Button copy
  *   of NintendoWare's layout library, spelt nw4r::lyt in this band after homebutton/hkb_material.cpp). The
  *   texture-flip table and its helpers (GetLTTexCoord ..) are GUESS names for the file's static data and code.
- * NAMES. The map rows keep their generated names until the hkb-b#1 rename batch lands (the source spells the
- *   manglings).
- * SHAPES. Point (a VEC2 with constructors and a member-wise assignment) stands in for nw4r::math::VEC2's own
- *   constructors, which src/nw4r/math.h does not declare: retail builds the quad origins in place and copies
- *   points as floats. DrawFrame / DrawFrame4 place their pieces through the Get*FrameSize helpers, DrawFrame8 inline.
- * RESIDUALS. constructor: retail loads the material list for each material pointer and its ResBlockSet copy into one
- *   register; ours copies it (`mr r8,r5`) and the frame loop's registers differ.
- * RESIDUALS. DrawSelf: retail keeps GetVtxPos's temporary at 0x8 and basePt at 0x10, ours the other way round.
- * RESIDUALS. DrawFrame: float register colouring (retail keeps the texture width in f31, ours the 0.0 constant).
- * RESIDUALS. DrawFrame4 / DrawFrame8: two `lfs` of the texture size load into swapped registers.
+ * SHAPES. Point (homebutton/hkb_material.h: a VEC2 with constructors and a member-wise assignment) stands in for
+ *   nw4r::math::VEC2's own constructors, which src/nw4r/math.h does not declare: retail builds the quad origins in
+ *   place and copies points as floats. DrawFrame / DrawFrame4 place their pieces through the Get*FrameSize helpers,
+ *   DrawFrame8 inline; the texture-coordinate helpers build the texture size as a Point (retail's VEC2(width, height)
+ *   temporary).
+ * SHAPES. the constructor reaches its records through CONVERT_OFFS_TO_PTR (homebutton/hkb_material.h): the inline
+ *   ConvertOffsToPtr calls recoloured the frame loop.
+ * SHAPES. DrawSelf copies GetVtxPos's result out of a reference-bound temporary (retail's slot order).
  * RESIDUALS. our object emits weak copies the target lacks (ut::Color ctor/dtor, Window::Content dtor); the target
- *   calls the folded Color constructor fn_80064834.
+ *   calls the folded Color constructor fn_80064834. Flip blocker: every row and the raw words match, but flipcheck
+ *   reports .text 0x2600 against the claimed 0x25B4 (the link strips the Content dtor, not the 0x4C B Color pair), and
+ *   a trial Matching flip grows main.dol by 0x20 bytes.
  */
 #include "homebutton/hkb_window.h"
 
@@ -59,20 +59,6 @@ struct TextureFlipInfo {
 inline f32& Component(math::VEC2& vec, int i) {
     return (&vec.x)[i];
 }
-
-/* A VEC2 built in place from its components or copied member by member. size: 0x8 */
-struct Point : public math::VEC2 {
-    Point() {}
-    Point(f32 px, f32 py) {
-        x = px;
-        y = py;
-    }
-    Point& operator=(const math::VEC2& v) {
-        x = v.x;
-        y = v.y;
-        return *this;
-    }
-};
 
 /* Places the left-top piece of a one- or four-piece frame. */
 inline void GetLTFrameSize(Point* pPt, Size* pSize, const math::VEC2& basePt, const Size& windowSize,
@@ -124,9 +110,7 @@ inline void GetLTTexCoord(math::VEC2* texCds, const Size& polSize, const Size& t
     TextureFlipInfo& flipInfo = GetTextureFlipInfo(textureFlip);
     int ix = flipInfo.idx[0];
     int iy = flipInfo.idx[1];
-    math::VEC2 tSz;
-    tSz.x = texSize.width;
-    tSz.y = texSize.height;
+    Point tSz(texSize.width, texSize.height);
 
     Component(texCds[VERTEX_LT], ix) = Component(texCds[VERTEX_LB], ix) = flipInfo.coords[VERTEX_LT][ix];
     Component(texCds[VERTEX_LT], iy) = Component(texCds[VERTEX_RT], iy) = flipInfo.coords[VERTEX_LT][iy];
@@ -143,9 +127,7 @@ inline void GetRTTexCoord(math::VEC2* texCds, const Size& polSize, const Size& t
     TextureFlipInfo& flipInfo = GetTextureFlipInfo(textureFlip);
     int ix = flipInfo.idx[0];
     int iy = flipInfo.idx[1];
-    math::VEC2 tSz;
-    tSz.x = texSize.width;
-    tSz.y = texSize.height;
+    Point tSz(texSize.width, texSize.height);
 
     Component(texCds[VERTEX_RT], ix) = Component(texCds[VERTEX_RB], ix) = flipInfo.coords[VERTEX_RT][ix];
     Component(texCds[VERTEX_RT], iy) = Component(texCds[VERTEX_LT], iy) = flipInfo.coords[VERTEX_RT][iy];
@@ -162,9 +144,7 @@ inline void GetRBTexCoord(math::VEC2* texCds, const Size& polSize, const Size& t
     TextureFlipInfo& flipInfo = GetTextureFlipInfo(textureFlip);
     int ix = flipInfo.idx[0];
     int iy = flipInfo.idx[1];
-    math::VEC2 tSz;
-    tSz.x = texSize.width;
-    tSz.y = texSize.height;
+    Point tSz(texSize.width, texSize.height);
 
     Component(texCds[VERTEX_RB], ix) = Component(texCds[VERTEX_RT], ix) = flipInfo.coords[VERTEX_RB][ix];
     Component(texCds[VERTEX_RB], iy) = Component(texCds[VERTEX_LB], iy) = flipInfo.coords[VERTEX_RB][iy];
@@ -181,9 +161,7 @@ inline void GetLBTexCoord(math::VEC2* texCds, const Size& polSize, const Size& t
     TextureFlipInfo& flipInfo = GetTextureFlipInfo(textureFlip);
     int ix = flipInfo.idx[0];
     int iy = flipInfo.idx[1];
-    math::VEC2 tSz;
-    tSz.x = texSize.width;
-    tSz.y = texSize.height;
+    Point tSz(texSize.width, texSize.height);
 
     Component(texCds[VERTEX_LB], ix) = Component(texCds[VERTEX_LT], ix) = flipInfo.coords[VERTEX_LB][ix];
     Component(texCds[VERTEX_LB], iy) = Component(texCds[VERTEX_RB], iy) = flipInfo.coords[VERTEX_LB][iy];
@@ -203,7 +181,7 @@ const ut::detail::RuntimeTypeInfo Window::typeInfo(&Pane::typeInfo);
  * material, then one material per frame record. */
 Window::Window(const res::Window* pBlock, const ResBlockSet& resBlockSet) : Pane(pBlock) {
     const res::WindowContent* pResContent =
-        detail::ConvertOffsToPtr<res::WindowContent>(pBlock, pBlock->contentOffset);
+        CONVERT_OFFS_TO_PTR(res::WindowContent, pBlock, pBlock->contentOffset);
     u8 texCoordNum = ut::Min<u8>(pResContent->texCoordNum, 8);
 
     if (texCoordNum > 0) {
@@ -211,7 +189,7 @@ Window::Window(const res::Window* pBlock, const ResBlockSet& resBlockSet) : Pane
     }
 
     mContentInflation = pBlock->inflation;
-    const u32* matOffsTbl = detail::ConvertOffsToPtr<u32>(resBlockSet.pMaterialList, 0xC);
+    const u32* matOffsTbl = CONVERT_OFFS_TO_PTR(u32, resBlockSet.pMaterialList, 0xC);
     for (int i = 0; i < 4; ++i) {
         *reinterpret_cast<u32*>(&mContent.vtxColors[i]) = pResContent->vtxCols[i];
     }
@@ -221,7 +199,7 @@ Window::Window(const res::Window* pBlock, const ResBlockSet& resBlockSet) : Pane
     }
 
     const res::Material* pResMaterial =
-        detail::ConvertOffsToPtr<res::Material>(resBlockSet.pMaterialList, matOffsTbl[pResContent->materialIdx]);
+        CONVERT_OFFS_TO_PTR(res::Material, resBlockSet.pMaterialList, matOffsTbl[pResContent->materialIdx]);
     mpMaterial = Layout::NewObj<Material>(pResMaterial, resBlockSet);
 
     mFrameNum = 0;
@@ -234,13 +212,13 @@ Window::Window(const res::Window* pBlock, const ResBlockSet& resBlockSet) : Pane
             mFrameNum = frameNum;
         }
 
-        const u32* frameOffsetTable = detail::ConvertOffsToPtr<u32>(pBlock, pBlock->frameOffsetTableOffset);
+        const u32* frameOffsetTable = CONVERT_OFFS_TO_PTR(u32, pBlock, pBlock->frameOffsetTableOffset);
         for (int i = 0; i < mFrameNum; ++i) {
             const res::WindowFrame* pResWindowFrame =
-                detail::ConvertOffsToPtr<res::WindowFrame>(pBlock, frameOffsetTable[i]);
+                CONVERT_OFFS_TO_PTR(res::WindowFrame, pBlock, frameOffsetTable[i]);
             mFrames[i].textureFlip = pResWindowFrame->textureFlip;
-            const res::Material* pResFrameMaterial = detail::ConvertOffsToPtr<res::Material>(
-                resBlockSet.pMaterialList, matOffsTbl[pResWindowFrame->materialIdx]);
+            const res::Material* pResFrameMaterial = CONVERT_OFFS_TO_PTR(
+                res::Material, resBlockSet.pMaterialList, matOffsTbl[pResWindowFrame->materialIdx]);
             mFrames[i].pMaterial = Layout::NewObj<Material>(pResFrameMaterial, resBlockSet);
         }
     }
@@ -311,8 +289,7 @@ void Window::DrawSelf(const DrawInfo& drawInfo) {
     LoadMtx(drawInfo);
 
     const WindowFrameSize frameSize = GetFrameSize(mFrameNum, mFrames);
-    const math::VEC2 vtxPos = GetVtxPos();
-    const math::VEC2 basePt = vtxPos;
+    const math::VEC2 basePt = static_cast<const math::VEC2&>(GetVtxPos());
 
     DrawContent(basePt, frameSize, mGlbAlpha);
 

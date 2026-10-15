@@ -11,19 +11,17 @@
  *   Pane::GetPaneRect (0x8052A484, `b` into it; hbm_text_panel.cpp, hbm_kb_widget.cpp, hbm_kb_cursor.cpp and
  *   tiHKBManager.cpp call it with a DrawInfo); the file name `hkb_pane.cpp` is a GUESS (retail lyt_pane).
  * RESIDUALS. Pane::Pane: retail keeps LinkListNode's zero stores for both lists' sentinel nodes before the list
- *   initialisation (LinkListNode deriving from ut::NonCopyable in src/nw4r/fn_805012C4.h, request hkb-b#4).
- * RESIDUALS. Pane::~Pane: retail reads the child's mbUserAllocated through the node (0xD2) and converts the node with
- *   `subic.`; the LinkList iterator of homebutton/hkb_material.h converts first (request hkb-b#4).
- * RESIDUALS. Pane::CalculateMtx: retail reuses the first mFlag load for the location-adjust test; ours reloads it.
- * RESIDUALS. CalcPaneRect: GetVtxPos's return copy and basePt swap stack slots (0x8 / 0x10), as in
- *   homebutton/hkb_window.cpp and hkb_textbox.cpp.
+ *   initialisation (LinkListNode deriving from ut::NonCopyable in src/nw4r/ut_LinkList.h, request hkb-lyt#1).
  * RESIDUALS. our object emits weak LinkList<Pane, 4> / LinkList<AnimationLink, 0> destructors (from the constructor)
  *   the target lacks.
  * RESIDUALS. flipcheck: the class table, Pane::typeInfo and the `.sdata2` pool end in the retail object's 8-byte fill
  *   (0x78 vs 0x74, 0x8 vs 0x4, 0x20 vs 0x1C), beside the four .text rows above.
- * SHAPES. CalcPaneRect copies GetVtxPos's result into basePt (retail's math::VEC2 copy), which keeps the dead copy
- *   retail stores at the end; mGlbAlpha reads the draw alpha into a local before the multiply; the child loop of the
- *   destructor copies the iterator with `it++`.
+ * SHAPES. CalculateMtx reads mFlag once into a local for the visibility and location-adjust tests (IsVisible() and a
+ *   second `mFlag & 4` reload it).
+ * SHAPES. CalcPaneRect copies GetVtxPos's result into basePt out of a reference-bound temporary (retail's math::VEC2
+ *   copy: the temporary sits above basePt), which keeps the dead copy retail stores at the end; mGlbAlpha reads the draw alpha into a local before the multiply; the child loop of the
+ *   destructor copies the iterator with `it++` and converts the node for DeleteObj through LinkList::GetPointerFromNode
+ *   (u32 arithmetic beside the iterator's own conversion, so the two are not merged and the test reads through the node).
  */
 #include "homebutton/hkb_layout.h"
 
@@ -67,7 +65,7 @@ Pane::~Pane() {
         PaneList::Iterator currIt = it++;
         mChildList.Erase(currIt.mIterator);
         if (!currIt->IsUserAllocated()) {
-            Layout::DeleteObj(currIt.operator->());
+            Layout::DeleteObj(PaneList::GetPointerFromNode(currIt.mIterator.mPointer));
         }
     }
 
@@ -90,8 +88,7 @@ namespace detail {
  * height. */
 const ut::Rect CalcPaneRect(const Pane* pPane) {
     ut::Rect ret;
-    const math::VEC2 vtxPos = pPane->GetVtxPos();
-    math::VEC2 basePt = vtxPos;
+    math::VEC2 basePt = static_cast<const math::VEC2&>(pPane->GetVtxPos());
 
     ret.left = basePt.x;
     ret.top = basePt.y;
@@ -181,7 +178,8 @@ Material* Pane::FindMaterialByName(const char* findName, bool bRecursive) {
 /* 0x8052A650 (0x2F8): Builds the local and global matrices and the global alpha, then recurses into the children
  * with the alpha the pane passes down. */
 void Pane::CalculateMtx(const DrawInfo& drawInfo) {
-    if (!IsVisible() && !drawInfo.mFlag.invisiblePaneCalculateMtx) {
+    const u8 flag = mFlag;
+    if (!(flag & 1) && !drawInfo.mFlag.invisiblePaneCalculateMtx) {
         return;
     }
 
@@ -192,7 +190,7 @@ void Pane::CalculateMtx(const DrawInfo& drawInfo) {
 
         {
             math::VEC2 scale = mScale;
-            if (drawInfo.mFlag.locationAdjust && (mFlag & 4)) {
+            if (drawInfo.mFlag.locationAdjust && (flag & 4)) {
                 scale.x *= drawInfo.mLocationAdjustScale.x;
                 scale.y *= drawInfo.mLocationAdjustScale.y;
             }

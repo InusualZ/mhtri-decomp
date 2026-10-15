@@ -12,18 +12,25 @@
  *   material of NintendoWare's layout library: CalcTextureMtx, SetIndTexMtx, ReserveGXMem, SetupGX, the anim links)
  *   and the nw4r::ut / nw4r::math callees it shares with the game; the map carries these names (the own rows and the
  *   layout callees are renamed), except the SetupGX statics kColSels / kAlpSels, whose spelling is per compiler.
+ * SHAPES. the default SRTs are set by the InitTexSRTs helper (the loop written in place swapped r6/r7) and built
+ *   through Point (homebutton/hkb_material.h), the VEC2(0,0) / VEC2(1,1) temporaries retail keeps on the stack; the
+ *   default material colour is one word store (retail's ut::Color::operator=(u32), which src/nw4r/fn_80502828.h does
+ *   not declare: request hkb-lyt#2).
+ * SHAPES. SetupGX sets bUseRasStage and clears it again on !bModVtxCol (retail's li 1 / bne / li 0; `a && b`, an
+ *   if-set and a ternary measured lower).
  * SHAPES. the constructor sits in a `#pragma dont_inline on` region: retail calls every getter, template and copy
  *   operator out of line there while the rest of the unit inlines them. SetupGX tests the record block through the
  *   Is*Cap accessors, which lets the compiler reuse one mGXMemCap load for the test and the address.
  * RESIDUALS. Init (0x805313A8): retail copies DefaultBlackColor as one aggregate (four lha, then four sth); src/gx.h
  *   declares GXColorS10::operator= out of line, so the copy here is field by field.
- *   ReserveGXMem (0x805314C4): retail builds each default SRT through nw4r::math::VEC2(0,0) / VEC2(1,1) temporaries
- *   (frame 0x60); src/nw4r/math.h's VEC2 has no constructor, so the fields are stored directly (frame 0x40).
+ *   ReserveGXMem (0x805314C4): the size sum is grouped by record size here (texture SRTs, the 4-byte records, then
+ *   texture maps and TEV stages) because the per-record sum of the natural form does not fold into retail's
+ *   (texSRT + indSRT) * 0x14 / (4-byte counts) << 2 shape; the grouped sum's adds still differ in order.
  *   Constructor (0x80530A50): mTevKCols copy through ut::Color::operator=(const Color&) where retail calls
  *   operator=(GXColor) (0x800647A0), and the TEV colour loop indexes its destination where retail walks a pointer.
- *   AnimationLinkList constructor (0x80530A30): retail keeps LinkListNode's two zero stores before Initialize_; the
- *   shared LinkListImpl declares no constructor, so they fold away here.
- *   SetupGX (0x805323D4): the `bUseVtxCol && bModVtxCol` materialisation (retail sets 1, then clears it on !bModVtxCol).
+ *   AnimationLinkList constructor (0x80530A30): retail keeps LinkListNode's two zero stores before Initialize_; they
+ *   survive only when LinkListNode derives from ut::NonCopyable (src/nw4r/ut_LinkList.h, request hkb-lyt#1).
+ *   SetupGX (0x805323D4): two saved registers swap in the TEV-stage loop (r26 / r31).
  *   Flip blockers: flipcheck reports .text 0x2D38 against the claimed 0x2D48 (-0x10) and the bytes differ from +0x304
  *   (retail emits the AnimationLinkList constructor before the Material constructor, and the copy operators before
  *   the templates); our object also emits five weak copies the target object lacks (ut::Color ctor, dtor and
@@ -391,6 +398,15 @@ Material::~Material() {
     }
 }
 
+/* Sets `num` texture SRTs to the identity transform. */
+static inline void InitTexSRTs(TexSRT* texSRTs, u32 num) {
+    for (u32 i = 0; i < num; i++) {
+        texSRTs[i].translate = Point(0.0f, 0.0f);
+        texSRTs[i].rotate = 0.0f;
+        texSRTs[i].scale = Point(1.0f, 1.0f);
+    }
+}
+
 /* 0x805314C4 (0x76C): grows the GX record block to the given counts and fills the new records with defaults. */
 void Material::ReserveGXMem(u8 texMapNum, u8 texSRTNum, u8 texCoordGenNum, u8 tevStageNum, bool allocTevSwap,
                             u8 indStageNum, u8 indSRTNum, bool allocChanCtrl, bool allocMatCol, bool allocAlpComp,
@@ -414,11 +430,10 @@ void Material::ReserveGXMem(u8 texMapNum, u8 texSRTNum, u8 texCoordGenNum, u8 te
 
         mpGXMem = MEMAllocFromAllocator(
             Layout::mspAllocator,
-            sizeof(TexMap) * texMapNum + sizeof(TexSRT) * texSRTNum + sizeof(TexCoordGen) * texCoordGenNum
-                + sizeof(ChanCtrl) * chanCtrlNum + sizeof(ut::Color) * matColNum
-                + sizeof(TevSwapMode) * 4 * tevSwapNum + sizeof(AlphaCompare) * alpCompNum
-                + sizeof(BlendMode) * blendModeNum + sizeof(IndirectStage) * indStageNum
-                + sizeof(TexSRT) * indSRTNum + sizeof(TevStage) * tevStageNum);
+            sizeof(TexSRT) * (indSRTNum + texSRTNum)
+                + sizeof(u32) * (texCoordGenNum + indStageNum + matColNum + blendModeNum + chanCtrlNum + tevSwapNum
+                                 + alpCompNum)
+                + sizeof(TexMap) * texMapNum + sizeof(TevStage) * tevStageNum);
 
         if (mpGXMem) {
             mGXMemCap.texMap = texMapNum;
@@ -434,26 +449,10 @@ void Material::ReserveGXMem(u8 texMapNum, u8 texSRTNum, u8 texCoordGenNum, u8 te
             mGXMemCap.blendMode = blendModeNum;
 
             mGXMemNum.texSRT = mGXMemCap.texSRT;
-            TexSRT* texSRTs = GetTexSRTAry();
-            const u32 texSRTCount = mGXMemNum.texSRT;
-            for (u32 i = 0; i < texSRTCount; i++) {
-                texSRTs[i].translate.x = 0.0f;
-                texSRTs[i].translate.y = 0.0f;
-                texSRTs[i].rotate = 0.0f;
-                texSRTs[i].scale.x = 1.0f;
-                texSRTs[i].scale.y = 1.0f;
-            }
+            InitTexSRTs(GetTexSRTAry(), mGXMemNum.texSRT);
 
             mGXMemNum.indSRT = mGXMemCap.indSRT;
-            TexSRT* indTexSRTs = GetIndTexSRTAry();
-            const u32 indSRTCount = mGXMemNum.indSRT;
-            for (u32 i = 0; i < indSRTCount; i++) {
-                indTexSRTs[i].translate.x = 0.0f;
-                indTexSRTs[i].translate.y = 0.0f;
-                indTexSRTs[i].rotate = 0.0f;
-                indTexSRTs[i].scale.x = 1.0f;
-                indTexSRTs[i].scale.y = 1.0f;
-            }
+            InitTexSRTs(GetIndTexSRTAry(), mGXMemNum.indSRT);
 
             mGXMemNum.chanCtrl = mGXMemCap.chanCtrl;
             if (mGXMemNum.chanCtrl) {
@@ -462,7 +461,7 @@ void Material::ReserveGXMem(u8 texMapNum, u8 texSRTNum, u8 texCoordGenNum, u8 te
 
             mGXMemNum.matCol = mGXMemCap.matCol;
             if (mGXMemNum.matCol) {
-                *GetMatColAry() = ut::Color(0xFFFFFFFF);
+                *reinterpret_cast<u32*>(GetMatColAry()) = 0xFFFFFFFF;
             }
 
             mGXMemNum.tevSwap = mGXMemCap.tevSwap;
@@ -705,7 +704,13 @@ bool Material::SetupGX(bool bModVtxCol, u8 alpha) {
         GXSetChanCtrl(4, false, 0, 1, 0, 0, 2);
     }
 
-    bool bUseRasStage = bUseVtxCol && bModVtxCol;
+    bool bUseRasStage = false;
+    if (bUseVtxCol) {
+        bUseRasStage = true;
+        if (!bModVtxCol) {
+            bUseRasStage = false;
+        }
+    }
 
     if (bUseMatCol) {
         ut::Color matCol = 0xFFFFFFFF;

@@ -16,8 +16,8 @@
  *   Animate, BuildPaneObj, Picture::DrawSelf at their addresses: the HOME Button copy of NintendoWare's layout
  *   library, spelt nw4r::lyt in this band after homebutton/hkb_material.cpp). SetTagProcessorImpl,
  *   IsIncludeAnimationGroupRef and SetMaterialTexCoordGen are GUESS names for the file's static helpers.
- * NAMES. The map rows keep their generated names until the hkb-b#1 rename batch lands (the source spells the
- *   manglings).
+ * SHAPES. the list destructors copy the iterator with `it++` (a copy then `++it` keeps a second register); the
+ *   GroupContainer destructor hands DeleteObj LinkList::GetPointerFromNode's pointer (see homebutton/hkb_pane.cpp).
  * SHAPES. BuildPaneObj casts the block in each case; Picture::Append sets the coordinate generator through a by-value
  *   helper (retail's Material::SetTexCoordGen, which homebutton/hkb_material.h does not declare: request hkb-b#4).
  * RESIDUALS. the range is three objects (seam request hkb-b#3): the class tables, the 0.0 pool word and the
@@ -25,10 +25,8 @@
  *   bytes (the end of the lyt_layout object), ours packs Picture::typeInfo at +0x4.
  * RESIDUALS. Layout / Group / GroupContainer constructors and Build's GroupContainer: retail keeps LinkListNode's two
  *   zero stores before the list initialisation; that happens when LinkListNode derives from ut::NonCopyable
- *   (measured on a probe), which src/nw4r/fn_805012C4.h does not declare (request hkb-b#4).
- * RESIDUALS. Layout / Group / GroupContainer destructors: retail copies the iterator with `it++` and converts nodes
- *   with u32 arithmetic; the LinkList template in homebutton/hkb_material.h has neither (request hkb-b#4), and our
- *   object emits weak LinkList<...> destructors the target lacks.
+ *   (measured on a probe), which src/nw4r/ut_LinkList.h does not declare (request hkb-lyt#1).
+ * RESIDUALS. our object emits weak LinkList<...> destructors the target lacks.
  * RESIDUALS. SetTagProcessor / SetTagProcessorImpl: the second inlined level walks the child list with `lwzu` where
  *   retail uses `lwz` + `addi`.
  */
@@ -76,8 +74,7 @@ inline void Group::AppendPane(Pane* pPane) {
 /* 0x8052B120 (0xAC): Unlinks and frees the group's pane links. */
 Group::~Group() {
     for (PaneLinkList::Iterator it = mPaneLinkList.GetBeginIter(); it != mPaneLinkList.GetEndIter();) {
-        PaneLinkList::Iterator currIt = it;
-        ++it;
+        PaneLinkList::Iterator currIt = it++;
         mPaneLinkList.Erase(currIt.mIterator);
         Layout::DeleteObj(currIt.operator->());
     }
@@ -86,11 +83,10 @@ Group::~Group() {
 /* 0x8052B1CC (0xC8): Unlinks the groups and destroys the ones the container allocated. */
 GroupContainer::~GroupContainer() {
     for (GroupList::Iterator it = mGroupList.GetBeginIter(); it != mGroupList.GetEndIter();) {
-        GroupList::Iterator currIt = it;
-        ++it;
+        GroupList::Iterator currIt = it++;
         mGroupList.Erase(currIt.mIterator);
         if (!currIt->IsUserAllocated()) {
-            Layout::DeleteObj(currIt.operator->());
+            Layout::DeleteObj(GroupList::GetPointerFromNode(currIt.mIterator.mPointer));
         }
     }
 }
@@ -184,8 +180,7 @@ Layout::~Layout() {
     }
 
     for (AnimTransformList::Iterator it = mAnimTransList.GetBeginIter(); it != mAnimTransList.GetEndIter();) {
-        AnimTransformList::Iterator currIt = it;
-        ++it;
+        AnimTransformList::Iterator currIt = it++;
         mAnimTransList.Erase(currIt.mIterator);
         DeleteObj(currIt.operator->());
     }

@@ -11,15 +11,18 @@
  *   NintendoWare's layout library, spelt nw4r::lyt in this band after homebutton/hkb_material.cpp).
  *   CalcLineRectImpl / CalcStringRectImpl are GUESS names for the file's line-measuring helpers; SetWriterTextColor
  *   is the GUESS name of the out-of-line copy of CharWriter::SetTextColor(Color, Color) (0x8052D400).
- * NAMES. The map rows keep their generated names until the hkb-b#1 rename batch lands (the source spells the
- *   manglings).
+ * SHAPES. DrawSelf takes the text width through ut::Rect::GetWidth (the inline call keeps retail's second
+ *   textRect.left load).
+ * SHAPES. the constructor reaches the material through CONVERT_OFFS_TO_PTR (homebutton/hkb_material.h): the inline
+ *   ConvertOffsToPtr copied the material list into a second register (`mr r5,r8`).
+ * SHAPES. GetTextDrawRect reads the line and character spacing into locals before the writer stores, and copies
+ *   GetVtxPos's result out of a reference-bound temporary (retail's slot order: temporary above the copy).
  * SHAPES. CalcLineRectImpl / CalcStringRectImpl are plain statics: retail emits them after their first user
  *   (DrawSelf, GetTextDrawRect), so they are defined there. SetFont(NULL) in the destructor keeps retail's dead
  *   GetWidth/GetHeight code.
- * RESIDUALS. constructor: the material-list register copy (`mr r5,r8`) the window constructor has too.
- * RESIDUALS. AllocStringBuffer: retail recomputes `minLen + 1` for the size and the loop count; ours keeps it.
- * RESIDUALS. DrawSelf: float register colouring (hMag in f30 / textWidth in f29 in retail) and one textRect.left reload.
- * RESIDUALS. GetTextDrawRect: the line/char-space loads and GetVtxPos's two stack copies are swapped.
+ * RESIDUALS. AllocStringBuffer: retail recomputes `minLen + 1` for NewArray's loop count after the allocation; ours keeps
+ *   it in r31 (an unsigned `minLen + 1U` argument recovers the recomputed size; an int, u16 or u32 local does not).
+ * RESIDUALS. DrawSelf: float register colouring (retail keeps hMag in f30 and a later 0.0 in f31; ours swaps them).
  * RESIDUALS. CharWriter::SetTextColor(Color, Color) is a file static here (src/nw4r/fn_80502828.h has no such
  *   member: request hkb-b#4); weak copies the target lacks (Color, Font, CharWriter record dtors).
  */
@@ -135,9 +138,9 @@ TextBox::TextBox(const res::TextBox* pBlock, const ResBlockSet& resBlockSet) : P
         }
     }
 
-    const u32* matOffsTbl = detail::ConvertOffsToPtr<u32>(resBlockSet.pMaterialList, 0xC);
+    const u32* matOffsTbl = CONVERT_OFFS_TO_PTR(u32, resBlockSet.pMaterialList, 0xC);
     const res::Material* pResMaterial =
-        detail::ConvertOffsToPtr<res::Material>(resBlockSet.pMaterialList, matOffsTbl[pBlock->materialIdx]);
+        CONVERT_OFFS_TO_PTR(res::Material, resBlockSet.pMaterialList, matOffsTbl[pBlock->materialIdx]);
     mpMaterial = Layout::NewObj<Material>(pResMaterial, resBlockSet);
 }
 
@@ -219,7 +222,7 @@ void TextBox::DrawSelf(const DrawInfo& drawInfo) {
 
     const wchar_t* strPos = mTextBuf;
     writer.SetCursor(textRect.left, -textRect.top);
-    const f32 textWidth = textRect.right - textRect.left;
+    const f32 textWidth = textRect.GetWidth();
     int remain = mTextLen;
 
     while (remain > 0) {
@@ -339,7 +342,7 @@ void TextBox::AllocStringBuffer(u16 minLen) {
     }
 
     FreeStringBuffer();
-    mTextBuf = Layout::NewArray<wchar_t>(minLen + 1);
+    mTextBuf = Layout::NewArray<wchar_t>(minLen + 1U);
     if (mTextBuf) {
         mTextBufBytes = (u16)textBufBytes;
     }
@@ -425,8 +428,10 @@ const ut::Rect TextBox::GetTextDrawRect(ut::TextWriterBase<wchar_t>* pWriter) co
     pWriter->SetCursor(0.0f, 0.0f);
     pWriter->mFont = mpFont;
     pWriter->SetFontSize(mFontSize.width, mFontSize.height);
-    pWriter->mLineSpace = mLineSpace;
-    pWriter->mCharSpace = mCharSpace;
+    const f32 lineSpace = mLineSpace;
+    const f32 charSpace = mCharSpace;
+    pWriter->mLineSpace = lineSpace;
+    pWriter->mCharSpace = charSpace;
     if (mpTagProcessor) {
         pWriter->mTagProcessor = mpTagProcessor;
     }
@@ -434,8 +439,7 @@ const ut::Rect TextBox::GetTextDrawRect(ut::TextWriterBase<wchar_t>* pWriter) co
     CalcStringRect(&textRect, *pWriter, mTextBuf, mTextLen, mSize.width);
 
     const Size textSize(textRect.right - textRect.left, textRect.bottom - textRect.top);
-    const math::VEC2 vtxPos = GetVtxPos();
-    math::VEC2 ltPos = vtxPos;
+    math::VEC2 ltPos = static_cast<const math::VEC2&>(GetVtxPos());
 
     ltPos.x += (mSize.width - textSize.width) * GetTextMagH();
     ltPos.y -= (mSize.height - textSize.height) * GetTextMagV();

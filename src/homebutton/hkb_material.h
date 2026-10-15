@@ -77,6 +77,11 @@ public:
     Iterator GetBeginIter() { return Iterator(mNode.mNext); }
     Iterator GetEndIter() { return Iterator(&mNode); }
 
+    /* Returns the element whose link is `node`. */
+    static T* GetPointerFromNode(detail::LinkListNode* node) {
+        return reinterpret_cast<T*>(reinterpret_cast<u32>(node) - Ofs);
+    }
+
     void PushBack(T* p) {
         detail::LinkListImpl::Insert(detail::LinkListImpl::GetEndIter(),
                                      reinterpret_cast<detail::LinkListNode*>(reinterpret_cast<u8*>(p) + Ofs));
@@ -109,6 +114,10 @@ template <typename T>
 inline const T* ConvertOffsToPtr(const void* baseAddress, unsigned int offset) {
     return reinterpret_cast<const T*>(reinterpret_cast<u32>(baseAddress) + offset);
 }
+
+/* ConvertOffsToPtr as a bare expression: the inline call copies its arguments into fresh registers, which recolours
+ * the caller where retail's allocation follows the expression form. */
+#define CONVERT_OFFS_TO_PTR(T, baseAddress, offset)     reinterpret_cast<const T*>(reinterpret_cast<u32>(baseAddress) + (offset))
 
 }  // namespace detail
 
@@ -173,6 +182,21 @@ struct ResBlockSet {
     /* +0x4 */ const void* pFontList; /* untyped: the fnl1 block, unread here */
     /* +0x8 */ const void* pMaterialList; /* untyped: the mat1 block, unread here */
     /* +0xC */ ResourceAccessor* pResAccessor;
+};
+
+/* A VEC2 built in place from its components or copied member by member: it stands in for nw4r::math::VEC2's own
+ * constructors, which src/nw4r/math.h does not declare. size: 0x8 */
+struct Point : public math::VEC2 {
+    Point() {}
+    Point(f32 px, f32 py) {
+        x = px;
+        y = py;
+    }
+    Point& operator=(const math::VEC2& v) {
+        x = v.x;
+        y = v.y;
+        return *this;
+    }
 };
 
 /* A texture scale/rotate/translate. size: 0x14 */
