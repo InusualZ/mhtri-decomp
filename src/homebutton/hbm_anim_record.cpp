@@ -1,407 +1,327 @@
 /*
- * homebutton/hbm_anim_record.cpp - software-keyboard code of the tiHKBManager band: the animation record that steps an
- * index through its table, and the animated sign-key widget around it (open/close, show/hide, page stepping, its
- * state selectors, the key listener and the parts' deleting destructors).
+ * homebutton/hbm_anim_record.cpp - software-keyboard code of the tiHKBManager band: the keyboard's sign panel
+ * (HbmAnimPanel): the 20 quick-chat keys with their phrase and gesture pages, the page and close buttons, the key-top
+ * pane it slides over its owner key, its pane handler and its key parts.
  *
- * RANGE.     .text 0x80556FC4..0x80558EB4 (61 functions; the ones not defined below keep the target object's bytes).
+ * RANGE.     .text 0x80556FC4..0x80558EB4 (61 functions), .ctors 0x8056F40C..0x8056F410, .rodata 0x8057BAB0..0x8057BDB0,
+ *            .data 0x80650B40..0x80651568, .bss 0x807907D0..0x80790D10, .sdata 0x80794628..0x80794638.
  * FLAGS.     GC/3.0a5.2 + cflags_hkb (configure.py); the retail object has no extab/extabindex, so `#pragma exceptions off`.
- * FLAGS.     Scoped `#pragma auto_inline on` around fn_805571D0/fn_805571FC: retail inlines them into hbmAnimStepBack,
- *            hbmAnimStepBackAlt and hbmAnimStepForward and also keeps their out-of-line copies.
- * NAMES.     GUESS file name: the band's `hbm_` prefix + the animation record; no `__FILE__` string, no runtime-dump name.
- * NAMES.     GUESS function names hbmAnim* (read off the bodies: the panes they bind, the states they set), view classes
- *            HbmAnimWidgetView / HbmAnimBaseView / HbmAnimNodeView / HbmAnimOwnerView / HbmAnimOwnerBaseView /
- *            HbmAnimKeyboardView (slots named by offset) and records HbmAnimWidget, HbmAnimPane, HbmAnimListener,
- *            HbmAnimTrigger, HbmAnimInput; map rows renamed with them (request hbm-misc).
- * SHAPES.    The views are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,<slot>(r12)` dispatch; no
- *            method is defined and nothing is constructed here, so no table is emitted (rule 10).
+ * FLAGS.     Scoped `#pragma auto_inline on` around the page helpers (resetPage, stepPageDown, stepPageUp): retail inlines
+ *            them into their callers and also keeps their out-of-line copies.
+ * NAMES.     GUESS file name: the band's `hbm_` prefix + the page record; no `__FILE__` string, no runtime-dump name.
+ *            The unit loads `fs_signWindow_a_*.brlan` and binds the N_SGN and P_SGNkey panes: the sign panel.
+ * NAMES.     GUESS classes HbmAnimPanel (three bases: the class table 0x80651448 holds the HbmPaneManager table at +0x50
+ *            and the HbmKeyListener table at +0xC4, as the destructor's stores show), HbmAnimPanelBase (its primary base:
+ *            HkbInputWidget's slots 0x08..0x30, then 0x34..0x4C), HbmAnimPanelPaneHandler (table 0x80651428),
+ *            HbmAnimPart and its kinds HbmAnimPartA/B/C; members named from the panes they bind and the events they send.
+ * NAMES.     GUESS data names hbmAnimPanelAnimDefs, hbmAnimPanelButtons, hbmAnimPanelPages, hbmAnimPanelEventDefault,
+ *            hbmAnimSignKeyNames, hbmAnimPanelKeyGroup, hbmAnimPanelCloseGroup, hbmAnimPanelKeyDefs.
+ * SHAPES.    The key table's group words are pointer variables, so the unit's static initialiser (the .ctors entry)
+ *            patches them as retail's 0x80558E18 does.
  * SHAPES.    The pane visibility is `(flags & 0xFE) | bit` through hbmAnimSetPaneVisible: retail's `rlwinm 24,30` (+ `ori`)
  *            pair; a bitfield store compiles to `rlwimi` instead.
- * SHAPES.    hbmAnimOpen hands slot 0x104 `self->index` twice (retail's two `mr` from the parameter register) and
- *            declares `source` before `keytop` (register colouring).
- * RESIDUALS. The literals ("N_SGNkeytop_all", "N_SGNkeyall") are this unit's .data strings in retail; ours are emitted
- *            in source order, so the relocation names differ until the unit's .data is emitted in order.
- * RESIDUALS. Unwritten, store vtables whose classes this unit would have to emit (rule 10): fn_80557228 (destructor),
- *            fn_80557390 (constructor), fn_80557744.
- * RESIDUALS. Unwritten, read this unit's own .data/.bss/.rodata tables the source does not emit yet: fn_80558064,
- *            fn_805580F0, fn_805581C0, fn_805583B4, fn_80558670, fn_805586D4, fn_80558E18 (the static initialiser).
- * RESIDUALS. Unwritten, call hbm_hermite.cpp's hbmNameMatches or
- *            hbm_text_panel.cpp's fn_80549D74: fn_80557004, fn_80557910, fn_80557E8C.
- * NAMES.     GUESS classes HbmAnimPart and its kinds HbmAnimPartA/B/C (band keys with a state word; their
- *            members reset, setState, show, getResource).
+ * SHAPES.    open hands slot 0x104 `mPage` twice (retail's two `mr` from the parameter register) and declares `source`
+ *            before `keytop` (register colouring).
+ * RESIDUALS. The parts' listener is stored after the HbmKey constructor (retail stores it inside it): HbmKey has no
+ *            (pane, listener) constructor and its +0x18 is typed HbmKeyAnim* in homebutton/hbm_value.h (request
+ *            hb-kb-parts#2).
+ * RESIDUALS. 0x80556FE4 (a second copy of the page reset) and 0x805571CC (the base's empty slot 0x34) are emitted by
+ *            retail for no caller in this unit; they keep their C spelling.
+ * RESIDUALS. The two onPaneEvent bodies and updateLabels: the inline lookups' index, page and key-table registers come
+ *            out in another order than retail's.
+ * RESIDUALS. HbmAnimPanelBase's table is not this unit's: its key function is slot 0x40, kept at 0x80454970 by another
+ *            unit, so the member is declared and never defined here.
  */
 
 #include "types.h"
+#include "homebutton/hbm_anim_record.h"
+#include "homebutton/hbm_text_panel.h"
+#include "MSL_C/wstring.h"
+#include "MSL_C/wprintf.h"
+#include "homebutton/hkb_layout.h"
+#include "homebutton/hkb_textbox.h"
+#include "homebutton/hbm_kb_event.h"
+#include "homebutton/hbm_hermite.h"
+#include "MEM/MEMAllocFromAllocator.h"
+#include "MSL_C/string.h"
+#include "MSL_C/wstring.h"
+#include "MSL_C/strtoul.h"
+#include "MSL/strlen.h"
+#include "Runtime.PPCEABI.H/memset.h"
 
 /* The retail object has no extab/extabindex: exceptions are off for this band. */
 #pragma exceptions off
 
-#include "homebutton/hbm_widget.h"
-#include "homebutton/hbm_value.h"
-#include "nw4r/fn_805012C4.h"
-#include "MSL_C/string.h"
-#include "MSL/strlen.h"
-#include "Runtime.PPCEABI.H/memset.h"
+extern "C" void wmemset(void* dst, int value, u16 size);
 
-/* An animated part: a band key with its state word; its class table (0x806513FC) and the out-of-line copy of its inline destructor (0x805576EC) are
- * this unit's.  size: 0x34 */
+/* A close or page button of the panel and the code its press stands for.  size: 0x18 */
+struct HbmAnimPanelButton {
+    /* +0x00 */ char name[20];
+    /* +0x14 */ s32 code;
+}; /* size: 0x18 */
+
+/* The event a sign key press sends (event 5): the text and the mode it is typed in.  size: 0x10 */
+struct HbmAnimSignEvent {
+    /* +0x00 */ u16 id;
+    /* +0x02 */ u16 kind;
+    /* +0x04 */ u8 mode;
+    /* +0x05 */ u8 pad_0x05[3];
+    /* +0x08 */ u32 unused_0x08;
+    /* +0x0C */ const wchar_t* text;
+}; /* size: 0x10 */
+
+/* The sound player of the panel's pane manager, as the sign keys use it: slot 0x24 plays a gesture, slot 0x28 the
+ * phrase sound.  size: 0x04 (approximation: only the vptr is touched) */
+class HbmAnimSoundView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void play(s32 sound);
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void playGesture(s32 gesture);
+    /* slot +0x028 */ virtual void playPhrase();
+}; /* size: 0x04 */
+
+/* A panel key: a band key with its state word and its kind; its class table (0x806513FC) and the out-of-line copy of
+ * its inline destructor (0x805576EC) are this unit's.  size: 0x34 */
 class HbmAnimPart : public HbmKey {
 public:
+    HbmAnimPart(nw4r::lyt::Pane* pane, HbmKeyListener* listener) : HbmKey(pane, listener) {}
+
     virtual void reset();
     virtual void setState(u32 state);
     virtual ~HbmAnimPart() {}
     virtual void show();
-    /* untyped: opaque handle passed through */
-    virtual void* getResource();
+    virtual s32 getType();
 
-    /* +0x30 */ void* mpResource;
+    /* +0x30 */ s32 mType;
 }; /* size: 0x34 */
 
-/* A HbmAnimPart kind (class table 0x80651378): its own slot 0x10 and reset are defined above as C functions.  size: 0x34 */
-class HbmAnimPartA : public HbmAnimPart {
-public:
-    virtual void setAnim(s32 anim);
-    virtual void reset();
-    virtual ~HbmAnimPartA();
-};
-
-/* A HbmAnimPart kind (class table 0x806513D0): its own slot 0x10 and reset are defined above as C functions.  size: 0x34 */
+/* The key-top pane (kind 0; class table 0x806513D0): shows and hides itself.  size: 0x34 */
 class HbmAnimPartB : public HbmAnimPart {
 public:
+    HbmAnimPartB(nw4r::lyt::Pane* pane, HbmKeyListener* listener) : HbmAnimPart(pane, listener) { mType = 0; }
+
     virtual void setAnim(s32 anim);
     virtual void reset();
     virtual ~HbmAnimPartB();
-};
+}; /* size: 0x34 */
 
-/* A HbmAnimPart kind (class table 0x806513A4): its own slot 0x10 and reset are defined above as C functions.  size: 0x34 */
+/* The keys' frame (kind 1; class table 0x806513A4): steps its idle and scrolling states.  size: 0x34 */
 class HbmAnimPartC : public HbmAnimPart {
 public:
+    HbmAnimPartC(nw4r::lyt::Pane* pane, HbmKeyListener* listener) : HbmAnimPart(pane, listener) { mType = 1; }
+
     virtual void setAnim(s32 anim);
     virtual void reset();
     virtual ~HbmAnimPartC();
+}; /* size: 0x34 */
+
+/* A sign key (kind 2; class table 0x80651378): steps a seven-state selector.  size: 0x34 */
+class HbmAnimPartA : public HbmAnimPart {
+public:
+    HbmAnimPartA(nw4r::lyt::Pane* pane, HbmKeyListener* listener) : HbmAnimPart(pane, listener) { mType = 2; }
+
+    virtual void setAnim(s32 anim);
+    virtual void reset();
+    virtual ~HbmAnimPartA();
+}; /* size: 0x34 */
+
+/* The key animations (.rodata 0x8057BAB0). */
+const HkbAnimDef hbmAnimPanelAnimDefs[9] = {
+    {0, "fs_signWindow_a_SGN_normal.brlan"},
+    {1, "fs_signWindow_a_SGN_FADE-IN.brlan"},
+    {8, "fs_signWindow_a_Scroll_FADE-OUT.brlan"},
+    {2, "fs_signWindow_a_SGN_Focus-IN.brlan"},
+    {6, "fs_signWindow_a_SGN_Focus-OUT.brlan"},
+    {3, "fs_signWindow_a_SGN_Roll_over.brlan"},
+    {4, "fs_signWindow_a_SGN_Pushed.brlan"},
+    {7, "fs_signWindow_a_SGN_scroll_next.brlan"},
+    {5, "fs_signWindow_a_SGN_scroll_prev.brlan"},
 };
 
+/* The close and page buttons (.rodata 0x8057BD18). */
+const HbmAnimPanelButton hbmAnimPanelButtons[3] = {
+    {"B_SGNkey_close", 24},
+    {"B_SGNkey_prev", 26},
+    {"B_SGNkey_next", 25},
+};
 
-extern "C" void fn_80557228(void* self);
+/* The panel's pages (.rodata 0x8057BD60). */
+const HbmAnimPanelPages hbmAnimPanelPages = {4, {0}, hkb_sign_keys};
 
-extern "C" void fn_80557744(void* self);
+/* The event a sign key press starts from (.rodata 0x8057BDA0). */
+const HbmAnimSignEvent hbmAnimPanelEventDefault = {0x2A, 3, 0, {0}, 0, NULL};
 
-extern "C" void fn_80557E8C(void* self);
+/* The sign keys' part names in key order (.data 0x80650C30). */
+const char* hbmAnimSignKeyNames[20] = {
+    "P_SGNkey_12", "P_SGNkey_01", "P_SGNkey_02", "P_SGNkey_03", "P_SGNkey_04",
+    "P_SGNkey_05", "P_SGNkey_06", "P_SGNkey_07", "P_SGNkey_08", "P_SGNkey_09",
+    "P_SGNkey_10", "P_SGNkey_11", "P_SGNkey_00", "P_SGNkey_13", "P_SGNkey_14",
+    "P_SGNkey_15", "P_SGNkey_16", "P_SGNkey_17", "P_SGNkey_18", "P_SGNkey_19",
+};
 
-extern "C" void wmemset(void* dst, int value, u16 size);
+/* The keys whose animations the sign keys and the page buttons share. */
+const char* hbmAnimPanelKeyGroup = "P_SGNkey_00";
+const char* hbmAnimPanelCloseGroup = "P_SGNkey_close";
 
-extern "C" void* fn_80557310(void* self, int flag);
+#define HBM_ANIM_PANEL_KEY_ANIMS                                                                                       \
+    {&hbmAnimPanelAnimDefs[0], &hbmAnimPanelAnimDefs[1], &hbmAnimPanelAnimDefs[2], &hbmAnimPanelAnimDefs[3],           \
+     &hbmAnimPanelAnimDefs[4], &hbmAnimPanelAnimDefs[5], &hbmAnimPanelAnimDefs[6]}
+#define HBM_ANIM_PANEL_SIGN_KEY(name) {2, name, 7, hbmAnimPanelKeyGroup, HBM_ANIM_PANEL_KEY_ANIMS}
 
-extern "C" void* fn_80557350(void* self, int flag);
+/* The key-top pane, the keys' frame, the sign keys and the buttons (.data 0x80650C90). */
+HbmKbChildKeyDef hbmAnimPanelKeyDefs[25] = {
+    {0, "N_SGNkeytop_all", 3, NULL, {&hbmAnimPanelAnimDefs[0], &hbmAnimPanelAnimDefs[1], &hbmAnimPanelAnimDefs[2]}},
+    {1, "N_SGNkeyall", 3, NULL, {&hbmAnimPanelAnimDefs[0], &hbmAnimPanelAnimDefs[7], &hbmAnimPanelAnimDefs[8]}},
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_12"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_01"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_02"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_03"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_04"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_05"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_06"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_07"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_08"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_09"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_10"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_11"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_00"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_13"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_14"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_15"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_16"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_17"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_18"),
+    HBM_ANIM_PANEL_SIGN_KEY("P_SGNkey_19"),
+    {2, "P_SGNkey_prev", 7, hbmAnimPanelCloseGroup, HBM_ANIM_PANEL_KEY_ANIMS},
+    {2, "P_SGNkey_next", 7, hbmAnimPanelCloseGroup, HBM_ANIM_PANEL_KEY_ANIMS},
+    {2, "P_SGNkey_close", 7, NULL, HBM_ANIM_PANEL_KEY_ANIMS},
+};
 
-extern const u8 lbl_8057BD60[];  /* the animation-record table of fn_80556FC4 */
+/* The sign keys' editable texts. */
+wchar_t hkb_sign_phrase_text[12][45];
+wchar_t hkb_sign_gesture_text[12][11];
 
-/* Resets one animation record to its table. */
-extern "C" void fn_80556FC4(HbmAnimRecord* self) {
-    self->flag_17 = 0;
-    self->flag_15 = 0;
-    self->flag_16 = 0;
-    self->table = lbl_8057BD60;
+/* Sets or clears the pane's visibility bit (bit 0 of +0xBB), keeping the other flags. */
+static inline void hbmAnimSetPaneVisible(HbmAnimPane* pane, BOOL visible) {
+    pane->flags = (u8)((pane->flags & 0xFE) | (visible ? 1 : 0));
 }
 
-/* Resets one animation record to its table. */
+/* Returns the code of the close or page button `name`, or 33 (a sign key). */
+static inline s32 hbmAnimFindButton(const char* name) {
+    for (u16 i = 0; i < 3; i++) {
+        if (hbmNameMatches(hbmAnimPanelButtons[i].name, name)) {
+            return hbmAnimPanelButtons[i].code;
+        }
+    }
+    return 33;
+}
+
+/* Returns the text the sign key `name` shows on `page`, or NULL. */
+static inline const wchar_t* hbmAnimFindSignText(const HbmAnimPanelPages* pages, u16 page, const char* name) {
+    u16 i;
+    const HkbSignKey* keys = pages->keys;
+    for (i = 0; i < 20; i++) {
+        if (hbmNameMatches(keys[i].button_name, name)) {
+            return (&keys[i].phrase)[page];
+        }
+    }
+    return NULL;
+}
+
+#pragma push
+#pragma auto_inline on
+/* 0x80556FC4 (0x20): Puts the panel back on its first page. */
+void HbmAnimPanelBase::resetPage() {
+    mPage = 0;
+    mbAnimating = 0;
+    mMode = 0;
+    mpPages = &hbmAnimPanelPages;
+}
+
+/* 0x80556FE4 (0x20): Puts a panel record back on its first page. */
 extern "C" void fn_80556FE4(HbmAnimRecord* self) {
     self->flag_17 = 0;
     self->flag_15 = 0;
     self->flag_16 = 0;
-    self->table = lbl_8057BD60;
+    self->table = (const u8*)&hbmAnimPanelPages;
 }
+#pragma pop
 
-/* Empty virtual slot. */
-extern "C" void fn_805571CC(void) {
-}
-
-/* The dispatch view of the widget: slot 0x10 updates it, 0x14 sets the state, 0x104/0x108 take the record index.  Declared as virtuals so MWCC emits the canonical
- * `lwz r12,0(r3); lwz r12,<slot>(r12)` dispatch; no method is defined and nothing is constructed here, so no table
- * is emitted (rule 10).
- * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
-class HbmAnimWidgetView {
-public:
-    /* slot +0x008 */ virtual void v_0x008();
-    /* slot +0x00C */ virtual void v_0x00C();
-    /* slot +0x010 */ virtual void v_0x010();
-    /* slot +0x014 */ virtual void v_0x014(s32 state);
-    /* slot +0x018 */ virtual void v_0x018();
-    /* slot +0x01C */ virtual void v_0x01C();
-    /* slot +0x020 */ virtual void v_0x020();
-    /* slot +0x024 */ virtual void v_0x024();
-    /* slot +0x028 */ virtual void v_0x028();
-    /* slot +0x02C */ virtual void v_0x02C();
-    /* slot +0x030 */ virtual void v_0x030();
-    /* slot +0x034 */ virtual void v_0x034();
-    /* slot +0x038 */ virtual void v_0x038();
-    /* slot +0x03C */ virtual void v_0x03C();
-    /* slot +0x040 */ virtual void v_0x040();
-    /* slot +0x044 */ virtual void v_0x044();
-    /* slot +0x048 */ virtual void v_0x048();
-    /* slot +0x04C */ virtual void v_0x04C();
-    /* slot +0x050 */ virtual void v_0x050();
-    /* slot +0x054 */ virtual void v_0x054();
-    /* slot +0x058 */ virtual void v_0x058();
-    /* slot +0x05C */ virtual void v_0x05C();
-    /* slot +0x060 */ virtual void v_0x060();
-    /* slot +0x064 */ virtual void v_0x064();
-    /* slot +0x068 */ virtual void v_0x068();
-    /* slot +0x06C */ virtual void v_0x06C();
-    /* slot +0x070 */ virtual void v_0x070();
-    /* slot +0x074 */ virtual void v_0x074();
-    /* slot +0x078 */ virtual void v_0x078();
-    /* slot +0x07C */ virtual void v_0x07C();
-    /* slot +0x080 */ virtual void v_0x080();
-    /* slot +0x084 */ virtual void v_0x084();
-    /* slot +0x088 */ virtual void v_0x088();
-    /* slot +0x08C */ virtual void v_0x08C();
-    /* slot +0x090 */ virtual void v_0x090();
-    /* slot +0x094 */ virtual void v_0x094();
-    /* slot +0x098 */ virtual void v_0x098();
-    /* slot +0x09C */ virtual void v_0x09C();
-    /* slot +0x0A0 */ virtual void v_0x0A0();
-    /* slot +0x0A4 */ virtual void v_0x0A4();
-    /* slot +0x0A8 */ virtual void v_0x0A8();
-    /* slot +0x0AC */ virtual void v_0x0AC();
-    /* slot +0x0B0 */ virtual void v_0x0B0();
-    /* slot +0x0B4 */ virtual void v_0x0B4();
-    /* slot +0x0B8 */ virtual void v_0x0B8();
-    /* slot +0x0BC */ virtual void v_0x0BC();
-    /* slot +0x0C0 */ virtual void v_0x0C0();
-    /* slot +0x0C4 */ virtual void v_0x0C4();
-    /* slot +0x0C8 */ virtual void v_0x0C8();
-    /* slot +0x0CC */ virtual void v_0x0CC();
-    /* slot +0x0D0 */ virtual void v_0x0D0();
-    /* slot +0x0D4 */ virtual void v_0x0D4();
-    /* slot +0x0D8 */ virtual void v_0x0D8();
-    /* slot +0x0DC */ virtual void v_0x0DC();
-    /* slot +0x0E0 */ virtual void v_0x0E0();
-    /* slot +0x0E4 */ virtual void v_0x0E4();
-    /* slot +0x0E8 */ virtual void v_0x0E8();
-    /* slot +0x0EC */ virtual void v_0x0EC();
-    /* slot +0x0F0 */ virtual void v_0x0F0();
-    /* slot +0x0F4 */ virtual void v_0x0F4();
-    /* slot +0x0F8 */ virtual void v_0x0F8();
-    /* slot +0x0FC */ virtual void v_0x0FC();
-    /* slot +0x100 */ virtual void v_0x100();
-    /* slot +0x104 */ virtual void v_0x104(u8 previous, u8 current);
-    /* slot +0x108 */ virtual void v_0x108(u8 current);
-    /* slot +0x10C */ virtual void v_0x10C();
-    /* slot +0x110 */ virtual void v_0x110();
-    /* slot +0x114 */ virtual void v_0x114();
-    /* slot +0x118 */ virtual void v_0x118();
-};
-
-/* A node of the widget's part list (+0x90) and the part at +0x38: slot 0x10 sets a mode, 0x14 a state, 0x28 reads the
- * kind, 0x2C plays an animation; the +0x04 word is the entry a selection hands on.  No method is defined and nothing
- * is constructed here, so no table is emitted.  size: 0x08 */
-class HbmAnimNodeView {
-public:
-    /* slot +0x008 */ virtual void v_0x008();
-    /* slot +0x00C */ virtual void v_0x00C();
-    /* slot +0x010 */ virtual void v_0x010(s32 mode);
-    /* slot +0x014 */ virtual void v_0x014(s32 state);
-    /* slot +0x018 */ virtual void v_0x018();
-    /* slot +0x01C */ virtual void v_0x01C();
-    /* slot +0x020 */ virtual void v_0x020();
-    /* slot +0x024 */ virtual void v_0x024();
-    /* slot +0x028 */ virtual s32 v_0x028();
-    /* slot +0x02C */ virtual void v_0x02C(s32 anim);
-
-    /* +0x04 */ u32 entry;
-}; /* size: 0x08 */
-
-/* A pane translation.  size: 0xC */
-struct HbmAnimVec3 {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-}; /* size: 0xC */
-
-/* The pane record a holder's +0x10 word points at: its translation at +0x2C and, in bit 0 of the +0xBB flag byte,
- * its visibility.  size: 0xBC */
-struct HbmAnimPane {
-    /* +0x00 */ u8 unused_0x00[0x2C];
-    /* +0x2C */ HbmAnimVec3 translate;
-    /* +0x38 */ u8 unused_0x38[0x83];
-    /* +0xBB */ u8 flags;
-}; /* size: 0xBC */
-
-/* Sets or clears the pane's visibility bit (bit 0 of +0xBB), keeping the other flags. */
-static inline void hbmAnimSetPaneVisible(HbmAnimPane* pane, BOOL visible)
-{
-    pane->flags = (u8)((pane->flags & 0xFE) | (visible ? 1 : 0));
-}
-
-/* What the owner's +0x4C base hands back (slot 0x28): the pane record at +0x10.  size: 0x14 */
-struct HbmAnimPaneHolder {
-    /* +0x00 */ u8 unused_0x00[0x10];
-    /* +0x10 */ HbmAnimPane* pane;
-}; /* size: 0x14 */
-
-/* The owner's +0x4C base: slot 0x28 returns the pane holder.
- * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
-class HbmAnimOwnerBaseView {
-public:
-    /* slot +0x008 */ virtual void v_0x008();
-    /* slot +0x00C */ virtual void v_0x00C();
-    /* slot +0x010 */ virtual void v_0x010();
-    /* slot +0x014 */ virtual void v_0x014();
-    /* slot +0x018 */ virtual void v_0x018();
-    /* slot +0x01C */ virtual void v_0x01C();
-    /* slot +0x020 */ virtual void v_0x020();
-    /* slot +0x024 */ virtual void v_0x024();
-    /* slot +0x028 */ virtual HbmAnimPaneHolder* v_0x028();
-};
-
-/* The owner at the widget's +0xD8: slot 0x24 says whether it is busy, slot 0x30 closes it; its +0x4C base holds the
- * pane.
- * size: 0x50 (approximation: only the vptr and the +0x4C base are touched) */
-class HbmAnimOwnerView {
-public:
-    /* slot +0x008 */ virtual void v_0x008();
-    /* slot +0x00C */ virtual void v_0x00C();
-    /* slot +0x010 */ virtual void v_0x010();
-    /* slot +0x014 */ virtual void v_0x014();
-    /* slot +0x018 */ virtual void v_0x018();
-    /* slot +0x01C */ virtual void v_0x01C();
-    /* slot +0x020 */ virtual void v_0x020();
-    /* slot +0x024 */ virtual s32 v_0x024();
-    /* slot +0x028 */ virtual void v_0x028();
-    /* slot +0x02C */ virtual void v_0x02C();
-    /* slot +0x030 */ virtual void v_0x030();
-
-    /* +0x04 */ u8 unused_0x04[0x48];
-    /* +0x4C */ u32 base_4C;
-}; /* size: 0x50 */
-
-/* The keyboard the listener drives: slot 0x20 reports a press with the pane name, slot 0x38 says whether it is busy;
- * its pane-lookup base sits at +0x24.  size: 0x28 (approximation: only the vptr and the +0x24 base are touched) */
-class HbmAnimKeyboardView {
-public:
-    /* slot +0x008 */ virtual void v_0x008();
-    /* slot +0x00C */ virtual void v_0x00C();
-    /* slot +0x010 */ virtual void v_0x010();
-    /* slot +0x014 */ virtual void v_0x014();
-    /* slot +0x018 */ virtual void v_0x018();
-    /* slot +0x01C */ virtual void v_0x01C();
-    /* slot +0x020 */ virtual void v_0x020(s32 event, const char* name);
-    /* slot +0x024 */ virtual void v_0x024();
-    /* slot +0x028 */ virtual void v_0x028();
-    /* slot +0x02C */ virtual void v_0x02C();
-    /* slot +0x030 */ virtual void v_0x030();
-    /* slot +0x034 */ virtual void v_0x034();
-    /* slot +0x038 */ virtual s32 v_0x038();
-
-    /* +0x04 */ u8 unused_0x04[0x20];
-    /* +0x24 */ u32 base_24;
-}; /* size: 0x28 */
-
-/* The widget's +0x24 base: slot 0x28 returns its pane holder, 0x48 selects an entry, 0x4C refreshes, 0x50 binds a named
- * animation, 0x5C finds a pane by name and 0x68 returns the active part.
- * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
-class HbmAnimBaseView {
-public:
-    /* slot +0x008 */ virtual void v_0x008();
-    /* slot +0x00C */ virtual void v_0x00C();
-    /* slot +0x010 */ virtual void v_0x010();
-    /* slot +0x014 */ virtual void v_0x014();
-    /* slot +0x018 */ virtual void v_0x018();
-    /* slot +0x01C */ virtual void v_0x01C();
-    /* slot +0x020 */ virtual void v_0x020();
-    /* slot +0x024 */ virtual void v_0x024();
-    /* slot +0x028 */ virtual HbmAnimPaneHolder* v_0x028();
-    /* slot +0x02C */ virtual void v_0x02C();
-    /* slot +0x030 */ virtual void v_0x030();
-    /* slot +0x034 */ virtual void v_0x034();
-    /* slot +0x038 */ virtual void v_0x038();
-    /* slot +0x03C */ virtual void v_0x03C();
-    /* slot +0x040 */ virtual void v_0x040();
-    /* slot +0x044 */ virtual void v_0x044();
-    /* slot +0x048 */ virtual void v_0x048(u32 entry);
-    /* slot +0x04C */ virtual void v_0x04C();
-    /* slot +0x050 */ virtual void v_0x050(const char* name, s32 mode);
-    /* slot +0x054 */ virtual void v_0x054();
-    /* slot +0x058 */ virtual void v_0x058();
-    /* slot +0x05C */ virtual HbmAnimNodeView* v_0x05C(const char* name);
-    /* slot +0x060 */ virtual void v_0x060();
-    /* slot +0x064 */ virtual void v_0x064();
-    /* slot +0x068 */ virtual HbmAnimWidgetView* v_0x068();
-};
-
-/* The listener hbmAnimHandleKeyEvent runs as: the controller at +0x08 and the keyboard at +0x0C (its pane-lookup base
- * at +0x24).  size: 0x10 */
-struct HbmAnimListener {
-    /* +0x00 */ u8 unused_0x00[0x08];
-    /* +0x08 */ HbmAnimNodeView* controller;
-    /* +0x0C */ HbmAnimKeyboardView* keyboard;
-}; /* size: 0x10 */
-
-/* A pane record read for its name.  size: 0xCD (approximation: the name is at most 17 bytes) */
-struct HbmAnimNamedPane {
-    /* +0x00 */ u8 unused_0x00[0xBC];
-    /* +0xBC */ char name[0x11];
-}; /* size: 0xCD */
-
-/* The trigger component handed to the listener: its pane record at +0x9C, whose name sits at +0xBC.  size: 0xA0 */
-struct HbmAnimTrigger {
-    /* +0x00 */ u8 unused_0x00[0x9C];
-    /* +0x9C */ HbmAnimNamedPane* pane;
-}; /* size: 0xA0 */
-
-/* The input record handed to the listener: bit 0x10 of the +0x0C word is the press.  size: 0x10 */
-struct HbmAnimInput {
-    /* +0x00 */ u8 unused_0x00[0x0C];
-    /* +0x0C */ u32 buttons;
-}; /* size: 0x10 */
-
-/* The animated widget as the bodies below read it: the pane record (+0x04), its animation record (+0x15..+0x18, the
- * HbmAnimRecord view, with the mode byte at +0x16), the pane-lookup base (+0x24), the state selector (+0x2C), the part
- * (+0x38), the part list (+0x90), the open and shown flags (+0xD0/+0xD1) and the owner (+0xD8).  size: 0xDC (approximation: bounded by the owner word) */
-struct HbmAnimWidget {
-    /* +0x00 */ u8 unused_0x00[4];      /* the vptr of HbmAnimWidgetView */
-    /* +0x04 */ HbmAnimPane* pane;
-    /* +0x08 */ u8 unused_0x08[0x0E];
-    /* +0x16 */ u8 mode;
-    /* +0x17 */ u8 index;
-    /* +0x18 */ const u8* table;
-    /* +0x1C */ u8 unused_0x1C[0x08];
-    /* +0x24 */ u32 base_24;
-    /* +0x28 */ u8 unused_0x28[0x04];
-    /* +0x2C */ s32 state;
-    /* +0x30 */ u8 unused_0x30[0x08];
-    /* +0x38 */ HbmAnimNodeView* part;
-    /* +0x3C */ u8 unused_0x3C[0x54];
-    /* +0x90 */ nw4r::ut::List parts;
-    /* +0x9C */ u8 unused_0x9C[0x34];
-    /* +0xD0 */ u8 open;
-    /* +0xD1 */ u8 shown;
-    /* +0xD2 */ u8 unused_0xD2[0x06];
-    /* +0xD8 */ HbmAnimOwnerView* owner;
-}; /* size: 0xDC */
-
-#pragma push
-#pragma auto_inline on
-/* Steps the animation record's index down, wrapping to the last entry. */
-extern "C" void fn_805571D0(HbmAnimRecord* self) {
-    if (self->flag_17 == 0) {
-        self->flag_17 = self->table[0] - 1;
+/* 0x80557004 (0x1C8): Runs a pressed button, or sends the pressed sign key's text in the current page (event 5). */
+void HbmAnimPanelBase::onPaneEvent(u32 event, const char* paneName) {
+    if (event != 4) {
+        return;
+    }
+    s32 code = hbmAnimFindButton(paneName);
+    if (code != 33) {
+        switch (code) {
+        case 24:
+            close();
+            break;
+        case 26:
+            prevPage();
+            break;
+        case 25:
+            nextPage();
+            break;
+        }
     } else {
-        self->flag_17 = self->flag_17 - 1;
+        const wchar_t* text = hbmAnimFindSignText(mpPages, mPage, paneName);
+        if (text != NULL) {
+            HbmAnimSignEvent ev = hbmAnimPanelEventDefault;
+            ev.mode = mMode;
+            ev.text = text;
+            if (hbmPanelIsSingleLine((struct HbmTextPanel*)mpTextOwner->getTextPanel())) {
+                ev.mode = 1;
+            }
+            if (mPage == 0) {
+                sendEvent(5, &ev);
+            }
+        }
     }
 }
 
-/* Steps the animation record's index up, wrapping to the first entry. */
-extern "C" void fn_805571FC(HbmAnimRecord* self) {
-    u8 next = self->flag_17 + 1;
-    self->flag_17 = next;
-    if (next >= self->table[0]) {
-        self->flag_17 = 0;
+/* 0x805571CC (0x4): Does nothing. */
+extern "C" void fn_805571CC(void) {}
+
+#pragma push
+#pragma auto_inline on
+/* 0x805571D0 (0x2C): Steps the page back, wrapping to the last page. */
+void HbmAnimPanelBase::stepPageDown() {
+    if (mPage == 0) {
+        mPage = mpPages->count - 1;
+    } else {
+        mPage = mPage - 1;
+    }
+}
+
+/* 0x805571FC (0x2C): Steps the page forward, wrapping to the first page. */
+void HbmAnimPanelBase::stepPageUp() {
+    u8 next = mPage + 1;
+    mPage = next;
+    if (next >= mpPages->count) {
+        mPage = 0;
     }
 }
 #pragma pop
 
-/* Releases the widget, then the storage, and returns it. */
+/* 0x80557228 (0xE8): Destroys the pane handler and the keys. */
+HbmAnimPanel::~HbmAnimPanel() {
+    mpPaneHandler->~HbmEventHandler();
+    MEMFreeToAllocator(mpAllocator, mpPaneHandler);
+    for (HbmKey* pKey = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, NULL); pKey != NULL;
+         pKey = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, NULL)) {
+        nw4r::ut::List_Remove(&mComponents, pKey);
+        pKey->destroy(mpAllocator);
+    }
+}
+
+/* 0x80557310 (0x40): Releases the object's storage and returns the pointer. */
 extern "C" void* fn_80557310(void* self, int flag) {
     if (self != 0) {
         if (flag > 0) {
@@ -411,251 +331,422 @@ extern "C" void* fn_80557310(void* self, int flag) {
     return self;
 }
 
-/* Releases the widget, then the storage, and returns it. */
-extern "C" void* fn_80557350(void* self, int flag) {
-    if (self != 0) {
-        if (flag > 0) {
-            operator delete(self);
+/* 0x80557350 (0x40): Destroys the pane handler. */
+HbmAnimPanelPaneHandler::~HbmAnimPanelPaneHandler() {}
+
+/* 0x80557390 (0x35C): Creates the pane handler and the pane manager, hides the root, and creates one part per key with
+ * its animations. */
+void HbmAnimPanel::create(MEMAllocator* allocator) {
+    const char* group;
+
+    HbmAnimPanelBase::create(allocator);
+    HbmAnimPanelPaneHandler* pHandler =
+        new (MEMAllocFromAllocator(allocator, sizeof(HbmAnimPanelPaneHandler))) HbmAnimPanelPaneHandler(this);
+    mpPaneHandler = pHandler;
+    HbmPaneManager::create(allocator, pHandler);
+    mpRoot->setVisible(0);
+    mpRoot->setEnable(1);
+    for (u16 i = 0; i < 25; i++) {
+        const HbmKbChildKeyDef* def = &hbmAnimPanelKeyDefs[i];
+        HbmAnimPart* pPart = NULL;
+        switch (def->type) {
+        case 2:
+            pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmAnimPartA)))
+                HbmAnimPartA(findTextBox(def->name), this);
+            break;
+        case 1:
+            pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmAnimPartC)))
+                HbmAnimPartC(findTextBox(def->name), this);
+            break;
+        case 0:
+            pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmAnimPartB)))
+                HbmAnimPartB(findTextBox(def->name), this);
+            break;
+        }
+        nw4r::ut::List_Append(&mComponents, pPart);
+        group = def->group;
+        u16 j = 0;
+        u32 numAnims = def->numAnims;
+        for (; j < numAnims; j++) {
+            const void* res = mpResAccessor->GetResource(0, def->anims[j]->name, NULL);
+            nw4r::lyt::AnimTransform* anim = getLayout()->CreateAnimTransform(res, mpResAccessor);
+            if (group != NULL) {
+                pPart->addGroupAnim(allocator, def->anims[j]->kind, anim, group, 0, 1);
+            } else {
+                pPart->addAnim(allocator, def->anims[j]->kind, anim, 0, 1);
+            }
         }
     }
-    return self;
+    init();
 }
 
-/* 0x80557AA8 (0x1AC): opens the widget for an owner at a mode and entry: resets the parts, selects the entry, moves
- * the key-top pane onto the owner's pane and plays the part's opening animation. */
-extern "C" void hbmAnimOpen(HbmAnimWidget* self, HbmAnimOwnerView* owner, u8 mode, u8 index) {
+/* 0x80557744 (0x1CC): Resets the page, the key-top pane and the page buttons, restores the default sign texts, labels
+ * the keys and lays the panes out. */
+void HbmAnimPanel::init() {
+    HbmAnimPanelBase::init();
+    getPaneAnim("N_SGNkeytop_all")->setState(0);
+    setPaneVisible("N_SGNkeytop_all", 1);
+    getPaneAnim("P_SGNkey_prev")->setState(0);
+    getPaneAnim("P_SGNkey_next")->setState(0);
+    for (int i = 0; i < 12; i++) {
+        wcscpy((u16*)hkb_sign_phrase_text[i], (const u16*)hkb_sign_phrase_defaults[i]);
+    }
+    for (int i = 0; i < 12; i++) {
+        wcscpy((u16*)hkb_sign_gesture_text[i], (const u16*)hkb_sign_gesture_defaults[i]);
+    }
+    updateLabels(mPage, mPage);
+    setPageNumber(mPage);
+    mpLyt->Animate(0);
+    mpLyt->CalculateMtx(mDrawInfo);
+}
+
+/* 0x80557910 (0x198): Runs the base's handling of a press, then plays the close sound, or the sign key's gesture or
+ * phrase. */
+void HbmAnimPanel::onPaneEvent(u32 event, const char* paneName) {
+    HbmAnimPanelBase::onPaneEvent(event, paneName);
+    if (event != 4) {
+        return;
+    }
+    s32 code = hbmAnimFindButton(paneName);
+    if (code != 33) {
+        switch (code) {
+        case 24:
+            mpSound->play(9);
+            break;
+        }
+    } else {
+        const wchar_t* text = hbmAnimFindSignText(mpPages, mPage, paneName);
+        if (text != NULL) {
+            if (mpOwner->isBusy() == 0 && mPage == 0) {
+                sendEvent(39, NULL);
+            }
+            if (mPage != 0) {
+                ((HbmAnimSoundView*)mpSound)->playGesture(atoi(paneName + 9));
+            } else {
+                ((HbmAnimSoundView*)mpSound)->playPhrase();
+            }
+        }
+    }
+}
+
+/* 0x80557AA8 (0x1AC): Opens the panel over a key at a mode and page: resets the keys, shows the page, moves the
+ * key-top pane onto the key's pane and fades it in. */
+void HbmAnimPanel::open(HbmAnimOwnerView* owner, u8 mode, u8 page) {
     HbmAnimPane* source;
-    HbmAnimNodeView* keytop;
+    HbmKey* keytop;
     HbmAnimPane* target;
 
-    ((HbmAnimWidgetView*)self)->v_0x0FC();
-    ((HbmAnimWidgetView*)self)->v_0x100();
-    ((HbmAnimBaseView*)&self->base_24)->v_0x068()->v_0x010();
-    self->open = 1;
-    self->shown = 0;
-    self->owner = owner;
-    ((HbmAnimBaseView*)&self->base_24)->v_0x04C();
-    self->mode = mode;
-    self->index = index;
-    ((HbmAnimWidgetView*)self)->v_0x104(self->index, self->index);
-    ((HbmAnimWidgetView*)self)->v_0x108(self->index);
-    keytop = ((HbmAnimBaseView*)&self->base_24)->v_0x05C("N_SGNkeytop_all");
-    source = ((HbmAnimOwnerBaseView*)&self->owner->base_4C)->v_0x028()->pane;
-    target = ((HbmAnimBaseView*)&self->base_24)->v_0x028()->pane;
+    resetKeys();
+    fadeKeys();
+    getRoot()->v_0x010();
+    mbOpen = 1;
+    mbShown = 0;
+    mpOwner = owner;
+    resetCursor();
+    mMode = mode;
+    mPage = page;
+    updateLabels(mPage, mPage);
+    setPageNumber(mPage);
+    keytop = getPaneAnim("N_SGNkeytop_all");
+    source = ((HbmAnimOwnerBaseView*)&mpOwner->base_4C)->getPaneHolder()->pane;
+    target = (HbmAnimPane*)getLayout()->mpRootPane;
     target->translate = source->translate;
-    keytop->v_0x010(6);
-    self->part->v_0x014(14);
-    self->part->v_0x02C(0);
+    keytop->setAnim(6);
+    mpSound->play(14);
+    mpSound->setEnable(0);
 }
 
-/* 0x80557C54 (0xC8): closes the widget over its owner: shows the owner's pane again while the owner is idle, plays
- * the key-top close animation and clears the shown flag. */
-extern "C" void hbmAnimHide(HbmAnimWidget* self) {
-    if (self->owner != 0) {
-        if (self->owner->v_0x024() == 0) {
-            hbmAnimSetPaneVisible(((HbmAnimOwnerBaseView*)&self->owner->base_4C)->v_0x028()->pane, TRUE);
+/* 0x80557C54 (0xC8): Starts closing the panel: shows the owner key's pane again while the key is idle and fades the
+ * key-top pane out. */
+void HbmAnimPanel::close() {
+    if (mpOwner != NULL) {
+        if (mpOwner->isBusy() == 0) {
+            hbmAnimSetPaneVisible(((HbmAnimOwnerBaseView*)&mpOwner->base_4C)->getPaneHolder()->pane, TRUE);
         }
-        ((HbmAnimBaseView*)&self->base_24)->v_0x05C("N_SGNkeytop_all")->v_0x010(7);
-        self->shown = 0;
-        self->part->v_0x02C(0);
+        getPaneAnim("N_SGNkeytop_all")->setAnim(7);
+        mbShown = 0;
+        mpSound->setEnable(0);
     }
 }
 
-/* 0x80557D1C (0x60): runs the widget's slots 0xF8, 0x4C and 0x10C. */
-extern "C" void hbmAnimRefresh(HbmAnimWidget* self) {
-    ((HbmAnimWidgetView*)self)->v_0x0F8();
-    ((HbmAnimWidgetView*)self)->v_0x04C();
-    ((HbmAnimWidgetView*)self)->v_0x10C();
+/* 0x80557D1C (0x60): Arms the keys, starts closing and finishes the close. */
+void HbmAnimPanel::refresh() {
+    armKeys();
+    close();
+    onClosed();
 }
 
-/* 0x80557D7C (0x88): closes the owner, clears the open flag and stops the key-top animation. */
-extern "C" void hbmAnimClose(HbmAnimWidget* self) {
-    if (self->owner != 0) {
-        self->owner->v_0x030();
+/* 0x80557D7C (0x88): Closes the owner key, clears the open flag and hides the key-top pane. */
+void HbmAnimPanel::onClosed() {
+    if (mpOwner != NULL) {
+        mpOwner->close();
     }
-    self->open = 0;
-    ((HbmAnimBaseView*)&self->base_24)->v_0x050("N_SGNkeytop_all", 0);
-    self->part->v_0x02C(1);
+    mbOpen = 0;
+    setPaneVisible("N_SGNkeytop_all", 0);
+    mpSound->setEnable(1);
 }
 
-/* 0x80557E04 (0x88): marks the widget shown, hides the owner's pane while the owner is idle and plays the part's
- * animation 2. */
-extern "C" void hbmAnimShow(HbmAnimWidget* self) {
-    self->shown = 1;
-    if (self->owner->v_0x024() == 0) {
-        hbmAnimSetPaneVisible(((HbmAnimOwnerBaseView*)&self->owner->base_4C)->v_0x028()->pane, FALSE);
+/* 0x80557E04 (0x88): Marks the panel shown, hides the owner key's pane while the key is idle and enables the panel's
+ * sound. */
+void HbmAnimPanel::show() {
+    mbShown = 1;
+    if (mpOwner->isBusy() == 0) {
+        hbmAnimSetPaneVisible(((HbmAnimOwnerBaseView*)&mpOwner->base_4C)->getPaneHolder()->pane, FALSE);
     }
-    self->part->v_0x02C(2);
+    mpSound->setEnable(2);
 }
 
-/* 0x80557FCC (0x90): sets mode 2 on every part of kind 2. */
-extern "C" void hbmAnimArmParts(HbmAnimWidget* self) {
-    HbmAnimNodeView* node;
-
-    for (node = (HbmAnimNodeView*)nw4r::ut::List_GetNext(&self->parts, 0); node != 0;
-         node = (HbmAnimNodeView*)nw4r::ut::List_GetNext(&self->parts, node)) {
-        if (node->v_0x028() == 2) {
-            node->v_0x010(2);
+/* 0x80557E8C (0x140): Follows the key-top and frame animations: relabels the keys when a scroll ends, finishes the
+ * close or the open, and tracks whether a scroll is running. */
+void HbmAnimPanel::onAnimEvent(u32 code, HbmKey* key, HbmKeyAnim* anim) {
+    s32 event = (s32)code;
+    if (hbmNameMatches("N_SGNkeyall", key->mpPane->mName)) {
+        if ((anim->kind == 7 || anim->kind == 5) && event == 1) {
+            updateLabels(mPage, mPage);
+        }
+    }
+    if (hbmNameMatches("N_SGNkeytop_all", key->mpPane->mName)) {
+        if (anim->kind == 8 && event == 1) {
+            onClosed();
+        }
+        if (anim->kind == 1 && event == 1) {
+            show();
+        }
+    }
+    if (anim->kind == 7 || anim->kind == 5) {
+        if (event == 0) {
+            mbAnimating = 1;
+        }
+        if (event == 1) {
+            mbAnimating = 0;
         }
     }
 }
 
-/* Returns the part's resource word. */
-/* untyped: opaque handle passed through */
-void* HbmAnimPart::getResource() {
-    return mpResource;
+/* 0x80557FCC (0x90): Arms every sign key (kind 2). */
+void HbmAnimPanel::armKeys() {
+    HbmAnimPart* pPart;
+
+    for (pPart = (HbmAnimPart*)nw4r::ut::List_GetNext(&mComponents, NULL); pPart != NULL;
+         pPart = (HbmAnimPart*)nw4r::ut::List_GetNext(&mComponents, pPart)) {
+        if (pPart->getType() == 2) {
+            pPart->setAnim(2);
+        }
+    }
 }
 
+/* Returns the part's kind. */
+s32 HbmAnimPart::getType() {
+    return mType;
+}
+
+/* 0x80558064 (0x80): Puts every key back to its rest state. */
+void HbmAnimPanel::resetKeys() {
+    for (u16 i = 0; i < 25; i++) {
+        getPaneAnim(hbmAnimPanelKeyDefs[i].name)->reset();
+    }
+}
 
 /* Clears the part's state. */
 void HbmAnimPart::reset() {
     mState = 0;
 }
 
+/* 0x805580F0 (0xC4): Puts the sign keys and buttons into their showing state and fades every key in. */
+void HbmAnimPanel::fadeKeys() {
+    for (u16 i = 2; i < 25; i++) {
+        ((HbmAnimPart*)getPaneAnim(hbmAnimPanelKeyDefs[i].name))->show();
+    }
+    for (HbmKey* pKey = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, NULL); pKey != NULL;
+         pKey = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, pKey)) {
+        pKey->setAnim(4);
+    }
+}
 
 /* Puts the part into its showing state. */
 void HbmAnimPart::show() {
     mState = 6;
 }
 
+/* 0x805581C0 (0x1F4): Labels the sign keys with the texts of `page` (long phrases cut to nine characters and an
+ * ellipsis) and the buttons in the current language. */
+void HbmAnimPanel::updateLabels(u16 page, u16 newPage) {
+    for (u16 i = 0; i < 20; i++) {
+        const char* buttonName = mpPages->keys[i].button_name;
+        char boxName[17];
+        memset(boxName, 0, 17);
+        strncpy(boxName, buttonName, strlen(buttonName));
+        boxName[0] = 'T';
+        const wchar_t* text = (&mpPages->keys[i].phrase)[page];
+        nw4r::lyt::TextBox* box = findTextBox(boxName);
+        wchar_t label[12];
+        wmemset(label, 0, 11);
+        if (wcslen((const u16*)text) > 10 && page == 0) {
+            wcsncpy((u16*)label, (const u16*)text, 9);
+            wcsncat((u16*)&label[10], (const u16*)L"\x2026", 1);
+            box->SetString(label, 0);
+        } else {
+            box->SetString(text, 0);
+        }
+    }
+    setPaneText("T_SGNkey_prev", hkbLayoutLabels[4][getLayoutType()]);
+    setPaneText("T_SGNkey_next", hkbLayoutLabels[3][getLayoutType()]);
+    setPaneText("T_SGNkey_close", hkbLayoutLabels[6][getLayoutType()]);
+}
 
-/* 0x80558434 (0xBC): steps the record back (stopping at the first entry) and shows the new entry. */
-extern "C" void hbmAnimStepBack(HbmAnimWidget* self) {
-    u8 previous = self->index;
+/* 0x805583B4 (0x80): Shows "page/count" in the page number text box. */
+void HbmAnimPanel::setPageNumber(s32 page) {
+    wchar_t text[17];
+    swprintf((u16*)text, 17, (const u16*)L"%d/%d", page + 1, mpPages->count);
+    findTextBox("T_SGN_pageNumber")->SetString(text, 0);
+}
+
+/* 0x80558434 (0xBC): Steps the page back (stopping at the first page) and scrolls the keys. */
+void HbmAnimPanel::prevPage() {
+    u8 previous = mPage;
     u8 current;
 
     if (previous == 0) {
         return;
     }
-    fn_805571D0((HbmAnimRecord*)self);
-    current = self->index;
-    ((HbmAnimWidgetView*)self)->v_0x104(previous, current);
-    ((HbmAnimWidgetView*)self)->v_0x108(current);
-    ((HbmAnimWidgetView*)self)->v_0x114();
-    self->part->v_0x014(15);
+    stepPageDown();
+    current = mPage;
+    updateLabels(previous, current);
+    setPageNumber(current);
+    scrollKeysBack();
+    mpSound->play(15);
 }
 
-/* 0x805584F0 (0xB8): steps the record forward (wrapping to the first entry) and shows the new entry. */
-extern "C" void hbmAnimStepForward(HbmAnimWidget* self) {
-    u8 previous = self->index;
+/* 0x805584F0 (0xB8): Steps the page forward (wrapping to the first page) and scrolls the keys. */
+void HbmAnimPanel::nextPage() {
+    u8 previous = mPage;
     u8 current;
 
-    fn_805571FC((HbmAnimRecord*)self);
-    current = self->index;
-    ((HbmAnimWidgetView*)self)->v_0x104(previous, current);
-    ((HbmAnimWidgetView*)self)->v_0x108(current);
-    ((HbmAnimWidgetView*)self)->v_0x118();
-    self->part->v_0x014(15);
+    stepPageUp();
+    current = mPage;
+    updateLabels(previous, current);
+    setPageNumber(current);
+    scrollKeysForward();
+    mpSound->play(15);
 }
 
-/* 0x805585A8 (0x48): sets mode 8 on the "N_SGNkeyall" pane. */
-extern "C" void hbmAnimKeysMode8(HbmAnimWidget* self) {
-    ((HbmAnimBaseView*)&self->base_24)->v_0x05C("N_SGNkeyall")->v_0x010(8);
+/* 0x805585A8 (0x48): Scrolls the keys' frame back. */
+void HbmAnimPanel::scrollKeysBack() {
+    getPaneAnim("N_SGNkeyall")->setAnim(8);
 }
 
-/* 0x805585F0 (0x48): sets mode 9 on the "N_SGNkeyall" pane. */
-extern "C" void hbmAnimKeysMode9(HbmAnimWidget* self) {
-    ((HbmAnimBaseView*)&self->base_24)->v_0x05C("N_SGNkeyall")->v_0x010(9);
+/* 0x805585F0 (0x48): Scrolls the keys' frame forward. */
+void HbmAnimPanel::scrollKeysForward() {
+    getPaneAnim("N_SGNkeyall")->setAnim(9);
 }
 
-/* The widget's completion test, when it has one. */
-extern "C" u32 fn_80558638(HbmWidget* self) {
-    if (self->tail.bytes.flag_D1 != 0) {
-        return ((HbmPaneManager*)&self->vtable_24)->HbmPaneManager::updateComponents();
+/* 0x80558638 (0x1C): Updates the components while the panel is shown. */
+u32 HbmAnimPanel::updateComponents() {
+    if (mbShown != 0) {
+        return HbmPaneManager::updateComponents();
     }
     return 0;
 }
 
-/* The widget's completion test, when it has one. */
-extern "C" u32 fn_80558654(HbmWidget* self, HkbManager* manager) {
-    if (self->tail.bytes.flag_D1 != 0) {
-        return ((HbmPaneManager*)&self->vtable_24)->HbmPaneManager::onKeyRelease(manager);
+/* 0x80558654 (0x1C): Hands a key release to the pane manager while the panel is shown. */
+s32 HbmAnimPanel::onKeyRelease(HkbManager* manager) {
+    if (mbShown != 0) {
+        return HbmPaneManager::onKeyRelease(manager);
     }
     return 0;
 }
 
-/* 0x80558738 (0xBC): the second class's step back (stopping at the first entry), showing the new entry. */
-extern "C" void hbmAnimStepBackAlt(HbmAnimWidget* self) {
-    u8 previous = self->index;
+/* 0x80558670 (0x64): Replaces the twelve editable phrases. */
+void HbmAnimPanel::setPhraseTexts(const wchar_t** texts) {
+    for (int i = 0; i < 12; i++) {
+        wcscpy((u16*)hkb_sign_phrase_text[i], (const u16*)texts[i]);
+    }
+}
+
+/* 0x805586D4 (0x64): Replaces the twelve editable gestures. */
+void HbmAnimPanel::setGestureTexts(const wchar_t** texts) {
+    for (int i = 0; i < 12; i++) {
+        wcscpy((u16*)hkb_sign_gesture_text[i], (const u16*)texts[i]);
+    }
+}
+
+/* 0x80558738 (0xBC): Steps the page back (stopping at the first page) and scrolls the keys. */
+void HbmAnimPanel::prevPageWrap() {
+    u8 previous = mPage;
     u8 current;
 
     if (previous == 0) {
         return;
     }
-    fn_805571D0((HbmAnimRecord*)self);
-    current = self->index;
-    ((HbmAnimWidgetView*)self)->v_0x104(previous, current);
-    ((HbmAnimWidgetView*)self)->v_0x108(current);
-    ((HbmAnimWidgetView*)self)->v_0x114();
-    self->part->v_0x014(15);
+    stepPageDown();
+    current = mPage;
+    updateLabels(previous, current);
+    setPageNumber(current);
+    scrollKeysBack();
+    mpSound->play(15);
 }
 
-/* 0x805587F4 (0x1AC): handles a key trigger: reports presses to the keyboard and, for a "B..." button, drives its
- * "P..." pane (press, release, select). */
-extern "C" void hbmAnimHandleKeyEvent(HbmAnimListener* self, HbmAnimTrigger* trigger, u32 event, HbmAnimInput* input) {
-    char* name = trigger->pane->name;
-    char paneName[17];
-    HbmAnimNodeView* pane;
+/* 0x805587F4 (0x1AC): Reports presses to the panel and, for a "B..." button, drives its "P..." part (press, release,
+ * focus). */
+void HbmAnimPanelPaneHandler::onPaneEvent(HbmComponent* pComponent, u32 event, HbmPaneTrigger* pTrigger) {
+    const char* name = pComponent->mpPane->mName;
+    char partName[17];
+    HbmKey* pPart;
 
-    if (self->keyboard->v_0x038() != 0 && event == 4) {
+    if (mpPanel->isAnimating() != 0 && event == 4) {
         return;
     }
-    if (event == 4 && (input->buttons & 0x10)) {
-        self->keyboard->v_0x020(4, name);
+    if (event == 4 && (pTrigger->trigger & 0x10)) {
+        mpPanel->onPaneEvent(4, name);
     }
     if (name[0] != 'B') {
         return;
     }
-    memset(paneName, 0, sizeof(paneName));
-    strncpy(paneName, name, strlen(name));
-    paneName[0] = 'P';
-    pane = ((HbmAnimBaseView*)&self->keyboard->base_24)->v_0x05C(paneName);
-    if (pane == 0) {
+    memset(partName, 0, sizeof(partName));
+    strncpy(partName, name, strlen(name));
+    partName[0] = 'P';
+    pPart = mpPanel->getPaneAnim(partName);
+    if (pPart == NULL) {
         return;
     }
     switch ((s32)event) {
     case 4:
-        if (input->buttons & 0x10) {
-            pane->v_0x010(0);
+        if (pTrigger->trigger & 0x10) {
+            pPart->setAnim(0);
         }
         break;
     case 1:
-        pane->v_0x010(2);
+        pPart->setAnim(2);
         break;
     case 0:
-        self->controller->v_0x014(4);
-        ((HbmAnimBaseView*)&self->keyboard->base_24)->v_0x048(pane->entry);
-        pane->v_0x010(1);
+        mpSound->play(4);
+        mpPanel->setCursorTarget((u32)pPart->mpPane);
+        pPart->setAnim(1);
         break;
     }
 }
 
-/* Whether the widget is flagged. */
-extern "C" u8 fn_805589A0(HbmWidget* self) {
-    return ((HbmAnimRecord*)self)->flag_15;
-}
-
-/* 0x805589A8 (0x9C): event 6 shows the pane and selects state 1, event 7 selects state 8; event 4 leaves state 1 for
+/* 0x805589A8 (0x9C): Event 6 shows the pane and selects state 1, event 7 selects state 8; event 4 leaves state 1 for
  * 0 and hides the pane in state 8. */
-extern "C" void hbmAnimHandleEvent(HbmAnimWidget* self, s32 event) {
+void HbmAnimPartB::setAnim(s32 event) {
     if (event == 6) {
-        hbmAnimSetPaneVisible(self->pane, TRUE);
-        ((HbmAnimWidgetView*)self)->v_0x014(1);
+        hbmAnimSetPaneVisible((HbmAnimPane*)mpPane, TRUE);
+        setState(1);
         return;
     }
     if (event == 7) {
-        ((HbmAnimWidgetView*)self)->v_0x014(8);
+        setState(8);
         return;
     }
-    switch (self->state) {
+    switch (mState) {
     case 1:
         if (event == 4) {
-            ((HbmAnimWidgetView*)self)->v_0x014(0);
+            setState(0);
         }
         break;
     case 8:
         if (event == 4) {
-            hbmAnimSetPaneVisible(self->pane, FALSE);
+            hbmAnimSetPaneVisible((HbmAnimPane*)mpPane, FALSE);
         }
         break;
     }
@@ -667,160 +758,113 @@ void HbmAnimPart::setState(u32 state) {
     HbmKey::setState(state);
 }
 
-
-/* 0x80558A4C (0xBC): steps the idle (0) and closing (5, 7) states on an input event. */
-extern "C" void hbmAnimStepIdle(HbmAnimWidget* self, s32 event) {
-    switch (self->state) {
+/* 0x80558A4C (0xBC): Steps the idle (0) and scrolling (5, 7) states on an input event. */
+void HbmAnimPartC::setAnim(s32 event) {
+    switch (mState) {
     case 0:
         if (event == 9) {
-            ((HbmAnimWidgetView*)self)->v_0x014(5);
+            setState(5);
         }
         if (event == 8) {
-            ((HbmAnimWidgetView*)self)->v_0x014(7);
+            setState(7);
         }
         break;
     case 5:
     case 7:
         if (event == 4) {
-            ((HbmAnimWidgetView*)self)->v_0x014(0);
+            setState(0);
         }
         break;
     }
 }
 
-/* 0x80558B08 (0x184): steps the seven-state selector on an input event (0 also forces state 4). */
-extern "C" void hbmAnimStepState(HbmAnimWidget* self, s32 event) {
+/* 0x80558B08 (0x184): Steps the seven-state selector on an input event (0 also forces state 4). */
+void HbmAnimPartA::setAnim(s32 event) {
     if (event == 0) {
-        ((HbmAnimWidgetView*)self)->v_0x014(4);
+        setState(4);
     }
-    switch ((u32)self->state) {
+    switch ((u32)mState) {
     case 0:
         if (event == 1) {
-            ((HbmAnimWidgetView*)self)->v_0x014(2);
+            setState(2);
         }
         break;
     case 2:
         if (event == 4) {
-            ((HbmAnimWidgetView*)self)->v_0x014(3);
+            setState(3);
         }
         if (event == 2) {
-            ((HbmAnimWidgetView*)self)->v_0x014(6);
+            setState(6);
         }
         break;
     case 3:
         if (event == 2) {
-            ((HbmAnimWidgetView*)self)->v_0x014(6);
+            setState(6);
         }
         break;
     case 6:
         if (event == 4) {
-            ((HbmAnimWidgetView*)self)->v_0x014(0);
+            setState(0);
         }
         if (event == 1) {
-            ((HbmAnimWidgetView*)self)->v_0x014(2);
+            setState(2);
         }
         break;
     case 4:
         if (event == 4) {
-            ((HbmAnimWidgetView*)self)->v_0x014(3);
+            setState(3);
         }
         if (event == 2) {
-            ((HbmAnimWidgetView*)self)->v_0x014(6);
+            setState(6);
         }
         break;
     }
 }
 
-/* Walks the widget's child pane. */
-extern "C" void fn_80558C8C(HbmWidget* self) {
-    ((HbmPaneManager*)&self->vtable_24)->HbmPaneManager::calcComponents();
+/* 0x80558C8C (0x8): Updates the pane manager's components. */
+void HbmAnimPanel::calcComponents() {
+    HbmPaneManager::calcComponents();
 }
 
-/* Empty virtual slot. */
-extern "C" void fn_80558C94(void) {
+/* 0x80558C94 (0x4): Does nothing. */
+void HbmAnimPanel::v_0x034() {}
+
+/* 0x80558CBC (0x14): Stores the language, then re-runs init. */
+void HbmAnimPanel::setLayoutType(s32 type) {
+    mLayoutType = type;
+    init();
 }
 
-/* Sets the animation record's index, wrapping to the first entry. */
-extern "C" void fn_80558C98(HbmAnimRecord* self, int index) {
-    self->flag_17 = index;
-    if ((u8)index < self->table[0]) {
-        return;
-    }
-    self->flag_17 = 0;
-}
-
-/* Stores the widget's active child, then updates it. */
-extern "C" void fn_80558CBC(HbmWidget* self, HbmWidget* child) {
-    self->child = child;
-    ((HbmAnimWidgetView*)self)->v_0x010();
-}
-
-/* The widget's type tag. */
-extern "C" u32 fn_80558CD0(void) {
+/* 0x80558CD0 (0x8): Reports the panel as busy in its own way (2). */
+s32 HbmAnimPanel::isBusy() {
     return 2;
 }
 
-/* The widget's first tail flag. */
-extern "C" u8 fn_80558CD8(HbmWidget* self) {
-    return self->tail.bytes.flag_D0;
-}
-
-/* Clears the widget's state selector. */
-extern "C" void fn_80558D3C(HbmWidget* self) {
-    self->mode.state = 0;
-}
-
-/* Clears the widget's state selector. */
-extern "C" void fn_80558D48(HbmWidget* self) {
-    self->mode.state = 0;
-}
-
-/* Clears the widget's state selector. */
-extern "C" void fn_80558DB0(HbmWidget* self) {
-    self->mode.state = 0;
+/* 0x80558CD8 (0x8): Whether the panel is open. */
+u8 HbmAnimPanel::isOpen() {
+    return mbOpen;
 }
 
 /* Destroys the part (the inline base destructors run here). */
-HbmAnimPartA::~HbmAnimPartA() {
+HbmAnimPartA::~HbmAnimPartA() {}
+
+/* Clears the part's state. */
+void HbmAnimPartA::reset() {
+    mState = 0;
 }
 
+/* Clears the part's state. */
+void HbmAnimPartC::reset() {
+    mState = 0;
+}
 
 /* Destroys the part (the inline base destructors run here). */
-HbmAnimPartB::~HbmAnimPartB() {
-}
+HbmAnimPartB::~HbmAnimPartB() {}
 
+/* Clears the part's state. */
+void HbmAnimPartB::reset() {
+    mState = 0;
+}
 
 /* Destroys the part (the inline base destructors run here). */
-HbmAnimPartC::~HbmAnimPartC() {
-}
-
-
-/* Adjustor thunk: base #3 -> fn_80557228. */
-extern "C" void fn_80558E84(void* base) {
-    fn_80557228((HbmWidget*)((u8*)base - HBM_OFFSET_OF(HbmWidget, vtable_24)));
-}
-
-/* Adjustor thunk: base #3 -> fn_80558638. */
-extern "C" void fn_80558E8C(void* base) {
-    fn_80558638((HbmWidget*)((u8*)base - HBM_OFFSET_OF(HbmWidget, vtable_24)));
-}
-
-/* Adjustor thunk: base #3 -> fn_80558654. */
-extern "C" void fn_80558E94(void* base, HkbManager* manager) {
-    fn_80558654((HbmWidget*)((u8*)base - HBM_OFFSET_OF(HbmWidget, vtable_24)), manager);
-}
-
-/* Adjustor thunk: base #3 -> fn_80558C8C. */
-extern "C" void fn_80558E9C(void* base) {
-    fn_80558C8C((HbmWidget*)((u8*)base - HBM_OFFSET_OF(HbmWidget, vtable_24)));
-}
-
-/* Adjustor thunk: base #3 -> fn_80557744. */
-extern "C" void fn_80558EA4(void* base) {
-    fn_80557744((HbmWidget*)((u8*)base - HBM_OFFSET_OF(HbmWidget, vtable_24)));
-}
-
-/* Adjustor thunk: base #5 -> fn_80557E8C. */
-extern "C" void fn_80558EAC(HbmAllocator* base) {
-    fn_80557E8C((HbmWidget*)((u8*)base - HBM_OFFSET_OF(HbmWidget, allocator)));
-}
+HbmAnimPartC::~HbmAnimPartC() {}

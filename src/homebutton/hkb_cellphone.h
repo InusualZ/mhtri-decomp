@@ -315,7 +315,7 @@ public:
 
 /* The cellphone keypad's multi-tap input: the current mode, the pending key and the character it cycles
  * through; it reports characters and state changes through post(). size: 0x34 */
-class HkbCellphoneInput : public HkbInputWidget {
+class HkbCellphoneInput : public HkbLayoutInputWidget {
 public:
     virtual ~HkbCellphoneInput();
     virtual void create(MEMAllocator* allocator);

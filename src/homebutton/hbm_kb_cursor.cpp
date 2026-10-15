@@ -27,12 +27,19 @@
  *            and re-derives the +0x1A04 base per call; three local shapes tried stay 35 to 61 words off - unwritten.
  * RESIDUALS. Unwritten, call unnamed functions of other units (hbm_text_panel.cpp, hbm_value.cpp, hbm_hermite.cpp's
  *            hbmNameMatches, fn_8052A040.cpp) or read this unit's .data name tables: fn_80566440, fn_80566618, fn_80566740,
- *            fn_80566910, fn_80566970, fn_80566A7C, fn_80566C94, fn_80567014, fn_8056725C, fn_80567A14, fn_80567D40,
- *            fn_80567E70, fn_8056802C, fn_80568CAC, fn_80568E08, fn_80568EBC, fn_80568FF0, fn_805690F0, hbmKbCursorSetMode,
- *            fn_805698BC, fn_8056999C, and the thunks fn_80569D4C, fn_80569D74, fn_80569D7C, fn_80569D8C..fn_80569DA4
- *            whose targets are among them.
+ *            fn_80566910, fn_80566970, fn_80566A7C, fn_80566C94, fn_8056725C, fn_80567A14, fn_80567D40, fn_80567E70,
+ *            fn_8056802C, fn_80568CAC, fn_80568E08, fn_80568EBC, fn_80568FF0, fn_805690F0, hbmKbCursorSetMode, fn_8056999C, and
+ *            the thunks fn_80569D4C, fn_80569D74, fn_80569D7C, fn_80569D8C..fn_80569DA4 whose targets are among them.
+ * RESIDUALS. Unwritten, need the keyboard's class (its table 0x80657F10 lists ~180 slots of the text panel's class) or
+ *            undeclared hbm_text_panel.cpp functions (hbmTextPaneListenerOnEvent, hbmPanelHitTest, hbmPanelSetItemCaret,
+ *            hbmKbWidgetHandleMessage): the destructor fn_80566440, the pane handler's onPaneEvent fn_8056999C and the
+ *            functions above that call them.
+ * RESIDUALS. hbmKbCursorCreateMemoKeys hoists the component list's address into a saved register; retail recomputes it
+ *            at the append (and keeps `this`/the allocator in r25/r26).
  * NAMES.     GUESS classes HbmKbCursorPart, its kinds HbmKbCursorPartA/B and HbmKbCursorKey (band keys with a state
- *            word; members reset, setState, getResource, getState).
+ *            word and a kind; members reset, setState, getType, getState).
+ * NAMES.     GUESS hbmKbCursorCreateMemoKeys / hbmKbCursorNewLine and data hbmKbCursorMemoAnimDefs /
+ *            hbmKbCursorMemoKeyDefs (the `my_Memo_a_*.brlan` animations of the N_Memo and Nigaoe keys).
  */
 
 #include "types.h"
@@ -45,33 +52,68 @@
 #include "homebutton/hbm_widget.h"
 #include "homebutton/hbm_text_panel.h"
 #include "homebutton/hbm_value.h"
+#include "homebutton/hkb_keyboard.h"
+#include "homebutton/hkb_layout.h"
+#include "homebutton/hkb_textbox.h"
+#include "MEM/MEMAllocFromAllocator.h"
 
 /* A cursor part: a band key with its state word; its class table (0x80657EC0) and the out-of-line copy of its inline destructor (0x80567204) are
  * this unit's.  size: 0x34 */
 class HbmKbCursorPart : public HbmKey {
 public:
+    HbmKbCursorPart(nw4r::lyt::Pane* pane) : HbmKey(pane) {}
+
     virtual void reset();
     virtual void setState(u32 state);
     virtual ~HbmKbCursorPart() {}
-    /* untyped: opaque handle passed through */
-    virtual void* getResource();
+    virtual u32 getType();
     virtual u32 getState();
 
-    /* +0x30 */ void* mpResource;
+    /* +0x30 */ u32 mType;
 }; /* size: 0x34 */
 
-/* A HbmKbCursorPart kind (class table 0x80657E68): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+/* The memo's portrait key (kind 1; class table 0x80657E68).  size: 0x34 */
 class HbmKbCursorPartA : public HbmKbCursorPart {
 public:
+    HbmKbCursorPartA(nw4r::lyt::Pane* pane) : HbmKbCursorPart(pane) { mType = 1; }
+
     virtual void setAnim(s32 anim);
     virtual ~HbmKbCursorPartA();
-};
+}; /* size: 0x34 */
 
-/* A HbmKbCursorPart kind (class table 0x80657E94): its own slot 0x10 are defined above as C functions.  size: 0x34 */
+/* The memo's body key (kind 0; class table 0x80657E94).  size: 0x34 */
 class HbmKbCursorPartB : public HbmKbCursorPart {
 public:
+    HbmKbCursorPartB(nw4r::lyt::Pane* pane) : HbmKbCursorPart(pane) { mType = 0; }
+
     virtual void setAnim(s32 anim);
     virtual ~HbmKbCursorPartB();
+}; /* size: 0x34 */
+
+/* A memo key of the keyboard: its kind, its pane name and its animations.  size: 0x3C */
+struct HbmKbCursorKeyDef {
+    /* +0x00 */ u32 type;
+    /* +0x04 */ const char* name;
+    /* +0x08 */ u32 numAnims;
+    /* +0x0C */ const HkbAnimDef* anims[12];
+}; /* size: 0x3C */
+
+/* The memo keys' animations (.rodata 0x8057C258). */
+const HkbAnimDef hbmKbCursorMemoAnimDefs[6] = {
+    {0, "my_Memo_a_normal.brlan"},
+    {1, "my_Memo_a_MailIn.brlan"},
+    {2, "my_Memo_a_MailOut.brlan"},
+    {3, "my_Memo_a_SendOut.brlan"},
+    {4, "my_Memo_a_NigaoeFoucusIn.brlan"},
+    {5, "my_Memo_a_NigaoeFoucusOut.brlan"},
+};
+
+/* The memo's body and portrait keys (.rodata 0x8057C3F0). */
+const HbmKbCursorKeyDef hbmKbCursorMemoKeyDefs[2] = {
+    {0, "N_Memo", 4,
+     {&hbmKbCursorMemoAnimDefs[0], &hbmKbCursorMemoAnimDefs[1], &hbmKbCursorMemoAnimDefs[2],
+      &hbmKbCursorMemoAnimDefs[3]}},
+    {1, "Nigaoe", 2, {&hbmKbCursorMemoAnimDefs[4], &hbmKbCursorMemoAnimDefs[5]}},
 };
 
 /* A cursor key: a band key whose reset and state setter are defined above as C functions (class table
@@ -519,6 +561,33 @@ void hbmKbCursorUpdateArrows(HbmCursorInput* self, u8 left, u8 right, f32 delta)
     self->rightHeld = right;
 }
 
+/* 0x80567014 (0x1F0): Creates the memo's body and portrait keys with their animations and lists them in the pane
+ * manager. */
+void hbmKbCursorCreateMemoKeys(KbObject* self, MEMAllocator* allocator)
+{
+    for (u16 i = 0; i < 2; i++) {
+        const HbmKbCursorKeyDef* def = &hbmKbCursorMemoKeyDefs[i];
+        HbmKbCursorPart* pPart = NULL;
+        switch (def->type) {
+        case 0:
+            pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbCursorPartB)))
+                HbmKbCursorPartB(((HbmPaneManager*)&self->tail_0x1A04)->findTextBox(def->name));
+            break;
+        case 1:
+            pPart = new (MEMAllocFromAllocator(allocator, sizeof(HbmKbCursorPartA)))
+                HbmKbCursorPartA(((HbmPaneManager*)&self->tail_0x1A04)->findTextBox(def->name));
+            break;
+        }
+        nw4r::ut::List_Append(&((HbmPaneManager*)&self->tail_0x1A04)->mComponents, pPart);
+        u32 numAnims = def->numAnims;
+        for (u16 j = 0; j < numAnims; j++) {
+            const void* res = ((HbmPaneManager*)&self->tail_0x1A04)->mpResAccessor->GetResource(0, def->anims[j]->name, NULL);
+            nw4r::lyt::AnimTransform* anim = ((HbmPaneManager*)&self->tail_0x1A04)->getLayout()->CreateAnimTransform(res, ((HbmPaneManager*)&self->tail_0x1A04)->mpResAccessor);
+            pPart->addAnim(allocator, def->anims[j]->kind, anim, 0, 1);
+        }
+    }
+}
+
 void* fn_80567004(KbObject* self, void* value)
 {
     void* old = self->sub_0x04;
@@ -881,6 +950,14 @@ void fn_80569910(KbObject* self, void* arg)
     fn_8055A888((HbmWidget*)&self->field_0x010, (int)arg);
 }
 
+/* 0x805698BC (0x54): In mode 1, plays the part's new-line animation (10), then breaks the line. */
+void hbmKbCursorNewLine(HbmCursorInput* self)
+{
+    if (self->mode == 1)
+        ((HbmCursorPartArgView*)((KbObject*)self)->tail_0x1A04.field_0x1D0)->v_0x010(10);
+    hbmPanelNewLine(self);
+}
+
 void fn_80569970(KbObject* self)
 {
     if (self->tail_0x1A04.field_0x1E4 != 1)
@@ -909,10 +986,9 @@ void HbmKbCursorPart::setState(u32 state) {
 }
 
 
-/* Returns the part's resource word. */
-/* untyped: opaque handle passed through */
-void* HbmKbCursorPart::getResource() {
-    return mpResource;
+/* Returns the part's kind. */
+u32 HbmKbCursorPart::getType() {
+    return mType;
 }
 
 

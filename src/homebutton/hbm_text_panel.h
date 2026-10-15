@@ -102,6 +102,9 @@ u16 hbmKbDeadKeyToSpacing(u16 c);
 /* Clears the panel's candidate selection. */
 void hbmPanelResetCandidate(struct HbmTextPanel* self);
 
+/* Whether the panel's text is a single line in its one-line mode. */
+s32 hbmPanelIsSingleLine(struct HbmTextPanel* self);
+
 #ifdef __cplusplus
 }
 #endif

@@ -955,7 +955,7 @@ void HkbKeyboardBase::init() {
 }
 
 /* 0x80535F4C (0x8): Returns the layout type. */
-s32 HkbInputWidget::getLayoutType() {
+s32 HkbLayoutInputWidget::getLayoutType() {
     return mLayoutType;
 }
 
@@ -3114,7 +3114,7 @@ s32 HbmKey::isAnimating() {
 }
 
 /* 0x8053E3A8 (0x4): Calculates the keyboard (nothing to do in the common part). */
-void HkbInputWidget::calc() {}
+void HkbLayoutInputWidget::calc() {}
 
 /* 0x8053E3AC (0x8): Returns the component list. */
 nw4r::ut::List* HbmPaneManager::getComponentList() {

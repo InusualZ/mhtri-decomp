@@ -4226,7 +4226,7 @@ Panel805482CC_Item* hbmPanelGetInputTarget(HbmTextPanel* self, s32 flag)
 #pragma pop
 
 /* Whether the panel is in mode 1 (`field_0x194C == 1`) while its input byte is set. */
-s32 fn_80549D74(HbmTextPanel* self)
+s32 hbmPanelIsSingleLine(HbmTextPanel* self)
 {
     if (self->field_0x1950 == 0) {
         return 0;

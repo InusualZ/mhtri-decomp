@@ -201,6 +201,11 @@ public:
         mState = 0;
     }
 
+    HbmKey(nw4r::lyt::Pane* pane, HbmKeyListener* listener) : mpPane(pane), mpCurAnim(NULL), mpListener(listener) {
+        nw4r::ut::List_Init(&mAnims, 0x10);
+        mState = 0;
+    }
+
     /* slot +0x008 */ virtual void reset();
     /* slot +0x00C */ virtual void update();
     /* slot +0x010 */ virtual void setAnim(s32 anim);

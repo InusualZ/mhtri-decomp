@@ -103,9 +103,9 @@ public:
     /* slot +0x01C */ virtual void setOwner(HkbInputWidget* owner);
 }; /* size: 0x4 */
 
-/* The root of the band's input widgets (the software keyboard, the cellphone keypad input and the band's widgets
- * derive from it): its notification sink and its layout type; the slots 0x08..0x30 are the ones every derived
- * class table shares.  size: 0x14 (approximation: the fields the shared members read) */
+/* The root of the band's input widgets: its notification sink; the slots 0x08..0x20 are the ones every derived
+ * class table shares (the language selector's table stops there).  size: 0x10 (approximation: the fields the
+ * shared members read) */
 class HkbInputWidget {
 public:
     /* slot +0x008 */ virtual ~HkbInputWidget() {}
@@ -114,16 +114,23 @@ public:
     /* slot +0x014 */ virtual void setEventSink(HkbEventSink* sink);
     /* untyped: caller-owned payload - the argument record of event `id` */
     /* slot +0x018 */ virtual void sendEvent(u32 id, void* data);
-    /* slot +0x01C */ virtual void onCommand(u32 command, u32 arg);
+    /* slot +0x01C */ virtual void onCommand(u32 command, u32 arg) {}
     /* slot +0x020 */ virtual void onPaneEvent(u32 event, const char* paneName);
+
+    /* +0x04 */ u32 unused_0x04;
+    /* +0x08 */ u32 unused_0x08;
+    /* +0x0C */ HkbEventSink* mpEventSink;
+}; /* size: 0x10 */
+
+/* An input widget with a layout type (the software keyboard, the cellphone keypad input and the sign panel derive
+ * from it): slots 0x24..0x30.  size: 0x14 */
+class HkbLayoutInputWidget : public HkbInputWidget {
+public:
     /* slot +0x024 */ virtual s32 isBusy();
     /* slot +0x028 */ virtual void setLayoutType(s32 type);
     /* slot +0x02C */ virtual s32 getLayoutType();
     /* slot +0x030 */ virtual void calc();
 
-    /* +0x04 */ u32 unused_0x04;
-    /* +0x08 */ u32 unused_0x08;
-    /* +0x0C */ HkbEventSink* mpEventSink;
     /* +0x10 */ s32 mLayoutType;
 }; /* size: 0x14 */
 
@@ -421,7 +428,7 @@ class HbmPaneManager;
 
 /* The software keyboard's common part: its event sink, its layout and case state and the input context it
  * reads; the slot order is the one the class table 0x8064DDE0 lists.  size: 0x4C */
-class HkbKeyboardBase : public HkbInputWidget {
+class HkbKeyboardBase : public HkbLayoutInputWidget {
 public:
     /* slot +0x008 */ virtual ~HkbKeyboardBase();
     /* slot +0x00C */ virtual void create(MEMAllocator* pAllocator);

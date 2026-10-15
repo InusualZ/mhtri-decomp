@@ -1825,34 +1825,40 @@ void* fn_8055E948(void* self, s32 flag)
     return self;
 }
 
-void* fn_8055E9A0(void* self, s32 flag)
+/* The HbmKbList as the band builds it: only its destructor is its own, so its class table (0x80651C40) and the
+ * this-adjusting destructor thunk come out of this unit. */
+class HbmKbToolbar : public HbmKbList {
+public:
+    virtual ~HbmKbToolbar();
+};
+
+/* Destroys the HbmKbList. */
+HbmKbToolbar::~HbmKbToolbar()
 {
-    if (self != 0) {
-        fn_80554714(self, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
 }
 
-void* fn_8055E9F8(void* self, s32 flag)
+/* The HbmKbChild as the band builds it: only its destructor is its own, so its class table (0x80651B40) and the
+ * this-adjusting destructor thunk come out of this unit. */
+class HbmKbSelector : public HbmKbChild {
+public:
+    virtual ~HbmKbSelector();
+};
+
+/* Destroys the HbmKbChild. */
+HbmKbSelector::~HbmKbSelector()
 {
-    if (self != 0) {
-        fn_80555B0C(self, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
 }
 
-void* fn_8055EA50(void* self, s32 flag)
+/* The HbmAnimPanel as the band builds it: only its destructor is its own, so its class table (0x80651A24) and the
+ * this-adjusting destructor thunk come out of this unit. */
+class HbmKbSignPanel : public HbmAnimPanel {
+public:
+    virtual ~HbmKbSignPanel();
+};
+
+/* Destroys the HbmAnimPanel. */
+HbmKbSignPanel::~HbmKbSignPanel()
 {
-    if (self != 0) {
-        fn_80557228(self, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
 }
 /* ---------------------------------------------------------------------------------------------------
  * adjustor thunks: the retail body is `subi r3,r3,N; b <deleting destructor>` (the flag passes through)
@@ -1864,12 +1870,4 @@ u8* hbmDeletingDtorThunk17F4(u8* base, s32 flag) { return (u8*)fn_8055E8F0(base 
 /* 0x8055EAD0 (0x8): Adjusts a base pointer by -0x1A04 and runs the deleting destructor. */
 u8* hbmDeletingDtorThunk1A04(u8* base, s32 flag) { return (u8*)fn_8055E948(base - 0x1A04, flag); }
 
-/* 0x8055EAD8 (0x8): Adjusts a base pointer by -0x14 and runs the deleting destructor. */
-u8* hbmDeletingDtorThunk14(u8* base, s32 flag) { return (u8*)fn_8055E9A0(base - 0x14, flag); }
-
-/* 0x8055EAE0 (0x8): Adjusts a base pointer by -0x1C and runs the deleting destructor. */
-u8* hbmDeletingDtorThunk1C(u8* base, s32 flag) { return (u8*)fn_8055E9F8(base - 0x1C, flag); }
-
-/* 0x8055EAE8 (0x8): Adjusts a base pointer by -0x24 and runs the deleting destructor. */
-u8* hbmDeletingDtorThunk24(u8* base, s32 flag) { return (u8*)fn_8055EA50(base - 0x24, flag); }
 }
