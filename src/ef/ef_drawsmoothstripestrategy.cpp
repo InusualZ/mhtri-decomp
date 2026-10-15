@@ -67,7 +67,8 @@
 #include "g3d/g3d_calcview.h"          /* mtx34_concat (rule 2) */
 #include "nw4r/fn_805012C4.h"          /* mtx34_rotate_vec3 (rule 2) */
 #include "fn_8004CAD8.h"               /* MTX34_ctor, vec3_cross, addVec3, subVec3 (rule 2) */
-#include "g3d/fn_80075DCC.h"           /* mtx34_set, sin_cos_deg (rule 2) */
+#include "g3d/g3d_draw.h" /* mtx34_set (rule 2) */
+#include "g3d/g3d_camera.h" /* sin_cos_deg (rule 2) */
 #include "g3d/g3d_anmchr.h"            /* math_reciprocal (rule 2) */
 #include "nw4r/mtx34_mult_vec3.h"      /* mtx34_mult_vec3 (rule 2) */
 #include "g3d/g3d_calcworld.h"         /* addVec3To (rule 2) */

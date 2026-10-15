@@ -24,6 +24,11 @@ void res_mat_tex_coord_gen_end_edit(struct ResHandle* pSelf);
 void res_mat_pix_end_edit(struct ResHandle* pSelf);
 void res_mat_misc_end_edit(struct ResHandle* pSelf);
 void res_gen_mode_end_edit(struct ResHandle* pSelf);
+/* 0x8007BB94 (0x18): sets `mask` in material `matID`'s buffer-flag word of the ScnMdl. */
+/* untyped: opaque handle passed through - the ScnMdl */
+u32 scn_mdl_set_mat_buffer_flag(void* pMdl, s32 matID, s32 mask);
+/* 0x8007C464 (0x10): marks the ScnMdl's visibility buffer for a refresh (bit 0 of +0x13C). */
+u32 fn_8007C464(void* pSelf);
 
 #ifdef __cplusplus
 }

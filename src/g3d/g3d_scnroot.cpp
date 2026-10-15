@@ -29,7 +29,9 @@
 #include "types.h"
 #include "OS/OSFastCast.h" /* OS_FASTCAST_U16 (rule 2) */
 #include "g3d/g3d_anmchr.h"  /* TypeObj::GetTypeName and operator==, owned by g3d/g3d_anmchr.cpp (rule 2) */
-#include "g3d/fn_80075DCC.h" /* type_obj_set_name_scnleaf (rule 2) */
+#include "g3d/g3d_fog.h" /* fog_ctor / fog_init (rule 2) */
+#include "g3d/g3d_light.h" /* light_setting_ctor (rule 2) */
+#include "g3d/g3d_scninline.h" /* the scene inline copies, placement new (rule 2) */
 #include "g3d/g3d_scnobj.h"  /* nw4r::g3d::ScnGroup, owned by g3d/g3d_scnobj.cpp (rule 2) */
 #include "g3d/g3d_scnroot.h" /* the full ScnRoot class (after g3d_scnobj.h) */
 #include "g3d/g3d_calcworld.h" /* camera_ctor (rule 2) */

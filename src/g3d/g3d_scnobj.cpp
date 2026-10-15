@@ -7,14 +7,14 @@
  *   the head of the TU (ScnObj::CalcViewMtx and the constructor, which stores this unit's ScnObj vtable and reads the
  *   `.sdata2` word 0x80795E60, follow it); the right edge and the `.data` edges are tudiscover's weak cuts and
  *   fragment boundaries; the 0x80082668-0x800827E4 tail is here because the run-time type members read the
- *   ScnObj/ScnLeaf/ScnGroup name records (scn_typename_ScnObj/_ScnLeaf/_ScnGroup), which `g3d/fn_80075DCC.cpp`'s
+ *   ScnObj/ScnLeaf/ScnGroup name records (scn_typename_ScnObj/_ScnLeaf/_ScnGroup), which `g3d/g3d_scninline.cpp`'s
  *   GetTypeObjStatic members read too.
  * NAMES. The members of ScnObj, ScnLeaf, ScnGroup, IScnObjCallback and IScnObjGather are nw4r's: the three vtables
  *   give the slot order, the asserts name the file, and the map rows carry the compiler's manglings.
  *   scn_typename_ScnObj/_ScnLeaf/_ScnGroup are GUESSES (the `.rodata` records by their strings); scnobj_culling_frustum
  *   is a GUESS (the `.sbss` word the gather pass saves, clears and restores around a NOTEST subtree and
  *   `g3d/g3d_scnroot.cpp`'s gather intersects boxes against); type_obj_set_name_scnleaf and
- *   type_obj_set_name_scngroup are GUESSES (the type-name store copies of `g3d/fn_80075DCC.cpp` the ScnLeaf and
+ *   type_obj_set_name_scngroup are GUESSES (the type-name store copies of `g3d/g3d_scninline.cpp` the ScnLeaf and
  *   ScnGroup type members call); G3dProcGatherScnObj, G3dProcCalcWorld, G3dProcCalcMat and G3dProcCalcView are
  *   GUESSES (the per-pass ScnGroup members DefG3dProcScnGroup dispatches to).
  * RESIDUALS. Unwritten: 0x8008147C-0x800814C0 (IScnObjCallback's destructor: defining it would emit the interface's
@@ -25,7 +25,7 @@
  *   a saved register across the detach call), Insert (one `subf` scheduled later), DefG3dProcScnGroup (retail keeps
  *   a dead `b` after the CALC_VIEW case).
  *   IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and the CheckCallback members sit in
- *   `g3d/fn_80075DCC.cpp`'s range.
+ *   `g3d/g3d_scninline.cpp`'s range.
  *   flipcheck: `.rodata` (the three name records) is claimed and not emitted.
  * SHAPES. The ScnObj constructor builds its MTX34/AABB arrays with explicit do-while loops over MTX34_ctor and
  *   AABB_ctor (retail's member-array construction: the math types declare no constructors to let MWCC emit it).
@@ -38,7 +38,7 @@
 #include "types.h"
 #include "g3d/g3d_scnobj.h"   /* this unit's own classes (rule 1) */
 #include "g3d/g3d_anmchr.h"   /* type_obj_set_name, owner g3d/g3d_anmchr.cpp (rule 2) */
-#include "g3d/fn_80075DCC.h"  /* the type-name store copies, owner g3d/fn_80075DCC.cpp (rule 2) */
+#include "g3d/g3d_scninline.h" /* the scene inline copies, placement new (rule 2) */
 #include "g3d/g3d_calcview.h" /* mtx34_copy_ps, owner g3d/g3d_calcview.cpp (rule 2) */
 #include "fn_8004CAD8.h"        /* mtx34_identity, owner fn_8004CAD8.cpp (rule 2) */
 #include "unsplit/g3d.h"      /* the name records and the culling frustum no unit owns (rule 2) */

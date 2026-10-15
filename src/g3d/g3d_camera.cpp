@@ -1,18 +1,21 @@
 /*
  * g3d/g3d_camera.cpp - nw4r g3d `Camera` posture/projection/viewport/scissor methods and the `ResCommon<CameraData>`
  *   accessors.
- * RANGE. .text 0x800746DC-0x80075DCC (27 functions); extab, extabindex, .data 0x8058E430-0x8058E570 (opens on
- *   "g3d_camera.cpp", read from fn_800746DC on), .sdata2 0x80795DC8-0x80795DF8.  The six accessors
+ * RANGE. .text 0x800746DC-0x80075E9C (30 functions); extab, extabindex, .data 0x8058E430-0x8058E570 (opens on
+ *   "g3d_camera.cpp", read from fn_800746DC on), .sdata2 0x80795DC8-0x80795E00.  The six accessors
  *   res_mdl_info_num_view_mtx..fn_800746D4 before it (no data references) sit in `g3d/g3d_calcworld.cpp` by the candidate cut.
- * NAMES. camera_init is a GUESS (the evidence follows).
+ *   The tail 0x80075DCC-0x80075E9C (sin_cos_deg, fn_80075DD8, fn_80075E98) is this TU's: fn_80075DD8 is called only
+ *   from fn_80075440/fn_800757A8, sin_cos_deg first from fn_80075940, and the pool words both read (0x80795DF8 from
+ *   fn_80075940, 0x80795DFC from sin_cos_deg) end this unit's `.sdata2`; `g3d/g3d_dcc.cpp`'s text opens on its
+ *   "g3d_dcc.cpp" referrer fn_80075E9C.
+ * NAMES. camera_init is a GUESS (the evidence follows).  sin_cos_deg is a GUESS (nw4r::math::SinCosDeg: the 256/360
+ *   table-index scale, then the pointer pair passed through).
  *   Map stems, plus the three `nw4r::g3d::Camera` members the map carries mangled (`SetPosition`, `SetPosture`,
  *   `SetPerspective`, `GetCameraMtx`); MTX44_ctor is a GUESS (0x80075390: the empty 4x4 matrix constructor, the MTX34_ctor scheme).
  * RESIDUALS. Partial (15): fn_80074758, `Camera::SetPosition`, `Camera::SetPosture`, 0x80074D78-0x80074FEC (three),
  *   fn_8007507C, fn_80075258, 0x80075394-0x80075844 (six, `Camera::GetCameraMtx` first), fn_80075940.
  *   flipcheck: `.text` 0x16A0 of 0x16F0; `.data`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
- *   instance, after the TU's own strings, playbook 80);
- *   `.sdata2` is 0x34 of 0x30 - one pooled
- *   literal is shared with `g3d/fn_80075DCC.cpp` (a candidate fold).
+ *   instance, after the TU's own strings, playbook 80); `.sdata2` differs (0x80795DFC is declared, not pooled).
  * SHAPES. `#pragma peephole off` around fn_80075940 (playbook 32); file-scope `#pragma fp_contract off`.
  *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except fn_800756DC,
  *   which measure better with the pass on.
@@ -24,7 +27,8 @@
 #include "nw4r/math.h"
 #include "g3d/g3d_calcview.h" /* mtx34_copy_ps (rule 2) */
 #include "g3d/g3d_state.h" /* g3d_state_get_render_mode (rule 2) */
-#include "g3d/fn_80075DCC.h" /* fn_80075DCC/fn_80075DD8, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "MTX/mtx44.h" /* C_MTXOrtho / C_MTXFrustum / C_MTXPerspective (rule 2) */
+#include "nw4r/math_triangular.h" /* math_sincos_idx (rule 2) */
 #include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
 #include "g3d/g3d_camera_types.h"
 #include "g3d/g3d_anmscn.h" /* fn_80067EE8, owned by g3d/g3d_anmscn.cpp (rule 2) */
@@ -74,6 +78,8 @@ extern "C" void fn_804C64E0(s32 a, s32 b, s32 c);
 extern "C" void fn_804C6660(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h, f32 i);
 extern "C" void fn_804C6710(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f);
 extern "C" void fn_804C6810(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h);
+
+extern f32 lbl_80795DFC;
 
 /* ------------------------------------------------------------------------------------------------ */
 /* types                                                                                             */
@@ -143,6 +149,9 @@ void fn_80075844(void* pMtx);
 void fn_80075848(nw4r::g3d::Camera* pSelf);
 void fn_800758C8(nw4r::g3d::Camera* pSelf);
 void fn_80075940(nw4r::g3d::Camera* pSelf);
+void sin_cos_deg(f32* pOutSin, f32* pOutCos, f32 angle);
+void fn_80075DD8(nw4r::g3d::Camera* pSelf);
+f32 (*fn_80075E98(f32 (*pMtx)[4]))[4];
 
 /* ------------------------------------------------------------------------------------------------ */
 /* g3d_camera.cpp                                                                                    */
@@ -711,3 +720,36 @@ void nw4r::g3d::Camera::SetPerspective(f32 fovy, f32 aspect, f32 near, f32 far) 
         pData->mFlags |= 0x20;
     }
 }
+
+extern "C" {
+
+/* 0x80075DCC (0xC): the sine and cosine of `angle` degrees (nw4r's SinCosDeg: the 256-step table index is
+ * `angle * 256 / 360`); the pointer pair passes through to math_sincos_idx untouched. */
+void sin_cos_deg(f32* pOutSin, f32* pOutCos, f32 angle) {
+    math_sincos_idx(pOutSin, pOutCos, lbl_80795DFC * angle);
+}
+
+/* 0x80075DD8 (0xC0): rebuilds the projection matrix from the camera's orthographic, frustum or perspective
+ * parameters and marks it current. */
+void fn_80075DD8(nw4r::g3d::Camera* pSelf) {
+    CameraData* pData = fn_80074A54(pSelf);
+
+    if (pData->mFlags & 0x40) {
+        C_MTXOrtho(fn_80075E98(pData->mProjMtx), pData->mUnkBC, pData->mUnkC0, pData->mUnkC4, pData->mUnkC8,
+                   pData->mProjC, pData->mProjD);
+    } else if (pData->mFlags & 0x10) {
+        C_MTXFrustum(fn_80075E98(pData->mProjMtx), pData->mUnkBC, pData->mUnkC0, pData->mUnkC4, pData->mUnkC8,
+                     pData->mProjC, pData->mProjD);
+    } else {
+        C_MTXPerspective(fn_80075E98(pData->mProjMtx), pData->mProjA, pData->mProjB, pData->mProjC,
+                         pData->mProjD);
+    }
+    pData->mFlags |= 0x80;
+}
+
+/* 0x80075E98 (0x4): hands the 4x4 projection matrix back as its row pointer (the MTX44 conversion). */
+f32 (*fn_80075E98(f32 (*pMtx)[4]))[4] {
+    return pMtx;
+}
+
+} /* extern "C" */

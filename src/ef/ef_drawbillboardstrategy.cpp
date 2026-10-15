@@ -86,7 +86,7 @@
 #include "ef/ef_particle_get_move_dir.h" /* ef_particle_get_move_dir (rule 2) */
 #include "nw4r/fn_805012C4.h"         /* mtx34_rotate_vec3 (rule 2) */
 #include "ef/ef_emitter_tex_flags.h"   /* ef_emitter_get_mtx (rule 2) */
-#include "g3d/fn_80075DCC.h"           /* mtx34_set (rule 2) */
+#include "g3d/g3d_draw.h" /* mtx34_set (rule 2) */
 
 /* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
  * (`Panic__Q24nw4r2dbFPCciPCce`). */

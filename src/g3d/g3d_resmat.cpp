@@ -37,7 +37,7 @@
 #include "g3d/g3d_resanmtexsrt.h"
 #include "g3d/g3d_cpu.h"
 #include "g3d/g3d_calcview.h"
-#include "g3d/fn_80075DCC.h"
+#include "g3d/g3d_draw1mat1shp.h" /* GDWriteXFCmd / g3d_gd_set_chan_mat_color / FPow (rule 2) */
 #include "fn_8004CAD8.h"
 #include "fn_80047398.h"
 #include "RVLGX/GXPixel.h"

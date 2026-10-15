@@ -19,6 +19,9 @@ extern "C" {
 
 void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
 
+/* 0x80075DCC (0xC): the sine and cosine of `angle` degrees through the 256-step table. */
+void sin_cos_deg(f32* pOutSin, f32* pOutCos, f32 angle);
+
 /* 0x80075390..0x80075620 - the matrix helpers (0x80075394 is the member `Camera::GetCameraMtx`) `g3d/g3d_state.cpp` calls (rule 2, moved out of that
  * unit's local extern block on landing). */
 void MTX44_ctor(nw4r::math::MTX44* pMtx);

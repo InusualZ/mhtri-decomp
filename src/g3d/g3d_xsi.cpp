@@ -23,7 +23,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "g3d/g3d_resmat.h"    /* nw4r::g3d::TexSrt (rule 2) */
-#include "g3d/fn_80075DCC.h"   /* sin_cos_deg (rule 2) */
+#include "g3d/g3d_camera.h" /* sin_cos_deg (rule 2) */
 #include "g3d/g3d_xsi.h"
 
 #pragma fp_contract off

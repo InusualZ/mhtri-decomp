@@ -78,7 +78,7 @@
 #include "RVLGX/GXTexture.h"
 #include "RVLGX/GXTransform.h"
 #include "g3d/g3d_scnroot.h"             /* VEC2_ctor (rule 2) */
-#include "g3d/fn_80075DCC.h"             /* fn_80077DF0 (rule 2) */
+#include "g3d/g3d_draw.h" /* mtx34_set (rule 2) */
 #include "g3d/g3d_calcview.h"            /* fn_800710BC (rule 2) */
 #include "g3d/g3d_state.h"               /* mtx34_inverse (rule 2) */
 #include "nw4r/fn_805012C4.h"            /* mtx34_rotate_vec3 (rule 2) */

@@ -67,7 +67,7 @@
  *   G3dObj::operator delete, AnmObj, AnmObjChr, AnmObjChrBlend, AnmObjChrRes: the empty bodies are complete (retail's
  *   operator delete is a bare `blr`; the compiler emits the constructors' base calls, vtable stores and member
  *   initialisers and the destructors' base calls).  The G3dObj vtable is emitted here (its first virtual,
- *   IsDerivedFrom, is defined here) while retail keeps it in `g3d/fn_80075DCC.cpp`'s `.data`.
+ *   IsDerivedFrom, is defined here) while retail keeps it in `g3d/g3d_obj.cpp`'s `.data`.
  *   The AnmObj type-name record (0x8056F568, read only by AnmObj::GetTypeObj and GetTypeObjStatic here) is
  *   `g3d/g3d_anmobj.cpp`'s `.rodata` claim (0x8056F568-0x8056F578).
  *   flipcheck: `.text` 0x6F18 of 0x6F90; extab 0x3EC of 0x3A4 (__dt__AnmObjChrNode's record is 108 B against 28 B);
@@ -83,7 +83,7 @@
 
 #include "types.h"
 #include "g3d/g3d_anmobj.h" /* anm_typename_AnmObj, owned by g3d/g3d_anmobj.cpp (rule 2) */
-#include "g3d/fn_80075DCC.h" /* anm_typename_G3dObj, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "g3d/g3d_scninline.h" /* the scene inline copies, placement new (rule 2) */
 #include "g3d/g3d_anmchr.h" /* this unit's own declarations, and the G3dObj dispatch record (rule 1) */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */

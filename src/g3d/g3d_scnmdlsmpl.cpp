@@ -14,7 +14,7 @@
  *   attribute, set when the ignore-animation-translation option is on), CalcPosture, CalcSkinning,
  *   G3dProcGatherScnObj .. G3dProcUpdateFrame, GetDrawMode and the GetCalcWorld* getters are GUESSES (the per-pass
  *   helpers G3dProc dispatches to and the field readers), as are the callees' names in `g3d/g3d_calcworld.h`,
- *   `g3d/g3d_calcview.h`, `g3d/g3d_calcmaterial.h`, `g3d/g3d_anmvis.h`, `g3d/fn_80075DCC.h` and `g3d/g3d_scnmdl.h`
+ *   `g3d/g3d_calcview.h`, `g3d/g3d_calcmaterial.h`, `g3d/g3d_anmvis.h`, `g3d/g3d_draw.h` and `g3d/g3d_scnmdl.h`
  *   (res_mdl_get_info, res_mdl_info_num_pos_nrm_mtx, res_mdl_info_num_view_mtx, res_mdl_info_ref, world_mtx_attr_*,
  *   g3d_calc_world, g3d_calc_skinning, g3d_calc_view*, g3d_lc_*, g3d_dc_invalidate_range, g3d_calc_material_directly,
  *   g3d_apply_vis_anm_result, g3d_draw_res_mdl_directly, type_obj_set_name_anmchr).
@@ -50,7 +50,8 @@ extern "C" nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox)
 #include "g3d/g3d_calcview.h"    /* the view-matrix calculator and the locked-cache helpers (rule 2) */
 #include "g3d/g3d_calcmaterial.h" /* g3d_calc_material_directly (rule 2) */
 #include "g3d/g3d_anmvis.h"      /* g3d_apply_vis_anm_result (rule 2) */
-#include "g3d/fn_80075DCC.h"     /* g3d_draw_res_mdl_directly (rule 2) */
+#include "g3d/g3d_draw.h" /* fn_80077E34, g3d_draw_res_mdl_directly (rule 2) */
+#include "g3d/g3d_scninline.h" /* the scene inline copies, placement new (rule 2) */
 #include "g3d/g3d_scnmdl.h"      /* res_mdl_info_ref (rule 2) */
 #include "nw4r/fn_805012C4.h"    /* nw4r::ut::LC (rule 2) */
 #include "g3d/g3d_resvtx.h"      /* nw4r::g3d::DC::StoreRange (rule 2) */

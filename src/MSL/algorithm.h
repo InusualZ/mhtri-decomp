@@ -1,6 +1,6 @@
 /* MSL/algorithm.h - the slice of MSL C++'s <algorithm> and <iterator> the g3d units instantiate: std::find and
  *   std::distance over a pointer range (ScnGroup::Remove(ScnObj*) walks its child array with them; the weak
- *   instances 0x8007B42C/0x8007B450/0x8007B47C sit in `g3d/fn_80075DCC.cpp`'s range).  Only the pointer case is
+ *   instances 0x8007B42C/0x8007B450/0x8007B47C sit in `g3d/g3d_scninline.cpp`'s range).  Only the pointer case is
  *   spelled: the iterator category is always random access. */
 #ifndef MHTRI_MSL_ALGORITHM_H
 #define MHTRI_MSL_ALGORITHM_H

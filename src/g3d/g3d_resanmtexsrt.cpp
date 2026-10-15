@@ -429,7 +429,7 @@ extern "C" u32 fn_8009348C(void* self, u32 arg) {
  * string lookup (fn_80092250) rather than the raw table (fn_80062750). */
 
 #include "fn_8004CAD8.h"           /* res_tex_ctor/res_pltt_ctor (rule 2, owner header) */
-#include "g3d/fn_80075DCC.h"       /* fn_8007B878 (rule 2, owner header) */
+#include "g3d/g3d_scninline.h" /* the scene inline copies, placement new (rule 2) */
 #include "g3d/g3d_resanmamblight.h"/* fn_80089F94 (rule 2, owner header) */
 #include "g3d/g3d_resmat.h"
 

@@ -92,7 +92,7 @@ struct ResTexBlock {
 
 /* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
-void* fn_8007B878(void* pOut, u32 value);                /* owner: src/g3d/fn_80075DCC.cpp */
+void* fn_8007B878(void* pOut, u32 value);                /* owner: src/g3d/g3d_scninline.cpp */
 }
 
 /* The unit's own functions, in address order (the forward declarations keep the source order free).

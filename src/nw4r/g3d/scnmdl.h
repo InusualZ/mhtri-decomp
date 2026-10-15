@@ -56,7 +56,7 @@ public:
 
         CopiedMatAccess(ScnMdl* mdl, u32 idx);
 
-        /* 0x8007BBAC - the material handle accessor, defined by `g3d/fn_80075DCC.cpp` (rule 2 owner). */
+        /* 0x8007BBAC - the material handle accessor, defined by `g3d/g3d_scnmdl.cpp` (rule 2 owner). */
         u32 GetResTexSrt(bool arg1);
     };
 

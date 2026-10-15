@@ -20,12 +20,12 @@
 #include "gx.h"                  /* GXWGFifo (rule 1) */
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
 #include "g3d/g3d_resanmtexsrt.h" /* the ten category accessors (rule 2) */
-#include "g3d/fn_80075DCC.h"     /* fn_80076xxx/0x8007B878 (rule 2) */
 #include "g3d/g3d_anmshp.h"      /* fn_800695EC (rule 2) */
 #include "g3d/g3d_anmtexpat.h"   /* fn_8006993C (rule 2) */
 #include "g3d/g3d_anmtexsrt.h"   /* fn_8006CDBC (rule 2) */
 #include "g3d/g3d_anmscn.h"      /* fn_8006584C (rule 2) */
 #include "g3d/g3d_anmclr.h"      /* fn_80063FD0 (rule 2) */
+#include "g3d/g3d_scninline.h" /* the scene inline copies, placement new (rule 2) */
 #include "g3d/g3d_calcmaterial.h" /* fn_8006F158/0x8006F298 (rule 2) */
 #include "g3d/g3d_anmvis.h"      /* fn_8006EC3C (rule 2) */
 #include "g3d/g3d_anmchr.h"      /* nw4r::g3d::ResAnmChr (rule 2) */

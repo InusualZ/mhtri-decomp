@@ -6,7 +6,7 @@
  *   conversion constant, read by `GXGetYScaleFactor` and `GXSetDispCopyYScale` only).
  * FLAGS. the `OS` lib block of `configure.py` (`Wii/1.3`) with `cflags_base` (-O4,p).
  * NAMES. SDK names throughout. The render modes are read by `__GXInitGX` (`RVLGX/GXInit.c`), `main.cpp` and
- *   `g3d/fn_80075DCC.cpp`. GUESS: `GXNtsc480ProgSoft` for the progressive NTSC mode at 0x8061A9FC (its vfilter is the
+ *   `g3d/g3d_init.cpp`. GUESS: `GXNtsc480ProgSoft` for the progressive NTSC mode at 0x8061A9FC (its vfilter is the
  *   soft {8,8,10,12,10,8,8}, where the SDK's `GXNtsc480Prog` carries {0,0,21,22,21,0,0}).
  * RESIDUALS. none in `.text`/`.sdata2`; the `.text` claim ends with 8 bytes of link padding. `.data` is 0x12C bytes where
  *   `splits.txt` claims 0x130: the map sizes `GXEurgb60Hz480IntDf` 0x40 (a 0x3C object plus 4 bytes of alignment fill),

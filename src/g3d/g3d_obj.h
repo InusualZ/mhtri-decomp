@@ -3,7 +3,7 @@
  *   Evidence: the vtables of `g3d/g3d_anmchr.cpp` (.data 0x8058BCA8..0x8058BE40): every class there opens with
  *   IsDerivedFrom, a pure G3dProc, the destructor, GetTypeObj and GetTypeName, and the AnmObj vtable at 0x8058BE08
  *   adds seven pure slots (SetFrame, GetFrame, UpdateFrame, SetUpdateRate, GetUpdateRate, Bind, Release); the
- *   destructor chain ends in 0x8007B2D4 (`g3d/fn_80075DCC.cpp`'s range) and an empty operator delete
+ *   destructor chain ends in 0x8007B2D4 (`g3d/g3d_obj.cpp`) and an empty operator delete
  *   (0x8005D3E0).  The member names follow nw4r's; the classes are GUESSES until their units define them.
  *   Every member is declared out of line: retail calls them (the G3dObj constructor 0x8005D428 stores the vtable at
  *   0x8058ED18, then the parent at +0x04 and the heap at +0x08, and asserts the heap; the AnmObj constructor
@@ -17,6 +17,10 @@
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl */
 
 struct MEMAllocator;
+
+/* 0x8056F668 - the "G3dObj" type-name record (`.rodata`: a length word, then the NUL-terminated name) GetTypeObj
+ * and `g3d/g3d_anmchr.cpp` read. */
+extern "C" u8 anm_typename_G3dObj[];
 
 namespace nw4r {
 namespace g3d {

@@ -252,25 +252,74 @@ g3d/g3d_calcworld.cpp:
 	.sdata2     start:0x80795DC0 end:0x80795DC8
 
 g3d/g3d_camera.cpp:
-	extab       start:0x80008138 end:0x800081F8
-	extabindex  start:0x800207FC end:0x8002091C
-	.text       start:0x800746DC end:0x80075DCC
+	extab       start:0x80008138 end:0x80008200
+	extabindex  start:0x800207FC end:0x80020928
+	.text       start:0x800746DC end:0x80075E9C
 	.data       start:0x8058E430 end:0x8058E570
-	.sdata2     start:0x80795DC8 end:0x80795DF8
+	.sdata2     start:0x80795DC8 end:0x80795E00
 
-g3d/fn_80075DCC.cpp:
-	extab       start:0x800081F8 end:0x80008588
-	extabindex  start:0x8002091C end:0x80020E74
-	.text       start:0x80075DCC end:0x8007C540
-	.rodata     start:0x8056F658 end:0x8056F678
-	.data       start:0x8058E570 end:0x8058EDA0
-	.sdata      start:0x807911E0 end:0x80791208
-	.sdata2     start:0x80795DF8 end:0x80795E60
+g3d/g3d_dcc.cpp:
+	extab       start:0x80008200 end:0x80008210
+	extabindex  start:0x80020928 end:0x80020940
+	.text       start:0x80075E9C end:0x800761BC
+	.data       start:0x8058E570 end:0x8058E608
+
+g3d/g3d_draw1mat1shp.cpp:
+	extab       start:0x80008210 end:0x800082C8
+	extabindex  start:0x80020940 end:0x80020A54
+	.text       start:0x800761BC end:0x800777B0
+	.rodata     start:0x8056F658 end:0x8056F668
+	.data       start:0x8058E608 end:0x8058E880
+	.sdata      start:0x807911E0 end:0x807911F8
+	.sdata2     start:0x80795E00 end:0x80795E18
+
+g3d/g3d_draw.cpp:
+	extab       start:0x800082C8 end:0x800083D8
+	extabindex  start:0x80020A54 end:0x80020BEC
+	.text       start:0x800777B0 end:0x80079FB4
+	.data       start:0x8058E880 end:0x8058EAD8
+	.sdata      start:0x807911F8 end:0x80791200
+	.sdata2     start:0x80795E18 end:0x80795E28
+
+g3d/g3d_fog.cpp:
+	extab       start:0x800083D8 end:0x80008408
+	extabindex  start:0x80020BEC end:0x80020C34
+	.text       start:0x80079FB4 end:0x8007A400
+	.data       start:0x8058EAD8 end:0x8058EB38
+	.sdata2     start:0x80795E28 end:0x80795E30
+
+g3d/g3d_init.cpp:
+	extab       start:0x80008408 end:0x80008418
+	extabindex  start:0x80020C34 end:0x80020C4C
+	.text       start:0x8007A400 end:0x8007A518
+	.data       start:0x8058EB38 end:0x8058EB80
+	.sdata      start:0x80791200 end:0x80791208
+
+g3d/g3d_light.cpp:
+	extab       start:0x80008418 end:0x800084A0
+	extabindex  start:0x80020C4C end:0x80020D18
+	.text       start:0x8007A518 end:0x8007B2D4
+	.data       start:0x8058EB80 end:0x8058ED18
+	.sdata2     start:0x80795E30 end:0x80795E58
+
+g3d/g3d_obj.cpp:
+	extab       start:0x800084A0 end:0x800084C0
+	extabindex  start:0x80020D18 end:0x80020D48
+	.text       start:0x8007B2D4 end:0x8007B424
+	.rodata     start:0x8056F668 end:0x8056F678
+	.data       start:0x8058ED18 end:0x8058ED38
+
+g3d/g3d_scninline.cpp:
+	extab       start:0x800084C0 end:0x80008540
+	extabindex  start:0x80020D48 end:0x80020E08
+	.text       start:0x8007B424 end:0x8007BB94
+	.data       start:0x8058ED38 end:0x8058EDA0
+	.sdata2     start:0x80795E58 end:0x80795E60
 
 g3d/g3d_scnmdl.cpp:
-	extab       start:0x80008588 end:0x80008674
-	extabindex  start:0x80020E74 end:0x80020FB8
-	.text       start:0x8007C540 end:0x8007F0E4 align:16
+	extab       start:0x80008540 end:0x80008674
+	extabindex  start:0x80020E08 end:0x80020FB8
+	.text       start:0x8007BB94 end:0x8007F0E4
 	.rodata     start:0x8056F678 end:0x8056F688
 	.data       start:0x8058EDA0 end:0x8058F0A0
 	.sdata      start:0x80791208 end:0x80791210

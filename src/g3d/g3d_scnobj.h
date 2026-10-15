@@ -9,7 +9,7 @@
  *   the child array at +0xDC..+0xE7.  The member names are nw4r's.
  *   Each class declares its destructor (ScnLeaf: ForEach) before the inherited overrides: MWCC emits a vtable in
  *   the unit that defines the class's first declared out-of-line virtual, and IsDerivedFrom lives in
- *   `g3d/fn_80075DCC.cpp` while the vtables are this unit's.
+ *   `g3d/g3d_scninline.cpp` while the vtables are this unit's.
  */
 #ifndef MHTRI_G3D_G3D_SCNOBJ_H
 #define MHTRI_G3D_G3D_SCNOBJ_H
@@ -21,7 +21,7 @@
 
 /* The "ScnObj", "ScnLeaf" and "ScnGroup" type-name records (`.rodata` 0x8056F6A0/0x8056F6B0/0x8056F6C0, this unit's
  * claim: a length word, then the NUL-terminated name) the scene objects' run-time type members read, here and in
- * `g3d/fn_80075DCC.cpp`'s GetTypeObjStatic members. */
+ * `g3d/g3d_scninline.cpp`'s GetTypeObjStatic members. */
 extern "C" {
 extern u8 scn_typename_ScnObj[];
 extern u8 scn_typename_ScnLeaf[];

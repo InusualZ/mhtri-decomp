@@ -33,7 +33,7 @@
 
 #include "gx.h"
 #include "g3d/g3d_state.h" /* fn_800868A0 (rule 2) */
-#include "g3d/fn_80075DCC.h" /* GDWriteXFCmd, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "g3d/g3d_draw1mat1shp.h" /* GDWriteXFCmd / g3d_gd_set_chan_mat_color / FPow (rule 2) */
 
 /* The write-gather-pipe window at 0xCC008000 and its `GXWGFifo` macro live in `gx.h` now that
  * a second `auto` unit (the GX-writer family at 0x800C6F90) needs them too (CLAUDE.md -> Conventions,
@@ -41,7 +41,7 @@
 
 /* Pipe writers and the byte table, all defined by other translation units of the same library; the
  * addresses are the map's and the local extab names above are the only object-level difference.
- * `fn_800868A0` comes from `g3d/g3d_state.h`, `GDWriteXFCmd` from `g3d/fn_80075DCC.h` (rule 2). */
+ * `fn_800868A0` comes from `g3d/g3d_state.h`, `GDWriteXFCmd` from `g3d/g3d_draw1mat1shp.h` (rule 2). */
 extern const u8 lbl_80795F58[4];
 
 #pragma peephole off

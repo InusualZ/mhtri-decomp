@@ -34,7 +34,7 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
 #include "unsplit/g3d.h"      /* the math types it reads through the band header */
-#include "g3d/fn_80075DCC.h" /* fn_8007A5E4/fn_8007A5A8/fn_8007A724, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "g3d/g3d_light.h" /* fn_8007A5A8 / fn_8007A5E4 / fn_8007A724 (rule 2) */
 #include "g3d/g3d_anmscn.h"
 #include "g3d/g3d_anmclr.h"   /* color_to_u32_ref, color_ctor_white, owned by g3d/g3d_anmclr.cpp (rule 2) */
 #include "g3d/g3d_anmchr.h"   /* the fn_8005Dxx helpers, the type-info members and G3dObj, owned by g3d/g3d_anmchr.cpp (rule 2) */

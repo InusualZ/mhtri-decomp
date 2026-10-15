@@ -19,7 +19,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "g3d/g3d_calcview.h" /* fn_800710BC/mtx34_copy_ps (rule 2) */
-#include "g3d/fn_80075DCC.h" /* fn_80075DCC, owned by g3d/fn_80075DCC.cpp (rule 2) */
+#include "g3d/g3d_camera.h" /* sin_cos_deg (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 

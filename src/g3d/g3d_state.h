@@ -16,7 +16,7 @@ extern "C" {
 
 /* 0x80088584 - returns the render mode the state keeps (caller: g3d_camera.cpp). */
 struct RenderModeObj* g3d_state_get_render_mode(void);
-/* 0x80088590 - forgets the cached state the `flag` bits select (callers: g3d/fn_80075DCC.cpp,
+/* 0x80088590 - forgets the cached state the `flag` bits select (callers: g3d/g3d_init.cpp, g3d/g3d_draw1mat1shp.cpp,
  * sound/fn_800E3CBC.cpp). */
 void g3d_state_invalidate(u32 flag);
 
@@ -53,7 +53,7 @@ struct G3dIndMtxOp;
 class G3dIndMtxCallback;
 struct Mat33;
 
-/* The material loaders `g3d/fn_80075DCC.cpp`'s draw path calls (C linkage: the map's names are plain). */
+/* The material loaders `g3d/g3d_draw1mat1shp.cpp`'s draw path calls (C linkage: the map's names are plain). */
 extern "C" {
 void g3d_state_set_mat_misc(nw4r::g3d::ResMatMisc misc);
 void g3d_state_load_tex_obj(nw4r::g3d::ResTexObj texObj);
