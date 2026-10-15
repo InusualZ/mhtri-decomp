@@ -32,10 +32,12 @@
  *   GUESS: `ef_flag_bit0`, `ef_flag_bit3`, `ef_flag_bit4`, `ef_draw_setting_flags_hi2`,
  *   GUESS: `ef_draw_setting_flags_mid3`, `ef_draw_setting_draw_order`, `ef_stripe_param_copy`,
  *   GUESS: `ef_stripe_sample_ctor`; the constants `ef_stripe_one`, `ef_stripe_zero`, `ef_stripe_epsilon` by value.
- * RESIDUALS. 3 partial rows:
- *  - `Draw` (0x800B76C4): two stack temporaries sit in swapped slots and the loop's saved registers differ;
- *  - `ef_draw_info_view_mtx`: retail reloads the depth offset for every product (ours keeps it in f2);
- *  - `ef_vec3_transform`: two saved values swap r30/r31.
+ * RESIDUALS. 2 partial rows:
+ *  - `Draw` (0x800B76C4): the second view-axis temporary (`z1`) and the short-stripe loop's `axis`/`frame` sit in
+ *    swapped stack slots (retail: frame 0x50, z0 0x44, z1 0x38);
+ *  - `ef_draw_info_view_mtx`: retail reloads the depth offset for every product (ours keeps it in f2); a non-const
+ *    `info`, pointer stores, `opt_common_subs off`, `optimization_level 2/3` keep it, `optimization_level 1` drops
+ *    the CSE but re-converts the projection type and keeps `pm` in r31.
  *   flipcheck: `.data` and `.sdata2` claimed, not emitted (declared by their map names, playbook 29).
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `ef_stripe_zero`, `ef_stripe_one`,
  *     `_savegpr_25`,
@@ -921,13 +923,13 @@ void DrawStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm)
         mtx34_concat(&mtx, &mtx, &ctx.manager_mtx);
         if (ef_flag_bit3(flags)) {
             MTX34 inv;
+            VEC3 z1;
+            VEC3 z0;
             MTX34_ctor(&inv);
             if (mtx34_inverse(&inv, &mtx)) {
-                VEC3 z;
-                copyVec3(&ctx.view_axis_z, setVec3(&z, inv.m[0][2], inv.m[1][2], inv.m[2][2]));
+                copyVec3(&ctx.view_axis_z, setVec3(&z0, inv.m[0][2], inv.m[1][2], inv.m[2][2]));
             } else {
-                VEC3 z;
-                copyVec3(&ctx.view_axis_z, setVec3(&z, 0.0f, 0.0f, 1.0f));
+                copyVec3(&ctx.view_axis_z, setVec3(&z1, 0.0f, 0.0f, 1.0f));
             }
         }
 
@@ -936,14 +938,15 @@ void DrawStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm)
             CalcAheadFunc calc_ahead = GetCalcAheadFunc(pm);
             GetFirstDrawParticleFunc first = GetGetFirstDrawParticleFunc(order);
             GetNextDrawParticleFunc next = GetGetNextDrawParticleFunc(order);
+            EfDrawParticle* q;
 
-            for (p = first(pm); p != NULL; p = next(pm, p)) {
+            for (q = first(pm); q != NULL; q = next(pm, q)) {
                 VEC3 axis;
                 MTX34 frame;
 
                 VEC3_ctor(&axis);
-                calc_ahead(&axis, &ctx, p);
-                ef_stripe_draw_segment(&frame, this, &ctx, flags, p, &axis, (VEC3*)&p->world_pos);
+                calc_ahead(&axis, &ctx, q);
+                ef_stripe_draw_segment(&frame, this, &ctx, flags, q, &axis, (VEC3*)&q->world_pos);
             }
             return;
         }
@@ -957,13 +960,11 @@ void DrawStripeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm)
         default: {
             VEC3 a;
             VEC3 b;
-            const VEC3* pb = setVec3(&b, -1.0f, 0.0f, 0.0f);
-            ef_stripe_draw_ribbon(this, &ctx, flags, setVec3(&a, 1.0f, 0.0f, 0.0f), pb);
+            ef_stripe_draw_ribbon(this, &ctx, flags, setVec3(&a, 1.0f, 0.0f, 0.0f), setVec3(&b, -1.0f, 0.0f, 0.0f));
             if (ed->type_option == 1) {
                 VEC3 c;
                 VEC3 d;
-                const VEC3* pd = setVec3(&d, 0.0f, 0.0f, 1.0f);
-                ef_stripe_draw_ribbon(this, &ctx, flags, setVec3(&c, 0.0f, 0.0f, -1.0f), pd);
+                ef_stripe_draw_ribbon(this, &ctx, flags, setVec3(&c, 0.0f, 0.0f, -1.0f), setVec3(&d, 0.0f, 0.0f, 1.0f));
             }
             break;
         }
@@ -1161,9 +1162,7 @@ s32 ef_draw_setting_connect_type(void* ctx, EfParticleState* particle) {
 
 /* Transforms a vector by the matrix the helper pair builds, and returns `dst`. */
 VEC3* ef_vec3_transform(VEC3* dst, const MTX34* m, const VEC3* v) {
-    void* x = vec3_to_vec(dst);
-    void* y = fn_800508AC((void*)v);
-    PSMTXMultVec((const f32*)mtx34_const_ptr((u32)m), y, x);
+    PSMTXMultVec((const f32*)mtx34_const_ptr((u32)m), fn_800508AC((void*)v), vec3_to_vec(dst));
     return dst;
 }
 

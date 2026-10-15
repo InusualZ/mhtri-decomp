@@ -34,20 +34,22 @@
  *   GUESS: (the unit's static initializer, the `.ctors` entry), and the `ef_strategy_impl_*_str` strings by their text.
  *   GUESS (from the body and its callers): `ef_particle_tex_offset_t`, `ef_particle_tex_offset_s`,
  *   GUESS: `ef_particle_tex_scale_t`, `ef_particle_tex_scale_s`, `ef_particle_wrap_t`, `ef_particle_wrap_s`.
- * RESIDUALS. 4 partial rows:
- *  - `SetupGP` (0x800C68E8): retail keeps an explicit `cmpwi 0` for the GX_NONE case of the position, normal and
- *    texcoord switches (ours folds it into the default; an explicit `default: break;` does not keep it);
- *  - `SetupGPAlpha` (0x800C7270): retail follows the reference compare with a redundant `bne`/`beq` pair (swapped
- *    compare operands, a reference local, `!(==)`, `(!=) != false` and an early return do not produce it);
- *  - `SetupGPTexture` (0x800C7CE0): the texture pointer lives in r30 (ours r23) and the loop's saved registers
- *    number one higher;
- *  - `AheadContext::AheadContext` (0x800C8F10): the two `(0, 1, 0)` temporaries sit in swapped stack slots.
+ * RESIDUALS. 1 partial row:
+ *  - `SetupGPTexture` (0x800C7CE0): the texture pointer lives in r30 (ours r23, r25 with `tex` declared first) and
+ *    the loop's saved registers number one higher; retail also keeps the LOD 0.0f in f26 across the loop and loads
+ *    its five constants in another order.
  *   flipcheck: `.ctors` and `.data` claimed, not emitted (the strings are declared by their map names).
  *   `DrawStrategyImpl` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
  *   `DrawStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
- * SHAPES. `SetupGP` returns early on one `||` of the per-emitter and the system flush flags (retail's `bne`/`b`).
+ * SHAPES. `SetupGP` returns early on one `||` of the per-emitter and the system flush flags (retail's `bne`/`b`);
+ *   the GX_NONE case of its position, normal and texcoord switches holds a dead self-store of the switched field,
+ *   which keeps retail's `cmpwi 0`/`beq` (an empty case folds into the default).
+ * SHAPES. `SetupGPAlpha` tests the first reference twice (`|| prev != ref || prev != ref`): the folded second test
+ *   leaves retail's `bne`/`beq` pair and its `cmpw prev, ref` operand order.
+ * SHAPES. `AheadContext::AheadContext` declares the manager-axis vector at function scope, ahead of the block-scoped
+ *   `(0, 1, 0)` temporaries (retail's stack-slot order).
  * SHAPES. `IsValidPointer` field asserts pass the pointer as the fourth `Panic` argument (retail loads it into r6);
  *   `InitTev`'s `GXSetZMode` arguments are ternaries (ours evaluates them in retail's order only that way); the
  *   attenuation selector is an enum; the accessors take `int layer` (the `layer >= 0 && layer < 3` assert folds into
@@ -530,6 +532,7 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
         for (i = 0; i < 8; i++) {
             switch (pos.type) {
             case 0:
+                pos.type = pos.type; /* a dead store: keeps retail's case-0 compare */
                 break;
             case 1:
                 switch (pos.cnt) {
@@ -583,6 +586,7 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
 
             switch (nrm.type) {
             case 0:
+                nrm.type = nrm.type; /* a dead store: keeps retail's case-0 compare */
                 break;
             case 1:
                 switch (nrm.cnt) {
@@ -632,6 +636,7 @@ void DrawStrategyImpl::SetupGP(EfDrawParticle* pp, const EfEmitterDrawSetting& s
 
             switch (tex0.type) {
             case 0:
+                tex0.type = tex0.type; /* a dead store: keeps retail's case-0 compare */
                 break;
             case 1:
                 switch (tex0.cnt) {
@@ -906,7 +911,8 @@ bool DrawStrategyImpl::SetupGPAlpha(EfDrawParticle* pp, const EfEmitterDrawSetti
     if (!IsValidPointer((u32)pp)) {
         nw4r::db::Panic(ef_strategy_impl_file_str, 591, ef_strategy_impl_pp_assert_str, pp);
     }
-    if (force || pp->alpha_ref0 != mPrevAlphaRef0) {
+    /* Retail tests the first reference twice (the second test is folded away). */
+    if (force || mPrevAlphaRef0 != pp->alpha_ref0 || mPrevAlphaRef0 != pp->alpha_ref0) {
         mPrevAlphaRef0 = pp->alpha_ref0;
         mPrevAlphaRef1 = pp->alpha_ref0;
         GXSetAlphaCompare(setting.alpha_comp0, pp->alpha_ref0, setting.alpha_op, setting.alpha_comp1,
@@ -1491,6 +1497,7 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
     EfEmitterDrawSetting* ed;
     VEC3 axis_y;
     VEC3 center;
+    VEC3 manager_y;
 
     ef_ahead_context_members_ctor(this);
     if (!IsValidPointer((u32)pm)) {
@@ -1521,8 +1528,6 @@ DrawStrategyImpl::AheadContext::AheadContext(const MTX34* view, EfDrawParticleMa
         nw4r::db::Panic(ef_strategy_impl_file_str, 1253, ef_strategy_impl_ed_assert_str, ed);
     }
     if ((s32)ed->type_direction == 5 || (s32)ed->type_direction == 7) {
-        VEC3 manager_y;
-
         setVec3(&manager_y, manager_mtx_inv.m[0][1], manager_mtx_inv.m[1][1], manager_mtx_inv.m[2][1]);
         if (ef_vec3_normalize(&manager_y) == 0) {
             VEC3 up;

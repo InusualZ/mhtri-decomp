@@ -9,28 +9,33 @@
  *   installs the vtable at the end of its own TU's `.data`; so this class's constructor is the tail of `ef/ef_drawlinestrategy.cpp`'s range
  *   (0x800BF7DC) and the DrawSmoothStripeStrategy constructor at this range's tail (0x800BFF98) is the next TU's.
  * FLAGS. `cflags_main`; `#pragma peephole off` before the includes (the FIFO writers keep the unfused narrowing stores,
- *   playbook 39), `#pragma dont_inline on` at the end (the inline destructor calls its base out of line).
+ *   playbook 39), `#pragma pool_data off` (each string address its own `lis`/`addi`), `#pragma dont_inline on` at
+ *   the end (the inline destructor calls its base out of line).
  * NAMES. `ef_point_setup_gx` is a GUESS for NintendoWare's setup (its assert
  *   on line 150 names `pm`); `ef_point_gx_position3f` is a GUESS (the 0x14 FIFO writer at +0x10 of `ef_point_gx_position`,
  *   reached by a tail call).
  *   GUESS: `ef_point_gx_position` (hands a vector to the FIFO writer, the billboard unit's scheme).
  *   GUESS (from the bodies): `ef_point_write_point`, `ef_point_gx_end`, `ef_point_gx_texcoord`, `ef_point_tex_flag`.
- * RESIDUALS. The source defines the FIFO writers and the emitter before `Draw`, so our `.text` (and the extab and
- *   extabindex records) run in a different order from retail's address order.
- *   1 partial row: `Draw` (0x800BF818): one `lwz r6, 0x24(pm)` (the asserted resource) is scheduled before the six assert
- *    temporaries where retail loads it after them, and one `lfs` is placed differently.
- *   flipcheck: `.data` claimed, not emitted; `.sdata` (the size clamp) is emitted with its bytes equal (0x4 short of
- *   the claim, the trailing pad); `.sdata2` (the literals' pool) holds 0.0f before 6.0f where retail has 6.0f first.
+ * RESIDUALS. Every row is written and every function is at 100 %.
+ *   flipcheck: `.data` (the four strings, then the vtable) and `.sdata2` are emitted byte for byte; `.sdata` (the
+ *   size clamp) is equal, 0x4 short of the claim (the trailing pad); `.text` emits this class's destructor after the
+ *   DrawSmoothStripeStrategy constructor that closes the range (retail: before it) and carries the weak copies of
+ *   the two base destructors (see `ef/ef_drawlinestrategy.cpp`'s header for the seam and the link).
  *   `DrawSmoothStripeStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
  * SHAPES. The `Panic` line numbers are literals (92/96/98 in `Draw`, 150 in the state setup), so the source's
  *   line count does not move them.
+ * SHAPES. `Draw`'s resource assert is the six-flag `EF_VALID_PTR_ASSERT` (the field is loaded after the flags), and
+ *   the 6.0f scale is set in the loop's init after the first particle is fetched (retail's `lfs` after the call);
+ *   `Draw` is defined first and the emitter, FIFO writers and GX setup follow in address order.
  */
 
 #pragma peephole off
+#pragma pool_data off
 
 #include "ef.h"
 #include "gx.h"
+#include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "ef/ef_drawpointstrategy.h"
 #include "ef/ef_drawstripestrategy.h" /* ef_draw_info_view_mtx (rule 2) */
 #include "ef/ef_drawsmoothstripestrategy.h" /* DrawSmoothStripeStrategy, whose constructor closes this range */
@@ -73,18 +78,106 @@ extern void GXSetVtxAttrFmt(u32 fmt, u32 attr, u32 cnt, u32 type, u32 frac);
 extern void GXLoadPosMtxImm(void* mtx, u32 id);
 extern void GXSetCurrentMtx(u32 id);
 
-/* This unit's `__FILE__`/assert strings, the draw-order table and the constants, declared, never
- * defined. */
-extern char ef_point_file_str[]; /* "ef_drawpointstrategy.cpp"                                .data 0x80594408 */
-extern char ef_point_pm_assert_str[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."      .data 0x80594424 */
-extern char ef_point_resource_assert_str[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..." .data 0x80594458 */
-extern char ef_point_ed_assert_str[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."     .data 0x80594494 */
+/* This unit's `__FILE__`/assert strings (its claimed `.data`, ahead of the vtable). */
+char ef_point_file_str[] = "ef_drawpointstrategy.cpp";
+char ef_point_pm_assert_str[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
+char ef_point_resource_assert_str[] = "NW4R:Pointer Error\npm->mResource(=%p) is not valid pointer.";
+char ef_point_ed_assert_str[] = "NW4R:Pointer Error\n&ed(=%p) is not valid pointer.";
 /* The largest point the size clamp allows (`.sdata`). */
 static f32 ef_point_max_size = 42.5f;
 
-/* --------------------------------------------------------------------------------------------------
- * The out-of-line GX FIFO writers, in address order.
- * -------------------------------------------------------------------------------------------------- */
+/* The point emitter, its FIFO writers and the point GX state, defined after `Draw` in retail's address order. */
+void ef_point_write_point(Vec* pos, u32 flag);
+void ef_point_gx_end(void);
+void ef_point_gx_texcoord(f32 x, f32 y);
+int ef_point_tex_flag(u32 value);
+void ef_point_gx_position(Vec* v);
+void ef_point_setup_gx(nw4r::ef::DrawPointStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* args);
+
+#ifdef __cplusplus
+}
+#endif
+
+namespace nw4r {
+namespace ef {
+
+/* 0x800BF818 (0x4B4): draws each live particle of the manager as a GX point, resizing the point only when the size
+ * changes. */
+void DrawPointStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
+    EfEmitterDrawSetting* ed;
+    u32 flag;
+    GetFirstDrawParticleFunc first_fn;
+    GetNextDrawParticleFunc next_fn;
+    u32 last_size;
+    bool first;
+    EfDrawParticle* particle;
+    Mtx34 mtx_view;
+    Mtx34 mtx_result;
+    f32 progress;
+    f32 scale;
+    u32 size;
+
+    if (!IsValidPointer((u32)pm)) {
+        nw4r::db::Panic(ef_point_file_str, 92, ef_point_pm_assert_str, pm);
+    }
+    ef_point_setup_gx(this, &info, pm);
+    EF_VALID_PTR_ASSERT(ef_point_file_str, 96, ef_point_resource_assert_str, pm->resource);
+    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
+    if (!IsValidPointer((u32)ed)) {
+        nw4r::db::Panic(ef_point_file_str, 98, ef_point_ed_assert_str, ed);
+    }
+
+    flag = (mNumTexmap != 0);
+
+    MTX34_ctor(&mtx_view);
+    ef_pm_get_mtx(pm, &mtx_view);
+    MTX34_ctor(&mtx_result);
+    ef_draw_info_view_mtx(&info, &mtx_result);
+    mtx34_concat(&mtx_result, &mtx_result, &mtx_view);
+    GXLoadPosMtxImm(mtx34_get_ptr(&mtx_result), 0);
+
+    first_fn = GetGetFirstDrawParticleFunc(ed->flags & 0x800);
+    next_fn = GetGetNextDrawParticleFunc(ed->flags & 0x800);
+
+    last_size = 0;
+    first = true;
+    for (particle = first_fn(pm), scale = 6.0f; particle != 0; particle = next_fn(pm, particle)) {
+        progress = ef_particle_get_scale(particle);
+        if (progress < ef_float_epsilon()) {
+            continue;
+        }
+        size = (u32)(s32)(scale * *ef_min_float(&ef_point_max_size, &progress));
+        if ((u8)size != 0) {
+            if ((u8)last_size != (u8)size) {
+                last_size = size;
+                GXSetPointSize((u8)size, 5);
+                SetupGP(particle, *ed, info, first, true);
+            } else {
+                SetupGP(particle, *ed, info, first, false);
+            }
+            first = false;
+            ef_point_write_point(&particle->world_pos, flag);
+        }
+    }
+}
+
+}  // namespace ef
+}  // namespace nw4r
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Emits one point at `pos`: GXBegin(POINTS, 0, 1), the position, and the (0, 0) texcoord when `flag`'s
+ * low bit asks for one. */
+void ef_point_write_point(Vec* pos, u32 flag) {
+    GXBegin(0xB8, 0, 1);
+    ef_point_gx_position(pos);
+    if (ef_point_tex_flag(flag)) {
+        ef_point_gx_texcoord(0.0f, 0.0f);
+    }
+    ef_point_gx_end();
+}
 
 /* Ends the current FIFO command (the SDK's no-op `GXEnd`). */
 void ef_point_gx_end(void) {}
@@ -117,21 +210,6 @@ static void ef_point_gx_position3f(f32 x, f32 y, f32 z) {
     GXWGFifo.f32 = z;
 }
 
-/* --------------------------------------------------------------------------------------------------
- * The single point emitter and the point GX state.
- * -------------------------------------------------------------------------------------------------- */
-
-/* Emits one point at `pos`: GXBegin(POINTS, 0, 1), the position, and the (0, 0) texcoord when `flag`'s
- * low bit asks for one. */
-void ef_point_write_point(Vec* pos, u32 flag) {
-    GXBegin(0xB8, 0, 1);
-    ef_point_gx_position(pos);
-    if (ef_point_tex_flag(flag)) {
-        ef_point_gx_texcoord(0.0f, 0.0f);
-    }
-    ef_point_gx_end();
-}
-
 /* Sets the point GX state (texcoord offsets, vertex format, current matrix). */
 void ef_point_setup_gx(nw4r::ef::DrawPointStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* args) {
     if (!IsValidPointer((u32)args)) {
@@ -155,69 +233,6 @@ void ef_point_setup_gx(nw4r::ef::DrawPointStrategy* self, const EfDrawInfo* info
 
 namespace nw4r {
 namespace ef {
-
-/* 0x800BF818 (0x4B4): draws each live particle of the manager as a GX point, resizing the point only when the size
- * changes. */
-void DrawPointStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
-    EfEmitterDrawSetting* ed;
-    u32 flag;
-    GetFirstDrawParticleFunc first_fn;
-    GetNextDrawParticleFunc next_fn;
-    u32 last_size;
-    bool first;
-    EfDrawParticle* particle;
-    Mtx34 mtx_view;
-    Mtx34 mtx_result;
-    f32 progress;
-    f32 scale;
-    u32 size;
-
-    if (!IsValidPointer((u32)pm)) {
-        nw4r::db::Panic(ef_point_file_str, 92, ef_point_pm_assert_str, pm);
-    }
-    ef_point_setup_gx(this, &info, pm);
-    if (!IsValidPointer((u32)pm->resource)) {
-        nw4r::db::Panic(ef_point_file_str, 96, ef_point_resource_assert_str, pm->resource);
-    }
-    ed = (EfEmitterDrawSetting*)ef_resource_draw_setting(pm->resource);
-    if (!IsValidPointer((u32)ed)) {
-        nw4r::db::Panic(ef_point_file_str, 98, ef_point_ed_assert_str, ed);
-    }
-
-    flag = (mNumTexmap != 0);
-
-    MTX34_ctor(&mtx_view);
-    ef_pm_get_mtx(pm, &mtx_view);
-    MTX34_ctor(&mtx_result);
-    ef_draw_info_view_mtx(&info, &mtx_result);
-    mtx34_concat(&mtx_result, &mtx_result, &mtx_view);
-    GXLoadPosMtxImm(mtx34_get_ptr(&mtx_result), 0);
-
-    first_fn = GetGetFirstDrawParticleFunc(ed->flags & 0x800);
-    next_fn = GetGetNextDrawParticleFunc(ed->flags & 0x800);
-
-    last_size = 0;
-    first = true;
-    scale = 6.0f;
-    for (particle = first_fn(pm); particle != 0; particle = next_fn(pm, particle)) {
-        progress = ef_particle_get_scale(particle);
-        if (progress < ef_float_epsilon()) {
-            continue;
-        }
-        size = (u32)(s32)(scale * *ef_min_float(&ef_point_max_size, &progress));
-        if ((u8)size != 0) {
-            if ((u8)last_size != (u8)size) {
-                last_size = size;
-                GXSetPointSize((u8)size, 5);
-                SetupGP(particle, *ed, info, first, true);
-            } else {
-                SetupGP(particle, *ed, info, first, false);
-            }
-            first = false;
-            ef_point_write_point(&particle->world_pos, flag);
-        }
-    }
-}
 
 /* 0x800BFF98 (0x3C): the DrawSmoothStripeStrategy constructor (the next unit's class; see the unit header). */
 DrawSmoothStripeStrategy::DrawSmoothStripeStrategy() {}

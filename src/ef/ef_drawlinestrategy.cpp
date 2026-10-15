@@ -21,8 +21,14 @@
  * RESIDUALS. Every row is written and every function is at 100 %.
  *   flipcheck: `.data` is emitted byte for byte (the four strings defined, then the vtable); `.text` carries the
  *   weak copies of the two base destructors (0x88) and emits the line destructor last, after the `DrawPointStrategy`
- *   constructor, where retail has it before; a trial flip ends in mwld's internal error (ELF_linker.c line 7133,
- *   phase Optimizing), and an out-of-line line destructor costs `DrawStrategyBuilder::Create` (100 -> 92.1);
+ *   constructor, where retail has it before (the range is one constructor off its TU: [0x800BEF5C, 0x800BF7DC)
+ *   holds this class's constructor through its destructor, measured with a local re-split, every row unchanged).
+ *   A trial flip ends in mwld's internal error (ELF_linker.c line 7133, phase Optimizing) whatever the seam; the
+ *   trigger is the weak base-destructor copies, whose strong copies sit in `ef/ef_drawstripestrategy.cpp`'s range:
+ *   with them suppressed (a scratch header declaring `~DrawStrategyImpl` out of line) the re-seamed flip links and
+ *   `main.dol` hashes OK; weakening the stripe object's symbols or compiling both objects does not avoid it, and an
+ *   out-of-line `~DrawStrategyImpl` costs `DrawStrategyBuilder::Create` (100 -> 55.9, its statics then register
+ *   destructors); an out-of-line line destructor costs it 100 -> 92.1;
  *   `.sdata` (the width clamp) and `.sdata2` (the literals' pool) are emitted
  *   with their bytes equal, 0x4 short of the claim each (the trailing pad the next object's alignment adds).
  *   `DrawPointStrategy` (constructor): the empty body is the whole source - the compiler

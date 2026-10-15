@@ -10,8 +10,8 @@
  *   installs the vtable at the end of its own TU's `.data`; so this class's constructor is the tail of `ef/ef_drawbillboardstrategy.cpp`'s range
  *   (0x800BE118) and the DrawLineStrategy constructor at this range's tail (0x800BEF5C) is the next TU's.
  * FLAGS. `cflags_main`; `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsh`/`extsb` in front of every
- *   narrowing FIFO store and byte load), now before the includes; `#pragma dont_inline on` at the end (the inline
- *   destructor calls its base out of line).
+ *   narrowing FIFO store and byte load), now before the includes; `#pragma pool_data off` (each string address its
+ *   own `lis`/`addi`); `#pragma dont_inline on` at the end (the inline destructor calls its base out of line).
  * NAMES. GUESS: `ef_free_gx_position3f` (the 0x14 FIFO writer at +0x10 of
  *   `ef_free_gx_position`, reached by a tail call).
  *   GUESS (from the bodies, the billboard unit's scheme): `ef_free_gx_position` (hands a vector to the FIFO writer),
@@ -19,27 +19,32 @@
  *   GUESS (the billboard unit's scheme): `ef_free_write_quad`, `ef_free_gx_end`, `ef_free_gx_u8`, `ef_free_tex_flag`,
  *   GUESS: `ef_free_scale_mtx` (the source rows scaled by (u,v,u) with the s/t correction).
  *   The data names spell their strings (`ef_free_file_str`, `ef_free_*_assert_str` after the asserted expression).
- * RESIDUALS. 2 partial rows:
- *  - `Draw` (0x800BE3C0): the three arguments are saved one register lower (r27-r29 against r28-r30) and one
- *    `lwz r6, 0x24(pm)` is scheduled earlier;
- *  - `ef_free_rotate_mtx`: the two products of the 0x24 component (`fmuls f6`, `fmuls f11`) are computed later and the
- *    float registers around them differ.
+ * RESIDUALS. 1 partial row:
+ *  - `Draw` (0x800BE3C0): `addi r4, r1, 0x38` (the rotation matrix passed to `ef_free_scale_mtx`) is scheduled
+ *    before the four `fmr`s where retail has it after them (a pointer local, a cast, a nested call and a block do
+ *    not move it).
  *   Relocation names that differ from retail (pool constants - the literals' own pool): `ef_free_hundred`,
  *     `ef_free_epsilon`, `ef_free_int_to_double`, `ef_free_one`, `ef_free_zero`.
- *   flipcheck: `.data` claimed, not emitted; `.rodata` (the quad tables) and `.sdata` (the texcoord table) are
- *   emitted.
+ *   flipcheck: `.data` (the strings, then the vtable), `.rodata` (the quad tables) and `.sdata` (the texcoord
+ *   table) are emitted; the range ends with the next class's constructor and the object emits this class's
+ *   destructor last (see `ef/ef_drawlinestrategy.cpp`'s header), plus the weak base-destructor copies.
  *   `DrawLineStrategy` (constructor): the empty body is the whole source - the compiler
  *     emits the base call and the vtable store.
  * SHAPES. The GX setup's pointer assert is the NW4R expression form `(void)(ok || (Panic(...), 0))`: its value
  *   leaves retail's dead `li r0,0; cmpwi r0,0` after the call (playbook 103).
+ * SHAPES. `Draw` declares `flag`, `next`, `first_pass`, `first`, `p`, `ed` in that order (retail's register
+ *   colouring) and hands `ef_free_rotate_mtx` the particle itself; the full rotation computes `sx * sy` and
+ *   `cx * sy` once, ahead of the matrix call.
  */
 
 #pragma peephole off
+#pragma pool_data off
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "gx.h"
 #include "ef.h"
+#include "ef/ef_pointer_assert.h" /* EF_VALID_PTR_ASSERT */
 #include "ef/ef_drawfreestrategy.h"
 #include "nw4r/mtx34_mult_vec3.h" /* mtx34_mult_vec3 (rule 2) */
 #include "ef/ef_drawlinestrategy.h" /* DrawLineStrategy, whose constructor closes this range */
@@ -64,14 +69,13 @@ extern "C" {
 
 #pragma fp_contract off
 
-/* This unit's `.data`/`.rodata`/`.sdata`/`.sdata2` symbols (its claimed ranges), declared, never
- * defined. */
-extern char ef_free_file_str[]; /* "ef_drawfreestrategy.cpp"                                 .data 0x805941F8 */
-extern char ef_free_p_assert_str[]; /* "NW4R:Pointer Error\np(=%p) is not valid pointer."        .data 0x80594210 */
-extern char ef_free_pm_assert_str[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."       .data 0x80594240 */
-extern char ef_free_resource_assert_str[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."  .data 0x80594274 */
-extern char ef_free_ed_assert_str[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."      .data 0x805942B0 */
-extern char ef_free_pp_assert_str[]; /* "NW4R:Pointer Error\npp(=%p) is not valid pointer."       .data 0x805942E4 */
+/* This unit's `__FILE__`/assert strings (its claimed `.data`, ahead of the vtable), in first-use order. */
+char ef_free_file_str[] = "ef_drawfreestrategy.cpp";
+char ef_free_p_assert_str[] = "NW4R:Pointer Error\np(=%p) is not valid pointer.";
+char ef_free_pm_assert_str[] = "NW4R:Pointer Error\npm(=%p) is not valid pointer.";
+char ef_free_resource_assert_str[] = "NW4R:Pointer Error\npm->mResource(=%p) is not valid pointer.";
+char ef_free_ed_assert_str[] = "NW4R:Pointer Error\n&ed(=%p) is not valid pointer.";
+char ef_free_pp_assert_str[] = "NW4R:Pointer Error\npp(=%p) is not valid pointer.";
 /* The unit quad in the XY plane and its crossing quad in the YZ plane (`.rodata`). */
 static const Vec3 ef_free_quad_vtx[4] = {
     {-1.0f, -1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}};
@@ -143,7 +147,7 @@ void ef_free_gx_u8(u8 value);
 int ef_free_tex_flag(u32 value);
 void ef_free_gx_position(const Vec3* v);
 void ef_free_scale_mtx(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v);
-void ef_free_rotate_mtx(MTX34* dst, const Vec3* pp, u8 mode);
+void ef_free_rotate_mtx(MTX34* dst, const EfDrawParticle* pp, u8 mode);
 void ef_free_setup_gx(nw4r::ef::DrawFreeStrategy* self, const EfDrawInfo* info, EfDrawParticleManager* pm);
 
 /* --------------------------------------------------------------------------------------------- *
@@ -231,13 +235,13 @@ namespace ef {
 /* 0x800BE3C0 (0x578): draws each particle as a quad under its own rotation, plus a crossing quad for draw types
  * that ask for one. */
 void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
-    EfDrawState* ed;
-    EfDrawParticle* p;
-    GetFirstDrawParticleFunc first;
-    GetNextDrawParticleFunc next;
-    MTX34 mtx_view, mtx_mgr;
     u32 flag;
+    GetNextDrawParticleFunc next;
     bool first_pass;
+    GetFirstDrawParticleFunc first;
+    EfDrawParticle* p;
+    EfDrawState* ed;
+    MTX34 mtx_view, mtx_mgr;
     f32 scale_a, scale_b, scale_x, scale_z;
 
     if (!IsValidPointer((u32)pm))
@@ -245,8 +249,7 @@ void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
 
     ef_free_setup_gx(this, &info, pm);
 
-    if (!IsValidPointer((u32)pm->resource))
-        nw4r::db::Panic(ef_free_file_str, 204, ef_free_resource_assert_str, pm->resource);
+    EF_VALID_PTR_ASSERT(ef_free_file_str, 204, ef_free_resource_assert_str, pm->resource);
 
     ed = (EfDrawState*)ef_resource_draw_setting(pm->resource);
 
@@ -284,7 +287,7 @@ void DrawFreeStrategy::Draw(const EfDrawInfo& info, EfDrawParticleManager* pm) {
         SetupGP(p, *(EfEmitterDrawSetting*)ed, info, first_pass, false);
         first_pass = false;
 
-        ef_free_rotate_mtx(&mtx_rot, (const Vec3*)&((EfDrawFreeParticle*)p)->pos, ed->drawer_mode);
+        ef_free_rotate_mtx(&mtx_rot, p, ed->drawer_mode);
         ef_free_scale_mtx(&mtx_final, &mtx_rot, scale_a, scale_b, scale_x, scale_z);
 
         mtx_final.m[0][3] += ((EfDrawFreeParticle*)p)->offset_x;
@@ -336,7 +339,7 @@ void ef_free_scale_mtx(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v) {
 
 /* Builds an `MTX34` rotation from the particle's angle vector `pp`: mode 0 rotates about X, 1 about Y,
  * 2 about Z and any other value composes the full Euler rotation.  `ef_sin_cos` is the sin/cos pair. */
-void ef_free_rotate_mtx(MTX34* dst, const Vec3* pp, u8 mode) {
+void ef_free_rotate_mtx(MTX34* dst, const EfDrawParticle* pp, u8 mode) {
     Vec3 v;
     f32 sx, cx, sy, cy, sz, cz;
 
@@ -369,10 +372,14 @@ void ef_free_rotate_mtx(MTX34* dst, const Vec3* pp, u8 mode) {
         ef_sin_cos(&sx, &cx, v.x);
         ef_sin_cos(&sy, &cy, v.y);
         ef_sin_cos(&sz, &cz, v.z);
-        mtx34_set(dst,
-                    cy * cz, sx * sy * cz - cx * sz, cx * sy * cz + sx * sz, 0.0f,
-                    cy * sz, sx * sy * sz + cx * cz, cx * sy * sz - sx * cz, 0.0f,
-                    -sy, cy * sx, cx * cy, 0.0f);
+        {
+            f32 sxsy = sx * sy;
+            f32 cxsy = cx * sy;
+            mtx34_set(dst,
+                        cy * cz, sxsy * cz - cx * sz, cxsy * cz + sx * sz, 0.0f,
+                        cy * sz, sxsy * sz + cx * cz, cxsy * sz - sx * cz, 0.0f,
+                        -sy, cy * sx, cx * cy, 0.0f);
+        }
         break;
     }
 }
