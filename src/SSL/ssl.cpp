@@ -17,11 +17,14 @@
  * SHAPES. Every request opens `/dev/net/ssl`, passes 32-byte aligned locals (`result`, the context id, the payload)
  *   through `IOS_Ioctlv` and closes the device again; the order of the two stores before the ioctl is load-bearing.
  *   `SSLRead`/`SSLWrite` split the transfer into an unaligned head (through a 32-byte bounce buffer), the 32-byte
- *   multiple and the tail, each through the `SSLiRecv`/`SSLiSend` inline. The certificate buffers are four
+ *   multiple and the tail, each through the `SSLiRecv`/`SSLiSend` inline; both walk the parameters `buf`/`length`
+ *   themselves (no local copies) and declare `bounce, ret, total, fd, size` in that order (the saved-register
+ *   colouring of `ret`/`total`). The certificate buffers are four
  *   file statics in one `.bss` run (retail addresses them from one base register, `addi rX,base,0` for the
  *   mutex), and the one-time buffer set-up is written out in both setters.
- * RESIDUALS. `SSLRead`/`SSLWrite`: the inlined chunk locals sit below their vectors (retail: above) and the
- *   parameters take other saved registers. `.data`/`.sdata` end 3 / 4 bytes short of the claims (the NCD
+ * RESIDUALS. `SSLRead`/`SSLWrite`: the inlined chunk locals sit below their vectors (retail: above; no
+ *   declaration or statement order inside the inline moves the vectors), and `size` takes r30 above the
+ *   parameters where retail gives it the lowest saved register, so the parameters sit one register low. `.data`/`.sdata` end 3 / 4 bytes short of the claims (the NCD
  *   object's 8-byte alignment pad).
  *   `SSLSetClientCert`/`SSLSetRootCA`: the base `lis`/`addi` of the statics relocates against our local section
  *   symbol where retail names `sslMutex`. Flip blocker (row 36): retail `.comment` marks `sslClientCert`, `sslClientKey`
@@ -182,11 +185,9 @@ static inline s32 SSLiSend(s32 fd, s32 ssl, u8* data, u32 size) {
 /* untyped: byte range */
 s32 SSLRead(s32 ssl, void* buf, s32 length) {
     u8 bounce[32] __attribute__((aligned(32)));
-    u8* dst = (u8*)buf;
-    u32 remaining = length;
-    s32 fd;
-    s32 total;
     s32 ret;
+    s32 total;
+    s32 fd;
     u32 size;
 
     fd = IOS_Open("/dev/net/ssl", 0);
@@ -194,41 +195,41 @@ s32 SSLRead(s32 ssl, void* buf, s32 length) {
     if (fd < 0) {
         return -1;
     }
-    if (remaining > 0x8000) {
-        remaining = 0x8000;
+    if ((u32)length > 0x8000) {
+        length = 0x8000;
     }
-    size = ((u32)dst & 0x1F) ? 32 - ((u32)dst & 0x1F) : 0;
+    size = ((u32)buf & 0x1F) ? 32 - ((u32)buf & 0x1F) : 0;
     total = 0;
     memset(bounce, 0, sizeof(bounce));
     if (size != 0) {
-        if (size > remaining) {
-            size = remaining;
+        if (size > (u32)length) {
+            size = (u32)length;
         }
         ret = SSLiRecv(fd, ssl, bounce, size);
         if (ret > 0) {
             total = ret;
-            memcpy(dst, bounce, ret);
+            memcpy(buf, bounce, ret);
             if ((u32)ret < size) {
                 IOS_Close(fd);
                 return total;
             }
-            dst += ret;
-            remaining -= ret;
+            buf = (u8*)buf + ret;
+            length -= ret;
         } else {
             IOS_Close(fd);
             return ret;
         }
     }
-    if (remaining != 0 && (size = remaining & ~0x1F) != 0) {
-        ret = SSLiRecv(fd, ssl, dst, size);
+    if (length != 0 && (size = (u32)length & ~0x1F) != 0) {
+        ret = SSLiRecv(fd, ssl, (u8*)buf, size);
         if (ret > 0) {
             total += ret;
             if ((u32)ret < size) {
                 IOS_Close(fd);
                 return total;
             }
-            dst += ret;
-            remaining -= ret;
+            buf = (u8*)buf + ret;
+            length -= ret;
         } else {
             IOS_Close(fd);
             if (total > 0) {
@@ -237,11 +238,11 @@ s32 SSLRead(s32 ssl, void* buf, s32 length) {
             return ret;
         }
     }
-    if (remaining != 0 && (size = remaining & 0x1F) != 0) {
+    if (length != 0 && (size = (u32)length & 0x1F) != 0) {
         memset(bounce, 0, sizeof(bounce));
         ret = SSLiRecv(fd, ssl, bounce, size);
         if (ret > 0) {
-            memcpy(dst, bounce, ret);
+            memcpy(buf, bounce, ret);
             total += ret;
         } else {
             IOS_Close(fd);
@@ -262,11 +263,9 @@ s32 SSLRead(s32 ssl, void* buf, s32 length) {
 /* untyped: byte range */
 s32 SSLWrite(s32 ssl, void* buf, s32 length) {
     u8 bounce[32] __attribute__((aligned(32)));
-    u8* src = (u8*)buf;
-    u32 remaining = length;
-    s32 fd;
-    s32 total;
     s32 ret;
+    s32 total;
+    s32 fd;
     u32 size;
 
     fd = IOS_Open("/dev/net/ssl", 0);
@@ -274,14 +273,14 @@ s32 SSLWrite(s32 ssl, void* buf, s32 length) {
     if (fd < 0) {
         return -1;
     }
-    size = ((u32)src & 0x1F) ? 32 - ((u32)src & 0x1F) : 0;
+    size = ((u32)buf & 0x1F) ? 32 - ((u32)buf & 0x1F) : 0;
     total = 0;
     memset(bounce, 0, sizeof(bounce));
     if (size != 0) {
-        if (size > remaining) {
-            size = remaining;
+        if (size > (u32)length) {
+            size = (u32)length;
         }
-        memcpy(bounce, src, size);
+        memcpy(bounce, buf, size);
         ret = SSLiSend(fd, ssl, bounce, size);
         if (ret > 0) {
             total = ret;
@@ -289,23 +288,23 @@ s32 SSLWrite(s32 ssl, void* buf, s32 length) {
                 IOS_Close(fd);
                 return ret;
             }
-            src += ret;
-            remaining -= ret;
+            buf = (u8*)buf + ret;
+            length -= ret;
         } else {
             IOS_Close(fd);
             return ret;
         }
     }
-    if (remaining != 0 && (size = remaining & ~0x1F) != 0) {
-        ret = SSLiSend(fd, ssl, src, size);
+    if (length != 0 && (size = (u32)length & ~0x1F) != 0) {
+        ret = SSLiSend(fd, ssl, (u8*)buf, size);
         if (ret > 0) {
             total += ret;
             if ((u32)ret < size) {
                 IOS_Close(fd);
                 return total;
             }
-            src += ret;
-            remaining -= ret;
+            buf = (u8*)buf + ret;
+            length -= ret;
         } else {
             IOS_Close(fd);
             if (total > 0) {
@@ -314,9 +313,9 @@ s32 SSLWrite(s32 ssl, void* buf, s32 length) {
             return ret;
         }
     }
-    if (remaining != 0 && (size = remaining & 0x1F) != 0) {
+    if (length != 0 && (size = (u32)length & 0x1F) != 0) {
         memset(bounce, 0, sizeof(bounce));
-        memcpy(bounce, src, size);
+        memcpy(bounce, buf, size);
         ret = SSLiSend(fd, ssl, bounce, size);
         if (ret > 0) {
             total += ret;

@@ -34,7 +34,7 @@ void NHTTPi_CheckCurrentThread(NHTTPThreadInfo* info, BOOL onThread);
  * 512-byte blocks for the part of the stream past the first 1024 bytes, then the 1024 bytes the
  * header addresses directly.  Only the fields the helpers touch are modelled. size: 0x438 */
 typedef struct NHTTPRecvBuf {
-    /* +0x000 */ s32 capacity;               /* the ring's total byte count (NHTTPi_RecvBufCopy) */
+    /* +0x000 */ volatile s32 capacity;      /* the ring's total byte count; re-read at every use */
     /* +0x004 */ u8 pad_0x004[0x18];
     /* +0x01C */ u32 length;                 /* bytes buffered (NHTTPi_isRecvBufFull) */
     /* +0x020 */ u8 pad_0x020[0x14];
@@ -63,9 +63,9 @@ s32 NHTTPi_SocRecvFromOffset(s32 handle, NHTTPConnection* conn, s32 flags, s32 o
 s32 NHTTPi_SocRecvOffsetRange(s32 handle, NHTTPConnection* conn, s32 flags, s32 offset, s32 length,
                               s32 arg);
 
-/* 0x805152C4 (0xF8): the index of the first space in the ring's stream between `start` and `end`, or
- * -1 when there is none. */
-s32 NHTTPi_RecvBufFindSpace(NHTTPRecvBuf* ring, s32 start, s32 end);
+/* 0x805152C4 (0xF8): skips spaces - the index of the first byte between `start` and `end` that is not
+ * a space, or -1 when there is none. */
+s32 NHTTPi_RecvBufSkipSpaces(NHTTPRecvBuf* ring, s32 start, s32 end);
 
 /* 0x805153BC (0x1F0): the case-insensitive search `NHTTPi_findHeaderField` names a header with: 0 when
  * the ring's stream between `start` and `end` holds `name` (each character compared upper-cased, the

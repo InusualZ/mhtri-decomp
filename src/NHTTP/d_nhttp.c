@@ -1,123 +1,68 @@
 /*
- * d_nhttp.c - the Revolution SDK NHTTP library's core TU, `.text` 0x80515774..0x8051B7FC
- * (108 functions, 24712 B): the connection/request/response objects and their list, the public
- * NHTTP calls over them, the comm thread that sends a request and receives its answer, the `NHTTPi_Soc*`
- * socket wrappers, and the string/URL/Base64 helpers.
- *
- * REGISTRATION.  Left edge 0x80515774 is the first referrer of the TU's `.data` strings (`"https://"`,
- * the base64 alphabet, `"CONNECT "`, the header literals) and the `.sdata` run jump 0x807943A0 ->
- * 0x807943A8 admits it; right edge 0x8051B7FC is `SSLNew`, the SSL library's start.  The source name is
- * `d_nhttp.c` (`NHTTPSetSystemProxy` panics with it, `.data:0x80630F04`).  One TU: the `.data` literals
- * appear in address order of their first use, from `createRequestObject` to `InitConnectionList`.
- *
- * FLAGS.  GC/3.0a5.2 with `cflags_nhttp` plus the unit's own `#pragma inline_max_size(8)` (below).
- *
- * BODY (sixth pass).  All 108 functions are written: 48 are byte-identical, 102 are >= 80 %,
- * the unit is 93.56 % fuzzy (13.84 % before this pass).  This pass wrote the request/response object
- * builder and teardown, the socket layer, the comm thread and its nine steps (connect, SSL tunnel,
- * request writer, three post-body senders, head/body receivers, header parser), the public calls and
- * `NHTTPi_Base64Encode`.
- *
- * NAMING (rule 7).  Every `fn_` row of the unit was named from its body and its callers, and the map
- * renamed with it; the SO resolver pair (`SOGetAddrInfo`/`SOFreeAddrInfo`) and the two 4-byte OS stubs
- * (`OSInitThreadQueueThunk`/`OSWakeupThreadThunk`) it calls were named too.  Evidence per family:
- *   - the public calls carry the SDK's own spelling where a `.data` string names it (`NHTTPAddHeaderField`,
- *     `NHTTPAddPostDataAscii`, `NHTTPSetProxy`), and the SDK's public vocabulary otherwise
- *     (`NHTTPCreateRequest`, `NHTTPSendRequestAsync`, `NHTTPCancelRequest`, `NHTTPDestroyResponse`,
- *     `NHTTPGetBodyAll`, `NHTTPGetResultCode`, `NHTTPSetVerifyOption`, `NHTTPClearRootCA`,
- *     `NHTTPClearClientCert`, `NHTTPSetSystemProxy`) - these are GUESSes: the body says what each does,
- *     the retail spelling is not in the image.
- *   - the internals are GUESSes read off the body: `NHTTPi_createRequestObject` (0x258-byte request +
- *     0x43C-byte response, URL parser), `NHTTPi_cancelRequestById`, `NHTTPi_probeSocket` (peek: 0 alive,
- *     -1 closed), `NHTTPi_openSocket`, `NHTTPi_SocConnect`, `NHTTPi_SocShutdown`, `NHTTPi_resolveHostName`,
- *     `NHTTPi_strToDec`, `NHTTPi_uintToStr`, `NHTTPi_isHeaderEnd`, `NHTTPi_findHeaderField`, and the
- *     comm-thread steps (`dequeueRequest`, `prepareTarget`, `connectSocket`, `negotiateSSL`,
- *     `sendRequest`, `sendHeaderFields`, `sendRawPostBody`, `sendMultipartBody`, `sendUrlEncodedBody`,
- *     `sendProxyConnect`, `recvProxyConnectReply`, `recvResponseHeaders`, `parseResponseHeaders`,
- *     `recvResponseBody`, `finishRequest`) whose behaviour is fixed by the strings they write.
- * Layouts: `NHTTPRequest` (bgnend.h), `NHTTPResponse`/`NHTTPConnection`/`NHTTPCommContext`/
- * `NHTTPProxyConfig` (d_nhttp.h) were completed from the field offsets the bodies use; the response IS the
- * receive ring `NHTTP_os_RVL.h` describes plus the caller's own word, and the sibling's `NHTTPSock`/
- * `conn` are that response and its request (see `NHTTPi_SocRecv` in d_nhttp.h).
- *
- * Load-bearing source shapes (each measured):
- *   - `#pragma inline_max_size(8)`: retail inlines only the one-line list wrappers (`Connection2Response`,
- *     `GetConnection`, ...) and keeps a `bl` to every bigger function; the default limit folds
- *     `NHTTPi_SocSend`, `NHTTPGetBodyBuffer`, `NHTTPi_GetResponseSize` into their callers (SaveBuf 46.5 ->
- *     95.4, GetBodyAll 28.2 -> 92.3).  8 and 10 are identical; 4 and 6 also stop the wrappers.
- *   - the file is in ADDRESS ORDER, so a callee defined below its caller stays a `bl` exactly as in retail
- *     (an out-of-order file inlined the request teardown into its users).
- *   - the four 4-12 byte shims (`NHTTPi_memcpy`/`strlen`/`strcmp`/`memclr`) are `asm`: MWCC inlines a C
- *     tail-call shim into every later caller, retail never does.
- *   - `static inline` for the two helpers retail inlines (`NHTTPi_toLower`, `NHTTPi_freeFieldList`,
- *     the proxy/basic-authorization writers): a plain `static` one is emitted as an extra symbol.
- *   - a range test is a source input: `c >= LO && c <= HI` folds into an unsigned compare retail almost
- *     never has.  A `&` pair in parentheses (`toLower`) or the constant on the LEFT (`'0' <= c`,
- *     `3 <= method`, `'0' > c`) keeps retail's two compares; `urlEncodedLength` is the one exception.
- *   - a `switch` on the post mode (`case 0: case 1:` before `case 2:`) reproduces retail's compare tree
- *     where `if (mode == 2) ... else if (mode < 2)` gave 64 % (sendPostField 64.4 -> 95.0).
- *   - a `for (;;) { ... if (x == 0) break; ... } return y;` puts the shared return at the loop's exit as
- *     retail does; locals declared uninitialised and set after the guard (`strToDec`) move the `li`.
- *   - `u8 previous` compared as `(s8)previous` keeps retail's re-extension of the byte at every test.
- *   - `NHTTPi_createRequestObject` is a `do { ... } while (0)` whose `break`s reach the shared cleanup
- *     (rule 8: no `goto`); the retail error blocks are separate per check, ours merge two of them.
- *   - kept from the earlier passes: `urlEncodedLength`/`...N` walk a separate pointer (`c = *p++`, not
- *     `*++s`, which fuses into `lbzu`); `encodeUrlChar` takes a `u8*` and stores the nibbles uncast;
- *     `NHTTPi_GetSystemInfoP` sits in `#pragma dont_inline on` so `InitThreadInfo` stays a `bl`;
- *     `containsString` walks the haystack with a pointer and tests `i < haystackLen - needleLen + 1`;
- *     `ControlConnectionList` declares its link slot inside the `else` and takes `mode` signed.
- *
- * CLAIMED DATA (rule 12).  The unit owns four runs in `splits.txt` and defines every object in them; the
- * `.bss`/`.sbss` ones are zero-filled, and the `.data`/`.sdata` pair is the version tag.
- *   - `.sbss 0x80795878..0x80795888` (16 B): two `OSRegisterVersion` lazy-init flags, the connection
- *     list's head and `NHTTPi_systemInfoP`.
- *   - `.bss 0x80762C20..0x80762C60` (0x40 B): the record `NHTTPi_NotifyCompletion` lazily initialises
- *     (`NHTTPi_completionSync`, name a GUESS; only 0x24 B are used, the tail stays padding).
- *   - `.sdata 0x80794410..0x80794418` and `.data 0x80630C50..0x80630D48`: the version tag (two pointer
- *     words and the three banners, incl. an unreferenced `UNOFFICIAL` one); byte-identical to the target.
- * NOT claimed, and why the literals below are local: the rest of the unit's strings sit in unowned runs
- * (`.data 0x80630B28..0x80630C50` and `0x80630D48..0x80630F88`, `.rodata 0x80574D00..0x80574DFC`,
- * `.sdata 0x807943A8..0x80794410` and the `":"` at 0x80794418); four requests are filed in
- * `tools/units/data-requests.json`.  Until they are claimed the unit's object carries its own literals
- * (`datagap`: ours-extra `.data` +657 B, `.rodata` 249 B, `.sdata` +104 B) and a string row's relocation
- * names its `@NN` literal where retail names `lbl_8063xxxx`.  Even a claim cannot make `.data` byte-equal:
- * retail's pool also holds the messages of four public calls the linker dropped (`NHTTPAddPostDataBinary`,
- * `NHTTPAddPostDataRaw`, `NHTTPSetPostDataEncoding`, `NHTTPDisableVerifyOptionForDebug`, at 0x80630DA8..),
- * so those bytes exist only in the target.  `-str reuse` also gives one symbol per literal where retail pools
- * several behind one base.
- *
- * Residuals (fuzzy, per function; built with GC/3.0a5.2, the lib's compiler since docs/network.md "SDK library
- * compilers"; some of the numbers below were taken under Wii/1.3):
- *   - `NHTTPi_Base64Encode` 48.8: retail divides by 3 with `li r0,3`/`divwu` and `groups * 3` with `mulli`
- *     (no reciprocal multiply, no shift-subtract) and schedules the two unrolled loops differently; no
- *     spelling of the division (`u32`, `3U`, a local, `opt size`, levels 2/3, peephole off) reproduces it.
- *   - `NHTTPi_urlEncodedLength` 59.64 / `NHTTPi_strtonum` 72.78 / `NHTTPi_containsString` 73.49 /
- *     `NHTTPi_strnicmp` 86.37 / `NHTTPi_compareToken` 94.22 /
- *     `NHTTPi_encodeUrlChar` 93.38: as recorded by the earlier passes - retail keeps a value in a
- *     callee-saved register (a frame ours does not need), a redundant terminator re-test in `strnicmp`,
- *     and merges two ranges in `urlEncodedLength` that the constant-left spelling would fuse.
- *   - `NHTTPi_AddConnection`/`NHTTPi_OmitConnectionList` 65.83: retail's fused `~(x | -x) >> 31`;
- *     `NHTTPi_ControlConnectionList` 92.91: retail's binary-search switch over modes 0-4.
- *   - `NHTTPi_dispatchConnectionCallback` 93.16 (retail's switch is a compare tree over 1-4 and holds the
- *     phase in r31), `NHTTPi_recvResponseBody` 92.99 / `NHTTPi_parseResponseHeaders` 87.10 /
- *     `NHTTPi_connectSocket` 88.64 / `NHTTPi_recvResponseHeaders` 91.01 / `NHTTPi_createRequestObject`
- *     91.92 / `NHTTPi_commThreadLoop` 91.94: register numbering of the longest-lived locals, and retail's
- *     `li r0,N; li r3,0; stw` (the return value loaded before the error store) where ours stores first -
- *     no scheduling pragma or return spelling moves it; the `.data` pool offsets (`addi r4,r28,0x88` off
- *     one base) are the unclaimed-literal effect above.
- *   - `NHTTPi_SocSSLConnect` 95.9 (retail's handshake result tree), `NHTTPi_SocRecv` 90.6 /
- *     `NHTTPi_SocSend` 95.3 / `NHTTPi_SocSend_sub` 97.0, `NHTTPi_cancelRequestById` 93.8 /
- *     `NHTTPi_cancelAllRequests` 92.7 (retail reloads `active->request` for the store), `NHTTP_SendRequestAsync`
- *     95.8 (retail stores the flag after the argument setup), `NHTTPi_GetResponseSize`/`BufferFull`/
- *     `Recv`/`PostSendCallback` (earlier passes): one to a few instructions of scheduling or allocation.
- *   - Relocation names that differ: `NHTTPi_createRequestObject` +0x21c, retail calls `NHTTPi_SetError` where ours
- *     inlines it; `NHTTPi_Base64Encode` reaches its table off a base where retail names `NHTTPi_base64Alphabet`;
- *     `NHTTPi_sendUrlEncodedBody` names `NHTTPi_urlEncodedHeader` where retail names the pool label `lbl_80630BDC`.
- *
- * Shared files touched (each minimal, all listed in the outbox): `NHTTPRequest` completed in
- * `NHTTP/NHTTP_bgnend.h` (+ `quitFlag`/`socket`/`sslHook` renames in `NHTTP_bgnend.c`), the request-info
- * word `active` in `NHTTP_os_RVL.c`, `NHTTPi_RecvBufFindUpper`/`FindSpace` prototypes in `NHTTP_os_RVL.h`,
- * the SO/SSL/OS calls in `unsplit/SO.h`, the new `unsplit/SSL.h` and `unsplit/OS.h`.
+ * d_nhttp.c - the Revolution SDK NHTTP library's core TU: the connection/request/response objects and their
+ *   list, the public NHTTP calls over them, the comm thread that sends a request and receives its answer, the
+ *   `NHTTPi_Soc*` socket wrappers, and the string/URL/Base64 helpers.
+ * RANGE. .text 0x80515774-0x8051B7FC (108 functions, 24712 B), in address order (a callee defined below its
+ *   caller stays a `bl`, as in retail).  Data claimed in `splits.txt`: .rodata 0x80574CE8-0x80574E00, .data
+ *   0x80630B28-0x80630F88, .bss 0x80762C20-0x80763900, .sdata 0x807943A8-0x80794420, .sbss 0x80795878-0x80795888.
+ *   Left edge: first referrer of the `.data` strings (`"https://"`) and the `.sdata` run jump 0x807943A0 ->
+ *   0x807943A8.  Right edge: `SSLNew`, the SSL library's start.
+ * SOURCE FILE. `NHTTPSetSystemProxy` panics with `"d_nhttp.c"` (`.data` 0x80630F04).
+ * FLAGS. GC/3.0a5.2 with `cflags_nhttp`, plus `#pragma inline_max_size(8)` below: retail inlines only the
+ *   one-line list wrappers and keeps a `bl` to every bigger function (the default limit folds them in).
+ * NAMES. Public calls carry the SDK's spelling where a `.data` message names it (`NHTTPAddHeaderField`,
+ *   `NHTTPAddPostDataAscii`, `NHTTPSetProxy`); GUESS: `NHTTPCreateRequest`, `NHTTPSendRequestAsync`,
+ *   `NHTTPCancelRequest`, `NHTTPDestroyResponse`, `NHTTPGetBodyAll`, `NHTTPGetResultCode`, `NHTTPSetVerifyOption`,
+ *   `NHTTPClearRootCA`, `NHTTPClearClientCert`, `NHTTPSetSystemProxy` (the SDK vocabulary; the body says what
+ *   each does).  GUESS, read off the bodies: `NHTTPi_createRequestObject`, `NHTTPi_cancelRequestById`,
+ *   `NHTTPi_probeSocket`, `NHTTPi_openSocket`, `NHTTPi_SocConnect`, `NHTTPi_SocShutdown`,
+ *   `NHTTPi_resolveHostName`, `NHTTPi_strToDec`, `NHTTPi_uintToStr`, `NHTTPi_isHeaderEnd`,
+ *   `NHTTPi_findHeaderField`, the comm-thread steps (`dequeueRequest`, `prepareTarget`, `connectSocket`,
+ *   `negotiateSSL`, `sendRequest`, `sendHeaderFields`, `sendRawPostBody`, `sendMultipartBody`,
+ *   `sendUrlEncodedBody`, `sendProxyConnect`, `recvProxyConnectReply`, `recvResponseHeaders`,
+ *   `parseResponseHeaders`, `recvResponseBody`, `finishRequest`), `NHTTPi_completionSync`, and the inline
+ *   helpers `NHTTPi_skipLine`, `NHTTPi_callSendCallback`, `NHTTPi_callBufferFullCallback`,
+ *   `NHTTPi_callCompleteCallback` (no symbol of their own).
+ * LAYOUT. `NHTTPRequest` (NHTTP_bgnend.h), `NHTTPResponse`/`NHTTPConnection`/`NHTTPCommContext`/`NHTTPProxyConfig`
+ *   (d_nhttp.h) come from the field offsets the bodies use; the response IS the receive ring `NHTTP_os_RVL.h`
+ *   describes.  `NHTTPi_systemInfo` is one 0xCA0-byte `NHTTPInfo` (the map splits it at 0x8076317A, a label no
+ *   relocation names).
+ * SHAPES. Each measured against the alternatives:
+ *   - inline helpers whose early returns join in one register: `NHTTPi_skipLine` (the chunk-extension and
+ *     trailer skips of `NHTTPi_recvResponseBody`), the three phase handlers of
+ *     `NHTTPi_dispatchConnectionCallback` (playbook 101).
+ *   - `volatile` fields where retail re-reads them (playbook 125): `NHTTPSock.length`,
+ *     `NHTTPRequestNode.request`, `NHTTPResponse.headerLength` / `NHTTPRecvBuf.capacity`.
+ *   - `if (r > 0) { ... } else { return r; }` after `SORecv`/`SOSend` (playbook 126), and `NHTTPi_SocRecv`
+ *     returns -1001 directly when the request has no connection.
+ *   - `NHTTPi_commThreadLoop`'s switches list `case 0:` with `default` (the compare tree pivots on it) and
+ *     the bodies in retail's order (again, finish, send); `sendRequest` answering 1 finishes the request.
+ *   - `r ? 0 : -1` (not `r == 0 ? -1 : 0`) for retail's `cntlzw`/`srwi`/`neg`; `(u32)mode == NHTTPI_LIST_ADD`
+ *     for the one unsigned compare in `NHTTPi_ControlConnectionList`, whose walk steps `link = &(*link)->next`.
+ *   - the send steps keep `u8* sendBuffer = thread->sendBuffer;` as a local (retail hoists the `addi`);
+ *     `NHTTPi_encodeUrlChar` computes the nibbles as `s32` from `(u8)c`; `NHTTPSetProxy` spells the password's
+ *     address `&credentials[userLength + 1]` (no CSE with the `":"` store).
+ *   - `NHTTPi_createRequestObject` is a `do { ... } while (0)` whose `break`s reach the shared cleanup (rule 8).
+ *   - the four 4-12 byte shims (`NHTTPi_memcpy`/`strlen`/`strcmp`/`memclr`) are `asm` (MWCC would inline a C
+ *     tail-call shim); a range test keeps the constant on the left (`'0' <= c`) to keep retail's two compares;
+ *     `NHTTPi_GetSystemInfoP` sits in `#pragma dont_inline on`.
+ * RESIDUALS.
+ *   - `.data`/`.rodata`/`.sdata` literals: retail's pool also holds the messages of four public calls the linker
+ *     dropped (`NHTTPAddPostDataBinary`, `NHTTPAddPostDataRaw`, `NHTTPSetPostDataEncoding`,
+ *     `NHTTPDisableVerifyOptionForDebug`, from 0x80630DA8), so ours is 905 of 1120 B and every string row
+ *     relocates against our `@NN`/section symbol plus another offset where retail names `lbl_8063xxxx`.
+ *   - `NHTTPi_AddConnection`/`NHTTPi_OmitConnectionList`: retail's `neg`/`nor`/`srawi` for `r ? 0 : -1`; no
+ *     spelling tried (ternary, `-(r == 0)`, `(r != 0) - 1`, casts) gives it.
+ *   - `NHTTPi_Base64Encode`: retail divides by 3 with `li r0,3; divwu` and multiplies with `mulli` (no
+ *     reciprocal, no shift-subtract); no spelling, local, inline divisor or `optimization_level` reproduces it.
+ *   - `NHTTPi_createRequestObject`: retail calls `NHTTPi_SetError` and jumps to the cleanup from inside the URL
+ *     scan loop, a two-level exit rule 8 forbids; plus register colouring.
+ *   - `NHTTPi_containsString`, `NHTTPi_uintToStr`, `NHTTPi_findHeaderField` (prologue copy order),
+ *     `NHTTPi_SocSend` (the `sslHandle` load scheduled above the `r31` save), `NHTTPi_BufferFullCallback` /
+ *     `NHTTPi_RecvCallback` (the connection's register), `NHTTPi_sendPostField`, `NHTTPi_recvResponseBody`,
+ *     `NHTTPi_compareToken`, `NHTTPi_strtonum`, `NHTTPCreateConnection`, `NHTTPi_PostSendCallback`: register
+ *     colouring or scheduling; a declaration-order search over each function's locals found nothing better.
+ *   - flip blockers: the map row `lbl_8076317A` (the tail of `NHTTPi_systemInfo`), the literal pool above.
  */
 
 #include "NHTTP/d_nhttp.h"
@@ -137,8 +82,9 @@
 
 /* The data this unit owns (rule 12, claimed in `splits.txt`): the 16-byte `.sbss` run
  * 0x80795878..0x80795888 - the two version-registration flags, the connection list's head and the
- * system-info slot - and the 0x40-byte `.bss` completion record.  All of it is zero-filled, which is
- * why the objects are plain definitions with no initialiser.  `NHTTPi_systemInfoP` is the word the
+ * system-info slot - and the `.bss` run 0x80762C20..0x80763900: the 0x40-byte completion record and the
+ * 0xCA0-byte system-info block.  All of it is zero-filled, which is why the objects are plain definitions
+ * with no initialiser.  `NHTTPi_systemInfoP` is the word the
  * band header `unsplit/NHTTP.h` used to declare; the other four names are derived from what uses them
  * (the unit header carries the evidence and the one GUESS). */
 /* MWCC emits `.sbss` objects in reverse definition order, so the four words are listed back to front
@@ -147,6 +93,7 @@ NHTTPInfo* NHTTPi_systemInfoP;                /* 0x80795884 */
 NHTTPConnection* NHTTPi_connectionListHead;   /* 0x80795880 */
 u32 NHTTPi_createVersionRegistered;           /* 0x8079587C */
 u32 NHTTPi_versionRegistered;                 /* 0x80795878 */
+NHTTPInfo NHTTPi_systemInfo;                  /* 0x80762C60 */
 NHTTPiCompletionSync NHTTPi_completionSync;   /* 0x80762C20 */
 
 /* The library's version banners (`.sdata` 0x80794410/0x80794414 and the `.data` 0x80630C50..0x80630D48
@@ -319,10 +266,10 @@ void NHTTP_DestroyResponse(NHTTPMutexInfo* mutex, NHTTPResponse* response) {
 s32 NHTTPi_findHeaderField(NHTTPRecvBuf* ring, const char* name, s32* offset) {
     s32 colon;
     s32 flag = 0;
-    s32 valueEnd;
     s32 valueStart;
     s32 line;
     s32 next;
+    s32 valueEnd;
 
     line = NHTTPi_RecvBufFindLine(ring, 12, ring->capacity, &colon, &flag);
 
@@ -339,7 +286,7 @@ s32 NHTTPi_findHeaderField(NHTTPRecvBuf* ring, const char* name, s32* offset) {
                     }
                     valueEnd -= flag;
                 }
-                valueStart = NHTTPi_RecvBufFindSpace(ring, colon + 1, valueEnd);
+                valueStart = NHTTPi_RecvBufSkipSpaces(ring, colon + 1, valueEnd);
                 if (valueStart < 0) {
                     valueStart = valueEnd;
                 }
@@ -456,41 +403,41 @@ s32 NHTTPi_SocSSLConnect(NHTTPInfo* info, NHTTPMutexInfo* mutex, NHTTPRequest* r
 /* Receive from the connection's own 32 KB buffer, refilling it from the socket when it is empty.
  * Answers the bytes handed out, or what the socket answered when it had nothing (<= 0). */
 s32 NHTTPi_SocRecv_sub(NHTTPConnection* connection, s32 fd, u8* buf, s32 length, s32 flags) {
-    s32 got = 0;
     u8* recvBuffer = connection->recvBuffer;
-    s32 want = length;
+    s32 got = 0;
     s32 refill;
 
     if (length > 0) {
         if (connection->recvUnread == 0) {
             refill = SORecv(fd, recvBuffer, 0x8000, flags);
-            if (refill <= 0) {
+            if (refill > 0) {
+                connection->recvUnread = refill;
+                connection->recvOffset = 0;
+            } else {
                 return refill;
             }
-            connection->recvUnread = refill;
-            connection->recvOffset = 0;
         }
         if (connection->recvUnread != 0) {
-            if ((u32)want > connection->recvUnread) {
-                want = connection->recvUnread;
+            if ((u32)length > connection->recvUnread) {
+                length = connection->recvUnread;
             }
-            NHTTPi_memcpy(buf, recvBuffer + connection->recvOffset, want);
-            connection->recvUnread -= want;
+            NHTTPi_memcpy(buf, recvBuffer + connection->recvOffset, length);
+            connection->recvUnread -= length;
             if (connection->recvUnread == 0) {
                 NHTTPi_memclr(recvBuffer, 0x8000);
                 connection->recvOffset = 0;
             } else {
-                connection->recvOffset += want;
+                connection->recvOffset += length;
             }
-            got = want;
+            got = length;
         }
     }
     return got;
 }
 
 /* Receive `length` bytes through SSL when the request holds a context, through the connection's
- * buffer otherwise.  A failure maps to -1002 for a cancelled request, 0 for a would-block, and -1001
- * for anything else.  (`handle` is the request-list mutex and `conn` the request - see the header.) */
+ * buffer otherwise; -1001 at once when the request has no connection.  A failed receive maps to -1002
+ * for a cancelled request, 0 for a would-block, and -1001 for anything else.  (`handle` is the request-list mutex and `conn` the request - see the header.) */
 s32 NHTTPi_SocRecv(s32 handle, NHTTPConnection* conn, s32 flags, u8* buf, s32 length, s32 arg) {
     s32 result;
 
@@ -502,7 +449,7 @@ s32 NHTTPi_SocRecv(s32 handle, NHTTPConnection* conn, s32 flags, u8* buf, s32 le
         if (connection != NULL) {
             result = NHTTPi_SocRecv_sub(connection, flags, buf, length, arg);
         } else {
-            result = -1001;
+            return -1001;
         }
     }
     if (result < 0) {
@@ -539,15 +486,16 @@ s32 NHTTPi_SocSend_sub(s32 fd, u8* buf, s32 length, s32 flags) {
         }
         NHTTPi_memcpy(aligned, buf, head);
         sent = SOSend(fd, aligned, head, flags);
-        if (sent <= 0) {
+        if (sent > 0) {
+            total = sent;
+            if ((u32)sent < head) {
+                return sent;
+            }
+            buf += sent;
+            length -= sent;
+        } else {
             return sent;
         }
-        total = sent;
-        if ((u32)sent < head) {
-            return sent;
-        }
-        buf += sent;
-        length -= sent;
     }
     if (length > 0 && (body = length & 0xFFFFFFE0) != 0) {
         sent = SOSend(fd, buf, body, flags);
@@ -643,8 +591,8 @@ s32 NHTTPi_SocConnect(NHTTPInfo* info, NHTTPMutexInfo* mutex, NHTTPRequest* requ
 
 /* Resolve a host name to its first IPv4 address, or 0 when it does not resolve. */
 u32 NHTTPi_resolveHostName(NHTTPRequest* request, const char* name) {
-    SOAddrInfo* result;
     u32 address = 0;
+    SOAddrInfo* result;
 
     if (SOGetAddrInfo(name, NULL, NULL, &result) == 0) {
         NHTTPi_memcpy(&address, &result->addr->addr, 4);
@@ -748,20 +696,19 @@ s32 NHTTPi_urlEncodedLengthN(const char* s, s32 n) {
  * alphanumeric is copied through, and anything else becomes `%XX` in upper-case hex.  Answers the
  * number of bytes written. */
 s32 NHTTPi_encodeUrlChar(u8* dst, char c) {
-    u8 value = (u8)c;
-    u8 high;
-    u8 low;
+    s32 high;
+    s32 low;
 
     if (c == ' ') {
         dst[0] = '+';
         return 1;
     }
     if (('0' <= c && c <= '9') || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')) {
-        dst[0] = value;
+        dst[0] = c;
         return 1;
     }
-    high = value >> 4;
-    low = value & 0xF;
+    high = (u8)c >> 4;
+    low = (u8)c & 0xF;
     dst[0] = '%';
     dst[1] = high < 10 ? high + '0' : high + '7';
     dst[2] = low < 10 ? low + '0' : low + '7';
@@ -844,10 +791,10 @@ s32 NHTTPi_strToDec(const char* s, s32 n) {
  * how many were written. */
 s32 NHTTPi_uintToStr(char* buf, u32 value) {
     u32 powers[9] = {1000000000, 100000000, 10000000, 1000000, 100000, 10000, 1000, 100, 10};
-    s32 length = 0;
-    BOOL started = FALSE;
     char* out = buf;
     s32 i;
+    BOOL started = FALSE;
+    s32 length = 0;
 
     for (i = 0; i < 9; i++) {
         u32 power = powers[i];
@@ -1002,8 +949,8 @@ s32 NHTTPi_isHeaderEnd(const char* window, s32 count) {
 /* Copy `length` bytes into the 256-byte send buffer, sending the buffer whenever it fills.  Answers
  * `length`, -1 for a cancelled request, and the send's own answer when it sent nothing (<= 0). */
 s32 NHTTPi_SaveBuf(NHTTPRequest* request, u8* buffer, s32 fd, s32* used, u8* data, s32 length) {
-    s32 remaining = length;
     s32 chunk;
+    s32 remaining = length;
     s32 sent;
 
     while (remaining > 0) {
@@ -1081,9 +1028,9 @@ s32 NHTTPi_sendPostField(NHTTPMutexInfo* mutex, NHTTPRequest* request, u8* buffe
     s32 sent = 0;
     NHTTPConnection* connection = NHTTPi_Request2Connection(mutex, (s32)request);
     u32 chunk;
-    u8* data;
     s32 result;
     u32 i;
+    u8* data;
     u8 encoded[3];
 
     if (connection == NULL) {
@@ -1118,11 +1065,13 @@ s32 NHTTPi_sendPostField(NHTTPMutexInfo* mutex, NHTTPRequest* request, u8* buffe
                 return 2;
             }
             break;
-        case 2:
-            for (i = 0; i < chunk; i++, data++) {
+        case 2: {
+            u8* p = data;
+
+            for (i = 0; i < chunk; i++, p++) {
                 NHTTPi_memclr(encoded, 3);
                 result = NHTTPi_SaveBuf(request, buffer, fd, used, encoded,
-                                        NHTTPi_encodeUrlChar(encoded, *data));
+                                        NHTTPi_encodeUrlChar(encoded, *p));
                 if (result < 0) {
                     return 1;
                 }
@@ -1131,6 +1080,7 @@ s32 NHTTPi_sendPostField(NHTTPMutexInfo* mutex, NHTTPRequest* request, u8* buffe
                 }
             }
             break;
+        }
         }
     }
     return 0;
@@ -1166,12 +1116,13 @@ s32 NHTTPi_appendSendData(NHTTPCommContext* context, const char* data, s32 lengt
     NHTTPThreadInfo* thread = NHTTPi_GetThreadInfoP(info);
     NHTTPRequestInfo* requestInfo = NHTTPi_GetReqInfoP(info);
     NHTTPRequest* request = (NHTTPRequest*)requestInfo->active->request;
+    u8* sendBuffer = thread->sendBuffer;
     s32 result;
 
     if (length == 0) {
         return 0;
     }
-    result = NHTTPi_SaveBuf(request, thread->sendBuffer, bgnend->socket, &context->sendUsed, (u8*)data, length);
+    result = NHTTPi_SaveBuf(request, sendBuffer, bgnend->socket, &context->sendUsed, (u8*)data, length);
     if (result < 0) {
         return 1;
     }
@@ -1438,6 +1389,7 @@ s32 NHTTPi_sendMultipartBody(NHTTPCommContext* context) {
     NHTTPThreadInfo* thread = NHTTPi_GetThreadInfoP(info);
     NHTTPInfo* bgnend = NHTTPi_GetBgnEndInfoP(info);
     s32 total = 0;
+    u8* sendBuffer = thread->sendBuffer;
     NHTTPHeaderField* field;
     char digits[12];
     s32 digitCount;
@@ -1524,7 +1476,7 @@ s32 NHTTPi_sendMultipartBody(NHTTPCommContext* context) {
             return result;
         }
         if (field->value == NULL) {
-            result = NHTTPi_sendPostField(mutex, request, thread->sendBuffer, field->token, bgnend->socket,
+            result = NHTTPi_sendPostField(mutex, request, sendBuffer, field->token, bgnend->socket,
                                           &context->sendUsed, 1);
             if (result != 0) {
                 return result;
@@ -1561,6 +1513,7 @@ s32 NHTTPi_sendUrlEncodedBody(NHTTPCommContext* context) {
     NHTTPThreadInfo* thread = NHTTPi_GetThreadInfoP(info);
     NHTTPInfo* bgnend = NHTTPi_GetBgnEndInfoP(info);
     s32 total = 0;
+    u8* sendBuffer = thread->sendBuffer;
     NHTTPHeaderField* field;
     char digits[12];
     s32 digitCount;
@@ -1614,7 +1567,7 @@ s32 NHTTPi_sendUrlEncodedBody(NHTTPCommContext* context) {
             return result;
         }
         if (field->value == NULL) {
-            result = NHTTPi_sendPostField(mutex, request, thread->sendBuffer, field->token, bgnend->socket,
+            result = NHTTPi_sendPostField(mutex, request, sendBuffer, field->token, bgnend->socket,
                                           &context->sendUsed, 2);
             if (result != 0) {
                 return result;
@@ -1984,7 +1937,6 @@ s32 NHTTPi_sendRequest(NHTTPCommContext* context) {
         if (result != 0) {
             if (result == 3) {
                 context->error = 3;
-                return result;
             }
             return result;
         }
@@ -2087,8 +2039,8 @@ s32 NHTTPi_parseResponseHeaders(NHTTPCommContext* context) {
     NHTTPResponse* response = request->response;
     NHTTPThreadInfo* thread = NHTTPi_GetThreadInfoP(info);
     u8* scratch = thread->sendBuffer;
-    s32 offset;
     s32 lineEnd;
+    s32 offset;
 
     if (NHTTPi_RecvBufCopy((NHTTPRecvBuf*)response, context->statusLine, 0, 14) == 0) {
         context->error = 7;
@@ -2098,7 +2050,7 @@ s32 NHTTPi_parseResponseHeaders(NHTTPCommContext* context) {
         context->error = 7;
         return 0;
     }
-    if (context->statusLine[8] != ' ') {
+    if ((s32)context->statusLine[8] != ' ') {
         context->error = 7;
         return 0;
     }
@@ -2166,11 +2118,11 @@ s32 NHTTPi_parseResponseHeaders(NHTTPCommContext* context) {
     }
     if (context->chunked > 256) {
         context->chunked = 0;
-    } else if (context->chunked > 0) {
-        context->chunked = NHTTPi_RecvBufFindUpper((NHTTPRecvBuf*)response, offset, offset + context->chunked,
-                                                   "chunked", ';') == 0;
     } else {
-        context->chunked = 0;
+        context->chunked = context->chunked > 0 ? NHTTPi_RecvBufFindUpper((NHTTPRecvBuf*)response, offset,
+                                                                          offset + context->chunked, "chunked",
+                                                                          ';') == 0
+                                                : 0;
     }
     context->error = 0;
     response->headersParsed = 1;
@@ -2182,6 +2134,30 @@ s32 NHTTPi_parseResponseHeaders(NHTTPCommContext* context) {
 static inline s32 NHTTPi_recvIntoResponse(NHTTPMutexInfo* mutex, NHTTPRequest* request, s32 fd, s32 offset,
                                           s32 length) {
     return NHTTPi_SocRecvOffsetRange((s32)mutex, (NHTTPConnection*)request, fd, offset, length, 0);
+}
+
+/* Reads and drops bytes one at a time up to the end of the current line (a CR read right after an LF
+ * ends it, the order the two-byte window is tested in); the number of bytes dropped, or the failing
+ * receive's result. */
+static inline s32 NHTTPi_skipLine(NHTTPMutexInfo* mutex, NHTTPRequest* request, s32 fd) {
+    s32 received;
+    s32 skipped;
+    s32 count;
+    char window[2];
+
+    window[0] = 0;
+    window[1] = 0;
+    skipped = 0;
+    count = 0;
+    while (window[count & 1] != '\r' || (s8)window[(count - 1) & 1] != '\n') {
+        received = NHTTPi_SocRecv((s32)mutex, (NHTTPConnection*)request, fd, (u8*)&window[count & 1], 1, 0);
+        if (received <= 0) {
+            return received;
+        }
+        skipped += received;
+        count++;
+    }
+    return skipped;
 }
 
 /* Receive the response body into the caller's buffer (the scratch buffer once the caller's is full),
@@ -2200,11 +2176,7 @@ s32 NHTTPi_recvResponseBody(NHTTPCommContext* context) {
     s32 received;
     s32 chunkSize;
     s32 index;
-    s32 skipped;
-    s32 count;
     u8 sizeWindow[2];
-    u8 extensionWindow[2];
-    u8 trailerWindow[2];
     u8 byte;
 
     if (request->method == 2 || response->statusCode == 204 || response->statusCode == 304 ||
@@ -2267,26 +2239,8 @@ s32 NHTTPi_recvResponseBody(NHTTPCommContext* context) {
                     if ((s8)byte == ';' || ((s8)byte == '\n' && (s8)sizeWindow[(index - 1) & 1] == '\r')) {
                         if ((s8)byte == '\n') {
                             index -= 1;
-                        } else {
-                            s32 fd = bgnend->socket;
-
-                            skipped = 0;
-                            count = 0;
-                            extensionWindow[0] = 0;
-                            extensionWindow[1] = 0;
-                            while (extensionWindow[count & 1] != '\r' ||
-                                   (s8)extensionWindow[(count - 1) & 1] != '\n') {
-                                received = NHTTPi_SocRecv((s32)mutex, (NHTTPConnection*)request, fd,
-                                                          &extensionWindow[count & 1], 1, 0);
-                                if (received <= 0) {
-                                    break;
-                                }
-                                skipped += received;
-                                count++;
-                            }
-                            if (received <= 0) {
-                                return 0;
-                            }
+                        } else if (NHTTPi_skipLine(mutex, request, bgnend->socket) <= 0) {
+                            return 0;
                         }
                         if (index == 0) {
                             return 0;
@@ -2329,18 +2283,7 @@ s32 NHTTPi_recvResponseBody(NHTTPCommContext* context) {
                         }
                     }
                 } else {
-                    s32 fd = bgnend->socket;
-
-                    count = 0;
-                    trailerWindow[0] = 0;
-                    trailerWindow[1] = 0;
-                    while (trailerWindow[count & 1] != '\r' || (s8)trailerWindow[(count - 1) & 1] != '\n') {
-                        if (NHTTPi_SocRecv((s32)mutex, (NHTTPConnection*)request, fd, &trailerWindow[count & 1], 1, 0) <=
-                            0) {
-                            break;
-                        }
-                        count++;
-                    }
+                    NHTTPi_skipLine(mutex, request, bgnend->socket);
                     context->error = 0;
                     break;
                 }
@@ -2381,7 +2324,8 @@ s32 NHTTPi_recvResponseBody(NHTTPCommContext* context) {
 
 /* The comm thread's body: serve queued requests one at a time until the quit flag is raised - dequeue,
  * resolve, connect, (tunnel), send, receive the head and the body, then wrap the request up.  A
- * would-block answer (2) keeps the request for the next round. */
+ * would-block answer (2) keeps the request for the next round; a failed step (1, or 3 from the send)
+ * finishes it. */
 void NHTTPi_commThreadLoop(void) {
     NHTTPCommContext context;
     NHTTPInfo* info = NHTTPi_GetSystemInfoP();
@@ -2396,8 +2340,8 @@ void NHTTPi_commThreadLoop(void) {
     context.sendUsed = 0;
     context.connected = 0;
     context.chunked = 0;
-    context.contentRemaining = 0;
     context.again = 0;
+    context.contentRemaining = 0;
     context.error = 0;
     while (bgnend->quitFlag == 0) {
         if (context.again == 0) {
@@ -2426,14 +2370,17 @@ void NHTTPi_commThreadLoop(void) {
             case 1:
                 NHTTPi_finishRequest(&context);
                 break;
+            case 0:
             default:
                 switch (NHTTPi_sendRequest(&context)) {
                 case 2:
                     context.again = 1;
                     break;
+                case 1:
                 case 3:
                     NHTTPi_finishRequest(&context);
                     break;
+                case 0:
                 default:
                     if (((NHTTPRequest*)requestInfo->active->request)->cancelled != 0) {
                         NHTTPi_finishRequest(&context);
@@ -2487,7 +2434,7 @@ NHTTPRequest* __NHTTPCreateRequestEx(const char* url, s32 method, u32 buffer, u3
                                                         NHTTPi_dispatchConnectionCallback, userData);
     NHTTPInfo* info;
     NHTTPMutexInfo* mutex;
-    NHTTPRequest* request;
+    NHTTPRequest* request = NULL;
 
     if (connection != NULL) {
         info = NHTTPi_GetSystemInfoP();
@@ -2504,9 +2451,10 @@ NHTTPRequest* __NHTTPCreateRequestEx(const char* url, s32 method, u32 buffer, u3
             NHTTP_DestroyRequest(info, request);
             NHTTPi_OmitConnectionList(mutex, connection);
             NHTTPi_free(connection);
+            request = NULL;
         }
     }
-    return NULL;
+    return request;
 }
 
 /* Allocate a connection and its request, register the connection in the list and set it up in the
@@ -2628,6 +2576,62 @@ s32 NHTTPGetSSLError(void) {
     return NHTTPi_GetSSLError(NHTTPi_GetSystemInfoP());
 }
 
+/* Hands the connection's request to its send callback with the phase-1 arguments and the response
+ * size; -1 when the connection, its request or the callback is missing. */
+static inline s32 NHTTPi_callSendCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection, NHTTPCallbackArgs* args) {
+    NHTTPRequest* request;
+    s32 (*sendCallback)(u32 arg0, u32* arg1, u32* arg2, u32 arg3, s32 size);
+
+    if (connection != NULL && (request = NHTTPi_Connection2Request(mutex, connection)) != NULL &&
+        (sendCallback = request->sendCallback) != NULL) {
+        return sendCallback(args->field_0x00, &args->field_0x04, &args->field_0x08, args->field_0x0C,
+                            NHTTPi_GetResponseSize(connection));
+    }
+    return -1;
+}
+
+/* Hands a full receive buffer to the response's buffer-full callback (the phase-2 arguments, the socket,
+ * the allocator pair and the response size) and stores what it answers back into the arguments. */
+static inline void NHTTPi_callBufferFullCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection,
+                                                 NHTTPCallbackArgs* args) {
+    if (connection != NULL) {
+        NHTTPResponse* response = NHTTPi_Connection2Response(mutex, connection);
+
+        if (response != NULL) {
+            NHTTPBufferFullCallback bufferFullCallback = response->bufferFullCallback;
+
+            if (bufferFullCallback != NULL) {
+                u32 buffer = args->field_0x00;
+                NHTTPSock* sock = NHTTPi_GetSock(connection);
+                s32 value = bufferFullCallback(&buffer, &args->field_0x04, sock, NHTTPi_alloc, NHTTPi_free,
+                                               NHTTPi_GetResponseSize(connection));
+
+                args->field_0x00 = value;
+                if (value != 0 && buffer != 0) {
+                    args->field_0x08 = 0;
+                }
+            }
+        }
+    }
+}
+
+/* Runs the connection's completion callback with its status, the response and the response size. */
+static inline void NHTTPi_callCompleteCallback(NHTTPMutexInfo* mutex, NHTTPConnection* connection) {
+    if (connection != NULL) {
+        NHTTPCompleteCallback completeCallback = connection->completeCallback;
+
+        if (completeCallback != NULL) {
+            NHTTPResponse* response = NHTTPi_Connection2Response(mutex, connection);
+
+            if (response != NULL) {
+                s32 status = NHTTPi_GetConnectionStatus(connection);
+
+                completeCallback(status, response, NHTTPi_GetResponseSize(connection));
+            }
+        }
+    }
+}
+
 /* The connection callback every created connection carries: it routes the four phases to what the
  * caller registered (the request's send hook, the response's buffer-full callback, the connection's
  * completion hook).  Phase 1 answers the hook's own value, -1 when there is none. */
@@ -2641,55 +2645,15 @@ s32 NHTTPi_dispatchConnectionCallback(NHTTPConnection* connection, s32 phase, NH
     switch (phase) {
     case 3:
         break;
-    case 1: {
-        NHTTPRequest* request;
-        s32 (*sendCallback)(u32 arg0, u32* arg1, u32* arg2, u32 arg3, s32 size);
-
-        if (connection != NULL && (request = NHTTPi_Connection2Request(mutex, connection)) != NULL &&
-            (sendCallback = request->sendCallback) != NULL) {
-            result = sendCallback(args->field_0x00, &args->field_0x04, &args->field_0x08, args->field_0x0C,
-                                  NHTTPi_GetResponseSize(connection));
-        } else {
-            result = -1;
-        }
+    case 1:
+        result = NHTTPi_callSendCallback(mutex, connection, args);
         break;
-    }
     case 2:
-        if (connection != NULL) {
-            NHTTPResponse* response = NHTTPi_Connection2Response(mutex, connection);
-
-            if (response != NULL) {
-                NHTTPBufferFullCallback bufferFullCallback = response->bufferFullCallback;
-
-                if (bufferFullCallback != NULL) {
-                    u32 buffer = args->field_0x00;
-                    NHTTPSock* sock = NHTTPi_GetSock(connection);
-                    s32 value = bufferFullCallback(&buffer, &args->field_0x04, sock, NHTTPi_alloc,
-                                                   NHTTPi_free, NHTTPi_GetResponseSize(connection));
-
-                    args->field_0x00 = value;
-                    if (value != 0 && buffer != 0) {
-                        args->field_0x08 = 0;
-                    }
-                }
-            }
-        }
+        NHTTPi_callBufferFullCallback(mutex, connection, args);
         result = 0;
         break;
     case 4:
-        if (connection != NULL) {
-            NHTTPCompleteCallback completeCallback = connection->completeCallback;
-
-            if (completeCallback != NULL) {
-                NHTTPResponse* response = NHTTPi_Connection2Response(mutex, connection);
-
-                if (response != NULL) {
-                    s32 status = NHTTPi_GetConnectionStatus(connection);
-
-                    completeCallback(status, response, NHTTPi_GetResponseSize(connection));
-                }
-            }
-        }
+        NHTTPi_callCompleteCallback(mutex, connection);
         result = 0;
         break;
     }
@@ -2710,7 +2674,7 @@ s32 NHTTPAddHeaderField(NHTTPRequest* handle, const char* token, const char* val
         printf("%s can be called before NHTTPStartConnection()\n", "NHTTPAddHeaderField");
         return -1;
     }
-    return NHTTP_AddHeaderField(request, bgnend, token, value) == 0 ? -1 : 0;
+    return NHTTP_AddHeaderField(request, bgnend, token, value) ? 0 : -1;
 }
 
 /* The same for one url-encoded post field. */
@@ -2727,7 +2691,7 @@ s32 NHTTPAddPostDataAscii(NHTTPRequest* handle, const char* token, const char* v
         printf("%s can be called before NHTTPStartConnection()\n", "NHTTPAddPostDataAscii");
         return -1;
     }
-    return NHTTPAddPostDataRaw(request, bgnend, token, value) == 0 ? -1 : 0;
+    return NHTTPAddPostDataRaw(request, bgnend, token, value) ? 0 : -1;
 }
 
 /* Start the request, answering the id the send returned (or -1 when it could not be started). */
@@ -2754,7 +2718,7 @@ NHTTPRequest* NHTTPCreateRequest(const char* url, s32 method, u32 buffer, u32 bu
 
 /* Cancel request `id`; answers 0 when it was found and -1 when not. */
 s32 NHTTPCancelRequest(s32 id) {
-    return NHTTPi_cancelRequestById(NHTTPi_GetSystemInfoP(), id) == 0 ? -1 : 0;
+    return NHTTPi_cancelRequestById(NHTTPi_GetSystemInfoP(), id) ? 0 : -1;
 }
 
 /* Destroy the response the handle names together with its connection (and its list entry). */
@@ -2846,7 +2810,7 @@ s32 NHTTPSetProxy(NHTTPRequest* handle, const char* host, s32 port, const char* 
         NHTTPi_memclr(credentials, 0x41);
         NHTTPi_memcpy(credentials, user, userLength);
         NHTTPi_memcpy(credentials + userLength, ":", 1);
-        NHTTPi_memcpy(credentials + userLength + 1, password, passwordLength);
+        NHTTPi_memcpy(&credentials[userLength + 1], password, passwordLength);
         request->proxyAuthLength = NHTTPi_Base64Encode(request->proxyAuth, credentials);
     }
     request->useProxy = 1;
@@ -2957,7 +2921,7 @@ NHTTPConnection* NHTTPi_ControlConnectionList(NHTTPMutexInfo* mutex, void* key, 
     NHTTPConnection* result = NULL;
 
     NHTTPi_lockReqList(mutex);
-    if (mode == NHTTPI_LIST_ADD) {
+    if ((u32)mode == NHTTPI_LIST_ADD) {
         result = key;
         ((NHTTPConnection*)key)->next = NHTTPi_connectionListHead;
         NHTTPi_connectionListHead = key;
@@ -2994,7 +2958,7 @@ NHTTPConnection* NHTTPi_ControlConnectionList(NHTTPMutexInfo* mutex, void* key, 
             if (result != NULL) {
                 break;
             }
-            link = &node->next;
+            link = &(*link)->next;
         }
     }
     NHTTPi_unlockReqList(mutex);
@@ -3269,17 +3233,17 @@ NHTTPRequest* NHTTPi_createRequestObject(NHTTPInfo* info, const char* url, s32 m
                                          NHTTPFreeBufferCallback freeCallback) {
     char urlBuffer[0x100];
     char* urlCopy = urlBuffer;
-    NHTTPRequest* request = NULL;
-    s32 urlLength;
-    s32 prefix;
+    s32 out;
+    s32 sawSlash;
     s32 rest;
     char* restPtr;
-    char* p;
     s32 i;
-    s32 out;
     s32 escapes;
+    NHTTPRequest* request = NULL;
+    s32 prefix;
+    char* p;
     s32 state;
-    s32 sawSlash;
+    s32 urlLength;
     s32 hostLength;
     s32 size;
     s32 number;

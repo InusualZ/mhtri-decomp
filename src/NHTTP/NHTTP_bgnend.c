@@ -51,13 +51,8 @@
  * `NHTTPi_markCommThreadReady` / `NHTTPi_isCommThreadReady` / `NHTTPi_strlen` /
  * `NHTTPi_containsString` in `d_nhttp.h`).
  *
- * BODY.  All 27 functions are reconstructed and measured; 23 are byte-identical, the unit is 97.62 %
- * fuzzy over the 2648 B of `.text` (2648 B ours), and the remaining four rows are:
- *
- *    93.85  NHTTPi_Startup             (400/400)
- *    92.68  NHTTPAddPostDataRaw        (396/396)
- *    96.85  NHTTPi_cancelRequest       (284/284)
- *    99.33  NHTTPi_RemoveNode          (72/72)
+ * BODY.  All 27 functions are reconstructed; 25 are byte-identical and the two open rows are
+ *   `NHTTPi_Startup` and `NHTTPAddPostDataRaw` (same sizes as retail; residuals below).
  *
  * Residuals (each measured with `symdiff.py -u NHTTP/NHTTP_bgnend` on this file):
  *   - NHTTPi_Startup: retail colours the `base`/`info` parameter web r31 and the message-group local
@@ -66,13 +61,11 @@
  *     declaration permutations of the local block (message group first, last, `memory` moved, `base`
  *     dropped in favour of the parameter) were measured: every one keeps `lis r31` for the message
  *     group, so this is the allocator's web priority, not a declaration-order lever.
- *   - NHTTPAddPostDataRaw: the two walks differ in the flag's live range - retail's `doRegister` is
- *     only read once, after both loops (`li r0,1` / `li r0,0` then one `cmpwi r0,0`), ours is read
- *     inside the outer loop as well, so it is held in a callee-saved register (r24) and re-tested
- *     (`li r24,1; cmpwi r24,0; bne`).  Retail's single read after the loops is the `goto`-shaped exit
- *     rule 8 forbids; no non-goto shape tried (`if (doRegister) break;` in the outer body, the flag as
- *     the loop condition, `i = 1` to force the outer exit) reproduces it.  The two walks themselves
- *     (`request->code[i - 2]` / `NHTTPi_postDataRawCode[i]`, the in-register `next++`) match.
+ *   - NHTTPAddPostDataRaw: the boundary-code search is the `static inline` `NHTTPi_makeUniqueCode`
+ *     (its `return TRUE` from inside both loops is retail's `li r0,1` / `li r0,0` and one `cmpwi`
+ *     after them); the instruction stream pairs, and the residual is colouring: retail keeps `value`
+ *     in r21 (the lowest saved register) and the parameters in r27-r29, ours `value` in r29 and the
+ *     rest one register low; no helper parameter order or caller declaration order moves it.
  *   - NHTTPi_cancelRequest: two residuals.  (a) The unlink pair loads its LHS base before its RHS value
  *     (`lwz r4,0(r31)` then `lwz r0,4(r31)`) where retail loads the value first; the same swap is
  *     NHTTPi_RemoveNode's only residual, and five source spellings (a `prev`/`next` local before or
@@ -91,8 +84,9 @@
  *   - `NHTTPi_SetHeaderField` declares `found` before `node`; the `else { found = 1; }` arm (the
  *     negated test) is what puts the first comparison's hit block out of line.
  *   - `NHTTPAddPostDataRaw` walks `request->code[i - 2]` (not a flat byte offset) - that is what makes
- *     MWCC emit retail's `add r22,r27,r24` + `lbz r25,0x38(r22)` - and its tail reads the field list
- *     back through `request->postDataList->next`.
+ *     MWCC emit retail's `add r22,r27,r24` + `lbz r25,0x38(r22)` - keeps the digit as a `char` stepped
+ *     through an `s32` temporary compared as `(u8)`, declares `result` before `length`, and reads the
+ *     field list back through `request->postDataList->next`.
  *   - `NHTTPRequestNode.id` / `NHTTPi_cancelRequest`'s `id` are `s32`: retail's comparison is `cmpw`,
  *     not `cmplw`.
  */
@@ -349,16 +343,49 @@ u32 NHTTP_AddHeaderField(NHTTPRequest* request, NHTTPInfo* owner, const char* to
     return (u32)NHTTPi_SetHeaderField(&request->headerList, owner, token, value);
 }
 
+/* Steps the request's 18-character boundary code until `value` no longer contains it, walking the
+ * digits from the last one back and wrapping each through `0-9`, `a-z`, `A-Z`; TRUE once the code is
+ * unique, FALSE when every digit has run back round to its start without one. */
+static inline BOOL NHTTPi_makeUniqueCode(NHTTPRequest* request, const char* value, s32 length) {
+    s32 i;
+
+    if (NHTTPi_containsString(value, length, request->code, 18) < 0) {
+        return TRUE;
+    }
+    for (i = 19; i >= 2; i--) {
+        char next = request->code[i - 2];
+
+        for (;;) {
+            s32 digit = (u8)next + 1;
+
+            if ((u8)digit == '{') {
+                digit = '0';
+            } else if ((u8)digit == '[') {
+                digit = 'a';
+            } else if ((u8)digit == ':') {
+                digit = 'A';
+            }
+            next = digit;
+            request->code[i - 2] = digit;
+            if (next == NHTTPi_postDataRawCode[i]) {
+                break;
+            }
+            if (NHTTPi_containsString(value, length, request->code, 18) < 0) {
+                return TRUE;
+            }
+        }
+    }
+    return FALSE;
+}
+
 /* 0x80514ACC (0x18C): the exclusive "post data raw" entry.  It walks the request's 18-byte code
  * (`+0x3A`) up to `NHTTPi_postDataRawCode` one character at a time, re-submitting the code through
  * `NHTTPi_containsString` after every step, and then registers the field.  The name is the one the
  * function's own warning string carries (`.data` 0x80630AAC). */
 s32 NHTTPAddPostDataRaw(NHTTPRequest* request, NHTTPInfo* owner, const char* token,
                         const char* value) {
-    s32 length = 0;
-    s32 doRegister = 0;
     s32 result = 0;
-    s32 i;
+    s32 length = 0;
 
     if (request->field_0x04 != 0) {
         return 0;
@@ -370,36 +397,7 @@ s32 NHTTPAddPostDataRaw(NHTTPRequest* request, NHTTPInfo* owner, const char* tok
     if (value != 0) {
         length = NHTTPi_strlen(value);
     }
-    if (NHTTPi_containsString(value, length, request->code, 18) < 0) {
-        doRegister = 1;
-    } else {
-        for (i = 19; i >= 2; i--) {
-            u8 next = (u8)request->code[i - 2];
-
-            for (;;) {
-                next++;
-                if (next == '{') {
-                    next = '0';
-                } else if (next == '[') {
-                    next = 'a';
-                } else if (next == ':') {
-                    next = 'A';
-                }
-                request->code[i - 2] = next;
-                if ((char)next == NHTTPi_postDataRawCode[i]) {
-                    break;
-                }
-                if (NHTTPi_containsString(value, length, request->code, 18) < 0) {
-                    doRegister = 1;
-                    break;
-                }
-            }
-            if (doRegister) {
-                break;
-            }
-        }
-    }
-    if (doRegister) {
+    if (NHTTPi_makeUniqueCode(request, value, length)) {
         result = NHTTPi_SetHeaderField(&request->postDataList, owner, token, value);
         if (result != 0) {
             request->postDataList->next->field_0x10 = (u32)length;

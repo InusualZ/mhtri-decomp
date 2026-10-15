@@ -27,7 +27,7 @@ typedef struct NHTTPRequestNode {
     /* +0x00 */ struct NHTTPRequestNode* next;
     /* +0x04 */ struct NHTTPRequestNode* prev;
     /* +0x08 */ s32 id;           /* the handle NHTTPi_insertRequest returns */
-    /* +0x0C */ s32 request;      /* the request object NHTTPi_cancelRequest destroys */
+    /* +0x0C */ volatile s32 request; /* the request object NHTTPi_cancelRequest destroys; re-read at every use */
     /* +0x10 */ s32 state;        /* -1 until a socket is opened; then that socket descriptor (`NHTTPi_connectSocket`) */
     /* +0x14 */ u32 unused_0x14;
 } NHTTPRequestNode;
@@ -46,7 +46,7 @@ typedef struct NHTTPRequestList {
 typedef struct NHTTPRequest {
     /* +0x000 */ u32 cancelled;              /* 1 once the request was cancelled or shut down */
     /* +0x004 */ u32 field_0x04;             /* committed-header flag NHTTP_AddHeaderField tests */
-    /* +0x008 */ u32 useSSL;                 /* 1 for an `https://` URL */
+    /* +0x008 */ s32 useSSL;                 /* 1 for an `https://` URL */
     /* +0x00C */ u32 useProxy;               /* 1 once `NHTTPSetProxy` gave the request a proxy */
     /* +0x010 */ u32 field_0x10;             /* "post data raw already added" flag */
     /* +0x014 */ s32 hostEnd;                /* offset in `url` of the `:` or `/` ending the host */

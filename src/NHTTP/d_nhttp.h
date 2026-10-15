@@ -36,7 +36,7 @@ typedef struct NHTTPHeaderField {
  * touched by the reconstructed bodies. size: 0x2C (approximate) */
 typedef struct NHTTPSock {
     /* +0x000 */ u8 pad_0x000[0x1C];
-    /* +0x01C */ u32 length;   /* bytes still available at `base` */
+    /* +0x01C */ volatile u32 length;   /* bytes still available at `base`; re-read at every use */
     /* +0x020 */ u8 pad_0x020[0x8];
     /* +0x028 */ u8* base;     /* the receive area's base */
 } NHTTPSock;
@@ -67,7 +67,7 @@ typedef void (*NHTTPCompleteCallback)(s32 status, struct NHTTPResponse* response
  * followed by the caller's own word - which is why the sibling's `NHTTPRecvBuf` helpers take the same
  * pointer.  Names are read off the bodies of `d_nhttp.c`. size: 0x43C */
 typedef struct NHTTPResponse {
-    /* +0x000 */ s32 headerLength;      /* bytes of the response head buffered in the ring */
+    /* +0x000 */ volatile s32 headerLength; /* bytes of the response head buffered in the ring; re-read at every use */
     /* +0x004 */ u32 received;          /* the third word the phase-2/3 callback exchanges */
     /* +0x008 */ u32 receivedTotal;
     /* +0x00C */ s32 contentLength;     /* the Content-Length header's value, -1 when it has none */
@@ -221,8 +221,8 @@ typedef struct NHTTPCommContext {
     /* +0x304 */ u8 statusLine[0x10];   /* the first bytes of the response */
     /* +0x314 */ u32 address;           /* the resolved address of `host` */
     /* +0x318 */ u32 lastAddress;       /* and the one the socket is connected to */
-    /* +0x31C */ u32 port;
-    /* +0x320 */ u32 lastPort;
+    /* +0x31C */ s32 port;
+    /* +0x320 */ s32 lastPort;
     /* +0x324 */ s32 sendUsed;          /* bytes queued in the request send buffer */
     /* +0x328 */ s32 recvCount;         /* bytes of the response head received */
     /* +0x32C */ s32 contentRemaining;  /* the body bytes still to come, or the current chunk's */
