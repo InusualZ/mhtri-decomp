@@ -220,15 +220,15 @@ void fn_8009078C(u32 *self, u32 value);
 u32 fn_80090794(u32 *self, u32 key);
 s32 fn_80090860(u32 *self);
 
-ResLightSet fn_800908FC(void *self, u32 idx);
+ResLightSet res_anm_scn_get_res_light_set_by_ref_number(void *self, u32 idx);
 void *fn_80090AC0(void *self, s32 offset);
-ResAnmAmbLight fn_80090ADC(void *self, u32 idx);
+ResAnmAmbLight res_anm_scn_get_res_anm_amb_light_by_ref_number(void *self, u32 idx);
 void *fn_80090CA0(void *self, s32 offset);
-ResAnmLight fn_80090CBC(void *self, u32 idx);
+ResAnmLight res_anm_scn_get_res_anm_light_by_ref_number(void *self, u32 idx);
 void *fn_80090E80(void *self, s32 offset);
-ResAnmFog fn_80090E9C(void *self, u32 idx);
+ResAnmFog res_anm_scn_get_res_anm_fog_by_ref_number(void *self, u32 idx);
 void *fn_80091060(void *self, s32 offset);
-ResAnmCamera fn_8009107C(void *self, u32 idx);
+ResAnmCamera res_anm_scn_get_res_anm_camera_by_ref_number(void *self, u32 idx);
 void *fn_80091240(void *self, s32 offset);
 char *fn_8009125C(void *self);
 u32 *fn_80091280(void *self);
@@ -468,7 +468,7 @@ u32 fn_80090218(u32 *self, u32 key)
 }
 
 /* Tail thunk to fn_80090218. */
-u32 fn_800902E0(u32 *self, u32 key)
+u32 res_anm_scn_get_res_anm_amb_light(u32 *self, u32 key)
 {
     return fn_80090218(self, key);
 }
@@ -514,7 +514,7 @@ u32 fn_800903EC(u32 *self, u32 key)
 }
 
 /* Tail thunk to fn_800903EC. */
-u32 fn_800904B4(u32 *self, u32 key)
+u32 res_anm_scn_get_res_anm_light(u32 *self, u32 key)
 {
     return fn_800903EC(self, key);
 }
@@ -560,7 +560,7 @@ u32 fn_800905C0(u32 *self, u32 key)
 }
 
 /* Tail thunk to fn_800905C0. */
-u32 fn_80090688(u32 *self, u32 key)
+u32 res_anm_scn_get_res_anm_fog(u32 *self, u32 key)
 {
     return fn_800905C0(self, key);
 }
@@ -606,7 +606,7 @@ u32 fn_80090794(u32 *self, u32 key)
 }
 
 /* Tail thunk to fn_80090794. */
-u32 fn_8009085C(u32 *self, u32 key)
+u32 res_anm_scn_get_res_anm_camera(u32 *self, u32 key)
 {
     return fn_80090794(self, key);
 }
@@ -634,7 +634,7 @@ s32 fn_80090860(u32 *self)
  * ------------------------------------------------------------------------------------------------ */
 
 /* `ResAnmScn::GetResLightSet(u32 idx)`: the light-set channel at `idx`. */
-ResLightSet fn_800908FC(void *self, u32 idx)
+ResLightSet res_anm_scn_get_res_light_set_by_ref_number(void *self, u32 idx)
 {
     const ResAnmScnData *pScn;
     const ResLightSetData *pArray;
@@ -674,7 +674,7 @@ void *fn_80090AC0(void *self, s32 offset)
 }
 
 /* `ResAnmScn::GetResAnmAmbLight(u32 idx)`: the ambient-light channel at `idx`. */
-ResAnmAmbLight fn_80090ADC(void *self, u32 idx)
+ResAnmAmbLight res_anm_scn_get_res_anm_amb_light_by_ref_number(void *self, u32 idx)
 {
     const ResAnmScnData *pScn;
     const ResAnmAmbLightData *pArray;
@@ -714,7 +714,7 @@ void *fn_80090CA0(void *self, s32 offset)
 }
 
 /* `ResAnmScn::GetResAnmLight(u32 idx)`: the light channel at `idx`. */
-ResAnmLight fn_80090CBC(void *self, u32 idx)
+ResAnmLight res_anm_scn_get_res_anm_light_by_ref_number(void *self, u32 idx)
 {
     const ResAnmScnData *pScn;
     const ResAnmLightData *pArray;
@@ -754,7 +754,7 @@ void *fn_80090E80(void *self, s32 offset)
 }
 
 /* `ResAnmScn::GetResAnmFog(u32 idx)`: the fog channel at `idx`. */
-ResAnmFog fn_80090E9C(void *self, u32 idx)
+ResAnmFog res_anm_scn_get_res_anm_fog_by_ref_number(void *self, u32 idx)
 {
     const ResAnmScnData *pScn;
     const ResAnmFogData *pArray;
@@ -794,7 +794,7 @@ void *fn_80091060(void *self, s32 offset)
 }
 
 /* `ResAnmScn::GetResAnmCamera(u32 idx)`: the camera channel at `idx`. */
-ResAnmCamera fn_8009107C(void *self, u32 idx)
+ResAnmCamera res_anm_scn_get_res_anm_camera_by_ref_number(void *self, u32 idx)
 {
     const ResAnmScnData *pScn;
     const ResAnmCameraData *pArray;

@@ -22,6 +22,17 @@ void* fn_80089F94(void* out, u32 v);
 
 #ifdef __cplusplus
 }
+
+namespace nw4r {
+namespace g3d {
+struct AmbLightAnmResult;
+}  // namespace g3d
+}  // namespace nw4r
+
+/* 0x8008A000 - `ResAnmAmbLight::GetAnmResult`: evaluates the ambient colour channel at `frame` into `pResult`
+ * (caller: g3d_anmscn.cpp). */
+extern "C" void res_anm_amb_light_get_anm_result(const struct ResHandle* pSelf,
+                                                 nw4r::g3d::AmbLightAnmResult* pResult, f32 frame);
 #endif
 
 #endif /* MHTRI_G3D_G3D_RESANMAMBLIGHT_H */

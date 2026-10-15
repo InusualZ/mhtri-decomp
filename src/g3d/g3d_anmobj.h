@@ -15,7 +15,7 @@ f32 f32_select_nonneg(f32 a, f32 b, f32 c);
 
 /* 0x8056F568 - the "AnmObj" type-name record (`.rodata`: a length word, then the NUL-terminated name)
  * `g3d/g3d_anmchr.cpp`'s AnmObj type-info members read. */
-extern u8 anm_typename_AnmObj[];
+extern const u8 anm_typename_AnmObj[];
 
 #ifdef __cplusplus
 }

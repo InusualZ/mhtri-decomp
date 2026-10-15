@@ -35,4 +35,19 @@ extern "C" void fog_copy_to(const G3dFog* pSelf, G3dFogData* pDst);
 extern "C" void fog_set_gp(const G3dFog* pSelf);
 #endif
 
+#ifdef __cplusplus
+namespace nw4r {
+namespace g3d {
+
+struct FogData;
+
+/* The fog handle: a pointer to its FogData record (`g3d/g3d_anmscn.cpp`'s GetFog takes it by value).  size: 0x4 */
+struct Fog {
+    /* +0x0 */ FogData* mpFogData;
+};
+
+}  // namespace g3d
+}  // namespace nw4r
+#endif
+
 #endif /* MHTRI_G3D_G3D_FOG_H */

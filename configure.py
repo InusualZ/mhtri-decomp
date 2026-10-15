@@ -1050,7 +1050,7 @@ config.libs = [
             Object(NonMatching, "g3d/fn_800D77B0.cpp"),
             Object(NonMatching, "g3d/g3d_basic.cpp"),
             Object(NonMatching, "g3d/g3d_anmclr.cpp"),
-            Object(NonMatching, "g3d/g3d_anmobj.cpp"),
+            Object(Matching, "g3d/g3d_anmobj.cpp"),
             Object(NonMatching, "g3d/g3d_anmscn.cpp"),
             Object(Matching, "g3d/fn_8005AA28.cpp"),
             Object(NonMatching, "g3d/g3d_dcc.cpp"),

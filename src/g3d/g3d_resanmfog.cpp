@@ -59,7 +59,7 @@ struct ResAnmFogResult {
 extern "C" s32 fn_8008F8C8(u32 *self, s32 offset);
 
 /* Evaluates the fog animation at `frame` into `pResult`. */
-extern "C" void fn_8008F6E8(void *arg0, ResAnmFogResult *pResult, f32 frame)
+extern "C" void res_anm_fog_get_anm_result(void *arg0, ResAnmFogResult *pResult, f32 frame)
 {
     ResAnmFogData *res;
     u32 flags;

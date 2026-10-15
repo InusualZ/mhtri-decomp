@@ -93,6 +93,142 @@ u32 fn_800689B0(void* p);
  * constructor throws calls it. */
 /* untyped: opaque handle passed through - the block and the placement address */
 void operator delete(void* block, void* place);
+
+#include "gx.h"
+#include "nw4r/math.h"
+#include "nw4r/g3d/res_common.h" /* ResHandle */
+#include "g3d/g3d_obj.h"         /* AnmScn, FrameCtrl */
+
+namespace nw4r {
+namespace g3d {
+
+/* The ambient light's evaluated result: which channels it animates and the colour.  size: 0x8 */
+struct AmbLightAnmResult {
+    enum {
+        FLAG_COLOR_ENABLE = (1 << 0),
+        FLAG_ALPHA_ENABLE = (1 << 1)
+    };
+
+    /* +0x0 */ u32 flags;
+    /* +0x4 */ u32 color;
+};
+
+/* A light's evaluated result: the type and enable bits, the position and aim, the colour, the distance and spot
+ * attenuation, and the specular colour and shininess.  size: 0x40 (the cache stride and Construct's multiplier) */
+struct LightAnmResult {
+    enum {
+        FLAG_LIGHT_TYPE_MASK = 3,
+        FLAG_LIGHT_ENABLE = (1 << 2),
+        FLAG_SPECULAR_ENABLE = (1 << 3),
+        FLAG_COLOR_ENABLE = (1 << 4),
+        FLAG_ALPHA_ENABLE = (1 << 5)
+    };
+
+    /* +0x00 */ u32 specIdx;
+    /* +0x04 */ u32 flags;
+    /* +0x08 */ math::VEC3 pos;
+    /* +0x14 */ math::VEC3 aim;
+    /* +0x20 */ GXColor color;
+    /* +0x24 */ s32 distFunc;
+    /* +0x28 */ f32 refDistance;
+    /* +0x2C */ f32 refBrightness;
+    /* +0x30 */ s32 spotFunc;
+    /* +0x34 */ f32 cutoff;
+    /* +0x38 */ GXColor specColor;
+    /* +0x3C */ f32 shininess;
+};
+
+/* A fog's evaluated result: the fog type, the z range and the colour.  size: 0x10 */
+struct FogAnmResult {
+    /* +0x0 */ s32 type;
+    /* +0x4 */ f32 startz;
+    /* +0x8 */ f32 endz;
+    /* +0xC */ GXColor color;
+};
+
+/* A camera's evaluated result: the camera-type and existence bits, the projection, the position, the aspect and
+ * clip planes, the rotation or aim (the camera type picks which), the twist and the field of view or ortho
+ * height.  size: 0x34 */
+struct CameraAnmResult {
+    enum {
+        FLAG_CAMERA_TYPE_MASK = 1,
+        FLAG_ANM_EXISTS = (1 << 1)
+    };
+
+    /* +0x00 */ u32 flags;
+    /* +0x04 */ s32 projType;
+    /* +0x08 */ math::VEC3 pos;
+    /* +0x14 */ f32 aspect;
+    /* +0x18 */ f32 near;
+    /* +0x1C */ f32 far;
+    /* +0x20 */ math::VEC3 rotate;
+    /* +0x2C */ f32 twist;
+    /* +0x30 */ f32 perspFovy;
+};
+
+/* The scene animation over a ResAnmScn resource, with optional result caches.  size: 0x38 (Construct's
+ * `new (pBuf)` size) */
+class AnmScnRes : public AnmScn, protected FrameCtrl {
+public:
+    /* The bits of mScnAnmFlags. */
+    enum ScnAnmFlag {
+        FLAG_HAS_CACHE = (1 << 0)
+    };
+
+    static AnmScnRes* Construct(MEMAllocator* pHeap, u32* pSize, ResHandle resAnmScn, bool bHasCache);
+    AnmScnRes(MEMAllocator* pHeap, ResHandle resAnmScn, AmbLightAnmResult* pAmbLightCache,
+              LightAnmResult* pLightCache, FogAnmResult* pFogCache, CameraAnmResult* pCameraCache);
+
+    virtual bool IsDerivedFrom(TypeObj type) const;
+    virtual void G3dProc(u32 task, u32 param, void* pInfo); /* untyped: caller-owned payload */
+    virtual ~AnmScnRes();
+    virtual const TypeObj GetTypeObj() const;
+    virtual const char* GetTypeName() const;
+
+    virtual void SetFrame(f32 frame);
+    virtual f32 GetFrame() const;
+    virtual void SetUpdateRate(f32 rate);
+    virtual f32 GetUpdateRate() const;
+    virtual void UpdateFrame();
+    virtual u32 GetNumLightSet() const;
+    virtual u32 GetNumAmbLight() const;
+    virtual u32 GetNumDiffuseLight() const;
+    virtual u32 GetNumSpecularLight() const;
+    virtual u32 GetNumFog() const;
+    virtual u32 GetNumCamera() const;
+    virtual u32 GetLightSetMaxRefNumber() const;
+    virtual u32 GetAmbLightMaxRefNumber() const;
+    virtual u32 GetDiffuseLightMaxRefNumber() const;
+    virtual u32 GetFogMaxRefNumber() const;
+    virtual u32 GetCameraMaxRefNumber() const;
+    virtual bool GetLightSet(LightSet& set, u32 refNumber);
+    virtual ut::Color GetAmbLightColor(u32 refNumber);
+    virtual void GetLight(LightObj* pDiff, LightObj* pSpec, u32 refNumber);
+    virtual void GetFog(Fog fog, u32 refNumber);
+    virtual bool GetCamera(Camera camera, u32 refNumber);
+    virtual u32 GetSpecularLightID(u32 refNumber) const;
+    virtual bool HasSpecularLight(u32 refNumber) const;
+    virtual AmbLightAnmResult* GetAmbLightResult(AmbLightAnmResult* pResult, u32 refNumber);
+    virtual LightAnmResult* GetLightResult(LightAnmResult* pResult, u32 refNumber);
+    virtual FogAnmResult* GetFogResult(FogAnmResult* pResult, u32 refNumber);
+    virtual CameraAnmResult* GetCameraResult(CameraAnmResult* pResult, u32 refNumber);
+
+    void SetScnAnmFlag(ScnAnmFlag flag, bool on);
+    bool TestScnAnmFlag(ScnAnmFlag flag) const;
+    void UpdateCache();
+    static const TypeObj GetTypeObjStatic();
+
+    /* +0x00 vtable, +0x04 G3dObj's parent and heap, +0x0C FrameCtrl */
+    /* +0x20 */ ResHandle mRes;
+    /* +0x24 */ u32 mScnAnmFlags;
+    /* +0x28 */ AmbLightAnmResult* mpAmbLightCache;
+    /* +0x2C */ LightAnmResult* mpLightCache;
+    /* +0x30 */ FogAnmResult* mpFogCache;
+    /* +0x34 */ CameraAnmResult* mpCameraCache;
+};
+
+}  // namespace g3d
+}  // namespace nw4r
 #endif
 
 #endif /* MHTRI_G3D_G3D_ANMSCN_H */

@@ -460,13 +460,14 @@ void g3d_light_table_set_setting(G3dLightTable* pSelf, const G3dLightSetting* pS
     }
     nw4r::math::MTX34* pCamera = g3d_state_get_camera_mtx();
     G3D_STATE_POINTER_ASSERT(pCamera, 0x504, "NW4R:Pointer Error\npCamera(=%p) is not valid pointer.");
-    light_setting_apply_view_mtx(&pSelf->setting, pCamera, light_setting_get_num_light_obj(pSetting));
+    light_setting_apply_view_mtx(&pSelf->setting, pCamera, light_setting_get_num_light_obj((const nw4r::g3d::LightSetting*)pSetting));
     fn_80085478(pSelf);
-    u32 numLightObj = light_setting_get_num_light_obj(&pSelf->setting);
+    u32 numLightObj = light_setting_get_num_light_obj((const nw4r::g3d::LightSetting*)&pSelf->setting);
     u32 slot = 0;
     for (u32 i = 0; slot < 8 && i < numLightObj; i++) {
-        G3dLightObj* pLight = &light_setting_get_light_obj_array(&pSelf->setting)[i];
-        if (light_obj_is_enable(pLight)) {
+        G3dLightObj* pLight =
+            &((G3dLightObj*)light_setting_get_light_obj_array((const nw4r::g3d::LightSetting*)&pSelf->setting))[i];
+        if (light_obj_is_enable((const nw4r::g3d::LightObj*)pLight)) {
             pSelf->loadedLightIdx[slot] = (s8)i;
             GXLoadLightObjImm((const GXLightObj*)fn_8008569C((G3DResRef*)pLight), 1 << slot);
             slot++;
@@ -527,7 +528,7 @@ void g3d_light_table_load_light_set(G3dLightTable* pSelf, s32 idx, u32* pMaskDif
     pSelf->loadedLightSet = idx;
     for (u32 i = 0; i < 8; i++) {
         s8 lightID = pSet->idxLight[i];
-        if (lightID < 0 || !light_obj_is_enable(&pSelf->lightObj[lightID])) {
+        if (lightID < 0 || !light_obj_is_enable((const nw4r::g3d::LightObj*)&pSelf->lightObj[lightID])) {
             continue;
         }
         u32 lightMask;
@@ -2005,7 +2006,7 @@ void g3d_tex_proj_env(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
             mtx34_concat(pM, g3d_state_get_camera_mtx_at(refCamera), pInvCamera);
             pM->m[0][3] = pM->m[1][3] = pM->m[2][3] = 0.0f;
             mtx34_concat(pM, g3d_state_get_env_tex_mtx(), pM);
-        } else if ((u8)lightIdx <= 127 && light_obj_is_enable(g3d_state_get_light_obj(lightIdx))) {
+        } else if ((u8)lightIdx <= 127 && light_obj_is_enable((const nw4r::g3d::LightObj*)g3d_state_get_light_obj(lightIdx))) {
             nw4r::math::VEC3 dir;
             nw4r::math::VEC3 up;
             nw4r::math::VEC3 xAxis;
@@ -2100,7 +2101,7 @@ void g3d_tex_proj_env_spec(nw4r::math::MTX34* pM, s8 refCamera, s8 refLight) {
         eye.z = -pCamera->m[2][2];
         nw4r::math::MTX34* pInvCamera = g3d_state_get_inv_camera_mtx();
         s32 lightIdx = g3d_state_get_light_set_entry(refLight);
-        if ((u8)lightIdx <= 127 && light_obj_is_enable(g3d_state_get_light_obj(lightIdx))) {
+        if ((u8)lightIdx <= 127 && light_obj_is_enable((const nw4r::g3d::LightObj*)g3d_state_get_light_obj(lightIdx))) {
             VEC3_ctor(&dir);
             G3dLightObj* pLight = g3d_state_get_light_obj(lightIdx);
             light_obj_get_light_dir((s32)pLight, (s32)&dir);
@@ -2285,7 +2286,7 @@ void g3d_state_set_fog(G3dFog fog, u32 idx) {
 
 /* 0x80088088 (0xA4): copies `fog` into fog `idx`, forgetting the loaded fog when it changes the one loaded. */
 void g3d_fog_table_set_fog(G3dFogTable* pSelf, G3dFog fog, u32 idx) {
-    if (idx <= 31 && fog_is_valid((const ResHandle*)&fog)) {
+    if (idx <= 31 && fog_is_valid((const nw4r::g3d::Fog*)&fog)) {
         if (pSelf->fogIdx == (s32)idx) {
             if (memcmp(g3d_fog_ref(&fog), &pSelf->fog[idx], sizeof(G3dFogData)) == 0) {
                 return;

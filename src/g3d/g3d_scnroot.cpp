@@ -26,7 +26,6 @@
  *   pass, the median-of-three pivot, the swap and its identity cast).
  *   scnroot_less_z_opa, scnroot_less_z_xlu, scnroot_less_sort_opa, scnroot_less_sort_xlu are GUESSES (the four
  *   comparators ZSort and Sort pass: draw priority first, then view depth or the object's sort value).
- *   AnmScnSceneView is a GUESS (the AnmScn slots CalcAnmScn calls: 0x50, 0x5C, 0x60, 0x70, 0x74);
  *   scnroot_num_fog and scnroot_num_camera are GUESSES (the `.sdata` words 32 the std::min calls take by address).
  * RESIDUALS. The ScnRoot constructor: the camera loop's counter and byte offset swap r29/r30.
  *   Construct: register colouring only - retail gives the size offsets r16..r21 and the parameters r22..r27, ours
@@ -54,6 +53,7 @@
 #include "g3d/g3d_scnmdlsmpl.h" /* AABB_ctor (rule 2) */
 #include "g3d/g3d_calcworld.h" /* camera_ctor (rule 2) */
 #include "g3d/g3d_camera.h"    /* camera_init, MTX44_ctor, the camera accessors (rule 2) */
+#include "g3d/g3d_camera_types.h" /* nw4r::g3d::Camera, AnmScn::GetCamera's by-value handle (rule 1) */
 #include "g3d/g3d_state.h"     /* the light, camera and fog setters (rule 2) */
 #include "fn_8004CAD8/mtx.h"   /* MTX34_ctor (rule 2) */
 #include "mh3_pad.h"           /* VEC3_ctor, word_copy_return_dst (rule 2) */
@@ -71,43 +71,6 @@ using nw4r::g3d::ScnObj;
 using nw4r::g3d::ScnObjGather;
 using nw4r::g3d::IScnObjGather;
 
-namespace nw4r {
-namespace g3d {
-
-/* The scene-animation slots CalcAnmScn calls.  AnmScn's vtable (0x8058C898, `g3d/g3d_anmscn.cpp`) has 34 slots;
- * only G3dObj's five are declared in `g3d/g3d_obj.h`, so this view continues the slot list from 0x1C.  No virtual
- * is defined here, so no table is emitted.  size: 0x10 (approximation: AnmScn's base) */
-class AnmScnSceneView : public AnmScn {
-public:
-    virtual void SetFrame(f32 frame) = 0;                        /* +0x1C */
-    virtual f32 GetFrame() const = 0;                            /* +0x20 */
-    virtual void SetUpdateRate(f32 rate) = 0;                    /* +0x24 */
-    virtual f32 GetUpdateRate() const = 0;                       /* +0x28 */
-    virtual void UpdateFrame() = 0;                              /* +0x2C */
-    virtual void UnusedSlot30() = 0;                             /* +0x30 */
-    virtual void UnusedSlot34() = 0;                             /* +0x34 */
-    virtual void UnusedSlot38() = 0;                             /* +0x38 */
-    virtual void UnusedSlot3C() = 0;                             /* +0x3C */
-    virtual void UnusedSlot40() = 0;                             /* +0x40 */
-    virtual void UnusedSlot44() = 0;                             /* +0x44 */
-    virtual void UnusedSlot48() = 0;                             /* +0x48 */
-    virtual void UnusedSlot4C() = 0;                             /* +0x4C */
-    virtual u32 GetLightSetMaxRefNumber() const = 0;             /* +0x50 */
-    virtual u32 GetAmbLightMaxRefNumber() const = 0;             /* +0x54 */
-    virtual u32 GetDiffuseLightMaxRefNumber() const = 0;         /* +0x58 */
-    virtual u32 GetFogMaxRefNumber() const = 0;                  /* +0x5C */
-    virtual u32 GetCameraMaxRefNumber() const = 0;               /* +0x60 */
-    virtual void UnusedSlot64() = 0;                             /* +0x64 */
-    virtual void UnusedSlot68() = 0;                             /* +0x68 */
-    virtual void UnusedSlot6C() = 0;                             /* +0x6C */
-    virtual void GetFog(ResHandle fog, u32 refNumber) = 0;       /* +0x70 */
-    virtual bool GetCamera(ResHandle camera, u32 refNumber) = 0; /* +0x74 */
-};
-
-}  // namespace g3d
-}  // namespace nw4r
-
-using nw4r::g3d::AnmScnSceneView;
 
 /* nw4r's pointer check: a valid pointer lies in MEM1, MEM2 or the locked cache. */
 #define SCNROOT_POINTER_ASSERT(ptr, line, msg)                                                  \
@@ -284,11 +247,11 @@ extern "C" inline u16 os_f32_to_u16_cast(register f32 arg)
 /* 0x80082F94 (0x88): whether the fog's range adjustment is on (asserting a valid handle). */
 extern "C" inline s32 fog_is_range_adj_enable(const ResHandle* pFog)
 {
-    if (!fog_is_valid(pFog)) {
+    if (!fog_is_valid((const nw4r::g3d::Fog*)pFog)) {
         nw4r::db::Panic("g3d_fog.h", 0x7F, "NW4R:Failed assertion IsValid()");
     }
     bool enable = false;
-    if (fog_is_valid(pFog) && fog_ptr_const(pFog)->adjEnable == 1) {
+    if (fog_is_valid((const nw4r::g3d::Fog*)pFog) && fog_ptr_const(pFog)->adjEnable == 1) {
         enable = true;
     }
     return enable;
@@ -297,11 +260,11 @@ extern "C" inline s32 fog_is_range_adj_enable(const ResHandle* pFog)
 /* 0x80083070 (0x88): sets the fog's near and far depths (asserting a valid handle). */
 extern "C" inline void fog_set_near_far(ResHandle* pFog, f32 nearz, f32 farz)
 {
-    if (!fog_is_valid(pFog)) {
+    if (!fog_is_valid((const nw4r::g3d::Fog*)pFog)) {
         nw4r::db::Panic("g3d_fog.h", 0x57, "NW4R:Failed assertion IsValid()");
     }
-    if (fog_is_valid(pFog)) {
-        FogData* pData = fog_ptr(pFog);
+    if (fog_is_valid((const nw4r::g3d::Fog*)pFog)) {
+        FogData* pData = (FogData*)fog_ptr((const nw4r::g3d::Fog*)pFog);
         pData->nearz = nearz;
         pData->farz = farz;
     }
@@ -381,9 +344,9 @@ extern "C" void scn_root_apply_anm_scn(ScnRoot* pRoot)
     if (pRoot->mpAnmScn == NULL) {
         return;
     }
-    u32 refLightSet = ((AnmScnSceneView*)pRoot->mpAnmScn)->GetLightSetMaxRefNumber();
-    u32 refFog = ((AnmScnSceneView*)pRoot->mpAnmScn)->GetFogMaxRefNumber();
-    u32 refCamera = ((AnmScnSceneView*)pRoot->mpAnmScn)->GetCameraMaxRefNumber();
+    u32 refLightSet = pRoot->mpAnmScn->GetLightSetMaxRefNumber();
+    u32 refFog = pRoot->mpAnmScn->GetFogMaxRefNumber();
+    u32 refCamera = pRoot->mpAnmScn->GetCameraMaxRefNumber();
     if (refLightSet != 0) {
         pRoot->mpAnmScn->GetLightSetting((nw4r::g3d::LightSetting*)pRoot->mLightSetting);
     }
@@ -392,7 +355,7 @@ extern "C" void scn_root_apply_anm_scn(ScnRoot* pRoot)
         for (u32 i = 0; i < num; i++) {
             ResHandle fog;
             fog_ctor((s32)&fog, pRoot->mFog[i]);
-            ((AnmScnSceneView*)pRoot->mpAnmScn)->GetFog(fog, i);
+            pRoot->mpAnmScn->GetFog(*(nw4r::g3d::Fog*)&fog, i);
         }
     }
     if (refCamera != 0) {
@@ -400,7 +363,7 @@ extern "C" void scn_root_apply_anm_scn(ScnRoot* pRoot)
         for (u32 i = 0; i < num; i++) {
             ResHandle camera;
             camera_ctor(&camera, (u32)&pRoot->mCamera[i]);
-            ((AnmScnSceneView*)pRoot->mpAnmScn)->GetCamera(camera, i);
+            pRoot->mpAnmScn->GetCamera(*(nw4r::g3d::Camera*)&camera, i);
         }
     }
 }

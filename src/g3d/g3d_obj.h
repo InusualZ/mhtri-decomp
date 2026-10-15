@@ -23,7 +23,24 @@ struct MEMAllocator;
 extern "C" u8 anm_typename_G3dObj[];
 
 namespace nw4r {
+namespace ut {
+struct Color;
+}  // namespace ut
+
 namespace g3d {
+
+/* The types AnmScn's interface names (`g3d/g3d_light.h`, `g3d/g3d_fog.h`, `g3d/g3d_camera_types.h` and
+ * `g3d/g3d_anmscn.h` define them). */
+struct LightObj;
+struct LightSet;
+struct LightSetting;
+struct Fog;
+class Camera;
+class AnmScnRes;
+struct AmbLightAnmResult;
+struct LightAnmResult;
+struct FogAnmResult;
+struct CameraAnmResult;
 
 /* size: 0xC */
 class G3dObj {
@@ -133,8 +150,40 @@ public:
     virtual const TypeObj GetTypeObj() const;
     virtual const char* GetTypeName() const;
 
-    /* 0x80064CF0: copies the animation's light sets into `pSetting`. */
+    /* The scene animation interface `g3d/g3d_anmscn.cpp` defines (its two vtables list the slots in this
+     * order: frame control, Attach/Detach, the counts, the reference-number limits, the setters and results). */
+    virtual void SetFrame(f32 frame) = 0;
+    virtual f32 GetFrame() const = 0;
+    virtual void SetUpdateRate(f32 rate) = 0;
+    virtual f32 GetUpdateRate() const = 0;
+    virtual void UpdateFrame() = 0;
+    virtual AnmScn* Attach(int idx, AnmScnRes* pRes);
+    virtual AnmScnRes* Detach(int idx);
+    virtual u32 GetNumLightSet() const = 0;
+    virtual u32 GetNumAmbLight() const = 0;
+    virtual u32 GetNumDiffuseLight() const = 0;
+    virtual u32 GetNumSpecularLight() const = 0;
+    virtual u32 GetNumFog() const = 0;
+    virtual u32 GetNumCamera() const = 0;
+    virtual u32 GetLightSetMaxRefNumber() const = 0;
+    virtual u32 GetAmbLightMaxRefNumber() const = 0;
+    virtual u32 GetDiffuseLightMaxRefNumber() const = 0;
+    virtual u32 GetFogMaxRefNumber() const = 0;
+    virtual u32 GetCameraMaxRefNumber() const = 0;
+    virtual bool GetLightSet(LightSet& set, u32 refNumber) = 0;
+    virtual ut::Color GetAmbLightColor(u32 refNumber) = 0;
+    virtual void GetLight(LightObj* pDiff, LightObj* pSpec, u32 refNumber) = 0;
+    virtual void GetFog(Fog fog, u32 refNumber) = 0;
+    virtual bool GetCamera(Camera camera, u32 refNumber) = 0;
+    virtual u32 GetSpecularLightID(u32 refNumber) const = 0;
+    virtual bool HasSpecularLight(u32 refNumber) const = 0;
+    virtual AmbLightAnmResult* GetAmbLightResult(AmbLightAnmResult* pResult, u32 refNumber) = 0;
+    virtual LightAnmResult* GetLightResult(LightAnmResult* pResult, u32 refNumber) = 0;
+    virtual FogAnmResult* GetFogResult(FogAnmResult* pResult, u32 refNumber) = 0;
+    virtual CameraAnmResult* GetCameraResult(CameraAnmResult* pResult, u32 refNumber) = 0;
+
     void GetLightSetting(LightSetting* pSetting);
+    static const TypeObj GetTypeObjStatic();
 };
 
 /* The visibility, material-colour, texture-pattern and shape animation interfaces; only their run-time type is reconstructed

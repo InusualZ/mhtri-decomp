@@ -48,7 +48,7 @@ typedef struct {
 /* Forward declarations for the unit's own functions. */
 void *fn_80089F94(void *self, u32 value);
 void fn_80089FF8(u32 *self, u32 value);
-void fn_8008A000(void *arg0, ResAnmAmbLightResult *pResult, f32 frame);
+void res_anm_amb_light_get_anm_result(void *arg0, ResAnmAmbLightResult *pResult, f32 frame);
 s32 fn_8008A188(u32 *self, s32 flag, f32 frame);
 f32 fn_8008A1A8(u16 *count, f32 frame);
 s32 fn_8008A204(u32 *self, s32 offset);
@@ -79,7 +79,7 @@ inline void fn_80089FF8(u32 *self, u32 value)
 }
 
 /* Evaluates an ambient-light channel at a frame. */
-void fn_8008A000(void *arg0, ResAnmAmbLightResult *pResult, f32 frame)
+void res_anm_amb_light_get_anm_result(void *arg0, ResAnmAmbLightResult *pResult, f32 frame)
 {
     ResAnmAmbLightData *res;
     u32 flags;

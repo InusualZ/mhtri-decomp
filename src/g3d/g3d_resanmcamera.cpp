@@ -87,7 +87,7 @@ typedef struct {
 extern "C" {
     void *fn_8008A220(void *self, u32 value);
     void fn_8008A284(u32 *self, u32 value);
-    void fn_8008A28C(void *self, ResAnmCamAnmResult *pResult, f32 frame);
+    void res_anm_camera_get_anm_result(void *self, ResAnmCamAnmResult *pResult, f32 frame);
     f32 fn_8008A644(ResAnmCamValue *self, f32 frame, u32 flag);
 }
 
@@ -117,7 +117,7 @@ extern "C" inline void fn_8008A284(u32 *self, u32 value)
 }
 
 /* Fills in the camera result for one frame from the resolved animation data. */
-extern "C" void fn_8008A28C(void *self, ResAnmCamAnmResult *pResult, f32 frame)
+extern "C" void res_anm_camera_get_anm_result(void *self, ResAnmCamAnmResult *pResult, f32 frame)
 {
     ResAnmCamData *res;
     u32 flags;

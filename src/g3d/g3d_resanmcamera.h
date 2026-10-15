@@ -17,6 +17,17 @@ f32 fn_8008A644(u32 *self, f32 frame, s32 flag);
 
 #ifdef __cplusplus
 }
+
+namespace nw4r {
+namespace g3d {
+struct CameraAnmResult;
+}  // namespace g3d
+}  // namespace nw4r
+
+/* 0x8008A28C - `ResAnmCamera::GetAnmResult`: evaluates the camera channels at `frame` into `pResult` (caller:
+ * g3d_anmscn.cpp). */
+extern "C" void res_anm_camera_get_anm_result(const struct ResHandle* pSelf, nw4r::g3d::CameraAnmResult* pResult,
+                                              f32 frame);
 #endif
 
 #endif /* MHTRI_G3D_G3D_RESANMCAMERA_H */

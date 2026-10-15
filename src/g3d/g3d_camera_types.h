@@ -77,6 +77,8 @@ public:
     void SetPosition(const math::VEC3& rPos);
     void SetPosture(const PostureInfo& rInfo);
     void SetPerspective(f32 fovy, f32 aspect, f32 near, f32 far);
+    /* 0x80074F24 - the orthographic projection (`g3d/g3d_anmscn.cpp`'s GetCamera calls it). */
+    void SetOrtho(f32 top, f32 bottom, f32 left, f32 right, f32 near, f32 far);
     void GetCameraMtx(math::MTX34* pMtx) const;
 
     /* +0x0 */ CameraData* mpData;

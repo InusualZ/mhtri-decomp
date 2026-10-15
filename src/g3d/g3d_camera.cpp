@@ -136,7 +136,6 @@ void fn_800749C8(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut);
 void fn_80074AA8(nw4r::g3d::Camera* pSelf, f32* pX, f32* pY, f32* pZ);
 s32 fn_80074D38(const f32* pA, const f32* pB);
 void fn_80074D78(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut);
-void fn_80074F24(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d, f32 e, f32 f);
 void fn_80074FEC(nw4r::g3d::Camera* pSelf, u32 x, u32 y, u32 w, u32 h);
 void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d);
 void camera_get_viewport(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f32* p4, f32* p5, f32* p6);
@@ -369,19 +368,19 @@ void nw4r::g3d::Camera::SetPerspective(f32 fovy, f32 aspect, f32 near, f32 far) 
     }
 }
 
-void fn_80074F24(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d, f32 e, f32 f) {
-    if (!fn_80067EE8(pSelf)) {
+void nw4r::g3d::Camera::SetOrtho(f32 top, f32 bottom, f32 left, f32 right, f32 near, f32 far) {
+    if (!fn_80067EE8(this)) {
         nw4r::db::Panic("g3d_camera.cpp", 371, "NW4R:Failed assertion IsValid()");
     }
-    if (fn_80067EE8(pSelf)) {
-        CameraData* pData = camera_ref(pSelf);
+    if (fn_80067EE8(this)) {
+        CameraData* pData = camera_ref(this);
         pData->mProjType = 1;
-        pData->mUnkBC = a;
-        pData->mUnkC0 = b;
-        pData->mUnkC4 = c;
-        pData->mUnkC8 = d;
-        pData->mProjC = e;
-        pData->mProjD = f;
+        pData->mUnkBC = top;
+        pData->mUnkC0 = bottom;
+        pData->mUnkC4 = left;
+        pData->mUnkC8 = right;
+        pData->mProjC = near;
+        pData->mProjD = far;
         pData->mFlags &= ~0xF0;
         pData->mFlags |= 0x40;
     }

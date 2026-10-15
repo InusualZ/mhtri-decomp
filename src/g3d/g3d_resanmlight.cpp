@@ -106,7 +106,7 @@ extern "C" inline s32 fn_8008FD04(u32 *self, s32 index)
 }
 
 /* Evaluates the light animation at `frame` into `pResult`. */
-extern "C" void fn_8008F8E4(void *arg0, ResAnmLightResult *pResult, f32 frame)
+extern "C" void res_anm_light_get_anm_result(void *arg0, ResAnmLightResult *pResult, f32 frame)
 {
     ResAnmLightConfig *res;
     u32 flags;

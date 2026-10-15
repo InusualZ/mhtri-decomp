@@ -1,65 +1,73 @@
 /*
- * g3d/g3d_anmscn.cpp - nw4r g3d `g3d_anmscn.cpp`: the scene-animation object (`AnmScn`), the checked `_ac.h`
- *   getters of the `ResAnmScn`/`ResAnmAmbLight`/`ResAnmLight`/`ResAnmFog`/`ResAnmCamera` headers it includes, their
- *   word accessors and the list-insert chain steps.
+ * g3d/g3d_anmscn.cpp - nw4r g3d `g3d_anmscn.cpp`: the scene animation (`AnmScn`, `AnmScnRes`): the light-object
+ *   builders, GetLightSetting, Construct and the AnmScnRes interface over a `ResAnmScn` resource with its result
+ *   caches, plus the out-of-line copies of the `LightObj`/`LightSetting`/`LightSet`, `ResAnmScn`, `ResLightSet`,
+ *   `ResAnmAmbLight`/`ResAnmLight`/`ResAnmFog`/`ResAnmCamera` and `Fog` accessors it calls.
  * RANGE. .text 0x800649CC-0x8006946C; extab 0x800078F4-0x80007BB4, extabindex 0x8001FC98-0x8002004C, .rodata
  *   0x8056F578-0x8056F598, .data 0x8058C288-0x8058CC40, .sdata 0x80791170-0x80791188, .sdata2 0x80795D70-0x80795D90.
- *   The TU is `g3d_anmscn.cpp`: its one-copy `__FILE__` string (0x8058C288) is cited from fn_800649CC through
- *   fn_80068FC4; the previous TU's (`g3d_anmobj.cpp`, 0x8058C248) by PlayPolicy_Loop and the next TU's
- *   (`g3d_anmshp.cpp`, 0x8058CC40) from anm_obj_shp_test_existence on.  The `.rodata` records 0x8056F578/0x8056F588 and the `.sdata`
- *   words 0x80791170-0x80791184 are read only from inside the range.
+ *   The TU is `g3d_anmscn.cpp`: its one-copy `__FILE__` string (0x8058C288) is cited from 0x800649CC through
+ *   0x80068FC4; the previous TU's (`g3d_anmobj.cpp`, 0x8058C248) by PlayPolicy_Loop and the next TU's
+ *   (`g3d_anmshp.cpp`, 0x8058CC40) from 0x8006946C on.
  * FLAGS. `cflags_g3d`'s `-O3` is measured on fn_800680A8 (docs/g3d.md, playbook 27).
- * NAMES. The stems are defined `extern "C"` (playbook 48); `fn_80066C8C` and `fn_800680A8` keep C++ linkage (map rows
- *   `fn_80066C8C__FPv`, `fn_800680A8__FPv`; the source spells the bare stem, playbook 50).  The cross-unit
- *   declarations are `g3d/g3d_anmscn.h`.
- *   GUESS: `vec3_copy_construct` (0x80067E54): copies three floats into `out` and returns it (a VEC3 copy).
- *   AnmScn's constructor is nw4r's member.  obj_delete_flagged is a GUESS; fog_set_color is a GUESS;
- *   res_anm_light_config_test_flag8 is a GUESS (the bodies' behaviour).
- * RESIDUALS. `fn_80066FA0` lacks retail's call to `fn_80066DB4` (+0x9C).  AnmScn's destructor (dtor_80065768) stays
- *   undefined: defining `AnmScn::~AnmScn` makes the explicit call from fn_80066080 pass -1 where retail passes 0.
- *   Unwritten (31 functions, objdiff scores them zero): 0x800649CC-0x80064BD4, 0x80064C24-0x80064CE0,
- *   0x80064CF0-0x8006518C, 0x800652C8-0x8006553C, 0x8006560C-0x800657C4, 0x800659D8-0x80065ED8,
- *   0x80065EF0-0x80065FFC, 0x800660DC-0x80066C68, 0x800670D4-0x800677D8, 0x80067824-0x800679D4,
- *   0x80067B90-0x80067E54, 0x80067EFC-0x800680A8, 0x800680CC-0x80068634, 0x800686FC-0x800689B0,
- *   0x80068A78-0x80069334.
- *   Partial: fn_8006522C, fn_8006553C, fn_800655A4, fn_80065ED8, fn_80066FA0.
- *   AnmScn's constructor has an empty body by design (the compiler emits the G3dObj base call and the vtable store).
- *   flipcheck: `.text`, extab and extabindex are partial; `.rodata`, `.data` and `.sdata2` are claimed and not
- *   emitted.
- * SHAPES. The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
- *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106); the
- *   `ResAnmFog`/`ResAnmCamera` accessors at the end compile under `#pragma pool_data off`.
+ * NAMES. The AnmScn/AnmScnRes members are nw4r's (the vtables at 0x8058C808/0x8058C898 fix the slot order, the
+ *   assert strings name Attach, Detach, GetParent, TestScnAnmFlag(FLAG_HAS_CACHE) and Construct's `pSize`/`pHeap`/
+ *   `buf` checks).  GUESS: the count/limit slot names (GetNum*, Get*MaxRefNumber, from the ResAnmScn reader each
+ *   forwards to), MakeSpecularLightObj (MakeDiffuseLightObj's specular twin), vec3_copy_construct,
+ *   obj_delete_flagged (the LightSet view's destructor), fog_set_color, res_anm_light_config_test_flag8,
+ *   res_anm_light_get_id, res_anm_fog_get_id, res_anm_camera_get_id.  The weak accessor copies keep their map stems
+ *   (C linkage); fn_80066C8C and fn_800680A8 keep C++ linkage (`fn_80066C8C__FPv`, `fn_800680A8__FPv`, playbook 50).
+ * RESIDUALS. MakeDiffuseLightObj (point case), MakeSpecularLightObj, GetFog: retail computes the address of the
+ *   by-value GXColor argument's copy before the copy (`addi r4` first); ours after.
+ *   GetLightSetting: retail's ambient colour is a temporary below the diffuse block's counts (stack 0x8 vs 0x10) and
+ *   its diffuse loops share one walking pointer (ours keeps two, one more register).
+ *   fn_80065ED8: retail keeps `not` + `and`, ours fuses `andc`.  fn_8006522C: retail's ternary join branch.
+ *   Data: the `.data` strings are not in `.text` order in retail (Construct's follow G3dProc's, GetLightSet's follow
+ *   GetFog's); the `_ac.h` inline tail (0x8058C928-0x8058CC40, its "ref" copies in `.sdata`) is still extern; the
+ *   weak `ut::Color` constructor/destructor copies MWCC emits here are retail's dead copies (linker-folded).
+ * SHAPES. `#pragma peephole off` (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`, `addi r0` vtable-store and
+ *   `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106) and `#pragma pool_data off` (each string its
+ *   own `lis`/`addi`).  GetLightSetting and GetAmbLightColor compile under `#pragma dont_inline on`, so the
+ *   `ut::Color` constructor is called out of line; the explicit `color.~Color()` reproduces retail's out-of-line
+ *   destructor call.  GetLightSet takes its LightSet by reference: retail passes a copy made by the out-of-line copy
+ *   constructor (fn_800651F0) and destroys it after the call (obj_delete_flagged), which GetLightSetting spells.
+ *   The resolver words are passed to the handle copies by reference (retail's return temporaries sit below the
+ *   handles); `perspFovy / 2.0f` keeps retail's load order of the ortho height.
  */
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle (rule 1) */
+#include "nw4r/db_assert.h"      /* nw4r::db::Panic / Warning, owner nw4r/db_assert.cpp (rule 2) */
+#include "nw4r/ut_Color.h"       /* nw4r::ut::Color */
 #include "unsplit/g3d.h"      /* the math types it reads through the band header */
-#include "g3d/g3d_light.h" /* fn_8007A5A8 / fn_8007A5E4 / fn_8007A724 (rule 2) */
+#include "g3d/g3d_light.h" /* LightObj / LightSet / LightSetting and their initialisers (rule 2) */
+#include "g3d/g3d_fog.h"   /* nw4r::g3d::Fog (rule 1) */
+#include "g3d/g3d_resanmscn.h"      /* the ResAnmScn index and reference-number getters (rule 2) */
+#include "g3d/g3d_resanmamblight.h" /* res_anm_amb_light_get_anm_result (rule 2) */
+#include "g3d/g3d_resanmcamera.h"   /* res_anm_camera_get_anm_result (rule 2) */
+#include "g3d/g3d_resanmlight.h"    /* res_anm_light_get_anm_result (rule 2) */
+#include "g3d/g3d_resanmfog.h"      /* res_anm_fog_get_anm_result (rule 2) */
 #include "g3d/g3d_anmscn.h"
+#include "g3d/light_obj_is_enable.h" /* this unit's light-object, light-setting and fog accessors */
 #include "g3d/g3d_anmclr.h"   /* color_to_u32_ref, color_ctor_white, owned by g3d/g3d_anmclr.cpp (rule 2) */
-#include "g3d/g3d_anmchr.h"   /* the fn_8005Dxx helpers, the type-info members and G3dObj, owned by g3d/g3d_anmchr.cpp (rule 2) */
+#include "g3d/g3d_anmchr.h"   /* type_obj_set_name, fn_8005DC60, GetAnmPlayPolicy, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
+#include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
 #include "fn_80047398.h" /* color_rgba_copy (rule 2) */
-#include "mh3_pad.h"        /* VEC3_ctor, owned by mh3_pad.cpp (rule 2) */
+#include "fn_8004CAD8.h" /* subVec3 / vec3_scale / vec3_normalize_into (rule 2) */
+#include "mh3_pad.h"        /* VEC3_ctor / copyVec3, owned by mh3_pad.cpp (rule 2) */
+#include "MSL_C/alloc.h"    /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
 
 #pragma peephole off
+#pragma pool_data off
 
-/* Forward declarations: this unit's own copy helpers. */
-extern "C" void fn_8006602C(u32 *dst, const u32 *src);
-extern "C" void fn_80066D48(u32 *dst, const u32 *src);
-extern "C" void fn_80066F94(u32 *dst, const u32 *src);
-extern "C" void fn_800670C8(u32 *dst, const u32 *src);
+using namespace nw4r;
+using namespace nw4r::g3d;
 
-/* A three-float vector record (the cluster's `.text` copies it field by field, so the struct is the
- * explicit-float-copy shape, not a word copy). */
-typedef nw4r::math::VEC3 Vec3f; /* size: 0xC */
+/* The run-time type-name records GetTypeObj/GetTypeObjStatic return. */
+extern "C" const TypeNameData<sizeof("AnmScn")> anm_typename_AnmScn = {sizeof("AnmScn"), "AnmScn"};
+extern "C" const TypeNameData<sizeof("AnmScnRes")> anm_typename_AnmScnRes = {sizeof("AnmScnRes"), "AnmScnRes"};
 
-/* The cluster's `.rodata` animation type-name records (0x8056F500-0x8056F678): a length word followed by
- * the NUL-terminated name.  Referenced by address only. */
-extern u8 lbl_8056F578[];
-extern u8 lbl_8056F588[];
-
-/* The type-name strings the plain getters below return by address (`.data`/`.rodata`, read-only). */
+/* The type-name strings the `_ac.h` getters below return by address (`.data`, read-only). */
 extern u8 lbl_8058C928[];
 extern u8 lbl_8058CA70[];
 extern u8 lbl_8058CB38[];
@@ -84,52 +92,312 @@ extern u8 lbl_8058CBA8[];
 extern u8 lbl_8058CBC8[];
 extern u8 lbl_8058CBD8[];
 extern u8 lbl_8058CBF8[];
+extern u8 lbl_8058CAFC[]; /* "ResAnmFog"     */
+extern u8 lbl_8058CAB8[]; /* "ResAnmCamera"  */
+extern u8 lbl_8058CB24[];
+extern u8 lbl_8058CB08[];
+extern u8 lbl_8058CAE4[];
+extern u8 lbl_8058CAC8[];
 
-/* --------------------------------------------------------------------------------------------- *
- * More vtable-dispatch wrappers and the ownership-copy helpers (0x800640EC-0x800657C4).
- * --------------------------------------------------------------------------------------------- */
+/* The `ResAnmScn` count readers of `g3d/g3d_resanmlight.cpp` (the GetNum* slots forward to them). */
+extern "C" u32 fn_80090110(const ResHandle *p);
+extern "C" u32 fn_800902E4(const ResHandle *p);
+extern "C" u32 fn_800904B8(const ResHandle *p);
+extern "C" u32 fn_8009068C(const ResHandle *p);
+extern "C" u32 fn_80090860(const ResHandle *p);
 
-extern "C" u32 fn_8006553C(void *p)
-{
-    G3dObj *obj = (G3dObj *)p;
-    u32 tmp = obj->vt->method_0x14(p);
-    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
+/* This unit's own accessor copies, declared ahead of the definitions (which follow retail's address order). */
+extern "C" {
+void fn_80064BD4(LightObj *p);
+void fn_80064BE4(LightObj *p);
+void fn_80064BF4(LightObj *p);
+void fn_80064C04(LightObj *self, const math::VEC3 *v);
+void fn_80064CE0(LightObj *self, const math::VEC3 *v);
+void fn_800651A4(LightObj *p);
+u32 *fn_800651E8(const LightSetting *p);
+void fn_800651F0(LightSet *dst, const LightSet *src);
+s32 fn_80065204(const LightSet *p);
+void fn_8006522C(LightSet *out, LightSetting *self, s32 index);
+u32 fn_8006527C(const LightSetting *p);
+LightSet *obj_delete_flagged(LightSet *pSelf, s16 flag);
+u32 fn_80065828(const ResHandle *p);
+u32 fn_800658B0(u32 *p);
+u32 fn_800658B8(void);
+s32 fn_800658C4(const ResHandle *p);
+u32 fn_800658F0(const ResHandle *p);
+u32 fn_8006591C(const ResHandle *p);
+u32 fn_80065948(const ResHandle *p);
+u32 fn_80065974(const ResHandle *p);
+u32 fn_800659A0(const ResHandle *p);
+u32 fn_80065ED8(u32 base, u32 size);
+ResHandle *fn_80065FFC(ResHandle *dst, const ResHandle *src);
+void fn_8006602C(u32 *dst, const u32 *src);
+u32 fn_80066038(const ResHandle *p);
+s32 fn_8006605C(const ResHandle *p);
+u32 fn_80066C68(const ResHandle *p);
+u32 fn_80066CF0(u32 *p);
+u32 fn_80066CF8(void);
+s32 fn_80066D04(const ResHandle *p);
+ResHandle *fn_80066D18(ResHandle *dst, const u32 &src);
+void fn_80066D48(u32 *dst, const u32 *src);
+u32 fn_80066D54(const ResHandle *p);
+u32 fn_80066E18(u32 *p);
+u32 fn_80066E20(void);
+s32 fn_80066E2C(const ResHandle *p);
+u32 fn_80066E5C(const ResHandle *p);
+u32 fn_80066EE4(u32 *p);
+u32 fn_80066EEC(void);
+u32 res_anm_light_config_test_flag8(const ResHandle *p);
+u32 fn_80066F2C(const ResHandle *p);
+s32 fn_80066F50(const ResHandle *p);
+ResHandle *fn_80066F64(ResHandle *dst, const u32 &src);
+void fn_80066F94(u32 *dst, const u32 *src);
+u32 fn_80066FA0(const ResHandle *self, u32 index);
+u32 fn_80067060(const ResHandle *p);
+s32 fn_80067084(const ResHandle *p);
+ResHandle *fn_80067098(ResHandle *dst, const u32 &src);
+void fn_800670C8(u32 *dst, const u32 *src);
+LightAnmResult *fn_800677D8(LightAnmResult *self);
+void fog_set_color(Fog *self, GXColor color);
+void fn_80067A5C(Fog *self, f32 startz, f32 endz);
+void fn_80067AE4(Fog *self, s32 type);
+FogAnmResult *fn_80067B5C(FogAnmResult *self);
+CameraAnmResult *fn_80067EB4(CameraAnmResult *self);
+u32 res_anm_light_get_id(const ResHandle *p);
+u32 res_anm_fog_get_id(const ResHandle *p);
+u32 res_anm_camera_get_id(const ResHandle *p);
+u32 fn_80068698(void *p);
+u32 fn_800686A0(void);
+u32 fn_800686AC(const ResHandle *p);
+ResHandle *fn_800686C0(ResHandle *self, const u32 &src);
+void fn_800686F0(u32 *dst, const u32 *src);
+u32 fn_80068A14(void *p);
+u32 fn_80068A1C(void);
+u32 fn_80068A28(const ResHandle *p);
+ResHandle *fn_80068A3C(ResHandle *self, const u32 &src);
+void fn_80068A6C(u32 *dst, const u32 *src);
 }
 
-extern "C" u32 fn_800655A4(void *p)
-{
-    G3dObj *obj = (G3dObj *)p;
-    u32 tmp = obj->vt->method_0x14(p);
-    return (u32)reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&tmp)->GetTypeName();
-}
+/* 0x800680A8: the ambient light's ID (C++ linkage, map row `fn_800680A8__FPv`). */
+unsigned int fn_800680A8(void *obj);
 
-/* Installs the vtable at +0x00 after running the base constructor. */
+/* The `ResAnmAmbLight`/`ResAnmLight`/`ResAnmFog`/`ResAnmCamera` records' ID word. */
 typedef struct {
-    /* +0x00 */ void *vt;
-} G3dVtObj; /* size: 0x4 */
+    /* +0x00 */ u8 pad_0x00[0xC];
+    /* +0x0C */ u32 id;
+} ResAnmIdHead; /* size: 0x10 (approximate - only the +0xC ID is evidenced) */
 
-/* 0x800657C4 (0x40): constructs the scene animation with no parent. */
-nw4r::g3d::AnmScn::AnmScn(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
+/* Whether `value` is a finite number (not infinite, not NaN): the frame and rate setters' assertion. */
+#define ANMSCN_FLOAT_VALID(value) (__fpclassifyf(value) > 2 && __fpclassifyf(value) != 1)
+
+#define ANMSCN_FILE "g3d_anmscn.cpp"
+#define ANMSCN_THIS_ERROR "NW4R:Pointer Error\nthis(=%p) is not valid pointer."
+#define ANMSCN_RESULT_ERROR "NW4R:Pointer Error\npResult(=%p) is not valid pointer."
+
+/* --------------------------------------------------------------------------------------------- *
+ * The light-object builders (0x800649CC-0x80064CF0).
+ * --------------------------------------------------------------------------------------------- */
+
+namespace nw4r {
+namespace g3d {
+namespace {
+
+/* 0x800649CC (0x208): builds a point, directional or spot light object from a light animation result. */
+void MakeDiffuseLightObj(LightObj *pObj, const LightAnmResult *pResult)
 {
+    s32 type = pResult->flags & LightAnmResult::FLAG_LIGHT_TYPE_MASK;
+
+    light_obj_clear(pObj);
+    switch (type) {
+    case 0:
+        light_obj_init_light_color(pObj, pResult->color);
+        fn_80064C14(pObj, &pResult->pos.x);
+        light_obj_init_light_spot(pObj, 0.0f, 0);
+        light_obj_init_light_dist_attn(pObj, pResult->refDistance, pResult->refBrightness, pResult->distFunc);
+        fn_8007A5E4(pObj, 0.0f, 0.0f, 0.0f);
+        break;
+    case 1: {
+        math::VEC3 dir;
+        math::VEC3 pos;
+
+        subVec3(&dir, &pResult->aim, &pResult->pos);
+        vec3_scale(&pos, &dir, -1.0e10f);
+        light_obj_init_light_color(pObj, pResult->color);
+        fn_80064C14(pObj, &pos.x);
+        light_obj_init_light_attn_a(pObj, 1.0f, 0.0f, 0.0f);
+        light_obj_init_light_attn_k(pObj, 1.0f, 0.0f, 0.0f);
+        fn_8007A5E4(pObj, 0.0f, 0.0f, 0.0f);
+        break;
+    }
+    case 2: {
+        math::VEC3 dir;
+
+        subVec3(&dir, &pResult->aim, &pResult->pos);
+        vec3_normalize_into(&dir, &dir);
+        light_obj_init_light_color(pObj, pResult->color);
+        fn_80064C14(pObj, &pResult->pos.x);
+        light_obj_init_light_spot(pObj, pResult->cutoff, pResult->spotFunc);
+        light_obj_init_light_dist_attn(pObj, pResult->refDistance, pResult->refBrightness, pResult->distFunc);
+        fn_80064C04(pObj, &dir);
+        break;
+    }
+    default:
+        nw4r::db::Panic(ANMSCN_FILE, 105, "NW4R:Fatal Error\nMakeDiffuseLightObj: Unknown LightType=(%d)", type);
+        break;
+    }
+    if (!(pResult->flags & LightAnmResult::FLAG_COLOR_ENABLE)) {
+        fn_80064BF4(pObj);
+    }
+    if (!(pResult->flags & LightAnmResult::FLAG_ALPHA_ENABLE)) {
+        fn_80064BE4(pObj);
+    }
+    fn_80064BD4(pObj);
 }
 
-/* 0x80065284 (0x44): the deleting destructor of a trivially destructible object. */
-/* untyped: opaque handle - the object to free */
-extern "C" void* obj_delete_flagged(void* pSelf, s16 flag)
+/* 0x80064C24 (0xBC): builds the specular light object from a light animation result. */
+void MakeSpecularLightObj(LightObj *pObj, const LightAnmResult *pResult)
 {
-    if (pSelf && flag > 0) {
-        operator delete(pSelf);
+    math::VEC3 dir;
+
+    subVec3(&dir, &pResult->aim, &pResult->pos);
+    vec3_normalize_into(&dir, &dir);
+    light_obj_clear(pObj);
+    light_obj_init_light_color(pObj, pResult->specColor);
+    fn_80064CE0(pObj, &dir);
+    light_obj_init_light_shininess(pObj, pResult->shininess);
+    if (!(pResult->flags & LightAnmResult::FLAG_COLOR_ENABLE)) {
+        fn_80064BF4(pObj);
     }
-    return pSelf;
+    if (!(pResult->flags & LightAnmResult::FLAG_ALPHA_ENABLE)) {
+        fn_80064BE4(pObj);
+    }
+    fn_80064BD4(pObj);
+}
+
+}  // namespace
+}  // namespace g3d
+}  // namespace nw4r
+
+/* Sets the light object's enable bit. */
+extern "C" void fn_80064BD4(LightObj *p)
+{
+    p->mFlags |= 4;
+}
+
+extern "C" void fn_80064BE4(LightObj *p)
+{
+    p->mFlags |= 0x20;
+}
+
+extern "C" void fn_80064BF4(LightObj *p)
+{
+    p->mFlags |= 0x10;
+}
+
+/* The three-float setter forwarders. */
+extern "C" void fn_80064C04(LightObj *self, const math::VEC3 *v)
+{
+    fn_8007A5E4(self, v->x, v->y, v->z);
+}
+
+extern "C" void fn_80064C14(void *self, const f32 *v)
+{
+    fn_8007A5A8(self, v[0], v[1], v[2]);
+}
+
+extern "C" void fn_80064CE0(LightObj *self, const math::VEC3 *v)
+{
+    fn_8007A724(self, v->x, v->y, v->z);
 }
 
 /* --------------------------------------------------------------------------------------------- *
- * The float and flag helpers (0x8006497C-0x80065ED8).
+ * AnmScn::GetLightSetting and the light accessors it calls (0x80064CF0-0x800652C8).
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_80064BD4(u32 *p)
+#pragma dont_inline on
+/* 0x80064CF0 (0x49C): fills the light setting's light sets, ambient colours and light objects from the scene
+ * animation. */
+void AnmScn::GetLightSetting(LightSetting *pSetting)
 {
-    *p |= 4;
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 182, ANMSCN_THIS_ERROR);
+    G3D_POINTER_ASSERT(ANMSCN_FILE, pSetting, 183, "NW4R:Pointer Error\npSetting(=%p) is not valid pointer.");
+
+    u32 numLightSet = GetLightSetMaxRefNumber();
+    u32 numAmbLight = GetAmbLightMaxRefNumber();
+    u32 numDiffuseLight = GetDiffuseLightMaxRefNumber();
+
+    if (numLightSet != 0) {
+        u32 numSettingLightSet = fn_8006527C(pSetting);
+        u32 n = *g3d_min_u32(&numLightSet, &numSettingLightSet);
+
+        for (u32 i = 0; i < n; i++) {
+            LightSet set;
+            LightSet arg;
+
+            fn_8006522C(&set, pSetting, i);
+            NW4R_ASSERT(fn_80065204(&set), ANMSCN_FILE, 198, "NW4R:Failed assertion lightSet.IsValid()");
+            fn_800651F0(&arg, &set);
+            GetLightSet(arg, i);
+            obj_delete_flagged(&arg, -1);
+        }
+    }
+
+    if (numAmbLight != 0) {
+        u32 *pAmbColor = fn_800651E8(pSetting);
+        u32 numLightObj = light_setting_get_num_light_obj(pSetting);
+        u32 n = *g3d_min_u32(&numAmbLight, &numLightObj);
+
+        for (u32 i = 0; i < n; i++) {
+            ut::Color color = GetAmbLightColor(i);
+            pAmbColor[i] = fn_800651BC(&color);
+            color.~Color();
+        }
+    }
+
+    if (numDiffuseLight != 0) {
+        LightObj *pLightObj = light_setting_get_light_obj_array(pSetting);
+        u32 numLightObj = light_setting_get_num_light_obj(pSetting);
+        u32 numLight = numDiffuseLight + GetNumSpecularLight();
+        u32 numDiffuse = *g3d_min_u32(&numDiffuseLight, &numLightObj);
+        u32 numTotal = *g3d_min_u32(&numLight, &numLightObj);
+        u32 i;
+
+        for (i = 0; i < numDiffuse; i++) {
+            fn_800651A4(&pLightObj[i]);
+        }
+        for (i = 0; i < numDiffuse; i++) {
+            LightObj *pSpec = NULL;
+
+            if (!light_obj_is_enable(&pLightObj[i])) {
+                if (HasSpecularLight(i)) {
+                    u32 specID = GetSpecularLightID(i);
+                    if (specID < numTotal) {
+                        pSpec = &pLightObj[specID];
+                    }
+                }
+                GetLight(&pLightObj[i], pSpec, i);
+            }
+        }
+    }
+}
+#pragma dont_inline reset
+
+/* Whether the light object is enabled. */
+extern "C" s32 light_obj_is_enable(const LightObj *p)
+{
+    u32 masked = p->mFlags & 4;
+    return masked != 0;
+}
+
+/* Clears the light object's enable bit. */
+extern "C" void fn_800651A4(LightObj *p)
+{
+    p->mFlags &= ~0x4u;
+}
+
+extern "C" LightObj *light_setting_get_light_obj_array(const LightSetting *p)
+{
+    return p->mpLightObjArray;
 }
 
 /* Reads the +0x0 word through the identity helper (0x80064754), the shape the two readers share. */
@@ -138,196 +406,861 @@ extern "C" u32 fn_800651BC(void *self)
     return *color_to_u32_ref((u32 *)self);
 }
 
-extern "C" u16 light_setting_get_num_light_obj(u16 *p)
+extern "C" u32 light_setting_get_num_light_obj(const LightSetting *p)
 {
-    return *p;
+    return p->mNumLightObj;
 }
 
-extern "C" u32 fn_80065574(void)
+extern "C" u32 *fn_800651E8(const LightSetting *p)
 {
-    const u8 *local;
-    return (u32)*type_obj_set_name(&local, lbl_8056F578);
+    return p->mpAmbLightColorArray;
 }
 
-extern "C" u32 fn_800655DC(void)
+/* Copies a light set view. */
+extern "C" void fn_800651F0(LightSet *dst, const LightSet *src)
 {
-    void *local;
-    return (u32)*fn_8005DC60(&local, lbl_8056F588);
+    dst->mpSetting = src->mpSetting;
+    dst->mpLightSetData = src->mpLightSetData;
+}
+
+/* Whether the light set view names a setting and a record. */
+extern "C" s32 fn_80065204(const LightSet *p)
+{
+    s32 ret = 0;
+    if (p->mpSetting != 0 && p->mpLightSetData != 0)
+        ret = 1;
+    return ret;
+}
+
+/* Out-of-range lookups store a NULL record but always store the setting. */
+extern "C" void fn_8006522C(LightSet *out, LightSetting *self, s32 index)
+{
+    LightSetData *elem;
+    if (index < (s32)self->mNumLightSet && index >= 0)
+        elem = &self->mpLightSetDataArray[index];
+    else
+        elem = 0;
+    out->mpSetting = self;
+    out->mpLightSetData = elem;
+}
+
+/* The smaller of two counts (by reference). */
+extern "C" const u32 *g3d_min_u32(const u32 *a, const u32 *b)
+{
+    return (*b < *a) ? b : a;
+}
+
+extern "C" u32 fn_8006527C(const LightSetting *p)
+{
+    return p->mNumLightSet;
+}
+
+/* 0x80065284 (0x44): the light set view's destructor (frees it when `flag` is positive). */
+extern "C" LightSet *obj_delete_flagged(LightSet *pSelf, s16 flag)
+{
+    if (pSelf && flag > 0) {
+        operator delete(pSelf);
+    }
+    return pSelf;
+}
+
+/* --------------------------------------------------------------------------------------------- *
+ * AnmScn's own members (0x800652C8-0x80065808).
+ * --------------------------------------------------------------------------------------------- */
+
+/* 0x800652C8 (0x274): a plain scene animation takes no children: warns and returns NULL. */
+AnmScn *AnmScn::Attach(int idx, AnmScnRes *pRes)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 269, ANMSCN_THIS_ERROR);
+    G3D_POINTER_ASSERT(ANMSCN_FILE, pRes, 270, "NW4R:Pointer Error\npObj(=%p) is not valid pointer.");
+    nw4r::db::Warning(ANMSCN_FILE, 276, "AnmScn::Attach(%d, %p(%s)) called with %s. Maybe uninteded call.", idx,
+                      pRes, pRes->GetTypeName(), GetTypeName());
+    return NULL;
+}
+
+/* 0x8006553C (0x38): returns the type's name. */
+const char *AnmScn::GetTypeName() const
+{
+    return GetTypeObj().GetTypeName();
+}
+
+/* 0x80065574 (0x30): returns the AnmScn type. */
+const nw4r::g3d::G3dObj::TypeObj AnmScn::GetTypeObj() const
+{
+    const u8 *pName;
+    return *reinterpret_cast<const TypeObj *>(type_obj_set_name(&pName, (const u8 *)&anm_typename_AnmScn));
+}
+
+/* 0x800655A4 (0x38): returns the type's name. */
+const char *AnmScnRes::GetTypeName() const
+{
+    return GetTypeObj().GetTypeName();
+}
+
+/* 0x800655DC (0x30): returns the AnmScnRes type. */
+const nw4r::g3d::G3dObj::TypeObj AnmScnRes::GetTypeObj() const
+{
+    const TypeObj::TypeName *pName;
+    return *reinterpret_cast<const TypeObj *>(fn_8005DC60((void **)&pName, (void *)&anm_typename_AnmScnRes));
+}
+
+/* 0x8006560C (0x15C): a plain scene animation has no children: warns and returns NULL. */
+AnmScnRes *AnmScn::Detach(int idx)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 286, ANMSCN_THIS_ERROR);
+    nw4r::db::Warning(ANMSCN_FILE, 292, "AnmScn::Detach(%d) called with %s. Maybe uninteded call.", idx,
+                      GetTypeName());
+    return NULL;
+}
+
+/* 0x80065768 (0x5C): destroys the scene animation. */
+AnmScn::~AnmScn()
+{
+}
+
+/* 0x800657C4 (0x40): constructs the scene animation with no parent. */
+AnmScn::AnmScn(MEMAllocator *pHeap) : nw4r::g3d::G3dObj(pHeap, NULL)
+{
 }
 
 /* The placement `operator delete`: nothing to release. */
 /* untyped: opaque handle passed through - the block and the placement address */
-void operator delete(void* block, void* place)
+void operator delete(void *block, void *place)
 {
 }
 
 /* --------------------------------------------------------------------------------------------- *
- * The checked `ResAnmScn` config accessors (0x80065828-0x8006605C): each resolves the object through
- * `fn_8006584C` (the checked getter that reads *self and panics out of `g3d_resanmscn_ac.h`) and reads
- * one field of the resolved config record.
+ * AnmScnRes's count and limit slots and the `ResAnmScn` readers they forward to (0x80065808-0x800659D8).
  * --------------------------------------------------------------------------------------------- */
 
-/* `ResAnmScnConfig` moved to g3d/fn_80063888.h (rule 1) when g3d/g3d_resanmlight.cpp became
- * the second consumer; `fn_8006584C`'s declaration moved with it (rule 2). */
-
-extern "C" u16 fn_80065828(void *p)
+u32 AnmScnRes::GetNumLightSet() const
 {
-    return fn_8006584C(p)->field_0x36;
+    return fn_80090110(&mRes);
 }
 
-extern "C" u16 fn_800658F0(void *p)
+u32 AnmScnRes::GetNumAmbLight() const
 {
-    return fn_8006584C(p)->field_0x3C;
+    return fn_800902E4(&mRes);
 }
 
-extern "C" u16 fn_8006591C(void *p)
+u32 AnmScnRes::GetNumDiffuseLight() const
 {
-    return fn_8006584C(p)->field_0x3E;
+    return fn_800904B8(&mRes);
 }
 
-extern "C" u16 fn_80065948(void *p)
+u32 AnmScnRes::GetNumSpecularLight() const
 {
-    return fn_8006584C(p)->field_0x40;
+    return fn_80065828(&mRes);
 }
 
-extern "C" u16 fn_80065974(void *p)
+extern "C" u32 fn_80065828(const ResHandle *p)
 {
-    return fn_8006584C(p)->field_0x42;
+    return fn_8006584C((void *)p)->field_0x36;
 }
 
-extern "C" u16 fn_800659A0(void *p)
+/* The checked `ResAnmScn` resolver: panics out of `g3d_resanmscn_ac.h` when the handle is empty. */
+extern "C" ResAnmScnConfig *fn_8006584C(void *p)
 {
-    return fn_8006584C(p)->field_0x44;
+    if (fn_800658C4((const ResHandle *)p) == 0)
+        nw4r::db::Panic((const char *)lbl_8058CC2C, 0x28, (const char *)lbl_8058CC10,
+                        (const char *)fn_800658B8(), "ref");
+    return (ResAnmScnConfig *)fn_800658B0((u32 *)p);
 }
 
-extern "C" u32 fn_80066038(void *p)
+extern "C" u32 fn_800658B0(u32 *p)
 {
-    return fn_8006584C(p)->field_0x38;
+    return *p;
 }
 
-extern "C" u16 fn_8006605C(void *p)
+extern "C" u32 fn_800658B8(void)
 {
-    return fn_8006584C(p)->field_0x34;
+    return (u32)lbl_8058CC04;
 }
 
-/* The +0x20 `this`-adjustor thunks (0x80065914/40/6C/98): each hands its sub-record to the matching
- * reader.  The sub-record sits 0x20 B into the outer object (the adjustor's own `addi r3, r3, 0x20`). */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x20];
-    /* +0x20 */ ResAnmScnConfig sub_0x20;
-} ResAnmScnOwner; /* size: 0x66 (approximate - the +0x20 sub-record offset is the only evidence) */
-
-extern "C" u16 fn_80065914(void *p)
+extern "C" s32 fn_800658C4(const ResHandle *p)
 {
-    return fn_8006591C(&((ResAnmScnOwner *)p)->sub_0x20);
+    return p->mpData != 0;
 }
 
-extern "C" u16 fn_80065940(void *p)
+u32 AnmScnRes::GetNumFog() const
 {
-    return fn_80065948(&((ResAnmScnOwner *)p)->sub_0x20);
+    return fn_8009068C(&mRes);
 }
 
-extern "C" u16 fn_8006596C(void *p)
+u32 AnmScnRes::GetNumCamera() const
 {
-    return fn_80065974(&((ResAnmScnOwner *)p)->sub_0x20);
+    return fn_80090860(&mRes);
 }
 
-extern "C" u16 fn_80065998(void *p)
+u32 AnmScnRes::GetLightSetMaxRefNumber() const
 {
-    return fn_800659A0(&((ResAnmScnOwner *)p)->sub_0x20);
+    return fn_800658F0(&mRes);
+}
+
+extern "C" u32 fn_800658F0(const ResHandle *p)
+{
+    return fn_8006584C((void *)p)->field_0x3C;
+}
+
+u32 AnmScnRes::GetAmbLightMaxRefNumber() const
+{
+    return fn_8006591C(&mRes);
+}
+
+extern "C" u32 fn_8006591C(const ResHandle *p)
+{
+    return fn_8006584C((void *)p)->field_0x3E;
+}
+
+u32 AnmScnRes::GetDiffuseLightMaxRefNumber() const
+{
+    return fn_80065948(&mRes);
+}
+
+extern "C" u32 fn_80065948(const ResHandle *p)
+{
+    return fn_8006584C((void *)p)->field_0x40;
+}
+
+u32 AnmScnRes::GetFogMaxRefNumber() const
+{
+    return fn_80065974(&mRes);
+}
+
+extern "C" u32 fn_80065974(const ResHandle *p)
+{
+    return fn_8006584C((void *)p)->field_0x42;
+}
+
+u32 AnmScnRes::GetCameraMaxRefNumber() const
+{
+    return fn_800659A0(&mRes);
+}
+
+extern "C" u32 fn_800659A0(const ResHandle *p)
+{
+    return fn_8006584C((void *)p)->field_0x44;
+}
+
+/* Whether the fog handle names a record. */
+extern "C" s32 fog_is_valid(const Fog *p)
+{
+    return p->mpFogData != 0;
 }
 
 /* --------------------------------------------------------------------------------------------- *
- * The word-copy wrappers (0x80065FFC-0x80067098).
+ * Construct, the constructor and the `ResAnmScn` readers it calls (0x800659D8-0x800660DC).
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" void *fn_80065FFC(void *dst, void *src)
+/* 0x800659D8 (0x500): sizes the object and its result caches, allocates them from `pHeap` and constructs the
+ * scene animation in the block; `pSize` receives the size. */
+AnmScnRes *AnmScnRes::Construct(MEMAllocator *pHeap, u32 *pSize, ResHandle resAnmScn, bool bHasCache)
+{
+    if (!fn_800658C4(&resAnmScn)) {
+        return NULL;
+    }
+
+    u32 numAmbLight = bHasCache ? fn_800902E4(&resAnmScn) : 0;
+    u32 numLight = bHasCache ? fn_800904B8(&resAnmScn) : 0;
+    u32 numFog = bHasCache ? fn_8009068C(&resAnmScn) : 0;
+    u32 numCamera = bHasCache ? fn_80090860(&resAnmScn) : 0;
+
+    u32 ambLightSize = numAmbLight * sizeof(AmbLightAnmResult);
+    u32 lightSize = numLight * sizeof(LightAnmResult);
+    u32 fogSize = numFog * sizeof(FogAnmResult);
+    u32 cameraSize = numCamera * sizeof(CameraAnmResult);
+
+    u32 ambLightOfs = fn_80065ED8(sizeof(AnmScnRes), 4);
+    u32 lightOfs = fn_80065ED8(ambLightOfs + ambLightSize, 4);
+    u32 fogOfs = fn_80065ED8(lightOfs + lightSize, 4);
+    u32 cameraOfs = fn_80065ED8(fogOfs + fogSize, 4);
+    u32 size = fn_80065ED8(cameraOfs + cameraSize, 4);
+
+    if (pSize != NULL) {
+        G3D_POINTER_ASSERT(ANMSCN_FILE, pSize, 1113, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.");
+        *pSize = size;
+    }
+    if (pHeap == NULL) {
+        return NULL;
+    }
+    G3D_POINTER_ASSERT(ANMSCN_FILE, pHeap, 1122, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
+
+    u8 *pBuf = (u8 *)Alloc(pHeap, size);
+    if (pBuf == NULL) {
+        return NULL;
+    }
+    G3D_POINTER_ASSERT(ANMSCN_FILE, pBuf, 1132, "NW4R:Pointer Error\nbuf(=%p) is not valid pointer.");
+    if (((u32)pBuf & 3) != 0) {
+        nw4r::db::Panic(ANMSCN_FILE, 1133, "NW4R:Alignment Error(0x%x)\nbuf must be aligned to 4 bytes boundary.",
+                        pBuf);
+    }
+
+    return new (pBuf) AnmScnRes(pHeap, resAnmScn,
+                                ambLightSize != 0 ? (AmbLightAnmResult *)(pBuf + ambLightOfs) : NULL,
+                                lightSize != 0 ? (LightAnmResult *)(pBuf + lightOfs) : NULL,
+                                fogSize != 0 ? (FogAnmResult *)(pBuf + fogOfs) : NULL,
+                                cameraSize != 0 ? (CameraAnmResult *)(pBuf + cameraOfs) : NULL);
+}
+
+/* Rounds `base` up to a multiple of `size` (a power of two). */
+extern "C" u32 fn_80065ED8(u32 base, u32 size)
+{
+    u32 mask = ~(size - 1);
+    return (size + base - 1) & mask;
+}
+
+/* 0x80065EF0 (0x10C): starts the frame control over the resource's frame count and play policy, keeps the
+ * resource and the caches, and fills the caches when there are any. */
+AnmScnRes::AnmScnRes(MEMAllocator *pHeap, ResHandle resAnmScn, AmbLightAnmResult *pAmbLightCache,
+                     LightAnmResult *pLightCache, FogAnmResult *pFogCache, CameraAnmResult *pCameraCache)
+    : AnmScn(pHeap),
+      FrameCtrl(0.0f, fn_8006605C(&resAnmScn), GetAnmPlayPolicy((AnmPolicy)fn_80066038(&resAnmScn)))
+{
+    fn_80065FFC(&mRes, &resAnmScn);
+    mScnAnmFlags = 0;
+    mpAmbLightCache = pAmbLightCache;
+    mpLightCache = pLightCache;
+    mpFogCache = pFogCache;
+    mpCameraCache = pCameraCache;
+    if (pAmbLightCache != NULL || pLightCache != NULL || pFogCache != NULL || pCameraCache != NULL) {
+        SetScnAnmFlag(FLAG_HAS_CACHE, true);
+    }
+    if (TestScnAnmFlag(FLAG_HAS_CACHE)) {
+        UpdateCache();
+    }
+}
+
+/* Copies a `ResAnmScn` handle. */
+extern "C" ResHandle *fn_80065FFC(ResHandle *dst, const ResHandle *src)
 {
     fn_8006602C((u32 *)dst, (const u32 *)src);
     return dst;
 }
 
-extern "C" void *fn_80066D18(void *dst, void *src)
+extern "C" void fn_8006602C(u32 *dst, const u32 *src)
 {
-    fn_80066D48((u32 *)dst, (const u32 *)src);
-    return dst;
+    *dst = *src;
 }
 
-extern "C" void *fn_80066F64(void *dst, void *src)
+/* The resource's play policy. */
+extern "C" u32 fn_80066038(const ResHandle *p)
 {
-    fn_80066F94((u32 *)dst, (const u32 *)src);
-    return dst;
+    return fn_8006584C((void *)p)->field_0x38;
 }
 
-extern "C" void *fn_80067098(void *dst, void *src)
+/* The resource's frame count. */
+extern "C" s32 fn_8006605C(const ResHandle *p)
 {
-    fn_800670C8((u32 *)dst, (const u32 *)src);
-    return dst;
+    return fn_8006584C((void *)p)->field_0x34;
+}
+
+/* 0x80066080 (0x5C): destroys the scene animation. */
+AnmScnRes::~AnmScnRes()
+{
 }
 
 /* --------------------------------------------------------------------------------------------- *
- * The resolved-resource accessors (0x80066C68-0x80067060): each resolves an object through a checked
- * getter and reads one field of it.
+ * The frame control and G3dProc (0x800660DC-0x80066990).
  * --------------------------------------------------------------------------------------------- */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x10];
-    /* +0x10 */ u32 field_0x10;
-} ResAnmAmbLightWord; /* size: 0x14 (approximate - only the +0x10 word this accessor reads is evidenced) */
 
-/* `ResAnmLightConfig` and the `fn_80066DB4`/`fn_80066E80` declarations moved to
- * g3d/fn_80063888.h (rules 1 and 2) when g3d/g3d_resanmlight.cpp became the second consumer. */
-
-extern "C" u32 fn_80066C68(void *p)
+/* 0x800660DC (0x1A0): sets the frame and refreshes the caches. */
+void AnmScnRes::SetFrame(f32 frame)
 {
-    return ((ResAnmAmbLightWord *)fn_80066C8C(p))->field_0x10;
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1192, ANMSCN_THIS_ERROR);
+    {
+        bool valid = false;
+        if (ANMSCN_FLOAT_VALID(frame)) {
+            valid = true;
+        }
+        if (!valid) {
+            nw4r::db::Panic(ANMSCN_FILE, 1193, "NW4R:Floating Point Value Error(%f)\nframe is infinite or nan.",
+                            frame);
+        }
+    }
+    SetFrm(frame);
+    if (TestScnAnmFlag(FLAG_HAS_CACHE)) {
+        UpdateCache();
+    }
 }
 
-extern "C" s32 fn_80066E2C(void *p)
+/* 0x8006627C (0x11C): the current frame. */
+f32 AnmScnRes::GetFrame() const
 {
-    return fn_80066DB4(p)->field_0x14 != 0;
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1206, ANMSCN_THIS_ERROR);
+    return GetFrm();
 }
 
-extern "C" u32 fn_80066E5C(void *p)
+/* 0x80066398 (0x1B8): sets the update rate; a stopped animation refreshes the caches. */
+void AnmScnRes::SetUpdateRate(f32 rate)
 {
-    return fn_80066E80(p)->field_0x14;
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1214, ANMSCN_THIS_ERROR);
+    {
+        bool valid = false;
+        if (ANMSCN_FLOAT_VALID(rate)) {
+            valid = true;
+        }
+        if (!valid) {
+            nw4r::db::Panic(ANMSCN_FILE, 1215, "NW4R:Floating Point Value Error(%f)\nrate is infinite or nan.",
+                            rate);
+        }
+    }
+    SetRate(rate);
+    if (0.0f == rate) {
+        if (TestScnAnmFlag(FLAG_HAS_CACHE)) {
+            UpdateCache();
+        }
+    }
+}
+
+/* 0x80066550 (0x11C): the update rate. */
+f32 AnmScnRes::GetUpdateRate() const
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1230, ANMSCN_THIS_ERROR);
+    return GetRate();
+}
+
+/* 0x8006666C (0x14C): advances the frame unless stopped, then refreshes the caches. */
+void AnmScnRes::UpdateFrame()
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1238, ANMSCN_THIS_ERROR);
+    if (0.0f != GetRate()) {
+        UpdateFrm();
+        if (TestScnAnmFlag(FLAG_HAS_CACHE)) {
+            UpdateCache();
+        }
+    }
+}
+
+/* 0x800667B8 (0x1D8): advances on the frame notification and tracks the parent on attach and detach. */
+/* untyped: caller-owned payload - the notification's argument (the new parent on attach) */
+void AnmScnRes::G3dProc(u32 task, u32 param, void *pInfo)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1261, ANMSCN_THIS_ERROR);
+    switch (task) {
+    case G3DPROC_UPDATEFRAME:
+        UpdateFrame();
+        break;
+    case G3DPROC_DETACH_PARENT:
+        NW4R_ASSERT(GetParent(), ANMSCN_FILE, 1273, "NW4R:Failed assertion GetParent()");
+        SetParent(NULL);
+        break;
+    case G3DPROC_ATTACH_PARENT:
+        NW4R_ASSERT(!GetParent(), ANMSCN_FILE, 1280, "NW4R:Failed assertion !GetParent()");
+        SetParent((nw4r::g3d::G3dObj *)pInfo);
+        break;
+    }
+}
+
+/* --------------------------------------------------------------------------------------------- *
+ * The light-set, ambient, light, fog and camera queries (0x80066990-0x80067EFC) and the accessor copies
+ * between them.
+ * --------------------------------------------------------------------------------------------- */
+
+/* 0x80066990 (0x2D8): selects the light objects and the ambient object of the light set `refNumber` names. */
+bool AnmScnRes::GetLightSet(LightSet &set, u32 refNumber)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1307, ANMSCN_THIS_ERROR);
+
+    ResHandle resLightSet;
+    fn_80067098(&resLightSet, res_anm_scn_get_res_light_set_by_ref_number(&mRes, refNumber));
+    if (!fn_80067084(&resLightSet)) {
+        return false;
+    }
+
+    u32 specIdx;
+    u32 i;
+    u32 numLight = fn_80067060(&resLightSet);
+    specIdx = 7;
+    for (i = 0; i < numLight; i++) {
+        u32 lightID = fn_80066FA0(&resLightSet, i);
+        if (lightID != 0xFFFF) {
+            ResHandle resLight;
+            fn_80066F64(&resLight, res_anm_scn_get_res_anm_light(&mRes, lightID));
+            NW4R_ASSERT(fn_80066F50(&resLight), ANMSCN_FILE, 1329, "NW4R:Failed assertion resLight.IsValid()");
+            light_set_select_light_obj(&set, i, fn_80066F2C(&resLight));
+            if (res_anm_light_config_test_flag8(&resLight)) {
+                light_set_select_light_obj(&set, specIdx--, fn_80066E5C(&resLight));
+            }
+        } else {
+            light_set_select_light_obj(&set, i, -1);
+        }
+    }
+    for (; numLight <= specIdx; numLight++) {
+        light_set_select_light_obj(&set, numLight, -1);
+    }
+
+    if (fn_80066E2C(&resLightSet)) {
+        ResHandle resAmb;
+        fn_80066D18(&resAmb, res_anm_scn_get_res_anm_amb_light(&mRes, fn_80066D54(&resLightSet)));
+        NW4R_ASSERT(fn_80066D04(&resAmb), ANMSCN_FILE, 1364, "NW4R:Failed assertion resAmb.IsValid()");
+        light_set_select_amb_light_obj(&set, fn_80066C68(&resAmb));
+    } else {
+        light_set_select_amb_light_obj(&set, -1);
+    }
+    return true;
+}
+
+/* The ambient light's light-object index. */
+extern "C" u32 fn_80066C68(const ResHandle *p)
+{
+    return ((const ResAnmLightConfig *)fn_80066C8C((void *)p))->field_0x10;
+}
+
+/* The checked `ResAnmAmbLight` resolver (C++ linkage). */
+void *fn_80066C8C(void *obj)
+{
+    if (fn_80066D04((const ResHandle *)obj) == 0)
+        nw4r::db::Panic((const char *)lbl_8058CAA0, 0x25, (const char *)lbl_8058CA80,
+                        (const char *)fn_80066CF8(), "ref");
+    return (void *)fn_80066CF0((u32 *)obj);
+}
+
+extern "C" u32 fn_80066CF0(u32 *p)
+{
+    return *p;
+}
+
+extern "C" u32 fn_80066CF8(void)
+{
+    return (u32)lbl_8058CA70;
+}
+
+extern "C" s32 fn_80066D04(const ResHandle *p)
+{
+    return p->mpData != 0;
+}
+
+/* Copies a `ResAnmAmbLight` handle. */
+extern "C" ResHandle *fn_80066D18(ResHandle *dst, const u32 &src)
+{
+    fn_80066D48((u32 *)dst, &src);
+    return dst;
+}
+
+extern "C" void fn_80066D48(u32 *dst, const u32 *src)
+{
+    *dst = *src;
+}
+
+/* The light set's ambient light ID; the invalid ID panics out of `g3d_reslightset_ac.h`. */
+extern "C" u32 fn_80066D54(const ResHandle *p)
+{
+    if (fn_80066DB4((void *)p)->field_0x18 == 0xFFFF)
+        nw4r::db::Panic((const char *)lbl_8058CA58, 0x79, (const char *)lbl_8058CA18);
+    return fn_80066DB4((void *)p)->field_0x18;
+}
+
+/* The checked `ResLightSet` resolver. */
+extern "C" ResAnmLightConfig *fn_80066DB4(void *p)
+{
+    if (fn_80067084((const ResHandle *)p) == 0)
+        nw4r::db::Panic((const char *)lbl_8058C950, 0x27, (const char *)lbl_8058C934,
+                        (const char *)fn_80066E20(), "ref");
+    return (ResAnmLightConfig *)fn_80066E18((u32 *)p);
+}
+
+extern "C" u32 fn_80066E18(u32 *p)
+{
+    return *p;
+}
+
+extern "C" u32 fn_80066E20(void)
+{
+    return (u32)lbl_8058C928;
+}
+
+/* Whether the light set has an ambient light. */
+extern "C" s32 fn_80066E2C(const ResHandle *p)
+{
+    return fn_80066DB4((void *)p)->field_0x14 != 0;
+}
+
+/* The light's specular light-object index. */
+extern "C" u32 fn_80066E5C(const ResHandle *p)
+{
+    return fn_80066E80((void *)p)->field_0x14;
+}
+
+/* The checked `ResAnmLight` resolver. */
+extern "C" ResAnmLightConfig *fn_80066E80(void *p)
+{
+    if (fn_80066F50((const ResHandle *)p) == 0)
+        nw4r::db::Panic((const char *)lbl_8058CB60, 0x8f, (const char *)lbl_8058CB44,
+                        (const char *)fn_80066EEC(), "ref");
+    return (ResAnmLightConfig *)fn_80066EE4((u32 *)p);
+}
+
+extern "C" u32 fn_80066EE4(u32 *p)
+{
+    return *p;
+}
+
+extern "C" u32 fn_80066EEC(void)
+{
+    return (u32)lbl_8058CB38;
 }
 
 /* 0x80066EF8 (0x34): whether bit 3 of the light config's channel flags is set. */
-/* untyped: opaque handle - the light-config handle */
-extern "C" u32 res_anm_light_config_test_flag8(void *p)
+extern "C" u32 res_anm_light_config_test_flag8(const ResHandle *p)
 {
-    return (fn_80066E80(p)->flags & 8) != 0;
+    return (fn_80066E80((void *)p)->flags & 8) != 0;
 }
 
-extern "C" u32 fn_80066F2C(void *p)
+/* The light's light-object index. */
+extern "C" u32 fn_80066F2C(const ResHandle *p)
 {
-    return fn_80066E80(p)->field_0x10;
+    return fn_80066E80((void *)p)->field_0x10;
 }
 
-extern "C" u8 fn_80067060(void *p)
+extern "C" s32 fn_80066F50(const ResHandle *p)
 {
-    return fn_80066DB4(p)->field_0x1A;
+    return p->mpData != 0;
 }
 
-/* --------------------------------------------------------------------------------------------- *
- * The composite teardown destructors (0x80067B5C/0x80067E70/0x80067EB4): construct-or-clear each
- * sub-record of the object through `VEC3_ctor`/`color_ctor_white`, then hand the object back.
- * --------------------------------------------------------------------------------------------- */
+/* Copies a `ResAnmLight` handle. */
+extern "C" ResHandle *fn_80066F64(ResHandle *dst, const u32 &src)
+{
+    fn_80066F94((u32 *)dst, &src);
+    return dst;
+}
+
+extern "C" void fn_80066F94(u32 *dst, const u32 *src)
+{
+    *dst = *src;
+}
+
+/* The bounds-checked light ID reader: an index past the end panics, and the invalid ID panics out of
+ * `g3d_reslightset_ac.h`. */
 typedef struct {
-    /* +0x00 */ u32 head_0x00;
-    /* +0x04 */ u32 head_0x04;
-    /* +0x08 */ Vec3f vec_0x08;
-} G3dSingleVecObj; /* size: 0x14 */
+    /* +0x00 */ u8 pad_0x00[0x3C];
+    /* +0x3C */ u16 entries_0x3C[1];
+} ResAnmLightTable; /* size: 0x3E (approximate - only the +0x3C table is evidenced) */
 
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0xC];
-    /* +0x0C */ u32 sub_0x0C;
-} G3dSub0CObj; /* size: 0x10 */
-
-extern "C" void *fn_80067B5C(void *self)
+extern "C" u32 fn_80066FA0(const ResHandle *self, u32 index)
 {
-    color_ctor_white(&((G3dSub0CObj *)self)->sub_0x0C);
+    u32 count = fn_80067060(self);
+    if (index > count - 1)
+        nw4r::db::Panic((const char *)lbl_8058CA00, 0x71, (const char *)lbl_8058C9C4,
+                        index, 0, fn_80067060(self) - 1);
+    if (((ResAnmLightTable *)fn_80066DB4((void *)self))->entries_0x3C[index] == 0xFFFF)
+        nw4r::db::Panic((const char *)lbl_8058C9AC, 0x72, (const char *)lbl_8058C968);
+    return ((ResAnmLightTable *)fn_80066DB4((void *)self))->entries_0x3C[index];
+}
+
+/* The light set's light count. */
+extern "C" u32 fn_80067060(const ResHandle *p)
+{
+    return fn_80066DB4((void *)p)->field_0x1A;
+}
+
+extern "C" s32 fn_80067084(const ResHandle *p)
+{
+    return p->mpData != 0;
+}
+
+/* Copies a `ResLightSet` handle. */
+extern "C" ResHandle *fn_80067098(ResHandle *dst, const u32 &src)
+{
+    fn_800670C8((u32 *)dst, &src);
+    return dst;
+}
+
+extern "C" void fn_800670C8(u32 *dst, const u32 *src)
+{
+    *dst = *src;
+}
+
+#pragma dont_inline on
+/* 0x800670D4 (0x17C): the ambient colour `refNumber` names; a channel the animation does not drive reads as
+ * full. */
+ut::Color AnmScnRes::GetAmbLightColor(u32 refNumber)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1381, ANMSCN_THIS_ERROR);
+
+    AmbLightAnmResult result;
+    const AmbLightAnmResult *pResult = GetAmbLightResult(&result, refNumber);
+    u32 color = pResult->color;
+    if (!(pResult->flags & AmbLightAnmResult::FLAG_COLOR_ENABLE)) {
+        color |= 0xFFFFFF00;
+    }
+    if (!(pResult->flags & AmbLightAnmResult::FLAG_ALPHA_ENABLE)) {
+        color |= 0xFF;
+    }
+    return ut::Color(color);
+}
+#pragma dont_inline reset
+
+/* 0x80067250 (0x588): builds the diffuse and specular light objects of the light `refNumber` names, or
+ * disables them when the light is off. */
+void AnmScnRes::GetLight(LightObj *pDiff, LightObj *pSpec, u32 refNumber)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1403, ANMSCN_THIS_ERROR);
+
+    LightAnmResult result;
+    fn_800677D8(&result);
+    const LightAnmResult *pResult = GetLightResult(&result, refNumber);
+    if (pResult->flags & LightAnmResult::FLAG_LIGHT_ENABLE) {
+        if (pDiff != NULL) {
+            G3D_POINTER_ASSERT(ANMSCN_FILE, pDiff, 1414, "NW4R:Pointer Error\ndiff(=%p) is not valid pointer.");
+            MakeDiffuseLightObj(pDiff, pResult);
+        }
+        if (pSpec != NULL) {
+            G3D_POINTER_ASSERT(ANMSCN_FILE, pSpec, 1421, "NW4R:Pointer Error\nspec(=%p) is not valid pointer.");
+            if (pResult->flags & LightAnmResult::FLAG_SPECULAR_ENABLE) {
+                MakeSpecularLightObj(pSpec, pResult);
+            } else {
+                fn_800651A4(pSpec);
+            }
+        }
+    } else {
+        if (pDiff != NULL) {
+            G3D_POINTER_ASSERT(ANMSCN_FILE, pDiff, 1439, "NW4R:Pointer Error\ndiff(=%p) is not valid pointer.");
+            fn_800651A4(pDiff);
+        }
+        if (pSpec != NULL) {
+            G3D_POINTER_ASSERT(ANMSCN_FILE, pSpec, 1444, "NW4R:Pointer Error\nspec(=%p) is not valid pointer.");
+            fn_800651A4(pSpec);
+        }
+    }
+}
+
+/* The light result's constructor: default-constructs its two vectors and two colours. */
+extern "C" LightAnmResult *fn_800677D8(LightAnmResult *self)
+{
+    VEC3_ctor(&self->pos);
+    VEC3_ctor(&self->aim);
+    color_ctor_white((u32 *)&self->color);
+    color_ctor_white((u32 *)&self->specColor);
     return self;
+}
+
+/* 0x80067824 (0x1B0): sets the fog's type, range and colour from the fog `refNumber` names. */
+void AnmScnRes::GetFog(Fog fog, u32 refNumber)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1454, ANMSCN_THIS_ERROR);
+    NW4R_ASSERT(fog_is_valid(&fog), ANMSCN_FILE, 1455, "NW4R:Failed assertion fog.IsValid()");
+
+    FogAnmResult result;
+    fn_80067B5C(&result);
+    const FogAnmResult *pResult = GetFogResult(&result, refNumber);
+    fn_80067AE4(&fog, pResult->type);
+    fn_80067A5C(&fog, pResult->startz, pResult->endz);
+    fog_set_color(&fog, pResult->color);
+}
+
+/* 0x800679D4 (0x80): copies a colour into the fog record the handle names. */
+extern "C" void fog_set_color(Fog *self, GXColor color)
+{
+    if (fog_is_valid(self) == 0)
+        nw4r::db::Panic((const char *)lbl_8058CBF8, 0x63, (const char *)lbl_8058CBD8);
+    if (fog_is_valid(self) != 0)
+        color_rgba_copy((u8 *)fog_ptr(self) + 20, (const u8 *)&color);
+}
+
+extern "C" u32 fog_ptr(const Fog *p)
+{
+    return (u32)p->mpFogData;
+}
+
+/* The fog record's z range. */
+typedef struct {
+    /* +0x00 */ s32 type;
+    /* +0x04 */ f32 startz;
+    /* +0x08 */ f32 endz;
+} FogDataHead; /* size: 0xC (approximate - the record continues with its colour at +0x14) */
+
+/* Sets the fog's z range. */
+extern "C" void fn_80067A5C(Fog *self, f32 startz, f32 endz)
+{
+    if (fog_is_valid(self) == 0)
+        nw4r::db::Panic((const char *)lbl_8058CBC8, 0x4b, (const char *)lbl_8058CBA8);
+    if (fog_is_valid(self) != 0) {
+        FogDataHead *obj = (FogDataHead *)fog_ptr(self);
+        obj->startz = startz;
+        obj->endz = endz;
+    }
+}
+
+/* Sets the fog's type. */
+extern "C" void fn_80067AE4(Fog *self, s32 type)
+{
+    if (fog_is_valid(self) == 0)
+        nw4r::db::Panic((const char *)lbl_8058CB98, 0x41, (const char *)lbl_8058CB78);
+    if (fog_is_valid(self) != 0)
+        ((FogDataHead *)fog_ptr(self))->type = type;
+}
+
+/* The fog result's constructor: default-constructs its colour. */
+extern "C" FogAnmResult *fn_80067B5C(FogAnmResult *self)
+{
+    color_ctor_white((u32 *)&self->color);
+    return self;
+}
+
+/* 0x80067B90 (0x2C4): sets the camera's projection, position and posture from the camera `refNumber` names;
+ * false when the animation has no such camera. */
+bool AnmScnRes::GetCamera(Camera camera, u32 refNumber)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1473, ANMSCN_THIS_ERROR);
+    NW4R_ASSERT(fn_80067EE8(&camera), ANMSCN_FILE, 1474, "NW4R:Failed assertion camera.IsValid()");
+
+    CameraAnmResult result;
+    fn_80067EB4(&result);
+    const CameraAnmResult *pResult = GetCameraResult(&result, refNumber);
+    if (!(pResult->flags & CameraAnmResult::FLAG_ANM_EXISTS)) {
+        return false;
+    }
+
+    switch (pResult->projType) {
+    case 0:
+        camera.SetPerspective(pResult->perspFovy, pResult->aspect, pResult->near, pResult->far);
+        break;
+    case 1: {
+        f32 height = pResult->perspFovy / 2.0f;
+        f32 width = height * pResult->aspect;
+        camera.SetOrtho(height, -height, -width, width, pResult->near, pResult->far);
+        break;
+    }
+    default:
+        nw4r::db::Panic(ANMSCN_FILE, 1515, "NW4R:Fatal Error\nUnknown GXProjectionType(=%d)", pResult->projType);
+        break;
+    }
+
+    Camera::PostureInfo posture;
+    camera_posture_info_ctor(&posture);
+    switch (pResult->flags & CameraAnmResult::FLAG_CAMERA_TYPE_MASK) {
+    case 0: {
+        math::VEC3 rotate;
+        posture.mType = 1;
+        copyVec3((math::VEC3 *)&posture.mUpX, (math::VEC3 *)vec3_copy_construct(&rotate, (void *)&pResult->rotate));
+        break;
+    }
+    case 1: {
+        math::VEC3 aim;
+        posture.mType = 2;
+        copyVec3((math::VEC3 *)&posture.mTargetX, (math::VEC3 *)vec3_copy_construct(&aim, (void *)&pResult->rotate));
+        posture.mUnk28 = pResult->twist;
+        break;
+    }
+    default:
+        nw4r::db::Panic(ANMSCN_FILE, 1542, "NW4R:Fatal Error\nUnknown CameraAnmResult::CameraType(=%d)",
+                        pResult->flags & CameraAnmResult::FLAG_CAMERA_TYPE_MASK);
+        break;
+    }
+    camera.SetPosition(pResult->pos);
+    camera.SetPosture(posture);
+    return true;
+}
+
+/* 0x80067E54 (0x1C): copies three floats into `out` and returns it. */
+extern "C" void *vec3_copy_construct(void *out, void *in)
+{
+    math::VEC3 *dst = (math::VEC3 *)out;
+    const math::VEC3 *src = (const math::VEC3 *)in;
+    dst->x = src->x;
+    dst->y = src->y;
+    dst->z = src->z;
+    return out;
 }
 
 extern "C" nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::PostureInfo *self)
@@ -338,109 +1271,11 @@ extern "C" nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::C
     return self;
 }
 
-extern "C" void *fn_80067EB4(void *self)
+/* The camera result's constructor: default-constructs its position. */
+extern "C" CameraAnmResult *fn_80067EB4(CameraAnmResult *self)
 {
-    VEC3_ctor(&((G3dSingleVecObj *)self)->vec_0x08);
+    VEC3_ctor(&self->pos);
     return self;
-}
-
-extern "C" u32 fn_800658B0(u32 *p)
-{
-    return *p;
-}
-
-/*
- * The single-vtable dispatch thunks (0x80064CE0, 0x80065ED8 ff.) and the flag readers.
- */
-
-extern "C" void fn_80064CE0(void *self, const f32 *v)
-{
-    fn_8007A724(self, v[0], v[1], v[2]);
-}
-
-extern "C" s32 light_obj_is_enable(u32 *p)
-{
-    u32 masked = *p & 4;
-    return masked != 0;
-}
-
-extern "C" s32 fog_is_valid(u32 *p)
-{
-    return *p != 0;
-}
-
-extern "C" u32 fn_80065ED8(u32 base, u32 size)
-{
-    u32 mask = ~(size - 1);
-    return (size + base - 1) & mask;
-}
-
-extern "C" void fn_8006602C(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The word accessors of the ResAnmAmbLight cluster (0x80066CF0-0x800670C8).
- * --------------------------------------------------------------------------------------------- */
-
-extern "C" u32 fn_80066CF0(u32 *p)
-{
-    return *p;
-}
-
-extern "C" void fn_80066D48(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-extern "C" u32 fn_80066E18(u32 *p)
-{
-    return *p;
-}
-
-extern "C" u32 fn_80066EE4(u32 *p)
-{
-    return *p;
-}
-
-extern "C" s32 fn_80066F50(u32 *p)
-{
-    return *p != 0;
-}
-
-extern "C" void fn_80066F94(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-extern "C" s32 fn_80067084(u32 *p)
-{
-    return *p != 0;
-}
-
-extern "C" void fn_800670C8(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The cluster's tail (0x80067A54-0x80067EE8).
- * --------------------------------------------------------------------------------------------- */
-
-extern "C" u32 fog_ptr(u32 *p)
-{
-    return *p;
-}
-
-extern "C" void *vec3_copy_construct(void *out, void *in)
-{
-    Vec3f *dst = (Vec3f *)out;
-    const Vec3f *src = (const Vec3f *)in;
-    dst->x = src->x;
-    dst->y = src->y;
-    dst->z = src->z;
-    return out;
 }
 
 extern "C" s32 fn_80067EE8(const void *p)
@@ -449,377 +1284,97 @@ extern "C" s32 fn_80067EE8(const void *p)
 }
 
 /* --------------------------------------------------------------------------------------------- *
- * The label getters and flag/word accessors (0x8006403C-0x80066EEC).
+ * The four result getters and the ID readers (0x80067EFC-0x80068A78).
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" u32 fn_800658B8(void)
+/* 0x80067EFC (0x1AC): the ambient light result `refNumber` names: the cached one, or evaluated at the current
+ * frame into `pResult`. */
+AmbLightAnmResult *AnmScnRes::GetAmbLightResult(AmbLightAnmResult *pResult, u32 refNumber)
 {
-    return (u32)lbl_8058CC04;
-}
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1556, ANMSCN_THIS_ERROR);
 
-extern "C" u32 fn_80066CF8(void)
-{
-    return (u32)lbl_8058CA70;
-}
-
-extern "C" u32 fn_80066E20(void)
-{
-    return (u32)lbl_8058C928;
-}
-
-extern "C" u32 fn_80066EEC(void)
-{
-    return (u32)lbl_8058CB38;
-}
-
-extern "C" s32 fn_800658C4(u32 *p)
-{
-    return *p != 0;
-}
-
-extern "C" s32 fn_80066D04(u32 *p)
-{
-    return *p != 0;
-}
-
-extern "C" void fn_80064BE4(u32 *p)
-{
-    *p |= 0x20;
-}
-
-extern "C" void fn_80064BF4(u32 *p)
-{
-    *p |= 0x10;
-}
-
-extern "C" void fn_800651A4(u32 *p)
-{
-    *p &= ~0x4u;
-}
-
-/* The three-word records (0x800651B4-0x80065204). */
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-} G3dWordTriple; /* size: 0xC */
-
-extern "C" u32 light_setting_get_light_obj_array(G3dWordTriple *p)
-{
-    return p->field_0x04;
-}
-
-extern "C" u32 fn_800651E8(G3dWordTriple *p)
-{
-    return p->field_0x08;
-}
-
-extern "C" void fn_800651F0(G3dWordTriple *dst, G3dWordTriple *src)
-{
-    dst->field_0x00 = src->field_0x00;
-    dst->field_0x04 = src->field_0x04;
-}
-
-extern "C" s32 fn_80065204(G3dWordTriple *p)
-{
-    s32 ret = 0;
-    if (p->field_0x00 != 0 && p->field_0x04 != 0)
-        ret = 1;
-    return ret;
-}
-
-/* The key arrays (0x8006522C/0x8006527C): a count at +0x2 and an array of 0xC-byte keys at +0xC. */
-typedef struct {
-    /* +0x00 */ u8 data_0x00[0xC];
-} G3dKey; /* size: 0xC */
-
-typedef struct {
-    /* +0x00 */ u16 pad_0x00;
-    /* +0x02 */ u16 count_0x02;
-    /* +0x04 */ u32 pad_0x04;
-    /* +0x08 */ u32 pad_0x08;
-    /* +0x0C */ G3dKey *array_0x0C;
-} G3dKeyArray; /* size: 0x10 */
-
-typedef struct {
-    /* +0x00 */ void *field_0x00;
-    /* +0x04 */ void *field_0x04;
-} G3dPtrPair; /* size: 0x8 */
-
-/* Out-of-range lookups store a NULL element but always store the array owner. */
-extern "C" void fn_8006522C(G3dPtrPair *out, G3dKeyArray *self, s32 index)
-{
-    void *elem;
-    if (index < (s32)self->count_0x02 && index >= 0)
-        elem = &self->array_0x0C[index];
-    else
-        elem = 0;
-    out->field_0x00 = self;
-    out->field_0x04 = elem;
-}
-
-extern "C" G3dWordTriple *g3d_min_u32(G3dWordTriple *a, G3dWordTriple *b)
-{
-    return (b->field_0x00 < a->field_0x00) ? b : a;
-}
-
-extern "C" u16 fn_8006527C(G3dKeyArray *p)
-{
-    return p->count_0x02;
-}
-
-/* The two +0x20 adjustor thunks that feed this cluster's own readers. */
-extern "C" u16 fn_80065820(void *p)
-{
-    return fn_80065828(&((ResAnmScnOwner *)p)->sub_0x20);
-}
-
-extern "C" u16 fn_800658E8(void *p)
-{
-    return fn_800658F0(&((ResAnmScnOwner *)p)->sub_0x20);
-}
-
-/* The three-float setter forwarder and the empty-base forwarder. */
-extern "C" void fn_80064C04(void *self, const f32 *v)
-{
-    fn_8007A5E4(self, v[0], v[1], v[2]);
-}
-
-extern "C" void fn_80064C14(void *self, const f32 *v)
-{
-    fn_8007A5A8(self, v[0], v[1], v[2]);
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The checked getters (0x80063FD0-0x80066D54): resolve the object through the validity test, panic
- * through `nw4r::db::Panic` out of the owning `_ac.h` when it is not valid, then return the resolved
- * pointer (or one of its fields).  The panic shape is nw4r's `NW4R_ASSERT` (the file/line/message and
- * the `"ref"` reference-name argument).
- * --------------------------------------------------------------------------------------------- */
-namespace nw4r {
-namespace db {
-
-void Panic(const char *file, int line, const char *message, ...);
-
-} /* namespace db */
-} /* namespace nw4r */
-
-extern "C" ResAnmScnConfig *fn_8006584C(void *p)
-{
-    if (fn_800658C4((u32 *)p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CC2C, 0x28, (const char *)lbl_8058CC10,
-                        (const char *)fn_800658B8(), "ref");
-    return (ResAnmScnConfig *)fn_800658B0((u32 *)p);
-}
-
-extern "C" u16 fn_80066D54(void *p)
-{
-    if (fn_80066DB4(p)->field_0x18 == 0xFFFF)
-        nw4r::db::Panic((const char *)lbl_8058CA58, 0x79, (const char *)lbl_8058CA18);
-    return fn_80066DB4(p)->field_0x18;
-}
-
-/* --------------------------------------------------------------------------------------------- *
- * The remaining teardown destructors (0x80066080-0x800677D8).
- * --------------------------------------------------------------------------------------------- */
-
-extern "C" void dtor_80065768(void *self, s32 flag);
-
-extern "C" void *fn_80066080(void *self, s16 flags)
-{
-    if (self != 0) {
-        dtor_80065768(self, 0);
-        if (flags > 0)
-            nw4r::g3d::G3dObj::operator delete(self);
+    ResHandle resAmb;
+    fn_80066D18(&resAmb, res_anm_scn_get_res_anm_amb_light_by_ref_number(&mRes, refNumber));
+    if (!fn_80066D04(&resAmb)) {
+        pResult->flags = 0;
+        pResult->color = 0xFFFFFFFF;
+        return pResult;
     }
-    return self;
-}
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x8];
-    /* +0x08 */ Vec3f vec_0x08;
-    /* +0x14 */ Vec3f vec_0x14;
-    /* +0x20 */ u32 sub_0x20;
-    /* +0x24 */ u8 pad_0x24[0x14];
-    /* +0x38 */ u32 sub_0x38;
-} G3dTeardownObj; /* size: 0x3C (approximate - only the sub-object offsets are evidenced) */
-
-extern "C" void *fn_800677D8(void *self)
-{
-    G3dTeardownObj *obj = (G3dTeardownObj *)self;
-    VEC3_ctor(&obj->vec_0x08);
-    VEC3_ctor(&obj->vec_0x14);
-    color_ctor_white(&obj->sub_0x20);
-    color_ctor_white(&obj->sub_0x38);
-    return self;
-}
-
-/* The three remaining checked getters (0x80066C8C/0x80066DB4/0x80066E80). */
-void *fn_80066C8C(void *obj)
-{
-    if (fn_80066D04((u32 *)obj) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CAA0, 0x25, (const char *)lbl_8058CA80,
-                        (const char *)fn_80066CF8(), "ref");
-    return (void *)fn_80066CF0((u32 *)obj);
-}
-
-ResAnmLightConfig *fn_80066DB4(void *p)
-{
-    if (fn_80067084((u32 *)p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058C950, 0x27, (const char *)lbl_8058C934,
-                        (const char *)fn_80066E20(), "ref");
-    return (ResAnmLightConfig *)fn_80066E18((u32 *)p);
-}
-
-ResAnmLightConfig *fn_80066E80(void *p)
-{
-    if (fn_80066F50((u32 *)p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CB60, 0x8f, (const char *)lbl_8058CB44,
-                        (const char *)fn_80066EEC(), "ref");
-    return (ResAnmLightConfig *)fn_80066EE4((u32 *)p);
-}
-
-/* The two resolved-object writers (0x80067A5C/0x80067AE4). */
-typedef struct {
-    /* +0x00 */ void *field_0x00;
-} G3dPtrObj; /* size: 0x4 */
-
-typedef struct {
-    /* +0x00 */ u32 pad_0x00;
-    /* +0x04 */ f32 field_0x04;
-    /* +0x08 */ f32 field_0x08;
-} G3dPairF32; /* size: 0xC */
-
-extern "C" void fn_80067A5C(void *self, f32 a, f32 b)
-{
-    if (fog_is_valid((u32 *)self) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CBC8, 0x4b, (const char *)lbl_8058CBA8);
-    if (fog_is_valid((u32 *)self) != 0) {
-        G3dPairF32 *obj = (G3dPairF32 *)(void *)fog_ptr((u32 *)self);
-        obj->field_0x04 = a;
-        obj->field_0x08 = b;
+    if (mpAmbLightCache != NULL) {
+        return &mpAmbLightCache[fn_800680A8(&resAmb)];
     }
+    res_anm_amb_light_get_anm_result(&resAmb, pResult, GetFrm());
+    return pResult;
 }
 
-/* 0x800679D4 (0x80): copies a colour into the fog record the handle names. */
-/* untyped: opaque handle - the fog handle */
-extern "C" void fog_set_color(void *self, const u8 *rgba)
-{
-    if (fog_is_valid((u32 *)self) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CBF8, 0x63, (const char *)lbl_8058CBD8);
-    if (fog_is_valid((u32 *)self) != 0)
-        color_rgba_copy((u8 *)fog_ptr((u32 *)self) + 20, rgba);
-}
-
-extern "C" void fn_80067AE4(void *self, void *value)
-{
-    if (fog_is_valid((u32 *)self) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CB98, 0x41, (const char *)lbl_8058CB78);
-    if (fog_is_valid((u32 *)self) != 0)
-        ((G3dPtrObj *)(void *)fog_ptr((u32 *)self))->field_0x00 = value;
-}
-
-/* The five +0x20 adjustor thunks that forward to the `0x8009xxxx` readers (each adds 0x20 to the
- * `this` pointer before the tail call). */
-extern "C" void fn_80090110(void *p);
-extern "C" void fn_800902E4(void *p);
-extern "C" void fn_800904B8(void *p);
-extern "C" void fn_8009068C(void *p);
-extern "C" void fn_80090860(void *p);
-
-extern "C" void fn_80065808(void *p)
-{
-    fn_80090110(&((ResAnmScnOwner *)p)->sub_0x20);
-}
-
-extern "C" void fn_80065810(void *p)
-{
-    fn_800902E4(&((ResAnmScnOwner *)p)->sub_0x20);
-}
-
-extern "C" void fn_80065818(void *p)
-{
-    fn_800904B8(&((ResAnmScnOwner *)p)->sub_0x20);
-}
-
-extern "C" void fn_800658D8(void *p)
-{
-    fn_8009068C(&((ResAnmScnOwner *)p)->sub_0x20);
-}
-
-extern "C" void fn_800658E0(void *p)
-{
-    fn_80090860(&((ResAnmScnOwner *)p)->sub_0x20);
-}
-
-/* The bounds-checked light-table reader (0x80066FA0): count = fn_80067060(self), an index past the end
- * panics, and the 0xFFFF entry sentinel panics out of `g3d_reslightset_ac.h`. */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x3C];
-    /* +0x3C */ u16 entries_0x3C[1];
-} ResAnmLightTable; /* size: 0x3E (approximate - only the +0x3C table is evidenced) */
-
-extern "C" u16 fn_80066FA0(void *self, u32 index)
-{
-    u32 count = fn_80067060(self);
-    ResAnmLightTable *table;
-    if (index > count - 1)
-        nw4r::db::Panic((const char *)lbl_8058CA00, 0x71, (const char *)lbl_8058C9C4,
-                        index, 0, fn_80067060(self) - 1);
-    table = (ResAnmLightTable *)fn_80066DB4(self);
-    if (table->entries_0x3C[index] == 0xFFFF)
-        nw4r::db::Panic((const char *)lbl_8058C9AC, 0x72, (const char *)lbl_8058C968);
-    return table->entries_0x3C[index];
-}
-
-/* 0x800680A8 (0x24): resolves the ambient-light handle through the checked getter and reads the word at +0xC. */
+/* 0x800680A8 (0x24): resolves the ambient-light handle through the checked getter and reads its ID at +0xC. */
 unsigned int fn_800680A8(void *obj)
 {
-    return *(unsigned int *)((char *)fn_80066C8C(obj) + 0xC);
+    return ((const ResAnmIdHead *)fn_80066C8C((void *)obj))->id;
 }
 
-/* --------------------------------------------------------------------------------------------- *
- * The `ResAnmFog`/`ResAnmCamera` accessors (0x80068634-0x80068A6C) and the list-insert chain steps
- * (0x80069334-0x8006943C).
- * --------------------------------------------------------------------------------------------- */
+/* 0x800680CC (0x290): the light result `refNumber` names: the cached one, or evaluated at the current frame. */
+LightAnmResult *AnmScnRes::GetLightResult(LightAnmResult *pResult, u32 refNumber)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1583, ANMSCN_THIS_ERROR);
+    G3D_POINTER_ASSERT(ANMSCN_FILE, pResult, 1584, ANMSCN_RESULT_ERROR);
 
-#pragma pool_data off
+    ResHandle resLight;
+    fn_80066F64(&resLight, res_anm_scn_get_res_anm_light_by_ref_number(&mRes, refNumber));
+    if (!fn_80066F50(&resLight)) {
+        pResult->flags = 0;
+        return pResult;
+    }
+    if (mpLightCache != NULL) {
+        return &mpLightCache[res_anm_light_get_id(&resLight)];
+    }
+    res_anm_light_get_anm_result(&resLight, pResult, GetFrm());
+    return pResult;
+}
 
-extern u8 lbl_8058CAFC[]; /* "ResAnmFog"     */
-extern u8 lbl_8058CAB8[]; /* "ResAnmCamera"  */
-extern u8 lbl_8058CB24[];
-extern u8 lbl_8058CB08[];
-extern u8 lbl_8058CAE4[];
-extern u8 lbl_8058CAC8[];
+/* 0x8006835C (0x24): the light's ID. */
+extern "C" u32 res_anm_light_get_id(const ResHandle *p)
+{
+    return ((const ResAnmIdHead *)fn_80066E80((void *)p))->id;
+}
+
+/* 0x80068380 (0x290): the fog result `refNumber` names: the cached one, or evaluated at the current frame. */
+FogAnmResult *AnmScnRes::GetFogResult(FogAnmResult *pResult, u32 refNumber)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1611, ANMSCN_THIS_ERROR);
+    G3D_POINTER_ASSERT(ANMSCN_FILE, pResult, 1612, ANMSCN_RESULT_ERROR);
+
+    ResHandle resFog;
+    fn_800686C0(&resFog, res_anm_scn_get_res_anm_fog_by_ref_number(&mRes, refNumber));
+    if (!fn_800686AC(&resFog)) {
+        pResult->type = 0;
+        return pResult;
+    }
+    if (mpFogCache != NULL) {
+        return &mpFogCache[res_anm_fog_get_id(&resFog)];
+    }
+    res_anm_fog_get_anm_result(&resFog, pResult, GetFrm());
+    return pResult;
+}
+
+/* 0x80068610 (0x24): the fog's ID. */
+extern "C" u32 res_anm_fog_get_id(const ResHandle *p)
+{
+    return ((const ResAnmIdHead *)fn_80068634((void *)p))->id;
+}
+
+/* The checked `ResAnmFog` resolver. */
+extern "C" u32 fn_80068634(void *p)
+{
+    if (fn_800686AC((const ResHandle *)p) == 0)
+        nw4r::db::Panic((const char *)lbl_8058CB24, 62, (const char *)lbl_8058CB08,
+                        (const char *)fn_800686A0(), "ref");
+    return fn_80068698(p);
+}
 
 extern "C" u32 fn_80068698(void *p)
 {
     return *(u32 *)p;
-}
-
-extern "C" u32 fn_80068A14(void *p)
-{
-    return *(u32 *)p;
-}
-
-extern "C" u32 fn_800686AC(void *p)
-{
-    return *(u32 *)p != 0;
-}
-
-extern "C" u32 fn_80068A28(void *p)
-{
-    return *(u32 *)p != 0;
-}
-
-extern "C" void fn_800686F0(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-extern "C" void fn_80068A6C(u32 *dst, const u32 *src)
-{
-    *dst = *src;
 }
 
 extern "C" u32 fn_800686A0(void)
@@ -827,66 +1382,205 @@ extern "C" u32 fn_800686A0(void)
     return (u32)lbl_8058CAFC;
 }
 
+extern "C" u32 fn_800686AC(const ResHandle *p)
+{
+    return p->mpData != 0;
+}
+
+/* Copies a `ResAnmFog` handle. */
+extern "C" ResHandle *fn_800686C0(ResHandle *self, const u32 &src)
+{
+    fn_800686F0((u32 *)self, &src);
+    return self;
+}
+
+extern "C" void fn_800686F0(u32 *dst, const u32 *src)
+{
+    *dst = *src;
+}
+
+/* 0x800686FC (0x290): the camera result `refNumber` names: the cached one, or evaluated at the current frame. */
+CameraAnmResult *AnmScnRes::GetCameraResult(CameraAnmResult *pResult, u32 refNumber)
+{
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1639, ANMSCN_THIS_ERROR);
+    G3D_POINTER_ASSERT(ANMSCN_FILE, pResult, 1640, ANMSCN_RESULT_ERROR);
+
+    ResHandle resCamera;
+    fn_80068A3C(&resCamera, res_anm_scn_get_res_anm_camera_by_ref_number(&mRes, refNumber));
+    if (!fn_80068A28(&resCamera)) {
+        pResult->flags = 0;
+        return pResult;
+    }
+    if (mpCameraCache != NULL) {
+        return &mpCameraCache[res_anm_camera_get_id(&resCamera)];
+    }
+    res_anm_camera_get_anm_result(&resCamera, pResult, GetFrm());
+    return pResult;
+}
+
+/* 0x8006898C (0x24): the camera's ID. */
+extern "C" u32 res_anm_camera_get_id(const ResHandle *p)
+{
+    return ((const ResAnmIdHead *)fn_800689B0((void *)p))->id;
+}
+
+/* The checked `ResAnmCamera` resolver. */
+extern "C" u32 fn_800689B0(void *p)
+{
+    if (fn_80068A28((const ResHandle *)p) == 0)
+        nw4r::db::Panic((const char *)lbl_8058CAE4, 125, (const char *)lbl_8058CAC8,
+                        (const char *)fn_80068A1C(), "ref");
+    return fn_80068A14(p);
+}
+
+extern "C" u32 fn_80068A14(void *p)
+{
+    return *(u32 *)p;
+}
+
 extern "C" u32 fn_80068A1C(void)
 {
     return (u32)lbl_8058CAB8;
 }
 
-extern "C" void *fn_800686C0(void *self, void *src)
+extern "C" u32 fn_80068A28(const ResHandle *p)
 {
-    fn_800686F0((u32 *)self, (const u32 *)src);
+    return p->mpData != 0;
+}
+
+/* Copies a `ResAnmCamera` handle. */
+extern "C" ResHandle *fn_80068A3C(ResHandle *self, const u32 &src)
+{
+    fn_80068A6C((u32 *)self, &src);
     return self;
 }
 
-extern "C" void *fn_80068A3C(void *self, void *src)
+extern "C" void fn_80068A6C(u32 *dst, const u32 *src)
 {
-    fn_80068A6C((u32 *)self, (const u32 *)src);
-    return self;
+    *dst = *src;
 }
 
-extern "C" u32 fn_800693A0(void)
+/* --------------------------------------------------------------------------------------------- *
+ * The specular queries, the flags and the cache refresh (0x80068A78-0x80069334).
+ * --------------------------------------------------------------------------------------------- */
+
+/* 0x80068A78 (0x15C): the specular light-object index of the light `refNumber` names, or -1. */
+u32 AnmScnRes::GetSpecularLightID(u32 refNumber) const
 {
-    const u8 *local;
-    return (u32)*type_obj_set_name(&local, lbl_8056F578);
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1669, ANMSCN_THIS_ERROR);
+
+    ResHandle resLight;
+    fn_80066F64(&resLight, res_anm_scn_get_res_anm_light_by_ref_number(&mRes, refNumber));
+    if (fn_80066F50(&resLight)) {
+        return fn_80066E5C(&resLight);
+    }
+    return (u32)-1;
 }
 
-extern "C" u32 fn_8006943C(void)
+/* 0x80068BD4 (0x168): whether the light `refNumber` names has a specular light. */
+bool AnmScnRes::HasSpecularLight(u32 refNumber) const
 {
-    void *local;
-    return (u32)*fn_8005DC60(&local, lbl_8056F588);
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1679, ANMSCN_THIS_ERROR);
+
+    ResHandle resLight;
+    fn_80066F64(&resLight, res_anm_scn_get_res_anm_light_by_ref_number(&mRes, refNumber));
+    bool has = false;
+    if (fn_80066F50(&resLight) && res_anm_light_config_test_flag8(&resLight)) {
+        has = true;
+    }
+    return has;
 }
 
-extern "C" u32 fn_80069334(void *self, u32 *key)
+/* 0x80068D3C (0x154): sets or clears a flag. */
+void AnmScnRes::SetScnAnmFlag(ScnAnmFlag flag, bool on)
 {
-    u32 res = fn_800693A0();
-
-    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
-        return 1;
-    return reinterpret_cast<const nw4r::g3d::G3dObj*>(self)->nw4r::g3d::G3dObj::IsDerivedFrom(*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key));
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1689, ANMSCN_THIS_ERROR);
+    if (on) {
+        mScnAnmFlags |= flag;
+    } else {
+        mScnAnmFlags &= ~flag;
+    }
 }
 
-extern "C" u32 fn_800693D0(void *self, u32 *key)
+/* 0x80068E90 (0x134): whether a flag is set. */
+bool AnmScnRes::TestScnAnmFlag(ScnAnmFlag flag) const
 {
-    u32 res = fn_8006943C();
-
-    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
-        return 1;
-    u32 local = *key;
-    return fn_80069334(self, &local);
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1704, ANMSCN_THIS_ERROR);
+    return (mScnAnmFlags & flag) != 0;
 }
 
-extern "C" u32 fn_80068634(void *p)
+/* 0x80068FC4 (0x370): evaluates every ambient light, light, fog and camera at the current frame into the
+ * caches. */
+void AnmScnRes::UpdateCache()
 {
-    if (fn_800686AC(p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CB24, 62, (const char *)lbl_8058CB08,
-                        (const char *)fn_800686A0(), "ref");
-    return fn_80068698(p);
+    G3D_POINTER_ASSERT(ANMSCN_FILE, this, 1712, ANMSCN_THIS_ERROR);
+    NW4R_ASSERT(TestScnAnmFlag(FLAG_HAS_CACHE), ANMSCN_FILE, 1713,
+                "NW4R:Failed assertion TestScnAnmFlag(FLAG_HAS_CACHE)");
+
+    u32 numAmbLight = fn_800902E4(&mRes);
+    u32 numLight = fn_800904B8(&mRes);
+    u32 numFog = fn_8009068C(&mRes);
+    u32 numCamera = fn_80090860(&mRes);
+    f32 frame = GetFrm();
+
+    for (u32 i = 0; i < numAmbLight; i++) {
+        ResHandle resAmb;
+        fn_80066D18(&resAmb, res_anm_scn_get_res_anm_amb_light(&mRes, i));
+        NW4R_ASSERT(fn_80066D04(&resAmb), ANMSCN_FILE, 1724, "NW4R:Failed assertion resAmb.IsValid()");
+        res_anm_amb_light_get_anm_result(&resAmb, &mpAmbLightCache[i], frame);
+    }
+    for (u32 i = 0; i < numLight; i++) {
+        ResHandle resLight;
+        fn_80066F64(&resLight, res_anm_scn_get_res_anm_light(&mRes, i));
+        NW4R_ASSERT(fn_80066F50(&resLight), ANMSCN_FILE, 1732, "NW4R:Failed assertion resLight.IsValid()");
+        res_anm_light_get_anm_result(&resLight, &mpLightCache[i], frame);
+    }
+    for (u32 i = 0; i < numFog; i++) {
+        ResHandle resFog;
+        fn_800686C0(&resFog, res_anm_scn_get_res_anm_fog(&mRes, i));
+        NW4R_ASSERT(fn_800686AC(&resFog), ANMSCN_FILE, 1740, "NW4R:Failed assertion resFog.IsValid()");
+        res_anm_fog_get_anm_result(&resFog, &mpFogCache[i], frame);
+    }
+    for (u32 i = 0; i < numCamera; i++) {
+        ResHandle resCamera;
+        fn_80068A3C(&resCamera, res_anm_scn_get_res_anm_camera(&mRes, i));
+        NW4R_ASSERT(fn_80068A28(&resCamera), ANMSCN_FILE, 1748, "NW4R:Failed assertion resCamera.IsValid()");
+        res_anm_camera_get_anm_result(&resCamera, &mpCameraCache[i], frame);
+    }
 }
 
-extern "C" u32 fn_800689B0(void *p)
+/* --------------------------------------------------------------------------------------------- *
+ * The run-time type checks (0x80069334-0x8006946C).
+ * --------------------------------------------------------------------------------------------- */
+
+/* 0x80069334 (0x6C): whether the object is an AnmScn or derives from `type`. */
+bool AnmScn::IsDerivedFrom(TypeObj type) const
 {
-    if (fn_80068A28(p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CAE4, 125, (const char *)lbl_8058CAC8,
-                        (const char *)fn_80068A1C(), "ref");
-    return fn_80068A14(p);
+    if (type == GetTypeObjStatic()) {
+        return true;
+    }
+    return nw4r::g3d::G3dObj::IsDerivedFrom(type);
+}
+
+/* 0x800693A0 (0x30): returns the AnmScn type. */
+const nw4r::g3d::G3dObj::TypeObj AnmScn::GetTypeObjStatic()
+{
+    const u8 *pName;
+    return *reinterpret_cast<const TypeObj *>(type_obj_set_name(&pName, (const u8 *)&anm_typename_AnmScn));
+}
+
+/* 0x800693D0 (0x6C): whether the object is an AnmScnRes or derives from `type`. */
+bool AnmScnRes::IsDerivedFrom(TypeObj type) const
+{
+    if (type == GetTypeObjStatic()) {
+        return true;
+    }
+    return AnmScn::IsDerivedFrom(type);
+}
+
+/* 0x8006943C (0x30): returns the AnmScnRes type. */
+const nw4r::g3d::G3dObj::TypeObj AnmScnRes::GetTypeObjStatic()
+{
+    const TypeObj::TypeName *pName;
+    return *reinterpret_cast<const TypeObj *>(fn_8005DC60((void **)&pName, (void *)&anm_typename_AnmScnRes));
 }

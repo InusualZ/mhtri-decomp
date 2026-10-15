@@ -61,16 +61,16 @@ u32 GXGetLightDir(s32, s32, s32);
 u32 GXInitLightColor(s32, void*);
 u32 GXGetLightColor(s32);
 /* internal */ void* fn_8007A518(s32 *arg0, s32 *arg1);
-/* internal */ u32 fn_8007A564(s32 *arg0);
-/* internal */ u32 fn_8007A578(s32 arg0, s32 *arg1);
+/* internal */ u32 light_obj_clear(s32 *arg0);
+/* internal */ u32 light_obj_init_light_color(s32 arg0, s32 *arg1);
 /* internal */ u32 fn_8007A5A8(s32 *arg0, void* a1, void* a2, void* a3);
 /* internal */ u32 fn_8007A5E4(s32 *arg0, void* a1, void* a2, void* a3);
-/* internal */ u32 fn_8007A624(s32 *arg0, void* a1, void* a2);
-/* internal */ void fn_8007A664(s32 *arg0);
-/* internal */ u32 fn_8007A6A4(s32 *arg0, void* a1, void* a2, void* a3);
-/* internal */ void fn_8007A6E4(s32 *arg0);
+/* internal */ u32 light_obj_init_light_spot(s32 *arg0, void* a1, void* a2);
+/* internal */ void light_obj_init_light_attn_a(s32 *arg0);
+/* internal */ u32 light_obj_init_light_dist_attn(s32 *arg0, void* a1, void* a2, void* a3);
+/* internal */ void light_obj_init_light_attn_k(s32 *arg0);
 /* internal */ u32 fn_8007A724(s32 *arg0, void* a1, void* a2, void* a3);
-/* internal */ u32 fn_8007A768(s32 *arg0, f32 farg0);
+/* internal */ u32 light_obj_init_light_shininess(s32 *arg0, f32 farg0);
 /* internal */ u32 light_obj_get_light_pos(s32 arg0, s32 arg1);
 /* internal */ u32 light_obj_get_light_dir(s32 arg0, s32 arg1);
 /* internal */ void fn_8007A800(s32 arg0, s32 arg1);
@@ -83,8 +83,8 @@ u32 GXGetLightColor(s32);
 /* internal */ u32 fn_8007B074(void *arg0, void *arg1);
 /* internal */ void light_setting_apply_view_mtx(void *arg0, s32 arg1, u32 arg2);
 /* internal */ void* fn_8007B148(u32 *arg0, u32 *arg1);
-/* internal */ s32 fn_8007B160(void *arg0, u32 arg1, s8 arg2);
-/* internal */ s32 fn_8007B224(void *arg0, s8 arg1);
+/* internal */ s32 light_set_select_light_obj(void *arg0, u32 arg1, s8 arg2);
+/* internal */ s32 light_set_select_amb_light_obj(void *arg0, s8 arg1);
 } /* extern "C" */
 
 extern "C" {
@@ -96,12 +96,12 @@ void* fn_8007A518(s32 *arg0, s32 *arg1) {
     return arg0;
 }
 
-u32 fn_8007A564(s32 *arg0) {
+u32 light_obj_clear(s32 *arg0) {
     *arg0 = 0;
     nw4r::g3d::detail::ZeroMemory32ByteBlocks((arg0 + 4), (u32)(0x40));
 }
 
-u32 fn_8007A578(s32 arg0, s32 *arg1) {
+u32 light_obj_init_light_color(s32 arg0, s32 *arg1) {
     s32 sp8;
 
     sp8 = *arg1;
@@ -118,22 +118,22 @@ u32 fn_8007A5E4(s32 *arg0, void* a1, void* a2, void* a3) {
     *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
 }
 
-u32 fn_8007A624(s32 *arg0, void* a1, void* a2) {
+u32 light_obj_init_light_spot(s32 *arg0, void* a1, void* a2) {
     GXInitLightSpot((s32)(arg0 + 4));
     *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
 }
 
-void fn_8007A664(s32 *arg0) {
+void light_obj_init_light_attn_a(s32 *arg0) {
     GXInitLightAttnA((s32)(arg0 + 4));
     *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
 }
 
-u32 fn_8007A6A4(s32 *arg0, void* a1, void* a2, void* a3) {
+u32 light_obj_init_light_dist_attn(s32 *arg0, void* a1, void* a2, void* a3) {
     GXInitLightDistAttn((s32)(arg0 + 4));
     *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
 }
 
-void fn_8007A6E4(s32 *arg0) {
+void light_obj_init_light_attn_k(s32 *arg0) {
     GXInitLightAttnK((s32)(arg0 + 4));
     *arg0 = (*arg0 & 0xFFFFFFFD) | 1;
 }
@@ -143,7 +143,7 @@ u32 fn_8007A724(s32 *arg0, void* a1, void* a2, void* a3) {
     *arg0 = (*arg0 & 0xFFFFFFFE) | 2 | 8;
 }
 
-u32 fn_8007A768(s32 *arg0, f32 farg0) {
+u32 light_obj_init_light_shininess(s32 *arg0, f32 farg0) {
     f32 temp_f4;
 
     temp_f4 = farg0 * lbl_80795E38;
@@ -292,7 +292,7 @@ typedef struct {
     /* +0x00 */ u32 field_0x00;
     /* +0x04 */ u8* field_0x04;
 } RawView_58; /* size: 0x8 */
-s32 fn_8007B160(void *arg0, u32 arg1, s8 arg2) {
+s32 light_set_select_light_obj(void *arg0, u32 arg1, s8 arg2) {
 }
 
 
@@ -304,7 +304,7 @@ typedef struct {
     /* +0x00 */ u8 pad_0x00[0x8];
     /* +0x08 */ u32 field_0x08;
 } RawView_60; /* size: 0xC */
-s32 fn_8007B224(void *arg0, s8 arg1) {
+s32 light_set_select_amb_light_obj(void *arg0, s8 arg1) {
 }
 
 } /* extern "C" */
