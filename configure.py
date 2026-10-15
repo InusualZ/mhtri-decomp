@@ -1111,7 +1111,7 @@ config.libs = [
             Object(NonMatching, "Network/sNetworkLibrary.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/sNetworkLibraryWii.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/sNetworkLibraryWii.cpp",
+            Object(Matching, "Network/sNetworkLibraryWii.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkPat.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkPat.cpp",
@@ -1150,7 +1150,7 @@ config.libs = [
             Object(Matching, "Network/NetworkStreamSink.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
             # Flags: unit header of src/Network/NetworkConnection.cpp.
-            Object(NonMatching, "Network/NetworkConnection.cpp",
+            Object(Matching, "Network/NetworkConnection.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
             # Flags: unit header of src/Network/NetworkConnectionStable.cpp.
             Object(NonMatching, "Network/NetworkConnectionStable.cpp",
