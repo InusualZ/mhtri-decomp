@@ -799,7 +799,7 @@ config.libs = [
             # Flags: unit header of src/ef/ef_cube.cpp (`-pool off`: one `lis`/`addi` per string).
             Object(NonMatching, "ef/ef_cube.cpp", extra_cflags=["-pool off"]),
             # Flags: unit header of src/ef/ef_cylinder.cpp (`-pool off`: one `lis`/`addi` per string).
-            Object(NonMatching, "ef/ef_cylinder.cpp", extra_cflags=["-pool off"]),
+            Object(Matching, "ef/ef_cylinder.cpp", extra_cflags=["-pool off"]),
             # Flags: unit header of src/ef/ef_disc.cpp (`-pool off`: one `lis`/`addi` per string).
             Object(Matching, "ef/ef_disc.cpp", extra_cflags=["-pool off"]),
             Object(NonMatching, "ef/ef_emitterform.cpp"),
