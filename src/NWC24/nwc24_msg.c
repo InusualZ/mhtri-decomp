@@ -73,51 +73,57 @@
  *     leak-free data run.  A future re-split may refine the position inside that window - it is the one
  *     open question in this register.
  *
- * BODY (second pass 2026-09-28).  All 17 functions are reconstructed and measured (11 byte-identical,
- * unit 89.94 % fuzzy over the 2392 B of `.text`, 2348 B ours - it was 85.71 % / 212 B before); the
- * unit's own pool
+ * BODY.  All 17 functions are reconstructed and measured; the unit's own pool
  * (`.data` 0x80631128-0x80631178, `.sdata` 0x80794438, `.sbss` 0x807958A0) is claimed and emitted, and
  * everything the bodies reference outside those ranges - the work block `.bss` 0x80766980, the
  * scheduler flags `.sbss` 0x807958A8-0x807958B4, the user-work pointer `.sbss` 0x80795898 and the
  * device-path literals `.data` 0x80631178+ - belongs to no registered unit and is declared `extern`
  * in `unsplit/NWC24.h` (playbook 29/58: declare, never define).
  *
- * LOAD-BEARING SHAPES (second pass, each measured on its own):
- *   - the file carries `#pragma dont_inline on`: retail KEEPS the `bl NWC24IsMsgLibOpened` /
+ * LOAD-BEARING SHAPES (each measured on its own):
+ *   - the file carries `#pragma auto_inline off`: retail KEEPS the `bl NWC24IsMsgLibOpened` /
  *     `...ByTool` / `...IsMsgLibOpenBlocked` calls in the request paths, and `-inline auto` folds
- *     their `sMsgLibOpenState` reads into the callers (playbook 61).  Without it
- *     `NWC24iSetScriptMode` is 12 B short, `NWC24iRequestGenerateUserId` 28 B.
+ *     their `sMsgLibOpenState` reads into the callers (playbook 61); the explicit `static inline`
+ *     helpers below are still inlined, as retail's are.
+ *   - the user id is a `u64`: `NWC24iGetUserId` copies it with one 64-bit load/store pair (low word
+ *     stored first), the generated seed is 9999999999999999 (0x002386F26FC0FFFF), and the generate
+ *     step (`NWC24iGenerateUserIdBlocked`) is an inline helper whose result reaches the caller in r3.
+ *     The prototype keeps `u32*` because `DWCi/dwc_auth_interface.c` passes `(u32*)&DWCi_consoleFriendCode`;
+ *     a `u64*` parameter compiles to the same row.  `error = (error != 0) ? error : resumeError;` is
+ *     retail's tail (an `if (error == 0)` form loses the two copies).
+ *   - the request entry points' thread/open checks are inline helpers returning -1/-10(/-26)/0 in r3
+ *     (`NWC24iCheckRequestThread`, `NWC24iCheckScriptModeThread`); `NWC24iRequestGenerateUserId`'s
+ *     answer copy is the inline `NWC24iCopyGeneratedUserId`, and its result test is a `switch`.
  *   - the work block's two mutexes are ONE 2-element array (`OSMutex mutex[2]`, 0x00/0x18) and every
  *     device-request function hoists a `work = &sNwc24Work` local; as two separate members, or with
  *     direct `sNwc24Work.` access in the request paths, MWCC does not common the base register and
  *     `NWC24iSetScriptMode` / `NWC24iRequestIoctl` / `NWC24iRequestGenerateUserId` each lose 5-12 B.
  *   - `sMsgLibOpenState` is `s32`: retail compares it SIGNED, so a `u32` gives `cmplwi` where the
- *     target has `cmpwi` in `NWC24BlockOpenMsgLib` (98.50 % -> 100 %).
+ *     target has `cmpwi` in `NWC24BlockOpenMsgLib`.
  *
  * Residuals:
  *   - `mr r3,r31` where retail has `addi r3,r31,0x0` for the offset-0 mutex argument
- *     (`NWC24SuspendScheduler` 98.85, `NWC24ResumeScheduler` 95.67, `NWC24iRequestIoctl` 94.93): the
- *     target object's `addi r3,r31,0` carries NO relocation, so it is a real `+0` the optimiser kept
- *     where ours folds it to a register copy.  Four argument spellings (`&work->mutex[0]`,
- *     `work->mutex`, `(char*)work + 0`, `&work[0].mutex[0]`) compile to the same `mr`; one instruction
- *     per site, and the only residual left in those three functions besides the two below.
- *   - `NWC24iRequestGenerateUserId` 83.78 % / 424 B of 444: the result test is written as one range
- *     compare where retail has two (`cmpwi r28,-0x23` + `cmpwi r28,-0x24`), and `NWC24iRequestIoctl`
- *     94.93 % / 344 B of 352 keeps `lwz r0,0x64(r31)` where retail computes `&outBuffer` first and the
- *     `argument != 0` test is `cmpwi` against retail's `cmplw` (a `u32` view of the argument).
- *   - `NWC24iGetUserId` 71.76 % / 344 B of 360: same instruction count, different load/store order -
- *     retail loads the work pointer into r3 and stores `userId[0]` after `userId[1]`; the RTC-shadow
- *     fallback and the 0x002386F2/0x6FC0FFFF seed pair transcribe the object's own immediates.
- *   - the four device-request entry points (`NWC24iGetUserId`, `NWC24iSetScriptMode`,
- *     `NWC24iRequestGenerateUserId`, `NWC24iRequestIoctl`) repeat the same one-time work-block
- *     initialiser verbatim, because retail's object carries four inlined copies of it (the original
- *     source used a macro or a textually repeated block; a helper function would emit a `bl`).
+ *     (`NWC24SuspendScheduler`, `NWC24ResumeScheduler`, `NWC24iRequestIoctl`, `NWC24iSetScriptMode`,
+ *     `NWC24iRequestGenerateUserId`): the target object's `addi r3,r31,0` carries NO relocation, so it is
+ *     a real `+0` the optimiser kept where ours folds it to a register copy.  Measured without effect:
+ *     four argument spellings, the init block as an inline helper (with a work parameter, with the
+ *     global, as a getter returning the work pointer), a two-iteration loop, direct global access,
+ *     `#pragma peephole off`, and the GC/3.0a3-3.0a5.2 and Wii/1.0-1.1 compilers.
+ *   - `NWC24iRequestGenerateUserId` / `NWC24iRequestIoctl`: retail tests the optional out-pointers with
+ *     `li r0,0; cmplw` and reads the answer through `addi r3,r29,0x60` + `lwz 4(r3)`; ours `cmpwi` and
+ *     folds the offset (a `(void*)0` NULL, an inline copy helper and a struct view of the answer were
+ *     measured without effect).  Retail tests 0 / -35 / -36 as three compares; an `||` chain gives a
+ *     range compare, the `switch` (best measured) a compare tree.
+ *   - `NWC24iSetScriptMode`: the -26 arm of the check helper is if-converted (`neg/or/srawi/and`) where
+ *     retail branches; five spellings of the helper measured identical.
+ *   - `NWC24iRequestIoctl` keeps `lwz r0,0x64(r31)` where retail computes `&outBuffer` first.
+ *   - the device-request entry points (`NWC24SuspendScheduler`, `NWC24ResumeScheduler`,
+ *     `NWC24iSetScriptMode`, `NWC24iRequestGenerateUserId`, `NWC24iRequestIoctl`) repeat the same
+ *     one-time work-block initialiser verbatim, because retail's object carries an inlined copy in each.
  *   - `datagap.py` reports `target-extra .data 80 B (ours 74 B)`: the claimed range
  *     0x80631128-0x80631178 is the version string (74 B) plus the 6 bytes dtk's range boundary rounds
  *     it out to, i.e. `.data` alignment padding the source cannot emit as a definition (the bytes
- *     themselves are identical).  `.text` is 44 B short of the claim.
- *   - the user-id / error constants in `NWC24iGetUserId` (0x002386F2 / 0x6FC0FFFF) are transcribed as
- *     the raw immediate pairs the object carries; their meaning is not recoverable from this image.
+ *     themselves are identical).
  */
 
 #include "types.h"
@@ -127,7 +133,7 @@
 #include "unsplit/NWC24.h"    /* the band's unowned data (rule 2) / memset */
 #include "Runtime.PPCEABI.H/memset.h"
 
-#pragma dont_inline on
+#pragma auto_inline off
 
 /* The library's state (`.sbss` 0x807958A0/0x807958A4, inside the unit's own `.sbss` range).  Both
    names are GUESSes - the original spellings are not in the image - and are derived from what the
@@ -153,6 +159,34 @@ static NWC24VersionTag sVersionTag = {
 /* The RTC shadow's user-id slot: the game keeps the id at the top of main memory and the NWC24
    library both reads and refreshes it there (a 32-byte DCStoreRange covers the two words). */
 #define NWC24_RTC_USER_ID_SHADOW 0x800031C0
+#define NWC24_RTC_USER_ID64 (*(u64*)NWC24_RTC_USER_ID_SHADOW)
+
+/* Generates a fresh user id with the message library's open blocked, and refreshes the RTC shadow's
+ * copy of it.  Retail inlines it into its one caller. */
+static inline s32 NWC24iGenerateUserIdBlocked(u64* userId)
+{
+    s32 error = NWC24BlockOpenMsgLib(1);
+    s32 openError;
+    u32 ticket;
+
+    if (error < 0) {
+        return error;
+    }
+    ticket = 0;
+    if (userId == 0) {
+        error = -3;
+    } else {
+        *userId = 9999999999999999ULL;
+        error = NWC24iRequestGenerateUserId(userId, &ticket);
+        NWC24_RTC_USER_ID64 = *userId;
+        DCStoreRange((void*)NWC24_RTC_USER_ID_SHADOW, 32);
+    }
+    openError = NWC24BlockOpenMsgLib(0);
+    if (error >= 0) {
+        error = openError;
+    }
+    return error;
+}
 
 /* 0x8051D710 (0x168): the user-id read.  With the message library open it answers the cached id the
  * work structure holds; otherwise it takes the RTC shadow's copy, validates it with the CRC check
@@ -162,57 +196,36 @@ int NWC24iGetUserId(u32* userId) {
     s32 error = 0;
 
     if (NWC24IsMsgLibOpened() || NWC24IsMsgLibOpenedByTool()) {
-        u32* work = sNwc24UserWork;
+        *(u64*)userId = sNwc24UserWork->userId;
+    } else {
+        s32 check;
+        s32 resumeError;
 
-        userId[0] = work[2];
-        userId[1] = work[3];
-        return error;
-    }
-    userId[0] = NWC24_RTC_USER_ID;
-    userId[1] = NWC24_RTC_USER_ID_HI;
-    if ((userId[0] | userId[1]) == 0) {
-        error = -5;
-    } else if (NWC24iCheckUserIdCRC(((u64)userId[0] << 32) | userId[1]) == 0) {
-        return 0;
-    }
-    error = NWC24SuspendScheduler();
-    if (error < 0) {
-        return error;
-    }
-    error = NWC24BlockOpenMsgLib(1);
-    if (error >= 0) {
-        u32 ticket = 0;
-
-        if (userId == 0) {
-            error = -3;
+        *(u64*)userId = NWC24_RTC_USER_ID64;
+        if (*(u64*)userId == 0) {
+            check = -5;
         } else {
-            userId[0] = 0x002386F2;
-            userId[1] = 0x6FC0FFFF;
-            error = NWC24iRequestGenerateUserId(userId, &ticket);
-            NWC24_RTC_USER_ID = userId[0];
-            NWC24_RTC_USER_ID_HI = userId[1];
-            DCStoreRange((void*)NWC24_RTC_USER_ID_SHADOW, 32);
+            check = NWC24iCheckUserIdCRC(*(u64*)userId);
         }
-        {
-            s32 openError = NWC24BlockOpenMsgLib(0);
-
-            if (error >= 0) {
-                error = openError;
-            }
+        if (check == 0) {
+            return check;
         }
-    }
-    if ((u32)(error + 36) <= 1) {
-        error = 0;
-    }
-    {
-        s32 resumeError = NWC24ResumeScheduler();
-
-        if (resumeError < 0 && error == 0) {
-            error = resumeError;
+        check = NWC24SuspendScheduler();
+        if (check < 0) {
+            return check;
+        }
+        error = NWC24iGenerateUserIdBlocked((u64*)userId);
+        if ((u32)(error + 36) <= 1) {
+            error = 0;
+        }
+        resumeError = NWC24ResumeScheduler();
+        if (resumeError < 0) {
+            error = (error != 0) ? error : resumeError;
         }
     }
     return error;
 }
+
 
 /* 0x8051D878 (0x3C): register the library's version string once. */
 void NWC24iRegisterVersion(void)
@@ -327,6 +340,22 @@ int NWC24ResumeScheduler(void)
     return error;
 }
 
+/* Answers -1 off a thread, -10 while the message library is open and -26 while its open is
+ * blocked, else 0. */
+static inline s32 NWC24iCheckScriptModeThread(void)
+{
+    if (OSGetCurrentThread() == 0) {
+        return -1;
+    }
+    if (NWC24IsMsgLibOpened() || NWC24IsMsgLibOpenedByTool()) {
+        return -10;
+    }
+    if (NWC24iIsMsgLibOpenBlocked()) {
+        return -26;
+    }
+    return 0;
+}
+
 /* 0x8051DB4C (0x1A0): set the library's script mode through the request device.  The mode word and
  * the device's answer travel in the work block's two 32-byte buffers. */
 int NWC24iSetScriptMode(u32 mode)
@@ -335,13 +364,7 @@ int NWC24iSetScriptMode(u32 mode)
     s32 error = 0;
     s32 fd;
 
-    if (OSGetCurrentThread() == 0) {
-        error = -1;
-    } else if (NWC24IsMsgLibOpened() || NWC24IsMsgLibOpenedByTool()) {
-        error = -10;
-    } else if (NWC24iIsMsgLibOpenBlocked()) {
-        error = -26;
-    }
+    error = NWC24iCheckScriptModeThread();
     if (error < 0) {
         return error;
     }
@@ -379,19 +402,39 @@ int NWC24iSetScriptMode(u32 mode)
     return error;
 }
 
+/* Answers -1 off a thread and -10 while the message library is open, else 0. */
+static inline s32 NWC24iCheckRequestThread(void)
+{
+    if (OSGetCurrentThread() == 0) {
+        return -1;
+    }
+    if (NWC24IsMsgLibOpened() || NWC24IsMsgLibOpenedByTool()) {
+        return -10;
+    }
+    return 0;
+}
+
+/* Copies the generated id (words 1-2 of the device's answer) and its ticket (word 3) out to the
+ * caller's optional slots. */
+static inline void NWC24iCopyGeneratedUserId(u32* answer, u64* userId, u32* ticket)
+{
+    if (userId != NULL) {
+        *userId = *(u64*)&answer[1];
+    }
+    if (ticket != NULL) {
+        *ticket = answer[3];
+    }
+}
+
 /* 0x8051DCEC (0x1BC): ask the device to generate a user id; the id lands in the work block's
  * output buffer and is copied out with the ticket word that follows it. */
-int NWC24iRequestGenerateUserId(u32* userId, u32* ticket)
+int NWC24iRequestGenerateUserId(u64* userId, u32* ticket)
 {
     NWC24RequestWork* work = &sNwc24Work;
     s32 error = 0;
     s32 fd;
 
-    if (OSGetCurrentThread() == 0) {
-        error = -1;
-    } else if (NWC24IsMsgLibOpened() || NWC24IsMsgLibOpenedByTool()) {
-        error = -10;
-    }
+    error = NWC24iCheckRequestThread();
     if (error < 0) {
         return error;
     }
@@ -413,14 +456,12 @@ int NWC24iRequestGenerateUserId(u32* userId, u32* ticket)
         error = NWC24iIoctl((u32)Nwc24GenerateUserIdName, fd, 15, 0, 0, work->outBuffer, 32);
         if (error >= 0) {
             error = (s32)work->outBuffer[0];
-            if (error == 0 || error == -35 || error == -36) {
-                if (userId != 0) {
-                    userId[0] = work->outBuffer[1];
-                    userId[1] = work->outBuffer[2];
-                }
-                if (ticket != 0) {
-                    *ticket = work->outBuffer[3];
-                }
+            switch (error) {
+            case 0:
+            case -35:
+            case -36:
+                NWC24iCopyGeneratedUserId(work->outBuffer, userId, ticket);
+                break;
             }
         }
         {

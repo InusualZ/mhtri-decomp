@@ -1251,6 +1251,7 @@ config.libs = [
             Object(NonMatching, "NWC24/nwc24_io.c"),   # 0x8051E068-0x8051E864
             # SO/soi: same SDK build (0x4199_60831); GC/3.0a5.2 measured 19 better / 0 worse (docs/network.md).
             Object(NonMatching, "SO/soi.cpp"),
+            Object(NonMatching, "SO/socket.cpp"),  # the SOCKET half of the SO band: src/SO/socket.cpp header
             # SSL/ssl and NCD/ncdsystem: same SDK build; GC/3.0a5.2 measured 5 / 5 better, 0 worse (docs/network.md).
             Object(NonMatching, "SSL/ssl.cpp"),
             Object(NonMatching, "NCD/ncdsystem.c"),

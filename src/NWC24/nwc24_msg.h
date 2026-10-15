@@ -29,7 +29,7 @@ int NWC24SuspendScheduler(void);
 int NWC24ResumeScheduler(void);
 int NWC24iSetScriptMode(u32 mode);
 int NWC24iGetUserId(u32* userId);
-int NWC24iRequestGenerateUserId(u32* userId, u32* ticket);
+int NWC24iRequestGenerateUserId(u64* userId, u32* ticket);
 int NWC24iRequestIoctl(u32 handle, u32 command, u32* argument);
 
 /* the `/dev/net/kd/request` command thunks; each forwards one command number */
@@ -58,8 +58,14 @@ extern s32 sNwc24SuspendCount;
 
 extern s32 sNwc24ResumeLimit;
 
-/* 0x80795898 - the library's work pointer; +0x08 is the cached user id (two words). */
-extern u32* sNwc24UserWork;
+/* The head of the library's work area as the user-id read sees it: the cached 64-bit user id at +0x08. */
+typedef struct NWC24UserWork {
+    /* +0x00 */ u8 pad_0x00[0x08];
+    /* +0x08 */ u64 userId;
+} NWC24UserWork; /* size: 0x10 (approximation: only the user-id prefix is modelled) */
+
+/* 0x80795898 - the library's work pointer. */
+extern NWC24UserWork* sNwc24UserWork;
 
 extern const char Nwc24SetScriptModeName[]; /* 0x8063118C "NWC24iSetScriptMode" */
 

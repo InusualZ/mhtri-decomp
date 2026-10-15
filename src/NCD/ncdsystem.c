@@ -21,18 +21,25 @@
  *   GUESS: `NCDGetCurrentIfConfig`, `NCDGetLinkStatus`, `NCDiGetWirelessMacAddress`, `NCDiGetEnabledConfigList`
  *   GUESS: `NCDiConfigRequest`, `NCDiInitAndLock`, `NETiConfigListToErrorBase`, `NETGetStartupErrorCode`
  *   GUESS: `NETiStartupErrorToCode`, `NETGetRexVersion`, `NCDGetWirelessMacAddress`
+ *   GUESS: `NCDiUnlock` (a dead-stripped helper the `.bss` order implies; its name and body are guesses)
  * SHAPES. The mutex, the reply words and the vectors are three file statics MWCC addresses from one base register.
  *   `NETMemCpy`/`NETMemSet` are `asm` functions: retail replicates the fill byte with in-place `rlwimi r4,r4`, runs
  *   counted `mtctr` loops whose shape no C spelling of ours reproduces (unrolled at -O4,p, `mtctr` hoisted above the
  *   zero test under `optimize_for_size`) and saves r31 in a leaf without a link-register frame.
+ * SHAPES. `NULL` is the SDK's `((void*)0)`: `NCDGetCurrentIfConfig`/`NCDGetCurrentIpConfig` compare their pointer
+ *   against it with `li r31,0; cmplw` (the register `result` starts in), the integer 0 gives `cmpwi`; the
+ *   `OSGetCurrentThread()` tests stay integer compares (`cmpwi r3,0`).
+ * SHAPES. `.bss` is laid out in first-use order: the never-called static `NCDiUnlock` ahead of the API is the first
+ *   user of `ncdMutex`, which puts it at +0x00 ahead of `ncdReply`/`ncdVectors` as in retail (without it every
+ *   base-relative offset in `NCDiGetWirelessMacAddress`, `NCDiConfigRequest`, `NCDiInitAndLock` and
+ *   `NCDGetLinkStatus` swaps 0x00/0x20); mwld strips the unreferenced helper again.
  * RESIDUALS. The `.data` "Unknown SOStartup Error" string and the `.sdata` "REX-PPC" pointer start 8-aligned in the
  *   target (a second TU, the NET helpers, begins between 0x8051CDD0 and 0x8051D0C8), so `.data` ends 6 bytes and
- *   `.sdata` 8 bytes short until that seam is drawn. `.bss`: ours lays the statics out in first-use order (`ncdReply`,
- *   `ncdMutex`, `ncdVectors`), retail puts `ncdMutex` first, so every base-relative offset in `NCDiGetWirelessMacAddress`,
- *   `NCDiConfigRequest` and `NCDGetLinkStatus` swaps 0x00/0x20. Retail tests the NULL pointer parameters with
- *   `li rX,0; cmplw rY,rX` (ours `cmpwi rY,0`) in `NCDGetCurrentIfConfig`, `NCDGetCurrentIpConfig`,
- *   `NCDiGetWirelessMacAddress` and `NCDiConfigRequest`. `NCDiGetEnabledConfigList` re-reads the profile's mode byte
- *   and keeps the masks in r25-r27.
+ *   `.sdata` 8 bytes short until that seam is drawn. `NCDiGetEnabledConfigList` re-reads the profile's mode byte
+ *   (`lbz r0,0x7ca(r4)` twice per profile) and keeps the masks in r25-r27 (ours CSEs the byte, masks in r29-r31;
+ *   an inline predicate, a declaration reorder and a volatile view were measured, none moves it).
+ *   `NCDGetLinkStatus` branches `blt`+`b` around its `result = -1` where ours emits one `bge` (five spellings of the
+ *   negative-status test measured identical).
  */
 
 #include "NCD/ncdsystem.h"
@@ -44,6 +51,11 @@
 #include "unsplit/OS.h"
 
 #pragma auto_inline off
+
+/* The SDK's C headers spell NULL as a void pointer: a pointer compared against it is a register compare
+   (`li rX,0` + `cmplw`), where the integer 0 gives `cmplwi`. */
+#undef NULL
+#define NULL ((void*)0)
 
 /* One network profile of the NCD configuration. */
 typedef struct NCDProfile {
@@ -87,6 +99,13 @@ u32 ncdInitFlags;
 static OSMutex ncdMutex;
 static s32 ncdReply[8] __attribute__((aligned(32)));
 static IPCIOVector ncdVectors[4] __attribute__((aligned(32)));
+
+/* Releases the library lock.  Nothing in the image calls it, so the linker strips it; it is compiled
+   before every other user of the lock, which is what puts `ncdMutex` first in `.bss`. */
+static void NCDiUnlock(void)
+{
+    OSUnlockMutex(&ncdMutex);
+}
 
 s32 NCDiConfigRequest(const char* function, NCDConfig* config, s32 command);
 void NCDiInitAndLock(void);
@@ -174,7 +193,7 @@ s32 NCDGetLinkStatus(void) {
     s32 result;
     s32 fd;
 
-    if (OSGetCurrentThread() == NULL) {
+    if (OSGetCurrentThread() == 0) {
         return -5;
     }
     NCDiInitAndLock();
@@ -215,7 +234,7 @@ s32 NCDiGetWirelessMacAddress(u8* address) {
     if (address == NULL) {
         return -3;
     }
-    if (OSGetCurrentThread() == NULL) {
+    if (OSGetCurrentThread() == 0) {
         return -5;
     }
     NCDiInitAndLock();
@@ -293,7 +312,7 @@ s32 NCDiConfigRequest(const char* function, NCDConfig* config, s32 command) {
     s32 result = 0;
     s32 fd;
 
-    if (OSGetCurrentThread() == NULL) {
+    if (OSGetCurrentThread() == 0) {
         return -5;
     }
     NCDiInitAndLock();
@@ -397,9 +416,9 @@ s32 NETiConfigListToErrorBase(u32 wired, u32 wireless, u32 wirelessOther) {
 /* 0x8051D048 (0x80): the user-facing network error code for a failed `SOStartup` result. */
 s32 NETGetStartupErrorCode(s32 result) {
     s32 base = 99;
-    u32 wired;
-    u32 wireless;
     u32 wirelessOther;
+    u32 wireless;
+    u32 wired;
 
     if (NCDiGetEnabledConfigList(&wired, &wireless, &wirelessOther) >= 0) {
         base = NETiConfigListToErrorBase(wired, wireless, wirelessOther);

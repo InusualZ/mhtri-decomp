@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (109)
+## Ideas that work (110)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -118,6 +118,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 122 | [Swapped epilogue loads after an inline-asm bctr: scope scheduling off to the function](122-scheduling-off-asm-epilogue.md) | works | pragma, flags | A small function that ends in an inline `asm { ... bctr }` matches except the epilogue - the target restores `lwz r31` before `lwz r0` (the reverse of MWCC's scheduled order). |
 | 123 | [A fill loop and by-value struct temps written in place colour differently from an inline helper fed the call result](123-inline-helper-direct-struct-arg.md) | works | source-shape, allocator | Same instructions, but a loop's pointer/counter/value registers are permuted among r4-r7 and two by-value struct copies sit in swapped stack slots. |
 | 124 | [Move a value's birth to recolour it: name a product early, or spell a hoisted invariant in place](124-value-birth-order-colours.md) | works | source-shape, allocator | Same instructions, two long-lived values swap registers (r8/r10, f3/f4) and no operand order or declaration order moves them. |
+| 125 | [A pointer test as li rX,0 + cmplw is a void-pointer NULL](125-pointer-test-as-li.md) | works | source-shape, allocator | Retail tests a pointer parameter with `li r31,0` + `cmplw r3,r31` (the 0 then reused as a local's initial value) where ours emits `cmpwi r3,0` |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

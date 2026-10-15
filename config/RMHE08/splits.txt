@@ -3689,11 +3689,18 @@ NWC24/nwc24_io.c:
 	.sbss       start:0x807958B8 end:0x807958D8
 
 SO/soi.cpp:
-	.text       start:0x8051E864 end:0x80521340
-	.data       start:0x80631230 end:0x80631468
-	.bss        start:0x80766C40 end:0x80766C68
-	.sdata      start:0x80794448 end:0x80794458
-	.sbss       start:0x807958D8 end:0x807958F0
+	.text       start:0x8051E864 end:0x8051F9D0
+	.data       start:0x80631230 end:0x80631410
+	.bss        start:0x80766C40 end:0x80766C58
+	.sdata      start:0x80794448 end:0x80794450
+	.sbss       start:0x807958D8 end:0x807958E8
+
+SO/socket.cpp:
+	.text       start:0x8051F9D0 end:0x80521340
+	.data       start:0x80631410 end:0x80631468
+	.bss        start:0x80766C58 end:0x80766C68
+	.sdata      start:0x80794450 end:0x80794458
+	.sbss       start:0x807958E8 end:0x807958F0
 
 VF/vf.cpp:
 	.text       start:0x80521340 end:0x80522334 align:16
