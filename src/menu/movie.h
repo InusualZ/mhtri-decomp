@@ -24,7 +24,7 @@ extern "C" {
 /* 0x8043F280 - the +0x0A byte of the movie player's state (.bss 0x806E28A0), which its playback loop 0x8043ED34
  * raises while a movie runs (with screen dimming disabled) and clears after.  NAME (a GUESS): the pad reader, the
  * system core and the network message pool all skip their work while it reads 1. */
-u8 isMoviePlaying(void);
+BOOL isMoviePlaying(void);
 
 #ifdef __cplusplus
 }

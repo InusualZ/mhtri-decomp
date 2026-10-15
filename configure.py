@@ -1160,6 +1160,9 @@ config.libs = [
             # Flags: unit header of src/Network/GameSpyInterfaceThread.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/GameSpyInterfaceThread.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
+            # Flags: unit header of src/Network/NetworkPeerGameSpy.cpp (the interface unit's flags).
+            Object(NonMatching, "Network/NetworkPeerGameSpy.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
         ],
     },
     {

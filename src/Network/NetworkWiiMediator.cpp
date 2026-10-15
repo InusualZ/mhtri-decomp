@@ -1797,7 +1797,7 @@ void startTermsCheck(NetworkWiiMediator* self)
 }
 
 /* The terms object's ready state, 0 when there is none. */
-s32 getMediatorTermsStatus(NetworkWiiMediator* self)
+u32 getMediatorTermsStatus(NetworkWiiMediator* self)
 {
     if (getPatTerms() != NULL) {
         return isPatTermsReady(getPatTerms());

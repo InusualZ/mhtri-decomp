@@ -222,21 +222,4 @@ void networkStreamQueue_removeMessage(NetworkStreamQueue* self);
 }
 #endif
 
-/* The free-function spellings `Network/NetworkConnectionStable.cpp` still calls for the writers' `attach`/`bind`
-   overrides: each is a qualified (direct) call, the call retail makes on a local writer object. */
-inline void networkPacket_attach(NetworkStreamWriter* packet, u8* block, u32 capacity)
-{
-    packet->NetworkStreamWriter::attach(block, capacity);
-}
-
-inline void networkStreamWriter_putBytes(NetworkStreamWriterDefault* frame, u8* block, u32 capacity)
-{
-    frame->NetworkStreamWriterDefault::attach(block, capacity);
-}
-
-inline void networkStreamReader_attach(NetworkStreamWriterDefault* frame, u8* block, u32 size)
-{
-    frame->NetworkStreamWriterDefault::bind(block, size);
-}
-
 #endif /* MHTRI_NETWORK_NETWORKUNITPACKET_H */

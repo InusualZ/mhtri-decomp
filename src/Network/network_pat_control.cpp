@@ -39,9 +39,9 @@
  *   (0x80428208/0x80428218, `msg_state_0xC300`), `pat_crypt_key_table` (.bss 0x806D3670, the Camellia key schedule
  *   `PatCryptSetKey` fills), `net_slot_initial_value` (.sdata2 0x8079C888, 10.0f, `resetSlotTable`'s seed).
  *   `isReadyCountOne` and `resetFailureState` (a `blr` stub) keep names that say only what the body does.
- * RESIDUALS. 1 row unwritten: `fn_80431D80` (0x80431D80, 0x1C), the compiler's array destructor for
- *   `net_profile_table`; ours emits it as `__arraydtor$NNNN` (byte-identical), so the row pairs only once the map
- *   carries the compiler's name.
+ * RESIDUALS. The map row `__arraydtor$9000` (0x80431D80, 0x1C) is the compiler's array destructor for
+ *   `net_profile_table`, named with this source's own counter: a change to the declarations this unit sees renumbers
+ *   it, and the row then stops pairing until the map follows (`nm` on the object prints the live name).
  *   `NetCtrlWk`'s constructor/destructor call the community lists' members out of line (declared in
  *   `Network/NetworkCommunityPat.h`, defined inline by `Network/NetworkCommunityPat.cpp`); the empty constructor and
  *   destructor bodies are complete (MWCC emits the member work).
@@ -52,8 +52,8 @@
  *    `checkLayerEntry` dispatch, step 6 into step 2's success block); without `goto` (rule 8) those two blocks are
  *    inline helpers, so the dispatch is emitted three times and the success block twice (0x3FC B larger, the whole
  *    .text excess); merging them through flags measured lower.  MWCC does not tail-merge identical blocks (measured on
- *    a demo), so only a `goto` reaches retail's shape.  Also `isMoviePlaying`'s `u8` costs a `clrlwi`, and the
- *    chat-entry scan keeps its `i >= 16` test where retail branches past the send loop.
+ *    a demo), so only a `goto` reaches retail's shape.  Also the chat-entry scan keeps its `i >= 16` test where retail
+ *    branches past the send loop.
  *  - `updateNetworkPatControl`: retail keeps every nested `switch` as a compare tree (`cmpwi`/`beq`/`bge`); ours goes
  *    through MWCC's `IRO_OptimizeSwitches` ("optimizing switch into ifs") and becomes `beq` chains.  Only a scoped
  *    `#pragma global_optimizer off` keeps the trees (and retail's 0x50 frame) but adds a frame pointer and scores
@@ -111,7 +111,6 @@
  *    through the `chars_0x035` view for the log and `text_0x035` for the mediator, and `layerReflectCallback`'s peer
  *    id is spelled `(char*)&...id_0x00` where retail keeps a second copy; the invite resets walk a pointer and the
  *    invite list is indexed, as retail forms them;
- *  - `initNetworkPatControl` compares the terms status unsigned (`getMediatorTermsStatus` is declared `s32`).
  *  - `initNetworkLibrary` is handed `PatLibraryParams` cast to the owner's `sNetworkLibraryInitParam` (one 0x2C block
  *    read two ways: this unit names the allocator/game words, the owner keeps `gameInfo[8]`; folding them is a rule-1
  *    item).
@@ -3022,7 +3021,7 @@ void initNetworkPatControl(void)
     initNetworkLibrary(getPatsObject(), (sNetworkLibraryInitParam*)&params);
     if (get_option_cfg(28) == 1) {
         initMediatorTerms(getInstance(), (void*)0x90037F60, 0x4400);
-        if ((u32)getMediatorTermsStatus(getInstance()) == 1) {
+        if (getMediatorTermsStatus(getInstance()) == 1) {
             work->flag_0xC499 = 1;
             if (isTermsCheckFinished(getPatTerms()) == 0) {
                 work->flag_0xC49A = 0;

@@ -155,7 +155,7 @@ typedef struct NetworkSessionManagerLogger {
 extern "C" {
 
 /* 0x803C9974 - the game's debug/log manager (the network library singleton, read through `mpInstance`). */
-NetworkLogger* getNetworkLogger(void);
+NetworkLogger* getNetworkLogger(void) __attribute__((nothrow));
 
 }
 

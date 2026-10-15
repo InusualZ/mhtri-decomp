@@ -17,8 +17,8 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
-/* 0x803768F0 - the network singleton (an 8-byte accessor). */
-PatInterface* getInstance_(void);
+/* 0x803768F0 - the network singleton (an 8-byte accessor); nothrow, so callers record no cleanup around it. */
+PatInterface* getInstance_(void) __attribute__((nothrow));
 /* 0x803768F8 - the lobby's "can leave the map" predicate (`lobby_w` +0x163/+0x16F/+0x0B0). */
 u32 fn_803768F8(void);
 /* 0x80377664 - the network big-data request entry (the `fn_804273EC(1, 0, 0)` wrapper). */

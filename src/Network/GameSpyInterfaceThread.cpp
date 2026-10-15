@@ -1,14 +1,13 @@
 /*
- * Network/GameSpyInterfaceThread.cpp - the GameSpy interface / peer band: the GT2 socket callbacks and three classes,
- *   the worker thread `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler`, each owning its bodies
- *   as members.  The class's type-only header, read by the mediator band, is `Network/gamespy_interface_types.h`.
- * RANGE. .text 0x8041B194-0x8041DF10 (66 functions); .data 0x806031A0-0x80603750 (the callback set, the log strings in
- *   retail's order, the thread vtable, the peer's string, the peer's and the timed handler's vtables), .bss
- *   0x806D3650-0x806D3670, .sdata 0x80793990-0x807939A0 (the literals "NG", "" and ":%u"), .sbss 0x80794CE0-0x80794CE8,
- *   extab, extabindex.  The left edge is `NetworkReflectService`'s end (string 0x80603154, table 0x80603190).  A second
- *   TU starts inside: the thread's vtable 0x806036A0 (padded to 0x806036B0) is followed by the peer's string 0x806036B0,
- *   a vtable-to-string seam whose `.text` side is 0x8041D750 (`NetworkPeerGameSpy::setContext`, extabindex 0x8003DB54);
- *   that TU is `NetworkPeerGameSpy` + `NetworkTimedHandler` (.text 0x8041D750-0x8041DF10, .data 0x806036B0-0x80603750).
+ * Network/GameSpyInterfaceThread.cpp - the GameSpy interface band: the GT2 socket callbacks and the worker thread
+ *   `GameSpyInterfaceThread`, owning its bodies as members.  The class's type-only header, read by the mediator band, is
+ *   `Network/gamespy_interface_types.h`.
+ * RANGE. .text 0x8041B194-0x8041D750 (52 functions); .data 0x806031A0-0x806036B0 (the callback set, the log strings in
+ *   retail's order, the thread vtable), .bss 0x806D3650-0x806D3670, .sdata 0x80793990-0x807939A0 (the literals "NG", ""
+ *   and ":%u"), .sbss 0x80794CE0-0x80794CE8, extab 0x8001D010-0x8001D100, extabindex 0x8003D9EC-0x8003DB54.  The left
+ *   edge is `NetworkReflectService`'s end (string 0x80603154, table 0x80603190); the right edge is the vtable-to-string
+ *   seam after the thread's vtable 0x806036A0 (padded to 0x806036B0): `Network/NetworkPeerGameSpy.cpp` starts at
+ *   0x8041D750 (`NetworkPeerGameSpy::setContext`, extabindex 0x8003DB54).
  * FLAGS. `-O3 -inline noauto -pool off` (configure.py; measured in docs/network.md, playbook 43); file-scope
  *   `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsb` + `cmpwi` forms, so narrow stores are compound
  *   assignments and shift-and-mask bytes are `(v >> 16) & 0xFF`, playbook 95).
@@ -16,14 +15,9 @@
  *   `publishRequest`); the six `gt2*Callback` bodies and `DWC_GetLastErrorEx` from the pool strings.  GUESSes from call
  *   shape or opcode: the unsplit callees (the `gt2*` API, `DWC_*`, `DWCi_natProbe*`, `sendReq*`, `hasMultipleRefs60d4`,
  *   `errorRecordCode613c`, `getErrorInfo654c`, `getGameInfo2d1c`), `natNegProgressCallback`, `natNegCompletedCallback`,
- *   `copyGameSpyAddress`, `NetworkReflectService::notify` and the peer's `armDrop`/`init` (the base's +0x20/+0x24
- *   slots).  The peer's other slot names are `NetworkPeerBase`'s:
- *   GUESS: setContext, send, receive, put, move, reset (the base slot each overrides).
- * RESIDUALS. `NetworkPeerGameSpy::receive`: retail keeps `payload` in the zero constant's register (r22) and a
- *   `clrlwi` before `cursor += aLen16` that ours drops.  `publishRequest`: the slot-loop temporaries `i * 4` and
- *   `&slotIds_44[i]` take r8/r7, ours r7/r8.  `.data`: the order cannot match inside one TU (retail's thread vtable sits
- *   before the peer's string; MWCC emits vtables last), so it waits for the cut at 0x8041D750.  `.sdata`: bytes match,
- *   the map names `sRejectMessageNG`/`sEmptyString`/`sPortFormat` label anonymous literals.
+ *   `copyGameSpyAddress` and `NetworkReflectService::notify`.
+ * RESIDUALS. `publishRequest`: the slot-loop temporaries `i * 4` and `&slotIds_44[i]` take r8/r7, ours r7/r8.
+ *   `.sdata`: bytes match, the map names `sRejectMessageNG`/`sEmptyString`/`sPortFormat` label anonymous literals.
  * SHAPES. Every call through a foreign object's vtable goes through a declared `virtual` (the only shape MWCC emits as
  *   `lwz r12,0x0(r3)` / `lwz r12,<slot>(r12)`).  `~GameSpyInterfaceThread` comes first in the class (the vtable pointer
  *   sits where the first virtual is declared, playbook 98); as the key function it makes this unit emit `__vt__` and
@@ -1261,247 +1255,6 @@ s32 GameSpyInterfaceThread::checkPeerProfile(const void* profile, u32 size)
 u32 GameSpyInterfaceThread::getPeerId()
 {
     return selfPeerId_4474;
-}
-
-/* Binds the peer to the interface and resets both buffers. */
-/* untyped: caller-owned payload - the interface and peer id pair */
-void NetworkPeerGameSpy::setContext(const void* context)
-{
-    const u32* id = (const u32*)context;
-
-    interface_6634 = (GameSpyInterfaceThread*)id[0];
-    peer_6638 = id[1];
-    field_6630 = interface_6634->registerReceiver(this, peer_6638);
-    memset(sendBuffer_14, 0, 0x600);
-    memset(recvBuffer_614, 0, 0x6000);
-    received_10 = 0;
-}
-
-/* Builds and sends a framed peer message from the two optional payloads. */
-s32 NetworkPeerGameSpy::send(const u8* a, s32 aLen, const u8* b, s32 bLen, s8 flag)
-{
-    s8 flagByte;
-    u16 aLen16;
-    u16 bLen16;
-    u8* cursor;
-    s32 total;
-    s8 slot;
-
-    flagByte = flag;
-    slot = interface_6634->getSlotState(peer_6638);
-    if (slot < 0) {
-        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, 0, -1);
-        return -1;
-    }
-    cursor = sendBuffer_14;
-    if (a == NULL || aLen <= 0) {
-        aLen16 = 0;
-        memcpy(cursor, &aLen16, 2);
-        cursor += 2;
-        total = 2;
-    } else {
-        {
-            NetworkLogger* lm = getNetworkLogger();
-            aLen16 = lm->encode_4C((u16)aLen);
-        }
-        memcpy(cursor, &aLen16, 2);
-        cursor += 2;
-        memcpy(cursor, a, (u32)(u16)aLen);
-        cursor += aLen;
-        total = aLen + 2;
-    }
-    if (b == NULL || bLen <= 0) {
-        bLen16 = 0;
-        memcpy(cursor, &bLen16, 2);
-        total = total + 2;
-    } else {
-        {
-            NetworkLogger* lm = getNetworkLogger();
-            bLen16 = lm->encode_4C((u16)(bLen + 1));
-        }
-        memcpy(cursor, &bLen16, 2);
-        memcpy(cursor + 2, &flagByte, 1);
-        total = total + 3;
-        memcpy(cursor + 3, b, (u32)(u16)bLen);
-        total = total + bLen;
-    }
-    {
-        NetworkLogger* lm = getNetworkLogger();
-        if (lm->flag_48(aLen16) == 0) {
-            NetworkLogger* lm2 = getNetworkLogger();
-            if (lm2->flag_48(bLen16) == 0) {
-                return 0;
-            }
-        }
-    }
-    slot = interface_6634->findSlot(peer_6638);
-    if (slot < 0) {
-        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, 0, -2);
-        return -1;
-    }
-    if (interface_6634->sendUnreliable((u8)slot, sendBuffer_14, total) == 0) {
-        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, 0, -3);
-        return -1;
-    }
-    return total;
-}
-
-/* Pulls one framed message out of the peer's receive buffer. */
-s32 NetworkPeerGameSpy::receive(u8* a, s32* aLen, u8* b, s32* bLen, u8* flag)
-{
-    u16 aLen16;
-    u16 bLen16;
-    u16 payload;
-    u8* cursor;
-    s32 aMax;
-    s32 bMax;
-    s32 consumed;
-    s8 slot;
-
-    aMax = *aLen;
-    bMax = *bLen;
-    *aLen = 0;
-    *bLen = 0;
-    *flag = 0;
-    slot = interface_6634->getSlotState(peer_6638);
-    if (slot < 0) {
-        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_RECEIVE, 0, 0);
-        return -1;
-    }
-    if (received_10 < 4) {
-        return 0;
-    }
-    LockMutex(&mutex_6614);
-    cursor = recvBuffer_614;
-    memcpy(&aLen16, cursor, 2);
-    {
-        NetworkLogger* lm = getNetworkLogger();
-        aLen16 = lm->flag_48(aLen16);
-    }
-    payload = 0;
-    bLen16 = 0;
-    if (received_10 >= (u32)aLen16 + 4) {
-        cursor += aLen16 + 2;
-        memcpy(&bLen16, cursor, 2);
-        {
-            NetworkLogger* lm = getNetworkLogger();
-            payload = lm->flag_48(bLen16);
-        }
-        bLen16 = payload;
-        cursor = recvBuffer_614;
-    }
-    if (received_10 < (u32)(aLen16 + payload + 4)) {
-        UnlockMutex(&mutex_6614);
-        return 0;
-    }
-    cursor += 2;
-    if (aLen16 != 0 && aLen16 <= aMax) {
-        memcpy(a, cursor, aLen16);
-        *aLen = aLen16;
-    }
-    cursor += aLen16;
-    cursor += 2;
-    if (bLen16 > 1) {
-        payload = bLen16 - 1;
-        if (payload <= bMax) {
-            memcpy(flag, cursor, 1);
-            cursor += 1;
-            memcpy(b, cursor, payload);
-            cursor += payload;
-            *bLen = payload;
-        }
-    }
-    consumed = aLen16 + bLen16 + 4;
-    received_10 = received_10 - consumed;
-    if (received_10 != 0) {
-        memmove(recvBuffer_614, cursor, received_10);
-    }
-    UnlockMutex(&mutex_6614);
-    return consumed;
-}
-
-/* Appends a buffer to the peer's receive queue. */
-s32 NetworkPeerGameSpy::put(const u8* data, s32 size, u32 a, u32 b, u32 c)
-{
-    LockMutex(&mutex_6614);
-    if (received_10 + size > 0x6000) {
-        INFO_LOG("NetworkPeerGameSpy::put: buf_recv_peer over. please check NetworkPeerGameSpy::MAX_SIZE_BUF_PEER\n");
-        UnlockMutex(&mutex_6614);
-        return -1;
-    }
-    memcpy(recvBuffer_614 + received_10, data, size);
-    received_10 = received_10 + size;
-    UnlockMutex(&mutex_6614);
-    return 0;
-}
-
-/* Reports whether the peer has a message queued. */
-s32 NetworkPeerGameSpy::move()
-{
-    s8 state;
-
-    state = (s8)interface_6634->getSlotState(peer_6638);
-    if (state > 0) {
-        return 1;
-    }
-    if (state < 0) {
-        return state;
-    }
-    return 0;
-}
-
-/* Empty body: the peer's vtable slot +0x20, which only the Mcs peer implements. */
-void NetworkPeerGameSpy::armDrop()
-{
-}
-
-/* Clears the peer through its own virtual slot +0x28 and reports it usable. */
-s32 NetworkPeerGameSpy::init()
-{
-    reset();
-    return 1;
-}
-
-/* Releases the peer's interface slot and drops its receive queue. */
-void NetworkPeerGameSpy::reset()
-{
-    interface_6634->unregisterReceiver(field_6630);
-    LockMutex(&mutex_6614);
-    memset(recvBuffer_614, 0, 0x6000);
-    received_10 = 0;
-    UnlockMutex(&mutex_6614);
-}
-
-/* Destroys the peer: MWCC destroys the queue mutex and the base after the empty body. */
-NetworkPeerGameSpy::~NetworkPeerGameSpy()
-{
-}
-
-/* Constructs the timed handler. */
-NetworkTimedHandler::NetworkTimedHandler()
-{
-    init(0);
-}
-
-/* The timed handler owns nothing. */
-NetworkTimedHandler::~NetworkTimedHandler()
-{
-}
-
-/* Sets the period and the timeout, clearing the state. */
-void NetworkTimedHandler::init(s64 period)
-{
-    clear();
-    timeout_14 = 1000;
-    period_08 = period;
-}
-
-/* Clears the timed handler's state, ready flag and expiry flag. */
-void NetworkTimedHandler::clear()
-{
-    state_04 = 0;
-    ready_10 = 0;
-    expired_18 = 0;
 }
 
 /* ---- the zero-initialised data this unit owns (declared in Network/GameSpyInterfaceThread.h; the

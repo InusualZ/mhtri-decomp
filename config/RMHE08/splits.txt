@@ -2179,13 +2179,19 @@ Network/NetworkReflectService.cpp:
 	.sbss       start:0x80794CD8 end:0x80794CE0
 
 Network/GameSpyInterfaceThread.cpp:
-	extab       start:0x8001D010 end:0x8001D16C
-	extabindex  start:0x8003D9EC end:0x8003DBD8
-	.text       start:0x8041B194 end:0x8041DF10
-	.data       start:0x806031A0 end:0x80603750
+	extab       start:0x8001D010 end:0x8001D100
+	extabindex  start:0x8003D9EC end:0x8003DB54
+	.text       start:0x8041B194 end:0x8041D750
+	.data       start:0x806031A0 end:0x806036B0
 	.bss        start:0x806D3650 end:0x806D3670
 	.sdata      start:0x80793990 end:0x807939A0
 	.sbss       start:0x80794CE0 end:0x80794CE8
+
+Network/NetworkPeerGameSpy.cpp:
+	extab       start:0x8001D100 end:0x8001D16C
+	extabindex  start:0x8003DB54 end:0x8003DBD8
+	.text       start:0x8041D750 end:0x8041DF10
+	.data       start:0x806036B0 end:0x80603750
 
 Camellia/camellia.c:
 	extab       start:0x8001D16C end:0x8001D1B4

@@ -294,7 +294,7 @@ u8 getPatTermsFlag(struct PatTerms* terms);
  *    when either accepted it. */
 /* untyped: byte range - the MEM2 buffer handed to the terms object */
 void initMediatorTerms(NetworkWiiMediator* self, void* buffer, u32 size);
-s32 getMediatorTermsStatus(NetworkWiiMediator* self);
+u32 getMediatorTermsStatus(NetworkWiiMediator* self);
 void setMediatorTransferMode(NetworkWiiMediator* self, u32 mode);
 /* 0x804169D4 - 0 while the transfer mode is 0 or no terms object exists, else `isTermsUpdateFinished` on it
  * (GUESS name). */

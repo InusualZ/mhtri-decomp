@@ -424,7 +424,7 @@ void NetworkConnectionStable::sendChannel(s32 channel)
     if (now_21B4 <= queues_1024.rateTarget_78 + queues_1024.lastSend_6C[channel]) {
         return;
     }
-    networkStreamWriter_putBytes(&frame, frame_001C, getMaxPacketSize());
+    frame.attach(frame_001C, getMaxPacketSize());
     networkStreamWriter_flush(&frame);
     networkStreamQueue_fillPacket(&queues->send_00[channel], &packet);
     sent = 0;
@@ -599,7 +599,7 @@ void NetworkConnectionStable::receivePackets()
         }
         bytesReceived_220C += received;
         totalBytesReceived_2230 += received;
-        networkStreamReader_attach(&reader, frame.block_04, frame.size_00);
+        reader.bind(frame.block_04, frame.size_00);
         while (make_sure_enough_space(&reader) != 0) {
             networkStreamReader_decryptFrame(&reader);
             valid = networkStreamReader_test(&reader);
@@ -764,7 +764,7 @@ void NetworkConnectionStable::sendHello(s32 reply)
     NetworkStreamWriter packet;
     u32 n;
 
-    networkPacket_attach(&packet, frame_001C, 0x400);
+    packet.attach(frame_001C, 0x400);
     networkPacket_begin(&packet, 0);
     if (reply != 0) {
         n = (u16)writeByte(&packet, 0x82);
@@ -784,7 +784,7 @@ void NetworkConnectionStable::sendHelloDone()
 {
     NetworkStreamWriter packet;
 
-    networkPacket_attach(&packet, frame_001C, 0x400);
+    packet.attach(frame_001C, 0x400);
     networkPacket_begin(&packet, 0);
     writeSize(&packet, writeByte(&packet, 0x83));
     putOnSendPool(&packet, 0);
@@ -800,7 +800,7 @@ void NetworkConnectionStable::sendPing(u8 index)
     index = index % 8;
     time = (u32)(networkConnectionMilliseconds * now_21B4);
     pingTimes_21D4[index] = networkConnectionZero;
-    networkPacket_attach(&packet, frame_001C, 0x400);
+    packet.attach(frame_001C, 0x400);
     networkPacket_begin(&packet, 0);
     n = (u16)writeByte(&packet, 0x91);
     n += (u16)writeByte(&packet, index);
@@ -816,7 +816,7 @@ void NetworkConnectionStable::sendPong(u8 index, u32 time)
     u32 n;
 
     index = index % 8;
-    networkPacket_attach(&packet, frame_001C, 0x400);
+    packet.attach(frame_001C, 0x400);
     networkPacket_begin(&packet, 0);
     n = (u16)writeByte(&packet, 0x92);
     n += (u16)writeByte(&packet, index);
@@ -830,7 +830,7 @@ void NetworkConnectionStable::sendClose(s32 relay)
 {
     NetworkStreamWriter packet;
 
-    networkPacket_attach(&packet, frame_001C, 0x400);
+    packet.attach(frame_001C, 0x400);
     networkPacket_begin(&packet, 0);
     writeSize(&packet, writeByte(&packet, relay != 0 ? 0x84 : 0x85));
     putOnSendPool(&packet, 1);
@@ -842,7 +842,7 @@ void NetworkConnectionStable::sendMtuProbe()
     if (mtuProbe_223E != 0) {
         mtuProbe_223E = 0;
         NetworkStreamWriterDefault frame;
-        networkStreamWriter_putBytes(&frame, frame_001C, mtu_2244);
+        frame.attach(frame_001C, mtu_2244);
         networkStreamWriter_flush(&frame);
         networkStreamWriter_skip(&frame, mtu_2244 - (u16)networkPacket_getFrameOverhead());
         networkStreamWriter_setMode(&frame, mtu_2244 - (u16)networkPacket_getFrameOverhead());
@@ -889,7 +889,7 @@ void NetworkConnectionStable::sendMtuReply(u32 size)
     NetworkStreamWriter packet;
     u32 n;
 
-    networkPacket_attach(&packet, frame_001C, 0x400);
+    packet.attach(frame_001C, 0x400);
     networkPacket_begin(&packet, 0);
     n = (u16)writeByte(&packet, 0x95);
     n += (u16)writeUInt(&packet, size);
