@@ -64,6 +64,39 @@ def test_replace(c):
         c.check("UTF-8 bytes are untouched", (rc, got), (0, "a é\r\nc\r\n".encode("utf-8")))
 
 
+def test_replace_file_is_verbatim(c):
+    """`--old-file/--new-file` copy C escapes byte for byte: a `\\n` inside a string literal must not become a line
+    break (MWCC would put the CRLF's 0x0D into .data)."""
+    literal = b'const char* s = "a\\nb\\0c\\\\d\\x41e`f";'
+    c.check("the fixture holds the escapes as text, not as bytes",
+            (b"\\n" in literal, b"\n" in literal, b"\0" in literal, b"\\x41" in literal), (True, False, False, True))
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, nl in (("LF", b"\n"), ("CRLF", b"\r\n")):
+            before = b"int x;" + nl + b'const char* s = "OLD";' + nl + b"int y;" + nl
+            rc, out, got = _replace(tmp, before, b'const char* s = "OLD";', literal)
+            c.check("%s file: --new-file with \\n \\0 \\\\ \\x41 and a backtick lands byte-identical" % name,
+                    (rc, got), (0, b"int x;" + nl + literal + nl + b"int y;" + nl))
+            c.check("... and no escape-decoding note is printed", "decoded C escapes" in out, False)
+        rc, out, got = _replace(tmp, b"x\n" + literal + b"\ny\n", literal, b'const char* s = "\\t";')
+        c.check("--old-file with the same escapes matches them as text", (rc, got),
+                (0, b'x\nconst char* s = "\\t";\ny\n'))
+        rc, out, got = _replace(tmp, b'x\n"a\nb"\n', b'"a\\nb"', b"z")
+        c.check("... and never matches the decoded bytes", (rc != 0, got), (True, b'x\n"a\nb"\n'))
+        multi = b'puts("1\\n");\nputs("2\\\\");\n'
+        rc, out, got = _replace(tmp, b"a\r\nb\r\n", b"a\r\n", multi)
+        c.check("a multi-line --new-file into CRLF converts only its real line breaks",
+                (rc, got), (0, b'puts("1\\n");\r\nputs("2\\\\");\r\nb\r\n'))
+
+
+def test_replace_help_names_the_decoding(c):
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, out = _run("replace", "--help", cwd=tmp)
+        flat = " ".join(out.split())
+        c.check("replace --help says the -file forms are verbatim and the inline forms decode",
+                (rc, "copied verbatim" in flat, "DECODE" in flat, "use --new-file for C string literals" in flat),
+                (0, True, True, True))
+
+
 def test_replace_inline_text(c):
     """`--old/--new` take C-style escapes in one argument - what `escape.py --edit` offered."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -72,6 +105,15 @@ def test_replace_inline_text(c):
         rc, out = _run("replace", f, "--old", "int a;\\nint b;", "--new", "int a;\\n\\tint c;", cwd=tmp)
         c.check("an escaped LF needle matches a CRLF file and the result keeps CRLF", (rc, _get(f)),
                 (0, b"x\r\nint a;\r\n\tint c;\r\n"))
+        c.check("... and the decoding is reported for both arguments",
+                ("--old decoded C escapes" in out, "--new decoded C escapes" in out), (True, True))
+        _put(f, b'p("A");\n')
+        rc, out = _run("replace", f, "--old", '"A"', "--new", '"a\\\\nb"', cwd=tmp)
+        c.check("an inline --new keeps a literal backslash-n only when written \\\\n",
+                (rc, _get(f), "decoded C escapes" in out), (0, b'p("a\\nb");\n', True))
+        rc, out = _run("replace", f, "--old", "p(", "--new", "q(", cwd=tmp)
+        c.check("an inline text with no escape prints no note", (rc, "decoded C escapes" in out), (0, False))
+        _put(f, b"x\r\nint a;\r\n\tint c;\r\n")
         rc, out = _run("replace", f, "--old", "nope", "--new", "x", cwd=tmp)
         c.check("... a missing needle is refused, nothing written", (rc != 0, _get(f)),
                 (True, b"x\r\nint a;\r\n\tint c;\r\n"))

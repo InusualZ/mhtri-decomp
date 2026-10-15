@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Line-ending-safe text edits: `replace` (CRLF/LF-agnostic, count-asserted), `normalise`, `check` (tree vs index).
+--old-file/--new-file are copied verbatim; the inline --old/--new decode C escapes (`lib.text.c_unescape`).
 Spec: docs/tools/spec/edit.md. CLI: edit.py replace FILE (--old-file A | --old T) (--new-file B | --new T) [--count N] | normalise FILE... | check [--fix] | check --blob [PATH...] [--rev R] [--repo D]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -50,10 +51,19 @@ def _diff(path: str, before: bytes, after: bytes) -> str:
     return "".join(difflib.unified_diff(a, b, "a/" + path, "b/" + path))
 
 
+def _inline(flag: str, arg: str) -> bytes:
+    """An inline `--old`/`--new` text decoded with C escapes; a stderr note when decoding changed it."""
+    raw = text.c_unescape(arg)
+    if raw != arg.encode("utf-8"):
+        sys.stderr.write("edit: %s decoded C escapes (a `\\n` in the argument is now a line break, `\\0` a NUL); "
+                         "a C string literal's escapes are copied verbatim only by %s-file\n" % (flag, flag))
+    return raw
+
+
 def cmd_replace(args) -> int:
     data = _read(args.file)
-    old = _read(args.old_file) if args.old_file is not None else text.c_unescape(args.old)
-    new = _read(args.new_file) if args.new_file is not None else text.c_unescape(args.new)
+    old = _read(args.old_file) if args.old_file is not None else _inline("--old", args.old)
+    new = _read(args.new_file) if args.new_file is not None else _inline("--new", args.new)
     after, lines = replace_bytes(data, old, new, args.count)
     kind = classify(data)
     _write(args.file, after)
@@ -217,14 +227,22 @@ def cmd_check(args) -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    r = sub.add_parser("replace", help="exact-text replace that preserves the file's line endings")
+    r = sub.add_parser(
+        "replace", help="exact-text replace that preserves the file's line endings",
+        description="Exact-text replace that preserves the file's line endings. The -file forms copy their bytes "
+                    "verbatim (backslashes included); only their line breaks take the ending of the span replaced. "
+                    "The inline forms DECODE C escapes (lib.text.c_unescape: \\n \\t \\r \\0 \\\\ \\\" \\xHH \\NNN), "
+                    "so a C string literal such as \"a\\nb\" passed inline becomes a real line break; put source "
+                    "text that carries escapes in a file.")
     r.add_argument("file")
     old = r.add_mutually_exclusive_group(required=True)
-    old.add_argument("--old-file", help="file holding the text to find (LF or CRLF)")
-    old.add_argument("--old", help="the text to find, with C-style escapes (\\n, \\t, \\xHH), in one argument")
+    old.add_argument("--old-file", help="file holding the text to find, copied verbatim (LF or CRLF)")
+    old.add_argument("--old", help="the text to find, in one argument; C escapes (\\n, \\t, \\0, \\\\, \\xHH) "
+                                   "are DECODED")
     new = r.add_mutually_exclusive_group(required=True)
-    new.add_argument("--new-file", help="file holding the replacement text")
-    new.add_argument("--new", help="the replacement, with C-style escapes, in one argument")
+    new.add_argument("--new-file", help="file holding the replacement text, copied verbatim (no escape decoding)")
+    new.add_argument("--new", help="the replacement, in one argument; C escapes are DECODED (a literal "
+                                   "backslash-n needs \\\\n) - use --new-file for C string literals")
     r.add_argument("--count", type=int, default=1, help="exact number of matches to require (default 1)")
     r.set_defaults(fn=cmd_replace)
     n = sub.add_parser("normalise", help="rewrite files to LF, reporting the CRLF/mixed ones")

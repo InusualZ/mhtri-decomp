@@ -30,10 +30,10 @@ Inputs -> outputs: files -> files, diff.
 
 ## Invariants and rules
 
-* `replace` reads FILE as bytes, matches OLD across `\n` **or** `\r\n` (the texts come from files, so there is no shell escaping), converts NEW to the ending of the span it replaces (a mixed file keeps each region's own ending; a span with no line break takes the file's dominant ending), asserts the match count (default exactly 1; 0 or more than N is refused with the line numbers of the matches and nothing is written), writes back the same bytes everywhere else, and prints a unified diff.
+* `replace` reads FILE as bytes, matches OLD across `\n` **or** `\r\n` (with `--old-file`/`--new-file` the texts are copied **verbatim**: a backslash escape such as `\n`, `\0`, `\\` or `\x41` inside a C string literal stays the characters it is, and only the file's real line breaks are converted), converts NEW to the ending of the span it replaces (a mixed file keeps each region's own ending; a span with no line break takes the file's dominant ending), asserts the match count (default exactly 1; 0 or more than N is refused with the line numbers of the matches and nothing is written), writes back the same bytes everywhere else, and prints a unified diff.
 * `normalise` rewrites the named text files to LF and reports which ones were CRLF/mixed.
 * `check` lists tracked files in the working tree whose on-disk endings differ from the index (`git ls-files --eol`); `--fix` normalises them.
-* `replace --old/--new` take the texts inline with C-style escapes (`lib.text.c_unescape`: `\n`, `\t`, `\xHH`, `\NNN`; an unknown escape stays literal) - the deleted `escape.py --edit`'s interface on `replace`'s rule. Each pair is exclusive with its `-file` form, and one of each is required. (Git Bash collapses a doubled backslash in an argument, so a literal backslash is safest in a file.)
+* `replace --old/--new` take the texts inline with C-style escapes (`lib.text.c_unescape`: `\n`, `\t`, `\xHH`, `\NNN`; an unknown escape stays literal) - the deleted `escape.py --edit`'s interface on `replace`'s rule. The decoding is the trap: a C line pasted inline (`--new 'p("a\nb");'`) gets a real line break inside its string literal, which in a CRLF file is a 0x0D the compiler puts into `.data`; so `replace --help` says which forms decode, and an inline text whose decoding changed it prints `edit: --new decoded C escapes ...` on stderr. Source text carrying escapes belongs in `--new-file`. Each pair is exclusive with its `-file` form, and one of each is required. (Git Bash collapses a doubled backslash in an argument, so a literal backslash is safest in a file.)
 * `check --blob` is the old `checklf.py`: per PATH (default: every path `git status` names) the working-tree bytes against the blob at `--rev` (`:` the index, or `HEAD`), by line-ending **style** - CRLF or a lone CR present on one side and not the other; a pure content change is not a finding, and a path git does not know is judged against the repository's LF convention. It exists because `git add` normalises a CRLF working tree to an LF blob, after which `git diff` and `git diff --cached` show nothing. Exit 1 on a finding. `--rev HEAD` was broken in checklf (it asked git for `HEADpath`); it reads `HEAD:path` now.
 
 ## Lib dependencies
@@ -43,7 +43,7 @@ text, git.
 ## Test contract
 
 Tier: fixture (temp files).
-`tools/tests/agents/test_edit.py` (the old `edit_selftest.py` plus `--old/--new` and `check --blob`, every case through the CLI); the per-path `check_path` cases (`test_check_path_cases`) came from the deleted `checklf` test.
+`tools/tests/agents/test_edit.py` (the old `edit_selftest.py` plus `--old/--new` and `check --blob`, every case through the CLI; `test_replace_file_is_verbatim` lands a `--new-file` carrying `\n`, `\0`, `\\`, `\x41` and a backtick byte-identical into an LF and a CRLF file, and `test_replace_help_names_the_decoding` pins the help text); the per-path `check_path` cases (`test_check_path_cases`) came from the deleted `checklf` test.
 
 ## Known gaps
 
