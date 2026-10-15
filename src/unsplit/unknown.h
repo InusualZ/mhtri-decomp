@@ -102,7 +102,7 @@ extern u32 frame_counter;
 /* The helpers the 0x805482CC-0x8054E894 band tail-calls into its unregistered neighbours (the bands
  * below at 0x8054F788 / 0x805526xx and above at 0x80553xxx / 0x8055Bxxx, none of which is registered
  * yet, so rule 2's owner has no header to name).  Signatures are the call sites': r3 is the address
- * the caller hands over, and `fn_8055A3E0` takes the sub-object plus the mode word the caller
+ * the caller hands over, and `hbmTextWriterSetStandardScreen` takes the sub-object plus the mode word the caller
  * materialises. */
 void fn_8054F788(void* record);
 void fn_80553670(void* record);

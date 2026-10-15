@@ -40,6 +40,20 @@ extern HbmKanaPair hbmKanaSmall;
 
 u16 hbmKanaToggleDakuten(u16 c);
 
+/* Whether `c` is a voiced, semi-voiced or small kana. */
+BOOL hbmKanaIsDakuten(u16 c);
+
+BOOL hbmKanaIsHandakuten(u16 c);
+
+BOOL hbmKanaIsSmall(u16 c);
+
+struct VuVec4;
+
+/* Stores the 4:3 and the 16:9 screen rectangle (left, top, right, bottom). */
+void hbmGetScreenRect4x3(struct VuVec4* rect);
+
+void hbmGetScreenRect16x9(struct VuVec4* rect);
+
 u16 hbmKanaToggleHandakuten(u16 c);
 
 u16 hbmKanaToggleSmall(u16 c);

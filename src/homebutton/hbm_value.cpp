@@ -1,6 +1,8 @@
 /*
  * homebutton/hbm_value.cpp - software-keyboard code of the tiHKBManager band: the wide-character text buffer (text,
- * cursor, selection anchor, input mode and KPR composition queue), the Vu object forwarders and the deleting destructors.
+ * cursor, selection anchor, input mode and KPR composition queue), the pane manager and its animated keys, the Vu
+ * object's part plumbing (create, init, refresh, draw, pointer and input dispatch, screen aspect) and the deleting
+ * destructors.
  *
  * RANGE.     .text 0x80558EB4..0x8055EAF0 (176 functions; the ones not defined below keep the target object's bytes).
  * FLAGS.     GC/3.0a5.2 + cflags_hkb (configure.py); the retail object has no extab/extabindex, so `#pragma exceptions off`.
@@ -8,41 +10,58 @@
  *            hbmTextPutInMode (twice) and also keeps their out-of-line copies; -inline noauto inlines nothing on its own.
  * NAMES.     GUESS file name: the band's `hbm_` prefix + the value/text helpers; no `__FILE__` string, no runtime-dump name.
  * NAMES.     GUESS view classes HbmTextBuffer (the text buffer: its slots 0x1C length, 0x20 append, 0x24 insert, 0x28 delete,
- *            0x2C replace, 0x40 set character, 0x5C put character, 0x98 selection range, 0x9C character before the cursor
- *            are read off the bodies that call them), HbmTextLayoutView (vptr at +0x4C, the panel's +0x10 sub-object),
- *            HbmVuView and HbmWidgetView (the dispatch views of VuVTable and HbmWidgetVtable); slots are named by offset.
- * NAMES.     GUESS function names (hbmText*, hbmVuApplyAspectRatio, hbmDeletingDtorThunk*): read off the bodies; map rows
- *            renamed with them (requests hbm-value#1..#41).
+ *            0x2C replace, 0x40 set character, 0x5C put character, 0x98 selection range, 0x9C character before the cursor,
+ *            0xA0 set that character), HbmTextLayoutView (vptr at +0x4C, the panel's +0x10 sub-object), HbmVuView,
+ *            HbmVuLinkPart, HbmVuNodeView and HbmWidgetView (dispatch views); slots are named by offset.
+ * NAMES.     GUESS function names (hbmText*, hbmVu*, hbmDeletingDtorThunk*): read off the bodies; map rows renamed with
+ *            them (requests hbm-value#1..#41 and hb-value-event#9).
+ * NAMES.     GUESS HbmPaneManager::drawPane / calcDrawMtx / createRoot (slots 0x38, 0x6C, 0x70: draw a named pane, flip
+ *            a matrix's y axis behind the view matrix, build the component manager); slots v_0x03C/v_0x040 switch the
+ *            16:9 / 4:3 screen and v_0x044 loads the matching projection.
+ * NAMES.     GUESS HbmKeyAnim fields (the animation transform, kind, frame, loop and recursive-bind flags) and
+ *            HbmKeyListener (the key's +0x18 receiver of animation start/end).
+ * NAMES.     GUESS classes HbmPaneManager and HbmKey (homebutton/hbm_value.h) and their members.
+ * NAMES.     GUESS class HbmKeyboard (the keyboard the band builds; its table 0x806521A8 and destructor thunk
+ *            0x8055EAB8 are this unit's) and HbmCellphoneKeypad (the keypad, table 0x80652074, thunk 0x8055EAC0).
  * SHAPES.    The view classes are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,<slot>(r12)` dispatch;
  *            no method is defined and nothing is constructed, so no table is emitted here (rule 10).
  * SHAPES.    hbmTextSetCharAt compares `capacity > index` and hbmTextLastChar tests an `s32` index (`subic.`): the other spellings
  *            swap the compare operands or add an `extsh.`.
  * SHAPES.    fn_8055DCD0 takes an `int` it narrows to u8: retail masks the argument (`clrlwi r0,r4,24`) and compares the
  *            masked copy, which a `u8` parameter does not emit.
+ * SHAPES.    HbmKey's loop and recursive flags are `bool` (stored and passed raw); a u8 parameter adds the `neg/or/srwi`
+ *            bool conversion before Pane::BindAnimation.
+ * SHAPES.    create fetches the layout resource into a local before Build (retail reloads mpResAccessor); hbmAnimRestoreState
+ *            runs through an inline helper so `this` and the saved state take retail's registers.
+ * SHAPES.    hbmVuDispatchPointer / hbmVuDispatchInput OR the results as `list | panel | wrapped | mode` (the only order of
+ *            24 that reproduces retail's two-pair tree); hbmVuApplyAspectRatio's body is an inline create also uses.
+ * SHAPES.    hbmTextAppendChar's character buffer is `u16[12]` (retail's 0x30-byte frame).
  * RESIDUALS. fn_8055A888 calls the stale name fn_805041F4 (relocdiff: the target names CharWriter::Print) and returns
  *            u32 where retail passes Print's f32 through; its prototype is in homebutton/hbm_value.h (request
  *            hbm-value#72).
  * RESIDUALS. HbmTextBuffer duplicates the HbmU16Array and HbmTextValue views of homebutton/hbm_widget.h (same object; only
  *            this unit uses them); the merge is a header change outside this unit.
- * RESIDUALS. Unwritten, need a declaration first: fn_80558FAC (wcsncat, not declared in MSL_C/wstring.h), fn_80559638 and
- *            fn_8055A224 (KPRPutChar/KPRGetChar/KPRInitQueue/KPRSetQueueMode, not declared in KPR/kpr.h), fn_80559E74,
- *            fn_80559EB4, fn_80559F10, fn_80559F50, fn_80559FAC, fn_8055A008, fn_8055A048 and fn_8055A3E0 (character
- *            converters of homebutton/hbm_hermite.cpp not declared in its header).
+ * RESIDUALS. HbmPaneCursor (the manager's +0x8C) is the five-entry container homebutton/hkb_keyboard.h models as the
+ *            non-virtual HkbRecentKeys; retail's is polymorphic with all-inline methods (table 0x80651814 here), so the
+ *            manager's constructor (0x8055B710) and calcComponents (its local copy) wait for that class (request
+ *            hb-value-event#12).
+ * RESIDUALS. getPaneVisible: retail loads mpLyt before the prologue's saves; calcDrawMtx: retail sets r3 for the final
+ *            PSMTXCopy at the end of each branch; v_0x03C: retail's 4:3 rectangle sits above the 16:9 one on the stack;
+ *            hbmTextPutChar: retail keeps the `(u16)count` mask the u32 count drops.
  * RESIDUALS. Unwritten, need the unowned .bss table 0x80790250 (0x580 bytes, read only by hbmTextWriterInit and hbmTextWriterRefresh)
  *            claimed first; its link slot (between hbm_text_panel's and hbm_anim_record's .bss) leaves the owner
  *            ambiguous (request hbm-value#70): hbmTextWriterInit, hbmTextWriterRefresh.
- * RESIDUALS. Unwritten, store a vtable whose class this unit would have to emit (rule 10): fn_80558F38, fn_8055CAD0.
+ * RESIDUALS. Unwritten, store a vtable whose class this unit would have to emit (rule 10): fn_80558F38, fn_8055B710,
+ *            fn_8055CAD0, fn_8055CB34 (the Vu object's constructor and destructor, table 0x80651950), createRoot (the gui
+ *            manager's tables 0x80658358/0x806582FC) and the eight part factories in 0x8055DFCC..0x8055E778.
  * RESIDUALS. Unwritten: fn_8055EAA8, the unit's static initialiser (its .ctors entry), which stores lbl_8060E748 into the
- *            .sbss word lbl_80795A70.
- * RESIDUALS. 69 functions (17560 bytes) are unwritten in 28 runs, the largest hbmTextWriterDraw (1272), fn_8055D594 (888),
- *            fn_8055CFC8 (824) and hbmTextWriterDrawLine (724); the list is `python tools/units/sweepcomments.py --unit
+ *            .sbss word lbl_80795A70; hbmTextWriterSetStandardScreen; the text writer's
+ *            0x8055A4BC..0x8055B434 run (hbmTextWriterDraw/DrawLine and five neighbours, the panel's sub-object view).
+ * RESIDUALS. 26 functions (7728 bytes) are unwritten, the largest hbmTextWriterDraw (1272), hbmTextWriterDrawLine (724),
+ *            calcComponents (668) and fn_8055CB34 (492); the list is `python tools/units/sweepcomments.py --unit
  *            homebutton/hbm_value`.
  * RESIDUALS. .data 0x80651568..0x80652340 spans at least 10 TUs (datagap.py emission-order seams), so the data cannot match
  *            until the range is re-cut.
- * NAMES.     GUESS classes HbmPaneManager and HbmKey (homebutton/hbm_value.h) and their members; the slots named
- *            v_0xNNN are not understood.
- * NAMES.     GUESS class HbmKeyboard (the keyboard the band builds; its table 0x806521A8 and destructor thunk
- *            0x8055EAB8 are this unit's) and HbmCellphoneKeypad (the keypad, table 0x80652074, thunk 0x8055EAC0).
  */
 
 #include "types.h"
@@ -65,11 +84,17 @@
 #include "homebutton/hbm_kb_widget.h"
 #include "homebutton/hbm_text_panel.h"
 #include "homebutton/hbm_value.h"
+#include "homebutton/hbm_hermite.h"
+#include "homebutton/hbm_kb_event.h"
 #include "MSL_C/wstring.h"
 #include "SC/SCApi.h"
 #include "KPR/kpr.h"
 #include "nw4r/fn_805012C4.h"
 #include "nw4r/fn_80502828.h"
+#include "homebutton/hkb_textbox.h"
+#include "MTX/mtx44.h"
+#include "RVLGX/GXTransform.h"
+#include "RVLGX/GXPixel.h"
 
 extern "C" void wmemset(void* dst, int value, u16 size);
 
@@ -79,6 +104,16 @@ extern f32 lbl_8079D700;
  * the unit's own `.sdata2` float pool and `.sdata` globals: other splits own them, so they are
  * declared, never defined (playbook 29).
  * ------------------------------------------------------------------------------------------------ */
+
+/* The Vu object's part at +0x10 (its slot 0xAC builds it): slot 0x10 initialises it, slot 0x14 links the wrapped
+ * keyboard.  size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
+class HbmVuLinkPart {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014(HkbKbWrapped* wrapped);
+};
 
 /* The dispatch view of the band's Vu objects (VuObject, its +0x1C sub-object and the objects its slots 0x68 and
  * 0xE0 return): the slots are the ones the VuVTable view of homebutton/hbm_vu_object.h names, declared as virtuals so
@@ -105,9 +140,9 @@ public:
     /* slot +0x044 */ virtual void v_0x044();
     /* slot +0x048 */ virtual void v_0x048();
     /* slot +0x04C */ virtual void v_0x04C();
-    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x050 */ virtual void v_0x050(s32 arg);
     /* slot +0x054 */ virtual void v_0x054();
-    /* slot +0x058 */ virtual void v_0x058();
+    /* slot +0x058 */ virtual void v_0x058(s32 first, s32 second);
     /* slot +0x05C */ virtual void v_0x05C();
     /* slot +0x060 */ virtual void v_0x060();
     /* slot +0x064 */ virtual void v_0x064();
@@ -127,15 +162,15 @@ public:
     /* slot +0x09C */ virtual void v_0x09C();
     /* slot +0x0A0 */ virtual void v_0x0A0();
     /* slot +0x0A4 */ virtual void v_0x0A4();
-    /* slot +0x0A8 */ virtual void v_0x0A8();
-    /* slot +0x0AC */ virtual void v_0x0AC();
-    /* slot +0x0B0 */ virtual void v_0x0B0();
-    /* slot +0x0B4 */ virtual void v_0x0B4();
-    /* slot +0x0B8 */ virtual void v_0x0B8();
-    /* slot +0x0BC */ virtual void v_0x0BC();
-    /* slot +0x0C0 */ virtual void v_0x0C0();
-    /* slot +0x0C4 */ virtual void v_0x0C4();
-    /* slot +0x0C8 */ virtual void v_0x0C8();
+    /* slot +0x0A8 */ virtual VuHeader* v_0x0A8();
+    /* slot +0x0AC */ virtual HbmVuLinkPart* v_0x0AC();
+    /* slot +0x0B0 */ virtual HkbKbPart3C* v_0x0B0();
+    /* slot +0x0B4 */ virtual HkbKbPart40* v_0x0B4();
+    /* slot +0x0B8 */ virtual HkbKbWrapped* v_0x0B8();
+    /* slot +0x0BC */ virtual HkbKbPart48* v_0x0BC();
+    /* slot +0x0C0 */ virtual HkbKbPart4C* v_0x0C0();
+    /* slot +0x0C4 */ virtual HkbKbPart50* v_0x0C4();
+    /* slot +0x0C8 */ virtual HkbKbPart44* v_0x0C8();
     /* slot +0x0CC */ virtual void v_0x0CC();
     /* slot +0x0D0 */ virtual void v_0x0D0();
     /* slot +0x0D4 */ virtual void v_0x0D4();
@@ -296,7 +331,7 @@ public:
     /* slot +0x094 */ virtual void v_0x094();
     /* slot +0x098 */ virtual void v_0x098(u32* first, u32* second);
     /* slot +0x09C */ virtual u16 v_0x09C();
-    /* slot +0x0A0 */ virtual void v_0x0A0();
+    /* slot +0x0A0 */ virtual void v_0x0A0(u16 ch);
     /* slot +0x0A4 */ virtual void v_0x0A4();
     /* slot +0x0A8 */ virtual void v_0x0A8();
     /* slot +0x0AC */ virtual void v_0x0AC();
@@ -341,6 +376,16 @@ extern "C" void hbmTextInit(HbmTextBuffer* self, MEMAllocator* allocator) {
     self->byteLength = 0;
     self->workText = (u16*)MEMAllocFromAllocator(allocator, self->capacity * 2);
     wmemset(self->workText, 0, self->capacity);
+}
+
+/* 0x80558FAC (0x6C): Appends one character and refreshes the buffer. */
+extern "C" void hbmTextAppendChar(HbmTextBuffer* self, u16 ch) {
+    u16 chars[12];
+    chars[0] = ch;
+    chars[1] = 0;
+    wcsncat(self->text, chars, wcslen(chars));
+    self->length++;
+    self->v_0x030();
 }
 
 /* 0x80559018 (0x38): Removes the last character and refreshes the buffer. */
@@ -478,6 +523,55 @@ extern "C" u32 hbmTextIndexAtByte(HbmTextBuffer* self, u32 byteOffset) {
         }
     }
     return 0;
+}
+
+/* 0x80559638 (0x1DC): Types one character: under an input mode it goes through the composition queue (a line break
+ * flushes it), then the result replaces the selection or is inserted at the cursor. */
+extern "C" void hbmTextPutChar(HbmTextBuffer* self, u16 ch) {
+    u16 chars[5];
+    u32 first;
+    u32 second;
+    u32 count;
+    u8 i;
+
+    if (ch == 0xFFFE) {
+        return;
+    }
+    chars[4] = 0;
+    chars[3] = 0;
+    chars[2] = 0;
+    chars[1] = 0;
+    chars[0] = 0;
+    if (self->inputMode != 0) {
+        self->lookahead[4] = 0;
+        self->lookahead[3] = 0;
+        self->lookahead[2] = 0;
+        self->lookahead[1] = 0;
+        self->lookahead[0] = 0;
+        if (ch == 10 && (u8)KPRLookAhead(&self->queue, 0, 0) != 0) {
+            count = KPRPutChar(&self->queue, 0xFFFF);
+        } else {
+            count = KPRPutChar(&self->queue, hbmToWideChar(ch));
+        }
+        for (i = 0; i < count; i++) {
+            chars[i] = KPRGetChar(&self->queue);
+        }
+        KPRLookAhead(&self->queue, (u32)self->lookahead, 5);
+    } else {
+        chars[0] = ch;
+        count = 1;
+        chars[1] = 0;
+    }
+    self->v_0x04C(0);
+    self->v_0x098(&first, &second);
+    if (first == second) {
+        self->v_0x024((u16)self->cursor, chars);
+        self->cursor += (u16)count;
+    } else {
+        self->v_0x02C((u16)first, (u16)(second - first), chars);
+        self->cursor = first + (u16)count;
+    }
+    self->anchor = self->cursor;
 }
 
 /* Appends a line break through slot 0x5C. */
@@ -650,6 +744,41 @@ extern "C" void hbmTextSetCharBeforeSelection(HbmTextBuffer* self, u16 ch) {
     }
 }
 
+/* 0x80559E74 (0x40): Whether the character before the selection is a voiced kana. */
+extern "C" s32 hbmTextIsDakutenAtCursor(HbmTextBuffer* self) {
+    return hbmKanaIsDakuten(self->v_0x09C()) != 0;
+}
+
+/* 0x80559EB4 (0x5C): Toggles the voiced mark of the character before the selection. */
+extern "C" void hbmTextToggleDakutenAtCursor(HbmTextBuffer* self) {
+    self->v_0x0A0(hbmKanaToggleDakuten(self->v_0x09C()));
+}
+
+/* 0x80559F10 (0x40): Whether the character before the selection is a semi-voiced kana. */
+extern "C" s32 hbmTextIsHandakutenAtCursor(HbmTextBuffer* self) {
+    return hbmKanaIsHandakuten(self->v_0x09C()) != 0;
+}
+
+/* 0x80559F50 (0x5C): Toggles the semi-voiced mark of the character before the selection. */
+extern "C" void hbmTextToggleHandakutenAtCursor(HbmTextBuffer* self) {
+    self->v_0x0A0(hbmKanaToggleHandakuten(self->v_0x09C()));
+}
+
+/* 0x80559FAC (0x5C): Cycles the kana forms of the character before the selection. */
+extern "C" void hbmTextCycleKanaAtCursor(HbmTextBuffer* self) {
+    self->v_0x0A0(hbmKanaCycle(self->v_0x09C()));
+}
+
+/* 0x8055A008 (0x40): Whether the character before the selection is a small kana. */
+extern "C" s32 hbmTextIsSmallAtCursor(HbmTextBuffer* self) {
+    return hbmKanaIsSmall(self->v_0x09C()) != 0;
+}
+
+/* 0x8055A048 (0x5C): Toggles the small form of the character before the selection. */
+extern "C" void hbmTextToggleSmallAtCursor(HbmTextBuffer* self) {
+    self->v_0x0A0(hbmKanaToggleSmall(self->v_0x09C()));
+}
+
 /* The text-layout sub-object whose vptr sits at its own +0x4C (the panel's +0x10 sub-object, `Panel805482CC_Sub`
  * in fn_805482CC.h): slot 0x90 re-lays the text out.
  * size: 0xDC (approximation: the largest offset reached is +0xD8) */
@@ -744,6 +873,21 @@ extern "C" void hbmTextSetInputMode(HbmTextBuffer* self, s32 mode) {
 }
 #pragma pop
 
+/* 0x8055A224 (0x74): Empties the composition queue and sets its flags for the current input mode. */
+extern "C" void hbmTextResetQueue(HbmTextBuffer* self) {
+    KPRInitQueue(&self->queue);
+    KPRSetQueueMode(&self->queue, 0);
+    self->lookahead[0] = 0;
+    switch (self->inputMode) {
+    case 1:
+        self->queue.mode = 4;
+        break;
+    case 2:
+        self->queue.mode = 8;
+        break;
+    }
+}
+
 /* 0x8055A298 (0xA0): Truncates the text and pulls the cursor and the anchor back inside it. */
 extern "C" void hbmTextTruncateClamped(HbmTextBuffer* self, u16 length) {
     hbmTextTruncate(self, length);
@@ -834,8 +978,106 @@ extern "C" void fn_8055B434(void) {
 extern "C" void fn_8055B438(void) {
 }
 
+/* 0x8055B43C (0x6C): Hands a manager event on as a pane event, then lets the sound player sound the pane. */
+/* untyped: caller-owned payload - the argument record of the event */
+void HbmPaneHandler::onEvent(u32 id, u32 event, void* data) {
+    HbmComponent* component = (HbmComponent*)id;
+    onPaneEvent(component, event, (HbmPaneTrigger*)data);
+    mpSound->playPaneSound(component->mpPane, event);
+}
+
+/* 0x8055B4A8 (0x8C): Returns the component whose pane is called `name`, or NULL. */
+HbmKey* HbmPaneManager::getPaneAnim(const char* name) {
+    HbmKey* key;
+    for (key = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, NULL); key != NULL;
+         key = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, key)) {
+        if (hbmNameMatches(name, key->mpPane->mName)) {
+            return key;
+        }
+    }
+    return NULL;
+}
+
+/* 0x8055B534 (0xEC): Returns the component whose first child is a text box holding just the character `key`. */
+HbmKey* HbmPaneManager::getKeyAnim(u16 key) {
+    HbmKey* component;
+    for (component = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, NULL); component != NULL;
+         component = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, component)) {
+        nw4r::lyt::TextBox* textBox =
+            nw4r::ut::DynamicCast<nw4r::lyt::TextBox>(&*component->mpPane->mChildList.GetBeginIter());
+        if (textBox != NULL && textBox->mTextBuf[0] == key && textBox->mTextBuf[1] == 0) {
+            return component;
+        }
+    }
+    return NULL;
+}
+
+/* An element of a Vu object's node list at +0x08: slot 0x0C updates it, slot 0x14 hands it an event.
+ * size: 0x04 (approximation: only the compiler-emitted vptr at +0x00 is touched) */
+class HbmVuNodeView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void update();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void notify(u32 event);
+};
+
+/* 0x8055B620 (0x70): Updates every node of the list at +0x08. */
+extern "C" void hbmVuNodesUpdate(VuObject* self) {
+    HbmVuNodeView* node;
+    for (node = (HbmVuNodeView*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x08, NULL); node != NULL;
+         node = (HbmVuNodeView*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x08, node)) {
+        node->update();
+    }
+}
+
+/* 0x8055B690 (0x80): Hands `event` to every node of the list at +0x08. */
+extern "C" void hbmVuNodesNotify(VuObject* self, u32 event) {
+    HbmVuNodeView* node;
+    for (node = (HbmVuNodeView*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x08, NULL); node != NULL;
+         node = (HbmVuNodeView*)nw4r::ut::List_GetNext((nw4r::ut::List*)&self->list_0x08, node)) {
+        node->notify(event);
+    }
+}
+
+/* 0x8055B7D4 (0xC4): Destroys the layout and the component manager. */
+HbmPaneManager::~HbmPaneManager() {
+    if (mpLyt != NULL) {
+        mpLyt->~Layout();
+        MEMFreeToAllocator(mpPaneAllocator, mpLyt);
+    }
+    if (mpRoot != NULL) {
+        mpRoot->~HbmPaneLayout();
+        MEMFreeToAllocator(mpPaneAllocator, mpRoot);
+    }
+}
+
 /* Destroys the keyboard layout. */
 HkbLayout::~HkbLayout() {
+}
+
+/* 0x8055B8F0 (0x1F4): Builds the layout from its resource, the component manager when there is a handler, and the
+ * draw information. */
+void HbmPaneManager::create(MEMAllocator* allocator, HbmEventHandler* handler) {
+    mpPaneAllocator = allocator;
+    mpLyt = new (MEMAllocFromAllocator(allocator, sizeof(HkbLayout))) HkbLayout();
+    /* untyped: the RLYT resource image */
+    void* resource = mpResAccessor->GetResource(0, mpLayoutName, NULL);
+    mpLyt->Build(resource, mpResAccessor);
+    if (handler != NULL) {
+        static_cast<HbmPaneHandler*>(handler)->setSound(mpSound);
+        mpRoot = createRoot(allocator, handler);
+        mpRoot->setLayout(mpLyt);
+        mpRoot->setMaxComponents(16);
+        mpRoot->setDrawInfo(&mDrawInfo);
+    }
+    mDrawInfo.mViewRect = mpLyt->GetLayoutRect();
+    nw4r::math::MTX34 viewMtx;
+    PSMTXIdentity(viewMtx.m);
+    mDrawInfo.mViewMtx = viewMtx;
+    mpLyt->CalculateMtx(mDrawInfo);
+    mDrawInfo.mFlag.receiveAlpha = 1;
+    mDrawInfo.mFlag.invisiblePaneCalculateMtx = 0;
 }
 
 
@@ -864,6 +1106,17 @@ extern "C" u32 fn_8055BE58(void) {
     return 5;
 }
 
+/* 0x8055BE60 (0x7C): Updates every component while the manager takes input. */
+void HbmPaneManager::drawComponents() {
+    if (mbInputActive) {
+        HbmKey* key;
+        for (key = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, NULL); key != NULL;
+             key = (HbmKey*)nw4r::ut::List_GetNext(&mComponents, key)) {
+            key->update();
+        }
+    }
+}
+
 /* Returns the scene's slot 0x30 result. */
 u32 HbmPaneManager::updateComponents() {
     return mpRoot->v_0x030();
@@ -875,13 +1128,193 @@ s32 HbmPaneManager::onKeyRelease(HkbManager* manager) {
     return 0;
 }
 
+/* 0x8055BEF8 (0xC0): Shows or hides the pane called `name`; a 'P' or 'W' pane takes its 'B' twin along. */
+void HbmPaneManager::setPaneVisible(const char* name, s32 visible) {
+    nw4r::lyt::Pane* pane = mpLyt->mpRootPane->FindPaneByName(name, true);
+    if (pane != NULL) {
+        pane->mFlag = (pane->mFlag & (u8)~1) | visible;
+        if (name[0] == 'P' || name[0] == 'W') {
+            char twin[17];
+            hbmNameCopyWithChar(twin, sizeof(twin), name, 0, 'B');
+            setPaneVisible(twin, visible);
+        }
+    }
+}
+
+/* 0x8055BFB8 (0x64): Reads whether the pane called `name` is shown; 0 when there is no such pane. */
+s32 HbmPaneManager::getPaneVisible(const char* name, u8* visible) {
+    nw4r::lyt::Pane* pane = mpLyt->mpRootPane->FindPaneByName(name, true);
+    if (pane == NULL) {
+        return 0;
+    }
+    *visible = pane->mFlag & 1;
+    return 1;
+}
+
+/* 0x8055C01C (0xCC): Sets the text of the text box called `name`. */
+void HbmPaneManager::setPaneText(const char* name, const wchar_t* text) {
+    nw4r::lyt::TextBox* textBox =
+        nw4r::ut::DynamicCast<nw4r::lyt::TextBox>(mpLyt->mpRootPane->FindPaneByName(name, true));
+    if (textBox != NULL) {
+        textBox->SetString(text, 0);
+    }
+}
+
 /* Returns the layout's pane called `name`, searching the whole tree. */
 nw4r::lyt::TextBox* HbmPaneManager::findTextBox(const char* name) {
     return (nw4r::lyt::TextBox*)mpLyt->mpRootPane->FindPaneByName(name, true);
 }
 
+/* 0x8055C104 (0x78): Returns how many frames channel `channel` has held the component of the pane called `name`. */
+u32 HbmPaneManager::getHoldFrames(u32 channel, const char* name) {
+    return mpRoot->findComponent(findTextBox(name))->getHoldFrames(channel);
+}
+
+/* 0x8055C17C (0x58): Draws the pane called `name` with the manager's draw information. */
+void HbmPaneManager::drawPane(const char* name) {
+    mpLyt->mpRootPane->FindPaneByName(name, true)->Draw(mDrawInfo);
+}
+
+/* 0x8055C1D4 (0xF8): Switches to the 16:9 screen: the root pane is stretched and the locations are adjusted back. */
+void HbmPaneManager::v_0x03C() {
+    mbStandardAspect = 0;
+    nw4r::ut::Rect standard;
+    hbmGetScreenRect4x3((VuVec4*)&standard);
+    nw4r::ut::Rect wide;
+    hbmGetScreenRect16x9((VuVec4*)&wide);
+    nw4r::math::VEC2 scale;
+    scale.x = (wide.right - wide.left) / (standard.right - standard.left);
+    scale.y = 1.0f;
+    mpLyt->mpRootPane->mScale = scale;
+    nw4r::math::VEC2 adjust;
+    adjust.x = (standard.right - standard.left) / (wide.right - wide.left);
+    adjust.y = 1.0f;
+    mDrawInfo.mLocationAdjustScale = adjust;
+    mDrawInfo.mFlag.locationAdjust = 1;
+    mScreenRect = wide;
+}
+
+/* 0x8055C2CC (0x70): Switches to the 4:3 screen: no stretch and no location adjustment. */
+void HbmPaneManager::v_0x040() {
+    mbStandardAspect = 1;
+    hbmGetScreenRect4x3((VuVec4*)&mScreenRect);
+    nw4r::math::VEC2 scale;
+    scale.x = 1.0f;
+    scale.y = 1.0f;
+    mpLyt->mpRootPane->mScale = scale;
+    nw4r::math::VEC2 adjust;
+    adjust.x = 1.0f;
+    adjust.y = 1.0f;
+    mDrawInfo.mLocationAdjustScale = adjust;
+    mDrawInfo.mFlag.locationAdjust = 1;
+}
+
+/* 0x8055C33C (0xAC): Loads the orthographic projection of the layout (4:3) or of the 16:9 screen. */
+void HbmPaneManager::v_0x044() {
+    Mtx44 projection;
+    nw4r::ut::Rect layoutRect = mpLyt->GetLayoutRect();
+    if (!mbStandardAspect) {
+        nw4r::ut::Rect wide;
+        hbmGetScreenRect16x9((VuVec4*)&wide);
+        C_MTXOrtho(projection, wide.bottom, wide.top, wide.left, wide.right, -1.0f, 1.0f);
+    } else {
+        C_MTXOrtho(projection, layoutRect.top, layoutRect.bottom, layoutRect.left, layoutRect.right, -1.0f, 1.0f);
+    }
+    GXSetProjection(projection, 1);
+}
+
+/* 0x8055C3E8 (0xAC): Writes `mtx` (behind the view matrix when the draw information asks for it) with its y axis
+ * flipped. */
+void HbmPaneManager::calcDrawMtx(nw4r::math::MTX34* out, const nw4r::lyt::DrawInfo& drawInfo,
+                                 const nw4r::math::MTX34* mtx) {
+    nw4r::math::MTX34 flipped;
+    if (drawInfo.mFlag.mulViewDraw) {
+        PSMTXConcat(drawInfo.mViewMtx.m, mtx->m, flipped.m);
+        flipped.m[0][1] = -flipped.m[0][1];
+        flipped.m[1][1] = -flipped.m[1][1];
+        flipped.m[2][1] = -flipped.m[2][1];
+    } else {
+        PSMTXCopy(mtx->m, flipped.m);
+        flipped.m[0][1] = -flipped.m[0][1];
+        flipped.m[1][1] = -flipped.m[1][1];
+        flipped.m[2][1] = -flipped.m[2][1];
+    }
+    PSMTXCopy(flipped.m, out->m);
+}
+
 /* Destroys the band key (its animations are released by destroy). */
 HbmKey::~HbmKey() {
+}
+
+/* 0x8055C4D4 (0xB8): Adds an animation of kind `kind` to the key and binds it to the pane, disabled. */
+void HbmKey::addAnim(MEMAllocator* allocator, u32 kind, nw4r::lyt::AnimTransform* anim, bool loop, bool recursive) {
+    HbmKeyAnim* entry = (HbmKeyAnim*)MEMAllocFromAllocator(allocator, sizeof(HbmKeyAnim));
+    if (entry != NULL) {
+        entry->mpAnim = anim;
+        entry->kind = kind;
+        entry->frame = 0.0f;
+        entry->bLoop = loop;
+        entry->bRecursive = recursive;
+    }
+    nw4r::ut::List_Append(&mAnims, entry);
+    mpPane->BindAnimation(anim, recursive, false);
+    mpPane->SetAnimationEnable(anim, false, recursive);
+}
+
+/* 0x8055C58C (0xAC): Adds an animation of kind `kind` bound to the contents named `group`, disabled. */
+void HbmKey::addGroupAnim(MEMAllocator* allocator, u32 kind, nw4r::lyt::AnimTransform* anim, const char* group,
+                          bool loop, bool recursive) {
+    HbmKeyAnim* entry = (HbmKeyAnim*)MEMAllocFromAllocator(allocator, sizeof(HbmKeyAnim));
+    if (entry != NULL) {
+        entry->mpAnim = anim;
+        entry->kind = kind;
+        entry->frame = 0.0f;
+        entry->bLoop = loop;
+        entry->bRecursive = recursive;
+    }
+    nw4r::ut::List_Append(&mAnims, entry);
+    hkbAnimBindNamedPane((HkbAnimTransform*)anim, mpPane, group);
+    mpPane->SetAnimationEnable(anim, false, recursive);
+}
+
+/* 0x8055C638 (0xFC): Stops the current animation and starts the one of kind `state` from its first frame. */
+void HbmKey::setState(u32 state) {
+    if (mpCurAnim != NULL) {
+        mpPane->SetAnimationEnable(mpCurAnim->mpAnim, false, mpCurAnim->bRecursive);
+    }
+    mpCurAnim = findAnim(state);
+    if (mpCurAnim != NULL) {
+        mpCurAnim->frame = 0.0f;
+        mpCurAnim->mpAnim->mFrame = 0.0f;
+        mpPane->SetAnimationEnable(mpCurAnim->mpAnim, true, mpCurAnim->bRecursive);
+        setAnim(3);
+        if (mpListener != NULL) {
+            mpListener->onAnimEvent(0, this, mpCurAnim);
+        }
+    }
+}
+
+/* 0x8055C734 (0x128): Advances the current animation one frame; at its end it loops or stops and reports it. */
+void HbmKey::update() {
+    if (mpCurAnim != NULL) {
+        mpCurAnim->frame += 1.0f;
+        HbmKeyAnim* anim = mpCurAnim;
+        if (anim->frame >= anim->mpAnim->GetFrameSize()) {
+            if (anim->bLoop) {
+                anim->frame = 0.0f;
+                mpCurAnim->mpAnim->mFrame = mpCurAnim->frame;
+            } else {
+                mpPane->SetAnimationEnable(mpCurAnim->mpAnim, false, mpCurAnim->bRecursive);
+                if (mpListener != NULL) {
+                    mpListener->onAnimEvent(1, this, mpCurAnim);
+                }
+                mpCurAnim = NULL;
+                setAnim(4);
+            }
+        } else {
+            mpCurAnim->mpAnim->mFrame = anim->frame;
+        }
+    }
 }
 
 /* Reads the list node's id and value out, or the empty pair. */
@@ -893,6 +1326,53 @@ extern "C" void hbmAnimSaveState(HbmWidgetNodeView* self, HbmIdValue* out) {
         f32 value = lbl_8079D700;
         out->id = -1;
         out->value = value;
+    }
+}
+
+/* Stops the key's current animation and restarts the one a saved (kind, frame) pair names. */
+static inline void hbmKeyRestoreState(HbmKey* key, const HbmIdValue* state) {
+    if (key->mpCurAnim != NULL) {
+        key->mpPane->SetAnimationEnable(key->mpCurAnim->mpAnim, false, key->mpCurAnim->bRecursive);
+    }
+    if (state->id < 0) {
+        key->mpCurAnim = NULL;
+    } else {
+        key->mpCurAnim = key->findAnim(state->id);
+    }
+    if (key->mpCurAnim != NULL) {
+        f32 frame = state->value;
+        key->mpCurAnim->frame = frame;
+        key->mpCurAnim->mpAnim->mFrame = frame;
+        key->mpPane->SetAnimationEnable(key->mpCurAnim->mpAnim, true, key->mpCurAnim->bRecursive);
+    }
+}
+
+/* 0x8055C894 (0xD4): Stops the current animation and restarts the one a saved (kind, frame) pair names. */
+extern "C" void hbmAnimRestoreState(HbmWidgetNodeView* anim, const HbmIdValue* state) {
+    hbmKeyRestoreState((HbmKey*)anim, state);
+}
+
+/* 0x8055C968 (0x148): Unbinds and frees every animation of the key, then destroys the key; without an allocator
+ * both go back through operator delete. */
+void HbmKey::destroy(MEMAllocator* allocator) {
+    HbmKeyAnim* anim;
+    if (allocator != NULL) {
+        for (anim = (HbmKeyAnim*)nw4r::ut::List_GetNext(&mAnims, NULL); anim != NULL;
+             anim = (HbmKeyAnim*)nw4r::ut::List_GetNext(&mAnims, NULL)) {
+            mpPane->UnbindAnimation(anim->mpAnim, true);
+            nw4r::ut::List_Remove(&mAnims, anim);
+            MEMFreeToAllocator(allocator, anim);
+        }
+        this->~HbmKey();
+        MEMFreeToAllocator(allocator, this);
+    } else {
+        for (anim = (HbmKeyAnim*)nw4r::ut::List_GetNext(&mAnims, NULL); anim != NULL;
+             anim = (HbmKeyAnim*)nw4r::ut::List_GetNext(&mAnims, NULL)) {
+            mpPane->UnbindAnimation(anim->mpAnim, true);
+            nw4r::ut::List_Remove(&mAnims, anim);
+            delete anim;
+        }
+        delete this;
     }
 }
 
@@ -928,8 +1408,8 @@ void* fn_8055CD20(void* self, s32 flag)
     return self;
 }
 
-/* 0x8055CF54 (0x74): Runs slot 0xCC on a 16:9 screen and slot 0xD0 otherwise, recording which in +0x3C. */
-void hbmVuApplyAspectRatio(VuObject* self)
+/* Runs slot 0xCC on a 16:9 screen and slot 0xD0 otherwise, recording which in +0x3C. */
+static inline void hbmVuApplyAspect(VuObject* self)
 {
     if (SCGetAspectRatio() == 1) {
         ((HbmVuView*)self)->v_0x0CC();
@@ -940,12 +1420,219 @@ void hbmVuApplyAspectRatio(VuObject* self)
     }
 }
 
+/* 0x8055CD60 (0x1F4): Builds the text buffers and the eight parts through the factory slots, creates each part
+ * from the allocator, applies the screen's aspect ratio and initialises the object. */
+void hbmVuCreateParts(VuObject* self)
+{
+    HbmVuView* vu = (HbmVuView*)self;
+
+    self->field_0x0C = vu->v_0x0A8();
+    hbmTextBuffersInit((HbmTextBufferSet*)(VuHeader*)self->field_0x0C, (MEMAllocator*)self->list_0x04);
+    self->field_0x10 = vu->v_0x0AC();
+    self->field_0x14 = vu->v_0x0B0();
+    ((HkbKbPart3C*)self->field_0x14)->v_0x00C((MEMAllocator*)self->list_0x04);
+    self->field_0x18 = vu->v_0x0B4();
+    ((HkbKbPart40*)self->field_0x18)->v_0x00C((MEMAllocator*)self->list_0x04);
+    self->sub_0x1C = (VuSub*)vu->v_0x0B8();
+    ((HkbKbWrapped*)self->sub_0x1C)->v_0x0D4((MEMAllocator*)self->list_0x04, (VuHeader*)self->field_0x0C);
+    self->field_0x20 = vu->v_0x0BC();
+    ((HkbKbPart48*)self->field_0x20)->v_0x00C((MEMAllocator*)self->list_0x04);
+    self->field_0x24 = vu->v_0x0C0();
+    ((HkbKbPart4C*)self->field_0x24)->v_0x008((MEMAllocator*)self->list_0x04);
+    self->field_0x28 = vu->v_0x0C4();
+    ((HkbKbPart50*)self->field_0x28)->v_0x00C((MEMAllocator*)self->list_0x04);
+    self->field_0x2C = vu->v_0x0C8();
+    ((HkbKbPart44*)self->field_0x2C)->v_0x00C((MEMAllocator*)self->list_0x04);
+    hbmVuApplyAspect(self);
+    vu->v_0x010();
+}
+
+/* 0x8055CF54 (0x74): Runs slot 0xCC on a 16:9 screen and slot 0xD0 otherwise, recording which in +0x3C. */
+void hbmVuApplyAspectRatio(VuObject* self)
+{
+    hbmVuApplyAspect(self);
+}
+
+/* 0x8055CFC8 (0x338): Links the parts to each other and to the wrapped keyboard, hands them the layout and the
+ * language, initialises each of them and resets the object's state. */
+void hbmVuInitParts(VuObject* self)
+{
+    HkbKbWrapped* wrapped = (HkbKbWrapped*)self->sub_0x1C;
+
+    wrapped->v_0x014();
+    ((HbmVuLinkPart*)self->field_0x10)->v_0x014((HkbKbWrapped*)self->sub_0x1C);
+    ((HkbKbPart3C*)self->field_0x14)->v_0x014((HkbKbWrapped*)self->sub_0x1C);
+    ((HkbKbPart40*)self->field_0x18)->v_0x014((HkbKbWrapped*)self->sub_0x1C);
+    ((HkbKbPart48*)self->field_0x20)->v_0x014((HkbKbWrapped*)self->sub_0x1C);
+    ((HkbKbPart50*)self->field_0x28)->v_0x014((HkbKbWrapped*)self->sub_0x1C);
+    ((HkbKbPart44*)self->field_0x2C)->v_0x014((HkbKbWrapped*)self->sub_0x1C);
+    ((HkbKbWrapped*)self->sub_0x1C)->sub_0x118.v_0x010((HkbKbPart48*)self->field_0x20);
+    ((HkbKbPart3C*)self->field_0x14)->v_0x118((HkbKbPart50*)self->field_0x28);
+    ((HkbKbPart3C*)self->field_0x14)->v_0x11C((HkbKbPart44*)self->field_0x2C);
+    ((HkbKbPart40*)self->field_0x18)->v_0x0FC((HkbKbPart50*)self->field_0x28);
+    ((HkbKbPart40*)self->field_0x18)->v_0x100((HkbKbPart44*)self->field_0x2C);
+    if (self->field_0x3C == 1) {
+        ((HbmVuView*)self)->v_0x0D0();
+    } else {
+        ((HbmVuView*)self)->v_0x0CC();
+    }
+    ((HkbKbPart50*)self->field_0x28)->v_0x0CC((u32)self->field_0x34);
+    ((HkbKbWrapped*)self->sub_0x1C)->v_0x0F8((u32)self->field_0x34);
+    ((HkbKbWrapped*)self->sub_0x1C)->v_0x110((u32)self->field_0x38);
+    ((HkbKbPart3C*)self->field_0x14)->v_0x028((u32)self->field_0x38);
+    ((HkbKbPart40*)self->field_0x18)->v_0x028((u32)self->field_0x38);
+    ((HkbKbPart44*)self->field_0x2C)->v_0x028((u32)self->field_0x38);
+    ((HkbKbPart48*)self->field_0x20)->v_0x048((u32)self->field_0x38);
+    ((HkbKbPart4C*)self->field_0x24)->v_0x018((u32)self->field_0x38);
+    ((HkbKbPart50*)self->field_0x28)->v_0x0D0((u32)self->field_0x38);
+    hkbKbdInputSetKeyMap((HkbKbdInput*)(HbmVuLinkPart*)self->field_0x10, (u32)self->field_0x34, (u32)self->field_0x38);
+    ((HbmVuLinkPart*)self->field_0x10)->v_0x010();
+    ((HkbKbPart3C*)self->field_0x14)->v_0x010();
+    ((HkbKbPart40*)self->field_0x18)->v_0x010();
+    ((HkbKbWrapped*)self->sub_0x1C)->v_0x010();
+    ((HkbKbPart48*)self->field_0x20)->v_0x010();
+    ((HkbKbPart4C*)self->field_0x24)->v_0x00C();
+    ((HkbKbPart50*)self->field_0x28)->v_0x010();
+    ((HkbKbPart44*)self->field_0x2C)->v_0x010();
+    ((HbmVuView*)self)->v_0x058(0, 0);
+    ((HbmVuView*)self)->v_0x050(0);
+}
+
 /* The same three-call chain through slot 0x138 instead of 0x13C. */
 void fn_8055D300(VuObject* self, u32 a, u32 b)
 {
     ((HbmVuView*)self)->v_0x068()->v_0x0E0()->v_0x138(a, b);
 }
 
+/* 0x8055D36C (0x10C): Refreshes the parts the current mode shows, the list, the cursor part and the wrapped
+ * keyboard, then the shown pop-ups. */
+void hbmVuRefreshParts(VuObject* self)
+{
+    if (((HkbKbPart4C*)self->field_0x24)->v_0x010()) {
+        ((HkbKbPart3C*)self->field_0x14)->v_0x114();
+    } else {
+        ((HkbKbPart40*)self->field_0x18)->v_0x038();
+    }
+    ((HkbKbPart4C*)self->field_0x24)->child_0x14.v_0x01C();
+    ((HkbKbPart48*)self->field_0x20)->v_0x0CC();
+    ((HkbKbWrapped*)self->sub_0x1C)->v_0x14C();
+    if (((HkbKbPart50*)self->field_0x28)->v_0x0B8()) {
+        ((HkbKbPart50*)self->field_0x28)->child_0x1C.v_0x01C();
+    }
+    if (((HkbKbPart44*)self->field_0x2C)->v_0x0D8()) {
+        ((HkbKbPart44*)self->field_0x2C)->child_0x24.v_0x01C();
+    }
+}
+
+/* 0x8055D478 (0x11C): Sets the z mode to less-or-equal and draws the parts the current mode shows, then the shown
+ * pop-ups. */
+void hbmVuDrawParts(VuObject* self)
+{
+    GXSetZMode(1, 3, 1);
+    ((HkbKbPart4C*)self->field_0x24)->v_0x098();
+    ((HkbKbWrapped*)self->sub_0x1C)->v_0x148();
+    if (((HkbKbPart4C*)self->field_0x24)->v_0x010()) {
+        ((HkbKbPart3C*)self->field_0x14)->v_0x110();
+    } else {
+        ((HkbKbPart40*)self->field_0x18)->v_0x03C();
+    }
+    ((HkbKbPart48*)self->field_0x20)->v_0x024();
+    if (((HkbKbPart50*)self->field_0x28)->v_0x0B8()) {
+        ((HkbKbPart50*)self->field_0x28)->v_0x0A4();
+    }
+    if (((HkbKbPart44*)self->field_0x2C)->v_0x0D8()) {
+        ((HkbKbPart44*)self->field_0x2C)->v_0x0D0();
+    }
+}
+
+/* Re-arms the wrapped keyboard and the parts after the mode flag changed. */
+static inline void hbmVuRearmParts(VuObject* self)
+{
+    ((HkbKbWrapped*)((HbmVuView*)self)->v_0x068())->v_0x018(6, 0);
+    if (!((HkbKbPart4C*)self->field_0x24)->v_0x010() && ((HkbKbPart40*)self->field_0x18)->v_0x040() == 3) {
+        ((HkbKbPart48*)self->field_0x20)->v_0x040(1);
+    } else {
+        ((HkbKbPart48*)self->field_0x20)->v_0x040(0);
+    }
+    if (((HkbKbPart4C*)self->field_0x24)->v_0x010()) {
+        ((HkbKbPart3C*)self->field_0x14)->v_0x034();
+    } else {
+        ((HkbKbPart40*)self->field_0x18)->v_0x034();
+    }
+}
+
+/* 0x8055D594 (0x378): Hands a pointer event to the shown pop-up, or else to the parts the current mode shows, and
+ * reports whether any took it; re-arms the parts when the mode flag changed underneath. */
+s32 hbmVuDispatchPointer(VuObject* self, s32 key, f32 x, f32 y, s32 arg_b, s32 arg_c, s32 arg_d)
+{
+    KbArgs args;
+    u32 mode = ((HkbKbPart4C*)self->field_0x24)->v_0x010();
+    s32 handled_mode;
+    s32 handled_list;
+    s32 handled_panel;
+    s32 handled_wrapped;
+    s32 result;
+
+    args.a = key;
+    args.x = x;
+    args.y = y;
+    args.b = arg_b;
+    args.c = arg_c;
+    args.d = arg_d;
+    if (((HkbKbPart50*)self->field_0x28)->v_0x0B8()) {
+        return ((HkbKbPart50*)self->field_0x28)->child_0x1C.v_0x020(key, x, y, arg_b, arg_c, arg_d, &args);
+    }
+    ((HkbKbWrapped*)self->sub_0x1C)->v_0x220(key, arg_b, arg_c, arg_d, &args);
+    if (((HkbKbPart44*)self->field_0x2C)->v_0x0D8()) {
+        return ((HkbKbPart44*)self->field_0x2C)->v_0x0E0(key, x, y, arg_b, arg_c, arg_d, &args);
+    }
+    if (mode) {
+        handled_mode = ((HkbKbPart3C*)self->field_0x14)->v_0x12C(key, x, y, arg_b, arg_c, arg_d, &args);
+    } else {
+        handled_mode = ((HkbKbPart40*)self->field_0x18)->v_0x114(key, x, y, arg_b, arg_c, arg_d, &args);
+    }
+    handled_list = ((HkbKbPart4C*)self->field_0x24)->child_0x14.v_0x020(key, x, y, arg_b, arg_c, arg_d, &args);
+    handled_panel = ((HkbKbPart48*)self->field_0x20)->child_0x17F4.v_0x020(key, x, y, arg_b, arg_c, arg_d, &args);
+    handled_wrapped = ((HkbKbWrapped*)self->sub_0x1C)->v_0x224(key, x, y, arg_b, arg_c, arg_d, &args);
+    result = (handled_list | handled_panel | handled_wrapped | handled_mode) != 0;
+    if (mode != ((HkbKbPart4C*)self->field_0x24)->v_0x010()) {
+        hbmVuRearmParts(self);
+    }
+    return result;
+}
+
+/* 0x8055D90C (0x26C): Hands an input record to the shown pop-up, or else to the parts the current mode shows, and
+ * reports whether any took it; re-arms the parts when the mode flag changed underneath. */
+/* untyped: the input record is passed through untouched */
+s32 hbmVuDispatchInput(VuObject* self, void* input)
+{
+    u32 mode = ((HkbKbPart4C*)self->field_0x24)->v_0x010();
+    s32 handled_mode;
+    s32 handled_list;
+    s32 handled_panel;
+    s32 handled_wrapped;
+    s32 result;
+
+    if (((HkbKbPart50*)self->field_0x28)->v_0x0B8()) {
+        return ((HkbKbPart50*)self->field_0x28)->child_0x1C.v_0x024(input);
+    }
+    if (((HkbKbPart44*)self->field_0x2C)->v_0x0D8()) {
+        return ((HkbKbPart44*)self->field_0x2C)->v_0x0E4(input);
+    }
+    if (mode) {
+        handled_mode = ((HkbKbPart3C*)self->field_0x14)->v_0x130(input);
+    } else {
+        handled_mode = ((HkbKbPart40*)self->field_0x18)->v_0x118(input);
+    }
+    handled_list = ((HkbKbPart4C*)self->field_0x24)->child_0x14.v_0x024(input);
+    handled_panel = ((HkbKbPart48*)self->field_0x20)->child_0x17F4.v_0x024(input);
+    handled_wrapped = ((HkbKbWrapped*)self->sub_0x1C)->v_0x228(input);
+    result = (handled_list | handled_panel | handled_wrapped | handled_mode) != 0;
+    if (mode != ((HkbKbPart4C*)self->field_0x24)->v_0x010()) {
+        hbmVuRearmParts(self);
+    }
+    return result;
+}
 /* ---------------------------------------------------------------------------------------------------
  * small virtual forwarders: `self->sub->slot(...)` through HbmVuView
  * ------------------------------------------------------------------------------------------------ */
@@ -965,6 +1652,18 @@ void fn_8055DBCC(VuObject* self) { ((HbmVuView*)self->sub_0x1C)->v_0x100(); }
 
 void fn_8055DBE0(VuObject* self) { ((HbmVuView*)self->sub_0x1C)->v_0x104(); }
 
+/* 0x8055DBF4 (0xDC): Lets the pane managers of every part take input, or not. */
+void hbmVuSetInputActive(VuObject* self, u8 active)
+{
+    ((HkbKbPart3C*)self->field_0x14)->child_0x4C.setInputActive(active);
+    ((HkbKbPart40*)self->field_0x18)->child_0x34.setInputActive(active);
+    ((HkbKbWrapped*)self->sub_0x1C)->child_0x1A04.setInputActive(active);
+    ((HkbKbPart48*)self->field_0x20)->child_0x17F4.setInputActive(active);
+    ((HkbKbPart4C*)self->field_0x24)->child_0x14.setInputActive(active);
+    ((HkbKbPart50*)self->field_0x28)->child_0x1C.setInputActive(active);
+    ((HkbKbPart44*)self->field_0x2C)->child_0x24.setInputActive(active);
+}
+
 /* A byte-flag setter that dispatches on the new value. */
 void fn_8055DCD0(VuObject* self, int flag)
 {
@@ -973,6 +1672,40 @@ void fn_8055DCD0(VuObject* self, int flag)
         ((HbmVuView*)self)->v_0x0D0();
     else
         ((HbmVuView*)self)->v_0x0CC();
+}
+
+/* 0x8055DD00 (0xCC): Sets the text of the wrapped keyboard's title text box. */
+void hbmVuSetTitleText(VuObject* self, const wchar_t* text)
+{
+    nw4r::lyt::TextBox* textBox = nw4r::ut::DynamicCast<nw4r::lyt::TextBox>(
+        ((HkbKbWrapped*)self->sub_0x1C)->child_0x1A04.findTextBox("T_title_text"));
+    if (textBox != NULL) {
+        textBox->SetString(text, 0);
+    }
+}
+
+/* 0x8055DDCC (0xB8): Switches every part to the 16:9 screen. */
+void hbmVuSetWideScreen(VuObject* self)
+{
+    ((HkbKbPart3C*)self->field_0x14)->child_0x4C.v_0x03C();
+    ((HkbKbPart40*)self->field_0x18)->child_0x34.v_0x03C();
+    ((HkbKbWrapped*)self->sub_0x1C)->v_0x234();
+    ((HkbKbPart48*)self->field_0x20)->v_0x114();
+    ((HkbKbPart4C*)self->field_0x24)->child_0x14.v_0x03C();
+    ((HkbKbPart50*)self->field_0x28)->child_0x1C.v_0x03C();
+    ((HkbKbPart44*)self->field_0x2C)->child_0x24.v_0x03C();
+}
+
+/* 0x8055DE84 (0xB8): Switches every part to the 4:3 screen. */
+void hbmVuSetStandardScreen(VuObject* self)
+{
+    ((HkbKbPart3C*)self->field_0x14)->child_0x4C.v_0x040();
+    ((HkbKbPart40*)self->field_0x18)->child_0x34.v_0x040();
+    ((HkbKbWrapped*)self->sub_0x1C)->v_0x238();
+    ((HkbKbPart48*)self->field_0x20)->v_0x118();
+    ((HkbKbPart4C*)self->field_0x24)->child_0x14.v_0x040();
+    ((HkbKbPart50*)self->field_0x28)->child_0x1C.v_0x040();
+    ((HkbKbPart44*)self->field_0x2C)->child_0x24.v_0x040();
 }
 
 /* Two factories: allocate a sub-object from the owner's allocator, then build or construct it. */

@@ -13,6 +13,9 @@ extern "C" {
 /* 0x80463B20 (0x1C): returns the length of a wide string in characters. */
 u32 wcslen(const u16* s);
 
+/* Appends at most `n` characters of `src` to `dst`. */
+u16* wcsncat(u16* dst, const u16* src, u32 n);
+
 /* 0x80463B3C (0x1C): copies the wide string `src` including its terminator to `dst`. */
 u16* wcscpy(u16* dst, const u16* src);
 

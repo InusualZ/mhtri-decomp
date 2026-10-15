@@ -28,7 +28,7 @@
  * RESIDUALS. Unwritten, call unnamed functions of other units (hbm_text_panel.cpp, hbm_value.cpp, hbm_hermite.cpp's
  *            hbmNameMatches, fn_8052A040.cpp) or read this unit's .data name tables: fn_80566440, fn_80566618, fn_80566740,
  *            fn_80566910, fn_80566970, fn_80566A7C, fn_80566C94, fn_80567014, fn_8056725C, fn_80567A14, fn_80567D40,
- *            fn_80567E70, fn_8056802C, fn_80568CAC, fn_80568E08, fn_80568EBC, fn_80568FF0, fn_805690F0, fn_8056977C,
+ *            fn_80567E70, fn_8056802C, fn_80568CAC, fn_80568E08, fn_80568EBC, fn_80568FF0, fn_805690F0, hbmKbCursorSetMode,
  *            fn_805698BC, fn_8056999C, and the thunks fn_80569D4C, fn_80569D74, fn_80569D7C, fn_80569D8C..fn_80569DA4
  *            whose targets are among them.
  * NAMES.     GUESS classes HbmKbCursorPart, its kinds HbmKbCursorPartA/B and HbmKbCursorKey (band keys with a state

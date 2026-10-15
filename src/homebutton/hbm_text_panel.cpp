@@ -33,7 +33,7 @@
  *            lays some `if` tails out as `bne; b` where ours falls through.
  * RESIDUALS. Unwritten (9 functions, 0xC1C bytes): the destructors fn_805425E4 (0xF4), fn_805426D8 (0x58),
  *            fn_80542730 (0x5C), fn_8054278C (0x5C), fn_80543020 (0x74) and fn_8054CF38 (0x134), the constructors
- *            fn_805427E8 (0x1CC) and fn_80542D8C (0x214), and the widget create fn_8054D0AC (0x530); they store the
+ *            hbmTextBuffersInit (0x1CC) and fn_80542D8C (0x214), and the widget create fn_8054D0AC (0x530); they store the
  *            tables at 0x8064ECA0..0x8064F1C0 and 0x806515D0..0x80651850, which wait on the classes behind them (rule 10)
  *            and on the .data re-cut below.
  * RESIDUALS. The static initializer (0x8054F550, paired with __sinit_\hbm_text_panel_cpp) fills each colour with
@@ -112,7 +112,7 @@ extern "C" void hbmPanelUpdateButtonRepeat(HbmTextPanel* self, s32 b, s32 c);
  * names are not recoverable. */
 
 /* The helper objects at +0x193C / +0x1940 / +0x1944 / +0x1A18 (Panel805482CC_ItemVtbl): the text buffers of 0x50 bytes
- * fn_805427E8 allocates and fills +0x04..+0x28 (homebutton/hbm_value.cpp's HbmTextBuffer view of the same class).
+ * hbmTextBuffersInit allocates and fills +0x04..+0x28 (homebutton/hbm_value.cpp's HbmTextBuffer view of the same class).
  * size: 0x50 */
 class HbmPanelItemView {
 public:
@@ -188,7 +188,7 @@ public:
     /* slot +0x11C */ virtual void v_0x11C(s32 arg);
 
     /* +0x00 is the compiler-emitted vptr */
-    /* +0x04 */ u16 capacity;              /* 512 when fn_805427E8 builds it */
+    /* +0x04 */ u16 capacity;              /* 512 when hbmTextBuffersInit builds it */
     /* +0x06 */ u16 length;
     /* +0x08 */ u16 byteLength;
     /* +0x0A */ u16 pad_0x0A;
@@ -561,7 +561,7 @@ struct HbmFade {
     /* +0x1C */ u32 id;
 };
 
-/* The set of the panel's three text buffers (fn_805427E8 builds them, fn_805425E4 is its deleting destructor).
+/* The set of the panel's three text buffers (hbmTextBuffersInit builds them, fn_805425E4 is its deleting destructor).
  * size: 0x14 */
 class HbmTextBufferSet {
 public:
@@ -5371,7 +5371,7 @@ void fn_8054E81C(void* panel)
 {
     HbmTextPanel* self = (HbmTextPanel*)panel;
     ((HbmPaneManager*)&self->field_0x1A04)->HbmPaneManager::v_0x03C();
-    fn_8055A3E0(&self->sub, 0);
+    hbmTextWriterSetStandardScreen((HbmTextWriter*)&self->sub, 0);
 }
 
 /* Close the +0x1A04 record and then the sub-object's layout at mode 1. */
@@ -5379,7 +5379,7 @@ void fn_8054E858(void* panel)
 {
     HbmTextPanel* self = (HbmTextPanel*)panel;
     ((HbmPaneManager*)&self->field_0x1A04)->HbmPaneManager::v_0x040();
-    fn_8055A3E0(&self->sub, 1);
+    hbmTextWriterSetStandardScreen((HbmTextWriter*)&self->sub, 1);
 }
 
 /* --------------------------------------------------------------------------------------------- */

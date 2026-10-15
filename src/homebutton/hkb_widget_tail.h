@@ -43,6 +43,17 @@ public:
     virtual ~HkbLayout();
 }; /* size: 0x20 */
 
+class HkbAnimTransform;
+class HkbKbdInput;
+
+extern "C" {
+/* Binds the animation's contents named `name` to the pane. */
+void hkbAnimBindNamedPane(HkbAnimTransform* anim, nw4r::lyt::Pane* pane, const char* name);
+
+/* Hands the keyboard manager the key map of `layoutType` and `language`. */
+void hkbKbdInputSetKeyMap(HkbKbdInput* self, s32 layoutType, s32 language);
+}
+
 /* Returns the USB keyboard's state, built on first use. */
 inline HkbKbdState& hkbGetKbdState() {
     static HkbKbdState sState;

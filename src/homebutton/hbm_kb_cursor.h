@@ -7,6 +7,15 @@
 #include "types.h"
 
 #ifdef __cplusplus
+class HkbKbWrapped;
+
+extern "C" {
+/* Puts the cursor part of a wrapped keyboard in `mode` (hiding or showing its panes). */
+void hbmKbCursorSetMode(HkbKbWrapped* wrapped, s32 mode);
+}
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 

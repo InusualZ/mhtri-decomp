@@ -316,12 +316,12 @@ static inline void hbmVec4Set(VuVec4* self, f32 y, f32 w, f32 z, f32 x)
 
 extern "C" {
 
-void fn_8055F6A0(VuVec4* self)
+void hbmGetScreenRect4x3(VuVec4* self)
 {
     hbmVec4Set(self, lbl_8079D72C, lbl_8079D728, lbl_8079D724, lbl_8079D720);
 }
 
-void fn_8055F6C4(VuVec4* self)
+void hbmGetScreenRect16x9(VuVec4* self)
 {
     hbmVec4Set(self, lbl_8079D72C, lbl_8079D728, lbl_8079D734, lbl_8079D730);
 }

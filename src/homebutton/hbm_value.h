@@ -6,15 +6,16 @@
 
 #include "types.h"
 #include "homebutton/hbm_widget.h"
+#include "homebutton/hbm_vu_object.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* r3 is the address the caller hands over (the +0x1A04 record of the panel at 0x805482CC and the
- * sub-object at its +0x10); `fn_8055A3E0` additionally takes the mode word the caller materialises. */
-/* untyped: opaque band object, typed by the callers' views */
-void fn_8055A3E0(void* sub, s32 mode);
+struct HbmTextWriter;
+
+/* Stores the writer's standard-screen flag and loads the 4:3 (set) or 16:9 screen rectangle. */
+void hbmTextWriterSetStandardScreen(struct HbmTextWriter* writer, s32 standard);
 
 u32 fn_8055A888(HbmWidget* self, int arg);
 
@@ -47,6 +48,9 @@ void hbmTextPutInMode(HbmTextBuffer* self, const u16* text, s32 mode);
 void hbmTextSetInputMode(HbmTextBuffer* self, s32 mode);
 #endif
 
+/* Links the Vu object's parts to each other, hands them the layout and the language and initialises them. */
+void hbmVuInitParts(VuObject* self);
+
 /* Reads the animation's current node out as an (id, frame) pair, or the empty pair. */
 void hbmAnimSaveState(HbmWidgetNodeView* anim, HbmIdValue* out);
 
@@ -65,7 +69,7 @@ struct MEMAllocator;
 struct HkbManager;
 class HbmEventHandler;
 class HbmSoundPlayer;
-class HbmKeyAnim;
+struct HbmKeyAnim;
 class HbmKey;
 
 namespace nw4r {
@@ -78,11 +82,15 @@ class AnimTransform;
 }  // namespace lyt
 }  // namespace nw4r
 
-/* The scene object at the pane manager's +0x0C and +0x10, as the slots the band calls.
+class HbmComponent;
+class HbmPaneHandler;
+
+/* The component manager at the pane manager's +0x10 (the gui manager class of the band, tables 0x806582FC /
+ * 0x80658358), as the slots the band calls.
  * size: 0x4 (approximation: only the vptr is touched) */
 class HbmPaneLayout {
 public:
-    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x008 */ virtual ~HbmPaneLayout();
     /* slot +0x00C */ virtual void v_0x00C();
     /* slot +0x010 */ virtual void v_0x010();
     /* slot +0x014 */ virtual void v_0x014();
@@ -97,16 +105,16 @@ public:
     /* slot +0x038 */ virtual void setVisible(s32 visible);
     /* slot +0x03C */ virtual void v_0x03C();
     /* slot +0x040 */ virtual void v_0x040();
-    /* slot +0x044 */ virtual void v_0x044();
-    /* slot +0x048 */ virtual void v_0x048();
-    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x044 */ virtual void setMaxComponents(u32 count);
+    /* slot +0x048 */ virtual void setLayout(nw4r::lyt::Layout* layout);
+    /* slot +0x04C */ virtual HbmComponent* findComponent(nw4r::lyt::Pane* pane);
     /* slot +0x050 */ virtual void v_0x050();
-    /* slot +0x054 */ virtual void v_0x054();
+    /* slot +0x054 */ virtual void setDrawInfo(nw4r::lyt::DrawInfo* drawInfo);
     /* slot +0x058 */ virtual void setEnable(s32 enable);
 }; /* size: 0x4 */
 
 /* The pane manager's cursor (embedded at its +0x8C): the slots the band calls.
- * size: 0x1C (approximation: the gap to the manager's end) */
+ * size: 0x18 (the vptr and five entries; the manager's allocator follows at +0xA4) */
 class HbmPaneCursor {
 public:
     /* slot +0x008 */ virtual void reset();
@@ -114,8 +122,8 @@ public:
     /* slot +0x010 */ virtual void v_0x010();
     /* slot +0x014 */ virtual u32 getTarget();
 
-    /* +0x04 */ u8 unused_0x04[0x18];
-}; /* size: 0x1C */
+    /* +0x04 */ u32 unused_0x04[5];
+}; /* size: 0x18 */
 
 /* The band's pane manager (class table 0x806517A0 in this unit's .data): a layout, its root, its sound player, its
  * component list and its cursor.  Every keyboard, cellphone keypad and band widget derives from it; the slots
@@ -134,7 +142,7 @@ public:
     /* slot +0x02C */ virtual nw4r::lyt::TextBox* findTextBox(const char* name);
     /* slot +0x030 */ virtual u32 getHoldFrames(u32 channel, const char* name);
     /* slot +0x034 */ virtual void setInputActive(u8 active);
-    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x038 */ virtual void drawPane(const char* name);
     /* slot +0x03C */ virtual void v_0x03C();
     /* slot +0x040 */ virtual void v_0x040();
     /* slot +0x044 */ virtual void v_0x044();
@@ -147,27 +155,48 @@ public:
     /* slot +0x060 */ virtual HbmKey* getKeyAnim(u16 key);
     /* slot +0x064 */ virtual nw4r::ut::List* getComponentList();
     /* slot +0x068 */ virtual HbmPaneLayout* getRoot();
-    /* slot +0x06C */ virtual void v_0x06C();
-    /* slot +0x070 */ virtual void v_0x070();
+    /* slot +0x06C */ virtual void calcDrawMtx(nw4r::math::MTX34* out, const nw4r::lyt::DrawInfo& drawInfo,
+                                             const nw4r::math::MTX34* mtx);
+    /* slot +0x070 */ virtual HbmPaneLayout* createRoot(MEMAllocator* allocator, HbmEventHandler* handler);
 
     /* +0x04 */ nw4r::lyt::Layout* mpLyt;
-    /* +0x08 */ u32 unused_0x08;
+    /* +0x08 */ const char* mpLayoutName;
     /* +0x0C */ nw4r::lyt::ResourceAccessor* mpResAccessor;
     /* +0x10 */ HbmPaneLayout* mpRoot;
     /* +0x14 */ HbmSoundPlayer* mpSound;
     /* +0x18 */ nw4r::lyt::DrawInfo mDrawInfo;
     /* +0x6C */ nw4r::ut::List mComponents;
-    /* +0x78 */ u8 unused_0x78[0x10];
+    /* +0x78 */ nw4r::ut::Rect mScreenRect;
     /* +0x88 */ u8 mbInputActive;
-    /* +0x89 */ u8 pad_0x89[3];
+    /* +0x89 */ u8 mbStandardAspect;
+    /* +0x8A */ u8 pad_0x8A[2];
     /* +0x8C */ HbmPaneCursor mCursor;
+    /* +0xA4 */ MEMAllocator* mpPaneAllocator;
 }; /* size: 0xA8 */
+
+/* An animation of a key's animation list: its transform, its kind, its frame and how it plays.  size: 0x18 */
+struct HbmKeyAnim {
+    /* +0x00 */ nw4r::lyt::AnimTransform* mpAnim;
+    /* +0x04 */ u32 kind;
+    /* +0x08 */ f32 frame;
+    /* +0x0C */ bool bLoop;
+    /* +0x0D */ bool bRecursive;
+    /* +0x0E */ u8 pad_0x0E[2];
+    /* +0x10 */ nw4r::ut::Link mLink;
+}; /* size: 0x18 */
+
+/* The receiver of a key's animation events (the key's +0x18): slot 0x08 hears an animation start (0) or end (1).
+ * size: 0x4 (approximation: only the vptr is touched) */
+class HbmKeyListener {
+public:
+    /* slot +0x008 */ virtual void onAnimEvent(u32 event, HbmKey* key, HbmKeyAnim* anim);
+}; /* size: 0x4 */
 
 /* The band's animated pane component (class table 0x8065184C in this unit's .data): its pane, its animation list
  * and its state.  Keys, buttons and the widgets' parts derive from it.  size: 0x30 */
 class HbmKey {
 public:
-    HbmKey(nw4r::lyt::Pane* pane) : mpPane(pane), mpCurAnim(NULL), mpNextAnim(NULL) {
+    HbmKey(nw4r::lyt::Pane* pane) : mpPane(pane), mpCurAnim(NULL), mpListener(NULL) {
         nw4r::ut::List_Init(&mAnims, 0x10);
         mState = 0;
     }
@@ -181,15 +210,16 @@ public:
     /* slot +0x020 */ virtual ~HbmKey();
 
     void destroy(MEMAllocator* allocator);
-    void addAnim(MEMAllocator* allocator, u32 kind, nw4r::lyt::AnimTransform* anim, u8 frame, u8 loop);
-    void addGroupAnim(MEMAllocator* allocator, u32 kind, nw4r::lyt::AnimTransform* anim, const char* group, u8 frame,
-                      u8 loop);
+    void addAnim(MEMAllocator* allocator, u32 kind, nw4r::lyt::AnimTransform* anim, bool loop, bool recursive);
+    void addGroupAnim(MEMAllocator* allocator, u32 kind, nw4r::lyt::AnimTransform* anim, const char* group, bool loop,
+                      bool recursive);
 
     /* +0x04 */ nw4r::lyt::Pane* mpPane;
     /* +0x08 */ nw4r::ut::List mAnims;
     /* +0x14 */ HbmKeyAnim* mpCurAnim;
-    /* +0x18 */ HbmKeyAnim* mpNextAnim;
-    /* +0x1C */ u8 unused_0x1C[0x10];
+    /* +0x18 */ HbmKeyListener* mpListener;
+    /* +0x1C */ nw4r::ut::Link mLink;
+    /* +0x24 */ u8 unused_0x24[8];
     /* +0x2C */ s32 mState;
 }; /* size: 0x30 */
 #endif

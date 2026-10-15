@@ -7,6 +7,20 @@
 #include "types.h"
 
 #ifdef __cplusplus
+class HbmTextBufferSet;
+class HbmPanelView;
+struct MEMAllocator;
+
+extern "C" {
+/* Builds the panel's three text buffers from the allocator. */
+void hbmTextBuffersInit(HbmTextBufferSet* set, MEMAllocator* allocator);
+
+/* Hides the writer's selection and caret and re-lays the panel's text out. */
+void hbmPanelRelayout(HbmPanelView* self);
+}
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 

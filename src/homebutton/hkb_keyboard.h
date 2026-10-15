@@ -545,7 +545,7 @@ class HbmSoundPlayer {
 public:
     /* slot +0x008 */ virtual void v_0x008();
     /* slot +0x00C */ virtual void v_0x00C();
-    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x010 */ virtual void playPaneSound(nw4r::lyt::Pane* pane, u32 event);
     /* slot +0x014 */ virtual void play(s32 sound);
     /* slot +0x018 */ virtual void v_0x018();
     /* slot +0x01C */ virtual void v_0x01C();
@@ -580,6 +580,8 @@ public:
     /* slot +0x04C */ virtual void v_0x04C();
     /* slot +0x050 */ virtual void v_0x050();
     /* slot +0x054 */ virtual void setTriggerTarget(s32 bTarget);
+    /* slot +0x058 */ virtual void v_0x058();
+    /* slot +0x05C */ virtual u16 getHoldFrames(u32 channel);
 
     void setTriggerFlag(u8 flag);
 
@@ -698,11 +700,12 @@ struct HbmPaneTrigger {
 /* The pane manager's event handler (homebutton/hbm_value.cpp): its sound player.  size: 0xC */
 class HbmPaneHandler : public HbmEventHandler {
 public:
+    /* Declared first: onPaneEvent has no body of its own, so no unit emits this class's table (retail has none). */
+    /* slot +0x018 */ virtual void onPaneEvent(HbmComponent* pComponent, u32 event, HbmPaneTrigger* pTrigger);
+    /* slot +0x01C */ virtual void setSound(HbmSoundPlayer* pSound);
     /* slot +0x008 */ virtual ~HbmPaneHandler() {}
     /* untyped: caller-owned payload - the argument record of the event */
     /* slot +0x00C */ virtual void onEvent(u32 id, u32 event, void* data);
-    /* slot +0x018 */ virtual void onPaneEvent(HbmComponent* pComponent, u32 event, HbmPaneTrigger* pTrigger);
-    /* slot +0x01C */ virtual void setSound(HbmSoundPlayer* pSound);
 
     /* +0x08 */ HbmSoundPlayer* mpSound;
 };
@@ -816,12 +819,6 @@ public:
     /* +0x106 */ u8 pad_0x106[2];
     /* +0x108 */ HkbKeyButton mShiftButton;
     /* +0x12C */ HkbKeyButton mCapsButton;
-};
-
-/* An animation entry of a key's animation list. size: 0x8 (approximation: the members this file reads) */
-struct HbmKeyAnim {
-    /* +0x0 */ u32 unused_0x00;
-    /* +0x4 */ u32 kind;
 };
 
 /* A key of the software keyboard: a band key with its kind; the class table is 0x8064DC04.  size: 0x34 */
