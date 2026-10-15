@@ -14,13 +14,6 @@
  *    `0.0` at `.sdata2` 0x8079C9F8 are all read here; the pool value `0.0` repeats at 0x8079C9A8 (floating-point
  *    conversion unit) and 0x8079CA10 (string-to-float unit), which makes this a TU of its own. `vsprintf` and
  *    `sprintf` are `vsnprintf` with an unbounded count (inlined).
- * RESIDUALS. `__pformatter`: retail jumps from every failed conversion straight into the bad-conversion block (MSL's
- *    `goto conversion_error`); the `buff_ptr == NULL` test after the switch adds a compare and keeps `num_chars` live
- *    across the switch, which recolours `buff_ptr` (r29 for r18) - the goto spelling measures 97.3 against 96.6.
- * RESIDUALS. `float2str`: retail's `%g` case jumps into the `%e` / `%f` bodies (MSL's `goto e_format` / `f_format`);
- *    the `style` dispatch adds two `li`/`b` pairs and a compare.
- * RESIDUALS. `round_decimal`: retail's final zero case branches back to the `new_length < 0` block (MSL's `goto
- *    return_zero`); the `for (;;)` re-entry adds `li r4,-1; b` - the goto spelling measures 99.7 against 95.6.
  * RESIDUALS. `.sdata` / `.rodata` 2 B / 3 B short of the map rows (padding).
  * SHAPES. the format record is built in a local and copied out; by-value `print_format` arguments are copied by the
  *    caller; the writers are reached through the `WriteProc` pointer. The bodies follow MSL's own spellings where
@@ -28,7 +21,10 @@
  *    `longlong2str` loops on `unsigned_num`, `double2hex` builds the exponent from the two top bytes and tests it with
  *    `snum ? snum - 0x3FF : 0`, `fabs` is an inline wrapper over `__fabs` (it decides the FPR colouring), the
  *    size_t / ptrdiff_t / int fetches keep distinct types so the compiler does not merge their bodies, and the `%c`
- *    argument is fetched as an `int`.
+ *    argument is fetched as an `int`. MSL's own gotos decide three bodies: `round_decimal` re-enters its zero case
+ *    (`goto return_zero`), `float2str`'s `%g` case jumps into the `%e` / `%f` bodies (`goto e_format` / `f_format`),
+ *    and every failed conversion in `__pformatter` jumps from inside its branch to the bad-conversion block at the
+ *    switch's `default` (`goto conversion_error`). `__pformatter`'s local declaration order decides its colouring.
  */
 
 #include "MSL_C/ansi_files.h"
@@ -611,64 +607,54 @@ static char* double2hex(f64 num, char* buff, print_format format)
 static void round_decimal(decimal* dec, int new_length)
 {
     char c;
-    char* q;
-    int length;
     char* p;
     int carry;
 
-    for (;;) {
-        if (new_length < 0) {
-            dec->exp = 0;
-            dec->sig.length = 1;
-            dec->sig.text[0] = '0';
-            return;
-        }
-
-        length = dec->sig.length;
-        if (new_length >= length) {
-            return;
-        }
-
-        p = (char*)dec->sig.text + new_length;
-        c = dec->sig.text[new_length] - '0';
-        if (c == 5) {
-            q = (char*)dec->sig.text + length;
-            do {
-                --q;
-            } while (q > p && *q == '0');
-            if (q == p) {
-                carry = p[-1] & 1;
-            } else {
-                carry = 1;
-            }
-        } else {
-            carry = c > 5;
-        }
-
-        while (new_length != 0) {
-            c = *--p + carry - '0';
-            carry = c > 9;
-            if (carry || c == 0) {
-                --new_length;
-            } else {
-                *p = c + '0';
-                break;
-            }
-        }
-
-        if (carry) {
-            dec->sig.length = 1;
-            dec->exp++;
-            dec->sig.text[0] = '1';
-            return;
-        }
-        if (new_length != 0) {
-            dec->sig.length = new_length;
-            return;
-        }
-        /* the cut leaves no digit: re-enter as the zero result */
-        new_length = -1;
+    if (new_length < 0) {
+    return_zero:
+        dec->exp = 0;
+        dec->sig.length = 1;
+        dec->sig.text[0] = '0';
+        return;
     }
+
+    if (new_length >= dec->sig.length) {
+        return;
+    }
+
+    p = (char*)dec->sig.text + new_length + 1;
+    c = *--p - '0';
+
+    if (c == 5) {
+        char* q = (char*)dec->sig.text + dec->sig.length;
+
+        while (--q > p && *q == '0') {
+        }
+        carry = (q == p) ? p[-1] & 1 : 1;
+    } else {
+        carry = c > 5;
+    }
+
+    while (new_length != 0) {
+        c = *--p - '0' + carry;
+        if ((carry = c > 9) != 0 || c == 0) {
+            --new_length;
+        } else {
+            *p = c + '0';
+            break;
+        }
+    }
+
+    if (carry != 0) {
+        dec->exp += 1;
+        dec->sig.length = 1;
+        dec->sig.text[0] = '1';
+        return;
+    } else if (new_length == 0) {
+        goto return_zero;
+    }
+
+    dec->sig.length = new_length;
 }
 
 /* 0x8045CA78 (0x79C): renders a double in `e`, `f` or `g` style (or as INF / NAN), filling backwards from the end of `buff`. */
@@ -684,7 +670,6 @@ static char* float2str(f64 num, char* buff, print_format format)
     int int_digits;
     int frac_digits;
     int radix_marker;
-    int style;
 
     radix_marker = *(u8*)_lconv.decimal_point;
 
@@ -763,31 +748,19 @@ static char* float2str(f64 num, char* buff, print_format format)
             } else {
                 format.conversion_char = 'E';
             }
-            style = 0;
-        } else {
-            if (format.alternate_form) {
-                format.precision -= dec.exp + 1;
-            } else {
-                if ((format.precision = dec.sig.length - (dec.exp + 1)) < 0) {
-                    format.precision = 0;
-                }
-            }
-            style = 1;
+            goto e_format;
         }
-        break;
+        if (format.alternate_form) {
+            format.precision -= dec.exp + 1;
+        } else {
+            if ((format.precision = dec.sig.length - (dec.exp + 1)) < 0) {
+                format.precision = 0;
+            }
+        }
+        goto f_format;
     case 'e':
     case 'E':
-        style = 0;
-        break;
-    case 'f':
-    case 'F':
-        style = 1;
-        break;
-    default:
-        return p;
-    }
-
-    if (style == 0) {
+    e_format:
         if (dec.sig.length > format.precision + 1) {
             round_decimal(&dec, format.precision + 1);
         }
@@ -828,7 +801,10 @@ static char* float2str(f64 num, char* buff, print_format format)
         } else if (format.sign_options == SIGN_SPACE) {
             *--p = ' ';
         }
-    } else {
+        break;
+    case 'f':
+    case 'F':
+    f_format:
         if ((frac_digits = -dec.exp + dec.sig.length - 1) < 0) {
             frac_digits = 0;
         }
@@ -874,6 +850,7 @@ static char* float2str(f64 num, char* buff, print_format format)
         } else if (format.sign_options == SIGN_SPACE) {
             *--p = ' ';
         }
+        break;
     }
 
     return p;
@@ -882,20 +859,20 @@ static char* float2str(f64 num, char* buff, print_format format)
 /* 0x8045D214 (0x8AC): formats `format_str` through `write`, fetching the arguments from `args`; returns the character count or -1. */
 static int __pformatter(WriteProc write, WriteArg* write_arg, const char* format_str, va_list args, int is_secure)
 {
-    long long_num;
     int num_chars;
+    char* buff_ptr;
     int chars_written;
     int field_width;
     const char* format_ptr;
-    const char* curr_format;
-    print_format format;
-    long long long_long_num;
-    f64 double_num;
-    char buff[512];
-    char* buff_ptr;
     char fill_char = ' ';
+    print_format format;
     char pad_char;
+    f64 double_num;
     const u16* wcs_ptr;
+    const char* curr_format;
+    long long_num;
+    char buff[512];
+    long long long_long_num;
 
     format_ptr = format_str;
     chars_written = 0;
@@ -942,13 +919,15 @@ static int __pformatter(WriteProc write, WriteArg* write_arg, const char* format
                 long_num = (char)long_num;
             }
             if (format.argument_options == ARG_LONG_LONG || format.argument_options == ARG_INTMAX) {
-                buff_ptr = longlong2str(long_long_num, buff + 512, format);
+                if ((buff_ptr = longlong2str(long_long_num, buff + 512, format)) == NULL) {
+                    goto conversion_error;
+                }
             } else {
-                buff_ptr = long2str(long_num, buff + 512, format);
+                if ((buff_ptr = long2str(long_num, buff + 512, format)) == NULL) {
+                    goto conversion_error;
+                }
             }
-            if (buff_ptr != NULL) {
-                num_chars = (buff + 511) - buff_ptr;
-            }
+            num_chars = (buff + 511) - buff_ptr;
             break;
         case 'o':
         case 'u':
@@ -974,13 +953,15 @@ static int __pformatter(WriteProc write, WriteArg* write_arg, const char* format
                 long_num = (u8)long_num;
             }
             if (format.argument_options == ARG_LONG_LONG || format.argument_options == ARG_INTMAX) {
-                buff_ptr = longlong2str(long_long_num, buff + 512, format);
+                if ((buff_ptr = longlong2str(long_long_num, buff + 512, format)) == NULL) {
+                    goto conversion_error;
+                }
             } else {
-                buff_ptr = long2str(long_num, buff + 512, format);
+                if ((buff_ptr = long2str(long_num, buff + 512, format)) == NULL) {
+                    goto conversion_error;
+                }
             }
-            if (buff_ptr != NULL) {
-                num_chars = (buff + 511) - buff_ptr;
-            }
+            num_chars = (buff + 511) - buff_ptr;
             break;
         case 'E':
         case 'F':
@@ -994,9 +975,10 @@ static int __pformatter(WriteProc write, WriteArg* write_arg, const char* format
                 double_num = *(f64*)__va_arg(args, 3);
             }
             buff_ptr = float2str(double_num, buff + 512, format);
-            if (buff_ptr != NULL) {
-                num_chars = (buff + 511) - buff_ptr;
+            if (buff_ptr == NULL) {
+                goto conversion_error;
             }
+            num_chars = (buff + 511) - buff_ptr;
             break;
         case 'A':
         case 'a':
@@ -1006,9 +988,10 @@ static int __pformatter(WriteProc write, WriteArg* write_arg, const char* format
                 double_num = *(f64*)__va_arg(args, 3);
             }
             buff_ptr = double2hex(double_num, buff + 512, format);
-            if (buff_ptr != NULL) {
-                num_chars = (buff + 511) - buff_ptr;
+            if (buff_ptr == NULL) {
+                goto conversion_error;
             }
+            num_chars = (buff + 511) - buff_ptr;
             break;
         case 's':
             if (format.argument_options == ARG_WIDE) {
@@ -1020,9 +1003,8 @@ static int __pformatter(WriteProc write, WriteArg* write_arg, const char* format
                 if (wcs_ptr == NULL) {
                     wcs_ptr = (const u16*)L"";
                 }
-                if ((int)wcstombs(buff, wcs_ptr, 512) < 0) {
-                    buff_ptr = NULL;
-                    break;
+                if ((num_chars = wcstombs(buff, wcs_ptr, 512)) < 0) {
+                    goto conversion_error;
                 }
                 buff_ptr = buff;
             } else {
@@ -1094,11 +1076,7 @@ static int __pformatter(WriteProc write, WriteArg* write_arg, const char* format
             num_chars = 1;
             break;
         default:
-            buff_ptr = NULL;
-            break;
-        }
-
-        if (buff_ptr == NULL) {
+        conversion_error:
             num_chars = strlen(curr_format);
             chars_written += num_chars;
             if (num_chars != 0 && write(write_arg, curr_format, num_chars) == NULL) {

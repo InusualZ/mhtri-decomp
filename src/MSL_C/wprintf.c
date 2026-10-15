@@ -13,18 +13,14 @@
  *    string are the `.data` record at 0x8060F4C8 (0x70 B); `.rodata` 0x80573188 is the empty narrow string; the
  *    pooled `0.0` at `.sdata2` 0x8079CA28 repeats at 0x8079CA10, so this is a TU of its own. `wfloat2str` builds the
  *    number as narrow digits in a local buffer and widens it with `mbstowcs`.
- * RESIDUALS. `__wpformatter`: retail jumps from every failed conversion straight into the bad-conversion block (MSL's
- *    `goto conversion_error`); the `buff_ptr == NULL` test after the switch adds a compare and recolours the
- *    callee-saved registers - the goto spelling measures 97.0 against 95.7.
- * RESIDUALS. `wfloat2str`: retail's `%g` case jumps into the `%e` / `%f` bodies (MSL's `goto e_format` / `f_format`);
- *    the `style` dispatch adds the `li`/`b` pairs and compares.
- * RESIDUALS. `wround_decimal`: retail's final zero case branches back to the `new_length < 0` block (MSL's `goto
- *    return_zero`); the `for (;;)` re-entry adds `li r4,-1; b`.
  * RESIDUALS. `.data` is 670 B against the map's 672 B and `.rodata` 1 B against 8 B (padding).
  * SHAPES. wide characters are `u16`; the format record is built in a local and copied out; by-value
  *    `wprint_format` arguments are copied by the caller. The bodies are the narrow printf bodies with MSL's wide
  *    spellings, retail's copy-paste slips included: `wfloat2str` checks `buff - p + precision` against the start of its
- *    narrow buffer, and the narrow `%#s` path reads its length byte through the stale wide `buff_ptr`.
+ *    narrow buffer, and the narrow `%#s` path reads its length byte through the stale wide `buff_ptr`. MSL's own gotos
+ *    shape `wround_decimal` (`goto return_zero`), `wfloat2str` (`goto e_format` / `f_format`) and `__wpformatter`
+ *    (`goto conversion_error` into the switch's `default`); `__wpformatter` stores the `%n` count through `buff_ptr`,
+ *    and its local declaration order decides its colouring and the `fill_char` / `pad_char` stack slots.
  */
 
 #include "MSL_C/ansi_fp.h"
@@ -626,63 +622,53 @@ static void wround_decimal(decimal* dec, int new_length)
 {
     char c;
     char* p;
-    char* q;
     int carry;
-    int length;
 
-    for (;;) {
-        if (new_length < 0) {
-            dec->exp = 0;
-            dec->sig.length = 1;
-            dec->sig.text[0] = '0';
-            return;
-        }
-
-        length = dec->sig.length;
-        if (new_length >= length) {
-            return;
-        }
-
-        p = (char*)dec->sig.text + new_length;
-        c = dec->sig.text[new_length] - '0';
-        if (c == 5) {
-            q = (char*)dec->sig.text + length;
-            do {
-                --q;
-            } while (q > p && *q == '0');
-            if (q == p) {
-                carry = p[-1] & 1;
-            } else {
-                carry = 1;
-            }
-        } else {
-            carry = c > 5;
-        }
-
-        while (new_length != 0) {
-            c = *--p + carry - '0';
-            carry = c > 9;
-            if (carry || c == 0) {
-                --new_length;
-            } else {
-                *p = c + '0';
-                break;
-            }
-        }
-
-        if (carry) {
-            dec->sig.length = 1;
-            dec->exp++;
-            dec->sig.text[0] = '1';
-            return;
-        }
-        if (new_length != 0) {
-            dec->sig.length = new_length;
-            return;
-        }
-        /* the cut leaves no digit: re-enter as the zero result */
-        new_length = -1;
+    if (new_length < 0) {
+    return_zero:
+        dec->exp = 0;
+        dec->sig.length = 1;
+        dec->sig.text[0] = '0';
+        return;
     }
+
+    if (new_length >= dec->sig.length) {
+        return;
+    }
+
+    p = (char*)dec->sig.text + new_length + 1;
+    c = *--p - '0';
+
+    if (c == 5) {
+        char* q = (char*)dec->sig.text + dec->sig.length;
+
+        while (--q > p && *q == '0') {
+        }
+        carry = (q == p) ? p[-1] & 1 : 1;
+    } else {
+        carry = c > 5;
+    }
+
+    while (new_length != 0) {
+        c = *--p - '0' + carry;
+        if ((carry = c > 9) != 0 || c == 0) {
+            --new_length;
+        } else {
+            *p = c + '0';
+            break;
+        }
+    }
+
+    if (carry != 0) {
+        dec->exp += 1;
+        dec->sig.length = 1;
+        dec->sig.text[0] = '1';
+        return;
+    } else if (new_length == 0) {
+        goto return_zero;
+    }
+
+    dec->sig.length = new_length;
 }
 
 /* 0x80462814 (0x790): renders a double in `e`, `f` or `g` style (or as INF / NAN) as narrow digits widened into `buff`. */
@@ -700,7 +686,6 @@ static u16* wfloat2str(f64 num, u16* wbuff, wprint_format format)
     int int_digits;
     int frac_digits;
     int radix_marker;
-    int style;
 
     radix_marker = *(u8*)_lconv.decimal_point;
 
@@ -779,32 +764,19 @@ static u16* wfloat2str(f64 num, u16* wbuff, wprint_format format)
             } else {
                 format.conversion_char = 'E';
             }
-            style = 0;
-        } else {
-            if (format.alternate_form) {
-                format.precision -= dec.exp + 1;
-            } else {
-                if ((format.precision = dec.sig.length - (dec.exp + 1)) < 0) {
-                    format.precision = 0;
-                }
-            }
-            style = 1;
+            goto e_format;
         }
-        break;
+        if (format.alternate_form) {
+            format.precision -= dec.exp + 1;
+        } else {
+            if ((format.precision = dec.sig.length - (dec.exp + 1)) < 0) {
+                format.precision = 0;
+            }
+        }
+        goto f_format;
     case 'e':
     case 'E':
-        style = 0;
-        break;
-    case 'f':
-    case 'F':
-        style = 1;
-        break;
-    default:
-        style = -1;
-        break;
-    }
-
-    if (style == 0) {
+    e_format:
         if (dec.sig.length > format.precision + 1) {
             wround_decimal(&dec, format.precision + 1);
         }
@@ -845,7 +817,10 @@ static u16* wfloat2str(f64 num, u16* wbuff, wprint_format format)
         } else if (format.sign_options == SIGN_SPACE) {
             *--p = ' ';
         }
-    } else if (style == 1) {
+        break;
+    case 'f':
+    case 'F':
+    f_format:
         if ((frac_digits = -dec.exp + dec.sig.length - 1) < 0) {
             frac_digits = 0;
         }
@@ -891,6 +866,7 @@ static u16* wfloat2str(f64 num, u16* wbuff, wprint_format format)
         } else if (format.sign_options == SIGN_SPACE) {
             *--p = ' ';
         }
+        break;
     }
 
     pw = wbuff - strlen(p) - 1;
@@ -902,21 +878,21 @@ static u16* wfloat2str(f64 num, u16* wbuff, wprint_format format)
 static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* format_str, va_list args, int is_secure)
 {
     int num_chars;
+    u16 fill_char = ' ';
     int chars_written;
-    int field_width;
+    wprint_format format;
     const u16* format_ptr;
     const u16* curr_format;
-    wprint_format format;
+    f64 double_num;
     long long_num;
     long long long_long_num;
-    f64 double_num;
-    u16 buff[512];
-    u16* buff_ptr;
-    u16 fill_char = ' ';
-    u16 pad_char;
-    const char* str_ptr;
     char c_buff;
+    int field_width;
+    u16 buff[512];
+    u16 pad_char;
     int narrow_len;
+    u16* buff_ptr;
+    const char* str_ptr;
 
     format_ptr = format_str;
     chars_written = 0;
@@ -960,13 +936,15 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
                 long_num = (short)long_num;
             }
             if (format.argument_options == ARG_LONG_LONG || format.argument_options == ARG_INTMAX) {
-                buff_ptr = wlonglong2str(long_long_num, buff + 512, format);
+                if ((buff_ptr = wlonglong2str(long_long_num, buff + 512, format)) == NULL) {
+                    goto conversion_error;
+                }
             } else {
-                buff_ptr = wlong2str(long_num, buff + 512, format);
+                if ((buff_ptr = wlong2str(long_num, buff + 512, format)) == NULL) {
+                    goto conversion_error;
+                }
             }
-            if (buff_ptr != NULL) {
-                num_chars = (buff + 511) - buff_ptr;
-            }
+            num_chars = (buff + 511) - buff_ptr;
             break;
         case 'o':
         case 'u':
@@ -989,13 +967,15 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
                 long_num = (u16)long_num;
             }
             if (format.argument_options == ARG_LONG_LONG || format.argument_options == ARG_INTMAX) {
-                buff_ptr = wlonglong2str(long_long_num, buff + 512, format);
+                if ((buff_ptr = wlonglong2str(long_long_num, buff + 512, format)) == NULL) {
+                    goto conversion_error;
+                }
             } else {
-                buff_ptr = wlong2str(long_num, buff + 512, format);
+                if ((buff_ptr = wlong2str(long_num, buff + 512, format)) == NULL) {
+                    goto conversion_error;
+                }
             }
-            if (buff_ptr != NULL) {
-                num_chars = (buff + 511) - buff_ptr;
-            }
+            num_chars = (buff + 511) - buff_ptr;
             break;
         case 'E':
         case 'F':
@@ -1009,9 +989,10 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
                 double_num = *(f64*)__va_arg(args, 3);
             }
             buff_ptr = wfloat2str(double_num, buff + 512, format);
-            if (buff_ptr != NULL) {
-                num_chars = (buff + 511) - buff_ptr;
+            if (buff_ptr == NULL) {
+                goto conversion_error;
             }
+            num_chars = (buff + 511) - buff_ptr;
             break;
         case 'A':
         case 'a':
@@ -1021,9 +1002,10 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
                 double_num = *(f64*)__va_arg(args, 3);
             }
             buff_ptr = wdouble2hex(double_num, buff + 512, format);
-            if (buff_ptr != NULL) {
-                num_chars = (buff + 511) - buff_ptr;
+            if (buff_ptr == NULL) {
+                goto conversion_error;
             }
+            num_chars = (buff + 511) - buff_ptr;
             break;
         case 's':
             if (format.argument_options == ARG_WIDE) {
@@ -1077,46 +1059,41 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
             } else {
                 narrow_len = strlen(str_ptr);
             }
-            num_chars = mbstowcs(buff, str_ptr, narrow_len);
-            if (num_chars < 0) {
-                buff_ptr = NULL;
-                break;
+            if ((num_chars = mbstowcs(buff, str_ptr, narrow_len)) < 0) {
+                goto conversion_error;
             }
             buff_ptr = buff;
             break;
-        case 'n': {
-            int* n_ptr;
-
+        case 'n':
             if (is_secure) {
                 __msl_runtime_constraint_violation_s(NULL, NULL, -1);
                 return -1;
             }
-            n_ptr = *(int**)__va_arg(args, 1);
+            buff_ptr = *(u16**)__va_arg(args, 1);
             switch (format.argument_options) {
             case ARG_NORMAL:
-                *n_ptr = chars_written;
+                *(int*)buff_ptr = chars_written;
                 break;
             case ARG_SHORT:
-                *(short*)n_ptr = chars_written;
+                *(short*)buff_ptr = chars_written;
                 break;
             case ARG_LONG:
-                *(long*)n_ptr = chars_written;
+                *(long*)buff_ptr = chars_written;
                 break;
             case ARG_INTMAX:
-                *(long long*)n_ptr = chars_written;
+                *(long long*)buff_ptr = chars_written;
                 break;
             case ARG_SIZE_T:
-                *(int*)n_ptr = chars_written;
+                *(int*)buff_ptr = chars_written;
                 break;
             case ARG_PTRDIFF_T:
-                *(int*)n_ptr = chars_written;
+                *(int*)buff_ptr = chars_written;
                 break;
             case ARG_LONG_LONG:
-                *(long long*)n_ptr = chars_written;
+                *(long long*)buff_ptr = chars_written;
                 break;
             }
             continue;
-        }
         case 'c':
             buff_ptr = buff;
             if (format.argument_options == ARG_WIDE) {
@@ -1133,11 +1110,7 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
             num_chars = 1;
             break;
         default:
-            buff_ptr = NULL;
-            break;
-        }
-
-        if (buff_ptr == NULL) {
+        conversion_error:
             num_chars = wcslen(curr_format);
             chars_written += num_chars;
             if (num_chars != 0 && write(write_arg, curr_format, num_chars) == NULL) {

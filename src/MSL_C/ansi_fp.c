@@ -12,11 +12,9 @@
  * EVIDENCE. `.sdata2` 0x8079C9A8..0x8079C9E0 holds `0.0 / 1.0 / -1.0 / 5.0 / DBL_MAX / 2^52 magic`, and the value
  *    `0.0` is pooled again at 0x8079C9F8 (read by the printf unit) so the next pool is another TU; the jump table
  *    `.data` 0x8060EA98 is the `__two_exp` switch, the power table `.rodata` 0x80572540 the powers-of-two digit strings.
- * RESIDUALS. `__str2dec`, `__timesdec`, `__minus_dec`: retail scans the rounding tail with a counted loop whose
- *    nonzero exit jumps past the parity test (MSL's `goto round` / `goto done`); every goto-free spelling either
- *    duplicates the inlined round-up or adds the `q < end` compare and loses the `mtctr`/`bdnz` - the goto spellings
- *    measure 100 against 89.2, 98.7 and 99.3.
- * SHAPES. the digit loops are compiler-unrolled by eight; `decimal` copies are struct assignments. MSL's helper
+ * RESIDUALS. none in `.text`.
+ * SHAPES. `__str2dec`, `__timesdec` and `__minus_dec` scan the rounding tail with a loop whose nonzero exit is MSL's
+ *    own `goto round` / `goto done` past the parity test (the counted `mtctr`/`bdnz` form needs it); the digit loops are compiler-unrolled by eight; `decimal` copies are struct assignments. MSL's helper
  *    shapes decide the colouring: `count_trailing_zero(f64)` declares its locals before assigning them, `__num2dec`
  *    rounds through the inline `__rounddec` / `__must_round` / `__dorounddecup`, and `__dec2num` keeps the NaN word
  *    as a `u64` and runs its feedback loop with the bracket tail inside the loop.
@@ -122,15 +120,18 @@ void __timesdec(decimal* result, const decimal* x, const decimal* y)
     result->sig.length = i;
     if (ptr < end && *ptr >= 5) {
         if (*ptr == 5) {
-            const u8* q = ptr + 1;
+            const u8* q;
 
-            while (q < end && *q == 0) {
-                q++;
+            for (q = ptr + 1; q < end; q++) {
+                if (*q != 0) {
+                    goto round;
+                }
             }
-            if (q == end && !(ptr[-1] & 1)) {
+            if (!(ptr[-1] & 1)) {
                 return;
             }
         }
+    round:
         __round_up_dec(result);
     }
 }
@@ -158,13 +159,14 @@ void __str2dec(decimal* d, const char* s, s16 exp)
 
         for (; *t != 0; t++) {
             if (*t != '0') {
-                break;
+                goto round;
             }
         }
-        if (*t == 0 && !(d->sig.text[i - 1] & 1)) {
+        if (!(d->sig.text[i - 1] & 1)) {
             return;
         }
     }
+round:
     __round_up_dec(d);
 }
 
@@ -387,15 +389,14 @@ void __minus_dec(decimal* z, const decimal* x, const decimal* y)
         } else if (*jn == 5) {
             const u8* je = y->sig.text + y->sig.length;
 
-            j = jn + 1;
-            while (j < je && *j == 0) {
-                ++j;
-            }
-            if (j >= je) {
-                i = ib + (jn - jb) + dexp - 1;
-                if (*i & 1) {
-                    round_down = 1;
+            for (j = jn + 1; j < je; ++j) {
+                if (*j != 0) {
+                    goto done;
                 }
+            }
+            i = ib + (jn - jb) + dexp - 1;
+            if (*i & 1) {
+                round_down = 1;
             }
         }
         if (round_down) {
@@ -413,6 +414,7 @@ void __minus_dec(decimal* z, const decimal* x, const decimal* y)
             *i -= 1;
         }
     }
+done:
     for (i = ib; *i == 0; ++i) {
     }
     if (i > ib) {
