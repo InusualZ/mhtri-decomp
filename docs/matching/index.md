@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (133)
+## Ideas that work (135)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -142,6 +142,8 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 146 | [An initialised array whose size is a multiple of 8 is 8-aligned, so a 4-aligned target object is not one array](146-initialised-array-8-align.md) | works | data, sections | A `.data` run that the map calls one array is not byte-identical when emitted as one array - ours is padded to an 8-byte boundary where the target continues 4-aligned. |
 | 147 | [Pool and string offsets shifted by a missing function: write the functions the linker strips](147-stripped-functions-pool-offsets.md) | works | data, sections | Every string or literal row of a unit relocates against the right section but the wrong offset, or the literal pool is in another order, while the functions that use them are correct. |
 | 155 | [A member cleanup record retail lacks: define the callee before its caller (MWCC's nothrow knowledge)](155-nothrow-callee-before-caller.md) | works | source-shape, sections | Our constructor or destructor carries an extab cleanup record (a member's destructor, an array's destroy, a base destructor) that retail's lacks, with byte-identical code - the call it guards is one MWCC could not yet... |
+| 156 | [A redundant same-type cast on the base pointer is a codegen input: it decides whether a field address is shared with its load](156-redundant-same-type-cast.md) | works | source-shape | Retail loads a field off the base (`lwz r6,0x654c(r3)`) and materialises the field's address last (`addi r8,r3,0x654c`), while ours computes the address first and loads through it (`addi r8,r3,0x654c` ... `lwz... |
+| 157 | [A constant tag block copied into a local is a brace-initialised local array emitted into the TU's own .sdata2 pool](157-constant-tag-block-copied.md) | works | source-shape, data | Retail copies a constant byte block into a stack local with both loads before the stores (`lwz r4,X@sda21 ; lwz r0,X+4@sda21 ; stw r4 ; stw r0`, or `lhz`+`lbz` for 3 bytes), the map names the words as separate `.sdata2`... |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

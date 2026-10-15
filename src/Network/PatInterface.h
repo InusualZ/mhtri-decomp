@@ -1139,13 +1139,6 @@ s32 sendReqBlackList(NetworkInstance* self, s32 mode, s32 max);
 
 /* ==== the request state machine (the former `Network/network_state.cpp`) ===================================== */
 
-/* The 3-byte payload `sendServerTimeout` builds from the two unowned constants. */
-typedef struct SessionTimeoutPayload {
-    /* +0x00 */ u16 code_00;
-    /* +0x02 */ u8  reason_02;
-    /* +0x03 */ u8  pad_03;
-} SessionTimeoutPayload;   /* size: 0x04 */
-
 /* `NetworkPostedError` (0x0C B) is defined in `unsplit/Network.h`; `PatInterface::postError` takes it by value. */
 
 #ifdef __cplusplus
@@ -1163,14 +1156,7 @@ s32  handleNetworkState1(NetworkInstance* self);
 s32  resetNetworkState4(NetworkInstance* self);
 s32  handleNetworkState4(NetworkInstance* self, s32 arg);
 
-/* The band's request-header constants (no registered owner; declared, never defined - playbook 29).
- * `sessionTimeoutParam`/`Param2` are the bytes {1,2,3}, `requestHeaderWord0`/`Word1` the 8-byte block
- * {1,2,3,5,4,6,7,8} `sendReqOpcode1B` copies, `maskedUserName` the "******" sentinel
- * `sendReqUserObject` compares a row's short name against. */
-extern const u16 sessionTimeoutParam;      /* 0x8079C7D8 */
-extern const u8  sessionTimeoutParam2;     /* 0x8079C7DA */
-extern const u32 requestHeaderWord0;       /* 0x8079C7E0 */
-extern const u32 requestHeaderWord1;       /* 0x8079C7E4 */
+/* `maskedUserName` is the "******" sentinel `sendReqUserObject` compares a row's short name against. */
 extern const char maskedUserName[7];       /* 0x80793968 - the map's own size, so MWCC uses sda21 */
 
 /* 0x803FFE88 - sends the server-timeout request built from the three words at `values`. */

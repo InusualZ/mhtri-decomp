@@ -91,6 +91,12 @@ block_relocations:
 # The same code in NetworkCommunityPat::handle_68 (lis/addi at 0x803F17F8).
 - source: .text:0x803F17F8
   end: .text:0x803F1800
+# The server-code failure 0x80050044 in buildErrorInfo613c (lis/addi at 0x803FD774) is a constant, not fn_80050044.
+- source: .text:0x803FD774
+  end: .text:0x803FD77C
+# The server-code failure 0x80050038 in buildErrorInfo613c (lis/addi at 0x803FD784) is a constant, not fn_80050028+0x10.
+- source: .text:0x803FD784
+  end: .text:0x803FD78C
 # The fetcher's busy code 0x800A0004 (lis/addi in open, read, list, close and queryChecksum) is a constant,
 # not fn_8009F85C+0x7A8.
 - source: .text:0x803F67A0

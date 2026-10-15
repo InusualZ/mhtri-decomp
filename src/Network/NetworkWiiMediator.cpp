@@ -43,13 +43,11 @@
  *    loops' tests where MWCC strength-reduces it into its own register (declaration orders tried);
  *  - `postMediatorRecord`: retail keeps an `ori r3,r3,0` copy of the first filter result before testing it (a
  *    `bool` local, a `(u32)` cast and a conditional spelling tried);
- *  - `isShiftJisLeadByte`: retail evaluates the two byte ranges as four unsigned compares; MWCC folds each range into
- *    one `addi`/`clrlwi`/`cmplwi` and the `>= 224` test into branchless code for every spelling tried;
- *  - `parseReflectPacket`: the lead-byte guard lands in `cr1` where retail reuses `cr0`, and retail re-reads `in[1]`
- *    (`lbz`+`extsb`) before the `out[1] = in[1] - 32` store; the switch and if-chain spellings emit the same object;
+ *  - `parseReflectPacket`: retail stores the copied bytes (`out[0] = in[0]`, `out[0] = c`) without the `extsb` ours
+ *    keeps under `peephole off`, and re-reads `in[1]` after the `out[0]` store (`peephole on`, `u8*`/`const u8*`
+ *    parameters and a `char` `c` tried: each trades one `extsb` for another or a `clrlwi`);
  *  - `buildReflectPacket`: the same instructions and size (344 B); a relocation artefact of the split;
  *  - `updateServerTime`: the 64-bit tail `return 0` emits `li r3,0` where retail emits `li r4,0` + `mr r3,r4`;
- *  - `isNameSymbolChar`: the `u8` local's mask lands in r3, retail r0 (a `u8` parameter costs `validateReflectName`);
  *  - `popTransferRecord`: retail computes `&length` before the queue address for the first `memcpy`;
  *    `pushTransferRecord`: r29-r31 permuted; `setGameInfo2d1c`: the title length in r29 where retail reuses r28;
  *  - `.data`: MWCC names the jump tables anonymously while the map calls them `jumptable_806024B8` (177 entries),
@@ -60,6 +58,10 @@
  *  - `initializeNetworkMediator` and `reflectInit` allocate with real `new PatInterface();` / `new
  *    NetworkReflectService();` / `new GameSpyInterfaceThread();` (playbook 62): each class has a declared constructor
  *    and a padding member making `sizeof` the allocation size (0xD640 / 0x816C / 0x44A0);
+ *  - a byte classifier keeps retail's two compares per range with the upper bound constant-first (`159 >= value`,
+ *    playbook 117) and a `result` local, or with each range as `(u8)(value - lo) > n` in one positive test whose
+ *    `return 1` comes first (`isShiftJisLeadByte`, `isNameSymbolChar`); a 0xC3-escaped Latin-1 `0xBF` (y-diaeresis)
+ *    becomes the two-byte `C5 B8`;
  *  - the slot range test is `slot < 0 || 4 <= slot` with an early return; the transfer queue is one flat array indexed
  *    by `slot << 12`; `applyEvent` takes the code as `s32` (the `addis` before the unsigned case compares);
  *  - each terms leaf accessor sits right after its first caller, the layout MWCC gives an uninlined inline function;
@@ -1046,23 +1048,25 @@ void updatePatField860(NetworkWiiMediator* self, u32 value)
 }
 s32 isShiftJisLeadByte(NetworkWiiMediator* self, u8 value)
 {
+    s32 result = 0;
+
     (void)self;
-    if ((value >= 129 && value <= 159) || (value >= 224 && value <= 239)) {
-        return 1;
+    if ((value >= 129 && 159 >= value) || (value >= 224 && 239 >= value)) {
+        result = 1;
     }
-    return 0;
+    return result;
 }
 s32 isNameSymbolChar(NetworkWiiMediator* self, char value)
 {
     (void)self;
     u8 symbol = (u8)value;
-    if (symbol == 0 || symbol >= 144 ||
-        (symbol >= 0x30 && symbol <= 0x39) ||
-        (symbol >= 0x41 && symbol <= 0x5A) ||
-        (symbol >= 0x61 && symbol <= 0x7A)) {
-        return 0;
+    if (symbol != 0 && symbol < 144 &&
+        (u8)(value - 0x30) > 9 &&
+        (u8)(value - 0x41) > 25 &&
+        (u8)(value - 0x61) > 25) {
+        return 1;
     }
-    return 1;
+    return 0;
 }
 void parseReflectLines(NetworkWiiMediator* self, s32 source)
 {
@@ -1124,7 +1128,7 @@ s32 parseReflectPacket(NetworkWiiMediator* self, char* out, const char* in, u32 
     (void)self;
     (void)unused4;
     if (length > 1 && (u8)in[0] == 0xC3 && (u8)in[1] >= 0xA0 && (u8)in[1] <= 0xBF) {
-        if ((u8)in[1] == 0xA0) {
+        if ((u8)in[1] == 0xBF) {
             out[0] = (char)0xC5;
             out[1] = (char)0xB8;
             return 2;
@@ -1135,11 +1139,11 @@ s32 parseReflectPacket(NetworkWiiMediator* self, char* out, const char* in, u32 
             return 2;
         }
     }
-    char c = in[0];
+    u8 c = in[0];
     if ((u8)(c - 97) <= 25) {
         out[0] = (char)(c - 32);
     } else if (allowSymbolMap != 0) {
-        switch (c - 33) {
+        switch ((char)c - 33) {
         case 31:
             out[0] = 'A';
             break;

@@ -13,8 +13,11 @@
  * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md).  File-scope `#pragma peephole off`
  *   (memset/memcpy argument order, the unfused `extsb`+`cmpwi` of `isOpeningAnnounce`, the `clrlwi r0,r0,16` before the
  *   ticket size's `sth`, the `bge`+`b` pairs), on for `setSomething` (its s32 store keeps no `clrlwi` only with the
- *   pass on) and for the state machine except `handleNetworkState2Binary` (retail's unfused `extsb r0,r0` + `cmpwi
- *   r0,0`, playbook 39).
+ *   pass on) and for `handleNetworkState1`, `advanceNetworkState5` and the request emitters before
+ *   `resetNetworkState4`; off again for `handleNetworkState2`, `handleNetworkState2Fmp`, `handleNetworkState2Binary`
+ *   and `handleNetworkState4` (retail's unfused `extsb r0,r0` + `cmpwi r0,0` / `subf` + `cmpwi`, and the
+ *   memcpy/memset argument order; their state bytes advance with `+=`, playbook 39/95).  `buildErrorInfo613c` is
+ *   `#pragma optimization_level 4` (the `subi`+`cmplwi` range-first switch lowering, playbook 108).
  * NAMES. The runtime dump names 14 of the state machine's 21 functions.  GUESSes from the bodies:
  *   `advanceNetworkState5` (gates on the +0x6133 == 5 byte); the `Fmp`/`Binary` suffixes of the three block-2
  *   dispatchers the map spells alike (the request family each calls); `sendReqOpcode1B`/`1F` (the wire opcode);
@@ -30,7 +33,6 @@
  *   `restoreFmpSelection`, `sendNtcLayerBinaryTo`/`sendNtcCircleBinaryTo` ...); `getFo` and the `getItem*` names
  *   are the log strings' (`PatInterface:getFo()`), and so are the real names of `stepPatInterface`
  *   ("PatInterface::move()") and `chooseServerAddress` ("setCurrentServer").  Data rows from their content:
- *   `sessionTimeoutParam`/`Param2` (0x8079C7D8/DDA, the bytes {1,2,3}), `requestHeaderWord0`/`1` (0x8079C7E0/E4),
  *   `maskedUserName` (0x80793968, "******").  GUESSes named by the mediator band for the field or slot each touches:
  *   `setPatReflectPageRange` (the body installs handler 0 and resets the login state), `PatInterface::clear`,
  *   `PatInterface::isReady`, `getPatServerTime`, `setPatBuffer`, `setPatRange`, `getPatAccountName`,
@@ -40,59 +42,66 @@
  *    `getSomething4` (the `s8` return adds an `extsb`), `sendNtcLayerUserPosition`, `sendNtcCircleChat`,
  *    `sendReqCircleInfoNoticeSet`, `reqUserSearchInfoMine`, `sendReqChannelInfo` (declared `void`, retail returns the
  *    request id), `sendReqUserSearchInfo`/`sendReqUserSearchHead` (the `s32`/`u8` mode parameter is retail's `s8`);
- *  - `buildErrorInfo613c`: retail lowers the switch on the server code to `code + 0x9A0000` range tests, ours to a
- *    compare chain (signed and unsigned case spellings tried);
  *  - `pushStack`: allocator colouring in the tail's three loads;
- *  - `sendNtcCircleUserValue`, `sendNtcLayerUserTransfer`, `sendLayerBinaryRecord`: retail keeps the kind byte's
- *    `li`/`beq`/`li` where ours if-converts to `neg`/`or`/`srwi` (ternary and if/else spellings tried);
- *  - `handleNetworkState2Binary`: the case-60 tokenizer leaves a loop from inside two nested loops (the conformant
- *    `&& != 0` plus `break` is 76 B short); retail recomputes the offset from `i` with `lbzx` off `self`, unrolls the
- *    token fill by 8 with an `andi.` remainder and saves 2 registers in line (ours 5, `_savegpr_27`); `-O2`, `-opt
- *    nostrength`, `u8*`/`u32*` aliases and every loop form tried are worse;
+ *  - `sendNtcCircleUserValue`, `sendNtcLayerUserTransfer`, `sendLayerBinaryRecord`: retail compares before loading the
+ *    kind byte's default (`cmpwi`; `li`; `beq`; `li`), ours loads it first (the `tag` temporary keeps the branch and
+ *    the single `stb`; a ternary or an if/else if-converts to `neg`/`or`/`srwi`, a default in the declaration costs a
+ *    callee-saved register);
+ *  - `handleNetworkState2Binary`: the tokenizer's `i` is strength-reduced into a walking `self + i` pointer where retail
+ *    indexes `lbzx` off `self` with `i + 0xD409` (so ours also reloads the byte the last `\r`/`\n` loop tested, and
+ *    keeps `self + 0x10000` per use); `#pragma opt_strength_reduction off` and `-O2`-level spellings are worse;
  *  - `sendReqUserObject`, `sendReqUnknownCheck`: the masked tag index (retail `clrlwi r0,r0,24` before `stbx`; `count`
- *    is a local whose range MWCC proves, so it folds the u8 conversion; an inlined `appendTag` helper and every index
- *    spelling tried are byte-identical); the error path is retail's through a by-value `postError_288(self, info)`; the
- *    vcall stages its vptr through a scratch register; `sendReqUnknownCheck` keeps one extra `li` (its two `1`
- *    constants do not CSE);
- *  - `handleNetworkState2Fmp`: one more callee-saved register (ours caches `serverCount_6604[1]` in r30) and the
- *    `memcpy` argument order in case 50;
- *  - `handleNetworkState2`, `handleNetworkState4`: retail's unfused `lbz; extsb; cmpwi r0,0` / `subf` + `cmpwi r0,0`
- *    where ours folds (not a peephole row; `-opt nocse`/`nopropagation`/`nodeadcode`/`nolifetimes` byte-identical), and
- *    argument setups one slot out of place;
- *  - `handleNetworkState1`: allocator colouring (the switch value in r4, retail r6; the transient `dataSent` in r4/r6);
- *  - `sendReqLoginInfo`: the remaining operand rows after `(u8)(loginInfoSent_82B4 + 255) <= 1` (retail's
- *    `addi`/`clrlwi`/`cmplwi` on the memory-loaded u8);
- *  - `sendReqOpcode1B`: retail loads both request-header words before storing either (a brace initialiser, temporaries
- *    and a struct local tried);
- *  - `reportPatError`: retail materialises `&pendingError_654C` after the code load;
+ *    is a local whose range MWCC proves, so it folds the u8 conversion; a `u8` count, `(u8)count++`, an inlined
+ *    `appendTag` helper and the `opt_*` pragmas do not keep it); the error path is retail's through a by-value
+ *    `postError_288(self, info)`; the vcall stages its vptr through a scratch register; `sendReqUnknownCheck` keeps
+ *    one extra `li` (its two `1` constants do not CSE);
+ *  - `handleNetworkState2Fmp`: the user-row search's offset induction `li r6,0` is scheduled after the count load
+ *    (retail before it; declaration order and the comma-initialised `for` tried);
+ *  - `handleNetworkState1`: `mode`'s `li r4,2` is scheduled before the `cmpwi` of `flag` (retail after; an if/else
+ *    if-converts, an earlier `mode = 2` costs a callee-saved register);
+ *  - `sendReqLoginInfo`: the tag-9 `li` and the count `li` swap in each branch, and the `putItemAny` argument setup
+ *    computes `&loginFields_82AC` last (statement orders, `const` and cast spellings tried);
  *  - `recvAnsAgreementPageInfo`: retail addresses the page count as `infoPtr+12`, ours folds it to `r1+28`.
- *  Data: `.data` and `.rodata` are byte-identical up to their tail padding; `.sdata2` differs from +0x9 (the state
- *  machine's constants stay `extern`, the builders' tag lists are emitted as their own literals).
+ *  - the tag lists (`sendServerTimeout` {1,2,3} at 0x8079C7D8, `sendReqOpcode1B`'s 8-byte block at 0x8079C7E0, the
+ *    runs from 0x8079C7E8) are single pool objects, one map row each (size = the array).
+ *  - `handleNetworkState2Binary`'s `extabindex` row carries its size, so it differs while the function's size does.
+ *  Data: `.data` and `.rodata` are byte-identical up to their tail padding; `.sdata2` is byte-identical up to its tail
+ *  padding; `.sdata` emits the `getServerName` strings as weak `@STRING@` objects in reverse ("", "???" .. "FMP")
+ *  where retail has "******" (`maskedUserName`, declared `extern`) then "FMP" .. "???", ""; `.sbss` is 4 of retail's 8 B.
  * SHAPES. The destructor 0x803FCF8C is the key function, so this object emits `__vt__12PatInterface` (rule 10); the
  *   class derives from `PatConnection` (`Network/PatConnection.h`).  The `recv*` handlers are virtuals (slots
  *   +0x10..+0x280) that `recvCommand` reaches through the packet table's member pointers (`__ptmf_scall`), so their map
  *   rows carry the manglings; the `sendReq*` builders and the accessors keep C linkage (the map names them unmangled)
  *   and take `NetworkInstance*` (a typedef of `PatInterface`).  Each handler logs `"%s:<name> ok\n"` with
  *   `getServerName`.
+ *  - a same-type cast is a codegen input: `((PatInterface*)self)->x` for a `NetworkInstance* self` let MWCC share
+ *    `&pendingError_654C` with the code load in `reportPatError` (retail materialises it last, so `self->` is
+ *    written), while removing the `(NetworkStateMachine*)self` casts of `handleNetworkState2Binary` costs it 10 points;
  *  - an aliasing local (`NetworkStateMachine* st = ...`, `u8 state = <field>`) is its own web: write the expression at
- *    the use site; a state byte taken into a local is `s32`;
+ *    the use site; a state byte taken into a local is `s32`; under `peephole off` a state byte advances with `+=`
+ *    (`x = x + 5` keeps a `clrlwi` before the `stb`);
  *  - retail branches over a body and leaves the return last: write the positive test with the return as the case's last
  *    statement, the branch-taken block as the `else`, `a && b && c` negated (playbook 34, 71);
- *  - `cmpwi` in retail means the source compared signed: `(s32)field`, `(s32)count < 30`, `(s32)field == -1`;
+ *  - `cmpwi` in retail means the source compared signed: `(s32)field`, `(s32)count < 30`, `(s32)field == -1`; the
+ *    tokenizer's fill loop runs `for (; index < 8; index++)` on the signed `index` (retail's `cmpwi`, `srwi` by-8
+ *    unroll and `andi.` remainder) and stores `binaryTokens_D60C[index++] = i++`;
  *  - a u8 comparison survives only on a memory-loaded operand: `(u8)(field + 255) <= 1`;
  *  - a local byte buffer's declared size is the frame (`u8 block[16]` for retail's 0x30); an SDA extern needs its size
  *    (`extern const char maskedUserName[7]`, playbook 64; with `[]` MWCC emits `lis`/`addi` and two `R_PPC_ADDR16_*`
  *    relocations);
+ *  - a constant tag list is a brace-initialised local array (`u8 tags[3] = {1, 2, 3}`, `u8 header[8] = {...}`): MWCC
+ *    copies it from its own `.sdata2` pool object with `lhz`/`lbz` or two `lwz` loads before the stores;
  *  - `count = count + 1; tags[count - 1] = v` (an alignment effect, kept for its score); `tags[count++] = v` with a
- *    known count is retail's `li`/`li`/`stb`; `u32* tokens = self->binaryTokens_D60C;` in `handleNetworkState2Binary`;
+ *    known count is retail's `li`/`li`/`stb`;
  *  - locals of one size are laid out in reverse declaration order (playbook 63), a byte array shorter than 4 below the
  *    words (`u8 tags[4]` keeps retail's slot); an address-taken parameter is homed below the locals (the notices pass
  *    `&value` itself); the record readers walk `for (i = 0, entry = recs; ...) { ...; entry++; }` (the loop index
- *    declared first); a failed `readBodySlice` returns its own result; the stack-clamped list answers divide into a `maxCount` local; `x == 0 ? a : b` decides which constant
- *    loads first; the position notice's loop indexes `list.items_04[i]` (a walking pointer swaps r3/r4);
- *  - the state machine's constants are this unit's `.sdata2`/`.sdata` rows, declared `extern` in the unit header and
- *    never defined (playbook 29: defining them rebuilds the pool); `buildErrorInfo613c`'s codes 0x80050038/0x80050044
- *    read as relocations in the split object (the `block_relocations` case).
+ *    declared first); a failed `readBodySlice` returns its own result; the stack-clamped list answers divide into a
+ *    `maxCount` local; `x == 0 ? a : b` decides which constant loads first; the position notice's loop indexes
+ *    `list.items_04[i]` (a walking pointer swaps r3/r4); the FMP user-row search reads the row table and the count
+ *    through `st->` at each use (a cached `rows` pointer costs a callee-saved register);
+ *  - every `.sdata2` constant is emitted by its reader (the pool's float literals and the tag lists), so no `.sdata2`
+ *    row is declared `extern`; `maskedUserName` (`.sdata`) still is.
  */
 
 #include "types.h"
@@ -276,27 +285,27 @@ void PatInterface::resetDefaults()
 /* Takes a reference on the singleton; the first one clears the ticket's size and restores the defaults. */
 void openPatInterface(NetworkInstance* self)
 {
-    if (((PatInterface*)self)->refCount_60D4++ == 0) {
-        if (((PatInterface*)self)->ticket_8BB0 != NULL) {
-            ((PatInterface*)self)->ticket_8BB0->size_400 = 0;
+    if (self->refCount_60D4++ == 0) {
+        if (self->ticket_8BB0 != NULL) {
+            self->ticket_8BB0->size_400 = 0;
         }
-        ((PatInterface*)self)->resetDefaults();
+        self->resetDefaults();
     }
 }
 
 /* Takes a reference on the singleton; the first one restores the defaults. */
 void increment60d4(NetworkInstance* self)
 {
-    if (((PatInterface*)self)->refCount_60D4++ == 0) {
-        ((PatInterface*)self)->resetDefaults();
+    if (self->refCount_60D4++ == 0) {
+        self->resetDefaults();
     }
 }
 
 /* Drops a reference on the singleton. */
 void decrement60d4(NetworkInstance* self)
 {
-    if (((PatInterface*)self)->refCount_60D4 > 0) {
-        ((PatInterface*)self)->refCount_60D4--;
+    if (self->refCount_60D4 > 0) {
+        self->refCount_60D4--;
     }
 }
 
@@ -398,14 +407,14 @@ s32 PatInterface::isReady()
 /* Whether the singleton holds more than one reference. */
 s32 hasMultipleRefs60d4(NetworkInstance* self)
 {
-    return ((PatInterface*)self)->refCount_60D4 > 1;
+    return self->refCount_60D4 > 1;
 }
 
 /* Clears the error record unless an error is pending. */
 void clearErrorRecord613c(NetworkInstance* self)
 {
-    if (((PatInterface*)self)->pendingError_654C.code_00 == 0) {
-        memset(&((PatInterface*)self)->errorRecord_613C, 0, sizeof(PatErrorRecord));
+    if (self->pendingError_654C.code_00 == 0) {
+        memset(&self->errorRecord_613C, 0, sizeof(PatErrorRecord));
     }
 }
 
@@ -414,13 +423,14 @@ void clearErrorRecord613c(NetworkInstance* self)
 s32 errorRecordCode613c(NetworkInstance* self, const void* record)
 {
     if (record != NULL) {
-        memcpy((void*)record, &((PatInterface*)self)->errorRecord_613C, sizeof(PatErrorRecord));
+        memcpy((void*)record, &self->errorRecord_613C, sizeof(PatErrorRecord));
     }
-    return ((PatInterface*)self)->errorRecord_613C.code_000;
+    return self->errorRecord_613C.code_000;
 }
 
 /* Fills `out` with the negative reply's error (code 0x80000007 unless `code` is a failure code itself, step 0x68, the
  * server's code), mapping the server codes of request 0x80050012 to their own failure codes. */
+#pragma optimization_level 4
 void buildErrorInfo613c(NetworkInstance* self, u32 code, NetworkErrorInfo* out)
 {
     if (out != NULL) {
@@ -432,36 +442,37 @@ void buildErrorInfo613c(NetworkInstance* self, u32 code, NetworkErrorInfo* out)
         out->param1_04 = 0x68;
         out->param2_08 = self->errorRecord_613C.code_000;
         if (code == 0x80050012) {
-            switch ((u32)self->errorRecord_613C.code_000) {
-            case 0xFF667F17:
-            case 0xFF667F18:
-            case 0xFF667F20:
+            switch ((u32)self->errorRecord_613C.code_000 + 0x9A0000) {
+            case 0x7F17:
+            case 0x7F18:
+            case 0x7F20:
                 out->code_00 = 0x80050037;
                 break;
-            case 0xFF667F19:
-            case 0xFF667F1A:
-                out->code_00 = 0x80050038;
-                break;
-            case 0xFF667F1C:
+            case 0x7F1C:
                 out->code_00 = 0x80050039;
                 break;
-            case 0xFF667F1B:
+            case 0x7F1B:
                 out->code_00 = 0x80050044;
+                break;
+            case 0x7F19:
+            case 0x7F1A:
+                out->code_00 = 0x80050038;
                 break;
             }
         }
     }
 }
+#pragma optimization_level reset
 
 /* Copies the pending error out when `info` is non-null and returns its code (0 while none is kept). */
 s32 getErrorInfo654c(NetworkInstance* self, u32* info)
 {
     if (info != NULL) {
-        info[0] = ((PatInterface*)self)->pendingError_654C.code_00;
-        info[1] = ((PatInterface*)self)->pendingError_654C.param1_04;
-        info[2] = ((PatInterface*)self)->pendingError_654C.param2_08;
+        info[0] = self->pendingError_654C.code_00;
+        info[1] = self->pendingError_654C.param1_04;
+        info[2] = self->pendingError_654C.param2_08;
     }
-    return ((PatInterface*)self)->pendingError_654C.code_00;
+    return self->pendingError_654C.code_00;
 }
 
 /* Copies the kept error out; a generic one (0x80000000) is replaced by `code` when that is a failure code. */
@@ -506,19 +517,19 @@ s32 PatInterface::postError(NetworkErrorInfo* info)
 /* Keeps `error` as the pending error unless one is kept, then reports the pending one with event `kind`. */
 void reportPatError(NetworkInstance* self, u32 kind, sNetworkLibraryError error)
 {
-    if (((PatInterface*)self)->pendingError_654C.code_00 == 0) {
-        ((PatInterface*)self)->pendingError_654C.code_00 = error.facility;
-        ((PatInterface*)self)->pendingError_654C.param1_04 = error.step;
-        ((PatInterface*)self)->pendingError_654C.param2_08 = error.code;
+    if (self->pendingError_654C.code_00 == 0) {
+        self->pendingError_654C.code_00 = error.facility;
+        self->pendingError_654C.param1_04 = error.step;
+        self->pendingError_654C.param2_08 = error.code;
     }
-    dispatchSessionHandlers((PatInterface*)self, kind, NULL, ((PatInterface*)self)->pendingError_654C.code_00, 1,
-                            (const u8*)&((PatInterface*)self)->pendingError_654C);
+    dispatchSessionHandlers(self, kind, NULL, self->pendingError_654C.code_00, 1,
+                            (const u8*)&self->pendingError_654C);
 }
 
 /* Reports event `code` with its payload to the session handlers. */
 void notifyPatEvent(NetworkInstance* self, u32 code, u32 count, const u8* data)
 {
-    dispatchSessionHandlers((PatInterface*)self, code, NULL, 0, count, data);
+    dispatchSessionHandlers(self, code, NULL, 0, count, data);
 }
 
 /* Whether session handler `index` is bound (0 with a warning for a bad index). */
@@ -528,7 +539,7 @@ s32 isCallback(NetworkInstance* self, s32 index)
         getNetworkLogger()->warn_10("PatInterface:isCallback(): mpEventCbFunc[%d] is bound over.\n", index);
         return 0;
     }
-    return ((PatInterface*)self)->eventCallbacks_60D8[index] != NULL;
+    return self->eventCallbacks_60D8[index] != NULL;
 }
 
 /* Binds session handler `index` (0..7) with its argument: 1, or -1 with a warning for a bad index. */
@@ -539,8 +550,8 @@ s32 setCallback(NetworkInstance* self, void (*callback)(), void* arg, u32 index)
         getNetworkLogger()->warn_10("PatInterface:setCallback(): mpEventCbFunc[%d] is bound over.\n", index);
         return -1;
     }
-    ((PatInterface*)self)->eventCallbacks_60D8[index] = (PatEventCallback)callback;
-    ((PatInterface*)self)->eventCallbackArgs_60F8[index] = (u32)arg;
+    self->eventCallbacks_60D8[index] = (PatEventCallback)callback;
+    self->eventCallbackArgs_60F8[index] = (u32)arg;
     return 1;
 }
 
@@ -616,17 +627,17 @@ void growStackSize(NetworkStateMachine* self, u32 size)
 /* 1 when the busy flag is already set, else sets it and returns 0. */
 s32 testAndSet611b(NetworkInstance* self)
 {
-    if (((PatInterface*)self)->busy_611B != 0) {
+    if (self->busy_611B != 0) {
         return 1;
     }
-    ((PatInterface*)self)->busy_611B = 1;
+    self->busy_611B = 1;
     return 0;
 }
 
 /* Clears the busy flag. */
 void set611b(NetworkInstance* self)
 {
-    ((PatInterface*)self)->busy_611B = 0;
+    self->busy_611B = 0;
 }
 
 /* Selects the connect server type (modulo 4) and hands its server block to the connection; logs when no address was
@@ -694,8 +705,8 @@ void copyServerBlock(NetworkInstance* self, s32 type, u8* out)
 /* The game time: the server's game time at the last sync plus the clock's progress since. */
 u32 getGameTime(NetworkInstance* self)
 {
-    return (u32)(((PatInterface*)self)->clock_611C - ((PatInterface*)self)->clockAtSync_6120) +
-           ((PatInterface*)self)->gameTimeBase_6128;
+    return (u32)(self->clock_611C - self->clockAtSync_6120) +
+           self->gameTimeBase_6128;
 }
 
 /* The server's date-time at the last sync. */
@@ -707,7 +718,7 @@ u32 getServerTime(PatInterface* self)
 /* The server's date-time now: the last sync's plus the game time. */
 s32 getServerDateTime(NetworkInstance* self)
 {
-    return getServerTime((PatInterface*)self) + getGameTime(self);
+    return getServerTime(self) + getGameTime(self);
 }
 
 /* The FMP slot the query settled on. */
@@ -728,10 +739,10 @@ s32 copyFmpSlot(NetworkInstance* self, NetworkFmpSlot* out, s32 index)
     if (out == NULL) {
         return -1;
     }
-    if (index < 0 || index >= getFmpSize((PatInterface*)self)) {
+    if (index < 0 || index >= getFmpSize(self)) {
         return -2;
     }
-    memcpy(out, &((PatInterface*)self)->fmpSlots_6C40[index], sizeof(NetworkFmpSlot));
+    memcpy(out, &self->fmpSlots_6C40[index], sizeof(NetworkFmpSlot));
     return index;
 }
 
@@ -952,7 +963,7 @@ void PatInterface::setPatchMessageBuffer(s8* buffer, u32 size)
 /* Arms or disarms the binary sub-machine. */
 void setPatByteD400(NetworkInstance* self, u8 value)
 {
-    ((PatInterface*)self)->binaryActive_D400 = value;
+    self->binaryActive_D400 = value;
 }
 
 /* Token `index` (0..7) of the split binary reply; NULL past 7. */
@@ -983,20 +994,20 @@ char* getPatAccountName(PatInterface* self)
 /* Copies this client's 8-byte short id out. */
 void getSelectedID(NetworkInstance* self, u8* out)
 {
-    memcpy(out, ((PatInterface*)self)->userRow_8B54.shortName_04, 8);
+    memcpy(out, self->userRow_8B54.shortName_04, 8);
 }
 
 /* Copies this client's hunter name (32 bytes) out. */
 void getSelectedHunterName(NetworkInstance* self, char* out)
 {
-    memcpy(out, ((PatInterface*)self)->userRow_8B54.accountName_0C, 32);
+    memcpy(out, self->userRow_8B54.accountName_0C, 32);
 }
 
 #pragma peephole on
 /* Sets the +0x6138 flag. */
 void setSomething(NetworkInstance* self, s32 value)
 {
-    ((PatInterface*)self)->flag_6138 = value;
+    self->flag_6138 = value;
 }
 
 #pragma peephole off
@@ -1471,6 +1482,7 @@ s32 advanceNetworkState5(NetworkInstance* self)
 }
 
 /* Drives the block-2 account sub-machine: login, charge, ticket and the user list. */
+#pragma peephole off
 s32 handleNetworkState2(NetworkInstance* self)
 {
     NetworkStateMachine* st = (NetworkStateMachine*)self;
@@ -1479,7 +1491,7 @@ s32 handleNetworkState2(NetworkInstance* self)
     case 5:
         if (st->fmpPhase_894D == 1) {
             if (st->loginInfoSent_82B4 == 0) {
-                st->requestState_6135 = st->requestState_6135 + 5;
+                st->requestState_6135 += 5;
                 break;
             }
             st->requestState_6135 = 120;
@@ -1487,12 +1499,12 @@ s32 handleNetworkState2(NetworkInstance* self)
         }
         return -(s32)(st->requestState_6135 + 1);
     case 10:
-        st->requestState_6135 = st->requestState_6135 + 5;
+        st->requestState_6135 += 5;
         sendReqLoginInfo(self);
         break;
     case 20:
         if (st->connectionPhase_894F == 1) {
-            st->requestState_6135 = st->requestState_6135 + 10;
+            st->requestState_6135 += 10;
             break;
         }
         if (isSubState_894F_5((PatInterface*)st) != 0 || isSubState_894F_3((PatInterface*)st) != 0) {
@@ -1516,7 +1528,7 @@ s32 handleNetworkState2(NetworkInstance* self)
         }
         return -st->requestState_6135;
     case 30:
-        st->requestState_6135 = st->requestState_6135 + 5;
+        st->requestState_6135 += 5;
         sendReqTicket(self);
         break;
     case 40:
@@ -1542,10 +1554,10 @@ s32 handleNetworkState2(NetworkInstance* self)
             sendReqUserListData(self, 1, st->userRowCount_8BB4);
             break;
         }
-        st->requestState_6135 = st->requestState_6135 + 10;
+        st->requestState_6135 += 10;
         break;
     case 60:
-        st->requestState_6135 = st->requestState_6135 + 5;
+        st->requestState_6135 += 5;
         sendReqOpcode1F(self);
         break;
     case 70:
@@ -1567,7 +1579,7 @@ s32 handleNetworkState2(NetworkInstance* self)
         break;
     }
     case 80:
-        st->requestState_6135 = st->requestState_6135 + 5;
+        st->requestState_6135 += 5;
         sendReqServerTime(self);
         break;
     case 90:
@@ -1575,7 +1587,7 @@ s32 handleNetworkState2(NetworkInstance* self)
         return 1;
     case 100:
         st->loginInfoSent_82B4 = 1;
-        st->requestState_6135 = st->requestState_6135 + 5;
+        st->requestState_6135 += 5;
         sendReqChargeInfo(self, 1);
         break;
     case 110:
@@ -1625,7 +1637,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
     case 5:
         if (st->fmpPhase_894D == 2) {
             if (st->loginInfoSent_82B4 == 0) {
-                st->requestState_6135 = st->requestState_6135 + 5;
+                st->requestState_6135 += 5;
             } else {
                 u8 mediatorState;
 
@@ -1642,14 +1654,11 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         /* falls through */
     case 10:
     {
-        NetworkUserRow* rows;
         s32 count;
         s32 i;
 
-        count = (s32)st->userRowCount_8BB4;
-        rows = (NetworkUserRow*)st->userRows_8BB8;
-        for (i = 0; i < count; i++) {
-            if (rows[i].id_00 == st->userRow_8B54.id_00) {
+        for (i = 0, count = (s32)st->userRowCount_8BB4; i < count; i++) {
+            if (((NetworkUserRow*)st->userRows_8BB8)[i].id_00 == st->userRow_8B54.id_00) {
                 break;
             }
         }
@@ -1662,19 +1671,19 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         st->userRow_8B54.field_38 = getSomething9(st);
         st->requestState_6135 += 5;
         sendReqUserObject(self, i, &st->userRow_8B54);
-        growStackSize(st, count * 92);
+        growStackSize(st, st->userRowCount_8BB4 * 92);
         st->userRows_8BB8 = 0;
         break;
     }
     case 20:
         if (st->sessionReady_8950 == 1) {
-            st->requestState_6135 = st->requestState_6135 + 5;
+            st->requestState_6135 += 5;
             sendReqTicket(self);
             break;
         }
         return -(s32)st->requestState_6135;
     case 30:
-        st->requestState_6135 = st->requestState_6135 + 5;
+        st->requestState_6135 += 5;
         resetNetworkState4(self);
         break;
     case 35:
@@ -1765,7 +1774,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         return 1;
     case 100:
         st->loginInfoSent_82B4 = 2;
-        st->requestState_6135 = st->requestState_6135 + 5;
+        st->requestState_6135 += 5;
         sendReqChargeInfo(self, 2);
         break;
     case 110:
@@ -1774,7 +1783,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         st->requestState_6135 = 200;
         break;
     case 200:
-        st->requestState_6135 = st->requestState_6135 + 5;
+        st->requestState_6135 += 5;
         sendReqLoginInfo(self);
         break;
     case 210:
@@ -1790,7 +1799,6 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
 }
 
 /* Drives the block-2 binary/circle sub-machine. */
-#pragma peephole off
 s32 handleNetworkState2Binary(NetworkInstance* self)
 {
     u8 state = ((NetworkStateMachine*)self)->requestState_6135;
@@ -1812,7 +1820,7 @@ s32 handleNetworkState2Binary(NetworkInstance* self)
         }
         return -state;
     case 10:
-        ((NetworkStateMachine*)self)->requestState_6135 = state + 5;
+        ((NetworkStateMachine*)self)->requestState_6135 += 5;
         sendReqServerTime(self);
         break;
     case 20:
@@ -1847,12 +1855,11 @@ s32 handleNetworkState2Binary(NetworkInstance* self)
     case 60:
         if (((NetworkStateMachine*)self)->binaryTextReady_D408 != 0) {
             u32 i = 0;
-            u32 index = 0;
+            s32 index;
             u32 j;
-            u32 k;
 
-            u32* tokens = ((NetworkStateMachine*)self)->binaryTokens_D60C;
             memset(((NetworkStateMachine*)self)->binaryTokens_D60C, 0, sizeof(((NetworkStateMachine*)self)->binaryTokens_D60C));
+            index = 0;
             for (j = 0; j < 8; j++) {
                 while (((NetworkStateMachine*)self)->binaryText_D409[i] != '\t' && ((NetworkStateMachine*)self)->binaryText_D409[i] != 0) {
                     i++;
@@ -1870,9 +1877,7 @@ s32 handleNetworkState2Binary(NetworkInstance* self)
                 if (((NetworkStateMachine*)self)->binaryText_D409[i] == 0) {
                     break;
                 }
-                tokens[index] = i;
-                index++;
-                i++;
+                ((NetworkStateMachine*)self)->binaryTokens_D60C[index++] = i++;
                 while (((NetworkStateMachine*)self)->binaryText_D409[i] != '\r' && ((NetworkStateMachine*)self)->binaryText_D409[i] != '\n' &&
                        ((NetworkStateMachine*)self)->binaryText_D409[i] != 0) {
                     i++;
@@ -1885,8 +1890,8 @@ s32 handleNetworkState2Binary(NetworkInstance* self)
                     break;
                 }
             }
-            for (k = index; k < 8; k++) {
-                tokens[k] = i;
+            for (; index < 8; index++) {
+                ((NetworkStateMachine*)self)->binaryTokens_D60C[index] = i;
             }
         }
         ((NetworkStateMachine*)self)->requestState_6135 += 10;
@@ -1944,13 +1949,11 @@ s32 sendReqTicket(NetworkInstance* self)
 
 s32 sendServerTimeout(NetworkInstance* self, const u32* values)
 {
-    SessionTimeoutPayload payload;
+    u8 tags[3] = {1, 2, 3};
     s32 ret;
 
-    payload.code_00 = sessionTimeoutParam;
-    payload.reason_02 = sessionTimeoutParam2;
     ret = flushBuffer(((NetworkStateMachine*)self), 17, 0);
-    putItemTaggedLongs(((NetworkStateMachine*)self), values, 3, (const u8*)&payload);
+    putItemTaggedLongs(((NetworkStateMachine*)self), values, 3, tags);
     encryptBuffer(((NetworkStateMachine*)self));
     return (u16)ret;
 }
@@ -2026,11 +2029,9 @@ s32 sendReqChargeInfo(NetworkInstance* self, s32 mode)
 
 s32 sendReqOpcode1B(NetworkInstance* self, u32 a, u32 b)
 {
-    u32 header[2];
+    u8 header[8] = {1, 2, 3, 5, 4, 6, 7, 8};
     s32 ret;
 
-    header[0] = requestHeaderWord0;
-    header[1] = requestHeaderWord1;
     ret = flushBuffer(((NetworkStateMachine*)self), 27, 0);
     writeUInt32Shared(((NetworkStateMachine*)self), a);
     writeUInt32Shared(((NetworkStateMachine*)self), b);
@@ -2075,7 +2076,7 @@ s32 sendReqUserObject(NetworkInstance* self, s32 index, NetworkUserRow* row)
         info.code_00 = -2147483648;
         info.param1_04 = 0;
         info.param2_08 = 0;
-        ((PatInterface*)self)->postError(info);
+        self->postError(info);
         return -1;
     }
     found = (NetworkUserRow*)(((NetworkStateMachine*)self)->userRows_8BB8 + index * 92);
@@ -2122,6 +2123,7 @@ s32 resetNetworkState4(NetworkInstance* self)
     return 0;
 }
 
+#pragma peephole off
 /* Drives the block-4 FMP list sub-machine (version, head, data, foot). */
 s32 handleNetworkState4(NetworkInstance* self, s32 arg)
 {
@@ -2187,8 +2189,6 @@ s32 handleNetworkState4(NetworkInstance* self, s32 arg)
 
 /* ==== the packet layer ======================================================================================= */
 
-#pragma peephole off
-
 inline const char* PatInterface::getServerName()
 {
     if (serverType_65F0 == 1) {
@@ -2244,18 +2244,18 @@ u32 sendReqFmpListVersion(NetworkInstance* self)
 {
     u32 id;
 
-    switch (((PatInterface*)self)->serverType_65F0) {
+    switch (self->serverType_65F0) {
     case 0:
-        id = flushBuffer((PatInterface*)self, 35, 0);
+        id = flushBuffer(self, 35, 0);
         break;
     case 1:
-        id = flushBuffer((PatInterface*)self, 79, 0);
+        id = flushBuffer(self, 79, 0);
         break;
     default:
-        PAT_POST_FAILURE((PatInterface*)self);
+        PAT_POST_FAILURE(self);
         return -1;
     }
-    encryptBuffer((PatInterface*)self);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2266,23 +2266,23 @@ u32 sendReqFmpListHead(NetworkInstance* self, s32 first, s32 count)
     u8 tagCount;
     u32 id;
 
-    tagCount = ((PatInterface*)self)->fmpListReady_6C3C != 0 ? 7 : 3;
-    switch (((PatInterface*)self)->serverType_65F0) {
+    tagCount = self->fmpListReady_6C3C != 0 ? 7 : 3;
+    switch (self->serverType_65F0) {
     case 0:
-        id = flushBuffer((PatInterface*)self, 37, 0);
+        id = flushBuffer(self, 37, 0);
         break;
     case 1:
-        id = flushBuffer((PatInterface*)self, 81, 0);
+        id = flushBuffer(self, 81, 0);
         break;
     default:
-        PAT_POST_FAILURE((PatInterface*)self);
+        PAT_POST_FAILURE(self);
         return -1;
     }
-    writeUInt32((PatInterface*)self, ((PatInterface*)self)->fmpListActive_6C38);
-    writeUInt32Shared((PatInterface*)self, first);
-    writeUInt32Shared((PatInterface*)self, count);
-    writeUInt8Array2((PatInterface*)self, tagCount, tags);
-    encryptBuffer((PatInterface*)self);
+    writeUInt32(self, self->fmpListActive_6C38);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    writeUInt8Array2(self, tagCount, tags);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2291,20 +2291,20 @@ u32 sendReqFmpListData(NetworkInstance* self, u32 start, u32 count)
 {
     u32 id;
 
-    switch (((PatInterface*)self)->serverType_65F0) {
+    switch (self->serverType_65F0) {
     case 0:
-        id = flushBuffer((PatInterface*)self, 39, 0);
+        id = flushBuffer(self, 39, 0);
         break;
     case 1:
-        id = flushBuffer((PatInterface*)self, 83, 0);
+        id = flushBuffer(self, 83, 0);
         break;
     default:
-        PAT_POST_FAILURE((PatInterface*)self);
+        PAT_POST_FAILURE(self);
         return -1;
     }
-    writeUInt32Shared((PatInterface*)self, start);
-    writeUInt32Shared((PatInterface*)self, count);
-    encryptBuffer((PatInterface*)self);
+    writeUInt32Shared(self, start);
+    writeUInt32Shared(self, count);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2313,18 +2313,18 @@ u32 sendReqFmpListFoot(NetworkInstance* self)
 {
     u32 id;
 
-    switch (((PatInterface*)self)->serverType_65F0) {
+    switch (self->serverType_65F0) {
     case 0:
-        id = flushBuffer((PatInterface*)self, 41, 0);
+        id = flushBuffer(self, 41, 0);
         break;
     case 1:
-        id = flushBuffer((PatInterface*)self, 85, 0);
+        id = flushBuffer(self, 85, 0);
         break;
     default:
-        PAT_POST_FAILURE((PatInterface*)self);
+        PAT_POST_FAILURE(self);
         return -1;
     }
-    encryptBuffer((PatInterface*)self);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2336,126 +2336,126 @@ u32 sendReqFmpInfo(NetworkInstance* self, u32 value, s32 brief)
     u32 id;
 
     tagCount = brief == 0 ? 9 : 2;
-    switch (((PatInterface*)self)->serverType_65F0) {
+    switch (self->serverType_65F0) {
     case 0:
-        id = flushBuffer((PatInterface*)self, 43, 0);
+        id = flushBuffer(self, 43, 0);
         break;
     case 1:
-        id = flushBuffer((PatInterface*)self, 87, 0);
+        id = flushBuffer(self, 87, 0);
         break;
     default:
-        PAT_POST_FAILURE((PatInterface*)self);
+        PAT_POST_FAILURE(self);
         return -1;
     }
-    writeUInt32((PatInterface*)self, value);
-    writeUInt8Array2((PatInterface*)self, tagCount, tags);
-    encryptBuffer((PatInterface*)self);
+    writeUInt32(self, value);
+    writeUInt8Array2(self, tagCount, tags);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the RFP server's address. */
 u32 sendReqRfpConnect(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 45, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 45, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the lobby server's address. */
 u32 sendReqLmpConnect(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 47, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 47, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the terms version. */
 u32 sendReqTermsVersion(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 49, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 49, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests one slice of the terms body. */
 u32 sendReqTerms(NetworkInstance* self, u32 a, u32 b, u32 len)
 {
-    u32 id = flushBuffer((PatInterface*)self, 51, 0);
-    writeUInt32((PatInterface*)self, a);
-    writeUInt32((PatInterface*)self, b);
-    writeUInt32((PatInterface*)self, len);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 51, 0);
+    writeUInt32(self, a);
+    writeUInt32(self, b);
+    writeUInt32(self, len);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the maintenance text. */
 u32 sendReqMaintenance(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 53, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 53, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the announcement text. */
 u32 sendReqAnnounce(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 55, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 55, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the no-charge text; returns 0, not the request id. */
 u32 sendReqNoCharge(NetworkInstance* self)
 {
-    flushBuffer((PatInterface*)self, 57, 0);
-    encryptBuffer((PatInterface*)self);
+    flushBuffer(self, 57, 0);
+    encryptBuffer(self);
     return 0;
 }
 
 /* Requests the media version. */
 u32 sendReqMediaVersionInfo(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 59, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 59, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the low-level vulgarity list's slice descriptor. */
 u32 sendReqVulgarityInfoLow(NetworkInstance* self, s32 mode)
 {
-    u32 id = flushBuffer((PatInterface*)self, 65, 0);
-    writeUInt32((PatInterface*)self, mode);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 65, 0);
+    writeUInt32(self, mode);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests one slice of the low-level vulgarity list. */
 u32 sendReqVulgarityLow(NetworkInstance* self, s32 mode, u32 slice, u32 offset, u32 length)
 {
-    u32 id = flushBuffer((PatInterface*)self, 67, 0);
-    writeUInt32((PatInterface*)self, mode);
-    writeUInt32((PatInterface*)self, slice);
-    writeUInt32((PatInterface*)self, offset);
-    writeUInt32((PatInterface*)self, length);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 67, 0);
+    writeUInt32(self, mode);
+    writeUInt32(self, slice);
+    writeUInt32(self, offset);
+    writeUInt32(self, length);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Sends the authentication token. */
 u32 sendReqAuthenticationToken(NetworkInstance* self, const char* token)
 {
-    u32 id = flushBuffer((PatInterface*)self, 69, 0);
-    writeString((PatInterface*)self, token);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 69, 0);
+    writeString(self, token);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests a file's checksum. */
 s32 sendReqBinaryChecksum(NetworkInstance* self, u8 fileId)
 {
-    u32 id = flushBuffer((PatInterface*)self, 71, 0);
-    writeUInt8((PatInterface*)self, fileId);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 71, 0);
+    writeUInt8(self, fileId);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2464,31 +2464,31 @@ s32 sendReqBinaryHead(NetworkInstance* self, u8 fileId, s8 mode)
 {
     u32 id;
 
-    ((PatInterface*)self)->binaryMode_611A = mode;
-    id = flushBuffer((PatInterface*)self, 73, 0);
-    writeUInt8((PatInterface*)self, fileId);
-    encryptBuffer((PatInterface*)self);
+    self->binaryMode_611A = mode;
+    id = flushBuffer(self, 73, 0);
+    writeUInt8(self, fileId);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests one chunk of a file. */
 s32 sendReqBinaryData(NetworkInstance* self, u8 fileId, u32 handle, u32 offset, u32 size)
 {
-    u32 id = flushBuffer((PatInterface*)self, 75, 0);
-    writeUInt8((PatInterface*)self, fileId);
-    writeUInt32((PatInterface*)self, handle);
-    writeUInt32((PatInterface*)self, offset);
-    writeUInt32((PatInterface*)self, size);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 75, 0);
+    writeUInt8(self, fileId);
+    writeUInt32(self, handle);
+    writeUInt32(self, offset);
+    writeUInt32(self, size);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Ends a file transfer. */
 s32 sendReqBinaryFoot(NetworkInstance* self, u8 fileId)
 {
-    u32 id = flushBuffer((PatInterface*)self, 77, 0);
-    writeUInt8((PatInterface*)self, fileId);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 77, 0);
+    writeUInt8(self, fileId);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2497,38 +2497,38 @@ u32 sendReqLayerStart(NetworkInstance* self)
 {
     u32 id;
 
-    ((PatInterface*)self)->layerMovePending_D62C = 0;
-    id = flushBuffer((PatInterface*)self, 89, 0);
-    writeLayerItemRequest((PatInterface*)self);
-    writeUserItemRequest((PatInterface*)self);
-    encryptBuffer((PatInterface*)self);
+    self->layerMovePending_D62C = 0;
+    id = flushBuffer(self, 89, 0);
+    writeLayerItemRequest(self);
+    writeUserItemRequest(self);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Ends the layer session. */
 u32 sendReqLayerEnd(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 91, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 91, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests a jump to the layer at `path`. */
 u32 sendReqLayerJump(NetworkInstance* self, const u8* path, u32 value)
 {
-    u32 id = flushBuffer((PatInterface*)self, 94, 0);
-    writeUnkShortArray((PatInterface*)self, path);
-    writeUInt32((PatInterface*)self, value);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 94, 0);
+    writeUnkShortArray(self, path);
+    writeUInt32(self, value);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Starts creating a layer under `layerId`. */
 u32 sendReqLayerCreateHead(NetworkInstance* self, s16 layerId)
 {
-    u32 id = flushBuffer((PatInterface*)self, 96, 0);
-    writeShortPlusOne((PatInterface*)self, layerId);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 96, 0);
+    writeShortPlusOne(self, layerId);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2543,11 +2543,11 @@ u32 sendReqLayerCreateSet(NetworkInstance* self, s16 layerId, PatLayerData* laye
     if (layer->name_014[0] == 0) {
         itemCount = 2;
     }
-    id = flushBuffer((PatInterface*)self, 98, 0);
-    writeShortPlusOne((PatInterface*)self, layerId);
-    writeLayerDownData((PatInterface*)self, layer, itemCount, items);
-    writeUnkByteIntStruct((PatInterface*)self, tags);
-    encryptBuffer((PatInterface*)self);
+    id = flushBuffer(self, 98, 0);
+    writeShortPlusOne(self, layerId);
+    writeLayerDownData(self, layer, itemCount, items);
+    writeUnkByteIntStruct(self, tags);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2557,12 +2557,12 @@ u32 sendReqLayerCreateFoot(NetworkInstance* self, s16 layerId, u8 move)
     u32 id;
 
     if (move == 0) {
-        ((PatInterface*)self)->layerMovePending_D62C = 0;
+        self->layerMovePending_D62C = 0;
     }
-    id = flushBuffer((PatInterface*)self, 100, 0);
-    writeShortPlusOne((PatInterface*)self, layerId);
-    writeUInt8((PatInterface*)self, move);
-    encryptBuffer((PatInterface*)self);
+    id = flushBuffer(self, 100, 0);
+    writeShortPlusOne(self, layerId);
+    writeUInt8(self, move);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2570,38 +2570,38 @@ u32 sendReqLayerCreateFoot(NetworkInstance* self, s16 layerId, u8 move)
 u32 sendReqLayerDown(NetworkInstance* self, s16 layerId, PatLayerData* layer)
 {
     u8 items[1] = { 12 };
-    u32 id = flushBuffer((PatInterface*)self, 102, 0);
-    writeShortPlusOne((PatInterface*)self, layerId);
-    writeLayerDownData((PatInterface*)self, layer, 1, items);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 102, 0);
+    writeShortPlusOne(self, layerId);
+    writeLayerDownData(self, layer, 1, items);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests a move up a layer. */
 u32 sendReqLayerUp(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 105, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 105, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Tells the server the jump to `path` is ready. */
 u32 sendReqLayerJumpReady(NetworkInstance* self, const u8* path, u32 value)
 {
-    u32 id = flushBuffer((PatInterface*)self, 108, 0);
-    writeUnkShortArray((PatInterface*)self, path);
-    writeUInt32((PatInterface*)self, value);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 108, 0);
+    writeUnkShortArray(self, path);
+    writeUInt32(self, value);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Tells the server to go ahead with the jump to `path`. */
 u32 sendReqLayerJumpGo(NetworkInstance* self, const u8* path, u32 value)
 {
-    u32 id = flushBuffer((PatInterface*)self, 110, 0);
-    writeUnkShortArray((PatInterface*)self, path);
-    writeUInt32((PatInterface*)self, value);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 110, 0);
+    writeUnkShortArray(self, path);
+    writeUInt32(self, value);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2616,36 +2616,36 @@ u32 sendReqLayerInfoSet(NetworkInstance* self, PatLayerData* layer, PatTagList* 
     if (layer->value_23E != 0) {
         items[itemCount++] = 23;
     }
-    id = flushBuffer((PatInterface*)self, 112, 0);
-    writeLayerDownData((PatInterface*)self, layer, itemCount, items);
-    writeUnkByteIntStruct((PatInterface*)self, tags);
-    encryptBuffer((PatInterface*)self);
+    id = flushBuffer(self, 112, 0);
+    writeLayerDownData(self, layer, itemCount, items);
+    writeUnkByteIntStruct(self, tags);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the layer at `path`'s settings: the user count items for mode 4, the layer items for mode 3. */
 u32 sendReqLayerInfo(NetworkInstance* self, const u8* path, const PatTagList* tags, s8 mode)
 {
-    u32 id = flushBuffer((PatInterface*)self, 115, 0);
-    writeUnkShortArray((PatInterface*)self, path);
+    u32 id = flushBuffer(self, 115, 0);
+    writeUnkShortArray(self, path);
     if (mode == 4) {
         u8 items[2] = { 0x15, 0x16 };
-        writeUInt8Array2((PatInterface*)self, 2, items);
+        writeUInt8Array2(self, 2, items);
     } else if (mode == 3) {
-        writeLayerItemRequest((PatInterface*)self);
+        writeLayerItemRequest(self);
     }
-    writeUnk2ByteArray((PatInterface*)self, tags);
-    encryptBuffer((PatInterface*)self);
+    writeUnk2ByteArray(self, tags);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the parent layer's settings with the layer items. */
 u32 sendReqLayerParentInfo(NetworkInstance* self, const PatTagList* tags)
 {
-    u32 id = flushBuffer((PatInterface*)self, 117, 0);
-    writeLayerItemRequest((PatInterface*)self);
-    writeUnk2ByteArray((PatInterface*)self, tags);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 117, 0);
+    writeLayerItemRequest(self);
+    writeUnk2ByteArray(self, tags);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2671,67 +2671,67 @@ u32 sendReqLayerChildInfo(NetworkInstance* self, s16 layer_id, u32 unused_arg)
 /* Requests the child layer list's head with the layer items. */
 u32 sendReqLayerChildListHead(NetworkInstance* self, s32 first, s32 count)
 {
-    u32 id = flushBuffer((PatInterface*)self, 121, 0);
-    writeUInt32Shared((PatInterface*)self, first);
-    writeUInt32Shared((PatInterface*)self, count);
-    writeLayerItemRequest((PatInterface*)self);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 121, 0);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    writeLayerItemRequest(self);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests a range of the child layer list. */
 u32 sendReqLayerChildListData(NetworkInstance* self, s32 first, s32 count)
 {
-    u32 id = flushBuffer((PatInterface*)self, 123, 0);
-    writeUInt32Shared((PatInterface*)self, first);
-    writeUInt32Shared((PatInterface*)self, count);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 123, 0);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Ends the child layer list request. */
 u32 sendReqLayerChildListFoot(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 125, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 125, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the sibling layer list's head with the layer items. */
 u32 sendReqLayerSiblingListHead(NetworkInstance* self, s32 first, s32 count)
 {
-    u32 id = flushBuffer((PatInterface*)self, 127, 0);
-    writeUInt32Shared((PatInterface*)self, first);
-    writeUInt32Shared((PatInterface*)self, count);
-    writeLayerItemRequest((PatInterface*)self);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 127, 0);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    writeLayerItemRequest(self);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests a range of the sibling layer list. */
 u32 sendReqLayerSiblingListData(NetworkInstance* self, s32 first, s32 count)
 {
-    u32 id = flushBuffer((PatInterface*)self, 129, 0);
-    writeUInt32Shared((PatInterface*)self, first);
-    writeUInt32Shared((PatInterface*)self, count);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 129, 0);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Ends the sibling layer list request. */
 u32 sendReqLayerSiblingListFoot(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 131, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 131, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the host of the layer at `path`. */
 u32 sendReqLayerHost(NetworkInstance* self, const u8* path)
 {
-    u32 id = flushBuffer((PatInterface*)self, 133, 0);
-    writeUnkShortArray((PatInterface*)self, path);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 133, 0);
+    writeUnkShortArray(self, path);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2750,9 +2750,9 @@ u32 sendReqLayerUserInfoSet(NetworkInstance* self, const NetLayerUserRecord* rec
 u32 sendReqLayerUserList(NetworkInstance* self)
 {
     u8 items[5] = { 1, 2, 3, 6, 7 };
-    u32 id = flushBuffer((PatInterface*)self, 139, 0);
-    writeUInt8Array2((PatInterface*)self, 5, items);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 139, 0);
+    writeUInt8Array2(self, 5, items);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2773,18 +2773,18 @@ u32 sendReqLayerUserListHead(NetworkInstance* self, u8 kind, const u8* path, u32
 /* Requests a range of the layer user list. */
 u32 sendReqLayerUserListData(NetworkInstance* self, s32 first, s32 count)
 {
-    u32 id = flushBuffer((PatInterface*)self, 143, 0);
-    writeUInt32Shared((PatInterface*)self, first);
-    writeUInt32Shared((PatInterface*)self, count);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 143, 0);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Ends the layer user list request. */
 u32 sendReqLayerUserListFoot(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 145, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 145, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -2808,18 +2808,18 @@ u32 sendReqLayerUserSearchHead(NetworkInstance* self, u8 kind, const u8* path, u
 /* Requests a range of the layer user search. */
 u32 sendReqLayerUserSearchData(NetworkInstance* self, s32 first, s32 count)
 {
-    u32 id = flushBuffer((PatInterface*)self, 149, 0);
-    writeUInt32Shared((PatInterface*)self, first);
-    writeUInt32Shared((PatInterface*)self, count);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 149, 0);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Ends the layer user search request. */
 u32 sendReqLayerUserSearchFoot(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 151, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 151, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -3017,9 +3017,9 @@ u32 sendReqCircleJoin(NetworkInstance* self, PatCircleInfo* info)
 /* Requests leaving the circle. */
 u32 sendReqCircleLeave(NetworkInstance* self, s32 circleId)
 {
-    u32 id = flushBuffer((PatInterface*)self, 187, 0);
-    writeUInt32Shared((PatInterface*)self, circleId);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 187, 0);
+    writeUInt32Shared(self, circleId);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -3046,17 +3046,17 @@ u32 sendReqCircleMatchOptionSet(NetworkInstance* self, PatMatchOptions* options)
 /* Requests the circle's match start. */
 u32 sendReqCircleMatchStart(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 198, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 198, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the circle's match end. */
 u32 sendReqCircleMatchEnd(NetworkInstance* self, s32 mode)
 {
-    u32 id = flushBuffer((PatInterface*)self, 201, 0);
-    writeUInt8((PatInterface*)self, mode);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 201, 0);
+    writeUInt8(self, mode);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -3110,18 +3110,18 @@ u32 sendReqCircleListHead(NetworkInstance* self, s32 mode, s32 count, PatCircleF
 /* Requests a range of the circle list. */
 u32 sendReqCircleListData(NetworkInstance* self, s32 first, s32 count)
 {
-    u32 id = flushBuffer((PatInterface*)self, 210, 0);
-    writeUInt32Shared((PatInterface*)self, first);
-    writeUInt32Shared((PatInterface*)self, count);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 210, 0);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Ends the circle list request. */
 u32 sendReqCircleListFoot(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 212, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 212, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -3129,22 +3129,22 @@ u32 sendReqCircleListFoot(NetworkInstance* self)
 u32 sendReqCircleKick(NetworkInstance* self, const char* userId)
 {
     PatKickList kick;
-    u32 id = flushBuffer((PatInterface*)self, 214, 0);
-    writeString((PatInterface*)self, userId);
+    u32 id = flushBuffer(self, 214, 0);
+    writeString(self, userId);
     memset(&kick, 0, sizeof(PatKickList));
     kick.kind_000 = 1;
-    writeUInt8((PatInterface*)self, 1);
-    writeUInt8Array((PatInterface*)self, kick.data_002, kick.size_102);
-    encryptBuffer((PatInterface*)self);
+    writeUInt8(self, 1);
+    writeUInt8Array(self, kick.data_002, kick.size_102);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the circle's host. */
 u32 sendReqCircleHost(NetworkInstance* self, s32 circleId)
 {
-    u32 id = flushBuffer((PatInterface*)self, 222, 0);
-    writeUInt32Shared((PatInterface*)self, circleId);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 222, 0);
+    writeUInt32Shared(self, circleId);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -3229,10 +3229,13 @@ void sendNtcCircleUserValue(NetworkInstance* self, s32 circleId, s32 value, u8 n
 
     memset(items, 0, sizeof(items));
     initItemList(self, &list, items, 2);
-    if (notify != 0) {
-        kind = 2;
-    } else {
-        kind = 1;
+    {
+        s32 tag = 1;
+
+        if (notify != 0) {
+            tag = 2;
+        }
+        kind = tag;
     }
     appendItemList(self, &list, 1, 1, (const u8*)&kind, 1);
     appendItemList(self, &list, 2, 3, (const u8*)&value, 4);
@@ -3278,10 +3281,13 @@ void sendNtcLayerUserTransfer(NetworkInstance* self, u32 state, const u8* userId
 
     memset(items, 0, sizeof(items));
     initItemList(self, &list, items, 2);
-    if (active != 0) {
-        kind = 5;
-    } else {
-        kind = 4;
+    {
+        s32 tag = 4;
+
+        if (active != 0) {
+            tag = 5;
+        }
+        kind = tag;
     }
     appendItemList(self, &list, 1, 1, (const u8*)&kind, 1);
     appendItemList(self, &list, 2, 3, (const u8*)&state, 4);
@@ -3298,10 +3304,13 @@ void sendLayerBinaryRecord(NetworkInstance* self, u32 a, u32 b, u32 c, u16 d, co
 
     memset(items, 0, sizeof(items));
     initItemList(self, &list, items, 5);
-    if (broadcast != 0) {
-        kind = 6;
-    } else {
-        kind = 7;
+    {
+        s32 tag = 7;
+
+        if (broadcast != 0) {
+            tag = 6;
+        }
+        kind = tag;
     }
     appendItemList(self, &list, 1, 1, (const u8*)&kind, 1);
     appendItemList(self, &list, 3, 3, (const u8*)&a, 4);
@@ -3361,35 +3370,35 @@ s32 sendReqBinaryUser(NetworkInstance* self, const u8* id, const u8* data, u16 s
 /* Sends this user's search tags. */
 u32 sendReqUserSearchSet(NetworkInstance* self, PatTagList* tags)
 {
-    u32 id = flushBuffer((PatInterface*)self, 252, 0);
-    writeUnkByteIntStruct((PatInterface*)self, tags);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 252, 0);
+    writeUnkByteIntStruct(self, tags);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Sends this user's binary with its value. */
 u32 sendReqUserBinarySet(NetworkInstance* self, u32 value, const u8* data, u32 size)
 {
-    u32 id = flushBuffer((PatInterface*)self, 254, 0);
-    writeUInt32((PatInterface*)self, value);
-    writeUInt8Array((PatInterface*)self, data, size);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 254, 0);
+    writeUInt32(self, value);
+    writeUInt8Array(self, data, size);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Sends a binary notice: its kind, an optional text (an empty one when null) and two values. */
 u32 sendReqUserBinaryNotice(NetworkInstance* self, u8 kind, const char* text, u32 a, u32 b)
 {
-    u32 id = flushBuffer((PatInterface*)self, 256, 0);
-    writeUInt8((PatInterface*)self, kind);
+    u32 id = flushBuffer(self, 256, 0);
+    writeUInt8(self, kind);
     if (text != NULL) {
-        writeString((PatInterface*)self, text);
+        writeString(self, text);
     } else {
-        writeUInt16((PatInterface*)self, 0);
+        writeUInt16(self, 0);
     }
-    writeUInt32((PatInterface*)self, a);
-    writeUInt32((PatInterface*)self, b);
-    encryptBuffer((PatInterface*)self);
+    writeUInt32(self, a);
+    writeUInt32(self, b);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -3414,18 +3423,18 @@ u32 sendReqUserSearchHead(NetworkInstance* self, u32 kind, u32 count, const char
 /* Requests a range of the user search. */
 u32 sendReqUserSearchData(NetworkInstance* self, s32 first, s32 count)
 {
-    u32 id = flushBuffer((PatInterface*)self, 261, 0);
-    writeUInt32Shared((PatInterface*)self, first);
-    writeUInt32Shared((PatInterface*)self, count);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 261, 0);
+    writeUInt32Shared(self, first);
+    writeUInt32Shared(self, count);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Ends the user search request. */
 u32 sendReqUserSearchFoot(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 263, 0);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 263, 0);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -3504,19 +3513,19 @@ s32 sendReqFriendAdd(NetworkInstance* self, const u8* id, const u32* options, co
 /* Answers a friend request (GUESS name: op-code 276, after the friend request 273). */
 u32 sendReqFriendAccept(NetworkInstance* self, const char* userId, u8 accept)
 {
-    u32 id = flushBuffer((PatInterface*)self, 276, 0);
-    writeString((PatInterface*)self, userId);
-    writeUInt8((PatInterface*)self, accept);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 276, 0);
+    writeString(self, userId);
+    writeUInt8(self, accept);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Removes a friend (GUESS name: op-code 279). */
 u32 sendReqFriendDelete(NetworkInstance* self, const char* userId)
 {
-    u32 id = flushBuffer((PatInterface*)self, 279, 0);
-    writeString((PatInterface*)self, userId);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 279, 0);
+    writeString(self, userId);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -3547,9 +3556,9 @@ s32 sendReqBlackAdd(NetworkInstance* self, const u8* id, const u32* options)
 /* Removes a user from the black list (GUESS name: op-code 285). */
 u32 sendReqBlackDelete(NetworkInstance* self, const char* userId)
 {
-    u32 id = flushBuffer((PatInterface*)self, 285, 0);
-    writeString((PatInterface*)self, userId);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 285, 0);
+    writeString(self, userId);
+    encryptBuffer(self);
     return (u16)id;
 }
 
@@ -3580,21 +3589,21 @@ u32 sendReqChannelInfo(NetworkInstance* self, u32 handle)
 /* Requests a range of a reflect channel. */
 u32 sendReqChannelData(NetworkInstance* self, u32 handle, u32 offset, u32 size)
 {
-    u32 id = flushBuffer((PatInterface*)self, 293, 0);
-    writeUInt8((PatInterface*)self, ((PatInterface*)self)->warningKind_8BBC);
-    writeUInt8((PatInterface*)self, handle);
-    writeUInt32((PatInterface*)self, offset);
-    writeUInt32((PatInterface*)self, size);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 293, 0);
+    writeUInt8(self, self->warningKind_8BBC);
+    writeUInt8(self, handle);
+    writeUInt32(self, offset);
+    writeUInt32(self, size);
+    encryptBuffer(self);
     return (u16)id;
 }
 
 /* Requests the reflect connection. */
 u32 sendReqConnect(NetworkInstance* self)
 {
-    u32 id = flushBuffer((PatInterface*)self, 295, 0);
-    writeUInt8((PatInterface*)self, ((PatInterface*)self)->warningKind_8BBC);
-    encryptBuffer((PatInterface*)self);
+    u32 id = flushBuffer(self, 295, 0);
+    writeUInt8(self, self->warningKind_8BBC);
+    encryptBuffer(self);
     return (u16)id;
 }
 
