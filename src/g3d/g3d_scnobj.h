@@ -23,9 +23,9 @@
  * claim: a length word, then the NUL-terminated name) the scene objects' run-time type members read, here and in
  * `g3d/g3d_scninline.cpp`'s GetTypeObjStatic members. */
 extern "C" {
-extern u8 scn_typename_ScnObj[];
-extern u8 scn_typename_ScnLeaf[];
-extern u8 scn_typename_ScnGroup[];
+extern const u8 scn_typename_ScnObj[0x10];
+extern const u8 scn_typename_ScnLeaf[0x10];
+extern const u8 scn_typename_ScnGroup[0x10];
 }
 
 namespace nw4r {
@@ -50,7 +50,12 @@ public:
     virtual void ExecCallback_DRAW_XLU(u32 timing, ScnObj* pObj, u32 param, void* pInfo);
 };
 
-/* The collector the gather pass hands every scene object to (`ScnRoot`'s draw lists).  size: 0x4 */
+/* The draw-order predicate the gather's Sort members take: true when `pLhs` is drawn before `pRhs`. */
+typedef bool (*ScnObjLessThanFunc)(ScnObj* pLhs, ScnObj* pRhs);
+
+/* The collector the gather pass hands every scene object to (`ScnRoot`'s draw lists).  Its vtable (0x8058ED38,
+ * `g3d/g3d_scninline.cpp`'s `.data`) has nine slots: the destructor, seven pure virtuals and IsUserSorted, whose base
+ * body returns false.  size: 0x4 */
 class IScnObjGather {
 public:
     /* How the collector culled the object: its children are visited for NOTCULLED and NOTEST. */
@@ -60,8 +65,16 @@ public:
         CULLINGSTATUS_CULLED = 2
     };
 
+    IScnObjGather();
     virtual ~IScnObjGather();
     virtual CullingStatus Add(ScnObj* pObj, bool opa, bool xlu) = 0;
+    virtual void Clear() = 0;
+    virtual void ZSort() = 0;
+    virtual void Sort() = 0;
+    virtual void Sort(ScnObjLessThanFunc pOpaFunc, ScnObjLessThanFunc pXluFunc) = 0;
+    virtual void DrawOpa(u32* pDrawMode) = 0;
+    virtual void DrawXlu(u32* pDrawMode) = 0;
+    virtual bool IsUserSorted() const;
 };
 
 /* size: 0xDC */
@@ -171,6 +184,8 @@ public:
     /* untyped: caller-owned payload - the pass's info block */
     void CheckCallback_DRAW_XLU(Timing timing, u32 param, void* pInfo);
     bool SetBoundingVolume(const math::AABB* pAABB);
+    int GetPriorityDrawOpa() const;
+    int GetPriorityDrawXlu() const;
     static const TypeObj GetTypeObjStatic();
 
     /* +0x0C */ math::MTX34 mMtxArray[MTX_TYPE_MAX];

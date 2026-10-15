@@ -217,7 +217,7 @@ void mtx34_copy(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
 void eft_em_spawn(struct _ENEMY_WORK* em, s32 a, s32 b, nw4r::math::VEC3* v, f32 c);
 void pl_capsule_box_set(_EFT28_PARAM* param, void* out);
 void fn_800FA3B8(_EFT28_PARAM* param);
-u32 fn_8007BE2C(nw4r::g3d::ScnMdl::CopiedMatAccess* access, u32 arg);
+u32 scn_mdl_mat_access_get_tev_color(nw4r::g3d::ScnMdl::CopiedMatAccess* access, u32 arg);
 void res_mat_tev_color_copy_ctor(_EFT26_MATOBJ* out, void* in);
 void res_mat_tev_color_end_edit(_EFT26_MATOBJ* obj);
 void fn_8011D7B0(s32 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 area, u8 team);
@@ -618,7 +618,7 @@ extern "C" void fn_8011870C(_EFT* self)
                 (nw4r::g3d::ScnMdl*)work->chara[0]->field_0x118, (u32)i);
             if (fn_800E2994(&access) != 0) {
                 _EFT26_MATOBJ obj;
-                u32 handle = fn_8007BE2C(&access, 0);
+                u32 handle = scn_mdl_mat_access_get_tev_color(&access, 0);
                 u32 ignored;
                 res_mat_tev_color_copy_ctor(&obj, &handle);
                 reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXGetTevKColor(GX_KCOLOR3, (GXColor*)&ignored);
@@ -932,7 +932,7 @@ extern "C" void fn_80119450(_EFT* self)
                 (nw4r::g3d::ScnMdl*)work->chara[0]->field_0x118, (u32)i);
             if (fn_800E2994(&access) != 0) {
                 _EFT26_MATOBJ obj;
-                u32 handle = fn_8007BE2C(&access, 0);
+                u32 handle = scn_mdl_mat_access_get_tev_color(&access, 0);
                 res_mat_tev_color_copy_ctor(&obj, &handle);
                 reinterpret_cast<nw4r::g3d::ResMatTevColor*>(&obj)->GXSetTevKColor(GX_KCOLOR3, *(GXColor*)&p->color_r);
                 res_mat_tev_color_end_edit(&obj);

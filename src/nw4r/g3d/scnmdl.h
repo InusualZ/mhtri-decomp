@@ -15,6 +15,7 @@
 
 #include "types.h"
 #include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple, owner g3d/g3d_scnmdlsmpl.cpp (rule 1) */
+#include "g3d/g3d_resshp.h"     /* nw4r::g3d::ResTev (rule 1) */
 
 namespace nw4r {
 namespace g3d {
@@ -49,10 +50,22 @@ struct ReplacementBlock {
 /* size: 0x188 */
 class ScnMdl : public ScnMdlSimple {
 public:
-    /* The material accessor the game's effect code builds on the stack.  size: 0x34 (approximation) */
+    /* The material accessor the game's effect code builds on the stack: the model, the material index and the
+     * handles of the material's copied blocks (the constructor's stores, in nw4r's member order).  size: 0x34 */
     struct CopiedMatAccess {
-        /* +0x00 */ u32 handle_0x00;
-        /* +0x04 */ u8 pad_0x04[0x30];
+        /* +0x00 */ ScnMdl* mpScnMdl;
+        /* +0x04 */ u32 mMatID;
+        /* +0x08 */ ResTexObj mTexObj;
+        /* +0x0C */ ResTlutObj mTlutObj;
+        /* +0x10 */ ResTexSrt mTexSrt;
+        /* +0x14 */ ResMatChan mChan;
+        /* +0x18 */ ResGenMode mGenMode;
+        /* +0x1C */ ResMatMisc mMatMisc;
+        /* +0x20 */ ResMatPix mPix;
+        /* +0x24 */ ResMatTevColor mTevColor;
+        /* +0x28 */ ResMatIndMtxAndScale mIndMtxAndScale;
+        /* +0x2C */ ResMatTexCoordGen mTexCoordGen;
+        /* +0x30 */ ResTev mTev;
 
         CopiedMatAccess(ScnMdl* mdl, u32 idx);
 

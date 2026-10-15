@@ -40,7 +40,8 @@
 #include "g3d/g3d_resshp.h"
 #include "g3d/g3d_state.h"     /* the material loaders (rule 2) */
 #include "nw4r/fn_805012C4.h"
-#include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
+#include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup / IScnObjGather (rule 1) */
+#include "g3d/g3d_scnroot.h"  /* nw4r::g3d::ScnObjGather (rule 1) */
 #include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple (rule 1) */
 #include "MSL/algorithm.h"     /* std::find / std::distance */
 #include "unsplit/g3d.h"      /* the scene objects' type-name records no unit owns (rule 2) */
@@ -54,7 +55,6 @@ namespace nw4r { namespace db {
 void Panic(const char* file, int line, const char* fmt, ...);
 }}
 
-extern u32 lbl_8058ED38;
 extern const char lbl_8058ED64[];
 extern const char lbl_8058ED90[];
 extern f32 lbl_80795E58;
@@ -64,17 +64,12 @@ extern "C" {
 /* internal */ void fn_8007B540(void* a0);
 /* internal */ void fn_8007B5BC(void* a0);
 /* internal */ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
-/* internal */ s32 fn_8007B794(s32 arg0, s16 arg1);
-/* internal */ s32 dtor_8007B7F0(s32 arg0, s16 arg1);
 /* internal */ s32 res_shp_copy_ctor(s32 arg0);
 /* internal */ u32 fn_8007B864(s32 *arg0, s32 *arg1);
 /* internal */ s32 fn_8007B878(s32 arg0, s32 arg1);
 /* internal */ u32 fn_8007B8DC(s32 *arg0, s32 arg1);
 /* internal */ void fn_8007B93C(void* a0);
 /* internal */ void fn_8007B998(void* a0);
-/* internal */ void fn_8007B99C(u32 **arg0);
-/* internal */ void fn_8007B9AC(void *arg0);
-/* internal */ s32 fn_8007BA00(void* a0);
 /* internal */ s32 fn_8007BA08(s32 arg0);
 /* internal */ u32 fn_8007BA38(s32 *arg0, s32 *arg1);
 /* internal */ const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
@@ -227,16 +222,17 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnMdl::GetTypeObjStatic()
     return *reinterpret_cast<const TypeObj*>(type_obj_set_name((const u8**)&pName, scn_typename_ScnMdl));
 }
 
+/* 0x8007B794: destroys the draw collector (its lists are the caller's buffers). */
+nw4r::g3d::ScnObjGather::~ScnObjGather()
+{
+}
+
+/* 0x8007B7F0: destroys the collector interface. */
+nw4r::g3d::IScnObjGather::~IScnObjGather()
+{
+}
+
 extern "C" {
-
-
-s32 fn_8007B794(s32 arg0, s16 arg1) {
-}
-
-
-s32 dtor_8007B7F0(s32 arg0, s16 arg1) {
-}
-
 
 s32 res_shp_copy_ctor(s32 arg0) {
     fn_8007B864(0, 0);
@@ -277,19 +273,21 @@ void fn_8007B998(void* a0) {
 
 }
 
-void fn_8007B99C(u32 **arg0) {
-    *arg0 = &lbl_8058ED38;
+}   /* extern "C": the collector members below have C++ linkage */
+
+/* 0x8007B99C: constructs the collector interface. */
+nw4r::g3d::IScnObjGather::IScnObjGather()
+{
 }
 
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x10];
-    /* +0x10 */ u32 field_0x10;
-    /* +0x14 */ u32 field_0x14;
-} RawView_67; /* size: 0x18 */
-void fn_8007B9AC(void *arg0) {
-    ((RawView_67*)arg0)->field_0x14 = 0;
-    ((RawView_67*)arg0)->field_0x10 = 0;
+/* 0x8007B9AC: empties both draw lists. */
+void nw4r::g3d::ScnObjGather::Clear()
+{
+    mNumScnObjXlu = 0;
+    mNumScnObjOpa = 0;
 }
+
+extern "C" {
 
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0xCC];
@@ -325,9 +323,15 @@ void nw4r::g3d::ScnObj::SetScnObjFlag(ScnObjFlag flag, u32 on)
 extern "C" {
 
 
-s32 fn_8007BA00(void* a0) {
-    return 0;
+}   /* extern "C": the collector member below has C++ linkage */
+
+/* 0x8007BA00: whether the user sorted the lists (the base never has). */
+bool nw4r::g3d::IScnObjGather::IsUserSorted() const
+{
+    return false;
 }
+
+extern "C" {
 
 s32 fn_8007BA08(s32 arg0) {
     fn_8007BA38(0, 0);

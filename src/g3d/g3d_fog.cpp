@@ -56,16 +56,16 @@ u32 GXSetFog(s32, void*, f32, f32, f32, f32);
 u32 GXSetFogRangeAdj(u8, u16, void*);
 u32 color_rgba_copy(s32, void*);
 s32 fog_is_valid(s32);
-void* fn_80067A54(s32);
-s32 fn_80075844(s32);
+void* fog_ptr(s32);
+s32 mtx44_ptr(s32);
 u32 GXInitFogAdjTable(void*, u16, s32);
 /* internal */ s32 fog_ctor(s32 arg0, void* a1);
 /* internal */ u32 fn_80079FE4(s32 *arg0, s32 arg1);
 /* internal */ void fog_init(s32 arg0);
 /* internal */ s32 fog_copy_to(s32 arg0, s32 arg1);
-/* internal */ s32 fn_8007A1B0(s32 *arg0);
+/* internal */ s32 fog_ptr_const(s32 *arg0);
 /* internal */ void fn_8007A1B8(s32 arg0, s32 *arg1, f32 *arg2, f32 *arg3, f32 *arg4, f32 *arg5, s32 arg6, u32 arg_sp0);
-/* internal */ void fn_8007A2A8(s32 arg0, u16 arg1, s16 arg2, s32 arg3);
+/* internal */ void fog_set_range_adj_param(s32 arg0, u16 arg1, s16 arg2, s32 arg3);
 /* internal */ void fog_set_gp(s32 arg0);
 } /* extern "C" */
 
@@ -123,7 +123,7 @@ void fog_init(s32 arg0) {
         nw4r::db::Panic((const char*)&lbl_8058EAD8, 0x20, (const char*)&lbl_8058EAE8);
     }
     if (fog_is_valid((s32)(arg0)) != 0) {
-        temp_r3 = (void *)(fn_80067A54((s32)(arg0)));
+        temp_r3 = (void *)(fog_ptr((s32)(arg0)));
         ((RawView_42*)temp_r3)->field_0x00 = 0;
         ((RawView_42*)temp_r3)->field_0x04 = (f32) lbl_80795E28;
         ((RawView_42*)temp_r3)->field_0x08 = (f32) lbl_80795E28;
@@ -182,7 +182,7 @@ s32 fog_copy_to(s32 arg0, s32 arg1) {
         nw4r::db::Panic((const char*)&lbl_8058EAD8, 0x3E, (const char*)&lbl_8058EAE8);
     }
     if ((arg1 != 0) && (fog_is_valid((s32)(arg0)) != 0)) {
-        temp_r3 = (void *)(fn_8007A1B0((s32 *)(arg0)));
+        temp_r3 = (void *)(fog_ptr_const((s32 *)(arg0)));
         ((RawView_43*)arg1)->field_0x00 = (f64) ((RawView_44*)temp_r3)->field_0x00;
         ((RawView_43*)arg1)->field_0x08 = (f64) ((RawView_44*)temp_r3)->field_0x08;
         ((RawView_43*)arg1)->field_0x10 = (f64) ((RawView_44*)temp_r3)->field_0x10;
@@ -194,7 +194,7 @@ s32 fog_copy_to(s32 arg0, s32 arg1) {
     return *((s32*)fog_ctor((s32)(&sp8), (void*)(0)));
 }
 
-s32 fn_8007A1B0(s32 *arg0) {
+s32 fog_ptr_const(s32 *arg0) {
     return *arg0;
 }
 
@@ -214,7 +214,7 @@ void fn_8007A1B8(s32 arg0, s32 *arg1, f32 *arg2, f32 *arg3, f32 *arg4, f32 *arg5
         nw4r::db::Panic((const char*)&lbl_8058EAD8, 0x68, (const char*)&lbl_8058EAE8);
     }
     if (fog_is_valid((s32)(arg0)) != 0) {
-        temp_r3 = (void *)(fn_80067A54((s32)(arg0)));
+        temp_r3 = (void *)(fog_ptr((s32)(arg0)));
         if (arg1 != NULL) {
             *arg1 = ((RawView_45*)temp_r3)->field_0x00;
         }
@@ -247,16 +247,16 @@ typedef struct {
     /* +0x1F */ u8 field_0x1F;
 } RawView_46; /* size: 0x20 */
 #pragma peephole on
-void fn_8007A2A8(s32 arg0, u16 arg1, s16 arg2, s32 arg3) {
+void fog_set_range_adj_param(s32 arg0, u16 arg1, s16 arg2, s32 arg3) {
     void *temp_r3;
 
     if (fog_is_valid(0) == 0) {
         nw4r::db::Panic((const char*)&lbl_8058EAD8, 0x81, (const char*)&lbl_8058EAE8);
     }
     if (fog_is_valid((s32)(arg0)) != 0) {
-        temp_r3 = (void *)(fn_80067A54((s32)(arg0)));
+        temp_r3 = (void *)(fog_ptr((s32)(arg0)));
         ((RawView_46*)temp_r3)->field_0x1A = arg2;
-        GXInitFogAdjTable((void*)(&((RawView_46*)temp_r3)->field_0x1C), (u16)(arg1), (s32)(fn_80075844((s32)(arg3))));
+        GXInitFogAdjTable((void*)(&((RawView_46*)temp_r3)->field_0x1C), (u16)(arg1), (s32)(mtx44_ptr((s32)(arg3))));
     }
 }
 #pragma peephole off
@@ -286,7 +286,7 @@ void fog_set_gp(s32 arg0) {
         nw4r::db::Panic((const char*)&lbl_8058EAD8, 0x8F, (const char*)&lbl_8058EAE8);
     }
     if (fog_is_valid((s32)(arg0)) != 0) {
-        temp_r3 = (void *)(fn_8007A1B0((s32 *)(arg0)));
+        temp_r3 = (void *)(fog_ptr_const((s32 *)(arg0)));
         if ((s32) ((RawView_47*)temp_r3)->field_0x00 != 0) {
             GXSetFogRangeAdj((u8)(((RawView_47*)temp_r3)->field_0x18), (u16)(((RawView_47*)temp_r3)->field_0x1A), (void*)(&((RawView_47*)temp_r3)->field_0x1C));
         }

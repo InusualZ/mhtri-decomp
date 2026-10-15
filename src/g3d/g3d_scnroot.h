@@ -33,7 +33,10 @@ public:
     virtual const char* GetTypeName() const;
 
     static const TypeObj GetTypeObjStatic();
+    static ScnRoot* Construct(MEMAllocator* pHeap, u32* pSize, u32 maxChildren, u32 maxScnObj, u32 numLightObj,
+                              u32 numLightSet);
 
+    void SetGlbSettings();
     int GetCamera(int index);
     void SetCurrentCamera(int camera);
     int GetFog(int index);
@@ -47,6 +50,30 @@ public:
     /* +0x2278 */ u8 mFog[32][0x30];      /* the FogData records */
     /* +0x2878 */ u8 mLightSetting[0x10]; /* the LightSetting record */
     /* +0x2888 */ AnmScn* mpAnmScn;
+};
+
+/* The draw collector ScnRoot::Construct builds beside the root: the opaque and translucent object lists.  The
+ * vtable is this unit's (`.data` 0x8058F640); the destructor (0x8007B794) and Clear (0x8007B9AC) are weak copies in
+ * `g3d/g3d_scninline.cpp`'s range.  Add is declared first so the vtable is emitted with it.  size: 0x18 */
+class ScnObjGather : public IScnObjGather {
+public:
+    ScnObjGather(ScnObj** ppBufOpa, ScnObj** ppBufXlu, u32 bufSize);
+
+    virtual CullingStatus Add(ScnObj* pObj, bool opa, bool xlu);
+    virtual ~ScnObjGather();
+    virtual void Clear();
+    virtual void ZSort();
+    virtual void Sort();
+    virtual void Sort(ScnObjLessThanFunc pOpaFunc, ScnObjLessThanFunc pXluFunc);
+    virtual void DrawOpa(u32* pDrawMode);
+    virtual void DrawXlu(u32* pDrawMode);
+    virtual bool IsUserSorted() const;
+
+    /* +0x04 */ ScnObj** mpArrayOpa;
+    /* +0x08 */ ScnObj** mpArrayXlu;
+    /* +0x0C */ u32 mSizeScnObj;
+    /* +0x10 */ u32 mNumScnObjOpa;
+    /* +0x14 */ u32 mNumScnObjXlu;
 };
 #else
 /* size: 0x288C (this view names only the accessors) */
@@ -62,13 +89,26 @@ public:
 }  // namespace nw4r
 #endif
 
+/* A fog record (`ScnRoot::mFog`'s elements, the record a fog handle names): the fields the SetGlbSettings fog pass and
+ * the Fog accessor copies read and write (nw4r's FogData layout; +0x1A is what fog_set_range_adj_param stores).
+ * size: 0x30 */
+struct FogData {
+    /* +0x00 */ u32 type;          /* GXFogType: 0 is off, bit 3 the orthographic variant */
+    /* +0x04 */ f32 startz;
+    /* +0x08 */ f32 endz;
+    /* +0x0C */ f32 nearz;
+    /* +0x10 */ f32 farz;
+    /* +0x14 */ u32 color;
+    /* +0x18 */ u8 adjEnable;      /* 1 when the range adjustment is on */
+    /* +0x19 */ u8 pad_0x19;
+    /* +0x1A */ u16 adjCenter;
+    /* +0x1C */ u8 adjTable[0x14];
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* 0x8056F6D0 - the "ScnRoot" type-name record (`.rodata`: a length word, then the NUL-terminated name) the class's
- * run-time type members read. */
-extern const char scn_typename_ScnRoot[];
 void VEC2_ctor(void* p); /* 0x800834F0 - constructs one 8-byte sub-object (ef_particle's parameter record) */
 #ifdef __cplusplus
 void scn_root_apply_anm_scn(nw4r::g3d::ScnRoot* pRoot); /* 0x8008311C - copies the bound scene animation's light, fog and camera settings into the root */

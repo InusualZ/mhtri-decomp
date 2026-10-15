@@ -78,6 +78,27 @@ Mat33* g3d_state_get_nrm_mtx(u32 idx);
 G3dIndMtxCallback* g3d_state_get_ind_mtx_hook(void);
 nw4r::math::MTX34* g3d_state_get_camera_mtx(void);
 }
+
+/* The light, camera and fog setters `g3d/g3d_scnroot.cpp`'s SetGlbSettings calls (C linkage: plain map names). */
+struct G3dLightSetting;
+struct G3dFogData;
+
+/* A fog handle: the fog data's address.  size: 0x4 */
+struct G3dFog {
+    /* +0x00 */ G3dFogData* mpData;
+};
+
+namespace nw4r {
+namespace g3d {
+class Camera;
+}  // namespace g3d
+}  // namespace nw4r
+extern "C" {
+void g3d_state_set_light_setting(const G3dLightSetting* pSetting);
+void g3d_state_set_camera(const nw4r::g3d::Camera& camera, u32 id, bool bUpdate);
+/* 0x80088050 (0x38): records fog `id` from the handle `fog`. */
+void g3d_state_set_fog(G3dFog fog, u32 id);
+}
 #endif
 
 #endif /* MHTRI_G3D_G3D_STATE_H */

@@ -17,16 +17,16 @@
  *   type_obj_set_name_scngroup are GUESSES (the type-name store copies of `g3d/g3d_scninline.cpp` the ScnLeaf and
  *   ScnGroup type members call); G3dProcGatherScnObj, G3dProcCalcWorld, G3dProcCalcMat and G3dProcCalcView are
  *   GUESSES (the per-pass ScnGroup members DefG3dProcScnGroup dispatches to).
- * RESIDUALS. Unwritten: 0x8008147C-0x800814C0 (IScnObjCallback's destructor: defining it would emit the interface's
- *   vtable here, which the target object does not carry) and 0x80081804-0x80081838 (the AABB copy assignment
- *   retail emits out of line; `nw4r::math::AABB` is a plain struct, so MWCC copies inline).
- *   Partial: SetBoundingVolume and GetBoundingVolume (retail calls the out-of-line AABB copy `fn_80081804`; ours
- *   copies inline), Remove(u32) (retail keeps `idx * 4` in
- *   a saved register across the detach call), Insert (one `subf` scheduled later), DefG3dProcScnGroup (retail keeps
+ *   scn_obj_callback_dtor is a GUESS (0x8008147C: IScnObjCallback's deleting destructor, written as the C helper
+ *   because defining the member would emit the interface's vtable here); aabb_copy is a GUESS (0x80081804: the
+ *   AABB assignment retail calls out of line).
+ * RESIDUALS. Partial: Remove(u32) (retail keeps `idx * 4` in a saved register across the detach call; tried a
+ *   `while`/`idx` loop and optimization_level 1/2, strength-reduction, common-subs, scheduling, lifetimes,
+ *   propagation and loop-invariant pragmas), Insert (one `subf` scheduled later), DefG3dProcScnGroup (retail keeps
  *   a dead `b` after the CALC_VIEW case).
  *   IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and the CheckCallback members sit in
  *   `g3d/g3d_scninline.cpp`'s range.
- *   flipcheck: `.rodata` (the three name records) is claimed and not emitted.
+ *   flipcheck: `.text` (the three partial rows) only; the name records are emitted.
  * SHAPES. The ScnObj constructor builds its MTX34/AABB arrays with explicit do-while loops over MTX34_ctor and
  *   AABB_ctor (retail's member-array construction: the math types declare no constructors to let MWCC emit it).
  *   `(int)mCallbackDeleteOption == 1` and `(u32)type < MTX_TYPE_MAX` reproduce retail's signed and unsigned
@@ -53,6 +53,18 @@
 /* The frustum the gather pass culls against while it is set (`ScnRoot`'s camera); a NOTEST status clears it for the
  * subtree.  `.sbss` 0x807948E8, between g3d_scnmdlsmpl's and g3d_scnroot's words in link order. */
 const nw4r::math::Frustum* scnobj_culling_frustum;
+
+/* The three classes' run-time type-name records (`.rodata`: the name's length with its NUL, then the name). */
+extern "C" const u8 scn_typename_ScnObj[0x10] = {0x00, 0x00, 0x00, sizeof("ScnObj"), 'S', 'c', 'n', 'O', 'b', 'j'};
+extern "C" const u8 scn_typename_ScnLeaf[0x10] = {0x00, 0x00, 0x00, sizeof("ScnLeaf"), 'S', 'c', 'n', 'L', 'e', 'a', 'f'};
+extern "C" const u8 scn_typename_ScnGroup[0x10] = {0x00, 0x00, 0x00, sizeof("ScnGroup"), 'S', 'c', 'n', 'G', 'r', 'o', 'u',
+                                                   'p'};
+
+extern "C" {
+void aabb_copy(nw4r::math::AABB* pDst, const nw4r::math::AABB* pSrc);
+/* untyped: opaque handle - the callback object being destroyed */
+void* scn_obj_callback_dtor(void* pSelf, s16 flag);
+}
 
 /* ------------------------------------------------------------------------------------------------ */
 /* ScnObj                                                                                           */
@@ -138,6 +150,16 @@ nw4r::g3d::ScnObj::~ScnObj()
     }
 }
 
+
+/* 0x8008147C (0x44): the callback interface's deleting destructor (frees only for a positive flag). */
+/* untyped: opaque handle - the callback object being destroyed */
+extern "C" void* scn_obj_callback_dtor(void* pSelf, s16 flag)
+{
+    if (pSelf && flag > 0) {
+        operator delete(pSelf);
+    }
+    return pSelf;
+}
 
 /* 0x800814C0 (0xB4): sets the flag an option id names; false for an unknown id. */
 bool nw4r::g3d::ScnObj::SetScnObjOption(u32 option, u32 value)
@@ -264,7 +286,7 @@ bool nw4r::g3d::ScnObj::SetBoundingVolume(ScnObjBoundingVolumeType type, const m
 {
     if (pAABB != NULL) {
         if (type < BOUNDINGVOLUME_MAX) {
-            mAABB[type] = *pAABB;
+            aabb_copy(&mAABB[type], pAABB);
             return SetScnObjOption(OPTION_ENABLE_CULLING, true);
         }
         return false;
@@ -272,12 +294,18 @@ bool nw4r::g3d::ScnObj::SetBoundingVolume(ScnObjBoundingVolumeType type, const m
     return SetScnObjOption(OPTION_ENABLE_CULLING, false);
 }
 
+/* 0x80081804 (0x34): copies a bounding box (the box type's assignment, called out of line). */
+extern "C" void aabb_copy(nw4r::math::AABB* pDst, const nw4r::math::AABB* pSrc)
+{
+    *pDst = *pSrc;
+}
+
 /* 0x80081838 (0x58): copies a bounding box out. */
 bool nw4r::g3d::ScnObj::GetBoundingVolume(ScnObjBoundingVolumeType type, math::AABB* pAABB) const
 {
     if (pAABB != NULL) {
         if (type < BOUNDINGVOLUME_MAX) {
-            *pAABB = mAABB[type];
+            aabb_copy(pAABB, &mAABB[type]);
             return true;
         }
         return false;

@@ -27,9 +27,11 @@
  *   getters, G3dProcUpdateFrame and IsDerivedFrom defined here are its weak copies (members of
  *   `g3d/g3d_scnmdlsmpl.h`), as is AnmObj::IsBound; ScnGroup::PopBack and ScnGroup::Empty (0x8007F05C, 0x8007F0BC)
  *   are `g3d/g3d_scnobj.h`'s.
- * RESIDUALS. Unwritten (empty stubs): the ScnMdl::CopiedMatAccess constructor (0x8007BEAC), fn_8007C3CC,
- *   fn_8007C474.  Partial: the CopiedMatAccess getters 0x8007BBAC-0x8007BEAC (m2c views), scn_mdl_set_mat_buffer_flag.
- *   Partial: RemoveAnmObj(AnmObj*) (the vertex-position loop's counter and destination swap r27/r28; its
+ *   scn_mdl_mat_access_get_chan/_gen_mode/_mat_misc/_pix/_tev_color are GUESSES (the CopiedMatAccess block getters
+ *   0x8007BC2C-0x8007BE2C: the flag each marks, the handle each reads); scn_mdl_vis_access_ctor,
+ *   scn_mdl_vis_access_set_visibility, scn_mdl_mark_vis_buffer_dirty and ScnMdlVisAccess are GUESSES (nw4r's
+ *   CopiedVisAccess: the node check, the +0x148 visibility buffer and the +0x13C refresh bit).
+ * RESIDUALS. Partial: RemoveAnmObj(AnmObj*) (the vertex-position loop's counter and destination swap r27/r28; its
  *   extab saved-register byte differs with it).
  *   flipcheck: `.rodata`, `.data` and `.sdata` byte-identical.  Order: AnmObj::IsBound comes after the
  *   DynamicCast<AnmObjShp> instance, retail has it before (an inline IsBound defined after SetAnmObj, or before it
@@ -55,6 +57,8 @@
 #include "g3d/g3d_anmtexpat.h"    /* apply_tex_pat_anm_result (rule 2) */
 #include "g3d/g3d_draw.h" /* fn_80077E34, fn_80078904, g3d_draw_res_mdl_directly (rule 2) */
 #include "g3d/g3d_scninline.h" /* the scene inline copies, placement new (rule 2) */
+#include "g3d/fn_8005AA28.h"     /* res_node_is_valid (rule 2) */
+#include "g3d/g3d_resnode.h"     /* nw4r::g3d::ResNode (rule 1) */
 #include "g3d/g3d_scnobj.h"       /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
 #include "g3d/g3d_anmvis.h"      /* g3d_apply_vis_anm_result/fn_8006ED84 (rule 2: owner g3d/g3d_anmvis.cpp) */
 #include "g3d/g3d_calcview.h"     /* fn_8006FFBC/fn_8006FFC8 (rule 2: owner g3d/g3d_calcview.cpp) */
@@ -81,6 +85,17 @@ using nw4r::g3d::ReplacementBlock;
 using nw4r::g3d::ScnMdl;
 using nw4r::g3d::ResMdl;
 using nw4r::g3d::ResMat;
+using nw4r::g3d::ResTexObj;
+using nw4r::g3d::ResTlutObj;
+using nw4r::g3d::ResTexSrt;
+using nw4r::g3d::ResMatChan;
+using nw4r::g3d::ResGenMode;
+using nw4r::g3d::ResMatMisc;
+using nw4r::g3d::ResMatPix;
+using nw4r::g3d::ResMatTevColor;
+using nw4r::g3d::ResMatIndMtxAndScale;
+using nw4r::g3d::ResMatTexCoordGen;
+using nw4r::g3d::ResTev;
 
 namespace nw4r {
 namespace db {
@@ -121,167 +136,223 @@ void res_tex_obj_common_copy_ctor(ResHandle* pDst, const ResHandle* pSrc);
 
 /* 0x8007BB94-0x8007C540: the material-buffer flag store, the ScnMdl::CopiedMatAccess members and the visibility
  * helpers ahead of Construct. */
-extern "C" {
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x140];
-    /* +0x140 */ u32 field_0x140;
-} RawView_70; /* size: 0x144 */
-#pragma peephole on
-u32 scn_mdl_set_mat_buffer_flag(void *arg0, s32 arg1, s32 arg2) {
-    s32 temp_r3;
-    s32 * temp_r6;
-
-    temp_r6 = (s32 *)(((RawView_70*)arg0)->field_0x140);
-    temp_r3 = arg1 * 4;
-    *(temp_r6 + temp_r3) = *(temp_r6 + temp_r3) | arg2;
-}
-#pragma peephole off
-
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u8 pad_0x08[0x8];
-    /* +0x10 */ u32 field_0x10;
-} RawView_71; /* size: 0x14 */
-u32 nw4r::g3d::ScnMdl::CopiedMatAccess::GetResTexSrt(bool arg1) {
-    u32 sp8;
-    void* arg0 = this;
-
-    if (((s32) ((RawView_71*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResTexSrt*>((void*)(&((RawView_71*)arg0)->field_0x10))->IsValid() != 0)) {
-        if (arg1 != 0) {
-            scn_mdl_set_mat_buffer_flag((void *)(((RawView_71*)arg0)->field_0x00), (s32)(((RawView_71*)arg0)->field_0x04), (s32)(4));
-        }
-        return ((RawView_71*)arg0)->field_0x10;
-    }
-    return (s32)nw4r::g3d::ResTexSrt((void*)NULL).mpData;
-}
-
-/* 0x8007BEAC - the ScnMdl::CopiedMatAccess constructor. */
-nw4r::g3d::ScnMdl::CopiedMatAccess::CopiedMatAccess(ScnMdl* pMdl, u32 idx)
+/* 0x8007BB94 (0x18): sets `mask` in material `matID`'s buffer-flag word of the ScnMdl. */
+/* untyped: opaque handle passed through - the ScnMdl */
+extern "C" void scn_mdl_set_mat_buffer_flag(void* pMdl, s32 matID, s32 mask)
 {
-    (void)pMdl;
-    (void)idx;
+    ((ScnMdl*)pMdl)->mpDLBuffer[matID] |= mask;
 }
 
-
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u8 pad_0x08[0xC];
-    /* +0x14 */ u32 field_0x14;
-} RawView_72; /* size: 0x18 */
-s32 fn_8007BC2C(void *arg0, s32 arg1) {
-    u32 sp8;
-
-    if (((s32) ((RawView_72*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatChan*>((void*)(&((RawView_72*)arg0)->field_0x14))->IsValid() != 0)) {
-        if (arg1 != 0) {
-            scn_mdl_set_mat_buffer_flag((void *)(((RawView_72*)arg0)->field_0x00), (s32)(((RawView_72*)arg0)->field_0x04), (s32)(8));
+/* 0x8007BBAC (0x80): the copied texture-SRT block (a null handle without a model or block); marks it edited on
+ * request. */
+u32 ScnMdl::CopiedMatAccess::GetResTexSrt(bool markDirty)
+{
+    if (mpScnMdl != NULL && mTexSrt.IsValid()) {
+        if (markDirty) {
+            scn_mdl_set_mat_buffer_flag(mpScnMdl, mMatID, 4);
         }
-        return ((RawView_72*)arg0)->field_0x14;
+        return (u32)mTexSrt.mpData;
     }
-    return (s32)nw4r::g3d::ResMatChan((void*)NULL).mpData;
+    return (u32)ResTexSrt(NULL).mpData;
 }
 
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u8 pad_0x08[0x10];
-    /* +0x18 */ u32 field_0x18;
-} RawView_73; /* size: 0x1C */
-s32 fn_8007BCAC(void *arg0, s32 arg1) {
-    u32 sp8;
+extern "C" {
 
-    if (((s32) ((RawView_73*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResGenMode*>((s32 *)(&((RawView_73*)arg0)->field_0x18))->IsValid() != 0)) {
-        if (arg1 != 0) {
-            scn_mdl_set_mat_buffer_flag((void *)(((RawView_73*)arg0)->field_0x00), (s32)(((RawView_73*)arg0)->field_0x04), (s32)(0x10));
+/* 0x8007BC2C (0x80): the copied lighting-channel block; marks it edited on request. */
+u32 scn_mdl_mat_access_get_chan(ScnMdl::CopiedMatAccess* pAccess, bool markDirty)
+{
+    if (pAccess->mpScnMdl != NULL && pAccess->mChan.IsValid()) {
+        if (markDirty) {
+            scn_mdl_set_mat_buffer_flag(pAccess->mpScnMdl, pAccess->mMatID, 8);
         }
-        return ((RawView_73*)arg0)->field_0x18;
+        return (u32)pAccess->mChan.mpData;
     }
-    return (s32)nw4r::g3d::ResGenMode((void*)NULL).mpData;
+    return (u32)ResMatChan(NULL).mpData;
 }
 
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u8 pad_0x08[0x14];
-    /* +0x1C */ u32 field_0x1C;
-} RawView_74; /* size: 0x20 */
-s32 fn_8007BD2C(void *arg0, s32 arg1) {
-    u32 sp8;
-
-    if (((s32) ((RawView_74*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatMisc*>((s32 *)(&((RawView_74*)arg0)->field_0x1C))->IsValid() != 0)) {
-        if (arg1 != 0) {
-            scn_mdl_set_mat_buffer_flag((void *)(((RawView_74*)arg0)->field_0x00), (s32)(((RawView_74*)arg0)->field_0x04), (s32)(0x20));
+/* 0x8007BCAC (0x80): the copied gen-mode block; marks it edited on request. */
+u32 scn_mdl_mat_access_get_gen_mode(ScnMdl::CopiedMatAccess* pAccess, bool markDirty)
+{
+    if (pAccess->mpScnMdl != NULL && pAccess->mGenMode.IsValid()) {
+        if (markDirty) {
+            scn_mdl_set_mat_buffer_flag(pAccess->mpScnMdl, pAccess->mMatID, 0x10);
         }
-        return ((RawView_74*)arg0)->field_0x1C;
+        return (u32)pAccess->mGenMode.mpData;
     }
-    return (s32)nw4r::g3d::ResMatMisc((void*)NULL).mpData;
+    return (u32)ResGenMode(NULL).mpData;
 }
 
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u8 pad_0x08[0x18];
-    /* +0x20 */ u32 field_0x20;
-} RawView_75; /* size: 0x24 */
-s32 fn_8007BDAC(void *arg0, s32 arg1) {
-    u32 sp8;
-
-    if (((s32) ((RawView_75*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatPix*>((s32 *)(&((RawView_75*)arg0)->field_0x20))->IsValid() != 0)) {
-        if (arg1 != 0) {
-            scn_mdl_set_mat_buffer_flag((void *)(((RawView_75*)arg0)->field_0x00), (s32)(((RawView_75*)arg0)->field_0x04), (s32)(0x80));
+/* 0x8007BD2C (0x80): the copied misc block; marks it edited on request. */
+u32 scn_mdl_mat_access_get_mat_misc(ScnMdl::CopiedMatAccess* pAccess, bool markDirty)
+{
+    if (pAccess->mpScnMdl != NULL && pAccess->mMatMisc.IsValid()) {
+        if (markDirty) {
+            scn_mdl_set_mat_buffer_flag(pAccess->mpScnMdl, pAccess->mMatID, 0x20);
         }
-        return ((RawView_75*)arg0)->field_0x20;
+        return (u32)pAccess->mMatMisc.mpData;
     }
-    return (s32)nw4r::g3d::ResMatPix((void*)NULL).mpData;
+    return (u32)ResMatMisc(NULL).mpData;
 }
 
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u8 pad_0x08[0x1C];
-    /* +0x24 */ u32 field_0x24;
-} RawView_76; /* size: 0x28 */
-s32 fn_8007BE2C(void *arg0, s32 arg1) {
-    u32 sp8;
-
-    if (((s32) ((RawView_76*)arg0)->field_0x00 != 0) && (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>((void*)(&((RawView_76*)arg0)->field_0x24))->IsValid() != 0)) {
-        if (arg1 != 0) {
-            scn_mdl_set_mat_buffer_flag((void *)(((RawView_76*)arg0)->field_0x00), (s32)(((RawView_76*)arg0)->field_0x04), (s32)(0x100));
+/* 0x8007BDAC (0x80): the copied pixel-engine block; marks it edited on request. */
+u32 scn_mdl_mat_access_get_pix(ScnMdl::CopiedMatAccess* pAccess, bool markDirty)
+{
+    if (pAccess->mpScnMdl != NULL && pAccess->mPix.IsValid()) {
+        if (markDirty) {
+            scn_mdl_set_mat_buffer_flag(pAccess->mpScnMdl, pAccess->mMatID, 0x80);
         }
-        return ((RawView_76*)arg0)->field_0x24;
+        return (u32)pAccess->mPix.mpData;
     }
-    return (s32)nw4r::g3d::ResMatTevColor((void*)NULL).mpData;
+    return (u32)ResMatPix(NULL).mpData;
 }
 
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u8 pad_0x04[0x4];
-    /* +0x08 */ u32 field_0x08;
-} RawView_77; /* size: 0xC */
-s32 fn_8007C3CC(void *arg0, s32 arg1) {
+/* 0x8007BE2C (0x80): the copied TEV-colour block; marks it edited on request. */
+u32 scn_mdl_mat_access_get_tev_color(ScnMdl::CopiedMatAccess* pAccess, bool markDirty)
+{
+    if (pAccess->mpScnMdl != NULL && pAccess->mTevColor.IsValid()) {
+        if (markDirty) {
+            scn_mdl_set_mat_buffer_flag(pAccess->mpScnMdl, pAccess->mMatID, 0x100);
+        }
+        return (u32)pAccess->mTevColor.mpData;
+    }
+    return (u32)ResMatTevColor(NULL).mpData;
 }
 
-
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x13C];
-    /* +0x13C */ u32 field_0x13C;
-} RawView_78; /* size: 0x140 */
-u32 fn_8007C464(void *arg0) {
-    ((RawView_78*)arg0)->field_0x13C = (s32) (((RawView_78*)arg0)->field_0x13C | 1);
 }
 
-typedef struct {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u32 field_0x04;
-    /* +0x08 */ u32 field_0x08;
-} RawView_79; /* size: 0xC */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x148];
-    /* +0x148 */ u32 field_0x148;
-} RawView_80; /* size: 0x14C */
-void* fn_8007C474(void *arg0, void *arg1, s32 arg2) {
+/* 0x8007BEAC (0x520): the accessor over material `idx`'s copied blocks: each handle names the model's replacement
+ * buffer entry, or is null without a valid material or buffer. */
+ScnMdl::CopiedMatAccess::CopiedMatAccess(ScnMdl* pMdl, u32 idx)
+    : mTexObj(NULL), mTlutObj(NULL), mTexSrt(NULL), mChan(NULL), mGenMode(NULL), mMatMisc(NULL), mPix(NULL),
+      mTevColor(NULL), mIndMtxAndScale(NULL), mTexCoordGen(NULL), mTev(NULL)
+{
+    bool valid = pMdl != NULL && pMdl->GetResMdl().GetResMat(idx).IsValid();
+    if (valid) {
+        mpScnMdl = pMdl;
+        mMatID = idx;
+        if (pMdl->mReplacement.mpTexObjDataArray != NULL) {
+            mTexObj = ResTexObj((u8*)pMdl->mReplacement.mpTexObjDataArray + idx * 0x104);
+        } else {
+            mTexObj = ResTexObj(NULL);
+        }
+        if (pMdl->mReplacement.mpTlutObjDataArray != NULL) {
+            mTlutObj = ResTlutObj((u8*)pMdl->mReplacement.mpTlutObjDataArray + idx * 0x64);
+        } else {
+            mTlutObj = ResTlutObj(NULL);
+        }
+        if (pMdl->mReplacement.mpTexSrtDataArray != NULL) {
+            mTexSrt = ResTexSrt((u8*)pMdl->mReplacement.mpTexSrtDataArray + idx * 0x248);
+        } else {
+            mTexSrt = ResTexSrt(NULL);
+        }
+        if (pMdl->mReplacement.mpChanDataArray != NULL) {
+            mChan = ResMatChan((u8*)pMdl->mReplacement.mpChanDataArray + idx * 0x28);
+        } else {
+            mChan = ResMatChan(NULL);
+        }
+        if (pMdl->mReplacement.mpGenModeDataArray != NULL) {
+            mGenMode = ResGenMode((u8*)pMdl->mReplacement.mpGenModeDataArray + idx * 8);
+        } else {
+            mGenMode = ResGenMode(NULL);
+        }
+        if (pMdl->mReplacement.mpMatMiscDataArray != NULL) {
+            mMatMisc = ResMatMisc((u8*)pMdl->mReplacement.mpMatMiscDataArray + idx * 0xC);
+        } else {
+            mMatMisc = ResMatMisc(NULL);
+        }
+        if (pMdl->mReplacement.mpPixDLArray != NULL) {
+            mPix = ResMatPix((u8*)pMdl->mReplacement.mpPixDLArray + idx * 0x20);
+        } else {
+            mPix = ResMatPix(NULL);
+        }
+        if (pMdl->mReplacement.mpTevColorDLArray != NULL) {
+            mTevColor = ResMatTevColor((u8*)pMdl->mReplacement.mpTevColorDLArray + idx * 0x80);
+        } else {
+            mTevColor = ResMatTevColor(NULL);
+        }
+        if (pMdl->mReplacement.mpIndMtxAndScaleDLArray != NULL) {
+            mIndMtxAndScale = ResMatIndMtxAndScale((u8*)pMdl->mReplacement.mpIndMtxAndScaleDLArray + idx * 0x40);
+        } else {
+            mIndMtxAndScale = ResMatIndMtxAndScale(NULL);
+        }
+        if (pMdl->mReplacement.mpTexCoordGenDLArray != NULL) {
+            mTexCoordGen = ResMatTexCoordGen((u8*)pMdl->mReplacement.mpTexCoordGenDLArray + idx * 0xA0);
+        } else {
+            mTexCoordGen = ResMatTexCoordGen(NULL);
+        }
+        if (pMdl->mReplacement.mpTevDataArray != NULL) {
+            mTev = ResTev((u8*)pMdl->mReplacement.mpTevDataArray + idx * 0x200);
+        } else {
+            mTev = ResTev(NULL);
+        }
+    } else {
+        mpScnMdl = NULL;
+        mMatID = idx;
+        mTexObj = ResTexObj(NULL);
+        mTlutObj = ResTlutObj(NULL);
+        mTexSrt = ResTexSrt(NULL);
+        mChan = ResMatChan(NULL);
+        mGenMode = ResGenMode(NULL);
+        mMatMisc = ResMatMisc(NULL);
+        mPix = ResMatPix(NULL);
+        mTevColor = ResMatTevColor(NULL);
+        mIndMtxAndScale = ResMatIndMtxAndScale(NULL);
+        mTexCoordGen = ResMatTexCoordGen(NULL);
+        mTev = ResTev(NULL);
+    }
 }
+
+extern "C" {
+
+/* 0x8007C3CC (0x98): shows or hides the accessor's node, marking the model's visibility buffer for a refresh when
+ * the byte changes; false without a model or buffer. */
+bool scn_mdl_vis_access_set_visibility(ScnMdlVisAccess* pAccess, bool visible)
+{
+    if (pAccess->mpScnMdl != NULL && pAccess->mpVis != NULL) {
+        if (visible) {
+            if (*pAccess->mpVis == 0) {
+                scn_mdl_mark_vis_buffer_dirty(pAccess->mpScnMdl);
+                *pAccess->mpVis = 1;
+            }
+        } else {
+            if (*pAccess->mpVis != 0) {
+                scn_mdl_mark_vis_buffer_dirty(pAccess->mpScnMdl);
+                *pAccess->mpVis = 0;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+/* 0x8007C464 (0x10): marks the ScnMdl's visibility buffer for a refresh (bit 0 of +0x13C). */
+void scn_mdl_mark_vis_buffer_dirty(ScnMdl* pSelf)
+{
+    pSelf->mFlags |= 1;
+}
+
+/* 0x8007C474 (0xCC): the accessor over node `nodeID`'s visibility byte (a null model without a valid node, a null
+ * byte without the model's visibility buffer). */
+ScnMdlVisAccess* scn_mdl_vis_access_ctor(ScnMdlVisAccess* pAccess, ScnMdl* pMdl, u32 nodeID)
+{
+    bool valid = pMdl != NULL &&
+                 res_node_is_valid((const ResHandle*)&(const nw4r::g3d::ResNode&)pMdl->GetResMdl().GetResNode(nodeID));
+    if (valid) {
+        pAccess->mpScnMdl = pMdl;
+        pAccess->mNodeID = nodeID;
+        if (pMdl->mReplacement.mpNodeVisible != NULL) {
+            pAccess->mpVis = pMdl->mReplacement.mpNodeVisible + nodeID;
+        } else {
+            pAccess->mpVis = NULL;
+        }
+    } else {
+        pAccess->mpScnMdl = NULL;
+        pAccess->mNodeID = nodeID;
+        pAccess->mpVis = NULL;
+    }
+    return pAccess;
+}
+
 } /* extern "C" */
 
 /* Wraps a copied block's handle word in a class temporary, so the edit hook gets the temporary's address. */
@@ -635,7 +706,7 @@ void ScnMdl::G3dProcCalcWorld(u32 param, const nw4r::math::MTX34* pParent)
             nw4r::g3d::ResMdl local = GetResMdl();
 
             fn_8006ED84(mReplacement.mpNodeVisible, &local, (u32*)GetAnmObjVis());
-            fn_8007C464(this);
+            scn_mdl_mark_vis_buffer_dirty(this);
         } else {
             nw4r::g3d::ResMdl local = GetResMdl();
 

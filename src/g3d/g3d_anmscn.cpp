@@ -428,7 +428,7 @@ extern "C" void fn_800670C8(u32 *dst, const u32 *src)
  * The cluster's tail (0x80067A54-0x80067EE8).
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" u32 fn_80067A54(u32 *p)
+extern "C" u32 fog_ptr(u32 *p)
 {
     return *p;
 }
@@ -558,7 +558,7 @@ extern "C" void fn_8006522C(G3dPtrPair *out, G3dKeyArray *self, s32 index)
     out->field_0x04 = elem;
 }
 
-extern "C" G3dWordTriple *fn_80065264(G3dWordTriple *a, G3dWordTriple *b)
+extern "C" G3dWordTriple *g3d_min_u32(G3dWordTriple *a, G3dWordTriple *b)
 {
     return (b->field_0x00 < a->field_0x00) ? b : a;
 }
@@ -695,7 +695,7 @@ extern "C" void fn_80067A5C(void *self, f32 a, f32 b)
     if (fog_is_valid((u32 *)self) == 0)
         nw4r::db::Panic((const char *)lbl_8058CBC8, 0x4b, (const char *)lbl_8058CBA8);
     if (fog_is_valid((u32 *)self) != 0) {
-        G3dPairF32 *obj = (G3dPairF32 *)(void *)fn_80067A54((u32 *)self);
+        G3dPairF32 *obj = (G3dPairF32 *)(void *)fog_ptr((u32 *)self);
         obj->field_0x04 = a;
         obj->field_0x08 = b;
     }
@@ -708,7 +708,7 @@ extern "C" void fog_set_color(void *self, const u8 *rgba)
     if (fog_is_valid((u32 *)self) == 0)
         nw4r::db::Panic((const char *)lbl_8058CBF8, 0x63, (const char *)lbl_8058CBD8);
     if (fog_is_valid((u32 *)self) != 0)
-        color_rgba_copy((u8 *)fn_80067A54((u32 *)self) + 20, rgba);
+        color_rgba_copy((u8 *)fog_ptr((u32 *)self) + 20, rgba);
 }
 
 extern "C" void fn_80067AE4(void *self, void *value)
@@ -716,7 +716,7 @@ extern "C" void fn_80067AE4(void *self, void *value)
     if (fog_is_valid((u32 *)self) == 0)
         nw4r::db::Panic((const char *)lbl_8058CB98, 0x41, (const char *)lbl_8058CB78);
     if (fog_is_valid((u32 *)self) != 0)
-        ((G3dPtrObj *)(void *)fn_80067A54((u32 *)self))->field_0x00 = value;
+        ((G3dPtrObj *)(void *)fog_ptr((u32 *)self))->field_0x00 = value;
 }
 
 /* The five +0x20 adjustor thunks that forward to the `0x8009xxxx` readers (each adds 0x20 to the

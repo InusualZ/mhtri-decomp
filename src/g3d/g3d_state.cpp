@@ -1982,11 +1982,6 @@ void G3dIndMtxCallbackStd::Exec(G3dIndMtxOp* pOp) {
 /* The identity projection, the channel load and the fog accessors                                   */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* A fog handle: the fog data's address.  size: 0x4 */
-struct G3dFog {
-    /* +0x00 */ G3dFogData* mpData;
-};
-
 extern "C" {
 
 void g3d_fog_table_load(G3dFogTable* pSelf, s32 idx);
@@ -2290,7 +2285,7 @@ void g3d_state_set_fog(G3dFog fog, u32 idx) {
 
 /* 0x80088088 (0xA4): copies `fog` into fog `idx`, forgetting the loaded fog when it changes the one loaded. */
 void g3d_fog_table_set_fog(G3dFogTable* pSelf, G3dFog fog, u32 idx) {
-    if (idx <= 31 && fog_is_valid(&fog)) {
+    if (idx <= 31 && fog_is_valid((const ResHandle*)&fog)) {
         if (pSelf->fogIdx == (s32)idx) {
             if (memcmp(g3d_fog_ref(&fog), &pSelf->fog[idx], sizeof(G3dFogData)) == 0) {
                 return;

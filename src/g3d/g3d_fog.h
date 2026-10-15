@@ -3,6 +3,7 @@
 #define MHTRI_G3D_G3D_FOG_H
 
 #include "types.h"
+#include "nw4r/math.h" /* nw4r::math::MTX44 */
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,6 +14,14 @@ extern "C" {
 s32 fog_ctor(s32 pSelf, void* pData);
 /* 0x80079FEC (0xC8): resets the fog the handle at `pSelf` names. */
 void fog_init(s32 pSelf);
+/* 0x8007A1B0 (0x8): the fog record the handle names (ResCommon::ptr const). */
+struct ResHandle;
+struct FogData;
+const struct FogData* fog_ptr_const(const struct ResHandle* pSelf);
+#ifdef __cplusplus
+/* 0x8007A2A8 (0xAC): sets the fog's range-adjustment centre and table from `width` and the projection `pProjMtx`. */
+void fog_set_range_adj_param(struct ResHandle* pSelf, u16 width, u16 center, const nw4r::math::MTX44* pProjMtx);
+#endif
 
 #ifdef __cplusplus
 }

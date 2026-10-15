@@ -119,6 +119,8 @@ public:
     /* +0x0C */ u32 mFlags;
 };
 
+struct LightSetting;
+
 /* The scene animation interface (cameras, lights, fog); only its constructor and the head of its vtable are
  * reconstructed.  size: 0x0C (approximation: the base's size, the derived scene animations add their members) */
 class AnmScn : public G3dObj {
@@ -130,6 +132,9 @@ public:
     virtual ~AnmScn();
     virtual const TypeObj GetTypeObj() const;
     virtual const char* GetTypeName() const;
+
+    /* 0x80064CF0: copies the animation's light sets into `pSetting`. */
+    void GetLightSetting(LightSetting* pSetting);
 };
 
 /* The visibility, material-colour, texture-pattern and shape animation interfaces; only their run-time type is reconstructed

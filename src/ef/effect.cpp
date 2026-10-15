@@ -209,8 +209,8 @@ void ef_resource_remove_all_texture_projects(s32 handle);
 s32 fn_800E28E4(void* chr);
 s32 fn_800E2994(void* access);
 
-void* fn_8007BE2C(void* access, u32 idx);
-void* fn_8007BC2C(void* access, u32 idx);
+void* scn_mdl_mat_access_get_tev_color(void* access, u32 idx);
+void* scn_mdl_mat_access_get_chan(void* access, u32 idx);
 void res_mat_tev_color_copy_ctor(void* out, void* handle);
 void res_mat_chan_copy_ctor(void* out, void* handle);
 
@@ -733,7 +733,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
             if (fn_800E2994(&access) == 0) {
                 return;
             }
-            u32 handle = (u32)fn_8007BE2C(&access, 0);
+            u32 handle = (u32)scn_mdl_mat_access_get_tev_color(&access, 0);
             void* tex;
             res_mat_tev_color_copy_ctor(&tex, &handle);
             if (reinterpret_cast<const nw4r::g3d::ResMatTevColor*>(&tex)->IsValid() == 0) {
@@ -746,7 +746,7 @@ extern "C" void fn_800FA5D4(EftSpawnOwner* owner, MHchar* chr) {
             if (fn_800E2994(&access) == 0) {
                 return;
             }
-            u32 handle = (u32)fn_8007BC2C(&access, 0);
+            u32 handle = (u32)scn_mdl_mat_access_get_chan(&access, 0);
             void* tex;
             res_mat_chan_copy_ctor(&tex, &handle);
             if (reinterpret_cast<const nw4r::g3d::ResMatChan*>(&tex)->IsValid() == 0) {

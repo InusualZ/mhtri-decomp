@@ -26,17 +26,46 @@ void res_mat_misc_end_edit(struct ResHandle* pSelf);
 void res_gen_mode_end_edit(struct ResHandle* pSelf);
 /* 0x8007BB94 (0x18): sets `mask` in material `matID`'s buffer-flag word of the ScnMdl. */
 /* untyped: opaque handle passed through - the ScnMdl */
-u32 scn_mdl_set_mat_buffer_flag(void* pMdl, s32 matID, s32 mask);
-/* 0x8007C464 (0x10): marks the ScnMdl's visibility buffer for a refresh (bit 0 of +0x13C). */
-u32 fn_8007C464(void* pSelf);
+void scn_mdl_set_mat_buffer_flag(void* pMdl, s32 matID, s32 mask);
 
 #ifdef __cplusplus
 }
 
 namespace nw4r { namespace g3d { class ScnMdl; } }
 
+/* 0x8007C464 (0x10): marks the ScnMdl's visibility buffer for a refresh (bit 0 of +0x13C). */
+extern "C" void scn_mdl_mark_vis_buffer_dirty(nw4r::g3d::ScnMdl* pSelf);
+
 /* 0x8007E498 (0x364): copies the flagged blocks of material `matID` into the model's replacement buffers. */
 extern "C" void scn_mdl_clean_mat_buffer(nw4r::g3d::ScnMdl* pMdl, u32 matID, u32 option);
+
+/* The node-visibility accessor the game's character code builds on the stack: the model, the node and the node's
+ * byte in the model's visibility buffer (nw4r's ScnMdl::CopiedVisAccess, built by scn_mdl_vis_access_ctor).
+ * size: 0xC */
+struct ScnMdlVisAccess {
+    /* +0x00 */ nw4r::g3d::ScnMdl* mpScnMdl;
+    /* +0x04 */ u32 mNodeID;
+    /* +0x08 */ u8* mpVis;
+};
+
+extern "C" {
+/* 0x8007C3CC (0x98): shows or hides the accessor's node; false without a model or buffer. */
+bool scn_mdl_vis_access_set_visibility(ScnMdlVisAccess* pAccess, bool visible);
+/* 0x8007C474 (0xCC): builds the accessor over node `nodeID` of `pMdl`. */
+ScnMdlVisAccess* scn_mdl_vis_access_ctor(ScnMdlVisAccess* pAccess, nw4r::g3d::ScnMdl* pMdl, u32 nodeID);
+}
+
+/* The CopiedMatAccess block getters (C linkage: the game's effect code calls them by their plain names); declared
+ * where the full ScnMdl class is visible. */
+#ifdef MHTRI_NW4R_G3D_SCNMDL_H
+extern "C" {
+u32 scn_mdl_mat_access_get_chan(nw4r::g3d::ScnMdl::CopiedMatAccess* pAccess, bool markDirty);
+u32 scn_mdl_mat_access_get_gen_mode(nw4r::g3d::ScnMdl::CopiedMatAccess* pAccess, bool markDirty);
+u32 scn_mdl_mat_access_get_mat_misc(nw4r::g3d::ScnMdl::CopiedMatAccess* pAccess, bool markDirty);
+u32 scn_mdl_mat_access_get_pix(nw4r::g3d::ScnMdl::CopiedMatAccess* pAccess, bool markDirty);
+u32 scn_mdl_mat_access_get_tev_color(nw4r::g3d::ScnMdl::CopiedMatAccess* pAccess, bool markDirty);
+}
+#endif
 #endif
 
 #endif /* MHTRI_G3D_G3D_SCNMDL_H */
