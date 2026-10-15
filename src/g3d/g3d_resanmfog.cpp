@@ -16,7 +16,7 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"          /* IS_VALID_PTR (rule 1) */
-#include "g3d/fn_800680CC.h"              /* fn_80068634, owner g3d/fn_800680CC.cpp (rule 2) */
+#include "g3d/g3d_anmscn.h"               /* fn_80068634, owner g3d/g3d_anmscn.cpp (rule 2) */
 #include "font/flfnt.h"                    /* fn_8005B1E4, owner font/flfnt.cpp (rule 2) */
 #include "g3d/g3d_resanmamblight.h"       /* fn_8008A188/fn_8008A1A8, owner g3d/g3d_resanmamblight.c (rule 2) */
 #include "g3d/g3d_resanmcamera.h" /* fn_8008A644 (rule 2) */

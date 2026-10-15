@@ -23,7 +23,7 @@
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_calcvtx.h"
-#include "g3d/fn_800680CC.h"
+#include "g3d/g3d_anmshp.h"    /* fn_8006946C (rule 2) */
 #include "unsplit/OS.h"
 
 #pragma peephole off

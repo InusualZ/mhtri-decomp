@@ -47,7 +47,7 @@ s32 res_node_is_valid(const ResHandle* pSelf);                     /* owner: src
 void* res_handle_ptr(const ResHandle* pSelf);                   /* owner: src/g3d/fn_8005AA28.cpp */
 ResNodeData* res_node_ptr(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
 ResNodeData* res_node_ref_nonconst(const ResHandle* pSelf);            /* owner: src/g3d/g3d_anmchr.cpp */
-VEC3* vec3_copy_construct(VEC3* pOut, const VEC3* pIn);              /* owner: src/g3d/fn_80063888.cpp */
+VEC3* vec3_copy_construct(VEC3* pOut, const VEC3* pIn);              /* owner: src/g3d/g3d_anmscn.cpp */
 void fn_8008C484(f32* pOut, f32 x, f32 y, f32 z);            /* owner: src/g3d/g3d_resanmchr.cpp */
 void* fn_8008A220(void* pOut, u32 value);                    /* owner: src/g3d/g3d_resanmcamera.cpp */
 }

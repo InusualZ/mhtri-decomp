@@ -1,12 +1,35 @@
 /* g3d/g3d_anmtexsrt.h - nw4r g3d's texture-SRT animation classes (AnmObjTexSrt and its node, override and resource
- *   forms), whose members `g3d/fn_800680CC.cpp` defines (the `g3d_anmtexsrt.cpp` part of its range).  Evidence: the
- *   four vtables at .data 0x8058D4D8..0x8058D5E0 and the `AnmObjTexSrt::Attach(...)` / `AnmObjTexSrtNode::G3dProc(...)`
+ *   forms), whose members `g3d/g3d_anmtexsrt.cpp` defines, and that unit's C-linkage helpers.  Evidence: the four
+ *   vtables at .data 0x8058D4D8..0x8058D5E0 and the `AnmObjTexSrt::Attach(...)` / `AnmObjTexSrtNode::G3dProc(...)`
  *   warnings. */
 #ifndef MHTRI_G3D_G3D_ANMTEXSRT_H
 #define MHTRI_G3D_G3D_ANMTEXSRT_H
 
 #include "types.h"
 #include "g3d/g3d_obj.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x8006CDBC - the checked `ResAnmTexSrt` resolver the `g3d/g3d_resfile.cpp` getters and the
+ * `g3d/g3d_resanmtexsrt.cpp` field readers call. */
+u32 fn_8006CDBC(void* p);
+/* 0x8006D9FC - the indexed handle reader the `g3d_resanmtexsrt.cpp` field readers call. */
+u32 fn_8006D9FC(void* self, u32 idx);
+/* 0x8006D9A4 - the keyed field reader (a sibling of the `g3d_resanmtexsrt.cpp` reader). */
+u32 fn_8006D9A4(void* self, void* key);
+
+#ifdef __cplusplus
+}
+
+struct ResHandle;
+namespace nw4r { namespace g3d { struct TexSrtAnmResult; } }
+
+/* 0x8006E338 (0x330): applies a texture-SRT result to a material's SRT block and indirect matrices. */
+extern "C" void apply_tex_srt_anm_result(struct ResHandle texSrt, struct ResHandle indMtx,
+                                         const nw4r::g3d::TexSrtAnmResult* pResult);
+#endif
 
 #ifdef __cplusplus
 namespace nw4r {

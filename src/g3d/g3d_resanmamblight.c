@@ -20,7 +20,7 @@
 #pragma peephole off
 #pragma fp_contract off
 
-/* The C++ helper `fn_80066C8C` (owner `g3d/fn_80063888.cpp`), spelled with its mangling because this unit is C. */
+/* The C++ helper `fn_80066C8C` (owner `g3d/g3d_anmscn.cpp`), spelled with its mangling because this unit is C. */
 extern u32 *fn_80066C8C__FPv(void *obj);
 
 /* The resolved animation object `fn_80066C8C__FPv` returns: a type word, a frame count and the

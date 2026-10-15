@@ -27,7 +27,7 @@
  *   (texSRT + indSRT) * 0x14 / (4-byte counts) << 2 shape; the grouped sum's adds still differ in order.
  *   Constructor (0x80530A50): the TEV colour loop indexes its destination where retail walks a pointer (the
  *   implicit GXColorS10 copy of request hkb-lyt#4 walks it). The mTevKCols copies call ut::Color::operator=(const
- *   GXColor&), which the map still names fn_800647A0 (g3d/fn_80063888.cpp's copy).
+ *   GXColor&), which the map still names fn_800647A0 (g3d/g3d_anmclr.cpp's copy).
  *   SetupGX (0x805323D4): two saved registers swap in the TEV-stage loop (r26 / r31).
  *   Flip blockers: flipcheck reports .text 0x2D38 against the claimed 0x2D48 (-0x10) and the bytes differ from +0x304
  *   (retail emits the AnimationLinkList constructor before the Material constructor, and the copy operators before

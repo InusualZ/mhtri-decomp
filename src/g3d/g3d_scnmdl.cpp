@@ -29,8 +29,8 @@
  * SHAPES. The handle copies retail calls out of line (res_mat_copy_ctor, res_tex_obj_copy_ctor, ...) are explicit calls
  *   on `ResHandle` locals, declared in Construct/G3dProcCalcMat/InitBuffer order so the stack slots match; a
  *   by-value handle word the callee returns becomes a `HandleTemp` class temporary, whose address is then taken.
- *   The unit does not include `g3d/fn_80063888.h`: its global placement `operator delete` gives Construct's
- *   `new (pBuf) ScnMdl` a landing pad retail lacks (the leaf `g3d/res_mat_copy_ctor.h` carries what is needed).
+ *   The unit does not include `g3d/g3d_anmscn.h`: its global placement `operator delete` gives Construct's
+ *   `new (pBuf) ScnMdl` a landing pad retail lacks (`g3d/g3d_anmclr.h` carries what is needed).
  *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
  *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
  */
@@ -38,9 +38,10 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h" /* ResHandle, IS_VALID_PTR (rule 1) */
 #include "nw4r/g3d/scnmdl.h"      /* nw4r::g3d::ScnMdl (rule 1) */
-#include "g3d/res_mat_copy_ctor.h" /* res_mat_copy_ctor, apply_clr_anm_result (rule 2: owner g3d/fn_80063888.cpp) */
+#include "g3d/g3d_anmclr.h"       /* res_mat_copy_ctor, apply_clr_anm_result (rule 2) */
 #include "g3d/g3d_anmchr.h"       /* G3dObj::operator delete, TypeObj::GetTypeName, type_obj_set_name, TypeObj::operator==, G3dObj (rule 2: owner g3d/g3d_anmchr.cpp) */
-#include "g3d/fn_800680CC.h"      /* fn_800696E4, fn_800697A4 (rule 2: owner g3d/fn_800680CC.cpp) */
+#include "g3d/g3d_anmshp.h"       /* ResVtxPos::ref, AnmObjShp::GetTypeObjStatic (rule 2: owner g3d/g3d_anmshp.cpp) */
+#include "g3d/g3d_anmtexpat.h"    /* apply_tex_pat_anm_result (rule 2) */
 #include "g3d/fn_80075DCC.h"      /* fn_8007B734..g3d_draw_res_mdl_directly (rule 2: owner g3d/fn_80075DCC.cpp) */
 #include "g3d/g3d_scnobj.h"       /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
 #include "g3d/g3d_anmvis.h"      /* g3d_apply_vis_anm_result/fn_8006ED84 (rule 2: owner g3d/g3d_anmvis.cpp) */

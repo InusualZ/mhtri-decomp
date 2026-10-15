@@ -19,10 +19,10 @@ measurements behind the lib's flags, which `configure.py` points at.
   tried (`-inline auto`, `-inline noauto`, `-opt nopeephole`) keeps the retail order, so the level is the lever.
 * **`-inline noauto`**. Measured with a scratch compile of the whole lib (report metric plus a raw per-section byte
   compare): two units reconstructed under `-inline noauto` reproduce their scores under it (83.20733 / 94.86212)
-  and drop under `-inline auto` (70.17290 / 93.59429), while `g3d/g3d_anmscn.cpp`'s object is identical under
-  both. Under `-inline noauto` the `*_ac.h` inline constructors are called out of line (`fn_800900A4`,
+  and drop under `-inline auto` (70.17290 / 93.59429), while `fn_800680A8__FPv`'s object (then a 0x24-byte unit of its
+  own, now part of `g3d/g3d_anmscn.cpp`) is identical under both. Under `-inline noauto` the `*_ac.h` inline constructors are called out of line (`fn_800900A4`,
   `fn_80062D58`, ...), so the units declare and call those copies by their map stems.
-* **`-Cpp_exceptions on`**. The retail objects carry `extab`/`extabindex`; `g3d/g3d_anmscn.cpp`'s are extab 0x8 +
+* **`-Cpp_exceptions on`**. The retail objects carry `extab`/`extabindex`; `fn_800680A8__FPv`'s are extab 0x8 +
   extabindex 0xC, unwind-only records (a 4-byte flag word and a zero terminator, no PC ranges, no actions), and
   the flag alone reproduces them - the same finding as `cflags_pl` and `Gecko_ExceptionPPC.cp`.
 

@@ -23,7 +23,8 @@
 #include "g3d/g3d_resshp.h"       /* `nw4r::g3d::ResTex`/`ResPltt` (rule 2) */
 #include "nw4r/g3d/res_common.h"   /* ResHandle (rule 1) */
 #include "g3d/g3d_anmchr.h"        /* fn_8006268C/fn_80062750/fn_80062914 (rule 2, owner header) */
-#include "g3d/fn_800680CC.h"       /* fn_80069664/fn_8006CDBC/fn_8006D9FC (rule 2, owner header) */
+#include "g3d/g3d_anmshp.h"        /* ResDic::GetNumData's owner (rule 2) */
+#include "g3d/g3d_anmtexsrt.h"     /* fn_8006CDBC/fn_8006D9FC (rule 2, owner header) */
 #include "g3d/g3d_resanmscn.h"     /* fn_8009125C/fn_800912D4/fn_800913A0/fn_80091628
                                     * (rule 2, owner header) */
 
@@ -273,7 +274,7 @@ extern "C" void* fn_80093420(u32* self, u32 ptr) {
 }
 
 /* ==================== 0x80091D20: the checked `ResAnmTexSrt` field reader ===================== */
-/* The same shape as `g3d/fn_800680CC.cpp`'s fn_8006D9A4: resolve the resource through
+/* The same shape as `g3d/g3d_anmtexsrt.cpp`'s fn_8006D9A4: resolve the resource through
  * fn_8006CDBC, read the body word at +0x10, index the handle, then look the key up in the table. */
 
 typedef struct {

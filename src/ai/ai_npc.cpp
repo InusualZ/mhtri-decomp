@@ -91,7 +91,7 @@
 #include "ef/fn_800CDB2C.h"
 #include "fn_80047398.h"
 #include "fn_8004CAD8.h"
-#include "g3d/fn_80063888.h"
+#include "g3d/g3d_anmscn.h"
 #include "lobby/lb_npc.h"
 #include "mh3_pad.h"
 #include "stage/stg_w.h"

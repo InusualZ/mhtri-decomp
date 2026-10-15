@@ -159,7 +159,7 @@
 #include "sound/snd_stream_reloc.h"    /* clearReverbWorkArea / setStreamTransferMode - owner sound/snd_stream_reloc.cpp */
 #include "lobby/lb_menu_pos_tbl.h"     /* syncItemListClock - owner lobby/lb_menu_pos_tbl.cpp */
 #include "g3d/fn_80075DCC.h"            /* the placement operator new - owner g3d/fn_80075DCC.cpp */
-#include "g3d/fn_80063888.h"            /* the placement operator delete - owner g3d/fn_80063888.cpp */
+#include "g3d/g3d_anmscn.h"            /* the placement operator delete - owner g3d/g3d_anmscn.cpp */
 #include "ef/fn_800CDB2C.h"               /* GameMode_ck - declared by its former owner's header */
 #include "enemy/em020_ai.h"                /* getInstance_ - owner enemy/em020_ai.cpp */
 #include "enemy/lobby_state_block.h"   /* lobby_state_block - owner enemy/em020_prog.cpp (its leaf header) */

@@ -474,7 +474,7 @@ void fn_802BBEE0(void);
  * never here.  `unsplit/unknown.h` carries the module-ambiguous ones. */
 #include "ef/fn_800CDB2C.h"
 #include "fn_8004CAD8.h"
-#include "g3d/fn_80063888.h"
+#include "g3d/g3d_anmscn.h"
 #include "lobby/lb_npc.h"
 #include "stage/stg_w.h"
 #include "unsplit/Runtime.PPCEABI.H.h"

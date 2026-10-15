@@ -173,10 +173,10 @@ struct ResName {
 
 /*
  * The declarations this unit needs.  The `*_ac.h` inline constructors/resolvers are out-of-line copies
- * owned by other units (plain map stems, so C linkage): 0x800658C4/0x800658B0 by `g3d/fn_80063888.cpp`, the
+ * owned by other units (plain map stems, so C linkage): 0x800658C4/0x800658B0 by `g3d/g3d_anmscn.cpp`, the
  * five 0x800900A4..0x80090728 constructors by `g3d/g3d_resanmlight.cpp`, 0x80052984..0x80053A90 by the texture
  * units of the 0x80052xxx band, 0x8006268C/0x80062D58 by `g3d/g3d_anmchr.cpp`, 0x800699B4/0x800699A8/0x80069BD8/
- * 0x80069C14 by `g3d/fn_800680CC.cpp`, and 0x800926CC/0x80092990 by `g3d/g3d_resanmtexsrt.cpp`.
+ * 0x80069C14 by `g3d/g3d_anmtexpat.cpp`, and 0x800926CC/0x80092990 by `g3d/g3d_resanmtexsrt.cpp`.
  */
 extern "C" {
 
@@ -226,10 +226,10 @@ void *res_pltt_ctor(void *self, u32 value);                  /* construct a ResP
 
 /* The name/handle store helpers: store the source word at +0x0 of `self` and return `self`. */
 void *res_name_copy_ctor(void *self, void *src); /* g3d/g3d_anmchr.cpp */
-void *fn_80069BD8(void *self, void *src); /* g3d/fn_800680CC.cpp */
-void *fn_80069C14(void *self, void *src); /* g3d/fn_800680CC.cpp */
+void *fn_80069BD8(void *self, void *src); /* g3d/g3d_anmtexpat.cpp */
+void *fn_80069C14(void *self, void *src); /* g3d/g3d_anmtexpat.cpp */
 
-/* The `ResAnmTexPat` ref()-check helpers (g3d/fn_800680CC.cpp): `fn_800699B4` is `*(u32*)p != 0` and
+/* The `ResAnmTexPat` ref()-check helpers (g3d/g3d_anmtexpat.cpp): `fn_800699B4` is `*(u32*)p != 0` and
  * `fn_800699A8` returns the class-name string the message is built from. */
 u32 fn_800699B4(void *p);
 u32 fn_800699A8(void);

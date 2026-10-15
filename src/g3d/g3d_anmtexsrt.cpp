@@ -1,37 +1,36 @@
 /*
- * g3d/fn_800680CC.cpp - nw4r g3d animation-object cluster: the `g3d_anmscn.cpp`, `g3d_anmshp.cpp`,
- *   `g3d_anmtexpat.cpp` and `g3d_anmtexsrt.cpp` bodies - accessor families (getters, `!= 0` readers, word copies,
- *   type-name returners, `Init`/`Set` forwarders, name readers) and the `TestScnAnm`/attach/detach bodies.
- * RANGE. .text 0x800680CC-0x8006EAC0 (133 functions); extab, extabindex, .rodata 0x8056F598-0x8056F628, .data
- *   0x8058CC40-0x8058D6C0, .sdata 0x80791188-0x807911A0, .sdata2 0x80795D90-0x80795DA8.  Four TUs by the `__FILE__`
- *   each body cites: fn_800680CC "g3d_anmscn.cpp" (lbl_8058C288), fn_8006946C "g3d_anmshp.cpp" (lbl_8058CC40),
- *   TestExistence__Q34nw4r3g3d12AnmObjTexPatCFUl "g3d_anmtexpat.cpp" (lbl_8058CD40), fn_80069CF4 onward "g3d_anmtexsrt.cpp" (lbl_8058CE10).  The left
- *   edge is `g3d/g3d_anmscn.cpp`, the right edge `g3d/g3d_anmvis.cpp`.
- * NAMES. apply_tex_pat_anm_result, apply_tex_srt_anm_result and AnmObjTexPat::TestExistence (0x800697D4, the
- *   "g3d_anmtexpat.cpp" asserts) are GUESSES (nw4r's ApplyTexPatAnmResult/ApplyTexSrtAnmResult, by the ScnMdl
- *   material pass that hands each the copied handles and the animation's result).  The file keeps the map's stem (`g3d_anmscn.cpp` already names `g3d/g3d_anmscn.cpp`); the stems are defined
- *   `extern "C"` (playbook 48).  The AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride and AnmObjTexSrtRes
- *   members are nw4r's (the `AnmObjTexSrt::Attach(...)` / `AnmObjTexSrtNode::G3dProc(...)` warnings and the four
- *   vtables); type_obj_set_name_texsrt_res/_node/_override are GUESSES (the store copies in
- *   `g3d/fn_80063888.cpp` their GetTypeObj members call).
- * RESIDUALS. 33 functions unwritten (objdiff scores them zero) in 15 runs: 0x800680CC-0x800686FC (the anmscn
- *   head), 0x800686FC-0x800689B0, 0x80068A78-0x80069334, 0x8006946C-0x800695D4, 0x800697D4-0x8006993C,
- *   0x800699C8-0x80069BD8, 0x8006C138-0x8006C650, 0x8006C668-0x8006CDBC,
- *   0x8006CD98-0x8006CDBC, 0x8006CE48-0x8006D000, 0x8006D084-0x8006D9A0 (the AnmObjTexSrtRes members),
- *   0x8006DA48-0x8006E2A8, 0x8006E338-0x8006E668.
+ * g3d/g3d_anmtexsrt.cpp - nw4r g3d `g3d_anmtexsrt.cpp`: the texture-SRT animation classes (`AnmObjTexSrt`,
+ *   `AnmObjTexSrtNode`, `AnmObjTexSrtOverride`, `AnmObjTexSrtRes`), the texture-SRT result applier, the checked
+ *   `ResAnmTexSrt`/`ResTexSrt` getters of the headers it includes and their accessors.
+ * RANGE. .text 0x80069C80-0x8006EAC0; extab 0x80007C1C-0x80007E98, extabindex 0x800200E8-0x8002040C, .rodata
+ *   0x8056F5C0-0x8056F628, .data 0x8058CE10-0x8058D6C0, .sdata 0x80791198-0x807911A0, .sdata2 0x80795D90-0x80795DA8.
+ *   The TU is `g3d_anmtexsrt.cpp`: its one-copy `__FILE__` string (0x8058CE10) is cited from
+ *   AnmObjTexSrt::TestExistence (0x80069CF4) through apply_tex_srt_anm_result (0x8006E338); the AnmObjTexSrt
+ *   constructor (0x80069C80) stores this TU's vtable (0x8058D5B0), and the previous TU's (`g3d_anmtexpat.cpp`,
+ *   0x8058CD40) record is last read at 0x80069C50.  The right edge is `g3d/g3d_anmvis.cpp`.
+ * FLAGS. `cflags_g3d` (docs/g3d.md).
+ * NAMES. apply_tex_srt_anm_result is a GUESS (nw4r's ApplyTexSrtAnmResult, by the ScnMdl material pass that hands it
+ *   the copied handles and the animation's result).  The AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride and
+ *   AnmObjTexSrtRes members are nw4r's (the `AnmObjTexSrt::Attach(...)` / `AnmObjTexSrtNode::G3dProc(...)` warnings
+ *   and the four vtables); the stems are defined `extern "C"` (playbook 48).  The classes are declared in
+ *   `g3d/g3d_anmtexsrt.h`, with the unit's C-linkage helpers.
+ * RESIDUALS. Unwritten (19 functions, objdiff scores them zero): 0x8006C138-0x8006C650, 0x8006C668-0x8006CDBC,
+ *   0x8006CE48-0x8006D000, 0x8006D084-0x8006D9A0 (the AnmObjTexSrtRes members), 0x8006DA48-0x8006E2A8,
+ *   0x8006E338-0x8006E668 (apply_tex_srt_anm_result).  Partial: fn_8006C650, fn_8006E668.
  *   AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride, AnmObjTexSrtRes: the destructors' empty bodies are complete
  *   (the compiler emits the base calls and the deleting tail; `#pragma peephole off` keeps retail's `extsh`).
- *   Partial: fn_8006C650, fn_8006D9FC, fn_8006E668, and the members whose only difference is a relocation name.
  *   fn_8006C650: retail materialises `~(b - 1)` with an explicit `not` where MWCC folds it into `andc` (one
  *   instruction fewer).
- *   flipcheck: `.text` 0xC8C of 0x69F4; `.rodata`, `.data` and `.sdata2` are claimed and not emitted; `.sdata` is
- *   0x4 of 0x18.
+ *   flipcheck: `.text`, extab and extabindex are partial; `.rodata`, `.data` and `.sdata2` are claimed and not
+ *   emitted.
  * SHAPES. The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
- *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
+ *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106) and
+ *   `#pragma pool_data off`.
  */
 
 #include "types.h"
-#include "g3d/fn_80063888.h"
+#include "g3d/g3d_anmscn.h"
+#include "g3d/g3d_anmclr.h"   /* type_obj_set_name_texsrt_res/_node/_override (rule 2) */
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResTexSrt (rule 2) */
 #include "g3d/g3d_anmchr.h"  /* the fn_8005Dxx / fn_80062xx helpers the g3d_anmchr.cpp range now owns (rule 2) */
@@ -43,50 +42,19 @@
 
 #pragma pool_data off
 
-/* The `.rodata` animation name records the helper-backed readers pass by address: lbl_8056F598.. are this unit's
- * (claimed, not emitted), lbl_8056F578/lbl_8056F588 are unclaimed. */
-extern u8 lbl_8056F578[];
-extern u8 lbl_8056F588[];
-extern u8 lbl_8056F598[];
-extern u8 lbl_8056F5A8[];
+/* The `.rodata` animation name records the helper-backed readers pass by address (claimed, not emitted). */
 extern u8 lbl_8056F5C0[];
 extern u8 anm_typename_AnmObjTexSrtNode[];     /* "AnmObjTexSrtNode" (this unit's .rodata) */
 extern u8 anm_typename_AnmObjTexSrtOverride[]; /* "AnmObjTexSrtOverride" (this unit's .rodata) */
 extern u8 anm_typename_AnmObjTexSrtRes[];      /* "AnmObjTexSrtRes" (this unit's .rodata) */
 
-/* The `.data` type-name strings the plain returners hand back by address (this unit's `.data`, and
- * `g3d/fn_80063888.cpp`'s for lbl_8058CAFC/lbl_8058CAB8; claimed, not emitted). */
-extern u8 lbl_8058CAFC[]; /* "ResAnmFog"     */
-extern u8 lbl_8058CAB8[]; /* "ResAnmCamera"  */
-extern u8 lbl_8058CCC8[]; /* "ResAnmShp"     */
-extern u8 lbl_8058CD04[]; /* "ResVtxPos"     */
-extern u8 lbl_8058CDC8[]; /* "ResAnmTexPat"  */
+/* The `.data` type-name strings the plain returners hand back by address (claimed, not emitted). */
 extern u8 lbl_8058D678[]; /* "ResAnmTexSrt"  */
 extern u8 lbl_8058D5F8[]; /* "ResTexSrt"     */
 
 /* --------------------------------------------------------------------------------------------- *
  * The word accessors (0x80068698-0x8006E6B4): read / test / copy the body word at +0x0.
  * --------------------------------------------------------------------------------------------- */
-
-extern "C" u32 fn_80068698(void *p)
-{
-    return *(u32 *)p;
-}
-
-extern "C" u32 fn_80068A14(void *p)
-{
-    return *(u32 *)p;
-}
-
-extern "C" u32 fn_80069650(void *p)
-{
-    return *(u32 *)p;
-}
-
-extern "C" u32 fn_800699A0(void *p)
-{
-    return *(u32 *)p;
-}
 
 extern "C" u32 fn_8006CE20(void *p)
 {
@@ -97,26 +65,6 @@ extern "C" u32 fn_8006CE20(void *p)
 nw4r::g3d::ResTexSrtData* nw4r::g3d::ResTexSrt::ptr()
 {
     return static_cast<ResTexSrtData *>(mpData);
-}
-
-extern "C" u32 fn_800686AC(void *p)
-{
-    return *(u32 *)p != 0;
-}
-
-extern "C" u32 fn_80068A28(void *p)
-{
-    return *(u32 *)p != 0;
-}
-
-extern "C" u32 fn_800696AC(void *p)
-{
-    return *(u32 *)p != 0;
-}
-
-extern "C" u32 fn_800699B4(void *p)
-{
-    return *(u32 *)p != 0;
 }
 
 extern "C" u32 fn_8006CE34(void *p)
@@ -136,31 +84,6 @@ bool nw4r::g3d::ResMatIndMtxAndScale::IsValid() const
     return mpData != NULL;
 }
 
-extern "C" void fn_800686F0(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-extern "C" void fn_80068A6C(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-extern "C" void fn_80069798(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-extern "C" void fn_80069C08(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
-extern "C" void fn_80069C44(u32 *dst, const u32 *src)
-{
-    *dst = *src;
-}
-
 extern "C" void fn_8006D030(u32 *dst, const u32 *src)
 {
     *dst = *src;
@@ -169,26 +92,6 @@ extern "C" void fn_8006D030(u32 *dst, const u32 *src)
 /* --------------------------------------------------------------------------------------------- *
  * The type-name returners (0x800686A0-0x8006E318): hand back the address of the `.data` name record.
  * --------------------------------------------------------------------------------------------- */
-
-extern "C" u32 fn_800686A0(void)
-{
-    return (u32)lbl_8058CAFC;
-}
-
-extern "C" u32 fn_80068A1C(void)
-{
-    return (u32)lbl_8058CAB8;
-}
-
-extern "C" u32 fn_80069658(void)
-{
-    return (u32)lbl_8058CCC8;
-}
-
-extern "C" u32 fn_800699A8(void)
-{
-    return (u32)lbl_8058CDC8;
-}
 
 extern "C" u32 fn_8006CE28(void)
 {
@@ -240,37 +143,9 @@ extern "C" u32 fn_8006C650(u32 a, u32 b)
  * one and hand the original `self` back in r3.
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800686F0(u32 *dst, const u32 *src);
 
-extern "C" void *fn_800686C0(void *self, void *src)
-{
-    fn_800686F0((u32 *)self, (const u32 *)src);
-    return self;
-}
 
-extern "C" void fn_80068A6C(u32 *dst, const u32 *src);
 
-extern "C" void *fn_80068A3C(void *self, void *src)
-{
-    fn_80068A6C((u32 *)self, (const u32 *)src);
-    return self;
-}
-
-extern "C" void fn_80069C08(u32 *dst, const u32 *src);
-
-extern "C" void *fn_80069BD8(void *self, void *src)
-{
-    fn_80069C08((u32 *)self, (const u32 *)src);
-    return self;
-}
-
-extern "C" void fn_80069C44(u32 *dst, const u32 *src);
-
-extern "C" void *fn_80069C14(void *self, void *src)
-{
-    fn_80069C44((u32 *)self, (const u32 *)src);
-    return self;
-}
 
 extern "C" void fn_8006D030(u32 *dst, const u32 *src);
 
@@ -285,80 +160,20 @@ extern "C" void *fn_8006D000(void *self, void *src)
  * unsplit store helpers and read the word back through the returned address.
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" u32 fn_800693A0(void)
-{
-    const u8 *local;
-    return (u32)*type_obj_set_name(&local, lbl_8056F578);
-}
-
-extern "C" u32 fn_8006943C(void)
-{
-    void *local;
-    return (u32)*fn_8005DC60(&local, lbl_8056F588);
-}
-
-/* 0x800697A4 (0x30): returns the AnmObjShp type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjShp::GetTypeObjStatic()
-{
-    void *local;
-    return *reinterpret_cast<const TypeObj*>(fn_8005DC60(&local, lbl_8056F598));
-}
-
-/* 0x80069C50 (0x30): returns the AnmObjTexPat type. */
-const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexPat::GetTypeObjStatic()
-{
-    void *local;
-    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&local, lbl_8056F5A8));
-}
-
 
 /* --------------------------------------------------------------------------------------------- *
  * The list-insert chain steps (0x80069334-0x8006EA24): resolve a name record, compare the caller's key
  * against it through the `fn_800639D0` helper, and on a miss run the previous step's insertion with a
- * copy of the key word (the shape `g3d/fn_80063888.cpp`'s `fn_800638F8` uses beside them).
+ * copy of the key word (the shape `g3d/g3d_anmchr.cpp`'s `fn_800638F8` uses beside them).
  * --------------------------------------------------------------------------------------------- */
 
 /* The three name readers this cluster's own insert steps chain into, defined in the helper section
  * beside their `fn_80063898`-family siblings. */
 
-extern "C" u32 fn_80069334(void *self, u32 *key)
-{
-    u32 res = fn_800693A0();
-
-    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
-        return 1;
-    return reinterpret_cast<const nw4r::g3d::G3dObj*>(self)->nw4r::g3d::G3dObj::IsDerivedFrom(*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key));
-}
-
-extern "C" u32 fn_800693D0(void *self, u32 *key)
-{
-    u32 res = fn_8006943C();
-
-    if ((*reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(key) == *reinterpret_cast<const nw4r::g3d::G3dObj::TypeObj*>(&res)))
-        return 1;
-    u32 local = *key;
-    return fn_80069334(self, &local);
-}
-
 
 /* --------------------------------------------------------------------------------------------- *
  * The teardown destructors and the checked word reader (0x8006AA4C-0x8006E9C8).
  * --------------------------------------------------------------------------------------------- */
-
-/* The g3d/main-band teardown helper this unit declares itself; fn_8005D384/G3dObj::operator delete/fn_800628A4/
- * fn_800628B4/fn_80062914 come from `g3d/g3d_anmchr.h`. */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x4];
-    /* +0x04 */ u32 field_0x04;
-} G3dResNameWord; /* size: 0x8 */
-
-/* 0x80069664 (0x48): returns the dictionary's entry count, 0 for an empty handle. */
-u32 nw4r::g3d::ResDic::GetNumData() const
-{
-    if (res_dic_is_valid(const_cast<ResDic*>(this)))
-        return ((G3dResNameWord *)res_dic_ptr(const_cast<ResDic*>(this)))->field_0x04;
-    return 0;
-}
 
 
 /* --------------------------------------------------------------------------------------------- *
@@ -393,52 +208,10 @@ void Panic(const char *file, int line, const char *message, ...);
 } /* namespace db */
 } /* namespace nw4r */
 
-extern u8 lbl_8058CB24[];
-extern u8 lbl_8058CB08[];
-extern u8 lbl_8058CAE4[];
-extern u8 lbl_8058CAC8[];
-extern u8 lbl_8058CCF0[];
-extern u8 lbl_8058CCD4[];
-extern u8 lbl_8058CD30[];
-extern u8 lbl_8058CD10[];
-extern u8 lbl_8058CDF4[];
-extern u8 lbl_8058CDD8[];
 extern u8 lbl_8058D6A4[];
 extern u8 lbl_8058D688[];
 extern u8 lbl_8058D620[];
 extern u8 lbl_8058D604[];
-
-extern "C" u32 fn_80068634(void *p)
-{
-    if (fn_800686AC(p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CB24, 62, (const char *)lbl_8058CB08,
-                        (const char *)fn_800686A0(), "ref");
-    return fn_80068698(p);
-}
-
-extern "C" u32 fn_800689B0(void *p)
-{
-    if (fn_80068A28(p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CAE4, 125, (const char *)lbl_8058CAC8,
-                        (const char *)fn_80068A1C(), "ref");
-    return fn_80068A14(p);
-}
-
-extern "C" u32 fn_800695EC(void *p)
-{
-    if (fn_800696AC(p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CCF0, 166, (const char *)lbl_8058CCD4,
-                        (const char *)fn_80069658(), "ref");
-    return fn_80069650(p);
-}
-
-extern "C" u32 fn_8006993C(void *p)
-{
-    if (fn_800699B4(p) == 0)
-        nw4r::db::Panic((const char *)lbl_8058CDF4, 92, (const char *)lbl_8058CDD8,
-                        (const char *)fn_800699A8(), "ref");
-    return fn_800699A0(p);
-}
 
 extern "C" u32 fn_8006CDBC(void *p)
 {
@@ -488,58 +261,9 @@ extern "C" u32 fn_8006D9A4(void *self, void *key)
 /* --------------------------------------------------------------------------------------------- *
  * The vtable-dispatch wrappers (0x8006A38C/0x8006A3F4/0x8006E794/0x8006E8F4): the body word 0 is its
  * vtable, the entry at +0x14 runs with the object and a word is read back through the `TypeObj::GetTypeName`
- * helper (the shape `g3d/fn_80063888.cpp` uses for its three wrappers).
+ * helper (the shape `g3d/g3d_anmscn.cpp` uses for its two wrappers).
  * --------------------------------------------------------------------------------------------- */
 
-
-namespace nw4r {
-namespace g3d {
-
-/* 0x800695D4 (0x8): returns the colour block. */
-const ResVtxClrData* ResVtxClr::ptr() const {
-    return mpData;
-}
-
-/* 0x800695DC (0x8): returns the normal block. */
-const ResVtxNrmData* ResVtxNrm::ptr() const {
-    return mpData;
-}
-
-/* 0x800695E4 (0x8): returns the position block. */
-const ResVtxPosData* ResVtxPos::ptr() const {
-    return mpData;
-}
-
-/* 0x800696C0 (0x24): returns the array's ID. */
-u32 ResVtxPos::GetID() const {
-    return ref().id;
-}
-
-/* 0x800696E4 (0x64): returns the position block, panicking on a NULL handle. */
-const ResVtxPosData& ResVtxPos::ref() const {
-    if (!IsValid()) {
-        nw4r::db::Panic((const char*)lbl_8058CD30, 39, (const char*)lbl_8058CD10, GetClassName(), "ref");
-    }
-    return *ptr();
-}
-
-/* 0x80069748 (0xC): returns the class name. */
-const char* ResVtxPos::GetClassName() {
-    return (const char*)lbl_8058CD04;
-}
-
-/* 0x80069754 (0x14): tells whether the handle is set. */
-bool ResVtxPos::IsValid() const {
-    return mpData != NULL;
-}
-
-/* 0x80069768 (0x30): copies the handle `pRhs` holds. */
-ResVtxPos::ResVtxPos(const ResVtxPos* pRhs) {
-    fn_80069798((u32*)this, (const u32*)pRhs);
-}
-
-}  // namespace g3d
-}  // namespace nw4r
 
 /* ------------------------------------------------------------------------------------------------ */
 /* AnmObjTexSrt and its node, override and resource forms (the g3d_anmtexsrt.cpp part)              */

@@ -70,7 +70,7 @@
 #include "ef/ef_animcurve.h" /* ef_anim_rand_next / ef_anim_name_hash (rule 2) */
 #include "g3d/mtx34_inverse.h" /* mtx34_inverse (rule 2) */
 #include "g3d/g3d_calcview.h" /* mtx34_concat (rule 2) */
-#include "g3d/fn_80063888.h" /* fn_80067E54 (rule 2) */
+#include "g3d/g3d_anmscn.h" /* vec3_copy_construct (rule 2) */
 #include "draw_shape/mtx34_copy.h" /* mtx34_copy (rule 2) */
 #include "vec3_scale.h" /* vec3_scale (rule 2) */
 #include "nw4r/fn_805012C4.h" /* nw4r::ut::List_GetNext (rule 2) */

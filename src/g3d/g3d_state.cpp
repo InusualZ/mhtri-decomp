@@ -112,7 +112,7 @@
 #include "gx.h"              /* GXWGFifo, the 0xCC008000 write window (rule 1) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResGenMode (rule 2) */
 #include "g3d/g3d_anmchr.h"    /* TypeObj::GetTypeName and operator==, owned by g3d/g3d_anmchr.cpp (rule 2) */
-#include "g3d/fn_80063888.h"   /* the cluster declarations, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "g3d/g3d_anmscn.h"   /* the cluster declarations, owned by g3d/g3d_anmscn.cpp (rule 2) */
 #include "fn_8004CAD8.h"       /* mtx34_identity/MTX34_ctor, owned by fn_8004CAD8.cpp (rule 2) */
 #include "g3d/g3d_camera.h"    /* fn_80075390..fn_80075620, owned by g3d/g3d_camera.cpp (rule 2) */
 #include "g3d/fn_80075DCC.h"    /* type_obj_set_name_scnleaf, GDWriteXFCmd, owned by g3d/fn_80075DCC.cpp (rule 2) */

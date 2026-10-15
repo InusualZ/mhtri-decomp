@@ -161,27 +161,55 @@ g3d/g3d_anmchr.cpp:
 	.sdata      start:0x80791138 end:0x80791158
 	.sdata2     start:0x80795D48 end:0x80795D68
 
-g3d/fn_80063888.cpp:
-	extab       start:0x8000776C end:0x80007B14
-	extabindex  start:0x8001FBFC end:0x8001FF5C
-	.text       start:0x80063E60 end:0x800680A8 align:16
-	.rodata     start:0x8056F550 end:0x8056F578
-	.data       start:0x8058C118 end:0x8058CC40
-	.sdata      start:0x80791158 end:0x80791178
-	.sdata2     start:0x80795D68 end:0x80795D90
+g3d/g3d_anmclr.cpp:
+	extab       start:0x8000776C end:0x800078EC
+	extabindex  start:0x8001FBFC end:0x8001FC8C
+	.text       start:0x80063E60 end:0x800648A8 align:16
+	.rodata     start:0x8056F550 end:0x8056F568
+	.data       start:0x8058C118 end:0x8058C248
+	.sdata      start:0x80791158 end:0x80791168
+
+g3d/g3d_anmobj.cpp:
+	extab       start:0x800078EC end:0x800078F4
+	extabindex  start:0x8001FC8C end:0x8001FC98
+	.text       start:0x800648A8 end:0x800649CC
+	.rodata     start:0x8056F568 end:0x8056F578
+	.data       start:0x8058C248 end:0x8058C288
+	.sdata      start:0x80791168 end:0x80791170
+	.sdata2     start:0x80795D68 end:0x80795D70
 
 g3d/g3d_anmscn.cpp:
-	extab       start:0x80007B14 end:0x80007B1C
-	extabindex  start:0x8001FF5C end:0x8001FF68
-	.text       start:0x800680A8 end:0x800680CC
+	extab       start:0x800078F4 end:0x80007BB4
+	extabindex  start:0x8001FC98 end:0x8002004C
+	.text       start:0x800649CC end:0x8006946C
+	.rodata     start:0x8056F578 end:0x8056F598
+	.data       start:0x8058C288 end:0x8058CC40
+	.sdata      start:0x80791170 end:0x80791188
+	.sdata2     start:0x80795D70 end:0x80795D90
 
-g3d/fn_800680CC.cpp:
-	extab       start:0x80007B1C end:0x80007E98
-	extabindex  start:0x8001FF68 end:0x8002040C
-	.text       start:0x800680CC end:0x8006EAC0
-	.rodata     start:0x8056F598 end:0x8056F628
-	.data       start:0x8058CC40 end:0x8058D6C0
-	.sdata      start:0x80791188 end:0x807911A0
+g3d/g3d_anmshp.cpp:
+	extab       start:0x80007BB4 end:0x80007BEC
+	extabindex  start:0x8002004C end:0x800200A0
+	.text       start:0x8006946C end:0x800697D4
+	.rodata     start:0x8056F598 end:0x8056F5A8
+	.data       start:0x8058CC40 end:0x8058CD40
+	.sdata      start:0x80791188 end:0x80791190
+
+g3d/g3d_anmtexpat.cpp:
+	extab       start:0x80007BEC end:0x80007C1C
+	extabindex  start:0x800200A0 end:0x800200E8
+	.text       start:0x800697D4 end:0x80069C80
+	.rodata     start:0x8056F5A8 end:0x8056F5C0
+	.data       start:0x8058CD40 end:0x8058CE10
+	.sdata      start:0x80791190 end:0x80791198
+
+g3d/g3d_anmtexsrt.cpp:
+	extab       start:0x80007C1C end:0x80007E98
+	extabindex  start:0x800200E8 end:0x8002040C
+	.text       start:0x80069C80 end:0x8006EAC0
+	.rodata     start:0x8056F5C0 end:0x8056F628
+	.data       start:0x8058CE10 end:0x8058D6C0
+	.sdata      start:0x80791198 end:0x807911A0
 	.sdata2     start:0x80795D90 end:0x80795DA8
 
 g3d/g3d_anmvis.cpp:

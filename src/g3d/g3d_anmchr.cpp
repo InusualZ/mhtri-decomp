@@ -60,7 +60,7 @@
  *   other instruction matches, with `#pragma fp_contract off` around it), AnmObjChrRes::Release(ResMdl, u32,
  *   BindOption) (the unrolled clear loop schedules its `subf` one slot early).
  *   GetAnmPlayPolicy (0x80061C70) is unwritten: its policy table (.sdata 0x80790E70) sits in `mh3_pad.cpp`'s claim.
- *   FrameCtrl::smBaseUpdateRate (.sdata 0x80791168) is `g3d/fn_80063888.cpp`'s claim, declared in the class only.
+ *   FrameCtrl::smBaseUpdateRate (.sdata 0x80791168) is `g3d/g3d_anmobj.cpp`'s claim, declared in the class only.
  *   Partial: g3d_round_up (retail materialises `~(align - 1)` with `nor` + `and` where MWCC folds it into `andc`;
  *   tried: a named mask local, swapped operands), and the members whose only difference is a relocation name (the
  *   strings).
@@ -68,22 +68,21 @@
  *   operator delete is a bare `blr`; the compiler emits the constructors' base calls, vtable stores and member
  *   initialisers and the destructors' base calls).  The G3dObj vtable is emitted here (its first virtual,
  *   IsDerivedFrom, is defined here) while retail keeps it in `g3d/fn_80075DCC.cpp`'s `.data`.
- *   The AnmObj type-name record (0x8056F568, read only by AnmObj::GetTypeObj and GetTypeObjStatic here) sits in
- *   `g3d/fn_80063888.cpp`'s `.rodata` claim (0x8056F550-0x8056F578) beside the AnmObjMatClr record (0x8056F550, read
- *   only by that unit's fn_80064868): the two owners interleave there, which one seam cannot express.
+ *   The AnmObj type-name record (0x8056F568, read only by AnmObj::GetTypeObj and GetTypeObjStatic here) is
+ *   `g3d/g3d_anmobj.cpp`'s `.rodata` claim (0x8056F568-0x8056F578).
  *   flipcheck: `.text` 0x6F18 of 0x6F90; extab 0x3EC of 0x3A4 (__dt__AnmObjChrNode's record is 108 B against 28 B);
  *   extabindex 0x4D4 of 0x4E0; `.rodata`, `.data` (0xA74 of 0xD08), `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
  *   Relocation names that differ from retail: the string literals (ours are `@NNN` pool names, the target's are the
  *   named `.data` rows) and the float pool constants.
  * SHAPES. The ResName constructor is complete: its work is the base initialiser.  The unit includes the leaf
- *   `g3d/anm_typename_AnmObj.h` instead of `g3d/fn_80063888.h`: a visible global placement `operator delete` gives
+ *   `g3d/g3d_anmobj.h` instead of `g3d/g3d_anmscn.h`: a visible global placement `operator delete` gives
  *   AnmObjChrBlend::Construct a landing pad (`__dl__FPvPv`) retail does not have.
  *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
  *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
  */
 
 #include "types.h"
-#include "g3d/anm_typename_AnmObj.h" /* anm_typename_AnmObj, owned by g3d/fn_80063888.cpp (leaf header, rule 2) */
+#include "g3d/g3d_anmobj.h" /* anm_typename_AnmObj, owned by g3d/g3d_anmobj.cpp (rule 2) */
 #include "g3d/fn_80075DCC.h" /* anm_typename_G3dObj, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/g3d_anmchr.h" /* this unit's own declarations, and the G3dObj dispatch record (rule 1) */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */

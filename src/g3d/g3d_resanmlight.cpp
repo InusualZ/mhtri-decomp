@@ -18,12 +18,12 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"        /* IS_VALID_PTR (rule 1) */
-#include "g3d/fn_80063888.h"            /* fn_8006584C/fn_80066E80, owner g3d/fn_80063888.cpp (rule 2) */
+#include "g3d/g3d_anmscn.h"            /* fn_8006584C/fn_80066E80, owner g3d/g3d_anmscn.cpp (rule 2) */
 #include "g3d/g3d_rescommon.h"          /* nw4r::g3d::ResDic / ResName (rule 2) */
 #include "g3d/g3d_anmchr.h"             /* fn_8006268C/fn_80062914/fn_80062750 (rule 2) */
 #include "font/flfnt.h"                 /* fn_8005B1E4 (rule 2) */
 #include "g3d/g3d_resanmamblight.h"     /* fn_8008A188/fn_8008A1A8, owner g3d/g3d_resanmamblight.c */
-#include "g3d/fn_800680CC.h" /* fn_80069664 (rule 2) */
+#include "g3d/g3d_anmshp.h" /* ResDic::GetNumData's owner (rule 2) */
 #include "g3d/g3d_resanmtexsrt.h" /* fn_80092330 (rule 2) */
 #include "MSL_C/alloc.h" /* floorf (rule 2) */
 #include "g3d/g3d_resanmcamera.h" /* fn_8008A644 (rule 2) */

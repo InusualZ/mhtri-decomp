@@ -31,7 +31,7 @@ void mtx34_set(Mtx34* dst, f32 m00, f32 m01, f32 m02, f32 m03,
                  f32 m10, f32 m11, f32 m12, f32 m13,
                  f32 m20, f32 m21, f32 m22, f32 m23);
 
-/* 0x8007A5E4/0x8007A5A8/0x8007A724 - the 3-float setters (caller: g3d/fn_80063888.cpp).  The object
+/* 0x8007A5E4/0x8007A5A8/0x8007A724 - the 3-float setters (caller: g3d/g3d_anmscn.cpp).  The object
  * arrives in r3 and the three values in f1-f3. */
 void fn_8007A5E4(void* self, f32 x, f32 y, f32 z);
 void fn_8007A5A8(void* self, f32 x, f32 y, f32 z);

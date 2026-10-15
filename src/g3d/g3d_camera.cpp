@@ -25,7 +25,7 @@
 #include "g3d/fn_80075DCC.h" /* fn_80075DCC/fn_80075DD8, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "main.h"         /* fn_8004028C/fn_8004029C, owned by main.cpp (rule 2) */
 #include "g3d/g3d_camera_types.h"
-#include "g3d/fn_80063888.h" /* fn_80067EE8, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "g3d/g3d_anmscn.h" /* fn_80067EE8, owned by g3d/g3d_anmscn.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 

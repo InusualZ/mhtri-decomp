@@ -38,7 +38,7 @@
 #include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
 #include "g3d/g3d_anmchr.h"      /* math_reciprocal, ResAnmChr, fn_800628C8 (rule 2) */
 #include "g3d/g3d_rescommon.h"   /* nw4r::g3d::ResDic (rule 2) */
-#include "g3d/fn_80063888.h"     /* fn_8006497C (rule 2) */
+#include "g3d/g3d_anmobj.h"      /* f32_select_nonneg (rule 2) */
 #include "fn_8004CAD8.h"         /* anim_tick_angle, mtx34_identity, sqrt_f32 (rule 2) */
 #include "mh3_pad.h"             /* copyVec3, setVec3, VEC3_ctor (rule 2) */
 
@@ -159,7 +159,7 @@ typedef struct {
     /* +0x1C */ f32 mat[12];
 } ResAnmChrObj; /* size: 0x4C - lower bound, an approximation */
 
-/* The 3-component record the walkers copy is `Vec3f` as `g3d/fn_80063888.cpp` already defines it
+/* The 3-component record the walkers copy is `Vec3f` as `g3d/g3d_anmscn.cpp` already defines it
  * (rule 1: a shared type is defined once, in the lexicographically first owner); this unit reads the
  * components through `f32*` cursors instead of redefining it. */
 

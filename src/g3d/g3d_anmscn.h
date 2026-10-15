@@ -1,21 +1,14 @@
-/* g3d/fn_80063888.h - the cross-unit declarations of `g3d/fn_80063888.cpp` (C linkage, plain map stems), except
+/* g3d/g3d_anmscn.h - the cross-unit declarations of `g3d/g3d_anmscn.cpp` (C linkage, plain map stems), except
  *   `fn_80066C8C`, which keeps C++ linkage outside the `extern "C"` block (map row `fn_80066C8C__FPv`). */
-#ifndef MHTRI_G3D_FN_80063888_H
-#define MHTRI_G3D_FN_80063888_H
+#ifndef MHTRI_G3D_G3D_ANMSCN_H
+#define MHTRI_G3D_G3D_ANMSCN_H
 
 #include "types.h"
-#include "g3d/res_mat_copy_ctor.h" /* res_mat_copy_ctor, apply_clr_anm_result (this unit's leaf header) */
-#include "g3d/anm_typename_AnmObj.h" /* anm_typename_AnmObj, this unit's record (leaf header) */
 #include "g3d/g3d_camera_types.h" /* `nw4r::g3d::Camera::PostureInfo`, the object `camera_posture_info_ctor` initialises */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* The three type-name store copies the texture-SRT classes GetTypeObj members call (g3d/fn_800680CC.cpp): each stores v through out and returns out. */
-const u8 **type_obj_set_name_texsrt_res(const u8 **out, const u8 *v);
-const u8 **type_obj_set_name_texsrt_node(const u8 **out, const u8 *v);
-const u8 **type_obj_set_name_texsrt_override(const u8 **out, const u8 *v);
 
 /* The cluster's owns with plain `fn_XXXXXXXX` map names, so C linkage. */
 /* 0x80064C14 - releases the object the second argument points at (`light/light.cpp`'s fn_802C1AD8 tail-calls it). */
@@ -27,11 +20,6 @@ s32 fn_80067EE8(const void *p);             /* 0x80067EE8 - `*(u32*)p != 0` */
 /* 0x80067E70 - the posture record's constructor: default-constructs its position, target and up vectors. */
 nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::PostureInfo *self);
 #endif
-
-
-/* The 3-float clamp `g3d/g3d_resanmchr.cpp`'s frame walkers call. */
-f32 f32_select_nonneg(f32 a, f32 b, f32 c);       /* 0x8006497C - the 3-float clamp helper */
-
 
 #ifdef __cplusplus
 }
@@ -91,8 +79,12 @@ ResAnmScnConfig *fn_8006584C(void *p);   /* 0x8006584C - the checked `ResAnmScn`
 ResAnmLightConfig *fn_80066DB4(void *p); /* 0x80066DB4 - the checked light-config getter */
 ResAnmLightConfig *fn_80066E80(void *p); /* 0x80066E80 - the checked light-config getter */
 
-/* The checked resource resolver `g3d/g3d_resfile.cpp`'s revision checks read. */
-u32 fn_80063FD0(void *p);                /* 0x80063FD0 - the checked `ResAnmScn` resource resolver */
+/* 0x80068634 - the checked `ResAnmFog` resolver: panics when the handle's reference is invalid, then returns the
+ * body word at +0x0 (the resolved data pointer; caller: g3d_resanmfog.cpp). */
+u32 fn_80068634(void* p);
+/* 0x800689B0 - the checked `ResAnmCamera` resolver (caller: g3d_resanmcamera.cpp): returns the resolved data
+ * pointer. */
+u32 fn_800689B0(void* p);
 
 #ifdef __cplusplus
 }
@@ -103,5 +95,5 @@ u32 fn_80063FD0(void *p);                /* 0x80063FD0 - the checked `ResAnmScn`
 void operator delete(void* block, void* place);
 #endif
 
-#endif /* MHTRI_G3D_FN_80063888_H */
+#endif /* MHTRI_G3D_G3D_ANMSCN_H */
 

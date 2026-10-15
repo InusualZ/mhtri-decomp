@@ -66,7 +66,7 @@
 #include "ef/ef_drawstripestrategy.h" /* the ahead-vector builders and EfAheadItem (this unit's own header) */
 #include "sys_mem.h"
 #include "unsplit/ef.h"
-#include "g3d/fn_80063888.h" /* fn_80067E54, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "g3d/g3d_anmscn.h" /* vec3_copy_construct, owned by g3d/g3d_anmscn.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "ef/ef_particle.h"   /* fn_800AB388 (rule 2) */
 #include "RVLGX/GXTransform.h"

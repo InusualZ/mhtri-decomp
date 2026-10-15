@@ -12,7 +12,7 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
-#include "g3d/fn_800680CC.h" /* fn_800689B0 (rule 2) */
+#include "g3d/g3d_anmscn.h" /* fn_800689B0 (rule 2) */
 #include "g3d/g3d_resanm.h"  /* fn_800898B0 (rule 2) */
 
 #pragma peephole off

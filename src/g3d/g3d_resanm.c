@@ -22,7 +22,7 @@
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
-#include "g3d/fn_80063888.h" /* fn_800651BC, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "g3d/g3d_anmscn.h" /* fn_800651BC, owned by g3d/g3d_anmscn.cpp (rule 2) */
 
 #pragma peephole off
 #pragma fp_contract off

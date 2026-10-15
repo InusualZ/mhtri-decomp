@@ -128,7 +128,7 @@
 #include "Pl/fn_8027D684.h"     /* the equip colour accessors (the owner's header, rule 2) */
 #include "g3d/g3d_camera_types.h" /* `nw4r::g3d::Camera` (the owner's header, rule 2) */
 #include "g3d/g3d_scnroot.h"    /* `nw4r::g3d::ScnRoot` (the owner's header, rule 2) */
-#include "g3d/fn_80063888.h"    /* `camera_posture_info_ctor` (the owner's header, rule 2) */
+#include "g3d/g3d_anmscn.h"    /* `camera_posture_info_ctor` (the owner's header, rule 2) */
 #include "camera/fn_802B5C58.h" /* `camera_position_set` (the owner's header, rule 2) */
 #include "mh3_pad.h"            /* `word_copy_return_dst`, `TaskSlot` (the owner's header, rule 2) */
 #include "unsplit/g3d.h"        /* `pRoot`, the g3d scene root (unowned: band header) */

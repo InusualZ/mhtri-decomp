@@ -34,7 +34,7 @@ void *res_dic_ptr(void *self);             /* 0x800628A4 - loads the word at +0x
 extern u8 anm_typename_AnmObjChrNode[];   /* 0x8056F510 - "AnmObjChrNode" */
 extern u8 anm_typename_AnmObjChrBlend[];  /* 0x8056F524 - "AnmObjChrBlend" */
 
-/* The name-record store helper (0x800638B8) `g3d/fn_800680CC.cpp` and `g3d/g3d_scnmdl.cpp` also call. */
+/* The name-record store helper (0x800638B8) `g3d/g3d_anmscn.cpp` and `g3d/g3d_scnmdl.cpp` also call. */
 const u8 **type_obj_set_name(const u8 **out, const u8 *v); /* stores `v` through `out` and returns `out` */
 
 
@@ -48,7 +48,7 @@ f32 math_reciprocal(f32 value);                /* 0x800610AC - the reciprocal he
 }
 #endif
 
-/* The object/vtable pair the dispatch wrappers of this unit, `g3d/fn_80063888.cpp` and `g3d/fn_800680CC.cpp` share (rule 1). */
+/* The object/vtable pair the dispatch wrappers of this unit, `g3d/g3d_anmscn.cpp` and `g3d/g3d_anmtexsrt.cpp` share (rule 1). */
 typedef u32 (*G3dVtMethod)(void *);
 typedef struct {
     /* +0x00 */ u8 pad_0x00[0x14];
