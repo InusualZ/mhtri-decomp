@@ -234,7 +234,9 @@ lines with a stray `L`. Use the helper instead:
 
     python tools/units/escape.py --write FILE "a\nb"      # C escapes \n \t \r \ \" \xHH \NNN -> exact bytes
     python tools/units/escape.py --escape FILE            # reverse: raw bytes -> a pasteable C literal
-    python tools/agents/edit.py replace FILE --old "..." --new "..." --count N   # C escapes; LF or CRLF
+    python tools/agents/edit.py replace FILE --old-file A --new-file B --count N  # verbatim bytes; LF or CRLF
+    python tools/agents/edit.py replace FILE --old "..." --new "..." --count N   # DECODES C escapes: never for
+                                         # C string literals (a \n becomes a line break); write A/B with Write
 
 `replace` matches across `\n` or `\r\n`, keeps the file's own endings, and **refuses, writing nothing, when the
 match count is not the N you asserted** - that is the difference between a rewrite and a corruption. Assert the count
