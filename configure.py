@@ -1695,7 +1695,7 @@ config.libs = [
             # Flags: unit header of src/Network/NetworkSessionManagerPat.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkSessionManagerPat.cpp"),
             # Flags: unit header of src/Network/NetworkLayer.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkLayer.cpp", extra_cflags=["-pool off"]),
+            Object(Matching, "Network/NetworkLayer.cpp", extra_cflags=["-pool off"]),
             # The tiHKBManager software keyboard and its layout engine, in link order; evidence in each unit header.
             # GC/3.0a5.2 + cflags_hkb: evidence on the FLAGS line of src/homebutton/hbm_kb_event.cpp.
             Object(Matching, "homebutton/hkb_pane.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
