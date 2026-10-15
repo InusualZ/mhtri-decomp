@@ -43,8 +43,8 @@ enum NetworkPeerErrorSource {
 
 /* The abstract peer the transport peers derive from (GUESS on the name: the class is the error-record
    holder every peer constructor chains, and its table carries the eight slots the three peers below
-   fill).  Its vtable (0x805F94E0, 0x2C B: the deleting `destroy` and eight pure slots; the object's 0x30 claim ends in alignment fill) is emitted here,
-   from the `destroy` this unit defines.  The pure slots carry the *union* of the derived peers'
+   fill).  Its vtable (0x805F94E0, 0x2C B: the virtual destructor and eight pure slots; the object's 0x30 claim ends in alignment fill) is emitted here,
+   from the destructor this unit defines.  The pure slots carry the *union* of the derived peers'
    signatures - a derived slot with a different parameter list would be a new virtual and would move
    every later slot - so the peers that ignore an argument simply leave it unused (GUESS on every
    parameter list: the buffer/Mcs `send` and the buffer/Udp `put` take fewer arguments than the widest
@@ -53,9 +53,9 @@ enum NetworkPeerErrorSource {
 class NetworkPeerBase {
 public:
     NetworkPeerBase();
-    /* +0x08 the deleting destructor as a plain virtual: the peers chain it with flags 0 by hand (the
-       hand-written `destroy` shape the band's other peers use), so no destructor vptr store is emitted */
-    virtual NetworkPeerBase* destroy(s16 flags);
+    /* +0x08 the virtual destructor: the peers' destructors chain it, and a peer's constructor and destructor
+       record it (and their members) as cleanups in `extab` */
+    virtual ~NetworkPeerBase();
     /* +0x0C (GUESS: the Udp peer binds its slot here, the Mcs peer its record, the buffer ignores it) */
     virtual void setContext(const void* context) = 0; /* untyped: caller-owned payload - each derived peer reads its own record layout through it */
     /* +0x10 (GUESS) */ virtual s32 send(const u8* data, s32 size, const u8* data2, s32 size2, s8 kind) = 0;

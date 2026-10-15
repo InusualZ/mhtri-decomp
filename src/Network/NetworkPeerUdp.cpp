@@ -8,7 +8,7 @@
  *   marked in `Network/NetworkPeerUdp.h`).
  * RESIDUALS. none in the rows; the `NETWORK_ERROR_*` immediates (0x8003xxxx) are plain `lis`/`addi` pairs in ours where
  *   the target relocates them against `@eti_` extabindex rows: 18 B of `.text`.  The DOL hash holds with it linked.
- * SHAPES. The table is emitted from `NetworkPeerUdp::destroy`, the key function (rule 10); the constructor is outside
+ * SHAPES. The table is emitted from `~NetworkPeerUdp`, the key function (rule 10); the constructor is outside
  *   the range (an unowned function at 0x803CA3BC stores the table).  `send`/`receive` declare the error code at
  *   function scope (a block-scope `error` takes r28, retail r31); `receive` declares `cursor, length, length2` in
  *   that order (the two length slots at 0xA/0x8).  Each `dont_inline` region keeps a retail `bl`.
@@ -195,15 +195,8 @@ void NetworkPeerUdp::reset()
 }
 
 /* Deleting destructor: chains the base destructor, then frees on request. */
-NetworkPeerBase* NetworkPeerUdp::destroy(s16 flags)
+NetworkPeerUdp::~NetworkPeerUdp()
 {
-    if (this != NULL) {
-        NetworkPeerBase::destroy(0);
-        if (flags > 0) {
-            operator delete(this);
-        }
-    }
-    return this;
 }
 
 #pragma dont_inline off

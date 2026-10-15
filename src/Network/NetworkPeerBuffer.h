@@ -16,7 +16,7 @@
 class NetworkPeerBuffer : public NetworkPeerBase {
 public:
     NetworkPeerBuffer();
-    /* +0x08 */ virtual NetworkPeerBase* destroy(s16 flags);
+    /* +0x08 */ virtual ~NetworkPeerBuffer();
     /* +0x0C */ virtual void setContext(const void* context); /* untyped: caller-owned payload - each derived peer reads its own record layout through it */
     /* +0x10 */ virtual s32 send(const u8* data, s32 size, const u8* data2, s32 size2, s8 kind);
     /* +0x14 */ virtual s32 receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind);

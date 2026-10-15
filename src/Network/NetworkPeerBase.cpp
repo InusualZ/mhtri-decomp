@@ -8,7 +8,7 @@
  * NAMES. `NetworkPeerBase` and the `networkPeerError_*` accessors are GUESSes from behaviour (marked in
  *   `Network/NetworkPeerBase.h`).
  * RESIDUALS. none.
- * SHAPES. The table is emitted from `NetworkPeerBase::destroy`, the key function (rule 10).  `NetworkUniqueId`'s
+ * SHAPES. The table is emitted from `~NetworkPeerBase`, the key function (rule 10).  `NetworkUniqueId`'s
  *   deleting destructor (its table's +0x08 slot) is defined here: the range holds its only copy, at the left edge,
  *   a discovery cap.  Each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  */
@@ -49,15 +49,9 @@ NetworkPeerBase::NetworkPeerBase()
 
 #pragma dont_inline off
 
-/* Deleting destructor of the abstract peer: frees on request, nothing to chain. */
-NetworkPeerBase* NetworkPeerBase::destroy(s16 flags)
+/* Destroys the abstract peer: nothing to chain. */
+NetworkPeerBase::~NetworkPeerBase()
 {
-    if (this != NULL) {
-        if (flags > 0) {
-            operator delete(this);
-        }
-    }
-    return this;
 }
 
 /* Copies the three-word record out when the caller supplies somewhere to put it. */

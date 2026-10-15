@@ -17,14 +17,14 @@
  *   the shared messages); every method and field name is a GUESS from the body and strings; the SDK calls are named
  *   from the strings beside them (`SOInit`, `SOFinish`, `SOStartup`, `SOCleanup`, `DWC_Init`).  GUESSes in the owners'
  *   headers: `DWC_Shutdown`, `NETGetStartupErrorCode`.
- * RESIDUALS. none in `.text`.  `.data` 0x61C of the claimed 0x620 and `.sbss` 4 of 8 (trailing alignment words); `extab`
- *   carries one `__dt__15sNetworkLibraryFv` cleanup record more than retail.
+ * RESIDUALS. none in `.text`.  `.data` 0x61C of the claimed 0x620 and `.sbss` 4 of 8 (trailing alignment words).
  * SHAPES. The table 0x80603080 inherits the base's non-pure slots (`setLogLevel`, the byte-order and calendar helpers)
  *   from the base table 0x80602A60 (`Network/sNetworkLibrary.cpp`).  `mpMediator__15sNetworkLibrary` (.sbss 0x80794CC4)
  *   is a static member of the base, defined by `Network/sNetworkLibrary.cpp` like `mpInstance` 0x80794CC0 and `mpRandom`
  *   0x80794CC8; this unit's `init`/`final` are its only writers, and `getInstance` in `sound/snd_stream_reloc.cpp`
  *   (0x800E89D8) is the header-inline accessor.  `createSocket`/`createFetcher` are real `new`s (the six `__dl__FPv`
- *   cleanup records); `constructNetworkWiiMediator`'s `new` gives its extab record.  `getTime` accumulates into a local
+ *   cleanup records); `constructNetworkWiiMediator`'s `new` gives its extab record.  `memset` is MSL's `nothrow` declaration
+ *   (`Runtime.PPCEABI.H/memset.h`), so the constructor records no base cleanup.  `getTime` accumulates into a local
  *   seeded with the epoch, and `accumulateElapsed` tests `!*elapsed` (operand order of the `fcmpu`).
  */
 #include "types.h"

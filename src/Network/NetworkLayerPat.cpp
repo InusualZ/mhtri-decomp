@@ -37,8 +37,8 @@
  * RESIDUALS. `moveRequests`: one callee-saved register fewer (`_savegpr_21`/`_restgpr_21` against retail's `_20`);
  *   `handleChat`, `reflect`: the slot-info constructor/destructor pair is named `__ct__/__dt__22NetworkSessionSlotInfo`
  *   here and `fn_803E6DD8`/`dtor_803E6D7C` in the map (the unwritten inline pair).
- * RESIDUALS. `extab`: the request record's constructor and destructor record cleanups for its `NetworkMutex` member
- *   that retail's (identical code) do not carry (+0x28 B).
+ * RESIDUALS. `extab`: the request record's inline members are emitted at the end of the object (retail: after their
+ *   first caller), `reset` and `clear` first.
  * RESIDUALS. 2 rows unwritten: the inline ctor/dtor pair `fn_803E6DD8`/`dtor_803E6D7C` (after `handleChat`, used by
  *   `handleChat` and `reflect`'s chat notice) - a copy of `NetworkSessionSlotInfo`'s members, whose manglings
  *   `Network/NetworkSessionManager.cpp` already defines, so the map cannot carry them twice; our calls reach those
@@ -75,6 +75,9 @@
  *    does not have (a u8 cast, a u8/u32 local tried); `storeFriendDetail`: retail keeps `index * 0x104` for the copy's
  *    destination, ours multiplies again; `importCommunityRec`: the state byte's `clrlwi` (a file-wide peephole on
  *    costs more); `removeFriendSlot`: the unrolled clear's remainder `addis`/`mulli` order.
+ * SHAPES. The request record's `reset` and `clear` are defined before its constructor and destructor (under
+ *   `dont_inline`): MWCC then knows those calls cannot throw and records no `NetworkMutex` member cleanup (retail's
+ *   empty `extab` records).
  * SHAPES. The constructor calls `NetworkLayer::NetworkLayer` and stores 0x805FC1E0 (79 slots); the table is emitted here
  *   (key function `stepRequest`, declared first; rule 10) and every override's map row carries the compiler's mangling.
  *  - every handler is the state machine over `NetworkLayerRequest::state_00` (0 start, waits, 100 cancelled, 110
@@ -6451,6 +6454,49 @@ void NetworkLayerPat::setCollectionLog(NetworkLayerPatRequest* request, u32 code
     request->setRecord(code, arg_a, arg_b);
 }
 
+#pragma dont_inline on
+/* Returns a request record to its idle state. */
+inline void NetworkLayerPatRequest::reset()
+{
+    this->state_00 = 0;
+    this->interval_4C = 0.0f;
+    this->timeout_50 = 0.0f;
+    this->requestId_70 = 0;
+    this->unused_24 = 0;
+    this->cancelled_74 = 0;
+    this->owner_94 = 0;
+    this->handler_98 = 0;
+    this->count_28 = 0;
+    this->record_54 = 0;
+    this->record_58 = 0;
+    this->record_5C = 0;
+    this->unused_60 = 0;
+    this->unused_64 = 0;
+    this->unused_68 = 0;
+    this->unused_6C = 0;
+    this->unused_04 = 0;
+    this->unused_08 = 0;
+    this->unused_0C = 0;
+    this->unused_10 = 0;
+    this->unused_14 = 0;
+    this->unused_18 = 0;
+    this->unused_1C = 0;
+    this->unused_20 = 0;
+    this->args_2C[0] = 0;
+    this->args_2C[1] = 0;
+    this->args_2C[2] = 0;
+    this->args_2C[3] = 0;
+    this->args_2C[4] = 0;
+    this->args_2C[5] = 0;
+    this->args_2C[6] = 0;
+    this->args_2C[7] = 0;
+}
+
+inline void NetworkLayerPatRequest::clear()
+{
+    reset();
+}
+
 /* Builds the record's mutex, then resets it. */
 inline NetworkLayerPatRequest::NetworkLayerPatRequest()
 {
@@ -6538,47 +6584,7 @@ inline NetworkLayerPatRequest::~NetworkLayerPatRequest()
     clear();
 }
 
-inline void NetworkLayerPatRequest::clear()
-{
-    reset();
-}
-
-/* Returns a request record to its idle state. */
-inline void NetworkLayerPatRequest::reset()
-{
-    this->state_00 = 0;
-    this->interval_4C = 0.0f;
-    this->timeout_50 = 0.0f;
-    this->requestId_70 = 0;
-    this->unused_24 = 0;
-    this->cancelled_74 = 0;
-    this->owner_94 = 0;
-    this->handler_98 = 0;
-    this->count_28 = 0;
-    this->record_54 = 0;
-    this->record_58 = 0;
-    this->record_5C = 0;
-    this->unused_60 = 0;
-    this->unused_64 = 0;
-    this->unused_68 = 0;
-    this->unused_6C = 0;
-    this->unused_04 = 0;
-    this->unused_08 = 0;
-    this->unused_0C = 0;
-    this->unused_10 = 0;
-    this->unused_14 = 0;
-    this->unused_18 = 0;
-    this->unused_1C = 0;
-    this->unused_20 = 0;
-    this->args_2C[0] = 0;
-    this->args_2C[1] = 0;
-    this->args_2C[2] = 0;
-    this->args_2C[3] = 0;
-    this->args_2C[4] = 0;
-    this->args_2C[5] = 0;
-    this->args_2C[6] = 0;
-    this->args_2C[7] = 0;
-}
+#pragma dont_inline off
 
 /* The server's message callback `setCallback(..., 4)` installs: re-orders the six arguments and runs `reflect`. */
 /* untyped: caller-owned payload - the six arguments are forwarded unchanged */

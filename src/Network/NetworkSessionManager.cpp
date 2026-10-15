@@ -24,7 +24,7 @@
  *   retail names (`NetworkSessionManager_deleteRequestMessage`, `NetworkRequest_getArgumentMessage`,
  *   `NetworkSessionManager_moveStandByMessage`,
  *   `NetworkSessionManagerPat_finalMessage`) are this object's anonymous literals.
- *   `.text` 0x2714 against 0x27B4; `extab` 0x428 against 0x40C; `.data` (flip blocker) 0x3B8 against 0x3C0 (-8; 225 of 960
+ *   `.text` 0x2714 against 0x27B4; `.data` (flip blocker) 0x3B8 against 0x3C0 (-8; 225 of 960
  *   bytes differ), written but out of order (the base table last, see RANGE); `.sbss` emits the 4 B word of the 8 B
  *   claim.
  *  - `NetworkRequest::copyRecord`: retail copies the 96-byte record as two words then eleven word pairs, `*dst = *src`
@@ -38,6 +38,9 @@
  *  - the constructor, `release`: the loop counter and element pointer take swapped registers (r30/r31);
  *    `NetworkSessionManager::allocRequest`: the pointer steps after the counter (a pointer loop costs it the saved `self`);
  *    `clear`, `move`: not characterised one by one (the objdiff rows).
+ * SHAPES. `NetworkRequest::reset` and `NetworkRequestPat`'s `reset`/`clear` are inline and defined before the
+ *   constructors and destructors that call them (under `dont_inline`): MWCC then records no pool or `NetworkMutex`
+ *   cleanup around those calls (retail's empty `extab` records), and emits each copy after its first caller.
  * SHAPES. Both tables are compiler output (rule 10): the base table 0x805FA908..0x805FAAD0 (456 B) is emitted here;
  *   `NetworkSessionManagerPat` declares `move` FIRST so it is the key function (its body opens the next unit), so the
  *   Pat constructor stores `__vt__24NetworkSessionManagerPat` without a second table here.  `NetworkBuffer` (table
@@ -91,28 +94,9 @@
 /* NetworkSessionManager - construction / pool                                                */
 /* ----------------------------------------------------------------------------------------- */
 
+#pragma dont_inline on
 #pragma peephole off
-NetworkSessionManager::NetworkSessionManager()
-{
-    s32 i;
-    NetworkRequest* request;
-
-    this->unused_04 = 0;
-    this->unused_08 = 0;
-    this->buffer = 0;
-    for (i = 0; i < 21; i++) {
-        this->requests_10[i] = 0;
-        this->request_state_64[i] = 0;
-    }
-    this->unused_79 = 1;
-    this->unused_7A = 1;
-    for (i = 0, request = this->pool_7C; i < 2; i++, request++) {
-        request->reset();
-    }
-}
-
-#pragma peephole off
-void NetworkRequest::reset()
+inline void NetworkRequest::reset()
 {
     this->state_00 = 0;
     this->interval_4C = networkRequestZero;
@@ -148,6 +132,27 @@ void NetworkRequest::reset()
     this->args_2C[7] = 0;
 }
 
+#pragma peephole off
+NetworkSessionManager::NetworkSessionManager()
+{
+    s32 i;
+    NetworkRequest* request;
+
+    this->unused_04 = 0;
+    this->unused_08 = 0;
+    this->buffer = 0;
+    for (i = 0; i < 21; i++) {
+        this->requests_10[i] = 0;
+        this->request_state_64[i] = 0;
+    }
+    this->unused_79 = 1;
+    this->unused_7A = 1;
+    for (i = 0, request = this->pool_7C; i < 2; i++, request++) {
+        request->reset();
+    }
+}
+
+#pragma peephole off
 /* Empties the pooled request; its mutex goes with the member. */
 NetworkRequest::~NetworkRequest()
 {
@@ -155,12 +160,10 @@ NetworkRequest::~NetworkRequest()
 }
 #pragma peephole on
 
-#pragma dont_inline on
 void NetworkRequest::clear()
 {
     this->reset();
 }
-#pragma dont_inline off
 
 /* Builds the pooled request: its mutex (the member), then an empty record. */
 NetworkRequest::NetworkRequest()
@@ -196,6 +199,7 @@ void NetworkSessionManager::clear()
         this->pool_7C[i].reset();
     }
 }
+#pragma dont_inline off
 
 void NetworkSessionManager::release()
 {
@@ -358,6 +362,7 @@ void NetworkSessionManager::request364()
 }
 #pragma peephole on
 
+#pragma dont_inline on
 void NetworkRequest::begin(NetworkSessionManager* owner, NetworkRequestDesc desc, u32 count, ...)
 {
     NetworkVaState args;
@@ -377,6 +382,7 @@ void NetworkRequest::begin(NetworkSessionManager* owner, NetworkRequestDesc desc
         this->args_2C[i] = net_va_arg(args, u32);
     }
 }
+#pragma dont_inline off
 
 /* ----------------------------------------------------------------------------------------- */
 /* NetworkSessionManager - the lazy request allocators                                        */
@@ -1077,20 +1083,9 @@ NetworkSessionPlayerRecord::NetworkSessionPlayerRecord()
 /* The Pat layer's own NetworkRequest array                                                   */
 /* ----------------------------------------------------------------------------------------- */
 
-/* Empties the request record and destroys its mutex. */
-NetworkRequestPat::~NetworkRequestPat()
-{
-    clear();
-}
-
-/* Empties the record. */
-void NetworkRequestPat::clear()
-{
-    reset();
-}
-
+#pragma dont_inline on
 /* Clears every field of the record. */
-void NetworkRequestPat::reset()
+inline void NetworkRequestPat::reset()
 {
     NetworkRequestPat* self = this;
 
@@ -1128,11 +1123,24 @@ void NetworkRequestPat::reset()
     self->args_2C[7] = 0;
 }
 
+/* Empties the record. */
+inline void NetworkRequestPat::clear()
+{
+    reset();
+}
+
+/* Empties the request record and destroys its mutex. */
+NetworkRequestPat::~NetworkRequestPat()
+{
+    clear();
+}
+
 /* Builds the request record: its mutex, then an empty record. */
 NetworkRequestPat::NetworkRequestPat()
 {
     reset();
 }
+#pragma dont_inline off
 #pragma peephole on
 
 /* ----------------------------------------------------------------------------------------- */

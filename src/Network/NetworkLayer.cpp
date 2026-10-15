@@ -16,6 +16,8 @@
  *   saved register more shifts every allocation.  The constructor: the second pool loop (an explicit pointer,
  *   the closer of the two spellings measured) swaps the counter/pointer registers.  `.data` is 0x45C of the claimed
  *   0x460 (the last 4 bytes, 0x805FB714, are alignment); the id helpers' string labels pair by address only.
+ * SHAPES. The record's `reset` is inline and defined before the constructor, under file-scope `dont_inline`: the pool
+ *   loop's call is then known not to throw (retail's empty constructor `extab`); its copy follows the constructor.
  * SHAPES. `__vt__12NetworkLayer` is emitted here from the class (key function `~NetworkLayer`, rule 10): 79 slots
  *   (+0x08..+0x140; the derived table 0x805FC1E0 is 0x144 B, so the base has no slot +0x144), the pure slots carrying
  *   `NetworkLayerPat`'s override names.  `NetworkLayerRequest` carries a real pointer-to-member handler (the reset is
@@ -33,29 +35,10 @@
 
 /* The bodies were written under a peephole-off region (see the file header). */
 #pragma peephole off
-
-NetworkLayer::NetworkLayer()
-{
-    s32 i;
-    NetworkLayerRequest* req;
-
-    this->context_04 = 0;
-    this->context_08 = 0;
-    for (i = 0; i < 21; i++) {
-        this->requests_0C[i] = 0;
-        this->requestState_60[i] = 0;
-    }
-    this->flag_75 = 1;
-    this->flag_76 = 1;
-    req = this->pool_78;
-    for (i = 0; i < 2; i++) {
-        req->reset();
-        req++;
-    }
-}
+#pragma dont_inline on
 
 /* Returns a request record to its idle state. */
-void NetworkLayerRequest::reset()
+inline void NetworkLayerRequest::reset()
 {
     this->state_00 = 0;
     this->interval_4C = 0.0f;
@@ -89,6 +72,26 @@ void NetworkLayerRequest::reset()
     this->args_2C[5] = 0;
     this->args_2C[6] = 0;
     this->args_2C[7] = 0;
+}
+
+NetworkLayer::NetworkLayer()
+{
+    s32 i;
+    NetworkLayerRequest* req;
+
+    this->context_04 = 0;
+    this->context_08 = 0;
+    for (i = 0; i < 21; i++) {
+        this->requests_0C[i] = 0;
+        this->requestState_60[i] = 0;
+    }
+    this->flag_75 = 1;
+    this->flag_76 = 1;
+    req = this->pool_78;
+    for (i = 0; i < 2; i++) {
+        req->reset();
+        req++;
+    }
 }
 
 NetworkLayerRequest::~NetworkLayerRequest()
@@ -293,12 +296,10 @@ void copyNetFriendRec(NetFriendRec* dst, const NetFriendRec* src)
     dst->valid_0x35 = src->valid_0x35;
 }
 
-#pragma dont_inline on
 s32 NetworkLayerRequest::isOwned()
 {
     return this->owner_94 != 0;
 }
-#pragma dont_inline off
 
 /* Runs the request's handler through its member-function pointer; a handler that reports completion
  * resets the record. */

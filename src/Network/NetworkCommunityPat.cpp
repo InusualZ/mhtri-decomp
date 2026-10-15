@@ -16,8 +16,7 @@
  *   `sendReqBlackAdd` 283, `sendReqBlackDelete` 285, `sendReqBlackList` 287; hence `blockPlayer`/`unblockPlayer`
  *   (BlackAdd/BlackDelete); `inviteFriend` (sends FriendAccept) and `sendFriendMessage` (FriendAdd with a text) keep the
  *   consumer's names.  `NetworkFriendInfo` is `menu/movie.cpp`'s (`menu/movie.h`), `strtok` MSL's.
- * RESIDUALS. `extab`: `~NetworkCommunityPatRequest` records a cleanup for its `NetworkMutex` member that retail's
- *   (byte-identical code) does not carry (+0x14 B).
+ * RESIDUALS. `extab`: the constructor's call to `getInstance_` is a may-throw range (pc 0x7C) retail does not record.
  * RESIDUALS. Not unwritten: the empty inline constructor/destructor bodies of `NetworkCommunityFriendList` and
  *   `NetworkCommunityBlockList` are complete (MWCC emits the element construction; declared so other units call them).
  *   `__dt__17NetworkFriendInfoFv`: retail re-extends the flag (`extsh r0,r4`), the empty inline destructor
@@ -28,8 +27,9 @@
  *   `handleUnblockPlayer`/`onPatEvent`: `setFriendTransferModeById` (NetworkLayerPat) takes `u8 mode`, so this caller
  *   emits a `clrlwi` retail lacks; a `u32` parameter restores both and lowers the callee, so the owner's u8 stays.
  *   `.sdata2`: retail emits `communityProfileSendInterval` (0x8079C7A8) before the inline record `reset`'s 0.0 and
- *   `clear`'s -3600.0, ours after (its definition has to follow `move`).  `extab`: two records differ by the
- *   mutex-member action `NetworkCommunity` records.
+ *   `clear`'s -3600.0, ours after (its definition has to follow `move`).
+ * SHAPES. The request record's `reset` and `clear` are defined before its destructor: MWCC then knows the destructor's
+ *   call cannot throw and records no cleanup for the `NetworkMutex` member (retail's empty `extab` record).
  * SHAPES. The records a handler delivers are declared in the case block that fills them (retail constructs them there);
  *   the event switch's cases follow retail's body order; `move`'s 1.0 is the named constant
  *   `communityProfileSendInterval` defined after its user (defined before, MWCC folds it into a pooled literal loaded
@@ -128,16 +128,6 @@ inline NetworkCommunityFriendList::NetworkCommunityFriendList()
 {
 }
 
-inline NetworkCommunityPatRequest::~NetworkCommunityPatRequest()
-{
-    clear();
-}
-
-inline void NetworkCommunityPatRequest::clear()
-{
-    reset();
-}
-
 /* Returns a request record to its idle state. */
 inline void NetworkCommunityPatRequest::reset()
 {
@@ -173,6 +163,16 @@ inline void NetworkCommunityPatRequest::reset()
     this->args_2C[5] = 0;
     this->args_2C[6] = 0;
     this->args_2C[7] = 0;
+}
+
+inline void NetworkCommunityPatRequest::clear()
+{
+    reset();
+}
+
+inline NetworkCommunityPatRequest::~NetworkCommunityPatRequest()
+{
+    clear();
 }
 
 inline NetworkCommunityPatRequest::NetworkCommunityPatRequest()

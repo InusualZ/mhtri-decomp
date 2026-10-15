@@ -12,11 +12,12 @@
  *   `NetworkCommunityHandler` globals `networkCommunityRequestDescNN`; every other name is a GUESS from the slot offset,
  *   the field it touches or what the pat control passes.
  * RESIDUALS. `__ct__16NetworkCommunityFv`: the pool loop keeps its counter and pointer registers swapped (r31/r30
- *   against retail r30/r31; the comma-form loop is the closest spelling of those measured).  `extab`: retail records
- *   the record's mutex as a member object (`~NetworkCommunityRequest` names 0x803CA338), while here it is a byte block
- *   with explicit constructor and destructor calls - the mutex class is
- *   `Network/NetworkStreamSink.cpp`'s and shared with `NetworkLayer`, `NetworkSessionManager` and five other units.  `.sdata2`: the object carries 4 B of the claimed 8.
+ *   against retail r30/r31; the comma-form loop is the closest spelling of those measured).  `.sdata2`: the object
+ *   carries 4 B of the claimed 8.
  * SHAPES. `__vt__16NetworkCommunity` is emitted here from the class (key function the destructor, rule 10).
+ * SHAPES. The record's `reset` is inline and defined before the constructor, under file-scope `dont_inline`: MWCC then
+ *   knows the pool loop's call cannot throw and records no pool cleanup (retail's empty constructor `extab`), and still
+ *   emits the out-of-line copy right after the constructor.
  */
 #include "Network/NetworkCommunity.h"            /* the unit's own header */
 #include "Network/NetworkSessionManager.h"       /* NetworkRequest_idCounter, NetworkVaState */
@@ -25,24 +26,10 @@
 
 /* Retail keeps the unfused lis/addi/lwz forms of the null member pointer copy (see the file header). */
 #pragma peephole off
-
-NetworkCommunity::NetworkCommunity()
-{
-    s32 i;
-    NetworkCommunityRequest* req;
-
-    this->reflectCallback_04 = 0;
-    this->reflectUser_08 = 0;
-    for (i = 0; i < 12; i++) {
-        this->requests_0C[i] = 0;
-    }
-    for (i = 0, req = this->pool_3C; i < 2; i++, req++) {
-        req->reset();
-    }
-}
+#pragma dont_inline on
 
 /* Returns a request record to its idle state. */
-void NetworkCommunityRequest::reset()
+inline void NetworkCommunityRequest::reset()
 {
     this->state_00 = 0;
     this->interval_4C = 0.0f;
@@ -76,6 +63,21 @@ void NetworkCommunityRequest::reset()
     this->args_2C[5] = 0;
     this->args_2C[6] = 0;
     this->args_2C[7] = 0;
+}
+
+NetworkCommunity::NetworkCommunity()
+{
+    s32 i;
+    NetworkCommunityRequest* req;
+
+    this->reflectCallback_04 = 0;
+    this->reflectUser_08 = 0;
+    for (i = 0; i < 12; i++) {
+        this->requests_0C[i] = 0;
+    }
+    for (i = 0, req = this->pool_3C; i < 2; i++, req++) {
+        req->reset();
+    }
 }
 
 NetworkCommunityRequest::~NetworkCommunityRequest()
@@ -146,12 +148,10 @@ void NetworkCommunity::move()
     }
 }
 
-#pragma dont_inline on
 s32 NetworkCommunityRequest::isOwned()
 {
     return this->owner_94 != 0;
 }
-#pragma dont_inline off
 
 /* Runs the request's handler through its member-function pointer; a handler that reports completion resets the
  * record. */

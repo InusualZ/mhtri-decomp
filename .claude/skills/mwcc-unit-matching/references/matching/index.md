@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (132)
+## Ideas that work (133)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -141,6 +141,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 145 | [A two-exit loop without goto: retail's own inline helpers, or the tail moved into the loop](145-goto-free-two-exit-loop.md) | works | source-shape | Retail's control flow was written with `goto` (a jump out of a nested loop, a shared round-up or cleanup tail), rule 8 forbids it, and the goto-free spellings duplicate the tail or add a compare. |
 | 146 | [An initialised array whose size is a multiple of 8 is 8-aligned, so a 4-aligned target object is not one array](146-initialised-array-8-align.md) | works | data, sections | A `.data` run that the map calls one array is not byte-identical when emitted as one array - ours is padded to an 8-byte boundary where the target continues 4-aligned. |
 | 147 | [Pool and string offsets shifted by a missing function: write the functions the linker strips](147-stripped-functions-pool-offsets.md) | works | data, sections | Every string or literal row of a unit relocates against the right section but the wrong offset, or the literal pool is in another order, while the functions that use them are correct. |
+| 155 | [A member cleanup record retail lacks: define the callee before its caller (MWCC's nothrow knowledge)](155-nothrow-callee-before-caller.md) | works | source-shape, sections | Our constructor or destructor carries an extab cleanup record (a member's destructor, an array's destroy, a base destructor) that retail's lacks, with byte-identical code - the call it guards is one MWCC could not yet... |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

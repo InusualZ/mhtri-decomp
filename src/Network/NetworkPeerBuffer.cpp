@@ -9,7 +9,7 @@
  *   `Network/NetworkPeerBuffer.h`).
  * RESIDUALS. none in the rows; `send`'s `NETWORK_ERROR_*` constant is an immediate the target relocates against an
  *   `@eti_` extabindex row (playbook 58), 3 B of `.text` relocation fields.  The DOL hash holds with it linked.
- * SHAPES. The table is emitted from `NetworkPeerBuffer::destroy`, the key function (rule 10).  `receive`'s stream is a
+ * SHAPES. The table is emitted from `~NetworkPeerBuffer`, the key function (rule 10).  `receive`'s stream is a
  *   real `NetworkStreamWriterDefault` local: its implicit destructor at every return gives the `extab` cleanup record.
  *   Each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  */
@@ -136,15 +136,8 @@ void NetworkPeerBuffer::reset()
 #pragma dont_inline on
 
 /* Deleting destructor of the payload buffer: chains the error-record base, then frees on request. */
-NetworkPeerBase* NetworkPeerBuffer::destroy(s16 flags)
+NetworkPeerBuffer::~NetworkPeerBuffer()
 {
-    if (this != NULL) {
-        NetworkPeerBase::destroy(0);
-        if (flags > 0) {
-            operator delete(this);
-        }
-    }
-    return this;
 }
 
 #pragma dont_inline off

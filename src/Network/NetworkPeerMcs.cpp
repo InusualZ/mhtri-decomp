@@ -9,7 +9,7 @@
  * RESIDUALS. none in the rows; the `NETWORK_ERROR_*` immediates are relocated against `@eti_` rows in the target
  *   (playbook 58): 36 B of `.text`.  `.sbss` holds the 4-byte `networkMcsRetryTime` against the claimed 8 B (the
  *   section's 8-byte alignment pads it).  The DOL hash holds with it linked.
- * SHAPES. The table (0x805F95E0) is emitted from `NetworkPeerMcs::destroy`, the key function (rule 10).  Each
+ * SHAPES. The table (0x805F95E0) is emitted from `~NetworkPeerMcs`, the key function (rule 10).  Each
  *   `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  */
 #include "types.h"
@@ -40,15 +40,8 @@ f32 networkMcsRetryTime;
 #pragma dont_inline on
 
 /* Deleting destructor: chains the base destructor, then frees on request. */
-NetworkPeerBase* NetworkPeerMcs::destroy(s16 flags)
+NetworkPeerMcs::~NetworkPeerMcs()
 {
-    if (this != NULL) {
-        NetworkPeerBase::destroy(0);
-        if (flags > 0) {
-            operator delete(this);
-        }
-    }
-    return this;
 }
 
 /* Builds the Mcs peer: the error base, the peer's table, its flags, the shared Mcs scratch packet and

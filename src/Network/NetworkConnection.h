@@ -17,7 +17,9 @@ struct NetworkConnectionOpenInfo;         /* Network/NetworkSessionStable.h */
 typedef void (*NetworkConnectionCallback)(s32 event, s8 index, u32 arg, s32 size, const u8* data, NetworkSessionStable* owner);
 
 /* The mutex the network records embed as a member (GUESS on the name): the constructor stores the table 0x805F91E0
-   and initialises the OS mutex after it; the destructor only frees on request.  The records' `LockMutex`/`UnlockMutex`
+   and initialises the OS mutex after it; the destructor only frees on request.  Both are out of line in
+   `Network/NetworkConnection.cpp`, so an embedding record's constructor and destructor record the member's cleanup
+   (`__dt__12NetworkMutexFv`) around any call MWCC cannot prove nothrow.  The records' `LockMutex`/`UnlockMutex`
    (`Network/NetworkSessionBase.cpp`) take its address. */
 class NetworkMutex {
 public:

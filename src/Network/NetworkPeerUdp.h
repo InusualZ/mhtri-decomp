@@ -13,12 +13,12 @@
 
 /* The Udp peer (table 0x805F9540): the abstract peer, the peer index it owns on the socket at +0x10 and
    the socket at +0x14.  Its constructor lives outside this unit (the table is stored by an unowned
-   function); the `destroy` defined here is the key function that makes MWCC emit the table. */
+   function); the destructor defined here is the key function that makes MWCC emit the table. */
 class NetworkPeerUdp : public NetworkPeerBase {
 public:
     /* 0x803CA3BC (`Network/NetworkConnection.cpp`, where the connection base creates the Udp peer) */
     NetworkPeerUdp();
-    /* +0x08 */ virtual NetworkPeerBase* destroy(s16 flags);
+    /* +0x08 */ virtual ~NetworkPeerUdp();
     /* +0x0C (docs/memory-dump.md names this one `setPeerAndSocket`) */ virtual void setContext(const void* context); /* untyped: caller-owned payload - each derived peer reads its own record layout through it */
     /* +0x10 (`sendPackets`) */ virtual s32 send(const u8* data, s32 size, const u8* data2, s32 size2, s8 kind);
     /* +0x14 (`receivePackets`) */ virtual s32 receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind);

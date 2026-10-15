@@ -69,8 +69,8 @@ public:
 class NetworkPeerGameSpy : public NetworkPeerBase {
 public:
     /* 0x803CA2F4 (`Network/NetworkConnection.cpp`) */ NetworkPeerGameSpy();
-    /* +0x08 deleting destructor: destroys the queue mutex and the base, then frees on request */
-    virtual NetworkPeerBase* destroy(s16 flags);
+    /* +0x08 destroys the queue mutex and the base */
+    virtual ~NetworkPeerGameSpy();
     /* +0x0C binds the peer to the interface and resets both buffers (the context is the interface and peer id pair) */
     virtual void setContext(const void* context); /* untyped: caller-owned payload - the interface and peer id pair */
     /* +0x10 builds and sends a framed peer message from the two optional payloads */

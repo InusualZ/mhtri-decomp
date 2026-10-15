@@ -11,10 +11,10 @@
  * NAMES. The file and class names are GUESSes: the base class of `NetworkConnectionStable`; the slot names are read off
  *   the derived class's overrides.  GUESS: setInterval, setTimeout, setLimit (the defaults each new connection copies).
  * NAMES. GUESS: NetworkMutex (the member mutex the network records embed).
- * RESIDUALS. `extab` (flip blocker): 0x80 of 0x94 B - retail's `NetworkPeerGameSpy` constructor carries a cleanup
- *   record against `NetworkPeerBase`'s destructor (`destroy__15NetworkPeerBaseFs`), which this project models as the
- *   plain virtual `destroy` the Matching peers are built on.
+ * RESIDUALS. none.
  * SHAPES. `NetworkMutex`'s destructor is complete with an empty body (it only frees on request) and matches.
+ * SHAPES. `NetworkPeerBase` has a real virtual destructor: `NetworkPeerGameSpy`'s constructor then records the base as
+ *   a cleanup around the mutex constructor (retail's 0x14-byte `extab` action), and `~NetworkConnection` is `delete`.
  * SHAPES. `NetworkPeerUdp`'s constructor is complete with an empty body (the compiler emits the base call and the
  *   table store) and matches.
  */
@@ -79,9 +79,7 @@ NetworkPeerUdp::NetworkPeerUdp()
 NetworkConnection::~NetworkConnection()
 {
     if (peer_0C != NULL) {
-        if (peer_0C != NULL) {
-            peer_0C->destroy(1);
-        }
+        delete peer_0C;
         peer_0C = NULL;
     }
 }

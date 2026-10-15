@@ -18,15 +18,14 @@
  *   `errorRecordCode613c`, `getErrorInfo654c`, `getGameInfo2d1c`), `natNegProgressCallback`, `natNegCompletedCallback`,
  *   `copyGameSpyAddress`, `NetworkReflectService::notify` and the peer's `armDrop`/`init` (the base's +0x20/+0x24
  *   slots).  The peer's other slot names are `NetworkPeerBase`'s:
- *   GUESS: setContext, send, receive, put, move, reset, destroy (the base slot each overrides).
+ *   GUESS: setContext, send, receive, put, move, reset (the base slot each overrides).
  * RESIDUALS. `NetworkPeerGameSpy::receive`: retail materialises the error-source constant as a relocation
  *   (`@eti_80030018+9/+10`) where ours is the immediate, and keeps a `clrlwi` ours drops.  `tGameSpyInterface`: the
  *   hoisted high word of `ticks * 17` is a fresh `li r0, 0` where retail reuses r24.  `publishRequest`, `step`: register
  *   colouring.  `.data`: 1392 of 1396 B until the cut, plus `NetworkTimedHandler`'s table, which this unit emits (its
  *   destructor is defined here) while retail's 0x80603740 lies past the claimed range, and `NetworkPeerGameSpy`'s table
- *   (0x30 B here: `NetworkPeerBase`'s pure `slot_2C` pad; retail's 0x80603714 is 0x2C B and unclaimed);
- *   `extab` lacks a 20-byte record: retail's peer constructor (in `Network/NetworkConnection.cpp`) and destructor clean
- *   up through `NetworkPeerBase`'s destructor, which this project models as the plain virtual `destroy`.  `.sdata` (flip blocker): the claimed 0x10 B (`sRejectMessageNG`, `sEmptyString`,
+ *   (0x30 B here: `NetworkPeerBase`'s pure `slot_2C` pad; retail's 0x80603714 is 0x2C B and unclaimed).
+ *   `.sdata` (flip blocker): the claimed 0x10 B (`sRejectMessageNG`, `sEmptyString`,
  *   `sPortFormat`) is not emitted.
  * SHAPES. Every call through a foreign object's vtable goes through a declared `virtual` (the only shape MWCC emits as
  *   `lwz r12,0x0(r3)` / `lwz r12,<slot>(r12)`).  `~GameSpyInterfaceThread` comes first in the class (the vtable pointer
@@ -1477,17 +1476,9 @@ void NetworkPeerGameSpy::reset()
     UnlockMutex(&mutex_6614);
 }
 
-/* Deleting destructor: destroys the queue mutex and the base, then frees on request. */
-NetworkPeerBase* NetworkPeerGameSpy::destroy(s16 flags)
+/* Destroys the peer: MWCC destroys the queue mutex and the base after the empty body. */
+NetworkPeerGameSpy::~NetworkPeerGameSpy()
 {
-    if (this != NULL) {
-        mutex_6614.NetworkMutex::~NetworkMutex();
-        NetworkPeerBase::destroy(0);
-        if (flags > 0) {
-            operator delete(this);
-        }
-    }
-    return this;
 }
 
 /* Constructs the timed handler. */
