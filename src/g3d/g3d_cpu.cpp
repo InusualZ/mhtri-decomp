@@ -4,11 +4,10 @@
  * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` keeps the unfused `clrlwi`+`cmpwi` alignment tests,
  *   `#pragma pool_data off` gives every string its own `lis`/`addi` as retail does.
  * NAMES. Copy32ByteBlocks and ZeroMemory32ByteBlocks are nw4r::g3d::detail's names for the two primitives.
- * RESIDUALS. ZeroMemory32ByteBlocks: the 36 stores of both loops differ in opcode alone - retail stores the f32 fill as a
- *   paired single (`psq_st f0,off,0,qr0`, no `ps_merge`), while every compiler under `build/compilers` emits `stfd`
- *   (and `__vec2x32float__` emits `ps_merge00` plus indexed `psq_stx`); the body kept is the f64 block fill.
- *   .sdata2: the object emits 0x4 of the claimed 0x8.
+ * RESIDUALS. .sdata2: the object emits 0x4 of the claimed 0x8.
  * SHAPES. the strings are literals in first-use order; the three asserts pass retail's line numbers explicitly.
+ *   ZeroMemory32ByteBlocks stores the fill with an inline `asm` block of four `psq_st` in the loop body; MWCC
+ *   unrolls the loop eight times and rebases the block's offsets (0..248), as retail does.
  */
 
 #include "types.h"
@@ -60,21 +59,23 @@ void Copy32ByteBlocks(void* pDst, const void* pSrc, u32 size) {
     }
 }
 
-/* Fills `size` bytes at `pDst` with 0.0f, one 32-byte block (four 8-byte slots) at a time. */
+/* Fills `size` bytes at `pDst` with 0.0f, one 32-byte block (four paired-single stores) at a time. */
 /* untyped: byte range */
 void ZeroMemory32ByteBlocks(void* pDst, u32 size) {
     G3D_CPU_ASSERT(pDst && !((u32)pDst & 0x3), 94, "NW4R:Failed assertion pDst && !((u32)pDst & 0x3)");
     G3D_CPU_ASSERT(size % 32 == 0, 95, "NW4R:Failed assertion size % 32 == 0");
 
-    f32 value = 0.0f;
-    f64* dst = (f64*)pDst;
+    register f32 value = 0.0f;
+    register u8* dst = (u8*)pDst;
     size /= 32;
     while (size != 0) {
-        dst[0] = value;
-        dst[1] = value;
-        dst[2] = value;
-        dst[3] = value;
-        dst += 4;
+        asm {
+            psq_st value, 0(dst), 0, 0
+            psq_st value, 8(dst), 0, 0
+            psq_st value, 16(dst), 0, 0
+            psq_st value, 24(dst), 0, 0
+        }
+        dst += 32;
         size--;
     }
 }

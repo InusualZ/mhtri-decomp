@@ -27,9 +27,9 @@ void sin_cos_deg(f32* pOutSin, f32* pOutCos, f32 angle);
 void MTX44_ctor(nw4r::math::MTX44* pMtx);
 /* 0x800746DC (0x7C): resets the camera record the handle names to its defaults. */
 void camera_init(nw4r::g3d::Camera* pSelf);
-void fn_80075440(void* pOut, const void* pIn);
-void fn_800754EC(void* pOut, const void* pIn);
-void fn_80075620(void* pOut, const void* pIn);
+void camera_get_projection_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::MTX44* pMtx);
+void camera_get_projection_tex_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::MTX34* pMtx);
+void camera_get_environment_tex_mtx(const nw4r::g3d::Camera* pSelf, nw4r::math::MTX34* pMtx);
 
 /* The camera-position copy `camera/fn_802B5C58.cpp`'s `get_camera_pos` reads through. */
 void fn_800749C8(const void* src, void* dst); /* 0x800749C8 - copies the camera's +0x74 vector out */

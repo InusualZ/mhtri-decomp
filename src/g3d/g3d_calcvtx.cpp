@@ -9,7 +9,9 @@
  *   ShpAnmVtxSet/ShpAnmKeyShape/ShpAnmResult constructors are GUESSES (the 0x218-byte shape-blend result);
  *   CopyResVtxClrHandle is a GUESS and CopyResVtxNrmHandle is a GUESS (the out-of-line handle copies the driver
  *   calls; the dump's GXInitLightColor there is a linker-folded duplicate).
- * RESIDUALS. fn_8007270C: retail blends with paired singles (`psq_l`, `ps_mul`, `ps_madd`); ours is scalar.
+ * RESIDUALS. fn_8007270C: the frame is 0x20 smaller than retail's (1472 vs 1504) and the small handle locals sit
+ *   in different slots, which renumbers the spills; the blends are inline `asm` blocks of paired singles in the
+ *   vertex loops (MWCC unrolls the key loop four times, as retail).
  *   .data/.sdata: the driver's strings are literals in first-use order, but the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
  *   instance, after the TU's own strings, playbook 80):
  *   the NW4R_G3D_RESOURCE_* copies are out-of-line definitions emitted ahead of the driver's.
@@ -26,6 +28,7 @@
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_calcvtx.h"
 #include "g3d/g3d_anmshp.h"    /* anm_obj_shp_test_existence (rule 2) */
+#include "g3d/g3d_obj.h"       /* nw4r::g3d::AnmObjShp (rule 2) */
 #include "unsplit/OS.h"
 
 #pragma peephole off
@@ -78,8 +81,6 @@ struct BlendKey {
     /* +0x4 */ f32 mWeight;
 };
 
-/* The animated-shape object's virtual that fills `pResult` and returns the blend for vertex array `id`. */
-typedef const ShpAnmResult* (*ShpCalcFn)(void* pSelf, ShpAnmResult* pResult, s32 id);
 
 /* 0x800730B4 (0x24): returns the number of colours. */
 u16 ResVtxClr::GetNumVtxClr() const {
@@ -230,7 +231,7 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
             nw4r::db::Panic("g3d_calcvtx.cpp", 50, "NW4R:Failed assertion mdl.GetResVtxPos(vtxPosID).ptr() != vtxPosTable[vtxPosID]");
         }
         ShpAnmResult result;
-        const ShpAnmResult* pResult = ((ShpCalcFn*)(*(void**)pAnmObjShp))[14](pAnmObjShp, &result, i);
+        const ShpAnmResult* pResult = static_cast<AnmObjShp*>(pAnmObjShp)->GetResult(&result, i);
         if (pResult == NULL) {
             nw4r::db::Panic("g3d_calcvtx.cpp", 55, "NW4R:Pointer must not be NULL (pResult)");
         }
@@ -282,19 +283,30 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
             f32* out = dstVtx;
             f32* end = out + count * 3;
             while (out < end) {
-                f32 v[3];
-                for (s32 j = 0; j < 3; j++) {
-                    v[j] = keys[0].mpVtx[j] * keys[0].mWeight;
+                register f32 w = keys[0].mWeight;
+                register const f32* pSrc = keys[0].mpVtx;
+                asm {
+                    psq_l f0, 0(pSrc), 0, 0
+                    psq_l f1, 8(pSrc), 1, 0
+                    ps_mul f0, f0, w
+                    ps_mul f1, f1, w
                 }
-                keys[0].mpVtx += 3;
+                keys[0].mpVtx = pSrc + 3;
                 for (s32 k = 1; k < numKeyShape; k++) {
-                    for (s32 j = 0; j < 3; j++) {
-                        v[j] += keys[k].mpVtx[j] * keys[k].mWeight;
+                    register f32 wk = keys[k].mWeight;
+                    register const f32* pKey = keys[k].mpVtx;
+                    asm {
+                        psq_l f3, 0(pKey), 0, 0
+                        psq_l f4, 8(pKey), 1, 0
+                        ps_madd f0, f3, wk, f0
+                        ps_madd f1, f4, wk, f1
                     }
-                    keys[k].mpVtx += 3;
+                    keys[k].mpVtx = pKey + 3;
                 }
-                for (s32 j = 0; j < 3; j++) {
-                    out[j] = v[j];
+                register f32* pOut = out;
+                asm {
+                    psq_st f0, 0(pOut), 0, 0
+                    psq_st f1, 8(pOut), 1, 0
                 }
                 out += 3;
             }
@@ -342,19 +354,30 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
             f32* out = dstVtx;
             f32* end = out + count * 3;
             while (out < end) {
-                f32 v[3];
-                for (s32 j = 0; j < 3; j++) {
-                    v[j] = keys[0].mpVtx[j] * keys[0].mWeight;
+                register f32 w = keys[0].mWeight;
+                register const f32* pSrc = keys[0].mpVtx;
+                asm {
+                    psq_l f0, 0(pSrc), 0, 0
+                    psq_l f1, 8(pSrc), 1, 0
+                    ps_mul f0, f0, w
+                    ps_mul f1, f1, w
                 }
-                keys[0].mpVtx += 3;
+                keys[0].mpVtx = pSrc + 3;
                 for (s32 k = 1; k < numKeyShape; k++) {
-                    for (s32 j = 0; j < 3; j++) {
-                        v[j] += keys[k].mpVtx[j] * keys[k].mWeight;
+                    register f32 wk = keys[k].mWeight;
+                    register const f32* pKey = keys[k].mpVtx;
+                    asm {
+                        psq_l f3, 0(pKey), 0, 0
+                        psq_l f4, 8(pKey), 1, 0
+                        ps_madd f0, f3, wk, f0
+                        ps_madd f1, f4, wk, f1
                     }
-                    keys[k].mpVtx += 3;
+                    keys[k].mpVtx = pKey + 3;
                 }
-                for (s32 j = 0; j < 3; j++) {
-                    out[j] = v[j];
+                register f32* pOut = out;
+                asm {
+                    psq_st f0, 0(pOut), 0, 0
+                    psq_st f1, 8(pOut), 1, 0
                 }
                 out += 3;
             }
@@ -402,20 +425,31 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
             f32* out = dstVtx;
             f32* end = out + count;
             while (out < end) {
-                f32 v[3];
-                for (s32 j = 0; j < 3; j++) {
-                    v[j] = keys[0].mpVtx[j] * keys[0].mWeight;
+                register f32 w = keys[0].mWeight;
+                register const f32* pSrc = keys[0].mpVtx;
+                asm {
+                    psq_l f0, 0(pSrc), 0, 2
+                    psq_l f1, 2(pSrc), 0, 2
+                    ps_mul f0, f0, w
+                    ps_mul f1, f1, w
                 }
-                keys[0].mpVtx += 1;
+                keys[0].mpVtx = pSrc + 1;
                 for (s32 k = 1; k < numKeyShape; k++) {
-                    for (s32 j = 0; j < 3; j++) {
-                        v[j] += keys[k].mpVtx[j] * keys[k].mWeight;
+                    register f32 wk = keys[k].mWeight;
+                    register const f32* pKey = keys[k].mpVtx;
+                    asm {
+                        psq_l f3, 0(pKey), 0, 2
+                        psq_l f4, 2(pKey), 0, 2
+                        ps_madd f0, f3, wk, f0
+                        ps_madd f1, f4, wk, f1
                     }
-                    keys[k].mpVtx += 1;
+                    keys[k].mpVtx = pKey + 1;
                 }
-                out[0] = v[0];
-                out[1] = v[1];
-                out[2] = v[2];
+                register f32* pOut = out;
+                asm {
+                    psq_st f0, 0(pOut), 0, 2
+                    psq_st f1, 2(pOut), 0, 2
+                }
                 out += 1;
             }
             DC::StoreRange(dst.GetData(), (u32)count * 4);

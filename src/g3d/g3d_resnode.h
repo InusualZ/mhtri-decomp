@@ -34,7 +34,9 @@ struct ResNodeData {
     /* +0x64 */ s32 mToNextSibling;
     /* +0x68 */ s32 mToPrevSibling;
     /* +0x6C */ u32 mSubResOfs; /* the offset fn_80099378 resolves a sub-resource through */
-}; /* size: 0x70 (a lower bound: only the fields above are reached) */
+    /* +0x70 */ u8 pad_0x70[0x30];
+    /* +0xA0 */ f32 mInvModelMtx[3][4]; /* the inverse bind matrix g3d_calc_skinning's envelope pass applies */
+}; /* size: 0xD0 (a lower bound: only the fields above are reached) */
 
 #ifdef __cplusplus
 #include "g3d/g3d_rescommon.h"

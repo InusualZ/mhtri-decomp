@@ -16,6 +16,14 @@ void fog_init(s32 pSelf);
 
 #ifdef __cplusplus
 }
+
+struct G3dFog;
+struct G3dFogData;
+
+/* 0x8007A0B4 - copies the fog's record into `pDst`. */
+extern "C" void fog_copy_to(const G3dFog* pSelf, G3dFogData* pDst);
+/* 0x8007A354 - loads the fog into the graphics pipe. */
+extern "C" void fog_set_gp(const G3dFog* pSelf);
 #endif
 
 #endif /* MHTRI_G3D_G3D_FOG_H */

@@ -76,12 +76,12 @@ u32 GXGetLightColor(s32);
 /* internal */ void fn_8007A800(s32 arg0, s32 arg1);
 /* internal */ u32 fn_8007A814(s32 *arg0, s32 arg1);
 /* internal */ void* light_setting_ctor(void *arg0, s32 arg1, s32 arg2, u32 arg3, s32 arg4, u32 arg5);
-/* internal */ u32 fn_8007AEF8(void *arg0, void *arg1);
-/* internal */ u32 fn_8007AF1C(s32 *arg0);
-/* internal */ s32 dtor_8007AF28(s32 arg0, s16 arg1);
-/* internal */ s32 fn_8007AF6C(void *arg0, void *arg1, u32 arg_sp0);
+/* internal */ u32 amb_light_obj_copy(void *arg0, void *arg1);
+/* internal */ u32 light_obj_ctor(s32 *arg0);
+/* internal */ s32 light_obj_dtor(s32 arg0, s16 arg1);
+/* internal */ s32 light_setting_import(void *arg0, void *arg1, u32 arg_sp0);
 /* internal */ u32 fn_8007B074(void *arg0, void *arg1);
-/* internal */ void fn_8007B0A0(void *arg0, s32 arg1, u32 arg2);
+/* internal */ void light_setting_apply_view_mtx(void *arg0, s32 arg1, u32 arg2);
 /* internal */ void* fn_8007B148(u32 *arg0, u32 *arg1);
 /* internal */ s32 fn_8007B160(void *arg0, u32 arg1, s8 arg2);
 /* internal */ s32 fn_8007B224(void *arg0, s8 arg1);
@@ -222,18 +222,18 @@ typedef struct {
     /* +0x02 */ u8 field_0x02;
     /* +0x03 */ u8 field_0x03;
 } RawView_52; /* size: 0x4 */
-u32 fn_8007AEF8(void *arg0, void *arg1) {
+u32 amb_light_obj_copy(void *arg0, void *arg1) {
     ((RawView_51*)arg0)->field_0x00 = (u8) ((RawView_52*)arg1)->field_0x00;
     ((RawView_51*)arg0)->field_0x01 = (u8) ((RawView_52*)arg1)->field_0x01;
     ((RawView_51*)arg0)->field_0x02 = (u8) ((RawView_52*)arg1)->field_0x02;
     ((RawView_51*)arg0)->field_0x03 = (u8) ((RawView_52*)arg1)->field_0x03;
 }
 
-u32 fn_8007AF1C(s32 *arg0) {
+u32 light_obj_ctor(s32 *arg0) {
     *arg0 = 0;
 }
 
-s32 dtor_8007AF28(s32 arg0, s16 arg1) {
+s32 light_obj_dtor(s32 arg0, s16 arg1) {
 }
 
 
@@ -251,7 +251,7 @@ typedef struct {
     /* +0x08 */ u8* field_0x08;
     /* +0x0C */ u8* field_0x0C;
 } RawView_54; /* size: 0x10 */
-s32 fn_8007AF6C(void *arg0, void *arg1, u32 arg_sp0) {
+s32 light_setting_import(void *arg0, void *arg1, u32 arg_sp0) {
 }
 
 
@@ -277,7 +277,7 @@ typedef struct {
     /* +0x00 */ u32 field_0x00;
     /* +0x04 */ u8* field_0x04;
 } RawView_57; /* size: 0x8 */
-void fn_8007B0A0(void *arg0, s32 arg1, u32 arg2) {
+void light_setting_apply_view_mtx(void *arg0, s32 arg1, u32 arg2) {
 }
 
 

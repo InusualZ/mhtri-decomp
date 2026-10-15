@@ -52,12 +52,12 @@ extern const char lbl_8058E5D8[];
 extern "C" {
 u32 mtx34_identity(s32);
 s32 fn_800D79B4(s32, s32, s32, s32);
-/* internal */ void fn_80075E9C(s32 arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, u32 arg_sp0);
+/* internal */ void g3d_calc_tex_mtx(s32 arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, u32 arg_sp0);
 /* internal */ void g3d_calc_tex_mtx_dcc(s32 arg0, s32 arg1, s32 arg2, s32 arg3);
 } /* extern "C" */
 
 extern "C" {
-void fn_80075E9C(s32 arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, u32 arg_sp0) {
+void g3d_calc_tex_mtx(s32 arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, u32 arg_sp0) {
     s32 temp_r11;
     s32 var_r10;
     s32 var_r26;

@@ -74,7 +74,7 @@
 #include "RVLGX/GXGeometry.h"
 #include "g3d/g3d_calcview.h" /* fn_800710BC (rule 2) */
 #include "nw4r/fn_805012C4.h" /* mtx34_rotate_vec3 (rule 2) */
-#include "fn_8004CAD8.h"      /* MTX34_ctor, fn_80050508 (rule 2) */
+#include "fn_8004CAD8.h"      /* MTX34_ctor, fn_80050508, vec3_to_vec (rule 2) */
 #include "draw_shape/mtx34_copy.h" /* the matrix copy (rule 2) */
 #include "g3d/g3d_draw.h" /* mtx34_set (rule 2) */
 #include "g3d/g3d_camera.h" /* sin_cos_deg (rule 2) */
@@ -133,7 +133,6 @@ extern char ef_stripe_inline3_file_str[]; /* "ef_drawstripestrategy.cpp" (an inl
 extern char ef_stripe_ed_assert_str[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."       .data 0x80593C14 */
 
 /* Helpers owned by other units. */
-extern void* fn_800508A8(void* arg);
 extern void* fn_800508AC(void* arg);
 extern void  PSMTXMultVec(const f32* mtx, const void* src, void* dst);
 extern void  ef_particle_get_move_dir(void* arg, Vec* v);
@@ -1162,7 +1161,7 @@ s32 ef_draw_setting_connect_type(void* ctx, EfParticleState* particle) {
 
 /* Transforms a vector by the matrix the helper pair builds, and returns `dst`. */
 VEC3* ef_vec3_transform(VEC3* dst, const MTX34* m, const VEC3* v) {
-    void* x = fn_800508A8(dst);
+    void* x = vec3_to_vec(dst);
     void* y = fn_800508AC((void*)v);
     PSMTXMultVec((const f32*)mtx34_const_ptr((u32)m), y, x);
     return dst;

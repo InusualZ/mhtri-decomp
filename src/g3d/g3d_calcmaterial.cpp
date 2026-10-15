@@ -3,10 +3,10 @@
  *   fn_8005A9BC returns (their inlined `g3d_resmat_ac.h` constructors assert 32-byte alignment in fn_8006F158/
  *   fn_8006F298 and 4-byte in fn_8006F374/fn_8006F41C/fn_8006F4BC), and g3d_calc_material_directly, which walks the material
  *   list and drives the per-material matrix updates.
- * RANGE. .text 0x8006EE78-0x8006F738 (33 functions); extab, extabindex, .data 0x8058D7E0-0x8058D938 (opens on
- *   "g3d_calcmaterial.cpp", g3d_calc_material_directly's assert).  The right seam is proven: fn_8006F738 cites "g3d_calcview.cpp".
- * NAMES. mtx34_axis_in_parent is a GUESS; mtx34_up_axis_in_parent is a GUESS (the evidence follows).
- *   res_mat_chan_end_edit is a GUESS; res_mat_ind_mtx_copy_ctor is a GUESS;
+ * RANGE. .text 0x8006EE78-0x8006F5A0 (31 functions); extab, extabindex, .data 0x8058D7E0-0x8058D938 (opens on
+ *   "g3d_calcmaterial.cpp", g3d_calc_material_directly's assert).  The right seam: the two paired-single routines from
+ *   0x8006F5A0 are g3d_calcview.cpp's (their only callers and their constant are calcview's).
+ * NAMES. res_mat_chan_end_edit is a GUESS; res_mat_ind_mtx_copy_ctor is a GUESS;
  *   res_mat_ind_mtx_end_edit is a GUESS; res_mat_tev_color_copy_ctor is a GUESS;
  *   res_mat_tev_color_end_edit is a GUESS; res_tex_obj_end_edit is a GUESS; res_tex_srt_copy_ctor is a GUESS;
  *   res_tex_srt_end_edit is a GUESS; res_tlut_obj_end_edit is a GUESS;
@@ -18,14 +18,19 @@
  *   GUESSES (the handle copies and the TexPatAnmResult constructor the ScnMdl material pass calls).
  *   g3d_calc_material_directly is a GUESS (0x8006EE78: applies the texture and colour animations to the model's
  *   materials, called by ScnMdlSimple's material pass).
- * RESIDUALS. The large vector/matrix bodies g3d_calc_material_directly, mtx34_axis_in_parent (0x8006F5A0, 0xC0 bytes) and mtx34_up_axis_in_parent (0x8006F660, 0xD8 bytes) are unwritten empty stubs; fn_8006F200 and
- *   tex_pat_anm_result_ctor are partial.
+ * RESIDUALS. fn_8006F200: retail branches to a separate `li r3,0; blr` where ours folds the return into `bnelr`
+ *   (tried: the inverted test and a result variable - worse or equal).
  *   flipcheck: `.text` 0x4D4 of 0x8C0; `.data`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
  *   instance, after the TU's own strings, playbook 80).
  */
 #include "types.h"
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_resfile.h"       /* res_mat_*_dc_store (rule 2) */
+#include "nw4r/g3d/res_common.h"   /* ResHandle (rule 1) */
+#include "g3d/g3d_anmclr.h"        /* res_mat_copy_ctor, apply_clr_anm_result (rule 2) */
+#include "g3d/g3d_anmtexpat.h"     /* apply_tex_pat_anm_result (rule 2) */
+#include "g3d/g3d_anmtexsrt.h"     /* nw4r::g3d::AnmObjTexSrt, apply_tex_srt_anm_result (rule 2) */
+#include "g3d/res_mat_chan_copy_ctor.h" /* res_mat_chan_copy_ctor (rule 2) */
 
 #pragma pool_data off
 
@@ -50,7 +55,6 @@ void res_pltt_ctor(void* p, u32 flag);
 /* The global material-table accessor the accessor chain reads at +0x3C. */
 
 /* This unit's own bodies, in address order. */
-void* g3d_calc_material_directly(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray);
 void fn_8006F118(void* pDst, const void* pSrc);
 void* fn_8006F200(void* pHandle, u32 offset);
 void fn_8006F258(void* pDst, const void* pSrc);
@@ -58,8 +62,7 @@ void* res_tex_srt_copy_ctor(void* pDst, const void* pSrc);
 void fn_8006F334(void* pDst, const void* pSrc);
 void fn_8006F3D8(u32* pDst, u32 value);
 u32* tex_pat_anm_result_ctor(u32* self);
-void mtx34_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec);
-void mtx34_up_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec);
+
 }
 
 /* The 32-byte-aligned resource pointer wrapper fn_8006F158 builds and the 4-byte-aligned ones
@@ -274,34 +277,64 @@ extern "C" {
 u32* tex_pat_anm_result_ctor(u32* self) {
     u32* p = self + 1;
     u32* mid = self + 9;
-    for (; p < mid; p++) {
+    do {
         res_tex_ctor(p, 0);
-    }
-    for (; mid < self + 17; mid++) {
+        p++;
+    } while (p < mid);
+    u32* end = self + 17;
+    do {
         res_pltt_ctor(mid, 0);
-    }
+        mid++;
+    } while (mid < end);
     return self;
 }
 
-/* Walks the model's material list and drives the per-material matrix update (a stub). */
-void* g3d_calc_material_directly(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray) {
-    (void)pMdl;
-    (void)pMatArray;
-    (void)pTexArray;
-    (void)pClrArray;
-    return pMdl;
-}
-
-/* The paired-single matrix/vector builders, a compiler-cloned pair (stubs). */
-void mtx34_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec) {
-    (void)pDst;
-    (void)pMtx;
-    (void)pVec;
-}
-void mtx34_up_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec) {
-    (void)pDst;
-    (void)pMtx;
-    (void)pVec;
-}
-
 }  // extern "C"
+
+/* 0x8006EE78 (0x264): applies the texture-pattern, texture-SRT and colour animations to the model's materials
+ * directly (no material buffer): each animated material block is edited in place and its display list stored. */
+extern "C" void g3d_calc_material_directly(const nw4r::g3d::ResMdl* pMdl, nw4r::g3d::AnmObjTexPat* pTexPat,
+                                           nw4r::g3d::AnmObjTexSrt* pTexSrt, nw4r::g3d::AnmObjMatClr* pMatClr) {
+    if (!pMdl->IsValid()) {
+        nw4r::db::Panic("g3d_calcmaterial.cpp", 0x2C, "NW4R:Failed assertion mdl.IsValid()");
+    }
+    u32 numMat = pMdl->GetResMatNumEntries();
+    for (u32 i = 0; i < numMat; i++) {
+        ResHandle mat;
+        res_mat_copy_ctor(&mat, (ResHandle*)&pMdl->GetResMat(i));
+        if (pTexPat != NULL && pTexPat->TestExistence(i)) {
+            nw4r::g3d::TexPatAnmResult result;
+            tex_pat_anm_result_ctor((u32*)&result);
+            const nw4r::g3d::TexPatAnmResult* pResult = pTexPat->GetResult(&result, i);
+            apply_tex_pat_anm_result(*(ResHandle*)&reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResTexObj(),
+                                     *(ResHandle*)&reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResTlutObj(),
+                                     pResult);
+            res_tex_obj_end_edit((ResHandle*)&reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResTexObj());
+            res_tlut_obj_end_edit((ResHandle*)&reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResTlutObj());
+        }
+        if (pTexSrt != NULL && pTexSrt->TestExistence(i)) {
+            ResHandle texSrt;
+            ResHandle indMtx;
+            nw4r::g3d::TexSrtAnmResult result;
+            res_tex_srt_copy_ctor(&texSrt, (ResHandle*)&reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResTexSrt());
+            res_mat_ind_mtx_copy_ctor(&indMtx,
+                                      (ResHandle*)&reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResMatIndMtxAndScale());
+            const nw4r::g3d::TexSrtAnmResult* pResult = pTexSrt->GetResult(&result, i);
+            apply_tex_srt_anm_result(texSrt, indMtx, pResult);
+            res_mat_ind_mtx_end_edit(&indMtx);
+            res_tex_srt_end_edit(&texSrt);
+        }
+        if (pMatClr != NULL && pMatClr->TestExistence(i)) {
+            ResHandle tevColor;
+            ResHandle chan;
+            nw4r::g3d::ClrAnmResult result;
+            res_mat_tev_color_copy_ctor(&tevColor,
+                                        (ResHandle*)&reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResMatTevColor());
+            res_mat_chan_copy_ctor(&chan, (ResHandle*)&reinterpret_cast<nw4r::g3d::ResMat&>(mat).GetResMatChan());
+            const nw4r::g3d::ClrAnmResult* pResult = pMatClr->GetResult(&result, i);
+            apply_clr_anm_result(chan, tevColor, pResult);
+            res_mat_chan_end_edit(&chan);
+            res_mat_tev_color_end_edit(&tevColor);
+        }
+    }
+}

@@ -68,7 +68,7 @@ extern "C" void GXSetViewport(f32 x, f32 y, f32 width, f32 height, f32 near, f32
 extern "C" void mtx34_identity(void* pOut);
 extern "C" void* mtx34_get_ptr(void* pMtx);
 extern "C" void vec3_normalize_into(void* pOut, const void* pIn);
-extern "C" s32 fn_800508A8(const void* pIn);
+extern "C" s32 vec3_to_vec(const void* pIn);
 extern "C" void vec3_cross(void* pOut, const void* pA, const void* pB);
 extern "C" f32 vec3_dot(const void* pA, const void* pB);
 extern "C" void GXProject(const f32* pViewMtx, const f32* pParams, const f32* pFrustum, void* pA,
@@ -140,9 +140,9 @@ void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d);
 void fn_80075170(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f32* p4, f32* p5, f32* p6);
 void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
 void MTX44_ctor(nw4r::math::MTX44* pMtx);
-void fn_80075440(nw4r::g3d::Camera* pSelf, void* pOut);
-void fn_800754EC(nw4r::g3d::Camera* pSelf, void* pOut);
-void fn_80075620(nw4r::g3d::Camera* pSelf, void* pOut);
+void camera_get_projection_mtx(nw4r::g3d::Camera* pSelf, void* pOut);
+void camera_get_projection_tex_mtx(nw4r::g3d::Camera* pSelf, void* pOut);
+void camera_get_environment_tex_mtx(nw4r::g3d::Camera* pSelf, void* pOut);
 void fn_800756DC(nw4r::g3d::Camera* pSelf);
 void fn_800757A8(nw4r::g3d::Camera* pSelf);
 void fn_80075844(void* pMtx);
@@ -380,7 +380,7 @@ void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVe
     MTX34_ctor((nw4r::math::MTX34*)viewMtx);
     MTX44_ctor((nw4r::math::MTX44*)projMtx);
     pSelf->GetCameraMtx((nw4r::math::MTX34*)viewMtx);
-    fn_80075440(pSelf, projMtx);
+    camera_get_projection_mtx(pSelf, projMtx);
     CameraData* pData = fn_80074A54(pSelf);
     f32 projType = (f32)pData->mProjType;
     params.mProjType = projType;
@@ -419,7 +419,7 @@ void nw4r::g3d::Camera::GetCameraMtx(math::MTX34* pMtx) const {
     mtx34_copy_ps((Mtx34*)pMtx, (const Mtx34*)pData);
 }
 
-void fn_80075440(nw4r::g3d::Camera* pSelf, void* pOut) {
+void camera_get_projection_mtx(nw4r::g3d::Camera* pSelf, void* pOut) {
     if (!fn_80067EE8(pSelf)) {
         nw4r::db::Panic("g3d_camera.cpp", 647, "NW4R:Failed assertion IsValid()");
     }
@@ -433,7 +433,7 @@ void fn_80075440(nw4r::g3d::Camera* pSelf, void* pOut) {
     nw4r::math::MTX44Copy((nw4r::math::MTX44*)pOut, (const nw4r::math::MTX44*)&pData->mProjMtx);
 }
 
-void fn_800754EC(nw4r::g3d::Camera* pSelf, void* pOut) {
+void camera_get_projection_tex_mtx(nw4r::g3d::Camera* pSelf, void* pOut) {
     if (!fn_80067EE8(pSelf)) {
         nw4r::db::Panic("g3d_camera.cpp", 665, "NW4R:Failed assertion IsValid()");
     }
@@ -459,7 +459,7 @@ void fn_800754EC(nw4r::g3d::Camera* pSelf, void* pOut) {
                 pData->mUnkD8);
 }
 
-void fn_80075620(nw4r::g3d::Camera* pSelf, void* pOut) {
+void camera_get_environment_tex_mtx(nw4r::g3d::Camera* pSelf, void* pOut) {
     if (!fn_80067EE8(pSelf)) {
         nw4r::db::Panic("g3d_camera.cpp", 713, "NW4R:Failed assertion IsValid()");
     }
@@ -557,9 +557,9 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
             nw4r::db::Panic("g3d_camera.cpp", 832, "nw4r::g3d::Camera::UpdateCameraMtx:\ncamera position and target are the same(%f %f %f).", pData->mPosX, pData->mPosY,
                             pData->mPosZ);
         }
-        s32 up = fn_800508A8(&pData->mUpX);
-        s32 target = fn_800508A8(&pData->mTargetX);
-        s32 pos = fn_800508A8(&pData->mPosX);
+        s32 up = vec3_to_vec(&pData->mUpX);
+        s32 target = vec3_to_vec(&pData->mTargetX);
+        s32 pos = vec3_to_vec(&pData->mPosX);
         mtx34_get_ptr(pData);
         fn_804C64E0(pos, target, up);
     } else if ((flags & 4) != 0) {

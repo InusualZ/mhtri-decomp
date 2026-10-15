@@ -78,7 +78,7 @@ extern u32 lbl_807911EC;
 extern u32 lbl_807911F0;
 
 extern "C" {
-u32 fn_8008715C(void*);
+u32 g3d_state_load_tex_srt(void*);
 f32 powf(f32 x, f32 y);
 /* internal */ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4);
 /* internal */ void* fn_8007663C(s32 *arg0);
@@ -237,11 +237,11 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
         }
         if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTexSrt*>((void*)(&((RawView_2*)arg2)->field_0x28))->IsValid() == 0)) {
             sp10 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResTexSrt().mpData;
-            fn_8008715C((void*)(&sp10));
+            g3d_state_load_tex_srt((void*)(&sp10));
             return;
         }
         spC = ((RawView_2*)arg2)->field_0x28;
-        fn_8008715C((void*)(&spC));
+        g3d_state_load_tex_srt((void*)(&spC));
         return;
     }
     if (arg3 != NULL) {

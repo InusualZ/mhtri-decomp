@@ -189,9 +189,13 @@ public:
     /* +0x14 */ u16* mpBinding;
 };
 
+struct ShpAnmResult;
+
 /* size: 0x18 (a lower bound: the binding count and words are evidenced) */
 class AnmObjShp : public AnmObj {
 public:
+    virtual const ShpAnmResult* GetResult(ShpAnmResult* pResult, u32 idx) = 0;
+
     static const TypeObj GetTypeObjStatic();
     /* +0x10 */ int mNumBinding;
     /* +0x14 */ u16* mpBinding;

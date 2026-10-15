@@ -32,6 +32,10 @@ struct _MH_VEC2 {
 /* Writes the scissor rectangle `main.cpp` keeps (a two-float pair). */
 void fn_8004030C(struct _MH_VEC2* v);
 
+/* 0x8003F940 - copies the render mode `src` into `dst` (the SDK record, gx/GXRenderModeObj.h). */
+struct GXRenderModeObj;
+void render_mode_copy(struct GXRenderModeObj* dst, struct GXRenderModeObj* src);
+
 #ifdef __cplusplus
 }  /* extern "C" */
 

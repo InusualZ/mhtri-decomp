@@ -26,6 +26,21 @@ u32 light_obj_get_light_dir(s32 pLightObj, s32 pOut);
 
 #ifdef __cplusplus
 }
+
+struct G3dLightObj;
+struct G3dLightSetting;
+struct _GXColor;
+
+/* 0x8007AEF8 - copies the ambient light colour `pSrc` into `pDst`. */
+extern "C" void amb_light_obj_copy(_GXColor* pDst, const _GXColor* pSrc);
+/* 0x8007AF1C/0x8007AF28 - constructs / destroys a light object. */
+extern "C" G3dLightObj* light_obj_ctor(G3dLightObj* pSelf);
+extern "C" G3dLightObj* light_obj_dtor(G3dLightObj* pSelf, s16 bDelete);
+/* 0x8007AF6C - copies the light objects of `pSrc` into the setting; FALSE when they do not fit. */
+extern "C" BOOL light_setting_import(G3dLightSetting* pSelf, const G3dLightSetting* pSrc);
+/* 0x8007B0A0 - moves the first `numLightObj` light objects into view space through `pCamera`. */
+extern "C" void light_setting_apply_view_mtx(G3dLightSetting* pSelf, const nw4r::math::MTX34* pCamera,
+                                             u32 numLightObj);
 #endif
 
 #endif /* MHTRI_G3D_G3D_LIGHT_H */

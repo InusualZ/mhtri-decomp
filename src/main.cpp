@@ -186,8 +186,10 @@ extern const f32 lbl_80795ACC;
 extern const f64 lbl_80795AD0;
 
 /* The active render mode (`GXRenderModeObj`), the SDK's own layout: the 4-byte TV mode, the 7 16-bit
- * geometry fields, then the interlace/field/AA bytes, the 12x2 sample pattern and the 7-byte V filter. */
-typedef struct {
+ * geometry fields, then the interlace/field/AA bytes, the 12x2 sample pattern and the 7-byte V filter.
+ * Its padding stays implicit: gx/GXRenderModeObj.h's explicit pad members would add a copy to render_mode_copy's
+ * memberwise aggregate copy. */
+typedef struct GXRenderModeObj {
     u32 viTVMode;
     u16 fbWidth;
     u16 efbHeight;

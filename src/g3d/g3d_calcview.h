@@ -28,7 +28,13 @@ const struct ResMdlInfoData* res_mdl_info_data(const void* pInfo); /* 0x8006FF50
 u32 res_mdl_info_get_node_of_pos_nrm_mtx(const void* pInfo, u32 mtxID); /* untyped: opaque handle - the info handle */
 s32* fn_80070054(void* pOut, const void* pKey);
 void mtx34_copy_ps(Mtx34* pDst, const Mtx34* pSrc);   /* 0x8007100C - paired-single copy of a 3x4 matrix */
+/* 0x8006F5A0 - `pDst` = the axis of matrix `pMtx` expressed in the parent matrix `pParentMtx`'s frame. */
+void mtx34_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pParentMtx);
+/* 0x8006F660 - `pDst` = the up axis of matrix `pMtx` expressed in the parent matrix `pParentMtx`'s frame. */
+void mtx34_up_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pParentMtx);
 
+/* 0x80070020 - the model's `ResMdlInfo` handle word (the info block's address). */
+u32 res_mdl_info_handle(void* pMdl); /* untyped: opaque handle - the model handle */
 /* 0x8006FFDC - the number of position/normal matrices the model's info block records. */
 u32 res_mdl_info_num_pos_nrm_mtx(const void* pInfo); /* untyped: opaque handle - the info handle */
 /* 0x80071C38 / 0x80071C3C / 0x80071C40 - the locked-cache helpers: wait for the DMA queue, invalidate a block's

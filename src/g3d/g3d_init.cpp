@@ -48,7 +48,7 @@ extern u32 lbl_80791200;
 extern "C" {
 u32 OSRegisterVersion(s32);
 u32 VIGetTvFormat(void);
-u32 fn_80088574(void*);
+u32 g3d_state_set_render_mode(void*);
 /* internal */ void fn_8007A400(s32 arg0);
 /* internal */ u32 fn_8007A468(void* a0);
 /* internal */ u32 fn_8007A46C(void* a0);
@@ -73,7 +73,7 @@ void fn_8007A400(s32 arg0) {
     if (VIGetTvFormat() == 1U) {
         var_r3 = (u32 *)(&GXPal528IntDf);
     }
-    fn_80088574((void*)(var_r3));
+    g3d_state_set_render_mode((void*)(var_r3));
 }
 
 u32 fn_8007A468(void* a0) {

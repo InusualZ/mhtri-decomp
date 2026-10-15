@@ -11,8 +11,9 @@
  *   GUESS (the world-matrix attribute bit helpers), g3d_calc_world is a GUESS and g3d_calc_skinning is a GUESS (the
  *   node-tree and node-mix byte-code runners), res_mdl_get_info is a GUESS and res_mdl_info_num_view_mtx is a GUESS
  *   (the ResMdlInfo handle and its view-matrix count).
- * RESIDUALS. Unwritten (objdiff scores it zero): g3d_calc_skinning.  Partial: fn_800736F8, g3d_calc_world, fn_80073CE0,
- *   fn_80073D34, fn_80073F00, addVec3To.
+ * RESIDUALS. Partial: fn_800736F8, g3d_calc_world, fn_80073CE0, fn_80073D34, fn_80073F00, addVec3To.
+ *   g3d_calc_skinning: its blend weight's stack slot (retail 20, ours 8); the paired-single accumulators are register
+ *   variables used by inline `asm` blocks (retail's f31-f26).
  *   flipcheck: `.text` 0xAD0 of 0xFE4; `.data`/`.sdata`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
  *   instance, after the TU's own strings, playbook 80);
  *   `.sdata2` byte-identical.
@@ -28,6 +29,7 @@
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
+#include "g3d/g3d_anmchr.h" /* res_node_ref_nonconst (rule 2) */
 #include "nw4r/fn_805012C4.h" /* nw4r::math::MTX34Scale (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_8006FDCC..mtx34_copy_ps (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -63,7 +65,6 @@ extern "C" f32* fn_8005CED0(void);
 extern "C" u32* fn_8005CEDC(void);
 extern "C" void* res_node_get_id(const void* p);
 extern "C" ResNodeData* res_node_ptr(const void* p);
-extern "C" void res_node_copy_ctor(void* pOut, const void* pIn);
 extern "C" void chr_anm_result_init(void* pOut);
 extern "C" void* fn_8008E1C0(void* pOut, const void* pIn);
 extern "C" void fn_8008F148(void* pOut, const void* pIn);
@@ -236,7 +237,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                 u32 nodeID = (pCode[1] << 8) + pCode[2];
                 u32 targetID = (pCode[3] << 8) + pCode[4];
                 s14 = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->GetResNode(nodeID).mpData;
-                res_node_copy_ctor(&s1C, &s14);
+                res_node_copy_ctor(&s1C, (u32*)&s14);
                 u32 mtxID = fn_8006FDCC(&s1C);
                 if (numMtx >= 0x800) {
                     nw4r::db::Panic("g3d_calcworld.cpp", 137, "NW4R:Failed assertion numMtxID < detail::workmem::WORKMEM_NUMMTXID");
@@ -444,6 +445,126 @@ ResMdlData* fn_800740A8(ResHandle* pMdl) {
 
 void* fn_8007410C(ResHandle* pSelf) {
     return pSelf->mpData;
+}
+
+/* A blend weight: the byte code's big-endian bit pattern read back as a float.  size: 0x4 */
+union SkinningWeight {
+    /* +0x0 */ u32 bits;
+    /* +0x0 */ f32 value;
+};
+
+/* 0x8007411C (0x504): runs the model's node-mix byte code: each skinned matrix the weighted sum of the node matrices
+ * in model space (paired-single accumulators), each envelope matrix its node matrix times the node's inverse bind
+ * matrix; then the scale attributes of the envelope matrices by the model's envelope mode. */
+void g3d_calc_skinning(nw4r::math::MTX34* pWorldMtxArray, u32* pWorldMtxAttribArray, const nw4r::g3d::ResMdl* pMdl,
+                       const u8* pByteCode) {
+    SkinningWeight weight;
+    ResHandle infoCopy;
+    ResHandle node;
+    ResHandle info;
+    if (pByteCode == NULL) {
+        pByteCode = (const u8*)pMdl->GetResByteCode("NodeMix");
+        if (pByteCode == NULL) {
+            return;
+        }
+    }
+    nw4r::math::MTX34* pModelMtx = (nw4r::math::MTX34*)g3d_workmem_skinning_mtx();
+    while (pByteCode[0] != 1) {
+        if (pByteCode[0] == 3) {
+            u32 mtxID = (pByteCode[1] << 8) + pByteCode[2];
+            u32 numBlend = pByteCode[3];
+            pWorldMtxAttribArray[mtxID] = world_mtx_attr_root_mtx();
+            pByteCode += 4;
+            register f32 acc0 = 0.0f;
+            register f32 acc1;
+            register f32 acc2;
+            register f32 acc3;
+            register f32 acc4;
+            register f32 acc5;
+            asm {
+                ps_merge00 acc0, acc0, acc0
+                ps_merge00 acc1, acc0, acc0
+                ps_merge00 acc2, acc0, acc0
+                ps_merge00 acc3, acc0, acc0
+                ps_merge00 acc4, acc0, acc0
+                ps_merge00 acc5, acc0, acc0
+            }
+            for (u32 i = 0; i < numBlend; i++) {
+                u32 nodeID = (pByteCode[0] << 8) + pByteCode[1];
+                if (nodeID >= 2048) {
+                    nw4r::db::Panic("g3d_calcworld.cpp", 0x18C,
+                                    "NW4R:Failed assertion mtxID < detail::workmem::WORKMEM_NUMSKINNINGMTX");
+                }
+                weight.bits = (pByteCode[5] | (pByteCode[4] << 8)) | ((pByteCode[2] << 24) | (pByteCode[3] << 16));
+                register f32 w = weight.value;
+                register const nw4r::math::MTX34* pSrc = &pModelMtx[nodeID];
+                asm {
+                    psq_l f1, 0(pSrc), 0, 0
+                    psq_l f2, 8(pSrc), 0, 0
+                    psq_l f3, 16(pSrc), 0, 0
+                    psq_l f4, 24(pSrc), 0, 0
+                    psq_l f5, 32(pSrc), 0, 0
+                    psq_l f6, 40(pSrc), 0, 0
+                    ps_madds0 acc0, f1, w, acc0
+                    ps_madds0 acc1, f2, w, acc1
+                    ps_madds0 acc2, f3, w, acc2
+                    ps_madds0 acc3, f4, w, acc3
+                    ps_madds0 acc4, f5, w, acc4
+                    ps_madds0 acc5, f6, w, acc5
+                }
+                pWorldMtxAttribArray[mtxID] &= pWorldMtxAttribArray[nodeID];
+                pByteCode += 6;
+            }
+            register nw4r::math::MTX34* pDst = &pWorldMtxArray[mtxID];
+            asm {
+                psq_st acc0, 0(pDst), 0, 0
+                psq_st acc1, 8(pDst), 0, 0
+                psq_st acc2, 16(pDst), 0, 0
+                psq_st acc3, 24(pDst), 0, 0
+                psq_st acc4, 32(pDst), 0, 0
+                psq_st acc5, 40(pDst), 0, 0
+            }
+        } else {
+            if (pByteCode[0] != 5) {
+                nw4r::db::Panic("g3d_calcworld.cpp", 0x1C9, "NW4R:Failed assertion c == ResByteCodeData::EVPMTX");
+            }
+            u32 mtxID = (pByteCode[1] << 8) + pByteCode[2];
+            u32 nodeID = (pByteCode[3] << 8) + pByteCode[4];
+            if (mtxID >= 2048) {
+                nw4r::db::Panic("g3d_calcworld.cpp", 0x1CD,
+                                "NW4R:Failed assertion mtxID < detail::workmem::WORKMEM_NUMSKINNINGMTX");
+            }
+            node.mpData = pMdl->GetResNode(nodeID).mpData;
+            mtx34_concat(&pModelMtx[mtxID], &pWorldMtxArray[mtxID],
+                         (const Mtx34*)&res_node_ref_nonconst(&node)->mInvModelMtx);
+            pByteCode += 5;
+        }
+    }
+    info.mpData = (void*)res_mdl_info_handle((void*)pMdl);
+    fn_80074668(&infoCopy, &info);
+    switch (fn_80074644(&infoCopy)) {
+    case 0:
+        return;
+    case 1: {
+        u32 numEnvMtx = res_mdl_info_num_pos_nrm_mtx(&infoCopy) - pMdl->GetResNodeNumEntries();
+        u32 numMtx = res_mdl_info_num_view_mtx(&infoCopy);
+        for (u32 i = numMtx - numEnvMtx; i < numMtx; i++) {
+            pWorldMtxAttribArray[i] |= 0x30000000;
+        }
+        break;
+    }
+    case 2: {
+        u32 numEnvMtx = res_mdl_info_num_pos_nrm_mtx(&infoCopy) - pMdl->GetResNodeNumEntries();
+        u32 numMtx = res_mdl_info_num_view_mtx(&infoCopy);
+        for (u32 i = numMtx - numEnvMtx; i < numMtx; i++) {
+            pWorldMtxAttribArray[i] &= ~0x20000000;
+        }
+        break;
+    }
+    default:
+        nw4r::db::Panic("g3d_calcworld.cpp", 0x1F9, "EnvelopeMatrixMode is Invalid.\n");
+        break;
+    }
 }
 
 u32 world_mtx_attr_root_mtx(void) {

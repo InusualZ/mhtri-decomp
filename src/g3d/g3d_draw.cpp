@@ -80,7 +80,7 @@ void Panic(const char* file, int line, const char* fmt, ...);
 extern "C" {
 u32 vec3_normalize_into(void*, void*, f32, f32);
 s32 res_node_is_valid(s32);
-s32 fn_8006518C(void);
+s32 light_obj_is_enable(void);
 u32 fn_8006E2A8(s32, s32);
 u32 fn_8006FDCC(void*);
 s32 res_mdl_info_get_node_of_pos_nrm_mtx(void*, s32);
@@ -89,9 +89,9 @@ u32 mtx34_concat(void*, void*, void*);
 s32 res_mdl_get_info(void*);
 s32 fn_80094094(s32);
 /* internal */ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2);
-/* internal */ s32 fn_80077D4C(s32 *arg0);
-/* internal */ s32 fn_80077D64(s32 arg0);
-/* internal */ u32 fn_80077DBC(void *arg1, void* a1);
+/* internal */ s32 light_obj_is_specular_light(s32 *arg0);
+/* internal */ s32 light_obj_is_point_light(s32 arg0);
+/* internal */ u32 vec3_negate(void *arg1, void* a1);
 /* internal */ s32 fn_80077DD8(s32 *arg0);
 /* internal */ u32 mtx34_set(void *arg0, f32 farg0, f32 farg1, f32 farg2, f32 farg3, f32 farg4, f32 farg5, f32 farg6, f32 farg7, f32 arg_sp8, f32 arg_spC, f32 arg_sp10, f32 arg_sp14);
 /* internal */ s32 fn_80077E34(s32 arg0, void* a1);
@@ -314,24 +314,24 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                 }
             }
             temp_r3_5 = (s32)g3d_state_get_light_obj(g3d_state_get_light_set_entry((s8)*var_r30));
-            if ((temp_r3_5 != 0) && (fn_8006518C() != 0)) {
+            if ((temp_r3_5 != 0) && (light_obj_is_enable() != 0)) {
                 VEC3_ctor((nw4r::math::VEC3*)&sp5C);
                 if (fn_80077DD8((s32 *)(temp_r3_5)) != 0) {
                     light_obj_get_light_dir((s32)(temp_r3_5), (s32)(&sp5C));
                     if ((temp_f31 == sp5C) && (temp_f31 == sp60) && (temp_f31 == sp64)) {
                         light_obj_get_light_pos((s32)(temp_r3_5), (s32)(&sp5C));
-                        fn_80077DBC((void *)(&sp44), (void*)(&sp5C));
+                        vec3_negate((void *)(&sp44), (void*)(&sp5C));
                         copyVec3((nw4r::math::VEC3*)&sp5C, (const nw4r::math::VEC3*)&sp44);
                         vec3_normalize_into((void*)(&sp5C), (void*)(&sp5C), 0, 0);
                     }
-                } else if (fn_80077D64((s32)(temp_r3_5)) != 0) {
+                } else if (light_obj_is_point_light((s32)(temp_r3_5)) != 0) {
                     light_obj_get_light_pos((s32)(temp_r3_5), (s32)(&sp5C));
-                    fn_80077DBC((void *)(&sp38), (void*)(&sp5C));
+                    vec3_negate((void *)(&sp38), (void*)(&sp5C));
                     copyVec3((nw4r::math::VEC3*)&sp5C, (const nw4r::math::VEC3*)&sp38);
                     vec3_normalize_into((void*)(&sp5C), (void*)(&sp5C), 0, 0);
                 } else {
                     VEC3_ctor((nw4r::math::VEC3*)&sp50);
-                    if (fn_80077D4C((s32 *)(temp_r3_5)) == 0) {
+                    if (light_obj_is_specular_light((s32 *)(temp_r3_5)) == 0) {
                         nw4r::db::Panic((const char*)&lbl_8058E880, 0xAB, (const char*)&lbl_8058E8B8);
                     }
                     light_obj_get_light_dir((s32)(temp_r3_5), (s32)(&sp50));
@@ -357,15 +357,15 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
 }
 #pragma peephole off
 
-s32 fn_80077D4C(s32 *arg0) {
+s32 light_obj_is_specular_light(s32 *arg0) {
     return (*arg0 & 2) != 0;
 }
 
-s32 fn_80077D64(s32 arg0) {
+s32 light_obj_is_point_light(s32 arg0) {
     s32 var_r31;
 
     var_r31 = 0;
-    if ((fn_80077DD8(0) == 0) && (fn_80077D4C((s32 *)(arg0)) == 0)) {
+    if ((fn_80077DD8(0) == 0) && (light_obj_is_specular_light((s32 *)(arg0)) == 0)) {
         var_r31 = 1;
     }
     return var_r31;
@@ -376,7 +376,7 @@ typedef struct {
     /* +0x04 */ u32 field_0x04;
     /* +0x08 */ u32 field_0x08;
 } RawView_20; /* size: 0xC */
-u32 fn_80077DBC(void *arg1, void* a1) {
+u32 vec3_negate(void *arg1, void* a1) {
     setVec3((nw4r::math::VEC3*)(-((RawView_20*)arg1)->field_0x00), (f32)(-((RawView_20*)arg1)->field_0x04), (f32)(-((RawView_20*)arg1)->field_0x08), 0);
 }
 

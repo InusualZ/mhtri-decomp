@@ -318,6 +318,8 @@ f32 calcVecDistXZ(const void* a, const void* b);
  * convert the family's placement-table entries. */
 struct Vec;
 void vec_to_mh_vec3(VEC3* dst, struct Vec* src);
+/* 0x800508A8 - returns the nw4r `VEC3` as the SDK's `Vec` (the same three floats). */
+extern "C" struct Vec* vec3_to_vec(nw4r::math::VEC3* pSelf);
 
 /* 0x80052300 / 0x80052408 - the animation key-frame readers (map manglings `getKeyData__FPff` /
  * `getKeyData3__FPffPfPfPf`), so C++ linkage at global scope, outside the `extern "C"` block.

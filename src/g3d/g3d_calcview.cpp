@@ -2,9 +2,9 @@
  * g3d/g3d_calcview.cpp - nw4r g3d view/billboard-matrix calculator: the per-billboard matrix builders
  *   (fn_8006F738, fn_8006F934, fn_8006FBBC) and the material/model accessor chain they drive (fn_8006FDCC ..
  *   fn_80070134).
- * RANGE. .text 0x8006F738-0x8007270C (44 functions); extab, extabindex, .rodata 0x8056F638-0x8056F658, .data
+ * RANGE. .text 0x8006F5A0-0x8007270C (46 functions); extab, extabindex, .rodata 0x8056F638-0x8056F658, .data
  *   0x8058D938-0x8058DD68 (opens on "g3d_calcview.cpp", then the billboard warning strings), .sdata
- *   0x807911A8-0x807911B8, .sdata2 0x80795DA8-0x80795DB0.  Both neighbours cite their own `__FILE__` strings.
+ *   0x807911A8-0x807911B8, .sdata2 0x80795DA8-0x80795DB8.  Both neighbours cite their own `__FILE__` strings.
  * NAMES. g3d_billboard_work_mtx is a GUESS; mtx34_inverse_affine is a GUESS; mtx34_inverse_transpose is a GUESS;
  *   g3d_billboard_func_tbl is a GUESS (the evidence follows).
  *   mtx34_calc_billboard_std is a GUESS; mtx34_calc_billboard_std_persp is a GUESS;
@@ -30,20 +30,23 @@
  *   g3d_calc_view_lc is a GUESS and g3d_calc_view_lc_dma is a GUESS (the three view-matrix calculators
  *   ScnMdlSimple's view pass picks between), g3d_lc_queue_wait is a GUESS, g3d_dc_invalidate_range is a GUESS and
  *   g3d_lc_base is a GUESS (the tail calls of LCQueueWait / DCInvalidateRange and the locked cache's address).
- * RESIDUALS. Unwritten (empty stubs, 2 rows, 0x1460 bytes; objdiff scores them near zero): g3d_calc_view_lc and
- *   g3d_calc_view_lc_dma (the locked-cache variants of g3d_calc_view: not attempted).  g3d_calc_view is 99.8 %: the
- *   normal and texture matrix pointers of its second loop take r19/r20 swapped.
+ * RESIDUALS. g3d_calc_view_lc and g3d_calc_view_lc_dma: retail keeps the attribute array and the matrix count in
+ *   stack slots and recomputes `base + i` at each use; ours keeps one more register live (the global index after the
+ *   billboard call), which renumbers r19-r30 and shifts the spill slots (tried: a separate index variable after the
+ *   call - worse).  g3d_calc_view: the normal and texture matrix pointers of its second loop take r19/r20 swapped.
+ *   The two asm routines mtx34_axis_in_parent/mtx34_up_axis_in_parent open the range: their only callers are this
+ *   unit's billboard builders and their constant calcview_det_epsilon_f32 (0x80795DB0) follows this unit's
+ *   `.sdata2` pair, before g3d_calcvtx.cpp's.
  *   Partial: fn_8006F908 (98 %), mtx34_calc_billboard_y and mtx34_calc_billboard_y_persp (99.8 %: the parent node index
  *   takes r5 where retail keeps it in r0).
  *   flipcheck: `.text` short of the claim; `.rodata` byte-identical; `.data`/`.sdata`: the strings are literals,
  *   the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
- *   instance, after the TU's own strings, playbook 80); `.sdata2` (calcview_zero_f32/calcview_epsilon_f32) is declared, not emitted.
+ *   instance, after the TU's own strings, playbook 80); `.sdata2` (calcview_zero_f32/calcview_epsilon_f32/calcview_det_epsilon_f32) is declared, not emitted.
  */
 #include "types.h"
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "g3d/res_mdl_info.h" /* ResMdlInfoData (rule 1) */
-#include "g3d/g3d_calcmaterial.h" /* mtx34_axis_in_parent (rule 2) */
 #include "g3d/g3d_anmchr.h" /* res_node_ref, res_node_ref_nonconst, res_node_ofs_to_node (rule 2) */
 #include "hud/mtx34_inverse_affine.h" /* mtx34_inverse_affine, mtx34_inverse_transpose, mtx34_to_mtx33, owner hud/pl_frame_sync.cpp (rule 2) */
 #include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
@@ -55,6 +58,7 @@
 #include "OS/LCEnable.h"     /* LCQueueLength, LCQueueWait, owner NAND/nand.c (rule 2) */
 #include "OS/OSVReport.h"
 #include "OS/OSThread.h"    /* OSYieldThread, owner OS/OSThread.c (rule 2) */
+#include "nw4r/ut_LockedCache.h" /* nw4r::ut::LC::StoreBlocks, LoadBlocks (rule 2) */
 
 /* The alignment-assert wrappers need the un-fused compare (retail keeps `clrlwi` + `cmpwi`), exactly
  * as g3d/g3d_basic.cpp and g3d/g3d_calcmaterial.cpp found. */
@@ -69,9 +73,10 @@ void Warning(const char* pFile, int line, const char* pFmt, ...);
 }  // namespace db
 }  // namespace nw4r
 
-/* The two `.sdata2` pool constants this unit reads (named map rows, not emitted yet). */
+/* The three `.sdata2` constants this unit reads (named map rows, not emitted yet). */
 extern const f32 calcview_epsilon_f32; /* 1.0e-18f */
 extern const f32 calcview_zero_f32; /* 0.0f: the unit's pooled constant (claimed, not emitted) */
+extern const f32 calcview_det_epsilon_f32; /* 1.0e-18f: the determinant threshold of the two paired-single routines */
 
 extern "C" {
 
@@ -96,10 +101,129 @@ u32 res_mdl_info_handle(void* self);
 u32* fn_80070054(u32* pDst, u32 ptr);
 void fn_800700B8(u32* pDst, u32 value);
 u32 res_node_get_child(ResHandle* pSelf);
-void g3d_calc_view_lc(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
-void g3d_calc_view_lc_dma(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
+void g3d_lc_queue_wait(u32 length);
+void g3d_lc_queue_drain(u32 length);
+void g3d_dc_invalidate_range(void* pBase, u32 size); /* untyped: byte range */
+void* g3d_lc_base(void); /* untyped: byte range - the locked cache */
 
 /* -------- reconstructed bodies -------- */
+
+/* 0x8006F5A0 (0xC0): the X and Y axes of `pMtx` expressed in `pParent`'s frame (the inverse of `pParent`'s 3x3
+ * applied to them); zero when `pParent` is singular. */
+asm void mtx34_axis_in_parent(register f32* pDst, register const f32* pMtx, register const f32* pParent)
+{
+    nofralloc
+    psq_l f0, 0(r5), 1, 0
+    psq_l f1, 4(r5), 0, 0
+    psq_l f2, 16(r5), 1, 0
+    ps_merge10 f6, f1, f0
+    psq_l f3, 20(r5), 0, 0
+    psq_l f4, 32(r5), 1, 0
+    ps_merge10 f7, f3, f2
+    psq_l f5, 36(r5), 0, 0
+    ps_mul f11, f3, f6
+    ps_mul f13, f5, f7
+    ps_merge10 f8, f5, f4
+    ps_msub f11, f1, f7, f11
+    ps_mul f12, f1, f8
+    ps_msub f13, f3, f8, f13
+    lis r12, calcview_det_epsilon_f32@ha
+    psq_l f3, 24(r4), 1, 0
+    ps_msub f12, f5, f6, f12
+    addi r12, r12, calcview_det_epsilon_f32@l
+    ps_mul f7, f0, f13
+    ps_mul f9, f0, f5
+    psq_l f6, 0(r12), 1, 0
+    ps_madd f7, f2, f12, f7
+    ps_sub f13, f13, f13
+    psq_l f2, 8(r4), 1, 0
+    ps_madd f7, f4, f11, f7
+    ps_msub f9, f1, f4, f9
+    psq_l f1, 16(r4), 0, 0
+    ps_abs f8, f7
+    psq_st f13, 8(r3), 1, 0
+    ps_cmpo0 cr0, f8, f6
+    bge @L_7ac
+    psq_st f13, 0(r3), 0, 0
+    blr
+@L_7ac:
+    fres f8, f7
+    psq_l f0, 0(r4), 0, 0
+    ps_add f11, f8, f8
+    ps_mul f10, f7, f8
+    ps_merge00 f4, f0, f1
+    ps_nmsub f8, f8, f10, f11
+    ps_merge11 f5, f0, f1
+    ps_merge00 f6, f2, f3
+    ps_muls0 f12, f12, f8
+    ps_muls0 f9, f9, f8
+    ps_muls0 f0, f4, f12
+    ps_madds1 f0, f5, f12, f0
+    ps_madds0 f0, f6, f9, f0
+    psq_st f0, 0(r3), 0, 0
+    blr
+}
+
+/* 0x8006F660 (0xD8): the same with the Z axis's projection added (the up vector a Y-rotation billboard keeps). */
+asm void mtx34_up_axis_in_parent(register f32* pDst, register const f32* pMtx, register const f32* pParent)
+{
+    nofralloc
+    psq_l f0, 0(r5), 1, 0
+    psq_l f1, 4(r5), 0, 0
+    psq_l f2, 16(r5), 1, 0
+    ps_merge10 f6, f1, f0
+    psq_l f3, 20(r5), 0, 0
+    psq_l f4, 32(r5), 1, 0
+    ps_merge10 f7, f3, f2
+    psq_l f5, 36(r5), 0, 0
+    ps_mul f11, f3, f6
+    ps_mul f13, f5, f7
+    ps_merge10 f8, f5, f4
+    ps_msub f11, f1, f7, f11
+    ps_mul f12, f1, f8
+    ps_msub f13, f3, f8, f13
+    lis r12, calcview_det_epsilon_f32@ha
+    psq_l f3, 24(r4), 1, 0
+    ps_msub f12, f5, f6, f12
+    addi r12, r12, calcview_det_epsilon_f32@l
+    ps_mul f7, f0, f13
+    ps_mul f9, f0, f5
+    psq_l f6, 0(r12), 1, 0
+    ps_madd f7, f2, f12, f7
+    ps_sub f13, f13, f13
+    psq_l f2, 8(r4), 1, 0
+    ps_madd f7, f4, f11, f7
+    ps_msub f9, f1, f4, f9
+    psq_l f1, 16(r4), 0, 0
+    ps_abs f8, f7
+    psq_st f13, 8(r3), 1, 0
+    ps_cmpo0 cr0, f8, f6
+    bge @L_86c
+    psq_st f13, 0(r3), 0, 0
+    blr
+@L_86c:
+    fres f8, f7
+    psq_l f0, 0(r4), 0, 0
+    ps_add f11, f8, f8
+    ps_mul f10, f7, f8
+    ps_merge00 f4, f0, f1
+    ps_nmsub f8, f8, f10, f11
+    ps_merge11 f5, f0, f1
+    ps_merge00 f6, f2, f3
+    ps_muls0 f12, f12, f8
+    psq_l f1, 32(r4), 0, 0
+    ps_muls0 f9, f9, f8
+    psq_l f2, 40(r4), 1, 0
+    ps_muls0 f0, f4, f12
+    ps_mul f1, f1, f9
+    ps_madds1 f0, f5, f12, f0
+    ps_sum0 f1, f1, f1, f1
+    ps_madds0 f0, f6, f9, f0
+    fmadds f1, f2, f9, f1
+    psq_st f0, 0(r3), 0, 0
+    psq_st f1, 8(r3), 1, 0
+    blr
+}
 
 /* 0x8006FDCC - the model's node-list accessor. */
 u32 fn_8006FDCC(void* self) {
@@ -200,7 +324,6 @@ const char* nw4r::g3d::ResMdl::GetClassName() {
 
 extern "C" {
 
-/* -------- registration stubs (reconstruction pending) -------- */
 /* 0x8006FF50 (0x34): the info block, asserting the handle is valid. */
 /* untyped: opaque handle - the ResMdlInfo handle */
 const ResMdlInfoData* res_mdl_info_data(const void* pInfo)
@@ -230,8 +353,6 @@ u32 res_mdl_info_num_pos_nrm_mtx(const void* pInfo)
     u32 ofs = res_mdl_info_data(pInfo)->mToPosNrmMtxTable;
     return *(const u32*)((const u8*)res_mdl_info_data(pInfo) + ofs);
 }
-void g3d_calc_view_lc(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
-void g3d_calc_view_lc_dma(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 
 /* 0x8006F898 (0x3C): the matrix of a 2D rotation (cos, sin) with per-axis scales `sx`, `sy`, and `sz` on Z. */
 asm void mtx34_from_rot2d_scale3(register Mtx34* pOut, register const f32* pCosSin, register f32 sx, register f32 sy,
@@ -572,6 +693,10 @@ Mtx34* mtx34_concat_array(Mtx34* pDst, const Mtx34* pA, const Mtx34* pSrc, u32 c
 /* 0x8007118C (0xC): rounds `value` up to a multiple of 32. */
 u32 round_up_32(u32 value) { return (value + 31) & ~31; }
 
+void word_swap_a(u32* pA, u32* pB);
+void word_swap_b(u32* pA, u32* pB);
+
+
 /* 0x80071BD0 (0x4): hands the word reference back. */
 u32* word_forward_a(u32* pWord) { return pWord; }
 
@@ -741,6 +866,349 @@ void g3d_calc_view(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pView
             if (pViewTexMtxArray != NULL) {
                 g3d_dc_flush_range_nosync(pViewTexMtxArray, texSize);
             }
+        }
+    }
+}
+
+/* 0x80071198 (0x9D8): `g3d_calc_view` through the locked cache: the view matrices of up to 40 world matrices at a
+ * time are built in one locked-cache buffer and stored to main memory by DMA while the next batch uses the other. */
+void g3d_calc_view_lc(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pViewNrmMtxArray,
+                      const nw4r::math::MTX34* pWorldMtxArray, const u32* pWorldMtxAttribArray, u32 numMtx,
+                      const nw4r::math::MTX34* pCamera, const nw4r::g3d::ResMdl* pMdl,
+                      nw4r::math::MTX34* pViewTexMtxArray)
+{
+    G3D_POINTER_ASSERT("g3d_calcview.cpp", pViewPosMtxArray, 0x4D4,
+                       "NW4R:Pointer Error\npViewPosArray(=%p) is not valid pointer.");
+    G3D_POINTER_ASSERT("g3d_calcview.cpp", pWorldMtxArray, 0x4D5,
+                       "NW4R:Pointer Error\npModelMtxArray(=%p) is not valid pointer.");
+    G3D_POINTER_ASSERT("g3d_calcview.cpp", pWorldMtxAttribArray, 0x4D6,
+                       "NW4R:Pointer Error\npModelMtxAttribArray(=%p) is not valid pointer.");
+    G3D_POINTER_ASSERT("g3d_calcview.cpp", pCamera, 0x4D7, "NW4R:Pointer Error\npView(=%p) is not valid pointer.");
+    if (numMtx != 0) {
+        u8* pLC = (u8*)g3d_lc_base();
+        Mtx34* pPosBuf = (Mtx34*)(pLC + 0x800);
+        nw4r::math::MTX33* pNrmBuf = (nw4r::math::MTX33*)(pLC + 0x1000);
+        Mtx34* pTexBuf = (Mtx34*)(pLC + 0x1800);
+        Mtx34* pPosBufNext = (Mtx34*)(pLC + 0x2800);
+        nw4r::math::MTX33* pNrmBufNext = (nw4r::math::MTX33*)(pLC + 0x3000);
+        Mtx34* pTexBufNext = (Mtx34*)(pLC + 0x3800);
+        const nw4r::math::MTX34* pWorld;
+        nw4r::math::MTX33* pNrmOut;
+        nw4r::math::MTX34* pTexOut;
+        u32 mtxBytes = numMtx * 0x30;
+        g3d_dc_invalidate_range(pViewPosMtxArray, round_up_32(mtxBytes));
+        u32 numDma = 1;
+        if (pViewNrmMtxArray != NULL) {
+            numDma = 2;
+            g3d_dc_invalidate_range(pViewNrmMtxArray, round_up_32(numMtx * 0x24));
+            if (pViewTexMtxArray != NULL) {
+                numDma = 3;
+                g3d_dc_invalidate_range(pViewTexMtxArray, round_up_32(mtxBytes));
+            }
+        }
+        Mtx34* pWork = (Mtx34*)g3d_billboard_work_mtx();
+        g3d_lc_queue_wait(0);
+        pWorld = pWorldMtxArray;
+        pNrmOut = pViewNrmMtxArray;
+        pTexOut = pViewTexMtxArray;
+        for (u32 base = 0; base < numMtx; base += 40) {
+            u32 num = numMtx - base;
+            u32 posBlocks;
+            u32 nrmBlocks;
+            if (num > 40) {
+                num = 40;
+                posBlocks = 60;
+                nrmBlocks = 45;
+            } else {
+                posBlocks = round_up_32(num * 0x30) >> 5;
+                nrmBlocks = round_up_32(num * 0x24) >> 5;
+            }
+            g3d_lc_queue_wait(numDma);
+            if (num > 1) {
+                mtx34_concat_array(pPosBuf, pCamera, pWorld, num);
+            } else {
+                mtx34_concat(pPosBuf, pCamera, pWorld);
+            }
+            for (u32 i = 0; i < num; i++) {
+                Mtx34 inverse;
+                u32 node;
+                u32 parentNode;
+                ResHandle mdl;
+                u32 info;
+                u32 nodeTmp;
+                u32 child;
+                u32 parentInfo;
+                u32 parentTmp;
+                u32 parent;
+                u32 attr = pWorldMtxAttribArray[base + i];
+                int bbIdx = u8_cast(attr);
+                if (bbIdx != 0) {
+                    Mtx34* pPos = &pPosBuf[i];
+                    if (!pMdl->IsValid()) {
+                        nw4r::db::Panic("g3d_calcview.cpp", 0x540, "NW4R:Failed assertion resMdl.IsValid()");
+                    }
+                    if (!(bbIdx < 7)) {
+                        nw4r::db::Panic("g3d_calcview.cpp", 0x541,
+                                        "NW4R:Failed assertion bbidx < ResNodeData::NUM_BILLBOARD");
+                    }
+                    mdl.mpData = ((const ResHandle*)pMdl)->mpData;
+                    g3d_billboard_func_tbl[bbIdx](pPos, pWorldMtxArray, test_flag_bit29(attr), pCamera,
+                                                  (const nw4r::g3d::ResMdl*)&mdl, base + i);
+                    info = res_mdl_info_handle((void*)pMdl);
+                    int nodeId = res_mdl_info_get_node_of_pos_nrm_mtx(&info, base + i);
+                    if (nodeId < 0) {
+                        nw4r::db::Panic("g3d_calcview.cpp", 0x54C, "NW4R:Failed assertion node_id >= 0");
+                    }
+                    nodeTmp = (u32)pMdl->GetResNode((u32)nodeId).mpData;
+                    res_node_copy_ctor(&node, &nodeTmp);
+                    bool bHasChild = false;
+                    if (res_node_is_valid(&node)) {
+                        child = res_node_get_child((ResHandle*)&node);
+                        if (res_node_is_valid(&child)) {
+                            bHasChild = true;
+                        }
+                    }
+                    if (bHasChild) {
+                        MTX34_ctor(&inverse);
+                        if (mtx34_inverse_affine(&inverse, &pWorldMtxArray[base + i]) == 1) {
+                            mtx34_concat(&pWork[base + i], &pPosBuf[i], &inverse);
+                        } else {
+                            mtx34_identity(&pWork[base + i]);
+                            pWork[base + i].m[0][3] = pCamera->m[0][3];
+                            pWork[base + i].m[1][3] = pCamera->m[1][3];
+                            pWork[base + i].m[2][3] = pCamera->m[2][3];
+                        }
+                    }
+                } else {
+                    parentInfo = res_mdl_info_handle((void*)pMdl);
+                    int parentNodeId = res_mdl_info_get_node_of_pos_nrm_mtx(&parentInfo, base + i);
+                    if (parentNodeId >= 0) {
+                        parentTmp = (u32)pMdl->GetResNode((u32)parentNodeId).mpData;
+                        res_node_copy_ctor(&parentNode, &parentTmp);
+                        if (res_node_is_valid(&parentNode) &&
+                            (res_node_ref_nonconst((ResHandle*)&parentNode)->mFlags & 0x400)) {
+                            parent = (u32)pMdl->GetResNode(
+                                (u32)res_node_ref_nonconst((ResHandle*)&parentNode)->mBillboardRefNodeID).mpData;
+                            u32 parentId = fn_8006FDCC(&parent);
+                            if (!(parentId < base + i)) {
+                                nw4r::db::Panic("g3d_calcview.cpp", 0x575,
+                                                "The billboard matrix hasn't be calculated yet.");
+                            }
+                            mtx34_concat(&pPosBuf[i], &pWork[parentId], &pWorldMtxArray[base + i]);
+                        }
+                    }
+                }
+            }
+            nw4r::ut::LC::StoreBlocks(pViewPosMtxArray, pPosBuf, posBlocks);
+            if (pViewNrmMtxArray != NULL) {
+                for (u32 i = 0; i < num; i++) {
+                    if (test_flag_bit29(pWorldMtxAttribArray[base + i]) != 0) {
+                        if (pViewTexMtxArray != NULL) {
+                            mtx34_copy_ps(&pTexBuf[i], &pPosBuf[i]);
+                            pTexBuf[i].m[2][3] = calcview_zero_f32;
+                            pTexBuf[i].m[1][3] = calcview_zero_f32;
+                            pTexBuf[i].m[0][3] = calcview_zero_f32;
+                        }
+                        nw4r::math::MTX34ToMTX33(&pNrmBuf[i], &pPosBuf[i]);
+                    } else if (pViewTexMtxArray != NULL) {
+                        mtx34_inverse_transpose(&pTexBuf[i], &pPosBuf[i]);
+                        nw4r::math::MTX34ToMTX33(&pNrmBuf[i], &pTexBuf[i]);
+                    } else {
+                        mtx34_to_mtx33(&pNrmBuf[i], &pPosBuf[i]);
+                    }
+                }
+            }
+            if (pViewNrmMtxArray != NULL) {
+                nw4r::ut::LC::StoreBlocks(pNrmOut, pNrmBuf, nrmBlocks);
+                if (pViewTexMtxArray != NULL) {
+                    nw4r::ut::LC::StoreBlocks(pTexOut, pTexBuf, posBlocks);
+                }
+            }
+            word_swap_b((u32*)&pPosBuf, (u32*)&pPosBufNext);
+            word_swap_a((u32*)&pNrmBuf, (u32*)&pNrmBufNext);
+            word_swap_b((u32*)&pTexBuf, (u32*)&pTexBufNext);
+            pWorld += 40;
+            pViewPosMtxArray += 40;
+            pNrmOut += 40;
+            pTexOut += 40;
+        }
+    }
+}
+
+/* 0x80071C48 (0xA88): `g3d_calc_view_lc` with the world matrices brought into the locked cache by DMA too: each
+ * batch's world matrices are loaded while the previous batch is computed. */
+void g3d_calc_view_lc_dma(nw4r::math::MTX34* pViewPosMtxArray, nw4r::math::MTX33* pViewNrmMtxArray,
+                      const nw4r::math::MTX34* pWorldMtxArray, const u32* pWorldMtxAttribArray, u32 numMtx,
+                      const nw4r::math::MTX34* pCamera, const nw4r::g3d::ResMdl* pMdl,
+                      nw4r::math::MTX34* pViewTexMtxArray)
+{
+    G3D_POINTER_ASSERT("g3d_calcview.cpp", pViewPosMtxArray, 0x5D3,
+                       "NW4R:Pointer Error\npViewPosArray(=%p) is not valid pointer.");
+    G3D_POINTER_ASSERT("g3d_calcview.cpp", pWorldMtxArray, 0x5D4,
+                       "NW4R:Pointer Error\npModelMtxArray(=%p) is not valid pointer.");
+    G3D_POINTER_ASSERT("g3d_calcview.cpp", pWorldMtxAttribArray, 0x5D5,
+                       "NW4R:Pointer Error\npModelMtxAttribArray(=%p) is not valid pointer.");
+    G3D_POINTER_ASSERT("g3d_calcview.cpp", pCamera, 0x5D6, "NW4R:Pointer Error\npView(=%p) is not valid pointer.");
+    if (numMtx != 0) {
+        u8* pLC = (u8*)g3d_lc_base();
+        const Mtx34* pWorldBuf = (const Mtx34*)pLC;
+        Mtx34* pPosBuf = (Mtx34*)(pLC + 0x800);
+        nw4r::math::MTX33* pNrmBuf = (nw4r::math::MTX33*)(pLC + 0x1000);
+        Mtx34* pTexBuf = (Mtx34*)(pLC + 0x1800);
+        const Mtx34* pWorldBufNext = (const Mtx34*)(pLC + 0x2000);
+        Mtx34* pPosBufNext = (Mtx34*)(pLC + 0x2800);
+        nw4r::math::MTX33* pNrmBufNext = (nw4r::math::MTX33*)(pLC + 0x3000);
+        Mtx34* pTexBufNext = (Mtx34*)(pLC + 0x3800);
+        nw4r::math::MTX33* pNrmOut;
+        nw4r::math::MTX34* pTexOut;
+        u32 mtxBytes = numMtx * 0x30;
+        g3d_dc_invalidate_range(pViewPosMtxArray, round_up_32(mtxBytes));
+        u32 numDma = 1;
+        if (pViewNrmMtxArray != NULL) {
+            numDma = 2;
+            g3d_dc_invalidate_range(pViewNrmMtxArray, round_up_32(numMtx * 0x24));
+            if (pViewTexMtxArray != NULL) {
+                numDma = 3;
+                g3d_dc_invalidate_range(pViewTexMtxArray, round_up_32(mtxBytes));
+            }
+        }
+        Mtx34* pWork = (Mtx34*)g3d_billboard_work_mtx();
+        g3d_lc_queue_wait(0);
+        nw4r::ut::LC::LoadBlocks((void*)pWorldBuf, (void*)pWorldMtxArray,
+                                 numMtx > 40 ? 60 : round_up_32(mtxBytes) >> 5);
+        if (numMtx > 20) {
+            g3d_lc_queue_drain(0);
+        } else {
+            g3d_lc_queue_wait(0);
+        }
+        pNrmOut = pViewNrmMtxArray;
+        pTexOut = pViewTexMtxArray;
+        for (u32 base = 0; base < numMtx; base += 40) {
+            u32 num = numMtx - base;
+            u32 posBlocks;
+            u32 nrmBlocks;
+            if (num > 40) {
+                num = 40;
+                posBlocks = 60;
+                nrmBlocks = 45;
+            } else {
+                posBlocks = round_up_32(num * 0x30) >> 5;
+                nrmBlocks = round_up_32(num * 0x24) >> 5;
+            }
+            g3d_lc_queue_wait(numDma);
+            if (base + 40 < numMtx) {
+                u32 numNext = numMtx - base - 40;
+                nw4r::ut::LC::LoadBlocks((void*)pWorldBufNext,
+                                         const_cast<nw4r::math::MTX34*>(&pWorldMtxArray[base + 40]),
+                                         numNext > 40 ? 60 : round_up_32(numNext * 0x30) >> 5);
+            }
+            if (num > 1) {
+                mtx34_concat_array(pPosBuf, pCamera, pWorldBuf, num);
+            } else {
+                mtx34_concat(pPosBuf, pCamera, pWorldBuf);
+            }
+            for (u32 i = 0; i < num; i++) {
+                Mtx34 inverse;
+                u32 node;
+                u32 parentNode;
+                ResHandle mdl;
+                u32 info;
+                u32 nodeTmp;
+                u32 child;
+                u32 parentInfo;
+                u32 parentTmp;
+                u32 parent;
+                u32 attr = pWorldMtxAttribArray[base + i];
+                int bbIdx = u8_cast(attr);
+                if (bbIdx != 0) {
+                    Mtx34* pPos = &pPosBuf[i];
+                    if (!pMdl->IsValid()) {
+                        nw4r::db::Panic("g3d_calcview.cpp", 0x65E, "NW4R:Failed assertion resMdl.IsValid()");
+                    }
+                    if (!(bbIdx < 7)) {
+                        nw4r::db::Panic("g3d_calcview.cpp", 0x65F,
+                                        "NW4R:Failed assertion bbidx < ResNodeData::NUM_BILLBOARD");
+                    }
+                    mdl.mpData = ((const ResHandle*)pMdl)->mpData;
+                    g3d_billboard_func_tbl[bbIdx](pPos, pWorldMtxArray, test_flag_bit29(attr), pCamera,
+                                                  (const nw4r::g3d::ResMdl*)&mdl, base + i);
+                    info = res_mdl_info_handle((void*)pMdl);
+                    int nodeId = res_mdl_info_get_node_of_pos_nrm_mtx(&info, base + i);
+                    if (nodeId < 0) {
+                        nw4r::db::Panic("g3d_calcview.cpp", 0x669, "NW4R:Failed assertion node_id >= 0");
+                    }
+                    nodeTmp = (u32)pMdl->GetResNode((u32)nodeId).mpData;
+                    res_node_copy_ctor(&node, &nodeTmp);
+                    bool bHasChild = false;
+                    if (res_node_is_valid(&node)) {
+                        child = res_node_get_child((ResHandle*)&node);
+                        if (res_node_is_valid(&child)) {
+                            bHasChild = true;
+                        }
+                    }
+                    if (bHasChild) {
+                        MTX34_ctor(&inverse);
+                        if (mtx34_inverse_affine(&inverse, &pWorldMtxArray[base + i]) == 1) {
+                            mtx34_concat(&pWork[base + i], &pPosBuf[i], &inverse);
+                        } else {
+                            mtx34_identity(&pWork[base + i]);
+                            pWork[base + i].m[0][3] = pCamera->m[0][3];
+                            pWork[base + i].m[1][3] = pCamera->m[1][3];
+                            pWork[base + i].m[2][3] = pCamera->m[2][3];
+                        }
+                    }
+                } else {
+                    parentInfo = res_mdl_info_handle((void*)pMdl);
+                    int parentNodeId = res_mdl_info_get_node_of_pos_nrm_mtx(&parentInfo, base + i);
+                    if (parentNodeId >= 0) {
+                        parentTmp = (u32)pMdl->GetResNode((u32)parentNodeId).mpData;
+                        res_node_copy_ctor(&parentNode, &parentTmp);
+                        if (res_node_is_valid(&parentNode) &&
+                            (res_node_ref_nonconst((ResHandle*)&parentNode)->mFlags & 0x400)) {
+                            parent = (u32)pMdl->GetResNode(
+                                (u32)res_node_ref_nonconst((ResHandle*)&parentNode)->mBillboardRefNodeID).mpData;
+                            u32 parentId = fn_8006FDCC(&parent);
+                            if (!(parentId < base + i)) {
+                                nw4r::db::Panic("g3d_calcview.cpp", 0x692,
+                                                "The billboard matrix hasn't be calculated yet.");
+                            }
+                            mtx34_concat(&pPosBuf[i], &pWork[parentId], &pWorldMtxArray[base + i]);
+                        }
+                    }
+                }
+            }
+            nw4r::ut::LC::StoreBlocks(pViewPosMtxArray, pPosBuf, posBlocks);
+            if (pViewNrmMtxArray != NULL) {
+                for (u32 i = 0; i < num; i++) {
+                    if (test_flag_bit29(pWorldMtxAttribArray[base + i]) != 0) {
+                        if (pViewTexMtxArray != NULL) {
+                            mtx34_copy_ps(&pTexBuf[i], &pPosBuf[i]);
+                            pTexBuf[i].m[2][3] = calcview_zero_f32;
+                            pTexBuf[i].m[1][3] = calcview_zero_f32;
+                            pTexBuf[i].m[0][3] = calcview_zero_f32;
+                        }
+                        nw4r::math::MTX34ToMTX33(&pNrmBuf[i], &pPosBuf[i]);
+                    } else if (pViewTexMtxArray != NULL) {
+                        mtx34_inverse_transpose(&pTexBuf[i], &pPosBuf[i]);
+                        nw4r::math::MTX34ToMTX33(&pNrmBuf[i], &pTexBuf[i]);
+                    } else {
+                        mtx34_to_mtx33(&pNrmBuf[i], &pPosBuf[i]);
+                    }
+                }
+            }
+            if (pViewNrmMtxArray != NULL) {
+                nw4r::ut::LC::StoreBlocks(pNrmOut, pNrmBuf, nrmBlocks);
+                if (pViewTexMtxArray != NULL) {
+                    nw4r::ut::LC::StoreBlocks(pTexOut, pTexBuf, posBlocks);
+                }
+            }
+            word_swap_b((u32*)&pWorldBuf, (u32*)&pWorldBufNext);
+            word_swap_b((u32*)&pPosBuf, (u32*)&pPosBufNext);
+            word_swap_a((u32*)&pNrmBuf, (u32*)&pNrmBufNext);
+            word_swap_b((u32*)&pTexBuf, (u32*)&pTexBufNext);
+            pViewPosMtxArray += 40;
+            pNrmOut += 40;
+            pTexOut += 40;
         }
     }
 }

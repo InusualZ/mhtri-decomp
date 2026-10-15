@@ -138,7 +138,7 @@ extern "C" u32 fn_800651BC(void *self)
     return *color_to_u32_ref((u32 *)self);
 }
 
-extern "C" u16 fn_800651E0(u16 *p)
+extern "C" u16 light_setting_get_num_light_obj(u16 *p)
 {
     return *p;
 }
@@ -358,13 +358,13 @@ extern "C" void fn_80064CE0(void *self, const f32 *v)
     fn_8007A724(self, v[0], v[1], v[2]);
 }
 
-extern "C" s32 fn_8006518C(u32 *p)
+extern "C" s32 light_obj_is_enable(u32 *p)
 {
     u32 masked = *p & 4;
     return masked != 0;
 }
 
-extern "C" s32 fn_800659C4(u32 *p)
+extern "C" s32 fog_is_valid(u32 *p)
 {
     return *p != 0;
 }
@@ -504,7 +504,7 @@ typedef struct {
     /* +0x08 */ u32 field_0x08;
 } G3dWordTriple; /* size: 0xC */
 
-extern "C" u32 fn_800651B4(G3dWordTriple *p)
+extern "C" u32 light_setting_get_light_obj_array(G3dWordTriple *p)
 {
     return p->field_0x04;
 }
@@ -692,9 +692,9 @@ typedef struct {
 
 extern "C" void fn_80067A5C(void *self, f32 a, f32 b)
 {
-    if (fn_800659C4((u32 *)self) == 0)
+    if (fog_is_valid((u32 *)self) == 0)
         nw4r::db::Panic((const char *)lbl_8058CBC8, 0x4b, (const char *)lbl_8058CBA8);
-    if (fn_800659C4((u32 *)self) != 0) {
+    if (fog_is_valid((u32 *)self) != 0) {
         G3dPairF32 *obj = (G3dPairF32 *)(void *)fn_80067A54((u32 *)self);
         obj->field_0x04 = a;
         obj->field_0x08 = b;
@@ -705,17 +705,17 @@ extern "C" void fn_80067A5C(void *self, f32 a, f32 b)
 /* untyped: opaque handle - the fog handle */
 extern "C" void fog_set_color(void *self, const u8 *rgba)
 {
-    if (fn_800659C4((u32 *)self) == 0)
+    if (fog_is_valid((u32 *)self) == 0)
         nw4r::db::Panic((const char *)lbl_8058CBF8, 0x63, (const char *)lbl_8058CBD8);
-    if (fn_800659C4((u32 *)self) != 0)
+    if (fog_is_valid((u32 *)self) != 0)
         color_rgba_copy((u8 *)fn_80067A54((u32 *)self) + 20, rgba);
 }
 
 extern "C" void fn_80067AE4(void *self, void *value)
 {
-    if (fn_800659C4((u32 *)self) == 0)
+    if (fog_is_valid((u32 *)self) == 0)
         nw4r::db::Panic((const char *)lbl_8058CB98, 0x41, (const char *)lbl_8058CB78);
-    if (fn_800659C4((u32 *)self) != 0)
+    if (fog_is_valid((u32 *)self) != 0)
         ((G3dPtrObj *)(void *)fn_80067A54((u32 *)self))->field_0x00 = value;
 }
 

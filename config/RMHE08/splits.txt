@@ -223,17 +223,17 @@ g3d/g3d_anmvis.cpp:
 g3d/g3d_calcmaterial.cpp:
 	extab       start:0x80007EC0 end:0x80007F40
 	extabindex  start:0x80020448 end:0x80020508
-	.text       start:0x8006EE78 end:0x8006F738
+	.text       start:0x8006EE78 end:0x8006F5A0
 	.data       start:0x8058D7E0 end:0x8058D938
 
 g3d/g3d_calcview.cpp:
 	extab       start:0x80007F40 end:0x80008008
 	extabindex  start:0x80020508 end:0x80020634
-	.text       start:0x8006F738 end:0x8007270C
+	.text       start:0x8006F5A0 end:0x8007270C
 	.rodata     start:0x8056F638 end:0x8056F658
 	.data       start:0x8058D938 end:0x8058DD68
 	.sdata      start:0x807911A8 end:0x807911B8
-	.sdata2     start:0x80795DA8 end:0x80795DB0
+	.sdata2     start:0x80795DA8 end:0x80795DB8
 
 g3d/g3d_calcvtx.cpp:
 	extab       start:0x80008008 end:0x800080B8

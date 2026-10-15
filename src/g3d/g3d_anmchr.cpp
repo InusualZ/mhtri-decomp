@@ -176,7 +176,7 @@ extern "C" u8* fn_8005CEEC(void)
     return lbl_8066AE80;
 }
 
-extern "C" u8* fn_8005CEF8(void)
+extern "C" u8* g3d_workmem_skinning_mtx(void)
 {
     return lbl_8066AE80;
 }
