@@ -1069,7 +1069,7 @@ config.libs = [
             Object(NonMatching, "Network/NetworkLayerPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkCommunity.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/NetworkCommunity.cpp",
+            Object(Matching, "Network/NetworkCommunity.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/NetworkCommunityPat.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkCommunityPat.cpp",
