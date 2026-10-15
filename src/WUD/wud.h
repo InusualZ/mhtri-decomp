@@ -57,6 +57,7 @@ WUDResultCallback WUDSetClearDeviceCallback(WUDResultCallback callback);
 /* 0x804FD4D0 / 0x804FD4F0 / 0x804FD5A0 / 0x804FD630 - start and stop device pairing. */
 void WUDStartSyncDevice(void);
 void WUDStartFastSyncSimple(void);
+s32 WUDStartSyncSpDevice(void);
 s32 WUDStopSyncSimple(void);
 s32 WUDStartClearDevice(void);
 /* 0x804FD510 - cancels a running pairing search. */
@@ -162,6 +163,9 @@ void _WUDSetDevAddr(u8 handle, u8* addr);
 u8* _WUDGetDevAddrUnchecked(u8 handle);
 void _WUDSetQueuedSize(u8 handle, u16 size);
 void _WUDSetNotAckedSize(u8 handle, u16 size);
+void _WUDEnableTestMode(void);
+s32 _WUDStartSyncDevice(void);
+void _WUDDeleteStoreDevice(void);
 
 /* size: 0x750 - the device manager's state: the pairing and clear state machines, the stack state and the callbacks. */
 typedef struct WUDCB {

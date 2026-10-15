@@ -6,13 +6,22 @@
  *   (0x807941C8) are one copy each read from 0x804FA750 to 0x804FF980.  The right edge 0x80500130 / .data 0x8062ED98 is the
  *   seam with WUD/WUDHidHost.cpp (that header carries the evidence: the `-str reuse` duplicate "Nintendo RVL-CNT" and the
  *   out-of-line calls of this unit's small functions).
+ *   Four functions the linker strips are written for their log strings, which the target's .data keeps in source order:
+ *   `WUDStartSyncSpDevice` (between `WUDStartFastSyncSimple` and `WUDStopSyncDevice`), `_WUDEnableTestMode`,
+ *   `_WUDStartSyncDevice` and `_WUDDeleteStoreDevice` (after `_WUDSetNotAckedSize`); their bodies are GUESSES.
  * FLAGS. `cflags_base` (-O4,p); the print helper `WUDiDebugPrint` is WUD/debug_msg.cpp's, so every log call is out of line.
+ *   Scoped pragmas, each measured on its own row: `opt_strength_reduction off` keeps the `i * 12` / `i * 0x60` index
+ *   arithmetic (`__wudClearControlBlock`, `WUDiInsertWbcNode`, `WUDiInsertDeviceNode`, `WUDiUpdateWiiFitSaveData`,
+ *   `WUDiSyncRegisterDevice`); `opt_common_subs off` (`WUDiInsertWbcNode`, `WUDiInsertDeviceNode`, `WUDiLoadWiiFitSaveData`,
+ *   `WUDiSyncRegisterDevice`); `opt_propagation off` (`WUDiSyncRegisterDevice`); `optimization_level 3` (`WUDiSyncFiber`,
+ *   `WUDiLoadDeviceInfo`).
  * NAMES. the map's names (`WUDGetBufferStatus`, `WUDSetSniffMode`, `WUDSetVisibility`, `WUDiGetDevInfo`,
  *   `WUDDeviceStatusCallback`, `WUDSetDeviceHistory`, `_WUDGetDevAddr`, `_WUDGetQueuedSize`, `_WUDGetNotAckedSize`,
  *   `_WUDGetLinkNumber`, `App_MEMalloc`, `App_MEMfree`, ...);
  *   the log strings name `SyncFlushCallback`, `DeleteFlushCallback`, `InitFlushCallback`, `ShutdownFlushCallback`, `CleanupCallback`,
  *   `__wudInitSub`, `__wudAppendRuntimePatch`, `RemovePatchCallback`, `SuperPeekPokeCallback`, `WUDiRemoveDevice`,
- *   `__wudPowerMangeEventStackCallback`, `__wudClearControlBlock` and the NAND callbacks `WUDiNand{Open,Seek,Write,Close}Callback`.
+ *   `__wudPowerMangeEventStackCallback`, `__wudClearControlBlock`, the NAND callbacks `WUDiNand{Open,Seek,Write,Close}Callback`
+ *   and the stripped `WUDStartSyncSpDevice`, `_WUDEnableTestMode`, `_WUDStartSyncDevice`, `_WUDDeleteStoreDevice`.
  *   GUESS names: `WUDiGetStoredDeviceInfo`, `WUDiFlushDeviceInfo`, `_WUDSetDevAddr`, `_WUDGetDevAddrUnchecked`,
  *   `_WUDSetQueuedSize`, `_WUDSetNotAckedSize`, the alarm handlers `WUDi{Sync,Clear,InitFlush,Init,Shutdown}AlarmHandler`
  *   and their fibers `WUDi{Sync,Clear,InitFlush,Init,Shutdown}Fiber`, `WUDiPatchCallback`, `WUDiPatchStepDone`, `WUDiFirmwareDoneCallback`,
@@ -21,51 +30,43 @@
  *   `WUDiPatchRecordCallback`, `WUDiPatchWriteCallback`, `WUDiVendorEventCallback`, `__wudSecurityEventStackCallback` (BTA_DM_*
  *   strings), `__wudLinkKeyEventStackCallback` (BTM_CB_EVT_* strings), `WUDiDeleteAllLinkKeys`, `WUDiUpdateWiiFitSaveData` (the
  *   checksum over the 0xA0-byte `wudWiiFitSaveData`, seeded from `wudWiiFitCrc`), `WUDiStoreDeviceInfoToSC`, `WUDiSyncRegisterDevice`,
- *   `WUDiInsertWbcNode`, `WUDiInsertDeviceNode`, `WUDiInsertDeviceNodeTail`; the BTE entry points `BTA_Init`, `bta_sys_set_trace_level`,
- *   `BTM_SetDefaultLinkPolicy`, `BTM_SetDefaultLinkSuperTout` (16-byte setters of one u16 each, the dump name is stale) and
- *   `BTA_DisableBluetooth` (0x8047D718, after `BTA_EnableBluetooth` in the bta_dm_api order); the variables `wudInquiryResult`,
- *   `wudFirmwareData`, `wudStackReady`, `wudTraceLevel`, `wudWbcInitCallback`, `wudInquiryRssi`, `wudInquiryCount` and the
- *   `wudPatch*` state; the `WUDCB` fields `linkKeyAddr`, `hostAddr`, `vendorEventStatus`, `syncRssiThreshold`,
- *   `enabledProfiles`, `linkKeyState`, `initFlushState`, `initState`, `shutdownState`, `wbcCount` and the `WUDDevice`
- *   fields `pinPending` and `linkKeyState` (WUD/wud.h).
- *   GUESS names pending their map rows (requests wud-slice1#1-#3): `WUDiLoadDeviceInfo` (map fn_804FBBB0: rebuilds the device
- *   table from the console settings' arrays), `WUDiLoadWiiFitSaveData` (map fn_804FC290: the RPHealth.dat read and checksum) and
- *   `wudWbcWorkArea` (map lbl_80795730: the 0x4B000-byte, 32-aligned save file buffer it panics without); the .bss objects
- *   `wudBtCmpDeviceInfo`, `wudNandFileInfo`, `wudNandBlock` and the file-local types `WUDSc*`, `WUDWiiFitSaveData`,
- *   `WUDWiiFitFile`, `WUDLinkKeyEvent`, `WUDAuthComplete`, `WUDLinkChange`.
- * RESIDUALS. Every row has a body.  `WUDiLoadDeviceInfo` and `WUDiLoadWiiFitSaveData` read 0 % in the report until their map rows
- *   are renamed (objdiff pairs rows by name).
- *   `WUDiUpdateWiiFitSaveData`, `WUDiSyncRegisterDevice`, `WUDiLoadWiiFitSaveData`: the checksum loop - the target accumulates one
- *   halfword at a time in two registers where ours loads the unrolled halfwords first; the target folds `wudSetWiiFitSaveData`'s
- *   `&local != NULL` test and leaves a dead `bl memcpy` behind a constant-false branch, ours does the opposite.
- *   `__wudClearControlBlock`, `WUDiInsertWbcNode`, `WUDiInsertDeviceNode`: the target keeps `i * 12` / `(i - 1) * 12` offsets
- *   (`add` + `lwzu`, `mulli`) where ours walks node pointers.
- *   `WUDiSyncFiber`: the target materialises each case's next state as `li; b join` where ours speculates one value; the
- *   `searchTime` countdowns load with `lha` (the fields are s16 in the target, u16 in WUD/wud.h).
+ *   `WUDiInsertWbcNode`, `WUDiInsertDeviceNode`, `WUDiInsertDeviceNodeTail`, `WUDiLoadDeviceInfo` (rebuilds the device table from
+ *   the console settings' arrays), `WUDiLoadWiiFitSaveData` (the RPHealth.dat read and checksum); the BTE entry points `BTA_Init`,
+ *   `bta_sys_set_trace_level`, `BTM_SetDefaultLinkPolicy`, `BTM_SetDefaultLinkSuperTout` (16-byte setters of one u16 each, the
+ *   dump name is stale) and `BTA_DisableBluetooth` (0x8047D718, after `BTA_EnableBluetooth` in the bta_dm_api order); the
+ *   variables `wudInquiryResult`, `wudStackReady`, `wudTraceLevel`, `wudWbcInitCallback`, `wudInquiryRssi`, `wudInquiryCount`,
+ *   `wudWbcWorkArea` (the 0x4B000-byte, 32-aligned save file buffer) and the `wudPatch*` state; the .data arrays
+ *   `wudHidDescriptor`, `wudSetupCommand`, `wudPatchImage`, `wudPatchTable` and `wudSearchCancelCommand` (the map still has
+ *   one 0x21C-byte `wudFirmwareData` row over them, request sdk-wud#1); the `WUDCB` fields `linkKeyAddr`, `hostAddr`,
+ *   `vendorEventStatus`, `syncRssiThreshold`, `enabledProfiles`, `linkKeyState`, `initFlushState`, `initState`, `shutdownState`,
+ *   `wbcCount` and the `WUDDevice` fields `pinPending` and `linkKeyState` (WUD/wud.h); the .bss objects `wudBtCmpDeviceInfo`,
+ *   `wudNandFileInfo`, `wudNandBlock` and the file-local types `WUDSc*`, `WUDWiiFitSaveData`, `WUDWiiFitFile`, `WUDPatchTable`,
+ *   `WUDLinkKeyEvent`.
+ * RESIDUALS. Every row has a body.
+ *   `WUDiUpdateWiiFitSaveData`: the target folds `wudSetWiiFitSaveData`'s NULL and `&local != NULL` tests late and leaves dead
+ *   `bl memcpy` calls behind unconditional branches; ours drops the NULL ones and keeps an `addic.` test of the local.
+ *   `WUDiLoadWiiFitSaveData`: the step switch is a compare tree in the target and a linear compare chain here (six dense cases
+ *   lower to a chain in this compiler; no source shape tried reproduces the tree).
+ *   `WUDiSyncFiber`: the target materialises each case's next state as `li; b join` where ours speculates one value, and its
+ *   inner switches are compare trees; the `searchTime` countdowns load with `lha` in the target (s16 fields measure lower here).
  *   `WUDiLoadDeviceInfo`: the inner search's exit test is threaded into the found/not-found jumps in the target.
- *   `WUDiSearchCallback`: the cancel command is addressed as `wudFirmwareData + 0x200` in one `addi` (a separate .data object in
- *   the target, one 0x21C struct here).
- *   String-pool offsets: rows that log through `wudFirmwareData` address their strings 0x18 lower than the target, the
- *   .data residual below (`WUDiRemoveDevice` differs in nothing else).
- *   `WUDiClearFiber`: the switch pivots on 8 where the target pivots on 7 (our case 7 folds into the default).
- *   `__wudInitSub`: the target rematerialises `wudCB` after the interrupt guard of the visibility store.
- *   `__wudPowerMangeEventStackCallback`: one branch sense, and the target compares the status signed (`cmpwi`).
- *   `WUDiPatchRecordCallback`, `WUDiPatchWriteCallback`, `RemovePatchCallback`, `__wudAppendRuntimePatch`: the
- *   `wudFirmwareData` sub-arrays are addressed off the struct base (an extra `addi` or saved register, +8 to +16 B).
- *   `WUDiAddDevice`, `WUDiDeleteAllLinkKeys`, `WUDiStoreDeviceInfoToSC`, `WUDiVendorEventCallback`,
- *   `__wudSecurityEventStackCallback`, `__wudLinkKeyEventStackCallback`: the cb/entry/callback locals take other
- *   callee-saved registers.
+ *   `__wudClearControlBlock`: the target's node cursor starts at `wudCB` with the field offset in the displacement.
+ *   `WUDiSearchCallback`, `RemovePatchCallback`, `WUDiPatchWriteCallback`, `__wudAppendRuntimePatch`, `WUDiAddDevice`,
+ *   `WUDiInsertWbcNode`, `WUDiInsertDeviceNode`, `WUDiDeleteAllLinkKeys`, `WUDiStoreDeviceInfoToSC`, `WUDiVendorEventCallback`,
+ *   `__wudSecurityEventStackCallback`, `WUDiSyncRegisterDevice`: load scheduling and callee-saved register assignment.
  *   `WUDiMove*`, `WUDiSyncCheck*`, `WUDiSyncDone`, `WUDiInsertDeviceNodeTail`: register numbering only.
- *   .text: the object is 0x6644 bytes against the 0x6600 claim (+0x44, the sum of the partial rows' size gaps).
- *   .data: 4333 of 4520 bytes - the target keeps the strings of WUD.c functions the linker stripped ("WUDStartSyncSpDevice()",
- *   ...), and dtk relocates the patch code word at 0x8062DD34 (`@etb_80010134+4`, request wud-slice1#10).
- * SHAPES. `wudFirmwareData` is one 0x21C-byte initialised object: the HID report descriptor, the patch address and length words
- *   followed by the patch code, and the 13-byte record table whose first byte is the record count; the patch writers index
- *   `patchImage[8 + n]` and `patchTable[n * 0xD + 1]` as the target does.  The vendor command buffers are stack arrays.
+ *   .text: the object's linked functions are smaller than the 0x6600 claim by the partial rows' size gaps.
+ *   .data: byte-identical to the target; dtk relocates the patch code word at 0x8062DD34 (`@etb_80010134+4`, request wud-slice1#10).
+ * SHAPES. The .data head is five initialised arrays in definition order: the HID report descriptor, the controller set-up
+ *   command, the patch image (address and length words, then the code), the patch records (`WUDPatchTable`, 0x5C bytes, so it
+ *   stays 4-aligned where a 0x78-byte array would be 8-aligned) and the search cancel command; the patch writers index
+ *   `wudPatchImage[8 + n]` and `wudPatchTable.records[n]` as the target does.  The vendor command buffers are stack arrays.
  *   The interrupt-guarded reads (`wudGetDeviceCount`, `wudGetLinkNumber`, `wudGetDeviceByIndex`, ...) and the SDK bodies the
- *   target inlines (`wudSetSniffMode`, `wudSetVisibility`, `wudStartClearDevice`, `wudGetNewDevice`) are static inline helpers;
- *   `wudGetDeviceByIndex` takes a u32 index, which keeps the target's `mulli` for the balance board half.  A u32 `level` holds
- *   the BOOL of `OSDisableInterrupts` (OS/OSInterrupt.h).
+ *   target inlines (`wudSetSniffMode`, `wudSetVisibility`, `wudStartClearDevice`, `wudGetNewDevice`, `wudCalcCrc`) are static
+ *   inline helpers; `wudGetDeviceByIndex` takes a u32 index, which keeps the target's `mulli` for the balance board half.  A u32
+ *   `level` holds the BOOL of `OSDisableInterrupts` (OS/OSInterrupt.h).  The security event payload is the device manager's
+ *   `tBTA_DM_SEC` (BTE/bta_dm_int.h).  A case that only leaves the function is a `return` at the end of its switch, which keeps
+ *   it in the compare tree (`WUDiClearFiber` case 7).
  */
 
 #include "types.h"
@@ -73,6 +74,7 @@
 #include "WUD/WUDHidHost.h"
 #include "WUD/debug_msg.h"
 #include "BTE/gki_time.h"
+#include "BTE/bta_dm_int.h"
 #include "SC/SCGetWpadMotorMode.h"
 #include "SC/sc.h"
 #include "OS/OSError.h"
@@ -203,19 +205,9 @@ static s8 wudSyncAux;
 static u8 wudInquiryRssi;
 static u8 wudInquiryCount;
 
-/* size: 0x21C - the Bluetooth host's HID report descriptor and the firmware patch data of the BCM2045 controller. */
-typedef struct WUDFirmwareData {
-    /* +0x000 */ u8 hidDescriptor[0xD9]; /* the Wii remote's HID report descriptor */
-    /* +0x0D9 */ u8 pad_0xD9[3];
-    /* +0x0DC */ u8 setupCommand[9]; /* vendor command 0xFC0A parameters */
-    /* +0x0E5 */ u8 pad_0xE5[3];
-    /* +0x0E8 */ u8 patchImage[0xBC]; /* the patch address and length (little endian words), then the patch code */
-    /* +0x1A4 */ u8 patchTable[0x78]; /* the record count, then 13-byte records of the vendor command 0xFC4F stream */
-} WUDFirmwareData; /* size: 0x21C */
-
 /* .data */
-static WUDFirmwareData wudFirmwareData = {
-    { /* +0x000 hidDescriptor */
+/* The Wii remote's HID report descriptor, registered with the HID host. */
+static u8 wudHidDescriptor[0xD9] = {
         0x05, 0x01, 0x09, 0x05, 0xA1, 0x01, 0x85, 0x10, 0x15, 0x00, 0x26, 0xFF,
         0x00, 0x75, 0x08, 0x95, 0x01, 0x06, 0x00, 0xFF, 0x09, 0x01, 0x91, 0x00,
         0x85, 0x11, 0x95, 0x01, 0x09, 0x01, 0x91, 0x00, 0x85, 0x12, 0x95, 0x02,
@@ -235,17 +227,15 @@ static WUDFirmwareData wudFirmwareData = {
         0x85, 0x3D, 0x95, 0x15, 0x09, 0x01, 0x81, 0x00, 0x85, 0x3E, 0x95, 0x15,
         0x09, 0x01, 0x81, 0x00, 0x85, 0x3F, 0x95, 0x15, 0x09, 0x01, 0x81, 0x00,
         0xC0,
-    },
-    { /* +0x0D9 pad_0xD9 */
-        0x00, 0x00, 0x00,
-    },
-    { /* +0x0DC setupCommand */
+};
+
+/* The parameters of vendor command 0xFC0A (the controller set-up before the patch download). */
+static u8 wudSetupCommand[9] = {
         0x05, 0x00, 0x9A, 0x0E, 0x00, 0x01, 0x00, 0x00, 0x00,
-    },
-    { /* +0x0E5 pad_0xE5 */
-        0x00, 0x00, 0x00,
-    },
-    { /* +0x0E8 patchImage */
+};
+
+/* The BCM2045 firmware patch: its address and length (little endian words), then the patch code. */
+static u8 wudPatchImage[0xBC] = {
         0x70, 0x99, 0x08, 0x00, 0xB4, 0x00, 0x00, 0x00, 0x88, 0x43, 0xD1, 0x07,
         0x09, 0x0C, 0x08, 0x43, 0xA0, 0x62, 0x19, 0x23, 0xDB, 0x01, 0x33, 0x80,
         0x7C, 0xF7, 0x88, 0xF8, 0x28, 0x76, 0x80, 0xF7, 0x17, 0xFF, 0x43, 0x78,
@@ -262,8 +252,16 @@ static WUDFirmwareData wudFirmwareData = {
         0x81, 0x03, 0x0F, 0xFE, 0x5C, 0x00, 0x0F, 0x00, 0x60, 0xFC, 0x0E, 0x00,
         0xFE, 0xFF, 0x00, 0x00, 0xFC, 0xFC, 0x0E, 0x00, 0xFF, 0x9F, 0x00, 0x00,
         0x30, 0xFC, 0x0E, 0x00, 0x7F, 0xFF, 0x00, 0x00,
-    },
-    { /* +0x1A4 patchTable */
+};
+
+/* size: 0x5C - the patch records: the record count, then the 13-byte records of the vendor command 0xFC4F stream. */
+typedef struct WUDPatchTable {
+    /* +0x00 */ u8 count;
+    /* +0x01 */ u8 records[7][0xD];
+} WUDPatchTable; /* size: 0x5C */
+
+/* The BCM2045 patch records. */
+static WUDPatchTable wudPatchTable = {
         0x07, 0x20, 0xBC, 0x65, 0x01, 0x00, 0x84, 0x42, 0x09, 0xD2, 0x84, 0x42,
         0x09, 0xD1, 0x21, 0x84, 0x5A, 0x00, 0x00, 0x83, 0xF0, 0x74, 0xFF, 0x09,
         0x0C, 0x08, 0x43, 0x22, 0x00, 0x61, 0x00, 0x00, 0x83, 0xF0, 0x40, 0xFC,
@@ -271,11 +269,12 @@ static WUDFirmwareData wudFirmwareData = {
         0xFC, 0x03, 0x28, 0x7D, 0xD1, 0x24, 0x3C, 0x62, 0x01, 0x00, 0x28, 0x20,
         0x00, 0xE0, 0x60, 0x8D, 0x23, 0x68, 0x25, 0x04, 0x12, 0x01, 0x00, 0x20,
         0x1C, 0x20, 0x1C, 0x24, 0xE0, 0xB0, 0x21, 0x26, 0x74, 0x2F, 0x00, 0x00,
-        0x86, 0xF0, 0x18, 0xFD, 0x21, 0x4F, 0x3B, 0x60, 0x30, 0x36, 0x08, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    },
+        0x86, 0xF0, 0x18, 0xFD, 0x21, 0x4F, 0x3B, 0x60,
+};
 
+/* The vendor command 0xFC4C parameters sent when a device search is cancelled. */
+static u8 wudSearchCancelCommand[0x1C] = {
+    0x30, 0x36, 0x08,
 };
 
 /* The device record of table index `index`: the ten remotes, then the six balance boards; read with interrupts off. */
@@ -441,27 +440,23 @@ static inline WUDDevice* wudFindLinkedWbc(void)
  * half and the sum of their complements in the low half. */
 static inline u32 wudCalcCrc(u32 seed, const u16* data, u32 size)
 {
-    u16 sum = seed >> 16;
     u16 inverseSum = seed;
-    u32 i;
+    u32 sum = seed >> 16;
+    s32 i;
 
-    for (i = 0; i < size; i += 2) {
+    for (i = 0; i < size / 2; i++) {
         u16 value = *data++;
 
         sum += value;
-        inverseSum += ~value;
+        inverseSum = inverseSum + ~value;
     }
-    return ((u32)sum << 16) | inverseSum;
+    return (sum << 16) | inverseSum;
 }
 
 /* Stores the given parts of the balance board record in the Wii Fit save data and seals it with its checksum. */
 static inline void wudSetWiiFitSaveData(const u8* bdAddr, const u8* linkKey, const u8* name)
 {
-    u16* word;
-    u16 sum;
-    u16 inverseSum;
     u32 crc;
-    s32 i;
 
     if (bdAddr != NULL) {
         memcpy(wudWiiFitSaveData.bdAddr, bdAddr, 6);
@@ -472,15 +467,7 @@ static inline void wudSetWiiFitSaveData(const u8* bdAddr, const u8* linkKey, con
     if (name != NULL) {
         memcpy(wudWiiFitSaveData.name, name, 0x40);
     }
-    sum = wudWiiFitCrc >> 16;
-    inverseSum = wudWiiFitCrc;
-    word = (u16*)&wudWiiFitSaveData;
-    for (i = 0; i < 0x40; i++) {
-        sum += *word;
-        inverseSum += (u16)~*word;
-        word++;
-    }
-    crc = ((u32)sum << 16) | inverseSum;
+    crc = wudCalcCrc(wudWiiFitCrc, (u16*)&wudWiiFitSaveData, 0x80);
     memcpy(wudWiiFitSaveData.crc, &crc, 4);
 }
 
@@ -615,6 +602,10 @@ s32 WUDiSyncCheckInquiry(void)
 /* Registers the device the pairing found: makes room in a full table (dropping a second balance board first), copies the
  * found record into a new one, adds it to the stack and the lists, and records a balance board in the history and the Wii
  * Fit save data; returns the next pairing step (7), or 0xFF when no record is free. */
+#pragma push
+#pragma opt_propagation off
+#pragma opt_strength_reduction off
+#pragma opt_common_subs off
 s32 WUDiSyncRegisterDevice(void)
 {
     WUDCB* cb = &wudCB;
@@ -652,6 +643,7 @@ s32 WUDiSyncRegisterDevice(void)
     wudDevAddrTable[device->handle] = device->bdAddr;
     return 7;
 }
+#pragma pop
 
 /* Whether the console settings are still busy with a read or write. */
 static inline BOOL wudScIsBusy(void)
@@ -832,6 +824,8 @@ static inline u8 wudGetWbcLinkNumber(void)
 /* Steps the pairing state machine: searches for a device, checks what it found against the stored records, opens its
  * link, registers it and its link key, stores the table in the console settings and the Wii Fit save file, and ends the
  * search. */
+#pragma push
+#pragma optimization_level 3
 void WUDiSyncFiber(void)
 {
     WUDCB* cb = &wudCB;
@@ -1123,6 +1117,7 @@ void WUDiSyncFiber(void)
         break;
     }
 }
+#pragma pop
 
 /* Runs the pairing fiber on the fiber stack when the pairing alarm fires. */
 void WUDiSyncAlarmHandler(OSAlarm* alarm, OSContext* context)
@@ -1166,6 +1161,8 @@ s32 WUDiTerminateDevice(void)
 /* Before a clear: removes the records still waiting for their link key and, with a balance board linked in a Japanese
  * game, wipes the link key in the Wii Fit save data; returns the next clear step (3 while links are open, 0x64 to write
  * the save data, else 5). */
+#pragma push
+#pragma opt_strength_reduction off
 s32 WUDiUpdateWiiFitSaveData(void)
 {
     WUDCB* cb = &wudCB;
@@ -1195,14 +1192,15 @@ s32 WUDiUpdateWiiFitSaveData(void)
     }
     return 5;
 }
+#pragma pop
 
 /* Steps the clear of the stored pairings: hides the host, drops the links, empties and flushes the console settings'
  * arrays, writes the wiped balance board record into Wii Fit's save file, then reports through the clear callback. */
 void WUDiClearFiber(void)
 {
+    const char* path;
     WUDCB* cb = &wudCB;
     WUDResultCallback callback;
-    const char* path;
     s32 written;
 
     cb->syncState = 0;
@@ -1229,8 +1227,6 @@ void WUDiClearFiber(void)
                 cb->clearState = 8;
             }
         }
-        break;
-    case 7:
         break;
     case 8:
         wudSetVisibility(0, wudGetConnectable());
@@ -1285,6 +1281,8 @@ void WUDiClearFiber(void)
             NANDCloseAsync(&wudNandFileInfo, WUDiNandCloseCallback, &wudNandBlock);
         }
         break;
+    case 7:
+        return;
     }
 }
 
@@ -1409,6 +1407,8 @@ static inline void wudPrintDevice(WUDDevice* device)
 
 /* Rebuilds the device table from the console settings: the paired remotes (moving later entries into empty slots), the
  * balance board of the history and the balance board array; then writes the arrays back and flushes them. Returns 5. */
+#pragma push
+#pragma optimization_level 3
 u8 WUDiLoadDeviceInfo(void)
 {
     WUDCB* cb;
@@ -1521,6 +1521,7 @@ u8 WUDiLoadDeviceInfo(void)
     SCFlushAsync(InitFlushCallback);
     return 5;
 }
+#pragma pop
 
 /* Advances the Wii Fit save file read one step from the NAND result; a short read or an error ends it. */
 void WUDiPatchCallback(s32 result, NANDCommandBlock* block)
@@ -1552,6 +1553,8 @@ void WUDiPatchStepDone(s32 result)
 /* Steps the read of Wii Fit's save file at bring-up: opens, seeks and reads it into the work area, checks the balance
  * board record's checksum and copies a valid record into the history of the console settings; returns the next
  * bring-up step (2 while it runs, 3 when it is done). */
+#pragma push
+#pragma opt_common_subs off
 u8 WUDiLoadWiiFitSaveData(void)
 {
     const char* path = "/title/00010004/52464e4a/data/RPHealth.dat";
@@ -1643,6 +1646,7 @@ u8 WUDiLoadWiiFitSaveData(void)
     }
     return next;
 }
+#pragma pop
 
 /* Steps the stack bring-up: waits for the console settings, clears the control block and reads the Wii Fit data or the
  * device arrays, then enables the Bluetooth stack. */
@@ -1728,9 +1732,13 @@ void WUDiShutdownAlarmHandler(OSAlarm* alarm, OSContext* context)
 }
 
 /* Resets the control block: the per-handle tables, both recently-used lists, the state machines and the device records. */
+#pragma push
+#pragma opt_strength_reduction off
 void __wudClearControlBlock(void)
 {
     WUDCB* cb = &wudCB;
+    WUDDeviceNode* node;
+    WUDDevice* device;
     u32 level;
     s32 i;
 
@@ -1742,17 +1750,20 @@ void __wudClearControlBlock(void)
     }
     cb->wbcTail = &cb->wbcNodes[5];
     cb->wbcHead = &cb->wbcNodes[0];
-    for (i = 0; i < 6; i++) {
-        cb->wbcNodes[i].device = &cb->wbcDevices[5 - i];
-        cb->wbcNodes[i].prev = (i == 0) ? NULL : &cb->wbcNodes[i - 1];
-        cb->wbcNodes[i].next = (i == 5) ? NULL : &cb->wbcNodes[i + 1];
+    node = cb->wbcNodes;
+    for (i = 0; i < 6; i++, node++) {
+        node->device = &cb->wbcDevices[5 - i];
+        node->prev = (i == 0) ? NULL : &cb->wbcNodes[i - 1];
+        node->next = (i == 5) ? NULL : &cb->wbcNodes[i + 1];
     }
     cb->deviceTail = &cb->deviceNodes[9];
     cb->deviceHead = &cb->deviceNodes[0];
-    for (i = 0; i < 10; i++) {
-        cb->deviceNodes[i].device = &cb->devices[i];
-        cb->deviceNodes[i].prev = (i == 0) ? NULL : &cb->deviceNodes[i - 1];
-        cb->deviceNodes[i].next = (i == 9) ? NULL : &cb->deviceNodes[i + 1];
+    node = cb->deviceNodes;
+    device = cb->devices;
+    for (i = 0; i < 10; i++, node++, device++) {
+        node->device = device;
+        node->prev = (i == 0) ? NULL : &cb->deviceNodes[i - 1];
+        node->next = (i == 9) ? NULL : &cb->deviceNodes[i + 1];
     }
     cb->syncState = 0;
     cb->linkKeyState = 0;
@@ -1773,6 +1784,7 @@ void __wudClearControlBlock(void)
     cb->bufferHead = 0;
     cb->bufferTail = 10;
     level = OSDisableInterrupts();
+    cb = &wudCB;
     memset(cb->devices, 0, sizeof(cb->devices));
     memset(cb->wbcDevices, 0, sizeof(cb->wbcDevices));
     cb->remoteCount = 0;
@@ -1782,6 +1794,7 @@ void __wudClearControlBlock(void)
     cb->syncRetries = 0;
     OSRestoreInterrupts(level);
 }
+#pragma pop
 
 /* Brings the Bluetooth stack up and arms the periodic alarm that drives the state machines; returns 0 when it is already up. */
 s32 WUDInit(void)
@@ -1992,6 +2005,13 @@ void WUDStartFastSyncSimple(void)
     WUDiStartSync(1, -1, 0, 1);
 }
 
+/* Starts pairing a special device (GUESS body: only its log string is retail evidence; the linker strips it). */
+s32 WUDStartSyncSpDevice(void)
+{
+    WUDiDebugPrint("WUDStartSyncSpDevice()\n");
+    return WUDiStartSync(0, 3, 1, 0);
+}
+
 /* Cancels a running pairing search; non-zero when the stack was running. */
 s32 WUDStopSyncDevice(void)
 {
@@ -2151,8 +2171,8 @@ void WUDiFirmwareDoneCallback(void)
 void WUDiPatchRecordCallback(s32 result)
 {
     u8 batch[0x100];
-    const u8* table = wudFirmwareData.patchTable;
     s32 count;
+    u8 records;
     s32 size;
 
     if ((wudPatchRecordCount == wudPatchRecordIndex && result != 0) || result == 0) {
@@ -2164,10 +2184,11 @@ void WUDiPatchRecordCallback(s32 result)
     if (wudPatchRecordCount - wudPatchRecordIndex < 0x13) {
         count = wudPatchRecordCount - wudPatchRecordIndex;
     }
+    records = count;
     batch[0] = count;
-    size = (u8)count * 0xD;
-    memcpy(&batch[1], &table[wudPatchRecordIndex * 0xD + 1], size);
-    wudPatchRecordIndex += (u8)count;
+    size = records * 0xD;
+    memcpy(&batch[1], wudPatchTable.records[wudPatchRecordIndex], size);
+    wudPatchRecordIndex += records;
     WUDiDebugPrint("Install the patches\n");
     BTM_VendorSpecificCommand(0xFC4F, size + 1, batch, WUDiPatchRecordCallback);
 }
@@ -2178,39 +2199,43 @@ void WUDiPatchWriteCallback(s32 result)
     u8 batch[0x100];
     u8 command[4 + 0xFB];
     u8 chunk;
+    s32 length;
     s32 i;
     u32 address;
 
     if (result != 0) {
         if (wudPatchLength == wudPatchSent) {
-            u8 count;
+            s32 count;
+            u8 records;
             s32 size;
 
             wudPatchRecordIndex = 0;
-            wudPatchRecordCount = wudFirmwareData.patchTable[0];
+            wudPatchRecordCount = wudPatchTable.count;
             count = 0x13;
-            if (wudFirmwareData.patchTable[0] < 0x13) {
-                count = wudFirmwareData.patchTable[0];
+            if (wudPatchRecordCount - wudPatchRecordIndex < 0x13) {
+                count = wudPatchRecordCount - wudPatchRecordIndex;
             }
-            size = count * 0xD;
+            records = count;
             batch[0] = count;
-            memcpy(&batch[1], &wudFirmwareData.patchTable[1], size);
-            wudPatchRecordIndex += count;
+            size = records * 0xD;
+            memcpy(&batch[1], wudPatchTable.records, size);
+            wudPatchRecordIndex += records;
             WUDiDebugPrint("Install the patches\n");
             BTM_VendorSpecificCommand(0xFC4F, size + 1, batch, WUDiPatchRecordCallback);
             return;
         }
-        chunk = 0xFB;
-        if ((u8)(wudPatchLength - wudPatchSent) < 0xFB) {
-            chunk = wudPatchLength - wudPatchSent;
+        length = 0xFB;
+        if (wudPatchLength - wudPatchSent < 0xFB) {
+            length = wudPatchLength - wudPatchSent;
         }
+        chunk = length;
         address = wudPatchAddress + wudPatchSent;
         command[0] = address;
         command[1] = address >> 8;
         command[2] = address >> 16;
         command[3] = address >> 24;
         for (i = 0; i < chunk; i++) {
-            command[4 + i] = wudFirmwareData.patchImage[8 + wudPatchSent + i];
+            command[4 + i] = wudPatchImage[8 + wudPatchSent + i];
         }
         wudPatchSent += chunk;
         WUDiDebugPrint("Download the patch codes [%d]\n", wudPatchSent);
@@ -2231,15 +2256,12 @@ void RemovePatchCallback(s32 result)
 
     WUDiDebugPrint("RemovePatch Callback\n");
     if (result != 0) {
-        chunk = 0xFB;
-        if (wudPatchLength < 0xFB) {
-            chunk = wudPatchLength;
-        }
+        chunk = (wudPatchLength < 0xFB) ? wudPatchLength : 0xFB;
         command[0] = wudPatchAddress;
         command[1] = wudPatchAddress >> 8;
         command[2] = wudPatchAddress >> 16;
         command[3] = wudPatchAddress >> 24;
-        image = wudFirmwareData.patchImage;
+        image = wudPatchImage;
         for (i = 0; i < chunk; i++) {
             command[4 + i] = image[8 + i];
         }
@@ -2264,13 +2286,13 @@ void SuperPeekPokeCallback(s32 result)
 void __wudAppendRuntimePatch(void)
 {
     WUDiDebugPrint("__wudAppendRuntimePatch()\n");
-    wudPatchAddress = (((((wudFirmwareData.patchImage[3] << 8) + wudFirmwareData.patchImage[2]) << 8) + wudFirmwareData.patchImage[1]) << 8)
-                      + wudFirmwareData.patchImage[0];
-    wudPatchLength = (((((wudFirmwareData.patchImage[7] << 8) + wudFirmwareData.patchImage[6]) << 8) + wudFirmwareData.patchImage[5]) << 8)
-                     + wudFirmwareData.patchImage[4];
+    wudPatchAddress = (((((wudPatchImage[3] << 8) + wudPatchImage[2]) << 8) + wudPatchImage[1]) << 8)
+                      + wudPatchImage[0];
+    wudPatchLength = (((((wudPatchImage[7] << 8) + wudPatchImage[6]) << 8) + wudPatchImage[5]) << 8)
+                     + wudPatchImage[4];
     if (__OSInIPL != 0) {
         WUDiDebugPrint("SuperPeekPoke\n");
-        BTM_VendorSpecificCommand(0xFC0A, 9, wudFirmwareData.setupCommand, SuperPeekPokeCallback);
+        BTM_VendorSpecificCommand(0xFC0A, 9, wudSetupCommand, SuperPeekPokeCallback);
         return;
     }
     WUDiDebugPrint("RemovePatch\n");
@@ -2310,13 +2332,7 @@ void __wudInitSub(void)
         wudStackReady = 1;
         OSRestoreInterrupts(level);
     }
-    {
-        u32 level = OSDisableInterrupts();
-        cb->discoverable = 0;
-        cb->connectable = 1;
-        OSRestoreInterrupts(level);
-    }
-    BTA_DmSetVisibility(0, 1);
+    wudSetVisibility(0, 1);
 }
 
 /* Registers the device at `bdAddr` with the stack's device database and, for a remote or balance board, with the HID host. */
@@ -2330,8 +2346,8 @@ void WUDiAddDevice(const u8* bdAddr)
     WUDiDebugPrint("BTA_DmAddDevice(): %d\n", status);
     if (memcmp(device->name, "Nintendo RVL-CNT", 0x10) == 0 || (memcmp(device->name, "Nintendo RVL-WBC", 0x10) == 0 && wudLinkedWbc != 0)) {
         BtaHhDscpInfo dscp;
-        dscp.length = sizeof(wudFirmwareData.hidDescriptor);
-        dscp.descriptor = wudFirmwareData.hidDescriptor;
+        dscp.length = sizeof(wudHidDescriptor);
+        dscp.descriptor = wudHidDescriptor;
         WUDiDebugPrint("BTA_HhAddDev()\n");
         BTA_HhAddDev(device->bdAddr, device->attrMask, device->subClass, device->appId, dscp);
     }
@@ -2458,6 +2474,9 @@ void WUDiMoveWbcToTail(WUDDevice* device)
 }
 
 /* Moves the balance board list entry of `device` in front of the first other entry that is not connected. */
+#pragma push
+#pragma opt_strength_reduction off
+#pragma opt_common_subs off
 void WUDiInsertWbcNode(WUDDevice* device)
 {
     WUDCB* cb = &wudCB;
@@ -2502,6 +2521,7 @@ void WUDiInsertWbcNode(WUDDevice* device)
     }
     OSRestoreInterrupts(level);
 }
+#pragma pop
 
 /* Moves the remote list entry of `device` to the head of the list. */
 void WUDiMoveDeviceToHead(WUDDevice* device)
@@ -2561,6 +2581,9 @@ void WUDiMoveDeviceToTail(WUDDevice* device)
 
 /* Moves the remote list entry of `device` in front of the first other entry that is not connected (or, with a balance board
  * linked, is not a Wii remote). */
+#pragma push
+#pragma opt_strength_reduction off
+#pragma opt_common_subs off
 void WUDiInsertDeviceNode(WUDDevice* device)
 {
     WUDCB* cb = &wudCB;
@@ -2607,6 +2630,7 @@ void WUDiInsertDeviceNode(WUDDevice* device)
     }
     OSRestoreInterrupts(level);
 }
+#pragma pop
 
 /* Moves the remote list entry of `device` in front of the first other entry that has no record, or behind a connected
  * tail entry. */
@@ -2688,28 +2712,6 @@ void CleanupCallback(s32 result)
     WUDiDebugPrint("WARNING: USB_CLOSE_FAILURE!\n");
 }
 
-/* size: 0x112 - the authentication complete payload (BTE `tBTA_DM_AUTH_CMPL`). */
-typedef struct WUDAuthComplete {
-    /* +0x000 */ u8 bdAddr[6];
-    /* +0x006 */ u8 name[0xF9];
-    /* +0x0FF */ u8 linkKey[0x10];
-    /* +0x10F */ u8 result;
-    /* +0x110 */ u8 pad_0x110[2];
-} WUDAuthComplete; /* size: 0x112 */
-
-/* size: 0x07 - the link up and link down payload: the device and the reason. */
-typedef struct WUDLinkChange {
-    /* +0x00 */ u8 bdAddr[6];
-    /* +0x06 */ u8 reason;
-} WUDLinkChange; /* size: 0x07 */
-
-/* size: 0x112 - the payload of a BTA device manager security event, by event. */
-union BtaDmSecEventData {
-    /* +0x00 */ u8 bdAddr[6];
-    /* +0x00 */ WUDAuthComplete authComplete;
-    /* +0x00 */ WUDLinkChange link;
-};
-
 /* Handles the device manager's security events: brings the HID host up after the stack is enabled, answers the PIN
  * request with the host address, keeps the link key of a completed authentication and counts the links. */
 void __wudSecurityEventStackCallback(u8 event, union BtaDmSecEventData* data)
@@ -2724,7 +2726,7 @@ void __wudSecurityEventStackCallback(u8 event, union BtaDmSecEventData* data)
     WUDiDebugPrint("__wudCleanupStackCallback: ");
     switch (event) {
     case 0:
-        memcpy(cb->hostAddr, data->bdAddr, 6);
+        memcpy(cb->hostAddr, data->enable.bd_addr, 6);
         WUDiDebugPrint("BTA_ENABLE_EVT\n");
         WUDiDebugPrint("host : %02x:%02x:%02x:%02x:%02x:%02x\n", cb->hostAddr[0], cb->hostAddr[1], cb->hostAddr[2],
                        cb->hostAddr[3], cb->hostAddr[4], cb->hostAddr[5]);
@@ -2743,7 +2745,7 @@ void __wudSecurityEventStackCallback(u8 event, union BtaDmSecEventData* data)
         if ((u8)cb->simple == 0) {
             pinAddr = cb->hostAddr;
         } else {
-            pinAddr = data->bdAddr;
+            pinAddr = data->pin_req.bd_addr;
         }
         if (wudStoredDeviceInfo.type == 4) {
             WUDiRemoveDevice(wudStoredDeviceInfo.bdAddr);
@@ -2758,30 +2760,30 @@ void __wudSecurityEventStackCallback(u8 event, union BtaDmSecEventData* data)
         pin[4] = pinAddr[1];
         pin[5] = pinAddr[0];
         OSRestoreInterrupts(level);
-        BTA_DmPinReply(data->bdAddr, 1, 6, pin);
+        BTA_DmPinReply(data->pin_req.bd_addr, 1, 6, pin);
         break;
     case 3:
         WUDiDebugPrint("BTA_DM_AUTH_CMPL_EVT\n");
-        WUDiDebugPrint("  addr : %02x:%02x:%02x:%02x:%02x:%02x\n", data->authComplete.bdAddr[0],
-                       data->authComplete.bdAddr[1], data->authComplete.bdAddr[2], data->authComplete.bdAddr[3],
-                       data->authComplete.bdAddr[4], data->authComplete.bdAddr[5]);
+        WUDiDebugPrint("  addr : %02x:%02x:%02x:%02x:%02x:%02x\n", data->auth_cmpl.bd_addr[0],
+                       data->auth_cmpl.bd_addr[1], data->auth_cmpl.bd_addr[2], data->auth_cmpl.bd_addr[3],
+                       data->auth_cmpl.bd_addr[4], data->auth_cmpl.bd_addr[5]);
         WUDiDebugPrint("  key  : %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
-                       data->authComplete.linkKey[0], data->authComplete.linkKey[1], data->authComplete.linkKey[2],
-                       data->authComplete.linkKey[3], data->authComplete.linkKey[4], data->authComplete.linkKey[5],
-                       data->authComplete.linkKey[6], data->authComplete.linkKey[7], data->authComplete.linkKey[8],
-                       data->authComplete.linkKey[9], data->authComplete.linkKey[10], data->authComplete.linkKey[11],
-                       data->authComplete.linkKey[12], data->authComplete.linkKey[13], data->authComplete.linkKey[14],
-                       data->authComplete.linkKey[15]);
-        WUDiDebugPrint("  result = %d\n", data->authComplete.result);
-        if (data->authComplete.result != 0) {
-            device = WUDiGetDevInfo(data->authComplete.bdAddr);
-            if (memcmp(wudStoredDeviceInfo.bdAddr, data->authComplete.bdAddr, 6) == 0) {
+                       data->auth_cmpl.key[0], data->auth_cmpl.key[1], data->auth_cmpl.key[2],
+                       data->auth_cmpl.key[3], data->auth_cmpl.key[4], data->auth_cmpl.key[5],
+                       data->auth_cmpl.key[6], data->auth_cmpl.key[7], data->auth_cmpl.key[8],
+                       data->auth_cmpl.key[9], data->auth_cmpl.key[10], data->auth_cmpl.key[11],
+                       data->auth_cmpl.key[12], data->auth_cmpl.key[13], data->auth_cmpl.key[14],
+                       data->auth_cmpl.key[15]);
+        WUDiDebugPrint("  result = %d\n", data->auth_cmpl.success);
+        if (data->auth_cmpl.success != 0) {
+            device = WUDiGetDevInfo(data->auth_cmpl.bd_addr);
+            if (memcmp(wudStoredDeviceInfo.bdAddr, data->auth_cmpl.bd_addr, 6) == 0) {
                 wudStoredDeviceInfo.linkState = 12;
                 if (device == NULL) {
                     device = &wudStoredDeviceInfo;
                 }
             }
-            memcpy(device->linkKey, data->authComplete.linkKey, 0x10);
+            memcpy(device->linkKey, data->auth_cmpl.key, 0x10);
         }
         break;
     case 4:
@@ -2789,17 +2791,17 @@ void __wudSecurityEventStackCallback(u8 event, union BtaDmSecEventData* data)
         break;
     case 5:
         WUDiDebugPrint("BTA_DM_LINK_UP_EVT\n");
-        WUDiDebugPrint("   addr : %02x:%02x:%02x:%02x:%02x:%02x\n", data->link.bdAddr[0], data->link.bdAddr[1],
-                       data->link.bdAddr[2], data->link.bdAddr[3], data->link.bdAddr[4], data->link.bdAddr[5]);
-        device = WUDiGetDevInfo(data->link.bdAddr);
-        if (device == NULL && memcmp(data->link.bdAddr, wudStoredDeviceInfo.bdAddr, 6) == 0) {
+        WUDiDebugPrint("   addr : %02x:%02x:%02x:%02x:%02x:%02x\n", data->link_up.bd_addr[0], data->link_up.bd_addr[1],
+                       data->link_up.bd_addr[2], data->link_up.bd_addr[3], data->link_up.bd_addr[4], data->link_up.bd_addr[5]);
+        device = WUDiGetDevInfo(data->link_up.bd_addr);
+        if (device == NULL && memcmp(data->link_up.bd_addr, wudStoredDeviceInfo.bdAddr, 6) == 0) {
             device = &wudStoredDeviceInfo;
         }
         if (device == NULL || wudGetLinkNumber() == 4) {
-            btm_remove_acl(data->link.bdAddr);
+            btm_remove_acl(data->link_up.bd_addr);
             WUDiDebugPrint("%s --> %02x:%02x:%02x:%02x:%02x:%02x\n", (device == NULL) ? "not paired" : "4 links exist",
-                           data->link.bdAddr[0], data->link.bdAddr[1], data->link.bdAddr[2], data->link.bdAddr[3],
-                           data->link.bdAddr[4], data->link.bdAddr[5]);
+                           data->link_up.bd_addr[0], data->link_up.bd_addr[1], data->link_up.bd_addr[2], data->link_up.bd_addr[3],
+                           data->link_up.bd_addr[4], data->link_up.bd_addr[5]);
         } else {
             device->linkState = (device->linkState == 2) ? 12 : 3;
             cb->linkNumber++;
@@ -2807,27 +2809,27 @@ void __wudSecurityEventStackCallback(u8 event, union BtaDmSecEventData* data)
         break;
     case 6:
         WUDiDebugPrint("BTA_DM_LINK_DOWN_EVT\n");
-        WUDiDebugPrint("   addr : %02x:%02x:%02x:%02x:%02x:%02x\n", data->link.bdAddr[0], data->link.bdAddr[1],
-                       data->link.bdAddr[2], data->link.bdAddr[3], data->link.bdAddr[4], data->link.bdAddr[5]);
-        WUDiDebugPrint("result: %d\n", data->link.reason);
-        device = WUDiGetDevInfo(data->link.bdAddr);
+        WUDiDebugPrint("   addr : %02x:%02x:%02x:%02x:%02x:%02x\n", data->link_down.bd_addr[0], data->link_down.bd_addr[1],
+                       data->link_down.bd_addr[2], data->link_down.bd_addr[3], data->link_down.bd_addr[4], data->link_down.bd_addr[5]);
+        WUDiDebugPrint("result: %d\n", data->link_down.status);
+        device = WUDiGetDevInfo(data->link_down.bd_addr);
         if (device != NULL) {
             device->linkState = 1;
             cb->linkNumber--;
-            if (memcmp(wudStoredDeviceInfo.bdAddr, data->link.bdAddr, 6) == 0) {
+            if (memcmp(wudStoredDeviceInfo.bdAddr, data->link_down.bd_addr, 6) == 0) {
                 cb->syncState = 0xFF;
             }
-            if (data->link.reason == 0x15) {
+            if (data->link_down.status == 0x15) {
                 for (i = 0; i < 4; i++) {
                     u8* history = wudBtDeviceInfo.devices[(u8)i + 10].bdAddr;
 
-                    if (memcmp(history, data->link.bdAddr, 6) == 0) {
+                    if (memcmp(history, data->link_down.bd_addr, 6) == 0) {
                         memset(history, 0, sizeof(WUDScDevice));
                         wudDeviceInfoDirty = 1;
                     }
                 }
             }
-        } else if (memcmp(wudStoredDeviceInfo.bdAddr, data->link.bdAddr, 6) == 0) {
+        } else if (memcmp(wudStoredDeviceInfo.bdAddr, data->link_down.bd_addr, 6) == 0) {
             cb->syncState = 0xFF;
             cb->linkNumber--;
         } else {
@@ -2883,7 +2885,7 @@ void WUDiSearchCallback(s32 event, const u8* data)
         return;
     case 4:
         WUDiDebugPrint("SEARCH CANCEL\n\n");
-        BTM_VendorSpecificCommand(0xFC4C, 0x1C, &wudFirmwareData.patchTable[0x5C], NULL);
+        BTM_VendorSpecificCommand(0xFC4C, 0x1C, wudSearchCancelCommand, NULL);
         wudInquiryCount = 0;
         memset(&wudInquiryResult, 0, sizeof(wudInquiryResult));
         wudCB.syncState = 4;
@@ -3068,15 +3070,16 @@ void __wudPowerMangeEventStackCallback(const u8* bdAddr, u32 status, u16 value, 
     WUDiDebugPrint("hci_status = %d\n", hciStatus);
     device = WUDiGetDevInfo(bdAddr);
     if (device == NULL) {
-        device = &wudStoredDeviceInfo;
-        if (memcmp(device->bdAddr, bdAddr, 6) != 0) {
+        if (memcmp(wudStoredDeviceInfo.bdAddr, bdAddr, 6) == 0) {
+            device = &wudStoredDeviceInfo;
+        } else {
             WUDiDebugPrint("Unknown device is connected and changes the connection type!!!!\n");
             WUDiDebugPrint(" addr = %02x:%02x:%02x:%02x:%02x:%02x,  status = %d\n", bdAddr[0], bdAddr[1], bdAddr[2], bdAddr[3], bdAddr[4],
                            bdAddr[5], status);
             return;
         }
     }
-    switch (status) {
+    switch ((s32)status) {
     case 0:
         device->linkState = 8;
         break;
@@ -3196,4 +3199,38 @@ void _WUDSetQueuedSize(u8 handle, u16 size)
 void _WUDSetNotAckedSize(u8 handle, u16 size)
 {
     wudNotAckedSize[handle] = size;
+}
+
+/* Puts the stack into test mode (GUESS body: only its log string is retail evidence; the linker strips it). */
+void _WUDEnableTestMode(void)
+{
+    WUDiDebugPrint("_WUDEnableTestMode\n");
+}
+
+/* Starts pairing the Wii remotes from the test tools (GUESS body: only its log string is retail evidence; the linker
+ * strips it). */
+s32 _WUDStartSyncDevice(void)
+{
+    WUDiDebugPrint("_WUDStartSyncDevice()\n");
+    return WUDiStartSync(0, 3, 0, 0);
+}
+
+/* Drops the stored balance board pairing (GUESS body: only its log strings are retail evidence; the linker strips it). */
+void _WUDDeleteStoreDevice(void)
+{
+    WUDDevice* device;
+
+    WUDiDebugPrint("_WUDDeleteStoreDevice()\n");
+    WUDiDebugPrint("dev number = %d\n", wudGetDeviceCount());
+    if (WUDiGetDevInfo(wudStoredDeviceInfo.bdAddr) == NULL) {
+        WUDiDebugPrint("Not Found");
+    }
+    device = wudFindLinkedWbc();
+    if (device != NULL) {
+        WUDiDebugPrint("Found the registered WBC\n");
+        WUDiRemoveDevice(device->bdAddr);
+        WUDiDebugPrint("Removed\n");
+    } else {
+        WUDiDebugPrint("Not Found WBC\n");
+    }
 }
