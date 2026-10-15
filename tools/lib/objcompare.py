@@ -344,6 +344,40 @@ def linked_trailing_pad(section: str, ours_size: int, claim_size: int, target_by
                                                                       "/".join(str(a) for a in sorted(set(successor_aligns)))))
 
 
+#: dtk's label for a leading padding run it assigned to a unit (`pad_10_80795090_sbss`: size, address, section).
+LEAD_PAD_LABEL_RE = re.compile(r"^pad_[0-9A-Fa-f]+_[0-9A-Fa-f]{8}_")
+
+
+def is_fill_label(name: str) -> bool:
+    """Whether `name` is one of dtk's fill labels (`gap_...` or `pad_<size>_<address>_<section>`): fill, not content."""
+    return name.startswith(PAD_LABEL_PREFIX) or bool(LEAD_PAD_LABEL_RE.match(name))
+
+
+def leading_fill(section: str, ours_size: int, ours_align: int, claim_size: int, target_bytes: bytes | None,
+                 target_symbols: dict, start: int | None, prev_end_ok: bool) -> int | None:
+    """The size of the fill the link puts in FRONT of our section, or None when there is none to model.
+
+    dtk can start a unit's claim at the previous object's end, before the unit's own aligned start (`DVD/dvd`'s
+    `.sbss` claim 0x80795090 holds 0x10 bytes of fill before its 32-aligned data at 0x807950A0). Linking our object
+    there, mwld places the section at the claim start rounded up to its alignment, so the lead comes back. All of:
+    not an exception table or `.init`; `start` known and `ours_align` (bytes) a power of two; the lead (the start
+    rounded up to `ours_align`, minus the start) is non-zero and `ours_size` plus it fits the claim; the target's
+    lead bytes are all zero (NOBITS: no bytes); no target symbol starts inside the lead but dtk's fill labels; and
+    `prev_end_ok` - the section linked before ours ends at the claim's start (the caller judges the predecessor)."""
+    if section in LINKED_PAD_NEVER or start is None or ours_align < 2 or ours_align & (ours_align - 1):
+        return None
+    if not prev_end_ok:
+        return None
+    lead = (start + ours_align - 1) // ours_align * ours_align - start
+    if lead <= 0 or ours_size + lead > claim_size:
+        return None
+    if target_bytes is not None and (len(target_bytes) < claim_size or any(target_bytes[:lead])):
+        return None
+    if [n for n, (off, _size) in target_symbols.items() if off < lead and not is_fill_label(n)]:
+        return None
+    return lead
+
+
 #: Sections whose symbol offsets decide where every later object's data lands, so an object that matches in size
 #: and bytes can still move the DOL: a spare global dead-stripped, a 4 B object where the original had 8 B, an order.
 POSITIONED = (".bss", ".sbss", ".sbss2", ".sdata", ".sdata2")
@@ -357,7 +391,7 @@ def data_symbol_gaps(ours: dict, theirs: dict, limit: int = 6) -> list[str]:
     the link uses)."""
     def named(m):
         return {n: v for n, v in m.items()
-                if not n.startswith(("@", PAD_LABEL_PREFIX, "lbl_", "zz_")) and not re.search(r"\$\d+$", n)}
+                if not n.startswith(("@", "lbl_", "zz_")) and not is_fill_label(n) and not re.search(r"\$\d+$", n)}
     o, t = named(ours), named(theirs)
     lines = ["%s: the target defines it at +0x%X (0x%X bytes), our object does not" % (n, t[n][0], t[n][1])
              for n in sorted(t, key=lambda n: t[n][0]) if n not in o]

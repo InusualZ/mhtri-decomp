@@ -91,6 +91,38 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   four READY with configure.py flipped (`main.dol: OK`); on the unflipped tree READY 237 -> 244, the seven gains all
   already `Object(Matching)` with the DOL hash green (BTE/l2c_api, BTE/port_rfc, DSP/dsp_task, DVD/dvd_broadway,
   OS/OSCache, OS/OSNet, OS/OSReset), no other verdict or refusal changed.
+* **A weak copy an earlier input defines is dropped (2026-10-14).** MWCC emits an inline function or an implicit vtable
+  as a weak copy in every TU that uses it; mwld keeps the first definition in link order and drops the later copies'
+  bytes. `flipcheck.weak_duplicate_symbols` removes such a copy from our object before the size and byte comparison
+  (through the same `strip_section` layout as the dead-strip model, in any strippable section) when all of these hold:
+  it is weak and of size > 0; the target object does not define the name; and a link input placed **before** ours
+  (`link_ctx["inputs"]`, the order of the link line) defines it, global or weak - a unit named in the same batch
+  counted as its built object at its target's link position. A copy that only a later input defines, or that no other
+  input defines, is kept and counted (a note says which). The note reads `<section>: 0xN of the object's 0xM bytes are
+  ... weak copies <names> that an earlier link input also defines (the link keeps the first definition); the 0xK bytes
+  the link keeps are compared`; a size line that still fails outside `.text` ends `... - after the link drops 0xN B of
+  symbol(s) from the object's 0xM`. Measured on all 629 registered units at `dcaef625`: nw4r/ut_ResFontBase (weak
+  `ut::Font` dtor and vtable; ut_Font, input 605, precedes it at 606) and nw4r/ut_CharWriter (weak `ut::Color` dtor;
+  font/flfnt, input 24) go NOT READY -> READY; trial flips of each alone and of both together hash `main.dol: OK`.
+  homebutton/hkb_window stays refused with `.text` +0xC (was +0x4C): its weak `ut::Color` dtor is dropped for
+  flfnt's, its `lyt::Window::Content` dtor is dead-stripped, and its weak `ut::Color` ctor has no other definer, so the
+  link keeps it - its trial flip put the ctor at 0x8052E350 inside the unit and grew `main.dol` by 0x20 (the 0xC
+  rounded to the DOL section alignment).
+* **A leading alignment fill is not a size gap (2026-10-14).** dtk can start a claim at the previous object's end,
+  before the unit's own aligned start (`DVD/dvd`'s `.sbss` claim 0x80795090 holds 0x10 bytes of fill, labelled
+  `pad_10_80795090_sbss`, before its 32-aligned data). `lib.objcompare.leading_fill` accepts the lead when all of
+  these hold: not `extab`/`extabindex`/`.init`; the claim's start rounded up to our section's alignment leaves a
+  non-zero lead and our size plus the lead fits the claim; the target's lead bytes are zero (NOBITS: none); no target
+  symbol starts inside the lead but dtk's fill labels (`gap_...`, `pad_<size>_<address>_<section>`:
+  `objcompare.is_fill_label`); and `flipcheck.predecessor_fills` - the registered range ending at the claim's start is an
+  unflipped stand-in, or a linked object whose built section fills its claim. Our size then counts the lead, the bytes
+  and the positioned-symbol offsets are compared after it (and a remaining tail goes through the trailing-pad rules).
+  The note reads `<section>: the 0xN-byte lead is alignment fill (...) - our 0xK bytes are compared at +0xN`. dtk's
+  `pad_` labels are fill labels in `data_symbol_gaps` too. Measured at `dcaef625`: OS/OSStateTM (already
+  `Object(Matching)`, DOL green; `.bss` lead 0x10) goes NOT READY -> READY; DVD/dvd's `.sbss` refusal goes (its trial
+  flip differs from retail in exactly the 6 `.text` bytes of `__DVDPrepareReset`'s register swap, so the lead links
+  as modelled; the unit stays refused on those bytes); AX/AXVPB, NAND/NANDCore and OS/OSExec lose their lead lines and
+  keep other refusals. No unit lost READY (266 -> 269).
 * **The reverse-reference row (2026-10-14).** A global the target object defines that another link input relocates, and
   that neither our object (global or weak) nor any other input defines, makes the flip's link fail: `<unit>: N symbol(s)
   the target object defines and another link input references are not defined by our object - <names> (referenced from
@@ -145,6 +177,14 @@ kept function calls it, FORCEACTIVE names it, the kept bytes differ, a non-zero 
 input defines the name; the same READY before and after the flip (our object as the link input, its own call from one
 stripped function to another rooting nothing), and a called function still refused after it. Mutations: model off fails 5, data-strip refusal off 1, map-row guard off 1, reverse-reference off
 1, `strip_section`'s zero-gap check off 1, its alignment check off 1, the model skipped for a linked unit 1, the unit's own object counted as another input 1.
+The weak-copy and leading-fill rules: `tools/tests/units/test_flipcheck_weak_lead.py` (28 checks, objects shaped like
+ut_ResFontBase, hkb_window and DVD/dvd): accepted - weak `.text` and `.data` copies an earlier input defines, a dead
+one, an earlier batch unit's built object; refused - no other definer, only a later one, a global copy, no link order,
+differing kept bytes, a batch object without the name, a target that defines the name (not stripped); the lead
+accepted NOBITS, PROGBITS and after a linked full predecessor; refused on non-zero lead bytes, a real symbol in the lead,
+no predecessor, a 16-aligned section, a short linked predecessor and a reordered layout. Mutations (each exits 1): weak
+model off, link order ignored, binding ignored, target-name guard off, batch object unchecked, leading fill off, lead
+bytes unchecked, lead symbols unchecked, predecessor not judged, linked predecessor size ignored, symbols not shifted.
 Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

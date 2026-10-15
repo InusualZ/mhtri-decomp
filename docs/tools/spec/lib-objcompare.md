@@ -32,6 +32,10 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   symbol but `gap_` labels, the next section placed at the claim's end; flipcheck's rule, see its spec).
   `linked_trailing_pad(section, ours_size, claim_size, target_bytes, target_symbols, start, successor_aligns) -> note | None`
   (the same tail test, but excused by a linked successor our object aligns to <= 16, so `.text` qualifies; never `LINKED_PAD_NEVER`).
+  `leading_fill(section, ours_size, ours_align, claim_size, target_bytes, target_symbols, start, prev_end_ok) -> lead | None`
+  (the fill the link puts before our section: the claim's start rounded up to our alignment, zero target bytes, no
+  symbol but fill labels, the predecessor judged by the caller; never `LINKED_PAD_NEVER`). `is_fill_label(name)`: dtk's
+  `gap_...` and `pad_<size>_<address>_<section>` labels (`data_symbol_gaps` skips both).
   `data_symbol_gaps(ours, theirs) -> [line]` with `POSITIONED` (the data sections whose symbol offsets position later data).
 * Symbols: `section_kind`, `wanted_kinds`, `defined_symbols(obj, kinds) -> {name: SymbolSize}`, `size_delta`,
   `symbols(target, ours, threshold, mode) -> [SymbolGap]`, `symbol_locations(obj)`, `symbol_rows(target, ours)` (a dtk-named row

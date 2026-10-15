@@ -223,13 +223,18 @@ def pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_path: s
                                    section_symbols(obj_path, name), start, next_aligns)
 
 
-def positioned_symbol_problems(claim: dict, ours: dict, src_path: str, obj_path: str) -> list[str]:
+def positioned_symbol_problems(claim: dict, ours: dict, src_path: str, obj_path: str,
+                               leads: dict[str, int] | None = None) -> list[str]:
     """Per positioned data section (`objcompare.POSITIONED`) the symbols whose offset, size or presence differs from
     the target's: equal sizes and bytes do not make the DOL hash hold when a spare global is dead-stripped or an
-    object is 4 B instead of 8 B. `python tools/mwlink_debugger.py trace <unit>` names the cause."""
+    object is 4 B instead of 8 B. `python tools/mwlink_debugger.py trace <unit>` names the cause. `leads` is `check`'s
+    section -> leading fill: our symbols sit that much later in the link."""
     out = []
+    leads = leads or {}
     for name in sorted(set(claim) & set(ours) & set(objcompare.POSITIONED)):
-        gaps = objcompare.data_symbol_gaps(section_symbols(src_path, name), section_symbols(obj_path, name))
+        lead = leads.get(name, 0)
+        mine = {n: (off + lead, size) for n, (off, size) in section_symbols(src_path, name).items()}
+        gaps = objcompare.data_symbol_gaps(mine, section_symbols(obj_path, name))
         if gaps:
             out.append("%s: symbol layout differs from the target (the link moves later data; `python "
                        "tools/mwlink_debugger.py trace <unit>` names the cause): %s" % (name, "; ".join(gaps)))
@@ -284,23 +289,28 @@ def data_seam_problems(unit: str, name: str, ours_path: str, obj_path: str, seam
 
 
 def pool_group_problems(unit: str, claim: dict, ours: dict, src_path: str, obj_path: str,
-                        note: str | None = None, padded: dict[str, int] | None = None) -> list[str]:
+                        note: str | None = None, padded: dict[str, int] | None = None,
+                        leads: dict[str, int] | None = None) -> list[str]:
     """The pool-sharing explanation for a differing `.sdata2`/`.sdata`: our object holds a partial pool of a TU.
 
     MWCC emits one literal pool per TU and the linker does not merge pools (docs/pool-seams.md), so when the
     unit's pooled literals are also read by other registered units the target's pool is shared with them and ours
     can only be a part of it - the flip is blocked by the seam, not by the source.  `note` is `poolseams`' fold line
     (None = look it up; nothing when the unit is in no group).  `padded` is `check`'s section -> our size where the
-    shortfall was judged alignment fill: such a section matches when our bytes equal the target's prefix.  One line
+    shortfall was judged alignment fill: such a section matches when our bytes equal the target's prefix.  `leads`
+    is the section -> leading fill `check` judged: our bytes are compared after that many zero bytes.  One line
     per differing pool section.
     """
     out = []
     padded = padded or {}
+    leads = leads or {}
     for name in (".sdata2", ".sdata"):
         if name not in claim:
             continue
         got = ours.get(name)
         mine, tgt = raw_section(src_path, name), raw_section(obj_path, name)
+        if mine and leads.get(name):
+            mine = bytes(leads[name]) + mine
         if mine is not None and tgt is not None:
             if got is not None and got[0] == claim[name][0] and mine == tgt:
                 continue
@@ -438,7 +448,8 @@ def link_reference_context() -> dict | None:
         return None
     index = objcompare.link_index(MAIN, paths)
     return {"refs": index["refs"], "ref_count": index["ref_count"],
-            "providers": {name: set(rels) for name, rels in index["providers"].items()}}
+            "providers": {name: set(rels) for name, rels in index["providers"].items()},
+            "inputs": list(paths)}
 
 
 def undefined_reference_problems(unit: str, target_rel: str, obj_path: str, src_path: str,
@@ -657,44 +668,154 @@ def deadstrip_roots(unit: str, target_rel: str, link_ctx: dict) -> set[str]:
     return roots | forced_active() | set(ENTRY_SYMBOLS)
 
 
+def _object_defines(path: str, name: str) -> bool:
+    """Whether the object at `path` defines `name` with a binding the link resolves across objects (global or weak)."""
+    facts = objcompare.reloc_facts(path) if os.path.exists(path) else None
+    return bool(facts) and provides_global(facts["defined"], name)
+
+
+def weak_duplicate_symbols(unit: str, src_path: str, obj_path: str, target_rel: str,
+                           link_ctx: dict | None) -> tuple[list, list[str]]:
+    """`([our symbols the link drops], notes)`: weak definitions in our object that an EARLIER link input defines too.
+
+    MWCC emits an inline function or an implicit vtable as a weak copy in every TU that uses it (`nw4r/ut_ResFontBase`
+    carries `ut::Font`'s dtor and vtable, `nw4r/ut_CharWriter` `ut::Color`'s dtor); mwld keeps the first definition
+    in link order and drops the later copies' bytes, which is why retail holds one (in `nw4r/ut_Font`, input 605, and
+    `font/flfnt`, input 24 - both before the units that repeat them). A copy is dropped when all of these hold: it is
+    weak, of size > 0, in a strippable section; the target object does not define the name (retail kept this unit's
+    own copy otherwise); and a link input placed BEFORE ours defines it, global or weak - a unit of the batch counted
+    as its built object at its link position. A copy that only a LATER input defines is kept (first wins: the link
+    keeps ours) and so is one nobody else defines (`homebutton/hkb_window`'s `ut::Color` ctor); both stay counted like
+    any other bytes, with a note. `([], [])` without the link order (`link_ctx["inputs"]`)."""
+    inputs = (link_ctx or {}).get("inputs")
+    elf = _elf(src_path)
+    if not inputs or elf is None:
+        return [], []
+    src_rel = os.path.normpath(os.path.join("build", "RMHE08", "src", unit + ".o"))
+    position = {rel: i for i, rel in enumerate(inputs)}
+    own = position.get(target_rel, position.get(src_rel))
+    if own is None:
+        return [], []
+    target_names = set(object_symbols(obj_path)[1])
+    # the batch's other units are linked from their built objects, at their target objects' link positions
+    batch = {os.path.normpath(os.path.join("build", "RMHE08", "obj", u + ".o")): u for u in BATCH - {unit}}
+    dropped, notes = [], []
+    for s in elf.symbols:
+        if (s.bind != objcompare.STB_WEAK or not s.defined or s.size == 0 or s.name in target_names
+                or s.section not in objcompare.STRIPPABLE_SECTIONS):
+            continue
+        earlier, later = [], []
+        for rel in sorted((set(link_ctx["providers"].get(s.name, ())) | set(batch)) - {target_rel, src_rel}):
+            if rel not in position:
+                continue
+            path = os.path.join(SRC, batch[rel] + ".o") if rel in batch else os.path.join(MAIN, rel)
+            if rel in batch and not _object_defines(path, s.name):
+                continue
+            (earlier if position[rel] < own else later).append(rel)
+        if earlier:
+            dropped.append(s)
+        elif later:
+            notes.append("%s: weak %s is defined again only by %s, which the link places after this unit - the "
+                         "first definition wins, so the link keeps our copy and it is counted"
+                         % (s.section, s.name, ", ".join(r.replace(os.sep, "/") for r in later)))
+        else:
+            notes.append("%s: weak %s is defined by no other link input, so the link keeps our copy and it is "
+                         "counted" % (s.section, s.name))
+    return dropped, notes
+
+
 def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path: str, target_rel: str,
-                    link_ctx: dict | None, map_rows: set[str] | None) -> tuple[bytes | None, list[str], list[str]]:
-    """`(our .text as the link keeps it, problems, notes)` when our object carries functions the link dead-strips.
+                    link_ctx: dict | None, map_rows: set[str] | None) -> tuple[dict[str, bytes], list[str], list[str]]:
+    """`({section: our bytes as the link keeps them}, problems, notes)` for the symbols the link removes from our
+    object: functions it dead-strips and weak copies it drops for an earlier definition (`weak_duplicate_symbols`).
 
     A unit may define a function the retail linker stripped (a GUESS body written so its strings land in the pool):
     our object carries it, the target and `symbols.txt` do not, and mwld strips it again at link. Such a function is
     excluded when `lib.objcompare.dead_symbols` finds it dead (nothing another link input, the batch, FORCEACTIVE or a
     `.comment` export flag keeps, directly or through a live symbol's relocations), no target symbol and no map row
-    carries its name, and `strip_section` can lay out the rest (the object already places each function at its
-    alignment after the previous one, zero-filled). The remaining `.text` then has to match the target byte for
+    carries its name, and `strip_section` can lay out the rest (the object already places each symbol at its
+    alignment after the previous one, zero-filled). The remaining bytes then have to match the target byte for
     byte like any other. A data symbol the same strip takes with it (a string only a stripped function read) is a
-    problem: our object counts its bytes, the link drops them. `(None, [], [])` when there is nothing to strip or no
-    link context; the first element is None too when the strip cannot be modelled (a note says why)."""
-    if link_ctx is None or STRIPPED_CODE not in ours:
-        return None, [], []
-    dead = objcompare.dead_symbols(src_path, deadstrip_roots(unit, target_rel, link_ctx)) or []
-    target_names = set(object_symbols(obj_path)[1])
-    rows = map_symbols() if map_rows is None else map_rows
-    code = [s for s in dead if s.section == STRIPPED_CODE and s.name not in target_names and s.name not in rows]
-    if not code:
-        return None, [], []
-    names = ", ".join(s.name for s in code)
-    problems = []
-    data = [s for s in dead if s.section != STRIPPED_CODE and s.section in claim]
-    if data:
-        problems.append("%s: the link dead-strips %d data symbol(s) with the stripped function(s) %s - %s - which our "
-                        "object counts and the link drops, so the linked section(s) fall short of the claim"
-                        % (unit, len(data), names, ", ".join("%s 0x%X B of %s" % (s.name, s.size, s.section)
-                                                             for s in data)))
-    kept = objcompare.strip_section(src_path, STRIPPED_CODE, code)
-    if kept is None:
-        return None, problems, ["%s: %s would be dead-stripped (no symbols.txt row, not in the target, nothing in the "
-                                "link references them) but the section is not laid out as aligned functions with "
-                                "zero gaps, so the stripped layout is not modelled" % (STRIPPED_CODE, names)]
-    return kept, problems, ["%s: 0x%X of the object's 0x%X bytes are dead-stripped function(s) %s (no symbols.txt row, "
-                            "not in the target, nothing in the link references them); the 0x%X bytes the link keeps "
-                            "are compared" % (STRIPPED_CODE, ours[STRIPPED_CODE][0] - len(kept), ours[STRIPPED_CODE][0],
-                                              names, len(kept))]
+    problem: our object counts its bytes, the link drops them. A section absent from the result is compared as the
+    object carries it; a note says why when a removal cannot be modelled. `({}, [], [])` without link context."""
+    if link_ctx is None:
+        return {}, [], []
+    weak, notes = weak_duplicate_symbols(unit, src_path, obj_path, target_rel, link_ctx)
+    weak_names = {s.name for s in weak}
+    code, problems = [], []
+    if STRIPPED_CODE in ours:
+        dead = objcompare.dead_symbols(src_path, deadstrip_roots(unit, target_rel, link_ctx)) or []
+        target_names = set(object_symbols(obj_path)[1])
+        rows = map_symbols() if map_rows is None else map_rows
+        code = [s for s in dead if s.section == STRIPPED_CODE and s.name not in target_names and s.name not in rows
+                and s.name not in weak_names]
+        data = [s for s in dead if s.section != STRIPPED_CODE and s.section in claim and s.name not in weak_names]
+        if code and data:
+            problems.append("%s: the link dead-strips %d data symbol(s) with the stripped function(s) %s - %s - which "
+                            "our object counts and the link drops, so the linked section(s) fall short of the claim"
+                            % (unit, len(data), ", ".join(s.name for s in code),
+                               ", ".join("%s 0x%X B of %s" % (s.name, s.size, s.section) for s in data)))
+    by_section: dict[str, tuple[list, list]] = {}
+    for s in code:
+        by_section.setdefault(s.section, ([], []))[0].append(s)
+    for s in weak:
+        by_section.setdefault(s.section, ([], []))[1].append(s)
+    kept: dict[str, bytes] = {}
+    for section, (stripped, copies) in sorted(by_section.items()):
+        dead_txt = ("dead-stripped function(s) %s (no symbols.txt row, not in the target, nothing in the link "
+                    "references them)" % ", ".join(s.name for s in stripped)) if stripped else ""
+        weak_txt = ("weak copies %s that an earlier link input also defines (the link keeps the first definition)"
+                    % ", ".join(s.name for s in copies)) if copies else ""
+        got = objcompare.strip_section(src_path, section, stripped + copies)
+        if got is None:
+            if stripped and not copies:
+                notes.append("%s: %s would be dead-stripped (no symbols.txt row, not in the target, nothing in the "
+                             "link references them) but the section is not laid out as aligned functions with zero "
+                             "gaps, so the stripped layout is not modelled"
+                             % (section, ", ".join(s.name for s in stripped)))
+            else:
+                notes.append("%s: the link removes %s but the section is not laid out as aligned symbols with zero "
+                             "gaps, so the stripped layout is not modelled"
+                             % (section, " and ".join(filter(None, [dead_txt, weak_txt]))))
+            continue
+        kept[section] = got
+        notes.append("%s: 0x%X of the object's 0x%X bytes are %s; the 0x%X bytes the link keeps are compared"
+                     % (section, ours[section][0] - len(got), ours[section][0],
+                        " and ".join(filter(None, [dead_txt, weak_txt])), len(got)))
+    return kept, problems, notes
+
+
+def predecessor_fills(unit: str, section: str) -> bool:
+    """Whether the section the link places before this claim ends exactly at the claim's start: the registered
+    range that ends there is an unflipped stand-in (it fills its own claim) or a linked object whose built section
+    fills its claim. No registered predecessor: False (the lead is not judged)."""
+    own, _starts = _range_index()
+    span = own.get((unit, section))
+    if span is None:
+        return False
+    base = section.split("$")[0]
+    linked = linked_units()
+    for (stem, objsec), (start, end) in own.items():
+        if end != span[0] or objsec.split("$")[0] != base or (stem, objsec) == (unit, section):
+            continue
+        if stem not in linked:
+            return True
+        built = sections(os.path.join(SRC, stem + ".o")).get(objsec)
+        return built is not None and built[0] >= end - start
+    return False
+
+
+def leading_fill_of(unit: str, name: str, ours: tuple[int, int], size: int, obj_path: str) -> int | None:
+    """`lib.objcompare.leading_fill` for one section of this unit: the target's bytes and symbols, the claim's start
+    and our object's alignment, the predecessor judged by `predecessor_fills`."""
+    own, _starts = _range_index()
+    span = own.get((unit, name))
+    if span is None or sections(obj_path).get(name) is None:
+        return None
+    data = raw_section(obj_path, name)
+    nobits = data is not None and len(data) == 0 and size > 0
+    return objcompare.leading_fill(name, ours[0], 1 << ours[1], size, None if nobits else data,
+                                   section_symbols(obj_path, name), span[0], predecessor_fills(unit, name))
 
 
 def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
@@ -707,12 +828,27 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
     if not ours:
         return missing_or_empty_object(unit, src_path, claim), []
     kept, problems, notes = deadstrip_model(unit, claim, ours, src_path, obj_path, target_rel, link_ctx, map_rows)
-    stripped = ""
-    if kept is not None:
-        stripped = "0x%X B of function(s) from the object's 0x%X" % (ours[STRIPPED_CODE][0] - len(kept),
-                                                                     ours[STRIPPED_CODE][0])
+    stripped: dict[str, str] = {}
+    if kept:
         ours = dict(ours)
-        ours[STRIPPED_CODE] = (len(kept), ours[STRIPPED_CODE][1])
+        for name, data in kept.items():
+            stripped[name] = ("dead-strips 0x%X B of function(s) from the object's 0x%X" if name == STRIPPED_CODE
+                              else "drops 0x%X B of symbol(s) from the object's 0x%X") % (
+                                  ours[name][0] - len(data), ours[name][0])
+            ours[name] = (len(data), ours[name][1])
+    leads: dict[str, int] = {}              # section -> fill the link puts before our bytes
+    for name, (size, _) in sorted(claim.items()):
+        got = ours.get(name)
+        if got is None or got[0] >= size:
+            continue
+        lead = leading_fill_of(unit, name, got, size, obj_path)
+        if lead:
+            leads[name] = lead
+            ours = dict(ours)
+            ours[name] = (got[0] + lead, got[1])
+            notes.append("%s: the 0x%X-byte lead is alignment fill (target zero, no symbol but dtk's fill labels, the "
+                         "predecessor ends at the claim's start and our section aligned to %d starts 0x%X in) - our "
+                         "0x%X bytes are compared at +0x%X" % (name, lead, 1 << got[1], lead, got[0], lead))
     padded: dict[str, int] = {}             # section -> our size, where the shortfall is only alignment fill
     for name, (size, _) in sorted(claim.items()):
         got = ours.get(name)
@@ -729,8 +865,8 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
                 padded[name] = got[0]
                 notes.append(pad)
                 continue
-            if name == STRIPPED_CODE and kept is not None:
-                hint = "; ".join(filter(None, [hint, "after the link dead-strips %s" % stripped]))
+            if name in stripped:
+                hint = "; ".join(filter(None, [hint, "after the link %s" % stripped[name]]))
             problems.append("%s: object is 0x%X, splits.txt claims 0x%X (%+d)%s"
                             % (name, got[0], size, got[0] - size, " - " + hint if hint else ""))
     for name in sorted(set(ours) - set(claim)):
@@ -744,18 +880,20 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
 
     # sizes and alignment matching is not enough: the bytes have to be the original's too.
     for name in sorted(set(ours) & set(claim)):
-        mine = kept if name == STRIPPED_CODE and kept is not None else raw_section(src_path, name)
+        mine = kept[name] if name in kept else raw_section(src_path, name)
         tgt = raw_section(obj_path, name)
         if mine is None or tgt is None:
             continue
+        if name in leads and mine:
+            mine = bytes(leads[name]) + mine    # the lead is fill (judged above): zero, as the target's is
         if name in padded:
             tgt = tgt[:padded[name]]        # the tail is fill (judged above): only our own bytes are compared
         if mine != tgt:
             problems += section_byte_problems(name, mine, tgt, src_path, obj_path)
             problems += data_seam_problems(unit, name, src_path, obj_path)
 
-    problems += pool_group_problems(unit, claim, ours, src_path, obj_path, padded=padded)
-    problems += positioned_symbol_problems(claim, ours, src_path, obj_path)
+    problems += pool_group_problems(unit, claim, ours, src_path, obj_path, padded=padded, leads=leads)
+    problems += positioned_symbol_problems(claim, ours, src_path, obj_path, leads=leads)
 
     # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function
     # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.
