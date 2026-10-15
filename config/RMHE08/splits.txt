@@ -3721,11 +3721,16 @@ SSL/ssl.cpp:
 	.sbss       start:0x80795888 end:0x80795890
 
 NCD/ncdsystem.c:
-	.text       start:0x8051C554 end:0x8051D710
-	.data       start:0x80630FE0 end:0x80631128
+	.text       start:0x8051C554 end:0x8051CDD0
+	.data       start:0x80630FE0 end:0x806310D0
 	.bss        start:0x80766920 end:0x80766980
-	.sdata      start:0x80794428 end:0x80794438
+	.sdata      start:0x80794428 end:0x80794430
 	.sbss       start:0x80795890 end:0x80795898
+
+NET/netmisc.c:
+	.text       start:0x8051CDD0 end:0x8051D710
+	.data       start:0x806310D0 end:0x80631128
+	.sdata      start:0x80794430 end:0x80794438
 
 NWC24/nwc24_msg.c:
 	.text       start:0x8051D710 end:0x8051E068 align:16

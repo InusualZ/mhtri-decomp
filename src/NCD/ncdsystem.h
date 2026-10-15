@@ -1,11 +1,12 @@
 /*
  * NCD/ncdsystem.h - declarations of the symbols owned by `NCD/ncdsystem.c` that other units call: the NCD
- *   configuration readers and the NET startup-error helper.
+ *   configuration readers (the NET helpers are `NET/netmisc.h`).
  */
 #ifndef MHTRI_NCD_NCDSYSTEM_H
 #define MHTRI_NCD_NCDSYSTEM_H
 
 #include "types.h"
+#include "NET/netmisc.h" /* the NET helpers linked after NCD, which callers of this header use */
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,28 +18,20 @@ extern "C" {
  * message and the range's own "NCDGetCurrentIfConfig" string. */
 s32 NCDGetCurrentIfConfig(u8* config);
 
-/* 0x8051D248 - copies the wireless MAC address (6 bytes) into `address`. GUESS on the name. */
-void NCDGetWirelessMacAddress(u8* address);
-
 /* 0x8051C64C - fill the caller's NCD IP configuration block; negative on failure (`NHTTPi_Startup`
  * passes its own system-info block and panics on a negative answer). */
 /* untyped: caller-owned payload */
 s32 NCDGetCurrentIpConfig(void* config);
 
-/* 0x8051D048 - the user-facing network error code for a failed `SOStartup` result (the SDK's NET
- * helper of that name; GUESS from its NCD-band neighbours and its one caller, which logs the negated
- * result as "Network Error Code is %d"). */
-s32 NETGetStartupErrorCode(s32 result);
-
 /* 0x8051C7A4 - the network link state (-8 / 1 while it is still coming up, 2 when the cable is out, negative on
  * failure). GUESS on the name: the SDK's NCD reader of that name, from SOStartupEx's wait on it. */
 s32 NCDGetLinkStatus(void);
 
-/* 0x8051D24C / 0x8051D60C - the NET library's memcpy / memset. */
-/* untyped: byte range */
-void* NETMemCpy(void* dst, const void* src, u32 size);
-/* untyped: byte range */
-void* NETMemSet(void* dst, s32 value, u32 size);
+/* 0x8051C8A8 - reads the wireless MAC address (6 bytes) through `/dev/net/ncd/manage`; negative on failure. */
+s32 NCDiGetWirelessMacAddress(u8* address);
+
+/* 0x8051C9D0 - the enabled profiles' masks by kind (wired, wireless, other wireless); negative on failure. */
+s32 NCDiGetEnabledConfigList(u32* wired, u32* wireless, u32* wirelessOther);
 
 #ifdef __cplusplus
 }

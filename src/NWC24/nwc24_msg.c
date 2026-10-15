@@ -73,12 +73,9 @@
  *     leak-free data run.  A future re-split may refine the position inside that window - it is the one
  *     open question in this register.
  *
- * BODY.  All 17 functions are reconstructed and measured; the unit's own pool
- * (`.data` 0x80631128-0x80631178, `.sdata` 0x80794438, `.sbss` 0x807958A0) is claimed and emitted, and
- * everything the bodies reference outside those ranges - the work block `.bss` 0x80766980, the
- * scheduler flags `.sbss` 0x807958A8-0x807958B4, the user-work pointer `.sbss` 0x80795898 and the
- * device-path literals `.data` 0x80631178+ - belongs to no registered unit and is declared `extern`
- * in `unsplit/NWC24.h` (playbook 29/58: declare, never define).
+ * BODY.  All 17 functions are reconstructed; the unit emits its whole data claim: `.data`
+ * 0x80631128-0x806311C0 (the version string, the request path and the two request names), `.sdata`
+ * 0x80794438 (`sVersionTag`), `.bss` 0x80766980-0x80766B00 and `.sbss` 0x80795898-0x807958B8.
  *
  * LOAD-BEARING SHAPES (each measured on its own):
  *   - the file carries `#pragma auto_inline off`: retail KEEPS the `bl NWC24IsMsgLibOpened` /
@@ -91,39 +88,32 @@
  *     The prototype keeps `u32*` because `DWCi/dwc_auth_interface.c` passes `(u32*)&DWCi_consoleFriendCode`;
  *     a `u64*` parameter compiles to the same row.  `error = (error != 0) ? error : resumeError;` is
  *     retail's tail (an `if (error == 0)` form loses the two copies).
+ *   - the request work is FOUR file statics in `.bss` (`sNwc24RequestMutex` +0x00, `sNwc24SchedulerMutex`
+ *     +0x18, the 32-byte-aligned `sNwc24InBuffer` +0x40 and `sNwc24OutBuffer` +0x60), not one struct: MWCC
+ *     addresses them from the section anchor, which is what gives retail's `addi r3,r31,0x0` for the
+ *     offset-0 mutex and the re-materialised `addi r3,r29,0x60` before each answer read (a struct
+ *     behind a `work` pointer folds both).  The one-time initialiser is the inline
+ *     `NWC24iInitRequestWork` with `level` declared at its top (a block-local `level` stops it inlining).
+ *   - `NULL` is the SDK's `((void*)0)` (playbook 125): the out-pointer tests are `li r0,0; cmplw`.
+ *     `NWC24iRequestGenerateUserId` tests the answer with `error == 0 || error == -35 || error == -36`.
  *   - the request entry points' thread/open checks are inline helpers returning -1/-10(/-26)/0 in r3
- *     (`NWC24iCheckRequestThread`, `NWC24iCheckScriptModeThread`); `NWC24iRequestGenerateUserId`'s
- *     answer copy is the inline `NWC24iCopyGeneratedUserId`, and its result test is a `switch`.
- *   - the work block's two mutexes are ONE 2-element array (`OSMutex mutex[2]`, 0x00/0x18) and every
- *     device-request function hoists a `work = &sNwc24Work` local; as two separate members, or with
- *     direct `sNwc24Work.` access in the request paths, MWCC does not common the base register and
- *     `NWC24iSetScriptMode` / `NWC24iRequestIoctl` / `NWC24iRequestGenerateUserId` each lose 5-12 B.
+ *     (`NWC24iCheckRequestThread`, `NWC24iCheckScriptModeThread`); the answer copy is the inline
+ *     `NWC24iCopyGeneratedUserId`.
  *   - `sMsgLibOpenState` is `s32`: retail compares it SIGNED, so a `u32` gives `cmplwi` where the
  *     target has `cmpwi` in `NWC24BlockOpenMsgLib`.
+ *   - data layout: `.sbss` is laid out in reverse declaration order, so the words are declared from the
+ *     top of the range down; the work-pointer slot is 8 bytes (an unreferenced separate word is
+ *     dead-stripped by mwld and shifts the rest of `.sbss`).  `.data` holds the four strings as arrays
+ *     (as literals at the call sites they follow the arrays and land in first-use order).
  *
- * Residuals:
- *   - `mr r3,r31` where retail has `addi r3,r31,0x0` for the offset-0 mutex argument
- *     (`NWC24SuspendScheduler`, `NWC24ResumeScheduler`, `NWC24iRequestIoctl`, `NWC24iSetScriptMode`,
- *     `NWC24iRequestGenerateUserId`): the target object's `addi r3,r31,0` carries NO relocation, so it is
- *     a real `+0` the optimiser kept where ours folds it to a register copy.  Measured without effect:
- *     four argument spellings, the init block as an inline helper (with a work parameter, with the
- *     global, as a getter returning the work pointer), a two-iteration loop, direct global access,
- *     `#pragma peephole off`, and the GC/3.0a3-3.0a5.2 and Wii/1.0-1.1 compilers.
- *   - `NWC24iRequestGenerateUserId` / `NWC24iRequestIoctl`: retail tests the optional out-pointers with
- *     `li r0,0; cmplw` and reads the answer through `addi r3,r29,0x60` + `lwz 4(r3)`; ours `cmpwi` and
- *     folds the offset (a `(void*)0` NULL, an inline copy helper and a struct view of the answer were
- *     measured without effect).  Retail tests 0 / -35 / -36 as three compares; an `||` chain gives a
- *     range compare, the `switch` (best measured) a compare tree.
- *   - `NWC24iSetScriptMode`: the -26 arm of the check helper is if-converted (`neg/or/srawi/and`) where
- *     retail branches; five spellings of the helper measured identical.
- *   - `NWC24iRequestIoctl` keeps `lwz r0,0x64(r31)` where retail computes `&outBuffer` first.
- *   - the device-request entry points (`NWC24SuspendScheduler`, `NWC24ResumeScheduler`,
- *     `NWC24iSetScriptMode`, `NWC24iRequestGenerateUserId`, `NWC24iRequestIoctl`) repeat the same
- *     one-time work-block initialiser verbatim, because retail's object carries an inlined copy in each.
- *   - `datagap.py` reports `target-extra .data 80 B (ours 74 B)`: the claimed range
- *     0x80631128-0x80631178 is the version string (74 B) plus the 6 bytes dtk's range boundary rounds
- *     it out to, i.e. `.data` alignment padding the source cannot emit as a definition (the bytes
- *     themselves are identical).
+ * RESIDUALS.
+ *   - `.data`: `Nwc24RequestPath` is declared `__attribute__((aligned(8)))`, which reproduces retail's six
+ *     zero bytes after the version string; what the original declared there is not known.
+ *   - `.bss` 0x80766A00-0x80766B00 (0x100 B) is addressed by nothing in the image; it is emitted as the
+ *     unreferenced `sNwc24ReservedWork` (GUESS), which mwld keeps.
+ *   - the relocations name the `.bss` anchor where the map names `sNwc24Work` (0x180 B over the four
+ *     statics and the reserve), and `sVersionTag` names `sNwc24Version` where the map has `lbl_80631128`;
+ *     the addresses are identical (map requests filed).
  */
 
 #include "types.h"
@@ -135,13 +125,66 @@
 
 #pragma auto_inline off
 
-/* The library's state (`.sbss` 0x807958A0/0x807958A4, inside the unit's own `.sbss` range).  Both
-   names are GUESSes - the original spellings are not in the image - and are derived from what the
-   API does with them: the open state's four values (0 closed, 1 opened by the game, 2 opened by a
-   tool, 3 open blocked) are exactly the four the public predicates compare against, and the second
-   word is the 0/1 flag NWC24iRegisterVersion sets around its one OSRegisterVersion call. */
-static s32 sMsgLibOpenState;   /* 0 closed, 1 opened by the game, 2 opened by a tool, 3 open blocked */
-static u32 sVersionRegistered; /* NWC24 version-registration flag */
+#undef NULL
+#define NULL ((void*)0)
+
+/* The head of the library's work area as the user-id read sees it: the cached 64-bit user id at +0x08. */
+typedef struct NWC24UserWork {
+    /* +0x00 */ u8 pad_0x00[0x08];
+    /* +0x08 */ u64 userId;
+} NWC24UserWork; /* size: 0x10 (approximation: only the user-id prefix is modelled) */
+
+/* The `.sbss` slot holding the work pointer: 8 bytes in retail, of which only the pointer is addressed. */
+typedef struct NWC24UserWorkSlot {
+    /* +0x00 */ NWC24UserWork* work;
+    /* +0x04 */ u32 unused_0x04;
+} NWC24UserWorkSlot; /* size: 0x8 */
+
+/* `.data` 0x80631128-0x806311BC: the version string, the request device's path and the two request
+   names the device layer reports errors under. */
+static char sNwc24Version[] = "<< RVL_SDK - NWC24 \trelease build: Jun  9 2009 11:59:51 (0x4199_60831) >>";
+static char Nwc24RequestPath[] __attribute__((aligned(8))) = "/dev/net/kd/request";
+static char Nwc24SetScriptModeName[] = "NWC24iSetScriptMode";
+static char Nwc24GenerateUserIdName[] = "NWC24iRequestGenerateUserId";
+
+/* `.bss` 0x80766980-0x80766B00: the request and scheduler mutexes, the 32-byte command input and
+   output buffers, and 0x100 bytes nothing in the image addresses. */
+static OSMutex sNwc24RequestMutex;
+static OSMutex sNwc24SchedulerMutex;
+static u32 sNwc24InBuffer[8] __attribute__((aligned(32)));
+static u32 sNwc24OutBuffer[8] __attribute__((aligned(32)));
+static u8 sNwc24ReservedWork[0x100];
+
+/* `.sbss` 0x80795898-0x807958B4 (MWCC lays the words out in reverse declaration order), from the bottom:
+   the library's work-pointer slot, the open state (0 closed, 1 opened by the game, 2 opened by a tool, 3 open blocked), the 0/1 flag
+   NWC24iRegisterVersion sets around its OSRegisterVersion call, the request work's one-time
+   initialisation flag (bit 0), and the scheduler pair's suspend depth and the limit both compare
+   against. */
+static s32 sNwc24ResumeLimit;
+static s32 sNwc24SuspendCount;
+static u32 sNwc24WorkInit;
+static u32 sVersionRegistered;
+static s32 sMsgLibOpenState;
+static NWC24UserWorkSlot sNwc24UserWork;
+
+/* Initialises the request mutexes and buffers once. */
+static inline void NWC24iInitRequestWork(void)
+{
+    BOOL level;
+
+    if ((sNwc24WorkInit & 1) == 0) {
+        level = OSDisableInterrupts();
+
+        if ((sNwc24WorkInit & 1) == 0) {
+            OSInitMutex(&sNwc24RequestMutex);
+            OSInitMutex(&sNwc24SchedulerMutex);
+            memset(sNwc24InBuffer, 0, 32);
+            memset(sNwc24OutBuffer, 0, 32);
+            sNwc24WorkInit |= 1;
+        }
+        OSRestoreInterrupts(level);
+    }
+}
 
 /* The library's version tag (`.sdata` 0x80794438, 8 B: the version-string pointer plus a zero word -
    the DOL's own bytes there are 0x80631128 then 0x00000000).  The literal itself is pooled into `.data`. */
@@ -152,7 +195,7 @@ typedef struct NWC24VersionTag {
 
 /* NAME (a GUESS, see the header): the tag NWC24iRegisterVersion hands to OSRegisterVersion. */
 static NWC24VersionTag sVersionTag = {
-    "<< RVL_SDK - NWC24 \trelease build: Jun  9 2009 11:59:51 (0x4199_60831) >>",
+    sNwc24Version,
     0,
 };
 
@@ -196,7 +239,7 @@ int NWC24iGetUserId(u32* userId) {
     s32 error = 0;
 
     if (NWC24IsMsgLibOpened() || NWC24IsMsgLibOpenedByTool()) {
-        *(u64*)userId = sNwc24UserWork->userId;
+        *(u64*)userId = sNwc24UserWork.work->userId;
     } else {
         s32 check;
         s32 resumeError;
@@ -282,28 +325,16 @@ int NWC24BlockOpenMsgLib(int block)
 /* 0x8051D98C (0xF0): raise the suspension depth and ask the device to suspend the scheduler. */
 int NWC24SuspendScheduler(void)
 {
-    NWC24RequestWork* work = &sNwc24Work;
     s32 error;
 
-    if ((sNwc24WorkInit & 1) == 0) {
-        BOOL level = OSDisableInterrupts();
-
-        if ((sNwc24WorkInit & 1) == 0) {
-            OSInitMutex(&work->mutex[0]);
-            OSInitMutex(&work->mutex[1]);
-            memset(work->inBuffer, 0, 32);
-            memset(work->outBuffer, 0, 32);
-            sNwc24WorkInit |= 1;
-        }
-        OSRestoreInterrupts(level);
-    }
-    OSLockMutex(&work->mutex[1]);
+    NWC24iInitRequestWork();
+    OSLockMutex(&sNwc24SchedulerMutex);
     error = NWC24iRequestCommand1();
     if (error >= 0) {
         sNwc24SuspendCount++;
         error = error - sNwc24ResumeLimit;
     }
-    OSUnlockMutex(&work->mutex[1]);
+    OSUnlockMutex(&sNwc24SchedulerMutex);
     return error;
 }
 
@@ -311,22 +342,10 @@ int NWC24SuspendScheduler(void)
  * suspended and the resume limit has not been reached. */
 int NWC24ResumeScheduler(void)
 {
-    NWC24RequestWork* work = &sNwc24Work;
     s32 error;
 
-    if ((sNwc24WorkInit & 1) == 0) {
-        BOOL level = OSDisableInterrupts();
-
-        if ((sNwc24WorkInit & 1) == 0) {
-            OSInitMutex(&work->mutex[0]);
-            OSInitMutex(&work->mutex[1]);
-            memset(work->inBuffer, 0, 32);
-            memset(work->outBuffer, 0, 32);
-            sNwc24WorkInit |= 1;
-        }
-        OSRestoreInterrupts(level);
-    }
-    OSLockMutex(&work->mutex[1]);
+    NWC24iInitRequestWork();
+    OSLockMutex(&sNwc24SchedulerMutex);
     if (sNwc24ResumeLimit > 0 && sNwc24SuspendCount == 0) {
         error = 0;
     } else {
@@ -336,7 +355,7 @@ int NWC24ResumeScheduler(void)
             error = error - sNwc24ResumeLimit;
         }
     }
-    OSUnlockMutex(&work->mutex[1]);
+    OSUnlockMutex(&sNwc24SchedulerMutex);
     return error;
 }
 
@@ -360,7 +379,6 @@ static inline s32 NWC24iCheckScriptModeThread(void)
  * the device's answer travel in the work block's two 32-byte buffers. */
 int NWC24iSetScriptMode(u32 mode)
 {
-    NWC24RequestWork* work = &sNwc24Work;
     s32 error = 0;
     s32 fd;
 
@@ -368,27 +386,16 @@ int NWC24iSetScriptMode(u32 mode)
     if (error < 0) {
         return error;
     }
-    if ((sNwc24WorkInit & 1) == 0) {
-        BOOL level = OSDisableInterrupts();
-
-        if ((sNwc24WorkInit & 1) == 0) {
-            OSInitMutex(&work->mutex[0]);
-            OSInitMutex(&work->mutex[1]);
-            memset(work->inBuffer, 0, 32);
-            memset(work->outBuffer, 0, 32);
-            sNwc24WorkInit |= 1;
-        }
-        OSRestoreInterrupts(level);
-    }
-    OSLockMutex(&work->mutex[0]);
-    memset(work->inBuffer, 0, 32);
+    NWC24iInitRequestWork();
+    OSLockMutex(&sNwc24RequestMutex);
+    memset(sNwc24InBuffer, 0, 32);
     error = NWC24iOpenFd((u32)Nwc24SetScriptModeName, Nwc24RequestPath, &fd, 0);
     if (error >= 0) {
-        work->inBuffer[0] = mode;
-        error = NWC24iIoctl((u32)Nwc24SetScriptModeName, fd, 34, work->inBuffer, 32,
-                            work->outBuffer, 32);
+        sNwc24InBuffer[0] = mode;
+        error = NWC24iIoctl((u32)Nwc24SetScriptModeName, fd, 34, sNwc24InBuffer, 32,
+                            sNwc24OutBuffer, 32);
         if (error >= 0) {
-            error = (s32)work->outBuffer[0];
+            error = (s32)sNwc24OutBuffer[0];
         }
         {
             s32 closeError = NWC24iCloseFd((u32)Nwc24SetScriptModeName, fd);
@@ -398,7 +405,7 @@ int NWC24iSetScriptMode(u32 mode)
             }
         }
     }
-    OSUnlockMutex(&work->mutex[0]);
+    OSUnlockMutex(&sNwc24RequestMutex);
     return error;
 }
 
@@ -430,7 +437,6 @@ static inline void NWC24iCopyGeneratedUserId(u32* answer, u64* userId, u32* tick
  * output buffer and is copied out with the ticket word that follows it. */
 int NWC24iRequestGenerateUserId(u64* userId, u32* ticket)
 {
-    NWC24RequestWork* work = &sNwc24Work;
     s32 error = 0;
     s32 fd;
 
@@ -438,30 +444,15 @@ int NWC24iRequestGenerateUserId(u64* userId, u32* ticket)
     if (error < 0) {
         return error;
     }
-    if ((sNwc24WorkInit & 1) == 0) {
-        BOOL level = OSDisableInterrupts();
-
-        if ((sNwc24WorkInit & 1) == 0) {
-            OSInitMutex(&work->mutex[0]);
-            OSInitMutex(&work->mutex[1]);
-            memset(work->inBuffer, 0, 32);
-            memset(work->outBuffer, 0, 32);
-            sNwc24WorkInit |= 1;
-        }
-        OSRestoreInterrupts(level);
-    }
-    OSLockMutex(&work->mutex[0]);
+    NWC24iInitRequestWork();
+    OSLockMutex(&sNwc24RequestMutex);
     error = NWC24iOpenFd((u32)Nwc24GenerateUserIdName, Nwc24RequestPath, &fd, 0);
     if (error >= 0) {
-        error = NWC24iIoctl((u32)Nwc24GenerateUserIdName, fd, 15, 0, 0, work->outBuffer, 32);
+        error = NWC24iIoctl((u32)Nwc24GenerateUserIdName, fd, 15, 0, 0, sNwc24OutBuffer, 32);
         if (error >= 0) {
-            error = (s32)work->outBuffer[0];
-            switch (error) {
-            case 0:
-            case -35:
-            case -36:
-                NWC24iCopyGeneratedUserId(work->outBuffer, userId, ticket);
-                break;
+            error = (s32)sNwc24OutBuffer[0];
+            if (error == 0 || error == -35 || error == -36) {
+                NWC24iCopyGeneratedUserId(sNwc24OutBuffer, userId, ticket);
             }
         }
         {
@@ -473,7 +464,7 @@ int NWC24iRequestGenerateUserId(u64* userId, u32* ticket)
             }
         }
     }
-    OSUnlockMutex(&work->mutex[0]);
+    OSUnlockMutex(&sNwc24RequestMutex);
     return error;
 }
 
@@ -512,33 +503,21 @@ int NWC24iRequestCommand3(void)
  * plus, for the two "retry" answers (-2 and -33), the word that follows it. */
 int NWC24iRequestIoctl(u32 handle, u32 command, u32* argument)
 {
-    NWC24RequestWork* work = &sNwc24Work;
     s32 error;
     s32 fd;
 
     if (OSGetCurrentThread() == 0) {
         return -1;
     }
-    if ((sNwc24WorkInit & 1) == 0) {
-        BOOL level = OSDisableInterrupts();
-
-        if ((sNwc24WorkInit & 1) == 0) {
-            OSInitMutex(&work->mutex[0]);
-            OSInitMutex(&work->mutex[1]);
-            memset(work->inBuffer, 0, 32);
-            memset(work->outBuffer, 0, 32);
-            sNwc24WorkInit |= 1;
-        }
-        OSRestoreInterrupts(level);
-    }
-    OSLockMutex(&work->mutex[0]);
+    NWC24iInitRequestWork();
+    OSLockMutex(&sNwc24RequestMutex);
     error = NWC24iOpenFd(handle, Nwc24RequestPath, &fd, 0);
     if (error >= 0) {
-        error = NWC24iIoctl(handle, fd, command, 0, 0, work->outBuffer, 32);
+        error = NWC24iIoctl(handle, fd, command, 0, 0, sNwc24OutBuffer, 32);
         if (error >= 0) {
-            error = (s32)work->outBuffer[0];
-            if ((error == -2 || error == -33) && argument != 0) {
-                *argument = work->outBuffer[1];
+            error = (s32)sNwc24OutBuffer[0];
+            if ((error == -2 || error == -33) && argument != NULL) {
+                *argument = sNwc24OutBuffer[1];
             }
         }
         {
@@ -549,6 +528,6 @@ int NWC24iRequestIoctl(u32 handle, u32 command, u32* argument)
             }
         }
     }
-    OSUnlockMutex(&work->mutex[0]);
+    OSUnlockMutex(&sNwc24RequestMutex);
     return error;
 }

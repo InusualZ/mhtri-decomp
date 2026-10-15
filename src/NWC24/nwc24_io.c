@@ -61,22 +61,14 @@
  * `0x80794440` (span 400 B) binds NWC24iPrepareShutdown to NWC24iRequestShutdown at the band's top;
  * the split position and its window are documented in the sibling's header.
  *
- * BODY.  All twelve functions are reconstructed and seven are byte-identical: `NWC24iOpenFd`,
- * `NWC24iIsAsyncIoctlBusy`, `NWC24iCloseFd`, `NWC24iIoctl`, `NWC24iCheckUserIdCRC`,
- * `NWC24iSynchronizeRtcCounter` and `NWC24iRequestShutdown`.  The unit measures 80.69472 % fuzzy over
- * its 2044 B.  The definitions run in ADDRESS order (flip requirement), so a body written later slots
- * into its own address, not at the end.
+ * BODY.  All twelve functions are reconstructed.  The definitions run in ADDRESS order (flip
+ * requirement), so a body written later slots into its own address, not at the end.
  *
  * DATA CLAIMED (rule 12; each range is referenced ONLY by this unit's own rows - checked with
- * `tools/units/callers.py` - so it is this TU's to own): `.sdata` 0x80794440-0x80794448
- * (`sShutdownFd`), `.sbss` 0x807958B8-0x807958D8 (the RTC work flag, the async slot and the three
- * shutdown words), `.bss` 0x80766B00-0x80766C40 (the RTC work block, the OS shutdown record and the
- * async request/reply blocks) and `.data` 0x806311E8-0x8063122C (this half's three literals).  Still
- * unowned and therefore declared `extern` in `unsplit/NWC24.h`: the sibling half's device-path
- * literals (`.data` 0x80631178-0x806311E8) and the library's message work block
- * (`.bss` 0x80766980-0x80766B00) - both are read by `nwc24_msg.c`'s rows as well, so claiming them
- * The `.rodata` 0x80574E00-0x80574E10 nibble table (`sNwc24UserIdSbox`, renamed from lbl_80574E00) is claimed too: its only
- * referencer is `getUnScrambleId`, and the body now emits it.
+ * `tools/units/callers.py`) and emitted by this file: `.rodata` 0x80574E00-0x80574E10 (`sNwc24UserIdSbox`),
+ * `.data` 0x806311C0-0x80631230 (the five strings), `.bss` 0x80766B00-0x80766C40 (a 0x80-byte reserve,
+ * the RTC mutex and buffers, the OS shutdown record and the async request/reply blocks), `.sdata`
+ * 0x80794440-0x80794448 (`sShutdownFd`) and `.sbss` 0x807958B8-0x807958D8.
  *
  * LOAD-BEARING SHAPES (each measured):
  *   - `NWC24iCheckUserIdCRC`: `for (i = 0; i < 43; i++) if ((id >> (53 - (i + 1))) & 1) id ^=
@@ -102,15 +94,22 @@
  *     instruction (97.98 %).
  *   - `NWC24iPrepareShutdown`: the `if (sShutdownFd.fd < 0)` open path is a fall-through with `result`
  *     pre-loaded to 0, and the SC park loop is a `for (;;)` whose `continue` re-runs `SCCheckStatus`.
- *   - file-wide `#pragma dont_inline on`: retail's `NWC24iSetRtcCounter` keeps three `bl`s
- *     (`NWC24iOpenFd` at target `.text` +0x3DC, `NWC24iIoctl` +0x410, `NWC24iCloseFd` +0x430 - the
- *     target object's own relocations) where `-inline auto` folds all three wrappers into it; the
- *     pragma reclaims them and lifts the row 40.50 -> 92.24.  A scoped pair around
- *     `NWC24iSetRtcCounter` measures exactly the same (92.24390 / unit 39.65558), and the file-wide
- *     form was kept: the pragma is a TU-wide setting (playbook 33) and its sibling `nwc24_msg.c`
- *     carries the same line for the same reason.
+ *   - `#pragma auto_inline off`: retail's `NWC24iSetRtcCounter` keeps three `bl`s (`NWC24iOpenFd`,
+ *     `NWC24iIoctl`, `NWC24iCloseFd`) where `-inline auto` folds the wrappers into it; the explicit
+ *     `static inline` helpers (`NWC24iInitRtcWork`, `NWC24iCheckRtcThread`) still inline.
+ *   - the RTC work is three file statics (`sNwc24RtcMutex`, the 32-byte-aligned `sNwc24RtcInBuffer`
+ *     and `sNwc24RtcOutBuffer`) addressed from the `.bss` anchor at 0x80766B00, which is what keeps
+ *     retail's `addi r6,r30,0xa0` / `stw r28,4(r6)` in-buffer stores and lets the -1/0 thread-check
+ *     helper stay a branch (with a struct behind a `work` pointer it is if-converted to
+ *     `cntlzw`/`extrwi`/`neg.`).  The mutex sits at +0x80: `.bss` is laid out in first-use order, so the
+ *     0x80-byte `sNwc24IoReservedWork` (GUESS) is first used by the static `NWC24iClearReservedWork`
+ *     (GUESS name and body), compiled ahead of every other `.bss` user and dead-stripped by mwld.
+ *     `NWC24iInitRtcWork` declares `level` at its top (retail keeps it in r31).
+ *   - `.sbss` is laid out in reverse declaration order, so its words are declared from the top of the
+ *     range down; that order also gives `NWC24iPrepareShutdown`, `NWC24iIoctlAsync` and
+ *     `NWC24iAsyncIoctlCallback` retail's schedule.
  *
- * getUnScrambleId (45.35 %, semantics PROVEN): the function takes the 64-bit user id in
+ * getUnScrambleId (semantics PROVEN): the function takes the 64-bit user id in
  *   r3:r4 (the CRC wrapper and its caller pass it straight through - both were declared `(void)` before, which
  *   is why a `bl` alone scored 100 %) and is, bit for bit: `v = ((id & 2^53-1) ^ 0x5E5E5E5E5E5E) & 2^53-1`; rotate
  *   `v` one bit right inside 53 bits; move bytes 1,5,3,4,2,0 round the 6-cycle (byte0<-1, 1<-5, 5<-3, 3<-4,
@@ -118,43 +117,20 @@
  *   rotate 10 bits left inside 53 bits; xor 0xB3B3B3B3B3B3.  Derived by emulating the target's 161 instructions
  *   over random inputs and matching a model (0 mismatches over 2000 inputs; the source transcribed likewise).
  *   Load-bearing shapes: the cycle is moves through ONE temporary and its START is load-bearing (start at byte
- *   2 = 45.35 %, the other five starts 36.7-43.8 %); per-byte replace is `(v & ~(0xFFULL << s)) | (u8)sub << s`
- *   with the nibbles indexed from a `u32` byte (`(u32)(v >> s) & 0xFF`), which is what makes MWCC insert with
- *   `rlwimi` and index with `rlwinm` as retail does; a `u8` sub value widened through `u64` costs a `srawi`.
- *   Residual: 0x290 B against 0x284; the mask/rotate chains of the byte cycle and the final 53-bit rotate are
- *   scheduled/combined differently (retail folds the final rotate into four `rlwinm`/`rlwimi` with no trailing
- *   mask; ours keeps `slwi`/`srwi`/`or`), and the register order of the early constants differs.  The original
- *   spelling of the cycle and the rotate is not decidable from the DOL; six cycle starts, two rotate spellings
- *   and two final-mask spellings were measured (grid, 24 builds).
+ *   2 is best, the other five starts and a copy-based ascending permutation measure lower); per-byte replace is
+ *   `(v & ~(0xFFULL << s)) | (u8)sub << s` with the nibbles indexed from a `u32` byte (`(u32)(v >> s) & 0xFF`),
+ *   which is what makes MWCC insert with `rlwimi` and index with `rlwinm` as retail does; a `u8` sub value
+ *   widened through `u64` costs a `srawi`.  The one-bit rotate is `(v | (v & 1) << 53) >> 1` (retail ORs
+ *   `rlwinm r0,lo,21,10,10` into the high word before the `srwi`), and the closing rotate masks its low part
+ *   (`(v >> 43) & 0x3FF`, retail's `rlwinm r3,hi,21,22,31`) with the xor applied unmasked.
  *
- * Other residuals:
- *   - `NWC24iSetRtcCounter`'s own residual (92.24 %, frame 0x30 both sides, all three `bl`s kept):
- *     retail's thread guard is an if-assignment into `error` that is re-tested (`li r3,-1` / `li r3,0` /
- *     `cmpwi r3,0` / `bge <body>` / `b <epilogue>`), four instructions ours does not carry because ours
- *     returns -1 straight to the epilogue; the faithful spelling of that shape -
- *     `error = OSGetCurrentThread() == 0 ? -1 : 0;` plus `if (error >= 0) { ...body... } return error;` -
- *     measured 87.55 % and was rejected (the body restructure costs more than the seam is worth).  What is
- *     left besides it is register colouring (retail keeps the disabled-interrupts level in r31 and the
- *     open/fd error in r28 where ours uses r29: `mr r31,r3` vs `mr r29,r3`, `stw r28,0x4(r6)` vs
- *     `stw r28,0xa4(r30)`) and one scheduling swap (retail materialises the in-buffer base `addi r6,r30,0xa0`
- *     before the `stw r27,0xa0(r30)`; ours after).
- *   - `NWC24iPrepareShutdown` 99.375 % (192 B both sides): the instruction multiset is identical; only
- *     the four-instruction window that builds `sShutdownInfo` is SCHEDULED differently (retail emits
- *     `lis r5,func@ha` / `lis r4,info@ha` / `addi r5,..` / `li r0,110` / `addi r3,..`, ours emits the
- *     two `lis` and the two `addi` in the other order).  Both source orders (`func` first, `priority`
- *     first) and a by-pointer spelling were measured and give the same schedule, so the residual is the
- *     list scheduler's, not the source's.
- *   - `NWC24iIoctlAsync` 91.30 % and `NWC24iAsyncIoctlCallback` 71.43 %: both are instruction-complete
- *     and differ only in the placement of ONE `li r3,0` - retail materialises the return value before
- *     the final `stw`, ours after.  Three spellings each (`if (error < 0) return -0x2A;` then the store
- *     then `return 0`, an if/else over a `result` local, and `result = 0` before/after the store) all
- *     measure identically, so the residual is the scheduler's here too.
- *
- * DATA residual (measured with `tools/units/datagap.py --unit NWC24/nwc24_io --mode both`): NO
- * `ours-extra` row.  `target-extra .data 68 B (ours 66 B)` is the two bytes of alignment padding
- * between this half's last literal (ends 0x8063122A) and the next `.data` object (0x80631230) - bytes
- * the source cannot emit as a definition, the same class as the sibling's own 6-byte pad.  The
- * `.rodata` and `.text` have no gap now.
+ * RESIDUALS.
+ *   - `getUnScrambleId`: 0x290 B against 0x284 (ours also saves r28); the byte-cycle mask chains are
+ *     scheduled differently, and the closing rotate keeps an `and` with the 53-bit mask (`and r3,r5,r7`,
+ *     `and r6,r3,r8`) where retail folds it into `rlwinm r5,hi,10,11,21`; six final-mask spellings, six
+ *     cycle starts and a copy-based permutation were measured.
+ *   - the relocations name the `.bss` anchor where the map names `sNwc24RtcWork` (0xE0 B over the
+ *     reserve, the mutex and the buffers); the addresses are identical (map request filed).
  */
 
 #include "types.h"
@@ -163,12 +139,12 @@
 #include "IPC/ipcclt.h"
 #include "unsplit/SC.h"       /* SCCheckStatus / SCGetIdleMode / SCGetCounterBias */
 #include "OS/OSStateTM.h"    /* SCSetIdleMode (rule 2) */
-#include "unsplit/NWC24.h"    /* the band's unowned work block and literals (rule 2) */
+#include "unsplit/NWC24.h"    /* the RTC shadow words (rule 2) */
 #include "unsplit/OS.h"       /* OSDisable(Interrupts) / OSRestoreInterrupts / OSInitMutex /
                                  OSGetTime / OSGetAppType / OSRegisterShutdownFunction */
 #include "Runtime.PPCEABI.H/memset.h"
 
-#pragma dont_inline on
+#pragma auto_inline off
 
 /* The RTC work block's one-time-initialisation flag (`.sbss` 0x807958B8).  The band's `.sbss`
    reserves two words here (the map sizes the symbol at 8 B) and nothing in the unit touches +0x04. */
@@ -177,21 +153,17 @@ typedef struct NWC24RtcWorkFlag {
     /* +0x04 */ u32 unused_04;
 } NWC24RtcWorkFlag; /* size: 0x8 */
 
-static NWC24RtcWorkFlag sNwc24RtcWorkInit; /* 0x807958B8 */
-
-/* The in-flight async command slot (`.sbss` 0x807958C0, inside the unit's own `.sbss` range).  The
-   map sizes the object at 8 B with no label at +0x4, so it is a two-word slot; the band's code only
-   ever touches word 0.  NAME (a GUESS, see the header): the async wrapper sets it, the completion
-   callback clears it, and `NWC24iIsAsyncIoctlBusy` reads it. */
+/* `.sbss` 0x807958B8-0x807958D4, declared from the top of the range down (MWCC lays the words out in
+   reverse declaration order): the shutdown half's async result word, in-flight flag and retry
+   countdown (armed at 5 by the prepare step, counted down by the handler), the in-flight async command
+   slot (the async wrapper sets word 0, the completion callback clears it, `NWC24iIsAsyncIoctlBusy` reads
+   it; nothing touches word 1) and the RTC work's one-time-initialisation flag.  The names are GUESSes
+   derived from those uses. */
+static s32 sShutdownIoctlResult;
+static s32 sShutdownRequestPending;
+static s32 sShutdownRetryCount;
 static u32 sAsyncIoctlSlot[2];
-
-/* The shutdown half's own state (`.sbss` 0x807958C8, right after `sAsyncIoctlSlot`).  All four names
-   are GUESSes - the image carries no spelling for them - derived from the two functions that use
-   them: the prepare step arms the countdown at 5, the handler counts it down and clears the
-   in-flight flag, and the async callback stores the device's answer into the result word. */
-static s32 sShutdownRetryCount;     /* +0x00 */
-static s32 sShutdownRequestPending; /* +0x04 */
-static s32 sShutdownIoctlResult;    /* +0x08 */
+static NWC24RtcWorkFlag sNwc24RtcWorkInit;
 
 /* The request device's descriptor slot (`.sdata` 0x80794440, 8 B): the descriptor starts at -1 so
    `NWC24iPrepareShutdown` opens the device, and `NWC24iRequestShutdown` hands the value to the async
@@ -205,19 +177,12 @@ typedef struct NWC24ShutdownFdSlot {
 
 static NWC24ShutdownFdSlot sShutdownFd = { -1, 0 };
 
-/* The device layer's own work block (`.bss` 0x80766B00, 0xE0 B): the mutex its requests take and
-   the two 32-byte buffers an ioctl travels in.  It is referenced only by `NWC24iSetRtcCounter`
-   (checked with `tools/units/callers.py`), so it is this unit's to own (rule 12) - the type used to
-   live in `unsplit/NWC24.h` as a foreign declaration. size: 0xE0 */
-typedef struct NWC24RtcWork {
-    /* +0x000 */ u8 pad_0x000[0x80];
-    /* +0x080 */ OSMutex mutex;
-    /* +0x098 */ u8 pad_0x098[0x08];
-    /* +0x0A0 */ u32 inBuffer[8];
-    /* +0x0C0 */ u32 outBuffer[8];
-} NWC24RtcWork; /* size: 0xE0 */
-
-static NWC24RtcWork sNwc24RtcWork; /* 0x80766B00 */
+/* `.bss` 0x80766B00-0x80766BE0, in first-use order: 0x80 bytes nothing in the image addresses (GUESS
+   name), then the mutex the RTC request takes and the two 32-byte buffers its ioctl travels in. */
+static u8 sNwc24IoReservedWork[0x80];
+static OSMutex sNwc24RtcMutex;
+static u32 sNwc24RtcInBuffer[8] __attribute__((aligned(32)));
+static u32 sNwc24RtcOutBuffer[8] __attribute__((aligned(32)));
 
 /* The record `NWC24iPrepareShutdown` registers with the OS (`.bss` 0x80766BE0).  The band's `.bss`
    reserves 0x20 bytes for it (the map's own gap to the next symbol at 0x80766C00), so the tail is
@@ -238,12 +203,22 @@ static NWC24ShutdownInfo sShutdownInfo;       /* 0x80766BE0 */
 static NWC24ShutdownRequest sShutdownRequest; /* 0x80766C00 */
 static u32 sShutdownReply[8];                 /* 0x80766C20, the ioctl's `outLen` block */
 
-/* The three literals this half of the library owns (`.data` 0x806311E8-0x8063122A).  `Nwc24RequestPath`
-   (0x80631178) is the sibling unit's copy of the same device path - the two copies are what makes
-   NWC24 two translation units (`-str reuse` merges identical literals inside one TU). */
+/* The five strings this half of the library owns (`.data` 0x806311C0-0x8063122A): the time device's
+   path, the RTC setter's name, and the shutdown pair's names around the request device's path.  The
+   request path is emitted again in `NWC24/nwc24_msg.c` - the two copies are what makes NWC24 two
+   translation units (`-str reuse` merges identical literals inside one TU). */
+static char Nwc24TimePath[] = "/dev/net/kd/time";
+static char Nwc24SetRtcName[] = "NWC24iSetRtcCounter";
 static char Nwc24PrepareShutdownName[] = "NWC24iPrepareShutdown";
 static char Nwc24RequestPath2[] = "/dev/net/kd/request";
 static char Nwc24RequestShutdownName[] = "NWC24iRequestShutdown";
+
+/* Clears the reserved work block.  Nothing in the image calls it, so the linker strips it; it is compiled
+   before every other user of `.bss`, which is what puts `sNwc24IoReservedWork` first in the section. */
+static void NWC24iClearReservedWork(void)
+{
+    memset(sNwc24IoReservedWork, 0, sizeof(sNwc24IoReservedWork));
+}
 
 /* 0x8051E068 (0x98): validate the 64-bit user id - unscramble it and fold bit `52 - i` of the
  * running value back into it 42 + i positions up, 43 times; anything left over is the -37 answer. */
@@ -287,7 +262,7 @@ u64 getUnScrambleId(u64 id)
     u64 v = ((id & NWC24_ID_MASK) ^ 0x5E5E5E5E5E5EULL) & NWC24_ID_MASK;
     u32 first;
 
-    v = (v >> 1) | ((v & 1) << 52);
+    v = (v | ((v & 1) << 53)) >> 1;
     first = NWC24_BYTE(v, 2);
     NWC24_PUT_BYTE(v, 2, NWC24_BYTE(v, 0));
     NWC24_PUT_BYTE(v, 0, NWC24_BYTE(v, 1));
@@ -301,40 +276,57 @@ u64 getUnScrambleId(u64 id)
     NWC24_SUB_BYTE(v, 3);
     NWC24_SUB_BYTE(v, 4);
     NWC24_SUB_BYTE(v, 5);
-    v = ((v << 10) | (v >> 43)) & NWC24_ID_MASK;
-    return (v ^ 0xB3B3B3B3B3B3ULL) & NWC24_ID_MASK;
+    v = ((v << 10) | ((v >> 43) & 0x3FF)) & NWC24_ID_MASK;
+    return v ^ 0xB3B3B3B3B3B3ULL;
+}
+
+/* Initialises the RTC request mutex and buffers once. */
+static inline void NWC24iInitRtcWork(void)
+{
+    BOOL level;
+
+    if (sNwc24RtcWorkInit.init == 0) {
+        level = OSDisableInterrupts();
+
+        if (sNwc24RtcWorkInit.init == 0) {
+            OSInitMutex(&sNwc24RtcMutex);
+            memset(sNwc24RtcInBuffer, 0, 32);
+            memset(sNwc24RtcOutBuffer, 0, 32);
+            sNwc24RtcWorkInit.init = 1;
+        }
+        OSRestoreInterrupts(level);
+    }
+}
+
+/* Answers -1 off a thread, else 0. */
+static inline s32 NWC24iCheckRtcThread(void)
+{
+    if (OSGetCurrentThread() == 0) {
+        return -1;
+    }
+    return 0;
 }
 
 /* 0x8051E384 (0x148): write the RTC counter through the time device - the value pair travels in the
  * work block's 32-byte input buffer and the device's answer comes back in the output one. */
 int NWC24iSetRtcCounter(u32 value, u32 flag)
 {
-    NWC24RtcWork* work = &sNwc24RtcWork;
     s32 fd;
     s32 error;
 
-    if (OSGetCurrentThread() == 0) {
-        return -1;
+    error = NWC24iCheckRtcThread();
+    if (error < 0) {
+        return error;
     }
-    if (sNwc24RtcWorkInit.init == 0) {
-        BOOL level = OSDisableInterrupts();
-
-        if (sNwc24RtcWorkInit.init == 0) {
-            OSInitMutex(&work->mutex);
-            memset(work->inBuffer, 0, 32);
-            memset(work->outBuffer, 0, 32);
-            sNwc24RtcWorkInit.init = 1;
-        }
-        OSRestoreInterrupts(level);
-    }
-    OSLockMutex(&work->mutex);
+    NWC24iInitRtcWork();
+    OSLockMutex(&sNwc24RtcMutex);
     error = NWC24iOpenFd((u32)Nwc24SetRtcName, Nwc24TimePath, &fd, 0);
     if (error >= 0) {
-        work->inBuffer[0] = value;
-        work->inBuffer[1] = flag;
-        error = NWC24iIoctl((u32)Nwc24SetRtcName, fd, 23, work->inBuffer, 32, work->outBuffer, 32);
+        sNwc24RtcInBuffer[0] = value;
+        sNwc24RtcInBuffer[1] = flag;
+        error = NWC24iIoctl((u32)Nwc24SetRtcName, fd, 23, sNwc24RtcInBuffer, 32, sNwc24RtcOutBuffer, 32);
         if (error >= 0) {
-            error = (s32)work->outBuffer[0];
+            error = (s32)sNwc24RtcOutBuffer[0];
         }
         {
             s32 closeError = NWC24iCloseFd((u32)Nwc24SetRtcName, fd);
@@ -344,7 +336,7 @@ int NWC24iSetRtcCounter(u32 value, u32 flag)
             }
         }
     }
-    OSUnlockMutex(&work->mutex);
+    OSUnlockMutex(&sNwc24RtcMutex);
     return error;
 }
 
