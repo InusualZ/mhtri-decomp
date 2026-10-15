@@ -75,3 +75,8 @@ target's exact 27436 B, no flag change. `fn_8027A044` 82.2 -> 100 (still in `src
 flags. The first demo used the base flags (peephole on) and found no masked store in either spelling; re-measuring
 under `-opt nopeephole` produced the table above, which is what the demo now asserts. Verified 2026-09-29 by
 compiling the same functions with both peephole states.
+
+**The peephole-on direction, measured.** `WPAD/wpad` (Wii/1.3, base flags): an `s8` counter updated with an
+`s32` operand, `q += cb->capacity`, emits an `extsb` on the operand before the add, where `q = q + cb->capacity`
+does not - the "When NOT to apply" case above. Writing the plain assignment took `__wpadIsBusyStream` 94.35 ->
+98.08 and `wpadSendWbcCommand` +0.8 points.

@@ -50,3 +50,8 @@ static inline void FillFrame(u8* fb, GXColor color) {
 ...
     FillFrame(frameBuffer, RGBToYCbCr(param->bg));
 ```
+
+**More evidence.** `TRK/msgbuf` (Wii/1.3): the read loop of the array helpers goes through an inline one-value
+helper (`TRKReadBuffer1_ui32`, inline only), which gives retail's colouring (the unit 8/15 -> 15/15 with ideas 18
+and 119). `BTE/bta_dm_act` (GC/3.0a5.2): Broadcom's static `bta_dm_get_remname` inlined at the three
+discovery-result sites took `bta_dm_sdp_result` 99.81 -> 100 (idea 143).

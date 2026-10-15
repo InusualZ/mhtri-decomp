@@ -57,3 +57,11 @@ s32 NHTTPi_Startup(u32 group)                 /* retail: `lis r30` for the table
 **Demonstration.** `063-declaration-order-colours.cpp` (`ideas.py demo-check 63`): the same loop with the
 table pointer declared before / after the counter: the pointer is `r31` in one and `r30` in the other, while the
 parameter is `r29` in both.
+
+**More evidence.** `TRK` (Wii/1.3): local declaration order closed or improved `TRK_RequestSend`,
+`TRKCloseFile`, `TRKSuppAccessFile` (a hill-climb over orders), `TRKDoWriteRegisters`, `TRKTargetCopyBytes` and
+`TRK/mem_TRK` (96.27 -> 100, 2/2 rows). `WPAD/wpad` and `WPAD/WPADHIDParser` (Wii/1.3): a declaration-order search
+closed `wpadAssignChannel`, `WPADSetAutoSamplingBuf`, `WPADSaveConfig` and `wpadDpdCalibrationReadDone` (with `i` and
+`sum` hoisted to function scope); the search splits call initialisers into assignments in source order. Ruled out
+(the order is inert): `Camellia/camellia` `camellia_setup256`, all 720 orders of its six declaration lines at
+99.80576; `WPAD/WPADClamp` `wpadStickDeadzoneSquare`, 200 orders; `SC/SCSystemConfig` `SCAddItem`, 250 orders.

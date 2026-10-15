@@ -49,3 +49,8 @@ void GXLoadTexMtxImm(const f32 mtx[][4], u32 id, s32 type)
 }
 #pragma pop
 ```
+
+**More evidence.** `TRK/dolphin_trk` `TRKTranslateAddress` (Wii/1.3): with the optimizer on, the two MEM2
+compares (`>= 0x10000000 && < 0x1C000000`) are merged into one `subis`/`subi` range test; the scoped
+`global_optimizer off` keeps retail's two compares (unit header SHAPES line; the row's before/after was not
+recorded). Idea 148 is a `todo` to try the same pragma on a switch lowered to a compare chain.

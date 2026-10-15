@@ -62,3 +62,8 @@ in r4 and the byte offset in r5 instead of r0/r6); `fn_804DA834` 81.56 -> **100 
 and `hash == p->hash` rather than the reverse); `RSOLink` 98.20 -> **100 %** (function-scope declaration order:
 the loop pointer before the entry pointer). `RSOStaticLocateObject` needed the message as a local `char* msg =
 ...`; using the symbol inline cost an extra `@ha` register and a whole `_savegpr_14` vs `_savegpr_15` colouring.
+
+**More evidence.** `TRK/msgbuf` (Wii/1.3): the order of a two-variable `for` initialiser (`for (i = 0, err = 0;
+...)`) fixed the array helpers' colouring (the unit went 8/15 -> 15/15 with ideas 119 and 123). `MSL_C/ansi_fp`
+(Wii/1.3): the order of two assignments in a loop tail (`feedback1 = feedback2; first_guess = next_guess;`) moved
+an `lfd` into retail's place, `__dec2num` 99.44 -> 100.

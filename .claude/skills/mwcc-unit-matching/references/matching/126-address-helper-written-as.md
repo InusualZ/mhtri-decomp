@@ -4,7 +4,7 @@ title: An address helper written as a macro instead of an inline function stops 
 status: works
 problem: Same instructions and length, but two volatile registers that carry an offset and a derived pointer are swapped (r5/r6) through the whole function.
 tags: [source-shape, allocator]
-applies: [GC/3.0a5.2]
+applies: [GC/3.0a5.2, Wii/1.3]
 demo: 
 related: [63, 123]
 ---
@@ -43,3 +43,9 @@ void List_Remove(List* list, void* object) {
     /* ... */
 }
 ```
+
+**The reverse direction.** When retail *did* go through an inline wrapper, its argument copies are what
+colours the caller: `MSL_C/printf` `double2hex` 99.92 -> 100 (Wii/1.3) with MSL's
+`static inline f64 fabs(f64 x) { return __fabs(x); }` instead of calling `__fabs` directly (the f0/f1 pair
+recoloured). Read retail's register order first, then decide macro or inline; an inline helper *invented* in place
+of a `goto` recolours the same way and does not work (idea 145).

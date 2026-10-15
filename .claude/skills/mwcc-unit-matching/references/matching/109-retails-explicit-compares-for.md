@@ -33,3 +33,7 @@ switch (type) { case 0: case 7: ...; return; case 1: ...; return;
 case 2: case 5: return;   /* cmpwi 2 ; beq ; cmpwi 5 ; beq  kept */
 default: break; }
 ```
+
+**More evidence.** `WUD/wud` (Wii/1.3): a `case 7: break;` that only reaches the end of the switch was dropped
+from the compare tree (the pivots moved); written as `case 7: return;` at the end of the switch it keeps its label
+at no instruction cost - `WUDiClearFiber` 98.83 -> 100.

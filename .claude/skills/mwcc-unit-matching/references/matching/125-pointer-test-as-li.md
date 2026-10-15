@@ -4,7 +4,7 @@ title: A pointer test as li rX,0 + cmplw is a void-pointer NULL
 status: works
 problem: retail tests a pointer parameter with `li r31,0` + `cmplw r3,r31` (the 0 then reused as a local's initial value) where ours emits `cmpwi r3,0`
 tags: [source-shape, allocator]
-applies: []
+applies: [GC/3.0a5.2, Wii/1.3]
 demo: 
 ---
 
@@ -45,3 +45,7 @@ s32 GetConfig(u8* out) {
     ...
 }
 ```
+
+**The cast form, measured on Wii/1.3.** `BTE/uusb_ppc` `uusb_acl_read_cback` 98.45 -> 100 (and
+`uusb_evt_read_cback` 98.49 -> 99.01) with `p != (BT_HDR*)NULL`: a null cast to the pointer's own type gives
+retail's `cmplw` on a register zero without redefining `NULL` for the unit.

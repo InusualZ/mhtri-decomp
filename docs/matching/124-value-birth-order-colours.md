@@ -54,3 +54,19 @@ f64 khi = dk * 6.93147180369123816490e-01;
 R = s * (hfsq + R);
 return khi - ((hfsq - (R + dk * 1.90821492927058770002e-10)) - f);
 ```
+
+**More ways to move a birth** (the last two are recorded in unit headers without a row number):
+
+* Declare without an initialiser and assign later: `T a; T b = x; a = f(b);` instead of `T a = f(x);` -
+  `MSL_C/ansi_fp` `count_trailing_zero`, `__must_round` and `__dorounddecup` three 99.x -> 100 (Wii/1.3); a plain
+  declaration permutation of `MSL_C/printf` `longlong2str` reached only 98.78, the MSL loop variable with it 100.
+* Name a pair as initialised locals in retail's colouring order: `MEM/mem_expheap` `AllocUsedBlockFromFreeBlock_`
+  `u32 usedEnd = size + (u32)memory;` then `u32 header = (u32)memory - 16;` 98.24 -> 100 (the reverse order 95.90).
+* Route a value through an existing `static inline` helper so its parameter is born late: `USB/usb`
+  `IUSB_RequestDone` 99.56 -> 100 freeing through the inline `usbFree` (moved ahead of its first user).
+* Stage a sum in a local before the statement it competes with: `TRK/msghndlr` `seq = gTRKSequence + 1;` fixed the
+  r5/r6 swap of the status reply in 11 rows (Wii/1.3).
+* Leave a result uninitialised so a later constant shares its register: `TRK/support` `TRK_RequestSend`'s status
+  (the loop's -1 shares r31 with it).
+* Read one value before declaring the next: `BTE/btm_devctl` `btm_read_local_features_complete` reads `p_cb`
+  before it declares `p_devcb` (the earlier-born `p_devcb` would take r29 instead of retail's r31; GC/3.0a5.2).

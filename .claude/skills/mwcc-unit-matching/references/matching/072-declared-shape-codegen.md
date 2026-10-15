@@ -60,3 +60,8 @@ the two-words-per-turn loop and nothing else; a 53-word struct gets one extra `l
 index compares with `cmpw` and a `u32` index with `cmplw`. Arity is not demonstrated (see above).
 (The earlier text cited "row 35's `s32` locals"; idea 35 is about dead copy chains and says nothing of that,
 so the cross-reference was dropped.)
+
+**Observed (homebutton band, GC/3.0a5.2; not measured as a before/after).** A `switch` on `(u32)state` gives
+retail's `cmplwi` bound check before a jump table, while a compare tree needs the `(s32)` selector; and
+`(u32)(request - 1) > 1` gives retail's `subi` + `cmplwi` range test (`homebutton/hbm_kb_cursor`
+`hbmKbCursorScrollToCaret`, idea 117).

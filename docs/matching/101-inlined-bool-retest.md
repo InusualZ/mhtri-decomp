@@ -49,3 +49,8 @@ int think(Conn* c, u32 now) {
     return ackThink(c, now) != 0;    /* retail: neg/or/srwi */
 }
 ```
+
+**More evidence.** `NHTTP/d_nhttp` (GC/3.0a5.2): the chunk-extension and trailer skips of
+`NHTTPi_recvResponseBody` are one inline `NHTTPi_skipLine`, and the three phase handlers of
+`NHTTPi_dispatchConnectionCallback` are inline helpers (with idea 130 and 131 the unit went 66 -> 83 of 108 rows);
+`NHTTPAddPostDataRaw` 92.68 -> 98.33 with its boundary-code search as the inline `NHTTPi_makeUniqueCode`.

@@ -45,3 +45,7 @@ unsigned char buf[0x500];
 S circ;
 void f(void) { init(&circ, buf, 0x500); }   /* .bss: circ at +0, buf at +0x20 */
 ```
+
+**First use counts in functions the linker strips.** `NCD/ncdsystem` (GC/3.0a5.2): writing the dead-stripped
+static `NCDiUnlock` ahead of the API puts `ncdMutex` first in `.bss` (+3 rows). The object order is decided at
+compile time, before the linker removes the function (idea 147 is the same effect on the string and literal pools).

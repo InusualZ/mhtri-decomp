@@ -51,3 +51,8 @@ its `.sdata` byte instead of redefining them, which let the remaining float rows
 `fn_8003FF98` and `fn_8003FC64` be judged on their instructions rather than on a pool name. `Pl/pl_skill.cpp`
 (batch 6): declaring its own constants `extern` and using them as load operands took five functions to 100 %,
 +0.072 pt for the unit, nothing worse.
+
+**Observed (homebutton band, GC/3.0a5.2; not measured as a before/after).** A literal the compiler pools itself
+is loaded once and kept in a register, while a constant declared `extern` (the declare-only form above) is
+reloaded after every store, because a store may alias it. A target that reloads the constant after stores is
+therefore reading an extern object; one that keeps it in a register is reading a pooled literal.

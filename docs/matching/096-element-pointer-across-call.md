@@ -38,3 +38,6 @@ for (i = 0; i < receiverCount_28; i++) { ... }
 receivers_14[index] = 0;
 *id = 0;
 ```
+
+**More evidence.** `SO/socket` `RecvFrom` (GC/3.0a5.2): naming the member block's address once
+(`args = &block->args`) gives retail's saved r21 for it (the row's own before/after was not recorded).

@@ -33,3 +33,6 @@ declaration order), `TRKTargetCheckMemoryRange` 89.1 -> 100.
 ```
 instructions[0] = is_read != 0 ? ((reg << 21) | 0xF0030000) : ((reg << 21) | 0xE0030000);
 ```
+
+**More evidence.** `TRK/msgbuf` (Wii/1.3): the inline copies in `TRK_AppendBuffer`/`TRK_ReadBuffer` count down the
+`u32` size parameter itself instead of a separate count (the unit went 8/15 -> 15/15 with ideas 18 and 123).
