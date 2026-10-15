@@ -78,6 +78,7 @@
 #include "lobby/lb_npc.h"
 #include "lobby/lobby_w.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "Network/network_pat_control.h" /* isNetCityMode (rule 2: its owner's header) */
 namespace s_801FBF78 {
 
 
@@ -516,7 +517,6 @@ extern "C" {
 void fn_80212370(void);
 void fn_8021261C(void);
 void fn_803C3F6C(void);
-u32 fn_804276D8(void);
 void fn_80375D30(void);
 void fn_802DB2B8(void);
 void fn_80211E68(void);
@@ -555,12 +555,12 @@ void lobby_frame_update(void)
     fn_8021261C();
     fn_803C3F6C();
     lobby_w.field_0x027 = lobby_w.field_0x000;
-    if (fn_804276D8() == 1) {
+    if (isNetCityMode() == 1) {
         fn_80375D30();
     }
     player_control_move();
     lbl_80794AB0 = 0;
-    if (fn_804276D8() == 1 && lobby_state_block[3] == 0 && lobby_w.field_0x16F == 0 &&
+    if (isNetCityMode() == 1 && lobby_state_block[3] == 0 && lobby_w.field_0x16F == 0 &&
         lobby_w.field_0x163 == 0) {
         lobby_w.field_0x12C = 1;
         lobby_w.field_0x172 = 10;

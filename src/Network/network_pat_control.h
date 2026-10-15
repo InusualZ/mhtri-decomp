@@ -17,6 +17,9 @@
 #include "Network/NetworkUniqueId.h"       /* NetworkUniqueId - the roster entries' address objects */
 #include "Network/NetworkFileFetcher.h"     /* NetworkFileFetcher - the fetch state machines' client */
 #include "menu/PatTerms.h"                  /* PatTerms - the terms object (owner menu/menu_plsearch.cpp) */
+#include "Camellia/camellia.h"              /* Camellia_Ekeygen / Camellia_EncryptBlock / Camellia_DecryptBlock */
+#include "Runtime.PPCEABI.H/memcpy.h"       /* memcpy */
+#include "Runtime.PPCEABI.H/memset.h"       /* memset */
 
 #ifdef __cplusplus
 extern "C" {
@@ -1053,20 +1056,13 @@ char* MH3GetErrorString2(s32 code);
 extern "C" {
 #endif
 
-/* Camellia's key schedule (owner: src/Camellia/camellia.c, whose vendor header `Camellia/camellia.h` declares it
- * too; including that header instead is an open rule-2 item).  `PatCamelliaKey` is the vendor's `KEY_TABLE_TYPE`. */
-typedef unsigned int PatCamelliaKey[68];
-
-void Camellia_Ekeygen(int keyBitLength, const unsigned char* rawKey, PatCamelliaKey keyTable);
-void Camellia_EncryptBlock(int keyBitLength, const unsigned char* plaintext,
-                           const PatCamelliaKey keyTable, unsigned char* cipherText);
-void Camellia_DecryptBlock(int keyBitLength, const unsigned char* cipherText,
-                           const PatCamelliaKey keyTable, unsigned char* plaintext);
+/* Camellia's key schedule, the vendor's `KEY_TABLE_TYPE` (owner header `Camellia/camellia.h`, included above). */
+typedef KEY_TABLE_TYPE PatCamelliaKey;
 
 /* The unit's Camellia key schedule (.bss 0x806D3670, 0x110 B), the 64 x 0x400 arena base (.sbss 0x80794CEC)
  * and the frame stamp of the last layer re-entry (.sbss 0x80794CE8, layer command 5): the peer-join chat line
  * is skipped in the frame the stamp was taken. */
-extern PatCamelliaKey lbl_806D3670;
+extern PatCamelliaKey pat_crypt_key_table;
 extern u8* net_arena_base;
 extern u32 net_peer_join_stamp;
 
@@ -1100,17 +1096,16 @@ void refreshFriendList(void);
  * unused word, the argument count and the argument words (at most four). */
 s32 queueNetCommand(u32 command, s8* result, s32 unused, s32 arg_count, const s32* args);
 void syncScheduleClock(NetCtrlWk* work);
+/* 0x804276D8 (GUESS name) - `isCityMode` while the network layer is up, else 0; unsigned, the lobby's
+ * `== 1` tests compile to `cmplwi`. */
+u32 isNetCityMode(void);
 
 /* The layer facade both network units drive.  `getNetworkLayerPat` and the holder type it takes are
  * declared in their owner's header, `Network/NetworkPat.h`, which this header reaches through
  * `Network/network_pat_control.h` (rule 2) - this unit only calls them. */
 
 /* The slot mode-word source value (.sdata2 0x8079C888). */
-extern f32 lbl_8079C888;
-
-/* MSL primitives. */
-void* memcpy(void* dst, const void* src, u32 size);
-void* memset(void* dst, int value, u32 size);
+extern f32 net_slot_initial_value;
 
 /* ---- the pat-control band's callees in this range (`Network/network_pat_control.cpp`; GUESS on every
  * name below: they are derived from the caller's use) ---- */

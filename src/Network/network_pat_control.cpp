@@ -29,6 +29,14 @@
  *   GUESS: `importLayerPeers` (0x80427C00, the peer table rebuilt from the layer's members).
  *   GUESS: `getCommunityRecord` (0x804281C4), `NetCommandPool`, `NetServerRows`, the helpers `stepLayerEntryCheck`/
  *   `finishLayerEntry` (inline pieces of `updateMessagePool`), `NetPeerCardMessage`.
+ *   GUESS from the bodies and callers: `resetArenaVectors` (0x80424308, `resetSlotTable`'s arena re-point),
+ *   `freeArenaBlock` (0x8042448C, the inverse of `allocArenaBlock`), `resetIdleFrames` (0x80426D10, zeroes the idle
+ *   counter; `menu/menu_sysmsg.cpp` calls it), `submitUserProfile` (0x80427630, a `blr` stub `enemy/em020_prog.cpp`
+ *   calls with the profile `buildNetUserProfile` just filled), `getSelfName` (0x80427634, `name_0x7368`),
+ *   `getMessageEntry` (0x8042767C, a 0x120-byte message slot), `isNetCityMode` (0x804276D8, `isCityMode` behind the
+ *   layer check; unsigned, the lobby's `== 1` is `cmplwi`), `getMessageTableState`/`clearMessageTableState`
+ *   (0x80428208/0x80428218, `msg_state_0xC300`), `pat_crypt_key_table` (.bss 0x806D3670, the Camellia key schedule
+ *   `PatCryptSetKey` fills), `net_slot_initial_value` (.sdata2 0x8079C888, 10.0f, `resetSlotTable`'s seed).
  *   `isReadyCountOne` and `resetFailureState` (a `blr` stub) keep names that say only what the body does.
  * RESIDUALS. 1 row unwritten: `fn_80431D80`, the compiler's array destructor for `net_profile_table` (its name is the
  *   compiler's `__arraydtor$NNNN`, which changes with every edit, so the map keeps the address name).
@@ -68,7 +76,7 @@ etwork_pat_control_cpp`: retail builds `net_pats_object` with `constructNetworkP
  *    `getCommunityMemberRecord`, `getNetworkLayerPat`, `getPatsObject`, `memset`, `readLayerIdChange`, `refreshRosterCache`,
  *    `releaseRemotePlayerParts`, `resetPeerTable`, `saveLayerId`, `sendCheckRequest`, `setErrorCode`, `strcpy`; `PatCryptEncrypt`, `layerReflectCallback`, `updateNetworkPatControl` save from r24 in retail
  *    (`_savegpr_24`/`_restgpr_24`), ours from r25/r26; `copyRosterLists` the other way (retail r25, ours r24);
- *    `resetSlotTable` names the `.sdata2` constant `lbl_8079C888` where retail's load carries no symbol, and
+ *    `resetSlotTable` names the `.sdata2` constant `net_slot_initial_value` where retail's load carries no symbol, and
  *    `initWorkRecord`/`copyFriendList` reach `net_ctrl_work`/`net_ctrl_wk` with an extra relocation (an address CSE'd
  *    differently).
  *  - flip blockers: `.bss` is 0xDFE4 against the 0xE100 claim and `.data` 0x580 against 0x620 (the unwritten rows'
@@ -233,7 +241,7 @@ typedef struct NetPeerEvent {
 #pragma peephole off
 void PatCryptSetKey(const u8* rawKey)
 {
-    Camellia_Ekeygen(0x100, rawKey, lbl_806D3670);
+    Camellia_Ekeygen(0x100, rawKey, pat_crypt_key_table);
 }
 
 /* Encrypts `*len` bytes of `buf` in place behind a big-endian length header (a 4-byte rotation of the 16-byte
@@ -265,7 +273,7 @@ s32 PatCryptEncrypt(u8* buf, u16* len)
         j++;
         i++;
         if ((j % 16) == 0) {
-            Camellia_EncryptBlock(0x100, blk, lbl_806D3670, blk);
+            Camellia_EncryptBlock(0x100, blk, pat_crypt_key_table, blk);
             memcpy(buf + j - 16, blk, 16);
             if ((s32)*len <= i) {
                 break;
@@ -302,7 +310,7 @@ s32 PatCryptDecrypt(u8* buf, u16* len)
         return 0x8000;
     }
     memcpy(blk, buf, 16);
-    Camellia_DecryptBlock(0x100, blk, lbl_806D3670, blk);
+    Camellia_DecryptBlock(0x100, blk, pat_crypt_key_table, blk);
     memcpy(hdr, blk, 4);
     n = (u16)((hdr[0] << 8) | hdr[1]);
     j = 4;
@@ -315,7 +323,7 @@ s32 PatCryptDecrypt(u8* buf, u16* len)
         j++;
         if ((i % 16) == 0) {
             memcpy(blk, buf + i, 16);
-            Camellia_DecryptBlock(0x100, blk, lbl_806D3670, blk);
+            Camellia_DecryptBlock(0x100, blk, pat_crypt_key_table, blk);
         }
     } while (i < (s32)*len && j < n);
     *len = (u16)j;
@@ -346,7 +354,7 @@ void setupArenaVectors(NetCtrlWk* work)
  * The same arena re-point, without the allocation: used to rebuild the arrays for a record whose arena
  * already exists (the record reset path).
  */
-void fn_80424308(NetCtrlWk* work)
+void resetArenaVectors(NetCtrlWk* work)
 {
     u8* base = net_arena_base;
     u32 k;
@@ -381,7 +389,7 @@ u32* allocArenaBlock(void)
 /*
  * Release the arena block `block`: clear its arrB value and mark its arrC slot free.
  */
-void fn_8042448C(u32 block)
+void freeArenaBlock(u32 block)
 {
     NetCtrlWk* work = net_ctrl_wk;
     u32 i;
@@ -438,10 +446,10 @@ void resetSlotTable(void)
     }
     work->slots_0x3ED4[0].state_0x00 = 1;
     work->slot_list_0x3ED0 = &work->slots_0x3ED4[0];
-    work->slot_list_0x3ED0->valueA_0x3C = lbl_8079C888;
-    work->slot_list_0x3ED0->valueB_0x40 = lbl_8079C888;
+    work->slot_list_0x3ED0->valueA_0x3C = net_slot_initial_value;
+    work->slot_list_0x3ED0->valueB_0x40 = net_slot_initial_value;
     work->slot_list_0x3ED0->mode_0x54 = 1;
-    fn_80424308(work);
+    resetArenaVectors(work);
 }
 
 /*
@@ -1201,7 +1209,7 @@ void updateMessagePool(void)
     for (i = 0; i < 0x40; i++) {
         if (work->arrC_0x7C98[i] != 0) {
             handleLobbyNetMessage((struct NetLobbyMessage*)work->arrA_0x7A98[i]);
-            fn_8042448C((u32)work->arrA_0x7A98[i]);
+            freeArenaBlock((u32)work->arrA_0x7A98[i]);
         }
     }
     for (i = 0, entry = work->command_pool_0x6320.entries_0x008; i < 0x80; i++, entry++) {
@@ -1770,7 +1778,7 @@ void updateMessagePool(void)
 /*
  * Reset the work record's stall counter.
  */
-void fn_80426D10(void)
+void resetIdleFrames(void)
 {
     net_ctrl_wk->idle_frames_0xC364 = 0;
 }
@@ -2045,14 +2053,14 @@ s32 sendUserPosition(u8 action, const f32* position, const u32* values, u8 mode,
 /*
  * Empty body: the retail symbol is a bare `blr`.
  */
-void fn_80427630(void)
+void submitUserProfile(void)
 {
 }
 
 /*
  * The record's own display name, or NULL when the network layer is not up.
  */
-char* fn_80427634(void)
+char* getSelfName(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
 
@@ -2065,7 +2073,7 @@ char* fn_80427634(void)
 /*
  * The `index`-th 0x120-byte slot of the message table, or NULL when the network layer is not up.
  */
-char* fn_8042767C(s32 index)
+char* getMessageEntry(s32 index)
 {
     NetCtrlWk* work = net_ctrl_wk;
 
@@ -2078,7 +2086,7 @@ char* fn_8042767C(s32 index)
 /*
  * Forward the record's own state to isCityMode, or 0 when the network layer is not up.
  */
-s32 fn_804276D8(void)
+u32 isNetCityMode(void)
 {
     if (getNetworkLayerPat(getPatsObject(), 0) == 0) {
         return 0;
@@ -2210,7 +2218,7 @@ s32 updatePeerCardBlock(const NetworkUniqueId* id, const u8* src, u32 size, s32 
                     setArenaBlockValue((u32)message, sizeof(NetPeerCardMessage));
                     return 1;
                 } else {
-                    fn_8042448C((u32)message);
+                    freeArenaBlock((u32)message);
                 }
             }
         }
@@ -2423,7 +2431,7 @@ NetCommunityRec* getCommunityRecord(s32 index)
 /*
  * The message-table fill state.
  */
-s32 fn_80428208(void)
+s32 getMessageTableState(void)
 {
     return net_ctrl_wk->msg_state_0xC300;
 }
@@ -2431,7 +2439,7 @@ s32 fn_80428208(void)
 /*
  * Clear the message-table fill state.
  */
-void fn_80428218(void)
+void clearMessageTableState(void)
 {
     net_ctrl_wk->msg_state_0xC300 = 0;
 }
