@@ -1174,10 +1174,10 @@ config.libs = [
             # The DWC auth interface (.text 0x80507C40..0x8050A710, 16 functions); its seam evidence is
             # the RANGE line of src/DWCi/dwc_auth_interface.c.
             # dwc_error / dwc_auth_interface / dwc_nasfunc: cflags_base (-func_align 16, the retail 16-byte packing); docs/network.md.
-            Object(NonMatching, "DWCi/dwc_base64.c", cflags=cflags_base),  # src/DWCi/dwc_base64.c header
-            Object(NonMatching, "DWCi/dwc_error.cpp", cflags=cflags_base),
+            Object(Matching, "DWCi/dwc_base64.c", cflags=cflags_base),  # src/DWCi/dwc_base64.c header
+            Object(Matching, "DWCi/dwc_error.cpp", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_init.cpp", cflags=cflags_base),
-            Object(NonMatching, "DWCi/dwc_report.cpp", cflags=cflags_base),
+            Object(Matching, "DWCi/dwc_report.cpp", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_auth_interface.c", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_nasfunc.c", cflags=cflags_base),
             Object(NonMatching, "DWCi/gt2Socket.c", cflags=cflags_base),
@@ -1555,9 +1555,9 @@ config.libs = [
             Object(Matching, "nw4r/ut_CharStrmReader.cpp"),
             Object(Matching, "nw4r/ut_TagProcessorBase.cpp"),
             Object(Matching, "nw4r/ut_LockedCache.cpp"),
-            Object(NonMatching, "nw4r/ut_Font.cpp"),
+            Object(Matching, "nw4r/ut_Font.cpp"),
             Object(NonMatching, "nw4r/ut_ResFontBase.cpp"),
-            Object(NonMatching, "nw4r/ut_ResFont.cpp"),
+            Object(Matching, "nw4r/ut_ResFont.cpp"),
             Object(NonMatching, "nw4r/ut_CharWriter.cpp"),
             Object(NonMatching, "nw4r/ut_TextWriterBase.cpp"),
             Object(NonMatching, "nw4r/fn_8050661C.cpp"),
