@@ -477,7 +477,7 @@ real command line: the PCode stream after each pass, and the register allocator'
 
 * The exact invocation, the `-o` redirection that keeps real objects untouched, and the support matrix are in
   `tools/mwcc-debugger/README.md`. No gdb on the host is **not** a blocker: `python
-  tools/mwcc-debugger/fetch_gdb.py --dest <home>/tools/mwcc-dbg` installs one in ~2 min (its
+  tools/mwcc-debugger/fetch_gdb.py --dest <tools-dir>/mwcc-dbg` installs one in ~2 min (its
   DEPENDS warnings are noise).
 * **Health-check the dump before you believe it.** `verify_pcode.py` classifies the dump first, and that
   classification is what makes a dump evidence rather than a plausible file:
@@ -571,7 +571,7 @@ the input-file record's stride and fields, the `*fill*` alignment site, and the 
   linker builds (derivations only - `GC/2.7`'s record stride is even `0x38`). `--prove` needs a native Windows
   gdb and a hand-assembled `--args` link line, and without capstone `anchors`/`phases`/`records`/`align` cannot
   run - `trace`, `verify`, `order`, `messages` and `info` can. No gdb is not a blocker: `python
-  tools/mwcc-debugger/fetch_gdb.py --dest <home>/tools/mwcc-dbg` installs one in ~2 min.
+  tools/mwcc-debugger/fetch_gdb.py --dest <tools-dir>/mwcc-dbg` installs one in ~2 min.
 * **The feedback loop is part of the job and it is mechanical.** A linker gap you hit is a register row, not a
   paragraph:
   * read `.pi/notes/mwlink-debugger-gaps.md` first - if your gap is already there, say so in your report (a

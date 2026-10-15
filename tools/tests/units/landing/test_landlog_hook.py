@@ -132,8 +132,8 @@ def test_every_allowance_is_recorded(c):
 
 
 def test_manifest_reaches_the_log_and_the_body(c):
-    """`--manifest` (2026-10-06): the landing log line carries the manifest id and the commit body a `manifest:` line;
-    a landing without one carries neither."""
+    """`--manifest` (2026-10-06): the landing log line carries the manifest id; the commit body never carries a
+    `manifest:` line (owner, 2026-10-15: manifests are local paths and stay out of history)."""
     fx = fixture()
     L.set_manifest("lane-net")
     try:
@@ -145,8 +145,9 @@ def test_manifest_reaches_the_log_and_the_body(c):
         L.set_manifest(None)
     rows, _ = landlog.read(str(fx.root))
     body = fx.git("log", "-1", "--format=%B")
-    c.check("a landing judged against a manifest logs its id and writes it in the body",
-            (code, rows[-1].get("manifest"), "manifest: lane-net" in body.splitlines()), (0, "lane-net", True))
+    c.check("a landing judged against a manifest logs its id and keeps it out of the commit body",
+            (code, rows[-1].get("manifest"), any(l.startswith("manifest:") for l in body.splitlines())),
+            (0, "lane-net", False))
     (fx.root / "src" / "batch.c").write_text("the second batch\n", encoding="utf-8")
     run_land(fx, body_gate())
     rows, _ = landlog.read(str(fx.root))

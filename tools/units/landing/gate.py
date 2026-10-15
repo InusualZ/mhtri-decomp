@@ -151,8 +151,7 @@ def message_body(b: Batch, before: dict, after: dict, fresh: bool) -> str:
             "gates: ground truth ok, base %s, %d check(s), ok recreated=%s%s"
             % ((b.base or "?")[:8], len(b.checks), fresh, ", main.elf relinked" if b.extra.get("flip") else "")]
     body += state.allow_lines(allow)
-    if state.MANIFEST:
-        body.append("manifest: %s" % state.MANIFEST)
+    # No `manifest:` line: a manifest is a local path (often absolute) and the landing log keeps its id (owner, 2026-10-15).
     body += ["warning: %s" % w for w in b.warnings]
     body.append("")
     if b.scratch:
