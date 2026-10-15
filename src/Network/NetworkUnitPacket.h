@@ -41,11 +41,6 @@ void writeSize(NetworkStreamWriter* self, u16 size);
 /* untyped: byte range - the bytes appended to the stream */
 s32 writeBytes(NetworkStreamWriter* self, const void* data, u32 len);
 
-/* the writer's remaining entry points the session tail drives (the second writer class); 0x803F9880 is its
-   flush override (empty) */
-void networkStreamWriter_flushFrame(NetworkStreamWriterDefault* self);
-/* untyped: byte range - the bytes appended to the stream */
-void networkStreamWriter_putBytes(NetworkStreamWriterDefault* self, const void* data, u32 size);
 s32 networkStreamWriter_flush(NetworkStreamWriterDefault* self);
 void networkStreamWriter_setMode(NetworkStreamWriterDefault* self, u16 value);
 void networkStreamWriter_putU16(NetworkStreamWriterDefault* self, u16 value);
@@ -71,21 +66,10 @@ void networkStreamWriter_bytes(NetworkStreamWriterDefault* self);
  * 1 when the frame is good. */
 void networkStreamReader_decryptFrame(NetworkStreamWriterDefault* self);
 s32 networkStreamReader_test(NetworkStreamWriterDefault* self);
-/* 0x803FAE7C / 0x803FAE8C - the framed writer's scramble overrides (table 0x805FCDD4 +0x30/+0x34). */
-void networkStreamWriter_encrypt(NetworkStreamWriterDefault* self, u8 key, u16 offset, u16 size);
-void networkStreamWriter_decrypt(NetworkStreamWriterDefault* self, u8 key, u16 offset, u16 size);
 u16 networkStreamWriter_size(const void* sub);
-
-/* 0x803F9E04 - binds a stream to the byte block it reads packets from (GUESS: the parent's init, then
- * the block pointer stored at +0x10). */
-void networkStreamReader_attach(NetworkStreamWriterDefault* self, u8* block, u32 size);
 
 /* 0x803F9E40 - true when a whole packet sits at the front of the block. */
 s32 make_sure_enough_space(NetworkStreamWriterDefault* self);
-
-/* 0x803F9EBC - copies the leading packet out; 0 when it is incomplete, -1 when `capacity` is too small,
- * else the packet's length. */
-s32 copy_from_buffer(NetworkStreamWriterDefault* self, u8* out, u32 capacity);
 
 /* 0x803F9F74 - drops the leading packet from the block and returns its length (0 when incomplete). */
 s32 networkStreamReader_consumePacket(NetworkStreamWriterDefault* self);
@@ -99,13 +83,6 @@ u16 networkStreamReader_getPayloadSize(NetworkStreamWriterDefault* self);
 u16 networkStreamReader_getCrc(NetworkStreamWriterDefault* self);
 u8 networkStreamReader_getKeyA(NetworkStreamWriterDefault* self);
 u8 networkStreamReader_getKeyB(NetworkStreamWriterDefault* self);
-
-/* 0x803F89CC - the packet's flush override (empty). */
-void networkPacket_flush(NetworkStreamWriter* self);
-
-/* 0x803F89D0 - binds the packet to `size` bytes at `buffer`. */
-/* untyped: byte range (the block the packet reads or writes) */
-void networkPacket_attach(NetworkStreamWriter* self, const void* buffer, u32 size);
 
 /* 0x803F8A14 - starts a message in `mode`. */
 void networkPacket_begin(NetworkStreamWriter* self, s32 mode);
@@ -121,9 +98,7 @@ u32 networkPacket_writeRecord(NetworkStreamWriter* self, const NetworkUniqueId* 
 /* 0x803F8E88 - stamps the message with `seconds`. */
 void networkPacket_setTimestamp(NetworkStreamWriter* self, f32 seconds);
 
-/* 0x803F8F20 / 0x803F8F6C - binds the packet to received bytes (the packet's `bind`), and moves the cursor
- * to the current message's payload. */
-void networkPacket_bind(NetworkStreamWriter* self, u8* block, u32 size);
+/* 0x803F8F6C - moves the cursor to the current message's payload. */
 void networkPacket_rewind(NetworkStreamWriter* self);
 
 /* 0x803F8FAC - true when a whole message sits at the packet's front. */
@@ -211,11 +186,6 @@ u32 putAllPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame);
 /* 0x803FAC38 - lifts whichever of two 16-bit sequence numbers wrapped so they compare the short way round. */
 void networkStreamQueue_unwrapSequence(NetworkStreamQueue* self, u16 own, u16 other, s32* ownOut, s32* otherOut);
 
-/* 0x803FAE70 / 0x803FAE74 / 0x803FAE78 - the writers' flush-hook and fill overrides (forward to the sink's). */
-void networkPacket_onFlush(NetworkStreamWriter* self, u8* data, u32 size);
-s32 networkPacket_fill(NetworkStreamWriter* self, u8* out, u32 size);
-void networkStreamWriter_onFlush(NetworkStreamWriterDefault* self, u8* data, u32 size);
-
 /* 0x803FA77C - binds `packet` to the bytes the queue holds. */
 void networkStreamQueue_fillPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet);
 
@@ -251,5 +221,22 @@ void networkStreamQueue_removeMessage(NetworkStreamQueue* self);
 #ifdef __cplusplus
 }
 #endif
+
+/* The free-function spellings `Network/NetworkConnectionStable.cpp` still calls for the writers' `attach`/`bind`
+   overrides: each is a qualified (direct) call, the call retail makes on a local writer object. */
+inline void networkPacket_attach(NetworkStreamWriter* packet, u8* block, u32 capacity)
+{
+    packet->NetworkStreamWriter::attach(block, capacity);
+}
+
+inline void networkStreamWriter_putBytes(NetworkStreamWriterDefault* frame, u8* block, u32 capacity)
+{
+    frame->NetworkStreamWriterDefault::attach(block, capacity);
+}
+
+inline void networkStreamReader_attach(NetworkStreamWriterDefault* frame, u8* block, u32 size)
+{
+    frame->NetworkStreamWriterDefault::bind(block, size);
+}
 
 #endif /* MHTRI_NETWORK_NETWORKUNITPACKET_H */

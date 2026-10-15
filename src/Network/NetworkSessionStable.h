@@ -259,7 +259,7 @@ class NetworkSessionStable : public NetworkSessionBase {
 public:
     NetworkSessionStable();
     virtual ~NetworkSessionStable();
-    /* +0x0C */ virtual void init(s8 isHost, NetworkSessionCallback callback, void* user, /* untyped: caller-owned payload - the callback's user pointer */
+    /* +0x0C */ virtual void init(u8 isHost, NetworkSessionCallback callback, void* user, /* untyped: caller-owned payload - the callback's user pointer */
                                   const u8* address, s32 param);
     /* +0x10 */ virtual void resetAllSlots();
     /* +0x14 */ virtual void move();
@@ -327,7 +327,7 @@ public:
     void moveOutOfBand(s8 index);
     s8 getUsableSlot(s8 index);
 
-    /* +0x0D */ char sendBuffer_0D[0x400];
+    /* +0x0D */ u8 sendBuffer_0D[0x400];
     /* +0x40D */ u8 pad_40D[0x03];
     /* +0x410 */ u8 receiveBuffer_410[0x400];
     /* +0x810 */ u8 sendBlock_810[4][0x2000];     /* each slot's send queue block */

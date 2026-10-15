@@ -59,6 +59,10 @@ public:
     NetworkStreamWriter();
     /* +0x0C (0x803FAE70, the packet's flush hook) */ virtual void onFlush(u8* data, u32 size);
     /* +0x08 */ virtual ~NetworkStreamWriter();
+    /* +0x10 (0x803F89CC, empty) */ virtual void flush();
+    /* +0x14 (0x803F89D0, the first message starts at the block) */ virtual void attach(u8* block, u32 capacity);
+    /* +0x1C (0x803F8F20, the cursor moves to the first message's payload) */ virtual void bind(u8* block, u32 size);
+    /* +0x20 (0x803FAE74, forwards to the sink's) */ virtual s32 fill(u8* out, u32 size);
 
     /* +0x10 */ u8* message_10;   /* the message the packet stands at */
     /* +0x14 */ u8* cursor_14;    /* the read cursor in the current message's payload */
@@ -69,6 +73,12 @@ public:
     NetworkStreamWriterDefault();
     /* +0x0C (0x803FAE78, the frame's flush hook) */ virtual void onFlush(u8* data, u32 size);
     /* +0x08 */ virtual ~NetworkStreamWriterDefault();
+    /* +0x10 (0x803F9880, empty) */ virtual void flush();
+    /* +0x14 (0x803F9884, the first frame starts at the block) */ virtual void attach(u8* block, u32 capacity);
+    /* +0x1C (0x803F9E04, the first frame starts at the block) */ virtual void bind(u8* block, u32 size);
+    /* +0x20 (0x803F9EBC, copies the current frame out) */ virtual s32 fill(u8* out, u32 size);
+    /* +0x30 (0x803FAE7C, forwards to the sink's) */ virtual void encrypt(u8 key, u16 offset, u16 size);
+    /* +0x34 (0x803FAE8C, forwards to the sink's) */ virtual void decrypt(u8 key, u16 offset, u16 size);
 
     /* +0x10 */ u8* message_10;   /* the frame the writer stands at */
 

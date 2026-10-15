@@ -22,7 +22,7 @@ class NetworkSessionBase {
 public:
     NetworkSessionBase();
     virtual ~NetworkSessionBase();
-    /* +0x0C */ virtual void init(s8 isHost, NetworkSessionCallback callback, void* user, /* untyped: caller-owned payload - the callback's user pointer */
+    /* +0x0C */ virtual void init(u8 isHost, NetworkSessionCallback callback, void* user, /* untyped: caller-owned payload - the callback's user pointer */
                                   const u8* address, s32 param) = 0;
     /* +0x10 */ virtual void resetAllSlots() = 0;
     /* +0x14 */ virtual void move() = 0;
@@ -63,7 +63,7 @@ public:
 
     /* +0x04 */ NetworkSessionCallback callback_04;   /* the event callback `init` stores; the constructor clears it */
     /* +0x08 */ void* user_08;                        /* untyped: caller-owned payload - handed back to the callback */
-    /* +0x0C */ s8 isHost_0C;                         /* set by `init` for the host session */
+    /* +0x0C */ u8 isHost_0C;                         /* set by `init` for the host session */
 };   /* size: 0x10 (evidence: the constructor stores the table and clears the words at +0x04/+0x08 and the byte at +0x0C; the derived fields start at +0x0D) */
 
 

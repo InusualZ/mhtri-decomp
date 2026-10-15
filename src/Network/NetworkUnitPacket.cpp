@@ -11,7 +11,8 @@
  *   (`putTopPacket`/`putLowPacket`/`putAllPacket`); the project keeps the names every caller uses
  *   (`NetworkStreamWriter`/`NetworkStreamWriterDefault`/`NetworkStreamQueue`).  GUESSes: the sink's +0x30/+0x34/+0x38
  *   slots `encrypt`/`decrypt`/`checksum` (u16 offset and size, from the forwarding overrides),
- *   `networkStreamReader_decryptFrame`, `networkStreamReader_test`, `networkStreamWriter_encrypt`/`_decrypt`.
+ *   `networkStreamReader_decryptFrame`, `networkStreamReader_test`.  The writers' overrides carry the slot names of
+ *   `NetworkStreamSink` (`Network/NetworkStreamSink.h`) they fill in the two tables.
  *   GUESS (the frame-header field each reads): networkPacket_getSequenceA, networkPacket_getSequenceB,
  *   GUESS: networkPacket_getSourceNonce, networkPacket_getSessionNonce, networkPacket_getFlag10, networkPacket_getChannel,
  *   GUESS: networkPacket_getFlag04, networkPacket_isHandshake, networkStreamQueue_putNextPacket,
@@ -19,12 +20,9 @@
  *   `J3DShapeMtxMulti::getUseMtxNum` there is a folded one-load body).
  * RESIDUALS. `networkPacket_beginMessage`: the 0x80/0x40 flag bits are computed into r3/r4 the other way round, and the value
  *   block's `stamp + offset` sum swaps its operands.  `networkPacket_takeByte`: the cursor is loaded before the block
- *   pointer (local and member spellings, `scheduling off` and level 2 tried).  `.data`: the two
- *   writer tables `__vt__26NetworkStreamWriterDefault`/`__vt__19NetworkStreamWriter` (0x805FCDD4/0x805FCE10) stay
- *   unemitted while their flush overrides (the key functions the classes declare first) are the free functions
- *   `networkStreamWriter_onFlush`/`networkPacket_onFlush`; their constructors and destructors are
- *   `Network/NetworkConnectionStable.cpp`'s.  The emission-order seam `dataorder.py` reports at 0x805FCE10 is those
- *   constructors referring to the tables, not a TU edge: every slot of both tables is a function of this range.  `extab`:
+ *   pointer (local and member spellings, `scheduling off` and level 2 tried).  `.data`: the emission-order seam
+ *   `dataorder.py` reports at 0x805FCE10 is the writers' constructors (`Network/NetworkConnectionStable.cpp`) referring
+ *   to the tables, not a TU edge: every slot of both tables is a function of this range.  `extab`:
  *   `networkStreamQueue_discard`'s cleanup range ends at the `hasMessage` call in retail (0x11 words) and at `memmove`
  *   in ours (0x1B) - a `throw()` on the declaration does not move it.  `.sdata`: 2 of 8 B (the frame version).
  * SHAPES. A message is a big-endian u16 payload size, a flag byte (0x80 user data, 0x40 a timestamp follows, 0x3F the
@@ -33,7 +31,8 @@
  *   bytes at +0x14/+0x15) and its payload; every value goes through the library's byte-order slots
  *   (`getNetworkLogger()`'s +0x48..+0x54).  `NetworkStreamQueue : NetworkStreamSink` (`Network/NetworkUnitPacket.h`)
  *   has its constructor and destructor (0x803FA5F4/0x803FA63C) here, so this unit emits `__vt__18NetworkStreamQueue`
- *   (0x805FCD98).
+ *   (0x805FCD98); `NetworkStreamWriter`/`NetworkStreamWriterDefault` define their key function `onFlush` here, so it
+ *   emits `__vt__19NetworkStreamWriter`/`__vt__26NetworkStreamWriterDefault` (0x805FCE10/0x805FCDD4) too.
  */
 
 #include "Network/NetworkUnitPacket.h"
@@ -56,17 +55,16 @@ u16 networkFrameVersion = 0x0101;
 extern "C" {
 
 /* The packet's flush override: nothing to hand on. */
-void networkPacket_flush(NetworkStreamWriter* self)
+void NetworkStreamWriter::flush()
 {
 }
 
-/* Binds the packet to `size` empty bytes at `buffer`; the first message starts there. */
-/* untyped: byte range (the block the packet reads or writes) */
-void networkPacket_attach(NetworkStreamWriter* self, const void* buffer, u32 size)
+/* Binds the packet to `capacity` empty bytes at `block`; the first message starts there. */
+void NetworkStreamWriter::attach(u8* block, u32 capacity)
 {
-    self->NetworkStreamSink::attach((u8*)buffer, size);
-    self->message_10 = (u8*)buffer;
-    self->cursor_14 = NULL;
+    NetworkStreamSink::attach(block, capacity);
+    this->message_10 = block;
+    this->cursor_14 = NULL;
 }
 
 /* Starts a plain message (a timestamp, no values) with user-data flag `mode`. */
@@ -199,12 +197,12 @@ void networkPacket_setTimestamp(NetworkStreamWriter* self, f32 seconds)
 }
 
 /* Binds the packet to `size` received bytes at `block` and moves the cursor to the first message's payload. */
-void networkPacket_bind(NetworkStreamWriter* self, u8* block, u32 size)
+void NetworkStreamWriter::bind(u8* block, u32 size)
 {
-    self->NetworkStreamSink::bind(block, size);
-    self->message_10 = block;
-    self->cursor_14 = NULL;
-    networkPacket_rewind(self);
+    NetworkStreamSink::bind(block, size);
+    this->message_10 = block;
+    this->cursor_14 = NULL;
+    networkPacket_rewind(this);
 }
 
 /* Moves the cursor to the current message's payload when a whole message is there. */
@@ -443,16 +441,15 @@ u32 networkPacket_getMessageOverhead(void)
 }
 
 /* The framed writer's flush override: nothing to hand on. */
-void networkStreamWriter_flushFrame(NetworkStreamWriterDefault* self)
+void NetworkStreamWriterDefault::flush()
 {
 }
 
-/* Binds the framed writer to `size` empty bytes at `data`; the first frame starts there (the writer's `attach`). */
-/* untyped: byte range - the bytes appended to the stream */
-void networkStreamWriter_putBytes(NetworkStreamWriterDefault* self, const void* data, u32 size)
+/* Binds the framed writer to `capacity` empty bytes at `block`; the first frame starts there. */
+void NetworkStreamWriterDefault::attach(u8* block, u32 capacity)
 {
-    self->NetworkStreamSink::attach((u8*)data, size);
-    self->message_10 = (u8*)data;
+    NetworkStreamSink::attach(block, capacity);
+    this->message_10 = block;
 }
 
 /* Appends an empty frame header (the version and the frame flag 4); 22, or -1. */
@@ -619,11 +616,11 @@ void networkStreamWriter_setKeyB(NetworkStreamWriterDefault* self, u8 key)
     self->message_10[0x15] = key;
 }
 
-/* Binds the reader to `size` received bytes at `block`; the first frame starts there (the writer's `bind`). */
-void networkStreamReader_attach(NetworkStreamWriterDefault* self, u8* block, u32 size)
+/* Binds the reader to `size` received bytes at `block`; the first frame starts there. */
+void NetworkStreamWriterDefault::bind(u8* block, u32 size)
 {
-    self->NetworkStreamSink::bind(block, size);
-    self->message_10 = block;
+    NetworkStreamSink::bind(block, size);
+    this->message_10 = block;
 }
 
 /* True when a whole frame sits at the current position. */
@@ -637,21 +634,21 @@ s32 make_sure_enough_space(NetworkStreamWriterDefault* self)
 
 /* Copies the current frame into `out`; its size, 0 when no whole frame is there, -1 when `capacity` is too
    small. */
-s32 copy_from_buffer(NetworkStreamWriterDefault* self, u8* out, u32 capacity)
+s32 NetworkStreamWriterDefault::fill(u8* out, u32 capacity)
 {
     u16 size;
 
-    if (self->used_0C - (self->message_10 - self->data_04) < 22) {
+    if (this->used_0C - (this->message_10 - this->data_04) < 22) {
         return 0;
     }
-    size = self->readSizeFromBuffer();
-    if (self->used_0C - (self->message_10 - self->data_04) < size) {
+    size = this->readSizeFromBuffer();
+    if (this->used_0C - (this->message_10 - this->data_04) < size) {
         return 0;
     }
     if (capacity < size) {
         return -1;
     }
-    memcpy(out, self->message_10, size);
+    memcpy(out, this->message_10, size);
     return size;
 }
 
@@ -931,7 +928,7 @@ void networkStreamQueue_discard(NetworkStreamQueue* self, s32 bytes, u8 mask)
     s32 left;
 
     removed = 0;
-    networkPacket_bind(&packet, self->data_04, self->used_0C);
+    packet.bind(self->data_04, self->used_0C);
     while (networkPacket_hasMessage(&packet) != 0) {
         bytes -= networkPacket_getMessageSize(&packet, mask);
         removed += networkPacket_getMessageSize(&packet, 0xFF);
@@ -985,7 +982,7 @@ u32 putTopPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame)
         result = 2;
     } else {
         skip = expected - first;
-        networkPacket_bind(&messages, networkStreamReader_getPayload(frame) + skip, size - skip);
+        messages.bind(networkStreamReader_getPayload(frame) + skip, size - skip);
         if (networkStreamQueue_appendAll(self, &messages) < 0) {
             getNetworkLogger()->log_14("NetworkUnitPacketPool::putTopPacket: recv buf over\n");
             return 0x80030032;
@@ -1012,7 +1009,7 @@ u32 networkStreamQueue_putNextPacket(NetworkStreamQueue* self, NetworkStreamWrit
     if (first + size <= expected) {
         result = 0;
     } else if (expected <= first) {
-        networkPacket_bind(&messages, networkStreamReader_getPayload(frame), size);
+        messages.bind(networkStreamReader_getPayload(frame), size);
         if (networkStreamQueue_appendAll(self, &messages) < 0) {
             getNetworkLogger()->log_14("NetworkUnitPacketPool::putLowPacket: recv buf over\n");
             return 0x80030032;
@@ -1030,7 +1027,7 @@ u32 putAllPacket(NetworkStreamQueue* self, NetworkStreamWriterDefault* frame)
     u32 size;
 
     size = networkStreamReader_getPayloadSize(frame);
-    networkPacket_bind(&messages, networkStreamReader_getPayload(frame), size);
+    messages.bind(networkStreamReader_getPayload(frame), size);
     if (networkStreamQueue_appendAll(self, &messages) < 0) {
         getNetworkLogger()->log_14("NetworkUnitPacketPool::putAllPacket: recv buf over\n");
         return 0x80030032;
@@ -1078,7 +1075,7 @@ s32 networkStreamQueue_hasMessage(NetworkStreamQueue* self)
 {
     NetworkStreamWriter packet;
 
-    networkPacket_bind(&packet, self->cursor_14, self->used_0C - (self->cursor_14 - self->data_04));
+    packet.bind(self->cursor_14, self->used_0C - (self->cursor_14 - self->data_04));
     return networkPacket_hasMessage(&packet);
 }
 
@@ -1087,7 +1084,7 @@ void networkStreamQueue_skipMessage(NetworkStreamQueue* self)
 {
     NetworkStreamWriter packet;
 
-    networkPacket_bind(&packet, self->cursor_14, self->used_0C - (self->cursor_14 - self->data_04));
+    packet.bind(self->cursor_14, self->used_0C - (self->cursor_14 - self->data_04));
     if (networkPacket_hasMessage(&packet) == 0) {
         return;
     }
@@ -1108,7 +1105,7 @@ void networkStreamQueue_removeMessage(NetworkStreamQueue* self)
     u16 size;
 
     left = self->used_0C - (self->cursor_14 - self->data_04);
-    networkPacket_bind(&packet, self->cursor_14, left);
+    packet.bind(self->cursor_14, left);
     if (networkPacket_hasMessage(&packet) == 0) {
         return;
     }
@@ -1120,33 +1117,33 @@ void networkStreamQueue_removeMessage(NetworkStreamQueue* self)
 }
 
 /* The packet's flush hook override: forwards to the sink's. */
-void networkPacket_onFlush(NetworkStreamWriter* self, u8* data, u32 size)
+void NetworkStreamWriter::onFlush(u8* data, u32 size)
 {
-    self->NetworkStreamSink::onFlush(data, size);
+    NetworkStreamSink::onFlush(data, size);
 }
 
 /* The packet's fill override: forwards to the sink's. */
-s32 networkPacket_fill(NetworkStreamWriter* self, u8* out, u32 size)
+s32 NetworkStreamWriter::fill(u8* out, u32 size)
 {
-    return self->NetworkStreamSink::fill(out, size);
+    return NetworkStreamSink::fill(out, size);
 }
 
 /* The framed writer's flush hook override: forwards to the sink's. */
-void networkStreamWriter_onFlush(NetworkStreamWriterDefault* self, u8* data, u32 size)
+void NetworkStreamWriterDefault::onFlush(u8* data, u32 size)
 {
-    self->NetworkStreamSink::onFlush(data, size);
+    NetworkStreamSink::onFlush(data, size);
 }
 
 /* The framed writer's scramble override: forwards to the sink's. */
-void networkStreamWriter_encrypt(NetworkStreamWriterDefault* self, u8 key, u16 offset, u16 size)
+void NetworkStreamWriterDefault::encrypt(u8 key, u16 offset, u16 size)
 {
-    self->NetworkStreamSink::encrypt(key, offset, size);
+    NetworkStreamSink::encrypt(key, offset, size);
 }
 
 /* The framed writer's unscramble override: forwards to the sink's. */
-void networkStreamWriter_decrypt(NetworkStreamWriterDefault* self, u8 key, u16 offset, u16 size)
+void NetworkStreamWriterDefault::decrypt(u8 key, u16 offset, u16 size)
 {
-    self->NetworkStreamSink::decrypt(key, offset, size);
+    NetworkStreamSink::decrypt(key, offset, size);
 }
 
 }

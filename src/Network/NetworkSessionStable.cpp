@@ -17,14 +17,11 @@
  *   (`NetworkSessionStable_downPerformancePackMessage`, `NetworkSessionStable_downPerformanceByteMessage`,
  *   `NetworkSessionStable_upPerformancePackMessage`, `NetworkSessionStable_upPerformanceByteMessage`,
  *   `NetworkSessionStable_moveOutOfBandMessage`) are this object's anonymous literals.
- *   `.text` 0x5228 against the claim's 0x522C; `extab`/`extabindex` differ in the rows whose sizes differ;
+ *   `.text` 0x5220 against the claim's 0x522C; `extab`/`extabindex` differ in the rows whose sizes differ;
  *   the object emits 16 B of `.sdata2` int-to-float constants retail loads from `Network/network_shared_data.cpp`
  *   (playbook 58: not their sole referencer, so unclaimable).  Rows:
- *  - `writeOp11`'s map row still carries the old mangling (`...UlScf`); the source's parameter order and `u8` kind
- *    give `writeOp11__20NetworkSessionStableFScPC15NetworkUniqueIdUlfUc` (request net-L3#2), so the row and
- *    `execControlOne`'s call pair only once the map is renamed;
- *  - `init`: `set` returns `s32` where retail's slot returns an `s8` (`mr` against `extsb`, request net-L3#3:
- *    `NetworkSessionBase::set`'s return type is the base's);
+ *  - `init`: `set` returns `s32` where retail's slot returns an `s8` (`mr` against `extsb`, request net-stream#1:
+ *    the `s8` return also needs `NetworkSessionManagerPat::connectPeer`'s local `slot` declared `s8`);
  *  - `move`: retail keeps the constant 3 out of a saved register and spills `sendBuffer_0D`'s address to the stack;
  *    it also destroys the inlined `writeOp7` stream after the `setError` loop that follows it (the `bl` at +0x360);
  *  - `set`: `this` and `isSelf` take r27/r29 against retail's r29/r27 (every local declaration order measured);
@@ -207,7 +204,7 @@ NetworkSessionStable::~NetworkSessionStable()
 /* Opens the session: clears the buffers, readies the four slots' queues, draws the nonce and takes the
    own slot. */
 /* untyped: caller-owned payload - the callback's user pointer */
-void NetworkSessionStable::init(s8 isHost, NetworkSessionCallback callback, void* user, const u8* address, s32 param)
+void NetworkSessionStable::init(u8 isHost, NetworkSessionCallback callback, void* user, const u8* address, s32 param)
 {
     s32 i;
 
@@ -317,7 +314,7 @@ inline void NetworkSessionStable::writeOp5(s8 index)
     NetworkStreamWriter stream;
     s8 term;
 
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     writeSize(&stream, (u16)writeByte(&stream, 5));
     term = index;
@@ -331,7 +328,7 @@ inline void NetworkSessionStable::writeOp3(const NetworkSessionSlot* slot)
     s8 term;
     u32 n;
 
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     n = (u16)writeByte(&stream, 3);
     n += (u16)writeUInt(&stream, slot->nonce_50);
@@ -346,7 +343,7 @@ inline void NetworkSessionStable::writeOp7()
     NetworkStreamWriter stream;
     s8 term;
 
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     writeSize(&stream, (u16)writeByte(&stream, 7));
     term = -2;
@@ -934,7 +931,7 @@ void NetworkSessionStable::put(const u8* data, s32 size, s32 channel, s32 count,
         getNetworkLogger()->warn_10("NetworkSessionStable::put: data too big -> %d\n", size);
         return;
     }
-    networkPacket_attach(&packet, sendBuffer_0D, 0x200);
+    packet.attach(sendBuffer_0D, 0x200);
     networkPacket_begin(&packet, 1);
     if (writeBytes(&packet, data, size) < 0) {
         setError(ownIndex_14826, NETWORK_ERROR_PUT_OVERFLOW, 0, 0x80000000, 3);
@@ -1069,7 +1066,7 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
             }
             break;
         case 3:
-            networkStreamReader_attach(&reader, ((const NetworkConnectionFrame*)data)->block_04, ((const NetworkConnectionFrame*)data)->size_00);
+            reader.bind(((const NetworkConnectionFrame*)data)->block_04, ((const NetworkConnectionFrame*)data)->size_00);
             channel = networkPacket_getChannel(&reader);
             if (nonce_16CD8 == networkPacket_getSessionNonce(&reader)) {
                 for (i = 0; i < 4; i++) {
@@ -1438,7 +1435,7 @@ s32 NetworkSessionStable::send(s8 index, s32 channel, s32 force)
     sentTotal = 0;
     queue = &queues->send_00[channel];
     do {
-        networkStreamWriter_putBytes(&writer, sendBuffer_0D, connection->getMaxPacketSize());
+        writer.attach(sendBuffer_0D, connection->getMaxPacketSize());
         networkStreamWriter_flush(&writer);
         networkStreamQueue_fillPacket(queue, &packet);
         sent = 0;
@@ -1815,7 +1812,7 @@ void NetworkSessionStable::writeOp1(u32 value)
     s8 term;
     u32 n;
 
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     n = (u16)writeByte(&stream, 1);
     n += (u16)writeUInt(&stream, value);
@@ -1830,7 +1827,7 @@ void NetworkSessionStable::writeOp2()
     NetworkStreamWriter stream;
     s8 term;
 
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     writeSize(&stream, writeByte(&stream, 2));
     term = -1;
@@ -1843,7 +1840,7 @@ void NetworkSessionStable::writeOp6(s8 value)
     NetworkStreamWriter stream;
     s8 term;
 
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     writeSize(&stream, writeByte(&stream, 6));
     term = value;
@@ -1857,7 +1854,7 @@ void NetworkSessionStable::writeOp10(s8 index)
     s8 term;
     u32 n;
 
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     n = (u16)writeByte(&stream, 10);
     n += (u16)networkPacket_writeRecord(&stream, &slots_14828[index].address_30.object_00);
@@ -1876,7 +1873,7 @@ void NetworkSessionStable::writeOp11(s8 index, const NetworkUniqueId* address, u
 
     scaled = 0;
     scaled = (u32)(networkMillisecondsPerSecond * delay);
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     n = (u16)writeByte(&stream, 11);
     n += (u16)networkPacket_writeRecord(&stream, address);
@@ -1895,7 +1892,7 @@ void NetworkSessionStable::writeOp8or9(u32 hasExtra, s8 index)
     s8 term;
     u32 n;
 
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     if (hasExtra != 0) {
         n = (u16)writeByte(&stream, 9);
@@ -1917,7 +1914,7 @@ void NetworkSessionStable::sendOp4(const void* data, u32 length, s8 index)
     s8 term;
     u32 n;
 
-    networkPacket_attach(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkPacket_begin(&stream, 0);
     n = (u16)writeByte(&stream, 4);
     n += (u16)writeBytes(&stream, data, length);
@@ -2050,7 +2047,7 @@ void NetworkSessionStable::moveOutOfBand(s8 index)
         return;
     }
     connection = slots_14828[slotIndex].connection_2C;
-    networkStreamWriter_putBytes(&stream, sendBuffer_0D, 0x400);
+    stream.attach(sendBuffer_0D, 0x400);
     networkStreamWriter_flush(&stream);
     networkStreamWriter_setMode(&stream, 0);
     networkStreamWriter_putU16(&stream, networkStreamWriter_size(&slots_14828[index].queues_54.send_00[0]));

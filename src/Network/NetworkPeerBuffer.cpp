@@ -78,14 +78,14 @@ s32 NetworkPeerBuffer::receive(u8* out, s32* size, u8* out2, s32* size2, u8* kin
     *size = 0;
     *size2 = 0;
     *kind = 0;
-    networkStreamReader_attach(&stream, this->payload_10, this->used_2010);
+    stream.bind(this->payload_10, this->used_2010);
     if (make_sure_enough_space(&stream) == 0) {
         return 0;
     }
     if (capacity < stream.readSizeFromBuffer()) {
         return 0;
     }
-    length = copy_from_buffer(&stream, out, capacity);
+    length = stream.fill(out, capacity);
     if (length < 0) {
         return 0;
     }
