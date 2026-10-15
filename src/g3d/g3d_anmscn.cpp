@@ -6,7 +6,7 @@
  *   0x8056F578-0x8056F598, .data 0x8058C288-0x8058CC40, .sdata 0x80791170-0x80791188, .sdata2 0x80795D70-0x80795D90.
  *   The TU is `g3d_anmscn.cpp`: its one-copy `__FILE__` string (0x8058C288) is cited from fn_800649CC through
  *   fn_80068FC4; the previous TU's (`g3d_anmobj.cpp`, 0x8058C248) by PlayPolicy_Loop and the next TU's
- *   (`g3d_anmshp.cpp`, 0x8058CC40) from fn_8006946C on.  The `.rodata` records 0x8056F578/0x8056F588 and the `.sdata`
+ *   (`g3d_anmshp.cpp`, 0x8058CC40) from anm_obj_shp_test_existence on.  The `.rodata` records 0x8056F578/0x8056F588 and the `.sdata`
  *   words 0x80791170-0x80791184 are read only from inside the range.
  * FLAGS. `cflags_g3d`'s `-O3` is measured on fn_800680A8 (docs/g3d.md, playbook 27).
  * NAMES. The stems are defined `extern "C"` (playbook 48); `fn_80066C8C` and `fn_800680A8` keep C++ linkage (map rows

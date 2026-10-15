@@ -97,4 +97,10 @@ void setSoftresetFlag(bool flag);
 void ArenaSelExec(void);
 #endif
 
+#ifdef __cplusplus
+/* 0x80790E70 (.sdata, 0x8) - the two frame folds (PlayPolicy_Onetime, PlayPolicy_Loop) the g3d
+ * GetAnmPlayPolicy indexes by play policy; the words sit inside this unit's `.sdata` claim. */
+extern float (*anm_play_policy_table[2])(float startFrame, float endFrame, float frame);
+#endif
+
 #endif /* MHTRI_MH3_PAD_H */

@@ -167,25 +167,34 @@ struct TexSrtAnmResult {
     /* +0x0C */ f32 srt[11][5];
 };
 
+/* size: 0x18 (a lower bound: the binding count and words are evidenced) */
 class AnmObjMatClr : public AnmObj {
 public:
     virtual const ClrAnmResult* GetResult(ClrAnmResult* pResult, u32 idx) = 0;
 
     bool TestExistence(u32 idx) const;
     static const TypeObj GetTypeObjStatic();
+    /* +0x10 */ int mNumBinding;
+    /* +0x14 */ u16* mpBinding;
 };
 
+/* size: 0x18 (a lower bound: the binding count and words are evidenced) */
 class AnmObjTexPat : public AnmObj {
 public:
     virtual const TexPatAnmResult* GetResult(TexPatAnmResult* pResult, u32 idx) = 0;
 
     bool TestExistence(u32 idx) const;
     static const TypeObj GetTypeObjStatic();
+    /* +0x10 */ int mNumBinding;
+    /* +0x14 */ u16* mpBinding;
 };
 
+/* size: 0x18 (a lower bound: the binding count and words are evidenced) */
 class AnmObjShp : public AnmObj {
 public:
     static const TypeObj GetTypeObjStatic();
+    /* +0x10 */ int mNumBinding;
+    /* +0x14 */ u16* mpBinding;
 };
 
 /* The checked cast of the run-time type: `pObj` as a `TTo`, or NULL when it is not one. */

@@ -25,7 +25,7 @@
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_calcvtx.h"
-#include "g3d/g3d_anmshp.h"    /* fn_8006946C (rule 2) */
+#include "g3d/g3d_anmshp.h"    /* anm_obj_shp_test_existence (rule 2) */
 #include "unsplit/OS.h"
 
 #pragma peephole off
@@ -219,7 +219,7 @@ extern "C" void fn_8007270C(void* pMdl, void* pAnmObjShp, const void** vtxPosTab
     s32 numVtxPos = (s32)mdl.GetResVtxPosNumEntries();
 
     for (s32 i = 0; i < numVtxPos; i++) {
-        if (!fn_8006946C(pAnmObjShp, i)) {
+        if (!anm_obj_shp_test_existence(pAnmObjShp, i)) {
             continue;
         }
         if (vtxPosTable == NULL) {

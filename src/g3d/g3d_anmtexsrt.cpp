@@ -14,22 +14,26 @@
  *   AnmObjTexSrtRes members are nw4r's (the `AnmObjTexSrt::Attach(...)` / `AnmObjTexSrtNode::G3dProc(...)` warnings
  *   and the four vtables); the stems are defined `extern "C"` (playbook 48).  The classes are declared in
  *   `g3d/g3d_anmtexsrt.h`, with the unit's C-linkage helpers.
- * RESIDUALS. Unwritten (19 functions, objdiff scores them zero): 0x8006C138-0x8006C650, 0x8006C668-0x8006CDBC,
- *   0x8006CE48-0x8006D000, 0x8006D084-0x8006D9A0 (the AnmObjTexSrtRes members), 0x8006DA48-0x8006E2A8,
- *   0x8006E338-0x8006E668 (apply_tex_srt_anm_result).  Partial: fn_8006C650, fn_8006E668.
+ *   ResAnmTexSrt::GetNumMaterial, the AnmObjTexSrtOverride constructor/Construct and the AnmObjTexSrtRes members
+ *   are nw4r's (the asserts, the vtables); their map rows are fn_ stems until rename request g3d-anmtex#5 lands.
+ *   texsrt_add_offset_to_ptr (0x8006D970, ut::AddOffsetToPtr), apply_tex_srt_anm_result_tex (0x8006E160, the
+ *   texture-SRT half of ApplyTexSrtAnmResult) and tex_srt_assign (0x8006E244, TexSrt's copy assignment) are
+ *   GUESSES.  ResAnmTexSrt::GetAnmResult is `g3d/g3d_resanmtexsrt.cpp`'s fn_800916FC.
+ * RESIDUALS. Partial: fn_8006C650 (retail materialises `~(b - 1)` with an explicit `nor` where MWCC folds it into
+ *   `andc`/`neg`; tried: a named mask, mask-first operands, signed casts).
  *   AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride, AnmObjTexSrtRes: the destructors' empty bodies are complete
  *   (the compiler emits the base calls and the deleting tail; `#pragma peephole off` keeps retail's `extsh`).
- *   fn_8006C650: retail materialises `~(b - 1)` with an explicit `not` where MWCC folds it into `andc` (one
- *   instruction fewer).
  *   flipcheck: `.text`, extab and extabindex are partial; `.rodata`, `.data` and `.sdata2` are claimed and not
  *   emitted.
  * SHAPES. The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
  *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106) and
- *   `#pragma pool_data off`.
+ *   `#pragma pool_data off`.  The unit includes `g3d/g3d_anmobj.h` rather than `g3d/g3d_anmscn.h`: the latter's
+ *   global placement `operator delete` gives the Construct functions a frame pointer and landing pad retail does not
+ *   have.  Local declaration order picks the registers in apply_tex_srt_anm_result and its texture half.
  */
 
 #include "types.h"
-#include "g3d/g3d_anmscn.h"
+#include "g3d/g3d_anmobj.h" /* anm_typename_AnmObj, owned by g3d/g3d_anmobj.cpp (rule 2) */
 #include "g3d/g3d_anmclr.h"   /* type_obj_set_name_texsrt_res/_node/_override (rule 2) */
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResTexSrt (rule 2) */
@@ -37,6 +41,10 @@
 #include "g3d/g3d_anmtexsrt.h" /* the texture-SRT classes this range defines (rule 1) */
 #include "nw4r/db_assert.h"   /* nw4r::db::Warning (rule 2) */
 #include "MSL_C/alloc.h"      /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
+#include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
+#include "fn_8004CAD8.h"     /* MTX34_ctor, abs_f32 (rule 2) */
+#include "g3d/g3d_dcc.h"
+#include "MSL/mathf.h"
 
 #pragma peephole off
 
@@ -108,11 +116,12 @@ const char *nw4r::g3d::ResTexSrt::GetClassName()
  * The two argument-less bodies (0x8006D9A0/0x8006E2A8): `blr`, no work.
  * --------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_8006D9A0(void)
+extern "C" u32 fn_8006D9A0(u32 p)
 {
+    return p;
 }
 
-extern "C" void fn_8006E2A8(void)
+extern "C" void fn_8006E2A8(nw4r::g3d::TexSrt* p)
 {
 }
 
@@ -182,7 +191,7 @@ extern "C" void *fn_8006D000(void *self, void *src)
 
 extern "C" s32 fn_8006E668(f32 x)
 {
-    return (s32)(((fn_8006E690(x) >> 15) & 0xFF) - 127);
+    return (s32)(((fn_8006E690(x) >> 23) & 0xFF) - 127);
 }
 
 extern "C" u32 fn_8006D9FC(void *self, u32 idx)
@@ -232,30 +241,21 @@ nw4r::g3d::ResTexSrtData& nw4r::g3d::ResTexSrt::ref()
 /* --------------------------------------------------------------------------------------------- *
  * The three field readers of the resolved `ResAnmTexSrt` record (0x8006D03C/0x8006D060/0x8006D9A4).
  * --------------------------------------------------------------------------------------------- */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0x10];
-    /* +0x10 */ u32 field_0x10;
-    /* +0x14 */ u8 pad_0x14[0xC];
-    /* +0x20 */ u16 field_0x20;
-    /* +0x22 */ u8 pad_0x22[0x6];
-    /* +0x28 */ u32 field_0x28;
-} ResAnmTexSrtData; /* size: 0x2C (approximate - only the three fields read here are evidenced) */
-
-extern "C" u16 fn_8006D060(void *p)
+extern "C" int fn_8006D060(void *p)
 {
-    return ((ResAnmTexSrtData *)(void *)fn_8006CDBC(p))->field_0x20;
+    return ((nw4r::g3d::ResAnmTexSrtData *)(void *)fn_8006CDBC(p))->numFrame;
 }
 
 extern "C" u32 fn_8006D03C(void *p)
 {
-    return ((ResAnmTexSrtData *)(void *)fn_8006CDBC(p))->field_0x28;
+    return ((nw4r::g3d::ResAnmTexSrtData *)(void *)fn_8006CDBC(p))->policy;
 }
 
-extern "C" u32 fn_8006D9A4(void *self, void *key)
+extern "C" u32 fn_8006D9A4(void *self, u32 idx)
 {
-    u32 tmp = fn_8006D9FC(self, ((ResAnmTexSrtData *)(void *)fn_8006CDBC(self))->field_0x10);
+    u32 tmp = fn_8006D9FC(self, ((nw4r::g3d::ResAnmTexSrtData *)(void *)fn_8006CDBC(self))->toTexSrtDataDic);
 
-    return (u32)(*reinterpret_cast<nw4r::g3d::ResDic *>(&tmp))[(int)key];
+    return (u32)(*reinterpret_cast<nw4r::g3d::ResDic *>(&tmp))[(int)idx];
 }
 
 /* --------------------------------------------------------------------------------------------- *
@@ -291,6 +291,10 @@ extern "C" u32 fn_8006D9A4(void *self, void *key)
     }
 
 #define TEXSRT_THIS_MSG "NW4R:Pointer Error\nthis(=%p) is not valid pointer."
+
+/* The unit's own helpers the class members below call before their definitions. */
+extern "C" u32 texsrt_add_offset_to_ptr(u32 base, s32 ofs);
+extern "C" nw4r::g3d::TexSrt* tex_srt_assign(nw4r::g3d::TexSrt* pDst, const nw4r::g3d::TexSrt* pSrc);
 
 /* 0x80069C80 (0x74): constructs the texture-SRT animation over a binding buffer of `numBinding` words, all
  * released. */
@@ -634,6 +638,374 @@ void nw4r::g3d::AnmObjTexSrtNode::G3dProc(u32 task, u32 param, void* pInfo) /* u
         }
         SetParent(static_cast<G3dObj*>(pInfo));
         break;
+    }
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* AnmObjTexSrtOverride and AnmObjTexSrtRes construction, results and frame control                    */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* 0x8006C138 (0x3F0): sizes an override node for `mdl` with `numChildren` children, reports the size through
+ * `pSize`, and builds it in one block from `pHeap` (NULL without a heap or memory). */
+nw4r::g3d::AnmObjTexSrtOverride* nw4r::g3d::AnmObjTexSrtOverride::Construct(MEMAllocator* pHeap, u32* pSize,
+                                                                            ResMdl mdl, int numChildren)
+{
+    if (!mdl.IsValid()) {
+        return NULL;
+    }
+    int numMat = mdl.GetResMatNumEntries();
+    u32 bindingOffset = fn_8006C650(sizeof(AnmObjTexSrtOverride), 2);
+    u32 childrenOffset = fn_8006C650(bindingOffset + numMat * sizeof(u16), 4);
+    u32 size = fn_8006C650(childrenOffset + numChildren * sizeof(AnmObjTexSrtRes*), 4);
+    if (pSize != NULL) {
+        TEXSRT_POINTER_ASSERT(pSize, 0x1D0, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.");
+        *pSize = size;
+    }
+    if (pHeap == NULL) {
+        return NULL;
+    }
+    TEXSRT_POINTER_ASSERT(pHeap, 0x1D9, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
+    u8* pBuf = (u8*)Alloc(pHeap, size);
+    if (pBuf == NULL) {
+        return NULL;
+    }
+    TEXSRT_POINTER_ASSERT(pBuf, 0x1E3, "NW4R:Pointer Error\nbuf(=%p) is not valid pointer.");
+    if ((u32)pBuf & 3) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x1E4,
+                        "NW4R:Alignment Error(0x%x)\nbuf must be aligned to 4 bytes boundary.", pBuf);
+    }
+    return new (pBuf) AnmObjTexSrtOverride(pHeap, (u16*)(pBuf + bindingOffset), numMat,
+                                           (AnmObjTexSrtRes**)(pBuf + childrenOffset), numChildren);
+}
+
+/* 0x8006C528 (0x128): constructs the override node over a binding buffer and a child array. */
+inline nw4r::g3d::AnmObjTexSrtOverride::AnmObjTexSrtOverride(MEMAllocator* pHeap, u16* pBindingBuf, int numBinding,
+                                                             AnmObjTexSrtRes** ppChildrenBuf, int numChildren)
+    : AnmObjTexSrtNode(pHeap, pBindingBuf, numBinding, ppChildrenBuf, numChildren)
+{
+    G3D_POINTER_ASSERT("g3d_anmtexsrt.h", this, 0xB0, TEXSRT_THIS_MSG);
+}
+
+/* 0x8006C668 (0x2BC): material `idx`'s result from the last child that animates it, or nothing. */
+const nw4r::g3d::TexSrtAnmResult* nw4r::g3d::AnmObjTexSrtOverride::GetResult(TexSrtAnmResult* pResult, u32 idx)
+{
+    TEXSRT_POINTER_ASSERT(this, 0x1F2, TEXSRT_THIS_MSG);
+    TEXSRT_POINTER_ASSERT(pResult, 0x1F3, "NW4R:Pointer Error\npResult(=%p) is not valid pointer.");
+    if (!((int)idx <= mNumBinding - 1)) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x1F4, "int(matId) is out of bounds(%d)\nint(matId) <= %d not satisfied.",
+                        idx, mNumBinding - 1);
+    }
+    for (int i = mChildrenArraySize - 1; i >= 0; i--) {
+        AnmObjTexSrtRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL && pChild->TestExistence(idx)) {
+            const TexSrtAnmResult* pChildResult = pChild->GetResult(pResult, idx);
+            if (pChildResult->flags != 0) {
+                return pChildResult;
+            }
+        }
+    }
+    pResult->flags = 0;
+    return pResult;
+}
+
+/* 0x8006C924 (0x474): sizes a resource-played animation of `res` for `mdl` (with a per-material result cache when
+ * `bHasCache`), reports the size through `pSize`, and builds it in one block from `pHeap`. */
+nw4r::g3d::AnmObjTexSrtRes* nw4r::g3d::AnmObjTexSrtRes::Construct(MEMAllocator* pHeap, u32* pSize, ResAnmTexSrt res,
+                                                                  ResMdl mdl, bool bHasCache)
+{
+    if (!fn_8006CE34(&res) || !mdl.IsValid()) {
+        return NULL;
+    }
+    int numMat = res.GetNumMaterial();
+    int numBinding = mdl.GetResMatNumEntries();
+    u32 cacheSize = (bHasCache ? numMat : 0) * sizeof(TexSrtAnmResult);
+    u32 size = sizeof(AnmObjTexSrtRes) + cacheSize + numBinding * sizeof(u16);
+    if (pSize != NULL) {
+        TEXSRT_POINTER_ASSERT(pSize, 0x227, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.");
+        *pSize = size;
+    }
+    if (pHeap == NULL) {
+        return NULL;
+    }
+    TEXSRT_POINTER_ASSERT(pHeap, 0x230, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
+    u8* pBuf = (u8*)Alloc(pHeap, size);
+    if (pBuf == NULL) {
+        return NULL;
+    }
+    TEXSRT_POINTER_ASSERT(pBuf, 0x23A, "NW4R:Pointer Error\nbuf(=%p) is not valid pointer.");
+    TexSrtAnmResult* pCacheBuf = bHasCache ? (TexSrtAnmResult*)(pBuf + sizeof(AnmObjTexSrtRes)) : NULL;
+    u16* pBindingBuf = (u16*)(pBuf + sizeof(AnmObjTexSrtRes) + cacheSize);
+    if ((u32)pBuf & 3) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x23E,
+                        "NW4R:Alignment Error(0x%x)\nbuf must be aligned to 4 bytes boundary.", pBuf);
+    }
+    if ((u32)pCacheBuf & 3) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x23F,
+                        "NW4R:Alignment Error(0x%x)\npCacheBuf must be aligned to 4 bytes boundary.", pCacheBuf);
+    }
+    if ((u32)pBindingBuf & 1) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x240,
+                        "NW4R:Alignment Error(0x%x)\npBindBuf must be aligned to 2 bytes boundary.", pBindingBuf);
+    }
+    return new (pBuf) AnmObjTexSrtRes(pHeap, res, pBindingBuf, numBinding, pCacheBuf);
+}
+
+/* 0x8006CD98 (0x24): the animated material count. */
+u32 nw4r::g3d::ResAnmTexSrt::GetNumMaterial() const
+{
+    return ((const ResAnmTexSrtData*)fn_8006CDBC((void*)this))->numMaterial;
+}
+
+/* 0x8006CE48 (0x1B8): builds a resource-played texture-SRT animation over `res`, with an optional result cache. */
+nw4r::g3d::AnmObjTexSrtRes::AnmObjTexSrtRes(MEMAllocator* pHeap, ResAnmTexSrt res, u16* pBindingBuf, int numBinding,
+                                            TexSrtAnmResult* pCacheBuf)
+    : AnmObjTexSrt(pHeap, pBindingBuf, numBinding),
+      FrameCtrl(0.0f, fn_8006D060(&res), GetAnmPlayPolicy((AnmPolicy)fn_8006D03C(&res)))
+{
+    fn_8006D000(&mRes, &res);
+    mpResultCache = pCacheBuf;
+    TEXSRT_POINTER_ASSERT(this, 0x25E, TEXSRT_THIS_MSG);
+    if (mpResultCache) {
+        UpdateCache();
+    }
+}
+
+/* 0x8006D084 (0x198): sets the frame and refreshes the result cache. */
+void nw4r::g3d::AnmObjTexSrtRes::SetFrame(f32 frame)
+{
+    TEXSRT_POINTER_ASSERT(this, 0x268, TEXSRT_THIS_MSG);
+    if (!texsrt_value_valid(frame)) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x269, "NW4R:Floating Point Value Error(%f)\nframe is infinite or nan.",
+                        frame);
+    }
+    SetFrm(frame);
+    if (mpResultCache) {
+        UpdateCache();
+    }
+}
+
+/* 0x8006D21C (0x11C): the current frame. */
+f32 nw4r::g3d::AnmObjTexSrtRes::GetFrame() const
+{
+    TEXSRT_POINTER_ASSERT(this, 0x276, TEXSRT_THIS_MSG);
+    return GetFrm();
+}
+
+/* 0x8006D338 (0x1B0): sets the update rate; a rate of 0 refreshes the result cache. */
+void nw4r::g3d::AnmObjTexSrtRes::SetUpdateRate(f32 rate)
+{
+    TEXSRT_POINTER_ASSERT(this, 0x27E, TEXSRT_THIS_MSG);
+    if (!texsrt_value_valid(rate)) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x27F, "NW4R:Floating Point Value Error(%f)\nrate is infinite or nan.",
+                        rate);
+    }
+    SetRate(rate);
+    if (rate == 0.0f && mpResultCache) {
+        UpdateCache();
+    }
+}
+
+/* 0x8006D4E8 (0x11C): the update rate. */
+f32 nw4r::g3d::AnmObjTexSrtRes::GetUpdateRate() const
+{
+    TEXSRT_POINTER_ASSERT(this, 0x28E, TEXSRT_THIS_MSG);
+    return GetRate();
+}
+
+/* 0x8006D604 (0x144): advances the frame unless the rate is 0, refreshing the result cache. */
+void nw4r::g3d::AnmObjTexSrtRes::UpdateFrame()
+{
+    TEXSRT_POINTER_ASSERT(this, 0x296, TEXSRT_THIS_MSG);
+    if (GetRate() != 0.0f) {
+        UpdateFrm();
+        if (mpResultCache) {
+            UpdateCache();
+        }
+    }
+}
+
+/* 0x8006D748 (0x228): binds every animated material to the model material of the same name; returns whether any
+ * matched. */
+bool nw4r::g3d::AnmObjTexSrtRes::Bind(ResMdl mdl)
+{
+    TEXSRT_POINTER_ASSERT(this, 0x2A9, TEXSRT_THIS_MSG);
+    if (!mdl.IsValid()) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x2AA, "NW4R:Failed assertion resMdl.IsValid()");
+    }
+    if ((int)mdl.GetResMatNumEntries() > mNumBinding) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x2AB,
+                        "NW4R:Failed assertion int(resMdl.GetResMatNumEntries()) <= mNumBinding");
+    }
+    int numMat = mRes.GetNumMaterial();
+    bool bSuccess = false;
+    for (u16 i = 0; i < numMat; i++) {
+        const ResAnmTexSrtMatData* pMatAnm = (const ResAnmTexSrtMatData*)fn_8006D9A4(&mRes, i);
+        ResName name((void*)texsrt_add_offset_to_ptr((u32)pMatAnm, pMatAnm->toResName - 4));
+        ResHandle mat;
+        res_mat_copy_ctor(&mat, (ResHandle*)&mdl.GetResMat(name));
+        if (reinterpret_cast<ResMat*>(&mat)->IsValid()) {
+            u32 id = res_mat_get_id(&mat);
+            mpBinding[id] = i;
+            bSuccess = true;
+        }
+    }
+    SetAnmFlag(ANMFLAG_ISBOUND, true);
+    return bSuccess;
+}
+
+/* 0x8006D970 (0x30): the address `ofs` bytes past `base`. */
+extern "C" u32 texsrt_add_offset_to_ptr(u32 base, s32 ofs)
+{
+    return ofs + fn_8006D9A0(base);
+}
+
+/* 0x8006DA48 (0x2CC): material `idx`'s result: nothing for an unbound material, the cached result, or the
+ * resource evaluated at the current frame into `pResult`. */
+const nw4r::g3d::TexSrtAnmResult* nw4r::g3d::AnmObjTexSrtRes::GetResult(TexSrtAnmResult* pResult, u32 idx)
+{
+    TEXSRT_POINTER_ASSERT(this, 0x2DE, TEXSRT_THIS_MSG);
+    TEXSRT_POINTER_ASSERT(pResult, 0x2DF, "NW4R:Pointer Error\npResult(=%p) is not valid pointer.");
+    if (!((int)idx <= mNumBinding - 1)) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x2E0, "int(matId) is out of bounds(%d)\nint(matId) <= %d not satisfied.",
+                        idx, mNumBinding - 1);
+    }
+    u32 anmId = mpBinding[idx];
+    if (anmId & 0xC000) {
+        pResult->flags = 0;
+        return pResult;
+    }
+    if (anmId != (anmId & 0x3FFF)) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x2EA, "NW4R:Failed assertion anmId == (anmId & BINDING_ID_MASK)");
+    }
+    if (mpResultCache) {
+        return &mpResultCache[anmId];
+    }
+    mRes.GetAnmResult(pResult, anmId, GetFrm());
+    return pResult;
+}
+
+/* 0x8006DD14 (0x274): evaluates every bound material's result at the current frame into the result cache. */
+void nw4r::g3d::AnmObjTexSrtRes::UpdateCache()
+{
+    TEXSRT_POINTER_ASSERT(this, 0x2FB, TEXSRT_THIS_MSG);
+    TEXSRT_POINTER_ASSERT(mpResultCache, 0x2FC, "NW4R:Pointer Error\nmpResultCache(=%p) is not valid pointer.");
+    f32 frame = GetFrm();
+    for (u32 i = 0; i < mNumBinding; i++) {
+        u16 binding = mpBinding[i];
+        if (!(binding & 0x8000)) {
+            u32 anmId = binding & 0x3FFF;
+            mRes.GetAnmResult(&mpResultCache[anmId], anmId, frame);
+        }
+    }
+}
+
+/* 0x8006DF88 (0x1D8): advances the frame on the update pass and handles being attached to or detached from a
+ * parent. */
+void nw4r::g3d::AnmObjTexSrtRes::G3dProc(u32 task, u32 param, void* pInfo) /* untyped: caller-owned payload */
+{
+    TEXSRT_POINTER_ASSERT(this, 0x311, TEXSRT_THIS_MSG);
+    switch (task) {
+    case G3DPROC_UPDATEFRAME:
+        UpdateFrame();
+        break;
+    case G3DPROC_DETACH_PARENT:
+        if (!GetParent()) {
+            nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x31D, "NW4R:Failed assertion GetParent()");
+        }
+        SetParent(NULL);
+        break;
+    case G3DPROC_ATTACH_PARENT:
+        if (GetParent()) {
+            nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x324, "NW4R:Failed assertion !GetParent()");
+        }
+        SetParent(static_cast<G3dObj*>(pInfo));
+        break;
+    }
+}
+
+/* 0x8006E160 (0xE4): copies the animated texture SRTs of `pResult` into the material's SRT block, with the matrix
+ * mode and the present bits. */
+extern "C" void apply_tex_srt_anm_result_tex(nw4r::g3d::ResTexSrt srt, const nw4r::g3d::TexSrtAnmResult* pResult)
+{
+    if (pResult == NULL) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x337, "NW4R:Pointer must not be NULL (pResult)");
+    }
+    nw4r::g3d::ResTexSrtData& r = srt.ref();
+    const nw4r::g3d::TexSrt* pSrc;
+    nw4r::g3d::TexSrt* pDst;
+    u32 texFlag = r.flagTexSrt;
+    u32 anmFlag = pResult->flags;
+    u32 mask = 0xF;
+    pSrc = (const nw4r::g3d::TexSrt*)pResult->srt[0];
+    pDst = r.texSrt;
+    for (; texFlag != 0 && anmFlag != 0; texFlag >>= 4, anmFlag >>= 4, mask <<= 4, pSrc++, pDst++) {
+        if ((texFlag & 1) && (anmFlag & 1)) {
+            r.texMtxMode = pResult->texMtxMode;
+            tex_srt_assign(pDst, pSrc);
+            r.flagTexSrt = (r.flagTexSrt & ~mask) | (pResult->flags & mask);
+        }
+    }
+}
+
+/* 0x8006E244 (0x64): copies the five SRT components of `pSrc` into `pDst` and returns `pDst`. */
+extern "C" nw4r::g3d::TexSrt* tex_srt_assign(nw4r::g3d::TexSrt* pDst, const nw4r::g3d::TexSrt* pSrc)
+{
+    fn_8006E2A8(pDst);
+    pDst->Su = pSrc->Su;
+    pDst->Sv = pSrc->Sv;
+    pDst->R = pSrc->R;
+    pDst->Tu = pSrc->Tu;
+    pDst->Tv = pSrc->Tv;
+    return pDst;
+}
+
+
+/* 0x8006E338 (0x330): applies a texture-SRT result to a material's SRT block and, scaled into the hardware's
+ * exponent range, to its indirect matrices. */
+extern "C" void apply_tex_srt_anm_result(struct ResHandle texSrt, struct ResHandle indMtx,
+                                         const nw4r::g3d::TexSrtAnmResult* pResult)
+{
+    TEXSRT_POINTER_ASSERT(pResult, 0x352, "NW4R:Pointer Error\npResult(=%p) is not valid pointer.");
+    if (!reinterpret_cast<nw4r::g3d::ResTexSrt*>(&texSrt)->IsValid()) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x353, "NW4R:Failed assertion srt.IsValid()");
+    }
+    if (!reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>(&indMtx)->IsValid()) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x354, "NW4R:Failed assertion ind.IsValid()");
+    }
+    apply_tex_srt_anm_result_tex(*reinterpret_cast<nw4r::g3d::ResTexSrt*>(&texSrt), pResult);
+    const nw4r::g3d::TexSrt* pSrt;
+    u32 indFlag;
+    int i;
+    indFlag = pResult->indFlags;
+    i = 8;
+    pSrt = (const nw4r::g3d::TexSrt*)pResult->srt[8];
+    f32 minVal = 1.0e-18f;
+    for (; indFlag != 0; pSrt++, i++, indFlag >>= 4) {
+        if (indFlag & 1) {
+            nw4r::math::MTX34 m;
+            MTX34_ctor(&m);
+            g3d_calc_tex_mtx_dcc(&m, true, pSrt, indFlag & 0xF);
+            f32 maxVal = fn_8006E6A4(minVal, abs_f32(m.m[0][0]));
+            maxVal = fn_8006E6A4(maxVal, abs_f32(m.m[0][1]));
+            maxVal = fn_8006E6A4(maxVal, abs_f32(m.m[0][3]));
+            maxVal = fn_8006E6A4(maxVal, abs_f32(m.m[1][0]));
+            maxVal = fn_8006E6A4(maxVal, abs_f32(m.m[1][1]));
+            maxVal = fn_8006E6A4(maxVal, abs_f32(m.m[1][3]));
+            s8 scaleExp = fn_8006E668(maxVal) + 1;
+            if (scaleExp > 46) {
+                nw4r::db::Warning("g3d_anmtexsrt.cpp", 0x377, "ApplyIndTexSrtAnmResult: scale_exp(%d) over 46",
+                                  scaleExp);
+            }
+            f32 scale = ldexpf(1.0f, -scaleExp);
+            m.m[0][0] *= scale;
+            m.m[0][1] *= scale;
+            m.m[0][2] = m.m[0][3] * scale;
+            m.m[1][0] *= scale;
+            m.m[1][1] *= scale;
+            m.m[1][2] = m.m[1][3] * scale;
+            reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>(&indMtx)->GXSetIndTexMtx((_GXIndTexMtxID)(i - 7), m,
+                                                                                          scaleExp);
+        }
     }
 }
 

@@ -23,6 +23,9 @@ const u8 **type_obj_set_name_texsrt_override(const u8 **out, const u8 *v);
 /* 0x80063FD0 - the checked `ResAnmScn` resource resolver `g3d/g3d_resfile.cpp`'s revision checks read. */
 u32 fn_80063FD0(void *p);
 
+/* 0x8006405C - the material's index in its model (the ResMat block's word at +0xC). */
+u32 res_mat_get_id(const struct ResHandle *p);
+
 /* 0x80064754 - returns the colour word itself (the identity the word readers pass their pointer through). */
 u32 *color_to_u32_ref(u32 *self);
 /* 0x80064834 - constructs a colour as opaque white (stores 0xFFFFFFFF through the word setter), returns `self`. */

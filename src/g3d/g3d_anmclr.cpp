@@ -17,10 +17,16 @@
  *   declarations are `g3d/g3d_anmclr.h`.  color_to_u32_ref (0x80064754, the identity the word readers pass a colour
  *   through, nw4r::ut::Color's ToU32ref shape) and color_ctor_white (0x80064834, stores 0xFFFFFFFF through the word
  *   setter, Color's default constructor shape) are GUESSES.
- * RESIDUALS. Unwritten (objdiff scores them zero): 0x80063E60-0x80063FC8 (AnmObjMatClr::TestExistence),
- *   0x80064128-0x800646E8 (apply_clr_anm_result).
- *   flipcheck: `.text`, extab and extabindex are partial; `.rodata`, `.data` and `.sdata` are claimed and not emitted.
- * SHAPES. The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`,
+ *   res_mat_get_id (0x8006405C, ResMat::GetID: the block's index word, read by AnmObjTexSrtRes::Bind) is a GUESS.
+ * RESIDUALS. Unwritten (objdiff scores it zero): 0x80064128-0x800646E8 (apply_clr_anm_result).  It works through
+ *   nw4r::ut::Color temporaries whose constructor, `operator=`, `operator&`, `operator|`, ToU32 and destructor
+ *   retail calls out of line (0x80064834, 0x800647A0, 0x80064758, 0x800646E8, 0x80064730, 0x8005B228); this unit
+ *   spells them as C stems and `nw4r/ut_Color.h` has no `operator&`/`operator|` and a constructor body that stores
+ *   the word directly, so the function waits for that header's members (request g3d-anmtex#9).
+ *   flipcheck: `.text`, extab and extabindex are partial; `.rodata`, `.data` and `.sdata` are claimed and not emitted
+ *   (their order follows apply_clr_anm_result's inline references).
+ * SHAPES. `#pragma pool_data off` (each assert string its own `lis`/`addi`).  The unit compiles with
+ *   `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`,
  *   `extsh`, `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
  */
 
@@ -30,8 +36,22 @@
 #include "g3d/g3d_anmclr.h"
 #include "g3d/g3d_anmchr.h"   /* type_obj_set_name_anmchr and G3dObj, owned by g3d/g3d_anmchr.cpp (rule 2) */
 #include "g3d/g3d_resmat.h"   /* nw4r::g3d::ResMat / ResMatChan (rule 2) */
+#include "g3d/g3d_pointer_assert.h" /* G3D_POINTER_ASSERT (rule 1) */
 
 #pragma peephole off
+
+#pragma pool_data off
+
+/* 0x80063E60 (0x168): whether material `idx` has an animation bound. */
+bool nw4r::g3d::AnmObjMatClr::TestExistence(u32 idx) const
+{
+    G3D_POINTER_ASSERT("g3d_anmclr.cpp", this, 52, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!((int)idx <= mNumBinding - 1)) {
+        nw4r::db::Panic("g3d_anmclr.cpp", 53, "int(matId) is out of bounds(%d)\nint(matId) <= %d not satisfied.", idx,
+                        mNumBinding - 1);
+    }
+    return (mpBinding[idx] & 0xC000) == 0;
+}
 
 /* The `.rodata` "AnmObjMatClr" type-name record (a length word followed by the NUL-terminated name). */
 extern u8 lbl_8056F550[];
@@ -133,7 +153,8 @@ const nw4r::g3d::ResMatData& nw4r::g3d::ResMat::ref() const
     return *ptr();
 }
 
-extern "C" u32 fn_8006405C(void *p)
+/* 0x8006405C (0x24): the material's index in its model. */
+extern "C" u32 res_mat_get_id(const struct ResHandle *p)
 {
     return ((const ResAnmChrData *)&reinterpret_cast<const nw4r::g3d::ResMat *>(p)->ref())->field_0x0C;
 }

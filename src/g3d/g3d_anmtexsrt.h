@@ -17,8 +17,8 @@ extern "C" {
 u32 fn_8006CDBC(void* p);
 /* 0x8006D9FC - the indexed handle reader the `g3d_resanmtexsrt.cpp` field readers call. */
 u32 fn_8006D9FC(void* self, u32 idx);
-/* 0x8006D9A4 - the keyed field reader (a sibling of the `g3d_resanmtexsrt.cpp` reader). */
-u32 fn_8006D9A4(void* self, void* key);
+/* 0x8006D9A4 - material `idx`'s animation record, from the resource's material dictionary. */
+u32 fn_8006D9A4(void* self, u32 idx);
 
 #ifdef __cplusplus
 }
@@ -37,6 +37,33 @@ namespace g3d {
 
 class AnmObjTexSrtRes;
 struct TexSrtAnmResult;
+
+/* A texture-SRT animation resource block: the material dictionary, the frame and material counts and the play
+ * policy.  size: 0x2C (approximation: only the read fields are named) */
+struct ResAnmTexSrtData {
+    /* +0x00 */ u8 pad_0x00[0x10];
+    /* +0x10 */ s32 toTexSrtDataDic;
+    /* +0x14 */ u8 pad_0x14[0xC];
+    /* +0x20 */ u16 numFrame;
+    /* +0x22 */ u16 numMaterial;
+    /* +0x24 */ u8 pad_0x24[0x4];
+    /* +0x28 */ u32 policy;
+};
+
+/* One animated material's record in a texture-SRT resource: the offset (from the record, plus 4) of its material
+ * name first.  size: 0x4 (a lower bound: only this word is evidenced) */
+struct ResAnmTexSrtMatData {
+    /* +0x00 */ s32 toResName;
+};
+
+/* The one-word handle on a texture-SRT animation resource.  size: 0x4 */
+class ResAnmTexSrt {
+public:
+    u32 GetNumMaterial() const;
+    void GetAnmResult(TexSrtAnmResult* pResult, u32 id, f32 frame) const;
+
+    /* +0x0 */ ResAnmTexSrtData* mpData;
+};
 
 /* The texture-SRT animation interface: one binding word per material (bit 15: no animation, bit 14: undefined).
  * size: 0x18 */
@@ -105,6 +132,10 @@ public:
 /* A node whose later children override the earlier ones.  size: 0x20 */
 class AnmObjTexSrtOverride : public AnmObjTexSrtNode {
 public:
+    AnmObjTexSrtOverride(MEMAllocator* pHeap, u16* pBindingBuf, int numBinding, AnmObjTexSrtRes** ppChildrenBuf,
+                         int numChildren);
+    static AnmObjTexSrtOverride* Construct(MEMAllocator* pHeap, u32* pSize, ResMdl mdl, int numChildren);
+
     virtual bool IsDerivedFrom(TypeObj type) const;
     virtual ~AnmObjTexSrtOverride();
     virtual const TypeObj GetTypeObj() const;
@@ -115,18 +146,35 @@ public:
     static const TypeObj GetTypeObjStatic();
 };
 
-/* A texture-SRT animation played from a resource.  Only the members its written functions reach are declared.
- * size: 0x34 (approximation: the resource form's tail is not reached yet) */
-class AnmObjTexSrtRes : public AnmObjTexSrt {
+/* A texture-SRT animation played from a resource: its frame counter, the animation resource and the result cache.
+ * size: 0x34 */
+class AnmObjTexSrtRes : public AnmObjTexSrt, protected FrameCtrl {
 public:
+    AnmObjTexSrtRes(MEMAllocator* pHeap, ResAnmTexSrt res, u16* pBindingBuf, int numBinding,
+                    TexSrtAnmResult* pCacheBuf);
+    static AnmObjTexSrtRes* Construct(MEMAllocator* pHeap, u32* pSize, ResAnmTexSrt res, ResMdl mdl, bool bHasCache);
+
     virtual bool IsDerivedFrom(TypeObj type) const;
+    virtual void G3dProc(u32 task, u32 param, void* pInfo); /* untyped: caller-owned payload */
     virtual ~AnmObjTexSrtRes();
     virtual const TypeObj GetTypeObj() const;
     virtual const char* GetTypeName() const;
 
-    static const TypeObj GetTypeObjStatic();
+    virtual void SetFrame(f32 frame);
+    virtual f32 GetFrame() const;
+    virtual void UpdateFrame();
+    virtual void SetUpdateRate(f32 rate);
+    virtual f32 GetUpdateRate() const;
+    virtual bool Bind(ResMdl mdl);
 
-    /* +0x18 */ FrameCtrl mFrameCtrl;
+    virtual const TexSrtAnmResult* GetResult(TexSrtAnmResult* pResult, u32 idx);
+
+    static const TypeObj GetTypeObjStatic();
+    void UpdateCache();
+
+    /* +0x18 */ /* FrameCtrl base (0x14 bytes) */
+    /* +0x2C */ ResAnmTexSrt mRes;
+    /* +0x30 */ TexSrtAnmResult* mpResultCache;
 };
 
 }  // namespace g3d

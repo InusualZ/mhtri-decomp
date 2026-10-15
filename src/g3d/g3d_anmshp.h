@@ -13,7 +13,7 @@ extern "C" {
 
 /* 0x8006946C - the first of the `g3d_resvtx_ac.h` accessor group (caller: g3d_calcvtx.cpp). */
 #ifdef __cplusplus
-bool fn_8006946C(const void* p, s32 id); /* C++ only: `bool` is not a C type */
+bool anm_obj_shp_test_existence(const void* p, s32 id); /* C++ only: `bool` is not a C type */
 #endif
 
 /* 0x800695EC - the checked `ResAnmShp` resource resolver (a `ResFile` revision-check getter). */

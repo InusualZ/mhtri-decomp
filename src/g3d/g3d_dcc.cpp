@@ -8,7 +8,7 @@
  *   fn_800769F4 calls and whose inline copies read that unit's strings.
  * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` throughout (playbook idea 106).
  * NAMES. Map stems (nw4r's CalcTexMtx overloads, by the asserts).
- * RESIDUALS. Partial: fn_80075E9C, fn_80076050 (m2c views).
+ * RESIDUALS. Partial: fn_80075E9C, g3d_calc_tex_mtx_dcc (m2c views).
  *   flipcheck: `.data` is claimed and not emitted (the strings are declared).
  */
 
@@ -53,7 +53,7 @@ extern "C" {
 u32 mtx34_identity(s32);
 s32 fn_800D79B4(s32, s32, s32, s32);
 /* internal */ void fn_80075E9C(s32 arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, u32 arg_sp0);
-/* internal */ void fn_80076050(s32 arg0, s32 arg1, s32 arg2, s32 arg3);
+/* internal */ void g3d_calc_tex_mtx_dcc(s32 arg0, s32 arg1, s32 arg2, s32 arg3);
 } /* extern "C" */
 
 extern "C" {
@@ -108,7 +108,7 @@ void fn_80075E9C(s32 arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, u32 arg_sp0) 
     }
 }
 
-void fn_80076050(s32 arg0, s32 arg1, s32 arg2, s32 arg3) {
+void g3d_calc_tex_mtx_dcc(s32 arg0, s32 arg1, s32 arg2, s32 arg3) {
     s32 temp_r11;
     s32 var_r10;
     s32 var_r5;

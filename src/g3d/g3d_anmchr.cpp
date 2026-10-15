@@ -55,11 +55,12 @@
  *   is a GUESS; anmchr_ref_name is a GUESS (the strings ResAnmChr::ref passes to Panic).
  *   type_obj_set_name_anmchr is a GUESS (0x8005DCD0: the type-name store copy the AnmObjChr, AnmObjMatClr,
  *   AnmObjTexPat and ScnMdlSimple type members call).
- * RESIDUALS. 1 function unwritten: GetAnmPlayPolicy (0x80061C70, 0x74).
+ * RESIDUALS. GetAnmPlayPolicy (0x80061C70, the "g3d_anmobj.h" assert) reads its two-entry table
+ *   anm_play_policy_table (.sdata 0x80790E70, map row lbl_80790E70, rename request g3d-anmtex#3), which sits inside
+ *   `mh3_pad.cpp`'s `.sdata` claim (seam request g3d-anmtex#6); it is declared in `mh3_pad.h`.
  *   Partial: AnmObjChrBlend::GetResult (0x8D0: the loop's index and the result-flag word take r24/r23 swapped; every
  *   other instruction matches, with `#pragma fp_contract off` around it), AnmObjChrRes::Release(ResMdl, u32,
  *   BindOption) (the unrolled clear loop schedules its `subf` one slot early).
- *   GetAnmPlayPolicy (0x80061C70) is unwritten: its policy table (.sdata 0x80790E70) sits in `mh3_pad.cpp`'s claim.
  *   FrameCtrl::smBaseUpdateRate (.sdata 0x80791168) is `g3d/g3d_anmobj.cpp`'s claim, declared in the class only.
  *   Partial: g3d_round_up (retail materialises `~(align - 1)` with `nor` + `and` where MWCC folds it into `andc`;
  *   tried: a named mask local, swapped operands), and the members whose only difference is a relocation name (the
@@ -98,6 +99,8 @@
 #include "nw4r/math_arithmetic.h"   /* nw4r::math::detail::FExp, owner nw4r/math_arithmetic.cpp (rule 2) */
 #include "nw4r/db_assert.h"  /* nw4r::db::Warning (rule 2) */
 #include "MSL_C/alloc.h"     /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
+#include "mh3_pad.h"          /* anm_play_policy_table (rule 2) */
+#include "mh3_pad.h"          /* anm_play_policy_table (rule 2) */
 #include "MEM/MEMAllocFromAllocator.h" /* MEMAllocFromAllocator, owner MTX/mtx.c (rule 2) */
 
 #pragma peephole off
@@ -429,6 +432,20 @@ extern "C" void* res_node_copy_ctor(void* self, u32* src)
 bool nw4r::g3d::ResAnmChr::IsValid() const
 {
     return mpData != NULL;
+}
+
+/* 0x80061C70 (0x74): the frame-folding function for `policy`. */
+nw4r::g3d::PlayPolicyFunc nw4r::g3d::GetAnmPlayPolicy(AnmPolicy policy)
+{
+    bool valid = false;
+    if ((u32)policy <= ANM_POLICY_LOOP) {
+        valid = true;
+    }
+    if (!valid) {
+        nw4r::db::Panic("g3d_anmobj.h", 0x3C, "policy is out of bounds(%d)\n%d <= policy <= %d not satisfied.", policy,
+                        ANM_POLICY_ONETIME, ANM_POLICY_LOOP);
+    }
+    return anm_play_policy_table[policy];
 }
 
 /* 0x80061CE4 (0x24): the play policy. */
