@@ -1031,7 +1031,7 @@ config.libs = [
             Object(Matching, "g3d/g3d_anmvis.cpp"),
             Object(NonMatching, "g3d/g3d_calcvtx.cpp"),
             Object(NonMatching, "g3d/g3d_calcworld.cpp"),
-            Object(NonMatching, "g3d/g3d_camera.cpp"),
+            Object(Matching, "g3d/g3d_camera.cpp"),
             Object(NonMatching, "g3d/g3d_state.cpp"),
             Object(Matching, "g3d/g3d_resvtx.cpp"),
             Object(NonMatching, "g3d/g3d_resanm.c"),
