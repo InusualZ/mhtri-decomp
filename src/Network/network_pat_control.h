@@ -1,7 +1,7 @@
 /*
  * Network/network_pat_control.h - the views of `Network/network_pat_control.cpp`: the `net_ctrl_wk` singleton (`.sbss`
  *   0x80794CF8, pointing at `net_ctrl_work`, `.bss` 0x806D3790) and its class `NetCtrlWk` (0xC4A8 B, the map's size).
- * SHAPES. `NetCtrlWk` is packed for the `u32` run at the odd offset +0x7996; the band's functions on the singleton are
+ * SHAPES. `NetCtrlWk` is packed (its peer-event run sits at the odd offset +0x7996); the band's functions on the singleton are
  *   its (static) members.  The "*Pat" holder is `Network/NetworkPat.h`'s.
  */
 #ifndef MHTRI_NETWORK_NETWORK_PAT_CONTROL_H
@@ -337,7 +337,10 @@ typedef struct NetInviteList {
 typedef struct NetSessionChatRecord {
     /* +0x000 */ NetworkUniqueId sender_0x000;
     /* +0x020 */ char name_0x020[0x15];
-    /* +0x035 */ u8 text_0x035[0x203];
+    /* +0x035 */ union {
+        u8 text_0x035[0x203];      /* the record handed to the mediator */
+        char chars_0x035[0x203];   /* the same text as the chat log prints it */
+    };
     /* +0x238 */ s32 color_0x238;
 } NetSessionChatRecord; /* size: 0x23C (approximate) */
 
@@ -412,7 +415,7 @@ typedef struct NetRecentListView {
 typedef struct NetFriendView {
     /* +0x00 */ char name_0x00[0x14];
     /* +0x14 */ char id_text_0x14[0xA];
-    /* +0x1E */ s16 area_0x1E;
+    /* +0x1E */ u16 area_0x1E;
     /* +0x20 */ u8 status_0x20;
     /* +0x21 */ u8 pad_0x21;
 } NetFriendView; /* size: 0x22 */
@@ -439,10 +442,7 @@ typedef struct NetCommunityView {
 
 /* Four slot ids the layer selection request takes (-1 = unset). */
 typedef struct NetSlotIds {
-    /* +0x00 */ u32 slot_0x00;
-    /* +0x04 */ u32 slot_0x04;
-    /* +0x08 */ u32 slot_0x08;
-    /* +0x0C */ u32 slot_0x0C;
+    /* +0x00 */ u32 slots_0x00[4];   /* one id per request slot, -1 when unused */
 } NetSlotIds; /* size: 0x10 */
 
 /* One 12-byte run of a laid-out message: where its text starts, the tag flags it carries (1 body, 2 size,
@@ -648,10 +648,19 @@ typedef struct NetServerConfig {
     /* +0x13BC */ u16 timeouts_0x13BC[40];
 } NetServerConfig; /* size: 0x140C */
 
+/* One peer event word (`NetCtrlWk::events_0x7996`): event kind 1, the action (1 = joined, 2 = left), the peer's
+ * slot and the peer count after it.  size: 0x4 */
+typedef struct NetPeerEvent {
+    /* +0x0 */ u8 kind_0x0;
+    /* +0x1 */ u8 action_0x1;
+    /* +0x2 */ u8 slot_0x2;
+    /* +0x3 */ u8 total_0x3;
+} NetPeerEvent; /* size: 0x4 */
+
 /* The network-control work record reached through `net_ctrl_wk`.  `entries_0x7CD8` is 16 records
  * of 0x5C; the tail offsets (+0x82C4, +0xBF2C, +0xC3F2, ...) are separate flags/counters. */
-/* Packed: the record carries a `u32` run at the odd offset +0x7996 (`slots_0x7996`), and natural
- * alignment would slide every later field by four bytes. */
+/* Packed: the record's fields sit at the offsets its code uses, the peer-event run (`events_0x7996`) at the odd
+ * offset +0x7996 included. */
 #pragma pack(push, 1)
 typedef struct NetCtrlWk {
 /*@NetCtrlWk begin@*/
@@ -752,7 +761,7 @@ typedef struct NetCtrlWk {
     /* +0x7993 */ u8 transfer_level_0x7993;
     /* +0x7994 */ u8 peer_total_0x7994;
     /* +0x7995 */ u8 peer_cards_changed_0x7995;   /* cleared once a peer's card block was refreshed (community command 11) */
-    /* +0x7996 */ u32 slots_0x7996[0x40];
+    /* +0x7996 */ NetPeerEvent events_0x7996[0x40];
     /* +0x7A96 */ u8 pad_0x7A96[0x2];
     /* +0x7A98 */ u32* arrA_0x7A98[0x40];
     /* +0x7B98 */ u32 arrB_0x7B98[0x40];
@@ -1090,11 +1099,11 @@ NetSlot* findSlotByOwner(void* owner /* untyped: opaque handle - the owner point
 void resetPeerTable(void);
 /* 0x80427C00 (GUESS) - rebuilds the peer table and `list` from the layer's members; the member total. */
 u8 importLayerPeers(NetPeerList* list);
-u32* findFreePeerEvent(void);
+NetPeerEvent* findFreePeerEvent(void);
 void refreshFriendList(void);
 /* 0x80427284 - queues a network command (1 = accepted): the command id, the caller's result byte, an
  * unused word, the argument count and the argument words (at most four). */
-s32 queueNetCommand(u32 command, s8* result, s32 unused, s32 arg_count, const s32* args);
+s32 queueNetCommand(u8 command, s8* result, s32 unused, s32 arg_count, const s32* args);
 void syncScheduleClock(NetCtrlWk* work);
 /* 0x804276D8 (GUESS name) - `isCityMode` while the network layer is up, else 0; unsigned, the lobby's
  * `== 1` tests compile to `cmplwi`. */
