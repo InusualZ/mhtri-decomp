@@ -22,31 +22,26 @@
  *   GUESS: `ut::List_GetFirst`): `ef_emres_get_name`, `ef_list_get_first`.
  *   GUESS: `ef_res_emitter_desc` (0x800A4864): returns the record 8 bytes into an emitter resource, the emitter
  *   description its callers read flags and draw settings from.
- * RESIDUALS. The source defines `fn_800A4AF0` (8 bytes) before `RetireEmitterAll`, so the two swap places in our
- *   `.text`.
- *   6 partial rows:
- *  - `fn_800A40F4`, `fn_800A4654`, `fn_800A49B8`, `fn_800A5154`: the table dispatches load the table pointer into a
- *    scratch GPR where retail reuses r12 for both loads (`lwz r12,0(r3); lwz r12,36(r12)`), as in
- *    `ef/ef_effectsystem.cpp`;
- *  - `fn_800A4BBC`: the loop temporaries take another callee-saved rotation (r25/r26/r29/r31) and the two +0xB4
- *    load/compare pairs are scheduled differently;
- *  - `fn_800A52E4`: retail's found-flag loop is rotated (the `cmpwi r0,0` guard twice, the match test before it,
- *    `pm` itself skipped); the check-self-first loop scores higher but is 4 bytes short, so the size-exact form
- *    stays.
- *   flipcheck: `.data`, `.sdata` and `.sdata2` claimed, not emitted.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_80501A64`,
- *     `List_Append__Q24nw4r2utFPQ34nw4r2ut4ListPv`, `fn_80501BF4`, `List_Remove__Q24nw4r2utFPQ34nw4r2ut4ListPv`,
- *     `fn_80501C60`, `List_GetNext__Q24nw4r2utFPCQ34nw4r2ut4ListPCv`, `fn_80501C9C`,
- *     `List_GetNth__Q24nw4r2utFPCQ34nw4r2ut4ListUs`.
- *   flipcheck: referenced but defined by nothing a flip can use: `fn_80501A64`, `fn_80501BF4`, `fn_80501C60`,
- *     `fn_80501C9C`.
+ *   GUESS: `EfEffA0Obj::OnDetach` (the +0xA0 handler's slot +0x10 the detach slot forwards to),
+ *   `EfSysMemoryManager::GetEmitter`/`ReleaseEmitter` (the pool's slots +0x24/+0x28).
+ * RESIDUALS. none in `.text`.
+ *   flipcheck: `.data`, `.sdata` and `.sdata2` claimed, not emitted - `.data` holds the strings, the class tables
+ *   `lbl_80592588` (Effect: fn_800A4464, fn_800A4470, fn_800A40F4, fn_800A5428, fn_800A4BBC, fn_800A5154) and
+ *   `lbl_805925A8` (fn_800A3888, fn_800A4A18), and the "<< NW4R - EF final ... >>" version string `.sdata`
+ *   points at; `ef/ef_draworder.cpp` (Matching) references both tables by those names, so emitting them takes the
+ *   Effect class with its virtual members here, the `__vt__` map names and the draworder references together.
  * SHAPES. The pointer guards are the `NW4R_POINTER_ASSERT` six-BOOL chain; the file argument is the call site's
  *   own string ("ef_effect.cpp", or "activitylist.h"/"res_emitter_ac.h" for the two header asserts).
  * SHAPES. `#line` puts each `Panic`/`Warning` on retail's line (`fn_800A45DC` 134, `fn_800A51D8` 423,
  *   `RetireEmitterAll` 160, `RetireParticleAll` 180, `fn_800A4BBC` 267/292/312/323).
  * SHAPES. `fn_800A40F4`'s fourth argument is `u16` (retail adds it with no mask), `EfEffEmitter::mField_0xB4` is
- *   `s32` (`cmpwi`), `ef_effect_set_calc_flag`'s bit is 0x10000, and the effect system's
+ *   `s32` (compared signed), `ef_effect_set_calc_flag`'s bit is 0x10000, and the effect system's
  *   constructor and destructor are `EfSys` members (`ef/ef_effectsystem.h`).
+ * SHAPES. The emitter (`EfEffEmitter`, its table at +0x1C), the memory manager (`EfSysMemoryManager`) and the +0xA0
+ *   detach handler (`EfEffA0Obj`) are polymorphic views whose virtual slots are declared only, so the calls load the
+ *   slot through r12 as retail does and no table is emitted.  The list walks of `fn_800A4BBC` each declare their
+ *   own node and counter, and its tick pass decrements the lifetime only for an active emitter while still walking
+ *   its children.  `fn_800A52E4` tests the parents of each emitter, not the emitter itself.
  * SHAPES. The effect record is a local view (`EfEff`, `EfEffEmitter`, `EfEffManager`): `ef.h`'s `struct Effect` is
  *   a union of the sibling units' copies; the map-named methods cast `this` to it.
  */
@@ -57,6 +52,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 #include "ef/ef_effectsystem.h" /* EfSys, whose constructor and destructor this unit defines (rule 1) */
+#include "nw4r/ut_list.h" /* nw4r::ut::List_* (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -103,17 +99,6 @@ typedef struct EfEffTable {
     /* +0x24 */ void (*method_0x24)(void* self);
 } EfEffTable; /* size: 0x28 */
 
-/* The memory manager ef_system_memory_manager hands back: a table with the effect-pool getter/releaser. */
-typedef struct EfEffMemMgrVtbl {
-    /* +0x00 */ u8 pad_0x00[0x24];
-    /* +0x24 */ void* (*getEmitter)(void* self);
-    /* +0x28 */ void (*releaseEmitter)(void* self, void* emitter);
-} EfEffMemMgrVtbl; /* size: 0x2C */
-
-typedef struct EfEffMemMgr {
-    /* +0x00 */ EfEffMemMgrVtbl* vtable;
-} EfEffMemMgr; /* size: 0x04 (lower bound: the manager's own state is not this unit's) */
-
 /* The object the effect keeps at +0x20 (`mManagerES`): its first word is the record `ef_system_memory_manager`
  * dereferences and its +0x04 word is the effect's +0xA0 back-pointer. */
 typedef struct EfEffManager {
@@ -123,10 +108,17 @@ typedef struct EfEffManager {
     /* +0x10 */ u32 field_0x10; /* the pool link fn_800A5104 tests and fn_800A3718 resets */
 } EfEffManager; /* size: 0x14 (lower bound: only +0x00/+0x04/+0x10 are touched) */
 
-/* The object the effect keeps at +0xA0; one virtual call reaches its slot +0x10. */
-typedef struct EfEffA0Obj {
-    /* +0x00 */ void** vtable;
-} EfEffA0Obj; /* size: 0x04 */
+struct EfEff;
+
+/* The object the effect keeps at +0xA0 (its detach handler): one virtual call reaches its slot +0x10.  Declared
+ * only, so this unit emits no table for it. */
+struct EfEffA0Obj {
+    /* +0x00: the vtable pointer */
+    virtual void slot_0x08();
+    virtual void slot_0x0C();
+    /* untyped: opaque handle - the detach slot passes its caller's argument through */
+    virtual void OnDetach(EfEff* effect, void* arg);
+}; /* size: 0x04 */
 
 /* The effect object this unit works on (`nw4r::ef::Effect`).  A local view (rule 1 debt above). */
 typedef struct EfEff {
@@ -169,7 +161,15 @@ typedef struct EfEffEmitter {
     /* +0x00C */ s32 mState;
     /* +0x010 */ void* mField_0x10;
     /* +0x014 */ u8 pad_0x014[0x08];
-    /* +0x01C */ EfEffTable* mTable;
+    /* +0x01C: the vtable pointer (the emitter's virtual slots +0x08..+0x24, called through r12) */
+    virtual void method_0x08();
+    virtual void method_0x0C();
+    virtual u32 method_0x10(void* a, void* b, u32 c);
+    virtual void method_0x14();
+    virtual void method_0x18();
+    virtual void method_0x1C();
+    virtual void method_0x20();
+    virtual void method_0x24();
     /* +0x020 */ u8 pad_0x020[0x04];
     /* +0x024 */ u32 mField_0x24; /* the two flag bits fn_800A4BBC tests */
     /* +0x028 */ u8 pad_0x028[0x8C];
@@ -227,10 +227,6 @@ void fn_800AE5B0(void* pm);
 void mtx34_identity(void* mtx);
 void mtx34_copy_ps(MTX34* dst, const MTX34* src);
 u16 fn_8009B374(void* list, void** buf, u16 size);
-void fn_80501A64(void* list, void* node);
-void fn_80501BF4(void* list, void* node);
-void* fn_80501C60(void* list, void* node);
-void* fn_80501C9C(void* list, u16 idx);
 
 /* This unit's own symbols (address order). */
 u32 fn_800A40F4(EfEff* self, EfEffManager* mgr, void* eh, u16 n);
@@ -305,7 +301,7 @@ void* fn_800A56A4(void);
  * =================================================================================================== */
 
 extern "C" u32 fn_800A40F4(EfEff* self, EfEffManager* mgr, void* eh, u16 n) {
-    EfEffMemMgr* mm;
+    EfSysMemoryManager* mm;
     EfEffEmitter* em;
 
 #line 41
@@ -327,14 +323,14 @@ extern "C" u32 fn_800A40F4(EfEff* self, EfEffManager* mgr, void* eh, u16 n) {
     self->mField_0x8C = zero;
     self->mField_0x90 = zero;
 
-    mm = (EfEffMemMgr*)ef_system_memory_manager(mgr);
-    em = (EfEffEmitter*)mm->vtable->getEmitter(mm);
+    mm = (EfSysMemoryManager*)ef_system_memory_manager(mgr);
+    em = (EfEffEmitter*)mm->GetEmitter();
     if (em == NULL) {
         return 0;
     }
-    if (em->mTable->method_0x10(em, self, eh, 128) == 0) {
-        mm = (EfEffMemMgr*)ef_system_memory_manager(mgr);
-        mm->vtable->releaseEmitter(mm, em);
+    if (em->method_0x10(self, eh, 128) == 0) {
+        mm = (EfSysMemoryManager*)ef_system_memory_manager(mgr);
+        mm->ReleaseEmitter((EfSysEmitter*)em);
         return 0;
     }
     ef_activity_list_add(&self->mEmitters, em);
@@ -345,7 +341,7 @@ extern "C" u32 fn_800A40F4(EfEff* self, EfEffManager* mgr, void* eh, u16 n) {
 
 /* 0x800A43E8 - appends an emitter to the group and bump the live count. */
 extern "C" void ef_activity_list_add(EfEffActivityList* list, void* node) {
-    fn_80501A64(&list->mActiveList, node);
+    nw4r::ut::List_Append((nw4r::ut::List*)&list->mActiveList, node);
     list->mNumActive++;
 }
 
@@ -406,13 +402,13 @@ extern "C" void fn_800A45DC(EfEffActivityList* list, void* node) {
     if (list->mActiveList.numObjects < list->mNumActive) {
         nw4r::db::Panic(lbl_8059263C, __LINE__, lbl_80592600);
     }
-    fn_80501BF4(&list->mActiveList, node);
-    fn_80501A64(&list->mRetireList, node);
+    nw4r::ut::List_Remove((nw4r::ut::List*)&list->mActiveList, node);
+    nw4r::ut::List_Append((nw4r::ut::List*)&list->mRetireList, node);
 }
 
 /* 0x800A4654 - creates an emitter on the effect's list. */
 extern "C" u32 fn_800A4654(EfEff* self, EfEffEmitter* emitter, u8 a, u16 b) {
-    EfEffMemMgr* mm;
+    EfSysMemoryManager* mm;
     EfEffEmitter* em;
 
 #line 114
@@ -423,14 +419,14 @@ extern "C" u32 fn_800A4654(EfEff* self, EfEffEmitter* emitter, u8 a, u16 b) {
         nw4r::db::Warning(lbl_80592430, __LINE__, lbl_805924E4, ef_emres_get_name(emitter));
         return 0;
     }
-    mm = (EfEffMemMgr*)ef_system_memory_manager(self->mManagerES);
-    em = (EfEffEmitter*)mm->vtable->getEmitter(mm);
+    mm = (EfSysMemoryManager*)ef_system_memory_manager(self->mManagerES);
+    em = (EfEffEmitter*)mm->GetEmitter();
     if (em == NULL) {
         return 0;
     }
-    if (em->mTable->method_0x10(em, self, emitter, a) == 0) {
-        mm = (EfEffMemMgr*)ef_system_memory_manager(self->mManagerES);
-        mm->vtable->releaseEmitter(mm, em);
+    if (em->method_0x10(self, emitter, a) == 0) {
+        mm = (EfSysMemoryManager*)ef_system_memory_manager(self->mManagerES);
+        mm->ReleaseEmitter((EfSysEmitter*)em);
         return 0;
     }
     ef_activity_list_add(&self->mEmitters, em);
@@ -464,10 +460,10 @@ extern "C" u32 fn_800A486C(EfEff* self, EfEffEmitter* em) {
 
 /* 0x800A49B8 - runs an emitter's teardown: table slot 0x0C, state 2, then slot 0x08 when detached. */
 extern "C" void fn_800A49B8(EfEffEmitter* em) {
-    em->mTable->method_0x0C(em);
+    em->method_0x0C();
     em->mState = 2;
     if (em->mField_0x10 == NULL) {
-        em->mTable->method_0x08(em);
+        em->method_0x08();
     }
 }
 
@@ -480,11 +476,6 @@ extern "C" void fn_800A4A18(void* p) {
 extern "C" void fn_800A4A1C(EfEffActivityList* list, void* node) {
     (void)node;
     list->mNumActive--;
-}
-
-/* 0x800A4AF0 - the list's live count. */
-extern "C" u16 fn_800A4AF0(EfEffList* list) {
-    return list->numObjects;
 }
 
 /* ===================================================================================================
@@ -510,6 +501,11 @@ u32 nw4r::ef::Effect::RetireEmitterAll() {
     return count;
 }
 
+/* 0x800A4AF0 - the list's live count. */
+extern "C" u16 fn_800A4AF0(EfEffList* list) {
+    return list->numObjects;
+}
+
 /* 0x800A4AF8 - retires every particle on every live emitter. */
 extern "C" u32 RetireParticleAll(EfEff* self) {
     u32 count = 0;
@@ -533,16 +529,14 @@ extern "C" u32 RetireParticleAll(EfEff* self) {
 
 extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
     EfEffEmitter* list[NW4R_EF_MAX_EMITTER];
-    EfEffEmitter* node;
     u16 num;
-    u16 i;
 
     if (flag & 1u) {
-        node = NULL;
-        while ((node = (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, node)) != NULL) {
+        EfEffEmitter* node = NULL;
+        while ((node = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&self->mEmitters.mActiveList, node)) != NULL) {
             if ((u32)(node->mState - 1) <= 1u) {
                 if ((node->mField_0x24 & 0x10000u) || (node->mField_0x24 & 0x8000u)) {
-                    node->mTable->method_0x24(node);
+                    node->method_0x24();
                 }
             }
         }
@@ -554,14 +548,14 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
     }
 
     if ((flag & 2u) == 0u) {
-        node = NULL;
-        while ((node = (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, node)) != NULL) {
-            if ((u32)(node->mState - 1) <= 1u && node->mField_0xB4 == 1u) {
+        EfEffEmitter* node = NULL;
+        while ((node = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&self->mEmitters.mActiveList, node)) != NULL) {
+            if ((u32)(node->mState - 1) <= 1u && node->mField_0xB4 == 1) {
                 node->mField_0xB4 = 0;
             }
             copyVec3(&node->mField_0x114, &node->mField_0x108);
             EfEffEmitter* child = NULL;
-            while ((child = (EfEffEmitter*)fn_80501C60(&node->mChildren, child)) != NULL) {
+            while ((child = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&node->mChildren, child)) != NULL) {
                 fn_800AE500(child, 0);
             }
         }
@@ -579,16 +573,16 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
             }
             num = fn_8009B374(&self->mEmitters.mActiveList, (void**)list,
                               (u16)fn_800A4AF0(&self->mEmitters.mActiveList));
-            for (i = 0; i < num; i++) {
-                list[i]->mTable->method_0x18(list[i]);
+            for (u16 i = 0; i < num; i++) {
+                list[i]->method_0x18();
             }
 
-            node = NULL;
-            while ((node = (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, node)) !=
+            EfEffEmitter* node = NULL;
+            while ((node = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&self->mEmitters.mActiveList, node)) !=
                    NULL) {
                 if ((u32)(node->mState - 1) <= 1u) {
                     if ((node->mField_0x24 & 0x10000u) || (node->mField_0x24 & 0x8000u)) {
-                        node->mTable->method_0x24(node);
+                        node->method_0x24();
                     }
                 }
             }
@@ -599,13 +593,13 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
             }
             num = fn_8009B374(&self->mEmitters.mActiveList, (void**)list,
                               (u16)fn_800A4AF0(&self->mEmitters.mActiveList));
-            for (i = 0; i < num; i++) {
+            for (u16 i = 0; i < num; i++) {
                 EfEffEmitter* e = list[i];
-                if (e->mField_0xB4 == 0u) {
+                if (e->mField_0xB4 == 0) {
                     e->mField_0xE4++;
                 }
-                e->mTable->method_0x1C(e);
-                if (e->mField_0xB4 == 0u) {
+                e->method_0x1C();
+                if (e->mField_0xB4 == 0) {
                     e->mField_0xE4--;
                 }
             }
@@ -616,8 +610,8 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
             }
             num = fn_8009B374(&self->mEmitters.mActiveList, (void**)list,
                               (u16)fn_800A4AF0(&self->mEmitters.mActiveList));
-            for (i = 0; i < num; i++) {
-                list[i]->mTable->method_0x20(list[i]);
+            for (u16 i = 0; i < num; i++) {
+                list[i]->method_0x20();
             }
 
 #line 322
@@ -626,8 +620,8 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
             }
             num = fn_8009B374(&self->mEmitters.mActiveList, (void**)list,
                               (u16)fn_800A4AF0(&self->mEmitters.mActiveList));
-            for (i = 0; i < num; i++) {
-                list[i]->mTable->method_0x1C(list[i]);
+            for (u16 i = 0; i < num; i++) {
+                list[i]->method_0x1C();
             }
 
             if (fn_800A5104(&((EfEffManager*)self->mManagerES)->field_0x10) != 0) {
@@ -637,32 +631,30 @@ extern "C" void fn_800A4BBC(EfEff* self, u32 flag) {
         }
 
         if (fn_800A50EC(self) != 0) {
-            node = NULL;
-            while ((node = (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, node)) !=
+            EfEffEmitter* node = NULL;
+            while ((node = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&self->mEmitters.mActiveList, node)) !=
                    NULL) {
-                if (node->mState == 1) {
-                    if (node->mField_0xE8 != 0) {
-                        node->mField_0xE8--;
-                        if (node->mField_0xB4 == 1u) {
-                            node->mField_0xB4 = 0;
-                        }
+                if (node->mState == 1 && node->mField_0xE8 != 0) {
+                    node->mField_0xE8--;
+                    if (node->mField_0xB4 == 1) {
+                        node->mField_0xB4 = 0;
                     }
-                    EfEffEmitter* child = NULL;
-                    while ((child = (EfEffEmitter*)fn_80501C60(&node->mChildren, child)) != NULL) {
-                        fn_800AE500(child, 1);
-                    }
+                }
+                EfEffEmitter* child = NULL;
+                while ((child = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&node->mChildren, child)) != NULL) {
+                    fn_800AE500(child, 1);
                 }
             }
         }
     }
 
-    node = NULL;
-    while ((node = (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, node)) != NULL) {
-        if ((u32)(node->mState - 1) <= 1u && node->mField_0xB4 == 3u) {
+    EfEffEmitter* node = NULL;
+    while ((node = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&self->mEmitters.mActiveList, node)) != NULL) {
+        if ((u32)(node->mState - 1) <= 1u && node->mField_0xB4 == 3) {
             node->mField_0xB4 = 1;
         }
         EfEffEmitter* child = NULL;
-        while ((child = (EfEffEmitter*)fn_80501C60(&node->mChildren, child)) != NULL) {
+        while ((child = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&node->mChildren, child)) != NULL) {
             fn_800AE5B0(child);
         }
         MTX34 mtx;
@@ -701,8 +693,7 @@ extern "C" u32 fn_800A513C(EfEff* self) {
 /* 0x800A5154 - the table's detach slot: forward to the +0xA0 object when not already detached. */
 extern "C" void fn_800A5154(EfEff* self, void* arg) {
     if (fn_800A51B0(self) == 0) {
-        EfEffA0Obj* o = (EfEffA0Obj*)self->mField_0xA0;
-        ((void (*)(EfEffA0Obj*, EfEff*, void*))o->vtable[4])(o, self, arg);
+        ((EfEffA0Obj*)self->mField_0xA0)->OnDetach(self, arg);
     }
 }
 
@@ -727,7 +718,7 @@ extern "C" void* fn_800A51D8(EfEff* self, u16 idx) {
     if ((u16)idx >= (u16)fn_800A51D0(self)) {
         nw4r::db::Panic(lbl_80592430, __LINE__, lbl_8059255C);
     }
-    return fn_80501C9C(&self->mEmitters.mActiveList, idx);
+    return nw4r::ut::List_GetNth((const nw4r::ut::List*)&self->mEmitters.mActiveList, idx);
 }
 
 /* 0x800A5248 - the record's state getter. */
@@ -737,7 +728,7 @@ extern "C" s32 ef_get_life_status(void* p) {
 
 /* 0x800A5250 - the emitter list's first live element. */
 extern "C" void* ef_list_get_first(EfEffList* list) {
-    return fn_80501C60(list, NULL);
+    return nw4r::ut::List_GetNext((const nw4r::ut::List*)list, NULL);
 }
 
 /* 0x800A5258 - walks the particle managers with `cb` and returns the count the walk accumulates. */
@@ -747,7 +738,7 @@ u32 nw4r::ef::Effect::ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bo
     EfEffEmitter* pm = (EfEffEmitter*)ef_list_get_first(&self->mEmitters.mActiveList);
     while (pm != NULL) {
         EfEffEmitter* next =
-            (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, pm);
+            (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&self->mEmitters.mActiveList, pm);
         count += fn_800A98D4(pm, cb, arg, flag, 0);
         pm = next;
     }
@@ -761,15 +752,14 @@ extern "C" u32 fn_800A52E4(EfEff* self, void (*cb)(void*, void*), void* arg, u32
     EfEffEmitter* pm = (EfEffEmitter*)ef_list_get_first(&self->mEmitters.mActiveList);
     while (pm != NULL) {
         EfEffEmitter* next =
-            (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, pm);
+            (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&self->mEmitters.mActiveList, pm);
         if (flag != 0u || ef_get_life_status(pm) == 1) {
-            BOOL found = FALSE;
             EfEffEmitter* p = pm;
-            while (!found && p != NULL) {
+            BOOL found = FALSE;
+            while (!found && (p = (EfEffEmitter*)p->mField_0xF4) != NULL) {
                 if (p == match) {
                     found = TRUE;
                 }
-                p = (EfEffEmitter*)p->mField_0xF4;
             }
             if (found) {
                 cb(pm, arg);
@@ -786,7 +776,7 @@ void nw4r::ef::Effect::SetRootMtx(const nw4r::math::MTX34& mtx) {
     EfEff* self = (EfEff*)this;
     mtx34_copy_ps(&self->mRootMtx, &mtx);
     EfEffEmitter* node = NULL;
-    while ((node = (EfEffEmitter*)fn_80501C60(&self->mEmitters.mActiveList, node)) != NULL) {
+    while ((node = (EfEffEmitter*)nw4r::ut::List_GetNext((const nw4r::ut::List*)&self->mEmitters.mActiveList, node)) != NULL) {
         if (node->mField_0xF4 == NULL) {
             fn_800A95D8(node);
         }

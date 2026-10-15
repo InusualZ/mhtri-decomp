@@ -10,7 +10,9 @@
  *   {3.0f, 0.5f} at 0x807912D8.
  * FLAGS. `cflags_main`; `#pragma peephole off` and `#pragma fp_contract off` around `fn_8009B374`/`ef_mtx34_from_y_axis`,
  *   and `#pragma peephole off` around `fn_8009BCB4` and `fn_8009C040` (retail's unfused `clrlwi` + `slwi`,
- *   `li r0,<slot>; psq_lx` and `fmuls` + `fsubs` there; file-wide, the pass costs `ef_vec_sin_cos`/`ef_sin_cos`).
+ *   `li r0,<slot>; psq_lx` and `fmuls` + `fsubs` there; file-wide, the pass costs `ef_vec_sin_cos`/`ef_sin_cos`);
+ *   file-wide `#pragma pool_data off` (each string its own `lis`/`addi`); `#pragma dont_inline on` over
+ *   `fn_8009B650` and `fn_8009C040` (retail calls the two column accessors out of line).
  * NAMES. The map has only `fn_` stems for the range.
  *   GUESS: `ef_vec_sin_cos` (0x8009C6F0): writes an angle's sine and cosine into a vector's x and y.
  *   GUESS: `ef_mtx34_from_y_axis` (0x8009B448): builds an orthonormal frame whose Y axis is a unit direction.
@@ -24,18 +26,12 @@
  *   `ef_util_f32_one`, `ef_util_f32_min_scale`, `ef_util_f32_minus_one`, `ef_util_f32_epsilon`, `ef_util_f32_flt_min`,
  *   `ef_util_f64_minus_one`, `ef_util_f32_half`, `ef_util_f32_three`, `ef_util_f32_65536`, `ef_util_f32_100000`,
  *   `ef_util_f32_min_scale_pair`, `ef_util_rsqrt_three_half`.
- * RESIDUALS. The source order differs from retail's, so `.text`, extab and extabindex run in another order.
- *  - `ef_mtx34_from_y_axis`: the float registers of the assert's distance test differ;
- *   relocdiff: `fn_8009B840` and `fn_8009BA78` score 100 but retail passes per-function copies of the
- *   "ef_util.cpp" string (`lbl_80591B98`/`lbl_80591BD8`, `lbl_80591C18`/`lbl_80591C58`) where ours passes
- *   `lbl_80591948`.
- *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x8 of 0x48 (the pool is declared); `.text` 0x1A0C of
- *   0x1A48; extab and extabindex differ in the open rows' records.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_80501C60`,
- *     `List_GetNext__Q24nw4r2utFPCQ34nw4r2ut4ListPCv`, `lbl_80591948`, `lbl_80591BD8`, `lbl_80591B98`,
- *     `lbl_80591C58`, `lbl_80591C18`, `ef_util_f32_zero`, `ef_util_f32_min_scale`, `fn_8050133C`,
- *     `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`.
- *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050133C`, `fn_80501C60`.
+ * RESIDUALS. none in `.text` or `.data`.
+ *   flipcheck: `.sdata2` claimed, not emitted - the pool constants are declared by their map names.  Retail's
+ *   pool runs {65536, 65536}, 256/2pi, then 0, 1, 1e-5, -1, FLT_EPSILON, FLT_MIN, -1.0 (double), 0.5, 3, 65536,
+ *   100000 and {1e-5, 0}; the literals' first uses in this source give 1, 1e-5, FLT_EPSILON, 0, FLT_MIN, -1, ...
+ *   instead.  `sqrt_f32`/`vec3_len` are nw4r inlines (`FSqrt`'s 0.0 test) whose weak copies this TU emitted
+ *   and the link dropped, which would create 0.0 first; not reproduced.
  * SHAPES. `fn_8009C040` keeps its three dot products in one local array (retail's frame and its stores of each
  *   product), declared first; the column vectors are declared and constructed in column order, and the sign flip
  *   multiplies by the named `-1.0` double.  `fn_8009CCAC`'s second and third reciprocals are conditional
@@ -46,6 +42,10 @@
  *   `ef_vec3_normalize_to` are C functions around an `asm` block (retail gives them a frame and an extab record).
  *   Inside a C function every physical register an `asm` block names is reserved for the whole function, so
  *   those blocks name their GPRs through `register` locals and the asserts before them keep retail's registers.
+ * SHAPES. `fn_8009BA78`/`fn_8009B840` are `inline` (the column accessors): defined ahead of `fn_8009B650` in that
+ *   order, their weak copies follow it as retail's do and their strings are the `@STRING@` tail (one "ef_util.cpp"
+ *   copy per assert).  `ef_mtx34_from_y_axis` declares `z`, `b`, `a`, `s` in that order (retail's float registers)
+ *   and its degenerate branch keeps `a = 1`.
  * SHAPES. The pointer assert is the six-BOOL chain with a two-test first `if` (`ef/ef_point.cpp`'s shape); its
  *   trailing `(ptr)` is retail's fourth `Panic` argument (`mr r6, <ptr>`).
  */
@@ -57,6 +57,8 @@
 #include "nw4r/math_triangular.h" /* nw4r::math::sSinCosTbl - owner src/nw4r/math_triangular.cpp (rule 2) */
 #include "ef/ef_util.h" /* the unit's own header */
 #include "nw4r/db_assert.h" /* nw4r::db::Panic and NW4R_ASSERT (rule 2) */
+#include "nw4r/math_types.h" /* nw4r::math::MTX34Scale (rule 2) */
+#include "nw4r/ut_list.h" /* nw4r::ut::List_GetNext (rule 2) */
 
 namespace nw4r {
 namespace math {
@@ -67,10 +69,8 @@ f32 FrSqrt(f32 x);
 } // namespace math
 } // namespace nw4r
 
-/* Helpers declared locally: the `ut::List` iterator, this unit's own unwritten tail and three math
- * callees. */
+/* Helpers declared locally: three math callees. */
 extern "C" {
-void* fn_80501C60(void* list, void* node);
 f32 asinf(f32 x);
 f32 atan2f(f32 y, f32 x);
 f32 fn_8005A63C(f32 x);
@@ -87,30 +87,9 @@ void fn_8009BF08(const f32* mtx, f32* vec);
 s32 ef_vec3_normalize_to(f32* dst, const f32* src);
 void ef_mtx34_rotate_xyz(f32* mtx, f32 x, f32 y, f32 z);
 void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale);
-void fn_8050133C(f32* dst, const f32* mtx, const f32* scale);
 }
 
-/* This unit's strings and pooled floats (its claimed `.data`/`.sdata2`) and the sin/cos table, declared,
- * never defined. */
-extern char lbl_80591948[]; /* "ef_util.cpp"                                                       .data */
-extern char lbl_80591954[]; /* "NW4R:Failed assertion list != NULL"                               .data */
-extern char lbl_80591978[]; /* "NW4R:Failed assertion array != NULL"                              .data */
-extern char lbl_8059199C[]; /* "NW4R:Pointer Error\nmtx(=%p) is not valid pointer."               .data */
-extern char lbl_805919D0[]; /* "NW4R:Failed assertion ... FAbs(VEC3Len(&vec) - 1.0F) < epsilon"   .data */
-extern char lbl_80591A24[]; /* "NW4R:Pointer Error\ndst(=%p) is not valid pointer."               .data */
-extern char lbl_80591A58[]; /* "NW4R:Pointer Error\nrotate(=%p) is not valid pointer."            .data */
-extern char lbl_80591A90[]; /* "NW4R:Pointer Error\ntranslate(=%p) is not valid pointer."         .data */
-extern char lbl_80591AC8[]; /* "NW4R:Pointer Error\nscale(=%p) is not valid pointer."             .data */
-extern char lbl_80591AFC[]; /* "NW4R:Pointer Error\nvec(=%p) is not valid pointer."               .data */
-extern char lbl_80591B30[]; /* "NW4R:Pointer Error\npOut(=%p) is not valid pointer."              .data */
-extern char lbl_80591B64[]; /* "NW4R:Pointer Error\nvec(=%p) is not valid pointer."               .data */
-extern char lbl_80591B98[]; /* "ef_util.cpp"                                                      .data */
-extern char lbl_80591BA4[]; /* "NW4R:Pointer Error\nmtx(=%p) is not valid pointer."               .data */
-extern char lbl_80591BD8[]; /* "ef_util.cpp"                                                      .data */
-extern char lbl_80591BE4[]; /* "NW4R:Pointer Error\nvec(=%p) is not valid pointer."               .data */
-extern char lbl_80591C18[]; /* "ef_util.cpp"                                                      .data */
-extern char lbl_80591C24[]; /* "NW4R:Pointer Error\nmtx(=%p) is not valid pointer."               .data */
-extern char lbl_80591C58[]; /* "ef_util.cpp"                                                      .data */
+/* This unit's pooled floats (its claimed `.sdata2`), declared, never defined. */
 
 extern const f32 ef_util_f32_65536_pair[2]; /* {65536.0f, 65536.0f} - the paired-single 65536 constant   .sdata2 */
 extern const f32 ef_util_f32_rad_to_fidx;   /* 40.743664f = 256 / (2 * pi) - radians to 8-bit fidx       .sdata2 */
@@ -149,7 +128,7 @@ f32 ef_util_rsqrt_three_half[2] = {3.0f, 0.5f};
         if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))                                  \
             ok1_ = FALSE;                                                                          \
         if (!ok1_)                                                                                 \
-            nw4r::db::Panic(lbl_80591948, line, msg, (ptr));                                       \
+            nw4r::db::Panic("ef_util.cpp", line, msg, (ptr));                                       \
     }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -157,6 +136,7 @@ f32 ef_util_rsqrt_three_half[2] = {3.0f, 0.5f};
 /* --------------------------------------------------------------------------------------------- */
 
 /* The two bodies below keep retail's unfused forms (playbook 39); the reset follows them. */
+#pragma pool_data off
 #pragma peephole off
 #pragma fp_contract off
 
@@ -166,12 +146,12 @@ extern "C" u16 fn_8009B374(void* list, void** buf, s32 size) {
     u16 count;
     void* node;
 
-    NW4R_ASSERT(list != NULL, lbl_80591948, 0x25, lbl_80591954);
-    NW4R_ASSERT(buf != NULL, lbl_80591948, 0x26, lbl_80591978);
+    NW4R_ASSERT(list != NULL, "ef_util.cpp", 0x25, "NW4R:Failed assertion list != NULL");
+    NW4R_ASSERT(buf != NULL, "ef_util.cpp", 0x26, "NW4R:Failed assertion array != NULL");
 
     count = 0;
     node = NULL;
-    while ((node = fn_80501C60(list, node)) != NULL) {
+    while ((node = nw4r::ut::List_GetNext((const nw4r::ut::List*)list, node)) != NULL) {
         u16 idx = count++;
 
         buf[idx] = node;
@@ -183,19 +163,20 @@ extern "C" u16 fn_8009B374(void* list, void** buf, s32 size) {
 
 /* Builds the orthonormal basis whose third row is the unit vector `vec`, into the 3x4 matrix `mtx`. */
 extern "C" void ef_mtx34_from_y_axis(f32* mtx, const f32* vec) {
-    f32 s;
-    f32 a;
-    f32 b;
     f32 z;
+    f32 b;
+    f32 a;
+    f32 s;
 
-    NW4R_POINTER_ASSERT(mtx, 0x1AE, lbl_8059199C);
-    NW4R_ASSERT(abs_f32(vec3_len(vec) - ef_util_f32_one) < ef_util_f32_min_scale, lbl_80591948, 0x1AF, lbl_805919D0);
+    NW4R_POINTER_ASSERT(mtx, 0x1AE, "NW4R:Pointer Error\nmtx(=%p) is not valid pointer.");
+    NW4R_ASSERT(abs_f32(vec3_len(vec) - ef_util_f32_one) < ef_util_f32_min_scale, "ef_util.cpp", 0x1AF, "NW4R:Failed assertion nw4r::math::FAbs(nw4r::math::VEC3Len(&vec) - 1.0F) < epsilon");
 
     z = vec[2];
     s = abs_f32(z);
     if (ef_util_f32_one - s < ef_util_f32_epsilon) {
-        a = ef_util_f32_zero;
-        b = ef_util_f32_zero;
+        a = ef_util_f32_one;
+        s = ef_util_f32_zero;
+        b = s;
     } else {
         s = sqrt_f32(ef_util_f32_one - z * z);
         a = vec[1] / s;
@@ -218,6 +199,30 @@ extern "C" void ef_mtx34_from_y_axis(f32* mtx, const f32* vec) {
 #pragma peephole on
 #pragma fp_contract on
 
+/* Reads column `index` of the 3x4 matrix `mtx` into `vec`, and returns `vec`. */
+extern "C" inline f32* fn_8009BA78(const f32* mtx, s32 index, f32* vec) {
+    NW4R_POINTER_ASSERT(mtx, 0x1D8, "NW4R:Pointer Error\nmtx(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT(vec, 0x1D9, "NW4R:Pointer Error\nvec(=%p) is not valid pointer.");
+
+    vec[0] = mtx[index];
+    vec[1] = mtx[index + 4];
+    vec[2] = mtx[index + 8];
+    return vec;
+}
+
+
+/* Writes `vec` into column `index` of the 3x4 matrix `mtx`. */
+extern "C" inline void fn_8009B840(f32* mtx, s32 index, const f32* vec) {
+    NW4R_POINTER_ASSERT(mtx, 0x1E5, "NW4R:Pointer Error\nmtx(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT(vec, 0x1E6, "NW4R:Pointer Error\nvec(=%p) is not valid pointer.");
+
+    mtx[index] = vec[0];
+    mtx[index + 4] = vec[1];
+    mtx[index + 8] = vec[2];
+}
+
+
+#pragma dont_inline on
 /* Builds an orthonormal 3x4 matrix from the first two columns of `src` (Gram-Schmidt): the first column
  * is normalised, the second is made perpendicular to it, and the third is their cross product. */
 extern "C" void fn_8009B650(const f32* src, f32* mtx) {
@@ -225,7 +230,7 @@ extern "C" void fn_8009B650(const f32* src, f32* mtx) {
     f32 v14[3];
     f32 v8[3];
 
-    NW4R_POINTER_ASSERT(mtx, 0x1F6, lbl_80591A24);
+    NW4R_POINTER_ASSERT(mtx, 0x1F6, "NW4R:Pointer Error\ndst(=%p) is not valid pointer.");
 
     VEC3_ctor((nw4r::math::VEC3*)v20);
     VEC3_ctor((nw4r::math::VEC3*)v14);
@@ -250,26 +255,8 @@ extern "C" void fn_8009B650(const f32* src, f32* mtx) {
     mtx[11] = ef_util_f32_zero;
 }
 
-/* Writes `vec` into column `index` of the 3x4 matrix `mtx`. */
-extern "C" void fn_8009B840(f32* mtx, s32 index, const f32* vec) {
-    NW4R_POINTER_ASSERT(mtx, 0x1E5, lbl_80591BA4);
-    NW4R_POINTER_ASSERT(vec, 0x1E6, lbl_80591B64);
 
-    mtx[index] = vec[0];
-    mtx[index + 4] = vec[1];
-    mtx[index + 8] = vec[2];
-}
-
-/* Reads column `index` of the 3x4 matrix `mtx` into `vec`, and returns `vec`. */
-extern "C" f32* fn_8009BA78(const f32* mtx, s32 index, f32* vec) {
-    NW4R_POINTER_ASSERT(mtx, 0x1D8, lbl_80591C24);
-    NW4R_POINTER_ASSERT(vec, 0x1D9, lbl_80591BE4);
-
-    vec[0] = mtx[index];
-    vec[1] = mtx[index + 4];
-    vec[2] = mtx[index + 8];
-    return vec;
-}
+#pragma dont_inline reset
 
 #pragma peephole off
 /* Decomposes the rotation part of the 3x4 matrix `mtx` into the Euler angles at `rot`, zeroing them when
@@ -280,7 +267,7 @@ extern "C" void fn_8009BCB4(const f32* mtx, f32* rot) {
     f32 sz;
     f32 t;
 
-    NW4R_POINTER_ASSERT(rot, 0x21B, lbl_80591A58);
+    NW4R_POINTER_ASSERT(rot, 0x21B, "NW4R:Pointer Error\nrotate(=%p) is not valid pointer.");
 
     for (;;) {
         sx = ef_mtx34_column_length(mtx, 0);
@@ -316,11 +303,145 @@ extern "C" void fn_8009BCB4(const f32* mtx, f32* rot) {
 
 /* Reads the translation column of the 3x4 matrix `mtx` into `vec`. */
 extern "C" void fn_8009BF08(const f32* mtx, f32* vec) {
-    NW4R_POINTER_ASSERT(vec, 0x259, lbl_80591A90);
+    NW4R_POINTER_ASSERT(vec, 0x259, "NW4R:Pointer Error\ntranslate(=%p) is not valid pointer.");
 
     vec[0] = mtx[3];
     vec[1] = mtx[7];
     vec[2] = mtx[11];
+}
+
+#pragma dont_inline on
+#pragma peephole off
+/* Computes the 3x4 matrix's three column scales into `scale` (Gram-Schmidt lengths, negated for a
+ * left-handed basis; a collapsed column gives 0). */
+extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
+    f32 d[3];
+    f32 vCol0[3];
+    f32 vCol1[3];
+    f32 vCol2[3];
+    f32 vTmp[3];
+    f32 len;
+    f32 r;
+
+    NW4R_POINTER_ASSERT(scale, 0x266, "NW4R:Pointer Error\nscale(=%p) is not valid pointer.");
+
+    VEC3_ctor((nw4r::math::VEC3*)vCol0);
+    VEC3_ctor((nw4r::math::VEC3*)vCol1);
+    VEC3_ctor((nw4r::math::VEC3*)vCol2);
+    VEC3_ctor((nw4r::math::VEC3*)vTmp);
+
+    fn_8009BA78(mtx, 0, vCol0);
+    len = vec3_length_sq(vCol0);
+    if (len > ef_util_f32_epsilon) {
+        r = nw4r::math::FrSqrt(len);
+        scale[0] = math_reciprocal(r);
+        vec3_scale_by(vCol0, vCol0, r);
+
+        fn_8009BA78(mtx, 1, vCol1);
+        d[0] = vec3_dot(vCol0, vCol1);
+        vec3_scale_by(vTmp, vCol0, d[0]);
+        PSVECSubtract(vCol1, vCol1, vTmp);
+
+        len = vec3_length_sq(vCol1);
+        if (len > ef_util_f32_epsilon) {
+            r = nw4r::math::FrSqrt(len);
+            scale[1] = math_reciprocal(r);
+            d[0] = d[0] * r;
+            vec3_scale_by(vCol1, vCol1, r);
+
+            fn_8009BA78(mtx, 2, vCol2);
+            d[2] = vec3_dot(vCol1, vCol2);
+            vec3_scale_by(vTmp, vCol1, d[2]);
+            PSVECSubtract(vCol2, vCol2, vTmp);
+            d[1] = vec3_dot(vCol0, vCol2);
+            vec3_scale_by(vTmp, vCol0, d[1]);
+            PSVECSubtract(vCol2, vCol2, vTmp);
+
+            len = vec3_length_sq(vCol2);
+            if (len > ef_util_f32_epsilon) {
+                scale[2] = sqrt_f32(len);
+                vec3_cross(vTmp, vCol1, vCol2);
+                if (vec3_dot(vCol0, vTmp) < ef_util_f32_zero) {
+                    scale[0] = scale[0] * ef_util_f64_minus_one;
+                    scale[1] = scale[1] * ef_util_f64_minus_one;
+                    scale[2] = scale[2] * ef_util_f64_minus_one;
+                }
+            } else {
+                scale[2] = ef_util_f32_zero;
+            }
+        } else {
+            scale[1] = ef_util_f32_zero;
+            fn_8009BA78(mtx, 2, vCol2);
+            d[1] = vec3_dot(vCol0, vCol2);
+            vec3_scale_by(vTmp, vCol0, d[1]);
+            PSVECSubtract(vCol2, vCol2, vTmp);
+            len = vec3_length_sq(vCol2);
+            if (len > ef_util_f32_epsilon)
+                scale[2] = sqrt_f32(len);
+            else
+                scale[2] = ef_util_f32_zero;
+        }
+    } else {
+        scale[0] = ef_util_f32_zero;
+        fn_8009BA78(mtx, 1, vCol1);
+        len = vec3_length_sq(vCol1);
+        if (len > ef_util_f32_epsilon) {
+            r = nw4r::math::FrSqrt(len);
+            scale[1] = math_reciprocal(r);
+            vec3_scale_by(vCol1, vCol1, r);
+
+            fn_8009BA78(mtx, 2, vCol2);
+            d[2] = vec3_dot(vCol1, vCol2);
+            vec3_scale_by(vTmp, vCol1, d[2]);
+            PSVECSubtract(vCol2, vCol2, vTmp);
+            scale[2] = vec3_len(vCol2);
+        } else {
+            scale[1] = ef_util_f32_zero;
+            fn_8009BA78(mtx, 2, vCol2);
+            scale[2] = vec3_len(vCol2);
+        }
+    }
+}
+#pragma peephole on
+
+#pragma dont_inline reset
+
+/* 0x8009C484 (0x26C): normalises `vec` into `dst` and returns 1, or copies `vec` unchanged and returns 0 when
+ * it is the zero vector (paired-single, one reciprocal square root step). */
+extern "C" s32 ef_vec3_normalize_to(register f32* dst, register const f32* vec) {
+    register s32 normalized;
+
+    NW4R_POINTER_ASSERT(dst, 0x2DB, "NW4R:Pointer Error\ndst(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT(vec, 0x2DC, "NW4R:Pointer Error\nvec(=%p) is not valid pointer.");
+    asm {
+        lfs        f0, ef_util_f32_half(r0)
+        lfs        f1, ef_util_f32_three(r0)
+        psq_l      f3, 0(vec), 0, 0
+        ps_mul     f6, f3, f3
+        psq_l      f4, 8(vec), 1, 0
+        ps_madd    f5, f4, f4, f6
+        fsubs      f2, f0, f0
+        ps_sum0    f5, f5, f4, f6
+        fcmpu      cr0, f5, f2
+        beq        zero
+        frsqrte    f2, f5
+        fmuls      f6, f2, f2
+        fmuls      f0, f2, f0
+        fnmsubs    f6, f6, f5, f1
+        fmuls      f2, f6, f0
+        ps_muls0   f3, f3, f2
+        psq_st     f3, 0(dst), 0, 0
+        ps_muls0   f4, f4, f2
+        psq_st     f4, 8(dst), 1, 0
+        li         normalized, 1
+        b          done
+    zero:
+        psq_st     f3, 0(dst), 0, 0
+        psq_st     f4, 8(dst), 1, 0
+        li         normalized, 0
+    done:
+    }
+    return normalized;
 }
 
 /* The asm bodies below name the table unqualified. */
@@ -410,7 +531,7 @@ extern "C" VEC3* ef_vec3_from_rotation(register const EfRotation* rot, register 
     register f32* wk;
     register u32 idx;
 
-    NW4R_POINTER_ASSERT(out, 0x3A6, lbl_80591B30);
+    NW4R_POINTER_ASSERT(out, 0x3A6, "NW4R:Pointer Error\npOut(=%p) is not valid pointer.");
     asm {
         lfs        f0, 0(rot)
         lfs        f1, 4(rot)
@@ -610,137 +731,6 @@ extern "C" void ef_mtx34_rotate_xyz(register f32* mtx, register f32 x, register 
     }
 }
 
-#pragma peephole off
-/* Computes the 3x4 matrix's three column scales into `scale` (Gram-Schmidt lengths, negated for a
- * left-handed basis; a collapsed column gives 0). */
-extern "C" void fn_8009C040(const f32* mtx, f32* scale) {
-    f32 d[3];
-    f32 vCol0[3];
-    f32 vCol1[3];
-    f32 vCol2[3];
-    f32 vTmp[3];
-    f32 len;
-    f32 r;
-
-    NW4R_POINTER_ASSERT(scale, 0x266, lbl_80591AC8);
-
-    VEC3_ctor((nw4r::math::VEC3*)vCol0);
-    VEC3_ctor((nw4r::math::VEC3*)vCol1);
-    VEC3_ctor((nw4r::math::VEC3*)vCol2);
-    VEC3_ctor((nw4r::math::VEC3*)vTmp);
-
-    fn_8009BA78(mtx, 0, vCol0);
-    len = vec3_length_sq(vCol0);
-    if (len > ef_util_f32_epsilon) {
-        r = nw4r::math::FrSqrt(len);
-        scale[0] = math_reciprocal(r);
-        vec3_scale_by(vCol0, vCol0, r);
-
-        fn_8009BA78(mtx, 1, vCol1);
-        d[0] = vec3_dot(vCol0, vCol1);
-        vec3_scale_by(vTmp, vCol0, d[0]);
-        PSVECSubtract(vCol1, vCol1, vTmp);
-
-        len = vec3_length_sq(vCol1);
-        if (len > ef_util_f32_epsilon) {
-            r = nw4r::math::FrSqrt(len);
-            scale[1] = math_reciprocal(r);
-            d[0] = d[0] * r;
-            vec3_scale_by(vCol1, vCol1, r);
-
-            fn_8009BA78(mtx, 2, vCol2);
-            d[2] = vec3_dot(vCol1, vCol2);
-            vec3_scale_by(vTmp, vCol1, d[2]);
-            PSVECSubtract(vCol2, vCol2, vTmp);
-            d[1] = vec3_dot(vCol0, vCol2);
-            vec3_scale_by(vTmp, vCol0, d[1]);
-            PSVECSubtract(vCol2, vCol2, vTmp);
-
-            len = vec3_length_sq(vCol2);
-            if (len > ef_util_f32_epsilon) {
-                scale[2] = sqrt_f32(len);
-                vec3_cross(vTmp, vCol1, vCol2);
-                if (vec3_dot(vCol0, vTmp) < ef_util_f32_zero) {
-                    scale[0] = scale[0] * ef_util_f64_minus_one;
-                    scale[1] = scale[1] * ef_util_f64_minus_one;
-                    scale[2] = scale[2] * ef_util_f64_minus_one;
-                }
-            } else {
-                scale[2] = ef_util_f32_zero;
-            }
-        } else {
-            scale[1] = ef_util_f32_zero;
-            fn_8009BA78(mtx, 2, vCol2);
-            d[1] = vec3_dot(vCol0, vCol2);
-            vec3_scale_by(vTmp, vCol0, d[1]);
-            PSVECSubtract(vCol2, vCol2, vTmp);
-            len = vec3_length_sq(vCol2);
-            if (len > ef_util_f32_epsilon)
-                scale[2] = sqrt_f32(len);
-            else
-                scale[2] = ef_util_f32_zero;
-        }
-    } else {
-        scale[0] = ef_util_f32_zero;
-        fn_8009BA78(mtx, 1, vCol1);
-        len = vec3_length_sq(vCol1);
-        if (len > ef_util_f32_epsilon) {
-            r = nw4r::math::FrSqrt(len);
-            scale[1] = math_reciprocal(r);
-            vec3_scale_by(vCol1, vCol1, r);
-
-            fn_8009BA78(mtx, 2, vCol2);
-            d[2] = vec3_dot(vCol1, vCol2);
-            vec3_scale_by(vTmp, vCol1, d[2]);
-            PSVECSubtract(vCol2, vCol2, vTmp);
-            scale[2] = vec3_len(vCol2);
-        } else {
-            scale[1] = ef_util_f32_zero;
-            fn_8009BA78(mtx, 2, vCol2);
-            scale[2] = vec3_len(vCol2);
-        }
-    }
-}
-#pragma peephole on
-
-/* 0x8009C484 (0x26C): normalises `vec` into `dst` and returns 1, or copies `vec` unchanged and returns 0 when
- * it is the zero vector (paired-single, one reciprocal square root step). */
-extern "C" s32 ef_vec3_normalize_to(register f32* dst, register const f32* vec) {
-    register s32 normalized;
-
-    NW4R_POINTER_ASSERT(dst, 0x2DB, lbl_80591A24);
-    NW4R_POINTER_ASSERT(vec, 0x2DC, lbl_80591AFC);
-    asm {
-        lfs        f0, ef_util_f32_half(r0)
-        lfs        f1, ef_util_f32_three(r0)
-        psq_l      f3, 0(vec), 0, 0
-        ps_mul     f6, f3, f3
-        psq_l      f4, 8(vec), 1, 0
-        ps_madd    f5, f4, f4, f6
-        fsubs      f2, f0, f0
-        ps_sum0    f5, f5, f4, f6
-        fcmpu      cr0, f5, f2
-        beq        zero
-        frsqrte    f2, f5
-        fmuls      f6, f2, f2
-        fmuls      f0, f2, f0
-        fnmsubs    f6, f6, f5, f1
-        fmuls      f2, f6, f0
-        ps_muls0   f3, f3, f2
-        psq_st     f3, 0(dst), 0, 0
-        ps_muls0   f4, f4, f2
-        psq_st     f4, 8(dst), 1, 0
-        li         normalized, 1
-        b          done
-    zero:
-        psq_st     f3, 0(dst), 0, 0
-        psq_st     f4, 8(dst), 1, 0
-        li         normalized, 0
-    done:
-    }
-    return normalized;
-}
-
 /* 0x8009CBA0 (0x80): scales every column of the 3x4 matrix `mtx` by the matching component of `scale`, into
  * `dst`; a zero component is replaced by 1.0e-05f (paired-single). */
 extern "C" asm void fn_8009CBA0(register f32* dst, register const f32* mtx, register const f32* scale) {
@@ -827,7 +817,7 @@ scale_rows:
 }
 
 /* Builds the reciprocal of the scale vector `scale` (a zero component becomes 100000.0f) and applies it
- * to the 3x4 matrix `mtx` through fn_8050133C. */
+ * to the 3x4 matrix `mtx` through `nw4r::math::MTX34Scale`. */
 extern "C" void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale) {
     f32 inv[3];
 
@@ -838,7 +828,7 @@ extern "C" void fn_8009CCAC(f32* dst, const f32* mtx, const f32* scale) {
         inv[0] = ef_util_f32_100000;
     inv[1] = ef_util_f32_zero != scale[1] ? math_reciprocal(scale[1]) : ef_util_f32_100000;
     inv[2] = ef_util_f32_zero != scale[2] ? math_reciprocal(scale[2]) : ef_util_f32_100000;
-    fn_8050133C(dst, mtx, inv);
+    nw4r::math::MTX34Scale((nw4r::math::MTX34*)dst, (const nw4r::math::MTX34*)mtx, (const nw4r::math::VEC3*)inv);
 }
 
 /* 0x8009CD64 (0x58): returns the length of column `index` of the 3x4 matrix `mtx` (paired-single, with one
@@ -868,3 +858,5 @@ extern "C" asm f32 ef_mtx34_column_length(register const f32* mtx, register s32 
     fmuls      f1, f1, f0
     blr
 }
+
+

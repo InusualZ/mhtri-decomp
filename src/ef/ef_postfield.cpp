@@ -10,7 +10,9 @@
  *   0x800B2590, 0x800B26B0/0x800B26D4, 0x800B2810/0x800B2840), and `ef/ef_resource.cpp` opens with the resource
  *   singleton's getter 0x800B2878 (it reads `.bss` 0x80694598, the `.ctors` entry's object).
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` and `#pragma fp_contract off` (retail keeps every
- *   `fmuls` + `fadds` pair unfused: the cylinder and circle tests lose 3 % each with it on).
+ *   `fmuls` + `fadds` pair unfused: the cylinder and circle tests lose 3 % each with it on); file-wide
+ *   `#pragma pool_data off` (each string its own `lis`/`addi`); `#pragma dont_inline on` over the accessor tail
+ *   (retail calls the three `_ac.h` accessors out of line).
  * NAMES. The file name is the TU's own `__FILE__` string (0x80593580), not a guess.  GUESS (from the bodies and the
  *   GUESS (collision dispatch, shapes 0 plane .. 5 cylinder): `ef_pf_collision_sphere`, `ef_pf_collision_cube`,
  *   GUESS: `ef_pf_collision_cylinder`, `ef_pf_collision_circle`, `ef_pf_collision_rectangle`, `ef_pf_collision_plane`,
@@ -22,21 +24,23 @@
  *   GUESS: `ef_res_slot_set_emitter_desc`, `ef_res_slot_set_params` (the dump's folded `GXInitTexObjUserData`),
  *   GUESS: `ef_res_slot_bind_emitter_desc`, `ef_res_slot_bind_params`, `ef_res_emitterparam_scale`,
  *   GUESS: `ef_res_emitterparam_vec`, `ef_res_emitterparam_set_scale`, `ef_res_emitterparam_set_vec`.
+ *   GUESS: `ef_res_drawparam_ref`, `ef_res_emitterparam_cref`, `ef_res_emitterparam_ref` (the dead-stripped
+ *   readers that place the accessors' weak copies).
  * SHAPES. `ef_vec3_lerp` is an `asm` function (retail's own paired-single body).  The hit tests take the crossing's
- *   step as one `f32 none = 2` returned at the end; their `-1` reflections are literals (the pool symbol is
- *   reloaded after every store).  `ef_pf_calc_particle` takes a non-const `EfPostFieldInfo*` (retail reloads the
- *   scale after each store), switches on the collision mode as `u32` (`cmplwi`) and keeps the 2^-46 test as a
- *   literal (hoisted into f31).  The hit tests name the shared `-2 * b` (retail's `fadds` operand order).
+ *   step as one `f32 none = 2` returned at the end.  Every pool constant is a literal (the unit emits its own
+ *   `.sdata2` pool in first-use order); `ef_pf_calc_particle` takes a non-const `EfPostFieldInfo*` (retail reloads
+ *   the scale after each store) and switches on the collision mode as `u32` (`cmplwi`).
  * SHAPES. The parameter accessors use `EF_VALID_PTR_ASSERT` (`ef/ef_pointer_assert.h`): the flags are set
  *   before the pointer is read, as retail's.
- * RESIDUALS. 2 partial rows; every row is written.  The source order differs from retail's, so our `.text` and the
- *   extab and extabindex records run in another order.
- *  - `ef_pf_hit_sphere`, `ef_pf_hit_cylinder`: `4 * b * b` comes out `fmuls f2, b, 4b` where retail has
- *    `fmuls f2, 4b, b` (`b * (4 * b)` and the source order give the same; a `4 * b` local fixes the order but
- *    loads the 4.0 into another register).
- *   Relocation names that differ from retail (pool constants): the literals' pool where retail names `ef_pf_two`,
- *     `ef_pf_minus_one`, `ef_pf_tiny`.
- *   flipcheck: `.data` and `.sdata2` claimed, not emitted (declared by their map names, playbook 29).
+ * SHAPES. The functions are defined in retail's address order: `ef_vec3_lerp` after `ef_pf_hit_plane` and
+ *   `vec3_sub_assign` after `ef_pf_hit_sphere`, their first callers.  The three `_ac.h` accessors are `inline`
+ *   (their strings are the weak `@STRING@` tail after the unit's literals, one copy per accessor); each weak copy
+ *   follows a dead-stripped one-call reader (`ef_res_drawparam_ref`, `ef_res_emitterparam_cref`,
+ *   `ef_res_emitterparam_ref`), and the accessors are defined cdata, data, drawparam so the tail comes out in
+ *   retail's reverse order.
+ * RESIDUALS. none in code or data.  flipcheck reads the `.sdata2` layout as different: the map names the pool
+ *   words (`ef_pf_*`) where our object's literals are anonymous `@` constants of the same bytes at the same
+ *   offsets.
  */
 
 #include "types.h"
@@ -70,32 +74,16 @@ extern "C" {
 
 #pragma peephole off
 #pragma fp_contract off
+#pragma pool_data off
 
 /* This TU's `__FILE__`/assert strings (its claimed `.data`), declared, never defined. */
-extern char ef_postfield_file_str[];  /* "ef_postfield.cpp"                                        .data 0x80593580 */
-extern char ef_postfield_assert0_str[];  /* "NW4R:Failed assertion 0"                                  .data 0x80593598 */
-extern char ef_res_drawparam_mdata_str[];     /* "NW4R:Pointer Error\nmData(=%p) ..." .data 0x805935B0 */
-extern char ef_res_emitterparam_mdata_str[];  /* "NW4R:Pointer Error\nmData(=%p) ..." .data 0x805935F8 */
-extern char ef_res_emitterparam_mdata2_str[]; /* "NW4R:Pointer Error\nmData(=%p) ..." .data 0x80593644 */
-extern char ef_res_drawparam_file_str[];  /* "res_drawparam_ac.h"                                       .data 0x805935E4 */
-extern char ef_res_emitterparam_file_str[];  /* "res_emitterparam_ac.h"                                    .data 0x8059362C */
-extern char ef_res_emitterparam_file2_str[];  /* "res_emitterparam_ac.h"                                    .data 0x80593678 */
-
-/* This TU's `.sdata2` constants, declared, never defined. */
-extern f32 ef_pf_minus_one;      /* -1.0f                .sdata2 0x807960E8 */
-extern f32 ef_pf_one;            /* 1.0f                 .sdata2 0x807960EC */
-extern f32 ef_pf_zero;           /* 0.0f                 .sdata2 0x807960F0 */
-extern f32 ef_pf_two;            /* 2.0f                 .sdata2 0x807960F4 */
-extern f32 ef_pf_epsilon;        /* FLT_EPSILON          .sdata2 0x807960F8 */
-extern f32 ef_pf_one_ulp1;       /* 1.0f + 1 ulp         .sdata2 0x807960FC */
-extern f32 ef_pf_one_ulp2;       /* 1.0f + 2 ulp         .sdata2 0x80796100 */
-extern f32 ef_pf_four;           /* 4.0f                 .sdata2 0x80796104 */
-extern f32 ef_pf_minus_two;      /* -2.0f                .sdata2 0x80796108 */
-extern f32 ef_pf_minus_epsilon;  /* -FLT_EPSILON         .sdata2 0x8079610C */
-extern f32 ef_pf_one_plus_1e5;   /* 1.00001f             .sdata2 0x80796110 */
-extern f32 ef_pf_one_minus_1e5;  /* 0.99999f             .sdata2 0x80796114 */
-extern f32 ef_pf_three_halves;   /* 1.5f                 .sdata2 0x80796118 */
-extern f32 ef_pf_tiny;           /* 2^-46                .sdata2 0x8079611C */
+/* The pool constants without an exact short spelling (`.sdata2`, emitted in first-use order). */
+#define EF_PF_EPSILON 1.1920929e-07f        /* FLT_EPSILON */
+#define EF_PF_ONE_ULP1 1.0000001f           /* 1.0f + 1 ulp */
+#define EF_PF_ONE_ULP2 1.0000002f           /* 1.0f + 2 ulp */
+#define EF_PF_ONE_PLUS_1E5 1.00001f
+#define EF_PF_ONE_MINUS_1E5 0.99999f
+#define EF_PF_TINY 1.4210855e-14f           /* 2^-46 */
 
 
 /* The post-field's collision record (`nw4r::ef::PostFieldInfo`): the shape, its axis/option byte, the response flags
@@ -127,29 +115,29 @@ s32 ef_pf_collision_sphere(const VEC3* pos, u8 option) {
     f32 length;
 
     assignVec3((Vec*)&p, (Vec*)pos);
-    if (p.y < ef_pf_minus_one || p.y > ef_pf_one) {
+    if (p.y < -1.0f || p.y > 1.0f) {
         return 3;
     }
-    if ((option & 1) != 0 && p.y < ef_pf_zero) {
+    if ((option & 1) != 0 && p.y < 0.0f) {
         return 3;
     }
-    if ((option & 2) != 0 && p.y > ef_pf_zero) {
+    if ((option & 2) != 0 && p.y > 0.0f) {
         return 3;
     }
-    if (p.x < ef_pf_minus_one || p.x > ef_pf_one) {
+    if (p.x < -1.0f || p.x > 1.0f) {
         return 3;
     }
-    if (p.z < ef_pf_minus_one || p.z > ef_pf_one) {
+    if (p.z < -1.0f || p.z > 1.0f) {
         return 3;
     }
     length = vec3_length_sq((const f32*)&p);
-    if (length > ef_pf_one) {
+    if (length > 1.0f) {
         return 3;
     }
-    if (ef_pf_one == length) {
+    if (1.0f == length) {
         return 1;
     }
-    if (option != 0 && ef_pf_zero == p.y) {
+    if (option != 0 && 0.0f == p.y) {
         return 1;
     }
     return 2;
@@ -162,22 +150,22 @@ s32 ef_pf_collision_cube(const VEC3* pos, u8 option) {
 
     assignVec3((Vec*)&p, (Vec*)pos);
     surface = false;
-    if (p.x < ef_pf_minus_one || p.x > ef_pf_one) {
+    if (p.x < -1.0f || p.x > 1.0f) {
         return 3;
     }
-    if (ef_pf_one == p.x || ef_pf_minus_one == p.x) {
+    if (1.0f == p.x || -1.0f == p.x) {
         surface = true;
     }
-    if (p.y < ef_pf_minus_one || p.y > ef_pf_one) {
+    if (p.y < -1.0f || p.y > 1.0f) {
         return 3;
     }
-    if (ef_pf_one == p.y || ef_pf_minus_one == p.y) {
+    if (1.0f == p.y || -1.0f == p.y) {
         surface = true;
     }
-    if (p.z < ef_pf_minus_one || p.z > ef_pf_one) {
+    if (p.z < -1.0f || p.z > 1.0f) {
         return 3;
     }
-    if (surface || ef_pf_one == p.z || ef_pf_minus_one == p.z) {
+    if (surface || 1.0f == p.z || -1.0f == p.z) {
         return 1;
     }
     return 2;
@@ -189,23 +177,23 @@ s32 ef_pf_collision_cylinder(const VEC3* pos, u8 option) {
     f32 radius;
 
     assignVec3((Vec*)&p, (Vec*)pos);
-    if (p.y < ef_pf_minus_one || p.y > ef_pf_one) {
+    if (p.y < -1.0f || p.y > 1.0f) {
         return 3;
     }
-    if (p.x < ef_pf_minus_one || p.x > ef_pf_one) {
+    if (p.x < -1.0f || p.x > 1.0f) {
         return 3;
     }
-    if (p.z < ef_pf_minus_one || p.z > ef_pf_one) {
+    if (p.z < -1.0f || p.z > 1.0f) {
         return 3;
     }
     radius = p.x * p.x + p.z * p.z;
-    if (radius > ef_pf_one) {
+    if (radius > 1.0f) {
         return 3;
     }
-    if (ef_pf_one == radius) {
+    if (1.0f == radius) {
         return 1;
     }
-    if (ef_pf_minus_one == p.y || ef_pf_one == p.y) {
+    if (-1.0f == p.y || 1.0f == p.y) {
         return 1;
     }
     return 2;
@@ -232,19 +220,19 @@ s32 ef_pf_collision_circle(const VEC3* pos, u8 axis) {
         p.z = pos->z;
         break;
     }
-    if (p.y > ef_pf_zero) {
+    if (p.y > 0.0f) {
         return 3;
     }
-    if (p.y < ef_pf_zero) {
+    if (p.y < 0.0f) {
         return 3;
     }
-    if (p.x < ef_pf_minus_one || p.x > ef_pf_one) {
+    if (p.x < -1.0f || p.x > 1.0f) {
         return 4;
     }
-    if (p.z < ef_pf_minus_one || p.z > ef_pf_one) {
+    if (p.z < -1.0f || p.z > 1.0f) {
         return 4;
     }
-    if (p.x * p.x + p.z * p.z > ef_pf_one) {
+    if (p.x * p.x + p.z * p.z > 1.0f) {
         return 4;
     }
     return 1;
@@ -271,16 +259,16 @@ s32 ef_pf_collision_rectangle(const VEC3* pos, u8 axis) {
         p.z = pos->z;
         break;
     }
-    if (p.y > ef_pf_zero) {
+    if (p.y > 0.0f) {
         return 3;
     }
-    if (p.y < ef_pf_zero) {
+    if (p.y < 0.0f) {
         return 3;
     }
-    if (p.x < ef_pf_minus_one || p.x > ef_pf_one) {
+    if (p.x < -1.0f || p.x > 1.0f) {
         return 4;
     }
-    if (p.z < ef_pf_minus_one || p.z > ef_pf_one) {
+    if (p.z < -1.0f || p.z > 1.0f) {
         return 4;
     }
     return 1;
@@ -306,10 +294,10 @@ s32 ef_pf_collision_plane(const VEC3* pos, u8 axis) {
         p.z = pos->z;
         break;
     }
-    if (p.y > ef_pf_zero) {
+    if (p.y > 0.0f) {
         return 2;
     }
-    if (p.y < ef_pf_zero) {
+    if (p.y < 0.0f) {
         return 3;
     }
     return 1;
@@ -331,10 +319,131 @@ s32 ef_pf_collision_test(u8 shape, const VEC3* pos, u8 option) {
     case 5:
         return ef_pf_collision_cylinder(pos, option);
     default:
-        nw4r::db::Panic(ef_postfield_file_str, 302, ef_postfield_assert0_str);
+        nw4r::db::Panic("ef_postfield.cpp", 302, "NW4R:Failed assertion 0");
         return 1;
     }
 }
+
+/* 0x800AF9FC (0x2C): `out = a + (b - a) * t`; defined after its first caller, as retail places it. */
+void ef_vec3_lerp(VEC3* out, const VEC3* a, const VEC3* b, f32 t);
+
+/* 0x800AF514 (0x4E8): the step from `prev` to `cur` against the plane the field's axis selects: the crossing's
+ * parameter `t` (2 for none), the crossing point in `hit` and, in world space, in `hit_world`; a reflecting field
+ * also turns the velocity and the step around and nudges the hit point off the plane. */
+f32 ef_pf_hit_plane(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cur, const VEC3* prev, VEC3* dir,
+                    VEC3* velocity, VEC3* hit, VEC3* hit_world) {
+    f32 none = 2.0f;
+
+    switch (info->option) {
+    case 0:
+        if (abs_f32(prev->y) < EF_PF_EPSILON && abs_f32(cur->y) < EF_PF_EPSILON) {
+            return 2.0f;
+        }
+        if (prev->y > 0.0f && cur->y < EF_PF_EPSILON) {
+            VEC3 unused_a1;
+            f32 t;
+
+            VEC3_ctor(&unused_a1);
+            t = -prev->y / dir->y;
+            ef_vec3_lerp(hit, prev, cur, t);
+            if ((info->flags & 2) != 0) {
+                velocity->y *= -1.0f;
+                dir->y *= -1.0f;
+                hit->y += EF_PF_EPSILON;
+            }
+            mtx34_mult_vec3(hit_world, mtx, hit);
+            return t;
+        }
+        if (prev->y < 0.0f && cur->y > EF_PF_EPSILON) {
+            VEC3 unused_a2;
+            f32 t;
+
+            VEC3_ctor(&unused_a2);
+            t = -prev->y / dir->y;
+            ef_vec3_lerp(hit, prev, cur, t);
+            if ((info->flags & 2) != 0) {
+                velocity->y *= -1.0f;
+                dir->y *= -1.0f;
+                hit->y -= EF_PF_EPSILON;
+            }
+            mtx34_mult_vec3(hit_world, mtx, hit);
+            return t;
+        }
+        return 2.0f;
+    case 1:
+        if (abs_f32(prev->z) < EF_PF_EPSILON && abs_f32(cur->z) < EF_PF_EPSILON) {
+            return 2.0f;
+        }
+        if (prev->z > 0.0f && cur->z < EF_PF_EPSILON) {
+            VEC3 unused_b1;
+            f32 t;
+
+            VEC3_ctor(&unused_b1);
+            t = -prev->z / dir->z;
+            ef_vec3_lerp(hit, prev, cur, t);
+            if ((info->flags & 2) != 0) {
+                velocity->z *= -1.0f;
+                dir->z *= -1.0f;
+                hit->z += EF_PF_EPSILON;
+            }
+            mtx34_mult_vec3(hit_world, mtx, hit);
+            return t;
+        }
+        if (prev->z < 0.0f && cur->z > EF_PF_EPSILON) {
+            VEC3 unused_b2;
+            f32 t;
+
+            VEC3_ctor(&unused_b2);
+            t = -prev->z / dir->z;
+            ef_vec3_lerp(hit, prev, cur, t);
+            if ((info->flags & 2) != 0) {
+                velocity->z *= -1.0f;
+                dir->z *= -1.0f;
+                hit->z -= EF_PF_EPSILON;
+            }
+            mtx34_mult_vec3(hit_world, mtx, hit);
+            return t;
+        }
+        return 2.0f;
+    case 2:
+        if (abs_f32(prev->x) < EF_PF_EPSILON && abs_f32(cur->x) < EF_PF_EPSILON) {
+            return 2.0f;
+        }
+        if (prev->x > 0.0f && cur->x < EF_PF_EPSILON) {
+            VEC3 unused_c1;
+            f32 t;
+
+            VEC3_ctor(&unused_c1);
+            t = -prev->x / dir->x;
+            ef_vec3_lerp(hit, prev, cur, t);
+            if ((info->flags & 2) != 0) {
+                velocity->x *= -1.0f;
+                dir->x *= -1.0f;
+                hit->x += EF_PF_EPSILON;
+            }
+            mtx34_mult_vec3(hit_world, mtx, hit);
+            return t;
+        }
+        if (prev->x < 0.0f && cur->x > EF_PF_EPSILON) {
+            VEC3 unused_c2;
+            f32 t;
+
+            VEC3_ctor(&unused_c2);
+            t = -prev->x / dir->x;
+            ef_vec3_lerp(hit, prev, cur, t);
+            if ((info->flags & 2) != 0) {
+                velocity->x *= -1.0f;
+                dir->x *= -1.0f;
+                hit->x -= EF_PF_EPSILON;
+            }
+            mtx34_mult_vec3(hit_world, mtx, hit);
+            return t;
+        }
+        return 2.0f;
+    }
+    return none;
+}
+
 
 /* 0x800AF9FC (0x2C): `out = a + (b - a) * t` (nw4r's paired-single VEC3 interpolation). */
 asm void ef_vec3_lerp(register VEC3* out, register const VEC3* a, register const VEC3* b, register f32 t) {
@@ -352,253 +461,135 @@ asm void ef_vec3_lerp(register VEC3* out, register const VEC3* a, register const
     blr
 }
 
-/* 0x800AF514 (0x4E8): the step from `prev` to `cur` against the plane the field's axis selects: the crossing's
- * parameter `t` (2 for none), the crossing point in `hit` and, in world space, in `hit_world`; a reflecting field
- * also turns the velocity and the step around and nudges the hit point off the plane. */
-f32 ef_pf_hit_plane(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cur, const VEC3* prev, VEC3* dir,
-                    VEC3* velocity, VEC3* hit, VEC3* hit_world) {
-    f32 none = ef_pf_two;
-
-    switch (info->option) {
-    case 0:
-        if (abs_f32(prev->y) < ef_pf_epsilon && abs_f32(cur->y) < ef_pf_epsilon) {
-            return ef_pf_two;
-        }
-        if (prev->y > ef_pf_zero && cur->y < ef_pf_epsilon) {
-            VEC3 unused_a1;
-            f32 t;
-
-            VEC3_ctor(&unused_a1);
-            t = -prev->y / dir->y;
-            ef_vec3_lerp(hit, prev, cur, t);
-            if ((info->flags & 2) != 0) {
-                velocity->y *= -1.0f;
-                dir->y *= -1.0f;
-                hit->y += ef_pf_epsilon;
-            }
-            mtx34_mult_vec3(hit_world, mtx, hit);
-            return t;
-        }
-        if (prev->y < ef_pf_zero && cur->y > ef_pf_epsilon) {
-            VEC3 unused_a2;
-            f32 t;
-
-            VEC3_ctor(&unused_a2);
-            t = -prev->y / dir->y;
-            ef_vec3_lerp(hit, prev, cur, t);
-            if ((info->flags & 2) != 0) {
-                velocity->y *= -1.0f;
-                dir->y *= -1.0f;
-                hit->y -= ef_pf_epsilon;
-            }
-            mtx34_mult_vec3(hit_world, mtx, hit);
-            return t;
-        }
-        return ef_pf_two;
-    case 1:
-        if (abs_f32(prev->z) < ef_pf_epsilon && abs_f32(cur->z) < ef_pf_epsilon) {
-            return ef_pf_two;
-        }
-        if (prev->z > ef_pf_zero && cur->z < ef_pf_epsilon) {
-            VEC3 unused_b1;
-            f32 t;
-
-            VEC3_ctor(&unused_b1);
-            t = -prev->z / dir->z;
-            ef_vec3_lerp(hit, prev, cur, t);
-            if ((info->flags & 2) != 0) {
-                velocity->z *= -1.0f;
-                dir->z *= -1.0f;
-                hit->z += ef_pf_epsilon;
-            }
-            mtx34_mult_vec3(hit_world, mtx, hit);
-            return t;
-        }
-        if (prev->z < ef_pf_zero && cur->z > ef_pf_epsilon) {
-            VEC3 unused_b2;
-            f32 t;
-
-            VEC3_ctor(&unused_b2);
-            t = -prev->z / dir->z;
-            ef_vec3_lerp(hit, prev, cur, t);
-            if ((info->flags & 2) != 0) {
-                velocity->z *= -1.0f;
-                dir->z *= -1.0f;
-                hit->z -= ef_pf_epsilon;
-            }
-            mtx34_mult_vec3(hit_world, mtx, hit);
-            return t;
-        }
-        return ef_pf_two;
-    case 2:
-        if (abs_f32(prev->x) < ef_pf_epsilon && abs_f32(cur->x) < ef_pf_epsilon) {
-            return ef_pf_two;
-        }
-        if (prev->x > ef_pf_zero && cur->x < ef_pf_epsilon) {
-            VEC3 unused_c1;
-            f32 t;
-
-            VEC3_ctor(&unused_c1);
-            t = -prev->x / dir->x;
-            ef_vec3_lerp(hit, prev, cur, t);
-            if ((info->flags & 2) != 0) {
-                velocity->x *= -1.0f;
-                dir->x *= -1.0f;
-                hit->x += ef_pf_epsilon;
-            }
-            mtx34_mult_vec3(hit_world, mtx, hit);
-            return t;
-        }
-        if (prev->x < ef_pf_zero && cur->x > ef_pf_epsilon) {
-            VEC3 unused_c2;
-            f32 t;
-
-            VEC3_ctor(&unused_c2);
-            t = -prev->x / dir->x;
-            ef_vec3_lerp(hit, prev, cur, t);
-            if ((info->flags & 2) != 0) {
-                velocity->x *= -1.0f;
-                dir->x *= -1.0f;
-                hit->x -= ef_pf_epsilon;
-            }
-            mtx34_mult_vec3(hit_world, mtx, hit);
-            return t;
-        }
-        return ef_pf_two;
-    }
-    return none;
-}
-
-
 /* 0x800AFA28 (0x608): as the plane test, with the crossing point inside the unit square. */
 f32 ef_pf_hit_rectangle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cur, const VEC3* prev,
                       VEC3* dir, VEC3* velocity, VEC3* hit, VEC3* hit_world) {
-    f32 none = ef_pf_two;
+    f32 none = 2.0f;
 
     switch (info->option) {
     case 0:
-        if (abs_f32(prev->y) < ef_pf_epsilon && abs_f32(cur->y) < ef_pf_epsilon) {
-            return ef_pf_two;
+        if (abs_f32(prev->y) < EF_PF_EPSILON && abs_f32(cur->y) < EF_PF_EPSILON) {
+            return 2.0f;
         }
-        if (prev->y > ef_pf_zero && cur->y < ef_pf_epsilon) {
+        if (prev->y > 0.0f && cur->y < EF_PF_EPSILON) {
             VEC3 unused_a1;
             f32 t;
 
             VEC3_ctor(&unused_a1);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (abs_f32(hit->x) < ef_pf_one_ulp1 && abs_f32(hit->z) < ef_pf_one_ulp1) {
+            if (abs_f32(hit->x) < EF_PF_ONE_ULP1 && abs_f32(hit->z) < EF_PF_ONE_ULP1) {
                 if ((info->flags & 2) != 0) {
                     velocity->y *= -1.0f;
                     dir->y *= -1.0f;
-                    hit->y += ef_pf_epsilon;
+                    hit->y += EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        if (prev->y < ef_pf_zero && cur->y > ef_pf_epsilon) {
+        if (prev->y < 0.0f && cur->y > EF_PF_EPSILON) {
             VEC3 unused_a2;
             f32 t;
 
             VEC3_ctor(&unused_a2);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (abs_f32(hit->x) < ef_pf_one_ulp1 && abs_f32(hit->z) < ef_pf_one_ulp1) {
+            if (abs_f32(hit->x) < EF_PF_ONE_ULP1 && abs_f32(hit->z) < EF_PF_ONE_ULP1) {
                 if ((info->flags & 2) != 0) {
                     velocity->y *= -1.0f;
                     dir->y *= -1.0f;
-                    hit->y -= ef_pf_epsilon;
+                    hit->y -= EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        return ef_pf_two;
+        return 2.0f;
     case 1:
-        if (abs_f32(prev->z) < ef_pf_epsilon && abs_f32(cur->z) < ef_pf_epsilon) {
-            return ef_pf_two;
+        if (abs_f32(prev->z) < EF_PF_EPSILON && abs_f32(cur->z) < EF_PF_EPSILON) {
+            return 2.0f;
         }
-        if (prev->z > ef_pf_zero && cur->z < ef_pf_epsilon) {
+        if (prev->z > 0.0f && cur->z < EF_PF_EPSILON) {
             VEC3 unused_b1;
             f32 t;
 
             VEC3_ctor(&unused_b1);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (abs_f32(hit->x) < ef_pf_one_ulp1 && abs_f32(hit->y) < ef_pf_one_ulp1) {
+            if (abs_f32(hit->x) < EF_PF_ONE_ULP1 && abs_f32(hit->y) < EF_PF_ONE_ULP1) {
                 if ((info->flags & 2) != 0) {
                     velocity->z *= -1.0f;
                     dir->z *= -1.0f;
-                    hit->z += ef_pf_epsilon;
+                    hit->z += EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        if (prev->z < ef_pf_zero && cur->z > ef_pf_epsilon) {
+        if (prev->z < 0.0f && cur->z > EF_PF_EPSILON) {
             VEC3 unused_b2;
             f32 t;
 
             VEC3_ctor(&unused_b2);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (abs_f32(hit->x) < ef_pf_one_ulp1 && abs_f32(hit->y) < ef_pf_one_ulp1) {
+            if (abs_f32(hit->x) < EF_PF_ONE_ULP1 && abs_f32(hit->y) < EF_PF_ONE_ULP1) {
                 if ((info->flags & 2) != 0) {
                     velocity->z *= -1.0f;
                     dir->z *= -1.0f;
-                    hit->z -= ef_pf_epsilon;
+                    hit->z -= EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        return ef_pf_two;
+        return 2.0f;
     case 2:
-        if (abs_f32(prev->x) < ef_pf_epsilon && abs_f32(cur->x) < ef_pf_epsilon) {
-            return ef_pf_two;
+        if (abs_f32(prev->x) < EF_PF_EPSILON && abs_f32(cur->x) < EF_PF_EPSILON) {
+            return 2.0f;
         }
-        if (prev->x > ef_pf_zero && cur->x < ef_pf_epsilon) {
+        if (prev->x > 0.0f && cur->x < EF_PF_EPSILON) {
             VEC3 unused_c1;
             f32 t;
 
             VEC3_ctor(&unused_c1);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (abs_f32(hit->y) < ef_pf_one_ulp1 && abs_f32(hit->z) < ef_pf_one_ulp1) {
+            if (abs_f32(hit->y) < EF_PF_ONE_ULP1 && abs_f32(hit->z) < EF_PF_ONE_ULP1) {
                 if ((info->flags & 2) != 0) {
                     velocity->x *= -1.0f;
                     dir->x *= -1.0f;
-                    hit->x += ef_pf_epsilon;
+                    hit->x += EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        if (prev->x < ef_pf_zero && cur->x > ef_pf_epsilon) {
+        if (prev->x < 0.0f && cur->x > EF_PF_EPSILON) {
             VEC3 unused_c2;
             f32 t;
 
             VEC3_ctor(&unused_c2);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (abs_f32(hit->y) < ef_pf_one_ulp1 && abs_f32(hit->z) < ef_pf_one_ulp1) {
+            if (abs_f32(hit->y) < EF_PF_ONE_ULP1 && abs_f32(hit->z) < EF_PF_ONE_ULP1) {
                 if ((info->flags & 2) != 0) {
                     velocity->x *= -1.0f;
                     dir->x *= -1.0f;
-                    hit->x -= ef_pf_epsilon;
+                    hit->x -= EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        return ef_pf_two;
+        return 2.0f;
     }
     return none;
 }
@@ -607,132 +598,132 @@ f32 ef_pf_hit_rectangle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC
 /* 0x800B0030 (0x5D8): as the plane test, with the crossing point inside the unit disc. */
 f32 ef_pf_hit_circle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cur, const VEC3* prev,
                       VEC3* dir, VEC3* velocity, VEC3* hit, VEC3* hit_world) {
-    f32 none = ef_pf_two;
+    f32 none = 2.0f;
 
     switch (info->option) {
     case 0:
-        if (abs_f32(prev->y) < ef_pf_epsilon && abs_f32(cur->y) < ef_pf_epsilon) {
-            return ef_pf_two;
+        if (abs_f32(prev->y) < EF_PF_EPSILON && abs_f32(cur->y) < EF_PF_EPSILON) {
+            return 2.0f;
         }
-        if (prev->y > ef_pf_zero && cur->y < ef_pf_epsilon) {
+        if (prev->y > 0.0f && cur->y < EF_PF_EPSILON) {
             VEC3 unused_a1;
             f32 t;
 
             VEC3_ctor(&unused_a1);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (hit->x * hit->x + hit->z * hit->z < ef_pf_one_ulp2) {
+            if (hit->x * hit->x + hit->z * hit->z < EF_PF_ONE_ULP2) {
                 if ((info->flags & 2) != 0) {
                     velocity->y *= -1.0f;
                     dir->y *= -1.0f;
-                    hit->y += ef_pf_epsilon;
+                    hit->y += EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        if (prev->y < ef_pf_zero && cur->y > ef_pf_epsilon) {
+        if (prev->y < 0.0f && cur->y > EF_PF_EPSILON) {
             VEC3 unused_a2;
             f32 t;
 
             VEC3_ctor(&unused_a2);
             t = -prev->y / dir->y;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (hit->x * hit->x + hit->z * hit->z < ef_pf_one_ulp2) {
+            if (hit->x * hit->x + hit->z * hit->z < EF_PF_ONE_ULP2) {
                 if ((info->flags & 2) != 0) {
                     velocity->y *= -1.0f;
                     dir->y *= -1.0f;
-                    hit->y -= ef_pf_epsilon;
+                    hit->y -= EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        return ef_pf_two;
+        return 2.0f;
     case 1:
-        if (abs_f32(prev->z) < ef_pf_epsilon && abs_f32(cur->z) < ef_pf_epsilon) {
-            return ef_pf_two;
+        if (abs_f32(prev->z) < EF_PF_EPSILON && abs_f32(cur->z) < EF_PF_EPSILON) {
+            return 2.0f;
         }
-        if (prev->z > ef_pf_zero && cur->z < ef_pf_epsilon) {
+        if (prev->z > 0.0f && cur->z < EF_PF_EPSILON) {
             VEC3 unused_b1;
             f32 t;
 
             VEC3_ctor(&unused_b1);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (hit->x * hit->x + hit->y * hit->y < ef_pf_one_ulp2) {
+            if (hit->x * hit->x + hit->y * hit->y < EF_PF_ONE_ULP2) {
                 if ((info->flags & 2) != 0) {
                     velocity->z *= -1.0f;
                     dir->z *= -1.0f;
-                    hit->z += ef_pf_epsilon;
+                    hit->z += EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        if (prev->z < ef_pf_zero && cur->z > ef_pf_epsilon) {
+        if (prev->z < 0.0f && cur->z > EF_PF_EPSILON) {
             VEC3 unused_b2;
             f32 t;
 
             VEC3_ctor(&unused_b2);
             t = -prev->z / dir->z;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (hit->x * hit->x + hit->y * hit->y < ef_pf_one_ulp2) {
+            if (hit->x * hit->x + hit->y * hit->y < EF_PF_ONE_ULP2) {
                 if ((info->flags & 2) != 0) {
                     velocity->z *= -1.0f;
                     dir->z *= -1.0f;
-                    hit->z -= ef_pf_epsilon;
+                    hit->z -= EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        return ef_pf_two;
+        return 2.0f;
     case 2:
-        if (abs_f32(prev->x) < ef_pf_epsilon && abs_f32(cur->x) < ef_pf_epsilon) {
-            return ef_pf_two;
+        if (abs_f32(prev->x) < EF_PF_EPSILON && abs_f32(cur->x) < EF_PF_EPSILON) {
+            return 2.0f;
         }
-        if (prev->x > ef_pf_zero && cur->x < ef_pf_epsilon) {
+        if (prev->x > 0.0f && cur->x < EF_PF_EPSILON) {
             VEC3 unused_c1;
             f32 t;
 
             VEC3_ctor(&unused_c1);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (hit->y * hit->y + hit->z * hit->z < ef_pf_one_ulp2) {
+            if (hit->y * hit->y + hit->z * hit->z < EF_PF_ONE_ULP2) {
                 if ((info->flags & 2) != 0) {
                     velocity->x *= -1.0f;
                     dir->x *= -1.0f;
-                    hit->x += ef_pf_epsilon;
+                    hit->x += EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        if (prev->x < ef_pf_zero && cur->x > ef_pf_epsilon) {
+        if (prev->x < 0.0f && cur->x > EF_PF_EPSILON) {
             VEC3 unused_c2;
             f32 t;
 
             VEC3_ctor(&unused_c2);
             t = -prev->x / dir->x;
             ef_vec3_lerp(hit, prev, cur, t);
-            if (hit->y * hit->y + hit->z * hit->z < ef_pf_one_ulp2) {
+            if (hit->y * hit->y + hit->z * hit->z < EF_PF_ONE_ULP2) {
                 if ((info->flags & 2) != 0) {
                     velocity->x *= -1.0f;
                     dir->x *= -1.0f;
-                    hit->x -= ef_pf_epsilon;
+                    hit->x -= EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-            return ef_pf_two;
+            return 2.0f;
         }
-        return ef_pf_two;
+        return 2.0f;
     }
     return none;
 }
@@ -743,7 +734,7 @@ f32 ef_pf_hit_circle(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
  * surface normal and nudges the point off the surface. */
 f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cur, const VEC3* prev, VEC3* dir,
                      VEC3* velocity, VEC3* hit, VEC3* hit_world) {
-    f32 best = ef_pf_two;
+    f32 best = 2.0f;
     f32 prev_sq = vec3_length_sq((const f32*)prev);
     f32 dir_sq;
     f32 b;
@@ -756,97 +747,97 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
     vec3_length_sq((const f32*)cur);
     dir_sq = vec3_length_sq((const f32*)dir);
     b = vec3_dot((const f32*)prev, (const f32*)dir);
-    disc = ef_pf_four * b * b - ef_pf_four * dir_sq * (prev_sq - ef_pf_one);
-    if (disc < ef_pf_zero) {
-        return ef_pf_two;
+    disc = 4.0f * b * b - 4.0f * dir_sq * (prev_sq - 1.0f);
+    if (disc < 0.0f) {
+        return 2.0f;
     }
     root = sqrt_f32(disc);
-    minus_two_b = ef_pf_minus_two * b;
-    t0 = (minus_two_b - root) / (ef_pf_two * dir_sq);
-    t1 = (minus_two_b + root) / (ef_pf_two * dir_sq);
-    if (t0 > ef_pf_zero && t0 < ef_pf_one_ulp1) {
+    minus_two_b = -2.0f * b;
+    t0 = (minus_two_b - root) / (2.0f * dir_sq);
+    t1 = (minus_two_b + root) / (2.0f * dir_sq);
+    if (t0 > 0.0f && t0 < EF_PF_ONE_ULP1) {
         ef_vec3_lerp(hit, prev, cur, t0);
-        if (!(info->option == 1 && hit->y < ef_pf_minus_epsilon) && !(info->option == 2 && hit->y > ef_pf_epsilon)) {
+        if (!(info->option == 1 && hit->y < -EF_PF_EPSILON) && !(info->option == 2 && hit->y > EF_PF_EPSILON)) {
             best = t0;
         }
     }
-    if (t1 > ef_pf_zero && t1 < ef_pf_one_ulp1 && t1 < best) {
+    if (t1 > 0.0f && t1 < EF_PF_ONE_ULP1 && t1 < best) {
         VEC3 far_hit;
 
         VEC3_ctor(&far_hit);
         ef_vec3_lerp(&far_hit, prev, cur, t1);
-        if (!(info->option == 1 && far_hit.y < ef_pf_minus_epsilon) &&
-            !(info->option == 2 && far_hit.y > ef_pf_epsilon)) {
+        if (!(info->option == 1 && far_hit.y < -EF_PF_EPSILON) &&
+            !(info->option == 2 && far_hit.y > EF_PF_EPSILON)) {
             copyVec3(hit, &far_hit);
             best = t1;
         }
     }
-    if ((u8)(info->option + 255) <= 1 && !(abs_f32(prev->y) < ef_pf_epsilon && abs_f32(cur->y) < ef_pf_epsilon)) {
-        if (prev->y > ef_pf_zero && cur->y < ef_pf_epsilon) {
+    if ((u8)(info->option + 255) <= 1 && !(abs_f32(prev->y) < EF_PF_EPSILON && abs_f32(cur->y) < EF_PF_EPSILON)) {
+        if (prev->y > 0.0f && cur->y < EF_PF_EPSILON) {
             VEC3 cap_hit_a;
             f32 t;
 
             VEC3_ctor(&cap_hit_a);
             t = -prev->y / dir->y;
             ef_vec3_lerp(&cap_hit_a, prev, cur, t);
-            if (t < best && cap_hit_a.x * cap_hit_a.x + cap_hit_a.z * cap_hit_a.z < ef_pf_one_ulp2) {
+            if (t < best && cap_hit_a.x * cap_hit_a.x + cap_hit_a.z * cap_hit_a.z < EF_PF_ONE_ULP2) {
                 copyVec3(hit, &cap_hit_a);
                 if ((info->flags & 2) != 0) {
                     velocity->y *= -1.0f;
                     dir->y *= -1.0f;
-                    hit->y += ef_pf_epsilon;
+                    hit->y += EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
-        } else if (prev->y < ef_pf_zero && cur->y > ef_pf_epsilon) {
+        } else if (prev->y < 0.0f && cur->y > EF_PF_EPSILON) {
             VEC3 cap_hit_b;
             f32 t;
 
             VEC3_ctor(&cap_hit_b);
             t = -prev->y / dir->y;
             ef_vec3_lerp(&cap_hit_b, prev, cur, t);
-            if (t < best && cap_hit_b.x * cap_hit_b.x + cap_hit_b.z * cap_hit_b.z < ef_pf_one_ulp2) {
+            if (t < best && cap_hit_b.x * cap_hit_b.x + cap_hit_b.z * cap_hit_b.z < EF_PF_ONE_ULP2) {
                 copyVec3(hit, &cap_hit_b);
                 if ((info->flags & 2) != 0) {
                     velocity->y *= -1.0f;
                     dir->y *= -1.0f;
-                    hit->y -= ef_pf_epsilon;
+                    hit->y -= EF_PF_EPSILON;
                 }
                 mtx34_mult_vec3(hit_world, mtx, hit);
                 return t;
             }
         }
     }
-    if (best < ef_pf_two) {
+    if (best < 2.0f) {
         if ((info->flags & 2) != 0) {
             MTX34 frame;
             VEC3 local;
             VEC3 normal_part;
-            f32 r = sqrt_f32(ef_pf_one - hit->z * hit->z);
+            f32 r = sqrt_f32(1.0f - hit->z * hit->z);
             f32 s;
             f32 c;
 
-            if (r > ef_pf_epsilon) {
+            if (r > EF_PF_EPSILON) {
                 c = hit->y / r;
                 s = -hit->x / r;
             } else {
-                c = ef_pf_one;
-                s = ef_pf_zero;
+                c = 1.0f;
+                s = 0.0f;
             }
             MTX34_ctor(&frame);
             frame.m[0][0] = c;
             frame.m[0][1] = hit->x;
             frame.m[0][2] = hit->z * s;
-            frame.m[0][3] = ef_pf_zero;
+            frame.m[0][3] = 0.0f;
             frame.m[1][0] = s;
             frame.m[1][1] = hit->y;
             frame.m[1][2] = -c * hit->z;
-            frame.m[1][3] = ef_pf_zero;
-            frame.m[2][0] = ef_pf_zero;
+            frame.m[1][3] = 0.0f;
+            frame.m[2][0] = 0.0f;
             frame.m[2][1] = hit->z;
             frame.m[2][2] = r;
-            frame.m[2][3] = ef_pf_zero;
+            frame.m[2][3] = 0.0f;
             mtx34_inverse(&frame, &frame);
             VEC3_ctor(&local);
             VEC3_ctor(&normal_part);
@@ -858,10 +849,10 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
             vec3_scale_by((f32*)&normal_part, (const f32*)hit, local.y);
             vec3_sub_assign((Vec*)velocity, (Vec*)&normal_part);
             vec3_sub_assign((Vec*)velocity, (Vec*)&normal_part);
-            if (prev_sq > ef_pf_one) {
-                vec3_scale_by((f32*)hit, (const f32*)hit, ef_pf_one_plus_1e5);
+            if (prev_sq > 1.0f) {
+                vec3_scale_by((f32*)hit, (const f32*)hit, EF_PF_ONE_PLUS_1E5);
             } else {
-                vec3_scale_by((f32*)hit, (const f32*)hit, ef_pf_one_minus_1e5);
+                vec3_scale_by((f32*)hit, (const f32*)hit, EF_PF_ONE_MINUS_1E5);
             }
         }
         mtx34_mult_vec3(hit_world, mtx, hit);
@@ -870,12 +861,18 @@ f32 ef_pf_hit_sphere(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* 
 }
 
 
+/* Subtracts `b` from `self` in place and returns `self`. */
+Vec* vec3_sub_assign(Vec* self, Vec* b) {
+    PSVECSubtract((f32*)self, (const f32*)self, (const f32*)b);
+    return self;
+}
+
 /* 0x800B0BC8 (0x6E0): the step from `prev` to `cur` against the unit cylinder (axis Y, caps at y = +-1): the nearest
  * crossing's `t` (2 for none) and point; a reflecting field mirrors the step and the velocity about the side's
  * normal (or the cap's) and nudges the point off the surface. */
 f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cur, const VEC3* prev, VEC3* dir,
                        VEC3* velocity, VEC3* hit, VEC3* hit_world) {
-    f32 best = ef_pf_two;
+    f32 best = 2.0f;
     f32 prev_sq = prev->x * prev->x + prev->z * prev->z;
     f32 dir_sq = dir->x * dir->x + dir->z * dir->z;
     f32 b = prev->x * dir->x + prev->z * dir->z;
@@ -885,62 +882,62 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
     f32 t0;
     f32 t1;
 
-    disc = ef_pf_four * b * b - ef_pf_four * dir_sq * (prev_sq - ef_pf_one);
-    if (disc < ef_pf_zero) {
+    disc = 4.0f * b * b - 4.0f * dir_sq * (prev_sq - 1.0f);
+    if (disc < 0.0f) {
         return best;
     }
     root = sqrt_f32(disc);
-    minus_two_b = ef_pf_minus_two * b;
-    t0 = (minus_two_b - root) / (ef_pf_two * dir_sq);
-    t1 = (minus_two_b + root) / (ef_pf_two * dir_sq);
-    if (t0 > ef_pf_zero && t0 < ef_pf_one_ulp1) {
+    minus_two_b = -2.0f * b;
+    t0 = (minus_two_b - root) / (2.0f * dir_sq);
+    t1 = (minus_two_b + root) / (2.0f * dir_sq);
+    if (t0 > 0.0f && t0 < EF_PF_ONE_ULP1) {
         ef_vec3_lerp(hit, prev, cur, t0);
-        if (abs_f32(hit->y) < ef_pf_one_ulp1) {
+        if (abs_f32(hit->y) < EF_PF_ONE_ULP1) {
             best = t0;
         }
     }
-    if (t1 > ef_pf_zero && t1 < ef_pf_one_ulp1 && t1 < best) {
+    if (t1 > 0.0f && t1 < EF_PF_ONE_ULP1 && t1 < best) {
         VEC3 far_hit;
 
         VEC3_ctor(&far_hit);
         ef_vec3_lerp(&far_hit, prev, cur, t1);
-        if (abs_f32(far_hit.y) < ef_pf_one_ulp1) {
+        if (abs_f32(far_hit.y) < EF_PF_ONE_ULP1) {
             copyVec3(hit, &far_hit);
             best = t1;
         }
     }
     {
-        f32 level = ef_pf_one;
+        f32 level = 1.0f;
 
-        if (!(abs_f32(prev->y - level) < ef_pf_epsilon && abs_f32(cur->y - level) < ef_pf_epsilon)) {
-            if (prev->y > level && cur->y < ef_pf_epsilon + level) {
+        if (!(abs_f32(prev->y - level) < EF_PF_EPSILON && abs_f32(cur->y - level) < EF_PF_EPSILON)) {
+            if (prev->y > level && cur->y < EF_PF_EPSILON + level) {
                 VEC3 cap_hit_a1;
 
                 VEC3_ctor(&cap_hit_a1);
                 t1 = (level - prev->y) / dir->y;
                 ef_vec3_lerp(&cap_hit_a1, prev, cur, t1);
-                if (t1 < best && cap_hit_a1.x * cap_hit_a1.x + cap_hit_a1.z * cap_hit_a1.z < ef_pf_one_ulp2) {
+                if (t1 < best && cap_hit_a1.x * cap_hit_a1.x + cap_hit_a1.z * cap_hit_a1.z < EF_PF_ONE_ULP2) {
                     copyVec3(hit, &cap_hit_a1);
                     if ((info->flags & 2) != 0) {
                         velocity->y *= -1.0f;
                         dir->y *= -1.0f;
-                        hit->y += ef_pf_epsilon;
+                        hit->y += EF_PF_EPSILON;
                     }
                     mtx34_mult_vec3(hit_world, mtx, hit);
                     return t1;
                 }
-            } else if (prev->y < level && cur->y > ef_pf_epsilon + level) {
+            } else if (prev->y < level && cur->y > EF_PF_EPSILON + level) {
                 VEC3 cap_hit_a2;
 
                 VEC3_ctor(&cap_hit_a2);
                 t1 = (level - prev->y) / dir->y;
                 ef_vec3_lerp(&cap_hit_a2, prev, cur, t1);
-                if (t1 < best && cap_hit_a2.x * cap_hit_a2.x + cap_hit_a2.z * cap_hit_a2.z < ef_pf_one_ulp2) {
+                if (t1 < best && cap_hit_a2.x * cap_hit_a2.x + cap_hit_a2.z * cap_hit_a2.z < EF_PF_ONE_ULP2) {
                     copyVec3(hit, &cap_hit_a2);
                     if ((info->flags & 2) != 0) {
                         velocity->y *= -1.0f;
                         dir->y *= -1.0f;
-                        hit->y -= ef_pf_epsilon;
+                        hit->y -= EF_PF_EPSILON;
                     }
                     mtx34_mult_vec3(hit_world, mtx, hit);
                     return t1;
@@ -949,37 +946,37 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
         }
     }
     {
-        f32 level = ef_pf_minus_one;
+        f32 level = -1.0f;
 
-        if (!(abs_f32(prev->y - level) < ef_pf_epsilon && abs_f32(cur->y - level) < ef_pf_epsilon)) {
-            if (prev->y > level && cur->y < ef_pf_epsilon + level) {
+        if (!(abs_f32(prev->y - level) < EF_PF_EPSILON && abs_f32(cur->y - level) < EF_PF_EPSILON)) {
+            if (prev->y > level && cur->y < EF_PF_EPSILON + level) {
                 VEC3 cap_hit_b1;
 
                 VEC3_ctor(&cap_hit_b1);
                 t1 = (level - prev->y) / dir->y;
                 ef_vec3_lerp(&cap_hit_b1, prev, cur, t1);
-                if (t1 < best && cap_hit_b1.x * cap_hit_b1.x + cap_hit_b1.z * cap_hit_b1.z < ef_pf_one_ulp2) {
+                if (t1 < best && cap_hit_b1.x * cap_hit_b1.x + cap_hit_b1.z * cap_hit_b1.z < EF_PF_ONE_ULP2) {
                     copyVec3(hit, &cap_hit_b1);
                     if ((info->flags & 2) != 0) {
                         velocity->y *= -1.0f;
                         dir->y *= -1.0f;
-                        hit->y += ef_pf_epsilon;
+                        hit->y += EF_PF_EPSILON;
                     }
                     mtx34_mult_vec3(hit_world, mtx, hit);
                     return t1;
                 }
-            } else if (prev->y < level && cur->y > ef_pf_epsilon + level) {
+            } else if (prev->y < level && cur->y > EF_PF_EPSILON + level) {
                 VEC3 cap_hit_b2;
 
                 VEC3_ctor(&cap_hit_b2);
                 t1 = (level - prev->y) / dir->y;
                 ef_vec3_lerp(&cap_hit_b2, prev, cur, t1);
-                if (t1 < best && cap_hit_b2.x * cap_hit_b2.x + cap_hit_b2.z * cap_hit_b2.z < ef_pf_one_ulp2) {
+                if (t1 < best && cap_hit_b2.x * cap_hit_b2.x + cap_hit_b2.z * cap_hit_b2.z < EF_PF_ONE_ULP2) {
                     copyVec3(hit, &cap_hit_b2);
                     if ((info->flags & 2) != 0) {
                         velocity->y *= -1.0f;
                         dir->y *= -1.0f;
-                        hit->y -= ef_pf_epsilon;
+                        hit->y -= EF_PF_EPSILON;
                     }
                     mtx34_mult_vec3(hit_world, mtx, hit);
                     return t1;
@@ -987,7 +984,7 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             }
         }
     }
-    if (best < ef_pf_two) {
+    if (best < 2.0f) {
         if ((info->flags & 2) != 0) {
             VEC3 normal;
             f32 d;
@@ -996,7 +993,7 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             sqrt_f32(dir->x * dir->x + dir->z * dir->z);
             d = dir->x * hit->x + dir->z * hit->z;
             normal.x = hit->x;
-            normal.y = ef_pf_zero;
+            normal.y = 0.0f;
             normal.z = hit->z;
             vec3_normalize_into(&normal, &normal);
             vec3_scale_by((f32*)&normal, (const f32*)&normal, d);
@@ -1005,16 +1002,16 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
             sqrt_f32(velocity->x * velocity->x + velocity->z * velocity->z);
             d = velocity->x * hit->x + velocity->z * hit->z;
             normal.x = hit->x;
-            normal.y = ef_pf_zero;
+            normal.y = 0.0f;
             normal.z = hit->z;
             vec3_normalize_into(&normal, &normal);
             vec3_scale_by((f32*)&normal, (const f32*)&normal, d);
             vec3_sub_assign((Vec*)velocity, (Vec*)&normal);
             vec3_sub_assign((Vec*)velocity, (Vec*)&normal);
-            if (prev_sq > ef_pf_one) {
-                vec3_scale_by((f32*)hit, (const f32*)hit, ef_pf_one_plus_1e5);
+            if (prev_sq > 1.0f) {
+                vec3_scale_by((f32*)hit, (const f32*)hit, EF_PF_ONE_PLUS_1E5);
             } else {
-                vec3_scale_by((f32*)hit, (const f32*)hit, ef_pf_one_minus_1e5);
+                vec3_scale_by((f32*)hit, (const f32*)hit, EF_PF_ONE_MINUS_1E5);
             }
         }
         mtx34_mult_vec3(hit_world, mtx, hit);
@@ -1028,7 +1025,7 @@ f32 ef_pf_hit_cylinder(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3
  * point onto the face. */
 f32 ef_pf_hit_cube(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cur, const VEC3* prev, VEC3* dir,
                    VEC3* velocity, VEC3* hit, VEC3* hit_world) {
-    f32 best = ef_pf_two;
+    f32 best = 2.0f;
     f32 t_px = best;
     f32 t_nx = best;
     f32 t_py = best;
@@ -1039,103 +1036,103 @@ f32 ef_pf_hit_cube(const MTX34* mtx, const EfPostFieldInfo* info, const VEC3* cu
     f32 t;
 
     VEC3_ctor(&face_hit);
-    t = (ef_pf_one - prev->x) / dir->x;
-    if (t > ef_pf_zero && t <= ef_pf_one_ulp1) {
+    t = (1.0f - prev->x) / dir->x;
+    if (t > 0.0f && t <= EF_PF_ONE_ULP1) {
         ef_vec3_lerp(&face_hit, prev, cur, t);
-        if (abs_f32(face_hit.y) <= ef_pf_one_ulp1 && abs_f32(face_hit.z) <= ef_pf_one_ulp1) {
+        if (abs_f32(face_hit.y) <= EF_PF_ONE_ULP1 && abs_f32(face_hit.z) <= EF_PF_ONE_ULP1) {
             t_px = t;
             if (t < best) {
                 best = t;
             }
         }
     }
-    t = (ef_pf_minus_one - prev->x) / dir->x;
-    if (t > ef_pf_zero && t <= ef_pf_one_ulp1) {
+    t = (-1.0f - prev->x) / dir->x;
+    if (t > 0.0f && t <= EF_PF_ONE_ULP1) {
         ef_vec3_lerp(&face_hit, prev, cur, t);
-        if (abs_f32(face_hit.y) <= ef_pf_one_ulp1 && abs_f32(face_hit.z) <= ef_pf_one_ulp1) {
+        if (abs_f32(face_hit.y) <= EF_PF_ONE_ULP1 && abs_f32(face_hit.z) <= EF_PF_ONE_ULP1) {
             t_nx = t;
             if (t < best) {
                 best = t;
             }
         }
     }
-    t = (ef_pf_one - prev->y) / dir->y;
-    if (t > ef_pf_zero && t <= ef_pf_one_ulp1) {
+    t = (1.0f - prev->y) / dir->y;
+    if (t > 0.0f && t <= EF_PF_ONE_ULP1) {
         ef_vec3_lerp(&face_hit, prev, cur, t);
-        if (abs_f32(face_hit.x) <= ef_pf_one_ulp1 && abs_f32(face_hit.z) <= ef_pf_one_ulp1) {
+        if (abs_f32(face_hit.x) <= EF_PF_ONE_ULP1 && abs_f32(face_hit.z) <= EF_PF_ONE_ULP1) {
             t_py = t;
             if (t < best) {
                 best = t;
             }
         }
     }
-    t = (ef_pf_minus_one - prev->y) / dir->y;
-    if (t > ef_pf_zero && t <= ef_pf_one_ulp1) {
+    t = (-1.0f - prev->y) / dir->y;
+    if (t > 0.0f && t <= EF_PF_ONE_ULP1) {
         ef_vec3_lerp(&face_hit, prev, cur, t);
-        if (abs_f32(face_hit.x) <= ef_pf_one_ulp1 && abs_f32(face_hit.z) <= ef_pf_one_ulp1) {
+        if (abs_f32(face_hit.x) <= EF_PF_ONE_ULP1 && abs_f32(face_hit.z) <= EF_PF_ONE_ULP1) {
             t_ny = t;
             if (t < best) {
                 best = t;
             }
         }
     }
-    t = (ef_pf_one - prev->z) / dir->z;
-    if (t > ef_pf_zero && t <= ef_pf_one_ulp1) {
+    t = (1.0f - prev->z) / dir->z;
+    if (t > 0.0f && t <= EF_PF_ONE_ULP1) {
         ef_vec3_lerp(&face_hit, prev, cur, t);
-        if (abs_f32(face_hit.x) <= ef_pf_one_ulp1 && abs_f32(face_hit.y) <= ef_pf_one_ulp1) {
+        if (abs_f32(face_hit.x) <= EF_PF_ONE_ULP1 && abs_f32(face_hit.y) <= EF_PF_ONE_ULP1) {
             t_pz = t;
             if (t < best) {
                 best = t;
             }
         }
     }
-    t = (ef_pf_minus_one - prev->z) / dir->z;
-    if (t > ef_pf_zero && t <= ef_pf_one_ulp1) {
+    t = (-1.0f - prev->z) / dir->z;
+    if (t > 0.0f && t <= EF_PF_ONE_ULP1) {
         ef_vec3_lerp(&face_hit, prev, cur, t);
-        if (abs_f32(face_hit.x) <= ef_pf_one_ulp1 && abs_f32(face_hit.y) <= ef_pf_one_ulp1) {
+        if (abs_f32(face_hit.x) <= EF_PF_ONE_ULP1 && abs_f32(face_hit.y) <= EF_PF_ONE_ULP1) {
             t_nz = t;
             if (t < best) {
                 best = t;
             }
         }
     }
-    if (ef_pf_two == best) {
-        return ef_pf_two;
+    if (2.0f == best) {
+        return 2.0f;
     }
     hit->x = prev->x + best * (cur->x - prev->x);
     hit->y = prev->y + best * (cur->y - prev->y);
     hit->z = prev->z + best * (cur->z - prev->z);
     mtx34_mult_vec3(hit_world, mtx, hit);
     if ((info->flags & 2) != 0) {
-        if (abs_f32(t_px - best) <= ef_pf_epsilon || abs_f32(t_nx - best) <= ef_pf_epsilon) {
+        if (abs_f32(t_px - best) <= EF_PF_EPSILON || abs_f32(t_nx - best) <= EF_PF_EPSILON) {
             velocity->x *= -1.0f;
             dir->x *= -1.0f;
         }
-        if (abs_f32(t_py - best) <= ef_pf_epsilon || abs_f32(t_ny - best) <= ef_pf_epsilon) {
+        if (abs_f32(t_py - best) <= EF_PF_EPSILON || abs_f32(t_ny - best) <= EF_PF_EPSILON) {
             velocity->y *= -1.0f;
             dir->y *= -1.0f;
         }
-        if (abs_f32(t_pz - best) <= ef_pf_epsilon || abs_f32(t_nz - best) <= ef_pf_epsilon) {
+        if (abs_f32(t_pz - best) <= EF_PF_EPSILON || abs_f32(t_nz - best) <= EF_PF_EPSILON) {
             velocity->z *= -1.0f;
             dir->z *= -1.0f;
         }
-        if (abs_f32(t_px - best) <= ef_pf_epsilon) {
-            hit->x = ef_pf_one;
+        if (abs_f32(t_px - best) <= EF_PF_EPSILON) {
+            hit->x = 1.0f;
         }
-        if (abs_f32(t_nx - best) <= ef_pf_epsilon) {
-            hit->x = ef_pf_minus_one;
+        if (abs_f32(t_nx - best) <= EF_PF_EPSILON) {
+            hit->x = -1.0f;
         }
-        if (abs_f32(t_py - best) <= ef_pf_epsilon) {
-            hit->y = ef_pf_one;
+        if (abs_f32(t_py - best) <= EF_PF_EPSILON) {
+            hit->y = 1.0f;
         }
-        if (abs_f32(t_ny - best) <= ef_pf_epsilon) {
-            hit->y = ef_pf_minus_one;
+        if (abs_f32(t_ny - best) <= EF_PF_EPSILON) {
+            hit->y = -1.0f;
         }
-        if (abs_f32(t_pz - best) <= ef_pf_epsilon) {
-            hit->z = ef_pf_one;
+        if (abs_f32(t_pz - best) <= EF_PF_EPSILON) {
+            hit->z = 1.0f;
         }
-        if (abs_f32(t_nz - best) <= ef_pf_epsilon) {
-            hit->z = ef_pf_minus_one;
+        if (abs_f32(t_nz - best) <= EF_PF_EPSILON) {
+            hit->z = -1.0f;
         }
     }
     return best;
@@ -1154,7 +1151,7 @@ s32 ef_pf_collide(const MTX34* mtx, const MTX34* world_mtx, const EfPostFieldInf
     ef_pf_collision_test(info->shape, cur, info->option);
     VEC3_ctor(&dir);
     PSVECSubtract((f32*)&dir, (const f32*)cur, (const f32*)prev);
-    t = ef_pf_two;
+    t = 2.0f;
     switch (info->shape) {
     case 0:
         t = ef_pf_hit_plane(mtx, info, cur, prev, &dir, velocity, hit, hit_world);
@@ -1175,10 +1172,10 @@ s32 ef_pf_collide(const MTX34* mtx, const MTX34* world_mtx, const EfPostFieldInf
         t = ef_pf_hit_cylinder(mtx, info, cur, prev, &dir, velocity, hit, hit_world);
         break;
     default:
-        nw4r::db::Panic(ef_postfield_file_str, 1418, ef_postfield_assert0_str);
+        nw4r::db::Panic("ef_postfield.cpp", 1418, "NW4R:Failed assertion 0");
         break;
     }
-    if (t > ef_pf_three_halves) {
+    if (t > 1.5f) {
         return 0;
     }
     if ((info->flags & 2) != 0 || (info->flags & 8) != 0) {
@@ -1189,7 +1186,7 @@ s32 ef_pf_collide(const MTX34* mtx, const MTX34* world_mtx, const EfPostFieldInf
         out_velocity->y *= info->scale.y;
         out_velocity->z *= info->scale.z;
         VEC3_ctor(&rest);
-        vec3_scale_by((f32*)&rest, (const f32*)&dir, ef_pf_one - t);
+        vec3_scale_by((f32*)&rest, (const f32*)&dir, 1.0f - t);
         mtx34_mult_vec3(&rest, world_mtx, &rest);
         rest.x *= info->scale.x;
         rest.y *= info->scale.y;
@@ -1248,15 +1245,15 @@ s32 ef_pf_calc_particle(EfDrawParticle* p, const EfPostFieldTransform* xform, Ef
     }
     mtx34_concat(&mtx, pm_mtx, &mtx);
     ef_mtx34_copy(&rot_mtx, &mtx);
-    rot_mtx.m[0][3] = ef_pf_zero;
-    rot_mtx.m[1][3] = ef_pf_zero;
-    rot_mtx.m[2][3] = ef_pf_zero;
+    rot_mtx.m[0][3] = 0.0f;
+    rot_mtx.m[1][3] = 0.0f;
+    rot_mtx.m[2][3] = 0.0f;
     MTX34_ctor(&inv);
     mtx34_inverse(&inv, &mtx);
     ef_mtx34_copy(&rot_inv, &inv);
-    rot_inv.m[0][3] = ef_pf_zero;
-    rot_inv.m[1][3] = ef_pf_zero;
-    rot_inv.m[2][3] = ef_pf_zero;
+    rot_inv.m[0][3] = 0.0f;
+    rot_inv.m[1][3] = 0.0f;
+    rot_inv.m[2][3] = 0.0f;
     VEC3_ctor(&local_pos);
     mtx34_mult_vec3(&local_pos, &inv, pos);
     state = ef_pf_collision_test(info->shape, &local_pos, info->option);
@@ -1435,42 +1432,8 @@ typedef struct EfResAccessor {
     /* +0x00 */ void* data;
 } EfResAccessor; /* size: 0x4 */
 
-/* 0x800B23A4 (0x118): the draw-parameter accessor's checked block (res_drawparam_ac.h). */
-EfResState* ef_res_drawparam_data(const EfResAccessor* self) {
-    EF_VALID_PTR_ASSERT(ef_res_drawparam_file_str, 90, ef_res_drawparam_mdata_str, self->data);
-    return (EfResState*)self->data;
-}
 extern EfResDrawParam* fn_800A5484(void* arg);
 extern EfResDrawParam* ef_res_emitter_desc(EfResDrawParam* arg);
-
-/* Sets or clears the 0x400 flag on the accessor's state word. */
-void ef_res_drawparam_set_flag_0400(void* self, int enable) {
-    if (enable != 0) {
-        ef_res_drawparam_data((EfResAccessor*)self)->flags_0x00 |= 0x400;
-    } else {
-        ef_res_drawparam_data((EfResAccessor*)self)->flags_0x00 &= ~0x400;
-    }
-}
-
-/* Stores a pointer into the record's first field. */
-void ef_res_slot_set_emitter_desc(EfResSlot* self, void* value) {
-    self->field_0x00 = value;
-}
-
-/* Stores a pointer into the record's first field. */
-void ef_res_slot_set_params(EfResSlot* self, void* value) {
-    self->field_0x00 = value;
-}
-
-/* Resolves the parameter through the two accessors and stores it. */
-void ef_res_slot_bind_emitter_desc(EfResSlot* self, void* arg) {
-    ef_res_slot_set_emitter_desc(self, ef_res_emitter_desc(fn_800A5484(arg)));
-}
-
-/* Resolves the parameter and stores the second block's +0x94 field. */
-void ef_res_slot_bind_params(EfResSlot* self, void* arg) {
-    ef_res_slot_set_params(self, &ef_res_emitter_desc(fn_800A5484(arg))->field_0x94);
-}
 
 /* The resolved parameter block the +0x4C/+0x54 accessors read. */
 typedef struct EfResParams {
@@ -1481,16 +1444,72 @@ typedef struct EfResParams {
     u8 pad_0x60[0x34]; /* +0x60 */
 } EfResParams; /* size: 0x94 */
 
+/* The three `_ac.h` accessors are `inline`: the callers below keep them out of line, MWCC places each weak copy
+ * after the first function that references it and emits its strings after the unit's own. */
+EfResState* ef_res_drawparam_data(const EfResAccessor* self);
+EfResParams* ef_res_emitterparam_cdata(const EfResAccessor* self);
+EfResParams* ef_res_emitterparam_data(const EfResAccessor* self);
+void ef_res_slot_set_emitter_desc(EfResSlot* self, void* value);
+void ef_res_slot_set_params(EfResSlot* self, void* value);
+
+#pragma dont_inline on
+
 /* 0x800B2598 (0x118): the emitter-parameter accessor's checked block (res_emitterparam_ac.h, the const copy). */
-EfResParams* ef_res_emitterparam_cdata(const EfResAccessor* self) {
-    EF_VALID_PTR_ASSERT(ef_res_emitterparam_file2_str, 97, ef_res_emitterparam_mdata2_str, self->data);
+inline EfResParams* ef_res_emitterparam_cdata(const EfResAccessor* self) {
+    EF_VALID_PTR_ASSERT("res_emitterparam_ac.h", 97, "NW4R:Pointer Error\nmData(=%p) is not valid pointer.", self->data);
     return (EfResParams*)self->data;
 }
 
 /* 0x800B26F8 (0x118): the emitter-parameter accessor's checked block (res_emitterparam_ac.h). */
-EfResParams* ef_res_emitterparam_data(const EfResAccessor* self) {
-    EF_VALID_PTR_ASSERT(ef_res_emitterparam_file_str, 90, ef_res_emitterparam_mdata_str, self->data);
+inline EfResParams* ef_res_emitterparam_data(const EfResAccessor* self) {
+    EF_VALID_PTR_ASSERT("res_emitterparam_ac.h", 90, "NW4R:Pointer Error\nmData(=%p) is not valid pointer.", self->data);
     return (EfResParams*)self->data;
+}
+
+/* 0x800B23A4 (0x118): the draw-parameter accessor's checked block (res_drawparam_ac.h). */
+inline EfResState* ef_res_drawparam_data(const EfResAccessor* self) {
+    EF_VALID_PTR_ASSERT("res_drawparam_ac.h", 90, "NW4R:Pointer Error\nmData(=%p) is not valid pointer.", self->data);
+    return (EfResState*)self->data;
+}
+
+/* Returns the draw-parameter block.  Nothing calls it, so the linker strips it, as it stripped retail's reader
+ * of the accessor; a frameless tail call, it adds no unwind record. */
+EfResState* ef_res_drawparam_ref(const EfResAccessor* self) {
+    return ef_res_drawparam_data(self);
+}
+
+/* Sets or clears the 0x400 flag on the accessor's state word. */
+void ef_res_drawparam_set_flag_0400(void* self, int enable) {
+    if (enable != 0) {
+        ef_res_drawparam_data((EfResAccessor*)self)->flags_0x00 |= 0x400;
+    } else {
+        ef_res_drawparam_data((EfResAccessor*)self)->flags_0x00 &= ~0x400;
+    }
+}
+
+/* Resolves the parameter through the two accessors and stores it. */
+void ef_res_slot_bind_emitter_desc(EfResSlot* self, void* arg) {
+    ef_res_slot_set_emitter_desc(self, ef_res_emitter_desc(fn_800A5484(arg)));
+}
+
+/* Stores a pointer into the record's first field. */
+void ef_res_slot_set_emitter_desc(EfResSlot* self, void* value) {
+    self->field_0x00 = value;
+}
+
+/* Resolves the parameter and stores the second block's +0x94 field. */
+void ef_res_slot_bind_params(EfResSlot* self, void* arg) {
+    ef_res_slot_set_params(self, &ef_res_emitter_desc(fn_800A5484(arg))->field_0x94);
+}
+
+/* Stores a pointer into the record's first field. */
+void ef_res_slot_set_params(EfResSlot* self, void* value) {
+    self->field_0x00 = value;
+}
+
+/* Returns the const emitter-parameter block; stripped by the linker like `ef_res_drawparam_ref`. */
+EfResParams* ef_res_emitterparam_cref(const EfResAccessor* self) {
+    return ef_res_emitterparam_cdata(self);
 }
 
 /* The resolved parameter's scale. */
@@ -1503,6 +1522,11 @@ void* ef_res_emitterparam_vec(void* self) {
     return &ef_res_emitterparam_cdata((EfResAccessor*)self)->field_0x54;
 }
 
+/* Returns the emitter-parameter block; stripped by the linker like `ef_res_drawparam_ref`. */
+EfResParams* ef_res_emitterparam_ref(const EfResAccessor* self) {
+    return ef_res_emitterparam_data(self);
+}
+
 /* Sets the resolved parameter's scale. */
 void ef_res_emitterparam_set_scale(void* self, f32 value) {
     ef_res_emitterparam_data((EfResAccessor*)self)->field_0x4C = value;
@@ -1513,11 +1537,7 @@ void ef_res_emitterparam_set_vec(void* self, const nw4r::math::VEC3* src) {
     copyVec3(&ef_res_emitterparam_data((EfResAccessor*)self)->field_0x54, src);
 }
 
-/* Subtracts `b` from `self` in place and returns `self`. */
-Vec* vec3_sub_assign(Vec* self, Vec* b) {
-    PSVECSubtract((f32*)self, (const f32*)self, (const f32*)b);
-    return self;
-}
+#pragma dont_inline reset
 
 #ifdef __cplusplus
 }

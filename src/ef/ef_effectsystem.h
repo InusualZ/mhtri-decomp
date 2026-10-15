@@ -30,9 +30,10 @@ typedef struct EfSysActivityList {
 } EfSysActivityList; /* size: 0x1C */
 
 class EfSysEffect;
+class EfSysEmitter;
 
 /* The allocator/pool object the system was handed (`fn_800D3D48` stores it into the system's +0x00): the
- * effect pool at table slots +0x10/+0x14 and the byte allocator at +0x60; the slots between are declared only
+ * effect pool at table slots +0x10/+0x14, the emitter pool at +0x24/+0x28 and the byte allocator at +0x60; the slots between are declared only
  * to place it.  Declared only, so no unit emits its table. */
 class EfSysMemoryManager {
 public:
@@ -44,8 +45,8 @@ public:
     virtual void slot_0x18();
     virtual void slot_0x1C();
     virtual void slot_0x20();
-    virtual void slot_0x24();
-    virtual void slot_0x28();
+    virtual EfSysEmitter* GetEmitter();
+    virtual void ReleaseEmitter(EfSysEmitter* emitter);
     virtual void slot_0x2C();
     virtual void slot_0x30();
     virtual void slot_0x34();

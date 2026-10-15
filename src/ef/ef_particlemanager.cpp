@@ -33,19 +33,18 @@
  *   (the colour fade's assert messages and constants, named from their text and value).
  * RESIDUALS. No row is unwritten.  The source order differs from retail's, so `.text`, extab and
  *   extabindex run in another order.
- *  - `ef_field_random`: the random-scaled push product inside the `vec3_scale_by` argument comes out
- *    `fmuls f1, f0, f1` in either source order; a unit local fixes it but moves the argument `mr`s after it.
  *  - `ef_pm_calc`: the frame is 0x420 where retail's is 0x430 and the locals sit at other offsets; the field and
  *    post-field record addresses add their block sizes in another order (`lwz`/`add` scheduling).
- *  - `ef_pm_draw`: retail tests the emitter's hidden bit as `beq` + `b` where ours branches once (an early return
- *    and a `bool` local give the same single branch).
+ *  - `ef_pm_draw`: retail tests the emitter's hidden bit as `beq` + `b` where ours branches once (an early return,
+ *    a `bool` local, one `&&` condition and an inline visibility helper give the same single branch), and keeps
+ *    `self`/`info`/the descriptor in r29/r30/r31 where ours has r30/r31/r29.
  *   relocdiff: our `.ctors` word carries the symbol `lbl_8056F2DC`, retail's none.
- *   flipcheck: `.bss`, `.data` and `.sdata2` claimed, not emitted (`.sdata2` is a partial pool: flipcheck names a
- *   fold with `ef/ef_particle.cpp`, one shared literal; request #28 moves the seam).
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_805013FC`,
- *     `MTX34RotAxisFIdx__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3f`.
- *   flipcheck: referenced but defined by nothing a flip can use: `fn_805013FC`, `fn_80501C80`.
+ *   flipcheck: `.bss` and `.data` claimed, not emitted; `.sdata2` is our literals' partial pool - the claimed
+ *   pool holds 256/2pi twice (0x807960A4 and 0x807960C0) and 2pi (0x807960A0, read by `ef/ef_particle.cpp`), so the
+ *   range spans more than one TU's pool (flipcheck names a fold with `ef/ef_particle.cpp`; request #28 moves the
+ *   seam).
  * SHAPES. `ef_field_random` names the cone tilt's and the push's unit randoms as locals (retail's operand order).
+ *   The pool constants are literals (retail's `fmuls` operand order in `ef_field_random`).
  * SHAPES. The pointer asserts are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
  *   ("ef_particlemanager.cpp", "particle.h" or "res_emitter.h"); `#line` reproduces each assert's line (61, 72, 73,
  *   0x29E, 0x2D5, ...).
@@ -86,19 +85,7 @@ namespace nw4r { namespace math { f32 SinFIdx(f32); } }
 
 /* The assert strings, the class table and the pool constants of this unit's claimed data, declared, never defined. */
 extern "C" {
-extern const f32 lbl_807960A4;
-extern const f32 lbl_807960A8;
-extern const f32 lbl_807960C0;
-extern const f32 ef_pm_f32_zero; /* 0.0f */
-extern const f32 ef_pm_f32_two; /* 2.0f */
-extern const f32 ef_pm_f32_inv_sqrt3; /* 1/sqrt(3) */
 extern const f32 ef_pm_f32_nan; /* NaN: no tail origin */
-extern const f32 ef_pm_f32_minus_one; /* -1.0f */
-extern const f32 ef_pm_f32_32768; /* 32768.0f */
-extern const f32 ef_pm_f32_65535; /* 65535.0f */
-extern const f32 ef_pm_f32_pi; /* pi */
-extern const f32 ef_pm_f32_epsilon; /* FLT_EPSILON: a fade range below it is no range */
-extern const f32 ef_pm_f32_256; /* 256.0f: the fade factor's fixed-point one */
 extern const char lbl_80592F78[]; /* "ef_particlemanager.cpp" */
 extern const char lbl_80592F90[]; /* "NW4R:Pointer Error\ntarget(=%p) is not valid pointer." */
 extern const char lbl_80592FC8[]; /* "NW4R:Failed assertion target->mParticleManager == this" */
@@ -144,7 +131,6 @@ void color_rgba_copy(void* dst, const void* src);
 void mtx34_mult_vec3(void* dst, const void* a, const void* b);
 s32 ef_get_life_status(void* self);
 u8* ef_emres_get_ptcl_track();
-void fn_805013FC(void* a, void* b, f32 f);
 }
 
 void operator delete(void* p) throw();
@@ -488,7 +474,7 @@ extern "C" void ef_draw_info_set_depth_offset(EfDrawInfo* self, f32 offset, cons
 
 /* Scale a normalised rate onto the sine table. */
 extern "C" f32 fn_800AB658(f32 x) {
-    return nw4r::math::SinFIdx(lbl_807960A4 * x);
+    return nw4r::math::SinFIdx(40.743664f * x);
 }
 
 /* ParticleManager constructor: base ctor, vtable, then the three sub-objects at +0x38/+0x58/+0x8C. */
@@ -568,11 +554,11 @@ extern "C" s32 ef_pm_initialize(EfPmManager* self, EfEmitterManager* parent, EfR
     NW4R_POINTER_ASSERT(lbl_80592F78, resource, ef_pm_err_resource_arg);
     ef_ref_object_init(self);
     ef_activity_list_clear(&self->list);
-    self->stateA.aa.a = lbl_807960A8;
-    self->stateA.aa.b = lbl_807960A8;
-    self->stateA.aa.vec.x = ef_pm_f32_zero;
-    self->stateA.aa.vec.y = ef_pm_f32_zero;
-    self->stateA.aa.vec.z = ef_pm_f32_zero;
+    self->stateA.aa.a = 1.0f;
+    self->stateA.aa.b = 1.0f;
+    self->stateA.aa.vec.x = 0.0f;
+    self->stateA.aa.vec.y = 0.0f;
+    self->stateA.aa.vec.z = 0.0f;
     self->managerEM = parent;
     ef_ref_object_add_ref((EffectManager*)parent);
     self->resource = resource;
@@ -674,7 +660,7 @@ extern "C" void ef_pm_calc_emitter_pos(nw4r::math::VEC3* result, BOOL emitterSpa
     }
     nw4r::math::VEC3 origin;
     mtx34_mult_vec3(result, mtxLocalToGlobal, pos);
-    setVec3(&origin, ef_pm_f32_zero, ef_pm_f32_zero, ef_pm_f32_zero);
+    setVec3(&origin, 0.0f, 0.0f, 0.0f);
     mtx34_mult_vec3(&origin, mtxEmitterToGlobal, &origin);
     PSVECSubtract(&result->x, &result->x, &origin.x);
 }
@@ -692,7 +678,7 @@ extern "C" void ef_pm_draw(EfPmManager* self, const EfDrawInfo* info) {
             EfDrawInfo local;
             ef_draw_info_copy(&local, info);
             f32 offset = ((EfPmDrawSetting*)ef_resource_draw_setting(self->resource))->depthOffset;
-            if (ef_pm_f32_zero != offset) {
+            if (0.0f != offset) {
                 nw4r::math::MTX34 m;
                 nw4r::math::VEC3 origin;
                 MTX34_ctor(&m);
@@ -737,17 +723,17 @@ extern "C" EfPmVecBlock* fn_800ADE98(EfPmVecBlock* self) {
 
 /* Scale a rate by the pool constant before handing it to the SDK vector routine. */
 extern "C" void fn_800AD514(void* a, void* b, f32 f) {
-    fn_805013FC(a, b, lbl_807960C0 * f);
+    nw4r::math::MTX34RotAxisFIdx((nw4r::math::MTX34*)a, (const nw4r::math::VEC3*)b, 40.743664f * f);
 }
 
 /* The reciprocal-rate wrapper: `out = in * (1 / f)`. */
 extern "C" void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 f) {
-    vec3_scale(out, in, lbl_807960A8 / f);
+    vec3_scale(out, in, 1.0f / f);
 }
 
 /* Scale the parameter's rate by `1.0f - rate` onto the matrix. */
 extern "C" s32 fn_800ADA24(nw4r::math::VEC3* out, EfPmDirParam* p, const nw4r::math::VEC3* v) {
-    vec3_scale_by(&out->x, &v->x, p->rate - lbl_807960A8);
+    vec3_scale_by(&out->x, &v->x, p->rate - 1.0f);
     return 1;
 }
 
@@ -817,14 +803,14 @@ extern "C" s32 ef_field_vortex(nw4r::math::VEC3* out, EfPmFieldVortexParam* p, c
     vec3_scale_by(&radial.x, &axis.x, vec3_dot(&axis.x, &pos->x));
     PSVECSubtract(&radial.x, &pos->x, &radial.x);
     f32 lenSq = vec3_length_sq(&radial.x);
-    if (ef_pm_f32_zero == lenSq) {
+    if (0.0f == lenSq) {
         return 0;
     }
     if (lenSq >= p->distance) {
         power = p->outerPower;
     } else {
         f32 t = lenSq / p->distance;
-        f32 inner = lbl_807960A8 - t;
+        f32 inner = 1.0f - t;
         power = inner * p->innerPower + t * p->outerPower;
     }
     ef_vec3_normalize_to(&radial, &radial);
@@ -912,14 +898,14 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
     }
 
     if ((p->flags & 2) != 0) {
-        out->x = (f32)(s16)(hash >> 16) / ef_pm_f32_32768;
+        out->x = (f32)(s16)(hash >> 16) / 32768.0f;
         hash = ef_anim_rand_next(hash);
-        out->y = (f32)(s16)(hash >> 16) / ef_pm_f32_32768;
+        out->y = (f32)(s16)(hash >> 16) / 32768.0f;
         hash = ef_anim_rand_next(hash);
-        out->z = (f32)(s16)(hash >> 16) / ef_pm_f32_32768;
+        out->z = (f32)(s16)(hash >> 16) / 32768.0f;
         hash = ef_anim_rand_next(hash);
         if ((p->flags & 1) != 0 && ef_vec3_normalize_to(out, out) == 0) {
-            out->y = lbl_807960A8;
+            out->y = 1.0f;
         }
         vec3_scale_by(&out->x, &out->x, p->power);
     } else {
@@ -931,15 +917,15 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
         }
         mtx34_mult_vec3(&dir, mtx, &dir);
         if (ef_vec3_normalize_to(&dir, &dir) == 0) {
-            dir.y = lbl_807960A8;
+            dir.y = 1.0f;
         }
         MTX34_ctor(&frame);
         ef_mtx34_from_y_axis(frame.m[0], &dir.x);
-        if (ef_pm_f32_zero != p->diffusion) {
-            f32 unit = (f32)(hash >> 16) / ef_pm_f32_65535;
+        if (0.0f != p->diffusion) {
+            f32 unit = (f32)(hash >> 16) / 65535.0f;
             f32 tilt = unit * p->diffusion;
             hash = ef_anim_rand_next(hash);
-            f32 turn = ef_pm_f32_two * (ef_pm_f32_pi * ((f32)(hash >> 16) / ef_pm_f32_65535));
+            f32 turn = 2.0f * (3.1415927f * ((f32)(hash >> 16) / 65535.0f));
             hash = ef_anim_rand_next(hash);
             ef_vec_sin_cos((Vec*)out, tilt);
             out->z = out->x;
@@ -949,29 +935,29 @@ extern "C" s32 ef_field_random(nw4r::math::VEC3* out, EfPmFieldRandomParam* p, c
             if ((p->flags & 1) != 0) {
                 vec3_scale_by(&out->x, &out->x, p->power);
             } else {
-                vec3_scale_by(&out->x, &out->x, (f32)((f32)(hash >> 16) / ef_pm_f32_65535) * p->power);
+                vec3_scale_by(&out->x, &out->x, (f32)((f32)(hash >> 16) / 65535.0f) * p->power);
             }
         } else {
-            out->x = ef_pm_f32_zero;
+            out->x = 0.0f;
             if ((p->flags & 1) != 0) {
                 out->y = p->power;
             } else {
-                f32 r = (f32)(s16)(hash >> 16) / ef_pm_f32_32768;
+                f32 r = (f32)(s16)(hash >> 16) / 32768.0f;
                 out->y = r * p->power;
             }
-            out->z = ef_pm_f32_zero;
+            out->z = 0.0f;
         }
         mtx34_mult_vec3(out, &frame, out);
     }
 
     if ((p->flags & 4) == 0) {
-        out->x = ef_pm_f32_zero;
+        out->x = 0.0f;
     }
     if ((p->flags & 8) == 0) {
-        out->y = ef_pm_f32_zero;
+        out->y = 0.0f;
     }
     if ((p->flags & 0x10) == 0) {
-        out->z = ef_pm_f32_zero;
+        out->z = 0.0f;
     }
     return 1;
 }
@@ -1066,7 +1052,7 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
     nw4r::math::VEC3 axisSum;
     setVec3(&axisSum, emMtx.m[0][2] + (emMtx.m[0][0] + emMtx.m[0][1]),
             emMtx.m[1][2] + (emMtx.m[1][0] + emMtx.m[1][1]), emMtx.m[2][2] + (emMtx.m[2][0] + emMtx.m[2][1]));
-    f32 emScale = ef_pm_f32_inv_sqrt3 * vec3_len(&axisSum.x);
+    f32 emScale = 0.57735026f * vec3_len(&axisSum.x);
     nw4r::math::MTX34 localToEm;
     MTX34_ctor(&localToEm);
     mtx34_concat(&localToEm, &pmInv, &emMtx);
@@ -1075,22 +1061,22 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
     mtx34_inverse(&emToLocal, &localToEm);
     nw4r::math::MTX34 pmRot;
     ef_mtx34_copy(&pmRot, &pmInv);
-    pmRot.m[0][3] = ef_pm_f32_zero;
-    pmRot.m[1][3] = ef_pm_f32_zero;
-    pmRot.m[2][3] = ef_pm_f32_zero;
+    pmRot.m[0][3] = 0.0f;
+    pmRot.m[1][3] = 0.0f;
+    pmRot.m[2][3] = 0.0f;
     nw4r::math::MTX34 pmRotInv;
     MTX34_ctor(&pmRotInv);
     mtx34_inverse(&pmRotInv, &pmRot);
     nw4r::math::MTX34 emToLocalRot;
     ef_mtx34_copy(&emToLocalRot, &emToLocal);
-    emToLocalRot.m[0][3] = ef_pm_f32_zero;
-    emToLocalRot.m[1][3] = ef_pm_f32_zero;
-    emToLocalRot.m[2][3] = ef_pm_f32_zero;
+    emToLocalRot.m[0][3] = 0.0f;
+    emToLocalRot.m[1][3] = 0.0f;
+    emToLocalRot.m[2][3] = 0.0f;
     nw4r::math::MTX34 localToEmRot;
     ef_mtx34_copy(&localToEmRot, &localToEm);
-    localToEmRot.m[0][3] = ef_pm_f32_zero;
-    localToEmRot.m[1][3] = ef_pm_f32_zero;
-    localToEmRot.m[2][3] = ef_pm_f32_zero;
+    localToEmRot.m[0][3] = 0.0f;
+    localToEmRot.m[1][3] = 0.0f;
+    localToEmRot.m[2][3] = 0.0f;
 
     while (p != NULL) {
         EfPmParticle* next = *(EfPmParticle**)((u8*)p + self->list.linkOffset + 4);
@@ -1119,8 +1105,8 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                 EffectHandle* pfEffect;
                 BOOL hasPostField;
                 u16 i;
-                setVec3(&addVel, ef_pm_f32_zero, ef_pm_f32_zero, ef_pm_f32_zero);
-                setVec3(&addPos, ef_pm_f32_zero, ef_pm_f32_zero, ef_pm_f32_zero);
+                setVec3(&addVel, 0.0f, 0.0f, 0.0f);
+                setVec3(&addPos, 0.0f, 0.0f, 0.0f);
                 hasPostField = FALSE;
                 fn_800ADE98(&pfTransform);
                 pfEffect = NULL;
@@ -1216,7 +1202,7 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                             ef_pm_calc_emitter_pos(&emPos, field.space == 1, &emToLocal, &pmMtx, &emMtx, &pos);
                             copyVec3(&rel, &emPos);
                         }
-                        setVec3(&out, ef_pm_f32_zero, ef_pm_f32_zero, ef_pm_f32_zero);
+                        setVec3(&out, 0.0f, 0.0f, 0.0f);
                         switch (target) {
                         case 1:
                             fn_800ADA24(&out, (EfPmDirParam*)&field, &vel);
@@ -1340,25 +1326,25 @@ extern "C" void ef_pm_calc(EfPmManager* self) {
                         VEC3_ctor(&local);
                         mtx34_mult_vec3(&local, &regionInv, &p->accel);
                         wrapped = FALSE;
-                        if (local.x > lbl_807960A8) {
-                            local.x = fmodf(lbl_807960A8 + local.x, ef_pm_f32_two) - lbl_807960A8;
+                        if (local.x > 1.0f) {
+                            local.x = fmodf(1.0f + local.x, 2.0f) - 1.0f;
                             wrapped = TRUE;
-                        } else if (local.x < ef_pm_f32_minus_one) {
-                            local.x = lbl_807960A8 + fmodf(local.x - lbl_807960A8, ef_pm_f32_two);
-                            wrapped = TRUE;
-                        }
-                        if (local.y > lbl_807960A8) {
-                            local.y = fmodf(lbl_807960A8 + local.y, ef_pm_f32_two) - lbl_807960A8;
-                            wrapped = TRUE;
-                        } else if (local.y < ef_pm_f32_minus_one) {
-                            local.y = lbl_807960A8 + fmodf(local.y - lbl_807960A8, ef_pm_f32_two);
+                        } else if (local.x < -1.0f) {
+                            local.x = 1.0f + fmodf(local.x - 1.0f, 2.0f);
                             wrapped = TRUE;
                         }
-                        if (local.z > lbl_807960A8) {
-                            local.z = fmodf(lbl_807960A8 + local.z, ef_pm_f32_two) - lbl_807960A8;
+                        if (local.y > 1.0f) {
+                            local.y = fmodf(1.0f + local.y, 2.0f) - 1.0f;
                             wrapped = TRUE;
-                        } else if (local.z < ef_pm_f32_minus_one) {
-                            local.z = lbl_807960A8 + fmodf(local.z - lbl_807960A8, ef_pm_f32_two);
+                        } else if (local.y < -1.0f) {
+                            local.y = 1.0f + fmodf(local.y - 1.0f, 2.0f);
+                            wrapped = TRUE;
+                        }
+                        if (local.z > 1.0f) {
+                            local.z = fmodf(1.0f + local.z, 2.0f) - 1.0f;
+                            wrapped = TRUE;
+                        } else if (local.z < -1.0f) {
+                            local.z = 1.0f + fmodf(local.z - 1.0f, 2.0f);
                             wrapped = TRUE;
                         }
                         if (wrapped) {
@@ -1407,7 +1393,7 @@ extern "C" void ef_pm_modulate_color(EfPmManager* self, EfPmParticle* pp, u8* co
         colorSec[3] = (colorSec[3] * self->stateA.b.colorPri[3] + 0x80) >> 8;
         break;
     case 2:
-        if (self->stateA.b.scale < ef_pm_f32_epsilon) {
+        if (self->stateA.b.scale < 1.1920929e-07f) {
             colorPri[0] = (colorPri[0] * self->stateA.b.colorPri[0] + 0x80) >> 8;
             colorPri[1] = (colorPri[1] * self->stateA.b.colorPri[1] + 0x80) >> 8;
             colorPri[2] = (colorPri[2] * self->stateA.b.colorPri[2] + 0x80) >> 8;
@@ -1434,7 +1420,7 @@ extern "C" void ef_pm_modulate_color(EfPmManager* self, EfPmParticle* pp, u8* co
                 colorSec[2] = (colorSec[2] * self->stateA.b.colorPri[2] + 0x80) >> 8;
                 colorSec[3] = (colorSec[3] * self->stateA.b.colorPri[3] + 0x80) >> 8;
             } else {
-                s32 t = (s32)(ef_pm_f32_256 * dist / self->stateA.b.scale);
+                s32 t = (s32)(256.0f * dist / self->stateA.b.scale);
                 u16 r = (self->stateA.b.colorSec[0] << 8) + t * (self->stateA.b.colorPri[0] - self->stateA.b.colorSec[0]);
                 u16 g = (self->stateA.b.colorSec[1] << 8) + t * (self->stateA.b.colorPri[1] - self->stateA.b.colorSec[1]);
                 u16 b = (self->stateA.b.colorSec[2] << 8) + t * (self->stateA.b.colorPri[2] - self->stateA.b.colorSec[2]);

@@ -19,6 +19,9 @@ typedef struct EfResourceManager {
     u32 num_emitters;                /* +0x0C  every loaded effect project's emitters */
     nw4r::ut::List texture_projects; /* +0x10 */
     u32 num_textures;                /* +0x1C  every loaded texture project's textures */
+
+    /* 0x800B2884 (0x30): Empties both lists (the singleton's static initialiser runs it). */
+    EfResourceManager();
 } EfResourceManager; /* size: 0x20 */
 
 #ifdef __cplusplus

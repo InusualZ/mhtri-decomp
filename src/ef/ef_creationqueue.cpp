@@ -5,22 +5,24 @@
  * RANGE. .text 0x800A3044-0x800A388C (7 functions); extab 0x80009B40-0x80009B60, extabindex 0x80022CBC-0x80022CEC,
  *   .data 0x805922C0-0x805923A0 (the `__FILE__` string `ef_creationqueue.cpp` first).
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the unfused `clrlwi` + `cmpwi` in
- *   `fn_800A3718` and `addi` + `cmpwi` in `fn_800A3800`).
+ *   `fn_800A3718` and `addi` + `cmpwi` in `fn_800A3800`); file-wide `#pragma pool_data off` (each string keeps
+ *   its own `lis`/`addi`).
  * NAMES. The map has only `fn_` stems for the range; the types and fields are GUESSes from the panic messages
- *   (`setting`, `eh`) and from `fn_800A7750` in `ef/ef_emitter.cpp`, which asserts the same handle.
+ *   (`setting`, `eh`, `mRefCount`, "referencedobject.h") and from `fn_800A7750` in `ef/ef_emitter.cpp`, which
+ *   asserts the same handle.
  *   GUESS: `ef_ref_object_add_ref` (0x800A337C): a referenced object's AddRef (its count at +0x10).
  *   GUESS: `ef_creation_queue_add_type0` (0x800A3044) queues entry type 0 (a particle creation).
  *   GUESS: `ef_creation_queue_add_type1` (0x800A33DC) queues type 1, which `fn_800A3718` dispatches through the
  *   emitter form's create slot. The types they share with `ef/ef_animcurve.cpp` live in
  *   `ef/ef_creationqueue.h`.
- * RESIDUALS. 2 partial rows:
- *  - `fn_800A3718`: retail reuses r12 for the form's table and slot (`lwz r12, ...; lwz r12, ...`), ours loads the
- *    table through r9;
- *  - `fn_800A3800`: the disposal call loads the table into r4 (`lwz r4, 0x1C(r31)`) where retail goes through the
- *    `this` register (`lwz r12, 0x1C(r3)`).
- *   flipcheck: `.data` claimed, not emitted.
- * SHAPES. A table member declared as a pointer to a struct of function pointers makes the virtual calls load the
- *   slot straight through the table register, as retail does.
+ *   GUESS: the virtual slots `EffectManager::Destroy` (+0x08, the disposal `Release` calls) and
+ *   `EmitterForm::CreateEmitter` (+0x14); the form's slots +0x08..+0x10 are unused here (`unused_slot08`..).
+ * RESIDUALS. none in `.text`; `.data` is the unit's literals, the `referencedobject.h` assert pair last (the
+ *   inline `Release`'s weak strings, reverse creation order).
+ * SHAPES. The manager and the form are classes whose table pointer sits at +0x1C (their data members declared
+ *   before the first virtual), so the virtual calls load the slot through r12 as retail does.  `Release` is an
+ *   `inline` function defined after its only caller: `-inline noauto` keeps it out of line, and its strings are
+ *   emitted after the unit's own.
  */
 
 #include "types.h"
@@ -32,25 +34,9 @@
 #include "nw4r/db_assert.h" /* nw4r::db::Panic / Warning and NW4R_ASSERT (rule 2) */
 
 #pragma peephole off
+#pragma pool_data off
 
 struct EmitterForm;
-
-/* The emitter form's virtual slot +0x14 (the type-1 creation entry) and the manager's virtual slot
- * +0x2 (its disposal).  Declaring the vtable member as a pointer to the function-pointer table makes
- * the call load the entry straight through the vtable register, the shape the target has. */
-typedef void (*EmitterFormCreate)(EmitterForm* self, EffectHandle* eh, const Setting* setting,
-                                  EffectManager* manager, u16 life, const Vec3* pos);
-typedef void (*EffectManagerDispose)(EffectManager* self);
-
-struct EmitterFormVtbl {
-    /* +0x00 */ u8 pad_0x00[0x14];
-    /* +0x14 */ EmitterFormCreate createEmitter;
-}; /* size: 0x18 */
-
-struct EffectManagerVtbl {
-    /* +0x00 */ u8 pad_0x00[0x8];
-    /* +0x08 */ EffectManagerDispose dispose;
-}; /* size: 0xC */
 
 /* The effect manager's resource table: fn_800A3718 reaches the emitter form through `+0x20`. */
 struct EmitterManager {
@@ -58,14 +44,15 @@ struct EmitterManager {
     /* +0x20 */ EmitterForm* mpEmitterForm;
 }; /* size: 0x24 */
 
-/* The reference-counted object a queue entry points at (`referencedobject.h`).  The vtable sits at
- * +0x1C, the count and its disposal type at +0x10/+0x0C, and +0xC8 holds the emitter manager. */
+/* The reference-counted object a queue entry points at (`referencedobject.h`).  The count and its disposal
+ * type sit at +0x10/+0x0C, the table pointer at +0x1C, and +0xC8 holds the emitter manager. */
 struct EffectManager {
     /* +0x00 */ u8 pad_0x00[0xC];
     /* +0x0C */ s32 mRefCountType;
     /* +0x10 */ u32 mRefCount;
     /* +0x14 */ u8 pad_0x14[0x8];
-    /* +0x1C */ EffectManagerVtbl* mpVtbl;
+    /* +0x1C: the vtable pointer */
+    virtual void Destroy();
     /* +0x20 */ u8 pad_0x20[0xC8 - 0x20];
     /* +0xC8 */ EmitterManager* mpEmitterManager;
 }; /* size: 0xCC */
@@ -73,7 +60,12 @@ struct EffectManager {
 /* The emitter form whose virtual slot +0x14 is the type-1 creation entry. */
 struct EmitterForm {
     /* +0x00 */ u8 pad_0x00[0x1C];
-    /* +0x1C */ EmitterFormVtbl* mpVtbl;
+    /* +0x1C: the vtable pointer */
+    virtual void unused_slot08();
+    virtual void unused_slot0C();
+    virtual void unused_slot10();
+    virtual void CreateEmitter(EffectHandle* eh, const Setting* setting, EffectManager* manager, u16 life,
+                               const Vec3* pos);
 }; /* size: 0x20 */
 
 /* NW4R_POINTER_ASSERT's RVL address-range check (MEM1/MEM2, cached and uncached, plus locked cache). */
@@ -84,14 +76,7 @@ struct EmitterForm {
      ((u32)(p) & 0xFFFFC000) == 0xE0000000)
 
 #define NW4R_POINTER_ASSERT(p, line, msg)                                                          \
-    (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(lbl_805922C0, line, msg, (p)))
-
-extern char lbl_805922C0[];
-extern char lbl_805922D8[];
-extern char lbl_80592310[];
-extern char lbl_80592344[];
-extern char lbl_80592364[];
-extern char lbl_80592388[];
+    (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic("ef_creationqueue.cpp", line, msg, (p)))
 
 /* 0x800A3390 - copies the 0xA-byte setting record. */
 extern "C" void fn_800A3390(Setting* dst, const Setting* src);
@@ -102,11 +87,11 @@ extern "C" u32 ef_ref_object_add_ref(EffectManager* manager);
 /* 0x800A3044 (0x338): queues a type-0 (particle) creation. */
 extern "C" void ef_creation_queue_add_type0(CreationQueue* self, const Setting* setting, EffectManager* manager,
                                             EffectHandle* eh, u16 life, const Vec3* pos, const Vec3* vel) {
-    NW4R_POINTER_ASSERT(setting, 0x20, lbl_805922D8);
-    NW4R_POINTER_ASSERT(eh, 0x21, lbl_80592310);
+    NW4R_POINTER_ASSERT(setting, 0x20, "NW4R:Pointer Error\nsetting(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT(eh, 0x21, "NW4R:Pointer Error\neh(=%p) is not valid pointer.");
 
     if (self->mCount >= 0x400) {
-        nw4r::db::Warning(lbl_805922C0, 0x25, lbl_80592344);
+        nw4r::db::Warning("ef_creationqueue.cpp", 0x25, "EffectLib: CreationQueue Full\n");
         return;
     }
 
@@ -149,11 +134,11 @@ extern "C" void fn_800A3390(Setting* dst, const Setting* src) {
 /* 0x800A33DC (0x33C): queues a type-1 (emitter) creation, the same shape as the type-0 path. */
 extern "C" void ef_creation_queue_add_type1(CreationQueue* self, const Setting* setting, EffectManager* manager,
                                             EffectHandle* eh, u16 life, const Vec3* pos, const Vec3* vel) {
-    NW4R_POINTER_ASSERT(setting, 0x41, lbl_805922D8);
-    NW4R_POINTER_ASSERT(eh, 0x42, lbl_80592310);
+    NW4R_POINTER_ASSERT(setting, 0x41, "NW4R:Pointer Error\nsetting(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT(eh, 0x42, "NW4R:Pointer Error\neh(=%p) is not valid pointer.");
 
     if (self->mCount >= 0x400) {
-        nw4r::db::Warning(lbl_805922C0, 0x46, lbl_80592344);
+        nw4r::db::Warning("ef_creationqueue.cpp", 0x46, "EffectLib: CreationQueue Full\n");
         return;
     }
 
@@ -180,10 +165,8 @@ extern "C" u32 fn_800A3800(EffectManager* manager);
 
 /* 0x800A3718 - executes the queue: dispatch each entry, release its manager, reset the count. */
 extern "C" void fn_800A3718(CreationQueue* self) {
-    s32 i = 0;
-    CreationQueueEntry* e = self->mEntry;
-
-    for (; i < self->mCount; e++, i++) {
+    for (s32 i = 0; i < self->mCount; i++) {
+        CreationQueueEntry* e = &self->mEntry[i];
         u32 hasPos = e->mFlags & 1;
         const Vec3* pos = 0;
         if (hasPos != 0) {
@@ -196,13 +179,11 @@ extern "C" void fn_800A3718(CreationQueue* self) {
                         e->mpManager, e->mLife, pos);
             fn_800A3800(e->mpManager);
             break;
-        case 1: {
-            EmitterForm* form = e->mpManager->mpEmitterManager->mpEmitterForm;
-            form->mpVtbl->createEmitter(form, e->mpHandle, &e->mSetting, e->mpManager, e->mLife,
-                                        pos);
+        case 1:
+            e->mpManager->mpEmitterManager->mpEmitterForm->CreateEmitter(e->mpHandle, &e->mSetting, e->mpManager,
+                                                                         e->mLife, pos);
             fn_800A3800(e->mpManager);
             break;
-        }
         }
     }
 
@@ -210,13 +191,13 @@ extern "C" void fn_800A3718(CreationQueue* self) {
 }
 
 /* 0x800A3800 - the manager's Release. */
-extern "C" u32 fn_800A3800(EffectManager* manager) {
-    NW4R_ASSERT(manager->mRefCount > 0, lbl_80592388, 0x6C, lbl_80592364);
+extern "C" inline u32 fn_800A3800(EffectManager* manager) {
+    NW4R_ASSERT(manager->mRefCount > 0, "referencedobject.h", 0x6C, "NW4R:Failed assertion mRefCount > 0");
 
     u32 refCount = manager->mRefCount - 1;
     manager->mRefCount = refCount;
     if (refCount == 0 && manager->mRefCountType == 2) {
-        manager->mpVtbl->dispose(manager);
+        manager->Destroy();
     }
 
     return manager->mRefCount;

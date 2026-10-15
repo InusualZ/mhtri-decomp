@@ -9,7 +9,9 @@
  *   (the channel tables, then three copies of the `__FILE__` string "ef_animcurve.cpp" at 0x80591E68, 0x80592260
  *   and 0x805922AC), .sdata2 0x80795FB8-0x80795FF0.
  * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps `clrlwi`/`extrwi` + `cmpwi` unfused) and
- *   `#pragma fp_contract off` (retail keeps `fmuls` + `fadds`/`fsubs` apart).
+ *   `#pragma fp_contract off` (retail keeps `fmuls` + `fadds`/`fsubs` apart); file-wide `#pragma pool_data off`
+ *   and `#pragma dont_inline on` (see SHAPES); `#pragma optimization_level 1` around `ef_anim_latch_tex_type`
+ *   (it keeps retail's first store; see RESIDUALS).
  * NAMES. GUESS (from the bodies): `ef_anim_resolve_tick`, `ef_anim_resolve_key_index`, `ef_anim_interp_u8`,
  *   GUESS: `ef_anim_advance_dividers`, `ef_anim_find_bracket_keys`, `ef_anim_split_resource`, `ef_anim_table_lo`,
  *   GUESS: `ef_anim_table_hi`, `ef_anim_interp_f32`, `ef_anim_key_copy`, `ef_anim_key_search`,
@@ -30,8 +32,10 @@
  *   GUESS: `ef_anim_rand_next` (0x8009EEDC): the random generator's LCG step.
  *   GUESS: `ef_anim_name_hash` (0x8009EEF4): hashes the seed, the curve's id, the key and the division.
  * RESIDUALS. 11 partial rows, every one written:
- *  - `ef_anim_latch_tex_type`: retail stores the masked byte before or-ing the new bits in and reloads `arg->mChannel`;
- *    ours drops the first store (no alias between the two records);
+ *  - `ef_anim_latch_tex_type`: retail stores the masked byte, keeps it in a register and reloads `arg->mChannel`; at
+ *    level 3 ours drops the first store, at the scoped level 1 it keeps the store but reloads the byte (a
+ *    volatile store, a pointer local, a named intermediate and `opt_dead_assignments`/`opt_common_subs off`
+ *    score lower);
  *  - `ef_anim_curve_rotate`, `ef_anim_curve_f32`, `ef_anim_curve_u8`: register colouring only (the mask, the two record strides and
  *    the key pointer take other callee-saved registers; retail reuses one pointer for the key data and the
  *    random range, flags read at -0xA);
@@ -40,11 +44,15 @@
  *  - `ef_anim_resolve_key_index`, `ef_anim_resolve_tick`, `ef_anim_curve_texture`, `ef_anim_tex_ramp`: register colours only;
  *  - `ef_anim_curve_rotate` keeps the key record pointers beside their data pointers, one callee-saved register more than
  *    retail: `_savegpr_20`/`_restgpr_20` where retail calls `_savegpr_21`/`_restgpr_21`.
- *   flipcheck: `.data` claimed, not emitted (the strings would have to come out of literal pools: the
- *   `ef_anim_key_search`/`ef_anim_find_bracket_keys` messages each carry their own copy of the file name after the main pool);
- *   `.sdata2` 0x10 of 0x38 (only the two conversion doubles MWCC re-emits); `.text` 0x6280 of 0x6288.
+ *   flipcheck: `.data` and `.sdata2` are byte-identical; `.text` is 0x6280 of 0x6288 (the rows above), and the
+ *   `.sdata2` layout reads as different because the map names the pool words (`ef_anim_f32_*`) where our
+ *   literals are anonymous `@` constants of the same bytes at the same offsets.
  * SHAPES. `ef_anim_name_hash` sums `d*K + c*K + (a*K + b*K) + 0x4BF53` in that grouping (retail's add order).
- * SHAPES. The `.sdata2` constants are referenced by name, never spelled as literals (a literal re-pools them).
+ * SHAPES. The data is the unit's own: the two divisor tables are defined first (`.data` +0x0/+0x100), the strings
+ *   are literals (first-use order, `#pragma pool_data off`) and every float is a literal (the `.sdata2` pool in
+ *   first-use order).  `ef_anim_find_bracket_keys` and `ef_anim_key_search` are `inline` under a file-wide
+ *   `#pragma dont_inline on`: their weak copies stay in retail's place and their strings are the `@STRING@` tail
+ *   (one "ef_animcurve.cpp" copy each).
  *   The kernels take the curve type last (retail evaluates it after the three floats). The key searches read
  *   their u16 keys `stride` bytes apart. `ef_creation_queue_reset` walks the queue entries with a bottom-tested loop.
  */
@@ -60,49 +68,50 @@
 
 #pragma peephole off
 #pragma fp_contract off
+#pragma pool_data off
+#pragma dont_inline on
 
-/* This unit's own pooled file-name literal (a copy per region - MWCC emitted three). */
-extern char ef_anim_file_str[];
-extern char ef_anim_file_str2[];
-extern char ef_anim_file_str3[];
 
-/* The two 0x100-byte tables the curve's divisor lookups index (this unit's claimed `.data`, declared,
- * never defined). */
-extern u8 ef_anim_table_lo_bytes[];
-extern u8 ef_anim_table_hi_bytes[];
+/* The divisor table `ef_anim_table_lo` indexes (`.data`, ahead of the strings). */
+u8 ef_anim_table_lo_bytes[0x100] = {
+    0x00, 0x01, 0x01, 0x02, 0x01, 0x02, 0x02, 0x03, 0x01, 0x02, 0x02, 0x03, 0x02, 0x03, 0x03, 0x04,
+    0x01, 0x02, 0x02, 0x03, 0x02, 0x03, 0x03, 0x04, 0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05,
+    0x01, 0x02, 0x02, 0x03, 0x02, 0x03, 0x03, 0x04, 0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05,
+    0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05, 0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06,
+    0x01, 0x02, 0x02, 0x03, 0x02, 0x03, 0x03, 0x04, 0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05,
+    0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05, 0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06,
+    0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05, 0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06,
+    0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06, 0x04, 0x05, 0x05, 0x06, 0x05, 0x06, 0x06, 0x07,
+    0x01, 0x02, 0x02, 0x03, 0x02, 0x03, 0x03, 0x04, 0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05,
+    0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05, 0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06,
+    0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05, 0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06,
+    0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06, 0x04, 0x05, 0x05, 0x06, 0x05, 0x06, 0x06, 0x07,
+    0x02, 0x03, 0x03, 0x04, 0x03, 0x04, 0x04, 0x05, 0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06,
+    0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06, 0x04, 0x05, 0x05, 0x06, 0x05, 0x06, 0x06, 0x07,
+    0x03, 0x04, 0x04, 0x05, 0x04, 0x05, 0x05, 0x06, 0x04, 0x05, 0x05, 0x06, 0x05, 0x06, 0x06, 0x07,
+    0x04, 0x05, 0x05, 0x06, 0x05, 0x06, 0x06, 0x07, 0x05, 0x06, 0x06, 0x07, 0x06, 0x07, 0x07, 0x08,
+};
 
-/* The pointer-error messages, one per guarded parameter name (the source's own spelling). */
-extern char ef_anim_header_assert_str[]; /* header   */
-extern char ef_anim_tick_assert_str[]; /* tick     */
-extern char ef_anim_tick_f32_assert_str[]; /* tickF32  */
-extern char ef_anim_res_div_assert_str[]; /* resDiv   */
-extern char ef_anim_final_assert_str[]; /* final    */
-extern char ef_anim_cmd_list_assert_str[]; /* mCmdList */
-extern char ef_anim_target_assert_str[]; /* target   */
-extern char ef_anim_zero_assert_str[]; /* "NW4R:Failed assertion 0"          */
-extern char ef_anim_key_assert_str[]; /* key                                */
-extern char ef_anim_div_l_assert_str[]; /* divL                               */
-extern char ef_anim_div_h_assert_str[]; /* divH                               */
-extern char ef_anim_head_assert_str[]; /* pHead                              */
-extern char ef_anim_random_assert_str[]; /* random                             */
-extern char ef_anim_random_table_assert_str[]; /* randomTable                        */
-extern char ef_anim_name_table_assert_str[]; /* nameTable                          */
-extern char ef_anim_pp_assert_str[]; /* pp                                 */
-extern char ef_anim_ptr_fixed_assert_str[]; /* ptrFixed                           */
-extern char ef_anim_div_order_assert_str[]; /* "NW4R:Failed assertion div < nextDiv" */
-extern char ef_anim_ptr_base_assert_str[]; /* ptrBase                            */
-extern char ef_anim_ptr_base_assert_str2[]; /* ptrBase                            */
+/* The divisor table `ef_anim_table_hi` indexes. */
+u8 ef_anim_table_hi_bytes[0x100] = {
+    0x00, 0x01, 0x02, 0x02, 0x04, 0x04, 0x04, 0x04, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+    0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+};
 
-/* The `.sdata2` constants, referenced by name (a float literal would re-pool them in this object). */
-extern f32 ef_anim_f32_zero; /* 0.0f        */
-extern f32 ef_anim_f32_one; /* 1.0f        */
-extern f32 ef_anim_f32_65536; /* 65536.0f    */
-extern f32 ef_anim_f32_three; /* 3.0f        */
-extern f32 ef_anim_f32_two; /* 2.0f        */
-extern f32 ef_anim_f32_one_and_half; /* 1.5f        */
-extern f32 ef_anim_f32_minus_two; /* -2.0f       */
-extern f32 ef_anim_f32_255; /* 255.0f      */
-extern f32 ef_anim_f32_epsilon; /* FLT_EPSILON */
 
 /* The pointer guard every ef entry point carries: the RVL address-range chain (seven windows, the
  * first `if` carrying two tests - the compiler materialises six BOOLs). */
@@ -356,16 +365,16 @@ CreationQueueEntry* ef_creation_queue_entry_ctor(CreationQueueEntry* slot);
  * steps long (`header` holds the tick count, flags and divisor count); a tick count <= 1 gives tick 0. */
 void ef_anim_resolve_tick(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
                  u32* resDiv) {
-    NW4R_POINTER_ASSERT(header, 0x87, ef_anim_header_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(tick, 0x88, ef_anim_tick_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(tickF32, 0x89, ef_anim_tick_f32_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(resDiv, 0x8A, ef_anim_res_div_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(header, 0x87, "NW4R:Pointer Error\nheader(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(tick, 0x88, "NW4R:Pointer Error\ntick(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(tickF32, 0x89, "NW4R:Pointer Error\ntickF32(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(resDiv, 0x8A, "NW4R:Pointer Error\nresDiv(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     *resDiv = 0;
     u16 count = header->mTickCount;
     if (count <= 1) {
         *tick = 0;
-        *tickF32 = ef_anim_f32_zero;
+        *tickF32 = 0.0f;
         *resDiv = step;
         return;
     }
@@ -454,11 +463,11 @@ void ef_anim_resolve_tick(u32 mode, const EfAnimHeader* header, u32 step, u16* t
  * its first key. */
 void ef_anim_resolve_key_index(u32 mode, const EfAnimHeader* header, u32 step, u16* tick, f32* tickF32,
                  u32* resDiv, u8* final) {
-    NW4R_POINTER_ASSERT(header, 0x12A, ef_anim_header_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(tick, 0x12B, ef_anim_tick_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(tickF32, 0x12C, ef_anim_tick_f32_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(resDiv, 0x12D, ef_anim_res_div_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(final, 0x12E, ef_anim_final_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(header, 0x12A, "NW4R:Pointer Error\nheader(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(tick, 0x12B, "NW4R:Pointer Error\ntick(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(tickF32, 0x12C, "NW4R:Pointer Error\ntickF32(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(resDiv, 0x12D, "NW4R:Pointer Error\nresDiv(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(final, 0x12E, "NW4R:Pointer Error\nfinal(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     *resDiv = 0;
     *final = 0;
@@ -522,7 +531,7 @@ void ef_anim_resolve_key_index(u32 mode, const EfAnimHeader* header, u32 step, u
             *tick = (f32)step * rate - (f32)(div * header->mTickCount);
         } else {
             s32 span = count - 1;
-            f32 rate = (ef_anim_f32_one + (f32)span * (f32)header->mDivCount) / (f32)mode;
+            f32 rate = (1.0f + (f32)span * (f32)header->mDivCount) / (f32)mode;
             u32 pos = (u32)((f32)step * rate);
             u32 div = pos / span;
             *resDiv = div;
@@ -550,8 +559,8 @@ void ef_anim_resolve_key_index(u32 mode, const EfAnimHeader* header, u32 step, u
  * key is copied (or drawn from its random byte range) and a key span is interpolated in u16.16 fixed point
  * with each channel's kernel type. */
 void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x31C, ef_anim_cmd_list_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(target, 0x31D, ef_anim_target_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(mCmdList, 0x31C, "NW4R:Pointer Error\nmCmdList(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(target, 0x31D, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     if (mCmdList[0] == 0xAB) {
         ef_anim_copy_u8_channels(mCmdList, target, step, mode);
@@ -635,7 +644,7 @@ void ef_anim_curve_u8(const u8* mCmdList, u8* target, u32 step, u16 seed, u32 mo
     }
 
     ef_anim_advance_dividers(header, (const EfAnimKeyRange*)key, idx, &divL, &divH);
-    u32 t = (u32)(ef_anim_f32_65536 * (tickF32 - (f32)keyLo)) / (keyHi - keyLo);
+    u32 t = (u32)(65536.0f * (tickF32 - (f32)keyLo)) / (keyHi - keyLo);
     const EfAnimCurveKey* recA = (const EfAnimCurveKey*)(keys + idx * stride);
     const u8* srcA = recA->mData.mByte;
     const EfAnimCurveKey* recB = (const EfAnimCurveKey*)(keys + (idx + 1) * stride);
@@ -798,23 +807,23 @@ u8 ef_anim_interp_u8(u32 tick, u8 start, u8 end, u8 type) {
     case 0:
         return (u8)(s + ((tick * (e - s)) >> 16));
     case 1: {
-        f32 t = (f32)tick / ef_anim_f32_65536;
+        f32 t = (f32)tick / 65536.0f;
         if (type == 1) {
             f32 s0 = (f32)s;
-            f32 w = ef_anim_f32_three - ef_anim_f32_two * t;
+            f32 w = 3.0f - 2.0f * t;
             return s0 + t * (t * (w * (f32)(int)(e - s)));
         } else {
-            f32 c1 = ((type >> 2) & 1) == 0 ? ef_anim_f32_zero : ef_anim_f32_one_and_half;
-            f32 c0 = ((type >> 3) & 1) == 0 ? ef_anim_f32_zero : ef_anim_f32_one_and_half;
+            f32 c1 = ((type >> 2) & 1) == 0 ? 0.0f : 1.5f;
+            f32 c0 = ((type >> 3) & 1) == 0 ? 0.0f : 1.5f;
             f32 s0 = (f32)s;
             f32 d = t * (f32)(int)(e - s);
-            f32 u = t * (t * (ef_anim_f32_two - (c0 + c1)));
-            f32 v = t * (ef_anim_f32_three + (ef_anim_f32_minus_two * c0 - c1));
+            f32 u = t * (t * (2.0f - (c0 + c1)));
+            f32 v = t * (3.0f + (-2.0f * c0 - c1));
             f32 r = s0 + d * (c0 + (u + v));
-            if (r < ef_anim_f32_zero) {
+            if (r < 0.0f) {
                 return 0;
             }
-            if (r > ef_anim_f32_255) {
+            if (r > 255.0f) {
                 return 0xFF;
             }
             return r;
@@ -823,7 +832,7 @@ u8 ef_anim_interp_u8(u32 tick, u8 start, u8 end, u8 type) {
     case 2:
         return start;
     default:
-        NW4R_ASSERT(0, ef_anim_file_str, 0x2C7, ef_anim_zero_assert_str);
+        NW4R_ASSERT(0, "ef_animcurve.cpp", 0x2C7, "NW4R:Failed assertion 0");
         return 0;
     }
 }
@@ -832,10 +841,10 @@ u8 ef_anim_interp_u8(u32 tick, u8 start, u8 end, u8 type) {
  * only at the last key or with bit 5, `divL` also when the step starts at division 0). */
 void ef_anim_advance_dividers(const EfAnimHeader* header, const EfAnimKeyRange* key, u32 lo, u32* divL,
                  u32* divH) {
-    NW4R_POINTER_ASSERT(header, 0x301, ef_anim_header_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(key, 0x302, ef_anim_key_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(divL, 0x303, ef_anim_div_l_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(divH, 0x304, ef_anim_div_h_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(header, 0x301, "NW4R:Pointer Error\nheader(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(key, 0x302, "NW4R:Pointer Error\nkey(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(divL, 0x303, "NW4R:Pointer Error\ndivL(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(divH, 0x304, "NW4R:Pointer Error\ndivH(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     *divH = *divL;
 
@@ -877,12 +886,12 @@ u32 ef_anim_name_hash(u16 a, u16 b, u16 c, u32 d) {
 
 /* 0x8009EF88 - binary-searches ef_anim_key_search's u16 key table for both bracketing keys (`outLo`/`outHi`);
  * `*flag` says whether `frac` lands exactly on the found key. */
-void ef_anim_find_bracket_keys(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
+inline void ef_anim_find_bracket_keys(u32* out, u8* flag, u16* outLo, u16* outHi, s32 target, f32 frac,
                  const u16* ptrBase, u32 stride, s32 lo, s32 hi) {
-    NW4R_POINTER_ASSERT(ptrBase, 0x1F1, ef_anim_ptr_base_assert_str2, ef_anim_file_str3);
+    NW4R_POINTER_ASSERT(ptrBase, 0x1F1, "NW4R:Pointer Error\nptrBase(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     s32 mid = (lo + hi) / 2;
-    u8 atTarget = fabsf((f32)target - frac) < ef_anim_f32_epsilon;
+    u8 atTarget = fabsf((f32)target - frac) < 1.1920929e-07f;
 
     u16 keyLo = EF_ANIM_KEY_AT(ptrBase, stride, lo);
     *outLo = keyLo;
@@ -941,12 +950,12 @@ void ef_anim_find_bracket_keys(u32* out, u8* flag, u16* outLo, u16* outHi, s32 t
  * name table; each block starts where the previous one's size (from the header) ends. */
 void ef_anim_split_resource(const u8* pHead, const EfAnimHeader** header, const u8** key, const u8** random,
                  const u8** randomTable, const u8** nameTable) {
-    NW4R_POINTER_ASSERT(pHead, 0x70, ef_anim_head_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(header, 0x71, ef_anim_header_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(key, 0x72, ef_anim_key_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(random, 0x73, ef_anim_random_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(randomTable, 0x74, ef_anim_random_table_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(nameTable, 0x75, ef_anim_name_table_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(pHead, 0x70, "NW4R:Pointer Error\npHead(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(header, 0x71, "NW4R:Pointer Error\nheader(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(key, 0x72, "NW4R:Pointer Error\nkey(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(random, 0x73, "NW4R:Pointer Error\nrandom(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(randomTable, 0x74, "NW4R:Pointer Error\nrandomTable(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(nameTable, 0x75, "NW4R:Pointer Error\nnameTable(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     *header = (const EfAnimHeader*)pHead;
     *key = pHead + sizeof(EfAnimHeader);
@@ -969,8 +978,8 @@ u8 ef_anim_table_hi(u32 index) {
  * (0xAB) is a table copy, otherwise an exact key is copied (or drawn from its random range) and a key
  * span is interpolated with each channel's kernel type, either end possibly random. */
 void ef_anim_curve_f32(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x418, ef_anim_cmd_list_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(target, 0x419, ef_anim_target_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(mCmdList, 0x418, "NW4R:Pointer Error\nmCmdList(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(target, 0x419, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     if (mCmdList[0] == 0xAB) {
         ef_anim_copy_f32_channels(mCmdList, target, step, mode);
@@ -1181,29 +1190,29 @@ f32 ef_anim_interp_f32(f32 t, f32 a, f32 b, u8 type) {
         return a + t * (b - a);
     case 1:
         if (type == 1) {
-            f32 w = ef_anim_f32_three - ef_anim_f32_two * t;
+            f32 w = 3.0f - 2.0f * t;
             return a + t * (t * (w * (b - a)));
         } else {
-            f32 c0 = ((type >> 3) & 1) == 0 ? ef_anim_f32_zero : ef_anim_f32_one_and_half;
-            f32 c1 = ((type >> 2) & 1) == 0 ? ef_anim_f32_zero : ef_anim_f32_one_and_half;
+            f32 c0 = ((type >> 3) & 1) == 0 ? 0.0f : 1.5f;
+            f32 c1 = ((type >> 2) & 1) == 0 ? 0.0f : 1.5f;
             f32 s = t * (b - a);
-            f32 u = t * (t * (c0 + c1 - ef_anim_f32_two));
-            f32 v = t * (ef_anim_f32_three + (ef_anim_f32_minus_two * c0 - c1));
+            f32 u = t * (t * (c0 + c1 - 2.0f));
+            f32 v = t * (3.0f + (-2.0f * c0 - c1));
             return a + s * (c0 + (u + v));
         }
     case 2:
         return a;
     default:
-        NW4R_ASSERT(0, ef_anim_file_str, 0x2F9, ef_anim_zero_assert_str);
-        return ef_anim_f32_zero;
+        NW4R_ASSERT(0, "ef_animcurve.cpp", 0x2F9, "NW4R:Failed assertion 0");
+        return 0.0f;
     }
 }
 
 /* 0x800A02F8 (0xA0C): the signed twin of ef_anim_curve_f32: a random record carries a sign byte after its
  * pairs, and a set byte negates the drawn values on a coin flip of the hash. */
 void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x51A, ef_anim_cmd_list_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(target, 0x51B, ef_anim_target_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(mCmdList, 0x51A, "NW4R:Pointer Error\nmCmdList(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(target, 0x51B, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     u8 mask = mCmdList[3];
     const EfAnimHeader* header;
@@ -1453,8 +1462,8 @@ void ef_anim_curve_rotate(const u8* mCmdList, f32* target, u32 step, u16 seed, u
  * key's value and type bits. */
 void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode,
                  const u8** nameTableOut, u32** target, EfAnimDivider* divider) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x669, ef_anim_cmd_list_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(pp, 0x66A, ef_anim_pp_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(mCmdList, 0x669, "NW4R:Pointer Error\nmCmdList(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(pp, 0x66A, "NW4R:Pointer Error\npp(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     const EfAnimHeader* header;
     const u8* key;
@@ -1522,7 +1531,7 @@ void ef_anim_curve_texture(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16
     }
 
     *channel = ((const EfAnimNameTable*)nameTable)->mName[k.mTick];
-    NW4R_POINTER_ASSERT(channel, 0x6DC, ef_anim_target_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(channel, 0x6DC, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     pp->mKeyValueBits &= (u16)~(0xF << (ch * 4));
     pp->mKeyValueBits |= (u16)((k.mValue & 0xF) << (ch * 4));
@@ -1545,8 +1554,8 @@ void ef_anim_key_copy(EfAnimKey* dst, const EfAnimKey* src) {
 
 /* 0x800A12AC - binary-searches a table of u16 keys (stride `stride` u16s) for `target` and return the
  * lower bracketing index in `*out`.  `flag` decides which side an exact hit narrows. */
-void ef_anim_key_search(s32* out, s32 target, const u16* ptrBase, u32 stride, s32 lo, s32 hi, int flag) {
-    NW4R_POINTER_ASSERT(ptrBase, 0x24C, ef_anim_ptr_base_assert_str, ef_anim_file_str2);
+inline void ef_anim_key_search(s32* out, s32 target, const u16* ptrBase, u32 stride, s32 lo, s32 hi, int flag) {
+    NW4R_POINTER_ASSERT(ptrBase, 0x24C, "NW4R:Pointer Error\nptrBase(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     s32 mid = (lo + hi) / 2;
 
@@ -1579,6 +1588,8 @@ void ef_anim_key_search(s32* out, s32 target, const u16* ptrBase, u32 stride, s3
 
 /* 0x800A14A4 - latches the one-shot flag and, the first time, folds the key type of `arg`'s channel into
  * the particle's key-type bit pairs. */
+#pragma push
+#pragma optimization_level 1
 void ef_anim_latch_tex_type(EfAnimParticle* self, const EfAnimDivider* arg) {
     if (self->mLatched == 0) {
         self->mKeyTypeBits &= (u8)~(3 << (arg->mChannel * 2));
@@ -1586,6 +1597,7 @@ void ef_anim_latch_tex_type(EfAnimParticle* self, const EfAnimDivider* arg) {
     }
     self->mLatched = 1;
 }
+#pragma pop
 
 /* 0x800A1504 - resolves a key's slot (`mPhase` folded into the divider's range) and returns the table word
  * at slot + 1 through `target`; ramp flag bit 2 picks calling the ramp helper or wrapping at the last key. */
@@ -1604,7 +1616,7 @@ void ef_anim_tex_ramp(EfAnimParticle* self, const EfAnimDivider* divider, const 
     }
 
     *target = nameTable->mName[(u16)idx];
-    NW4R_POINTER_ASSERT(target, 0x70D, ef_anim_target_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(target, 0x70D, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.", "ef_animcurve.cpp");
 }
 
 /* 0x800A16C4 (0x5E4): fires one child-creation key: resolves its payload (inline, or drawn from the random
@@ -1613,11 +1625,11 @@ void ef_anim_tex_ramp(EfAnimParticle* self, const EfAnimDivider* divider, const 
 void ef_anim_fire_child_key(const EfAnimChildKey* ptrFixed, u16 seed, const EfAnimHeader* header,
                  const EfAnimNameTable* nameTable, const EfAnimChildTable* randomTable, EfAnimParticle* pp,
                  u32 div) {
-    NW4R_POINTER_ASSERT(ptrFixed, 0x71E, ef_anim_ptr_fixed_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(header, 0x71F, ef_anim_header_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(nameTable, 0x720, ef_anim_name_table_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(randomTable, 0x721, ef_anim_random_table_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(pp, 0x722, ef_anim_pp_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(ptrFixed, 0x71E, "NW4R:Pointer Error\nptrFixed(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(header, 0x71F, "NW4R:Pointer Error\nheader(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(nameTable, 0x720, "NW4R:Pointer Error\nnameTable(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(randomTable, 0x721, "NW4R:Pointer Error\nrandomTable(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(pp, 0x722, "NW4R:Pointer Error\npp(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     const EfAnimChildSetting* setting;
     if (ptrFixed->mFlags == 0) {
@@ -1625,7 +1637,7 @@ void ef_anim_fire_child_key(const EfAnimChildKey* ptrFixed, u16 seed, const EfAn
     } else {
         u32 hash = ef_anim_name_hash(seed, header->mNameId, ptrFixed->mData.mRandomIndex, div);
         if ((ptrFixed->mFlags & 2) == 0) {
-            NW4R_ASSERT(0, ef_anim_file_str, 0x744, ef_anim_zero_assert_str);
+            NW4R_ASSERT(0, "ef_animcurve.cpp", 0x744, "NW4R:Failed assertion 0");
         } else {
             if (randomTable->mCount == 0) {
                 return;
@@ -1652,8 +1664,8 @@ void ef_anim_fire_child_key(const EfAnimChildKey* ptrFixed, u16 seed, const EfAn
  * the divisions in between and the start of the last one; a ping-pong curve (flag bit 6) walks the odd
  * divisions backwards and skips the turning keys. */
 void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 seed, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x768, ef_anim_cmd_list_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(pp, 0x769, ef_anim_pp_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(mCmdList, 0x768, "NW4R:Pointer Error\nmCmdList(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(pp, 0x769, "NW4R:Pointer Error\npp(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     const EfAnimHeader* header;
     const u8* key;
@@ -1710,7 +1722,7 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
         return;
     }
 
-    NW4R_ASSERT(divA < divB, ef_anim_file_str, 0x7D7, ef_anim_div_order_assert_str);
+    NW4R_ASSERT(divA < divB, "ef_animcurve.cpp", 0x7D7, "NW4R:Failed assertion div < nextDiv");
 
     if ((header->mFlags & 0x40) != 0) {
         if ((divA & 1) == 0) {
@@ -1801,8 +1813,8 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
 
 /* 0x800A2504 - copies the `u8` channels the key's mask selects out of one key record. */
 void ef_anim_copy_u8_channels(const u8* mCmdList, u8* target, u32 step, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x92C, ef_anim_cmd_list_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(target, 0x92D, ef_anim_target_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(mCmdList, 0x92C, "NW4R:Pointer Error\nmCmdList(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(target, 0x92D, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     u8 mask = mCmdList[3];
     u8 end = ef_anim_table_hi(mask);
@@ -1833,8 +1845,8 @@ void ef_anim_copy_u8_channels(const u8* mCmdList, u8* target, u32 step, u32 mode
 /* 0x800A27B4 - the same tick resolution as ef_anim_resolve_tick without the divisor/fraction outputs: the
  * `mode` argument is the curve's step count and the only result is the key tick. */
 void ef_anim_key_tick(const EfAnimHeader* header, u32 step, u16* tick, u32 mode) {
-    NW4R_POINTER_ASSERT(header, 0x8AB, ef_anim_header_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(tick, 0x8AC, ef_anim_tick_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(header, 0x8AB, "NW4R:Pointer Error\nheader(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(tick, 0x8AC, "NW4R:Pointer Error\ntick(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     u16 count = header->mTickCount;
     if (count <= 1) {
@@ -1920,8 +1932,8 @@ void ef_anim_key_tick(const EfAnimHeader* header, u32 step, u16* tick, u32 mode)
 
 /* 0x800A2CF0 - the f32 twin of ef_anim_copy_u8_channels: same mask walk, one f32 per selected channel. */
 void ef_anim_copy_f32_channels(const u8* mCmdList, f32* target, u32 step, u32 mode) {
-    NW4R_POINTER_ASSERT(mCmdList, 0x950, ef_anim_cmd_list_assert_str, ef_anim_file_str);
-    NW4R_POINTER_ASSERT(target, 0x951, ef_anim_target_assert_str, ef_anim_file_str);
+    NW4R_POINTER_ASSERT(mCmdList, 0x950, "NW4R:Pointer Error\nmCmdList(=%p) is not valid pointer.", "ef_animcurve.cpp");
+    NW4R_POINTER_ASSERT(target, 0x951, "NW4R:Pointer Error\ntarget(=%p) is not valid pointer.", "ef_animcurve.cpp");
 
     u8 mask = mCmdList[3];
     u8 end = ef_anim_table_hi(mask);

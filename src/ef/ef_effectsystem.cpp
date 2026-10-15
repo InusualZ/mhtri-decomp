@@ -13,7 +13,9 @@
  * FLAGS. `cflags_main` plus `-pool off` (configure.py: the static initializer addresses each static with its own
  *   `lis`/`addi`); `#pragma peephole off` from `Initialize` on (the table stores as `lis` + `addi r0` + `stw r0`, the
  *   sweeps' unfused `clrlwi` + `slwi`); `#pragma dont_inline on` over `Initialize` (retail calls its inline helpers)
- *   and again at the end (the implicit constructors stay out of line, as retail's).
+ *   and again at the end (the implicit constructors stay out of line, as retail's); file-wide
+ *   `#pragma optimization_level 4` (the three group sweeps keep `groupID * 0x1C` in a callee-saved register across
+ *   the `Panic`, as retail does; at level 3 they re-materialise the `mulli` and grow by 8 bytes each).
  * NAMES. The classes are nw4r's (`DrawOrder`, `DrawStrategyBuilder`, `EmitterFormBuilder`, `DrawInfo`); `EfSys`
  *   keeps this layout's own name while `ef.h` carries an `EffectSystem` stub.  The other functions keep `fn_`
  *   stems except `RetireEffect`, written as an `nw4r::ef::EffectSystem` member, and the four inline helpers
@@ -22,12 +24,7 @@
  *   GUESS (from the body and its callers): `ef_draw_info_projection`.
  *   GUESS: `sDrawOrder`, `sDrawStrategyBuilder`, `sEmitterFormBuilder`, `sDrawInfo` (the statics, named for their
  *   class), `ef_system_version_registered` (the once-flag the system's constructor tests).
- * RESIDUALS. 3 partial rows:
- *  - `fn_800A5D8C`, `fn_800A5E6C`, `fn_800A5F4C` (ours 0xE8 of 0xE0 each): retail keeps `groupID * 0x1C` in a
- *    callee-saved register across the `Panic` and reuses it, ours re-materialises the `mulli` per use; a group
- *    pointer local, a scaled index local, an `int` group, hoisted `num`/`i` declarations and the expression-form
- *    assert all score the same or lower.
- *   flipcheck: `.data` and `.sdata2` are byte-identical; `.text` differs in the rows above (0xBC0 of 0xBA8).
+ * RESIDUALS. none in code or data.
  * SHAPES. `#line` puts each assert on retail's line (0x4F, 0x50, 0x67, 0x7B, 0x83, 0x9F, 0xA0, 0xB2, 0xC9, 0xDD).
  * SHAPES. The group table is `new (allocator->Alloc(n * 0x1C + 0x20)) EfSysActivityList[n]` with the allocation
  *   as the placement argument (a named block local shares the `mulli` and swaps the loop registers); the
@@ -45,6 +42,7 @@
  */
 
 #include "types.h"
+#pragma optimization_level 4
 #include "nw4r/math.h"
 #include "ef.h" /* nw4r::ef::EffectSystem / nw4r::ef::Effect (rule 9's owner) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
