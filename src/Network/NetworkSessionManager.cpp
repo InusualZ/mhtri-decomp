@@ -20,24 +20,18 @@
  *   forwards to), the `slot_14C`..`slot_168` wrappers (their vtable slot).
  *   GUESS: NetworkRequestHead (the request fields ahead of the mutex both request records share).
  *   GUESS: clear, reset (`NetworkRequestPat`'s own record reset and its forwarder).
- * RESIDUALS. `move`: one callee-saved register fewer (`_savegpr_23`/`_restgpr_23` against retail's `_savegpr_22`/`_restgpr_22`); the log strings
- *   retail names (`NetworkSessionManager_deleteRequestMessage`, `NetworkRequest_getArgumentMessage`,
- *   `NetworkSessionManager_moveStandByMessage`,
- *   `NetworkSessionManagerPat_finalMessage`) are this object's anonymous literals.
- *   `.text` 0x2714 against 0x27B4; `.data` (flip blocker) 0x3B8 against 0x3C0 (-8; 225 of 960
- *   bytes differ), written but out of order (the base table last, see RANGE); `.sbss` emits the 4 B word of the 8 B
- *   claim.
- *  - `NetworkRequest::copyRecord`: retail copies the 96-byte record as two words then eleven word pairs, `*dst = *src`
- *    emits `lmw`/`stmw` (`-use_lmw_stmw off` changes nothing), so `copyRecord` is 96 B short; it is referenced only from
- *    this object's `extab`;
- *  - `slot_144`, `sendBatch_138`, `slot_13C`, `slot_140`: the staging order of the mapped byte array, and the `clrlwi`
- *    retail gives the `u8` flags argument at the call (no spelling tried reaches the `mr`/`clrlwi` pair);
- *  - `networkSessionReflectCallback`: retail saves all six incoming argument registers before building the callee's,
- *    ours does the minimal four-move rotation;
- *  - `~NetworkRequest`: retail's unfused `extsh` of the deleting flag;
- *  - the constructor, `release`: the loop counter and element pointer take swapped registers (r30/r31);
- *    `NetworkSessionManager::allocRequest`: the pointer steps after the counter (a pointer loop costs it the saved `self`);
- *    `clear`, `move`: not characterised one by one (the objdiff rows).
+ * RESIDUALS. `.text` and `extabindex` are the target's bytes; every row pairs at 100.  Flip blockers, all data:
+ *  - `extab`: the Pat constructor's record ends its first range at pc 0x7C where retail's runs to 0x90 - the
+ *    `getInstance_` call (owned by `enemy/em020_prog.cpp`, declared in `enemy/em020_ai.h`) is may-throw here; with
+ *    the declaration `__attribute__((nothrow))` (playbook 155) the record is byte-identical (request net-L5#1);
+ *  - `.data` 0x3B8 against 0x3C0: retail emits the base table between `deleteRequest`'s string and `getArgument`'s,
+ *    with 8-byte gaps before the table (0x805FA902) and before `NetworkSessionManagerPat::final`'s string
+ *    (0x805FAB03) that MWCC's 4-byte string/table alignment does not produce inside one object - the range holds
+ *    more than one TU (request net-L5#2 carries the seam evidence); ours emits the strings first and the table last;
+ *    the log strings retail names (`NetworkSessionManager_deleteRequestMessage`,
+ *    `NetworkRequest_getArgumentMessage`, `NetworkSessionManager_moveStandByMessage`,
+ *    `NetworkSessionManagerPat_finalMessage`) are this object's anonymous literals;
+ *  - `.sbss` emits the 4 B `NetworkRequest_idCounter` word of the 8 B claim (0x80794CA4 has no referrer).
  * SHAPES. `NetworkRequest::reset` and `NetworkRequestPat`'s `reset`/`clear` are inline and defined before the
  *   constructors and destructors that call them (under `dont_inline`): MWCC then records no pool or `NetworkMutex`
  *   cleanup around those calls (retail's empty `extab` records), and emits each copy after its first caller.
@@ -45,6 +39,21 @@
  *   `NetworkSessionManagerPat` declares `move` FIRST so it is the key function (its body opens the next unit), so the
  *   Pat constructor stores `__vt__24NetworkSessionManagerPat` without a second table here.  `NetworkBuffer` (table
  *   0x805F9150) is a declared class with no virtual defined here, so no table is emitted for it.
+ *  - the base's constructor through `move`, `allocRequest`, the `putTerminator*`/`sendBatch_138`/`slot_13C`..`slot_144`
+ *    writers run under `#pragma peephole off`: with the pass on, MWCC bumps a loop's counter before its
+ *    strength-reduced pointers (retail bumps the pointers first) and fuses `extsb`+`cmpwi` into `extsb.`;
+ *  - `move` is under a scoped `#pragma optimization_level 4` (the unrolled scan keeps its trip count 3 in a saved
+ *    register, `_savegpr_22` as retail), and every multi-test case is a chain of `if (...) continue;` - an `||` chain
+ *    inverts the last branch;
+ *  - the constructor's and `release`'s loops index the arrays (`pool_7C[i]`); a pointer loop swaps r30/r31;
+ *  - the batch writers return early on `count <= 0`, and the single-slot writers test the mapped id before storing it;
+ *  - `networkSessionReflectCallback` is the session's `NetworkSessionCallback` (event, index, arg, size, data, user)
+ *    forwarding to `networkSessionReflect0(user, event, (s8)index, arg, size, data)`;
+ *  - `NetworkSessionRecordBlock` is 0x48 B (`copyRecord`'s two words and eight word pairs; it is the circle's option
+ *    list `copyCircleToProfile` copies);
+ *  - the Pat constructor precedes the record classes' members (retail's `.text` order); the circle containers'
+ *    destructors and `GameSpyInterfaceThread::getInstance` are `inline` and defined before it, so MWCC emits them right
+ *    after it and records no cleanup around the `getInstance` call;
  *  - the record classes embed a `NetworkUniqueId` with out-of-line constructors/destructors in the target's order; the
  *    unique id's constructor is out of line, so no element's vptr is stored inline;
  *  - the 21 `request*` rows sit in two `#pragma peephole off`/`on` pairs (on, MWCC fuses the descriptor address into
@@ -136,7 +145,6 @@ inline void NetworkRequest::reset()
 NetworkSessionManager::NetworkSessionManager()
 {
     s32 i;
-    NetworkRequest* request;
 
     this->unused_04 = 0;
     this->unused_08 = 0;
@@ -147,8 +155,8 @@ NetworkSessionManager::NetworkSessionManager()
     }
     this->unused_79 = 1;
     this->unused_7A = 1;
-    for (i = 0, request = this->pool_7C; i < 2; i++, request++) {
-        request->reset();
+    for (i = 0; i < 2; i++) {
+        this->pool_7C[i].reset();
     }
 }
 
@@ -176,7 +184,6 @@ NetworkSessionManager::~NetworkSessionManager()
 {
     NetworkSessionManager::release();
 }
-#pragma peephole on
 
 
 void NetworkSessionManager::init(u32 a, u32 b)
@@ -205,8 +212,6 @@ void NetworkSessionManager::release()
 {
     NetworkBuffer* buf;
     s32 i;
-    NetworkRequest** slot;
-    NetworkRequest* request;
 
     buf = this->buffer;
     if (buf != 0) {
@@ -219,26 +224,26 @@ void NetworkSessionManager::release()
             this->buffer = 0;
         }
     }
-    for (i = 0, slot = this->requests_10; i < 0x15; i++, slot++) {
-        this->deleteRequest(slot);
+    for (i = 0; i < 21; i++) {
+        this->deleteRequest(&this->requests_10[i]);
     }
-    for (i = 0, request = this->pool_7C; i < 2; i++, request++) {
-        request->clear();
+    for (i = 0; i < 2; i++) {
+        this->pool_7C[i].clear();
     }
 }
 
 /* One tick of the request state machine: opens the slot's request, resolves the ones that may
    move this tick and retires the ones whose target has gone away. */
+#pragma push
+#pragma optimization_level 4
 void NetworkSessionManager::move()
 {
-    NetworkRequest* req;
-    NetworkLogger* log;
-    NetworkBuffer* buf;
     s32 i;
+    s32 j;
+    NetworkRequest* req;
 
-    buf = this->buffer;
-    if (buf != 0) {
-        buf->end();
+    if (this->buffer != 0) {
+        this->buffer->end();
     }
     for (i = 0; i < 21; i++) {
         req = this->requests_10[i];
@@ -254,7 +259,6 @@ void NetworkSessionManager::move()
                 break;
             case 2:
                 {
-                    s32 j;
                     for (j = 0; j < 21; j++) {
                         if (this->request_state_64[j] != 0) {
                             break;
@@ -263,14 +267,16 @@ void NetworkSessionManager::move()
                     if (j == 21) {
                         break;
                     }
-                    log = getNetworkLogger();
-                    log->log_14("NetworkSessionManager::move: request[%d] is moving, stand by...\n", j);
+                    getNetworkLogger()->log_14("NetworkSessionManager::move: request[%d] is moving, stand by...\n", j);
                     continue;
                 }
             case 3:
             case 6:
                 if (this->request_state_64[11] != 0 || this->request_state_64[12] != 0 ||
-                    this->request_state_64[2] != 0 || this->request_state_64[1] != 0) {
+                    this->request_state_64[2] != 0) {
+                    continue;
+                }
+                if (this->request_state_64[1] != 0) {
                     continue;
                 }
                 break;
@@ -281,8 +287,10 @@ void NetworkSessionManager::move()
                 /* falls through */
             case 11:
                 if (this->request_state_64[2] != 0 || this->request_state_64[1] != 0 ||
-                    this->request_state_64[3] != 0 || this->request_state_64[6] != 0 ||
-                    this->request_state_64[10] != 0) {
+                    this->request_state_64[3] != 0 || this->request_state_64[6] != 0) {
+                    continue;
+                }
+                if (this->request_state_64[10] != 0) {
                     continue;
                 }
                 break;
@@ -305,6 +313,8 @@ void NetworkSessionManager::move()
         }
     }
 }
+#pragma pop
+#pragma peephole on
 
 #pragma dont_inline on
 s32 NetworkRequest::isOwned()
@@ -767,7 +777,6 @@ void NetworkSessionManager::putTerminatorC(u32 a, u32 b, u8 c)
         buf->put(a, b, 1, 1, &data, c);
     }
 }
-#pragma peephole on
 
 /* Maps each requested player slot and puts the batch on the current stream buffer. */
 void NetworkSessionManager::sendBatch_138(u32 a, u32 b, s32 count, const s8* data)
@@ -777,6 +786,9 @@ void NetworkSessionManager::sendBatch_138(u32 a, u32 b, s32 count, const s8* dat
     s32 i;
 
     n = 0;
+    if (count <= 0) {
+        return;
+    }
     for (i = 0; i < count; i++) {
         s8 value = mapId_1C0(data[i]);
         if (value >= 0) {
@@ -796,6 +808,9 @@ void NetworkSessionManager::slot_13C(u32 a, u32 b, s32 count, const s8* data, u8
     s32 i;
 
     n = 0;
+    if (count <= 0) {
+        return;
+    }
     for (i = 0; i < count; i++) {
         s8 value = mapId_1C0(data[i]);
         if (value >= 0) {
@@ -811,12 +826,14 @@ void NetworkSessionManager::slot_13C(u32 a, u32 b, s32 count, const s8* data, u8
 void NetworkSessionManager::slot_140(u32 a, u32 b, s8 idx)
 {
     s8 data;
+    s8 value;
     NetworkBuffer* buf;
 
-    data = mapId_1C0(idx);
-    if (data < 0) {
+    value = mapId_1C0(idx);
+    if (value < 0) {
         return;
     }
+    data = value;
     buf = this->buffer;
     if (buf != 0) {
         buf->put(a, b, 0, 1, &data, 0xFF);
@@ -827,17 +844,20 @@ void NetworkSessionManager::slot_140(u32 a, u32 b, s8 idx)
 void NetworkSessionManager::slot_144(u32 a, u32 b, s8 idx, u8 flags)
 {
     s8 data;
+    s8 value;
     NetworkBuffer* buf;
 
-    data = mapId_1C0(idx);
-    if (data < 0) {
+    value = mapId_1C0(idx);
+    if (value < 0) {
         return;
     }
+    data = value;
     buf = this->buffer;
     if (buf != 0) {
         buf->put(a, b, 1, 1, &data, flags);
     }
 }
+#pragma peephole on
 
 void NetworkSessionManager::flush()
 {
@@ -906,6 +926,7 @@ void NetworkSessionManager::slot_168()
 /* NetworkSessionManager - pool + mutex helpers                                               */
 /* ----------------------------------------------------------------------------------------- */
 
+#pragma peephole off
 NetworkRequest* NetworkSessionManager::allocRequest()
 {
     s32 i;
@@ -917,6 +938,7 @@ NetworkRequest* NetworkSessionManager::allocRequest()
     }
     return 0;
 }
+#pragma peephole on
 
 void NetworkSessionManager::deleteRequest(NetworkRequest** slot)
 {
@@ -1006,7 +1028,7 @@ void NetworkRequest::restartTimer(f32 interval)
     UnlockMutex(&this->mutex_78);
 }
 
-/* Moves the 0x60-byte record block an out-of-band request carries. */
+/* Moves the 0x48-byte record block (a circle's option list). */
 void NetworkRequest::copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src)
 {
     *dst = *src;
@@ -1021,21 +1043,21 @@ void NetworkRequest::copyRecord(NetworkSessionRecordBlock* dst, const NetworkSes
    deleting flag, so the peephole pass is off for the records. */
 #pragma peephole off
 
-/* Builds the chat record around its sender's address. */
-NetworkSessionSlotInfo::NetworkSessionSlotInfo()
-{
-}
-
 /* Destroys the chat record's sender address. */
 NetworkSessionSlotInfo::~NetworkSessionSlotInfo()
 {
 }
 
-/* The reflection callbacks: both re-order the six incoming arguments and tail-call the real body. */
-/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
-extern "C" void networkSessionReflectCallback(void* a0, void* a1, s8 a2, void* a3, void* a4, void* a5)
+/* Builds the chat record around its sender's address. */
+NetworkSessionSlotInfo::NetworkSessionSlotInfo()
 {
-    networkSessionReflect0(a5, a0, a2, a3, a4, a1);
+}
+
+/* The reflection callbacks: both re-order the six incoming arguments and tail-call the real body. */
+/* untyped: caller-owned payload - the session's `NetworkSessionCallback`: the packet data and the user pointer */
+extern "C" void networkSessionReflectCallback(s32 event, s32 index, u32 arg, s32 size, const void* data, void* user)
+{
+    networkSessionReflect0(user, (void*)event, index, (void*)arg, (void*)size, (void*)data);
 }
 
 /* untyped: caller-owned payload - the six arguments are forwarded unchanged */
@@ -1045,27 +1067,49 @@ extern "C" void networkSessionReflectCallbackEx(void* a0, void* a1, void* a2, vo
 }
 
 /* Destroys the 32 circle entries. */
-NetworkSessionCircleList::~NetworkSessionCircleList()
+inline NetworkSessionCircleList::~NetworkSessionCircleList()
+{
+}
+
+/* Destroys a circle entry's address. */
+inline NetworkSessionCircleInfo::~NetworkSessionCircleInfo()
+{
+}
+
+/* Returns the game-spy thread singleton. */
+inline GameSpyInterfaceThread* GameSpyInterfaceThread::getInstance()
+{
+    return sGameSpyInterfaceThread;
+}
+
+/* ----------------------------------------------------------------------------------------- */
+/* NetworkSessionManagerPat                                                                   */
+/* ----------------------------------------------------------------------------------------- */
+
+/* Builds the Pat side of the session: its own request pair, its player records and the circle
+   list, then the two on-demand singletons the Pat layer drives. */
+#pragma dont_inline on
+NetworkSessionManagerPat::NetworkSessionManagerPat()
+{
+    if (getInstance_() == 0) {
+        new PatInterface();
+    }
+    if (GameSpyInterfaceThread::getInstance() == 0) {
+        new GameSpyInterfaceThread();
+    }
+    this->field_6E75 = 0;
+    this->clear();
+}
+
+#pragma dont_inline off
+
+/* Builds the 32 circle entries. */
+NetworkSessionCircleList::NetworkSessionCircleList()
 {
 }
 
 /* Builds a circle entry around its address. */
 NetworkSessionCircleInfo::NetworkSessionCircleInfo()
-{
-}
-
-/* Destroys a circle entry's address. */
-NetworkSessionCircleInfo::~NetworkSessionCircleInfo()
-{
-}
-
-GameSpyInterfaceThread* GameSpyInterfaceThread::getInstance()
-{
-    return sGameSpyInterfaceThread;
-}
-
-/* Builds the 32 circle entries. */
-NetworkSessionCircleList::NetworkSessionCircleList()
 {
 }
 
@@ -1141,33 +1185,29 @@ NetworkRequestPat::NetworkRequestPat()
     reset();
 }
 #pragma dont_inline off
-#pragma peephole on
-
-/* ----------------------------------------------------------------------------------------- */
-/* NetworkSessionManagerPat                                                                   */
-/* ----------------------------------------------------------------------------------------- */
-
-/* Builds the Pat side of the session: its own request pair, its player records and the circle
-   list, then the two on-demand singletons the Pat layer drives. */
-#pragma dont_inline on
-#pragma peephole off
-NetworkSessionManagerPat::NetworkSessionManagerPat()
-{
-    if (getInstance_() == 0) {
-        new PatInterface();
-    }
-    if (GameSpyInterfaceThread::getInstance() == 0) {
-        new GameSpyInterfaceThread();
-    }
-    this->field_6E75 = 0;
-    this->clear();
-}
 
 #pragma dont_inline on
 /* Releases the Pat session; MWCC destroys the members and the base after the body. */
 NetworkSessionManagerPat::~NetworkSessionManagerPat()
 {
     this->release();
+}
+
+
+/* Starts a Pat session: the interface singletons, the base's own init and then a clear. */
+#pragma dont_inline on
+#pragma peephole off
+void NetworkSessionManagerPat::init(u32 a, u32 b)
+{
+    if (getInstance_() == 0) {
+        new PatInterface();
+    }
+    this->NetworkSessionManager::init(a, b);
+    if (GameSpyInterfaceThread::getInstance() == 0) {
+        new GameSpyInterfaceThread();
+    }
+    this->field_6E75 = 0;
+    this->clear();
 }
 
 #pragma dont_inline on
@@ -1200,24 +1240,6 @@ void NetworkSessionManagerPat::clear()
     }
     this->field_6E74 = 0;
 }
-#pragma peephole reset
-
-/* Starts a Pat session: the interface singletons, the base's own init and then a clear. */
-#pragma dont_inline on
-#pragma peephole off
-void NetworkSessionManagerPat::init(u32 a, u32 b)
-{
-    if (getInstance_() == 0) {
-        new PatInterface();
-    }
-    this->NetworkSessionManager::init(a, b);
-    if (GameSpyInterfaceThread::getInstance() == 0) {
-        new GameSpyInterfaceThread();
-    }
-    this->field_6E75 = 0;
-    this->clear();
-}
-
 #pragma peephole reset
 /* Tears the Pat session down: drains the game-spy thread, then runs the base class's teardown. */
 void NetworkSessionManagerPat::release()

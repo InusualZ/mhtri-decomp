@@ -263,7 +263,7 @@ public:
                                   const u8* address, s32 param);
     /* +0x10 */ virtual void resetAllSlots();
     /* +0x14 */ virtual void move();
-    /* +0x18 */ virtual s32 set(s32 isSelf, const u8* address);
+    /* +0x18 */ virtual s8 set(s32 isSelf, const u8* address);
     /* +0x1C */ virtual void resetSlot(s8 index);
     /* +0x20 */ virtual void connect(s8 index, u32 a, u32 b);
     /* +0x24 */ virtual void disconnectAll();

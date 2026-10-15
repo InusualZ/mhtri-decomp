@@ -16,12 +16,11 @@
  *   the base).
  * RESIDUALS. Every row has a body.
  *  - `networkSessionReflect1`, `moveStartSession`: one callee-saved register colouring each;
- *  - `networkSessionReflect0`: the event-code select's scheduling;
- *  - `setCircleInfo`: the option's enable byte compares with `cmplwi` where retail has `cmpwi` (u8, s8, bool tried);
- *  - `packCircleOptions`: the name entries are addressed from the list base where retail strength-reduces a pointer at
- *    +0x08 (the explicit pointer spelling swaps two registers);
+ *  - `networkSessionReflect0`: the event-code select's scheduling (retail extends the chat sender into r4 and loads
+ *    the code 31 after the compare; `if`/`else`, the ternary and the inverted test measure lower);
  *  - `updatePlayerRecord`: under its `#pragma peephole on` island (retail stores the u32 state into the byte field
- *    unmasked) MWCC folds the second dispatch's `lwz r12,0(r3)` into `lwz r12,0x540(r31)`;
+ *    unmasked) MWCC folds the second dispatch's `lwz r12,0(r3)` into `lwz r12,0x540(r31)`; with the pass off the
+ *    store gains a `clrlwi` (a `(u8)` cast and a named object pointer change nothing), which measures lower;
  *  - `.sdata2`: the pool entries pair by address, not by name (anonymous `@NNN` against the map's `lbl_8079C758`;
  *    naming one would claim a symbol the original did not have, playbook 58);
  *  - `.sdata` 0xC against 0x10; `flipcheck` reads both small-data pools as a partial pool of a TU spanning several
@@ -35,6 +34,8 @@
  *    mode byte signed `set ? 1 : 2`;
  *  - every handler is one state machine over `NetworkRequest::state_00` (0 start, its own waits, 100 cancelled, 110
  *    failed); `requestFlags_30C[i]`/`requestIds_360[i]` are the reply bits and ids `networkSessionReflect1` sets;
+ *  - `setCircleInfo` compares the option's enable byte as `(s32)` (retail's `cmpwi`; the plain `u8` gives `cmplwi`);
+ *    `packCircleOptions` addresses each name entry through `e = &src->entries_08[i]` (retail's pointer at +0x08);
  *  - `32 <= id` keeps retail's two signed compares (`id >= 32` merges them into one `cmplwi`); `-(!x)` gives retail's
  *    `cntlzw`/`srwi`/`neg` where `-(x == 0)` gives `extrwi`;
  *  - the stack copies are real `NetworkUniqueId`/`NetworkSessionSlotInfo` locals declared in the block retail constructs
@@ -2851,7 +2852,7 @@ void NetworkSessionManagerPat::setCircleInfo(s32 index, const PatCircleInfo* inf
         PatCircleOption* option = &options->entries_04[i];
         u32 slot = option->slot_00 - 1;
 
-        if (slot < 8 && option->enabled_01 == 1) {
+        if (slot < 8 && (s32)option->enabled_01 == 1) {
             item->options_128.slots_08[slot].enabled_00 = 1;
             item->options_128.slots_08[slot].value_04 = option->value_04;
             if (item->options_128.count_04 <= slot) {
@@ -3039,6 +3040,7 @@ s32 NetworkSessionManagerPat::packCircleOptions(PatCircleOption* dst, s32 max, N
 {
     s32 count;
     u32 i;
+    NetworkNameEntry* e;
 
     if (dst == NULL || max <= 0 || src == NULL) {
         return 0;
@@ -3048,10 +3050,11 @@ s32 NetworkSessionManagerPat::packCircleOptions(PatCircleOption* dst, s32 max, N
         src->count_04 = 8;
     }
     for (i = 0; i < src->count_04; i++) {
+        e = &src->entries_08[i];
         dst->slot_00 = i + 1;
-        if (src->entries_08[i].enabled_00 == 1) {
+        if (e->enabled_00 == 1) {
             dst->enabled_01 = 1;
-            dst->value_04 = src->entries_08[i].value_04;
+            dst->value_04 = e->value_04;
             dst++;
             count++;
             if (count >= max) {
@@ -3324,7 +3327,7 @@ void closeNetworkSessionManagerPat(NetworkSessionManagerPat* self)
 s8 NetworkSessionManagerPat::connectPeer(const NetworkUniqueId* address, u32 value)
 {
     PatPeerConnect peer;
-    s32 slot;
+    s8 slot;
 
     if (GameSpyInterfaceThread::getInstance() == NULL || this->buffer == NULL || address == NULL || value == 0 ||
         this->field_3C8 == 0) {

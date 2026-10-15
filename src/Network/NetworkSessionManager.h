@@ -19,8 +19,8 @@
 #include "Network/network_shared_data.h"
 #include "Runtime.PPCEABI.H/ptmf.h"
 
-/* The 0x60-byte record block `NetworkRequest::copyRecord` moves.  Only its size (24 words) is
-   evidenced - the two leading scalars are how MWCC splits the copy, not a field the range reads. */
+/* The 0x48-byte record block `NetworkRequest::copyRecord` moves (a circle's option list).  Only its size (18 words)
+   is evidenced - the two leading scalars are how MWCC splits the copy, not a field the range reads. */
 typedef struct NetworkSessionRecordPair {
     u32 lo_00;         /* +0x00 */
     u32 hi_04;         /* +0x04 */
@@ -29,8 +29,8 @@ typedef struct NetworkSessionRecordPair {
 typedef struct NetworkSessionRecordBlock {
     u32 first_00;      /* +0x00 */
     u32 second_04;     /* +0x04 */
-    NetworkSessionRecordPair rest_08[11];   /* +0x08..+0x5F */
-} NetworkSessionRecordBlock;   /* size: 0x60 */
+    NetworkSessionRecordPair rest_08[8];   /* +0x08..+0x47 */
+} NetworkSessionRecordBlock;   /* size: 0x48 */
 
 /* The record classes the Pat layer's arrays and stack frames hold.  Each size is evidenced (the
    `__construct_array` / `__destroy_arr` element sizes, and the field offsets the range addresses).  Each embeds a
@@ -196,7 +196,7 @@ struct NetworkRequest : public NetworkRequestHead {
     void begin(NetworkSessionManager* owner, NetworkRequestDesc desc, u32 count, ...);   /* starts it: id, clock, handler and up to 8 word arguments */
     void cancel();                           /* sets the cancel flag */
     s32 isCancelled();                       /* the cancel flag */
-    static void copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src);   /* moves the 0x60-byte record block */
+    static void copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src);   /* moves the 0x48-byte record block */
 };   /* size: 0xA4 */
 
 /* The Pat layer's own request record: the same 0xA4-byte layout with a constructor, a destructor and a reset of its
@@ -698,7 +698,7 @@ extern NetworkRequestDesc networkRequestDesc428;
 
 /* the writer's remaining entry points the tail of the range drives (`networkStreamWriter_attach`/`_reserve`) are
    `Network/NetworkStreamSink.cpp`'s, declared in its header; the writer methods `Network/NetworkCommunityPat.cpp`
-   owns (`writeByte`..`writeBytes`, `networkStreamWriter_putBytes`..`_size`) are declared in
+   owns (`writeByte`..`writeBytes`, `NetworkStreamWriterDefault::attach`..`_size`) are declared in
    `Network/NetworkCommunityPat.h` */
 
 /* The manager logger accessor `getNetworkLogger` is *not* declared here: no registered unit owns it,
@@ -721,8 +721,8 @@ extern u32 NetworkRequest_idCounter;
 
 /* the two reflection adapters (this unit defines them; `initNetworkSessionStable` takes the first
    one's address as the session vtable's +0x0C callback) */
-/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
-void networkSessionReflectCallback(void* a0, void* a1, s8 a2, void* a3, void* a4, void* a5);
+/* untyped: caller-owned payload - the session's `NetworkSessionCallback`: the packet data and the user pointer */
+void networkSessionReflectCallback(s32 event, s32 index, u32 arg, s32 size, const void* data, void* user);
 /* untyped: caller-owned payload - the six arguments are forwarded unchanged */
 void networkSessionReflectCallbackEx(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5);
 

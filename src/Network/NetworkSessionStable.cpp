@@ -735,7 +735,7 @@ void NetworkSessionStable::move()
 }
 
 /* Takes the free slot, builds its connection and hands it the session's callback and the address record. */
-s32 NetworkSessionStable::set(s32 isSelf, const u8* address)
+s8 NetworkSessionStable::set(s32 isSelf, const u8* address)
 {
     NetworkConnectionStable* connection;
     u8 block[0x80];
