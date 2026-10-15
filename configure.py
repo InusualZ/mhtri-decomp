@@ -1268,7 +1268,7 @@ config.libs = [
             # SSL/ssl and NCD/ncdsystem: same SDK build; GC/3.0a5.2 measured 5 / 5 better, 0 worse (docs/network.md).
             Object(NonMatching, "SSL/ssl.cpp"),
             Object(NonMatching, "NCD/ncdsystem.c"),
-            Object(NonMatching, "NET/netmisc.c"),  # the RevoEX NET helpers after NCD: src/NET/netmisc.c header
+            Object(Matching, "NET/netmisc.c"),  # the RevoEX NET helpers after NCD: src/NET/netmisc.c header
         ],
     },
     {
