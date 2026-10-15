@@ -20,6 +20,9 @@ void fn_805634A4(void* self);
 
 extern f32 lbl_807946D8[2];  /* a small-data record whose float at +4 is written by fn_8056167C */
 
+/* The label strings per layout type (.data 0x806574D8): thirteen rows of eight layouts. */
+extern const wchar_t* const hkbLayoutLabels[13][8];
+
 #ifdef __cplusplus
 }
 #endif

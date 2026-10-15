@@ -17,6 +17,27 @@ u8 lbl_80794750[];
 
 #ifdef __cplusplus
 }
+
+/* The USB keyboard's lock and shift state: the caps lock and the two shift keys, one bit each.  size: 0x1 */
+class HkbKbdState {
+public:
+    HkbKbdState();
+    ~HkbKbdState();
+    void setCapsLock(const u8& bCapsLock);
+
+    /* Returns whether a shift key is held. */
+    bool isShiftHeld() const { return mbLeftShift || mbRightShift; }
+
+    /* +0x0 */ u8 mbCapsLock : 1;
+    /* +0x0 */ u8 mbLeftShift : 1;
+    /* +0x0 */ u8 mbRightShift : 1;
+}; /* size: 0x1 */
+
+/* Returns the USB keyboard's state, built on first use. */
+inline HkbKbdState& hkbGetKbdState() {
+    static HkbKbdState sState;
+    return sState;
+}
 #endif
 
 #endif

@@ -41,6 +41,8 @@
  *            until the range is re-cut.
  * NAMES.     GUESS classes HbmPaneManager and HbmKey (homebutton/hbm_value.h) and their members; the slots named
  *            v_0xNNN are not understood.
+ * NAMES.     GUESS class HbmKeyboard (the keyboard the band builds; its table 0x806521A8 and destructor thunk
+ *            0x8055EAB8 are this unit's).
  */
 
 #include "types.h"
@@ -881,7 +883,7 @@ s32 HbmPaneManager::onKeyRelease(HkbManager* manager) {
 
 /* Returns the layout's pane called `name`, searching the whole tree. */
 nw4r::lyt::TextBox* HbmPaneManager::findTextBox(const char* name) {
-    return (nw4r::lyt::TextBox*)mpLayout->mpRootPane->FindPaneByName(name, true);
+    return (nw4r::lyt::TextBox*)mpLyt->mpRootPane->FindPaneByName(name, true);
 }
 
 /* Destroys the band key (its animations are released by destroy). */
@@ -1052,14 +1054,16 @@ void fn_8055E838(VuObject* self, void* value) { self->field_0x14 = value; }
  * deleting destructors: `if (self && flag > 0) delete self;` returns the object (the compiler's own
  * deleting-destructor shape, dispatching into the class's non-deleting destructor first)
  * ------------------------------------------------------------------------------------------------ */
-void* fn_8055E840(void* self, s32 flag)
+/* The software keyboard as the band builds it: only its destructor is its own, so its class table
+ * (0x806521A8) and the this-adjusting destructor thunk come out of this unit.  size: 0x150 */
+class HbmKeyboard : public HkbKeyboard {
+public:
+    virtual ~HbmKeyboard();
+};
+
+/* Destroys the keyboard. */
+HbmKeyboard::~HbmKeyboard()
 {
-    if (self != 0) {
-        fn_805385D0(self, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
 }
 
 void* fn_8055E898(void* self, s32 flag)
@@ -1124,9 +1128,6 @@ void* fn_8055EA50(void* self, s32 flag)
 /* ---------------------------------------------------------------------------------------------------
  * adjustor thunks: the retail body is `subi r3,r3,N; b <deleting destructor>` (the flag passes through)
  * ------------------------------------------------------------------------------------------------ */
-
-/* 0x8055EAB8 (0x8): Adjusts a base pointer by -0x4C and runs the deleting destructor. */
-u8* hbmDeletingDtorThunk4C(u8* base, s32 flag) { return (u8*)fn_8055E840(base - 0x4C, flag); }
 
 /* 0x8055EAC0 (0x8): Adjusts a base pointer by -0x34 and runs the deleting destructor. */
 u8* hbmDeletingDtorThunk34(u8* base, s32 flag) { return (u8*)fn_8055E898(base - 0x34, flag); }

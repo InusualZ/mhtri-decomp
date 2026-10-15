@@ -9,15 +9,12 @@
 #define HKB_QWERTY_KEY_COUNT 50  /* P_key_00..49 */
 #define HKB_QWERTY_NAME_COUNT 55 /* the character keys, DELETE, LF, SPACE, SHIFT and CAPS */
 
-/* One character key: its pane name and the characters it types plain, with caps lock, shifted, and shifted
- * with caps lock. */
+/* One character key: its pane name and the characters it types, indexed by the keyboard's case column (plain,
+ * with caps lock, shifted, shifted with caps lock). */
 /* size: 0xC */
 struct HkbQwertyKey {
     const char* name;        /* +0x00 */
-    wchar_t plain;           /* +0x04 */
-    wchar_t caps;            /* +0x06 */
-    wchar_t shift;           /* +0x08 */
-    wchar_t shift_caps;      /* +0x0A */
+    wchar_t chars[4];        /* +0x04 */
 };
 
 extern const char* hkb_qwerty_key_names[HKB_QWERTY_NAME_COUNT];

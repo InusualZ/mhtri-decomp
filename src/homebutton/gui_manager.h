@@ -115,7 +115,7 @@ struct CNode {
     /* +0x08 */ CNode* next_0x08;
 }; /* size: 0xC */
 
-/* The nw4hbm::lyt::Pane view fn_8056B6D0 reads: only its inline name at +0xBC. */
+/* The nw4hbm::lyt::Pane view hkbGetPaneComponentByName reads: only its inline name at +0xBC. */
 struct Pane {
     /* +0x00 */ u8   pad_0x00[0xBC];
     /* +0xBC */ char name_0xBC[0x20];

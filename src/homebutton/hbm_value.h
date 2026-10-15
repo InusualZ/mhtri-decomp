@@ -32,6 +32,7 @@ extern f32 lbl_8079D700;
 
 #ifdef __cplusplus
 #include "nw4r/fn_805012C4.h"
+#include "homebutton/hkb_drawinfo.h"
 
 struct MEMAllocator;
 struct HkbManager;
@@ -44,6 +45,7 @@ namespace nw4r {
 namespace lyt {
 class Pane;
 class Layout;
+class ResourceAccessor;
 class TextBox;
 class AnimTransform;
 }  // namespace lyt
@@ -64,6 +66,16 @@ public:
     /* slot +0x028 */ virtual void v_0x028();
     /* slot +0x02C */ virtual void v_0x02C();
     /* slot +0x030 */ virtual u32 v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void setVisible(s32 visible);
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void v_0x054();
+    /* slot +0x058 */ virtual void setEnable(s32 enable);
 }; /* size: 0x4 */
 
 /* The pane manager's cursor (embedded at its +0x8C): the slots the band calls.
@@ -111,12 +123,12 @@ public:
     /* slot +0x06C */ virtual void v_0x06C();
     /* slot +0x070 */ virtual void v_0x070();
 
-    /* +0x04 */ nw4r::lyt::Layout* mpLayout;
+    /* +0x04 */ nw4r::lyt::Layout* mpLyt;
     /* +0x08 */ u32 unused_0x08;
-    /* +0x0C */ HbmPaneLayout* mpBuilder;
+    /* +0x0C */ nw4r::lyt::ResourceAccessor* mpResAccessor;
     /* +0x10 */ HbmPaneLayout* mpRoot;
     /* +0x14 */ HbmSoundPlayer* mpSound;
-    /* +0x18 */ u32 mDrawInfo[21];
+    /* +0x18 */ nw4r::lyt::DrawInfo mDrawInfo;
     /* +0x6C */ nw4r::ut::List mComponents;
     /* +0x78 */ u8 unused_0x78[0x10];
     /* +0x88 */ u8 mbInputActive;
@@ -128,11 +140,16 @@ public:
  * and its state.  Keys, buttons and the widgets' parts derive from it.  size: 0x30 */
 class HbmKey {
 public:
+    HbmKey(nw4r::lyt::Pane* pane) : mpPane(pane), mpCurAnim(NULL), mpNextAnim(NULL) {
+        nw4r::ut::List_Init(&mAnims, 0x10);
+        mState = 0;
+    }
+
     /* slot +0x008 */ virtual void reset();
     /* slot +0x00C */ virtual void update();
     /* slot +0x010 */ virtual void setAnim(s32 anim);
     /* slot +0x014 */ virtual void setState(u32 state);
-    /* slot +0x018 */ virtual BOOL isAnimating();
+    /* slot +0x018 */ virtual s32 isAnimating();
     /* slot +0x01C */ virtual HbmKeyAnim* findAnim(u32 kind);
     /* slot +0x020 */ virtual ~HbmKey();
 

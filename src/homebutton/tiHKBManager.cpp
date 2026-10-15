@@ -48,6 +48,7 @@
 #include "MEM/mem_expheap.h"
 #include "KBD/kbd.h"
 #include "homebutton/hbm_hermite.h"
+#include "homebutton/tiHKBManager.h"
 #include "nw4r/fn_805012C4.h"
 
 /* The vtables this unit's managers store (the unit's own `.data`; their classes are not reconstructed). */
@@ -492,7 +493,7 @@ extern "C" u32 fn_8056B424(u32* a, u32* b) { return *b != *a; }
 extern "C" void fn_8056B6C8(Component* self, void* pane) { self->field_0x9C = pane; }
 
 /* --- 0x8056B6D0: getPaneComponentByName - find the component whose pane's name matches `name`. --- */
-extern "C" Component* fn_8056B6D0(PaneManager* self, const char* name) {
+extern "C" Component* hkbGetPaneComponentByName(PaneManager* self, const char* name) {
     for (u32 i = 0; i < self->list_0x24.mSize; i++) {
         Node* n = (Node*)nw4r::ut::List_GetNth((nw4r::ut::List*)&self->list_0x24, (u16)i);
         Pane* pane = (Pane*)n->mKey;
@@ -774,21 +775,6 @@ void fn_8056C148(u32 value, u32* out)
     *out = value;
 }
 
-/* A cursor over the set key bits of the manager's channels: the word it scans (`kind` 0..3 selects channel
- * word +0x04..+0x10), the bit and channel it stands on and the number of bits it has passed.
- * size: 0x0C */
-struct HkbKeyIter {
-    /* +0x00 */ HkbManager* manager;
-    /* +0x04 */ u8 kind;
-    /* +0x05 */ s8 bit;
-    /* +0x06 */ u8 channel;
-    /* +0x07 */ u8 pad_07;
-    /* +0x08 */ u16 count;
-    /* +0x0A */ u8 pad_0A[2];
-};
-
-HkbKeyIter hkbKeyIterSeek(const HkbKeyIter* start);
-
 /* 0x8056C3D8: blend the two packed words +0x34 / +0x38 through the mask +0x3C. */
 u32 fn_8056C3D8(HkbManager* self)
 {
@@ -836,7 +822,7 @@ HkbKeyIter hkbKeyIterBeginWord3(HkbManager* manager)
 }
 
 /* 0x8056C5E8: set the two words +0x38 / +0x3C. */
-void fn_8056C5E8(HkbManager* self, u32 a, u32 b)
+void hkbSetKeyRepeat(HkbManager* self, u32 a, u32 b)
 {
     self->channels[0].w24 = a;
     self->channels[0].w28 = b;
