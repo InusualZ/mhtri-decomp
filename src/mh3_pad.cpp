@@ -79,7 +79,7 @@
 #include "mh3_pad/lb_param_w.h" /* LbParamWork / lb_param_w (rule 1/2) */
 #include "mh3_pad/option_w.h"   /* option_w (rule 2) */
 #include "MEM/mem.h"            /* MEMAllocator (rule 1) */
-#include "RSO/runtime.h"     /* RSOModule + RSOStaticLocateObject (rule 2) */
+#include "RSO/runtime.h"     /* RSOModule, RSOStaticLocateObject, RSOUnLinkList (rule 2) */
 #include "fn_80040598.h"     /* the game-root RSO loaders (rule 2) */
 #include "ef/fn_800CDB2C.h"  /* GameMode_ck / fn_800CEE2C (rule 2) */
 #include "mh3_pad/task.h"    /* `TaskSlot` (rule 1) */
@@ -165,7 +165,6 @@ extern f32 lbl_80795AE4;
 
 /* --- helpers owned by other units (rule 2 headers included above) --- */
 extern void DCFlushRange(void* addr, u32 size);
-extern void fn_804DAF94(void* module);
 extern void KPADInit(void);
 extern void KPADShutdown(void);
 extern void WPADStartSyncDevice(void);
@@ -255,19 +254,19 @@ extern "C" void rso_overlay_release_all(void)
         loadedE4 = 1;
     }
     if (loadedD8 != 0) {
-        fn_804DAF94(lbl_807947D8);
+        RSOUnLinkList(lbl_807947D8);
         lbl_807947D8 = NULL;
     }
     if (loadedDC != 0) {
-        fn_804DAF94(lbl_807947DC);
+        RSOUnLinkList(lbl_807947DC);
         lbl_807947DC = NULL;
     }
     if (loadedE0 != 0) {
-        fn_804DAF94(lbl_807947E0);
+        RSOUnLinkList(lbl_807947E0);
         lbl_807947E0 = NULL;
     }
     if (loadedE4 != 0) {
-        fn_804DAF94(lbl_807947E4);
+        RSOUnLinkList(lbl_807947E4);
         lbl_807947E4 = NULL;
     }
     lbl_807947C8[0] = 0xFF;
@@ -361,7 +360,7 @@ extern "C" void stage_map_set(u8 which)
     if ((s8)lbl_807947C8[1] == -1 || (s8)lbl_807947C8[1] != (s8)sel) {
         if (lbl_807947E4 != NULL) {
             lbl_807947E4->epilog(lbl_807947E4);
-            fn_804DAF94(lbl_807947E4);
+            RSOUnLinkList(lbl_807947E4);
             lbl_807947E4 = NULL;
         }
         DCFlushRange((void*)lbl_807947C0, (u32)(0x80C4CE00 - lbl_807947C0));

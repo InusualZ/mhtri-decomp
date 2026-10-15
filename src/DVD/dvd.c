@@ -2,7 +2,7 @@
  * DVD/dvd.c - the SDK DVD command layer (state machine, error recovery, ReadAbs/Inquiry/Cancel/Reset).
  *
  * RANGE. `.text` 0x804A6410-0x804AB040; `.data` 0x80618800-0x80618C10; `.bss` 0x80741A40-0x807466F0; `.sdata`
- *   0x80793DE0-0x80793DF8; `.sbss` 0x807950A0-0x80795138 (53 functions / 0x4AB8 B).
+ *   0x80793DE0-0x80793DF8; `.sbss` 0x80795090-0x80795138 (53 functions / 0x4AB8 B).
  *   - the DOL string `dvd.c` (.sdata 0x80793DEC) is the `__FILE__` of the FST-size panic; the version string `<< RVL_SDK -
  *     DVD ... >>` at `.data` 0x80618800 is registered by `DVDInit` through `__DVDVersion` (.sdata 0x80793DE0)
  *   - `.data`: the two strings, six jump tables (`stateCoverClosed`, `stateBusy` x2, `DVDCancelAsync` x2, `DVDCancel`)
@@ -30,8 +30,9 @@
  *   inlined `__DVDPrepareResetAsync` (6 bytes); local declaration order and a `DVDCancelAllAsync` inline helper were
  *   measured and fix only the standalone copy or break it.
  *   `.sbss` matches the target's layout (0x98 B, section alignment 32) through the `aligned(32)` `__DVDNumTmdBytes`
- *   (an IOS output word); the split object's `.sbss` is aligned 8, so a `DVD/dvdfs.c` flip needs `align:32` on this
- *   unit's `.sbss` split line (without it this unit's `.sbss` links 0x10 low, at 0x80795090).
+ *   (an IOS output word); the split object's `.sbss` is aligned 8, so this unit's `.sbss` split line carries `align:32`
+ *   and starts at 0x80795090: the 0x10 of fill after `DVD/dvdfs.c`'s `.sbss` is this unit's (its symbols start at
+ *   0x807950A0).
  *   `__DVDStopMotorCommandBlock` is a 0x60 map row; the block is 0x30 and the trailing 0x30 is unreferenced (`.bss`
  *   0x4C80 vs 0x4CB0). `__ErrorInfo` (.bss 0x80746880) sits in `DVD/dvderror.c`'s run.
  *   Relocation names only (bytes identical): the jump tables, the two strings and the `.bss` base (`...bss.0` for

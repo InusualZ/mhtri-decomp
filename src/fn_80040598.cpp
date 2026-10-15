@@ -4,7 +4,7 @@
  *
  * The loaders open a path with `fn_800CEE2C` (a `DVDOpen`-shaped wrapper that fills a 0x3C-byte
  * `DVDFileInfo`), read `ALIGN32(fileInfo.length)` bytes with `fn_800CEDD4`, flush the destination, and
- * hand the loaded object to the RSO runtime (`fn_804DAF8C` / `fn_804DAE40` = list-add-and-locate).
+ * hand the loaded object to the RSO runtime (`RSOLinkList` / `RSOListInit` = list-add-and-locate).
  * The two paths they are called with are `01/hbm_data.rso` (0x8057CA40, .data) and `mh3.sel`
  * (0x80790E30, .sdata), from the caller at 0x800408A8 - the same caller that publishes the `system_w`
  * keyboard slots and initialises the byte array `ck_sub_ovl_idx` reads.  `fn_80040598` also keeps the
@@ -58,10 +58,11 @@
  *     `set_kbd_param__FPcUl`'s `char *`/`ulong`), so the map's name is authoritative and the two
  *     residuals are left as the compiler-build difference they are (the retail DOL's `.comment` is
  *     version 14, ours 15).
- *   - `fn_80040598` (276 B target / 280 B ours, 92.2 %): one extra `b`.  The target reaches its default
- *     body by fall-through and places the two case bodies after it; MWCC puts the case bodies first in
- *     ours, so the default body needs a jump.  `bssSize`/`end` are also coloured r5/r4 in the target and
- *     r4/r3 in ours.  `switch (mode & 0xFF)` is what reproduces the target's `clrlwi` + `cmplwi` pair - a
+ *   - `fn_80040598` (276 B target / 280 B ours): one extra `b`.  The target compares 0xFF, 3, 4, reaches
+ *     its default body by fall-through and places case 3 then case 0xFF after it; MWCC lays the bodies
+ *     out in case-label order, so the default body needs a jump (default-first source order flips the
+ *     compare order to 3, 0xFF, 4; an `if` chain interleaves the compares).  Passing `end` as
+ *     `RSOLinkList`'s `bss` argument gives the target's r5/r4 colouring.  `switch (mode & 0xFF)` is what reproduces the target's `clrlwi` + `cmplwi` pair - a
  *     plain `switch (mode)`, an `if`/`else if` chain on `mode & 0xFF` (276 B, but 84 %) and `-O4,p
  *     -func_align 4` were all measured worse; `-O4,p` costs this function 22 points and drops
  *     `CntSdRsoTerminate` from 100 % to 84.3 %, so `-O3 -inline noauto` stands.
@@ -69,37 +70,33 @@
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit fn_80040598.cpp`.
  * The file name is provisional - `auto/` plus the first symbol's address - because nothing in the object
  * names the original source file.  Rename it the moment there is evidence.
- * NAMES. GUESS (from each body and its callers): kbd_reset_call, kbd_close_call
+ * NAMES. GUESS (from each body and its callers): kbd_reset_call, kbd_close_call, rso_overlay_bss_end (.sbss
+ *   0x807947C4, written only here: the aligned BSS end for load modes 3 and the default).
+ * DATA. `.sbss` 0x807947C4..0x807947C8 is this unit's (sole referencer); 0x807947B4..0x807947D0's other
+ *   words are read by `mh3_pad.cpp` too and stay unclaimed.
  */
 
 #include "types.h"
 #include "unsplit/unknown.h" /* `system_w`/`SystemWork` (undecided module, rule 1/2) */
+#include "DVD/dvdfs.h"      /* DVDFileInfo, DVDClose (rule 2) */
+#include "RSO/runtime.h"    /* RSOModule, RSOLinkList, RSOListInit (rule 2) */
 
 #define ALIGN32(x) (((u32)(x) + 31) & ~31)
 
-/* The SDK's 0x3C-byte DVDFileInfo: `fn_800CEE2C` fills it in, its byte count lives at +0x34 and
- * `fn_800CEDD4` clamps the read to it (`lwz r3,52(r3)` in that function, and both loaders here re-read
- * the same word at 0x34 of their local). */
-typedef struct DVDFileInfo {
-    u8 pad_0x00[0x34];
-    u32 length; /* +0x34: file length in bytes */
-    u8 pad_0x38[4];
-} DVDFileInfo;
-
-/* Loading helpers, all outside this unit (names are the map's, so the relocations pair). */
+/* Loading helpers outside this unit; `fn_800CEE2C` fills the SDK's 0x3C-byte `DVDFileInfo` and
+ * `fn_800CEDD4` clamps the read to its byte count at +0x34. */
 extern "C" int fn_800CEE2C(const char* path, DVDFileInfo* fileInfo);
 extern "C" int fn_800CEDD4(DVDFileInfo* fileInfo, void* dest, u32 size, int prio);
-extern "C" int fn_804A6120(DVDFileInfo* fileInfo);
 extern "C" void DCFlushRange(void* addr, u32 size);
-extern "C" void fn_804DAF8C(void* module);
-extern "C" void fn_804DAE40(void* module);
 
 /* The pool tops this unit maintains, and the sub-overlay index block the caller at 0x800408A8 clears. */
 extern u32 lbl_807947B4;
 extern u32 lbl_807947B8;
 extern u32 lbl_807947C0;
-extern u32 lbl_807947C4;
 extern u8 lbl_807947C8;
+
+/* .sbss 0x807947C4: the end of the last overlay's BSS, stored for load modes 3 and the default. */
+u32 rso_overlay_bss_end;
 
 /* The keyboard tail of the game's system interface block `system_w` lives in
  * `unsplit/unknown.h` (rule 1/2: the type and its declaration are shared with `main.cpp` and
@@ -124,10 +121,10 @@ extern "C" void* fn_80040598(const char* path, void* buffer, u32 mode)
         return NULL;
     }
 
-    fn_804A6120(&fileInfo);
+    DVDClose(&fileInfo);
     DCFlushRange(buffer, size);
 
-    bssSize = *(u32*)((u8*)buffer + 0x1C);
+    bssSize = ((RSOModule*)buffer)->bss_size;
     if (bssSize != 0) {
         end = ALIGN32((u32)buffer + size);
 
@@ -136,18 +133,18 @@ extern "C" void* fn_80040598(const char* path, void* buffer, u32 mode)
             lbl_807947B8 = ALIGN32(end + bssSize);
             break;
         case 3:
-            lbl_807947C4 = ALIGN32(end + bssSize);
+            rso_overlay_bss_end = ALIGN32(end + bssSize);
             break;
         case 4:
             break;
         default:
             lbl_807947C0 = ALIGN32(end + bssSize);
-            lbl_807947C4 = ALIGN32(end + bssSize);
+            rso_overlay_bss_end = ALIGN32(end + bssSize);
             break;
         }
     }
 
-    fn_804DAF8C(buffer);
+    RSOLinkList((RSOModule*)buffer, (void*)end);
     return buffer;
 }
 
@@ -168,9 +165,9 @@ extern "C" void* CntSdRsoTerminate(const char* path, void* buffer)
         return NULL;
     }
 
-    fn_804A6120(&fileInfo);
+    DVDClose(&fileInfo);
     DCFlushRange(buffer, size);
-    fn_804DAE40(buffer);
+    RSOListInit((RSOModule*)buffer);
     lbl_807947B4 = (u32)buffer + size;
     return buffer;
 }

@@ -46,6 +46,7 @@
 #include "ef/eft007.h"
 #include "sound/fn_800D7F54.h"
 #include "ef/fn_800FD864_fx_types.h"
+#include "DVD/dvdfs.h" /* DVDFileInfo, DVDClose (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * the family work block `eft_res_slot_get(0x8F4)` attaches to the slot at `_EFT::work_0x38`
@@ -134,9 +135,8 @@ extern "C" void mtx34_copy(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void cpSetRotMatrix(_CP_VECTOR* rot, nw4r::math::MTX34* mtx);
 void setVector3(nw4r::math::VEC3* out, f32 x, f32 y, f32 z);
 
-/* File load (`fn_800CEE2C`/`fn_804A6120`) and the work heap.  The eft004 pool helpers and `memcpy`
+/* The work heap.  File load (`fn_800CEE2C`/`DVDClose`), the eft004 pool helpers and `memcpy`
  * come from their owners' headers (rule 2). */
-extern "C" s32 fn_804A6120(void* info);
 void* work_mem_alloc(u32 size);
 void work_mem_free(void* ptr);
 u16 ran_suu(s32 index);
@@ -1424,7 +1424,7 @@ extern "C" void fn_800FE978(_EFT* self)
     if (size != 0) {
         if (fn_800CEE2C(name, &info) != 0) {
             size = (info.length + 0x1F) & ~0x1FU;
-            fn_804A6120(&info);
+            DVDClose((DVDFileInfo*)&info);
             mem = work_mem_alloc(size);
             load_file(name, (u32)mem, (s32)size);
             memcpy(&header, mem, 0x98);

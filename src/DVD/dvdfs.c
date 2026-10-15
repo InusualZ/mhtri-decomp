@@ -2,7 +2,7 @@
  * DVD/dvdfs.c - the SDK DVD file-system layer (path to entry number, open, read-async).
  *
  * RANGE. `.text` 0x804A5AB0-0x804A6410; `.data` 0x806186C8-0x80618800; `.sdata` 0x80793DD0-0x80793DE0; `.sbss`
- *   0x80795070-0x807950A0 (8 functions / 0x928 B).
+ *   0x80795070-0x80795090 (8 functions / 0x928 B).
  *   - the DOL string `dvdfs.c` (.sdata 0x80793DD8) is the `__FILE__` of the asserts in `DVDConvertPathToEntrynum` and
  *     `DVDReadAsyncPrio`; the right edge is the first function that reads the `dvd.c` string (`StampCommand`)
  *   - `.data` holds this file's three message strings; `.sbss` the FST pointers, `currentDirectory` and
@@ -16,8 +16,8 @@
  *   spells them as literals).
  * RESIDUALS. none in code.
  *   `.sbss` 0x80795090..0x807950A0 is the padding before `DVD/dvd.c`'s 32-aligned `.sbss` (its `__DVDNumTmdBytes`
- *   is `aligned(32)`); a flip of this unit needs `align:32` on that unit's `.sbss` split line while `DVD/dvd.c` is
- *   not linked from source. 0x80795074 is the hole before the 8-aligned `__DVDThreadQueue`.
+ *   is `aligned(32)`, `align:32` on that split line), so this unit's claim ends at 0x80795090. 0x80795074 is the
+ *   hole before the 8-aligned `__DVDThreadQueue`.
  *   `fsLowerChar` is MSL's inline `tolower` (`MSL_C/ctype.h` has no `tolower` yet).
  * SHAPES. `DVDEntryToPath` inlines into itself and into `DVDOpen` two levels deep (the third level is the `bl`).
  *   goto: owner exemption 2026-10-14, docs/pipeline.md 11 - `DVDConvertPathToEntrynum` keeps the SDK's one
