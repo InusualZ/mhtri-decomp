@@ -148,7 +148,7 @@ s32 networkLog_destroyContext(NetworkSessionManagerLogger* log, void* context);
 /* 0x80417C40 - an empty hook the library and the Pat holder constructors call with themselves and 1
  * (GUESS: a debug object registration compiled out of this build). */
 /* untyped: opaque handle - any constructed object */
-void registerNetworkObject(void* object, s32 kind);
+void registerNetworkObject(void* object, s32 kind) __attribute__((nothrow));
 
 #ifdef __cplusplus
 }

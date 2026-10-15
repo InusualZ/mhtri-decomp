@@ -2,13 +2,13 @@
  * Network/GameSpyInterfaceThread.cpp - the GameSpy interface / peer band: the GT2 socket callbacks and three classes,
  *   the worker thread `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler`, each owning its bodies
  *   as members.  The class's type-only header, read by the mediator band, is `Network/gamespy_interface_types.h`.
- * RANGE. .text 0x8041B194-0x8041DF10 (66 functions); .data 0x806031A0-0x80603714 (the callback set, the log strings in
- *   retail's order, the thread vtable), .bss 0x806D3650-0x806D3670, .sdata 0x80793990-0x807939A0, .sbss
- *   0x80794CE0-0x80794CE8, extab, extabindex.  The left edge is `NetworkReflectService`'s end (string 0x80603154, table
- *   0x80603190).  Two more TUs probably start inside: the thread's vtable 0x806036A0 is followed by the peer's strings
- *   0x806036B0 (a vtable-to-string seam at 0x8041D750, `NetworkPeerGameSpy`, vtable 0x80603714), and the timed handler's
- *   vtable 0x80603740 rises above the peer's (0x8041DE20), so the `.data` right edge 0x80603714 is interim; the data
- *   tools defer `lbl_80603740` (span-blocked) and the `.sdata` `sRejectMessageNG`, `sEmptyString`, `sPortFormat`.
+ * RANGE. .text 0x8041B194-0x8041DF10 (66 functions); .data 0x806031A0-0x80603750 (the callback set, the log strings in
+ *   retail's order, the thread vtable, the peer's string, the peer's and the timed handler's vtables), .bss
+ *   0x806D3650-0x806D3670, .sdata 0x80793990-0x807939A0 (the literals "NG", "" and ":%u"), .sbss 0x80794CE0-0x80794CE8,
+ *   extab, extabindex.  The left edge is `NetworkReflectService`'s end (string 0x80603154, table 0x80603190).  A second
+ *   TU starts inside: the thread's vtable 0x806036A0 (padded to 0x806036B0) is followed by the peer's string 0x806036B0,
+ *   a vtable-to-string seam whose `.text` side is 0x8041D750 (`NetworkPeerGameSpy::setContext`, extabindex 0x8003DB54);
+ *   that TU is `NetworkPeerGameSpy` + `NetworkTimedHandler` (.text 0x8041D750-0x8041DF10, .data 0x806036B0-0x80603750).
  * FLAGS. `-O3 -inline noauto -pool off` (configure.py; measured in docs/network.md, playbook 43); file-scope
  *   `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsb` + `cmpwi` forms, so narrow stores are compound
  *   assignments and shift-and-mask bytes are `(v >> 16) & 0xFF`, playbook 95).
@@ -19,14 +19,11 @@
  *   `copyGameSpyAddress`, `NetworkReflectService::notify` and the peer's `armDrop`/`init` (the base's +0x20/+0x24
  *   slots).  The peer's other slot names are `NetworkPeerBase`'s:
  *   GUESS: setContext, send, receive, put, move, reset (the base slot each overrides).
- * RESIDUALS. `NetworkPeerGameSpy::receive`: retail materialises the error-source constant as a relocation
- *   (`@eti_80030018+9/+10`) where ours is the immediate, and keeps a `clrlwi` ours drops.  `tGameSpyInterface`: the
- *   hoisted high word of `ticks * 17` is a fresh `li r0, 0` where retail reuses r24.  `publishRequest`, `step`: register
- *   colouring.  `.data`: 1392 of 1396 B until the cut, plus `NetworkTimedHandler`'s table, which this unit emits (its
- *   destructor is defined here) while retail's 0x80603740 lies past the claimed range, and `NetworkPeerGameSpy`'s table
- *   (0x30 B here: `NetworkPeerBase`'s pure `slot_2C` pad; retail's 0x80603714 is 0x2C B and unclaimed).
- *   `.sdata` (flip blocker): the claimed 0x10 B (`sRejectMessageNG`, `sEmptyString`,
- *   `sPortFormat`) is not emitted.
+ * RESIDUALS. `NetworkPeerGameSpy::receive`: retail keeps `payload` in the zero constant's register (r22) and a
+ *   `clrlwi` before `cursor += aLen16` that ours drops.  `publishRequest`: the slot-loop temporaries `i * 4` and
+ *   `&slotIds_44[i]` take r8/r7, ours r7/r8.  `.data`: the order cannot match inside one TU (retail's thread vtable sits
+ *   before the peer's string; MWCC emits vtables last), so it waits for the cut at 0x8041D750.  `.sdata`: bytes match,
+ *   the map names `sRejectMessageNG`/`sEmptyString`/`sPortFormat` label anonymous literals.
  * SHAPES. Every call through a foreign object's vtable goes through a declared `virtual` (the only shape MWCC emits as
  *   `lwz r12,0x0(r3)` / `lwz r12,<slot>(r12)`).  `~GameSpyInterfaceThread` comes first in the class (the vtable pointer
  *   sits where the first virtual is declared, playbook 98); as the key function it makes this unit emit `__vt__` and
@@ -35,7 +32,8 @@
  *   logs so the switch re-reads the stack; `isQueued` is the plain three-way return; a `switch` whose cases all leave 0
  *   is `break` + one trailing `return 0;` (playbook 34).  `profile_4485` is five `u32` at the odd offset 0x4485 (the
  *   class's `#pragma pack(1)`); the connect call's out parameter is one `GT2Connection`.  The callback set is defined
- *   ahead of the first literal (MWCC emits `.data` in definition order).
+ *   ahead of the first literal (MWCC emits `.data` in definition order).  The worker's sleep is the signed 64-bit
+ *   `(s64)17 * ticks-per-ms` (`OSMillisecondsToTicks`); a `u64` product hoists a fresh zero for the high word.
  */
 
 #include "types.h"
@@ -196,7 +194,7 @@ extern "C" void gt2ConnectAttemptCallback(s32 unused0, s32 socket, s32 unused1, 
     }
     peerId = GameSpyInterfaceThread::getInstance()->getPeerId();
     if (GameSpyInterfaceThread::getInstance()->checkPeerProfile(profile, size) == 0) {
-        gt2Reject(socket, sRejectMessageNG, 2);
+        gt2Reject(socket, "NG", 2);
         GameSpyInterfaceThread::getInstance()->publishRequest(-0x2DA0, 0xFF, peerId);
         return;
     }
@@ -361,7 +359,7 @@ s32 GameSpyInterfaceThread::runNasLogin()
         if (DWC_SVLBegin() == 0) {
             DWC_SVLEnd();
             stage_98 = 4;
-        } else if (DWC_SVLGetTokenAsync(sEmptyString, svlResult_94) == 0) {
+        } else if (DWC_SVLGetTokenAsync("", svlResult_94) == 0) {
             DWC_SVLEnd();
             stage_98 = 4;
         } else {
@@ -491,7 +489,7 @@ void GameSpyInterfaceThread::ConnectToAnybody(s32 arg)
         phase_74 = -1;
         return;
     }
-    snprintf(address, 7, sPortFormat, (u16)bufferSize_4482);
+    snprintf(address, 7, ":%u", (u16)bufferSize_4482);
     address[6] = 0;
     if (gt2CreateSocket(&sGameSpySocket, address, 0x2000, 0x2000, (NetworkCallback)gt2SocketErrorCallback) == 0) {
         gt2SetUnrecognizedMessageCallback(sGameSpySocket, (NetworkCallback)gt2UnrecognizedMessageCallback);
@@ -937,9 +935,9 @@ void GameSpyInterfaceThread::step()
                                 break;
                             }
                             setError(0x80000007, 0x5F, 0x2DAD);
+                            negotiationDone_446E = -1;
+                            negotiationResult_446D = 1;
                         }
-                        negotiationDone_446E = -1;
-                        negotiationResult_446D = 1;
                     } else {
                         negotiationDone_446E = -1;
                         negotiationResult_446D = 1;
@@ -1150,8 +1148,6 @@ extern "C" s32 runThread(GameSpyInterfaceThread* self)
 /* The worker thread's body: drains the request flags until the stop flag is set. */
 void GameSpyInterfaceThread::tGameSpyInterface(s32 arg)
 {
-    u64 ticks;
-
     OSInitMutex(mutex_4450);
     mutexReady_444C = 1;
     for (;;) {
@@ -1171,8 +1167,8 @@ void GameSpyInterfaceThread::tGameSpyInterface(s32 arg)
             started_120 = 0;
             break;
         }
-        ticks = (u64)(*(volatile u32*)0x800000F8 / 4 / 1000);
-        OSSleepTicks(ticks * 17);
+        /* 17 ms in timer ticks (OSMillisecondsToTicks: the bus clock / 4 / 1000) */
+        OSSleepTicks((s64)17 * (*(volatile u32*)0x800000F8 / 4 / 1000));
     }
     mutexReady_444C = 0;
     INFO_LOG("NetworkGameSpyInterface::tGameSpyInterface GameSpyInterfaceThread End\n");

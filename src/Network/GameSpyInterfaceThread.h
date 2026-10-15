@@ -155,21 +155,4 @@ extern GameSpyNegotiation sNatNegState;   /* 0x806D3660 (.bss) - the NAT-negotia
 extern u32   sGameSpySocket;              /* 0x80794CE0 (.sbss) - the GT2 socket */
 }
 
-/* Declarations moved here from `unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* the GT2 reject message, the empty service-locator string and the listen-address format (shared
-   `.sdata` pool entries no registered unit claims) */
-extern const char sRejectMessageNG[3];
-
-extern const char sEmptyString[4];
-
-extern const char sPortFormat[4];
-
-#ifdef __cplusplus
-}
-#endif
-
 #endif

@@ -13,6 +13,8 @@
  * RESIDUALS. `onReply`: the read reply's `transferred_20` copy sits in r4 and the available byte count in r7, retail the
  *   other way round (all 24 declaration orders of the locals measured).  The error code 0x800A0004 is relocated in the
  *   target (`ef_anim_curve_f32+0x7A8`); `config.yml`'s `block_relocations` entries remove those relocations.
+ *   `extab` (6 B): retail records no cleanup around `getInstance_`, which is nothrow there; `__attribute__((nothrow))`
+ *   on its declaration in `enemy/em020_ai.h` closes the section.
  */
 
 #include "Network/NetworkFileFetcher.h"

@@ -12,9 +12,10 @@
  *   `networkLog_destroyContext` (the release half of `acquireResolver`) and `networkSocketPool_acquire`/`_release`
  *   (members over the socket table) keep the C names and parameter types their callers use.
  * RESIDUALS. `dateToTime`: the unrolled month loop computes `months - 8` before `months - 1` in retail (two adjacent
- *   instructions swapped; loop/declaration/type variants measured).  `extab` is 96 of 136 B: retail's constructor and
- *   destructor carry cleanup records for the member mutex (`networkInstance_destroyMutex`), which needs the mutex as a class member
- *   with a destructor (NetworkSessionManager's type).
+ *   instructions swapped; loop/declaration/type variants and `-schedule off` measured).  `extab`: the constructor's
+ *   record starts at the `registerNetworkObject` return (0x34) where retail's starts at the virtual call (0x60) -
+ *   retail's `getNetworkLogger` is nothrow (`__attribute__((nothrow))` on its declaration in
+ *   `Network/NetworkStreamSink.h` closes it; `registerNetworkObject` is declared nothrow here).
  * SHAPES. `convertTime`/`dateToTime` count days from 1 January of year 0; every unit constant is an unsigned 64-bit
  *   macro (retail divides through `__div2u`/`__mod2u`), the products `n * 366ULL` keep retail's dead sign extension,
  *   and `convertTime` adds each cycle as `(s16)(n * k)` (retail `extsh`es the product, not the sum).
