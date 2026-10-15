@@ -56,16 +56,9 @@
 #include "g3d/g3d_anmchr.h" /* fn_800610AC - owner src/g3d/g3d_anmchr.cpp (rule 2) */
 #include "nw4r/math_triangular.h" /* nw4r::math::sSinCosTbl - owner src/nw4r/math_triangular.cpp (rule 2) */
 #include "ef/ef_util.h" /* the unit's own header */
+#include "nw4r/db_assert.h" /* nw4r::db::Panic and NW4R_ASSERT (rule 2) */
 
-/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
- * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r {
-namespace db {
-
-void Panic(const char* pFile, int line, const char* pFmt, ...);
-
-} // namespace db
-
 namespace math {
 
 /* `FrSqrt__Q24nw4r4mathFf`, the reciprocal square root the scale path uses. */
@@ -159,14 +152,6 @@ f32 ef_util_rsqrt_three_half[2] = {3.0f, 0.5f};
             nw4r::db::Panic(lbl_80591948, line, msg, (ptr));                                       \
     }
 
-/* The library's condition assert: the message is the expression's own text, and the call passes no
- * pointer (the target's three-argument `Panic`). */
-#define NW4R_ASSERT(cond, line, msg)                                                               \
-    {                                                                                              \
-        if (!(cond))                                                                               \
-            nw4r::db::Panic(lbl_80591948, line, msg);                                              \
-    }
-
 /* --------------------------------------------------------------------------------------------- */
 /* The bodies, in address order.                                                                  */
 /* --------------------------------------------------------------------------------------------- */
@@ -181,8 +166,8 @@ extern "C" u16 fn_8009B374(void* list, void** buf, s32 size) {
     u16 count;
     void* node;
 
-    NW4R_ASSERT(list != NULL, 0x25, lbl_80591954);
-    NW4R_ASSERT(buf != NULL, 0x26, lbl_80591978);
+    NW4R_ASSERT(list != NULL, lbl_80591948, 0x25, lbl_80591954);
+    NW4R_ASSERT(buf != NULL, lbl_80591948, 0x26, lbl_80591978);
 
     count = 0;
     node = NULL;
@@ -204,7 +189,7 @@ extern "C" void ef_mtx34_from_y_axis(f32* mtx, const f32* vec) {
     f32 z;
 
     NW4R_POINTER_ASSERT(mtx, 0x1AE, lbl_8059199C);
-    NW4R_ASSERT(abs_f32(vec3_len(vec) - ef_util_f32_one) < ef_util_f32_min_scale, 0x1AF, lbl_805919D0);
+    NW4R_ASSERT(abs_f32(vec3_len(vec) - ef_util_f32_one) < ef_util_f32_min_scale, lbl_80591948, 0x1AF, lbl_805919D0);
 
     z = vec[2];
     s = abs_f32(z);

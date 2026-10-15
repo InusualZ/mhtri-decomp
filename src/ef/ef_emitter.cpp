@@ -64,13 +64,7 @@
 #include "ef/ef_util.h" /* ef_mtx34_column_length, owned by ef_util.cpp's range (rule 2) */
 #include "draw_shape/mtx34_copy.h" /* mtx34_copy, owned by draw_shape.cpp's range (rule 2) */
 #include "ef/ef_random.h" /* nw4r::ef::Random, seeded through its Srand (rule 1) */
-
-namespace nw4r {
-namespace db {
-void Panic(const char* file, int line, const char* fmt, ...);
-void Warning(const char* file, int line, const char* fmt, ...);
-}  // namespace db
-}  // namespace nw4r
+#include "nw4r/db_assert.h" /* nw4r::db::Panic / Warning and NW4R_ASSERT (rule 2) */
 
 extern "C" {
 
@@ -497,12 +491,6 @@ s32 fn_800A98D4(EfEmitterObj* self, void* cb, void* arg, s32 flag, s32 recurse);
  * Assert shapes
  * ------------------------------------------------------------------------------------------------- */
 
-/* `NW4R_ASSERT(expr)`: the file is "ef_emitter.cpp" and the message is the literalised expression;
- * the `__LINE__` value comes from a `#line` directive at the call site (the sibling units' device). */
-#define NW4R_ASSERT(expr, msg)                                                                     \
-    if (!(expr))                                                                                   \
-    nw4r::db::Panic(lbl_80592850, __LINE__, msg)
-
 /* `NW4R_POINTER_ASSERT`'s RVL address-range check (six materialised BOOLs), shared verbatim with
  * ef/ef_particlemanager.cpp and the ef shape units; the file differs by call site. */
 #define NW4R_POINTER_ASSERT(file, ptr, msg)                                                  \
@@ -564,7 +552,7 @@ extern "C" void* fn_800A630C(void* self, s16 flag) {
 extern "C" u32 fn_800A6350(EfEmitterObj* self) {
     u32 total = 0;
 #line 53
-    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, lbl_80592860);
+    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, lbl_80592850, __LINE__, lbl_80592860);
     u16 size = fn_800A4AF0(&self->particles);
     void* list[NW4R_EF_MAX_PARTICLEMANAGER];
     u16 num = fn_8009B374(&self->particles, list, size);
@@ -597,7 +585,7 @@ extern "C" void fn_800A6420(EfEmitterObj* self) {
     fn_800A6938(self);
     if ((self->flags & 1) != 0) {
 #line 88
-        NW4R_ASSERT(fn_800A4AF0(&self->managerEF->emitters) < NW4R_EF_MAX_EMITTER, lbl_805928BC);
+        NW4R_ASSERT(fn_800A4AF0(&self->managerEF->emitters) < NW4R_EF_MAX_EMITTER, lbl_80592850, __LINE__, lbl_805928BC);
         u16 size = fn_800A4AF0(&self->managerEF->emitters);
         void* list[NW4R_EF_MAX_EMITTER];
         u16 num = fn_8009B374(&self->managerEF->emitters, list, size);
@@ -672,7 +660,7 @@ extern "C" s32 fn_800A67E8(EfEmitterObj* self, EfParticleRec* target) {
 extern "C" u32 fn_800A6938(EfEmitterObj* self) {
     u32 total = 0;
 #line 147
-    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, lbl_80592860);
+    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, lbl_80592850, __LINE__, lbl_80592860);
     u16 size = fn_800A4AF0(&self->particles);
     void* list[NW4R_EF_MAX_PARTICLEMANAGER];
     u16 num = fn_8009B374(&self->particles, list, size);
@@ -1412,7 +1400,7 @@ extern "C" void fn_800A8D30(EfEmitterObj* self) {
         return;
     }
 #line 973
-    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, lbl_80592860);
+    NW4R_ASSERT(fn_800A4AF0(&self->particles) < NW4R_EF_MAX_PARTICLEMANAGER, lbl_80592850, __LINE__, lbl_80592860);
     u16 size = fn_800A4AF0(&self->particles);
     void* list[NW4R_EF_MAX_PARTICLEMANAGER];
     u16 num = fn_8009B374(&self->particles, list, size);

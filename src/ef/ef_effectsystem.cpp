@@ -54,13 +54,7 @@
 #include "ef/ef_drawstrategyimpl.h" /* nw4r::ef::DrawStrategyBuilder (rule 1) */
 #include "ef/ef_effectsystem.h" /* EfSys, the unit's own header */
 #include "MSL/new.h" /* the placement array forms */
-
-namespace nw4r {
-namespace db {
-void Panic(const char* file, int line, const char* fmt, ...);
-void Warning(const char* file, int line, const char* fmt, ...);
-} // namespace db
-} // namespace nw4r
+#include "nw4r/db_assert.h" /* nw4r::db::Panic / Warning and NW4R_ASSERT (rule 2) */
 
 /* ===================================================================================================
  * Types.  The `EfSys` prefix keeps this unit's views apart from the sibling units' (`EfList`, ...).
@@ -164,12 +158,6 @@ void PSMTXCopy(const void* src, void* dst);
 /* ===================================================================================================
  * Assert shapes
  * =================================================================================================== */
-
-/* `NW4R_ASSERT(expr, msg)`: the file is "ef_effectsystem.cpp" and the message is the pooled literal; the
- * `__LINE__` value comes from a `#line` directive at the call site. */
-#define NW4R_ASSERT(expr, msg)                                                                     \
-    if (!(expr))                                                                                   \
-    nw4r::db::Panic(ef_effectsystem_file_name, __LINE__, msg)
 
 /* `NW4R_POINTER_ASSERT`'s RVL address-range check (six materialised BOOLs), shared verbatim with the
  * sibling ef units; the message differs by call site. */
@@ -279,7 +267,7 @@ extern "C" u32 fn_800A56B0(EfSys* self, u32 maxGroupID) {
 #line 79
     NW4R_POINTER_ASSERT(self->mMemoryManager, ef_effectsystem_err_memory_manager);
 #line 80
-    NW4R_ASSERT(maxGroupID > 0, ef_effectsystem_err_max_group);
+    NW4R_ASSERT(maxGroupID > 0, ef_effectsystem_file_name, __LINE__, ef_effectsystem_err_max_group);
     self->mMaxGroupID = maxGroupID;
     self->mActivityList = new (self->mMemoryManager->Alloc(maxGroupID * 0x1C + 0x20)) EfSysActivityList[maxGroupID];
     for (u32 i = 0; i < self->mMaxGroupID; ++i) {
@@ -365,7 +353,7 @@ extern "C" u32 fn_800A5D8C(EfSys* self, u32 groupID) {
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
 
 #line 178
-    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT, ef_effectsystem_err_list_size);
+    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT, ef_effectsystem_file_name, __LINE__, ef_effectsystem_err_list_size);
     u16 num = fn_8009B374(&self->mActivityList[groupID].mActiveList, (void**)list,
                           (u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList));
     for (u16 i = 0; i < num; i++) {
@@ -382,7 +370,7 @@ extern "C" u32 fn_800A5E6C(EfSys* self, u32 groupID) {
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
 
 #line 201
-    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT, ef_effectsystem_err_list_size);
+    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT, ef_effectsystem_file_name, __LINE__, ef_effectsystem_err_list_size);
     u16 num = fn_8009B374(&self->mActivityList[groupID].mActiveList, (void**)list,
                           (u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList));
     for (u16 i = 0; i < num; i++) {
@@ -397,7 +385,7 @@ extern "C" u32 fn_800A5F4C(EfSys* self, u32 groupID) {
     EfSysEffect* list[NW4R_EF_MAX_EFFECT];
 
 #line 221
-    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT, ef_effectsystem_err_list_size);
+    NW4R_ASSERT((u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList) < NW4R_EF_MAX_EFFECT, ef_effectsystem_file_name, __LINE__, ef_effectsystem_err_list_size);
     u16 num = fn_8009B374(&self->mActivityList[groupID].mActiveList, (void**)list,
                           (u16)fn_800A4AF0(&self->mActivityList[groupID].mActiveList));
     for (u16 i = 0; i < num; i++) {

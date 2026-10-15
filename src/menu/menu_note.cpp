@@ -13,26 +13,13 @@
 
 #include "types.h"
 
-/* `nw4r::db::Panic`: declaring the owner's real spelling makes the C++ front-end reproduce the map's
- * mangling (`Panic__Q24nw4r2dbFPCciPCce`) exactly; spelling the mangling itself re-mangles it
- * (rule 9).  Its last parameter is variadic - the retail call sets `cr1`'s eq bit, which only the
- * varargs convention does. */
-namespace nw4r {
-namespace db {
-void Panic(const char* file, int line, const char* fmt, ...);
-}  // namespace db
-}  // namespace nw4r
+#include "nw4r/db_assert.h" /* nw4r::db::Panic and NW4R_ASSERT (rule 2) */
 
 /* The unit's own two literals, in `.data` (the retail build did not use `-str readonly`, so the
  * pool is `.data` and not `.rodata`); the map names them after what they hold.  The unit claims
  * them (0x805E91F8..0x805E9220), so they are defined here, ahead of the jump table. */
 char s_menu_note_cpp[] = "menu_note.cpp";                /* .data 0x805E91F8 */
 char s_nw4r_assert_failed[] = "NW4R:Failed assertion 0"; /* .data 0x805E9208 */
-
-/* nw4r's assert; the message is the `NW4R_ASSERT(...)` stringification of the condition (which is
- * why the pooled format string reads "NW4R:Failed assertion 0"), and the file is this unit's
- * `__FILE__`. */
-#define NW4R_ASSERT(exp, line, msg) ((exp) ? (void)0 : nw4r::db::Panic(s_menu_note_cpp, line, msg))
 
 /* Maps a note-list entry to the item table's slot and the index into it. */
 extern "C" void get_note_item_slot(u8 note_entry, u8* p_slot_tbl, u8* p_slot_idx) {
@@ -78,7 +65,7 @@ extern "C" void get_note_item_slot(u8 note_entry, u8* p_slot_tbl, u8* p_slot_idx
         *p_slot_idx = 20;
         break;
     default:
-        NW4R_ASSERT(0, 2301, s_nw4r_assert_failed);
+        NW4R_ASSERT(0, s_menu_note_cpp, 2301, s_nw4r_assert_failed);
         break;
     }
 }

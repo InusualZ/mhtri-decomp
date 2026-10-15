@@ -56,17 +56,10 @@
 #include "ef/ef_particlemanager.h"
 #include "ef/ef_animcurve.h" /* the unit's own header */
 #include "ef/ef_creationqueue.h" /* CreationQueue and its two `Add` members (rule 2) */
+#include "nw4r/db_assert.h" /* nw4r::db::Panic and NW4R_ASSERT (rule 2) */
 
 #pragma peephole off
 #pragma fp_contract off
-
-/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
- * (`Panic__Q24nw4r2dbFPCciPCce`). */
-namespace nw4r {
-namespace db {
-void Panic(const char* file, int line, const char* fmt, ...);
-}  // namespace db
-}  // namespace nw4r
 
 /* This unit's own pooled file-name literal (a copy per region - MWCC emitted three). */
 extern char ef_anim_file_str[];
@@ -121,9 +114,6 @@ extern f32 ef_anim_f32_epsilon; /* FLT_EPSILON */
 
 #define NW4R_POINTER_ASSERT(p, line, msg, file)                                                    \
     (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(file, line, msg, (p)))
-
-#define NW4R_ASSERT(cond, line, msg, file)                                                         \
-    ((cond) ? (void)0 : nw4r::db::Panic(file, line, msg))
 
 /* The header record the curve readers hold: a flags byte, a divisor count and a key count.  The
  * `key` record ef_anim_advance_dividers walks is the same shape but read through its own `+0x00` count. */
@@ -833,7 +823,7 @@ u8 ef_anim_interp_u8(u32 tick, u8 start, u8 end, u8 type) {
     case 2:
         return start;
     default:
-        NW4R_ASSERT(0, 0x2C7, ef_anim_zero_assert_str, ef_anim_file_str);
+        NW4R_ASSERT(0, ef_anim_file_str, 0x2C7, ef_anim_zero_assert_str);
         return 0;
     }
 }
@@ -1204,7 +1194,7 @@ f32 ef_anim_interp_f32(f32 t, f32 a, f32 b, u8 type) {
     case 2:
         return a;
     default:
-        NW4R_ASSERT(0, 0x2F9, ef_anim_zero_assert_str, ef_anim_file_str);
+        NW4R_ASSERT(0, ef_anim_file_str, 0x2F9, ef_anim_zero_assert_str);
         return ef_anim_f32_zero;
     }
 }
@@ -1635,7 +1625,7 @@ void ef_anim_fire_child_key(const EfAnimChildKey* ptrFixed, u16 seed, const EfAn
     } else {
         u32 hash = ef_anim_name_hash(seed, header->mNameId, ptrFixed->mData.mRandomIndex, div);
         if ((ptrFixed->mFlags & 2) == 0) {
-            NW4R_ASSERT(0, 0x744, ef_anim_zero_assert_str, ef_anim_file_str);
+            NW4R_ASSERT(0, ef_anim_file_str, 0x744, ef_anim_zero_assert_str);
         } else {
             if (randomTable->mCount == 0) {
                 return;
@@ -1720,7 +1710,7 @@ void ef_anim_curve_child(const u8* mCmdList, EfAnimParticle* pp, u32 step, u16 s
         return;
     }
 
-    NW4R_ASSERT(divA < divB, 0x7D7, ef_anim_div_order_assert_str, ef_anim_file_str);
+    NW4R_ASSERT(divA < divB, ef_anim_file_str, 0x7D7, ef_anim_div_order_assert_str);
 
     if ((header->mFlags & 0x40) != 0) {
         if ((divA & 1) == 0) {

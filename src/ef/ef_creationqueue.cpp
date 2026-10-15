@@ -29,17 +29,9 @@
 
 #include "ef/ef_creationqueue.h" /* the unit's own header */
 #include "ef/ef_emitter.h" /* fn_800A7750 (rule 2) */
+#include "nw4r/db_assert.h" /* nw4r::db::Panic / Warning and NW4R_ASSERT (rule 2) */
 
 #pragma peephole off
-
-/* `nw4r::db::Panic`/`Warning`, declared in their namespace so the front-end emits the map's mangling
- * (`Panic__Q24nw4r2dbFPCciPCce`). */
-namespace nw4r {
-namespace db {
-void Panic(const char* file, int line, const char* fmt, ...);
-void Warning(const char* file, int line, const char* fmt, ...);
-}  // namespace db
-}  // namespace nw4r
 
 struct EmitterForm;
 
@@ -93,8 +85,6 @@ struct EmitterForm {
 
 #define NW4R_POINTER_ASSERT(p, line, msg)                                                          \
     (NW4R_VALID_PTR(p) ? (void)0 : nw4r::db::Panic(lbl_805922C0, line, msg, (p)))
-
-#define NW4R_ASSERT(exp, line, msg) ((exp) ? (void)0 : nw4r::db::Panic(lbl_80592388, line, msg))
 
 extern char lbl_805922C0[];
 extern char lbl_805922D8[];
@@ -221,7 +211,7 @@ extern "C" void fn_800A3718(CreationQueue* self) {
 
 /* 0x800A3800 - the manager's Release. */
 extern "C" u32 fn_800A3800(EffectManager* manager) {
-    NW4R_ASSERT(manager->mRefCount > 0, 0x6C, lbl_80592364);
+    NW4R_ASSERT(manager->mRefCount > 0, lbl_80592388, 0x6C, lbl_80592364);
 
     u32 refCount = manager->mRefCount - 1;
     manager->mRefCount = refCount;
