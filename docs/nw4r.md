@@ -6,7 +6,7 @@ The NintendoWare for Revolution library units under `src/nw4r/` (`nw4r::math`, `
 ## Compiler and flags
 
 The `nw4r` lib block in `configure.py` compiles `nw4r/db_assert.cpp`, `nw4r/math_arithmetic.cpp`,
-`nw4r/math_triangular.cpp`, `nw4r/fn_805012C4.cpp`, `nw4r/fn_80502828.cpp`, `nw4r/fn_80504A3C.cpp` and `nw4r/fn_8050661C.cpp` with **GC/3.0a5.2** and `cflags_nw4r` (`cflags_os` plus
+`nw4r/math_triangular.cpp`, the eight files cut from `fn_805012C4` (`nw4r/math_types.cpp`, `math_geometry`, `ut_list`, `ut_LinkList`, `ut_binaryFileFormat`, `ut_CharStrmReader`, `ut_TagProcessorBase`, `ut_LockedCache`), `nw4r/fn_80502828.cpp`, `nw4r/ut_TextWriterBase.cpp` and `nw4r/fn_8050661C.cpp` with **GC/3.0a5.2** and `cflags_nw4r` (`cflags_os` plus
 `-fp_contract off`). The other `nw4r/` stubs stay in the `OS` block until their bodies are measured.
 
 Evidence, from `mt.py matrix` on the written bodies:

@@ -1,5 +1,5 @@
 /*
- * nw4r/TextWriterBase.h - nw4r::ut's text writer, whose members `nw4r/fn_80504A3C.cpp` defines
+ * nw4r/TextWriterBase.h - nw4r::ut's text writer, whose members `nw4r/ut_TextWriterBase.cpp` defines
  *   (TextWriterBase<T>, instantiated for char and wchar_t) and the print context its tag processor receives.
  */
 #ifndef MHTRI_NW4R_TEXTWRITERBASE_H
