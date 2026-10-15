@@ -10,9 +10,9 @@
  *   GUESS: `ef_cylinder_emit` (0x800CB948): the per-step emission loop `Emission` drives.
  *   GUESS: `ef_cylinder_file_name`, `ef_cylinder_err_em`, `ef_cylinder_err_pm`, `ef_cylinder_err_params` (their
  *   text).
- * RESIDUALS. `.text` and `.data` are byte-identical.  `.sdata2` is retail's run except that `Emission`'s 2^52
- *   `(f32)(u16)` constant pools after its floats where retail's pools before them (0x80796290), so the pool
- *   references read our `@N` labels.
+ * NAMES. GUESS: `ef_cylinder_split_count` (stripped by the link; no retail address): the function between the two
+ *   whose `(f32)(u16)` 2^52 constant pools at 0x80796290, ahead of `Emission`'s literals.
+ * RESIDUALS. none: `.text`, `.data`, `.sdata2`, extab and extabindex are byte-identical (flipcheck READY).
  * SHAPES. The function is `nw4r::ef::EmitterFormCylinder::Emission` (declared in `ef/ef_emform.h`; this unit defines the key
  *   function, so the class's table is emitted here, after the strings).  The particle manager's spawn is its
  *   virtual `CreateParticle`, taking the position and velocity by value (copied velocity first, momentum
@@ -21,6 +21,8 @@
  *   `lis`/`addi`.
  * SHAPES. The float constants are literals, so MWCC hoists them into registers; the `|scale|` clamps are
  *   `fabsf(x) > eps ? x : eps`, which loads the floor after the call as retail does.
+ * SHAPES. The 2^52 constant pools ahead of `Emission`'s literals only when a function compiled between the two
+ *   converts a `u16` first; it is unreferenced and built under `#pragma exceptions off` so it leaves no extab record.
  * SHAPES. `#line 49` and `#line 140` put the two functions' `CHECK_PTR` sites on retail's lines 49-51 and 140-142.
  */
 
@@ -125,6 +127,15 @@ void ef_cylinder_emit(nw4r::ef::EmitterFormCylinder* form, EfWork* em, ParticleM
         }
     }
 }
+
+/* Returns the sweep's step count as a float; nothing calls it, so the link strips it (its conversion constant
+ * stays in the pool ahead of Emission's literals). */
+#pragma exceptions off
+f32 ef_cylinder_split_count(EfWork* em)
+{
+    return (f32)em->split_count;
+}
+#pragma exceptions reset
 
 /* Guards its pointers, derives the scale triplet, the parameter range and the per-step scale, then
  * sweeps the whole count or emits a single particle. */

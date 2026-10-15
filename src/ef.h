@@ -66,15 +66,21 @@ struct EfParticleParams {
     /* +0x18 */ EfParticleScale scale_0x18;
     /* +0x20 */ VEC3 field_0x20;
     /* +0x2C */ EfParticleNode field_0x2C[3];
-    /* +0x44 */ u8 pad_0x44[0x0C];
+    /* +0x44 */ f32 tex_rotate[3];   /* copied from the descriptor by ef_particle_param_init */
     /* +0x50 */ EfParticleNode field_0x50[3];
-    /* +0x68 */ u8 field_0x68[0x11]; /* fn_800AB3D0 returns this address */
+    /* +0x68 */ u32 textures[3];     /* the three texture handles, copied from the descriptor */
+    /* +0x74 */ u16 tex_wrap;
+    /* +0x76 */ u8 tex_reverse;
+    /* +0x77 */ u8 alpha_ref0;
+    /* +0x78 */ u8 alpha_ref1;
     /* +0x79 */ s8 field_0x79;      /* read as a signed flag by ef_particle_flick_alpha */
-    /* +0x7A */ u8 pad_0x7A[0x06];
+    /* +0x7A */ u8 rotate_offset[3]; /* byte angles, the descriptor's offsets plus their random share */
+    /* +0x7D */ u8 field_0x7D;      /* cleared by ef_particle_param_init */
+    /* +0x7E */ u8 pad_0x7E[0x02];
     /* +0x80 */ VEC3 field_0x80;
     /* +0x8C */ VEC3 field_0x8C;
     /* +0x98 */ VEC3 field_0x98;
-    /* +0xA4 */ u8 pad_0xA4[0x04];
+    /* +0xA4 */ f32 momentum;       /* the creation argument ef_particle_init stores */
     /* +0xA8 */ struct EfParticleMgr* manager;
 }; /* size: 0xAC (bounded by the particle's field_0xCC) */
 
@@ -93,20 +99,12 @@ struct EfParticleChain {
  * unit's functions read are named. */
 typedef struct EfParticleMgr EfParticleMgr;
 struct EfParticleMgr {
-    /* +0x00 */ u8 pad_0x00[0x24];
+    /* +0x00 */ u8 pad_0x00[0x20];
+    /* +0x20 */ struct EfWork* emitter; /* the owning emitter: its random block and its effect */
     /* +0x24 */ void* context;   /* the object ef_resource_draw_setting walks into */
     /* +0x28 */ u8 pad_0x28[0x30];
-    /* +0x58 */ f32 scale_a;     /* read by ef_particle_get_scale (inlined) */
-    /* +0x5C */ f32 scale_b;     /* read by fn_800AB37C */
-
-#ifdef __cplusplus
-    /* The factor ef_particle_get_scale multiplies its scale product by.  It is an inline member in the original:
-     * retail keeps the argument setup (`mr r4,r3`) and the call's branch (`b +4`) with the body inlined
-     * right after it - so it stays a MEMBER and cannot move out of the struct.  Guarded because this
-     * header is included by C units (ef/fn_8011722C.c), which must see the data fields only; a member
-     * function adds no storage, so the layout is identical either way. */
-    f32 GetScaleA(EfParticle* self, f32 v) { return v * scale_a; }
-#endif
+    /* +0x58 */ f32 scale_a;     /* read by ef_pm_scale_a */
+    /* +0x5C */ f32 scale_b;     /* read by ef_pm_scale_b */
 }; /* size: 0x60 (lower bound: the highest offset any function of this unit reads) */
 
 /* The particle manager's dispatch table; +0x14 is the spawn entry. */
@@ -121,10 +119,14 @@ struct EfParticle {
     /* +0x1C */ EfParticleSlots* slots;
     /* +0x20 */ EfParticleParams params;
     /* +0xCC */ VEC3 field_0xCC;
-    /* +0xD8 */ u8 pad_0xD8[0x04];
+    /* +0xD8 */ u32 field_0xD8;     /* cleared by ef_particle_init */
     /* +0xDC */ u16 field_0xDC;
-    /* +0xDE */ u8 pad_0xDE[0x02];
-}; /* size: 0xE0 (lower bound: +0xDC is the highest offset any function of this unit reads) */
+    /* +0xDE */ u16 random_seed;    /* drawn from the emitter's random block at creation */
+    /* +0xE0 */ u16 life;           /* the creation life, at least 1 */
+    /* +0xE2 */ u16 field_0xE2;     /* cleared by ef_particle_init */
+    /* +0xE4 */ u8 pad_0xE4;
+    /* +0xE5 */ u8 random_byte;     /* drawn from the emitter's random block at creation */
+}; /* size: 0xE8 (lower bound: +0xE5 is the highest offset any function of this unit writes) */
 
 /* The per-emitter work record `em`.  Only the fields the shape files read are named. */
 typedef struct EfWork {
@@ -145,7 +147,9 @@ typedef struct EfWork {
     f32 euler_x;          /* +0x84  Euler angles of the axis-angle stage */
     f32 euler_y;          /* +0x88 */
     f32 euler_z;          /* +0x8C */
-    u8 pad_0x90[0x58];    /* +0x90 */
+    u8 pad_0x90[0x2C];    /* +0x90 */
+    void* effect;         /* +0xBC  mManagerEF, the owning `nw4r::ef::Effect` (C-visible header) */
+    u8 pad_0xC0[0x28];    /* +0xC0 */
     u16 spawn_flag;     /* +0xE8  passed through to the particle's spawn slot */
     u8 pad_0xEA[0x02];  /* +0xEA */
     u32 progress;       /* +0xEC  fixed-point progress read by ef_random_float */
@@ -290,6 +294,8 @@ namespace ef {
 struct Effect {
     /* +0x00 */ u8 pad_0x00[0x44];
     /* +0x44 */ void* owner_0x44;   /* back-pointer to the spawning `_EFT` (ef/fn_800FD864_fx.cpp) */
+    /* +0x48 */ u8 pad_0x48[0x40];
+    /* +0x88 */ VEC3 velocity;      /* the effect's own velocity, added to each new particle's (ef/ef_particle.cpp) */
     void SetRootMtx(const nw4r::math::MTX34& mtx); /* eft007/eft009 */
     u32 RetireEmitterAll();                         /* eft004/eft007; ef/ef_effectsystem.cpp adds it */
     /* Walks the effect's particle-manager pool, calling `cb` with each entry and its index; the
@@ -297,7 +303,7 @@ struct Effect {
      * The owner `ef/ef_effect.cpp` returns the walked count (the target accumulates it and the
      * sweep units add it); the consumers call it as a statement, whose `.text` is unaffected. */
     u32 ForeachParticleManager(void (*cb)(void*, u32), u32 arg, bool flag); /* eft001/effect.cpp */
-}; /* size: 0x48 (lower bound: +0x44 is the highest offset the spawn handler reads) */
+}; /* size: 0x94 (lower bound: +0x88 is the highest offset any reader uses) */
 
 /* The effect system the manager keeps at `eft_control` +0x04 (`fn_800D3C0C` builds it); the per-frame handler
  * and the resource manager both need it.  `RetireEffect` is a direct call returning `u32`, as its owner

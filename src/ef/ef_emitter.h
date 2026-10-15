@@ -27,7 +27,7 @@ nw4r::math::MTX34* ef_calc_inherit_mtx(nw4r::math::MTX34* dst, const nw4r::math:
                                        bool inheritRotate, s8 inheritTranslate, bool aroundOrigin);
 #endif
 /* 0x800A6E70 - steps the random block and returns the high half of its state. */
-u16 ef_random_u16(u32* random);
+s32 ef_random_u16(u32* random);
 /* 0x800A96C0 - marks a particle manager's matrix for rebuilding. */
 struct EfPmManager;
 void ef_pm_set_mtx_dirty(struct EfPmManager* pm);
