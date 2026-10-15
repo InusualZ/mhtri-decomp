@@ -1179,19 +1179,19 @@ config.libs = [
             Object(NonMatching, "DWCi/dwc_init.cpp", cflags=cflags_base),
             Object(Matching, "DWCi/dwc_report.cpp", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_auth_interface.c", cflags=cflags_base),
-            Object(NonMatching, "DWCi/dwc_nasfunc.c", cflags=cflags_base),
-            Object(NonMatching, "DWCi/dwc_svl.c", cflags=cflags_base),  # src/DWCi/dwc_svl.c header
+            Object(Matching, "DWCi/dwc_nasfunc.c", cflags=cflags_base),
+            Object(Matching, "DWCi/dwc_svl.c", cflags=cflags_base),  # src/DWCi/dwc_svl.c header
             Object(NonMatching, "DWCi/darray.c", cflags=cflags_base),  # src/DWCi/darray.c header
-            Object(NonMatching, "DWCi/hashtable.c", cflags=cflags_base),  # src/DWCi/hashtable.c header
+            Object(Matching, "DWCi/hashtable.c", cflags=cflags_base),  # src/DWCi/hashtable.c header
             Object(NonMatching, "DWCi/gsPlatform.c", cflags=cflags_base),  # src/DWCi/gsPlatform.c header
             Object(NonMatching, "DWCi/gsAvailable.c", cflags=cflags_base),  # src/DWCi/gsAvailable.c header
             Object(NonMatching, "DWCi/gt2Auth.c", cflags=cflags_base),  # src/DWCi/gt2Auth.c header
-            Object(NonMatching, "DWCi/gt2Buffer.c", cflags=cflags_base),  # src/DWCi/gt2Buffer.c header
-            Object(NonMatching, "DWCi/gt2Callback.c", cflags=cflags_base),  # src/DWCi/gt2Callback.c header
+            Object(Matching, "DWCi/gt2Buffer.c", cflags=cflags_base),  # src/DWCi/gt2Buffer.c header
+            Object(Matching, "DWCi/gt2Callback.c", cflags=cflags_base),  # src/DWCi/gt2Callback.c header
             Object(NonMatching, "DWCi/gt2Connection.c", cflags=cflags_base),  # src/DWCi/gt2Connection.c header
             Object(NonMatching, "DWCi/gt2Main.c", cflags=cflags_base),  # src/DWCi/gt2Main.c header
             Object(NonMatching, "DWCi/gt2Message.c", cflags=cflags_base),  # src/DWCi/gt2Message.c header
-            Object(NonMatching, "DWCi/gt2Socket.c", cflags=cflags_base),
+            Object(Matching, "DWCi/gt2Socket.c", cflags=cflags_base),
             Object(NonMatching, "DWCi/gt2Utility.c", cflags=cflags_base),
             # The DWCi band tail (.text 0x80512490..0x805145B8, 17 functions / 8488 B).  The left
             # edge is the seam the recon resolved: `tudiscover.py at 0x80512490` pins `strong x2`
