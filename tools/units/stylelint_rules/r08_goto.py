@@ -16,6 +16,10 @@ EXEMPT = {
     "src/DVD/dvddevice.c": ("__DVDCheckDevice", 2),  # owner ruling 2026-10-14: the SDK's shared `error` exit
 }
 
+# Owner-granted library exemptions (docs/pipeline.md 11): every `goto` in a file under these directories passes.
+# Owner ruling 2026-10-15: MSL_C keeps MSL's own gotos (its source uses them; the goto-free shapes cost rows).
+EXEMPT_DIRS = ("src/MSL_C/",)
+
 FUNC_HEAD_RE = r"\b{name}\s*\([^;{{}}]*\)\s*\{{"
 
 
@@ -41,6 +45,8 @@ def _exempt_span(src: Source) -> "tuple[int, int, int] | None":
 
 def findings(src: Source) -> list[dict]:
     """Every `goto` keyword in code (a comment or a literal naming it is not one), less an owner exemption."""
+    if src.rel.replace("\\", "/").startswith(EXEMPT_DIRS):
+        return []
     span = _exempt_span(src)
     out, used = [], 0
     for m in RULE8_RE.finditer(src.code):

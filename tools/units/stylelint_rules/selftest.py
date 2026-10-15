@@ -214,6 +214,9 @@ def selftest() -> int:
     dv = "BOOL __DVDCheckDevice(void) {\n    goto error;\n    goto error;\nerror:\n    return 0;\n}\n"
     check("rule8 exempt: __DVDCheckDevice's two gotos pass", lines_of(dv, 8, "src/DVD/dvddevice.c"), [])
     check("rule8 exempt: the DVD exemptions do not cross files", lines_of(dv, 8, "src/DVD/dvdfs.c"), [2, 3])
+    msl = "int f(void) {\n    goto a;\na:\n    goto b;\nb:\n    return 0;\n}\n"
+    check("rule8 exempt: MSL_C gotos pass in any function", lines_of(msl, 8, "src/MSL_C/printf.c"), [])
+    check("rule8 exempt: the MSL_C exemption does not reach other libraries", lines_of(msl, 8, "src/MSL/e_pow.cpp"), [2, 4])
     check("rule8 exempt: a goto in another function of the file fires",
           lines_of(ex + "void f(void) {\n    goto z;\nz:\n    return;\n}\n", 8, arc), [9])
 
