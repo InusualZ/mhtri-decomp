@@ -9,15 +9,15 @@
  * NAMES. `MEMCreateExpHeapEx`, `MEMDestroyExpHeap`, `MEMFreeToExpHeap`, `RecycleRegion_` are the map's names; GUESS
  *    (the dump holds junk names at the addresses): `MEMAllocFromExpHeapEx`, `MEMGetAllocatableSizeForExpHeapEx`,
  *    `AllocUsedBlockFromFreeBlock_`, `AllocFromHead_`, `AllocFromTail_`, the inlined helpers (no symbols) and the file name.
- * RESIDUALS. `AllocUsedBlockFromFreeBlock_`: the `back.start` add is scheduled after the free-region unlink loads where the
- *    target issues it first, so the volatile temporaries r5/r6 (front start, back end) are swapped and the used-list
- *    append takes r3/r4 the other way round; tried: statement order of the four range bounds (six orders), local
- *    declaration order, an append helper, a region-extent helper.  The other eight functions are byte-identical.
+ * RESIDUALS. none in .text: the nine functions are byte-identical to the target.
  * SHAPES. The RVL SDK helper structure decides the allocation: `RegionBody_`/`RegionEnd_`, `RemoveRegion_` (returns the
  *    predecessor), `InsertRegionAfter_` (returns the region), `InitRegion_`, `FillAllocMemory_`, inlined into each
  *    caller; best-fit locals initialised at their declarations; `__abs` for the allocatable-size alignment;
  *    `RecycleRegion_` compares the predecessor's end as a region pointer.  The bit-field region header (direction,
  *    alignment, group id) is stored in two halfword writes by the target.
+ *    `AllocUsedBlockFromFreeBlock_` names the used block's end (`usedEnd`) and then its header (`header`) as
+ *    initialised locals in that order (the order the target colours them, r30/r29), spells the back region's end
+ *    `block + size + 16` in place, and loads the used list's tail into a local before the append.
  */
 
 #include "types.h"
@@ -119,11 +119,13 @@ static void* AllocUsedBlockFromFreeBlock_(MEMiExpHeapHead* exp, MEMiHeapRegion* 
     MEMRegion front;
     MEMRegion back;
     MEMiHeapRegion* prev;
+    u32 usedEnd = size + (u32)memory;
+    u32 header = (u32)memory - 16;
 
-    front.end = (u32)memory - 16;
-    back.start = size + (u32)memory;
+    front.end = header;
+    back.start = usedEnd;
     front.start = (u32)block - block->attribute.bits.alignment;
-    back.end = RegionEnd_(block);
+    back.end = (u32)block + block->size + 16;
 
     prev = RemoveRegion_(&exp->freeList, block);
 
@@ -142,14 +144,16 @@ static void* AllocUsedBlockFromFreeBlock_(MEMiExpHeapHead* exp, MEMiHeapRegion* 
     {
         MEMRegion range;
         MEMiHeapRegion* used;
+        MEMiHeapRegion* tail;
 
-        range.start = (u32)memory - 16;
+        range.start = header;
         range.end = back.start;
         used = InitRegion_(&range, 0x5544); /* 'UD' */
         used->attribute.bits.allocDirection = direction;
         used->attribute.bits.alignment = (u32)used - front.end;
         used->attribute.bits.groupID = exp->groupID;
-        InsertRegionAfter_(&exp->usedList, exp->usedList.tail, used);
+        tail = exp->usedList.tail;
+        InsertRegionAfter_(&exp->usedList, tail, used);
     }
     return memory;
 }

@@ -26,9 +26,13 @@
  * RESIDUALS. 18 of 21 rows match the target.  `SCParseConfBuffer` 0x804DB6C0 and `SCFlushStep` 0x804DC6A0 differ
  *    in the shared failure exits (the target branches to one block from inside the item loop and from every NAND
  *    call, which needs `goto`: four `li r3, 2; b` pairs in the item loop, the delete/open blocks duplicated per
- *    step) and register numbering; `SCAddItem` keeps a scheduling and colouring residual around
- *    its `memmove` and the closing counter updates (same size).  flipcheck: `.text` (+0x74: `SCParseConfBuffer`
- *    +32 B and `SCFlushStep` +92 B; `SCAddItem` same size), the `@NN` relocation names of `SCv0`/`SCed`, and the
+ *    step) and register numbering; `SCAddItem` keeps a scheduling and colouring residual around its `memmove` (the
+ *    target colours `first` r0 and `*last` r5) and the closing counter updates (same size); the declaration order
+ *    (250 sampled orders of the 11 locals), the memmove operand spellings, `ItemNumTotal++` placements, the type-byte
+ *    store spellings and scoped optimization_level/scheduling/peephole/strength-reduction pragmas do not move it.
+ *    `SCFlushStep` shares its delete block between steps 0 and 1 and step 5's open block with step 1 (a `goto` or
+ *    case labels inside an `if`).  flipcheck: `.text` (+0x74: `SCParseConfBuffer` +32 B and `SCFlushStep` +92 B;
+ *    `SCAddItem` same size), the `@NN` relocation names of `SCv0`/`SCed`, and the
  *    tail padding of `.rodata`/`.sdata`/`.sbss`.
  * SHAPES. `NULL` is redefined as `((void*)0)` for the pointer compares that the target emits as `li`+`cmplw`; the
  *    item lookup and the add/replace paths run inside `do { ... } while (0)` so every failure shares one exit; the

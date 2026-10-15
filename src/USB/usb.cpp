@@ -20,16 +20,22 @@
  *   are written in their string positions so the object's .data is the target's byte for byte.  Their bodies are
  *   GUESSES beyond the strings and their order (no code of theirs is in the DOL).
  * RESIDUALS. All 22 linked rows have a body.  `__CtrlMsgInt` (0x804E57C0): retail schedules the stage-byte set-up
- *   (`li r6,0`/`li r5,1`/`li r0,2`) ahead of the request byte and stores the three `sthbrx` after it.
+ *   (`li r6,0`/`li r5,1`/`li r0,2`) ahead of the request byte and stores the three `sthbrx` after it and the first
+ *   `DCFlushRange` arguments; every order of the four set-up stores (and of the vector block) keeps the `sthbrx` three
+ *   slots early, and indexed stores or a reordered halfword trio do not move them.
  *   `usbIsoPacketTotal` (0x804E5F30): retail keeps the result in r31 across the oversize log and branches to one
- *   epilogue (a `return result` inside the loop is constant-folded; a `for (;;)` with two breaks rotates the loop).
- *   `IUSB_RequestDone` (0x804E4960): the clean-list walk pointer and the block swap r29/r30.
+ *   epilogue (a `return result` inside the loop is constant-folded; a `for (;;)` with two breaks rotates the loop; a
+ *   `BOOL ok` flag or an inline summing helper keeps a test of the flag), which needs `goto` (rule 8).  The target's
+ *   `nop` before the loop body is MWCC's 16-byte loop alignment and follows once the r31 save is reproduced.
  *   flipcheck blockers: the rows above, and .text carries the stripped functions (+0xFB8 B); .data/.sbss/.sdata end in
  *   alignment fill.
  * SHAPES. A single exit through `do { ... break; ... } while (0)` reproduces the target's one shared epilogue (a `return`
  *   in the middle or a flag measured worse); the bulk helpers take `s32` parameters so callers do not re-extend them,
  *   while the control-transfer set takes the SDK's `u8`/`u16` setup fields (no `clrlwi` before `sthbrx`); the transfer
  *   helpers name themselves through `__FUNCTION__`, which MWCC pools at the function's start.
+ *   Every request and buffer is freed through the inline `usbFree` (its parameter colours the clean-list block of
+ *   `IUSB_RequestDone` after the walk pointer) and taken through `usbAlloc`.  `__CtrlMsgInt` stores the request type,
+ *   then the three byte-reversed halfwords, then the request byte and the stage byte.
  */
 
 #include "types.h"
@@ -118,10 +124,30 @@ s32 IUSB_CloseLib(void)
     return 0;
 }
 
+/* Frees one IPC heap block and logs a failure. */
+static inline void usbFree(void* block) /* untyped: caller-owned block */
+{
+    if (block != NULL) {
+        s32 freed = iosFree(usbHeapId, block);
+        if (freed < 0) {
+            IUSB_LogError("iosFree(%d, 0x%x) failed: %d\n", usbHeapId, block, freed);
+        }
+    }
+}
+
+/* Takes an aligned IPC heap block and logs a failure. */
+static inline void* usbAlloc(u32 size) /* untyped: caller-owned block */
+{
+    void* block = iosAllocAligned(usbHeapId, size, 0x20);
+    if (block == NULL) {
+        IUSB_LogError("iosAllocAligned(%d, %u) failed: %d\n", usbHeapId, size, block);
+    }
+    return block;
+}
+
 /* Frees the buffers a finished request owns, runs its callback and frees the request. */
 s32 IUSB_RequestDone(s32 result, USBRequest* request)
 {
-    void* block;
     IUSB_Log("_intrBlkCtrlIsoCb returned: %d\n", result);
     IUSB_Log("_intrBlkCtrlIsoCb: nclean = %d\n", request->cleanCount);
     if ((u32)(request->cleanCount - 2) > 2 && request->cleanCount != 7 && request->cleanCount != 0) {
@@ -130,13 +156,7 @@ s32 IUSB_RequestDone(s32 result, USBRequest* request)
         u32 i;
         for (i = 0; i < request->cleanCount; i++) {
             IUSB_Log("Freeing clean[%d] = %x\n", i, request->clean[i]);
-            block = request->clean[i];
-            if (block != NULL) {
-                s32 freed = iosFree(usbHeapId, block);
-                if (freed < 0) {
-                    IUSB_LogError("iosFree(%d, 0x%x) failed: %d\n", usbHeapId, block, freed);
-                }
-            }
+            usbFree(request->clean[i]);
         }
         request->cleanCount = 0;
     }
@@ -147,12 +167,7 @@ s32 IUSB_RequestDone(s32 result, USBRequest* request)
         IUSB_Log("calling iso callback\n");
         request->callbackEx(result, request->callbackExtra, request->callbackArg);
     }
-    if (request != NULL) {
-        s32 freed = iosFree(usbHeapId, request);
-        if (freed < 0) {
-            IUSB_LogError("iosFree(%d, 0x%x) failed: %d\n", usbHeapId, request, freed);
-        }
-    }
+    usbFree(request);
     return result;
 }
 
@@ -165,10 +180,7 @@ s32 IUSB_OpenDeviceIds(const char* bus, s32 vendor, s32 product, s32* fd)
     if (fd == NULL) {
         result = -4;
     } else {
-        request = (USBRequest*)iosAllocAligned(usbHeapId, sizeof(USBRequest), 0x20);
-        if (request == NULL) {
-            IUSB_LogError("iosAllocAligned(%d, %u) failed: %d\n", usbHeapId, sizeof(USBRequest), request);
-        }
+        request = (USBRequest*)usbAlloc(sizeof(USBRequest));
         if (request == NULL) {
             IUSB_LogError("OpenDeviceIds: Not enough memory\n");
             result = -22;
@@ -181,12 +193,7 @@ s32 IUSB_OpenDeviceIds(const char* bus, s32 vendor, s32 product, s32* fd)
             *fd = result;
         }
     }
-    if (request != NULL) {
-        s32 freed = iosFree(usbHeapId, request);
-        if (freed < 0) {
-            IUSB_LogError("iosFree(%d, 0x%x) failed: %d\n", usbHeapId, request, freed);
-        }
-    }
+    usbFree(request);
     return result;
 }
 
@@ -197,10 +204,7 @@ s32 IUSB_OpenDeviceIdsAsync(const char* bus, s32 vendor, s32 product, USBCallbac
     s32 result;
 
     IUSB_Log("OpenDevice\n");
-    request = (USBRequest*)iosAllocAligned(usbHeapId, sizeof(USBRequest), 0x20);
-    if (request == NULL) {
-        IUSB_LogError("iosAllocAligned(%d, %u) failed: %d\n", usbHeapId, sizeof(USBRequest), request);
-    }
+    request = (USBRequest*)usbAlloc(sizeof(USBRequest));
     if (request == NULL) {
         IUSB_LogError("OpenDeviceIdsAsync: Not enough memory\n");
         result = -22;
@@ -213,12 +217,8 @@ s32 IUSB_OpenDeviceIdsAsync(const char* bus, s32 vendor, s32 product, USBCallbac
         IUSB_Log("OpenDevice - %s\n", request->path);
         result = IOS_OpenAsync(request->path, 0, (void*)IUSB_RequestDone, request);
         IUSB_Log("OpenDevice returned: %d\n", result);
-        if (result < 0 && request != NULL) {
-            s32 freed = iosFree(usbHeapId, request);
-            if (freed < 0) {
-                IUSB_LogError("iosFree(%d, 0x%x) failed: %d\n", usbHeapId, request, freed);
-            }
-        }
+        if (result < 0)
+            usbFree(request);
     }
     return result;
 }
@@ -241,10 +241,7 @@ s32 IUSB_CloseDeviceAsync(s32 fd, USBCallback callback, void* callbackArg) /* un
     s32 result;
 
     IUSB_Log("CloseDevice\n");
-    request = (USBRequest*)iosAllocAligned(usbHeapId, sizeof(USBRequest), 0x20);
-    if (request == NULL) {
-        IUSB_LogError("iosAllocAligned(%d, %u) failed: %d\n", usbHeapId, sizeof(USBRequest), request);
-    }
+    request = (USBRequest*)usbAlloc(sizeof(USBRequest));
     if (request == NULL) {
         IUSB_LogError("CloseDeviceAsync: Not enough memory\n");
         result = -22;
@@ -255,35 +252,10 @@ s32 IUSB_CloseDeviceAsync(s32 fd, USBCallback callback, void* callbackArg) /* un
         request->cleanCount = 0;
         result = IOS_CloseAsync(fd, (void*)IUSB_RequestDone, request);
         IUSB_Log("CloseDevice returned: %d\n", result);
-        if (result < 0 && request != NULL) {
-            s32 freed = iosFree(usbHeapId, request);
-            if (freed < 0) {
-                IUSB_LogError("iosFree(%d, 0x%x) failed: %d\n", usbHeapId, request, freed);
-            }
-        }
+        if (result < 0)
+            usbFree(request);
     }
     return result;
-}
-
-/* Frees one IPC heap block and logs a failure. */
-static inline void usbFree(void* block) /* untyped: caller-owned block */
-{
-    if (block != NULL) {
-        s32 freed = iosFree(usbHeapId, block);
-        if (freed < 0) {
-            IUSB_LogError("iosFree(%d, 0x%x) failed: %d\n", usbHeapId, block, freed);
-        }
-    }
-}
-
-/* Takes an aligned IPC heap block and logs a failure. */
-static inline void* usbAlloc(u32 size) /* untyped: caller-owned block */
-{
-    void* block = iosAllocAligned(usbHeapId, size, 0x20);
-    if (block == NULL) {
-        IUSB_LogError("iosAllocAligned(%d, %u) failed: %d\n", usbHeapId, size, block);
-    }
-    return block;
 }
 
 /* Opens the device node `path` into `fd`; no caller in the DOL, so the linker strips it. */
@@ -537,10 +509,10 @@ s32 __CtrlMsgInt(s32 fd, u8 requestType, u8 request, u16 value, u16 index, u16 l
                     result = -22;
                 } else {
                     *typeBuf = requestType;
-                    *requestBuf = request;
                     __sthbrx(value, valueBuf, 0);
                     __sthbrx(index, indexBuf, 0);
                     __sthbrx(length, lengthBuf, 0);
+                    *requestBuf = request;
                     *stageBuf = 0;
                     vectors[0].base = typeBuf;
                     vectors[0].length = 1;
