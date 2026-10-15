@@ -73,8 +73,6 @@
 
 extern "C" void wmemset(void* dst, int value, u16 size);
 
-extern "C" void* fn_8055B898(void* self, int flag);
-
 extern f32 lbl_8079D700;
 
 /* ---------------------------------------------------------------------------------------------------
@@ -834,16 +832,10 @@ extern "C" void fn_8055B434(void) {
 extern "C" void fn_8055B438(void) {
 }
 
-/* Runs the widget's own destructor, then releases its storage. */
-extern "C" void* fn_8055B898(void* self, int flag) {
-    if (self != 0) {
-        fn_8052B5F8(self, 0);
-        if (flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+/* Destroys the keyboard layout. */
+HkbLayout::~HkbLayout() {
 }
+
 
 /* Stores the widget's layout-name string. */
 extern "C" void fn_8055BAE4(HbmWidget* self, const void* name) {
@@ -891,7 +883,7 @@ HbmKey::~HbmKey() {
 }
 
 /* Reads the list node's id and value out, or the empty pair. */
-extern "C" void fn_8055C85C(HbmWidgetNodeView* self, HbmIdValue* out) {
+extern "C" void hbmAnimSaveState(HbmWidgetNodeView* self, HbmIdValue* out) {
     if (self->node != 0) {
         out->value = self->node->value;
         out->id = self->node->id;

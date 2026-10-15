@@ -47,6 +47,14 @@ public:
         mPaletteEntryNum = 0;
     }
 
+    /* Takes the image and sampling state of a GX texture object, with no palette. */
+    TexMap(const GXTexObj& texObj) {
+        Set(texObj);
+        mpPalette = NULL;
+        mBits.paletteFormat = 0;
+        mPaletteEntryNum = 0;
+    }
+
     void Get(GXTexObj* pTexObj) const;
     void Get(GXTlutObj* pTlutObj) const;
     void Set(const GXTexObj& texObj);

@@ -21,10 +21,13 @@ u32 fn_8055A888(HbmWidget* self, int arg);
 /* untyped: opaque band object, typed by the callers' views */
 void* fn_8055B174(void* a, void* b);
 
-/* untyped: opaque band object, typed by the callers' views */
-void* fn_8055B898(void* self, int flag);
-
 extern f32 lbl_8079D700;
+
+/* Reads the animation's current node out as an (id, frame) pair, or the empty pair. */
+void hbmAnimSaveState(HbmWidgetNodeView* anim, HbmIdValue* out);
+
+/* Puts the animation back on the node a saved (id, frame) pair names. */
+void hbmAnimRestoreState(HbmWidgetNodeView* anim, const HbmIdValue* state);
 
 #ifdef __cplusplus
 }

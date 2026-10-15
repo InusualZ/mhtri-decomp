@@ -15,7 +15,7 @@
 
 #include "types.h"
 
-struct Panel805482CC;
+struct HbmTextPanel;
 struct Panel805482CC_Sub;
 struct Panel805482CC_Item;
 struct Panel805482CC_Scroll;
@@ -112,7 +112,7 @@ struct Panel805482CC_Vtbl {
     /* +0x00C */ void* slot_0x00C;
     /* +0x010 */ void* slot_0x010;
     /* +0x014 */ void* slot_0x014;
-    /* +0x18 */ void (*fn_0x18)(Panel805482CC* self, s32 id, void* arg);
+    /* +0x18 */ void (*fn_0x18)(HbmTextPanel* self, s32 id, void* arg);
     /* +0x01C */ void* slot_0x01C;
     /* +0x020 */ void* slot_0x020;
     /* +0x024 */ void* slot_0x024;
@@ -160,7 +160,7 @@ struct Panel805482CC_Vtbl {
     /* +0x0CC */ void* slot_0x0CC;
     /* +0x0D0 */ void* slot_0x0D0;
     /* +0x0D4 */ void* slot_0x0D4;
-    /* +0xD8 */ void (*fn_0xD8)(Panel805482CC* self);
+    /* +0xD8 */ void (*fn_0xD8)(HbmTextPanel* self);
     /* +0x0DC */ void* slot_0x0DC;
     /* +0x0E0 */ void* slot_0x0E0;
     /* +0x0E4 */ void* slot_0x0E4;
@@ -201,7 +201,7 @@ struct Panel805482CC_Vtbl {
     /* +0x170 */ void* slot_0x170;
     /* +0x174 */ void* slot_0x174;
     /* +0x178 */ void* slot_0x178;
-    /* +0x17C */ void (*fn_0x17C)(Panel805482CC* self, s32 id);
+    /* +0x17C */ void (*fn_0x17C)(HbmTextPanel* self, s32 id);
     /* +0x180 */ void* slot_0x180;
     /* +0x184 */ void* slot_0x184;
     /* +0x188 */ void* slot_0x188;
@@ -346,7 +346,7 @@ typedef struct Panel805482CC_Sub18B8 {
     /* +0x04 */ u8 pad_0x04[0x3C];
 } Panel805482CC_Sub18B8; /* size: 0x40 - a lower bound */
 
-typedef struct Panel805482CC {
+typedef struct HbmTextPanel {
     /* +0x000 */ Panel805482CC_Vtbl* vtbl;
     /* +0x004 */ u32 field_0x004;
     /* +0x008 */ u16 field_0x008;
@@ -396,6 +396,6 @@ typedef struct Panel805482CC {
     /* +0x1AE8 */ s32 field_0x1AE8;                           /* repeat countdown of button bit 0x1000 */
     /* +0x1AEC */ u8 pad_0x1AEC[0x4];
     /* +0x1AF0 */ u32 field_0x1AF0;                           /* the pressed buttons plus the auto-repeated ones */
-} Panel805482CC; /* size: 0x1AF4 - a lower bound (the band reads the object through +0x1AF0) */
+} HbmTextPanel; /* size: 0x1AF4 - a lower bound (the band reads the object through +0x1AF0) */
 
 #endif /* MHTRI_FN_805482CC_H */

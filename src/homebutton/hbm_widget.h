@@ -153,21 +153,21 @@ struct HbmU16Array {
     /* +0x0C */ u16* data;
 };
 
-/* A second view of the widget where +0x14 holds the band's list node (fn_8055C85C).
+/* A second view of the widget where +0x14 holds the band's list node (hbmAnimSaveState).
  * size: 0x18 */
 struct HbmWidgetNodeView {
     /* +0x00 */ u8 pad_0x00[0x14];
     /* +0x14 */ struct HbmListNode* node;
 };
 
-/* A node of the band's sorted list (fn_8055C85C).  size: 0xC */
+/* A node of the band's sorted list (hbmAnimSaveState).  size: 0xC */
 struct HbmListNode {
     /* +0x00 */ u32 pad_0x00;
     /* +0x04 */ s32 id;
     /* +0x08 */ f32 value;
 };
 
-/* The (id, value) pair fn_8055C85C writes out.  size: 0x8 */
+/* The (id, value) pair hbmAnimSaveState writes out.  size: 0x8 */
 struct HbmIdValue {
     /* +0x00 */ s32 id;
     /* +0x04 */ f32 value;

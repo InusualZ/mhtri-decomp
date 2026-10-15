@@ -15,18 +15,6 @@
 #include "homebutton/hkb_resource_accessor.h"
 #include "MEM/MEMAllocFromAllocator.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* The layout's deleting destructor as homebutton/hbm_value.cpp calls it (Layout::~Layout below). */
-/* untyped: opaque band object, typed by the callers' views */
-void fn_8052B5F8(void* self, int flag);
-
-#ifdef __cplusplus
-}
-#endif
-
 namespace nw4r {
 namespace ut {
 namespace detail {

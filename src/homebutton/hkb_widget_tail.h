@@ -5,6 +5,7 @@
 #define HOMEBUTTON_HKB_WIDGET_TAIL_H
 
 #include "types.h"
+#include "homebutton/hkb_layout.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,8 +13,6 @@ extern "C" {
 
 /* untyped: opaque band object, typed by the callers' views */
 void  fn_8056D814(void* obj, void* owner);
-
-u8 lbl_80794750[];
 
 #ifdef __cplusplus
 }
@@ -32,6 +31,17 @@ public:
     /* +0x0 */ u8 mbLeftShift : 1;
     /* +0x0 */ u8 mbRightShift : 1;
 }; /* size: 0x1 */
+
+/* The keyboard's layout: a nw4r layout whose animation files become HkbAnimTransform objects.  size: 0x20 */
+class HkbLayout : public nw4r::lyt::Layout {
+public:
+    /* untyped: byte range - the RLAN resource image */
+    virtual nw4r::lyt::AnimTransform* CreateAnimTransform(const void* animResBuf,
+                                                          nw4r::lyt::ResourceAccessor* pResAcsr);
+    /* homebutton/hbm_value.cpp defines it; declared after CreateAnimTransform so the class table stays
+     * homebutton/hkb_widget_tail.cpp's. */
+    virtual ~HkbLayout();
+}; /* size: 0x20 */
 
 /* Returns the USB keyboard's state, built on first use. */
 inline HkbKbdState& hkbGetKbdState() {

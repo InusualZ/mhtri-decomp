@@ -85,6 +85,9 @@ extern u8  lbl_8064F0B0[];   /* the vtable/type record a factory stores into its
 /* Returns the spacing character of the dead key `c` (the key the keyboard animates for it). */
 u16 hbmKbDeadKeyToSpacing(u16 c);
 
+/* Clears the panel's candidate selection. */
+void hbmPanelResetCandidate(struct HbmTextPanel* self);
+
 #ifdef __cplusplus
 }
 #endif

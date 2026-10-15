@@ -1,32 +1,55 @@
 /*
- * homebutton/hbm_kb_widget.cpp - software-keyboard code of the tiHKBManager band: the keyboard widget's state
- * selector, property handlers, page stepping, flag accessors, deleting destructors and adjustor thunks.
+ * homebutton/hbm_kb_widget.cpp - software-keyboard code of the tiHKBManager band: the keyboard widget's prediction
+ * window (its handlers, its on/off switch, its scroll buttons), the prediction-candidate list it embeds at +0x18B8
+ * (layout, drawing, scrolling, input), the input handlers of the window's buttons, flag accessors, deleting
+ * destructors and adjustor thunks.
  *
  * RANGE.     .text 0x8054F7BC..0x805546B4 (102 functions), .ctors 0x8056F400..0x8056F404, .rodata 0x8057B2F0..0x8057B668,
  *            .data 0x8064F360..0x80650160; the functions not defined below keep the target object's bytes.
  * FLAGS.     GC/3.0a5.2 + cflags_hkb (see src/homebutton/hbm_kb_event.cpp); no extab/extabindex in the target, so
  *            `#pragma exceptions off`.
+ * FLAGS.     Scoped `#pragma auto_inline on` around hbmKbCandSelect: retail inlines it into hbmKbCandHandleInput (the
+ *            two slot lookups and the -1 store) and keeps it out of line; file-wide auto_inline inlines the adjustor
+ *            thunks' callees and drops nine rows to 0.
  * NAMES.     GUESS file name: the band's `hbm_` prefix + the keyboard widget class; no `__FILE__` string and no
  *            runtime-dump name.
- * NAMES.     GUESS type HkbWidgetProperty (the record the widget's slot +0x18 fills and applies).
- * NAMES.     GUESS function names (map rows renamed): hkbKbWidgetSetPropertyFlag (stores +0x17E8 and applies it as
- *            property 0x1D), hkbKbWidgetHandleByteProperty (property ids 0x22/0x23 through slots +0x40/+0x44).
- * SHAPES.    Signed compares (`cmpwi`, `ble`) read the widget's words as `s32`: fn_80551314 casts +0x1A90,
- *            fn_80551E5C switches on `(s32)state`, fn_80553F84 takes its selector as `s32`.
- * RESIDUALS. The constructors (fn_80553F50, fn_80553FC8, fn_80554278) store the unit's own `.data` vtables at +0x00
- *            and +0x14: they need their classes reconstructed (rule 10), not hand-written stores.
- * RESIDUALS. fn_80551404, fn_8055136C, fn_80550BA4, fn_80550C30 and fn_80550CCC read widget words (+0x17F0, +0x18F0,
- *            +0x1A94) that the shared view in homebutton/hkb_widget.h does not name yet.
- * RESIDUALS. fn_805542BC is declared `(HkbWidget*)` in homebutton/hbm_kb_widget.h; its body takes
- *            (self, s32, u32 id, HkbFlagRecord*), so it waits for the declaration.
+ * NAMES.     GUESS function names (map rows renamed with them): hkbKbWidget*, hbmKbWidget* (the widget's prediction
+ *            handlers), hbmKbCand* (the candidate list), hbmKbButton* and hbmKbSwitch* (the window's button handlers),
+ *            read off the bodies: the panes they bind by name, the states and sounds they set.
+ * NAMES.     GUESS view classes HbmKbWidget, HbmKbCandidateList, HbmKbHandlerBase, HbmKbButtonHandler,
+ *            HbmKbSwitchHandler, HbmKbPartView, HbmKbWordPartView, HbmKbButtonView, HbmKbHighlightView and the slot
+ *            names of their views; HbmKbCandidateList's two bases follow its constructor's stores at +0x00/+0x14.
+ * NAMES.     The widget's base at +0x17F4 is the band's pane manager (homebutton/hkb_keyboard.cpp's HbmPaneManager:
+ *            DrawInfo at +0x18, component list at +0x6C, input flag at +0x88); its +0x04/+0x10/+0x14 are the layout
+ *            view, the root layout and the sound player, and the slot names follow that lane's view.
+ * SHAPES.    The views are polymorphic so MWCC emits the canonical `lwz r12,0(r3); lwz r12,<slot>(r12)` dispatch; no
+ *            method is defined and nothing is constructed here, so no table is emitted (rule 10).
+ * SHAPES.    Signed compares (`cmpwi`, `ble`) read the widget's words as `s32`: fn_80551E5C switches on `(s32)state`,
+ *            fn_80553F84 takes its selector as `s32`; the handlers test `event == 1` unsigned and `(s32)event == 0`.
+ * SHAPES.    A call result stored through (`owner->getPanel()->flag = 0`) is split into a local first: written in one
+ *            expression MWCC loads the constant into a saved register before the call.
+ * SHAPES.    The text-width helper is inline (retail repeats it in every caller); its result is named in a local
+ *            before `+ margin` (retail's operand order), and the candidate pane sizes and positions go through
+ *            temporaries (Size, a VEC2 with a constructor, a VEC3) as retail's stack stores show.
+ * RESIDUALS. hbmKbWidgetClearCandidateTexts, hbmKbCandHandleInput, hbmKbCandLayout, hbmKbCandScrollBy: the loop counter
+ *            and the induction pointer take each other's saved registers.
+ * RESIDUALS. hbmKbWidgetUpdateScrollButtons and hbmKbWidgetScrollPrevPage: retail reloads the button pane (and the
+ *            first-word index) after the visibility test; ours reuses the loaded value.
+ * RESIDUALS. hbmKbWidgetHandleEvent: retail compares the candidate code with `addis r0,r3,0; cmplwi r0,0xFFFF`.
+ * RESIDUALS. hbmKbCandDraw: retail's frame is 0x80 with the scissor rectangle above the transformed corners; ours 0x70.
+ * RESIDUALS. The `.sdata2` constants (0.0f, 640.0f, 1.0f, 20.0f, 0.01f, 0.5f, 15.0f, the int->float magics) are this
+ *            unit's own pool (0x8079D6A0..0x8079D6D0) but load from MWCC's anonymous entries (`@NN`): an ARG row each.
+ * RESIDUALS. The pane-name strings are retail's `.data` string pool (0x8064F360..); ours sit at other offsets of our
+ *            pool, an ARG row per use.
+ * RESIDUALS. Unwritten, store this unit's own `.data` class tables and need their classes (and the base class's
+ *            members, named differently by two other lanes) reconstructed (rule 10): 0x8054F90C (widget destructor),
+ *            0x8054FBB4 (widget build), 0x80550128 (key-part construction), 0x80551F4C, 0x80553F50, 0x80553FC8,
+ *            0x80554278 (constructors).
+ * RESIDUALS. Unwritten, read the static key table 0x8064F388 (26 0x40-byte entries pointing at `.rodata`) the unit's
+ *            static initialiser 0x80554600 patches: 0x805514E0, 0x80554600.
  * RESIDUALS. datagap: the claimed `.data` 0x8064F360..0x80650160 spans at least 7 TUs (emission-order seams at
  *            0x8064FFC4, 0x8064FFF0, 0x8065001C, 0x80650038, 0x80650080, 0x806500A0) - a seam question for the
  *            registration.
- * RESIDUALS. 41 functions are unwritten: 0x8054F90C-0x8054F9F4, 0x8054FBB4-0x80550124, 0x80550128-0x80550488,
- *            0x805504EC-0x80550768, 0x80550770-0x805508F4, 0x80550910-0x80550ACC, 0x80550BA4-0x80550CBC,
- *            0x80550CCC-0x805512B4, 0x8055136C-0x8055148C, 0x805514E0-0x80551680, 0x805516E4-0x80551964,
- *            0x80551970-0x80551E5C, 0x80551F4C-0x80553670, 0x80553680-0x80553F84, 0x80553FC8-0x80554268,
- *            0x80554278-0x805544C0, 0x80554600-0x80554664.
  * NAMES.     GUESS classes HbmKbWidgetPart and its kinds HbmKbWidgetPartA/B/C (band keys with a state word; members
  *            reset, setAnim, setState, getState, getResource).
  */
@@ -38,6 +61,13 @@
 #include "homebutton/hbm_kb_widget.h"
 #include "homebutton/hbm_value.h"
 #include "homebutton/hkb_keyboard.h"
+#include "homebutton/hbm_text_panel.h"
+#include "homebutton/tiHKBManager.h"
+#include "homebutton/gui_manager.h"
+#include "homebutton/hkb_textbox.h"
+#include "homebutton/hkb_texmap.h"
+#include "MTX/mtxvec.h"
+#include "RVLGX/GXTransform.h"
 
 /* A widget part: a band key with its state word; its class table (0x8064FE74) and the out-of-line copy of its inline destructor (0x80550494) are
  * this unit's.  size: 0x34 */
@@ -78,6 +108,551 @@ public:
 
 /* The retail object has no extab/extabindex: exceptions are off for this band. */
 #pragma exceptions off
+
+/* A text pane of the candidate list: the box the candidate words and their buttons are drawn in. */
+typedef nw4r::lyt::TextBox HbmKbTextPane;
+
+/* A pane animation of the widget's pane manager (a gui component): slot 0x10 sets its frame, 0x14 plays an
+ * animation, 0x18 whether it plays, 0x24 and 0x28 read its state and its kind, 0x54 enables it, 0x58 whether its
+ * words are paged, 0x5C the key at a position; its pane is at +0x9C.  No method is defined and nothing is constructed
+ * here, so no table is emitted (rule 10).
+ * size: 0xA0 (approximation: the gui component record; only the vptr and +0x9C are touched) */
+class HbmKbPartView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void setFrame(s32 frame);
+    /* slot +0x014 */ virtual void play(s32 anim);
+    /* slot +0x018 */ virtual bool v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual s32 v_0x024();
+    /* slot +0x028 */ virtual s32 v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void v_0x054(s32 enable);
+    /* slot +0x058 */ virtual bool isPaged();
+    /* slot +0x05C */ virtual u16 getKeyAt(s32 position);
+
+    /* +0x04 */ u8 unused_0x04[0x98];
+    /* +0x9C */ HbmKbTextPane* pane;
+}; /* size: 0xA0 */
+
+/* A word part of the candidate list (its text or its frame): slot 0x10 replays its press animation, 0x54 enables it;
+ * its pane is at +0x9C.  size: 0xA0 (approximation: the gui component record; only the vptr and +0x9C are touched) */
+class HbmKbWordPartView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void replay();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void setEnabled(s32 enable);
+
+    /* +0x04 */ u8 unused_0x04[0x98];
+    /* +0x9C */ HbmKbTextPane* pane;
+}; /* size: 0xA0 */
+
+/* A button of the prediction window: slot 0x10 replays its animation, 0x14 plays one; its pane is at +0x9C.
+ * size: 0xA0 (approximation: the gui component record; only the vptr and +0x9C are touched) */
+class HbmKbButtonView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void replay();
+    /* slot +0x014 */ virtual void play(s32 anim);
+
+    /* +0x04 */ u8 unused_0x04[0x98];
+    /* +0x9C */ nw4r::lyt::Pane* pane;
+}; /* size: 0xA0 */
+
+/* The pane manager the widget derives from (+0x17F4), as its virtual slots: slot 0x2C finds a text box by name,
+ * 0x5C a pane animation by name.
+ * size: 0x04 (approximation: only the vptr is touched) */
+class HbmKbLayoutView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual nw4r::lyt::Pane* findTextBox(const char* name);
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void v_0x054();
+    /* slot +0x058 */ virtual void v_0x058();
+    /* slot +0x05C */ virtual HbmKbPartView* getPaneAnim(const char* name);
+}; /* size: 0x04 */
+
+/* The text panel the widget's owner hands back through slot 0x68: its +0x19E1 byte marks a pending candidate.
+ * size: 0x19E2 (approximation: only +0x19E1 is touched) */
+struct HbmKbPanelState {
+    /* +0x0000 */ u8 unused_0x0000[0x19E1];
+    /* +0x19E1 */ u8 candidatePending;
+}; /* size: 0x19E2 */
+
+/* The owner the widget reads its text panel from (+0x17F0): slot 0x68 returns the panel.
+ * size: 0x04 (approximation: only the vptr is touched) */
+class HbmKbOwnerView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void v_0x03C();
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual void v_0x044();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void v_0x054();
+    /* slot +0x058 */ virtual void v_0x058();
+    /* slot +0x05C */ virtual void v_0x05C();
+    /* slot +0x060 */ virtual void v_0x060();
+    /* slot +0x064 */ virtual void v_0x064();
+    /* slot +0x068 */ virtual HbmKbPanelState* getPanel();
+}; /* size: 0x04 */
+
+/* The layout view of the widget's pane manager (+0x17F8): slot 0x30 takes the DrawInfo, 0x38 shows or hides it.
+ * size: 0x04 (approximation: only the vptr is touched) */
+class HbmKbSceneView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void v_0x014();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void setDrawInfo(const nw4r::lyt::DrawInfo* drawInfo);
+    /* slot +0x034 */ virtual void v_0x034();
+    /* slot +0x038 */ virtual void setVisible(s32 visible);
+}; /* size: 0x04 */
+
+/* The sound player of the widget's pane manager (+0x1808): slot 0x14 plays a sound.
+ * size: 0x04 (approximation: only the vptr is touched) */
+class HbmKbSoundView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void play(s32 sound);
+}; /* size: 0x04 */
+
+/* The root layout of the widget's pane manager (+0x1804), its buttons' registry: slot 0x10 refreshes it.
+ * size: 0x04 (approximation: only the vptr is touched) */
+class HbmKbPaneManagerView {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void refresh();
+}; /* size: 0x04 */
+
+/* The button component the pane manager hands back by name: its +0x04 byte holds it pressed.
+ * size: 0x08 (approximation: only +0x04 is touched) */
+struct HbmKbButtonState {
+    /* +0x00 */ u32 unused_0x00;
+    /* +0x04 */ u8 held;
+}; /* size: 0x08 */
+
+/* A candidate highlight: slot 0x08 clears it (homebutton/hbm_value.cpp's node object).
+ * size: 0x04 (approximation: only the vptr is touched) */
+class HbmKbHighlightView {
+public:
+    /* slot +0x008 */ virtual void clear();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void setMode(s32 mode);
+    /* slot +0x014 */ virtual void setState(s32 state);
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual s32 getState();
+}; /* size: 0x04 */
+
+/* The prediction dictionary the candidate list shows: the word count, then the words (61 wide characters each).
+ * size: 0x4 + count * 0x7A */
+struct HbmKbCandidateSet {
+    /* +0x00 */ s32 count;
+    /* +0x04 */ wchar_t words[1][0x3D];
+}; /* size: 0x7E (approximation: the word array runs to `count`) */
+
+/* The primary base of the prediction window's input handlers and of the candidate list (tables 0x8064FFC4,
+ * 0x8064FFF0, 0x8065001C, 0x80650038): the handler's id at +0x08, the keyboard widget it belongs to at +0x0C and
+ * the listener its events go to at +0x10.  Declared only; the tables are the constructors'.
+ * size: 0x14 */
+class HbmKbHandlerBase {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+
+    /* +0x04 */ u32 unused_0x04;
+    /* +0x08 */ u32 id;
+    /* +0x0C */ HbmKbWidget* widget;
+    /* +0x10 */ HkbWidget* listener;
+}; /* size: 0x14 */
+
+/* The input record the handlers read: the pointer position at +0x00, the trigger kind at +0x04, the trigger flags at
+ * +0x0C and the button state at +0x10.  size: 0x14 */
+struct HbmKbInputEvent {
+    /* +0x00 */ s32 position;
+    /* +0x04 */ u32 trigger;
+    /* +0x08 */ u32 unused_0x08;
+    /* +0x0C */ u32 flags;
+    /* +0x10 */ u32 state;
+}; /* size: 0x14 */
+
+/* The event-listener base of the prediction-switch handler (+0x14, table 0x8064FFF0 + 0x1C).  size: 0x04 */
+class HbmKbPartListener {
+public:
+    /* slot +0x008 */ virtual void onPartEvent(s32 kind, HbmKbPartView* sender, const HbmKbInputEvent* input);
+}; /* size: 0x04 */
+
+/* The handler of one prediction-window button (table 0x8065001C, constructor fn_80553FC8): the button's part at
+ * +0x1C.  size: 0x20 */
+class HbmKbButtonHandler : public HbmKbHandlerBase {
+public:
+    /* +0x14 */ u32 unused_0x14;
+    /* +0x18 */ u32 unused_0x18;
+    /* +0x1C */ HbmKbPartView* part;
+}; /* size: 0x20 */
+
+/* The handler of the prediction on/off switch (table 0x8064FFF0, constructor fn_80554278): the part whose events it
+ * takes at +0x1C and its two buttons at +0x28/+0x2C.  size: 0x30 */
+class HbmKbSwitchHandler : public HbmKbHandlerBase, public HbmKbPartListener {
+public:
+    /* +0x18 */ u32 unused_0x18;
+    /* +0x1C */ HbmKbPartView* source;
+    /* +0x20 */ u8 unused_0x20[8];
+    /* +0x28 */ HbmKbPartView* onButton;
+    /* +0x2C */ HbmKbPartView* offButton;
+}; /* size: 0x30 */
+
+/* The scroll-listener base of the candidate list (+0x14, its table 0x80650054): the scroller reports the end of a
+ * scroll through it.  size: 0x04 */
+class HbmKbScrollListener {
+public:
+    /* slot +0x008 */ virtual void onScrolled(s32 kind, s32 delta);
+}; /* size: 0x04 */
+
+/* The scroller of the candidate list (+0x18 of the list, its table at 0x8064F338 is homebutton/hbm_text_panel.cpp's):
+ * slot 0x08 starts a scroll, 0x0C steps it, 0x10 reads its offset, 0x14 whether it moves, 0x20 resets it.
+ * size: 0x10 (approximation: only the vptr is touched) */
+class HbmKbScrollerView {
+public:
+    /* slot +0x008 */ virtual void start(HbmKbScrollListener* listener, f32 from, f32 to, s32 words, f32 frames);
+    /* slot +0x00C */ virtual void step();
+    /* slot +0x010 */ virtual f32 getOffset();
+    /* slot +0x014 */ virtual bool isMoving();
+    /* slot +0x018 */ virtual void v_0x018();
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void reset();
+
+    /* +0x04 */ u8 unused_0x04[0xC];
+}; /* size: 0x10 */
+
+/* The prediction-candidate list embedded in the keyboard widget (+0x18B8): twenty word slots (a text pane, its
+ * frame and its highlight each), the window it scrolls through the dictionary and the scroller that moves it.
+ * Its tables (0x80650038, 0x80650054) are stored by its constructor fn_80551F4C; nothing is constructed here.
+ * size: 0x200 */
+class HbmKbCandidateList : public HbmKbHandlerBase, public HbmKbScrollListener {
+public:
+    /* +0x018 */ HbmKbScrollerView scroller;
+    /* +0x028 */ f32 value_028;
+    /* +0x02C */ u8 flag_02C;
+    /* +0x02D */ u8 flag_02D;
+    /* +0x02E */ u8 unused_0x02E[2];
+    /* +0x030 */ u32 value_030;
+    /* +0x034 */ u8 unused_0x034[4];
+    /* +0x038 */ HbmKbWordPartView* texts[20];
+    /* +0x088 */ HbmKbWordPartView* frames[20];
+    /* +0x0D8 */ HbmKbPartView* area;
+    /* +0x0DC */ HbmKbPartView* window;
+    /* +0x0E0 */ HbmKbHighlightView* highlights[20];
+    /* +0x130 */ HbmIdValue highlightValues[20];
+    /* +0x1D0 */ s32 selected;
+    /* +0x1D4 */ s32 pressed;
+    /* +0x1D8 */ s32 first;
+    /* +0x1DC */ f32 scroll;
+    /* +0x1E0 */ s32 count;
+    /* +0x1E4 */ s32 shownFirst;
+    /* +0x1E8 */ s32 shownLast;
+    /* +0x1EC */ s32 lastWhole;
+    /* +0x1F0 */ f32 tailOffset;
+    /* +0x1F4 */ f32 areaWidth;
+    /* +0x1F8 */ u8 touched;
+    /* +0x1F9 */ u8 unused_0x1F9[3];
+    /* +0x1FC */ HbmKbCandidateSet* words;
+}; /* size: 0x200 */
+
+/* The keyboard widget the band's handlers run on, as the handlers of this unit see it: its own slots (named by
+ * offset), the layout base at +0x17F4, the DrawInfo its layout is drawn with, the prediction-candidate list and
+ * the gui components of the prediction window.  Declared as virtuals so MWCC emits the canonical
+ * `lwz r12,0(r3); lwz r12,<slot>(r12)` dispatch; no method is defined and nothing is constructed here, so no
+ * table is emitted (rule 10).
+ * size: 0x1B8C (approximation: bounded by the last field the handlers touch) */
+class HbmKbWidget {
+public:
+    /* slot +0x008 */ virtual void v_0x008();
+    /* slot +0x00C */ virtual void v_0x00C();
+    /* slot +0x010 */ virtual void v_0x010();
+    /* slot +0x014 */ virtual void setState(s32 state);
+    /* untyped: caller-owned payload - the record the property id selects */
+    /* slot +0x018 */ virtual void setProperty(u32 id, void* value);
+    /* slot +0x01C */ virtual void v_0x01C();
+    /* slot +0x020 */ virtual void v_0x020();
+    /* slot +0x024 */ virtual void v_0x024();
+    /* slot +0x028 */ virtual void v_0x028();
+    /* slot +0x02C */ virtual void v_0x02C();
+    /* slot +0x030 */ virtual void v_0x030();
+    /* slot +0x034 */ virtual bool isPredicting();
+    /* slot +0x038 */ virtual void v_0x038();
+    /* slot +0x03C */ virtual void setActive(s32 active);
+    /* slot +0x040 */ virtual void v_0x040();
+    /* slot +0x044 */ virtual bool isLocked();
+    /* slot +0x048 */ virtual void v_0x048();
+    /* slot +0x04C */ virtual void v_0x04C();
+    /* slot +0x050 */ virtual void v_0x050();
+    /* slot +0x054 */ virtual void v_0x054();
+    /* slot +0x058 */ virtual void v_0x058();
+    /* slot +0x05C */ virtual void v_0x05C();
+    /* slot +0x060 */ virtual void v_0x060();
+    /* slot +0x064 */ virtual void v_0x064();
+    /* slot +0x068 */ virtual void v_0x068();
+    /* slot +0x06C */ virtual void v_0x06C();
+    /* slot +0x070 */ virtual void v_0x070();
+    /* slot +0x074 */ virtual void v_0x074();
+    /* slot +0x078 */ virtual void v_0x078();
+    /* slot +0x07C */ virtual void v_0x07C();
+    /* slot +0x080 */ virtual void v_0x080();
+    /* slot +0x084 */ virtual void v_0x084();
+    /* slot +0x088 */ virtual void v_0x088();
+    /* slot +0x08C */ virtual void v_0x08C();
+    /* slot +0x090 */ virtual void v_0x090();
+    /* slot +0x094 */ virtual void v_0x094();
+    /* slot +0x098 */ virtual void v_0x098();
+    /* slot +0x09C */ virtual void v_0x09C();
+    /* slot +0x0A0 */ virtual void v_0x0A0();
+    /* slot +0x0A4 */ virtual void v_0x0A4();
+    /* slot +0x0A8 */ virtual void v_0x0A8();
+    /* slot +0x0AC */ virtual void v_0x0AC();
+    /* slot +0x0B0 */ virtual void v_0x0B0();
+    /* slot +0x0B4 */ virtual void v_0x0B4();
+    /* slot +0x0B8 */ virtual void v_0x0B8();
+    /* slot +0x0BC */ virtual void v_0x0BC();
+    /* slot +0x0C0 */ virtual void v_0x0C0();
+    /* slot +0x0C4 */ virtual void v_0x0C4();
+    /* slot +0x0C8 */ virtual void v_0x0C8();
+    /* slot +0x0CC */ virtual void v_0x0CC();
+    /* slot +0x0D0 */ virtual void v_0x0D0();
+    /* slot +0x0D4 */ virtual void v_0x0D4();
+    /* slot +0x0D8 */ virtual void pagePrevious();
+    /* slot +0x0DC */ virtual void pageNext();
+    /* slot +0x0E0 */ virtual void setSwitch(s32 on);
+    /* slot +0x0E4 */ virtual void refreshKeys();
+    /* slot +0x0E8 */ virtual void clearCandidate();
+    /* slot +0x0EC */ virtual void selectCandidate(s32 index);
+    /* slot +0x0F0 */ virtual void commitCandidate();
+    /* slot +0x0F4 */ virtual void v_0x0F4();
+    /* slot +0x0F8 */ virtual bool isBusy();
+    /* slot +0x0FC */ virtual void setPredictMode(s32 mode);
+    /* slot +0x100 */ virtual void v_0x100();
+    /* slot +0x104 */ virtual void setFocus(s32 index);
+    /* slot +0x108 */ virtual void setCursor(s32 index);
+    /* slot +0x10C */ virtual u16 getCandidateCode();
+
+    /* +0x0004 */ u8 unused_0x0004[0xC];
+    /* +0x0010 */ u8 layoutBlock[0x17D8];
+    /* +0x17E8 */ u8 flag_17E8;
+    /* +0x17E9 */ u8 predictEnabled;
+    /* +0x17EA */ u8 unused_0x17EA[2];
+    /* +0x17EC */ u32 textureMode;
+    /* +0x17F0 */ HbmKbOwnerView* owner;
+    /* +0x17F4 */ void* vtable_17F4;     /* the layout base (HbmKbLayoutView) */
+    /* +0x17F8 */ HbmKbSceneView* layoutView;
+    /* +0x17FC */ u8 unused_0x17FC[8];
+    /* +0x1804 */ HbmKbPaneManagerView* root;
+    /* +0x1808 */ HbmKbSoundView* sound;
+    /* +0x180C */ nw4r::lyt::DrawInfo drawInfo;
+    /* +0x1860 */ u8 unused_0x1860[0xC];
+    /* +0x186C */ f32 areaLeft;
+    /* +0x1870 */ u8 unused_0x1870[4];
+    /* +0x1874 */ f32 areaRight;
+    /* +0x1878 */ u8 unused_0x1878[4];
+    /* +0x187C */ u8 layoutShown;
+    /* +0x187D */ u8 unused_0x187D[0x3B];
+    /* +0x18B8 */ HbmKbCandidateList candidates;
+    /* +0x1AB8 */ u8 unused_0x1AB8[0x14];
+    /* +0x1ACC */ HbmKbButtonView* leftArrow;
+    /* +0x1AD0 */ HbmKbButtonView* leftButton;
+    /* +0x1AD4 */ HbmKbButtonView* leftAnim;
+    /* +0x1AD8 */ u8 unused_0x1AD8[0x14];
+    /* +0x1AEC */ HbmKbButtonView* rightArrow;
+    /* +0x1AF0 */ HbmKbButtonView* rightButton;
+    /* +0x1AF4 */ HbmKbButtonView* rightAnim;
+    /* +0x1AF8 */ u8 unused_0x1AF8[0x18];
+    /* +0x1B10 */ HbmKbButtonView* onButton;
+    /* +0x1B14 */ HbmKbButtonView* onButtonFrame;
+    /* +0x1B18 */ HbmKbButtonView* offButton;
+    /* +0x1B1C */ HbmKbButtonView* offButtonFrame;
+    /* +0x1B20 */ HbmKbButtonView* onLabel;
+    /* +0x1B24 */ HbmKbButtonView* offLabel;
+    /* +0x1B28 */ GXTexObj textureOn;
+    /* +0x1B48 */ GXTexObj textureOff;
+    /* +0x1B68 */ u8 unused_0x1B68[0x18];
+    /* +0x1B80 */ HbmKbButtonView* switchButton;
+    /* +0x1B84 */ HbmKbPartView* switchPart;
+    /* +0x1B88 */ u8 flag_1B88;
+}; /* size: 0x1B8C */
+
+/* The layout base of the widget, through which its panes and components are found by name. */
+static inline HbmKbLayoutView* hbmKbLayout(HbmKbWidget* self) {
+    return (HbmKbLayoutView*)&self->vtable_17F4;
+}
+
+/* The pane manager the widget derives from (its base at +0x17F4). */
+static inline HbmPaneManager* hbmKbPaneManager(HbmKbWidget* self) {
+    return (HbmPaneManager*)&self->vtable_17F4;
+}
+
+extern "C" {
+void hbmKbCandLayout(HbmKbCandidateList* self);
+void hbmKbCandSetWords(HbmKbCandidateList* self);
+void hbmKbCandDraw(HbmKbCandidateList* self, const nw4r::lyt::DrawInfo* drawInfo);
+s32 hbmKbCandNextWindow(HbmKbCandidateList* self, s32 index);
+s32 hbmKbCandPrevWindow(HbmKbCandidateList* self, s32 index);
+void hbmKbCandScrollTo(HbmKbCandidateList* self, s32 index);
+}
+
+/* Sets a pane's size. */
+static inline void hbmKbSetPaneSize(nw4r::lyt::Pane* pane, const nw4r::lyt::Size& size) {
+    pane->mSize = size;
+}
+
+/* A two-component vector built from its components.  size: 0x8 */
+struct HbmKbVec2 : public nw4r::math::VEC2 {
+    HbmKbVec2(f32 fx, f32 fy) {
+        x = fx;
+        y = fy;
+    }
+}; /* size: 0x8 */
+
+/* Places a pane at `pos` in its parent's plane. */
+static inline void hbmKbSetPaneTranslate(nw4r::lyt::Pane* pane, const nw4r::math::VEC2& pos) {
+    nw4r::math::VEC3 translate;
+    translate.x = pos.x;
+    translate.y = pos.y;
+    translate.z = 0.0f;
+    pane->mTranslate = translate;
+}
+
+/* The drawn width of a wide string in a text box's font, character spacing and font size; 0 for no string. */
+static inline f32 hbmKbTextWidth(const nw4r::lyt::TextBox* text, const wchar_t* str) {
+    if (str == NULL) {
+        return 0.0f;
+    }
+    f32 charSpace;
+    f32 fontWidth;
+    const nw4r::ut::Font* font = text->GetFont();
+    fontWidth = text->mFontSize.width;
+    charSpace = text->mCharSpace;
+    f32 width = 0.0f;
+    for (; *str != 0; str++) {
+        width += charSpace;
+        width += font->GetCharWidth(*str);
+    }
+    return 0.01f + width * (fontWidth / font->GetWidth());
+}
+
+/* The drawn width of a text box's own string; 0 for no box. */
+static inline f32 hbmKbPaneTextWidth(const nw4r::lyt::TextBox* text) {
+    if (text == NULL) {
+        return 0.0f;
+    }
+    return hbmKbTextWidth(text, text->mTextBuf);
+}
+
+/* The word slot that shows candidate `index`, or -1 when the word is outside the shown range. */
+static inline s32 hbmKbCandidateSlot(const HbmKbCandidateList* list, s32 index) {
+    s32 slot;
+    if (index < list->shownFirst) {
+        return -1;
+    }
+    if (index > list->shownLast) {
+        return -1;
+    }
+    if (index < list->first) {
+        slot = 20 - (list->first - index);
+    } else {
+        slot = index - list->first;
+    }
+    while (slot < 0) {
+        slot += 20;
+    }
+    while (slot >= 20) {
+        slot -= 20;
+    }
+    return slot;
+}
+
+/* The number of words the list shows. */
+static inline s32 hbmKbShownCount(const HbmKbCandidateList* list) {
+    return list->count > 0 ? list->shownLast - list->shownFirst + 1 : 0;
+}
+
+/* Saves every highlight's state and clears it. */
+static inline void hbmKbResetHighlights(HbmKbCandidateList* list) {
+    u32 i;
+    for (i = 0; i < 20; i++) {
+        hbmAnimSaveState((HbmWidgetNodeView*)list->highlights[i], &list->highlightValues[i]);
+        HbmIdValue empty = {0, 0.0f};
+        list->highlights[i]->clear();
+        hbmAnimRestoreState((HbmWidgetNodeView*)list->highlights[i], &empty);
+    }
+}
 
 /* Empty virtual slot. */
 extern "C" void fn_8054F7BC(void) {
@@ -215,9 +790,58 @@ void HbmKbWidgetPart::reset() {
 }
 
 
+/* Shows the prediction input, clears its candidate texts and frames, and binds the on/off texture to the switch. */
+extern "C" void hbmKbWidgetShowPredictInput(HbmKbWidget* self) {
+    u32 i;
+    hbmKbLayout(self)->getPaneAnim("N_predictInput")->play(0);
+    self->predictEnabled = 0;
+    self->setPredictMode(1);
+    self->setActive(0);
+    self->drawInfo.mFlag.invisiblePaneCalculateMtx = 1;
+    for (i = 0; i < 20; i++) {
+        self->candidates.texts[i]->pane->SetString(L"", 0);
+        self->candidates.frames[i]->setEnabled(1);
+    }
+    self->candidates.tailOffset = 0.0f;
+    self->candidates.areaWidth = self->areaRight - self->areaLeft;
+    if (self->textureMode == 0) {
+        nw4r::lyt::TexMap texMap(self->textureOff);
+        self->offButton->pane->GetMaterial()->GetTexMapAry()[0] = texMap;
+    } else {
+        nw4r::lyt::TexMap texMap(self->textureOn);
+        self->offButton->pane->GetMaterial()->GetTexMapAry()[0] = texMap;
+    }
+    self->switchPart->play(9);
+    self->layoutView->setVisible(0);
+    self->layoutView->setDrawInfo(&self->drawInfo);
+}
+
 /* Stores the keyboard widget's +0x1B88 byte. */
 extern "C" void fn_80550768(HkbWidget* self, u8 flag) {
     self->flag_1B88 = flag;
+}
+
+/* Hides the candidate text area, steps the layout base, shows the area again and draws the candidate list. */
+extern "C" void hbmKbWidgetDrawCandidates(HbmKbWidget* self) {
+    hbmKbLayout(self)->findTextBox("N_prdc_Texts")->SetVisible(false);
+    hbmKbPaneManager(self)->HbmPaneManager::calcComponents();
+    hbmKbLayout(self)->findTextBox("N_prdc_Texts")->SetVisible(true);
+    hbmKbCandDraw(&self->candidates, &self->drawInfo);
+}
+
+/* Steps the layout base and the candidate scroller, re-lays the candidate words out and, while the layout is shown,
+ * animates and recalculates the candidate text area. */
+extern "C" void hbmKbWidgetUpdateCandidates(HbmKbWidget* self) {
+    hbmKbPaneManager(self)->HbmPaneManager::drawComponents();
+    self->candidates.scroller.step();
+    if (self->candidates.scroller.isMoving()) {
+        self->candidates.scroll = self->candidates.scroller.getOffset();
+    }
+    hbmKbCandLayout(&self->candidates);
+    if (self->layoutShown) {
+        hbmKbLayout(self)->findTextBox("N_prdc_Texts")->Animate(0);
+        hbmKbLayout(self)->findTextBox("N_prdc_Texts")->CalculateMtx(self->drawInfo);
+    }
 }
 
 /* Stores the keyboard widget's +0x17EC word, then dispatches slot +0x10 on itself. */
@@ -229,6 +853,30 @@ extern "C" void fn_805508F4(HkbWidget* self, u32 value) {
 /* Stores the keyboard widget's +0x17EC word. */
 extern "C" void fn_80550908(HkbWidget* self, u32 value) {
     self->value_17EC = value;
+}
+
+/* Switches the prediction buttons between the on and the off look, optionally replaying the window's animation. */
+extern "C" void hbmKbWidgetSetPredictLook(HbmKbWidget* self, s32 animate) {
+    bool off = !self->isPredicting();
+    if (off) {
+        self->switchButton->pane->SetVisible(true);
+        self->switchPart->play(8);
+    } else {
+        self->switchPart->play(9);
+    }
+    if (self->isPredicting()) {
+        hbmKbLayout(self)->getPaneAnim("P_OnBtn")->setFrame(0);
+        if (animate) {
+            self->sound->play(17);
+        }
+    } else {
+        hbmKbLayout(self)->getPaneAnim("P_OffBtn")->setFrame(0);
+        hbmKbLayout(self)->getPaneAnim("P_prdc_scrl_Left")->play(0);
+        hbmKbLayout(self)->getPaneAnim("P_prdc_scrl_Rght")->play(0);
+        if (animate) {
+            self->sound->play(16);
+        }
+    }
 }
 
 /* Turns the widget's two mode flags off and back on in order. */
@@ -245,6 +893,25 @@ extern "C" void fn_80550B38(HkbWidget* self) {
     self->v_0x03C(0);
 }
 
+/* Clears every candidate text and the panel's pending-candidate mark. */
+extern "C" void hbmKbWidgetClearCandidateTexts(HbmKbWidget* self) {
+    u32 i;
+    for (i = 0; i < 20; i++) {
+        self->candidates.texts[i]->pane->SetString(L"", 0);
+    }
+    HbmKbPanelState* panel = self->owner->getPanel();
+    panel->candidatePending = 0;
+}
+
+/* Drops the panel's pending candidate and resets the focus and the cursor. */
+extern "C" void hbmKbWidgetResetCandidate(HbmKbWidget* self) {
+    HbmKbPanelState* panel = self->owner->getPanel();
+    panel->candidatePending = 0;
+    hbmPanelResetCandidate((struct HbmTextPanel*)self->owner->getPanel());
+    self->setFocus(-1);
+    self->setCursor(-1);
+}
+
 /* Stores the keyboard widget's +0x1A88 word. */
 extern "C" void fn_80550CBC(HkbWidget* self, u32 value) {
     self->value_1A88 = value;
@@ -255,19 +922,148 @@ extern "C" void fn_80550CC4(HkbWidget* self, u32 value) {
     self->value_1A8C = value;
 }
 
-/* Advances the widget's page and re-targets it. */
-extern "C" void fn_805512B4(HkbWidget* self) {
-    if (self->index_1AA4 < self->count_1A98 - 1) {
-        fn_80553074(self->sub_18B8, 1);
-        self->child_1808->v_0x014(11);
+/* Drops the panel's pending candidate, applies property 0x17 and resets the focus and the cursor. */
+extern "C" void hbmKbWidgetCancelCandidate(HbmKbWidget* self) {
+    HbmKbPanelState* panel = self->owner->getPanel();
+    panel->candidatePending = 0;
+    self->setProperty(0x17, 0);
+    self->setFocus(-1);
+    self->setCursor(-1);
+}
+
+/* Marks the panel's candidate pending, applies the candidate code as property 0x16 and moves focus and cursor to it. */
+extern "C" void hbmKbWidgetFocusCandidate(HbmKbWidget* self, s32 code) {
+    u32 value;
+    HbmKbPanelState* panel = self->owner->getPanel();
+    panel->candidatePending = 1;
+    value = (u16)code;
+    self->setProperty(0x16, &value);
+    self->setFocus(code);
+    self->setCursor(code);
+}
+
+/* Stores the +0x17E8 flag, applies it as property 0x1D, resets the switch labels and shows the on or the off buttons;
+ * switched off, it also hides the switch, resets its part and clears every candidate text. */
+extern "C" void hbmKbWidgetSetPredictFlag(HbmKbWidget* self, u8 flag) {
+    HkbWidgetProperty prop;
+    u32 i;
+    self->flag_17E8 = flag;
+    self->setProperty(0x1F, &prop);
+    prop.flag_04 = flag;
+    self->setProperty(0x1D, &prop);
+    self->onLabel->play(0);
+    self->offLabel->play(0);
+    if (flag) {
+        self->onButton->pane->SetVisible(true);
+        self->onButtonFrame->pane->SetVisible(true);
+        self->offButton->pane->SetVisible(false);
+        self->offButtonFrame->pane->SetVisible(false);
+    } else {
+        self->onButton->pane->SetVisible(false);
+        self->onButtonFrame->pane->SetVisible(false);
+        self->offButton->pane->SetVisible(true);
+        self->offButtonFrame->pane->SetVisible(true);
+    }
+    if (!flag) {
+        self->switchButton->pane->SetVisible(false);
+        self->switchPart->play(0);
+        for (i = 0; i < 20; i++) {
+            self->candidates.texts[i]->pane->SetString(L"", 0);
+        }
     }
 }
 
-/* Steps the widget's page back and re-targets it. */
-extern "C" void fn_80551314(HkbWidget* self) {
-    if ((s32)self->value_1A90 > 0) {
-        fn_80553074(self->sub_18B8, -1);
-        self->child_1808->v_0x014(11);
+/* Takes a new keyboard layout block: resets the scroller, holds the prediction button while the layout base
+ * re-binds and the keys refresh, then empties the candidate list and commits. */
+extern "C" void hbmKbWidgetSetLayout(HbmKbWidget* self, const u8* layout) {
+    HbmKbButtonState* button;
+    self->candidates.scroller.reset();
+    memcpy(self->layoutBlock, layout, 0x17D8);
+    button = (HbmKbButtonState*)hkbGetPaneComponentByName((PaneManager*)self->root,
+                                                         self->isPredicting() ? "B_OnBtn" : "B_OffBtn");
+    if (button) {
+        button->held = 1;
+    }
+    hbmKbPaneManager(self)->HbmPaneManager::init();
+    self->refreshKeys();
+    if (button) {
+        button->held = 0;
+    }
+    self->candidates.pressed = -1;
+    self->candidates.selected = -1;
+    self->candidates.scroll = 0.0f;
+    self->candidates.shownFirst = 0;
+    self->candidates.shownLast = 0;
+    hbmKbResetHighlights(&self->candidates);
+    self->candidates.first = 0;
+    self->candidates.scroll = 0.0f;
+    self->candidates.pressed = -1;
+    hbmKbCandSetWords(&self->candidates);
+    self->commitCandidate();
+}
+
+/* Shows the left and right scroll buttons while there are candidates beyond the window, hides them otherwise. */
+extern "C" void hbmKbWidgetUpdateScrollButtons(HbmKbWidget* self) {
+    if (self->candidates.first <= 0) {
+        self->leftArrow->pane->SetVisible(false);
+        self->leftButton->pane->SetVisible(false);
+        self->leftAnim->play(0);
+    } else if (!self->leftArrow->pane->IsVisible()) {
+        self->leftArrow->pane->SetVisible(true);
+        self->leftButton->pane->SetVisible(true);
+        self->leftButton->replay();
+    }
+    if (self->candidates.lastWhole >= self->candidates.count - 1) {
+        self->rightArrow->pane->SetVisible(false);
+        self->rightButton->pane->SetVisible(false);
+        self->rightAnim->play(0);
+    } else if (!self->rightArrow->pane->IsVisible()) {
+        self->rightArrow->pane->SetVisible(true);
+        self->rightButton->pane->SetVisible(true);
+        self->rightButton->replay();
+    }
+}
+
+/* Scrolls the candidate list one word on while its last word is not wholly shown, and replays the window. */
+extern "C" void hbmKbWidgetScrollNextWord(HbmKbWidget* self) {
+    if (self->candidates.lastWhole < self->candidates.count - 1) {
+        hbmKbCandScrollBy(&self->candidates, 1);
+        self->sound->play(11);
+    }
+}
+
+/* Scrolls the candidate list one word back while its first word is not shown, and replays the window. */
+extern "C" void hbmKbWidgetScrollPrevWord(HbmKbWidget* self) {
+    if (self->candidates.first > 0) {
+        hbmKbCandScrollBy(&self->candidates, -1);
+        self->sound->play(11);
+    }
+}
+
+/* Scrolls the candidate list one word on, unless its last word is already shown. */
+extern "C" void hbmKbWidgetScrollNextPage(HbmKbWidget* self) {
+    if (self->candidates.lastWhole < self->candidates.count - 1) {
+        if (self->candidates.scroll > 0.0f) {
+            hbmKbCandScrollTo(&self->candidates, self->candidates.first);
+        } else if (!(self->candidates.scroll < 0.0f)) {
+            s32 index = hbmKbCandNextWindow(&self->candidates, self->candidates.first);
+            if (index >= 0) {
+                hbmKbCandScrollTo(&self->candidates, index);
+            }
+        }
+        self->sound->play(11);
+    }
+}
+
+/* Scrolls the candidate list one word back, unless its first word is already shown. */
+extern "C" void hbmKbWidgetScrollPrevPage(HbmKbWidget* self) {
+    if (self->candidates.first > 0) {
+        if (self->candidates.scroll < 0.0f) {
+            hbmKbCandScrollTo(&self->candidates, self->candidates.first);
+        } else if (!(self->candidates.scroll > 0.0f)) {
+            hbmKbCandScrollTo(&self->candidates, hbmKbCandPrevWindow(&self->candidates, self->candidates.first));
+        }
+        self->sound->play(11);
     }
 }
 
@@ -315,6 +1111,53 @@ extern "C" void fn_80551698(HkbWidget* self, u8 flag) {
     self->pane_1B84->v_0x014(12);
 }
 
+/* The widget's event handler (base #6): window states, candidate commit, selection and the prediction switch. */
+extern "C" void hbmKbWidgetHandleEvent(HbmKbWidget* self, u32 sender, s32 event, s32 arg) {
+    (void)sender;
+    switch (event) {
+    case 0:
+        self->sound->play(arg);
+        break;
+    case 0x100:
+        self->commitCandidate();
+        break;
+    case 0x101:
+        if (self->getCandidateCode() != 0xFFFF) {
+            u32 code;
+            HbmKbPanelState* panel = self->owner->getPanel();
+    panel->candidatePending = 0;
+            code = self->getCandidateCode();
+            self->sound->play(9);
+            self->setProperty(0x15, &code);
+        }
+        break;
+    case 0x102:
+        if (arg >= 0) {
+            self->selectCandidate(arg);
+        } else {
+            self->clearCandidate();
+        }
+        break;
+    case 0x300:
+        self->setActive(1);
+        self->root->refresh();
+        hbmKbLayout(self)->getPaneAnim("P_prdc_scrl_Left")->play(0);
+        hbmKbLayout(self)->getPaneAnim("P_prdc_scrl_Rght")->play(0);
+        if (self->predictEnabled) {
+            hbmKbLayout(self)->getPaneAnim("W_predictWindow")->play(11);
+        }
+        break;
+    case 0x301:
+        self->clearCandidate();
+        self->setActive(0);
+        self->root->refresh();
+        break;
+    case 0x400:
+        self->root->refresh();
+        break;
+    }
+}
+
 /* The keyboard widget's +0x1A8C word. */
 extern "C" u32 fn_80551964(HkbWidget* self) {
     return self->value_1A8C;
@@ -322,6 +1165,148 @@ extern "C" u32 fn_80551964(HkbWidget* self) {
 
 /* Empty virtual slot. */
 extern "C" void fn_8055196C(void) {
+}
+
+/* Steps a five-state button through its states for the caller's event. */
+void HbmKbWidgetPart::setAnim(s32 event) {
+    if (event == 0) {
+        setState(4);
+        return;
+    }
+    if (event == 5) {
+        setState(0);
+        return;
+    }
+    switch ((s32)mState) {
+    case 0:
+        if (event == 1) {
+            setState(1);
+        }
+        break;
+    case 1:
+        if (event == 4) {
+            setState(3);
+        }
+        if (event == 2) {
+            setState(2);
+        }
+        break;
+    case 3:
+        if (event == 2) {
+            setState(2);
+        }
+        break;
+    case 2:
+        if (event == 4) {
+            setState(0);
+        }
+        if (event == 1) {
+            setState(1);
+        }
+        break;
+    case 4:
+        if (event == 4) {
+            setState(3);
+        }
+        if (event == 2) {
+            setState(2);
+        }
+        break;
+    }
+}
+
+/* Steps a seven-state button (with a held state 6) through its states for the caller's event. */
+extern "C" void hbmKbButtonStep7(HkbWidget* self, s32 event) {
+    if (event == 0 && (s32)self->state != 6) {
+        self->v_0x014(4);
+    }
+    if (event == 6 && (s32)self->state == 6) {
+        self->v_0x014(5);
+    }
+    if (event == 7 && (s32)self->state != 6) {
+        self->v_0x014(6);
+    }
+    switch (self->state) {
+    case 0:
+        if (event == 1) {
+            self->v_0x014(1);
+        }
+        break;
+    case 1:
+        if (event == 4) {
+            self->v_0x014(3);
+        }
+        if (event == 2) {
+            self->v_0x014(2);
+        }
+        break;
+    case 3:
+        if (event == 2) {
+            self->v_0x014(2);
+        }
+        break;
+    case 2:
+        if (event == 4) {
+            self->v_0x014(0);
+        }
+        if (event == 1) {
+            self->v_0x014(1);
+        }
+        break;
+    case 4:
+        if (event == 4) {
+            self->v_0x014(3);
+        }
+        if (event == 2) {
+            self->v_0x014(2);
+        }
+        break;
+    case 5:
+        if (event == 4) {
+            self->v_0x014(0);
+        }
+        break;
+    case 6:
+        break;
+    }
+}
+
+/* Steps a four-state button (with a locked state 4) through its states for the caller's event. */
+extern "C" void hbmKbButtonStep4(HkbWidget* self, s32 event) {
+    if (event == 0) {
+        self->v_0x014(7);
+        return;
+    }
+    switch ((s32)self->state) {
+    case 0:
+        if (event == 1) {
+            self->v_0x014(1);
+        }
+        break;
+    case 1:
+        if (event == 4) {
+            self->v_0x014(3);
+        }
+        if (event == 2) {
+            self->v_0x014(2);
+        }
+        break;
+    case 3:
+        if (event == 2) {
+            self->v_0x014(2);
+        }
+        break;
+    case 2:
+        if (event == 4) {
+            self->v_0x014(0);
+        }
+        if (event == 1) {
+            self->v_0x014(1);
+        }
+        break;
+    case 4:
+        break;
+    }
 }
 
 /* Steps the widget's page one way or the other for the caller's event. */
@@ -357,9 +1342,419 @@ extern "C" void fn_80551F08(HkbWidget* self) {
     self->v_0x110();
 }
 
+/* Lays the candidate words out around the scroll offset: the words before the window's first word fill leftwards,
+ * the rest rightwards until the area is full; records the shown range and the last whole word. */
+extern "C" void hbmKbCandLayout(HbmKbCandidateList* self) {
+    f32 margin = 20.0f;
+    f32 x = self->scroll;
+    f32 left = self->area->pane->mTranslate.x;
+    f32 areaWidth = self->area->pane->mSize.width;
+    s32 selected = self->selected;
+    s32 i;
+    s32 slot;
+    s32 index;
+    bool whole;
+
+    for (i = 0; i < 20; i++) {
+        HbmKbTextPane* text = self->texts[i]->pane;
+        nw4r::lyt::Pane* frame = self->frames[i]->pane;
+        const nw4r::lyt::Size size = text->GetSize();
+        text->SetString(L"", 0);
+        text->SetVisible(false);
+        hbmKbSetPaneSize(frame, nw4r::lyt::Size(0.0f, size.height));
+    }
+
+    slot = 20;
+    index = self->window->isPaged() ? self->first : 0;
+    while (x > 0.0f) {
+        HbmKbTextPane* text;
+        nw4r::lyt::Pane* frame;
+        f32 width;
+        f32 pos;
+        if (index == 0) {
+            break;
+        }
+        slot--;
+        index--;
+        if (slot < 0) {
+            slot = 19;
+        }
+        text = self->texts[slot]->pane;
+        frame = self->frames[slot]->pane;
+        text->SetString(self->words->words[index], 0);
+        text->SetVisible(true);
+        const nw4r::lyt::Size size = text->GetSize();
+        width = hbmKbPaneTextWidth(text);
+        x -= margin;
+        x -= width;
+        hbmKbSetPaneSize(text, nw4r::lyt::Size(width, size.height));
+        hbmKbSetPaneSize(frame, nw4r::lyt::Size(width, size.height));
+        pos = width * 0.5f + (left + x);
+        hbmKbSetPaneTranslate(text, HbmKbVec2(pos, 0.0f));
+        hbmKbSetPaneTranslate(frame, HbmKbVec2(pos, 0.0f));
+        if (index == selected) {
+            self->highlights[slot]->setMode(1);
+        } else {
+            self->highlights[slot]->setMode(2);
+        }
+    }
+    self->shownFirst = index;
+
+    slot = 0;
+    index = self->window->isPaged() ? self->first : self->count;
+    x = self->scroll;
+    while (x < areaWidth) {
+        HbmKbTextPane* text;
+        nw4r::lyt::Pane* frame;
+        f32 width;
+        f32 pos;
+        if (index == self->count) {
+            break;
+        }
+        text = self->texts[slot]->pane;
+        frame = self->frames[slot]->pane;
+        text->SetString(self->words->words[index], 0);
+        text->SetVisible(true);
+        const nw4r::lyt::Size size = text->GetSize();
+        width = hbmKbPaneTextWidth(text);
+        hbmKbSetPaneSize(text, nw4r::lyt::Size(width, size.height));
+        hbmKbSetPaneSize(frame, nw4r::lyt::Size(width, size.height));
+        pos = width * 0.5f + (left + x);
+        hbmKbSetPaneTranslate(text, HbmKbVec2(pos, 0.0f));
+        hbmKbSetPaneTranslate(frame, HbmKbVec2(pos, 0.0f));
+        if (index == selected) {
+            self->highlights[slot]->setMode(1);
+        }
+        x += margin;
+        x += width;
+        index++;
+        if (x <= 0.0f) {
+            self->highlights[slot]->setMode(5);
+        }
+        if (++slot >= 20) {
+            slot = 0;
+        }
+    }
+
+    for (i = 0; i < 20; i++) {
+        if (!self->texts[i]->pane->IsVisible()) {
+            self->highlights[i]->setMode(5);
+        }
+    }
+    self->shownLast = index - 1;
+    whole = true;
+    if (!(x - margin <= areaWidth) && hbmKbShownCount(self) != 1) {
+        whole = false;
+    }
+    if (whole) {
+        self->lastWhole = self->shownLast;
+    } else {
+        self->lastWhole = self->shownLast - 1;
+    }
+    self->tailOffset = x;
+}
+
+#pragma push
+#pragma auto_inline on
+/* Moves the selection highlight from the selected word to `index`. */
+extern "C" void hbmKbCandSelect(HbmKbCandidateList* self, s32 index) {
+    s32 slot = hbmKbCandidateSlot(self, self->selected);
+    if (slot >= 0) {
+        self->highlights[slot]->setMode(2);
+    }
+    slot = hbmKbCandidateSlot(self, index);
+    if (slot >= 0) {
+        self->highlights[slot]->setMode(1);
+    }
+    self->selected = index;
+}
+#pragma pop
+
+/* Takes a new dictionary: resets the highlights and the selection, replaces the space characters that open a word
+ * with the blank glyph, and lays the words out. */
+extern "C" void hbmKbCandSetWords(HbmKbCandidateList* self) {
+    u32 i;
+    self->count = self->words->count;
+    for (i = 0; i < 20; i++) {
+        self->highlights[i]->setState(0);
+    }
+    self->selected = -1;
+    self->pressed = -1;
+    self->scroll = 0.0f;
+    for (i = 0; i < self->count; i++) {
+        wchar_t* word = self->words->words[i];
+        if (word[0] == 0x20 || word[0] == 0x3000) {
+            word[0] = 0xE057;
+        }
+    }
+    hbmKbCandLayout(self);
+}
+
+/* Draws the candidate words clipped to the candidate area, keeping the selected and the pressed words in view while
+ * the list scrolls. */
+extern "C" void hbmKbCandDraw(HbmKbCandidateList* self, const nw4r::lyt::DrawInfo* drawInfo) {
+    s32 selected = hbmKbCandidateSlot(self, self->selected);
+    u32 i;
+    u32 scissorLeft;
+    u32 scissorTop;
+    u32 scissorWidth;
+    u32 scissorHeight;
+    f32 scale;
+    f32 center;
+    nw4r::math::VEC2 pos;
+    nw4r::math::VEC2 size;
+
+    if (!self->scroller.isMoving()) {
+        for (i = 0; i < 20; i++) {
+            if (i == selected || self->highlights[i]->getState() == 2) {
+                self->texts[i]->pane->SetVisible(false);
+            }
+        }
+    }
+    const nw4r::ut::Rect rect = self->area->pane->GetPaneRect(*drawInfo);
+    Vec leftTop = {0.0f, 0.0f, 0.0f};
+    Vec rightBottom = {0.0f, 0.0f, 0.0f};
+    leftTop.x = rect.left;
+    leftTop.y = rect.top;
+    rightBottom.x = rect.right;
+    rightBottom.y = rect.bottom;
+    PSMTXMultVec(self->area->pane->mGlbMtx.m, &leftTop, &leftTop);
+    PSMTXMultVec(self->area->pane->mGlbMtx.m, &rightBottom, &rightBottom);
+    GXGetScissor(&scissorLeft, &scissorTop, &scissorWidth, &scissorHeight);
+    scale = 640.0f / self->areaWidth;
+    size.x = scale * (rightBottom.x - leftTop.x);
+    center = leftTop.x + self->areaWidth * 0.5f;
+    pos.x = center + center * (scale - 1.0f);
+    GXSetScissor(pos.x, scissorTop, size.x, scissorHeight);
+    self->window->pane->Draw(*drawInfo);
+    if (!self->scroller.isMoving()) {
+        GXSetScissor(scissorLeft, scissorTop, size.x + pos.x - scissorLeft, scissorHeight);
+        for (i = 0; i < 20; i++) {
+            if (i == selected || self->highlights[i]->getState() == 2) {
+                self->texts[i]->pane->SetVisible(true);
+                self->texts[i]->pane->Draw(*drawInfo);
+            }
+        }
+    }
+    GXSetScissor(scissorLeft, scissorTop, scissorWidth, scissorHeight);
+}
+
+/* The first word after `index` that does not fit when the window starts at `index`, minus one; -1 at the end. */
+extern "C" s32 hbmKbCandNextWindow(HbmKbCandidateList* self, s32 index) {
+    f32 areaWidth;
+    f32 margin = 20.0f;
+    f32 x = -margin;
+    areaWidth = self->area->pane->mSize.width;
+    HbmKbTextPane* text = self->texts[0]->pane;
+    s32 i = index;
+    while (x <= areaWidth) {
+        if (i == self->count) {
+            return -1;
+        }
+        f32 width = hbmKbTextWidth(text, self->words->words[i]);
+        x += width + margin;
+        i++;
+    }
+    if (i - 1 == index) {
+        i++;
+    }
+    return i - 1;
+}
+
+/* The first word of the window that ends just before `index`. */
+extern "C" s32 hbmKbCandPrevWindow(HbmKbCandidateList* self, s32 index) {
+    f32 areaWidth;
+    f32 margin = 20.0f;
+    f32 x = -margin;
+    areaWidth = self->area->pane->mSize.width;
+    HbmKbTextPane* text = self->texts[0]->pane;
+    s32 i = index - 1;
+    while (x <= areaWidth) {
+        if (i < 0) {
+            return 0;
+        }
+        f32 width = hbmKbTextWidth(text, self->words->words[i]);
+        x += width + margin;
+        i--;
+    }
+    if (i + 2 == index) {
+        i--;
+    }
+    return i + 2;
+}
+
+/* Scrolls the list by `delta` words from its first word. */
+extern "C" void hbmKbCandScrollBy(HbmKbCandidateList* self, s32 delta) {
+    f32 distance = 0.0f;
+    f32 margin = 20.0f;
+    if (delta < 0) {
+        HbmKbTextPane* text = self->texts[0]->pane;
+        for (s32 i = 0; i > delta; i--) {
+            f32 width = hbmKbTextWidth(text, self->words->words[i + self->first - 1]);
+            distance -= width + margin;
+        }
+    } else {
+        HbmKbTextPane* text = self->texts[0]->pane;
+        for (s32 i = 0; i < delta; i++) {
+            f32 width = hbmKbTextWidth(text, self->words->words[self->first + i]);
+            distance += width + margin;
+        }
+    }
+    self->scroller.start(self, 0.0f, -distance, delta, 15.0f);
+}
+
+/* Scrolls the list so that its window starts at word `target`. */
+extern "C" void hbmKbCandScrollTo(HbmKbCandidateList* self, s32 target) {
+    f32 distance = 0.0f;
+    f32 margin = 20.0f;
+    s32 first = self->first;
+    if (target > first) {
+        HbmKbTextPane* text = self->texts[0]->pane;
+        for (s32 i = first; i < target; i++) {
+            f32 width = hbmKbTextWidth(text, self->words->words[i]);
+            distance -= width + margin;
+        }
+    } else if (target < first) {
+        HbmKbTextPane* text = self->texts[0]->pane;
+        for (s32 i = first - 1; i >= target; i--) {
+            f32 width = hbmKbTextWidth(text, self->words->words[i]);
+            distance += width + margin;
+        }
+    }
+    s32 words = target - self->first;
+    self->scroller.start(self, self->scroll, distance, words, 15.0f);
+}
+
+/* Scrolls the list just far enough that word `target` is in its window. */
+extern "C" void hbmKbCandShowWord(HbmKbCandidateList* self, s32 target) {
+    s32 first = self->first;
+    if (target > first) {
+        for (;;) {
+            s32 next = hbmKbCandNextWindow(self, first);
+            if (next < 0 || next > target) {
+                break;
+            }
+            first = next;
+        }
+        hbmKbCandScrollTo(self, first);
+    } else if (target < first) {
+        while (target < first) {
+            first = hbmKbCandPrevWindow(self, first);
+        }
+        hbmKbCandScrollTo(self, first);
+    }
+}
+
 /* Dispatches the base subobject at +0x18 with the caller's argument. */
 extern "C" void fn_80553670(HkbWidget* self, u32 arg) {
     ((HkbWidget*)&self->table_18)->v_0x014(arg);
+}
+
+/* Brings the selected word into the window when the list is at rest. */
+extern "C" void hbmKbCandShowSelected(HbmKbCandidateList* self) {
+    if (self->selected >= 0 && !self->scroller.isMoving()) {
+        if (self->first > self->selected) {
+            hbmKbCandShowWord(self, self->selected);
+        } else if (self->lastWhole < self->selected) {
+            hbmKbCandShowWord(self, self->selected);
+        }
+    }
+}
+
+/* The end of a scroll (scroll-listener slot): resets the highlights, moves the window by `delta` words (clamped at
+ * the first word) and tells the listener. */
+extern "C" void hbmKbCandOnScrolled(HbmKbCandidateList* self, s32 kind, s32 delta) {
+    if (kind == 1) {
+        s32 first = self->first + delta;
+        if (first < 0) {
+            hbmKbResetHighlights(self);
+            self->first = 0;
+            self->scroll = 0.0f;
+            self->pressed = -1;
+        } else {
+            hbmKbResetHighlights(self);
+            self->first = first;
+            self->scroll = 0.0f;
+            self->pressed = -1;
+        }
+        if (self->listener) {
+            self->listener->v_0x008(self, 0x100, 0);
+        }
+    }
+}
+
+/* Input handler of the candidate list: a key press commits the selected word, touching the area or a word frame
+ * selects and reports it, releasing the area or the pressed word lets it go - while the widget takes input. */
+extern "C" void hbmKbCandHandleInput(HbmKbCandidateList* self, HbmKbPartView* sender, u32 event, const HbmKbInputEvent* input) {
+    s32 i;
+    if ((!self->widget->isBusy() || event == 1 || (s32)event == 0) &&
+        (!hbmKbLayout(self->widget)->getPaneAnim("W_predictWindow")->v_0x018() || event == 1) &&
+        !self->widget->isLocked()) {
+        switch ((s32)event) {
+        case 4:
+            if (input->flags == 0x10) {
+                s32 slot = hbmKbCandidateSlot(self, self->selected);
+                if (self->pressed >= 0 && slot >= 0) {
+                    self->texts[slot]->replay();
+                    self->frames[slot]->replay();
+                    self->highlights[slot]->setMode(0);
+                    if (self->listener) {
+                        self->listener->v_0x008(self, 0x101, 0);
+                    }
+                }
+            }
+            break;
+        case 0:
+            if (sender == self->area) {
+                self->touched = 1;
+                for (i = 0; i < 20; i++) {
+                    self->texts[i]->replay();
+                    self->frames[i]->replay();
+                }
+                hbmKbCandSelect(self, -1);
+            } else if (self->pressed < 0 && self->touched) {
+                for (i = 0; i < 20; i++) {
+                    if (self->frames[i] == (HbmKbWordPartView*)sender) {
+                        s32 index = self->first + i;
+                        while (index < self->shownFirst) {
+                            index += 20;
+                        }
+                        while (index > self->shownLast) {
+                            index -= 20;
+                        }
+                        if (self->listener) {
+                            self->listener->v_0x008(self, 0x102, index);
+                        }
+                        self->highlights[i]->setMode(1);
+                        if (self->listener) {
+                            self->listener->v_0x008(self, 0, 4);
+                        }
+                        break;
+                    }
+                }
+            }
+            break;
+        case 1:
+            if (sender == self->area) {
+                self->touched = 0;
+                for (i = 0; i < 20; i++) {
+                    self->highlights[i]->setMode(2);
+                }
+            }
+            if (self->pressed >= 0) {
+                self->pressed = -1;
+                if (self->listener) {
+                    self->listener->v_0x008(self, 0x102, -1);
+                }
+                for (i = 0; i < 20; i++) {
+                    self->texts[i]->replay();
+                    self->frames[i]->replay();
+                    self->highlights[i]->setMode(2);
+                }
+            }
+            break;
+        }
+    }
 }
 
 /* Whether the sub-object's +0x10 child is set, then its +0x08 slot. */
@@ -379,9 +1774,88 @@ extern "C" void fn_80553F84(void* self, s32 arg1, u32 arg2, HkbFlagRecord* rec) 
     child->v_0x008(self, 1024, 0);
 }
 
+/* Input handler of a prediction-window button: a release or a key press on it pages the candidates, a touch and a
+ * release replay its part, while the widget takes input. */
+extern "C" void hbmKbButtonHandleInput(HbmKbButtonHandler* self, HbmKbPartView* sender, u32 event, const HbmKbInputEvent* input) {
+    if ((!self->widget->isBusy() || event == 1 || (s32)event == 0) &&
+        (!hbmKbLayout(self->widget)->getPaneAnim("W_predictWindow")->v_0x018() || event == 1) &&
+        !self->widget->isLocked()) {
+        switch ((s32)event) {
+        case 4:
+            if (input->flags == 0x10) {
+                self->part->setFrame(0);
+                if (self->id == 1) {
+                    self->widget->pageNext();
+                } else if (self->id == 2) {
+                    self->widget->pagePrevious();
+                }
+            }
+            break;
+        case 2:
+            if (input->state == 0x10 && !(input->flags & 0x10) && sender->getKeyAt(input->position) % 20 != 0) {
+                self->part->setFrame(0);
+                if (self->id == 1) {
+                    self->widget->pageNext();
+                } else if (self->id == 2) {
+                    self->widget->pagePrevious();
+                }
+            }
+            break;
+        case 1:
+            self->part->setFrame(2);
+            break;
+        case 0:
+            self->part->setFrame(1);
+            if (self->listener) {
+                self->listener->v_0x008(self, 0, 4);
+            }
+            break;
+        }
+    }
+}
+
 /* The u16 element at index `index` of the array at +0x80. */
 extern "C" u16 fn_80554268(HkbU16Array* self, u32 index) {
     return self->values_80[index];
+}
+
+/* Event slot of the prediction switch (listener base): a trigger-7 release on the on or the off button reports
+ * 0x301 or 0x300 to the listener. */
+extern "C" void hbmKbSwitchOnPartEvent(HbmKbSwitchHandler* self, s32 kind, HbmKbPartView* sender, const HbmKbInputEvent* input) {
+    if (sender == self->onButton) {
+        if (input->trigger == 7 && kind == 1 && self->listener) {
+            self->listener->v_0x008(self, 0x301, 0);
+        }
+    } else if (sender == self->offButton) {
+        if (input->trigger == 7 && kind == 1 && self->listener) {
+            self->listener->v_0x008(self, 0x300, 0);
+        }
+    }
+}
+
+/* Input handler of the prediction switch: a key press toggles the switch, a touch and a release replay the button
+ * the event came from, while the widget takes input. */
+extern "C" void hbmKbSwitchHandleInput(HbmKbSwitchHandler* self, HbmKbPartView* sender, u32 event, const HbmKbInputEvent* input) {
+    if ((!self->widget->isBusy() || event == 1 || (s32)event == 0) &&
+        (!hbmKbLayout(self->widget)->getPaneAnim("W_predictWindow")->v_0x018() || event == 1)) {
+        HbmKbPartView* button = sender == self->source ? self->onButton : self->offButton;
+        switch ((s32)event) {
+        case 4:
+            if (input->flags & 0x10) {
+                self->widget->setSwitch(1);
+            }
+            break;
+        case 1:
+            button->setFrame(2);
+            break;
+        case 0:
+            button->setFrame(1);
+            if (self->listener) {
+                self->listener->v_0x008(self, 0, 4);
+            }
+            break;
+        }
+    }
 }
 
 /* The low half of the keyboard widget's +0x1A90 word. */
@@ -424,15 +1898,14 @@ HbmKbWidgetPartB::~HbmKbWidgetPartB() {
 HbmKbWidgetPartC::~HbmKbWidgetPartC() {
 }
 
-
-/* Adjustor thunk: base #3 -> fn_805536FC. */
-extern "C" void fn_80554664(HkbWidget* self) {
-    fn_805536FC((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_14)));
+/* Adjustor thunk: base #3 -> hbmKbCandOnScrolled. */
+extern "C" void fn_80554664(HkbWidget* self, s32 kind, s32 delta) {
+    hbmKbCandOnScrolled((HbmKbCandidateList*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_14)), kind, delta);
 }
 
-/* Adjustor thunk: base #3 -> fn_805542BC. */
-extern "C" void fn_8055466C(HkbWidget* self) {
-    fn_805542BC((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_14)));
+/* Adjustor thunk: base #3 -> hbmKbSwitchOnPartEvent. */
+extern "C" void fn_8055466C(HkbWidget* self, s32 kind, HbmKbPartView* sender, const HbmKbInputEvent* input) {
+    hbmKbSwitchOnPartEvent((HbmKbSwitchHandler*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_14)), kind, sender, input);
 }
 
 /* Adjustor thunk: base #3 -> fn_80553F84. */
@@ -455,22 +1928,22 @@ extern "C" void fn_8055468C(HkbWidget* self) {
     fn_80551EB0((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_17F4)));
 }
 
-/* Adjustor thunk: base #5 -> fn_80550804. */
+/* Adjustor thunk: base #5 -> hbmKbWidgetUpdateCandidates. */
 extern "C" void fn_80554694(HkbWidget* self) {
-    fn_80550804((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_17F4)));
+    hbmKbWidgetUpdateCandidates((HbmKbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_17F4)));
 }
 
-/* Adjustor thunk: base #5 -> fn_80550770. */
+/* Adjustor thunk: base #5 -> hbmKbWidgetDrawCandidates. */
 extern "C" void fn_8055469C(HkbWidget* self) {
-    fn_80550770((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_17F4)));
+    hbmKbWidgetDrawCandidates((HbmKbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_17F4)));
 }
 
-/* Adjustor thunk: base #5 -> fn_805504EC. */
+/* Adjustor thunk: base #5 -> hbmKbWidgetShowPredictInput. */
 extern "C" void fn_805546A4(HkbWidget* self) {
-    fn_805504EC((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_17F4)));
+    hbmKbWidgetShowPredictInput((HbmKbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_17F4)));
 }
 
-/* Adjustor thunk: base #6 -> fn_805516E4. */
-extern "C" void fn_805546AC(HkbWidget* self) {
-    fn_805516E4((HkbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_189C)));
+/* Adjustor thunk: base #6 -> hbmKbWidgetHandleEvent. */
+extern "C" void fn_805546AC(HkbWidget* self, u32 sender, s32 event, s32 arg) {
+    hbmKbWidgetHandleEvent((HbmKbWidget*)((u8*)self - HKB_OFFSET_OF(HkbWidget, vtable_189C)), sender, event, arg);
 }

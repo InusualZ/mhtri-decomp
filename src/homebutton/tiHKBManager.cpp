@@ -776,7 +776,7 @@ void fn_8056C148(u32 value, u32* out)
 }
 
 /* 0x8056C3D8: blend the two packed words +0x34 / +0x38 through the mask +0x3C. */
-u32 fn_8056C3D8(HkbManager* self)
+u32 hkbGetModifierState(HkbManager* self)
 {
     u32 v = self->channels[0].w20;
     u32 b = self->channels[0].w28;

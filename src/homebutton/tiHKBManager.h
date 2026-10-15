@@ -46,6 +46,10 @@ s32 hkbKeyIterValid(HkbKeyIter* it);
 u8 hkbKeyIterGetUsage(HkbKeyIter* it);
 /* Returns the character of the key the cursor stands on. */
 u16 hkbKeyIterGetChar(HkbKeyIter* it);
+/* Returns channel 0's modifier word with the masked bits replaced. */
+u32 hkbGetModifierState(HkbManager* manager);
+/* Sets the modifier bits `mask` of the manager's state to `value` and updates the keyboard LEDs. */
+void hkbSetModifierState(HkbManager* manager, u32 value, u32 mask);
 /* Sets the manager's key repeat words. */
 void hkbSetKeyRepeat(HkbManager* manager, u32 delay, u32 interval);
 /* Returns the component of `self` whose pane is named `name`. */

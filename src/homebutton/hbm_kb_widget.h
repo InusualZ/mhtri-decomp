@@ -7,6 +7,12 @@
 #include "types.h"
 #include "homebutton/hkb_widget.h"
 
+class HbmKbWidget;
+class HbmKbCandidateList;
+class HbmKbSwitchHandler;
+class HbmKbPartView;
+struct HbmKbInputEvent;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -14,24 +20,23 @@ extern "C" {
 /* untyped: opaque band object, typed by the callers' views */
 void fn_8054F90C(void* self, s32 flag);
 
-void fn_805504EC(HkbWidget* self);
+void hbmKbWidgetShowPredictInput(HbmKbWidget* self);
 
-void fn_80550770(HkbWidget* self);
+void hbmKbWidgetDrawCandidates(HbmKbWidget* self);
 
-void fn_80550804(HkbWidget* self);
+void hbmKbWidgetUpdateCandidates(HbmKbWidget* self);
 
-void fn_805516E4(HkbWidget* self);
+void hbmKbWidgetHandleEvent(HbmKbWidget* self, u32 sender, s32 event, s32 arg);
 
 void fn_80551EB0(HkbWidget* self);
 
 void fn_80551F08(HkbWidget* self);
 
-/* untyped: opaque band object, typed by the callers' views */
-void fn_80553074(void* self, s32 value);
+void hbmKbCandScrollBy(HbmKbCandidateList* self, s32 delta);
 
-void fn_805536FC(HkbWidget* self);
+void hbmKbCandOnScrolled(HbmKbCandidateList* self, s32 kind, s32 delta);
 
-void fn_805542BC(HkbWidget* self);
+void hbmKbSwitchOnPartEvent(HbmKbSwitchHandler* self, s32 kind, HbmKbPartView* sender, const HbmKbInputEvent* input);
 
 #ifdef __cplusplus
 }

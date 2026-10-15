@@ -27,7 +27,7 @@
  *            tried (locals in either order) keeps one load/store pair after the other.
  * RESIDUALS. fn_8054CDC4 calls the band declaration fn_80526D00 (src/unsplit/unknown.h) of KPRClearQueue (request
  *            hbm-value#73); relocdiff reports the name.
- * RESIDUALS. Panel805482CC (fn_805482CC.h) and HkbWidget (homebutton/hkb_widget.h) are views of one object (the
+ * RESIDUALS. HbmTextPanel (fn_805482CC.h) and HkbWidget (homebutton/hkb_widget.h) are views of one object (the
  *            +0x18B8 record, the +0x193C helper); the merge and the header's own generated file name are changes
  *            outside this unit.
  * RESIDUALS. 98 functions (48312 bytes) are unwritten in 28 runs, the largest fn_8054358C (8732), fn_80549D9C (2880),
@@ -79,9 +79,9 @@ public:
 #pragma exceptions off
 
 /* This unit's own later entry point, called by fn_805486B0 before its definition. */
-extern "C" void fn_805492A8(Panel805482CC* self, u32* before, u32* after);
-extern "C" void fn_80549570(Panel805482CC* self, Panel805482CC_Cell* cell, u32 count);
-extern "C" void hbmPanelUpdateButtonRepeat(Panel805482CC* self, s32 b, s32 c);
+extern "C" void fn_805492A8(HbmTextPanel* self, u32* before, u32* after);
+extern "C" void fn_80549570(HbmTextPanel* self, Panel805482CC_Cell* cell, u32 count);
+extern "C" void hbmPanelUpdateButtonRepeat(HbmTextPanel* self, s32 b, s32 c);
 
 /* Dispatch views of the panel's polymorphic parts: the slots are the ones the `*Vtbl` views of fn_805482CC.h name,
  * declared as virtuals so MWCC emits the canonical `lwz r12,0(r3); lwz r12,<slot>(r12)` dispatch.  No method is
@@ -464,21 +464,21 @@ extern "C" {
 #endif
 
 /* --- this unit's own entry points, in address order (so the bodies read in the object's order) --- */
-void fn_805482CC(Panel805482CC* self, Panel805482CC_Change* change);
+void fn_805482CC(HbmTextPanel* self, Panel805482CC_Change* change);
 void fn_80548394(Panel805482CC_Set* set, Panel805482CC_Item* item, u32 id, f32 a, f32 b, f32 c);
-void fn_805483E4(Panel805482CC* self);
-void fn_80548680(Panel805482CC* self);
+void fn_805483E4(HbmTextPanel* self);
+void fn_80548680(HbmTextPanel* self);
 void fn_80548694(void);
-void fn_80548698(Panel805482CC* self);
+void fn_80548698(HbmTextPanel* self);
 void fn_805486AC(void);
-void fn_805486B0(Panel805482CC* self);
+void fn_805486B0(HbmTextPanel* self);
 s32 fn_8054893C(void);
 s32 fn_80548944(void);
 void fn_8054894C(void);
-void fn_80548950(Panel805482CC* self, u32 key);
+void fn_80548950(HbmTextPanel* self, u32 key);
 void fn_80548B04(void);
-void fn_80548B08(Panel805482CC* self, u16 value);
-Panel805482CC_Item* fn_80549CC0(Panel805482CC* self, s32 flag);
+void fn_80548B08(HbmTextPanel* self, u16 value);
+Panel805482CC_Item* fn_80549CC0(HbmTextPanel* self, s32 flag);
 
 /* ---------------------------------------------------------------------------------------------------
  * virtual slots of the band's keyboard classes that do nothing or return a constant
@@ -512,7 +512,7 @@ void hbmKbSlot158Nop(void)
 }
 
 /* 0x805431B0 (0x8): Stores the panel's +0x1952 byte. */
-void hbmPanelSetInputLatch(Panel805482CC* self, u8 value)
+void hbmPanelSetInputLatch(HbmTextPanel* self, u8 value)
 {
     self->field_0x1952 = value;
 }
@@ -529,7 +529,7 @@ s32 hbmKbSlotE4True(void)
 }
 
 /* 0x80543554 (0x38): Asks the panel's slot 0x18 for value 31 and returns it. */
-u32 hbmPanelQuery31(Panel805482CC* self)
+u32 hbmPanelQuery31(HbmTextPanel* self)
 {
     u32 value;
     ((HbmPanelView*)self)->v_0x018(31, &value);
@@ -641,7 +641,7 @@ s32 hbmKbSlotDCFalse(void)
 }
 
 /* Applies an absolute or relative text-position change to the panel, then reports it through slot 0x17C. */
-void fn_805482CC(Panel805482CC* self, Panel805482CC_Change* change)
+void fn_805482CC(HbmTextPanel* self, Panel805482CC_Change* change)
 {
     if (((HbmPanelScrollView*)&self->scroll)->v_0x014() != 0) {
         return;
@@ -680,7 +680,7 @@ void fn_80548394(Panel805482CC_Set* set, Panel805482CC_Item* item, u32 id, f32 a
 }
 
 /* Dispatch the panel's object at +0x1940 through its slot 0x110 (a tail call in retail). */
-void fn_80548680(Panel805482CC* self)
+void fn_80548680(HbmTextPanel* self)
 {
     Panel805482CC_Item* item = self->field_0x1940;
 
@@ -693,7 +693,7 @@ void fn_80548694(void)
 }
 
 /* Dispatch the panel's object at +0x1940 through its slot 0x114 (a tail call in retail). */
-void fn_80548698(Panel805482CC* self)
+void fn_80548698(HbmTextPanel* self)
 {
     Panel805482CC_Item* item = self->field_0x1940;
 
@@ -710,7 +710,7 @@ void fn_805486AC(void)
  * +0x193C and push the delta into the text record and the panel's own cursor; with input latched,
  * either accept the object at +0x1940's pending selection or the one at +0x1944.
  */
-void fn_805486B0(Panel805482CC* self)
+void fn_805486B0(HbmTextPanel* self)
 {
     Panel805482CC_Item* item;
 
@@ -803,7 +803,7 @@ void fn_8054894C(void)
  * The three helper objects are tried in turn (the panel's input byte at +0x1950 and its mode word at
  * +0x194C pick which), and the key is special-cased for the two ids at 0x309B/0x309C.
  */
-void fn_80548950(Panel805482CC* self, u32 key)
+void fn_80548950(HbmTextPanel* self, u32 key)
 {
     Panel805482CC_Item* item;
 
@@ -839,7 +839,7 @@ void fn_80548B04(void)
 }
 
 /* Store the incoming u16 into the sub-object's +0x04 field. */
-void fn_80548B08(Panel805482CC* self, u16 value)
+void fn_80548B08(HbmTextPanel* self, u16 value)
 {
     self->sub.field_0x04 = value;
 }
@@ -851,7 +851,7 @@ void fn_80548B08(Panel805482CC* self, u16 value)
  * `a` is the key, `b` a flag that selects the "cursor moved" report only, `c`/`d`/`e` the mode
  * parameters the selected object's slots 0xEC / 0x54 / 0x100 take.
  */
-void fn_80548B10(Panel805482CC* self, u32 a, s32 b, s32 c, s32 d, s32 e)
+void fn_80548B10(HbmTextPanel* self, u32 a, s32 b, s32 c, s32 d, s32 e)
 {
     Panel805482CC_Item* item;
 
@@ -915,7 +915,7 @@ void fn_80548B10(Panel805482CC* self, u32 a, s32 b, s32 c, s32 d, s32 e)
 }
 
 /* Whether the sub-object's +0x04 field is non-zero (`(x | -x) >> 31`, retail's zero test). */
-s32 fn_80548E2C(Panel805482CC* self)
+s32 fn_80548E2C(HbmTextPanel* self)
 {
     return self->sub.field_0x04 != 0;
 }
@@ -940,7 +940,7 @@ void fn_80548E28(void)
  * node list at +0x19E4, unlink the node the panel currently points at, then hand the new node and
  * the remaining count to fn_80549570 and refresh the sub-object's two layout slots.
  */
-void fn_80548E40(Panel805482CC* self)
+void fn_80548E40(HbmTextPanel* self)
 {
     u32 before = ((HbmPanelItemView*)self->field_0x193C)->v_0x088();
     u32 after;
@@ -993,7 +993,7 @@ void fn_80548E40(Panel805482CC* self)
 }
 
 /* Hand the sub-object's layout pass at +0x118 to 0x8054F788, then refresh the sub-object. */
-void fn_80549C50(Panel805482CC* self)
+void fn_80549C50(HbmTextPanel* self)
 {
     ((HbmPanelView*)self)->v_0x018(6, NULL);
     fn_8054F788(&self->field_0x118);
@@ -1005,7 +1005,7 @@ void fn_80549C50(Panel805482CC* self)
  * slot 0xD8 / 0xE4 reports non-zero. */
 #pragma push
 #pragma auto_inline on
-Panel805482CC_Item* fn_80549CC0(Panel805482CC* self, s32 flag)
+Panel805482CC_Item* fn_80549CC0(HbmTextPanel* self, s32 flag)
 {
     if (self->field_0x1950 == 0) {
         return self->field_0x193C;
@@ -1027,7 +1027,7 @@ Panel805482CC_Item* fn_80549CC0(Panel805482CC* self, s32 flag)
 #pragma pop
 
 /* Whether the panel is in mode 1 (`field_0x194C == 1`) while its input byte is set. */
-s32 fn_80549D74(Panel805482CC* self)
+s32 fn_80549D74(HbmTextPanel* self)
 {
     if (self->field_0x1950 == 0) {
         return 0;
@@ -1036,7 +1036,7 @@ s32 fn_80549D74(Panel805482CC* self)
 }
 
 /* Forward the +0x18B8 record to 0x80553670 (a tail call in retail). */
-void fn_8054A8DC(Panel805482CC* self)
+void fn_8054A8DC(HbmTextPanel* self)
 {
     fn_80553670(&self->field_0x18B8);
 }
@@ -1064,7 +1064,7 @@ void fn_8054CA3C(void)
 }
 
 /* 0x8054CA40 (0x108): Whether the +0x193C helper is empty and ready and the helper the mode selects is idle. */
-s32 hbmPanelIsReadyToCommit(Panel805482CC* self)
+s32 hbmPanelIsReadyToCommit(HbmTextPanel* self)
 {
     if (((HbmPanelItemView*)self->field_0x193C)->v_0x01C() != 0
         || ((HbmPanelItemView*)self->field_0x193C)->v_0x0CC() == 0) {
@@ -1087,19 +1087,19 @@ s32 hbmPanelIsReadyToCommit(Panel805482CC* self)
 }
 
 /* Store the incoming word into the panel's +0x1988 field. */
-void fn_8054CDBC(Panel805482CC* self, s32 value)
+void fn_8054CDBC(HbmTextPanel* self, s32 value)
 {
     self->field_0x1988 = value;
 }
 
 /* Forward the +0x19C4 record to 0x80526D00 (a tail call in retail). */
-void fn_8054CDC4(Panel805482CC* self)
+void fn_8054CDC4(HbmTextPanel* self)
 {
     fn_80526D00(&self->field_0x19C4);
 }
 
 /* 0x8054CF04 (0x34): In mode 1 with input latched, passes -1 to slot 0xF8 of the +0x1940 helper. */
-void hbmPanelResetCandidate(Panel805482CC* self)
+void hbmPanelResetCandidate(HbmTextPanel* self)
 {
     if (self->field_0x1950 != 0 && self->field_0x194C == 1) {
         ((HbmPanelValueView*)self->field_0x1940)->v_0x0F8(-1);
@@ -1118,13 +1118,13 @@ u8* hbmPanelHelperDeletingDtor(u8* self, s32 flag)
 }
 
 /* Store the incoming byte into the panel's +0x1AB6 field. */
-void fn_8054D810(Panel805482CC* self, u8 value)
+void fn_8054D810(HbmTextPanel* self, u8 value)
 {
     self->field_0x1AB6 = value;
 }
 
 /* 0x8054DCC8 (0x104): Sets the text box's string and switches its two highlight animations on or off with it. */
-void hbmPanelSetTextBoxString(Panel805482CC* self, const u16* text)
+void hbmPanelSetTextBoxString(HbmTextPanel* self, const u16* text)
 {
     HbmPaneView* textBox =
         ((HbmPanelAnimView*)&self->field_0x1A04)->layout->rootPane->v_0x03C("T_As_TextBox_00", 1);
@@ -1140,14 +1140,14 @@ void hbmPanelSetTextBoxString(Panel805482CC* self, const u16* text)
 }
 
 /* Drop the second argument and forward the rest to hbmPanelUpdateButtonRepeat (a tail call in retail). */
-void fn_8054DDCC(Panel805482CC* self, s32 a, s32 b, s32 c)
+void fn_8054DDCC(HbmTextPanel* self, s32 a, s32 b, s32 c)
 {
     hbmPanelUpdateButtonRepeat(self, b, c);
 }
 
 /* 0x8054E064 (0x11C): Records the pressed buttons and adds an auto-repeat press for each held direction button whose
  * countdown runs out (30 frames to the first repeat, 9 between repeats). */
-void hbmPanelUpdateButtonRepeat(Panel805482CC* self, s32 pressed, s32 held)
+void hbmPanelUpdateButtonRepeat(HbmTextPanel* self, s32 pressed, s32 held)
 {
     self->field_0x1AF0 = pressed;
     if (held & 0x0002) {
@@ -1195,18 +1195,18 @@ void hbmPanelUpdateButtonRepeat(Panel805482CC* self, s32 pressed, s32 held)
 /* Forwards the key release to the +0x1A04 pane manager (a tail call in retail). */
 void fn_8054E05C(void* panel, HkbManager* manager)
 {
-    Panel805482CC* self = (Panel805482CC*)panel;
+    HbmTextPanel* self = (HbmTextPanel*)panel;
     ((HbmPaneManager*)&self->field_0x1A04)->HbmPaneManager::onKeyRelease(manager);
 }
 
 /* The u16 at +0x008. */
-u16 fn_8054E524(Panel805482CC* self)
+u16 fn_8054E524(HbmTextPanel* self)
 {
     return self->field_0x008;
 }
 
 /* Dispatch the object at +0x1A18 through its slot 0x14 (a tail call in retail). */
-void fn_8054E808(Panel805482CC* self)
+void fn_8054E808(HbmTextPanel* self)
 {
     Panel805482CC_Item* item = self->field_0x1A18;
 
@@ -1216,7 +1216,7 @@ void fn_8054E808(Panel805482CC* self)
 /* Reset the +0x1A04 record and then the sub-object's layout at mode 0. */
 void fn_8054E81C(void* panel)
 {
-    Panel805482CC* self = (Panel805482CC*)panel;
+    HbmTextPanel* self = (HbmTextPanel*)panel;
     ((HbmPaneManager*)&self->field_0x1A04)->HbmPaneManager::v_0x03C();
     fn_8055A3E0(&self->sub, 0);
 }
@@ -1224,7 +1224,7 @@ void fn_8054E81C(void* panel)
 /* Close the +0x1A04 record and then the sub-object's layout at mode 1. */
 void fn_8054E858(void* panel)
 {
-    Panel805482CC* self = (Panel805482CC*)panel;
+    HbmTextPanel* self = (HbmTextPanel*)panel;
     ((HbmPaneManager*)&self->field_0x1A04)->HbmPaneManager::v_0x040();
     fn_8055A3E0(&self->sub, 1);
 }
