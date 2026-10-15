@@ -7,7 +7,8 @@
  *   strings, generated last), .sdata 0x80793948-0x80793950, .sdata2 0x8079C7A8-0x8079C7B8, extab, extabindex.
  * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md).  File-scope
  *   `#pragma dont_inline on` (retail calls every inline member out of line, the generated record ctors/dtors included)
- *   and `#pragma peephole off` (the `__ptmf_null` copy keeps its unfused lis/addi/lwz).
+ *   and `#pragma peephole off` above the includes (the `__ptmf_null` copy keeps its unfused lis/addi/lwz, and
+ *   `menu/movie.h`'s inline `~NetworkFriendInfo` keeps retail's `extsh r0,r4`).
  * NAMES. The class name is its own "NetworkCommunityPat::deleteRequest" string's; every other name is a GUESS from what
  *   the bodies store, compare and pass (the `setCollectionLog*` helpers by analogy with `NetworkLayerPat`'s).  The
  *   senders are `Network/PatInterface.cpp`'s, named from their Pat op-codes and the `recvAns*` trace strings (request N,
@@ -16,26 +17,34 @@
  *   `sendReqBlackAdd` 283, `sendReqBlackDelete` 285, `sendReqBlackList` 287; hence `blockPlayer`/`unblockPlayer`
  *   (BlackAdd/BlackDelete); `inviteFriend` (sends FriendAccept) and `sendFriendMessage` (FriendAdd with a text) keep the
  *   consumer's names.  `NetworkFriendInfo` is `menu/movie.cpp`'s (`menu/movie.h`), `strtok` MSL's.
- * RESIDUALS. `extab`: the constructor's call to `getInstance_` is a may-throw range (pc 0x7C) retail does not record.
+ * RESIDUALS. `extab`: the constructor's call to `getInstance_` is a may-throw range (pc 0x7C) retail does not record;
+ *   `__attribute__((nothrow))` on its declaration (`enemy/em020_ai.h`, not this unit's) clears it (requested).
  * RESIDUALS. Not unwritten: the empty inline constructor/destructor bodies of `NetworkCommunityFriendList` and
  *   `NetworkCommunityBlockList` are complete (MWCC emits the element construction; declared so other units call them).
- *   `__dt__17NetworkFriendInfoFv`: retail re-extends the flag (`extsh r0,r4`), the empty inline destructor
- *   here compares r4 directly - 4 bytes short (`.text` 0x61C0 against 0x61C4); a virtual and a non-virtual destructor
- *   score the same.  `writeProfileRange_50`: one `add` keeps its operands swapped.  `onPatEvent`: the strtok loop's
- *   token/index registers swap (r26/r27) and the two by-value error copies sit in named locals (retail inlines
- *   `NetworkInstanceDispatch::postError(NetworkPostedError)`, kept out of line by the file-scope `dont_inline`).
- *   `handleUnblockPlayer`/`onPatEvent`: `setFriendTransferModeById` (NetworkLayerPat) takes `u8 mode`, so this caller
- *   emits a `clrlwi` retail lacks; a `u32` parameter restores both and lowers the callee, so the owner's u8 stays.
- *   `.sdata2`: retail emits `communityProfileSendInterval` (0x8079C7A8) before the inline record `reset`'s 0.0 and
- *   `clear`'s -3600.0, ours after (its definition has to follow `move`).
+ * RESIDUALS. `writeProfileRange_50`: the last window-end sum loads 0x3F8/0x3FC into r7/r0 in retail; every operand order
+ *   and local spelling measured either swaps the two loads or the `add` operands (scheduling off changes nothing).
+ * RESIDUALS. `onPatEvent`: the two by-value error copies (cases 0x807B/0x807E) sit in named locals, so the frame
+ *   holds them in source order (0x20/0x08) where retail's inlined `postError(NetworkErrorInfo)` puts both copies below
+ *   both records (0x14/0x08); `dont_inline off` around it inlines the copy right but also inlines the generated record
+ *   constructors retail calls (wrong callees), and function-scope copies land above the frame's other records.
+ * RESIDUALS. `handleUnblockPlayer`/`onPatEvent`: `setFriendTransferModeById` (NetworkLayerPat) takes `u8 mode`, so the
+ *   three callers here emit a `clrlwi` retail lacks; an `s32 mode` in `NetworkLayerPat.h` removes all three (measured),
+ *   so the parameter is int-wide in retail - the owner's change, requested.
  * SHAPES. The request record's `reset` and `clear` are defined before its destructor: MWCC then knows the destructor's
  *   call cannot throw and records no cleanup for the `NetworkMutex` member (retail's empty `extab` record).
  * SHAPES. The records a handler delivers are declared in the case block that fills them (retail constructs them there);
  *   the event switch's cases follow retail's body order; `move`'s 1.0 is the named constant
- *   `communityProfileSendInterval` defined after its user (defined before, MWCC folds it into a pooled literal loaded
- *   in the other order).  The request records' members are inline: retail emits each out-of-line copy right after the
- *   first function that calls it.
+ *   `communityProfileSendInterval`, defined `const volatile` above every function so `.sdata2` opens with it as in
+ *   retail (a plain `const` definition there makes `move` load a second, pooled 1.0).  The request records' members
+ *   are inline: retail emits each out-of-line copy right after the first function that calls it.
+ * SHAPES. `onPatEvent`'s profile-name loop indexes with a block-scope `nameIndex` and the block list loop counts with
+ *   `j` (retail's register choice for both).
+ * SHAPES. `NetworkCommunityProfile` and `NetworkCommunityPeer` declare their constructor and destructor, defined inline
+ *   here beside the friend and block lists' (implicit ones are emitted ahead of the lists', not in retail's order).
  */
+/* Retail keeps the unfused lis/addi/lwz forms of the null member pointer copy and the deleting destructors' extsh;
+ * stated before the includes so the header-inline destructors compile under it too. */
+#pragma peephole off
 #include "Network/NetworkCommunityPat.h"         /* the unit's own header */
 #include "Network/NetworkSessionManager.h"       /* NetworkRequest_idCounter, NetworkVaState */
 #include "Network/NetworkSessionBase.h"          /* LockMutex/UnlockMutex, getNetworkBinaryState */
@@ -78,9 +87,9 @@ enum {
     REPLY_ABORTED = 0x2
 };
 
-/* How long `move` waits between two profile sends (seconds of the logger's clock); defined at the end of the file, because a
- * definition ahead of `move` is folded into a pooled literal (see the file header). */
-extern const f32 communityProfileSendInterval;
+/* How long `move` waits between two profile sends (seconds of the logger's clock); `volatile` keeps `move` loading
+ * the object instead of a pooled copy of its value (see the file header). */
+extern const volatile f32 communityProfileSendInterval = 1.0f;
 
 /* Whether the state machine's community session is up (+0x6559, set when the binary exchange reaches phase 3). */
 inline s32 isPatShutdown(NetworkStateMachine* self)
@@ -90,8 +99,6 @@ inline s32 isPatShutdown(NetworkStateMachine* self)
 
 /* Retail calls every inline member out of line (each copy follows its first caller). */
 #pragma dont_inline on
-/* Retail keeps the unfused lis/addi/lwz forms of the null member pointer copy. */
-#pragma peephole off
 
 /* The Pat callback slot 6: hands the event to the layer installed with it. */
 static void communityPatEventCallback(s32 code, s32 requestId, s32 flag, s32 count, const u8* data,
@@ -118,6 +125,16 @@ inline NetworkCommunityFriendList::~NetworkCommunityFriendList()
 {
 }
 
+/* Destroys a peer's profile record. */
+inline NetworkCommunityPeer::~NetworkCommunityPeer()
+{
+}
+
+/* Destroys a profile block (its owner id). */
+inline NetworkCommunityProfile::~NetworkCommunityProfile()
+{
+}
+
 /* Builds the block list's entries. */
 inline NetworkCommunityBlockList::NetworkCommunityBlockList()
 {
@@ -125,6 +142,16 @@ inline NetworkCommunityBlockList::NetworkCommunityBlockList()
 
 /* Builds the friend list's entries. */
 inline NetworkCommunityFriendList::NetworkCommunityFriendList()
+{
+}
+
+/* Builds a peer's profile record. */
+inline NetworkCommunityPeer::NetworkCommunityPeer()
+{
+}
+
+/* Builds a profile block (its owner id). */
+inline NetworkCommunityProfile::NetworkCommunityProfile()
 {
 }
 
@@ -2175,13 +2202,14 @@ void NetworkCommunityPat::onPatEvent(s32 code, s32 requestId, s32 flag, s32 coun
         this->peer_630.names_16C[2][0] = 0;
         token = strtok((char*)profileIn->names_13D, "\t");
         while (token != NULL) {
-            i = this->peer_630.nameCount_168;
-            if (i >= 3) {
+            s32 nameIndex = this->peer_630.nameCount_168;
+
+            if (nameIndex >= 3) {
                 break;
             }
             length = strlen(token) < sizeof(this->peer_630.names_16C[0]) - 1 ? strlen(token)
                                                                               : sizeof(this->peer_630.names_16C[0]) - 1;
-            memcpy(this->peer_630.names_16C[i], token, length);
+            memcpy(this->peer_630.names_16C[nameIndex], token, length);
             this->peer_630.names_16C[this->peer_630.nameCount_168][length] = 0;
             this->peer_630.nameCount_168++;
             token = strtok(NULL, "\t");
@@ -2355,8 +2383,8 @@ void NetworkCommunityPat::onPatEvent(s32 code, s32 requestId, s32 flag, s32 coun
         }
         this->blocked_2268.count_00 = count < 16 ? count : 16;
         blockedIn = (const NetworkCommunityBlockedPayload*)data;
-        for (i = 0; i < this->blocked_2268.count_00; i++) {
-            blocked = &this->blocked_2268.entries_04[i];
+        for (j = 0; j < this->blocked_2268.count_00; j++) {
+            blocked = &this->blocked_2268.entries_04[j];
             blocked->id_00.importFrom(3, blockedIn->id_04, sizeof(blockedIn->id_04));
             memcpy(blocked->name_20, blockedIn->name_0C, sizeof(blocked->name_20) - 1);
             blocked->name_20[sizeof(blocked->name_20) - 1] = 0;
@@ -2518,5 +2546,3 @@ void NetworkCommunityPat::setCollectionLog(NetworkCommunityPatRequest* request, 
     request->setRecord(code, arg0, arg1);
 }
 
-/* How long `move` waits between two profile sends (declared at the top of the file). */
-extern const f32 communityProfileSendInterval = 1.0f;

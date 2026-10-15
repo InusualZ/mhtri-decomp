@@ -72,6 +72,9 @@ struct NetworkCommunityProfile {
     /* +0x020 */ u32 windowOffset_020;    /* the window's first byte */
     /* +0x024 */ u32 windowSize_024;      /* how many bytes from it */
     /* +0x028 */ u8 data_028[0x100];
+
+    NetworkCommunityProfile();    /* 0x803F0760 - inline, emitted by Network/NetworkCommunityPat.cpp */
+    ~NetworkCommunityProfile();   /* 0x803F05D4 */
 };   /* size: 0x128 (the length `clear` zeroes) */
 
 /* Who a profile write is announced to: `kind_00` 0..4 (1 = one player, named by `id_04`). */
@@ -125,6 +128,9 @@ struct NetworkCommunityPeer {
     /* +0x262 */ u8 pad_262[2];
     /* +0x264 */ u32 value_264;
     /* +0x268 */ u32 value_268;
+
+    NetworkCommunityPeer();    /* 0x803F0730 - inline, emitted by Network/NetworkCommunityPat.cpp */
+    ~NetworkCommunityPeer();   /* 0x803F0578 */
 };   /* size: 0x26C (the gap to the friend list) */
 
 /* The data record the data message (Pat message 0x806D) delivers (command 15): the sender, its name and tag, a word

@@ -11,9 +11,7 @@
  * NAMES. The class name is its own "NetworkCommunity::deleteRequest" string's; the descriptors are the named
  *   `NetworkCommunityHandler` globals `networkCommunityRequestDescNN`; every other name is a GUESS from the slot offset,
  *   the field it touches or what the pat control passes.
- * RESIDUALS. `__ct__16NetworkCommunityFv`: the pool loop keeps its counter and pointer registers swapped (r31/r30
- *   against retail r30/r31; the comma-form loop is the closest spelling of those measured).  `.sdata2`: the object
- *   carries 4 B of the claimed 8.
+ * RESIDUALS. `.sdata2`: the object carries 4 B of the claimed 8.
  * SHAPES. `__vt__16NetworkCommunity` is emitted here from the class (key function the destructor, rule 10).
  * SHAPES. The record's `reset` is inline and defined before the constructor, under file-scope `dont_inline`: MWCC then
  *   knows the pool loop's call cannot throw and records no pool cleanup (retail's empty constructor `extab`), and still
@@ -68,15 +66,14 @@ inline void NetworkCommunityRequest::reset()
 NetworkCommunity::NetworkCommunity()
 {
     s32 i;
-    NetworkCommunityRequest* req;
 
     this->reflectCallback_04 = 0;
     this->reflectUser_08 = 0;
     for (i = 0; i < 12; i++) {
         this->requests_0C[i] = 0;
     }
-    for (i = 0, req = this->pool_3C; i < 2; i++, req++) {
-        req->reset();
+    for (i = 0; i < 2; i++) {
+        this->pool_3C[i].reset();
     }
 }
 
