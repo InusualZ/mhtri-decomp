@@ -1694,7 +1694,7 @@ config.libs = [
             Object(Matching, "homebutton/hkb_drawinfo.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hkb_animation.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(Matching, "homebutton/hkb_resource_accessor.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
-            Object(NonMatching, "homebutton/hkb_arc_resource_accessor.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(Matching, "homebutton/hkb_arc_resource_accessor.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hkb_keyboard.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hkb_cellphone.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hbm_text_panel.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
