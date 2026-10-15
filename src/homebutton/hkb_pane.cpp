@@ -10,12 +10,14 @@
  *   nw4r::lyt::detail::CalcPaneRect (0x8052A3FC), the pane's rectangle from its base point and size, and
  *   Pane::GetPaneRect (0x8052A484, `b` into it; hbm_text_panel.cpp, hbm_kb_widget.cpp, hbm_kb_cursor.cpp and
  *   tiHKBManager.cpp call it with a DrawInfo); the file name `hkb_pane.cpp` is a GUESS (retail lyt_pane).
- * RESIDUALS. Pane::Pane: retail keeps LinkListNode's zero stores for both lists' sentinel nodes before the list
- *   initialisation (LinkListNode deriving from ut::NonCopyable in src/nw4r/ut_LinkList.h, request hkb-lyt#1).
- * RESIDUALS. our object emits weak LinkList<Pane, 4> / LinkList<AnimationLink, 0> destructors (from the constructor)
- *   the target lacks.
- * RESIDUALS. flipcheck: the class table, Pane::typeInfo and the `.sdata2` pool end in the retail object's 8-byte fill
- *   (0x78 vs 0x74, 0x8 vs 0x4, 0x20 vs 0x1C), beside the four .text rows above.
+ *   GUESS: nw4r::lyt::detail::PaneBase (homebutton/hkb_layout.h), the polymorphic base holding mLink.
+ * RESIDUALS. our object emits weak LinkList<Pane, 4> / LinkList<AnimationLink, 0>, LinkListNode, ut::NonCopyable and
+ *   PaneBase destructors and PaneBase's vtable, which the target lacks; nothing in the link references them, so they
+ *   are dead-stripped (a trial Matching flip links main.dol byte-identical).
+ * RESIDUALS. flipcheck reports the class table, Pane::typeInfo and the `.sdata2` pool short of the retail object's
+ *   8-byte fill (0x78 vs 0x74, 0x8 vs 0x4, 0x20 vs 0x1C); the link supplies the fill.
+ * SHAPES. Pane derives from detail::PaneBase, whose constructor stores mLink's two zero words (+0x04, +0x08) before
+ *   Pane's vtable pointer, retail's order (a plain mLink member is stored after it).
  * SHAPES. CalculateMtx reads mFlag once into a local for the visibility and location-adjust tests (IsVisible() and a
  *   second `mFlag & 4` reload it).
  * SHAPES. CalcPaneRect copies GetVtxPos's result into basePt out of a reference-bound temporary (retail's math::VEC2

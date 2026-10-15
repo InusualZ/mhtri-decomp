@@ -23,10 +23,10 @@
  * RESIDUALS. the range is three objects (seam request hkb-b#3): the class tables, the 0.0 pool word and the
  *   SetTagProcessorImpl position cannot match as one object; retail fills Layout::mspAllocator's `.sbss` slot to 8
  *   bytes (the end of the lyt_layout object), ours packs Picture::typeInfo at +0x4.
- * RESIDUALS. Layout / Group / GroupContainer constructors and Build's GroupContainer: retail keeps LinkListNode's two
- *   zero stores before the list initialisation; that happens when LinkListNode derives from ut::NonCopyable
- *   (measured on a probe), which src/nw4r/ut_LinkList.h does not declare (request hkb-lyt#1).
- * RESIDUALS. our object emits weak LinkList<...> destructors the target lacks.
+ * SHAPES. the Layout / Group / GroupContainer constructors keep LinkListNode's two zero stores before the list
+ *   initialisation because LinkListNode derives from ut::NonCopyable (src/nw4r/ut_LinkList.h).
+ * RESIDUALS. our object emits weak LinkList<...>, LinkListNode and ut::NonCopyable destructors the target lacks
+ *   (unreferenced, dead-stripped by the link).
  * RESIDUALS. SetTagProcessor / SetTagProcessorImpl: the second inlined level walks the child list with `lwzu` where
  *   retail uses `lwz` + `addi`.
  */

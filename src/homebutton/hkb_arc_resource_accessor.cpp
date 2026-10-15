@@ -16,12 +16,11 @@
  *   library's multi-archive accessor: an archive list at +0x04 searched by GetResource, a font list at +0x10
  *   searched by GetFont with strcmp, 0x8C font links and 0xA4 archive links); FindNameResource and GetResourceSub
  *   for the two file-local helpers; every row takes the compiler's mangling.
- * RESIDUALS. MultiArcResourceAccessor constructor 0x8053508C: retail keeps the two LinkListNode NULL stores of each
- *   list (+0x08/+0x0C, +0x14/+0x18) before the list init; here they fold away, as in homebutton/hkb_material.cpp's
- *   AnimationLinkList constructor (a LinkListImpl constructor calling an inline Initialize_ measured the same; a
- *   LinkListNode deriving from ut::NonCopyable makes the row 100, request hkb-lyt#1).
- *   The object also emits weak copies of the two LinkList destructors (0x58 B each) that no retail object carries:
- *   nothing references them, so the link dead-strips them.
+ * RESIDUALS. none in .text. The object also emits weak copies of the two LinkList destructors (0x58 B each) and the
+ *   empty LinkListNode / ut::NonCopyable destructors (0x40 B each) that no retail object carries: nothing references
+ *   them, so the link dead-strips them.
+ * SHAPES. the constructor keeps the two LinkListNode NULL stores of each list (+0x08/+0x0C, +0x14/+0x18) before the
+ *   list init because LinkListNode derives from ut::NonCopyable (src/nw4r/ut_LinkList.h).
  * SHAPES. the type string is filled with plain `resType >> n` stores (a (u8) cast adds an rlwinm mask retail lacks).
  */
 #include "homebutton/hkb_arc_resource_accessor.h"

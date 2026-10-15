@@ -170,7 +170,7 @@ struct MaterialResourceNum {
 struct Material {
     /* +0x00 */ char name[20];
     /* +0x14 */ GXColorS10 tevCols[3];
-    /* +0x2C */ ut::Color tevKCols[4];
+    /* +0x2C */ GXColor tevKCols[4];
     /* +0x3C */ MaterialResourceNum resNum;
 };
 

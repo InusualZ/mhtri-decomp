@@ -14,8 +14,7 @@
  *   layout callees are renamed), except the SetupGX statics kColSels / kAlpSels, whose spelling is per compiler.
  * SHAPES. the default SRTs are set by the InitTexSRTs helper (the loop written in place swapped r6/r7) and built
  *   through Point (homebutton/hkb_material.h), the VEC2(0,0) / VEC2(1,1) temporaries retail keeps on the stack; the
- *   default material colour is one word store (retail's ut::Color::operator=(u32), which src/nw4r/fn_80502828.h does
- *   not declare: request hkb-lyt#2).
+ *   default material colour is one word store through ut::Color::operator=(u32) (src/nw4r/ut_Color.h).
  * SHAPES. SetupGX sets bUseRasStage and clears it again on !bModVtxCol (retail's li 1 / bne / li 0; `a && b`, an
  *   if-set and a ternary measured lower).
  * SHAPES. the constructor sits in a `#pragma dont_inline on` region: retail calls every getter, template and copy
@@ -26,10 +25,9 @@
  *   ReserveGXMem (0x805314C4): the size sum is grouped by record size here (texture SRTs, the 4-byte records, then
  *   texture maps and TEV stages) because the per-record sum of the natural form does not fold into retail's
  *   (texSRT + indSRT) * 0x14 / (4-byte counts) << 2 shape; the grouped sum's adds still differ in order.
- *   Constructor (0x80530A50): mTevKCols copy through ut::Color::operator=(const Color&) where retail calls
- *   operator=(GXColor) (0x800647A0), and the TEV colour loop indexes its destination where retail walks a pointer.
- *   AnimationLinkList constructor (0x80530A30): retail keeps LinkListNode's two zero stores before Initialize_; they
- *   survive only when LinkListNode derives from ut::NonCopyable (src/nw4r/ut_LinkList.h, request hkb-lyt#1).
+ *   Constructor (0x80530A50): the TEV colour loop indexes its destination where retail walks a pointer (the
+ *   implicit GXColorS10 copy of request hkb-lyt#4 walks it). The mTevKCols copies call ut::Color::operator=(const
+ *   GXColor&), which the map still names fn_800647A0 (g3d/fn_80063888.cpp's copy).
  *   SetupGX (0x805323D4): two saved registers swap in the TEV-stage loop (r26 / r31).
  *   Flip blockers: flipcheck reports .text 0x2D38 against the claimed 0x2D48 (-0x10) and the bytes differ from +0x304
  *   (retail emits the AnimationLinkList constructor before the Material constructor, and the copy operators before
@@ -461,7 +459,7 @@ void Material::ReserveGXMem(u8 texMapNum, u8 texSRTNum, u8 texCoordGenNum, u8 te
 
             mGXMemNum.matCol = mGXMemCap.matCol;
             if (mGXMemNum.matCol) {
-                *reinterpret_cast<u32*>(GetMatColAry()) = 0xFFFFFFFF;
+                *GetMatColAry() = 0xFFFFFFFF;
             }
 
             mGXMemNum.tevSwap = mGXMemCap.tevSwap;

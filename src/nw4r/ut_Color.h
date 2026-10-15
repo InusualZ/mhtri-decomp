@@ -31,6 +31,17 @@ struct Color : public _GXColor {
 
     ~Color() {}
 
+    /* Sets the four channels from one RGBA word. */
+    Color& operator=(u32 rgba) {
+        *reinterpret_cast<u32*>(this) = rgba;
+        return *this;
+    }
+
+    /* Copies the four channels of an SDK colour. */
+    Color& operator=(const GXColor& color) {
+        return *this = *reinterpret_cast<const u32*>(&color);
+    }
+
     u32 ToU32() const {
         return *reinterpret_cast<const u32*>(this);
     }

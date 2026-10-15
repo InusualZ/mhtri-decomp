@@ -10,10 +10,21 @@
 namespace nw4r {
 namespace ut {
 
+/* An empty base that forbids copying its derived class. size: 0x1 */
+class NonCopyable {
+protected:
+    NonCopyable() {}
+    ~NonCopyable() {}
+
+private:
+    NonCopyable(const NonCopyable&);
+    const NonCopyable& operator=(const NonCopyable&);
+};
+
 namespace detail {
 
 /* One link of an intrusive doubly linked list. size: 0x8 */
-class LinkListNode {
+class LinkListNode : private NonCopyable {
 public:
     LinkListNode() : mNext(NULL), mPrev(NULL) {}
 

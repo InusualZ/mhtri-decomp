@@ -104,8 +104,22 @@ struct Layout {
 
 }  // namespace res
 
+namespace detail {
+
+/* The pane's polymorphic base holding its link in the parent's child list; Pane::Pane stores the link before the
+ *   vtable pointer, which only a base class constructor orders so. size: 0xC */
+class PaneBase {
+public:
+    PaneBase() : mLink() {}
+    virtual ~PaneBase() {}
+
+    /* +0x04 */ ut::detail::LinkListNode mLink;
+};
+
+}  // namespace detail
+
 /* A node of the layout's pane tree: its transform, size, alpha, name, material and child panes. size: 0xD8 */
-class Pane {
+class Pane : public detail::PaneBase {
 public:
     Pane(const res::Pane* pBlock);
     virtual ~Pane();
@@ -155,7 +169,6 @@ public:
     /* The class's run-time type record (0x80795A18); its parent is NULL. */
     static const ut::detail::RuntimeTypeInfo typeInfo;
 
-    /* +0x04 */ ut::detail::LinkListNode mLink;
     /* +0x0C */ Pane* mpParent;
     /* +0x10 */ ut::LinkList<Pane, 4> mChildList;
     /* +0x1C */ AnimationLinkList mAnimList;
