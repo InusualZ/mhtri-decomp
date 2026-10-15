@@ -31,9 +31,9 @@
  *   - inline helpers whose early returns join in one register: `NHTTPi_skipLine` (the chunk-extension and
  *     trailer skips of `NHTTPi_recvResponseBody`), the three phase handlers of
  *     `NHTTPi_dispatchConnectionCallback` (playbook 101).
- *   - `volatile` fields where retail re-reads them (playbook 125): `NHTTPSock.length`,
+ *   - `volatile` fields where retail re-reads them (playbook 130): `NHTTPSock.length`,
  *     `NHTTPRequestNode.request`, `NHTTPResponse.headerLength` / `NHTTPRecvBuf.capacity`.
- *   - `if (r > 0) { ... } else { return r; }` after `SORecv`/`SOSend` (playbook 126), and `NHTTPi_SocRecv`
+ *   - `if (r > 0) { ... } else { return r; }` after `SORecv`/`SOSend` (playbook 131), and `NHTTPi_SocRecv`
  *     returns -1001 directly when the request has no connection.
  *   - `NHTTPi_commThreadLoop`'s switches list `case 0:` with `default` (the compare tree pivots on it) and
  *     the bodies in retail's order (again, finish, send); `sendRequest` answering 1 finishes the request.
