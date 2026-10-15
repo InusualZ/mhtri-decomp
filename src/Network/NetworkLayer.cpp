@@ -7,15 +7,16 @@
  *   the table 0x805FB5D0), .sdata2 0x8079C778-0x8079C780 (read only from this range), extab, extabindex.  The left edge
  *   is the `.data` V->S seam at 0x805FB2B8 (the session manager's `setSessionLogSessionLost` ends at 0x803DF2EC).
  * FLAGS. The game-root `cflags_main` plus `-pool off` (configure.py; measured in docs/network.md: the id
- *   helpers address each warning string with their own `lis`/`addi`); file-scope `#pragma peephole off`.
+ *   helpers address each warning string with their own `lis`/`addi`); file-scope `#pragma peephole off`; `move` under
+ *   a scoped `#pragma optimization_level 4` (the unrolled scan keeps its trip count 3 in r29 as retail; at level 3 it
+ *   is rematerialised in r0 and every register shifts).
  * NAMES. Every name except the class's own is a GUESS from the slot offset or the field it touches; the 22 descriptors
  *   are the `NetworkLayerHandler` globals `networkLayerRequestDescNN`; the request starters the game calls carry the
  *   consumers' spellings (`closeSession_1C`, `requestServers_24`, ... - `Network/network_pat_control.cpp`).
- * RESIDUALS. `move`: one callee-saved register fewer (`_savegpr_23`/`_restgpr_23` against retail's `_22`).
- * RESIDUALS. `NetworkLayer::move`: the unrolled inner scan's trip count 3 sits in r0 where retail holds it in r29 - one
- *   saved register more shifts every allocation.  The constructor: the second pool loop (an explicit pointer,
- *   the closer of the two spellings measured) swaps the counter/pointer registers.  `.data` is 0x45C of the claimed
- *   0x460 (the last 4 bytes, 0x805FB714, are alignment); the id helpers' string labels pair by address only.
+ * RESIDUALS. None in `.text`, `extab` or `extabindex`; `.data` is 0x45C of the claimed 0x460 (the last 4 bytes,
+ *   0x805FB714, are alignment); the id helpers' string labels pair by address only.
+ * SHAPES. `move` declares `i`, `j`, `req` in that order (the order colours `this` r30, `req` r31, `j` r23 as retail);
+ *   the constructor's pool loop indexes `pool_78[i]`; `isOwned`/`run` follow `move` (their first caller).
  * SHAPES. The record's `reset` is inline and defined before the constructor, under file-scope `dont_inline`: the pool
  *   loop's call is then known not to throw (retail's empty constructor `extab`); its copy follows the constructor.
  * SHAPES. `__vt__12NetworkLayer` is emitted here from the class (key function `~NetworkLayer`, rule 10): 79 slots
@@ -77,7 +78,6 @@ inline void NetworkLayerRequest::reset()
 NetworkLayer::NetworkLayer()
 {
     s32 i;
-    NetworkLayerRequest* req;
 
     this->context_04 = 0;
     this->context_08 = 0;
@@ -87,10 +87,8 @@ NetworkLayer::NetworkLayer()
     }
     this->flag_75 = 1;
     this->flag_76 = 1;
-    req = this->pool_78;
     for (i = 0; i < 2; i++) {
-        req->reset();
-        req++;
+        this->pool_78[i].reset();
     }
 }
 
@@ -148,10 +146,13 @@ void NetworkLayer::release()
 
 /* One tick of the request state machine: starts the requests allowed to move this tick and retires the
  * ones whose owner has let go. */
+#pragma push
+#pragma optimization_level 4
 void NetworkLayer::move()
 {
-    NetworkLayerRequest* req;
     s32 i;
+    s32 j;
+    NetworkLayerRequest* req;
 
     for (i = 0; i < 21; i++) {
         req = this->requests_0C[i];
@@ -167,7 +168,6 @@ void NetworkLayer::move()
                 break;
             case 2:
                 {
-                    s32 j;
                     for (j = 0; j < 21; j++) {
                         if (this->requestState_60[j] != 0) {
                             break;
@@ -191,6 +191,21 @@ void NetworkLayer::move()
                 this->requestState_60[i] = 0;
             }
         }
+    }
+}
+#pragma pop
+
+s32 NetworkLayerRequest::isOwned()
+{
+    return this->owner_94 != 0;
+}
+
+/* Runs the request's handler through its member-function pointer; a handler that reports completion
+ * resets the record. */
+void NetworkLayerRequest::run()
+{
+    if (this->owner_94 != 0 && (this->owner_94->*this->handler_98)(this) != 0) {
+        clear();
     }
 }
 
@@ -294,20 +309,6 @@ void copyNetFriendRec(NetFriendRec* dst, const NetFriendRec* src)
     memcpy(dst->name_0x20, src->name_0x20, sizeof(dst->name_0x20));
     memcpy(&dst->flag_0x34, &src->flag_0x34, sizeof(dst->flag_0x34));
     dst->valid_0x35 = src->valid_0x35;
-}
-
-s32 NetworkLayerRequest::isOwned()
-{
-    return this->owner_94 != 0;
-}
-
-/* Runs the request's handler through its member-function pointer; a handler that reports completion
- * resets the record. */
-void NetworkLayerRequest::run()
-{
-    if (this->owner_94 != 0 && (this->owner_94->*this->handler_98)(this) != 0) {
-        clear();
-    }
 }
 
 /* The request descriptors the starters pass by value: `{0, handler slot, 0}`, a member-function pointer to the

@@ -322,6 +322,25 @@ struct NetUserPositionNotice {
     ~NetUserPositionNotice();   /* 0x803EDEAC */
 };   /* size: 0x38 */
 
+/* The chat event `handleChat` (event 15, this console's own message) and `reflect` (event 16, a received one) report:
+ * the sender's address, name and text, the caller's tag word and the time it was stamped with (GUESS on the name; the
+ * layout is the session layer's chat record `NetworkSessionSlotInfo`, whose members this TU does not call - retail's
+ * constructor/destructor copies 0x803E6DD8/0x803E6D7C follow `handleChat`). */
+struct NetChatNotice {
+    /* +0x000 */ NetworkUniqueId sender_000;   /* the sender's address object */
+    /* +0x020 */ char name_020[0x13];          /* the sender's name (19 characters) */
+    /* +0x033 */ u8 nameEnd_033;               /* its terminator */
+    /* +0x034 */ u8 flag_034;                  /* cleared by both fillers */
+    /* +0x035 */ char text_035[0x200];         /* the message (at most 0x1FF characters) */
+    /* +0x235 */ u8 textEnd_235;
+    /* +0x236 */ u8 pad_236[0x02];
+    /* +0x238 */ u32 tag_238;                  /* the sender's tag word */
+    /* +0x23C */ s32 time_23C;                 /* the server time the message was stamped with */
+
+    NetChatNotice();    /* 0x803E6DD8 */
+    ~NetChatNotice();   /* 0x803E6D7C */
+};   /* size: 0x240 */
+
 /* The login record the server sends this console when it enters a layer (only the fields `applyLoginRecord` takes
  * are named; GUESS on their meaning from where they go). */
 typedef struct NetLayerLoginRecord {
