@@ -3673,11 +3673,56 @@ DWCi/dwc_auth_interface.c:
 	.sbss       start:0x807957D0 end:0x807957F8
 
 DWCi/dwc_nasfunc.c:
-	.text       start:0x8050A710 end:0x80511620 align:16
-	.data       start:0x806307F0 end:0x806308A8
-	.bss        start:0x807613B8 end:0x807625C0
-	.sdata      start:0x80794330 end:0x80794358
-	.sbss       start:0x807957F8 end:0x80795820
+	.text       start:0x8050A710 end:0x8050A990 align:16
+	.data       start:0x806307F0 end:0x80630828
+	.sdata      start:0x80794330 end:0x80794338
+	.sbss       start:0x807957F8 end:0x80795800
+
+DWCi/dwc_svl.c:
+	.text       start:0x8050A990 end:0x8050AAF0 align:16
+	.data       start:0x80630828 end:0x80630848
+	.sbss       start:0x80795800 end:0x80795808
+
+DWCi/darray.c:
+	.text       start:0x8050AAF0 end:0x8050B460 align:16
+
+DWCi/hashtable.c:
+	.text       start:0x8050B460 end:0x8050B880 align:16
+
+DWCi/gsPlatform.c:
+	.text       start:0x8050B880 end:0x8050C5F0 align:16
+	.data       start:0x80630848 end:0x80630858
+	.bss        start:0x807613B8 end:0x807614D8
+	.sdata      start:0x80794338 end:0x80794340
+	.sbss       start:0x80795808 end:0x80795818
+
+DWCi/gsAvailable.c:
+	.text       start:0x8050C5F0 end:0x8050C950 align:16
+	.data       start:0x80630858 end:0x80630880
+	.bss        start:0x807614D8 end:0x807615C0
+	.sdata      start:0x80794340 end:0x80794348
+	.sbss       start:0x80795818 end:0x80795820
+
+DWCi/gt2Auth.c:
+	.text       start:0x8050C950 end:0x8050CD20 align:16
+	.data       start:0x80630880 end:0x806308A8
+
+DWCi/gt2Buffer.c:
+	.text       start:0x8050CD20 end:0x8050CEE0 align:16
+
+DWCi/gt2Callback.c:
+	.text       start:0x8050CEE0 end:0x8050D7A0 align:16
+
+DWCi/gt2Connection.c:
+	.text       start:0x8050D7A0 end:0x8050DEC0 align:16
+
+DWCi/gt2Main.c:
+	.text       start:0x8050DEC0 end:0x8050E2B0 align:16
+
+DWCi/gt2Message.c:
+	.text       start:0x8050E2B0 end:0x80511620 align:16
+	.bss        start:0x807615C0 end:0x807625C0
+	.sdata      start:0x80794348 end:0x80794358
 
 DWCi/gt2Socket.c:
 	.text       start:0x80511620 end:0x80512200 align:16

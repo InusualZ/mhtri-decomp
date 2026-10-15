@@ -3,18 +3,22 @@
  * socket and connection creation and teardown, the raw send and the per-socket connection timers.
  *
  * RANGE. `.text` 0x80511620..0x80512200 (14 functions); no data of its own. The left edge ends the GT2 message
- *   file, whose last three functions `DWCi/dwc_nasfunc.c` ends with (they address its `.sdata`
- *   `DWCi_protocolMagic`); the right edge is gt2Utility's first function (`DWCi/gt2Utility.c`). The GT2 files link
- *   in name order (gt2Auth .. gt2Message in `dwc_nasfunc.c`, then gt2Socket, gt2Utility).
+ *   file (`DWCi/gt2Message.c`, whose last three functions address its `.sdata` `DWCi_protocolMagic`); the right edge
+ *   is gt2Utility's first function (`DWCi/gt2Utility.c`). The GT2 files link in name order (`DWCi/gt2Auth.c` ..
+ *   `DWCi/gt2Message.c`, then gt2Socket, gt2Utility).
  * FLAGS. `cflags_base` (-func_align 16): the retail functions start 16-byte aligned; per-row scores are unaffected
  *   by the lib's `cflags_dwc` (-func_align 4), the object layout is not.
  * NAMES. GUESSes from the bodies, kept from before the GT2 identification (`DWCi_createConnection` =
  *   gti2CreateSocket, `DWCi_createRequest` = gti2NewSocketConnection, ...). The GT2 records (`DWCiConn` = GTI2Socket,
  *   `DWCiReq` = GTI2Connection, `GTI2Buffer`) live in `DWCi/dwc_nasfunc.h` with the SDK's field names. The file name
  *   is the GameSpy SDK's `gt2Socket.c` (no `__FILE__` string).
- * RESIDUALS. `DWCi_createRequest`/`DWCi_findRequest` keep smaller frames than retail (0x30/0x20 against 0x170/0xB0);
- *   `DWCi_createRequest` keeps no saved-register frame (retail `_savegpr_27`/`_restgpr_27`); the other open rows
- *   differ in register colouring and block order.
+ * RESIDUALS. none measured (every row matches).
+ * SHAPES. The connection lookup keys on a whole `DWCiReq` on the stack (retail's 0xB0 frame) and `DWCi_findRequest`
+ *   / `DWCi_removeRequest` are defined ahead of their callers, which expand them (`DWCi_createRequest` twice,
+ *   `DWCi_sendTo`, `DWCi_requestTick`, `DWCi_connectionFlushRequests`); `DWCi_createConnection` returns the GT2
+ *   result code and writes the socket only on success; the send error dispatch is an if/else chain ending in a
+ *   shared `return 1`;
+ *   `DWCi_removeRequest` leaves through one `||` early return (retail's `beq` / `bne` / `b` exit).
  */
 
 #include "types.h"
@@ -34,7 +38,7 @@ u32 DWCi_requestTableHash(DWCiAddrKey** key, u32 bucket);
 u32 DWCi_requestTableCompare(DWCiAddrKey** a, DWCiAddrKey** b);
 void DWCi_requestListRelease(DWCiReq** slot);
 u32 DWCi_findRequest(DWCiConn* conn, u32 addr, u16 port);
-void DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize2, u32 arg5, u32 mode);
+s32 DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize2, u32 arg5, s32 mode);
 void DWCi_destroyConnection(DWCiConn* conn);
 void DWCi_setConnectionUserValue(DWCiConn* conn, u32 value);
 void DWCi_removeRequest(DWCiReq* req);
@@ -62,7 +66,7 @@ u32 DWCi_requestTableCompare(DWCiAddrKey** a, DWCiAddrKey** b)
     if (ka->addr != kb->addr) {
         return ka->addr - kb->addr;
     }
-    return (u16)(ka->port - kb->port);
+    return (s16)(ka->port - kb->port);
 }
 
 /* 0x80511680 - the request list's "release one slot" hook. */
@@ -74,8 +78,8 @@ void DWCi_requestListRelease(DWCiReq** slot)
 /* 0x80511690 - look a request up by `{addr, port}`. */
 u32 DWCi_findRequest(DWCiConn* conn, u32 addr, u16 port)
 {
-    DWCiAddrKey key;
-    DWCiAddrKey* pkey;
+    DWCiReq key;
+    DWCiReq* pkey;
     DWCiReq** slot;
 
     key.addr = addr;
@@ -91,7 +95,7 @@ u32 DWCi_findRequest(DWCiConn* conn, u32 addr, u16 port)
 /* 0x805116E0 - build a connection around `host`: parse the address, allocate the 0x4C-byte record,
  * its request table and list, open the transport handle, then connect (or, in mode 3, only stamp
  * the address). */
-void DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize2, u32 arg5, u32 mode)
+s32 DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize2, u32 arg5, s32 mode)
 {
     DWCiConn* conn;
     DWCiSockAddrIn sa;
@@ -107,13 +111,11 @@ void DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize
         bufSize1 = 0x10000;
     }
     if (DWCi_parseAddress(host, &addr, &port) == 0) {
-        *out = (DWCiConn*)4;
-        return;
+        return 4;
     }
     conn = gsimalloc(0x4C);
     if (conn == 0) {
-        *out = (DWCiConn*)1;
-        return;
+        return 1;
     }
     memset(conn, 0, 0x4C);
     conn->sock = -1;
@@ -123,15 +125,13 @@ void DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize
     conn->connections = TableNew2(4, 32, 2, (TableHashFn)DWCi_requestTableHash, (TableCompareFn)DWCi_requestTableCompare, NULL);
     if (conn->connections == 0) {
         gsifree(conn);
-        *out = (DWCiConn*)1;
-        return;
+        return 1;
     }
     conn->closedConnections = ArrayNew(4, 4, (ArrayElementFreeFn)DWCi_requestListRelease);
     if (conn->closedConnections == 0) {
         TableFree(conn->connections);
         gsifree(conn);
-        *out = (DWCiConn*)1;
-        return;
+        return 1;
     }
     conn->sock = DWCi_socketCreate(2, 2, 17);
     conn->protocolType = mode;
@@ -144,8 +144,7 @@ void DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize
         TableFree(conn->connections);
         ArrayFree(conn->closedConnections);
         gsifree(conn);
-        *out = (DWCiConn*)3;
-        return;
+        return 3;
     }
     memset(&sa, 0, 8);
     sa.family = 2;
@@ -157,8 +156,7 @@ void DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize
             TableFree(conn->connections);
             ArrayFree(conn->closedConnections);
             gsifree(conn);
-            *out = (DWCiConn*)3;
-            return;
+            return 3;
         }
     }
     salen = 8;
@@ -166,6 +164,7 @@ void DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize
     conn->addr = sa.addr;
     conn->port = SOAddressToHostPort(sa.port);
     *out = conn;
+    return 0;
 }
 
 /* 0x80511920 - close the connection object itself: mark "shutdown while busy", or release the
@@ -191,22 +190,9 @@ void DWCi_setConnectionUserValue(DWCiConn* conn, u32 value)
 
 u32 DWCi_createRequest(DWCiConn* conn, DWCiReq** out, u32 addr, u16 port)
 {
-    DWCiAddrKey key;
-    DWCiAddrKey* pkey;
-    DWCiReq** slot;
-    DWCiReq* req;
-    DWCiReq* entry;
-    DWCiReq** found;
+    DWCiReq* req = NULL;
 
-    key.addr = addr;
-    key.port = port;
-    pkey = &key;
-    found = TableLookup(conn->connections, &pkey);
-    req = 0;
-    if (found != 0) {
-        req = *found;
-    }
-    if (req != 0) {
+    if (DWCi_findRequest(conn, addr, port) != 0) {
         return 5;
     }
     req = gsimalloc(0xA0);
@@ -230,16 +216,8 @@ u32 DWCi_createRequest(DWCiConn* conn, DWCiReq** out, u32 addr, u16 port)
                             req->receiveFilters = ArrayNew(4, 2, 0);
                             if (req->receiveFilters != 0) {
                                 TableEnter(conn->connections, &req);
-                                key.addr = addr;
-                                key.port = port;
-                                pkey = &key;
-                                slot = TableLookup(conn->connections, &pkey);
-                                entry = 0;
-                                if (slot != 0) {
-                                    entry = *slot;
-                                }
-                                *out = entry;
-                                if (entry != 0) {
+                                *out = (DWCiReq*)DWCi_findRequest(conn, addr, port);
+                                if (*out != 0) {
                                     return 0;
                                 }
                             }
@@ -248,6 +226,8 @@ u32 DWCi_createRequest(DWCiConn* conn, DWCiReq** out, u32 addr, u16 port)
                 }
             }
         }
+    }
+    if (req != NULL) {
         gsifree(req->incomingBuffer.buffer);
         gsifree(req->outgoingBuffer.buffer);
         if (req->incomingBufferMessages != 0) {
@@ -271,27 +251,22 @@ u32 DWCi_createRequest(DWCiConn* conn, DWCiReq** out, u32 addr, u16 port)
  * remove it from the request list (state 7) or from the request table, by its own key. */
 void DWCi_removeRequest(DWCiReq* req)
 {
-    DWCiReq* key;
-    u32 count;
-    u32 i;
+    int count;
+    int i;
 
-    key = req;
-    if (req->freeAtAcceptReject != 0) {
-        return;
-    }
-    if (req->callbackLevel != 0) {
+    if (req->freeAtAcceptReject != 0 || req->callbackLevel != 0) {
         return;
     }
     if (req->state == 7) {
         count = ArrayLength(req->conn->closedConnections);
         for (i = 0; i < count; i++) {
-            if (*(DWCiReq**)ArrayNth(req->conn->closedConnections, i) == req) {
+            if (req == *(DWCiReq**)ArrayNth(req->conn->closedConnections, i)) {
                 ArrayDeleteAt(req->conn->closedConnections, i);
                 return;
             }
         }
     } else {
-        TableRemove(req->conn->connections, &key);
+        TableRemove(req->conn->connections, &req);
     }
 }
 
@@ -301,10 +276,6 @@ void DWCi_removeRequest(DWCiReq* req)
 u32 DWCi_sendTo(DWCiConn* conn, u32 addr, u16 port, void* buf, int len)
 {
     DWCiSockAddrIn sa;
-    DWCiAddrKey key;
-    DWCiAddrKey* pkey;
-    DWCiReq** slot;
-    DWCiReq* req;
     int err;
 
     DWCi_GetStringLength(&buf, &len);
@@ -318,50 +289,38 @@ u32 DWCi_sendTo(DWCiConn* conn, u32 addr, u16 port, void* buf, int len)
     if (DWCi_socketSendTo(conn->sock, buf, len, 0, &sa, 8) == -1) {
         err = DWCi_socketGetLastError(conn->sock);
         if (err == -15) {
-            if (DWCi_requestReconnect(conn, addr, port) != 0) {
+            if (DWCi_requestReconnect(conn, addr, port) == 0) {
+                return 0;
+            }
+        } else if (err == -23) {
+            if (DWCi_requestRetry(conn, addr, port, 1) == 0) {
+                return 0;
+            }
+        } else {
+            if (err == -42 || err == -6) {
                 return 1;
             }
-            return 0;
-        }
-        if (err == -23) {
-            if (DWCi_requestRetry(conn, addr, port, 1) != 0) {
-                return 1;
-            }
-            return 0;
-        }
-        if (err == -42 || err == -6) {
-            return 1;
-        }
-        if (err == -35) {
-            return 1;
-        }
-        if (conn->error == 0) {
-            conn->error = 1;
-            DWCi_socketShutdown(conn);
-            if (DWCi_socketConnect(conn) != 0) {
-                if (conn->callbackLevel != 0) {
-                    conn->close = 1;
-                } else {
-                    DWCi_socketClose(conn->sock);
-                    TableFree(conn->connections);
-                    ArrayFree(conn->closedConnections);
-                    gsifree(conn);
-                    SocketShutDown();
+            if (err != -35) {
+                if (conn->error == 0) {
+                    conn->error = 1;
+                    DWCi_socketShutdown(conn);
+                    if (DWCi_socketConnect(conn) != 0) {
+                        if (conn->callbackLevel != 0) {
+                            conn->close = 1;
+                        } else {
+                            DWCi_socketClose(conn->sock);
+                            TableFree(conn->connections);
+                            ArrayFree(conn->closedConnections);
+                            gsifree(conn);
+                            SocketShutDown();
+                        }
+                    }
                 }
+                return 0;
             }
         }
-        return 0;
-    }
-    if (conn->sendDumpCallback != 0) {
-        key.addr = addr;
-        key.port = port;
-        pkey = &key;
-        slot = TableLookup(conn->connections, &pkey);
-        req = 0;
-        if (slot != 0) {
-            req = *slot;
-        }
-        if (DWCi_requestSend(conn, req, addr, port, 0, buf, len, 1) == 0) {
+    } else if (conn->sendDumpCallback != 0) {
+        if (DWCi_requestSend(conn, (DWCiReq*)DWCi_findRequest(conn, addr, port), addr, port, 0, buf, len, 1) == 0) {
             return 0;
         }
     }
@@ -372,30 +331,16 @@ u32 DWCi_sendTo(DWCiConn* conn, u32 addr, u16 port, void* buf, int len)
  * timed out, then drop the terminal ones through the same remove path DWCi_removeRequest uses. */
 u32 DWCi_requestTick(void** slot, u32* now)
 {
-    DWCiReq* req;
-    DWCiReq* key;
-    u32 count;
-    u32 i;
+    DWCiReq* req = *slot;
+    u32 time = *now;
 
-    req = *slot;
-    if (req->state != 7 && DWCi_requestIsTimedOut(req, *now) == 0) {
-        return 0;
+    if (req->state != 7) {
+        if (DWCi_requestIsTimedOut(req, time) == 0) {
+            return 0;
+        }
     }
     if (req->state == 7 && req->freeAtAcceptReject == 0 && req->callbackLevel == 0) {
-        key = req;
-        if (req->state == 7 && req->freeAtAcceptReject == 0 && req->callbackLevel == 0) {
-            if (req->state == 7) {
-                count = ArrayLength(req->conn->closedConnections);
-                for (i = 0; i < count; i++) {
-                    if (*(DWCiReq**)ArrayNth(req->conn->closedConnections, i) == req) {
-                        ArrayDeleteAt(req->conn->closedConnections, i);
-                        return 1;
-                    }
-                }
-            } else {
-                TableRemove(req->conn->connections, &key);
-            }
-        }
+        DWCi_removeRequest(req);
     }
     return 1;
 }
@@ -416,29 +361,7 @@ void DWCi_connectionFlushRequests(DWCiConn* conn)
     int i;
 
     for (i = ArrayLength(conn->closedConnections) - 1; i >= 0; i--) {
-        DWCiReq* req = *(DWCiReq**)ArrayNth(conn->closedConnections, i);
-        DWCiReq* key;
-
-        if (req->freeAtAcceptReject != 0) {
-            continue;
-        }
-        if (req->callbackLevel != 0) {
-            continue;
-        }
-        if (req->state == 7) {
-            u32 count = ArrayLength(req->conn->closedConnections);
-            u32 j;
-
-            for (j = 0; j < count; j++) {
-                if (*(DWCiReq**)ArrayNth(req->conn->closedConnections, j) == req) {
-                    ArrayDeleteAt(req->conn->closedConnections, j);
-                    break;
-                }
-            }
-        } else {
-            key = req;
-            TableRemove(req->conn->connections, &key);
-        }
+        DWCi_removeRequest(*(DWCiReq**)ArrayNth(conn->closedConnections, i));
     }
 }
 

@@ -89,8 +89,8 @@
  * .bss 1584 B, .sbss 80 B, .sdata 56 B; ours 0).  Two ranges the bodies now
  * need are filed in the outbox: `.bss` 0x80762A20 (0x200 B, the socket receive buffer, sole referencer
  * `DWCi_natNegTickSocket`) and `.data` 0x806308E8 (0x120 B, the negotiator's string pool, sole referencer
- * `DWCi_NatNegStartSession`, dead-stripped emitters); `DWCi_natProbeStatus` (0x80795818) is written by the
- * unregistered band's `DWCi_natProbePoll`.
+ * `DWCi_NatNegStartSession`, dead-stripped emitters); `DWCi_natProbeStatus` (0x80795818) is written by
+ * `DWCi/gsAvailable.c`'s `DWCi_natProbePoll`.
  */
 
 #include "types.h"
