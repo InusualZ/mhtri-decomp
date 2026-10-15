@@ -15,19 +15,25 @@
  *    AAN scale factors read as doubles; `.sdata2` 0x8079D3A8..0x8079D3BC are the inverse-DCT constants of the
  *    paired-single routines; the decoder uses the locked cache (`LCStoreData`, `LCQueueWait`, `PPCMfhid2`).
  *    `.bss` 0x8075AFC0 .. 0x8075B110 and `.sbss` 0x807954A0..0x807955C8 are read here only.
- * RESIDUALS. `THPBuildLookupTables` 0x804E1DC0: register numbering of the nested lookup loops (the target keeps the
- *    prefix in r30 and the length in r31); `THPVideoDecode` 0x804E1120: the marker switch is compiled with signed
- *    compares where the target uses unsigned ones (a `u8`, `u32` or cast switch value changes nothing), the target tests
- *    0xD9 explicitly, and its error exits are shared tails at the end of the function (`li r3,N; b exit` in the order
- *    25, 27, 26, 11, 3, the parse status, 28, 29), the layout of jumps to labelled exits that the nested-`if` form
- *    without `goto` does not reach (an explicit `case 0xD9` scores lower); `THPDecodeFrame` 0x804E2010: each row loop
- *    keeps the unextended `row + 16` in r31 where the target keeps the `clrlwi` result (`row = row + 16`,
- *    `(u16)(row + 16)` and `0x10` change nothing); `THPParseHuffmanTable` 0x804E19F0, `THPDecodeFrameAnySize`
- *    0x804E2EF0, `THPDecodeFrame512x448`, `THPParseFrameHeader`, `THPParseQuantTable`: register numbering.
- *    flipcheck: .text 0x346C vs 0x3490.
+ * RESIDUALS. `THPVideoDecode` 0x804E1120: the marker switch is compiled with signed compares where the target uses
+ *    unsigned ones (a `u8`, `u32` or cast switch value changes nothing), the target tests 0xD9 explicitly, and its
+ *    error exits are shared tails at the end of the function (`li r3,N; b exit` in the order 25, 27, 26, 11, 3, the
+ *    parse status, 28, 29), the layout of jumps to labelled exits that the nested-`if` form without `goto` does not
+ *    reach (an explicit `case 0xD9` scores lower); `THPParseHuffmanTable` 0x804E19F0: register numbering and the
+ *    slot of the `THPHuffCounts` cursor load (declaration orders were hill-climbed); `THPParseQuantTable`
+ *    0x804E1650: register numbering (declaration orders were hill-climbed).
+ *    flipcheck: .text 0x347C vs 0x3490.
  * SHAPES. the marker switch lists its case bodies in the target's block order (0xC4, 0xC0, 0xDD, 0xDB, 0xDA, APPn/COM,
  *    0xD8); `THPDecodeFrame` declares `savedGqr6` before `savedGqr5` and builds the GQR values in the physical r3, which
  *    keeps r3 out of the function's other allocations as in the target.
+ *    `THPDecodeFrame` advances its u16 row as `row = (row + 16) & 0xFFFF` (the mask keeps the `clrlwi` result in the
+ *    row register; `row += 16` keeps the unextended sum); `THPDecodeFrame512x448` tests `--restartCounter == 0` on
+ *    the decremented value while 640x480 and AnySize re-read the field; `THPDecodeFrameAnySize` holds the width in a
+ *    `u32` declared last; `THPBuildLookupTables` reads the six table selectors (scaled to table indices) into locals
+ *    in DC0..AC2 order before the six stores; `THPParseHuffmanTable` sums the counts with a `u8` counter, walks the
+ *    sixteen code lengths with one rolled loop (the compiler unrolls it by two), keeps a `u16` code index, and takes
+ *    its `huffman` local just before that loop, and spells the table index `((selector & 0xF) << 1) + (selector >> 4)`;
+ *    `THPParseFrameHeader` stores the quantiser selector with `*cursor++`.
  */
 
 #include "types.h"
@@ -224,9 +230,8 @@ u8 THPParseFrameHeader(void)
         if ((index == 0 && sampling != 0x22) || (index != 0 && sampling != 0x11)) {
             return 0x13;
         }
-        THPState->component[index].quantTable = *THPState->cursor;
+        THPState->component[index].quantTable = *THPState->cursor++;
         index++;
-        THPState->cursor++;
     }
     return 0;
 }
@@ -268,9 +273,9 @@ u8 THPParseQuantTable(void)
     f32 raw[64];
     u16 remaining;
     u16 i;
-    u16 j;
     u16 row;
     u16 table;
+    u16 j;
     s32 count;
     f64 rowScale;
 
@@ -317,20 +322,20 @@ u8 THPParseQuantTable(void)
 
 u8 THPParseHuffmanTable(void)
 {
-    u16 remaining;
     u8 selector;
-    u8 table;
     u16 total;
-    u8 length;
-    u8 count;
+    u16 remaining;
+    u8 table;
+    s32 count;
     s32 k;
-    s32 codeIndex;
+    s32 length;
     u8 sizeValue;
+    u16 codeIndex;
     u16 code;
     s32 j;
     s32 l;
     THPHuffTable* huffman;
-    s32 i;
+    u8 i;
 
     THPHuffSizes = THPWorkEnd;
     THPHuffCodes = THPWorkEnd + 0x101;
@@ -338,14 +343,13 @@ u8 THPParseHuffmanTable(void)
     THPState->cursor += 2;
     do {
         selector = *THPState->cursor++;
-        table = ((selector * 2) & 0x1E) + (selector >> 4);
+        table = ((selector & 0xF) << 1) + (selector >> 4);
         THPHuffCounts = THPState->cursor;
         total = 0;
         for (i = 0; i < 16; i++) {
             total += *THPState->cursor++;
         }
-        huffman = &THPState->huffman[table];
-        huffman->symbols = THPState->cursor;
+        THPState->huffman[table].symbols = THPState->cursor;
         THPState->cursor += total;
         k = 0;
         for (length = 1; length <= 16; length++) {
@@ -367,9 +371,9 @@ u8 THPParseHuffmanTable(void)
             code = (code * 2) & 0xFFFE;
             sizeValue++;
         }
+        huffman = &THPState->huffman[table];
         j = 0;
-        l = 1;
-        for (i = 0; i < 8; i++) {
+        for (l = 1; l <= 16; l++) {
             if (THPHuffCounts[l - 1] != 0) {
                 huffman->valueOffset[l] = j - ((u16*)THPHuffCodes)[j];
                 j += THPHuffCounts[l - 1];
@@ -378,19 +382,10 @@ u8 THPParseHuffmanTable(void)
                 huffman->maxCode[l] = -1;
                 huffman->valueOffset[l] = -1;
             }
-            if (THPHuffCounts[l] != 0) {
-                huffman->valueOffset[l + 1] = j - ((u16*)THPHuffCodes)[j];
-                j += THPHuffCounts[l];
-                huffman->maxCode[l + 1] = ((u16*)THPHuffCodes)[j - 1];
-            } else {
-                huffman->maxCode[l + 1] = -1;
-                huffman->valueOffset[l + 1] = -1;
-            }
-            l += 2;
         }
         huffman->maxCode[17] = 0xFFFFF;
-        remaining -= total + 0x11;
-        THPState->tableMask |= 1 << table;
+        remaining = remaining - (total + 0x11);
+        THPState->tableMask = THPState->tableMask | (1 << table);
     } while (remaining != 0);
     return 0;
 }
@@ -429,12 +424,21 @@ void THPBuildLookupTables(void)
             }
         }
     }
-    THPDcTable0 = &THPState->huffman[THPState->component[0].dcTable * 2];
-    THPDcTable1 = &THPState->huffman[THPState->component[1].dcTable * 2];
-    THPDcTable2 = &THPState->huffman[THPState->component[2].dcTable * 2];
-    THPAcTable0 = &THPState->huffman[THPState->component[0].acTable * 2 + 1];
-    THPAcTable1 = &THPState->huffman[THPState->component[1].acTable * 2 + 1];
-    THPAcTable2 = &THPState->huffman[THPState->component[2].acTable * 2 + 1];
+    {
+        u32 dc0 = THPState->component[0].dcTable * 2;
+        u32 dc1 = THPState->component[1].dcTable * 2;
+        u32 dc2 = THPState->component[2].dcTable * 2;
+        u32 ac0 = THPState->component[0].acTable * 2 + 1;
+        u32 ac1 = THPState->component[1].acTable * 2 + 1;
+        u32 ac2 = THPState->component[2].acTable * 2 + 1;
+
+        THPDcTable0 = &THPState->huffman[dc0];
+        THPDcTable1 = &THPState->huffman[dc1];
+        THPDcTable2 = &THPState->huffman[dc2];
+        THPAcTable0 = &THPState->huffman[ac0];
+        THPAcTable1 = &THPState->huffman[ac1];
+        THPAcTable2 = &THPState->huffman[ac2];
+    }
 }
 
 /* The inverse-DCT constants the paired-single routines load through the small-data base. */
@@ -476,17 +480,17 @@ void THPDecodeFrame(u8* planeY, u8* planeU, u8* planeV)
     if (width == 512 && height == 448) {
         while (row < height) {
             THPDecodeFrame512x448();
-            row += 16;
+            row = (row + 16) & 0xFFFF;
         }
     } else if (width == 640 && height == 480) {
         while (row < height) {
             THPDecodeFrame640x480();
-            row += 16;
+            row = (row + 16) & 0xFFFF;
         }
     } else {
         while (row < height) {
             THPDecodeFrameAnySize();
-            row += 16;
+            row = (row + 16) & 0xFFFF;
         }
     }
     savedGqr5 = THPSavedGqr5;
@@ -527,8 +531,7 @@ void THPDecodeFrame512x448(void)
         THPQuantTable = THPState->quant[THPState->component[2].quantTable];
         THPIdctUpper(THPBlocks[5], x);
         if (THPState->restartEnabled != 0) {
-            THPState->restartCounter--;
-            if (THPState->restartCounter == 0) {
+            if (--THPState->restartCounter == 0) {
                 THPState->restartCounter = THPState->restartInterval;
                 THPState->bitPosition = ((THPState->bitPosition + 6) & ~7) + 1;
                 if (THPState->bitPosition > 0x21) {
@@ -1211,9 +1214,9 @@ void THPDecodeFrame640x480(void)
 
 void THPDecodeFrameAnySize(void)
 {
-    u16 width = THPState->width;
     u8 mcu;
     u32 x;
+    u32 width = THPState->width;
 
     LCQueueWait(3);
     for (mcu = 0; mcu < THPState->mcuColumns; mcu++) {

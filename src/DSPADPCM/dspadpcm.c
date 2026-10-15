@@ -16,20 +16,24 @@
  *    the library name `DSPADPCM` and the file name `dspadpcm.c` are GUESSES.
  * RESIDUALS. encodeAdpcmFrame: retail reloads the coefficient pair inside the 14-sample loops and indexes
  *    `pcm[i + 1]`/`out[i + 1]` as `(i + 1) * 2` (ours hoists the pair and strength-reduces to pointers), and
- *    spills the best-vector index to 0xD8(r1) (frame 0x130 against our 0x120).  refineAdpcmCodebook: register
+ *    spills the best-vector index to 0xD8(r1) (frame 0x130 against our 0x120); a scoped `opt_loop_invariants off`
+ *    reproduces the coefficient reloads but keeps the pointer walks, and `opt_strength_reduction off` (scoped or
+ *    file-wide) loses every loop, so neither is applied.  refineAdpcmCodebook: register
  *    numbering and an 8-byte shorter body (retail saves r18..r31, ours r19..r31; the step-up reuses one
  *    `&a[1]` base).
  *    computeAdpcmCoefs: the codebook split indexes `(3 * i + 1) * 8` per element where ours strength-reduces to
  *    pointer offsets, the final coefficient loop keeps `coefs + 4 * i` in a scratch register, and the prologue
  *    copies `work` before `src`.  adpcmLuDecompose2: the row swap indexes each element (`(3 * m + y) * 8`) where
- *    ours strength-reduces to `lfdux`.  encodeAdpcmSamples: the `/ 14` quotients of the nibble counts are
- *    scheduled in the other order, and the two loop nibble addresses' register allocation.
+ *    ours strength-reduces to `lfdux`.
  *    .text 0x3290 against the claimed 0x3310: encodeAdpcmFrame -0x44, computeAdpcmCoefs -0x1C, refineAdpcmCodebook
  *    -0x8; the in-object 16-byte alignment gaps shrink by 0x18.
  * SHAPES. the 3x3 matrices are flat `f64` arrays used 1-based (row and column 0 unused) with stride 3, walked by
  *    explicit running indices (`row`, `k`, `idx`) where retail's code keeps integer index registers; the order-2
  *    step-down in adpcmReflection2 is the generic loop `for (i = 1; i > 0; i--)`, which keeps retail's counted
  *    loops; adpcmCovariance2 takes a plain `s16*` (a `const` pointer lets the loads move above the stores).
+ *    encodeAdpcmSamples builds each loop nibble address in its own variable (`= n / 14 * 16; += 2; += n % 14`,
+ *    which keeps the products in the result registers) and takes the remainder of the total nibble count into a
+ *    block local before the quotient (the remainder's divide is the first one emitted).
  */
 
 #pragma function_align 16
@@ -147,17 +151,6 @@ s32 getBytesForAdpcmSamples(s32 samples)
     return (samples + 13) / 14 * 8;
 }
 
-/* The nibble address of sample `sample`: 16 nibbles per 14-sample frame, past the 2-nibble frame header. */
-static inline u32 nibbleAddress(u32 sample)
-{
-    u32 frames = sample / 14;
-    u32 rest = sample % 14;
-    u32 nibble = frames * 16 + 2;
-
-    nibble += rest;
-    return nibble;
-}
-
 /* Encodes `samples` 16-bit samples into `dst` and fills the sample header record `info`. */
 s32 encodeAdpcmSamples(const s16* src, s32 samples, s32 sampleRate, s32 loopStart, s32 loopEnd, u8* dst, u8* info,
                        u8* work)
@@ -179,15 +172,24 @@ s32 encodeAdpcmSamples(const s16* src, s32 samples, s32 sampleRate, s32 loopStar
     looped = 0;
     if (loopStart >= 0 && loopEnd > 0 && loopEnd > loopStart && loopEnd < samples) {
         looped = 1;
-        loopStartNibble = nibbleAddress(loopStart);
-        loopEndNibble = nibbleAddress(loopEnd);
+        loopStartNibble = (u32)loopStart / 14 * 16;
+        loopStartNibble += 2;
+        loopStartNibble += (u32)loopStart % 14;
+        loopEndNibble = (u32)loopEnd / 14 * 16;
+        loopEndNibble += 2;
+        loopEndNibble += (u32)loopEnd % 14;
     }
     header = (DspAdpcmInfo*)info;
     vecCount = computeAdpcmCoefs(src, samples, header, (f64*)work);
     encodeAdpcmFrames(header, vecCount, src, samples, looped, loopStart, dst, &loopState);
-    nibbles = samples / 14 * 16;
-    if (samples % 14 != 0) {
-        nibbles = nibbles + samples % 14 + 2;
+    {
+        s32 rest = samples % 14;
+
+        nibbles = samples / 14 * 16;
+        if (rest != 0) {
+            nibbles += rest;
+            nibbles += 2;
+        }
     }
     header->sample_count = samples;
     header->nibble_count = nibbles;
@@ -386,7 +388,6 @@ void encodeAdpcmFrame(s16 (*coef)[2], s32 vecCount, s16* pcm, s32 loopIdx, u8* d
 /* Finds the 8 coefficient pairs of the sample and writes them, scaled by 2048, into the header; returns 8. */
 s32 computeAdpcmCoefs(const s16* src, s32 samples, DspAdpcmInfo* info, f64* work)
 {
-    s16 (*coefs)[2] = info->coef;
     s16 buf[28];
     f64 r[3];
     f64 refl[3];
@@ -395,6 +396,7 @@ s32 computeAdpcmCoefs(const s16* src, s32 samples, DspAdpcmInfo* info, f64* work
     f64 book[24];
     f64* frame;
     s32 frames;
+    s16 (*coefs)[2] = info->coef;
     s32 i;
     s32 j;
     s32 n;
@@ -640,14 +642,14 @@ s32 adpcmLuDecompose2(f64* a, s32* index)
     f64 recips[3];
     f64 val;
     f64 tmp;
-    f64 min;
     f64 max;
+    f64 min;
     s32 i;
     s32 x;
     s32 y;
-    s32 maxIndex;
     s32 k;
     s32 row;
+    s32 maxIndex;
 
     i = 3;
     for (x = 1; x <= 2; x++) {
