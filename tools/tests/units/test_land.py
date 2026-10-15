@@ -1276,6 +1276,87 @@ def test_rescued_branch_and_already_applied(c):
         check("... and the base commit is the commit before it", repo_git(tmp, "rev-parse", "HEAD~1"), base_sha)
 
 
+SPLIT_BASE = {"configure.py": "Object(NonMatching, 'nw4r/old.cpp')\n",
+              "config/RMHE08/splits.txt": "nw4r/old.cpp:\n",
+              "config/RMHE08/symbols.txt": "fn_80504A3C = .text:0x80504A3C; // type:function size:0x4\n",
+              "src/nw4r/old.cpp": "// the unit being split\n",
+              "src/nw4r/old.h": "// the full header\n",
+              "docs/nw4r.md": "# nw4r\n",
+              "tools/units/other.py": "# another stream's tool\n",
+              ".gitignore": ".pi/\n"}
+
+
+def _write_files(tmp, files):
+    """Write `files` (repo-relative path -> text, LF) into the working tree without staging or committing them."""
+    for rel, text in files.items():
+        path = os.path.join(tmp, *rel.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+
+
+def split_repo(tmp, foreign_tool=False):
+    """The 2026-10-14 split, shrunk: one unit cut into two with new headers, the old source deleted, configure.py,
+    splits.txt, a doc and the old header (now a compatibility header) edited - all BEFORE `record-base` - and
+    symbols.txt renamed after it, so the base's dirty snapshot holds only part of the batch. `foreign_tool` adds
+    a tracked tools/ edit no `--units` entry names. -> the base commit."""
+    repo_git(tmp, "init", "-q")
+    repo_git(tmp, "checkout", "-q", "-b", "main")
+    _write_tree(tmp, SPLIT_BASE)                  # writes and commits the base
+    _write_files(tmp, {"configure.py": "Object(NonMatching, 'nw4r/ut_a.cpp')\nObject(NonMatching, 'nw4r/ut_b.cpp')\n",
+                      "config/RMHE08/splits.txt": "nw4r/ut_a.cpp:\nnw4r/ut_b.cpp:\n",
+                      "src/nw4r/ut_a.cpp": "// a\n", "src/nw4r/ut_a.h": "// a\n",
+                      "src/nw4r/ut_b.cpp": "// b\n", "src/nw4r/ut_b.h": "// b\n",
+                      "src/nw4r/old.h": "#include \"nw4r/ut_a.h\"\n", "docs/nw4r.md": "# nw4r (split)\n"})
+    os.remove(os.path.join(tmp, "src", "nw4r", "old.cpp"))
+    if foreign_tool:
+        _write_files(tmp, {"tools/units/other.py": "# another stream's in-flight edit\n"})
+    L.record_base(tmp)
+    _write_files(tmp, {"config/RMHE08/symbols.txt": "ut_TextWriterBase = .text:0x80504A3C; // type:function size:0x4\n"})
+    return repo_git(tmp, "rev-parse", "HEAD")
+
+
+def test_already_applied_commits_every_measured_path(c):
+    """--already-applied commits every changed batch path the gate measured, or refuses and lists the rest."""
+    check = c.check
+    units = ["nw4r/ut_a", "nw4r/ut_b"]
+    with testing.temp_dir() as tmp:
+        base_sha = split_repo(tmp)
+        check("split: the base snapshot holds only part of the batch (the heuristic is false)",
+              L.looks_already_applied(L.changed_status(tmp), L.base_dirty_paths(tmp)), False)
+        buf = io.StringIO()
+        with mock.patch.object(L.gate, "verify", fake_verify_with(lambda main: None)), \
+                contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            code = L.land(tmp, units, None, no_build=True, check_outbox=False, release_claims=False,
+                          subject="game/nw4r: split", already_applied=True)
+        check("split: --already-applied lands", (code, L.answer_line(buf.getvalue())[:6]), (0, "LANDED"))
+        committed = sorted(repo_git(tmp, "diff", "--name-status", base_sha, "HEAD").splitlines())
+        check("split: the commit carries the registration, the new headers, the deletion, the doc and the rename",
+              committed, sorted(["M\tconfigure.py", "M\tconfig/RMHE08/splits.txt", "M\tconfig/RMHE08/symbols.txt",
+                                 "D\tsrc/nw4r/old.cpp", "M\tsrc/nw4r/old.h", "A\tsrc/nw4r/ut_a.cpp",
+                                 "A\tsrc/nw4r/ut_a.h", "A\tsrc/nw4r/ut_b.cpp", "A\tsrc/nw4r/ut_b.h",
+                                 "M\tdocs/nw4r.md"]))
+        check("split: nothing is left behind in the tree", repo_git(tmp, "status", "--porcelain", "-uall"), "")
+    with testing.temp_dir() as tmp:
+        base_sha = split_repo(tmp, foreign_tool=True)
+        buf = io.StringIO()
+        with mock.patch.object(L.gate, "verify", fake_verify_with(lambda main: None)), \
+                contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            code = L.land(tmp, units, None, no_build=True, check_outbox=False, release_claims=False,
+                          subject="game/nw4r: split", already_applied=True)
+        answer = L.answer_line(buf.getvalue())
+        check("near miss: an unnamed tools/ edit refuses the landing", (code, answer[:7]), (1, "REFUSED"))
+        check("... naming the path it would leave behind", "tools/units/other.py" in answer, True)
+        check("... and nothing else", "configure.py" in answer, False)
+        check("... and commits nothing", repo_git(tmp, "rev-parse", "HEAD"), base_sha)
+        check("... and sweeps nothing into the index", repo_git(tmp, "diff", "--cached", "--name-only"), "")
+        check("... and leaves the edit in the tree", repo_git(tmp, "status", "--porcelain", "tools"),
+              "M tools/units/other.py")
+    check("left_behind: a scratch dump, an outside path and a base-dirty path are not reported",
+          L.left_behind([("??", "d910.json"), ("??", "orig/x.dol"), (" M", "docs/a.md"), (" M", "tools/x.py")],
+                        [], {"docs/a.md"}), ["tools/x.py"])
+
+
 def test_command_detail(c):
     """The head of a linter's output, the FAILED target of ninja's."""
     check = c.check

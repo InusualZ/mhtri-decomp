@@ -28,7 +28,8 @@ prints the `land.band_ownership_warnings` command beside `stylelint.py --diff ma
   halves of the snapshot come from `rows/objects.py` and `rows/data.py`. Its report rebuild runs the registry's `report`
   command (`lib.artifacts`) unconditionally - ninja judges freshness, a no-op is 0.06 s.
 * `message.py` - `.git/land_msg.txt`: written only by a green gate, cleared by every refusal; `message_error`.
-* `stage.py` - `land_stageable`, `looks_already_applied`, the pathspec commit, `land_decision`. `stage_batch` and
+* `stage.py` - `land_stageable`, `left_behind` (the changed batch paths a pathspec would leave out), `looks_already_applied`,
+  the pathspec commit, `land_decision`. `stage_batch` and
   `commit_pathspec` go through `Git.run_paths`: a pathspec within `proc.ARGV_BUDGET` (8 KB) is today's exact
   `git commit -F <msg> -- <paths>`, a longer one is read from stdin (`--pathspec-from-file=- --pathspec-file-nul`) with
   the same semantics - only the named paths are committed, another stream's staged file stays staged.

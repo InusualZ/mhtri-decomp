@@ -107,7 +107,8 @@ def main() -> int:
     ld.add_argument("--message", default=None, help="override the gate message's subject line")
     ld.add_argument("--already-applied", action="store_true", dest="already_applied",
                     help="the batch was applied before `record-base` ran, so its paths are in the base's "
-                         "dirty snapshot; stage them anyway (otherwise `land` refuses and says so)")
+                         "dirty snapshot; stage every changed batch path anyway, and refuse (listing them) "
+                         "when a changed path would still be left out of the commit")
     sub.add_parser("integrate", help="forward to tools/units/integrate.py (apply the lanes' integrator requests "
                                      "in one batch on an integrate/<date> branch); every argument passes through")
     rs = sub.add_parser("resolve", help="union-resolve a branch's registration append-conflict in a "

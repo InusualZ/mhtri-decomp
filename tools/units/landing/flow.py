@@ -23,7 +23,7 @@ from tools.units.landing.message import (clear_land_message, land_message_path, 
 from tools.units.landing.rows.tree import (branch_error, preflight_foreign, preflight_report, require_clean_tree,
     tolerate_scratch)
 from tools.units.landing.stage import (commit_pathspec, foreign_warning, land_decision, land_stageable,
-    looks_already_applied, stage_batch, staged_elsewhere)
+    left_behind, looks_already_applied, stage_batch, staged_elsewhere)
 
 
 # --- the landing log: every `land` attempt is one line of `.pi/land-log.jsonl` (`lib.lanes.landlog`) ----------
@@ -272,24 +272,35 @@ def _land(main: str, units: list[str], rec: dict, base: str | None, no_build: bo
                              % (",".join(norm_units), ", ".join(foreign)), "paths outside the batch (after the build)")
     base_dirty = base_dirty_paths(main)
     stageable = land_stageable(norm_units, rows, base_dirty, main=main)
-    if gate_ok and looks_already_applied(rows, base_dirty, main=main):
+    if gate_ok and already_applied:
+        # --already-applied: the base's dirty snapshot holds the batch's own edits, so it names nothing foreign.
+        # It applies whatever `looks_already_applied` says: a snapshot holding only PART of the batch (a path
+        # edited after `record-base`) made the flag a silent no-op, and the commit carried the named units'
+        # sources while configure.py, splits.txt, the new headers and the deletions stayed in the tree. The gate
+        # measured the whole tree, so the commit is every changed batch path or nothing.
+        print("NOTE: --already-applied: the base's dirty snapshot is ignored - staging every changed batch path.",
+              file=sys.stderr)
+        stageable = land_stageable(norm_units, rows, set(), main=main)
+        behind = left_behind(rows, stageable, set(), main=main)
+        if behind:
+            clear_land_message(main)
+            return _refused(rec, "REFUSED %s | --already-applied: %d changed path(s) the gate measured would be "
+                                 "left out of the commit: %s - name each in --units (a tools/ path, an untracked "
+                                 "file outside src/) or clear it from the tree, then re-run"
+                                 % (",".join(norm_units), len(behind), ", ".join(behind)),
+                            "every changed path is in the commit")
+    elif gate_ok and looks_already_applied(rows, base_dirty, main=main):
         # the batch was applied to the tree *before* `record-base` ran, so the base's dirty snapshot recorded
         # its own edits as foreign and `land_stageable` excluded them (all of them, or just the shared files).
         # This is the 2026-09-26 case (b): the gate printed "READY: every check passed" and `land` then
         # refused with "no batch path is stageable", and the batch had to be committed by hand. Name the
         # ordering and the two ways out instead.
-        if already_applied:
-            print("NOTE: --already-applied: the batch was applied before `record-base`, so the base's dirty "
-                  "snapshot recorded its own edits as foreign - staging the batch's paths anyway.",
-                  file=sys.stderr)
-            stageable = land_stageable(norm_units, rows, set(), main=main)
-        else:
-            clear_land_message(main)
-            return _refused(rec, "REFUSED %s | the batch is already applied: every changed path was dirty when "
-                                 "`record-base` ran, so the gate excluded it as foreign work and has nothing to "
-                                 "stage. Revert the batch and re-record the base (`land.py record-base`) with a "
-                                 "clean tree, or land it as-is with --already-applied." % ",".join(norm_units),
-                            "already applied")
+        clear_land_message(main)
+        return _refused(rec, "REFUSED %s | the batch is already applied: every changed path was dirty when "
+                             "`record-base` ran, so the gate excluded it as foreign work and has nothing to "
+                             "stage. Revert the batch and re-record the base (`land.py record-base`) with a "
+                             "clean tree, or land it as-is with --already-applied." % ",".join(norm_units),
+                        "already applied")
     action, why = land_decision(gate_ok, stageable, gate_failures, kinds_from_failures(gate_failures))
     if action != "commit":
         clear_land_message(main)

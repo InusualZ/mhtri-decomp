@@ -80,6 +80,24 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]],
     return stageable
 
 
+def left_behind(rows: list[tuple[str, str]], stageable: list[str], base_dirty: set[str] | None = None,
+                main: str | None = None) -> list[str]:
+    """The changed batch paths the commit would NOT carry: allowed, not scratch, not `base_dirty`, not `stageable`.
+
+    The gate builds and measures the whole working tree, so a commit that leaves one of these behind lands a tree
+    the gate never measured. `--already-applied` passes an empty `base_dirty` (its snapshot holds the batch's own
+    edits) and refuses on any path listed here: on 2026-10-14 such a landing committed only the named units'
+    sources and `symbols.txt`, leaving `configure.py`, `splits.txt`, the new headers and the deletions in the
+    tree, and `main` did not build until a second commit."""
+    keep, foreign = set(stageable), base_dirty or set()
+    out: list[str] = []
+    for _code, path in rows:
+        if path in keep or path in foreign or path in out or is_scratch(path) or outside_batch([path], main=main):
+            continue
+        out.append(path)
+    return out
+
+
 def looks_already_applied(rows: list[tuple[str, str]], base_dirty: set[str] | None, main: str | None = None) -> bool:
     """True when the batch was applied to the tree *before* `record-base` ran.
 
