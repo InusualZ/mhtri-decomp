@@ -9,7 +9,9 @@
  *   `SetPerspective`, `GetCameraMtx`); MTX44_ctor is a GUESS (0x80075390: the empty 4x4 matrix constructor, the MTX34_ctor scheme).
  * RESIDUALS. Partial (15): fn_80074758, `Camera::SetPosition`, `Camera::SetPosture`, 0x80074D78-0x80074FEC (three),
  *   fn_8007507C, fn_80075258, 0x80075394-0x80075844 (six, `Camera::GetCameraMtx` first), fn_80075940.
- *   flipcheck: `.text` 0x16A0 of 0x16F0; `.data` is claimed and not emitted; `.sdata2` is 0x34 of 0x30 - one pooled
+ *   flipcheck: `.text` 0x16A0 of 0x16F0; `.data`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
+ *   instance, after the TU's own strings, playbook 80);
+ *   `.sdata2` is 0x34 of 0x30 - one pooled
  *   literal is shared with `g3d/fn_80075DCC.cpp` (a candidate fold).
  * SHAPES. `#pragma peephole off` around fn_80075940 (playbook 32); file-scope `#pragma fp_contract off`.
  *   The unit compiles with `#pragma peephole off` (retail's unfused forms; playbook idea 106) except fn_800756DC,
@@ -28,6 +30,8 @@
 #include "g3d/g3d_anmscn.h" /* fn_80067EE8, owned by g3d/g3d_anmscn.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
+
+#pragma pool_data off
 
 #pragma peephole off
 
@@ -70,19 +74,6 @@ extern "C" void fn_804C64E0(s32 a, s32 b, s32 c);
 extern "C" void fn_804C6660(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h, f32 i);
 extern "C" void fn_804C6710(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f);
 extern "C" void fn_804C6810(f32 a, f32 b, f32 c, f32 d, f32 e, f32 f, f32 g, f32 h);
-
-/* The panic file/format strings the target references as map symbols. They are extern here rather
- * than literals: MWCC's `-str reuse` would pool a literal into one blob and address it through a
- * shared base register, while the target loads each one with its own `lis`/`addi`. */
-extern const char lbl_8058E430[];
-extern const char lbl_8058E440[];
-extern const char lbl_8058E468[];
-extern const char lbl_8058E488[];
-extern const char lbl_8058E4E0[];
-extern const char lbl_8058E4F8[];
-extern const char lbl_8058E520[];
-extern const char lbl_8058E534[];
-extern const char lbl_8058E55C[];
 
 /* ------------------------------------------------------------------------------------------------ */
 /* types                                                                                             */
@@ -160,7 +151,7 @@ void fn_80075940(nw4r::g3d::Camera* pSelf);
 /* The `ResCommon<CameraData>::ref()`-style accessor (g3d_rescommon_ac.h:140). */
 CameraData* fn_800748E4(nw4r::g3d::Camera* pSelf) {
     if (pSelf->mpData == NULL) {
-        nw4r::db::Panic(lbl_8058E520, 140, lbl_8058E4F8);
+        nw4r::db::Panic("g3d_rescommon_ac.h", 140, "NW4R:Pointer must not be NULL (mpData)");
     }
     return pSelf->mpData;
 }
@@ -168,7 +159,7 @@ CameraData* fn_800748E4(nw4r::g3d::Camera* pSelf) {
 /* The same accessor's second instantiation (g3d_rescommon_ac.h:143). */
 CameraData* fn_80074A54(nw4r::g3d::Camera* pSelf) {
     if (pSelf->mpData == NULL) {
-        nw4r::db::Panic(lbl_8058E55C, 143, lbl_8058E534);
+        nw4r::db::Panic("g3d_rescommon_ac.h", 143, "NW4R:Pointer must not be NULL (mpData)");
     }
     return pSelf->mpData;
 }
@@ -177,7 +168,7 @@ CameraData* fn_80074A54(nw4r::g3d::Camera* pSelf) {
 void camera_init(nw4r::g3d::Camera* pSelf) {
     RenderModeObj* pMode = (RenderModeObj*)g3d_state_get_render_mode();
     if (pMode == NULL) {
-        nw4r::db::Panic(lbl_8058E430, 50, lbl_8058E440);
+        nw4r::db::Panic("g3d_camera.cpp", 50, "NW4R:Pointer must not be NULL (rmode)");
     }
     u16 width = pMode->mUnk04;
     fn_80074758(pSelf, width, pMode->mUnk06, width, pMode->mUnk08, pMode->mUnk0E, pMode->mUnk10);
@@ -185,7 +176,7 @@ void camera_init(nw4r::g3d::Camera* pSelf) {
 
 void fn_80074758(nw4r::g3d::Camera* pSelf, u16 a1, u16 a2, u16 a3, u16 a4, u16 a5, u16 a6) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 62, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 62, "NW4R:Failed assertion IsValid()");
     }
     if (!fn_80067EE8(pSelf)) {
         return;
@@ -235,7 +226,7 @@ void fn_80074758(nw4r::g3d::Camera* pSelf, u16 a1, u16 a2, u16 a3, u16 a4, u16 a
 
 void fn_800749C8(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 195, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 195, "NW4R:Failed assertion IsValid()");
     }
     if (pOut != NULL && fn_80067EE8(pSelf)) {
         CameraData* pData = fn_80074A54(pSelf);
@@ -247,7 +238,7 @@ void fn_800749C8(nw4r::g3d::Camera* pSelf, nw4r::math::VEC3* pOut) {
 
 void fn_80074AA8(nw4r::g3d::Camera* pSelf, f32* pX, f32* pY, f32* pZ) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 206, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 206, "NW4R:Failed assertion IsValid()");
     }
     if (fn_80067EE8(pSelf)) {
         CameraData* pData = fn_80074A54(pSelf);
@@ -274,7 +265,7 @@ s32 fn_80074D38(const f32* pA, const f32* pB) {
 
 void fn_80074D78(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 282, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 282, "NW4R:Failed assertion IsValid()");
     }
     if (pOut == NULL || !fn_80067EE8(pSelf)) {
         return;
@@ -299,7 +290,7 @@ void fn_80074D78(nw4r::g3d::Camera* pSelf, nw4r::g3d::Camera::PostureInfo* pOut)
 
 void fn_80074F24(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d, f32 e, f32 f) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 371, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 371, "NW4R:Failed assertion IsValid()");
     }
     if (fn_80067EE8(pSelf)) {
         CameraData* pData = fn_800748E4(pSelf);
@@ -317,7 +308,7 @@ void fn_80074F24(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d, f32 e, f3
 
 void fn_80074FEC(nw4r::g3d::Camera* pSelf, u32 x, u32 y, u32 w, u32 h) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 430, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 430, "NW4R:Failed assertion IsValid()");
     }
     if (fn_80067EE8(pSelf)) {
         CameraData* pData = fn_800748E4(pSelf);
@@ -330,7 +321,7 @@ void fn_80074FEC(nw4r::g3d::Camera* pSelf, u32 x, u32 y, u32 w, u32 h) {
 
 void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 463, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 463, "NW4R:Failed assertion IsValid()");
     }
     if (fn_80067EE8(pSelf)) {
         CameraData* pData = fn_800748E4(pSelf);
@@ -344,7 +335,7 @@ void fn_8007507C(nw4r::g3d::Camera* pSelf, f32 a, f32 b, f32 c, f32 d) {
 
 void fn_80075170(nw4r::g3d::Camera* pSelf, f32* p1, f32* p2, f32* p3, f32* p4, f32* p5, f32* p6) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 521, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 521, "NW4R:Failed assertion IsValid()");
     }
     if (fn_80067EE8(pSelf)) {
         CameraData* pData = fn_80074A54(pSelf);
@@ -407,7 +398,7 @@ void MTX44_ctor(nw4r::math::MTX44* pMtx) {
 
 void nw4r::g3d::Camera::GetCameraMtx(math::MTX34* pMtx) const {
     if (!fn_80067EE8(this)) {
-        nw4r::db::Panic(lbl_8058E430, 629, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 629, "NW4R:Failed assertion IsValid()");
     }
     if (pMtx == NULL || !fn_80067EE8(this)) {
         return;
@@ -421,7 +412,7 @@ void nw4r::g3d::Camera::GetCameraMtx(math::MTX34* pMtx) const {
 
 void fn_80075440(nw4r::g3d::Camera* pSelf, void* pOut) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 647, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 647, "NW4R:Failed assertion IsValid()");
     }
     if (pOut == NULL || !fn_80067EE8(pSelf)) {
         return;
@@ -435,7 +426,7 @@ void fn_80075440(nw4r::g3d::Camera* pSelf, void* pOut) {
 
 void fn_800754EC(nw4r::g3d::Camera* pSelf, void* pOut) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 665, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 665, "NW4R:Failed assertion IsValid()");
     }
     if (pOut == NULL || !fn_80067EE8(pSelf)) {
         return;
@@ -461,7 +452,7 @@ void fn_800754EC(nw4r::g3d::Camera* pSelf, void* pOut) {
 
 void fn_80075620(nw4r::g3d::Camera* pSelf, void* pOut) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 713, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 713, "NW4R:Failed assertion IsValid()");
     }
     if (pOut == NULL || !fn_80067EE8(pSelf)) {
         return;
@@ -480,7 +471,7 @@ void fn_80075620(nw4r::g3d::Camera* pSelf, void* pOut) {
 #pragma peephole on
 void fn_800756DC(nw4r::g3d::Camera* pSelf) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 736, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 736, "NW4R:Failed assertion IsValid()");
     }
     if (!fn_80067EE8(pSelf)) {
         return;
@@ -498,7 +489,7 @@ void fn_800756DC(nw4r::g3d::Camera* pSelf) {
 
 void fn_800757A8(nw4r::g3d::Camera* pSelf) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 773, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 773, "NW4R:Failed assertion IsValid()");
     }
     if (!fn_80067EE8(pSelf)) {
         return;
@@ -516,7 +507,7 @@ void fn_80075844(void* pMtx) {
 
 void fn_80075848(nw4r::g3d::Camera* pSelf) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 789, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 789, "NW4R:Failed assertion IsValid()");
     }
     if (!fn_80067EE8(pSelf)) {
         return;
@@ -527,7 +518,7 @@ void fn_80075848(nw4r::g3d::Camera* pSelf) {
 
 void fn_800758C8(nw4r::g3d::Camera* pSelf) {
     if (!fn_80067EE8(pSelf)) {
-        nw4r::db::Panic(lbl_8058E430, 806, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 806, "NW4R:Failed assertion IsValid()");
     }
     if (!fn_80067EE8(pSelf)) {
         return;
@@ -554,7 +545,7 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
     f32 sinX, sinY, sinZ, cosX, cosY, cosZ;
     if ((flags & 1) != 0) {
         if (fn_80074D38(&pData->mPosX, &pData->mUpX) == 0) {
-            nw4r::db::Panic(lbl_8058E430, 832, lbl_8058E488, pData->mPosX, pData->mPosY,
+            nw4r::db::Panic("g3d_camera.cpp", 832, "nw4r::g3d::Camera::UpdateCameraMtx:\ncamera position and target are the same(%f %f %f).", pData->mPosX, pData->mPosY,
                             pData->mPosZ);
         }
         s32 up = fn_800508A8(&pData->mUpX);
@@ -615,7 +606,7 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
         }
     } else {
         if ((flags & 2) == 0) {
-            nw4r::db::Panic(lbl_8058E430, 926, lbl_8058E4E0);
+            nw4r::db::Panic("g3d_camera.cpp", 926, "Unknown camera type(%x)");
         }
         sin_cos_deg(&sinX, &cosX, pData->mUnk98);
         sin_cos_deg(&sinY, &cosY, pData->mUnk9C);
@@ -653,7 +644,7 @@ void fn_80075940(nw4r::g3d::Camera* pSelf) {
 
 void nw4r::g3d::Camera::SetPosition(const math::VEC3& rPos) {
     if (!fn_80067EE8(this)) {
-        nw4r::db::Panic(lbl_8058E430, 180, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 180, "NW4R:Failed assertion IsValid()");
     }
     if (fn_80067EE8(this)) {
         CameraData* pData = fn_800748E4(this);
@@ -664,7 +655,7 @@ void nw4r::g3d::Camera::SetPosition(const math::VEC3& rPos) {
 
 void nw4r::g3d::Camera::SetPosture(const PostureInfo& rInfo) {
     if (!fn_80067EE8(this)) {
-        nw4r::db::Panic(lbl_8058E430, 226, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 226, "NW4R:Failed assertion IsValid()");
     }
     if (!fn_80067EE8(this)) {
         return;
@@ -707,7 +698,7 @@ void nw4r::g3d::Camera::SetPosture(const PostureInfo& rInfo) {
 
 void nw4r::g3d::Camera::SetPerspective(f32 fovy, f32 aspect, f32 near, f32 far) {
     if (!fn_80067EE8(this)) {
-        nw4r::db::Panic(lbl_8058E430, 329, lbl_8058E468);
+        nw4r::db::Panic("g3d_camera.cpp", 329, "NW4R:Failed assertion IsValid()");
     }
     if (fn_80067EE8(this)) {
         CameraData* pData = fn_800748E4(this);

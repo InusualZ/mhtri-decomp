@@ -1,19 +1,24 @@
 /*
  * g3d/g3d_resanmcamera.cpp - nw4r g3d camera-animation channel evaluator (fn_8008A28C) and its accessors.
  * RANGE. .text 0x8008A220-0x8008A664 (4 functions); extab, extabindex, .data 0x8058FF20-0x80590010.  fn_8008A28C
- *   passes "g3d_resanmcamera.cpp", and fn_8008A220's strings (lbl_8058FFD4, lbl_8058FFFC) sit in the same fragment.
- * NAMES. Map stems.
- * RESIDUALS. fn_8008A28C: the four `Panic` string literals share one pooled base register where retail materialises
- *   each with its own `lis`/`addi` (0x20 bytes short, and a larger frame: 0x30 with `_savegpr_27` for the pool
- *   base, retail 0x20); `-pool off` reproduces retail, and `cflags_g3d` does not carry it.
- *   flipcheck: `.text` 0x424 of 0x444; `.data` is 0xEE of 0xF0 and its bytes differ.
- * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`.
+ *   passes "g3d_resanmcamera.cpp"; fn_8008A220's two strings close the fragment.
+ * FLAGS. `cflags_g3d`; file-scope `#pragma pool_data off` (each string its own `lis`/`addi`), `#pragma peephole
+ *   off` and `#pragma fp_contract off`.
+ * NAMES. Map stems.  res_user_data_init is a GUESS (the dead-stripped caller of the `_ac.h` constructor).
+ * RESIDUALS. none in code or data; the extra dead-stripped function makes flipcheck read .text/extab as
+ *   different, while the linked DOL is byte-identical.
+ * SHAPES. fn_8008A220/fn_8008A284 are `g3d_resuser_ac.h` inline accessors: `inline`, referenced by the
+ *   dead-stripped res_user_data_init at the head of the file, so MWCC emits their weak copies first and their
+ *   strings after the out-of-line ones (the inline tail, playbook 80).  fn_8008A644 is defined after
+ *   fn_8008A28C, in retail's order.
  */
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_anmscn.h" /* fn_800689B0 (rule 2) */
 #include "g3d/g3d_resanm.h"  /* fn_800898B0 (rule 2) */
+
+#pragma pool_data off
 
 #pragma peephole off
 #pragma fp_contract off
@@ -86,7 +91,16 @@ extern "C" {
     f32 fn_8008A644(ResAnmCamValue *self, f32 frame, u32 flag);
 }
 
-extern "C" void *fn_8008A220(void *self, u32 value)
+/* Sets a sub-resource offset word through the `g3d_resuser_ac.h` constructor.  Nothing calls it, so the
+ * linker strips it, as it stripped retail's caller; it is what makes MWCC emit the two inline accessors
+ * below at the head of the unit. */
+extern "C" void* res_user_data_init(void* self, u32 value) /* untyped: opaque handle - the resource word */
+{
+    return fn_8008A220(self, value);
+}
+
+/* `g3d_resuser_ac.h`'s offset constructor: stores the word, then asserts it is 4-byte aligned. */
+extern "C" inline void *fn_8008A220(void *self, u32 value)
 {
     fn_8008A284((u32 *)self, value);
     if (value & 3) {
@@ -96,18 +110,10 @@ extern "C" void *fn_8008A220(void *self, u32 value)
     return self;
 }
 
-extern "C" void fn_8008A284(u32 *self, u32 value)
+/* Stores the offset word. */
+extern "C" inline void fn_8008A284(u32 *self, u32 value)
 {
     *self = value;
-}
-
-/* Evaluates one channel: the constant when its flag is set, else the interpolated key data. */
-extern "C" f32 fn_8008A644(ResAnmCamValue *self, f32 frame, u32 flag)
-{
-    if (flag) {
-        return self->value;
-    }
-    return fn_800898B0((u8 *)self + self->offset, frame);
 }
 
 /* Fills in the camera result for one frame from the resolved animation data. */
@@ -166,4 +172,13 @@ extern "C" void fn_8008A28C(void *self, ResAnmCamAnmResult *pResult, f32 frame)
             "NW4R Internal error\nUnknown projection-type (=%d)", res->projType);
         break;
     }
+}
+
+/* Evaluates one channel: the constant when its flag is set, else the interpolated key data. */
+extern "C" f32 fn_8008A644(ResAnmCamValue *self, f32 frame, u32 flag)
+{
+    if (flag) {
+        return self->value;
+    }
+    return fn_800898B0((u8 *)self + self->offset, frame);
 }

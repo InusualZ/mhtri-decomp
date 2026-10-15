@@ -9,8 +9,8 @@
  * RESIDUALS. fn_8008F8C8: retail keeps the base word in r0 (`lwz r0,0(r3); add r3,r0,r4`), ours in r3, the C++
  *   front-end's choice for the one named temporary; a plain-expression return, a result temporary and an inverted
  *   branch all score lower.
- *   flipcheck: `.data` is claimed and not emitted.
- * SHAPES. The channel evaluators take `(self, f32 frame, s32 flag)`: retail schedules the float argument first, and
+ *   flipcheck: `.data` byte-identical.
+ * SHAPES. `#pragma pool_data off`; the two strings are literals.  The channel evaluators take `(self, f32 frame, s32 flag)`: retail schedules the float argument first, and
  *   the ABI-identical `(self, s32 flag, f32 frame)` changes fn_8008F6E8's codegen.
  */
 
@@ -20,6 +20,8 @@
 #include "font/flfnt.h"                    /* fn_8005B1E4, owner font/flfnt.cpp (rule 2) */
 #include "g3d/g3d_resanmamblight.h"       /* fn_8008A188/fn_8008A1A8, owner g3d/g3d_resanmamblight.c (rule 2) */
 #include "g3d/g3d_resanmcamera.h" /* fn_8008A644 (rule 2) */
+
+#pragma pool_data off
 
 #pragma peephole off
 #pragma fp_contract off
@@ -33,11 +35,6 @@ void Panic(const char *file, int line, const char *message, ...);
 
 } /* namespace db */
 } /* namespace nw4r */
-
-/* The `.data` `__FILE__`/assert strings the retail body passes by address (this unit's `.data`, claimed, not
- * emitted). */
-extern u8 lbl_805903F0[]; /* "g3d_resanmfog.cpp" */
-extern u8 lbl_80590404[]; /* "NW4R:Pointer Error\npResult(=%p) is not valid pointer." */
 
 /* The resolved animation resource the fog evaluator reads.  Only the fields this unit touches
  * are named; the record continues past +0x24. */
@@ -73,7 +70,7 @@ extern "C" void fn_8008F6E8(void *arg0, ResAnmFogResult *pResult, f32 frame)
     u32 valid = IS_VALID_PTR(pResult);
 
     if (!valid) {
-        nw4r::db::Panic((const char *)lbl_805903F0, 43, (const char *)lbl_80590404, pResult);
+        nw4r::db::Panic("g3d_resanmfog.cpp", 43, "NW4R:Pointer Error\npResult(=%p) is not valid pointer.", pResult);
     }
     res = (ResAnmFogData *)fn_80068634(arg0);
     flags = res->flags;

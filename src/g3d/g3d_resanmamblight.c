@@ -3,19 +3,26 @@
  *   offset helpers.
  * RANGE. .text 0x80089F94-0x8008A220 (6 functions); extab, extabindex, .data 0x8058FE90-0x8058FF20 (fn_8008A000
  *   passes "g3d_resanmamblight.cpp"), .sdata2 0x80795EC0-0x80795ED0.  fn_80089F94 cites "g3d_resanmscn_ac.h"
- *   (lbl_8058FF08); fn_8008A204 carries no data reference, so 0x8008A204 is an alternative right edge.
+ *   ("g3d_resanmscn_ac.h"); fn_8008A204 carries no data reference, so 0x8008A204 is an alternative right edge.
+ * FLAGS. `cflags_g3d`; file-scope `#pragma pool_data off`, `#pragma peephole off` and `#pragma fp_contract off`.
  * NAMES. Map stems.  The retail TU is C++; the source stays `.c` because it is C-idiom (fn_80089F94 passes a
  *   `void*` to a `u32*` parameter), so `fn_80066C8C__FPv` and the `Panic` mangling are spelled verbatim.
- * RESIDUALS. fn_8008A000: two string addresses differ with the `.data` layout, and one instruction more.
+ *   res_anm_scn_offset_init is a GUESS (the dead-stripped caller of the `_ac.h` constructor).
+ * RESIDUALS. fn_8008A000: one `fmr f1,f31` more than retail (index 87).
  *   fn_8008A204: retail keeps the base word in r0 (`lwz r0,0(r3); add r3,r0,r4`), ours in r3.
- *   flipcheck: `.text` 0x290 of 0x28C; `.data` is 0x8A of 0x90 and its bytes differ.
- * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`.
+ *   flipcheck: `.text` is 4 bytes long (fn_8008A000) plus the dead-stripped res_anm_scn_offset_init; data
+ *   sections byte-identical.
+ * SHAPES. fn_80089F94/fn_80089FF8 are `g3d_resanmscn_ac.h` inline accessors: `inline`, referenced by the
+ *   dead-stripped res_anm_scn_offset_init at the head of the file, so MWCC emits their weak copies first and
+ *   their strings as weak `@STRING@` objects after the out-of-line ones (the inline tail, playbook 80).
  */
 
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
 #include "nw4r/db_assert.h" /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
+
+#pragma pool_data off
 
 #pragma peephole off
 #pragma fp_contract off
@@ -47,9 +54,16 @@ s32 fn_8008A188(u32 *self, s32 flag, f32 frame);
 f32 fn_8008A1A8(u16 *count, f32 frame);
 s32 fn_8008A204(u32 *self, s32 offset);
 
+/* Sets a sub-resource offset word through the `g3d_resanmscn_ac.h` constructor.  Nothing calls it, so the
+ * linker strips it, as it stripped retail's caller; it is what makes MWCC emit the two inline accessors
+ * below at the head of the unit (a frameless tail call, so it adds no unwind record). */
+void *res_anm_scn_offset_init(void *self, u32 value) /* untyped: opaque handle - the resource word */
+{
+    return fn_80089F94(self, value);
+}
 
 /* Stores a pointer and asserts its 4-byte alignment. */
-void *fn_80089F94(void *self, u32 value)
+inline void *fn_80089F94(void *self, u32 value)
 {
     fn_80089FF8(self, value);
     if (value & 3) {
@@ -60,7 +74,7 @@ void *fn_80089F94(void *self, u32 value)
 }
 
 /* Stores a word. */
-void fn_80089FF8(u32 *self, u32 value)
+inline void fn_80089FF8(u32 *self, u32 value)
 {
     *self = value;
 }

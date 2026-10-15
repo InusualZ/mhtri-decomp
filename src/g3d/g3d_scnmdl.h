@@ -13,7 +13,7 @@ extern "C" {
 
 /* 0x8056F678 - the "ScnMdl" type-name record (`.rodata`: a length word, then the NUL-terminated name) the
  * class's run-time type members read. */
-extern u8 scn_typename_ScnMdl[];
+extern const u8 scn_typename_ScnMdl[];
 void g3d_root_model_bind(s32 root, u32 id);
 /* 0x8007D404 - the `ResMdlInfo` handle's block (asserting the handle is valid). */
 u32 res_mdl_info_ref(const void* pInfo); /* untyped: opaque handle - the info handle */

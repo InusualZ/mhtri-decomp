@@ -13,7 +13,10 @@
  *   0x80092588-0x80092848 and 0x8009284C-0x80092B0C (four each), fn_80092B10, fn_80092C08, fn_80092CC4,
  *   fn_80092DBC, fn_80092E78, fn_80092F70, fn_8009302C, fn_80093124, fn_800931E0, fn_800932D8, fn_80093394,
  *   fn_8009348C, 0x80093548-0x8009368C (two), 0x80093690-0x800938EC (four).
- *   flipcheck: `.text` 0x19A0 of 0x2294; `.data`, `.sdata` and `.sdata2` are claimed and not emitted.
+ *   flipcheck: `.text` 0x19A0 of 0x2294; `.data`/`.sdata`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
+ *   instance, after the TU's own strings, playbook 80);
+ *   the `ResName` records stay externs, and the run also holds "g3d_resfile.cpp"'s strings (a data seam with
+ *   `g3d/g3d_resfile.cpp`); `.sdata2` is not emitted.
  * SHAPES. File-scope `#pragma peephole off`: the constructor guards keep retail's split `clrlwi` + `cmpwi`.
  */
 
@@ -45,14 +48,6 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 extern "C" {
 
-/* The `ResFile` accessors' assert strings, this unit's own `.data` fragment. */
-extern const char lbl_80590928[]; /* "g3d_resanmtexsrt.cpp" */
-extern const char lbl_80590940[]; /* "this(=%p) is not valid pointer." */
-extern const char lbl_80590974[]; /* "pResult(=%p) is not valid pointer." */
-extern const char lbl_805909AC[]; /* "frame is infinite or nan." */
-extern const char lbl_805909EC[]; /* "matData(=%p) is not valid pointer." */
-extern const char lbl_80590A28[]; /* "ofs != 0" */
-extern const char lbl_80590A48[]; /* "g3d_rescommon_ac.h" */
 /* The `ResName` categories of the `ResFile` root dictionary (length-prefixed records). */
 extern const u8 lbl_80590A60[]; /* "3DModels(NW4R)" */
 extern const u8 lbl_80590A80[]; /* "Palettes(NW4R)" */
@@ -64,25 +59,6 @@ extern const u8 lbl_80590B20[]; /* "AnmTexPat(NW4R)" */
 extern const u8 lbl_80590B40[]; /* "AnmTexSrt(NW4R)" */
 extern const u8 lbl_80590B60[]; /* "AnmShp(NW4R)" */
 extern const u8 lbl_80590B80[]; /* "AnmScn(NW4R)" */
-extern const char lbl_80590BD8[]; /* "NW4R:Failed assertion !((u32)p & 0x3)" */
-extern const char lbl_80590C00[]; /* "g3d_resanmshp_ac.h" */
-extern const char lbl_80590C14[]; /* the same assert string */
-extern const char lbl_80590C3C[]; /* "g3d_resanmtexsrt_ac.h" */
-extern const char lbl_80590C54[]; /* the same assert string */
-extern const char lbl_80590C7C[]; /* "g3d_resanmtexpat_ac.h" */
-extern const char lbl_80590C94[]; /* the same assert string */
-extern const char lbl_80590CBC[]; /* "g3d_resanmclr_ac.h" */
-extern const char lbl_80590CD0[]; /* the same assert string */
-extern const char lbl_80590CF8[]; /* "g3d_resanmvis_ac.h" */
-extern const char lbl_80590D0C[]; /* the same assert string */
-extern const char lbl_80590D34[]; /* "g3d_resanmchr_ac.h" */
-extern const char lbl_80590D48[]; /* "%s::%s: Object not valid." */
-extern const char lbl_80590D64[]; /* "g3d_resfile_ac.h" */
-
-/* The `.sdata` words the `ResFile` default-construct path hands back the address of (the queue's
- * lbl_80791270/lbl_80791278). */
-extern u32 lbl_80791270;
-extern u32 lbl_80791278;
 
 } // extern "C"
 
@@ -163,7 +139,7 @@ extern "C" u32 fn_800924A8(u32* p) {
 }
 
 extern "C" void* fn_800924B0(void) {
-    return &lbl_80791278;
+    return (void*)"ResFile";
 }
 
 extern "C" u32 fn_800924B8(u32* p) {
@@ -228,7 +204,7 @@ extern "C" void fn_80093484(u32* self, u32 ptr) { *self = ptr; }
 extern "C" void* fn_80092B9C(u32* self, u32 ptr) {
     fn_80092C00(self, ptr);
     if ((ptr & 3) != 0) {
-        nw4r::db::Panic(lbl_80590D34, 39, lbl_80590D0C);
+        nw4r::db::Panic("g3d_resanmchr_ac.h", 39, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
     return self;
 }
@@ -236,7 +212,7 @@ extern "C" void* fn_80092B9C(u32* self, u32 ptr) {
 extern "C" void* fn_80092D50(u32* self, u32 ptr) {
     fn_80092DB4(self, ptr);
     if ((ptr & 3) != 0) {
-        nw4r::db::Panic(lbl_80590CF8, 39, lbl_80590CD0);
+        nw4r::db::Panic("g3d_resanmvis_ac.h", 39, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
     return self;
 }
@@ -244,7 +220,7 @@ extern "C" void* fn_80092D50(u32* self, u32 ptr) {
 extern "C" void* fn_80092F04(u32* self, u32 ptr) {
     fn_80092F68(self, ptr);
     if ((ptr & 3) != 0) {
-        nw4r::db::Panic(lbl_80590CBC, 39, lbl_80590C94);
+        nw4r::db::Panic("g3d_resanmclr_ac.h", 39, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
     return self;
 }
@@ -252,7 +228,7 @@ extern "C" void* fn_80092F04(u32* self, u32 ptr) {
 extern "C" void* fn_800930B8(u32* self, u32 ptr) {
     fn_8009311C(self, ptr);
     if ((ptr & 3) != 0) {
-        nw4r::db::Panic(lbl_80590C7C, 92, lbl_80590C54);
+        nw4r::db::Panic("g3d_resanmtexpat_ac.h", 92, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
     return self;
 }
@@ -260,7 +236,7 @@ extern "C" void* fn_800930B8(u32* self, u32 ptr) {
 extern "C" void* fn_8009326C(u32* self, u32 ptr) {
     fn_800932D0(self, ptr);
     if ((ptr & 3) != 0) {
-        nw4r::db::Panic(lbl_80590C3C, 38, lbl_80590C14);
+        nw4r::db::Panic("g3d_resanmtexsrt_ac.h", 38, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
     return self;
 }
@@ -268,7 +244,7 @@ extern "C" void* fn_8009326C(u32* self, u32 ptr) {
 extern "C" void* fn_80093420(u32* self, u32 ptr) {
     fn_80093484(self, ptr);
     if ((ptr & 3) != 0) {
-        nw4r::db::Panic(lbl_80590C00, 166, lbl_80590BD8);
+        nw4r::db::Panic("g3d_resanmshp_ac.h", 166, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
     return self;
 }
@@ -457,6 +433,8 @@ extern "C" u32 fn_8009348C(void* self, u32 arg) {
 #include "g3d/g3d_resanmamblight.h"/* fn_80089F94 (rule 2, owner header) */
 #include "g3d/g3d_resmat.h"
 
+#pragma pool_data off
+
 extern "C" void* fn_80092B9C(u32* self, u32 ptr);
 
 extern "C" u32 fn_800924CC(void* self, u32 arg) {
@@ -566,7 +544,7 @@ extern "C" u32 fn_80092020(void* self, void* name);
 /* `ResDic::GetOffset` guarded by the `g3d_rescommon_ac.h` assert. */
 extern "C" u32 fn_800922D0(u32* self, u32 ofs) {
     if (ofs == 0) {
-        nw4r::db::Panic(lbl_80590A48, 123, lbl_80590A28);
+        nw4r::db::Panic("g3d_rescommon_ac.h", 123, "NW4R:Failed assertion ofs != 0");
     }
     return *self + ofs;
 }
@@ -589,7 +567,7 @@ void* nw4r::g3d::ResDic::operator[](const char* name) const {
 /* `ResCommon<T>::ref()` guarded by the `g3d_resfile_ac.h` inlined assert; returns the body word. */
 extern "C" u32 fn_80092444(void* self) {
     if (fn_800924B8((u32*)self) == 0) {
-        nw4r::db::Panic(lbl_80590D64, 60, lbl_80590D48, fn_800924B0(), &lbl_80791270);
+        nw4r::db::Panic("g3d_resfile_ac.h", 60, "%s::%s: Object not valid.", fn_800924B0(), "ref");
     }
     return fn_800924A8((u32*)self);
 }

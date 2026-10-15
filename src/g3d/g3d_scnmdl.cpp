@@ -24,8 +24,9 @@
  *   are `g3d/g3d_scnobj.h`'s.
  * RESIDUALS. Partial: RemoveAnmObj(AnmObj*) (the vertex-position loop's counter and destination swap r27/r28; its
  *   extab saved-register byte differs with it).
- *   flipcheck: `.rodata` (the "ScnMdl" name record, declared not defined), `.data` and `.sdata` are claimed and not
- *   emitted.
+ *   flipcheck: `.rodata`, `.data` and `.sdata` byte-identical.  Order: AnmObj::IsBound comes after the
+ *   DynamicCast<AnmObjShp> instance, retail has it before (an inline IsBound defined after SetAnmObj, or before it
+ *   under `dont_inline`, and an implicit DynamicCast instance all keep the instance first).
  * SHAPES. The handle copies retail calls out of line (res_mat_copy_ctor, res_tex_obj_copy_ctor, ...) are explicit calls
  *   on `ResHandle` locals, declared in Construct/G3dProcCalcMat/InitBuffer order so the stack slots match; a
  *   by-value handle word the callee returns becomes a `HandleTemp` class temporary, whose address is then taken.
@@ -33,6 +34,9 @@
  *   `new (pBuf) ScnMdl` a landing pad retail lacks (`g3d/g3d_anmclr.h` carries what is needed).
  *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
  *   `addi r0` vtable-store and `mr r3` + `lwz r12,0(r3)` virtual-call forms; playbook idea 106).
+ *   `#pragma pool_data off`; the strings are literals in first-use order, and res_mdl_info_ref is `inline` (a weak
+ *   copy after Construct, its strings in the inline tail after the vtable, playbook 80).  The five `*_end_edit`
+ *   hooks are defined after InitBuffer, retail's order.  scn_typename_ScnMdl is defined here (`.rodata`).
  */
 
 #include "types.h"
@@ -60,6 +64,8 @@
 #include "g3d/res_mat_chan_copy_ctor.h" /* res_mat_chan_copy_ctor (rule 2: owner fn_80059550.cpp) */
 #include "unsplit/g3d.h"
 
+#pragma pool_data off
+
 #pragma peephole off
 
 /* `ScnMdl` lives in its real namespace (rule 9's owner spelling); this unit's bodies name it short. */
@@ -78,24 +84,6 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 }  // namespace db
 }  // namespace nw4r
-
-/* The panic file/format strings and data objects this unit's bodies reference.  They are `extern` map
- * labels, not literals: MWCC's `-str reuse` would pool a repeated literal into one blob addressed
- * through a shared base register, while the target loads each one with its own `lis`/`addi`. */
-extern const char lbl_8058EDA0[]; /* "g3d_scnmdl.cpp" */
-extern const char scn_mdl_psize_error_msg[]; /* "NW4R:Pointer Error\npSize(=%p) is not valid pointer." */
-extern const char lbl_8058EDE4[]; /* "NW4R:Failed assertion ((u32)buf & 0x1f) == 0" */
-extern const char lbl_8058EE14[]; /* "NW4R:Failed assertion pos.GetSize() == ResVtxPos(rep.vtxPosTable..." */
-extern const char lbl_8058EE64[]; /* "...((u32)&mReplacement.pixDLArray[i] & 0x1f) == 0" */
-extern const char lbl_8058EEAC[]; /* "...((u32)&mReplacement.tevColorDLArray[i] & 0x1f) == 0" */
-extern const char lbl_8058EEF8[]; /* "...((u32)&mReplacement.indMtxAndScaleDLArray[i] & 0x1f) == 0" */
-extern const char lbl_8058EF48[]; /* "...((u32)&mReplacement.texCoordGenDLArray[i] & 0x1f) == 0" */
-extern const char lbl_8058EF98[]; /* "...((u32)&mReplacement.tevDataArray[i] & 0x1f) == 0" */
-extern const char lbl_8058EFE0[]; /* "NW4R:Failed assertion !mpAnmObjShp" */
-extern const char lbl_8058F004[]; /* "NW4R:Failed assertion !GetParent()" */
-extern const char lbl_8058F070[]; /* "%s::%s: Object not valid." */
-extern const char lbl_8058F090[]; /* "g3d_resmdl_ac.h" */
-extern const char lbl_80791208[4]; /* the `.sdata` string "ref" */
 
 /* ------------------------------------------------------------------------------------------------ */
 /* the object                                                                                        */
@@ -289,14 +277,14 @@ ScnMdl* ScnMdl::Construct(MEMAllocator* pHeap, u32* pSize, ResMdl mdl, u32 buffe
         if (!ok2 && !(((u32)pSize & 0xFFFFC000u) == 0xE0000000u))
             ok1 = FALSE;
         if (!ok1)
-            nw4r::db::Panic(lbl_8058EDA0, 802, scn_mdl_psize_error_msg, pSize);
+            nw4r::db::Panic("g3d_scnmdl.cpp", 802, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.", pSize);
         *pSize = size;
     }
 
     if (pHeap != NULL) {
         u8* pBuf = (u8*)Alloc(pHeap, size);
         if ((u32)pBuf & 0x1F) {
-            nw4r::db::Panic(lbl_8058EDA0, 813, lbl_8058EDE4);
+            nw4r::db::Panic("g3d_scnmdl.cpp", 813, "NW4R:Failed assertion ((u32)buf & 0x1f) == 0");
         }
         if (pBuf == NULL) {
             return NULL;
@@ -342,7 +330,7 @@ ScnMdl* ScnMdl::Construct(MEMAllocator* pHeap, u32* pSize, ResMdl mdl, u32 buffe
                     vtxPosDataOffset += fn_8007D470(pos.GetSize());
                     pos.CopyTo(rep.mpVtxPosTable[i]);
                     if (pos.GetSize() != nw4r::g3d::ResVtxPos(rep.mpVtxPosTable[i]).GetSize()) {
-                        nw4r::db::Panic(lbl_8058EDA0, 866, lbl_8058EE14);
+                        nw4r::db::Panic("g3d_scnmdl.cpp", 866, "NW4R:Failed assertion pos.GetSize() == ResVtxPos(rep.vtxPosTable[i]).GetSize()");
                     }
                 } else {
                     rep.mpVtxPosTable[i] = pos.ptr();
@@ -440,11 +428,11 @@ extern "C" {
 
 /* 0x8007D404 - `ResCommon<ResMdl>::ref()`: the `g3d_resmdl_ac.h` inlined assert, then the handle. */
 /* untyped: opaque handle - the info handle */
-u32 res_mdl_info_ref(const void* pInfo) {
+inline u32 res_mdl_info_ref(const void* pInfo) {
     ResHandle* pSelf = (ResHandle*)pInfo;
 
     if (res_mdl_info_is_valid(pSelf) == 0) {
-        nw4r::db::Panic(lbl_8058F090, 57, lbl_8058F070, res_mdl_info_get_class_name(), lbl_80791208);
+        nw4r::db::Panic("g3d_resmdl_ac.h", 57, "%s::%s: Object not valid.", res_mdl_info_get_class_name(), "ref");
     }
     return fn_8007D468(pSelf);
 }
@@ -807,34 +795,6 @@ bool ScnMdl::GetScnObjOption(u32 option, u32* pValue) const
     return true;
 }
 
-extern "C" {
-
-/* 0x8007E478 (0x8): stores the tev block's display list back without waiting. */
-void res_tev_end_edit(struct ResHandle* pSelf) {
-    res_tev_dc_store(pSelf, 0);
-}
-
-/* 0x8007E480 (0x8): stores the texture-coordinate-generator block back without waiting. */
-void res_mat_tex_coord_gen_end_edit(struct ResHandle* pSelf) {
-    res_mat_tex_coord_gen_dc_store(pSelf, 0);
-}
-
-/* 0x8007E488 (0x8): stores the pixel-engine block back without waiting. */
-void res_mat_pix_end_edit(struct ResHandle* pSelf) {
-    res_mat_pix_dc_store(pSelf, 0);
-}
-
-/* 0x8007E490 (0x4): the misc block's edit hook, empty. */
-void res_mat_misc_end_edit(struct ResHandle* pSelf) {
-    (void)pSelf;
-}
-
-/* 0x8007E494 (0x4): the gen-mode block's edit hook, empty. */
-void res_gen_mode_end_edit(struct ResHandle* pSelf) {
-    (void)pSelf;
-}
-
-} /* extern "C" */
 
 /* 0x8007E01C (0x45C): fills the node-visibility buffer from the nodes' flags, then copies every material's blocks
  * into the replacement buffers that exist and clears each material's buffer-flag word. */
@@ -887,7 +847,7 @@ void ScnMdl::InitBuffer()
         }
         if (mReplacement.mpPixDLArray) {
             if (((u32)mReplacement.mpPixDLArray + i * 0x20) & 0x1F) {
-                nw4r::db::Panic(lbl_8058EDA0, 1312, lbl_8058EE64);
+                nw4r::db::Panic("g3d_scnmdl.cpp", 1312, "NW4R:Failed assertion ((u32)&mReplacement.pixDLArray[i] & 0x1f) == 0");
             }
             res_mat_pix_end_edit(&HandleTemp(res_mat_pix_copy_to(
                 (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatPix(),
@@ -895,7 +855,7 @@ void ScnMdl::InitBuffer()
         }
         if (mReplacement.mpTevColorDLArray) {
             if (((u32)mReplacement.mpTevColorDLArray + i * 0x80) & 0x1F) {
-                nw4r::db::Panic(lbl_8058EDA0, 1318, lbl_8058EEAC);
+                nw4r::db::Panic("g3d_scnmdl.cpp", 1318, "NW4R:Failed assertion ((u32)&mReplacement.tevColorDLArray[i] & 0x1f) == 0");
             }
             res_mat_tev_color_end_edit(&HandleTemp(res_mat_tev_color_copy_to(
                 (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatTevColor(),
@@ -903,7 +863,7 @@ void ScnMdl::InitBuffer()
         }
         if (mReplacement.mpIndMtxAndScaleDLArray) {
             if (((u32)mReplacement.mpIndMtxAndScaleDLArray + i * 0x40) & 0x1F) {
-                nw4r::db::Panic(lbl_8058EDA0, 1324, lbl_8058EEF8);
+                nw4r::db::Panic("g3d_scnmdl.cpp", 1324, "NW4R:Failed assertion ((u32)&mReplacement.indMtxAndScaleDLArray[i] & 0x1f) == 0");
             }
             res_mat_ind_mtx_end_edit(&HandleTemp(res_mat_ind_mtx_copy_to(
                 (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatIndMtxAndScale(),
@@ -911,7 +871,7 @@ void ScnMdl::InitBuffer()
         }
         if (mReplacement.mpTexCoordGenDLArray) {
             if (((u32)mReplacement.mpTexCoordGenDLArray + i * 0xA0) & 0x1F) {
-                nw4r::db::Panic(lbl_8058EDA0, 1330, lbl_8058EF48);
+                nw4r::db::Panic("g3d_scnmdl.cpp", 1330, "NW4R:Failed assertion ((u32)&mReplacement.texCoordGenDLArray[i] & 0x1f) == 0");
             }
             res_mat_tex_coord_gen_end_edit(&HandleTemp(res_mat_tex_coord_gen_copy_to(
                 (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResMatTexCoordGen(),
@@ -919,7 +879,7 @@ void ScnMdl::InitBuffer()
         }
         if (mReplacement.mpTevDataArray) {
             if (((u32)mReplacement.mpTevDataArray + i * 0x200) & 0x1F) {
-                nw4r::db::Panic(lbl_8058EDA0, 1336, lbl_8058EF98);
+                nw4r::db::Panic("g3d_scnmdl.cpp", 1336, "NW4R:Failed assertion ((u32)&mReplacement.tevDataArray[i] & 0x1f) == 0");
             }
             res_tev_end_edit(&HandleTemp(res_tev_copy_to(
                 (ResHandle*)&reinterpret_cast<ResMat&>(matHandle).GetResTev(),
@@ -927,6 +887,35 @@ void ScnMdl::InitBuffer()
         }
     }
 }
+
+extern "C" {
+
+/* 0x8007E478 (0x8): stores the tev block's display list back without waiting. */
+void res_tev_end_edit(struct ResHandle* pSelf) {
+    res_tev_dc_store(pSelf, 0);
+}
+
+/* 0x8007E480 (0x8): stores the texture-coordinate-generator block back without waiting. */
+void res_mat_tex_coord_gen_end_edit(struct ResHandle* pSelf) {
+    res_mat_tex_coord_gen_dc_store(pSelf, 0);
+}
+
+/* 0x8007E488 (0x8): stores the pixel-engine block back without waiting. */
+void res_mat_pix_end_edit(struct ResHandle* pSelf) {
+    res_mat_pix_dc_store(pSelf, 0);
+}
+
+/* 0x8007E490 (0x4): the misc block's edit hook, empty. */
+void res_mat_misc_end_edit(struct ResHandle* pSelf) {
+    (void)pSelf;
+}
+
+/* 0x8007E494 (0x4): the gen-mode block's edit hook, empty. */
+void res_gen_mode_end_edit(struct ResHandle* pSelf) {
+    (void)pSelf;
+}
+
+} /* extern "C" */
 
 /* 0x8007E498 (0x364): copies each block `option` flags of material `matID` into its replacement buffer, closes each
  * copy's edit, and clears those flags in the material's buffer-flag word. */
@@ -1016,7 +1005,7 @@ bool ScnMdl::SetAnmObj(AnmObj* pObj, AnmObjType type)
                     RemoveAnmObj(mpAnmObjShp);
                 }
                 if (mpAnmObjShp != NULL) {
-                    nw4r::db::Panic(lbl_8058EDA0, 0x5B2, lbl_8058EFE0);
+                    nw4r::db::Panic("g3d_scnmdl.cpp", 0x5B2, "NW4R:Failed assertion !mpAnmObjShp");
                 }
                 mpAnmObjShp = pShp;
                 pShp->G3dProc(G3DPROC_ATTACH_PARENT, 0, this);
@@ -1143,12 +1132,16 @@ ScnMdl::ScnMdl(MEMAllocator* pHeap, ResMdl mdl, nw4r::math::MTX34* pWorldMtxArra
 ScnMdl::~ScnMdl()
 {
     if (GetParent() != 0) {
-        nw4r::db::Panic(lbl_8058EDA0, 1627, lbl_8058F004);
+        nw4r::db::Panic("g3d_scnmdl.cpp", 1627, "NW4R:Failed assertion !GetParent()");
     }
     if (mpAnmObjShp != 0) {
         RemoveAnmObj(mpAnmObjShp);
     }
 }
+
+/* The "ScnMdl" run-time type-name record: the name's size with its NUL, then the name (`TypeNameData`'s
+ * layout, spelled as bytes because its consumers read it as `const u8*`). */
+extern "C" const u8 scn_typename_ScnMdl[0x10] = {0x00, 0x00, 0x00, sizeof("ScnMdl"), 'S', 'c', 'n', 'M', 'd', 'l'};
 
 /* 0x8007EF1C (0x30): returns the type. */
 const nw4r::g3d::G3dObj::TypeObj ScnMdl::GetTypeObj() const

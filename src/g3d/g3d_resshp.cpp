@@ -19,10 +19,13 @@
  *   fn_8009A1E0: retail keeps `lbl_8056F730` in r31 across the `fn_800866FC` call (frame 0x20, r29-r31); ours
  *     rematerialises it after the call (frame 0x10, 8 bytes shorter); every spelling of the table read emits the same.
  *   res_tev_copy_to: the final `subf`'s destination register (r0 in retail, r4 here).
- *   flipcheck: `.text` 0x1340 of 0x1348; `.rodata`, `.data` and `.sdata` are claimed and not emitted.
+ *   flipcheck: `.text` 0x1340 of 0x1348; `.rodata` (the pre-prim size table) is declared, not emitted; `.data`/
+ *   `.sdata`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
+ *   instance, after the TU's own strings, playbook 80).
  * SHAPES. File-scope `#pragma peephole off`: the `rlwinm` flag extracts keep retail's `cmpwi`, and fn_800997E0/
  *   fn_800998CC materialise their range check (`li r3, 0` / `li r3, 1` + `cmpwi`).
- *   The `.sdata` "ref" strings are sized externs (`extern char lbl_807912B8[4];`): MWCC then emits `li r7, @sda21`.
+ *   `#pragma pool_data off`; the strings are literals ("ref", 4 bytes, goes to `.sdata` and loads with
+ *   `li r7, @sda21`).
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -33,6 +36,8 @@
 #include "g3d/g3d_state.h"
 #include "g3d/g3d_resvtx.h"
 #include "g3d/g3d_resshp.h"
+
+#pragma pool_data off
 
 /* The target's `-O3` schedule is retail only with the peephole pass off: every flag extract keeps an
  * explicit `cmpwi` after the `rlwinm` instead of the folded record form `rlwinm.`. */
@@ -80,29 +85,10 @@ struct ResTexBlock {
     /* +0x2C */ f32 mLodMax;    /* fn_8009A490's fifth out                             */
 }; /* size: 0x30 (a lower bound: only the words above are reached) */
 
-/* The pooled constants this unit reads (this unit's data, claimed, not emitted). */
-extern "C" {
-extern const char lbl_805916E0[]; /* "NW4R:Failed assertion !((u32)p & 0x3)"   .data */
-extern const char lbl_80591708[]; /* "g3d_resshp_ac.h"                        .data */
-extern const char lbl_80591718[]; /* "ResShpPrePrim"                          .data */
-extern const char lbl_80591728[]; /* "%s::%s: Object not valid."              .data */
-extern const char lbl_80591748[]; /* "g3d_resshp_ac.h"                        .data */
-extern const char lbl_80591758[]; /* "NW4R:Failed assertion !((u32)p & 0x3)"   .data */
-extern const char lbl_80591780[]; /* "g3d_rescommon_ac.h"                     .data */
-extern const char lbl_80591794[]; /* "ResTagDL"                               .data */
-extern const char lbl_805917A0[]; /* "%s::%s: Object not valid."              .data */
-extern const char lbl_805917BC[]; /* "g3d_rescommon_ac.h"                     .data */
-extern const char lbl_805917D0[]; /* "%s::%s: Object not valid."              .data */
-extern const char lbl_805917EC[]; /* "g3d_rescommon_ac.h"                     .data */
-}
-
 /* The `"ref"` member-name strings of the accessor asserts (`.sdata`).  Declared as *sized*
  * 4-byte arrays so MWCC's small-data heuristic emits the target's `li rN, @sda21` address form (an
  * unsized `extern const char[]` is assumed large and gets `lis`/`addi` - the same lever as
  * `g3d/g3d_resfile.cpp`'s `lbl_80791290`). */
-extern char lbl_807912B8[4]; /* "ref" */
-extern char lbl_807912BC[4]; /* "ref" */
-extern char lbl_807912C0[4]; /* "ref" */
 
 /* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
@@ -157,7 +143,7 @@ u32 fn_8009943C(ResHandle* pSelf, u32 ofs) {
 
 /* The class-name string the `%s::%s: Object not valid.` assert passes for ResShpPrePrim. */
 u32 fn_80099488(void) {
-    return (u32)lbl_80591718;
+    return (u32)"ResShpPrePrim";
 }
 
 /* ResShpPrePrim's validity word. */
@@ -169,7 +155,7 @@ s32 fn_80099494(const ResHandle* pSelf) {
 ResHandle* fn_800994A8(ResHandle* pSelf, u32 value) {
     fn_8009950C(pSelf, value);
     if ((value & 0x3) != 0) {
-        nw4r::db::Panic(lbl_80591708, 0x2C, lbl_805916E0);
+        nw4r::db::Panic("g3d_resshp_ac.h", 0x2C, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
     return pSelf;
 }
@@ -182,7 +168,7 @@ void fn_8009950C(ResHandle* pSelf, u32 value) {
 /* `ResTagDL::ref` with the `g3d_rescommon_ac.h` assert. */
 ResTagDLData* fn_80099514(ResHandle* pSelf) {
     if (fn_8009958C(pSelf) == 0) {
-        nw4r::db::Panic(lbl_805917EC, 0x151, lbl_805917D0, (const char*)fn_80099580(), lbl_807912B8);
+        nw4r::db::Panic("g3d_rescommon_ac.h", 0x151, "%s::%s: Object not valid.", (const char*)fn_80099580(), "ref");
     }
     return fn_80099578(pSelf);
 }
@@ -194,7 +180,7 @@ ResTagDLData* fn_80099578(const ResHandle* pSelf) {
 
 /* The class-name string the `%s::%s: Object not valid.` assert passes for ResTagDL. */
 u32 fn_80099580(void) {
-    return (u32)lbl_80591794;
+    return (u32)"ResTagDL";
 }
 
 /* ResTagDL's validity word. */
@@ -213,7 +199,7 @@ u32 fn_800995A0(ResHandle* pSelf) {
 ResHandle* fn_800995D4(ResHandle* pSelf, u32 value) {
     fn_80099638(pSelf, value);
     if ((value & 0x3) != 0) {
-        nw4r::db::Panic(lbl_80591780, 0x151, lbl_80591758);
+        nw4r::db::Panic("g3d_rescommon_ac.h", 0x151, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
     return pSelf;
 }
@@ -226,7 +212,7 @@ void fn_80099638(ResHandle* pSelf, u32 value) {
 /* Assert ResShpPrePrim validity, then hand back the pointer (the `g3d_resshp_ac.h` ref form). */
 u32 fn_80099640(ResHandle* pSelf) {
     if (fn_80099494(pSelf) == 0) {
-        nw4r::db::Panic(lbl_80591748, 0x2C, lbl_80591728, (const char*)fn_80099488(), lbl_807912C0);
+        nw4r::db::Panic("g3d_resshp_ac.h", 0x2C, "%s::%s: Object not valid.", (const char*)fn_80099488(), "ref");
     }
     return fn_800996A4(pSelf);
 }
@@ -263,7 +249,7 @@ u32 fn_80099724(const ResHandle* pSelf, u32 ofs) {
 /* `ResTagDL::ref` with the `g3d_rescommon_ac.h` assert (the second out-of-line copy). */
 ResTagDLData* fn_80099740(ResHandle* pSelf) {
     if (fn_8009958C(pSelf) == 0) {
-        nw4r::db::Panic(lbl_805917BC, 0x151, lbl_805917A0, (const char*)fn_80099580(), lbl_807912BC);
+        nw4r::db::Panic("g3d_rescommon_ac.h", 0x151, "%s::%s: Object not valid.", (const char*)fn_80099580(), "ref");
     }
     return fn_800997A4(pSelf);
 }
@@ -287,21 +273,8 @@ u32 fn_800997AC(ResHandle* pSelf) {
 /* half plus the `ResTev`/`ResTex` cache helpers.  Same TU, same section claim (widened below).      */
 /* ================================================================================================== */
 
-/* The pooled `__FILE__`/assert strings this half passes (this unit's `.data`, claimed, not emitted). */
-extern const char lbl_80591618[]; /* "g3d_resshp.cpp"                                              */
-extern const char lbl_80591628[]; /* "attr is out of bounds(%d)\n%d <= attr <= %d not satisfied."    */
-extern const char lbl_80591664[]; /* "NW4R:Failed assertion ref().idVtxPosition >= 0"               */
-extern const char lbl_80591694[]; /* "NW4R:Failed assertion idx == 0 || idx == 1"                   */
-extern const char lbl_805916C0[]; /* "NW4R:Failed assertion idx < 8"                                */
-extern const char lbl_80591800[]; /* "%s::%s: Object not valid."                                   */
-extern const char lbl_80591820[]; /* "g3d_restev_ac.h"                                             */
-extern const char lbl_80591830[]; /* "%s::%s: Object not valid."                                   */
-extern const char lbl_80591850[]; /* "g3d_restex_ac.h"                                             */
-
 /* The `"ref"` member-name strings of the `ResTev`/`ResTex` asserts, declared as *sized* 4-byte arrays
  * so MWCC's small-data heuristic emits the target's `li rN, @sda21` form (the lever the head records). */
-extern char lbl_807912C8[4]; /* "ref" */
-extern char lbl_807912D0[4]; /* "ref" */
 
 /* The pre-prim display-list size table `ResTev`'s draw path indexes by the block's primitive count
  * (`lbl_8056F730[0..15]` = 0xA0, 0xA0, 0xC0, 0xC0, 0x100, ..., 0x1E0).  `.data`, so not small data. */
@@ -363,7 +336,7 @@ extern "C" void fn_800997E0(ResHandle* pSelf, s32 attr, u32 pData, u32 size) {
     }
 
     if (!inRange) {
-        nw4r::db::Panic(lbl_80591618, 0x2D4, lbl_80591628, attr, 9, 20);
+        nw4r::db::Panic("g3d_resshp.cpp", 0x2D4, "attr is out of bounds(%d)\n%d <= attr <= %d not satisfied.", attr, 9, 20);
     }
 
     u32 prePrim = fn_800996AC(pSelf);
@@ -382,7 +355,7 @@ extern "C" void fn_800998CC(ResHandle* pSelf, u32 attr) {
     }
 
     if (!inRange) {
-        nw4r::db::Panic(lbl_80591618, 0x30F, lbl_80591628, attr, 9, 20);
+        nw4r::db::Panic("g3d_resshp.cpp", 0x30F, "attr is out of bounds(%d)\n%d <= attr <= %d not satisfied.", attr, 9, 20);
     }
 
     u32 prePrim = fn_800996AC(pSelf);
@@ -395,7 +368,7 @@ extern "C" void fn_800998CC(ResHandle* pSelf, u32 attr) {
  * shape's own `idVtxPosition` (the assert the target bakes into `ref().idVtxPosition >= 0`). */
 extern "C" u32 res_shp_get_vtx_pos(ResHandle* pSelf) {
     if (reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref().idVtxPosition < 0) {
-        nw4r::db::Panic(lbl_80591618, 0x31E, lbl_80591664);
+        nw4r::db::Panic("g3d_resshp.cpp", 0x31E, "NW4R:Failed assertion ref().idVtxPosition >= 0");
     }
 
     u32 mdl = fn_80099400(pSelf);
@@ -420,7 +393,7 @@ extern "C" u32 res_shp_get_vtx_clr(ResHandle* pSelf, u32 idx) {
     bool inRange = (idx == 0 || idx == 1);
 
     if (!inRange) {
-        nw4r::db::Panic(lbl_80591618, 0x330, lbl_80591694);
+        nw4r::db::Panic("g3d_resshp.cpp", 0x330, "NW4R:Failed assertion idx == 0 || idx == 1");
     }
 
     const s16* pId = &pData->idVtxClr[idx];
@@ -436,7 +409,7 @@ extern "C" u32 res_shp_get_vtx_clr(ResHandle* pSelf, u32 idx) {
 /* 0x80099B10 - one tex-coord resource (eight per shape, hence the `idx < 8` assert). */
 extern "C" u32 fn_80099B10(ResHandle* pSelf, u32 idx) {
     if (idx >= 8) {
-        nw4r::db::Panic(lbl_80591618, 0x33B, lbl_805916C0);
+        nw4r::db::Panic("g3d_resshp.cpp", 0x33B, "NW4R:Failed assertion idx < 8");
     }
 
     const s16* pId = &reinterpret_cast<const nw4r::g3d::ResShp*>(pSelf)->ref().idVtxTexCoord[idx];
@@ -643,7 +616,7 @@ extern "C" void fn_8009A12C(ResHandle* pSelf, s32 flag) {
 /* 0x8009A174 - `ResTev::ref` with the `g3d_restev_ac.h` validity assert. */
 extern "C" u32 fn_8009A174(ResHandle* pSelf) {
     if (!reinterpret_cast<const nw4r::g3d::ResTev*>(pSelf)->IsValid()) {
-        nw4r::db::Panic(lbl_80591820, 0x25, lbl_80591800, nw4r::g3d::ResTev::GetClassName(), lbl_807912C8);
+        nw4r::db::Panic("g3d_restev_ac.h", 0x25, "%s::%s: Object not valid.", nw4r::g3d::ResTev::GetClassName(), "ref");
     }
     return fn_8009A1D8(pSelf);
 }
@@ -731,7 +704,7 @@ extern "C" u32 fn_8009A408(ResHandle* pSelf) {
 /* 0x8009A42C - `ResTex::ref` with the `g3d_restex_ac.h` validity assert. */
 nw4r::g3d::ResTexData& nw4r::g3d::ResTex::ref() {
     if (!IsValid()) {
-        nw4r::db::Panic(lbl_80591850, 0x26, lbl_80591830, GetClassName(), lbl_807912D0);
+        nw4r::db::Panic("g3d_restex_ac.h", 0x26, "%s::%s: Object not valid.", GetClassName(), "ref");
     }
     return *ptr();
 }

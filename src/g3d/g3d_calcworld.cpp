@@ -1,7 +1,7 @@
 /*
  * g3d/g3d_calcworld.cpp - nw4r g3d node/matrix world pass (g3d_calc_world, g3d_calc_skinning) and its node-table accessors.
  * RANGE. .text 0x800736F8-0x800746DC (30 functions); extab, extabindex, .data 0x8058E178-0x8058E430 (g3d_calc_world
- *   passes "g3d_calcworld.cpp", lbl_8058E184; the fn_80073E80..world_mtx_attr_root_mtx helpers read lbl_8058E340..lbl_8058E420),
+ *   passes "g3d_calcworld.cpp"; the fn_80073E80..world_mtx_attr_root_mtx helpers pass "g3d_resnode_ac.h".."g3d_resmdl_ac.h"),
  *   .sdata 0x807911D0-0x807911E0, .sdata2 0x80795DC0-0x80795DC8.  The six accessors res_mdl_info_num_view_mtx..fn_800746D4 carry no
  *   data reference: the candidate cut 0x800746DC puts them here, 0x80074620 is the alternative.
  * NAMES. camera_ctor is a GUESS (the evidence follows).
@@ -13,8 +13,9 @@
  *   (the ResMdlInfo handle and its view-matrix count).
  * RESIDUALS. Unwritten (objdiff scores it zero): g3d_calc_skinning.  Partial: fn_800736F8, g3d_calc_world, fn_80073CE0,
  *   fn_80073D34, fn_80073F00, addVec3To.
- *   flipcheck: `.text` 0xAD0 of 0xFE4; `.data` is claimed and not emitted; `.sdata` is 0x4 of 0x10, `.sdata2` 0x4
- *   of 0x8.
+ *   flipcheck: `.text` 0xAD0 of 0xFE4; `.data`/`.sdata`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
+ *   instance, after the TU's own strings, playbook 80);
+ *   `.sdata2` byte-identical.
  * SHAPES. `#pragma peephole off` around fn_8007403C keeps retail's masked compare (playbook 32); file-scope
  *   `#pragma fp_contract off`.
  *   The unit compiles with `#pragma peephole off` throughout (retail keeps the unfused `clrlwi` + `cmpwi`, `extsh`,
@@ -30,6 +31,8 @@
 #include "nw4r/fn_805012C4.h" /* nw4r::math::MTX34Scale (rule 2) */
 #include "g3d/g3d_calcview.h" /* fn_8006FDCC..mtx34_copy_ps (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+
+#pragma pool_data off
 
 #pragma peephole off
 
@@ -68,26 +71,6 @@ extern "C" void fn_80098D5C(void* pA, const void* pB);
 extern "C" void fn_80098F6C(void* pA, void* pOut);
 extern "C" s32 fn_800D77B0(void* pA, void* pB, void* pC, void* pD, s32 e, void* pF);
 extern "C" s32 fn_800D7D24(void* pA, void* pB, void* pC, void* pD, s32 e, void* pF);
-
-/* The panic file/format strings the target references as map symbols. They are extern here rather
- * than literals: MWCC's `-str reuse` would pool a literal into one blob and address it through a
- * shared base register, while the target loads each one with its own `lis`/`addi`. */
-extern const char lbl_8058E178[];
-extern const char lbl_8058E184[];
-extern const char lbl_8058E198[];
-extern const char lbl_8058E1E0[];
-extern const char lbl_8058E208[];
-extern const char lbl_8058E240[];
-extern const char lbl_8058E320[];
-extern const char lbl_8058E340[];
-extern const char lbl_8058E354[];
-extern const char lbl_8058E380[];
-extern const char lbl_8058E390[];
-extern const char lbl_8058E3B8[];
-extern const char lbl_8058E3C8[];
-extern const char lbl_8058E3F0[];
-extern const char lbl_8058E400[];
-extern const char lbl_8058E420[];
 
 /* ------------------------------------------------------------------------------------------------ */
 /* types                                                                                             */
@@ -229,7 +212,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
     u8* pCode = pByteCode;
     chr_anm_result_init(&rec);
     if (pCode == NULL) {
-        pCode = (u8*)(void*)reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->GetResByteCode(lbl_8058E178);
+        pCode = (u8*)(void*)reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->GetResByteCode("NodeTree");
     }
     if (pCode != NULL) {
         NodeMtxRec* pRec = NULL;
@@ -256,7 +239,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                 res_node_copy_ctor(&s1C, &s14);
                 u32 mtxID = fn_8006FDCC(&s1C);
                 if (numMtx >= 0x800) {
-                    nw4r::db::Panic(lbl_8058E184, 137, lbl_8058E198);
+                    nw4r::db::Panic("g3d_calcworld.cpp", 137, "NW4R:Failed assertion numMtxID < detail::workmem::WORKMEM_NUMMTXID");
                 }
                 pMtxIDList[numMtx++] = mtxID;
                 u8* pDstMtx = pMtxArray + mtxID * 0x30;
@@ -303,7 +286,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                     pMtxIDs[mtxID] =
                         fn_800D77B0(pDstMtx, pDstScale, pSrcMtx, pSrcScale, prev, pRec);
                 } else if ((pRec->mUnk00 & 0x400) != 0) {
-                    nw4r::db::Panic(lbl_8058E184, 245, lbl_8058E1E0);
+                    nw4r::db::Panic("g3d_calcworld.cpp", 245, "NW4R_G3D_MAYA_DISABLE must be disabled.");
                     pMtxIDs[mtxID] =
                         fn_800D7D24(pDstMtx, pDstScale, pSrcMtx, pSrcScale, prev, pRec);
                 } else {
@@ -319,7 +302,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
                 break;
             }
             default:
-                nw4r::db::Panic(lbl_8058E184, 273, lbl_8058E208);
+                nw4r::db::Panic("g3d_calcworld.cpp", 273, "NW4R:Failed assertion c == ResByteCodeData::MTXDUP");
                 /* fallthrough */
             case 6: {
                 u32 nodeID = (pCode[1] << 8) + pCode[2];
@@ -339,7 +322,7 @@ void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx
         for (u32 i = 0; i < numMtx; i++) {
             u32 mtxID = pMtxIDList[i];
             if (mtxID >= 0x800) {
-                nw4r::db::Panic(lbl_8058E184, 294, lbl_8058E240);
+                nw4r::db::Panic("g3d_calcworld.cpp", 294, "NW4R:Failed assertion mtxID < detail::workmem::WORKMEM_NUMMTXID");
             }
             f32* pS = pScale + mtxID * 3;
             if (1.0f != pS[0] || 1.0f != pS[1] || 1.0f != pS[2]) {
@@ -386,13 +369,13 @@ MtxArg* fn_80073DC4(MtxArg* pSelf, void* pM, void* pS, void* pAttr) {
     pSelf->mpVec = pS;
     pSelf->mpMtxID = pAttr;
     if (pM == NULL) {
-        nw4r::db::Panic(lbl_8058E3F0, 46, lbl_8058E3C8);
+        nw4r::db::Panic("g3d_calcworld.h", 46, "NW4R:Pointer must not be NULL (m)");
     }
     if (pS == NULL) {
-        nw4r::db::Panic(lbl_8058E3B8, 47, lbl_8058E390);
+        nw4r::db::Panic("g3d_calcworld.h", 47, "NW4R:Pointer must not be NULL (s)");
     }
     if (pAttr == NULL) {
-        nw4r::db::Panic(lbl_8058E380, 48, lbl_8058E354);
+        nw4r::db::Panic("g3d_calcworld.h", 48, "NW4R:Pointer must not be NULL (attr)");
     }
     return pSelf;
 }
@@ -403,7 +386,7 @@ u32 fn_80073E80(u32 value, u32 low) {
 
 u32 fn_80073E8C(void* pSelf) {
     if (!res_node_is_valid(pSelf)) {
-        nw4r::db::Panic(lbl_8058E340, 90, lbl_8058E320);
+        nw4r::db::Panic("g3d_resnode_ac.h", 90, "NW4R:Failed assertion IsValid()");
     }
     if (res_node_is_valid(pSelf)) {
         return ((ResNodeData*)res_node_ptr(pSelf))->mMtxID;
@@ -454,7 +437,7 @@ s32 res_mdl_get_info(ResHandle* pMdl) {
 /* The `ResMdl` root, with the `g3d_resmdl_ac.h` validity assert. */
 ResMdlData* fn_800740A8(ResHandle* pMdl) {
     if (!reinterpret_cast<const nw4r::g3d::ResMdl*>(pMdl)->IsValid()) {
-        nw4r::db::Panic(lbl_8058E420, 120, lbl_8058E400, nw4r::g3d::ResMdl::GetClassName(), "ref");
+        nw4r::db::Panic("g3d_resmdl_ac.h", 120, "%s::%s: Object not valid.", nw4r::g3d::ResMdl::GetClassName(), "ref");
     }
     return (ResMdlData*)fn_8007410C(pMdl);
 }

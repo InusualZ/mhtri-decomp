@@ -6,14 +6,17 @@
  * NAMES. Map stems; `mSubResOfs` is a GUESS (its target class is evidenced only by fn_8008A220's
  *   `g3d_resuser_ac.h`).
  * RESIDUALS. fn_80098D5C: register naming only (retail keeps the flag word in r31 and `flags & ~0x10` in r29,
- *   ours in r29/r28).  flipcheck: `.data` and `.sdata2` are claimed and not emitted.
+ *   ours in r29/r28).  flipcheck: `.data` and `.sdata2` byte-identical.
  * SHAPES. File-scope `#pragma peephole off`: every `rlwinm` flag extract keeps retail's `cmpwi` (fn_80099134).
+ *   `#pragma pool_data off`; the strings and the 1.0f/0.0f pool are literals, emitted in first-use order.
  */
 #include "types.h"
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_resnode.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+
+#pragma pool_data off
 
 /* The target's `-O3` schedule is retail only with the peephole pass off: every flag extract keeps an
  * explicit `cmpwi` after the `rlwinm` instead of the folded record form `rlwinm.`. */
@@ -29,16 +32,6 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 }  // namespace db
 }  // namespace nw4r
-
-/* The pooled constants this unit reads, declared, not defined: the claimed `.data`/`.sdata2` are not emitted
- * yet. */
-extern "C" {
-extern const char lbl_805915C0[]; /* "g3d_resnode.cpp"                            .data */
-extern const char lbl_805915D0[]; /* "NW4R:Pointer must not be NULL (pResult)"    .data */
-extern const char lbl_805915F8[]; /* "NW4R:Failed assertion IsValid()"            .data */
-extern const f32 lbl_80795F48;          /* 1.0f                                         .sdata2 */
-extern const f32 lbl_80795F4C;          /* 0.0f                                         .sdata2 */
-}
 
 /* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
@@ -70,10 +63,10 @@ u32 fn_800993B4(ResHandle* pSelf, u32 ofs);
  * scale/rotation-matrix/translation parts it selects from the node's own state. */
 void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
     if (pResult == NULL) {
-        nw4r::db::Panic(lbl_805915C0, 0x20, lbl_805915D0);
+        nw4r::db::Panic("g3d_resnode.cpp", 0x20, "NW4R:Pointer must not be NULL (pResult)");
     }
     if (res_node_is_valid(pSelf) == 0) {
-        nw4r::db::Panic(lbl_805915C0, 0x21, lbl_805915F8);
+        nw4r::db::Panic("g3d_resnode.cpp", 0x21, "NW4R:Failed assertion IsValid()");
     }
     if (res_node_is_valid(pSelf) != 0) {
         u32 flags = pResult->flags;
@@ -81,9 +74,9 @@ void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
         if ((flags & 0x80) != 0) {
             u32 dataFlags = pData->mFlags;
             if ((dataFlags & 0x8) != 0) {
-                pResult->scale[2] = lbl_80795F48;
-                pResult->scale[1] = lbl_80795F48;
-                pResult->scale[0] = lbl_80795F48;
+                pResult->scale[2] = 1.0f;
+                pResult->scale[1] = 1.0f;
+                pResult->scale[0] = 1.0f;
                 flags |= 0x18;
             } else {
                 u32 newFlags = flags & ~0x10;
@@ -111,9 +104,9 @@ void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
         }
         if ((flags & 0x200) != 0) {
             if ((pData->mFlags & 0x2) != 0) {
-                pResult->mtx[11] = lbl_80795F4C;
-                pResult->mtx[7] = lbl_80795F4C;
-                pResult->mtx[3] = lbl_80795F4C;
+                pResult->mtx[11] = 0.0f;
+                pResult->mtx[7] = 0.0f;
+                pResult->mtx[3] = 0.0f;
                 flags |= 0x40;
             } else {
                 pResult->mtx[3] = pData->mTranslate[0];
@@ -135,10 +128,10 @@ void fn_80098D5C(ResHandle* pSelf, AnmResult* pResult) {
 /* Fill one `AnmResult` from the node's own animation state (the pair's other direction). */
 void fn_80098F6C(ResHandle* pSelf, AnmResult* pResult) {
     if (pResult == NULL) {
-        nw4r::db::Panic(lbl_805915C0, 0x7E, lbl_805915D0);
+        nw4r::db::Panic("g3d_resnode.cpp", 0x7E, "NW4R:Pointer must not be NULL (pResult)");
     }
     if (res_node_is_valid(pSelf) == 0) {
-        nw4r::db::Panic(lbl_805915C0, 0x7F, lbl_805915F8);
+        nw4r::db::Panic("g3d_resnode.cpp", 0x7F, "NW4R:Failed assertion IsValid()");
     }
     if (res_node_is_valid(pSelf) != 0) {
         ResNodeData* pData = res_node_ptr(pSelf);
@@ -146,9 +139,9 @@ void fn_80098F6C(ResHandle* pSelf, AnmResult* pResult) {
         u32 dataFlags = pData->mFlags;
         if ((dataFlags & 0x8) != 0) {
             flags |= 0x18;
-            pResult->scale[2] = lbl_80795F48;
-            pResult->scale[1] = lbl_80795F48;
-            pResult->scale[0] = lbl_80795F48;
+            pResult->scale[2] = 1.0f;
+            pResult->scale[1] = 1.0f;
+            pResult->scale[0] = 1.0f;
         } else {
             if ((dataFlags & 0x10) != 0) {
                 flags |= 0x10;
@@ -202,11 +195,11 @@ void fn_80099134(ResNodeData* pSelf) {
 /* Store the translate triple, setting the channel bit when the triple is zeroed. */
 void fn_80099178(ResHandle* pSelf, f32 x, f32 y, f32 z) {
     if (res_node_is_valid(pSelf) == 0) {
-        nw4r::db::Panic(lbl_805915C0, 0xEF, lbl_805915F8);
+        nw4r::db::Panic("g3d_resnode.cpp", 0xEF, "NW4R:Failed assertion IsValid()");
     }
     if (res_node_is_valid(pSelf) != 0) {
         ResNodeData* pData = (ResNodeData*)res_handle_ptr(pSelf);
-        if (lbl_80795F4C == x && lbl_80795F4C == y && lbl_80795F4C == z) {
+        if (0.0f == x && 0.0f == y && 0.0f == z) {
             pData->mFlags |= 0x2;
         } else {
             pData->mFlags &= ~0x2;
@@ -221,11 +214,11 @@ void fn_80099178(ResHandle* pSelf, f32 x, f32 y, f32 z) {
 /* Store the rotate triple, setting the channel bit when the triple is zeroed. */
 void fn_80099278(ResHandle* pSelf, f32 x, f32 y, f32 z) {
     if (res_node_is_valid(pSelf) == 0) {
-        nw4r::db::Panic(lbl_805915C0, 0x103, lbl_805915F8);
+        nw4r::db::Panic("g3d_resnode.cpp", 0x103, "NW4R:Failed assertion IsValid()");
     }
     if (res_node_is_valid(pSelf) != 0) {
         ResNodeData* pData = (ResNodeData*)res_handle_ptr(pSelf);
-        if (lbl_80795F4C == x && lbl_80795F4C == y && lbl_80795F4C == z) {
+        if (0.0f == x && 0.0f == y && 0.0f == z) {
             pData->mFlags |= 0x4;
         } else {
             pData->mFlags &= ~0x4;

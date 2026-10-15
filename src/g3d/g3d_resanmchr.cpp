@@ -19,7 +19,9 @@
  *   fn_8008B704, fn_8008BEF0: retail truncates float to short/byte with `psq_st ...,1,qrN` + `lha`/`lbz`; a
  *     `union` pun, a two-step temporary and a plain cast all emit `fctiwz`/`stfd`.
  *   fn_8008F6C4: two loads ordered 0x10-then-0x00 here, 0x00-then-0x10 in retail.
- *   flipcheck: `.text` 0x4590 of 0x5084; `.rodata` and `.data` are claimed and not emitted; `.sdata2` is 0x10 of 0x38.
+ *   flipcheck: `.text` 0x4590 of 0x5084; `.rodata` is declared, not emitted; `.data`: the strings are literals,
+ *   the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
+ *   instance, after the TU's own strings, playbook 80); `.sdata2`: the float constants are literals, the pool is 0x30 of 0x38.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_80501434`,
  *     `MTX34RotXYZFIdx__Q24nw4r4mathFPQ34nw4r4math5MTX34fff`, `fn_80500F60`, `Atan2FIdx__Q24nw4r4mathFff`,
  *     `fn_805012C4`, `MTX33Identity__Q24nw4r4mathFPQ34nw4r4math5MTX33`, `fn_805012E8`,
@@ -42,6 +44,8 @@
 #include "fn_8004CAD8.h"         /* anim_tick_angle, mtx34_identity, sqrt_f32 (rule 2) */
 #include "mh3_pad.h"             /* copyVec3, setVec3, VEC3_ctor (rule 2) */
 
+#pragma pool_data off
+
 /* Retail keeps the split `clrlwi`+`slwi`/`cmpwi` forms the peephole would fuse; `fp_contract` stays on (the
  * target's fn_8008AED0 uses fused `fmadds`/`fmsubs`). */
 #pragma peephole off
@@ -57,31 +61,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 } // namespace db
 } // namespace nw4r
 
-/* The panic file/format strings the target references as map symbols.  They are declared here as
- * externs rather than literals: MWCC's `-str reuse` pools repeated literals, while the target loads
- * each assert string with its own `lis`/`addi`; the claimed `.data` is not emitted yet. */
-extern const char lbl_80590010[]; /* "g3d_resanmchr.cpp" */
-extern const char lbl_80590028[]; /* the ScaleType format string */
-extern const char lbl_80590088[]; /* the "not valid pointer" format string */
-extern const char lbl_805900BC[]; /* the position-bounds format string */
-extern const char lbl_80590100[]; /* the frame-bounds format string */
-extern const char lbl_8059013C[]; /* the 7-value ScaleType format string */
-extern const char lbl_805901A0[]; /* the rotation ScaleType format string */
-extern const char lbl_80590200[]; /* the first pointer-error format string of the walkers */
-extern const char lbl_805902E4[]; /* the second pointer-error format string (fn_8008DA10) */
-extern const char lbl_8059031C[]; /* the second pointer-error format string (fn_8008DF8C/...) */
-extern const char lbl_80590350[]; /* the second pointer-error format string (fn_8008E1C0/F148) */
-extern const char lbl_80590388[]; /* the second pointer-error format string (fn_8008E408) */
-extern const char lbl_805903BC[]; /* the second pointer-error format string (fn_8008E698) */
-
 /* The float constants the target reads from `.sdata2`. */
-extern const f32 lbl_80795ED0; /* 0.0f */
-extern const f32 lbl_80795EE8; /* 1.0f */
-extern const f32 lbl_80795EEC; /* 2.0f */
-extern const f32 lbl_80795EF0; /* 3.0f */
-extern const f32 lbl_80795EF4; /* the cast helper's scale */
-extern const f32 lbl_80795EF8;
-extern const f32 lbl_80795EFC;
 extern const f32 lbl_80795F00;
 
 /*
@@ -351,7 +331,7 @@ f32 fn_8008A93C(u32* self, u32* p, s32 isConst, f32 frame)
     data = fn_8008B078((u32)self, *p);
     valid = IS_VALID_PTR(data);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x1B7, lbl_80590088, data);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x1B7, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", data);
     }
     return fn_8008AA8C(data, frame);
 }
@@ -372,10 +352,10 @@ f32 fn_8008B808(u32* self, u32* p, s32 isConst, f32 frame)
  * length; v0/t0 and v1/t1 are the two keys' values and tangents. */
 f32 fn_8008AED0(f32 v0, f32 t0, f32 v1, f32 t1, f32 rate, f32 span)
 {
-    f32 hm1 = rate - lbl_80795EE8;
+    f32 hm1 = rate - 1.0f;
 
     return (span * hm1 * ((hm1 * t0) + (rate * t1))) +
-           ((rate * (rate * (((lbl_80795EEC * rate) - lbl_80795EF0) * (v0 - v1)))) + v0);
+           ((rate * (rate * (((2.0f * rate) - 3.0f) * (v0 - v1)))) + v0);
 }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -617,7 +597,7 @@ u8 fn_8008BE88(f32 value)
 /* Scales a 3-float record by a constant and forwards it. */
 void fn_8008C484(f32* out, f32 x, f32 y, f32 z)
 {
-    fn_80501434(out, lbl_80795EF4 * x, lbl_80795EF4 * y, lbl_80795EF4 * z);
+    fn_80501434(out, 0.7111111f * x, 0.7111111f * y, 0.7111111f * z);
 }
 
 /* A u16-keyed float table value. */
@@ -629,9 +609,9 @@ f32 fn_8008C7F0(u32 self, u16 index)
 /* Zeroes the 3-float record at +0x4 and clears the matrix at +0x1C. */
 void fn_8008D1AC(ResAnmChrObj* self)
 {
-    self->scale[0] = lbl_80795EE8;
-    self->scale[1] = lbl_80795EE8;
-    self->scale[2] = lbl_80795EE8;
+    self->scale[0] = 1.0f;
+    self->scale[1] = 1.0f;
+    self->scale[2] = 1.0f;
     mtx34_identity(self->mat);
 }
 
@@ -676,7 +656,7 @@ f32 fn_8008B0B0(u32* self, u32* p, s32 isConst, f32 frame)
     data = fn_8008B078((u32)self, *p);
     valid = IS_VALID_PTR(data);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x1B7, lbl_80590088, data);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x1B7, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", data);
     }
     return fn_8008B200(data, frame);
 }
@@ -692,7 +672,7 @@ f32 fn_8008B80C(u32* self, u32* p, s32 isConst, f32 frame)
     data = fn_8008B078((u32)self, *p);
     valid = IS_VALID_PTR(data);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x1B7, lbl_80590088, data);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x1B7, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", data);
     }
     return fn_8008B95C(data, frame);
 }
@@ -715,7 +695,7 @@ f32 fn_8008C4A0(u32 self, u32* p, u16 index, s32 isConst, f32 frame)
     data = fn_8008B078(self, *p);
     valid = IS_VALID_PTR(data);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x1CF, lbl_80590088, data);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x1CF, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", data);
     }
     return fn_8008C600(data, index, frame);
 }
@@ -736,7 +716,7 @@ f32 fn_8008C808(u32 self, u32* p, u16 index, s32 isConst, f32 frame)
     data = fn_8008B078(self, *p);
     valid = IS_VALID_PTR(data);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x1CF, lbl_80590088, data);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x1CF, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", data);
     }
     return fn_8008C968(data, index, frame);
 }
@@ -757,7 +737,7 @@ f32 fn_8008CBA0(u32 self, u32* p, u16 index, s32 isConst, f32 frame)
     data = fn_8008B078(self, *p);
     valid = IS_VALID_PTR(data);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x1CF, lbl_80590088, data);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x1CF, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", data);
     }
     return fn_8008CD00(data, index, frame);
 }
@@ -775,10 +755,10 @@ f32 fn_8008C600(u32 self, u16 index, f32 frame)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x16C, lbl_80590088, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x16C, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", self);
     }
     pos = math_f32_to_u16(frame);
-    if (frame == lbl_80795ED0) {
+    if (frame == 0.0f) {
         return fn_8008C7F0(self, 0);
     }
     if (index <= pos) {
@@ -786,7 +766,7 @@ f32 fn_8008C600(u32 self, u16 index, f32 frame)
     }
     delta = frame - (f32)pos;
     v0 = fn_8008C7F0(self, pos);
-    if (lbl_80795ED0 == delta) {
+    if (0.0f == delta) {
         return v0;
     }
     return (delta * (fn_8008C7F0(self, (u16)(pos + 1)) - v0)) + v0;
@@ -801,10 +781,10 @@ f32 fn_8008C968(u32 self, u16 index, f32 frame)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x16C, lbl_80590088, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x16C, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", self);
     }
     pos = math_f32_to_u16(frame);
-    if (frame == lbl_80795ED0) {
+    if (frame == 0.0f) {
         return fn_8008CB58((const ResAnmChrU16Channel*)self, 0);
     }
     if (index <= pos) {
@@ -812,7 +792,7 @@ f32 fn_8008C968(u32 self, u16 index, f32 frame)
     }
     delta = frame - (f32)pos;
     v0 = fn_8008CB58((const ResAnmChrU16Channel*)self, pos);
-    if (lbl_80795ED0 == delta) {
+    if (0.0f == delta) {
         return v0;
     }
     return (delta * (fn_8008CB58((const ResAnmChrU16Channel*)self, (u16)(pos + 1)) - v0)) + v0;
@@ -827,10 +807,10 @@ f32 fn_8008CD00(u32 self, u16 index, f32 frame)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x16C, lbl_80590088, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x16C, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", self);
     }
     pos = math_f32_to_u16(frame);
-    if (frame == lbl_80795ED0) {
+    if (frame == 0.0f) {
         return fn_8008CEF0((const ResAnmChrU8Channel*)self, 0);
     }
     if (index <= pos) {
@@ -838,7 +818,7 @@ f32 fn_8008CD00(u32 self, u16 index, f32 frame)
     }
     delta = frame - (f32)pos;
     v0 = fn_8008CEF0((const ResAnmChrU8Channel*)self, pos);
-    if (lbl_80795ED0 == delta) {
+    if (0.0f == delta) {
         return v0;
     }
     return (delta * (fn_8008CEF0((const ResAnmChrU8Channel*)self, (u16)(pos + 1)) - v0)) + v0;
@@ -874,7 +854,7 @@ f32 fn_8008AA8C(u32 self, f32 frame)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0xFC, lbl_80590088, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0xFC, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", self);
     }
     firstIdx = fn_8008B040(self, 0);
     fn_8008B004(&first, &firstIdx);
@@ -889,7 +869,7 @@ f32 fn_8008AA8C(u32 self, f32 frame)
     delta = frame - fn_8008AFF8(&first);
     pos = math_f32_to_u16(ch->rate * (delta * anim_tick_angle(ch->count)));
     if (pos > ch->count - 1) {
-        nw4r::db::Panic(lbl_80590010, 0x11A, lbl_805900BC, (f64)pos, (f64)(ch->count - 1));
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x11A, "estimatePos is out of bounds(%f)\nestimatePos <= %f not satisfied.", (f64)pos, (f64)(ch->count - 1));
     }
     keyIdx = fn_8008B040(self, (u16)pos);
     fn_8008B004(&key, &keyIdx);
@@ -917,7 +897,7 @@ f32 fn_8008AA8C(u32 self, f32 frame)
     hiFrame = fn_8008AFF8(&next);
     frameValid = (loFrame <= frame) && (frame <= hiFrame);
     if (!frameValid) {
-        nw4r::db::Panic(lbl_80590010, 0x150, lbl_80590100, frame, loFrame, hiFrame);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x150, "frame is out of bounds(%f)\n%f <= frame <= %f not satisfied.", frame, loFrame, hiFrame);
     }
     span = frame - loFrame;
     return fn_8008AED0(curVal, curTan, nextVal, nextTan,
@@ -969,7 +949,7 @@ f32 fn_8008B200(u32 self, f32 frame)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0xFC, lbl_80590088, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0xFC, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", self);
     }
     firstIdx = fn_8008B7D0(self, 0);
     fn_8008B794(&first, &firstIdx);
@@ -984,7 +964,7 @@ f32 fn_8008B200(u32 self, f32 frame)
     delta = frame - fn_8008B784(&first);
     pos = math_f32_to_u16(ch->rate * (delta * anim_tick_angle(ch->count)));
     if (pos > ch->count - 1) {
-        nw4r::db::Panic(lbl_80590010, 0x11A, lbl_805900BC, (f64)pos, (f64)(ch->count - 1));
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x11A, "estimatePos is out of bounds(%f)\nestimatePos <= %f not satisfied.", (f64)pos, (f64)(ch->count - 1));
     }
     keyIdx = fn_8008B7D0(self, (u16)pos);
     fn_8008B794(&key, &keyIdx);
@@ -1012,7 +992,7 @@ f32 fn_8008B200(u32 self, f32 frame)
     hiFrame = fn_8008B784(&next);
     frameValid = (loFrame <= frame) && (frame <= hiFrame);
     if (!frameValid) {
-        nw4r::db::Panic(lbl_80590010, 0x150, lbl_80590100, frame, loFrame, hiFrame);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x150, "frame is out of bounds(%f)\n%f <= frame <= %f not satisfied.", frame, loFrame, hiFrame);
     }
     span = frame - loFrame;
     return fn_8008AED0(curVal, curTan, nextVal, nextTan,
@@ -1049,7 +1029,7 @@ f32 fn_8008B95C(u32 self, f32 frame)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0xFC, lbl_80590088, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0xFC, "NW4R:Pointer Error\npAnm(=%p) is not valid pointer.", self);
     }
     firstIdx = fn_8008C000(self, 0);
     fn_8008BFC4(&first, &firstIdx);
@@ -1064,7 +1044,7 @@ f32 fn_8008B95C(u32 self, f32 frame)
     delta = frame - fn_8008BF5C(&first);
     pos = math_f32_to_u16(ch->rate * (delta * anim_tick_angle(ch->count)));
     if (pos > ch->count - 1) {
-        nw4r::db::Panic(lbl_80590010, 0x11A, lbl_805900BC, (f64)pos, (f64)(ch->count - 1));
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x11A, "estimatePos is out of bounds(%f)\nestimatePos <= %f not satisfied.", (f64)pos, (f64)(ch->count - 1));
     }
     keyIdx = fn_8008C000(self, (u16)pos);
     fn_8008BFC4(&key, &keyIdx);
@@ -1092,7 +1072,7 @@ f32 fn_8008B95C(u32 self, f32 frame)
     hiFrame = fn_8008BF5C(&next);
     frameValid = (loFrame <= frame) && (frame <= hiFrame);
     if (!frameValid) {
-        nw4r::db::Panic(lbl_80590010, 0x150, lbl_80590100, frame, loFrame, hiFrame);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x150, "frame is out of bounds(%f)\n%f <= frame <= %f not satisfied.", frame, loFrame, hiFrame);
     }
     span = frame - loFrame;
     return fn_8008AED0(curVal, curTan, nextVal, nextTan,
@@ -1165,8 +1145,8 @@ u32* fn_8008A664(f32* out, u32* self, f32* keys, f32 frame)
         }
         break;
     default:
-        nw4r::db::Panic(lbl_80590010, 0x298, lbl_80590028, flags);
-        v0 = lbl_80795ED0;
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x298, "NW4R Internal error\nResAnmChrNodeData.flags has invalid ScaleType(flags=0x%08X, ScaleType=0x%X)", flags);
+        v0 = 0.0f;
         v1 = v0;
         v2 = v0;
         break;
@@ -1187,9 +1167,9 @@ void fn_8008D1C4(ResAnmChrObj* self, u32 unused, const f32* key, f32 frame)
 
     (void)unused;
     VEC3_ctor(&rec);
-    self->scale[0] = lbl_80795EE8;
-    self->scale[1] = lbl_80795EE8;
-    self->scale[2] = lbl_80795EE8;
+    self->scale[0] = 1.0f;
+    self->scale[1] = 1.0f;
+    self->scale[2] = 1.0f;
     mtx34_identity(self->mat);
     fn_8008CF2C(&rec, key, key + 2, frame);
     self->mat[3] = rec.x;
@@ -1199,14 +1179,14 @@ void fn_8008D1C4(ResAnmChrObj* self, u32 unused, const f32* key, f32 frame)
 
 void fn_8008D25C(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
 {
-    self->scale[0] = lbl_80795EE8;
-    self->scale[1] = lbl_80795EE8;
-    self->scale[2] = lbl_80795EE8;
+    self->scale[0] = 1.0f;
+    self->scale[1] = 1.0f;
+    self->scale[2] = 1.0f;
     fn_8008C038(self->mat, self->pos, arg1, (u32)key, key + 2, frame);
     self->flags |= 0x80000000;
-    self->mat[3] = lbl_80795ED0;
-    self->mat[7] = lbl_80795ED0;
-    self->mat[11] = lbl_80795ED0;
+    self->mat[3] = 0.0f;
+    self->mat[7] = 0.0f;
+    self->mat[11] = 0.0f;
 }
 
 void fn_8008D30C(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
@@ -1215,9 +1195,9 @@ void fn_8008D30C(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
     void* row;
 
     VEC3_ctor(&rec);
-    self->scale[0] = lbl_80795EE8;
-    self->scale[1] = lbl_80795EE8;
-    self->scale[2] = lbl_80795EE8;
+    self->scale[0] = 1.0f;
+    self->scale[1] = 1.0f;
+    self->scale[2] = 1.0f;
     row = fn_8008C038(self->mat, self->pos, arg1, (u32)key, key + 2, frame);
     self->flags |= 0x80000000;
     fn_8008CF2C(&rec, key, row, frame);
@@ -1233,9 +1213,9 @@ void fn_8008D3DC(ResAnmChrObj* self, u32 arg1, const f32* key, f32 frame)
     row = (void*)fn_8008A664(self->scale, (u32*)key, (f32*)&key[2], frame);
     fn_8008C038(self->mat, self->pos, arg1, (u32)key, row, frame);
     self->flags |= 0x80000000;
-    self->mat[3] = lbl_80795ED0;
-    self->mat[7] = lbl_80795ED0;
-    self->mat[11] = lbl_80795ED0;
+    self->mat[3] = 0.0f;
+    self->mat[7] = 0.0f;
+    self->mat[11] = 0.0f;
 }
 
 void fn_8008D47C(ResAnmChrObj* self, u32 unused, const f32* key, f32 frame)
@@ -1287,16 +1267,16 @@ void fn_8008DA10(ResAnmChrObj* self, f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x499, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x499, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x49A, lbl_805902E4, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x49A, "NW4R:Pointer Error\npScale(=%p) is not valid pointer.", out);
     }
     if (self->flags & 8) {
-        out[0] = lbl_80795EE8;
-        out[1] = lbl_80795EE8;
-        out[2] = lbl_80795EE8;
+        out[0] = 1.0f;
+        out[1] = 1.0f;
+        out[2] = 1.0f;
     } else {
         copyVec3((nw4r::math::VEC3*)out, (const nw4r::math::VEC3*)self->scale);
     }
@@ -1308,16 +1288,16 @@ void fn_8008E1C0(ResAnmChrObj* self, f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x50D, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x50D, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x50E, lbl_80590350, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x50E, "NW4R:Pointer Error\npTrans(=%p) is not valid pointer.", out);
     }
     if (self->flags & 0x40) {
-        out[0] = lbl_80795ED0;
-        out[1] = lbl_80795ED0;
-        out[2] = lbl_80795ED0;
+        out[0] = 0.0f;
+        out[1] = 0.0f;
+        out[2] = 0.0f;
     } else {
         out[0] = self->mat[3];
         out[1] = self->mat[7];
@@ -1331,11 +1311,11 @@ void fn_8008DF8C(ResAnmChrObj* self, f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x4F4, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x4F4, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x4F5, lbl_8059031C, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x4F5, "NW4R:Pointer Error\npRot(=%p) is not valid pointer.", out);
     }
     if (self->flags & 0x20) {
         fn_805012C4(out);
@@ -1351,13 +1331,13 @@ void fn_8008F148(ResAnmChrObj* self, const f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x607, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x607, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x608, lbl_80590350, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x608, "NW4R:Pointer Error\npTrans(=%p) is not valid pointer.", out);
     }
-    if (out[0] == lbl_80795ED0 && out[1] == lbl_80795ED0 && out[2] == lbl_80795ED0) {
+    if (out[0] == 0.0f && out[1] == 0.0f && out[2] == 0.0f) {
         mask = 0x40;
         if (self->flags & 0x20) {
             mask |= 4;
@@ -1381,11 +1361,11 @@ void fn_8008E408(ResAnmChrObj* self, f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x52A, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x52A, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x52B, lbl_80590388, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x52B, "NW4R:Pointer Error\npRT(=%p) is not valid pointer.", out);
     }
     flags = self->flags;
     if (flags & 0x20) {
@@ -1399,9 +1379,9 @@ void fn_8008E408(ResAnmChrObj* self, f32* out)
         }
     } else if (flags & 0x40) {
         mtx34_copy_ps((Mtx34*)out, (const Mtx34*)self->mat);
-        out[3] = lbl_80795ED0;
-        out[7] = lbl_80795ED0;
-        out[11] = lbl_80795ED0;
+        out[3] = 0.0f;
+        out[7] = 0.0f;
+        out[11] = 0.0f;
     } else {
         mtx34_copy_ps((Mtx34*)out, (const Mtx34*)self->mat);
     }
@@ -1413,11 +1393,11 @@ void fn_8008E698(ResAnmChrObj* self, f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x55B, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x55B, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x55C, lbl_805903BC, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x55C, "NW4R:Pointer Error\npMtx(=%p) is not valid pointer.", out);
     }
     fn_8008E408(self, out);
     if (!(self->flags & 8)) {
@@ -1432,13 +1412,13 @@ void fn_8008E8D0(ResAnmChrObj* self, const f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x572, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x572, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x573, lbl_805902E4, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x573, "NW4R:Pointer Error\npScale(=%p) is not valid pointer.", out);
     }
-    if (out[0] == lbl_80795EE8 && out[1] == lbl_80795EE8 && out[2] == lbl_80795EE8) {
+    if (out[0] == 1.0f && out[1] == 1.0f && out[2] == 1.0f) {
         t = self->flags | 0x18;
         self->flags = t;
         if (t & 4) {
@@ -1462,13 +1442,13 @@ void fn_8008EB68(ResAnmChrObj* self, const f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x59A, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x59A, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x59B, lbl_8059031C, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x59B, "NW4R:Pointer Error\npRot(=%p) is not valid pointer.", out);
     }
-    if (out[0] == lbl_80795ED0 && out[1] == lbl_80795ED0 && out[2] == lbl_80795ED0) {
+    if (out[0] == 0.0f && out[1] == 0.0f && out[2] == 0.0f) {
         mask = 0x20;
         flags = self->flags;
         if (flags & 0x40) {
@@ -1478,15 +1458,15 @@ void fn_8008EB68(ResAnmChrObj* self, const f32* out)
             }
         }
         self->flags |= mask;
-        self->mat[0] = lbl_80795EE8;
-        self->mat[1] = lbl_80795ED0;
-        self->mat[2] = lbl_80795ED0;
-        self->mat[4] = lbl_80795ED0;
-        self->mat[5] = lbl_80795EE8;
-        self->mat[6] = lbl_80795ED0;
-        self->mat[8] = lbl_80795ED0;
-        self->mat[9] = lbl_80795ED0;
-        self->mat[10] = lbl_80795EE8;
+        self->mat[0] = 1.0f;
+        self->mat[1] = 0.0f;
+        self->mat[2] = 0.0f;
+        self->mat[4] = 0.0f;
+        self->mat[5] = 1.0f;
+        self->mat[6] = 0.0f;
+        self->mat[8] = 0.0f;
+        self->mat[9] = 0.0f;
+        self->mat[10] = 1.0f;
     } else {
         nw4r::math::VEC3 rec;
 
@@ -1509,15 +1489,15 @@ void fn_8008EE68(ResAnmChrObj* self, const f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x5DB, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x5DB, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x5DC, lbl_8059031C, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x5DC, "NW4R:Pointer Error\npRot(=%p) is not valid pointer.", out);
     }
-    if (out[0] == lbl_80795EE8 && out[1] == lbl_80795ED0 && out[2] == lbl_80795ED0 &&
-        out[3] == lbl_80795ED0 && out[4] == lbl_80795EE8 && out[5] == lbl_80795ED0 &&
-        out[6] == lbl_80795ED0 && out[7] == lbl_80795ED0 && out[8] == lbl_80795EE8) {
+    if (out[0] == 1.0f && out[1] == 0.0f && out[2] == 0.0f &&
+        out[3] == 0.0f && out[4] == 1.0f && out[5] == 0.0f &&
+        out[6] == 0.0f && out[7] == 0.0f && out[8] == 1.0f) {
         mask = 0x20;
         flags = self->flags;
         if (flags & 0x40) {
@@ -1542,11 +1522,11 @@ void fn_8008F3DC(ResAnmChrObj* self, const void* src)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x671, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x671, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(src);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x672, lbl_805903BC, src);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x672, "NW4R:Pointer Error\npMtx(=%p) is not valid pointer.", src);
     }
     setVec3(&rec, fn_8008F6C4((u32)src, 0), fn_8008F6C4((u32)src, 1), fn_8008F6C4((u32)src, 2));
     fn_8008E8D0(self, (const f32*)&rec);
@@ -1566,26 +1546,26 @@ s32 fn_8008DC4C(ResAnmChrObj* self, f32* out)
 
     valid = IS_VALID_PTR(self);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x4BB, lbl_80590200, self);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x4BB, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", self);
     }
     valid = IS_VALID_PTR(out);
     if (!valid) {
-        nw4r::db::Panic(lbl_80590010, 0x4BC, lbl_8059031C, out);
+        nw4r::db::Panic("g3d_resanmchr.cpp", 0x4BC, "NW4R:Pointer Error\npRot(=%p) is not valid pointer.", out);
     }
     if (self->flags & 0x20) {
-        out[0] = lbl_80795ED0;
-        out[1] = lbl_80795ED0;
-        out[2] = lbl_80795ED0;
+        out[0] = 0.0f;
+        out[1] = 0.0f;
+        out[2] = 0.0f;
         return 1;
     }
     if (self->flags & 0x80000000) {
         copyVec3((nw4r::math::VEC3*)out, (const nw4r::math::VEC3*)self->pos);
         return 1;
     }
-    r = sqrt_f32(lbl_80795EE8 - self->mat[8] * self->mat[8]);
-    if (r == lbl_80795ED0) {
+    r = sqrt_f32(1.0f - self->mat[8] * self->mat[8]);
+    if (r == 0.0f) {
         out[0] = fn_8008DF64(self->mat[2] + self->mat[5], self->mat[6] + self->mat[1]);
-        out[1] = f32_select_nonneg(self->mat[8], lbl_80795EF8, lbl_80795EFC);
+        out[1] = f32_select_nonneg(self->mat[8], -90.0f, 90.0f);
         out[2] = fn_8008DF64(self->mat[2] + self->mat[5], self->mat[6] - self->mat[1]);
     } else {
         out[0] = fn_8008DF64(self->mat[9], self->mat[10]);

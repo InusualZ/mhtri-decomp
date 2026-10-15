@@ -97,8 +97,9 @@
  *     counter, an inline store helper - no better).
  *   g3d_tev_cache_update, g3d_state_load_mat_ind_mtx_dl, g3d_state_load_mat_ind_mtx: register order only.
  *   flipcheck: `.text` short of the claim; `.ctors`, `.bss`, `.sbss`, `.rodata` and `.sdata2` are claimed and not
- *     emitted, `.data` is 0xAC of 0x598 and `.sdata` 0x4 of 0x20 (the globals and the asserts' strings are declared,
- *     not defined).
+ *     emitted (the globals are declared, not defined); `.data`/`.sdata`: the asserts' strings are literals,
+ *     the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
+ *     instance, after the TU's own strings, playbook 80).
  * SHAPES. `#pragma fp_contract off` around g3d_state_load_mat_chan: retail keeps `fmuls` + `fadds` for the scaled
  *   ambient (it took the function from 97.7 to 100).  File-scope `#pragma pool_data off`: retail gives each assert string its own `lis`/`addi` (it took
  *   g3d_tex_proj_build to 100).  File-scope `#pragma peephole off`: retail keeps every `rlwinm`/`clrlwi` + `cmpwi` and unfused
@@ -140,14 +141,6 @@
 /* externs: the SDK and the neighbouring units this one calls (the map owns their names)             */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* The panic file/format strings the target references as map symbols, declared here rather than as
- * literals for the same reason `g3d_camera.cpp` does: `-str reuse` would pool a literal. */
-extern const char lbl_8058F750[]; /* "g3d_state.cpp" */
-extern const char lbl_8058F80C[]; /* "NW4R:Failed assertion mtxID < NUM_CAMERA && mtxID >= 0" */
-
-/* `.sdata` and `.sbss` globals the range's small accessors hand back the address of. */
-extern u32 lbl_8079124C;
-
 namespace nw4r {
 namespace db {
 
@@ -181,7 +174,7 @@ extern "C" void fn_80501658(void* p);
         if (!ok2_ && !(((u32)(ptr) & 0xFFFFC000u) == 0xE0000000u))                              \
             ok1_ = FALSE;                                                                        \
         if (!ok1_)                                                                              \
-            nw4r::db::Panic(lbl_8058F750, line, msg, (ptr));                                     \
+            nw4r::db::Panic("g3d_state.cpp", line, msg, (ptr));                                     \
     }
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -557,7 +550,7 @@ const nw4r::g3d::ResTevData* nw4r::g3d::ResTev::ptr() const {
 
 /* 0x80086768 (0x8): returns the class name. */
 const char* nw4r::g3d::ResTev::GetClassName() {
-    return (const char*)&lbl_8079124C;
+    return "ResTev";
 }
 
 extern "C" {
@@ -844,7 +837,7 @@ void g3d_tex_coord_scale_set_tex_maps(StatePairTable* pSelf, nw4r::g3d::ResTev t
     const nw4r::g3d::ResTevData& r = tev.ref();
     const u32* pMaps = (const u32*)r.texMapID;
     if (((u32)pMaps & 3) != 0) {
-        nw4r::db::Panic(lbl_8058F750, 0x249, "NW4R:Failed assertion ((u32)x & 0x3) == 0");
+        nw4r::db::Panic("g3d_state.cpp", 0x249, "NW4R:Failed assertion ((u32)x & 0x3) == 0");
     }
     if ((pSelf->mFlags & 2) == 0 || pMaps[0] != pSelf->texMapWord[0] || pMaps[1] != pSelf->texMapWord[1]) {
         pSelf->texMapWord[0] = pMaps[0];
@@ -872,7 +865,7 @@ void g3d_gd_set_gen_mode(u8 numTexGens, u8 numChans, u8 numTevStages, u8 numIndS
 /* Records `tev` as the loaded TEV, returning whether it already was. */
 BOOL g3d_tev_cache_update(u32* pCached, nw4r::g3d::ResTev tev) {
     if (!tev.IsValid()) {
-        nw4r::db::Panic(lbl_8058F750, 0x3B2, "NW4R:Failed assertion rhs.IsValid()");
+        nw4r::db::Panic("g3d_state.cpp", 0x3B2, "NW4R:Failed assertion rhs.IsValid()");
     }
     if (*pCached == (u32)tev.ptr()) {
         return TRUE;
@@ -1077,10 +1070,10 @@ extern "C" {
 /* 0x80087580 (0x90): records texture matrix `idx`'s scene-dependent function type. */
 void g3d_tex_mtx_func_type_set(s32* pFuncTypes, u32 idx, s32 funcType) {
     if (idx >= 8) {
-        nw4r::db::Panic(lbl_8058F750, 0x363, "NW4R:Failed assertion idx >= 0 && idx < 8");
+        nw4r::db::Panic("g3d_state.cpp", 0x363, "NW4R:Failed assertion idx >= 0 && idx < 8");
     }
     if (funcType >= 4) {
-        nw4r::db::Panic(lbl_8058F750, 0x364,
+        nw4r::db::Panic("g3d_state.cpp", 0x364,
                         "NW4R:Failed assertion funcType < MAX_SCNDEPENDENT_TEXMTX_FUNCTYPE");
     }
     pFuncTypes[idx] = funcType;
@@ -1089,7 +1082,7 @@ void g3d_tex_mtx_func_type_set(s32* pFuncTypes, u32 idx, s32 funcType) {
 /* 0x80087610 (0x70): returns the texture-matrix mode projection `idx` needs. */
 s32 g3d_tex_proj_mtx_mode(G3dTexProjTable* pSelf, u32 idx) {
     if (idx >= 0x100) {
-        nw4r::db::Panic(lbl_8058F750, 0x469, "NW4R:Failed assertion idx < NUM_SCNDEPENDENT_TEXMTX_FUNCTYPE");
+        nw4r::db::Panic("g3d_state.cpp", 0x469, "NW4R:Failed assertion idx < NUM_SCNDEPENDENT_TEXMTX_FUNCTYPE");
     }
     if (idx >= 0x100) {
         idx = 0;
@@ -1100,13 +1093,13 @@ s32 g3d_tex_proj_mtx_mode(G3dTexProjTable* pSelf, u32 idx) {
 /* 0x80087680 (0x1F0): builds projection `idx`'s matrix into `pOut` from camera `refCamera` and light `refLight`. */
 void g3d_tex_proj_build(G3dTexProjTable* pSelf, u32 idx, nw4r::math::MTX34* pOut, s8 refCamera, s8 refLight) {
     if (idx >= 0x100) {
-        nw4r::db::Panic(lbl_8058F750, 0x459, "NW4R:Failed assertion idx < NUM_SCNDEPENDENT_TEXMTX_FUNCTYPE");
+        nw4r::db::Panic("g3d_state.cpp", 0x459, "NW4R:Failed assertion idx < NUM_SCNDEPENDENT_TEXMTX_FUNCTYPE");
     }
     if (refCamera >= 0x20) {
-        nw4r::db::Panic(lbl_8058F750, 0x45A, "NW4R:Failed assertion ref_camera < NUM_CAMERA");
+        nw4r::db::Panic("g3d_state.cpp", 0x45A, "NW4R:Failed assertion ref_camera < NUM_CAMERA");
     }
     if (refLight >= 0x80) {
-        nw4r::db::Panic(lbl_8058F750, 0x45B, "NW4R:Failed assertion ref_light < NUM_LIGHT");
+        nw4r::db::Panic("g3d_state.cpp", 0x45B, "NW4R:Failed assertion ref_light < NUM_LIGHT");
     }
     G3D_STATE_POINTER_ASSERT(pOut, 0x45C, "NW4R:Pointer Error\npOut(=%p) is not valid pointer.");
     if (idx >= 0x100) {
@@ -1255,7 +1248,7 @@ void g3d_view_mtx_arrays_set(G3dViewMtxArrays* pSelf, nw4r::math::MTX34* pPos, M
 /* 0x80087E90 (0x78): returns view position matrix `idx`. */
 nw4r::math::MTX34* g3d_view_mtx_arrays_pos_mtx(G3dViewMtxArrays* pSelf, u32 idx) {
     if (pSelf->pViewPosMtx == NULL) {
-        nw4r::db::Panic(lbl_8058F750, 0x3EE, "NW4R:Pointer must not be NULL (mpViewPosMtxArray)");
+        nw4r::db::Panic("g3d_state.cpp", 0x3EE, "NW4R:Pointer must not be NULL (mpViewPosMtxArray)");
     }
     if (pSelf->pViewPosMtx != NULL) {
         return &pSelf->pViewPosMtx[idx];
@@ -1352,7 +1345,7 @@ nw4r::math::MTX34* g3d_state_get_inv_camera_mtx(void) {
 nw4r::math::MTX34* g3d_camera_table_inv_camera_mtx(G3dCameraTable* pSelf) {
     if ((pSelf->flags & 1) == 0) {
         if (!mtx34_inverse(&pSelf->invCameraMtx, g3d_camera_table_camera_mtx(pSelf))) {
-            nw4r::db::Panic(lbl_8058F750, 0x69B, "NW4R:Failed assertion result");
+            nw4r::db::Panic("g3d_state.cpp", 0x69B, "NW4R:Failed assertion result");
         }
         pSelf->flags |= 1;
     }
@@ -1382,7 +1375,7 @@ nw4r::math::MTX34* g3d_state_get_camera_mtx_at(u32 idx) {
 /* 0x8008841C (0x84): returns camera `idx`'s matrix, NULL past the table. */
 nw4r::math::MTX34* g3d_camera_table_camera_mtx_at(G3dCameraTable* pSelf, u32 idx) {
     if (!g3d_camera_idx_valid(idx)) {
-        nw4r::db::Panic(lbl_8058F750, 0x66A, lbl_8058F80C);
+        nw4r::db::Panic("g3d_state.cpp", 0x66A, "NW4R:Failed assertion mtxID < NUM_CAMERA && mtxID >= 0");
     }
     if (idx <= 31) {
         return &pSelf->cameraMtx[idx];
@@ -1410,7 +1403,7 @@ nw4r::math::MTX34* g3d_state_get_proj_tex_mtx_at(u32 idx) {
 /* 0x800884D0 (0x84): returns camera `idx`'s texture projection matrix, NULL past the table. */
 nw4r::math::MTX34* g3d_camera_table_proj_tex_mtx_at(G3dCameraTable* pSelf, u32 idx) {
     if (!g3d_camera_idx_valid(idx)) {
-        nw4r::db::Panic(lbl_8058F750, 0x67E, lbl_8058F80C);
+        nw4r::db::Panic("g3d_state.cpp", 0x67E, "NW4R:Failed assertion mtxID < NUM_CAMERA && mtxID >= 0");
     }
     if (idx <= 31) {
         return &pSelf->projTexMtx[idx];
@@ -1617,7 +1610,7 @@ void G3dIndMtxCallbackStd::SetNrmMapMtx(_GXIndTexMtxID id, const nw4r::math::VEC
                                         const nw4r::math::MTX34* pNrmMtx,
                                         nw4r::g3d::ResMatMiscData::IndirectMethod method) {
     if (!(id == GX_ITM_0 || id == GX_ITM_1 || id == GX_ITM_2)) {
-        nw4r::db::Panic(lbl_8058F750, 0x9E4,
+        nw4r::db::Panic("g3d_state.cpp", 0x9E4,
                         "NW4R:Failed assertion id == GX_ITM_0 || id == GX_ITM_1 || id == GX_ITM_2");
     }
     u32 idx = id - GX_ITM_0;
@@ -1641,7 +1634,7 @@ void G3dIndMtxCallbackStd::SetNrmMapMtx(_GXIndTexMtxID id, const nw4r::math::VEC
                 pMtx->m[1][0] = 0.0f;
             }
             if (pNrmMtx == NULL) {
-                nw4r::db::Panic(lbl_8058F750, 0xA06, "NW4R:Pointer must not be NULL (pNrmMtx)");
+                nw4r::db::Panic("g3d_state.cpp", 0xA06, "NW4R:Pointer must not be NULL (pNrmMtx)");
             }
             mtx34_concat(pMtx, &mtx[idx], pNrmMtx);
         } else {

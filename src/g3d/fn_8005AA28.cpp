@@ -1,23 +1,35 @@
 /*
  * g3d/fn_8005AA28.cpp - nw4r g3d `ResMat` accessor copies of the `_ac.h` inlines and a VEC3 static initialiser.
- * RANGE. .text 0x8005AA28-0x8005ABD8 (8 functions); extab, extabindex, .ctors 0x8056F2D0-0x8056F2D4 (fn_8005AB78's
- *   word), .data 0x8058B350-0x8058B388, .bss 0x8066AE48-0x8066AE60, .sdata 0x80791124-0x80791130, .sdata2
- *   0x80795CF0-0x80795CF8.
+ * RANGE. .text 0x8005AA28-0x8005ABD8 (8 functions); extab, extabindex, .ctors 0x8056F2D0-0x8056F2D4 (the static
+ *   initialiser's word), .data 0x8058B350-0x8058B388, .bss 0x8066AE48-0x8066AE60, .sdata 0x80791124-0x80791130,
+ *   .sdata2 0x80795CF0-0x80795CF8.
+ * FLAGS. `cflags_g3d`; `#pragma pool_data off`.
  * NAMES. res_handle_ptr is a GUESS (the evidence follows).
  *   res_node_is_valid is a GUESS (the evidence follows).
  *   The file keeps the map's stem: the range's only `__FILE__` string is the accessor header
- *   "g3d_resnode_ac.h" (lbl_8058B370, fn_8005AA44's assert).  Module `g3d` from the callers
+ *   "g3d_resnode_ac.h" (fn_8005AA44's assert).  Module `g3d` from the callers
  *   (`nw4r::g3d::ScnMdl::CopiedMatAccess`, `g3d/g3d_calcworld.cpp`'s fn_80073E8C; mtx34_trans_apply's twin is
  *   `g3d/g3d_basic.cpp`'s fn_800D7ED0).
  *   GUESS: `mtx34_trans_apply` (the `PSMTXTransApply` wrapper at 0x8005AB08).
- * RESIDUALS. none in `.text`.  flipcheck: `.ctors` (fn_8005AB78 compiles as a plain function), `.data`, `.bss` and
- *   `.sdata2` are claimed and not emitted; `.sdata` is 0x7 of 0xC.
+ *   GUESS: res_mat_set_flag_0x100 (the dead-stripped caller of fn_8005AA44), s_origin / s_origin_x100 (map rows
+ *   lbl_8066AE48 / lbl_8066AE54), StaticVec3.  The static initialiser is MWCC's `__sinit_\fn_8005AA28_cpp`
+ *   (map row fn_8005AB78).
+ * RESIDUALS. none in code or data once the map rows carry the names above; the extra dead-stripped function
+ *   makes flipcheck read .text/extab as different, while the linked DOL is byte-identical.
+ * SHAPES. The data is the TU's own: fn_8005AA44 is an `inline` (`_ac.h`) function referenced by the
+ *   dead-stripped res_mat_set_flag_0x100, so its two strings are weak `@STRING@` objects after the TU's own
+ *   (the inline tail, playbook 80); "ResMat" (7 bytes) goes to `.sdata`; the two VEC3s are file-scope statics
+ *   (`.bss`) whose constructors call `setVec3`, which makes MWCC emit `__sinit`, its `.ctors` word and the
+ *   0.0f/100.0f `.sdata2` pool.  The (base, dx) constructor reproduces retail's argument order (`this`, then
+ *   the x sum, then y/z through the base reference).
  */
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMat (rule 2) */
 #include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple (rule 2) */
+
+#pragma pool_data off
 
 namespace nw4r {
 namespace db {
@@ -46,17 +58,6 @@ struct ResMatData {
     /* +0x14 */ u32 mFlags;
 };
 
-/* The pooled constants and strings this unit reads, declared, not defined: the claimed `.data`/`.bss`/`.sdata2`
- * are not emitted yet. */
-extern "C" {
-extern const char lbl_8058B350[]; /* "NW4R:Failed assertion IsValid()"            .data */
-extern const char lbl_8058B370[]; /* "g3d_resnode_ac.h"                          .data */
-extern Vec3 lbl_8066AE48;         /* the first file-scope VEC3 (0, 0, 0)         .bss  */
-extern Vec3 lbl_8066AE54;         /* the second file-scope VEC3 (100, 0, 0)      .bss  */
-extern f32 lbl_80795CF0;          /* 0.0f                                       .sdata2 */
-extern f32 lbl_80795CF4;          /* 100.0f                                     .sdata2 */
-}
-
 /* The neighbours this unit calls (plain map stems), each owner named beside it. */
 extern "C" {
 void* mtx34_get_ptr(void* pMtx);                     /* owner: src/fn_8004CAD8.cpp        */
@@ -69,6 +70,7 @@ void PSMTXTransApply(Mtx34* pDst, const Mtx34* pSrc, f32 x, f32 y, f32 z);
 extern "C" {
 
 /* Forward declarations for the two `_ac.h` accessors fn_8005AA44 re-checks after its assert. */
+void fn_8005AA44(ResMatHandle* pSelf, u32 enable);
 void* res_handle_ptr(const ResMatHandle* pSelf);
 u32 res_node_is_valid(const ResMatHandle* pSelf);
 
@@ -86,10 +88,17 @@ bool nw4r::g3d::ResMat::IsValid() const {
 
 extern "C" {
 
+/* Sets the mat's 0x100 flag through the `_ac.h` setter.  Nothing calls it, so the linker strips it, as it
+ * stripped retail's caller; it is what makes MWCC emit fn_8005AA44 here as an inline copy. */
+void res_mat_set_flag_0x100(ResMatHandle* pSelf)
+{
+    fn_8005AA44(pSelf, 1);
+}
+
 /* The `_ac.h` flag setter: assert the handle is valid, then set or clear the mat's 0x100 flag. */
-void fn_8005AA44(ResMatHandle* pSelf, u32 enable) {
+inline void fn_8005AA44(ResMatHandle* pSelf, u32 enable) {
     if (!res_node_is_valid(pSelf)) {
-        nw4r::db::Panic(lbl_8058B370, 0xAF, lbl_8058B350);
+        nw4r::db::Panic("g3d_resnode_ac.h", 0xAF, "NW4R:Failed assertion IsValid()");
     }
     if (res_node_is_valid(pSelf)) {
         if (enable != 0) {
@@ -129,11 +138,23 @@ Mtx34* mtx34_trans_apply(Mtx34* pSrc, const Vec3* pPos, void* pNodeMtx) {
     return pSrc;
 }
 
-/* Constructs the two file-scope VEC3s (the `.ctors` word 0x8056F2D0): lbl_8066AE48 = (0, 0, 0) and
- * lbl_8066AE54 = lbl_8066AE48 + (100, 0, 0). */
-void fn_8005AB78(void) {
-    setVec3(&lbl_8066AE48, lbl_80795CF0, lbl_80795CF0, lbl_80795CF0);
-    setVec3(&lbl_8066AE54, lbl_80795CF4 + lbl_8066AE48.x, lbl_8066AE48.y, lbl_8066AE48.z);
-}
-
 }  // extern "C"
+
+/* A file-scope vector whose constructors build it through `setVec3`.  size: 0xC */
+struct StaticVec3 : public Vec3 {
+    /* Builds (x, y, z). */
+    StaticVec3(f32 x, f32 y, f32 z)
+    {
+        setVec3(this, x, y, z);
+    }
+    /* Builds `base` moved `dx` along x. */
+    StaticVec3(const Vec3& base, f32 dx)
+    {
+        setVec3(this, dx + base.x, base.y, base.z);
+    }
+};
+
+/* The two file-scope vectors the static initialiser (`.ctors` word 0x8056F2D0) builds: the origin, and the
+ * origin moved 100 along x. */
+static StaticVec3 s_origin(0.0f, 0.0f, 0.0f);
+static StaticVec3 s_origin_x100(s_origin, 100.0f);

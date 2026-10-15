@@ -200,6 +200,16 @@ TTo* DynamicCast(TFrom* pObj)
     return NULL;
 }
 
+/* A run-time type-name record as a unit defines it in `.rodata`: the name's size with its NUL, then the name
+ * (`TypeObj::TypeName` is the same record read through a fixed-size view).  The unit that defines a class's
+ * GetTypeObjStatic owns its record; `{sizeof("Name"), "Name"}` reproduces retail's bytes.
+ * size: 0x4 + N, rounded up to 0x4 */
+template <u32 N>
+struct TypeNameData {
+    /* +0x0 */ u32 len;
+    /* +0x4 */ char str[N];
+};
+
 /* How a frame past the end is folded back (PlayPolicy_Onetime, PlayPolicy_Loop): (start, end, frame) -> frame. */
 typedef f32 (*PlayPolicyFunc)(f32 startFrame, f32 endFrame, f32 frame);
 

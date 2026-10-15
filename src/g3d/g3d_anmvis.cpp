@@ -2,17 +2,28 @@
  * g3d/g3d_anmvis.cpp - nw4r g3d `ResAnmVis` handle accessors and the `AnmObjVis` node-visibility query and walkers.
  * RANGE. .text 0x8006EAC0-0x8006EE78 (8 functions); extab, extabindex, .rodata 0x8056F628-0x8056F638, .data
  *   0x8058D6C0-0x8058D7E0, .sdata 0x807911A0-0x807911A8.  Both edges are the unclaimed run's, not proven seams.
+ * FLAGS. `cflags_g3d`; `#pragma pool_data off` (each string its own `lis`/`addi`), `#pragma dont_inline` around
+ *   fn_8006EC3C (retail calls fn_8006EC28 out of line), `#pragma peephole off` over the two walkers.
  * NAMES. Map stems; the dump's three names in this range come from a differently laid-out build and contradict
  *   the `g3d_anmvis.cpp`/`ResAnmVis` strings.
  *   g3d_apply_vis_anm_result is a GUESS (0x8006ECB4: applies the visibility animation to the model's nodes, called
- *   by ScnMdlSimple's world pass).
- * RESIDUALS. flipcheck: `.rodata`, `.data` and `.sdata` are claimed and not emitted.
- * SHAPES. `AnmObjVis` is polymorphic with twelve placeholder slots ahead of the called one, so the call is a real
+ *   by ScnMdlSimple's world pass).  anm_obj_vis_res_is_valid / anm_obj_vis_res_data are GUESSES (the
+ *   dead-stripped ResAnmVis readers, below).
+ *   anm_typename_AnmObjVis follows the `anm_typename_*` records (map row lbl_8056F628).
+ * RESIDUALS. none in code or data; the two extra dead-stripped functions make flipcheck read .text as
+ *   different, while the linked DOL is byte-identical.
+ * SHAPES. The data is the TU's own: the panic strings are literals (`.data`, in first-use order), the 4-byte
+ *   "ref" goes to `.sdata`, and the type-name record is a defined `TypeNameData` (`.rodata`).
+ *   fn_8006EC28..fn_8006ECA8 are `inline` (`ResCommon`/`_ac.h` accessors): MWCC emits an inline function's
+ *   strings after every out-of-line function's (the inline tail, playbook 80), which is retail's order
+ *   (ResAnmVis, "%s::%s...", "g3d_resanmvis_ac.h" after the pByteVec message), and places the weak copies
+ *   right after the first function that references one, in the order it references them.  That referrer is
+ *   anm_obj_vis_res_is_valid/anm_obj_vis_res_data: retail's referrers are dead-stripped by the linker, and so
+ *   are these (frameless tail calls, so they add no unwind record).
+ *   `AnmObjVis` is polymorphic with twelve placeholder slots ahead of the called one, so the call is a real
  *   virtual dispatch (`lwz r12,0x38(r12)`); a function-pointer field emits a different temp register.
  *   `#pragma peephole off` from g3d_apply_vis_anm_result through fn_8006ED84 keeps retail's `mr r3,rN` +
  *   `lwz r12,0(r3)` virtual-call table load and its `clrlwi r0,r3,24` ahead of the `stb`.
- *   `lbl_807911A0` is a sized `char[4]` (`li r7, @sda21`); the file/format strings are extern labels, because
- *   `-str reuse` would pool the twice-used `lbl_8058D6C0` into one base register.
  */
 
 #include "types.h"
@@ -20,7 +31,9 @@
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
 #include "g3d/g3d_resnode.h" /* nw4r::g3d::ResNode (rule 2) */
 #include "g3d/fn_8005AA28.h" /* fn_8005AA44 (rule 2: its owner's header) */
-#include "g3d/g3d_obj.h"      /* nw4r::g3d::AnmObjVis (rule 1) */
+#include "g3d/g3d_obj.h"      /* nw4r::g3d::AnmObjVis, TypeNameData (rule 1) */
+
+#pragma pool_data off
 
 namespace nw4r {
 namespace db {
@@ -32,21 +45,6 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 }  // namespace db
 }  // namespace nw4r
-
-/* The panic file/format strings the target references as map symbols.  They are extern here rather than
- * literals: MWCC's `-str reuse` would pool a repeated literal (`lbl_8058D6C0` is loaded twice inside
- * fn_8006EAC0) into one blob and address it through a shared base register, while the target loads each
- * one with its own `lis`/`addi`. */
-extern const char lbl_8056F628[]; /* the AnmObjVis type-info record */
-extern const char lbl_8058D6C0[]; /* "g3d_anmvis.cpp" */
-extern const char lbl_8058D6D0[]; /* "NW4R:Pointer Error\nthis(=%p) is not valid pointer." */
-extern const char lbl_8058D704[]; /* "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied." */
-extern const char lbl_8058D748[]; /* "NW4R:Failed assertion node.GetID() == nodeID" */
-extern const char lbl_8058D778[]; /* "NW4R:Pointer must not be NULL (pByteVec)" */
-extern const char lbl_8058D7A4[]; /* "ResAnmVis" */
-extern const char lbl_8058D7B0[]; /* "%s::%s: Object not valid." */
-extern const char lbl_8058D7CC[]; /* "g3d_resanmvis_ac.h" */
-extern char lbl_807911A0[4]; /* "ref" - sized (4) so MWCC's small-data heuristic emits @sda21 */
 
 /* The node-visibility object the range walks.  Its +0x00 word is a polymorphic vtable pointer (the two
  * walkers dispatch through vtable offset +0x38), the entry count sits at +0x10 and the halfword array at
@@ -74,6 +72,10 @@ struct AnmObjVis {
     /* +0x10 */ s32 mNumEntries;
     /* +0x14 */ u16* mpEntries;
 }; /* size: 0x18 - lower bound, an approximation */
+
+/* The AnmObjVis run-time type name GetTypeObjStatic points at. */
+extern "C" const nw4r::g3d::TypeNameData<sizeof("AnmObjVis")> anm_typename_AnmObjVis = {sizeof("AnmObjVis"),
+                                                                                         "AnmObjVis"};
 
 extern "C" {
 
@@ -104,41 +106,58 @@ bool fn_8006EAC0(AnmObjVis* pSelf, s32 nodeId)
     u32 valid = IS_VALID_PTR(pSelf);
 
     if (!valid) {
-        nw4r::db::Panic(lbl_8058D6C0, 54, lbl_8058D6D0, pSelf);
+        nw4r::db::Panic("g3d_anmvis.cpp", 54, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.", pSelf);
     }
     if (nodeId > pSelf->mNumEntries - 1) {
-        nw4r::db::Panic(lbl_8058D6C0, 55, lbl_8058D704, nodeId, pSelf->mNumEntries - 1);
+        nw4r::db::Panic("g3d_anmvis.cpp", 55, "int(nodeId) is out of bounds(%d)\nint(nodeId) <= %d not satisfied.",
+                        nodeId, pSelf->mNumEntries - 1);
     }
     return (pSelf->mpEntries[nodeId] & 0xC000) == 0;
 }
 
+/* Tell whether a ResAnmVis handle is set, and return its checked resource data.  Nothing calls them, so the
+ * linker strips both, as it stripped retail's readers; their references (IsValid, then ref) make MWCC emit the
+ * inline accessors below at this point and in retail's order.  Each is a frameless tail call, so neither
+ * adds an unwind record. */
+u32 anm_obj_vis_res_is_valid(ResHandle* pRes)
+{
+    return fn_8006EC28(pRes);
+}
+
+u32 anm_obj_vis_res_data(ResHandle* pRes)
+{
+    return fn_8006EC3C(pRes);
+}
+
 /* `ResCommon<ResAnmVis>::IsValid()`: the handle's resource pointer is non-NULL. */
-s32 fn_8006EC28(const ResHandle* pSelf)
+inline s32 fn_8006EC28(const ResHandle* pSelf)
 {
     u32 data = (u32)pSelf->mpData;
 
     return ((u32)(-(s32)data) | data) >> 31;
 }
 
+#pragma dont_inline on
 /* `ResCommon<ResAnmVis>::ref()` guarded by the `g3d_resanmvis_ac.h` inlined assert. */
-u32 fn_8006EC3C(ResHandle* pSelf)
+inline u32 fn_8006EC3C(ResHandle* pSelf)
 {
     if (fn_8006EC28(pSelf) == 0) {
-        nw4r::db::Panic(lbl_8058D7CC, 39, lbl_8058D7B0, fn_8006ECA8(), lbl_807911A0);
+        nw4r::db::Panic("g3d_resanmvis_ac.h", 39, "%s::%s: Object not valid.", fn_8006ECA8(), "ref");
     }
     return fn_8006ECA0(pSelf);
 }
+#pragma dont_inline reset
 
 /* `ResCommon<ResAnmVis>::ref()`: the handle's resource pointer. */
-u32 fn_8006ECA0(const ResHandle* pSelf)
+inline u32 fn_8006ECA0(const ResHandle* pSelf)
 {
     return (u32)pSelf->mpData;
 }
 
 /* `ResCommon<ResAnmVis>`'s type name, spelled out of line by the `_ac.h` assert. */
-const char* fn_8006ECA8(void)
+inline const char* fn_8006ECA8(void)
 {
-    return lbl_8058D7A4;
+    return "ResAnmVis";
 }
 
 /* Walk the model's node table and, for every node the object marks visible, query the node handle's ID
@@ -156,7 +175,7 @@ void g3d_apply_vis_anm_result(void* pModel, AnmObjVis* pSelf)
             node = (s32)reinterpret_cast<const nw4r::g3d::ResMdl*>(pModel)->GetResNode(i).mpData;
             res_node_copy_ctor(&handle, &node);
             if ((u32)res_node_get_id(&handle) != i) {
-                nw4r::db::Panic(lbl_8058D6C0, 733, lbl_8058D748);
+                nw4r::db::Panic("g3d_anmvis.cpp", 733, "NW4R:Failed assertion node.GetID() == nodeID");
             }
             fn_8005AA44(&handle, pSelf->GetNodeFlag(i));
         }
@@ -164,13 +183,12 @@ void g3d_apply_vis_anm_result(void* pModel, AnmObjVis* pSelf)
 }
 
 /* Walk the model's node table and write one byte per visible node into `pByteVec`. */
-#pragma peephole off
 void fn_8006ED84(u8* pByteVec, void* pModel, AnmObjVis* pSelf)
 {
     s32 numNodes;
 
     if (pByteVec == NULL) {
-        nw4r::db::Panic(lbl_8058D6C0, 743, lbl_8058D778);
+        nw4r::db::Panic("g3d_anmvis.cpp", 743, "NW4R:Pointer must not be NULL (pByteVec)");
     }
     numNodes = reinterpret_cast<const nw4r::g3d::ResMdl*>(pModel)->GetResNodeNumEntries();
     for (u32 i = 0; i < (u32)numNodes; i++) {
@@ -190,9 +208,5 @@ const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjVis::GetTypeObjStatic()
 {
     u32 value;
 
-    return *reinterpret_cast<const TypeObj*>(fn_8005DC60(&value, lbl_8056F628));
+    return *reinterpret_cast<const TypeObj*>(fn_8005DC60(&value, &anm_typename_AnmObjVis));
 }
-
-extern "C" {
-
-}  // extern "C"

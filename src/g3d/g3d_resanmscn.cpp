@@ -10,7 +10,10 @@
  * RESIDUALS. fn_800913A0: register colouring only - the two `ResAnmTexPatInfoData` counts in r31/r30 (retail
  *   r30/r29), the texture-name array in r29 (retail r31), the palette counter on r24 (retail reuses r31), and the
  *   loop temporaries at 0x0C/0x1C/0x28/0x2C (retail 0x0C/0x14/0x1C/0x28).
- *   flipcheck: `.data` is claimed and not emitted; `.sdata` is 0x4 of 0x8.
+ *   flipcheck: `.sdata` byte-identical; `.data`: the claimed 0x805908B0 run is the inline tail of the
+ *   `_ac.h` accessors (not emitted as such yet, playbook 80), and the getters' own strings sit at
+ *   0x80590700-0x805908B0 behind `g3d/g3d_resanmlight.cpp`'s name records (0x80590660-0x80590700), which this
+ *   unit's getters read: a data seam to re-draw, so those stay externs.
  * SHAPES. No peephole pragma: turning it off moves the eight offset helpers' base from r0 to r3.
  *   The five getters declare the fallback temporary before the result (r1+0xC for the empty path, r1+0x8 for the
  *   element), and the `"ref"` assert argument stays a literal (an extern loads with `lis`/`addi`, not `@sda21`).
@@ -23,6 +26,8 @@
 #include "g3d/g3d_resshp.h"       /* nw4r::g3d::ResTex / ResPltt (rule 2) */
 #include "nw4r/g3d/res_anm.h"    /* ResAnmAmbLightData, ResAnmFogData (rule 1) */
 
+#pragma pool_data off
+
 namespace nw4r {
 namespace db {
 
@@ -33,18 +38,11 @@ void Panic(const char *pFile, int line, const char *pFmt, ...);
 } // namespace db
 } // namespace nw4r
 
-/* The assert file/format strings the bodies pass by address.  They are declared as externs rather than
- * written as literals: the target loads each one with its own `lis`/`addi`, and `-str reuse` would pool
- * repeated literals.  The one string the target reaches through small data - the `"ref"` argument of the
- * `%s::%s: Object not valid.` message - stays a literal, because only a literal gets the `@sda21` form
- * of `li r7, ...` that fn_800912F8 has. */
+/* The `ResAnmScn` getters' assert strings.  They sit at 0x80590700-0x805908B0, outside this unit's claimed
+ * `.data` (no registered range covers them), so they stay externs until the data seam is re-drawn. */
 extern const char lbl_80590700[]; /* "g3d_resanmscn.cpp" */
 extern const char lbl_80590718[]; /* "NW4R:Failed assertion IsValid()" */
 extern const char lbl_80590738[]; /* "NW4R:Pointer Error\npArray(=%p) is not valid pointer." */
-extern const char lbl_805908B0[]; /* "NW4R:Pointer must not be NULL (mpData)" */
-extern const char lbl_805908D8[]; /* "g3d_rescommon_ac.h" */
-extern const char lbl_805908F0[]; /* "%s::%s: Object not valid." */
-extern const char lbl_8059090C[]; /* "g3d_resanmtexpat_ac.h" */
 
 /*
  * The `ResAnmScn` resource (`g3d_resanmscn.h`).  Only the fields this unit reads are named; the tail of
@@ -450,7 +448,7 @@ char *fn_8009125C(void *self)
 u32 *fn_80091280(void *self)
 {
     if (*(u32 **)self == NULL) {
-        nw4r::db::Panic(lbl_805908D8, 143, lbl_805908B0);
+        nw4r::db::Panic("g3d_rescommon_ac.h", 143, "NW4R:Pointer must not be NULL (mpData)");
     }
     return *(u32 **)self;
 }
@@ -466,7 +464,7 @@ u32 fn_800912D4(void *self)
 u32 fn_800912F8(void *self)
 {
     if (fn_800699B4(self) == 0) {
-        nw4r::db::Panic(lbl_8059090C, 92, lbl_805908F0, (const char *)fn_800699A8(), "ref");
+        nw4r::db::Panic("g3d_resanmtexpat_ac.h", 92, "%s::%s: Object not valid.", (const char *)fn_800699A8(), "ref");
     }
     return fn_8009135C(self);
 }

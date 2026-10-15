@@ -20,11 +20,14 @@
  *   materials, called by ScnMdlSimple's material pass).
  * RESIDUALS. The large vector/matrix bodies g3d_calc_material_directly, mtx34_axis_in_parent (0x8006F5A0, 0xC0 bytes) and mtx34_up_axis_in_parent (0x8006F660, 0xD8 bytes) are unwritten empty stubs; fn_8006F200 and
  *   tex_pat_anm_result_ctor are partial.
- *   flipcheck: `.text` 0x4D4 of 0x8C0; `.data` is claimed and not emitted.
+ *   flipcheck: `.text` 0x4D4 of 0x8C0; `.data`: the strings are literals, the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
+ *   instance, after the TU's own strings, playbook 80).
  */
 #include "types.h"
 #include "g3d/g3d_resmat.h"
 #include "g3d/g3d_resfile.h"       /* res_mat_*_dc_store (rule 2) */
+
+#pragma pool_data off
 
 /* The five assert wrappers below need the *un-fused* compare (retail keeps `clrlwi` + `cmpwi` and a
  * separate `add`/`blr`, where the peephole pass folds them into `clrlwi.`/`bnelr`), exactly as
@@ -58,21 +61,6 @@ u32* tex_pat_anm_result_ctor(u32* self);
 void mtx34_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec);
 void mtx34_up_axis_in_parent(f32* pDst, const f32* pMtx, const f32* pVec);
 }
-
-/* The pooled file-name/assert strings this unit reads, declared, not defined: the claimed `.data` is not
- * emitted yet. */
-extern const char lbl_8058D7E0[]; /* "g3d_calcmaterial.cpp"                            .data */
-extern const char lbl_8058D7F8[]; /* "NW4R:Failed assertion mdl.IsValid()"            .data */
-extern const char lbl_8058D81C[]; /* "NW4R:Failed assertion !((u32)p & 0x1f)"         .data */
-extern const char lbl_8058D848[]; /* "g3d_resmat_ac.h"                                .data */
-extern const char lbl_8058D858[]; /* "NW4R:Failed assertion !((u32)p & 0x1f)"         .data */
-extern const char lbl_8058D880[]; /* "g3d_resmat_ac.h"                                .data */
-extern const char lbl_8058D890[]; /* "NW4R:Failed assertion !((u32)p & 0x3)"          .data */
-extern const char lbl_8058D8B8[]; /* "g3d_resmat_ac.h"                                .data */
-extern const char lbl_8058D8C8[]; /* "NW4R:Failed assertion !((u32)p & 0x3)"          .data */
-extern const char lbl_8058D8F0[]; /* "g3d_resmat_ac.h"                                .data */
-extern const char lbl_8058D900[]; /* "NW4R:Failed assertion !((u32)p & 0x3)"          .data */
-extern const char lbl_8058D928[]; /* "g3d_resmat_ac.h"                                .data */
 
 /* The 32-byte-aligned resource pointer wrapper fn_8006F158 builds and the 4-byte-aligned ones
  * (fn_8006F374 / fn_8006F41C / fn_8006F4BC).  The asserts are the g3d_resmat_ac.h inlines. */
@@ -164,16 +152,15 @@ void* res_tex_srt_copy_ctor(void* pDst, const void* pSrc) {
     return pDst;
 }
 
-/* The alignment-asserting resource pointer constructors (g3d_resmat_ac.h inlines).
- * `lbl_8058D848`/`lbl_8058D880`/`...` are the header file strings, `lbl_8058D81C`/`lbl_8058D858`/...
- * the "!((u32)p & mask)" messages. */
+/* The alignment-asserting resource pointer constructors (g3d_resmat_ac.h inlines) pass the header file
+ * strings and the "!((u32)p & mask)" messages. */
 } /* extern "C" */
 
 /* 0x8006F158 (0x64): wraps `pData`, asserting its alignment. */
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatTevColor::ResMatTevColor(void* pData) : ResCommon<ResMatTevColorData>(pData) {
     if ((u32)pData & 0x1F) {
-        nw4r::db::Panic((const char*)lbl_8058D880, 378, (const char*)lbl_8058D858);
+        nw4r::db::Panic("g3d_resmat_ac.h", 378, "NW4R:Failed assertion !((u32)p & 0x1f)");
     }
 }
 
@@ -184,7 +171,7 @@ extern "C" {
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResMatIndMtxAndScale::ResMatIndMtxAndScale(void* pData) : ResCommon<ResMatIndMtxAndScaleData>(pData) {
     if ((u32)pData & 0x1F) {
-        nw4r::db::Panic((const char*)lbl_8058D848, 413, (const char*)lbl_8058D81C);
+        nw4r::db::Panic("g3d_resmat_ac.h", 413, "NW4R:Failed assertion !((u32)p & 0x1f)");
     }
 }
 
@@ -196,7 +183,7 @@ extern "C" {
 nw4r::g3d::ResTexSrt::ResTexSrt(void* pData) {
     fn_8006F3D8((u32*)this, (u32)pData);
     if ((u32)pData & 0x3) {
-        nw4r::db::Panic(lbl_8058D8B8, 107, lbl_8058D890);
+        nw4r::db::Panic("g3d_resmat_ac.h", 107, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
 }
 
@@ -207,7 +194,7 @@ extern "C" {
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResTlutObj::ResTlutObj(void* pData) : ResCommon<ResTlutObjData>(pData) {
     if ((u32)pData & 0x3) {
-        nw4r::db::Panic((const char*)lbl_8058D8F0, 74, (const char*)lbl_8058D8C8);
+        nw4r::db::Panic("g3d_resmat_ac.h", 74, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
 }
 
@@ -218,7 +205,7 @@ extern "C" {
 /* untyped: opaque handle - the block address */
 nw4r::g3d::ResTexObj::ResTexObj(void* pData) : ResCommon<ResTexObjData>(pData) {
     if ((u32)pData & 0x3) {
-        nw4r::db::Panic((const char*)lbl_8058D928, 40, (const char*)lbl_8058D900);
+        nw4r::db::Panic("g3d_resmat_ac.h", 40, "NW4R:Failed assertion !((u32)p & 0x3)");
     }
 }
 

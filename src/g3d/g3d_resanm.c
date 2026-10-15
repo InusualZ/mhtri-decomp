@@ -11,9 +11,9 @@
  *   fn_80089C6C: the key-index addressing (`slwi`/`lwzx`) is scheduled and allocated differently.
  *   fn_80089F78: retail truncates float to short with `psq_st f1,0(r3),1,qr5` + `lha`; no source shape or flag
  *   reproduces it.
- *   flipcheck: `.text` 0x6C4 of 0x6E4; `.data` 0xC4 of 0xC8; `.sdata2` 0x24 of 0x28.
- *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_8058FDD8`,
- *     `lbl_8058FDC8`, `lbl_8058FE0C`, `lbl_8058FE50`, `dtor_8005B228`.
+ *   flipcheck: `.text` 0x6C4 of 0x6E4; `.data` and `.sdata2` byte-identical (the strings are literals under
+ *   `#pragma pool_data off`).
+ *   Relocation names that differ from retail (pool constants, save helpers, statics): `dtor_8005B228`.
  * SHAPES. File-scope `#pragma peephole off` and `#pragma fp_contract off`: retail has no record-form instruction and
  *   no fused multiply-add.
  */
@@ -23,6 +23,8 @@
 #include "nw4r/g3d/res_common.h"
 #include "g3d/g3d_scnroot.h" /* fn_80082F18 (rule 2) */
 #include "g3d/g3d_anmscn.h" /* fn_800651BC, owned by g3d/g3d_anmscn.cpp (rule 2) */
+
+#pragma pool_data off
 
 #pragma peephole off
 #pragma fp_contract off

@@ -12,7 +12,10 @@
  *   fn_8008FE88: one instruction short - retail's `li r7,0x0` is missing.
  *   fn_80090000: retail keeps `base` in r0 (`lwz r0,0(r3); add r3,r0,r4`), ours in r3.
  *   fn_80090058: retail's two branch arms use the stack slots 0xC and 0x8, ours share one.
- *   flipcheck: `.text` 0xFF0 of 0x1018 (the ten short functions).
+ *   flipcheck: `.text` 0xFF0 of 0x1018 (the ten short functions); `.data`: the strings are literals, but
+ *   the `_ac.h` accessor strings are not the inline tail yet (retail: weak `@STRING@` copies, one per inline
+ *   instance, after the TU's own strings, playbook 80), and the run's last 0xA0 bytes (0x80590660-0x80590700, the
+ *   `ResName` records `g3d/g3d_resanmscn.cpp`'s getters read) belong to that unit's TU (a data seam).
  * SHAPES. `base += offset` in fn_80090000 keeps the branch (a plain `if`/`return` if-converts to branchless code).
  */
 
@@ -28,6 +31,8 @@
 #include "MSL_C/alloc.h" /* floorf (rule 2) */
 #include "g3d/g3d_resanmcamera.h" /* fn_8008A644 (rule 2) */
 
+#pragma pool_data off
+
 #pragma peephole off
 #pragma fp_contract off
 
@@ -42,19 +47,6 @@ void Panic(const char *file, int line, const char *message, ...);
 } /* namespace nw4r */
 
 /* The `.data` `__FILE__`/assert strings the retail bodies pass by address (unsplit `.data`). */
-extern u8 lbl_80590440[]; /* "g3d_resanmlight.cpp" */
-extern u8 lbl_80590454[]; /* "NW4R:Pointer Error\npResult(=%p) is not valid pointer." */
-extern u8 lbl_8059048C[]; /* the default-channel assert message */
-extern u8 lbl_805904BC[]; /* "NW4R:Pointer Error\npArray(=%p)..." */
-extern u8 lbl_80590500[]; /* "g3d_resanm_ac.h" */
-extern u8 lbl_80590510[]; /* "NW4R:Failed assertion ..." */
-extern u8 lbl_80590550[]; /* "g3d_resanm_ac.h" */
-extern u8 lbl_80590560[]; /* "NW4R:Pointer Error\nthis(=%p)..." */
-extern u8 lbl_80590598[]; /* "g3d_resanm_ac.h" */
-extern u8 lbl_805905A8[]; /* "NW4R:Pointer Error\npArray(=%p)..." */
-extern u8 lbl_805905F0[]; /* "g3d_resanm_ac.h" */
-extern u8 lbl_80590600[]; /* "NW4R:Pointer Error\nthis(=%p)..." */
-extern u8 lbl_80590638[]; /* "g3d_resanm_ac.h" */
 extern u8 lbl_80590660[]; /* the light-set channel name record */
 extern u8 lbl_80590680[]; /* the unknown channel name record */
 extern u8 lbl_805906A0[]; /* the unknown channel name record */
@@ -130,7 +122,7 @@ extern "C" void fn_8008F8E4(void *arg0, ResAnmLightResult *pResult, f32 frame)
     u32 valid = IS_VALID_PTR(pResult);
 
     if (!valid) {
-        nw4r::db::Panic((const char *)lbl_80590440, 0x2C, (const char *)lbl_80590454, pResult);
+        nw4r::db::Panic("g3d_resanmlight.cpp", 0x2C, "NW4R:Pointer Error\npResult(=%p) is not valid pointer.", pResult);
     }
     res = fn_80066E80(arg0);
     flags = res->flags;
@@ -171,7 +163,7 @@ extern "C" void fn_8008F8E4(void *arg0, ResAnmLightResult *pResult, f32 frame)
             pResult->field_0x2C = fn_8008A644(&res->channel_0x48, frame, (flags & 0x20000000) != 0);
             break;
         default:
-            nw4r::db::Panic((const char *)lbl_80590440, 0x8C, (const char *)lbl_8059048C, kind);
+            nw4r::db::Panic("g3d_resanmlight.cpp", 0x8C, "NW4R Internal error\nUnknown light-type (=%d)", kind);
             break;
         }
         if (second) {
@@ -189,13 +181,13 @@ extern "C" s32 fn_8008FD04(u32 *self, s32 index)
     u32 valid = IS_VALID_PTR(self);
 
     if (!valid) {
-        nw4r::db::Panic((const char *)lbl_80590598, 0x55, (const char *)lbl_80590560, self);
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x55, "NW4R:Pointer Error\npData(=%p) is not valid pointer.", self);
     }
     if (*self == 0) {
-        nw4r::db::Panic((const char *)lbl_80590550, 0x56, (const char *)lbl_80590510);
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x56, "NW4R:Failed assertion pData->toResBoolAnmFramesData != 0");
     }
     if (index < 0) {
-        nw4r::db::Panic((const char *)lbl_80590500, 0x57, (const char *)lbl_805904BC, index, 0);
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x57, "iframeOffset is out of bounds(%d)\n%d <= iframeOffset not satisfied.", index, 0);
     }
     return fn_8008FE88((u32 *)((u8 *)self + *self), index);
 }
@@ -206,10 +198,10 @@ extern "C" s32 fn_8008FE88(u32 *self, s32 index)
     u32 valid = IS_VALID_PTR(self);
 
     if (!valid) {
-        nw4r::db::Panic((const char *)lbl_80590638, 0x45, (const char *)lbl_80590600, self);
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x45, "NW4R:Pointer Error\npData(=%p) is not valid pointer.", self);
     }
     if (index < 0) {
-        nw4r::db::Panic((const char *)lbl_805905F0, 0x46, (const char *)lbl_805905A8, index);
+        nw4r::db::Panic("g3d_resanm_ac.h", 0x46, "iframeOffset is out of bounds(%d)\n%d <= iframeOffset not satisfied.", index);
     }
     u32 word = self[((u32)index) >> 5];
     u32 bit = 0x80000000u >> (((u32)index) & 31);

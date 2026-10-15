@@ -6,14 +6,15 @@
  * RESIDUALS. fn_800D7D24: one prologue pair reordered - retail copies `pNode` to r29 and loads the flag word to r30
  *   before copying `handle` to r31, ours copies it to r30 first (tried: the local inlined or reordered, `tmpMtx`/
  *   `tmpVec` scoped into their branches; the `handleArg` -> `handle` alias is kept).
- *   flipcheck: the `.text` layout is a permutation of retail's - every function keeps its size but sits at another
- *   address, so the definitions are not in address order; `.data` and `.sdata2` are claimed and not emitted.
+ *   flipcheck: `.data` and `.sdata2` byte-identical.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `fn_8050133C`,
  *     `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`, `fn_80501390`,
  *     `MTX34Trans__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3`.
  *   flipcheck: referenced but defined by nothing a flip can use: `fn_8050133C`, `fn_80501390`.
  * SHAPES. File-scope `#pragma peephole off`: fn_800D7F40 keeps the unfolded `(x & 0x40000000) != 0`, and
- *   fn_800D7D24 and fn_800D79B4 lose rows without it.
+ *   fn_800D7D24 and fn_800D79B4 lose rows without it.  `#pragma pool_data off` gives every string its own
+ *   `lis`/`addi`.  The definitions are in retail's address order, which also orders the `.data` strings and the
+ *   0.0f/1.0f `.sdata2` pool (first use).
  */
 #include "types.h"
 #include "nw4r/math.h"
@@ -21,6 +22,8 @@
 #include "g3d/fn_80075DCC.h" /* fn_80075DCC, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
+
+#pragma pool_data off
 
 /* The retail object keeps the un-folded `(x & mask) != 0` form in fn_800D7F40 (`rlwinm` + the
  * neg/or/srwi tests) and the un-fused compares elsewhere; the file-scope peephole pass folds both.
@@ -49,15 +52,6 @@ void PSMTXScaleApply(Mtx34* pDst, const Mtx34* pSrc, f32 xS, f32 yS, f32 zS);
 void PSMTXCopy(const Mtx34* pSrc, Mtx34* pDst);
 void PSMTXConcat(const Mtx34* pA, const Mtx34* pB, Mtx34* pDst);
 }
-
-/* The pooled constants and the file-name/assert strings, declared, not defined: the claimed `.data`/`.sdata2`
- * are not emitted yet. */
-extern const char lbl_80595840[]; /* "g3d_basic.cpp"                                       .data */
-extern const char lbl_80595850[]; /* "NW4R:Pointer Error\npMtx(=%p) is not valid pointer." */
-extern const char lbl_80595884[]; /* "NW4R:Pointer Error\n& srt(=%p) is not valid pointer." */
-extern const char lbl_805958B8[]; /* "NW4R:Failed assertion (flag & TexSrt::FLAG_ANM_..."  */
-extern const f32 lbl_807963D0;    /* 0.0f                                                 .sdata2 */
-extern const f32 lbl_807963D4;    /* 1.0f                                                 .sdata2 */
 
 /* The `Srt` record fn_800D79B4 reads: a 2-D scale, a rotation and a 2-D translation.
  * size: 0x14 (only these five fields are reached; a lower bound) */
@@ -98,23 +92,65 @@ struct ResNode {
         if (!ok2_ && !(((u32)(ptr)&0xFFFFC000u) == 0xE0000000u))                               \
             ok1_ = FALSE;                                                                      \
         if (!ok1_)                                                                             \
-            nw4r::db::Panic(lbl_80595840, line, msg, (ptr));                                   \
+            nw4r::db::Panic("g3d_basic.cpp", line, msg, (ptr));                                   \
     }
 
 extern "C" {
 
-/* Test bit 0x40000000 of a resource handle. */
-u32 fn_800D7F40(u32 handle) {
-    u32 masked = handle & 0x40000000;
-    return masked != 0;
-}
+/* The unit's own functions, in retail's order. */
+int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag);
+Mtx34* fn_800D7ED0(Mtx34* pSrc, const Vec3* pScale, void* pNodeMtx);
+u32 fn_800D7F40(u32 handle);
 
-/* Scale `pSrc` by the VEC3 `pScale` into the resource node's matrix and return `pSrc`. */
-Mtx34* fn_800D7ED0(Mtx34* pSrc, const Vec3* pScale, void* pNodeMtx) {
-    const Mtx34* src = (const Mtx34*)mtx34_get_ptr(pSrc);
-    Mtx34* dst = (Mtx34*)mtx34_const_ptr(pNodeMtx);
-    PSMTXScaleApply(dst, src, pScale->x, pScale->y, pScale->z);
-    return pSrc;
+/* Build the SRT matrix into `pMtx` (or concatenate it with `pMtx`), and report whether the flag's mode
+ * is legal. */
+int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag) {
+    f32 sin_, cos_;
+    Mtx34 mtx;
+
+    NW4R_POINTER_ASSERT(pMtx, 36, "NW4R:Pointer Error\npMtx(=%p) is not valid pointer.");
+    NW4R_POINTER_ASSERT(pSrt, 37, "NW4R:Pointer Error\n& srt(=%p) is not valid pointer.");
+    if (!(flag & 0x1)) {
+        nw4r::db::Panic("g3d_basic.cpp", 38, "NW4R:Failed assertion (flag & TexSrt::FLAG_ANM_EXISTS) != 0");
+    }
+
+    if (((flag >> 1) & 0x7) == 0x7) {
+        return 0;
+    }
+
+    sin_cos_deg(&sin_, &cos_, pSrt->rotate);
+
+    if (direct != 0) {
+        pMtx->m[0][0] = pSrt->scaleX * cos_;
+        pMtx->m[0][1] = -pSrt->scaleY * sin_;
+        pMtx->m[0][2] = 0.0f;
+        pMtx->m[0][3] = pSrt->transX;
+        pMtx->m[1][0] = pSrt->scaleX * sin_;
+        pMtx->m[1][1] = pSrt->scaleY * cos_;
+        pMtx->m[1][2] = 0.0f;
+        pMtx->m[1][3] = pSrt->transY;
+        pMtx->m[2][0] = 0.0f;
+        pMtx->m[2][1] = 0.0f;
+        pMtx->m[2][2] = 1.0f;
+        pMtx->m[2][3] = 0.0f;
+    } else {
+        MTX34_ctor(&mtx);
+        mtx.m[0][0] = pSrt->scaleX * cos_;
+        mtx.m[0][1] = -pSrt->scaleY * sin_;
+        mtx.m[0][2] = 0.0f;
+        mtx.m[0][3] = pSrt->transX;
+        mtx.m[1][0] = pSrt->scaleX * sin_;
+        mtx.m[1][1] = pSrt->scaleY * cos_;
+        mtx.m[1][2] = 0.0f;
+        mtx.m[1][3] = pSrt->transY;
+        mtx.m[2][0] = 0.0f;
+        mtx.m[2][1] = 0.0f;
+        mtx.m[2][2] = 1.0f;
+        mtx.m[2][3] = 0.0f;
+        mtx34_concat(pMtx, &mtx, pMtx);
+    }
+
+    return 1;
 }
 
 /* The SRT dispatch: from the node's flag word pick a copy, a concatenation or a vector transform. */
@@ -153,9 +189,9 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
 
     if (flag & 0x8) {
         handle = world_mtx_attr_scale_one(handle);
-        pVecOut->z = lbl_807963D4;
-        pVecOut->y = lbl_807963D4;
-        pVecOut->x = lbl_807963D4;
+        pVecOut->z = 1.0f;
+        pVecOut->y = 1.0f;
+        pVecOut->x = 1.0f;
     } else {
         handle = world_mtx_attr_not_scale_one(handle);
         copyVec3(pVecOut, &pNode->pos);
@@ -168,55 +204,18 @@ void fn_800D7D24(Mtx34* pMtx, Vec3* pVecOut, const Mtx34* pSrcMtx, const Vec3* p
     }
 }
 
-/* Build the SRT matrix into `pMtx` (or concatenate it with `pMtx`), and report whether the flag's mode
- * is legal. */
-int fn_800D79B4(Mtx34* pMtx, int direct, const Srt* pSrt, u32 flag) {
-    f32 sin_, cos_;
-    Mtx34 mtx;
+/* Scale `pSrc` by the VEC3 `pScale` into the resource node's matrix and return `pSrc`. */
+Mtx34* fn_800D7ED0(Mtx34* pSrc, const Vec3* pScale, void* pNodeMtx) {
+    const Mtx34* src = (const Mtx34*)mtx34_get_ptr(pSrc);
+    Mtx34* dst = (Mtx34*)mtx34_const_ptr(pNodeMtx);
+    PSMTXScaleApply(dst, src, pScale->x, pScale->y, pScale->z);
+    return pSrc;
+}
 
-    NW4R_POINTER_ASSERT(pMtx, 36, lbl_80595850);
-    NW4R_POINTER_ASSERT(pSrt, 37, lbl_80595884);
-    if (!(flag & 0x1)) {
-        nw4r::db::Panic(lbl_80595840, 38, lbl_805958B8);
-    }
-
-    if (((flag >> 1) & 0x7) == 0x7) {
-        return 0;
-    }
-
-    sin_cos_deg(&sin_, &cos_, pSrt->rotate);
-
-    if (direct != 0) {
-        pMtx->m[0][0] = pSrt->scaleX * cos_;
-        pMtx->m[0][1] = -pSrt->scaleY * sin_;
-        pMtx->m[0][2] = lbl_807963D0;
-        pMtx->m[0][3] = pSrt->transX;
-        pMtx->m[1][0] = pSrt->scaleX * sin_;
-        pMtx->m[1][1] = pSrt->scaleY * cos_;
-        pMtx->m[1][2] = lbl_807963D0;
-        pMtx->m[1][3] = pSrt->transY;
-        pMtx->m[2][0] = lbl_807963D0;
-        pMtx->m[2][1] = lbl_807963D0;
-        pMtx->m[2][2] = lbl_807963D4;
-        pMtx->m[2][3] = lbl_807963D0;
-    } else {
-        MTX34_ctor(&mtx);
-        mtx.m[0][0] = pSrt->scaleX * cos_;
-        mtx.m[0][1] = -pSrt->scaleY * sin_;
-        mtx.m[0][2] = lbl_807963D0;
-        mtx.m[0][3] = pSrt->transX;
-        mtx.m[1][0] = pSrt->scaleX * sin_;
-        mtx.m[1][1] = pSrt->scaleY * cos_;
-        mtx.m[1][2] = lbl_807963D0;
-        mtx.m[1][3] = pSrt->transY;
-        mtx.m[2][0] = lbl_807963D0;
-        mtx.m[2][1] = lbl_807963D0;
-        mtx.m[2][2] = lbl_807963D4;
-        mtx.m[2][3] = lbl_807963D0;
-        mtx34_concat(pMtx, &mtx, pMtx);
-    }
-
-    return 1;
+/* Test bit 0x40000000 of a resource handle. */
+u32 fn_800D7F40(u32 handle) {
+    u32 masked = handle & 0x40000000;
+    return masked != 0;
 }
 
 } /* extern "C" */
