@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (135)
+## Ideas that work (138)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -144,6 +144,9 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 155 | [A member cleanup record retail lacks: define the callee before its caller (MWCC's nothrow knowledge)](155-nothrow-callee-before-caller.md) | works | source-shape, sections | Our constructor or destructor carries an extab cleanup record (a member's destructor, an array's destroy, a base destructor) that retail's lacks, with byte-identical code - the call it guards is one MWCC could not yet... |
 | 156 | [A redundant same-type cast on the base pointer is a codegen input: it decides whether a field address is shared with its load](156-redundant-same-type-cast.md) | works | source-shape | Retail loads a field off the base (`lwz r6,0x654c(r3)`) and materialises the field's address last (`addi r8,r3,0x654c`), while ours computes the address first and loads through it (`addi r8,r3,0x654c` ... `lwz... |
 | 157 | [A constant tag block copied into a local is a brace-initialised local array emitted into the TU's own .sdata2 pool](157-constant-tag-block-copied.md) | works | source-shape, data | Retail copies a constant byte block into a stack local with both loads before the stores (`lwz r4,X@sda21 ; lwz r0,X+4@sda21 ; stw r4 ; stw r0`, or `lhz`+`lbz` for 3 bytes), the map names the words as separate `.sdata2`... |
+| 158 | [A zero initializer lays bss out in definition order instead of first-use order](158-zero-initializer-lays-bss.md) | works | data, source-shape, sections | In a C unit the .bss/.sbss objects come out in first-use order, not in retail's order, and no declaration order moves them |
+| 159 | [Keep a callee defined ahead of its caller out of line: auto_inline off around the callee's definition](159-keep-a-callee-defined.md) | works | pragma, source-shape | Written in retail's function order, a large callee defined ahead of its caller is folded into it (the caller grows by the callee's size), and dont_inline also unfolds the callee's own helpers |
+| 160 | [A void function's two-condition early exit is one \|\| return, not two returns](160-void-functions-two-condition.md) | works | source-shape | A void function's entry checks branch beq / bne / b in retail and bne / beq (4 bytes shorter) in ours, whatever order or nesting the two checks are written in |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 
