@@ -13,14 +13,18 @@
  *    string are the `.data` record at 0x8060F4C8 (0x70 B); `.rodata` 0x80573188 is the empty narrow string; the
  *    pooled `0.0` at `.sdata2` 0x8079CA28 repeats at 0x8079CA10, so this is a TU of its own. `wfloat2str` builds the
  *    number as narrow digits in a local buffer and widens it with `mbstowcs`.
- * RESIDUALS. all ten rows have bodies; 4 at 100 (wparse_format, __wstring_write, swprintf, vswprintf). __wpformatter 87: the
- *    compiler merges the identical SIZE_T / PTRDIFF_T / default integer fetches where the target keeps one body per option,
- *    -172 B on .text; wfloat2str 89: the target lays the INF / NAN blocks before the digit code and keeps the ctype test as
- *    clrlslwi, ours does not; wdouble2hex 92: the exponent byte merge (rlwimi order) and the callee-saved assignment;
- *    wround_decimal 89.6 and wlong2str 99: as the narrow printf rows. `.data` is 670 B against the map's 672 B and `.rodata` 1 B
- *    against 8 B (padding); the unit cannot flip while .text is short.
+ * RESIDUALS. `__wpformatter`: retail jumps from every failed conversion straight into the bad-conversion block (MSL's
+ *    `goto conversion_error`); the `buff_ptr == NULL` test after the switch adds a compare and recolours the
+ *    callee-saved registers - the goto spelling measures 97.0 against 95.7.
+ * RESIDUALS. `wfloat2str`: retail's `%g` case jumps into the `%e` / `%f` bodies (MSL's `goto e_format` / `f_format`);
+ *    the `style` dispatch adds the `li`/`b` pairs and compares.
+ * RESIDUALS. `wround_decimal`: retail's final zero case branches back to the `new_length < 0` block (MSL's `goto
+ *    return_zero`); the `for (;;)` re-entry adds `li r4,-1; b`.
+ * RESIDUALS. `.data` is 670 B against the map's 672 B and `.rodata` 1 B against 8 B (padding).
  * SHAPES. wide characters are `u16`; the format record is built in a local and copied out; by-value
- *    `wprint_format` arguments are copied by the caller.
+ *    `wprint_format` arguments are copied by the caller. The bodies are the narrow printf bodies with MSL's wide
+ *    spellings, retail's copy-paste slips included: `wfloat2str` checks `buff - p + precision` against the start of its
+ *    narrow buffer, and the narrow `%#s` path reads its length byte through the stale wide `buff_ptr`.
  */
 
 #include "MSL_C/ansi_fp.h"
@@ -34,6 +38,18 @@
 #include "MSL/strlen.h"
 #include "Runtime.PPCEABI.H/__va_arg.h"
 #include "stdarg.h"
+
+/* Returns the absolute value of `x` (MSL's inline `fabs`). */
+static inline f64 fabs(f64 x)
+{
+    return __fabs(x);
+}
+
+/* Tests a wide character for the upper-case class of the active locale (0 outside 0..255). */
+static inline int wide_isupper(u16 c)
+{
+    return c >= 0x100 ? 0 : (_current_locale.ctype->wctype_map[c] & CTYPE_UPPER);
+}
 
 /* The opaque argument the writers receive. */
 typedef struct WWriteArg WWriteArg;
@@ -275,7 +291,6 @@ static u16* wlong2str(long num, u16* buff, wprint_format format)
     u32 unsigned_num;
     u32 base;
     int digit;
-    int ch;
     u16* p;
     int n;
     int minus;
@@ -319,14 +334,11 @@ static u16* wlong2str(long num, u16* buff, wprint_format format)
         digit = unsigned_num % base;
         num = unsigned_num / base;
         if (digit < 10) {
-            ch = '0' + digit;
+            digit += '0';
         } else {
-            ch = 'A' - 10 + digit;
-            if (format.conversion_char == 'x') {
-                ch = 'a' - 10 + digit;
-            }
+            digit = (format.conversion_char == 'x') ? digit + 'a' - 10 : digit + 'A' - 10;
         }
-        *--p = ch;
+        *--p = digit;
         n++;
     } while (num != 0);
 
@@ -367,10 +379,9 @@ static u16* wlong2str(long num, u16* buff, wprint_format format)
 /* 0x80461FDC (0x2BC): renders a signed or unsigned long long as wide digits, filling backwards from the end of `buff`. */
 static u16* wlonglong2str(long long num, u16* buff, wprint_format format)
 {
+    int digit;
     u64 unsigned_num;
     u64 base;
-    int digit;
-    int ch;
     u16* p;
     int n;
     int minus;
@@ -379,6 +390,7 @@ static u16* wlonglong2str(long long num, u16* buff, wprint_format format)
     n = 0;
     p = buff;
     *--p = 0;
+    unsigned_num = num;
     if (num == 0 && format.precision == 0 && !(format.alternate_form && format.conversion_char == 'o')) {
         return p;
     }
@@ -389,7 +401,7 @@ static u16* wlonglong2str(long long num, u16* buff, wprint_format format)
         base = 10;
         if (num < 0) {
             if (num != (long long)0x8000000000000000LL) {
-                num = -num;
+                unsigned_num = -num;
             }
             minus = 1;
         }
@@ -410,20 +422,16 @@ static u16* wlonglong2str(long long num, u16* buff, wprint_format format)
     }
 
     do {
-        unsigned_num = num;
         digit = unsigned_num % base;
-        num = unsigned_num / base;
+        unsigned_num = unsigned_num / base;
         if (digit < 10) {
-            ch = '0' + digit;
+            digit += '0';
         } else {
-            ch = 'A' - 10 + digit;
-            if (format.conversion_char == 'x') {
-                ch = 'a' - 10 + digit;
-            }
+            digit = (format.conversion_char == 'x') ? digit + 'a' - 10 : digit + 'A' - 10;
         }
-        *--p = ch;
+        *--p = digit;
         n++;
-    } while (num != 0);
+    } while (unsigned_num != 0);
 
     if (base == 8 && format.alternate_form && *p != '0') {
         *--p = '0';
@@ -462,18 +470,22 @@ static u16* wlonglong2str(long long num, u16* buff, wprint_format format)
 /* 0x80462298 (0x454): renders a double as a wide hexadecimal floating-point literal (or as INF / NAN), filling backwards from the end of `buff`. */
 static u16* wdouble2hex(f64 num, u16* buff, wprint_format format)
 {
-    decimal dec;
-    decform form;
-    wprint_format exp_format;
     u16* p;
-    int i;
-    int bit;
-    int shift;
-    u8 nibble;
-    int exp_field;
-    int digit;
-    u8* bytes;
-    u8 radix = *_lconv.decimal_point;
+    u8* q;
+    u8 working_byte;
+    f64 ld;
+    u32 snum;
+    long exp;
+    wprint_format exp_format;
+    int hex_precision;
+    int mantissa_bit;
+    decform form;
+    decimal dec;
+    int radix_marker;
+
+    radix_marker = *(u8*)_lconv.decimal_point;
+    p = buff;
+    ld = num;
 
     if (format.precision > 509) {
         return NULL;
@@ -536,71 +548,77 @@ static u16* wdouble2hex(f64 num, u16* buff, wprint_format format)
             }
         }
         return p;
-    default:
-        bytes = (u8*)&num;
-        exp_format.justification_options = RIGHT_JUSTIFY;
-        exp_format.sign_options = SIGN_ALWAYS;
-        exp_format.precision_specified = 0;
-        exp_format.alternate_form = 0;
-        exp_format.argument_options = ARG_NORMAL;
-        exp_format.conversion_char = 'd';
-        exp_format.field_width = 0;
-        exp_format.precision = 1;
-        exp_field = (u32)(((bytes[0] << 25) & 0xFE000000) | (bytes[1] << 17)) >> 21;
-        p = wlong2str((exp_field - 0x3FF) & ((-exp_field | exp_field) >> 31), buff, exp_format);
-        if (format.conversion_char == 'a') {
-            *--p = 'p';
-        } else {
-            *--p = 'P';
-        }
-
-        bit = format.precision * 4 + 11;
-        for (i = format.precision; i >= 1; i--) {
-            if (bit < 64) {
-                shift = 7 - (bit & 7);
-                nibble = bytes[bit >> 3] >> shift;
-                if ((bit & ~7) != ((bit - 4) & ~7)) {
-                    nibble |= (bytes[(bit >> 3) - 1] << 8) >> shift;
-                }
-                nibble &= 0xF;
-                if (nibble < 10) {
-                    digit = '0' + nibble;
-                } else if (format.conversion_char == 'a') {
-                    digit = 'a' - 10 + nibble;
-                } else {
-                    digit = 'A' - 10 + nibble;
-                }
-            } else {
-                digit = '0';
-            }
-            *--p = digit;
-            bit -= 4;
-        }
-
-        if (format.precision != 0 || format.alternate_form) {
-            *--p = radix;
-        }
-        if (__fabs(num) != 0.0) {
-            *--p = '1';
-        } else {
-            *--p = '0';
-        }
-        if (format.conversion_char == 'a') {
-            *--p = 'x';
-        } else {
-            *--p = 'X';
-        }
-        *--p = '0';
-
-        if (dec.sign) {
-            *--p = '-';
-        } else if (format.sign_options == SIGN_ALWAYS) {
-            *--p = '+';
-        } else if (format.sign_options == SIGN_SPACE) {
-            *--p = ' ';
-        }
-        return p;
     }
+
+    exp_format.justification_options = RIGHT_JUSTIFY;
+    exp_format.sign_options = SIGN_ALWAYS;
+    exp_format.precision_specified = 0;
+    exp_format.alternate_form = 0;
+    exp_format.argument_options = ARG_NORMAL;
+    exp_format.field_width = 0;
+    exp_format.precision = 1;
+    exp_format.conversion_char = 'd';
+
+    snum = ((u8*)&num)[0] << 25;
+    snum |= ((u8*)&num)[1] << 17;
+    snum = (snum >> 21) & 0x7FF;
+    exp = snum ? snum - 0x3FF : 0;
+
+    p = wlong2str(exp, buff, exp_format);
+    if (format.conversion_char == 'a') {
+        *--p = 'p';
+    } else {
+        *--p = 'P';
+    }
+    q = (u8*)&num;
+
+    mantissa_bit = 11 + format.precision * 4;
+    for (hex_precision = format.precision; hex_precision >= 1; hex_precision--) {
+        if (mantissa_bit < 64) {
+            int mantissa_byte;
+
+            mantissa_byte = mantissa_bit >> 3;
+            working_byte = *(q + mantissa_byte) >> (7 - (mantissa_bit & 7));
+            if ((mantissa_bit & ~7) != ((mantissa_bit - 4) & ~7)) {
+                working_byte |= (*(q + (mantissa_byte - 1)) << 8) >> (7 - (mantissa_bit & 7));
+            }
+            if ((working_byte &= 0x0F) < 10) {
+                working_byte += '0';
+            } else if (format.conversion_char == 'a') {
+                working_byte += 'a' - 10;
+            } else {
+                working_byte += 'A' - 10;
+            }
+        } else {
+            working_byte = '0';
+        }
+        *--p = working_byte;
+        mantissa_bit -= 4;
+    }
+
+    if (format.precision != 0 || format.alternate_form) {
+        *--p = radix_marker;
+    }
+    if (fabs(ld) != 0.0) {
+        *--p = '1';
+    } else {
+        *--p = '0';
+    }
+    if (format.conversion_char == 'a') {
+        *--p = 'x';
+    } else {
+        *--p = 'X';
+    }
+    *--p = '0';
+
+    if (dec.sign) {
+        *--p = '-';
+    } else if (format.sign_options == SIGN_ALWAYS) {
+        *--p = '+';
+    } else if (format.sign_options == SIGN_SPACE) {
+        *--p = ' ';
+    }
+    return p;
 }
 
 /* 0x804626EC (0x128): rounds the digits of `dec` to `new_length`, propagating a carry into the exponent. */
@@ -612,76 +630,79 @@ static void wround_decimal(decimal* dec, int new_length)
     int carry;
     int length;
 
-    if (new_length < 0) {
-        dec->exp = 0;
-        dec->sig.length = 1;
-        dec->sig.text[0] = '0';
-        return;
-    }
-
-    length = dec->sig.length;
-    if (new_length >= length) {
-        return;
-    }
-
-    p = (char*)dec->sig.text + new_length;
-    c = dec->sig.text[new_length] - '0';
-    if (c == 5) {
-        q = (char*)dec->sig.text + length;
-        do {
-            --q;
-        } while (q > p && *q == '0');
-        if (q == p) {
-            carry = p[-1] & 1;
-        } else {
-            carry = 1;
+    for (;;) {
+        if (new_length < 0) {
+            dec->exp = 0;
+            dec->sig.length = 1;
+            dec->sig.text[0] = '0';
+            return;
         }
-    } else {
-        carry = c > 5;
-    }
 
-    while (new_length != 0) {
-        c = *--p + carry - '0';
-        carry = c > 9;
-        if (carry || c == 0) {
-            --new_length;
-        } else {
-            *p = c + '0';
-            break;
+        length = dec->sig.length;
+        if (new_length >= length) {
+            return;
         }
-    }
 
-    if (carry) {
-        dec->sig.length = 1;
-        dec->exp++;
-        dec->sig.text[0] = '1';
-        return;
+        p = (char*)dec->sig.text + new_length;
+        c = dec->sig.text[new_length] - '0';
+        if (c == 5) {
+            q = (char*)dec->sig.text + length;
+            do {
+                --q;
+            } while (q > p && *q == '0');
+            if (q == p) {
+                carry = p[-1] & 1;
+            } else {
+                carry = 1;
+            }
+        } else {
+            carry = c > 5;
+        }
+
+        while (new_length != 0) {
+            c = *--p + carry - '0';
+            carry = c > 9;
+            if (carry || c == 0) {
+                --new_length;
+            } else {
+                *p = c + '0';
+                break;
+            }
+        }
+
+        if (carry) {
+            dec->sig.length = 1;
+            dec->exp++;
+            dec->sig.text[0] = '1';
+            return;
+        }
+        if (new_length != 0) {
+            dec->sig.length = new_length;
+            return;
+        }
+        /* the cut leaves no digit: re-enter as the zero result */
+        new_length = -1;
     }
-    if (new_length != 0) {
-        dec->sig.length = new_length;
-        return;
-    }
-    dec->exp = 0;
-    dec->sig.length = 1;
-    dec->sig.text[0] = '0';
 }
 
 /* 0x80462814 (0x790): renders a double in `e`, `f` or `g` style (or as INF / NAN) as narrow digits widened into `buff`. */
-static u16* wfloat2str(f64 num, u16* buff, wprint_format format)
+static u16* wfloat2str(f64 num, u16* wbuff, wprint_format format)
 {
     decimal dec;
     decform form;
-    char digits[512];
+    char buff[512];
+    u16* pw;
     char* p;
     char* q;
     int n;
-    int exp;
-    int sign_char;
+    int digits;
+    int sign;
     int int_digits;
     int frac_digits;
+    int radix_marker;
     int style;
-    u16* wp;
-    u8 radix = *_lconv.decimal_point;
+
+    radix_marker = *(u8*)_lconv.decimal_point;
 
     if (format.precision > 509) {
         return NULL;
@@ -691,199 +712,190 @@ static u16* wfloat2str(f64 num, u16* buff, wprint_format format)
     form.digits = 32;
     __num2dec(&form, num, &dec);
 
-    q = (char*)&dec.sig.text[dec.sig.length];
-    while (dec.sig.length > 1 && *--q == '0') {
-        dec.sig.length--;
-        dec.exp++;
+    p = (char*)dec.sig.text + dec.sig.length;
+    while (dec.sig.length > 1 && *--p == '0') {
+        --dec.sig.length;
+        ++dec.exp;
     }
 
     switch (dec.sig.text[0]) {
-    case 'I':
-        if (num < 0.0) {
-            wp = buff - 5;
-            if (ctype_wclass(format.conversion_char, CTYPE_UPPER)) {
-                wcscpy(wp, L"-INF");
-            } else {
-                wcscpy(wp, L"-inf");
-            }
-        } else {
-            wp = buff - 4;
-            if (ctype_wclass(format.conversion_char, CTYPE_UPPER)) {
-                wcscpy(wp, L"INF");
-            } else {
-                wcscpy(wp, L"inf");
-            }
-        }
-        return wp;
-    case 'N':
-        if (dec.sign) {
-            wp = buff - 5;
-            if (ctype_wclass(format.conversion_char, CTYPE_UPPER)) {
-                wcscpy(wp, L"-NAN");
-            } else {
-                wcscpy(wp, L"-nan");
-            }
-        } else {
-            wp = buff - 4;
-            if (ctype_wclass(format.conversion_char, CTYPE_UPPER)) {
-                wcscpy(wp, L"NAN");
-            } else {
-                wcscpy(wp, L"nan");
-            }
-        }
-        return wp;
     case '0':
         dec.exp = 0;
-        /* fall through */
-    default:
-        p = digits + 512;
-        dec.exp += dec.sig.length - 1;
-        *--p = 0;
-
-        switch (format.conversion_char) {
-        case 'g':
-        case 'G':
-            if (dec.sig.length > format.precision) {
-                wround_decimal(&dec, format.precision);
-            }
-            if (dec.exp < -4 || dec.exp >= format.precision) {
-                if (format.alternate_form) {
-                    format.precision--;
-                } else {
-                    format.precision = dec.sig.length - 1;
-                }
-                if (format.conversion_char == 'g') {
-                    format.conversion_char = 'e';
-                } else {
-                    format.conversion_char = 'E';
-                }
-                style = 0;
+        break;
+    case 'I':
+        if (num < 0.0) {
+            pw = wbuff - 5;
+            if (wide_isupper(format.conversion_char)) {
+                wcscpy(pw, L"-INF");
             } else {
-                if (format.alternate_form) {
-                    format.precision -= dec.exp + 1;
-                } else {
-                    format.precision = dec.sig.length - (dec.exp + 1);
-                    if (format.precision < 0) {
-                        format.precision = 0;
-                    }
-                }
-                style = 1;
+                wcscpy(pw, L"-inf");
             }
-            break;
-        case 'e':
-        case 'E':
-            style = 0;
-            break;
-        case 'f':
-        case 'F':
-            style = 1;
-            break;
-        default:
-            style = -1;
-            break;
+        } else {
+            pw = wbuff - 4;
+            if (wide_isupper(format.conversion_char)) {
+                wcscpy(pw, L"INF");
+            } else {
+                wcscpy(pw, L"inf");
+            }
         }
+        return pw;
+    case 'N':
+        if (dec.sign) {
+            pw = wbuff - 5;
+            if (wide_isupper(format.conversion_char)) {
+                wcscpy(pw, L"-NAN");
+            } else {
+                wcscpy(pw, L"-nan");
+            }
+        } else {
+            pw = wbuff - 4;
+            if (wide_isupper(format.conversion_char)) {
+                wcscpy(pw, L"NAN");
+            } else {
+                wcscpy(pw, L"nan");
+            }
+        }
+        return pw;
+    }
 
-        if (style == 0) {
-            if (dec.sig.length > format.precision + 1) {
-                wround_decimal(&dec, format.precision + 1);
-            }
-            exp = dec.exp;
-            sign_char = '+';
-            if (exp < 0) {
-                exp = -exp;
-                sign_char = '-';
-            }
-            n = 0;
-            while (exp != 0 || n < 2) {
-                n++;
-                *--p = '0' + exp % 10;
-                exp /= 10;
-            }
-            *--p = sign_char;
-            *--p = format.conversion_char;
+    dec.exp += dec.sig.length - 1;
+    p = buff + 512;
+    *--p = 0;
 
-            if (format.precision + ((digits + 512) - p) > 509) {
-                return NULL;
+    switch (format.conversion_char) {
+    case 'g':
+    case 'G':
+        if (dec.sig.length > format.precision) {
+            wround_decimal(&dec, format.precision);
+        }
+        if (dec.exp < -4 || dec.exp >= format.precision) {
+            if (format.alternate_form) {
+                --format.precision;
+            } else {
+                format.precision = dec.sig.length - 1;
             }
-            if (dec.sig.length < format.precision + 1) {
-                n = format.precision + 2 - dec.sig.length;
-                while (--n != 0) {
-                    *--p = '0';
+            if (format.conversion_char == 'g') {
+                format.conversion_char = 'e';
+            } else {
+                format.conversion_char = 'E';
+            }
+            style = 0;
+        } else {
+            if (format.alternate_form) {
+                format.precision -= dec.exp + 1;
+            } else {
+                if ((format.precision = dec.sig.length - (dec.exp + 1)) < 0) {
+                    format.precision = 0;
                 }
             }
-            q = (char*)&dec.sig.text[dec.sig.length];
-            n = dec.sig.length;
+            style = 1;
+        }
+        break;
+    case 'e':
+    case 'E':
+        style = 0;
+        break;
+    case 'f':
+    case 'F':
+        style = 1;
+        break;
+    default:
+        style = -1;
+        break;
+    }
+
+    if (style == 0) {
+        if (dec.sig.length > format.precision + 1) {
+            wround_decimal(&dec, format.precision + 1);
+        }
+        n = dec.exp;
+        sign = '+';
+        if (n < 0) {
+            n = -n;
+            sign = '-';
+        }
+        for (digits = 0; n || digits < 2; ++digits) {
+            *--p = n % 10 + '0';
+            n /= 10;
+        }
+        *--p = sign;
+        *--p = format.conversion_char;
+        if (buff - p + format.precision > 509) {
+            return NULL;
+        }
+        if (dec.sig.length < format.precision + 1) {
+            n = format.precision + 2 - dec.sig.length;
             while (--n != 0) {
-                *--p = *--q;
+                *--p = '0';
             }
-            if (format.precision != 0 || format.alternate_form) {
-                *--p = radix;
-            }
-            *--p = dec.sig.text[0];
-        } else if (style == 1) {
-            frac_digits = (dec.sig.length - dec.exp) - 1;
-            if (frac_digits < 0) {
+        }
+        q = (char*)dec.sig.text + dec.sig.length;
+        n = dec.sig.length;
+        while (--n != 0) {
+            *--p = *--q;
+        }
+        if (format.precision || format.alternate_form) {
+            *--p = radix_marker;
+        }
+        *--p = dec.sig.text[0];
+        if (dec.sign) {
+            *--p = '-';
+        } else if (format.sign_options == SIGN_ALWAYS) {
+            *--p = '+';
+        } else if (format.sign_options == SIGN_SPACE) {
+            *--p = ' ';
+        }
+    } else if (style == 1) {
+        if ((frac_digits = -dec.exp + dec.sig.length - 1) < 0) {
+            frac_digits = 0;
+        }
+        if (frac_digits > format.precision) {
+            wround_decimal(&dec, dec.sig.length - (frac_digits - format.precision));
+            if ((frac_digits = -dec.exp + dec.sig.length - 1) < 0) {
                 frac_digits = 0;
             }
-            if (frac_digits > format.precision) {
-                wround_decimal(&dec, dec.sig.length - (frac_digits - format.precision));
-                frac_digits = (dec.sig.length - dec.exp) - 1;
-                if (frac_digits < 0) {
-                    frac_digits = 0;
-                }
-            }
-            int_digits = dec.exp + 1;
-            if (int_digits < 0) {
-                int_digits = 0;
-            }
-            if (int_digits + frac_digits > 509) {
-                return NULL;
-            }
-
-            n = 0;
-            q = (char*)&dec.sig.text[dec.sig.length];
-            while (n < format.precision - frac_digits) {
+        }
+        if ((int_digits = dec.exp + 1) < 0) {
+            int_digits = 0;
+        }
+        if (int_digits + frac_digits > 509) {
+            return NULL;
+        }
+        q = (char*)dec.sig.text + dec.sig.length;
+        for (digits = 0; digits < (format.precision - frac_digits); ++digits) {
+            *--p = '0';
+        }
+        for (digits = 0; digits < frac_digits && digits < dec.sig.length; ++digits) {
+            *--p = *--q;
+        }
+        for (; digits < frac_digits; ++digits) {
+            *--p = '0';
+        }
+        if (format.precision || format.alternate_form) {
+            *--p = radix_marker;
+        }
+        if (int_digits) {
+            for (digits = 0; digits < int_digits - dec.sig.length; ++digits) {
                 *--p = '0';
-                n++;
             }
-            n = 0;
-            while (n < frac_digits && n < dec.sig.length) {
+            for (; digits < int_digits; ++digits) {
                 *--p = *--q;
-                n++;
             }
-            for (; n < frac_digits; n++) {
-                *--p = '0';
-            }
-            if (format.precision != 0 || format.alternate_form) {
-                *--p = radix;
-            }
-            if (int_digits != 0) {
-                n = 0;
-                while (n < int_digits - dec.sig.length) {
-                    *--p = '0';
-                    n++;
-                }
-                for (; n < int_digits; n++) {
-                    *--p = *--q;
-                }
-            } else {
-                *--p = '0';
-            }
+        } else {
+            *--p = '0';
         }
-
-        if (style >= 0) {
-            if (dec.sign) {
-                *--p = '-';
-            } else if (format.sign_options == SIGN_ALWAYS) {
-                *--p = '+';
-            } else if (format.sign_options == SIGN_SPACE) {
-                *--p = ' ';
-            }
+        if (dec.sign) {
+            *--p = '-';
+        } else if (format.sign_options == SIGN_ALWAYS) {
+            *--p = '+';
+        } else if (format.sign_options == SIGN_SPACE) {
+            *--p = ' ';
         }
-        wp = buff - (strlen(p) + 1);
-        mbstowcs(wp, p, strlen(p));
-        return wp;
     }
+
+    pw = wbuff - strlen(p) - 1;
+    mbstowcs(pw, p, strlen(p));
+    return pw;
 }
 
 /* 0x80462FA4 (0x98C): formats `format_str` through `write`, fetching the arguments from `args`; returns the character count or -1. */
@@ -904,7 +916,7 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
     u16 pad_char;
     const char* str_ptr;
     char c_buff;
-    u8 narrow_len;
+    int narrow_len;
 
     format_ptr = format_str;
     chars_written = 0;
@@ -938,11 +950,11 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
             } else if (format.argument_options == ARG_INTMAX) {
                 long_long_num = *(long long*)__va_arg(args, 2);
             } else if (format.argument_options == ARG_SIZE_T) {
-                long_num = *(long*)__va_arg(args, 1);
+                long_num = *(u32*)__va_arg(args, 1);
             } else if (format.argument_options == ARG_PTRDIFF_T) {
                 long_num = *(long*)__va_arg(args, 1);
             } else {
-                long_num = *(long*)__va_arg(args, 1);
+                long_num = *(int*)__va_arg(args, 1);
             }
             if (format.argument_options == ARG_SHORT) {
                 long_num = (short)long_num;
@@ -967,11 +979,11 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
             } else if (format.argument_options == ARG_INTMAX) {
                 long_long_num = *(long long*)__va_arg(args, 2);
             } else if (format.argument_options == ARG_SIZE_T) {
-                long_num = *(long*)__va_arg(args, 1);
+                long_num = *(u32*)__va_arg(args, 1);
             } else if (format.argument_options == ARG_PTRDIFF_T) {
                 long_num = *(long*)__va_arg(args, 1);
             } else {
-                long_num = *(long*)__va_arg(args, 1);
+                long_num = *(int*)__va_arg(args, 1);
             }
             if (format.argument_options == ARG_SHORT) {
                 long_num = (u16)long_num;
@@ -992,7 +1004,7 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
         case 'f':
         case 'g':
             if (format.argument_options == ARG_LONG_DOUBLE) {
-                double_num = *(f64*)__va_arg(args, 3);
+                double_num = *(long double*)__va_arg(args, 3);
             } else {
                 double_num = *(f64*)__va_arg(args, 3);
             }
@@ -1004,7 +1016,7 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
         case 'A':
         case 'a':
             if (format.argument_options == ARG_LONG_DOUBLE) {
-                double_num = *(f64*)__va_arg(args, 3);
+                double_num = *(long double*)__va_arg(args, 3);
             } else {
                 double_num = *(f64*)__va_arg(args, 3);
             }
@@ -1050,7 +1062,7 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
                 str_ptr = "";
             }
             if (format.alternate_form) {
-                narrow_len = *str_ptr++;
+                narrow_len = (u8)*buff_ptr++;
                 if (format.precision_specified && narrow_len > format.precision) {
                     narrow_len = format.precision;
                 }
@@ -1108,10 +1120,10 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
         case 'c':
             buff_ptr = buff;
             if (format.argument_options == ARG_WIDE) {
+                *buff = *(int*)__va_arg(args, 1);
                 num_chars = 1;
-                *buff = *(u16*)__va_arg(args, 1);
             } else {
-                c_buff = *(char*)__va_arg(args, 1);
+                c_buff = *(int*)__va_arg(args, 1);
                 num_chars = mbtowc(buff, &c_buff, 1);
             }
             break;
@@ -1127,10 +1139,11 @@ static int __wpformatter(WWriteProc write, WWriteArg* write_arg, const u16* form
 
         if (buff_ptr == NULL) {
             num_chars = wcslen(curr_format);
+            chars_written += num_chars;
             if (num_chars != 0 && write(write_arg, curr_format, num_chars) == NULL) {
                 return -1;
             }
-            return chars_written + num_chars;
+            return chars_written;
         }
 
         field_width = num_chars;
