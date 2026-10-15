@@ -16,7 +16,7 @@ void wpadAccCalibrationReadDone(s32 chan, s32 result);
 void wpadExtCalibrationReadDone(s32 chan, s32 result);
 void wpadExtIdReadDone(s32 chan, s32 result);
 void wpadDpdCalibrationReadDone(s32 chan, s32 error, s32 which);
-s32 wpadDispatchReport(s32 chan, u8* report);
+s32 wpadDispatchReport(u8 chan, u8* report);
 void wpadReportStatus(u8 chan, u8* report, WPADSample* sample);
 void wpadReportReadData(u8 chan, u8* report, WPADSample* sample);
 void wpadReportAck(u8 chan, u8* report, WPADSample* sample);

@@ -40,7 +40,7 @@ typedef struct WPADCmdQueue {
 typedef struct WPADDpdObject {
     /* +0x00 */ s16 x;
     /* +0x02 */ s16 y;
-    /* +0x04 */ s16 size;
+    /* +0x04 */ u16 size;
     /* +0x06 */ s8 slot;
     /* +0x07 */ u8 pad_0x07;
 } WPADDpdObject; /* size: 0x08 */

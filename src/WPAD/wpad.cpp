@@ -42,8 +42,10 @@
  *   `SCGetWpadSensorBarPosition`, `SCGetWpadSpeakerVolume`), `OSReturnToMenuPending`.
  * RESIDUALS. `WPADControlDpd`: the zero byte and the report id swap r12/r31 in two of its queued reports.
  *   `WPADControlSpeaker`: the first two one-byte writes of the "off" path swap the stack slots of the value/size bytes
- *   and of the command and its by-value copy.  Register-numbering differences only (the variable order) remain in `WPADDisconnect`, `wpadAssignChannel`,
- *   `wpadHidOpenCallback`, `wpadUpdateRadioSensitivity` and `WPADSetAutoSamplingBuf`.  `wpadSamplingFiber`: the status
+ *   and of the command and its by-value copy.  Register-numbering differences only (the variable order) remain in `WPADDisconnect`,
+ *   `wpadHidOpenCallback`, `wpadUpdateRadioSensitivity`, `wpadCountIdleReports`, `wpadPollSample`, `WPADControlLed`,
+ *   `wpadSendWbcCommand`, `__wpadIsBusyStream`, `wpadSendCommand`, `WPADSendStreamData` and `wpadSendWriteByte`
+ *   (declaration orders searched).  `wpadSamplingFiber`: the status
  *   switch keeps a `beq case 2` + `b end` where the original falls into case 2 behind a `bne end` (no switch/if spelling
  *   found).  `wpadSampleChanged`: the or-chains are evaluated last-term first and five callee-saved registers are used
  *   where the original uses four and truncates `changed` after each debounce; the balance-board loop is spelled with two
@@ -470,17 +472,24 @@ static inline void wpadQueueClear(WPADCmdQueue* queue)
 /* Sends one queued command to the remote and arms its reply timeout. */
 void wpadSendCommand(s32 chan, WPADCommand cmd)
 {
-    u16 length = cmd.length;
-    WPADCB* cb = wpadCBTable[chan];
-    u8 reportId = (u8)cmd.reportId;
-    u8* data = cmd.data;
-    u32 level = OSDisableInterrupts();
-    s8 handle = cb->devHandle;
-    s32 prevStatus = cb->status;
-    s32 rumble;
     BT_HDR* buf;
+    u32 level;
+    s32 rumble;
+    u8* data;
+    WPADCB* cb;
+    s8 handle;
     u8* payload;
+    u8 reportId;
+    s32 prevStatus;
+    u16 length;
 
+    length = cmd.length;
+    cb = wpadCBTable[chan];
+    reportId = (u8)cmd.reportId;
+    data = cmd.data;
+    level = OSDisableInterrupts();
+    handle = cb->devHandle;
+    prevStatus = cb->status;
     if (handle < 0) {
         OSRestoreInterrupts(level);
         return;
@@ -712,11 +721,14 @@ BOOL wpadSampleChanged(WPADCB* cb, WPADSample* sample, WPADSample* last)
 /* Counts consecutive reports with no input and clears the flag once the count passes the limit. */
 void wpadCountIdleReports(s32 chan, WPADSample* sample)
 {
-    WPADCB* cb = wpadCBTable[chan];
-    s32 idle = 0;
-    u32 format = cb->dataFormat;
+    u32 format;
+    WPADCB* cb;
+    s32 idle;
     u16 count;
 
+    cb = wpadCBTable[chan];
+    idle = 0;
+    format = cb->dataFormat;
     if ((u32)(format - 3) <= 2 && sample->buttons == 0x1C10) {
         idle = 1;
     }
@@ -737,8 +749,8 @@ void wpadCountIdleReports(s32 chan, WPADSample* sample)
 /* Reads the newest sample, refreshes the last-input time and drops the link after the idle limit. */
 void wpadPollSample(s32 chan)
 {
-    WPADCB* cb = wpadCBTable[chan];
     BOOL changed = FALSE;
+    WPADCB* cb = wpadCBTable[chan];
 
     if (wpadPollState == 5) {
         u32 level = OSDisableInterrupts();
@@ -1239,8 +1251,8 @@ void wpadAbortCallback(s32 chan, s32 result)
  * block the firmware generation selects, then a status request. */
 void wpadInitSequence(s32 chan, s32 result)
 {
-    WPADCB* cb = wpadCBTable[chan];
     u16 calSize;
+    WPADCB* cb = wpadCBTable[chan];
     u32 calAddr;
     u8 leds;
     u32 level;
@@ -1293,10 +1305,11 @@ void wpadInitSequence(s32 chan, s32 result)
 /* Picks the channel for a newly opened device: the balance board always takes channel 3, a remote takes its history slot. */
 s32 wpadAssignChannel(WPADDeviceInfo* info)
 {
-    s32 chan = -1;
-    const u8* addr = _WUDGetDevAddr(info->handle);
+    const u8* addr;
     s32 i;
+    s32 chan = -1;
 
+    addr = _WUDGetDevAddr(info->handle);
     if (memcmp(info, "Nintendo RVL-WBC", 0x10) == 0) {
         chan = 3;
         if (wpadCBTable[3]->used != 0) {
@@ -1670,10 +1683,15 @@ s32 WPADIsMotorEnabled(void)
 /* Lights the player LEDs selected by `leds`; returns 0 or a negative error. */
 s32 WPADControlLed(s32 chan, u8 leds, WPADCallback callback)
 {
-    WPADCB* cb = wpadCBTable[chan];
-    u32 level = OSDisableInterrupts();
-    s32 status = cb->status;
-    s32 ready = cb->ready;
+    WPADCB* cb;
+    u32 level;
+    s32 ready;
+    s32 status;
+
+    cb = wpadCBTable[chan];
+    level = OSDisableInterrupts();
+    status = cb->status;
+    ready = cb->ready;
     OSRestoreInterrupts(level);
     if (status != -1) {
         if (ready == 0) {
@@ -1697,8 +1715,8 @@ s32 WPADControlLed(s32 chan, u8 leds, WPADCallback callback)
 BOOL WPADSaveConfig(void (*callback)(s32 result))
 {
     u32 level;
-    u8 volume;
     s32 motor;
+    u8 volume;
     s32 saved;
 
     if (SCCheckStatus() != 0) {
@@ -1767,12 +1785,15 @@ void wpadCopyCurrentSample(s32 chan, void* dest) /* untyped: caller-owned sample
 /* Points the channel at a ring of `count` samples that it fills after every report. */
 void WPADSetAutoSamplingBuf(s32 chan, void* buf, u32 count) /* untyped: caller-owned ring of samples */
 {
-    WPADCB* cb = wpadCBTable[chan];
-    u32 level = OSDisableInterrupts();
-    s8 fill = -4;
+    s8 fill;
     s32 size;
+    WPADCB* cb;
+    u32 level;
     s32 i;
 
+    cb = wpadCBTable[chan];
+    level = OSDisableInterrupts();
+    fill = -4;
     if (cb->status == -1) {
         fill = -1;
     }
@@ -2038,8 +2059,8 @@ void WPADSetSpeakerVolume(u8 volume)
 BOOL __wpadIsBusyStream(s32 chan)
 {
     WPADCB* cb = wpadCBTable[chan];
-    u8 weakRadio = cb->weakRadio;
     u32 level = OSDisableInterrupts();
+    u8 weakRadio = cb->weakRadio;
     u8 deviceType = cb->deviceType;
     u8 bufferStatus = WUDGetBufferStatus();
     s8 queued;
@@ -2050,7 +2071,7 @@ BOOL __wpadIsBusyStream(s32 chan)
         u32 inner = OSDisableInterrupts();
         queued = cb->cmdQueue.tail - cb->cmdQueue.head;
         if (queued < 0) {
-            queued += cb->cmdQueue.capacity;
+            queued = queued + cb->cmdQueue.capacity;
         }
         OSRestoreInterrupts(inner);
     }
@@ -2103,11 +2124,16 @@ BOOL WPADCanSendStreamData(s32 chan)
 /* Queues one packet of speaker data (up to 20 bytes); returns 0 or a negative error. */
 s32 WPADSendStreamData(s32 chan, const void* data, u32 length) /* untyped: byte range */
 {
-    WPADCB* cb = wpadCBTable[chan];
-    u32 level = OSDisableInterrupts();
-    s32 status = cb->status;
-    s32 ready = cb->ready;
+    WPADCB* cb;
+    u32 level;
+    s32 ready;
+    s32 status;
     WPADCommand cmd;
+
+    cb = wpadCBTable[chan];
+    level = OSDisableInterrupts();
+    status = cb->status;
+    ready = cb->ready;
     OSRestoreInterrupts(level);
     if (status == -1) {
         return -1;
@@ -2256,7 +2282,7 @@ s32 WPADiSendSetReportType(WPADCmdQueue* queue, u32 type, s32 onChangeOnly, WPAD
 
     cmd.reportId = 0x12;
     cmd.length = 2;
-    cmd.data[0] = 4 & ~-(onChangeOnly != 0);
+    cmd.data[0] = onChangeOnly != 0 ? 0 : 4;
     cmd.callback = callback;
     switch (type) {
     case 0:
@@ -2315,9 +2341,9 @@ s32 WPADiSendSetReportType(WPADCmdQueue* queue, u32 type, s32 onChangeOnly, WPAD
 s32 wpadSendWriteByte(WPADCmdQueue* queue, u8 value, u32 addr, WPADCallback callback)
 {
     WPADCommand cmd;
+    u8 size = 1;
     u8 byteValue = value;
     u32 address = addr;
-    u8 size = 1;
 
     cmd.reportId = 0x16;
     cmd.length = 0x15;
@@ -2389,12 +2415,16 @@ char* wpadGetGameName(void)
 /* Sends the balance-board handshake bytes to the extension register through the write queue. */
 s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback)
 {
-    WPADCB* cb = wpadCBTable[chan];
-    u32 level = OSDisableInterrupts();
-    s32 status = cb->status;
-    s32 ready = cb->ready;
-    s8 data[7];
+    u32 level;
+    s32 status;
+    WPADCB* cb;
+    s32 ready;
+    u8 data[7];
 
+    cb = wpadCBTable[chan];
+    level = OSDisableInterrupts();
+    status = cb->status;
+    ready = cb->ready;
     OSRestoreInterrupts(level);
     if (status != -1) {
         if (ready == 0 || WUDIsLinkedWBC() == 0) {
@@ -2411,12 +2441,12 @@ s32 wpadSendWbcCommand(s32 chan, s32 command, WPADCallback callback)
             switch (command) {
             case 0xAA: {
                 s8 used;
-                OSDisableInterrupts();
+                u32 inner = OSDisableInterrupts();
                 used = cb->cmdQueue.tail - cb->cmdQueue.head;
                 if (used < 0) {
-                    used += cb->cmdQueue.capacity;
+                    used = used + cb->cmdQueue.capacity;
                 }
-                OSRestoreInterrupts(0);
+                OSRestoreInterrupts(inner);
                 if ((u32)(used + 4) <= (u32)(cb->cmdQueue.capacity - 1)) {
                     WPADWriteExtReg(chan, data, 7, 0xF1, NULL);
                     WPADWriteExtReg(chan, data, 1, 0xF1, NULL);

@@ -24,19 +24,24 @@
  *   `wpadIsFirstPartyExtension`; GUESS data names `wpadExtType`, `wpadExtSubType`, `wpadExtNone` (the 21 0xFF bytes an
  *   absent extension reads as); GUESS field `WPADCB::extStatus`.  Statics are named from use; the .bss rows at
  *   0x8075EA00.. are not understood yet.
- * RESIDUALS. `wpadAccCalibrationReadDone`: the ten-bit pointer coordinates are built with rlwimi where the original
- *   sign-extends the low byte before the or (no cast spelling found).  `wpadExtCalibrationReadDone` adds the block offset
- *   to the buffer in the other operand order.  `wpadDecodeDpd`, `wpadDecodeDpdInterleaved`, `wpadDecodeExtDualStick` and
- *   `wpadDecodeExtBoard` differ in register numbering and the order of the payload loads against the stores into the
- *   sample.  `wpadReportReadData` and `wpadReportStatus` differ in register numbering and one reload;
- *   `wpadReportButtonsAccel` and `wpadReportButtons` differ in scheduling.  The accelerometer decode is an inline
- *   (`wpadDecodeAccel`, or `wpadDecodeAccelAt` through the sample pointer where a handler hands `&sample` to a decoder;
- *   `wpadInterleavedAxis` for the interleaved reports; `wpadDecodeNunchuk`/`wpadDecodeNunchukAt` for the Nunchuk
- *   payload): the original looks the control block up again inside it, which a plain statement sequence CSEs away.
- *   `wpadReportExt21` and the interleaved handlers hand the decoders a copy of the sample pointer (`decoded`), so their
- *   own stores keep the parameter in a register; the other handlers pass `&sample` itself.  `wpadExtNone` is the map's
- *   `wpadExtZero` until request wpad-slice1#23's map half is applied.  Flip blockers: .text (the partial rows) and
- *   .sdata2 (`wpadDecodeDpd` converts the unsigned pointer size, which needs the 4330000000000000 constant).
+ * RESIDUALS. `wpadAccCalibrationReadDone`: the ten-bit pointer coordinates of the four calibration points are loaded and
+ *   combined in a different order (register numbering follows).  `wpadExtCalibrationReadDone` adds the block offset to the
+ *   buffer in the other operand order.  `wpadDecodeDpd` numbers the rotation loop's array bases and two float temporaries
+ *   differently.  `wpadDecodeExtDualStick` and `wpadDecodeExtBoard` differ in register numbering; `wpadDecodeExtBoard`
+ *   also builds the middle weight words with rlwimi from the shifted low byte where the original shifts it with srawi
+ *   first (no cast spelling found).  `wpadDispatchReport`, `wpadReportReadData`, `wpadReportStatus` and
+ *   `wpadReportButtonsAccelExt16` differ in register numbering (no declaration order moves it); `wpadReportStatus` also
+ *   keeps an extsh on the extension bit.  `wpadReportButtonsAccel` and `wpadReportButtons` load the control block one slot
+ *   later.  `wpadExtNone` is the map's `wpadExtZero` until request wpad-slice1#23's map half is applied.
+ *   Flip blockers: .text (the partial rows) and .sdata2 (`wpadDecodeDpd` converts the unsigned pointer size, which needs
+ *   the 4330000000000000 constant).
+ * SHAPES. A pointer coordinate's low byte is `(s16)(b & 0xFF)` (the mask keeps the extsh a bare cast drops); an extension
+ *   axis's low bits are `(s16)((s16)((s32)b >> n) & m)` (retail keeps the dead srawi); stick clamps are two independent
+ *   `if`s over a copy.  The accelerometer decode is an inline (`wpadDecodeAccel`, or `wpadDecodeAccelAt` through the
+ *   sample pointer; `wpadInterleavedAxis` for the interleaved reports; `wpadDecodeNunchukAt` for the Nunchuk payload): the
+ *   original looks the control block up again inside it, which a plain statement sequence CSEs away.  The extension
+ *   handlers hand the decoders a copy of the sample pointer (`decoded`); `wpadReportButtonsAccelDpd10Ext6` passes the
+ *   copy to its own stores and `&sample` to the Nunchuk and Classic decoders.
  */
 
 #include "types.h"
@@ -119,40 +124,19 @@ static inline s16 wpadInterleavedAxis(s32 chan, u8 high, u8 low, s32 axis)
     return (s16)((s16)((s16)(high << 2) & ~3) | (s16)((low >> 6) & 2)) - wpadCBTable[chan]->calA.accZero[axis];
 }
 
-/* Decodes a Nunchuk-style extension payload (`ext`: stick, three accelerometer bytes and the low bits/buttons byte)
- * and centres the stick on its first reading. */
-static inline void wpadDecodeNunchuk(s32 chan, u8* ext, WPADSample* sample)
-{
-    WPADCB* cb = wpadCBTable[chan];
-    s16 value;
-
-    sample->nunchuk.stickX = ext[0];
-    sample->nunchuk.stickY = ext[1];
-    sample->nunchuk.accX = (s16)((s16)((s16)(ext[2] << 2) & ~3) | ((ext[5] >> 2) & 3)) - cb->calB.nunchuk.accZero[0];
-    sample->nunchuk.accY = (s16)((s16)((s16)(ext[3] << 2) & ~3) | ((ext[5] >> 4) & 3)) - cb->calB.nunchuk.accZero[1];
-    sample->nunchuk.accZ = (s16)((s16)((s16)(ext[4] << 2) & ~3) | (s16)((s32)ext[5] >> 6)) - cb->calB.nunchuk.accZero[2];
-    sample->buttons = sample->buttons | ((~ext[5] << 13) & 0x6000);
-    if (cb->centerValid == 0) {
-        cb->centerValid = 1;
-        cb->calB.nunchuk.stickX[0] = sample->nunchuk.stickX;
-        cb->calB.nunchuk.stickY[0] = sample->nunchuk.stickY;
-    }
-    value = sample->nunchuk.stickX - (u8)cb->calB.nunchuk.stickX[0];
-    sample->nunchuk.stickX = value < -0x80 ? -0x80 : (value > 0x7F ? 0x7F : value);
-    value = sample->nunchuk.stickY - (u8)cb->calB.nunchuk.stickY[0];
-    sample->nunchuk.stickY = value < -0x80 ? -0x80 : (value > 0x7F ? 0x7F : value);
-}
-
 /* Decodes a Nunchuk-style extension payload into the sample `*sample` points at. */
 static inline void wpadDecodeNunchukAt(s32 chan, u8* ext, WPADSample** sample)
 {
     WPADCB* cb = wpadCBTable[chan];
     s16 value;
+    s16 clamped;
+    s16 valueY;
+    s16 clampedY;
 
     (*sample)->nunchuk.stickX = ext[0];
     (*sample)->nunchuk.stickY = ext[1];
-    (*sample)->nunchuk.accX = (s16)((s16)((s16)(ext[2] << 2) & ~3) | ((ext[5] >> 2) & 3)) - cb->calB.nunchuk.accZero[0];
-    (*sample)->nunchuk.accY = (s16)((s16)((s16)(ext[3] << 2) & ~3) | ((ext[5] >> 4) & 3)) - cb->calB.nunchuk.accZero[1];
+    (*sample)->nunchuk.accX = (s16)((s16)((s16)(ext[2] << 2) & ~3) | (s16)((s16)((s32)ext[5] >> 2) & 3)) - cb->calB.nunchuk.accZero[0];
+    (*sample)->nunchuk.accY = (s16)((s16)((s16)(ext[3] << 2) & ~3) | (s16)((s16)((s32)ext[5] >> 4) & 3)) - cb->calB.nunchuk.accZero[1];
     (*sample)->nunchuk.accZ = (s16)((s16)((s16)(ext[4] << 2) & ~3) | (s16)((s32)ext[5] >> 6)) - cb->calB.nunchuk.accZero[2];
     (*sample)->buttons = (*sample)->buttons | ((~ext[5] << 13) & 0x6000);
     if (cb->centerValid == 0) {
@@ -160,10 +144,24 @@ static inline void wpadDecodeNunchukAt(s32 chan, u8* ext, WPADSample** sample)
         cb->calB.nunchuk.stickX[0] = (*sample)->nunchuk.stickX;
         cb->calB.nunchuk.stickY[0] = (*sample)->nunchuk.stickY;
     }
-    value = (*sample)->nunchuk.stickX - (u8)cb->calB.nunchuk.stickX[0];
-    (*sample)->nunchuk.stickX = value < -0x80 ? -0x80 : (value > 0x7F ? 0x7F : value);
-    value = (*sample)->nunchuk.stickY - (u8)cb->calB.nunchuk.stickY[0];
-    (*sample)->nunchuk.stickY = value < -0x80 ? -0x80 : (value > 0x7F ? 0x7F : value);
+    value = (u8)(*sample)->nunchuk.stickX - (u8)cb->calB.nunchuk.stickX[0];
+    clamped = value;
+    if (value < -0x80) {
+        clamped = -0x80;
+    }
+    if (value > 0x7F) {
+        clamped = 0x7F;
+    }
+    (*sample)->nunchuk.stickX = clamped;
+    valueY = (u8)(*sample)->nunchuk.stickY - (u8)cb->calB.nunchuk.stickY[0];
+    clampedY = valueY;
+    if (valueY < -0x80) {
+        clampedY = -0x80;
+    }
+    if (valueY > 0x7F) {
+        clampedY = 0x7F;
+    }
+    (*sample)->nunchuk.stickY = clampedY;
 }
 
 /* Starts the extension handshake on the auxiliary queue: the report type, the two initialisation writes and the
@@ -220,39 +218,39 @@ void wpadExtInitCallback(s32 chan, s32 result)
  * missing block, and derives the pointer centre, pivot and roll of the channel. */
 void wpadAccCalibrationReadDone(s32 chan, s32 result)
 {
-    s16 defaultX[4] = { 127, 896, 896, 127 };
-    s16 defaultY[4] = { 93, 93, 674, 674 };
-    WPADCB* cb = wpadCBTable[chan];
-    u8* data = (u8*)cb->replyA;
-    WPADDpdCalPoint* points = cb->calA.dpdPoint;
-    WPADDpdCalPoint read[4];
-    f32 px[4];
-    f32 py[4];
-    f32 measured[4];
-    f32 expected[4];
-    f32 sumX;
-    f32 sumY;
-    f32 angleX;
-    f32 angleY;
-    u8 i;
     u8 block;
+    f32 sumY;
+    WPADCB* cb = wpadCBTable[chan];
+    f32 angleX;
+    f32 sumX;
+    f32 px[4];
+    s16 defaultX[4] = { 127, 896, 896, 127 };
+    u8 i;
+    f32 py[4];
+    WPADDpdCalPoint read[4];
+    s16 defaultY[4] = { 93, 93, 674, 674 };
+    f32 measured[4];
+    f32 angleY;
+    u8* data;
+    f32 expected[4];
 
-    points[0].x = defaultX[0];
-    points[0].y = defaultY[0];
-    points[0].size = cb->reportRate;
-    points[0].index = 0;
-    points[1].x = defaultX[1];
-    points[1].y = defaultY[1];
-    points[1].size = cb->reportRate;
-    points[1].index = 1;
-    points[2].x = defaultX[2];
-    points[2].y = defaultY[2];
-    points[2].size = cb->reportRate;
-    points[2].index = 2;
-    points[3].x = defaultX[3];
-    points[3].y = defaultY[3];
-    points[3].size = cb->reportRate;
-    points[3].index = 3;
+    data = (u8*)cb->replyA;
+    cb->calA.dpdPoint[0].x = defaultX[0];
+    cb->calA.dpdPoint[0].y = defaultY[0];
+    cb->calA.dpdPoint[0].size = cb->reportRate;
+    cb->calA.dpdPoint[0].index = 0;
+    cb->calA.dpdPoint[1].x = defaultX[1];
+    cb->calA.dpdPoint[1].y = defaultY[1];
+    cb->calA.dpdPoint[1].size = cb->reportRate;
+    cb->calA.dpdPoint[1].index = 1;
+    cb->calA.dpdPoint[2].x = defaultX[2];
+    cb->calA.dpdPoint[2].y = defaultY[2];
+    cb->calA.dpdPoint[2].size = cb->reportRate;
+    cb->calA.dpdPoint[2].index = 2;
+    cb->calA.dpdPoint[3].x = defaultX[3];
+    cb->calA.dpdPoint[3].y = defaultY[3];
+    cb->calA.dpdPoint[3].size = cb->reportRate;
+    cb->calA.dpdPoint[3].index = 3;
     cb->calA.accZero[0] = 0x212;
     cb->calA.accZero[1] = 0x212;
     cb->calA.accZero[2] = 0x212;
@@ -278,47 +276,47 @@ void wpadAccCalibrationReadDone(s32 chan, s32 result)
                 WPADDpdCalPoint* point;
 
                 WPADiDebugPrint("Dpd Setting is ok.\n");
-                read[0].x = (s16)raw[0] | ((raw[2] << 4) & 0x300);
-                read[0].y = 767 - (s16)((s16)raw[1] | ((raw[2] << 2) & 0x300));
+                read[0].x = (s16)(raw[0] & 0xFF) | ((raw[2] << 4) & 0x300);
+                read[0].y = 767 - (s16)((s16)(raw[1] & 0xFF) | ((raw[2] << 2) & 0x300));
                 read[0].size = cb->reportRate;
                 read[0].index = 0;
-                read[1].x = (s16)raw[3] | ((raw[2] << 8) & 0x300);
-                read[1].y = 767 - (s16)((s16)raw[4] | ((raw[2] << 6) & 0x300));
+                read[1].x = (s16)(raw[3] & 0xFF) | ((raw[2] << 8) & 0x300);
+                read[1].y = 767 - (s16)((s16)(raw[4] & 0xFF) | ((raw[2] << 6) & 0x300));
                 read[1].size = cb->reportRate;
                 read[1].index = 1;
-                read[2].x = (s16)raw[5] | ((raw[7] << 4) & 0x300);
-                read[2].y = 767 - (s16)((s16)raw[6] | ((raw[7] << 2) & 0x300));
+                read[2].x = (s16)(raw[5] & 0xFF) | ((raw[7] << 4) & 0x300);
+                read[2].y = 767 - (s16)((s16)(raw[6] & 0xFF) | ((raw[7] << 2) & 0x300));
                 read[2].size = cb->reportRate;
                 read[2].index = 2;
-                read[3].x = (s16)raw[8] | ((raw[7] << 8) & 0x300);
-                read[3].y = 767 - (s16)((s16)raw[9] | ((raw[7] << 6) & 0x300));
+                read[3].x = (s16)(raw[8] & 0xFF) | ((raw[7] << 8) & 0x300);
+                read[3].y = 767 - (s16)((s16)(raw[9] & 0xFF) | ((raw[7] << 6) & 0x300));
                 read[3].size = cb->reportRate;
                 read[3].index = 3;
                 point = read;
                 for (j = 0; j < 4; j++, point++) {
                     if (point->x < 512 && point->y < 384) {
-                        points[0].x = point->x;
-                        points[0].y = point->y;
-                        points[0].size = point->size;
-                        points[0].index = point->index;
+                        cb->calA.dpdPoint[0].x = point->x;
+                        cb->calA.dpdPoint[0].y = point->y;
+                        cb->calA.dpdPoint[0].size = point->size;
+                        cb->calA.dpdPoint[0].index = point->index;
                     }
                     if (point->x > 512 && point->y < 384) {
-                        points[1].x = point->x;
-                        points[1].y = point->y;
-                        points[1].size = point->size;
-                        points[1].index = point->index;
+                        cb->calA.dpdPoint[1].x = point->x;
+                        cb->calA.dpdPoint[1].y = point->y;
+                        cb->calA.dpdPoint[1].size = point->size;
+                        cb->calA.dpdPoint[1].index = point->index;
                     }
                     if (point->x > 512 && point->y > 384) {
-                        points[2].x = point->x;
-                        points[2].y = point->y;
-                        points[2].size = point->size;
-                        points[2].index = point->index;
+                        cb->calA.dpdPoint[2].x = point->x;
+                        cb->calA.dpdPoint[2].y = point->y;
+                        cb->calA.dpdPoint[2].size = point->size;
+                        cb->calA.dpdPoint[2].index = point->index;
                     }
                     if (point->x < 512 && point->y > 384) {
-                        points[3].x = point->x;
-                        points[3].y = point->y;
-                        points[3].size = point->size;
-                        points[3].index = point->index;
+                        cb->calA.dpdPoint[3].x = point->x;
+                        cb->calA.dpdPoint[3].y = point->y;
+                        cb->calA.dpdPoint[3].size = point->size;
+                        cb->calA.dpdPoint[3].index = point->index;
                     }
                 }
                 break;
@@ -331,10 +329,10 @@ void wpadAccCalibrationReadDone(s32 chan, s32 result)
     sumX = 0.0f;
     sumY = sumX;
     for (i = 0; i < 4; i++) {
-        px[i] = points[i].x;
-        py[i] = points[i].y;
-        sumX += (f32)(points[i].x - defaultX[i]);
-        sumY += (f32)(points[i].y - defaultY[i]);
+        px[i] = cb->calA.dpdPoint[i].x;
+        py[i] = cb->calA.dpdPoint[i].y;
+        sumX += (f32)(cb->calA.dpdPoint[i].x - defaultX[i]);
+        sumY += (f32)(cb->calA.dpdPoint[i].y - defaultY[i]);
         WPADiDebugPrint("x = %lf, y = %lf\n", px[i], py[i]);
     }
     sumX *= 0.25f;
@@ -620,11 +618,11 @@ void wpadExtIdReadDone(s32 chan, s32 result)
 void wpadDpdCalibrationReadDone(s32 chan, s32 error, s32 which)
 {
     WPADCB* cb = wpadCBTable[chan];
+    s32 i;
+    s32 sum = 0;
     u8* data = (u8*)cb->replyA;
 
     if (error == 0) {
-        s32 sum = 0;
-        s32 i;
         for (i = 0; i < 0x2F; i++) {
             sum += data[i];
         }
@@ -648,10 +646,11 @@ void wpadReportIgnored(u8 chan, u8* report, WPADSample* sample)
 void wpadReportStatus(u8 chan, u8* report, WPADSample* sample)
 {
     WPADCB* cb = wpadCBTable[chan];
-    s32 wasAttached = cb->flags.extensionAttached;
     u32 level;
+    s32 wasAttached;
     WPADCallback callback;
 
+    wasAttached = cb->flags.extensionAttached;
     WPADiDebugPrint("Received report 20\n");
     level = OSDisableInterrupts();
     if (cb->ready == 0) {
@@ -730,17 +729,18 @@ void wpadReportStatus(u8 chan, u8* report, WPADSample* sample)
 /* Handles the memory-read reply: copies the payload and runs the read's follow-up when the last block arrives. */
 void wpadReportReadData(u8 chan, u8* report, WPADSample* sample)
 {
-    WPADCB* cb = wpadCBTable[chan];
-    u32 level = OSDisableInterrupts();
-    u32 base;
-    u16 offset;
-    u32 high;
-    u16 low;
-    u8 size;
     s16 delta;
+    u32 base;
     s32 result;
+    u32 level;
+    u32 high;
+    WPADCB* cb = wpadCBTable[chan];
+    u16 low;
     WPADCallback callback;
+    u16 offset;
+    u8 size;
 
+    level = OSDisableInterrupts();
     if ((report[3] & 0xF) != 0) {
         WPADiDebugPrint("read error happens!\n");
         cb->replyC = -1;
@@ -844,25 +844,25 @@ void wpadReportAck(u8 chan, u8* report, WPADSample* sample)
 }
 
 /* Dispatches an input report to its handler and publishes the decoded sample; returns -1 for an unknown report id. */
-s32 wpadDispatchReport(s32 chan, u8* report)
+s32 wpadDispatchReport(u8 chan, u8* report)
 {
-    WPADCB* cb = wpadCBTable[(u8)chan];
+    WPADCB* cb = wpadCBTable[chan];
     s32 result = 0;
 
     if ((u8)(report[0] + 0xE0) <= 0x1F) {
-        WPADCB* current = wpadCBTable[(u8)chan];
         u32 level = OSDisableInterrupts();
+        WPADCB* current = wpadCBTable[chan];
         WPADSample* sample = &current->samples[current->sampleIndex];
 
         if (report[0] != 0x3E && report[0] != 0x3F) {
             memset(sample, 0, sizeof(WPADSample));
         }
-        wpadReportHandlers[report[0] - 0x20]((u8)chan, report, sample);
+        wpadReportHandlers[report[0] - 0x20](chan, report, sample);
         if (cb->ready == 0) {
             sample->extensionError = -4;
         }
         if (report[0] != 0x3E && report[0] != 0x3F) {
-            WPADCB* next = wpadCBTable[(u8)chan];
+            WPADCB* next = wpadCBTable[chan];
             next->sampleIndex = (next->sampleIndex == 0);
         }
         OSRestoreInterrupts(level);
@@ -877,7 +877,7 @@ s32 wpadDispatchReport(s32 chan, u8* report)
 /* Decodes the pointer objects of a basic (format 1) or extended (format 3) report and rotates them by the channel's roll. */
 void wpadDecodeDpd(s32 chan, WPADSample** sample, u32 format, u8* data, s32 length)
 {
-    u32 i;
+    u8 i;
     u8 slot;
 
     if (wpadCBTable[chan]->dpdBlocked != 0) {
@@ -889,9 +889,11 @@ void wpadDecodeDpd(s32 chan, WPADSample** sample, u32 format, u8* data, s32 leng
             s32 offset = slot * 3;
             if (offset + 2 < length) {
                 u8* object = data + offset;
+                u8 x = object[0];
                 u8 high = object[2];
-                (*sample)->dpd[slot].x = object[0] | ((high << 4) & 0x300);
-                (*sample)->dpd[slot].y = 0x2FF - (object[1] | ((high << 2) & 0x300));
+                u8 y = object[1];
+                (*sample)->dpd[slot].x = (s16)(x & 0xFF) | ((high << 4) & 0x300);
+                (*sample)->dpd[slot].y = 0x2FF - (s16)((s16)(y & 0xFF) | ((high << 2) & 0x300));
                 (*sample)->dpd[slot].size = high & 0xF;
                 (*sample)->dpd[slot].size = (u8)(3.141592f * ((f32)(*sample)->dpd[slot].size * (f32)(*sample)->dpd[slot].size));
                 if ((*sample)->dpd[slot].size == 0 || (*sample)->dpd[slot].x == 0x3FF || (*sample)->dpd[slot].y == 0x2FF) {
@@ -915,11 +917,11 @@ void wpadDecodeDpd(s32 chan, WPADSample** sample, u32 format, u8* data, s32 leng
             u8 y = object[1];
             u8 high = data[pair * 5 + 2];
             if (slot % 2 == 0) {
-                (*sample)->dpd[slot].x = x | ((high << 4) & 0x300);
-                (*sample)->dpd[slot].y = 0x2FF - (y | ((high << 2) & 0x300));
+                (*sample)->dpd[slot].x = (s16)(x & 0xFF) | ((high << 4) & 0x300);
+                (*sample)->dpd[slot].y = 0x2FF - (s16)((s16)(y & 0xFF) | ((high << 2) & 0x300));
             } else {
-                (*sample)->dpd[slot].x = x | ((high << 8) & 0x300);
-                (*sample)->dpd[slot].y = 0x2FF - (y | ((high << 6) & 0x300));
+                (*sample)->dpd[slot].x = (s16)(x & 0xFF) | ((high << 8) & 0x300);
+                (*sample)->dpd[slot].y = 0x2FF - (s16)((s16)(y & 0xFF) | ((high << 6) & 0x300));
             }
             if ((*sample)->dpd[slot].x == 0x3FF || (*sample)->dpd[slot].y == 0x2FF) {
                 (*sample)->dpd[slot].x = 0;
@@ -932,16 +934,14 @@ void wpadDecodeDpd(s32 chan, WPADSample** sample, u32 format, u8* data, s32 leng
         }
     }
     for (i = 0; i < 4; i++) {
-        WPADDpdObject* object = &(*sample)->dpd[i];
-        if (object->x != 0 || object->y != 0x2FF) {
-            f32 px = (f32)object->x + wpadDpdCenterX[chan];
-            f32 py = (f32)object->y + wpadDpdCenterY[chan];
-            f32 dx = px - wpadDpdPivotX[chan];
-            f32 dy = py - wpadDpdPivotY[chan];
-            f32 sine = (f32)sin(-1.0f * wpadDpdRoll[chan]);
-            object->x = wpadDpdPivotX[chan] + ((dx * (f32)cos(-1.0f * wpadDpdRoll[chan])) - (dy * sine));
-            sine = (f32)cos(-1.0f * wpadDpdRoll[chan]);
-            (*sample)->dpd[i].y = wpadDpdPivotY[chan] + ((dx * (f32)sin(-1.0f * wpadDpdRoll[chan])) + (dy * sine));
+        if ((*sample)->dpd[i].x != 0 || (*sample)->dpd[i].y != 0x2FF) {
+            WPADDpdObject* object = &(*sample)->dpd[i];
+            f32 dx = ((f32)(*sample)->dpd[i].x + wpadDpdCenterX[chan]) - wpadDpdPivotX[chan];
+            f32 dy = ((f32)object->y + wpadDpdCenterY[chan]) - wpadDpdPivotY[chan];
+            f32 term = dy * (f32)sin(-1.0f * wpadDpdRoll[chan]);
+            object->x = wpadDpdPivotX[chan] + ((dx * (f32)cos(-1.0f * wpadDpdRoll[chan])) - term);
+            term = dy * (f32)cos(-1.0f * wpadDpdRoll[chan]);
+            (*sample)->dpd[i].y = wpadDpdPivotY[chan] + ((dx * (f32)sin(-1.0f * wpadDpdRoll[chan])) + term);
         }
     }
 }
@@ -949,18 +949,18 @@ void wpadDecodeDpd(s32 chan, WPADSample** sample, u32 format, u8* data, s32 leng
 /* Decodes one 9-byte pointer record of an interleaved report into `slot` of the sample, plus its bounding box. */
 void wpadDecodeDpdInterleaved(s32 chan, WPADSample** sample, u8 slot, u8* data, s32 reserved)
 {
-    (*sample)->dpd[slot].x = data[0] | ((data[2] << 4) & 0x300);
-    (*sample)->dpd[slot].y = 0x2FF - (data[1] | ((data[2] << 2) & 0x300));
+    (*sample)->dpd[slot].x = (s16)(data[0] & 0xFF) | ((data[2] << 4) & 0x300);
+    (*sample)->dpd[slot].y = 0x2FF - (s16)((s16)(data[1] & 0xFF) | ((data[2] << 2) & 0x300));
     (*sample)->dpdExt[slot].intensity = (((s16)((data[7] << 8) & 0xFF00) | data[8]) << 6) & 0xFFC0;
     (*sample)->dpdExt[slot].sizeExtra = data[2] & 0xF;
-    (*sample)->dpdExt[slot].left = data[3] != 0xFF ? data[3] : 0;
-    (*sample)->dpdExt[slot].top = data[4] != 0xFF ? data[4] : 0;
-    (*sample)->dpdExt[slot].right = data[5] != 0xFF ? data[5] : 0;
-    (*sample)->dpdExt[slot].bottom = data[6] != 0xFF ? data[6] : 0;
+    (*sample)->dpdExt[slot].left = (s8)data[3] == -1 ? 0 : data[3];
+    (*sample)->dpdExt[slot].top = (s8)data[4] == -1 ? 0 : data[4];
+    (*sample)->dpdExt[slot].right = (s8)data[5] == -1 ? 0 : data[5];
+    (*sample)->dpdExt[slot].bottom = (s8)data[6] == -1 ? 0 : data[6];
     (*sample)->dpdExt[slot].left = (*sample)->dpdExt[slot].left * 8;
-    (*sample)->dpdExt[slot].top = 0x2FF - (*sample)->dpdExt[slot].top * 8;
+    (*sample)->dpdExt[slot].top = 0x2FF - (s16)((*sample)->dpdExt[slot].top * 8);
     (*sample)->dpdExt[slot].right = (*sample)->dpdExt[slot].right * 8;
-    (*sample)->dpdExt[slot].bottom = 0x2FF - (*sample)->dpdExt[slot].bottom * 8;
+    (*sample)->dpdExt[slot].bottom = 0x2FF - (s16)((*sample)->dpdExt[slot].bottom * 8);
     (*sample)->dpd[slot].size = 3.141592f * ((f32)(s8)(*sample)->dpdExt[slot].sizeExtra * (f32)(s8)(*sample)->dpdExt[slot].sizeExtra);
     if ((*sample)->dpd[slot].size == 0 || (*sample)->dpd[slot].x == 0x3FF || (*sample)->dpd[slot].y == 0x2FF || (*sample)->dpdExt[slot].sizeExtra == 0xF) {
         (*sample)->dpd[slot].x = 0;
@@ -980,18 +980,18 @@ void wpadDecodeExtDualStick(s32 chan, WPADSample** sample, u8 variant, u8* data,
     switch (variant) {
     case 2:
         (*sample)->classic.leftX = (s16)((s16)(data[0] * 4) & ~3) | (data[4] & 3);
-        (*sample)->classic.rightX = (s16)((s16)(data[1] * 4) & ~3) | ((data[4] >> 2) & 3);
-        (*sample)->classic.leftY = (s16)((s16)(data[2] * 4) & ~3) | ((data[4] >> 4) & 3);
+        (*sample)->classic.rightX = (s16)((s16)(data[1] * 4) & ~3) | (s16)((s16)((s32)data[4] >> 2) & 3);
+        (*sample)->classic.leftY = (s16)((s16)(data[2] * 4) & ~3) | (s16)((s16)((s32)data[4] >> 4) & 3);
         (*sample)->classic.rightY = (s16)((s16)(data[3] * 4) & ~3) | (s16)((s32)data[4] >> 6);
         (*sample)->classic.leftTrigger = data[5];
         (*sample)->classic.rightTrigger = (length < 9) ? 0 : data[6];
         (*sample)->classic.buttons = (length < 9) ? 0 : (((data[8] & ~0xFF00) | ((data[7] << 8) & 0xFF00)) ^ 0xFFFF);
         break;
     case 3:
-        (*sample)->classic.leftX = (s16)data[0] * 4;
-        (*sample)->classic.rightX = (s16)data[1] * 4;
-        (*sample)->classic.leftY = (s16)data[2] * 4;
-        (*sample)->classic.rightY = (s16)data[3] * 4;
+        (*sample)->classic.leftX = (s16)(data[0] & 0xFF) * 4;
+        (*sample)->classic.rightX = (s16)(data[1] & 0xFF) * 4;
+        (*sample)->classic.leftY = (s16)(data[2] & 0xFF) * 4;
+        (*sample)->classic.rightY = (s16)(data[3] & 0xFF) * 4;
         (*sample)->classic.leftTrigger = data[4];
         (*sample)->classic.rightTrigger = data[5];
         (*sample)->classic.buttons = (length < 8) ? 0 : (((data[7] & ~0xFF00) | ((data[6] << 8) & 0xFF00)) ^ 0xFFFF);
@@ -999,9 +999,9 @@ void wpadDecodeExtDualStick(s32 chan, WPADSample** sample, u8 variant, u8* data,
     default:
         (*sample)->classic.leftX = (data[0] * 0x10) & 0x3F0;
         (*sample)->classic.leftY = (data[1] * 0x10) & 0x3F0;
-        (*sample)->classic.rightX = (s16)((s16)((s32)data[2] >> 7) | ((((data[1] >> 5) & 6) & ~0x18) | ((data[0] >> 3) & 0x18))) << 5;
+        (*sample)->classic.rightX = (s16)((s16)((s32)data[2] >> 7) | ((s16)((s16)((s32)data[0] >> 3) & 0x18) | ((s16)((s16)((s32)data[1] >> 5) & 6) & ~0x18))) << 5;
         (*sample)->classic.rightY = (data[2] << 5) & 0x3E0;
-        (*sample)->classic.leftTrigger = (u8)((((((s32)data[3] >> 5) & ~0x18) | (((s32)data[2] >> 2) & 0x18)) * 8) & 0xF8);
+        (*sample)->classic.leftTrigger = (u8)(((((s16)((s32)data[2] >> 2) & 0x18) | (((s32)data[3] >> 5) & ~0x18)) * 8) & 0xF8);
         (*sample)->classic.rightTrigger = (u8)((data[3] * 8) & 0xF8);
         (*sample)->classic.buttons = ((data[5] & ~0xFF00) | ((data[4] << 8) & 0xFF00)) ^ 0xFFFF;
         break;
@@ -1032,20 +1032,68 @@ void wpadDecodeExtDualStick(s32 chan, WPADSample** sample, u8 variant, u8* data,
         }
     }
     {
-        s16 value = (*sample)->classic.leftX - cb->calB.classic.leftX[0];
-        (*sample)->classic.leftX = value < -0x200 ? -0x200 : (value > 0x1FF ? 0x1FF : value);
+        s16 value;
+        s16 clamped;
+
+        value = (*sample)->classic.leftX - cb->calB.classic.leftX[0];
+        clamped = value;
+        if (value < -0x200) {
+            clamped = -0x200;
+        }
+        if (value > 0x1FF) {
+            clamped = 0x1FF;
+        }
+        (*sample)->classic.leftX = clamped;
         value = (*sample)->classic.leftY - cb->calB.classic.leftY[0];
-        (*sample)->classic.leftY = value < -0x200 ? -0x200 : (value > 0x1FF ? 0x1FF : value);
+        clamped = value;
+        if (value < -0x200) {
+            clamped = -0x200;
+        }
+        if (value > 0x1FF) {
+            clamped = 0x1FF;
+        }
+        (*sample)->classic.leftY = clamped;
     }
     if (cb->deviceType == 2) {
-        s16 value = (*sample)->classic.rightX - cb->calB.classic.rightX[0];
-        (*sample)->classic.rightX = value < -0x200 ? -0x200 : (value > 0x1FF ? 0x1FF : value);
+        s16 value;
+        s16 clamped;
+
+        value = (*sample)->classic.rightX - cb->calB.classic.rightX[0];
+        clamped = value;
+        if (value < -0x200) {
+            clamped = -0x200;
+        }
+        if (value > 0x1FF) {
+            clamped = 0x1FF;
+        }
+        (*sample)->classic.rightX = clamped;
         value = (*sample)->classic.rightY - cb->calB.classic.rightY[0];
-        (*sample)->classic.rightY = value < -0x200 ? -0x200 : (value > 0x1FF ? 0x1FF : value);
+        clamped = value;
+        if (value < -0x200) {
+            clamped = -0x200;
+        }
+        if (value > 0x1FF) {
+            clamped = 0x1FF;
+        }
+        (*sample)->classic.rightY = clamped;
         value = (*sample)->classic.leftTrigger - cb->calB.classic.leftTrigger;
-        (*sample)->classic.leftTrigger = value < 0 ? 0 : (value > 0xFF ? 0xFF : value);
+        clamped = value;
+        if (value < 0) {
+            clamped = 0;
+        }
+        if (value > 0xFF) {
+            clamped = 0xFF;
+        }
+        (*sample)->classic.leftTrigger = clamped;
         value = (*sample)->classic.rightTrigger - cb->calB.classic.rightTrigger;
-        (*sample)->classic.rightTrigger = value < 0 ? 0 : (value > 0xFF ? 0xFF : value);
+        clamped = value;
+        if (value < 0) {
+            clamped = 0;
+        }
+        if (value > 0xFF) {
+            clamped = 0xFF;
+        }
+        (*sample)->classic.rightTrigger = clamped;
     }
     if (wpadSticksZeroed[chan] != 0) {
         (*sample)->classic.rightX = 0;
@@ -1089,6 +1137,7 @@ void wpadDecodeExtBoard(s32 chan, WPADSample** sample, u8 format, u8* data, u32 
 void wpadReportButtonsExt8(u8 chan, u8* report, WPADSample* sample)
 {
     WPADCB* cb = wpadCBTable[chan];
+    WPADSample* decoded = sample;
 
     sample->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
     if (cb->dataFormat == 0 || cb->dataFormat == 3 || cb->dataFormat == 6 || cb->dataFormat == 10) {
@@ -1102,13 +1151,14 @@ void wpadReportButtonsExt8(u8 chan, u8* report, WPADSample* sample)
     wpadDecryptExtension(chan, report + 3, 8, 0);
     if (cb->flags.extensionAttached != 0) {
         if (cb->deviceType == 1) {
-            wpadDecodeNunchuk(chan, report + 3, sample);
+            wpadDecodeNunchukAt(chan, report + 3, &decoded);
         } else if (cb->deviceType == 2) {
-            wpadDecodeExtDualStick(chan, &sample, cb->extensionSubType, report + 3, 8);
+            wpadDecodeExtDualStick(chan, &decoded, cb->extensionSubType, report + 3, 8);
         } else if (cb->deviceType == 16) {
-            sample->simple.stickX = report[5];
-            sample->simple.stickY = report[6];
-            sample->simple.buttons = ((report[10] & ~0xFF00) | ((report[9] << 8) & 0xFF00)) ^ 0xFFFF;
+            WPADSample* simple = decoded;
+            simple->simple.stickX = report[5];
+            simple->simple.stickY = report[6];
+            simple->simple.buttons = ((report[10] & ~0xFF00) | ((report[9] << 8) & 0xFF00)) ^ 0xFFFF;
         }
         if (memcmp(wpadExtRaw, wpadExtNone, 8) == 0 && sample->extensionError == 0) {
             sample->extensionError = -7;
@@ -1184,6 +1234,7 @@ void wpadReportExt19(u8 chan, u8* report, WPADSample* sample)
 void wpadReportButtonsAccelExt16(u8 chan, u8* report, WPADSample* sample)
 {
     WPADCB* cb = wpadCBTable[chan];
+    WPADSample* decoded = sample;
 
     sample->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
     if (cb->dataFormat <= 1 || (u32)(cb->dataFormat - 3) <= 1 || (u32)(cb->dataFormat - 6) <= 1 || cb->dataFormat == 13) {
@@ -1197,17 +1248,12 @@ void wpadReportButtonsAccelExt16(u8 chan, u8* report, WPADSample* sample)
     memcpy(wpadExtRaw, report + 6, 0x10);
     wpadDecryptExtension(chan, report + 6, 0x10, 0);
     if (cb->flags.extensionAttached != 0) {
-        switch (cb->deviceType) {
-        case 1: {
-            wpadDecodeNunchukAt(chan, report + 6, &sample);
-            break;
-        }
-        case 2:
-            wpadDecodeExtDualStick(chan, &sample, cb->extensionSubType, report + 6, 0x10);
-            break;
-        case 4:
-            wpadDecodeExtBoard(chan, &sample, cb->dataFormat, report + 6, 0x10);
-            break;
+        if (cb->deviceType == 1) {
+            wpadDecodeNunchukAt(chan, report + 6, &decoded);
+        } else if (cb->deviceType == 2) {
+            wpadDecodeExtDualStick(chan, &decoded, cb->extensionSubType, report + 6, 0x10);
+        } else if (cb->deviceType == 4) {
+            wpadDecodeExtBoard(chan, &decoded, cb->dataFormat, report + 6, 0x10);
         }
         if (memcmp(wpadExtRaw, wpadExtNone, 0x10) == 0 && sample->extensionError == 0) {
             sample->extensionError = -7;
@@ -1236,27 +1282,28 @@ void wpadReportButtonsDpd10Ext9(u8 chan, u8* report, WPADSample* sample)
 void wpadReportButtonsAccelDpd10Ext6(u8 chan, u8* report, WPADSample* sample)
 {
     WPADCB* cb = wpadCBTable[chan];
+    WPADSample* decoded = sample;
 
-    sample->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
+    decoded->buttons = ((report[1] & ~0xFF00) | ((report[2] << 8) & 0xFF00)) & 0x9F1F;
     if (cb->dataFormat <= 8 || cb->dataFormat == 11 || cb->dataFormat == 15) {
-        sample->extensionError = 0;
+        decoded->extensionError = 0;
     } else {
-        sample->extensionError = -4;
+        decoded->extensionError = -4;
     }
-    sample->deviceType = cb->deviceType;
+    decoded->deviceType = cb->deviceType;
     cb->flags.buttonByteTopBit = (report[1] >> 7) & 1;
-    wpadDecodeAccelAt(chan, report, &sample);
-    wpadDecodeDpd(chan, &sample, cb->dpdFormat, report + 6, 10);
+    wpadDecodeAccelAt(chan, report, &decoded);
+    wpadDecodeDpd(chan, &decoded, cb->dpdFormat, report + 6, 10);
     memcpy(wpadExtRaw, report + 16, 6);
     wpadDecryptExtension(chan, report + 16, 6, 0);
     if (cb->flags.extensionAttached != 0) {
         if (cb->deviceType == 1) {
             wpadDecodeNunchukAt(chan, report + 16, &sample);
-        } else if (cb->deviceType == 2 || (u8)(cb->deviceType - 0x11) <= 1) {
+        } else if (cb->deviceType == 2 || cb->deviceType == 0x11 || cb->deviceType == 0x12) {
             wpadDecodeExtDualStick(chan, &sample, cb->extensionSubType, report + 16, 6);
         }
-        if (memcmp(wpadExtRaw, wpadExtNone, 6) == 0 && sample->extensionError == 0) {
-            sample->extensionError = -7;
+        if (memcmp(wpadExtRaw, wpadExtNone, 6) == 0 && decoded->extensionError == 0) {
+            decoded->extensionError = -7;
         }
     }
 }
