@@ -3910,8 +3910,11 @@ homebutton/hbm_kb_cursor.cpp:
 	.sdata2     start:0x8079D750 end:0x8079D788
 
 homebutton/gui.cpp:
-	.text       start:0x80569DAC end:0x8056A478
+	.text       start:0x80569DAC end:0x80569E64
 	.data       start:0x80658200 end:0x80658290
+
+homebutton/hbm_gui_draw.cpp:
+	.text       start:0x80569E64 end:0x8056A478
 	.sdata2     start:0x8079D788 end:0x8079D7A0
 
 homebutton/tiHKBManager.cpp:

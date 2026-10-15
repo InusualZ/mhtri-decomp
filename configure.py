@@ -1699,6 +1699,7 @@ config.libs = [
             Object(NonMatching, "homebutton/hbm_kb_event.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hbm_kb_cursor.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/gui.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
+            Object(NonMatching, "homebutton/hbm_gui_draw.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/tiHKBManager.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
             Object(NonMatching, "homebutton/hkb_widget_tail.cpp", mw_version="GC/3.0a5.2", cflags=cflags_hkb),
         ],

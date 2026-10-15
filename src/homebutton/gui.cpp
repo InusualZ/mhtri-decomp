@@ -1,21 +1,21 @@
 /*
- * homebutton/gui.cpp - software-keyboard code, `.text` 0x80569DAC..0x8056A478 (7 functions, 2 reconstructed).
+ * homebutton/gui.cpp - software-keyboard code of the tiHKBManager band: the pane widget's create/init pair, its class
+ * table and its adjustor thunks.
  *
- * RANGE. .text 0x80569DAC-0x8056A478; .data 0x80658200-0x80658290; .sdata2 0x8079D788-0x8079D7A0.  The .data object
- * 0x80658200 is a class table whose own slots are this unit's 0x80569DAC, 0x80569DF4, 0x80569E5C, 0x80569E54 and
- * 0x80569E4C (the other slots are homebutton/hbm_value.cpp's, homebutton/hkb_keyboard.cpp's and
- * homebutton/hbm_kb_event.cpp's); it sits between homebutton/hbm_kb_cursor.cpp's .data and homebutton/tiHKBManager.cpp's,
- * as this unit's .text does, and homebutton/hbm_kb_event.cpp (0x805615F8) is its one reader.  The table is not emitted
- * yet (rule 10).
- *
- * Phase 4 recut: 2 function(s) of 0x80569DAC..0x8056A478 from the former registered unit `homebutton/gui.cpp`.
- *
- * Name: the homebutton::gui component / pane-manager classes (their real spellings come from the shared dump, see homebutton/gui_manager.h); most functions keep their `fn_<addr>` placeholders.  The band was built with C++ exceptions off (no
- * extab/extabindex in the target objects), so the scoped `#pragma exceptions off` below is carried from the absorbed sources.
- *
- * Residuals: partial reconstruction - the functions not defined below keep the target object's bytes; the evidence, type views and
- * per-function residuals of the absorbed sources are in docs/splits/phase4/homebutton-carried-notes.md; the type views are in
- * `homebutton/hkb_widget.h`, `homebutton/hbm_widget.h`, `homebutton/hbm_vu_object.h`, `homebutton/hbm_kb_object.h` and `homebutton/gui_manager.h`.
+ * RANGE.     .text 0x80569DAC..0x80569E64 (5 functions: create, init and the three `addi r3,r3,-4` thunks);
+ *            .data 0x80658200..0x80658290 (the pane widget's class table).
+ * FLAGS.     GC/3.0a5.2 + cflags_hkb (configure.py); the retail object has no extab/extabindex, so `#pragma exceptions off`.
+ * NAMES.     GUESS file name: the band's former `gui` unit; no `__FILE__` string, no runtime-dump name.
+ * NAMES.     GUESS classes HbmGuiPaneWidget (the 0xAC-byte object homebutton/hbm_kb_event.cpp's 0x805615F8 builds) and
+ *            HbmGuiAttachable (its abstract primary base, homebutton/gui.h); the pane manager at +0x04 is
+ *            homebutton/hbm_value.h's HbmPaneManager.
+ * SHAPES.    The pane widget is a real class (two bases), so MWCC emits the class table 0x80658200 (primary part:
+ *            create, init; the +0x04 part: the destructor, init and calcComponents thunks; then the destructor and
+ *            calcComponents again) and the three adjustor thunks at the end of the unit.
+ * SHAPES.    create converts `this` through a reference (`HbmPaneManager& base = *this`): a pointer cast adds the null
+ *            check retail does not have.
+ * RESIDUALS. Our class table is 0x8C bytes, the claimed .data 0x90: the last word is zero in retail (no relocation) and
+ *            no concrete class can emit a null slot, so it is read as the next object's alignment padding.
  */
 
 #include "types.h"
@@ -24,26 +24,22 @@
 /* The retail object has no extab/extabindex: exceptions are off for this band. */
 #pragma exceptions off
 
-#include "homebutton/gui_manager.h"
+#include "homebutton/gui.h"
 #include "homebutton/hbm_value.h"
+#include "homebutton/hkb_layout.h"
 
-/* The unowned helpers this band dispatches into.  They sit in the unsplit `main` band before this
- * unit (fn_80501xxx / fn_8055xxxx), so rule 2 leaves them a counted gap (tools/units/stylelint.py,
- * "address band interleaves modules"); MEMAlloc-from / MEMFree-to are the same. */
+/* 0x80569DAC (0x48): builds the pane manager with the allocator, then initialises the widget. */
+void HbmGuiPaneWidget::create(MEMAllocator* allocator)
+{
+    HbmPaneManager& base = *this;
 
-/* The `.data` vtables this unit's objects point at (they live outside the claimed .text range).
- * They are the map's `lbl_` objects; referencing them keeps MWCC from emitting a table of its own. */
-
-/* --- 0x80569DAC: re-init the object at +4 with `a`, then run its virtual slot 3. --- */
-extern "C" void fn_80569DAC(Manager* self, void* a) {
-    ((HbmPaneManager*)&self->field_0x04)->HbmPaneManager::create((MEMAllocator*)a, NULL);
-    ((void (*)(Manager*))self->vtable->slot_0C)(self);
+    base.HbmPaneManager::create(allocator, NULL);
+    init();
 }
 
-/* --- 0x80569DF4: retarget the allocator's slot 0x38 and free the +0x1C block through slot 0x30. --- */
-extern "C" void fn_80569DF4(Manager* self) {
-    Manager* a = (Manager*)self->allocator;
-    ((void (*)(Manager*, int))a->vtable->slot_38)(a, 0);
-    a = (Manager*)self->allocator;
-    ((void (*)(Manager*, void*))a->vtable->slot_30)(a, &self->field_0x1C);
+/* 0x80569DF4 (0x58): advances the layout's animations and recomputes its matrices. */
+void HbmGuiPaneWidget::init()
+{
+    mpLyt->Animate(0);
+    mpLyt->CalculateMtx(mDrawInfo);
 }
