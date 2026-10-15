@@ -3612,9 +3612,20 @@ nw4r/ut_LockedCache.cpp:
 	.ctors      start:0x8056F3D8 end:0x8056F3DC
 	.bss        start:0x80760C78 end:0x80760C98
 
-nw4r/fn_80502828.cpp:
-	.text       start:0x80502828 end:0x80504A3C
-	.data       start:0x8062FAF0 end:0x8062FC48
+nw4r/ut_Font.cpp:
+	.text       start:0x80502828 end:0x80502910
+	.data       start:0x8062FAF0 end:0x8062FB80
+
+nw4r/ut_ResFontBase.cpp:
+	.text       start:0x80502910 end:0x80503010
+	.data       start:0x8062FB80 end:0x8062FBE8
+
+nw4r/ut_ResFont.cpp:
+	.text       start:0x80503010 end:0x80503314
+	.data       start:0x8062FBE8 end:0x8062FC48
+
+nw4r/ut_CharWriter.cpp:
+	.text       start:0x80503314 end:0x80504A3C
 	.bss        start:0x80760C98 end:0x80760CB8
 	.sbss       start:0x80795768 end:0x80795770
 	.sdata2     start:0x8079D4F0 end:0x8079D510

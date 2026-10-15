@@ -28,15 +28,18 @@
  *   `StampIntType`, `FinishCommand`, `IsDmaCommand`, `IsImmCommandWithResult`.
  * RESIDUALS. `__DVDPrepareReset` swaps r29/r30 between the outer interrupt level and `DVDResume`'s in the
  *   inlined `__DVDPrepareResetAsync` (6 bytes); local declaration order and a `DVDCancelAllAsync` inline helper were
- *   measured and fix only the standalone copy or break it.
- *   `.sbss` matches the target's layout (0x98 B, section alignment 32) through the `aligned(32)` `__DVDNumTmdBytes`
- *   (an IOS output word); the split object's `.sbss` is aligned 8, so this unit's `.sbss` split line carries `align:32`
- *   and starts at 0x80795090: the 0x10 of fill after `DVD/dvdfs.c`'s `.sbss` is this unit's (its symbols start at
- *   0x807950A0).
- *   `__DVDStopMotorCommandBlock` is a 0x60 map row; the block is 0x30 and the trailing 0x30 is unreferenced (`.bss`
- *   0x4C80 vs 0x4CB0). `__ErrorInfo` (.bss 0x80746880) sits in `DVD/dvderror.c`'s run.
+ *   measured and fix only the standalone copy or break it; so were a block-scoped `level`, an SDK-shaped global
+ *   `DVDCancelAllAsync` (the standalone copy drops to a callback/level swap) and a scoped `inline_bottom_up on`.
+ *   `__ErrorInfo` (.bss 0x80746880) sits in `DVD/dvderror.c`'s run.
  *   Relocation names only (bytes identical): the jump tables, the two strings and the `.bss` base (`...bss.0` for
  *   `__DVDTicketViewBuffer`) are anonymous in our object.
+ * SHAPES. `.sbss` matches the target's layout (0x98 B, section alignment 32) through the `aligned(32)`
+ *   `__DVDNumTmdBytes` (an IOS output word); the split object's `.sbss` is aligned 8, so the `.sbss` split line
+ *   carries `align:32`; the claim starts at 0x80795090 so the 0x10 of link fill after `DVD/dvdfs.c`'s `.sbss` has an
+ *   owner (the land gate refuses unowned bytes); the symbols start at 0x807950A0 (flip blocker: flipcheck does not
+ *   model fill at a section's start).
+ * SHAPES. `.bss` ends with two 0x30 command blocks: `__DVDStopMotorCommandBlock` and the unreferenced
+ *   `__DVDRestartMotorCommandBlock` (GUESS name, SDK scheme), a global so the compiler keeps it.
  * SHAPES. `#pragma inline_bottom_up off`: an inline helper's own calls are not inlined again, which is why the
  *   error-code tail `stateGettingError` keeps `bl StampCommand` while a direct `StampCommand` call auto-inlines, and
  *   why `cbForStateCheckID2`'s inlined `stateReadingFST` keeps its `bl`; code the target inlines one level deeper
@@ -155,6 +158,7 @@ static OSAlarm FatalAlarm;
 static OSAlarm CoverAlarm;
 static OSAlarm ResetAlarm;
 DVDCommandBlock __DVDStopMotorCommandBlock;
+DVDCommandBlock __DVDRestartMotorCommandBlock;
 
 /* .sbss (emitted in reverse definition order) */
 static DVDStateFunc LastState;
