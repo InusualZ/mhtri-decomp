@@ -81,7 +81,7 @@ class HbmEventHandler {
 public:
     HbmEventHandler() : mpManager(NULL) {}
 
-    /* slot +0x008 */ virtual ~HbmEventHandler();
+    /* slot +0x008 */ virtual ~HbmEventHandler() {}
     /* untyped: caller-owned payload - the argument record of the event */
     /* slot +0x00C */ virtual void onEvent(u32 id, u32 event, void* data);
     /* slot +0x010 */ virtual void setManager(HbmPaneManager* manager);

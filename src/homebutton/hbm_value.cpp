@@ -42,7 +42,7 @@
  * NAMES.     GUESS classes HbmPaneManager and HbmKey (homebutton/hbm_value.h) and their members; the slots named
  *            v_0xNNN are not understood.
  * NAMES.     GUESS class HbmKeyboard (the keyboard the band builds; its table 0x806521A8 and destructor thunk
- *            0x8055EAB8 are this unit's).
+ *            0x8055EAB8 are this unit's) and HbmCellphoneKeypad (the keypad, table 0x80652074, thunk 0x8055EAC0).
  */
 
 #include "types.h"
@@ -1060,14 +1060,16 @@ HbmKeyboard::~HbmKeyboard()
 {
 }
 
-void* fn_8055E898(void* self, s32 flag)
+/* The cellphone keypad as the band builds it: only its destructor is its own, so its class table
+ * (0x80652074) and the this-adjusting destructor thunk come out of this unit.  size: 0xEC */
+class HbmCellphoneKeypad : public HkbCellphoneKeypad {
+public:
+    virtual ~HbmCellphoneKeypad();
+};
+
+/* Destroys the keypad. */
+HbmCellphoneKeypad::~HbmCellphoneKeypad()
 {
-    if (self != 0) {
-        fn_8053F65C(self, 0);
-        if (flag > 0)
-            operator delete(self);
-    }
-    return self;
 }
 
 void* fn_8055E8F0(void* self, s32 flag)
@@ -1122,9 +1124,6 @@ void* fn_8055EA50(void* self, s32 flag)
 /* ---------------------------------------------------------------------------------------------------
  * adjustor thunks: the retail body is `subi r3,r3,N; b <deleting destructor>` (the flag passes through)
  * ------------------------------------------------------------------------------------------------ */
-
-/* 0x8055EAC0 (0x8): Adjusts a base pointer by -0x34 and runs the deleting destructor. */
-u8* hbmDeletingDtorThunk34(u8* base, s32 flag) { return (u8*)fn_8055E898(base - 0x34, flag); }
 
 /* 0x8055EAC8 (0x8): Adjusts a base pointer by -0x17F4 and runs the deleting destructor. */
 u8* hbmDeletingDtorThunk17F4(u8* base, s32 flag) { return (u8*)fn_8055E8F0(base - 0x17F4, flag); }

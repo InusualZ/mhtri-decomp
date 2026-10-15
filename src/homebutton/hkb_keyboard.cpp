@@ -3209,9 +3209,6 @@ HkbKeyButton::~HkbKeyButton() {}
 /* 0x805386F8 (0x40): Destroys the pane event handler. */
 HbmPaneEventHandler::~HbmPaneEventHandler() {}
 
-/* 0x80538738 (0x40): Destroys the event handler. */
-HbmEventHandler::~HbmEventHandler() {}
-
 /* 0x80538778 (0x40): Destroys the keyboard's common part. */
 HkbKeyboardBase::~HkbKeyboardBase() {}
 
