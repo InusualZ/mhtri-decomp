@@ -158,6 +158,33 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
   0x42 of 0x48) go NOT READY -> READY, and a real link with both as `Object(Matching)` in a scratch worktree hashes
   `main.dol: OK`; `Network/NetworkPool`'s .sdata 0x5, .sdata2 0x4 and .sbss 0x4 of 0x8 are accepted (its `.text`
   still differs in MAIN's build; the NET-B lane reports its own link OK).
+* **dtk's auto object is a successor too (2026-10-15).** When no registered range starts at a short claim's end,
+  `pad_context` takes the next section's alignment from dtk's auto split object that starts there
+  (`flipcheck.auto_successor`: `auto_<nn>_<ADDR>_<section>` as this tree's `build/RMHE08/config.json` lists it - never a
+  stale file left under `obj/`). Such an object is never flipped, so the link places it at its own alignment and the
+  trailing-pad rule above applies unchanged. Measured: `g3d/g3d_cpu` (`.sdata2` 0x4 of the 0x8 claim at 0x80795F50,
+  followed by `auto_11_80795F58_sdata2`, 2**3) goes NOT READY -> READY; its trial flip hashes `main.dol: OK`.
+* **No byte line for bytes only one object has (2026-10-15).** When the size line already refuses a section and the
+  bytes both objects carry are equal, the two byte lines are not printed (they named a first difference past our
+  section's end, `at +0x4 (ours 00, target 00)`); a difference inside the shared bytes is still printed as before, and
+  the `.data` seam diagnosis still runs. Measured on 651 units at `06aed493`: 34 units lose such lines, all still refused
+  by their size line, no other line changes.
+* **Relocations are compared by the place they resolve to (2026-10-15).** Equal bytes do not make a match when a
+  relocation at the same offset names another copy of identical data: `g3d/g3d_resvtx`'s accessors loading the other
+  of four `"ref"` copies, `g3d/g3d_scn`'s inline accessors each naming the other's string - READY printed, the trial flip
+  moved the DOL hash. `relocation_place_problems` places both objects at the claim (`lib.objcompare.reloc_places`: a
+  local symbol at its section's `splits.txt` start plus its value and the addend; a named global or weak, and any
+  undefined name, at its `symbols.txt` address - two spellings of one address agree; an unmapped name compares by name;
+  our sections shifted by a leading fill and mapped through the dead-strip model's `strip_moves` layout, a relocation
+  inside a stripped function not compared) and refuses one line per section:
+  `<section>: N relocation(s) resolve to a different place or type than the target's at the same offset, so the link
+  writes other addresses even where the bytes are equal - +0xOFF ours 0xADDR, target 0xADDR; ...` (offsets in the
+  target's layout, the first `RELOC_PLACE_FIRST` spelled, each relocation type named when the two differ). An offset
+  only one object relocates is not this line. Measured on 651 units at `06aed493`: 22163 relocated offsets of the 295
+  `Object(Matching)` units compared, all equal (22153 resolved to addresses), READY unchanged for every unit; the line
+  appears on 255 of the 360 NOT READY units and is the only refusal of none. The real `g3d/g3d_resvtx` object with the
+  `.text` relocations at +0x4C0/+0x550 swapped (bytes unchanged) reads READY on main and `.text: 2 relocation(s) ...
+  +0x4BC ours 0x80791258, target 0x8079125C; ...` here.
 * Exit status is non-zero when any unit is not flip-ready.
 
 ## Lib dependencies
@@ -199,6 +226,13 @@ accepted NOBITS, PROGBITS and after a linked full predecessor; refused on non-ze
 no predecessor, a 16-aligned section, a short linked predecessor and a reordered layout. Mutations (each exits 1): weak
 model off, link order ignored, binding ignored, target-name guard off, batch object unchecked, leading fill off, lead
 bytes unchecked, lead symbols unchecked, predecessor not judged, linked predecessor size ignored, symbols not shifted.
+`test_auto_successor_pad` (4 more checks in `test_flipcheck_pad.py`, 37 in all): g3d/g3d_cpu-shaped - ready before an
+8-aligned auto object the split lists; refused by the size line alone before a 4-aligned one and before one only a stale
+file under `obj/` names; a short section's own bytes still compared. Mutation: main's flipcheck fails 3.
+The relocation places: `tools/tests/units/test_flipcheck_reloc.py` (11 checks, g3d_resvtx-shaped): the same copies under
+other names ready; swapped copies refused with the verbatim line; the same place under another type refused; map
+aliases agree, another map address refused, an unmapped name compared by name; `strip_moves`/`apply_moves`, offsets
+mapped through the strip, the one-sided offset and the unresolved place not compared. Mutation: main's flipcheck fails 3.
 Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

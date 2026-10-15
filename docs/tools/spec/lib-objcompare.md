@@ -57,7 +57,14 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   a relocation naming a section symbol, a 0-size label or a non-candidate keeps its whole section; every doubt is live),
   `strip_section(obj, section, dead) -> bytes | None` (the section as the link lays it out without `dead`: each kept symbol
   at its `.comment` alignment, gaps zero; None unless the object already obeys that layout - no overlap, each symbol at the
-  previous end rounded up to its alignment, zero gaps, the last ending at the section's end).
+  previous end rounded up to its alignment, zero gaps, the last ending at the section's end), built on
+  `strip_moves(obj, section, dead) -> (bytes, [(start, end, new start)]) | None` (the same layout as spans) and
+  `apply_moves(data, moves) -> bytes`; `moved_offset(moves, offset) -> int | None`.
+* Relocation places: `reloc_places(obj, bases, shifts, addresses, moves) -> {section: {offset: [(type, place)]}} | None`
+  (where each relocation lands at the claim: a named global/weak or undefined name at its `addresses` (map) row, a
+  local at its section's base plus value and addend, else `("name", name, addend)` / `("in", section, offset)`; offsets
+  shifted by `shifts` and mapped through `moves`), `reloc_place_diffs(ours, target) -> [(offset, ours, target)]`
+  (offsets both relocate, places or types differing; an unresolved place skipped), `format_place(place)`.
 * Linkage: `linkage_sets(obj) -> (global defined, undefined) | None`, `linkage_audit(our_def, our_undef, tgt_def, tgt_undef)`.
 * Fingerprints: `fingerprint(path) -> str` (target drift), `touch_fingerprint(path, symbols) -> {body, ext} | None`,
   `fingerprints_equal(a, b)` (TOUCHED), `file_sha256(path)` (the raw half the gate pairs with `fingerprint`:

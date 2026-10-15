@@ -755,6 +755,96 @@ def by_owner(target, ours) -> tuple[int, int, list[str]]:
     return matched, total, lines + notes
 
 
+# --- relocation places: where each relocation resolves, in the link's address space -----------------------------
+
+def moved_offset(moves: list[tuple[int, int, int]], offset: int) -> int | None:
+    """Where `offset` of a section lands under `strip_moves`' `[(start, end, new start)]`; None inside a stripped span."""
+    for lo, hi, new_lo in moves:
+        if lo <= offset < hi:
+            return new_lo + offset - lo
+    return None
+
+
+def reloc_places(obj, bases: dict[str, int], shifts: dict[str, int] | None = None,
+                 addresses: dict[str, int] | None = None,
+                 moves: dict[str, list[tuple[int, int, int]]] | None = None) -> dict[str, dict[int, list[tuple]]] | None:
+    """`{applied section: {offset: [(type, place)]}}`: where every relocation of one object lands once it is linked
+    at the claim, or None when the object cannot be read. Two objects can carry equal (masked) bytes and still point
+    their relocations at different copies of identical data; comparing names cannot see it (ours says `@123`, the
+    target `lbl_80793A10`), comparing places can.
+
+    A place is `("addr", address)` when it is known: a named global or weak symbol with an `addresses` row (the map:
+    the link resolves a name, and a weak copy the link drops resolves to the kept one), else a symbol the object
+    defines in a section with a `bases` start (its claimed address) plus the symbol's value, the section's `shifts`
+    (a leading fill) and the addend; an undefined name with an `addresses` row is that row plus the addend. Otherwise
+    `("name", name, addend)` for an undefined name the map does not carry and `("in", section, offset)` for a local
+    symbol in a section with no base. A section with `moves` (`strip_moves`: the link dead-strips part of it) has its
+    offsets - the relocations' and the symbols' - mapped through them; a relocation inside a stripped span is dropped
+    and a local symbol inside one resolves to None (not compared). Relocation offsets carry the section's shift too."""
+    elf = be32(obj)
+    if elf is None:
+        return None
+    shifts = shifts or {}
+    addresses = addresses or {}
+    moves = moves or {}
+
+    def place_in(sec: str, offset: int) -> int | None:
+        if sec in moves:
+            return moved_offset(moves[sec], offset)
+        return offset + shifts.get(sec, 0)
+
+    syms = elf.symbols
+    nsec = len(elf.sections)
+    targets = _reloc_targets(elf)
+    out: dict[str, dict[int, list[tuple]]] = {}
+    for r in elf.relocs():
+        applied = targets.get(r.rela_index) or r.section
+        at = place_in(applied, r.offset)
+        if at is None:
+            continue
+        sym = syms[r.symbol] if r.symbol < len(syms) else None
+        place = None
+        if sym is not None and sym.name and sym.bind in (STB_GLOBAL, STB_WEAK) and sym.name in addresses:
+            place = ("addr", addresses[sym.name] + r.addend)
+        elif sym is not None and 0 < sym.shndx < nsec:
+            sec = elf.sections[sym.shndx].name
+            if sym.type == STT_SECTION:
+                value = place_in(sec, r.addend)
+            else:
+                value = place_in(sec, sym.value)
+                value = None if value is None else value + r.addend
+            if value is not None:
+                place = ("addr", bases[sec] + value) if sec in bases else ("in", sec, value)
+        elif sym is not None and sym.name:
+            place = ("name", sym.name, r.addend)
+        out.setdefault(applied, {}).setdefault(at, []).append((r.type, place))
+    return out
+
+
+def format_place(place: tuple | None) -> str:
+    """One place of `reloc_places` as text: `0x80793A10`, `name+0x4`, `.sdata+0x8`."""
+    if place is None:
+        return "?"
+    if place[0] == "addr":
+        return "0x%08X" % place[1]
+    head, off = place[1], place[2]
+    return "%s%s" % (head, "%+#x" % off if off else "")
+
+
+def reloc_place_diffs(ours: dict[int, list[tuple]], target: dict[int, list[tuple]]) -> list[tuple]:
+    """`[(offset, ours [(type, place)], target [(type, place)])]` for every offset BOTH objects relocate where the
+    two resolve to different places (or relocation types). An offset only one side relocates is not this question;
+    a place None on either side (a local symbol inside a stripped span) is not compared. Pure."""
+    out = []
+    for off in sorted(set(ours) & set(target)):
+        mine, theirs = sorted(ours[off], key=repr), sorted(target[off], key=repr)
+        if any(p is None for _t, p in mine + theirs):
+            continue
+        if mine != theirs:
+            out.append((off, mine, theirs))
+    return out
+
+
 # --- callees: symbol-name relocation differences per written function -------------------------------------------
 
 #: A compiler-local name in OUR object: a pool/jump-table/string label (`@123`, `@stringBase0`, `@4@x`), a local
@@ -983,7 +1073,22 @@ def _align_up(value: int, align: int) -> int:
 
 def strip_section(obj, section: str, dead: list) -> bytes | None:
     """Section `section` of `obj` as the linker lays it out once the `dead` symbols are stripped, or None when that
-    cannot be modelled.
+    cannot be modelled (`strip_moves` decides the layout)."""
+    got = strip_moves(obj, section, dead)
+    return None if got is None else apply_moves(*got)
+
+
+def apply_moves(data: bytes, moves: list[tuple[int, int, int]]) -> bytes:
+    """`data` laid out by `strip_moves`' `[(start, end, new start)]`, the gaps zero-filled."""
+    out = bytearray()
+    for lo, hi, new_lo in moves:
+        out += bytes(new_lo - len(out)) + data[lo:hi]
+    return bytes(out)
+
+
+def strip_moves(obj, section: str, dead: list) -> tuple[bytes, list[tuple[int, int, int]]] | None:
+    """`(the section's bytes, [(start, end, new start)])`: where each kept symbol span of section `section` of `obj`
+    lands once the `dead` symbols are stripped, ascending, or None when that cannot be modelled.
 
     Each kept symbol is placed at its alignment (its `.comment` entry's, else the section's) after the previous kept
     one, the gap zero-filled. The model is accepted only where the object itself already obeys it - the symbols of
@@ -1012,11 +1117,13 @@ def strip_section(obj, section: str, dead: list) -> bytes | None:
         pos = hi
     if pos != len(data):
         return None
-    out = bytearray()
+    moves, end = [], 0
     for (lo, hi), span in sorted(spans.items()):
         if span["kept"]:
-            out += bytes(_align_up(len(out), span["align"]) - len(out)) + data[lo:hi]
-    return bytes(out)
+            new_lo = _align_up(end, span["align"])
+            moves.append((lo, hi, new_lo))
+            end = new_lo + hi - lo
+    return data, moves
 
 
 def link_inputs(ninja: str) -> list[str] | None:

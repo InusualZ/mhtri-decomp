@@ -11,6 +11,7 @@ import sys
 from tools.lib import findings as _findings
 from tools.lib import objcompare
 from tools.lib import project as _project  # the splits / map readers
+from tools.lib.project import ownership as _ownership  # dtk's auto split objects
 from tools.lib.lanes.naming import norm_unit  # the one unit spelling rule
 from tools.units import dataseams  # `.data` emission-order seams: order-only / multi-TU diagnosis
 from tools.units import poolseams  # literal pools as TU evidence: a pool difference a fold explains
@@ -190,17 +191,39 @@ def linked_pad_note(unit: str, name: str, ours: tuple[int, int], size: int, obj_
     return None, None
 
 
+_AUTO: dict = {}
+
+
+def auto_successor(section: str, address: int) -> tuple[str, str] | None:
+    """`(object path, section)` of dtk's auto split object (`auto_<nn>_<ADDR>_<section>`) that starts at `address` in
+    `section`, as this tree's split lists it (`build/RMHE08/config.json`; never a stale file in `obj/`), or None.
+    Such an object is never flipped: the link places its target object at its own alignment."""
+    if MAIN not in _AUTO:
+        build = os.path.join(MAIN, "build", "RMHE08")
+        _AUTO[MAIN] = _ownership.AutoObjects.load(os.path.join(build, "config.json"), None)
+    base = section.split("$")[0]
+    for start, _end, name in _AUTO[MAIN].ranges.get(base, ()):
+        if start == address:
+            return os.path.join(MAIN, "build", "RMHE08", "obj", name + ".o"), base
+    return None
+
+
 def pad_context(unit: str, section: str) -> tuple[int | None, list[int]]:
     """`(the claim's start, [alignments the next linked section may carry])` for a trailing-pad judgement: the
     registered range that starts where this claim ends, its target object's alignment and - when built - our
-    object's. `(start, [])` when the next section is not a registered unit's (it is not judged)."""
+    object's; with no registered range there, dtk's auto object that starts there (`auto_successor`) and its
+    alignment. `(start, [])` when neither is known (it is not judged)."""
     own, starts = _range_index()
     span = own.get((unit, section))
     if span is None:
         return None, []
     nxt = starts.get((section.split("$")[0], span[1]))
     if nxt is None:
-        return span[0], []
+        auto = auto_successor(section, span[1])
+        if auto is None:
+            return span[0], []
+        got = sections(auto[0]).get(auto[1])
+        return span[0], [1 << got[1]] if got is not None else []
     stem, objsec = nxt
     aligns = []
     for side in ("obj", "src"):
@@ -238,6 +261,61 @@ def positioned_symbol_problems(claim: dict, ours: dict, src_path: str, obj_path:
         if gaps:
             out.append("%s: symbol layout differs from the target (the link moves later data; `python "
                        "tools/mwlink_debugger.py trace <unit>` names the cause): %s" % (name, "; ".join(gaps)))
+    return out
+
+
+_MAP_ADDRESSES: dict = {}
+
+
+def map_addresses() -> dict[str, int]:
+    """`{name: address}` for every name `symbols.txt` defines exactly once (a duplicated name resolves nothing),
+    read once per `SYMBOLS` path."""
+    if SYMBOLS not in _MAP_ADDRESSES:
+        rows: dict[str, list[int]] = {}
+        if os.path.exists(SYMBOLS):
+            for row in _project.SymbolMap(SYMBOLS).rows():
+                rows.setdefault(row.name, []).append(row.address)
+        _MAP_ADDRESSES[SYMBOLS] = {n: a[0] for n, a in rows.items() if len(a) == 1}
+    return _MAP_ADDRESSES[SYMBOLS]
+
+
+def _places_text(side: list, ours: list, target: list) -> str:
+    """One side's `[(type, place)]` at an offset as text; each relocation type is named when the two sides' differ."""
+    typed = [t for t, _p in ours] != [t for t, _p in target]
+    return "/".join(objcompare.format_place(p) + (" (%s)" % objcompare.reloc_name(t) if typed else "")
+                    for t, p in side)
+
+
+#: How many differing relocations one section's refusal line spells before `...`.
+RELOC_PLACE_FIRST = 4
+
+
+def relocation_place_problems(unit: str, claim: dict, src_path: str, obj_path: str,
+                              leads: dict[str, int] | None = None, moves: dict | None = None) -> list[str]:
+    """One line per claimed section where a relocation at the same offset resolves to a different place (or type) in
+    our object than in the target (`lib.objcompare.reloc_places`): the masked bytes can be equal while an accessor
+    points at the other of two identical string copies (`g3d/g3d_resvtx`'s four `"ref"` copies, `g3d/g3d_scn`'s inline
+    accessors), and the link then writes another address into the DOL. Both objects are placed at the claim
+    (`splits.txt`'s starts), a named global through the map; `leads` shifts our sections and `moves` (the dead-strip
+    model's `strip_moves` layouts) maps our offsets where the link strips symbols."""
+    own, _starts = _range_index()
+    bases = {sec: own[(unit, sec)][0] for sec in claim if (unit, sec) in own}
+    addresses = map_addresses()
+    mine = objcompare.reloc_places(src_path, bases, leads, addresses, moves)
+    theirs = objcompare.reloc_places(obj_path, bases, None, addresses)
+    if mine is None or theirs is None:
+        return []
+    out = []
+    for name in sorted(set(claim) & set(mine) & set(theirs)):
+        diffs = objcompare.reloc_place_diffs(mine[name], theirs[name])
+        if not diffs:
+            continue
+        shown = ["+0x%X ours %s, target %s" % (off, _places_text(o, o, t), _places_text(t, o, t))
+                 for off, o, t in diffs[:RELOC_PLACE_FIRST]]
+        more = " (... %d more)" % (len(diffs) - RELOC_PLACE_FIRST) if len(diffs) > RELOC_PLACE_FIRST else ""
+        out.append("%s: %d relocation(s) resolve to a different place or type than the target's at the same offset, "
+                   "so the link writes other addresses even where the bytes are equal - %s%s"
+                   % (name, len(diffs), "; ".join(shown), more))
     return out
 
 
@@ -726,9 +804,11 @@ def weak_duplicate_symbols(unit: str, src_path: str, obj_path: str, target_rel: 
 
 
 def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path: str, target_rel: str,
-                    link_ctx: dict | None, map_rows: set[str] | None) -> tuple[dict[str, bytes], list[str], list[str]]:
+                    link_ctx: dict | None, map_rows: set[str] | None,
+                    moves: dict | None = None) -> tuple[dict[str, bytes], list[str], list[str]]:
     """`({section: our bytes as the link keeps them}, problems, notes)` for the symbols the link removes from our
     object: functions it dead-strips and weak copies it drops for an earlier definition (`weak_duplicate_symbols`).
+    `moves`, when given, receives each rewritten section's `lib.objcompare.strip_moves` layout.
 
     A unit may define a function the retail linker stripped (a GUESS body written so its strings land in the pool):
     our object carries it, the target and `symbols.txt` do not, and mwld strips it again at link. Such a function is
@@ -782,7 +862,8 @@ def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path:
                     % ", ".join(s.name for s in copies)) if copies else ""
         data_txt = ("dead-stripped weak data %s (no symbols.txt row, not in the target, nothing the link keeps "
                     "references them)" % ", ".join(s.name for s in dead_data)) if dead_data else ""
-        got = objcompare.strip_section(src_path, section, stripped + copies + dead_data)
+        laid = objcompare.strip_moves(src_path, section, stripped + copies + dead_data)
+        got = None if laid is None else objcompare.apply_moves(*laid)
         if got is None:
             if stripped and not copies:
                 notes.append("%s: %s would be dead-stripped (no symbols.txt row, not in the target, nothing in the "
@@ -795,6 +876,8 @@ def deadstrip_model(unit: str, claim: dict, ours: dict, src_path: str, obj_path:
                              % (section, " and ".join(filter(None, [dead_txt, weak_txt, data_txt]))))
             continue
         kept[section] = got
+        if moves is not None:
+            moves[section] = laid[1]
         notes.append("%s: 0x%X of the object's 0x%X bytes are %s; the 0x%X bytes the link keeps are compared"
                      % (section, ours[section][0] - len(got), ours[section][0],
                         " and ".join(filter(None, [dead_txt, weak_txt, data_txt])), len(got)))
@@ -843,7 +926,9 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
     ours = sections(src_path)
     if not ours:
         return missing_or_empty_object(unit, src_path, claim), []
-    kept, problems, notes = deadstrip_model(unit, claim, ours, src_path, obj_path, target_rel, link_ctx, map_rows)
+    moves: dict[str, list] = {}              # section -> where the dead-strip model moves our symbols
+    kept, problems, notes = deadstrip_model(unit, claim, ours, src_path, obj_path, target_rel, link_ctx, map_rows,
+                                            moves)
     stripped: dict[str, str] = {}
     if kept:
         ours = dict(ours)
@@ -866,6 +951,7 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
                          "predecessor ends at the claim's start and our section aligned to %d starts 0x%X in) - our "
                          "0x%X bytes are compared at +0x%X" % (name, lead, 1 << got[1], lead, got[0], lead))
     padded: dict[str, int] = {}             # section -> our size, where the shortfall is only alignment fill
+    sized: set[str] = set()                 # sections whose size line already refuses the flip
     for name, (size, _) in sorted(claim.items()):
         got = ours.get(name)
         if got is None:
@@ -883,6 +969,7 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
                 continue
             if name in stripped:
                 hint = "; ".join(filter(None, [hint, "after the link %s" % stripped[name]]))
+            sized.add(name)
             problems.append("%s: object is 0x%X, splits.txt claims 0x%X (%+d)%s"
                             % (name, got[0], size, got[0] - size, " - " + hint if hint else ""))
     for name in sorted(set(ours) - set(claim)):
@@ -905,11 +992,14 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
         if name in padded:
             tgt = tgt[:padded[name]]        # the tail is fill (judged above): only our own bytes are compared
         if mine != tgt:
-            problems += section_byte_problems(name, mine, tgt, src_path, obj_path)
+            if name not in sized or objcompare.first_difference(mine, tgt) is not None:
+                problems += section_byte_problems(name, mine, tgt, src_path, obj_path)
+            # else: the bytes both objects have are equal and the size line already refuses the length
             problems += data_seam_problems(unit, name, src_path, obj_path)
 
     problems += pool_group_problems(unit, claim, ours, src_path, obj_path, padded=padded, leads=leads)
     problems += positioned_symbol_problems(claim, ours, src_path, obj_path, leads=leads)
+    problems += relocation_place_problems(unit, claim, src_path, obj_path, leads=leads, moves=moves)
 
     # row 36: a byte-identical object can still break the DOL if the linker deadstrips a trailing function
     # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.
