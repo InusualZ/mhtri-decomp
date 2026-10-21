@@ -10,12 +10,12 @@
  *   `eft007_part_spawn` are GUESSes from their bodies; the map has only `fn_` stems for the rest.
  *   GUESS: `eft007_effect_ids`/`eft007_param_ids`/`eft007_colours` (map `lbl_8059DAA0`/`lbl_8059DAC8`/
  *   `lbl_8059DAF0`: the `res_eft_create` arguments by type, the RGBA colours `colour_index_0x08` selects).
- * RESIDUALS. 1 partial row: `fn_80103518` is instruction-identical; only the callee-saved registers are coloured
- *   differently (retail: `work` r31, `self` r30, the loop cursor r29; ours `self` r31, cursor r30, `work` r29;
- *   `work` declared first, `work` assigned after the constructors and one function-scope `i` all measure lower).
- *   Ours names the three switch tables `@NNN` where retail names the `jumptable_8059DB00`/`DB50`/`DBA0` entries.
- *   `.data` and `.sdata2` are emitted byte-identical; flipcheck's only blocker is that row's 34 `.text` bytes.
- * SHAPES. The `eft007` setters take the part index as `u8` and the enemy wrappers as `u32`: the narrowing at the call
+ * RESIDUALS. none in bytes: every row, `.data` and `.sdata2` match.  Ours names the three switch tables `@NNN` where
+ *   retail names the `jumptable_8059DB00`/`DB50`/`DBA0` entries.  The `.data` 0x8059DBF0-0x8059E160 eft007 reads
+ *   (`lbl_8059DCF8`/`DE00`/`DE48`) is `ef/eft009.cpp`'s by `.data` order (seam request filed).
+ * SHAPES. `fn_80103518` declares one function-scope `i` first (`s32 i;` before the locals): it colours `work` r31,
+ *   `self` r30 and the loop cursor r29 as retail does; a per-loop `i` or `i` declared last swaps them.
+ *   The `eft007` setters take the part index as `u8` and the enemy wrappers as `u32`: the narrowing at the call
  *   is retail's `clrlwi`.
  *   `get_camera_pos`/`get_camera_direction` are called through the out-pointer view (`void (VEC3*)`): the owner's
  *   by-value `VEC3 get_camera_pos()` grows the frame from 0x1C0 to 0x1F0.
@@ -678,6 +678,7 @@ extern "C" void fn_80103130(_EFT007* self)
 /* Per-frame body of the third step: a two-stage retire/park state machine over the pooled emitters. */
 extern "C" void fn_80103518(_EFT007* self)
 {
+    s32 i;
     nw4r::math::VEC3 vec;
     nw4r::math::MTX34 mtx;
     _EFT007_WORK* work = self->work_0x38;
@@ -692,7 +693,7 @@ extern "C" void fn_80103518(_EFT007* self)
             self->flag_0x01 = 1;
             self->step_0x06++;
             self->delay_0x10 = 10;
-            for (s32 i = 0; i < work->count; i++) {
+            for (i = 0; i < work->count; i++) {
                 work->effects[i]->RetireEmitterAll();
             }
             /* fallthrough */
@@ -703,7 +704,7 @@ extern "C" void fn_80103518(_EFT007* self)
             mulVecMat(&vec, &mtx);
             mtx34_trans_add(&mtx, &vec);
             mtx34_trans_get(&mtx, &self->pos_0x18);
-            for (s32 i = 0; i < work->count; i++) {
+            for (i = 0; i < work->count; i++) {
                 work->effects[i]->SetRootMtx(mtx);
                 effect_retire(work->effects[i], 0);
             }

@@ -12,11 +12,11 @@
  *   `lbl_80791940`..`lbl_80791968`): `eft026_effect_ids`, `eft026_handler_kinds`, `eft026_durations`,
  *   `eft026_spin_rates`, `eft026_scale_keys_2`/`_9`/`_a`/`_b`, `eft026_alpha_keys_N`/`_kind2`,
  *   `eft026_alpha_key_tables`, `eft026_model_counts`; `EftUvModelHooks` (`update`, `set_scalar`).
- *   Also: `#pragma pool_data off` (each table its own `lis`/`addi`); `fn_80118B2C` at `optimization_level 4` (its
- *   type switch's `subi`/`cmplwi` range test).
- * RESIDUALS. 3 partial rows:
- *  - `fn_80118214`: the placement tail's register pressure after the 12-way switch, frame 0x10 larger;
- *  - `fn_8011870C`, `fn_80119450`: callee-saved register colouring only.
+ *   Also: `#pragma pool_data off` (each table its own `lis`/`addi`); `fn_80118B2C` and `fn_80118214` at
+ *   `optimization_level 4` (their type switches' `subi`/`cmplwi` range test).
+ * RESIDUALS. 2 partial rows:
+ *  - `fn_8011870C`, `fn_80119450`: frames 0x10/0x20 larger (the stack slots of the material-access and colour
+ *    temporaries are laid out differently), which also recolours `fn_8011870C`'s callee-saved registers.
  *   `.sdata2` is 0x68 of 0x6C: retail has a second, unreferenced 0.0f before 410.0f (0x80796B24) that one TU's
  *   pool cannot hold twice; `.data` 0x264 of 0x268 (identical prefix).
  *   Relocation names that differ from retail: pool constants (`@NNN`), the switch table (`jumptable_805A06BC`).
@@ -26,6 +26,9 @@
  *   constructors, extract colour bytes masked (`(col & 0xFF000000) >> 24`) and test loop floats against literals.
  *   `fn_80119AA8` returns nothing; `fn_80117FF8`'s flag test re-reads the stored type; `_EFT26_WORK::slots` is
  *   `[2][2]`; `fn_80118FF0` runs `move2` before the scale copy.
+ *   `fn_80118214`: the kind-1/2 vs 8/9 colours and the 1/8 vs 2/9 tail are `switch`es; the dead-enemy path stores
+ *   state 3; the camera position is a `const VEC3&` bound after `fn_80119818`, with `cam` declared after it; the
+ *   `== 8` scale test is `(s32)` (retail `cmpwi`).
  *   `eft026_durations` is `s32[]`: the eft026 timer tests compile to retail's signed `cmpw` only with the signed view.
  */
 
@@ -491,6 +494,8 @@ extern "C" void fn_801181D8(_EFT* self)
 
 /* Pools one model per live char, seeds the five colour phases and places the model by kind (1/2/8/9 hang off the
  * enemy joint, 3 is the two-model break, 7/10 are plain ramps). */
+#pragma push
+#pragma optimization_level 4
 extern "C" void fn_80118214(_EFT* self)
 {
     _EFT26_WORK* work = (_EFT26_WORK*)self->work_0x38;
@@ -500,7 +505,6 @@ extern "C" void fn_80118214(_EFT* self)
     nw4r::math::VEC3 vB;
     nw4r::math::VEC3 vC;
     nw4r::math::MTX34 mtx;
-    nw4r::math::VEC3 cam;
     s32 i;
 
     VEC3_ctor(&vA);
@@ -529,9 +533,9 @@ extern "C" void fn_80118214(_EFT* self)
             u32 col;
             work->phase[i].frame = (u16)ran_suu(0) & 3;
             col = get_stg_eft_col(self->area_0x44, 1);
-            work->phase[i].color.r = (u8)(col >> 24);
-            work->phase[i].color.g = (u8)(col >> 16);
-            work->phase[i].color.b = (u8)(col >> 8);
+            work->phase[i].color.r = (u8)((col & 0xFF000000) >> 24);
+            work->phase[i].color.g = (u8)((col & 0x00FF0000) >> 16);
+            work->phase[i].color.b = (u8)((col & 0x0000FF00) >> 8);
             work->phase[i].color.a = 0;
         }
         break;
@@ -539,20 +543,25 @@ extern "C" void fn_80118214(_EFT* self)
     case 2:
     case 8:
     case 9:
-        if (self->type_0x02 == 1 || self->type_0x02 == 2) {
+        switch (self->type_0x02) {
+        case 1:
+        case 2:
             rec->r = 0x81;
             rec->g = 0x78;
             rec->b = 0;
             rec->a = 4;
-        } else {
+            break;
+        case 8:
+        case 9:
             rec->r = 0x81;
             rec->b = 0;
             rec->a = 5;
+            break;
         }
         em = (_EFT26_EM*)self->source_0x30;
         if (em_work_die_ck((struct _ENEMY_WORK*)em) != 0) {
             self->flag_0x01 = 0;
-            self->state_0x05++;
+            self->state_0x05 = 3;
             return;
         }
         get_joint_wpos_em((struct _ENEMY_WORK*)em, work->joint, &vA);
@@ -567,9 +576,12 @@ extern "C" void fn_80118214(_EFT* self)
         mulVecMat(&vB, &mtx);
         addVec3To(&self->pos_0x18, &vB);
         work->field_0x74 = em->height_0x18C;
-        if (self->type_0x02 == 1 || self->type_0x02 == 8) {
-            nw4r::math::VEC3 camPos = get_camera_pos();
+        switch (self->type_0x02) {
+        case 1:
+        case 8: {
             fn_80119818(work->chara[0], 1);
+            const nw4r::math::VEC3& camPos = get_camera_pos();
+            nw4r::math::VEC3 cam;
             copyVec3(&vC, &camPos);
             subVec3(&cam, &self->pos_0x18, &vC);
             copyVec3(&vA, &cam);
@@ -582,12 +594,16 @@ extern "C" void fn_80118214(_EFT* self)
                     work->chara[0]->setVisibility(4, false);
                 }
             }
-            if (self->type_0x02 == 8) {
+            if ((s32)self->type_0x02 == 8) {
                 work->scale.y *= 0.7f;
                 work->scale.z *= 1.2f;
             }
-        } else {
+            break;
+        }
+        case 2:
+        case 9:
             fn_80119818(work->chara[0], 5);
+            break;
         }
         break;
     case 3:
@@ -600,7 +616,7 @@ extern "C" void fn_80118214(_EFT* self)
         em = (_EFT26_EM*)self->source_0x30;
         if (em_work_die_ck((struct _ENEMY_WORK*)em) != 0) {
             self->flag_0x01 = 0;
-            self->state_0x05++;
+            self->state_0x05 = 3;
             return;
         }
         get_joint_wmat_em((struct _ENEMY_WORK*)em, work->joint, &mtx);
@@ -618,9 +634,9 @@ extern "C" void fn_80118214(_EFT* self)
             u32 col;
             work->phase[i].frame = 0;
             col = get_stg_eft_col(self->area_0x44, 1);
-            work->phase[i].color.r = (u8)(col >> 24);
-            work->phase[i].color.g = (u8)(col >> 16);
-            work->phase[i].color.b = (u8)(col >> 8);
+            work->phase[i].color.r = (u8)((col & 0xFF000000) >> 24);
+            work->phase[i].color.g = (u8)((col & 0x00FF0000) >> 16);
+            work->phase[i].color.b = (u8)((col & 0x0000FF00) >> 8);
             work->phase[i].color.a = 0;
         }
         ((EftUvModelHooks*)work->models[0])->set_scalar(5.0f);
@@ -628,6 +644,7 @@ extern "C" void fn_80118214(_EFT* self)
     }
     fn_801186C4(self);
 }
+#pragma pop
 
 /* State 1: dispatch on the per-type handler table. */
 extern "C" void fn_801186C4(_EFT* self)

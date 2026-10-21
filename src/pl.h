@@ -23,7 +23,7 @@ extern "C" {
  */
 
 /* The actor's joint/model block, the one definition (`sound/mhchar.h` includes this header).  Union of
- * `ef/eft002.cpp`, `ef/eft007.cpp`, `ef/fn_80101DF4.cpp`, `ef/fn_80114E34.cpp`, `ef/fn_8011722C.c`,
+ * `ef/eft002.cpp`, `ef/eft007.cpp`, `ef/em_effect_ctrl.cpp`, `ef/fn_80114E34.cpp`, `ef/fn_8011722C.c`,
  * `ef/fn_803066F0.c`, `enemy/fn_80138074.cpp`, `sound/fn_800D7F54.cpp` and the sound band's view
  * (`sound/mhchar.cpp`).  They agree on every shared field; the band views that overlap are unions
  * above (+0x10, +0x44, +0x54).  The sound band's `rot_0x54` was a `VEC3` of floats and is the

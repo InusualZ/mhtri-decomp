@@ -923,19 +923,13 @@ ef/eft004_fx.cpp:
 	.sdata      start:0x80791788 end:0x80791790
 	.sdata2     start:0x807966B8 end:0x807966E8
 
-ef/fn_80101DF4.cpp:
-	extab       start:0x8000BEF4 end:0x8000BEFC
-	extabindex  start:0x80025D58 end:0x80025D64
-	.text       start:0x80101DF4 end:0x80101FA4
-	.data       start:0x8059C8E8 end:0x8059DAA0
-	.sdata2     start:0x807966E8 end:0x807966F0
-
 ef/em_effect_ctrl.cpp:
-	extab       start:0x8000BEFC end:0x8000BF1C
-	extabindex  start:0x80025D64 end:0x80025D94
-	.text       start:0x80101FA4 end:0x80102994
-	.sdata      start:0x80791790 end:0x80791798
-	.sdata2     start:0x807966F0 end:0x80796740
+	extab       start:0x8000BEF4 end:0x8000BF1C
+	extabindex  start:0x80025D58 end:0x80025D94
+	.text       start:0x80101DF4 end:0x80102994
+	.data       start:0x8059C8E8 end:0x8059DAA0
+	.sdata      start:0x80791790 end:0x807917A0
+	.sdata2     start:0x807966E8 end:0x80796740
 
 ef/eft007.cpp:
 	extab       start:0x8000BF1C end:0x8000BF7C
