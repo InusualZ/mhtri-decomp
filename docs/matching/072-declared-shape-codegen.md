@@ -7,7 +7,7 @@ tags: [source-shape]
 applies: [DWCi]
 demo: 072-declared-shape-codegen.cpp
 reviewed: 2026-09-29
-related: [3, 57, 66, 65, 60]
+related: [3, 57, 60, 65, 66, 100, 117]
 ---
 
 # 72. The declared SHAPE is a codegen input: a struct's exact size, an index's signedness, and arity
@@ -65,3 +65,7 @@ so the cross-reference was dropped.)
 retail's `cmplwi` bound check before a jump table, while a compare tree needs the `(s32)` selector; and
 `(u32)(request - 1) > 1` gives retail's `subi` + `cmplwi` range test (`homebutton/hbm_kb_cursor`
 `hbmKbCursorScrollToCaret`, idea 117).
+
+**An `int` index for a two-sided range test.** `x >= 0 && x < 2` on an `int` keeps retail's materialised test
+(`li r0,0; cmplwi x,1; bgt; li r0,1; cmpwi r0,0`); on a `u32` MWCC folds it to `cmplwi x,2; blt` or the branchless
+`xori`/`cntlzw` form. `ef/ef_particle` `ef_particle_get_color`/`get_alpha` -> 100 with `int` indices (Wii/1.3).

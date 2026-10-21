@@ -7,7 +7,7 @@ tags: [source-shape, allocator]
 applies: [NHTTP]
 demo: 063-declaration-order-colours.cpp
 reviewed: 2026-09-29
-related: [18, 22, 35]
+related: [18, 22, 35, 47]
 ---
 
 # 63. A local's DECLARATION ORDER colours registers - locals are coloured before parameters
@@ -65,3 +65,10 @@ closed `wpadAssignChannel`, `WPADSetAutoSamplingBuf`, `WPADSaveConfig` and `wpad
 `sum` hoisted to function scope); the search splits call initialisers into assignments in source order. Ruled out
 (the order is inert): `Camellia/camellia` `camellia_setup256`, all 720 orders of its six declaration lines at
 99.80576; `WPAD/WPADClamp` `wpadStickDeadzoneSquare`, 200 orders; `SC/SCSystemConfig` `SCAddItem`, 250 orders.
+
+**More votes (g3d, Wii/1.3).** `ResMdl::Bind` and `ResMat::Bind` want the loop index declared first, two `CopyTo`
+the walked pointers before the flag, the anmchr node setters `flags` before `mask`, and a range check `inRange`
+before `hasLayer` (`g3d/g3d_resmat` 95.34 -> 99.66 with these and other levers). `MSL_C/printf` `__pformatter` and
+`MSL_C/wprintf` `__wpformatter` closed only through a scored search over declaration orders (scratch hill climb,
+about 1.3 s per candidate through ninja): random orders reached 99.64, a swap/move neighbourhood 99.82 and an
+exhaustive search over 5-subsets 100 (idea 47).

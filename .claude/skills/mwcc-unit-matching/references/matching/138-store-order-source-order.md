@@ -39,3 +39,7 @@ __AXOutDspReady = 0;                            /* then the ready flag, priority
 __AXDspTask.priority = 0;
 __AXOutTaskDone = 0;
 ```
+
+**A chained assignment stores its rightmost target first.** `m[0][3] = m[1][3] = m[2][3] = 0.0f` stores
+`m[2][3]` first (`ef/ef_particle` `ef_particle_init`, fn_800A8F18's rotation zeroing, Wii/1.3): write the chain in
+the reverse of retail's store order.

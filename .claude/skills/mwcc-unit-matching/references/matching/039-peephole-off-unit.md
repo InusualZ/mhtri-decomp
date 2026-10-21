@@ -72,3 +72,8 @@ instead of one line per outbox:
 `rlwinm`; inside `#pragma peephole off ... reset` the same code keeps `clrlwi` + `stb` and `clrlwi` + `slwi`
 (verified 2026-09-29). The paired-single epilogue and record-form cases were not demonstrated (a paired-single op
 cannot be produced from source here, see `notes/paired-single.md`).
+
+**The inverse: a scoped `#pragma peephole on`.** Inside a peephole-off g3d file, a few helpers want the pass back:
+the 28-byte offset helpers keep their base in r0 (`lwz r0,0(r3)`) only with it on (`g3d/g3d_resanmscn`,
+`g3d/g3d_resmat`), and `g3d/g3d_fog`'s fn_8007A1B8 and `SetGP` measure better with it on. Bracket them with
+`#pragma peephole on` ... `#pragma peephole off` and measure every row of the unit.

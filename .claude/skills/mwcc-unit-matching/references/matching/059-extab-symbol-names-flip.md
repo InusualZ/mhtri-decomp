@@ -71,3 +71,12 @@ the build: a *new* occurrence means `objextab.py` did not run for that rule (che
 
 **Demo.** None: the defect is a symbol name and binding in a linked object (`st_info`), which a compile-only
 assertion cannot observe; the whole link is the evidence.
+
+**Exception: a weak copy the link drops keeps local entry symbols.** An inline function's out-of-line weak copy
+that the target object does not define (mwld keeps another TU's copy and drops this one with its `extab` and
+`extabindex` entries) has no map address. A global map name on such an entry kills mwld with internal error
+`ELF_linker.c` line 7133 (phase Optimizing); `objextab.py` therefore leaves those entries ordinal and local and names
+every later entry at its offset minus the dropped sizes. Bisected on `ef/ef_drawlinestrategy` by swapping one object
+in the build's own link line; with the rule, line, point and free flip together and the DOL hashes
+bf4850739478caaedfe675949eb7c28595a7fde9 (`docs/tools/spec/objextab.md`). After a `splits.txt` edit, delete the
+unit's object: ninja does not know objextab's names depend on it.

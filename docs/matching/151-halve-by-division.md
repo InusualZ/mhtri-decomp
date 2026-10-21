@@ -1,10 +1,10 @@
 ---
 id: 151
 title: x / 2.0f gives retail's fmuls x,0.5 operand order
-status: todo
+status: works
 problem: Retail halves a float with `fmuls fD,fX,f0.5` and ours has the operands the other way round (`fmuls fD,f0.5,fX`).
 tags: [source-shape]
-applies: [GC/3.0a5.2]
+applies: [GC/3.0a5.2, Wii/1.3]
 demo: 
 related: [18]
 ---
@@ -21,7 +21,9 @@ its reciprocal and keeps the dividend as the first operand.
 order reproduces it, spell the division: `x / 2.0f`.
 
 **Result.** Used in `homebutton/hbm_kb_cursor` `hbmKbCursorScrollToCaret` (GC/3.0a5.2, unit header SHAPES line);
-the before/after row numbers were not recorded.
+the before/after row numbers were not recorded. Wii/1.3: `g3d/g3d_light` `LightObj::InitLightShininess`
+(`GXInitLightAttn(..., shininess / 2.0f, 0.0f, 1.0f - shininess / 2.0f)`) is 100 with the division and 99.58 with
+`shininess * 0.5f` (measured 2026-10-21 with `recompile.py --measure`, same 96 bytes, the `fmuls` operands swapped).
 
 **Example.**
 

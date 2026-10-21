@@ -38,3 +38,8 @@ switch (type) { case 9: case 28: case 29: A(); break; case 13: case 26: case 27:
 /* -O3:  cmpwi r0,28 ; blt ; cmpwi r0,29 ; ble ; cmpwi r0,26 ; blt ; cmpwi r0,27 ; ble ; cmpwi r0,9 ; ...
  * lvl4: subi r0,r3,28 ; cmplwi r0,1 ; ble ; subi r0,r3,26 ; cmplwi r0,1 ; ble ; cmpwi r3,9 ; beq ; cmpwi r3,13 ; beq */
 ```
+
+**Also: a product kept across a call.** `ef/ef_effectsystem` (Wii/1.3) needs a file-wide
+`#pragma optimization_level 4`: its three group sweeps keep `groupID * 0x1C` in a callee-saved register across the
+`Panic`, as retail does; at level 3 they re-materialise the `mulli` and each grows by 8 bytes (unit 99.10 -> 100
+with the other levers of its lane; the unit is `Matching`).

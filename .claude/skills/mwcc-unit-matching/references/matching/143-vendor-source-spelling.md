@@ -39,3 +39,11 @@ static WriteArg* __FileWrite(WriteArg* file, const char* buffer, u32 count)
     return (__fwrite(buffer, 1, count, (FILE*)file) == count) ? file : NULL;
 }
 ```
+
+**MSL's own gotos (rule 8 exemption for `src/MSL_C/` only).** Retail MSL_C was compiled from source with `goto`s,
+and only those shapes close the rows: `__str2dec`, `__timesdec`, `__minus_dec` (ansi_fp 99.31 -> 100),
+`round_decimal`'s `goto return_zero`, `float2str`'s `goto e_format`/`f_format`, and `__pformatter`'s
+`if ((buff_ptr = long2str(...)) == NULL) goto conversion_error;` inside each `long`/`long long` branch, not after them
+(98.01 -> 99.47 before the colouring search, then 100 with idea 63's order search); `printf` 98.62 -> 100 and
+`wprintf` 98.16 -> 100, all three trial-flipped with the DOL hash unchanged. The owner's ruling (`docs/pipeline.md`
+11, 2026-10-15) exempts a `goto` in a file under `src/MSL_C/` and nowhere else.

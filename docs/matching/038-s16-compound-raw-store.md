@@ -80,3 +80,7 @@ compiling the same functions with both peephole states.
 `s32` operand, `q += cb->capacity`, emits an `extsb` on the operand before the add, where `q = q + cb->capacity`
 does not - the "When NOT to apply" case above. Writing the plain assignment took `__wpadIsBusyStream` 94.35 ->
 98.08 and `wpadSendWbcCommand` +0.8 points.
+
+**A float converted into a `u16` field (peephole off).** `field += (int)ef_truncate_float(x)` keeps a `clrlwi` of
+the converted value; `field += (u16)ef_truncate_float(x)` is retail's `fctiwz; lwz; lhz; add; sth` - the operand
+already has the field's type. `ef/ef_emitter` fn_800A834C (Wii/1.3).

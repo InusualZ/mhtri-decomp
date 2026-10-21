@@ -6,7 +6,7 @@ problem: A slot call loads its table through the saved object (`lwz r11,0x1C(r29
 tags: [source-shape, allocator]
 applies: [Wii/1.3]
 demo: 
-related: [22, 63]
+related: [22, 63, 161]
 ---
 
 # 105. A virtual call with by-value vector arguments and the parameter order behind the prologue's moves
@@ -71,3 +71,11 @@ void Emission(s32 ctx, EfWork* em, Pm* pm, s32 n, u32 flags, EfParams* p, u16 li
                        1.0f + 0.01f * (f32)em->scale_rate * ef_random_float(&em->progress), ...);
 }
 ```
+
+**The same rule at a plain call site.** `ef_free_scale_mtx(MTX34* dst, const MTX34* m, f32 s, f32 t, f32 u, f32 v)`
+and `(MTX34* dst, f32 s, f32 t, f32 u, f32 v, const MTX34* m)` use the same registers (r3, r4, f1-f4), but MWCC sets
+the arguments up in parameter order, so the `addi r4` moves after the four `fmr`s. Symptom: one `addi rN,r1,X`
+INSERT/DELETE pair around a run of `fmr` before a `bl`. Putting the matrix last took `ef/ef_drawfreestrategy`
+`Draw` 99.43 -> 100 (unit 99.78 -> 100, now `Matching`; the callee is `extern "C"`, so no mangling changed). The
+billboard quad writers' "floats first, pivot and flags last" is the same rule. Nested calls in the arguments run
+right to left (idea 161).

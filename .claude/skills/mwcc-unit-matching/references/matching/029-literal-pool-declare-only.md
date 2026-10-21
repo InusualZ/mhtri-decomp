@@ -7,7 +7,7 @@ tags: [data, sections]
 applies: [Wii/1.3]
 demo: 029-literal-pool-declare-only.cpp
 reviewed: 2026-09-29
-related: [12, 23, 58, 64]
+related: [12, 23, 58, 64, 166]
 ---
 
 # 29. A claimed literal pool: declare the constants, never define them
@@ -56,3 +56,7 @@ its `.sdata` byte instead of redefining them, which let the remaining float rows
 is loaded once and kept in a register, while a constant declared `extern` (the declare-only form above) is
 reloaded after every store, because a store may alias it. A target that reloads the constant after stores is
 therefore reading an extern object; one that keeps it in a register is reading a pooled literal.
+
+**When the pool is the unit's own and emitted whole.** The declare-only form keeps the constants reloadable (they
+may alias), which itself costs rows; once the unit owns its entire pool, literals rebuild it byte-identical and hoist
+like retail's (idea 166, the ef units).
