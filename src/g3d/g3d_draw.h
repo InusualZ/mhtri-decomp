@@ -34,12 +34,12 @@ extern "C" void g3d_draw_res_mdl_directly(const nw4r::g3d::ResMdl* pMdl, const n
                                           const u8* pByteCodeXlu, const void* pReplacement, u32 drawMode);
 
 
-struct G3dLightObj;
+namespace nw4r { namespace g3d { class LightObj; } }
 
 /* 0x80077D4C/0x80077D64 - whether the light object is a specular light / a point light (caller:
  * g3d/g3d_state.cpp). */
-extern "C" s32 light_obj_is_specular_light(const G3dLightObj* pSelf);
-extern "C" s32 light_obj_is_point_light(const G3dLightObj* pSelf);
+extern "C" s32 light_obj_is_specular_light(const nw4r::g3d::LightObj* pSelf);
+extern "C" s32 light_obj_is_point_light(const nw4r::g3d::LightObj* pSelf);
 /* 0x80077DBC - writes the negation of `pIn` to `pOut`. */
 extern "C" void vec3_negate(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
 #endif

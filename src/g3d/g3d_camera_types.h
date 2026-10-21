@@ -9,8 +9,11 @@
 #ifdef __cplusplus
 
 /* The camera payload `Camera::mpData` points at (`g3d_camera.cpp`'s `CameraData`). The 0x70 flag word
- * records which posture/projection branch is current. */
+ * records which posture/projection branch is current.  The constructor (`g3d/g3d_scnroot.cpp`, inline) runs the
+ * matrix and vector members' constructors. */
 struct CameraData {
+    CameraData();
+
     /* +0x00 */ f32 mViewMtx[3][4];
     /* +0x30 */ f32 mProjMtx[3][4];
     /* +0x60 */ u32 mUnk60[4];

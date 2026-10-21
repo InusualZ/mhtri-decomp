@@ -9,6 +9,7 @@
 #ifdef __cplusplus
 #ifdef MHTRI_G3D_G3D_SCNOBJ_H
 #include "g3d/g3d_camera_types.h" /* CameraData (rule 1) */
+#include "g3d/g3d_light.h"        /* LightSetting (rule 1) */
 #endif
 
 namespace nw4r {
@@ -48,7 +49,7 @@ public:
     /* +0xF5 */ u8 pad_0xF5[3];
     /* +0xF8 */ CameraData mCamera[32];
     /* +0x2278 */ u8 mFog[32][0x30];      /* the FogData records */
-    /* +0x2878 */ u8 mLightSetting[0x10]; /* the LightSetting record */
+    /* +0x2878 */ LightSetting mLightSetting;
     /* +0x2888 */ AnmScn* mpAnmScn;
 };
 

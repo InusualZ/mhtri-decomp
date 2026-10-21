@@ -17,8 +17,9 @@
  *   slot; both bodies return false).  The field names past ScnGroup are GUESSES (mpCollection, mDrawMode,
  *   mScnRootFlags by the constructor's stores).
  *   scnroot_align4 is a GUESS; scn_root_get_current_camera is a GUESS (C linkage: `ef/eft019.cpp` and
- *   `ef/em_effect_ctrl.cpp` call it); light_setting_dtor is a GUESS; camera_data_ctor is a GUESS (0x80083488, the
- *   record constructor the ScnRoot constructor runs on each camera).  scn_typename_ScnRoot is a GUESS.
+ *   `ef/em_effect_ctrl.cpp` call it); the CameraData constructor (0x80083488) and LightSetting's destructor
+ *   (0x80083444) are the kept copies of the two members' inline constructor/destructor.  scn_typename_ScnRoot is a
+ *   GUESS.
  *   fog_is_range_adj_enable, fog_ref, fog_set_near_far and camera_get_projection_type are GUESSES (the Fog/Camera
  *   inline copies SetGlbSettings calls: the "g3d_fog.h" asserts, the +0x18/+0x0C/+0x10/+0xA8 fields).
  *   scnroot_sort, scnroot_insertion_sort, scnroot_min_element, scnroot_median3, scnroot_iter_swap, scnroot_move are
@@ -27,18 +28,26 @@
  *   scnroot_less_z_opa, scnroot_less_z_xlu, scnroot_less_sort_opa, scnroot_less_sort_xlu are GUESSES (the four
  *   comparators ZSort and Sort pass: draw priority first, then view depth or the object's sort value).
  *   scnroot_num_fog and scnroot_num_camera are GUESSES (the `.sdata` words 32 the std::min calls take by address).
- * RESIDUALS. The ScnRoot constructor: the camera loop's counter and byte offset swap r29/r30.
- *   Construct: register colouring only - retail gives the size offsets r16..r21 and the parameters r22..r27, ours
+ * RESIDUALS. Construct: register colouring only - retail gives the size offsets r16..r21 and the parameters r22..r27, ours
  *   the reverse (tried: pRoot and listSize declared later/earlier).
  *   scnroot_sort (both instances): i/j/pivot rotate r26..r28 against retail's (tried: declaration orders, the
  *   second-pass `j` reloaded, a separate pivot local; `offsetB` as a local fixes the 3/4 offset's scheduling).
- *   flipcheck: `.text`/extab only; `.rodata`, `.data`, `.sdata` and `.sdata2` byte-identical.
+ *   flipcheck: `.text`/extab only (the rows above; the scnroot_sort/iter_swap pair is emitted in the other
+ *   order); `.rodata`, `.data`, `.sdata` and `.sdata2` byte-identical.
  * SHAPES. File-scope `#pragma peephole off`, `#pragma pool_data off` (retail keeps every `clrlwi` + `cmpwi`) and
  *   `#pragma fp_contract off` (SetGlbSettings keeps `fmuls` + `fadds`).  The Fog/Camera inline copies are `inline`
  *   definitions ahead of SetGlbSettings under `#pragma dont_inline on`: the weak copies follow their referencer in
  *   retail's order, and their `@STRING@` tail (range-adjust, near/far, ref) needs near/far defined before ref.
  *   GetPriorityDraw* return `int` (the comparators' signed compare); Add post-increments the list counts.
+ *   The camera records and the light setting are members with constructors (the compiler builds the camera array
+ *   first, then the light setting, and records the light setting's destructor in the constructor's and the
+ *   destructor's unwind actions); the constructor and destructor compile under `dont_inline`.  The math types'
+ *   empty constructors, VEC2_ctor and G3dObj's operator delete are visible inline bodies so their calls get no
+ *   unwind range (their weak copies other than VEC2_ctor are dropped by the link).  `#pragma peephole off` comes
+ *   before the includes so the LightSetting destructor's kept copy keeps `extsh` + `cmpwi`.
  */
+
+#pragma peephole off
 
 #include "types.h"
 #include "OS/OSFastCast.h" /* OS_FASTCAST_U16 (rule 2) */
@@ -62,7 +71,6 @@
 #include "nw4r/math_geometry.h" /* nw4r::math::Frustum (rule 2) */
 #include "nw4r/db_assert.h" /* nw4r::db::Panic (rule 2) */
 
-#pragma peephole off
 #pragma pool_data off
 #pragma fp_contract off
 
@@ -95,9 +103,6 @@ using nw4r::g3d::IScnObjGather;
 
 extern "C" {
 u32 scnroot_align4(u32 size);
-CameraData* camera_data_ctor(CameraData* pData);
-/* untyped: opaque handle - the LightSetting record */
-void* light_setting_dtor(void* pSelf, s16 flag);
 s32 fog_is_range_adj_enable(const ResHandle* pFog);
 void fog_set_near_far(ResHandle* pFog, f32 nearz, f32 farz);
 s32 camera_get_projection_type(nw4r::g3d::Camera* pCamera);
@@ -333,7 +338,7 @@ void ScnRoot::SetGlbSettings()
         }
         g3d_state_set_fog(*(G3dFog*)&fog, i);
     }
-    g3d_state_set_light_setting((const G3dLightSetting*)mLightSetting);
+    g3d_state_set_light_setting(&mLightSetting);
 }
 
 #pragma dont_inline reset
@@ -348,7 +353,7 @@ extern "C" void scn_root_apply_anm_scn(ScnRoot* pRoot)
     u32 refFog = pRoot->mpAnmScn->GetFogMaxRefNumber();
     u32 refCamera = pRoot->mpAnmScn->GetCameraMaxRefNumber();
     if (refLightSet != 0) {
-        pRoot->mpAnmScn->GetLightSetting((nw4r::g3d::LightSetting*)pRoot->mLightSetting);
+        pRoot->mpAnmScn->GetLightSetting(&pRoot->mLightSetting);
     }
     if (refFog != 0) {
         u32 num = *g3d_min_u32(&scnroot_num_fog, &refFog);
@@ -388,21 +393,48 @@ extern "C" nw4r::math::VEC3* vec3_ctor_return(nw4r::math::VEC3* pVec)
     return pVec;
 }
 
+/* The math types' empty constructors, visible so the compiler knows the camera record's constructor does not throw
+ * (their kept copies are 0x8005050C, 0x80075390 and 0x80043EA8). */
+extern "C" inline void MTX34_ctor(nw4r::math::MTX34* out) {}
+extern "C" inline void MTX44_ctor(nw4r::math::MTX44* pMtx) {}
+extern "C" inline void VEC3_ctor(nw4r::math::VEC3* out) {}
+
+/* 0x800834F0 (0x4): constructs an 8-byte vector (leaves it unset). */
+/* untyped: opaque handle - callers pass their own 8-byte vector records */
+extern "C" inline void VEC2_ctor(void* p)
+{
+}
+
+/* G3dObj's empty operator delete, visible so the destructor's deleting tail does not throw. */
+inline void nw4r::g3d::G3dObj::operator delete(void* pBlock) /* untyped: byte range */
+{
+}
+
+/* 0x80083488 (0x68): constructs a camera record's matrix and vector members. */
+inline CameraData::CameraData()
+{
+    MTX34_ctor((nw4r::math::MTX34*)mViewMtx);
+    MTX44_ctor((nw4r::math::MTX44*)mProjMtx);
+    VEC3_ctor((nw4r::math::VEC3*)&mPosX);
+    VEC3_ctor((nw4r::math::VEC3*)&mTargetX);
+    VEC3_ctor((nw4r::math::VEC3*)&mUpX);
+    VEC3_ctor((nw4r::math::VEC3*)&mUnk98);
+    VEC2_ctor(&mViewportX);
+    VEC2_ctor(&mViewportW);
+}
+
+#pragma push
+#pragma dont_inline on
 /* 0x80083328 (0x11C): builds the root over its child array, draw collection and light buffers, and initialises
  * every camera and fog record. */
 /* untyped: opaque handle - the draw collection, the light-object buffers */
 ScnRoot::ScnRoot(MEMAllocator* pHeap, void* pCollection, ScnObj** ppChildren, u32 maxChildren, u32 numLightObj,
                  u32 numAmbLightObj, void* pLightObjBuf, void* pLightAnmBuf, void* pAmbLightObjBuf)
     : ScnGroup(pHeap, ppChildren, maxChildren), mpCollection(pCollection), mDrawMode(2), mScnRootFlags(0),
-      mCurrentCameraID(0)
+      mCurrentCameraID(0),
+      mLightSetting((nw4r::g3d::LightObj*)pLightObjBuf, (nw4r::g3d::AmbLightObj*)pLightAnmBuf, numLightObj,
+                    (nw4r::g3d::LightSetData*)pAmbLightObjBuf, numAmbLightObj)
 {
-    CameraData* pCamera = mCamera;
-    do {
-        camera_data_ctor(pCamera);
-        pCamera++;
-    } while (pCamera < &mCamera[32]);
-    light_setting_ctor(mLightSetting, (s32)pLightObjBuf, (s32)pLightAnmBuf, numLightObj, (s32)pAmbLightObjBuf,
-                       numAmbLightObj);
     mpAnmScn = NULL;
     u32 i;
     for (i = 0; i < 32; i++) {
@@ -417,44 +449,14 @@ ScnRoot::ScnRoot(MEMAllocator* pHeap, void* pCollection, ScnObj** ppChildren, u3
     }
 }
 
-/* 0x80083444 (0x44): the light setting's deleting destructor (frees only for a positive flag). */
-/* untyped: opaque handle - the LightSetting record */
-extern "C" void* light_setting_dtor(void* pSelf, s16 flag)
-{
-    if (pSelf && flag > 0) {
-        operator delete(pSelf);
-    }
-    return pSelf;
-}
-
-/* 0x80083488 (0x68): constructs a camera record's matrix and vector members. */
-extern "C" CameraData* camera_data_ctor(CameraData* pData)
-{
-    MTX34_ctor((nw4r::math::MTX34*)pData->mViewMtx);
-    MTX44_ctor((nw4r::math::MTX44*)pData->mProjMtx);
-    VEC3_ctor((nw4r::math::VEC3*)&pData->mPosX);
-    VEC3_ctor((nw4r::math::VEC3*)&pData->mTargetX);
-    VEC3_ctor((nw4r::math::VEC3*)&pData->mUpX);
-    VEC3_ctor((nw4r::math::VEC3*)&pData->mUnk98);
-    VEC2_ctor(&pData->mViewportX);
-    VEC2_ctor(&pData->mViewportW);
-    return pData;
-}
-
-/* 0x800834F0 (0x4): constructs an 8-byte vector (leaves it unset). */
-/* untyped: opaque handle - callers pass their own 8-byte vector records */
-extern "C" void VEC2_ctor(void* p)
-{
-}
-
 /* 0x800834F4 (0xA4): detaches the scene animation and destroys the light setting. */
 ScnRoot::~ScnRoot()
 {
     if (mpAnmScn) {
         mpAnmScn->G3dProc(G3DPROC_DETACH_PARENT, 0, this);
     }
-    light_setting_dtor(mLightSetting, -1);
 }
+#pragma pop
 
 /* 0x80083598 (0x160): culls the object against the gather frustum and appends it to the opaque and translucent
  * lists it asks for. */

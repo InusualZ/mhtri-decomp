@@ -123,9 +123,9 @@ static bool CompareMdlZOpa(const MdlZ& lhs, const MdlZ& rhs);
 }  // namespace nw4r
 
 extern "C" {
-s32 light_obj_is_specular_light(const G3dLightObj* pLObj);
-s32 light_obj_is_point_light(const G3dLightObj* pLObj);
-s32 light_obj_is_directional(const G3dLightObj* pLObj);
+s32 light_obj_is_specular_light(const nw4r::g3d::LightObj* pLObj);
+s32 light_obj_is_point_light(const nw4r::g3d::LightObj* pLObj);
+s32 light_obj_is_directional(const nw4r::g3d::LightObj* pLObj);
 void vec3_negate(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
 void fn_80077E64(s32* pDst, s32* pSrc);
 void SetupDraw1Mat1ShpSwap(nw4r::g3d::Draw1Mat1ShpSwap* pSwap, nw4r::g3d::DrawResMdlReplacement* pRep, u32 idx);
@@ -219,23 +219,23 @@ static G3dIndMtxCallback* PrepareIndMtxOp(ResMat mat, ResNode node, ResShp shp) 
             }
         }
 
-        G3dLightObj* pLObj = g3d_state_get_light_obj(g3d_state_get_light_set_entry(lightRef[i]));
-        if (pLObj != NULL && light_obj_is_enable((LightObj*)pLObj)) {
+        LightObj* pLObj = g3d_state_get_light_obj(g3d_state_get_light_set_entry(lightRef[i]));
+        if (pLObj != NULL && light_obj_is_enable(pLObj)) {
             math::VEC3 lightDir;
             math::VEC3 specDir;
             math::VEC3 negDir;
             math::VEC3 negPos;
             VEC3_ctor(&lightDir);
             if (light_obj_is_directional(pLObj)) {
-                light_obj_get_light_dir((LightObj*)pLObj, &lightDir);
+                light_obj_get_light_dir(pLObj, &lightDir);
                 if (0.0f == lightDir.x && 0.0f == lightDir.y && 0.0f == lightDir.z) {
-                    light_obj_get_light_pos((LightObj*)pLObj, &lightDir);
+                    light_obj_get_light_pos(pLObj, &lightDir);
                     vec3_negate(&negDir, &lightDir);
                     copyVec3(&lightDir, &negDir);
                     vec3_normalize_into(&lightDir, &lightDir);
                 }
             } else if (light_obj_is_point_light(pLObj)) {
-                light_obj_get_light_pos((LightObj*)pLObj, &lightDir);
+                light_obj_get_light_pos(pLObj, &lightDir);
                 vec3_negate(&negPos, &lightDir);
                 copyVec3(&lightDir, &negPos);
                 vec3_normalize_into(&lightDir, &lightDir);
@@ -244,7 +244,7 @@ static G3dIndMtxCallback* PrepareIndMtxOp(ResMat mat, ResNode node, ResShp shp) 
                 if (!light_obj_is_specular_light(pLObj)) {
                     nw4r::db::Panic("g3d_draw.cpp", 0xAB, "NW4R:Failed assertion pLObj->IsSpecularLight()");
                 }
-                light_obj_get_light_dir((LightObj*)pLObj, &specDir);
+                light_obj_get_light_dir(pLObj, &specDir);
                 lightDir.x = -2.0f * specDir.z * specDir.x;
                 lightDir.y = -2.0f * specDir.z * specDir.y;
                 lightDir.z = 1.0f + -2.0f * specDir.z * specDir.z;
@@ -265,12 +265,12 @@ static G3dIndMtxCallback* PrepareIndMtxOp(ResMat mat, ResNode node, ResShp shp) 
 extern "C" {
 
 /* 0x80077D4C (0x18): whether the light object is a specular light (flag bit 1). */
-s32 light_obj_is_specular_light(const G3dLightObj* pLObj) {
-    return (*(const u32*)pLObj & 2) != 0;
+s32 light_obj_is_specular_light(const nw4r::g3d::LightObj* pLObj) {
+    return (pLObj->mFlag & 2) != 0;
 }
 
 /* 0x80077D64 (0x58): whether the light object is neither directional nor specular. */
-s32 light_obj_is_point_light(const G3dLightObj* pLObj) {
+s32 light_obj_is_point_light(const nw4r::g3d::LightObj* pLObj) {
     s32 isPoint = 0;
     if (!light_obj_is_directional(pLObj) && !light_obj_is_specular_light(pLObj)) {
         isPoint = 1;
@@ -284,8 +284,8 @@ void vec3_negate(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn) {
 }
 
 /* 0x80077DD8 (0x18): whether the light object is directional (flag bit 0). */
-s32 light_obj_is_directional(const G3dLightObj* pLObj) {
-    return (*(const u32*)pLObj & 1) != 0;
+s32 light_obj_is_directional(const nw4r::g3d::LightObj* pLObj) {
+    return (pLObj->mFlag & 1) != 0;
 }
 
 /* 0x80077DF0 (0x44): fills a matrix from twelve values, row by row. */

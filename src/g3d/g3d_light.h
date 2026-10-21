@@ -13,9 +13,12 @@ namespace nw4r {
 namespace g3d {
 
 /* One GX light and its kind flags (bit 0: directional, bit 1: specular, bit 2: enabled, bit 3: specular direction
- * set).  size: 0x44 */
+ * set).  The constructor and destructor are inline; their kept copies (0x8007AF1C, 0x8007AF28) follow
+ * g3d_light.cpp's LightSetting constructor.  size: 0x44 */
 class LightObj {
 public:
+    LightObj() : mFlag(0) {}
+    ~LightObj() {}
     LightObj& operator=(const LightObj& rhs);
 
     void Clear();
@@ -47,9 +50,13 @@ struct LightSetData {
     /* +0x9 */ u8 pad_0x9[3];
 };
 
-/* The light objects, ambient lights and light sets a scene shares.  size: 0x10 */
+/* The light objects, ambient lights and light sets a scene shares.  The destructor is inline (its kept copy,
+ * 0x80083444, follows g3d_scnroot.cpp's ScnRoot constructor).  size: 0x10 */
 class LightSetting {
 public:
+    LightSetting(LightObj* pLightObjArray, AmbLightObj* pAmbLightObjArray, u32 numLight,
+                 LightSetData* pLightSetDataArray, u32 numLightSet);
+    ~LightSetting() {}
     bool Import(const LightSetting& rhs);
     void ApplyViewMtx(const math::MTX34& camMtx, u32 numLight);
 
@@ -91,18 +98,8 @@ void fn_8007A5E4(void* self, f32 x, f32 y, f32 z); /* untyped: opaque handle - t
 void fn_8007A5A8(void* self, f32 x, f32 y, f32 z); /* untyped: opaque handle - the LightObj */
 void fn_8007A724(void* self, f32 x, f32 y, f32 z); /* untyped: opaque handle - the LightObj */
 
-/* 0x8007A8E0 (0x618): builds a light setting over its light-object, ambient-light and light-set buffers. */
-/* untyped: opaque handle - the LightSetting record */
-void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 numLightObj, s32 pAmbLightObjBuf,
-                         u32 numAmbLightObj);
-
 #ifdef __cplusplus
 }
-
-/* 0x8007AF1C / 0x8007AF28 - construct / destroy a light object (the light setting's defaults and the light table's
- * array construction take them by these names). */
-extern "C" nw4r::g3d::LightObj* light_obj_ctor(nw4r::g3d::LightObj* pSelf);
-extern "C" nw4r::g3d::LightObj* light_obj_dtor(nw4r::g3d::LightObj* pSelf, s16 bDelete);
 #endif
 
 #endif /* MHTRI_G3D_G3D_LIGHT_H */

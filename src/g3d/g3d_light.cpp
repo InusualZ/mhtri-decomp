@@ -9,17 +9,22 @@
  * FLAGS. cflags_g3d (docs/g3d.md); `#pragma peephole off` (playbook idea 106) and `#pragma dont_inline on` (the
  *   inline members and the compiler-generated copies are called out of line, as retail does).
  * NAMES. nw4r's classes and members (LightObj, AmbLightObj, LightSetData, LightSetting, LightSet; the asserts name
- *   G3DState::NUM_LIGHT and the three buffers).  light_obj_get_light_pos/light_obj_get_light_dir, fn_8007A5A8,
- *   fn_8007A5E4, fn_8007A724 and light_setting_ctor keep C names because `g3d/g3d_draw.cpp`, `g3d/g3d_anmscn.cpp` and
- *   `g3d/g3d_scnroot.cpp` call them by those names (nw4r's GetLightPos, GetLightDir, InitLightPos, InitLightDir,
- *   InitSpecularDir and the LightSetting constructor).  GUESS: light_obj_enable, light_obj_disable,
+ *   G3DState::NUM_LIGHT and the three buffers); the LightSetting constructor and LightObj's inline constructor and
+ *   destructor (their kept copies follow the LightSetting constructor) under their C++ manglings.
+ *   light_obj_get_light_pos/light_obj_get_light_dir, fn_8007A5A8, fn_8007A5E4 and fn_8007A724 keep C names because
+ *   `g3d/g3d_draw.cpp` and `g3d/g3d_anmscn.cpp` call them by those names (nw4r's GetLightPos, GetLightDir,
+ *   InitLightPos, InitLightDir and InitSpecularDir).  GUESS: light_obj_enable, light_obj_disable,
  *   light_obj_is_enable, light_set_is_valid, light_setting_get_num_light_obj (`g3d/g3d_anmscn.cpp`'s kept copies of
  *   LightObj::Enable/Disable/IsEnable, LightSet::IsValid and LightSetting::GetNumLightObj).
  * RESIDUALS. The anmscn copies above are declared here until their owner names them (g3d-draw#7..#11).
  * SHAPES. InitLightShininess divides by 2.0f (`* 0.5f` swaps the fmuls operands); the LightSetting constructor
- *   stores its parameters through the cast `pSelf` before naming its locals (retail stores from the incoming
- *   registers) and declares `white` before `amb` (the two 0xFFFFFFFF pool words are created in that order).
+ *   stores its parameters in its initialiser list and declares `white` before `amb` (the two 0xFFFFFFFF pool words
+ *   are created in that order); its four LightObj locals get no destructor calls (an inline empty destructor).
+ *   `#pragma peephole off` comes before the includes: an inline function compiles under the pragmas at its
+ *   definition, and the header's LightObj destructor keeps retail's `extsh` + `cmpwi` deleting-flag test only so.
  */
+
+#pragma peephole off
 
 #include "types.h"
 #include "gx.h"
@@ -35,7 +40,6 @@
 #include "MSL/algorithm.h"         /* std::max */
 #include "sys_mem.h"                /* operator delete (rule 2) */
 
-#pragma peephole off
 #pragma pool_data off
 #pragma dont_inline on
 
@@ -190,30 +194,23 @@ void LightObj::ApplyViewMtx(const math::MTX34& camMtx) {
 }  // namespace g3d
 }  // namespace nw4r
 
-extern "C" {
+namespace nw4r {
+namespace g3d {
 
 /* 0x8007A8E0 (0x618): stores the buffers and counts, clears every light set, selects the first two lights in light
  * set 0, and fills the lights with the defaults: a spot light, a point light, a specular light, then disabled
  * lights, each with a white ambient light. */
-void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 numLightObj, s32 pAmbLightObjBuf,
-                         u32 numAmbLightObj) { /* untyped: opaque handle - the LightSetting record */
-    using namespace nw4r::g3d;
-    ((LightSetting*)pSelf)->mNumLight = numLightObj;
-    ((LightSetting*)pSelf)->mNumLightSet = numAmbLightObj;
-    ((LightSetting*)pSelf)->mpLightObjArray = (LightObj*)pLightObjBuf;
-    ((LightSetting*)pSelf)->mpAmbLightObjArray = (AmbLightObj*)pLightAnmBuf;
-    ((LightSetting*)pSelf)->mpLightSetDataArray = (LightSetData*)pAmbLightObjBuf;
-    LightSetting* pSetting = (LightSetting*)pSelf;
-    LightObj* pLightObjArray = (LightObj*)pLightObjBuf;
-    AmbLightObj* pAmbLightObjArray = (AmbLightObj*)pLightAnmBuf;
-    LightSetData* pLightSetDataArray = (LightSetData*)pAmbLightObjBuf;
-    bool countsFit = (u16)numLightObj <= 128 && (u16)numAmbLightObj <= 128;
+LightSetting::LightSetting(LightObj* pLightObjArray, AmbLightObj* pAmbLightObjArray, u32 numLight,
+                           LightSetData* pLightSetDataArray, u32 numLightSet)
+    : mNumLight(numLight), mNumLightSet(numLightSet), mpLightObjArray(pLightObjArray),
+      mpAmbLightObjArray(pAmbLightObjArray), mpLightSetDataArray(pLightSetDataArray) {
+    bool countsFit = (u16)numLight <= 128 && (u16)numLightSet <= 128;
     if (!countsFit) {
         nw4r::db::Panic("g3d_light.cpp", 0x134,
                         "NW4R:Failed assertion mNumLight <= G3DState::NUM_LIGHT && mNumLightSet <= "
                         "G3DState::NUM_LIGHT_SET");
     }
-    bool countsSet = pSetting->mNumLight > 0 && pSetting->mNumLightSet > 0;
+    bool countsSet = mNumLight > 0 && mNumLightSet > 0;
     if (!countsSet) {
         nw4r::db::Panic("g3d_light.cpp", 0x135, "NW4R:Failed assertion mNumLight > 0 && mNumLightSet > 0");
     }
@@ -224,8 +221,8 @@ void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 nu
     G3D_POINTER_ASSERT("g3d_light.cpp", pLightSetDataArray, 0x139,
                        "NW4R:Pointer Error\npLightSetDataArray(=%p) is not valid pointer.");
 
-    for (u32 i = 0; i < pSetting->mNumLightSet; i++) {
-        LightSetData& data = pSetting->mpLightSetDataArray[i];
+    for (u32 i = 0; i < mNumLightSet; i++) {
+        LightSetData& data = mpLightSetDataArray[i];
         data.idxAmbLight = -1;
         data.idxLight[0] = -1;
         data.idxLight[1] = -1;
@@ -236,9 +233,9 @@ void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 nu
         data.idxLight[6] = -1;
         data.idxLight[7] = -1;
     }
-    pSetting->mpLightSetDataArray[0].idxLight[0] = 0;
-    pSetting->mpLightSetDataArray[0].idxLight[1] = 2;
-    pSetting->mpLightSetDataArray[0].idxAmbLight = -1;
+    mpLightSetDataArray[0].idxLight[0] = 0;
+    mpLightSetDataArray[0].idxLight[1] = 2;
+    mpLightSetDataArray[0].idxAmbLight = -1;
 
     GXColor white = {0xFF, 0xFF, 0xFF, 0xFF};
     AmbLightObj amb = {0xFF, 0xFF, 0xFF, 0xFF};
@@ -246,10 +243,6 @@ void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 nu
     LightObj pointLight;
     LightObj specLight;
     LightObj offLight;
-    light_obj_ctor(&spotLight);
-    light_obj_ctor(&pointLight);
-    light_obj_ctor(&specLight);
-    light_obj_ctor(&offLight);
     spotLight.Clear();
     pointLight.Clear();
     specLight.Clear();
@@ -274,49 +267,23 @@ void* light_setting_ctor(void* pSelf, s32 pLightObjBuf, s32 pLightAnmBuf, u32 nu
 
     light_obj_disable(&offLight);
 
-    if (pSetting->mNumLight > 0) {
-        pSetting->mpLightObjArray[0] = spotLight;
-        pSetting->mpAmbLightObjArray[0] = amb;
+    if (mNumLight > 0) {
+        mpLightObjArray[0] = spotLight;
+        mpAmbLightObjArray[0] = amb;
     }
-    if (pSetting->mNumLight > 1) {
-        pSetting->mpLightObjArray[1] = pointLight;
-        pSetting->mpAmbLightObjArray[1] = amb;
+    if (mNumLight > 1) {
+        mpLightObjArray[1] = pointLight;
+        mpAmbLightObjArray[1] = amb;
     }
-    if (pSetting->mNumLight > 2) {
-        pSetting->mpLightObjArray[2] = specLight;
-        pSetting->mpAmbLightObjArray[2] = amb;
+    if (mNumLight > 2) {
+        mpLightObjArray[2] = specLight;
+        mpAmbLightObjArray[2] = amb;
     }
-    for (u32 i = 3; i < pSetting->mNumLight; i++) {
-        pSetting->mpLightObjArray[i] = offLight;
-        pSetting->mpAmbLightObjArray[i] = amb;
+    for (u32 i = 3; i < mNumLight; i++) {
+        mpLightObjArray[i] = offLight;
+        mpAmbLightObjArray[i] = amb;
     }
-    return pSetting;
 }
-
-}
-
-namespace nw4r {
-namespace g3d {
-
-}  // namespace g3d
-}  // namespace nw4r
-
-/* 0x8007AF1C (0xC): starts the light object with no flags. */
-extern "C" nw4r::g3d::LightObj* light_obj_ctor(nw4r::g3d::LightObj* pSelf) {
-    pSelf->mFlag = 0;
-    return pSelf;
-}
-
-/* 0x8007AF28 (0x44): destroys a light object, freeing it when `bDelete` is positive. */
-extern "C" nw4r::g3d::LightObj* light_obj_dtor(nw4r::g3d::LightObj* pSelf, s16 bDelete) {
-    if (pSelf != NULL && bDelete > 0) {
-        operator delete(pSelf);
-    }
-    return pSelf;
-}
-
-namespace nw4r {
-namespace g3d {
 
 /* 0x8007AF6C (0x108): copies another setting's lights, ambient lights and light sets when they fit; a disabled
  * light disables this setting's light instead of being copied. */

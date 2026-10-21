@@ -44,6 +44,7 @@ class ResMatTexCoordGen;
 class ResMatTevColor;
 class ResMatChan;
 class ResShp;
+class LightObj;
 }  // namespace g3d
 }  // namespace nw4r
 
@@ -69,7 +70,7 @@ void g3d_state_load_mat_chan(nw4r::g3d::ResMatChan chan, u32 maskColor0, u32 mas
 void g3d_state_load_fog(s32 idx);
 void g3d_state_load_light_set(s32 idx, u32* pMaskDiffColor, u32* pMaskDiffAlpha, u32* pMaskSpecColor,
                               u32* pMaskSpecAlpha, struct _GXColor* pAmb);
-struct G3dLightObj* g3d_state_get_light_obj(u32 idx);
+nw4r::g3d::LightObj* g3d_state_get_light_obj(u32 idx);
 s8 g3d_state_get_light_set_entry(u32 idx);
 void g3d_state_load_mat_ind_mtx_dl(nw4r::g3d::ResMatIndMtxAndScale ind);
 void g3d_state_load_mat_ind_mtx(nw4r::g3d::ResMatIndMtxAndScale ind, G3dIndMtxCallback* pCallback);
@@ -87,7 +88,6 @@ void g3d_state_load_shp_pre_prim(const nw4r::g3d::ResShp shp);
 }
 
 /* The light, camera and fog setters `g3d/g3d_scnroot.cpp`'s SetGlbSettings calls (C linkage: plain map names). */
-struct G3dLightSetting;
 struct G3dFogData;
 
 /* A fog handle: the fog data's address.  size: 0x4 */
@@ -98,10 +98,11 @@ struct G3dFog {
 namespace nw4r {
 namespace g3d {
 class Camera;
+class LightSetting;
 }  // namespace g3d
 }  // namespace nw4r
 extern "C" {
-void g3d_state_set_light_setting(const G3dLightSetting* pSetting);
+void g3d_state_set_light_setting(const nw4r::g3d::LightSetting* pSetting);
 void g3d_state_set_camera(const nw4r::g3d::Camera& camera, u32 id, bool bUpdate);
 /* 0x80088050 (0x38): records fog `id` from the handle `fog`. */
 void g3d_state_set_fog(G3dFog fog, u32 id);
