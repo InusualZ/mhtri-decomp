@@ -785,7 +785,7 @@ config.libs = [
             Object(Matching, "ef/ef_effectsystem.cpp", extra_cflags=["-pool off"]),
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
-            Object(NonMatching, "ef/ef_postfield.cpp"),
+            Object(Matching, "ef/ef_postfield.cpp"),
             Object(NonMatching, "ef/ef_resource.cpp"),
             Object(NonMatching, "ef/ef_drawbillboardstrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawpointstrategy.cpp"),
@@ -1237,7 +1237,7 @@ config.libs = [
         "host": False,
         "objects": [
             Object(NonMatching, "NHTTP/NHTTP_bgnend.c"),
-            Object(NonMatching, "NHTTP/NHTTP_os_RVL.c"),
+            Object(Matching, "NHTTP/NHTTP_os_RVL.c"),
             Object(NonMatching, "NHTTP/d_nhttp.c"),
         ],
     },
