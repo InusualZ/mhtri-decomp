@@ -1050,10 +1050,11 @@ Grouped by cause; each cost a lane ~30 min the first time.
   repo. A worker wrote scratch there, found the tree from earlier sessions' same mistake, and `rm -rf`'d `C:\c`
   without listing it. Since then: scratch is `<checkout>\.pi\tmp\<slug>\` spelled as a Windows path, and nothing
   outside the checkout is ever deleted, moved or overwritten - it is listed and reported (§11, 2026-10-14).
-* **git-bash / MSYS.** `recompile.py --measure` and `measure.py` are unusable from git-bash: `absolutize()` turns
-  cmd's `/c` into `C:\c`, an interactive cmd runs and no object is written (the "`-o` is a DIRECTORY" message
-  misattributes it; `MSYS_NO_PATHCONV` / `MSYS2_ARG_CONV_EXCL` do not help). Use PowerShell/cmd, or `ninja` +
-  `tools/objdiff/symdiff.py -u <unit>`; an MSYS-safe whole-unit probe took 0.3 s.
+* **git-bash / MSYS.** `measure.py` and `recompile.py --measure` work from git-bash (MINGW64, 2026-10-21:
+  `measure.py g3d/g3d_light -q --no-cache` 1.0 s, `recompile.py g3d/g3d_light --measure <symbol>` 1.0 s, both
+  scoring the fresh object). `lib.units.absolutize()` treats every token that starts with `-` or `/` as a switch, so
+  cmd's `/c` is never resolved to `C:\c` (`tools/tests/lib/test_units.py` checks it). Arguments you pass are still
+  read by Windows Python: give a repo-relative or Windows path, never `/c/Users/...` (the bullet above).
 * **Line endings.** Files are LF in the repo and working tree (`* text=auto eol=lf`; a clone must not set
   `core.autocrlf=true`, which overrides `eol=lf`). Older notes said `include/**`/`configure.py` are CRLF - if a
   scripted anchor with `\n` fails to match, `assert` the match count and read/write with `newline=""`.
