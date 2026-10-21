@@ -788,7 +788,7 @@ config.libs = [
             Object(Matching, "ef/ef_postfield.cpp"),
             Object(NonMatching, "ef/ef_resource.cpp"),
             Object(NonMatching, "ef/ef_drawbillboardstrategy.cpp"),
-            Object(NonMatching, "ef/ef_drawdirectionalstrategy.cpp"),
+            Object(Matching, "ef/ef_drawdirectionalstrategy.cpp"),
                         Object(Matching, "ef/ef_drawpointstrategy.cpp"),
                         Object(Matching, "ef/ef_drawlinestrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
@@ -804,8 +804,8 @@ config.libs = [
             # Flags: unit header of src/ef/ef_disc.cpp (`-pool off`: one `lis`/`addi` per string).
             Object(Matching, "ef/ef_disc.cpp", extra_cflags=["-pool off"]),
             Object(NonMatching, "ef/ef_emitterform.cpp"),
-            Object(NonMatching, "ef/ef_emitter.cpp"),
-            Object(NonMatching, "ef/ef_particle.cpp"),
+            Object(Matching, "ef/ef_emitter.cpp"),
+            Object(Matching, "ef/ef_particle.cpp"),
             # Flags: unit header of src/ef/ef_emform.cpp (`-pool off`: one `lis`/`addi` per string).
             Object(Matching, "ef/ef_emform.cpp", extra_cflags=["-pool off"]),
             # Flags: unit header of src/ef/ef_line.cpp (`-pool off`: one `lis`/`addi` per string).
