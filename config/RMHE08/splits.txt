@@ -417,17 +417,18 @@ g3d/g3d_resanmscn.cpp:
 	.sdata      start:0x80791268 end:0x80791270
 
 g3d/g3d_resanmtexsrt.cpp:
-	extab       start:0x80009208 end:0x800093A8
-	extabindex  start:0x80021EE8 end:0x80022158
-	.text       start:0x800916FC end:0x80093990
-	.data       start:0x80590928 end:0x80590D78
-	.sdata      start:0x80791270 end:0x80791280
+	extab       start:0x80009208 end:0x80009290
+	extabindex  start:0x80021EE8 end:0x80021FB4
+	.text       start:0x800916FC end:0x80092444
+	.data       start:0x80590928 end:0x80590A60
 	.sdata2     start:0x80795F08 end:0x80795F10
 
 g3d/g3d_resfile.cpp:
-	extab       start:0x800093A8 end:0x800094E0
-	extabindex  start:0x80022158 end:0x8002232C
-	.text       start:0x80093990 end:0x800947A4 align:16
+	extab       start:0x80009290 end:0x800094E0
+	extabindex  start:0x80021FB4 end:0x8002232C
+	.text       start:0x80092444 end:0x800947A4
+	.data       start:0x80590A60 end:0x80590D78 align:32
+	.sdata      start:0x80791270 end:0x80791280
 
 g3d/g3d_resmat.cpp:
 	extab       start:0x800094E0 end:0x80009850

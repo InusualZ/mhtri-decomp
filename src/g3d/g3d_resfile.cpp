@@ -1,7 +1,10 @@
 /*
- * g3d/g3d_resfile.cpp - nw4r g3d `ResFile` container checks/releases and the out-of-line `g3d_resmat_ac.h` accessors.
- * RANGE. .text 0x80093990-0x800947A4 (53 functions); extab, extabindex.  fn_80093990's `CheckRevision()` assert
- *   passes "g3d_resfile.cpp" (lbl_80590BA0); the next body, fn_800947A4, cites "g3d_resmat.cpp".
+ * g3d/g3d_resfile.cpp - nw4r g3d `ResFile`: the root-dictionary lookups per category, the bind/release walks, the
+ *   container checks/releases and the out-of-line `g3d_resmat_ac.h` accessors.
+ * RANGE. .text 0x80092444-0x800947A4 (107 functions); extab 0x80009290-0x800094E0, extabindex
+ *   0x80021FB4-0x8002232C, .data 0x80590A60-0x80590D78 (the ten 32-aligned category names, "g3d_resfile.cpp",
+ *   then the `_ac.h` inline tail), .sdata 0x80791270-0x80791280.  The left edge is `ResFile::ref` (0x80092444,
+ *   asserts "g3d_resfile_ac.h"); the next body, fn_800947A4, cites "g3d_resmat.cpp".
  * NAMES. res_mat_ind_mtx_copy_to is a GUESS; res_mat_ind_mtx_dc_store is a GUESS; res_mat_pix_copy_to is a GUESS;
  *   res_mat_pix_dc_store is a GUESS; res_mat_tev_color_copy_to is a GUESS; res_mat_tev_color_dc_store is a GUESS;
  *   res_mat_tex_coord_gen_copy_to is a GUESS; res_mat_tex_coord_gen_dc_store is a GUESS (the evidence follows).
@@ -12,7 +15,11 @@
  * RESIDUALS. none.  The flip links because `tools/elf/objextab.py` gives the object's extab/extabindex entries the
  *   map's `@etb_`/`@eti_` names with global binding (`@eti_800222FC` is referenced from the `.data` blob at
  *   0x8057C820; playbook 59).
- * SHAPES. The `.sdata` "ref" strings are sized externs (`extern char lbl_80791294[4];`): MWCC then emits
+ * SHAPES. The lookups sit under `#pragma peephole off`; their `_ac.h` accessors are `inline` and
+ *   `__declspec(noinline)`, each placed after a dead-stripped one-call referencer (res_file_root,
+ *   res_file_anm_*_init), so the weak copies land at retail's addresses and their strings form the tail;
+ *   `ResFile::ref` names its member through a local `static char` ("ref" first in `.sdata`).  The handles are
+ *   `ResHandleTemp` class temporaries.  The resmat `.sdata` "ref" strings are sized externs (`extern char lbl_80791294[4];`): MWCC then emits
  *   `li rN, @sda21`, not `lis`/`addi`.
  */
 
@@ -35,6 +42,12 @@
 #include "g3d/g3d_cpu.h"
 #include "g3d/g3d_resfile.h"
 #include "g3d/g3d_resmat.h"
+#include "g3d/g3d_rescommon.h"
+#include "g3d/g3d_resshp.h"
+#include "fn_8004CAD8.h"
+#include "g3d/g3d_resanmamblight.h"
+#include "g3d/g3d_resanmscn.h"
+#include "g3d/g3d_anmshp.h"
 
 namespace nw4r {
 namespace db {
@@ -47,10 +60,8 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 } // namespace db
 } // namespace nw4r
 
-/* The panic file/format strings the target references as map symbols: lbl_80590BA0/lbl_80590BB0 are in
+/* The panic file/format strings the target references as map symbols: "g3d_resfile.cpp"/"NW4R:Failed assertion CheckRevision()" are in
  * `g3d/g3d_resanmtexsrt.cpp`'s `.data`, lbl_80591280/lbl_80591294 are unclaimed. */
-extern const char lbl_80590BA0[]; /* "g3d_resfile.cpp" */
-extern const char lbl_80590BB0[]; /* "NW4R:Failed assertion CheckRevision()" */
 extern const char lbl_80591280[]; /* "ResMatTexCoordGen" */
 extern const char lbl_80591294[]; /* "%s::%s: Object not valid." */
 extern const char lbl_805912B0[]; /* "g3d_resmat_ac.h" */
@@ -113,6 +124,524 @@ typedef struct {
 } ResMaterialTable; /* size: 0x8 (approximate - only +0x4 is evidenced) */
 
 /* ------------------------------------------------------------------------------------------------ */
+/* 0x80092444-0x80093990: the `ResFile` root-dictionary lookups (`GetResXxx`/`GetResXxxNumEntries` per   */
+/* category), the `_ac.h` accessors they keep out of line and the bind/release walks.                    */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* The moved block keeps retail's split `clrlwi` + `cmpwi` (no record-form `clrlwi.`). */
+#pragma peephole off
+
+/* A `ResName` dictionary key: the name's length, then the name (`.data`, one 0x20 slot each). */
+struct ResFileNameData {
+    /* +0x00 */ u32 len;
+    /* +0x04 */ char str[0x1C];
+}; /* size: 0x20 */
+
+/* The ten category keys of the `ResFile` root dictionary. */
+static ResFileNameData res_file_name_mdl __attribute__((aligned(32))) = {14, "3DModels(NW4R)"};
+static ResFileNameData res_file_name_pltt __attribute__((aligned(32))) = {14, "Palettes(NW4R)"};
+static ResFileNameData res_file_name_tex __attribute__((aligned(32))) = {14, "Textures(NW4R)"};
+static ResFileNameData res_file_name_anm_chr __attribute__((aligned(32))) = {12, "AnmChr(NW4R)"};
+static ResFileNameData res_file_name_anm_vis __attribute__((aligned(32))) = {12, "AnmVis(NW4R)"};
+static ResFileNameData res_file_name_anm_clr __attribute__((aligned(32))) = {12, "AnmClr(NW4R)"};
+static ResFileNameData res_file_name_anm_tex_pat __attribute__((aligned(32))) = {15, "AnmTexPat(NW4R)"};
+static ResFileNameData res_file_name_anm_tex_srt __attribute__((aligned(32))) = {15, "AnmTexSrt(NW4R)"};
+static ResFileNameData res_file_name_anm_shp __attribute__((aligned(32))) = {12, "AnmShp(NW4R)"};
+static ResFileNameData res_file_name_anm_scn __attribute__((aligned(32))) = {12, "AnmScn(NW4R)"};
+
+extern "C" {
+u32 fn_80092444(void* self);
+u32 fn_800924A8(u32* p);
+const char* fn_800924B0(void);
+u32 fn_800924B8(u32* p);
+u32 fn_800924CC(void* self, u32 arg);
+u32 fn_80092790(void* self, u32 arg);
+u32 fn_80092A54(void* self, u32 arg);
+u32 fn_80092C08(void* self, u32 arg);
+u32 fn_80092DBC(void* self, u32 arg);
+u32 fn_80092F70(void* self, u32 arg);
+u32 fn_80093124(void* self, u32 arg);
+u32 fn_800932D8(void* self, u32 arg);
+u32 fn_8009348C(void* self, u32 arg);
+u32 fn_800935D4(void* self, u32 arg);
+void* fn_80092B9C(u32* self, u32 ptr);
+void* fn_80092D50(u32* self, u32 ptr);
+void* fn_80092F04(u32* self, u32 ptr);
+void* fn_800930B8(u32* self, u32 ptr);
+void* fn_8009326C(u32* self, u32 ptr);
+void* fn_80093420(u32* self, u32 ptr);
+void fn_80092C00(u32* self, u32 ptr);
+void fn_80092DB4(u32* self, u32 ptr);
+void fn_80092F68(u32* self, u32 ptr);
+void fn_8009311C(u32* self, u32 ptr);
+void fn_800932D0(u32* self, u32 ptr);
+void fn_80093484(u32* self, u32 ptr);
+}
+
+/* The file's root block word; dead-stripped, it places `ResFile::ref`'s weak copy here. */
+extern "C" u32 res_file_root(void* self) /* untyped: opaque handle - the ResFile handle */
+{
+    return fn_80092444(self);
+}
+
+/* `ResFile::ref()`: the checked root block word. */
+extern "C" __declspec(noinline) inline u32 fn_80092444(void* self) {
+    static char sMember[] = "ref";
+
+    if (fn_800924B8((u32*)self) == 0) {
+        nw4r::db::Panic("g3d_resfile_ac.h", 60, "%s::%s: Object not valid.", fn_800924B0(), sMember);
+    }
+    return fn_800924A8((u32*)self);
+}
+
+/* `ResFile::ptr()`. */
+extern "C" __declspec(noinline) inline u32 fn_800924A8(u32* p) {
+    return *p;
+}
+
+/* `ResFile::GetClassName()`. */
+extern "C" __declspec(noinline) inline const char* fn_800924B0(void) {
+    return "ResFile";
+}
+
+/* `ResFile::IsValid()`. */
+extern "C" __declspec(noinline) inline u32 fn_800924B8(u32* p) {
+    return *p != 0;
+}
+
+
+
+
+
+
+/* `ResFile::GetResMdl(int)`. */
+extern "C" u32 fn_800924CC(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_mdl)];
+    if (entry != 0) {
+        return *(u32*)fn_8007B878((s32)&ResHandleTemp().self()->word, (s32)(u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)fn_8007B878((s32)&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResMdl(u32)`, forwarding to the `int` overload. */
+extern "C" void* fn_80092584(void* self, u32 arg) { return (void*)fn_800924CC(self, arg); }
+
+/* `ResFile::GetResMdlNumEntries()`. */
+extern "C" u32 fn_80092588(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_mdl)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+namespace nw4r {
+namespace g3d {
+
+u32 ResFile::GetResPltt(const char* pName) const {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444((void*)this) + 24))[nw4r::g3d::ResName((void*)&res_file_name_pltt)];
+    if (entry != 0) {
+        return *(u32*)res_pltt_ctor(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[pName]);
+    }
+    return *(u32*)res_pltt_ctor(&ResHandleTemp().self()->word, 0);
+}
+
+/* 0x800926CC (0xC4): looks `name` up in the file's palette dictionary. */
+ResPltt ResFile::GetResPltt(const ResName name) const {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(const_cast<ResFile*>(this)) + 24))[nw4r::g3d::ResName((void*)&res_file_name_pltt)];
+    if (entry != 0) {
+        return *reinterpret_cast<ResPltt*>(res_pltt_ctor(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[name]));
+    }
+    return *reinterpret_cast<ResPltt*>(res_pltt_ctor(&ResHandleTemp().self()->word, 0));
+}
+
+}  // namespace g3d
+}  // namespace nw4r
+
+/* `ResFile::GetResPltt(int)`. */
+extern "C" u32 fn_80092790(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_pltt)];
+    if (entry != 0) {
+        return *(u32*)res_pltt_ctor(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)res_pltt_ctor(&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResPltt(u32)`. */
+extern "C" void* fn_80092848(void* self, u32 arg) { return (void*)fn_80092790(self, arg); }
+
+/* `ResFile::GetResPlttNumEntries()`. */
+extern "C" u32 fn_8009284C(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_pltt)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+namespace nw4r {
+namespace g3d {
+
+u32 ResFile::GetResTex(const char* pName) const {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444((void*)this) + 24))[nw4r::g3d::ResName((void*)&res_file_name_tex)];
+    if (entry != 0) {
+        return *(u32*)res_tex_ctor(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[pName]);
+    }
+    return *(u32*)res_tex_ctor(&ResHandleTemp().self()->word, 0);
+}
+
+/* 0x80092990 (0xC4): looks `name` up in the file's texture dictionary. */
+ResTex ResFile::GetResTex(const ResName name) const {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(const_cast<ResFile*>(this)) + 24))[nw4r::g3d::ResName((void*)&res_file_name_tex)];
+    if (entry != 0) {
+        return *reinterpret_cast<ResTex*>(res_tex_ctor(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[name]));
+    }
+    return *reinterpret_cast<ResTex*>(res_tex_ctor(&ResHandleTemp().self()->word, 0));
+}
+
+}  // namespace g3d
+}  // namespace nw4r
+
+/* `ResFile::GetResTex(int)`. */
+extern "C" u32 fn_80092A54(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_tex)];
+    if (entry != 0) {
+        return *(u32*)res_tex_ctor(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)res_tex_ctor(&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResTex(u32)`. */
+extern "C" void* fn_80092B0C(void* self, u32 arg) { return (void*)fn_80092A54(self, arg); }
+
+/* `ResFile::GetResTexNumEntries()`. */
+extern "C" u32 fn_80092B10(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_tex)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+/* Constructs a `ResAnmChr` handle; dead-stripped, it places the inline constructor's weak copy here. */
+extern "C" void* res_file_anm_chr_init(u32* self, u32 ptr) /* untyped: opaque handle - the constructed resource handle */
+{
+    return fn_80092B9C(self, ptr);
+}
+
+/* `ResAnmChr(void*)`: stores the block pointer and asserts its 4-byte alignment. */
+extern "C" __declspec(noinline) inline void* fn_80092B9C(u32* self, u32 ptr) {
+    fn_80092C00(self, ptr);
+    if ((ptr & 3) != 0) {
+        nw4r::db::Panic("g3d_resanmchr_ac.h", 39, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+    return self;
+}
+
+/* `ResCommon<ResAnmChrData>(void*)`. */
+extern "C" __declspec(noinline) inline void fn_80092C00(u32* self, u32 ptr) { *self = ptr; }
+
+
+
+
+/* `ResFile::GetResAnmChr(int)`. */
+extern "C" u32 fn_80092C08(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_chr)];
+    if (entry != 0) {
+        return *(u32*)fn_80092B9C(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)fn_80092B9C(&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResAnmChr(u32)`. */
+extern "C" void* fn_80092CC0(void* self, u32 arg) { return (void*)fn_80092C08(self, arg); }
+
+/* `ResFile::GetResAnmChrNumEntries()`. */
+extern "C" u32 fn_80092CC4(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_chr)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+/* Constructs a `ResAnmVis` handle; dead-stripped, it places the inline constructor's weak copy here. */
+extern "C" void* res_file_anm_vis_init(u32* self, u32 ptr) /* untyped: opaque handle - the constructed resource handle */
+{
+    return fn_80092D50(self, ptr);
+}
+
+/* `ResAnmVis(void*)`. */
+extern "C" __declspec(noinline) inline void* fn_80092D50(u32* self, u32 ptr) {
+    fn_80092DB4(self, ptr);
+    if ((ptr & 3) != 0) {
+        nw4r::db::Panic("g3d_resanmvis_ac.h", 39, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+    return self;
+}
+
+/* `ResCommon<ResAnmVisData>(void*)`. */
+extern "C" __declspec(noinline) inline void fn_80092DB4(u32* self, u32 ptr) { *self = ptr; }
+
+
+
+
+/* `ResFile::GetResAnmVis(int)`. */
+extern "C" u32 fn_80092DBC(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_vis)];
+    if (entry != 0) {
+        return *(u32*)fn_80092D50(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)fn_80092D50(&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResAnmVis(u32)`. */
+extern "C" void* fn_80092E74(void* self, u32 arg) { return (void*)fn_80092DBC(self, arg); }
+
+/* `ResFile::GetResAnmVisNumEntries()`. */
+extern "C" u32 fn_80092E78(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_vis)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+/* Constructs a `ResAnmClr` handle; dead-stripped, it places the inline constructor's weak copy here. */
+extern "C" void* res_file_anm_clr_init(u32* self, u32 ptr) /* untyped: opaque handle - the constructed resource handle */
+{
+    return fn_80092F04(self, ptr);
+}
+
+/* `ResAnmClr(void*)`. */
+extern "C" __declspec(noinline) inline void* fn_80092F04(u32* self, u32 ptr) {
+    fn_80092F68(self, ptr);
+    if ((ptr & 3) != 0) {
+        nw4r::db::Panic("g3d_resanmclr_ac.h", 39, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+    return self;
+}
+
+/* `ResCommon<ResAnmClrData>(void*)`. */
+extern "C" __declspec(noinline) inline void fn_80092F68(u32* self, u32 ptr) { *self = ptr; }
+
+
+
+
+/* `ResFile::GetResAnmClr(int)`. */
+extern "C" u32 fn_80092F70(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_clr)];
+    if (entry != 0) {
+        return *(u32*)fn_80092F04(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)fn_80092F04(&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResAnmClr(u32)`. */
+extern "C" void* fn_80093028(void* self, u32 arg) { return (void*)fn_80092F70(self, arg); }
+
+/* `ResFile::GetResAnmClrNumEntries()`. */
+extern "C" u32 fn_8009302C(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_clr)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+/* Constructs a `ResAnmTexPat` handle; dead-stripped, it places the inline constructor's weak copy here. */
+extern "C" void* res_file_anm_tex_pat_init(u32* self, u32 ptr) /* untyped: opaque handle - the constructed resource handle */
+{
+    return fn_800930B8(self, ptr);
+}
+
+/* `ResAnmTexPat(void*)`. */
+extern "C" __declspec(noinline) inline void* fn_800930B8(u32* self, u32 ptr) {
+    fn_8009311C(self, ptr);
+    if ((ptr & 3) != 0) {
+        nw4r::db::Panic("g3d_resanmtexpat_ac.h", 92, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+    return self;
+}
+
+/* `ResCommon<ResAnmTexPatData>(void*)`. */
+extern "C" __declspec(noinline) inline void fn_8009311C(u32* self, u32 ptr) { *self = ptr; }
+
+
+
+
+/* `ResFile::GetResAnmTexPat(int)`. */
+extern "C" u32 fn_80093124(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_tex_pat)];
+    if (entry != 0) {
+        return *(u32*)fn_800930B8(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)fn_800930B8(&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResAnmTexPat(u32)`. */
+extern "C" void* fn_800931DC(void* self, u32 arg) { return (void*)fn_80093124(self, arg); }
+
+/* `ResFile::GetResAnmTexPatNumEntries()`. */
+extern "C" u32 fn_800931E0(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_tex_pat)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+/* Constructs a `ResAnmTexSrt` handle; dead-stripped, it places the inline constructor's weak copy here. */
+extern "C" void* res_file_anm_tex_srt_init(u32* self, u32 ptr) /* untyped: opaque handle - the constructed resource handle */
+{
+    return fn_8009326C(self, ptr);
+}
+
+/* `ResAnmTexSrt(void*)`. */
+extern "C" __declspec(noinline) inline void* fn_8009326C(u32* self, u32 ptr) {
+    fn_800932D0(self, ptr);
+    if ((ptr & 3) != 0) {
+        nw4r::db::Panic("g3d_resanmtexsrt_ac.h", 38, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+    return self;
+}
+
+/* `ResCommon<ResAnmTexSrtData>(void*)`. */
+extern "C" __declspec(noinline) inline void fn_800932D0(u32* self, u32 ptr) { *self = ptr; }
+
+
+
+
+/* `ResFile::GetResAnmTexSrt(int)`. */
+extern "C" u32 fn_800932D8(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_tex_srt)];
+    if (entry != 0) {
+        return *(u32*)fn_8009326C(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)fn_8009326C(&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResAnmTexSrt(u32)`. */
+extern "C" void* fn_80093390(void* self, u32 arg) { return (void*)fn_800932D8(self, arg); }
+
+/* `ResFile::GetResAnmTexSrtNumEntries()`. */
+extern "C" u32 fn_80093394(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_tex_srt)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+/* Constructs a `ResAnmShp` handle; dead-stripped, it places the inline constructor's weak copy here. */
+extern "C" void* res_file_anm_shp_init(u32* self, u32 ptr) /* untyped: opaque handle - the constructed resource handle */
+{
+    return fn_80093420(self, ptr);
+}
+
+/* `ResAnmShp(void*)`. */
+extern "C" __declspec(noinline) inline void* fn_80093420(u32* self, u32 ptr) {
+    fn_80093484(self, ptr);
+    if ((ptr & 3) != 0) {
+        nw4r::db::Panic("g3d_resanmshp_ac.h", 166, "NW4R:Failed assertion !((u32)p & 0x3)");
+    }
+    return self;
+}
+
+/* `ResCommon<ResAnmShpData>(void*)`. */
+extern "C" __declspec(noinline) inline void fn_80093484(u32* self, u32 ptr) { *self = ptr; }
+
+
+
+
+/* `ResFile::GetResAnmShp(int)`. */
+extern "C" u32 fn_8009348C(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_shp)];
+    if (entry != 0) {
+        return *(u32*)fn_80093420(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)fn_80093420(&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResAnmShp(u32)`. */
+extern "C" void* fn_80093544(void* self, u32 arg) { return (void*)fn_8009348C(self, arg); }
+
+/* `ResFile::GetResAnmShpNumEntries()`. */
+extern "C" u32 fn_80093548(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_shp)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+/* `ResFile::GetResAnmScn(int)`. */
+extern "C" u32 fn_800935D4(void* self, u32 arg) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_scn)];
+    if (entry != 0) {
+        return *(u32*)fn_80089F94(&ResHandleTemp().self()->word, (u32)nw4r::g3d::ResDic((void*)entry)[(int)arg]);
+    }
+    return *(u32*)fn_80089F94(&ResHandleTemp().self()->word, 0);
+}
+
+/* `ResFile::GetResAnmScn(u32)`. */
+extern "C" void* fn_8009368C(void* self, u32 arg) { return (void*)fn_800935D4(self, arg); }
+
+/* `ResFile::GetResAnmScnNumEntries()`. */
+extern "C" u32 fn_80093690(void* self) {
+    u32 entry = (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_scn)];
+    if (entry != 0) {
+        return nw4r::g3d::ResDic((void*)entry).GetNumData();
+    }
+    return 0;
+}
+
+/* Whether the file has an `AnmChr` category. */
+extern "C" u32 fn_8009371C(void* self) {
+    return (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_chr)] != 0;
+}
+
+/* Whether the file has an `AnmTexSrt` category. */
+extern "C" u32 fn_80093794(void* self) {
+    return (u32)nw4r::g3d::ResDic((void*)(fn_80092444(self) + 24))[nw4r::g3d::ResName((void*)&res_file_name_anm_tex_srt)] != 0;
+}
+
+/* Binds every model and scene animation of the file against `arg`; false when one fails. */
+extern "C" u32 fn_8009380C(void* self, u32* arg) {
+    u32 i;
+    u32 present = 1;
+    u32 count = fn_80092588(self);
+    for (i = 0; i < count; i++) {
+        present = reinterpret_cast<nw4r::g3d::ResMdl*>(ResHandleTemp().set((u32)fn_80092584(self, i)))
+                      ->Bind(*reinterpret_cast<const nw4r::g3d::ResFile*>(ResHandleTemp().set(*arg))) &&
+                  present;
+    }
+
+    u32 count2 = fn_800931E0(self);
+    for (i = 0; i < count2; i++) {
+        present = fn_800913A0(ResHandleTemp().set((u32)fn_800931DC(self, i)), ResHandleTemp().set(*arg));
+    }
+    return present;
+}
+
+/* Releases every model and scene animation of the file. */
+extern "C" void CleanUpTracks(void* self) {
+    u32 count = fn_80092588(self);
+    for (u32 i = 0; i < count; i++) {
+        void* value = fn_80092584(self, i);
+        reinterpret_cast<nw4r::g3d::ResMdl*>(&value)->Release();
+    }
+
+    u32 count2 = fn_800931E0(self);
+    for (u32 i = 0; i < count2; i++) {
+        void* value = fn_800931DC(self, i);
+        fn_80091628(&value);
+    }
+}
+
+#pragma peephole reset
+
+/* ------------------------------------------------------------------------------------------------ */
 /* The unit's own functions, in address order.                                                        */
 /* ------------------------------------------------------------------------------------------------ */
 
@@ -153,7 +682,7 @@ extern "C" u32 fn_8009466C(ResHandle* p);
  * three object categories through its own helper. */
 extern "C" void fn_80093990(ResHandle* pSelf) {
     if (fn_80093B0C(pSelf) == 0) {
-        nw4r::db::Panic(lbl_80590BA0, 0xDF, lbl_80590BB0);
+        nw4r::db::Panic("g3d_resfile.cpp", 0xDF, "NW4R:Failed assertion CheckRevision()");
     }
 
     u32 count = fn_80092588(pSelf);
